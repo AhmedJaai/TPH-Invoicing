@@ -17,6 +17,7 @@
     "drive:inventory": "tsx --env-file=.env scripts/drive-inventory.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
     "@auth/drizzle-adapter": "^1.11.3",
     "drizzle-orm": "^0.45.2",
     "googleapis": "^178.0.0",

@@ -1,7 +1,8 @@
 import { db } from "@/db";
 import { suppliers } from "@/db/schema";
 import { asc } from "drizzle-orm";
-import { Analyzer, type SupplierRef } from "@/components/analyzer";
+import { Uploader } from "@/components/uploader";
+import type { SupplierRef } from "@/components/analyzer";
 
 export const dynamic = "force-dynamic";
 
@@ -61,14 +62,14 @@ export default async function Home() {
           من أول يوم.
         </h1>
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-ink-soft">
-          جرّب الآن: اسحب أي ملف من أرشيفك وسيقرأ النظام اسمه ويحدّد المورد والمبلغ والشهر
-          والمجلد الذي يخصّه. الاستخراج الذكي من داخل الفاتورة والرفع التلقائي يبدآن في المرحلة
-          الثانية.
+          ارفع الفاتورة كما وصلتك من واتساب — باسمها العشوائي أو صورةً بجوالك. يقرأ النظام
+          المستند نفسه، ويستخرج المورد والرقم والتاريخ والمبالغ، ويسمّيه ويحدّد مجلده،
+          ويعرض كل ذلك للتعديل قبل أن يُحفظ شيء.
         </p>
 
         <div className="mt-8">
           {data.ok ? (
-            <Analyzer suppliers={rows} />
+            <Uploader />
           ) : (
             <div className="rounded-xl border border-line bg-danger-bg p-4 text-sm text-danger">
               تعذّر الاتصال بقاعدة البيانات: {data.message}
