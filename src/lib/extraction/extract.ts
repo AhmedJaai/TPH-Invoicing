@@ -7,7 +7,13 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { extractionSchema, type ExtractionResult } from "./schema";
+import { extractionSchema } from "./schema";
+import {
+  buildInstructions,
+  type ExtractionOutcome,
+  type ExtractionProvider,
+  type ExtractionRequest,
+} from "./provider";
 
 export const EXTRACTION_MODEL = "claude-opus-5";
 
@@ -19,52 +25,16 @@ export function isSupportedUpload(mimeType: string): boolean {
   return mimeType === PDF_TYPE || (SUPPORTED_IMAGE_TYPES as readonly string[]).includes(mimeType);
 }
 
-function buildSystemPrompt(companyVat: string, companyName: string, supplierNames: string[]): string {
-  return `أنت مساعد محاسبي دقيق في ${companyName}، مقهى في جدة. مهمتك قراءة مستند مالي واستخراج حقوله حرفياً.
-
-الرقم الضريبي لمنشأتنا: ${companyVat}
-نحن دائماً المشتري في هذه المستندات، لا البائع.
-
-موردونا المعروفون: ${supplierNames.join(" · ")}
-
-قواعد الاستخراج:
-- انسخ الأرقام كما هي حرفياً. لا تحسب ولا تصحّح ولا تستنتج مبلغاً غائباً.
-- إن كان المبلغ غير واضح أو مقطوعاً، اتركه فارغاً واخفض الثقة. الفراغ أأمن من التخمين.
-- ميّز الرقم الضريبي للبائع عن رقم المشتري بموضعه في المستند لا بشكله. رقمنا ${companyVat} هو رقم المشتري دائماً.
-- المستند الذي يحمل «عرض سعر» أو Quotation أو Proforma ليس فاتورة مهما شابهها.
-- المستند الذي يجمع عدة عمليات بتواريخ مختلفة ورصيد مُدوَّر هو كشف حساب لا فاتورة.
-- التاريخ بصيغة YYYY-MM-DD ميلادية. إن لم يظهر إلا التاريخ الهجري فحوّله واخفض ثقة التاريخ.
-- الثقة تقديرك الصادق للوضوح: المستند الممسوح بجودة رديئة ثقته منخفضة ولو قرأتَه.`;
-}
-
-export interface ExtractionInput {
-  data: Buffer;
-  mimeType: string;
-  companyVat: string;
-  companyName: string;
-  supplierNames: string[];
-}
-
-export interface ExtractionOutcome {
-  ok: true;
-  value: ExtractionResult;
-  model: string;
-  usage: { inputTokens: number; outputTokens: number };
-}
-
-export interface ExtractionFailure {
-  ok: false;
-  reason: string;
-}
-
-export async function extractDocument(
-  input: ExtractionInput,
-): Promise<ExtractionOutcome | ExtractionFailure> {
+async function extractWithClaude(input: ExtractionRequest): Promise<ExtractionOutcome> {
   if (!process.env.ANTHROPIC_API_KEY) {
-    return { ok: false, reason: "مفتاح ANTHROPIC_API_KEY غير مضبوط. أضفه إلى ملف .env" };
+    return {
+      ok: false,
+      provider: "claude",
+      reason: "مفتاح ANTHROPIC_API_KEY غير مضبوط. أضفه إلى .env أو بدّل إلى المزوّد المحلي المجاني بـEXTRACTION_PROVIDER=ollama",
+    };
   }
   if (!isSupportedUpload(input.mimeType)) {
-    return { ok: false, reason: `نوع ملف غير مدعوم: ${input.mimeType}` };
+    return { ok: false, provider: "claude", reason: `نوع ملف غير مدعوم: ${input.mimeType}` };
   }
 
   const client = new Anthropic();
@@ -92,7 +62,7 @@ export async function extractDocument(
       system: [
         {
           type: "text",
-          text: buildSystemPrompt(input.companyVat, input.companyName, input.supplierNames),
+          text: buildInstructions(input.companyVat, input.companyName, input.supplierNames),
           // التعليمات ثابتة عبر كل الرفعات — تخزينها يخفض الكلفة كثيراً
           cache_control: { type: "ephemeral" },
         },
@@ -110,17 +80,18 @@ export async function extractDocument(
     });
 
     if (response.stop_reason === "refusal") {
-      return { ok: false, reason: "رفض النموذج معالجة هذا الملف. راجعه يدوياً." };
+      return { ok: false, provider: "claude", reason: "رفض النموذج معالجة هذا الملف. راجعه يدوياً." };
     }
     if (response.stop_reason === "max_tokens") {
-      return { ok: false, reason: "المستند أطول من المتوقع ولم يكتمل استخراجه." };
+      return { ok: false, provider: "claude", reason: "المستند أطول من المتوقع ولم يكتمل استخراجه." };
     }
     if (!response.parsed_output) {
-      return { ok: false, reason: "تعذّر تحليل مخرجات النموذج." };
+      return { ok: false, provider: "claude", reason: "تعذّر تحليل مخرجات النموذج." };
     }
 
     return {
       ok: true,
+      provider: "claude",
       value: response.parsed_output,
       model: response.model,
       usage: {
@@ -130,14 +101,20 @@ export async function extractDocument(
     };
   } catch (error) {
     if (error instanceof Anthropic.RateLimitError) {
-      return { ok: false, reason: "تجاوزنا حدّ الطلبات. أعد المحاولة بعد قليل." };
+      return { ok: false, provider: "claude", reason: "تجاوزنا حدّ الطلبات. أعد المحاولة بعد قليل." };
     }
     if (error instanceof Anthropic.AuthenticationError) {
-      return { ok: false, reason: "مفتاح Anthropic غير صالح." };
+      return { ok: false, provider: "claude", reason: "مفتاح Anthropic غير صالح." };
     }
     if (error instanceof Anthropic.APIError) {
-      return { ok: false, reason: `خطأ من واجهة Claude (${error.status}): ${error.message}` };
+      return { ok: false, provider: "claude", reason: `خطأ من واجهة Claude (${error.status}): ${error.message}` };
     }
-    return { ok: false, reason: `خطأ غير متوقع: ${(error as Error).message}` };
+    return { ok: false, provider: "claude", reason: `خطأ غير متوقع: ${(error as Error).message}` };
   }
 }
+
+export const claudeProvider: ExtractionProvider = {
+  name: "claude",
+  isConfigured: () => Boolean(process.env.ANTHROPIC_API_KEY),
+  extract: extractWithClaude,
+};

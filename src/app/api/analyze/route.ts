@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, supplierAliases, suppliers } from "@/db/schema";
-import { extractDocument, isSupportedUpload } from "@/lib/extraction/extract";
+import { extractDocument, isSupportedUpload } from "@/lib/extraction";
 import { runPipeline } from "@/lib/extraction/pipeline";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import { companyConfig } from "@/config/drive";
@@ -126,6 +126,7 @@ export async function POST(request: Request) {
     sizeBytes: file.size,
     sha256,
     model: extraction.model,
+    provider: extraction.provider,
     usage: extraction.usage,
     extraction: extraction.value,
     supplierMatch: {
