@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/*
+ * نظام لوني عالي التباين: أبيض وأسود خالصان.
+ * الرمادي للنص الثانوي والحدود فقط، واللون محجوز للحالات وحدها
+ * حتى يبقى التنبيه ملحوظاً لأنه الملوّن الوحيد في الشاشة.
+ */
+:root {
+  --surface: #ffffff;
+  --raised: #ffffff;
+  --sunken: #f4f4f5;
+  --ink: #000000;
+  --ink-soft: #52525b;
+  --muted: #8b8b93;
+  --line: #e4e4e7;
+  --line-strong: #000000;
+  --inverse-surface: #000000;
+  --inverse-ink: #ffffff;
+
+  --ok: #067647;
+  --ok-bg: #ecfdf3;
+  --warn: #b54708;
+  --warn-bg: #fffaeb;
+  --danger: #b42318;
+  --danger-bg: #fef3f2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #000000;
+    --raised: #0a0a0b;
+    --sunken: #131316;
+    --ink: #ffffff;
+    --ink-soft: #a1a1aa;
+    --muted: #71717a;
+    --line: #26262b;
+    --line-strong: #ffffff;
+    --inverse-surface: #ffffff;
+    --inverse-ink: #000000;
+
+    --ok: #4ade80;
+    --ok-bg: #052e1a;
+    --warn: #fbbf24;
+    --warn-bg: #2e1f05;
+    --danger: #f87171;
+    --danger-bg: #2e0f0d;
+  }
+}
+
+@theme inline {
+  --font-sans: var(--font-thmanyah), system-ui, sans-serif;
+  --font-display: var(--font-thmanyah-display), var(--font-thmanyah), serif;
+
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-inverse-surface: var(--inverse-surface);
+  --color-inverse-ink: var(--inverse-ink);
+
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--surface);
+  color: var(--ink);
+  /* مساحة آمنة أسفل شاشات الآيفون ذات الشريط السفلي */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* الأرقام في الجداول المالية بعرض ثابت حتى تصطفّ الخانات */
+.nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* منطقة الإفلات حين يُسحب ملف فوقها */
+.dropping {
+  border-color: var(--ink);
+  background: var(--sunken);
+}

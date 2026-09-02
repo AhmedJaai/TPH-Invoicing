@@ -1,0 +1,11 @@
+{
+  "name": "فواتير ذا بوبليك هاوس",
+  "short_name": "الفواتير",
+  "description": "نظام إدارة دورة الفواتير",
+  "start_url": "/",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "ar",
+  "background_color": "#ffffff",
+  "theme_color": "#000000"
+}
