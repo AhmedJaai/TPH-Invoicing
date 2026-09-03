@@ -404,10 +404,14 @@ async function main() {
          * ثقة ١٫٠ كاملة. فالثقة لا تحرس من الاختراع، والرقم المخترع في نظام
          * محاسبي أسوأ من غيابه. يُترك ليُدخله إنسان.
          */
+        // الكشف وعرض السعر لا يُقيَّدان أصلاً، فرسالتهما غير رسالة الفاتورة
+        const isInvoiceKind = ["TAX_INVOICE", "SIMPLIFIED_INVOICE"].includes(x.documentKind);
         outcomes.push({
           fileName: t.fileName,
           status: "skipped",
-          detail: `${x.documentKind} — لا رقم فاتورة في اسم الملف، أدخله يدوياً`,
+          detail: isInvoiceKind
+            ? "فاتورة بلا رقم في اسم الملف — أدخل الرقم يدوياً ليُقيَّد"
+            : `${x.documentKind} — لا يُقيَّد فاتورة`,
         });
       } else if (review.canCreateInvoice && supplierId) {
         const [inv] = await tx.insert(invoices).values({

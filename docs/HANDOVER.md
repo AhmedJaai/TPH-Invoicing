@@ -8,6 +8,43 @@
 
 ---
 
+## REVISION 2 — 2026-09-03, later the same day
+
+The report below was written before a remediation pass. **Sections 1 and 3–15 remain accurate as descriptions of architecture and mechanism. The following facts changed.** Where a section below contradicts this block, this block is current.
+
+**Fixed**
+
+| Was | Now |
+|---|---|
+| `/api/archive` trusted client-supplied `isTaxValid` / `inputVatEligible` / `isFixedAsset` / `findings` (§2 BROKEN #1, §10.1) | Server recomputes all of them in `src/lib/confirm.ts` (`reviewConfirmed`, 13 tests) before the Drive upload. Client flags are ignored; the blocker gate uses server findings. |
+| Silent invoice loss when `total` or the invoice number was unparseable (§2 BROKEN #3) | Rejected with `409` and an explicit message naming what is missing. Nothing reaches Drive. |
+| `TaxInvoice` missing from `TYPE_TOKENS` (§2 BROKEN #4) | Added. The 11,600 SAR SardTrading invoice is now in the database. |
+| `mark-paid` / `bank-import` writing `action: "DOCUMENT_ARCHIVED"` (§2 BROKEN #7) | Now `INVOICES_MARKED_PAID` and `BANK_IMPORTED`; `DRIVE_SYNCED` and `SUPPLIER_ALIAS_LEARNED` added. |
+| `invoice_lines` held 1 row; 122/123 invoices had `vat = 0` (§2 PARTIAL) | Content backfill read **140 archive files with 0 failures**. See the new counts below. |
+| 153/154 documents had `sha256 = NULL` (§2 PARTIAL) | All **157** documents now hashed and carry `extraction_json`. |
+| No in-app Drive refresh (§2 PLANNED) | `POST /api/drive-sync` + a "افحص الدرايف عن ملفات جديدة" panel on `/`. Diffs Drive file IDs against `documents`, recent-3-months by default, reads content for files whose names can't be parsed. Shared walker in `src/lib/drive-sync.ts`; import planner in `src/lib/archive-import.ts` (8 tests). |
+| No way to teach bank beneficiary names (§19 P1 #9) | `POST /api/supplier-alias` + a per-transaction supplier dropdown and editable alias field on `/bank`, pre-filled by `suggestAlias()`. Saves as `kind: BANK_BENEFICIARY, source: LEARNED`, then "re-match with the new names". |
+
+**New live counts (verified by SELECT)**
+
+`users 1 · suppliers 24 · supplier_aliases 86 · documents 157 (all hashed, all extracted) · invoices 126 · invoice_lines 291 (108 distinct items) · statements 11 · statement_lines 0 · payments 27 · payment_allocations 47 · bank_imports 1 · bank_transactions 1428 · issues 0 · month_closes 0 · audit_logs 2`
+
+`invoices`: total **130,178.41 SAR** · `is_tax_valid` **56** (was 1) · `vat_minor > 0` **65** (was 1) · fixed assets 5 · **recoverable input VAT 11,158.82 SAR** · **VAT at risk 1,414.87 SAR across 9 invoices** (previously reported as a false "0").
+
+Tests: **240 passing, 17 files** (was 215/15).
+
+**New finding — the model fabricates invoice numbers with confidence 1.0.** On an invoice carrying no printed number, `gemini-3.5-flash-lite` returned `TPH-20260521` — assembled from the company's initials and the date — and reported `confidence.invoiceNumber = 1.0`. **Model self-reported confidence is therefore not a usable guard against fabrication.** Mitigation applied: the backfill never takes an invoice number from the model for a document that came from the archive; such documents are reported for manual entry. The one fabricated row was deleted. An explicit prohibition was added to the shared prompt.
+
+**New finding — Gemini free tier is 20 requests per DAY per model**, not per minute (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, quotaValue 20, for `gemini-3.8-flash`, which is what `gemini-flash-latest` resolves to). Quotas are per-model and independent, so `scripts/backfill-content.ts` rotates through seven models (`GEMINI_MODELS`) and exits cleanly when all are exhausted, resuming on the next run. This is a hard constraint on any future bulk re-read.
+
+**Backfill safety rule (unchanged, and it earned its keep):** the script never writes an amount over one a human wrote in a filename. Three files disagreed and were reported, not overwritten — `CoffeeLabs V405523` (678.10 vs 678.00), and two Rawnah invoices whose totals the model could not read.
+
+**Still open from §16/§19:** statement reconciliation, month close, alerts, accounting export, documents browser, issues UI, supplier CRUD, rate limiting, generated migrations, `AUTH_BYPASS` present in production, key rotation, and the preview-vs-production database question.
+
+Revised production readiness: **~68%** (from ~55%). The write-path integrity hole is closed and the data is real; the remaining gap is missing subsystems and operational hardening, not architecture.
+
+---
+
 ## 1. EXECUTIVE SUMMARY
 
 ### What is this application?
