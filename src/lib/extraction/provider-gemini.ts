@@ -92,7 +92,13 @@ const GEMINI_SCHEMA = {
 const RETRYABLE = new Set([429, 500, 502, 503, 504]);
 const MAX_ATTEMPTS = 4;
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** أساس التباعد بين المحاولات. يُضبط صفراً في الاختبارات فلا تنتظر. */
+function retryBaseMs(): number {
+  const raw = Number(process.env.GEMINI_RETRY_BASE_MS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : 1000;
+}
+
+const wait = (ms: number) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
 
 const SUPPORTED = [
   "application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif",
@@ -162,7 +168,7 @@ export const geminiProvider: ExtractionProvider = {
         lastError = (e as Error).message;
         response = null;
         if (attempt < MAX_ATTEMPTS) {
-          await wait(1000 * 2 ** (attempt - 1));
+          await wait(retryBaseMs() * 2 ** (attempt - 1));
           continue;
         }
         return { ok: false, provider: "gemini", reason: `تعذّر الاتصال بجيميني: ${lastError}` };
@@ -171,7 +177,7 @@ export const geminiProvider: ExtractionProvider = {
       if (response.ok) break;
 
       if (RETRYABLE.has(response.status) && attempt < MAX_ATTEMPTS) {
-        await wait(1000 * 2 ** (attempt - 1));
+        await wait(retryBaseMs() * 2 ** (attempt - 1));
         continue;
       }
       break;

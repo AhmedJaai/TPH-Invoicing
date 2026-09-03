@@ -55,7 +55,10 @@ describe("اختيار المزوّد", () => {
 
 describe("مزوّد جيميني", () => {
   const original = process.env.GEMINI_API_KEY;
-  beforeEach(() => { process.env.GEMINI_API_KEY = "test-key"; });
+  beforeEach(() => {
+    process.env.GEMINI_API_KEY = "test-key";
+    process.env.GEMINI_RETRY_BASE_MS = "0"; // بلا انتظار في الاختبارات
+  });
   afterEach(() => {
     if (original === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = original;
@@ -123,6 +126,48 @@ describe("مزوّد جيميني", () => {
 
   it("يرفض نوع ملف غير مدعوم", async () => {
     const r = await geminiProvider.extract({ ...request, mimeType: "text/plain" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("يعيد المحاولة على الضغط العابر ثم ينجح", async () => {
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => {
+      calls++;
+      if (calls < 3) {
+        return { ok: false, status: 503, json: async () => ({}), text: async () => "busy" } as unknown as Response;
+      }
+      return {
+        ok: true, status: 200,
+        json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(VALID) }] }, finishReason: "STOP" }] }),
+        text: async () => "",
+      } as unknown as Response;
+    }));
+
+    const r = await geminiProvider.extract(request);
+    expect(calls).toBe(3);
+    expect(r.ok).toBe(true);
+  });
+
+  it("يستسلم بعد أربع محاولات ويقول ذلك صراحةً", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      { ok: false, status: 503, json: async () => ({}), text: async () => "busy" } as unknown as Response,
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const r = await geminiProvider.extract(request);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain("ضغط شديد");
+  });
+
+  it("لا يعيد المحاولة على خطأ دائم مثل 404", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      { ok: false, status: 404, json: async () => ({}), text: async () => "no model" } as unknown as Response,
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const r = await geminiProvider.extract(request);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(r.ok).toBe(false);
   });
 });
