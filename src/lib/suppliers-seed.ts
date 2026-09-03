@@ -28,7 +28,11 @@ export interface SupplierSeed {
 
 export const SUPPLIER_SEED: SupplierSeed[] = [
   { slug: "OliveLeaves", driveFolderName: "Olive Leaves", nameAr: "أوراق الزيتون", nameEn: "Olive Leaves", category: "FOOD" },
-  { slug: "AVAL", driveFolderName: "AVAL (Badr)", nameAr: "أفال — بدر", nameEn: "AVAL", category: "COFFEE" },
+  {
+    slug: "AVAL", driveFolderName: "AVAL (Badr)", nameAr: "أفال — بدر", nameEn: "AVAL", category: "COFFEE",
+    bankAliases: ["شركة إيفال بي بي إس", "إيفال", "ايفال"],
+    notes: "تظهر في البنك باسم «شركة إيفال بي بي إس»",
+  },
   { slug: "Zacopack", driveFolderName: "Zacopack", nameAr: "زاكوباك", nameEn: "Zacopack", category: "PACKAGING" },
   { slug: "GoldenCup", driveFolderName: "Golden Cup Factory", nameAr: "مصنع الكوب الذهبي", nameEn: "Golden Cup Factory", category: "PACKAGING" },
   { slug: "WesternRoastery", driveFolderName: "Western Roastery", nameAr: "المحمصة الغربية", nameEn: "Western Roastery", category: "COFFEE" },
@@ -36,18 +40,18 @@ export const SUPPLIER_SEED: SupplierSeed[] = [
   { slug: "CoffeeLabs", driveFolderName: "Coffee Labs (مختبرات القهوة)", nameAr: "مختبرات القهوة", nameEn: "Coffee Labs", category: "COFFEE" },
   {
     slug: "BeCof", driveFolderName: "BeCof (بيكوف)", nameAr: "بيكوف", nameEn: "BeCof", category: "COFFEE",
-    bankAliases: ["KHALID SAED BN MAHFUS TRADING"],
-    notes: "اسم المستفيد في البنك يخالف اسم المورد تماماً",
+    bankAliases: ["KHALID SAED BN MAHFUS TRADING", "خالد سعيد بن محفوظ", "محفوظ"],
+    notes: "تظهر في البنك باسم «خالد سعيد بن محفوظ للتجارة»",
   },
   {
     slug: "Loreva", driveFolderName: "Loreva Cake", nameAr: "لوريفا كيك", nameEn: "Loreva Cake", category: "FOOD",
-    bankAliases: ["MaqamAlThiqa"],
-    notes: "اسم المستفيد مستخرج من ملفات الإيصالات في الأرشيف",
+    bankAliases: ["MaqamAlThiqa", "مقام الثقة", "الثقة"],
+    notes: "تظهر في البنك باسم «مقام الثقة»",
   },
   {
     slug: "Ganache", driveFolderName: "Ganache (AGK)", nameAr: "غاناش", nameEn: "Ganache AGK", category: "FOOD",
-    bankAliases: ["Khashoggi"],
-    notes: "اسم المستفيد مستخرج من ملفات الإيصالات في الأرشيف",
+    bankAliases: ["Khashoggi", "شركة أنس غالب حمزة خاشقجي التجارية المحدودة", "خاشقجي"],
+    notes: "تظهر في البنك باسم «شركة أنس غالب حمزة خاشقجي التجارية» — لا باسم غاناش",
   },
   { slug: "KohiRoastary", driveFolderName: "Kohi Roastary", nameAr: "كوهي روستري", nameEn: "Kohi Roastary", category: "COFFEE" },
   { slug: "Rawnah", driveFolderName: "Rawnah (رونة)", nameAr: "رونة", nameEn: "Rawnah", category: "FOOD" },
@@ -56,7 +60,7 @@ export const SUPPLIER_SEED: SupplierSeed[] = [
   { slug: "LavaKombucha", driveFolderName: "Lava of Kombucha", nameAr: "لافا كمبوتشا", nameEn: "Lava of Kombucha", category: "FOOD" },
   {
     slug: "SardCo", driveFolderName: "Sard Co", nameAr: "سرد كو", nameEn: "Sard Co", category: "PACKAGING",
-    bankAliases: ["شركة الصرد للتعبئة"],
+    bankAliases: ["شركة الصرد للتعبئة", "الصرد"],
   },
   { slug: "MoodCoffee", driveFolderName: "Mood Coffee (مود القهوة)", nameAr: "مود القهوة", nameEn: "Mood Coffee", category: "COFFEE" },
   {

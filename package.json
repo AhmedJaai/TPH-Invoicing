@@ -20,7 +20,9 @@
     "db:demo": "tsx --env-file=.env scripts/seed-demo.ts",
     "try": "tsx --env-file=.env scripts/try-extract.ts",
     "drive:diagnose": "tsx --env-file=.env scripts/diagnose-drive.ts",
-    "try:archive": "tsx --env-file=.env scripts/try-archive.ts"
+    "try:archive": "tsx --env-file=.env scripts/try-archive.ts",
+    "try:bank": "tsx --env-file=.env scripts/try-bank.ts",
+    "try:match": "tsx --env-file=.env scripts/try-match.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
@@ -32,6 +34,7 @@
     "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "xlsx": "^0.18.5",
     "zod": "^4.5.4"
   },
   "devDependencies": {

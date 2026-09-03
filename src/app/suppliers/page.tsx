@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { invoices, paymentAllocations, statements, supplierAliases, suppliers } from "@/db/schema";
+import { suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
@@ -25,11 +25,26 @@ export default async function SuppliersPage() {
       billingCycle: suppliers.billingCycle,
       issuesInvoices: suppliers.issuesInvoices,
       contractOnFile: suppliers.contractOnFile,
-      invoiceCount: sql<number>`(select count(*)::int from ${invoices} where ${invoices.supplierId} = ${suppliers.id})`,
-      billedMinor: sql<number>`(select coalesce(sum(${invoices.totalMinor}), 0)::int from ${invoices} where ${invoices.supplierId} = ${suppliers.id})`,
-      paidMinor: sql<number>`(select coalesce(sum(${paymentAllocations.amountMinor}), 0)::int from ${paymentAllocations} join ${invoices} on ${invoices.id} = ${paymentAllocations.invoiceId} where ${invoices.supplierId} = ${suppliers.id})`,
-      statementCount: sql<number>`(select count(*)::int from ${statements} where ${statements.supplierId} = ${suppliers.id})`,
-      aliasCount: sql<number>`(select count(*)::int from ${supplierAliases} where ${supplierAliases.supplierId} = ${suppliers.id})`,
+      // الاستعلامات الفرعية تُسمّي أعمدتها بالجدول صراحةً — بدونها يلتبس
+      // عمود id بين الجدول الخارجي والداخلي ويرفض Postgres الاستعلام كله.
+      invoiceCount: sql<number>`(
+        select count(*)::int from invoices i where i.supplier_id = suppliers.id
+      )`,
+      billedMinor: sql<number>`(
+        select coalesce(sum(i.total_minor), 0)::int from invoices i where i.supplier_id = suppliers.id
+      )`,
+      paidMinor: sql<number>`(
+        select coalesce(sum(pa.amount_minor), 0)::int
+        from payment_allocations pa
+        join invoices i on i.id = pa.invoice_id
+        where i.supplier_id = suppliers.id
+      )`,
+      statementCount: sql<number>`(
+        select count(*)::int from statements st where st.supplier_id = suppliers.id
+      )`,
+      aliasCount: sql<number>`(
+        select count(*)::int from supplier_aliases sa where sa.supplier_id = suppliers.id
+      )`,
     })
     .from(suppliers)
     .where(eq(suppliers.isActive, true))
