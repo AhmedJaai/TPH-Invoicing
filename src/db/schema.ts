@@ -227,11 +227,20 @@ export const invoiceLines = pgTable("invoice_lines", {
   id: id(),
   invoiceId: text("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
   description: text("description").notNull(),
+  /** الوصف بعد التطبيع — عليه يقوم تجميع الأصناف وتتبّع الأسعار */
+  normalizedDescription: text("normalized_description").notNull().default(""),
   qty: numeric("qty", { precision: 12, scale: 3 }).notNull().default("1"),
   unitPriceMinor: integer("unit_price_minor").notNull(),
   lineTotalMinor: integer("line_total_minor").notNull(),
   vatRate: numeric("vat_rate", { precision: 5, scale: 4 }).notNull().default("0.15"),
-}, (t) => [index("invoice_lines_invoice_idx").on(t.invoiceId)]);
+  /** تاريخ الفاتورة منسوخ هنا لتتبّع الأسعار بلا ربط في كل استعلام */
+  invoiceDate: timestamp("invoice_date", { withTimezone: true }),
+  supplierId: text("supplier_id").references(() => suppliers.id),
+}, (t) => [
+  index("invoice_lines_invoice_idx").on(t.invoiceId),
+  index("invoice_lines_item_idx").on(t.normalizedDescription),
+  index("invoice_lines_item_date_idx").on(t.normalizedDescription, t.invoiceDate),
+]);
 
 /* ───────────────────────── كشوف الموردين ───────────────────────── */
 

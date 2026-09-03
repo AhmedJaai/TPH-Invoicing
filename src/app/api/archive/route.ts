@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, documents, invoices, payments, statements, issues } from "@/db/schema";
+import { accounts, documents, invoiceLines, invoices, payments, statements, issues } from "@/db/schema";
 import { requireUser, UnauthenticatedError } from "@/lib/session";
 import { ForbiddenError } from "@/lib/permissions";
 import { driveConfig } from "@/config/drive";
@@ -16,6 +16,7 @@ import { driveForUser, findOrCreateFolder, existingNamesIn, uploadFile } from "@
 import { resolveNameCollision } from "@/lib/naming";
 import { parseRiyals } from "@/lib/money";
 import { diffCorrections, recordAudit } from "@/lib/audit";
+import { normalizeItem } from "@/lib/items";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -43,6 +44,8 @@ interface ArchiveBody {
   rawExtraction?: Record<string, unknown>;
   extractionModel?: string;
   findings?: { code: string; severity: "INFO" | "WARN" | "BLOCKER"; message: string }[];
+  /** بنود الفاتورة كما استُخرجت — عليها يقوم تتبّع الأسعار وتحليل الاستهلاك */
+  lines?: { description: string; quantity: string; unitPrice: string; lineTotal: string }[];
 }
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -180,7 +183,7 @@ export async function POST(request: Request) {
 
     const isInvoice = ["TAX_INVOICE", "SIMPLIFIED_INVOICE"].includes(body.documentKind);
     if (isInvoice && body.supplierId && body.invoiceNumber && body.invoiceDate && totalMinor !== null) {
-      await tx.insert(invoices).values({
+      const [inv] = await tx.insert(invoices).values({
         documentId: doc.id,
         supplierId: body.supplierId,
         invoiceNumber: body.invoiceNumber,
@@ -194,7 +197,33 @@ export async function POST(request: Request) {
         isTaxValid: body.isTaxValid ?? false,
         inputVatEligible: body.inputVatEligible ?? false,
         isFixedAsset: body.isFixedAsset ?? false,
-      });
+      }).returning({ id: invoices.id });
+
+      // البنود: بلا تخمين — السطر بلا سعر وحدة أو مبلغ لا يُسجَّل،
+      // لأنّ صفراً مخترعاً يفسد متوسط السعر وتحليل الاستهلاك معاً.
+      for (const l of body.lines ?? []) {
+        const description = l.description?.trim();
+        if (!description) continue;
+        const unitPriceMinor = parseRiyals(l.unitPrice ?? "");
+        const lineTotalMinor = parseRiyals(l.lineTotal ?? "");
+        if (unitPriceMinor === null && lineTotalMinor === null) continue;
+
+        const quantity = Number((l.quantity ?? "1").replace(/[^\d.]/g, "")) || 1;
+        const resolvedTotal = lineTotalMinor ?? Math.round((unitPriceMinor ?? 0) * quantity);
+        const resolvedUnit =
+          unitPriceMinor ?? (quantity > 0 ? Math.round(resolvedTotal / quantity) : resolvedTotal);
+
+        await tx.insert(invoiceLines).values({
+          invoiceId: inv.id,
+          description,
+          normalizedDescription: normalizeItem(description),
+          qty: String(quantity),
+          unitPriceMinor: resolvedUnit,
+          lineTotalMinor: resolvedTotal,
+          invoiceDate: new Date(`${body.invoiceDate}T00:00:00Z`),
+          supplierId: body.supplierId,
+        });
+      }
     }
 
     if (body.documentKind === "STATEMENT" && body.supplierId && body.invoiceDate) {

@@ -16,7 +16,8 @@
     "drive:auth": "tsx --env-file=.env scripts/drive-auth.ts",
     "drive:inventory": "tsx --env-file=.env scripts/drive-inventory.ts",
     "drive:migrate": "tsx --env-file=.env scripts/migrate-archive.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:demo": "tsx --env-file=.env scripts/seed-demo.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

@@ -213,6 +213,7 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
           rawExtraction: it.data.extraction,
           extractionModel: it.data.model,
           findings: r.findings,
+          lines: (it.data.extraction as { lines?: unknown[] } | undefined)?.lines ?? [],
         }),
       });
       const json = await res.json();
