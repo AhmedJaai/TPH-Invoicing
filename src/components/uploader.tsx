@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatRiyalsDisplay } from "@/lib/money";
 
 interface Finding {
@@ -52,6 +52,8 @@ type Item =
       fileBase64: string;
       mimeType: string;
       archiving?: boolean;
+      startedAt?: number;
+      finishedInMs?: number;
       archived?: { fileName: string; renamed: boolean; link?: string; corrected: string[] };
       archiveError?: string;
     };
@@ -74,6 +76,42 @@ const SEVERITY_STYLE: Record<Finding["severity"], string> = {
   WARN: "bg-warn-bg text-warn",
   BLOCKER: "bg-danger-bg text-danger",
 };
+
+/**
+ * شريط تقدّم الرفع مع عدّاد يعمل حيّاً.
+ *
+ * الرفع لا يعطينا نسبة حقيقية (طلب واحد لا يبلّغ عن تقدّمه)، فالشريط
+ * متحرّك يدلّ على أنّ العمل جارٍ، والعدّاد هو المعلومة الصادقة عن الزمن.
+ */
+function UploadProgress({ startedAt }: { startedAt?: number }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!startedAt) return;
+    const tick = () => setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
+  const slow = elapsed >= 30;
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span className={slow ? "text-warn" : "text-ink-soft"}>
+          {slow ? "يرفع… الخادم بطيء، امنحه لحظة" : "يرفع إلى الدرايف…"}
+        </span>
+        <span className="nums shrink-0 text-muted" dir="ltr">
+          {elapsed}s
+        </span>
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sunken">
+        <div className="upload-bar h-full w-1/3 rounded-full bg-ink" />
+      </div>
+    </div>
+  );
+}
 
 function Field({
   label,
@@ -108,6 +146,16 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
   const [items, setItems] = useState<Item[]>([]);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * مرجع حيّ للعناصر.
+   *
+   * قراءة الحالة من داخل دالة تحديث setState خطأ: React ينفّذها متأخّراً
+   * وقد يكرّرها، فتبقى القيمة المقروءة فارغة ويخرج الكود صامتاً — وهو ما
+   * كان يُبقي زرّ الرفع على «يرفع…» بلا أن يُرسَل طلب أصلاً.
+   */
+  const itemsRef = useRef<Item[]>([]);
+  itemsRef.current = items;
 
   const analyze = useCallback(async (file: File) => {
     const id = `${file.name}-${Date.now()}-${Math.random()}`;
@@ -176,16 +224,17 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
   }, []);
 
   const archive = useCallback(async (id: string) => {
-    let target: Item | undefined;
-    setItems((prev) => {
-      target = prev.find((it) => it.id === id);
-      return prev.map((it) =>
-        it.id === id && it.state === "done" ? { ...it, archiving: true, archiveError: undefined } : it,
-      );
-    });
-    if (!target || target.state !== "done") return;
-    const it = target;
+    const it = itemsRef.current.find((x) => x.id === id);
+    if (!it || it.state !== "done" || it.archiving || it.archived) return;
     const r = it.data.result;
+
+    setItems((prev) =>
+      prev.map((x) =>
+        x.id === id && x.state === "done"
+          ? { ...x, archiving: true, archiveError: undefined, startedAt: Date.now() }
+          : x,
+      ),
+    );
 
     // مهلة صريحة: الطلب الذي لا يردّ خلال دقيقتين يُلغى برسالة مفهومة
     // بدل أن يبقى الزرّ «يرفع…» إلى الأبد.
@@ -231,6 +280,7 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
               ? {
                   ...x,
                   archiving: false,
+                  finishedInMs: Date.now() - (x.startedAt ?? Date.now()),
                   archived: {
                     fileName: json.fileName,
                     renamed: json.renamed,
@@ -238,7 +288,12 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
                     corrected: json.correctedFields ?? [],
                   },
                 }
-              : { ...x, archiving: false, archiveError: json.error ?? "فشل الرفع" }
+              : {
+                  ...x,
+                  archiving: false,
+                  finishedInMs: Date.now() - (x.startedAt ?? Date.now()),
+                  archiveError: json.error ?? "فشل الرفع",
+                }
             : x,
         ),
       );
@@ -250,6 +305,7 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
             ? {
                 ...x,
                 archiving: false,
+                finishedInMs: Date.now() - (x.startedAt ?? Date.now()),
                 archiveError: aborted
                   ? "تأخّر الخادم أكثر من دقيقتين ولم يردّ. تحقّق من الدرايف قبل إعادة المحاولة."
                   : (e as Error).message,
@@ -429,9 +485,15 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
                   </ul>
                 )}
 
+                {item.archiving && <UploadProgress startedAt={item.startedAt} />}
+
                 {item.archived ? (
                   <div className="mt-4 rounded-lg bg-ok-bg px-3 py-2.5 text-xs leading-relaxed text-ok">
-                    <p className="font-bold">أُرشف في الدرايف</p>
+                    <p className="font-bold">
+                      ✓ اكتمل الرفع
+                      {item.finishedInMs !== undefined &&
+                        ` — في ${(item.finishedInMs / 1000).toFixed(1)} ثانية`}
+                    </p>
                     <p className="mt-1 font-mono" dir="ltr">{item.archived.fileName}</p>
                     {item.archived.renamed && (
                       <p className="mt-1">تعارض الاسم فأُضيف رقم نسخة — لم يُستبدل ملف قائم.</p>
@@ -446,24 +508,31 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
                     )}
                   </div>
                 ) : (
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <p className="text-xs text-muted">
-                      {item.archiveError ? (
-                        <span className="text-danger">{item.archiveError}</span>
-                      ) : r.canArchive ? (
-                        "جاهز للأرشفة بعد اعتمادك"
-                      ) : (
-                        "لا يمكن أرشفته قبل معالجة ما سبق"
-                      )}
-                    </p>
-                    <button
-                      onClick={() => archive(item.id)}
-                      disabled={!r.canArchive || item.archiving}
-                      className="shrink-0 rounded-lg bg-inverse-surface px-4 py-2 text-sm font-bold text-inverse-ink transition-opacity hover:opacity-90 disabled:opacity-40"
-                    >
-                      {item.archiving ? "يرفع…" : "اعتمد وارفع"}
-                    </button>
-                  </div>
+                  <>
+                    {item.archiveError && (
+                      <div className="mt-4 rounded-lg bg-danger-bg px-3 py-2.5 text-xs leading-relaxed text-danger">
+                        <p className="font-bold">
+                          ✕ فشل الرفع
+                          {item.finishedInMs !== undefined &&
+                            ` — بعد ${(item.finishedInMs / 1000).toFixed(1)} ثانية`}
+                        </p>
+                        <p className="mt-1">{item.archiveError}</p>
+                      </div>
+                    )}
+
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <p className="text-xs text-muted">
+                        {r.canArchive ? "جاهز للأرشفة بعد اعتمادك" : "لا يمكن أرشفته قبل معالجة ما سبق"}
+                      </p>
+                      <button
+                        onClick={() => archive(item.id)}
+                        disabled={!r.canArchive || item.archiving}
+                        className="shrink-0 rounded-lg bg-inverse-surface px-4 py-2 text-sm font-bold text-inverse-ink transition-opacity hover:opacity-90 disabled:opacity-40"
+                      >
+                        {item.archiving ? "يرفع…" : item.archiveError ? "أعد المحاولة" : "اعتمد وارفع"}
+                      </button>
+                    </div>
+                  </>
                 )}
               </article>
             );

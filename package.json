@@ -19,7 +19,8 @@
     "typecheck": "tsc --noEmit",
     "db:demo": "tsx --env-file=.env scripts/seed-demo.ts",
     "try": "tsx --env-file=.env scripts/try-extract.ts",
-    "drive:diagnose": "tsx --env-file=.env scripts/diagnose-drive.ts"
+    "drive:diagnose": "tsx --env-file=.env scripts/diagnose-drive.ts",
+    "try:archive": "tsx --env-file=.env scripts/try-archive.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

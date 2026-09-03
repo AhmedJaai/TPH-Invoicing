@@ -92,3 +92,21 @@ body {
   border-color: var(--ink);
   background: var(--sunken);
 }
+
+/* شريط تقدّم متحرّك — يدلّ على أنّ العمل جارٍ دون ادّعاء نسبة لا نعرفها */
+@keyframes upload-slide {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(420%); }
+}
+
+.upload-bar {
+  animation: upload-slide 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-bar {
+    animation: none;
+    width: 100%;
+    opacity: 0.4;
+  }
+}
