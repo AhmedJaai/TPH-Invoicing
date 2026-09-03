@@ -1,12 +1,21 @@
 /** نقطة الدخول الوحيدة للاستخراج — تختار المزوّد من متغيّرات البيئة. */
 import { claudeProvider } from "./extract";
+import { geminiProvider } from "./provider-gemini";
 import { ollamaProvider } from "./provider-ollama";
 import { selectedProviderName, type ExtractionOutcome, type ExtractionRequest } from "./provider";
 
 export { isSupportedUpload } from "./extract";
 export type { ExtractionOutcome, ExtractionRequest } from "./provider";
 
-const PROVIDERS = { claude: claudeProvider, ollama: ollamaProvider } as const;
+const PROVIDERS = {
+  claude: claudeProvider,
+  gemini: geminiProvider,
+  ollama: ollamaProvider,
+} as const;
+
+export function activeProviderName(): string {
+  return selectedProviderName();
+}
 
 export function activeProvider() {
   return PROVIDERS[selectedProviderName()];

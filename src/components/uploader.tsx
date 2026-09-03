@@ -12,6 +12,9 @@ interface Finding {
 interface AnalysisResponse {
   originalFileName: string;
   sizeBytes: number;
+  model?: string;
+  provider?: string;
+  extraction?: Record<string, unknown>;
   result: {
     documentKind: string;
     supplier?: { id: string; slug: string; nameAr: string };
@@ -27,6 +30,7 @@ interface AnalysisResponse {
     beneficiary?: string;
     proposedFileName?: string;
     proposedFolderPath?: string;
+    proposedFolderName?: string;
     isTaxValid: boolean;
     inputVatEligible: boolean;
     isFixedAsset: boolean;
@@ -39,7 +43,18 @@ interface AnalysisResponse {
 type Item =
   | { id: string; fileName: string; state: "reading" }
   | { id: string; fileName: string; state: "failed"; error: string }
-  | { id: string; fileName: string; state: "done"; data: AnalysisResponse; edited: Record<string, string> };
+  | {
+      id: string;
+      fileName: string;
+      state: "done";
+      data: AnalysisResponse;
+      edited: Record<string, string>;
+      fileBase64: string;
+      mimeType: string;
+      archiving?: boolean;
+      archived?: { fileName: string; renamed: boolean; link?: string; corrected: string[] };
+      archiveError?: string;
+    };
 
 const KIND_LABEL: Record<string, string> = {
   TAX_INVOICE: "فاتورة ضريبية",
@@ -89,7 +104,7 @@ function Field({
   );
 }
 
-export function Uploader() {
+export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) {
   const [items, setItems] = useState<Item[]>([]);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -97,6 +112,14 @@ export function Uploader() {
   const analyze = useCallback(async (file: File) => {
     const id = `${file.name}-${Date.now()}-${Math.random()}`;
     setItems((prev) => [{ id, fileName: file.name, state: "reading" }, ...prev]);
+
+    // نحتفظ بالبايتات لأنّ الأرشفة ترفع الملف الأصلي نفسه لا نسخة معاد بناؤها
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    const fileBase64 = btoa(binary);
 
     try {
       const body = new FormData();
@@ -122,6 +145,8 @@ export function Uploader() {
                 fileName: file.name,
                 state: "done",
                 data,
+                fileBase64,
+                mimeType: file.type,
                 edited: {
                   invoiceNumber: data.result.invoiceNumber ?? "",
                   invoiceDate: data.result.invoiceDate ?? "",
@@ -148,6 +173,77 @@ export function Uploader() {
         it.id === id && it.state === "done" ? { ...it, edited: { ...it.edited, [key]: value } } : it,
       ),
     );
+  }, []);
+
+  const archive = useCallback(async (id: string) => {
+    let target: Item | undefined;
+    setItems((prev) => {
+      target = prev.find((it) => it.id === id);
+      return prev.map((it) =>
+        it.id === id && it.state === "done" ? { ...it, archiving: true, archiveError: undefined } : it,
+      );
+    });
+    if (!target || target.state !== "done") return;
+    const it = target;
+    const r = it.data.result;
+
+    try {
+      const res = await fetch("/api/archive", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          fileName: it.edited.fileName || r.proposedFileName,
+          folderName: r.proposedFolderName,
+          periodMonth: r.periodMonth,
+          mimeType: it.mimeType,
+          fileBase64: it.fileBase64,
+          documentKind: r.documentKind,
+          supplierId: r.supplier?.id,
+          invoiceNumber: it.edited.invoiceNumber,
+          invoiceDate: it.edited.invoiceDate,
+          subtotal: r.subtotalMinor !== undefined ? String(r.subtotalMinor / 100) : "",
+          vat: it.edited.vat.replace(/,/g, ""),
+          total: it.edited.total.replace(/,/g, ""),
+          sellerVat: r.sellerVat,
+          buyerVat: r.buyerVat,
+          beneficiary: r.beneficiary,
+          isTaxValid: r.isTaxValid,
+          inputVatEligible: r.inputVatEligible,
+          isFixedAsset: r.isFixedAsset,
+          rawExtraction: it.data.extraction,
+          extractionModel: it.data.model,
+          findings: r.findings,
+        }),
+      });
+      const json = await res.json();
+
+      setItems((prev) =>
+        prev.map((x) =>
+          x.id === id && x.state === "done"
+            ? res.ok
+              ? {
+                  ...x,
+                  archiving: false,
+                  archived: {
+                    fileName: json.fileName,
+                    renamed: json.renamed,
+                    link: json.webViewLink,
+                    corrected: json.correctedFields ?? [],
+                  },
+                }
+              : { ...x, archiving: false, archiveError: json.error ?? "فشل الرفع" }
+            : x,
+        ),
+      );
+    } catch (e) {
+      setItems((prev) =>
+        prev.map((x) =>
+          x.id === id && x.state === "done"
+            ? { ...x, archiving: false, archiveError: (e as Error).message }
+            : x,
+        ),
+      );
+    }
   }, []);
 
   const handleFiles = useCallback(
@@ -257,18 +353,22 @@ export function Uploader() {
                     needsReview={low.has("رقم الفاتورة")}
                     onChange={(v) => editField(item.id, "invoiceNumber", v)}
                   />
-                  <Field
-                    label="الضريبة"
-                    value={item.edited.vat}
-                    needsReview={low.has("المبالغ")}
-                    onChange={(v) => editField(item.id, "vat", v)}
-                  />
-                  <Field
-                    label="الإجمالي"
-                    value={item.edited.total}
-                    needsReview={low.has("المبالغ")}
-                    onChange={(v) => editField(item.id, "total", v)}
-                  />
+                  {canSeeAmounts && (
+                    <>
+                      <Field
+                        label="الضريبة"
+                        value={item.edited.vat}
+                        needsReview={low.has("المبالغ")}
+                        onChange={(v) => editField(item.id, "vat", v)}
+                      />
+                      <Field
+                        label="الإجمالي"
+                        value={item.edited.total}
+                        needsReview={low.has("المبالغ")}
+                        onChange={(v) => editField(item.id, "total", v)}
+                      />
+                    </>
+                  )}
                 </dl>
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -313,20 +413,42 @@ export function Uploader() {
                   </ul>
                 )}
 
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <p className="text-xs text-muted">
-                    {r.canArchive
-                      ? "جاهز للأرشفة بعد اعتمادك"
-                      : "لا يمكن أرشفته قبل معالجة ما سبق"}
-                  </p>
-                  <button
-                    disabled
-                    title="يبدأ العمل بعد إعداد بيانات جوجل"
-                    className="shrink-0 rounded-lg bg-inverse-surface px-4 py-2 text-sm font-bold text-inverse-ink disabled:opacity-40"
-                  >
-                    اعتمد وارفع
-                  </button>
-                </div>
+                {item.archived ? (
+                  <div className="mt-4 rounded-lg bg-ok-bg px-3 py-2.5 text-xs leading-relaxed text-ok">
+                    <p className="font-bold">أُرشف في الدرايف</p>
+                    <p className="mt-1 font-mono" dir="ltr">{item.archived.fileName}</p>
+                    {item.archived.renamed && (
+                      <p className="mt-1">تعارض الاسم فأُضيف رقم نسخة — لم يُستبدل ملف قائم.</p>
+                    )}
+                    {item.archived.corrected.length > 0 && (
+                      <p className="mt-1">سُجّل في التدقيق تعديلك اليدوي: {item.archived.corrected.join("، ")}</p>
+                    )}
+                    {item.archived.link && (
+                      <a href={item.archived.link} target="_blank" rel="noreferrer" className="mt-1 inline-block underline underline-offset-4">
+                        افتحه في الدرايف
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <p className="text-xs text-muted">
+                      {item.archiveError ? (
+                        <span className="text-danger">{item.archiveError}</span>
+                      ) : r.canArchive ? (
+                        "جاهز للأرشفة بعد اعتمادك"
+                      ) : (
+                        "لا يمكن أرشفته قبل معالجة ما سبق"
+                      )}
+                    </p>
+                    <button
+                      onClick={() => archive(item.id)}
+                      disabled={!r.canArchive || item.archiving}
+                      className="shrink-0 rounded-lg bg-inverse-surface px-4 py-2 text-sm font-bold text-inverse-ink transition-opacity hover:opacity-90 disabled:opacity-40"
+                    >
+                      {item.archiving ? "يرفع…" : "اعتمد وارفع"}
+                    </button>
+                  </div>
+                )}
               </article>
             );
           })}

@@ -1,29 +1,14 @@
+import { redirect } from "next/navigation";
+import { asc, count, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { suppliers } from "@/db/schema";
-import { asc } from "drizzle-orm";
+import { documents, suppliers } from "@/db/schema";
 import { Uploader } from "@/components/uploader";
-import type { SupplierRef } from "@/components/analyzer";
+import { UserMenu } from "@/components/user-menu";
+import { currentUser } from "@/lib/session";
+import { can } from "@/lib/permissions";
+import { activeProviderName } from "@/lib/extraction";
 
 export const dynamic = "force-dynamic";
-
-async function loadSuppliers(): Promise<
-  { ok: true; rows: SupplierRef[] } | { ok: false; message: string }
-> {
-  try {
-    const rows = await db
-      .select({
-        slug: suppliers.slug,
-        nameAr: suppliers.nameAr,
-        driveFolderName: suppliers.driveFolderName,
-        issuesInvoices: suppliers.issuesInvoices,
-      })
-      .from(suppliers)
-      .orderBy(asc(suppliers.nameAr));
-    return { ok: true, rows };
-  } catch (error) {
-    return { ok: false, message: (error as Error).message };
-  }
-}
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "warn" }) {
   return (
@@ -35,23 +20,39 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "wa
 }
 
 export default async function Home() {
-  const data = await loadSuppliers();
-  const rows = data.ok ? data.rows : [];
+  const user = await currentUser();
+  if (!user) redirect("/login");
+
+  const showAmounts = can(user.role, "amounts:view");
+
+  const rows = await db
+    .select({
+      slug: suppliers.slug,
+      nameAr: suppliers.nameAr,
+      issuesInvoices: suppliers.issuesInvoices,
+    })
+    .from(suppliers)
+    .where(eq(suppliers.isActive, true))
+    .orderBy(asc(suppliers.nameAr));
+
+  const [{ value: archivedCount }] = await db
+    .select({ value: count() })
+    .from(documents)
+    .where(eq(documents.status, "ARCHIVED"));
+
   const needContract = rows.filter((s) => !s.issuesInvoices).length;
 
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-line bg-surface/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-5 py-3.5">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-5 py-3">
           <div className="min-w-0">
             <p className="truncate font-display text-lg font-bold leading-tight">
               فواتير ذا بوبليك هاوس
             </p>
             <p className="truncate text-[11px] text-muted">الرقم الضريبي ٣١٠٠٠٧٩٧١٦٠٠٠٠٣</p>
           </div>
-          <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] text-ink-soft">
-            المرحلة صفر
-          </span>
+          <UserMenu name={user.name} role={user.role} />
         </div>
       </header>
 
@@ -68,55 +69,48 @@ export default async function Home() {
         </p>
 
         <div className="mt-8">
-          {data.ok ? (
-            <Uploader />
-          ) : (
-            <div className="rounded-xl border border-line bg-danger-bg p-4 text-sm text-danger">
-              تعذّر الاتصال بقاعدة البيانات: {data.message}
-            </div>
-          )}
+          <Uploader canSeeAmounts={showAmounts} />
         </div>
 
         <section className="mt-10">
           <h2 className="mb-3 text-sm font-bold">حالة النظام</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="الموردون" value={data.ok ? String(rows.length) : "—"} />
+            <Stat label="الموردون" value={String(rows.length)} />
             <Stat
               label="يحتاجون عقد توريد"
-              value={data.ok ? String(needContract) : "—"}
+              value={String(needContract)}
               tone={needContract > 0 ? "warn" : undefined}
             />
-            <Stat label="قاعدة البيانات" value={data.ok ? "تعمل" : "متوقفة"} />
-            <Stat label="أرشيف الدرايف" value="قراءة فقط" />
+            <Stat label="مستندات مؤرشفة" value={String(archivedCount)} />
+            <Stat label="قارئ الفواتير" value={activeProviderName()} />
           </div>
         </section>
 
-        {data.ok && rows.length > 0 && (
-          <section className="mt-10">
-            <h2 className="mb-3 text-sm font-bold">الموردون المسجّلون</h2>
-            <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
-              {rows.map((s) => (
-                <li key={s.slug} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                  <span className="min-w-0 truncate text-sm">{s.nameAr}</span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    {!s.issuesInvoices && (
-                      <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[10px] font-bold text-warn">
-                        بلا فواتير
-                      </span>
-                    )}
-                    <span className="font-mono text-[11px] text-muted" dir="ltr">
-                      {s.slug}
+        <section className="mt-10">
+          <h2 className="mb-3 text-sm font-bold">الموردون المسجّلون</h2>
+          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+            {rows.map((s) => (
+              <li key={s.slug} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <span className="min-w-0 truncate text-sm">{s.nameAr}</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  {!s.issuesInvoices && (
+                    <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[10px] font-bold text-warn">
+                      بلا فواتير
                     </span>
+                  )}
+                  <span className="font-mono text-[11px] text-muted" dir="ltr">
+                    {s.slug}
                   </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <footer className="mt-12 border-t border-line pt-5 text-xs leading-relaxed text-muted">
-          لم يُرفع ولم يُعدَّل ولم يُحذف أي ملف في الدرايف. الخطوة التالية إعداد بيانات جوجل،
-          ودليلها في ملف README.
+          {showAmounts
+            ? "لك صلاحية الاطلاع على الأرقام المالية."
+            : "دورك لا يشمل الأرقام المالية — تظهر لك المستندات دون مبالغها."}
         </footer>
       </main>
     </div>

@@ -6,12 +6,14 @@
  *
  * المزوّدون المتاحون:
  *   claude  — الأدق، مدفوع بالاستخدام، وبياناتك ليست مادة تدريب.
+ *   gemini  — طبقة مجانية سخية، لكن جوجل تستخدم بيانات الطبقة المجانية
+ *             لتحسين منتجاتها وقد يقرؤها مراجعون بشريون.
  *   ollama  — نموذج رؤية مفتوح المصدر يعمل على جهازك، مجاني تماماً وخاص تماماً،
  *             لكنه أقل دقة ولا يعمل إلا والجهاز مشتغل.
  */
 import type { ExtractionResult } from "./schema";
 
-export type ProviderName = "claude" | "ollama";
+export type ProviderName = "claude" | "gemini" | "ollama";
 
 export interface ExtractionRequest {
   data: Buffer;
@@ -44,9 +46,11 @@ export interface ExtractionProvider {
   extract(request: ExtractionRequest): Promise<ExtractionOutcome>;
 }
 
+const PROVIDER_NAMES: readonly ProviderName[] = ["claude", "gemini", "ollama"];
+
 export function selectedProviderName(): ProviderName {
   const raw = (process.env.EXTRACTION_PROVIDER ?? "claude").toLowerCase();
-  return raw === "ollama" ? "ollama" : "claude";
+  return (PROVIDER_NAMES as readonly string[]).includes(raw) ? (raw as ProviderName) : "claude";
 }
 
 /** التعليمات مشتركة بين المزوّدين حتى تُقارن دقّتهما على أساس واحد. */

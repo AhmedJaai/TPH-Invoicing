@@ -13,6 +13,8 @@ import { extractDocument, isSupportedUpload } from "@/lib/extraction";
 import { runPipeline } from "@/lib/extraction/pipeline";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import { companyConfig } from "@/config/drive";
+import { requireUser, UnauthenticatedError } from "@/lib/session";
+import { ForbiddenError } from "@/lib/permissions";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -49,6 +51,15 @@ async function loadSuppliers(): Promise<SupplierRecord[]> {
 }
 
 export async function POST(request: Request) {
+  // المحرس طبقة أولى؛ هذا الفحص هو الحاجز الفعلي.
+  try {
+    await requireUser("document:upload");
+  } catch (e) {
+    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: e.message }, { status: 401 });
+    if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 });
+    throw e;
+  }
+
   let form: FormData;
   try {
     form = await request.formData();

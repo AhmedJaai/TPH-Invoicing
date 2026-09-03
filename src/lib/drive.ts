@@ -83,3 +83,82 @@ export async function listChildren(
 }
 
 export const isFolder = (f: DriveFile): boolean => f.mimeType === FOLDER_MIME;
+
+/** عميل درايف بصلاحية مستخدم بعينه — الرفع يتم باسمه لا باسم حساب مشترك. */
+export function driveForUser(refreshToken: string): drive_v3.Drive {
+  const auth = createOAuthClient();
+  auth.setCredentials({ refresh_token: refreshToken });
+  return google.drive({ version: "v3", auth });
+}
+
+/** يبحث عن مجلد باسمه داخل أب، أو ينشئه. لا يحذف ولا ينقل شيئاً. */
+export async function findOrCreateFolder(
+  drive: drive_v3.Drive,
+  parentId: string,
+  name: string,
+): Promise<string> {
+  const escaped = name.replace(/'/g, "\\'");
+  const res = await drive.files.list({
+    q: `'${parentId}' in parents and name = '${escaped}' and mimeType = '${FOLDER_MIME}' and trashed = false`,
+    fields: "files(id, name)",
+    pageSize: 1,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+
+  const existing = res.data.files?.[0]?.id;
+  if (existing) return existing;
+
+  const created = await drive.files.create({
+    requestBody: { name, mimeType: FOLDER_MIME, parents: [parentId] },
+    fields: "id",
+    supportsAllDrives: true,
+  });
+
+  const id = created.data.id;
+  if (!id) throw new Error(`تعذّر إنشاء المجلد: ${name}`);
+  return id;
+}
+
+/** أسماء الملفات الموجودة في مجلد — لحساب لاحقة النسخة عند التكرار. */
+export async function existingNamesIn(
+  drive: drive_v3.Drive,
+  folderId: string,
+): Promise<string[]> {
+  const files = await listChildren(drive, folderId);
+  return files.map((f) => f.name);
+}
+
+export interface UploadResult {
+  fileId: string;
+  fileName: string;
+  folderId: string;
+  webViewLink?: string;
+}
+
+/**
+ * يرفع ملفاً جديداً. لا يستبدل ملفاً قائماً أبداً — عند تعارض الاسم
+ * يجب أن يكون المتصل قد حسم الاسم البديل عبر resolveNameCollision.
+ */
+export async function uploadFile(
+  drive: drive_v3.Drive,
+  options: { folderId: string; fileName: string; mimeType: string; data: Buffer },
+): Promise<UploadResult> {
+  const { Readable } = await import("node:stream");
+  const created = await drive.files.create({
+    requestBody: { name: options.fileName, parents: [options.folderId] },
+    media: { mimeType: options.mimeType, body: Readable.from(options.data) },
+    fields: "id, name, webViewLink",
+    supportsAllDrives: true,
+  });
+
+  const id = created.data.id;
+  if (!id) throw new Error("لم يرجع الدرايف معرّف الملف بعد الرفع");
+
+  return {
+    fileId: id,
+    fileName: created.data.name ?? options.fileName,
+    folderId: options.folderId,
+    webViewLink: created.data.webViewLink ?? undefined,
+  };
+}
