@@ -1,4 +1,5 @@
 import { Nav } from "./nav";
+import { TrialBanner } from "./trial-banner";
 import { UserMenu } from "./user-menu";
 import type { Role } from "@/lib/permissions";
 
@@ -17,6 +18,7 @@ export function PageShell({
 }) {
   return (
     <div className="min-h-screen">
+      <TrialBanner />
       <header className="sticky top-0 z-10 border-b border-line bg-surface/85 backdrop-blur-md">
         <div className="mx-auto max-w-5xl px-5 py-3">
           <div className="flex items-center justify-between gap-4">

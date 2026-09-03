@@ -15,9 +15,29 @@ const clear = process.argv.includes("--clear");
 const MARK = "DEMO-";
 
 async function wipe() {
+  // الفواتير التجريبية تُعرف بوسمها في رقم الفاتورة، والدفعات المرتبطة بها
+  // تُحذف عبر تخصيصاتها — لأنّ الدفعة المنشأة بلا مستند لا يطالها حذف المستند.
+  const demoInvoices = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(like(invoices.invoiceNumber, `${MARK}%`));
+
+  let payDeleted = 0;
+  for (const inv of demoInvoices) {
+    const allocs = await db
+      .select({ paymentId: paymentAllocations.paymentId })
+      .from(paymentAllocations)
+      .where(eq(paymentAllocations.invoiceId, inv.id));
+    for (const a of allocs) {
+      await db.delete(payments).where(eq(payments.id, a.paymentId));
+      payDeleted++;
+    }
+  }
+
   const docs = await db.select({ id: documents.id }).from(documents).where(like(documents.fileName, `${MARK}%`));
   for (const d of docs) await db.delete(documents).where(eq(documents.id, d.id));
-  console.log(`حُذفت ${docs.length} مستنداً تجريبياً.`);
+
+  console.log(`حُذف ${docs.length} مستنداً و${payDeleted} دفعة تجريبية.`);
 }
 
 async function main() {

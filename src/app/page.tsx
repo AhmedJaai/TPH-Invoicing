@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { documents, suppliers } from "@/db/schema";
 import { Uploader } from "@/components/uploader";
 import { UserMenu } from "@/components/user-menu";
+import { Nav } from "@/components/nav";
+import { TrialBanner } from "@/components/trial-banner";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { activeProviderName } from "@/lib/extraction";
@@ -44,15 +46,21 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen">
+      <TrialBanner />
       <header className="sticky top-0 z-10 border-b border-line bg-surface/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-5 py-3">
-          <div className="min-w-0">
-            <p className="truncate font-display text-lg font-bold leading-tight">
-              فواتير ذا بوبليك هاوس
-            </p>
-            <p className="truncate text-[11px] text-muted">الرقم الضريبي ٣١٠٠٠٧٩٧١٦٠٠٠٠٣</p>
+        <div className="mx-auto max-w-3xl px-5 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="truncate font-display text-base font-bold leading-tight">
+                فواتير ذا بوبليك هاوس
+              </p>
+              <p className="truncate text-[11px] text-muted">الرقم الضريبي ٣١٠٠٠٧٩٧١٦٠٠٠٠٣</p>
+            </div>
+            <UserMenu name={user.name} role={user.role} />
           </div>
-          <UserMenu name={user.name} role={user.role} />
+          <div className="mt-2.5">
+            <Nav role={user.role} active="/" />
+          </div>
         </div>
       </header>
 

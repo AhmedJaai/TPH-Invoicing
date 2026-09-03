@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, documents, invoiceLines, invoices, payments, statements, issues } from "@/db/schema";
-import { requireUser, UnauthenticatedError } from "@/lib/session";
+import { isAuthBypassed, requireUser, UnauthenticatedError } from "@/lib/session";
 import { ForbiddenError } from "@/lib/permissions";
 import { driveConfig } from "@/config/drive";
 import { driveForUser, findOrCreateFolder, existingNamesIn, uploadFile } from "@/lib/drive";
@@ -114,7 +114,11 @@ export async function POST(request: Request) {
   const token = await driveTokenFor(user.id);
   if (!token) {
     return NextResponse.json(
-      { error: "لا يوجد تفويض درايف لحسابك. سجّل الخروج ثم الدخول مرة أخرى ووافق على صلاحية الدرايف." },
+      {
+        error: isAuthBypassed()
+          ? "وضع التجربة لا يرفع إلى الدرايف — الرفع يحتاج حساب جوجل حقيقياً. التحليل والقراءة يعملان."
+          : "لا يوجد تفويض درايف لحسابك. سجّل الخروج ثم الدخول مرة أخرى ووافق على صلاحية الدرايف.",
+      },
       { status: 428 },
     );
   }

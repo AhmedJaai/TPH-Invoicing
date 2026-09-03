@@ -9,7 +9,26 @@ export interface CurrentUser {
   role: Role;
 }
 
+/**
+ * وضع التجربة: يتخطّى تسجيل الدخول ويعطي صلاحية المالك.
+ *
+ * للتجربة وحدها. متى كان مفعَّلاً، فكل من يعرف الرابط يدخل — فلا ترفع
+ * فواتير حقيقية وهو مشتغل. يظهر شريط تحذير في كل صفحة كي لا يُنسى.
+ */
+export function isAuthBypassed(): boolean {
+  return process.env.AUTH_BYPASS === "true";
+}
+
+const TRIAL_USER: CurrentUser = {
+  id: "trial-user",
+  email: "trial@local",
+  name: "وضع التجربة",
+  role: "OWNER",
+};
+
 export async function currentUser(): Promise<CurrentUser | null> {
+  if (isAuthBypassed()) return TRIAL_USER;
+
   const session = await auth();
   if (!session?.user?.id || !session.user.email) return null;
   return {

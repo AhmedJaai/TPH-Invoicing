@@ -12,6 +12,9 @@ const PUBLIC_PATHS = ["/login", "/api/auth"];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // وضع التجربة يفتح الأبواب عمداً — راجع src/lib/session.ts
+  if (process.env.AUTH_BYPASS === "true") return NextResponse.next();
+
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
   // وجود كعكة الجلسة فحص مبدئي فقط؛ التحقق الفعلي في الخادم.
