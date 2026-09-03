@@ -17,7 +17,7 @@ import {
   type ExtractionRequest,
 } from "./provider";
 
-const DEFAULT_MODEL = "gemini-3.8-flash";
+const DEFAULT_MODEL = "gemini-flash-latest";
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 
 function modelName(): string {
@@ -88,6 +88,12 @@ const GEMINI_SCHEMA = {
   ],
 } as const;
 
+/** أخطاء عابرة تستحق إعادة المحاولة: ضغط على النموذج أو حدّ لحظي. */
+const RETRYABLE = new Set([429, 500, 502, 503, 504]);
+const MAX_ATTEMPTS = 4;
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 const SUPPORTED = [
   "application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif",
 ];
@@ -112,12 +118,7 @@ export const geminiProvider: ExtractionProvider = {
       return { ok: false, provider: "gemini", reason: `نوع ملف غير مدعوم: ${request.mimeType}` };
     }
 
-    let response: Response;
-    try {
-      response = await fetch(`${ENDPOINT}/${modelName()}:generateContent`, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify({
+    const body = JSON.stringify({
           system_instruction: {
             parts: [
               {
@@ -138,15 +139,46 @@ export const geminiProvider: ExtractionProvider = {
               ],
             },
           ],
-          generationConfig: {
-            temperature: 0,
-            responseMimeType: "application/json",
-            responseSchema: GEMINI_SCHEMA,
-          },
-        }),
-      });
-    } catch (e) {
-      return { ok: false, provider: "gemini", reason: `تعذّر الاتصال بجيميني: ${(e as Error).message}` };
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: "application/json",
+        responseSchema: GEMINI_SCHEMA,
+      },
+    });
+
+    // النماذج المجانية تتعرّض للضغط كثيراً، والفشل من أول محاولة يوقف
+    // المستخدم بلا داعٍ. نعيد المحاولة بتباعد متزايد على الأخطاء العابرة وحدها.
+    let response: Response | null = null;
+    let lastError = "";
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        response = await fetch(`${ENDPOINT}/${modelName()}:generateContent`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-goog-api-key": key },
+          body,
+        });
+      } catch (e) {
+        lastError = (e as Error).message;
+        response = null;
+        if (attempt < MAX_ATTEMPTS) {
+          await wait(1000 * 2 ** (attempt - 1));
+          continue;
+        }
+        return { ok: false, provider: "gemini", reason: `تعذّر الاتصال بجيميني: ${lastError}` };
+      }
+
+      if (response.ok) break;
+
+      if (RETRYABLE.has(response.status) && attempt < MAX_ATTEMPTS) {
+        await wait(1000 * 2 ** (attempt - 1));
+        continue;
+      }
+      break;
+    }
+
+    if (!response) {
+      return { ok: false, provider: "gemini", reason: `تعذّر الاتصال بجيميني: ${lastError}` };
     }
 
     if (!response.ok) {
@@ -156,6 +188,13 @@ export const geminiProvider: ExtractionProvider = {
           ok: false,
           provider: "gemini",
           reason: "تجاوزنا حدّ الطبقة المجانية لجيميني. انتظر دقيقة وأعد المحاولة.",
+        };
+      }
+      if (response.status === 503) {
+        return {
+          ok: false,
+          provider: "gemini",
+          reason: `النموذج ${modelName()} تحت ضغط شديد الآن رغم ${MAX_ATTEMPTS} محاولات. أعد المحاولة بعد دقائق.`,
         };
       }
       if (response.status === 404) {
