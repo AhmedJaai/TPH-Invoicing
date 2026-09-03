@@ -6,6 +6,7 @@ const LINKS: { href: string; label: string; needs?: Parameters<typeof can>[1] }[
   { href: "/dashboard", label: "لوحة القيادة", needs: "reports:view" },
   { href: "/audit", label: "التدقيق", needs: "amounts:view" },
   { href: "/analysis", label: "الاستهلاك", needs: "amounts:view" },
+  { href: "/payments", label: "الدفعات", needs: "payment:approve" },
   { href: "/suppliers", label: "المورّدون" },
 ];
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 
 interface Finding {
@@ -54,7 +55,6 @@ type Item =
       archiving?: boolean;
       startedAt?: number;
       finishedInMs?: number;
-      archived?: { fileName: string; renamed: boolean; link?: string; corrected: string[] };
       archiveError?: string;
     };
 
@@ -142,8 +142,19 @@ function Field({
   );
 }
 
+interface Archived {
+  id: string;
+  fileName: string;
+  folder: string;
+  link?: string;
+  renamed: boolean;
+  at: number;
+}
+
 export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) {
+  const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
+  const [archived, setArchived] = useState<Archived[]>([]);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -225,7 +236,7 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
 
   const archive = useCallback(async (id: string) => {
     const it = itemsRef.current.find((x) => x.id === id);
-    if (!it || it.state !== "done" || it.archiving || it.archived) return;
+    if (!it || it.state !== "done" || it.archiving) return;
     const r = it.data.result;
 
     setItems((prev) =>
@@ -273,30 +284,36 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
       });
       const json = await res.json();
 
-      setItems((prev) =>
-        prev.map((x) =>
-          x.id === id && x.state === "done"
-            ? res.ok
+      if (res.ok) {
+        // البطاقة أدّت غرضها. ننقلها إلى سجل مختصر ونُخلي الشاشة للملف التالي.
+        setArchived((prev) => [
+          {
+            id,
+            fileName: json.fileName,
+            folder: r.proposedFolderPath ?? "",
+            link: json.webViewLink,
+            renamed: Boolean(json.renamed),
+            at: Date.now(),
+          },
+          ...prev,
+        ]);
+        setItems((prev) => prev.filter((x) => x.id !== id));
+        // تحديث أرقام الصفحة: عدد المستندات المؤرشفة وغيرها
+        router.refresh();
+      } else {
+        setItems((prev) =>
+          prev.map((x) =>
+            x.id === id && x.state === "done"
               ? {
-                  ...x,
-                  archiving: false,
-                  finishedInMs: Date.now() - (x.startedAt ?? Date.now()),
-                  archived: {
-                    fileName: json.fileName,
-                    renamed: json.renamed,
-                    link: json.webViewLink,
-                    corrected: json.correctedFields ?? [],
-                  },
-                }
-              : {
                   ...x,
                   archiving: false,
                   finishedInMs: Date.now() - (x.startedAt ?? Date.now()),
                   archiveError: json.error ?? "فشل الرفع",
                 }
-            : x,
-        ),
-      );
+              : x,
+          ),
+        );
+      }
     } catch (e) {
       const aborted = (e as Error).name === "AbortError";
       setItems((prev) =>
@@ -316,7 +333,7 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
     } finally {
       clearTimeout(timer);
     }
-  }, []);
+  }, [router]);
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
@@ -326,8 +343,20 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
     [analyze],
   );
 
+  const justArchived = archived.length > 0 && Date.now() - archived[0].at < 8000;
+
   return (
     <section>
+      {justArchived && (
+        <div className="mb-4 rounded-xl border border-ok/40 bg-ok-bg px-4 py-3">
+          <p className="text-sm font-bold text-ok">✓ تم الرفع بنجاح</p>
+          <p className="mt-1 truncate font-mono text-[11px] text-ok/80" dir="ltr">
+            {archived[0].fileName}
+          </p>
+          <p className="mt-1 text-xs text-ink-soft">الشاشة جاهزة للملف التالي.</p>
+        </div>
+      )}
+
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -360,6 +389,35 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
           يقرأ النظام الملف نفسه ويستخرج حقوله. اسم الملف الأصلي لا يهم.
         </p>
       </div>
+
+      {archived.length > 0 && (
+        <section className="mt-6">
+          <h2 className="mb-2 text-sm font-bold">رُفع في هذه الجلسة ({archived.length})</h2>
+          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+            {archived.map((a) => (
+              <li key={a.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <span className="min-w-0">
+                  <span className="block truncate font-mono text-[11px]" dir="ltr">{a.fileName}</span>
+                  <span className="block truncate text-[11px] text-muted" dir="ltr">{a.folder}</span>
+                  {a.renamed && (
+                    <span className="text-[10px] text-warn">أُضيف رقم نسخة — لم يُستبدل ملف قائم</span>
+                  )}
+                </span>
+                {a.link && (
+                  <a
+                    href={a.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 text-[11px] text-ink-soft underline underline-offset-4 hover:text-ink"
+                  >
+                    افتحه
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {items.length > 0 && (
         <div className="mt-6 space-y-3">
@@ -487,27 +545,7 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
 
                 {item.archiving && <UploadProgress startedAt={item.startedAt} />}
 
-                {item.archived ? (
-                  <div className="mt-4 rounded-lg bg-ok-bg px-3 py-2.5 text-xs leading-relaxed text-ok">
-                    <p className="font-bold">
-                      ✓ اكتمل الرفع
-                      {item.finishedInMs !== undefined &&
-                        ` — في ${(item.finishedInMs / 1000).toFixed(1)} ثانية`}
-                    </p>
-                    <p className="mt-1 font-mono" dir="ltr">{item.archived.fileName}</p>
-                    {item.archived.renamed && (
-                      <p className="mt-1">تعارض الاسم فأُضيف رقم نسخة — لم يُستبدل ملف قائم.</p>
-                    )}
-                    {item.archived.corrected.length > 0 && (
-                      <p className="mt-1">سُجّل في التدقيق تعديلك اليدوي: {item.archived.corrected.join("، ")}</p>
-                    )}
-                    {item.archived.link && (
-                      <a href={item.archived.link} target="_blank" rel="noreferrer" className="mt-1 inline-block underline underline-offset-4">
-                        افتحه في الدرايف
-                      </a>
-                    )}
-                  </div>
-                ) : (
+                {(
                   <>
                     {item.archiveError && (
                       <div className="mt-4 rounded-lg bg-danger-bg px-3 py-2.5 text-xs leading-relaxed text-danger">
