@@ -202,3 +202,19 @@ describe("صيغ حقيقية من الأرشيف لم يتوقّعها المف
     expect(r.ok && r.value.kind).toBe("INVOICE");
   });
 });
+
+describe("صيغ نوع ظهرت في الأرشيف الفعلي", () => {
+  it("يفهم TaxInvoice كفاتورة — كانت تسقط من الترحيل بصمت", () => {
+    const r = parseFileName(
+      "2026-08-18_SardTrading_TaxInvoice_124001345_SAR11600.00.pdf",
+      ["SardTrading"],
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.kind).toBe("INVOICE");
+    expect(r.value.slug).toBe("SardTrading");
+    expect(r.value.invoiceNumber).toBe("124001345");
+    expect(r.value.amountMinor).toBe(1_160_000);
+    expect(r.value.date).toBe("2026-08-18");
+  });
+});

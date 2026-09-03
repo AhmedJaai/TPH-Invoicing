@@ -71,6 +71,9 @@ const STOPWORDS = new Set([
   "مصنع", "معرض", "وشركاه", "واولاده", "الوطنيه", "العربيه", "السعوديه",
   "company", "co", "ltd", "limited", "est", "establishment", "trading", "factory", "for",
   "ben", "id", "bv", "bb", "ref", "transfer", "تحويل", "حواله", "سداد", "مدفوعات",
+  // أدوات ربط وكلمات مصرفية ثابتة — ترد في كل حركة فلا تميّز أحداً
+  "الي", "علي", "من", "عن", "لدي", "لصالح", "المستفيد", "مستفيد",
+  "حساب", "بنك", "مصرف", "البنك", "فرع", "صادر", "وارد", "قيد",
 ]);
 
 /** الكلمات المميِّزة في اسم: ما ليس شائعاً وطوله ثلاثة أحرف فأكثر. */
@@ -242,4 +245,36 @@ export function findDuplicatePayments(transactions: readonly BankTx[]): BankTx[]
     groups.set(key, list);
   }
   return [...groups.values()].filter((g) => g.length > 1);
+}
+
+/**
+ * يقترح اسماً بديلاً من وصف حركة بنكية.
+ *
+ * وصف البنك يخلط اسم المستفيد بضجيج ثابت: «تحويل»، «شركة»، «التجارية»،
+ * وأرقام مرجعية. والاسم البديل النافع هو ما تفرّد به المستفيد وحده.
+ * فنُسقط الشائع والأرقام ونُبقي أوّل ما بقي — والمستخدم يصحّحه إن شاء،
+ * لأنّ اقتراحاً يُعدَّل خير من حقل فارغ يُملأ من الصفر.
+ */
+export function suggestAlias(description: string, maxWords = 4): string {
+  const tokens = normalizeName(description)
+    .split(" ")
+    .filter((t) => t.length >= 3 && !STOPWORDS.has(t) && !/^\d+$/.test(t));
+
+  if (tokens.length <= maxWords) return tokens.join(" ");
+
+  /*
+   * الاقتصار على أوّل الكلمات يقطع الاسم في غير موضعه: «شركة أنس غالب حمزة
+   * خاشقجي» تميّزها كلمتها الأخيرة لا أولاها. فنُبقي أطول الكلمات — والطول
+   * دليل معقول على التفرّد في الأسماء العربية — ثم نعيدها إلى ترتيبها الأصلي
+   * كي تُقرأ اسماً لا كلمات مبعثرة.
+   */
+  const keep = new Set(
+    tokens
+      .map((t, i) => ({ t, i }))
+      .sort((a, b) => b.t.length - a.t.length || a.i - b.i)
+      .slice(0, maxWords)
+      .map((x) => x.i),
+  );
+
+  return tokens.filter((_, i) => keep.has(i)).join(" ");
 }

@@ -22,7 +22,8 @@
     "drive:diagnose": "tsx --env-file=.env scripts/diagnose-drive.ts",
     "try:archive": "tsx --env-file=.env scripts/try-archive.ts",
     "try:bank": "tsx --env-file=.env scripts/try-bank.ts",
-    "try:match": "tsx --env-file=.env scripts/try-match.ts"
+    "try:match": "tsx --env-file=.env scripts/try-match.ts",
+    "drive:backfill": "tsx --env-file=.env scripts/backfill-content.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

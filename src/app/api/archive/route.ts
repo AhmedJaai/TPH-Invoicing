@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, documents, invoiceLines, invoices, payments, statements, issues } from "@/db/schema";
+import { accounts, documents, invoiceLines, invoices, payments, statements, issues, suppliers } from "@/db/schema";
 import { isAuthBypassed, requireUser, UnauthenticatedError } from "@/lib/session";
 import { ForbiddenError } from "@/lib/permissions";
 import { driveConfig } from "@/config/drive";
@@ -17,6 +17,8 @@ import { resolveNameCollision } from "@/lib/naming";
 import { parseRiyals } from "@/lib/money";
 import { diffCorrections, recordAudit } from "@/lib/audit";
 import { normalizeItem } from "@/lib/items";
+import { reviewConfirmed } from "@/lib/confirm";
+import { companyConfig } from "@/config/drive";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,6 +39,10 @@ interface ArchiveBody {
   sellerVat?: string;
   buyerVat?: string;
   beneficiary?: string;
+  /**
+   * رايات المتصفّح — تُقرأ ولا يُعمل بها.
+   * الخادم يعيد حسابها من القيم المعتمدة، فلا يقرّر المتصفّح صحّة فاتورة ضريبياً.
+   */
   isTaxValid?: boolean;
   inputVatEligible?: boolean;
   isFixedAsset?: boolean;
@@ -81,14 +87,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "الاسم أو المجلد أو الشهر ناقص" }, { status: 400 });
   }
 
-  const blockers = (body.findings ?? []).filter((f) => f.severity === "BLOCKER");
-  if (blockers.length > 0) {
-    return NextResponse.json(
-      { error: `لا يمكن الأرشفة قبل معالجة: ${blockers[0].message}` },
-      { status: 409 },
-    );
-  }
-
   let data: Buffer;
   try {
     data = Buffer.from(body.fileBase64, "base64");
@@ -107,6 +105,70 @@ export async function POST(request: Request) {
   if (duplicate) {
     return NextResponse.json(
       { error: `هذا الملف مرفوع مسبقاً باسم ${duplicate.fileName}` },
+      { status: 409 },
+    );
+  }
+
+  // ── التحقّق على الخادم ──
+  // يُعاد الحساب هنا من القيم المعتمدة. رايات المتصفّح لا تُصدَّق.
+  const subtotalMinor = parseRiyals(body.subtotal ?? "");
+  const vatMinor = parseRiyals(body.vat ?? "");
+  const totalMinor = parseRiyals(body.total ?? "");
+
+  const [supplierRow] = body.supplierId
+    ? await db
+        .select({
+          id: suppliers.id,
+          issuesInvoices: suppliers.issuesInvoices,
+          contractOnFile: suppliers.contractOnFile,
+        })
+        .from(suppliers)
+        .where(eq(suppliers.id, body.supplierId))
+        .limit(1)
+    : [];
+
+  if (body.supplierId && !supplierRow) {
+    return NextResponse.json({ error: "المورد المحدَّد غير موجود" }, { status: 400 });
+  }
+
+  const trimmedNumber = body.invoiceNumber?.trim();
+  const duplicateInvoiceNumber =
+    Boolean(body.supplierId && trimmedNumber) &&
+    (
+      await db
+        .select({ id: invoices.id })
+        .from(invoices)
+        .where(and(eq(invoices.supplierId, body.supplierId!), eq(invoices.invoiceNumber, trimmedNumber!)))
+        .limit(1)
+    ).length > 0;
+
+  const review = reviewConfirmed(
+    {
+      documentKind: body.documentKind,
+      supplierId: body.supplierId,
+      invoiceNumber: body.invoiceNumber,
+      invoiceDate: body.invoiceDate,
+      subtotalMinor,
+      vatMinor,
+      totalMinor,
+      sellerVat: body.sellerVat,
+      buyerVat: body.buyerVat,
+    },
+    {
+      companyVat: companyConfig.vatNumber,
+      supplierIssuesInvoices: supplierRow?.issuesInvoices,
+      supplierContractOnFile: supplierRow?.contractOnFile,
+      duplicateFile: false, // فُحصت بالبصمة أعلاه وردّت 409
+      duplicateInvoiceNumber,
+    },
+  );
+
+  if (review.blockers.length > 0) {
+    return NextResponse.json(
+      {
+        error: `لا يمكن الأرشفة قبل معالجة: ${review.blockers[0].message}`,
+        blockers: review.blockers.map((f) => f.message),
+      },
       { status: 409 },
     );
   }
@@ -154,10 +216,6 @@ export async function POST(request: Request) {
   }
 
   // ── قاعدة البيانات ──
-  const subtotalMinor = parseRiyals(body.subtotal ?? "") ?? null;
-  const vatMinor = parseRiyals(body.vat ?? "") ?? null;
-  const totalMinor = parseRiyals(body.total ?? "") ?? null;
-
   const kindMap: Record<string, string> = {
     TAX_INVOICE: "TAX_INVOICE", SIMPLIFIED_INVOICE: "SIMPLIFIED_INVOICE",
     STATEMENT: "STATEMENT", QUOTATION: "QUOTATION", PROFORMA: "PROFORMA",
@@ -185,22 +243,23 @@ export async function POST(request: Request) {
       })
       .returning({ id: documents.id });
 
-    const isInvoice = ["TAX_INVOICE", "SIMPLIFIED_INVOICE"].includes(body.documentKind);
-    if (isInvoice && body.supplierId && body.invoiceNumber && body.invoiceDate && totalMinor !== null) {
+    // الشروط فُحصت على الخادم قبل الرفع؛ ما وصل هنا مكتمل أو ليس فاتورة
+    if (review.canCreateInvoice) {
       const [inv] = await tx.insert(invoices).values({
         documentId: doc.id,
-        supplierId: body.supplierId,
-        invoiceNumber: body.invoiceNumber,
+        supplierId: body.supplierId!,
+        invoiceNumber: trimmedNumber!,
         invoiceDate: new Date(`${body.invoiceDate}T00:00:00Z`),
         periodMonth: body.periodMonth,
         subtotalMinor: subtotalMinor ?? 0,
         vatMinor: vatMinor ?? 0,
-        totalMinor,
+        totalMinor: totalMinor!,
         sellerVat: body.sellerVat ?? null,
         buyerVat: body.buyerVat ?? null,
-        isTaxValid: body.isTaxValid ?? false,
-        inputVatEligible: body.inputVatEligible ?? false,
-        isFixedAsset: body.isFixedAsset ?? false,
+        // من الخادم لا من المتصفّح
+        isTaxValid: review.isTaxValid,
+        inputVatEligible: review.inputVatEligible,
+        isFixedAsset: review.isFixedAsset,
       }).returning({ id: invoices.id });
 
       // البنود: بلا تخمين — السطر بلا سعر وحدة أو مبلغ لا يُسجَّل،
@@ -225,7 +284,7 @@ export async function POST(request: Request) {
           unitPriceMinor: resolvedUnit,
           lineTotalMinor: resolvedTotal,
           invoiceDate: new Date(`${body.invoiceDate}T00:00:00Z`),
-          supplierId: body.supplierId,
+          supplierId: body.supplierId!,
         });
       }
     }
@@ -254,8 +313,14 @@ export async function POST(request: Request) {
       });
     }
 
-    // التنبيهات غير المانعة تبقى مفتوحة لتُتابَع لا لتُنسى
-    for (const f of body.findings ?? []) {
+    // التنبيهات غير المانعة تبقى مفتوحة لتُتابَع لا لتُنسى.
+    // مصدرها الخادم؛ ويُضاف من المتصفّح ما لا يستطيع الخادم حسابه وحده:
+    // ثقة النموذج في كل حقل، وهي معلومة لا مانعة.
+    const persisted = [
+      ...review.findings,
+      ...(body.findings ?? []).filter((f) => f.code === "LOW_CONFIDENCE_FIELD"),
+    ];
+    for (const f of persisted) {
       await tx.insert(issues).values({
         code: f.code,
         severity: f.severity,

@@ -16,7 +16,11 @@ export type AuditAction =
   | "SUPPLIER_UPDATED"
   | "ISSUE_WAIVED"
   | "MONTH_CLOSED"
-  | "USER_ROLE_CHANGED";
+  | "USER_ROLE_CHANGED"
+  | "DRIVE_SYNCED"
+  | "BANK_IMPORTED"
+  | "INVOICES_MARKED_PAID"
+  | "SUPPLIER_ALIAS_LEARNED";
 
 export async function recordAudit(entry: {
   actorId?: string | null;

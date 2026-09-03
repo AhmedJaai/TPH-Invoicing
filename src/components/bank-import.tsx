@@ -13,10 +13,24 @@ interface Summary {
   openInvoicesBefore: number; warnings: number;
 }
 
+interface UnknownTx {
+  id: string;
+  date: string;
+  amountMinor: number;
+  description: string;
+  suggestedAlias: string;
+}
+
 interface Preview {
   summary: Summary;
   preview: { date: string; amountMinor: number; supplierName?: string; invoiceNumbers: string[]; kind: string }[];
-  unknownTop: { date: string; amountMinor: number; description: string }[];
+  unknown: UnknownTx[];
+  supplierOnlyList: { date: string; amountMinor: number; supplierName: string }[];
+}
+
+export interface SupplierOption {
+  id: string;
+  nameAr: string;
 }
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" | "danger" }) {
@@ -29,7 +43,101 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "ok
   );
 }
 
-export function BankImport({ openInvoiceCount }: { openInvoiceCount: number }) {
+/**
+ * صفّ لحركة بنكية لم يُعرف مستفيدها.
+ *
+ * الربط اليدوي هنا ليس تصحيحاً لمرّة واحدة: الاسم الذي يختاره صاحب العمل
+ * يُحفظ اسماً بنكياً للمورّد، فتُطابَق كل حركة مشابهة بعده بلا تدخّل.
+ */
+function UnknownRow({
+  tx,
+  suppliers,
+  onLearned,
+}: {
+  tx: UnknownTx;
+  suppliers: SupplierOption[];
+  onLearned: () => void;
+}) {
+  const [supplierId, setSupplierId] = useState("");
+  const [alias, setAlias] = useState(tx.suggestedAlias);
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [message, setMessage] = useState<string | null>(null);
+
+  const save = async () => {
+    if (!supplierId || !alias.trim()) return;
+    setState("saving");
+    try {
+      const res = await fetch("/api/supplier-alias", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ supplierId, value: alias.trim() }),
+      });
+      const json = await res.json();
+      setMessage(json.message ?? json.error);
+      setState(res.ok ? "saved" : "error");
+      if (res.ok) onLearned();
+    } catch (e) {
+      setMessage((e as Error).message);
+      setState("error");
+    }
+  };
+
+  return (
+    <li className={`px-3 py-2.5 ${state === "saved" ? "bg-ok-bg" : ""}`}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 flex-1 truncate text-xs text-ink-soft" dir="ltr" title={tx.description}>
+          {tx.description}
+        </p>
+        <span className="nums shrink-0 text-xs font-bold" dir="ltr">
+          {formatRiyalsDisplay(tx.amountMinor)}
+        </span>
+        <span className="nums shrink-0 text-[11px] text-muted" dir="ltr">{tx.date}</span>
+      </div>
+
+      {state === "saved" ? (
+        <p className="mt-1.5 text-[11px] font-bold text-ok">✓ {message}</p>
+      ) : (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <select
+            value={supplierId}
+            onChange={(e) => setSupplierId(e.target.value)}
+            className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+          >
+            <option value="">اختر المورّد…</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>{s.nameAr}</option>
+            ))}
+          </select>
+          <input
+            value={alias}
+            onChange={(e) => setAlias(e.target.value)}
+            placeholder="اسمه في البنك"
+            dir="auto"
+            className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+          />
+          <button
+            onClick={save}
+            disabled={!supplierId || !alias.trim() || state === "saving"}
+            className="shrink-0 rounded-lg bg-inverse-surface px-3 py-1.5 text-[11px] font-bold text-inverse-ink disabled:opacity-30"
+          >
+            {state === "saving" ? "يحفظ…" : "اربط"}
+          </button>
+          {state === "error" && message && (
+            <p className="w-full text-[11px] text-danger">{message}</p>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+export function BankImport({
+  openInvoiceCount,
+  suppliers,
+}: {
+  openInvoiceCount: number;
+  suppliers: SupplierOption[];
+}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<File | null>(null);
@@ -39,6 +147,8 @@ export function BankImport({ openInvoiceCount }: { openInvoiceCount: number }) {
   const [done, setDone] = useState<string | null>(null);
   const [marking, setMarking] = useState(false);
   const [markResult, setMarkResult] = useState<string | null>(null);
+  /** كم اسماً بنكياً تعلّمه النظام في هذه الجلسة — يفتح زرّ إعادة المطابقة */
+  const [learned, setLearned] = useState(0);
 
   const send = useCallback(async (file: File, apply: boolean) => {
     setBusy(apply ? "applying" : "reading");
@@ -53,6 +163,7 @@ export function BankImport({ openInvoiceCount }: { openInvoiceCount: number }) {
       if (apply) {
         setDone(`طوبقت ${json.summary.matchedInvoices} فاتورة من ${json.created} تحويلاً`);
         setData(null);
+        setLearned(0);
         router.refresh();
       } else {
         setData(json as Preview);
@@ -156,17 +267,54 @@ export function BankImport({ openInvoiceCount }: { openInvoiceCount: number }) {
               </>
             )}
 
-            {data.unknownTop.length > 0 && (
+            {data.unknown.length > 0 && (
               <>
-                <p className="mt-4 text-xs font-bold text-warn">أكبر الحركات المجهولة</p>
+                <p className="mt-5 text-xs font-bold text-warn">
+                  {data.unknown.length} حركة لم يُعرف مستفيدها
+                </p>
+                <p className="text-[11px] leading-relaxed text-muted">
+                  اسم المورّد في البنك يخالف اسمه عندنا غالباً. اربط كلّ حركة بمورّدها مرّة
+                  واحدة، ويُحفظ الاسم البنكي فتُطابَق الحركات المشابهة تلقائياً بعدها.
+                  {learned > 0 && ` — رُبط ${learned} حتى الآن.`}
+                </p>
+
+                <ul className="mt-2 max-h-[26rem] divide-y divide-line overflow-y-auto rounded-lg border border-line">
+                  {data.unknown.map((u) => (
+                    <UnknownRow
+                      key={u.id}
+                      tx={u}
+                      suppliers={suppliers}
+                      onLearned={() => setLearned((n) => n + 1)}
+                    />
+                  ))}
+                </ul>
+
+                {learned > 0 && (
+                  <button
+                    onClick={() => fileRef.current && send(fileRef.current, false)}
+                    disabled={busy !== null}
+                    className="mt-2 w-full rounded-lg border border-line px-4 py-2 text-xs font-bold hover:border-ink-soft disabled:opacity-40"
+                  >
+                    {busy === "reading" ? "يعيد المطابقة…" : "أعد المطابقة بالأسماء الجديدة"}
+                  </button>
+                )}
+              </>
+            )}
+
+            {data.supplierOnlyList.length > 0 && (
+              <>
+                <p className="mt-5 text-xs font-bold">عُرف المورّد ولم تُطابَق فاتورة</p>
                 <p className="text-[11px] text-muted">
-                  لم يُعرف المستفيد. أضف اسمه البنكي إلى المورّد ليُطابَق مستقبلاً.
+                  تحويل إلى مورّد معروف لا تفسّره فاتورة مفتوحة — إمّا سُدّدت سلفاً أو لم تُرفع فاتورتها.
                 </p>
                 <ul className="mt-1.5 divide-y divide-line">
-                  {data.unknownTop.slice(0, 6).map((u, i) => (
+                  {data.supplierOnlyList.slice(0, 8).map((u, i) => (
                     <li key={i} className="flex items-center justify-between gap-3 py-1.5 text-xs">
-                      <span className="min-w-0 truncate text-ink-soft" dir="ltr">{u.description}</span>
-                      <span className="nums shrink-0" dir="ltr">{formatRiyalsDisplay(u.amountMinor)}</span>
+                      <span className="min-w-0 truncate">{u.supplierName}</span>
+                      <span className="nums shrink-0 text-muted" dir="ltr">{u.date}</span>
+                      <span className="nums shrink-0 font-medium" dir="ltr">
+                        {formatRiyalsDisplay(u.amountMinor)}
+                      </span>
                     </li>
                   ))}
                 </ul>

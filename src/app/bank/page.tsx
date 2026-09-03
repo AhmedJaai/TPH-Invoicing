@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { invoices } from "@/db/schema";
+import { invoices, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, PageShell } from "@/components/page-shell";
@@ -29,6 +29,12 @@ export default async function BankPage() {
       select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = invoices.id
     ), 0) + 1`);
 
+  const supplierRows = await db
+    .select({ id: suppliers.id, nameAr: suppliers.nameAr })
+    .from(suppliers)
+    .where(eq(suppliers.isActive, true))
+    .orderBy(asc(suppliers.nameAr));
+
   return (
     <PageShell
       user={user}
@@ -36,7 +42,7 @@ export default async function BankPage() {
       title="السداد"
       intro="طريقان لإقفال الفواتير المفتوحة: مطابقة كشف البنك، أو اعتمادها مسدَّدة بإقرارك. الأول أدقّ والثاني أسرع."
     >
-      <BankImport openInvoiceCount={Number(open)} />
+      <BankImport openInvoiceCount={Number(open)} suppliers={supplierRows} />
     </PageShell>
   );
 }

@@ -6,6 +6,7 @@ import { Uploader } from "@/components/uploader";
 import { UserMenu } from "@/components/user-menu";
 import { Nav } from "@/components/nav";
 import { TrialBanner } from "@/components/trial-banner";
+import { DriveSync } from "@/components/drive-sync";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { activeProviderName } from "@/lib/extraction";
@@ -79,6 +80,10 @@ export default async function Home() {
         <div className="mt-8">
           <Uploader canSeeAmounts={showAmounts} />
         </div>
+
+        <section className="mt-8">
+          <DriveSync />
+        </section>
 
         <section className="mt-10">
           <h2 className="mb-3 text-sm font-bold">حالة النظام</h2>

@@ -10,7 +10,7 @@ import { requireUser, UnauthenticatedError } from "@/lib/session";
 import { ForbiddenError } from "@/lib/permissions";
 import { parseBankStatement } from "@/lib/bank/parse";
 import {
-  matchBankTransactions, findDuplicatePayments,
+  matchBankTransactions, findDuplicatePayments, suggestAlias,
   type BankTx, type OpenInvoice, type SupplierAliasIndex,
 } from "@/lib/bank/match";
 import { normalizeName } from "@/lib/suppliers-seed";
@@ -134,14 +134,30 @@ export async function POST(request: Request) {
         invoiceNumbers: m.invoices.map((i) => i.invoiceNumber),
         kind: m.kind,
       })),
-      unknownTop: real
+      /*
+       * الحركات المجهولة كلّها لا أكبرها فقط.
+       * هذه بالضبط ما يحتاج ربطاً يدوياً بمورّد، ومعها اقتراح للاسم البنكي
+       * كي يبدأ المستخدم من نصّ يصحّحه لا من حقل فارغ.
+       */
+      unknown: real
         .filter((m) => m.kind === "NONE")
         .sort((a, b) => b.tx.amountMinor - a.tx.amountMinor)
-        .slice(0, 15)
+        .slice(0, 60)
+        .map((m) => ({
+          id: m.tx.id,
+          date: m.tx.valueDate.toISOString().slice(0, 10),
+          amountMinor: m.tx.amountMinor,
+          description: m.tx.description.slice(0, 140),
+          suggestedAlias: suggestAlias(m.tx.description),
+        })),
+      supplierOnlyList: real
+        .filter((m) => m.kind === "SUPPLIER_ONLY")
+        .sort((a, b) => b.tx.amountMinor - a.tx.amountMinor)
+        .slice(0, 20)
         .map((m) => ({
           date: m.tx.valueDate.toISOString().slice(0, 10),
           amountMinor: m.tx.amountMinor,
-          description: m.tx.description.slice(0, 90),
+          supplierName: m.supplierName ?? "—",
         })),
     });
   }
@@ -200,7 +216,7 @@ export async function POST(request: Request) {
 
   await recordAudit({
     actorId: user.id,
-    action: "DOCUMENT_ARCHIVED",
+    action: "BANK_IMPORTED",
     entityType: "bank_import",
     entityId: imp.id,
     after: { ...summary, مدفوعات_أُنشئت: created },

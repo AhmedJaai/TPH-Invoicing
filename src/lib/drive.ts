@@ -180,3 +180,30 @@ export async function uploadFile(
     webViewLink: created.data.webViewLink ?? undefined,
   };
 }
+
+/**
+ * ينزّل محتوى ملف من الدرايف. قراءة محضة — لا يعدّل شيئاً.
+ *
+ * يُستعمل لقراءة الأرشيف القائم بمحتواه لا بأسماء ملفاته: الاسم يعطي
+ * الإجمالي وحده، والمحتوى يعطي التفصيل الضريبي والبنود.
+ */
+export async function downloadFile(
+  drive: drive_v3.Drive,
+  fileId: string,
+): Promise<{ data: Buffer; mimeType: string }> {
+  const meta = await drive.files.get({
+    fileId,
+    fields: "mimeType",
+    supportsAllDrives: true,
+  });
+
+  const res = await drive.files.get(
+    { fileId, alt: "media", supportsAllDrives: true },
+    { responseType: "arraybuffer" },
+  );
+
+  return {
+    data: Buffer.from(res.data as ArrayBuffer),
+    mimeType: meta.data.mimeType ?? "application/octet-stream",
+  };
+}

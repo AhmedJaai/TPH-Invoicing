@@ -31,6 +31,10 @@ const TYPE_TOKENS: Record<string, DocumentNameKind> = {
   invoice: "INVOICE",
   "invoice-scan": "INVOICE",
   invoices: "INVOICE",
+  // ظهرت في الأرشيف الفعلي على فاتورة سرد للتجارة بـ١١٬٦٠٠ ريال، وغيابها
+  // من هذا الجدول أسقطها من الترحيل بصمت. الصيغة مقبولة والنوع فاتورة.
+  taxinvoice: "INVOICE",
+  "tax-invoice": "INVOICE",
   statement: "STATEMENT",
   ledger: "LEDGER",
   proformainvoice: "PROFORMA",

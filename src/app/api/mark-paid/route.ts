@@ -104,7 +104,7 @@ export async function POST(request: Request) {
 
   await recordAudit({
     actorId: user.id,
-    action: "DOCUMENT_ARCHIVED",
+    action: "INVOICES_MARKED_PAID",
     entityType: "payment_run",
     entityId: body.throughMonth ?? body.supplierId ?? "manual",
     after: {

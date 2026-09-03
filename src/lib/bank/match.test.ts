@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   findDuplicatePayments, findInvoiceCombination, findSupplierInText,
   isInternalNoise, matchBankTransactions,
-  type BankTx, type OpenInvoice, type SupplierAliasIndex,
-} from "./match";
+  type BankTx, type OpenInvoice, type SupplierAliasIndex, suggestAlias } from "./match";
 import { normalizeName } from "@/lib/suppliers-seed";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
@@ -174,5 +173,23 @@ describe("كشف الدفع المكرر", () => {
       tx({ id: "a", transactionType: "نقاط بيع ودفع إلكتروني", amountMinor: 100 }),
       tx({ id: "b", transactionType: "نقاط بيع ودفع إلكتروني", amountMinor: 100 }),
     ])).toHaveLength(0);
+  });
+});
+
+describe("suggestAlias", () => {
+  it("يستخرج الاسم المميِّز من وصف بنكي مزدحم", () => {
+    const s = suggestAlias("تحويل الى شركة انس غالب حمزه خاشقجي التجارية المحدودة 123456789");
+    expect(s).toContain("خاشقجي");
+    expect(s).not.toContain("شركه");
+    expect(s).not.toContain("123456789");
+  });
+
+  it("يُسقط الكلمات الشائعة وحدها فلا يعود بفراغ حين لا يبقى غيرها", () => {
+    expect(suggestAlias("شركة التجارية المحدودة")).toBe("");
+  });
+
+  it("يحدّ عدد الكلمات", () => {
+    const s = suggestAlias("مطاعم ومقاهي الوجبات السريعة الشهية اللذيذة الفاخرة", 3);
+    expect(s.split(" ")).toHaveLength(3);
   });
 });
