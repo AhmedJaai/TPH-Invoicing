@@ -20,7 +20,8 @@ export type AuditAction =
   | "DRIVE_SYNCED"
   | "BANK_IMPORTED"
   | "INVOICES_MARKED_PAID"
-  | "SUPPLIER_ALIAS_LEARNED";
+  | "SUPPLIER_ALIAS_LEARNED"
+  | "STATEMENT_RECONCILED";
 
 export async function recordAudit(entry: {
   actorId?: string | null;

@@ -66,6 +66,23 @@ const GEMINI_SCHEMA = {
         required: ["description", "quantity", "unitPrice", "lineTotal"],
       },
     },
+    openingBalance: { type: "STRING", description: "الرصيد الافتتاحي في كشف الحساب أو فارغ" },
+    closingBalance: { type: "STRING", description: "الرصيد الختامي في كشف الحساب أو فارغ" },
+    statementLines: {
+      type: "ARRAY",
+      description: "سطور كشف الحساب — في كشوف الحساب وحدها، وفارغة في الفواتير",
+      items: {
+        type: "OBJECT",
+        properties: {
+          date: { type: "STRING" },
+          ref: { type: "STRING" },
+          description: { type: "STRING" },
+          debit: { type: "STRING" },
+          credit: { type: "STRING" },
+        },
+        required: ["date", "ref", "description", "debit", "credit"],
+      },
+    },
     confidence: {
       type: "OBJECT",
       description: "ثقتك في كل مجموعة حقول بين 0 و 1",
@@ -84,7 +101,8 @@ const GEMINI_SCHEMA = {
   required: [
     "documentKind", "supplierNameAr", "supplierNameEn", "sellerVatNumber", "sellerCrNumber",
     "buyerNameAr", "buyerVatNumber", "invoiceNumber", "invoiceDate", "subtotalAmount",
-    "vatAmount", "totalAmount", "beneficiaryName", "lines", "confidence", "notes",
+    "vatAmount", "totalAmount", "beneficiaryName", "lines",
+    "openingBalance", "closingBalance", "statementLines", "confidence", "notes",
   ],
 } as const;
 

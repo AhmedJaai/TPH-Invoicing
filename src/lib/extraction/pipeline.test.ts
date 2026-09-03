@@ -26,6 +26,7 @@ const base: ExtractionResult = {
   invoiceNumber: "260302", invoiceDate: "2026-08-17",
   subtotalAmount: "113.04", vatAmount: "16.96", totalAmount: "130.00",
   beneficiaryName: "", lines: [],
+  openingBalance: "", closingBalance: "", statementLines: [],
   confidence: { documentKind: 0.99, supplierName: 0.98, invoiceNumber: 0.97, invoiceDate: 0.99, amounts: 0.98, vatNumbers: 0.96 },
   notes: "",
 };

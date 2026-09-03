@@ -8,6 +8,9 @@ const LINKS: { href: string; label: string; needs?: Parameters<typeof can>[1] }[
   { href: "/analysis", label: "الاستهلاك", needs: "amounts:view" },
   { href: "/payments", label: "الدفعات", needs: "payment:approve" },
   { href: "/bank", label: "السداد", needs: "bank:view" },
+  { href: "/statements", label: "الكشوف", needs: "amounts:view" },
+  { href: "/close", label: "الإقفال", needs: "month:close" },
+  { href: "/documents", label: "المستندات" },
   { href: "/suppliers", label: "المورّدون" },
 ];
 

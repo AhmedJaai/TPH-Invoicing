@@ -31,6 +31,15 @@ export const invoiceLineSchema = z.object({
   lineTotal: moneyString,
 });
 
+/** سطر في كشف حساب المورّد: ما حمّله علينا وما سدّدناه. */
+export const statementLineSchema = z.object({
+  date: z.string().describe("تاريخ الحركة بصيغة YYYY-MM-DD، أو فارغ"),
+  ref: z.string().describe("المرجع أو رقم الفاتورة كما كتبه المورّد، أو فارغ"),
+  description: z.string().describe("بيان الحركة كما ورد، أو فارغ"),
+  debit: moneyString.describe("المبلغ المحمَّل علينا (مدين)، أو فارغ"),
+  credit: moneyString.describe("المبلغ المسدَّد منّا (دائن)، أو فارغ"),
+});
+
 export const extractionSchema = z.object({
   documentKind: z
     .enum(DOCUMENT_KINDS)
@@ -63,6 +72,16 @@ export const extractionSchema = z.object({
   beneficiaryName: z.string().describe("اسم المستفيد في إيصال التحويل البنكي، أو فارغ"),
 
   lines: z.array(invoiceLineSchema).describe("بنود الفاتورة. اتركها فارغة إن لم تكن مقروءة."),
+
+  /* ── كشوف الحساب وحدها ── */
+  openingBalance: moneyString.describe("الرصيد الافتتاحي في كشف الحساب، أو فارغ"),
+  closingBalance: moneyString.describe("الرصيد الختامي في كشف الحساب، أو فارغ"),
+  statementLines: z
+    .array(statementLineSchema)
+    .describe(
+      "سطور كشف الحساب. تُملأ في كشوف الحساب وحدها، وتُترك فارغة في الفواتير. " +
+        "انسخ كل سطر كما هو ولا تحسب مجموعاً ولا رصيداً.",
+    ),
 
   confidence: z
     .object({

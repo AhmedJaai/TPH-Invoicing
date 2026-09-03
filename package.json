@@ -23,7 +23,9 @@
     "try:archive": "tsx --env-file=.env scripts/try-archive.ts",
     "try:bank": "tsx --env-file=.env scripts/try-bank.ts",
     "try:match": "tsx --env-file=.env scripts/try-match.ts",
-    "drive:backfill": "tsx --env-file=.env scripts/backfill-content.ts"
+    "drive:backfill": "tsx --env-file=.env scripts/backfill-content.ts",
+    "try:statement": "tsx --env-file=.env scripts/try-statement.ts",
+    "db:merge": "tsx --env-file=.env scripts/merge-suppliers.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, documents, invoiceLines, invoices, payments, statements, issues, suppliers } from "@/db/schema";
+import { accounts, documents, invoiceLines, invoices, monthCloses, payments, statements, issues, suppliers } from "@/db/schema";
 import { isAuthBypassed, requireUser, UnauthenticatedError } from "@/lib/session";
 import { ForbiddenError } from "@/lib/permissions";
 import { driveConfig } from "@/config/drive";
@@ -105,6 +105,24 @@ export async function POST(request: Request) {
   if (duplicate) {
     return NextResponse.json(
       { error: `هذا الملف مرفوع مسبقاً باسم ${duplicate.fileName}` },
+      { status: 409 },
+    );
+  }
+
+  /*
+   * الشهر المقفل مقفل فعلاً.
+   * إقفالٌ يمكن أن يُضاف إليه بعده ليس إقفالاً، والتقارير التي بُنيت عليه
+   * تصير كاذبة بأثر رجعي. من وجد فاتورة متأخّرة يعيد فتح الشهر عمداً.
+   */
+  const [closed] = await db
+    .select({ status: monthCloses.status })
+    .from(monthCloses)
+    .where(eq(monthCloses.month, body.periodMonth))
+    .limit(1);
+
+  if (closed?.status === "CLOSED") {
+    return NextResponse.json(
+      { error: `شهر ${body.periodMonth} مقفل. أعد فتحه من صفحة الإقفال إن كانت هذه فاتورة متأخّرة.` },
       { status: 409 },
     );
   }
