@@ -52,26 +52,72 @@ function isQuotaProblem(reason: string): boolean {
 }
 
 /**
- * قراءة ملف مع صبر طويل.
+ * قائمة نماذج تُجرَّب بالترتيب.
  *
- * إعادة المحاولة داخل المزوّد تقيس بالثواني، وحصّة الطبقة المجانية تُحسب
- * بالدقيقة. فمحاولات سريعة متتابعة تستهلك الحصّة ولا تنتظر تجدّدها.
- * هنا ننتظر تجدّد الدقيقة فعلاً قبل أن نعاود.
+ * حصّة الطبقة المجانية **يومية لكل نموذج على حدة**: عشرون طلباً في اليوم
+ * لـgemini-3.8-flash. فقراءة مئة وخمسين ملفاً على نموذج واحد تحتاج أسبوعاً.
+ * ولمّا كانت الحصص منفصلة، فالانتقال من نموذج نفدت حصّته إلى غيره يجمع
+ * الحصص كلّها في شوط واحد.
+ *
+ * والأصغر أوّلاً عن قصد: حصّته أوسع، وخطؤه لا يفسد مالاً لأنّ السكربت لا
+ * يكتب مبلغاً فوق ما كتبه إنسان — يسجّل الخلاف ويترك القرار له.
+ */
+const MODELS: string[] = (
+  process.env.GEMINI_MODELS ??
+  [
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3-flash-preview",
+    "gemini-flash-latest",
+  ].join(",")
+)
+  .split(",")
+  .map((m) => m.trim())
+  .filter(Boolean);
+
+let modelIndex = 0;
+
+/** يُستعمَل للخروج المنظّم حين تنفد حصص اليوم كلّها. */
+class AllModelsExhausted extends Error {}
+
+function selectModel(i: number) {
+  modelIndex = i;
+  process.env.GEMINI_MODEL = MODELS[i];
+}
+
+/**
+ * قراءة ملف مع صبر ثم انتقال.
+ *
+ * تنتظر مرّة واحدة تجدّد الدقيقة — فقد يكون الحدّ لحظياً — فإن بقي الرفض
+ * فالحدّ يومي، والانتظار حينئذٍ عبث. فتنتقل إلى النموذج التالي.
  */
 async function extractPatiently(
   request: Parameters<typeof extractDocument>[0],
   label: string,
 ): Promise<Awaited<ReturnType<typeof extractDocument>>> {
-  const waits = [65_000, 65_000, 120_000];
-  let outcome = await extractDocument(request);
+  for (let i = modelIndex; i < MODELS.length; i++) {
+    selectModel(i);
 
-  for (let i = 0; i < waits.length && !outcome.ok && isQuotaProblem(outcome.reason); i++) {
-    console.log(`${label} — الحصّة نفدت، ننتظر ${Math.round(waits[i] / 1000)} ثانية ثم نعاود…`);
-    await wait(waits[i]);
+    let outcome = await extractDocument(request);
+    if (outcome.ok || !isQuotaProblem(outcome.reason)) return outcome;
+
+    console.log(`${label} — ${MODELS[i]} مضغوط، ننتظر ٤٠ ثانية…`);
+    await wait(40_000);
+
     outcome = await extractDocument(request);
+    if (outcome.ok || !isQuotaProblem(outcome.reason)) return outcome;
+
+    if (i + 1 < MODELS.length) {
+      console.log(`${label} — نفدت حصّة ${MODELS[i]} اليومية، ننتقل إلى ${MODELS[i + 1]}`);
+    }
   }
 
-  return outcome;
+  throw new AllModelsExhausted(
+    `نفدت حصّة اليوم في كل النماذج المتاحة (${MODELS.join("، ")}).`,
+  );
 }
 
 async function storedDrive() {
@@ -124,7 +170,7 @@ interface Outcome {
 
 async function main() {
   console.log(`\nوضع التشغيل : ${commit ? "كتابة فعلية" : "معاينة فقط (أضف --commit)"}`);
-  console.log(`قارئ الفواتير: ${activeProviderName()}`);
+  console.log(`قارئ الفواتير: ${activeProviderName()} — ${MODELS.length} نموذجاً بالتناوب`);
   console.log(`التمهّل      : ${delayMs} مللي ثانية بين ملف وآخر\n`);
 
   const drive = await storedDrive();
@@ -205,15 +251,25 @@ async function main() {
 
     const sha256 = createHash("sha256").update(data).digest("hex");
 
-    const extraction = await extractPatiently(
-      {
-        data, mimeType,
-        companyVat: companyConfig.vatNumber,
-        companyName: companyConfig.nameAr,
-        supplierNames: supplierList.map((s) => `${s.nameAr} (${s.slug})`),
-      },
-      label,
-    );
+    let extraction: Awaited<ReturnType<typeof extractDocument>>;
+    try {
+      extraction = await extractPatiently(
+        {
+          data, mimeType,
+          companyVat: companyConfig.vatNumber,
+          companyName: companyConfig.nameAr,
+          supplierNames: supplierList.map((s) => `${s.nameAr} (${s.slug})`),
+        },
+        label,
+      );
+    } catch (e) {
+      if (e instanceof AllModelsExhausted) {
+        console.log(`\n⏸  ${e.message}`);
+        console.log("   ما قُرئ محفوظ. أعد تشغيل الأمر نفسه غداً ليكمل من حيث وقف.\n");
+        break;
+      }
+      throw e;
+    }
 
     if (!extraction.ok) {
       outcomes.push({ fileName: t.fileName, status: "failed", detail: extraction.reason });
@@ -295,8 +351,10 @@ async function main() {
         const stored = t.storedTotalMinor ?? null;
         const agrees =
           extractedTotal !== null && stored !== null && Math.abs(extractedTotal - stored) <= 1;
+        // المستند قد يكون مبسّطاً بلا تفصيل ضريبي — وهذا ليس خلافاً في المبلغ
+        const hasBreakdown = extractedSubtotal !== null && extractedVat !== null;
 
-        if (agrees && extractedSubtotal !== null && extractedVat !== null) {
+        if (agrees && hasBreakdown) {
           await tx.update(invoices).set({
             subtotalMinor: extractedSubtotal,
             vatMinor: extractedVat,
@@ -311,6 +369,22 @@ async function main() {
             fileName: t.fileName, status: "updated",
             detail: `ضريبة ${formatRiyalsDisplay(extractedVat)} · ${review.isTaxValid ? "ضريبية كاملة" : "لا تصلح للخصم"}`,
           });
+        } else if (agrees) {
+          // المبلغ متطابق ولا تفصيل ضريبي في المستند — فاتورة مبسّطة غالباً
+          await tx.update(invoices).set({
+            subtotalMinor: extractedSubtotal ?? extractedTotal!,
+            vatMinor: extractedVat ?? 0,
+            sellerVat: x.sellerVatNumber || null,
+            buyerVat: x.buyerVatNumber || null,
+            isTaxValid: review.isTaxValid,
+            inputVatEligible: review.inputVatEligible,
+            isFixedAsset: review.isFixedAsset,
+            updatedAt: new Date(),
+          }).where(eq(invoices.id, invoiceId));
+          outcomes.push({
+            fileName: t.fileName, status: "updated",
+            detail: "بلا تفصيل ضريبي في المستند — لا تصلح للخصم",
+          });
         } else {
           // لا نكتب المبالغ فوق ما كتبه إنسان. نسجّل الخلاف ليراجعه.
           await tx.update(invoices).set({
@@ -323,6 +397,18 @@ async function main() {
             detail: `الاسم ${stored !== null ? formatRiyalsDisplay(stored) : "—"} · المحتوى ${extractedTotal !== null ? formatRiyalsDisplay(extractedTotal) : "لم يُقرأ"}`,
           });
         }
+      } else if (t.documentId) {
+        /*
+         * مستند من الأرشيف بلا صفّ فاتورة: معناه أنّ اسم الملف لم يحمل رقماً.
+         * ولا نأخذ الرقم من النموذج هنا — رأيناه يخترع «TPH-20260521» ويعطيه
+         * ثقة ١٫٠ كاملة. فالثقة لا تحرس من الاختراع، والرقم المخترع في نظام
+         * محاسبي أسوأ من غيابه. يُترك ليُدخله إنسان.
+         */
+        outcomes.push({
+          fileName: t.fileName,
+          status: "skipped",
+          detail: `${x.documentKind} — لا رقم فاتورة في اسم الملف، أدخله يدوياً`,
+        });
       } else if (review.canCreateInvoice && supplierId) {
         const [inv] = await tx.insert(invoices).values({
           documentId: documentId!,
@@ -386,7 +472,10 @@ async function main() {
     });
 
     const last = outcomes[outcomes.length - 1];
-    console.log(`${label} — ${last.status} · ${last.detail}${last.linesAdded ? ` · ${last.linesAdded} بند` : ""}`);
+    console.log(
+      `${label} — ${last.status} · ${last.detail}` +
+        `${last.linesAdded ? ` · ${last.linesAdded} بند` : ""} · ${MODELS[modelIndex]}`,
+    );
     await wait(delayMs);
   }
 
@@ -403,6 +492,7 @@ async function main() {
   console.log(`لا تُقيَّد        : ${count("skipped")}`);
   console.log(`فشلت            : ${count("failed")}`);
   console.log(`بنود مسجّلة     : ${lines}`);
+  console.log(`آخر نموذج       : ${MODELS[modelIndex]}`);
 
   const mismatches = outcomes.filter((o) => o.status === "mismatch");
   if (mismatches.length) {
