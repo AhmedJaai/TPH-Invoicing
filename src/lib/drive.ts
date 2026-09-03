@@ -33,13 +33,31 @@ export function createOAuthClient(redirectUri?: string): OAuth2Client {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-/** عميل درايف من refresh token مخزّن في البيئة — للأدوات التي تعمل من الطرفية. */
+/**
+ * عميل درايف لأدوات الطرفية.
+ *
+ * يفضّل تفويض مستخدم مسجَّل في قاعدة البيانات على متغيّر بيئة منفصل —
+ * فمن سجّل دخوله ووافق على صلاحية الدرايف يكفي، ولا حاجة لخطوة إعداد ثانية.
+ */
+export async function driveForCli(
+  lookupStoredToken?: () => Promise<string | null>,
+): Promise<drive_v3.Drive> {
+  const token = process.env.GOOGLE_DRIVE_REFRESH_TOKEN ?? (await lookupStoredToken?.()) ?? null;
+  if (!token) {
+    throw new Error(
+      "لا يوجد تفويض درايف. سجّل دخولك في التطبيق مرة واحدة، أو شغّل: npm run drive:auth",
+    );
+  }
+  const auth = createOAuthClient();
+  auth.setCredentials({ refresh_token: token });
+  return google.drive({ version: "v3", auth });
+}
+
+/** نسخة متزامنة تعتمد متغيّر البيئة وحده. */
 export function driveFromEnv(): drive_v3.Drive {
   const token = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
   if (!token) {
-    throw new Error(
-      "GOOGLE_DRIVE_REFRESH_TOKEN غير مضبوط. شغّل أولاً:\n  npm run drive:auth",
-    );
+    throw new Error("GOOGLE_DRIVE_REFRESH_TOKEN غير مضبوط. شغّل: npm run drive:auth");
   }
   const auth = createOAuthClient();
   auth.setCredentials({ refresh_token: token });

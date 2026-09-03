@@ -74,6 +74,11 @@ describe("رفض الأسماء المخالفة", () => {
   it("يرفض مبلغاً بلا منزلتين عشريتين", () => {
     const r = parseFileName("2026-08-17_OliveLeaves_Invoice_260302_SAR410.pdf", SLUGS);
     expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain("منزلتين");
+  });
+
+  it("يتجاهل ملفات الملاحظات", () => {
+    expect(parseFileName("NOTES.txt", SLUGS).ok).toBe(false);
   });
 
   it("يرفض تاريخاً غير موجود", () => {
@@ -132,5 +137,68 @@ describe("البناء والتفكيك متعاكسان", () => {
   it("النقدي يحتفظ بامتداد الصورة", () => {
     expect(buildCashFileName({ date: "2026-09-01", description: "ثلج", amountMinor: 5_000 }))
       .toBe("2026-09-01_Cash_ثلج_SAR50.00.jpg");
+  });
+});
+
+
+describe("صيغ حقيقية من الأرشيف لم يتوقّعها المفكّك أولاً", () => {
+  it("كشف بوصف فترة قبل المبلغ", () => {
+    const r = parseFileName("2026-05-31_Ganache-AGK_Statement_May_SAR6371.00.pdf", ["Ganache-AGK"]);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.kind).toBe("STATEMENT");
+    expect(r.value.slug).toBe("Ganache-AGK");
+    expect(r.value.periodLabel).toBe("May");
+    expect(r.value.amountMinor).toBe(637_100);
+  });
+
+  it("كشف بوصف بدل المبلغ", () => {
+    const r = parseFileName("2026-07-31_OliveLeaves_Statement_to-31-07.pdf", SLUGS);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.amountMinor).toBeUndefined();
+    expect(r.value.periodLabel).toBe("to-31-07");
+  });
+
+  it("فاتورة مبدئية تُميَّز عن الفاتورة", () => {
+    const r = parseFileName("2026-05-17_GoldenCup_ProformaInvoice_INV263287_SAR13506.75.pdf", SLUGS);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.kind).toBe("PROFORMA");
+    expect(r.value.invoiceNumber).toBe("INV263287");
+  });
+
+  it("فاتورة بلا رقم", () => {
+    const r = parseFileName("2026-05-21_LavaKombucha_Invoice_SAR405.00.pdf", SLUGS);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.kind).toBe("INVOICE");
+    expect(r.value.invoiceNumber).toBeUndefined();
+    expect(r.value.amountMinor).toBe(40_500);
+  });
+
+  it("اسم يحمل الشهر بلا يوم يُعلَّم", () => {
+    const r = parseFileName("2026-05_HungryManBakery_Invoices_INVA-02527_SAR240.00.pdf", []);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.date).toBe("2026-05-01");
+    expect(r.value.monthOnly).toBe(true);
+  });
+
+  it("الدفتر يُقرأ ككشف", () => {
+    const r = parseFileName("2026-05-31_HungryManBakery_Ledger_May_SAR240.00.pdf", []);
+    expect(r.ok && r.value.kind).toBe("LEDGER");
+  });
+
+  it("الفاتورة الصادرة تُميَّز عن الواردة", () => {
+    const r = parseFileName("2026-07-01_SalesInvoice_SabeaJar_S00011_SAR1100.00.pdf", []);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.kind).toBe("SALES_INVOICE");
+  });
+
+  it("الفاتورة الممسوحة تُقرأ كفاتورة", () => {
+    const r = parseFileName("2026-06-13_PURE-Oska_Invoice-scan_SAR396.75.pdf", ["PURE-Oska"]);
+    expect(r.ok && r.value.kind).toBe("INVOICE");
   });
 });

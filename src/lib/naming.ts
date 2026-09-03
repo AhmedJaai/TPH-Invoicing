@@ -13,19 +13,50 @@
  */
 import { formatRiyals, parseRiyals } from "./money";
 
-export type DocumentNameKind = "INVOICE" | "STATEMENT" | "RECEIPT" | "CASH";
+export type DocumentNameKind =
+  | "INVOICE"
+  | "STATEMENT"
+  | "RECEIPT"
+  | "CASH"
+  | "PROFORMA"
+  | "QUOTATION"
+  | "LEDGER"
+  | "SALES_INVOICE";
+
+/**
+ * أنواع المستندات كما تظهر في أسماء الملفات، بكل صيغها في الأرشيف الفعلي.
+ * المفتاح بحروف صغيرة للمطابقة، والقيمة هي النوع المعياري.
+ */
+const TYPE_TOKENS: Record<string, DocumentNameKind> = {
+  invoice: "INVOICE",
+  "invoice-scan": "INVOICE",
+  invoices: "INVOICE",
+  statement: "STATEMENT",
+  ledger: "LEDGER",
+  proformainvoice: "PROFORMA",
+  proforma: "PROFORMA",
+  quotation: "QUOTATION",
+  "quotation-draft": "QUOTATION",
+  salesinvoice: "SALES_INVOICE",
+  customerpayment: "RECEIPT",
+};
 
 export interface ParsedFileName {
   kind: DocumentNameKind;
-  /** التاريخ بصيغة YYYY-MM-DD كما ورد في الاسم */
+  /** التاريخ بصيغة YYYY-MM-DD. الأسماء التي تحمل الشهر وحده تُكمَّل باليوم الأول */
   date: string;
+  /** صحيح حين لم يحمل الاسم يوماً — يُنبَّه عليه بدل تخمينه بصمت */
+  monthOnly?: boolean;
   slug?: string;
   invoiceNumber?: string;
+  /** وصف الفترة في الكشوف: "May" أو "to-31-07" */
+  periodLabel?: string;
   /** اسم المستفيد البنكي إن وُجد في اسم ملف الإيصال */
   beneficiary?: string;
   /** وصف الإيصال النقدي */
   description?: string;
-  amountMinor: number;
+  /** يغيب حين لا يحمل الاسم مبلغاً — بعض الكشوف تحمل وصفاً بدله */
+  amountMinor?: number;
   extension: string;
   /** رقم النسخة عند تكرار الاسم: "‎(2)" ← 2 */
   duplicateIndex?: number;
@@ -78,12 +109,27 @@ export function splitSlugAndBeneficiary(
   return { slug: token.slice(0, dash), beneficiary: token.slice(dash + 1) };
 }
 
+/** التاريخ الكامل أو الشهر وحده — الأرشيف يحوي الصيغتين. */
+function parseDateToken(value: string): { date: string; monthOnly: boolean } | null {
+  if (DATE_RE.test(value) && isRealDate(value)) return { date: value, monthOnly: false };
+  if (/^\d{4}-\d{2}$/.test(value)) {
+    const m = Number(value.slice(5));
+    if (m >= 1 && m <= 12) return { date: `${value}-01`, monthOnly: true };
+  }
+  return null;
+}
+
 export function parseFileName(
   fileName: string,
   knownSlugs: readonly string[] = [],
 ): ParseResult {
   const { base: rawBase, extension } = splitExtension(fileName);
   if (!extension) return { ok: false, reason: "الملف بلا امتداد" };
+
+  // ملفات خدمية لا محاسبية
+  if (extension === "txt" || extension === "md") {
+    return { ok: false, reason: "ملف ملاحظات لا مستند محاسبي" };
+  }
 
   let base = rawBase;
   let duplicateIndex: number | undefined;
@@ -96,46 +142,91 @@ export function parseFileName(
   const parts = base.split("_");
   if (parts.length < 3) return { ok: false, reason: "عدد المقاطع أقل من المتوقع" };
 
-  const [date, marker] = parts;
-  if (!isRealDate(date)) return { ok: false, reason: `تاريخ غير صالح: ${date}` };
+  const parsedDate = parseDateToken(parts[0]);
+  if (!parsedDate) return { ok: false, reason: `تاريخ غير صالح: ${parts[0]}` };
+  const { date, monthOnly } = parsedDate;
 
-  const amountToken = parts[parts.length - 1];
-  const amountMatch = amountToken.match(AMOUNT_RE);
-  if (!amountMatch) {
-    return { ok: false, reason: `مبلغ غير صالح: ${amountToken} — يجب أن يكون SAR بمنزلتين عشريتين` };
+  // المبلغ اختياري: بعض الكشوف تحمل وصف فترة بدل الرقم.
+  // لكن ما بدأ بـSAR فهو محاولة كتابة مبلغ — نرفضه إن خالف الصيغة بدل
+  // أن نعدّه وصفاً، وإلا مرّت الأخطاء المطبعية في المبالغ بصمت.
+  let amountMinor: number | undefined;
+  const lastPart = parts[parts.length - 1];
+  const amountMatch = lastPart.match(AMOUNT_RE);
+  if (amountMatch) {
+    const parsed = parseRiyals(amountMatch[1]);
+    if (parsed === null) return { ok: false, reason: `تعذّر قراءة المبلغ: ${lastPart}` };
+    amountMinor = parsed;
+  } else if (/^SAR/i.test(lastPart)) {
+    return {
+      ok: false,
+      reason: `مبلغ غير صالح: ${lastPart} — يجب أن يكون SAR بمنزلتين عشريتين`,
+    };
   }
-  const amountMinor = parseRiyals(amountMatch[1]);
-  if (amountMinor === null) return { ok: false, reason: `تعذّر قراءة المبلغ: ${amountToken}` };
 
-  const common = { date, amountMinor, extension, duplicateIndex };
+  const common = { date, monthOnly, amountMinor, extension, duplicateIndex };
+  const marker = parts[1];
 
   if (marker === "Receipt") {
-    if (parts.length !== 4) return { ok: false, reason: "صيغة إيصال غير مكتملة" };
     const { slug, beneficiary } = splitSlugAndBeneficiary(parts[2], knownSlugs);
     return { ok: true, value: { kind: "RECEIPT", slug, beneficiary, ...common } };
   }
 
   if (marker === "Cash") {
-    if (parts.length < 4) return { ok: false, reason: "الإيصال النقدي بلا وصف" };
-    const description = parts.slice(2, -1).join("_");
+    const end = amountMatch ? -1 : undefined;
+    const description = parts.slice(2, end).join("_");
+    if (!description) return { ok: false, reason: "الإيصال النقدي بلا وصف" };
     return { ok: true, value: { kind: "CASH", description, ...common } };
   }
 
-  const type = parts[2];
-  if (type === "Invoice") {
-    if (parts.length !== 5) return { ok: false, reason: "صيغة فاتورة غير مكتملة" };
+  // بعض الأنواع تسبق الاسم (فاتورة صادرة، دفعة عميل) كما يسبقه Receipt وCash
+  const leading = TYPE_TOKENS[marker.toLowerCase()];
+  if (leading) {
+    const rest = parts.slice(2, amountMatch ? -1 : undefined).filter(Boolean);
     return {
       ok: true,
-      value: { kind: "INVOICE", slug: marker, invoiceNumber: parts[3], ...common },
+      value: {
+        kind: leading,
+        slug: rest[0],
+        invoiceNumber: rest.length > 1 ? rest.slice(1).join("_") : undefined,
+        ...common,
+      },
     };
   }
 
-  if (type === "Statement") {
-    if (parts.length !== 4) return { ok: false, reason: "صيغة كشف غير مكتملة" };
-    return { ok: true, value: { kind: "STATEMENT", slug: marker, ...common } };
+  // وإلا فالنوع بعد اسم المورّد
+  let typeIndex = -1;
+  let kind: DocumentNameKind | undefined;
+  for (let i = 2; i < parts.length; i++) {
+    const found = TYPE_TOKENS[parts[i].toLowerCase()];
+    if (found) {
+      typeIndex = i;
+      kind = found;
+      break;
+    }
   }
 
-  return { ok: false, reason: `نوع مستند غير معروف: ${type}` };
+  if (!kind) return { ok: false, reason: `نوع مستند غير معروف: ${parts[2]}` };
+
+  const slug = parts.slice(1, typeIndex).join("_");
+  if (!slug) return { ok: false, reason: "لا يوجد اسم مورّد" };
+
+  // ما بين النوع والمبلغ: رقم الفاتورة أو وصف الفترة
+  const tail = parts.slice(typeIndex + 1, amountMatch ? -1 : undefined).filter(Boolean);
+  const descriptor = tail.join("_") || undefined;
+
+  const needsNumber = kind === "INVOICE" || kind === "SALES_INVOICE" || kind === "PROFORMA";
+
+  return {
+    ok: true,
+    value: {
+      kind,
+      slug,
+      // رقم الفاتورة إن وُجد؛ وغيابه مقبول لأنّ بعض الفواتير في الأرشيف بلا رقم
+      invoiceNumber: needsNumber ? descriptor : undefined,
+      periodLabel: needsNumber ? undefined : descriptor,
+      ...common,
+    },
+  };
 }
 
 export interface BuildOptions {

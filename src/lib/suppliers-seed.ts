@@ -75,8 +75,22 @@ export const SUPPLIER_SEED: SupplierSeed[] = [
     notes: "غير مذكور في قائمة الأسماء المختصرة الأصلية — الاسم المختصر مقترح ويحتاج تأكيد المالك",
   },
   {
-    slug: "HungryMan", driveFolderName: "Hungry Man", nameAr: "هنقري مان", nameEn: "Hungry Man", category: "FOOD",
-    notes: "وارد في قائمة المالك ولم يُرصد له مجلد في الأشهر التي جُردت — اسم المجلد يحتاج تأكيداً",
+    slug: "HungryMan", driveFolderName: "Hungry Man Bakery", nameAr: "هنقري مان بيكري", nameEn: "Hungry Man Bakery", category: "FOOD",
+  },
+  {
+    slug: "HungryManBakery", driveFolderName: "Hungry Man Bakery ", nameAr: "هنقري مان بيكري (صيغة ثانية)",
+    nameEn: "Hungry Man Bakery", category: "FOOD",
+    notes: "صيغة اسم ثانية ظهرت في الأرشيف — تُدمج مع HungryMan عند التوحيد",
+  },
+  {
+    slug: "Ganache-AGK", driveFolderName: "Ganache (AGK) ", nameAr: "غاناش (صيغة ثانية)", nameEn: "Ganache AGK",
+    category: "FOOD",
+    notes: "صيغة اسم ثانية في كشوف مايو — تُدمج مع Ganache عند التوحيد",
+  },
+  {
+    slug: "SabeaJar", driveFolderName: "Sales - Sabea Jar (فاتورة صادرة)", nameAr: "سبعة جرة — عميل",
+    nameEn: "Sabea Jar", category: "OTHER",
+    notes: "عميل لا مورّد — فواتيرنا الصادرة إليه. لا تدخل المشتريات",
   },
 ];
 

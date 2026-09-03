@@ -8,13 +8,26 @@
  * وكتابة في قاعدة البيانات وحدها. ويربط كل سجل بملفه عبر driveFileId.
  */
 import { writeFileSync, mkdirSync } from "node:fs";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { documents, invoices, payments, statements, suppliers, supplierAliases } from "@/db/schema";
-import { driveFromEnv, isFolder, listChildren, type DriveFile } from "@/lib/drive";
+import { accounts, documents, invoices, payments, statements, suppliers, supplierAliases } from "@/db/schema";
+import { driveForCli, isFolder, listChildren, type DriveFile } from "@/lib/drive";
 import { parseFileName, type ParsedFileName } from "@/lib/naming";
 import { driveConfig, SUPPLIER_INFO_CARD } from "@/config/drive";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { KNOWN_SLUGS, normalizeName } from "@/lib/suppliers-seed";
+
+/** يقرأ تفويض الدرايف من أول مستخدم سجّل دخوله. */
+async function storedDrive() {
+  return driveForCli(async () => {
+    const [row] = await db
+      .select({ token: accounts.refresh_token })
+      .from(accounts)
+      .where(eq(accounts.provider, "google"))
+      .limit(1);
+    return row?.token ?? null;
+  });
+}
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const commit = process.argv.includes("--commit");
@@ -27,15 +40,20 @@ interface Row {
   problem?: string;
 }
 
-const KIND_TO_DOCUMENT = {
+const KIND_TO_DOCUMENT: Record<string, string> = {
   INVOICE: "TAX_INVOICE",
   STATEMENT: "STATEMENT",
   RECEIPT: "RECEIPT",
   CASH: "CASH_RECEIPT",
-} as const;
+  PROFORMA: "PROFORMA",
+  QUOTATION: "QUOTATION",
+  LEDGER: "STATEMENT",
+  // فاتورة صادرة منّا لا واردة إلينا — تُحفظ ولا تدخل المشتريات
+  SALES_INVOICE: "UNKNOWN",
+};
 
 async function collect(): Promise<Row[]> {
-  const drive = driveFromEnv();
+  const drive = await storedDrive();
   const rows: Row[] = [];
 
   for (const [year, yearFolderId] of Object.entries(driveConfig.yearFolderIds)) {
@@ -104,6 +122,18 @@ async function main() {
     if (p.slug && !supplier) {
       needsAttention.push(`${row.month}/${row.file.name} — المورد ${p.slug} غير مسجّل`);
     }
+    if (p.amountMinor === undefined) {
+      needsAttention.push(`${row.month}/${row.file.name} — لا مبلغ في الاسم، سُجّل كمستند بلا قيد`);
+    }
+    if (p.monthOnly) {
+      needsAttention.push(`${row.month}/${row.file.name} — الاسم يحمل الشهر بلا يوم`);
+    }
+    if (p.kind === "INVOICE" && !p.invoiceNumber) {
+      needsAttention.push(`${row.month}/${row.file.name} — فاتورة بلا رقم في الاسم`);
+    }
+    if (p.kind === "SALES_INVOICE") {
+      needsAttention.push(`${row.month}/${row.file.name} — فاتورة صادرة منّا، لا تدخل المشتريات`);
+    }
 
     // أسماء المستفيدين البنكية هدية مجانية من أسماء ملفات الإيصالات
     if (p.kind === "RECEIPT" && p.beneficiary && p.slug) {
@@ -135,7 +165,7 @@ async function main() {
         .returning({ id: documents.id });
       created++;
 
-      if (p.kind === "INVOICE" && supplier && p.invoiceNumber) {
+      if (p.kind === "INVOICE" && supplier && p.invoiceNumber && p.amountMinor !== undefined) {
         await tx
           .insert(invoices)
           .values({
@@ -153,7 +183,7 @@ async function main() {
         invoicesCreated++;
       }
 
-      if (p.kind === "STATEMENT" && supplier) {
+      if ((p.kind === "STATEMENT" || p.kind === "LEDGER") && supplier && p.amountMinor !== undefined) {
         const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
         await tx.insert(statements).values({
           documentId: doc.id,
@@ -165,7 +195,7 @@ async function main() {
         statementsCreated++;
       }
 
-      if (p.kind === "RECEIPT" || p.kind === "CASH") {
+      if ((p.kind === "RECEIPT" || p.kind === "CASH") && p.amountMinor !== undefined) {
         await tx.insert(payments).values({
           documentId: doc.id,
           supplierId: supplier?.id ?? null,
@@ -204,7 +234,7 @@ async function main() {
   }
 
   // ── التقرير ──
-  const totalMinor = parsed.reduce((sum, r) => sum + r.parsed!.amountMinor, 0);
+  const totalMinor = parsed.reduce((sum, r) => sum + (r.parsed!.amountMinor ?? 0), 0);
   console.log("═".repeat(58));
   console.log("  تقرير الترحيل");
   console.log("═".repeat(58));

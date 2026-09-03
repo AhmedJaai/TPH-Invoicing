@@ -8,7 +8,10 @@
  * خريطة «اسم المجلد ← الاسم المختصر» وأسماء المستفيدين البنكيين.
  */
 import { writeFileSync, mkdirSync } from "node:fs";
-import { driveFromEnv, isFolder, listChildren, type DriveFile } from "@/lib/drive";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { accounts } from "@/db/schema";
+import { driveForCli, isFolder, listChildren, type DriveFile } from "@/lib/drive";
 import { parseFileName, type ParsedFileName } from "@/lib/naming";
 import { driveConfig, SERVICE_FOLDER_NAMES, SUPPLIER_INFO_CARD } from "@/config/drive";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -23,10 +26,22 @@ interface Row {
   problem?: string;
 }
 
+/** يقرأ تفويض الدرايف من أول مستخدم سجّل دخوله. */
+async function storedDrive() {
+  return driveForCli(async () => {
+    const [row] = await db
+      .select({ token: accounts.refresh_token })
+      .from(accounts)
+      .where(eq(accounts.provider, "google"))
+      .limit(1);
+    return row?.token ?? null;
+  });
+}
+
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
 async function main() {
-  const drive = driveFromEnv();
+  const drive = await storedDrive();
   const rows: Row[] = [];
   const infoCards: string[] = [];
 
@@ -90,11 +105,12 @@ function report(rows: Row[], infoCards: string[]) {
     const k = r.parsed!.kind;
     const e = byKind.get(k) ?? { count: 0, totalMinor: 0 };
     e.count++;
-    e.totalMinor += r.parsed!.amountMinor;
+    e.totalMinor += r.parsed!.amountMinor ?? 0;
     byKind.set(k, e);
   }
   const kindLabel: Record<string, string> = {
     INVOICE: "فواتير", STATEMENT: "كشوف", RECEIPT: "إيصالات سداد", CASH: "نقدي",
+    PROFORMA: "فواتير مبدئية", QUOTATION: "عروض أسعار", LEDGER: "دفاتر", SALES_INVOICE: "فواتير صادرة",
   };
   console.log(`\n── حسب النوع ──`);
   for (const [kind, e] of [...byKind].sort((a, b) => b[1].count - a[1].count)) {
