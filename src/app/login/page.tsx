@@ -2,9 +2,15 @@ import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
 
 const ERROR_TEXT: Record<string, string> = {
-  AccessDenied: "هذا البريد غير مصرَّح له بالدخول. راجع أحمد لإضافتك.",
+  AccessDenied: "هذا البريد غير مصرَّح له بالدخول. راجع أحمد لإضافتك إلى القائمة البيضاء.",
   Configuration: "إعدادات الدخول غير مكتملة. راجع متغيّرات جوجل في الخادم.",
   Verification: "انتهت صلاحية رابط الدخول. حاول مرة أخرى.",
+  // يقع حين يوجد مستخدم بهذا البريد في قاعدة البيانات بلا حساب جوجل مرتبط
+  OAuthAccountNotLinked:
+    "هذا البريد مسجّل في النظام لكنه غير مرتبط بحساب جوجل. يلزم حذف سجلّه ثم إعادة المحاولة.",
+  OAuthCallback: "تعذّر إكمال التفويض مع جوجل. تأكّد أنّ عنوان الرجوع مسجّل في بيانات الاعتماد.",
+  OAuthSignin: "تعذّر بدء التفويض مع جوجل. راجع Client ID و Client Secret.",
+  Callback: "تعذّر إكمال الدخول بعد رجوعك من جوجل.",
 };
 
 export default async function LoginPage({
