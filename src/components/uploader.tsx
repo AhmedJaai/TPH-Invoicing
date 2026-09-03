@@ -187,9 +187,15 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
     const it = target;
     const r = it.data.result;
 
+    // مهلة صريحة: الطلب الذي لا يردّ خلال دقيقتين يُلغى برسالة مفهومة
+    // بدل أن يبقى الزرّ «يرفع…» إلى الأبد.
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 120_000);
+
     try {
       const res = await fetch("/api/archive", {
         method: "POST",
+        signal: abort.signal,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           fileName: it.edited.fileName || r.proposedFileName,
@@ -237,13 +243,22 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
         ),
       );
     } catch (e) {
+      const aborted = (e as Error).name === "AbortError";
       setItems((prev) =>
         prev.map((x) =>
           x.id === id && x.state === "done"
-            ? { ...x, archiving: false, archiveError: (e as Error).message }
+            ? {
+                ...x,
+                archiving: false,
+                archiveError: aborted
+                  ? "تأخّر الخادم أكثر من دقيقتين ولم يردّ. تحقّق من الدرايف قبل إعادة المحاولة."
+                  : (e as Error).message,
+              }
             : x,
         ),
       );
+    } finally {
+      clearTimeout(timer);
     }
   }, []);
 

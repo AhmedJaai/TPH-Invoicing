@@ -17,7 +17,7 @@ import { requireUser, UnauthenticatedError } from "@/lib/session";
 import { ForbiddenError } from "@/lib/permissions";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 const MAX_BYTES = 25 * 1024 * 1024;
 

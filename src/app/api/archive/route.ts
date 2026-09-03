@@ -19,7 +19,7 @@ import { diffCorrections, recordAudit } from "@/lib/audit";
 import { normalizeItem } from "@/lib/items";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 interface ArchiveBody {
   fileName: string;
