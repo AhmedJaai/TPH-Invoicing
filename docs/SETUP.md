@@ -7,39 +7,52 @@
 
 ## الخطوة ١ — بيانات جوجل (إلزامية)
 
-بدونها لا يدخل أحد ولا يُرفع شيء.
+> جوجل غيّرت هذه الواجهة في ٢٠٢٦ إلى «Google Auth Platform»، وقسّمت ما كان
+> صفحة واحدة إلى أربعة أقسام. الخطوات أدناه للواجهة الجديدة.
 
-### ١-أ · أنشئ مشروعاً
+**لا تبدأ تجربة الـ٣٠٠ دولار** — لا نحتاج فوترة، وهي تطلب بطاقة بلا داعٍ.
 
-1. افتح [console.cloud.google.com](https://console.cloud.google.com).
-2. قائمة المشاريع أعلى الشاشة ← **New Project** ← سمِّه `TPH Invoicing` ← **Create**.
-3. تأكّد أنه المشروع المختار قبل كل خطوة تالية.
+### ١-أ · أنشئ مشروعاً وفعّل واجهة الدرايف
 
-### ١-ب · فعّل واجهة الدرايف
+1. [console.cloud.google.com](https://console.cloud.google.com) ← **New Project** ← `TPH Invoicing`.
+2. **APIs & Services ← Library** ← ابحث `Google Drive API` ← **Enable**.
 
-**APIs & Services ← Library** ← ابحث `Google Drive API` ← **Enable**.
+بدون الخطوة الثانية يفشل الرفع لاحقاً بخطأ غامض.
 
-### ١-ج · شاشة الموافقة
+### ١-ب · Google Auth Platform
 
-1. **APIs & Services ← OAuth consent screen** ← **External** ← **Create**.
-2. اسم التطبيق `فواتير ذا بوبليك هاوس` · بريد الدعم والمطوّر: بريدك.
-3. **Scopes ← Add or Remove Scopes** وأضف:
-   - `https://www.googleapis.com/auth/drive`
-   - `openid` · `email` · `profile`
-4. **Test users**: أضف بريدك وبريد المحاسب ومدير المشتريات.
-5. اضغط **Publish App**. ستظهر لكل مستخدم مرة واحدة شاشة «لم توثّق جوجل هذا
-   التطبيق» يتجاوزها بـ **Advanced ← Continue**.
+من القائمة الجانبية افتح **Google Auth Platform**، ثم نفّذ الأقسام بالترتيب:
 
-> بقاء التطبيق في وضع **Testing** يعني انتهاء الجلسة كل سبعة أيام. النشر يُنهي ذلك.
+| القسم | ما تضبطه |
+|---|---|
+| **Branding** | اسم التطبيق `TPH Invoicing` بالإنجليزية (الأسماء غير اللاتينية تُبطئ التدقيق) · بريد الدعم · بريد المطوّر |
+| **Audience** | **External** · أضف نفسك ومن سيستخدم النظام في **Test users** |
+| **Data access** | **Add or remove scopes** ← أضف `https://www.googleapis.com/auth/drive` ومعه `openid` و `email` و `profile` |
+| **Clients** | **Create OAuth client** ← **Web application** |
 
-### ١-د · بيانات الاعتماد
+سيحذّرك جوجل أنّ نطاق `drive` **مقيَّد**. هذا متوقّع، ويعمل لمستخدمي الاختبار
+بلا توثيق.
 
-1. **Credentials ← Create Credentials ← OAuth client ID ← Web application**.
-2. في **Authorized redirect URIs** أضف كل عنوان ستستخدمه:
-   - `http://localhost:3000/api/auth/callback/google`
-   - `https://tph-invoicing.vercel.app/api/auth/callback/google`
-   - `http://127.0.0.1:53682/callback` — لأداة `drive:auth`
-3. انسخ **Client ID** و **Client Secret** إلى `.env`.
+### ١-ج · عناوين الرجوع
+
+في العميل الجديد أضف الثلاثة **حرفياً**:
+
+```
+https://tph-invoicing.vercel.app/api/auth/callback/google
+http://localhost:3000/api/auth/callback/google
+http://127.0.0.1:53682/callback
+```
+
+الأول للموقع الحيّ، والثاني للتطوير، والثالث لأداة جرد الدرايف. أيّ حرف زائد
+يعطي `redirect_uri_mismatch`.
+
+انسخ **Client ID** و **Client Secret** إلى `.env`.
+
+### ١-د · النشر لإنهاء انتهاء الجلسة
+
+ما دام التطبيق في وضع **Testing** تنتهي الجلسة كل سبعة أيام. حين ترضى عنه ارجع
+إلى **Audience** واضغط **Publish app**. ستظهر شاشة «لم توثّق جوجل هذا التطبيق»
+يتجاوزها كل مستخدم مرة واحدة بـ **Advanced ← Continue**. السقف مئة مستخدم.
 
 ---
 
@@ -178,3 +191,11 @@ printf '%s' "القيمة" | vercel env add اسم_المتغير production --f
 | «مفتاح ANTHROPIC_API_KEY غير مضبوط» | اضبط المفتاح أو بدّل `EXTRACTION_PROVIDER` |
 | «تجاوزنا حدّ الطبقة المجانية» | حدّ جيميني ١٥ طلباً في الدقيقة — انتظر قليلاً |
 | `redirect_uri_mismatch` | العنوان غير مضاف في بيانات اعتماد جوجل (الخطوة ١-د) |
+
+---
+
+## وضع التجربة
+
+`AUTH_BYPASS=true` يتخطّى تسجيل الدخول ويعطي صلاحية المالك. للتجربة وحدها:
+متى كان مفعّلاً فكل من يعرف الرابط يدخل، ويظهر شريط أصفر في كل صفحة ينبّه على
+ذلك. أطفئه بـ `AUTH_BYPASS=false` ثم أعد النشر.
