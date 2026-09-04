@@ -42,10 +42,7 @@ export const AREAS: readonly NavArea[] = [
     short: "انتباهك",
     needs: "reports:view",
     owns: ["/audit"],
-    children: [
-      { href: "/attention", label: "المشاكل" },
-      { href: "/audit", label: "المراجعة التفصيلية", needs: "audit:view" },
-    ],
+    children: [],
   },
   {
     href: "/purchases",

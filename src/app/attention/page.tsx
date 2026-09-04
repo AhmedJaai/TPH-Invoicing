@@ -5,6 +5,7 @@ import { Empty, PageShell } from "@/components/page-shell";
 import { AttentionList } from "@/components/attention-list";
 import { IMPACT_LABEL, buildAttention, countBySeverity, impactByKind } from "@/lib/attention";
 import { Money } from "@/components/money";
+import { LinkButton } from "@/components/ui";
 import { ITEM, countNoun } from "@/lib/arabic";
 import { gatherAttentionFacts } from "@/lib/attention-facts";
 
@@ -34,6 +35,7 @@ export default async function AttentionPage() {
     <PageShell
       user={user}
       title="ما يحتاج انتباهك"
+      actions={<LinkButton href="/purchases/invoices?tax=INVALID" variant="primary" size="sm">ابدأ بالضريبة</LinkButton>}
       intro="كل الاستثناءات في مكان واحد، مرتّبةً بالأهمّ. ولكلٍّ منها خطوة ومكانٌ يُعالَج فيه."
     >
       {money.length > 0 && (
