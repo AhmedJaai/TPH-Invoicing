@@ -69,6 +69,8 @@ export const RULES: Record<string, RateLimitRule> = {
   "supplier-alias": { limit: 200, windowSeconds: 3600 },
   "bank-rule": { limit: 200, windowSeconds: 3600 },
   supplier: { limit: 60, windowSeconds: 3600 },
+  // البحث يُستدعى مع الكتابة، فحدّه مرتفع
+  search: { limit: 600, windowSeconds: 3600 },
   // دِلاء منفصلة: كانت المصروفات والأصناف تستهلك حدّ المورّدين
   product: { limit: 200, windowSeconds: 3600 },
   expense: { limit: 60, windowSeconds: 3600 },

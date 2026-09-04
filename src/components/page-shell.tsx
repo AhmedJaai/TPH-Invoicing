@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MobileTabBar, Nav, UploadButton } from "./nav";
+import { SearchBox } from "./search-box";
 import { TrialBanner } from "./trial-banner";
 import { UserMenu } from "./user-menu";
 import type { Role } from "@/lib/permissions";
@@ -42,14 +43,15 @@ export function PageShell({
       <TrialBanner />
       <header className="sticky top-0 z-20 border-b border-line bg-surface/85 backdrop-blur-md">
         <div className={`mx-auto ${w} px-4 py-3 sm:px-6`}>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="truncate font-display text-base font-bold leading-tight tracking-tight"
+              className="hidden shrink-0 truncate font-display text-base font-bold leading-tight tracking-tight sm:block"
             >
               ذا بوبليك هاوس
             </Link>
-            <div className="flex items-center gap-2">
+            <SearchBox />
+            <div className="flex shrink-0 items-center gap-2">
               <MobileUpload role={user.role} />
               <UserMenu name={user.name} role={user.role} />
             </div>
