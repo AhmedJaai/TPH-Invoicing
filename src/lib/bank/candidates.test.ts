@@ -199,3 +199,31 @@ describe("generateCandidates", () => {
     }
   });
 });
+
+describe("المعايرة — المرجع مؤيِّد لا نافٍ", () => {
+  /**
+   * أوصاف الأهلي تحمل مراجع البنك — رقم سداد أو حوالة أو هوية — لا
+   * أرقام فواتير المورّدين. فكان عدم تطابقها يُحسَب حجّةً ضدّ المطابقة،
+   * فسقفُ أي مطابقة ٠٫٨٣ ولو تطابق المبلغ تماماً وأكّد إنسانٌ المورّد —
+   * أي أنّ التلقائية كانت مستحيلة بحكم المعايرة لا بحكم الشكّ.
+   */
+  it("مرجعٌ بنكيّ لا يطابق رقم الفاتورة لا يخفض الدرجة", () => {
+    const rows = [inv({ id: "a", outstandingMinor: 1_000_00, invoiceNumber: "260342" })];
+    const withBankRef = generateCandidates(tx({ references: ["6959405833"] }), rows)[0];
+    const withNoRef = generateCandidates(tx({ references: [] }), rows)[0];
+    expect(withBankRef.score).toBeCloseTo(withNoRef.score, 6);
+  });
+
+  it("والمطابق يرفعها", () => {
+    const rows = [inv({ id: "a", outstandingMinor: 1_000_00, invoiceNumber: "260342" })];
+    const matched = generateCandidates(tx({ references: ["260342"] }), rows)[0];
+    const plain = generateCandidates(tx({ references: [] }), rows)[0];
+    expect(matched.score).toBeGreaterThan(plain.score);
+  });
+
+  it("مورّد مؤكَّد ومبلغ مطابق وتاريخ قريب يبلغ حدّ التلقائية", () => {
+    const rows = [inv({ id: "a", outstandingMinor: 1_000_00, invoiceDate: day("2026-08-11") })];
+    const [c] = generateCandidates(tx({ supplierScore: 0.95 }), rows);
+    expect(c.score).toBeGreaterThanOrEqual(0.85);
+  });
+});

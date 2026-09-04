@@ -56,6 +56,14 @@ interface Keyword {
 }
 
 const KEYWORDS: readonly Keyword[] = [
+  /*
+    ما يلي مأخوذ من كشف أحمد نفسه — لا من تخيّل صيغ.
+    «تحويل إلى الأهل والأصدقاء» عبارة البنك لتحويل شخصيّ، وكانت تُقرأ
+    سدادَ مورّد فتُنسب إلى المورّدين ظلماً.
+  */
+  { match: /تحويل\s*الي\s*الاهل|الاهل\s*والاصدقاء|Family\s*(and|&)\s*Friends/i, kind: "OWNER_TRANSFER", label: "تحويل إلى الأهل والأصدقاء" },
+  { match: /\bSAUDI\s*TELECOM\b|\bSTC\s*PAY\b/i, kind: "UTILITY", direction: "DEBIT", label: "الاتصالات السعودية" },
+  { match: /^CITY\s*:\s*Digital\s*Channel$/i, kind: "BANK_FEE", direction: "DEBIT", label: "رسم القناة الرقمية" },
   // الحكوميّ قبل الزكاة: «زاتكا» ضريبة لا صدقة
   { match: /\bZATCA\b|هيئه\s*الزكاه\s*والضريبه|هيئه\s*الزكاة/i, kind: "GOVERNMENT", direction: "DEBIT", label: "جهة ضريبية" },
   { match: /التامينات\s*الاجتماعيه|\bGOSI\b/i, kind: "GOVERNMENT", direction: "DEBIT", label: "التأمينات الاجتماعية" },
@@ -91,6 +99,11 @@ export function classify(
   }
 
   /* ── ٢. المتعلَّم ── */
+  /*
+    المفتاح يُحسب قبل الكلمات كي يعمّ التعلّم: من أكّد مرّةً أنّ صاحب
+    الهوية ٢١٤٩٨٣٠١١٥ هو نفسه، صُنّفت تحويلاته كلّها بعدها بلا سؤال —
+    وهي في كشفه أكثر من ثلاثين حركة.
+  */
   const key = merchantKey(tx);
   if (key) {
     const known = memory.get(key);

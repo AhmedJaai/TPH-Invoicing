@@ -75,13 +75,32 @@ export const MAX_POOL = 40;
 
 const WEIGHTS: ScoreParts = { supplier: 0.35, amount: 0.4, date: 0.1, reference: 0.15 };
 
-export function combine(parts: ScoreParts): number {
-  return (
-    parts.supplier * WEIGHTS.supplier +
-    parts.amount * WEIGHTS.amount +
-    parts.date * WEIGHTS.date +
-    parts.reference * WEIGHTS.reference
-  );
+/**
+ * يجمع الأبعاد بأوزانها — على ما هو **متاح** منها وحده.
+ *
+ * كان غياب المرجع يُحسب صفراً، ووصف البنك نادراً ما يحمل رقم الفاتورة.
+ * فسقفُ أيّ مطابقة كان ٠٫٨٢ ولو تطابق المبلغ تماماً وعُرف المورّد
+ * يقيناً — أي أنّ التلقائية كانت مستحيلة بحكم المعايرة لا بحكم الشكّ.
+ *
+ * والصواب أن يُقسَّم الوزن على ما يُمكن قياسه: البُعد الذي لا سبيل إلى
+ * قياسه لا يُحسَب حجّةً على المرشّح.
+ *
+ * والمرجع بُعدٌ **مؤيِّد لا نافٍ**: أوصاف هذا البنك تحمل مراجعه هو —
+ * رقم سدادٍ أو رقم حوالة أو رقم هوية — لا أرقام فواتير مورّديك. فعدم
+ * تطابقه لا يقول شيئاً عن المطابقة، وحسبانه حجّةً ضدّها جعل سقف كل
+ * مطابقة ٠٫٨٣ ولو تطابق المبلغ تماماً وأكّد إنسانٌ المورّد. فإن طابق
+ * رفع، وإن لم يطابق سكت.
+ */
+export function combine(parts: ScoreParts, available?: Partial<Record<keyof ScoreParts, boolean>>): number {
+  const keys: (keyof ScoreParts)[] = ["supplier", "amount", "date", "reference"];
+  let sum = 0;
+  let total = 0;
+  for (const k of keys) {
+    if (available && available[k] === false) continue;
+    sum += parts[k] * WEIGHTS[k];
+    total += WEIGHTS[k];
+  }
+  return total === 0 ? 0 : sum / total;
 }
 
 function daysBetween(a: Date, b: Date): number {
@@ -218,7 +237,7 @@ export function generateCandidates(
       outcome,
       allocatedMinor: Math.min(tx.amountMinor, inv.outstandingMinor),
       parts,
-      score: combine(parts),
+      score: combine(parts, { reference: reference > 0 }),
       evidence,
     });
   }
@@ -243,7 +262,7 @@ export function generateCandidates(
         أن تجتمع عدّة فواتير على مبلغٍ بالمصادفة أكبر من احتمال أن
         تطابقه واحدة.
       */
-      score: combine(parts) * (1 - 0.02 * subset.length),
+      score: combine(parts, { reference: reference > 0 }) * (1 - 0.02 * subset.length),
       evidence: [
         `${subset.length} فواتير مجموعها ${sum / 100} ريالاً`,
         ...(amount === 1 ? ["المجموع يطابق الدفعة تماماً"] : [`فرق المجموع ${Math.abs(tx.amountMinor - sum) / 100} ريالاً`]),
