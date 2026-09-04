@@ -15,6 +15,8 @@ export interface BankTx {
   transactionType: string;
   amountMinor: number;
   direction: "DEBIT" | "CREDIT";
+  /** المستفيد كما كتبه البنك — لا اسم المورّد الذي رجّحناه. */
+  beneficiaryRaw?: string;
 }
 
 export interface OpenInvoice {

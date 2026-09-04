@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
+import { ConfirmAction } from "@/components/ui-client";
 
 interface Summary {
   bank: string; accountNumber?: string;
@@ -442,25 +443,38 @@ export function BankImport({
         )}
       </section>
 
-      {/* ── الخيار الثاني: الوسم اليدوي ── */}
+      {/*
+        ── طريقة سداد أخرى ──
+
+        هذا الفعل لا يُثبت أنّ مالاً خرج، بل يُثبت أنّك قلتَ إنّه خرج.
+        وكان زرّاً عادياً بجانب مسار البنك فبدا خياراً ثانياً كالأوّل.
+
+        (وقد أُعيد هذا الحارس بعد أن ضاع في إعادة كتابة المكوّن معالِجاً —
+        فالارتداد في فعلٍ خطر أسوأ من غيابه ابتداءً.)
+      */}
       <section className="border-t border-line pt-8">
-        <h2 className="text-base font-bold">الخيار الثاني — اعتبرها مسدَّدة</h2>
-        <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-          أسرع، وأقلّ دقّة. تُعتبر كل الفواتير المفتوحة مسدَّدة بإقرارك أنت — ويُسجَّل
-          في سجل التدقيق أنّ مصدر السداد إقرارك لا مطابقة بنكية، فلا يلتبس الأمر على
-          من يراجع لاحقاً.
+        <h2 className="font-display text-lg font-bold leading-tight">طريقة سداد أخرى</h2>
+        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-ink-soft">
+          حين تُدفع الفواتير نقداً أو من حساب لا يصل كشفه، تُعلن سدادها بنفسك.
+          ويُسجَّل في سجل التدقيق أنّ مصدر السداد إقرارك لا مطابقة بنكية، فلا يلتبس
+          الأمر على من يراجع لاحقاً.
         </p>
 
-        <div className="mt-3 rounded-xl border border-warn/40 bg-warn-bg p-4">
-          <p className="text-sm font-bold text-warn">{openInvoiceCount} فاتورة مفتوحة الآن</p>
-          <button
-            onClick={markPaid}
+        <div className="mt-4">
+          <p className="mb-3 text-sm font-bold">
+            <span className="nums">{openInvoiceCount}</span> فاتورة مفتوحة الآن
+          </p>
+          <ConfirmAction
+            label="أعلن سدادها يدوياً"
+            variant="secondary"
             disabled={marking || openInvoiceCount === 0}
-            className="mt-3 rounded-lg border border-warn/60 px-4 py-2 text-xs font-bold text-warn disabled:opacity-40"
-          >
-            {marking ? "يعتمد…" : "اعتبرها كلّها مسدَّدة"}
-          </button>
-          {markResult && <p className="mt-2 text-xs text-ink-soft">{markResult}</p>}
+            title={`ستُعتبر ${openInvoiceCount} فاتورة مسدَّدة بإقرارك`}
+            consequence="هذا لا يُثبت سداداً بنكياً. لن تظهر هذه الفواتير في المستحقّات بعدها، وسيحمل سجل التدقيق اسمك مصدراً وحيداً للسداد."
+            acknowledgement="أفهم أنّ هذا إقرارٌ منّي لا مطابقةٌ بنكية."
+            confirmLabel="أعلن سدادها"
+            onConfirm={markPaid}
+          />
+          {markResult && <p className="mt-3 text-xs text-ink-soft">{markResult}</p>}
         </div>
       </section>
     </div>

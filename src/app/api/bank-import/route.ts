@@ -17,6 +17,8 @@ import { assignIdentities, fileFingerprint } from "@/lib/bank/identity";
 import { allocate, createPayment } from "@/services/payment.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
 import { recordAudit } from "@/lib/audit";
+import { runReconciliation } from "@/services/reconcile.service";
+import type { SupplierIdentity } from "@/lib/bank/entities";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -78,6 +80,23 @@ export async function POST(request: Request) {  let user;
     ],
   }));
 
+  const identityRows = await db
+    .select({
+      id: suppliers.id, nameAr: suppliers.nameAr, slug: suppliers.slug,
+      nameEn: suppliers.nameEn, driveFolderName: suppliers.driveFolderName,
+      aliases: sql<string>`coalesce(string_agg(${supplierAliases.value}, '||'), '')`,
+    })
+    .from(suppliers)
+    .leftJoin(supplierAliases, eq(supplierAliases.supplierId, suppliers.id))
+    .where(eq(suppliers.isActive, true))
+    .groupBy(suppliers.id);
+
+  const supplierIdentities: SupplierIdentity[] = identityRows.map((r) => ({
+    supplierId: r.id, nameAr: r.nameAr, slug: r.slug,
+    nameEn: r.nameEn, driveFolderName: r.driveFolderName,
+    aliases: r.aliases.split("||").filter(Boolean),
+  }));
+
   const ruleRows = await db
     .select({
       id: bankRules.id, normalized: bankRules.normalized,
@@ -110,7 +129,42 @@ export async function POST(request: Request) {  let user;
     id: `row-${r.rowNumber}-${i}`,
     valueDate: r.valueDate, description: r.description,
     transactionType: r.transactionType, amountMinor: r.amountMinor, direction: r.direction,
+    beneficiaryRaw: r.beneficiaryRaw,
   }));
+
+  /*
+    محرّك التسوية الجديد.
+
+    كان `matchBankTransactions` هو الحاكم: جشعٌ يحجز الفاتورة لأوّل
+    حركة تطلبها، ومجموعاتٌ حتى ثلاث فواتير من بركةٍ من أربع عشرة،
+    وتصنيفٌ بالكلمات المفتاحية.
+
+    والجديد يقرأ بنية الوصف أوّلاً، ويعرّف المستفيد بأدلّة مصنَّفة،
+    ويولّد المرشّحين كلّهم، ثمّ يوزّعها على الفترة كلّها لا حركةً حركة،
+    ولا يحسم تلقائياً إلّا بشرطَي الدرجة والفارق.
+  */
+  const engine = runReconciliation({
+    rows: parsed.rows.map((r, i) => ({
+      key: `row-${r.rowNumber}-${i}`,
+      valueDate: r.valueDate,
+      description: r.description,
+      beneficiaryRaw: r.beneficiaryRaw,
+      transactionType: r.transactionType,
+      amountMinor: r.amountMinor,
+      direction: r.direction,
+    })),
+    invoices: open.map((o) => ({
+      id: o.invoiceId,
+      supplierId: o.supplierId,
+      invoiceNumber: o.invoiceNumber,
+      invoiceDate: o.invoiceDate,
+      periodMonth: o.periodMonth,
+      totalMinor: o.outstandingMinor,
+      outstandingMinor: o.outstandingMinor,
+    })),
+    suppliers: supplierIdentities,
+  });
+  const engineByKey = new Map(engine.results.map((r) => [r.key, r]));
 
   const matches = matchBankTransactions(txs, open, index, rules);
   const duplicates = findDuplicatePayments(txs, rules);
@@ -268,11 +322,35 @@ export async function POST(request: Request) {  let user;
           valueDate: m.tx.valueDate,
           description: m.tx.description,
           transactionType: m.tx.transactionType || null,
-          beneficiaryRaw: m.supplierName ?? null,
+          /*
+            ما كتبه البنك في عمود المستفيد — لا اسم المورّد الذي
+            رجّحناه. كان يُكتب هنا اسمُ المطابقة، فإن لم تُطابَق الحركة
+            بقي العمود فارغاً؛ ودائرة مغلقة على نفسها: لا يُعرف المستفيد
+            لأنّ العمود فارغ، والعمود فارغ لأنّه لم يُعرف.
+          */
+          beneficiaryRaw: m.tx.beneficiaryRaw ?? null,
           amountMinor: m.tx.amountMinor,
           direction: m.tx.direction,
-          category: m.category,
+          category: engineByKey.get(m.tx.id)?.category ?? m.category,
           ruleId: m.ruleId ?? null,
+          supplierId: engineByKey.get(m.tx.id)?.supplierId ?? m.supplierId ?? null,
+          matchDisposition: engineByKey.get(m.tx.id)?.decision?.disposition ?? null,
+          matchScore: engineByKey.get(m.tx.id)?.candidate
+            ? Math.round(engineByKey.get(m.tx.id)!.candidate!.score * 100)
+            : null,
+          matchOutcome: engineByKey.get(m.tx.id)?.outcome ?? null,
+          /*
+            الأدلّة تُحفَظ بنصّها كي يُعرَض «لماذا؟» بعد شهر — لا رقمُ
+            ثقةٍ ثابت لا يقول شيئاً.
+          */
+          matchEvidence: engineByKey.get(m.tx.id)
+            ? {
+                تصنيف: engineByKey.get(m.tx.id)!.classificationReason,
+                مستفيد: engineByKey.get(m.tx.id)!.supplierEvidence,
+                مطابقة: engineByKey.get(m.tx.id)!.decision?.reasons ?? [],
+                درجةالمستفيد: Math.round(engineByKey.get(m.tx.id)!.supplierScore * 100),
+              }
+            : null,
           matchStatus:
             m.invoices.length > 0 ? "MATCHED"
             : m.kind === "INTERNAL" || m.kind === "CLASSIFIED" ? "IGNORED"

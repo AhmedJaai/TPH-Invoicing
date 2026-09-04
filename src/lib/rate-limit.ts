@@ -65,6 +65,7 @@ export const RULES: Record<string, RateLimitRule> = {
   "drive-sync": { limit: 12, windowSeconds: 3600 },
   "bank-import": { limit: 12, windowSeconds: 3600 },
   "mark-paid": { limit: 10, windowSeconds: 3600 },
+  "match-undo": { limit: 60, windowSeconds: 3600 },
   "month-close": { limit: 30, windowSeconds: 3600 },
   "supplier-alias": { limit: 200, windowSeconds: 3600 },
   "bank-rule": { limit: 200, windowSeconds: 3600 },

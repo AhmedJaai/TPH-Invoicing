@@ -417,6 +417,8 @@ export const bankRules = pgTable("bank_rules", {
   index("bank_rules_category_idx").on(t.category),
 ]);
 
+export const matchDispositionEnum = pgEnum("match_disposition", ["AUTO", "SUGGEST", "REVIEW"]);
+
 export const bankTransactions = pgTable("bank_transactions", {
   id: id(),
   bankImportId: text("bank_import_id").notNull().references(() => bankImports.id, { onDelete: "cascade" }),
@@ -446,6 +448,19 @@ export const bankTransactions = pgTable("bank_transactions", {
    * سلامة بيانات مالية: كل تقرير مبنيّ عليها يصير مضاعفاً.
    */
   externalId: text("external_id"),
+  /**
+   * لماذا طُوبقت — لا رقمَ ثقةٍ ثابتاً.
+   *
+   * كانت الحالة تُحفَظ بلا سببها، فمن يراجع بعد شهر لا يعرف لِمَ نُسبت
+   * الحركة إلى هذا المورّد. والمال يُراجَع.
+   */
+  matchDisposition: matchDispositionEnum("match_disposition"),
+  /** درجة الترجيح من مئة — عددٌ صحيح لا كسر. */
+  matchScore: integer("match_score"),
+  matchOutcome: text("match_outcome"),
+  matchEvidence: jsonb("match_evidence"),
+  /** المورّد الذي رجّحه المحرّك — قد يوجد بلا فاتورة مطابقة. */
+  supplierId: text("supplier_id").references(() => suppliers.id),
   /** القاعدة التي صنّفتها، إن وُجدت */
   ruleId: text("rule_id").references(() => bankRules.id, { onDelete: "set null" }),
 }, (t) => [

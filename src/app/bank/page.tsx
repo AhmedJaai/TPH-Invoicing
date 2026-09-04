@@ -1,48 +1,157 @@
 import { redirect } from "next/navigation";
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { invoices, suppliers } from "@/db/schema";
+import { bankTransactions, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
-import { Empty, PageShell } from "@/components/page-shell";
+import { PageShell } from "@/components/page-shell";
+import { Money } from "@/components/money";
+import { Card, EmptyState, Section, Stat, StatGrid } from "@/components/ui";
 import { BankImport } from "@/components/bank-import";
+import { MatchExplain, type MatchExplanation } from "@/components/match-explain";
+import { CATEGORY_LABEL } from "@/lib/bank/rules";
+import { countNoun, ITEM } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * البنك: أين تحرّكت الأموال.
+ *
+ * كانت الصفحة تُسمّى «السداد»، وهو خلطٌ بين شيئين: البنك يقول أين ذهب
+ * المال، والمستحقّات تقول ماذا عليك. وهما متداخلان لا واحد.
+ *
+ * وكل مطابقة هنا تحمل «لماذا؟» — الأدلّة بنصّها — وزرَّ تراجع. فمن
+ * وافق على مطابقة خاطئة لا يبقى أسيرها.
+ */
 export default async function BankPage() {
   const user = await currentUser();
   if (!user) redirect("/login");
   if (!can(user.role, "bank:view")) {
     return (
-      <PageShell user={user} width="wide" title="السداد">
-        <Empty message="كشف البنك محجوب عن دورك." />
+      <PageShell user={user} width="wide" title="البنك">
+        <EmptyState title="كشف البنك محجوب عن دورك." />
       </PageShell>
     );
   }
 
-  const [{ open }] = await db
-    .select({
-      open: sql<number>`count(*)::int`,
-    })
-    .from(invoices)
-    .where(sql`${invoices.totalMinor} > coalesce((
-      select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = invoices.id
-    ), 0) + 1`);
+  const [counts, supplierRows, recent] = await Promise.all([
+    db.execute<Record<string, number>>(sql`
+      select
+        (select count(*)::int from bank_transactions)                                as tx,
+        (select count(*)::int from bank_transactions
+          where match_disposition = 'AUTO')                                         as auto,
+        (select count(*)::int from bank_transactions
+          where match_disposition = 'SUGGEST')                                      as suggest,
+        (select count(*)::int from bank_transactions
+          where match_disposition = 'REVIEW' or category = 'UNKNOWN')               as review,
+        (select coalesce(sum(amount_minor),0)::bigint from bank_transactions
+          where direction = 'CREDIT' and category = 'POS_SETTLEMENT')               as settled,
+        (select count(*)::int from invoices i
+          where i.total_minor > coalesce((select sum(pa.amount_minor)::int
+            from payment_allocations pa where pa.invoice_id = i.id), 0) + 1)        as open
+    `),
 
-  const supplierRows = await db
-    .select({ id: suppliers.id, nameAr: suppliers.nameAr })
-    .from(suppliers)
-    .where(eq(suppliers.isActive, true))
-    .orderBy(asc(suppliers.nameAr));
+    db.select({ id: suppliers.id, nameAr: suppliers.nameAr })
+      .from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.nameAr)),
+
+    db.select({
+      id: bankTransactions.id,
+      valueDate: bankTransactions.valueDate,
+      description: bankTransactions.description,
+      beneficiaryRaw: bankTransactions.beneficiaryRaw,
+      amountMinor: bankTransactions.amountMinor,
+      direction: bankTransactions.direction,
+      category: bankTransactions.category,
+      matchedPaymentId: bankTransactions.matchedPaymentId,
+      matchDisposition: bankTransactions.matchDisposition,
+      matchScore: bankTransactions.matchScore,
+      matchOutcome: bankTransactions.matchOutcome,
+      matchEvidence: bankTransactions.matchEvidence,
+    })
+      .from(bankTransactions)
+      .where(sql`${bankTransactions.matchDisposition} is not null`)
+      .orderBy(desc(bankTransactions.valueDate))
+      .limit(25),
+  ]);
+
+  const f = counts.rows[0] ?? {};
+  const n = (k: string) => Number(f[k] ?? 0);
 
   return (
     <PageShell
       user={user}
-     
-      title="السداد"
-      intro="طريقان لإقفال الفواتير المفتوحة: مطابقة كشف البنك، أو اعتمادها مسدَّدة بإقرارك. الأول أدقّ والثاني أسرع."
+      width="wide"
+      title="البنك"
+      intro="أين تحرّكت الأموال. وكل مطابقة هنا تقول لماذا طُوبقت، ويمكن التراجع عنها."
     >
-      <BankImport openInvoiceCount={Number(open)} suppliers={supplierRows} />
+      <StatGrid>
+        <Stat label="حركات مخزّنة" value={String(n("tx"))} sub="بعد إزالة المكرَّر" />
+        <Stat
+          label="تسويات الشبكة"
+          minor={n("settled")}
+          tone="ok"
+          sub="إيراد البطاقات يصل حسابك"
+        />
+        <Stat
+          label="تحتاج قرارك"
+          value={String(n("review"))}
+          tone={n("review") > 0 ? "warn" : "ok"}
+          sub="مجهولة أو مرشّحان متقاربان"
+        />
+        <Stat
+          label="فواتير مفتوحة"
+          value={String(n("open"))}
+          href="/payments"
+          sub="ما زال عليها رصيد"
+        />
+      </StatGrid>
+
+      {recent.length > 0 && (
+        <Section
+          title="آخر ما قرّره المحرّك"
+          hint={`${countNoun(n("auto"), ITEM)} طُوبقت تلقائياً · ${countNoun(n("suggest"), ITEM)} تنتظر تأكيدك. والدرجة ترجيحٌ لا يقين، فتُعرَض وصفاً لا نسبة.`}
+        >
+          <ul className="space-y-2.5">
+            {recent.map((t) => {
+              const explanation: MatchExplanation = {
+                transactionId: t.id,
+                disposition: t.matchDisposition,
+                score: t.matchScore,
+                outcome: t.matchOutcome,
+                amountMinor: t.amountMinor,
+                matched: t.matchedPaymentId !== null,
+                evidence: t.matchEvidence as MatchExplanation["evidence"],
+              };
+              return (
+                <li key={t.id}>
+                  <Card>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-bold">
+                          {t.beneficiaryRaw ?? t.description?.slice(0, 60) ?? "حركة"}
+                        </span>
+                        <span className="nums block truncate text-[11px] text-muted">
+                          {t.valueDate.toISOString().slice(0, 10)} ·{" "}
+                          {t.direction === "DEBIT" ? "صادر" : "وارد"} ·{" "}
+                          {CATEGORY_LABEL[t.category] ?? t.category}
+                        </span>
+                      </span>
+                      <span className="nums shrink-0 text-sm font-bold">
+                        <Money minor={t.amountMinor} />
+                      </span>
+                    </div>
+                    <MatchExplain match={explanation} />
+                  </Card>
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      )}
+
+      <Section title="استيراد كشف" hint="الملف الذي استُورد من قبل لا يتكرّر — تُقيَّد الحركات الجديدة وحدها.">
+        <BankImport openInvoiceCount={n("open")} suppliers={supplierRows} />
+      </Section>
     </PageShell>
   );
 }

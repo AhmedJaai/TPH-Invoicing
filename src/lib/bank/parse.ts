@@ -21,6 +21,16 @@ export interface BankRow {
   balanceMinor?: number;
   /** المرجع المستخرج من الوصف إن وُجد */
   reference?: string;
+  /**
+   * المستفيد كما كتبه البنك في عموده.
+   *
+   * كان القارئ لا يبحث عن هذا العمود أصلاً، فبقي فارغاً في كل حركة —
+   * وعليه يقوم تعريف المستفيد. فكان المحرّك يقرأ الاسم من داخل الوصف
+   * إن وُجد، ويعجز إن لم يوجد.
+   */
+  beneficiaryRaw?: string;
+  /** تاريخ القيد، إن كان في الكشف عمودٌ له غير تاريخ العملية. */
+  postingDate?: Date;
 }
 
 export interface ParseWarning {
@@ -40,20 +50,49 @@ export interface BankStatementParse {
 
 /** رؤوس الأعمدة بصيغها العربية والإنجليزية. */
 const HEADERS: Record<string, string[]> = {
-  date: ["date", "التاريخ", "value date", "تاريخ العملية"],
-  type: ["transaction type", "نوع العملية", "type", "نوع الحركة"],
-  description: ["description", "الوصف", "البيان", "details"],
-  amount: ["amount", "المبلغ", "قيمة العملية"],
-  balance: ["balance", "الرصيد"],
-  debit: ["debit", "مدين", "صادر"],
-  credit: ["credit", "دائن", "وارد"],
+  date: ["date", "التاريخ", "value date", "تاريخ العملية", "تاريخ العمليه", "trx date"],
+  postingDate: ["posting date", "تاريخ القيد", "book date"],
+  type: ["transaction type", "نوع العملية", "نوع العمليه", "type", "نوع الحركة"],
+  description: ["description", "الوصف", "البيان", "details", "narrative", "تفاصيل"],
+  /*
+    عمود المستفيد. يختلف اسمه بين صيغ التصدير، ولذلك تُذكر صيغه كلّها —
+    وغيابه هو ما جعل تعريف المستفيد يعتمد على نبش الاسم من داخل الوصف.
+  */
+  beneficiary: [
+    "beneficiary", "المستفيد", "اسم المستفيد", "beneficiary name",
+    "الطرف الآخر", "الطرف الاخر", "counterparty", "payee", "المرسل اليه",
+  ],
+  amount: ["amount", "المبلغ", "قيمة العملية", "قيمه العمليه"],
+  balance: ["balance", "الرصيد", "الرصيد بعد العملية"],
+  debit: ["debit", "مدين", "صادر", "مسحوبات"],
+  credit: ["credit", "دائن", "وارد", "ايداعات", "إيداعات"],
 };
 
+/** يوحّد رأس العمود قبل المطابقة: الهمزة والتاء المربوطة والفراغات. */
+function normalizeHeader(cell: string): string {
+  return cell
+    .replace(/[ً-ْـ]/g, "")
+    .replace(/[إأآٱ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
 function matchHeader(cell: string): string | null {
-  const v = cell.trim().toLowerCase();
+  const v = normalizeHeader(cell);
   if (!v) return null;
-  for (const [key, forms] of Object.entries(HEADERS)) {
-    if (forms.some((f) => v === f || v.startsWith(f))) return key;
+  /*
+    الأطول أوّلاً: «تاريخ القيد» يجب ألّا يُلتقَط بـ«التاريخ»، و«اسم
+    المستفيد» ألّا يُلتقَط بصيغة أقصر تسبقه في الترتيب.
+  */
+  const entries = Object.entries(HEADERS)
+    .flatMap(([key, forms]) => forms.map((f) => ({ key, form: normalizeHeader(f) })))
+    .sort((a, b) => b.form.length - a.form.length);
+
+  for (const { key, form } of entries) {
+    if (v === form || v.startsWith(form)) return key;
   }
   return null;
 }
@@ -80,37 +119,76 @@ export function extractReference(description: string): string | undefined {
   return long?.[0];
 }
 
+
+interface HeaderLocation {
+  headerRow: number;
+  map: Record<string, number>;
+  accountNumber?: string;
+}
+
+/**
+ * يبحث عن صفّ الرؤوس داخل ورقة، وعن رقم الحساب فيما قبله.
+ *
+ * ويُقبَل الصفّ حين يحمل تاريخاً ومبلغاً — أو تاريخاً وعمودَي مدين
+ * ودائن — فهذا أقلّ ما يصلح كشفَ حساب.
+ */
+function locateHeader(grid: readonly string[][]): HeaderLocation {
+  let accountNumber: string | undefined;
+
+  for (let i = 0; i < Math.min(grid.length, HEADER_SEARCH_ROWS); i++) {
+    const cells = (grid[i] ?? []).map((c) => String(c ?? ""));
+
+    const acct = cells.join(" ").match(/\b(\d{10,})\b/);
+    if (acct !== null && accountNumber === undefined) accountNumber = acct[1];
+
+    const found: Record<string, number> = {};
+    cells.forEach((c, idx) => {
+      const key = matchHeader(c);
+      if (key !== null && found[key] === undefined) found[key] = idx;
+    });
+
+    if (found.date !== undefined && (found.amount !== undefined || found.debit !== undefined)) {
+      return { headerRow: i, map: found, accountNumber };
+    }
+  }
+
+  return { headerRow: -1, map: {}, accountNumber };
+}
+
+/** كم صفّاً يُفتَّش عن الرؤوس قبل اليأس — الترويسة قد تطول. */
+const HEADER_SEARCH_ROWS = 60;
+
 export function parseBankStatement(
   buffer: Buffer,
   options: { bank?: string } = {},
 ): BankStatementParse {
   const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const grid = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: false, defval: "" });
 
+  /*
+    تُجرَّب الأوراق كلّها لا الأولى وحدها: بعض صيغ التصدير تضع ورقة
+    غلافٍ أو ملخّصاً قبل ورقة الحركات، فقراءة الأولى تُرجع لا شيء.
+    وتُختار أوّل ورقة يُعثَر فيها على صفّ رؤوس صالح.
+  */
+  let grid: string[][] = [];
   const warnings: ParseWarning[] = [];
   let accountNumber: string | undefined;
-
-  // البحث عن صفّ الرؤوس، ورقم الحساب في ما قبله
   let headerRow = -1;
   let map: Record<string, number> = {};
 
-  for (let i = 0; i < Math.min(grid.length, 40); i++) {
-    const cells = (grid[i] ?? []).map((c) => String(c ?? ""));
-    const acct = cells.join(" ").match(/\b(\d{10,})\b/);
-    if (acct && !accountNumber) accountNumber = acct[1];
-
-    const found: Record<string, number> = {};
-    cells.forEach((c, idx) => {
-      const key = matchHeader(c);
-      if (key && found[key] === undefined) found[key] = idx;
+  for (const name of wb.SheetNames) {
+    const candidate = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[name], {
+      header: 1, raw: false, defval: "",
     });
-
-    if (found.date !== undefined && (found.amount !== undefined || found.debit !== undefined)) {
-      headerRow = i;
-      map = found;
+    const found = locateHeader(candidate);
+    if (found.headerRow !== -1) {
+      grid = candidate;
+      headerRow = found.headerRow;
+      map = found.map;
+      accountNumber = found.accountNumber;
       break;
     }
+    if (grid.length === 0) grid = candidate;
+    accountNumber ??= found.accountNumber;
   }
 
   if (headerRow === -1) {
@@ -164,6 +242,12 @@ export function parseBankStatement(
     }
 
     const description = (cells[map.description] ?? "").replace(/[\n\r]+/g, " ").trim();
+    const beneficiaryRaw = map.beneficiary !== undefined
+      ? (cells[map.beneficiary] ?? "").replace(/[\n\r]+/g, " ").trim()
+      : "";
+    const postingDate = map.postingDate !== undefined
+      ? parseBankDate(cells[map.postingDate] ?? "")
+      : null;
     const balanceRaw = map.balance !== undefined ? (cells[map.balance] ?? "").replace(/[٬,\s]/g, "") : "";
     const balanceMinor = balanceRaw ? (parseRiyals(balanceRaw) ?? undefined) : undefined;
 
@@ -176,6 +260,12 @@ export function parseBankStatement(
       direction,
       balanceMinor,
       reference: extractReference(description),
+      /*
+        الفراغ لا يُحفَظ نصّاً فارغاً: الفرق بين «لا عمود مستفيد في
+        الكشف» و«العمود موجود وفارغ» يُقرأ لاحقاً من غياب الحقل.
+      */
+      beneficiaryRaw: beneficiaryRaw.length > 0 ? beneficiaryRaw : undefined,
+      postingDate: postingDate ?? undefined,
     });
   }
 
