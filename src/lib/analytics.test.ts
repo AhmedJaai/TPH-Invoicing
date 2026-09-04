@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  ageBucket, buildAging, findPriceGaps, paymentStatus,
+  ageBucket, buildAging, findSameNameCandidates, paymentStatus,
   spendByMonth, summarizeItems, vatAtRisk, type LineRow,
 } from "./analytics";
 import { normalizeItem } from "./items";
@@ -140,42 +140,59 @@ describe("تحليل الاستهلاك", () => {
     expect(items[0].displayName).toBe("بن");
   });
 
-  it("يفصل المورّدين ويرتّبهم بالأرخص", () => {
+  it("الاسم الواحد عند مورّدين صنفان لا صنف — درس «العنب»", () => {
     const items = summarizeItems([
-      line({ description: "حليب 2 لتر", invoiceDate: "2026-08-01", supplierId: "s1", supplierName: "أ", unitPriceMinor: 900 }),
-      line({ description: "حليب 2 لتر", invoiceDate: "2026-08-02", supplierId: "s2", supplierName: "ب", unitPriceMinor: 750 }),
+      line({ description: "عنب", invoiceDate: "2026-07-25", supplierId: "s1", supplierName: "المحمصة الغربية", quantity: 5, unitPriceMinor: 15_500 }),
+      line({ description: "عنب", invoiceDate: "2026-07-13", supplierId: "s2", supplierName: "لافا كمبوتشا", quantity: 10, unitPriceMinor: 1_350 }),
     ]);
-    expect(items[0].suppliers[0].supplierName).toBe("ب");
-    expect(items[0].suppliers[0].lastUnitPriceMinor).toBe(750);
+    expect(items).toHaveLength(2);
+    expect(items.map((i) => i.supplierName).sort()).toEqual(["المحمصة الغربية", "لافا كمبوتشا"]);
+    // ولا يُحسب لأيّهما «تغيّر سعر» من سعر الآخر
+    expect(items.every((i) => i.priceChange === null)).toBe(true);
+  });
+
+  it("مفتاح الصنف يحمل المورّد", () => {
+    const items = summarizeItems([
+      line({ description: "بن", invoiceDate: "2026-08-01", supplierId: "s1", supplierName: "أ" }),
+    ]);
+    expect(items[0].key.startsWith("s1::")).toBe(true);
+    expect(items[0].supplierId).toBe("s1");
   });
 });
 
-describe("فجوة السعر بين المورّدين", () => {
+describe("أسماء تتكرّر عند مورّدين", () => {
   const items = summarizeItems([
     line({ description: "حليب 2 لتر", invoiceDate: "2026-08-01", supplierId: "s1", supplierName: "أ", quantity: 100, unitPriceMinor: 1000 }),
     line({ description: "حليب 2 لتر", invoiceDate: "2026-08-02", supplierId: "s2", supplierName: "ب", quantity: 100, unitPriceMinor: 800 }),
   ]);
 
-  it("تكشف الصنف المشترى بسعرين وتقدّر التوفير", () => {
-    const gaps = findPriceGaps(items);
-    expect(gaps).toHaveLength(1);
-    expect(gaps[0].cheapest.supplierName).toBe("ب");
-    expect(gaps[0].dearest.supplierName).toBe("أ");
-    expect(gaps[0].gapMinor).toBe(200);
-    expect(gaps[0].potentialSavingMinor).toBe(40_000); // ٢٠٠ هللة × ٢٠٠ وحدة
+  it("تُعرض مرشّحةً بالأرخص والأغلى", () => {
+    const c = findSameNameCandidates(items);
+    expect(c).toHaveLength(1);
+    expect(c[0].cheaper.supplierName).toBe("ب");
+    expect(c[0].dearer.supplierName).toBe("أ");
+    expect(c[0].gapMinor).toBe(200);
+    expect(c[0].gapRatio).toBeCloseTo(0.25);
   });
 
-  it("تتجاهل الفروق التافهة", () => {
-    const tiny = summarizeItems([
+  it("لا تُقدَّر وفورات — تطابق الاسم لا يعني تطابق الصنف", () => {
+    const c = findSameNameCandidates(items)[0] as unknown as Record<string, unknown>;
+    expect(c.potentialSavingMinor).toBeUndefined();
+  });
+
+  it("الفارق الطفيف لا يُعرض", () => {
+    const near = summarizeItems([
       line({ description: "سكر", invoiceDate: "2026-08-01", supplierId: "s1", supplierName: "أ", unitPriceMinor: 1000 }),
-      line({ description: "سكر", invoiceDate: "2026-08-02", supplierId: "s2", supplierName: "ب", unitPriceMinor: 990 }),
+      line({ description: "سكر", invoiceDate: "2026-08-02", supplierId: "s2", supplierName: "ب", unitPriceMinor: 980 }),
     ]);
-    expect(findPriceGaps(tiny)).toHaveLength(0);
+    expect(findSameNameCandidates(near)).toHaveLength(0);
   });
 
-  it("تتجاهل ما يُشترى من مورّد واحد", () => {
-    const single = summarizeItems([line({ description: "شاي", invoiceDate: "2026-08-01" })]);
-    expect(findPriceGaps(single)).toHaveLength(0);
+  it("الصنف عند مورّد واحد ليس مرشّحاً", () => {
+    const one = summarizeItems([
+      line({ description: "شاي", invoiceDate: "2026-08-01", supplierId: "s1", supplierName: "أ", unitPriceMinor: 1000 }),
+    ]);
+    expect(findSameNameCandidates(one)).toHaveLength(0);
   });
 });
 
@@ -233,7 +250,7 @@ describe("تغيّر السعر يُقارَن داخل المورّد الوا�
       line({ description: "بن", invoiceDate: "2026-08-01", supplierId: "s1", supplierName: "أفال", unitPriceMinor: 6000 }),
     ]);
     expect(items[0].priceChange?.direction).toBe("up");
-    expect(items[0].priceChangeSupplierName).toBe("أفال");
+    expect(items[0].supplierName).toBe("أفال");
   });
 
   it("يتجاهل تاريخ مورّد آخر عند حساب تغيّر المورّد الحالي", () => {
@@ -242,9 +259,11 @@ describe("تغيّر السعر يُقارَن داخل المورّد الوا�
       line({ description: "حليب", invoiceDate: "2026-07-01", supplierId: "s2", supplierName: "ب", unitPriceMinor: 900 }),
       line({ description: "حليب", invoiceDate: "2026-08-01", supplierId: "s2", supplierName: "ب", unitPriceMinor: 1000 }),
     ]);
-    // آخر شراء من «ب»: ارتفع من ٩ إلى ١٠، لا انخفض من ٢٠
-    expect(items[0].priceChangeSupplierName).toBe("ب");
-    expect(items[0].priceChange?.direction).toBe("up");
-    expect(items[0].priceChange?.previousMinor).toBe(900);
+    // «ب» صنف مستقلّ: ارتفع من ٩ إلى ١٠، ولا يُقارن بسعر «أ» إطلاقاً
+    const b = items.find((i) => i.supplierName === "ب")!;
+    expect(b.priceChange?.direction).toBe("up");
+    expect(b.priceChange?.previousMinor).toBe(900);
+    const a = items.find((i) => i.supplierName === "أ")!;
+    expect(a.priceChange).toBeNull();
   });
 });

@@ -194,7 +194,7 @@ export default async function AuditPage() {
                       <td className="px-3 py-2.5">
                         <p className="font-medium">{i.displayName}</p>
                         <p className="text-[11px] text-muted">
-                          {i.priceChangeSupplierName ?? "—"} · طُلب {i.orderCount} مرة
+                          {i.supplierName} · طُلب {i.orderCount} مرة
                         </p>
                       </td>
                       <td className="px-3 py-2.5 text-ink-soft"><Money minor={c.previousMinor} /></td>

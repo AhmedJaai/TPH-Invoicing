@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { buildInsights, type InsightInput } from "./insights";
-import { summarizeItems, findPriceGaps, buildAging, type LineRow } from "./analytics";
+import { summarizeItems, findSameNameCandidates, buildAging, type LineRow } from "./analytics";
 import { normalizeItem } from "./items";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
 const empty: InsightInput = {
-  items: [], priceGaps: [], aging: [], monthlySpend: [],
+  items: [], sameNameCandidates: [], aging: [], monthlySpend: [],
   vatAtRiskMinor: 0, vatAtRiskCount: 0, notTaxValidCount: 0,
   unpaidTotalMinor: 0, unpaidCount: 0, unpostedCount: 0, fixedAssetCount: 0,
   suppliersWithoutContract: [], suppliersMissingStatement: [],
@@ -70,18 +70,21 @@ describe("توصية فروق الأسعار بين المورّدين", () => {
     line({ description: "حليب 2 لتر", date: "2026-08-02", supplierId: "s2", supplierName: "بيكوف", qty: 100, unit: 800 }),
   ]);
 
-  it("تحسب التوفير وتسمّي الأرخص والأغلى", () => {
-    const r = buildInsights({ ...empty, items, priceGaps: findPriceGaps(items) });
-    const gap = r.find((x) => x.id === "price-gaps")!;
-    expect(gap.severity).toBe("opportunity");
-    expect(gap.impactMinor).toBe(40_000);
-    expect(gap.detail).toContain("بيكوف");
-    expect(gap.detail).toContain("أوراق الزيتون");
+  it("تسمّي الأرخص والأغلى ولا تدّعي توفيراً", () => {
+    const r = buildInsights({ ...empty, items, sameNameCandidates: findSameNameCandidates(items) });
+    const same = r.find((x) => x.id === "same-name")!;
+    expect(same.detail).toContain("بيكوف");
+    expect(same.detail).toContain("أوراق الزيتون");
+    // لا رقم يُسمّى توفيراً قبل أن يؤكّد الإنسان أنّهما صنف واحد
+    expect(same.impactMinor).toBe(0);
+    expect(same.severity).toBe("info");
   });
 
-  it("تحذّر قبل التوحيد بدل أن تأمر به", () => {
-    const r = buildInsights({ ...empty, items, priceGaps: findPriceGaps(items) });
-    expect(r.find((x) => x.id === "price-gaps")!.action).toContain("جودة");
+  it("تنبّه إلى أنّ تطابق الاسم ليس تطابق الصنف", () => {
+    const r = buildInsights({ ...empty, items, sameNameCandidates: findSameNameCandidates(items) });
+    const same = r.find((x) => x.id === "same-name")!;
+    expect(same.detail).toContain("كمبوتشا");
+    expect(same.action).toContain("الصنف نفسه");
   });
 });
 

@@ -230,8 +230,18 @@ export const invoiceLines = pgTable("invoice_lines", {
   /** الوصف بعد التطبيع — عليه يقوم تجميع الأصناف وتتبّع الأسعار */
   normalizedDescription: text("normalized_description").notNull().default(""),
   qty: numeric("qty", { precision: 12, scale: 3 }).notNull().default("1"),
+  /**
+   * السعر الفعلي للوحدة — ما دُفع، لا ما في القائمة.
+   * النموذج ينسخ سعر القائمة أحياناً والإجمالي بعد الخصم، فيصير الضرب
+   * لا يستقيم. عليه وحده يقوم تتبّع الأسعار. راجع lib/line-pricing.ts
+   */
   unitPriceMinor: integer("unit_price_minor").notNull(),
   lineTotalMinor: integer("line_total_minor").notNull(),
+  /** سعر القائمة قبل الخصم، إن خالف الفعلي */
+  listUnitPriceMinor: integer("list_unit_price_minor"),
+  discountMinor: integer("discount_minor").notNull().default(0),
+  /** كيف سُوّي التعارض: CONSISTENT · DISCOUNTED · TOTAL_INCLUDES_VAT · DERIVED · INCONSISTENT */
+  pricingBasis: text("pricing_basis"),
   vatRate: numeric("vat_rate", { precision: 5, scale: 4 }).notNull().default("0.15"),
   /** تاريخ الفاتورة منسوخ هنا لتتبّع الأسعار بلا ربط في كل استعلام */
   invoiceDate: timestamp("invoice_date", { withTimezone: true }),

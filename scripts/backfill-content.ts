@@ -30,6 +30,7 @@ import { extractDocument, activeProviderName } from "@/lib/extraction";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import { reviewConfirmed } from "@/lib/confirm";
 import { normalizeItem } from "@/lib/items";
+import { reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { parseRiyals, formatRiyalsDisplay } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
 
@@ -446,25 +447,41 @@ async function main() {
       if (invoiceId) {
         await tx.delete(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId));
         let added = 0;
+        const resolved: (NonNullable<ReturnType<typeof resolveLinePricing>> & {
+          description: string; quantity: number;
+        })[] = [];
+
         for (const l of x.lines) {
           const description = l.description?.trim();
           if (!description) continue;
-          const unit = parseRiyals(l.unitPrice ?? "");
-          const total = parseRiyals(l.lineTotal ?? "");
-          // السطر بلا سعر ولا مبلغ لا يُسجَّل — صفرٌ مخترع يفسد متوسط السعر
-          if (unit === null && total === null) continue;
-
           const qty = Number((l.quantity ?? "1").replace(/[^\d.]/g, "")) || 1;
-          const lineTotal = total ?? Math.round((unit ?? 0) * qty);
-          const unitPrice = unit ?? (qty > 0 ? Math.round(lineTotal / qty) : lineTotal);
+          // السطر بلا سعر ولا مبلغ لا يُسجَّل — صفرٌ مخترع يفسد متوسط السعر
+          const pricing = resolveLinePricing({
+            quantity: qty,
+            unitPriceMinor: parseRiyals(l.unitPrice ?? ""),
+            lineTotalMinor: parseRiyals(l.lineTotal ?? ""),
+          });
+          if (!pricing) continue;
+          resolved.push({ ...pricing, description, quantity: qty });
+        }
 
+        // تُسوّى بصافي الفاتورة — بعض المورّدين يكتب البنود شاملة الضريبة
+        const { lines: finalLines } = reconcileInvoiceLines(
+          resolved,
+          extractedSubtotal ?? t.storedTotalMinor ?? null,
+        );
+
+        for (const l of finalLines) {
           await tx.insert(invoiceLines).values({
             invoiceId,
-            description,
-            normalizedDescription: normalizeItem(description),
-            qty: String(qty),
-            unitPriceMinor: unitPrice,
-            lineTotalMinor: lineTotal,
+            description: l.description,
+            normalizedDescription: normalizeItem(l.description),
+            qty: String(l.quantity),
+            unitPriceMinor: l.effectiveUnitMinor,
+            lineTotalMinor: l.netTotalMinor,
+            listUnitPriceMinor: l.listUnitMinor,
+            discountMinor: l.discountMinor,
+            pricingBasis: l.basis,
             invoiceDate: x.invoiceDate ? new Date(`${x.invoiceDate}T00:00:00Z`) : null,
             supplierId,
           });

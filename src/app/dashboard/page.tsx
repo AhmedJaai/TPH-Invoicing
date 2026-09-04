@@ -6,7 +6,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
 import {
-  buildAging, findPriceGaps, paymentStatus, spendByMonth, summarizeItems, vatAtRisk,
+  buildAging, findSameNameCandidates, paymentStatus, spendByMonth, summarizeItems, vatAtRisk,
   type LineRow,
 } from "@/lib/analytics";
 import { buildInsights, SEVERITY_LABEL, type InsightSeverity } from "@/lib/insights";
@@ -183,13 +183,13 @@ export default async function DashboardPage() {
 
   const unpaid = withStatus.filter((r) => r.status.state !== "PAID");
   const unpaidTotal = unpaid.reduce((s, r) => s + Math.max(0, r.status.remainingMinor), 0);
-  const priceGaps = findPriceGaps(items);
+  const sameName = findSameNameCandidates(items);
   const totalSpend = invoiceRows.reduce((s, r) => s + r.totalMinor, 0);
   const thisMonth = monthly[monthly.length - 1];
 
   const insights = buildInsights({
     items,
-    priceGaps,
+    sameNameCandidates: sameName,
     aging,
     monthlySpend: monthly,
     vatAtRiskMinor: vat.atRiskMinor,
@@ -246,10 +246,9 @@ export default async function DashboardPage() {
           tone={vat.atRiskMinor > 0 ? "danger" : "ok"}
         />
         <Kpi
-          label="توفير ممكن"
-          value={<Money minor={priceGaps.reduce((s, g) => s + g.potentialSavingMinor, 0)} />}
-          sub={`${priceGaps.length} صنفاً بسعرين`}
-          tone="ok"
+          label="أسماء تتكرّر عند مورّدين"
+          value={String(sameName.length)}
+          sub="للمراجعة — تطابق الاسم لا يعني تطابق الصنف"
         />
       </div>
 

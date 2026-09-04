@@ -28,6 +28,7 @@ import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import { extractDocument } from "@/lib/extraction";
 import { reviewConfirmed } from "@/lib/confirm";
 import { normalizeItem } from "@/lib/items";
+import { reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { parseRiyals } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
 import { recordAudit } from "@/lib/audit";
@@ -317,21 +318,36 @@ export async function POST(request: Request) {
         if (!inv) return;
         invoicesCreated++;
 
+        const resolved: (NonNullable<ReturnType<typeof resolveLinePricing>> & {
+          description: string; quantity: number;
+        })[] = [];
+
         for (const l of x.lines) {
           const description = l.description?.trim();
           if (!description) continue;
-          const unit = parseRiyals(l.unitPrice ?? "");
-          const lineTotal = parseRiyals(l.lineTotal ?? "");
-          if (unit === null && lineTotal === null) continue;
           const qty = Number((l.quantity ?? "1").replace(/[^\d.]/g, "")) || 1;
-          const resolvedTotal = lineTotal ?? Math.round((unit ?? 0) * qty);
+          const pricing = resolveLinePricing({
+            quantity: qty,
+            unitPriceMinor: parseRiyals(l.unitPrice ?? ""),
+            lineTotalMinor: parseRiyals(l.lineTotal ?? ""),
+          });
+          if (!pricing) continue;
+          resolved.push({ ...pricing, description, quantity: qty });
+        }
+
+        const { lines: finalLines } = reconcileInvoiceLines(resolved, parseRiyals(x.subtotalAmount));
+
+        for (const l of finalLines) {
           await tx.insert(invoiceLines).values({
             invoiceId: inv.id,
-            description,
-            normalizedDescription: normalizeItem(description),
-            qty: String(qty),
-            unitPriceMinor: unit ?? (qty > 0 ? Math.round(resolvedTotal / qty) : resolvedTotal),
-            lineTotalMinor: resolvedTotal,
+            description: l.description,
+            normalizedDescription: normalizeItem(l.description),
+            qty: String(l.quantity),
+            unitPriceMinor: l.effectiveUnitMinor,
+            lineTotalMinor: l.netTotalMinor,
+            listUnitPriceMinor: l.listUnitMinor,
+            discountMinor: l.discountMinor,
+            pricingBasis: l.basis,
             invoiceDate: new Date(`${x.invoiceDate}T00:00:00Z`),
             supplierId: supplier.id,
           });

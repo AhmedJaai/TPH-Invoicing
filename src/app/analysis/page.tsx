@@ -5,7 +5,7 @@ import { invoiceLines, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
-import { findPriceGaps, summarizeItems, type LineRow } from "@/lib/analytics";
+import { findSameNameCandidates, summarizeItems, type LineRow } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -67,8 +67,7 @@ export default async function AnalysisPage() {
   }
 
   const totalSpend = items.reduce((s, i) => s + i.totalSpentMinor, 0);
-  const gaps = findPriceGaps(items);
-  const totalSaving = gaps.reduce((s, g) => s + g.potentialSavingMinor, 0);
+  const sameName = findSameNameCandidates(items);
   const top = items.slice(0, 40);
 
   // الأصناف التي قاربت دورة إعادة طلبها
@@ -96,48 +95,52 @@ export default async function AnalysisPage() {
           <p className="mt-1 text-xl font-bold"><Money minor={totalSpend} /></p>
         </div>
         <div className="rounded-xl border border-line bg-raised px-4 py-3">
-          <p className="text-xs text-muted">أصناف بسعرين</p>
-          <p className={`nums mt-1 text-xl font-bold ${gaps.length ? "text-warn" : ""}`}>{gaps.length}</p>
+          <p className="text-xs text-muted">أسماء تتكرّر عند مورّدين</p>
+          <p className="nums mt-1 text-xl font-bold">{sameName.length}</p>
         </div>
         <div className="rounded-xl border border-line bg-raised px-4 py-3">
-          <p className="text-xs text-muted">توفير ممكن</p>
-          <p className="mt-1 text-xl font-bold"><Money minor={totalSaving} tone={totalSaving > 0 ? "ok" : undefined} /></p>
+          <p className="text-xs text-muted">مورّدون</p>
+          <p className="nums mt-1 text-xl font-bold">
+            {new Set(items.map((i) => i.supplierId).filter(Boolean)).size}
+          </p>
         </div>
       </div>
 
-      {gaps.length > 0 && (
+      {sameName.length > 0 && (
         <section className="mt-10">
-          <h2 className="mb-1 text-base font-bold">الصنف نفسه بسعرين</h2>
-          <p className="mb-3 text-xs text-muted">
-            أسرع توفير ممكن: أصناف تشتريها من أكثر من مورّد بفارق سعر يستحق النظر.
+          <h2 className="mb-1 text-base font-bold">اسم واحد عند مورّدين — للمراجعة</h2>
+          <p className="mb-3 text-xs leading-relaxed text-muted">
+            هذه مرشّحات لا نتائج. تطابق الاسم لا يعني تطابق الصنف: «عنب» عند المحمصة الغربية
+            كيلو بنّ بـ١٥٥ ريالاً، و«عنب» عند لافا زجاجة كمبوتشا بـ١٣٫٥٠. فانظر الوصفين
+            بنفسك — فإن كانا صنفاً واحداً فالفارق فرصة، وإلّا فلا معنى للمقارنة.
           </p>
           <div className="overflow-x-auto rounded-xl border border-line">
-            <table className="w-full min-w-[38rem] text-sm">
+            <table className="w-full min-w-[40rem] text-sm">
               <thead className="bg-sunken text-xs text-muted">
                 <tr>
-                  <th className="px-3 py-2 text-right font-medium">الصنف</th>
+                  <th className="px-3 py-2 text-right font-medium">الاسم المشترك</th>
                   <th className="px-3 py-2 text-right font-medium">الأرخص</th>
                   <th className="px-3 py-2 text-right font-medium">الأغلى</th>
                   <th className="px-3 py-2 text-right font-medium">الفارق</th>
-                  <th className="px-3 py-2 text-right font-medium">التوفير المقدَّر</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line bg-raised">
-                {gaps.slice(0, 20).map((g) => (
-                  <tr key={g.item.key}>
-                    <td className="px-3 py-2.5 font-medium">{g.item.displayName}</td>
+                {sameName.slice(0, 20).map((g) => (
+                  <tr key={g.normalized}>
+                    <td className="px-3 py-2.5 font-medium">{g.normalized}</td>
                     <td className="px-3 py-2.5">
-                      <span className="block text-xs text-muted">{g.cheapest.supplierName}</span>
-                      <Money minor={g.cheapest.lastUnitPriceMinor} tone="ok" />
+                      <span className="block text-xs text-muted">{g.cheaper.supplierName}</span>
+                      <span className="block text-[11px]">{g.cheaper.displayName}</span>
+                      <Money minor={g.cheaper.lastUnitPriceMinor} tone="ok" />
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className="block text-xs text-muted">{g.dearest.supplierName}</span>
-                      <Money minor={g.dearest.lastUnitPriceMinor} tone="danger" />
+                      <span className="block text-xs text-muted">{g.dearer.supplierName}</span>
+                      <span className="block text-[11px]">{g.dearer.displayName}</span>
+                      <Money minor={g.dearer.lastUnitPriceMinor} tone="danger" />
                     </td>
                     <td className="nums px-3 py-2.5 font-bold text-warn">
                       {Math.round(g.gapRatio * 100)}٪
                     </td>
-                    <td className="px-3 py-2.5 font-bold"><Money minor={g.potentialSavingMinor} tone="ok" /></td>
                   </tr>
                 ))}
               </tbody>
@@ -197,9 +200,7 @@ export default async function AnalysisPage() {
                 <tr key={i.key}>
                   <td className="px-3 py-2.5">
                     <p className="font-medium">{i.displayName}</p>
-                    <p className="text-[11px] text-muted">
-                      {i.suppliers.map((s) => s.supplierName).join(" · ") || "—"}
-                    </p>
+                    <p className="text-[11px] text-muted">{i.supplierName}</p>
                   </td>
                   <td className="nums px-3 py-2.5">{i.orderCount}</td>
                   <td className="nums px-3 py-2.5">{Math.round(i.totalQuantity * 100) / 100}</td>

@@ -6,7 +6,7 @@
  *
  * دوال خالصة: تأخذ نتائج التحليل وتُرجع توصيات. لا شبكة ولا قاعدة بيانات.
  */
-import type { ItemSummary, PriceGap, SupplierAging, MonthlySpend } from "./analytics";
+import type { ItemSummary, SameNameCandidate, SupplierAging, MonthlySpend } from "./analytics";
 
 export type InsightSeverity = "critical" | "warning" | "opportunity" | "info";
 
@@ -33,7 +33,7 @@ const riyals = (minor: number) =>
 
 export interface InsightInput {
   items: readonly ItemSummary[];
-  priceGaps: readonly PriceGap[];
+  sameNameCandidates: readonly SameNameCandidate[];
   aging: readonly SupplierAging[];
   monthlySpend: readonly MonthlySpend[];
   vatAtRiskMinor: number;
@@ -65,17 +65,17 @@ export function buildInsights(input: InsightInput): Insight[] {
     });
   }
 
-  /* ── فروق أسعار بين المورّدين ── */
-  const totalGap = input.priceGaps.reduce((s, g) => s + g.potentialSavingMinor, 0);
-  if (totalGap > 0) {
-    const top = input.priceGaps[0];
+  /* ── أصناف باسم واحد عند مورّدين ── */
+  if (input.sameNameCandidates.length > 0) {
+    const top = input.sameNameCandidates[0];
     out.push({
-      id: "price-gaps",
-      severity: "opportunity",
-      title: `توفير ممكن ${riyals(totalGap)} ريال بتوحيد مصدر الشراء`,
-      detail: `${input.priceGaps.length} صنفاً تشتريه من أكثر من مورّد بأسعار مختلفة. أكبرها «${top.item.displayName}»: ${riyals(top.cheapest.lastUnitPriceMinor)} عند ${top.cheapest.supplierName} مقابل ${riyals(top.dearest.lastUnitPriceMinor)} عند ${top.dearest.supplierName}.`,
-      impactMinor: totalGap,
-      action: "راجع أسباب الفارق — قد يكون جودة أو حجم طلب — فإن لم يكن، وحّد الشراء عند الأرخص أو تفاوض على مطابقة السعر.",
+      id: "same-name",
+      severity: "info",
+      title: `${input.sameNameCandidates.length} اسم صنف يتكرّر عند أكثر من مورّد`,
+      detail: `أكبرها فارقاً «${top.cheaper.displayName}»: ${riyals(top.cheaper.lastUnitPriceMinor)} عند ${top.cheaper.supplierName} مقابل ${riyals(top.dearer.lastUnitPriceMinor)} عند ${top.dearer.supplierName}. وتطابق الاسم لا يعني تطابق الصنف — «عنب» عند محمصة كيلو بنّ، وعند لافا زجاجة كمبوتشا.`,
+      // لا يُدّعى توفير قبل أن يؤكّد الإنسان أنّهما صنف واحد
+      impactMinor: 0,
+      action: "راجع القائمة: إن كانا الصنف نفسه فعلاً فوحّد الشراء عند الأرخص أو تفاوض على مطابقة السعر.",
     });
   }
 

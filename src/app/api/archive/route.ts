@@ -17,6 +17,7 @@ import { resolveNameCollision } from "@/lib/naming";
 import { parseRiyals } from "@/lib/money";
 import { diffCorrections, recordAudit } from "@/lib/audit";
 import { normalizeItem } from "@/lib/items";
+import { reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { reviewConfirmed } from "@/lib/confirm";
 import { companyConfig } from "@/config/drive";
 
@@ -282,25 +283,38 @@ export async function POST(request: Request) {
 
       // البنود: بلا تخمين — السطر بلا سعر وحدة أو مبلغ لا يُسجَّل،
       // لأنّ صفراً مخترعاً يفسد متوسط السعر وتحليل الاستهلاك معاً.
+      const resolved: (ReturnType<typeof resolveLinePricing> & object & {
+        description: string; quantity: number;
+      })[] = [];
+
       for (const l of body.lines ?? []) {
         const description = l.description?.trim();
         if (!description) continue;
-        const unitPriceMinor = parseRiyals(l.unitPrice ?? "");
-        const lineTotalMinor = parseRiyals(l.lineTotal ?? "");
-        if (unitPriceMinor === null && lineTotalMinor === null) continue;
-
         const quantity = Number((l.quantity ?? "1").replace(/[^\d.]/g, "")) || 1;
-        const resolvedTotal = lineTotalMinor ?? Math.round((unitPriceMinor ?? 0) * quantity);
-        const resolvedUnit =
-          unitPriceMinor ?? (quantity > 0 ? Math.round(resolvedTotal / quantity) : resolvedTotal);
+        // السعر الفعلي لا سعر القائمة — راجع lib/line-pricing.ts
+        const pricing = resolveLinePricing({
+          quantity,
+          unitPriceMinor: parseRiyals(l.unitPrice ?? ""),
+          lineTotalMinor: parseRiyals(l.lineTotal ?? ""),
+        });
+        if (!pricing) continue;
+        resolved.push({ ...pricing, description, quantity });
+      }
 
+      // ثمّ تُسوّى البنود بصافي الفاتورة: بعض المورّدين يكتبها شاملة الضريبة
+      const { lines: finalLines } = reconcileInvoiceLines(resolved, subtotalMinor);
+
+      for (const l of finalLines) {
         await tx.insert(invoiceLines).values({
           invoiceId: inv.id,
-          description,
-          normalizedDescription: normalizeItem(description),
-          qty: String(quantity),
-          unitPriceMinor: resolvedUnit,
-          lineTotalMinor: resolvedTotal,
+          description: l.description,
+          normalizedDescription: normalizeItem(l.description),
+          qty: String(l.quantity),
+          unitPriceMinor: l.effectiveUnitMinor,
+          lineTotalMinor: l.netTotalMinor,
+          listUnitPriceMinor: l.listUnitMinor,
+          discountMinor: l.discountMinor,
+          pricingBasis: l.basis,
           invoiceDate: new Date(`${body.invoiceDate}T00:00:00Z`),
           supplierId: body.supplierId!,
         });

@@ -117,34 +117,44 @@ export interface LineRow {
 }
 
 export interface ItemSummary {
+  /** المفتاح: المورّد ثمّ الصنف — الاسم وحده لا يعرّف صنفاً */
   key: string;
+  supplierId: string | null;
+  supplierName: string;
+  normalized: string;
   /** أوضح صيغة للاسم — الأطول عادةً أوفاها وصفاً */
   displayName: string;
   orderCount: number;
   totalQuantity: number;
   totalSpentMinor: number;
   averageUnitPriceMinor: number;
+  lastUnitPriceMinor: number;
   lastOrderedAt: Date | null;
   firstOrderedAt: Date | null;
   /** متوسط الأيام بين طلبين — يكشف دورة إعادة الطلب */
   averageDaysBetweenOrders: number | null;
-  suppliers: { supplierId: string; supplierName: string; lastUnitPriceMinor: number; orderCount: number }[];
-  /**
-   * تغيّر السعر عند المورّد الذي اشتريتَ منه آخر مرة.
-   *
-   * المقارنة داخل المورّد الواحد عمداً: لو قارنّا عبر المورّدين لظهر
-   * الانتقال من مورّد غالٍ إلى رخيص كأنّه «انخفاض سعر»، وهو ليس كذلك.
-   */
+  /** تغيّر السعر عند هذا المورّد */
   priceChange: PriceChange | null;
-  /** اسم المورّد الذي تخصّه المقارنة أعلاه */
-  priceChangeSupplierName: string | null;
 }
 
+/**
+ * تجميع الأصناف — **لكل مورّد على حدة**.
+ *
+ * الدمج عبر المورّدين على الاسم وحده كان خطأً جسيماً: «عنب» عند المحمصة
+ * الغربية كيلو بنّ بمئة وخمسة وخمسين ريالاً، و«عنب» عند لافا زجاجة كمبوتشا
+ * بثلاثة عشر. فدمجهما أنتج «صنف واحد بسعرين» و«توفير ممكن» لا وجود له.
+ *
+ * الاسم لا يعرّف صنفاً. والمورّد مع الاسم أقرب، وإن بقي ناقصاً — فالمورّد
+ * الواحد قد يكتب الصنف نفسه بصيغتين («عنب» و«كولومبي عنب»). لكن الخطأ في
+ * هذا الاتجاه يُفرّق ما هو واحد، وذلك أهون من أن يجمع ما ليس واحداً ثمّ
+ * يبني عليه توصية بالمال.
+ */
 export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
   const groups = new Map<string, LineRow[]>();
   for (const row of rows) {
-    const key = row.normalizedDescription || normalizeItem(row.description);
-    if (!key) continue;
+    const normalized = row.normalizedDescription || normalizeItem(row.description);
+    if (!normalized) continue;
+    const key = `${row.supplierId ?? "—"}::${normalized}`;
     const list = groups.get(key) ?? [];
     list.push(row);
     groups.set(key, list);
@@ -153,16 +163,18 @@ export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
   const summaries: ItemSummary[] = [];
 
   for (const [key, list] of groups) {
-    const dated = list.filter((r) => r.invoiceDate).sort(
-      (a, b) => a.invoiceDate!.getTime() - b.invoiceDate!.getTime(),
-    );
+    const dated = list
+      .filter((r) => r.invoiceDate)
+      .sort((a, b) => a.invoiceDate!.getTime() - b.invoiceDate!.getTime());
 
     const totalQuantity = list.reduce((s, r) => s + r.quantity, 0);
     const totalSpentMinor = list.reduce((s, r) => s + r.lineTotalMinor, 0);
 
     // الأطول اسماً أوفى وصفاً غالباً: «حليب طازج كامل الدسم ٢ لتر» خير من «حليب»
-    const displayName = list.reduce((best, r) =>
-      r.description.length > best.length ? r.description : best, list[0].description);
+    const displayName = list.reduce(
+      (best, r) => (r.description.length > best.length ? r.description : best),
+      list[0].description,
+    );
 
     // متوسط الفترة بين الطلبات — يُحسب من التواريخ الفريدة لا من كل سطر
     const uniqueDays = [...new Set(dated.map((r) => r.invoiceDate!.toISOString().slice(0, 10)))].sort();
@@ -173,101 +185,75 @@ export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
       averageDaysBetweenOrders = Math.round((last - first) / 86_400_000 / (uniqueDays.length - 1));
     }
 
-    // تجميع المورّدين لهذا الصنف — يكشف شراء الصنف نفسه بسعرين
-    const bySupplier = new Map<string, { supplierId: string; supplierName: string; lastUnitPriceMinor: number; orderCount: number; lastDate: number }>();
-    for (const r of list) {
-      if (!r.supplierId) continue;
-      const t = r.invoiceDate?.getTime() ?? 0;
-      const prev = bySupplier.get(r.supplierId);
-      if (!prev) {
-        bySupplier.set(r.supplierId, {
-          supplierId: r.supplierId,
-          supplierName: r.supplierName ?? "—",
-          lastUnitPriceMinor: r.unitPriceMinor,
-          orderCount: 1,
-          lastDate: t,
-        });
-      } else {
-        prev.orderCount++;
-        if (t >= prev.lastDate) {
-          prev.lastUnitPriceMinor = r.unitPriceMinor;
-          prev.lastDate = t;
-        }
-      }
-    }
+    const latest = dated[dated.length - 1] ?? list[list.length - 1];
 
     summaries.push({
       key,
+      supplierId: list[0].supplierId,
+      supplierName: list[0].supplierName ?? "—",
+      normalized: key.split("::")[1] ?? "",
       displayName,
       orderCount: list.length,
       totalQuantity,
       totalSpentMinor,
       averageUnitPriceMinor: totalQuantity > 0 ? Math.round(totalSpentMinor / totalQuantity) : 0,
+      lastUnitPriceMinor: latest.unitPriceMinor,
       lastOrderedAt: dated.length ? dated[dated.length - 1].invoiceDate : null,
       firstOrderedAt: dated.length ? dated[0].invoiceDate : null,
       averageDaysBetweenOrders,
-      suppliers: [...bySupplier.values()]
-        .map(({ supplierId, supplierName, lastUnitPriceMinor, orderCount }) => ({
-          supplierId, supplierName, lastUnitPriceMinor, orderCount,
-        }))
-        .sort((a, b) => a.lastUnitPriceMinor - b.lastUnitPriceMinor),
-      priceChange: null,
-      priceChangeSupplierName: null,
+      priceChange: detectPriceChange(
+        dated.map((r) => ({ date: r.invoiceDate!, unitPriceMinor: r.unitPriceMinor })),
+      ),
     });
-
-    // المقارنة تجري على تاريخ المورّد الأحدث شراءً وحده
-    const latest = dated[dated.length - 1];
-    const summary = summaries[summaries.length - 1];
-    if (latest?.supplierId) {
-      const sameSupplier = dated.filter((r) => r.supplierId === latest.supplierId);
-      summary.priceChange = detectPriceChange(
-        sameSupplier.map((r) => ({ date: r.invoiceDate!, unitPriceMinor: r.unitPriceMinor })),
-      );
-      summary.priceChangeSupplierName = latest.supplierName ?? null;
-    }
   }
 
   return summaries.sort((a, b) => b.totalSpentMinor - a.totalSpentMinor);
 }
 
 /**
- * الأصناف التي تُشترى من أكثر من مورّد بأسعار مختلفة.
- * هذه أسرع طريقة لتوفير مال في مقهى: نفس الصنف، سعران.
+ * أصناف تحمل الاسم نفسه عند مورّدين مختلفين.
+ *
+ * مرشّحة للمراجعة لا نتيجة مؤكَّدة. تطابق الاسم لا يعني تطابق الصنف —
+ * ودرس «العنب» يمنعنا من أن نبني على ذلك رقماً نسمّيه توفيراً. فيُعرض
+ * الاسمان والمورّدان والسعران، ويقرّر الإنسان أهما صنف واحد أم لا.
  */
-export interface PriceGap {
-  item: ItemSummary;
-  cheapest: ItemSummary["suppliers"][number];
-  dearest: ItemSummary["suppliers"][number];
+export interface SameNameCandidate {
+  normalized: string;
+  cheaper: ItemSummary;
+  dearer: ItemSummary;
   gapMinor: number;
   gapRatio: number;
-  /** التوفير المقدَّر لو اشتُري كله من الأرخص */
-  potentialSavingMinor: number;
 }
 
-export function findPriceGaps(items: readonly ItemSummary[], minRatio = 0.05): PriceGap[] {
-  const gaps: PriceGap[] = [];
-
-  for (const item of items) {
-    if (item.suppliers.length < 2) continue;
-    const cheapest = item.suppliers[0];
-    const dearest = item.suppliers[item.suppliers.length - 1];
-    const gapMinor = dearest.lastUnitPriceMinor - cheapest.lastUnitPriceMinor;
-    if (gapMinor <= 0 || cheapest.lastUnitPriceMinor === 0) continue;
-
-    const gapRatio = gapMinor / cheapest.lastUnitPriceMinor;
-    if (gapRatio < minRatio) continue;
-
-    gaps.push({
-      item,
-      cheapest,
-      dearest,
-      gapMinor,
-      gapRatio,
-      potentialSavingMinor: Math.round(gapMinor * item.totalQuantity),
-    });
+export function findSameNameCandidates(
+  items: readonly ItemSummary[],
+  minRatio = 0.05,
+): SameNameCandidate[] {
+  const byName = new Map<string, ItemSummary[]>();
+  for (const i of items) {
+    if (!i.normalized || !i.supplierId) continue;
+    const list = byName.get(i.normalized) ?? [];
+    list.push(i);
+    byName.set(i.normalized, list);
   }
 
-  return gaps.sort((a, b) => b.potentialSavingMinor - a.potentialSavingMinor);
+  const out: SameNameCandidate[] = [];
+
+  for (const [normalized, list] of byName) {
+    if (list.length < 2) continue;
+    const sorted = [...list].sort((a, b) => a.lastUnitPriceMinor - b.lastUnitPriceMinor);
+    const cheaper = sorted[0];
+    const dearer = sorted[sorted.length - 1];
+    const gapMinor = dearer.lastUnitPriceMinor - cheaper.lastUnitPriceMinor;
+    if (gapMinor <= 0 || cheaper.lastUnitPriceMinor === 0) continue;
+
+    const gapRatio = gapMinor / cheaper.lastUnitPriceMinor;
+    if (gapRatio < minRatio) continue;
+
+    out.push({ normalized, cheaper, dearer, gapMinor, gapRatio });
+  }
+
+  return out.sort((a, b) => b.gapRatio - a.gapRatio);
 }
 
 /* ───────────────────────── ضريبة المدخلات المعرّضة ───────────────────────── */
