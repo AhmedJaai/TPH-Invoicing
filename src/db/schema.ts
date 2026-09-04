@@ -391,6 +391,7 @@ export const txCategoryEnum = pgEnum("tx_category", [
   "INTERNAL",   // حركة تشغيلية: نقاط بيع · رسوم بنك
   "OTHER",
   "UNKNOWN",
+  "POS_SETTLEMENT", "POS_FEE", "POS_VAT", "BANK_FEE",
 ]);
 
 export const ruleSourceEnum = pgEnum("rule_source", ["MANUAL", "SUGGESTED"]);

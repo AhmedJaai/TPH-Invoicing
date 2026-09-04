@@ -34,7 +34,8 @@
     "db:products": "tsx --env-file=.env scripts/build-products.ts",
     "db:expenses": "tsx --env-file=.env scripts/derive-expenses.ts",
     "db:verify": "tsx --env-file=.env scripts/verify-invariants.ts",
-    "db:dedupe": "tsx --env-file=.env scripts/dedupe-bank.ts"
+    "db:dedupe": "tsx --env-file=.env scripts/dedupe-bank.ts",
+    "db:reclassify": "tsx --env-file=.env scripts/reclassify-bank.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
