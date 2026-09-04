@@ -12,6 +12,8 @@ import { gatherAttentionFacts } from "@/lib/attention-facts";
 import { buildDataHealth } from "@/lib/data-health";
 import { gatherHealthFacts } from "@/lib/data-health-facts";
 import { spendByMonth } from "@/lib/analytics";
+import { Figure } from "@/components/figure";
+import { gatherHomeProvenance } from "@/lib/provenance-facts";
 
 export const dynamic = "force-dynamic";
 
@@ -22,35 +24,6 @@ export const dynamic = "force-dynamic";
  * صباح. فصار أوّل ما يُرى: ماذا يحتاج انتباهك، وأين المال، وما مدى اكتمال
  * ما بُنيت عليه هذه الأرقام. والرفع زرٌّ ظاهر لا صفحة أولى.
  */
-
-function Kpi({
-  label, value, sub, tone, href,
-}: {
-  label: string;
-  value: React.ReactNode;
-  sub?: string;
-  tone?: "warn" | "danger" | "ok" | "muted";
-  href?: string;
-}) {
-  const cls =
-    tone === "warn" ? "text-warn" : tone === "danger" ? "text-danger"
-    : tone === "ok" ? "text-ok" : tone === "muted" ? "text-muted" : "";
-
-  const body = (
-    <>
-      <p className="text-xs text-muted">{label}</p>
-      <p className={`mt-1.5 text-2xl font-bold leading-none ${cls}`}>{value}</p>
-      {sub && <p className="mt-1.5 text-[11px] leading-relaxed text-muted">{sub}</p>}
-    </>
-  );
-
-  const box = "rounded-xl border border-line bg-raised px-4 py-3.5";
-  return href ? (
-    <Link href={href} className={`${box} transition-colors hover:border-ink-soft`}>{body}</Link>
-  ) : (
-    <div className={box}>{body}</div>
-  );
-}
 
 function Bar({ label, value, max, note }: { label: string; value: number; max: number; note?: string }) {
   const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
@@ -77,9 +50,10 @@ export default async function HomePage() {
   // مدير المشتريات لا يرى المال — تُعرض له وجهته مباشرةً
   if (!showAmounts) redirect("/upload");
 
-  const [health, attentionFacts] = await Promise.all([
+  const [health, attentionFacts, prov] = await Promise.all([
     gatherHealthFacts().then(buildDataHealth),
     gatherAttentionFacts(),
+    gatherHomeProvenance(),
   ]);
 
   const attention = buildAttention(attentionFacts);
@@ -100,11 +74,6 @@ export default async function HomePage() {
   const monthly = spendByMonth(invoiceRows);
   const thisMonth = monthly[monthly.length - 1];
   const prevMonth = monthly[monthly.length - 2];
-  const outstanding = invoiceRows.reduce(
-    (s, r) => s + Math.max(0, r.totalMinor - Number(r.allocated)),
-    0,
-  );
-
   const trend =
     thisMonth && prevMonth && prevMonth.totalMinor > 0
       ? (thisMonth.totalMinor - prevMonth.totalMinor) / prevMonth.totalMinor
@@ -130,31 +99,39 @@ export default async function HomePage() {
       intro="ما تحتاج معرفته أو فعله اليوم — لا ما في قاعدة البيانات من سجلات."
     >
       {/* ── الأرقام ── */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/*
           المبيعات وهامش الربح يحتاجان مصدر مبيعات لم يُوصَل بعد.
           صفرٌ هنا يوحي بأنّ المقهى لم يبع شيئاً — والفراغ الصادق خير منه.
         */}
-        <Kpi label="مبيعات اليوم" value="غير موصولة" tone="muted" sub="لا مصدر مبيعات بعد" />
-        <Kpi
-          label={`مشتريات ${thisMonth?.month ?? "الشهر"}`}
-          value={<Money minor={thisMonth?.totalMinor ?? 0} />}
-          sub={
+        <Figure label="مبيعات اليوم" value="غير موصولة" tone="muted" note="لا مصدر مبيعات بعد" />
+
+        <Figure
+          label={`مشتريات ${prov.month ?? "الشهر"}`}
+          provenance={prov.purchases}
+          href="/purchases"
+          tone={trend !== null && trend > 0.15 ? "warn" : undefined}
+          note={
             trend === null
-              ? `${thisMonth?.invoiceCount ?? 0} فاتورة`
+              ? undefined
               : `${trend > 0 ? "▲" : "▼"} ${Math.abs(Math.round(trend * 100))}٪ عن ${prevMonth!.month}`
           }
-          tone={trend !== null && trend > 0.15 ? "warn" : undefined}
-          href="/purchases"
         />
-        <Kpi
+
+        <Figure
           label="الرصيد المستحق"
-          value={<Money minor={outstanding} />}
-          sub="للمورّدين الآن"
-          tone={outstanding > 0 ? "warn" : "ok"}
+          provenance={prov.outstanding}
           href="/money"
+          tone={prov.outstanding.valueMinor > 0 ? "warn" : "ok"}
+          note="للمورّدين الآن"
         />
-        <Kpi label="هامش الربح" value="غير متاح" tone="muted" sub="يحتاج المبيعات والتكلفة" />
+
+        <Figure
+          label="ضريبة مدخلات مؤكَّدة"
+          provenance={prov.vat}
+          href="/attention"
+          note="من فواتير مستوفية الأركان وحدها"
+        />
       </div>
 
       {/* ── ما يحتاج انتباهك ── */}

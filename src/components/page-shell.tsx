@@ -84,23 +84,5 @@ function MobileUpload({ role }: { role: Role }) {
   );
 }
 
-export function Empty({ message }: { message: string }) {
-  return (
-    <div className="rounded-xl border border-dashed border-line px-5 py-10 text-center">
-      <p className="text-sm text-muted">{message}</p>
-    </div>
-  );
-}
-
-export function Money({ minor, tone }: { minor: number; tone?: "warn" | "danger" | "ok" }) {
-  const cls = tone === "warn" ? "text-warn" : tone === "danger" ? "text-danger" : tone === "ok" ? "text-ok" : "";
-  const whole = Math.floor(Math.abs(minor) / 100);
-  const frac = String(Math.abs(minor) % 100).padStart(2, "0");
-  const digits = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return (
-    <span className={`nums ${cls}`} dir="ltr">
-      {minor < 0 ? "-" : ""}
-      {digits}.{frac}
-    </span>
-  );
-}
+// يُعاد تصديرهما للمستوردين القدامى؛ تعريفهما في `money.tsx`
+export { Money, Empty } from "./money";
