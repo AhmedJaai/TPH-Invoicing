@@ -193,3 +193,68 @@ describe("suggestAlias", () => {
     expect(s.split(" ")).toHaveLength(3);
   });
 });
+
+describe("التصنيف يسبق التخمين", () => {
+  const index: SupplierAliasIndex[] = [
+    { supplierId: "s1", supplierName: "سابع جار", normalizedNames: ["سابع جار"] },
+  ];
+
+  it("قاعدة الإيجار تمنع عدّ الحوالة سداد مورّد", () => {
+    const tx: BankTx = {
+      id: "t1", valueDate: new Date("2026-08-01T00:00:00Z"),
+      description: "تحويل الى مؤسسة سابع جار", transactionType: "حوالة",
+      amountMinor: 4_750_000, direction: "DEBIT",
+    };
+    const withoutRule = matchBankTransactions([tx], [], index);
+    expect(withoutRule[0].kind).toBe("SUPPLIER_ONLY");
+
+    const withRule = matchBankTransactions([tx], [], index, [
+      { id: "r1", normalized: "سابع جار", category: "RENT" },
+    ]);
+    expect(withRule[0].kind).toBe("CLASSIFIED");
+    expect(withRule[0].category).toBe("RENT");
+    expect(withRule[0].ruleId).toBe("r1");
+    expect(withRule[0].invoices).toHaveLength(0);
+  });
+
+  it("قاعدة التحويل الشخصي تُخرج المالك من قائمة المورّدين", () => {
+    const tx: BankTx = {
+      id: "t2", valueDate: new Date("2026-08-02T00:00:00Z"),
+      description: "تحويل الى احمد الجعيدي", transactionType: "حوالة",
+      amountMinor: 500_000, direction: "DEBIT",
+    };
+    const r = matchBankTransactions([tx], [], [], [
+      { id: "r2", normalized: "احمد الجعيدي", category: "PERSONAL" },
+    ]);
+    expect(r[0].category).toBe("PERSONAL");
+    expect(r[0].kind).toBe("CLASSIFIED");
+  });
+
+  it("قاعدة المورّد تربط الحركة بمورّدها ولو لم يُعرف من الوصف", () => {
+    const tx: BankTx = {
+      id: "t3", valueDate: new Date("2026-08-05T00:00:00Z"),
+      description: "حوالة صادرة 8891231", transactionType: "حوالة",
+      amountMinor: 42_000, direction: "DEBIT",
+    };
+    const open: OpenInvoice[] = [{
+      invoiceId: "i1", supplierId: "s1", supplierName: "سابع جار",
+      invoiceNumber: "1", invoiceDate: new Date("2026-08-01T00:00:00Z"),
+      periodMonth: "2026-08", outstandingMinor: 42_000,
+    }];
+    const r = matchBankTransactions([tx], open, index, [
+      { id: "r3", normalized: "حواله صادره 8891231", category: "SUPPLIER", supplierId: "s1" },
+    ]);
+    expect(r[0].kind).toBe("EXACT_INVOICE");
+    expect(r[0].supplierId).toBe("s1");
+    expect(r[0].category).toBe("SUPPLIER");
+  });
+
+  it("بلا قواعد يبقى السلوك كما كان", () => {
+    const tx: BankTx = {
+      id: "t4", valueDate: new Date("2026-08-01T00:00:00Z"),
+      description: "نقاط بيع", transactionType: "نقاط بيع",
+      amountMinor: 100, direction: "DEBIT",
+    };
+    expect(matchBankTransactions([tx], [], index)[0].category).toBe("INTERNAL");
+  });
+});

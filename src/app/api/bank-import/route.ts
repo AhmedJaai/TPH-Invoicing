@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  bankImports, bankTransactions, invoices, paymentAllocations, payments,
+  bankImports, bankRules, bankTransactions, invoices, paymentAllocations, payments,
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { requireUser, UnauthenticatedError } from "@/lib/session";
@@ -14,6 +14,7 @@ import {
   type BankTx, type OpenInvoice, type SupplierAliasIndex,
 } from "@/lib/bank/match";
 import { normalizeName } from "@/lib/suppliers-seed";
+import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
 import { recordAudit } from "@/lib/audit";
 
 export const runtime = "nodejs";
@@ -76,6 +77,14 @@ export async function POST(request: Request) {
     ],
   }));
 
+  const ruleRows = await db
+    .select({
+      id: bankRules.id, normalized: bankRules.normalized,
+      category: bankRules.category, supplierId: bankRules.supplierId,
+    })
+    .from(bankRules);
+  const rules: BankRule[] = ruleRows;
+
   const invRows = await db
     .select({
       invoiceId: invoices.id, supplierId: invoices.supplierId, supplierName: suppliers.nameAr,
@@ -102,9 +111,19 @@ export async function POST(request: Request) {
     transactionType: r.transactionType, amountMinor: r.amountMinor, direction: r.direction,
   }));
 
-  const matches = matchBankTransactions(txs, open, index);
-  const duplicates = findDuplicatePayments(txs);
-  const real = matches.filter((m) => m.kind !== "INTERNAL");
+  const matches = matchBankTransactions(txs, open, index, rules);
+  const duplicates = findDuplicatePayments(txs, rules);
+  // المصنَّف بقاعدة ليس مجهولاً ولا سداد مورّد — يخرج من العدّ كالتشغيلي
+  const real = matches.filter((m) => m.kind !== "INTERNAL" && m.kind !== "CLASSIFIED");
+  const classified = matches.filter((m) => m.kind === "CLASSIFIED");
+
+  const byCategory: Record<string, { count: number; amountMinor: number }> = {};
+  for (const m of matches) {
+    const c = m.category;
+    byCategory[c] = byCategory[c] ?? { count: 0, amountMinor: 0 };
+    byCategory[c].count++;
+    byCategory[c].amountMinor += m.tx.amountMinor;
+  }
   const matched = real.filter((m) => m.invoices.length > 0);
 
   const summary = {
@@ -122,6 +141,15 @@ export async function POST(request: Request) {
     duplicateGroups: duplicates.length,
     openInvoicesBefore: open.length,
     warnings: parsed.warnings.length,
+    classified: classified.length,
+    classifiedAmountMinor: classified.reduce((s, m) => s + m.tx.amountMinor, 0),
+    byCategory: Object.entries(byCategory)
+      .map(([category, v]) => ({
+        category,
+        label: CATEGORY_LABEL[category as TxCategory] ?? category,
+        ...v,
+      }))
+      .sort((a, b) => b.amountMinor - a.amountMinor),
   };
 
   if (!apply) {
@@ -149,6 +177,8 @@ export async function POST(request: Request) {
           amountMinor: m.tx.amountMinor,
           description: m.tx.description.slice(0, 140),
           suggestedAlias: suggestAlias(m.tx.description),
+          // اقتراح يُعرض لا حكم يُنفَّذ — الكلمة قد تخدع
+          suggestedCategory: suggestCategory(`${m.tx.description} ${m.tx.transactionType}`),
         })),
       supplierOnlyList: real
         .filter((m) => m.kind === "SUPPLIER_ONLY")
@@ -184,7 +214,12 @@ export async function POST(request: Request) {
           beneficiaryRaw: m.supplierName ?? null,
           amountMinor: m.tx.amountMinor,
           direction: m.tx.direction,
-          matchStatus: m.invoices.length > 0 ? "MATCHED" : m.kind === "INTERNAL" ? "IGNORED" : "UNMATCHED",
+          category: m.category,
+          ruleId: m.ruleId ?? null,
+          matchStatus:
+            m.invoices.length > 0 ? "MATCHED"
+            : m.kind === "INTERNAL" || m.kind === "CLASSIFIED" ? "IGNORED"
+            : "UNMATCHED",
         })
         .returning({ id: bankTransactions.id });
 

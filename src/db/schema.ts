@@ -331,6 +331,50 @@ export const bankImports = pgTable("bank_imports", {
 
 export const txDirectionEnum = pgEnum("tx_direction", ["DEBIT", "CREDIT"]);
 
+/**
+ * تصنيف الحركة البنكية.
+ *
+ * كشف الحساب ليس كلّه مورّدين: فيه رواتب وإيجار وزكاة وكهرباء وتحويلات
+ * شخصية للمالك. وعرضها كلّها «مدفوعات مورّدين مجهولة» يغرق النافع في
+ * الضجيج. ولا يمكن استنتاج هذا من الوصف وحده استنتاجاً موثوقاً — فيقرّره
+ * المالك مرّة، ويتعلّمه النظام قاعدةً تسري على ما يشبهها بعدها.
+ */
+export const txCategoryEnum = pgEnum("tx_category", [
+  "SUPPLIER",   // سداد مورّد
+  "SALARY",     // راتب أو أجر
+  "RENT",       // إيجار
+  "ZAKAT",      // زكاة أو صدقة
+  "UTILITY",    // كهرباء · مياه · اتصالات · إنترنت
+  "GOVERNMENT", // رسوم حكومية · تأمينات · ضريبة
+  "PERSONAL",   // تحويل شخصي للمالك
+  "INTERNAL",   // حركة تشغيلية: نقاط بيع · رسوم بنك
+  "OTHER",
+  "UNKNOWN",
+]);
+
+export const ruleSourceEnum = pgEnum("rule_source", ["MANUAL", "SUGGESTED"]);
+
+/**
+ * قاعدة تصنيف تعلّمها النظام من إقرار المالك.
+ * النمط يُطابَق بكلماته المميِّزة لا بنصّه كاملاً، لأنّ وصف البنك مقطوع.
+ */
+export const bankRules = pgTable("bank_rules", {
+  id: id(),
+  /** النمط كما كتبه المالك */
+  pattern: text("pattern").notNull(),
+  normalized: text("normalized").notNull(),
+  category: txCategoryEnum("category").notNull(),
+  /** يُملأ حين يكون التصنيف SUPPLIER */
+  supplierId: text("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
+  note: text("note"),
+  source: ruleSourceEnum("source").notNull().default("MANUAL"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+}, (t) => [
+  uniqueIndex("bank_rule_normalized_uniq").on(t.normalized),
+  index("bank_rules_category_idx").on(t.category),
+]);
+
 export const bankTransactions = pgTable("bank_transactions", {
   id: id(),
   bankImportId: text("bank_import_id").notNull().references(() => bankImports.id, { onDelete: "cascade" }),
@@ -342,9 +386,14 @@ export const bankTransactions = pgTable("bank_transactions", {
   ref: text("ref"),
   matchedPaymentId: text("matched_payment_id").references(() => payments.id),
   matchStatus: matchStatusEnum("match_status").notNull().default("UNMATCHED"),
+  /** ما هذه الحركة: سداد مورّد أم راتب أم إيجار أم غيره */
+  category: txCategoryEnum("category").notNull().default("UNKNOWN"),
+  /** القاعدة التي صنّفتها، إن وُجدت */
+  ruleId: text("rule_id").references(() => bankRules.id, { onDelete: "set null" }),
 }, (t) => [
   index("bank_tx_date_idx").on(t.valueDate),
   index("bank_tx_status_idx").on(t.matchStatus),
+  index("bank_tx_category_idx").on(t.category),
 ]);
 
 /* ───────────────────────── التنبيهات ───────────────────────── */
@@ -477,6 +526,11 @@ export const bankImportsRelations = relations(bankImports, ({ one, many }) => ({
 export const bankTransactionsRelations = relations(bankTransactions, ({ one }) => ({
   bankImport: one(bankImports, { fields: [bankTransactions.bankImportId], references: [bankImports.id] }),
   matchedPayment: one(payments, { fields: [bankTransactions.matchedPaymentId], references: [payments.id] }),
+  rule: one(bankRules, { fields: [bankTransactions.ruleId], references: [bankRules.id] }),
+}));
+
+export const bankRulesRelations = relations(bankRules, ({ one }) => ({
+  supplier: one(suppliers, { fields: [bankRules.supplierId], references: [suppliers.id] }),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({

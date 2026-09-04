@@ -142,6 +142,136 @@ function Field({
   );
 }
 
+export interface SupplierOption {
+  id: string;
+  nameAr: string;
+}
+
+/**
+ * اختيار المورّد أو إنشاؤه.
+ *
+ * المورّد غير المعروف كان طريقاً مسدوداً: الخادم يرفض الأرشفة بلا مورّد،
+ * والشاشة تقول «غير معروف» ولا تتيح شيئاً. فيقف صاحب العمل أمام فاتورة
+ * صحيحة لا يستطيع حفظها.
+ */
+function SupplierPicker({
+  detected,
+  candidates,
+  suppliers,
+  chosen,
+  onChoose,
+  onCreated,
+}: {
+  detected?: SupplierOption;
+  candidates: { id: string; nameAr: string }[];
+  suppliers: SupplierOption[];
+  chosen?: SupplierOption;
+  onChoose: (s: SupplierOption) => void;
+  onCreated: (s: SupplierOption) => void;
+}) {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const active = chosen ?? detected;
+
+  const create = async () => {
+    const nameAr = name.trim();
+    if (nameAr.length < 2) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/supplier", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ nameAr }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setError(json.error ?? "تعذّر الإنشاء"); return; }
+      onCreated({ id: json.supplier.id, nameAr: json.supplier.nameAr });
+      setCreating(false);
+      setName("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg bg-sunken px-3 py-2">
+      <p className="text-xs text-muted">
+        المورد
+        {!active && <span className="mr-1 font-bold text-danger">— لم يُعرف، اختره أو أنشئه</span>}
+        {chosen && <span className="mr-1 text-ok">— اخترتَه</span>}
+      </p>
+
+      <select
+        value={active?.id ?? ""}
+        onChange={(e) => {
+          const sup = suppliers.find((x) => x.id === e.target.value)
+            ?? candidates.find((x) => x.id === e.target.value);
+          if (sup) onChoose({ id: sup.id, nameAr: sup.nameAr });
+        }}
+        className={`mt-1 w-full rounded border bg-surface px-2 py-1.5 text-sm outline-none focus:border-ink ${
+          active ? "border-line" : "border-danger"
+        }`}
+      >
+        <option value="">اختر المورّد…</option>
+        {candidates.length > 0 && (
+          <optgroup label="مرشّحون من قراءة الملف">
+            {candidates.map((c) => (
+              <option key={`c-${c.id}`} value={c.id}>{c.nameAr}</option>
+            ))}
+          </optgroup>
+        )}
+        <optgroup label="كل المورّدين">
+          {suppliers.map((x) => (
+            <option key={x.id} value={x.id}>{x.nameAr}</option>
+          ))}
+        </optgroup>
+      </select>
+
+      {creating ? (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void create(); }}
+            placeholder="اسم المورّد الجديد"
+            dir="auto"
+            autoFocus
+            className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-ink"
+          />
+          <button
+            onClick={() => void create()}
+            disabled={busy || name.trim().length < 2}
+            className="shrink-0 rounded bg-inverse-surface px-2.5 py-1 text-[11px] font-bold text-inverse-ink disabled:opacity-30"
+          >
+            {busy ? "…" : "أنشئه"}
+          </button>
+          <button
+            onClick={() => { setCreating(false); setError(null); }}
+            className="shrink-0 text-[11px] text-muted hover:text-ink"
+          >
+            إلغاء
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setCreating(true)}
+          className="mt-1.5 text-[11px] text-ink-soft underline underline-offset-4 hover:text-ink"
+        >
+          مورّد جديد…
+        </button>
+      )}
+
+      {error && <p className="mt-1 text-[11px] text-danger">{error}</p>}
+    </div>
+  );
+}
+
 interface Archived {
   id: string;
   fileName: string;
@@ -151,9 +281,19 @@ interface Archived {
   at: number;
 }
 
-export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) {
+export function Uploader({
+  canSeeAmounts = true,
+  suppliers: initialSuppliers = [],
+}: {
+  canSeeAmounts?: boolean;
+  suppliers?: SupplierOption[];
+}) {
   const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
+  /** قائمة المورّدين، تنمو حين يُنشئ المستخدم مورّداً جديداً من هنا */
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>(initialSuppliers);
+  /** المورّد الذي اختاره المستخدم لكل ملف، يغلب ما استنتجه النظام */
+  const [chosen, setChosen] = useState<Record<string, SupplierOption>>({});
   const [archived, setArchived] = useState<Archived[]>([]);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -264,7 +404,7 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
           mimeType: it.mimeType,
           fileBase64: it.fileBase64,
           documentKind: r.documentKind,
-          supplierId: r.supplier?.id,
+          supplierId: chosen[id]?.id ?? r.supplier?.id,
           invoiceNumber: it.edited.invoiceNumber,
           invoiceDate: it.edited.invoiceDate,
           subtotal: r.subtotalMinor !== undefined ? String(r.subtotalMinor / 100) : "",
@@ -333,7 +473,7 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
     } finally {
       clearTimeout(timer);
     }
-  }, [router]);
+  }, [router, chosen]);
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
@@ -502,12 +642,19 @@ export function Uploader({ canSeeAmounts = true }: { canSeeAmounts?: boolean }) 
                 </dl>
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg bg-sunken px-3 py-2">
-                    <p className="text-xs text-muted">المورد</p>
-                    <p className="mt-0.5 truncate text-sm font-medium">
-                      {r.supplier?.nameAr ?? "غير معروف"}
-                    </p>
-                  </div>
+                  <SupplierPicker
+                    detected={r.supplier}
+                    candidates={r.supplierCandidates}
+                    suppliers={suppliers}
+                    chosen={chosen[item.id]}
+                    onChoose={(sup) => setChosen((prev) => ({ ...prev, [item.id]: sup }))}
+                    onCreated={(sup) => {
+                      setSuppliers((prev) =>
+                        prev.some((x) => x.id === sup.id) ? prev : [...prev, sup].sort((a, b) => a.nameAr.localeCompare(b.nameAr, "ar")),
+                      );
+                      setChosen((prev) => ({ ...prev, [item.id]: sup }));
+                    }}
+                  />
                   <div className="rounded-lg bg-sunken px-3 py-2">
                     <p className="text-xs text-muted">الشهر المحاسبي</p>
                     <p className="nums mt-0.5 text-sm font-medium">{r.periodMonth ?? "—"}</p>

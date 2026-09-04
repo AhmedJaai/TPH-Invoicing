@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 
 interface Summary {
   bank: string; accountNumber?: string;
@@ -11,6 +12,9 @@ interface Summary {
   matchedTransactions: number; matchedInvoices: number;
   supplierOnly: number; unknown: number; duplicateGroups: number;
   openInvoicesBefore: number; warnings: number;
+  classified: number;
+  classifiedAmountMinor: number;
+  byCategory: { category: string; label: string; count: number; amountMinor: number }[];
 }
 
 interface UnknownTx {
@@ -19,7 +23,14 @@ interface UnknownTx {
   amountMinor: number;
   description: string;
   suggestedAlias: string;
+  suggestedCategory: TxCategory;
 }
+
+/** التصنيفات المعروضة — بلا UNKNOWN فهي الحالة لا خياراً. */
+const CATEGORY_OPTIONS: TxCategory[] = [
+  "SUPPLIER", "SALARY", "RENT", "ZAKAT", "UTILITY",
+  "GOVERNMENT", "PERSONAL", "INTERNAL", "OTHER",
+];
 
 interface Preview {
   summary: Summary;
@@ -44,10 +55,11 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "ok
 }
 
 /**
- * صفّ لحركة بنكية لم يُعرف مستفيدها.
+ * صفّ لحركة بنكية لم تُعرف.
  *
- * الربط اليدوي هنا ليس تصحيحاً لمرّة واحدة: الاسم الذي يختاره صاحب العمل
- * يُحفظ اسماً بنكياً للمورّد، فتُطابَق كل حركة مشابهة بعده بلا تدخّل.
+ * كشف الحساب ليس كلّه مورّدين: فيه رواتب وإيجار وزكاة وكهرباء وتحويلات
+ * شخصية. وعرضها كلّها «مدفوعات مجهولة» يغرق النافع في الضجيج. فيصنّفها
+ * المالك مرّة، وتصير قاعدةً تسري على ما يشبهها في كل كشف بعده.
  */
 function UnknownRow({
   tx,
@@ -58,19 +70,29 @@ function UnknownRow({
   suppliers: SupplierOption[];
   onLearned: () => void;
 }) {
+  const [category, setCategory] = useState<TxCategory>(
+    tx.suggestedCategory === "UNKNOWN" ? "SUPPLIER" : tx.suggestedCategory,
+  );
   const [supplierId, setSupplierId] = useState("");
-  const [alias, setAlias] = useState(tx.suggestedAlias);
+  const [pattern, setPattern] = useState(tx.suggestedAlias);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
+  const needsSupplier = category === "SUPPLIER";
+  const ready = pattern.trim().length >= 3 && (!needsSupplier || Boolean(supplierId));
+
   const save = async () => {
-    if (!supplierId || !alias.trim()) return;
+    if (!ready) return;
     setState("saving");
     try {
-      const res = await fetch("/api/supplier-alias", {
+      const res = await fetch("/api/bank-rule", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ supplierId, value: alias.trim() }),
+        body: JSON.stringify({
+          pattern: pattern.trim(),
+          category,
+          supplierId: needsSupplier ? supplierId : undefined,
+        }),
       });
       const json = await res.json();
       setMessage(json.message ?? json.error);
@@ -99,29 +121,44 @@ function UnknownRow({
       ) : (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <select
-            value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value)}
-            className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+            value={category}
+            onChange={(e) => setCategory(e.target.value as TxCategory)}
+            className="min-w-[8rem] rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
           >
-            <option value="">اختر المورّد…</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.nameAr}</option>
+            {CATEGORY_OPTIONS.map((c) => (
+              <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>
             ))}
           </select>
+
+          {needsSupplier && (
+            <select
+              value={supplierId}
+              onChange={(e) => setSupplierId(e.target.value)}
+              className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+            >
+              <option value="">اختر المورّد…</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.nameAr}</option>
+              ))}
+            </select>
+          )}
+
           <input
-            value={alias}
-            onChange={(e) => setAlias(e.target.value)}
-            placeholder="اسمه في البنك"
+            value={pattern}
+            onChange={(e) => setPattern(e.target.value)}
+            placeholder="النصّ المميِّز في وصف الحركة"
             dir="auto"
             className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
           />
+
           <button
             onClick={save}
-            disabled={!supplierId || !alias.trim() || state === "saving"}
+            disabled={!ready || state === "saving"}
             className="shrink-0 rounded-lg bg-inverse-surface px-3 py-1.5 text-[11px] font-bold text-inverse-ink disabled:opacity-30"
           >
-            {state === "saving" ? "يحفظ…" : "اربط"}
+            {state === "saving" ? "يحفظ…" : "صنّفها"}
           </button>
+
           {state === "error" && message && (
             <p className="w-full text-[11px] text-danger">{message}</p>
           )}
@@ -242,6 +279,22 @@ export function BankImport({
               <Stat label="حركات مجهولة" value={String(data.summary.unknown)} tone={data.summary.unknown ? "warn" : undefined} />
             </div>
 
+            {data.summary.byCategory.filter((c) => c.category !== "UNKNOWN" && c.category !== "SUPPLIER").length > 0 && (
+              <div className="mt-3">
+                <p className="text-[11px] font-bold">حركات صنّفتَها سابقاً</p>
+                <ul className="mt-1 flex flex-wrap gap-1.5">
+                  {data.summary.byCategory
+                    .filter((c) => c.category !== "UNKNOWN" && c.category !== "SUPPLIER")
+                    .map((c) => (
+                      <li key={c.category} className="rounded-lg border border-line px-2 py-1 text-[11px]">
+                        {c.label}: {c.count} ·{" "}
+                        <span className="nums" dir="ltr">{formatRiyalsDisplay(c.amountMinor)}</span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+
             {data.summary.duplicateGroups > 0 && (
               <p className="mt-3 rounded-lg bg-danger-bg px-3 py-2 text-xs text-danger">
                 ⚠ {data.summary.duplicateGroups} مجموعة يُشتبه بتكرار دفعها — راجعها بعد الاستيراد
@@ -273,9 +326,10 @@ export function BankImport({
                   {data.unknown.length} حركة لم يُعرف مستفيدها
                 </p>
                 <p className="text-[11px] leading-relaxed text-muted">
-                  اسم المورّد في البنك يخالف اسمه عندنا غالباً. اربط كلّ حركة بمورّدها مرّة
-                  واحدة، ويُحفظ الاسم البنكي فتُطابَق الحركات المشابهة تلقائياً بعدها.
-                  {learned > 0 && ` — رُبط ${learned} حتى الآن.`}
+                  ليست كلّها مورّدين: فيها رواتب وإيجار وزكاة وكهرباء وتحويلاتك الشخصية.
+                  صنّف كلّ حركة مرّة واحدة — يُحفظ التصنيف قاعدةً تسري على ما يشبهها في كل
+                  كشف بعده، فتُخرَج من حساب مستحقّات المورّدين.
+                  {learned > 0 && ` — صُنّف ${learned} حتى الآن.`}
                 </p>
 
                 <ul className="mt-2 max-h-[26rem] divide-y divide-line overflow-y-auto rounded-lg border border-line">

@@ -6,6 +6,7 @@
  * لذلك المطابقة تمرّ على الأسماء البديلة، وتتعلّم كل اسم جديد بعد إقراره.
  */
 import { normalizeName } from "@/lib/suppliers-seed";
+import { findRule, type BankRule, type TxCategory } from "./rules";
 
 export interface BankTx {
   id: string;
@@ -38,6 +39,8 @@ export type BankMatchKind =
   | "INVOICE_GROUP"
   | "SUPPLIER_ONLY"
   | "INTERNAL"
+  /** صنّفها المالك بقاعدة: راتب أو إيجار أو زكاة… فلا تُطابَق بفاتورة */
+  | "CLASSIFIED"
   | "NONE";
 
 export interface BankMatch {
@@ -49,6 +52,9 @@ export interface BankMatch {
   invoices: OpenInvoice[];
   confidence: number;
   note?: string;
+  category: TxCategory;
+  /** القاعدة التي صنّفتها، إن وُجدت */
+  ruleId?: string;
 }
 
 /** حركات لا علاقة لها بالمورّدين — نستبعدها قبل المطابقة لتصفو النتيجة. */
@@ -77,7 +83,7 @@ const STOPWORDS = new Set([
 ]);
 
 /** الكلمات المميِّزة في اسم: ما ليس شائعاً وطوله ثلاثة أحرف فأكثر. */
-function distinctiveTokens(normalized: string): string[] {
+export function distinctiveTokens(normalized: string): string[] {
   return normalized.split(" ").filter((t) => t.length >= 3 && !STOPWORDS.has(t));
 }
 
@@ -179,6 +185,8 @@ export function matchBankTransactions(
   transactions: readonly BankTx[],
   openInvoices: readonly OpenInvoice[],
   aliasIndex: readonly SupplierAliasIndex[],
+  /** قواعد صنّفها المالك — تُقدَّم على التخمين لأنّها إقراره هو */
+  rules: readonly BankRule[] = [],
 ): BankMatch[] {
   const bySupplier = new Map<string, OpenInvoice[]>();
   for (const inv of openInvoices) {
@@ -192,13 +200,36 @@ export function matchBankTransactions(
 
   for (const tx of transactions) {
     if (tx.direction === "CREDIT" || isInternalNoise(tx)) {
-      results.push({ tx, kind: "INTERNAL", invoices: [], confidence: 1, note: "حركة تشغيلية لا سداد مورّد" });
+      results.push({
+        tx, kind: "INTERNAL", invoices: [], confidence: 1,
+        category: "INTERNAL", note: "حركة تشغيلية لا سداد مورّد",
+      });
       continue;
     }
 
-    const supplier = findSupplierInText(`${tx.description} ${tx.transactionType}`, aliasIndex);
+    const text = `${tx.description} ${tx.transactionType}`;
+    const rule = findRule(text, rules);
+
+    /*
+     * قاعدة المالك تسبق كل تخمين. فحوالة الإيجار إلى «سابع جار» تبدو
+     * سداد مورّد، وتحويله إلى نفسه يبدو مستفيداً — ولا يُصحّح ذلك إلا هو.
+     */
+    if (rule && rule.category !== "SUPPLIER") {
+      results.push({
+        tx, kind: "CLASSIFIED", invoices: [], confidence: 1,
+        category: rule.category, ruleId: rule.id,
+        note: "صنّفتَها بقاعدة سابقة",
+      });
+      continue;
+    }
+
+    const supplier =
+      (rule?.supplierId
+        ? aliasIndex.find((a) => a.supplierId === rule.supplierId)
+        : undefined) ?? findSupplierInText(text, aliasIndex);
+
     if (!supplier) {
-      results.push({ tx, kind: "NONE", invoices: [], confidence: 0 });
+      results.push({ tx, kind: "NONE", invoices: [], confidence: 0, category: "UNKNOWN" });
       continue;
     }
 
@@ -215,6 +246,8 @@ export function matchBankTransactions(
         supplierName: supplier.supplierName,
         invoices: combo,
         confidence: combo.length === 1 ? 0.98 : 0.9,
+        category: "SUPPLIER",
+        ruleId: rule?.id,
         note: combo.length > 1 ? `تسدّد ${combo.length} فواتير` : undefined,
       });
       continue;
@@ -227,6 +260,8 @@ export function matchBankTransactions(
       supplierName: supplier.supplierName,
       invoices: [],
       confidence: 0.6,
+      category: "SUPPLIER",
+      ruleId: rule?.id,
       note: "عُرف المورّد ولم تُطابَق فاتورة بعينها",
     });
   }
@@ -234,11 +269,21 @@ export function matchBankTransactions(
   return results;
 }
 
-/** دفعتان لنفس الجهة بنفس المبلغ في نفس اليوم — نمط الدفع المكرر. */
-export function findDuplicatePayments(transactions: readonly BankTx[]): BankTx[][] {
+/**
+ * دفعتان لنفس الجهة بنفس المبلغ في نفس اليوم — نمط الدفع المكرر.
+ *
+ * تُستثنى الحركات المصنَّفة غير مورّدين: فاتورتا كهرباء لعدّادين في يوم
+ * واحد ليستا دفعةً مكرّرة، والتنبيه عليهما يُفقد التنبيه معناه.
+ */
+export function findDuplicatePayments(
+  transactions: readonly BankTx[],
+  rules: readonly BankRule[] = [],
+): BankTx[][] {
   const groups = new Map<string, BankTx[]>();
   for (const tx of transactions) {
     if (tx.direction !== "DEBIT" || isInternalNoise(tx)) continue;
+    const rule = findRule(`${tx.description} ${tx.transactionType}`, rules);
+    if (rule && rule.category !== "SUPPLIER") continue;
     const key = `${tx.valueDate.toISOString().slice(0, 10)}|${tx.amountMinor}|${normalizeName(tx.description).slice(0, 30)}`;
     const list = groups.get(key) ?? [];
     list.push(tx);

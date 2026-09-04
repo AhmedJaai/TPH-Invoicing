@@ -30,6 +30,7 @@ export default async function Home() {
 
   const rows = await db
     .select({
+      id: suppliers.id,
       slug: suppliers.slug,
       nameAr: suppliers.nameAr,
       issuesInvoices: suppliers.issuesInvoices,
@@ -78,7 +79,10 @@ export default async function Home() {
         </p>
 
         <div className="mt-8">
-          <Uploader canSeeAmounts={showAmounts} />
+          <Uploader
+            canSeeAmounts={showAmounts}
+            suppliers={rows.map((s) => ({ id: s.id, nameAr: s.nameAr }))}
+          />
         </div>
 
         <section className="mt-8">
