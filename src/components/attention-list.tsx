@@ -1,7 +1,11 @@
+"use client";
+
 import Link from "next/link";
-import { Money } from "@/components/page-shell";
+import { useState } from "react";
+import { Money } from "@/components/money";
+import { ITEM, countNoun } from "@/lib/arabic";
 import {
-  AREA_LABEL, SEVERITY_LABEL,
+  AREA_LABEL, IMPACT_LABEL, SEVERITY_LABEL, prioritize,
   type AttentionItem, type AttentionSeverity,
 } from "@/lib/attention";
 
@@ -27,7 +31,9 @@ export function AttentionCard({ item }: { item: AttentionItem }) {
         </span>
       </div>
 
-      <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">{item.detail}</p>
+      <Impact item={item} />
+
+      <p className="mt-2 text-xs leading-relaxed text-ink-soft">{item.detail}</p>
       <p className="mt-2 text-xs leading-relaxed">
         <span className="font-bold">الخطوة التالية: </span>
         {item.action}
@@ -66,7 +72,40 @@ export function AttentionCard({ item }: { item: AttentionItem }) {
   );
 }
 
-export function AttentionList({ items }: { items: readonly AttentionItem[] }) {
+/**
+ * أثر البند بالريال، فوق شرحه.
+ *
+ * «ارتفع السعر ١٢٪» لا تُحرّك أحداً؛ «يكلّفك ٦٬٤٠٠ في السنة» تُحرّكه.
+ * والنوع يُذكر معه كي لا يُخلط ما قد يُسترد بما هو مستحقّ عليك.
+ */
+function Impact({ item }: { item: AttentionItem }) {
+  const { kind, amountMinor } = item.impact;
+  if (amountMinor === null || amountMinor === 0) {
+    return <p className="mt-1.5 text-[11px] font-bold opacity-70">{IMPACT_LABEL[kind]}</p>;
+  }
+  return (
+    <p className="mt-1.5 text-sm font-bold">
+      <Money minor={amountMinor} />
+      <span className="ms-1.5 text-[11px] font-normal opacity-70">{IMPACT_LABEL[kind]}</span>
+    </p>
+  );
+}
+
+/**
+ * أهمّ ثلاثة، والباقي مطويّ.
+ *
+ * أربعة عشر بنداً معروضة دفعةً واحدة ليست أولويّة بل قائمة — ومن يراها
+ * كلّها لا يبدأ بشيء.
+ */
+export function AttentionList({
+  items,
+  limit = 3,
+}: {
+  items: readonly AttentionItem[];
+  limit?: number;
+}) {
+  const [showAll, setShowAll] = useState(false);
+
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-line px-5 py-10 text-center">
@@ -77,11 +116,25 @@ export function AttentionList({ items }: { items: readonly AttentionItem[] }) {
       </div>
     );
   }
+  const { top, rest } = prioritize(items, limit);
+  const shown = showAll ? [...top, ...rest] : top;
+
   return (
     <div className="space-y-2.5">
-      {items.map((i) => (
+      {shown.map((i) => (
         <AttentionCard key={i.id} item={i} />
       ))}
+
+      {rest.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          aria-expanded={showAll}
+          className="w-full rounded-xl border border-dashed border-line px-4 py-3 text-xs font-medium text-ink-soft transition-colors hover:border-ink-soft"
+        >
+          {showAll ? "اطوِ الباقي" : `بقي ${countNoun(rest.length, ITEM)} أقلّ أهمّية`}
+        </button>
+      )}
     </div>
   );
 }

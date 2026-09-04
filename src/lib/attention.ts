@@ -38,6 +38,36 @@ export interface AttentionEvidence {
   amountMinor?: number;
 }
 
+/**
+ * أثر البند بالريال — وهو ما يجعله يستحقّ الانتباه أو لا يستحقّه.
+ *
+ * «ارتفع السعر ١٢٪» جملة لا تُحرّك أحداً. «يكلّفك ٦٬٤٠٠ ريالاً في السنة»
+ * تُحرّكه. ونوع الأثر يُذكر معه، لأنّ ريالاً قد يُسترد ليس كريالٍ
+ * معرَّض للرفض وليس كريالٍ مقدَّر على سنة قادمة.
+ */
+export type ImpactKind =
+  | "RECOVERABLE"  // مالٌ خرج وقد يُسترد
+  | "AT_RISK"      // مالٌ قد يضيع إن لم يُعالَج
+  | "ANNUAL"       // أثرٌ سنويّ مقدَّر لا مبلغ واقع
+  | "OWED"         // مالٌ مستحقّ عليك، لا مالٌ يضيع
+  | "BLOCKED"      // لا مبلغ، لكنّه يوقف عملاً
+  | "UNATTRIBUTED"; // مبلغ معلوم لم يُنسب إلى وجهه بعد
+
+export interface AttentionImpact {
+  kind: ImpactKind;
+  /** `null` حين يُعلم الأثر ولا يُعلم قدره — ولا يُفترض صفراً. */
+  amountMinor: number | null;
+}
+
+export const IMPACT_LABEL: Record<ImpactKind, string> = {
+  RECOVERABLE: "قد يُسترد",
+  AT_RISK: "معرَّض للضياع",
+  ANNUAL: "أثر سنويّ مقدَّر",
+  OWED: "مستحقّ عليك",
+  BLOCKED: "يوقف عملاً",
+  UNATTRIBUTED: "لم يُنسب بعد",
+};
+
 export interface AttentionItem {
   id: string;
   area: AttentionArea;
@@ -49,6 +79,8 @@ export interface AttentionItem {
   href: string;
   count: number;
   amountMinor?: number;
+  /** أثره بالريال — يُقدَّم على الشدّة في الترتيب حين يكون معلوماً. */
+  impact: AttentionImpact;
   evidence: AttentionEvidence[];
 }
 
@@ -114,6 +146,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       href: "/bank",
       count: f.duplicatePayments,
       amountMinor: f.duplicatePaymentAmountMinor,
+      impact: { kind: "RECOVERABLE", amountMinor: f.duplicatePaymentAmountMinor },
       evidence: [],
     });
   }
@@ -128,6 +161,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       action: "عالجها أو تجاوزها بسبب مكتوب.",
       href: "/documents?status=NEEDS_REVIEW",
       count: f.openBlockers,
+      impact: { kind: "BLOCKED", amountMinor: null },
       evidence: [],
     });
   }
@@ -144,6 +178,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       href: "/performance",
       count: f.notTaxValidCount,
       amountMinor: f.vatAtRiskMinor,
+      impact: { kind: "AT_RISK", amountMinor: f.vatAtRiskMinor },
       evidence: f.vatAtRiskEvidence,
     });
   }
@@ -159,6 +194,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       href: "/payments",
       count: f.overdueSuppliers.length,
       amountMinor: f.overdueMinor,
+      impact: { kind: "OWED", amountMinor: f.overdueMinor },
       evidence: f.overdueSuppliers,
     });
   }
@@ -174,6 +210,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       href: "/money",
       count: f.unclassifiedBankTx,
       amountMinor: f.unclassifiedBankAmountMinor,
+      impact: { kind: "UNATTRIBUTED", amountMinor: f.unclassifiedBankAmountMinor },
       evidence: [],
     });
   }
@@ -189,6 +226,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       href: "/performance",
       count: f.priceRises.length,
       amountMinor: f.priceRiseAnnualMinor,
+      impact: { kind: "ANNUAL", amountMinor: f.priceRiseAnnualMinor },
       evidence: f.priceRises,
     });
   }
@@ -204,6 +242,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       action: "اطلب الكشف الشهري منهم، ثمّ طابقه.",
       href: "/statements",
       count: f.suppliersMissingStatement.length,
+      impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: f.suppliersMissingStatement.map((name) => ({ label: name })),
     });
   }
@@ -219,6 +258,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       action: "اقرأ محتواها من صفحة المستندات.",
       href: "/documents",
       count: f.unknownTaxCount,
+      impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: f.unknownTaxEvidence,
     });
   }
@@ -233,6 +273,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       action: "اقرأ محتواها ليكتمل التحليل.",
       href: "/documents",
       count: f.invoicesWithoutLines,
+      impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: [],
     });
   }
@@ -247,6 +288,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       action: "راجعه واعتمده أو ارفضه.",
       href: "/documents?status=NEEDS_REVIEW",
       count: f.pendingDocuments,
+      impact: { kind: "BLOCKED", amountMinor: null },
       evidence: [],
     });
   }
@@ -261,6 +303,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       action: "وقّع عقد توريد مكتوباً، أو استبدله بمورّد يصدر فواتير ضريبية.",
       href: "/settings",
       count: f.suppliersWithoutContract.length,
+      impact: { kind: "AT_RISK", amountMinor: null },
       evidence: f.suppliersWithoutContract.map((name) => ({ label: name })),
     });
   }
@@ -268,6 +311,46 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
   return out.sort(
     (a, b) => RANK[a.severity] - RANK[b.severity] || (b.amountMinor ?? 0) - (a.amountMinor ?? 0),
   );
+}
+
+/**
+ * أهمّ ثلاثة، ثمّ الباقي.
+ *
+ * أربعة عشر بنداً معروضة دفعةً واحدة ليست أولويّة بل قائمة. والترتيب
+ * بالشدّة وحدها يضع «فرصة توفير ٦٬٤٠٠ سنويّاً» تحت «مستند لم يُقرأ»،
+ * فيُقدَّم الأثر المعلوم على الشدّة حين يكون كبيراً.
+ *
+ * البند بلا مبلغ لا يُدفع إلى الذيل: قد يكون مانعاً لإقفال شهر.
+ */
+export function prioritize(
+  items: readonly AttentionItem[],
+  limit = 3,
+): { top: AttentionItem[]; rest: AttentionItem[] } {
+  const sorted = [...items].sort(
+    (a, b) =>
+      RANK[a.severity] - RANK[b.severity] ||
+      (b.impact.amountMinor ?? 0) - (a.impact.amountMinor ?? 0) ||
+      a.id.localeCompare(b.id),
+  );
+  return { top: sorted.slice(0, limit), rest: sorted.slice(limit) };
+}
+
+/**
+ * مجموع الأثر بحسب نوعه.
+ *
+ * لا تُجمع الأنواع بعضها إلى بعض: ريالٌ قد يُسترد ليس كريالٍ معرَّض
+ * للرفض وليس كتقديرٍ سنويّ. وجمعها يُنتج رقماً ضخماً لا معنى له.
+ */
+export function impactByKind(
+  items: readonly AttentionItem[],
+): Partial<Record<ImpactKind, { amountMinor: number; count: number }>> {
+  const out: Partial<Record<ImpactKind, { amountMinor: number; count: number }>> = {};
+  for (const i of items) {
+    const bucket = (out[i.impact.kind] ??= { amountMinor: 0, count: 0 });
+    bucket.count++;
+    bucket.amountMinor += i.impact.amountMinor ?? 0;
+  }
+  return out;
 }
 
 /** عدّ سريع للعرض في القائمة العلوية. */

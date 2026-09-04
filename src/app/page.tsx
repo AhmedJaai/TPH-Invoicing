@@ -6,7 +6,7 @@ import { invoices, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Money, PageShell } from "@/components/page-shell";
-import { AttentionCard } from "@/components/attention-list";
+import { AttentionList } from "@/components/attention-list";
 import { buildAttention, countBySeverity } from "@/lib/attention";
 import { gatherAttentionFacts } from "@/lib/attention-facts";
 import { buildDataHealth } from "@/lib/data-health";
@@ -88,8 +88,6 @@ export default async function HomePage() {
   const maxSupplier = topSuppliers[0]?.[1] ?? 0;
   const maxMonth = Math.max(...monthly.map((m) => m.totalMinor), 1);
 
-  const top3 = attention.slice(0, 3);
-
   return (
     <PageShell
       user={user}
@@ -149,15 +147,7 @@ export default async function HomePage() {
           )}
         </div>
 
-        {top3.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-line px-5 py-8 text-center">
-            <p className="text-sm font-bold text-ok">كل ما يعرفه النظام سليم.</p>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {top3.map((i) => <AttentionCard key={i.id} item={i} />)}
-          </div>
-        )}
+        <AttentionList items={attention} limit={3} />
       </section>
 
       {/* ── الاتجاه ── */}
