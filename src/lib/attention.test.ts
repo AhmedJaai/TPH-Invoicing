@@ -71,9 +71,9 @@ describe("buildAttention", () => {
     expect(ids({ notTaxValidCount: 9, vatAtRiskMinor: 0 })).not.toContain("vat-at-risk");
   });
 
-  it("الحركات غير المصنَّفة تُوجَّه إلى صفحة المال", () => {
+  it("الحركات غير المصنَّفة تُوجَّه إلى الحركات نفسها لا إلى صفحة جامعة", () => {
     const item = buildAttention({ ...quiet, unclassifiedBankTx: 20, unclassifiedBankAmountMinor: 5_000 })[0];
-    expect(item.href).toBe("/money");
+    expect(item.href).toBe("/bank");
     expect(item.area).toBe("BANK");
   });
 
@@ -220,5 +220,50 @@ describe("impactByKind", () => {
     const by = impactByKind(buildAttention({ ...quiet, pendingDocuments: 3 }));
     expect(by.BLOCKED?.count).toBe(1);
     expect(by.BLOCKED?.amountMinor).toBe(0);
+  });
+});
+
+describe("كل تنبيه يفتح سجلّه بعينه", () => {
+  const noisy = buildAttention({
+    ...quiet,
+    duplicatePayments: 1, duplicatePaymentAmountMinor: 100_00,
+    openBlockers: 1,
+    vatAtRiskMinor: 500_00, notTaxValidCount: 3,
+    unknownTaxCount: 4,
+    overdueMinor: 900_00, overdueSuppliers: [{ label: "س" }],
+    unclassifiedBankTx: 5, unclassifiedBankAmountMinor: 300_00,
+    pendingDocuments: 2,
+    invoicesWithoutLines: 6,
+    suppliersMissingStatement: ["أ"],
+    suppliersWithoutContract: ["ب"],
+    priceRises: [{ label: "حليب" }], priceRiseAnnualMinor: 200_000,
+  });
+
+  /**
+   * الصفحات الجامعة تعرض بطاقاتٍ لا سجلات، فالوصول إليها من تنبيه
+   * يترك المستخدم يبحث من جديد — وهو ما كان يفعله قبل هذا.
+   */
+  const HUBS = ["/money", "/purchases", "/performance", "/"];
+
+  it("لا تنبيه يُرسل إلى صفحة جامعة", () => {
+    expect(noisy.length).toBeGreaterThan(6);
+    for (const i of noisy) {
+      expect(HUBS, `${i.id} يُرسل إلى صفحة جامعة`).not.toContain(i.href);
+    }
+  });
+
+  it("تنبيهات الفواتير تفتح القائمة مُرشَّحةً", () => {
+    for (const id of ["vat-at-risk", "unknown-tax", "no-lines", "overdue"]) {
+      const item = noisy.find((i) => i.id === id);
+      if (!item) continue;
+      expect(item.href, id).toContain("/purchases/invoices?");
+    }
+  });
+
+  it("لكل تنبيه نصُّ فعلٍ يقول إلى أين يذهب", () => {
+    for (const i of noisy) {
+      expect(i.actionLabel, i.id).toBeTruthy();
+      expect(i.actionLabel).not.toBe("عالِجها");
+    }
   });
 });

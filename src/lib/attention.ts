@@ -69,6 +69,11 @@ export const IMPACT_LABEL: Record<ImpactKind, string> = {
 };
 
 export interface AttentionItem {
+  /**
+   * نصّ الزرّ. الفعل يُسمّى بما يفعله لا بكلمة واحدة تصلح لكل شيء —
+   * «عالِجها» لا تقول للمستخدم إلى أين يذهب ولا ماذا سيجد.
+   */
+  actionLabel?: string;
   id: string;
   area: AttentionArea;
   severity: AttentionSeverity;
@@ -143,6 +148,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `${f.duplicatePayments} دفعة يُشتبه بتكرارها`,
       detail: "تحويلان لنفس الجهة بنفس المبلغ في نفس اليوم.",
       action: "راجعها فوراً — استرداد المكرّر يصعب كلّما تأخّر.",
+      actionLabel: "افتح الحركات",
       href: "/bank",
       count: f.duplicatePayments,
       amountMinor: f.duplicatePaymentAmountMinor,
@@ -159,6 +165,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `${f.openBlockers} تنبيه مانع لم يُعالَج`,
       detail: "يمنع إقفال الشهر ويشوّه أرقامه.",
       action: "عالجها أو تجاوزها بسبب مكتوب.",
+      actionLabel: "افتح ما يحتاج مراجعة",
       href: "/documents?status=NEEDS_REVIEW",
       count: f.openBlockers,
       impact: { kind: "BLOCKED", amountMinor: null },
@@ -175,7 +182,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `${riyals(f.vatAtRiskMinor)} ريال ضريبة مدخلات معرّضة للضياع`,
       detail: `${f.notTaxValidCount} فاتورة لا تحمل الأركان الأربعة، فلا يجوز خصم ضريبتها.`,
       action: "اطلب من هؤلاء المورّدين فاتورة ضريبية كاملة تحمل رقمنا الضريبي.",
-      href: "/performance",
+      actionLabel: "افتح الفواتير الناقصة",
+      href: "/purchases/invoices?tax=INVALID",
       count: f.notTaxValidCount,
       amountMinor: f.vatAtRiskMinor,
       impact: { kind: "AT_RISK", amountMinor: f.vatAtRiskMinor },
@@ -191,7 +199,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `${riyals(f.overdueMinor)} ريال مستحقّة منذ أكثر من ٦٠ يوماً`,
       detail: "التأخّر الطويل يفسد شروط التوريد ويضعف تفاوضك.",
       action: "أدرجها في دفعة أوّل الشهر.",
-      href: "/payments",
+      actionLabel: "افتح المتأخّرة",
+      href: "/purchases/invoices?overdue=1",
       count: f.overdueSuppliers.length,
       amountMinor: f.overdueMinor,
       impact: { kind: "OWED", amountMinor: f.overdueMinor },
@@ -207,7 +216,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `${f.unclassifiedBankTx} حركة بنكية لم تُصنَّف`,
       detail: `بقيمة ${riyals(f.unclassifiedBankAmountMinor)} ريال. ما لم يُصنَّف يبقى محسوباً على المورّدين ظلماً.`,
       action: "صنّفها مرّة — يُحفظ التصنيف قاعدةً تسري على أمثاله في كل كشف بعده.",
-      href: "/money",
+      actionLabel: "افتح الحركات",
+      href: "/bank",
       count: f.unclassifiedBankTx,
       amountMinor: f.unclassifiedBankAmountMinor,
       impact: { kind: "UNATTRIBUTED", amountMinor: f.unclassifiedBankAmountMinor },
@@ -223,7 +233,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `ارتفاع الأسعار يكلّفك ${riyals(f.priceRiseAnnualMinor)} ريال سنوياً`,
       detail: `${f.priceRises.length} صنفاً ارتفع سعره عند مورّده.`,
       action: "فاوض على الثلاثة الأعلى أثراً، واطلب عرضاً من مورّد بديل لتفاوض بورقة في يدك.",
-      href: "/performance",
+      actionLabel: "افتح الأصناف",
+      href: "/analysis",
       count: f.priceRises.length,
       amountMinor: f.priceRiseAnnualMinor,
       impact: { kind: "ANNUAL", amountMinor: f.priceRiseAnnualMinor },
@@ -240,6 +251,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `${f.suppliersMissingStatement.length} مورّد لم يصل كشفه`,
       detail: "الكشف وحده يكشف فاتورة حُمّلت عليك ولم تصلك — ولا يظهر ذلك في أرشيفك مهما فتّشته.",
       action: "اطلب الكشف الشهري منهم، ثمّ طابقه.",
+      actionLabel: "اطلب الكشوف",
       href: "/statements",
       count: f.suppliersMissingStatement.length,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
@@ -256,7 +268,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       // الفرق عن «غير صالحة» مقصود: هذه تُقرأ، وتلك يُطالَب مورّدها
       detail: "حالتها مجهولة لا غير صالحة. لا تُطالِب مورّدها قبل قراءتها.",
       action: "اقرأ محتواها من صفحة المستندات.",
-      href: "/documents",
+      actionLabel: "افتح ما لم يُقرأ",
+      href: "/purchases/invoices?tax=UNKNOWN",
       count: f.unknownTaxCount,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: f.unknownTaxEvidence,
@@ -271,7 +284,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `${f.invoicesWithoutLines} فاتورة بلا بنود`,
       detail: "تحليل الأصناف والأسعار لا يراها، فأرقامه ناقصة بقدرها.",
       action: "اقرأ محتواها ليكتمل التحليل.",
-      href: "/documents",
+      actionLabel: "افتح فواتير بلا بنود",
+      href: "/purchases/invoices?noLines=1",
       count: f.invoicesWithoutLines,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: [],
@@ -286,6 +300,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `${f.pendingDocuments} مستند لم يُبتّ فيه`,
       detail: "مرفوع ولم يُعتمد ولم يُرفض.",
       action: "راجعه واعتمده أو ارفضه.",
+      actionLabel: "افتح الوارد",
       href: "/documents?status=NEEDS_REVIEW",
       count: f.pendingDocuments,
       impact: { kind: "BLOCKED", amountMinor: null },
@@ -301,7 +316,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `${f.suppliersWithoutContract.length} مورّد لا يصدر فواتير وبلا عقد`,
       detail: `${f.suppliersWithoutContract.join(" · ")} — بلا عقد لا خصم ضريبة ولا إثبات مصروف.`,
       action: "وقّع عقد توريد مكتوباً، أو استبدله بمورّد يصدر فواتير ضريبية.",
-      href: "/settings",
+      actionLabel: "افتح المورّدين",
+      href: "/suppliers",
       count: f.suppliersWithoutContract.length,
       impact: { kind: "AT_RISK", amountMinor: null },
       evidence: f.suppliersWithoutContract.map((name) => ({ label: name })),

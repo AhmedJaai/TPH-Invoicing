@@ -71,7 +71,7 @@ export function AttentionCard({ item }: { item: AttentionItem }) {
           href={item.href}
           className="inline-flex items-center gap-1.5 rounded-xl bg-inverse-surface px-4 py-2 text-xs font-bold text-inverse-ink transition-opacity hover:opacity-90"
         >
-          عالِجها ←
+          {item.actionLabel ?? "عالِجها"} ←
         </Link>
       </div>
     </article>

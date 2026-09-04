@@ -54,7 +54,9 @@ export const AREAS: readonly NavArea[] = [
     needs: "amounts:view",
     owns: ["/suppliers", "/statements", "/analysis"],
     children: [
-      { href: "/purchases", label: "الفواتير" },
+      { href: "/purchases", label: "النظرة العامة" },
+      { href: "/purchases/invoices", label: "الفواتير" },
+      { href: "/purchases/invoices?paid=UNPAID", label: "المستحقّ عليك" },
       { href: "/suppliers", label: "المورّدون", needs: "supplier:view" },
       { href: "/purchases/products", label: "الأصناف" },
       { href: "/analysis", label: "ذكاء الشراء", needs: "reports:view" },
@@ -69,7 +71,7 @@ export const AREAS: readonly NavArea[] = [
     owns: ["/bank", "/payments", "/close"],
     children: [
       { href: "/money", label: "النظرة العامة" },
-      { href: "/payments", label: "المستحقّ للمورّدين", needs: "payment:approve" },
+      { href: "/payments", label: "دفعة أوّل الشهر", needs: "payment:approve" },
       { href: "/money/expenses", label: "المصروفات" },
       { href: "/bank", label: "البنك" },
       { href: "/money/statement", label: "كشف الحساب" },
