@@ -1,6 +1,7 @@
 /** مساعدات الجلسة للواجهات البرمجية وصفحات الخادم. */
 import { auth } from "@/auth";
 import { can, ForbiddenError, type Capability, type Role } from "./permissions";
+import { previewAllowed } from "./preview-mode";
 
 export interface CurrentUser {
   id: string;
@@ -14,9 +15,11 @@ export interface CurrentUser {
  *
  * للتجربة وحدها. متى كان مفعَّلاً، فكل من يعرف الرابط يدخل — فلا ترفع
  * فواتير حقيقية وهو مشتغل. يظهر شريط تحذير في كل صفحة كي لا يُنسى.
+ *
+ * ولا يعمل في الإنتاج مهما فُعِّل المتغيّر — راجع `preview-mode.ts`.
  */
 export function isAuthBypassed(): boolean {
-  return process.env.AUTH_BYPASS === "true";
+  return previewAllowed(process.env);
 }
 
 const TRIAL_USER: CurrentUser = {

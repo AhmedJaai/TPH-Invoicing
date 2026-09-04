@@ -65,13 +65,10 @@ function MoreIcon({ className }: { className?: string }) {
 
 export function Nav({ role }: { role: Role }) {
   const pathname = usePathname() ?? "/";
-  const [moreOpen, setMoreOpen] = useState(false);
-
   const areas = visibleAreas(role);
   const area = activeArea(pathname);
   const children = area ? visibleChildren(role, area) : [];
   const child = area ? activeChild(pathname, area) : undefined;
-  const { tabs, more } = mobileTabs(role, pathname);
 
   return (
     <>
@@ -118,7 +115,26 @@ export function Nav({ role }: { role: Role }) {
         </nav>
       )}
 
-      {/* ── الجوّال: شريط سفليّ ثابت ── */}
+    </>
+  );
+}
+
+
+/**
+ * شريط الجوّال السفليّ.
+ *
+ * يُركَّب في جذر الصفحة لا داخل الترويسة: الترويسة عليها `backdrop-blur`،
+ * والمرشِّح يُنشئ إطاراً حاويًا يحبس `fixed` داخله — فكان الشريط يظهر
+ * أعلى الشاشة لا أسفلها. لا يُدخل هذا المكوّن ترويسةً أبداً.
+ */
+export function MobileTabBar({ role }: { role: Role }) {
+  const pathname = usePathname() ?? "/";
+  const [moreOpen, setMoreOpen] = useState(false);
+  const area = activeArea(pathname);
+  const { tabs, more } = mobileTabs(role, pathname);
+
+  return (
+    <>
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md sm:hidden">
         <nav className="flex items-stretch" aria-label="المساحات">
           {tabs.map((a) => (

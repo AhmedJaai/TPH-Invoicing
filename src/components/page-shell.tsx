@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Nav, UploadButton } from "./nav";
+import { MobileTabBar, Nav, UploadButton } from "./nav";
 import { TrialBanner } from "./trial-banner";
 import { UserMenu } from "./user-menu";
 import type { Role } from "@/lib/permissions";
@@ -68,6 +68,9 @@ export function PageShell({
         </div>
         <div className="mt-7">{children}</div>
       </main>
+
+      {/* خارج الترويسة عمداً: `backdrop-blur` عليها يحبس `fixed` داخلها */}
+      <MobileTabBar role={user.role} />
     </div>
   );
 }

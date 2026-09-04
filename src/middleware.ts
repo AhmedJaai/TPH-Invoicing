@@ -6,14 +6,15 @@
  */
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { previewAllowed } from "@/lib/preview-mode";
 
 const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // وضع التجربة يفتح الأبواب عمداً — راجع src/lib/session.ts
-  if (process.env.AUTH_BYPASS === "true") return NextResponse.next();
+  // وضع التجربة يفتح الأبواب عمداً، ولا يعمل في الإنتاج — راجع lib/preview-mode.ts
+  if (previewAllowed(process.env)) return NextResponse.next();
 
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
