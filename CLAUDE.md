@@ -1,1 +1,103 @@
 @AGENTS.md
+
+# TPH-Invoicing — الذاكرة الدائمة
+
+نظام مالي وتشغيلي لمقهى **مؤسسة ذا بوبليك هاوس** (النسيم، جدة).
+الرقم الضريبي `310007971600003` · السجل `7052766941`.
+
+الشرح الطويل في **`docs/ARCHITECTURE.md`** — وهو مصدر الحقيقة للمعمارية.
+هذا الملف يحمل ما تحتاجه *قبل* أن تكتب سطراً: القرارات وأسبابها، والمصائد.
+`docs/HANDOVER.md` و`docs/PLAN.md` **وثيقتان مؤرّختان** — تصفان ما كان، لا ما هو قائم.
+
+## قيود لا تُخترق
+
+1. **لا يُمسّ أرشيف جوجل درايف.** لا حذف ولا نقل ولا إعادة تسمية بلا طلب صريح من أحمد.
+2. **العربية** في كل ما يُكتب له: فصحى سهلة.
+3. **المال عدد صحيح بالهللات** (`HALALAS_PER_RIYAL = 100` في `src/lib/money.ts`). لا عدد عشري في أي حساب مالي، أبداً.
+4. **المجهول ليس صفراً.** ما لم يُقرأ يُعرض «غير معروف»، لا `0`. صفرٌ كاذب يقول إنّ المقهى لم يشترِ شيئاً.
+5. **لا بيانات مبيعات مخترَعة.** لا Foodics بعد؛ `notConnected` في `src/lib/sales/connector.ts` **يرمي** `NotConnectedError` ولا يُرجع أصفاراً.
+
+## البنية التقنية
+
+Next.js **16.3.4** (App Router) · React 19.2.8 · TypeScript 5 صارم · Tailwind v4
+Drizzle ORM 0.45.2 + `pg` 8.23 على **Neon Postgres**
+Auth.js v5 (`next-auth@5.0.0-beta.32`) + `@auth/drizzle-adapter` — جوجل، جلسات في القاعدة
+Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
+
+**القاعدة:** يجب استعمال نقطة Neon **المجمَّعة** (`...-pooler.c-2.us-east-2.aws.neon.tech`).
+غير المجمَّعة تنفد اتصالاتها تحت Vercel.
+
+**النشر:** Vercel `tph4/tph-invoicing` · GitHub `AhmedJaai/TPH-Invoicing` · الفرع `main`.
+
+## القاعدة — ٢٧ جدولاً
+
+`users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
+`suppliers` `supplier_aliases` `supplier_products` · `payments` `payment_allocations`
+`bank_imports` `bank_transactions` `bank_rules` · `statements` `statement_lines` · `month_closes`
+`products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products` (فارغة عمداً)
+`audit_logs` `rate_limits`
+
+التعريف في `src/db/schema.ts`.
+
+### الهجرات: SQL صريح، لا `drizzle-kit push`
+
+الملفات في `drizzle/sql/` ويشغّلها `npm run db:migrate` (`scripts/migrate.ts`).
+
+**السبب:** `drizzle-kit push` يطلب طرفيّة تفاعلية — فيتعذّر في CI — ولا يترك أثراً يُراجَع.
+
+| الملف | ماذا يفعل |
+|---|---|
+| `001_audit_log_immutable.sql` | مؤثِّرات تمنع تعديل سجلّ التدقيق أو حذفه أو تفريغه |
+| `002_tax_status_and_idempotency.sql` | حالات الضريبة، ومفاتيح منع التكرار الثلاثة |
+| `003_transaction_type.sql` | `bank_transactions.transaction_type` |
+| `004_rate_limits.sql` | جدول حدّ الطلبات |
+| `005_products_and_sales_domain.sql` | الأصناف والمصروفات المتكرّرة ومجال المبيعات |
+
+## المكتبات التي يجب معرفتها
+
+| الملف | مسؤوليّته |
+|---|---|
+| `src/lib/confirm.ts` | `reviewConfirmed()` — **الخادم** يعيد اشتقاق حال الضريبة. لا يُصدَّق المتصفّح في رقم مالي. |
+| `src/lib/line-pricing.ts` | `resolveLinePricing()` / `reconcileInvoiceLines()` — قلب صحّة الأسعار |
+| `src/lib/allocation.ts` | `planAllocations()` — يمنع تخصيص أكثر من قيمة الدفعة |
+| `src/lib/bank/identity.ts` | بصمة الحركة والملف — أساس منع التكرار |
+| `src/lib/bank/rules.ts` | تصنيف الحركات. **GOVERNMENT قبل ZAKAT** وإلّا قُرئت «زاتكا» صدقةً |
+| `src/lib/bank/match.ts` | ربط الحركة بمورّد — حدود الكلمات، لا احتواء نصّي |
+| `src/lib/statement-match.ts` | مطابقة كشوف المورّدين |
+| `src/lib/month-close.ts` | الإقفال: `BLOCK` يمنع، `WARN` لا يمنع |
+| `src/lib/attention.ts` | كل تنبيه يحمل `href` (مكان الإصلاح) و`evidence` (لِمَ ظهر) |
+| `src/lib/data-health.ts` | التغطية لا تُختلق؛ فيها حال `NOT_CONNECTED` |
+| `src/services/guard.ts` | `guard(route, capability)` + `respondTo(e)` → 401/403/429. **مدخل كل واجهة** |
+
+## القرارات وأسبابها
+
+- **الخادم لا يثق بالمتصفّح.** كان `/api/archive` يحفظ `isTaxValid` كما أرسله المتصفّح. صار `reviewConfirmed()` يشتقّه من جديد.
+- **الفشل يُسمَع.** كانت الفاتورة التي يتعذّر قراءة إجماليها تُؤرشَف بصمت وتُعرض «نجحت». صارت تُرفض بـ409.
+- **الاستيراد منيع من التكرار** بثلاث طبقات: بصمة الملف، ومعرّف الحركة الخارجي، وبصمة المستند (`documents_sha_uniq` جزئي `WHERE status <> 'REJECTED'`). السبب: كشف بنكي استُورد ثلاث مرّات — ١٤٢٨ حركة صارت ٤٢٨٤.
+- **بصمة الحركة مفهرسة بالتكرار** (`row_number()`) كي تنجو الأسطر المتكرّرة فعلاً داخل الملف نفسه.
+- **الصنف يُفتَح بمفتاح `${supplierId}::${اسم}`** لا بالاسم وحده. السبب: «العنب» من لافا كمبوتشا، ومن محمصة الغربية كيلو بنّ — فأنتج دمجهما «توفيراً» وهمياً بـ٢١٢٢ ريالاً.
+- **فترة كشف المورّد تُشتقّ من تواريخ أسطره** لا من اسم الملف. السبب: كشف Olive Leaves تراكمي (مايو–أغسطس) فأنتج ٣٦ فاتورة «مفقودة» كذباً.
+- **نافذة مطابقة الفاتورة ±٧ أيام** — سطر بتاريخ ٢٣ يخصّ فاتورة بتاريخ ٢٦.
+- **المورّد المكرَّر يُدمَج ويُعطَّل، ولا يُحذف** (`npm run db:merge`).
+- **الذكاء الاصطناعي لا يخترع رقم فاتورة.** اختلق النموذج `TPH-20260521` بثقة ١٫٠٠. صار محظوراً في الموجِّه، ولا يُؤخذ رقم من النموذج لمستندات الأرشيف.
+- **قواعد البنك تعمّ ولا تخصّ عمليةً واحدة** — كانت ٣٢ قاعدة تحمل كلٌّ مرجع حوالة بعينها.
+
+## المصائد المعروفة
+
+- **حصّة Gemini المجانية = ٢٠ طلباً/اليوم لكل نموذج** (لا في الدقيقة). لذلك تدوير سبعة نماذج.
+- **الطبقة المجانية تتدرّب على الفواتير ويراجعها بشر.** التبديل سطر: `EXTRACTION_PROVIDER=claude`.
+- **`AUTH_BYPASS`** يفتح كل الأبواب. أُزيل من بيئة إنتاج Vercel، لكن لا شيء في **الكود** يمنع إعادته هناك — الحارس بيئيّ فقط (`src/middleware.ts:16`، `src/lib/session.ts:19`).
+- **`transaction_type`** لنحو ٥٤٨ حركة قديمة لا يُستعاد إلّا بإعادة استيراد الكشف.
+- **مفاتيح تحتاج تدويراً بيد أحمد:** `GEMINI_API_KEY` و`GOOGLE_CLIENT_SECRET` (ظهرا في محادثة).
+- **بيئة المعاينة في Vercel** — لم يُتحقّق أتشارك قاعدة الإنتاج أم لا. إن كانت تشاركها فكل نشر تجريبي يكتب في البيانات الحقيقية.
+
+## الأوامر
+
+`npm test` (٤٢٣ اختباراً) · `npm run typecheck` · `npm run lint`
+`npm run db:migrate` · `db:audit` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules`
+`npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`
+
+## ما ليس مبنيّاً — عمداً
+
+Foodics ونقاط البيع · تكلفة المبيعات والهامش · المخزون والوصفات · التنبّؤ · «المدير المالي» الذكي · تصدير محاسبي · الإشعارات.
+جداول المبيعات موجودة وفارغة، وواجهة `SalesConnector` معرَّفة بلا تطبيق. **لا تملأها ببيانات وهمية.**
