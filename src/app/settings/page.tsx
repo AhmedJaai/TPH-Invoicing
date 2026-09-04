@@ -10,6 +10,9 @@ import { activeProviderName } from "@/lib/extraction";
 import { isAuthBypassed } from "@/lib/session";
 import { buildDataHealth } from "@/lib/data-health";
 import { gatherHealthFacts } from "@/lib/data-health-facts";
+import { RecurringExpenses, type ExpenseRow } from "@/components/recurring-expenses";
+import { monthlyShare } from "@/lib/cashflow";
+import type { TxCategory } from "@/lib/bank/rules";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +41,22 @@ export default async function SettingsPage() {
   ).rows;
 
   const health = buildDataHealth(await gatherHealthFacts());
+
+  const expenses: ExpenseRow[] = (
+    await db.execute<{ id: string; label: string; category: string; amount_minor: number; cadence: string }>(sql`
+      select id, label, category::text as category, amount_minor, cadence
+        from recurring_expenses where is_active order by amount_minor desc
+    `)
+  ).rows.map((r) => {
+    const row = {
+      id: r.id,
+      label: r.label,
+      category: r.category as TxCategory,
+      amountMinor: Number(r.amount_minor),
+      cadence: r.cadence as ExpenseRow["cadence"],
+    };
+    return { ...row, monthlyMinor: monthlyShare(row) };
+  });
 
   const tiles: HubTile[] = [
     {
@@ -70,11 +89,10 @@ export default async function SettingsPage() {
       disabled: true,
     },
     {
-      href: "/settings",
+      href: "/settings/audit",
       title: "سجل التدقيق",
       value: String(f?.audit ?? 0),
-      detail: "غير قابل للتعديل ولا الحذف — مفروض بمشغّلات في القاعدة",
-      disabled: true,
+      detail: "ما فُعل ومن فعله ومتى — غير قابل للتعديل ولا الحذف",
     },
     {
       href: "/settings",
@@ -93,6 +111,16 @@ export default async function SettingsPage() {
       intro="ما يُضبط مرّة: المورّدون وقواعد التصنيف وحال الربط."
     >
       <HubGrid tiles={tiles} />
+
+      <section className="mt-10">
+        <h2 className="text-base font-bold">المصروفات المتكرّرة</h2>
+        <p className="mb-3 mt-1 text-xs leading-relaxed text-muted">
+          ما يتكرّر بلا فاتورة تصلك: الإيجار والرواتب والاشتراكات. كشف البنك يقول
+          «أين ذهب المال»، وهذه تقول «كم يُتوقَّع» — فيُقابَل المتوقَّع بالفعلي في
+          قائمة الدخل.
+        </p>
+        <RecurringExpenses rows={expenses} />
+      </section>
 
       <section className="mt-10">
         <div className="mb-1 flex items-baseline justify-between gap-3">

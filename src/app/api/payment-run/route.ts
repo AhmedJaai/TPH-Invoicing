@@ -3,18 +3,16 @@ import { NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { invoices, paymentAllocations, suppliers } from "@/db/schema";
-import { requireUser, UnauthenticatedError } from "@/lib/session";
-import { ForbiddenError } from "@/lib/permissions";
+import { guard, respondTo } from "@/services/guard";
 import { buildPaymentRun, toBankTransferCsv, type PayableInvoice } from "@/lib/payment-run";
 
 export const runtime = "nodejs";
 
-export async function GET(request: Request) {
-  try {
-    await requireUser("payment:approve");
+export async function GET(request: Request) {  try {
+    await guard("payment-run", "payment:approve");
   } catch (e) {
-    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: e.message }, { status: 401 });
-    if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 });
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
     throw e;
   }
 

@@ -6,8 +6,7 @@ import {
   bankImports, bankRules, bankTransactions, invoices, paymentAllocations,
   supplierAliases, suppliers,
 } from "@/db/schema";
-import { requireUser, UnauthenticatedError } from "@/lib/session";
-import { ForbiddenError } from "@/lib/permissions";
+import { guard, respondTo } from "@/services/guard";
 import { parseBankStatement } from "@/lib/bank/parse";
 import {
   matchBankTransactions, findDuplicatePayments, suggestAlias,
@@ -24,13 +23,12 @@ export const maxDuration = 60;
 
 const MAX_BYTES = 15 * 1024 * 1024;
 
-export async function POST(request: Request) {
-  let user;
+export async function POST(request: Request) {  let user;
   try {
-    user = await requireUser("bank:view");
+    user = await guard("bank-import", "bank:view");
   } catch (e) {
-    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: e.message }, { status: 401 });
-    if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 });
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
     throw e;
   }
 
@@ -269,6 +267,7 @@ export async function POST(request: Request) {
           externalId: row.externalId,
           valueDate: m.tx.valueDate,
           description: m.tx.description,
+          transactionType: m.tx.transactionType || null,
           beneficiaryRaw: m.supplierName ?? null,
           amountMinor: m.tx.amountMinor,
           direction: m.tx.direction,

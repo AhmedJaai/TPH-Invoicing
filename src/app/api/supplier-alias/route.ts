@@ -9,8 +9,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { supplierAliases, suppliers } from "@/db/schema";
-import { requireUser, UnauthenticatedError } from "@/lib/session";
-import { ForbiddenError } from "@/lib/permissions";
+import { guard, respondTo } from "@/services/guard";
 import { normalizeName } from "@/lib/suppliers-seed";
 import { recordAudit } from "@/lib/audit";
 
@@ -22,13 +21,12 @@ interface Body {
   value: string;
 }
 
-export async function POST(request: Request) {
-  let user;
+export async function POST(request: Request) {  let user;
   try {
-    user = await requireUser("supplier:edit");
+    user = await guard("supplier-alias", "supplier:edit");
   } catch (e) {
-    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: e.message }, { status: 401 });
-    if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 });
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
     throw e;
   }
 

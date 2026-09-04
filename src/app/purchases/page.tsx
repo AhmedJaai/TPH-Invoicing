@@ -27,6 +27,8 @@ export default async function PurchasesPage() {
         (select count(*)::int from suppliers where is_active)                    as suppliers,
         (select count(distinct normalized_description)::int from invoice_lines)  as items,
         (select count(*)::int from statements)                                   as statements,
+        (select count(*)::int from supplier_products)                            as sp_total,
+        (select count(*)::int from supplier_products where product_id is not null) as sp_mapped,
         (select count(distinct supplier_id)::int from invoices)                  as active_suppliers,
         (select count(distinct supplier_id)::int from statements)                as with_statements,
         (select coalesce(sum(greatest(0, total_minor - coalesce((
@@ -53,10 +55,17 @@ export default async function PurchasesPage() {
       detail: `${f?.active_suppliers ?? 0} منهم لهم فواتير`,
     },
     {
+      href: "/purchases/products",
+      title: "الأصناف",
+      value: `${f?.sp_mapped ?? 0} / ${f?.sp_total ?? 0}`,
+      detail: "مربوطة بصنف معياري — الربط أساس كل تحليل تكلفة لاحق",
+      tone: Number(f?.sp_mapped ?? 0) === 0 ? "warn" : undefined,
+    },
+    {
       href: "/performance",
-      title: "الأصناف والأسعار",
+      title: "الأسعار",
       value: String(f?.items ?? 0),
-      detail: "صنفاً بعد توحيد أسمائها عند مورّديها",
+      detail: "صنفاً تُتبَّع أسعاره عند مورّده",
     },
     {
       href: "/payments",

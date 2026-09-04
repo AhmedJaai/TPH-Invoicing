@@ -9,8 +9,8 @@
  */
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { isAuthBypassed, requireUser, UnauthenticatedError } from "@/lib/session";
-import { ForbiddenError } from "@/lib/permissions";
+import { isAuthBypassed } from "@/lib/session";
+import { guard, respondTo } from "@/services/guard";
 import { parseRiyals } from "@/lib/money";
 import { diffCorrections, recordAudit } from "@/lib/audit";
 import {
@@ -59,8 +59,8 @@ const PAYMENT_KINDS = new Set(["RECEIPT", "CASH_RECEIPT"]);
 
 /** يترجم أخطاء الخدمات إلى ردود HTTP — الترجمة وحدها مسؤولية الواجهة. */
 function toResponse(e: unknown): NextResponse | null {
-  if (e instanceof UnauthenticatedError) return NextResponse.json({ error: e.message }, { status: 401 });
-  if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 });
+  const guarded = respondTo(e);
+  if (guarded) return guarded;
   if (e instanceof InvalidInputError) return NextResponse.json({ error: e.message }, { status: 400 });
   if (e instanceof UnknownYearError) return NextResponse.json({ error: e.message }, { status: 400 });
   if (e instanceof DuplicateDocumentError) return NextResponse.json({ error: e.message }, { status: 409 });
@@ -84,7 +84,7 @@ function toResponse(e: unknown): NextResponse | null {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser("document:upload");
+    const user = await guard("archive", "document:upload");
 
     let body: ArchiveBody;
     try {

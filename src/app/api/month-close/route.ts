@@ -11,8 +11,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { monthCloses } from "@/db/schema";
-import { requireUser, UnauthenticatedError } from "@/lib/session";
-import { ForbiddenError } from "@/lib/permissions";
+import { guard, respondTo } from "@/services/guard";
 import { buildMonthClose } from "@/lib/month-close";
 import { gatherMonthFacts } from "@/lib/month-close-facts";
 import { recordAudit } from "@/lib/audit";
@@ -29,13 +28,12 @@ interface Body {
   note?: string;
 }
 
-export async function POST(request: Request) {
-  let user;
+export async function POST(request: Request) {  let user;
   try {
-    user = await requireUser("month:close");
+    user = await guard("month-close", "month:close");
   } catch (e) {
-    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: e.message }, { status: 401 });
-    if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 });
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
     throw e;
   }
 

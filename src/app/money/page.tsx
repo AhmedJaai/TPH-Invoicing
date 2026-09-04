@@ -90,12 +90,10 @@ export default async function MoneyPage() {
       detail: "قائمة تحقّق تُقرأ قبل أن يُقفل الشهر",
     },
     {
-      href: "/money",
-      title: "التدفّق النقدي",
-      value: "غير متاح",
-      detail: "يحتاج أرصدة البنك — لا تُحفظ حالياً مع الحركات",
-      tone: "muted",
-      disabled: true,
+      href: "/money/statement",
+      title: "التدفّق النقدي وقائمة الدخل",
+      value: "اعرضها",
+      detail: "من كشف بنكك وفواتيرك — وما يحتاج مبيعات معروضٌ بسببه لا بصفر",
     },
   ];
 

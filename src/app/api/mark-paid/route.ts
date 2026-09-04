@@ -9,8 +9,7 @@ import { NextResponse } from "next/server";
 import { and, eq, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { invoices, paymentAllocations, payments } from "@/db/schema";
-import { requireUser, UnauthenticatedError } from "@/lib/session";
-import { ForbiddenError } from "@/lib/permissions";
+import { guard, respondTo } from "@/services/guard";
 import { recordAudit } from "@/lib/audit";
 
 export const runtime = "nodejs";
@@ -24,13 +23,12 @@ interface Body {
   note?: string;
 }
 
-export async function POST(request: Request) {
-  let user;
+export async function POST(request: Request) {  let user;
   try {
-    user = await requireUser("payment:approve");
+    user = await guard("mark-paid", "payment:approve");
   } catch (e) {
-    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: e.message }, { status: 401 });
-    if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 });
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
     throw e;
   }
 

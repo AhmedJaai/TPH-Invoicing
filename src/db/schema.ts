@@ -279,8 +279,11 @@ export const invoiceLines = pgTable("invoice_lines", {
   /** تاريخ الفاتورة منسوخ هنا لتتبّع الأسعار بلا ربط في كل استعلام */
   invoiceDate: timestamp("invoice_date", { withTimezone: true }),
   supplierId: text("supplier_id").references(() => suppliers.id),
+  /** صنف المورّد، ومنه إلى الصنف المعياري */
+  supplierProductId: text("supplier_product_id"),
 }, (t) => [
   index("invoice_lines_invoice_idx").on(t.invoiceId),
+  index("invoice_lines_supplier_product_idx").on(t.supplierProductId),
   index("invoice_lines_item_idx").on(t.normalizedDescription),
   index("invoice_lines_item_date_idx").on(t.normalizedDescription, t.invoiceDate),
 ]);
@@ -418,6 +421,14 @@ export const bankTransactions = pgTable("bank_transactions", {
   bankImportId: text("bank_import_id").notNull().references(() => bankImports.id, { onDelete: "cascade" }),
   valueDate: timestamp("value_date", { withTimezone: true }).notNull(),
   description: text("description"),
+  /**
+   * «نوع العملية» في كشف البنك، منفصلاً عن الوصف.
+   *
+   * كنّا نقرؤه للمطابقة ثمّ نطرحه — و«نقاط بيع» و«رسوم» ترد فيه لا في
+   * الوصف، فبقيت مئات الحركات «غير مصنَّفة» لأنّ ما يصنّفها لم يُحفظ.
+   * والفراغ فيه يعني «حركة قديمة استُوردت قبل حفظه» لا «بلا نوع».
+   */
+  transactionType: text("transaction_type"),
   beneficiaryRaw: text("beneficiary_raw"),
   amountMinor: integer("amount_minor").notNull(),
   direction: txDirectionEnum("direction").notNull(),
@@ -440,6 +451,7 @@ export const bankTransactions = pgTable("bank_transactions", {
   index("bank_tx_date_idx").on(t.valueDate),
   index("bank_tx_status_idx").on(t.matchStatus),
   index("bank_tx_category_idx").on(t.category),
+  index("bank_tx_type_idx").on(t.transactionType),
   uniqueIndex("bank_tx_external_uniq").on(t.externalId),
 ]);
 
@@ -487,6 +499,155 @@ export const monthCloses = pgTable("month_closes", {
   closedById: text("closed_by_id").references(() => users.id),
   closedAt: timestamp("closed_at", { withTimezone: true }),
 });
+
+/* ───────────────────────── حدّ الطلبات ───────────────────────── */
+
+/**
+ * عدّاد الطلبات في نافذة ثابتة.
+ * في القاعدة لا في ذاكرة العملية: البيئة السحابية تُشغّل نسخاً متعدّدة،
+ * فعدّادُ كل نسخة على حدة يجعل الحدّ الفعلي أضعافه.
+ */
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  count: integer("count").notNull().default(0),
+}, (t) => [
+  primaryKey({ columns: [t.key, t.windowStart] }),
+  index("rate_limits_window_idx").on(t.windowStart),
+]);
+
+
+/* ───────────────────────── الأصناف المعيارية ───────────────────────── */
+
+/**
+ * الصنف المعياري.
+ *
+ * `normalized_description` ليس مُعرِّف صنف: «حليب كامل الدسم ٢ لتر» عند
+ * مورّد و«Full Cream Milk 2L» عند آخر شيء واحد، و«عنب» عند محمصة كيلو بنّ
+ * وعند لافا زجاجة كمبوتشا شيئان. فالاسم لا يجمع ولا يفرّق.
+ *
+ * وهذا الجدول هو ما يجمع، ومنه وحده يمكن لاحقاً: مبيعات ← استهلاك ← تكلفة.
+ */
+export const productCategoryEnum = pgEnum("product_category", [
+  "COFFEE", "DAIRY", "BAKERY", "FOOD", "BEVERAGE",
+  "PACKAGING", "CLEANING", "EQUIPMENT", "OTHER",
+]);
+
+export const baseUnitEnum = pgEnum("base_unit", ["KG", "G", "L", "ML", "PIECE", "PACK"]);
+
+export const products = pgTable("products", {
+  id: id(),
+  nameAr: text("name_ar").notNull(),
+  nameEn: text("name_en"),
+  category: productCategoryEnum("category").notNull().default("OTHER"),
+  /** الوحدة التي يُقاس بها الصنف مهما اختلفت عبوات مورّديه */
+  baseUnit: baseUnitEnum("base_unit").notNull().default("PIECE"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: now(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("products_category_idx").on(t.category)]);
+
+/**
+ * صنف المورّد وربطه بالمعياري.
+ *
+ * الربط **لا يقع تلقائياً على تشابه الاسم** — درس «العنب». يُقترح ويؤكّده
+ * إنسان، وما لم يؤكَّد يبقى اقتراحاً لا يُبنى عليه رقم.
+ */
+export const supplierProducts = pgTable("supplier_products", {
+  id: id(),
+  supplierId: text("supplier_id").notNull().references(() => suppliers.id, { onDelete: "cascade" }),
+  normalizedDescription: text("normalized_description").notNull(),
+  displayName: text("display_name").notNull(),
+  productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
+  /** حجم العبوة بالوحدة الأساس: كرتون ١٢ × ١ لتر = 12 */
+  packSize: numeric("pack_size", { precision: 12, scale: 3 }),
+  confirmedById: text("confirmed_by_id").references(() => users.id),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  createdAt: now(),
+}, (t) => [
+  uniqueIndex("supplier_products_uniq").on(t.supplierId, t.normalizedDescription),
+  index("supplier_products_product_idx").on(t.productId),
+]);
+
+/* ───────────────────────── المصروفات المتكرّرة ───────────────────────── */
+
+/**
+ * المصروف الذي يتكرّر بلا فاتورة تصله: الإيجار والرواتب والاشتراكات.
+ * تصنيفات كشف البنك تقول «أين ذهب المال»، وهذا يقول «كم يُتوقَّع» —
+ * فيُقابَل المتوقَّع بالفعلي.
+ */
+export const recurringExpenses = pgTable("recurring_expenses", {
+  id: id(),
+  label: text("label").notNull(),
+  category: txCategoryEnum("category").notNull(),
+  amountMinor: integer("amount_minor").notNull(),
+  /** MONTHLY · QUARTERLY · ANNUAL */
+  cadence: text("cadence").notNull().default("MONTHLY"),
+  startsOn: text("starts_on"),
+  endsOn: text("ends_on"),
+  note: text("note"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+}, (t) => [index("recurring_expenses_active_idx").on(t.isActive)]);
+
+/* ───────────────────────── مجال المبيعات ───────────────────────── */
+
+/**
+ * جداول محايدة عن أي مزوّد، تُنشأ فارغةً وتنتظر موصلاً.
+ *
+ * وجودها الآن يمنع أن تُبنى التقارير فوق نموذج فواتير ثمّ تُعاد كتابتها.
+ * ولا واجهة برمجية لأي مزوّد في هذا المستودع — الموصل يُكتب لاحقاً.
+ */
+export const salesSources = pgTable("sales_sources", {
+  id: id(),
+  name: text("name").notNull(),
+  kind: text("kind").notNull().default("POS"),
+  isConnected: boolean("is_connected").notNull().default(false),
+  lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  createdAt: now(),
+});
+
+export const posProducts = pgTable("pos_products", {
+  id: id(),
+  sourceId: text("source_id").notNull().references(() => salesSources.id, { onDelete: "cascade" }),
+  /** معرّف الصنف عند المزوّد */
+  externalId: text("external_id").notNull(),
+  name: text("name").notNull(),
+  category: text("category"),
+  priceMinor: integer("price_minor"),
+  productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
+  createdAt: now(),
+}, (t) => [uniqueIndex("pos_products_uniq").on(t.sourceId, t.externalId)]);
+
+export const sales = pgTable("sales", {
+  id: id(),
+  sourceId: text("source_id").notNull().references(() => salesSources.id, { onDelete: "cascade" }),
+  externalId: text("external_id").notNull(),
+  soldAt: timestamp("sold_at", { withTimezone: true }).notNull(),
+  businessDate: text("business_date").notNull(),
+  grossMinor: integer("gross_minor").notNull(),
+  discountMinor: integer("discount_minor").notNull().default(0),
+  refundMinor: integer("refund_minor").notNull().default(0),
+  vatMinor: integer("vat_minor").notNull().default(0),
+  netMinor: integer("net_minor").notNull(),
+  orderCount: integer("order_count").notNull().default(1),
+  createdAt: now(),
+}, (t) => [
+  uniqueIndex("sales_uniq").on(t.sourceId, t.externalId),
+  index("sales_date_idx").on(t.businessDate),
+]);
+
+export const saleLines = pgTable("sale_lines", {
+  id: id(),
+  saleId: text("sale_id").notNull().references(() => sales.id, { onDelete: "cascade" }),
+  posProductId: text("pos_product_id").references(() => posProducts.id, { onDelete: "set null" }),
+  description: text("description").notNull(),
+  quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull().default("1"),
+  unitPriceMinor: integer("unit_price_minor").notNull(),
+  lineTotalMinor: integer("line_total_minor").notNull(),
+}, (t) => [index("sale_lines_sale_idx").on(t.saleId)]);
 
 /* ───────────────────────── سجل التدقيق ───────────────────────── */
 

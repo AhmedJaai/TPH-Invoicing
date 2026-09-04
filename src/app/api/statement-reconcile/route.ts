@@ -16,8 +16,7 @@ import {
   accounts, documents, invoices, issues, statementLines, statements,
   supplierAliases, suppliers,
 } from "@/db/schema";
-import { requireUser, UnauthenticatedError } from "@/lib/session";
-import { ForbiddenError } from "@/lib/permissions";
+import { guard, respondTo } from "@/services/guard";
 import { driveForUser, downloadFile } from "@/lib/drive";
 import { extractDocument, isSupportedUpload } from "@/lib/extraction";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
@@ -54,13 +53,12 @@ async function loadSuppliers(): Promise<SupplierRecord[]> {
   }));
 }
 
-export async function POST(request: Request) {
-  let user;
+export async function POST(request: Request) {  let user;
   try {
-    user = await requireUser("amounts:view");
+    user = await guard("statement-reconcile", "amounts:view");
   } catch (e) {
-    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: e.message }, { status: 401 });
-    if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 });
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
     throw e;
   }
 
