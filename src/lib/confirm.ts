@@ -11,7 +11,10 @@
  * القرار الفعلي فيرى المستخدم شيئاً ويحدث غيره.
  */
 import { ISSUE, ISSUE_TEXT } from "./issue-codes";
-import { validateInvoice, type Finding } from "./validation";
+import {
+  validateInvoice,
+  type Finding, type InputVatStatus, type TaxStatus,
+} from "./validation";
 
 /** أنواع تُقيَّد كفواتير — لها وحدها فحص ضريبي كامل. */
 const INVOICE_KINDS = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE"]);
@@ -44,8 +47,8 @@ export interface ConfirmContext {
 export interface ConfirmReview {
   findings: Finding[];
   blockers: Finding[];
-  isTaxValid: boolean;
-  inputVatEligible: boolean;
+  taxStatus: TaxStatus;
+  inputVatStatus: InputVatStatus;
   isFixedAsset: boolean;
   /** هل تكتمل شروط إنشاء صفّ فاتورة؟ غيابها يجب أن يُعلَن لا أن يُبتلَع */
   canCreateInvoice: boolean;
@@ -149,8 +152,8 @@ export function reviewConfirmed(
   return {
     findings,
     blockers: findings.filter((f) => f.severity === "BLOCKER"),
-    isTaxValid: validation.isTaxValid,
-    inputVatEligible: validation.inputVatEligible,
+    taxStatus: validation.taxStatus,
+    inputVatStatus: validation.inputVatStatus,
     isFixedAsset: validation.isFixedAsset,
     canCreateInvoice,
   };

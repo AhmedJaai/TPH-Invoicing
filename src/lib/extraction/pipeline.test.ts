@@ -54,8 +54,8 @@ describe("فاتورة ضريبية سليمة وصلت باسم عشوائي", 
   });
 
   it("صالحة لخصم المدخلات ويسمح بأرشفتها", () => {
-    expect(r.isTaxValid).toBe(true);
-    expect(r.inputVatEligible).toBe(true);
+    expect(r.taxStatus).toBe("VALID");
+    expect(r.inputVatStatus).toBe("ELIGIBLE");
     expect(r.canArchive).toBe(true);
     expect(r.findings).toHaveLength(0);
   });
@@ -73,7 +73,7 @@ describe("الفاتورة المبسطة", () => {
   it("تنبّه لفقد خصم المدخلات لكنها تُؤرشف", () => {
     const r = run({ documentKind: "SIMPLIFIED_INVOICE", buyerVatNumber: "" });
     expect(codes(r)).toContain(ISSUE.MISSING_BUYER_VAT);
-    expect(r.inputVatEligible).toBe(false);
+    expect(r.inputVatStatus).not.toBe("ELIGIBLE");
     expect(r.canArchive).toBe(true);
   });
 });

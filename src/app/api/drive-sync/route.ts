@@ -305,13 +305,14 @@ export async function POST(request: Request) {
           invoiceNumber: x.invoiceNumber.trim(),
           invoiceDate: new Date(`${x.invoiceDate}T00:00:00Z`),
           periodMonth: entry.month || x.invoiceDate.slice(0, 7),
-          subtotalMinor: parseRiyals(x.subtotalAmount) ?? 0,
-          vatMinor: parseRiyals(x.vatAmount) ?? 0,
+          // الفراغ يبقى فراغاً — المجهول لا يصير صفراً
+          subtotalMinor: parseRiyals(x.subtotalAmount),
+          vatMinor: parseRiyals(x.vatAmount),
           totalMinor,
           sellerVat: x.sellerVatNumber || null,
           buyerVat: x.buyerVatNumber || null,
-          isTaxValid: review.isTaxValid,
-          inputVatEligible: review.inputVatEligible,
+          taxStatus: review.taxStatus,
+          inputVatStatus: review.inputVatStatus,
           isFixedAsset: review.isFixedAsset,
         }).onConflictDoNothing().returning({ id: invoices.id });
 

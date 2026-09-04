@@ -22,8 +22,8 @@ describe("الفاتورة الضريبية الكاملة", () => {
       sellerVat: "310111111100003", buyerVat: COMPANY_VAT,
       subtotalMinor: 10_000, vatMinor: 1_500, totalMinor: 11_500,
     }, ctx);
-    expect(r.isTaxValid).toBe(true);
-    expect(r.inputVatEligible).toBe(true);
+    expect(r.taxStatus).toBe("VALID");
+    expect(r.inputVatStatus).toBe("ELIGIBLE");
     expect(r.findings).toHaveLength(0);
   });
 });
@@ -35,7 +35,7 @@ describe("الفاتورة المبسطة", () => {
       sellerVat: "310111111100003", buyerVat: null,
       subtotalMinor: 10_000, vatMinor: 1_500, totalMinor: 11_500,
     }, ctx);
-    expect(r.inputVatEligible).toBe(false);
+    expect(r.inputVatStatus).not.toBe("ELIGIBLE");
     expect(codes(r)).toContain(ISSUE.MISSING_BUYER_VAT);
     expect(hasBlocker(r.findings)).toBe(false);
   });
@@ -50,7 +50,7 @@ describe("رقم ضريبي لمنشأة أخرى", () => {
     }, ctx);
     expect(codes(r)).toContain(ISSUE.BUYER_VAT_MISMATCH);
     expect(hasBlocker(r.findings)).toBe(true);
-    expect(r.inputVatEligible).toBe(false);
+    expect(r.inputVatStatus).not.toBe("ELIGIBLE");
   });
 
   it("يتجاهل المسافات والشرطات في المقارنة", () => {
@@ -59,7 +59,7 @@ describe("رقم ضريبي لمنشأة أخرى", () => {
       sellerVat: "310111111100003", buyerVat: "3100-0797-1600-003",
       subtotalMinor: 10_000, vatMinor: 1_500, totalMinor: 11_500,
     }, ctx);
-    expect(r.isTaxValid).toBe(true);
+    expect(r.taxStatus).toBe("VALID");
   });
 });
 
@@ -72,7 +72,7 @@ describe("عرض السعر والمسودة", () => {
     }, ctx);
     expect(codes(r)).toContain(ISSUE.NOT_A_TAX_INVOICE);
     expect(hasBlocker(r.findings)).toBe(true);
-    expect(r.isTaxValid).toBe(false);
+    expect(r.taxStatus).not.toBe("VALID");
   });
 });
 
@@ -145,5 +145,87 @@ describe("ثقة الاستخراج", () => {
     }, ctx);
     expect(r.lowConfidenceFields).toEqual(["invoiceNumber", "invoiceDate"]);
     expect(codes(r)).toContain(ISSUE.LOW_CONFIDENCE_FIELD);
+  });
+});
+
+describe("المجهول لا يصير صفراً", () => {
+  const COMPANY = "310007971600003";
+  const SELLER = "300012345600003";
+
+  const complete = {
+    kind: "TAX_INVOICE" as const,
+    invoiceNumber: "INV-1",
+    sellerVat: SELLER,
+    buyerVat: COMPANY,
+    totalMinor: 11_500,
+  };
+
+  it("ضريبةٌ لم تُقرأ ← الحالة مجهولة لا غير صالحة", () => {
+    const r = validateInvoice(
+      { ...complete, subtotalMinor: null, vatMinor: null },
+      { companyVat: COMPANY },
+    );
+    expect(r.taxStatus).toBe("UNKNOWN");
+    expect(r.inputVatStatus).toBe("UNKNOWN");
+  });
+
+  it("ضريبةٌ قُرئت وكانت صفراً ← غير صالحة، والفرق مقصود", () => {
+    const r = validateInvoice(
+      { ...complete, subtotalMinor: 11_500, vatMinor: 0 },
+      { companyVat: COMPANY },
+    );
+    expect(r.taxStatus).toBe("INVALID");
+    expect(r.inputVatStatus).toBe("NOT_ELIGIBLE");
+  });
+
+  it("المجهول يحمل تنبيهاً يقول ما ينقص", () => {
+    const r = validateInvoice(
+      { ...complete, subtotalMinor: null, vatMinor: null },
+      { companyVat: COMPANY },
+    );
+    expect(r.findings.some((f) => f.code === "TAX_STATUS_UNKNOWN")).toBe(true);
+  });
+
+  it("ركنٌ ناقص معلوم يسبق الجهل: بلا رقم ضريبي للمشتري ← غير صالحة لا مجهولة", () => {
+    const r = validateInvoice(
+      { ...complete, buyerVat: null, subtotalMinor: null, vatMinor: null },
+      { companyVat: COMPANY },
+    );
+    expect(r.taxStatus).toBe("INVALID");
+  });
+
+  it("عرض السعر لا يُقيَّد أصلاً ← NOT_APPLICABLE لا INVALID", () => {
+    const r = validateInvoice(
+      { ...complete, kind: "QUOTATION", subtotalMinor: 10_000, vatMinor: 1_500 },
+      { companyVat: COMPANY },
+    );
+    expect(r.taxStatus).toBe("NOT_APPLICABLE");
+    expect(r.inputVatStatus).toBe("NOT_ELIGIBLE");
+  });
+
+  it("الفحص الحسابي لا يجري على مجهول فلا يتّهم بلا علم", () => {
+    const r = validateInvoice(
+      { ...complete, subtotalMinor: null, vatMinor: null },
+      { companyVat: COMPANY },
+    );
+    expect(r.findings.some((f) => f.code === "VAT_MATH_MISMATCH")).toBe(false);
+  });
+
+  it("أساس الرسملة يُشتقّ من الفرق حين يُجهَل الصافي وتُعرف الضريبة", () => {
+    const r = validateInvoice(
+      { ...complete, subtotalMinor: null, vatMinor: 60_000, totalMinor: 460_000 },
+      { companyVat: COMPANY },
+    );
+    expect(r.taxStatus).toBe("VALID");
+    // ٤٦٠٬٠٠٠ − ٦٠٬٠٠٠ = ٤٠٠٬٠٠٠ هللة، فوق حدّ الرسملة ٣٠٠٬٠٠٠
+    expect(r.isFixedAsset).toBe(true);
+  });
+
+  it("بلا إجمالي معلوم لا يُحكم بالرسملة", () => {
+    const r = validateInvoice(
+      { ...complete, totalMinor: null, subtotalMinor: null, vatMinor: null },
+      { companyVat: COMPANY },
+    );
+    expect(r.isFixedAsset).toBe(false);
   });
 });

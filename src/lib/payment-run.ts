@@ -6,6 +6,8 @@
  * التفاوض الوحيدة: المال الذي لم يُدفع بعد.
  */
 
+import type { InputVatStatus, TaxStatus } from "./validation";
+
 export interface PayableInvoice {
   invoiceId: string;
   supplierId: string;
@@ -15,12 +17,13 @@ export interface PayableInvoice {
   periodMonth: string;
   totalMinor: number;
   allocatedMinor: number;
-  isTaxValid: boolean;
-  inputVatEligible: boolean;
-  vatMinor: number;
+  taxStatus: TaxStatus;
+  inputVatStatus: InputVatStatus;
+  /** `null` تعني «لم تُقرأ» */
+  vatMinor: number | null;
 }
 
-export type HoldReason = "NOT_TAX_VALID" | "NO_VAT_DEDUCTION";
+export type HoldReason = "NOT_TAX_VALID" | "NO_VAT_DEDUCTION" | "TAX_UNKNOWN";
 
 export interface SupplierPayment {
   supplierId: string;
@@ -51,6 +54,8 @@ export interface PaymentRun {
 const HOLD_TEXT: Record<HoldReason, string> = {
   NOT_TAX_VALID: "ليست فاتورة ضريبية كاملة — اطلب البديل قبل السداد",
   NO_VAT_DEDUCTION: "لا تصلح لخصم ضريبة المدخلات — اطلب فاتورة ضريبية",
+  // المجهول لا يُسدَّد ولا يُطالَب صاحبه: يُقرأ أوّلاً
+  TAX_UNKNOWN: "لم يُقرأ تفصيلها الضريبي — اقرأ المستند قبل السداد",
 };
 
 /**
@@ -74,9 +79,11 @@ export function buildPaymentRun(
   const payable: PayableInvoice[] = [];
 
   for (const inv of inScope) {
-    if (!inv.isTaxValid) {
+    if (inv.taxStatus === "UNKNOWN") {
+      held.push({ invoice: inv, reason: "TAX_UNKNOWN", message: HOLD_TEXT.TAX_UNKNOWN });
+    } else if (inv.taxStatus !== "VALID") {
       held.push({ invoice: inv, reason: "NOT_TAX_VALID", message: HOLD_TEXT.NOT_TAX_VALID });
-    } else if (!inv.inputVatEligible) {
+    } else if (inv.inputVatStatus !== "ELIGIBLE") {
       held.push({ invoice: inv, reason: "NO_VAT_DEDUCTION", message: HOLD_TEXT.NO_VAT_DEDUCTION });
     } else {
       payable.push(inv);
@@ -102,7 +109,7 @@ export function buildPaymentRun(
     readyTotalMinor: ready.reduce((s, r) => s + r.totalMinor, 0),
     held,
     heldTotalMinor: held.reduce((s, h) => s + (h.invoice.totalMinor - h.invoice.allocatedMinor), 0),
-    vatAtRiskMinor: held.reduce((s, h) => s + h.invoice.vatMinor, 0),
+    vatAtRiskMinor: held.reduce((s, h) => s + (h.invoice.vatMinor ?? 0), 0),
   };
 }
 

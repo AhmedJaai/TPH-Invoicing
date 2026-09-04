@@ -12,7 +12,10 @@ import {
   buildReceiptFileName,
   buildStatementFileName,
 } from "@/lib/naming";
-import { validateInvoice, type Finding } from "@/lib/validation";
+import {
+  validateInvoice,
+  type Finding, type InputVatStatus, type TaxStatus,
+} from "@/lib/validation";
 import { ISSUE, ISSUE_TEXT } from "@/lib/issue-codes";
 import { SERVICE_FOLDERS } from "@/config/drive";
 import type { ExtractionResult } from "./schema";
@@ -48,8 +51,8 @@ export interface PipelineResult {
   /** مسار المجلد في الدرايف */
   proposedFolderPath?: string;
   proposedFolderName?: string;
-  isTaxValid: boolean;
-  inputVatEligible: boolean;
+  taxStatus: TaxStatus;
+  inputVatStatus: InputVatStatus;
   isFixedAsset: boolean;
   findings: Finding[];
   lowConfidenceFields: string[];
@@ -256,8 +259,8 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     proposedFileName,
     proposedFolderPath,
     proposedFolderName,
-    isTaxValid: validation.isTaxValid,
-    inputVatEligible: validation.inputVatEligible,
+    taxStatus: validation.taxStatus,
+    inputVatStatus: validation.inputVatStatus,
     isFixedAsset: validation.isFixedAsset,
     findings,
     lowConfidenceFields: validation.lowConfidenceFields,

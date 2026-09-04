@@ -7,7 +7,7 @@ const inv = (o: Partial<PayableInvoice> & { invoiceId: string }): PayableInvoice
   supplierId: "s1", supplierName: "أوراق الزيتون",
   invoiceNumber: o.invoiceId, invoiceDate: d("2026-08-15"),
   periodMonth: "2026-08", totalMinor: 10_000, allocatedMinor: 0,
-  isTaxValid: true, inputVatEligible: true, vatMinor: 1_500,
+  taxStatus: "VALID", inputVatStatus: "ELIGIBLE", vatMinor: 1_500,
   ...o,
 });
 
@@ -63,7 +63,7 @@ describe("حجز غير الصالح ضريبياً", () => {
   it("يمنع سداد ما ليس فاتورة ضريبية", () => {
     const run = buildPaymentRun([
       inv({ invoiceId: "ok" }),
-      inv({ invoiceId: "bad", isTaxValid: false, inputVatEligible: false, vatMinor: 3_000 }),
+      inv({ invoiceId: "bad", taxStatus: "INVALID", inputVatStatus: "NOT_ELIGIBLE", vatMinor: 3_000 }),
     ], "2026-08");
 
     expect(run.ready[0].invoiceCount).toBe(1);
@@ -75,7 +75,7 @@ describe("حجز غير الصالح ضريبياً", () => {
 
   it("يحجز ما لا يصلح لخصم المدخلات ولو كان ضريبياً شكلاً", () => {
     const run = buildPaymentRun([
-      inv({ invoiceId: "x", isTaxValid: true, inputVatEligible: false }),
+      inv({ invoiceId: "x", taxStatus: "VALID", inputVatStatus: "NOT_ELIGIBLE" }),
     ], "2026-08");
     expect(run.held[0].reason).toBe("NO_VAT_DEDUCTION");
     expect(run.ready).toHaveLength(0);
@@ -83,8 +83,8 @@ describe("حجز غير الصالح ضريبياً", () => {
 
   it("يحسب إجمالي المحجوز", () => {
     const run = buildPaymentRun([
-      inv({ invoiceId: "a", isTaxValid: false, totalMinor: 20_000 }),
-      inv({ invoiceId: "b", isTaxValid: false, totalMinor: 5_000, allocatedMinor: 2_000 }),
+      inv({ invoiceId: "a", taxStatus: "INVALID", totalMinor: 20_000 }),
+      inv({ invoiceId: "b", taxStatus: "INVALID", totalMinor: 5_000, allocatedMinor: 2_000 }),
     ], "2026-08");
     expect(run.heldTotalMinor).toBe(23_000);
   });
@@ -120,11 +120,50 @@ describe("ملف التحويلات", () => {
 describe("رسالة المورّد", () => {
   it("تسرد أرقام الفواتير الناقصة وتطلب البديل", () => {
     const run = buildPaymentRun([
-      inv({ invoiceId: "1", invoiceNumber: "990", isTaxValid: false }),
+      inv({ invoiceId: "1", invoiceNumber: "990", taxStatus: "INVALID" }),
     ], "2026-08");
     const msg = buildSupplierMessage("بيكوف", run.held);
     expect(msg).toContain("بيكوف");
     expect(msg).toContain("990");
     expect(msg).toContain("310007971600003");
+  });
+});
+
+describe("المجهول لا يُسدَّد ولا يُطالَب صاحبه", () => {
+  const base = {
+    invoiceId: "i1", supplierId: "s1", supplierName: "أوراق الزيتون",
+    invoiceNumber: "260300", invoiceDate: new Date("2026-08-05T00:00:00Z"),
+    periodMonth: "2026-08", totalMinor: 50_000, allocatedMinor: 0, vatMinor: null,
+  };
+
+  it("الفاتورة المجهولة تُحجَز بسبب يخصّها", () => {
+    const run = buildPaymentRun(
+      [{ ...base, taxStatus: "UNKNOWN", inputVatStatus: "UNKNOWN" }],
+      "2026-08",
+    );
+    expect(run.held).toHaveLength(1);
+    expect(run.held[0].reason).toBe("TAX_UNKNOWN");
+    expect(run.held[0].message).toContain("اقرأ المستند");
+    expect(run.ready).toHaveLength(0);
+  });
+
+  it("سبب الحجز يفرّق بين «اقرأ المستند» و«طالِب المورّد»", () => {
+    const run = buildPaymentRun(
+      [
+        { ...base, invoiceId: "u", taxStatus: "UNKNOWN", inputVatStatus: "UNKNOWN" },
+        { ...base, invoiceId: "b", taxStatus: "INVALID", inputVatStatus: "NOT_ELIGIBLE" },
+      ],
+      "2026-08",
+    );
+    const reasons = run.held.map((h) => h.reason).sort();
+    expect(reasons).toEqual(["NOT_TAX_VALID", "TAX_UNKNOWN"]);
+  });
+
+  it("الضريبة المجهولة لا تُجمع في «المعرّض» كصفر", () => {
+    const run = buildPaymentRun(
+      [{ ...base, taxStatus: "UNKNOWN", inputVatStatus: "UNKNOWN" }],
+      "2026-08",
+    );
+    expect(run.vatAtRiskMinor).toBe(0);
   });
 });

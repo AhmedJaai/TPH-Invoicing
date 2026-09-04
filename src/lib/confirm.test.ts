@@ -20,15 +20,15 @@ describe("reviewConfirmed", () => {
   it("يعتمد الفاتورة المكتملة الأركان", () => {
     const r = reviewConfirmed(validInvoice, { companyVat: COMPANY_VAT });
     expect(r.blockers).toHaveLength(0);
-    expect(r.isTaxValid).toBe(true);
-    expect(r.inputVatEligible).toBe(true);
+    expect(r.taxStatus).toBe("VALID");
+    expect(r.inputVatStatus).toBe("ELIGIBLE");
     expect(r.canCreateInvoice).toBe(true);
   });
 
   it("لا يصدّق راية المتصفّح: الفاتورة بلا رقم ضريبي للمشتري ليست صالحة للخصم", () => {
     const r = reviewConfirmed({ ...validInvoice, buyerVat: "" }, { companyVat: COMPANY_VAT });
-    expect(r.isTaxValid).toBe(false);
-    expect(r.inputVatEligible).toBe(false);
+    expect(r.taxStatus).not.toBe("VALID");
+    expect(r.inputVatStatus).not.toBe("ELIGIBLE");
   });
 
   it("يمنع الأرشفة حين يخالف الرقم الضريبي للمشتري رقم المنشأة", () => {

@@ -5,6 +5,7 @@ const clean: MonthFacts = {
   month: "2026-08",
   invoiceCount: 43,
   notTaxValidCount: 0,
+  unknownTaxCount: 0,
   unpaidCount: 0,
   unpaidTotalMinor: 0,
   unpostedCount: 0,
@@ -93,5 +94,24 @@ describe("buildMonthClose", () => {
 
   it("البند السليم لا يحمل خطوة", () => {
     for (const i of buildMonthClose(clean).items) expect(i.action).toBeUndefined();
+  });
+});
+
+describe("المجهول بند مستقلّ في قائمة الإقفال", () => {
+  it("لا يظهر البند إلا حين توجد فواتير لم تُقرأ", () => {
+    const r = buildMonthClose(clean);
+    expect(r.items.some((i) => i.id === "tax-unknown")).toBe(false);
+  });
+
+  it("يظهر بعدده وبخطوة تخصّه: اقرأ المستند لا طالِب المورّد", () => {
+    const r = buildMonthClose({ ...clean, unknownTaxCount: 5 });
+    const item = r.items.find((i) => i.id === "tax-unknown")!;
+    expect(item.state).toBe("WARN");
+    expect(item.detail).toContain("5");
+    expect(item.action).toContain("اقرأ محتواها");
+  });
+
+  it("المجهول ينبّه ولا يمنع الإقفال", () => {
+    expect(buildMonthClose({ ...clean, unknownTaxCount: 9 }).canClose).toBe(true);
   });
 });

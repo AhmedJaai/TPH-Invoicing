@@ -33,8 +33,8 @@ export async function GET(request: Request) {
       periodMonth: invoices.periodMonth,
       totalMinor: invoices.totalMinor,
       vatMinor: invoices.vatMinor,
-      isTaxValid: invoices.isTaxValid,
-      inputVatEligible: invoices.inputVatEligible,
+      taxStatus: invoices.taxStatus,
+      inputVatStatus: invoices.inputVatStatus,
       allocatedMinor: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}), 0)::int`,
     })
     .from(invoices)
@@ -52,8 +52,8 @@ export async function GET(request: Request) {
       periodMonth: r.periodMonth,
       totalMinor: r.totalMinor,
       allocatedMinor: Number(r.allocatedMinor),
-      isTaxValid: r.isTaxValid,
-      inputVatEligible: r.inputVatEligible,
+      taxStatus: r.taxStatus,
+      inputVatStatus: r.inputVatStatus,
       vatMinor: r.vatMinor,
     })),
     month,

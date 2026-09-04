@@ -18,7 +18,8 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
   const [inv] = await db
     .select({
       invoiceCount: sql<number>`count(*)::int`,
-      notTaxValidCount: sql<number>`count(*) filter (where not ${invoices.isTaxValid})::int`,
+      notTaxValidCount: sql<number>`count(*) filter (where ${invoices.taxStatus} = 'INVALID')::int`,
+      unknownTaxCount: sql<number>`count(*) filter (where ${invoices.taxStatus} = 'UNKNOWN')::int`,
       unpostedCount: sql<number>`count(*) filter (where not ${invoices.postedToAccounting})::int`,
       fixedAssetCount: sql<number>`count(*) filter (where ${invoices.isFixedAsset})::int`,
       suppliersWithInvoices: sql<number>`count(distinct ${invoices.supplierId})::int`,
@@ -65,6 +66,7 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     month,
     invoiceCount: Number(inv?.invoiceCount ?? 0),
     notTaxValidCount: Number(inv?.notTaxValidCount ?? 0),
+    unknownTaxCount: Number(inv?.unknownTaxCount ?? 0),
     unpaidCount: Number(inv?.unpaidCount ?? 0),
     unpaidTotalMinor: Number(inv?.unpaidTotalMinor ?? 0),
     unpostedCount: Number(inv?.unpostedCount ?? 0),

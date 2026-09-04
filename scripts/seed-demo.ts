@@ -102,8 +102,8 @@ async function main() {
       subtotalMinor: p.total - p.vat,
       vatMinor: p.vat,
       totalMinor: p.total,
-      isTaxValid: p.valid,
-      inputVatEligible: p.valid,
+      taxStatus: p.valid ? "VALID" : "INVALID",
+      inputVatStatus: p.valid ? "ELIGIBLE" : "NOT_ELIGIBLE",
     }).returning({ id: invoices.id });
 
     for (const l of p.lines) {

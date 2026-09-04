@@ -79,8 +79,8 @@ export default async function DashboardPage() {
       periodMonth: invoices.periodMonth,
       totalMinor: invoices.totalMinor,
       vatMinor: invoices.vatMinor,
-      isTaxValid: invoices.isTaxValid,
-      inputVatEligible: invoices.inputVatEligible,
+      taxStatus: invoices.taxStatus,
+      inputVatStatus: invoices.inputVatStatus,
       isFixedAsset: invoices.isFixedAsset,
       postedToAccounting: invoices.postedToAccounting,
       allocatedMinor: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}), 0)::int`,
@@ -156,7 +156,7 @@ export default async function DashboardPage() {
       invoiceNumber: r.invoiceNumber,
       invoiceDate: r.invoiceDate,
       vatMinor: r.vatMinor,
-      inputVatEligible: r.inputVatEligible,
+      inputVatStatus: r.inputVatStatus,
     })),
   );
 
@@ -202,7 +202,7 @@ export default async function DashboardPage() {
     monthlySpend: monthly,
     vatAtRiskMinor: vat.atRiskMinor,
     vatAtRiskCount: vat.atRiskCount,
-    notTaxValidCount: withStatus.filter((r) => !r.isTaxValid).length,
+    notTaxValidCount: withStatus.filter((r) => r.taxStatus === "INVALID").length,
     unpaidTotalMinor: unpaidTotal,
     unpaidCount: unpaid.length,
     unpostedCount: withStatus.filter((r) => !r.postedToAccounting).length,
@@ -211,9 +211,9 @@ export default async function DashboardPage() {
     vatAtRiskInvoices: vat.rows.map((r) => ({
       invoiceId: r.invoiceId, supplierName: r.supplierName,
       invoiceNumber: r.invoiceNumber, invoiceDate: r.invoiceDate,
-      amountMinor: r.vatMinor, note: "ضريبة لا تُخصم",
+      amountMinor: r.vatMinor ?? 0, note: "ضريبة لا تُخصم",
     })),
-    notTaxValidInvoices: withStatus.filter((r) => !r.isTaxValid).map(asRef),
+    notTaxValidInvoices: withStatus.filter((r) => r.taxStatus === "INVALID").map(asRef),
     unpaidInvoices: unpaid.map((r) => ({ ...asRef(r), amountMinor: Math.max(0, r.status.remainingMinor) })),
     unpostedInvoices: withStatus.filter((r) => !r.postedToAccounting).map(asRef),
     fixedAssetInvoices: withStatus.filter((r) => r.isFixedAsset).map(asRef),
@@ -260,7 +260,11 @@ export default async function DashboardPage() {
         <Kpi
           label="ضريبة مدخلات معرّضة"
           value={<Money minor={vat.atRiskMinor} />}
-          sub={`${vat.atRiskCount} فاتورة غير صالحة`}
+          sub={
+            vat.unknownCount > 0
+              ? `${vat.atRiskCount} فاتورة غير صالحة · ${vat.unknownCount} لم تُقرأ`
+              : `${vat.atRiskCount} فاتورة غير صالحة`
+          }
           tone={vat.atRiskMinor > 0 ? "danger" : "ok"}
         />
         <Kpi

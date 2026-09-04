@@ -6,6 +6,14 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
 import { paymentStatus, summarizeItems, vatAtRisk, type LineRow } from "@/lib/analytics";
+import { TAX_STATUS_LABEL, type TaxStatus } from "@/lib/validation";
+
+const TAX_TONE: Record<TaxStatus, string> = {
+  VALID: "text-ok",
+  INVALID: "text-danger",
+  UNKNOWN: "text-warn",
+  NOT_APPLICABLE: "text-muted",
+};
 
 export const dynamic = "force-dynamic";
 
@@ -47,8 +55,8 @@ export default async function AuditPage() {
       periodMonth: invoices.periodMonth,
       totalMinor: invoices.totalMinor,
       vatMinor: invoices.vatMinor,
-      isTaxValid: invoices.isTaxValid,
-      inputVatEligible: invoices.inputVatEligible,
+      taxStatus: invoices.taxStatus,
+      inputVatStatus: invoices.inputVatStatus,
       isFixedAsset: invoices.isFixedAsset,
       postedToAccounting: invoices.postedToAccounting,
       supplierName: suppliers.nameAr,
@@ -101,7 +109,8 @@ export default async function AuditPage() {
 
   const unpaid = withStatus.filter((r) => r.status.state !== "PAID");
   const unpaidTotal = unpaid.reduce((s, r) => s + Math.max(0, r.status.remainingMinor), 0);
-  const notTaxValid = withStatus.filter((r) => !r.isTaxValid);
+  const notTaxValid = withStatus.filter((r) => r.taxStatus === "INVALID");
+  const unknownTax = withStatus.filter((r) => r.taxStatus === "UNKNOWN");
   const vat = vatAtRisk(
     rows.map((r) => ({
       invoiceId: r.id,
@@ -109,7 +118,7 @@ export default async function AuditPage() {
       invoiceNumber: r.invoiceNumber,
       invoiceDate: r.invoiceDate,
       vatMinor: r.vatMinor,
-      inputVatEligible: r.inputVatEligible,
+      inputVatStatus: r.inputVatStatus,
     })),
   );
   const unposted = withStatus.filter((r) => !r.postedToAccounting);
@@ -143,15 +152,15 @@ export default async function AuditPage() {
           tone={unpaidTotal > 0 ? "warn" : "ok"}
         />
         <Card
-          label="ليست فواتير ضريبية"
+          label="لا تصلح لخصم المدخلات"
           value={String(notTaxValid.length)}
-          note="لا تصلح لخصم المدخلات"
+          note={unknownTax.length > 0 ? `و${unknownTax.length} لم تُقرأ بعد` : "الباقي صالح"}
           tone={notTaxValid.length > 0 ? "danger" : "ok"}
         />
         <Card
           label="ضريبة مدخلات معرّضة"
           value={<Money minor={vat.atRiskMinor} />}
-          note="مبلغ قد نخسره"
+          note={vat.unknownCount > 0 ? `${vat.unknownCount} فاتورة لم تُقرأ` : "مبلغ قد نخسره"}
           tone={vat.atRiskMinor > 0 ? "danger" : "ok"}
         />
         <Card
@@ -255,11 +264,9 @@ export default async function AuditPage() {
                       )}
                     </td>
                     <td className="px-3 py-2.5">
-                      {r.isTaxValid ? (
-                        <span className="text-xs text-ok">✓ كاملة</span>
-                      ) : (
-                        <span className="text-xs text-danger">✕ لا خصم</span>
-                      )}
+                      <span className={`text-xs ${TAX_TONE[r.taxStatus]}`}>
+                        {TAX_STATUS_LABEL[r.taxStatus]}
+                      </span>
                     </td>
                     <td className="px-3 py-2.5 text-xs">
                       {r.postedToAccounting ? (
@@ -309,7 +316,7 @@ export default async function AuditPage() {
                   </span>
                 </span>
                 <span className="shrink-0 text-sm font-bold text-danger">
-                  <Money minor={r.vatMinor} />
+                  <Money minor={r.vatMinor ?? 0} />
                 </span>
               </li>
             ))}

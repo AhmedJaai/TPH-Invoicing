@@ -9,7 +9,7 @@ import {
   pgTable, pgEnum, text, integer, boolean, timestamp, jsonb,
   doublePrecision, numeric, uniqueIndex, index, primaryKey,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { createId } from "@/lib/id";
 
 const id = () => text("id").primaryKey().$defaultFn(createId);
@@ -177,12 +177,40 @@ export const documents = pgTable("documents", {
   uploadedAt: now(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
-  index("documents_sha_idx").on(t.sha256),
+  /*
+   * البصمة فريدة: الملف نفسه لا يدخل النظام مرّتين مهما اختلف اسمه.
+   * كان الفحص في الكود وحده — وهو يفلت من طلبين متزامنين، والقاعدة لا تفلت.
+   *
+   * والمحجور مستثنى: النسخة المكرّرة تبقى مسجّلةً ببصمتها لتُعرف، ولا
+   * تمنع الأصل. حذف السجلّ كان سيُخفي أنّ الرفع وقع أصلاً.
+   */
+  uniqueIndex("documents_sha_uniq").on(t.sha256).where(sql`status <> 'REJECTED'`),
   index("documents_period_supplier_idx").on(t.periodMonth, t.supplierId),
   index("documents_status_idx").on(t.status),
 ]);
 
 /* ───────────────────────── الفواتير ───────────────────────── */
+
+/**
+ * حالة الفاتورة ضريبياً.
+ *
+ * الراية الثنائية كانت تكذب: `false` تعني «ليست ضريبية» و«لا نعرف» معاً.
+ * وأكثر فواتير الأرشيف رُحّلت من أسماء الملفات بلا تفصيل ضريبي، فوُسمت
+ * كلّها «غير صالحة» — وهي في الحقيقة **مجهولة**. والفرق ليس لفظياً: الأولى
+ * تُطالِب المورّد ببديل، والثانية تُطالِبنا نحن بقراءة المستند.
+ */
+export const taxStatusEnum = pgEnum("tax_status", [
+  "VALID",          // تحمل الأركان الأربعة
+  "INVALID",        // ينقصها ركن معلوم
+  "UNKNOWN",        // لم يُقرأ تفصيلها الضريبي بعد
+  "NOT_APPLICABLE", // عرض سعر أو مبدئية — لا تُقيَّد أصلاً
+]);
+
+export const inputVatStatusEnum = pgEnum("input_vat_status", [
+  "ELIGIBLE",
+  "NOT_ELIGIBLE",
+  "UNKNOWN",
+]);
 
 export const invoices = pgTable("invoices", {
   id: id(),
@@ -194,16 +222,20 @@ export const invoices = pgTable("invoices", {
   /** شهر الأرشفة — شهر تاريخ الفاتورة إلا إذا رُحّلت */
   periodMonth: text("period_month").notNull(),
 
-  subtotalMinor: integer("subtotal_minor").notNull(),
-  vatMinor: integer("vat_minor").notNull(),
+  /**
+   * الصافي والضريبة يقبلان الفراغ عمداً: `null` تعني «لم يُقرأ» لا «صفر».
+   * الإجمالي وحده إلزامي — لا تُقيَّد فاتورة بلا مبلغ.
+   */
+  subtotalMinor: integer("subtotal_minor"),
+  vatMinor: integer("vat_minor"),
   totalMinor: integer("total_minor").notNull(),
 
   sellerVat: text("seller_vat"),
   buyerVat: text("buyer_vat"),
 
-  /** تحمل الأركان الأربعة: رقم + ضريبي بائع + ضريبي مشترٍ مطابق + تفصيل ضريبة */
-  isTaxValid: boolean("is_tax_valid").notNull().default(false),
-  inputVatEligible: boolean("input_vat_eligible").notNull().default(false),
+  /** الأركان الأربعة: رقم + ضريبي بائع + ضريبي مشترٍ مطابق + تفصيل ضريبة */
+  taxStatus: taxStatusEnum("tax_status").notNull().default("UNKNOWN"),
+  inputVatStatus: inputVatStatusEnum("input_vat_status").notNull().default("UNKNOWN"),
   /** معدّة فوق ٣٬٠٠٠ ريال — تُرسمل ولا تُصرف */
   isFixedAsset: boolean("is_fixed_asset").notNull().default(false),
 
@@ -221,6 +253,7 @@ export const invoices = pgTable("invoices", {
   index("invoices_period_idx").on(t.periodMonth),
   index("invoices_date_idx").on(t.invoiceDate),
   index("invoices_posted_idx").on(t.postedToAccounting),
+  index("invoices_tax_status_idx").on(t.taxStatus),
 ]);
 
 export const invoiceLines = pgTable("invoice_lines", {
@@ -323,11 +356,16 @@ export const paymentAllocations = pgTable("payment_allocations", {
 export const bankImports = pgTable("bank_imports", {
   id: id(),
   fileName: text("file_name").notNull(),
+  /** بصمة الملف — استيراده ثانيةً يُعرف بها ولا يُكرَّر */
+  fileSha256: text("file_sha256"),
   bank: text("bank"),
+  accountNumber: text("account_number"),
   rowCount: integer("row_count").notNull().default(0),
+  /** حركات دخلت فعلاً في هذا الاستيراد، بعد استبعاد المكرّر */
+  newRowCount: integer("new_row_count").notNull().default(0),
   importedById: text("imported_by_id").references(() => users.id),
   importedAt: now(),
-});
+}, (t) => [uniqueIndex("bank_imports_file_sha_uniq").on(t.fileSha256)]);
 
 export const txDirectionEnum = pgEnum("tx_direction", ["DEBIT", "CREDIT"]);
 
@@ -388,12 +426,21 @@ export const bankTransactions = pgTable("bank_transactions", {
   matchStatus: matchStatusEnum("match_status").notNull().default("UNMATCHED"),
   /** ما هذه الحركة: سداد مورّد أم راتب أم إيجار أم غيره */
   category: txCategoryEnum("category").notNull().default("UNKNOWN"),
+  /**
+   * هوية الحركة عند البنك: بصمة من الحساب والتاريخ والمبلغ والاتجاه والوصف.
+   *
+   * بدونها كان استيراد الكشف نفسه مرّتين يضاعف حركاته — ووجدنا في قاعدة
+   * أحمد ألفاً وأربعمئة مجموعة مكرّرة فعلاً. وهذه ليست مشكلة عرض بل مشكلة
+   * سلامة بيانات مالية: كل تقرير مبنيّ عليها يصير مضاعفاً.
+   */
+  externalId: text("external_id"),
   /** القاعدة التي صنّفتها، إن وُجدت */
   ruleId: text("rule_id").references(() => bankRules.id, { onDelete: "set null" }),
 }, (t) => [
   index("bank_tx_date_idx").on(t.valueDate),
   index("bank_tx_status_idx").on(t.matchStatus),
   index("bank_tx_category_idx").on(t.category),
+  uniqueIndex("bank_tx_external_uniq").on(t.externalId),
 ]);
 
 /* ───────────────────────── التنبيهات ───────────────────────── */

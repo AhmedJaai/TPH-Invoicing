@@ -60,8 +60,8 @@ async function main() {
   console.log(`  المورّد المطابَق   ${r.supplier?.nameAr ?? "لم يُطابَق"}  (بـ${match.method})`);
   console.log(`  الاسم الجديد      ${r.proposedFileName ?? "—"}`);
   console.log(`  المجلد            ${r.proposedFolderPath ?? "—"}`);
-  console.log(`  فاتورة ضريبية     ${r.isTaxValid ? "نعم" : "لا"}`);
-  console.log(`  خصم المدخلات      ${r.inputVatEligible ? "نعم" : "لا"}`);
+  console.log(`  الحالة الضريبية   ${r.taxStatus}`);
+  console.log(`  خصم المدخلات      ${r.inputVatStatus}`);
   console.log(`  الإجمالي          ${r.totalMinor !== undefined ? formatRiyalsDisplay(r.totalMinor) : "—"} ريال`);
   console.log(`  يُسمح بالأرشفة     ${r.canArchive ? "نعم" : "لا"}`);
   if (r.findings.length) { console.log(`  التنبيهات:`); for (const f of r.findings) console.log(`     [${f.severity}] ${f.message}`); }

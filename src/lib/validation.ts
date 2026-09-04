@@ -35,9 +35,27 @@ export interface ValidationContext {
   confidenceThreshold?: number;
 }
 
+/**
+ * حالة الفاتورة ضريبياً.
+ *
+ * الراية الثنائية كانت تكذب: `false` تعني «ليست ضريبية» و«لا نعرف» معاً.
+ * والفرق ليس لفظياً — الأولى تُطالِب المورّد ببديل، والثانية تُطالِبنا نحن
+ * بقراءة المستند. ولوحة القيادة كانت تعرض «ضريبة معرّضة: صفر» عن مئة فاتورة
+ * لم يُقرأ تفصيلها، وذلك أسوأ من الفراغ لأنّه يُطمئن كذباً.
+ */
+export type TaxStatus = "VALID" | "INVALID" | "UNKNOWN" | "NOT_APPLICABLE";
+export type InputVatStatus = "ELIGIBLE" | "NOT_ELIGIBLE" | "UNKNOWN";
+
+export const TAX_STATUS_LABEL: Record<TaxStatus, string> = {
+  VALID: "ضريبية كاملة",
+  INVALID: "لا تصلح للخصم",
+  UNKNOWN: "لم تُقرأ بعد",
+  NOT_APPLICABLE: "لا تُقيَّد",
+};
+
 export interface ValidationResult {
-  isTaxValid: boolean;
-  inputVatEligible: boolean;
+  taxStatus: TaxStatus;
+  inputVatStatus: InputVatStatus;
   isFixedAsset: boolean;
   findings: Finding[];
   /** الحقول التي تحتاج مراجعة بشرية — تُلوَّن بالأصفر في الواجهة */
@@ -87,14 +105,22 @@ export function validateInvoice(
     findings.push(finding(ISSUE.BUYER_VAT_MISMATCH));
   }
 
-  // تفصيل الضريبة: مبلغ ضريبة مذكور صراحةً وموجب.
+  /*
+   * الفراغ ليس صفراً.
+   * `null` تعني «لم يُقرأ»، و`0` تعني «قُرئ وكان صفراً». والخلط بينهما هو
+   * ما جعل مئة فاتورة مجهولة تظهر «غير صالحة ضريبياً» وهي لم تُقرأ أصلاً.
+   */
+  const vatKnown = candidate.vatMinor !== null && candidate.vatMinor !== undefined;
+  const subtotalKnown = candidate.subtotalMinor !== null && candidate.subtotalMinor !== undefined;
+  const totalKnown = candidate.totalMinor !== null && candidate.totalMinor !== undefined;
+
   const vatMinor = candidate.vatMinor ?? 0;
   const subtotalMinor = candidate.subtotalMinor ?? 0;
   const totalMinor = candidate.totalMinor ?? 0;
-  const hasVatBreakdown = vatMinor > 0;
+  const hasVatBreakdown = vatKnown && vatMinor > 0;
 
-  // فحص حسابي يكشف أخطاء الاستخراج قبل أن تصل إلى القيد.
-  if (subtotalMinor > 0 && totalMinor > 0) {
+  // فحص حسابي يكشف أخطاء الاستخراج قبل أن تصل إلى القيد — على المعلوم وحده.
+  if (subtotalKnown && totalKnown && subtotalMinor > 0 && totalMinor > 0) {
     if (subtotalMinor + vatMinor !== totalMinor) {
       findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
         message: `المجموع ${totalMinor / 100} لا يساوي الصافي ${subtotalMinor / 100} زائد الضريبة ${vatMinor / 100}`,
@@ -111,13 +137,35 @@ export function validateInvoice(
     }
   }
 
-  const isTaxValid =
-    !isNotInvoice && hasNumber && hasSellerVat && buyerVatMatches && hasVatBreakdown;
-  const inputVatEligible = isTaxValid;
+  /*
+   * الحالة الضريبية على ثلاث درجات لا اثنتين:
+   *   ركنٌ ناقص معلوم  ← INVALID، وعلاجها مطالبة المورّد.
+   *   تفصيل لم يُقرأ    ← UNKNOWN، وعلاجها قراءة المستند.
+   *   الأركان الأربعة  ← VALID.
+   */
+  const pillarsFailing = !hasNumber || !hasSellerVat || !buyerVatMatches;
 
-  // أساس الرسملة: الضريبة تدخل التكلفة فقط حين لا تكون قابلة للخصم.
-  const assetBasis = inputVatEligible ? subtotalMinor : totalMinor;
-  const isFixedAsset = assetBasis > FIXED_ASSET_THRESHOLD_MINOR;
+  let taxStatus: TaxStatus;
+  if (isNotInvoice) taxStatus = "NOT_APPLICABLE";
+  else if (pillarsFailing) taxStatus = "INVALID";
+  else if (!vatKnown) taxStatus = "UNKNOWN";
+  else taxStatus = hasVatBreakdown ? "VALID" : "INVALID";
+
+  const inputVatStatus: InputVatStatus =
+    taxStatus === "VALID" ? "ELIGIBLE" : taxStatus === "UNKNOWN" ? "UNKNOWN" : "NOT_ELIGIBLE";
+
+  if (taxStatus === "UNKNOWN") findings.push(finding(ISSUE.TAX_STATUS_UNKNOWN));
+
+  /*
+   * أساس الرسملة: الضريبة تدخل التكلفة فقط حين لا تكون قابلة للخصم.
+   * ومع صافٍ مجهول وضريبة معلومة يُشتقّ الصافي من الفرق بدل أن يُفترض صفراً.
+   */
+  const assetBasis =
+    inputVatStatus === "ELIGIBLE"
+      ? (subtotalKnown ? subtotalMinor : totalMinor - vatMinor)
+      : totalMinor;
+  // بلا إجمالي معلوم لا يُحكم بالرسملة — الجهل لا يُترجم «لا»
+  const isFixedAsset = totalKnown && assetBasis > FIXED_ASSET_THRESHOLD_MINOR;
   if (isFixedAsset) {
     findings.push(finding(ISSUE.POSSIBLE_FIXED_ASSET, {
       message: `مبلغ ${assetBasis / 100} ريال يتجاوز حد الرسملة ٣٬٠٠٠ — راجع إن كانت معدّة تُهلك`,
@@ -138,7 +186,7 @@ export function validateInvoice(
     }));
   }
 
-  return { isTaxValid, inputVatEligible, isFixedAsset, findings, lowConfidenceFields };
+  return { taxStatus, inputVatStatus, isFixedAsset, findings, lowConfidenceFields };
 }
 
 /** هل يمنع أي تنبيه إدراج الفاتورة في دفعة السداد أو قيدها؟ */

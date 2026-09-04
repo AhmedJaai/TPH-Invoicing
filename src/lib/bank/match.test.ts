@@ -312,3 +312,18 @@ describe("ركام كشف البنك لا يُنسَب إلى أحد", () => {
     expect(s).not.toContain("الاهلي");
   });
 });
+
+describe("سطور تسوية شبكة البطاقات تشغيلية", () => {
+  const tx = (description: string): BankTx => ({
+    id: "t", valueDate: new Date("2026-08-12T00:00:00Z"), description,
+    transactionType: "", amountMinor: 322, direction: "DEBIT",
+  });
+
+  it("سطر المرجع من شبكة البطاقات ليس مدفوعاً لأحد", () => {
+    expect(isInternalNoise(tx("REFERENCE : 81140155 VS26 0812 000000"))).toBe(true);
+  });
+
+  it("حوالة حقيقية لا تُعدّ تشغيلية", () => {
+    expect(isInternalNoise(tx("شركة الصرد للتعبئة والتغليف BEN ID:40305412"))).toBe(false);
+  });
+});

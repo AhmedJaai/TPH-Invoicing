@@ -5,6 +5,7 @@
  * فتُختبر كلها. الاستعلام مسؤولية الصفحة، والحساب مسؤولية هذا الملف.
  */
 import { detectPriceChange, normalizeItem, type PriceChange } from "./items";
+import type { InputVatStatus } from "./validation";
 
 /* ───────────────────────── حالة السداد ───────────────────────── */
 
@@ -263,25 +264,47 @@ export interface VatRiskRow {
   supplierName: string;
   invoiceNumber: string;
   invoiceDate: Date;
-  vatMinor: number;
-  inputVatEligible: boolean;
+  /** `null` تعني «لم يُقرأ» لا «صفر» */
+  vatMinor: number | null;
+  inputVatStatus: InputVatStatus;
 }
 
 export interface VatRisk {
+  /** ضريبة معلومة على فاتورة معلوم أنّها لا تصلح للخصم */
   atRiskMinor: number;
   recoverableMinor: number;
   atRiskCount: number;
+  /** فواتير لم يُقرأ تفصيلها — لا يُدّعى عنها شيء */
+  unknownCount: number;
+  unknownTotalMinor: number;
   rows: VatRiskRow[];
 }
 
-/** كم ضريبة مدخلات نخسرها لأنّ الفواتير ليست ضريبية كاملة. */
-export function vatAtRisk(rows: readonly VatRiskRow[]): VatRisk {
-  const atRisk = rows.filter((r) => !r.inputVatEligible && r.vatMinor > 0);
+/**
+ * كم ضريبة مدخلات نخسرها.
+ *
+ * المجهول يُعدّ على حدة ولا يدخل «المعرّض». كانت مئة فاتورة لم يُقرأ
+ * تفصيلها تُحسب صفراً، فتقول اللوحة «صفر ريال معرّضة» — وذلك أسوأ من
+ * الفراغ لأنّه يُطمئن كذباً.
+ */
+export function vatAtRisk(
+  rows: readonly VatRiskRow[],
+  unknownTotals: readonly number[] = [],
+): VatRisk {
+  const atRisk = rows.filter(
+    (r) => r.inputVatStatus === "NOT_ELIGIBLE" && r.vatMinor !== null && r.vatMinor > 0,
+  );
+  const unknown = rows.filter((r) => r.inputVatStatus === "UNKNOWN");
+
   return {
-    atRiskMinor: atRisk.reduce((s, r) => s + r.vatMinor, 0),
-    recoverableMinor: rows.filter((r) => r.inputVatEligible).reduce((s, r) => s + r.vatMinor, 0),
+    atRiskMinor: atRisk.reduce((s, r) => s + (r.vatMinor ?? 0), 0),
+    recoverableMinor: rows
+      .filter((r) => r.inputVatStatus === "ELIGIBLE")
+      .reduce((s, r) => s + (r.vatMinor ?? 0), 0),
     atRiskCount: atRisk.length,
-    rows: [...atRisk].sort((a, b) => b.vatMinor - a.vatMinor),
+    unknownCount: unknown.length,
+    unknownTotalMinor: unknownTotals.reduce((s, v) => s + v, 0),
+    rows: [...atRisk].sort((a, b) => (b.vatMinor ?? 0) - (a.vatMinor ?? 0)),
   };
 }
 

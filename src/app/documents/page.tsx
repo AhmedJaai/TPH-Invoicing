@@ -101,7 +101,7 @@ export default async function DocumentsPage({
       supplierName: suppliers.nameAr,
       invoiceNumber: invoices.invoiceNumber,
       totalMinor: invoices.totalMinor,
-      isTaxValid: invoices.isTaxValid,
+      taxStatus: invoices.taxStatus,
     })
     .from(documents)
     .leftJoin(suppliers, eq(documents.supplierId, suppliers.id))
@@ -249,7 +249,8 @@ export default async function DocumentsPage({
                       {r.invoiceNumber && (
                         <p className="text-[11px] text-muted" dir="ltr">
                           {r.invoiceNumber}
-                          {r.isTaxValid === false && <span className="text-warn"> · لا خصم</span>}
+                          {r.taxStatus === "INVALID" && <span className="text-danger"> · لا خصم</span>}
+                          {r.taxStatus === "UNKNOWN" && <span className="text-warn"> · لم تُقرأ</span>}
                         </p>
                       )}
                     </td>

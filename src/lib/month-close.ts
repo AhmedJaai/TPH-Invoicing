@@ -25,6 +25,8 @@ export interface MonthFacts {
   month: string;
   invoiceCount: number;
   notTaxValidCount: number;
+  /** فواتير لم يُقرأ تفصيلها الضريبي — مجهولة لا غير صالحة */
+  unknownTaxCount: number;
   unpaidCount: number;
   unpaidTotalMinor: number;
   unpostedCount: number;
@@ -89,6 +91,21 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
         : `${facts.documentsNeedingReview} مستند لم يُبتّ فيه`,
     action: facts.documentsNeedingReview === 0 ? undefined : "راجعها وأرشفها أو ارفضها",
   });
+
+  /*
+   * المجهول بند مستقلّ عن غير الصالح.
+   * علاج الأوّل قراءة المستند، وعلاج الثاني مطالبة المورّد ببديل — وخلطهما
+   * يُرسل صاحب العمل إلى المورّد ليطالبه بما لم نقرأه بعد.
+   */
+  if (facts.unknownTaxCount > 0) {
+    items.push({
+      id: "tax-unknown",
+      label: "كل الفواتير قُرئ تفصيلها الضريبي",
+      state: "WARN",
+      detail: `${facts.unknownTaxCount} فاتورة لم يُقرأ تفصيلها الضريبي`,
+      action: "اقرأ محتواها — حالتها مجهولة لا غير صالحة، ولا تُطالِب المورّد قبل ذلك",
+    });
+  }
 
   items.push({
     id: "tax-valid",

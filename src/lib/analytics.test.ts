@@ -198,9 +198,9 @@ describe("أسماء تتكرّر عند مورّدين", () => {
 
 describe("ضريبة المدخلات المعرّضة", () => {
   const rows = [
-    { invoiceId: "1", supplierName: "أ", invoiceNumber: "1", invoiceDate: d("2026-08-01"), vatMinor: 1_500, inputVatEligible: true },
-    { invoiceId: "2", supplierName: "ب", invoiceNumber: "2", invoiceDate: d("2026-08-02"), vatMinor: 3_000, inputVatEligible: false },
-    { invoiceId: "3", supplierName: "ج", invoiceNumber: "3", invoiceDate: d("2026-08-03"), vatMinor: 900, inputVatEligible: false },
+    { invoiceId: "1", supplierName: "أ", invoiceNumber: "1", invoiceDate: d("2026-08-01"), vatMinor: 1_500, inputVatStatus: "ELIGIBLE" as const },
+    { invoiceId: "2", supplierName: "ب", invoiceNumber: "2", invoiceDate: d("2026-08-02"), vatMinor: 3_000, inputVatStatus: "NOT_ELIGIBLE" as const },
+    { invoiceId: "3", supplierName: "ج", invoiceNumber: "3", invoiceDate: d("2026-08-03"), vatMinor: 900, inputVatStatus: "NOT_ELIGIBLE" as const },
   ];
 
   it("تحسب المعرّض والقابل للاسترداد", () => {
@@ -216,7 +216,7 @@ describe("ضريبة المدخلات المعرّضة", () => {
 
   it("تتجاهل ما لا ضريبة فيه", () => {
     expect(vatAtRisk([
-      { invoiceId: "4", supplierName: "د", invoiceNumber: "4", invoiceDate: d("2026-08-01"), vatMinor: 0, inputVatEligible: false },
+      { invoiceId: "4", supplierName: "د", invoiceNumber: "4", invoiceDate: d("2026-08-01"), vatMinor: 0, inputVatStatus: "NOT_ELIGIBLE" as const },
     ]).atRiskCount).toBe(0);
   });
 });
@@ -265,5 +265,45 @@ describe("تغيّر السعر يُقارَن داخل المورّد الوا�
     expect(b.priceChange?.previousMinor).toBe(900);
     const a = items.find((i) => i.supplierName === "أ")!;
     expect(a.priceChange).toBeNull();
+  });
+});
+
+describe("ضريبة معرّضة: المجهول لا يُحسب صفراً", () => {
+  const row = (
+    id: string,
+    vatMinor: number | null,
+    inputVatStatus: "ELIGIBLE" | "NOT_ELIGIBLE" | "UNKNOWN",
+  ) => ({
+    invoiceId: id, supplierName: "أ", invoiceNumber: id,
+    invoiceDate: new Date("2026-08-01T00:00:00Z"), vatMinor, inputVatStatus,
+  });
+
+  it("المجهول يُعدّ على حدة ولا يدخل المعرّض", () => {
+    const v = vatAtRisk([
+      row("a", 1_500, "NOT_ELIGIBLE"),
+      row("b", null, "UNKNOWN"),
+      row("c", null, "UNKNOWN"),
+      row("d", 2_000, "ELIGIBLE"),
+    ]);
+    expect(v.atRiskMinor).toBe(1_500);
+    expect(v.atRiskCount).toBe(1);
+    expect(v.unknownCount).toBe(2);
+    expect(v.recoverableMinor).toBe(2_000);
+  });
+
+  it("كل الفواتير مجهولة ← معرّض صفر، لكن المجهول معلَن لا مخفيّ", () => {
+    const v = vatAtRisk([row("a", null, "UNKNOWN"), row("b", null, "UNKNOWN")]);
+    expect(v.atRiskMinor).toBe(0);
+    expect(v.unknownCount).toBe(2);
+  });
+
+  it("الضريبة الصفرية على فاتورة غير صالحة لا تُعدّ معرّضة — لا شيء يُخسر", () => {
+    const v = vatAtRisk([row("a", 0, "NOT_ELIGIBLE")]);
+    expect(v.atRiskCount).toBe(0);
+  });
+
+  it("يرتّب المعرّض بالأكبر ليُعالَج أوّلاً", () => {
+    const v = vatAtRisk([row("a", 500, "NOT_ELIGIBLE"), row("b", 9_000, "NOT_ELIGIBLE")]);
+    expect(v.rows[0].invoiceNumber).toBe("b");
   });
 });

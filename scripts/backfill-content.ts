@@ -29,6 +29,7 @@ import { walkArchive } from "@/lib/drive-sync";
 import { extractDocument, activeProviderName } from "@/lib/extraction";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import { reviewConfirmed } from "@/lib/confirm";
+import { TAX_STATUS_LABEL } from "@/lib/validation";
 import { normalizeItem } from "@/lib/items";
 import { reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { parseRiyals, formatRiyalsDisplay } from "@/lib/money";
@@ -361,14 +362,14 @@ async function main() {
             vatMinor: extractedVat,
             sellerVat: x.sellerVatNumber || null,
             buyerVat: x.buyerVatNumber || null,
-            isTaxValid: review.isTaxValid,
-            inputVatEligible: review.inputVatEligible,
+            taxStatus: review.taxStatus,
+            inputVatStatus: review.inputVatStatus,
             isFixedAsset: review.isFixedAsset,
             updatedAt: new Date(),
           }).where(eq(invoices.id, invoiceId));
           outcomes.push({
             fileName: t.fileName, status: "updated",
-            detail: `ضريبة ${formatRiyalsDisplay(extractedVat)} · ${review.isTaxValid ? "ضريبية كاملة" : "لا تصلح للخصم"}`,
+            detail: `ضريبة ${formatRiyalsDisplay(extractedVat)} · ${TAX_STATUS_LABEL[review.taxStatus]}`,
           });
         } else if (agrees) {
           // المبلغ متطابق ولا تفصيل ضريبي في المستند — فاتورة مبسّطة غالباً
@@ -377,8 +378,8 @@ async function main() {
             vatMinor: extractedVat ?? 0,
             sellerVat: x.sellerVatNumber || null,
             buyerVat: x.buyerVatNumber || null,
-            isTaxValid: review.isTaxValid,
-            inputVatEligible: review.inputVatEligible,
+            taxStatus: review.taxStatus,
+            inputVatStatus: review.inputVatStatus,
             isFixedAsset: review.isFixedAsset,
             updatedAt: new Date(),
           }).where(eq(invoices.id, invoiceId));
@@ -421,13 +422,14 @@ async function main() {
           invoiceNumber: x.invoiceNumber.trim(),
           invoiceDate: new Date(`${x.invoiceDate}T00:00:00Z`),
           periodMonth: t.month || x.invoiceDate.slice(0, 7),
-          subtotalMinor: extractedSubtotal ?? 0,
-          vatMinor: extractedVat ?? 0,
+          // الفراغ يبقى فراغاً — المجهول لا يصير صفراً
+          subtotalMinor: extractedSubtotal,
+          vatMinor: extractedVat,
           totalMinor: extractedTotal!,
           sellerVat: x.sellerVatNumber || null,
           buyerVat: x.buyerVatNumber || null,
-          isTaxValid: review.isTaxValid,
-          inputVatEligible: review.inputVatEligible,
+          taxStatus: review.taxStatus,
+          inputVatStatus: review.inputVatStatus,
           isFixedAsset: review.isFixedAsset,
         }).onConflictDoNothing().returning({ id: invoices.id });
         invoiceId = inv?.id;

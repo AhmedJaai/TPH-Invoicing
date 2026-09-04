@@ -27,7 +27,10 @@
     "try:statement": "tsx --env-file=.env scripts/try-statement.ts",
     "db:merge": "tsx --env-file=.env scripts/merge-suppliers.ts",
     "db:reprice": "tsx --env-file=.env scripts/recompute-line-pricing.ts",
-    "db:repair-rules": "tsx --env-file=.env scripts/repair-bank-rules.ts"
+    "db:repair-rules": "tsx --env-file=.env scripts/repair-bank-rules.ts",
+    "db:repair": "tsx --env-file=.env scripts/repair-integrity.ts",
+    "db:audit": "tsx --env-file=.env scripts/audit-data.ts",
+    "db:migrate": "tsx --env-file=.env scripts/migrate.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
