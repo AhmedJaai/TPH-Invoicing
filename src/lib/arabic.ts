@@ -65,3 +65,27 @@ export const DOCUMENT: NounForms = {
   many: "مستنداً",
   zero: "لا مستندات",
 };
+
+export const MONTH: NounForms = {
+  one: "شهر واحد",
+  two: "شهران",
+  few: "أشهر",
+  many: "شهراً",
+  zero: "لا أشهر",
+};
+
+export const STATEMENT: NounForms = {
+  one: "كشف واحد",
+  two: "كشفان",
+  few: "كشوف",
+  many: "كشفاً",
+  zero: "لا كشوف",
+};
+
+export const PRODUCT: NounForms = {
+  one: "صنف واحد",
+  two: "صنفان",
+  few: "أصناف",
+  many: "صنفاً",
+  zero: "لا أصناف",
+};

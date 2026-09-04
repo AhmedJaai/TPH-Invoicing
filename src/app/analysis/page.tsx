@@ -19,7 +19,7 @@ export default async function AnalysisPage() {
   if (!user) redirect("/login");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} width="wide" title="تحليل الاستهلاك">
+      <PageShell user={user} width="wide" title="ذكاء الشراء">
         <Empty message="دورك لا يشمل الأرقام المالية، فهذه الصفحة محجوبة عنك." />
       </PageShell>
     );
@@ -58,7 +58,7 @@ export default async function AnalysisPage() {
       <PageShell
         user={user}
        
-        title="تحليل الاستهلاك"
+        title="ذكاء الشراء"
         intro="كل صنف اشتريته: كم مرة طُلب، وبأي كميّة، وكم كلّف، ومن أي مورّد، وكل كم يوم تحتاجه."
       >
         <Empty message="لا توجد بنود فواتير بعد. البنود تُسجَّل عند أرشفة الفواتير — ارفع فاتورة وستظهر هنا." />
@@ -82,7 +82,7 @@ export default async function AnalysisPage() {
     <PageShell
       user={user}
      
-      title="تحليل الاستهلاك"
+      title="ذكاء الشراء"
       intro="كل صنف اشتريته: كم مرة طُلب، وبأي كميّة، وكم كلّف، ومن أي مورّد، وكل كم يوم تحتاجه."
     >
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -151,17 +151,25 @@ export default async function AnalysisPage() {
 
       {dueSoon.length > 0 && (
         <section className="mt-10">
-          <h2 className="mb-1 text-base font-bold">أصناف قارب موعد طلبها</h2>
-          <p className="mb-3 text-xs text-muted">
-            محسوبة من دورة طلبك المعتادة لكل صنف، لا من مخزون — النظام لا يعرف مخزونك.
+          {/*
+            «قارب موعد طلبها» توحي بأنّ النظام يعرف المخزون، وهو لا يعرفه.
+            كلّ ما يعرفه سلوك شرائك: كم يوماً بين طلب وطلب، ومتى كان آخره.
+            فتُقال الملاحظة كما هي، ويُترك الاستنتاج لصاحبها.
+          */}
+          <h2 className="mb-1 font-display text-lg font-bold leading-tight">
+            أصناف مضى على آخر شرائها ما يقارب دورتك المعتادة
+          </h2>
+          <p className="mb-3 max-w-2xl text-xs leading-relaxed text-muted">
+            هذه ليست توصية بإعادة الطلب — النظام لا يعرف مخزونك. هو يعرف كم يوماً يمرّ
+            عادةً بين شرائك للصنف ومتى اشتريتَه آخر مرّة، فيعرض المقارنة وحدها.
           </p>
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {dueSoon.map((x) => (
               <li key={x.item.key} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{x.item.displayName}</span>
-                  <span className="block text-[11px] text-muted">
-                    تطلبه كل {x.cycle} يوماً تقريباً · آخر طلب قبل {x.since} يوماً
+                  <span className="block text-[11px] leading-relaxed text-muted">
+                    عادةً تشتريه كل {x.cycle} يوماً · آخر شراء قبل {x.since} يوماً
                   </span>
                 </span>
                 <span
@@ -169,7 +177,7 @@ export default async function AnalysisPage() {
                     x.since > x.cycle ? "bg-warn-bg text-warn" : "bg-sunken text-ink-soft"
                   }`}
                 >
-                  {x.since > x.cycle ? "تأخّر" : "قارب"}
+                  {x.since > x.cycle ? "تجاوز دورتك" : "بلغ دورتك"}
                 </span>
               </li>
             ))}
@@ -178,9 +186,9 @@ export default async function AnalysisPage() {
       )}
 
       <section className="mt-10">
-        <h2 className="mb-1 text-base font-bold">الأصناف حسب الإنفاق</h2>
-        <p className="mb-3 text-xs text-muted">
-          مرتّبة بالأكثر كلفة — أعلى الصفحة هو ما يستحق التفاوض عليه.
+        <h2 className="mb-1 font-display text-lg font-bold leading-tight">الأصناف حسب الإنفاق</h2>
+        <p className="mb-3 max-w-2xl text-xs leading-relaxed text-muted">
+          مرتّبة بالأكثر كلفة — أعلى الصفحة هو ما يستحقّ التفاوض عليه.
         </p>
         <div className="scroll-x rounded-2xl border border-line shadow-raised">
           <table className="w-full min-w-[46rem] text-sm">

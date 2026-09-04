@@ -93,6 +93,7 @@ export default async function SuppliersPage() {
       <DataTable
         rows={rows}
         keyOf={(r) => r.id}
+        hrefOf={(r) => `/suppliers/${r.slug}`}
         columns={[
           {
             key: "name",
@@ -100,7 +101,9 @@ export default async function SuppliersPage() {
             primary: true,
             cell: (r) => (
               <span>
-                <span className="block font-medium">{r.nameAr}</span>
+                <a href={`/suppliers/${r.slug}`} className="block font-medium hover:underline hover:underline-offset-4">
+                  {r.nameAr}
+                </a>
                 <span className="block font-mono text-[11px] text-muted" dir="ltr">
                   {r.slug}
                   {Number(r.aliasCount) > 0 && ` · ${r.aliasCount} اسم بديل`}
