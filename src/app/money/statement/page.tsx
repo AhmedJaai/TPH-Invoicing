@@ -116,15 +116,15 @@ export default async function FinancialStatementPage() {
         )}
 
         <div className="mt-3 grid grid-cols-3 gap-3">
-          <div className="rounded-xl border border-line bg-raised px-4 py-3">
+          <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
             <p className="text-xs text-muted">الوارد</p>
             <p className="mt-1 text-xl font-bold text-ok"><Money minor={cash.totalInMinor} /></p>
           </div>
-          <div className="rounded-xl border border-line bg-raised px-4 py-3">
+          <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
             <p className="text-xs text-muted">الصادر</p>
             <p className="mt-1 text-xl font-bold text-warn"><Money minor={cash.totalOutMinor} /></p>
           </div>
-          <div className="rounded-xl border border-line bg-raised px-4 py-3">
+          <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
             <p className="text-xs text-muted">الصافي</p>
             <p className={`mt-1 text-xl font-bold ${cash.netMinor >= 0 ? "text-ok" : "text-danger"}`}>
               <Money minor={cash.netMinor} />
@@ -133,9 +133,9 @@ export default async function FinancialStatementPage() {
         </div>
 
         {cash.months.length > 0 && (
-          <div className="mt-3 overflow-x-auto rounded-xl border border-line">
+          <div className="mt-3 scroll-x rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[32rem] text-sm">
-              <thead className="bg-sunken text-xs text-muted">
+              <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
                   <th className="px-3 py-2 text-right font-medium">الشهر</th>
                   <th className="px-3 py-2 text-right font-medium">وارد</th>
@@ -166,7 +166,7 @@ export default async function FinancialStatementPage() {
         <p className="mt-1 text-xs leading-relaxed text-muted">
           ناقصةٌ معلَنة. ينقصها: {pl.missing.join(" · ")} — ولن تُعرض بأرقام مقدَّرة.
         </p>
-        <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+        <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
           {pl.lines.map((l) => (
             <li key={l.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
               <span className="min-w-0">
@@ -200,9 +200,9 @@ export default async function FinancialStatementPage() {
             <Empty message="لا مصروفات متكرّرة مسجّلة ولا حركات مصنَّفة بعد." />
           </div>
         ) : (
-          <div className="mt-3 overflow-x-auto rounded-xl border border-line">
+          <div className="mt-3 scroll-x rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[34rem] text-sm">
-              <thead className="bg-sunken text-xs text-muted">
+              <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
                   <th className="px-3 py-2 text-right font-medium">البند</th>
                   <th className="px-3 py-2 text-right font-medium">المتوقَّع شهرياً</th>

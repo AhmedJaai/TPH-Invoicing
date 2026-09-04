@@ -39,7 +39,7 @@ export default async function AttentionPage() {
       {money.length > 0 && (
         <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {money.map((m) => (
-            <div key={m.kind} className="rounded-xl border border-line bg-raised px-4 py-3">
+            <div key={m.kind} className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
               <p className="text-xs text-muted">{IMPACT_LABEL[m.kind]}</p>
               <p className="mt-1.5 text-xl font-bold leading-none">
                 <Money minor={m.amountMinor} />

@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "warn" }) {
   return (
-    <div className="rounded-xl border border-line bg-raised px-4 py-3">
+    <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
       <p className="text-xs text-muted">{label}</p>
       <p className={`nums mt-1 text-xl font-bold ${tone === "warn" ? "text-warn" : ""}`}>{value}</p>
     </div>
@@ -78,7 +78,7 @@ export default async function Home() {
 
         <section className="mt-10">
           <h2 className="mb-3 text-sm font-bold">الموردون المسجّلون</h2>
-          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {rows.map((s) => (
               <li key={s.slug} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <span className="min-w-0 truncate text-sm">{s.nameAr}</span>

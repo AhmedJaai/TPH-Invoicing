@@ -263,9 +263,9 @@ export default async function DocumentsPage({
           />
         </div>
       ) : (
-        <div className="mt-3 overflow-x-auto rounded-xl border border-line">
+        <div className="mt-3 scroll-x rounded-2xl border border-line shadow-raised">
           <table className="w-full min-w-[46rem] text-sm">
-            <thead className="bg-sunken text-xs text-muted">
+            <thead className="sticky top-0 bg-sunken text-xs text-muted">
               <tr>
                 <th className="px-3 py-2 text-right font-medium">الملف</th>
                 <th className="px-3 py-2 text-right font-medium">النوع</th>

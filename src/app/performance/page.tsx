@@ -76,7 +76,7 @@ export default async function PerformancePage() {
       intro="ما تدعمه بياناتك الموجودة: الأصناف وأسعارها ومورّدوها. وما يحتاج مبيعات — الهامش والتكلفة — مذكور صراحةً أنّه غير متاح."
     >
       {/* ── ما هو غير متاح، صراحةً ── */}
-      <div className="rounded-xl border border-dashed border-line px-4 py-3">
+      <div className="rounded-2xl border border-dashed border-line px-4 py-3">
         <p className="text-xs leading-relaxed text-muted">
           <span className="font-bold text-ink-soft">غير متاح بعد: </span>
           هامش الربح · تكلفة المبيعات · ربحية الصنف · متوسّط الفاتورة — كلّها تحتاج مصدر
@@ -91,21 +91,21 @@ export default async function PerformancePage() {
       )}
 
       <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">أصناف مختلفة</p>
           <p className="nums mt-1 text-xl font-bold">{items.length}</p>
         </div>
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">مشتريات محسوبة بالبنود</p>
           <p className="mt-1 text-xl font-bold"><Money minor={totalSpend} /></p>
         </div>
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">أسعار تحرّكت</p>
           <p className={`nums mt-1 text-xl font-bold ${priceMoves.length ? "text-warn" : ""}`}>
             {priceMoves.length}
           </p>
         </div>
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">أسماء تتكرّر عند مورّدين</p>
           <p className="nums mt-1 text-xl font-bold">{sameName.length}</p>
         </div>
@@ -118,9 +118,9 @@ export default async function PerformancePage() {
             سعر الوحدة في آخر فاتورة مقابل السعر الذي قبله — عند المورّد نفسه، وبعد
             الخصم والضريبة لا قبلهما.
           </p>
-          <div className="overflow-x-auto rounded-xl border border-line">
+          <div className="scroll-x rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[38rem] text-sm">
-              <thead className="bg-sunken text-xs text-muted">
+              <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
                   <th className="px-3 py-2 text-right font-medium">الصنف</th>
                   <th className="px-3 py-2 text-right font-medium">السابق</th>
@@ -164,9 +164,9 @@ export default async function PerformancePage() {
         {items.length === 0 ? (
           <Empty message="لا بنود بعد. البنود تُسجَّل عند قراءة محتوى الفواتير." />
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-line">
+          <div className="scroll-x rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[40rem] text-sm">
-              <thead className="bg-sunken text-xs text-muted">
+              <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
                   <th className="px-3 py-2 text-right font-medium">الصنف</th>
                   <th className="px-3 py-2 text-right font-medium">المورّد</th>

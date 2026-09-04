@@ -130,7 +130,7 @@ export default async function SettingsPage() {
         <p className="mb-3 text-xs leading-relaxed text-muted">
           ما ليس موصولاً يُقال عنه ذلك، ولا يُملأ بصفر ولا ببيانات وهمية.
         </p>
-        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+        <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
           {health.metrics.map((m) => (
             <li key={m.id} className="px-4 py-2.5">
               <div className="flex items-center justify-between gap-3">

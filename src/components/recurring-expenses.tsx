@@ -67,7 +67,7 @@ export function RecurringExpenses({ rows }: { rows: ExpenseRow[] }) {
     <div>
       {rows.length > 0 && (
         <>
-          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {rows.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <span className="min-w-0">
@@ -99,7 +99,7 @@ export function RecurringExpenses({ rows }: { rows: ExpenseRow[] }) {
         </>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-raised p-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-raised shadow-raised p-3">
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}

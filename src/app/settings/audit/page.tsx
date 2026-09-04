@@ -103,7 +103,7 @@ export default async function AuditTrailPage({
       {rows.length === 0 ? (
         <Empty message="لا سجلات بعد." />
       ) : (
-        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+        <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
           {rows.map((r) => (
             <li key={r.id} className="px-4 py-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">

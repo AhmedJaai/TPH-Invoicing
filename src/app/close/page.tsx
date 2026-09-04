@@ -68,7 +68,7 @@ export default async function ClosePage() {
       {closed.length > 0 && (
         <section className="mt-10">
           <h2 className="mb-3 text-sm font-bold">أشهر مقفلة</h2>
-          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {closed.map((c) => (
               <li key={c.month} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                 <span className="nums font-medium" dir="ltr">{c.month}</span>

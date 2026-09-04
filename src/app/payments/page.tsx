@@ -81,25 +81,25 @@ export default async function PaymentsPage({
       intro="مستحقّات الشهر المنقضي مورّداً مورّداً. ما ليس فاتورة ضريبية كاملة يُحجز — السداد قبل الحصول عليها يفقدك ورقة التفاوض الوحيدة."
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">جاهز للتحويل</p>
           <p className="mt-1 text-xl font-bold text-ok"><Money minor={run.readyTotalMinor} /></p>
           <p className="mt-1 text-[11px] text-muted">{run.ready.length} مورّد</p>
         </div>
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">محجوز</p>
           <p className={`mt-1 text-xl font-bold ${run.held.length ? "text-warn" : ""}`}>
             <Money minor={run.heldTotalMinor} />
           </p>
           <p className="mt-1 text-[11px] text-muted">{run.held.length} فاتورة</p>
         </div>
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">ضريبة معرّضة</p>
           <p className={`mt-1 text-xl font-bold ${run.vatAtRiskMinor ? "text-danger" : ""}`}>
             <Money minor={run.vatAtRiskMinor} />
           </p>
         </div>
-        <div className="flex items-center rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="flex items-center rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           {run.ready.length > 0 ? (
             <a
               href={`/api/payment-run?month=${month}`}
@@ -124,7 +124,7 @@ export default async function PaymentsPage({
           <h2 className="mb-3 text-base font-bold">جاهز للاعتماد</h2>
           <div className="space-y-3">
             {run.ready.map((s) => (
-              <article key={s.supplierId} className="rounded-xl border border-line bg-raised p-4">
+              <article key={s.supplierId} className="rounded-2xl border border-line bg-raised shadow-raised p-4">
                 <div className="flex items-baseline justify-between gap-3">
                   <h3 className="text-sm font-bold">{s.supplierName}</h3>
                   <span className="text-base font-bold"><Money minor={s.totalMinor} /></span>

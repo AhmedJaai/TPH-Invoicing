@@ -23,6 +23,15 @@
   --warn-bg: #fffaeb;
   --danger: #b42318;
   --danger-bg: #fef3f2;
+
+  /*
+   * الارتفاع بالظلّ لا باللون.
+   * البطاقة على أرضية بيضاء لا يفصلها عنها إلّا حدّ رمادي باهت، فتبدو
+   * الشاشة مسطّحةً كجدول. وظلٌّ خفيف يُنشئ الطبقة دون أن يكسر التقشّف.
+   */
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.06);
+  --shadow-lifted: 0 2px 4px rgb(0 0 0 / 0.05), 0 4px 12px rgb(0 0 0 / 0.08);
+  --ring: color-mix(in oklab, var(--ink) 22%, transparent);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -44,6 +53,11 @@
     --warn-bg: #2e1f05;
     --danger: #f87171;
     --danger-bg: #2e0f0d;
+
+    /* في الظلام لا يُرى الظلّ — فالطبقة تُصنع بالحدّ والأرضية */
+    --shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.02);
+    --shadow-lifted: 0 4px 16px rgb(0 0 0 / 0.5);
+    --ring: color-mix(in oklab, var(--ink) 35%, transparent);
   }
 }
 
@@ -68,6 +82,9 @@
   --color-warn-bg: var(--warn-bg);
   --color-danger: var(--danger);
   --color-danger-bg: var(--danger-bg);
+
+  --shadow-raised: var(--shadow-raised);
+  --shadow-lifted: var(--shadow-lifted);
 }
 
 html {
@@ -109,4 +126,53 @@ body {
     width: 100%;
     opacity: 0.4;
   }
+}
+
+
+/*
+ * حلقة التركيز ظاهرة دائماً لمن يتنقّل بلوحة المفاتيح.
+ * `outline: none` بلا بديل يجعل التطبيق غير قابل للاستعمال بلا فأرة.
+ */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+/*
+ * الجدول الذي يفيض عرضاً يُمرَّر داخل إطاره، ولا يُمرَّر الصفحةَ كلَّها.
+ * وحافّة متدرّجة تدلّ على أنّ وراءه مزيداً — وإلّا ظنّه القارئ منتهياً.
+ */
+.scroll-x {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* السطر يُقصّ عند حدّه ولا يمدّ البطاقة */
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/*
+ * هيكل الانتظار: يدلّ على أنّ شيئاً قادم وأين سيقع، بلا نسبة مئوية
+ * مخترَعة. والنسبة الكاذبة أسوأ من غيابها.
+ */
+@keyframes shimmer {
+  0% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+  100% { opacity: 0.55; }
+}
+
+.skeleton {
+  background: var(--sunken);
+  border-radius: 0.5rem;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
 }

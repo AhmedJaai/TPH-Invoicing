@@ -31,7 +31,7 @@ const SEVERITY_TEXT: Record<InsightSeverity, string> = {
 function Kpi({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: string; tone?: "warn" | "danger" | "ok" }) {
   const cls = tone === "warn" ? "text-warn" : tone === "danger" ? "text-danger" : tone === "ok" ? "text-ok" : "";
   return (
-    <div className="rounded-xl border border-line bg-raised px-4 py-3.5">
+    <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3.5">
       <p className="text-xs text-muted">{label}</p>
       <p className={`mt-1.5 text-2xl font-bold leading-none ${cls}`}>{value}</p>
       {sub && <p className="mt-1.5 text-[11px] leading-relaxed text-muted">{sub}</p>}
@@ -352,7 +352,7 @@ export default async function DashboardPage() {
       <div className="mt-10 grid gap-8 lg:grid-cols-2">
         <section>
           <h2 className="mb-3 text-base font-bold">المصروف الشهري</h2>
-          <div className="space-y-3 rounded-xl border border-line bg-raised p-4">
+          <div className="space-y-3 rounded-2xl border border-line bg-raised shadow-raised p-4">
             {monthly.map((m) => (
               <Bar key={m.month} label={m.month} value={m.totalMinor} max={maxMonth} note={`${m.invoiceCount} فاتورة`} />
             ))}
@@ -361,7 +361,7 @@ export default async function DashboardPage() {
 
         <section>
           <h2 className="mb-3 text-base font-bold">أعلى المورّدين</h2>
-          <div className="space-y-3 rounded-xl border border-line bg-raised p-4">
+          <div className="space-y-3 rounded-2xl border border-line bg-raised shadow-raised p-4">
             {topSuppliers.map(([name, total]) => (
               <Bar key={name} label={name} value={total} max={maxSupplier} />
             ))}
@@ -373,9 +373,9 @@ export default async function DashboardPage() {
         <section className="mt-10">
           <h2 className="mb-1 text-base font-bold">أعمار الذمم</h2>
           <p className="mb-3 text-xs text-muted">المستحقّ لكل مورّد موزّعاً على عمر الدين.</p>
-          <div className="overflow-x-auto rounded-xl border border-line">
+          <div className="scroll-x rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[38rem] text-sm">
-              <thead className="bg-sunken text-xs text-muted">
+              <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
                   <th className="px-3 py-2 text-right font-medium">المورّد</th>
                   <th className="px-3 py-2 text-right font-medium">أقل من ٣٠</th>

@@ -4,7 +4,9 @@ import { db } from "@/db";
 import { suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
-import { Empty, Money, PageShell } from "@/components/page-shell";
+import { PageShell } from "@/components/page-shell";
+import { Money } from "@/components/money";
+import { Badge, DataTable, EmptyState, LinkButton } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +55,11 @@ export default async function SuppliersPage() {
   if (rows.length === 0) {
     return (
       <PageShell user={user} width="wide" title="المورّدون">
-        <Empty message="لا مورّدين بعد. شغّل npm run db:seed لتأسيس السجل." />
+        <EmptyState
+          title="لا مورّدين بعد."
+          hint="يُنشَأ المورّد تلقائياً حين تُقرأ أوّل فاتورة منه — أو أضفه بنفسك من الإعدادات."
+          action={<LinkButton href="/settings" variant="primary">أضف مورّداً</LinkButton>}
+        />
       </PageShell>
     );
   }
@@ -73,7 +79,7 @@ export default async function SuppliersPage() {
       intro="سجلّ كل مورّد: بياناته الضريبية، ودورة فوترته، وما فُوتر وما سُدّد، والأسماء البديلة التي يُعرف بها في البنك."
     >
       {needAttention.length > 0 && (
-        <div className="mb-6 rounded-xl border border-warn/40 bg-warn-bg p-4">
+        <div className="mb-6 rounded-2xl border border-warn/40 bg-warn-bg p-4 shadow-raised sm:p-5">
           <h2 className="text-sm font-bold text-warn">
             {needAttention.length} مورّد يحتاج عقد توريد
           </h2>
@@ -84,66 +90,95 @@ export default async function SuppliersPage() {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-line">
-        <table className="w-full min-w-[44rem] text-sm">
-          <thead className="bg-sunken text-xs text-muted">
-            <tr>
-              <th className="px-3 py-2 text-right font-medium">المورّد</th>
-              <th className="px-3 py-2 text-right font-medium">التصنيف</th>
-              <th className="px-3 py-2 text-right font-medium">الرقم الضريبي</th>
-              <th className="px-3 py-2 text-right font-medium">الفواتير</th>
-              {showAmounts && <th className="px-3 py-2 text-right font-medium">المفوتر</th>}
-              {showAmounts && <th className="px-3 py-2 text-right font-medium">الرصيد</th>}
-              <th className="px-3 py-2 text-right font-medium">الكشوف</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line bg-raised">
-            {rows.map((r) => {
-              const balance = Number(r.billedMinor) - Number(r.paidMinor);
-              return (
-                <tr key={r.id}>
-                  <td className="px-3 py-2.5">
-                    <p className="font-medium">{r.nameAr}</p>
-                    <p className="font-mono text-[11px] text-muted" dir="ltr">
-                      {r.slug}
-                      {Number(r.aliasCount) > 0 && ` · ${r.aliasCount} اسم بديل`}
-                    </p>
-                    {!r.issuesInvoices && (
-                      <span className="mt-1 inline-block rounded-full bg-warn-bg px-2 py-0.5 text-[10px] font-bold text-warn">
-                        بلا فواتير
+      <DataTable
+        rows={rows}
+        keyOf={(r) => r.id}
+        columns={[
+          {
+            key: "name",
+            header: "المورّد",
+            primary: true,
+            cell: (r) => (
+              <span>
+                <span className="block font-medium">{r.nameAr}</span>
+                <span className="block font-mono text-[11px] text-muted" dir="ltr">
+                  {r.slug}
+                  {Number(r.aliasCount) > 0 && ` · ${r.aliasCount} اسم بديل`}
+                </span>
+                {!r.issuesInvoices && (
+                  <span className="mt-1 inline-block">
+                    <Badge tone="warn">بلا فواتير</Badge>
+                  </span>
+                )}
+              </span>
+            ),
+          },
+          {
+            key: "category",
+            header: "التصنيف",
+            secondary: true,
+            cell: (r) => <span className="text-ink-soft">{CATEGORY[r.category] ?? r.category}</span>,
+          },
+          {
+            key: "vat",
+            header: "الرقم الضريبي",
+            secondary: true,
+            cell: (r) =>
+              r.vatNumber ? (
+                <span className="nums" dir="ltr">{r.vatNumber}</span>
+              ) : (
+                <span className="text-warn">ناقص</span>
+              ),
+          },
+          {
+            key: "invoices",
+            header: "الفواتير",
+            align: "end",
+            cell: (r) => <span className="nums">{r.invoiceCount}</span>,
+          },
+          ...(showAmounts
+            ? [
+                {
+                  key: "billed",
+                  header: "المفوتر",
+                  align: "end" as const,
+                  cell: (r: (typeof rows)[number]) => <Money minor={Number(r.billedMinor)} />,
+                },
+                {
+                  key: "balance",
+                  header: "الرصيد",
+                  align: "end" as const,
+                  cell: (r: (typeof rows)[number]) => {
+                    const balance = Number(r.billedMinor) - Number(r.paidMinor);
+                    return (
+                      <span className="font-bold">
+                        <Money minor={balance} tone={balance > 0 ? "warn" : "ok"} />
                       </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-ink-soft">{CATEGORY[r.category] ?? r.category}</td>
-                  <td className="px-3 py-2.5">
-                    {r.vatNumber ? (
-                      <span className="nums text-xs" dir="ltr">{r.vatNumber}</span>
-                    ) : (
-                      <span className="text-xs text-warn">ناقص</span>
-                    )}
-                  </td>
-                  <td className="nums px-3 py-2.5">{r.invoiceCount}</td>
-                  {showAmounts && (
-                    <td className="px-3 py-2.5"><Money minor={Number(r.billedMinor)} /></td>
-                  )}
-                  {showAmounts && (
-                    <td className="px-3 py-2.5 font-medium">
-                      <Money minor={balance} tone={balance > 0 ? "warn" : "ok"} />
-                    </td>
-                  )}
-                  <td className="px-3 py-2.5">
-                    {Number(r.statementCount) > 0 ? (
-                      <span className="nums text-xs">{r.statementCount}</span>
-                    ) : (
-                      <span className="text-xs text-warn">لا كشوف</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                    );
+                  },
+                },
+              ]
+            : []),
+          {
+            key: "statements",
+            header: "الكشوف",
+            align: "end",
+            cell: (r) =>
+              Number(r.statementCount) > 0 ? (
+                <span className="nums">{r.statementCount}</span>
+              ) : (
+                <span className="text-warn">لا كشوف</span>
+              ),
+          },
+        ]}
+        empty={
+          <EmptyState
+            title="لا مورّدين بعد."
+            hint="يُنشَأ المورّد تلقائياً حين تُقرأ أوّل فاتورة منه، أو أضفه من الإعدادات."
+            action={<LinkButton href="/settings" variant="primary">أضف مورّداً</LinkButton>}
+          />
+        }
+      />
 
       {!showAmounts && (
         <p className="mt-4 text-xs text-muted">

@@ -11,6 +11,51 @@ interface Response {
   error?: string;
 }
 
+function ChecksSummary({
+  items,
+  canClose,
+  month,
+}: {
+  items: readonly { state: "PASS" | "WARN" | "BLOCK" }[];
+  canClose: boolean;
+  month: string;
+}) {
+  const passed = items.filter((i) => i.state === "PASS").length;
+  const blocks = items.filter((i) => i.state === "BLOCK").length;
+  const warns = items.filter((i) => i.state === "WARN").length;
+
+  return (
+    <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
+      <p className="text-xs text-muted">إقفال {month}</p>
+      <p className="mt-1.5 font-display text-2xl font-bold leading-none">
+        {canClose ? "جاهز للإقفال" : "لا يمكن الإقفال بعد"}
+      </p>
+      <p className="nums mt-2.5 text-sm font-bold">
+        {passed} من {items.length} فحصاً اجتاز
+      </p>
+
+      <div className="mt-3 flex gap-1" aria-hidden>
+        {items.map((i, n) => (
+          <span
+            key={n}
+            className={`h-1.5 flex-1 rounded-full ${
+              i.state === "PASS" ? "bg-ok" : i.state === "WARN" ? "bg-warn" : "bg-danger"
+            }`}
+          />
+        ))}
+      </div>
+
+      <p className="mt-2.5 text-[11px] leading-relaxed text-muted">
+        {blocks > 0
+          ? `${blocks} مانعاً يجب حلّه، و${warns} تنبيهاً لا يمنع.`
+          : warns > 0
+            ? `لا مانع. و${warns} تنبيهاً ستُقرّ بها عند الإقفال.`
+            : "لا مانع ولا تنبيه."}
+      </p>
+    </div>
+  );
+}
+
 const STATE_STYLE: Record<CheckItem["state"], { icon: string; box: string; text: string }> = {
   PASS: { icon: "✓", box: "border-line bg-raised", text: "text-ok" },
   WARN: { icon: "!", box: "border-warn/40 bg-warn-bg", text: "text-warn" },
@@ -106,11 +151,18 @@ export function MonthClose({
 
       {report && (
         <>
+          {/*
+            رأسٌ يجيب السؤال قبل القائمة.
+            قائمةٌ من ثمانية بنود لا تقول «هل أقفل أم لا» إلّا بعد قراءتها
+            كلّها. والعدد يقولها في سطر، ثمّ تُقرأ التفاصيل عند الحاجة.
+          */}
+          <ChecksSummary items={report.items} canClose={report.canClose} month={month} />
+
           <ul className="space-y-2">
             {report.items.map((i) => {
               const st = STATE_STYLE[i.state];
               return (
-                <li key={i.id} className={`rounded-xl border p-3.5 ${st.box}`}>
+                <li key={i.id} className={`rounded-2xl border p-3.5 shadow-raised sm:p-4 ${st.box}`}>
                   <div className="flex items-start gap-2.5">
                     <span className={`shrink-0 text-sm font-bold ${st.text}`}>{st.icon}</span>
                     <div className="min-w-0 flex-1">
@@ -130,7 +182,7 @@ export function MonthClose({
           </ul>
 
           {!isClosed && (
-            <div className="rounded-xl border border-line bg-raised p-4">
+            <div className="rounded-2xl border border-line bg-raised shadow-raised p-4">
               {report.canClose ? (
                 <>
                   <p className="text-sm font-bold">
@@ -177,7 +229,7 @@ export function MonthClose({
           )}
 
           {isClosed && (
-            <div className="rounded-xl border border-line bg-raised p-4">
+            <div className="rounded-2xl border border-line bg-raised shadow-raised p-4">
               <p className="text-sm font-bold">هذا الشهر مقفل.</p>
               <p className="mt-1 text-xs leading-relaxed text-ink-soft">
                 الأرشفة ترفض إضافة مستند إليه. إن وصلتك فاتورة متأخّرة تخصّه، أعد فتحه —

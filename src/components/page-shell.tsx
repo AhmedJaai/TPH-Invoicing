@@ -41,9 +41,12 @@ export function PageShell({
     <div className="min-h-screen">
       <TrialBanner />
       <header className="sticky top-0 z-20 border-b border-line bg-surface/85 backdrop-blur-md">
-        <div className={`mx-auto ${w} px-5 py-3`}>
+        <div className={`mx-auto ${w} px-4 py-3 sm:px-6`}>
           <div className="flex items-center justify-between gap-4">
-            <Link href="/" className="truncate font-display text-base font-bold leading-tight">
+            <Link
+              href="/"
+              className="truncate font-display text-base font-bold leading-tight tracking-tight"
+            >
               ذا بوبليك هاوس
             </Link>
             <div className="flex items-center gap-2">
@@ -58,15 +61,19 @@ export function PageShell({
       </header>
 
       {/* الحشو السفليّ يُخلي مكان الشريط السفليّ على الجوّال */}
-      <main className={`mx-auto ${w} px-5 pb-28 pt-8 sm:pb-16`}>
+      <main className={`mx-auto ${w} px-4 pb-28 pt-7 sm:px-6 sm:pb-16 sm:pt-10`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="font-display text-2xl font-black leading-tight sm:text-3xl">{title}</h1>
-            {intro && <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">{intro}</p>}
+            <h1 className="font-display text-[1.65rem] font-black leading-[1.15] tracking-tight sm:text-4xl">
+              {title}
+            </h1>
+            {intro && (
+              <p className="mt-2.5 max-w-2xl text-sm leading-relaxed text-ink-soft">{intro}</p>
+            )}
           </div>
           {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
         </div>
-        <div className="mt-7">{children}</div>
+        <div className="mt-7 sm:mt-8">{children}</div>
       </main>
 
       {/* خارج الترويسة عمداً: `backdrop-blur` عليها يحبس `fixed` داخلها */}

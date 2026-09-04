@@ -1,5 +1,6 @@
 "use client";
 
+
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -47,7 +48,7 @@ export interface SupplierOption {
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" | "danger" }) {
   const cls = tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : tone === "danger" ? "text-danger" : "";
   return (
-    <div className="rounded-xl border border-line bg-raised px-3 py-2.5">
+    <div className="rounded-2xl border border-line bg-raised shadow-raised px-3 py-2.5">
       <p className="text-[11px] text-muted">{label}</p>
       <p className={`nums mt-0.5 text-lg font-bold ${cls}`}>{value}</p>
     </div>
@@ -213,7 +214,6 @@ export function BankImport({
   }, [router]);
 
   const markPaid = useCallback(async () => {
-    if (!confirm(`سيُعتبر كل ما تبقّى مفتوحاً (${openInvoiceCount} فاتورة) مسدَّداً، ويُسجَّل ذلك باسمك في سجل التدقيق. متابعة؟`)) return;
     setMarking(true);
     setMarkResult(null);
     try {
@@ -230,7 +230,7 @@ export function BankImport({
     } finally {
       setMarking(false);
     }
-  }, [openInvoiceCount, router]);
+  }, [router]);
 
   return (
     <div className="space-y-8">
@@ -266,7 +266,7 @@ export function BankImport({
         {done && <p className="mt-3 rounded-lg bg-ok-bg px-3 py-2 text-xs font-bold text-ok">✓ {done}</p>}
 
         {data && (
-          <div className="mt-4 rounded-xl border border-line bg-raised p-4">
+          <div className="mt-4 rounded-2xl border border-line bg-raised shadow-raised p-4">
             <p className="text-xs text-muted">
               {data.summary.bank} · حساب {data.summary.accountNumber ?? "—"} ·{" "}
               {data.summary.periodStart} إلى {data.summary.periodEnd}

@@ -96,11 +96,11 @@ export function StatementReconcile({
         </p>
 
         {archived.length === 0 ? (
-          <p className="mt-3 rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs text-muted">
+          <p className="mt-3 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-xs text-muted">
             لا كشوف مؤرشفة بعد. ارفع كشف المورّد من الصفحة الرئيسية أوّلاً.
           </p>
         ) : (
-          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {archived.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
                 <span className="min-w-0">

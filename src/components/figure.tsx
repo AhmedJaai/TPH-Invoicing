@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Money } from "./money";
+import { TONE_TEXT, type Tone } from "./ui";
 import type { Provenance } from "@/lib/provenance";
 
 /**
@@ -28,30 +29,28 @@ export function Figure({
   value?: React.ReactNode;
   unit?: string;
   href?: string;
-  tone?: "warn" | "danger" | "ok" | "muted";
-  note?: string;
+  tone?: Tone;
+  note?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
 
-  const cls =
-    tone === "warn" ? "text-warn" : tone === "danger" ? "text-danger"
-    : tone === "ok" ? "text-ok" : tone === "muted" ? "text-muted" : "";
-
+  const cls = tone ? TONE_TEXT[tone] : "";
   const shown = value ?? (provenance ? <Money minor={provenance.valueMinor} /> : "—");
+  const big = `nums font-display text-2xl font-bold leading-none sm:text-[1.75rem] ${cls}`;
 
   return (
-    <div className="rounded-xl border border-line bg-raised px-4 py-3.5">
-      <p className="text-xs text-muted">{label}</p>
+    <div className="rounded-2xl border border-line bg-raised px-4 py-3.5 shadow-raised sm:px-5 sm:py-4">
+      <p className="text-[11px] font-medium text-muted">{label}</p>
 
       {href ? (
-        <Link href={href} className={`mt-1.5 block text-2xl font-bold leading-none ${cls} hover:underline hover:underline-offset-4`}>
+        <Link href={href} className={`mt-2 block ${big} transition-opacity hover:opacity-70`}>
           {shown}
         </Link>
       ) : (
-        <p className={`mt-1.5 text-2xl font-bold leading-none ${cls}`}>{shown}</p>
+        <p className={`mt-2 ${big}`}>{shown}</p>
       )}
 
-      {note && <p className="mt-1.5 text-[11px] leading-relaxed text-muted">{note}</p>}
+      {note && <p className="mt-2 text-[11px] leading-relaxed text-muted">{note}</p>}
 
       {provenance && (
         <>

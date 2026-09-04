@@ -206,7 +206,7 @@ export function ProductMapping({
             «عنب» عند المحمصة الغربية كيلو بنّ، وعند لافا زجاجة كمبوتشا. فما يُضعف
             الاقتراح معروض معه.
           </p>
-          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {suggestionGroups.map((g) => (
               <LinkRow
                 key={g.s.normalized}
@@ -227,11 +227,11 @@ export function ProductMapping({
           ما اشتريتَه من مورّدين مختلفين تحت شيء واحد.
         </p>
         {singles.length === 0 ? (
-          <p className="mt-3 rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs text-ok">
+          <p className="mt-3 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-xs text-ok">
             كل الأصناف مربوطة.
           </p>
         ) : (
-          <ul className="mt-3 max-h-[36rem] divide-y divide-line overflow-y-auto rounded-xl border border-line bg-raised">
+          <ul className="mt-3 max-h-[36rem] divide-y divide-line overflow-y-auto rounded-2xl border border-line bg-raised shadow-raised">
             {singles.slice(0, 60).map((r) => (
               <LinkRow key={r.id} items={[r]} products={products} onDone={() => onDone([r.id])} />
             ))}
@@ -247,7 +247,7 @@ export function ProductMapping({
       {mapped.length > 0 && (
         <section>
           <h2 className="text-base font-bold">مربوطة ({mapped.length})</h2>
-          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {mapped.slice(0, 40).map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-3 px-3 py-2">
                 <span className="min-w-0">

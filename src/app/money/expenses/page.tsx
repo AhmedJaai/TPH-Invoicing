@@ -187,9 +187,9 @@ export default async function ExpensesPage({
         {variance.length === 0 ? (
           <Empty message="لا بيانات لهذا الشهر." />
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-line">
+          <div className="scroll-x rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[34rem] text-xs">
-              <thead className="bg-sunken text-muted">
+              <thead className="sticky top-0 bg-sunken text-muted">
                 <tr>
                   <th className="px-3 py-2 text-start font-medium">الباب</th>
                   <th className="px-3 py-2 text-end font-medium">المتوقَّع</th>
@@ -229,7 +229,7 @@ export default async function ExpensesPage({
         {actual.length === 0 ? (
           <Empty message="لا قيود في هذا الشهر." />
         ) : (
-          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {actual.map((e) => (
               <li key={e.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <span className="min-w-0">
@@ -265,7 +265,7 @@ function Box({
 }) {
   const cls = tone === "warn" ? "text-warn" : tone === "ok" ? "text-ok" : tone === "muted" ? "text-muted" : "";
   return (
-    <div className="rounded-xl border border-line bg-raised px-4 py-3.5">
+    <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3.5">
       <p className="text-xs text-muted">{label}</p>
       <p className={`mt-1.5 text-2xl font-bold leading-none ${cls}`}><Money minor={minor} /></p>
       {note && <p className="mt-1.5 text-[11px] text-muted">{note}</p>}

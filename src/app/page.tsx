@@ -5,7 +5,9 @@ import { db } from "@/db";
 import { invoices, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
-import { Money, PageShell } from "@/components/page-shell";
+import { PageShell } from "@/components/page-shell";
+import { Money } from "@/components/money";
+import { Card, LinkButton, Section, StatGrid } from "@/components/ui";
 import { AttentionList } from "@/components/attention-list";
 import { buildAttention, countBySeverity } from "@/lib/attention";
 import { gatherAttentionFacts } from "@/lib/attention-facts";
@@ -29,14 +31,14 @@ function Bar({ label, value, max, note }: { label: string; value: number; max: n
   const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-3 text-xs">
-        <span className="min-w-0 truncate">{label}</span>
-        <span className="shrink-0 font-medium"><Money minor={value} /></span>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="min-w-0 truncate text-xs font-medium">{label}</span>
+        <span className="nums shrink-0 text-xs font-bold"><Money minor={value} /></span>
       </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-sunken">
-        <div className="h-full rounded-full bg-ink" style={{ width: `${pct}%` }} />
+      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-sunken">
+        <div className="h-full rounded-full bg-ink transition-all" style={{ width: `${pct}%` }} />
       </div>
-      {note && <p className="mt-0.5 text-[10px] text-muted">{note}</p>}
+      {note && <p className="mt-1 text-[10px] text-muted">{note}</p>}
     </div>
   );
 }
@@ -97,7 +99,7 @@ export default async function HomePage() {
       intro="ما تحتاج معرفته أو فعله اليوم — لا ما في قاعدة البيانات من سجلات."
     >
       {/* ── الأرقام ── */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <StatGrid>
         {/*
           المبيعات وهامش الربح يحتاجان مصدر مبيعات لم يُوصَل بعد.
           صفرٌ هنا يوحي بأنّ المقهى لم يبع شيئاً — والفراغ الصادق خير منه.
@@ -130,31 +132,32 @@ export default async function HomePage() {
           href="/attention"
           note="من فواتير مستوفية الأركان وحدها"
         />
-      </div>
+      </StatGrid>
 
       {/* ── ما يحتاج انتباهك ── */}
-      <section className="mt-10">
-        <div className="mb-3 flex items-baseline justify-between gap-3">
-          <h2 className="text-base font-bold">
-            {attention.length === 0
-              ? "لا شيء يحتاج انتباهك"
-              : `${attention.length} أمراً يحتاج انتباهك`}
-          </h2>
-          {attention.length > 0 && (
-            <Link href="/attention" className="text-xs underline underline-offset-4 hover:text-ink">
-              اعرضها كلّها ({counts.CRITICAL} حرج · {counts.HIGH} عالٍ)
+      <Section
+        title={
+          attention.length === 0
+            ? "لا شيء يحتاج انتباهك"
+            : `يحتاج انتباهك (${attention.length})`
+        }
+        action={
+          attention.length > 0 ? (
+            <Link href="/attention" className="text-xs font-medium underline underline-offset-4 hover:text-ink">
+              {counts.CRITICAL} حرج · {counts.HIGH} عالٍ ←
             </Link>
-          )}
-        </div>
-
+          ) : undefined
+        }
+      >
         <AttentionList items={attention} limit={3} />
-      </section>
+      </Section>
 
       {/* ── الاتجاه ── */}
-      <div className="mt-10 grid gap-8 lg:grid-cols-2">
+      <div className="mt-8 grid gap-6 sm:mt-10 lg:grid-cols-2">
         <section>
-          <h2 className="mb-3 text-base font-bold">المصروف الشهري</h2>
-          <div className="space-y-3 rounded-xl border border-line bg-raised p-4">
+          <h2 className="mb-3 font-display text-lg font-bold leading-tight">المصروف الشهري</h2>
+          <Card>
+            <div className="space-y-3.5">
             {monthly.length === 0 ? (
               <p className="text-xs text-muted">لا بيانات بعد.</p>
             ) : (
@@ -162,12 +165,14 @@ export default async function HomePage() {
                 <Bar key={m.month} label={m.month} value={m.totalMinor} max={maxMonth} note={`${m.invoiceCount} فاتورة`} />
               ))
             )}
-          </div>
+            </div>
+          </Card>
         </section>
 
         <section>
-          <h2 className="mb-3 text-base font-bold">أعلى المورّدين</h2>
-          <div className="space-y-3 rounded-xl border border-line bg-raised p-4">
+          <h2 className="mb-3 font-display text-lg font-bold leading-tight">أعلى المورّدين</h2>
+          <Card>
+            <div className="space-y-3.5">
             {topSuppliers.length === 0 ? (
               <p className="text-xs text-muted">لا بيانات بعد.</p>
             ) : (
@@ -175,23 +180,22 @@ export default async function HomePage() {
                 <Bar key={name} label={name} value={total} max={maxSupplier} />
               ))
             )}
-          </div>
+            </div>
+          </Card>
         </section>
       </div>
 
       {/* ── صحّة البيانات ── */}
-      <section className="mt-10">
-        <div className="mb-1 flex items-baseline justify-between gap-3">
-          <h2 className="text-base font-bold">صحّة البيانات</h2>
-          <span className="text-xs font-bold">
+      <Section
+        title="صحّة البيانات"
+        hint="الرقم بلا بيان تغطيته يخدع. هذه نسبة ما بُنيت عليه أرقام الصفحة — وما لم يُوصَل يُقال عنه «غير موصول» ولا يُملأ بصفر."
+        action={
+          <span className="nums text-sm font-bold">
             ثقة الأرقام {Math.round(health.confidence * 100)}٪
           </span>
-        </div>
-        <p className="mb-3 text-xs leading-relaxed text-muted">
-          الرقم بلا بيان تغطيته يخدع. هذه نسبة ما بُنيت عليه أرقام الصفحة —
-          وما لم يُوصَل يُقال عنه «غير موصول» ولا يُملأ بصفر.
-        </p>
-        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+        }
+      >
+        <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
           {health.metrics.map((m) => (
             <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
               <span className="min-w-0">
@@ -210,21 +214,11 @@ export default async function HomePage() {
             </li>
           ))}
         </ul>
-      </section>
+      </Section>
 
       <div className="mt-8 flex flex-wrap gap-2">
-        <Link
-          href="/upload"
-          className="rounded-lg bg-inverse-surface px-4 py-2.5 text-sm font-bold text-inverse-ink"
-        >
-          أضف مستنداً
-        </Link>
-        <Link
-          href="/documents"
-          className="rounded-lg border border-line px-4 py-2.5 text-sm font-medium hover:border-ink-soft"
-        >
-          الأرشيف
-        </Link>
+        <LinkButton href="/upload" variant="primary">أضف مستنداً</LinkButton>
+        <LinkButton href="/documents">الأرشيف</LinkButton>
       </div>
     </PageShell>
   );

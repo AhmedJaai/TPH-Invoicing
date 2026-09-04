@@ -87,7 +87,7 @@ export function DriveSync() {
   const s = result?.summary;
 
   return (
-    <section className="rounded-xl border border-line bg-raised p-4">
+    <section className="rounded-2xl border border-line bg-raised shadow-raised p-4">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-bold">مزامنة الدرايف</h2>
         <button onClick={() => setOpen(false)} className="text-[11px] text-muted hover:text-ink">

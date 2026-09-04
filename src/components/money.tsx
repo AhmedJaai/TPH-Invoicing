@@ -21,7 +21,7 @@ export function Money({ minor, tone }: { minor: number; tone?: "warn" | "danger"
 
 export function Empty({ message }: { message: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-line px-5 py-10 text-center">
+    <div className="rounded-2xl border border-dashed border-line px-5 py-10 text-center">
       <p className="text-sm text-muted">{message}</p>
     </div>
   );

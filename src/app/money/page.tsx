@@ -114,7 +114,7 @@ export default async function MoneyPage() {
         {byCategory.length === 0 ? (
           <Empty message="لا حركات مصنَّفة بعد. صنّف حركاتك من صفحة كشف البنك." />
         ) : (
-          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {byCategory.map((c) => (
               <li key={c.category} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <span className="min-w-0">

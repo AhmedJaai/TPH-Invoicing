@@ -27,7 +27,7 @@ const STATE_STYLE = {
 function Card({ label, value, note, tone }: { label: string; value: React.ReactNode; note?: string; tone?: "warn" | "danger" | "ok" }) {
   const cls = tone === "warn" ? "text-warn" : tone === "danger" ? "text-danger" : tone === "ok" ? "text-ok" : "";
   return (
-    <div className="rounded-xl border border-line bg-raised px-4 py-3">
+    <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
       <p className="text-xs text-muted">{label}</p>
       <p className={`mt-1 text-xl font-bold ${cls}`}>{value}</p>
       {note && <p className="mt-1 text-[11px] leading-relaxed text-muted">{note}</p>}
@@ -180,9 +180,9 @@ export default async function AuditPage() {
         {priceMoves.length === 0 ? (
           <Empty message="لم يتغيّر سعر أي صنف تغيّراً يُذكر — أو لم تُسجَّل بنود كافية بعد." />
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-line">
+          <div className="scroll-x rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[38rem] text-sm">
-              <thead className="bg-sunken text-xs text-muted">
+              <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
                   <th className="px-3 py-2 text-right font-medium">الصنف</th>
                   <th className="px-3 py-2 text-right font-medium">السابق</th>
@@ -229,9 +229,9 @@ export default async function AuditPage() {
         <p className="mb-3 text-xs text-muted">
           السداد يُحتسب من إيصالات مخصَّصة للفاتورة، لا من تاريخها.
         </p>
-        <div className="overflow-x-auto rounded-xl border border-line">
+        <div className="scroll-x rounded-2xl border border-line shadow-raised">
           <table className="w-full min-w-[42rem] text-sm">
-            <thead className="bg-sunken text-xs text-muted">
+            <thead className="sticky top-0 bg-sunken text-xs text-muted">
               <tr>
                 <th className="px-3 py-2 text-right font-medium">الفاتورة</th>
                 <th className="px-3 py-2 text-right font-medium">المورّد</th>
@@ -288,12 +288,12 @@ export default async function AuditPage() {
 
       {/* ── ما يحتاج تدخّلاً ── */}
       <section className="mt-10 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-line bg-raised p-4">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised p-4">
           <h3 className="text-sm font-bold">فواتير بلا قيد</h3>
           <p className="mt-1 text-xs text-muted">مضى عليها وقت ولم تُقيَّد في النظام المحاسبي.</p>
           <p className="mt-2 text-2xl font-bold text-warn">{unposted.length}</p>
         </div>
-        <div className="rounded-xl border border-line bg-raised p-4">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised p-4">
           <h3 className="text-sm font-bold">أصول ثابتة محتملة</h3>
           <p className="mt-1 text-xs text-muted">فوق ٣٬٠٠٠ ريال — تُرسمل وتُهلك ولا تُصرف.</p>
           <p className="mt-2 text-2xl font-bold">{assets.length}</p>
@@ -306,7 +306,7 @@ export default async function AuditPage() {
           <p className="mb-3 text-xs text-muted">
             مرتّبة بالأكبر أثراً — اطلب من هؤلاء المورّدين فاتورة ضريبية كاملة.
           </p>
-          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {vat.rows.slice(0, 15).map((r) => (
               <li key={r.invoiceId} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <span className="min-w-0">

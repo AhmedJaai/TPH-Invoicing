@@ -52,17 +52,17 @@ export default async function ProductsPage() {
       intro="اسم الصنف عند مورّده ليس مُعرِّفاً له. الربط بصنف معياري هو ما يجمع ما اشتريتَه من مورّدين مختلفين تحت شيء واحد — وهو أساس كل تحليل تكلفة لاحق."
     >
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">أصناف مورّدين</p>
           <p className="nums mt-1 text-xl font-bold">{coverage.total}</p>
         </div>
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">مربوطة بصنف معياري</p>
           <p className={`nums mt-1 text-xl font-bold ${coverage.mapped > 0 ? "text-ok" : ""}`}>
             {coverage.mapped}
           </p>
         </div>
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">أصناف معيارية</p>
           <p className="nums mt-1 text-xl font-bold">{products.length}</p>
         </div>

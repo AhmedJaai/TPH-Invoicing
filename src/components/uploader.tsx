@@ -142,6 +142,34 @@ function Field({
   );
 }
 
+/**
+ * لا يُعرَض إلّا ما يحتاج قراراً.
+ *
+ * حين تُقرأ الحقول الستّة كلّها بثقة، فمطالبة المستخدم بتأكيدها واحداً
+ * واحداً عملٌ بلا فائدة — يُبطئه ويعلّمه أن يضغط «موافق» بلا نظر. فإن
+ * كان كلّ شيء سليماً قيل ذلك في سطر، وبقيت التفاصيل خلف نقرة. وإن كان
+ * فيه ما يحتاج مراجعة، ذُكر عدده وفُتح مباشرةً.
+ */
+function DecisionBanner({ count }: { count: number }) {
+  if (count === 0) {
+    return (
+      <div className="mt-3 flex items-center gap-2 rounded-xl border border-ok/40 bg-ok-bg px-3 py-2.5">
+        <span className="text-ok" aria-hidden>✓</span>
+        <p className="text-xs font-bold text-ok">قُرئ كل شيء بثقة — راجع التفاصيل إن شئت، ثمّ أرشِف.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 flex items-center gap-2 rounded-xl border border-warn/40 bg-warn-bg px-3 py-2.5">
+      <span className="text-warn" aria-hidden>⚠</span>
+      <p className="text-xs font-bold text-warn">
+        {count === 1 ? "حقلٌ واحد يحتاج انتباهك" : count === 2 ? "حقلان يحتاجان انتباهك" : `${count} حقول تحتاج انتباهك`}
+        {" "}قبل الأرشفة.
+      </p>
+    </div>
+  );
+}
+
 export interface SupplierOption {
   id: string;
   nameAr: string;
@@ -533,7 +561,7 @@ export function Uploader({
       {archived.length > 0 && (
         <section className="mt-6">
           <h2 className="mb-2 text-sm font-bold">رُفع في هذه الجلسة ({archived.length})</h2>
-          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {archived.map((a) => (
               <li key={a.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <span className="min-w-0">
@@ -574,7 +602,7 @@ export function Uploader({
           {items.map((item) => {
             if (item.state === "reading") {
               return (
-                <article key={item.id} className="rounded-xl border border-line bg-raised p-4">
+                <article key={item.id} className="rounded-2xl border border-line bg-raised shadow-raised p-4">
                   <p className="truncate font-mono text-xs text-ink-soft" dir="ltr">
                     {item.fileName}
                   </p>
@@ -587,7 +615,7 @@ export function Uploader({
 
             if (item.state === "failed") {
               return (
-                <article key={item.id} className="rounded-xl border border-line bg-raised p-4">
+                <article key={item.id} className="rounded-2xl border border-line bg-raised shadow-raised p-4">
                   <p className="truncate font-mono text-xs text-ink-soft" dir="ltr">
                     {item.fileName}
                   </p>
@@ -598,9 +626,12 @@ export function Uploader({
 
             const r = item.data.result;
             const low = new Set(r.lowConfidenceFields);
+            const blocking = r.findings.filter((f) => f.severity === "BLOCKER").length;
+            const needsSupplier = !chosen[item.id] && !r.supplier;
+            const decisions = low.size + blocking + (needsSupplier ? 1 : 0);
 
             return (
-              <article key={item.id} className="rounded-xl border border-line bg-raised p-4">
+              <article key={item.id} className="rounded-2xl border border-line bg-raised shadow-raised p-4">
                 <header className="flex items-start justify-between gap-3">
                   <p className="min-w-0 flex-1 truncate font-mono text-xs text-ink-soft" dir="ltr">
                     {item.fileName}
@@ -609,6 +640,14 @@ export function Uploader({
                     {KIND_LABEL[r.documentKind] ?? r.documentKind}
                   </span>
                 </header>
+
+                <DecisionBanner count={decisions} />
+
+                <details open={decisions > 0} className="group mt-3">
+                  <summary className="cursor-pointer list-none text-xs font-bold text-ink-soft underline underline-offset-4 hover:text-ink">
+                    <span className="group-open:hidden">اعرض التفاصيل</span>
+                    <span className="hidden group-open:inline">أخفِ التفاصيل</span>
+                  </summary>
 
                 <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <Field
@@ -676,6 +715,8 @@ export function Uploader({
                     </p>
                   </div>
                 )}
+
+                </details>
 
                 {r.findings.length > 0 && (
                   <ul className="mt-3 space-y-1.5">

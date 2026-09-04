@@ -86,19 +86,19 @@ export default async function AnalysisPage() {
       intro="كل صنف اشتريته: كم مرة طُلب، وبأي كميّة، وكم كلّف، ومن أي مورّد، وكل كم يوم تحتاجه."
     >
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">أصناف مختلفة</p>
           <p className="nums mt-1 text-xl font-bold">{items.length}</p>
         </div>
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">إجمالي المشتريات</p>
           <p className="mt-1 text-xl font-bold"><Money minor={totalSpend} /></p>
         </div>
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">أسماء تتكرّر عند مورّدين</p>
           <p className="nums mt-1 text-xl font-bold">{sameName.length}</p>
         </div>
-        <div className="rounded-xl border border-line bg-raised px-4 py-3">
+        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">مورّدون</p>
           <p className="nums mt-1 text-xl font-bold">
             {new Set(items.map((i) => i.supplierId).filter(Boolean)).size}
@@ -114,9 +114,9 @@ export default async function AnalysisPage() {
             كيلو بنّ بـ١٥٥ ريالاً، و«عنب» عند لافا زجاجة كمبوتشا بـ١٣٫٥٠. فانظر الوصفين
             بنفسك — فإن كانا صنفاً واحداً فالفارق فرصة، وإلّا فلا معنى للمقارنة.
           </p>
-          <div className="overflow-x-auto rounded-xl border border-line">
+          <div className="scroll-x rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[40rem] text-sm">
-              <thead className="bg-sunken text-xs text-muted">
+              <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
                   <th className="px-3 py-2 text-right font-medium">الاسم المشترك</th>
                   <th className="px-3 py-2 text-right font-medium">الأرخص</th>
@@ -155,7 +155,7 @@ export default async function AnalysisPage() {
           <p className="mb-3 text-xs text-muted">
             محسوبة من دورة طلبك المعتادة لكل صنف، لا من مخزون — النظام لا يعرف مخزونك.
           </p>
-          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {dueSoon.map((x) => (
               <li key={x.item.key} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <span className="min-w-0">
@@ -182,9 +182,9 @@ export default async function AnalysisPage() {
         <p className="mb-3 text-xs text-muted">
           مرتّبة بالأكثر كلفة — أعلى الصفحة هو ما يستحق التفاوض عليه.
         </p>
-        <div className="overflow-x-auto rounded-xl border border-line">
+        <div className="scroll-x rounded-2xl border border-line shadow-raised">
           <table className="w-full min-w-[46rem] text-sm">
-            <thead className="bg-sunken text-xs text-muted">
+            <thead className="sticky top-0 bg-sunken text-xs text-muted">
               <tr>
                 <th className="px-3 py-2 text-right font-medium">الصنف</th>
                 <th className="px-3 py-2 text-right font-medium">مرات الطلب</th>
