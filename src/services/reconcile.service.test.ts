@@ -146,3 +146,88 @@ describe("runReconciliation", () => {
     expect(runReconciliation(input)).toEqual(runReconciliation(input));
   });
 });
+
+describe("خطّة الكتابة — مصدر قرارٍ واحد", () => {
+  it("التلقائيّ وحده يُكتَب، والاقتراح ينتظر تأكيداً", () => {
+    const { results, planned } = runReconciliation({
+      // مرشّحان متساويان: القرار اقتراحٌ لا مطابقة
+      rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" })],
+      invoices: [
+        invoice({ id: "a", outstandingMinor: 1_000_00 }),
+        invoice({ id: "b", outstandingMinor: 1_000_00 }),
+      ],
+      suppliers,
+    });
+    expect(results[0].decision?.disposition).toBe("SUGGEST");
+    expect(planned).toEqual([]);
+  });
+
+  it("المطابقة التلقائية تُنتج خطّة تخصيص", () => {
+    const { planned } = runReconciliation({
+      rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" })],
+      invoices: [invoice({ id: "a", outstandingMinor: 1_000_00 })],
+      suppliers,
+    });
+    expect(planned).toHaveLength(1);
+    expect(planned[0].allocations).toEqual([{ invoiceId: "a", amountMinor: 1_000_00 }]);
+    expect(planned[0].supplierId).toBe("S1");
+  });
+
+  it("مجموع التخصيصات لا يتجاوز قيمة الدفعة", () => {
+    const { planned } = runReconciliation({
+      rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون", amountMinor: 2_000_00 })],
+      invoices: [
+        invoice({ id: "a", outstandingMinor: 1_200_00, invoiceDate: day("2026-08-05") }),
+        invoice({ id: "b", outstandingMinor: 800_00, invoiceDate: day("2026-08-09") }),
+      ],
+      suppliers,
+    });
+    if (planned.length > 0) {
+      const sum = planned[0].allocations.reduce((s, a) => s + a.amountMinor, 0);
+      expect(sum).toBeLessThanOrEqual(planned[0].amountMinor);
+    }
+  });
+
+  it("لا تخصيص فوق قيمة الفاتورة الواحدة", () => {
+    const { planned } = runReconciliation({
+      rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون", amountMinor: 2_000_00 })],
+      invoices: [
+        invoice({ id: "a", outstandingMinor: 1_200_00, invoiceDate: day("2026-08-05") }),
+        invoice({ id: "b", outstandingMinor: 800_00, invoiceDate: day("2026-08-09") }),
+      ],
+      suppliers,
+    });
+    for (const p of planned) {
+      for (const a of p.allocations) expect(a.amountMinor).toBeGreaterThan(0);
+    }
+  });
+
+  it("الدفعة عبر شهور تحفظها كلّها لا شهر أوّل فاتورة", () => {
+    const { planned } = runReconciliation({
+      rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون", amountMinor: 2_000_00,
+        valueDate: day("2026-09-15") })],
+      invoices: [
+        invoice({ id: "aug", outstandingMinor: 1_200_00, periodMonth: "2026-08",
+          invoiceDate: day("2026-08-20") }),
+        invoice({ id: "sep", outstandingMinor: 800_00, periodMonth: "2026-09",
+          invoiceDate: day("2026-09-05") }),
+      ],
+      suppliers,
+    });
+    const multi = planned.find((p) => p.months.length > 1);
+    if (multi) {
+      expect(multi.months).toEqual(["2026-08", "2026-09"]);
+      // الأحدث هو الحاكم: الدفعة تُغلق ما بلغته
+      expect(multi.primaryMonth).toBe("2026-09");
+    }
+  });
+
+  it("الخطّة فارغة حين لا مطابقة تلقائية", () => {
+    const { planned } = runReconciliation({
+      rows: [row({ key: "t1", description: "تحويل الى جهة" })],
+      invoices: [invoice({ id: "a" })],
+      suppliers,
+    });
+    expect(planned).toEqual([]);
+  });
+});

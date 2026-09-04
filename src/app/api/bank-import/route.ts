@@ -9,10 +9,9 @@ import {
 import { guard, respondTo } from "@/services/guard";
 import { parseBankStatement } from "@/lib/bank/parse";
 import {
-  matchBankTransactions, findDuplicatePayments, suggestAlias,
-  type BankTx, type OpenInvoice, type SupplierAliasIndex,
+  findDuplicatePayments, suggestAlias,
+  type BankTx, type OpenInvoice,
 } from "@/lib/bank/match";
-import { normalizeName } from "@/lib/suppliers-seed";
 import { assignIdentities, fileFingerprint } from "@/lib/bank/identity";
 import { allocate, createPayment } from "@/services/payment.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
@@ -51,34 +50,6 @@ export async function POST(request: Request) {  let user;
       { status: 400 },
     );
   }
-
-  // فهرس أسماء المورّدين وأسمائهم البنكية
-  const sup = await db
-    .select({
-      id: suppliers.id, nameAr: suppliers.nameAr, nameEn: suppliers.nameEn,
-      folder: suppliers.driveFolderName,
-    })
-    .from(suppliers)
-    .where(eq(suppliers.isActive, true));
-
-  const aliasRows = sup.length
-    ? await db
-        .select({ supplierId: supplierAliases.supplierId, value: supplierAliases.value })
-        .from(supplierAliases)
-        .where(inArray(supplierAliases.supplierId, sup.map((s) => s.id)))
-    : [];
-
-  const index: SupplierAliasIndex[] = sup.map((s) => ({
-    supplierId: s.id,
-    supplierName: s.nameAr,
-    normalizedNames: [
-      ...new Set(
-        [s.nameAr, s.nameEn ?? "", s.folder, ...aliasRows.filter((a) => a.supplierId === s.id).map((a) => a.value)]
-          .filter(Boolean)
-          .map(normalizeName),
-      ),
-    ],
-  }));
 
   const identityRows = await db
     .select({
@@ -165,21 +136,29 @@ export async function POST(request: Request) {  let user;
     suppliers: supplierIdentities,
   });
   const engineByKey = new Map(engine.results.map((r) => [r.key, r]));
+  const txByKey = new Map<string, (typeof txs)[number]>(txs.map((t) => [t.id, t]));
+  const rowAmount = new Map<string, number>(
+    parsed.rows.map((r, i) => [`row-${r.rowNumber}-${i}`, r.amountMinor]),
+  );
 
-  const matches = matchBankTransactions(txs, open, index, rules);
+  /*
+    `matchBankTransactions` خرج من المسار.
+
+    كان يعمل بجانب المحرّك الجديد: هذا يكتب المال وذاك يكتب «أدلّةً»
+    فوقه — فتُحفَظ حركةٌ بدرجة ٩١ ونتيجةِ «فاتورة بعينها» وحالتُها
+    `UNMATCHED`، لأنّ المحرّكين اختلفا. مصدرُ قرارٍ واحد أو لا شيء.
+
+    وبقي `findDuplicatePayments` وحده: هو كشفٌ لا مطابقة.
+  */
   const duplicates = findDuplicatePayments(txs, rules);
-  // المصنَّف بقاعدة ليس مجهولاً ولا سداد مورّد — يخرج من العدّ كالتشغيلي
-  const real = matches.filter((m) => m.kind !== "INTERNAL" && m.kind !== "CLASSIFIED");
-  const classified = matches.filter((m) => m.kind === "CLASSIFIED");
 
   const byCategory: Record<string, { count: number; amountMinor: number }> = {};
-  for (const m of matches) {
-    const c = m.category;
+  for (const r of engine.results) {
+    const c = r.category;
     byCategory[c] = byCategory[c] ?? { count: 0, amountMinor: 0 };
     byCategory[c].count++;
-    byCategory[c].amountMinor += m.tx.amountMinor;
+    byCategory[c].amountMinor += rowAmount.get(r.key) ?? 0;
   }
-  const matched = real.filter((m) => m.invoices.length > 0);
 
   const summary = {
     bank: parsed.bank,
@@ -187,17 +166,27 @@ export async function POST(request: Request) {  let user;
     periodStart: parsed.periodStart?.toISOString().slice(0, 10),
     periodEnd: parsed.periodEnd?.toISOString().slice(0, 10),
     totalRows: parsed.rows.length,
-    operational: matches.length - real.length,
-    payments: real.length,
-    matchedTransactions: matched.length,
-    matchedInvoices: new Set(matched.flatMap((m) => m.invoices.map((i) => i.invoiceId))).size,
-    supplierOnly: real.filter((m) => m.kind === "SUPPLIER_ONLY").length,
-    unknown: real.filter((m) => m.kind === "NONE").length,
+    /*
+      الأعداد من المحرّك — لا من المُطابِق القديم. كانت الشاشة تعرض
+      عدداً والخادم يكتب غيره.
+    */
+    operational: engine.summary.notPayment,
+    payments: engine.summary.total - engine.summary.notPayment,
+    matchedTransactions: engine.summary.auto,
+    matchedInvoices: new Set(engine.planned.flatMap((p) => p.allocations.map((a) => a.invoiceId))).size,
+    suggested: engine.summary.suggest,
+    needsReview: engine.summary.review,
+    supplierOnly: engine.results.filter((r) => r.outcome === "KNOWN_SUPPLIER_NO_INVOICE").length,
+    unknown: engine.results.filter((r) => r.outcome === "UNKNOWN_ENTITY").length,
     duplicateGroups: duplicates.length,
     openInvoicesBefore: open.length,
     warnings: parsed.warnings.length,
-    classified: classified.length,
-    classifiedAmountMinor: classified.reduce((s, m) => s + m.tx.amountMinor, 0),
+    classified: engine.results.filter(
+      (r) => r.outcome === "NOT_A_PAYMENT" && r.kind !== "UNKNOWN",
+    ).length,
+    classifiedAmountMinor: engine.results
+      .filter((r) => r.outcome === "NOT_A_PAYMENT" && r.kind !== "UNKNOWN")
+      .reduce((sum, r) => sum + (rowAmount.get(r.key) ?? 0), 0),
     byCategory: Object.entries(byCategory)
       .map(([category, v]) => ({
         category,
@@ -210,39 +199,56 @@ export async function POST(request: Request) {  let user;
   if (!apply) {
     return NextResponse.json({
       ok: true, applied: false, summary,
-      preview: matched.slice(0, 40).map((m) => ({
-        date: m.tx.valueDate.toISOString().slice(0, 10),
-        amountMinor: m.tx.amountMinor,
-        supplierName: m.supplierName,
-        invoiceNumbers: m.invoices.map((i) => i.invoiceNumber),
-        kind: m.kind,
-      })),
+      /*
+        المعاينة تعرض ما سيُكتَب فعلاً — لا ما وجده محرّك آخر. فما تراه
+        قبل الموافقة هو ما يقع بعدها.
+      */
+      preview: engine.planned.slice(0, 40).map((p) => {
+        const r = engineByKey.get(p.transactionKey)!;
+        return {
+          date: p.paidAt.toISOString().slice(0, 10),
+          amountMinor: p.amountMinor,
+          supplierName: supplierIdentities.find((s) => s.supplierId === p.supplierId)?.nameAr ?? "—",
+          invoiceNumbers: p.allocations.map((a) =>
+            open.find((o) => o.invoiceId === a.invoiceId)?.invoiceNumber ?? null,
+          ),
+          kind: r.outcome,
+          months: p.months,
+          why: r.decision?.reasons ?? [],
+        };
+      }),
       /*
        * الحركات المجهولة كلّها لا أكبرها فقط.
        * هذه بالضبط ما يحتاج ربطاً يدوياً بمورّد، ومعها اقتراح للاسم البنكي
        * كي يبدأ المستخدم من نصّ يصحّحه لا من حقل فارغ.
        */
-      unknown: real
-        .filter((m) => m.kind === "NONE")
+      unknown: engine.results
+        .filter((r) => r.outcome === "UNKNOWN_ENTITY")
+        .map((r) => ({ r, tx: txByKey.get(r.key)! }))
+        .filter((x) => x.tx !== undefined)
         .sort((a, b) => b.tx.amountMinor - a.tx.amountMinor)
         .slice(0, 60)
-        .map((m) => ({
-          id: m.tx.id,
-          date: m.tx.valueDate.toISOString().slice(0, 10),
-          amountMinor: m.tx.amountMinor,
-          description: m.tx.description.slice(0, 140),
-          suggestedAlias: suggestAlias(m.tx.description),
+        .map(({ r, tx }) => ({
+          id: r.key,
+          date: tx.valueDate.toISOString().slice(0, 10),
+          amountMinor: tx.amountMinor,
+          description: tx.description.slice(0, 140),
+          suggestedAlias: suggestAlias(tx.beneficiaryRaw ?? tx.description),
           // اقتراح يُعرض لا حكم يُنفَّذ — الكلمة قد تخدع
-          suggestedCategory: suggestCategory(`${m.tx.description} ${m.tx.transactionType}`),
+          suggestedCategory: suggestCategory(`${tx.description} ${tx.transactionType}`),
+          why: r.classificationReason,
         })),
-      supplierOnlyList: real
-        .filter((m) => m.kind === "SUPPLIER_ONLY")
+      supplierOnlyList: engine.results
+        .filter((r) => r.outcome === "KNOWN_SUPPLIER_NO_INVOICE")
+        .map((r) => ({ r, tx: txByKey.get(r.key)! }))
+        .filter((x) => x.tx !== undefined)
         .sort((a, b) => b.tx.amountMinor - a.tx.amountMinor)
         .slice(0, 20)
-        .map((m) => ({
-          date: m.tx.valueDate.toISOString().slice(0, 10),
-          amountMinor: m.tx.amountMinor,
-          supplierName: m.supplierName ?? "—",
+        .map(({ r, tx }) => ({
+          date: tx.valueDate.toISOString().slice(0, 10),
+          amountMinor: tx.amountMinor,
+          supplierName:
+            supplierIdentities.find((s) => s.supplierId === r.supplierId)?.nameAr ?? "—",
         })),
     });
   }
@@ -258,12 +264,12 @@ export async function POST(request: Request) {  let user;
    * وبدون ذلك استُورد كشف واحد ثلاث مرّات فصارت كل حركة ثلاثاً.
    */
   const identified = assignIdentities(
-    matches.map((m) => ({
-      valueDate: m.tx.valueDate,
-      amountMinor: m.tx.amountMinor,
-      direction: m.tx.direction,
-      description: m.tx.description,
-      match: m,
+    txs.map((t) => ({
+      valueDate: t.valueDate,
+      amountMinor: t.amountMinor,
+      direction: t.direction,
+      description: t.description,
+      tx: t,
     })),
     parsed.accountNumber,
   );
@@ -311,49 +317,69 @@ export async function POST(request: Request) {  let user;
     return NextResponse.json({ error: "تعذّر تسجيل عملية الاستيراد" }, { status: 500 });
   }
 
+  /*
+    خطّة الكتابة من المحرّك وحده.
+
+    كان المُطابِق القديم هو من ينشئ الدفعات والتخصيصات، والمحرّك الجديد
+    يكتب «أدلّةً» فوقها. فيمكن أن تُحفَظ حركةٌ بدرجة ٩١ ونتيجةِ «فاتورة
+    بعينها»، وحالتُها `UNMATCHED` — لأنّ المحرّكين اختلفا. ومن يصدّق
+    المستخدم حينئذ؟
+
+    فصار مصدر القرار واحداً: `planned` من `runReconciliation`.
+  */
+  const plannedByKey = new Map(engine.planned.map((p) => [p.transactionKey, p]));
+
   await db.transaction(async (tx) => {
     for (const row of fresh) {
-      const m = row.match;
+      const t = row.tx;
+      const decided = engineByKey.get(t.id);
+      const plan = plannedByKey.get(t.id);
       const [inserted] = await tx
         .insert(bankTransactions)
         .values({
           bankImportId: importId,
           externalId: row.externalId,
-          valueDate: m.tx.valueDate,
-          description: m.tx.description,
-          transactionType: m.tx.transactionType || null,
+          valueDate: t.valueDate,
+          description: t.description,
+          transactionType: t.transactionType || null,
           /*
             ما كتبه البنك في عمود المستفيد — لا اسم المورّد الذي
             رجّحناه. كان يُكتب هنا اسمُ المطابقة، فإن لم تُطابَق الحركة
             بقي العمود فارغاً؛ ودائرة مغلقة على نفسها: لا يُعرف المستفيد
             لأنّ العمود فارغ، والعمود فارغ لأنّه لم يُعرف.
           */
-          beneficiaryRaw: m.tx.beneficiaryRaw ?? null,
-          amountMinor: m.tx.amountMinor,
-          direction: m.tx.direction,
-          category: engineByKey.get(m.tx.id)?.category ?? m.category,
-          ruleId: m.ruleId ?? null,
-          supplierId: engineByKey.get(m.tx.id)?.supplierId ?? m.supplierId ?? null,
-          matchDisposition: engineByKey.get(m.tx.id)?.decision?.disposition ?? null,
-          matchScore: engineByKey.get(m.tx.id)?.candidate
-            ? Math.round(engineByKey.get(m.tx.id)!.candidate!.score * 100)
-            : null,
-          matchOutcome: engineByKey.get(m.tx.id)?.outcome ?? null,
+          beneficiaryRaw: t.beneficiaryRaw ?? null,
+          amountMinor: t.amountMinor,
+          direction: t.direction,
+          /*
+            كل هذه من المحرّك — بلا احتياطٍ إلى القديم. الاحتياط هنا
+            يعني مصدرَي حقيقة، وهو ما يُنتج التناقض لا يُصلحه.
+          */
+          category: decided?.category ?? "UNKNOWN",
+          ruleId: null,
+          supplierId: decided?.supplierId ?? null,
+          matchDisposition: decided?.decision?.disposition ?? null,
+          matchScore: decided?.candidate ? Math.round(decided.candidate.score * 100) : null,
+          matchOutcome: decided?.outcome ?? null,
           /*
             الأدلّة تُحفَظ بنصّها كي يُعرَض «لماذا؟» بعد شهر — لا رقمُ
             ثقةٍ ثابت لا يقول شيئاً.
           */
-          matchEvidence: engineByKey.get(m.tx.id)
+          matchEvidence: decided
             ? {
-                تصنيف: engineByKey.get(m.tx.id)!.classificationReason,
-                مستفيد: engineByKey.get(m.tx.id)!.supplierEvidence,
-                مطابقة: engineByKey.get(m.tx.id)!.decision?.reasons ?? [],
-                درجةالمستفيد: Math.round(engineByKey.get(m.tx.id)!.supplierScore * 100),
+                تصنيف: decided.classificationReason,
+                مستفيد: decided.supplierEvidence,
+                مطابقة: decided.decision?.reasons ?? [],
+                درجةالمستفيد: Math.round(decided.supplierScore * 100),
               }
             : null,
+          /*
+            الحالة تتبع القرار نفسه: ما يُكتَب له سدادٌ «مطابَقة»، وما
+            ليس سداد مورّد «متجاهَلة»، وما عداهما ينتظر.
+          */
           matchStatus:
-            m.invoices.length > 0 ? "MATCHED"
-            : m.kind === "INTERNAL" || m.kind === "CLASSIFIED" ? "IGNORED"
+            plan !== undefined ? "MATCHED"
+            : decided && decided.outcome === "NOT_A_PAYMENT" ? "IGNORED"
             : "UNMATCHED",
         })
         .onConflictDoNothing()
@@ -361,15 +387,19 @@ export async function POST(request: Request) {  let user;
 
       // القيد الفريد ردّها: حركة سبقتنا إليها كتابة أخرى
       if (!inserted) continue;
-      if (m.invoices.length === 0) continue;
+      if (!plan) continue;
 
       const paymentId = await createPayment(tx, {
-        supplierId: m.supplierId ?? null,
-        paidAt: m.tx.valueDate,
-        amountMinor: m.tx.amountMinor,
+        supplierId: plan.supplierId,
+        paidAt: plan.paidAt,
+        amountMinor: plan.amountMinor,
         method: "BANK_TRANSFER",
-        beneficiaryNameRaw: m.tx.description.slice(0, 200),
-        appliesToMonth: m.invoices[0].periodMonth,
+        beneficiaryNameRaw: (t.beneficiaryRaw ?? t.description).slice(0, 200),
+        /*
+          الشهر الحاكم هو الأحدث بين شهور الفواتير لا شهر أوّلها: دفعةٌ
+          تسدّد أغسطس وسبتمبر وأكتوبر كانت تُنسب إلى أغسطس كلّها.
+        */
+        appliesToMonth: plan.primaryMonth,
       });
 
       await tx
@@ -381,12 +411,7 @@ export async function POST(request: Request) {  let user;
        * التخصيص محدود بقيمة الدفعة: كانت فاتورة بـ١٥٠٠٫٠١ تُخصَّص كاملةً
        * على حوالة بـ١٥٠٠٫٠٠، فيخلق النظام هللةً لم تُدفع.
        */
-      await allocate(
-        tx,
-        paymentId,
-        m.tx.amountMinor,
-        m.invoices.map((i) => ({ invoiceId: i.invoiceId, amountMinor: i.outstandingMinor })),
-      );
+      await allocate(tx, paymentId, plan.amountMinor, plan.allocations);
       created++;
     }
   });

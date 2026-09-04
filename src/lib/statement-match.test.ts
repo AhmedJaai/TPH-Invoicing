@@ -199,3 +199,90 @@ describe("buildDiscrepancyMemo", () => {
     expect(memo).not.toContain("يختلف مبلغها");
   });
 });
+
+describe("النواة المشتركة — لا جشع في الكشوف أيضاً", () => {
+  const inv = (id: string, number: string, total: number, date: string) => ({
+    invoiceId: id, invoiceNumber: number, totalMinor: total,
+    invoiceDate: new Date(`${date}T00:00:00Z`),
+  });
+  /*
+    النوع يُكتب صراحةً لا بـ`Partial<T> & { date: string }`: التقاطع
+    يُنتج `Date & string` وهو نوعٌ لا يقبل شيئاً.
+  */
+  interface LineSpec {
+    date: string;
+    ref?: string;
+    description?: string;
+    debitMinor?: number;
+    creditMinor?: number;
+  }
+  const line = (over: LineSpec): StatementLineInput => ({
+    date: new Date(`${over.date}T00:00:00Z`),
+    ref: over.ref ?? null,
+    description: over.description ?? null,
+    debitMinor: over.debitMinor ?? 0,
+    creditMinor: over.creditMinor ?? 0,
+  });
+
+  it("الفاتورة لا تُنسب إلى سطرين", () => {
+    const r = reconcileStatement(
+      [
+        line({ date: "2026-08-10", debitMinor: 500_00 }),
+        line({ date: "2026-08-10", ref: "INV-1", debitMinor: 500_00 }),
+      ],
+      [inv("i1", "INV-1", 500_00, "2026-08-10")],
+    );
+    const matched = r.lines.filter((l) => l.invoice !== undefined);
+    expect(matched).toHaveLength(1);
+    // والمرجع أوثق من المبلغ والتاريخ، فيفوز صاحبُه
+    expect(matched[0].method).toBe("REF");
+  });
+
+  it("السطر المكرَّر في كشف المورّد يُسمّى مكرَّراً لا مفقوداً", () => {
+    const r = reconcileStatement(
+      [
+        line({ date: "2026-08-10", ref: "INV-1", debitMinor: 500_00 }),
+        line({ date: "2026-08-10", ref: "INV-1", debitMinor: 500_00 }),
+      ],
+      [inv("i1", "INV-1", 500_00, "2026-08-10")],
+    );
+    expect(r.lines[1].status).toBe("DUPLICATE_LINE");
+  });
+
+  it("الإشعار الدائن يُفصَل عن السداد", () => {
+    const r = reconcileStatement(
+      [
+        line({ date: "2026-08-12", description: "إشعار دائن — مرتجع", creditMinor: 200_00 }),
+        line({ date: "2026-08-15", description: "سداد", creditMinor: 700_00 }),
+      ],
+      [],
+    );
+    expect(r.lines[0].status).toBe("CREDIT_NOTE");
+    expect(r.lines[1].status).toBe("PAYMENT");
+  });
+
+  it("المطابقة بمرجعٍ وتاريخٍ بعيد تُسمّى اختلاف تاريخ", () => {
+    const r = reconcileStatement(
+      [line({ date: "2026-09-30", ref: "INV-1", debitMinor: 500_00 })],
+      [inv("i1", "INV-1", 500_00, "2026-08-01")],
+    );
+    expect(r.lines[0].status).toBe("DATE_MISMATCH");
+  });
+
+  it("لكل سطر مطابَق درجةٌ وسببٌ مكتوب", () => {
+    const r = reconcileStatement(
+      [line({ date: "2026-08-10", ref: "INV-1", debitMinor: 500_00 })],
+      [inv("i1", "INV-1", 500_00, "2026-08-10")],
+    );
+    expect(r.lines[0].score).toBeGreaterThan(0);
+    expect(r.lines[0].why?.length).toBeGreaterThan(0);
+  });
+
+  it("النتيجة ثابتة لا تتقلّب", () => {
+    const args: Parameters<typeof reconcileStatement> = [
+      [line({ date: "2026-08-10", ref: "INV-1", debitMinor: 500_00 })],
+      [inv("i1", "INV-1", 500_00, "2026-08-10")],
+    ];
+    expect(reconcileStatement(...args)).toEqual(reconcileStatement(...args));
+  });
+});

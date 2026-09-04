@@ -10,6 +10,14 @@ export interface HomeProvenance {
   purchases: Provenance;
   outstanding: Provenance;
   vat: Provenance;
+  /**
+   * الصادر من الحساب — والمجهول منه معلَنٌ بمبلغه.
+   *
+   * «مصروفات البنك ٤٢٬٠٠٠» تُقرأ كاملةً وفيها ثمانية آلاف لم يُعرف
+   * وجهها. فيُعرَض المعروف وحده رقماً، والمجهول بجانبه بمبلغه — لا
+   * مطموراً فيه ولا محذوفاً منه بصمت.
+   */
+  bankOutflow: Provenance;
   /** الشهر الذي بُنيت عليه مشتريات الشهر. */
   month: string | null;
 }
@@ -64,6 +72,15 @@ export async function gatherHomeProvenance(): Promise<HomeProvenance> {
         where tax_status = 'VALID' and vat_minor is not null)                as vat_valid_amount,
       (select count(*)::int from invoices where tax_status = 'UNKNOWN')      as vat_unknown_count,
       (select count(*)::int from invoices where tax_status = 'INVALID')      as vat_invalid_count,
+
+      (select count(*)::int from bank_transactions
+        where direction = 'DEBIT' and category = 'UNKNOWN')                  as bank_unknown_count,
+      (select coalesce(sum(amount_minor), 0)::int from bank_transactions
+        where direction = 'DEBIT' and category = 'UNKNOWN')                  as bank_unknown_minor,
+      (select count(*)::int from bank_transactions
+        where direction = 'DEBIT' and category <> 'UNKNOWN')                 as bank_known_count,
+      (select coalesce(sum(amount_minor), 0)::int from bank_transactions
+        where direction = 'DEBIT' and category <> 'UNKNOWN')                 as bank_known_minor,
       (select coalesce(sum(vat_minor), 0)::int from invoices
         where tax_status = 'INVALID' and vat_minor is not null)              as vat_invalid_amount
   `)).rows;
@@ -170,8 +187,36 @@ export async function gatherHomeProvenance(): Promise<HomeProvenance> {
     });
   }
 
+  const bankOutflow: Contribution[] = [
+    {
+      id: "bank-known",
+      label: "حركات معروفة الوجه",
+      count: Number(r?.bank_known_count ?? 0),
+      amountMinor: Number(r?.bank_known_minor ?? 0),
+      unit: "حركة",
+      included: true,
+    },
+  ];
+  if (Number(r?.bank_unknown_count ?? 0) > 0) {
+    bankOutflow.push({
+      id: "bank-unknown",
+      label: "حركات لم يُعرف وجهها",
+      count: Number(r!.bank_unknown_count),
+      /*
+        مبلغها معلوم وإن جُهل وجهها — فيُذكر. وهذا يخالف حالَ المستند
+        الذي لم يُقرأ أصلاً: ذاك مبلغه مجهول فيبقى `null`.
+      */
+      amountMinor: Number(r!.bank_unknown_minor),
+      unit: "حركة",
+      included: false,
+      reason: "خارج الرقم حتى تُصنَّف — ومبلغها معلوم",
+      href: "/bank",
+    });
+  }
+
   return {
     month,
+    bankOutflow: buildProvenance(bankOutflow),
     purchases: buildProvenance(purchases),
     outstanding: buildProvenance(outstanding),
     vat: buildProvenance(vat),

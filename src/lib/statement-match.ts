@@ -29,10 +29,22 @@ export interface OurInvoice {
   totalMinor: number;
 }
 
+/**
+ * حالات سطر الكشف.
+ *
+ * كانت أربعاً، فكل ما لم يُطابَق «مفقود من الأرشيف» — والحال أغنى:
+ * السطر قد يكون مكرّراً في كشف المورّد نفسه، أو إشعاراً دائناً، أو
+ * سداداً لم يُنسَب، أو مطابقاً بمرجعٍ يتنازعه سطران. وكلٌّ يحتاج فعلاً
+ * مختلفاً، فتسميتها كلّها «مفقودة» يُخفي ما يجب أن يُرى.
+ */
 export type LineStatus =
   | "MATCHED"
   | "AMOUNT_MISMATCH"
+  | "DATE_MISMATCH"
   | "MISSING_FROM_ARCHIVE"
+  | "DUPLICATE_LINE"
+  | "REFERENCE_CONFLICT"
+  | "CREDIT_NOTE"
   | "PAYMENT";
 
 export interface LineMatch {
@@ -43,6 +55,10 @@ export interface LineMatch {
   differenceMinor?: number;
   /** كيف طوبق: بالرقم أوثق من بالمبلغ */
   method?: "REF" | "AMOUNT_DATE";
+  /** درجة الترجيح من مئة — ليست يقيناً. */
+  score?: number;
+  /** لماذا طوبق هكذا، بنصّه. */
+  why?: string[];
 }
 
 export interface Reconciliation {
@@ -66,6 +82,8 @@ export interface Reconciliation {
 
   findings: Finding[];
 }
+
+import { reconcile, type Claim } from "./bank/optimizer";
 
 /** توحيد رقم الفاتورة للمقارنة: بلا رموز ولا فراغ، بحروف كبيرة. */
 export function normalizeRef(value: string | null | undefined): string {
@@ -105,61 +123,134 @@ export function reconcileStatement(
   const tolerance = options.toleranceMinor ?? 1;
   const windowMs = (options.dateWindowDays ?? 7) * DAY;
 
-  const claimed = new Set<string>();
-  const lines: LineMatch[] = [];
-
   const ourByRef = ourInvoices.map((i) => ({ invoice: i, ref: normalizeRef(i.invoiceNumber) }));
 
-  for (const line of statementLines) {
-    // السطر الدائن سداد لا فاتورة — يدخل الرصيد ولا يُطابَق بفاتورة
-    if (line.creditMinor > 0 && line.debitMinor === 0) {
-      lines.push({ line, status: "PAYMENT" });
-      continue;
-    }
-    if (line.debitMinor <= 0) {
-      lines.push({ line, status: "PAYMENT" });
-      continue;
-    }
+  /*
+    ── النواة المشتركة ──
 
+    كان هنا `claimed` جشعٌ: أوّل سطر يجد فاتورةً يحجزها، فيُحرَم سطرٌ
+    لاحقٌ أولى بها. وهي عين المشكلة التي عولجت في محرّك البنك — فلا
+    يصحّ أن يُصلَح أحدهما ويُترك الآخر، ولا أن يُكتَب مطابقان مختلفان
+    لعملٍ واحد.
+
+    فتُولَّد المطالبات كلّها أوّلاً، ثمّ تُوزَّع بالدرجة عبر الكشف كلّه
+    في `reconcile()` نفسها التي يستعملها البنك.
+  */
+  const debitLines = statementLines.filter((l) => l.debitMinor > 0);
+  const claims: Claim[] = [];
+
+  debitLines.forEach((line, lineIndex) => {
+    const key = `line-${lineIndex}`;
     const theirRef = normalizeRef(line.ref ?? line.description);
 
-    // ١) بالرقم — أوثق دليل
-    let hit = ourByRef.find(
-      (o) => !claimed.has(o.invoice.invoiceId) && refMatches(theirRef, o.ref),
-    );
-    let method: LineMatch["method"] = "REF";
+    for (const o of ourByRef) {
+      const byRef = theirRef.length > 0 && refMatches(theirRef, o.ref);
+      const amountClose = Math.abs(o.invoice.totalMinor - line.debitMinor) <= tolerance;
+      const dateClose =
+        Math.abs(o.invoice.invoiceDate.getTime() - line.date.getTime()) <= windowMs;
 
-    // ٢) بالمبلغ والتاريخ — حين لا يكتب المورّد رقماً
-    if (!hit) {
-      hit = ourByRef.find(
-        (o) =>
-          !claimed.has(o.invoice.invoiceId) &&
-          Math.abs(o.invoice.totalMinor - line.debitMinor) <= tolerance &&
-          Math.abs(o.invoice.invoiceDate.getTime() - line.date.getTime()) <= windowMs,
-      );
-      method = "AMOUNT_DATE";
+      if (!byRef && !(amountClose && dateClose)) continue;
+
+      /*
+        المرجع أوثق دليل: المورّد كتب رقم فاتورتنا بنفسه. والمبلغ
+        والتاريخ معاً أضعف — قد يجتمعان بالمصادفة في كشفٍ فيه عشرات
+        الأسطر المتقاربة.
+      */
+      const score = byRef ? (amountClose ? 1 : 0.9) : 0.7;
+      const why: string[] = [];
+      if (byRef) why.push(`المورّد كتب مرجعاً يطابق رقم فاتورتنا ${o.invoice.invoiceNumber}`);
+      if (amountClose) why.push("المبلغ يطابق");
+      else why.push(`فرق المبلغ ${Math.abs(o.invoice.totalMinor - line.debitMinor) / 100} ريالاً`);
+      if (dateClose) why.push("التاريخ ضمن النافذة");
+      else why.push("التاريخ خارج النافذة");
+
+      claims.push({
+        transactionId: key,
+        candidate: {
+          invoiceIds: [o.invoice.invoiceId],
+          outcome: amountClose ? "EXACT_INVOICE" : "AMOUNT_MISMATCH",
+          allocatedMinor: line.debitMinor,
+          parts: {
+            supplier: 1,
+            amount: amountClose ? 1 : 0,
+            date: dateClose ? 1 : 0,
+            reference: byRef ? 1 : 0,
+          },
+          score,
+          evidence: why,
+        },
+      });
+    }
+  });
+
+  const resolved = reconcile(claims);
+  const byLineKey = new Map(resolved.assigned.map((a) => [a.transactionId, a]));
+  const invoiceById = new Map(ourInvoices.map((i) => [i.invoiceId, i]));
+  const claimedIds = new Set(resolved.assigned.flatMap((a) => a.candidate.invoiceIds));
+
+  const lines: LineMatch[] = [];
+  let debitIndex = -1;
+  /** يكشف تكرار السطر داخل كشف المورّد نفسه. */
+  const seenLines = new Set<string>();
+
+  for (const line of statementLines) {
+    if (line.debitMinor <= 0) {
+      /*
+        الدائن ليس دائماً سداداً: قد يكون إشعاراً دائناً — مرتجَعاً أو
+        خصماً — وهو يغيّر ما علينا لا ما دفعناه. ويُفصَل بوصفه.
+      */
+      const text = `${line.description ?? ""} ${line.ref ?? ""}`;
+      const isCredit = /اشعار\s*دائن|إشعار\s*دائن|credit\s*note|مرتجع|خصم/i.test(text);
+      lines.push({ line, status: isCredit ? "CREDIT_NOTE" : "PAYMENT" });
+      continue;
     }
 
+    debitIndex++;
+    const fingerprint = `${line.date.toISOString().slice(0, 10)}|${line.debitMinor}|${normalizeRef(line.ref ?? line.description)}`;
+    if (seenLines.has(fingerprint)) {
+      lines.push({ line, status: "DUPLICATE_LINE" });
+      continue;
+    }
+    seenLines.add(fingerprint);
+
+    const hit = byLineKey.get(`line-${debitIndex}`);
     if (!hit) {
       lines.push({ line, status: "MISSING_FROM_ARCHIVE" });
       continue;
     }
 
-    claimed.add(hit.invoice.invoiceId);
-    const difference = line.debitMinor - hit.invoice.totalMinor;
+    const invoice = invoiceById.get(hit.candidate.invoiceIds[0])!;
+    const difference = line.debitMinor - invoice.totalMinor;
+    const byRef = hit.candidate.parts.reference === 1;
+    const dateClose = hit.candidate.parts.date === 1;
+
+    /*
+      مرشّحان متقاربان في المرجع تنازعٌ يُعلَن، لا يُحسم بصمت: قد يكون
+      المورّد كرّر رقماً أو كرّرنا نحن فاتورة.
+    */
+    const contested =
+      hit.runnerUpScore !== null && hit.candidate.score - hit.runnerUpScore < 0.05;
+
+    const status: LineStatus =
+      contested ? "REFERENCE_CONFLICT"
+      : Math.abs(difference) > tolerance ? "AMOUNT_MISMATCH"
+      : !dateClose ? "DATE_MISMATCH"
+      : "MATCHED";
 
     lines.push({
       line,
-      invoice: hit.invoice,
-      method,
+      invoice,
+      method: byRef ? "REF" : "AMOUNT_DATE",
       differenceMinor: difference,
-      status: Math.abs(difference) <= tolerance ? "MATCHED" : "AMOUNT_MISMATCH",
+      score: Math.round(hit.candidate.score * 100),
+      why: hit.candidate.evidence,
+      status,
     });
   }
 
   const missingFromArchive = lines.filter((l) => l.status === "MISSING_FROM_ARCHIVE");
   const amountMismatches = lines.filter((l) => l.status === "AMOUNT_MISMATCH");
-  const notInStatement = ourInvoices.filter((i) => !claimed.has(i.invoiceId));
+  const notInStatement = ourInvoices.filter((i) => !claimedIds.has(i.invoiceId));
 
   const theirBilledMinor = statementLines.reduce((s, l) => s + Math.max(0, l.debitMinor), 0);
   const theirPaidMinor = statementLines.reduce((s, l) => s + Math.max(0, l.creditMinor), 0);

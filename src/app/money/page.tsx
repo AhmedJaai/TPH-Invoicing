@@ -5,6 +5,9 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
 import { HubGrid, type HubTile } from "@/components/hub";
+import { Figure } from "@/components/figure";
+import { gatherHomeProvenance } from "@/lib/provenance-facts";
+
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +22,8 @@ export default async function MoneyPage() {
       </PageShell>
     );
   }
+
+  const prov = await gatherHomeProvenance();
 
   const [f] = (
     await db.execute<Record<string, number>>(sql`
@@ -104,6 +109,20 @@ export default async function MoneyPage() {
       title="المال"
       intro="أين ذهب المال وما بقي عليك — من كشف بنكك وفواتيرك، لا من تقدير."
     >
+      {/*
+        الصادر من الحساب، والمجهول منه معلَنٌ بمبلغه.
+        «مصروفاتك ٤٢٬٠٠٠» تُقرأ كاملةً وفيها ثمانية آلاف لم يُعرف وجهها.
+      */}
+      <div className="mb-6 max-w-md">
+        <Figure
+          label="الصادر من الحساب"
+          provenance={prov.bankOutflow}
+          unit="حركة"
+          href="/bank"
+          note="اضغط «من أين جاء؟» لترى ما لم يُصنَّف بعد"
+        />
+      </div>
+
       <HubGrid tiles={tiles} />
 
       <section className="mt-10">

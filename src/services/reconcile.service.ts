@@ -43,8 +43,34 @@ export interface TransactionResult {
   runnerUpScore: number | null;
 }
 
+/** ما يُكتَب فعلاً حين يوافق المستخدم — من المحرّك وحده. */
+export interface PlannedPayment {
+  transactionKey: string;
+  supplierId: string;
+  amountMinor: number;
+  paidAt: Date;
+  /**
+   * التخصيصات لكل فاتورة على حدة.
+   *
+   * وليست «كامل المتبقّي» دائماً: السداد الجزئي يُخصَّص بقدره،
+   * والزيادة لا تُخصَّص فوق قيمة الفاتورة.
+   */
+  allocations: { invoiceId: string; amountMinor: number }[];
+  /**
+   * الشهور التي تخصّها هذه الدفعة.
+   *
+   * كان يُحفَظ شهر أوّل فاتورة وحده، فدفعةٌ تسدّد أغسطس وسبتمبر
+   * وأكتوبر تُنسب إلى أغسطس كلّها. والشهر الحاكم هو الأحدث — لأنّ
+   * الدفعة تُغلق ما بلغته — والباقي يُحفَظ معه.
+   */
+  months: string[];
+  primaryMonth: string;
+}
+
 export interface ReconcileResult {
   results: TransactionResult[];
+  /** خطّة الكتابة — لا تُنفَّذ إلّا بموافقة، ومصدرها المحرّك وحده. */
+  planned: PlannedPayment[];
   summary: {
     total: number;
     understood: number;
@@ -127,6 +153,51 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
     };
   });
 
+  /*
+    خطّة الكتابة.
+
+    كان المحرّك القديم هو من ينشئ الدفعات، والجديد يكتب «أدلّةً» فوقها —
+    فيمكن أن تقول الشاشة اقتراحاً ويكتب الخادم غيره. مصدرُ قرارٍ واحد
+    أو لا شيء.
+
+    والاقتراح لا يُكتَب: التلقائيّ وحده. أمّا `SUGGEST` فينتظر تأكيداً،
+    وهذا هو معنى أن يكون اقتراحاً.
+  */
+  const planned: PlannedPayment[] = [];
+  for (const r of results) {
+    if (r.decision?.disposition !== "AUTO" || !r.candidate || !r.supplierId) continue;
+
+    const chosen = invoices.filter((i) => r.candidate!.invoiceIds.includes(i.id));
+    if (chosen.length === 0) continue;
+
+    /*
+      يُوزَّع المبلغ على الفواتير بترتيب تاريخها — الأقدم أوّلاً — ولا
+      يتجاوز مجموعُ التخصيصات قيمةَ الدفعة ولا قيمةَ أيّ فاتورة.
+    */
+    let left = r.candidate.allocatedMinor;
+    const allocations: PlannedPayment["allocations"] = [];
+    for (const inv of [...chosen].sort((a, b) => a.invoiceDate.getTime() - b.invoiceDate.getTime())) {
+      if (left <= 0) break;
+      const take = Math.min(left, inv.outstandingMinor);
+      if (take <= 0) continue;
+      allocations.push({ invoiceId: inv.id, amountMinor: take });
+      left -= take;
+    }
+    if (allocations.length === 0) continue;
+
+    const months = [...new Set(chosen.map((i) => i.periodMonth))].sort();
+
+    planned.push({
+      transactionKey: r.key,
+      supplierId: r.supplierId,
+      amountMinor: r.candidate.allocatedMinor,
+      paidAt: prepared.find((p) => p.key === r.key)!.canonical.valueDate,
+      allocations,
+      months,
+      primaryMonth: months[months.length - 1],
+    });
+  }
+
   const summary = {
     total: results.length,
     understood: results.filter((r) => r.kind !== "UNKNOWN").length,
@@ -139,7 +210,7 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
     notPayment: results.filter((r) => !PAYMENT_KINDS.includes(r.kind)).length,
   };
 
-  return { results, summary };
+  return { results, planned, summary };
 }
 
 /**
