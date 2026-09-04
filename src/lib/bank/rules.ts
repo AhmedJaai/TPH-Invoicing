@@ -105,7 +105,8 @@ const HINTS: { category: TxCategory; words: string[] }[] = [
       "راتب", "رواتب", "مسير", "اجور", "مكافاه",
     ],
   },
-  { category: "RENT", words: ["ايجار", "الايجار", "rent", "lease"] },
+  // منصّة «إيجار» الحكومية: يظهر اسمها وحده في سطر السداد بلا اسم المؤجّر
+  { category: "RENT", words: ["ejar", "ايجار", "الايجار", "rent", "lease"] },
   { category: "ZAKAT", words: ["زكاه", "صدقه", "تبرع", "charity", "donation"] },
   { category: "INTERNAL", words: ["نقاط بيع", "رسوم", "ضريبه عمليه", "دفع الكتروني", "digital channel"] },
 ];

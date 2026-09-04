@@ -258,3 +258,57 @@ describe("التصنيف يسبق التخمين", () => {
     expect(matchBankTransactions([tx], [], index)[0].category).toBe("INTERNAL");
   });
 });
+
+describe("ركام كشف البنك لا يُنسَب إلى أحد", () => {
+  /** سداد إيجار عبر منصّة «إيجار» — لا اسم مستفيد فيه إطلاقاً */
+  const EJAR = "EJAR رقم السداد20904553589 هاتف الأهلي مرجع سداد6959405833 مرجع107125784";
+
+  const index: SupplierAliasIndex[] = [
+    {
+      supplierId: "mariah", supplierName: "مريم — براونيز",
+      // اسمان بديلان مسمومان حُفظا من وصف حوالة سابقة
+      normalizedNames: ["مريم براونيز", "ماريه بامخشب الاهلي مرجع100344323"],
+    },
+    { supplierId: "sabea", supplierName: "سبعة جرة", normalizedNames: ["sabea jar"] },
+    { supplierId: "olive", supplierName: "أوراق الزيتون", normalizedNames: ["اوراق الزيتون"] },
+  ];
+
+  it("لا يُنسب سداد الإيجار إلى مورّد لمجرّد ورود اسم البنك في وصفه", () => {
+    expect(findSupplierInText(EJAR, index)).toBeUndefined();
+  });
+
+  it("«jar» لا تطابق داخل «EJAR» — الكلمة تُطابَق كلمةً لا حرفاً في وسط أخرى", () => {
+    const only = [index[1]];
+    expect(findSupplierInText(EJAR, only)).toBeUndefined();
+    expect(findSupplierInText("تحويل الى Sabea Jar", only)?.supplierId).toBe("sabea");
+  });
+
+  it("لصق الأرقام بالكلمة لا يمنع المطابقة", () => {
+    const idx: SupplierAliasIndex[] = [
+      { supplierId: "x", supplierName: "س", normalizedNames: ["خاشقجي"] },
+    ];
+    expect(findSupplierInText("حوالة خاشقجي12345 مبلغ", idx)?.supplierId).toBe("x");
+  });
+
+  it("الاسم الحقيقي ما زال يُطابَق رغم تشديد القواعد", () => {
+    expect(
+      findSupplierInText("شركة انس غالب حمزه خاشقجي  التجارية المحد ودة", [
+        { supplierId: "g", supplierName: "غاناش", normalizedNames: ["شركه انس غالب حمزه خاشقجي التجاريه المحدوده"] },
+      ])?.supplierId,
+    ).toBe("g");
+  });
+
+  it("مولّد الاسم البديل يُسقط الأرقام وركام البنك", () => {
+    const s = suggestAlias(EJAR);
+    expect(s).not.toContain("الاهلي");
+    expect(s).not.toContain("مرجع");
+    expect(s).not.toMatch(/\d/);
+  });
+
+  it("مولّد الاسم البديل يُبقي الاسم الحقيقي", () => {
+    const s = suggestAlias("ماريه بامخشب الاهلي مرجع100344323");
+    expect(s).toContain("ماريه");
+    expect(s).toContain("بامخشب");
+    expect(s).not.toContain("الاهلي");
+  });
+});

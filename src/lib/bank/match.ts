@@ -80,11 +80,40 @@ const STOPWORDS = new Set([
   // أدوات ربط وكلمات مصرفية ثابتة — ترد في كل حركة فلا تميّز أحداً
   "الي", "علي", "من", "عن", "لدي", "لصالح", "المستفيد", "مستفيد",
   "حساب", "بنك", "مصرف", "البنك", "فرع", "صادر", "وارد", "قيد",
+  /*
+   * ركام كشف الأهلي. «الأهلي» اسم البنك نفسه، يرد في كل سطر سداد
+   * («هاتف الأهلي مرجع سداد…») — ولمّا التقطه مولّد الأسماء البديلة وحفظه
+   * جزءاً من اسم مورّد، صارت كل حوالة في الكشف تُنسب إلى ذلك المورّد.
+   */
+  "الاهلي", "اهلي", "snb", "الراجحي", "راجحي", "rajhi", "sadad", "مرجع",
+  "السداد", "هاتف", "رقم", "فاتوره", "صادره", "وارده", "بطاقه", "مدى", "mada",
+  "atm", "pos", "bill", "payment", "channel", "digital", "city",
+  // ركام وصف الراتب: «BV:Monthly Salary» — ليست من اسم أحد
+  "monthly", "salary", "ben", "bv",
 ]);
 
 /** الكلمات المميِّزة في اسم: ما ليس شائعاً وطوله ثلاثة أحرف فأكثر. */
 export function distinctiveTokens(normalized: string): string[] {
   return normalized.split(" ").filter((t) => t.length >= 3 && !STOPWORDS.has(t));
+}
+
+/**
+ * هل ترد الكلمة في الوصف كلمةً مستقلّة؟
+ *
+ * الاحتواء في وسط كلمة أخرى يخدع: «jar» من «Sabea Jar» يقع داخل «EJAR»
+ * — وهي منصّة الإيجار لا اسم العميل — فنُسب سداد الإيجار إلى «سبعة جرة».
+ *
+ * ونتسامح في لصق الأرقام وحده، لأنّ كشف البنك يلصقها بالكلمة بلا فاصل:
+ * «السداد20904553589». فالكلمة تطابق ما يبدأ بها ثمّ أرقامٌ لا غير.
+ */
+function tokenAppears(token: string, haystackTokens: ReadonlySet<string>): boolean {
+  if (haystackTokens.has(token)) return true;
+  for (const h of haystackTokens) {
+    if (h.length > token.length && h.startsWith(token) && /^\d+$/.test(h.slice(token.length))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -133,7 +162,7 @@ export function findSupplierInText(
       const tokens = distinctiveTokens(name);
       if (tokens.length === 0) continue;
 
-      const matched = tokens.filter((t) => haystackTokens.has(t) || haystack.includes(t));
+      const matched = tokens.filter((t) => tokenAppears(t, haystackTokens));
       if (matched.length === 0) continue;
 
       const ratio = matched.length / tokens.length;
@@ -303,7 +332,13 @@ export function findDuplicatePayments(
 export function suggestAlias(description: string, maxWords = 4): string {
   const tokens = normalizeName(description)
     .split(" ")
-    .filter((t) => t.length >= 3 && !STOPWORDS.has(t) && !/^\d+$/.test(t));
+    .filter(
+      (t) =>
+        t.length >= 3 &&
+        !STOPWORDS.has(t) &&
+        // الأرقام وما لُصقت به ليست من اسم أحد: «مرجع100344323»
+        !/\d/.test(t),
+    );
 
   if (tokens.length <= maxWords) return tokens.join(" ");
 
