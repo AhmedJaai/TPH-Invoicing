@@ -19,7 +19,7 @@ export default async function AnalysisPage() {
   if (!user) redirect("/login");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} active="/performance" title="تحليل الاستهلاك">
+      <PageShell user={user} width="wide" title="تحليل الاستهلاك">
         <Empty message="دورك لا يشمل الأرقام المالية، فهذه الصفحة محجوبة عنك." />
       </PageShell>
     );
@@ -57,7 +57,7 @@ export default async function AnalysisPage() {
     return (
       <PageShell
         user={user}
-        active="/performance"
+       
         title="تحليل الاستهلاك"
         intro="كل صنف اشتريته: كم مرة طُلب، وبأي كميّة، وكم كلّف، ومن أي مورّد، وكل كم يوم تحتاجه."
       >
@@ -81,7 +81,7 @@ export default async function AnalysisPage() {
   return (
     <PageShell
       user={user}
-      active="/performance"
+     
       title="تحليل الاستهلاك"
       intro="كل صنف اشتريته: كم مرة طُلب، وبأي كميّة، وكم كلّف، ومن أي مورّد، وكل كم يوم تحتاجه."
     >

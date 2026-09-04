@@ -40,7 +40,7 @@ export default async function AuditPage() {
   if (!user) redirect("/login");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} active="/performance" title="التدقيق">
+      <PageShell user={user} width="wide" title="التدقيق">
         <Empty message="دورك لا يشمل الأرقام المالية، فهذه الصفحة محجوبة عنك." />
       </PageShell>
     );
@@ -128,7 +128,7 @@ export default async function AuditPage() {
     return (
       <PageShell
         user={user}
-        active="/performance"
+       
         title="التدقيق"
         intro="فحص شامل: ما سُدّد وما لم يُسدَّد، وما يصلح لخصم المدخلات وما لا يصلح، وما تغيّر سعره."
       >
@@ -140,7 +140,7 @@ export default async function AuditPage() {
   return (
     <PageShell
       user={user}
-      active="/performance"
+     
       title="التدقيق"
       intro="فحص شامل: ما سُدّد وما لم يُسدَّد، وما يصلح لخصم المدخلات وما لا يصلح، وما تغيّر سعره عن آخر مرة."
     >

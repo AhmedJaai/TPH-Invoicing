@@ -13,7 +13,7 @@ export default async function AttentionPage() {
   if (!user) redirect("/login");
   if (!can(user.role, "reports:view")) {
     return (
-      <PageShell user={user} active="/attention" title="ما يحتاج انتباهك">
+      <PageShell user={user} title="ما يحتاج انتباهك">
         <Empty message="دورك لا يشمل التقارير المالية، فهذه الصفحة محجوبة عنك." />
       </PageShell>
     );
@@ -25,7 +25,7 @@ export default async function AttentionPage() {
   return (
     <PageShell
       user={user}
-      active="/attention"
+     
       title="ما يحتاج انتباهك"
       intro="كل الاستثناءات في مكان واحد، مرتّبةً بالأهمّ. ولكلٍّ منها خطوة ومكانٌ يُعالَج فيه."
     >

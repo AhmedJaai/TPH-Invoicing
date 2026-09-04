@@ -14,7 +14,7 @@ export default async function MoneyPage() {
   if (!user) redirect("/login");
   if (!can(user.role, "bank:view")) {
     return (
-      <PageShell user={user} active="/money" title="المال">
+      <PageShell user={user} title="المال">
         <Empty message="هذه الصفحة محجوبة عن دورك." />
       </PageShell>
     );
@@ -100,7 +100,7 @@ export default async function MoneyPage() {
   return (
     <PageShell
       user={user}
-      active="/money"
+     
       title="المال"
       intro="أين ذهب المال وما بقي عليك — من كشف بنكك وفواتيرك، لا من تقدير."
     >

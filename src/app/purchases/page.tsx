@@ -13,7 +13,7 @@ export default async function PurchasesPage() {
   if (!user) redirect("/login");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} active="/purchases" title="المشتريات">
+      <PageShell user={user} width="wide" title="المشتريات">
         <Empty message="دورك لا يشمل الأرقام المالية، فهذه الصفحة محجوبة عنك." />
       </PageShell>
     );
@@ -96,7 +96,7 @@ export default async function PurchasesPage() {
   return (
     <PageShell
       user={user}
-      active="/purchases"
+     
       title="المشتريات"
       intro="ما اشتريتَه ومن اشتريتَه منه وما بقي عليك — وكشوف مورّديك التي تكشف ما لم يصلك."
     >

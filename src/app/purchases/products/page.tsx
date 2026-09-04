@@ -13,7 +13,7 @@ export default async function ProductsPage() {
   if (!user) redirect("/login");
   if (!can(user.role, "supplier:edit")) {
     return (
-      <PageShell user={user} active="/purchases" title="الأصناف">
+      <PageShell user={user} width="wide" title="الأصناف">
         <Empty message="تعديل الأصناف للمالك والمحاسب." />
       </PageShell>
     );
@@ -38,7 +38,7 @@ export default async function ProductsPage() {
 
   if (rows.length === 0) {
     return (
-      <PageShell user={user} active="/purchases" title="الأصناف">
+      <PageShell user={user} width="wide" title="الأصناف">
         <Empty message="لا أصناف بعد. تُبنى من بنود الفواتير — اقرأ محتوى فواتيرك أوّلاً." />
       </PageShell>
     );
@@ -47,7 +47,7 @@ export default async function ProductsPage() {
   return (
     <PageShell
       user={user}
-      active="/purchases"
+     
       title="الأصناف"
       intro="اسم الصنف عند مورّده ليس مُعرِّفاً له. الربط بصنف معياري هو ما يجمع ما اشتريتَه من مورّدين مختلفين تحت شيء واحد — وهو أساس كل تحليل تكلفة لاحق."
     >

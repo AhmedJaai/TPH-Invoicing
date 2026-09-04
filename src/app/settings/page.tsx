@@ -21,7 +21,7 @@ export default async function SettingsPage() {
   if (!user) redirect("/login");
   if (!can(user.role, "supplier:view")) {
     return (
-      <PageShell user={user} active="/settings" title="الإعدادات">
+      <PageShell user={user} title="الإعدادات">
         <Empty message="هذه الصفحة محجوبة عن دورك." />
       </PageShell>
     );
@@ -106,7 +106,7 @@ export default async function SettingsPage() {
   return (
     <PageShell
       user={user}
-      active="/settings"
+     
       title="الإعدادات"
       intro="ما يُضبط مرّة: المورّدون وقواعد التصنيف وحال الربط."
     >

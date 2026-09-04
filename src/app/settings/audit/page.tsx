@@ -65,7 +65,7 @@ export default async function AuditTrailPage({
   if (!user) redirect("/login");
   if (!can(user.role, "audit:view")) {
     return (
-      <PageShell user={user} active="/settings" title="سجل التدقيق">
+      <PageShell user={user} width="wide" title="سجل التدقيق">
         <Empty message="سجل التدقيق للمالك والمحاسب." />
       </PageShell>
     );
@@ -96,7 +96,7 @@ export default async function AuditTrailPage({
   return (
     <PageShell
       user={user}
-      active="/settings"
+     
       title="سجل التدقيق"
       intro="ما فُعل، ومن فعله، ومتى — غير قابل للتعديل ولا الحذف، مفروضاً بمشغّلات في القاعدة لا باتفاق برمجي."
     >

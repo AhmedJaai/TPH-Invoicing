@@ -17,7 +17,7 @@ export default async function ClosePage() {
   if (!user) redirect("/login");
   if (!can(user.role, "month:close")) {
     return (
-      <PageShell user={user} active="/money" title="إقفال الشهر">
+      <PageShell user={user} title="إقفال الشهر">
         <Empty message="إقفال الشهر للمالك والمحاسب." />
       </PageShell>
     );
@@ -41,7 +41,7 @@ export default async function ClosePage() {
 
   if (months.length === 0) {
     return (
-      <PageShell user={user} active="/money" title="إقفال الشهر">
+      <PageShell user={user} title="إقفال الشهر">
         <Empty message="لا بيانات بعد. ارفع فواتيرك أوّلاً." />
       </PageShell>
     );
@@ -54,7 +54,7 @@ export default async function ClosePage() {
   return (
     <PageShell
       user={user}
-      active="/money"
+     
       title="إقفال الشهر"
       intro="الإقفال إعلانٌ بأنّ الشهر تمّ: كل فاتورة وصلت، وكل خلل عُولج أو أُقرَّ به عمداً. فليس زرّاً يُضغط بل قائمةً تُقرأ."
     >

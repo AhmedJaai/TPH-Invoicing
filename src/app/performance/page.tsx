@@ -23,7 +23,7 @@ export default async function PerformancePage() {
   if (!user) redirect("/login");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} active="/performance" title="الأداء">
+      <PageShell user={user} width="wide" title="الأداء">
         <Empty message="دورك لا يشمل الأرقام المالية، فهذه الصفحة محجوبة عنك." />
       </PageShell>
     );
@@ -71,7 +71,7 @@ export default async function PerformancePage() {
   return (
     <PageShell
       user={user}
-      active="/performance"
+     
       title="الأداء"
       intro="ما تدعمه بياناتك الموجودة: الأصناف وأسعارها ومورّدوها. وما يحتاج مبيعات — الهامش والتكلفة — مذكور صراحةً أنّه غير متاح."
     >

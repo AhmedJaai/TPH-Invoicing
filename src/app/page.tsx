@@ -124,7 +124,8 @@ export default async function HomePage() {
   return (
     <PageShell
       user={user}
-      active="/"
+      width="wide"
+     
       title="حال المقهى"
       intro="ما تحتاج معرفته أو فعله اليوم — لا ما في قاعدة البيانات من سجلات."
     >

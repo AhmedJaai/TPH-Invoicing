@@ -14,7 +14,7 @@ export default async function BankPage() {
   if (!user) redirect("/login");
   if (!can(user.role, "bank:view")) {
     return (
-      <PageShell user={user} active="/money" title="السداد">
+      <PageShell user={user} width="wide" title="السداد">
         <Empty message="كشف البنك محجوب عن دورك." />
       </PageShell>
     );
@@ -38,7 +38,7 @@ export default async function BankPage() {
   return (
     <PageShell
       user={user}
-      active="/money"
+     
       title="السداد"
       intro="طريقان لإقفال الفواتير المفتوحة: مطابقة كشف البنك، أو اعتمادها مسدَّدة بإقرارك. الأول أدقّ والثاني أسرع."
     >

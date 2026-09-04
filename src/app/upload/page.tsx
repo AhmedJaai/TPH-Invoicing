@@ -3,9 +3,7 @@ import { asc, count, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, suppliers } from "@/db/schema";
 import { Uploader } from "@/components/uploader";
-import { UserMenu } from "@/components/user-menu";
-import { Nav } from "@/components/nav";
-import { TrialBanner } from "@/components/trial-banner";
+import { PageShell } from "@/components/page-shell";
 import { DriveSync } from "@/components/drive-sync";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
@@ -47,43 +45,18 @@ export default async function Home() {
   const needContract = rows.filter((s) => !s.issuesInvoices).length;
 
   return (
-    <div className="min-h-screen">
-      <TrialBanner />
-      <header className="sticky top-0 z-10 border-b border-line bg-surface/85 backdrop-blur-md">
-        <div className="mx-auto max-w-3xl px-5 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="truncate font-display text-base font-bold leading-tight">
-                فواتير ذا بوبليك هاوس
-              </p>
-              <p className="truncate text-[11px] text-muted">الرقم الضريبي ٣١٠٠٠٧٩٧١٦٠٠٠٠٣</p>
-            </div>
-            <UserMenu name={user.name} role={user.role} />
-          </div>
-          <div className="mt-2.5">
-            <Nav role={user.role} active="/upload" />
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl px-5 py-8 sm:py-12">
-        <h1 className="font-display text-3xl font-black leading-tight sm:text-4xl">
-          كل فاتورة في مكانها،
-          <br />
-          من أول يوم.
-        </h1>
-        <p className="mt-3 max-w-xl text-sm leading-relaxed text-ink-soft">
-          ارفع الفاتورة كما وصلتك من واتساب — باسمها العشوائي أو صورةً بجوالك. يقرأ النظام
-          المستند نفسه، ويستخرج المورد والرقم والتاريخ والمبالغ، ويسمّيه ويحدّد مجلده،
-          ويعرض كل ذلك للتعديل قبل أن يُحفظ شيء.
-        </p>
-
-        <div className="mt-8">
-          <Uploader
+    <PageShell
+      user={user}
+      width="form"
+      title="أضف مستنداً"
+      intro="ارفع الفاتورة كما وصلتك من واتساب — باسمها العشوائي أو صورةً بجوّالك. يقرأ النظام المستند نفسه، ويستخرج المورّد والرقم والتاريخ والمبالغ، ويعرض كل ذلك للتعديل قبل أن يُحفظ شيء."
+    >
+      <div>
+        <Uploader
             canSeeAmounts={showAmounts}
-            suppliers={rows.map((s) => ({ id: s.id, nameAr: s.nameAr }))}
-          />
-        </div>
+          suppliers={rows.map((s) => ({ id: s.id, nameAr: s.nameAr }))}
+        />
+      </div>
 
         <section className="mt-8">
           <DriveSync />
@@ -129,7 +102,6 @@ export default async function Home() {
             ? "لك صلاحية الاطلاع على الأرقام المالية."
             : "دورك لا يشمل الأرقام المالية — تظهر لك المستندات دون مبالغها."}
         </footer>
-      </main>
-    </div>
+    </PageShell>
   );
 }

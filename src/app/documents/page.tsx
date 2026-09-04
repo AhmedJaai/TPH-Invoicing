@@ -171,7 +171,8 @@ export default async function DocumentsPage({
   return (
     <PageShell
       user={user}
-      active="/documents"
+      width="wide"
+     
       title="المستندات"
       intro="صندوق الوارد والأرشيف معاً: ما ينتظرك أوّلاً، ثمّ ما مضى. وكلٌّ منها موصول بملفه في الدرايف."
     >
