@@ -61,7 +61,7 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
   if (!can(user.role, "reports:view")) {
     return (
-      <PageShell user={user} active="/dashboard" title="لوحة القيادة">
+      <PageShell user={user} active="/" title="لوحة القيادة">
         <Empty message="دورك لا يشمل التقارير المالية، فهذه الصفحة محجوبة عنك." />
       </PageShell>
     );
@@ -94,7 +94,7 @@ export default async function DashboardPage() {
     return (
       <PageShell
         user={user}
-        active="/dashboard"
+        active="/"
         title="لوحة القيادة"
         intro="مؤشّرات مشترياتك وتوصيات مبنيّة على بياناتك أنت."
       >
@@ -241,7 +241,7 @@ export default async function DashboardPage() {
   return (
     <PageShell
       user={user}
-      active="/dashboard"
+      active="/"
       title="لوحة القيادة"
       intro="مؤشّرات مشترياتك وتوصيات مبنيّة على بياناتك أنت — لا على قواعد عامة."
     >

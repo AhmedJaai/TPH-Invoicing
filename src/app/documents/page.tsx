@@ -39,9 +39,24 @@ interface Params {
   month?: string;
   supplier?: string;
   kind?: string;
+  status?: string;
   q?: string;
   page?: string;
 }
+
+/**
+ * صناديق الوارد.
+ *
+ * الأرشيف وحده متصفّح ملفات؛ وصاحب العمل لا يحتاج تصفّح مئة وسبعة وخمسين
+ * ملفاً، بل يحتاج معرفة أيّها ينتظره. فالحالة أوّل ما يُرشَّح به.
+ */
+const STATUS_BUCKETS: { id: string; label: string; tone?: "warn" | "ok" }[] = [
+  { id: "PENDING", label: "جديد", tone: "warn" },
+  { id: "EXTRACTED", label: "قيد القراءة" },
+  { id: "NEEDS_REVIEW", label: "يحتاج مراجعة", tone: "warn" },
+  { id: "ARCHIVED", label: "مؤرشف", tone: "ok" },
+  { id: "REJECTED", label: "محجور" },
+];
 
 function Chip({
   href,
@@ -80,6 +95,7 @@ export default async function DocumentsPage({
   if (p.month) filters.push(eq(documents.periodMonth, p.month));
   if (p.supplier) filters.push(eq(documents.supplierId, p.supplier));
   if (p.kind) filters.push(sql`${documents.kind}::text = ${p.kind}`);
+  if (p.status) filters.push(sql`${documents.status}::text = ${p.status}`);
   // البحث في اسم الملف كما هو في الدرايف — وهو ما يتذكّره المستخدم عادةً
   if (p.q?.trim()) filters.push(ilike(documents.fileName, `%${p.q.trim()}%`));
   const where = filters.length ? and(...filters) : undefined;
@@ -123,6 +139,12 @@ export default async function DocumentsPage({
     .where(eq(suppliers.isActive, true))
     .orderBy(asc(suppliers.nameAr));
 
+  const statusRows = await db
+    .select({ status: documents.status, n: sql<number>`count(*)::int` })
+    .from(documents)
+    .groupBy(documents.status);
+  const statusCount = new Map(statusRows.map((r) => [r.status as string, Number(r.n)]));
+
   const kindRows = await db
     .select({ kind: documents.kind, n: sql<number>`count(*)::int` })
     .from(documents)
@@ -144,14 +166,14 @@ export default async function DocumentsPage({
   };
 
   const pages = Math.ceil(Number(total) / PAGE_SIZE);
-  const hasFilter = Boolean(p.month || p.supplier || p.kind || p.q);
+  const hasFilter = Boolean(p.month || p.supplier || p.kind || p.q || p.status);
 
   return (
     <PageShell
       user={user}
       active="/documents"
       title="المستندات"
-      intro="كل ما أُرشِف، وكلٌّ منها موصول بملفه في الدرايف. ابحث باسم الملف أو رشّح بالشهر أو المورّد أو النوع."
+      intro="صندوق الوارد والأرشيف معاً: ما ينتظرك أوّلاً، ثمّ ما مضى. وكلٌّ منها موصول بملفه في الدرايف."
     >
       {/* ── البحث والترشيح ── */}
       <form action="/documents" className="flex flex-wrap items-center gap-2">
@@ -165,6 +187,7 @@ export default async function DocumentsPage({
         {p.month && <input type="hidden" name="month" value={p.month} />}
         {p.supplier && <input type="hidden" name="supplier" value={p.supplier} />}
         {p.kind && <input type="hidden" name="kind" value={p.kind} />}
+        {p.status && <input type="hidden" name="status" value={p.status} />}
         <button
           type="submit"
           className="rounded-lg bg-inverse-surface px-4 py-2 text-xs font-bold text-inverse-ink"
@@ -182,6 +205,21 @@ export default async function DocumentsPage({
       </form>
 
       <div className="mt-3 space-y-2">
+        {/* الحالة أوّلاً: ما ينتظرك قبل ما مضى */}
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          <Chip href={link({ status: undefined })} active={!p.status}>الكل ({Number(total)})</Chip>
+          {STATUS_BUCKETS.map((b) => {
+            const n = statusCount.get(b.id) ?? 0;
+            if (n === 0 && p.status !== b.id) return null;
+            return (
+              <Chip key={b.id} href={link({ status: b.id })} active={p.status === b.id}>
+                <span className={p.status === b.id ? "" : b.tone === "warn" ? "text-warn" : b.tone === "ok" ? "text-ok" : ""}>
+                  {b.label} ({n})
+                </span>
+              </Chip>
+            );
+          })}
+        </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1">
           <Chip href={link({ month: undefined })} active={!p.month}>كل الأشهر</Chip>
           {monthRows.map((m) => (

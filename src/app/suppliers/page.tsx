@@ -52,7 +52,7 @@ export default async function SuppliersPage() {
 
   if (rows.length === 0) {
     return (
-      <PageShell user={user} active="/suppliers" title="المورّدون">
+      <PageShell user={user} active="/settings" title="المورّدون">
         <Empty message="لا مورّدين بعد. شغّل npm run db:seed لتأسيس السجل." />
       </PageShell>
     );
@@ -68,7 +68,7 @@ export default async function SuppliersPage() {
   return (
     <PageShell
       user={user}
-      active="/suppliers"
+      active="/settings"
       title="المورّدون"
       intro="سجلّ كل مورّد: بياناته الضريبية، ودورة فوترته، وما فُوتر وما سُدّد، والأسماء البديلة التي يُعرف بها في البنك."
     >

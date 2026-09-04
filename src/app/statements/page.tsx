@@ -14,7 +14,7 @@ export default async function StatementsPage() {
   if (!user) redirect("/login");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} active="/statements" title="كشوف المورّدين">
+      <PageShell user={user} active="/purchases" title="كشوف المورّدين">
         <Empty message="دورك لا يشمل الأرقام المالية، فهذه الصفحة محجوبة عنك." />
       </PageShell>
     );
@@ -46,7 +46,7 @@ export default async function StatementsPage() {
   return (
     <PageShell
       user={user}
-      active="/statements"
+      active="/purchases"
       title="كشوف المورّدين"
       intro="مقابلة كشف المورّد بفواتيرك. وهذه وحدها تكشف الفاتورة التي حمّلها عليك ولم تصلك — فاتورة ناقصة لا يكشفها تفتيش أرشيفك، لأنّها ليست فيه."
     >
