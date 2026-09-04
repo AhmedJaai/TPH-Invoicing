@@ -187,6 +187,14 @@ export default async function DashboardPage() {
   const totalSpend = invoiceRows.reduce((s, r) => s + r.totalMinor, 0);
   const thisMonth = monthly[monthly.length - 1];
 
+  const asRef = (r: typeof withStatus[number]) => ({
+    invoiceId: r.id,
+    supplierName: r.supplierName ?? "—",
+    invoiceNumber: r.invoiceNumber,
+    invoiceDate: r.invoiceDate,
+    amountMinor: r.totalMinor,
+  });
+
   const insights = buildInsights({
     items,
     sameNameCandidates: sameName,
@@ -199,6 +207,16 @@ export default async function DashboardPage() {
     unpaidCount: unpaid.length,
     unpostedCount: withStatus.filter((r) => !r.postedToAccounting).length,
     fixedAssetCount: withStatus.filter((r) => r.isFixedAsset).length,
+    // الأدلّة: الصفوف نفسها التي بُنيت عليها الأرقام
+    vatAtRiskInvoices: vat.rows.map((r) => ({
+      invoiceId: r.invoiceId, supplierName: r.supplierName,
+      invoiceNumber: r.invoiceNumber, invoiceDate: r.invoiceDate,
+      amountMinor: r.vatMinor, note: "ضريبة لا تُخصم",
+    })),
+    notTaxValidInvoices: withStatus.filter((r) => !r.isTaxValid).map(asRef),
+    unpaidInvoices: unpaid.map((r) => ({ ...asRef(r), amountMinor: Math.max(0, r.status.remainingMinor) })),
+    unpostedInvoices: withStatus.filter((r) => !r.postedToAccounting).map(asRef),
+    fixedAssetInvoices: withStatus.filter((r) => r.isFixedAsset).map(asRef),
     suppliersWithoutContract: noContract.map((s) => s.nameAr),
     suppliersMissingStatement: missingStatement,
     duplicatePaymentCount: 0,
@@ -287,6 +305,40 @@ export default async function DashboardPage() {
                   <span className="font-bold">الخطوة التالية: </span>
                   {n.action}
                 </p>
+
+                {/* التوصية بلا دليلها دعوى — فالدليل تحتها، يُفتح بضغطة */}
+                {n.evidence.length > 0 && (
+                  <details className="group mt-2.5">
+                    <summary className="cursor-pointer list-none text-[11px] font-bold underline underline-offset-4 opacity-80 hover:opacity-100">
+                      اعرض التفاصيل ({n.evidence.length + (n.evidenceMore ?? 0)})
+                    </summary>
+                    <ul className="mt-2 divide-y divide-line/60 rounded-lg border border-line/60 bg-surface/60">
+                      {n.evidence.map((e, i) => (
+                        <li key={i} className="flex items-start justify-between gap-3 px-3 py-1.5">
+                          <span className="min-w-0">
+                            <span className="block truncate text-[11px] font-medium">{e.label}</span>
+                            {e.sub && (
+                              <span className="block truncate text-[10px] text-muted">{e.sub}</span>
+                            )}
+                            {e.note && (
+                              <span className="block text-[10px] text-muted">{e.note}</span>
+                            )}
+                          </span>
+                          {e.amountMinor !== undefined && (
+                            <span className="shrink-0 text-[11px] font-bold">
+                              <Money minor={e.amountMinor} />
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    {(n.evidenceMore ?? 0) > 0 && (
+                      <p className="mt-1 text-[10px] text-muted">
+                        وأكبرها معروض — بقي {n.evidenceMore} غيرها.
+                      </p>
+                    )}
+                  </details>
+                )}
               </article>
             ))}
           </div>

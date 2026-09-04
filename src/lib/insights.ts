@@ -10,6 +10,14 @@ import type { ItemSummary, SameNameCandidate, SupplierAging, MonthlySpend } from
 
 export type InsightSeverity = "critical" | "warning" | "opportunity" | "info";
 
+/** صفٌّ من الدليل خلف التوصية — فاتورة أو صنف بعينه. */
+export interface InsightEvidence {
+  label: string;
+  sub?: string;
+  amountMinor?: number;
+  note?: string;
+}
+
 export interface Insight {
   id: string;
   severity: InsightSeverity;
@@ -18,6 +26,40 @@ export interface Insight {
   /** الأثر المالي بالهللات — يُرتَّب عليه، صفر لما لا أثر مالي مباشر له */
   impactMinor: number;
   action: string;
+  /**
+   * ما بُنيت عليه التوصية، صفّاً صفّاً.
+   *
+   * التوصية بلا دليلها دعوى: «تسع فواتير لا تصلح للخصم» لا تُفيد ما لم
+   * تقل أيّها. فتُعرض مطويّةً تحتها، تُفتح بضغطة.
+   */
+  evidence: InsightEvidence[];
+  /** كم بقي خارج القائمة المعروضة */
+  evidenceMore?: number;
+}
+
+/** فاتورة بعينها تُساق دليلاً. */
+export interface InvoiceRef {
+  invoiceId: string;
+  supplierName: string;
+  invoiceNumber: string;
+  invoiceDate: Date;
+  amountMinor: number;
+  note?: string;
+}
+
+const MAX_EVIDENCE = 12;
+
+function fromInvoices(rows: readonly InvoiceRef[]): Pick<Insight, "evidence" | "evidenceMore"> {
+  const sorted = [...rows].sort((a, b) => b.amountMinor - a.amountMinor);
+  return {
+    evidence: sorted.slice(0, MAX_EVIDENCE).map((r) => ({
+      label: r.invoiceNumber,
+      sub: `${r.supplierName} · ${r.invoiceDate.toISOString().slice(0, 10)}`,
+      amountMinor: r.amountMinor,
+      note: r.note,
+    })),
+    evidenceMore: Math.max(0, sorted.length - MAX_EVIDENCE),
+  };
 }
 
 export const SEVERITY_LABEL: Record<InsightSeverity, string> = {
@@ -43,6 +85,13 @@ export interface InsightInput {
   unpaidCount: number;
   unpostedCount: number;
   fixedAssetCount: number;
+
+  /* ── الأدلّة: الصفوف التي بُنيت عليها الأرقام أعلاه ── */
+  vatAtRiskInvoices?: readonly InvoiceRef[];
+  notTaxValidInvoices?: readonly InvoiceRef[];
+  unpaidInvoices?: readonly InvoiceRef[];
+  unpostedInvoices?: readonly InvoiceRef[];
+  fixedAssetInvoices?: readonly InvoiceRef[];
   suppliersWithoutContract: readonly string[];
   /** مورّدون نشطون لم يصل كشفهم عن الشهر المنقضي */
   suppliersMissingStatement: readonly string[];
@@ -62,6 +111,7 @@ export function buildInsights(input: InsightInput): Insight[] {
       detail: `${input.vatAtRiskCount} فاتورة لا تحمل الأركان الأربعة للفاتورة الضريبية، فلا يجوز خصم ضريبتها.`,
       impactMinor: input.vatAtRiskMinor,
       action: "اطلب من هؤلاء المورّدين فاتورة ضريبية كاملة تحمل رقمنا الضريبي، وبديلاً عن الفواتير المبسطة مستقبلاً.",
+      ...fromInvoices(input.vatAtRiskInvoices ?? []),
     });
   }
 
@@ -76,6 +126,13 @@ export function buildInsights(input: InsightInput): Insight[] {
       // لا يُدّعى توفير قبل أن يؤكّد الإنسان أنّهما صنف واحد
       impactMinor: 0,
       action: "راجع القائمة: إن كانا الصنف نفسه فعلاً فوحّد الشراء عند الأرخص أو تفاوض على مطابقة السعر.",
+      evidence: input.sameNameCandidates.slice(0, MAX_EVIDENCE).map((c) => ({
+        label: c.normalized,
+        sub: `${c.cheaper.supplierName} «${c.cheaper.displayName}» مقابل ${c.dearer.supplierName} «${c.dearer.displayName}»`,
+        amountMinor: c.dearer.lastUnitPriceMinor - c.cheaper.lastUnitPriceMinor,
+        note: `فارق ${Math.round(c.gapRatio * 100)}٪`,
+      })),
+      evidenceMore: Math.max(0, input.sameNameCandidates.length - MAX_EVIDENCE),
     });
   }
 
@@ -100,6 +157,13 @@ export function buildInsights(input: InsightInput): Insight[] {
       detail: `${rises.length} صنفاً ارتفع سعره ٥٪ فأكثر. أكبرها «${top.item.displayName}» بنسبة ${Math.round(top.item.priceChange!.deltaRatio * 100)}٪ — أثره وحده ${riyals(top.annual)} ريال في السنة.`,
       impactMinor: annualRise,
       action: "فاوض على الأصناف الثلاثة الأعلى أثراً أوّلاً، واطلب عرض سعر من مورّد بديل لتفاوض بورقة في يدك.",
+      evidence: rises.slice(0, MAX_EVIDENCE).map((x) => ({
+        label: x.item.displayName,
+        sub: `${x.item.supplierName} · ${riyals(x.item.priceChange!.previousMinor)} ← ${riyals(x.item.priceChange!.currentMinor)}`,
+        amountMinor: x.annual,
+        note: `+${Math.round(x.item.priceChange!.deltaRatio * 100)}٪ · أثر سنوي مقدَّر`,
+      })),
+      evidenceMore: Math.max(0, rises.length - MAX_EVIDENCE),
     });
   }
 
@@ -114,6 +178,12 @@ export function buildInsights(input: InsightInput): Insight[] {
       detail: `${overdue.length} مورّداً لهم مستحقّات متقادمة. أقدمها عند ${overdue[0].supplierName} منذ ${overdue[0].oldestDays} يوماً.`,
       impactMinor: overdueTotal,
       action: "التأخّر الطويل يفسد شروط التوريد ويضعف تفاوضك. أدرجها في دفعة أوّل الشهر القادمة.",
+      evidence: overdue.slice(0, MAX_EVIDENCE).map((a) => ({
+        label: a.supplierName,
+        sub: `أقدم دين منذ ${a.oldestDays} يوماً`,
+        amountMinor: a.buckets.d60 + a.buckets.d90 + a.buckets.older,
+      })),
+      evidenceMore: Math.max(0, overdue.length - MAX_EVIDENCE),
     });
   }
 
@@ -126,6 +196,7 @@ export function buildInsights(input: InsightInput): Insight[] {
       detail: "هذا هو رصيدك المستحق للمورّدين الآن.",
       impactMinor: 0,
       action: "راجعها قبل توليد دفعة أوّل الشهر.",
+      ...fromInvoices(input.unpaidInvoices ?? []),
     });
   }
 
@@ -138,6 +209,7 @@ export function buildInsights(input: InsightInput): Insight[] {
       detail: "لا تحمل الأركان الأربعة، فلا تصلح لخصم المدخلات.",
       impactMinor: 0,
       action: "اطلب البديل قبل السداد — بعد السداد يصعب انتزاع الفاتورة الصحيحة.",
+      ...fromInvoices(input.notTaxValidInvoices ?? []),
     });
   }
 
@@ -150,6 +222,7 @@ export function buildInsights(input: InsightInput): Insight[] {
       detail: "تحويلان لنفس الجهة بنفس المبلغ في نفس اليوم.",
       impactMinor: 0,
       action: "راجعها فوراً — استرداد المبلغ المكرّر يصعب كلّما تأخّر.",
+      evidence: [],
     });
   }
 
@@ -162,6 +235,7 @@ export function buildInsights(input: InsightInput): Insight[] {
       detail: "مؤرشفة في الدرايف لكنها لم تدخل النظام المحاسبي.",
       impactMinor: 0,
       action: "قيّدها قبل إقفال الشهر — الفاتورة غير المقيَّدة تختفي من التقارير.",
+      ...fromInvoices(input.unpostedInvoices ?? []),
     });
   }
 
@@ -174,6 +248,7 @@ export function buildInsights(input: InsightInput): Insight[] {
       detail: "معدّات تتجاوز ٣٬٠٠٠ ريال — تُرسمل وتُهلك على عمرها الإنتاجي ولا تُصرف دفعة واحدة.",
       impactMinor: 0,
       action: "راجعها مع المحاسب قبل الإقفال — صرفها دفعة واحدة يشوّه ربح الشهر.",
+      ...fromInvoices(input.fixedAssetInvoices ?? []),
     });
   }
 
@@ -186,6 +261,7 @@ export function buildInsights(input: InsightInput): Insight[] {
       detail: `${input.suppliersWithoutContract.join(" · ")} — بلا عقد لا خصم ضريبة ولا إثبات مصروف.`,
       impactMinor: 0,
       action: "وقّع عقد توريد مكتوباً مع كل منهم، أو استبدله بمورّد يصدر فواتير ضريبية.",
+      evidence: input.suppliersWithoutContract.map((n) => ({ label: n })),
     });
   }
 
@@ -198,6 +274,7 @@ export function buildInsights(input: InsightInput): Insight[] {
       detail: `${input.suppliersMissingStatement.join(" · ")} — بلا كشف لا تعرف إن كانت هناك فاتورة لم تصلك.`,
       impactMinor: 0,
       action: "اطلب الكشف الشهري منهم — الكشف هو ما يكشف الفاتورة الضائعة.",
+      evidence: input.suppliersMissingStatement.map((n) => ({ label: n })),
     });
   }
 
@@ -218,6 +295,11 @@ export function buildInsights(input: InsightInput): Insight[] {
           action: up
             ? "افحص إن كان السبب ارتفاع أسعار أم زيادة كميّات — العلاج يختلف تماماً."
             : "تحقّق أنّ الانخفاض ليس فواتير لم تصل بعد.",
+          evidence: input.monthlySpend.slice(-6).map((m) => ({
+            label: m.month,
+            sub: `${m.invoiceCount} فاتورة`,
+            amountMinor: m.totalMinor,
+          })),
         });
       }
     }

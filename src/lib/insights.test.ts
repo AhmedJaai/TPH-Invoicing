@@ -201,3 +201,45 @@ describe("اتجاه المصروف", () => {
     ] }))).not.toContain("spend-trend");
   });
 });
+
+describe("دليل كل توصية", () => {
+  const inv = (n: string, amount: number, supplier = "أوراق الزيتون") => ({
+    invoiceId: `i-${n}`, supplierName: supplier, invoiceNumber: n,
+    invoiceDate: d("2026-08-10"), amountMinor: amount,
+  });
+
+  it("توصية الضريبة المعرّضة تسوق فواتيرها بأرقامها", () => {
+    const r = buildInsights({
+      ...empty,
+      vatAtRiskMinor: 30_000, vatAtRiskCount: 2,
+      vatAtRiskInvoices: [inv("260137", 20_000), inv("260140", 10_000)],
+    });
+    const n = r.find((x) => x.id === "vat-at-risk")!;
+    expect(n.evidence).toHaveLength(2);
+    // الأكبر أثراً أوّلاً
+    expect(n.evidence[0].label).toBe("260137");
+    expect(n.evidence[0].amountMinor).toBe(20_000);
+    expect(n.evidence[0].sub).toContain("أوراق الزيتون");
+  });
+
+  it("لا يُعرض أكثر من اثني عشر دليلاً، ويُذكر ما بقي", () => {
+    const many = Array.from({ length: 20 }, (_, i) => inv(`INV-${i}`, (i + 1) * 100));
+    const r = buildInsights({
+      ...empty, unpaidCount: 20, unpaidTotalMinor: 21_000, unpaidInvoices: many,
+    });
+    const n = r.find((x) => x.id === "unpaid")!;
+    expect(n.evidence).toHaveLength(12);
+    expect(n.evidenceMore).toBe(8);
+  });
+
+  it("المورّدون بلا عقد يُسمَّون واحداً واحداً", () => {
+    const r = buildInsights({ ...empty, suppliersWithoutContract: ["أوسكا", "مريم"] });
+    const n = r.find((x) => x.id === "no-contract")!;
+    expect(n.evidence.map((e) => e.label)).toEqual(["أوسكا", "مريم"]);
+  });
+
+  it("كل توصية تحمل حقل دليل ولو فارغاً", () => {
+    const r = buildInsights({ ...empty, unpaidCount: 1, unpaidTotalMinor: 100 });
+    for (const n of r) expect(Array.isArray(n.evidence)).toBe(true);
+  });
+});
