@@ -70,6 +70,7 @@ export const AREAS: readonly NavArea[] = [
     children: [
       { href: "/money", label: "النظرة العامة" },
       { href: "/payments", label: "المستحقّ للمورّدين", needs: "payment:approve" },
+      { href: "/money/expenses", label: "المصروفات" },
       { href: "/bank", label: "البنك" },
       { href: "/money/statement", label: "كشف الحساب" },
       { href: "/close", label: "إقفال الشهر", needs: "month:close" },

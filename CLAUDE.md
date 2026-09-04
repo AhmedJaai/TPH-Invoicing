@@ -29,13 +29,13 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 
 **النشر:** Vercel `tph4/tph-invoicing` · GitHub `AhmedJaai/TPH-Invoicing` · الفرع `main`.
 
-## القاعدة — ٢٧ جدولاً
+## القاعدة — ٢٨ جدولاً
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` · `payments` `payment_allocations`
 `bank_imports` `bank_transactions` `bank_rules` · `statements` `statement_lines` · `month_closes`
 `products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products` (فارغة عمداً)
-`audit_logs` `rate_limits`
+`audit_logs` `rate_limits` `expenses`
 
 التعريف في `src/db/schema.ts`.
 
@@ -52,6 +52,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 | `003_transaction_type.sql` | `bank_transactions.transaction_type` |
 | `004_rate_limits.sql` | جدول حدّ الطلبات |
 | `005_products_and_sales_domain.sql` | الأصناف والمصروفات المتكرّرة ومجال المبيعات |
+| `006_expenses.sql` | المصروف الفعلي، وقيدٌ يمنع تكراره عن حركة أو فاتورة |
 
 ## المكتبات التي يجب معرفتها
 
@@ -67,6 +68,9 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 | `src/lib/month-close.ts` | الإقفال: `BLOCK` يمنع، `WARN` لا يمنع |
 | `src/lib/attention.ts` | كل تنبيه يحمل `href` (مكان الإصلاح) و`evidence` (لِمَ ظهر) |
 | `src/lib/data-health.ts` | التغطية لا تُختلق؛ فيها حال `NOT_CONNECTED` |
+| `src/lib/expenses.ts` | المصروف الفعلي. **سداد المورّد ليس مصروفاً** — محسوبٌ في المشتريات |
+| `src/lib/provenance.ts` | «من أين جاء هذا الرقم» — التغطية بالعدد لا بالمبلغ |
+| `src/lib/arabic.ts` | تمييز العدد — القاعدة تدور عند المئة فلا تُكتب بالحدس |
 | `src/lib/nav.ts` | المساحات وأقسامها. الموضع يُشتقّ من المسار لا من خاصيّة تُكتب باليد فتُنسى |
 | `src/services/guard.ts` | `guard(route, capability)` + `respondTo(e)` → 401/403/429. **مدخل كل واجهة** |
 
@@ -81,6 +85,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 - **نافذة مطابقة الفاتورة ±٧ أيام** — سطر بتاريخ ٢٣ يخصّ فاتورة بتاريخ ٢٦.
 - **المورّد المكرَّر يُدمَج ويُعطَّل، ولا يُحذف** (`npm run db:merge`).
 - **الذكاء الاصطناعي لا يخترع رقم فاتورة.** اختلق النموذج `TPH-20260521` بثقة ١٫٠٠. صار محظوراً في الموجِّه، ولا يُؤخذ رقم من النموذج لمستندات الأرشيف.
+- **المصروف الفعلي لا يشمل سداد المورّد** — وإلّا حُسب مرّتين. وما يقول وصفه «شراء بضاعة» يُستبعَد ولو صنّفته القاعدة راتباً؛ ولا يُصحَّح التصنيف آلياً، بل يُعرَض التناقض.
 - **عرض الصفحة يتبع ما فيها** — `form` للنماذج و`page` للعادي و`wide` للوحات والجداول. كان الكلّ `max-w-5xl`.
 - **قواعد البنك تعمّ ولا تخصّ عمليةً واحدة** — كانت ٣٢ قاعدة تحمل كلٌّ مرجع حوالة بعينها.
 
@@ -96,7 +101,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 ## الأوامر
 
 `npm test` (٤٢٣ اختباراً) · `npm run typecheck` · `npm run lint`
-`npm run db:migrate` · `db:audit` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules`
+`npm run db:migrate` · `db:expenses` · `db:audit` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`
 
 ## ما ليس مبنيّاً — عمداً

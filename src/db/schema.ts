@@ -591,6 +591,37 @@ export const recurringExpenses = pgTable("recurring_expenses", {
   createdAt: now(),
 }, (t) => [index("recurring_expenses_active_idx").on(t.isActive)]);
 
+export const expenseSourceEnum = pgEnum("expense_source", ["BANK", "INVOICE", "MANUAL"]);
+
+/**
+ * المصروف الفعلي — مقابل `recurring_expenses` الذي يقول المتوقَّع.
+ *
+ * كان الفعليّ يُشتقّ من كشف البنك عند العرض، وذلك يترك ثلاث فجوات:
+ * مصروفٌ دُفع نقداً لا يظهر، ومصروفٌ تصله فاتورة لا يُحسب مصروفاً، ولا
+ * يُعرف هل دُفع إيجار هذا الشهر أصلاً.
+ *
+ * والمبلغ موجب دائماً: كونه مصروفاً يحمل اتجاهه.
+ */
+export const expenses = pgTable("expenses", {
+  id: id(),
+  periodMonth: text("period_month").notNull(),
+  occurredOn: text("occurred_on").notNull(),
+  category: txCategoryEnum("category").notNull(),
+  label: text("label").notNull(),
+  amountMinor: integer("amount_minor").notNull(),
+  source: expenseSourceEnum("source").notNull(),
+  bankTransactionId: text("bank_transaction_id").references(() => bankTransactions.id, { onDelete: "set null" }),
+  invoiceId: text("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+  recurringExpenseId: text("recurring_expense_id").references(() => recurringExpenses.id, { onDelete: "set null" }),
+  note: text("note"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+}, (t) => [
+  index("expenses_period_idx").on(t.periodMonth),
+  index("expenses_category_idx").on(t.category),
+  index("expenses_recurring_idx").on(t.recurringExpenseId),
+]);
+
 /* ───────────────────────── مجال المبيعات ───────────────────────── */
 
 /**
