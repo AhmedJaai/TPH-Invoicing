@@ -25,7 +25,7 @@ const MAX_BYTES = 15 * 1024 * 1024;
 
 export async function POST(request: Request) {  let user;
   try {
-    user = await guard("bank-import", "bank:view");
+    user = await guard("bank-import", "bank:edit");
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;

@@ -35,7 +35,7 @@ interface Body {
 export async function POST(request: Request) {
   let user;
   try {
-    user = await guard("supplier", "amounts:view");
+    user = await guard("expense", "expense:edit");
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;

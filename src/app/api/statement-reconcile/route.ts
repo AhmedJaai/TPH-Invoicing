@@ -55,7 +55,7 @@ async function loadSuppliers(): Promise<SupplierRecord[]> {
 
 export async function POST(request: Request) {  let user;
   try {
-    user = await guard("statement-reconcile", "amounts:view");
+    user = await guard("statement-reconcile", "supplier:edit");
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;

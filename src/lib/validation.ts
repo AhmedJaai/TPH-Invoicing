@@ -6,6 +6,7 @@
  * والفاتورة المبسطة بلا رقم ضريبي للمشتري لا تصلح لخصم ضريبة المدخلات.
  */
 import { FIXED_ASSET_THRESHOLD_MINOR, VAT_RATE } from "@/config/drive";
+import { isSupplierRounding } from "./money";
 import { ISSUE, ISSUE_TEXT, type IssueCode, type Severity } from "./issue-codes";
 
 export interface Finding {
@@ -121,7 +122,16 @@ export function validateInvoice(
 
   // فحص حسابي يكشف أخطاء الاستخراج قبل أن تصل إلى القيد — على المعلوم وحده.
   if (subtotalKnown && totalKnown && subtotalMinor > 0 && totalMinor > 0) {
-    if (subtotalMinor + vatMinor !== totalMinor) {
+    if (isSupplierRounding(subtotalMinor, vatMinor, totalMinor)) {
+      /*
+       * المورّد يُسقط كسور الريال من الإجمالي، والمطبوع هو الملزِم.
+       * فلا يُعدّ خطأً، لكنّه يُذكَر كي لا يُظنّ أنّ النظام لم يره.
+       */
+      findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
+        severity: "INFO",
+        message: `المورّد قرّب الإجمالي: ${(subtotalMinor + vatMinor) / 100} صار ${totalMinor / 100}`,
+      }));
+    } else if (subtotalMinor + vatMinor !== totalMinor) {
       findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
         message: `المجموع ${totalMinor / 100} لا يساوي الصافي ${subtotalMinor / 100} زائد الضريبة ${vatMinor / 100}`,
       }));

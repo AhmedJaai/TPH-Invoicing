@@ -100,56 +100,64 @@ export default async function DocumentsPage({
   if (p.q?.trim()) filters.push(ilike(documents.fileName, `%${p.q.trim()}%`));
   const where = filters.length ? and(...filters) : undefined;
 
-  const [{ total }] = await db
-    .select({ total: count() })
-    .from(documents)
-    .where(where);
+  /*
+    ستّة استعلامات متوازية لا متسلسلة.
 
-  const rows = await db
-    .select({
-      id: documents.id,
-      fileName: documents.fileName,
-      driveFileId: documents.driveFileId,
-      kind: documents.kind,
-      status: documents.status,
-      periodMonth: documents.periodMonth,
-      uploadedAt: documents.uploadedAt,
-      supplierName: suppliers.nameAr,
-      invoiceNumber: invoices.invoiceNumber,
-      totalMinor: invoices.totalMinor,
-      taxStatus: invoices.taxStatus,
-    })
-    .from(documents)
-    .leftJoin(suppliers, eq(documents.supplierId, suppliers.id))
-    .leftJoin(invoices, eq(invoices.documentId, documents.id))
-    .where(where)
-    .orderBy(desc(documents.periodMonth), desc(documents.uploadedAt))
-    .limit(PAGE_SIZE)
-    .offset((page - 1) * PAGE_SIZE);
+    كانت تُنتظر واحداً بعد واحد، وكلٌّ رحلةُ شبكة إلى Neon — فيُجمع
+    تأخيرها كلّه قبل أوّل رسم. ولا يعتمد أيّها على الآخر، فلا سبب
+    لتسلسلها.
+  */
+  const [totalRows, rows, monthRows, supplierRows, statusRows, kindRows] = await Promise.all([
+    db.select({ total: count() }).from(documents).where(where),
 
-  const monthRows = await db
-    .select({ month: documents.periodMonth })
-    .from(documents)
-    .groupBy(documents.periodMonth)
-    .orderBy(desc(documents.periodMonth));
+    db
+      .select({
+        id: documents.id,
+        fileName: documents.fileName,
+        driveFileId: documents.driveFileId,
+        kind: documents.kind,
+        status: documents.status,
+        periodMonth: documents.periodMonth,
+        uploadedAt: documents.uploadedAt,
+        supplierName: suppliers.nameAr,
+        invoiceNumber: invoices.invoiceNumber,
+        totalMinor: invoices.totalMinor,
+        taxStatus: invoices.taxStatus,
+      })
+      .from(documents)
+      .leftJoin(suppliers, eq(documents.supplierId, suppliers.id))
+      .leftJoin(invoices, eq(invoices.documentId, documents.id))
+      .where(where)
+      .orderBy(desc(documents.periodMonth), desc(documents.uploadedAt))
+      .limit(PAGE_SIZE)
+      .offset((page - 1) * PAGE_SIZE),
 
-  const supplierRows = await db
-    .select({ id: suppliers.id, nameAr: suppliers.nameAr })
-    .from(suppliers)
-    .where(eq(suppliers.isActive, true))
-    .orderBy(asc(suppliers.nameAr));
+    db
+      .select({ month: documents.periodMonth })
+      .from(documents)
+      .groupBy(documents.periodMonth)
+      .orderBy(desc(documents.periodMonth)),
 
-  const statusRows = await db
-    .select({ status: documents.status, n: sql<number>`count(*)::int` })
-    .from(documents)
-    .groupBy(documents.status);
+    db
+      .select({ id: suppliers.id, nameAr: suppliers.nameAr })
+      .from(suppliers)
+      .where(eq(suppliers.isActive, true))
+      .orderBy(asc(suppliers.nameAr)),
+
+    db
+      .select({ status: documents.status, n: sql<number>`count(*)::int` })
+      .from(documents)
+      .groupBy(documents.status),
+
+    db
+      .select({ kind: documents.kind, n: sql<number>`count(*)::int` })
+      .from(documents)
+      .groupBy(documents.kind)
+      .orderBy(desc(sql`count(*)`)),
+  ]);
+
+  const total = totalRows[0].total;
   const statusCount = new Map(statusRows.map((r) => [r.status as string, Number(r.n)]));
-
-  const kindRows = await db
-    .select({ kind: documents.kind, n: sql<number>`count(*)::int` })
-    .from(documents)
-    .groupBy(documents.kind)
-    .orderBy(desc(sql`count(*)`));
 
   const link = (patch: Partial<Params>) => {
     const next = new URLSearchParams();

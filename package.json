@@ -32,7 +32,8 @@
     "db:audit": "tsx --env-file=.env scripts/audit-data.ts",
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
     "db:products": "tsx --env-file=.env scripts/build-products.ts",
-    "db:expenses": "tsx --env-file=.env scripts/derive-expenses.ts"
+    "db:expenses": "tsx --env-file=.env scripts/derive-expenses.ts",
+    "db:verify": "tsx --env-file=.env scripts/verify-invariants.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

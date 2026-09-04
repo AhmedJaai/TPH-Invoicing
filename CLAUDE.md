@@ -53,6 +53,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 | `004_rate_limits.sql` | جدول حدّ الطلبات |
 | `005_products_and_sales_domain.sql` | الأصناف والمصروفات المتكرّرة ومجال المبيعات |
 | `006_expenses.sql` | المصروف الفعلي، وقيدٌ يمنع تكراره عن حركة أو فاتورة |
+| `007_financial_invariants.sql` | قيود المال في القاعدة: التخصيص والفاتورة والمصروف |
 
 ## المكتبات التي يجب معرفتها
 
@@ -89,6 +90,10 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 - **الذكاء الاصطناعي لا يخترع رقم فاتورة.** اختلق النموذج `TPH-20260521` بثقة ١٫٠٠. صار محظوراً في الموجِّه، ولا يُؤخذ رقم من النموذج لمستندات الأرشيف.
 - **المصروف الفعلي لا يشمل سداد المورّد** — وإلّا حُسب مرّتين. وما يقول وصفه «شراء بضاعة» يُستبعَد ولو صنّفته القاعدة راتباً؛ ولا يُصحَّح التصنيف آلياً، بل يُعرَض التناقض.
 - **عرض الصفحة يتبع ما فيها** — `form` للنماذج و`page` للعادي و`wide` للوحات والجداول. كان الكلّ `max-w-5xl`.
+- **الثوابت المالية تُفرَض في القاعدة لا في الكود وحده** — `npm run db:verify` يثبت أنّها ترفض فعلاً. والقيد بلا اختبار ادّعاء.
+- **يُتسامح بريالٍ في فرق (صافي+ضريبة) عن الإجمالي** — المورّد يُسقط كسور الريال والمطبوع هو الملزِم. القيمة في `TOTAL_ROUNDING_TOLERANCE_MINOR`، وهي نفسها في القاعدة.
+- **الكتابة لا تُحرَس بصلاحية قراءة** — `bank:edit` و`expense:edit` منفصلتان عن `bank:view` و`amounts:view`.
+- **محتوى المستند بيانات لا تعليمات** — الموجِّه يعلنها صراحةً في أوّله.
 - **قواعد البنك تعمّ ولا تخصّ عمليةً واحدة** — كانت ٣٢ قاعدة تحمل كلٌّ مرجع حوالة بعينها.
 
 ## المصائد المعروفة
@@ -102,8 +107,8 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 
 ## الأوامر
 
-`npm test` (٤٢٣ اختباراً) · `npm run typecheck` · `npm run lint`
-`npm run db:migrate` · `db:expenses` · `db:audit` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules`
+`npm test` (٥٦٥ اختباراً) · `npm run typecheck` · `npm run lint`
+`npm run db:migrate` · `db:verify` · `db:expenses` · `db:audit` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`
 
 ## ما ليس مبنيّاً — عمداً

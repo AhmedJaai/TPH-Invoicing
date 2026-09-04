@@ -76,23 +76,39 @@ export async function deriveExpensesFromBank(
   const { candidates, goodsPurchases } = deriveFromBank(txs, already);
   const recurring = await activeRecurring();
 
+  /*
+    إدخالٌ واحد لكل الصفوف داخل معاملة، لا صفٌّ صفّاً.
+
+    كانت ألفٌ وأربعمئة حركة تُنتج ألفاً وأربعمئة رحلة إلى القاعدة،
+    ويترك الفشل في المنتصف اشتقاقاً جزئياً لا يُعرف مداه. والمعاملة
+    تجعله كلّه أو لا شيء منه، والدفعة تجعله رحلةً واحدة.
+  */
   let linked = 0;
-  for (const c of candidates) {
+  const values = candidates.map((c) => {
     const match = matchRecurring(c, recurring);
     if (match) linked++;
-
-    await db.insert(expenses).values({
+    return {
       id: createId(),
       periodMonth: c.periodMonth,
       occurredOn: c.occurredOn,
       category: c.category,
       label: c.label,
       amountMinor: c.amountMinor,
-      source: "BANK",
+      source: "BANK" as const,
       bankTransactionId: c.bankTransactionId,
       recurringExpenseId: match?.id ?? null,
       createdById: userId ?? null,
-    }).onConflictDoNothing();
+    };
+  });
+
+  if (values.length > 0) {
+    // تُقسَّم دفعاتٍ كي لا يتجاوز الاستعلام حدّ المعاملات في بروتوكول pg
+    const CHUNK = 500;
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < values.length; i += CHUNK) {
+        await tx.insert(expenses).values(values.slice(i, i + CHUNK)).onConflictDoNothing();
+      }
+    });
   }
 
   const debits = txs.filter((t) => t.direction === "DEBIT");

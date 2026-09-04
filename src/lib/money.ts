@@ -6,6 +6,28 @@
 
 export const HALALAS_PER_RIYAL = 100;
 
+/**
+ * ما يُتسامح فيه بين (الصافي + الضريبة) والإجمالي المطبوع.
+ *
+ * وُجد في فواتير حقيقية أنّ المورّد يُسقط كسور الريال من الإجمالي:
+ * «ملتقى الأواني» ٥٢٥٫٠٠ + ٧٨٫٧٥ = ٦٠٣٫٧٥ والمطبوع ٦٠٣٫٠٠، و«مختبرات
+ * القهوة» ٥٧٤٫٠٠ + ٨٦٫١٠ = ٦٦٠٫١٠ والمطبوع ٦٦٠٫٠٠.
+ *
+ * والمطبوع هو الملزِم. فيُتسامح بريالٍ واحد — وهو أقصى ما يُنتجه
+ * التقريب إلى الريال — وما جاوزه خطأُ قراءةٍ لا تقريب.
+ */
+export const TOTAL_ROUNDING_TOLERANCE_MINOR = HALALAS_PER_RIYAL;
+
+/** هل الفرق بين المجموع والإجمالي تقريبُ مورّد لا خطأ قراءة؟ */
+export function isSupplierRounding(
+  subtotalMinor: number,
+  vatMinor: number,
+  totalMinor: number,
+): boolean {
+  const diff = Math.abs(subtotalMinor + vatMinor - totalMinor);
+  return diff > 0 && diff <= TOTAL_ROUNDING_TOLERANCE_MINOR;
+}
+
 /** يحوّل نصاً مثل "410.00" أو "410" أو "١٬٢٣٤٫٥٠" إلى هللات. */
 export function parseRiyals(input: string): number | null {
   const normalized = input

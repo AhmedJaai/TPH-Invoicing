@@ -32,7 +32,7 @@ interface Body {
 
 export async function POST(request: Request) {  let user;
   try {
-    user = await guard("bank-rule", "bank:view");
+    user = await guard("bank-rule", "bank:edit");
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;

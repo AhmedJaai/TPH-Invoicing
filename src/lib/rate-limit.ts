@@ -69,6 +69,10 @@ export const RULES: Record<string, RateLimitRule> = {
   "supplier-alias": { limit: 200, windowSeconds: 3600 },
   "bank-rule": { limit: 200, windowSeconds: 3600 },
   supplier: { limit: 60, windowSeconds: 3600 },
+  // دِلاء منفصلة: كانت المصروفات والأصناف تستهلك حدّ المورّدين
+  product: { limit: 200, windowSeconds: 3600 },
+  expense: { limit: 60, windowSeconds: 3600 },
+  "expense-actual": { limit: 30, windowSeconds: 3600 },
 };
 
 export function ruleFor(route: string): RateLimitRule {

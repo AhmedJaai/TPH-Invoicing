@@ -28,6 +28,21 @@ import { createPayment } from "@/services/payment.service";
 import type { RawLine } from "@/services/types";
 
 export const runtime = "nodejs";
+
+/**
+ * حدٌّ للحجم ونوعٌ من قائمة سماح.
+ *
+ * كانت القراءة تحدّ بخمسة وعشرين ميجابايت والأرشفة تقبل أي base64 —
+ * فيمرّ ما لم يُقرأ أصلاً. والنوع كان يُصدَّق من المتصفّح ويُمرَّر إلى
+ * درايف كما هو، فيمكن أن يُحفظ ملفٌ بنوعٍ يخالف محتواه.
+ */
+const MAX_ARCHIVE_BYTES = 25 * 1024 * 1024;
+
+const ARCHIVABLE_TYPES: readonly string[] = [
+  "application/pdf",
+  "image/jpeg", "image/png", "image/gif", "image/webp",
+  "image/heic", "image/heif",
+];
 export const maxDuration = 60;
 
 interface ArchiveBody {
@@ -97,6 +112,10 @@ export async function POST(request: Request) {
       throw new InvalidInputError("الاسم أو المجلد أو الشهر ناقص");
     }
 
+    if (!ARCHIVABLE_TYPES.includes(body.mimeType)) {
+      throw new InvalidInputError(`نوع الملف غير مقبول: ${body.mimeType}`);
+    }
+
     let data: Buffer;
     try {
       data = Buffer.from(body.fileBase64, "base64");
@@ -104,6 +123,11 @@ export async function POST(request: Request) {
       throw new InvalidInputError("محتوى الملف غير صالح");
     }
     if (data.length === 0) throw new InvalidInputError("الملف فارغ");
+    if (data.length > MAX_ARCHIVE_BYTES) {
+      throw new InvalidInputError(
+        `الملف أكبر من ${MAX_ARCHIVE_BYTES / (1024 * 1024)} ميجابايت`,
+      );
+    }
 
     // ── فحوص تسبق أي كتابة ──
     const sha256 = sha256Of(data);

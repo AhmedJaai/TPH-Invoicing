@@ -22,6 +22,8 @@ export type Capability =
   | "amounts:view"
   | "reports:view"
   | "bank:view"
+  | "bank:edit"
+  | "expense:edit"
   | "payroll:view"
   | "payment:approve"
   | "month:close"
@@ -31,13 +33,14 @@ export type Capability =
 const MATRIX: Record<Role, readonly Capability[]> = {
   OWNER: [
     "document:upload", "document:view", "supplier:view", "supplier:edit",
-    "amounts:view", "reports:view", "bank:view", "payroll:view",
-    "payment:approve", "month:close", "users:manage", "audit:view",
+    "amounts:view", "reports:view", "bank:view", "bank:edit", "payroll:view",
+    "expense:edit", "payment:approve", "month:close", "users:manage", "audit:view",
   ],
   // المحاسب يرى كل المالية ولا يدير المستخدمين
   ACCOUNTANT: [
     "document:upload", "document:view", "supplier:view", "supplier:edit",
-    "amounts:view", "reports:view", "bank:view", "month:close", "audit:view",
+    "amounts:view", "reports:view", "bank:view", "bank:edit",
+    "expense:edit", "month:close", "audit:view",
   ],
   // مدير المشتريات يرفع ويتابع الناقص فقط — لا أرقام مالية ولا بنك ولا رواتب
   PURCHASING: ["document:upload", "document:view", "supplier:view"],
