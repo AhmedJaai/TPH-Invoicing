@@ -21,18 +21,39 @@ describe("transactionIdentity", () => {
     expect(transactionIdentity(base)).toBe(transactionIdentity({ ...base }));
   });
 
+  const id = transactionIdentity(base);
+
   it("اختلاف أي جزء يغيّر الهوية", () => {
-    const id = transactionIdentity(base);
     expect(transactionIdentity({ ...base, amountMinor: 15_001 })).not.toBe(id);
     expect(transactionIdentity({ ...base, valueDate: "2026-08-14" })).not.toBe(id);
     expect(transactionIdentity({ ...base, direction: "CREDIT" })).not.toBe(id);
     expect(transactionIdentity({ ...base, description: "غيره" })).not.toBe(id);
     expect(transactionIdentity({ ...base, occurrence: 1 })).not.toBe(id);
-    expect(transactionIdentity({ ...base, accountNumber: "999" })).not.toBe(id);
   });
 
-  it("الحساب الفارغ لا يكسر الهوية", () => {
-    expect(transactionIdentity({ ...base, accountNumber: null })).toHaveLength(64);
+  /*
+    كان هنا اختبار يشترط أن يفصل رقمُ الحساب بين بصمتين — وقد أثبت
+    الواقع أنّ الشرط خطأ: صُدِّر كشفان لنفس الحساب، أحدهما يحمل رقمه
+    في ترويسته والآخر لا يحمله، فاختلفت بصمتا حركة واحدة ودخلت مرّتين.
+    ألفٌ وأربعمئة واثنتان وأربعون حركةً زائدة.
+
+    والمقايضة معلومة ومقبولة: لو صار للمنشأة حسابان، وحملا في اليوم
+    نفسه حركتين بنفس المبلغ والاتجاه والوصف حرفاً بحرف، لاعتُبرتا واحدة.
+    وعلاجها حينئذ تحديد نطاق الفرادة بالحساب في القاعدة، لا إعادةُ رقم
+    الحساب إلى البصمة.
+  */
+  it("رقم الحساب خارج البصمة — فهو خاصّية ملفٍ لا خاصّية حركة", () => {
+    expect(transactionIdentity({ ...base, accountNumber: "999" })).toBe(id);
+    expect(transactionIdentity({ ...base, accountNumber: null })).toBe(id);
+  });
+
+  it("صيغتا تصدير مختلفتان لنفس الحركة تعطيان البصمة نفسها", () => {
+    // الفراغ الزائد وحالة الأحرف اختلافُ عرضٍ لا اختلاف معنى
+    const a = transactionIdentity({ ...base, accountNumber: "12600000942005",
+      description: "81140155-260508-POS VS VA T 418069" });
+    const b = transactionIdentity({ ...base, accountNumber: null,
+      description: "81140155-260508-POS  VS  va t  418069" });
+    expect(a).toBe(b);
   });
 });
 
@@ -58,10 +79,11 @@ describe("assignIdentities", () => {
     expect(b).toEqual(a);
   });
 
-  it("اختلاف رقم الحساب يفصل بين كشفين متشابهين", () => {
+  it("الحركة نفسها تُعرَف وإن اختلف رقم الحساب في ترويسة الملف", () => {
+    // صيغة تصدير تحمل رقم الحساب وأخرى لا تحمله — والحركة واحدة
     const rows = [row("2026-08-01", 500, "أ")];
-    expect(assignIdentities(rows, "ACC-1")[0].externalId)
-      .not.toBe(assignIdentities(rows, "ACC-2")[0].externalId);
+    expect(assignIdentities(rows, "12600000942005")[0].externalId)
+      .toBe(assignIdentities(rows, null)[0].externalId);
   });
 
   it("ترتيب المجموعة يُحسب لكل مجموعة على حدة", () => {

@@ -10,6 +10,15 @@
  * حركتين متطابقتين تماماً في اليوم — رسمَين، أو فاتورتَي كهرباء لعدّادين —
  * وهما حقيقيتان. فلو أُهمل الترتيب لابتلعت البصمة إحداهما. ومعه: الملف
  * نفسه يعطي البصمات نفسها فلا يتكرّر، والحركتان الحقيقيتان تبقيان اثنتين.
+ *
+ * ولا تدخل البصمةَ خصائصُ **الملف**، بل خصائص **الحركة** وحدها.
+ * كان رقم الحساب جزءاً منها، فاستُورد كشفان لنفس الحساب من مصدرين:
+ * أحدهما يحمل رقم الحساب في ترويسته والآخر لا يحمله. فاختلفت البصمتان
+ * لحركة واحدة بعينها — نفس التاريخ ونفس المبلغ ونفس الوصف حرفاً بحرف —
+ * ودخلت مرّتين. ألفٌ وأربعمئة واثنتان وأربعون حركةً زائدة، ومعها نصف
+ * «إيراد» لم يدخل الحساب قطّ.
+ *
+ * والدرس: ما يتغيّر بتغيّر صيغة التصدير لا يصلح جزءاً من هوية الحركة.
  */
 import { createHash } from "node:crypto";
 
@@ -24,13 +33,29 @@ export interface TransactionIdentityInput {
   occurrence: number;
 }
 
+/**
+ * يوحّد الوصف قبل أن يدخل البصمة.
+ *
+ * صيغتا التصدير تختلفان في الفراغات وحالة الأحرف لنفس الحركة، وهذا
+ * اختلاف عرضٍ لا اختلاف معنى.
+ */
+export function normalizeDescription(text: string | null | undefined): string {
+  return (text ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
 export function transactionIdentity(input: TransactionIdentityInput): string {
+  /*
+    رقم الحساب مقصودٌ خروجه: هو خاصّية ملفٍ لا خاصّية حركة، ويغيب في
+    بعض صيغ التصدير فيفرّق بصمةَ حركةٍ واحدة.
+  */
   const parts = [
-    input.accountNumber ?? "",
     input.valueDate,
     String(input.amountMinor),
     input.direction,
-    input.description ?? "",
+    normalizeDescription(input.description),
     String(input.occurrence),
   ];
   return createHash("sha256").update(parts.join("|")).digest("hex");
