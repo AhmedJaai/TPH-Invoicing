@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type MergeSuggestion, type ProductCategory } from "@/lib/products";
+import { buttonClass } from "@/components/ui";
 
 export interface SupplierProductView {
   id: string;
@@ -158,6 +159,163 @@ function LinkRow({
   );
 }
 
+
+/**
+ * فرزٌ لا إدارة قاعدة بيانات.
+ *
+ * كانت الشاشة قائمةً من ستّين صفّاً، كلٌّ فيه قائمة اختيار وحقل اسم
+ * وتصنيف — فيقف صاحب العمل أمام جدولٍ يملؤه. والقرار في كل صفّ واحدٌ
+ * بسيط: أهذا الصنف هو ذاك أم لا؟
+ *
+ * فصار يُعرض واحدٌ في كل مرّة بقراره، ثمّ يُنتقل تلقائياً إلى الذي
+ * يليه. والقائمة تبقى تحته لمن أراد أن يرى الكلّ.
+ */
+function Triage({
+  queue,
+  products,
+  onResolved,
+}: {
+  queue: SupplierProductView[];
+  products: ProductOption[];
+  onResolved: (id: string) => void;
+}) {
+  const [index, setIndex] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const item = queue[index];
+  if (!item) {
+    return (
+      <div className="rounded-2xl border border-ok/40 bg-ok-bg px-5 py-10 text-center">
+        <p className="text-sm font-bold text-ok">لا شيء ينتظر الفرز.</p>
+        <p className="mt-1.5 text-xs text-ink-soft">كل صنف مورّد صار له صنف معياري.</p>
+      </div>
+    );
+  }
+
+  /*
+    المرشَّح: صنف معياري يحمل الاسم نفسه بعد التوحيد.
+    لا يُقبَل آلياً أبداً — درس «العنب» أنّ الاسم يخدع — بل يُعرض
+    ليُقرّه إنسان بضغطة واحدة.
+  */
+  const candidate = products.find(
+    (p) => normalizeForMatch(p.nameAr) === normalizeForMatch(item.displayName),
+  );
+
+  async function send(body: Record<string, unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/product", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const d = (await res.json()) as { error?: string };
+        setError(d.error ?? "تعذّر الحفظ");
+        return;
+      }
+      onResolved(item.id);
+      setIndex((i) => i + 1);
+    } catch {
+      setError("تعذّر الاتصال بالخادم");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const accept = () =>
+    send({ action: "link", supplierProductIds: [item.id], productId: candidate!.id });
+
+  const createOwn = () =>
+    send({
+      action: "link",
+      supplierProductIds: [item.id],
+      newProductName: item.displayName,
+      category: "OTHER",
+    });
+
+  return (
+    <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[11px] text-muted">
+          <span className="nums">{index + 1}</span> من <span className="nums">{queue.length}</span>
+        </p>
+        {index > 0 && (
+          <button
+            type="button"
+            onClick={() => setIndex((i) => i - 1)}
+            className="text-[11px] text-muted underline underline-offset-4 hover:text-ink"
+          >
+            رجوع
+          </button>
+        )}
+      </div>
+
+      <div className="mt-1 flex gap-1" aria-hidden>
+        {queue.map((_, i) => (
+          <span key={i} className={`h-1 flex-1 rounded-full ${i < index ? "bg-ink" : "bg-sunken"}`} />
+        ))}
+      </div>
+
+      <p className="mt-4 font-display text-xl font-bold leading-snug">{item.displayName}</p>
+      <p className="mt-1.5 text-xs text-muted">
+        {item.supplierName} · اشتريته {item.orderCount} مرّة ·{" "}
+        {formatRiyalsDisplay(item.totalSpentMinor)} ريال
+      </p>
+
+      {candidate ? (
+        <div className="mt-4 rounded-xl border border-line bg-surface px-3.5 py-3">
+          <p className="text-[11px] text-muted">صنف معياري بالاسم نفسه</p>
+          <p className="mt-1 text-sm font-bold">{candidate.nameAr}</p>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+            الاسم متطابق — والاسم وحده يخدع أحياناً. أقرَّه إن كان هو فعلاً.
+          </p>
+        </div>
+      ) : (
+        <p className="mt-4 text-xs leading-relaxed text-muted">
+          لا صنف معياري يحمل هذا الاسم. إنشاؤه يجعل ما تشتريه من مورّدين مختلفين
+          يُجمع تحت شيء واحد.
+        </p>
+      )}
+
+      {error && <p className="mt-3 text-xs text-danger">{error}</p>}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {candidate && (
+          <button type="button" onClick={accept} disabled={busy} className={buttonClass("primary", "sm")}>
+            {busy ? "يحفظ…" : `نعم، هو «${candidate.nameAr}»`}
+          </button>
+        )}
+        <button type="button" onClick={createOwn} disabled={busy} className={buttonClass(candidate ? "secondary" : "primary", "sm")}>
+          {candidate ? "لا، أنشئ صنفاً له" : "أنشئ صنفاً معيارياً له"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setIndex((i) => i + 1)}
+          disabled={busy}
+          className={buttonClass("quiet", "sm")}
+        >
+          تخطَّ
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** توحيدٌ للمقابلة وحدها — لا يُحفظ ولا يُعرض. */
+function normalizeForMatch(s: string): string {
+  return s
+    .replace(/[\u064B-\u0652\u0640]/g, "")
+    .replace(/[إأآٱ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
 export function ProductMapping({
   rows,
   products,
@@ -198,6 +356,15 @@ export function ProductMapping({
 
   return (
     <div className="space-y-8">
+      <section>
+        <h2 className="font-display text-lg font-bold leading-tight">افرزها واحداً واحداً</h2>
+        <p className="mb-3 mt-1 max-w-2xl text-xs leading-relaxed text-muted">
+          القرار في كل صنف واحدٌ بسيط: أهو الصنف المعياري نفسه أم لا؟ فيُعرض
+          واحدٌ في كل مرّة، ويُنتقل إلى الذي يليه.
+        </p>
+        <Triage queue={singles} products={products} onResolved={(id) => onDone([id])} />
+      </section>
+
       {suggestionGroups.length > 0 && (
         <section>
           <h2 className="text-base font-bold">مرشّحات للجمع</h2>

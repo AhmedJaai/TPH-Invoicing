@@ -169,6 +169,39 @@ function UnknownRow({
   );
 }
 
+
+/**
+ * خطوات الاستيراد، ظاهرةً.
+ *
+ * كان كل شيء في شاشة واحدة: الرفع والمعاينة والتصنيف والقواعد والتطبيق
+ * والوسم اليدويّ. فلا يعرف المستخدم أين هو ولا كم بقي. والخطوة تُشتقّ
+ * من الحال لا تُخزَّن — فحالٌ ثانية قد تخالف الأولى.
+ */
+const STEPS = ["ارفع الكشف", "يُقرأ", "راجع ما يحتاجك", "طبّق", "تمّ"] as const;
+
+function Steps({ current }: { current: number }) {
+  return (
+    <ol className="flex items-center gap-1.5" aria-label="خطوات الاستيراد">
+      {STEPS.map((label, i) => (
+        <li key={label} className="flex min-w-0 flex-1 flex-col gap-1">
+          <span
+            className={`h-1 rounded-full ${
+              i < current ? "bg-ink" : i === current ? "bg-ink/50" : "bg-sunken"
+            }`}
+          />
+          <span
+            className={`truncate text-[10px] ${
+              i === current ? "font-bold text-ink" : "text-muted"
+            }`}
+          >
+            {label}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function BankImport({
   openInvoiceCount,
   suppliers,
@@ -232,15 +265,23 @@ export function BankImport({
     }
   }, [router]);
 
+  /*
+    الخطوة الحالية تُشتقّ من الحال لا تُخزَّن.
+    حالٌ ثانية تُخزَّن هي حالٌ ثانية قد تخالف الأولى.
+  */
+  const step = done ? 4 : data ? (data.summary.unknown > 0 ? 2 : 3) : busy === "reading" ? 1 : 0;
+
   return (
     <div className="space-y-8">
       {/* ── الخيار الأول: كشف البنك ── */}
       <section>
-        <h2 className="text-base font-bold">الخيار الأوّل — اقرأ كشف البنك</h2>
-        <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-          الأدقّ: كل سداد مثبت بحركة بنكية بتاريخها ومبلغها. ارفع كشف الحساب بصيغة Excel،
-          وسيُعرض عليك ما سيحدث قبل أن يُحفظ شيء.
+        <h2 className="font-display text-lg font-bold leading-tight">اقرأ كشف البنك</h2>
+        <p className="mb-4 mt-1 max-w-2xl text-xs leading-relaxed text-ink-soft">
+          الأدقّ: كل سداد مثبت بحركة بنكية بتاريخها ومبلغها. ولا يُحفظ شيء قبل أن
+          تراه.
         </p>
+
+        <Steps current={step} />
 
         <div
           onClick={() => inputRef.current?.click()}
@@ -272,11 +313,26 @@ export function BankImport({
               {data.summary.periodStart} إلى {data.summary.periodEnd}
             </p>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {/*
+              الرقم الأوّل هو ما يحتاج المستخدم، لا مجموع ما في الملف.
+              من يرى «٢٤٣ حركة» يظنّ أنّ عليه مراجعة مئتين وأربعين، وإنّما
+              عليه اثنتا عشرة.
+            */}
+            <p className="mt-3 font-display text-2xl font-bold leading-none">
+              {data.summary.unknown === 0
+                ? "لا شيء يحتاجك"
+                : `${data.summary.unknown} حركة تحتاجك`}
+            </p>
+            <p className="mt-1.5 text-xs text-muted">
+              من <span className="nums">{data.summary.totalRows}</span> حركة —
+              الباقي صُنّف بقواعدك أو بطبيعته.
+            </p>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Stat label="حركات الكشف" value={String(data.summary.totalRows)} />
               <Stat label="مدفوعات محتملة" value={String(data.summary.payments)} />
               <Stat label="ستُطابق فواتير" value={String(data.summary.matchedInvoices)} tone="ok" />
-              <Stat label="حركات مجهولة" value={String(data.summary.unknown)} tone={data.summary.unknown ? "warn" : undefined} />
+              <Stat label="تحتاجك" value={String(data.summary.unknown)} tone={data.summary.unknown ? "warn" : undefined} />
             </div>
 
             {data.summary.byCategory.filter((c) => c.category !== "UNKNOWN" && c.category !== "SUPPLIER").length > 0 && (

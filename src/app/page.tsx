@@ -16,6 +16,9 @@ import { gatherHealthFacts } from "@/lib/data-health-facts";
 import { spendByMonth } from "@/lib/analytics";
 import { Figure } from "@/components/figure";
 import { gatherHomeProvenance } from "@/lib/provenance-facts";
+import { Changes } from "@/components/changes";
+import { buildChanges } from "@/lib/changes";
+import { gatherChangeFacts } from "@/lib/changes-facts";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +63,13 @@ export default async function HomePage() {
 
   const attention = buildAttention(attentionFacts);
   const counts = countBySeverity(attention);
+
+  const changes = buildChanges(
+    await gatherChangeFacts(
+      attentionFacts.priceRises.length,
+      attentionFacts.priceRiseAnnualMinor,
+    ),
+  );
 
   const invoiceRows = await db
     .select({
@@ -133,6 +143,14 @@ export default async function HomePage() {
           note="من فواتير مستوفية الأركان وحدها"
         />
       </StatGrid>
+
+      {/* ── ما الذي تغيّر ── */}
+      <Section
+        title="ما الذي تغيّر"
+        hint="كل ما سواه في هذه الصفحة يصف الحال. وهذا وحده يصف الحركة — وهو ما يستحقّ نظرةً كل صباح."
+      >
+        <Changes changes={changes} />
+      </Section>
 
       {/* ── ما يحتاج انتباهك ── */}
       <Section
