@@ -76,6 +76,11 @@ export async function POST(request: Request) {
         matchDisposition: "REVIEW",
         matchOutcome: null,
         matchScore: null,
+        /*
+          الردّ يُنزل الطبقة إلى «مقترَحة»: عاد لها مرشّحٌ بلا حسم.
+          ولا تعود `RAW` — فما عُرف عنها لم يُمحَ بردّ المطابقة.
+        */
+        lifecycle: "SUGGESTED",
       })
       .where(eq(bankTransactions.id, tx.id));
 

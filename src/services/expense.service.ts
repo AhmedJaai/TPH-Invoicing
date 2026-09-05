@@ -9,6 +9,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bankTransactions, expenses, recurringExpenses } from "@/db/schema";
 import { createId } from "@/lib/id";
+import { expenseEventKey } from "@/lib/expenses";
 import { recordAudit } from "@/lib/audit";
 import {
   deriveFromBank,
@@ -97,6 +98,11 @@ export async function deriveExpensesFromBank(
       source: "BANK" as const,
       bankTransactionId: c.bankTransactionId,
       recurringExpenseId: match?.id ?? null,
+      /*
+        بصمة الحدث لا بصمة السجلّ: القيد على الحركة وحدها لا يمنع أن
+        يصل الحدث نفسه من مستندٍ رُفع، فيُقيَّد مصروفان عن دفعةٍ واحدة.
+      */
+      eventKey: expenseEventKey(c),
       createdById: userId ?? null,
     };
   });
@@ -186,6 +192,16 @@ export async function recordManualExpense(
     amountMinor: input.amountMinor,
     source: "MANUAL",
     recurringExpenseId: match?.id ?? null,
+    /*
+      وتُحفَظ للقيد اليدويّ أيضاً — لا ليمنعه قيد، بل ليُعرَض تكرارُه.
+      فقيدُ الإنسان مرّتين قد يكون قصداً، والقرار له.
+    */
+    eventKey: expenseEventKey({
+      category: input.category,
+      occurredOn: input.occurredOn,
+      amountMinor: input.amountMinor,
+      label: input.label,
+    }),
     note: input.note,
     createdById: userId,
   });

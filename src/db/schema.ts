@@ -467,6 +467,16 @@ export const classificationSourceEnum = pgEnum("classification_source", [
   "STRUCTURE", "MEMORY", "RULE", "KEYWORD", "AI", "HUMAN", "UNKNOWN",
 ]);
 
+/**
+ * أين تقف الحركة من طبقاتها.
+ *
+ * والتفصيل في `src/lib/bank/lifecycle.ts`: طبقاتٌ متراكمة لا حالاتٌ
+ * متنافسة، وكلٌّ تُبنى على ما تحتها ولا تمحوه.
+ */
+export const txLifecycleEnum = pgEnum("tx_lifecycle", [
+  "RAW", "INFERRED", "SUGGESTED", "CONFIRMED", "POSTED",
+]);
+
 export const decisionEventEnum = pgEnum("decision_event", [
   "CLASSIFIED", "MATCH_SUGGESTED", "MATCH_CONFIRMED",
   "MATCH_REJECTED", "MATCH_REVERSED", "ENTITY_LEARNED", "POSTED",
@@ -524,12 +534,15 @@ export const bankTransactions = pgTable("bank_transactions", {
   classificationVersion: text("classification_version"),
   /** القاعدة التي صنّفتها، إن وُجدت */
   ruleId: text("rule_id").references(() => bankRules.id, { onDelete: "set null" }),
+  /** أين تقف من طبقاتها: خام ← مُستنتَجة ← مقترَحة ← مُقَرَّة ← مُقيَّدة. */
+  lifecycle: txLifecycleEnum("lifecycle").notNull().default("RAW"),
 }, (t) => [
   index("bank_tx_date_idx").on(t.valueDate),
   index("bank_tx_status_idx").on(t.matchStatus),
   index("bank_tx_category_idx").on(t.category),
   index("bank_tx_type_idx").on(t.transactionType),
   index("bank_tx_account_idx").on(t.bankAccountId),
+  index("bank_tx_lifecycle_idx").on(t.lifecycle),
   /*
     الفرادة مقيَّدة بالحساب — والقيد الفعليّ تعبيريّ في
     `014_identity_scoping.sql` لأنّ الحساب المجهول يجب أن يظلّ نطاقاً
@@ -696,6 +709,15 @@ export const expenses = pgTable("expenses", {
   bankTransactionId: text("bank_transaction_id").references(() => bankTransactions.id, { onDelete: "set null" }),
   invoiceId: text("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
   recurringExpenseId: text("recurring_expense_id").references(() => recurringExpenses.id, { onDelete: "set null" }),
+  /**
+   * بصمة **الحدث** لا بصمة السجلّ.
+   *
+   * الحدث الواحد يصل من مصدرين لا يعرف أحدهما الآخر — كشف البنك
+   * ومستندٌ رُفع — فيُقيَّد مصروفان ويعلو مصروف الشهر عمّا صُرف.
+   * والقيد في `016` على المشتقّ وحده: ما اشتقّه النظام مرّتين عن حدثٍ
+   * واحد خطأٌ يقيناً، وما كتبه الإنسان مرّتين قد يكون قصداً.
+   */
+  eventKey: text("event_key"),
   note: text("note"),
   createdById: text("created_by_id").references(() => users.id),
   createdAt: now(),
@@ -703,6 +725,7 @@ export const expenses = pgTable("expenses", {
   index("expenses_period_idx").on(t.periodMonth),
   index("expenses_category_idx").on(t.category),
   index("expenses_recurring_idx").on(t.recurringExpenseId),
+  index("expenses_event_idx").on(t.eventKey),
 ]);
 
 /* ──────────────────── الفروع والحسابات ──────────────────── */

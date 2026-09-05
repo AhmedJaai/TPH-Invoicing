@@ -21,6 +21,7 @@ import { applyAdjudication, runReconciliation } from "@/services/reconcile.servi
 import { adjudicate } from "@/services/adjudicator.service";
 import { selectedAdjudicator } from "@/lib/bank/adjudicator-provider";
 import { toCanonical } from "@/lib/bank/canonical";
+import { deriveLifecycle } from "@/lib/bank/lifecycle";
 import { loadMerchantMemory } from "@/services/counterparty.service";
 import { loadSupplierProfiles } from "@/services/supplier-profile.service";
 import { analyzeCoverage, describeCoverage } from "@/lib/bank/coverage";
@@ -557,6 +558,18 @@ export async function POST(request: Request) {  let user;
             plan !== undefined ? "MATCHED"
             : decided && decided.outcome === "NOT_A_PAYMENT" ? "IGNORED"
             : "UNMATCHED",
+          /*
+            الطبقة تُشتقّ من الحقائق نفسها التي تُكتَب بجانبها — لا
+            تُخمَّن ولا تُترَك `RAW` للكلّ. وهي تجيب سؤالاً لم يكن
+            يُجاب: أين تقف هذه الحركة الآن؟
+          */
+          lifecycle: deriveLifecycle({
+            classified: (decided?.category ?? "UNKNOWN") !== "UNKNOWN",
+            hasCandidate: decided?.candidate != null,
+            decided: decided?.decision?.disposition === "AUTO",
+            posted: plan !== undefined,
+            ignored: decided?.outcome === "NOT_A_PAYMENT",
+          }),
         })
         .onConflictDoNothing()
         .returning({ id: bankTransactions.id });

@@ -119,6 +119,7 @@ export async function POST(request: Request) {
             matchStatus: "MATCHED",
             matchDisposition: "AUTO",
             matchOutcome: "ADVANCE",
+            lifecycle: "POSTED",
             supplierId,
           })
           .where(eq(bankTransactions.id, tx.id));
@@ -157,6 +158,8 @@ export async function POST(request: Request) {
           matchStatus: "IGNORED",
           matchDisposition: null,
           matchOutcome: "NOT_A_PAYMENT",
+          /* «ليست سداداً» إقرارٌ تامّ لا نقص — فلا تبقى في المعلَّق */
+          lifecycle: "CONFIRMED",
         })
         .where(eq(bankTransactions.id, tx.id));
 
@@ -269,6 +272,7 @@ export async function POST(request: Request) {
         matchedPaymentId: id,
         matchStatus: "MATCHED",
         matchDisposition: "AUTO",
+        lifecycle: "POSTED",
         supplierId: chosen[0].supplierId,
         category: "SUPPLIER",
       })
@@ -389,6 +393,7 @@ async function applyManualSplit(
         matchedPaymentId: id,
         matchStatus: "MATCHED",
         matchDisposition: "AUTO",
+        lifecycle: "POSTED",
         supplierId: rows[0].supplierId,
         category: "SUPPLIER",
       })

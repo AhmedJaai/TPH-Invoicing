@@ -230,6 +230,7 @@ export async function POST(request: Request) {
           matchedPaymentId: id,
           matchStatus: "MATCHED",
           matchDisposition: "AUTO",
+          lifecycle: "POSTED",
           supplierId: plan.supplierId,
           category: "SUPPLIER",
         })

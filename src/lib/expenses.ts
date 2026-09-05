@@ -308,3 +308,79 @@ export function suspectedSupplierExpenses(
   }
   return out;
 }
+
+
+/* ─────────────── ازدواج المصروف عن حدثٍ واحد ─────────────── */
+
+/**
+ * بصمة **الحدث** لا بصمة السجلّ.
+ *
+ * الحدث الواقعيّ الواحد — دفعُ فاتورة كهرباء بألفٍ ومئتين في الخامس من
+ * أغسطس — يصل النظام من مصدرين لا يعرف أحدهما الآخر: مرّةً من كشف
+ * البنك، ومرّةً من مستندٍ رُفع للدرايف. فيُقيَّد مصروفان، ويصير مصروف
+ * الشهر أعلى ممّا صُرف.
+ *
+ * والقيود القائمة لا تمنعه: هي تمنع تكرار السجلّ عن **نفس** الحركة أو
+ * **نفس** الفاتورة، وهذان سجلّان عن مصدرين مختلفين — فيمرّان.
+ *
+ * فالبصمة تصف ما وقع: بابُه ويومُه ومبلغُه ومن وقع له. ولا يدخلها
+ * المصدر — وإلّا عادت تفرّق بين ما تريد جمعه.
+ *
+ * **ولا تدخلها الفواصل الدقيقة عمداً.** فمصروفان في اليوم نفسه بالباب
+ * نفسه والمبلغ نفسه لجهةٍ واحدة يُعامَلان واحداً: احتمال أن يكونا
+ * حدثين حقيقيّين أضعفُ بكثير من احتمال أن يكونا حدثاً واحداً وصل
+ * مرّتين. والخطأ في هذا الاتّجاه يُنقص رقماً، والخطأ في الاتّجاه الآخر
+ * يخترع مصروفاً — ونقصٌ يُكتشَف خيرٌ من زيادةٍ تُصدَّق.
+ */
+export function expenseEventKey(input: {
+  category: TxCategory;
+  occurredOn: string;
+  amountMinor: number;
+  label: string;
+}): string {
+  const label = input.label
+    .replace(/[\u064B-\u0652\u0640]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .toUpperCase()
+    .slice(0, 60);
+
+  return [input.category, input.occurredOn, String(input.amountMinor), label].join("|");
+}
+
+export interface DuplicateExpense {
+  key: string;
+  count: number;
+  amountMinor: number;
+  sources: ExpenseSource[];
+  label: string;
+  occurredOn: string;
+}
+
+/**
+ * يجد المصروفات التي تصف حدثاً واحداً.
+ *
+ * ويُعرَض ولا يُحذَف: أيّهما الصحيح قرارُ إنسان — قد يكون أحدهما
+ * أدقّ وصفاً أو أصحّ باباً.
+ */
+export function findDuplicateExpenses(rows: readonly Expense[]): DuplicateExpense[] {
+  const groups = new Map<string, Expense[]>();
+
+  for (const e of rows) {
+    const key = expenseEventKey(e);
+    groups.set(key, [...(groups.get(key) ?? []), e]);
+  }
+
+  return [...groups.entries()]
+    .filter(([, list]) => list.length > 1)
+    .map(([key, list]) => ({
+      key,
+      count: list.length,
+      /* المبلغ الزائد لا المبلغ كلّه: واحدٌ منها صحيح */
+      amountMinor: list[0].amountMinor * (list.length - 1),
+      sources: [...new Set(list.map((e) => e.source))],
+      label: list[0].label,
+      occurredOn: list[0].occurredOn,
+    }))
+    .sort((a, b) => b.amountMinor - a.amountMinor);
+}

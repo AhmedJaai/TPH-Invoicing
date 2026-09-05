@@ -3,6 +3,8 @@ import {
   MATCH_TOLERANCE_PCT,
   deriveFromBank,
   expectedVsActual,
+  expenseEventKey,
+  findDuplicateExpenses,
   isExpenseCategory,
   suspectedSupplierExpenses,
   looksLikeGoodsPurchase,
@@ -368,5 +370,60 @@ describe("suspectedSupplierExpenses", () => {
 
   it("لا مورّدين فلا اشتباه", () => {
     expect(suspectedSupplierExpenses([exp({ id: "a" })], [])).toEqual([]);
+  });
+});
+
+describe("ازدواج المصروف عن حدثٍ واحد", () => {
+  const e = (over: Partial<Expense> & { id: string }): Expense => ({
+    periodMonth: "2026-08",
+    occurredOn: "2026-08-05",
+    category: "UTILITY",
+    label: "فاتورة كهرباء",
+    amountMinor: 1_200_00,
+    source: "BANK",
+    ...over,
+  });
+
+  /*
+    القيود القائمة تمنع تكرار السجلّ عن نفس الحركة أو نفس الفاتورة —
+    وهذان سجلّان عن مصدرين مختلفين، فيمرّان. والحدث واحد.
+  */
+  it("الحدث الواحد من مصدرين يُكشَف", () => {
+    const dups = findDuplicateExpenses([
+      e({ id: "a", source: "BANK" }),
+      e({ id: "b", source: "INVOICE" }),
+    ]);
+    expect(dups).toHaveLength(1);
+    expect(dups[0].sources).toEqual(["BANK", "INVOICE"]);
+    /* الزائد لا الكلّ: واحدٌ منهما صحيح */
+    expect(dups[0].amountMinor).toBe(1_200_00);
+  });
+
+  it("المصدر لا يدخل البصمة — وإلّا فرّقت ما تريد جمعه", () => {
+    expect(expenseEventKey({ category: "UTILITY", occurredOn: "2026-08-05", amountMinor: 100, label: "كهرباء" }))
+      .toBe(expenseEventKey({ category: "UTILITY", occurredOn: "2026-08-05", amountMinor: 100, label: "كهرباء" }));
+  });
+
+  it("اختلاف اليوم أو المبلغ أو الباب حدثان", () => {
+    expect(findDuplicateExpenses([e({ id: "a" }), e({ id: "b", occurredOn: "2026-08-06" })])).toHaveLength(0);
+    expect(findDuplicateExpenses([e({ id: "a" }), e({ id: "b", amountMinor: 1_200_01 })])).toHaveLength(0);
+    expect(findDuplicateExpenses([e({ id: "a" }), e({ id: "b", category: "RENT" })])).toHaveLength(0);
+  });
+
+  it("اختلاف صيغة الوصف لا يفرّق حدثاً", () => {
+    const dups = findDuplicateExpenses([
+      e({ id: "a", label: "فاتورة كهرباء" }),
+      e({ id: "b", label: "فاتورة  الكهرباء", source: "INVOICE" }),
+    ]);
+    /* «الكهرباء» غير «كهرباء» — والبصمة لا تُطبّع أدوات التعريف عمداً */
+    expect(dups).toHaveLength(0);
+  });
+
+  it("ثلاثة عن حدثٍ واحد: الزائد اثنان", () => {
+    const dups = findDuplicateExpenses([
+      e({ id: "a" }), e({ id: "b", source: "INVOICE" }), e({ id: "c", source: "MANUAL" }),
+    ]);
+    expect(dups[0].count).toBe(3);
+    expect(dups[0].amountMinor).toBe(2_400_00);
   });
 });
