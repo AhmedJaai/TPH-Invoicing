@@ -54,6 +54,9 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 | `005_products_and_sales_domain.sql` | الأصناف والمصروفات المتكرّرة ومجال المبيعات |
 | `006_expenses.sql` | المصروف الفعلي، وقيدٌ يمنع تكراره عن حركة أو فاتورة |
 | `007_financial_invariants.sql` | قيود المال في القاعدة: التخصيص والفاتورة والمصروف |
+| `010_counterparties.sql` | ذاكرة المستفيدين: هويّة الجهة وأدلّتها |
+| `011_branches_and_accounts.sql` | الفروع والحسابات وفترات التسوية |
+| `012_sales_domain.sql` | طرق دفع البيعة والمرتجعات ودفعات التسوية |
 | `008_bank_kinds.sql` | أبواب حركة البنك: تسوية الشبكة ورسومها وضريبتها |
 | `009_match_evidence.sql` | أدلّة المطابقة وقرارها ودرجتها — كي يُعرَض «لماذا؟» ويُتراجَع |
 
@@ -70,7 +73,15 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 | `src/lib/bank/classification.ts` | تصنيف بطبقات: البنية ← المتعلَّم ← الكلمات ← المجهول يُعلَن |
 | `src/lib/bank/entities.ts` | تعريف المستفيد بأدلّة قاطعة وظنّية — والظنّيّ وحده لا يكفي |
 | `src/lib/bank/candidates.ts` | توليد المرشّحين وتسجيلهم · مجموع الجزئيات بلا سقف ثلاث |
-| `src/lib/bank/optimizer.ts` | التسوية الشاملة — لا جشع |
+| `src/lib/bank/optimizer.ts` | تفريعٌ وتحديد: أعلى **مجموع** لا أعلى درجة. وميزانيّة عقد، فإن نفدت رجع للجشع وأعلن `exact: false` |
+| `src/lib/bank/coverage.ts` | فجوات التغطية — الغائب لا يُرى فيجب أن يُحسَب |
+| `src/lib/bank/adjudicate.ts` | متى يُستدعى الذكاء: عند العجز وحده، وعلى مرشّحين مولَّدين لا بيانات خام |
+| `src/lib/bank/parsers/detect.ts` | كشف البنك من الملفّ — و`\b` لا تفصل عند `_` وأسماء الملفّات مليئة بها |
+| `src/lib/bank/parsers/pdf-text.ts` | نصّ PDF ومواضعه — ولا يُرمى ملفٌّ كامل إلى نموذج |
+| `src/lib/extraction/schemas-by-kind.ts` | مخطّط لكل نوع مستند — لا ثلاثون حقلاً لفاتورةٍ فيها ستّة |
+| `src/lib/extraction/benchmark.ts` | مقياس النماذج — **الخطأ الواثق** يسبق الدقّة |
+| `src/lib/extraction/versions.ts` | نسخ الموجِّه والمخطّط، والنماذج مثبَّتة لا عائمة |
+| `src/services/counterparty.service.ts` | تأكيدٌ واحد يعمّ على أمثاله |
 | `src/lib/bank/decision.ts` | تلقائيّ/اقتراح/مراجعة بقاعدة الهامش |
 | `src/services/reconcile.service.ts` | الجسر: صفوف الكشف ← قرارٌ لكل حركة مع أدلّته |
 | `src/lib/bank/match.ts` | ربط الحركة بمورّد — حدود الكلمات، لا احتواء نصّي |
@@ -128,6 +139,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 
 `npm test` (٥٦٥ اختباراً) · `npm run typecheck` · `npm run lint`
 `npm run db:migrate` · `db:verify` · `db:rematch` · `db:reclassify` · `db:dedupe` · `db:expenses` · `db:audit` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules`
+`npm run db:dedupe` · `db:rematch` · `db:reclassify`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`
 
 ## ما ليس مبنيّاً — عمداً
