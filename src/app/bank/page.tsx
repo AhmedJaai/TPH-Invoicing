@@ -9,6 +9,7 @@ import { Money } from "@/components/money";
 import { Card, EmptyState, Section, Stat, StatGrid } from "@/components/ui";
 import { BankImport } from "@/components/bank-import";
 import { MatchExplain, type MatchExplanation } from "@/components/match-explain";
+import { ReconcileQueue, type QueueItem } from "@/components/reconcile-queue";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
 import { countNoun, ITEM } from "@/lib/arabic";
 
@@ -34,7 +35,7 @@ export default async function BankPage() {
     );
   }
 
-  const [counts, supplierRows, recent] = await Promise.all([
+  const [counts, supplierRows, recent, pending] = await Promise.all([
     db.execute<Record<string, number>>(sql`
       select
         (select count(*)::int from bank_transactions)                                as tx,
@@ -72,7 +73,41 @@ export default async function BankPage() {
       .where(sql`${bankTransactions.matchDisposition} is not null`)
       .orderBy(desc(bankTransactions.valueDate))
       .limit(25),
+
+    /*
+      المعلّقات: ما لم يُعرف وجهه. تُرتَّب بالأكبر مبلغاً — فحلّ حركةٍ
+      بخمسة آلاف أنفع من حلّ حركةٍ بريال.
+    */
+    db.select({
+      id: bankTransactions.id,
+      valueDate: bankTransactions.valueDate,
+      amountMinor: bankTransactions.amountMinor,
+      direction: bankTransactions.direction,
+      description: bankTransactions.description,
+      beneficiaryRaw: bankTransactions.beneficiaryRaw,
+      matchEvidence: bankTransactions.matchEvidence,
+    })
+      .from(bankTransactions)
+      .where(sql`${bankTransactions.category} = 'UNKNOWN'
+        and ${bankTransactions.counterpartyId} is null`)
+      .orderBy(desc(bankTransactions.amountMinor))
+      .limit(40),
   ]);
+
+  const queue: QueueItem[] = pending.map((t) => {
+    const ev = t.matchEvidence as { تصنيف?: string; مستفيد?: string[] } | null;
+    return {
+      id: t.id,
+      date: t.valueDate.toISOString().slice(0, 10),
+      amountMinor: t.amountMinor,
+      direction: t.direction as "DEBIT" | "CREDIT",
+      description: (t.description ?? "").slice(0, 160),
+      beneficiaryRaw: t.beneficiaryRaw,
+      guessName: null,
+      guessKind: null,
+      why: [ev?.تصنيف, ...(ev?.مستفيد ?? [])].filter((x): x is string => Boolean(x)),
+    };
+  });
 
   const f = counts.rows[0] ?? {};
   const n = (k: string) => Number(f[k] ?? 0);
@@ -105,6 +140,15 @@ export default async function BankPage() {
           sub="ما زال عليها رصيد"
         />
       </StatGrid>
+
+      {queue.length > 0 && (
+        <Section
+          title="حلّ المعلّقات"
+          hint="سؤالٌ واحد عن حركةٍ واحدة، ثمّ ننتقل. وما تؤكّده يصير ذاكرةً تعمّ على أمثاله، فيقصر الطابور من نفسه."
+        >
+          <ReconcileQueue items={queue} suppliers={supplierRows} />
+        </Section>
+      )}
 
       {recent.length > 0 && (
         <Section

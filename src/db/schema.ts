@@ -461,6 +461,8 @@ export const bankTransactions = pgTable("bank_transactions", {
   matchEvidence: jsonb("match_evidence"),
   /** المورّد الذي رجّحه المحرّك — قد يوجد بلا فاتورة مطابقة. */
   supplierId: text("supplier_id").references(() => suppliers.id),
+  /** الجهة التي عُرفت من ذاكرة المستفيدين. */
+  counterpartyId: text("counterparty_id"),
   /** القاعدة التي صنّفتها، إن وُجدت */
   ruleId: text("rule_id").references(() => bankRules.id, { onDelete: "set null" }),
 }, (t) => [
@@ -636,6 +638,53 @@ export const expenses = pgTable("expenses", {
   index("expenses_period_idx").on(t.periodMonth),
   index("expenses_category_idx").on(t.category),
   index("expenses_recurring_idx").on(t.recurringExpenseId),
+]);
+
+/* ──────────────────── ذاكرة المستفيدين ──────────────────── */
+
+/**
+ * الجهة التي يُدفَع لها أو يُقبَض منها.
+ *
+ * كان التعلّم قواعدَ نصّية: «احفظ هذا النمط». وهي تُطابِق نصّاً ولا
+ * تعرف جهةً — فتغيّرُ صيغةِ اسمٍ يُبطلها. وهذه هويّةٌ للجهة نفسها،
+ * تجمع أدلّتها على اختلافها.
+ */
+export const counterparties = pgTable("counterparties", {
+  id: id(),
+  displayName: text("display_name").notNull(),
+  kind: txCategoryEnum("kind").notNull().default("UNKNOWN"),
+  supplierId: text("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
+  note: text("note"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("counterparties_supplier_idx").on(t.supplierId)]);
+
+export const counterpartyEvidenceKindEnum = pgEnum("counterparty_evidence_kind", [
+  "NAME", "ACCOUNT", "IBAN", "NATIONAL_ID", "MERCHANT_ID", "REFERENCE",
+]);
+
+/**
+ * ما يدلّ على الجهة.
+ *
+ * والدليل الواحد لا يدلّ على جهتين — يمنعه فهرسٌ فريد في القاعدة، لا
+ * الشيفرة: الكتابة تأتي من مسارين لا يعرف أحدهما الآخر.
+ */
+export const counterpartyEvidence = pgTable("counterparty_evidence", {
+  id: id(),
+  counterpartyId: text("counterparty_id").notNull()
+    .references(() => counterparties.id, { onDelete: "cascade" }),
+  kind: counterpartyEvidenceKindEnum("kind").notNull(),
+  value: text("value").notNull(),
+  normalized: text("normalized").notNull(),
+  /** الدليل المتكرّر أوثق. */
+  confirmations: integer("confirmations").notNull().default(1),
+  confirmedById: text("confirmed_by_id").references(() => users.id),
+  createdAt: now(),
+}, (t) => [
+  uniqueIndex("counterparty_evidence_uniq").on(t.kind, t.normalized),
+  index("counterparty_evidence_party_idx").on(t.counterpartyId),
 ]);
 
 /* ───────────────────────── مجال المبيعات ───────────────────────── */

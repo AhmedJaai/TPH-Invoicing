@@ -17,6 +17,7 @@ import { allocate, createPayment } from "@/services/payment.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
 import { recordAudit } from "@/lib/audit";
 import { runReconciliation } from "@/services/reconcile.service";
+import { loadMerchantMemory } from "@/services/counterparty.service";
 import type { SupplierIdentity } from "@/lib/bank/entities";
 
 export const runtime = "nodejs";
@@ -122,6 +123,14 @@ export async function POST(request: Request) {  let user;
     ويولّد المرشّحين كلّهم، ثمّ يوزّعها على الفترة كلّها لا حركةً حركة،
     ولا يحسم تلقائياً إلّا بشرطَي الدرجة والفارق.
   */
+  /*
+    ذاكرة المستفيدين تُقرأ قبل التصنيف.
+
+    فمن أكّد مرّةً أنّ صاحب الهوية ٢١٤٩٨٣٠١١٥ هو نفسه، صُنّفت تحويلاته
+    كلّها بعدها بلا سؤال — وهي في كشفه أكثر من ثلاثين حركة.
+  */
+  const memory = await loadMerchantMemory();
+
   const engine = runReconciliation({
     rows: parsed.rows.map((r, i) => ({
       key: `row-${r.rowNumber}-${i}`,
@@ -142,6 +151,7 @@ export async function POST(request: Request) {  let user;
       outstandingMinor: o.outstandingMinor,
     })),
     suppliers: supplierIdentities,
+    memory,
   });
   const engineByKey = new Map(engine.results.map((r) => [r.key, r]));
   const txByKey = new Map<string, (typeof txs)[number]>(txs.map((t) => [t.id, t]));
