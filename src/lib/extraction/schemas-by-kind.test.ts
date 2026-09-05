@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  classifierSchema, fieldCount, invoiceExtractionSchema,
-  receiptExtractionSchema, schemaFor, statementExtractionSchema,
+  absentFieldsFor, classifierSchema, fieldCount, invoiceExtractionSchema,
+  receiptExtractionSchema, schemaFor, statementExtractionSchema, widen,
 } from "./schemas-by-kind";
 import { extractionSchema } from "./schema";
 
@@ -70,5 +70,72 @@ describe("المصنِّف", () => {
       documentKind: "SOMETHING", confidence: 1, reason: "",
     });
     expect(r.success).toBe(false);
+  });
+});
+
+describe("التوسيع إلى الشكل الكامل", () => {
+  /*
+    `schemas-by-kind.ts` كان مكتوباً ومختبَراً ولا يستدعيه أحد: يُطلَب
+    المخطّط الضخم لكلّ شيء. والتوسيع هو ما جعل استعمالَه ممكناً بلا
+    تغيير كل ما بعده.
+  */
+  it("الفاتورة تُوسَّع فتُقبَل في المخطّط الكامل", () => {
+    const wide = widen("TAX_INVOICE", {
+      supplierNameAr: "أوراق الزيتون", supplierNameEn: "", sellerVatNumber: "310000000000003",
+      sellerCrNumber: "", buyerNameAr: "ذا بوبليك هاوس", buyerVatNumber: "310007971600003",
+      invoiceNumber: "260342", invoiceDate: "2026-08-10",
+      subtotalAmount: "1000.00", vatAmount: "150.00", totalAmount: "1150.00",
+      lines: [], confidence: { supplierName: 0.9, invoiceNumber: 0.95, invoiceDate: 0.9, amounts: 0.99, vatNumbers: 0.8 },
+      notes: "",
+    }, 0.97);
+
+    const parsed = extractionSchema.parse(wide);
+    expect(parsed.documentKind).toBe("TAX_INVOICE");
+    expect(parsed.invoiceNumber).toBe("260342");
+    /* ثقةُ التصنيف من المرحلة الأولى — لا يخمّنها مخطّطُ النوع */
+    expect(parsed.confidence.documentKind).toBe(0.97);
+  });
+
+  it("الإيصال يسمّي تاريخه ورقمه بغير اسميهما فيُترجَمان", () => {
+    const wide = widen("RECEIPT", {
+      beneficiaryName: "سرد للتجارة", beneficiaryAccount: "", senderName: "",
+      referenceNumber: "FT26001", transferDate: "2026-08-11", totalAmount: "11600.00",
+      confidence: { supplierName: 0.7, invoiceNumber: 0.6, invoiceDate: 0.9, amounts: 0.99, vatNumbers: 0 },
+      notes: "",
+    }, 0.9);
+
+    const parsed = extractionSchema.parse(wide);
+    expect(parsed.beneficiaryName).toBe("سرد للتجارة");
+    expect(parsed.invoiceNumber).toBe("FT26001");
+    expect(parsed.invoiceDate).toBe("2026-08-11");
+  });
+
+  /*
+    هذا هو لبّ التخصيص: الحقل الفارغ في المخطّط الواحد غامض — أفارغٌ
+    لأنّه غير موجود أم لأنّه لم يُقرأ؟ وبعده صار الجواب معلوماً بالبناء.
+  */
+  it("ما لم يُسأل عنه يُقال إنّه لم يُسأل — لا يُخلَط بما لم يُقرأ", () => {
+    const wide = widen("RECEIPT", { totalAmount: "100.00", notes: "" }, 0.9) as { notes: string };
+    expect(wide.notes).toContain("لا يحملها هذا النوع");
+    expect(wide.notes).toContain("statementLines");
+    expect(wide.notes).toContain("lines");
+  });
+
+  it("والفاتورة لا تُسأل عن أرصدة كشف", () => {
+    expect(absentFieldsFor("TAX_INVOICE")).toContain("openingBalance");
+    expect(absentFieldsFor("TAX_INVOICE")).toContain("statementLines");
+    expect(absentFieldsFor("TAX_INVOICE")).not.toContain("invoiceNumber");
+  });
+
+  it("والكشف لا يُسأل عن بنود فاتورة", () => {
+    expect(absentFieldsFor("STATEMENT")).toContain("lines");
+    expect(absentFieldsFor("STATEMENT")).not.toContain("openingBalance");
+  });
+
+  it("التوسيع لا يخترع قيمة", () => {
+    const wide = widen("TAX_INVOICE", {}, 0.5) as Record<string, unknown>;
+    expect(wide.supplierNameAr).toBe("");
+    expect(wide.totalAmount).toBe("");
+    expect(wide.lines).toEqual([]);
   });
 });

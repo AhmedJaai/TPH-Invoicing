@@ -118,3 +118,86 @@ export function schemaFor(kind: DocumentKind) {
 export function fieldCount(kind: DocumentKind): number {
   return Object.keys(schemaFor(kind).shape).length;
 }
+
+/* ─────────────── من المخطّط الضيّق إلى النتيجة الكاملة ─────────────── */
+
+/**
+ * حقولٌ **لا وجود لها في هذا النوع** — لا حقولٌ لم تُقرأ.
+ *
+ * وهذا هو الفرق الذي بُني عليه التخصيص كلّه: الحقل الفارغ في المخطّط
+ * الواحد الضخم غامض — أفارغٌ لأنّ المستند لا يحمله، أم لأنّ النموذج لم
+ * يقرأه؟ وبعد التخصيص صار الجواب معلوماً بالبناء: ما لم يُسأل عنه
+ * أصلاً غيرُ موجود في هذا النوع، وما سُئل عنه وعاد فارغاً لم يُقرأ.
+ *
+ * ويُحفَظ هذا في `notes` كي لا يضيع بعد التوسيع.
+ */
+export function absentFieldsFor(kind: DocumentKind): string[] {
+  const asked = new Set(Object.keys(schemaFor(kind).shape));
+  const all = [
+    "supplierNameAr", "supplierNameEn", "sellerVatNumber", "sellerCrNumber",
+    "buyerNameAr", "buyerVatNumber", "invoiceNumber", "invoiceDate",
+    "subtotalAmount", "vatAmount", "totalAmount", "beneficiaryName",
+    "lines", "openingBalance", "closingBalance", "statementLines",
+  ];
+  return all.filter((f) => !asked.has(f));
+}
+
+/**
+ * يوسّع النتيجة الضيّقة إلى شكل `ExtractionResult` الكامل.
+ *
+ * والغرض أن يبقى ما بعده — `pipeline.ts` وما يليه — بلا تغيير: هو
+ * يقرأ شكلاً واحداً، والتخصيص شأنُ الاستخراج وحده.
+ *
+ * ولا يخترع شيئاً: ما لم يُسأل عنه يبقى فارغاً، ويُذكَر أنّه لم يُسأل.
+ */
+export function widen(
+  kind: DocumentKind,
+  narrow: Record<string, unknown>,
+  classifierConfidence: number,
+): Record<string, unknown> {
+  const str = (k: string): string => {
+    const v = narrow[k];
+    return typeof v === "string" ? v : "";
+  };
+  const arr = (k: string): unknown[] => (Array.isArray(narrow[k]) ? (narrow[k] as unknown[]) : []);
+  const conf = (narrow.confidence ?? {}) as Record<string, number>;
+
+  const absent = absentFieldsFor(kind);
+  const note = str("notes");
+
+  return {
+    documentKind: kind,
+    supplierNameAr: str("supplierNameAr"),
+    supplierNameEn: str("supplierNameEn"),
+    sellerVatNumber: str("sellerVatNumber"),
+    sellerCrNumber: str("sellerCrNumber"),
+    buyerNameAr: str("buyerNameAr"),
+    buyerVatNumber: str("buyerVatNumber"),
+    invoiceNumber: str("invoiceNumber") || str("referenceNumber"),
+    /* الإيصال يسمّي تاريخه `transferDate`، والكشف `statementDate` */
+    invoiceDate: str("invoiceDate") || str("transferDate") || str("statementDate"),
+    subtotalAmount: str("subtotalAmount"),
+    vatAmount: str("vatAmount"),
+    totalAmount: str("totalAmount"),
+    beneficiaryName: str("beneficiaryName"),
+    lines: arr("lines"),
+    openingBalance: str("openingBalance"),
+    closingBalance: str("closingBalance"),
+    statementLines: arr("statementLines"),
+    confidence: {
+      /* ثقة التصنيف من المرحلة الأولى — لا يخمّنها مخطّطُ النوع */
+      documentKind: classifierConfidence,
+      supplierName: conf.supplierName ?? 0,
+      invoiceNumber: conf.invoiceNumber ?? 0,
+      invoiceDate: conf.invoiceDate ?? 0,
+      amounts: conf.amounts ?? 0,
+      vatNumbers: conf.vatNumbers ?? 0,
+    },
+    notes:
+      absent.length === 0
+        ? note
+        : [note, `حقولٌ لا يحملها هذا النوع فلم تُطلَب: ${absent.join("، ")}`]
+            .filter(Boolean)
+            .join(" · "),
+  };
+}

@@ -655,8 +655,19 @@ export const supplierProducts = pgTable("supplier_products", {
   normalizedDescription: text("normalized_description").notNull(),
   displayName: text("display_name").notNull(),
   productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
-  /** حجم العبوة بالوحدة الأساس: كرتون ١٢ × ١ لتر = 12 */
+  /** حجم العبوة: كرتون ١٢ × ١ لتر = 12 */
   packSize: numeric("pack_size", { precision: 12, scale: 3 }),
+  /**
+   * وحدةُ ما بداخل العبوة وكمّيتُه.
+   *
+   * وبدونهما `packSize` وحدَه يقول «كم عبوة» ولا يقول «كم في الواحدة
+   * ولا بأيّ وحدة» — فكرتون ١٢ × ١ لتر وكرتون ١٢ × ٥٠٠ مل سواء، وسعرُ
+   * اللتر فيهما مختلفٌ ضعفين. والمقارنة حينئذ تُعلن ارتفاعاً لم يقع.
+   *
+   * ويُذكران معاً أو يُتركان معاً — يفرضه قيدٌ في `017`.
+   */
+  contentUnit: baseUnitEnum("content_unit"),
+  contentQuantity: numeric("content_quantity", { precision: 12, scale: 3 }),
   confirmedById: text("confirmed_by_id").references(() => users.id),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   createdAt: now(),
@@ -886,6 +897,15 @@ export const posProducts = pgTable("pos_products", {
 export const sales = pgTable("sales", {
   id: id(),
   sourceId: text("source_id").notNull().references(() => salesSources.id, { onDelete: "cascade" }),
+  /**
+   * الفرع الذي بِيعت فيه.
+   *
+   * وكان غيابُه افتراضاً مدفوناً: أنّ المنشأة فرعٌ واحد. والمرتجعات
+   * والتسويات تحمل فرعها، والبيعةُ لا — فلا يُقارَن مبيع فرعٍ بمرتجعه،
+   * ولا يُعرَف أيّ فرعٍ أودع هذه التسوية. وإصلاحُه بعد ملء الجدول
+   * يعني نسبةَ كل ما مضى إلى فرعٍ واحد بالحدس.
+   */
+  branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
   externalId: text("external_id").notNull(),
   soldAt: timestamp("sold_at", { withTimezone: true }).notNull(),
   businessDate: text("business_date").notNull(),
@@ -905,11 +925,22 @@ export const saleLines = pgTable("sale_lines", {
   id: id(),
   saleId: text("sale_id").notNull().references(() => sales.id, { onDelete: "cascade" }),
   posProductId: text("pos_product_id").references(() => posProducts.id, { onDelete: "set null" }),
+  /**
+   * معرّف السطر عند المزوّد — أساس منع التكرار عند إعادة المزامنة.
+   *
+   * وبدونه تُضاعَف أسطر البيعة كلّما أُعيدت مزامنتها. وهذا هو الدرس
+   * نفسه الذي كلّف كشفاً بنكياً استُورد ثلاث مرّات: منعُ التكرار
+   * يُبنى قبل أن تدخل البيانات، لا بعد أن تتضاعف.
+   */
+  externalId: text("external_id"),
   description: text("description").notNull(),
   quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull().default("1"),
   unitPriceMinor: integer("unit_price_minor").notNull(),
   lineTotalMinor: integer("line_total_minor").notNull(),
-}, (t) => [index("sale_lines_sale_idx").on(t.saleId)]);
+}, (t) => [
+  index("sale_lines_sale_idx").on(t.saleId),
+  uniqueIndex("sale_lines_external_uniq").on(t.saleId, t.externalId),
+]);
 
 /* ───────────────────────── سجل التدقيق ───────────────────────── */
 
@@ -1038,12 +1069,20 @@ export const salePayments = pgTable("sale_payments", {
   saleId: text("sale_id").notNull().references(() => sales.id, { onDelete: "cascade" }),
   method: salePaymentMethodEnum("method").notNull(),
   amountMinor: integer("amount_minor").notNull(),
-  /** معرّف العملية لدى الشبكة — أساس مطابقة التسوية. */
+  /** معرّف العملية لدى الشبكة — أساس مطابقة التسوية ومنعِ التكرار. */
   externalId: text("external_id"),
   createdAt: now(),
 }, (t) => [
   index("sale_payments_sale_idx").on(t.saleId),
   index("sale_payments_method_idx").on(t.method),
+  /*
+    إعادةُ المزامنة لا تُضاعف الدفعة.
+
+    وكان الجدول بلا قيد: مزامنةٌ ثانية لليوم نفسه تُنشئ لكلّ بيعةٍ
+    دفعاتها مرّةً أخرى، فيصير المقبوض ضعفَ المبيع — ثمّ لا تُطابق
+    التسوية شيئاً.
+  */
+  uniqueIndex("sale_payments_external_uniq").on(t.saleId, t.method, t.externalId),
 ]);
 
 /**
@@ -1098,7 +1137,11 @@ export const settlementBatches = pgTable("settlement_batches", {
   bankTransactionId: text("bank_transaction_id")
     .references(() => bankTransactions.id, { onDelete: "set null" }),
   createdAt: now(),
-}, (t) => [index("settlement_bank_idx").on(t.bankTransactionId)]);
+}, (t) => [
+  index("settlement_bank_idx").on(t.bankTransactionId),
+  /* ودفعةُ التسوية كذلك: تُقرأ من ملفٍّ قد يُرفَع مرّتين */
+  uniqueIndex("settlement_external_uniq").on(t.sourceId, t.externalId),
+]);
 
 /**
  * أثرُ التحكيم — سجلٌّ مستقلّ لا عمودٌ في الحركة.

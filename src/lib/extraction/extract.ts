@@ -4,10 +4,21 @@
  * يُمرَّر ملف الـPDF أو الصورة إلى Claude مباشرةً — فهو يقرأ المستندات
  * الممسوحة ضوئياً بنفسه. وهذا يغني عن محرّك OCR منفصل، ويحلّ مشكلة
  * الحروف العربية المقلوبة التي تصيب استخراج النصّ من ملفات PDF.
+ *
+ * **والقراءة على مرحلتين**: يُصنَّف المستند أوّلاً بسؤالٍ واحد رخيص، ثمّ
+ * يُطلَب مخطّطُ نوعه وحده.
+ *
+ * وكان `schemas-by-kind.ts` مكتوباً ومختبَراً ولا يستدعيه أحد: يُطلَب
+ * المخطّط الضخم لكلّ شيء — ثلاثون حقلاً يُسأل عنها النموذج وهو يقرأ
+ * فاتورة فيها ستّة. وهذا يُضعف الدقّة من وجهين: يُشتّت انتباهه، ويجعل
+ * الحقل الفارغ غامضاً — أفارغٌ لأنّه غير موجود أم لأنّه لم يُقرأ؟
+ *
+ * وبعد التخصيص صار الجواب معلوماً بالبناء، ويُحفَظ في `notes`.
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { extractionSchema } from "./schema";
+import { classifierSchema, schemaFor, widen } from "./schemas-by-kind";
 import { PINNED_MODELS } from "./versions";
 import {
   buildInstructions,
@@ -57,6 +68,33 @@ async function extractWithClaude(input: ExtractionRequest): Promise<ExtractionOu
         });
 
   try {
+    /*
+      ── المرحلة الأولى: ما هذا المستند؟ ──
+
+      سؤالٌ واحد بثلاثة حقول. رخيصٌ لأنّه لا يطلب قراءةَ أرقام، وسقفُ
+      مخرجاته صغير. وثمرتُه أنّ المرحلة الثانية تسأل عمّا يخصّ النوع
+      وحده.
+    */
+    const classified = await client.messages.parse({
+      model: EXTRACTION_MODEL,
+      max_tokens: 512,
+      messages: [{
+        role: "user",
+        content: [
+          fileBlock,
+          { type: "text", text: "ما نوع هذا المستند؟ صنّفه ولا تستخرج حقوله." },
+        ],
+      }],
+      output_config: { format: zodOutputFormat(classifierSchema) },
+    });
+
+    const kind = classified.parsed_output?.documentKind ?? null;
+    const kindConfidence = classified.parsed_output?.confidence ?? 0;
+
+    /*
+      وإن تعذّر التصنيف رجع المسار إلى المخطّط الكامل — لا يُفترَض نوع.
+      وافتراضُ «فاتورة» هنا يعني ألّا يُسأل عن أرصدة كشفٍ في كشفٍ حساب.
+    */
     const response = await client.messages.parse({
       model: EXTRACTION_MODEL,
       max_tokens: 16000,
@@ -73,11 +111,18 @@ async function extractWithClaude(input: ExtractionRequest): Promise<ExtractionOu
           role: "user",
           content: [
             fileBlock,
-            { type: "text", text: "استخرج حقول هذا المستند وفق المخطط المطلوب." },
+            {
+              type: "text",
+              text: kind
+                ? `هذا المستند مصنَّفٌ ${kind}. استخرج حقوله وفق المخطط المطلوب.`
+                : "استخرج حقول هذا المستند وفق المخطط المطلوب.",
+            },
           ],
         },
       ],
-      output_config: { format: zodOutputFormat(extractionSchema) },
+      output_config: {
+        format: zodOutputFormat(kind ? schemaFor(kind) : extractionSchema),
+      },
     });
 
     if (response.stop_reason === "refusal") {
@@ -90,14 +135,21 @@ async function extractWithClaude(input: ExtractionRequest): Promise<ExtractionOu
       return { ok: false, provider: "claude", reason: "تعذّر تحليل مخرجات النموذج." };
     }
 
+    /*
+      يُوسَّع الضيّق إلى الشكل الكامل هنا، فيبقى ما بعده — `pipeline.ts`
+      وما يليه — بلا تغيير. والتخصيص شأنُ الاستخراج وحده.
+    */
+    const raw = response.parsed_output as Record<string, unknown>;
+    const value = extractionSchema.parse(kind ? widen(kind, raw, kindConfidence) : raw);
+
     return {
       ok: true,
       provider: "claude",
-      value: response.parsed_output,
+      value,
       model: response.model,
       usage: {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
+        inputTokens: classified.usage.input_tokens + response.usage.input_tokens,
+        outputTokens: classified.usage.output_tokens + response.usage.output_tokens,
       },
     };
   } catch (error) {
