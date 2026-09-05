@@ -56,8 +56,21 @@ const WEIGHT: Record<EvidenceKind, number> = {
 
 const DECISIVE: readonly EvidenceKind[] = ["ACCOUNT", "ALIAS", "NATIONAL_ID"];
 
-/** أقصر كلمة يُعتدّ بها — ما دونها يقع بالمصادفة. */
+/** أقصر كلمة يُعتدّ بها عادةً — ما دونها يقع بالمصادفة. */
 export const MIN_TOKEN = 4;
+
+/**
+ * وأقصر منها حين لا يبقى في الاسم سواها.
+ *
+ * «سرد للتجارة»: «للتجاره» كلمةٌ عامّة لا تميّز أحداً، و«سرد» ثلاثة
+ * أحرف فتسقط بالحدّ — فيبقى الاسم بلا كلمةٍ مميّزة واحدة، ولا يُطابَق
+ * أبداً. وهذا سببُ عجز مطابقةِ دفعةٍ بأحد عشر ألفاً في بيانات أحمد.
+ *
+ * وكثيرٌ من أسماء التجارة العربية ثلاثيّة: سرد · لافا · بدر · نور.
+ * فيُقبَل الثلاثيّ **حين لا يوجد أطول منه** — لا مطلقاً، كي لا تكثر
+ * المصادفات.
+ */
+export const MIN_TOKEN_FALLBACK = 3;
 
 /** كلمات تتكرّر في أسماء الشركات فلا تميّز أحداً. */
 const STOPWORDS = new Set([
@@ -69,16 +82,22 @@ const STOPWORDS = new Set([
 ]);
 
 export function distinctiveTokens(name: string): string[] {
-  return normalizeText(name)
+  const words = normalizeText(name)
     .split(/[\s\-_/،,.]+/)
     .map((t) => t.trim())
-    .filter((t) => t.length >= MIN_TOKEN && !STOPWORDS.has(t.toLowerCase()));
+    .filter((t) => t.length > 0 && !STOPWORDS.has(t.toLowerCase()));
+
+  const long = words.filter((t) => t.length >= MIN_TOKEN);
+  if (long.length > 0) return long;
+
+  // لا كلمة طويلة مميّزة: يُقبَل الثلاثيّ كي لا يبقى الاسم بلا هوية
+  return words.filter((t) => t.length >= MIN_TOKEN_FALLBACK);
 }
 
 /** يُطابَق على حدود الكلمات لا بالاحتواء — «jar» داخل «EJAR» ليست مطابقة. */
 export function tokenAppears(token: string, text: string): boolean {
   const t = normalizeText(token);
-  if (t.length < MIN_TOKEN) return false;
+  if (t.length < MIN_TOKEN_FALLBACK) return false;
   const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}([^\\p{L}\\p{N}]|$)`, "iu").test(text);
 }

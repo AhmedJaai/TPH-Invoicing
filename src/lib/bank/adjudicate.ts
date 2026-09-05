@@ -9,11 +9,13 @@
  * وحين يُستدعى، لا يُعطى الملفّ ولا القاعدة: يُعطى **مرشّحين مولَّدين
  * حسابياً** ويُسأل أيّهم. فهو يرجّح بين معلومات، ولا يخترع واحدة.
  *
- * وهذا الملفّ **يقرّر متى** فقط. والاستدعاء نفسه ليس مبنيّاً بعد،
- * ولا يُدَّعى أنّه كذلك.
+ * وهذا الملفّ **يقرّر متى** وأيّ **نوعٍ** من الغموض. والاستدعاء في
+ * `services/adjudicator.service.ts`.
  */
 import type { Candidate } from "./candidates";
 import type { Decision } from "./decision";
+import type { EntityCandidate } from "./entity-candidates";
+import { highValueThreshold } from "./verdict-policy";
 
 export type AdjudicationReason =
   | "CLOSE_CANDIDATES"     // مرشّحان متقاربان — النظام لا يعرف أيّهما
@@ -21,11 +23,26 @@ export type AdjudicationReason =
   | "CONFLICTING_EVIDENCE" // أدلّة تتناقض
   | "NONE";
 
+/**
+ * نوع الغموض — وهما مختلفان لا واحد.
+ *
+ * كان النظام يخلطهما: يُنشئ لحركةٍ مجهولة المستفيد حالةَ تحكيمٍ
+ * **بلا مرشّحي فواتير**، والحَكَم يرفض ما لا مرشّح له. فالمسار الذي
+ * صُمّم لأخطر الحالات — مبلغٌ كبير وجهةٌ مجهولة — كان ميّتاً.
+ *
+ *   `INVOICE` : نعرف الجهة ونختلف أيّ فاتورة.
+ *   `ENTITY`  : لا نعرف من هي الجهة أصلاً.
+ */
+export type AdjudicationKind = "INVOICE" | "ENTITY";
+
 export interface AdjudicationCase {
   transactionId: string;
+  kind: AdjudicationKind;
   reason: AdjudicationReason;
-  /** ما يُعرَض على الحَكَم — مرشّحون مولَّدون، لا بيانات خام. */
+  /** مرشّحو الفواتير — لحالة `INVOICE`. */
   candidates: Candidate[];
+  /** مرشّحو الجهات — لحالة `ENTITY`. */
+  entityCandidates: EntityCandidate[];
   /** لماذا احتاج حَكَماً. */
   note: string;
 }
@@ -33,7 +50,9 @@ export interface AdjudicationCase {
 /**
  * الحدّ الذي يصير عنده المبلغ المجهول مستحقّاً للتحكيم.
  *
- * ألف ريال: ما دونها لا يستحقّ كلفة نموذج، وحلّه بيد صاحب العمل أسرع.
+ * يُحسب من وسيط حركات المقهى — راجع `verdict-policy.ts`. وكان ثابتاً
+ * بألف ريال، وهو رقمٌ لا يعني الشيء نفسه في مقهىً يشتري بعشرة آلاف
+ * شهرياً وفي آخر يشتري بمئة ألف.
  */
 export const HIGH_VALUE_MINOR = 100_000;
 
@@ -45,7 +64,11 @@ export interface CaseInput {
   amountMinor: number;
   supplierId: string | null;
   candidates: readonly Candidate[];
+  /** ما رُشِّح من الجهات حين جُهل المستفيد. */
+  entityCandidates?: readonly EntityCandidate[];
   decision: Decision | null;
+  /** وسيط حركات المقهى — الكبير نسبيّ لا ثابت. */
+  medianAmountMinor?: number | null;
 }
 
 /**
@@ -62,20 +85,33 @@ export function needsAdjudication(input: CaseInput): AdjudicationCase | null {
   if (top && second && top.score - second.score < CLOSE_MARGIN) {
     return {
       transactionId: input.transactionId,
+      kind: "INVOICE",
       reason: "CLOSE_CANDIDATES",
       candidates: [top, second, ...input.candidates.slice(2, 5)],
+      entityCandidates: [],
       note:
         `مرشّحان متقاربان (${Math.round(top.score * 100)} و${Math.round(second.score * 100)}) — ` +
         "الحساب لا يفصل بينهما",
     };
   }
 
-  if (input.supplierId === null && input.amountMinor >= HIGH_VALUE_MINOR) {
+  /*
+    مجهول المستفيد وكبير القيمة: حالةُ **جهة** لا حالةُ فاتورة. وتُرسَل
+    بمرشّحي جهات — فإن لم يُرشَّح أحد فلا شيء يُسأل عنه، ويبقى للإنسان.
+  */
+  const threshold = highValueThreshold(input.medianAmountMinor ?? null);
+  const entities = input.entityCandidates ?? [];
+
+  if (input.supplierId === null && input.amountMinor >= threshold && entities.length > 0) {
     return {
       transactionId: input.transactionId,
+      kind: "ENTITY",
       reason: "UNKNOWN_HIGH_VALUE",
       candidates: [],
-      note: `مبلغ كبير (${input.amountMinor / 100} ريالاً) ومستفيده مجهول`,
+      entityCandidates: [...entities],
+      note:
+        `مبلغ كبير (${(input.amountMinor / 100).toFixed(2)} ريالاً) ومستفيده مجهول — ` +
+        `و${entities.length} جهةً مرشَّحة`,
     };
   }
 

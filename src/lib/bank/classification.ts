@@ -21,6 +21,9 @@ import type { TxKind } from "./taxonomy";
 
 export type Layer = "STRUCTURE" | "LEARNED" | "KEYWORD" | "NONE";
 
+/** نسخة منطق التصنيف — تُرفَع مع كل تغيير في الطبقات أو الكلمات. */
+export const CLASSIFICATION_VERSION = "2026-09-05.1";
+
 export interface Classification {
   kind: TxKind;
   layer: Layer;
@@ -28,7 +31,27 @@ export interface Classification {
   reason: string;
   /** هوية المستفيد إن عُرفت. */
   merchantKey: string | null;
+  /**
+   * مصدر التصنيف كما يُحفَظ في القاعدة.
+   *
+   * وكان يُحسَب ثمّ يُرمى: يُكتب `rule_id = null` صراحةً، فيضيع من
+   * صنّف ولماذا — ولا يُقاس بعدها أيّ القواعد أدقّ، ولا يُصحَّح ما أخطأ.
+   */
+  source: ClassificationSource;
+  /** القاعدة التي صنّفت، إن كانت قاعدةً محفوظة. */
+  ruleId: string | null;
 }
+
+export type ClassificationSource =
+  | "STRUCTURE" | "MEMORY" | "RULE" | "KEYWORD" | "AI" | "HUMAN" | "UNKNOWN";
+
+/** الطبقة التي حسمت ← المصدر الذي يُحفَظ. */
+export const LAYER_SOURCE: Record<Layer, ClassificationSource> = {
+  STRUCTURE: "STRUCTURE",
+  LEARNED: "MEMORY",
+  KEYWORD: "KEYWORD",
+  NONE: "UNKNOWN",
+};
 
 /** ذاكرة المستفيدين: ما أكّده الإنسان من قبل. */
 export interface MerchantMemory {
@@ -93,6 +116,8 @@ export function classify(
     return {
       kind: tx.pos.kind,
       layer: "STRUCTURE",
+      source: "STRUCTURE",
+      ruleId: null,
       reason: `بنية الوصف تقول إنّها حركة شبكة${tx.pos.scheme ? ` (${tx.pos.scheme})` : ""}`,
       merchantKey: tx.pos.merchantId ? `POS:${tx.pos.merchantId}` : null,
     };
@@ -111,6 +136,8 @@ export function classify(
       return {
         kind: known.kind,
         layer: "LEARNED",
+        source: "MEMORY",
+        ruleId: null,
         reason: `أكّدتَ من قبل أنّ هذا المستفيد ${known.confirmations > 1 ? `${known.confirmations} مرّات` : "مرّةً"}`,
         merchantKey: key,
       };
@@ -122,6 +149,8 @@ export function classify(
     return {
       kind: "SUPPLIER_PAYMENT",
       layer: "KEYWORD",
+      source: "KEYWORD",
+      ruleId: null,
       reason: "الوصف يقول صراحةً إنّه شراء بضاعة",
       merchantKey: key,
     };
@@ -130,13 +159,18 @@ export function classify(
   for (const k of KEYWORDS) {
     if (k.direction && k.direction !== tx.direction) continue;
     if (!k.match.test(tx.searchText)) continue;
-    return { kind: k.kind, layer: "KEYWORD", reason: k.label, merchantKey: key };
+    return {
+      kind: k.kind, layer: "KEYWORD", source: "KEYWORD", ruleId: null,
+      reason: k.label, merchantKey: key,
+    };
   }
 
   /* ── ٤. المجهول ── */
   return {
     kind: "UNKNOWN",
     layer: "NONE",
+    source: "UNKNOWN",
+    ruleId: null,
     reason:
       tx.direction === "CREDIT"
         ? "وارد لم يُعرف مصدره — ولا يُفترَض أنّه ضجيج"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  CLOSE_MARGIN, HIGH_VALUE_MINOR, needsAdjudication, planAdjudication,
+  CLOSE_MARGIN, needsAdjudication, planAdjudication,
   type CaseInput,
 } from "./adjudicate";
 import type { Candidate } from "./candidates";
@@ -49,14 +49,37 @@ describe("needsAdjudication", () => {
       .toBeNull();
   });
 
-  it("المبلغ الكبير المجهول مستفيده يستحقّ", () => {
-    const r = needsAdjudication(input({ supplierId: null, amountMinor: HIGH_VALUE_MINOR }));
+  /*
+    كانت هذه الحالة تُنشَأ **بلا مرشّحين** والحَكَم يرفض ما لا مرشّح
+    له — فالمسار الذي صُمّم لأخطر الحالات كان ميّتاً. صارت حالةَ
+    **جهة** تحمل مرشّحي جهات، وتُسقَط إن لم يُرشَّح أحد.
+  */
+  const entity = {
+    counterpartyId: "C1", supplierId: null, displayName: "جهة", score: 0.4, evidence: ["كلمة"],
+  };
+
+  it("المبلغ الكبير المجهول مستفيده يستحقّ — وحالتُه حالةُ جهة", () => {
+    const r = needsAdjudication(input({
+      supplierId: null,
+      amountMinor: 600_000,
+      medianAmountMinor: 100_00,
+      entityCandidates: [entity],
+    }));
     expect(r?.reason).toBe("UNKNOWN_HIGH_VALUE");
+    expect(r?.kind).toBe("ENTITY");
+    expect(r?.entityCandidates).toHaveLength(1);
+  });
+
+  it("ولا يُرسَل ما لا جهةَ مرشَّحة له — لا شيء يُسأل عنه", () => {
+    expect(needsAdjudication(input({
+      supplierId: null, amountMinor: 600_000, medianAmountMinor: 100_00, entityCandidates: [],
+    }))).toBeNull();
   });
 
   it("والصغير المجهول لا يستحقّ كلفة نموذج", () => {
-    expect(needsAdjudication(input({ supplierId: null, amountMinor: HIGH_VALUE_MINOR - 1 })))
-      .toBeNull();
+    expect(needsAdjudication(input({
+      supplierId: null, amountMinor: 1_000, medianAmountMinor: 100_00, entityCandidates: [entity],
+    }))).toBeNull();
   });
 
   it("لا يُعرَض على الحَكَم إلّا مرشّحون مولَّدون — لا بيانات خام", () => {

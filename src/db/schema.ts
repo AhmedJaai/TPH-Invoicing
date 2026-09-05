@@ -419,6 +419,21 @@ export const bankRules = pgTable("bank_rules", {
 
 export const matchDispositionEnum = pgEnum("match_disposition", ["AUTO", "SUGGEST", "REVIEW"]);
 
+/**
+ * من صنّف هذه الحركة.
+ *
+ * كان النظام يعرف السبب داخلياً ثمّ يكتب `rule_id = null` صراحةً —
+ * فيضيع من صنّف ولماذا، ولا يُقاس بعدها أيّ القواعد أدقّ.
+ */
+export const classificationSourceEnum = pgEnum("classification_source", [
+  "STRUCTURE", "MEMORY", "RULE", "KEYWORD", "AI", "HUMAN", "UNKNOWN",
+]);
+
+export const decisionEventEnum = pgEnum("decision_event", [
+  "CLASSIFIED", "MATCH_SUGGESTED", "MATCH_CONFIRMED",
+  "MATCH_REJECTED", "MATCH_REVERSED", "ENTITY_LEARNED", "POSTED",
+]);
+
 export const bankTransactions = pgTable("bank_transactions", {
   id: id(),
   bankImportId: text("bank_import_id").notNull().references(() => bankImports.id, { onDelete: "cascade" }),
@@ -465,6 +480,10 @@ export const bankTransactions = pgTable("bank_transactions", {
   counterpartyId: text("counterparty_id"),
   /** الحساب الذي وردت فيه — أساس تعدّد الحسابات لاحقاً. */
   bankAccountId: text("bank_account_id"),
+  /** من صنّفها ولماذا — لا رقمَ ثقةٍ مجرَّداً. */
+  classificationSource: classificationSourceEnum("classification_source"),
+  classificationReason: text("classification_reason"),
+  classificationVersion: text("classification_version"),
   /** القاعدة التي صنّفتها، إن وُجدت */
   ruleId: text("rule_id").references(() => bankRules.id, { onDelete: "set null" }),
 }, (t) => [
@@ -1006,3 +1025,55 @@ export const settlementBatches = pgTable("settlement_batches", {
     .references(() => bankTransactions.id, { onDelete: "set null" }),
   createdAt: now(),
 }, (t) => [index("settlement_bank_idx").on(t.bankTransactionId)]);
+
+/**
+ * أثرُ التحكيم — سجلٌّ مستقلّ لا عمودٌ في الحركة.
+ *
+ * لأنّ الحركة قد تُحكَّم أكثر من مرّة: عند الاستيراد، ثمّ بعد أن
+ * تتعلّم الذاكرة شيئاً. وحفظُ الأخير وحده يمحو تاريخ القرار.
+ */
+export const adjudications = pgTable("adjudications", {
+  id: id(),
+  bankTransactionId: text("bank_transaction_id").notNull()
+    .references(() => bankTransactions.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  provider: text("provider").notNull(),
+  model: text("model").notNull(),
+  promptVersion: text("prompt_version").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  durationMs: integer("duration_ms").notNull().default(0),
+  /** ما قاله النموذج عن نفسه — إشارةٌ لا حُكم. */
+  modelConfidence: numeric("model_confidence", { precision: 4, scale: 3 }),
+  modelReason: text("model_reason"),
+  claimedCodes: text("claimed_codes").array().notNull().default([]),
+  upheldCodes: text("upheld_codes").array().notNull().default([]),
+  refutedCodes: text("refuted_codes").array().notNull().default([]),
+  chosenInvoiceIds: text("chosen_invoice_ids").array().notNull().default([]),
+  chosenCounterparty: text("chosen_counterparty"),
+  disposition: matchDispositionEnum("disposition").notNull(),
+  signals: jsonb("signals"),
+  refused: text("refused"),
+  createdAt: now(),
+}, (t) => [
+  index("adjudications_tx_idx").on(t.bankTransactionId),
+]);
+
+/**
+ * تاريخ القرار.
+ *
+ * سجلّ التدقيق يقول **من فعل ماذا**، وهذا يقول **كيف تطوّر القرار**:
+ * اقترح الذكاء الفاتورة ١٨٢ · رفضها أحمد · طابق ١٨٩ · تعلّم النظام
+ * هويّة الحساب. وهما سؤالان مختلفان.
+ */
+export const decisionHistory = pgTable("decision_history", {
+  id: id(),
+  bankTransactionId: text("bank_transaction_id")
+    .references(() => bankTransactions.id, { onDelete: "cascade" }),
+  event: decisionEventEnum("event").notNull(),
+  /** نظام أم إنسان أم نموذج. */
+  actor: text("actor").notNull(),
+  actorId: text("actor_id").references(() => users.id),
+  detail: text("detail"),
+  payload: jsonb("payload"),
+  createdAt: now(),
+}, (t) => [index("decision_history_tx_idx").on(t.bankTransactionId, t.createdAt)]);

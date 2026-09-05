@@ -66,31 +66,46 @@ describe("validateVerdict", () => {
   const map = new Map([["c1", cand()]]);
 
   it("يقبل اختياراً من القائمة", () => {
-    const r = validateVerdict({ choice: "c1", confidence: 0.9, reason: "", rejected: "" }, map);
+    const r = validateVerdict({ choice: "c1", confidence: 0.9, reasonCodes: [], reason: "" }, map);
     expect(r.candidate).not.toBeNull();
   });
 
   it("يقبل NONE", () => {
-    const r = validateVerdict({ choice: VERDICT_NONE, confidence: 0, reason: "", rejected: "" }, map);
+    const r = validateVerdict({ choice: VERDICT_NONE, confidence: 0, reasonCodes: [], reason: "" }, map);
     expect(r.candidate).toBeNull();
     expect(r.rejected).toBeNull();
   });
 
   it("يردّ ما ليس في القائمة — وهذا يمنع اختراع فاتورة", () => {
-    const r = validateVerdict({ choice: "c9", confidence: 1, reason: "", rejected: "" }, map);
+    const r = validateVerdict({ choice: "c9", confidence: 1, reasonCodes: [], reason: "" }, map);
     expect(r.candidate).toBeNull();
     expect(r.rejected).toContain("وليس في القائمة");
   });
 
   it("يردّ ثقةً خارج المدى", () => {
     for (const confidence of [-0.1, 1.5, NaN]) {
-      const r = validateVerdict({ choice: "c1", confidence, reason: "", rejected: "" }, map);
+      const r = validateVerdict({ choice: "c1", confidence, reasonCodes: [], reason: "" }, map);
       expect(r.candidate).toBeNull();
     }
   });
 
   it("يتجاهل الفراغ حول المعرّف", () => {
-    const r = validateVerdict({ choice: " c1 ", confidence: 0.8, reason: "", rejected: "" }, map);
+    const r = validateVerdict({ choice: " c1 ", confidence: 0.8, reasonCodes: [], reason: "" }, map);
     expect(r.candidate).not.toBeNull();
+  });
+});
+
+
+describe("الموجِّه يذكر رموز الأدلّة", () => {
+  it("يعطي القائمة ويمنع ما سواها", () => {
+    const { prompt } = buildAdjudicationPrompt(tx, [cand()], labels);
+    expect(prompt).toContain("AMOUNT_EXACT");
+    expect(prompt).toContain("لا تذكر رمزاً لا ينطبق");
+  });
+
+  it("ويحدّ المهمّة: ترتيب مرشّحين لا تدقيق", () => {
+    const { prompt } = buildAdjudicationPrompt(tx, [cand()], labels);
+    expect(prompt).toContain("رتّب المرشّحين");
+    expect(prompt).not.toContain("أنت مدقّق مالي");
   });
 });

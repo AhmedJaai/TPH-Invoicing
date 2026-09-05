@@ -10,7 +10,10 @@
  *   ← قرار.
  */
 import { toCanonical, matchableReferences, type RawBankRow } from "@/lib/bank/canonical";
-import { classify, type MerchantMemory } from "@/lib/bank/classification";
+import {
+  CLASSIFICATION_VERSION, classify,
+  type ClassificationSource, type MerchantMemory,
+} from "@/lib/bank/classification";
 import { resolveSupplier, type SupplierIdentity } from "@/lib/bank/entities";
 import { generateCandidates, type Candidate, type OpenInvoice } from "@/lib/bank/candidates";
 import { reconcile, type Claim } from "@/lib/bank/optimizer";
@@ -44,6 +47,10 @@ export interface TransactionResult {
   category: TxCategory;
   /** لماذا صُنّفت هكذا. */
   classificationReason: string;
+  /** ومن صنّفها — يُحفَظ كي يُقاس ويُصحَّح. */
+  classificationSource: ClassificationSource;
+  classificationRuleId: string | null;
+  classificationVersion: string;
   supplierId: string | null;
   supplierScore: number;
   /** أدلّة تعريف المستفيد، بنصّها. */
@@ -251,6 +258,9 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
       kind: p.classification.kind,
       category: toCategory(p.classification.kind),
       classificationReason: p.classification.reason,
+      classificationSource: p.classification.source,
+      classificationRuleId: p.classification.ruleId,
+      classificationVersion: CLASSIFICATION_VERSION,
       supplierId: supplier.supplierId,
       supplierScore: supplier.score,
       supplierEvidence: supplier.evidence,

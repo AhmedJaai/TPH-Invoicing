@@ -17,9 +17,17 @@
 import { z } from "zod";
 import type { Candidate } from "./candidates";
 import type { CanonicalTransaction } from "./canonical";
+import { ALL_REASON_CODES } from "./reason-codes";
 
 export const VERDICT_NONE = "NONE";
 
+/**
+ * مهمّة الحَكَم مقيَّدة عمداً.
+ *
+ * كان يُقال له «أنت مدقّق مالي» — وهي صفةٌ تدعوه إلى التصرّف كوكيل:
+ * يستنتج ويقترح ويتجاوز البيانات. والمطلوب أضيق من ذلك بكثير:
+ * **يرتّب تفسيرات مرشّحين حُسبوا**، لا أكثر.
+ */
 export const adjudicationSchema = z.object({
   /**
    * معرّف المرشّح المختار، أو `NONE`.
@@ -28,10 +36,17 @@ export const adjudicationSchema = z.object({
    * كي لا يستطيع النموذج أن يذكر فاتورةً ليست في القائمة أصلاً.
    */
   choice: z.string().describe("معرّف المرشّح المختار من القائمة، أو NONE إن لم يترجّح شيء"),
-  confidence: z.number().describe("ثقتك بين 0 و 1"),
-  reason: z.string().describe("لماذا اخترته، بجملة عربية قصيرة تذكر الدليل"),
-  /** ما رجّح غيره — يُعرَض للمستخدم كي يرى ما لم يُختَر. */
-  rejected: z.string().describe("لماذا استُبعد أقرب منافس، أو فارغ"),
+  /**
+   * الأدلّة برموزٍ لا بنثر.
+   *
+   * فالنثر لا يُفحَص: يقول «المرجع مطابق» ودرجةُ المرجع صفر. والرمز
+   * يُقابَل بما حسبه النظام، فيُردّ إن لم يقع.
+   */
+  reasonCodes: z.array(z.string()).describe(
+    "رموز الأدلّة من القائمة المعطاة وحدها",
+  ),
+  confidence: z.number().describe("ثقتك بين 0 و 1 — إشارةٌ واحدة، والنظام يقرّر"),
+  reason: z.string().describe("جملة عربية قصيرة تشرح الاختيار"),
 });
 
 export type AdjudicationVerdict = z.infer<typeof adjudicationSchema>;
@@ -86,11 +101,14 @@ export function buildAdjudicationPrompt(
     .join(" · ");
 
   const prompt = [
-    "أنت مدقّق مالي. مهمتك اختيار الفاتورة التي تفسّر هذه الحركة البنكية.",
+    "مهمّتك واحدة: رتّب المرشّحين أدناه واختر أقواهم تفسيراً لهذه الحركة.",
+    "لستَ مطالباً بتدقيقٍ ولا باستنتاجٍ خارج ما أُعطيت.",
     "",
-    "قيدان لا يُخترقان:",
+    "قيود لا تُخترق:",
     "١) اختر معرّفاً من القائمة أدناه فقط، أو اكتب NONE. ولا تذكر فاتورةً ليست في القائمة.",
     "٢) إن لم يترجّح شيء بوضوح فاكتب NONE. الترك أسلم من نسبة مالٍ إلى فاتورة لم تُدفع.",
+    "٣) اذكر أدلّتك برموز من هذه القائمة وحدها، ولا تذكر رمزاً لا ينطبق:",
+    `   ${ALL_REASON_CODES.join(" · ")}`,
     "",
     "الحركة:",
     `  التاريخ: ${tx.valueDate.toISOString().slice(0, 10)}`,

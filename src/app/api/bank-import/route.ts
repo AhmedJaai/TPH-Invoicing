@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  bankImports, bankRules, bankTransactions, invoices, paymentAllocations,
+  adjudications, bankImports, bankRules, bankTransactions, decisionHistory, invoices, paymentAllocations,
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
@@ -17,7 +17,8 @@ import { allocate, createPayment } from "@/services/payment.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
 import { recordAudit } from "@/lib/audit";
 import { applyAdjudication, runReconciliation } from "@/services/reconcile.service";
-import { adjudicate, geminiAdjudicator, toSuggestion } from "@/services/adjudicator.service";
+import { adjudicate } from "@/services/adjudicator.service";
+import { selectedAdjudicator } from "@/lib/bank/adjudicator-provider";
 import { toCanonical } from "@/lib/bank/canonical";
 import { loadMerchantMemory } from "@/services/counterparty.service";
 import { analyzeCoverage, describeCoverage } from "@/lib/bank/coverage";
@@ -194,7 +195,9 @@ export async function POST(request: Request) {  let user;
     وإن لم يكن مهيَّأً مضى المسار حسابياً بحتاً — وهذا هو الأصل، لا
     حالةُ عطل.
   */
-  const judge = geminiAdjudicator();
+  const judge = selectedAdjudicator();
+  const engineByKeyDraft = new Map(engine.results.map((r) => [r.key, r]));
+  let adjudicationOutcomes: Awaited<ReturnType<typeof adjudicate>> = [];
   if (judge.isConfigured() && engine.adjudicationCases.length > 0) {
     const canonicalByKey = new Map(
       parsed.rows.map((r, i) => [
@@ -221,16 +224,31 @@ export async function POST(request: Request) {  let user;
       ]),
     );
 
-    const outcomes = await adjudicate(
-      judge, engine.adjudicationCases, canonicalByKey, invoiceLabels,
-    );
+    /*
+      الوسيط يُحسب من الدفعة نفسها: «الكبير» نسبيّ لا ثابت — ألف ريال
+      في مقهىً صغير كبيرة، وفي آخر عاديّة.
+    */
+    const amounts = parsed.rows.map((r) => r.amountMinor).sort((a, b) => a - b);
+    const median = amounts.length > 0 ? amounts[Math.floor(amounts.length / 2)] : null;
+
+    const outcomes = await adjudicate({
+      cases: engine.adjudicationCases,
+      transactions: canonicalByKey,
+      invoiceLabels,
+      kindOf: (id) => engineByKeyDraft.get(id)?.kind ?? "UNKNOWN",
+      medianAmountMinor: median,
+      provider: judge,
+    });
+
+    adjudicationOutcomes = outcomes;
 
     engine = applyAdjudication(
       engine,
       outcomes.map((o) => ({
         transactionId: o.transactionId,
         candidate: o.candidate,
-        ...toSuggestion(o),
+        disposition: o.decision.disposition,
+        reasons: o.decision.reasons,
       })),
     );
   }
@@ -464,7 +482,15 @@ export async function POST(request: Request) {  let user;
             يعني مصدرَي حقيقة، وهو ما يُنتج التناقض لا يُصلحه.
           */
           category: decided?.category ?? "UNKNOWN",
-          ruleId: null,
+          /*
+            سبب التصنيف يُحفَظ، لا يُحسَب ثمّ يُرمى. كان يُكتب
+            `ruleId: null` صراحةً ولو صنّفت قاعدةٌ الحركة — فيضيع من
+            صنّف ولماذا، ولا يُقاس بعدها أيّ القواعد أدقّ.
+          */
+          ruleId: decided?.classificationRuleId ?? null,
+          classificationSource: decided?.classificationSource ?? "UNKNOWN",
+          classificationReason: decided?.classificationReason ?? null,
+          classificationVersion: decided?.classificationVersion ?? null,
           supplierId: decided?.supplierId ?? null,
           matchDisposition: decided?.decision?.disposition ?? null,
           matchScore: decided?.candidate ? Math.round(decided.candidate.score * 100) : null,
@@ -495,6 +521,56 @@ export async function POST(request: Request) {  let user;
 
       // القيد الفريد ردّها: حركة سبقتنا إليها كتابة أخرى
       if (!inserted) continue;
+
+      await tx.insert(decisionHistory).values({
+        bankTransactionId: inserted.id,
+        event: "CLASSIFIED",
+        actor: decided?.classificationSource === "MEMORY" ? "MEMORY" : "SYSTEM",
+        actorId: user.id,
+        detail: decided?.classificationReason ?? "بلا سبب مسجَّل",
+        payload: {
+          الباب: decided?.category,
+          المصدر: decided?.classificationSource,
+          النسخة: decided?.classificationVersion,
+        },
+      });
+
+      /* أثرُ التحكيم، إن حُكِّمت */
+      const verdict = adjudicationOutcomes.find((o) => o.transactionId === t.id);
+      if (verdict) {
+        await tx.insert(adjudications).values({
+          bankTransactionId: inserted.id,
+          kind: verdict.kind,
+          provider: verdict.provenance.provider,
+          model: verdict.provenance.model,
+          promptVersion: verdict.provenance.promptVersion,
+          schemaVersion: verdict.provenance.schemaVersion,
+          durationMs: verdict.provenance.durationMs,
+          modelConfidence: String(verdict.provenance.modelConfidence),
+          modelReason: verdict.provenance.modelReason,
+          claimedCodes: verdict.provenance.claimedCodes,
+          upheldCodes: verdict.provenance.upheldCodes,
+          refutedCodes: verdict.provenance.refutedCodes,
+          chosenInvoiceIds: verdict.candidate?.invoiceIds ?? [],
+          chosenCounterparty: verdict.entityChoice?.name ?? null,
+          disposition: verdict.decision.disposition,
+          signals: verdict.decision.signals,
+          refused: verdict.refused,
+        });
+
+        await tx.insert(decisionHistory).values({
+          bankTransactionId: inserted.id,
+          event: "MATCH_SUGGESTED",
+          actor: `AI:${verdict.provenance.provider}`,
+          actorId: user.id,
+          detail: verdict.provenance.modelReason || "بلا سبب",
+          payload: {
+            الثقة: verdict.provenance.modelConfidence,
+            "أدلّة صحّت": verdict.provenance.upheldCodes,
+            "أدلّة رُدّت": verdict.provenance.refutedCodes,
+          },
+        });
+      }
       if (!plan) continue;
 
       const paymentId = await createPayment(tx, {
@@ -521,6 +597,15 @@ export async function POST(request: Request) {  let user;
        */
       await allocate(tx, paymentId, plan.amountMinor, plan.allocations);
       created++;
+
+      await tx.insert(decisionHistory).values({
+        bankTransactionId: inserted.id,
+        event: "POSTED",
+        actor: "SYSTEM",
+        actorId: user.id,
+        detail: `طُوبقت مع ${plan.allocations.length} فاتورة`,
+        payload: { الدفعة: paymentId, الشهور: plan.months },
+      });
     }
   });
 
