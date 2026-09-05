@@ -7,7 +7,16 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { ConfirmAction } from "@/components/ui-client";
 
+interface Coverage {
+  from: string | null;
+  to: string | null;
+  gaps: { start: string; end: string; days: number }[];
+  overlaps: number;
+  summary: string;
+}
+
 interface Summary {
+  coverage?: Coverage;
   bank: string; accountNumber?: string;
   periodStart?: string; periodEnd?: string;
   totalRows: number; operational: number; payments: number;
@@ -313,6 +322,29 @@ export function BankImport({
               {data.summary.bank} · حساب {data.summary.accountNumber ?? "—"} ·{" "}
               {data.summary.periodStart} إلى {data.summary.periodEnd}
             </p>
+
+            {/*
+              الفجوة تُعرَض قبل كل شيء: التكرار يُرفَض من نفسه، أمّا
+              الأسبوع الذي لم يُستورَد فلا يشكو منه أحد — الغائب لا يُرى.
+            */}
+            {data.summary.coverage && data.summary.coverage.gaps.length > 0 && (
+              <div className="mt-3 rounded-xl border border-warn/40 bg-warn-bg px-3 py-2.5">
+                <p className="text-xs font-bold text-warn">
+                  فجوة في التغطية — أيامٌ لم يُستورَد كشفها
+                </p>
+                <ul className="mt-1.5 space-y-0.5">
+                  {data.summary.coverage.gaps.slice(0, 4).map((g, i) => (
+                    <li key={i} className="nums text-[11px] leading-relaxed">
+                      {g.start} ← {g.end} ({g.days} يوماً)
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1.5 text-[10px] leading-relaxed text-ink-soft">
+                  حركات هذه الأيام غائبة عن النظام، ولن تظهر ناقصةً في أي تقرير — لأنّ
+                  الغائب لا يُرى. ارفع كشفها لتكتمل.
+                </p>
+              </div>
+            )}
 
             {/*
               الرقم الأوّل هو ما يحتاج المستخدم، لا مجموع ما في الملف.

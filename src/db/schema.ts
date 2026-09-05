@@ -463,6 +463,8 @@ export const bankTransactions = pgTable("bank_transactions", {
   supplierId: text("supplier_id").references(() => suppliers.id),
   /** الجهة التي عُرفت من ذاكرة المستفيدين. */
   counterpartyId: text("counterparty_id"),
+  /** الحساب الذي وردت فيه — أساس تعدّد الحسابات لاحقاً. */
+  bankAccountId: text("bank_account_id"),
   /** القاعدة التي صنّفتها، إن وُجدت */
   ruleId: text("rule_id").references(() => bankRules.id, { onDelete: "set null" }),
 }, (t) => [
@@ -639,6 +641,78 @@ export const expenses = pgTable("expenses", {
   index("expenses_category_idx").on(t.category),
   index("expenses_recurring_idx").on(t.recurringExpenseId),
 ]);
+
+/* ──────────────────── الفروع والحسابات ──────────────────── */
+
+/**
+ * الفرع.
+ *
+ * غيابه لم يكن نقصاً في الميزات بل افتراضاً مدفوناً في المخطّط: أنّ
+ * المنشأة فرعٌ واحد. وربطُ نقاط البيع قبل رفعه يعني إعادة كتابة
+ * المخطّط عند فتح الفرع الثاني.
+ *
+ * وليس هذا تعدّد مستأجرين: منظّمةٌ واحدة وفروعٌ تحتها. والفرق أنّ
+ * الأولى تحتاج عزلاً كاملاً وهذه تحتاج عموداً.
+ */
+export const branches = pgTable("branches", {
+  id: id(),
+  nameAr: text("name_ar").notNull(),
+  nameEn: text("name_en"),
+  code: text("code").notNull().unique(),
+  city: text("city"),
+  /** الفرع الأوّل — يُنسَب إليه كل ما سبق إنشاء الفروع. */
+  isDefault: boolean("is_default").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  openedOn: text("opened_on"),
+  createdAt: now(),
+});
+
+/**
+ * الحساب البنكيّ.
+ *
+ * كان رقم الحساب سطراً في ترويسة ملفّ، لا كياناً. فلا يُعرف رصيده ولا
+ * عملته ولا أيّ فرعٍ يخصّه، ولا يُقارَن ملفّان لحسابين.
+ */
+export const bankAccounts = pgTable("bank_accounts", {
+  id: id(),
+  branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+  bankName: text("bank_name").notNull(),
+  label: text("label").notNull(),
+  accountNumber: text("account_number").notNull().unique(),
+  iban: text("iban"),
+  currency: text("currency").notNull().default("SAR"),
+  openingBalanceMinor: integer("opening_balance_minor"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: now(),
+});
+
+export const reconciliationStatusEnum = pgEnum("reconciliation_status", [
+  "OPEN", "IN_PROGRESS", "RECONCILED", "DISCREPANCY",
+]);
+
+/**
+ * فترة التسوية.
+ *
+ * «استوردتُ الملفّ» ليست «طابقتُ الشهر». وبلا هذه لا يُعرف هل غُطّي
+ * أغسطس كلّه أم نصفه، ولا هل تداخل ملفّان، ولا ما الفرق بين ما يقوله
+ * البنك وما نحسبه.
+ */
+export const reconciliationPeriods = pgTable("reconciliation_periods", {
+  id: id(),
+  bankAccountId: text("bank_account_id").notNull()
+    .references(() => bankAccounts.id, { onDelete: "cascade" }),
+  periodStart: text("period_start").notNull(),
+  periodEnd: text("period_end").notNull(),
+  openingBalanceMinor: integer("opening_balance_minor"),
+  closingBalanceMinor: integer("closing_balance_minor"),
+  importedCount: integer("imported_count").notNull().default(0),
+  matchedCount: integer("matched_count").notNull().default(0),
+  differenceMinor: integer("difference_minor"),
+  status: reconciliationStatusEnum("status").notNull().default("OPEN"),
+  reviewedById: text("reviewed_by_id").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: now(),
+}, (t) => [uniqueIndex("reconciliation_period_uniq").on(t.bankAccountId, t.periodStart, t.periodEnd)]);
 
 /* ──────────────────── ذاكرة المستفيدين ──────────────────── */
 

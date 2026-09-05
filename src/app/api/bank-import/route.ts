@@ -18,6 +18,7 @@ import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from 
 import { recordAudit } from "@/lib/audit";
 import { runReconciliation } from "@/services/reconcile.service";
 import { loadMerchantMemory } from "@/services/counterparty.service";
+import { analyzeCoverage, describeCoverage } from "@/lib/bank/coverage";
 import type { SupplierIdentity } from "@/lib/bank/entities";
 
 export const runtime = "nodejs";
@@ -131,6 +132,35 @@ export async function POST(request: Request) {  let user;
   */
   const memory = await loadMerchantMemory();
 
+  /*
+    تغطية الفترات.
+
+    كان النظام يعرف أنّ الحركة مكرّرة، ولا يعرف أنّ بين آخر كشفٍ وهذا
+    فجوةَ أسبوع لم تُستورَد — فتغيب حركاتها ولا يشكو أحد، لأنّ الغائب
+    لا يُرى.
+  */
+  const priorPeriods = (
+    await db.execute<{ start: string | null; end: string | null }>(sql`
+      select to_char(min(value_date), 'YYYY-MM-DD') as start,
+             to_char(max(value_date), 'YYYY-MM-DD') as end
+      from bank_transactions
+      group by bank_import_id
+    `)
+  ).rows
+    .filter((r): r is { start: string; end: string } => r.start !== null && r.end !== null)
+    .map((r) => ({ start: r.start, end: r.end }));
+
+  const thisPeriod =
+    parsed.periodStart && parsed.periodEnd
+      ? [{
+          start: parsed.periodStart.toISOString().slice(0, 10),
+          end: parsed.periodEnd.toISOString().slice(0, 10),
+          label: "هذا الملفّ",
+        }]
+      : [];
+
+  const coverage = analyzeCoverage([...priorPeriods, ...thisPeriod]);
+
   const engine = runReconciliation({
     rows: parsed.rows.map((r, i) => ({
       key: `row-${r.rowNumber}-${i}`,
@@ -199,6 +229,14 @@ export async function POST(request: Request) {  let user;
     duplicateGroups: duplicates.length,
     openInvoicesBefore: open.length,
     warnings: parsed.warnings.length,
+    source: parsed.source,
+    coverage: {
+      from: coverage.from,
+      to: coverage.to,
+      gaps: coverage.gaps,
+      overlaps: coverage.overlaps.length,
+      summary: describeCoverage(coverage),
+    },
     classified: engine.results.filter(
       (r) => r.outcome === "NOT_A_PAYMENT" && r.kind !== "UNKNOWN",
     ).length,
