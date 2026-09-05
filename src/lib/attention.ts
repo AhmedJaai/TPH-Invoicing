@@ -123,6 +123,18 @@ export interface AttentionFacts {
   /** فواتير بلا بنود — تحليل الأصناف لا يراها */
   invoicesWithoutLines: number;
 
+  /**
+   * أيامٌ لا يغطّيها كشفٌ بنكيّ.
+   *
+   * وهذه أخطر ما في القائمة وأخفاه: كل بندٍ آخر يصف شيئاً **موجوداً**
+   * فيه خلل، وهذا يصف شيئاً **غائباً**. حركاتُ الأيام غير المغطّاة لا
+   * تظهر في عدّادٍ ولا في جدول، فيبدو النظام تامّاً وهو ناقص.
+   */
+  bankGapDays: number;
+  bankGapRanges: AttentionEvidence[];
+  /** فرقٌ بين ما يقوله البنك وما تقتضيه الحركات المقروءة. */
+  bankBalanceDifferenceMinor: number | null;
+
   /** أصناف ارتفع سعرها عند مورّدها */
   priceRises: AttentionEvidence[];
   priceRiseAnnualMinor: number;
@@ -140,6 +152,55 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
   const out: AttentionItem[] = [];
 
   /* ── حرج ── */
+
+  /*
+    الفجوة تسبق كل شيء.
+
+    ما دام في الشهر يومٌ لم يُقرأ كشفُه، فكل رقمٍ بعده ناقصٌ بمقدارٍ
+    مجهول — والمجهول لا يُقاس. ولذلك تُعرَض أوّلاً ولو كانت أرقامُ
+    غيرها أكبر: البنود الأخرى تصف خللاً في موجود، وهذه تصف غائباً.
+  */
+  if (f.bankGapDays > 0) {
+    out.push({
+      id: "bank-coverage-gap",
+      area: "BANK",
+      severity: "CRITICAL",
+      title: `${f.bankGapDays} يوماً بلا كشف بنكيّ`,
+      detail: "حركات هذه الأيام غائبة لا معدومة — ولا يظهر غيابها في أي عدّاد.",
+      action: "استورد الكشف الذي يغطّيها قبل أن تُقرأ أرقام الشهر.",
+      actionLabel: "استورد كشفاً",
+      href: "/bank",
+      count: f.bankGapDays,
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: f.bankGapRanges,
+    });
+  }
+
+  /*
+    الفرق في المعادلة: البنك يقول رصيداً وحركاتُنا تقول غيره.
+    وهو مالٌ لا نعرف أين ذهب — لا خطأ عرضٍ ولا خطأ مطابقة.
+  */
+  if (f.bankBalanceDifferenceMinor !== null && Math.abs(f.bankBalanceDifferenceMinor) > 1) {
+    const diff = Math.abs(f.bankBalanceDifferenceMinor);
+    out.push({
+      id: "bank-balance-difference",
+      area: "BANK",
+      severity: "CRITICAL",
+      title: "رصيد البنك لا يطابق حركاته المقروءة",
+      detail:
+        f.bankBalanceDifferenceMinor > 0
+          ? "البنك يقول رصيداً أعلى — حركاتٌ واردة لم تُقرأ."
+          : "البنك يقول رصيداً أقلّ — حركاتٌ صادرة لم تُقرأ.",
+      action: "راجع الكشف: الفرق يعني حركاتٍ لم تصل، لا خطأ في المطابقة.",
+      actionLabel: "افتح الحركات",
+      href: "/bank",
+      count: 1,
+      amountMinor: diff,
+      impact: { kind: "BLOCKED", amountMinor: diff },
+      evidence: [],
+    });
+  }
+
   if (f.duplicatePayments > 0) {
     out.push({
       id: "duplicate-payments",

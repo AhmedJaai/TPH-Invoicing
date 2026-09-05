@@ -17,9 +17,10 @@ import { normalizeText, type CanonicalTransaction } from "@/lib/bank/canonical";
 import type { MerchantMemory } from "@/lib/bank/classification";
 import type { TxCategory } from "@/lib/bank/rules";
 import { fromCategory } from "@/lib/bank/apply";
+import { isConflict, isExclusive } from "@/lib/bank/evidence-uniqueness";
 
-export type EvidenceKind =
-  | "NAME" | "ACCOUNT" | "IBAN" | "NATIONAL_ID" | "MERCHANT_ID" | "REFERENCE";
+export type { EvidenceKind } from "@/lib/bank/evidence-uniqueness";
+import type { EvidenceKind } from "@/lib/bank/evidence-uniqueness";
 
 export interface EvidenceItem {
   kind: EvidenceKind;
@@ -128,27 +129,42 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
   const added: EvidenceItem[] = [];
 
   for (const e of evidence) {
-    const owner = existingOwners.find(
+    const owners = existingOwners.filter(
       (o) => o.kind === e.kind && o.normalized === e.normalized,
     );
+    const mine = owners.find((o) => o.counterpartyId === counterpartyId);
+    const others = owners.filter((o) => o.counterpartyId !== counterpartyId);
 
-    if (owner && owner.counterpartyId !== counterpartyId) {
-      conflicts.push({ evidence: e, ownedBy: owner.displayName });
+    /*
+      التضارب يُعلَن في القاطع وحده.
+
+      كان يُعلَن في كل نوع — فمن أكّد جهةً اسمها «مؤسسة الرياض للتجارة»
+      وفي النظام أخرى بالاسم نفسه، رُدّ دليلُه وقيل له «الاسم لجهة
+      أخرى». وليس تضارباً: هما مؤسّستان، والاسم لا يدلّ على واحدة.
+    */
+    if (others.length > 0 && isConflict(e.kind, false)) {
+      conflicts.push({ evidence: e, ownedBy: others[0].displayName });
       continue;
     }
 
-    if (owner) {
+    if (mine) {
       // الدليل المتكرّر أوثق — يُعدّ ولا يُكرَّر
       await db
         .update(counterpartyEvidence)
         .set({ confirmations: sql`${counterpartyEvidence.confirmations} + 1` })
         .where(and(
+          eq(counterpartyEvidence.counterpartyId, counterpartyId),
           eq(counterpartyEvidence.kind, e.kind),
           eq(counterpartyEvidence.normalized, e.normalized),
         ));
       continue;
     }
 
+    /*
+      الظنّي المشترك يُحفَظ للجهتين معاً — ثمّ يُسقطه القارئ من الذاكرة
+      لأنّه لم يعد يدلّ على واحدة. حفظُه ليس عبثاً: هو يوثّق أنّ الاسم
+      مشترَك، وبه يُعرَف سببُ سقوطه.
+    */
     await db.insert(counterpartyEvidence).values({
       id: createId(),
       counterpartyId,
@@ -197,9 +213,33 @@ export async function loadMerchantMemory(): Promise<Map<string, MerchantMemory>>
 
   const memory = new Map<string, MerchantMemory>();
 
+  /*
+    الدليل الظنّي المشترك يُسقَط، لا يُرجَّح أحدُ صاحبيه.
+
+    كان `memory.set` يكتب فوق سابقه، فإن حمل الاسمَ نفسه جهتان فازت
+    آخرُ صفٍّ قرأته القاعدة — بلا ترتيبٍ مضمون. فتُصنَّف حركةُ هذه
+    باسم تلك، ويُنسَب سدادٌ إلى مورّدٍ لم يُدفَع له. والصمت هنا أسوأ من
+    الجهل: الجهل يُعرَض ويُراجَع.
+  */
+  const ambiguous = new Set<string>();
   for (const r of rows) {
     const key = memoryKey(r.kind, r.normalized);
-    if (!key) continue;
+    if (!key || isExclusive(r.kind)) continue;
+    const prior = memory.get(key);
+    if (prior && prior.counterpartyId !== r.counterpartyId) ambiguous.add(key);
+    memory.set(key, {
+      key,
+      kind: fromCategory(r.txKind),
+      supplierId: r.supplierId,
+      confirmations: r.confirmations,
+      counterpartyId: r.counterpartyId,
+    });
+  }
+  for (const key of ambiguous) memory.delete(key);
+
+  for (const r of rows) {
+    const key = memoryKey(r.kind, r.normalized);
+    if (!key || !isExclusive(r.kind)) continue;
     memory.set(key, {
       key,
       /*
@@ -210,6 +250,7 @@ export async function loadMerchantMemory(): Promise<Map<string, MerchantMemory>>
       kind: fromCategory(r.txKind),
       supplierId: r.supplierId,
       confirmations: r.confirmations,
+      counterpartyId: r.counterpartyId,
     });
   }
 

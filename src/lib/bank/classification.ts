@@ -61,6 +61,8 @@ export interface MerchantMemory {
   supplierId: string | null;
   /** كم مرّة أكّده إنسان. */
   confirmations: number;
+  /** الجهة صاحبة الدليل — بها يُعرَف اشتراك دليلٍ ظنّيّ بين جهتين. */
+  counterpartyId?: string;
 }
 
 /**

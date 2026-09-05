@@ -6,6 +6,8 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import type { AttentionEvidence, AttentionFacts } from "./attention";
 import { previousMonth } from "./filing";
+import { analyzeCoverage } from "./bank/coverage";
+import { checkBalance } from "./bank/balance-equation";
 
 interface Row {
   [key: string]: unknown;
@@ -143,7 +145,63 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     amountMinor: Number(r.now_price) - Number(r.then_price),
   }));
 
+  /*
+    فجوات التغطية — تُحسب من فترات الاستيرادات نفسها.
+
+    وكانت تُحسب عند الاستيراد وحده ثمّ تُنسى: تُعرَض في شاشة النتيجة
+    مرّةً ولا يبقى منها أثر. فمن استورد كشفاً ناقصاً في أغسطس لا يذكّره
+    شيءٌ في سبتمبر.
+  */
+  const periods = (
+    await db.execute<{ start: string | null; end: string | null }>(sql`
+      select to_char(min(value_date), 'YYYY-MM-DD') as start,
+             to_char(max(value_date), 'YYYY-MM-DD') as end
+      from bank_transactions
+      group by bank_import_id
+    `)
+  ).rows
+    .filter((r): r is { start: string; end: string } => r.start !== null && r.end !== null);
+
+  const coverage = periods.length > 0 ? analyzeCoverage(periods) : null;
+  const gaps = coverage?.gaps ?? [];
+
+  const bankGapRanges = gaps.slice(0, 8).map<AttentionEvidence>((g) => ({
+    label: `${g.start} ← ${g.end}`,
+    sub: `${g.days} يوماً بلا كشف`,
+  }));
+
+  /*
+    معادلة الكشف على المدى المغطّى كلِّه.
+    والمجهول يبقى `null` — لا صفراً؛ فالصفر هنا يقول «الحساب مضبوط»
+    وهو لا يُعلم.
+  */
+  const [totals] = (
+    await db.execute<{ credits: number | null; debits: number | null }>(sql`
+      select coalesce(sum(amount_minor) filter (where direction = 'CREDIT'), 0)::int as credits,
+             coalesce(sum(amount_minor) filter (where direction = 'DEBIT'), 0)::int  as debits
+      from bank_transactions
+    `)
+  ).rows;
+
+  const [balances] = (
+    await db.execute<{ opening: number | null; closing: number | null }>(sql`
+      select sum(opening_balance_minor)::int as opening,
+             sum(closing_balance_minor)::int as closing
+      from reconciliation_periods
+    `)
+  ).rows;
+
+  const balance = checkBalance({
+    openingMinor: balances?.opening ?? null,
+    closingMinor: balances?.closing ?? null,
+    creditsMinor: Number(totals?.credits ?? 0),
+    debitsMinor: Number(totals?.debits ?? 0),
+  });
+
   return {
+    bankGapDays: gaps.reduce((sum, g) => sum + g.days, 0),
+    bankGapRanges,
+    bankBalanceDifferenceMinor: balance.differenceMinor,
     openBlockers: Number(counts?.open_blockers ?? 0),
     pendingDocuments: Number(counts?.pending_docs ?? 0),
     // كشف الدفعات المكرّرة يحتاج قراءة الكشف نفسه — يُعرض من صفحة البنك

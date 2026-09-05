@@ -9,6 +9,8 @@ import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bankTransactions, documents, invoices, issues, statements } from "@/db/schema";
 import { nextMonth } from "./filing";
+import { analyzeCoverage } from "./bank/coverage";
+import { checkBalance } from "./bank/balance-equation";
 import type { MonthFacts } from "./month-close";
 
 export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
@@ -58,9 +60,88 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     .where(and(gte(statements.periodEnd, start), lt(statements.periodEnd, end)));
 
   const [bank] = await db
-    .select({ n: sql<number>`count(*)::int` })
+    .select({
+      n: sql<number>`count(*)::int`,
+      /*
+        «بلا تفسير» = لم تُطابَق ولم تُصنَّف باباً معروفاً.
+        و«متجاهَلة» تفسيرٌ صحيح: صاحبها قال إنّها ليست سداداً.
+      */
+      unexplained: sql<number>`count(*) filter (
+        where ${bankTransactions.matchStatus} = 'UNMATCHED'
+          and ${bankTransactions.category} = 'UNKNOWN'
+      )::int`,
+      unexplainedMinor: sql<number>`coalesce(sum(${bankTransactions.amountMinor}) filter (
+        where ${bankTransactions.matchStatus} = 'UNMATCHED'
+          and ${bankTransactions.category} = 'UNKNOWN'
+      ), 0)::int`,
+      creditsMinor: sql<number>`coalesce(sum(${bankTransactions.amountMinor})
+        filter (where ${bankTransactions.direction} = 'CREDIT'), 0)::int`,
+      debitsMinor: sql<number>`coalesce(sum(${bankTransactions.amountMinor})
+        filter (where ${bankTransactions.direction} = 'DEBIT'), 0)::int`,
+    })
     .from(bankTransactions)
     .where(and(gte(bankTransactions.valueDate, start), lt(bankTransactions.valueDate, end)));
+
+  /*
+    فجوة التغطية داخل الشهر.
+
+    الفترات تُؤخذ من الاستيرادات نفسها — أوّل حركةٍ فيها وآخرها — ثمّ
+    تُقصّ على حدود الشهر. فيوم لم يغطّه كشفٌ هو يومٌ لا نعرف ماذا جرى فيه،
+    لا يومٌ لم يجرِ فيه شيء.
+  */
+  const monthStartIso = `${month}-01`;
+  const monthEndIso = new Date(end.getTime() - 86_400_000).toISOString().slice(0, 10);
+
+  const importPeriods = (
+    await db.execute<{ start: string | null; end: string | null }>(sql`
+      select to_char(min(value_date), 'YYYY-MM-DD') as start,
+             to_char(max(value_date), 'YYYY-MM-DD') as end
+      from bank_transactions
+      group by bank_import_id
+    `)
+  ).rows
+    .filter((r): r is { start: string; end: string } => r.start !== null && r.end !== null)
+    .map((r) => ({
+      start: r.start < monthStartIso ? monthStartIso : r.start,
+      end: r.end > monthEndIso ? monthEndIso : r.end,
+    }))
+    .filter((r) => r.start <= r.end);
+
+  const gapDays = importPeriods.length === 0
+    ? 0
+    : (() => {
+        const cov = analyzeCoverage([...importPeriods, { start: monthStartIso, end: monthStartIso }]);
+        const days = cov.gaps
+          .filter((g) => g.start <= monthEndIso && g.end >= monthStartIso)
+          .reduce((sum, g) => sum + g.days, 0);
+        /* والذيل الناقص فجوةٌ أيضاً: كشفٌ ينتهي في ٢٠ والشهر ثلاثون */
+        const covered = cov.to;
+        const tail = covered !== null && covered < monthEndIso
+          ? Math.round(
+              (new Date(`${monthEndIso}T00:00:00Z`).getTime()
+                - new Date(`${covered}T00:00:00Z`).getTime()) / 86_400_000,
+            )
+          : 0;
+        return days + tail;
+      })();
+
+  /*
+    الأرصدة تُقرأ من فترة التسوية إن سُجّلت. وما لم يُسجَّل يبقى `null`
+    — لا صفراً: افتراضُ الصفر يخترع فرقاً بحجم الرصيد كلِّه.
+  */
+  const [period] = await db.execute<{ opening: number | null; closing: number | null }>(sql`
+    select sum(opening_balance_minor)::int as opening,
+           sum(closing_balance_minor)::int as closing
+    from reconciliation_periods
+    where period_start >= ${monthStartIso} and period_end <= ${monthEndIso}
+  `).then((r) => r.rows);
+
+  const balance = checkBalance({
+    openingMinor: period?.opening ?? null,
+    closingMinor: period?.closing ?? null,
+    creditsMinor: Number(bank?.creditsMinor ?? 0),
+    debitsMinor: Number(bank?.debitsMinor ?? 0),
+  });
 
   return {
     month,
@@ -76,5 +157,10 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     suppliersWithInvoices: Number(inv?.suppliersWithInvoices ?? 0),
     suppliersWithStatement: Number(stmt?.n ?? 0),
     bankImportCoversMonth: Number(bank?.n ?? 0) > 0,
+    bankGapDays: gapDays,
+    bankUnexplainedCount: Number(bank?.unexplained ?? 0),
+    bankUnexplainedMinor: Number(bank?.unexplainedMinor ?? 0),
+    bankBalanceStatus: balance.status,
+    bankBalanceDifferenceMinor: balance.differenceMinor,
   };
 }

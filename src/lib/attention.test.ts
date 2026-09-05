@@ -17,6 +17,7 @@ const quiet: AttentionFacts = {
   suppliersMissingStatement: [], suppliersWithoutContract: [],
   invoicesWithoutLines: 0,
   priceRises: [], priceRiseAnnualMinor: 0,
+  bankGapDays: 0, bankGapRanges: [], bankBalanceDifferenceMinor: 0,
 };
 
 const ids = (f: Partial<AttentionFacts>) => buildAttention({ ...quiet, ...f }).map((i) => i.id);
@@ -265,5 +266,39 @@ describe("كل تنبيه يفتح سجلّه بعينه", () => {
       expect(i.actionLabel, i.id).toBeTruthy();
       expect(i.actionLabel).not.toBe("عالِجها");
     }
+  });
+});
+
+describe("الغائب يُرى", () => {
+  /*
+    كل بندٍ آخر يصف شيئاً موجوداً فيه خلل، وهذا يصف شيئاً غائباً —
+    فيبدو النظام تامّاً وهو ناقص.
+  */
+  it("فجوة التغطية بندٌ حرج بمداها", () => {
+    const items = buildAttention({
+      ...quiet,
+      bankGapDays: 12,
+      bankGapRanges: [{ label: "2026-08-09 ← 2026-08-20", sub: "12 يوماً بلا كشف" }],
+    });
+    const gap = items.find((i) => i.id === "bank-coverage-gap");
+    expect(gap?.severity).toBe("CRITICAL");
+    expect(gap?.evidence).toHaveLength(1);
+    expect(gap?.href).toBe("/bank");
+  });
+
+  it("فرق المعادلة بندٌ حرج بمبلغه", () => {
+    const item = buildAttention({ ...quiet, bankBalanceDifferenceMinor: -11_600_00 })
+      .find((i) => i.id === "bank-balance-difference");
+    expect(item?.severity).toBe("CRITICAL");
+    expect(item?.amountMinor).toBe(11_600_00);
+    expect(item?.detail).toContain("صادرة لم تُقرأ");
+  });
+
+  it("هللةٌ ليست فرقاً", () => {
+    expect(ids({ bankBalanceDifferenceMinor: 1 })).not.toContain("bank-balance-difference");
+  });
+
+  it("المعادلة المجهولة لا تُنتج بنداً — الجهل يُعلَن في الإقفال لا هنا", () => {
+    expect(ids({ bankBalanceDifferenceMinor: null })).not.toContain("bank-balance-difference");
   });
 });

@@ -23,7 +23,6 @@
 import { createHash } from "node:crypto";
 
 export interface TransactionIdentityInput {
-  accountNumber?: string | null;
   /** التاريخ بصيغة YYYY-MM-DD */
   valueDate: string;
   amountMinor: number;
@@ -49,7 +48,8 @@ export function normalizeDescription(text: string | null | undefined): string {
 export function transactionIdentity(input: TransactionIdentityInput): string {
   /*
     رقم الحساب مقصودٌ خروجه: هو خاصّية ملفٍ لا خاصّية حركة، ويغيب في
-    بعض صيغ التصدير فيفرّق بصمةَ حركةٍ واحدة.
+    بعض صيغ التصدير فيفرّق بصمةَ حركةٍ واحدة. وتمييزُ الحسابات يقع في
+    نطاق القيد (`identityScope`) لا في البصمة.
   */
   const parts = [
     input.valueDate,
@@ -74,20 +74,34 @@ export interface RowForIdentity {
  */
 export function assignIdentities<T extends RowForIdentity>(
   rows: readonly T[],
-  accountNumber?: string | null,
 ): (T & { externalId: string })[] {
   const seen = new Map<string, number>();
 
   return rows.map((row) => {
     const valueDate = row.valueDate.toISOString().slice(0, 10);
-    const key = [valueDate, row.amountMinor, row.direction, row.description ?? ""].join("|");
+    /*
+      التطبيع نفسه في العدّ وفي البصمة.
+
+      كان العدّ يستعمل الوصف خاماً والبصمة تستعمله موحَّداً. فحركتان
+      لا يفرّقهما إلّا فراغٌ مزدوج — وهذا اختلاف تصديرٍ لا اختلاف
+      حركة — تأخذان الترتيب صفراً كلتاهما، ثمّ يوحّدهما التطبيع فتخرج
+      لهما بصمةٌ واحدة، فتُبتلَع إحداهما بوصفها «مكرّرة». وهي حركة
+      حقيقية بمال حقيقي، تختفي بلا أثر ولا شكوى.
+
+      والقاعدة: تمثيلٌ واحد للهوية، يُعدّ به ويُبصَم به.
+    */
+    const key = [
+      valueDate,
+      row.amountMinor,
+      row.direction,
+      normalizeDescription(row.description),
+    ].join("|");
     const occurrence = seen.get(key) ?? 0;
     seen.set(key, occurrence + 1);
 
     return {
       ...row,
       externalId: transactionIdentity({
-        accountNumber,
         valueDate,
         amountMinor: row.amountMinor,
         direction: row.direction,
@@ -96,6 +110,32 @@ export function assignIdentities<T extends RowForIdentity>(
       }),
     };
   });
+}
+
+/**
+ * نطاق الهوية: الحساب الداخليّ.
+ *
+ * البصمة تصف **الحركة**، ولا تصف أين وقعت. فحوالتان بالمبلغ نفسه في
+ * اليوم نفسه بالوصف نفسه، إحداهما من حساب الراجحي والأخرى من حساب
+ * الأهلي، لهما البصمة نفسها — وكان القيد الفريد على البصمة وحدها،
+ * فتُقبَل الأولى وتُرَدّ الثانية بوصفها «مستوردة مسبقاً». حركةٌ حقيقية
+ * تُمحى لأنّ حساباً آخر سبقها.
+ *
+ * فالنطاق جزء من القيد لا من البصمة: الحساب المجهول يأخذ نطاقاً واحداً
+ * ثابتاً كي يبقى منع التكرار عاملاً قبل أن تُعرف الحسابات.
+ */
+export const UNSCOPED = "~";
+
+export function identityScope(bankAccountId: string | null | undefined): string {
+  return bankAccountId ?? UNSCOPED;
+}
+
+/** المفتاح الكامل كما يفرضه القيد في القاعدة. */
+export function scopedIdentity(
+  bankAccountId: string | null | undefined,
+  externalId: string,
+): string {
+  return `${identityScope(bankAccountId)}::${externalId}`;
 }
 
 /** بصمة الملف كاملاً — استيراده ثانيةً يُعرف بها قبل قراءة صفوفه. */

@@ -11,6 +11,8 @@
  * دالة خالصة: تأخذ حقائق الشهر وتُرجع القائمة.
  */
 
+import type { BalanceStatus } from "@/lib/bank/balance-equation";
+
 export type CheckState = "PASS" | "WARN" | "BLOCK";
 
 export interface CheckItem {
@@ -38,6 +40,19 @@ export interface MonthFacts {
   /** منهم من وصل كشفه عن الشهر */
   suppliersWithStatement: number;
   bankImportCoversMonth: boolean;
+  /**
+   * أيامٌ في الشهر لم يغطّها كشفٌ بنكيّ.
+   *
+   * الفجوة لا تُرى بلا هذا العدد: حركاتُ أسبوعٍ لم يُستورَد كشفُه تغيب
+   * ولا يشكو أحد، لأنّ الغائب لا يظهر في قائمة.
+   */
+  bankGapDays: number;
+  /** حركاتٌ في الشهر لا يُعرف ما هي — لا مطابَقة ولا مصنَّفة. */
+  bankUnexplainedCount: number;
+  bankUnexplainedMinor: number;
+  /** حال معادلة الكشف: افتتاحي + وارد − صادر = ختامي. */
+  bankBalanceStatus: BalanceStatus;
+  bankBalanceDifferenceMinor: number | null;
 }
 
 export interface MonthCloseReport {
@@ -162,6 +177,66 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     detail: facts.bankImportCoversMonth ? "السداد مثبت بحركات بنكية" : "لم يُستورد كشف بنك يغطّي الشهر",
     action: facts.bankImportCoversMonth ? undefined : "استورد كشف الحساب من صفحة السداد",
   });
+
+  /*
+    الفجوة تمنع الإقفال.
+
+    وكانت تُحسب وتُعرض ولا تمنع — فيُقفَل شهرٌ ينقصه أسبوع كامل من
+    الحركات، ويصير الإقفال شهادةً على ما لم يُقرأ. والفرق بين تنبيهٍ
+    ومانعٍ هنا هو الفرق بين «قد ينقص» و«ينقص يقيناً»: الفجوة يقين.
+  */
+  if (facts.bankImportCoversMonth) {
+    items.push({
+      id: "bank-coverage",
+      label: "لا فجوة في تغطية الشهر",
+      state: facts.bankGapDays === 0 ? "PASS" : "BLOCK",
+      detail:
+        facts.bankGapDays === 0
+          ? "أيّام الشهر كلّها مغطّاة بكشف"
+          : `${facts.bankGapDays} يوماً من الشهر بلا كشف — حركاتها غائبة لا معدومة`,
+      action:
+        facts.bankGapDays === 0 ? undefined : "استورد الكشف الذي يغطّي الأيام الناقصة",
+    });
+
+    /*
+      المعادلة شرطُ التسوية، لا المطابقة.
+
+      «طوبقت ٣٠١ حركة» لا تقول إنّ الحساب مضبوط: قد تكون المطابقة تامّةً
+      على كشفٍ ناقص. والمعادلة وحدها تكشف ما لم يصل أصلاً.
+    */
+    items.push({
+      id: "bank-balance",
+      label: "معادلة كشف البنك صحيحة",
+      state:
+        facts.bankBalanceStatus === "BALANCED" || facts.bankBalanceStatus === "WITHIN_TOLERANCE"
+          ? "PASS"
+          : facts.bankBalanceStatus === "UNKNOWN"
+            ? "WARN"
+            : "BLOCK",
+      detail:
+        facts.bankBalanceStatus === "UNKNOWN"
+          ? "الكشف لا يحمل رصيداً افتتاحياً أو ختامياً — المعادلة لا تُفحَص"
+          : facts.bankBalanceDifferenceMinor === null || facts.bankBalanceDifferenceMinor === 0
+            ? "الافتتاحي والحركات يعطيان الختامي"
+            : `فرقٌ غير مفسَّر: ${riyals(Math.abs(facts.bankBalanceDifferenceMinor))} ريال`,
+      action:
+        facts.bankBalanceStatus === "UNEXPLAINED"
+          ? "راجع الكشف — الفرق يعني حركاتٍ لم تُقرأ، لا خطأ مطابقة"
+          : facts.bankBalanceStatus === "UNKNOWN"
+            ? "أدخل رصيدَي أوّل المدّة وآخرها كي تُفحَص المعادلة"
+            : undefined,
+    });
+
+    if (facts.bankUnexplainedCount > 0) {
+      items.push({
+        id: "bank-unexplained",
+        label: "لا حركة بنكية بلا تفسير",
+        state: "WARN",
+        detail: `${facts.bankUnexplainedCount} حركة بلا تفسير، قيمتها ${riyals(facts.bankUnexplainedMinor)} ريال`,
+        action: "افتح طابور المراجعة واحسم ما بقي",
+      });
+    }
+  }
 
   if (facts.fixedAssetCount > 0) {
     items.push({

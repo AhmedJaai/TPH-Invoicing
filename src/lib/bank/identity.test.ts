@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { assignIdentities, fileFingerprint, transactionIdentity } from "./identity";
+import {
+  assignIdentities, fileFingerprint, identityScope,
+  normalizeDescription, scopedIdentity, transactionIdentity, UNSCOPED,
+} from "./identity";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
@@ -9,7 +12,6 @@ const row = (date: string, amount: number, desc: string, dir: "DEBIT" | "CREDIT"
 
 describe("transactionIdentity", () => {
   const base = {
-    accountNumber: "12600000942005",
     valueDate: "2026-08-13",
     amountMinor: 15_000,
     direction: "DEBIT" as const,
@@ -31,59 +33,89 @@ describe("transactionIdentity", () => {
     expect(transactionIdentity({ ...base, occurrence: 1 })).not.toBe(id);
   });
 
-  /*
-    كان هنا اختبار يشترط أن يفصل رقمُ الحساب بين بصمتين — وقد أثبت
-    الواقع أنّ الشرط خطأ: صُدِّر كشفان لنفس الحساب، أحدهما يحمل رقمه
-    في ترويسته والآخر لا يحمله، فاختلفت بصمتا حركة واحدة ودخلت مرّتين.
-    ألفٌ وأربعمئة واثنتان وأربعون حركةً زائدة.
-
-    والمقايضة معلومة ومقبولة: لو صار للمنشأة حسابان، وحملا في اليوم
-    نفسه حركتين بنفس المبلغ والاتجاه والوصف حرفاً بحرف، لاعتُبرتا واحدة.
-    وعلاجها حينئذ تحديد نطاق الفرادة بالحساب في القاعدة، لا إعادةُ رقم
-    الحساب إلى البصمة.
-  */
-  it("رقم الحساب خارج البصمة — فهو خاصّية ملفٍ لا خاصّية حركة", () => {
-    expect(transactionIdentity({ ...base, accountNumber: "999" })).toBe(id);
-    expect(transactionIdentity({ ...base, accountNumber: null })).toBe(id);
-  });
-
   it("صيغتا تصدير مختلفتان لنفس الحركة تعطيان البصمة نفسها", () => {
     // الفراغ الزائد وحالة الأحرف اختلافُ عرضٍ لا اختلاف معنى
-    const a = transactionIdentity({ ...base, accountNumber: "12600000942005",
-      description: "81140155-260508-POS VS VA T 418069" });
-    const b = transactionIdentity({ ...base, accountNumber: null,
-      description: "81140155-260508-POS  VS  va t  418069" });
+    const a = transactionIdentity({ ...base, description: "81140155-260508-POS VS VA T 418069" });
+    const b = transactionIdentity({ ...base, description: "81140155-260508-POS  VS  va t  418069" });
     expect(a).toBe(b);
+  });
+});
+
+/*
+  كان هنا اختبارٌ يشترط أن يفصل رقمُ الحساب بين بصمتين — وقد أثبت الواقع
+  أنّ الشرط خطأ: صُدِّر كشفان لنفس الحساب، أحدهما يحمل رقمه في ترويسته
+  والآخر لا يحمله، فاختلفت بصمتا حركةٍ واحدة ودخلت مرّتين.
+
+  وكانت المقايضة معلومة: حسابان يحملان في اليوم نفسه حركتين متطابقتين
+  حرفاً بحرف تُعتبران واحدة. وهذا ما يُغلقه النطاق الآن — في القيد لا في
+  البصمة، كما قال الاختبار القديم نصّاً.
+*/
+describe("نطاق الهوية", () => {
+  it("الحساب المجهول نطاقٌ واحد ثابت", () => {
+    expect(identityScope(null)).toBe(UNSCOPED);
+    expect(identityScope(undefined)).toBe(UNSCOPED);
+  });
+
+  it("حسابان مختلفان يفصلان بين حركتين لهما البصمة نفسها", () => {
+    const [tx] = assignIdentities([row("2026-08-01", 500_00, "إيجار")]);
+    expect(scopedIdentity("acc_rajhi", tx.externalId))
+      .not.toBe(scopedIdentity("acc_ahli", tx.externalId));
+  });
+
+  it("الحساب نفسه يجمعهما فتُعرَف الثانية مكرّرة", () => {
+    const [tx] = assignIdentities([row("2026-08-01", 500_00, "إيجار")]);
+    expect(scopedIdentity("acc_rajhi", tx.externalId))
+      .toBe(scopedIdentity("acc_rajhi", tx.externalId));
   });
 });
 
 describe("assignIdentities", () => {
   it("استيراد الملف نفسه مرّتين يعطي البصمات نفسها — فلا يتكرّر", () => {
     const rows = [row("2026-08-01", 500, "أ"), row("2026-08-02", 700, "ب")];
-    const first = assignIdentities(rows, "ACC").map((r) => r.externalId);
-    const second = assignIdentities(rows, "ACC").map((r) => r.externalId);
+    const first = assignIdentities(rows).map((r) => r.externalId);
+    const second = assignIdentities(rows).map((r) => r.externalId);
     expect(second).toEqual(first);
   });
 
   it("حركتان متطابقتان في الملف الواحد تبقيان اثنتين", () => {
     const rows = [row("2026-08-01", 300, "رسوم"), row("2026-08-01", 300, "رسوم")];
-    const ids = assignIdentities(rows, "ACC").map((r) => r.externalId);
+    const ids = assignIdentities(rows).map((r) => r.externalId);
     expect(new Set(ids).size).toBe(2);
   });
 
   it("ثلاث حركات متطابقة تعطي ثلاث هويات، وإعادة الاستيراد تعطيها هي نفسها", () => {
     const rows = [row("2026-08-01", 8, "قناة"), row("2026-08-01", 8, "قناة"), row("2026-08-01", 8, "قناة")];
-    const a = assignIdentities(rows, "ACC").map((r) => r.externalId);
-    const b = assignIdentities(rows, "ACC").map((r) => r.externalId);
+    const a = assignIdentities(rows).map((r) => r.externalId);
+    const b = assignIdentities(rows).map((r) => r.externalId);
     expect(new Set(a).size).toBe(3);
     expect(b).toEqual(a);
   });
 
-  it("الحركة نفسها تُعرَف وإن اختلف رقم الحساب في ترويسة الملف", () => {
-    // صيغة تصدير تحمل رقم الحساب وأخرى لا تحمله — والحركة واحدة
-    const rows = [row("2026-08-01", 500, "أ")];
-    expect(assignIdentities(rows, "12600000942005")[0].externalId)
-      .toBe(assignIdentities(rows, null)[0].externalId);
+  /*
+    هذا هو العطب الذي كشفته المراجعة: العدّ كان بالوصف الخام والبصمة
+    بالوصف الموحَّد. فحركتان لا يفرّقهما إلّا فراغٌ مزدوج تأخذان الترتيب
+    صفراً كلتاهما، ثمّ يوحّدهما التطبيع فتخرج لهما بصمةٌ واحدة —
+    فتُبتلَع الثانية بوصفها «مكرّرة». مالٌ حقيقي يختفي بلا شكوى.
+  */
+  it("حركتان يفرّقهما الفراغ وحده تبقيان اثنتين", () => {
+    const rows = [
+      row("2026-08-01", 300, "رسوم قناة"),
+      row("2026-08-01", 300, "رسوم  قناة"),
+    ];
+    const ids = assignIdentities(rows).map((r) => r.externalId);
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  it("العدّ والبصمة يستعملان التطبيع نفسه", () => {
+    // ثلاث صيغٍ لوصفٍ واحد: ترتيبها ٠ و١ و٢ لا ثلاثة أصفار
+    const rows = [
+      row("2026-08-01", 8, "POS VS"),
+      row("2026-08-01", 8, "pos  vs"),
+      row("2026-08-01", 8, " POS VS "),
+    ];
+    const ids = assignIdentities(rows).map((r) => r.externalId);
+    expect(new Set(ids).size).toBe(3);
+    expect(normalizeDescription("pos  vs")).toBe(normalizeDescription(" POS VS "));
   });
 
   it("ترتيب المجموعة يُحسب لكل مجموعة على حدة", () => {
@@ -92,14 +124,16 @@ describe("assignIdentities", () => {
       row("2026-08-01", 700, "ب"),
       row("2026-08-01", 500, "أ"),
     ];
-    const ids = assignIdentities(rows, "ACC");
+    const ids = assignIdentities(rows);
     // الأوّل والثالث متطابقان في المحتوى لكن ترتيبهما مختلف
     expect(ids[0].externalId).not.toBe(ids[2].externalId);
     expect(new Set(ids.map((r) => r.externalId)).size).toBe(3);
   });
 
   it("الوصف الفارغ لا يُسقط الهوية", () => {
-    const ids = assignIdentities([{ valueDate: d("2026-08-01"), amountMinor: 300, direction: "DEBIT" as const, description: null }], null);
+    const ids = assignIdentities([
+      { valueDate: d("2026-08-01"), amountMinor: 300, direction: "DEBIT" as const, description: null },
+    ]);
     expect(ids[0].externalId).toHaveLength(64);
   });
 });

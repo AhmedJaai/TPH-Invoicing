@@ -363,6 +363,13 @@ export const bankImports = pgTable("bank_imports", {
   fileSha256: text("file_sha256"),
   bank: text("bank"),
   accountNumber: text("account_number"),
+  /**
+   * الحساب الداخليّ الذي يخصّه هذا الكشف.
+   *
+   * ورقم الحساب النصّي يبقى كما ورد في الملفّ — للأثر لا للربط. كان
+   * النصّ هو العلاقة، فاختلاف صيغةٍ يفصل كشفين لحسابٍ واحد.
+   */
+  bankAccountId: text("bank_account_id"),
   rowCount: integer("row_count").notNull().default(0),
   /** حركات دخلت فعلاً في هذا الاستيراد، بعد استبعاد المكرّر */
   newRowCount: integer("new_row_count").notNull().default(0),
@@ -491,7 +498,13 @@ export const bankTransactions = pgTable("bank_transactions", {
   index("bank_tx_status_idx").on(t.matchStatus),
   index("bank_tx_category_idx").on(t.category),
   index("bank_tx_type_idx").on(t.transactionType),
-  uniqueIndex("bank_tx_external_uniq").on(t.externalId),
+  index("bank_tx_account_idx").on(t.bankAccountId),
+  /*
+    الفرادة مقيَّدة بالحساب — والقيد الفعليّ تعبيريّ في
+    `014_identity_scoping.sql` لأنّ الحساب المجهول يجب أن يظلّ نطاقاً
+    واحداً، و`NULL` في بوستجرس لا يساوي `NULL`، فيفتح باب التكرار على
+    مصراعيه بدل أن يسدّه.
+  */
 ]);
 
 /* ───────────────────────── التنبيهات ───────────────────────── */
@@ -776,8 +789,14 @@ export const counterpartyEvidence = pgTable("counterparty_evidence", {
   confirmedById: text("confirmed_by_id").references(() => users.id),
   createdAt: now(),
 }, (t) => [
-  uniqueIndex("counterparty_evidence_uniq").on(t.kind, t.normalized),
+  /*
+    الجهة لا تحمل الدليل نفسه مرّتين — هذا صحيح في كل نوع.
+    أمّا حَظرُ الدليل على غيرها فيخصّ القاطع وحده، وقيدُه جزئيّ في
+    `014_identity_scoping.sql`: الاسم ليس هويّة، ومحمدان يجوز وجودهما.
+  */
+  uniqueIndex("counterparty_evidence_party_uniq").on(t.counterpartyId, t.kind, t.normalized),
   index("counterparty_evidence_party_idx").on(t.counterpartyId),
+  index("counterparty_evidence_lookup_idx").on(t.kind, t.normalized),
 ]);
 
 /* ───────────────────────── مجال المبيعات ───────────────────────── */
@@ -917,6 +936,7 @@ export const paymentAllocationsRelations = relations(paymentAllocations, ({ one 
 
 export const bankImportsRelations = relations(bankImports, ({ one, many }) => ({
   importedBy: one(users, { fields: [bankImports.importedById], references: [users.id] }),
+  bankAccount: one(bankAccounts, { fields: [bankImports.bankAccountId], references: [bankAccounts.id] }),
   transactions: many(bankTransactions),
 }));
 

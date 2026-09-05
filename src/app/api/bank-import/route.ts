@@ -1,6 +1,6 @@
 /** استيراد كشف البنك ومطابقة مدفوعاته بالفواتير. */
 import { NextResponse } from "next/server";
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   adjudications, bankImports, bankRules, bankTransactions, decisionHistory, invoices, paymentAllocations,
@@ -13,6 +13,7 @@ import {
   type BankTx, type OpenInvoice,
 } from "@/lib/bank/match";
 import { assignIdentities, fileFingerprint } from "@/lib/bank/identity";
+import { resolveBankAccount } from "@/services/bank-account.service";
 import { allocate, createPayment } from "@/services/payment.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
 import { recordAudit } from "@/lib/audit";
@@ -397,15 +398,35 @@ export async function POST(request: Request) {  let user;
       description: t.description,
       tx: t,
     })),
-    parsed.accountNumber,
   );
 
+  /*
+    الحساب يُعرَّف قبل الكتابة.
+
+    كان رقم الحساب نصّاً في عمود، فلا تُنسَب الحركة إلى كيان. ومن غير
+    ذلك لا يُقيَّد منعُ التكرار بحسابه: حوالتان متطابقتان من حسابين —
+    وهذا يقع — تبتلع أولاهما الأخرى.
+  */
+  const bankAccountId = await resolveBankAccount({
+    accountNumber: parsed.accountNumber,
+    bankName: parsed.bank,
+  });
+
+  /*
+    البحث عن السابق مقيَّد بالحساب نفسه. والمجهول نطاقٌ واحد: حركاته
+    تُقارَن بحركات المجهول لا بحركات حسابٍ معروف.
+  */
   const existingIds = new Set(
     (
       await db
         .select({ externalId: bankTransactions.externalId })
         .from(bankTransactions)
-        .where(inArray(bankTransactions.externalId, identified.map((r) => r.externalId)))
+        .where(and(
+          inArray(bankTransactions.externalId, identified.map((r) => r.externalId)),
+          bankAccountId === null
+            ? isNull(bankTransactions.bankAccountId)
+            : eq(bankTransactions.bankAccountId, bankAccountId),
+        ))
     ).map((r) => r.externalId!),
   );
 
@@ -430,6 +451,7 @@ export async function POST(request: Request) {  let user;
         fileSha256,
         bank: parsed.bank,
         accountNumber: parsed.accountNumber ?? null,
+        bankAccountId,
         rowCount: parsed.rows.length,
         newRowCount: newRows,
         importedById: user.id,
@@ -464,6 +486,7 @@ export async function POST(request: Request) {  let user;
         .insert(bankTransactions)
         .values({
           bankImportId: importId,
+          bankAccountId,
           externalId: row.externalId,
           valueDate: t.valueDate,
           description: t.description,

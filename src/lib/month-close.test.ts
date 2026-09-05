@@ -15,6 +15,11 @@ const clean: MonthFacts = {
   suppliersWithInvoices: 9,
   suppliersWithStatement: 9,
   bankImportCoversMonth: true,
+  bankGapDays: 0,
+  bankUnexplainedCount: 0,
+  bankUnexplainedMinor: 0,
+  bankBalanceStatus: "BALANCED",
+  bankBalanceDifferenceMinor: 0,
 };
 
 const state = (r: ReturnType<typeof buildMonthClose>, id: string) =>
@@ -113,5 +118,61 @@ describe("المجهول بند مستقلّ في قائمة الإقفال", ()
 
   it("المجهول ينبّه ولا يمنع الإقفال", () => {
     expect(buildMonthClose({ ...clean, unknownTaxCount: 9 }).canClose).toBe(true);
+  });
+});
+
+describe("تغطية البنك ومعادلته", () => {
+  /*
+    الفجوة كانت تُحسب وتُعرض ولا تمنع — فيُقفَل شهرٌ ينقصه أسبوع من
+    الحركات، ويصير الإقفال شهادةً على ما لم يُقرأ.
+  */
+  it("فجوةٌ في التغطية تمنع الإقفال", () => {
+    const r = buildMonthClose({ ...clean, bankGapDays: 7 });
+    expect(state(r, "bank-coverage")).toBe("BLOCK");
+    expect(r.canClose).toBe(false);
+  });
+
+  it("لا فجوة → تمرّ", () => {
+    expect(state(buildMonthClose(clean), "bank-coverage")).toBe("PASS");
+  });
+
+  /* «طوبقت كل الحركات» لا تعني «الحساب مضبوط» */
+  it("فرقٌ غير مفسَّر في المعادلة يمنع الإقفال", () => {
+    const r = buildMonthClose({
+      ...clean, bankBalanceStatus: "UNEXPLAINED", bankBalanceDifferenceMinor: -11_600_00,
+    });
+    expect(state(r, "bank-balance")).toBe("BLOCK");
+    expect(r.canClose).toBe(false);
+    expect(r.blockers.some((b) => b.detail.includes("11,600.00"))).toBe(true);
+  });
+
+  it("رصيدٌ مجهول ينبّه ولا يمنع — الجهل غير الخطأ", () => {
+    const r = buildMonthClose({
+      ...clean, bankBalanceStatus: "UNKNOWN", bankBalanceDifferenceMinor: null,
+    });
+    expect(state(r, "bank-balance")).toBe("WARN");
+    expect(r.canClose).toBe(true);
+  });
+
+  it("هللةٌ واحدة تمرّ", () => {
+    expect(state(buildMonthClose({
+      ...clean, bankBalanceStatus: "WITHIN_TOLERANCE", bankBalanceDifferenceMinor: 1,
+    }), "bank-balance")).toBe("PASS");
+  });
+
+  it("حركاتٌ بلا تفسير تنبّه", () => {
+    const r = buildMonthClose({
+      ...clean, bankUnexplainedCount: 9, bankUnexplainedMinor: 42_000_00,
+    });
+    expect(state(r, "bank-unexplained")).toBe("WARN");
+    expect(r.canClose).toBe(true);
+  });
+
+  /* بلا كشفٍ أصلاً لا يُسأل عن فجوةٍ ولا معادلة — السؤال سابقٌ لأوانه */
+  it("بلا كشف: لا فحص تغطية ولا معادلة", () => {
+    const r = buildMonthClose({ ...clean, bankImportCoversMonth: false, bankGapDays: 30 });
+    expect(state(r, "bank-coverage")).toBeUndefined();
+    expect(state(r, "bank-balance")).toBeUndefined();
+    expect(r.canClose).toBe(true);
   });
 });
