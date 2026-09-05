@@ -124,6 +124,16 @@ export interface AttentionFacts {
   invoicesWithoutLines: number;
 
   /**
+   * مصروفاتٌ تصف حدثاً واحداً وصل من مصدرين.
+   *
+   * وتُعرَض ولا تُحذَف: القيد الآليّ كاد يمحو ثلاثة مصروفات حقيقية،
+   * لكلٍّ حركتُها البنكية ببصمتها. فأيّهما الصحيح قرارُ إنسان.
+   */
+  duplicateExpenses: number;
+  duplicateExpenseAmountMinor: number;
+  duplicateExpenseEvidence: AttentionEvidence[];
+
+  /**
    * أيامٌ لا يغطّيها كشفٌ بنكيّ.
    *
    * وهذه أخطر ما في القائمة وأخفاه: كل بندٍ آخر يصف شيئاً **موجوداً**
@@ -198,6 +208,23 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       amountMinor: diff,
       impact: { kind: "BLOCKED", amountMinor: diff },
       evidence: [],
+    });
+  }
+
+  if (f.duplicateExpenses > 0) {
+    out.push({
+      id: "duplicate-expenses",
+      area: "DATA",
+      severity: "HIGH",
+      title: `${f.duplicateExpenses} مصروفاً يصف حدثاً وصل مرّتين`,
+      detail: "الحدث الواحد يصل من كشف البنك ومن مستندٍ رُفع — فيُقيَّد مرّتين ويعلو مصروف الشهر.",
+      action: "راجعها واحذف الزائد بيدك — أيّهما الصحيح قرارُك لا قرارُ النظام.",
+      actionLabel: "افتح المصروفات",
+      href: "/money/expenses",
+      count: f.duplicateExpenses,
+      amountMinor: f.duplicateExpenseAmountMinor,
+      impact: { kind: "RECOVERABLE", amountMinor: f.duplicateExpenseAmountMinor },
+      evidence: f.duplicateExpenseEvidence,
     });
   }
 

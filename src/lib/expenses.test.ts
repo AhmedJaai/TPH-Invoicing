@@ -419,6 +419,49 @@ describe("ازدواج المصروف عن حدثٍ واحد", () => {
     expect(dups).toHaveLength(0);
   });
 
+  /*
+    ── حالتان حقيقيّتان من بيانات أحمد ──
+
+    فشل التصميم الأوّل عليهما: كان الوصف يُقتطَع عند ستّين حرفاً، ولا
+    يفرّق بين فاتورتَي كهرباء في اليوم نفسه إلّا **مرجعُ السداد** —
+    وهو يقع بعد الحرف الستّين في وصف الأهليّ. فبدتا مكرَّرتين، وكاد
+    القيدُ يحذف مالاً خرج فعلاً.
+  */
+  const snb = (ref: string) =>
+    `Saudi Energy رقم السداد3015160477${ref} هاتف الأهلي مرجع سداد689828${ref}045 مرجع13002483${ref}`;
+
+  it("مرجعُ سدادٍ بعد الحرف الستّين يفرّق حدثين", () => {
+    const dups = findDuplicateExpenses([
+      e({ id: "a", label: snb("1"), amountMinor: 1_699_39, bankTransactionId: "t1" }),
+      e({ id: "b", label: snb("2"), amountMinor: 1_699_39, bankTransactionId: "t2" }),
+    ]);
+    expect(dups).toHaveLength(0);
+  });
+
+  it("وحركتان بنكيّتان مختلفتان حدثان — مهما تطابق كلُّ ما عداهما", () => {
+    const dups = findDuplicateExpenses([
+      e({ id: "a", bankTransactionId: "t1" }),
+      e({ id: "b", bankTransactionId: "t2" }),
+    ]);
+    expect(dups).toHaveLength(0);
+  });
+
+  it("وحركةٌ واحدة تشهد لمصروفين → تكرارٌ حقّاً", () => {
+    const dups = findDuplicateExpenses([
+      e({ id: "a", bankTransactionId: "t1" }),
+      e({ id: "b", bankTransactionId: "t1" }),
+    ]);
+    expect(dups).toHaveLength(1);
+  });
+
+  it("والمصدران المختلفان بلا أثرٍ متعارض تكرارٌ كذلك", () => {
+    const dups = findDuplicateExpenses([
+      e({ id: "a", source: "BANK", bankTransactionId: "t1" }),
+      e({ id: "b", source: "INVOICE" }),
+    ]);
+    expect(dups).toHaveLength(1);
+  });
+
   it("ثلاثة عن حدثٍ واحد: الزائد اثنان", () => {
     const dups = findDuplicateExpenses([
       e({ id: "a" }), e({ id: "b", source: "INVOICE" }), e({ id: "c", source: "MANUAL" }),

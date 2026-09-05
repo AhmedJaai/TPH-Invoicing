@@ -7,6 +7,7 @@
  *
  * دوالّ خالصة. لا قاعدة بيانات.
  */
+import { createHash } from "node:crypto";
 import { CATEGORY_LABEL, type TxCategory } from "./bank/rules";
 
 export type ExpenseSource = "BANK" | "INVOICE" | "MANUAL";
@@ -326,11 +327,15 @@ export function suspectedSupplierExpenses(
  * فالبصمة تصف ما وقع: بابُه ويومُه ومبلغُه ومن وقع له. ولا يدخلها
  * المصدر — وإلّا عادت تفرّق بين ما تريد جمعه.
  *
- * **ولا تدخلها الفواصل الدقيقة عمداً.** فمصروفان في اليوم نفسه بالباب
- * نفسه والمبلغ نفسه لجهةٍ واحدة يُعامَلان واحداً: احتمال أن يكونا
- * حدثين حقيقيّين أضعفُ بكثير من احتمال أن يكونا حدثاً واحداً وصل
- * مرّتين. والخطأ في هذا الاتّجاه يُنقص رقماً، والخطأ في الاتّجاه الآخر
- * يخترع مصروفاً — ونقصٌ يُكتشَف خيرٌ من زيادةٍ تُصدَّق.
+ * **والوصف يدخلها كاملاً — لا مقتطعاً.**
+ *
+ * كان يُقتطَع عند ستّين حرفاً، ففشل على بيانات أحمد الحقيقية: ثلاثُ
+ * فواتير مرافق في يومٍ واحد بمبالغ متطابقة، ولا يفرّقها إلّا **مرجعُ
+ * السداد** — وهو يقع بعد الحرف الستّين في وصف الأهليّ. فبدت كلٌّ منها
+ * مكرَّرةً وهي حدثان حقيقيّان بحركتين بنكيّتين مختلفتين.
+ *
+ * فالاقتطاع لتقصير المفتاح يُسقط ما يميّز. والتقصير يكون بالتلبيد لا
+ * بالقصّ: الطول ثابت والمحتوى كامل.
  */
 export function expenseEventKey(input: {
   category: TxCategory;
@@ -342,10 +347,22 @@ export function expenseEventKey(input: {
     .replace(/[\u064B-\u0652\u0640]/g, "")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim()
-    .toUpperCase()
-    .slice(0, 60);
+    .toUpperCase();
 
-  return [input.category, input.occurredOn, String(input.amountMinor), label].join("|");
+  return createHash("sha256")
+    .update([input.category, input.occurredOn, String(input.amountMinor), label].join("|"))
+    .digest("hex");
+}
+
+/**
+ * الأثر الذي يشهد للمصروف.
+ *
+ * ووجودُ أثرين مختلفين يعني حدثين مختلفين — مهما تطابق كلُّ ما عداهما.
+ * حركتان بنكيّتان ببصمتين مختلفتين هما دفعتان وقعتا، لا دفعةٌ وصلت
+ * مرّتين.
+ */
+export function expenseAnchor(e: Expense): string | null {
+  return e.bankTransactionId ?? null;
 }
 
 export interface DuplicateExpense {
@@ -372,7 +389,18 @@ export function findDuplicateExpenses(rows: readonly Expense[]): DuplicateExpens
   }
 
   return [...groups.entries()]
-    .filter(([, list]) => list.length > 1)
+    .filter(([, list]) => {
+      if (list.length < 2) return false;
+      /*
+        آثارٌ مختلفة ⇒ أحداثٌ مختلفة.
+
+        وهذا ما كشفته بيانات أحمد: فاتورتا كهرباء في يومٍ واحد بمبلغين
+        متطابقين، لكلٍّ حركتُها البنكية ببصمتها. فهما دفعتان وقعتا، لا
+        دفعةٌ وصلت مرّتين — وحذفُ إحداهما يمحو مالاً خرج فعلاً.
+      */
+      const anchors = list.map(expenseAnchor).filter((a): a is string => a !== null);
+      return new Set(anchors).size <= 1;
+    })
     .map(([key, list]) => ({
       key,
       count: list.length,

@@ -8,6 +8,7 @@ import type { AttentionEvidence, AttentionFacts } from "./attention";
 import { previousMonth } from "./filing";
 import { analyzeCoverage } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
+import { findDuplicateExpenses, type Expense } from "./expenses";
 
 interface Row {
   [key: string]: unknown;
@@ -198,7 +199,40 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     debitsMinor: Number(totals?.debits ?? 0),
   });
 
+  /*
+    ازدواج المصروف — يُكشَف ولا يُحذَف.
+
+    والكشف في `lib/expenses.ts` دالّةً خالصة، وهي التي تستثني ما اختلف
+    أثرُه: حركتان بنكيّتان مختلفتان حدثان لا حدث.
+  */
+  const expenseRows = (
+    await db.execute<Record<string, unknown>>(sql`
+      select id, period_month, occurred_on, category, label,
+             amount_minor, source, bank_transaction_id
+        from expenses
+       where occurred_on >= to_char(now() - interval '120 days', 'YYYY-MM-DD')
+    `)
+  ).rows.map<Expense>((r) => ({
+    id: String(r.id),
+    periodMonth: String(r.period_month),
+    occurredOn: String(r.occurred_on),
+    category: r.category as Expense["category"],
+    label: String(r.label),
+    amountMinor: Number(r.amount_minor),
+    source: r.source as Expense["source"],
+    bankTransactionId: r.bank_transaction_id ? String(r.bank_transaction_id) : null,
+  }));
+
+  const dupExpenses = findDuplicateExpenses(expenseRows);
+
   return {
+    duplicateExpenses: dupExpenses.length,
+    duplicateExpenseAmountMinor: dupExpenses.reduce((s, d) => s + d.amountMinor, 0),
+    duplicateExpenseEvidence: dupExpenses.slice(0, 6).map<AttentionEvidence>((d) => ({
+      label: d.label.slice(0, 45),
+      sub: `${d.occurredOn} · ${d.sources.join(" + ")}`,
+      amountMinor: d.amountMinor,
+    })),
     bankGapDays: gaps.reduce((sum, g) => sum + g.days, 0),
     bankGapRanges,
     bankBalanceDifferenceMinor: balance.differenceMinor,

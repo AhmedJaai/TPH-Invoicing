@@ -18,6 +18,7 @@ const quiet: AttentionFacts = {
   invoicesWithoutLines: 0,
   priceRises: [], priceRiseAnnualMinor: 0,
   bankGapDays: 0, bankGapRanges: [], bankBalanceDifferenceMinor: 0,
+  duplicateExpenses: 0, duplicateExpenseAmountMinor: 0, duplicateExpenseEvidence: [],
 };
 
 const ids = (f: Partial<AttentionFacts>) => buildAttention({ ...quiet, ...f }).map((i) => i.id);
@@ -300,5 +301,24 @@ describe("الغائب يُرى", () => {
 
   it("المعادلة المجهولة لا تُنتج بنداً — الجهل يُعلَن في الإقفال لا هنا", () => {
     expect(ids({ bankBalanceDifferenceMinor: null })).not.toContain("bank-balance-difference");
+  });
+});
+
+describe("ازدواج المصروف", () => {
+  /*
+    يُعرَض ولا يُحذَف: القيد الآليّ كاد يمحو ثلاثة مصروفات حقيقية من
+    بيانات المقهى، لكلٍّ حركتُها البنكية ببصمتها.
+  */
+  it("بندٌ عالٍ بمبلغ الزائد لا بمبلغ الكلّ", () => {
+    const item = buildAttention({
+      ...quiet, duplicateExpenses: 2, duplicateExpenseAmountMinor: 1_200_00,
+    }).find((i) => i.id === "duplicate-expenses");
+    expect(item?.severity).toBe("HIGH");
+    expect(item?.amountMinor).toBe(1_200_00);
+    expect(item?.action).toContain("بيدك");
+  });
+
+  it("ولا بند بلا ازدواج", () => {
+    expect(ids({})).not.toContain("duplicate-expenses");
   });
 });
