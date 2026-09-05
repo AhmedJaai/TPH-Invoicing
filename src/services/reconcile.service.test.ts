@@ -313,3 +313,29 @@ describe("الرسم يصل إلى المال", () => {
     expect(planned[0].feeReason).toBeNull();
   });
 });
+
+describe("القراءة البصرية لا تُحسَم تلقائياً", () => {
+  /*
+    المعادلة تكشف الخطأ الجسيم — سطراً ساقطاً أو رقماً قُرئ ٧ بدل ١ —
+    ولا تكشف تبادلَ وصفين بين سطرين متساويَي المبلغ. فالحساب صحيح على
+    مدخلٍ غير مثبت، وهو حال الحلّ التقريبيّ نفسه.
+  */
+  const input = {
+    rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون", description: "شراء بضاعة" })],
+    invoices: [invoice({ id: "i1" })],
+    suppliers,
+  };
+
+  it("المقروء حسابياً يُحسَم", () => {
+    const { results, planned } = runReconciliation(input);
+    expect(results[0].decision?.disposition).toBe("AUTO");
+    expect(planned).toHaveLength(1);
+  });
+
+  it("والمقروء بصرياً يُقترَح ولا يُكتَب", () => {
+    const { results, planned } = runReconciliation({ ...input, readSource: "VISION" });
+    expect(results[0].decision?.disposition).toBe("SUGGEST");
+    expect(results[0].decision?.reasons.some((r) => r.includes("بصرياً"))).toBe(true);
+    expect(planned).toHaveLength(0);
+  });
+});

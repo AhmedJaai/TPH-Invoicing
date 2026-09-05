@@ -194,6 +194,8 @@ export async function POST(request: Request) {  let user;
     suppliers: supplierIdentities,
     memory,
     profiles,
+    /* ما قُرئ بصرياً لا يُحسَم تلقائياً — الشرط في المحرّك لا هنا */
+    readSource: parsed.source === "PDF_VISION" ? "VISION" : "PARSED",
   });
   /*
     الحَكَم — إن كان مهيَّأً.
@@ -321,6 +323,11 @@ export async function POST(request: Request) {  let user;
     openInvoicesBefore: open.length,
     warnings: parsed.warnings.length,
     source: parsed.source,
+    /*
+      حدود القراءة تُعرَض دائماً: محوِّلُ بنكٍ لم يُجرَّب، أو كشفٌ قُرئ
+      بصرياً. وهذه ليست أخطاءً وقعت بل حدودٌ يجب أن تُعرَف قبل الوثوق.
+    */
+    notices: parsed.notices ?? [],
     coverage: {
       from: coverage.from,
       to: coverage.to,

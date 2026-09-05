@@ -19,6 +19,8 @@ interface Summary {
   coverage?: Coverage;
   /** هل بلغ المحسِّن الحلّ الأمثل يقيناً، أم رجع إلى الجشع؟ */
   exact?: boolean;
+  /** حدود القراءة المعلومة سلفاً — تُعرَض دائماً لا عند الخطأ. */
+  notices?: string[];
   bank: string; accountNumber?: string;
   periodStart?: string; periodEnd?: string;
   totalRows: number; operational: number; payments: number;
@@ -345,6 +347,27 @@ export function BankImport({
                   حركات هذه الأيام غائبة عن النظام، ولن تظهر ناقصةً في أي تقرير — لأنّ
                   الغائب لا يُرى. ارفع كشفها لتكتمل.
                 </p>
+              </div>
+            )}
+
+            {/*
+              حدود القراءة تُعرَض قبل الأرقام.
+
+              محوِّلُ بنكٍ لم يُجرَّب على كشفٍ حقيقيّ، أو كشفٌ قُرئ بصرياً
+              من صورة — كلاهما حدٌّ معلوم سلفاً لا خطأٌ وقع. وإخفاؤه حتى
+              يقع الخطأ يجعل من يقع فيه يظنّ أنّ النظام أخطأ، وإنّما هو
+              يعمل ضمن حدّه المعلَن.
+            */}
+            {(data.summary.notices ?? []).length > 0 && (
+              <div className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5">
+                <p className="text-xs font-bold">حدود هذه القراءة</p>
+                <ul className="mt-1.5 space-y-1">
+                  {(data.summary.notices ?? []).map((n, i) => (
+                    <li key={i} className="text-[11px] leading-relaxed text-ink-soft">
+                      — {n}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 

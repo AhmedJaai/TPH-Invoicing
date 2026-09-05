@@ -39,6 +39,14 @@ export interface ReconcileInput {
    */
   profiles?: ReadonlyMap<string, SupplierProfile>;
   /**
+   * مصدر الصفوف — هل قُرئت حسابياً أم بصرياً؟
+   *
+   * وما قُرئ بصرياً لا يُطابَق تلقائياً مهما بلغت الدرجة: قراءةُ نموذجٍ
+   * للأرقام تُخطئ، والمعادلة تكشف الخطأ الجسيم ولا تكشف تبادلَ وصفين
+   * بين سطرين متساويَي المبلغ.
+   */
+  readSource?: "PARSED" | "VISION";
+  /**
    * الحَكَم — اختياريّ.
    *
    * إن غاب مضى المسار حسابياً بحتاً، وهذا هو الأصل. وإن حضر لم يُستدعَ
@@ -176,7 +184,10 @@ export function applyAdjudication(
 }
 
 export function runReconciliation(input: ReconcileInput): ReconcileResult {
-  const { rows, invoices, suppliers, memory = new Map(), profiles = new Map() } = input;
+  const {
+    rows, invoices, suppliers,
+    memory = new Map(), profiles = new Map(), readSource = "PARSED",
+  } = input;
 
   const prepared = rows.map((row) => {
     const canonical = toCanonical(row);
@@ -231,18 +242,22 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
     ومطابقةٌ بُنيت على حلٍّ لم يُثبت أنّه الأفضل ليست «مطابقة» بل
     اقتراح — وقولُ «تمّت المطابقة» عنها ادّعاء.
   */
-  if (!exact) {
+  /*
+    والقراءة البصرية كذلك: كلاهما «حسابٌ صحيح على مدخلٍ غير مثبت».
+  */
+  const demotion =
+    !exact
+      ? "الحلّ تقريبيّ: نفدت ميزانيّة البحث فلم يُثبَت أنّه الأفضل — فيُقترَح ولا يُطابَق"
+      : readSource === "VISION"
+        ? "الكشف قُرئ بصرياً من صورة — فلا يُطابَق تلقائياً مهما بلغت الدرجة"
+        : null;
+
+  if (demotion !== null) {
     for (const [key, entry] of decided) {
       if (entry.d.disposition !== "AUTO") continue;
       decided.set(key, {
         a: entry.a,
-        d: {
-          disposition: "SUGGEST",
-          reasons: [
-            ...entry.d.reasons,
-            "الحلّ تقريبيّ: نفدت ميزانيّة البحث فلم يُثبَت أنّه الأفضل — فيُقترَح ولا يُطابَق",
-          ],
-        },
+        d: { disposition: "SUGGEST", reasons: [...entry.d.reasons, demotion] },
       });
     }
   }
