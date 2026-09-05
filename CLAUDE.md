@@ -75,6 +75,10 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 | `src/lib/bank/candidates.ts` | توليد المرشّحين وتسجيلهم · مجموع الجزئيات بلا سقف ثلاث |
 | `src/lib/bank/optimizer.ts` | تفريعٌ وتحديد: أعلى **مجموع** لا أعلى درجة. وميزانيّة عقد، فإن نفدت رجع للجشع وأعلن `exact: false` |
 | `src/lib/bank/coverage.ts` | فجوات التغطية — الغائب لا يُرى فيجب أن يُحسَب |
+| `src/lib/bank/fees.ts` | الرسم البنكيّ داخل الدفعة — والنقص سدادٌ جزئيّ لا رسم |
+| `src/lib/bank/reversal.ts` | ما خرج ثمّ عاد — لا إيراد ولا تحويل داخليّ |
+| `src/lib/credit-notes.ts` | الإشعار الدائن يخفض المستحقّ ولا يُعدّ سداداً |
+| `src/services/adjudicator.service.ts` | استدعاء الحَكَم — وحكمه اقتراحٌ لا مطابقة |
 | `src/lib/bank/adjudicate.ts` | متى يُستدعى الذكاء: عند العجز وحده، وعلى مرشّحين مولَّدين لا بيانات خام |
 | `src/lib/bank/parsers/detect.ts` | كشف البنك من الملفّ — و`\b` لا تفصل عند `_` وأسماء الملفّات مليئة بها |
 | `src/lib/bank/parsers/pdf-text.ts` | نصّ PDF ومواضعه — ولا يُرمى ملفٌّ كامل إلى نموذج |

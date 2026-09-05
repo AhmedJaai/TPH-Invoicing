@@ -30,6 +30,14 @@ interface Body {
   transactionId?: string;
   /** الفواتير التي تفسّر الحركة — تُقبَل كما هي. */
   invoiceIds?: string[];
+  /**
+   * أو توزيعٌ يكتبه صاحب العمل بنفسه.
+   *
+   * لأنّ النظام لا يعرف دائماً كيف قُسّمت الحوالة: دفعةٌ بسبعة آلاف
+   * وخمسمئة قد تكون أربعة آلاف على فاتورة وثلاثة آلاف وخمسمئة على
+   * أخرى، ولا شيء في الكشف يقول ذلك. فيقوله هو.
+   */
+  split?: { invoiceId: string; amountMinor: number }[];
   /** أو: ليست سداد فاتورة، وهذا سببها. */
   notAPayment?: keyof typeof NOT_PAYMENT_KINDS;
 }
@@ -92,6 +100,11 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ ok: true, message: `حُفظت: ${kind.label}` });
+  }
+
+  /* ── توزيعٌ يدويّ ── */
+  if (body.split && body.split.length > 0) {
+    return await applyManualSplit(user.id, tx, body.split);
   }
 
   /* ── قبول مطابقة ── */
@@ -204,5 +217,117 @@ export async function POST(request: Request) {
     ok: true,
     message: `طُوبقت مع ${allocations.length} فاتورة${remainder}`,
     allocations,
+  });
+}
+
+
+/**
+ * توزيعٌ يكتبه صاحب العمل.
+ *
+ * ويُتحقَّق منه في الخادم كما يُتحقَّق من أي رقم: لا مبلغ سالب، ولا
+ * مجموعٌ يتجاوز الدفعة، ولا تخصيصٌ فوق المتبقّي على الفاتورة. وقيود
+ * القاعدة تحرسه أيضاً — فالحارس مزدوج.
+ */
+async function applyManualSplit(
+  userId: string,
+  tx: { id: string; amountMinor: number; valueDate: Date; beneficiaryRaw: string | null; description: string | null },
+  split: { invoiceId: string; amountMinor: number }[],
+): Promise<NextResponse> {
+  for (const s of split) {
+    if (!Number.isInteger(s.amountMinor) || s.amountMinor <= 0) {
+      return NextResponse.json({ error: "كل مبلغ يجب أن يكون موجباً" }, { status: 400 });
+    }
+  }
+
+  const total = split.reduce((sum, s) => sum + s.amountMinor, 0);
+  if (total > tx.amountMinor) {
+    return NextResponse.json(
+      { error: `المجموع ${(total / 100).toFixed(2)} يتجاوز الدفعة ${(tx.amountMinor / 100).toFixed(2)}` },
+      { status: 400 },
+    );
+  }
+
+  const rows = await db
+    .select({
+      id: invoices.id,
+      supplierId: invoices.supplierId,
+      periodMonth: invoices.periodMonth,
+      totalMinor: invoices.totalMinor,
+      allocated: sql<number>`coalesce((select sum(pa.amount_minor)::int
+        from payment_allocations pa where pa.invoice_id = invoices.id), 0)`,
+    })
+    .from(invoices)
+    .where(inArray(invoices.id, split.map((s) => s.invoiceId)));
+
+  if (rows.length !== split.length) {
+    return NextResponse.json({ error: "بعض الفواتير غير موجودة" }, { status: 400 });
+  }
+
+  if (new Set(rows.map((r) => r.supplierId)).size > 1) {
+    return NextResponse.json(
+      { error: "لا تُجمَع فواتير مورّدين مختلفين في دفعة واحدة" },
+      { status: 400 },
+    );
+  }
+
+  for (const s of split) {
+    const inv = rows.find((r) => r.id === s.invoiceId)!;
+    const outstanding = inv.totalMinor - Number(inv.allocated);
+    if (s.amountMinor > outstanding) {
+      return NextResponse.json(
+        { error: `تخصيصٌ فوق المتبقّي على فاتورة: ${(outstanding / 100).toFixed(2)} متبقٍّ` },
+        { status: 400 },
+      );
+    }
+  }
+
+  const months = [...new Set(rows.map((r) => r.periodMonth))].sort();
+
+  const paymentId = await db.transaction(async (t) => {
+    const id = await createPayment(t, {
+      supplierId: rows[0].supplierId,
+      paidAt: tx.valueDate,
+      amountMinor: tx.amountMinor,
+      method: "BANK_TRANSFER",
+      beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
+      appliesToMonth: months[months.length - 1],
+    });
+
+    await allocate(t, id, tx.amountMinor, split);
+
+    await t
+      .update(bankTransactions)
+      .set({
+        matchedPaymentId: id,
+        matchStatus: "MATCHED",
+        matchDisposition: "AUTO",
+        supplierId: rows[0].supplierId,
+        category: "SUPPLIER",
+      })
+      .where(eq(bankTransactions.id, tx.id));
+
+    return id;
+  });
+
+  await recordAudit({
+    actorId: userId,
+    action: "INVOICES_MARKED_PAID",
+    entityType: "bank_transaction",
+    entityId: tx.id,
+    after: {
+      الفعل: "وزّعها بنفسه",
+      الدفعة: paymentId,
+      التوزيع: split.map((s) => `${s.invoiceId}:${s.amountMinor / 100}`),
+      "بلا تخصيص": (tx.amountMinor - total) / 100,
+    },
+  });
+
+  const left = tx.amountMinor - total;
+  return NextResponse.json({
+    ok: true,
+    message:
+      left > 0
+        ? `وُزّعت على ${split.length} فاتورة، وبقي ${(left / 100).toFixed(2)} بلا تخصيص`
+        : `وُزّعت على ${split.length} فاتورة بالكامل`,
   });
 }

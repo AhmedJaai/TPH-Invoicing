@@ -105,6 +105,51 @@ export interface ReconcileResult {
  */
 const PAYMENT_KINDS: readonly TxKind[] = ["SUPPLIER_PAYMENT", "UNKNOWN"];
 
+/**
+ * يُدخِل حكم الحَكَم على النتيجة.
+ *
+ * ولا يرفع حالةً إلى «مطابَقة»: أقصى ما يبلغه حكمُه «اقتراح». فالنموذج
+ * يرجّح بين مرشّحين حُسبوا، والإنسان يُقرّ.
+ */
+export function applyAdjudication(
+  result: ReconcileResult,
+  verdicts: readonly {
+    transactionId: string;
+    candidate: Candidate | null;
+    disposition: "SUGGEST" | "REVIEW";
+    reasons: string[];
+  }[],
+): ReconcileResult {
+  if (verdicts.length === 0) return result;
+
+  const byKey = new Map(verdicts.map((v) => [v.transactionId, v]));
+
+  const results = result.results.map((r) => {
+    const v = byKey.get(r.key);
+    if (!v) return r;
+
+    return {
+      ...r,
+      candidate: v.candidate ?? r.candidate,
+      outcome: v.candidate?.outcome ?? r.outcome,
+      decision: {
+        disposition: v.disposition,
+        reasons: [...(r.decision?.reasons ?? []), ...v.reasons],
+      },
+    };
+  });
+
+  const suggest = results.filter((r) => r.decision?.disposition === "SUGGEST").length;
+  const review = results.filter((r) => r.decision?.disposition === "REVIEW").length;
+
+  return {
+    ...result,
+    results,
+    // الخطّة لا تتغيّر: حكم الحَكَم لا يُكتَب مالاً
+    summary: { ...result.summary, suggest, review },
+  };
+}
+
 export function runReconciliation(input: ReconcileInput): ReconcileResult {
   const { rows, invoices, suppliers, memory = new Map() } = input;
 

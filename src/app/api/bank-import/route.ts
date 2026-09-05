@@ -16,7 +16,9 @@ import { assignIdentities, fileFingerprint } from "@/lib/bank/identity";
 import { allocate, createPayment } from "@/services/payment.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
 import { recordAudit } from "@/lib/audit";
-import { runReconciliation } from "@/services/reconcile.service";
+import { applyAdjudication, runReconciliation } from "@/services/reconcile.service";
+import { adjudicate, geminiAdjudicator, toSuggestion } from "@/services/adjudicator.service";
+import { toCanonical } from "@/lib/bank/canonical";
 import { loadMerchantMemory } from "@/services/counterparty.service";
 import { analyzeCoverage, describeCoverage } from "@/lib/bank/coverage";
 import type { SupplierIdentity } from "@/lib/bank/entities";
@@ -161,7 +163,7 @@ export async function POST(request: Request) {  let user;
 
   const coverage = analyzeCoverage([...priorPeriods, ...thisPeriod]);
 
-  const engine = runReconciliation({
+  let engine = runReconciliation({
     rows: parsed.rows.map((r, i) => ({
       key: `row-${r.rowNumber}-${i}`,
       valueDate: r.valueDate,
@@ -183,6 +185,56 @@ export async function POST(request: Request) {  let user;
     suppliers: supplierIdentities,
     memory,
   });
+  /*
+    الحَكَم — إن كان مهيَّأً.
+
+    لا يُستدعى إلّا لما قرّر المخطِّط أنّه ملتبس، ولا يُطابِق حكمُه
+    تلقائياً: يرفع الحالة إلى «اقتراح» ينتظر إقرارك.
+
+    وإن لم يكن مهيَّأً مضى المسار حسابياً بحتاً — وهذا هو الأصل، لا
+    حالةُ عطل.
+  */
+  const judge = geminiAdjudicator();
+  if (judge.isConfigured() && engine.adjudicationCases.length > 0) {
+    const canonicalByKey = new Map(
+      parsed.rows.map((r, i) => [
+        `row-${r.rowNumber}-${i}`,
+        toCanonical({
+          valueDate: r.valueDate,
+          description: r.description,
+          beneficiaryRaw: r.beneficiaryRaw,
+          transactionType: r.transactionType,
+          amountMinor: r.amountMinor,
+          direction: r.direction,
+        }),
+      ]),
+    );
+
+    const invoiceLabels = new Map(
+      open.map((o) => [
+        o.invoiceId,
+        {
+          number: o.invoiceNumber,
+          date: o.invoiceDate.toISOString().slice(0, 10),
+          outstandingMinor: o.outstandingMinor,
+        },
+      ]),
+    );
+
+    const outcomes = await adjudicate(
+      judge, engine.adjudicationCases, canonicalByKey, invoiceLabels,
+    );
+
+    engine = applyAdjudication(
+      engine,
+      outcomes.map((o) => ({
+        transactionId: o.transactionId,
+        candidate: o.candidate,
+        ...toSuggestion(o),
+      })),
+    );
+  }
+
   const engineByKey = new Map(engine.results.map((r) => [r.key, r]));
   const txByKey = new Map<string, (typeof txs)[number]>(txs.map((t) => [t.id, t]));
   const rowAmount = new Map<string, number>(
