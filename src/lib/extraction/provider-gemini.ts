@@ -10,6 +10,7 @@
  *   EXTRACTION_PROVIDER=gemini
  */
 import { extractionSchema } from "./schema";
+import { PINNED_MODELS } from "./versions";
 import {
   buildInstructions,
   type ExtractionOutcome,
@@ -17,7 +18,14 @@ import {
   type ExtractionRequest,
 } from "./provider";
 
-const DEFAULT_MODEL = "gemini-flash-latest";
+/*
+  مثبَّتٌ بنسخته لا باسمٍ عائم.
+
+  كان `gemini-flash-latest`: يتغيّر النموذج تحته بلا إشعار، في مسارٍ
+  يقرأ أرقام فواتير. فتختلف الدقّة بين شهر وشهر ولا يُعرف السبب.
+  والتبديل يبقى ممكناً بـ`GEMINI_MODEL` — لكنّه قرارٌ يُتَّخَذ لا يقع.
+*/
+const DEFAULT_MODEL = PINNED_MODELS.gemini;
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 
 function modelName(): string {

@@ -20,7 +20,7 @@ export const DOCUMENT_KINDS = [
 ] as const;
 
 /** المبالغ تُطلب كنصوص لا كأرقام، حتى لا تفقد الفاصلة العشرية دقّتها في JSON. */
-const moneyString = z
+export const moneyString = z
   .string()
   .describe("المبلغ كنصّ بالأرقام اللاتينية ومنزلتين عشريتين، مثل 410.00. اتركه فارغاً إن لم يظهر.");
 

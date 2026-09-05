@@ -924,3 +924,85 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, { fields: [sessions.userId], references: [users.id] }),
 }));
+
+/*
+  اسمٌ مستقلّ عمداً: `payment_method` موجود لدفعات المورّدين بقيمٍ أخرى
+  (تحويل بنكيّ · نقد). وطرق دفع البيعة شيءٌ آخر — مدى وفيزا وآبل باي.
+  ودمجهما في نوعٍ واحد يخلط مفهومين لأنّ اسميهما تشابها.
+*/
+export const salePaymentMethodEnum = pgEnum("sale_payment_method", [
+  "CASH", "MADA", "VISA", "MASTERCARD", "AMEX", "APPLE_PAY", "STC_PAY", "TRANSFER", "OTHER",
+]);
+
+/**
+ * تفصيل دفع البيعة.
+ *
+ * البيعة الواحدة قد تُدفع بطريقتين — نصفها نقداً ونصفها بطاقة — فهي
+ * أسطر لا عمود. وبدونها لا يُعرف: بعتَ مئة ألف، منها كم مدى وكم نقداً؟
+ */
+export const salePayments = pgTable("sale_payments", {
+  id: id(),
+  saleId: text("sale_id").notNull().references(() => sales.id, { onDelete: "cascade" }),
+  method: salePaymentMethodEnum("method").notNull(),
+  amountMinor: integer("amount_minor").notNull(),
+  /** معرّف العملية لدى الشبكة — أساس مطابقة التسوية. */
+  externalId: text("external_id"),
+  createdAt: now(),
+}, (t) => [
+  index("sale_payments_sale_idx").on(t.saleId),
+  index("sale_payments_method_idx").on(t.method),
+]);
+
+/**
+ * المرتجع سجلٌّ لا رقم.
+ *
+ * كان `sales.refundMinor` رقماً بلا سبب ولا صنف ولا تاريخ. فإذا سُئل
+ * «لماذا انخفضت المبيعات؟» لم يُعرف: كم مرتجعاً، وأيّ صنف، وأيّ يوم.
+ */
+export const refunds = pgTable("refunds", {
+  id: id(),
+  saleId: text("sale_id").references(() => sales.id, { onDelete: "set null" }),
+  sourceId: text("source_id").notNull().references(() => salesSources.id, { onDelete: "cascade" }),
+  externalId: text("external_id").notNull(),
+  branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+  refundedAt: timestamp("refunded_at", { withTimezone: true }).notNull(),
+  businessDate: text("business_date").notNull(),
+  amountMinor: integer("amount_minor").notNull(),
+  reason: text("reason"),
+  createdAt: now(),
+}, (t) => [
+  uniqueIndex("refunds_external_uniq").on(t.sourceId, t.externalId),
+  index("refunds_date_idx").on(t.businessDate),
+]);
+
+export const refundLines = pgTable("refund_lines", {
+  id: id(),
+  refundId: text("refund_id").notNull().references(() => refunds.id, { onDelete: "cascade" }),
+  posProductId: text("pos_product_id").references(() => posProducts.id, { onDelete: "set null" }),
+  description: text("description").notNull(),
+  quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull().default("1"),
+  amountMinor: integer("amount_minor").notNull(),
+}, (t) => [index("refund_lines_refund_idx").on(t.refundId)]);
+
+/**
+ * دفعة التسوية: ما تُودعه الشبكة في الحساب.
+ *
+ * وهي الجسر بين المبيعات والبنك. وبدونها لا يُقارَن ما بيع بما وصل،
+ * ولا يُعرف أنّ الفرق رسمٌ أو ضريبةٌ أو تأخّرُ يوم.
+ */
+export const settlementBatches = pgTable("settlement_batches", {
+  id: id(),
+  sourceId: text("source_id").references(() => salesSources.id, { onDelete: "set null" }),
+  branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+  merchantId: text("merchant_id"),
+  scheme: text("scheme"),
+  batchDate: text("batch_date").notNull(),
+  externalId: text("external_id"),
+  grossMinor: integer("gross_minor").notNull().default(0),
+  feeMinor: integer("fee_minor").notNull().default(0),
+  vatMinor: integer("vat_minor").notNull().default(0),
+  netMinor: integer("net_minor").notNull().default(0),
+  bankTransactionId: text("bank_transaction_id")
+    .references(() => bankTransactions.id, { onDelete: "set null" }),
+  createdAt: now(),
+}, (t) => [index("settlement_bank_idx").on(t.bankTransactionId)]);

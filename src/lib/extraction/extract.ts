@@ -8,6 +8,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { extractionSchema } from "./schema";
+import { PINNED_MODELS } from "./versions";
 import {
   buildInstructions,
   type ExtractionOutcome,
@@ -15,7 +16,7 @@ import {
   type ExtractionRequest,
 } from "./provider";
 
-export const EXTRACTION_MODEL = "claude-opus-5";
+export const EXTRACTION_MODEL = PINNED_MODELS.claude;
 
 /** أنواع الملفات التي يقبلها النموذج مباشرةً. */
 const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
