@@ -90,7 +90,15 @@ const KEYWORDS: readonly Keyword[] = [
   { match: /\bSAUDI\s*TELECOM\b|\bSTC\s*PAY\b/i, kind: "UTILITY", direction: "DEBIT", label: "الاتصالات السعودية" },
   { match: /^CITY\s*:\s*Digital\s*Channel$/i, kind: "BANK_FEE", direction: "DEBIT", label: "رسم القناة الرقمية" },
   // الحكوميّ قبل الزكاة: «زاتكا» ضريبة لا صدقة
-  { match: /\bZATCA\b|هيئه\s*الزكاه\s*والضريبه|هيئه\s*الزكاة/i, kind: "GOVERNMENT", direction: "DEBIT", label: "جهة ضريبية" },
+  /*
+    و«زاتكا» بالعربية كذلك — وكانت تفوت.
+
+    القاعدة تعرف `ZATCA` لاتينيةً و«هيئه الزكاه والضريبه» كاملةً،
+    ولا تعرف النطق العربيّ المختصر الذي يكتبه الأهليّ في أوصافه.
+    فحركةُ سدادٍ حكوميّ تخرج مجهولةً، ثمّ — لو وافق مبلغُها فاتورةً —
+    تُنسَب إلى مورّد.
+  */
+  { match: /\bZATCA\b|زاتكا|هيئه\s*الزكاه\s*والضريبه|هيئه\s*الزكاة/i, kind: "GOVERNMENT", direction: "DEBIT", label: "جهة ضريبية" },
   { match: /التامينات\s*الاجتماعيه|\bGOSI\b/i, kind: "GOVERNMENT", direction: "DEBIT", label: "التأمينات الاجتماعية" },
   { match: /\bEJAR\b|ايجار|شبكه\s*ايجار/i, kind: "RENT", direction: "DEBIT", label: "منصّة إيجار" },
   { match: /رواتب|\bSALARY\b|\bPAYROLL\b|Monthly\s*Sal/i, kind: "SALARY", direction: "DEBIT", label: "وصفٌ يقول راتباً" },

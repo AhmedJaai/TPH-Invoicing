@@ -200,6 +200,24 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
   const candidatesByKey = new Map<string, Candidate[]>();
 
   for (const p of prepared) {
+    /*
+      المال الداخل ليس سداداً — وكشفته مصفوفة التسوية.
+
+      كان الاتّجاه لا يُفحَص أصلاً: حركةٌ **واردة** بابُها مجهول تمرّ
+      إلى تعريف المستفيد ثمّ إلى توليد المرشّحين، فإن وافق مبلغُها
+      فاتورةً مفتوحة حُسمت تلقائياً — فيُنشَأ سدادٌ لمورّدٍ من مالٍ
+      **دخل** الحساب، وتُقفَل فاتورةٌ لم تُدفَع.
+
+      وأثرُه مضاعف: إيرادٌ يُقرأ مصروفاً، ومستحقٌّ يختفي.
+
+      والوارد قد يكون ردّ مبلغ — وذلك بابُ `reversal.ts` لا بابُ
+      المطابقة: ما خرج ثمّ عاد لا يُطابَق بفاتورة.
+    */
+    if (p.canonical.direction !== "DEBIT") {
+      perKey.set(p.key, { supplierId: null, score: 0, evidence: [] });
+      continue;
+    }
+
     if (!PAYMENT_KINDS.includes(p.classification.kind)) {
       perKey.set(p.key, { supplierId: null, score: 0, evidence: [] });
       continue;
