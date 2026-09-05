@@ -25,5 +25,46 @@ const TO_CATEGORY: Record<TxKind, TxCategory> = {
 };
 
 export function toCategory(kind: TxKind): TxCategory {
-  return TO_CATEGORY[kind];
+  /*
+    الافتراض عند المجهول لا `undefined`.
+
+    كانت تُرجع `undefined` لمفتاحٍ ليس من `TxKind`، فيمرّ صامتاً حتى
+    يصل القاعدةَ فيولّد `category = ::tx_category` — خطأً في بناء
+    الجملة لا في المنطق، ويصعب ردّه إلى سببه.
+  */
+  return TO_CATEGORY[kind] ?? "UNKNOWN";
+}
+
+/**
+ * الترجمة العكسية: من عمود القاعدة إلى لغة المحرّك.
+ *
+ * وهذه هي التي نقصت. `counterparties.kind` عمودٌ من `TxCategory`،
+ * وذاكرة المستفيدين كانت تُسنده إلى `TxKind` بـ`as` — فيُقرأ
+ * «SUPPLIER» على أنّه نوعٌ في المحرّك وليس منه.
+ *
+ * والأثر لم يكن خطأً ظاهراً بل **صمتاً**: `PAYMENT_KINDS` لا تحوي
+ * «SUPPLIER»، فكل جهةٍ تعلّمها النظام خرجت من مطابقة الفواتير أصلاً.
+ * فصار التعلّم يُنقص المطابقات بدل أن يزيدها.
+ *
+ * والدرس: `as` تُسكت المترجم ولا تُصلح اختلافاً.
+ */
+const FROM_CATEGORY: Record<TxCategory, TxKind> = {
+  SUPPLIER: "SUPPLIER_PAYMENT",
+  SALARY: "SALARY",
+  RENT: "RENT",
+  ZAKAT: "ZAKAT",
+  UTILITY: "UTILITY",
+  GOVERNMENT: "GOVERNMENT",
+  PERSONAL: "OWNER_TRANSFER",
+  INTERNAL: "INTERNAL_TRANSFER",
+  OTHER: "EXPENSE",
+  UNKNOWN: "UNKNOWN",
+  POS_SETTLEMENT: "POS_SETTLEMENT",
+  POS_FEE: "POS_FEE",
+  POS_VAT: "POS_VAT",
+  BANK_FEE: "BANK_FEE",
+};
+
+export function fromCategory(category: TxCategory): TxKind {
+  return FROM_CATEGORY[category] ?? "UNKNOWN";
 }

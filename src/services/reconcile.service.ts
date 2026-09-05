@@ -226,6 +226,26 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
     const supplier = perKey.get(p.key)!;
     const isPayment = PAYMENT_KINDS.includes(p.classification.kind);
 
+    /*
+      كل حركةٍ يُحتمَل أنّها سداد تحمل حالةَ قرار.
+
+      كانت التي بلا مرشّح تُترَك بلا حالة — لا `AUTO` ولا `SUGGEST` ولا
+      `REVIEW` — فتقول الخلاصة «٨٥ تحتاج مراجعة» ولا يجدها الطابور،
+      لأنّه يبحث عن حالة. فيقف صاحب العمل أمام رقمٍ لا يقابله شيء.
+
+      وما ليس سداداً أصلاً يبقى بلا حالة بحقّ: لا قرار فيه.
+    */
+    const fallback: Decision | null = isPayment
+      ? {
+          disposition: "REVIEW",
+          reasons: [
+            supplier.supplierId === null
+              ? "لم يُعرَف المستفيد — عرِّفه مرّةً فيُعرَف ما يشبهه"
+              : "المورّد معروف ولا فاتورة مفتوحة تطابق هذه الدفعة",
+          ],
+        }
+      : null;
+
     return {
       key: p.key,
       kind: p.classification.kind,
@@ -234,7 +254,7 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
       supplierId: supplier.supplierId,
       supplierScore: supplier.score,
       supplierEvidence: supplier.evidence,
-      decision: found?.d ?? null,
+      decision: found?.d ?? fallback,
       candidate: found?.a.candidate ?? null,
       runnerUpScore: found?.a.runnerUpScore ?? null,
       outcome: found?.a.candidate.outcome ?? outcomeWithout(isPayment, supplier.supplierId),
@@ -292,10 +312,7 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
     understood: results.filter((r) => r.kind !== "UNKNOWN").length,
     auto: results.filter((r) => r.decision?.disposition === "AUTO").length,
     suggest: results.filter((r) => r.decision?.disposition === "SUGGEST").length,
-    review: results.filter(
-      (r) => r.decision?.disposition === "REVIEW" ||
-        (r.decision === null && PAYMENT_KINDS.includes(r.kind)),
-    ).length,
+    review: results.filter((r) => r.decision?.disposition === "REVIEW").length,
     notPayment: results.filter((r) => !PAYMENT_KINDS.includes(r.kind)).length,
   };
 

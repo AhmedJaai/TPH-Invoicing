@@ -104,6 +104,17 @@ async function main() {
     const slice = results.slice(i, i + CHUNK);
     await db.transaction(async (t) => {
       for (const r of slice) {
+        /*
+          الحارس قبل الكتابة.
+
+          `sql` تُسقط المعامل عند `undefined` فتُنتج `category =
+          ::tx_category` — خطأً في بناء الجملة يقف عنده الترحيل كلّه.
+          والتحقّق هنا يجعل الخطأ يُقال بلغةٍ تُفهَم، لا بخطأ صياغة.
+        */
+        if (!r.category) {
+          throw new Error(`حركة ${r.key} بلا باب — يُصلَح المصدر لا يُكتَب المجهول`);
+        }
+
         await t.execute(sql`
           update bank_transactions set
             category          = ${r.category}::tx_category,

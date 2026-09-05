@@ -16,6 +16,7 @@ import { recordAudit } from "@/lib/audit";
 import { normalizeText, type CanonicalTransaction } from "@/lib/bank/canonical";
 import type { MerchantMemory } from "@/lib/bank/classification";
 import type { TxCategory } from "@/lib/bank/rules";
+import { fromCategory } from "@/lib/bank/apply";
 
 export type EvidenceKind =
   | "NAME" | "ACCOUNT" | "IBAN" | "NATIONAL_ID" | "MERCHANT_ID" | "REFERENCE";
@@ -201,7 +202,12 @@ export async function loadMerchantMemory(): Promise<Map<string, MerchantMemory>>
     if (!key) continue;
     memory.set(key, {
       key,
-      kind: r.txKind as MerchantMemory["kind"],
+      /*
+        تُترجَم لا تُسنَد: العمود من `TxCategory` والمحرّك يتكلّم
+        `TxKind`. وكانت `as` تُسكت المترجم فتخرج كل جهةٍ متعلَّمة من
+        مطابقة الفواتير صامتةً.
+      */
+      kind: fromCategory(r.txKind),
       supplierId: r.supplierId,
       confirmations: r.confirmations,
     });
