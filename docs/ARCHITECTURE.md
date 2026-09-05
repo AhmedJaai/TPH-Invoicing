@@ -112,7 +112,7 @@
 
 ## ٦. القاعدة
 
-٢٧ جدولاً. المفاتيح نصّية (`randomUUID`). كل المبالغ `integer` بالهللات.
+٣٧ جدولاً. المفاتيح نصّية (`randomUUID`). كل المبالغ `integer` بالهللات.
 الشهر المحاسبي نصّ `YYYY-MM` مشتقّ من تاريخ الفاتورة لا تاريخ الرفع.
 
 **المستندات والمال:** `users` `accounts` `sessions` `suppliers` `supplier_aliases`
@@ -126,9 +126,23 @@
 > شيئان باسم واحد. فالربط **لا يقع آلياً**: يُقترح مع ما يُضعفه، ويؤكّده إنسان،
 > ويُسجَّل تأكيده بفاعله ووقته.
 
-**المصروفات:** `recurring_expenses`
+**المصروفات:** `recurring_expenses` `expenses`
+> `recurring_expenses` تقول **كم يُتوقَّع**، و`expenses` تقول **كم صُرف**.
+> وسداد المورّد ليس مصروفاً هنا — هو محسوبٌ في المشتريات، وقيده مرّتين
+> يضاعف مصروف المقهى.
+
+**ذاكرة المستفيدين:** `counterparties` `counterparty_evidence`
+> الجهة التي يُدفَع لها ليست بالضرورة مورّداً: قد تكون موظّفاً أو جهةً
+> حكومية أو مالكاً أو شبكةَ بطاقات. ولذلك `supplier_id` فيها **اختياريّ**.
+> والدليل الواحد لا يدلّ على جهتين — يمنعه فهرسٌ فريد.
+
+**الفروع والحسابات:** `branches` `bank_accounts` `reconciliation_periods`
+> غيابها لم يكن نقصاً في الميزات بل افتراضاً مدفوناً في المخطّط: أنّ
+> المنشأة فرعٌ واحد وحسابٌ واحد، وأنّ «استوردتُ الملفّ» يساوي «انتهيت».
+> وليس هذا تعدّد مستأجرين — منظّمةٌ واحدة وفروعٌ تحتها.
 
 **مجال المبيعات — فارغ وجاهز:** `sales_sources` `pos_products` `sales` `sale_lines`
+`sale_payments` `refunds` `refund_lines` `settlement_batches`
 > لا واجهة برمجية لأي مزوّد في هذا المستودع. الجداول محايدة، وواجهة الموصل
 > في `lib/sales/connector.ts`، والحال الافتراضي «غير موصول» — **يرمي عند
 > الطلب ولا يُرجع أصفاراً**، لأنّ الصفر يوحي بأنّ المقهى لم يبع شيئاً.
@@ -146,6 +160,15 @@
 | `supplier_products_uniq` | صنفان لمورّد واحد بالوصف نفسه |
 | `sales_uniq` · `pos_products_uniq` | تكرار عملية بيع أو صنف عند المزامنة |
 | `rate_limits` PK | فلتان طلبين متزامنين من العدّ |
+| `payment_allocations_bounds` (مؤثِّر) | تخصيصاً أكبر من الدفعة أو من الفاتورة |
+| `payment_allocations_positive` | تخصيصاً بصفر أو سالب |
+| `invoices_total_positive` | فاتورةً بصفر أو سالب |
+| `invoices_parts_sum_to_total` | صافياً وضريبةً لا يساويان الإجمالي — بتسامح ريال |
+| `expenses_period_matches_date` | شهراً محاسبياً يخالف تاريخ الحدث |
+| `expenses_bank_tx_uniq` · `expenses_invoice_uniq` | قيد المصروف نفسه مرّتين |
+| `counterparty_evidence_uniq` | دليلاً واحداً يدلّ على جهتين |
+| `branches_single_default` | فرعين افتراضيّين فتنقسم نسبة البيانات القديمة |
+| `bank_tx_match_score_range` | درجةً خارج المئة |
 
 ### حالات بدل الرايات
 
@@ -154,7 +177,30 @@ tax_status:        VALID | INVALID | UNKNOWN | NOT_APPLICABLE
 input_vat_status:  ELIGIBLE | NOT_ELIGIBLE | UNKNOWN
 tx_category:       SUPPLIER | SALARY | RENT | ZAKAT | UTILITY
                    | GOVERNMENT | PERSONAL | INTERNAL | OTHER | UNKNOWN
+                   | POS_SETTLEMENT | POS_FEE | POS_VAT | BANK_FEE
+match_disposition: AUTO | SUGGEST | REVIEW
+reconciliation:    OPEN | IN_PROGRESS | RECONCILED | DISCREPANCY
 ```
+
+### محرّك التسوية
+
+```
+صفوف الكشف
+   ↓  toCanonical()        نموذج معياريّ: المرجع يُنسب إلى نوعه بدليل
+   ↓  classify()           بطبقات: البنية ← المتعلَّم ← الكلمات ← المجهول يُعلَن
+   ↓  resolveSupplier()    أدلّة قاطعة وظنّية — والظنّيّ وحده لا يكفي
+   ↓  generateCandidates() كل مرشّح، ومجموع الجزئيات بلا سقف ثلاث
+   ↓  reconcile()          تفريعٌ وتحديد: أعلى مجموع لا أعلى درجة
+   ↓  decide()             الدرجة **والفارق** عن التالي — أثبِت لا تجد
+   ↓  adjudicate()         حَكَمٌ للملتبس وحده، وحكمه اقتراح لا مطابقة
+   ↓  planned[]            وهو وحده ما يُكتَب مالاً
+```
+
+> **مصدر قرارٍ واحد.** `matchBankTransactions` خرج من المسار نهائياً. وكان
+> يعمل بجانبه: هذا يكتب المال وذاك يكتب أدلّةً فوقه — فتُحفَظ حركةٌ بدرجة
+> ٩١ ونتيجةِ «فاتورة بعينها» وحالتُها `UNMATCHED`.
+>
+> **والنواة نفسها تُستعمل لكشوف المورّدين** — ولا مطابقان مختلفان لعملٍ واحد.
 
 ---
 

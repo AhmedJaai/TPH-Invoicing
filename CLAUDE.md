@@ -29,13 +29,15 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 
 **النشر:** Vercel `tph4/tph-invoicing` · GitHub `AhmedJaai/TPH-Invoicing` · الفرع `main`.
 
-## القاعدة — ٢٨ جدولاً
+## القاعدة — ٣٧ جدولاً
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` · `payments` `payment_allocations`
 `bank_imports` `bank_transactions` `bank_rules` · `statements` `statement_lines` · `month_closes`
 `products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products` (فارغة عمداً)
 `audit_logs` `rate_limits` `expenses`
+`counterparties` `counterparty_evidence` · `branches` `bank_accounts` `reconciliation_periods`
+`sale_payments` `refunds` `refund_lines` `settlement_batches`
 
 التعريف في `src/db/schema.ts`.
 
@@ -54,11 +56,11 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 | `005_products_and_sales_domain.sql` | الأصناف والمصروفات المتكرّرة ومجال المبيعات |
 | `006_expenses.sql` | المصروف الفعلي، وقيدٌ يمنع تكراره عن حركة أو فاتورة |
 | `007_financial_invariants.sql` | قيود المال في القاعدة: التخصيص والفاتورة والمصروف |
+| `008_bank_kinds.sql` | أبواب حركة البنك: تسوية الشبكة ورسومها وضريبتها |
+| `009_match_evidence.sql` | أدلّة المطابقة وقرارها ودرجتها — كي يُعرَض «لماذا؟» ويُتراجَع |
 | `010_counterparties.sql` | ذاكرة المستفيدين: هويّة الجهة وأدلّتها |
 | `011_branches_and_accounts.sql` | الفروع والحسابات وفترات التسوية |
 | `012_sales_domain.sql` | طرق دفع البيعة والمرتجعات ودفعات التسوية |
-| `008_bank_kinds.sql` | أبواب حركة البنك: تسوية الشبكة ورسومها وضريبتها |
-| `009_match_evidence.sql` | أدلّة المطابقة وقرارها ودرجتها — كي يُعرَض «لماذا؟» ويُتراجَع |
 
 ## المكتبات التي يجب معرفتها
 
@@ -131,6 +133,8 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 - **الحلّ التقريبيّ لا يُطابَق تلقائياً** — حين تنفد ميزانيّة المحسِّن يصير التلقائيّ اقتراحاً، فقولُ «تمّت المطابقة» عن حلٍّ لم يُثبَت أنّه الأفضل ادّعاء.
 - **`beneficiary_raw` في الصفوف القديمة ملوَّث** — كان يحمل اسم المورّد المطابَق لا المستفيد. فلا يُبنى عليه اسمُ جهة؛ يُؤخذ من الوصف قبل `BEN ID`.
 - **المورّد المسجَّل مرّتين يمنع المطابقة** — دفعةٌ لـ«سرد كو» وفاتورةٌ لـ«سرد للتجارة». يكشفه `npm run db:split-check` بدليلٍ ماليّ لا بتشابه اسم.
+- **`as` تُسكت المترجم ولا تُصلح اختلافاً.** ذاكرة المستفيدين كانت تُسنِد `TxCategory` إلى `TxKind` بـ`as`، فخرجت كل جهةٍ متعلَّمة من مطابقة الفواتير **صامتةً** — والتعلّم يُنقص المطابقات بدل أن يزيدها. الترجمة صريحة الآن في `apply.ts`، ولها اختبارٌ يمرّ على كل باب وكل نوع.
+- **كل ما يُحتمَل أنّه سداد يحمل حالةَ قرار** — وإلّا قالت الخلاصة «٨٥ تحتاج مراجعة» ولم يجدها الطابور.
 - **قواعد البنك تعمّ ولا تخصّ عمليةً واحدة** — كانت ٣٢ قاعدة تحمل كلٌّ مرجع حوالة بعينها.
 
 ## المصائد المعروفة
@@ -145,9 +149,9 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 
 ## الأوامر
 
-`npm test` (٥٦٥ اختباراً) · `npm run typecheck` · `npm run lint`
-`npm run db:migrate` · `db:verify` · `db:rematch` · `db:reclassify` · `db:dedupe` · `db:expenses` · `db:audit` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules`
-`npm run db:dedupe` · `db:rematch` · `db:reclassify` · `db:learn` · `db:link` · `db:split-check`
+`npm test` (٩٠١ اختباراً · ٦١ ملفاً) · `npm run typecheck` · `npm run lint`
+`npm run db:migrate` · `db:verify` · `db:dedupe` · `db:rematch` · `db:reclassify` · `db:learn` · `db:link` · `db:split-check`
+`npm run db:expenses` · `db:audit` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`
 
 ## ما ليس مبنيّاً — عمداً
