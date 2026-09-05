@@ -67,6 +67,7 @@ export const RULES: Record<string, RateLimitRule> = {
   "mark-paid": { limit: 10, windowSeconds: 3600 },
   "match-undo": { limit: 60, windowSeconds: 3600 },
   counterparty: { limit: 300, windowSeconds: 3600 },
+  "match-confirm": { limit: 200, windowSeconds: 3600 },
   "month-close": { limit: 30, windowSeconds: 3600 },
   "supplier-alias": { limit: 200, windowSeconds: 3600 },
   "bank-rule": { limit: 200, windowSeconds: 3600 },

@@ -231,3 +231,49 @@ describe("خطّة الكتابة — مصدر قرارٍ واحد", () => {
     expect(planned).toEqual([]);
   });
 });
+
+describe("الحلّ التقريبيّ لا يُطابَق تلقائياً", () => {
+  it("حين ينفد البحث يصير التلقائيّ اقتراحاً — وقولُ «تمّت» عنه ادّعاء", () => {
+    /*
+      حالة متشابكة عمداً كي تنفد ميزانيّة المحسِّن: عشرون حركة تتنافس
+      على ستّ عشرة فاتورة لمورّدٍ واحد.
+    */
+    const invoices = Array.from({ length: 16 }, (_, i) =>
+      invoice({ id: `i${i}`, outstandingMinor: 1_000_00 + i, invoiceDate: day("2026-08-10") }));
+    const rows = Array.from({ length: 20 }, (_, i) =>
+      row({ key: `t${i}`, beneficiaryRaw: "أوراق الزيتون", amountMinor: 1_000_00 + (i % 16) }));
+
+    const { results, summary } = runReconciliation({ rows, invoices, suppliers });
+
+    if (!summary.exact) {
+      for (const r of results) {
+        expect(r.decision?.disposition).not.toBe("AUTO");
+      }
+    }
+    expect(typeof summary.exact).toBe("boolean");
+  });
+});
+
+describe("حالات التحكيم تُحسَب دائماً", () => {
+  it("تُحسَب وإن لم يُستدعَ حَكَم — فمعرفة كم التبس أهمّ من حلّه", () => {
+    const { adjudicationCases } = runReconciliation({
+      rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" })],
+      invoices: [
+        invoice({ id: "a", outstandingMinor: 1_000_00 }),
+        invoice({ id: "b", outstandingMinor: 1_000_00 }),
+      ],
+      suppliers,
+    });
+    expect(adjudicationCases.length).toBeGreaterThan(0);
+    expect(adjudicationCases[0].reason).toBe("CLOSE_CANDIDATES");
+  });
+
+  it("وما حُسم تلقائياً لا يدخلها", () => {
+    const { adjudicationCases } = runReconciliation({
+      rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" })],
+      invoices: [invoice({ id: "a", outstandingMinor: 1_000_00 })],
+      suppliers,
+    });
+    expect(adjudicationCases).toEqual([]);
+  });
+});

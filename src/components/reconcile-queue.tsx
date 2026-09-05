@@ -16,6 +16,42 @@ import { Badge, buttonClass, Card, EmptyState } from "./ui";
  * يجيبه يصير ذاكرةً تعمّ على أمثاله، فيقصر الطابور من نفسه.
  */
 
+/**
+ * ما يحتاج قرارك — بكلّ صوره.
+ *
+ * كان الطابور «الحركات المجهولة» وحدها. والواقع أنّ ما يحتاج قراراً
+ * أوسع: مرشّحان متقاربان، ومبلغٌ لا يطابق، وسدادٌ جزئيّ، وزيادة،
+ * ومطابقةٌ اقترحها الحساب ولم يحسمها. وكلّها كانت تُعرَض أو لا تُعرَض
+ * بلا زرّ يُتَّخذ به قرار.
+ */
+export type QueueReason =
+  | "UNKNOWN_ENTITY"
+  | "CLOSE_CANDIDATES"
+  | "AMOUNT_MISMATCH"
+  | "PARTIAL_PAYMENT"
+  | "OVERPAYMENT"
+  | "SUGGESTED"
+  | "APPROXIMATE";
+
+export const REASON_LABEL: Record<QueueReason, string> = {
+  UNKNOWN_ENTITY: "مستفيد غير معروف",
+  CLOSE_CANDIDATES: "مرشّحان متقاربان",
+  AMOUNT_MISMATCH: "المبلغ لا يوافق فاتورة",
+  PARTIAL_PAYMENT: "سداد جزئي",
+  OVERPAYMENT: "أكثر من المستحقّ",
+  SUGGESTED: "اقتراح ينتظر إقرارك",
+  APPROXIMATE: "حلٌّ تقريبيّ",
+};
+
+export interface CandidateOption {
+  /** معرّف الحركة المرشَّحة — يُرسَل عند القبول. */
+  invoiceIds: string[];
+  label: string;
+  amountMinor: number;
+  score: number;
+  why: string[];
+}
+
 export interface QueueItem {
   id: string;
   date: string;
@@ -23,10 +59,13 @@ export interface QueueItem {
   direction: "DEBIT" | "CREDIT";
   description: string;
   beneficiaryRaw: string | null;
+  reason: QueueReason;
   /** ما رجّحه المحرّك، إن رجّح. */
   guessName: string | null;
   guessKind: string | null;
   why: string[];
+  /** المرشّحون — يُعرَضون ليُختار بينهم لا ليُقرأ عنهم. */
+  candidates?: CandidateOption[];
 }
 
 export interface SupplierOption {
@@ -83,6 +122,44 @@ export function ReconcileQueue({
     setName("");
     setMessage(null);
     setIndex(0);
+  }
+
+  /** يقبل مرشّحاً بعينه — وهذا هو ما كان ينقص: خيارٌ يُتَّخَذ. */
+  async function acceptCandidate(option: CandidateOption) {
+    setBusy(true);
+    setFailed(false);
+    try {
+      const res = await fetch("/api/match-confirm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ transactionId: item!.id, invoiceIds: option.invoiceIds }),
+      });
+      const data = (await res.json()) as { message?: string; error?: string };
+      if (!res.ok) { setFailed(true); setMessage(data.error ?? "تعذّر القبول"); }
+      else { setMessage(data.message ?? "طُوبقت"); router.refresh(); next(); }
+    } catch {
+      setFailed(true);
+      setMessage("تعذّر الاتصال بالخادم");
+    } finally { setBusy(false); }
+  }
+
+  /** يُعلن أنّها ليست سداد فاتورة — دفعةٌ مقدَّمة أو غيرها. */
+  async function markNotAPayment(as: string) {
+    setBusy(true);
+    setFailed(false);
+    try {
+      const res = await fetch("/api/match-confirm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ transactionId: item!.id, notAPayment: as }),
+      });
+      const data = (await res.json()) as { message?: string; error?: string };
+      if (!res.ok) { setFailed(true); setMessage(data.error ?? "تعذّر الحفظ"); }
+      else { setMessage(data.message ?? "حُفظت"); router.refresh(); next(); }
+    } catch {
+      setFailed(true);
+      setMessage("تعذّر الاتصال بالخادم");
+    } finally { setBusy(false); }
   }
 
   async function confirm() {
@@ -144,7 +221,9 @@ export function ReconcileQueue({
             </span>
             <span className="nums mt-1.5 block text-[11px] text-muted">{item.date}</span>
           </span>
-          {item.guessKind && <Badge tone="warn">ترجيح</Badge>}
+          <Badge tone={item.reason === "UNKNOWN_ENTITY" ? "warn" : "danger"}>
+            {REASON_LABEL[item.reason]}
+          </Badge>
         </div>
 
         <p className="mt-3 text-sm font-bold leading-snug">
@@ -163,6 +242,51 @@ export function ReconcileQueue({
                 ))}
               </ul>
             )}
+          </div>
+        )}
+
+        {/*
+          المرشّحون يُعرَضون ليُختار بينهم.
+
+          كان النظام يقول «تحتاج قرارك» ولا يعطي ما يُقرَّر به — فيقف
+          صاحب العمل أمام حركةٍ يعرف أنّها تحتاجه ولا يملك فعلاً.
+        */}
+        {item.candidates && item.candidates.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs font-bold">أيّ فاتورة تفسّرها؟</p>
+            <ul className="mt-2 space-y-2">
+              {item.candidates.map((c, i) => (
+                <li key={i} className="rounded-xl border border-line px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-bold">{c.label}</span>
+                      <span className="block text-[10px] text-muted">
+                        {c.why.slice(0, 2).join(" · ")}
+                      </span>
+                    </span>
+                    <span className="nums shrink-0 text-xs font-bold">
+                      <Money minor={c.amountMinor} />
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => acceptCandidate(c)}
+                    className={`${buttonClass("primary", "sm")} mt-2`}
+                  >
+                    هذه هي
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => markNotAPayment("ADVANCE")}
+              className={`${buttonClass("secondary", "sm")} mt-2`}
+            >
+              ليست سداد فاتورة — دفعة مقدَّمة
+            </button>
           </div>
         )}
 

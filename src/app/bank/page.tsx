@@ -75,8 +75,12 @@ export default async function BankPage() {
       .limit(25),
 
     /*
-      المعلّقات: ما لم يُعرف وجهه. تُرتَّب بالأكبر مبلغاً — فحلّ حركةٍ
-      بخمسة آلاف أنفع من حلّ حركةٍ بريال.
+      المعلّقات: **كلّ** ما يحتاج قراراً لا المجهول وحده.
+
+      كان الطابور «الحركات المجهولة». والواقع أنّ ما يحتاج قراراً أوسع:
+      اقتراحٌ ينتظر إقراراً، ومبلغٌ لا يوافق، وسدادٌ جزئيّ، وزيادة —
+      وكلّها كانت تُعرَض أو لا تُعرَض بلا زرّ يُتَّخذ به قرار، فيقف
+      صاحب العمل أمام حركةٍ يعرف أنّها تحتاجه ولا يملك فعلاً.
     */
     db.select({
       id: bankTransactions.id,
@@ -86,16 +90,36 @@ export default async function BankPage() {
       description: bankTransactions.description,
       beneficiaryRaw: bankTransactions.beneficiaryRaw,
       matchEvidence: bankTransactions.matchEvidence,
+      matchOutcome: bankTransactions.matchOutcome,
+      matchDisposition: bankTransactions.matchDisposition,
+      supplierId: bankTransactions.supplierId,
     })
       .from(bankTransactions)
-      .where(sql`${bankTransactions.category} = 'UNKNOWN'
-        and ${bankTransactions.counterpartyId} is null`)
+      .where(sql`${bankTransactions.matchedPaymentId} is null
+        and ${bankTransactions.matchStatus} <> 'IGNORED'
+        and (
+          ${bankTransactions.matchDisposition} in ('SUGGEST','REVIEW')
+          or (${bankTransactions.category} = 'UNKNOWN'
+              and ${bankTransactions.counterpartyId} is null
+              and ${bankTransactions.direction} = 'DEBIT')
+        )`)
       .orderBy(desc(bankTransactions.amountMinor))
-      .limit(40),
+      .limit(60),
   ]);
 
+  /** يترجم ما قرّره المحرّك إلى سببٍ يُقرأ. */
+  function reasonOf(t: (typeof pending)[number]): QueueItem["reason"] {
+    if (t.matchOutcome === "PARTIAL_PAYMENT") return "PARTIAL_PAYMENT";
+    if (t.matchOutcome === "OVERPAYMENT") return "OVERPAYMENT";
+    if (t.matchOutcome === "AMOUNT_MISMATCH") return "AMOUNT_MISMATCH";
+    if (t.matchDisposition === "SUGGEST") return "SUGGESTED";
+    if (t.supplierId === null) return "UNKNOWN_ENTITY";
+    return "CLOSE_CANDIDATES";
+  }
+
   const queue: QueueItem[] = pending.map((t) => {
-    const ev = t.matchEvidence as { تصنيف?: string; مستفيد?: string[] } | null;
+    const ev = t.matchEvidence as
+      { تصنيف?: string; مستفيد?: string[]; مطابقة?: string[] } | null;
     return {
       id: t.id,
       date: t.valueDate.toISOString().slice(0, 10),
@@ -103,9 +127,12 @@ export default async function BankPage() {
       direction: t.direction as "DEBIT" | "CREDIT",
       description: (t.description ?? "").slice(0, 160),
       beneficiaryRaw: t.beneficiaryRaw,
+      reason: reasonOf(t),
       guessName: null,
       guessKind: null,
-      why: [ev?.تصنيف, ...(ev?.مستفيد ?? [])].filter((x): x is string => Boolean(x)),
+      why: [ev?.تصنيف, ...(ev?.مستفيد ?? []), ...(ev?.مطابقة ?? [])]
+        .filter((x): x is string => Boolean(x))
+        .slice(0, 4),
     };
   });
 

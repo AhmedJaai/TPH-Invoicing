@@ -15,6 +15,8 @@ import { resolveSupplier, type SupplierIdentity } from "@/lib/bank/entities";
 import { generateCandidates, type Candidate, type OpenInvoice } from "@/lib/bank/candidates";
 import { reconcile, type Claim } from "@/lib/bank/optimizer";
 import { decide, type Decision } from "@/lib/bank/decision";
+import { planAdjudication, type AdjudicationCase } from "@/lib/bank/adjudicate";
+import type { CanonicalTransaction } from "@/lib/bank/canonical";
 import { toCategory } from "@/lib/bank/apply";
 import type { TxCategory } from "@/lib/bank/rules";
 import type { Outcome, TxKind } from "@/lib/bank/taxonomy";
@@ -24,6 +26,16 @@ export interface ReconcileInput {
   invoices: readonly OpenInvoice[];
   suppliers: readonly SupplierIdentity[];
   memory?: ReadonlyMap<string, MerchantMemory>;
+  /**
+   * الحَكَم — اختياريّ.
+   *
+   * إن غاب مضى المسار حسابياً بحتاً، وهذا هو الأصل. وإن حضر لم يُستدعَ
+   * إلّا لما عجز الحساب عنه، ولا يُطابِق حكمُه تلقائياً.
+   */
+  adjudicator?: {
+    run(cases: readonly AdjudicationCase[], transactions: ReadonlyMap<string, CanonicalTransaction>):
+      Promise<readonly { transactionId: string; candidate: Candidate | null; disposition: "SUGGEST" | "REVIEW"; reasons: string[] }[]>;
+  };
 }
 
 export interface TransactionResult {
@@ -69,9 +81,13 @@ export interface PlannedPayment {
 
 export interface ReconcileResult {
   results: TransactionResult[];
+  /** حالاتٌ يستحقّ التباسُها حَكَماً — ولم يُستدعَ بعد. */
+  adjudicationCases: AdjudicationCase[];
   /** خطّة الكتابة — لا تُنفَّذ إلّا بموافقة، ومصدرها المحرّك وحده. */
   planned: PlannedPayment[];
   summary: {
+    /** هل بلغ المحسِّن الحلّ الأمثل يقيناً؟ */
+    exact: boolean;
     total: number;
     understood: number;
     auto: number;
@@ -100,6 +116,7 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
 
   const claims: Claim[] = [];
   const perKey = new Map<string, { supplierId: string | null; score: number; evidence: string[] }>();
+  const candidatesByKey = new Map<string, Candidate[]>();
 
   for (const p of prepared) {
     if (!PAYMENT_KINDS.includes(p.classification.kind)) {
@@ -127,11 +144,37 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
       invoices,
     )) {
       claims.push({ transactionId: p.key, candidate });
+      const list = candidatesByKey.get(p.key) ?? [];
+      list.push(candidate);
+      candidatesByKey.set(p.key, list);
     }
   }
 
-  const { assigned } = reconcile(claims);
+  const { assigned, exact } = reconcile(claims);
   const decided = new Map(assigned.map((a) => [a.transactionId, { a, d: decide(a) }]));
+
+  /*
+    الحلّ التقريبيّ لا يُطابَق تلقائياً.
+
+    حين تنفد ميزانيّة البحث يرجع المحسِّن إلى الجشع ويُعلن `exact:false`.
+    ومطابقةٌ بُنيت على حلٍّ لم يُثبت أنّه الأفضل ليست «مطابقة» بل
+    اقتراح — وقولُ «تمّت المطابقة» عنها ادّعاء.
+  */
+  if (!exact) {
+    for (const [key, entry] of decided) {
+      if (entry.d.disposition !== "AUTO") continue;
+      decided.set(key, {
+        a: entry.a,
+        d: {
+          disposition: "SUGGEST",
+          reasons: [
+            ...entry.d.reasons,
+            "الحلّ تقريبيّ: نفدت ميزانيّة البحث فلم يُثبَت أنّه الأفضل — فيُقترَح ولا يُطابَق",
+          ],
+        },
+      });
+    }
+  }
 
   const results: TransactionResult[] = prepared.map((p) => {
     const found = decided.get(p.key);
@@ -199,6 +242,7 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
   }
 
   const summary = {
+    exact,
     total: results.length,
     understood: results.filter((r) => r.kind !== "UNKNOWN").length,
     auto: results.filter((r) => r.decision?.disposition === "AUTO").length,
@@ -210,7 +254,23 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
     notPayment: results.filter((r) => !PAYMENT_KINDS.includes(r.kind)).length,
   };
 
-  return { results, planned, summary };
+  /*
+    ما يستحقّ حَكَماً.
+
+    ويُحسَب دائماً وإن لم يُستدعَ أحد: فمعرفةُ كم التبس أهمّ من حلّه —
+    دفعةٌ فيها مئتا التباس ليست حالةً تُحكَّم بل بياناتٌ ناقصة.
+  */
+  const adjudicationCases = planAdjudication(
+    results.map((r) => ({
+      transactionId: r.key,
+      amountMinor: prepared.find((p) => p.key === r.key)?.canonical.amountMinor ?? 0,
+      supplierId: r.supplierId,
+      candidates: candidatesByKey.get(r.key) ?? [],
+      decision: r.decision,
+    })),
+  ).cases;
+
+  return { results, planned, adjudicationCases, summary };
 }
 
 /**

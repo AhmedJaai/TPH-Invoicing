@@ -11,6 +11,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../src/db";
 import { runReconciliation } from "../src/services/reconcile.service";
+import { loadMerchantMemory } from "../src/services/counterparty.service";
 import type { SupplierIdentity } from "../src/lib/bank/entities";
 import type { OpenInvoice } from "../src/lib/bank/candidates";
 
@@ -62,6 +63,8 @@ async function main() {
     `)
   ).rows;
 
+  const memory = await loadMerchantMemory();
+
   const { results, summary } = runReconciliation({
     rows: rows.map((r) => ({
       key: r.id as string,
@@ -74,6 +77,7 @@ async function main() {
     })),
     invoices,
     suppliers,
+    memory,
   });
 
   const alreadyMatched = new Set(

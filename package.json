@@ -36,7 +36,10 @@
     "db:verify": "tsx --env-file=.env scripts/verify-invariants.ts",
     "db:dedupe": "tsx --env-file=.env scripts/dedupe-bank.ts",
     "db:reclassify": "tsx --env-file=.env scripts/reclassify-bank.ts",
-    "db:rematch": "tsx --env-file=.env scripts/rematch-bank.ts"
+    "db:rematch": "tsx --env-file=.env scripts/rematch-bank.ts",
+    "db:learn": "tsx --env-file=.env scripts/learn-counterparties.ts",
+    "db:link": "tsx --env-file=.env scripts/link-counterparties.ts",
+    "db:split-check": "tsx --env-file=.env scripts/find-split-suppliers.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
