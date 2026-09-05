@@ -277,3 +277,39 @@ describe("حالات التحكيم تُحسَب دائماً", () => {
     expect(adjudicationCases).toEqual([]);
   });
 });
+
+describe("الرسم يصل إلى المال", () => {
+  /*
+    كان `splitBankFee` يُحسب ويُختبَر ولا يستدعيه أحد خارج اختباره.
+    فتُقسَّم الدفعة كاملةً بما فيها رسمُ التحويل، ويُنسَب إلى المورّد
+    مالٌ ذهب إلى البنك. وحسابٌ صحيح لا يصل إلى المال أسوأ من عدمه:
+    يوهم أنّ الحالة معالَجة.
+  */
+  it("خصمٌ يزيد عن الفاتورة بقدر رسم التحويل يُقيَّد رسماً", () => {
+    const { planned } = runReconciliation({
+      rows: [row({
+        key: "t1", amountMinor: 1_015_00,
+        beneficiaryRaw: "أوراق الزيتون", description: "شراء بضاعة",
+      })],
+      invoices: [invoice({ id: "i1", totalMinor: 1_000_00, outstandingMinor: 1_000_00 })],
+      suppliers,
+    });
+    expect(planned).toHaveLength(1);
+    expect(planned[0].feeMinor).toBe(15_00);
+    expect(planned[0].feeReason).toContain("رسم");
+    /* المبلغ المسجَّل ما خرج فعلاً، وإلّا اختلّت معادلة الكشف */
+    expect(planned[0].amountMinor).toBe(1_015_00);
+    /* والمخصَّص على الفاتورة قيمتها لا أكثر */
+    expect(planned[0].allocations.reduce((s, a) => s + a.amountMinor, 0)).toBe(1_000_00);
+  });
+
+  it("الخصم المساوي بلا رسم", () => {
+    const { planned } = runReconciliation({
+      rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون", description: "شراء بضاعة" })],
+      invoices: [invoice({ id: "i1" })],
+      suppliers,
+    });
+    expect(planned[0].feeMinor).toBe(0);
+    expect(planned[0].feeReason).toBeNull();
+  });
+});

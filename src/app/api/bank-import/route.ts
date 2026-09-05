@@ -603,6 +603,11 @@ export async function POST(request: Request) {  let user;
         method: "BANK_TRANSFER",
         beneficiaryNameRaw: (t.beneficiaryRaw ?? t.description).slice(0, 200),
         /*
+          الرسم يُحفَظ في حقله فيخرج من القسمة — ولا يُنسَب إلى المورّد
+          مالٌ ذهب إلى البنك.
+        */
+        feeMinor: plan.feeMinor,
+        /*
           الشهر الحاكم هو الأحدث بين شهور الفواتير لا شهر أوّلها: دفعةٌ
           تسدّد أغسطس وسبتمبر وأكتوبر كانت تُنسب إلى أغسطس كلّها.
         */

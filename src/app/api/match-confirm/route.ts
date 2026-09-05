@@ -11,7 +11,7 @@
 import { NextResponse } from "next/server";
 import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bankTransactions, invoices } from "@/db/schema";
+import { bankTransactions, decisionHistory, invoices } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { allocate, createPayment } from "@/services/payment.service";
 import { recordAudit } from "@/lib/audit";
@@ -40,6 +40,8 @@ interface Body {
   split?: { invoiceId: string; amountMinor: number }[];
   /** أو: ليست سداد فاتورة، وهذا سببها. */
   notAPayment?: keyof typeof NOT_PAYMENT_KINDS;
+  /** لمن دُفعت المقدَّمة، إن لم يُعرَف المورّد من الحركة. */
+  supplierId?: string;
 }
 
 export async function POST(request: Request) {
@@ -81,15 +83,92 @@ export async function POST(request: Request) {
     const kind = NOT_PAYMENT_KINDS[body.notAPayment];
     if (!kind) return NextResponse.json({ error: "سببٌ غير معروف" }, { status: 400 });
 
-    await db
-      .update(bankTransactions)
-      .set({
-        category: kind.category,
-        matchStatus: "IGNORED",
-        matchDisposition: null,
-        matchOutcome: "NOT_A_PAYMENT",
-      })
-      .where(eq(bankTransactions.id, tx.id));
+    /*
+      الدفعة المقدَّمة **مالٌ خرج**، لا حركةٌ تُتجاهَل.
+
+      كانت تُوسَم `IGNORED` وينتهي الأمر: يختفي من الحساب ألفُ ريالٍ
+      دُفعت للمورّد قبل وصول فاتورته، ولا يبقى لها أثر — فإذا وصلت
+      الفاتورة دُفعت ثانيةً. والتجاهل يليق بما ليس مالاً: رسمٌ بنكيّ أو
+      تحويلٌ داخليّ. أمّا هذه فتُقيَّد دفعةً حالُها `ADVANCE`، ورصيداً
+      للمورّد يُخصَّص على فاتورته حين تصل.
+    */
+    if (body.notAPayment === "ADVANCE") {
+      const supplierId = body.supplierId ?? tx.supplierId;
+      if (!supplierId) {
+        return NextResponse.json(
+          { error: "الدفعة المقدَّمة تحتاج مورّداً — لمن دُفعت؟" },
+          { status: 400 },
+        );
+      }
+
+      const advanceId = await db.transaction(async (t) => {
+        const id = await createPayment(t, {
+          supplierId,
+          paidAt: tx.valueDate,
+          amountMinor: tx.amountMinor,
+          method: "BANK_TRANSFER",
+          beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
+          isAdvance: true,
+        });
+
+        await t
+          .update(bankTransactions)
+          .set({
+            category: "SUPPLIER",
+            matchedPaymentId: id,
+            matchStatus: "MATCHED",
+            matchDisposition: "AUTO",
+            matchOutcome: "ADVANCE",
+            supplierId,
+          })
+          .where(eq(bankTransactions.id, tx.id));
+
+        await t.insert(decisionHistory).values({
+          bankTransactionId: tx.id,
+          event: "MATCH_CONFIRMED",
+          actor: "HUMAN",
+          actorId: user.id,
+          detail: "دفعةٌ مقدَّمة لمورّد — رصيدٌ ينتظر فاتورته",
+          payload: { الدفعة: id, المورّد: supplierId, المبلغ: tx.amountMinor },
+        });
+
+        return id;
+      });
+
+      await recordAudit({
+        actorId: user.id,
+        action: "INVOICES_MARKED_PAID",
+        entityType: "bank_transaction",
+        entityId: tx.id,
+        after: { الفعل: "قُيّدت دفعةً مقدَّمة", الدفعة: advanceId, المورّد: supplierId },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        message: "قُيّدت دفعةً مقدَّمة — تُخصَّص على فاتورة المورّد حين تصل",
+      });
+    }
+
+    await db.transaction(async (t) => {
+      await t
+        .update(bankTransactions)
+        .set({
+          category: kind.category,
+          matchStatus: "IGNORED",
+          matchDisposition: null,
+          matchOutcome: "NOT_A_PAYMENT",
+        })
+        .where(eq(bankTransactions.id, tx.id));
+
+      await t.insert(decisionHistory).values({
+        bankTransactionId: tx.id,
+        event: "MATCH_REJECTED",
+        actor: "HUMAN",
+        actorId: user.id,
+        detail: `أُعلنت ليست سداد فاتورة: ${kind.label}`,
+        payload: { الباب: kind.category },
+      });
+    });
 
     await recordAudit({
       actorId: user.id,
@@ -194,6 +273,15 @@ export async function POST(request: Request) {
         category: "SUPPLIER",
       })
       .where(eq(bankTransactions.id, tx.id));
+
+    await t.insert(decisionHistory).values({
+      bankTransactionId: tx.id,
+      event: "MATCH_CONFIRMED",
+      actor: "HUMAN",
+      actorId: user.id,
+      detail: `أقرّها على ${allocations.length} فاتورة`,
+      payload: { الدفعة: id, الفواتير: allocations.map((a) => a.invoiceId), الشهور: sorted },
+    });
 
     return id;
   });
@@ -305,6 +393,15 @@ async function applyManualSplit(
         category: "SUPPLIER",
       })
       .where(eq(bankTransactions.id, tx.id));
+
+    await t.insert(decisionHistory).values({
+      bankTransactionId: tx.id,
+      event: "MATCH_CONFIRMED",
+      actor: "HUMAN",
+      actorId: userId,
+      detail: `وزّعها بنفسه على ${split.length} فاتورة`,
+      payload: { الدفعة: id, التوزيع: split },
+    });
 
     return id;
   });

@@ -13,6 +13,7 @@
  * المال أغلى من غيابها.
  */
 import type { Outcome } from "./taxonomy";
+import { splitBankFee } from "./fees";
 
 export interface OpenInvoice {
   id: string;
@@ -114,9 +115,23 @@ export function dateScore(txDate: Date, invoiceDate: Date): number {
   return 1 - d / DATE_WINDOW_DAYS;
 }
 
-/** درجة قرب المبلغ: تامّة عند التطابق، وتنهار سريعاً بالبعد. */
+/**
+ * درجة قرب المبلغ: تامّة عند التطابق، وتنهار سريعاً بالبعد.
+ *
+ * والزيادةُ التي في حدّ رسم التحويل تطابقٌ تامّ لا نقص.
+ *
+ * كان الرسم يُحسب في `fees.ts` ولا يبلغ التسجيل: تُقاس الدفعة بخمسة
+ * آلاف وعشرين على فاتورة بخمسة آلاف فتُعطى ٠٫٨٥، فلا تبلغ حدّ الحسم
+ * التلقائيّ وتبقى معلّقةً في «تحتاج مراجعة» — وصاحب العمل يعرف يقيناً
+ * أنّها مدفوعة. فيراجع يدوياً ما حسبه النظام صحيحاً ولم يستعمله.
+ *
+ * والحدّ يمنع أن يصير هذا تسامحاً عامّاً: `splitBankFee` تشترط ألّا
+ * يجاوز الفائض خمسةً وسبعين ريالاً ولا اثنين في المئة. وما جاوزهما فرقٌ
+ * يُحقَّق فيه لا رسمٌ يُفترَض.
+ */
 export function amountScore(paidMinor: number, dueMinor: number): number {
   if (dueMinor <= 0) return 0;
+  if (splitBankFee(paidMinor, dueMinor) !== null) return 1;
   const diff = Math.abs(paidMinor - dueMinor);
   if (diff <= EXACT_TOLERANCE_MINOR) return 1;
   const ratio = diff / dueMinor;
@@ -218,14 +233,28 @@ export function generateCandidates(
     if (amount === 0 && reference === 0) continue;
 
     const diff = tx.amountMinor - inv.outstandingMinor;
+    /*
+      الرسم ليس فائضاً.
+
+      كان الخصمُ الزائد بقدر رسم التحويل يُسمَّى `OVERPAYMENT`، وهي حالةٌ
+      تُرفَع إلى المراجعة عمداً لأنّها «تغيّر الرصيد». فيُراجَع يدوياً ما
+      يعرفه النظام يقيناً: خمسة آلاف وعشرون على فاتورة بخمسة آلاف ليست
+      فائضةً بعشرين — هي الفاتورة ورسمُ تحويلها.
+    */
+    const fee = splitBankFee(tx.amountMinor, inv.outstandingMinor);
     const outcome: Outcome =
-      Math.abs(diff) <= EXACT_TOLERANCE_MINOR ? "EXACT_INVOICE"
+      Math.abs(diff) <= EXACT_TOLERANCE_MINOR || fee !== null ? "EXACT_INVOICE"
       : diff < 0 ? "PARTIAL_PAYMENT"
       : "OVERPAYMENT";
 
     const parts = { supplier: tx.supplierScore, amount, date, reference };
     const evidence = [`المورّد مرجَّح بدرجة ${Math.round(tx.supplierScore * 100)}٪`];
-    if (amount === 1) evidence.push("المبلغ يطابق المتبقّي تماماً");
+    if (amount === 1) {
+      evidence.push(
+        fee ? `المبلغ يطابق المتبقّي مع رسم تحويل ${(fee.feeMinor / 100).toFixed(2)}`
+            : "المبلغ يطابق المتبقّي تماماً",
+      );
+    }
     else if (outcome === "PARTIAL_PAYMENT") evidence.push(`سدادٌ جزئيّ — يبقى ${(-diff) / 100} ريالاً`);
     else if (outcome === "OVERPAYMENT") evidence.push(`يزيد ${diff / 100} ريالاً عن المتبقّي`);
     if (reference === 1) evidence.push("المرجع يطابق رقم الفاتورة");

@@ -4,16 +4,23 @@
  * كان القبول نهائياً: من وافق على مطابقة خاطئة لا يملك ردّها إلّا
  * بتعديل القاعدة يدوياً. والمال يُراجَع ويُصحَّح.
  *
- * والتراجع ليس حذفاً صامتاً: تُفكّ التخصيصات، وتُحذف الدفعة إن لم يبقَ
- * لها تخصيص، وتعود الحركة «تحتاج مراجعة»، ويُكتب ذلك كلّه في سجلّ
- * التدقيق باسم من تراجع.
+ * **ولا يُحذف شيء.** كانت الدفعة تُحذف إن لم تعد تفسّر حركة — فيختفي
+ * أنّ مالاً خرج ونُسب ثمّ رُدّ نسبُه، ولا يبقى إلّا سطرٌ في سجلّ
+ * التدقيق يقول إنّ شيئاً حُذف. ومن راجع بعد شهر يجد فاتورةً عادت
+ * مستحقّةً بلا سببٍ ظاهر، فيدفع ثمنها مرّتين.
+ *
+ * فصارت الدفعة تُردّ لا تُحذف: تُفكّ تخصيصاتها، وتُعلَن `REVERSED`
+ * بسببها ومن ردّها، فتخرج من «ما دُفع» ويبقى أثرها. ويُكتب الحدث في
+ * `decision_history` — وهو يجيب عن سؤالٍ آخر غير «من فعل ماذا»:
+ * **كيف تطوّر هذا القرار؟**
  */
 import { NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bankTransactions, paymentAllocations, payments } from "@/db/schema";
+import { bankTransactions, decisionHistory } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { recordAudit } from "@/lib/audit";
+import { reversePayment } from "@/services/payment.service";
 
 export const runtime = "nodejs";
 
@@ -55,11 +62,12 @@ export async function POST(request: Request) {
   }
 
   const paymentId = tx.matchedPaymentId;
-  let removedAllocations = 0;
-  let removedPayment = false;
+  const reason = body.reason?.trim() || "تراجعٌ يدويّ عن المطابقة";
+  let freedInvoices: string[] = [];
+  let freedMinor = 0;
+  let reversedPayment = false;
 
   await db.transaction(async (t) => {
-    // تُفكّ الحركة عن الدفعة أوّلاً كي لا يمنع المفتاح الأجنبيّ حذفها
     await t
       .update(bankTransactions)
       .set({
@@ -71,14 +79,9 @@ export async function POST(request: Request) {
       })
       .where(eq(bankTransactions.id, tx.id));
 
-    const removed = await t
-      .delete(paymentAllocations)
-      .where(eq(paymentAllocations.paymentId, paymentId));
-    removedAllocations = removed.rowCount ?? 0;
-
     /*
-      الدفعة تُحذف إن لم تعد تفسّر شيئاً. أمّا إن بقيت لها حركة أخرى
-      فتبقى — فحذفها يكسر مطابقةً صحيحة لم يُطلَب التراجع عنها.
+      الدفعة تُردّ إن لم تعد تفسّر حركة. أمّا إن بقيت لها حركة أخرى
+      فتبقى عاملة — فردّها يكسر مطابقةً صحيحة لم يُطلَب التراجع عنها.
     */
     const [{ others }] = (
       await t.execute<{ others: number }>(sql`
@@ -88,9 +91,37 @@ export async function POST(request: Request) {
     ).rows;
 
     if (Number(others) === 0) {
-      await t.delete(payments).where(eq(payments.id, paymentId));
-      removedPayment = true;
+      const outcome = await reversePayment(t, {
+        paymentId,
+        kind: "REVERSED",
+        reason,
+        userId: user.id,
+      });
+      freedInvoices = outcome.freedInvoiceIds;
+      freedMinor = outcome.freedMinor;
+      reversedPayment = true;
     }
+
+    /*
+      الحدث في تاريخ القرار — لا في سجلّ التدقيق وحده.
+
+      سجلّ التدقيق يجيب «من فعل ماذا ومتى»، وهذا يجيب «كيف صار هذا
+      القرار على ما هو عليه»: صُنّفت، ثمّ اقتُرحت، ثمّ أُقرّت، ثمّ رُدّت.
+      وبلا التسلسل لا يُقاس أين يُخطئ النظام.
+    */
+    await t.insert(decisionHistory).values({
+      bankTransactionId: tx.id,
+      event: "MATCH_REVERSED",
+      actor: "HUMAN",
+      actorId: user.id,
+      detail: reason,
+      payload: {
+        الدفعة: paymentId,
+        "فواتير تحرّرت": freedInvoices.length,
+        "مبلغ تحرّر": freedMinor,
+        "رُدّت الدفعة": reversedPayment,
+      },
+    });
   });
 
   await recordAudit({
@@ -107,18 +138,20 @@ export async function POST(request: Request) {
     },
     after: {
       الفعل: "تراجع عن المطابقة",
-      السبب: body.reason?.trim() || "لم يُذكر",
-      "تخصيصات فُكّت": removedAllocations,
-      "حُذفت الدفعة": removedPayment,
+      السبب: reason,
+      "تخصيصات فُكّت": freedInvoices.length,
+      "رُدّت الدفعة": reversedPayment,
+      "مبلغ تحرّر": freedMinor,
     },
   });
 
   return NextResponse.json({
     ok: true,
-    removedAllocations,
-    removedPayment,
-    message: removedPayment
-      ? `فُكّت المطابقة وحُذفت الدفعة و${removedAllocations} تخصيصاً`
-      : `فُكّت المطابقة و${removedAllocations} تخصيصاً، والدفعة باقية لحركة أخرى`,
+    removedAllocations: freedInvoices.length,
+    reversedPayment,
+    freedMinor,
+    message: reversedPayment
+      ? `فُكّت المطابقة ورُدّت الدفعة و${freedInvoices.length} تخصيصاً — والدفعة باقيةٌ في السجلّ مردودةً بسببها`
+      : `فُكّت المطابقة و${freedInvoices.length} تخصيصاً، والدفعة باقية لحركة أخرى`,
   });
 }

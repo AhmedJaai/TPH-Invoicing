@@ -154,12 +154,40 @@ describe("generateCandidates", () => {
   });
 
   it("الزيادة تُسمّى زيادةً لا مطابقة", () => {
+    // خمسون ريالاً على فاتورة بألف: فوق حدّ الرسم (اثنان في المئة) فهي زيادة
     const [c] = generateCandidates(
-      tx({ amountMinor: 1_020_00 }),
+      tx({ amountMinor: 1_050_00 }),
       [inv({ id: "a", outstandingMinor: 1_000_00 })],
     );
     expect(c.outcome).toBe("OVERPAYMENT");
     expect(c.allocatedMinor).toBe(1_000_00);
+  });
+
+  /*
+    والزيادةُ التي في حدّ رسم التحويل ليست زيادة.
+
+    كانت تُسمّى `OVERPAYMENT` فتُرفَع إلى المراجعة عمداً لأنّها «تغيّر
+    الرصيد» — فيُراجَع يدوياً ما يعرفه النظام يقيناً: خمسة آلاف وعشرون
+    على فاتورة بخمسة آلاف هي الفاتورة ورسمُ تحويلها.
+  */
+  it("الزيادة في حدّ رسم التحويل مطابقةٌ تامّة", () => {
+    const [c] = generateCandidates(
+      tx({ amountMinor: 1_020_00 }),
+      [inv({ id: "a", outstandingMinor: 1_000_00 })],
+    );
+    expect(c.outcome).toBe("EXACT_INVOICE");
+    expect(c.parts.amount).toBe(1);
+    expect(c.allocatedMinor).toBe(1_000_00);
+    expect(c.evidence.some((e) => e.includes("رسم تحويل"))).toBe(true);
+  });
+
+  it("وما جاوز الحدّ لا يُفترَض رسماً", () => {
+    // التسامح الذي يبتلع كل فرق يُخفي أخطاءً بدل أن يُصلحها
+    const [c] = generateCandidates(
+      tx({ amountMinor: 1_500_00 }),
+      [inv({ id: "a", outstandingMinor: 1_000_00 })],
+    );
+    expect(c?.outcome ?? "OVERPAYMENT").toBe("OVERPAYMENT");
   });
 
   it("المجموعة تُرشَّح ويُذكر عددها", () => {

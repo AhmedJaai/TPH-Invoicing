@@ -330,6 +330,18 @@ export const paymentMethodEnum = pgEnum("payment_method", [
   "EMPLOYEE_ADVANCE", // تحويل لموظف — يفتح تنبيهاً حتى تصل الإيصالات
 ]);
 
+/**
+ * حال الدفعة.
+ *
+ * كان لها حالٌ واحد ضمنيّ: «موجودة». فلا فرق بين دفعةٍ لم تُخصَّص بعد
+ * ودفعةٍ رُدَّ مالُها — تُحسبان معاً في «المدفوع»، فيظهر المقهى وقد دفع
+ * ما لم يدفع. والتفصيل في `src/lib/payment-state.ts`.
+ */
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "UNAPPLIED", "PARTIALLY_APPLIED", "APPLIED",
+  "OVERPAYMENT", "ADVANCE", "REVERSED", "VOID",
+]);
+
 export const payments = pgTable("payments", {
   id: id(),
   documentId: text("document_id").unique().references(() => documents.id),
@@ -341,10 +353,29 @@ export const payments = pgTable("payments", {
   beneficiaryNameRaw: text("beneficiary_name_raw"),
   /** الشهر الذي تخصّه الدفعة، لا شهر التحويل */
   appliesToMonth: text("applies_to_month"),
+  /** الحال المشتقّ من التخصيصات والردّ — يُحفَظ ليُبحَث ويُجمَع. */
+  status: paymentStatusEnum("status").notNull().default("UNAPPLIED"),
+  /**
+   * رسمُ التحويل داخل مبلغ الدفعة.
+   *
+   * يخرج من القسمة قبلها، وإلّا ظهرت دفعةٌ بخمسة آلاف وعشرين على فاتورة
+   * بخمسة آلاف «فائضةً بعشرين» — ويُفتَح للمورّد رصيدٌ لا وجود له،
+   * والعشرون ذهبت إلى البنك.
+   */
+  feeMinor: integer("fee_minor").notNull().default(0),
+  /** أعلنها صاحبها مقدّمةً — نيّةٌ لا تُشتقّ من رقم. */
+  isAdvance: boolean("is_advance").notNull().default(false),
+  /** رُدَّ مالها: وقعت ثمّ رجعت، ولها أثرٌ في الكشف. */
+  reversedAt: timestamp("reversed_at", { withTimezone: true }),
+  reversedById: text("reversed_by_id").references(() => users.id),
+  reversalReason: text("reversal_reason"),
+  /** سُجّلت خطأً ولم تقع أصلاً — غير المردودة. */
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
   createdAt: now(),
 }, (t) => [
   index("payments_supplier_date_idx").on(t.supplierId, t.paidAt),
   index("payments_applies_month_idx").on(t.appliesToMonth),
+  index("payments_status_idx").on(t.status),
 ]);
 
 export const paymentAllocations = pgTable("payment_allocations", {

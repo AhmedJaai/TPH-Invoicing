@@ -21,6 +21,7 @@ import { decide, type Decision } from "@/lib/bank/decision";
 import { planAdjudication, type AdjudicationCase } from "@/lib/bank/adjudicate";
 import type { CanonicalTransaction } from "@/lib/bank/canonical";
 import { toCategory } from "@/lib/bank/apply";
+import { splitBankFee } from "@/lib/bank/fees";
 import type { TxCategory } from "@/lib/bank/rules";
 import type { Outcome, TxKind } from "@/lib/bank/taxonomy";
 
@@ -84,6 +85,15 @@ export interface PlannedPayment {
    */
   months: string[];
   primaryMonth: string;
+  /**
+   * رسمُ التحويل داخل مبلغ الدفعة.
+   *
+   * كان `splitBankFee` يحسبه ثمّ لا يصل إلى المال: تُقسَّم الدفعة كاملةً
+   * بما فيها الرسم، فيُنسَب إلى المورّد ما ذهب إلى البنك. وحسابٌ صحيح لا
+   * يصل إلى المال أسوأ من عدمه — يوهم أنّ الحالة معالَجة.
+   */
+  feeMinor: number;
+  feeReason: string | null;
 }
 
 export interface ReconcileResult {
@@ -305,14 +315,33 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
 
     const months = [...new Set(chosen.map((i) => i.periodMonth))].sort();
 
+    /*
+      الرسم يُفصَل قبل الكتابة.
+
+      الشرط أن يزيد المدفوع على مجموع الفواتير بقدرٍ في حدّ رسم التحويل.
+      وما جاوز الحدّ ليس رسماً بل فرقاً يُحقَّق فيه — فلا يُفترَض،
+      لأنّ التسامح الذي يبتلع كل فرق يُخفي أخطاءً بدل أن يُصلحها.
+    */
+    const txAmount = prepared.find((p) => p.key === r.key)!.canonical.amountMinor;
+    const invoiceSum = allocations.reduce((sum, a) => sum + a.amountMinor, 0);
+    const fee = splitBankFee(txAmount, invoiceSum);
+
     planned.push({
       transactionKey: r.key,
       supplierId: r.supplierId,
-      amountMinor: r.candidate.allocatedMinor,
+      /*
+        المبلغ المسجَّل هو ما خرج من الحساب فعلاً — بما فيه الرسم.
+        والرسم يُعلَن في حقله، فيخرج من القسمة ولا يُخصَّص على مورّد.
+        وكتابةُ المبلغ ناقصاً الرسم تجعل الدفعة لا تساوي الحركة، فتختلّ
+        معادلة الكشف بمقدار الرسوم كلِّها.
+      */
+      amountMinor: fee ? txAmount : r.candidate.allocatedMinor,
       paidAt: prepared.find((p) => p.key === r.key)!.canonical.valueDate,
       allocations,
       months,
       primaryMonth: months[months.length - 1],
+      feeMinor: fee?.feeMinor ?? 0,
+      feeReason: fee?.reason ?? null,
     });
   }
 
