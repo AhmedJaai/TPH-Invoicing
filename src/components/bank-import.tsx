@@ -291,7 +291,7 @@ export function BankImport({
           <input
             ref={inputRef}
             type="file"
-            accept=".xlsx,.xls,.csv"
+            accept=".xlsx,.xls,.csv,.pdf"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -301,7 +301,7 @@ export function BankImport({
           <p className="text-sm font-bold">
             {busy === "reading" ? "يقرأ الكشف…" : "اختر ملف كشف الحساب"}
           </p>
-          <p className="mt-1 text-xs text-muted">Excel من بنكك — لا يُحفظ شيء قبل مراجعتك</p>
+          <p className="mt-1 text-xs text-muted">Excel أو PDF نصّيّ من بنكك — لا يُحفظ شيء قبل مراجعتك</p>
         </div>
 
         {error && <p className="mt-3 rounded-lg bg-danger-bg px-3 py-2 text-xs text-danger">{error}</p>}

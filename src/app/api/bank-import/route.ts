@@ -7,7 +7,7 @@ import {
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { parseBankStatement } from "@/lib/bank/parse";
+import { readStatementFile } from "@/services/statement-file.service";
 import {
   findDuplicatePayments, suggestAlias,
   type BankTx, type OpenInvoice,
@@ -42,7 +42,15 @@ export async function POST(request: Request) {  let user;
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const fileSha256 = fileFingerprint(buffer);
-  const parsed = parseBankStatement(buffer);
+  const parsed = await readStatementFile(buffer, file.name, file.type);
+
+  /*
+    الملفّ المصوَّر يُعلَن ولا يُخمَّن: إرجاع «صفر حركة» هنا يقول إنّ
+    الكشف فارغ، وهو ليس كذلك.
+  */
+  if (parsed.blocked) {
+    return NextResponse.json({ error: parsed.blocked, source: parsed.source }, { status: 422 });
+  }
 
   if (parsed.rows.length === 0) {
     return NextResponse.json(

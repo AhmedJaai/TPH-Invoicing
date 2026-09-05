@@ -158,45 +158,37 @@ function locateHeader(grid: readonly string[][]): HeaderLocation {
 /** كم صفّاً يُفتَّش عن الرؤوس قبل اليأس — الترويسة قد تطول. */
 const HEADER_SEARCH_ROWS = 60;
 
-export function parseBankStatement(
-  buffer: Buffer,
-  options: { bank?: string } = {},
+/**
+ * يقرأ الكشف من صفوفٍ نصّية — لا من جدول.
+ *
+ * تُشارك `parseBankStatement` منطقَها كلّه: البحث عن الرؤوس، وقراءة
+ * التواريخ والمبالغ، والتقاط المستفيد. فالفرق بين PDF وExcel في
+ * **مصدر الصفوف** لا في فهمها، ولو كُتب لكلٍّ قارئ لاختلفا يوماً.
+ */
+
+/**
+ * يبني الصفوف من شبكةٍ وموضعِ رؤوسها.
+ *
+ * مشتركةٌ بين Excel وPDF عمداً: الفرق بينهما في مصدر الشبكة لا في
+ * فهمها، ولو كُتب لكلٍّ منطقٌ لاختلفا يوماً في قراءة تاريخٍ أو مبلغ.
+ */
+function buildRows(
+  grid: readonly (readonly string[])[],
+  headerRow: number,
+  map: Record<string, number>,
+  ctx: { bank?: string; accountNumber?: string; warnings?: ParseWarning[] },
 ): BankStatementParse {
-  const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
-
-  /*
-    تُجرَّب الأوراق كلّها لا الأولى وحدها: بعض صيغ التصدير تضع ورقة
-    غلافٍ أو ملخّصاً قبل ورقة الحركات، فقراءة الأولى تُرجع لا شيء.
-    وتُختار أوّل ورقة يُعثَر فيها على صفّ رؤوس صالح.
-  */
-  let grid: string[][] = [];
-  const warnings: ParseWarning[] = [];
-  let accountNumber: string | undefined;
-  let headerRow = -1;
-  let map: Record<string, number> = {};
-
-  for (const name of wb.SheetNames) {
-    const candidate = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[name], {
-      header: 1, raw: false, defval: "",
-    });
-    const found = locateHeader(candidate);
-    if (found.headerRow !== -1) {
-      grid = candidate;
-      headerRow = found.headerRow;
-      map = found.map;
-      accountNumber = found.accountNumber;
-      break;
-    }
-    if (grid.length === 0) grid = candidate;
-    accountNumber ??= found.accountNumber;
-  }
+  const warnings = ctx.warnings ?? [];
 
   if (headerRow === -1) {
     return {
-      bank: options.bank ?? "غير محدَّد",
-      accountNumber,
+      bank: ctx.bank ?? "غير محدَّد",
+      accountNumber: ctx.accountNumber,
       rows: [],
-      warnings: [{ rowNumber: 0, reason: "لم يُعثر على صفّ الرؤوس — تأكّد أنّ الملف كشف حساب", raw: "" }],
+      warnings: [
+        ...warnings,
+        { rowNumber: 0, reason: "لم يُعثر على صفّ الرؤوس — تأكّد أنّ الملف كشف حساب", raw: "" },
+      ],
     };
   }
 
@@ -248,7 +240,8 @@ export function parseBankStatement(
     const postingDate = map.postingDate !== undefined
       ? parseBankDate(cells[map.postingDate] ?? "")
       : null;
-    const balanceRaw = map.balance !== undefined ? (cells[map.balance] ?? "").replace(/[٬,\s]/g, "") : "";
+    const balanceRaw = map.balance !== undefined
+      ? (cells[map.balance] ?? "").replace(/[٬,\s]/g, "") : "";
     const balanceMinor = balanceRaw ? (parseRiyals(balanceRaw) ?? undefined) : undefined;
 
     rows.push({
@@ -272,11 +265,64 @@ export function parseBankStatement(
   const dates = rows.map((r) => r.valueDate.getTime());
 
   return {
-    bank: options.bank ?? "الأهلي (SNB)",
-    accountNumber,
+    bank: ctx.bank ?? "الأهلي (SNB)",
+    accountNumber: ctx.accountNumber,
     rows,
     warnings,
     periodStart: dates.length ? new Date(Math.min(...dates)) : undefined,
     periodEnd: dates.length ? new Date(Math.max(...dates)) : undefined,
   };
 }
+
+export function parseRowGrid(
+  grid: readonly (readonly string[])[],
+  options: { bank?: string; accountNumber?: string } = {},
+): BankStatementParse {
+  const cells = grid.map((r) => [...r]);
+  const found = locateHeader(cells);
+  return buildRows(cells, found.headerRow, found.map, {
+    bank: options.bank,
+    accountNumber: options.accountNumber ?? found.accountNumber,
+  });
+}
+
+export function parseBankStatement(
+  buffer: Buffer,
+  options: { bank?: string } = {},
+): BankStatementParse {
+  const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
+
+  /*
+    تُجرَّب الأوراق كلّها لا الأولى وحدها: بعض صيغ التصدير تضع ورقة
+    غلافٍ أو ملخّصاً قبل ورقة الحركات، فقراءة الأولى تُرجع لا شيء.
+    وتُختار أوّل ورقة يُعثَر فيها على صفّ رؤوس صالح.
+  */
+  let grid: string[][] = [];
+  const warnings: ParseWarning[] = [];
+  let accountNumber: string | undefined;
+  let headerRow = -1;
+  let map: Record<string, number> = {};
+
+  for (const name of wb.SheetNames) {
+    const candidate = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[name], {
+      header: 1, raw: false, defval: "",
+    });
+    const found = locateHeader(candidate);
+    if (found.headerRow !== -1) {
+      grid = candidate;
+      headerRow = found.headerRow;
+      map = found.map;
+      accountNumber = found.accountNumber;
+      break;
+    }
+    if (grid.length === 0) grid = candidate;
+    accountNumber ??= found.accountNumber;
+  }
+
+  return buildRows(grid, headerRow, map, {
+    bank: options.bank,
+    accountNumber,
+    warnings,
+  });
+}
+
