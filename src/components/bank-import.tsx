@@ -17,6 +17,8 @@ interface Coverage {
 
 interface Summary {
   coverage?: Coverage;
+  /** هل بلغ المحسِّن الحلّ الأمثل يقيناً، أم رجع إلى الجشع؟ */
+  exact?: boolean;
   bank: string; accountNumber?: string;
   periodStart?: string; periodEnd?: string;
   totalRows: number; operational: number; payments: number;
@@ -342,6 +344,29 @@ export function BankImport({
                 <p className="mt-1.5 text-[10px] leading-relaxed text-ink-soft">
                   حركات هذه الأيام غائبة عن النظام، ولن تظهر ناقصةً في أي تقرير — لأنّ
                   الغائب لا يُرى. ارفع كشفها لتكتمل.
+                </p>
+              </div>
+            )}
+
+            {/*
+              الحلّ التقريبيّ يُعلَن.
+
+              حين تنفد ميزانيّة العقد يرجع المحسِّن إلى الجشع، فيُنتج
+              توزيعاً جيّداً لا أفضل. وكان هذا يُحسَب ولا يُعرَض — فتقول
+              الشاشة عن حلٍّ تقريبيّ ما تقوله عن حلٍّ مثبت. والقرار نفسه
+              يحتاط فيصير التلقائيّ اقتراحاً، لكنّ من يرى الاقتراحات
+              كثُرت فجأةً يستحقّ أن يعرف لماذا.
+            */}
+            {data.summary.exact === false && (
+              <div className="mt-3 rounded-xl border border-warn/40 bg-warn-bg px-3 py-2.5">
+                <p className="text-xs font-bold text-warn">
+                  التوزيع تقريبيّ — لا مثبت
+                </p>
+                <p className="mt-1.5 text-[10px] leading-relaxed text-ink-soft">
+                  الاحتمالات في هذا الكشف أكثر من أن تُستقصى كلّها، فتوقّف البحث عند
+                  أفضل ما بلغه. والتوزيع المعروض صحيحٌ ومتّسق، لكن قد يوجد توزيعٌ أنسب
+                  لم يُبلَغ — ولذلك لم تُطابَق حركةٌ تلقائياً هنا: صارت كلّها اقتراحاً
+                  ينتظر إقرارك. راجعها بعينك.
                 </p>
               </div>
             )}

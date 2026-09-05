@@ -29,6 +29,7 @@ import { allocate, createPayment } from "@/services/payment.service";
 import { recordAudit } from "@/lib/audit";
 import { runReconciliation } from "@/services/reconcile.service";
 import { loadMerchantMemory } from "@/services/counterparty.service";
+import { loadSupplierProfiles } from "@/services/supplier-profile.service";
 import type { SupplierIdentity } from "@/lib/bank/entities";
 import type { OpenInvoice } from "@/lib/bank/candidates";
 
@@ -155,6 +156,11 @@ export async function POST(request: Request) {
     .filter((i) => i.outstandingMinor > 0);
 
   const memory = await loadMerchantMemory();
+  /*
+    ملامح السداد: كيف يُسدَّد كل مورّد عادةً. ترجّح بين متقاربَين ولا
+    تُنشئ مطابقةً بلا دليل.
+  */
+  const profiles = await loadSupplierProfiles();
 
   /*
     يُعاد الحساب على الحركات المختارة **مجتمعةً**.
@@ -176,6 +182,7 @@ export async function POST(request: Request) {
     invoices: open,
     suppliers: supplierIdentities,
     memory,
+    profiles,
   });
 
   const plannedByKey = new Map(engine.planned.map((p) => [p.transactionKey, p]));

@@ -14,6 +14,7 @@
  */
 import type { Outcome } from "./taxonomy";
 import { splitBankFee } from "./fees";
+import { fitToProfile, type SupplierProfile } from "./supplier-profile";
 
 export interface OpenInvoice {
   id: string;
@@ -35,6 +36,14 @@ export interface MatchInput {
   supplierScore: number;
   /** المراجع الصالحة للمطابقة، بنصّها. */
   references: readonly string[];
+  /**
+   * كيف يُسدَّد هذا المورّد عادةً — إن عُرف.
+   *
+   * ترجّح ولا تحسم: تحرّك درجةً حُسبت من أدلّة، ولا تُنشئ مطابقةً بلا
+   * دليل. فمن سُدّد مئةَ مرّةٍ في يومين قد يُسدَّد اليوم بعد شهر، وذلك
+   * لا يجعل السداد غيرَ سداد.
+   */
+  profile?: SupplierProfile;
 }
 
 /** أبعاد التسجيل، كلٌّ من صفر إلى واحد. */
@@ -74,6 +83,44 @@ export const MAX_GROUP_SIZE = 8;
 /** أقصى عدد فواتير تدخل البحث عن مجموعة. */
 export const MAX_POOL = 40;
 
+/**
+ * ترتيب بركة البحث: بصلتها بهذه الدفعة، لا بحجمها.
+ *
+ * كانت تُرتَّب تنازلياً بالمتبقّي وتُقصّ عند أربعين. فمورّدٌ له ستّون
+ * فاتورة مفتوحة ودفعةٌ تسدّد ثلاثاً صغيرةً قريبةَ التاريخ: تزاحمها
+ * الأربعون الكبرى فلا تدخل البحث أصلاً — ولا تُوجَد المجموعة أبداً.
+ * والقصّ ليس خطأً؛ الخطأ أن يقصّ بمعيارٍ لا صلة له بالسؤال.
+ *
+ * والفاتورة التي تجاوز متبقّيها الدفعةَ لا تدخل مجموعةً مجموعُها
+ * الدفعة — رياضةً لا ترجيحاً. فإسقاطها ليس تقريباً بل حذفُ المستحيل،
+ * وهو وحده يوسّع البحث النافع دون أن يوسّع تكلفته.
+ */
+export function rankPool(
+  invoices: readonly OpenInvoice[],
+  targetMinor: number,
+  txDate: Date | null,
+  toleranceMinor: number = GROUP_TOLERANCE_MINOR,
+): OpenInvoice[] {
+  const feasible = invoices.filter(
+    (i) => i.outstandingMinor > 0 && i.outstandingMinor <= targetMinor + toleranceMinor,
+  );
+
+  if (txDate === null) {
+    return [...feasible].sort((a, b) => b.outstandingMinor - a.outstandingMinor);
+  }
+
+  /*
+    قربُ التاريخ أوّلاً — فالدفعة تسدّد ما قرُب لا ما كبُر — ثمّ الحجم
+    عند التساوي، لأنّ الكبير يقطع فرع البحث مبكراً فيُسرّعه.
+  */
+  return [...feasible].sort((a, b) => {
+    const da = dateScore(txDate, a.invoiceDate);
+    const db = dateScore(txDate, b.invoiceDate);
+    if (da !== db) return db - da;
+    return b.outstandingMinor - a.outstandingMinor;
+  });
+}
+
 const WEIGHTS: ScoreParts = { supplier: 0.35, amount: 0.4, date: 0.1, reference: 0.15 };
 
 /**
@@ -108,9 +155,38 @@ function daysBetween(a: Date, b: Date): number {
   return Math.abs(a.getTime() - b.getTime()) / 86_400_000;
 }
 
-/** درجة قرب التاريخ: تامّة في اليوم نفسه، وتتناقص حتى حدّ النافذة. */
+/**
+ * نافذة الفاتورة **بعد** الدفعة.
+ *
+ * أضيق من نافذة ما قبلها بكثير، وليس صفراً: قد يُدفَع اليومَ ويُصدِر
+ * المورّد فاتورته غداً أو بعد أيام. أمّا فاتورةٌ بعد الدفعة بشهر فليست
+ * التي سُدّدت بها.
+ */
+export const FUTURE_WINDOW_DAYS = 7;
+
+/**
+ * درجة قرب التاريخ — **باتّجاهها**.
+ *
+ * لأنّ الزمن في التجارة ذو اتّجاه: تصل الفاتورة ثمّ تُدفَع. فاتورةٌ قبل
+ * الدفعة بعشرين يوماً أمرٌ عاديّ، وفاتورةٌ **بعدها** بعشرين يوماً ليست
+ * التي سُدّدت بها — ولا يمكن أن تكون.
+ *
+ * وكان القياس بالقيمة المطلقة فيستويان. فتُرجَّح فاتورةٌ لم تكن قد
+ * صدرت يوم الدفع على فاتورةٍ صدرت قبله بشهر، ويُنسَب سدادٌ إلى ما لم
+ * يكن موجوداً حين وقع.
+ *
+ * والنافذة الأمامية ليست صفراً: قد يُدفَع اليومَ وتصدر الفاتورة غداً.
+ */
 export function dateScore(txDate: Date, invoiceDate: Date): number {
   const d = daysBetween(txDate, invoiceDate);
+  const invoiceAfterPayment = invoiceDate.getTime() > txDate.getTime();
+
+  if (invoiceAfterPayment) {
+    if (d > FUTURE_WINDOW_DAYS) return 0;
+    /* ونصفُ الدرجة سقفاً: ممكنٌ لا مرجَّح */
+    return 0.5 * (1 - d / FUTURE_WINDOW_DAYS);
+  }
+
   if (d > DATE_WINDOW_DAYS) return 0;
   return 1 - d / DATE_WINDOW_DAYS;
 }
@@ -175,11 +251,15 @@ export function findSubsets(
   targetMinor: number,
   toleranceMinor: number = GROUP_TOLERANCE_MINOR,
   maxSize: number = MAX_GROUP_SIZE,
+  /** تاريخ الدفعة — به تُرتَّب البركة بصلتها لا بحجمها. */
+  txDate: Date | null = null,
 ): OpenInvoice[][] {
-  const pool = [...invoices]
-    .filter((i) => i.outstandingMinor > 0)
-    .sort((a, b) => b.outstandingMinor - a.outstandingMinor)
-    .slice(0, MAX_POOL);
+  const ranked = rankPool(invoices, targetMinor, txDate, toleranceMinor).slice(0, MAX_POOL);
+  /*
+    ويُعاد ترتيبها تنازلياً بعد الانتقاء: الانتقاء بالصلة، والترتيب
+    داخل البحث بالحجم كي يُقطَع الفرع مبكراً. وهما سؤالان مختلفان.
+  */
+  const pool = [...ranked].sort((a, b) => b.outstandingMinor - a.outstandingMinor);
 
   const found: OpenInvoice[][] = [];
   const current: OpenInvoice[] = [];
@@ -214,6 +294,30 @@ export function findSubsets(
  * لا يُختار هنا شيء ولا يُستبعَد الضعيف — الاختيار لاحق، وإخفاءُ
  * المرشّح الثاني هو ما يجعل المطابقة تبدو أكيدة وهي ليست كذلك.
  */
+/**
+ * يطبّق ملامح المورّد على درجةٍ حُسبت من أدلّة.
+ *
+ * ولا يُستدعى إلّا بعد أن تُحسب الدرجة كاملةً: الملامح تُرجّح بين
+ * متقاربَين، ولا تُنشئ مرشّحاً ولا تلغيه. والدرجة تبقى في [٠،١] كي لا
+ * تختلّ حدود القرار التي عُوير عليها.
+ */
+function applyProfile(
+  score: number,
+  tx: MatchInput,
+  subset: readonly OpenInvoice[],
+  evidence: string[],
+): number {
+  if (!tx.profile?.known) return score;
+
+  const earliest = Math.min(...subset.map((i) => i.invoiceDate.getTime()));
+  const lagDays = Math.round((tx.valueDate.getTime() - earliest) / 86_400_000);
+
+  const fit = fitToProfile(tx.profile, { lagDays, invoiceCount: subset.length });
+  if (fit.reason) evidence.push(`عادةُ المورّد: ${fit.reason}`);
+
+  return Math.max(0, Math.min(1, score + fit.adjustment));
+}
+
 export function generateCandidates(
   tx: MatchInput,
   invoices: readonly OpenInvoice[],
@@ -266,13 +370,16 @@ export function generateCandidates(
       outcome,
       allocatedMinor: Math.min(tx.amountMinor, inv.outstandingMinor),
       parts,
-      score: combine(parts, { reference: reference > 0 }),
+      score: applyProfile(
+        combine(parts, { reference: reference > 0 }),
+        tx, [inv], evidence,
+      ),
       evidence,
     });
   }
 
   /* ── مجموعة فواتير ── */
-  for (const subset of findSubsets(mine, tx.amountMinor)) {
+  for (const subset of findSubsets(mine, tx.amountMinor, GROUP_TOLERANCE_MINOR, MAX_GROUP_SIZE, tx.valueDate)) {
     if (subset.length < 2) continue;
 
     const sum = subset.reduce((s, i) => s + i.outstandingMinor, 0);
@@ -281,6 +388,13 @@ export function generateCandidates(
     const reference = Math.max(...subset.map((i) => referenceScore(tx.references, i.invoiceNumber)));
 
     const parts = { supplier: tx.supplierScore, amount, date, reference };
+    const evidence = [
+      `${subset.length} فواتير مجموعها ${sum / 100} ريالاً`,
+      ...(amount === 1
+        ? ["المجموع يطابق الدفعة تماماً"]
+        : [`فرق المجموع ${Math.abs(tx.amountMinor - sum) / 100} ريالاً`]),
+    ];
+
     out.push({
       invoiceIds: subset.map((i) => i.id),
       outcome: "MULTI_INVOICE",
@@ -291,11 +405,11 @@ export function generateCandidates(
         أن تجتمع عدّة فواتير على مبلغٍ بالمصادفة أكبر من احتمال أن
         تطابقه واحدة.
       */
-      score: combine(parts, { reference: reference > 0 }) * (1 - 0.02 * subset.length),
-      evidence: [
-        `${subset.length} فواتير مجموعها ${sum / 100} ريالاً`,
-        ...(amount === 1 ? ["المجموع يطابق الدفعة تماماً"] : [`فرق المجموع ${Math.abs(tx.amountMinor - sum) / 100} ريالاً`]),
-      ],
+      score: applyProfile(
+        combine(parts, { reference: reference > 0 }) * (1 - 0.02 * subset.length),
+        tx, subset, evidence,
+      ),
+      evidence,
     });
   }
 

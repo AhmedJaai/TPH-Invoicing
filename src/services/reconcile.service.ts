@@ -22,6 +22,7 @@ import { planAdjudication, type AdjudicationCase } from "@/lib/bank/adjudicate";
 import type { CanonicalTransaction } from "@/lib/bank/canonical";
 import { toCategory } from "@/lib/bank/apply";
 import { splitBankFee } from "@/lib/bank/fees";
+import type { SupplierProfile } from "@/lib/bank/supplier-profile";
 import type { TxCategory } from "@/lib/bank/rules";
 import type { Outcome, TxKind } from "@/lib/bank/taxonomy";
 
@@ -30,6 +31,13 @@ export interface ReconcileInput {
   invoices: readonly OpenInvoice[];
   suppliers: readonly SupplierIdentity[];
   memory?: ReadonlyMap<string, MerchantMemory>;
+  /**
+   * كيف يُسدَّد كل مورّد عادةً — بمفتاح `supplierId`.
+   *
+   * ترجّح ولا تحسم، ولا تُبنى على سابقةٍ أو سابقتين. وغيابها يُعيد
+   * الحساب إلى الأدلّة وحدها، وهو الأصل لا حالةُ عطل.
+   */
+  profiles?: ReadonlyMap<string, SupplierProfile>;
   /**
    * الحَكَم — اختياريّ.
    *
@@ -168,7 +176,7 @@ export function applyAdjudication(
 }
 
 export function runReconciliation(input: ReconcileInput): ReconcileResult {
-  const { rows, invoices, suppliers, memory = new Map() } = input;
+  const { rows, invoices, suppliers, memory = new Map(), profiles = new Map() } = input;
 
   const prepared = rows.map((row) => {
     const canonical = toCanonical(row);
@@ -202,6 +210,7 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
         supplierId: resolution.supplierId,
         supplierScore: resolution.score,
         references: matchableReferences(p.canonical.references).map((r) => r.value),
+        profile: profiles.get(resolution.supplierId),
       },
       invoices,
     )) {

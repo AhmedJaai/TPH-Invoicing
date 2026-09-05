@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DATE_WINDOW_DAYS, MAX_GROUP_SIZE,
-  amountScore, dateScore, findSubsets, generateCandidates, referenceScore,
+  amountScore, dateScore, findSubsets, generateCandidates, rankPool, referenceScore,
   type MatchInput, type OpenInvoice,
 } from "./candidates";
 
@@ -58,9 +58,26 @@ describe("dateScore", () => {
     expect(dateScore(far, day("2026-08-10"))).toBe(0);
   });
 
-  it("قبل الفاتورة كبعدها", () => {
-    expect(dateScore(day("2026-08-05"), day("2026-08-10")))
-      .toBe(dateScore(day("2026-08-15"), day("2026-08-10")));
+  /*
+    كان القياس بالقيمة المطلقة فيستوي ما قبل الفاتورة وما بعدها. وهذا
+    خطأ في الواقع لا في الحساب: تصل الفاتورة ثمّ تُدفَع. فكانت تُرجَّح
+    فاتورةٌ لم تكن قد صدرت يوم الدفع على فاتورةٍ صدرت قبله بشهر —
+    ويُنسَب سدادٌ إلى ما لم يكن موجوداً حين وقع.
+  */
+  it("الفاتورة قبل الدفعة أرجح منها بعدها", () => {
+    const before = dateScore(day("2026-08-15"), day("2026-08-10"));
+    const after = dateScore(day("2026-08-05"), day("2026-08-10"));
+    expect(before).toBeGreaterThan(after);
+  });
+
+  it("الفاتورة بعد الدفعة بأسبوعين مستحيلة", () => {
+    expect(dateScore(day("2026-08-01"), day("2026-08-15"))).toBe(0);
+  });
+
+  it("وبعدها بيومٍ ممكنةٌ لا مرجَّحة — قد يُدفَع اليوم وتصدر غداً", () => {
+    const d = dateScore(day("2026-08-10"), day("2026-08-11"));
+    expect(d).toBeGreaterThan(0);
+    expect(d).toBeLessThanOrEqual(0.5);
   });
 });
 
@@ -253,5 +270,51 @@ describe("المعايرة — المرجع مؤيِّد لا نافٍ", () => {
     const rows = [inv({ id: "a", outstandingMinor: 1_000_00, invoiceDate: day("2026-08-11") })];
     const [c] = generateCandidates(tx({ supplierScore: 0.95 }), rows);
     expect(c.score).toBeGreaterThanOrEqual(0.85);
+  });
+});
+
+describe("ترتيب بركة البحث بالصلة", () => {
+  const oi = (id: string, amount: number, date: string): OpenInvoice => ({
+    id, supplierId: "S1", invoiceNumber: null,
+    invoiceDate: day(date), periodMonth: date.slice(0, 7),
+    totalMinor: amount, outstandingMinor: amount,
+  });
+
+  /*
+    الفاتورة التي تجاوز متبقّيها الدفعةَ لا تدخل مجموعةً مجموعُها
+    الدفعة — رياضةً لا ترجيحاً. وكانت تُرتَّب أوّلاً لأنّها الأكبر،
+    فتزاحم الصغار على المواضع الأربعين.
+  */
+  it("ما جاوز الدفعة يخرج — حذفُ المستحيل لا تقريب", () => {
+    const pool = rankPool(
+      [oi("big", 50_000_00, "2026-08-01"), oi("fit", 500_00, "2026-08-01")],
+      1_000_00, day("2026-08-05"),
+    );
+    expect(pool.map((i) => i.id)).toEqual(["fit"]);
+  });
+
+  it("الأقرب تاريخاً يسبق الأكبر مبلغاً", () => {
+    const pool = rankPool(
+      [oi("far", 900_00, "2026-06-01"), oi("near", 100_00, "2026-08-04")],
+      1_000_00, day("2026-08-05"),
+    );
+    expect(pool[0].id).toBe("near");
+  });
+
+  it("بلا تاريخٍ للدفعة يُرتَّب بالحجم — كما كان", () => {
+    const pool = rankPool(
+      [oi("small", 100_00, "2026-08-04"), oi("large", 900_00, "2026-06-01")],
+      1_000_00, null,
+    );
+    expect(pool[0].id).toBe("large");
+  });
+
+  it("مجموعةٌ صغيرة قريبة تُوجَد ولو زاحمها ستّون كبيرة", () => {
+    const noise = Array.from({ length: 60 }, (_, i) =>
+      oi(`n${i}`, 30_000_00 + i, "2026-05-01"));
+    const wanted = [oi("a", 300_00, "2026-08-04"), oi("b", 700_00, "2026-08-03")];
+    const subsets = findSubsets([...noise, ...wanted], 1_000_00, 100, 8, day("2026-08-05"));
+    expect(subsets.some((s) => s.length === 2 && s.every((i) => ["a", "b"].includes(i.id))))
+      .toBe(true);
   });
 });

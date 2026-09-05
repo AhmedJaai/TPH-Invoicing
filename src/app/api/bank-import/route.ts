@@ -22,6 +22,7 @@ import { adjudicate } from "@/services/adjudicator.service";
 import { selectedAdjudicator } from "@/lib/bank/adjudicator-provider";
 import { toCanonical } from "@/lib/bank/canonical";
 import { loadMerchantMemory } from "@/services/counterparty.service";
+import { loadSupplierProfiles } from "@/services/supplier-profile.service";
 import { analyzeCoverage, describeCoverage } from "@/lib/bank/coverage";
 import type { SupplierIdentity } from "@/lib/bank/entities";
 
@@ -135,6 +136,11 @@ export async function POST(request: Request) {  let user;
     كلّها بعدها بلا سؤال — وهي في كشفه أكثر من ثلاثين حركة.
   */
   const memory = await loadMerchantMemory();
+  /*
+    ملامح السداد: كيف يُسدَّد كل مورّد عادةً. ترجّح بين متقاربَين ولا
+    تُنشئ مطابقةً بلا دليل.
+  */
+  const profiles = await loadSupplierProfiles();
 
   /*
     تغطية الفترات.
@@ -186,6 +192,7 @@ export async function POST(request: Request) {  let user;
     })),
     suppliers: supplierIdentities,
     memory,
+    profiles,
   });
   /*
     الحَكَم — إن كان مهيَّأً.
@@ -280,6 +287,18 @@ export async function POST(request: Request) {  let user;
   }
 
   const summary = {
+    /*
+      هل بلغ المحسِّن الحلّ الأمثل يقيناً؟
+
+      كان يُحسَب ولا يُعرَض. وحين تنفد ميزانيّة العقد يرجع المحسِّن إلى
+      الجشع فيُنتج توزيعاً **جيّداً لا أفضل**، وقد يكون فيه توزيعٌ أنسب
+      لم يُبلَغ. وإخفاء ذلك يجعل الشاشة تقول عن حلٍّ تقريبيّ ما تقوله عن
+      حلٍّ مثبت — وهو ادّعاء.
+
+      والقرار نفسه يحتاط: التلقائيّ يصير اقتراحاً عند التقريب. لكنّ
+      المستخدم يستحقّ أن يعرف **لماذا** كثُرت الاقتراحات فجأةً.
+    */
+    exact: engine.summary.exact,
     bank: parsed.bank,
     accountNumber: parsed.accountNumber,
     periodStart: parsed.periodStart?.toISOString().slice(0, 10),
