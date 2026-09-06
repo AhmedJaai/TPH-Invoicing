@@ -19,6 +19,24 @@ async function mustFail(label: string, statement: string): Promise<boolean> {
   }
 }
 
+/**
+ * وبعضُ القيود يُثبَت بالقبول لا بالرفض.
+ *
+ * فالقيد الذي يرفض كلّ شيء «يعمل» بالمعنى الساذج ويمنع الواقع. ومرجعُ
+ * عمليّةٍ واحد في حسابين بنكيّين حركتان حقيقيّتان — فيجب أن يُقبَل.
+ */
+async function mustPass(label: string, statement: string): Promise<boolean> {
+  try {
+    await db.execute(sql.raw(`begin; ${statement}; rollback;`));
+    console.log("  ✓", label, "— قُبل");
+    return true;
+  } catch (e) {
+    try { await db.execute(sql.raw("rollback")); } catch { /* لا معاملة مفتوحة */ }
+    console.log("  ✕", label, "— رفضته القاعدة!", (e as Error).message.slice(0, 90));
+    return false;
+  }
+}
+
 async function main() {
   const [inv] = (await db.execute<{ id: string; total: number }>(sql`
     select i.id, i.total_minor as total from invoices i order by i.total_minor desc limit 1
@@ -72,6 +90,32 @@ async function main() {
       القاعدة كان المنع في الشيفرة وحدها — والشيفرة تفلت من طلبين
       متزامنين، ومن نصٍّ يُشغَّل بيد.
     */
+    /*
+      مرجعُ العمليّة: فريدٌ **داخل الحساب** لا في النظام كلّه.
+
+      فحوالتان بمرجعٍ واحد في الحساب نفسه حوالةٌ واحدة قُيّدت مرّتين؛
+      وفي حسابين مختلفين حوالتان حقيقيّتان. والقيد يجب أن يفرّق —
+      وإلّا منع الواقع بحجّة منع الخطأ.
+    */
+    ...(tx ? [await mustFail("مرجعُ عمليّةٍ مكرَّر في الحساب نفسه",
+      `insert into bank_transactions
+         (id, bank_import_id, value_date, description, amount_minor, direction,
+          occurrence, bank_account_id, operation_ref, identity_key)
+       select 't-ref-same', bank_import_id, value_date, description, amount_minor,
+              direction, occurrence + 77, bank_account_id, operation_ref,
+              't-ref-same-identity'
+       from bank_transactions where operation_ref is not null limit 1`)] : []),
+
+    ...(tx ? [await mustPass("المرجعُ نفسه في حسابٍ آخر — حركتان",
+      `insert into bank_accounts (id, bank_name, label, account_number)
+         values ('t-acct', 'بنك اختبار', 'اختبار', 't-acct-number');
+       insert into bank_transactions
+         (id, bank_import_id, value_date, description, amount_minor, direction,
+          occurrence, bank_account_id, operation_ref, identity_key)
+       select 't-ref-other', bank_import_id, value_date, description, amount_minor,
+              direction, occurrence, 't-acct', operation_ref, 't-ref-other-identity'
+       from bank_transactions where operation_ref is not null limit 1`)] : []),
+
     ...(tx ? [await mustFail("حركتان بهويّةٍ مخزَّنة واحدة",
       `insert into bank_transactions
          (id, bank_import_id, value_date, description, transaction_type, beneficiary_raw,

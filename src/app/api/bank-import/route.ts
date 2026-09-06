@@ -613,8 +613,16 @@ export async function POST(request: Request) {  let user;
         .values({
           bankImportId: importId,
           bankAccountId,
-          externalId: row.row.key,
-          /* الهويّة المخزَّنة — وبها يُعرَف أنّها عندنا في المرّة القادمة */
+          /*
+            العمودان يحملان الهويّة نفسها — لا خوارزميّتين.
+
+            وكان `external_id` يحمل مفتاح الصفّ داخل الملفّ («row-5-4»)،
+            وعليه فهرسٌ فريد مقيَّد بالحساب. فاستيرادُ ملفٍّ ثانٍ تتكرّر
+            فيه أرقامُ الصفوف تُرَدّ صفوفُه الجديدة صامتةً — حركاتٌ
+            حقيقيّة تختفي بلا شكوى. والفهرس القديم يحرس الآن ما يحرسه
+            `bank_tx_identity_uniq` نفسه.
+          */
+          externalId: row.verdict.identityKey,
           identityKey: row.verdict.identityKey,
           operationRef: row.verdict.operationRef,
           occurrence: row.verdict.occurrence,

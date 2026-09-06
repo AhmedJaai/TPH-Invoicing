@@ -204,3 +204,48 @@ describe("ي · مرجعان مختلفان عمليّتان — والالتب�
     expect(r.known).toHaveLength(0);
   });
 });
+
+describe("ك · المتساهل لا يبتلع حركةً حقيقيّة", () => {
+  it("حوالتان لا يفرّقهما إلّا رقمٌ في النصّ — الثانية جديدة", () => {
+    /*
+      وهذا أخطر من التكرار: التكرار يُرى في الرصيد، والنقص لا يُرى.
+    */
+    const stored = store([row("a", { description: "TRF ABC 123456" })]);
+    const incoming2 = incoming([row("b", { description: "TRF ABC 654321" })]);
+    const r = syncRows(incoming2, stored, ACC);
+    expect(r.fresh).toHaveLength(1);
+    expect(r.known).toHaveLength(0);
+  });
+
+  it("ولا رقمُ دفعةٍ ولا رقمُ تاجرٍ يُبتلَعان", () => {
+    const stored = store([row("a", { description: "POS BATCH 998877 FEE" })]);
+    const r = syncRows(incoming([row("b", { description: "POS BATCH 112233 FEE" })]), stored, ACC);
+    expect(r.fresh).toHaveLength(1);
+  });
+});
+
+describe("ل · الحساب: نطاقٌ لا هويّة", () => {
+  it("المرجع نفسه في حسابين حركتان", () => {
+    const one = [row("a", { description: "حوالة مرجع555444" })];
+    const r = syncRows(incoming(one), store(one, "acct-2"), ACC);
+    expect(r.fresh).toHaveLength(1);
+  });
+
+  it("مقيَّدةٌ بحسابٍ مجهول ثمّ عُرف الحساب ← تُعرَف ولا تُكرَّر", () => {
+    /*
+      وهذا هو العطب الذي أدخل الكشف كلّه مرّةً ثانية: القديم في نطاق
+      «المجهول» والوارد بحسابٍ عُرف الآن.
+    */
+    const one = [row("a", { description: "حوالة مرجع777111" })];
+    const storedUnknown = store(one, null);
+    const r = syncRows(incoming(one), storedUnknown, ACC);
+    expect(r.fresh).toHaveLength(0);
+    expect(r.known).toHaveLength(1);
+  });
+
+  it("والوارد المجهولُ حسابُه يُقابَل بما هو مقيَّد بحساب", () => {
+    const one = [row("a", { description: "حوالة مرجع777222" })];
+    const r = syncRows(incoming(one), store(one, ACC), null);
+    expect(r.fresh).toHaveLength(0);
+  });
+});
