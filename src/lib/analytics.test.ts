@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ageBucket, buildAging, findSameNameCandidates, paymentStatus,
-  spendByMonth, summarizeItems, vatAtRisk, type LineRow,
+  spendByMonth, spendTrend, summarizeItems, vatAtRisk, type LineRow,
 } from "./analytics";
 import { normalizeItem } from "./items";
 
@@ -305,5 +305,43 @@ describe("ضريبة معرّضة: المجهول لا يُحسب صفراً", (
   it("يرتّب المعرّض بالأكبر ليُعالَج أوّلاً", () => {
     const v = vatAtRisk([row("a", 500, "NOT_ELIGIBLE"), row("b", 9_000, "NOT_ELIGIBLE")]);
     expect(v.rows[0].invoiceNumber).toBe("b");
+  });
+});
+
+describe("spendTrend — الشهر الجاري يُقارَن بمثله", () => {
+  const row = (periodMonth: string, day: number, totalMinor: number) => ({
+    periodMonth,
+    invoiceDate: new Date(Date.UTC(+periodMonth.slice(0, 4), +periodMonth.slice(5, 7) - 1, day)),
+    totalMinor,
+  });
+
+  /*
+    ستّة أيّامٍ من سبتمبر مقابل أغسطس كاملاً كانت تعطي «▼ ٩٨٪».
+    والمقارنة الصادقة: أوّل ستّة أيّامٍ بأوّل ستّة.
+  */
+  it("يقصّ الشهر السابق عند يوم اليوم حين يكون الجاري ناقصاً", () => {
+    const rows = [
+      row("2026-08", 3, 500_00), row("2026-08", 20, 4000_00),
+      row("2026-09", 2, 400_00),
+    ];
+    const t = spendTrend(rows, new Date(Date.UTC(2026, 8, 6)));
+    expect(t.basisDays).toBe(6);
+    // 400 مقابل 500 — لا 400 مقابل 4500
+    expect(t.pct).toBeCloseTo(-0.2, 5);
+  });
+
+  it("الشهر التامّ يُقارَن بالشهر كلّه", () => {
+    const rows = [
+      row("2026-07", 3, 1000_00), row("2026-07", 25, 1000_00),
+      row("2026-08", 5, 1000_00),
+    ];
+    const t = spendTrend(rows, new Date(Date.UTC(2026, 8, 6)));
+    expect(t.basisDays).toBeNull();
+    expect(t.pct).toBeCloseTo(-0.5, 5);
+  });
+
+  it("بلا أساس لا نسبة — ولا يُخترَع صفر", () => {
+    const rows = [row("2026-09", 2, 400_00)];
+    expect(spendTrend(rows, new Date(Date.UTC(2026, 8, 6))).pct).toBeNull();
   });
 });

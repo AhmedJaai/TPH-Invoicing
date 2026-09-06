@@ -256,11 +256,19 @@ export function reconcileStatement(
   const theirPaidMinor = statementLines.reduce((s, l) => s + Math.max(0, l.creditMinor), 0);
   const ourBilledMinor = ourInvoices.reduce((s, i) => s + i.totalMinor, 0);
 
+  /*
+    معادلة الكشف: افتتاحي + مدين − دائن = ختامي.
+
+    ولا تُحسَب إلّا إذا عُرف طرفاها. كان الافتتاحيّ المجهول يُفترَض صفراً،
+    فتُحسَب المعادلة على رقمٍ لم يُقرأ، ثمّ يُقال للمستخدم «حساب الكشف
+    نفسه لا يستقيم» — فيُتَّهم المورّد بخطأٍ مصدره أنّنا لم نقرأ سطراً.
+    والمجهول يُعلَن مجهولاً: `null` تعني «لم تُفحَص»، لا «فُحصت فنجحت».
+  */
   let balanceArithmeticOk: boolean | null = null;
   let computedClosingMinor: number | null = null;
-  if (options.closingBalanceMinor !== undefined) {
+  if (options.closingBalanceMinor !== undefined && options.openingBalanceMinor !== undefined) {
     computedClosingMinor =
-      (options.openingBalanceMinor ?? 0) + theirBilledMinor - theirPaidMinor;
+      options.openingBalanceMinor + theirBilledMinor - theirPaidMinor;
     balanceArithmeticOk =
       Math.abs(computedClosingMinor - options.closingBalanceMinor) <= tolerance;
   }

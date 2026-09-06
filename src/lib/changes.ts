@@ -50,6 +50,15 @@ export interface ChangeFacts {
   purchasesPrevMonth: number;
   thisMonthLabel: string;
   prevMonthLabel: string;
+  /**
+   * كم يوماً مضى من الشهر الجاري — أو `null` إن كان تامّاً.
+   *
+   * حين يكون جارياً تُقصّ مشتريات الشهر السابق عند اليوم نفسه، وإلّا
+   * قُورن ستّة أيامٍ بشهرٍ كامل فقيل «أنفقتَ أقلّ بثمانيةٍ وتسعين
+   * بالمئة» في السادس من كل شهر — إنذارٌ كاذبٌ دوريّ يُفقد الثقة
+   * بالصفحة كلّها.
+   */
+  daysElapsedInMonth: number | null;
 
   /** مستندات وصلت في آخر سبعة أيام، والسبعة التي قبلها. */
   documentsLast7: number;
@@ -74,10 +83,17 @@ export function buildChanges(f: ChangeFacts): Change[] {
   {
     const dir = direction(f.purchasesThisMonth, f.purchasesPrevMonth);
     const pct = pctChange(f.purchasesThisMonth, f.purchasesPrevMonth);
+    const partial = f.daysElapsedInMonth !== null;
     out.push({
       id: "purchases",
       label: "المشتريات",
-      baseline: `عن ${f.prevMonthLabel}`,
+      /*
+        الأساس يقول ما قِيس فعلاً. والشهر الجاري يُقارَن بمثله من
+        السابق — أوّل ستّة أيامٍ بأوّل ستّة — لا بشهرٍ تامّ.
+      */
+      baseline: partial
+        ? `عن أوّل ${f.daysElapsedInMonth} يوماً من ${f.prevMonthLabel}`
+        : `عن ${f.prevMonthLabel}`,
       direction: dir,
       pct,
       currentMinor: f.purchasesThisMonth,

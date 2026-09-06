@@ -13,6 +13,7 @@ interface Row extends Record<string, unknown> {
   outstanding_now: number;
   outstanding_then: number;
   new_unclassified: number;
+  days_elapsed: number | null;
 }
 
 export async function gatherChangeFacts(
@@ -35,8 +36,21 @@ export async function gatherChangeFacts(
         (select m from prv)                                                       as prev_month,
         (select coalesce(sum(total_minor),0)::bigint from invoices
           where period_month = (select m from cur))                               as purchases_this,
+        /*
+          الشهر السابق يُقصّ عند اليوم نفسه إن كان الجاري لم يتمّ.
+
+          كان يُجمَع كاملاً ويُقارَن بستّة أيّامٍ من الجاري، فيُقال في
+          السادس من كل شهر «أنفقتَ أقلّ بـ٩٨٪» — والنقص يومٌ لا سلوك.
+          والقصّ يجعل المقارنة مثلاً بمثل، ويُعلَن في نصّ الأساس.
+        */
         (select coalesce(sum(total_minor),0)::bigint from invoices
-          where period_month = (select m from prv))                               as purchases_prev,
+          where period_month = (select m from prv)
+            and (
+              (select m from cur) <> to_char(now(), 'YYYY-MM')
+              or extract(day from invoice_date) <= extract(day from now())
+            ))                                                                    as purchases_prev,
+        (select case when (select m from cur) = to_char(now(), 'YYYY-MM')
+                     then extract(day from now())::int end)                       as days_elapsed,
         (select count(*)::int from documents
           where created_at >= now() - interval '7 days')                         as docs_7,
         (select count(*)::int from documents
@@ -63,6 +77,7 @@ export async function gatherChangeFacts(
     purchasesPrevMonth: Number(r?.purchases_prev ?? 0),
     thisMonthLabel: r?.this_month ?? "هذا الشهر",
     prevMonthLabel: r?.prev_month ?? "الشهر السابق",
+    daysElapsedInMonth: r?.days_elapsed == null ? null : Number(r.days_elapsed),
     documentsLast7: Number(r?.docs_7 ?? 0),
     documentsPrev7: Number(r?.docs_prev_7 ?? 0),
     outstandingNow: Number(r?.outstanding_now ?? 0),

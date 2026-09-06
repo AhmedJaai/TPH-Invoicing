@@ -199,7 +199,8 @@ export async function POST(request: Request) {  let user;
           supplierId: supplier.id,
           periodStart: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)),
           periodEnd: date,
-          closingBalanceMinor: p.amountMinor!,
+          /* الرصيد الذي لم يُقرأ من الاسم يبقى مجهولاً — ويُملأ عند المطابقة */
+          closingBalanceMinor: p.amountMinor ?? null,
         });
       }
 

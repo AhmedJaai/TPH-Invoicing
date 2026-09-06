@@ -183,14 +183,15 @@ async function main() {
         invoicesCreated++;
       }
 
-      if ((p.kind === "STATEMENT" || p.kind === "LEDGER") && supplier && p.amountMinor !== undefined) {
+      if ((p.kind === "STATEMENT" || p.kind === "LEDGER") && supplier) {
         const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
         await tx.insert(statements).values({
           documentId: doc.id,
           supplierId: supplier.id,
           periodStart: start,
           periodEnd: date,
-          closingBalanceMinor: p.amountMinor,
+          /* الرصيد المجهول يُعلَن، والكشف يُقيَّد — هويّته مورّدُه لا رصيدُه */
+          closingBalanceMinor: p.amountMinor ?? null,
         });
         statementsCreated++;
       }

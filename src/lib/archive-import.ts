@@ -53,8 +53,19 @@ export function planImport(parsed: ParsedFileName, hasSupplier: boolean): Import
     documentKind,
     createsInvoice:
       parsed.kind === "INVOICE" && hasSupplier && Boolean(parsed.invoiceNumber) && hasAmount,
+    /*
+      الكشف يُقيَّد ولو لم يُقرأ رصيده.
+
+      كان يُشترَط له مبلغٌ في الاسم كما يُشترَط للفاتورة — فسقطت ثلاثة
+      كشوف مؤرشفة من الجدول تماماً، منها كشفا «أوراق الزيتون». والأثر
+      أنّ المورّد يظهر في «لم يصل كشفه» وقد أرسله، فيُطالَب بما سلّم.
+
+      والفرق أنّ الفاتورة بلا مبلغ لا معنى لها، أمّا الكشف فهويّته
+      مورّدُه وفترتُه؛ ورصيده يُملأ حين يُطابَق. و`null` تقول «لم يُقرأ»
+      منذ صارت الأعمدة تقبله — انظر `018_statement_balances_nullable.sql`.
+    */
     createsStatement:
-      (parsed.kind === "STATEMENT" || parsed.kind === "LEDGER") && hasSupplier && hasAmount,
+      (parsed.kind === "STATEMENT" || parsed.kind === "LEDGER") && hasSupplier,
     createsPayment: (parsed.kind === "RECEIPT" || parsed.kind === "CASH") && hasAmount,
     paymentMethod: parsed.kind === "CASH" ? "CASH" : "BANK_TRANSFER",
     notes,

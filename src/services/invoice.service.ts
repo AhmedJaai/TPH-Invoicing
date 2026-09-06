@@ -6,7 +6,7 @@
  * حساب السعر أنتج «ارتفاع أسعار ١٥٪» لم يقع.
  */
 import { eq } from "drizzle-orm";
-import { invoiceLines, invoices, statements } from "@/db/schema";
+import { invoiceLines, invoices, statementLines, statements } from "@/db/schema";
 import { normalizeItem } from "@/lib/items";
 import { reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { parseRiyals } from "@/lib/money";
@@ -115,22 +115,73 @@ export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<nu
   return lines.length;
 }
 
+/** سطر كشفٍ كما قرأه النموذج — قبل أي مطابقة. */
+export interface RawStatementLine {
+  date: Date;
+  ref: string | null;
+  description: string | null;
+  debitMinor: number;
+  creditMinor: number;
+}
+
 export interface CreateStatementInput {
   documentId: string;
   supplierId: string;
   periodEnd: Date;
-  closingBalanceMinor: number;
+  /** `null` تعني «لم يُقرأ» لا «صفر» — والصفر الكاذب يقول إنّ المورّد لا يطالبنا */
+  openingBalanceMinor: number | null;
+  closingBalanceMinor: number | null;
+  /** أسطر الكشف كما استُخرجت. فارغةٌ تعني «لم تُقرأ»، ولا تُختلق. */
+  lines?: readonly RawStatementLine[];
 }
 
+/**
+ * يقيّد كشف مورّد — بأسطره.
+ *
+ * كانت الأسطر تُستخرَج ثمّ تُرمى: يُحفَظ الرصيد الختاميّ وحده. فبقيت
+ * `statement_lines` فارغةً في أحد عشر كشفاً، والمطابقة مستحيلةٌ لأنّ ما
+ * يُطابَق غير موجود — ثمّ يُقال في البوّابة «لم يُطابَق منها واحد» كأنّ
+ * التقصير من صاحب المقهى. والكشف بلا أسطره ورقةٌ برقم.
+ *
+ * والفترة تُشتقّ من تواريخ الأسطر حين تُقرأ، لا من شهر تاريخ الكشف:
+ * كشف «أوراق الزيتون» تراكميّ (مايو–أغسطس)، فاشتقاق الشهر من آخره
+ * أنتج ٣٦ فاتورة «مفقودة» كذباً.
+ */
 export async function createStatement(tx: Tx, input: CreateStatementInput): Promise<void> {
-  const start = new Date(
-    Date.UTC(input.periodEnd.getUTCFullYear(), input.periodEnd.getUTCMonth(), 1),
-  );
-  await tx.insert(statements).values({
-    documentId: input.documentId,
-    supplierId: input.supplierId,
-    periodStart: start,
-    periodEnd: input.periodEnd,
-    closingBalanceMinor: input.closingBalanceMinor,
-  });
+  const lines = input.lines ?? [];
+
+  const start =
+    lines.length > 0
+      ? new Date(Math.min(...lines.map((l) => l.date.getTime())))
+      : new Date(Date.UTC(input.periodEnd.getUTCFullYear(), input.periodEnd.getUTCMonth(), 1));
+
+  const end =
+    lines.length > 0
+      ? new Date(Math.max(input.periodEnd.getTime(), ...lines.map((l) => l.date.getTime())))
+      : input.periodEnd;
+
+  const [row] = await tx
+    .insert(statements)
+    .values({
+      documentId: input.documentId,
+      supplierId: input.supplierId,
+      periodStart: start,
+      periodEnd: end,
+      openingBalanceMinor: input.openingBalanceMinor,
+      closingBalanceMinor: input.closingBalanceMinor,
+    })
+    .returning({ id: statements.id });
+
+  if (!row) return;
+
+  for (const l of lines) {
+    await tx.insert(statementLines).values({
+      statementId: row.id,
+      date: l.date,
+      ref: l.ref,
+      description: l.description,
+      debitMinor: l.debitMinor,
+      creditMinor: l.creditMinor,
+    });
+  }
 }

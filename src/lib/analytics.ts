@@ -328,3 +328,45 @@ export function spendByMonth(
   }
   return [...map.values()].sort((a, b) => a.month.localeCompare(b.month));
 }
+
+/**
+ * اتّجاه المشتريات شهراً عن شهر — والشهر الجاري يُقارَن بمثله.
+ *
+ * كان الشهر الجاري يُجمَع كما هو ويُقارَن بشهرٍ تامّ قبله، فتقول
+ * الصفحة في السادس من سبتمبر «▼ ٩٨٪ عن أغسطس». والنقص يومٌ لا سلوك،
+ * والإنذار الكاذب الذي يتكرّر كل أوّل شهر يُفقد الثقة بما عداه.
+ *
+ * فإن كان الشهر الأحدث هو شهر اليوم، قُصّ الشهر السابق عند اليوم نفسه:
+ * أوّل ستّة أيّامٍ بأوّل ستّة. و`basisDays` تقول ما قِيس كي يُعلَن.
+ */
+export interface SpendTrend {
+  /** نسبة التغيّر كسراً — أو `null` إن لا أساس يُقاس عليه. */
+  pct: number | null;
+  /** عدد أيّام الشهر الجاري المقيسة، أو `null` إن كان تامّاً. */
+  basisDays: number | null;
+  prevMonth: string | null;
+}
+
+export function spendTrend(
+  rows: readonly { periodMonth: string; invoiceDate: Date; totalMinor: number }[],
+  today: Date,
+): SpendTrend {
+  const months = [...new Set(rows.map((r) => r.periodMonth))].sort();
+  const cur = months[months.length - 1];
+  const prev = months[months.length - 2];
+  if (!cur || !prev) return { pct: null, basisDays: null, prevMonth: prev ?? null };
+
+  const runningMonth = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}`;
+  const basisDays = cur === runningMonth ? today.getUTCDate() : null;
+
+  const sum = (month: string, capDay: number | null) =>
+    rows
+      .filter((r) => r.periodMonth === month && (capDay === null || r.invoiceDate.getUTCDate() <= capDay))
+      .reduce((s, r) => s + r.totalMinor, 0);
+
+  const curTotal = sum(cur, null);
+  const prevTotal = sum(prev, basisDays);
+  if (prevTotal <= 0) return { pct: null, basisDays, prevMonth: prev };
+
+  return { pct: (curTotal - prevTotal) / prevTotal, basisDays, prevMonth: prev };
+}

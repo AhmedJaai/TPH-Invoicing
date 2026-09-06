@@ -296,8 +296,15 @@ export const statements = pgTable("statements", {
   supplierId: text("supplier_id").notNull().references(() => suppliers.id),
   periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
   periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
-  openingBalanceMinor: integer("opening_balance_minor").notNull().default(0),
-  closingBalanceMinor: integer("closing_balance_minor").notNull().default(0),
+  /**
+   * رصيدا الكشف — و`null` تعني «لم يُقرأ» لا «صفر».
+   *
+   * كانا صفراً بالافتراض، فكشفٌ تعذّرت قراءة رصيده يُحفَظ «لا يطالبنا
+   * بشيء»؛ ثمّ تُحسَب المعادلة على ذلك الصفر فيُقال إنّ حساب المورّد لا
+   * يستقيم. والتفصيل في `018_statement_balances_nullable.sql`.
+   */
+  openingBalanceMinor: integer("opening_balance_minor"),
+  closingBalanceMinor: integer("closing_balance_minor"),
   createdAt: now(),
 }, (t) => [index("statements_supplier_end_idx").on(t.supplierId, t.periodEnd)]);
 

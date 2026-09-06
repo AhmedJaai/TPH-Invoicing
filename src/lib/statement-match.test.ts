@@ -163,6 +163,30 @@ describe("reconcileStatement", () => {
     expect(r.balanceArithmeticOk).toBeNull();
   });
 
+  /*
+    كان الافتتاحيّ المجهول يُفترَض صفراً فتُحسَب المعادلة على رقمٍ لم
+    يُقرأ، ثمّ يُتَّهم المورّد بأنّ «حسابه لا يستقيم» — والخلل عندنا.
+  */
+  it("بلا رصيد افتتاحي لا تُحسَب المعادلة ولا يُتَّهم المورّد", () => {
+    const r = reconcileStatement(
+      [line({ date: "2026-05-14", ref: "260137", debitMinor: 42000 })],
+      [inv("a", "260137", "2026-05-14", 42000)],
+      { closingBalanceMinor: 60000 },
+    );
+    expect(r.balanceArithmeticOk).toBeNull();
+    expect(r.computedClosingMinor).toBeNull();
+    expect(r.findings.some((f) => f.message.includes("لا يستقيم"))).toBe(false);
+  });
+
+  it("الافتتاحيّ صفراً مقروءاً يُفحَص — الصفر المقروء ليس كالمجهول", () => {
+    const r = reconcileStatement(
+      [line({ date: "2026-05-14", ref: "260137", debitMinor: 42000 })],
+      [inv("a", "260137", "2026-05-14", 42000)],
+      { openingBalanceMinor: 0, closingBalanceMinor: 42000 },
+    );
+    expect(r.balanceArithmeticOk).toBe(true);
+  });
+
   it("المرجع القصير لا يطابق كل شيء", () => {
     const r = reconcileStatement(
       [line({ date: "2026-05-14", ref: "7", debitMinor: 500 })],

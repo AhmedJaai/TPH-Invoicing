@@ -13,7 +13,7 @@ import { buildAttention, countBySeverity } from "@/lib/attention";
 import { gatherAttentionFacts } from "@/lib/attention-facts";
 import { buildDataHealth } from "@/lib/data-health";
 import { gatherHealthFacts } from "@/lib/data-health-facts";
-import { spendByMonth } from "@/lib/analytics";
+import { spendByMonth, spendTrend } from "@/lib/analytics";
 import { Figure } from "@/components/figure";
 import { gatherHomeProvenance } from "@/lib/provenance-facts";
 import { Changes } from "@/components/changes";
@@ -74,6 +74,7 @@ export default async function HomePage() {
   const invoiceRows = await db
     .select({
       periodMonth: invoices.periodMonth,
+      invoiceDate: invoices.invoiceDate,
       totalMinor: invoices.totalMinor,
       supplierName: suppliers.nameAr,
       allocated: sql<number>`coalesce((
@@ -84,12 +85,12 @@ export default async function HomePage() {
     .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id));
 
   const monthly = spendByMonth(invoiceRows);
-  const thisMonth = monthly[monthly.length - 1];
-  const prevMonth = monthly[monthly.length - 2];
-  const trend =
-    thisMonth && prevMonth && prevMonth.totalMinor > 0
-      ? (thisMonth.totalMinor - prevMonth.totalMinor) / prevMonth.totalMinor
-      : null;
+  /*
+    الشهر الجاري يُقارَن بمثله من السابق لا بشهرٍ تامّ — وإلّا قيل في
+    السادس من كل شهر «▼ ٩٨٪» والنقص يومٌ لا سلوك.
+  */
+  const trendResult = spendTrend(invoiceRows, new Date());
+  const trend = trendResult.pct;
 
   const bySupplier = new Map<string, number>();
   for (const r of invoiceRows) {
@@ -124,7 +125,11 @@ export default async function HomePage() {
           note={
             trend === null
               ? undefined
-              : `${trend > 0 ? "▲" : "▼"} ${Math.abs(Math.round(trend * 100))}٪ عن ${prevMonth!.month}`
+              : `${trend > 0 ? "▲" : "▼"} ${Math.abs(Math.round(trend * 100))}٪ عن ${
+                  trendResult.basisDays === null
+                    ? trendResult.prevMonth
+                    : `أوّل ${trendResult.basisDays} يوماً من ${trendResult.prevMonth}`
+                }`
           }
         />
 

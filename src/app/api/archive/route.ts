@@ -25,6 +25,7 @@ import {
   assertMonthOpen, BlockedError, InvalidInputError, MonthClosedError, reviewForArchive,
 } from "@/services/validation.service";
 import { createInvoice, createStatement, replaceLines } from "@/services/invoice.service";
+import { parseStatementExtras } from "@/lib/extraction/statement-extras";
 import { createPayment } from "@/services/payment.service";
 import type { RawLine } from "@/services/types";
 
@@ -241,11 +242,22 @@ export async function POST(request: Request) {
       }
 
       if (body.documentKind === "STATEMENT" && body.supplierId && invoiceDate) {
+        /*
+          الأسطر والرصيد الافتتاحيّ يُقرآن من مخرَج النموذج الخام لا من
+          حقلٍ يرسله المتصفّح: هي القاعدة نفسها التي في `reviewConfirmed()`
+          — الخادم يشتقّ الرقم المالي ولا يصدّق ما يُملى عليه.
+
+          وكانا يُهمَلان تماماً، فيُحفَظ الكشف برصيدٍ ختاميّ وحده وبلا
+          سطر — فلا يُطابَق أبداً.
+        */
+        const parsed = parseStatementExtras(body.rawExtraction);
         await createStatement(tx, {
           documentId: docId,
           supplierId: body.supplierId,
           periodEnd: invoiceDate,
-          closingBalanceMinor: totalMinor ?? 0,
+          openingBalanceMinor: parsed.openingBalanceMinor,
+          closingBalanceMinor: totalMinor ?? parsed.closingBalanceMinor,
+          lines: parsed.lines,
         });
       }
 

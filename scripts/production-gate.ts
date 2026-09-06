@@ -7,7 +7,8 @@
  * و«لم يُفحَص» تمنع الجاهزية كما يمنعها الفشل: بوّابةٌ تعدّ غير المفحوص
  * ناجحاً تُنتج ثقةً بلا سند.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -15,7 +16,24 @@ import {
 } from "@/lib/ops/production-gate";
 import { checkBalance } from "@/lib/bank/balance-equation";
 
-const EXPECTED_MIGRATIONS = 17;
+/**
+ * الهجرات المتوقَّعة تُقرأ من المجلّد لا تُكتَب عدداً.
+ *
+ * كان العدد ثابتاً في الشيفرة (`17`)، فأوّل هجرةٍ تُضاف تجعل البوّابة
+ * تقول «١٨ من ١٧ — فشل»: تُعاقِب على التقدّم، ثمّ يُسكِتها من يزيد الرقم
+ * بيده فتصير رقماً يُجامَل لا فحصاً يجري. والمقارنة بالأسماء تكشف
+ * الاتّجاهين: هجرةٌ في المجلّد لم تُطبَّق، وهجرةٌ طُبّقت وملفّها غائب —
+ * وهذه الثانية أخطر، لأنّها قاعدةٌ لا يصفها المستودع.
+ */
+const MIGRATION_DIR = join(process.cwd(), "drizzle", "sql");
+
+function migrationsOnDisk(): string[] {
+  try {
+    return readdirSync(MIGRATION_DIR).filter((f) => f.endsWith(".sql")).sort();
+  } catch {
+    return [];
+  }
+}
 
 /** ما لا يُفحَص آلياً — ويُقَرّ في ملفٍّ يوقّعه إنسان. */
 interface ManualAttestation {
@@ -65,14 +83,27 @@ async function main() {
     await db.execute<{ name: string }>(sql`select name from schema_migrations order by name`)
   ).rows.map((r) => r.name);
 
+  const onDisk = migrationsOnDisk();
+  const appliedSet = new Set(applied);
+  const pending = onDisk.filter((f) => !appliedSet.has(f));
+  const orphaned = applied.filter((n) => !onDisk.includes(n));
+
   add(
     "migration_integrity",
-    applied.length === EXPECTED_MIGRATIONS ? "PASS" : "FAIL",
-    `${applied.length} من ${EXPECTED_MIGRATIONS} مطبَّقة` +
-      (applied.length < EXPECTED_MIGRATIONS
-        ? ` — الناقص يبدأ من ${String(applied.length + 1).padStart(3, "0")}`
-        : ""),
-    applied.length < EXPECTED_MIGRATIONS ? "npm run db:migrate" : undefined,
+    onDisk.length === 0 ? "UNKNOWN"
+    : pending.length === 0 && orphaned.length === 0 ? "PASS"
+    : "FAIL",
+    onDisk.length === 0
+      ? "لم يُقرأ مجلّد الهجرات — لا يُحكَم"
+      : pending.length === 0 && orphaned.length === 0
+        ? `${applied.length} هجرةً مطبَّقة — وهي عينُ ما في المستودع`
+        : [
+            pending.length > 0 ? `${pending.length} لم تُطبَّق: ${pending.join("، ")}` : "",
+            orphaned.length > 0
+              ? `${orphaned.length} مطبَّقة وملفّها غائب: ${orphaned.join("، ")}`
+              : "",
+          ].filter(Boolean).join(" · "),
+    pending.length > 0 ? "npm run db:migrate" : undefined,
   );
 
   /* ── ٢ · سلامة القاعدة: الأعمدة التي تكتب فيها الشيفرة موجودة ── */

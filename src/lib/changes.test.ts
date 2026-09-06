@@ -8,6 +8,7 @@ const quiet: ChangeFacts = {
   outstandingNow: 500_00, outstandingThen: 500_00,
   risingItems: 0, risingAnnualMinor: 0,
   newUnclassified: 0,
+  daysElapsedInMonth: null,
 };
 const f = (o: Partial<ChangeFacts> = {}): ChangeFacts => ({ ...quiet, ...o });
 
@@ -95,5 +96,21 @@ describe("notable", () => {
 
   it("السكون التامّ يُنتج فراغاً — وهو خبرٌ بذاته", () => {
     expect(notable(buildChanges(quiet))).toEqual([]);
+  });
+});
+
+describe("الشهر الجاري يُقارَن بمثله", () => {
+  /*
+    كان الشهر الجاري يُقارَن بشهرٍ تامّ، فيُقال في السادس من كل شهر
+    «أنفقتَ أقلّ بـ٩٨٪» — والنقص يومٌ لا سلوك.
+  */
+  it("الشهر الناقص يقول في أساسه كم يوماً قِيس", () => {
+    const c = buildChanges(f({ daysElapsedInMonth: 6 })).find((x) => x.id === "purchases");
+    expect(c?.baseline).toBe("عن أوّل 6 يوماً من 2026-08");
+  });
+
+  it("الشهر التامّ يُقارَن بالشهر كلّه", () => {
+    const c = buildChanges(f({ daysElapsedInMonth: null })).find((x) => x.id === "purchases");
+    expect(c?.baseline).toBe("عن 2026-08");
   });
 });

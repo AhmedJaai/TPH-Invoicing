@@ -10,7 +10,8 @@ export interface ArchivedStatement {
   periodStart: string;
   periodEnd: string;
   fileName: string;
-  closingBalanceMinor: number;
+  /** `null` تعني «لم يُقرأ» — وتُعرَض «غير معروف» لا صفراً. */
+  closingBalanceMinor: number | null;
   lineCount: number;
 }
 
@@ -107,13 +108,19 @@ export function StatementReconcile({
                   <span className="block truncate text-sm font-medium">{a.supplierName}</span>
                   <span className="nums block text-[11px] text-muted" dir="ltr">
                     {a.periodStart} → {a.periodEnd}
-                    {a.lineCount > 0 && ` · ${a.lineCount} سطر مطابَق`}
+                    {a.lineCount > 0
+                      ? ` · ${a.lineCount} سطر مطابَق`
+                      : " · بلا أسطر — طابِقه لتُقرأ"}
                   </span>
                 </span>
                 <span className="flex shrink-0 items-center gap-3">
-                  <span className="nums text-sm font-bold" dir="ltr">
-                    {formatRiyalsDisplay(a.closingBalanceMinor)}
-                  </span>
+                  {a.closingBalanceMinor === null ? (
+                    <span className="text-sm font-bold text-muted">غير معروف</span>
+                  ) : (
+                    <span className="nums text-sm font-bold" dir="ltr">
+                      {formatRiyalsDisplay(a.closingBalanceMinor)}
+                    </span>
+                  )}
                   <button
                     onClick={() => {
                       const f = new FormData();

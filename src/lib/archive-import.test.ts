@@ -22,11 +22,24 @@ describe("planImport", () => {
     expect(p.notes.some((n) => n.includes("بلا رقم"))).toBe(true);
   });
 
-  it("الكشف بلا مبلغ لا يُقيَّد ويُذكر", () => {
+  /*
+    كان هذا الاختبار يُثبّت العطب: الكشف بلا مبلغٍ في اسمه يسقط من
+    الجدول كلّه. فسقطت ثلاثة كشوف مؤرشفة فعلاً — منها هذا — وظهر
+    «أوراق الزيتون» في «لم يصل كشفه» وقد أرسله مرّتين.
+
+    والفاتورة بلا مبلغ لا معنى لها فلا تُقيَّد، أمّا الكشف فهويّته
+    مورّدُه وفترتُه؛ ورصيده يُملأ حين يُطابَق ويُعلَن مجهولاً حتّى ذلك.
+  */
+  it("الكشف بلا مبلغ يُقيَّد ويُذكر أنّ مبلغه لم يُقرأ", () => {
     const p = plan("2026-07-31_OliveLeaves_Statement_to-31-07.pdf");
     expect(p.documentKind).toBe("STATEMENT");
-    expect(p.createsStatement).toBe(false);
+    expect(p.createsStatement).toBe(true);
     expect(p.notes.some((n) => n.includes("لا مبلغ"))).toBe(true);
+  });
+
+  it("الفاتورة بلا مبلغ تبقى غير مقيَّدة — الفرق مقصود", () => {
+    const p = plan("2026-05-21_OliveLeaves_Invoice_260137.pdf");
+    expect(p.createsInvoice).toBe(false);
   });
 
   it("الإيصال يُنشئ دفعة", () => {
