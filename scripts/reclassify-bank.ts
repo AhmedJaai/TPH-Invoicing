@@ -113,6 +113,23 @@ async function main() {
   }
 
   console.log(`\n✓ حُدّثت ${updates.length} حركة — بابها ومصدرها وسببها وأثرها`);
+
+  /*
+    ── وتُطوى القرارات التي لم يعد لها موضوع ──
+
+    `match_disposition` عمودٌ عن مطابقة **فاتورة**. فحركةٌ بابُها رسمٌ
+    بنكيّ أو تسويةُ شبكة لا فاتورة لها تُطابَق، وبقاءُ «تنتظر مراجعتك»
+    عليها يُبقيها في الطابور إلى الأبد — يُسأل صاحبُ العمل عن رسمٍ
+    بقرشين صُنّف تلقائياً منذ شهر.
+  */
+  const cleared = await db.execute(sql`
+    update bank_transactions
+    set match_disposition = null, match_outcome = null, match_score = null
+    where matched_payment_id is null
+      and match_disposition is not null
+      and category not in ('SUPPLIER', 'UNKNOWN')
+  `);
+  console.log(`✓ طُويت ${cleared.rowCount} قراراً لا موضوع له — أبوابها ليست سداد مورّد`);
   process.exit(0);
 }
 main();

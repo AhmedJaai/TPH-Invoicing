@@ -554,6 +554,14 @@ export const bankTransactions = pgTable("bank_transactions", {
    * مرّةً ثانية. والقيد عليه في `020`.
    */
   occurrence: integer("occurrence").notNull().default(0),
+  /**
+   * رقم العمليّة عند البنك — من تطابق مرجعُه تطابقت عمليّته.
+   *
+   * والترتيب وحده لا يكفي: الكشف قد يذكر الحوالة الواحدة مرّتين،
+   * فيحميهما `occurrence` بوصفهما حقيقيّتين. والرسمُ يتكرّر حقّاً،
+   * أمّا الحوالة فلها رقمٌ لا يتكرّر. فارغٌ لحركات الشبكة.
+   */
+  operationRef: text("operation_ref"),
 }, (t) => [
   index("bank_tx_date_idx").on(t.valueDate),
   index("bank_tx_status_idx").on(t.matchStatus),

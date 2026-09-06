@@ -153,6 +153,19 @@ export async function POST(request: Request) {
   /* ── ٢. تُنسَب المجموعة إلى جهتها، وبأثرٍ مسجَّل ── */
   const reason = `أكّدتَها بنفسك${identities[0] ? ` — ${identities[0].label}` : ""}`;
 
+  /*
+    والقرارُ القديم يُطوى مع الجواب.
+
+    من قال «هذه رسمٌ بنكيّ» فقد قال ضمناً إنّها ليست سداد فاتورة —
+    فبقاءُ `match_disposition` على «تنتظر مراجعتك» يجعلها تعود إلى
+    الطابور بعد كلّ تحديث، ويقرأ صاحبُ العمل أنّ عمله لم يُحفَظ. وقد
+    حُفظ، والعمود الآخر هو الذي كذب.
+
+    أمّا سدادُ المورّد فيبقى قراره: عُرف صاحبه ولم تُوجد فاتورته بعد،
+    وذاك عملٌ آخر لا يُلغى بمعرفة الجهة.
+  */
+  const notAPayment = body.kind !== "SUPPLIER";
+
   for (const r of rows) {
     await db
       .update(bankTransactions)
@@ -163,12 +176,20 @@ export async function POST(request: Request) {
         classificationSource: "HUMAN",
         classificationReason: reason,
         classificationVersion: CLASSIFICATION_VERSION,
+        ...(notAPayment && r.matchedPaymentId === null
+          ? {
+              matchStatus: "IGNORED" as const,
+              matchDisposition: null,
+              matchOutcome: null,
+              matchScore: null,
+            }
+          : {}),
         lifecycle: deriveLifecycle({
           classified: true,
           hasCandidate: Boolean(body.supplierId),
           decided: true,
           posted: r.matchedPaymentId !== null,
-          ignored: r.matchStatus === "IGNORED",
+          ignored: notAPayment || r.matchStatus === "IGNORED",
         }),
       })
       .where(eq(bankTransactions.id, r.id));

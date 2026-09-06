@@ -13,7 +13,7 @@ import { ReconcileQueue, type QueueGroup, type QueueItem } from "@/components/re
 import { toCanonical } from "@/lib/bank/canonical";
 import { groupByIdentity } from "@/lib/bank/pattern";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
-import { countNoun, ITEM } from "@/lib/arabic";
+import { countNoun, ITEM, TRANSACTION } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +51,14 @@ export default async function BankPage() {
           where direction = 'CREDIT' and category = 'POS_SETTLEMENT')               as settled,
         (select count(*)::int from invoices i
           where i.total_minor > coalesce((select sum(pa.amount_minor)::int
-            from payment_allocations pa where pa.invoice_id = i.id), 0) + 1)        as open
+            from payment_allocations pa where pa.invoice_id = i.id), 0) + 1)        as open,
+        /* سدادُ مورّدٍ عُرف صاحبه ولم تُوجد فاتورته — ليس مجهولاً ولا مطابَقاً */
+        (select count(*)::int from bank_transactions
+          where matched_payment_id is null and match_status <> 'IGNORED'
+            and category = 'SUPPLIER' and supplier_id is not null)                  as unapplied,
+        (select coalesce(sum(amount_minor),0)::bigint from bank_transactions
+          where matched_payment_id is null and match_status <> 'IGNORED'
+            and category = 'SUPPLIER' and supplier_id is not null)                  as unapplied_sum
     `),
 
     db.select({ id: suppliers.id, nameAr: suppliers.nameAr })
@@ -98,13 +105,27 @@ export default async function BankPage() {
       transactionType: bankTransactions.transactionType,
     })
       .from(bankTransactions)
+      /*
+        ما يحتاج **تعريفاً**، لا ما يحمل قراراً قديماً.
+
+        كان الشرط `match_disposition in ('SUGGEST','REVIEW')` — وهو
+        عمودٌ عن المطابقة بفاتورة، لا عن معرفة الجهة. فمن عرّف حركةً
+        وحدّث الصفحة وجدها تُسأل عنه ثانيةً كأنّه لم يفعل شيئاً: التعريف
+        كُتب فعلاً، والقرار القديم بقي كما هو، والطابور يقرأ القرار.
+        وستّ وأربعون حركة أكّدها أحمد بيده كانت تعود إليه كلّ مرّة.
+
+        فصار الطابور يقرأ الطبقة والمصدر: ما قرّره إنسان لا يُسأل عنه،
+        وما عُرف بابُه وليس سداد مورّد لا قرار فيه أصلاً — والرسمُ
+        البنكيّ لا يُسأل عنه وقد صُنّف تلقائياً.
+      */
       .where(sql`${bankTransactions.matchedPaymentId} is null
         and ${bankTransactions.matchStatus} <> 'IGNORED'
+        and ${bankTransactions.lifecycle} not in ('CONFIRMED','POSTED')
+        and ${bankTransactions.classificationSource} is distinct from 'HUMAN'
         and (
-          ${bankTransactions.matchDisposition} in ('SUGGEST','REVIEW')
-          or (${bankTransactions.category} = 'UNKNOWN'
-              and ${bankTransactions.counterpartyId} is null
-              and ${bankTransactions.direction} = 'DEBIT')
+          ${bankTransactions.category} = 'UNKNOWN'
+          or (${bankTransactions.category} = 'SUPPLIER'
+              and ${bankTransactions.matchDisposition} in ('SUGGEST','REVIEW'))
         )`)
       .orderBy(desc(bankTransactions.amountMinor))
       /*
@@ -239,6 +260,19 @@ export default async function BankPage() {
           value={String(n("open"))}
           href="/payments"
           sub="ما زال عليها رصيد"
+        />
+        {/*
+          سدادٌ عُرف مورّده ولم تُوجد فاتورته.
+
+          يُعرَض عدداً ومبلغاً لا في الطابور: السؤال عنه ليس «ما هذه؟»
+          — ذاك عُرف — بل «أيّ فاتورة تفسّرها؟»، وهو عملٌ آخر. وإخفاؤه
+          يجعل مئتي ألف ريال تختفي من الشاشة بلا أثر.
+        */}
+        <Stat
+          label="سداد بلا فاتورة"
+          minor={n("unapplied_sum")}
+          tone={n("unapplied") > 0 ? "warn" : "ok"}
+          sub={`${countNoun(n("unapplied"), TRANSACTION)} · المورّد معروف ولا فاتورة تقابله`}
         />
       </StatGrid>
 

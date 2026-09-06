@@ -21,6 +21,7 @@
  * والدرس: ما يتغيّر بتغيّر صيغة التصدير لا يصلح جزءاً من هوية الحركة.
  */
 import { createHash } from "node:crypto";
+import type { CanonicalTransaction } from "./canonical";
 
 export interface TransactionIdentityInput {
   /** التاريخ بصيغة YYYY-MM-DD */
@@ -195,4 +196,45 @@ export function unseenRows<T extends RowForIdentity & { occurrence: number }>(
   priorCount: ReadonlyMap<string, number>,
 ): T[] {
   return rows.filter((r) => r.occurrence >= (priorCount.get(naturalKey(r)) ?? 0));
+}
+
+/**
+ * مرجع العمليّة — هويّةُ الحركة حين يعطيها البنك رقماً خاصّاً بها.
+ *
+ * المفتاح الطبيعيّ يمنع أن يدخل الكشفُ مرّتين، ولا يمنع أن **يذكر
+ * الكشفُ الواحد الحوالةَ مرّتين**. وهذا يقع: في تصدير الأهليّ خمسُ
+ * حوالات مذكورة مرّتين — أربعة عشر ألف ريال — وفيها حوالةٌ لـ«مقام
+ * الثقة» رآها أحمد بعينه وقال «عمليّة واحدة حاسبها مرّتين».
+ *
+ * وكان الترتيب (`occurrence`) يحميهما معاً بوصفهما حركتين حقيقيّتين،
+ * لأنّ الكشف الواحد قد يحمل رسمَين متطابقين في اليوم — وهو صحيح في
+ * الرسوم. لكنّ الحوالة تحمل ما لا يحمله الرسم: **رقم عمليّة لا
+ * يتكرّر**. فمن تطابق مرجعُه تطابقت عمليّته.
+ *
+ * والتمييز مقيس لا مفترَض: في ١٤٤٥ حركة، ١٢٤ لها مرجع عمليّة، وخمسة
+ * مراجع مكرّرة — كلّها بنفس المبلغ، ولا مرجعَ واحدٌ يخدم مبلغين. أمّا
+ * `CITY:Digital Channel` فلا مرجع فيها، وتكرارُها في اليوم حقيقيّ.
+ *
+ * وحركات الشبكة تُستثنى: «REFERENCE : 81140155 MC26 0811» رقمُ طرفيّةٍ
+ * وشبكةٍ وتاريخ، لا رقم عمليّة — ويتكرّر بطبيعته.
+ */
+export function operationRef(tx: CanonicalTransaction): string | null {
+  if (tx.pos) return null;
+
+  const parts = new Set<string>();
+  for (const r of tx.references) {
+    if (r.kind === "BANK_REF" || r.kind === "SADAD") parts.add(`${r.kind}:${r.value}`);
+  }
+  /*
+    ورمز الحوالة يأتي بلا كلمةٍ تسبقه: «ANCBKNCBK6B82411900579769»
+    داخل «حوالات تحت الطلب…». فيُلتقَط بشكله: طويلٌ يخلط حرفاً برقم.
+  */
+  for (const m of tx.searchText.matchAll(
+    /\b(?=[A-Z0-9]*[A-Z])(?=[A-Z0-9]*\d)[A-Z0-9]{12,}\b/gi,
+  )) {
+    parts.add(`TOK:${m[0].toUpperCase()}`);
+  }
+
+  if (parts.size === 0) return null;
+  return [...parts].sort().join("|");
 }

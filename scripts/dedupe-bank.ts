@@ -35,8 +35,11 @@
  * وأربعمئة حركة، والمحذوف يحمله. فحذفٌ بلا دمج يشتري إزالة التكرار
  * بثمنِ حقلٍ لا يُستعاد إلّا بإعادة استيراد الكشف.
  */
-import { sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "../src/db";
+import { bankTransactions } from "../src/db/schema";
+import { toCanonical } from "../src/lib/bank/canonical";
+import { operationRef } from "../src/lib/bank/identity";
 
 const APPLY = process.argv.includes("apply");
 
@@ -66,9 +69,20 @@ async function main() {
       select acct, value_date, amount_minor, direction, descr, bank_import_id, count(*)::int as n
       from counted group by 1,2,3,4,5,6
     ),
+    seen as (
+      select coalesce(bank_account_id, '~') as acct, value_date, amount_minor, direction,
+             upper(btrim(regexp_replace(coalesce(description,''), '\s+', ' ', 'g'))) as descr,
+             (max(occurrence) + 1)::int as accepted
+      from bank_transactions group by 1,2,3,4,5
+    ),
     truth as (
-      select acct, value_date, amount_minor, direction, descr, max(n)::int as keep
-      from per_file group by 1,2,3,4,5
+      select p.acct, p.value_date, p.amount_minor, p.direction, p.descr,
+             greatest(max(p.n)::int, max(s2.accepted)) as keep
+      from per_file p
+      join seen s2 on s2.acct = p.acct and s2.value_date = p.value_date
+                  and s2.amount_minor = p.amount_minor and s2.direction = p.direction
+                  and s2.descr = p.descr
+      group by 1,2,3,4,5
     ),
     ranked as (
       select c.*, tr.keep,
@@ -110,6 +124,7 @@ async function main() {
   console.log(`\nتكرارٌ حقيقيّ يبقى     ${real.n} مجموعة (${real.rows} حركة) — كشفٌ واحد ذكرها أكثر من مرّة`);
 
   if (!APPLY) {
+    await byOperationRef();
     console.log("\nعرضٌ فقط. للتنفيذ:  npm run db:dedupe -- apply");
     process.exit(0);
   }
@@ -140,9 +155,20 @@ async function main() {
       select acct, value_date, amount_minor, direction, descr, bank_import_id, count(*)::int as n
       from counted group by 1,2,3,4,5,6
     ),
+    seen as (
+      select coalesce(bank_account_id, '~') as acct, value_date, amount_minor, direction,
+             upper(btrim(regexp_replace(coalesce(description,''), '\s+', ' ', 'g'))) as descr,
+             (max(occurrence) + 1)::int as accepted
+      from bank_transactions group by 1,2,3,4,5
+    ),
     truth as (
-      select acct, value_date, amount_minor, direction, descr, max(n)::int as keep
-      from per_file group by 1,2,3,4,5
+      select p.acct, p.value_date, p.amount_minor, p.direction, p.descr,
+             greatest(max(p.n)::int, max(s2.accepted)) as keep
+      from per_file p
+      join seen s2 on s2.acct = p.acct and s2.value_date = p.value_date
+                  and s2.amount_minor = p.amount_minor and s2.direction = p.direction
+                  and s2.descr = p.descr
+      group by 1,2,3,4,5
     ),
     ranked as (
       select c.*, tr.keep,
@@ -187,9 +213,20 @@ async function main() {
       select acct, value_date, amount_minor, direction, descr, bank_import_id, count(*)::int as n
       from counted group by 1,2,3,4,5,6
     ),
+    seen as (
+      select coalesce(bank_account_id, '~') as acct, value_date, amount_minor, direction,
+             upper(btrim(regexp_replace(coalesce(description,''), '\s+', ' ', 'g'))) as descr,
+             (max(occurrence) + 1)::int as accepted
+      from bank_transactions group by 1,2,3,4,5
+    ),
     truth as (
-      select acct, value_date, amount_minor, direction, descr, max(n)::int as keep
-      from per_file group by 1,2,3,4,5
+      select p.acct, p.value_date, p.amount_minor, p.direction, p.descr,
+             greatest(max(p.n)::int, max(s2.accepted)) as keep
+      from per_file p
+      join seen s2 on s2.acct = p.acct and s2.value_date = p.value_date
+                  and s2.amount_minor = p.amount_minor and s2.direction = p.direction
+                  and s2.descr = p.descr
+      group by 1,2,3,4,5
     ),
     ranked as (
       select c.id, tr.keep,
@@ -235,7 +272,108 @@ async function main() {
     select count(*)::int as n from bank_transactions
   `)).rows[0];
   console.log(`✓ حُذف ${res.rowCount} · أُعيد ترقيم ${renumbered.rowCount} · بقي ${after.n}`);
+
+  await byOperationRef();
   process.exit(0);
+}
+
+/**
+ * الشوط الثاني: من تطابق مرجعُ عمليّته تطابقت عمليّته.
+ *
+ * ويُحسَب في TypeScript لا في SQL، لأنّ الدالّة واحدة: يكتب بها
+ * المستورِد ويقرأ بها هذا. ولو كُتب هنا استخراجٌ ثانٍ بصيغةٍ أخرى
+ * لافترق الفاحصُ عن الكاتب — وهو أصل العطب الذي أدخل الكشف مرّتين.
+ */
+async function byOperationRef() {
+  const rows = (await db.execute<{
+    id: string; v: string; a: number; d: string; descr: string | null;
+    ty: string | null; pay: string | null; acct: string; imp_at: string;
+  }>(sql`
+    select t.id, t.value_date::text as v, t.amount_minor as a, t.direction::text as d,
+           t.description as descr, t.transaction_type as ty, t.matched_payment_id as pay,
+           coalesce(t.bank_account_id, '~') as acct, i.created_at::text as imp_at
+    from bank_transactions t join bank_imports i on i.id = t.bank_import_id
+  `)).rows;
+
+  const refOf = new Map<string, string>();
+  const groups = new Map<string, typeof rows>();
+
+  for (const r of rows) {
+    const ref = operationRef(toCanonical({
+      valueDate: new Date(r.v), description: r.descr, transactionType: r.ty,
+      amountMinor: Number(r.a), direction: r.d as "DEBIT" | "CREDIT",
+    }));
+    if (!ref) continue;
+    refOf.set(r.id, ref);
+    const key = `${r.acct}\u0000${ref}`;
+    const g = groups.get(key) ?? [];
+    g.push(r);
+    groups.set(key, g);
+  }
+
+  const doomed: string[] = [];
+  const blocked: typeof rows[] = [];
+
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    const paid = g.filter((r) => r.pay !== null);
+    /*
+      نسختان كلتاهما مرتبطة بدفعة ليستا مسألةَ تكرار: هما دفعتان
+      قُيّدتا على حوالةٍ واحدة. وحذفُ إحداهما يترك دفعةً بلا أثرٍ
+      بنكيّ، ونسبُ المال قرارُ إنسان. فتُعرَض ولا تُحذف.
+    */
+    if (paid.length > 1) { blocked.push(g); continue; }
+    const keep = paid[0] ?? [...g].sort((x, y) =>
+      x.imp_at.localeCompare(y.imp_at) || x.id.localeCompare(y.id))[0];
+    for (const r of g) if (r.id !== keep.id) doomed.push(r.id);
+  }
+
+  const sum = doomed.reduce((n, id) =>
+    n + Number(rows.find((r) => r.id === id)?.a ?? 0), 0);
+
+  console.log(`\n── مرجع العمليّة ──`);
+  console.log(`حركات لها مرجع        ${refOf.size}`);
+  console.log(`نسخٌ زائدة            ${doomed.length}  (${(sum / 100).toFixed(2)} ريال)`);
+  if (blocked.length > 0) {
+    console.log(`موقوفة                ${blocked.length} مجموعة — نسختاها مرتبطتان بدفعتين:`);
+    for (const g of blocked) {
+      console.log(`   ${g[0].v.slice(0, 10)} · ${(Number(g[0].a) / 100).toFixed(2)} · ${(g[0].descr ?? "").slice(0, 50).replace(/\s+/g, " ")}`);
+      for (const r of g) console.log(`      ${r.id} → دفعة ${r.pay ?? "—"}`);
+    }
+  }
+
+  if (!APPLY) {
+    console.log("\nعرضٌ فقط.");
+    return;
+  }
+
+  if (doomed.length > 0) {
+    const CHUNK = 200;
+    for (let i = 0; i < doomed.length; i += CHUNK) {
+      await db.delete(bankTransactions)
+        .where(inArray(bankTransactions.id, doomed.slice(i, i + CHUNK)));
+    }
+  }
+
+  /*
+    ثمّ تُكتَب المراجع — بعد الحذف، وإلّا ردّها القيد الفريد.
+
+    والموقوفة تُترَك بلا مرجع: نسختان لعمليّةٍ واحدة لا يقبلهما القيد،
+    وكتابتُه لإحداهما ادّعاءٌ بأنّ الأخرى عمليّةٌ ثانية. فيبقى العمود
+    فارغاً حتى يحسم إنسانٌ أيَّ الدفعتين تخصّها — والفراغ هنا يقول
+    «لم يُحسَم»، وهو الحقّ.
+  */
+  let written = 0;
+  const gone = new Set(doomed);
+  const held = new Set(blocked.flat().map((r) => r.id));
+  for (const [id, ref] of refOf) {
+    if (gone.has(id) || held.has(id)) continue;
+    await db.update(bankTransactions)
+      .set({ operationRef: ref })
+      .where(eq(bankTransactions.id, id));
+    written++;
+  }
+  console.log(`✓ حُذف ${doomed.length} · كُتب المرجع لـ${written} حركة · تُركت ${held.size} بلا مرجع (موقوفة)`);
 }
 
 main();
