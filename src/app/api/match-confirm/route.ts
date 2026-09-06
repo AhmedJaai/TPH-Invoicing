@@ -15,6 +15,7 @@ import { bankTransactions, decisionHistory, invoices } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { allocate, createPayment } from "@/services/payment.service";
 import { recordAudit } from "@/lib/audit";
+import { settleSupplierAccount } from "@/lib/allocation";
 
 export const runtime = "nodejs";
 
@@ -42,6 +43,15 @@ interface Body {
   notAPayment?: keyof typeof NOT_PAYMENT_KINDS;
   /** لمن دُفعت المقدَّمة، إن لم يُعرَف المورّد من الحركة. */
   supplierId?: string;
+  /**
+   * أو: سدادٌ **لحساب المورّد** لا لفاتورةٍ بعينها.
+   *
+   * وهذه ليست حالةً استثنائية: بعض مورّدي أحمد لا يعطون فاتورةً أصلاً
+   * — يعطون كشف حساب أو ورقةً باليد. فالحوالة سدادٌ لحسابه، والفواتير
+   * تفصيلٌ داخله؛ تُوزَّع عليها بالأقدم أوّلاً، وما بقي يبقى غير
+   * مخصَّص — وهي حالٌ صحيحة لا نقص.
+   */
+  settleSupplier?: boolean;
 }
 
 export async function POST(request: Request) {
@@ -182,6 +192,30 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ ok: true, message: `حُفظت: ${kind.label}` });
+  }
+
+  /* ── سدادٌ على حساب المورّد ── */
+  if (body.settleSupplier) {
+    const supplierId = tx.supplierId ?? body.supplierId ?? null;
+    if (!supplierId) {
+      return NextResponse.json(
+        { error: "لا يُسدَّد حسابٌ بلا مورّد — حدّد المورّد أوّلاً" },
+        { status: 400 },
+      );
+    }
+    if (tx.direction !== "DEBIT") {
+      return NextResponse.json(
+        { error: "المال الداخل ليس سداداً" },
+        { status: 400 },
+      );
+    }
+    if (tx.matchedPaymentId) {
+      return NextResponse.json(
+        { error: "هذه الحركة مقيَّدة بدفعة بالفعل" },
+        { status: 409 },
+      );
+    }
+    return await settleAccount(user.id, tx, supplierId);
   }
 
   /* ── توزيعٌ يدويّ ── */
@@ -431,5 +465,115 @@ async function applyManualSplit(
       left > 0
         ? `وُزّعت على ${split.length} فاتورة، وبقي ${(left / 100).toFixed(2)} بلا تخصيص`
         : `وُزّعت على ${split.length} فاتورة بالكامل`,
+  });
+}
+
+/**
+ * يقيّد سداداً على حساب المورّد، ويوزّعه بالأقدم أوّلاً.
+ *
+ * **والخادم لا يأخذ من المتصفّح إلّا معرّف الحركة.** الفواتير تُقرأ
+ * الآن، والمستحقّ يُحسَب الآن، والتوزيع يُخطَّط الآن — لأنّ ما رُجّح
+ * لحظةَ الاستيراد قد تكون فاتورتُه سُدّدت بعده من دفعةٍ أخرى.
+ */
+async function settleAccount(
+  userId: string,
+  tx: typeof bankTransactions.$inferSelect,
+  supplierId: string,
+) {
+  const open = (await db
+    .select({
+      id: invoices.id,
+      invoiceDate: invoices.invoiceDate,
+      periodMonth: invoices.periodMonth,
+      totalMinor: invoices.totalMinor,
+      allocated: sql<number>`coalesce((select sum(pa.amount_minor)::int
+        from payment_allocations pa where pa.invoice_id = ${invoices.id}), 0)`,
+    })
+    .from(invoices)
+    .where(eq(invoices.supplierId, supplierId)))
+    .map((i) => ({
+      invoiceId: i.id,
+      invoiceDate: i.invoiceDate,
+      periodMonth: i.periodMonth,
+      outstandingMinor: i.totalMinor - Number(i.allocated),
+    }))
+    .filter((i) => i.outstandingMinor > 0);
+
+  const plan = settleSupplierAccount(tx.amountMinor, tx.valueDate, open);
+  const months = plan.allocations
+    .map((a) => open.find((o) => o.invoiceId === a.invoiceId)?.periodMonth)
+    .filter((m): m is string => Boolean(m))
+    .sort();
+
+  const paymentId = await db.transaction(async (t) => {
+    const id = await createPayment(t, {
+      supplierId,
+      paidAt: tx.valueDate,
+      amountMinor: tx.amountMinor,
+      method: "BANK_TRANSFER",
+      beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
+      /* شهر الدفعة هو الأحدث بين فواتيرها — لا شهر أوّلها */
+      appliesToMonth: months.length > 0 ? months[months.length - 1] : null,
+    });
+
+    if (plan.allocations.length > 0) {
+      await allocate(t, id, tx.amountMinor, plan.allocations);
+    }
+
+    await t
+      .update(bankTransactions)
+      .set({
+        matchedPaymentId: id,
+        supplierId,
+        category: "SUPPLIER",
+        matchStatus: "MATCHED",
+        matchDisposition: null,
+        matchOutcome: plan.remainingMinor > 0 ? "SUPPLIER_ON_ACCOUNT" : "SUPPLIER_SETTLED",
+        lifecycle: "POSTED",
+      })
+      .where(eq(bankTransactions.id, tx.id));
+
+    await t.insert(decisionHistory).values({
+      bankTransactionId: tx.id,
+      event: "MATCH_CONFIRMED",
+      actor: "HUMAN",
+      actorId: userId,
+      detail: "سدادٌ على حساب المورّد — وُزّع بالأقدم أوّلاً",
+      payload: {
+        المبلغ: tx.amountMinor,
+        "فواتير سُدِّدت": plan.allocations.length,
+        "خُصِّص": plan.allocatedMinor,
+        "بقي غير مخصَّص": plan.remainingMinor,
+      },
+    });
+
+    return id;
+  });
+
+  await recordAudit({
+    actorId: userId,
+    action: "INVOICES_MARKED_PAID",
+    entityType: "bank_transaction",
+    entityId: tx.id,
+    after: {
+      الفعل: "سدادٌ على حساب المورّد",
+      المبلغ: tx.amountMinor,
+      "فواتير سُدِّدت": plan.allocations.length,
+      "بقي غير مخصَّص": plan.remainingMinor,
+      الدفعة: paymentId,
+    },
+  });
+
+  const money = (m: number) => (m / 100).toFixed(2);
+  return NextResponse.json({
+    ok: true,
+    paymentId,
+    allocated: plan.allocatedMinor,
+    remaining: plan.remainingMinor,
+    message: plan.allocations.length === 0
+      ? `قُيّد سدادٌ بـ${money(tx.amountMinor)} على حساب المورّد — لا فاتورة مفتوحة تقابله، فبقي غير مخصَّص`
+      : `سُدِّد ${money(plan.allocatedMinor)} على ${plan.allocations.length} فاتورة بالأقدم أوّلاً${
+          plan.remainingMinor > 0 ? ` · وبقي ${money(plan.remainingMinor)} غير مخصَّص` : " · والرصيد صفر"
+        }`,
   });
 }

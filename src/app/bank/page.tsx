@@ -37,7 +37,7 @@ export default async function BankPage() {
     );
   }
 
-  const [counts, supplierRows, recent, pending] = await Promise.all([
+  const [counts, supplierRows, balances, recent, pending] = await Promise.all([
     db.execute<Record<string, number>>(sql`
       select
         (select count(*)::int from bank_transactions)                                as tx,
@@ -63,6 +63,17 @@ export default async function BankPage() {
 
     db.select({ id: suppliers.id, nameAr: suppliers.nameAr })
       .from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.nameAr)),
+
+    /* ما على كلّ مورّد الآن — ليُعرَض قبل السداد على حسابه لا بعده */
+    db.execute<{ supplier_id: string; outstanding: string }>(sql`
+      select i.supplier_id,
+             sum(i.total_minor - coalesce((select sum(pa.amount_minor)::int
+               from payment_allocations pa where pa.invoice_id = i.id), 0))::bigint as outstanding
+      from invoices i
+      group by i.supplier_id
+      having sum(i.total_minor - coalesce((select sum(pa.amount_minor)::int
+        from payment_allocations pa where pa.invoice_id = i.id), 0)) > 0
+    `),
 
     db.select({
       id: bankTransactions.id,
@@ -157,6 +168,9 @@ export default async function BankPage() {
   }
 
   const supplierName = new Map(supplierRows.map((s) => [s.id, s.nameAr]));
+  const outstanding = new Map(
+    balances.rows.map((b) => [b.supplier_id, Number(b.outstanding)]),
+  );
 
   /*
     الحركة تُحوَّل مرّةً واحدة، ويُقرأ منها العرضُ والتجميع معاً.
@@ -225,6 +239,9 @@ export default async function BankPage() {
         items,
         guessName: only ? supplierName.get(only) ?? null : null,
         why: items[0]?.why ?? [],
+        supplierId: only,
+        supplierName: only ? supplierName.get(only) ?? null : null,
+        outstandingMinor: only ? outstanding.get(only) ?? 0 : undefined,
       };
     }),
     /*

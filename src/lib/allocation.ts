@@ -58,3 +58,57 @@ export function planAllocations(
     shortfallMinor: Math.max(0, requested - allocated),
   };
 }
+
+/* ─────────────────── سداد حساب المورّد ─────────────────── */
+
+/**
+ * المورّد محور المستحقّات، لا الفاتورة.
+ *
+ * كان النظام يسأل عن كل حوالة: **أيّ فاتورة تفسّرها؟** فإن لم يجد
+ * فاتورةً بمبلغها بالضبط وقف — وفي كشف أحمد خمسٌ وستّون حركة كذلك،
+ * بمئةٍ وستّةٍ وسبعين ألف ريال: مورّدها معروف، ومالُها خرج، ولا شيء
+ * يُكتَب. وسببُ ذلك أنّ بعض مورّديه لا يعطون فاتورةً أصلاً — يعطون
+ * كشف حساب، أو ورقةً باليد.
+ *
+ * والواقع أنّ الحوالة سدادٌ **لحساب المورّد**؛ والفواتير تفصيلٌ داخله.
+ * فتُقيَّد الدفعة، ثمّ تُوزَّع على ما هو مفتوح — والباقي يبقى «غير
+ * مخصَّص»، وهي حالٌ صحيحة لا نقص.
+ *
+ * والترتيب سياسة معلنة: **الأقدم أوّلاً.** لا يكسرها إلّا رقمُ فاتورةٍ
+ * في الحوالة، أو توزيعٌ يكتبه صاحب العمل بيده — ولا يخترعها المحسِّن
+ * ليرفع درجةً.
+ */
+export interface OpenInvoice {
+  invoiceId: string;
+  invoiceDate: Date;
+  outstandingMinor: number;
+}
+
+/**
+ * لا تُسدَّد فاتورةٌ لم تكن قد وُجدت.
+ *
+ * والسبعةُ أيّام تسامحٌ مقصود: الفاتورة تُكتب بتاريخ التسليم وتصل
+ * بعده، والحوالة قد تسبقها بأيّام. أمّا ما جاوز ذلك فسدادٌ مقدَّم،
+ * وهو قرارُ إنسان لا استنتاجُ آلة.
+ */
+export const SETTLEMENT_FORWARD_DAYS = 7;
+
+export function settleSupplierAccount(
+  paymentAmountMinor: number,
+  paidAt: Date,
+  invoices: readonly OpenInvoice[],
+): AllocationPlan {
+  const horizon = paidAt.getTime() + SETTLEMENT_FORWARD_DAYS * 86_400_000;
+
+  const eligible = invoices
+    .filter((i) => i.outstandingMinor > 0 && i.invoiceDate.getTime() <= horizon)
+    .sort((a, b) =>
+      a.invoiceDate.getTime() - b.invoiceDate.getTime()
+      || a.invoiceId.localeCompare(b.invoiceId));
+
+  return planAllocations(
+    paymentAmountMinor,
+    0,
+    eligible.map((i) => ({ invoiceId: i.invoiceId, amountMinor: i.outstandingMinor })),
+  );
+}

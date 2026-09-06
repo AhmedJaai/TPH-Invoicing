@@ -82,6 +82,11 @@ export interface QueueGroup {
   /** ما رجّحه المحرّك للمجموعة، إن رجّح. */
   guessName: string | null;
   why: string[];
+  /** المورّد إن اجتمعت المجموعة عليه — وبه يُتاح السداد على حسابه. */
+  supplierId?: string | null;
+  supplierName?: string | null;
+  /** ما عليه من فواتير مفتوحة الآن. */
+  outstandingMinor?: number;
 }
 
 export interface SupplierOption {
@@ -176,6 +181,39 @@ export function ReconcileQueue({
 
   const markNotAPayment = () =>
     post("/api/match-confirm", { transactionId: single!.id, notAPayment: "ADVANCE" }, next);
+
+  /**
+   * سدادٌ على حساب المورّد — لا على فاتورةٍ بعينها.
+   *
+   * وليست حالةً استثنائية: بعض المورّدين لا يعطون فاتورةً أصلاً، يعطون
+   * كشف حسابٍ أو ورقةً باليد. فكان النظام يقف عند «المورّد معروف ولا
+   * فاتورة تقابله» ولا يعطي فعلاً — خمسٌ وستّون حركة بمئةٍ وستّةٍ
+   * وسبعين ألف ريال.
+   */
+  async function settleAccount() {
+    setBusy(true);
+    setFailed(false);
+    let ok = 0;
+    for (const item of group!.items) {
+      try {
+        const res = await fetch("/api/match-confirm", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ transactionId: item.id, settleSupplier: true }),
+        });
+        const data = (await res.json()) as { message?: string; error?: string };
+        if (!res.ok) { setFailed(true); setMessage(data.error ?? "تعذّر السداد"); break; }
+        ok++;
+        setMessage(data.message ?? "سُدِّد");
+      } catch {
+        setFailed(true);
+        setMessage("تعذّر الاتصال بالخادم");
+        break;
+      }
+    }
+    setBusy(false);
+    if (ok > 0) { router.refresh(); next(); }
+  }
 
   /** يؤكّد المجموعة كلّها — والخادم يعيد التحقّق من أنّها مجموعة. */
   const confirm = () =>
@@ -301,6 +339,37 @@ export function ReconcileQueue({
             >
               ليست سداد فاتورة — دفعة مقدَّمة
             </button>
+          </div>
+        )}
+
+        {/*
+          المورّد معروف: فالسؤال ليس «ما هذه؟» بل «أتُسدَّد على حسابه؟».
+          والفواتير تفصيلٌ داخل الحساب لا شرطٌ لقبوله.
+        */}
+        {group.supplierId && (
+          <div className="mt-4 rounded-xl border border-line bg-sunken px-3 py-2.5">
+            <p className="text-[11px] text-muted">
+              المورّد معروف: <span className="font-bold text-ink">{group.supplierName}</span>
+              {typeof group.outstandingMinor === "number" && (
+                <>
+                  {" "}· عليه الآن <span className="nums font-bold">
+                    <Money minor={group.outstandingMinor} />
+                  </span>
+                </>
+              )}
+            </p>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={settleAccount}
+              className={`${buttonClass("primary", "sm")} mt-2`}
+            >
+              {busy ? "يقيّد…" : "سدِّد على حساب المورّد — بالأقدم أوّلاً"}
+            </button>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
+              تُقيَّد الدفعة وتُوزَّع على الفواتير المفتوحة من الأقدم، وما بقي
+              يبقى غير مخصَّص — ولا تُخترَع فاتورة.
+            </p>
           </div>
         )}
 
