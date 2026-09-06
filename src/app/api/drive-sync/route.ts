@@ -31,6 +31,7 @@ import { reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { parseRiyals } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
 import { recordAudit } from "@/lib/audit";
+import { canonicalName } from "@/lib/canonical-name";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -132,6 +133,9 @@ export async function POST(request: Request) {  let user;
     );
   }
 
+  /** ما سُجّل في هذا الطلب — به يُسأل عن تسميته بعد قراءته. */
+  const recordedFileIds = new Set<string>();
+
   const supplierList = await loadSuppliers();
   const bySlug = new Map(supplierList.map((s) => [s.slug, s]));
   const byFolder = new Map(supplierList.map((s) => [s.driveFolderName.trim(), s]));
@@ -200,6 +204,7 @@ export async function POST(request: Request) {  let user;
 
       if (!doc) return; // سُجّل بين الفحص والكتابة — لا نكرّره
       created++;
+      recordedFileIds.add(entry.file.id);
 
       if (plan.createsInvoice && supplier) {
         await tx.insert(invoices).values({
@@ -316,6 +321,7 @@ export async function POST(request: Request) {  let user;
         if (!doc) return;
         created++;
         read++;
+        recordedFileIds.add(entry.file.id);
 
         if (!review.canCreateInvoice || !supplier) return;
 
@@ -396,11 +402,68 @@ export async function POST(request: Request) {  let user;
     });
   }
 
+  /*
+    ── وما سُجّل للتوّ: أيُّه اسمُه خارج الصيغة؟ ──
+
+    وهذا موضعُ السؤال الطبيعيّ. الملفّ الذي رفعه المورّد باسمه —
+    «فاتورة - 260351 - مؤسسة ذا بوبليك هاوس.pdf» — يُكتشَف هنا، ويُقرأ
+    محتواه هنا، فيُعرَف مورّدُه وتاريخُه وإجماليُّه **هنا**. فسؤالُ
+    «أأوحّد اسمَه؟» يقع في هذه اللحظة لا في شاشةٍ أخرى.
+
+    وكان يقع في شاشةٍ أخرى: فحصُ التسمية ينظر إلى المسجَّل، والملفّ
+    الجديد لم يُسجَّل بعد — فيراه أحمد في المزامنة «اسمُه غلط» ويراه
+    الفحصُ «لا شيء». خيطان لا يلتقيان، والعمل بينهما يضيع.
+
+    ولا يُعاد تسميةُ شيء هنا: يُقترَح وحسب، والفعلُ في `/api/drive-rename`
+    باختيارٍ ملفّاً ملفّاً.
+  */
+  const justRecorded = [...recordedFileIds];
+  const renameSuggestions: { fileId: string; current: string; proposed: string }[] = [];
+
+  if (justRecorded.length > 0) {
+    const rows = await db
+      .select({
+        driveFileId: documents.driveFileId,
+        fileName: documents.fileName,
+        kind: documents.kind,
+        slug: suppliers.slug,
+        invoiceDate: invoices.invoiceDate,
+        invoiceTotal: invoices.totalMinor,
+        invoiceNumber: invoices.invoiceNumber,
+        statementEnd: statements.periodEnd,
+        statementTotal: statements.closingBalanceMinor,
+      })
+      .from(documents)
+      .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
+      .leftJoin(invoices, eq(invoices.documentId, documents.id))
+      .leftJoin(statements, eq(statements.documentId, documents.id))
+      .where(inArray(documents.driveFileId, justRecorded));
+
+    for (const r of rows) {
+      if (!r.driveFileId) continue;
+      const verdict = canonicalName({
+        driveFileId: r.driveFileId,
+        fileName: r.fileName,
+        kind: r.kind,
+        slug: r.slug,
+        date: (r.invoiceDate ?? r.statementEnd)?.toISOString().slice(0, 10) ?? null,
+        totalMinor: r.invoiceTotal ?? r.statementTotal ?? null,
+        invoiceNumber: r.invoiceNumber ?? null,
+      });
+      if (verdict.status === "RENAME") {
+        renameSuggestions.push({
+          fileId: r.driveFileId, current: r.fileName, proposed: verdict.proposed,
+        });
+      }
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     applied: true,
     summary: { ...scanned, created, invoicesCreated, contentRead: read, remainingUnnamed: remaining },
     notes: notes.slice(0, 20),
     readFailures,
+    renameSuggestions,
   });
 }

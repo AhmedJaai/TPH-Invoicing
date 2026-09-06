@@ -18,8 +18,16 @@ interface Summary {
   truncated?: boolean;
 }
 
+interface RenameSuggestion {
+  fileId: string;
+  current: string;
+  proposed: string;
+}
+
 interface Result {
   applied: boolean;
+  /** ما سُجّل للتوّ واسمُه خارج الصيغة — يُقترَح هنا لا في شاشةٍ أخرى. */
+  renameSuggestions?: RenameSuggestion[];
   summary: Summary;
   files?: { name: string; month: string; folder: string; understood: boolean }[];
   notes?: string[];
@@ -49,6 +57,8 @@ export function DriveSync() {
   const [error, setError] = useState<string | null>(null);
   const [full, setFull] = useState(false);
   const [open, setOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renamed, setRenamed] = useState<string | null>(null);
 
   const call = useCallback(
     async (apply: boolean) => {
@@ -183,6 +193,71 @@ export function DriveSync() {
               {s.contentRead ? ` · قُرئ محتوى ${s.contentRead}` : ""}
               {s.remainingUnnamed ? ` · بقي ${s.remainingUnnamed} ملفاً يحتاج قراءة` : ""}
             </p>
+          )}
+
+          {/*
+            ── تسميةُ ما سُجّل للتوّ ──
+
+            الملفّ الذي رفعه المورّد باسمه يُكتشَف هنا، ويُقرأ محتواه
+            هنا، فيُعرَف مورّدُه وتاريخُه وإجماليُّه هنا. فالسؤال يقع في
+            هذه اللحظة — لا في شاشةٍ أخرى ينظر فيها الفحصُ إلى المسجَّل
+            فيقول «لا شيء» لأنّ الجديد لم يكن قد سُجّل بعد.
+          */}
+          {result?.renameSuggestions && result.renameSuggestions.length > 0 && (
+            <div className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5">
+              <p className="text-[11px] font-bold text-warn">
+                {result.renameSuggestions.length} ملفّاً سُجّل واسمُه خارج الصيغة
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {result.renameSuggestions.slice(0, 8).map((r) => (
+                  <li key={r.fileId} className="leading-relaxed">
+                    <span className="block truncate text-[10px] text-muted line-through" dir="ltr">
+                      {r.current}
+                    </span>
+                    <span className="block truncate text-[10px] font-bold" dir="ltr">
+                      {r.proposed}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={renaming}
+                  onClick={async () => {
+                    setRenaming(true);
+                    setRenamed(null);
+                    try {
+                      const res = await fetch("/api/drive-rename", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({
+                          apply: true,
+                          fileIds: result.renameSuggestions!.map((r) => r.fileId),
+                        }),
+                      });
+                      const text = await res.text();
+                      let json: { message?: string; error?: string } | null = null;
+                      try { json = JSON.parse(text) as { message?: string; error?: string }; }
+                      catch { /* ليس JSON */ }
+                      setRenamed(
+                        !json ? `تعذّرت التسمية (${res.status})`
+                        : res.ok ? (json.message ?? "تمّت") : (json.error ?? "تعذّرت التسمية"),
+                      );
+                      if (res.ok) router.refresh();
+                    } catch (e) {
+                      setRenamed((e as Error).message);
+                    } finally {
+                      setRenaming(false);
+                    }
+                  }}
+                  className="rounded-lg border border-line px-2.5 py-1 text-[11px] font-medium hover:border-ink-soft"
+                >
+                  {renaming ? "يوحّد…" : "وحّد تسميتها في الدرايف"}
+                </button>
+                {renamed && <span className="text-[10px] text-muted">{renamed}</span>}
+              </div>
+            </div>
           )}
 
           {result?.notes && result.notes.length > 0 && (
