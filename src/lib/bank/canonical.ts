@@ -33,6 +33,18 @@ export interface CanonicalTransaction extends RawBankRow {
   pos: PosDetails | null;
   /** القناة كما يقولها البنك: هاتف · تطبيق · فرع … */
   channel: string | null;
+  /**
+   * المستفيد كما يقوله **البنك** — مقروءاً من الوصف لا من العمود.
+   *
+   * العمود `beneficiary_raw` ملوَّث في الصفوف القديمة: كان الاستيراد
+   * يكتب فيه اسم المورّد الذي طابقه هو، لا المستفيد. وسبعةٌ وثلاثون
+   * صفّاً من ستّة وأربعين كذلك. فبُني عليه تجميعٌ جمع أربع حوالات
+   * لأربع جهات مختلفة تحت اسمٍ واحد — «سبعة جرة» وهي أصلاً عميل لا
+   * مورّد. وقرارٌ واحد عليها كان سيُخطئ في أربع.
+   *
+   * فصار يُقرأ من نصّ البنك؛ والعمود لا يُصدَّق إلّا إذا أيّده النصّ.
+   */
+  beneficiary: string | null;
 }
 
 export type ReferenceKind =
@@ -137,6 +149,49 @@ export function detectChannel(text: string): string | null {
   return null;
 }
 
+/* ─────────────────── المستفيد ─────────────────── */
+
+/**
+ * ما يدلّ على أنّ في الوصف اسمَ مستفيدٍ أصلاً.
+ *
+ * ولا يُشتقّ اسمٌ من كلّ وصف: «CITY:Digital Channel» رسمٌ لا مستفيد
+ * له، و«81140155-260626-POS 0» حركةُ شبكة. واشتقاقُ اسمٍ منهما يصنع
+ * جهةً وهميّة تُجمَع تحتها حركات.
+ */
+const HAS_BENEFICIARY = /BEN\s*ID|BENBK|حوالات\s*تحت\s*الطلب|رقم\s*السداد/i;
+
+/** ما بعده ليس من الاسم. */
+const BENEFICIARY_END =
+  /BEN\s*ID|BENBK|REMBK|Business\s+contracts|Value\s*Date|Buying\s+Goods|رقم\s*السداد|مرجع|بنك\s+\S+|شراء\s*بضاع[هة]|\bB[UVB]:/i;
+
+/** بقايا صيغة الحوالة قبل الاسم: تاريخٌ ورمزُ عمليّة. */
+const TRANSFER_NOISE = /^(?:\d+[A-Z]?|[A-Z]*\d[A-Z0-9]{5,}|NCBK\S*)$/i;
+
+/**
+ * يقرأ اسم المستفيد من وصف البنك.
+ *
+ * والصيغة في كشف الأهليّ: عبارةُ الحوالة، ثمّ تاريخٌ ورمزُ عمليّة، ثمّ
+ * **الاسم**، ثمّ اسم بنك المستفيد أو رقم هويّته. فيُقصّ الطرفان ويبقى
+ * ما بينهما.
+ */
+export function beneficiaryFrom(description: string | null | undefined): string | null {
+  const raw = (description ?? "").trim();
+  if (raw.length === 0 || !HAS_BENEFICIARY.test(raw)) return null;
+
+  let text = raw.replace(/^\s*حوالات\s*تحت\s*الطلب\s*/i, "");
+
+  const end = text.search(BENEFICIARY_END);
+  if (end > 0) text = text.slice(0, end);
+
+  const tokens = text.split(/\s+/).filter((t) => t.length > 0);
+  while (tokens.length > 0 && TRANSFER_NOISE.test(tokens[0])) tokens.shift();
+
+  const name = tokens.join(" ").replace(/[:,،.\-]+$/, "").trim();
+  if (name.length < 3) return null;
+  if ((name.match(/\p{L}/gu) ?? []).length < 3) return null;
+  return name;
+}
+
 /* ─────────────────── التحويل ─────────────────── */
 
 export function toCanonical(row: RawBankRow): CanonicalTransaction {
@@ -163,6 +218,17 @@ export function toCanonical(row: RawBankRow): CanonicalTransaction {
       هويّةٌ تُقارَن، والثاني وصفٌ يُقرأ.
     */
     pos: recognizePos(row.description, row.direction, row.transactionType),
+    /*
+      نصّ البنك يسبق العمود، ولا يُلغيه.
+
+      فالعمود في الكشوف الجديدة يُقرأ من الكشف نفسه وهو خبرٌ صحيح؛
+      وفي الصفوف القديمة ملوَّث بما كتبه نظامُنا. والوصفُ حكَمٌ بينهما:
+      إن حمل اسماً فهو المقدَّم، وإلّا فالعمود على حاله.
+
+      والتلوّث يُعالَج في مصدره — `db:reclassify` يعيد كتابة العمود
+      ممّا قاله البنك ويُفرّغ ما لم يقله — لا بالالتفاف حوله في كل قراءة.
+    */
+    beneficiary: beneficiaryFrom(row.description) ?? row.beneficiaryRaw?.trim() ?? null,
     channel: detectChannel(searchText),
   };
 }

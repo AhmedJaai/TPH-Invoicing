@@ -58,9 +58,14 @@ export interface Identity {
  * يقول شيئاً، والادّعاء بأنّه هويّة أسوأ من الاعتراف بالجهل.
  */
 export function signatureOf(tx: CanonicalTransaction): string | null {
-  const source = [tx.beneficiaryRaw, tx.description]
-    .filter((p): p is string => Boolean(p && p.trim()))
-    .join(" ");
+  /*
+    الوصف وحده — ولا يدخل عمودُ المستفيد.
+
+    لأنّه ملوَّث في الصفوف القديمة باسم المورّد الذي طابقه نظامُنا، فلو
+    دخل النمطَ لجمع حوالاتٍ لجهاتٍ مختلفة تحت نمطٍ واحد: الاسم المُقحَم
+    يتصدّر الكلمات الاثنتي عشرة فيطغى على ما يفرّقها.
+  */
+  const source = tx.description ?? "";
 
   const tokens = normalizeText(source)
     .toUpperCase()
@@ -135,7 +140,14 @@ export function identitiesOf(tx: CanonicalTransaction): Identity[] {
   }
   if (tx.pos?.merchantId) push("MERCHANT_ID", tx.pos.merchantId);
 
-  const name = tx.beneficiaryRaw?.trim();
+  /*
+    الاسم من نصّ البنك لا من العمود — و`beneficiary` هو المؤيَّد وحده.
+
+    وكان يُؤخَذ العمود خاماً، فجُمعت أربع حوالات لأربع جهات — «أطوار
+    العقارية» و«top taste» و«مؤسسة عمار» و«PURE BEVERAGE» — تحت اسمٍ
+    واحد كتبه نظامُنا عن نفسه. وقرارٌ واحد عليها يُخطئ في أربع.
+  */
+  const name = tx.beneficiary?.trim();
   if (name) push("NAME", name);
 
   const sig = signatureOf(tx);

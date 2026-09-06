@@ -124,8 +124,11 @@ export default async function BankPage() {
         and ${bankTransactions.classificationSource} is distinct from 'HUMAN'
         and (
           ${bankTransactions.category} = 'UNKNOWN'
-          or (${bankTransactions.category} = 'SUPPLIER'
-              and ${bankTransactions.matchDisposition} in ('SUGGEST','REVIEW'))
+          or (${bankTransactions.category} = 'SUPPLIER' and (
+                /* عُرف أنّه سدادُ مورّد ولم يُعرَف أيّ مورّد */
+                ${bankTransactions.supplierId} is null
+                or ${bankTransactions.matchDisposition} in ('SUGGEST','REVIEW')
+             ))
         )`)
       .orderBy(desc(bankTransactions.amountMinor))
       /*
@@ -155,6 +158,22 @@ export default async function BankPage() {
 
   const supplierName = new Map(supplierRows.map((s) => [s.id, s.nameAr]));
 
+  /*
+    الحركة تُحوَّل مرّةً واحدة، ويُقرأ منها العرضُ والتجميع معاً.
+
+    وكان العرض يأخذ `beneficiary_raw` خاماً — وهو ملوَّث في الصفوف
+    القديمة باسم المورّد الذي طابقه نظامُنا. فيُعرَض على صاحب العمل اسمُ
+    جهةٍ لم يذكرها البنك قطّ.
+  */
+  const canonical = new Map(pending.map((t) => [t.id, toCanonical({
+    valueDate: t.valueDate,
+    description: t.description,
+    beneficiaryRaw: t.beneficiaryRaw,
+    transactionType: t.transactionType,
+    amountMinor: t.amountMinor,
+    direction: t.direction as "DEBIT" | "CREDIT",
+  })]));
+
   const toItem = (t: (typeof pending)[number]): QueueItem => {
     const ev = t.matchEvidence as
       { تصنيف?: string; مستفيد?: string[]; مطابقة?: string[] } | null;
@@ -164,7 +183,7 @@ export default async function BankPage() {
       amountMinor: t.amountMinor,
       direction: t.direction as "DEBIT" | "CREDIT",
       description: (t.description ?? "").slice(0, 160),
-      beneficiaryRaw: t.beneficiaryRaw,
+      beneficiaryRaw: canonical.get(t.id)?.beneficiary ?? null,
       reason: reasonOf(t),
       guessName: t.supplierId ? supplierName.get(t.supplierId) ?? null : null,
       guessKind: null,
@@ -184,19 +203,14 @@ export default async function BankPage() {
   */
   const { groups: rawGroups, ungrouped } = groupByIdentity(
     pending,
-    (t) => toCanonical({
-      valueDate: t.valueDate,
-      description: t.description,
-      beneficiaryRaw: t.beneficiaryRaw,
-      transactionType: t.transactionType,
-      amountMinor: t.amountMinor,
-      direction: t.direction as "DEBIT" | "CREDIT",
-    }),
+    (t) => canonical.get(t.id)!,
     (t) => t.amountMinor,
   );
 
   const titleOf = (t: (typeof pending)[number]) =>
-    t.beneficiaryRaw?.trim() || (t.description ?? "").trim().slice(0, 70) || "بلا وصف";
+    canonical.get(t.id)?.beneficiary?.trim()
+    || (t.description ?? "").trim().slice(0, 70)
+    || "بلا وصف";
 
   const groups: QueueGroup[] = [
     ...rawGroups.map((g) => {

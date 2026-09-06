@@ -65,8 +65,40 @@ describe("الترتيب: الأقطع يسبق الأظنّ", () => {
     expect(groupingIdentity(tx)?.kind).toBe("NATIONAL_ID");
   });
 
-  it("بلا اسمٍ ولا رقم تبقى الهويّة النمط", () => {
-    expect(groupingIdentity(row({ description: ZATCA_A }))?.kind).toBe("PATTERN");
+  it("الاسم يُقرأ من نصّ البنك — لا من عمودٍ يكتبه نظامُنا", () => {
+    /*
+      كان العمود يُؤخذ خاماً، وهو ملوَّث باسم المورّد الذي طابقه
+      النظام. فجُمعت أربع حوالات لأربع جهات تحت اسمٍ واحد، وقرارٌ
+      واحد عليها يُخطئ في أربع.
+    */
+    const tx = row({
+      description: "حوالات تحت الطلب20260805S ANCBKNCBK6B82412005390704 top taste trading Company BENBK:AL INMA BANK",
+      beneficiaryRaw: "سبعة جرة — عميل",
+    });
+    expect(tx.beneficiary).toBe("top taste trading Company");
+    expect(groupingIdentity(tx)?.key).toBe("NAME:TOP TASTE TRADING COMPANY");
+  });
+
+  it("حوالتان لجهتين لا تجتمعان وإن حمل العمودُ اسماً واحداً", () => {
+    const a = row({
+      description: "حوالات تحت الطلب20260813S ANCBKNCBK6B82410205449975 مؤسسة عمار مصطفى احمد بن صديق BENBK:SAUDI INVESTMENT BA NK",
+      beneficiaryRaw: "سبعة جرة — عميل",
+    });
+    const b = row({
+      description: "حوالات تحت الطلب20260823S ANCBKNCBK6B82411033564951 PURE BEVERAGE INDUSTRY CO CLOS BENBK:SAUDI AWWAL BANK",
+      beneficiaryRaw: "سبعة جرة — عميل",
+    });
+    expect(groupingIdentity(a)?.key).not.toBe(groupingIdentity(b)?.key);
+  });
+
+  it("ولا يُشتقّ اسمٌ من رسمٍ لا مستفيد له", () => {
+    expect(row({ description: "CITY:Digital Channel" }).beneficiary).toBeNull();
+    expect(row({ description: "81140155-260626-POS 0" }).beneficiary).toBeNull();
+  });
+
+  it("وبلا اسمٍ ولا رقم تبقى الهويّة النمط", () => {
+    expect(groupingIdentity(row({ description: "PoSMonthlyFeeSep81140156" }))?.kind)
+      .toBe("PATTERN");
   });
 
   it("المفتاح يُكتب ويُقرأ بصيغةٍ واحدة", () => {

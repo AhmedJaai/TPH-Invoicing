@@ -17,7 +17,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "../src/db";
 import { bankTransactions, decisionHistory } from "../src/db/schema";
-import { toCanonical } from "../src/lib/bank/canonical";
+import { beneficiaryFrom, normalizeText, toCanonical } from "../src/lib/bank/canonical";
 import { classify, CLASSIFICATION_VERSION } from "../src/lib/bank/classification";
 import { toCategory } from "../src/lib/bank/apply";
 import { CATEGORY_LABEL } from "../src/lib/bank/rules";
@@ -130,6 +130,36 @@ async function main() {
       and category not in ('SUPPLIER', 'UNKNOWN')
   `);
   console.log(`✓ طُويت ${cleared.rowCount} قراراً لا موضوع له — أبوابها ليست سداد مورّد`);
+
+  /*
+    ── والمستفيد يُعاد إلى ما قاله البنك ──
+
+    العمود ملوَّث: كان الاستيراد القديم يكتب فيه اسم المورّد الذي طابقه
+    هو. سبعةٌ وثلاثون صفّاً من ستّة وأربعين. وأثرُه أنّه يُعرَض لصاحب
+    العمل اسمَ جهةٍ لم يذكرها البنك، ويُجمَع به ما لا يجتمع.
+
+    فيُقرأ من الوصف. وما لا يُقرأ منه يُفرَّغ: الفراغ يقول «لم يذكره
+    البنك»، والاسم المُقحَم يقول ما ليس صحيحاً.
+  */
+  const benRows = (await db.execute<{ id: string; b: string | null; d: string | null }>(sql`
+    select id, beneficiary_raw as b, description as d from bank_transactions
+  `)).rows;
+
+  let fixed = 0, emptied = 0;
+  for (const r of benRows) {
+    const derived = beneficiaryFrom(r.d);
+    const stored = r.b?.trim() ?? null;
+    const corroborated = stored && normalizeText(r.d).toUpperCase()
+      .includes(normalizeText(stored).toUpperCase());
+    const next = derived ?? (corroborated ? stored : null);
+    if (next === stored) continue;
+
+    await db.update(bankTransactions)
+      .set({ beneficiaryRaw: next })
+      .where(eq(bankTransactions.id, r.id));
+    if (next === null) emptied++; else fixed++;
+  }
+  console.log(`✓ المستفيد: صُحّح ${fixed} · فُرّغ ${emptied} لم يذكره البنك`);
   process.exit(0);
 }
 main();
