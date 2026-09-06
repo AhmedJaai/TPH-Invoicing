@@ -99,25 +99,39 @@ export function DriveSync() {
 
         /*
           ما أوقفته المهلة يُستأنَف — والمستخدم لا يُطلَب منه أن يفهم
-          أنّ الأشهر تُقرأ على دفعات.
+          أنّ الأشهر تُقرأ على دفعات، ولا أنّ المحتوى يُقرأ اثنين
+          اثنين.
         */
         let guard = 0;
-        while (json.summary?.truncated && (json.summary.pendingMonths?.length ?? 0) > 0 && guard < 12) {
+        const suggestions = [...(json.renameSuggestions ?? [])];
+
+        while (guard < 12) {
+          const moreMonths = json.summary?.truncated
+            && (json.summary.pendingMonths?.length ?? 0) > 0;
+          const moreContent = apply && (json.summary?.remainingUnnamed ?? 0) > 0;
+          if (!moreMonths && !moreContent) break;
           guard++;
-          setBusy(apply ? "applying" : "scanning");
-          const next = await post({
-            apply, readContent: apply, onlyMonths: json.summary.pendingMonths,
-          });
+
+          const next = await post(
+            moreMonths
+              ? { apply, readContent: apply, onlyMonths: json.summary.pendingMonths }
+              : { full, apply, readContent: apply, months: 3 },
+          );
+          suggestions.push(...(next.renameSuggestions ?? []));
           json = {
             ...next,
+            renameSuggestions: suggestions,
             summary: {
               ...next.summary,
-              newFiles: json.summary.newFiles + next.summary.newFiles,
-              understoodByName: json.summary.understoodByName + next.summary.understoodByName,
-              needContentReading: json.summary.needContentReading + next.summary.needContentReading,
+              newFiles: json.summary.newFiles,
+              understoodByName: json.summary.understoodByName,
+              needContentReading: json.summary.needContentReading,
+              created: (json.summary.created ?? 0) + (next.summary.created ?? 0),
+              contentRead: (json.summary.contentRead ?? 0) + (next.summary.contentRead ?? 0),
             },
           };
         }
+        json.renameSuggestions = suggestions;
 
         setResult(json);
         if (apply) router.refresh();

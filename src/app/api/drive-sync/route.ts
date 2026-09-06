@@ -38,7 +38,28 @@ export const maxDuration = 60;
 
 /** حدّ لكل طلب: الاستدعاء السحابي له سقف زمني، والباقي يكمله الطلب التالي. */
 const MAX_NAMED_PER_CALL = 60;
-const MAX_CONTENT_PER_CALL = 4;
+const MAX_CONTENT_PER_CALL = 2;
+
+/**
+ * ميزانيّةُ الطلب الواحد — والوقتُ مورِدٌ يُقسَم لا يُفترَض.
+ *
+ * سقفُ المزوّد ستّون ثانية. والعمل ثلاثةُ أقسام: مشيٌ على الأرشيف،
+ * ثمّ قراءةُ محتوى ما لا يُفهم اسمُه، ثمّ كتابة. وأثقلُها الثاني: كلّ
+ * ملفٍّ يُنزَّل ويُستخرَج بنموذج — عشرُ ثوانٍ أو أكثر للواحد. فأربعةٌ
+ * منها وحدها قد تستغرق الدقيقة.
+ *
+ * وكانت المهلة على المشي وحده، فيقف المشي في وقته ثمّ تلتهم القراءةُ
+ * الباقي ويُقتَل الطلب — فيبدو للمستخدم أنّ «سجّل الجديد» لا يعمل.
+ *
+ * فصار لكلّ قسمٍ حدُّه، ولآخر الطلب فسحةٌ تكفي للكتابة والردّ. واثنان
+ * في الطلب لا أربعة: آخرُ ملفٍّ يبدأ عند الثامنة والعشرين، فإن استغرق
+ * خمساً وعشرين انتهى عند الثالثة والخمسين — دون السقف بفسحة.
+ *
+ * والشاشة تتابع وحدها حتى ينتهي الباقي، فلا يُطلَب من صاحب العمل أن
+ * يضغط سبع مرّات ولا أن يعرف لماذا.
+ */
+const WALK_BUDGET_MS = 20_000;
+const CONTENT_BUDGET_MS = 28_000;
 
 interface Body {
   /** عدد الأشهر الأخيرة التي تُفحص. الافتراضي ثلاثة. */
@@ -115,8 +136,8 @@ export async function POST(request: Request) {  let user;
     فتنفجر الشاشة برسالة «Unexpected token 'A'» — ولا أحد يعرف أنّ
     السبب مهلةٌ لا عطب. والوقوف المعلَن أصدق من قتلٍ صامت.
   */
-  const budgetMs = 40_000;
-  const deadline = Date.now() + budgetMs;
+  const startedAt = Date.now();
+  const deadline = startedAt + WALK_BUDGET_MS;
 
   let fresh: ArchiveEntry[];
   let pendingMonths: string[] = [];
@@ -251,6 +272,12 @@ export async function POST(request: Request) {  let user;
 
   if (body.readContent) {
     for (const entry of unnamed.slice(0, MAX_CONTENT_PER_CALL)) {
+      /*
+        الوقوف قبل بدء ملفٍّ لا في وسطه: الاستخراج يستغرق ما يستغرق،
+        وقطعُه في منتصفه يترك ملفّاً نُزّل ولم يُقيَّد. فيُسأل الوقتُ
+        عند الباب، ومن دخل أُتِمّ له.
+      */
+      if (Date.now() - startedAt >= CONTENT_BUDGET_MS) break;
       let data: Buffer;
       let mimeType: string;
       try {
@@ -384,7 +411,7 @@ export async function POST(request: Request) {  let user;
     }
   }
 
-  const remaining = Math.max(0, unnamed.length - (body.readContent ? MAX_CONTENT_PER_CALL : 0));
+  const remaining = Math.max(0, unnamed.length - read);
 
   if (created > 0) {
     await recordAudit({
