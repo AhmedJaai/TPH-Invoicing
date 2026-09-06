@@ -193,26 +193,31 @@ export function ReconcileQueue({
   async function settleAccount() {
     setBusy(true);
     setFailed(false);
-    let ok = 0;
-    for (const item of group!.items) {
-      try {
-        const res = await fetch("/api/match-confirm", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ transactionId: item.id, settleSupplier: true }),
-        });
-        const data = (await res.json()) as { message?: string; error?: string };
-        if (!res.ok) { setFailed(true); setMessage(data.error ?? "تعذّر السداد"); break; }
-        ok++;
-        setMessage(data.message ?? "سُدِّد");
-      } catch {
-        setFailed(true);
-        setMessage("تعذّر الاتصال بالخادم");
-        break;
-      }
+    try {
+      /*
+        المجموعة تُرسَل معاً — والخادم يقيّدها في معاملةٍ واحدة.
+
+        وكانت تُرسَل حركةً حركة: خمسةَ عشر طلباً لمجموعةٍ واحدة، فإن
+        نجح ثمانية وفشل التاسع بقيت نصفَ مقيَّدة ولا أحد يعرف أين وقفت.
+      */
+      const res = await fetch("/api/match-confirm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          transactionId: group!.items[0].id,
+          transactionIds: group!.items.map((i) => i.id),
+          settleSupplier: true,
+        }),
+      });
+      const data = (await res.json()) as { message?: string; error?: string };
+      if (!res.ok) { setFailed(true); setMessage(data.error ?? "تعذّر السداد"); }
+      else { setMessage(data.message ?? "سُدِّد"); router.refresh(); next(); }
+    } catch {
+      setFailed(true);
+      setMessage("تعذّر الاتصال بالخادم");
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
-    if (ok > 0) { router.refresh(); next(); }
   }
 
   /** يؤكّد المجموعة كلّها — والخادم يعيد التحقّق من أنّها مجموعة. */
@@ -366,9 +371,30 @@ export function ReconcileQueue({
             >
               {busy ? "يقيّد…" : "سدِّد على حساب المورّد — بالأقدم أوّلاً"}
             </button>
+            {/* ما سيحدث يُقال قبل الضغط لا بعده */}
+            {typeof group.outstandingMinor === "number" && (
+              <p className="nums mt-1.5 text-[11px] text-muted">
+                سيُخصَّص{" "}
+                <span className="font-bold text-ink">
+                  <Money minor={Math.min(group.totalMinor, group.outstandingMinor)} />
+                </span>
+                {" · ويبقى على حسابه "}
+                <span className="font-bold text-ink">
+                  <Money minor={Math.max(0, group.outstandingMinor - group.totalMinor)} />
+                </span>
+                {group.totalMinor > group.outstandingMinor && (
+                  <>
+                    {" · وغير مخصَّص "}
+                    <span className="font-bold text-ink">
+                      <Money minor={group.totalMinor - group.outstandingMinor} />
+                    </span>
+                  </>
+                )}
+              </p>
+            )}
             <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
-              تُقيَّد الدفعة وتُوزَّع على الفواتير المفتوحة من الأقدم، وما بقي
-              يبقى غير مخصَّص — ولا تُخترَع فاتورة.
+              لا رقمَ فاتورةٍ في الحوالة — فتُوزَّع على المفتوح بالأقدم أوّلاً،
+              وما بقي يبقى غير مخصَّص. ولا تُخترَع فاتورة.
             </p>
           </div>
         )}

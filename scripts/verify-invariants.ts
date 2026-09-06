@@ -38,6 +38,17 @@ async function main() {
     await mustFail("تخصيص بمبلغ سالب",
       `insert into payment_allocations (id, payment_id, invoice_id, amount_minor)
        values ('t-neg', '${pay.id}', '${inv.id}', -100)`),
+    /*
+      وسباقُ دفعتين على فاتورةٍ واحدة يُحسَم في القاعدة لا في الترتيب.
+
+      دفعتان تقرآن «المستحقّ ٣٬٠٠٠» في اللحظة نفسها ثمّ تخصّصانه
+      كلتاهما — والمؤثِّر يرفض الثانية. ولولاه لصارت الفاتورة مسدَّدة
+      مرّتين، ولخرج من الحساب ستّة آلاف عن ثلاثة.
+    */
+    await mustFail("تخصيصٌ يتجاوز إجمالي الفاتورة (سباق دفعتين)",
+      `insert into payment_allocations (id, payment_id, invoice_id, amount_minor)
+       values ('t-race', '${pay.id}', '${inv.id}', ${Number(inv.total)})`),
+
     await mustFail("تخصيص أكبر من قيمة الدفعة",
       `insert into payment_allocations (id, payment_id, invoice_id, amount_minor)
        values ('t-over', '${pay.id}', '${inv.id}', ${Number(pay.amount) + 1000})`),

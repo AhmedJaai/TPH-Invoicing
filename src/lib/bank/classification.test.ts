@@ -247,3 +247,43 @@ describe("«نوع العملية» يُصنّف حين يصمت الوصف", ()
     expect(c.kind).not.toBe("POS_FEE");
   });
 });
+
+describe("الذاكرة تعمل على المستقبل لا على الكشف نفسه فقط", () => {
+  /*
+    وهذا هو تعريف «أعرّفه مرّة» الحقيقيّ: لا أن يختفي التنبيه من هذه
+    الشاشة، بل أن يأتي كشفُ الشهر القادم فيُعرَف بلا سؤال.
+  */
+  const memory = buildMemory([{
+    key: "ID:2149830115",
+    kind: "SUPPLIER_PAYMENT",
+    supplierId: "S-almarai",
+    at: new Date("2026-09-01"),
+  }]);
+
+  it("عُرّف في سبتمبر ← كشفُ أكتوبر يعرفه", () => {
+    const october = classify(row({
+      valueDate: new Date("2026-10-14T00:00:00Z"),
+      amountMinor: 4_120_00,
+      description: "المراعي BEN ID:2149830115 شراء بضاعة 99887766",
+    }), memory);
+    expect(october.kind).toBe("SUPPLIER_PAYMENT");
+    expect(october.source).toBe("MEMORY");
+  });
+
+  it("ويعرفه وإن تغيّر مبلغُه ووصفُه ما دامت هويّتُه واحدة", () => {
+    const later = classify(row({
+      valueDate: new Date("2026-11-02T00:00:00Z"),
+      amountMinor: 777_25,
+      description: "LOCAL TRANSFER المراعي BEN ID:2149830115 دفعة",
+    }), memory);
+    expect(later.kind).toBe("SUPPLIER_PAYMENT");
+  });
+
+  it("ولا يعرف من ليس هو — الهويّة لا التشابه", () => {
+    const other = classify(row({
+      valueDate: new Date("2026-10-14T00:00:00Z"),
+      description: "المراعي BEN ID:1111111111 شراء بضاعة",
+    }), memory);
+    expect(other.source).not.toBe("MEMORY");
+  });
+});
