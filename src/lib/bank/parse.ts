@@ -7,7 +7,7 @@
  * القراءة متسامحة مع اختلاف الأعمدة: نتعرّف على الرؤوس بأسمائها لا بمواضعها،
  * فلو غيّر البنك ترتيب أعمدته لم ينكسر الاستيراد.
  */
-import * as XLSX from "xlsx";
+import { readWorkbookSafely } from "./parsers/safe-xlsx";
 import { parseRiyals } from "@/lib/money";
 
 export interface BankRow {
@@ -290,7 +290,12 @@ export function parseBankStatement(
   buffer: Buffer,
   options: { bank?: string } = {},
 ): BankStatementParse {
-  const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
+  /*
+    القراءة عبر حرسٍ لا مباشرةً: `xlsx@0.18.5` فيه ثغرتان عاليتان بلا
+    إصلاحٍ على npm، والمشروع يقرأ بها ملفّات **يرفعها مستخدم**.
+    التفصيل في `parsers/safe-xlsx.ts`.
+  */
+  const safe = readWorkbookSafely(buffer);
 
   /*
     تُجرَّب الأوراق كلّها لا الأولى وحدها: بعض صيغ التصدير تضع ورقة
@@ -298,15 +303,15 @@ export function parseBankStatement(
     وتُختار أوّل ورقة يُعثَر فيها على صفّ رؤوس صالح.
   */
   let grid: string[][] = [];
-  const warnings: ParseWarning[] = [];
+  const warnings: ParseWarning[] = safe.warnings.map((reason, i) => ({
+    rowNumber: -(i + 1), reason, raw: "",
+  }));
   let accountNumber: string | undefined;
   let headerRow = -1;
   let map: Record<string, number> = {};
 
-  for (const name of wb.SheetNames) {
-    const candidate = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[name], {
-      header: 1, raw: false, defval: "",
-    });
+  for (const sheet of safe.sheets) {
+    const candidate = sheet.grid;
     const found = locateHeader(candidate);
     if (found.headerRow !== -1) {
       grid = candidate;
