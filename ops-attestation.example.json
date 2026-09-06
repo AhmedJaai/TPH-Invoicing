@@ -1,0 +1,20 @@
+{
+  "_": "انسخه إلى ops-attestation.json. ما لا يُفحَص آلياً يُقِرّه إنسان — ولا يُكتَب PASS بالنيّة.",
+
+  "backupTaken": {
+    "at": "2026-09-06",
+    "by": "ahmed"
+  },
+
+  "isolationVerified": {
+    "at": "2026-09-06",
+    "by": "ahmed",
+    "productionId": "معرّف العنقود من /api/ops/db-identity في الإنتاج",
+    "previewId": "ومعرّفه في المعاينة — واختلافُهما هو الإثبات"
+  },
+
+  "secretsRotated": {
+    "at": "2026-09-06",
+    "by": "ahmed"
+  }
+}

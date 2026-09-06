@@ -45,3 +45,6 @@ next-env.d.ts
 
 # تقارير جرد الدرايف — تُولَّد محلياً وقد تحمل بيانات موردين
 /reports
+
+ops-attestation.json
+truth-audit.json
