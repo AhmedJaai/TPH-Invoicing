@@ -35,6 +35,7 @@
     "ops:certify": "tsx --env-file=.env scripts/certify-flow.ts",
     "ops:truth": "tsx --env-file=.env scripts/truth-audit.ts",
     "ops:gate": "tsx --env-file=.env scripts/production-gate.ts",
+    "db:repair-months": "tsx --env-file=.env scripts/repair-period-month.ts",
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
     "db:products": "tsx --env-file=.env scripts/build-products.ts",
     "db:expenses": "tsx --env-file=.env scripts/derive-expenses.ts",

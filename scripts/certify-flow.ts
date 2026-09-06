@@ -14,6 +14,7 @@
  *
  * وستّة سيناريوهات، آخرها هو الذي كاد يكلّف مالاً حقيقياً.
  */
+import { writeFileSync } from "node:fs";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -329,6 +330,19 @@ async function main() {
   const failed = results.filter((r) => !r.pass).length;
   console.log("───────────────────────────────────");
   console.log(`  ${results.length - failed} من ${results.length} نجحت\n`);
+
+  /*
+    النتيجة تُكتَب كي تقرأها البوّابة.
+
+    وبلا ذلك يبقى بندُ «اختبار الدورة كاملةً» مجهولاً أبداً، ويُطلَب من
+    الإنسان أن ينقل نتيجةً بيده — وما يُنقَل باليد يُنقَل خطأً.
+  */
+  writeFileSync("certify-result.json", JSON.stringify({
+    at: new Date().toISOString(),
+    total: results.length,
+    passed: results.length - failed,
+    results,
+  }, null, 2), "utf8");
 
   /* ولم يُكتَب شيء — يُتحقَّق من ذلك لا يُدَّعى */
   const [leftover] = (

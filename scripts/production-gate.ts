@@ -24,6 +24,22 @@ interface ManualAttestation {
   isolationVerified?: { at: string; by: string; productionId: string; previewId: string };
 }
 
+function readJson<T>(file: string): T | null {
+  try {
+    return JSON.parse(readFileSync(file, "utf8")) as T;
+  } catch {
+    return null;
+  }
+}
+
+/** عمرُ النتيجة — شهادةٌ عمرُها أسبوع لا تصف اليوم. */
+function ageOf(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "اليوم";
+  if (days === 1) return "أمس";
+  return `قبل ${days} يوماً`;
+}
+
 function readAttestation(): ManualAttestation {
   try {
     return JSON.parse(readFileSync("ops-attestation.json", "utf8")) as ManualAttestation;
@@ -197,19 +213,28 @@ async function main() {
   ).rows;
   const stmtTotal = Number(stmt?.total ?? 0);
   const stmtEmpty = Number(stmt?.empty ?? 0);
+  /*
+    الكشف المؤرشَف غير الكشف المطابَق.
+
+    أرشفتُه تُنشئ صفَّه، ومطابقتُه — من `/statements` — هي التي تقرأ
+    أسطره. فكشفٌ بلا أسطر ليس بياناتٍ فاسدة بل **عملاً لم يُنجَز**،
+    وهذا فرقٌ يجب أن تعرفه البوّابة: لو سمّته فشلاً لطالبت بإصلاح ما
+    ليس مكسوراً، ولو سمّته نجاحاً لادّعت أنّ المسار جُرّب وهو لم يُجرَّب.
+
+    والعدّ وحده يُخفي الفرق: «١١ كشفاً» تبدو نجاحاً.
+  */
   add(
     "supplier_statements",
-    stmtTotal === 0 ? "UNKNOWN" : stmtEmpty === 0 ? "PASS" : "FAIL",
+    stmtTotal === 0 || stmtEmpty === stmtTotal ? "UNKNOWN"
+      : stmtEmpty === 0 ? "PASS" : "FAIL",
     stmtTotal === 0
-      ? "لا كشف مورّدٍ مستورد — لم يُفحَص المسار"
-      /*
-        كشفٌ بلا أسطر ليس كشفاً: هو صفٌّ يقول إنّ الكشف وصل، ولا يحمل
-        ما وصل به. والعدّ وحده يخفي هذا — «١١ كشفاً» تبدو نجاحاً.
-      */
-      : stmtEmpty > 0
-        ? `${stmtTotal} كشفاً، و${stmtEmpty} منها بلا سطرٍ واحد — صفٌّ يقول إنّ الكشف وصل ولا يحمل ما فيه`
-        : `${stmtTotal} كشفاً · ${Number(stmt?.lines ?? 0)} سطراً`,
-    stmtEmpty > 0 ? "أعد استيراد الكشوف الفارغة — أو احذف صفوفها إن لم تصل أصلاً" : "استورد كشف مورّدٍ واحداً على الأقلّ",
+      ? "لا كشف مورّدٍ مؤرشَف — لم يُفحَص المسار"
+      : stmtEmpty === stmtTotal
+        ? `${stmtTotal} كشفاً مؤرشَفاً، ولم يُطابَق منها واحد — المسار لم يُجرَّب`
+        : stmtEmpty > 0
+          ? `${stmtEmpty} من ${stmtTotal} كشفاً مؤرشَفاً بلا مطابقة`
+          : `${stmtTotal} كشفاً · ${Number(stmt?.lines ?? 0)} سطراً مطابَقاً`,
+    "طابِق كشفاً واحداً على الأقلّ من /statements",
   );
 
   /* ── ٨ · إقفال الشهر ── */
@@ -335,17 +360,31 @@ async function main() {
     true,
   );
 
+  /*
+    والنتيجتان تُقرآن من ملفّيهما لا تُنقَلان باليد — وما يُنقَل باليد
+    يُنقَل خطأً. وقِدَمُ الملفّ يُعلَن: شهادةٌ عمرُها أسبوع لا تصف اليوم.
+    */
+  const certify = readJson<{ at: string; total: number; passed: number }>("certify-result.json");
   add(
     "end_to_end_tests",
-    "UNKNOWN",
-    "يُشتقّ من npm run ops:certify — شغّله وسجّل نتيجته",
+    certify === null ? "UNKNOWN" : certify.passed === certify.total ? "PASS" : "FAIL",
+    certify === null
+      ? "لم تُشغَّل الشهادة بعد"
+      : `${certify.passed} من ${certify.total} سيناريو · ${ageOf(certify.at)}`,
     "npm run ops:certify",
   );
 
+  const truth = readJson<{ at: string; counts: Record<string, number> }>("truth-audit.json");
+  const c = truth?.counts;
   add(
     "real_data_verification",
-    "UNKNOWN",
-    "يُشتقّ من npm run ops:truth — شغّله وسجّل نتيجته",
+    truth === null ? "UNKNOWN"
+      : (c?.CORRECTED ?? 0) + (c?.DUPLICATE ?? 0) + (c?.MISSING ?? 0) === 0 ? "PASS" : "FAIL",
+    truth === null
+      ? "لم يُشغَّل تدقيق الحقيقة بعد"
+      : `مطابق ${c?.VERIFIED ?? 0} · يحتاج تصحيحاً ${c?.CORRECTED ?? 0} · ` +
+        `مكرَّر ${c?.DUPLICATE ?? 0} · مفقود ${c?.MISSING ?? 0} · ` +
+        `لا يُقطَع فيه ${c?.AMBIGUOUS ?? 0} · ${ageOf(truth.at)}`,
     "npm run ops:truth",
   );
 

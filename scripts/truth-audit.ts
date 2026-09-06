@@ -14,7 +14,7 @@ import { db } from "@/db";
 import { accounts, documents, invoices, suppliers } from "@/db/schema";
 import { driveForCli, isFolder, listChildren, type DriveFile } from "@/lib/drive";
 import { parseFileName } from "@/lib/naming";
-import { driveConfig, SERVICE_FOLDER_NAMES } from "@/config/drive";
+import { driveConfig } from "@/config/drive";
 import { KNOWN_SLUGS } from "@/lib/suppliers-seed";
 import {
   VERDICT_LABEL, auditTruth, isClean, summarize,
@@ -31,12 +31,22 @@ async function walkArchive(
   rootId: string,
   depth = 0,
 ): Promise<DriveFile[]> {
-  if (depth > 4) return [];
+  if (depth > 5) return [];
   const children = await listChildren(drive, rootId);
   const out: DriveFile[] = [];
 
   for (const child of children) {
-    if (SERVICE_FOLDER_NAMES.includes(child.name)) continue;
+    /*
+      والمجلّدات الخدمية تُدخَل لا تُتخطّى.
+
+      `drive-inventory` يتخطّاها لأنّه يجرد **فواتير المورّدين**. وهذا
+      يقابل القاعدة كلَّها — وفيها إيصالات سداد ونقديّ ومرافق، وهي في
+      `_إيصالات السداد` وأخواته. فتخطّيها جعل أوّل تشغيلٍ يقول «سبعة
+      قيودٍ بلا أصل» وأصولُها موجودة، لم يدخل عليها الفاحص.
+
+      وهذا عطبٌ في الفاحص لا في البيانات — وأخطرُ أنواعه: يُنتج إنذاراً
+      كاذباً، ومن يعتاد الإنذار الكاذب يتجاهل الصادق.
+    */
     if (isFolder(child)) out.push(...(await walkArchive(drive, child.id, depth + 1)));
     else out.push(child);
   }
@@ -57,8 +67,21 @@ async function main() {
     return a?.token ?? null;
   });
 
-  const files = await walkArchive(drive, driveConfig.accountsFolderId);
-  console.log(`  الأرشيف: ${files.length} ملفّاً\n`);
+  const all = await walkArchive(drive, driveConfig.accountsFolderId);
+
+  /*
+    ملفّات الملاحظات ليست مستندات محاسبية.
+
+    و`parseFileName` تردّها صراحةً: «ملف ملاحظات لا مستند محاسبي».
+    فعدُّها «مفقودة» لأنّها بلا قيدٍ في القاعدة ضجيجٌ يُغرق الحقيقيّ:
+    أوّل تشغيلٍ أعطى ٩٢ مفقوداً، واحدٌ وثمانون منها `NOTES.txt`.
+  */
+  const NOTES = /\.(txt|md)$/i;
+  const files = all.filter((f) => !NOTES.test(f.name));
+  const notes = all.length - files.length;
+
+  console.log(`  الأرشيف: ${files.length} ملفّاً` +
+    (notes > 0 ? ` (و${notes} ملفَّ ملاحظاتٍ استُثني)` : "") + "\n");
 
   const archive: ArchiveFile[] = files.map((f) => {
     const parsed = parseFileName(f.name, KNOWN_SLUGS);
@@ -127,7 +150,7 @@ async function main() {
   }
 
   const out = "truth-audit.json";
-  writeFileSync(out, JSON.stringify({ counts, findings }, null, 2), "utf8");
+  writeFileSync(out, JSON.stringify({ at: new Date().toISOString(), counts, findings }, null, 2), "utf8");
   console.log(`───────────────────────────────────\n`);
   console.log(`  التفصيل كاملاً في ${out}`);
   console.log(`  الحكم: ${isClean(counts) ? "نقيّة" : "تحتاج مراجعة"}\n`);

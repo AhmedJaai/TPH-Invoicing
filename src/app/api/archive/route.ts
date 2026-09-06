@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { isAuthBypassed } from "@/lib/session";
 import { guard, respondTo } from "@/services/guard";
+import { monthOf } from "@/lib/filing";
 import { parseRiyals } from "@/lib/money";
 import { diffCorrections, recordAudit } from "@/lib/audit";
 import {
@@ -129,10 +130,43 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+      ── الشهر يُشتقّ في الخادم، ولا يُؤخَذ كما أرسله المتصفّح ──
+
+      وهذا الملفّ وقع فيه هذا الخطأ مرّتين. الأولى في `isTaxValid`،
+      وأُصلحت بـ`reviewConfirmed()`. والثانية هنا: `periodMonth` يُقرأ
+      من الجسم ويُفحَص شكلُه (`YYYY-MM`) ثمّ يُكتَب في المستند والفاتورة
+      والدفعة — بلا أن يُقابَل بتاريخ الفاتورة نفسه.
+
+      وكشفه تدقيقُ الحقيقة على بيانات حقيقية: ستّ فواتير مؤرَّخة في
+      أغسطس ٢٠٢٦ محفوظةٌ في سبتمبر — وهو **شهر رفعها**. فأغسطس ناقصٌ
+      بقيمتها وسبتمبر زائد، وإقفالُ أغسطس يمرّ وهو لا يراها.
+
+      والقاعدة مكتوبة في `CLAUDE.md` منذ البداية: «الشهر المحاسبي مشتقٌّ
+      من تاريخ الفاتورة لا تاريخ الرفع». والقاعدة التي لا يفرضها الكود
+      وصيّةٌ لا قاعدة.
+    */
+    const invoiceDate = body.invoiceDate ? new Date(`${body.invoiceDate}T00:00:00Z`) : null;
+
+    const derivedMonth =
+      invoiceDate !== null && !Number.isNaN(invoiceDate.getTime())
+        ? monthOf(invoiceDate)
+        /*
+          وما لا تاريخ له — إيصالٌ نقديّ أو كشفٌ بلا تاريخ مقروء — يبقى
+          على ما اختاره صاحبه: هو أدرى، ولا يُخترَع له شهر.
+        */
+        : body.periodMonth;
+
+    const periodMonth = derivedMonth;
+
+    /* والاختلاف يُسجَّل لا يُبتلَع: من يراجع بعد شهرٍ يعرف لِمَ تغيّر. */
+    const monthCorrected =
+      body.periodMonth !== periodMonth ? { أرسله: body.periodMonth, واشتُقّ: periodMonth } : null;
+
     // ── فحوص تسبق أي كتابة ──
     const sha256 = sha256Of(data);
     await assertNotDuplicate(sha256);
-    await assertMonthOpen(body.periodMonth);
+    await assertMonthOpen(periodMonth);
 
     const subtotalMinor = parseRiyals(body.subtotal ?? "");
     const vatMinor = parseRiyals(body.vat ?? "");
@@ -153,7 +187,7 @@ export async function POST(request: Request) {
     // ── الدرايف ──
     const uploaded = await archiveToDrive({
       userId: user.id,
-      periodMonth: body.periodMonth,
+      periodMonth,
       folderName: body.folderName,
       fileName: body.fileName,
       mimeType: body.mimeType,
@@ -161,8 +195,6 @@ export async function POST(request: Request) {
     });
 
     // ── القاعدة ──
-    const invoiceDate = body.invoiceDate ? new Date(`${body.invoiceDate}T00:00:00Z`) : null;
-
     const documentId = await db.transaction(async (tx) => {
       const docId = await createDocument(tx, {
         driveFileId: uploaded.fileId,
@@ -172,7 +204,7 @@ export async function POST(request: Request) {
         sizeBytes: data.length,
         sha256,
         kind: body.documentKind,
-        periodMonth: body.periodMonth,
+        periodMonth,
         supplierId: body.supplierId,
         rawExtraction: body.rawExtraction,
         extractionModel: body.extractionModel,
@@ -186,7 +218,7 @@ export async function POST(request: Request) {
           supplierId: body.supplierId,
           invoiceNumber: body.invoiceNumber!.trim(),
           invoiceDate,
-          periodMonth: body.periodMonth,
+          periodMonth,
           subtotalMinor,
           vatMinor,
           totalMinor,
@@ -225,7 +257,7 @@ export async function POST(request: Request) {
           amountMinor: totalMinor,
           method: body.documentKind === "CASH_RECEIPT" ? "CASH" : "BANK_TRANSFER",
           beneficiaryNameRaw: body.beneficiary,
-          appliesToMonth: body.periodMonth,
+          appliesToMonth: periodMonth,
         });
       }
 
@@ -260,7 +292,9 @@ export async function POST(request: Request) {
         fileName: uploaded.fileName,
         driveFileId: uploaded.fileId,
         folderName: body.folderName,
-        periodMonth: body.periodMonth,
+        periodMonth,
+        /* الشهر المصحَّح يُسجَّل بطرفيه — لا يُبتلَع */
+        ...(monthCorrected ? { الشهر_صُحّح: monthCorrected } : {}),
         الحالة_الضريبية: review.taxStatus,
         خصم_المدخلات: review.inputVatStatus,
         manualCorrections: corrections,
@@ -276,6 +310,9 @@ export async function POST(request: Request) {
       webViewLink: uploaded.webViewLink,
       taxStatus: review.taxStatus,
       correctedFields: Object.keys(corrections),
+      /* ويُعاد إلى الشاشة كي يراه من رفع، لا يُصحَّح خلف ظهره */
+      periodMonth,
+      monthCorrected,
     });
   } catch (e) {
     const mapped = toResponse(e);
