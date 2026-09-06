@@ -201,3 +201,32 @@ describe("المفتاح الطبيعيّ: رفعُ الكشف عشرين مرّ
     expect(naturalKey(file[0])).not.toBe(naturalKey({ ...file[0], amountMinor: 51 }));
   });
 });
+
+describe("الحساب معرفةٌ تتحسّن — فلا يدخل هويّة الحركة", () => {
+  const day = (d: string) => new Date(`${d}T00:00:00Z`);
+  const row = {
+    valueDate: day("2026-08-12"),
+    amountMinor: 833_75,
+    direction: "DEBIT" as const,
+    description: "حوالة top taste",
+  };
+
+  it("المفتاح الطبيعيّ لا يعرف الحساب أصلاً", () => {
+    /*
+      وهذا هو الأصل الذي وقع العطب حين خُولف: الكشوف الأولى استُوردت
+      ولا يُقرأ منها رقمُ الحساب فحُفظت بحسابٍ فارغ، ثمّ صار يُقرأ.
+      فبُحث عن السابق في نطاق الحساب الجديد ولم يوجد — ودخل الكشف
+      كلّه ثانيةً.
+
+      والفارغ ليس «حساباً آخر»، هو «لم نكن نعرف».
+    */
+    expect(naturalKey(row)).toBe(naturalKey({ ...row }));
+    expect(naturalKey(row)).not.toContain("account");
+  });
+
+  it("الصفّ يُعرَف سابقاً وإن اختلف نطاق حسابه", () => {
+    const stored = assignIdentities([row]);
+    const reupload = assignIdentities([row]);
+    expect(unseenRows(reupload, countByNaturalKey(stored))).toHaveLength(0);
+  });
+});

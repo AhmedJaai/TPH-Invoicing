@@ -1,6 +1,6 @@
 /** استيراد كشف البنك ومطابقة مدفوعاته بالفواتير. */
 import { NextResponse } from "next/server";
-import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   adjudications, bankImports, bankRules, bankTransactions, decisionHistory, invoices, paymentAllocations,
@@ -13,7 +13,7 @@ import {
   type BankTx, type OpenInvoice,
 } from "@/lib/bank/match";
 import {
-  assignIdentities, countByNaturalKey, fileFingerprint, unseenRows,
+  assignIdentities, countByNaturalKey, fileFingerprint, naturalKey, unseenRows,
 } from "@/lib/bank/identity";
 import { resolveBankAccount } from "@/services/bank-account.service";
 import { allocate, createPayment } from "@/services/payment.service";
@@ -454,22 +454,34 @@ export async function POST(request: Request) {  let user;
     حركةٌ واحدة، وتبقى الحركتان المتطابقتان الحقيقيّتان اثنتين.
   */
   const times = identified.map((r) => r.valueDate.getTime());
-  const accountScope = bankAccountId === null
-    ? isNull(bankTransactions.bankAccountId)
-    : eq(bankTransactions.bankAccountId, bankAccountId);
 
+  /*
+    ولا يُقيَّد البحثُ بالحساب.
+
+    كان يُقيَّد، فوقع العطب مرّةً ثالثة من الجذر نفسه: **هويّةٌ قُيِّدت
+    بمعرفةٍ تتحسّن مع الوقت ليست هويّة.** الكشوف الأولى استُوردت ولا
+    يُقرأ منها رقمُ الحساب، فحُفظت حركاتها بحسابٍ فارغ. ثمّ صار القارئ
+    يقرأ الرقم، فرُفع الكشف نفسه فبحث عن سابقٍ **في نطاق الحساب
+    الجديد** — ولم يجد شيئاً، لأنّ القديم كلّه في نطاق «المجهول».
+    فدخل ألفٌ وأربعمئة وستّ وثلاثون حركة ثانيةً، وصار الصادر ضعفه.
+
+    والفارغ ليس «حساباً آخر»، هو «لم نكن نعرف». فيُقارَن بما في
+    المدى كلِّه، ثمّ يُتبنّى ما طابق: يُكتَب له الحساب فيلتحق بنطاقه،
+    ولا يبقى في المجهول ينتظر أن يُضاعَف.
+  */
   const priorRows = times.length === 0 ? [] : await db
     .select({
+      id: bankTransactions.id,
       valueDate: bankTransactions.valueDate,
       amountMinor: bankTransactions.amountMinor,
       direction: bankTransactions.direction,
       description: bankTransactions.description,
+      bankAccountId: bankTransactions.bankAccountId,
     })
     .from(bankTransactions)
     .where(and(
       gte(bankTransactions.valueDate, new Date(Math.min(...times))),
       lte(bankTransactions.valueDate, new Date(Math.max(...times))),
-      accountScope,
     ));
 
   const priorCount = countByNaturalKey(
@@ -489,6 +501,35 @@ export async function POST(request: Request) {  let user;
 
   const alreadyImported = Boolean(priorImport);
   const fresh = unseenRows(identified, priorCount);
+
+  /*
+    ── التبنّي ──
+
+    ما عُرف الآن أنّه من هذا الحساب يُكتَب له الحساب، فينتقل من نطاق
+    «المجهول» إلى نطاقه. وبه يحرسه القيدُ الفريد في القاعدة بعد اليوم،
+    ولا يعود يعتمد على فحصٍ في الشيفرة وحده.
+
+    ولا يُتبنّى إلّا ما طابق مفتاحاً في هذا الكشف: تلك وحدها التي ثبت
+    أنّها من هذا الحساب — والباقي يبقى مجهولاً لأنّه لم يُثبَت.
+  */
+  if (bankAccountId !== null) {
+    const incoming = new Set(identified.map((r) => naturalKey(r)));
+    const adopt = priorRows
+      .filter((r) => r.bankAccountId === null && incoming.has(naturalKey({
+        valueDate: r.valueDate,
+        amountMinor: r.amountMinor,
+        direction: r.direction as "DEBIT" | "CREDIT",
+        description: r.description,
+      })))
+      .map((r) => r.id);
+
+    for (let i = 0; i < adopt.length; i += 400) {
+      await db
+        .update(bankTransactions)
+        .set({ bankAccountId })
+        .where(inArray(bankTransactions.id, adopt.slice(i, i + 400)));
+    }
+  }
   const newRows = fresh.length;
 
   let importId = priorImport?.id ?? "";
