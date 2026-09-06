@@ -47,8 +47,19 @@ const CATEGORY_OPTIONS: TxCategory[] = [
   "GOVERNMENT", "PERSONAL", "INTERNAL", "OTHER",
 ];
 
+/** حصيلة المزامنة — ما الجديد قبل ما المعنى. */
+interface SyncSummary {
+  inFile: number;
+  alreadyKnown: number;
+  added: number;
+  ambiguous: number;
+  byReference: number;
+  ambiguousRows?: { date: string; amountMinor: number; description: string; reason: string }[];
+}
+
 interface Preview {
   summary: Summary;
+  sync?: SyncSummary;
   preview: { date: string; amountMinor: number; supplierName?: string; invoiceNumbers: string[]; kind: string }[];
   unknown: UnknownTx[];
   supplierOnlyList: { date: string; amountMinor: number; supplierName: string }[];
@@ -399,13 +410,49 @@ export function BankImport({
               من يرى «٢٤٣ حركة» يظنّ أنّ عليه مراجعة مئتين وأربعين، وإنّما
               عليه اثنتا عشرة.
             */}
+            {/*
+              المزامنة تُقال أوّلاً.
+
+              لأنّ صاحب العمل لا يريد أن يُدخِل ملفّاً، يريد أن يعرف ما
+              الجديد فيه. وكان يُقال «أُضيفت ٣٢٧ حركة» عن ملفٍّ لم يُضِف
+              واحدة — فيراجع ثلاثمئة سطرٍ حسم أمرها من شهر.
+            */}
+            {data.sync && (
+              <div className="mt-3 rounded-xl border border-line bg-sunken px-3 py-3">
+                <p className="font-display text-2xl font-bold leading-none">
+                  {data.sync.added === 0
+                    ? "لا جديد في هذا الكشف"
+                    : `${data.sync.added} حركة جديدة`}
+                </p>
+                <p className="nums mt-1.5 text-xs text-muted">
+                  {data.sync.inFile} في الملفّ · {data.sync.alreadyKnown} مسجّلة عندك
+                  {data.sync.byReference > 0 && ` (${data.sync.byReference} عُرفت بمرجع عمليّتها)`}
+                  {data.sync.ambiguous > 0 && ` · ${data.sync.ambiguous} ملتبسة`}
+                </p>
+                {data.sync.ambiguous > 0 && (
+                  <div className="mt-2 border-t border-line pt-2">
+                    <p className="text-[11px] font-bold text-warn">تحتاج قرارك — لن تُضاف ولن تُحذف</p>
+                    <ul className="mt-1 space-y-1">
+                      {(data.sync.ambiguousRows ?? []).map((a, i) => (
+                        <li key={i} className="text-[10px] leading-relaxed text-muted">
+                          <span className="nums">{a.date}</span> ·{" "}
+                          <span className="nums font-bold">{(a.amountMinor / 100).toFixed(2)}</span> ·{" "}
+                          {a.description} — {a.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
             <p className="mt-3 font-display text-2xl font-bold leading-none">
               {data.summary.unknown === 0
                 ? "لا شيء يحتاجك"
                 : `${data.summary.unknown} حركة تحتاجك`}
             </p>
             <p className="mt-1.5 text-xs text-muted">
-              من <span className="nums">{data.summary.totalRows}</span> حركة —
+              من <span className="nums">{data.sync?.added ?? data.summary.totalRows}</span> حركة جديدة —
               الباقي صُنّف بقواعدك أو بطبيعته.
             </p>
 

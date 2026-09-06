@@ -12,13 +12,13 @@ import {
   findDuplicatePayments, suggestAlias,
   type BankTx, type OpenInvoice,
 } from "@/lib/bank/match";
-import {
-  assignIdentities, countByNaturalKey, fileFingerprint, naturalKey, unseenRows,
-} from "@/lib/bank/identity";
+import { fileFingerprint, operationRef, operationRefs } from "@/lib/bank/identity";
+import { factKey, looseKey, syncRows, type KnownRow } from "@/lib/bank/sync";
 import { resolveBankAccount } from "@/services/bank-account.service";
 import { allocate, createPayment } from "@/services/payment.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
 import { recordAudit } from "@/lib/audit";
+import { countNoun, TRANSACTION } from "@/lib/arabic";
 import { applyAdjudication, runReconciliation } from "@/services/reconcile.service";
 import { adjudicate } from "@/services/adjudicator.service";
 import { selectedAdjudicator } from "@/lib/bank/adjudicator-provider";
@@ -122,6 +122,82 @@ export async function POST(request: Request) {  let user;
   }));
 
   /*
+    ══ المزامنة قبل التسوية ══
+
+    السؤال الأوّل ليس «ماذا تعني هذه الحركة؟» بل **«أهي عندنا؟»**.
+    وكان المسار يعكسهما: يحسب لثلاثمئة حركة مرشّحيها ودرجاتها ويستدعي
+    الحَكَم، ثمّ يكتشف أنّ مئتين وتسعين منها مقيَّدة. عملٌ ضائع، وذاكرةٌ
+    تُستدعى بلا سبب، وحسابٌ يُعاد على ما فُرغ منه.
+
+    فصار الترتيب: اقرأ ← عرّف الحساب ← اعرف الهويّات ← افصل المعروف عن
+    الجديد ← **سوِّ الجديد وحده**.
+  */
+  const bankAccountId = await resolveBankAccount({
+    accountNumber: parsed.accountNumber,
+    bankName: parsed.bank,
+  });
+
+  const times = parsed.rows.map((r) => r.valueDate.getTime());
+  const canonicalRows = parsed.rows.map((r, i) => ({
+    key: `row-${r.rowNumber}-${i}`,
+    raw: r,
+    tx: toCanonical({
+      valueDate: r.valueDate,
+      description: r.description,
+      beneficiaryRaw: r.beneficiaryRaw,
+      transactionType: r.transactionType,
+      amountMinor: r.amountMinor,
+      direction: r.direction,
+    }),
+  }));
+
+  /*
+    ما يُقابَل: حركاتُ الفترة نفسها — بالفهرس، لا القاعدة كلّها. وبلا
+    قيدِ حساب: «المجهول» ليس حساباً آخر، هو «لم نكن نعرف».
+  */
+  const priorRows = times.length === 0 ? [] : await db
+    .select({
+      id: bankTransactions.id,
+      valueDate: bankTransactions.valueDate,
+      amountMinor: bankTransactions.amountMinor,
+      direction: bankTransactions.direction,
+      description: bankTransactions.description,
+      transactionType: bankTransactions.transactionType,
+      beneficiaryRaw: bankTransactions.beneficiaryRaw,
+      bankAccountId: bankTransactions.bankAccountId,
+      operationRef: bankTransactions.operationRef,
+    })
+    .from(bankTransactions)
+    .where(and(
+      gte(bankTransactions.valueDate, new Date(Math.min(...times))),
+      lte(bankTransactions.valueDate, new Date(Math.max(...times))),
+    ));
+
+  const knownRows: KnownRow[] = priorRows.map((r) => {
+    const tx = toCanonical({
+      valueDate: r.valueDate, description: r.description,
+      beneficiaryRaw: r.beneficiaryRaw, transactionType: r.transactionType,
+      amountMinor: r.amountMinor, direction: r.direction as "DEBIT" | "CREDIT",
+    });
+    return {
+      id: r.id,
+      accountId: r.bankAccountId,
+      refs: operationRefs(tx),
+      operationRef: r.operationRef ?? operationRef(tx),
+      factKey: factKey(tx),
+      looseKey: looseKey(tx),
+    };
+  });
+
+  const sync = syncRows(
+    canonicalRows.map((c) => ({ row: c, tx: c.tx })),
+    knownRows,
+    bankAccountId,
+  );
+
+  const freshRows = sync.fresh;
+
+  /*
     محرّك التسوية الجديد.
 
     كان `matchBankTransactions` هو الحاكم: جشعٌ يحجز الفاتورة لأوّل
@@ -175,14 +251,15 @@ export async function POST(request: Request) {  let user;
   const coverage = analyzeCoverage([...priorPeriods, ...thisPeriod]);
 
   let engine = runReconciliation({
-    rows: parsed.rows.map((r, i) => ({
-      key: `row-${r.rowNumber}-${i}`,
-      valueDate: r.valueDate,
-      description: r.description,
-      beneficiaryRaw: r.beneficiaryRaw,
-      transactionType: r.transactionType,
-      amountMinor: r.amountMinor,
-      direction: r.direction,
+    /* الجديد وحده — ولا يُعاد حسابُ ما قُيّد وفُرغ منه */
+    rows: freshRows.map((f) => ({
+      key: f.row.key,
+      valueDate: f.row.raw.valueDate,
+      description: f.row.raw.description,
+      beneficiaryRaw: f.row.raw.beneficiaryRaw,
+      transactionType: f.row.raw.transactionType,
+      amountMinor: f.row.raw.amountMinor,
+      direction: f.row.raw.direction,
     })),
     invoices: open.map((o) => ({
       id: o.invoiceId,
@@ -356,6 +433,23 @@ export async function POST(request: Request) {  let user;
     return NextResponse.json({
       ok: true, applied: false, summary,
       /*
+        المعاينة تقول أوّلاً: ما الجديد؟ قبل أن تقول ما معناه. فمن رفع
+        كشفاً كلّه مقيَّد لا يُعرَض عليه ثلاثمئة سطرٍ ليراجعها.
+      */
+      sync: {
+        inFile: canonicalRows.length,
+        alreadyKnown: sync.known.length,
+        added: freshRows.length,
+        ambiguous: sync.ambiguous.length,
+        byReference: sync.known.filter((k) => k.verdict.basis === "REFERENCE").length,
+        ambiguousRows: sync.ambiguous.slice(0, 10).map((a) => ({
+          date: a.row.raw.valueDate.toISOString().slice(0, 10),
+          amountMinor: a.row.raw.amountMinor,
+          description: (a.row.raw.description ?? "").slice(0, 90),
+          reason: a.verdict.reason,
+        })),
+      },
+      /*
         المعاينة تعرض ما سيُكتَب فعلاً — لا ما وجده محرّك آخر. فما تراه
         قبل الموافقة هو ما يقع بعدها.
       */
@@ -413,86 +507,11 @@ export async function POST(request: Request) {  let user;
    * ── التطبيق ──
    *
    * الاستيراد منيع من التكرار على ثلاث طبقات:
-   *   ١. بصمة الملف: الملف نفسه يُعرف قبل قراءة صفوفه.
-   *   ٢. هوية كل حركة: بصمة من محتواها وترتيب تكرارها في الملف.
-   *   ٣. قيد فريد في القاعدة: الفحص في الكود يفلت من طلبين متزامنين، والقيد لا يفلت.
-   *
-   * وبدون ذلك استُورد كشف واحد ثلاث مرّات فصارت كل حركة ثلاثاً.
+   *   ١. بصمة الملف: الملف نفسه يُعرف قبل قراءة صفوفه — اختصارٌ سريع لا هويّة.
+   *   ٢. هويّة كل حركة (`sync.ts`): مرجعُ العمليّة أوّلاً، فالوقائع.
+   *   ٣. قيدٌ فريد في القاعدة على الهويّة المخزَّنة: الفحص في الشيفرة
+   *      يفلت من طلبين متزامنين، والقيد لا يفلت.
    */
-  const identified = assignIdentities(
-    txs.map((t) => ({
-      valueDate: t.valueDate,
-      amountMinor: t.amountMinor,
-      direction: t.direction,
-      description: t.description,
-      tx: t,
-    })),
-  );
-
-  /*
-    الحساب يُعرَّف قبل الكتابة.
-
-    كان رقم الحساب نصّاً في عمود، فلا تُنسَب الحركة إلى كيان. ومن غير
-    ذلك لا يُقيَّد منعُ التكرار بحسابه: حوالتان متطابقتان من حسابين —
-    وهذا يقع — تبتلع أولاهما الأخرى.
-  */
-  const bankAccountId = await resolveBankAccount({
-    accountNumber: parsed.accountNumber,
-    bankName: parsed.bank,
-  });
-
-  /*
-    البحث عن السابق مقيَّد بالحساب نفسه. والمجهول نطاقٌ واحد: حركاته
-    تُقارَن بحركات المجهول لا بحركات حسابٍ معروف.
-  */
-  /*
-    كم من كلّ حركةٍ عند القاعدة الآن؟
-
-    والسؤال بهذه الصيغة مقصود. الكشف يذكر الحركة بعدد ما وقعت — مرّةً
-    أو مرّتين — فإن كان عندنا منها مثلُ ما يقول الكشف فلا جديد، وإن
-    كان أقلّ دخل الفرق وحده. وبهذا يُرفَع الملف عشرين مرّة فلا تزيد
-    حركةٌ واحدة، وتبقى الحركتان المتطابقتان الحقيقيّتان اثنتين.
-  */
-  const times = identified.map((r) => r.valueDate.getTime());
-
-  /*
-    ولا يُقيَّد البحثُ بالحساب.
-
-    كان يُقيَّد، فوقع العطب مرّةً ثالثة من الجذر نفسه: **هويّةٌ قُيِّدت
-    بمعرفةٍ تتحسّن مع الوقت ليست هويّة.** الكشوف الأولى استُوردت ولا
-    يُقرأ منها رقمُ الحساب، فحُفظت حركاتها بحسابٍ فارغ. ثمّ صار القارئ
-    يقرأ الرقم، فرُفع الكشف نفسه فبحث عن سابقٍ **في نطاق الحساب
-    الجديد** — ولم يجد شيئاً، لأنّ القديم كلّه في نطاق «المجهول».
-    فدخل ألفٌ وأربعمئة وستّ وثلاثون حركة ثانيةً، وصار الصادر ضعفه.
-
-    والفارغ ليس «حساباً آخر»، هو «لم نكن نعرف». فيُقارَن بما في
-    المدى كلِّه، ثمّ يُتبنّى ما طابق: يُكتَب له الحساب فيلتحق بنطاقه،
-    ولا يبقى في المجهول ينتظر أن يُضاعَف.
-  */
-  const priorRows = times.length === 0 ? [] : await db
-    .select({
-      id: bankTransactions.id,
-      valueDate: bankTransactions.valueDate,
-      amountMinor: bankTransactions.amountMinor,
-      direction: bankTransactions.direction,
-      description: bankTransactions.description,
-      bankAccountId: bankTransactions.bankAccountId,
-    })
-    .from(bankTransactions)
-    .where(and(
-      gte(bankTransactions.valueDate, new Date(Math.min(...times))),
-      lte(bankTransactions.valueDate, new Date(Math.max(...times))),
-    ));
-
-  const priorCount = countByNaturalKey(
-    priorRows.map((prior) => ({
-      valueDate: prior.valueDate,
-      amountMinor: prior.amountMinor,
-      direction: prior.direction as "DEBIT" | "CREDIT",
-      description: prior.description,
-    })),
-  );
-
   const [priorImport] = await db
     .select({ id: bankImports.id })
     .from(bankImports)
@@ -500,7 +519,37 @@ export async function POST(request: Request) {  let user;
     .limit(1);
 
   const alreadyImported = Boolean(priorImport);
-  const fresh = unseenRows(identified, priorCount);
+  const fresh = freshRows;
+
+  /*
+    ── التبنّي ──
+
+    ما عُرف الآن أنّه من هذا الحساب يُكتَب له الحساب، فينتقل من نطاق
+    «المجهول» إلى نطاقه ويحرسه القيدُ في القاعدة بعد اليوم.
+  */
+  if (bankAccountId !== null) {
+    const adopt = sync.known
+      .map((k) => k.verdict.matchedId)
+      .filter((id) => priorRows.find((p) => p.id === id)?.bankAccountId === null);
+    for (let i = 0; i < adopt.length; i += 400) {
+      await db.update(bankTransactions)
+        .set({ bankAccountId })
+        .where(inArray(bankTransactions.id, adopt.slice(i, i + 400)));
+    }
+  }
+
+  /*
+    ── ما تعلّمناه عن القديم يُكتَب عليه ──
+
+    كشفٌ أحدث قد يحمل مرجعَ عمليّةٍ لم يكن في الأوّل. فهو خبرٌ عن
+    الحركة نفسها لا حركةٌ ثانية: يُكتَب المرجع، وتُعرَف به المرّة
+    القادمة مهما تغيّر وصفُها.
+  */
+  for (const e of sync.enrich) {
+    await db.update(bankTransactions)
+      .set({ operationRef: e.operationRef })
+      .where(eq(bankTransactions.id, e.id));
+  }
 
   /*
     ── التبنّي ──
@@ -512,24 +561,6 @@ export async function POST(request: Request) {  let user;
     ولا يُتبنّى إلّا ما طابق مفتاحاً في هذا الكشف: تلك وحدها التي ثبت
     أنّها من هذا الحساب — والباقي يبقى مجهولاً لأنّه لم يُثبَت.
   */
-  if (bankAccountId !== null) {
-    const incoming = new Set(identified.map((r) => naturalKey(r)));
-    const adopt = priorRows
-      .filter((r) => r.bankAccountId === null && incoming.has(naturalKey({
-        valueDate: r.valueDate,
-        amountMinor: r.amountMinor,
-        direction: r.direction as "DEBIT" | "CREDIT",
-        description: r.description,
-      })))
-      .map((r) => r.id);
-
-    for (let i = 0; i < adopt.length; i += 400) {
-      await db
-        .update(bankTransactions)
-        .set({ bankAccountId })
-        .where(inArray(bankTransactions.id, adopt.slice(i, i + 400)));
-    }
-  }
   const newRows = fresh.length;
 
   let importId = priorImport?.id ?? "";
@@ -573,17 +604,20 @@ export async function POST(request: Request) {  let user;
 
   await db.transaction(async (tx) => {
     for (const row of fresh) {
-      const t = row.tx;
-      const decided = engineByKey.get(t.id);
-      const plan = plannedByKey.get(t.id);
+      const t = row.row.tx;
+      const key = row.row.key;
+      const decided = engineByKey.get(key);
+      const plan = plannedByKey.get(key);
       const [inserted] = await tx
         .insert(bankTransactions)
         .values({
           bankImportId: importId,
           bankAccountId,
-          externalId: row.externalId,
-          /* جزءٌ من المفتاح الطبيعيّ — لا حقلٌ وصفيّ */
-          occurrence: row.occurrence,
+          externalId: row.row.key,
+          /* الهويّة المخزَّنة — وبها يُعرَف أنّها عندنا في المرّة القادمة */
+          identityKey: row.verdict.identityKey,
+          operationRef: row.verdict.operationRef,
+          occurrence: row.verdict.occurrence,
           valueDate: t.valueDate,
           description: t.description,
           transactionType: t.transactionType || null,
@@ -671,7 +705,7 @@ export async function POST(request: Request) {  let user;
       });
 
       /* أثرُ التحكيم، إن حُكِّمت */
-      const verdict = adjudicationOutcomes.find((o) => o.transactionId === t.id);
+      const verdict = adjudicationOutcomes.find((o) => o.transactionId === key);
       if (verdict) {
         await tx.insert(adjudications).values({
           bankTransactionId: inserted.id,
@@ -713,7 +747,7 @@ export async function POST(request: Request) {  let user;
         paidAt: plan.paidAt,
         amountMinor: plan.amountMinor,
         method: "BANK_TRANSFER",
-        beneficiaryNameRaw: (t.beneficiaryRaw ?? t.description).slice(0, 200),
+        beneficiaryNameRaw: (t.beneficiaryRaw ?? t.description ?? "").slice(0, 200),
         /*
           الرسم يُحفَظ في حقله فيخرج من القسمة — ولا يُنسَب إلى المورّد
           مالٌ ذهب إلى البنك.
@@ -757,7 +791,8 @@ export async function POST(request: Request) {  let user;
     after: {
       ...summary,
       حركات_جديدة: newRows,
-      حركات_موجودة_تُخطّيت: identified.length - newRows,
+      حركات_موجودة_تُخطّيت: sync.known.length,
+      حركات_ملتبسة: sync.ambiguous.length,
       مدفوعات_أُنشئت: created,
       الملف_مستورد_مسبقاً: alreadyImported,
     },
@@ -766,18 +801,31 @@ export async function POST(request: Request) {  let user;
   return NextResponse.json({
     ok: true,
     applied: true,
-    summary: { ...summary, newRows, skippedRows: identified.length - newRows },
+    /*
+      «مزامنة» لا «استيراد».
+
+      صاحب العمل لا يريد أن يُدخِل ملفّاً؛ يريد أن يعرف ما الجديد فيه.
+      فتُقال له الأعداد الأربعة: ما في الملفّ، وما هو عنده، وما دخل،
+      وما التبس. وكان يُقال «أُضيفت ٣٢٧ حركة» عن ملفٍّ لم يُضِف واحدة.
+    */
+    summary: { ...summary, newRows, skippedRows: sync.known.length },
+    sync: {
+      inFile: canonicalRows.length,
+      alreadyKnown: sync.known.length,
+      added: newRows,
+      ambiguous: sync.ambiguous.length,
+      enriched: sync.enrich.length,
+      byReference: sync.known.filter((k) => k.verdict.basis === "REFERENCE").length,
+    },
     created,
     alreadyImported,
     importId,
     rejectedByConstraint,
     message:
       newRows === 0
-        ? `هذا الكشف مقيَّد عندك من قبل — قُرئت ${identified.length} حركة، وكلّها مسجَّلة، فلم تُضَف واحدة.`
-        : `أُضيفت ${newRows} حركة جديدة${
-            identified.length - newRows > 0
-              ? ` · ${identified.length - newRows} كانت مسجَّلة من قبل فلم تتكرّر`
-              : ""
+        ? `هذا الكشف مقيَّد عندك من قبل — ${countNoun(canonicalRows.length, TRANSACTION)} كلّها مسجَّلة، فلم تُضَف واحدة.`
+        : `تمّت المزامنة: ${countNoun(canonicalRows.length, TRANSACTION)} في الملفّ · ${sync.known.length} موجودة · ${newRows} جديدة${
+            sync.ambiguous.length > 0 ? ` · ${sync.ambiguous.length} تحتاج قرارك` : ""
           }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} ردّها قيد القاعدة` : ""}.`,
   });
 }

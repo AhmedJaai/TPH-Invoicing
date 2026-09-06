@@ -55,20 +55,21 @@ async function main() {
        values ('t-exp2', '2026-07', '2026-08-01', 'RENT', 'اختبار', 100, 'MANUAL')`),
 
     /*
-      وهذا هو القيد الذي غاب فدخل كشفٌ كامل مرّتين.
+      الهويّة المخزَّنة: لا صفّان بمفتاحٍ واحد.
 
-      يُنسَخ صفٌّ قائم بمفتاحه الطبيعيّ كلِّه — الحساب والتاريخ والمبلغ
-      والاتجاه والوصف والترتيب — ببصمةٍ مختلفة. وهذا بالضبط ما وقع:
-      بصمتان لحركةٍ واحدة. فإن قبلته القاعدة فالمنع ادّعاء.
+      وهي التي يُقرَّر بها «أهذه الحركة عندنا؟». فإن لم تُقيَّد في
+      القاعدة كان المنع في الشيفرة وحدها — والشيفرة تفلت من طلبين
+      متزامنين، ومن نصٍّ يُشغَّل بيد.
     */
-    ...(tx ? [await mustFail("حركة بنكية مكرَّرة بمفتاحها الطبيعيّ (ببصمة أخرى)",
+    ...(tx ? [await mustFail("حركتان بهويّةٍ مخزَّنة واحدة",
       `insert into bank_transactions
          (id, bank_import_id, value_date, description, transaction_type, beneficiary_raw,
-          amount_minor, direction, external_id, occurrence, bank_account_id)
-       select 't-dup-natural', bank_import_id, value_date, description, transaction_type,
-              beneficiary_raw, amount_minor, direction, 't-dup-fingerprint', occurrence,
-              bank_account_id
-       from bank_transactions where id = '${tx.id}'`)] : []),
+          amount_minor, direction, external_id, occurrence, bank_account_id, identity_key)
+       select 't-dup-identity', bank_import_id, value_date, description, transaction_type,
+              beneficiary_raw, amount_minor, direction, 't-dup-id-fp', occurrence + 99,
+              bank_account_id, identity_key
+       from bank_transactions where id = '${tx.id}' and identity_key is not null`)] : []),
+
   ];
 
   const passed = results.filter(Boolean).length;

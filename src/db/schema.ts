@@ -562,6 +562,14 @@ export const bankTransactions = pgTable("bank_transactions", {
    * أمّا الحوالة فلها رقمٌ لا يتكرّر. فارغٌ لحركات الشبكة.
    */
   operationRef: text("operation_ref"),
+  /**
+   * هويّة الحركة المخزَّنة — لا محسوبةً في كل استيراد.
+   *
+   * `REF:<حساب>|<مرجع>` حين يعطي البنك رقماً للعمليّة، وإلّا
+   * `FACT:<حساب>|<تاريخ>|<مبلغ>|<اتجاه>|<وصف>|<ترتيب>`. وبها يُعرَف
+   * ما هو عندنا **قبل** أن تُحسَب تسويةٌ أو تُستدعى ذاكرة.
+   */
+  identityKey: text("identity_key"),
 }, (t) => [
   index("bank_tx_date_idx").on(t.valueDate),
   index("bank_tx_status_idx").on(t.matchStatus),
