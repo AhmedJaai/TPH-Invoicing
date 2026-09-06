@@ -5,6 +5,7 @@ import { documents, suppliers } from "@/db/schema";
 import { Uploader } from "@/components/uploader";
 import { PageShell } from "@/components/page-shell";
 import { DriveSync } from "@/components/drive-sync";
+import { DriveRename } from "@/components/drive-rename";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { activeProviderName } from "@/lib/extraction";
@@ -58,8 +59,9 @@ export default async function Home() {
         />
       </div>
 
-        <section className="mt-8">
+        <section className="mt-8 flex flex-wrap items-start gap-3">
           <DriveSync />
+          <DriveRename />
         </section>
 
         <section className="mt-10">
