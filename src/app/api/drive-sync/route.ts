@@ -42,6 +42,8 @@ const MAX_CONTENT_PER_CALL = 4;
 interface Body {
   /** عدد الأشهر الأخيرة التي تُفحص. الافتراضي ثلاثة. */
   months?: number;
+  /** أشهرٌ بعينها — بها يستأنف الطلبُ التالي ما أوقفته المهلة. */
+  onlyMonths?: string[];
   /** فحص الأرشيف كله — أبطأ بكثير */
   full?: boolean;
   apply?: boolean;
@@ -101,11 +103,28 @@ export async function POST(request: Request) {  let user;
       .filter((v): v is string => Boolean(v)),
   );
 
-  const months = body.full ? undefined : recentMonths(Math.max(1, Math.min(24, body.months ?? 3)));
+  const months = Array.isArray(body.onlyMonths) && body.onlyMonths.length > 0
+    ? body.onlyMonths.slice(0, 36)
+    : body.full ? undefined : recentMonths(Math.max(1, Math.min(24, body.months ?? 3)));
+
+  /*
+    مهلةٌ دون سقف المزوّد.
+
+    كان الطلب يُقتَل عند الستّين ثانية، فيردّ المزوّد نصّاً لا JSON،
+    فتنفجر الشاشة برسالة «Unexpected token 'A'» — ولا أحد يعرف أنّ
+    السبب مهلةٌ لا عطب. والوقوف المعلَن أصدق من قتلٍ صامت.
+  */
+  const budgetMs = 40_000;
+  const deadline = Date.now() + budgetMs;
 
   let fresh: ArchiveEntry[];
+  let pendingMonths: string[] = [];
+  let truncated = false;
   try {
-    fresh = await walkArchive(drive, { months, knownFileIds: known });
+    const walked = await walkArchive(drive, { months, knownFileIds: known, deadline });
+    fresh = walked.entries;
+    pendingMonths = walked.pendingMonths;
+    truncated = walked.truncated;
   } catch (e) {
     return NextResponse.json(
       { error: `تعذّرت قراءة الدرايف: ${(e as Error).message}` },
@@ -127,7 +146,10 @@ export async function POST(request: Request) {  let user;
   }
 
   const scanned = {
-    scope: body.full ? "الأرشيف كله" : `آخر ${months!.length} أشهر`,
+    scope: months ? `${months.length} شهراً` : "الأرشيف كله",
+    /** أشهرٌ لم يُمشَ عليها — يكملها الطلب التالي بلا أن يُعيد ما مضى. */
+    pendingMonths,
+    truncated,
     knownBefore: known.size,
     newFiles: fresh.length,
     understoodByName: named.length,

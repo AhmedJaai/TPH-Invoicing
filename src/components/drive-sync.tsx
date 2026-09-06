@@ -13,6 +13,9 @@ interface Summary {
   invoicesCreated?: number;
   contentRead?: number;
   remainingUnnamed?: number;
+  /** أشهرٌ أوقفتها المهلة — يستأنفها الطلب التالي. */
+  pendingMonths?: string[];
+  truncated?: boolean;
 }
 
 interface Result {
@@ -51,18 +54,62 @@ export function DriveSync() {
     async (apply: boolean) => {
       setBusy(apply ? "applying" : "scanning");
       setError(null);
-      try {
+
+      /*
+        الشاشة تقرأ النصّ قبل أن تدّعي أنّه JSON.
+
+        كان `res.json()` يُستدعى بلا شرط، فإن ردّ المزوّد صفحة خطأ —
+        وهو ما يقع عند تجاوز المهلة — انفجرت برسالة
+        «Unexpected token 'A'». وهي رسالةٌ عن المحلّل لا عن العطب،
+        فيقف صاحب العمل أمام نصٍّ لا يدلّه على شيء.
+      */
+      const post = async (body: unknown) => {
         const res = await fetch("/api/drive-sync", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ full, apply, readContent: apply, months: 3 }),
+          body: JSON.stringify(body),
         });
-        const json = await res.json();
-        if (!res.ok) {
-          setError(json.error ?? "تعذّرت المزامنة");
-          return;
+        const text = await res.text();
+        let json: (Result & { error?: string }) | null = null;
+        try { json = JSON.parse(text) as Result & { error?: string }; } catch { /* ليس JSON */ }
+
+        if (!json) {
+          throw new Error(
+            res.status === 504 || /timeout|timed out/i.test(text)
+              ? "استغرقت القراءة أكثر من المسموح. جرّب بلا «الأرشيف كله»، أو أعد المحاولة — يُستأنف من حيث وقف."
+              : `تعذّرت المزامنة (${res.status}). ${text.slice(0, 120)}`,
+          );
         }
-        setResult(json as Result);
+        if (!res.ok) throw new Error(json.error ?? "تعذّرت المزامنة");
+        return json;
+      };
+
+      try {
+        let json = await post({ full, apply, readContent: apply, months: 3 });
+
+        /*
+          ما أوقفته المهلة يُستأنَف — والمستخدم لا يُطلَب منه أن يفهم
+          أنّ الأشهر تُقرأ على دفعات.
+        */
+        let guard = 0;
+        while (json.summary?.truncated && (json.summary.pendingMonths?.length ?? 0) > 0 && guard < 12) {
+          guard++;
+          setBusy(apply ? "applying" : "scanning");
+          const next = await post({
+            apply, readContent: apply, onlyMonths: json.summary.pendingMonths,
+          });
+          json = {
+            ...next,
+            summary: {
+              ...next.summary,
+              newFiles: json.summary.newFiles + next.summary.newFiles,
+              understoodByName: json.summary.understoodByName + next.summary.understoodByName,
+              needContentReading: json.summary.needContentReading + next.summary.needContentReading,
+            },
+          };
+        }
+
+        setResult(json);
         if (apply) router.refresh();
       } catch (e) {
         setError((e as Error).message);

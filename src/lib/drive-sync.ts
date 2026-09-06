@@ -23,6 +23,40 @@ export interface WalkOptions {
   months?: readonly string[];
   /** ملفات معروفة سلفاً — تُتخطّى بلا قراءة */
   knownFileIds?: ReadonlySet<string>;
+  /**
+   * مهلةٌ يقف عندها المشي (وقتٌ مطلق بالمللي ثانية).
+   *
+   * لأنّ الدالّة تعمل داخل طلبٍ له سقفٌ زمنيّ عند المزوّد. وبلا مهلة
+   * كان الطلب يُقتَل عند الستّين ثانية فيردّ المزوّد نصّاً لا JSON،
+   * وتنفجر الشاشة برسالةٍ لا يفهمها أحد: «Unexpected token 'A'».
+   *
+   * والوقوف بمهلةٍ ليس فشلاً: ما مُشي عليه يُرجَع، وما بقي يُقال إنّه
+   * بقي — والطلب التالي يكمله.
+   */
+  deadline?: number;
+}
+
+export interface WalkResult {
+  entries: ArchiveEntry[];
+  /** أشهرٌ لم يُمشَ عليها بعد — يكملها الطلب التالي. */
+  pendingMonths: string[];
+  /** أوقفته المهلة قبل أن يُتمّ. */
+  truncated: boolean;
+}
+
+/** كم مجلّد مورّدٍ يُقرأ معاً — الشبكة تنتظر أكثر ممّا تحسب. */
+const FOLDER_CONCURRENCY = 6;
+
+async function inBatches<T, R>(
+  items: readonly T[],
+  size: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
+  }
+  return out;
 }
 
 /**
@@ -34,10 +68,13 @@ export interface WalkOptions {
 export async function walkArchive(
   drive: drive_v3.Drive,
   options: WalkOptions = {},
-): Promise<ArchiveEntry[]> {
+): Promise<WalkResult> {
   const wanted = options.months?.length ? new Set(options.months) : null;
   const known = options.knownFileIds;
+  const deadline = options.deadline ?? Infinity;
   const out: ArchiveEntry[] = [];
+  const pending: string[] = [];
+  let truncated = false;
 
   for (const yearFolderId of Object.values(driveConfig.yearFolderIds)) {
     let months: DriveFile[];
@@ -52,22 +89,33 @@ export async function walkArchive(
       if (!MONTH_RE.test(month.name)) continue;
       if (wanted && !wanted.has(month.name)) continue;
 
-      for (const folder of (await listChildren(drive, month.id)).filter(isFolder)) {
-        for (const file of await listChildren(drive, folder.id)) {
-          if (isFolder(file)) continue;
-          if (file.name === SUPPLIER_INFO_CARD) continue;
-          if (/\.(txt|md)$/i.test(file.name)) continue;
-          if (known?.has(file.id)) continue;
-          out.push({ month: month.name, folderName: folder.name, file });
-        }
+      /*
+        المهلة تُفحَص عند رأس كل شهر لا داخله: الشهر وحدةٌ تُتمّ أو
+        تُؤجَّل كاملة، فلا يبقى نصفُ شهرٍ لا يعرف أحدٌ أين وقف.
+      */
+      if (Date.now() >= deadline) {
+        truncated = true;
+        pending.push(month.name);
+        continue;
       }
+
+      const folders = (await listChildren(drive, month.id)).filter(isFolder);
+      const perFolder = await inBatches(folders, FOLDER_CONCURRENCY, async (folder) => {
+        const files = await listChildren(drive, folder.id);
+        return files
+          .filter((f) => !isFolder(f))
+          .filter((f) => f.name !== SUPPLIER_INFO_CARD)
+          .filter((f) => !/\.(txt|md)$/i.test(f.name))
+          .filter((f) => !known?.has(f.id))
+          .map((file) => ({ month: month.name, folderName: folder.name, file }));
+      });
+      for (const group of perFolder) out.push(...group);
     }
   }
 
-  return out;
+  return { entries: out, pendingMonths: [...new Set(pending)], truncated };
 }
 
-/** الأشهر الأخيرة بصيغة YYYY-MM، من الأحدث إلى الأقدم. */
 export function recentMonths(count: number, from = new Date()): string[] {
   const out: string[] = [];
   let y = from.getUTCFullYear();

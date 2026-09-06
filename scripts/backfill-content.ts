@@ -212,7 +212,7 @@ async function main() {
     (await db.select({ id: documents.driveFileId }).from(documents))
       .map((d) => d.id).filter((v): v is string => Boolean(v)),
   );
-  const orphans = await walkArchive(drive, { knownFileIds: knownIds });
+  const { entries: orphans } = await walkArchive(drive, { knownFileIds: knownIds });
   for (const o of orphans) {
     targets.push({
       driveFileId: o.file.id,
