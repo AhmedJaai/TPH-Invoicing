@@ -13,7 +13,8 @@ import { db } from "@/db";
 import { counterparties, counterpartyEvidence } from "@/db/schema";
 import { createId } from "@/lib/id";
 import { recordAudit } from "@/lib/audit";
-import { normalizeText, type CanonicalTransaction } from "@/lib/bank/canonical";
+import type { CanonicalTransaction } from "@/lib/bank/canonical";
+import { identitiesOf, memoryKeyFor, type IdentityKind } from "@/lib/bank/pattern";
 import type { MerchantMemory } from "@/lib/bank/classification";
 import type { TxCategory } from "@/lib/bank/rules";
 import { fromCategory } from "@/lib/bank/apply";
@@ -33,32 +34,17 @@ export interface EvidenceItem {
  *
  * ولا يُؤخَذ المرجع البنكيّ دليلاً: هو رقم عمليةٍ يتغيّر كل مرّة، فحفظه
  * يُنتج ذاكرةً لا تُطابِق شيئاً بعده.
+ *
+ * والقائمة هي `identitiesOf` نفسها التي يقرأ بها المصنِّف — تمثيلٌ
+ * واحد يُكتَب به ويُبحَث به. وكان الكاتب يوحّد الاسم والقارئ يأخذه
+ * خاماً، فلا يلتقيان في اسمٍ فيه همزة.
  */
 export function evidenceFrom(tx: CanonicalTransaction): EvidenceItem[] {
-  const out: EvidenceItem[] = [];
-  const seen = new Set<string>();
-
-  const push = (kind: EvidenceKind, value: string) => {
-    const normalized = normalizeText(value).toUpperCase();
-    if (normalized.length < 3) return;
-    const key = `${kind}:${normalized}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    out.push({ kind, value, normalized });
-  };
-
-  for (const r of tx.references) {
-    if (r.kind === "ACCOUNT") push("ACCOUNT", r.value);
-    if (r.kind === "IBAN") push("IBAN", r.value);
-    if (r.kind === "NATIONAL_ID") push("NATIONAL_ID", r.value);
-  }
-
-  if (tx.pos?.merchantId) push("MERCHANT_ID", tx.pos.merchantId);
-
-  const name = tx.beneficiaryRaw?.trim();
-  if (name && name.length >= 3) push("NAME", name);
-
-  return out;
+  return identitiesOf(tx).map((i) => ({
+    kind: i.kind,
+    value: i.value,
+    normalized: i.normalized,
+  }));
 }
 
 export interface ConfirmInput {
@@ -68,8 +54,14 @@ export interface ConfirmInput {
   displayName?: string;
   kind: TxCategory;
   supplierId?: string | null;
-  /** الحركة التي أكّدها الإنسان — تُستخرَج أدلّتها منها. */
-  transaction: CanonicalTransaction;
+  /**
+   * الحركات التي أكّدها الإنسان — تُستخرَج أدلّتها من **كلّها**.
+   *
+   * جمعٌ لا مفرد، لأنّ الإنسان يؤكّد مجموعةً متشابهة دفعةً واحدة.
+   * وأدلّتها تتكامل: حركةٌ حملت رقم حسابٍ وأختُها حملت الاسم — فحفظُ
+   * الاتحاد يجعل الجهة تُعرَف من أيّهما ورد بعد.
+   */
+  transactions: readonly CanonicalTransaction[];
 }
 
 export interface ConfirmResult {
@@ -88,7 +80,21 @@ export interface ConfirmResult {
  * العمل — قد يكون خطأً سابقاً، وقد يكون حسابين لشخصٍ واحد.
  */
 export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmResult> {
-  const evidence = evidenceFrom(input.transaction);
+  const first = input.transactions[0];
+  if (!first) throw new Error("لا حركة تُؤكَّد");
+
+  /*
+    اتحاد الأدلّة لا أدلّة واحدة.
+
+    الحركات المتشابهة يكمل بعضها بعضاً: هذه حملت رقم الحساب وتلك حملت
+    الاسم، وثالثةٌ لا تحمل إلّا نمطها. فمن حفظ أدلّة واحدةٍ منها ترك
+    الجهة تُعرَف من وجهٍ واحد وتغيب من الوجوه الأخرى.
+  */
+  const merged = new Map<string, EvidenceItem>();
+  for (const tx of input.transactions) {
+    for (const e of evidenceFrom(tx)) merged.set(`${e.kind}:${e.normalized}`, e);
+  }
+  const evidence = [...merged.values()];
 
   const existingOwners = evidence.length > 0
     ? await db
@@ -112,7 +118,7 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
     await db.insert(counterparties).values({
       id: counterpartyId,
       displayName: input.displayName?.trim()
-        || input.transaction.beneficiaryRaw?.trim()
+        || first.beneficiaryRaw?.trim()
         || "جهة بلا اسم",
       kind: input.kind,
       supplierId: input.supplierId ?? null,
@@ -182,7 +188,8 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
     entityType: "counterparty",
     entityId: counterpartyId,
     after: {
-      الجهة: input.displayName ?? input.transaction.beneficiaryRaw ?? "—",
+      الجهة: input.displayName ?? first.beneficiaryRaw ?? "—",
+      "حركات أُكِّدت": input.transactions.length,
       الباب: input.kind,
       "أدلّة أُضيفت": added.map((a) => `${a.kind}:${a.value}`),
       تضارب: conflicts.map((c) => `${c.evidence.kind}:${c.evidence.value} → ${c.ownedBy}`),
@@ -259,9 +266,10 @@ export async function loadMerchantMemory(): Promise<Map<string, MerchantMemory>>
 
 /** يترجم نوع الدليل إلى المفتاح الذي يبحث به المصنِّف. */
 function memoryKey(kind: string, normalized: string): string | null {
-  if (kind === "ACCOUNT" || kind === "IBAN") return `ACC:${normalized}`;
-  if (kind === "NATIONAL_ID") return `ID:${normalized}`;
-  if (kind === "MERCHANT_ID") return `POS:${normalized}`;
-  if (kind === "NAME") return `NAME:${normalized}`;
-  return null;
+  /*
+    المرجع البنكيّ ليس هويّة: رقم عمليةٍ يتغيّر كل مرّة. يُحفَظ إن
+    حُفظ، ولا يُبنى عليه تعرّف.
+  */
+  if (kind === "REFERENCE") return null;
+  return memoryKeyFor(kind as IdentityKind, normalized);
 }

@@ -15,7 +15,7 @@ import { distinctiveTokens } from "./match";
 export type TxCategory =
   | "SUPPLIER" | "SALARY" | "RENT" | "ZAKAT" | "UTILITY"
   | "GOVERNMENT" | "PERSONAL" | "INTERNAL" | "OTHER" | "UNKNOWN"
-  | "POS_SETTLEMENT" | "POS_FEE" | "POS_VAT" | "BANK_FEE";
+  | "POS_SETTLEMENT" | "POS_FEE" | "POS_VAT" | "BANK_FEE" | "BANK_VAT";
 
 export const CATEGORY_LABEL: Record<TxCategory, string> = {
   SUPPLIER: "سداد مورّد",
@@ -32,12 +32,13 @@ export const CATEGORY_LABEL: Record<TxCategory, string> = {
   POS_FEE: "رسوم شبكة",
   POS_VAT: "ضريبة رسوم الشبكة",
   BANK_FEE: "رسوم بنكية",
+  BANK_VAT: "ضريبة رسوم البنك",
 };
 
 /** التصنيفات التي لا تدخل حساب مستحقّات المورّدين. */
 export const NON_SUPPLIER_CATEGORIES: readonly TxCategory[] = [
   "SALARY", "RENT", "ZAKAT", "UTILITY", "GOVERNMENT", "PERSONAL", "INTERNAL", "OTHER",
-  "POS_SETTLEMENT", "POS_FEE", "POS_VAT", "BANK_FEE",
+  "POS_SETTLEMENT", "POS_FEE", "POS_VAT", "BANK_FEE", "BANK_VAT",
 ];
 
 export interface BankRule {

@@ -426,6 +426,7 @@ export const txDirectionEnum = pgEnum("tx_direction", ["DEBIT", "CREDIT"]);
  * المالك مرّة، ويتعلّمه النظام قاعدةً تسري على ما يشبهها بعدها.
  */
 export const txCategoryEnum = pgEnum("tx_category", [
+  "BANK_VAT",   // ضريبة القيمة المضافة على رسم البنك — بابها غير باب الرسم
   "SUPPLIER",   // سداد مورّد
   "SALARY",     // راتب أو أجر
   "RENT",       // إيجار
@@ -472,6 +473,8 @@ export const matchDispositionEnum = pgEnum("match_disposition", ["AUTO", "SUGGES
  */
 export const classificationSourceEnum = pgEnum("classification_source", [
   "STRUCTURE", "MEMORY", "RULE", "KEYWORD", "AI", "HUMAN", "UNKNOWN",
+  /** المقدار نفسه دلّ: صادرٌ صغير ليس ضريبةً هو رسمُ بنك. */
+  "AMOUNT",
 ]);
 
 /**
@@ -543,6 +546,14 @@ export const bankTransactions = pgTable("bank_transactions", {
   ruleId: text("rule_id").references(() => bankRules.id, { onDelete: "set null" }),
   /** أين تقف من طبقاتها: خام ← مُستنتَجة ← مقترَحة ← مُقَرَّة ← مُقيَّدة. */
   lifecycle: txLifecycleEnum("lifecycle").notNull().default("RAW"),
+  /**
+   * ترتيب هذه الحركة بين مثيلاتها في الكشف — من صفر.
+   *
+   * جزءٌ من المفتاح الطبيعيّ لا حقلٌ وصفيّ: به تنجو الحركتان
+   * المتطابقتان الحقيقيّتان في اليوم الواحد، وبه يُردّ الكشفُ المرفوع
+   * مرّةً ثانية. والقيد عليه في `020`.
+   */
+  occurrence: integer("occurrence").notNull().default(0),
 }, (t) => [
   index("bank_tx_date_idx").on(t.valueDate),
   index("bank_tx_status_idx").on(t.matchStatus),
@@ -845,6 +856,14 @@ export const counterparties = pgTable("counterparties", {
 
 export const counterpartyEvidenceKindEnum = pgEnum("counterparty_evidence_kind", [
   "NAME", "ACCOUNT", "IBAN", "NATIONAL_ID", "MERCHANT_ID", "REFERENCE",
+  /**
+   * شكل الوصف بعد إسقاط أرقامه.
+   *
+   * وهو ما يبقى حين لا يكون للحركة اسمُ مستفيدٍ ولا رقم حساب — وتلك
+   * حال كلّ حركةٍ خرجت مجهولةً من كشف أحمد. ظنّيٌّ كالاسم: يُشترَك
+   * فيه، وإن اشتُرك سقط.
+   */
+  "PATTERN",
 ]);
 
 /**

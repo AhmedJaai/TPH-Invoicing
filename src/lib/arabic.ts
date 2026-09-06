@@ -50,6 +50,22 @@ export const ITEM: NounForms = {
   zero: "لا بنود",
 };
 
+export const TRANSACTION: NounForms = {
+  one: "حركة واحدة",
+  two: "حركتان",
+  few: "حركات",
+  many: "حركة",
+  zero: "لا حركات",
+};
+
+export const TIME: NounForms = {
+  one: "مرّة واحدة",
+  two: "مرّتين",
+  few: "مرّات",
+  many: "مرّة",
+  zero: "لا مرّة",
+};
+
 export const INVOICE: NounForms = {
   one: "فاتورة واحدة",
   two: "فاتورتان",

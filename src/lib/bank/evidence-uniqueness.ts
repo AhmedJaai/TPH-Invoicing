@@ -15,15 +15,22 @@
  * الظنّي المشترك **لا يُعرِّف جهةً وحده**، لأنّه لم يعد يدلّ على واحدة.
  */
 export type EvidenceKind =
-  | "NAME" | "ACCOUNT" | "IBAN" | "NATIONAL_ID" | "MERCHANT_ID" | "REFERENCE";
+  | "NAME" | "ACCOUNT" | "IBAN" | "NATIONAL_ID" | "MERCHANT_ID" | "REFERENCE"
+  | "PATTERN";
 
 /** الأدلّة القاطعة: أرقامٌ رسميّة لا تدلّ على جهتين. */
 export const EXCLUSIVE_KINDS: readonly EvidenceKind[] = [
   "ACCOUNT", "IBAN", "NATIONAL_ID", "MERCHANT_ID",
 ];
 
-/** الأدلّة الظنّية: تتكرّر بطبيعتها فلا تُحتكَر. */
-export const SHARED_KINDS: readonly EvidenceKind[] = ["NAME", "REFERENCE"];
+/**
+ * الأدلّة الظنّية: تتكرّر بطبيعتها فلا تُحتكَر.
+ *
+ * والنمط منها: «حوالات تحت الطلب … شركة …» شكلٌ قد يشترك فيه اثنان.
+ * فإن اشترك سقط من الذاكرة كما يسقط الاسم المشترَك — لأنّه لم يعد
+ * يدلّ على واحدة، لا لأنّه صار خطأً.
+ */
+export const SHARED_KINDS: readonly EvidenceKind[] = ["NAME", "REFERENCE", "PATTERN"];
 
 export function isExclusive(kind: EvidenceKind): boolean {
   return EXCLUSIVE_KINDS.includes(kind);

@@ -61,6 +61,27 @@ export function transactionIdentity(input: TransactionIdentityInput): string {
   return createHash("sha256").update(parts.join("|")).digest("hex");
 }
 
+/**
+ * المفتاح الطبيعيّ للحركة — تمثيلٌ نصّيّ لما يقيّده الفهرس في القاعدة.
+ *
+ * وهو **ليس** بصمة: لا يُهشَّم ولا يُختصَر، فلا «نسخة» له تتغيّر
+ * بتغيّر الشيفرة فتُبطل ما حُفظ قبلها. والبصمة تبقى للعرض والإحالة،
+ * أمّا المنع فعلى هذا.
+ */
+export function naturalKey(input: {
+  valueDate: Date;
+  amountMinor: number;
+  direction: "DEBIT" | "CREDIT";
+  description?: string | null;
+}): string {
+  return [
+    input.valueDate.toISOString().slice(0, 10),
+    String(input.amountMinor),
+    input.direction,
+    normalizeDescription(input.description),
+  ].join("|");
+}
+
 export interface RowForIdentity {
   valueDate: Date;
   amountMinor: number;
@@ -74,7 +95,7 @@ export interface RowForIdentity {
  */
 export function assignIdentities<T extends RowForIdentity>(
   rows: readonly T[],
-): (T & { externalId: string })[] {
+): (T & { externalId: string; occurrence: number })[] {
   const seen = new Map<string, number>();
 
   return rows.map((row) => {
@@ -101,6 +122,7 @@ export function assignIdentities<T extends RowForIdentity>(
 
     return {
       ...row,
+      occurrence,
       externalId: transactionIdentity({
         valueDate,
         amountMinor: row.amountMinor,
@@ -141,4 +163,36 @@ export function scopedIdentity(
 /** بصمة الملف كاملاً — استيراده ثانيةً يُعرف بها قبل قراءة صفوفه. */
 export function fileFingerprint(data: Buffer): string {
   return createHash("sha256").update(data).digest("hex");
+}
+
+/** يعدّ ما في القاعدة من كل مفتاحٍ طبيعيّ. */
+export function countByNaturalKey(
+  rows: readonly RowForIdentity[],
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const k = naturalKey(r);
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * ما لم يُقيَّد بعد من صفوف الملف.
+ *
+ * القاعدة في سطر: **الكشف يقول كم مرّة وقعت الحركة، والقاعدة تقول كم
+ * مرّة قُيّدت. والفرق وحده يدخل.**
+ *
+ * فملفٌّ يذكر الحركة مرّتين والقاعدةُ فيها مرّتان ← لا شيء. ورفعُ
+ * الملف عشرين مرّة ← لا شيء في كلّ مرّة. وكشفٌ أطول يذكرها ثلاثاً
+ * والقاعدةُ فيها اثنتان ← تدخل الثالثة وحدها.
+ *
+ * وهذا يحلّ ما كان يتناقض: منعُ التكرار، وبقاءُ الحركتين المتطابقتين
+ * الحقيقيّتين في اليوم الواحد — وهما في كشف أحمد ثلاث وعشرون مجموعة.
+ */
+export function unseenRows<T extends RowForIdentity & { occurrence: number }>(
+  rows: readonly T[],
+  priorCount: ReadonlyMap<string, number>,
+): T[] {
+  return rows.filter((r) => r.occurrence >= (priorCount.get(naturalKey(r)) ?? 0));
 }

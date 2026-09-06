@@ -11,18 +11,21 @@
  *   ١. **البنية**  — ما يُقرأ من شكل الوصف نفسه (حركات الشبكة).
  *   ٢. **المتعلَّم** — ما أكّده الإنسان من قبل لهذا المستفيد بعينه.
  *   ٣. **الكلمات** — دليلٌ ظنّيّ، ولا يُؤخَذ إلّا بشرطه.
- *   ٤. **المجهول** — يُعلَن مجهولاً ولا يُخمَّن.
+ *   ٤. **المقدار** — الصادر الصغير الذي ليس ضريبةً رسمُ بنك.
+ *   ٥. **المجهول** — يُعلَن مجهولاً ولا يُخمَّن.
  *
  * والطبقة الأعلى تحسم، فلا تُنقَض بما دونها. ونفس المدخل يُنتج نفس
  * المخرج دائماً.
  */
 import type { CanonicalTransaction } from "./canonical";
+import { identitiesOf } from "./pattern";
 import type { TxKind } from "./taxonomy";
+import { countNoun, TIME } from "@/lib/arabic";
 
-export type Layer = "STRUCTURE" | "LEARNED" | "KEYWORD" | "NONE";
+export type Layer = "STRUCTURE" | "LEARNED" | "KEYWORD" | "AMOUNT" | "NONE";
 
 /** نسخة منطق التصنيف — تُرفَع مع كل تغيير في الطبقات أو الكلمات. */
-export const CLASSIFICATION_VERSION = "2026-09-05.1";
+export const CLASSIFICATION_VERSION = "2026-09-06.1";
 
 export interface Classification {
   kind: TxKind;
@@ -43,13 +46,15 @@ export interface Classification {
 }
 
 export type ClassificationSource =
-  | "STRUCTURE" | "MEMORY" | "RULE" | "KEYWORD" | "AI" | "HUMAN" | "UNKNOWN";
+  | "STRUCTURE" | "MEMORY" | "RULE" | "KEYWORD" | "AMOUNT" | "AI" | "HUMAN"
+  | "UNKNOWN";
 
 /** الطبقة التي حسمت ← المصدر الذي يُحفَظ. */
 export const LAYER_SOURCE: Record<Layer, ClassificationSource> = {
   STRUCTURE: "STRUCTURE",
   LEARNED: "MEMORY",
   KEYWORD: "KEYWORD",
+  AMOUNT: "AMOUNT",
   NONE: "UNKNOWN",
 };
 
@@ -80,6 +85,18 @@ interface Keyword {
   label: string;
 }
 
+/**
+ * ما يقول إنّه **ضريبة على رسم** — لا كلّ ما فيه «ضريبة».
+ *
+ * لأنّ ضريبة الرسم ليست رسماً: بابها غير بابه، ومن جمعهما لم يعد
+ * يعرف كم دفع للبنك وكم دفع للدولة.
+ *
+ * والصيغة مضيَّقة عمداً: «Tax» وحدها تقع في وصف زاتكا
+ * («Zakat, Tax and Customs») وهو سدادٌ حكوميّ بأربعة عشر ألف ريال —
+ * فلو أُخذت لصار سدادُ الدولة «ضريبةَ رسمٍ بنكيّ».
+ */
+const VAT_RE = /ضريبه\s*القيمه\s*المضافه|ضريبه\s*عمليه|ضريبه\s*رسوم|\bVAT\b/i;
+
 const KEYWORDS: readonly Keyword[] = [
   /*
     ما يلي مأخوذ من كشف أحمد نفسه — لا من تخيّل صيغ.
@@ -88,7 +105,23 @@ const KEYWORDS: readonly Keyword[] = [
   */
   { match: /تحويل\s*الي\s*الاهل|الاهل\s*والاصدقاء|Family\s*(and|&)\s*Friends/i, kind: "OWNER_TRANSFER", label: "تحويل إلى الأهل والأصدقاء" },
   { match: /\bSAUDI\s*TELECOM\b|\bSTC\s*PAY\b/i, kind: "UTILITY", direction: "DEBIT", label: "الاتصالات السعودية" },
-  { match: /^CITY\s*:\s*Digital\s*Channel$/i, kind: "BANK_FEE", direction: "DEBIT", label: "رسم القناة الرقمية" },
+  /*
+    الضريبة قبل الرسم دائماً.
+
+    وصفُ الرسم ووصفُ ضريبته واحد — «CITY:Digital Channel» — ولا
+    يفرّقهما إلّا «نوع العملية». فمن فحص الرسم أوّلاً نسب إلى البنك
+    ما ذهب إلى الدولة، وخمسٌ وثلاثون حركة في كشف أحمد كذلك.
+
+    ولا تُطابَق هنا «Tax» وحدها: وصفُ زاتكا يحملها
+    («Zakat, Tax and Customs») وهي سدادٌ حكوميّ لا ضريبةُ رسم.
+  */
+  { match: VAT_RE, kind: "BANK_VAT", direction: "DEBIT", label: "ضريبة على رسمٍ بنكيّ" },
+  /*
+    ولا تُقيَّد بأوّل النصّ وآخره: `searchText` يجمع الوصف والنوع
+    والمستفيد، فالرسو التي كانت تُعرَف حين يغيب نوعها خرجت مجهولةً
+    حين حضر. والمرساة تُطابِق النصّ الكامل لا الحقلَ المقصود.
+  */
+  { match: /CITY\s*:\s*Digital\s*Channel/i, kind: "BANK_FEE", direction: "DEBIT", label: "رسم القناة الرقمية" },
   // الحكوميّ قبل الزكاة: «زاتكا» ضريبة لا صدقة
   /*
     و«زاتكا» بالعربية كذلك — وكانت تفوت.
@@ -98,7 +131,13 @@ const KEYWORDS: readonly Keyword[] = [
     فحركةُ سدادٍ حكوميّ تخرج مجهولةً، ثمّ — لو وافق مبلغُها فاتورةً —
     تُنسَب إلى مورّد.
   */
-  { match: /\bZATCA\b|زاتكا|هيئه\s*الزكاه\s*والضريبه|هيئه\s*الزكاة/i, kind: "GOVERNMENT", direction: "DEBIT", label: "جهة ضريبية" },
+  /*
+    وبالإنجليزية كذلك: الأهليّ يكتبها «Zakat, Tax and Customs Au
+    thority» — مقطوعةً كعادته. فالقاعدة تعرف الاسم العربيّ والمختصر
+    ولا تعرف هذا، وأربعة عشر ألف ريالٍ من سدادٍ حكوميّ تخرج مجهولة.
+  */
+  { match: /\bZATCA\b|زاتكا|هيئه\s*الزكاه\s*والضريبه|هيئه\s*الزكاة|Zakat,?\s*Tax\s*and\s*Customs/i, kind: "GOVERNMENT", direction: "DEBIT", label: "جهة ضريبية" },
+  { match: /\bMinistry\s+of\b|وزاره\s|امانه\s|بلديه/i, kind: "GOVERNMENT", direction: "DEBIT", label: "جهة حكومية" },
   { match: /التامينات\s*الاجتماعيه|\bGOSI\b/i, kind: "GOVERNMENT", direction: "DEBIT", label: "التأمينات الاجتماعية" },
   { match: /\bEJAR\b|ايجار|شبكه\s*ايجار/i, kind: "RENT", direction: "DEBIT", label: "منصّة إيجار" },
   { match: /رواتب|\bSALARY\b|\bPAYROLL\b|Monthly\s*Sal/i, kind: "SALARY", direction: "DEBIT", label: "وصفٌ يقول راتباً" },
@@ -116,6 +155,15 @@ const KEYWORDS: readonly Keyword[] = [
  * راتباً، لأنّ القاعدة تعلّمت اسم شخصٍ هو مورّد وموظّف معاً.
  */
 const GOODS_RE = /شراء\s*بضاعه|شراء\s*بضاعة|قيمه\s*بضاعه|goods\s*purchase/i;
+
+/**
+ * حدّ الرسم الصغير: عشرون ريالاً.
+ *
+ * والحدّ **دون** لا **حتى**: العشرون نفسها ليست رسماً — قد تكون سداداً
+ * صغيراً أو تحويلاً. وما دون ذلك لا يُدفَع لمورّدٍ ولا يُقبَض راتباً.
+ */
+export const SMALL_FEE_MAX_MINOR = 20_00;
+
 
 export function classify(
   tx: CanonicalTransaction,
@@ -138,21 +186,26 @@ export function classify(
     المفتاح يُحسب قبل الكلمات كي يعمّ التعلّم: من أكّد مرّةً أنّ صاحب
     الهوية ٢١٤٩٨٣٠١١٥ هو نفسه، صُنّفت تحويلاته كلّها بعدها بلا سؤال —
     وهي في كشفه أكثر من ثلاثين حركة.
+
+    وتُجرَّب هويّات الحركة **كلّها** بالترتيب لا أقواها وحدها. كان
+    يُجرَّب مفتاحٌ واحد، فالحركة التي لا اسم لها ولا حساب لا مفتاح لها
+    أصلاً: يؤكّدها الإنسان مئة مرّة فلا تُعرَف أختُها. وفي كشف أحمد
+    كانت تلك حالَ **كلّ** حركةٍ مجهولة — خمسٍ وثمانين.
   */
-  const key = merchantKey(tx);
-  if (key) {
-    const known = memory.get(key);
-    if (known) {
-      return {
-        kind: known.kind,
-        layer: "LEARNED",
-        source: "MEMORY",
-        ruleId: null,
-        reason: `أكّدتَ من قبل أنّ هذا المستفيد ${known.confirmations > 1 ? `${known.confirmations} مرّات` : "مرّةً"}`,
-        merchantKey: key,
-      };
-    }
+  const identities = identitiesOf(tx);
+  for (const identity of identities) {
+    const known = memory.get(identity.key);
+    if (!known) continue;
+    return {
+      kind: known.kind,
+      layer: "LEARNED",
+      source: "MEMORY",
+      ruleId: null,
+      reason: `${identity.label} أكّدتَه من قبل ${countNoun(known.confirmations, TIME)}`,
+      merchantKey: identity.key,
+    };
   }
+  const key = identities[0]?.key ?? null;
 
   /* ── ٣. الكلمات ── */
   if (GOODS_RE.test(tx.searchText)) {
@@ -175,7 +228,35 @@ export function classify(
     };
   }
 
-  /* ── ٤. المجهول ── */
+  /* ── ٤. المقدار ── */
+  /*
+    الصادر الأقلّ من عشرين ريالاً — إن لم يكن ضريبةً — رسمُ بنك.
+
+    في كشف الأهليّ رسومٌ صغيرة كثيرة لا يقول وصفها شيئاً، وبعضها
+    بوصفٍ فارغ تماماً. ولا مورّد يُدفَع له ثلاثة ريالات، ولا راتب.
+    فالمقدار هنا دليلٌ أقوى من الصمت.
+
+    وموضعها بعد الكلمات مقصود: زكاةُ خمسة ريالات تبقى زكاةً، ورسمُ
+    القناة الرقمية يبقى بوصفه. والمقدار لا ينقض ما قيل صراحةً.
+
+    ولا تُطبَّق على الوارد: مالٌ يدخل الحساب ليس رسماً مهما صغر.
+  */
+  if (
+    tx.direction === "DEBIT"
+    && tx.amountMinor > 0
+    && tx.amountMinor < SMALL_FEE_MAX_MINOR
+  ) {
+    return {
+      kind: "BANK_FEE",
+      layer: "AMOUNT",
+      source: "AMOUNT",
+      ruleId: null,
+      reason: "صادرٌ أقلّ من عشرين ريالاً وليس ضريبة — رسمُ بنك بحكم مقداره",
+      merchantKey: key,
+    };
+  }
+
+  /* ── ٥. المجهول ── */
   return {
     kind: "UNKNOWN",
     layer: "NONE",
@@ -190,22 +271,18 @@ export function classify(
 }
 
 /**
- * مفتاح المستفيد.
+ * أقوى مفاتيح المستفيد — والقائمة كلّها في `identitiesOf`.
  *
- * رقم الحساب أثبت من الاسم — الاسم يُكتب بصيغ، والحساب لا. فإن وُجد
- * حسابٌ في الحركة كان هو المفتاح، وإلّا فاسم المستفيد موحَّداً.
+ * رقم الحساب أثبت من الاسم — الاسم يُكتب بصيغ، والحساب لا. ثمّ النمط
+ * بعدهما: هو ما يبقى حين لا يكون للحركة اسمٌ ولا حساب، وهو حال أكثر
+ * ما يخرج مجهولاً.
+ *
+ * والتوحيد هنا هو التوحيد في `counterparty.service` نفسه — كان الاسم
+ * يُكتب موحَّداً ويُقرأ خاماً، فلا يلتقيان في اسمٍ فيه همزةٌ أو تاء
+ * مربوطة، وهو أكثر الأسماء العربية.
  */
 export function merchantKey(tx: CanonicalTransaction): string | null {
-  const account = tx.references.find((r) => r.kind === "ACCOUNT" || r.kind === "IBAN");
-  if (account) return `ACC:${account.value}`;
-
-  const id = tx.references.find((r) => r.kind === "NATIONAL_ID");
-  if (id) return `ID:${id.value}`;
-
-  const name = (tx.beneficiaryRaw ?? "").trim();
-  if (name.length >= 3) return `NAME:${name.replace(/\s+/g, " ").toUpperCase()}`;
-
-  return null;
+  return identitiesOf(tx)[0]?.key ?? null;
 }
 
 /**

@@ -27,6 +27,11 @@ async function main() {
     select id, amount_minor as amount from payments order by amount_minor desc limit 1
   `)).rows;
 
+  /* حركةٌ قائمة — تُنسَخ حرفاً بحرف ليُختبَر ردُّ المكرَّر. */
+  const [tx] = (await db.execute<{ id: string }>(sql`
+    select id from bank_transactions order by amount_minor desc limit 1
+  `)).rows;
+
   if (!inv || !pay) { console.log("لا بيانات كافية للفحص."); process.exit(0); }
 
   const results = [
@@ -48,6 +53,22 @@ async function main() {
     await mustFail("مصروف شهره يخالف تاريخه",
       `insert into expenses (id, period_month, occurred_on, category, label, amount_minor, source)
        values ('t-exp2', '2026-07', '2026-08-01', 'RENT', 'اختبار', 100, 'MANUAL')`),
+
+    /*
+      وهذا هو القيد الذي غاب فدخل كشفٌ كامل مرّتين.
+
+      يُنسَخ صفٌّ قائم بمفتاحه الطبيعيّ كلِّه — الحساب والتاريخ والمبلغ
+      والاتجاه والوصف والترتيب — ببصمةٍ مختلفة. وهذا بالضبط ما وقع:
+      بصمتان لحركةٍ واحدة. فإن قبلته القاعدة فالمنع ادّعاء.
+    */
+    ...(tx ? [await mustFail("حركة بنكية مكرَّرة بمفتاحها الطبيعيّ (ببصمة أخرى)",
+      `insert into bank_transactions
+         (id, bank_import_id, value_date, description, transaction_type, beneficiary_raw,
+          amount_minor, direction, external_id, occurrence, bank_account_id)
+       select 't-dup-natural', bank_import_id, value_date, description, transaction_type,
+              beneficiary_raw, amount_minor, direction, 't-dup-fingerprint', occurrence,
+              bank_account_id
+       from bank_transactions where id = '${tx.id}'`)] : []),
   ];
 
   const passed = results.filter(Boolean).length;

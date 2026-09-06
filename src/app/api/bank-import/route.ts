@@ -1,6 +1,6 @@
 /** استيراد كشف البنك ومطابقة مدفوعاته بالفواتير. */
 import { NextResponse } from "next/server";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   adjudications, bankImports, bankRules, bankTransactions, decisionHistory, invoices, paymentAllocations,
@@ -12,7 +12,9 @@ import {
   findDuplicatePayments, suggestAlias,
   type BankTx, type OpenInvoice,
 } from "@/lib/bank/match";
-import { assignIdentities, fileFingerprint } from "@/lib/bank/identity";
+import {
+  assignIdentities, countByNaturalKey, fileFingerprint, unseenRows,
+} from "@/lib/bank/identity";
 import { resolveBankAccount } from "@/services/bank-account.service";
 import { allocate, createPayment } from "@/services/payment.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
@@ -443,18 +445,40 @@ export async function POST(request: Request) {  let user;
     البحث عن السابق مقيَّد بالحساب نفسه. والمجهول نطاقٌ واحد: حركاته
     تُقارَن بحركات المجهول لا بحركات حسابٍ معروف.
   */
-  const existingIds = new Set(
-    (
-      await db
-        .select({ externalId: bankTransactions.externalId })
-        .from(bankTransactions)
-        .where(and(
-          inArray(bankTransactions.externalId, identified.map((r) => r.externalId)),
-          bankAccountId === null
-            ? isNull(bankTransactions.bankAccountId)
-            : eq(bankTransactions.bankAccountId, bankAccountId),
-        ))
-    ).map((r) => r.externalId!),
+  /*
+    كم من كلّ حركةٍ عند القاعدة الآن؟
+
+    والسؤال بهذه الصيغة مقصود. الكشف يذكر الحركة بعدد ما وقعت — مرّةً
+    أو مرّتين — فإن كان عندنا منها مثلُ ما يقول الكشف فلا جديد، وإن
+    كان أقلّ دخل الفرق وحده. وبهذا يُرفَع الملف عشرين مرّة فلا تزيد
+    حركةٌ واحدة، وتبقى الحركتان المتطابقتان الحقيقيّتان اثنتين.
+  */
+  const times = identified.map((r) => r.valueDate.getTime());
+  const accountScope = bankAccountId === null
+    ? isNull(bankTransactions.bankAccountId)
+    : eq(bankTransactions.bankAccountId, bankAccountId);
+
+  const priorRows = times.length === 0 ? [] : await db
+    .select({
+      valueDate: bankTransactions.valueDate,
+      amountMinor: bankTransactions.amountMinor,
+      direction: bankTransactions.direction,
+      description: bankTransactions.description,
+    })
+    .from(bankTransactions)
+    .where(and(
+      gte(bankTransactions.valueDate, new Date(Math.min(...times))),
+      lte(bankTransactions.valueDate, new Date(Math.max(...times))),
+      accountScope,
+    ));
+
+  const priorCount = countByNaturalKey(
+    priorRows.map((prior) => ({
+      valueDate: prior.valueDate,
+      amountMinor: prior.amountMinor,
+      direction: prior.direction as "DEBIT" | "CREDIT",
+      description: prior.description,
+    })),
   );
 
   const [priorImport] = await db
@@ -464,11 +488,13 @@ export async function POST(request: Request) {  let user;
     .limit(1);
 
   const alreadyImported = Boolean(priorImport);
-  const fresh = identified.filter((r) => !existingIds.has(r.externalId));
+  const fresh = unseenRows(identified, priorCount);
   const newRows = fresh.length;
 
   let importId = priorImport?.id ?? "";
   let created = 0;
+  /** ما ردّه القيد بعد أن أجازه الفحص — يُعدّ ولا يُبتلَع. */
+  let rejectedByConstraint = 0;
 
   if (newRows > 0 || !priorImport) {
     const [imp] = await db
@@ -515,6 +541,8 @@ export async function POST(request: Request) {  let user;
           bankImportId: importId,
           bankAccountId,
           externalId: row.externalId,
+          /* جزءٌ من المفتاح الطبيعيّ — لا حقلٌ وصفيّ */
+          occurrence: row.occurrence,
           valueDate: t.valueDate,
           description: t.description,
           transactionType: t.transactionType || null,
@@ -581,8 +609,12 @@ export async function POST(request: Request) {  let user;
         .onConflictDoNothing()
         .returning({ id: bankTransactions.id });
 
-      // القيد الفريد ردّها: حركة سبقتنا إليها كتابة أخرى
-      if (!inserted) continue;
+      /*
+        القيد الفريد ردّها: إمّا حركةٌ سبقتنا إليها كتابةٌ أخرى، وإمّا
+        حركةٌ مقيَّدة من قبل فاتها الفحصُ أعلاه. والقيد آخر الحرّاس ولا
+        يفلت منه شيء.
+      */
+      if (!inserted) { rejectedByConstraint++; continue; }
 
       await tx.insert(decisionHistory).values({
         bankTransactionId: inserted.id,
@@ -697,11 +729,14 @@ export async function POST(request: Request) {  let user;
     created,
     alreadyImported,
     importId,
+    rejectedByConstraint,
     message:
       newRows === 0
-        ? "هذا الكشف مستورد مسبقاً — لم تُضَف حركة واحدة، ولم يتكرّر شيء."
+        ? `هذا الكشف مقيَّد عندك من قبل — قُرئت ${identified.length} حركة، وكلّها مسجَّلة، فلم تُضَف واحدة.`
         : `أُضيفت ${newRows} حركة جديدة${
-            identified.length - newRows > 0 ? ` وتُخطّيت ${identified.length - newRows} موجودة` : ""
-          }.`,
+            identified.length - newRows > 0
+              ? ` · ${identified.length - newRows} كانت مسجَّلة من قبل فلم تتكرّر`
+              : ""
+          }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} ردّها قيد القاعدة` : ""}.`,
   });
 }

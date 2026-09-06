@@ -139,3 +139,111 @@ describe("buildMemory", () => {
     expect(buildMemory([]).size).toBe(0);
   });
 });
+
+describe("الطبقة الرابعة — المقدار يدلّ حين يصمت الوصف", () => {
+  it("صادرٌ صغير بلا وصفٍ رسمُ بنك", () => {
+    const c = classify(row({ amountMinor: 3_00, description: "" }));
+    expect(c.kind).toBe("BANK_FEE");
+    expect(c.layer).toBe("AMOUNT");
+    expect(c.source).toBe("AMOUNT");
+  });
+
+  it("الضريبة تخرج من حكم الرسم — بابها غير بابه", () => {
+    const c = classify(row({
+      amountMinor: 1_05, description: "", transactionType: "ضريبة القيمة المضافة",
+    }));
+    expect(c.kind).not.toBe("BANK_FEE");
+  });
+
+  it("العشرون نفسها ليست رسماً — الحدّ دون لا حتّى", () => {
+    expect(classify(row({ amountMinor: 20_00, description: "" })).kind).toBe("UNKNOWN");
+    expect(classify(row({ amountMinor: 19_99, description: "" })).kind).toBe("BANK_FEE");
+  });
+
+  it("الوارد الصغير ليس رسماً مهما صغر", () => {
+    const c = classify(row({ amountMinor: 5_00, direction: "CREDIT", description: "" }));
+    expect(c.kind).not.toBe("BANK_FEE");
+  });
+
+  it("المقدار لا ينقض ما قيل صراحةً: زكاةُ خمسة ريالات زكاة", () => {
+    expect(classify(row({ amountMinor: 5_00, description: "صدقه" })).kind).toBe("ZAKAT");
+  });
+
+  it("ولا ينقض ما تعلّمه النظام", () => {
+    const memory = buildMemory([{
+      key: "NAME:المراعي", kind: "SUPPLIER_PAYMENT", supplierId: "S1", at: new Date("2026-01-01"),
+    }]);
+    const c = classify(row({ amountMinor: 2_00, beneficiaryRaw: "المراعي" }), memory);
+    expect(c.kind).toBe("SUPPLIER_PAYMENT");
+  });
+});
+
+describe("الضريبة على الرسم بابٌ غير باب الرسم", () => {
+  it("رسمُ القناة الرقمية رسم، وضريبتُه ضريبة — والوصف واحد", () => {
+    const fee = classify(row({ amountMinor: 50, description: "CITY:Digital Channel" }));
+    const vat = classify(row({
+      amountMinor: 8, description: "CITY:Digital Channel",
+      transactionType: "ضريبة القيمة المضافة",
+    }));
+    expect(fee.kind).toBe("BANK_FEE");
+    expect(vat.kind).toBe("BANK_VAT");
+  });
+
+  it("حضورُ «نوع العملية» لا يُخرِج الرسم من بابه", () => {
+    /*
+      كانت القاعدة مقيَّدة بأوّل النصّ وآخره، و`searchText` يجمع الوصف
+      والنوع — فالرسم الذي يُعرَف حين يغيب نوعه يخرج مجهولاً حين يحضر.
+    */
+    const c = classify(row({
+      amountMinor: 50, description: "CITY:Digital Channel",
+      transactionType: "رسوم القناة الرقمية",
+    }));
+    expect(c.kind).toBe("BANK_FEE");
+  });
+
+  it("سدادُ زاتكا حكوميّ — ولا تخدع كلمةُ Tax في وصفه", () => {
+    const c = classify(row({
+      amountMinor: 14_209_32,
+      description: "Zakat, Tax and Customs Au thority رقم السداد310007971626300",
+      transactionType: "مدفوعات سداد",
+    }));
+    expect(c.kind).toBe("GOVERNMENT");
+  });
+
+  it("الوزارات والأمانات حكوميّة", () => {
+    expect(classify(row({
+      amountMinor: 250_00,
+      description: "Ministry of Municipal and  Rural Affairs رقم السداد982521151712",
+    })).kind).toBe("GOVERNMENT");
+  });
+});
+
+describe("«نوع العملية» يُصنّف حين يصمت الوصف", () => {
+  it("وصفٌ بلا كلمة، ونوعٌ يقولها كاملة", () => {
+    const c = classify(row({
+      amountMinor: 13, description: "81140155-260626-POS 0",
+      transactionType: "ضريبة عملية نقاط بيع فوري",
+    }));
+    expect(c.kind).toBe("POS_VAT");
+    expect(c.layer).toBe("STRUCTURE");
+  });
+
+  it("الرسم الشهريّ لأجهزة الشبكة وضريبتُه", () => {
+    expect(classify(row({
+      amountMinor: 100_00, description: "PoSMonthlyFeeSep81140156",
+      transactionType: "نقاط بيع شهري",
+    })).kind).toBe("POS_FEE");
+    expect(classify(row({
+      amountMinor: 15_00, description: "PoSMonthlyFeeSep81140156",
+      transactionType: "ضريبة رسوم أجهزة نقاط بيع",
+    })).kind).toBe("POS_VAT");
+  });
+
+  it("ولا يُصنَّف بالنوع ما ليس من الشبكة", () => {
+    const c = classify(row({
+      amountMinor: 5_000_00, description: "حوالة لمورّد",
+      transactionType: "حوالة فورية محلية صادرة",
+    }));
+    expect(c.kind).not.toBe("POS_FEE");
+  });
+});

@@ -95,8 +95,13 @@ describe("runReconciliation", () => {
   });
 
   it("الذاكرة تُقدَّم على الكلمات في التصنيف", () => {
+    /*
+      المفتاح موحَّد كما يكتبه `identitiesOf` — والاسم يُقرأ بالصيغة
+      نفسها التي يُكتب بها. وكان يُكتب موحَّداً ويُقرأ خاماً، فاسمٌ فيه
+      همزةٌ أو تاءٌ مربوطة لا يلتقي بنفسه، وهو أكثر الأسماء العربية.
+    */
     const memory = buildMemory([
-      { key: "NAME:أوراق الزيتون", kind: "SUPPLIER_PAYMENT", supplierId: "S1", at: day("2026-01-01") },
+      { key: "NAME:اوراق الزيتون", kind: "SUPPLIER_PAYMENT", supplierId: "S1", at: day("2026-01-01") },
     ]);
     const { results } = runReconciliation({
       rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون", description: "BV:رواتب شهرية" })],
@@ -106,6 +111,27 @@ describe("runReconciliation", () => {
     });
     expect(results[0].kind).toBe("SUPPLIER_PAYMENT");
     expect(results[0].classificationReason).toContain("أكّدتَ");
+  });
+
+  it("النمط يُعرَف حين لا اسم للمستفيد ولا حساب", () => {
+    /*
+      وهذه حال كلّ حركةٍ خرجت مجهولةً من كشف أحمد: سدادٌ حكوميّ بلا
+      اسمٍ ولا رقم حساب. وكان مفتاح الذاكرة يخرج فارغاً لها، فيؤكّدها
+      مئة مرّة ولا تُعرَف أختُها.
+    */
+    const description = "Ministry of Municipal and Rural Affairs رقم السداد982521151712 مرجع132190936";
+    const memory = buildMemory([{
+      key: "PAT:MINISTRY OF MUNICIPAL AND RURAL AFFAIRS رقم السداد# مرجع#",
+      kind: "GOVERNMENT", supplierId: null, at: day("2026-01-01"),
+    }]);
+    const { results } = runReconciliation({
+      rows: [row({ key: "t1", beneficiaryRaw: null, description })],
+      invoices: [],
+      suppliers,
+      memory,
+    });
+    expect(results[0].kind).toBe("GOVERNMENT");
+    expect(results[0].classificationReason).toContain("نمط الوصف");
   });
 
   it("لكل نتيجة سببُ تصنيفها مكتوباً", () => {

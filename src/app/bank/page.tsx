@@ -9,7 +9,9 @@ import { Money } from "@/components/money";
 import { Card, EmptyState, Section, Stat, StatGrid } from "@/components/ui";
 import { BankImport } from "@/components/bank-import";
 import { MatchExplain, type MatchExplanation } from "@/components/match-explain";
-import { ReconcileQueue, type QueueItem } from "@/components/reconcile-queue";
+import { ReconcileQueue, type QueueGroup, type QueueItem } from "@/components/reconcile-queue";
+import { toCanonical } from "@/lib/bank/canonical";
+import { groupByIdentity } from "@/lib/bank/pattern";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
 import { countNoun, ITEM } from "@/lib/arabic";
 
@@ -93,6 +95,7 @@ export default async function BankPage() {
       matchOutcome: bankTransactions.matchOutcome,
       matchDisposition: bankTransactions.matchDisposition,
       supplierId: bankTransactions.supplierId,
+      transactionType: bankTransactions.transactionType,
     })
       .from(bankTransactions)
       .where(sql`${bankTransactions.matchedPaymentId} is null
@@ -104,7 +107,12 @@ export default async function BankPage() {
               and ${bankTransactions.direction} = 'DEBIT')
         )`)
       .orderBy(desc(bankTransactions.amountMinor))
-      .limit(60),
+      /*
+        الحدّ يُرفَع لأنّ الوحدة صارت المجموعة لا الحركة: ستّون حركة
+        قد تكون ثماني مجموعات. والقصّ عند ستّين كان يُخفي أنّ في
+        القاعدة أخواتٍ لما يُسأل عنه — فيُجاب عن سبعٍ ويبقى ثمانٍ.
+      */
+      .limit(400),
   ]);
 
   /** يترجم ما قرّره المحرّك إلى سببٍ يُقرأ. */
@@ -112,12 +120,21 @@ export default async function BankPage() {
     if (t.matchOutcome === "PARTIAL_PAYMENT") return "PARTIAL_PAYMENT";
     if (t.matchOutcome === "OVERPAYMENT") return "OVERPAYMENT";
     if (t.matchOutcome === "AMOUNT_MISMATCH") return "AMOUNT_MISMATCH";
+    /*
+      «المورّد معروف ولا فاتورة» سببٌ قائم بذاته لا «مرشّحان
+      متقاربان». وهو في كشف أحمد أكثر المعلّقات: ثمانون حركة بمئتين
+      وأربعة وأربعين ألف ريال — كانت تُعرَض بسببٍ ليس سببها، فيُبحَث
+      عن مرشّحين لا وجود لهم.
+    */
+    if (t.matchOutcome === "KNOWN_SUPPLIER_NO_INVOICE") return "KNOWN_SUPPLIER_NO_INVOICE";
     if (t.matchDisposition === "SUGGEST") return "SUGGESTED";
     if (t.supplierId === null) return "UNKNOWN_ENTITY";
     return "CLOSE_CANDIDATES";
   }
 
-  const queue: QueueItem[] = pending.map((t) => {
+  const supplierName = new Map(supplierRows.map((s) => [s.id, s.nameAr]));
+
+  const toItem = (t: (typeof pending)[number]): QueueItem => {
     const ev = t.matchEvidence as
       { تصنيف?: string; مستفيد?: string[]; مطابقة?: string[] } | null;
     return {
@@ -128,13 +145,70 @@ export default async function BankPage() {
       description: (t.description ?? "").slice(0, 160),
       beneficiaryRaw: t.beneficiaryRaw,
       reason: reasonOf(t),
-      guessName: null,
+      guessName: t.supplierId ? supplierName.get(t.supplierId) ?? null : null,
       guessKind: null,
       why: [ev?.تصنيف, ...(ev?.مستفيد ?? []), ...(ev?.مطابقة ?? [])]
         .filter((x): x is string => Boolean(x))
         .slice(0, 4),
     };
-  });
+  };
+
+  /*
+    التجميع في الخادم.
+
+    لأنّ الهويّة تُشتقّ بالدالّة نفسها التي يكتب بها الاستيراد ويتحقّق
+    بها مسار التأكيد — فما تراه الشاشة مجموعةً هو ما سيراه الخادم
+    مجموعةً. ولو جُمع في المتصفّح لصار تجميعان: واحدٌ يُعرَض وآخر
+    يُكتَب، ولا يلتقيان إلّا بالمصادفة.
+  */
+  const { groups: rawGroups, ungrouped } = groupByIdentity(
+    pending,
+    (t) => toCanonical({
+      valueDate: t.valueDate,
+      description: t.description,
+      beneficiaryRaw: t.beneficiaryRaw,
+      transactionType: t.transactionType,
+      amountMinor: t.amountMinor,
+      direction: t.direction as "DEBIT" | "CREDIT",
+    }),
+    (t) => t.amountMinor,
+  );
+
+  const titleOf = (t: (typeof pending)[number]) =>
+    t.beneficiaryRaw?.trim() || (t.description ?? "").trim().slice(0, 70) || "بلا وصف";
+
+  const groups: QueueGroup[] = [
+    ...rawGroups.map((g) => {
+      const items = g.items.map(toItem);
+      const supplierIds = new Set(g.items.map((t) => t.supplierId));
+      const only = supplierIds.size === 1 ? [...supplierIds][0] : null;
+      return {
+        key: g.key,
+        identityLabel: g.identity.label,
+        title: titleOf(g.items[0]),
+        totalMinor: g.totalMinor,
+        items,
+        guessName: only ? supplierName.get(only) ?? null : null,
+        why: items[0]?.why ?? [],
+      };
+    }),
+    /*
+      ما لا هويّة له يُعرَض على حدة ولا يُدسّ في مجموعة.
+
+      حركةٌ بلا اسمٍ ولا وصفٍ ولا رقم لا يُتعلَّم منها شيء — تُصنَّف هي
+      وحدها. وقولُ ذلك أصدق من جمعها مع غيرها بحجّة أنّنا لم نعرف
+      أيّهما.
+    */
+    ...ungrouped.map((t) => ({
+      key: `bare:${t.id}`,
+      identityLabel: "لا هويّة لها — تُحسم وحدها",
+      title: titleOf(t),
+      totalMinor: t.amountMinor,
+      items: [toItem(t)],
+      guessName: t.supplierId ? supplierName.get(t.supplierId) ?? null : null,
+      why: [],
+    })),
+  ];
 
   const f = counts.rows[0] ?? {};
   const n = (k: string) => Number(f[k] ?? 0);
@@ -168,12 +242,12 @@ export default async function BankPage() {
         />
       </StatGrid>
 
-      {queue.length > 0 && (
+      {groups.length > 0 && (
         <Section
           title="حلّ المعلّقات"
-          hint="سؤالٌ واحد عن حركةٍ واحدة، ثمّ ننتقل. وما تؤكّده يصير ذاكرةً تعمّ على أمثاله، فيقصر الطابور من نفسه."
+          hint="سؤالٌ واحد عن كلّ ما يتشابه، ثمّ ننتقل. وما تؤكّده يصير ذاكرةً تعمّ على أمثاله — في الكشوف السابقة الآن، وفي القادمة بلا سؤال."
         >
-          <ReconcileQueue items={queue} suppliers={supplierRows} />
+          <ReconcileQueue groups={groups} suppliers={supplierRows} />
         </Section>
       )}
 

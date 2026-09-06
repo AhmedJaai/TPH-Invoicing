@@ -13,6 +13,7 @@ const TO_CATEGORY: Record<TxKind, TxCategory> = {
   POS_FEE: "POS_FEE",
   POS_VAT: "POS_VAT",
   BANK_FEE: "BANK_FEE",
+  BANK_VAT: "BANK_VAT",
   INTERNAL_TRANSFER: "INTERNAL",
   OWNER_TRANSFER: "PERSONAL",
   SALARY: "SALARY",
@@ -63,6 +64,7 @@ const FROM_CATEGORY: Record<TxCategory, TxKind> = {
   POS_FEE: "POS_FEE",
   POS_VAT: "POS_VAT",
   BANK_FEE: "BANK_FEE",
+  BANK_VAT: "BANK_VAT",
 };
 
 export function fromCategory(category: TxCategory): TxKind {

@@ -16,6 +16,7 @@ export type TxKind =
   | "POS_FEE"            // رسوم شبكة على العملية
   | "POS_VAT"            // ضريبة رسوم الشبكة
   | "BANK_FEE"           // رسوم بنكية
+  | "BANK_VAT"           // ضريبة القيمة المضافة على رسم البنك
   | "INTERNAL_TRANSFER"  // بين حسابَي المنشأة
   | "OWNER_TRANSFER"     // سحب المالك أو إيداعه
   | "SALARY"
@@ -32,6 +33,7 @@ export const KIND_LABEL: Record<TxKind, string> = {
   POS_FEE: "رسوم شبكة",
   POS_VAT: "ضريبة رسوم الشبكة",
   BANK_FEE: "رسوم بنكية",
+  BANK_VAT: "ضريبة رسوم البنك",
   INTERNAL_TRANSFER: "تحويل داخلي",
   OWNER_TRANSFER: "تحويل المالك",
   SALARY: "راتب أو أجر",

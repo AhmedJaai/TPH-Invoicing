@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  assignIdentities, fileFingerprint, identityScope,
-  normalizeDescription, scopedIdentity, transactionIdentity, UNSCOPED,
+  assignIdentities, countByNaturalKey, fileFingerprint, identityScope,
+  naturalKey, normalizeDescription, scopedIdentity, transactionIdentity,
+  unseenRows, UNSCOPED,
 } from "./identity";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
@@ -146,5 +147,57 @@ describe("fileFingerprint", () => {
 
   it("اختلاف بايت واحد يغيّر البصمة", () => {
     expect(fileFingerprint(Buffer.from("أ"))).not.toBe(fileFingerprint(Buffer.from("ب")));
+  });
+});
+
+describe("المفتاح الطبيعيّ: رفعُ الكشف عشرين مرّة لا يزيد حركة", () => {
+  const day = (d: string) => new Date(`${d}T00:00:00Z`);
+
+  /** كشفٌ فيه حركتان متطابقتان في اليوم — وهما حقيقيّتان. */
+  const file = [
+    { valueDate: day("2026-08-12"), amountMinor: 50, direction: "DEBIT" as const, description: "CITY:Digital Channel" },
+    { valueDate: day("2026-08-12"), amountMinor: 50, direction: "DEBIT" as const, description: "CITY:Digital Channel" },
+    { valueDate: day("2026-08-12"), amountMinor: 833_75, direction: "DEBIT" as const, description: "حوالة top taste" },
+  ];
+
+  it("أوّل استيراد: كلّ الصفوف جديدة", () => {
+    const rows = assignIdentities(file);
+    expect(unseenRows(rows, new Map())).toHaveLength(3);
+  });
+
+  it("رفعُ الملف نفسه عشرين مرّة لا يضيف شيئاً", () => {
+    const rows = assignIdentities(file);
+    let stored = [...rows];
+    for (let i = 0; i < 20; i++) {
+      const fresh = unseenRows(rows, countByNaturalKey(stored));
+      expect(fresh).toHaveLength(0);
+      stored = [...stored, ...fresh];
+    }
+    expect(stored).toHaveLength(3);
+  });
+
+  it("الحركتان المتطابقتان الحقيقيّتان تبقيان اثنتين", () => {
+    const stored = assignIdentities(file);
+    expect(countByNaturalKey(stored).get(naturalKey(file[0]))).toBe(2);
+  });
+
+  it("كشفٌ أطول يذكرها ثلاثاً: تدخل الثالثة وحدها", () => {
+    const stored = assignIdentities(file);
+    const longer = assignIdentities([...file, {
+      valueDate: day("2026-08-12"), amountMinor: 50, direction: "DEBIT" as const,
+      description: "CITY:Digital Channel",
+    }]);
+    const fresh = unseenRows(longer, countByNaturalKey(stored));
+    expect(fresh).toHaveLength(1);
+    expect(fresh[0].occurrence).toBe(2);
+  });
+
+  it("المفتاح لا يتأثّر بفراغٍ مزدوج ولا بحالة الأحرف", () => {
+    expect(naturalKey({ ...file[2], description: "حوالة  TOP  TASTE" }))
+      .toBe(naturalKey({ ...file[2], description: " حوالة top taste " }));
+  });
+
+  it("حركةٌ بمبلغٍ مختلف مفتاحُها مختلف — ولا تُبتلَع", () => {
+    expect(naturalKey(file[0])).not.toBe(naturalKey({ ...file[0], amountMinor: 51 }));
   });
 });

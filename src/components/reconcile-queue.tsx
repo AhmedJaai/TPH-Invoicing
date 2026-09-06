@@ -4,26 +4,23 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Money } from "./money";
 import { Badge, buttonClass, Card, EmptyState } from "./ui";
+import { countNoun, TRANSACTION } from "@/lib/arabic";
 
 /**
- * حلّ المعلّقات — واحدةً واحدة.
+ * حلّ المعلّقات — **مجموعةً مجموعة** لا حركةً حركة.
  *
- * كانت الشاشة تعرض قوائم منسدلة: صنّف، واختر مورّداً، واحفظ نمطاً.
- * وهذه واجهة إدارة قاعدة بيانات لا واجهة عمل — تطلب من صاحب المقهى أن
- * يفهم كيف يعمل النظام كي يستعمله.
+ * كانت الشاشة تسأل عن كل حركة على حدة. وفي كشفٍ فيه ستّون حركة، خمس
+ * عشرة منها لمورّدٍ واحد، يعني ذلك خمسة عشر سؤالاً عن شيءٍ واحد —
+ * فيُترَك الطابور ولا يُنجَز. والنظام الذي لا يُستعمَل لا يحمي شيئاً.
  *
- * وهنا يُسأل سؤالاً واحداً عن حركةٍ واحدة: **ما هذه؟** ثمّ ينتقل. وما
- * يجيبه يصير ذاكرةً تعمّ على أمثاله، فيقصر الطابور من نفسه.
+ * فصار السؤال: **ما هذه السبع؟** ثمّ تُحسَم السبع بضغطة. وما يُجاب به
+ * يُحفَظ هويّةً للجهة، فتُعرَف أخواتُها في الكشوف السابقة الآن، وفي
+ * القادمة بلا سؤال.
+ *
+ * والتجميع يقع في الخادم لا هنا: هو الذي يشتقّ الهويّة، وهو الذي
+ * يتحقّق منها ثانيةً قبل الكتابة. وهذه الشاشة تعرض ما جمعه.
  */
 
-/**
- * ما يحتاج قرارك — بكلّ صوره.
- *
- * كان الطابور «الحركات المجهولة» وحدها. والواقع أنّ ما يحتاج قراراً
- * أوسع: مرشّحان متقاربان، ومبلغٌ لا يطابق، وسدادٌ جزئيّ، وزيادة،
- * ومطابقةٌ اقترحها الحساب ولم يحسمها. وكلّها كانت تُعرَض أو لا تُعرَض
- * بلا زرّ يُتَّخذ به قرار.
- */
 export type QueueReason =
   | "UNKNOWN_ENTITY"
   | "CLOSE_CANDIDATES"
@@ -31,7 +28,8 @@ export type QueueReason =
   | "PARTIAL_PAYMENT"
   | "OVERPAYMENT"
   | "SUGGESTED"
-  | "APPROXIMATE";
+  | "APPROXIMATE"
+  | "KNOWN_SUPPLIER_NO_INVOICE";
 
 export const REASON_LABEL: Record<QueueReason, string> = {
   UNKNOWN_ENTITY: "مستفيد غير معروف",
@@ -41,10 +39,10 @@ export const REASON_LABEL: Record<QueueReason, string> = {
   OVERPAYMENT: "أكثر من المستحقّ",
   SUGGESTED: "اقتراح ينتظر إقرارك",
   APPROXIMATE: "حلٌّ تقريبيّ",
+  KNOWN_SUPPLIER_NO_INVOICE: "المورّد معروف ولا فاتورة تقابله",
 };
 
 export interface CandidateOption {
-  /** معرّف الحركة المرشَّحة — يُرسَل عند القبول. */
   invoiceIds: string[];
   label: string;
   amountMinor: number;
@@ -60,12 +58,30 @@ export interface QueueItem {
   description: string;
   beneficiaryRaw: string | null;
   reason: QueueReason;
-  /** ما رجّحه المحرّك، إن رجّح. */
   guessName: string | null;
   guessKind: string | null;
   why: string[];
-  /** المرشّحون — يُعرَضون ليُختار بينهم لا ليُقرأ عنهم. */
   candidates?: CandidateOption[];
+}
+
+/**
+ * مجموعةٌ من الحركات يجمعها دليلٌ واحد.
+ *
+ * و`identityLabel` ليس زينة: هو جواب «لماذا اجتمعت هذه؟» — رقمُ حسابٍ
+ * واحد أم نمطُ وصفٍ واحد. ومن لا يعرف لماذا اجتمعت لا ينبغي أن يحسمها
+ * دفعةً واحدة.
+ */
+export interface QueueGroup {
+  key: string;
+  /** نوع الدليل الجامع: «رقم الحساب» · «نمط الوصف» … */
+  identityLabel: string;
+  /** ما يُعرَض عنواناً: اسم المستفيد أو صدر النمط. */
+  title: string;
+  totalMinor: number;
+  items: QueueItem[];
+  /** ما رجّحه المحرّك للمجموعة، إن رجّح. */
+  guessName: string | null;
+  why: string[];
 }
 
 export interface SupplierOption {
@@ -87,14 +103,13 @@ const KINDS: { value: string; label: string }[] = [
 ];
 
 export function ReconcileQueue({
-  items,
+  groups,
   suppliers,
 }: {
-  items: readonly QueueItem[];
+  groups: readonly QueueGroup[];
   suppliers: readonly SupplierOption[];
 }) {
   const router = useRouter();
-  const [index, setIndex] = useState(0);
   const [kind, setKind] = useState<string | null>(null);
   const [supplierId, setSupplierId] = useState("");
   const [name, setName] = useState("");
@@ -102,11 +117,14 @@ export function ReconcileQueue({
   const [message, setMessage] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [done, setDone] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState(false);
 
-  const remaining = items.filter((i) => !done.has(i.id));
-  const item = remaining[Math.min(index, remaining.length - 1)];
+  const remaining = groups.filter((g) => !done.has(g.key));
+  const group = remaining[0];
 
-  if (!item) {
+  const pendingCount = remaining.reduce((n, g) => n + g.items.length, 0);
+
+  if (!group) {
     return (
       <EmptyState
         title="لا شيء معلّق."
@@ -116,66 +134,21 @@ export function ReconcileQueue({
   }
 
   function next() {
-    setDone((d) => new Set(d).add(item!.id));
+    setDone((d) => new Set(d).add(group!.key));
     setKind(null);
     setSupplierId("");
     setName("");
-    setMessage(null);
-    setIndex(0);
+    setExpanded(false);
   }
 
-  /** يقبل مرشّحاً بعينه — وهذا هو ما كان ينقص: خيارٌ يُتَّخَذ. */
-  async function acceptCandidate(option: CandidateOption) {
+  async function post(url: string, payload: unknown, onOk: () => void) {
     setBusy(true);
     setFailed(false);
     try {
-      const res = await fetch("/api/match-confirm", {
+      const res = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ transactionId: item!.id, invoiceIds: option.invoiceIds }),
-      });
-      const data = (await res.json()) as { message?: string; error?: string };
-      if (!res.ok) { setFailed(true); setMessage(data.error ?? "تعذّر القبول"); }
-      else { setMessage(data.message ?? "طُوبقت"); router.refresh(); next(); }
-    } catch {
-      setFailed(true);
-      setMessage("تعذّر الاتصال بالخادم");
-    } finally { setBusy(false); }
-  }
-
-  /** يُعلن أنّها ليست سداد فاتورة — دفعةٌ مقدَّمة أو غيرها. */
-  async function markNotAPayment(as: string) {
-    setBusy(true);
-    setFailed(false);
-    try {
-      const res = await fetch("/api/match-confirm", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ transactionId: item!.id, notAPayment: as }),
-      });
-      const data = (await res.json()) as { message?: string; error?: string };
-      if (!res.ok) { setFailed(true); setMessage(data.error ?? "تعذّر الحفظ"); }
-      else { setMessage(data.message ?? "حُفظت"); router.refresh(); next(); }
-    } catch {
-      setFailed(true);
-      setMessage("تعذّر الاتصال بالخادم");
-    } finally { setBusy(false); }
-  }
-
-  async function confirm() {
-    if (!kind) return;
-    setBusy(true);
-    setFailed(false);
-    try {
-      const res = await fetch("/api/counterparty", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          transactionId: item!.id,
-          kind,
-          supplierId: kind === "SUPPLIER" ? supplierId : null,
-          displayName: name.trim() || item!.beneficiaryRaw || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = (await res.json()) as { message?: string; error?: string };
       if (!res.ok) {
@@ -184,7 +157,7 @@ export function ReconcileQueue({
       } else {
         setMessage(data.message ?? "حُفظت");
         router.refresh();
-        next();
+        onOk();
       }
     } catch {
       setFailed(true);
@@ -194,14 +167,34 @@ export function ReconcileQueue({
     }
   }
 
+  const single = group.items.length === 1 ? group.items[0] : null;
+
+  /** يقبل مرشّحاً بعينه — ولا يكون إلّا لحركةٍ مفردة. */
+  const acceptCandidate = (option: CandidateOption) =>
+    post("/api/match-confirm",
+      { transactionId: single!.id, invoiceIds: option.invoiceIds }, next);
+
+  const markNotAPayment = () =>
+    post("/api/match-confirm", { transactionId: single!.id, notAPayment: "ADVANCE" }, next);
+
+  /** يؤكّد المجموعة كلّها — والخادم يعيد التحقّق من أنّها مجموعة. */
+  const confirm = () =>
+    post("/api/counterparty", {
+      transactionIds: group.items.map((i) => i.id),
+      kind,
+      supplierId: kind === "SUPPLIER" ? supplierId : null,
+      displayName: name.trim() || group.items[0].beneficiaryRaw || undefined,
+    }, next);
+
   const ready = kind !== null && (kind !== "SUPPLIER" || supplierId !== "");
+  const shown = expanded ? group.items : group.items.slice(0, 3);
 
   return (
     <div>
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <p className="text-xs text-muted">
-          بقيت <span className="nums font-bold">{remaining.length}</span> من{" "}
-          <span className="nums">{items.length}</span>
+          بقيت <span className="nums font-bold">{remaining.length}</span> مجموعة ·{" "}
+          <span className="nums">{pendingCount}</span> حركة
         </p>
         <button
           type="button"
@@ -216,28 +209,55 @@ export function ReconcileQueue({
         <div className="flex items-start justify-between gap-3">
           <span className="min-w-0">
             <span className="nums block font-display text-2xl font-bold leading-none">
-              {item.direction === "DEBIT" ? "−" : "+"}
-              <Money minor={item.amountMinor} />
+              <Money minor={group.totalMinor} />
             </span>
-            <span className="nums mt-1.5 block text-[11px] text-muted">{item.date}</span>
+            <span className="mt-1.5 block text-[11px] text-muted">
+              {countNoun(group.items.length, TRANSACTION)} · يجمعها {group.identityLabel}
+            </span>
           </span>
-          <Badge tone={item.reason === "UNKNOWN_ENTITY" ? "warn" : "danger"}>
-            {REASON_LABEL[item.reason]}
+          <Badge tone={group.items.length > 1 ? "warn" : "danger"}>
+            {REASON_LABEL[group.items[0].reason]}
           </Badge>
         </div>
 
-        <p className="mt-3 text-sm font-bold leading-snug">
-          {item.beneficiaryRaw ?? "بلا اسم مستفيد"}
-        </p>
-        <p className="clamp-2 mt-1 text-[11px] leading-relaxed text-muted">{item.description}</p>
+        <p className="mt-3 text-sm font-bold leading-snug" dir="auto">{group.title}</p>
 
-        {item.guessName && (
+        {/*
+          الحركات تُعرَض قبل الحسم.
+
+          لأنّ من يُقرّر على سبعٍ لم يرَها لا يُقرّر، بل يوافق.
+        */}
+        <ul className="mt-2 space-y-1 border-r-2 border-line pr-2.5">
+          {shown.map((i) => (
+            <li key={i.id} className="flex items-baseline justify-between gap-3">
+              <span className="nums shrink-0 text-[10px] text-muted">{i.date}</span>
+              <span className="clamp-1 min-w-0 flex-1 text-[10px] text-muted" dir="auto">
+                {i.description || "بلا وصف"}
+              </span>
+              <span className="nums shrink-0 text-[11px] font-bold">
+                {i.direction === "DEBIT" ? "−" : "+"}
+                <Money minor={i.amountMinor} />
+              </span>
+            </li>
+          ))}
+        </ul>
+        {group.items.length > 3 && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-1.5 text-[10px] text-muted underline underline-offset-4"
+          >
+            {expanded ? "اطوِ" : `أظهر الـ${group.items.length} كلّها`}
+          </button>
+        )}
+
+        {group.guessName && (
           <div className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5">
             <p className="text-[11px] text-muted">نعتقد أنّها</p>
-            <p className="text-sm font-bold">{item.guessName}</p>
-            {item.why.length > 0 && (
+            <p className="text-sm font-bold">{group.guessName}</p>
+            {group.why.length > 0 && (
               <ul className="mt-1.5 space-y-0.5">
-                {item.why.slice(0, 3).map((w, i) => (
+                {group.why.slice(0, 3).map((w, i) => (
                   <li key={i} className="text-[10px] leading-relaxed text-muted">— {w}</li>
                 ))}
               </ul>
@@ -245,17 +265,11 @@ export function ReconcileQueue({
           </div>
         )}
 
-        {/*
-          المرشّحون يُعرَضون ليُختار بينهم.
-
-          كان النظام يقول «تحتاج قرارك» ولا يعطي ما يُقرَّر به — فيقف
-          صاحب العمل أمام حركةٍ يعرف أنّها تحتاجه ولا يملك فعلاً.
-        */}
-        {item.candidates && item.candidates.length > 0 && (
+        {single && single.candidates && single.candidates.length > 0 && (
           <div className="mt-4">
             <p className="text-xs font-bold">أيّ فاتورة تفسّرها؟</p>
             <ul className="mt-2 space-y-2">
-              {item.candidates.map((c, i) => (
+              {single.candidates.map((c, i) => (
                 <li key={i} className="rounded-xl border border-line px-3 py-2.5">
                   <div className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
@@ -282,7 +296,7 @@ export function ReconcileQueue({
             <button
               type="button"
               disabled={busy}
-              onClick={() => markNotAPayment("ADVANCE")}
+              onClick={markNotAPayment}
               className={`${buttonClass("secondary", "sm")} mt-2`}
             >
               ليست سداد فاتورة — دفعة مقدَّمة
@@ -290,8 +304,9 @@ export function ReconcileQueue({
           </div>
         )}
 
-        {/* السؤال واحد: ما هذه؟ */}
-        <p className="mt-4 text-xs font-bold">ما هذه الحركة؟</p>
+        <p className="mt-4 text-xs font-bold">
+          {group.items.length > 1 ? "ما هذه الحركات؟" : "ما هذه الحركة؟"}
+        </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {KINDS.map((k) => (
             <button
@@ -309,7 +324,6 @@ export function ReconcileQueue({
           ))}
         </div>
 
-        {/* المورّد لا يُسأل عنه إلّا حين يُختار «سداد مورّد» */}
         {kind === "SUPPLIER" && (
           <label className="mt-3 block">
             <span className="text-[11px] text-muted">أيّ مورّد؟</span>
@@ -320,7 +334,7 @@ export function ReconcileQueue({
             >
               <option value="">اختر…</option>
               {suppliers.map((s) => (
-                <option key={s.id} value={s.nameAr === "" ? s.id : s.id}>{s.nameAr}</option>
+                <option key={s.id} value={s.id}>{s.nameAr}</option>
               ))}
             </select>
           </label>
@@ -333,7 +347,7 @@ export function ReconcileQueue({
               value={name}
               onChange={(e) => setName(e.target.value)}
               dir="auto"
-              placeholder={item.beneficiaryRaw ?? "مثلاً: شركة الكهرباء"}
+              placeholder={group.items[0].beneficiaryRaw ?? group.title.slice(0, 40)}
               className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-ink"
             />
           </label>
@@ -346,7 +360,11 @@ export function ReconcileQueue({
             onClick={confirm}
             className={buttonClass("primary", "sm")}
           >
-            {busy ? "يحفظ…" : "أكّد وانتقل"}
+            {busy
+              ? "يحفظ…"
+              : group.items.length > 1
+                ? `أكّد — وطبّقها على ${countNoun(group.items.length, TRANSACTION)}`
+                : "أكّد وانتقل"}
           </button>
           {message && (
             <span className={`text-[11px] ${failed ? "text-danger" : "text-ok"}`}>{message}</span>
@@ -355,7 +373,8 @@ export function ReconcileQueue({
 
         <p className="mt-3 border-t border-line pt-2.5 text-[10px] leading-relaxed text-muted">
           ما تؤكّده هنا يصير ذاكرةً: تُحفَظ أدلّة هذه الجهة — اسمها وحسابها ورقم
-          هويّتها — فتُعرَف حركاتها القادمة بلا سؤال.
+          هويّتها ونمط وصفها — فتُعرَف حركاتها في الكشوف السابقة الآن، وفي القادمة
+          بلا سؤال.
         </p>
       </Card>
     </div>

@@ -51,9 +51,10 @@ const REFERENCE_RE = /^REFERENCE\s*:\s*(\d{6,})\s+([A-Z]{2})(\d{2})\s+(\d{4})/i;
 export function recognizePos(
   description: string | null | undefined,
   direction: "DEBIT" | "CREDIT",
+  transactionType?: string | null,
 ): PosDetails | null {
   const raw = (description ?? "").trim();
-  if (raw.length === 0) return null;
+  if (raw.length === 0) return fromType(transactionType);
 
   const inline = raw.match(INLINE_RE);
   if (inline) {
@@ -62,7 +63,7 @@ export function recognizePos(
     const scheme = tail.trim().split(/\s+/)[0]?.toUpperCase();
     const batchRef = tail.match(/(\d{4,})\s*$/)?.[1];
 
-    const kind = kindOf(flat, direction);
+    const kind = kindOf(flat, direction) ?? fromType(transactionType)?.kind;
     if (!kind) return null;
     return {
       kind,
@@ -88,6 +89,33 @@ export function recognizePos(
     };
   }
 
+  return fromType(transactionType);
+}
+
+/**
+ * ما يقوله البنك في «نوع العملية» صراحةً.
+ *
+ * والوصف قد يصمت: `81140155-260626-POS 0` لا كلمة فيه، و
+ * `PoSMonthlyFeeSep81140156` لا يشبه صيغة الدفعات. والنوع يقولها
+ * كاملةً: «ضريبة عملية نقاط بيع فوري». وكان يُقرأ للمطابقة ثمّ يُطرح
+ * من التصنيف — فبقيت حركاتٌ «غير مصنَّفة» وما يصنّفها مكتوبٌ في عمودٍ
+ * مجاور.
+ *
+ * والضريبة تُفحص قبل الرسم: نصّها يحوي «رسوم» أحياناً.
+ */
+function fromType(transactionType?: string | null): PosDetails | null {
+  const t = (transactionType ?? "")
+    .replace(/[ًٌٍَُِّْـ]/g, "")
+    .replace(/[إأآٱ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (t.length === 0) return null;
+  if (!/نقاط\s*بيع|دفع\s*الكتروني/.test(t)) return null;
+
+  if (/ضريبه/.test(t)) return { kind: "POS_VAT" };
+  if (/رسوم|شهري/.test(t)) return { kind: "POS_FEE" };
+  if (/ايداع|دفع\s*الكتروني/.test(t)) return { kind: "POS_SETTLEMENT" };
   return null;
 }
 

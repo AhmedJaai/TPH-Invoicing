@@ -152,7 +152,17 @@ export function toCanonical(row: RawBankRow): CanonicalTransaction {
     ...row,
     searchText,
     references: extractReferences(searchText),
-    pos: recognizePos(row.description, row.direction),
+    /*
+      النوع يدخل التعرّف على حركات الشبكة — لا النصّ وحده.
+
+      «٨١١٤٠١٥٥-٢٦٠٦٢٦-POS 0» لا كلمة فيه تقول ما هو، ونوعُه يقول
+      «ضريبة عملية نقاط بيع فوري». وكان يُقرأ ثمّ يُطرح.
+
+      ولا يدخل `signatureOf` — هناك خاصّيةُ تصديرٍ تفرّق نمط الحركة
+      الواحدة بين ملفّين. وهنا دليلٌ صريح على بابها. والفرق أنّ الأوّل
+      هويّةٌ تُقارَن، والثاني وصفٌ يُقرأ.
+    */
+    pos: recognizePos(row.description, row.direction, row.transactionType),
     channel: detectChannel(searchText),
   };
 }
