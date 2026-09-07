@@ -513,7 +513,7 @@ async function settleAccounts(
       periodMonth: invoices.periodMonth,
       totalMinor: invoices.totalMinor,
       allocated: sql<number>`coalesce((select sum(pa.amount_minor)::int
-        from payment_allocations pa where pa.invoice_id = ${invoices.id}), 0)`,
+        from payment_allocations pa where pa.invoice_id = ${invoices}.id), 0)`,
     })
     .from(invoices)
     .where(eq(invoices.supplierId, supplierId)))

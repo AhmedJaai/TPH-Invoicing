@@ -107,6 +107,24 @@ const KINDS: { value: string; label: string }[] = [
   { value: "OTHER", label: "أخرى" },
 ];
 
+/**
+ * يقرأ الردّ نصّاً ثمّ يحاول تحليله.
+ *
+ * القاعدة: **كلّ واجهةٍ تقرأ ردّاً تقرأه نصّاً قبل أن تدّعي أنّه JSON.**
+ * وكان `res.json()` يقع داخل `try` مع الطلب نفسه، فإذا ردّ الخادم ٥٠٠
+ * بصفحة خطأ — وهي ليست JSON — انفجر التحليل وسقط في `catch` فقيل
+ * «تعذّر الاتصال بالخادم». فأُرسل صاحب العمل يفحص شبكةً سليمة بينما
+ * العطب في الخادم ومعه رمزُ حالةٍ يدلّ عليه.
+ */
+async function readBody(res: Response): Promise<{ message?: string; error?: string }> {
+  const text = await res.text().catch(() => "");
+  try {
+    return text ? (JSON.parse(text) as { message?: string; error?: string }) : {};
+  } catch {
+    return {};
+  }
+}
+
 export function ReconcileQueue({
   groups,
   suppliers,
@@ -155,10 +173,10 @@ export function ReconcileQueue({
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await res.json()) as { message?: string; error?: string };
+      const data = await readBody(res);
       if (!res.ok) {
         setFailed(true);
-        setMessage(data.error ?? "تعذّر الحفظ");
+        setMessage(data.error ?? `تعذّر الحفظ — ردّ الخادم بالرمز ${res.status}`);
       } else {
         setMessage(data.message ?? "حُفظت");
         router.refresh();
@@ -166,7 +184,7 @@ export function ReconcileQueue({
       }
     } catch {
       setFailed(true);
-      setMessage("تعذّر الاتصال بالخادم");
+      setMessage("تعذّر الاتصال بالخادم — لم يصل الطلب. تحقّق من الشبكة.");
     } finally {
       setBusy(false);
     }
@@ -209,12 +227,12 @@ export function ReconcileQueue({
           settleSupplier: true,
         }),
       });
-      const data = (await res.json()) as { message?: string; error?: string };
-      if (!res.ok) { setFailed(true); setMessage(data.error ?? "تعذّر السداد"); }
+      const data = await readBody(res);
+      if (!res.ok) { setFailed(true); setMessage(data.error ?? `تعذّر السداد — ردّ الخادم بالرمز ${res.status}`); }
       else { setMessage(data.message ?? "سُدِّد"); router.refresh(); next(); }
     } catch {
       setFailed(true);
-      setMessage("تعذّر الاتصال بالخادم");
+      setMessage("تعذّر الاتصال بالخادم — لم يصل الطلب. تحقّق من الشبكة.");
     } finally {
       setBusy(false);
     }
