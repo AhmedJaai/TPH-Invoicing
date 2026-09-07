@@ -13,6 +13,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --env-file=.env scripts/seed-suppliers.ts",
+    "bench:extraction": "tsx --env-file=.env scripts/benchmark-providers.ts",
     "drive:auth": "tsx --env-file=.env scripts/drive-auth.ts",
     "drive:inventory": "tsx --env-file=.env scripts/drive-inventory.ts",
     "drive:migrate": "tsx --env-file=.env scripts/migrate-archive.ts",

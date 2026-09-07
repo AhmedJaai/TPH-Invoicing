@@ -49,3 +49,6 @@ next-env.d.ts
 ops-attestation.json
 truth-audit.json
 .scratch/
+
+# مخرَجات القياس — نتيجةُ تشغيلٍ لا شيفرة
+bench-*.json
