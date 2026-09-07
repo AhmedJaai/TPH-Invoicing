@@ -52,11 +52,13 @@ export async function GET() {
 
   const provider = selectedProviderName();
   const providerKeyPresent =
-    provider === "gemini"
-      ? Boolean(process.env.GEMINI_API_KEY)
-      : provider === "claude"
-        ? Boolean(process.env.ANTHROPIC_API_KEY)
-        : true;
+    provider === "deepseek"
+      ? Boolean(process.env.DEEPSEEK_API_KEY)
+      : provider === "gemini"
+        ? Boolean(process.env.GEMINI_API_KEY)
+        : provider === "claude"
+          ? Boolean(process.env.ANTHROPIC_API_KEY)
+          : true;
 
   const checks = {
     database,

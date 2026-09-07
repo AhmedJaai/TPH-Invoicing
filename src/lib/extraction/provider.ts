@@ -13,7 +13,7 @@
  */
 import type { ExtractionResult } from "./schema";
 
-export type ProviderName = "claude" | "gemini" | "ollama";
+export type ProviderName = "deepseek" | "claude" | "gemini" | "ollama";
 
 export interface ExtractionRequest {
   data: Buffer;
@@ -46,11 +46,11 @@ export interface ExtractionProvider {
   extract(request: ExtractionRequest): Promise<ExtractionOutcome>;
 }
 
-const PROVIDER_NAMES: readonly ProviderName[] = ["claude", "gemini", "ollama"];
+const PROVIDER_NAMES: readonly ProviderName[] = ["deepseek", "claude", "gemini", "ollama"];
 
 export function selectedProviderName(): ProviderName {
-  const raw = (process.env.EXTRACTION_PROVIDER ?? "claude").toLowerCase();
-  return (PROVIDER_NAMES as readonly string[]).includes(raw) ? (raw as ProviderName) : "claude";
+  const raw = (process.env.EXTRACTION_PROVIDER ?? "deepseek").toLowerCase();
+  return (PROVIDER_NAMES as readonly string[]).includes(raw) ? (raw as ProviderName) : "deepseek";
 }
 
 /** التعليمات مشتركة بين المزوّدين حتى تُقارن دقّتهما على أساس واحد. */

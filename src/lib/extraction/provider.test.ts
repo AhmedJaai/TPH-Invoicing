@@ -36,9 +36,9 @@ describe("اختيار المزوّد", () => {
   const original = process.env.EXTRACTION_PROVIDER;
   afterEach(() => { process.env.EXTRACTION_PROVIDER = original; });
 
-  it("الافتراضي كلود", () => {
+  it("الافتراضي ديب سيك", () => {
     delete process.env.EXTRACTION_PROVIDER;
-    expect(selectedProviderName()).toBe("claude");
+    expect(selectedProviderName()).toBe("deepseek");
   });
 
   it("يقبل جيميني وأولاما ويتجاهل الحروف الكبيرة", () => {
@@ -50,7 +50,7 @@ describe("اختيار المزوّد", () => {
 
   it("الاسم المجهول يرجع للافتراضي بدل أن يعطّل النظام", () => {
     process.env.EXTRACTION_PROVIDER = "chatgpt";
-    expect(selectedProviderName()).toBe("claude");
+    expect(selectedProviderName()).toBe("deepseek");
   });
 });
 

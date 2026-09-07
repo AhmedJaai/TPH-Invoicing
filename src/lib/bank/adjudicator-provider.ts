@@ -12,6 +12,8 @@
  */
 import { z } from "zod";
 import { PINNED_MODELS } from "@/lib/extraction/versions";
+import { callDeepseek, parseJsonLoose } from "@/lib/ai/deepseek";
+import { isDeepseekConfigured, modelFor } from "@/lib/ai/models";
 
 export const verdictSchema = z.object({
   choice: z.string(),
@@ -175,13 +177,64 @@ function openAiCompatible(
   };
 }
 
+/**
+ * الحَكَم — DeepSeek.
+ *
+ * ولا يمرّ بـ`openAiCompatible` رغم أنّه يتكلّم لغتها. السبب أنّ تلك
+ * تنادي `fetch` عارياً: بلا مهلة، وبلا إعادة محاولة، وبلا تمييزٍ بين
+ * «الرصيد نفد» و«الخادم تحت ضغط». والتحكيم يقع داخل استيراد كشفٍ
+ * بنكيّ — أي في مسارٍ ماليّ طويل، ونداءٌ فيه بلا مهلة يعلّق الطلب حتى
+ * يقتله المزوّد فيردّ صفحةً نصّية تنفجر في الشاشة.
+ *
+ * فيمرّ بـ`callDeepseek`: مهلةٌ معلَنة، وإعادةٌ على العابر وحده، وعطبٌ
+ * مصنَّف. وهي الطبقة نفسها التي يمرّ بها الاستخراج — فمزوّدٌ واحد
+ * بسلوكٍ واحد، لا سلوكان في مسارين.
+ *
+ * وكان الافتراضي المكتوب هنا `deepseek-chat` — ولا وجود له في حساب
+ * أحمد أصلاً: الحساب يعرض ثلاثة نماذج ليس فيها. سلسلةٌ حرفيّة كُتبت
+ * مرّةً ولم يعد أحدٌ يسأل أصحيحةٌ هي، وهي بالضبط ما يمنعه `ai/models.ts`.
+ */
 export function deepseekProvider(): AdjudicatorProvider {
-  return openAiCompatible(
-    "deepseek",
-    process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com/v1",
-    process.env.DEEPSEEK_API_KEY,
-    process.env.ADJUDICATOR_MODEL ?? "deepseek-chat",
-  );
+  const model = process.env.ADJUDICATOR_MODEL || modelFor("REASONING");
+  return {
+    name: "deepseek",
+    model,
+    isConfigured: isDeepseekConfigured,
+    async judge(prompt) {
+      /*
+        شكلُ الجواب يُطلَب هنا لا يُترَك للمستدعي.
+
+        جيميني كان يفرضه بـ`responseSchema`، وDeepSeek لا يفرض شيئاً.
+        وجُرِّب بلا وصفٍ للشكل فاختار المرشّح **الصحيح** وأجاب
+        `{"answer":"a"}` — حكمٌ سليم في غلافٍ لا يقرؤه المخطّط، فسقط
+        كأنّه فشل. والخسارة هنا مضاعفة: كلفةُ نداءٍ صحيح، ثمّ حركةٌ
+        تُرفَع إلى مراجعةٍ بشرية بلا حاجة.
+
+        فالوصف في المزوّد نفسه: كلّ مستدعٍ يرث الصحّة، ولا يُنتظَر من
+        كلّ واحدٍ أن يتذكّر.
+      */
+      const shape =
+        'أجب بكائن JSON واحد بهذا الشكل حرفياً وبلا أيّ نصّ آخر:\n' +
+        '{"choice": "معرّف المرشّح أو NONE", "reasonCodes": ["رموز الأدلّة"], ' +
+        '"confidence": 0.0, "reason": "سببٌ بجملة قصيرة"}';
+
+      const result = await callDeepseek({
+        task: "REASONING",
+        maxTokens: 2000,
+        json: true,
+        messages: [{ role: "user", content: `${prompt}\n\n${shape}` }],
+      });
+      if (!result.ok) throw new Error(result.reason);
+
+      const parsed = parseJsonLoose(result.text);
+      if (!parsed.ok) throw new Error("مخرَج الحَكَم ليس JSON");
+
+      const verdict = verdictSchema.safeParse(parsed.value);
+      if (!verdict.success) throw new Error("مخرَجٌ لا يطابق المخطّط");
+
+      return { verdict: verdict.data, durationMs: result.durationMs };
+    },
+  };
 }
 
 export function qwenProvider(): AdjudicatorProvider {
@@ -207,8 +260,8 @@ const PROVIDERS: Record<AdjudicatorName, () => AdjudicatorProvider> = {
  * يُراد نموذجُ رؤيةٍ رخيصٌ للاستخراج ونموذجُ استدلالٍ قويّ للتحكيم.
  */
 export function selectedAdjudicator(): AdjudicatorProvider {
-  const raw = (process.env.ADJUDICATOR_PROVIDER ?? "gemini").toLowerCase();
-  const make = PROVIDERS[raw as AdjudicatorName] ?? PROVIDERS.gemini;
+  const raw = (process.env.ADJUDICATOR_PROVIDER ?? "deepseek").toLowerCase();
+  const make = PROVIDERS[raw as AdjudicatorName] ?? PROVIDERS.deepseek;
   return make();
 }
 

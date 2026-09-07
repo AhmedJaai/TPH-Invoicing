@@ -20,7 +20,7 @@ describe("المزوّدون — التحكيم محايد", () => {
 
   it("والاسم المجهول يرجع إلى الافتراضيّ لا يكسر", () => {
     process.env.ADJUDICATOR_PROVIDER = "لا-يوجد";
-    expect(selectedAdjudicator().name).toBe("gemini");
+    expect(selectedAdjudicator().name).toBe("deepseek");
   });
 
   it("غير المهيَّأ يُعلن ذلك ولا يُحاوَل", () => {

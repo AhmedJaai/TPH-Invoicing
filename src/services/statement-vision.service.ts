@@ -13,8 +13,12 @@
 import {
   buildVisionPrompt, visionStatementSchema, type VisionStatement,
 } from "@/lib/bank/vision-statement";
+import { callDeepseek } from "@/lib/ai/deepseek";
+import { isDeepseekConfigured, modelFor } from "@/lib/ai/models";
+import { resolveDocumentInput } from "@/lib/ai/document-input";
+import { detailFor } from "@/lib/ai/pdf-images";
 
-export type VisionProviderName = "claude" | "gemini";
+export type VisionProviderName = "deepseek" | "claude" | "gemini";
 
 export interface VisionOutcome {
   ok: boolean;
@@ -150,6 +154,67 @@ export function geminiVision(): VisionProvider {
 }
 
 /**
+ * القراءة البصرية — DeepSeek.
+ *
+ * وهنا يظهر فرقٌ جوهريّ عن المزوّدَين السابقين: **كلاهما يقرأ الـPDF
+ * نفسه، وDeepSeek لا يقبله.** الأنواع المقبولة عنده أربعة صور فقط،
+ * وقد رُدّ الـPDF بـ٤٠٠ حين جُرّب.
+ *
+ * فيُنتزَع ما في الملفّ من صور. وهذا المسار لا يُستدعى أصلاً إلّا حين
+ * يعجز استخراج النصّ — أي أنّ الملفّ مصوَّر، وصورتُه موضوعةٌ فيه كما
+ * هي. فالانتزاع يجد ما يبحث عنه في الحالة التي بُني لها بالضبط.
+ *
+ * وإن لم يجد قال «لم يُقرأ» ولم يُرسل شيئاً — فالكشف الذي لا يُقرأ
+ * يُعلَن، ولا تُخترَع له أرصدة.
+ */
+export function deepseekVision(): VisionProvider {
+  const model = modelFor("VISION");
+  return {
+    name: "deepseek",
+    model,
+    isConfigured: isDeepseekConfigured,
+    async read(pdf: Buffer): Promise<VisionOutcome> {
+      const input = await resolveDocumentInput(pdf, "application/pdf");
+      if (input.mode !== "IMAGE") {
+        return {
+          ok: false,
+          provider: "deepseek",
+          model,
+          reason:
+            input.mode === "UNREADABLE"
+              ? input.reason
+              : "الكشف نصّيّ — يُقرأ حسابياً ولا يُرسَل إلى نموذج رؤية",
+        };
+      }
+
+      const result = await callDeepseek({
+        task: "VISION",
+        maxTokens: 16000,
+        json: true,
+        messages: [
+          {
+            role: "user",
+            content: [
+              ...input.images.map((img) => ({
+                type: "image_url" as const,
+                image_url: {
+                  url: `data:${img.mimeType};base64,${img.data.toString("base64")}`,
+                  detail: detailFor(img),
+                },
+              })),
+              { type: "text" as const, text: buildVisionPrompt() },
+            ],
+          },
+        ],
+      });
+
+      if (!result.ok) return { ok: false, provider: "deepseek", model, reason: result.reason };
+      return parseOrFail(result.text, "deepseek", model);
+    },
+  };
+}
+
+/**
  * المزوّد المختار — بمتغيّر مستقلّ عن الاستخراج والتحكيم.
  *
  * لأنّها ثلاثة أعمالٍ مختلفة الحساسيّة: قراءةُ فاتورةٍ غير قراءةِ كشفٍ
@@ -158,11 +223,16 @@ export function geminiVision(): VisionProvider {
  */
 export function selectedVision(): VisionProvider {
   const raw = (process.env.VISION_PROVIDER ?? "").toLowerCase();
+  if (raw === "deepseek") return deepseekVision();
   if (raw === "gemini") return geminiVision();
   if (raw === "claude") return claudeVision();
 
-  /* بلا اختيارٍ صريح: أوّلُ مهيَّأٍ — ولا يُفترَض شيء */
-  const claude = claudeVision();
-  if (claude.isConfigured()) return claude;
-  return geminiVision();
+  /*
+    بلا اختيارٍ صريح: ديب سيك.
+
+    وكان الاحتياط جيميني — وهو الذي يعمل في الإنتاج اليوم فعلاً، لأنّ
+    `VISION_PROVIDER` غير مضبوط هناك. أي أنّ مسار القراءة البصرية كان
+    يقع على جيميني بلا أن يختاره أحد.
+  */
+  return deepseekVision();
 }
