@@ -18,7 +18,7 @@ import {
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { driveForUser, downloadFile } from "@/lib/drive";
+import { driveForUser, downloadFile, getFileMeta } from "@/lib/drive";
 import { recentMonths, walkArchive, type ArchiveEntry } from "@/lib/drive-sync";
 import { parseFileName } from "@/lib/naming";
 import { KNOWN_SLUGS } from "@/lib/suppliers-seed";
@@ -66,6 +66,15 @@ interface Body {
   months?: number;
   /** أشهرٌ بعينها — بها يستأنف الطلبُ التالي ما أوقفته المهلة. */
   onlyMonths?: string[];
+  /**
+   * ملفّاتٌ بعينها — تُقرأ بمعرّفاتها بلا مشيٍ على الأرشيف.
+   *
+   * لأنّ قراءة ملفّين لا تستحقّ إعادةَ المشي على السنوات والأشهر
+   * ومجلّدات المورّدين: عشرون ثانية تُهدَر قبل أن يُقرأ حرف، والدفعة
+   * التالية تُهدرها ثانيةً. فالمشي مرّةً واحدة في الفحص، ثمّ تُقرأ
+   * الملفّات بأسمائها من القائمة التي خرجت منه.
+   */
+  fileIds?: string[];
   /** فحص الأرشيف كله — أبطأ بكثير */
   full?: boolean;
   apply?: boolean;
@@ -142,16 +151,43 @@ export async function POST(request: Request) {  let user;
   let fresh: ArchiveEntry[];
   let pendingMonths: string[] = [];
   let truncated = false;
-  try {
-    const walked = await walkArchive(drive, { months, knownFileIds: known, deadline });
-    fresh = walked.entries;
-    pendingMonths = walked.pendingMonths;
-    truncated = walked.truncated;
-  } catch (e) {
-    return NextResponse.json(
-      { error: `تعذّرت قراءة الدرايف: ${(e as Error).message}` },
-      { status: 502 },
-    );
+
+  const direct = Array.isArray(body.fileIds) ? body.fileIds.slice(0, 8) : [];
+
+  if (direct.length > 0) {
+    /*
+      ── قراءةٌ بالمعرّف: بلا مشي ──
+
+      يُسأل عن الملفّ نفسه، ثمّ عن مجلّده وجدّه — ثلاثةُ نداءات لا
+      عشرات. والشهرُ واسمُ المجلّد يُقرآن من الدرايف لا ممّا أرسله
+      المتصفّح: من أرسل معرّفاً لا يُملي علينا أين هو.
+    */
+    const entries: ArchiveEntry[] = [];
+    for (const id of direct) {
+      /* ما هو مسجَّل لا يُقرأ ثانيةً — استخراجٌ بلا سبب */
+      if (known.has(id)) continue;
+      const file = await getFileMeta(drive, id);
+      if (!file) continue;
+      const folder = file.parents?.[0] ? await getFileMeta(drive, file.parents[0]) : null;
+      const monthFolder = folder?.parents?.[0]
+        ? await getFileMeta(drive, folder.parents[0])
+        : null;
+      if (!folder || !monthFolder || !/^\d{4}-\d{2}$/.test(monthFolder.name)) continue;
+      entries.push({ month: monthFolder.name, folderName: folder.name, file });
+    }
+    fresh = entries;
+  } else {
+    try {
+      const walked = await walkArchive(drive, { months, knownFileIds: known, deadline });
+      fresh = walked.entries;
+      pendingMonths = walked.pendingMonths;
+      truncated = walked.truncated;
+    } catch (e) {
+      return NextResponse.json(
+        { error: `تعذّرت قراءة الدرايف: ${(e as Error).message}` },
+        { status: 502 },
+      );
+    }
   }
 
   /** ما سُجّل في هذا الطلب — به يُسأل عن تسميته بعد قراءته. */
@@ -171,7 +207,9 @@ export async function POST(request: Request) {  let user;
   }
 
   const scanned = {
-    scope: months ? `${months.length} شهراً` : "الأرشيف كله",
+    scope: direct.length > 0
+      ? `${direct.length} ملفّاً بعينه`
+      : months ? `${months.length} شهراً` : "الأرشيف كله",
     /** أشهرٌ لم يُمشَ عليها — يكملها الطلب التالي بلا أن يُعيد ما مضى. */
     pendingMonths,
     truncated,
@@ -187,6 +225,7 @@ export async function POST(request: Request) {  let user;
       applied: false,
       summary: scanned,
       files: fresh.slice(0, 40).map((e) => ({
+        fileId: e.file.id,
         name: e.file.name,
         month: e.month,
         folder: e.folderName,

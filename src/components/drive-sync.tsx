@@ -24,12 +24,20 @@ interface RenameSuggestion {
   proposed: string;
 }
 
+interface ScannedFile {
+  fileId: string;
+  name: string;
+  month: string;
+  folder: string;
+  understood: boolean;
+}
+
 interface Result {
   applied: boolean;
   /** ما سُجّل للتوّ واسمُه خارج الصيغة — يُقترَح هنا لا في شاشةٍ أخرى. */
   renameSuggestions?: RenameSuggestion[];
   summary: Summary;
-  files?: { name: string; month: string; folder: string; understood: boolean }[];
+  files?: ScannedFile[];
   notes?: string[];
   readFailures?: string[];
 }
@@ -58,6 +66,8 @@ export function DriveSync() {
   const [full, setFull] = useState(false);
   const [open, setOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  /** معرّفاتُ ما لا يُفهم اسمُه — تُقرأ بها بلا إعادة مشي. */
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
   const [renamed, setRenamed] = useState<string | null>(null);
 
   const call = useCallback(
@@ -99,38 +109,63 @@ export function DriveSync() {
 
         /*
           ما أوقفته المهلة يُستأنَف — والمستخدم لا يُطلَب منه أن يفهم
-          أنّ الأشهر تُقرأ على دفعات، ولا أنّ المحتوى يُقرأ اثنين
-          اثنين.
+          أنّ الأشهر تُقرأ على دفعات.
         */
         let guard = 0;
         const suggestions = [...(json.renameSuggestions ?? [])];
 
-        while (guard < 12) {
-          const moreMonths = json.summary?.truncated
-            && (json.summary.pendingMonths?.length ?? 0) > 0;
-          const moreContent = apply && (json.summary?.remainingUnnamed ?? 0) > 0;
-          if (!moreMonths && !moreContent) break;
+        while (guard < 12 && json.summary?.truncated
+          && (json.summary.pendingMonths?.length ?? 0) > 0) {
           guard++;
-
-          const next = await post(
-            moreMonths
-              ? { apply, readContent: apply, onlyMonths: json.summary.pendingMonths }
-              : { full, apply, readContent: apply, months: 3 },
-          );
+          const next = await post({
+            apply, readContent: apply, onlyMonths: json.summary.pendingMonths,
+          });
           suggestions.push(...(next.renameSuggestions ?? []));
           json = {
             ...next,
-            renameSuggestions: suggestions,
             summary: {
               ...next.summary,
-              newFiles: json.summary.newFiles,
-              understoodByName: json.summary.understoodByName,
-              needContentReading: json.summary.needContentReading,
-              created: (json.summary.created ?? 0) + (next.summary.created ?? 0),
-              contentRead: (json.summary.contentRead ?? 0) + (next.summary.contentRead ?? 0),
+              newFiles: json.summary.newFiles + next.summary.newFiles,
+              understoodByName: json.summary.understoodByName + next.summary.understoodByName,
+              needContentReading: json.summary.needContentReading + next.summary.needContentReading,
             },
           };
         }
+
+        /*
+          ── ثمّ تُقرأ الملفّات بمعرّفاتها، بلا إعادة المشي ──
+
+          وهذا ما كان يُهدر الوقت: كلّ دفعةِ قراءةٍ تمشي من جديد على
+          السنوات والأشهر ومجلّدات المورّدين — عشرون ثانية قبل أن
+          يُقرأ حرف، ثمّ تُقتَل الدفعة. فصار المشي مرّةً في الفحص،
+          والقراءة بالمعرّفات بعده.
+        */
+        if (apply) {
+          const queue = pendingIds.slice();
+          let rounds = 0;
+          while (queue.length > 0 && rounds < 40) {
+            rounds++;
+            const chunk = queue.splice(0, 2);
+            const next = await post({ apply: true, readContent: true, fileIds: chunk });
+            suggestions.push(...(next.renameSuggestions ?? []));
+            json = {
+              ...json,
+              summary: {
+                ...json.summary,
+                created: (json.summary.created ?? 0) + (next.summary.created ?? 0),
+                contentRead: (json.summary.contentRead ?? 0) + (next.summary.contentRead ?? 0),
+                remainingUnnamed: queue.length,
+              },
+            };
+            setResult({ ...json, renameSuggestions: suggestions });
+          }
+          setPendingIds([]);
+        } else {
+          setPendingIds(
+            (json.files ?? []).filter((f) => !f.understood).map((f) => f.fileId),
+          );
+        }
+
         json.renameSuggestions = suggestions;
 
         setResult(json);
@@ -141,7 +176,7 @@ export function DriveSync() {
         setBusy(null);
       }
     },
-    [full, router],
+    [full, router, pendingIds],
   );
 
   if (!open) {

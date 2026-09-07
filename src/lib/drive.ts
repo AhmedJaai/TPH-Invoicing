@@ -209,6 +209,38 @@ export async function downloadFile(
 }
 
 /**
+ * بيانات ملفٍّ بعينه — بمعرّفه، بلا مشيٍ على الأرشيف.
+ *
+ * لأنّ قراءة ملفّين لا تستحقّ إعادةَ المشي على الأرشيف كلّه. وكان
+ * ذلك يقع: كلّ دفعةِ قراءةٍ تمشي من جديد على السنوات والأشهر ومجلّدات
+ * المورّدين — عشرون ثانية تُهدَر قبل أن يُقرأ حرف.
+ */
+export async function getFileMeta(
+  drive: drive_v3.Drive,
+  fileId: string,
+): Promise<DriveFile | null> {
+  try {
+    const res = await drive.files.get({
+      fileId,
+      fields: "id, name, mimeType, size, modifiedTime, parents",
+      supportsAllDrives: true,
+    });
+    const f = res.data;
+    if (!f.id || !f.name || !f.mimeType) return null;
+    return {
+      id: f.id,
+      name: f.name,
+      mimeType: f.mimeType,
+      size: f.size ? Number(f.size) : undefined,
+      modifiedTime: f.modifiedTime ?? undefined,
+      parents: f.parents ?? undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * إعادة تسمية ملفٍّ في الأرشيف — العمليّةُ الكتابيّةُ الوحيدة عليه.
  *
  * وأوّلُ قيدٍ في هذا المشروع: «لا يُمسّ أرشيف جوجل درايف — لا حذف ولا
