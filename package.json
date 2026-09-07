@@ -47,7 +47,8 @@
     "db:link": "tsx --env-file=.env scripts/link-counterparties.ts",
     "db:identity": "tsx --env-file=.env scripts/identity-report.ts",
     "db:repair-scope": "tsx --env-file=.env scripts/repair-import-scope.ts",
-    "db:split-check": "tsx --env-file=.env scripts/find-split-suppliers.ts"
+    "db:split-check": "tsx --env-file=.env scripts/find-split-suppliers.ts",
+    "db:unpaid": "tsx --env-file=.env scripts/diagnose-unpaid.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

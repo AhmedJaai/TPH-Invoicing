@@ -111,6 +111,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 | `src/lib/bank/parsers/detect.ts` | كشف البنك من الملفّ — و`\b` لا تفصل عند `_` وأسماء الملفّات مليئة بها |
 | `src/lib/bank/parsers/pdf-text.ts` | نصّ PDF ومواضعه — ولا يُرمى ملفٌّ كامل إلى نموذج |
 | `src/lib/extraction/schemas-by-kind.ts` | مخطّط لكل نوع مستند — لا ثلاثون حقلاً لفاتورةٍ فيها ستّة |
+| `src/lib/extraction/statement-extras.ts` | أسطر الكشف ورصيداه من مخرَج النموذج الخام — والرصيد المجهول `null` لا صفر |
 | `src/lib/extraction/benchmark.ts` | مقياس النماذج — **الخطأ الواثق** يسبق الدقّة · **لا تصل إليها شاشة** |
 | `src/lib/extraction/versions.ts` | نسخ الموجِّه والمخطّط، والنماذج مثبَّتة لا عائمة |
 | `src/services/counterparty.service.ts` | تأكيدٌ واحد يعمّ على أمثاله |
@@ -255,9 +256,9 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 · `@anthropic-ai/sdk` 0.123
 
 ## الأوامر
 
-`npm test` (١٢٣٣ اختباراً · ٨٣ ملفاً) · `npm run typecheck` · `npm run lint`
+`npm test` (١٢٥٨ اختباراً · ٨٥ ملفاً) · `npm run typecheck` · `npm run lint`
 `npm run db:migrate` · `db:verify` · `db:dedupe` · `db:rematch` · `db:reclassify` · `db:learn` · `db:link` · `db:split-check`
-`npm run db:expenses` · `db:audit` · `db:measure` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules` · `db:repair-scope` · `db:identity`
+`npm run db:expenses` · `db:audit` · `db:measure` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules` · `db:repair-scope` · `db:identity` · `db:unpaid`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`
 
 ### بوّابة الإنتاج — لا يُقال «جاهز» بلا دليل

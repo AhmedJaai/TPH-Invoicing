@@ -5,7 +5,8 @@
 > (أبرزها: كانت تذكر Prisma، والمشروع يستعمل **Drizzle**).
 > عند الاختلاف، **هذه الوثيقة هي المرجع**.
 >
-> آخر تحديث: ٢٠٢٦-٠٩-٠٤ · بعد المرحلة الثالثة (الأصناف والمصروفات ومجال المبيعات).
+> آخر تحديث: ٢٠٢٦-٠٩-٠٧ · بعد جولة الهويّة والمزامنة.
+> ٣٩ جدولاً · ٢٥ هجرة · ١٬٢٥٨ اختباراً في ٨٥ ملفاً.
 
 ---
 
@@ -238,16 +239,44 @@ reconciliation:    OPEN | IN_PROGRESS | RECONCILED | DISCREPANCY
 npm run dev              # التشغيل المحلّي
 npm test                 # اختبارات منطق الأعمال
 npm run typecheck        # فحص الأنواع
+npm run lint             # فحص الأسلوب
+
+# القاعدة — والهجرة هي الطريق الوحيد لتغيير المخطّط
 npm run db:migrate       # تطبيق الهجرات
+npm run db:verify        # إثبات أنّ القيود المالية ترفض فعلاً
+npm run db:seed          # تأسيس سجل المورّدين
+
+# تدقيق البيانات وإصلاحها
 npm run db:audit         # تدقيق اكتمال البيانات وسلامتها
 npm run db:repair        # إصلاح أعطال السلامة (بمعاينة أوّلاً)
-npm run db:seed          # تأسيس سجل المورّدين
+npm run db:dedupe        # إزالة الحركات المكرّرة
+npm run db:merge         # دمج مورّد مكرّر
+npm run db:split-check   # كشف المورّد المسجَّل مرّتين — بدليلٍ ماليّ
+npm run db:reprice       # إعادة حساب أسعار البنود
+npm run db:products      # بناء أصناف المورّدين من بنود الفواتير
+npm run db:expenses      # اشتقاق المصروف الفعليّ من دفتر البنك
+npm run db:unpaid        # تشخيص المستحقّ — أيّ فاتورةٍ لها حركةٌ بمبلغها
+
+# البنك والمطابقة
+npm run db:reclassify    # إعادة التصنيف
+npm run db:rematch       # إعادة المطابقة — بالقرار وأثره كاملين
+npm run db:learn         # تعلّم الجهات من المطابقات المؤكَّدة
+npm run db:link          # ربط الجهات المتعلَّمة بالمورّدين
+npm run db:identity      # تقرير الهويّة — بمَ عُرفت كلّ حركة
+npm run db:repair-rules  # تعميم قواعد التصنيف
+npm run db:repair-scope  # تقييد الاستيراد بحسابه
+npm run db:measure       # أنتحسّن أم نسوء — على ما حكم فيه إنسان وحده
+
+# الدرايف
 npm run drive:migrate    # ترحيل الأرشيف بأسماء ملفاته
 npm run drive:backfill   # قراءة محتوى الملفات (مرّة واحدة)
-npm run db:reprice       # إعادة حساب أسعار البنود
-npm run db:merge         # دمج مورّد مكرّر
-npm run db:repair-rules  # تعميم قواعد التصنيف
-npm run db:products      # بناء أصناف المورّدين من بنود الفواتير
+npm run drive:diagnose   # تشخيص الوصول إلى الأرشيف
+
+# بوّابة الإنتاج — لا يُقال «جاهز» بلا دليل
+npm run ops:gate         # خمسة عشر بنداً · و«لم يُفحَص» تمنع كما يمنع الفشل
+npm run ops:certify      # سبعةُ سيناريوهات ماليّة، كلٌّ يُلغى أثرُه
+npm run ops:truth        # الأصل في الدرايف مقابل القيد
+npm run ops:isolation    # بصمةُ القاعدة — بمعرّف العنقود لا باسم المضيف
 ```
 
 ---
