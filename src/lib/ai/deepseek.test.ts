@@ -173,3 +173,36 @@ describe("التزامن المحدود", () => {
     expect(await mapWithConcurrency([], 4, async () => 1)).toEqual([]);
   });
 });
+
+describe("الانقطاع يُميَّز عن الفساد", () => {
+  beforeEach(() => {
+    process.env.DEEPSEEK_API_KEY = "sk-test";
+    process.env.DEEPSEEK_RETRY_BASE_MS = "0";
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env.DEEPSEEK_API_KEY;
+  });
+
+  /*
+    علاجُهما مختلف: المقطوع يُعاد عليه بسقفٍ أعلى وقد ينجح، والفاسد لا
+    يُصلحه التكرار. وكانا يخرجان بالوصف نفسه فلا يفرّق المستدعي.
+  */
+  it("المقطوع يحمل truncated", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        choices: [{ message: { content: '{"a":' }, finish_reason: "length" }],
+      }), { status: 200 })));
+    const r = await callDeepseek({ task: "TEXT", maxTokens: 10, messages: [{ role: "user", content: "س" }] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.truncated).toBe(true);
+  });
+
+  it("والفاسد لا يحمله", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response("ليس JSON", { status: 200 })));
+    const r = await callDeepseek({ task: "TEXT", maxTokens: 10, messages: [{ role: "user", content: "س" }] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.truncated).toBeUndefined();
+  });
+});

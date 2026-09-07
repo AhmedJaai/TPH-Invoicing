@@ -56,6 +56,14 @@ export interface DeepseekSuccess {
 export interface DeepseekFailure {
   ok: false;
   kind: DeepseekFailureKind;
+  /**
+   * انقطع المخرَج عند السقف.
+   *
+   * يُميَّز عن سائر `INVALID_RESPONSE` لأنّ علاجه مختلف: هذا يُعاد عليه
+   * **بسقفٍ أعلى** وقد ينجح، وذاك مخرَجٌ فاسد لا يُصلحه التكرار. وكان
+   * الاثنان يخرجان بالوصف نفسه، فلا يستطيع المستدعي أن يفرّق.
+   */
+  truncated?: boolean;
   reason: string;
   model: string;
   task: AiTask;
@@ -291,6 +299,7 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
       return {
         ok: false, kind: "INVALID_RESPONSE",
         reason: "انقطع المخرَج عند سقف الرموز قبل أن يكتمل",
+        truncated: true,
         model, task: call.task, durationMs: Date.now() - started, attempts: attempt,
       };
     }

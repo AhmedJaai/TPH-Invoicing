@@ -81,6 +81,23 @@ function documentParts(input: DocumentInput): ContentPart[] {
   return [];
 }
 
+/**
+ * سقفُ المخرَج يتبع ما يُقرأ.
+ *
+ * كان ١٦٠٠٠ لكلّ شيء. والفاتورة من ثلاثة بنود مخرَجُها أربعُ مئة رمز،
+ * والكشفُ ذو الستّين سطراً يحتاج آلافاً. فسقفٌ واحد إمّا ضيّقٌ على
+ * الكشف أو واسعٌ بلا معنى على الفاتورة.
+ *
+ * والسقف لا يُدفَع ثمنُه إن لم يُستهلَك — لكنّه يُخفي الانقطاع: مخرَجٌ
+ * ينقطع عند ١٦٠٠٠ لا يُعرَف أطال المستندُ أم ضلّ النموذج.
+ *
+ * والأرقام من القياس على الأرشيف لا من التخمين: أطولُ مخرَجِ فاتورةٍ
+ * في ١٢٦ فاتورة كان دون الألفين.
+ */
+function ceilingFor(kind: DocumentKind | null): number {
+  return kind === "STATEMENT" ? 16000 : 6000;
+}
+
 /** أيّ نموذج يقرأ هذا المستند: نصّيٌّ رخيص أم رؤية. */
 function taskFor(input: DocumentInput): "TEXT" | "VISION" {
   return input.mode === "TEXT" ? "TEXT" : "VISION";
@@ -186,8 +203,9 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
 
   /* ── المرحلة الثانية، ومعها إعادةٌ موجَّهة عند الاختلال ── */
   let lastReason = "";
+  let ceiling = ceilingFor(kind);
 
-  for (let pass = 1; pass <= 2; pass++) {
+  for (let pass = 1; pass <= 3; pass++) {
     /*
       سقفٌ سخيّ عمداً.
 
@@ -196,11 +214,23 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
       قبله: انقطع مخرَجُ فاتورةٍ من ثلاثة بنود عند الحدّ فرُدَّت القراءة
       كلّها. والانقطاع لا يُرى في الجواب — يُرى في `finish_reason`.
     */
-    const response = await callDeepseek({ task, maxTokens: 16000, json: true, messages: askMessages });
+    const response = await callDeepseek({ task, maxTokens: ceiling, json: true, messages: askMessages });
 
     if (!response.ok) {
       if (response.kind === "NOT_CONFIGURED" || response.kind === "NO_BALANCE") {
         return { ok: false, provider: "deepseek", reason: response.reason };
+      }
+      /*
+        الانقطاع وحده يُعاد عليه بسقفٍ أعلى — مرّةً واحدة.
+
+        ولا يُرفَع السقف عالمياً: مستندٌ واحد طويل لا يجعل كلّ فاتورةٍ
+        تحتاج ستّةَ عشر ألفاً. ومرّةً واحدة لأنّ الرفع بلا حدّ يُنفق
+        على مخرَجٍ لا يكتمل مهما رُفع.
+      */
+      if (response.truncated && ceiling < 16000) {
+        ceiling = 16000;
+        lastReason = response.reason;
+        continue;
       }
       lastReason = response.reason;
       break;
