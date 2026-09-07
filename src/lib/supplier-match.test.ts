@@ -88,3 +88,50 @@ describe("قياس التشابه", () => {
     expect(s).toBeLessThan(1);
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════
+   الاسم النظاميّ يحوي اسمَ الشهرة
+
+   وُجد على كشف أوراق الزيتون الحقيقيّ: المستند يقول «مؤسسة أوراق
+   الزيتون التجارية» والمخزَّن «أوراق الزيتون». والتشابهُ الحرفيّ
+   بينهما ٠٫٦٧ — دون حدّ الترجيح — فيُردّ الكشف بـ«لم يُعرف المورّد»
+   وهو مذكورٌ في صدر صفحته.
+   ═══════════════════════════════════════════════════════════════ */
+describe("الاحتواء دليلٌ أقوى من التشابه", () => {
+  const s = (nameAr: string, id = nameAr): SupplierRecord => ({
+    id, slug: id, nameAr, driveFolderName: id,
+    issuesInvoices: true, contractOnFile: false, aliases: [],
+  });
+
+  it("الاسم النظاميّ يُطابَق باسم الشهرة داخله", () => {
+    const list = [s("أوراق الزيتون"), s("بيكوف"), s("زاكوباك")];
+    const m = matchSupplier(list, { supplierNameAr: "مؤسسة أوراق الزيتون التجارية" });
+    expect(m.supplier?.nameAr).toBe("أوراق الزيتون");
+    expect(m.method).toBe("NAME");
+  });
+
+  it("ولا تُحذَف الصيغ بقائمة — «محمصة» أصلُ الاسم لا زائدة", () => {
+    const list = [s("المحمصة الغربية"), s("محمصة أطلس")];
+    expect(matchSupplier(list, { supplierNameAr: "المحمصة الغربية" }).supplier?.nameAr)
+      .toBe("المحمصة الغربية");
+  });
+
+  it("وإن احتواه اسمان لم يعد الاحتواء دليلاً", () => {
+    const list = [s("سرد كو"), s("سرد كو للتجارة")];
+    const m = matchSupplier(list, { supplierNameAr: "مؤسسة سرد كو للتجارة المحدودة" });
+    expect(m.supplier).toBeUndefined();
+    expect(m.candidates.length).toBeGreaterThan(1);
+  });
+
+  it("والاسمُ القصير لا يبتلع ما احتواه", () => {
+    const list = [s("سرد")];
+    expect(matchSupplier(list, { supplierNameAr: "مؤسسة سرد الكبرى للتجارة" }).supplier)
+      .toBeUndefined();
+  });
+
+  it("ولا يُطابَق اسمٌ ليس فيه", () => {
+    const list = [s("أوراق الزيتون")];
+    expect(matchSupplier(list, { supplierNameAr: "مؤسسة الرياض للتجارة" }).supplier)
+      .toBeUndefined();
+  });
+});

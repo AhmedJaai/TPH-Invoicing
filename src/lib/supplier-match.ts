@@ -54,6 +54,37 @@ export function similarity(a: string, b: string): number {
 
 const digitsOnly = (v?: string | null) => (v ?? "").replace(/\D/g, "");
 
+/**
+ * اسمُ الشهرة داخل الاسم النظاميّ — دليلٌ قويّ لا تشابهٌ ضعيف.
+ *
+ * المستندات تحمل الاسم النظاميّ كاملاً: «مؤسسة أوراق الزيتون التجارية».
+ * والمخزَّن اسمُ الشهرة: «أوراق الزيتون». والتشابهُ الحرفيّ بينهما
+ * ‏٠٫٦٧ — دون حدّ الترجيح، فيُردّ الكشفُ بـ«لم يُعرف المورّد» وهو
+ * مذكورٌ في صدر صفحته.
+ *
+ * وقِيس على كشف أوراق الزيتون الحقيقيّ فوقع فعلاً.
+ *
+ * ولا تُحذَف صيغُ الشركات بقائمةٍ ثابتة — «محمصة» في «المحمصة الغربية»
+ * أصلُ الاسم لا زائدة، وحذفُها يُنشئ خلطاً. وإنّما يُسأل سؤالٌ أضيق:
+ * **أكلماتُ المخزَّن كلُّها واردةٌ في المستخرَج بترتيبها؟** فإن كانت،
+ * فالمستخرَج هو نفسه موسَّعاً — لا اسمٌ آخر يشبهه.
+ *
+ * ويُشترَط طولٌ معتبَر للمخزَّن (كلمتان فأكثر، أو كلمةٌ من خمسة أحرف)
+ * كي لا يبتلع اسمٌ قصيرٌ كلَّ ما احتواه.
+ */
+function containsTradeName(extracted: string, stored: string): boolean {
+  const a = extracted.split(/\s+/).filter(Boolean);
+  const b = stored.split(/\s+/).filter(Boolean);
+  if (b.length === 0) return false;
+  if (b.length === 1 && b[0].length < 5) return false;
+  if (b.length > a.length) return false;
+
+  for (let i = 0; i + b.length <= a.length; i++) {
+    if (b.every((w, j) => a[i + j] === w)) return true;
+  }
+  return false;
+}
+
 export function matchSupplier(
   suppliers: readonly SupplierRecord[],
   extracted: { sellerVatNumber?: string; supplierNameAr?: string; supplierNameEn?: string },
@@ -80,6 +111,24 @@ export function matchSupplier(
       (s) => normalizeName(s.nameAr) === name || (s.nameEn && normalizeName(s.nameEn) === name),
     );
     if (byName) return { supplier: byName, method: "NAME", confidence: 0.9, candidates: [] };
+  }
+
+  /*
+    الاحتواء يسبق التشابه: «مؤسسة أوراق الزيتون التجارية» تحوي
+    «أوراق الزيتون» كلمةً كلمة، وذلك أقوى من درجةِ تشابهٍ حرفيّة.
+  */
+  for (const name of names) {
+    const byContain = suppliers.filter(
+      (s) => containsTradeName(name, normalizeName(s.nameAr))
+        || (s.nameEn ? containsTradeName(name, normalizeName(s.nameEn)) : false),
+    );
+    /* واحدٌ لا غير — فإن احتواها اسمان لم يعد الاحتواء دليلاً */
+    if (byContain.length === 1) {
+      return { supplier: byContain[0], method: "NAME", confidence: 0.88, candidates: [] };
+    }
+    if (byContain.length > 1) {
+      return { method: "NONE", confidence: 0.6, candidates: byContain.slice(0, 4) };
+    }
   }
 
   const scored = suppliers
