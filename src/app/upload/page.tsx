@@ -65,7 +65,29 @@ export default async function Home() {
         فصفحةُ المهمّة اليومية أكثرُها ليس المهمّة. وقد طُوي ذلك كلُّه
         خلف تفصيلٍ يُفتَح عند الحاجة، وبقي فوقَه ما يخصّ الرفع وحده.
       */}
-      <details className="mt-10 rounded-2xl border border-line bg-raised shadow-raised">
+      {/*
+        مزامنة الدرايف فعلٌ يوميّ لا حالةُ نظام.
+
+        كانت مطويّةً داخل «حالة النظام والمورّدون المسجّلون» بعد جولة
+        تحسين الواجهة، فظنّ صاحب العمل أنّ الزرّ حُذف — وبحث عنه.
+        **والفعل الذي لا يُرى غيرُ موجود**، مهما كان مكتوباً في الشيفرة.
+
+        وموضعُه هنا: تحت الرفع مباشرةً، لأنّه الطريق الثاني إلى الشيء
+        نفسه — الرفع يدخل ملفّاً واحداً، والمزامنة تلتقط ما وصل الدرايف
+        من غير هذه الصفحة.
+      */}
+      <section className="mt-10 rounded-2xl border border-line bg-raised p-4 shadow-raised">
+        <h2 className="mb-1 text-sm font-bold">مزامنة الأرشيف</h2>
+        <p className="mb-4 text-sm text-muted">
+          تبحث في درايف عن ملفّات لم تُسجَّل بعد، فتقرأها وتقيّدها وتقترح توحيد أسمائها.
+        </p>
+        <div className="flex flex-wrap items-start gap-3">
+          <DriveSync />
+          <DriveRename />
+        </div>
+      </section>
+
+      <details className="mt-6 rounded-2xl border border-line bg-raised shadow-raised">
         <summary className="cursor-pointer px-4 py-3 text-sm font-bold">
           حالة النظام والمورّدون المسجّلون
         </summary>
@@ -80,11 +102,6 @@ export default async function Home() {
             />
             <Stat label="مستندات مؤرشفة" value={String(archivedCount)} />
             <Stat label="قارئ الفواتير" value={activeProviderName()} />
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-start gap-3">
-            <DriveSync />
-            <DriveRename />
           </div>
 
           <h3 className="mb-2 mt-8 text-sm font-bold">الموردون المسجّلون</h3>
