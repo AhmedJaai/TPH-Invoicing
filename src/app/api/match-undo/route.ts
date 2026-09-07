@@ -66,6 +66,7 @@ export async function POST(request: Request) {
   let freedInvoices: string[] = [];
   let freedMinor = 0;
   let reversedPayment = false;
+  let previousAllocations: { invoiceId: string; amountMinor: number }[] = [];
 
   await db.transaction(async (t) => {
     await t
@@ -105,6 +106,7 @@ export async function POST(request: Request) {
       freedInvoices = outcome.freedInvoiceIds;
       freedMinor = outcome.freedMinor;
       reversedPayment = true;
+      previousAllocations = outcome.previousAllocations;
     }
 
     /*
@@ -125,6 +127,11 @@ export async function POST(request: Request) {
         "فواتير تحرّرت": freedInvoices.length,
         "مبلغ تحرّر": freedMinor,
         "رُدّت الدفعة": reversedPayment,
+        /*
+          التفصيل لا العدد: أيّ فاتورةٍ كانت تُغطّى وبكم.
+          فبعد شهرٍ يُقرأ «كانت على فاتورتَي أغسطس ٤ و١٢» لا «فُكّت ٢».
+        */
+        "كانت مخصَّصة على": previousAllocations,
       },
     });
   });
@@ -147,6 +154,7 @@ export async function POST(request: Request) {
       "تخصيصات فُكّت": freedInvoices.length,
       "رُدّت الدفعة": reversedPayment,
       "مبلغ تحرّر": freedMinor,
+      "كانت مخصَّصة على": previousAllocations,
     },
   });
 

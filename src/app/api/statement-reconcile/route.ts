@@ -233,11 +233,27 @@ export async function POST(request: Request) {  let user;
 
   const ours: OurInvoice[] = invRows;
 
+  /*
+    ══ المجهول ليس صفراً — ولا هو مجموعَ الكشف ══
+
+    كان الافتتاحيّ يُمرَّر `opening ?? 0`، والختاميّ يسقط إلى
+    `totalAmount` إن غاب. وكلاهما اختراع:
+
+      • رصيدٌ افتتاحيّ لم يُقرأ ليس صفراً — الصفر يقول «لم يكن على
+        المقهى شيء أوّل المدّة»، وهي دعوى لا يملكها من لم يقرأ السطر.
+      • ومجموعُ الكشف ليس رصيداً ختامياً إلّا أن يضمن ذلك عقدُ
+        المستند — والمجموع قد يكون مجموع المدين وحده.
+
+    وأثرُه أنّ المعادلة تُحسَب على رقمٍ مخترَع، فيُقال «حساب المورّد لا
+    يستقيم» ويُتَّهم المورّد بخطأٍ مصدره أنّنا لم نقرأ. و`reconcileStatement`
+    تُحسن التصرّف أصلاً: تُرجع `null` إن غاب أحدهما — أي «لم تُفحَص»
+    لا «فُحصت فنجحت». فالواجب ألّا نمنعها ذلك بصفرٍ نصنعه.
+  */
   const opening = parseRiyals(x.openingBalance ?? "");
-  const closing = parseRiyals(x.closingBalance ?? "") ?? parseRiyals(x.totalAmount ?? "");
+  const closing = parseRiyals(x.closingBalance ?? "");
 
   const result = reconcileStatement(parsedLines, ours, {
-    openingBalanceMinor: opening ?? 0,
+    openingBalanceMinor: opening ?? undefined,
     closingBalanceMinor: closing ?? undefined,
   });
 
@@ -312,8 +328,9 @@ export async function POST(request: Request) {  let user;
     await tx.update(statements).set({
       periodStart: start,
       periodEnd: end,
-      openingBalanceMinor: opening ?? 0,
-      closingBalanceMinor: closing ?? 0,
+      /* العمودان يقبلان `null` منذ الهجرة ٠١٨ — فالمجهول يُحفَظ مجهولاً */
+      openingBalanceMinor: opening ?? null,
+      closingBalanceMinor: closing ?? null,
     }).where(eq(statements.id, statementId));
 
     for (const f of result.findings) {

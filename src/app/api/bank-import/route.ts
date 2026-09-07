@@ -13,7 +13,7 @@ import {
   type BankTx, type OpenInvoice,
 } from "@/lib/bank/match";
 import { fileFingerprint, operationRef, operationRefs } from "@/lib/bank/identity";
-import { factKey, looseKey, syncRows, type KnownRow } from "@/lib/bank/sync";
+import { beneficiaryKey, factKey, looseKey, syncRows, type KnownRow } from "@/lib/bank/sync";
 import { resolveBankAccount } from "@/services/bank-account.service";
 import { allocate, createPayment } from "@/services/payment.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
@@ -186,6 +186,9 @@ export async function POST(request: Request) {  let user;
       operationRef: r.operationRef ?? operationRef(tx),
       factKey: factKey(tx),
       looseKey: looseKey(tx),
+      amountMinor: r.amountMinor,
+      direction: r.direction as "DEBIT" | "CREDIT",
+      beneficiary: beneficiaryKey(tx),
     };
   });
 
@@ -441,12 +444,24 @@ export async function POST(request: Request) {  let user;
         alreadyKnown: sync.known.length,
         added: freshRows.length,
         ambiguous: sync.ambiguous.length,
+        /*
+          التضارب يُعدّ ويُعرَض وحده — لا يُجمَع مع الالتباس.
+          الالتباس نقصُ دليل، والتضارب دليلٌ يكذّب دليلاً؛ وعلاجهما
+          مختلف: الأوّل يُحسَم بنظرة، والثاني يُفحَص فيه الملفّ.
+        */
+        conflict: sync.conflict.length,
         byReference: sync.known.filter((k) => k.verdict.basis === "REFERENCE").length,
         ambiguousRows: sync.ambiguous.slice(0, 10).map((a) => ({
           date: a.row.raw.valueDate.toISOString().slice(0, 10),
           amountMinor: a.row.raw.amountMinor,
           description: (a.row.raw.description ?? "").slice(0, 90),
           reason: a.verdict.reason,
+        })),
+        conflictRows: sync.conflict.slice(0, 10).map((c) => ({
+          date: c.row.raw.valueDate.toISOString().slice(0, 10),
+          amountMinor: c.row.raw.amountMinor,
+          description: (c.row.raw.description ?? "").slice(0, 90),
+          reason: c.verdict.reason,
         })),
       },
       /*
@@ -815,6 +830,7 @@ export async function POST(request: Request) {  let user;
       حركات_جديدة: newRows,
       حركات_موجودة_تُخطّيت: sync.known.length,
       حركات_ملتبسة: sync.ambiguous.length,
+      تضارب_هويّة: sync.conflict.length,
       مدفوعات_أُنشئت: created,
       الملف_مستورد_مسبقاً: alreadyImported,
     },
@@ -836,6 +852,13 @@ export async function POST(request: Request) {  let user;
       alreadyKnown: sync.known.length,
       added: newRows,
       ambiguous: sync.ambiguous.length,
+      conflict: sync.conflict.length,
+      conflictRows: sync.conflict.slice(0, 10).map((c) => ({
+        date: c.row.raw.valueDate.toISOString().slice(0, 10),
+        amountMinor: c.row.raw.amountMinor,
+        description: (c.row.raw.description ?? "").slice(0, 90),
+        reason: c.verdict.reason,
+      })),
       enriched: sync.enrich.length,
       byReference: sync.known.filter((k) => k.verdict.basis === "REFERENCE").length,
     },
@@ -848,6 +871,8 @@ export async function POST(request: Request) {  let user;
         ? `هذا الكشف مقيَّد عندك من قبل — ${countNoun(canonicalRows.length, TRANSACTION)} كلّها مسجَّلة، فلم تُضَف واحدة.`
         : `تمّت المزامنة: ${countNoun(canonicalRows.length, TRANSACTION)} في الملفّ · ${sync.known.length} موجودة · ${newRows} جديدة${
             sync.ambiguous.length > 0 ? ` · ${sync.ambiguous.length} تحتاج قرارك` : ""
+          }${
+            sync.conflict.length > 0 ? ` · ${sync.conflict.length} تضارب هويّة — لم تُقيَّد` : ""
           }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} ردّها قيد القاعدة` : ""}.`,
   });
 }

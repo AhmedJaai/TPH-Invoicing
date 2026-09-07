@@ -112,13 +112,26 @@ export interface ReverseOutcome {
   freedInvoiceIds: string[];
   freedMinor: number;
   reason: string;
+  /**
+   * ما كانت الدفعة تغطّيه قبل الردّ — **فاتورةً فاتورة بمبلغها**.
+   *
+   * وكان المردود يُحفَظ عدداً ومجموعاً: «فُكّت ٢ تخصيصات، تحرّر ٣٠٠٠».
+   * وذلك يجيب «كم» ولا يجيب «أيّ» — فلا يُعرَف بعد شهرٍ أنّ هذه الدفعة
+   * كانت على فاتورتَي أغسطس ٤ و١٢. والصفوف تُحذَف من `payment_allocations`
+   * لأنّ خمسين استعلاماً تحسب المستحقّ منها، وإبقاءُ المردود فيها يوجب
+   * تصفيتَه في كلٍّ منها — وفي مؤثِّرَي القاعدة أيضاً؛ ونسيانُ واحدٍ
+   * يُنقص المستحقّ صامتاً. فيُحفَظ التفصيل في أثر القرار وسجلّ التدقيق،
+   * وكلاهما لا يُحذَف منه شيء.
+   */
+  previousAllocations: { invoiceId: string; amountMinor: number }[];
 }
 
 /**
  * يردّ دفعةً أو يلغيها.
  *
- * ولا يحذف شيئاً: التخصيصات تُفَكّ والدفعة تبقى بحالها وسببها. والحذف
- * يجعل الفاتورة تعود مستحقّةً بلا سببٍ ظاهر، فيُدفَع ثمنها مرّتين.
+ * والدفعة تبقى بحالها وسببها ومن ردّها — لا تُحذَف. والحذف يجعل الفاتورة
+ * تعود مستحقّةً بلا سببٍ ظاهر، فيُدفَع ثمنها مرّتين. وما كانت تغطّيه
+ * يخرج في `previousAllocations` كي يُقيَّد أثراً لا يُمحى.
  */
 export async function reversePayment(tx: Tx, input: ReverseInput): Promise<ReverseOutcome> {
   const allocations = await tx
@@ -146,6 +159,10 @@ export async function reversePayment(tx: Tx, input: ReverseInput): Promise<Rever
     freedInvoiceIds: plan.freedInvoiceIds,
     freedMinor: plan.freedMinor,
     reason: plan.reason,
+    previousAllocations: allocations.map((a) => ({
+      invoiceId: a.invoiceId,
+      amountMinor: a.amountMinor,
+    })),
   };
 }
 

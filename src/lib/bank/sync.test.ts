@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { toCanonical, type RawBankRow } from "./canonical";
 import { operationRef, operationRefs } from "./identity";
 import {
-  factKey, identityText, looseKey, syncRows, type Incoming, type KnownRow,
+  beneficiaryKey, factKey, identityText, looseKey, syncRows,
+  type Incoming, type KnownRow,
 } from "./sync";
 
 const ACC = "acct-1";
@@ -32,6 +33,9 @@ function store(rows: readonly Row[], accountId: string | null = ACC): KnownRow[]
       operationRef: operationRef(tx),
       factKey: factKey(tx),
       looseKey: looseKey(tx),
+      amountMinor: tx.amountMinor,
+      direction: tx.direction,
+      beneficiary: beneficiaryKey(tx),
     };
   });
 }
@@ -247,5 +251,96 @@ describe("ل · الحساب: نطاقٌ لا هويّة", () => {
     const one = [row("a", { description: "حوالة مرجع777222" })];
     const r = syncRows(incoming(one), store(one, ACC), null);
     expect(r.fresh).toHaveLength(0);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   ل · المرجع لا يعبر الحسابات، والمرجعُ المتناقض ليس معرفة
+
+   هذه الحالات جاءت من مراجعةٍ خارجية. والفرض أنّ المرجع البنكيّ
+   فريدٌ داخل حسابه لا في البنك كلّه — فحسابان قد يحملان رقمَ عمليّةٍ
+   واحداً وهما عمليّتان.
+
+   وأخطرُ منها: مرجعٌ واحد بمبلغين. ذلك تناقضٌ في المصدر لا معرفة —
+   إمّا عطبُ قارئ وإمّا شذوذُ تصدير. وابتلاعُه صمتاً يُخفي المال.
+   ═══════════════════════════════════════════════════════════════ */
+describe("ل · المرجع نطاقُه حسابُه", () => {
+  it("المرجع نفسه في حسابٍ آخر لا يجعلها معروفة", () => {
+    const a = [row("a", { description: "حوالة مرجع998877" })];
+    const r = syncRows(incoming(a), store(a, "acct-2"), ACC);
+    expect(r.known).toHaveLength(0);
+    expect(r.fresh).toHaveLength(1);
+  });
+});
+
+describe("م · المرجع الواحد بمبلغين تناقضٌ لا معرفة", () => {
+  it("المرجع نفسه ومبلغٌ مختلف ← تضارب هويّة", () => {
+    const before = [row("a", { description: "حوالة مرجع555444", amountMinor: 3_000_00 })];
+    const after = [row("b", { description: "حوالة مرجع555444", amountMinor: 4_500_00 })];
+    const r = syncRows(incoming(after), store(before), ACC);
+
+    expect(r.known).toHaveLength(0);
+    expect(r.fresh).toHaveLength(0);
+    expect(r.conflict).toHaveLength(1);
+    expect(r.conflict[0].verdict.reason).toContain("المبلغ");
+  });
+
+  it("والمرجع نفسه واتّجاهٌ مختلف ← تضارب أيضاً", () => {
+    const before = [row("a", { description: "حوالة مرجع555444", direction: "DEBIT" })];
+    const after = [row("b", { description: "حوالة مرجع555444", direction: "CREDIT" })];
+    const r = syncRows(incoming(after), store(before), ACC);
+    expect(r.conflict).toHaveLength(1);
+  });
+
+  it("والمرجع نفسه بالمبلغ نفسه معرفةٌ كما كان", () => {
+    const a = [row("a", { description: "حوالة مرجع555444" })];
+    const r = syncRows(incoming(a), store(a), ACC);
+    expect(r.known).toHaveLength(1);
+    expect(r.conflict).toHaveLength(0);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   ن · المستفيد مانعٌ لا صانع
+
+   وصفٌ عامّ («TRANSFER») في يومٍ واحد بمبلغٍ واحد إلى مورّدين
+   مختلفين كان يُنتج مفتاحاً واحداً — فتُبتلَع الثانية ويختفي مالٌ
+   خرج. وأخطرُ من التكرار: التكرار يُرى في الرصيد والنقصُ لا يُرى.
+
+   والاتّجاه الآخر يجب أن يبقى مصوناً: صفٌّ صُدّر مرّةً باسم المستفيد
+   ومرّةً بدونه حركةٌ واحدة لا حركتان.
+   ═══════════════════════════════════════════════════════════════ */
+describe("ن · المستفيد مانعٌ لا صانع", () => {
+  const generic = { description: "TRANSFER", amountMinor: 3_000_00 };
+
+  it("مستفيدان مذكوران ومختلفان ← حركتان", () => {
+    const before = [row("a", { ...generic, beneficiaryRaw: "مؤسسة أوراق الزيتون" })];
+    const after = [row("b", { ...generic, beneficiaryRaw: "مصنع الكوب الذهبي" })];
+    const r = syncRows(incoming(after), store(before), ACC);
+    expect(r.fresh).toHaveLength(1);
+    expect(r.known).toHaveLength(0);
+  });
+
+  it("المستفيد نفسه ← حركةٌ واحدة", () => {
+    const a = [row("a", { ...generic, beneficiaryRaw: "مؤسسة أوراق الزيتون" })];
+    const r = syncRows(incoming(a), store(a), ACC);
+    expect(r.known).toHaveLength(1);
+    expect(r.fresh).toHaveLength(0);
+  });
+
+  it("وغيابُه عن أحد الطرفين ليس تناقضاً — فلا يُنشئ تكراراً", () => {
+    const before = [row("a", { ...generic, beneficiaryRaw: null })];
+    const after = [row("b", { ...generic, beneficiaryRaw: "مؤسسة أوراق الزيتون" })];
+    expect(syncRows(incoming(after), store(before), ACC).known).toHaveLength(1);
+
+    const before2 = [row("a", { ...generic, beneficiaryRaw: "مؤسسة أوراق الزيتون" })];
+    const after2 = [row("b", { ...generic, beneficiaryRaw: null })];
+    expect(syncRows(incoming(after2), store(before2), ACC).known).toHaveLength(1);
+  });
+
+  it("والفراغ والترقيم في اسم المستفيد لا يصنعان حركة", () => {
+    const before = [row("a", { ...generic, beneficiaryRaw: "مؤسسة  أوراق الزيتون" })];
+    const after = [row("b", { ...generic, beneficiaryRaw: "مؤسسه أوراق الزيتون" })];
+    expect(syncRows(incoming(after), store(before), ACC).known).toHaveLength(1);
   });
 });

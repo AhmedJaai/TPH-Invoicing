@@ -98,6 +98,21 @@ export function factKey(row: RowFacts): string {
   ].join("|");
 }
 
+/**
+ * المستفيد موحَّداً — أو `null` إن لم يذكره الكشف.
+ *
+ * ولا يدخل `factKey` نفسه: لو دخله لصار الصفُّ الذي صُدّر مرّةً باسم
+ * المستفيد ومرّةً بدونه **حركتين**، وهو تكرارٌ يُضاعف المال. وإنّما
+ * يُستعمَل مانعاً: مستفيدان مذكوران ومختلفان لا يجتمعان في حركة، ولو
+ * تطابق كلُّ ما عداهما. أمّا غيابُه عن أحد الطرفين فليس تناقضاً.
+ */
+export function beneficiaryKey(row: { beneficiaryRaw?: string | null }): string | null {
+  const raw = row.beneficiaryRaw?.trim();
+  if (!raw) return null;
+  const norm = identityText(raw);
+  return norm.length > 0 ? norm : null;
+}
+
 /** المفتاح المتساهل: كالوقائع، والوصفُ بلا أرقام. */
 export function looseKey(row: RowFacts): string {
   return [
@@ -129,6 +144,18 @@ export interface KnownRow {
   operationRef: string | null;
   factKey: string;
   looseKey: string;
+  /**
+   * المبلغ والاتّجاه — يُحملان كي **يُقابَل بهما المرجع**.
+   *
+   * ‏«مرجعٌ واحد» كان يكفي وحده للحكم بأنّها معروفة. وذلك صحيحٌ ما دام
+   * المصدر متّسقاً؛ فإن جاء المرجع نفسه بمبلغٍ آخر فليس ذلك معرفةً بل
+   * **تناقضاً في المصدر** — عطبُ قارئٍ أو شذوذُ تصدير. وابتلاعُه صمتاً
+   * يُخفي فرقاً في المال لا يظهر في أيّ شاشة.
+   */
+  amountMinor: number;
+  direction: "DEBIT" | "CREDIT";
+  /** المستفيد الموحَّد إن ذُكر — مانعٌ للمطابقة لا صانعٌ لها. */
+  beneficiary: string | null;
 }
 
 export type Verdict =
@@ -137,7 +164,15 @@ export type Verdict =
   /** جديدة — تُقيَّد وتُسوَّى. */
   | { status: "NEW"; identityKey: string; occurrence: number; operationRef: string | null }
   /** ملتبسة — لا تُدسّ ولا تُبتلَع، تُعرَض ليقرّر إنسان. */
-  | { status: "AMBIGUOUS"; reason: string; againstId: string };
+  | { status: "AMBIGUOUS"; reason: string; againstId: string }
+  /**
+   * متضاربة — المصدر يناقض نفسه، فلا تُقيَّد ولا تُثري ولا تُبتلَع.
+   *
+   * وهي غير الالتباس: الالتباس نقصُ دليل («أهي هي؟»)، والتضارب دليلٌ
+   * **يكذّب** دليلاً («المرجع نفسه والمبلغ غيره»). والثاني لا يُحسَم
+   * بترجيح، بل يُوقَف حتى يُنظَر في الملفّ أو في القارئ.
+   */
+  | { status: "CONFLICT"; reason: string; againstId: string };
 
 export interface Incoming<T> {
   row: T;
@@ -148,6 +183,7 @@ export interface SyncResult<T> {
   known: { row: T; verdict: Extract<Verdict, { status: "KNOWN" }> }[];
   fresh: { row: T; verdict: Extract<Verdict, { status: "NEW" }> }[];
   ambiguous: { row: T; verdict: Extract<Verdict, { status: "AMBIGUOUS" }> }[];
+  conflict: { row: T; verdict: Extract<Verdict, { status: "CONFLICT" }> }[];
   /** ما يُكتَب للحركات المقيَّدة التي عرفنا مرجعها الآن. */
   enrich: { id: string; operationRef: string }[];
 }
@@ -196,7 +232,7 @@ export function syncRows<T>(
     loose.set(e.looseKey, b);
   }
 
-  const result: SyncResult<T> = { known: [], fresh: [], ambiguous: [], enrich: [] };
+  const result: SyncResult<T> = { known: [], fresh: [], ambiguous: [], conflict: [], enrich: [] };
   const addedSoFar = new Map<string, number>();
 
   const claim = (hit: KnownRow) => {
@@ -215,6 +251,28 @@ export function syncRows<T>(
     /* ── الأولى: مرجعٌ مشترك — مرجعٌ واحد يكفي ── */
     const byReference = refs.map((r) => byRef.get(r)).find((e) => e && !gone.has(e.id));
     if (byReference) {
+      /*
+        المرجعُ يدلّ على العمليّة، والمبلغُ يُثبتها.
+
+        فإن اتّفق المرجع واختلف المبلغ أو الاتّجاه فأحدُ المصدرين
+        يكذب — ولا يُقيَّد على أحدهما مال. يُوقَف الصفّ ويُعرَض.
+      */
+      const sameAmount = byReference.amountMinor === item.tx.amountMinor;
+      const sameDirection = byReference.direction === item.tx.direction;
+      if (!sameAmount || !sameDirection) {
+        result.conflict.push({
+          row: item.row,
+          verdict: {
+            status: "CONFLICT",
+            againstId: byReference.id,
+            reason: !sameAmount
+              ? `المرجع نفسه والمبلغ مختلف — المقيَّد ${byReference.amountMinor} والوارد ${item.tx.amountMinor}`
+              : "المرجع نفسه والاتّجاه مختلف — صادرٌ ووارد لا يجتمعان في عمليّة",
+          },
+        });
+        continue;
+      }
+
       claim(byReference);
       result.known.push({
         row: item.row,
@@ -246,13 +304,29 @@ export function syncRows<T>(
       الوارد أغنى (فيُثري المقيَّد بمرجعه)، وإمّا أن يكون أفقر (فيُعلَن
       الالتباس). وإن خلا الطرفان من المرجع فلا دليل — والوارد جديد.
     */
-    const laxPool = waiting(loose, lax);
-    const near = exact.length > 0
-      ? exact
+    /*
+      مستفيدان مذكوران ومختلفان ← ليسا حركةً واحدة.
+
+      و`factKey` يُبنى من الوصف وحده، فحوالتان بوصفٍ عامّ («TRANSFER»)
+      في يومٍ واحد بمبلغٍ واحد إلى مورّدين مختلفين يتساوى مفتاحُهما —
+      فتُبتلَع الثانية ويختفي مالٌ خرج فعلاً. وهذا أخطر من التكرار:
+      التكرار يُرى في الرصيد، والنقص لا يُرى.
+
+      والشرط ذكرُهما معاً: غيابُ الاسم عن أحد الطرفين نقصُ علمٍ لا
+      تناقض — فلا يمنع، وإلّا صار الصفُّ المصدَّر بلا اسمٍ حركةً ثانية.
+    */
+    const mine = beneficiaryKey(item.tx);
+    const agrees = (e: KnownRow) =>
+      mine === null || e.beneficiary === null || e.beneficiary === mine;
+
+    const laxPool = waiting(loose, lax).filter(agrees);
+    const exactAgreeing = exact.filter(agrees);
+    const near = exactAgreeing.length > 0
+      ? exactAgreeing
       : (ref !== null || laxPool.some((e) => e.operationRef !== null) ? laxPool : []);
 
     if (near.length > 0) {
-      const isLoose = exact.length === 0;
+      const isLoose = exactAgreeing.length === 0;
 
       /*
         مرجعان مختلفان على وقائع واحدة **ليسا التباساً**: البنك يعطي
