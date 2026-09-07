@@ -46,7 +46,8 @@ interface Row {
   subtotal_minor: number | null;
   vat_minor: number | null;
   total_minor: number | null;
-  supplier_name: string | null;
+  supplier_name_ar: string | null;
+  supplier_name_en: string | null;
 }
 
 /** الحقول المقيسة — وكلٌّ يُقاس على حدة فيُعرَف أين يقع الضعف. */
@@ -87,7 +88,30 @@ function judge(x: ExtractionResult | null, truth: Row, into: Record<Field, Score
   check("subtotal", minor(x?.subtotalAmount), truth.subtotal_minor === null ? null : String(truth.subtotal_minor));
   check("vat", minor(x?.vatAmount), truth.vat_minor === null ? null : String(truth.vat_minor));
   check("total", minor(x?.totalAmount), truth.total_minor === null ? null : String(truth.total_minor));
-  check("supplier", (x?.supplierNameAr || x?.supplierNameEn) ?? null, truth.supplier_name);
+  /*
+    المورّد يُقاس على اسميه معاً.
+
+    المسجَّل عندنا اسمان — عربيّ وإنجليزيّ — والفاتورة قد تحمل أحدهما.
+    فمطابقةُ الإنجليزيّ بالعربيّ تعدّ صواباً خطأً، وذلك يُنقص الدقّة
+    عن غير حقّ ويُخفي الضعف الحقيقيّ إن وقع.
+  */
+  const wantAr = truth.supplier_name_ar;
+  const wantEn = truth.supplier_name_en;
+  if (!wantAr && !wantEn) {
+    into.supplier.unmeasured++;
+  } else {
+    const got = [x?.supplierNameAr, x?.supplierNameEn].filter((v): v is string => Boolean(v && v.trim()));
+    if (x === null || got.length === 0) into.supplier.missing++;
+    else {
+      const wants = [wantAr, wantEn].filter((v): v is string => Boolean(v));
+      /* يكفي أن يلتقي طرفٌ بطرف — والاحتواء لأنّ المطبوع يحمل «مؤسسة» و«المحدودة» */
+      const hit = got.some((g) =>
+        wants.some((w) => norm(g) === norm(w) || norm(g).includes(norm(w)) || norm(w).includes(norm(g))),
+      );
+      if (hit) into.supplier.right++;
+      else into.supplier.wrong++;
+    }
+  }
 }
 
 function table(label: string, s: Record<Field, Score>): string {
@@ -116,19 +140,26 @@ async function main() {
   const kindAt = args.indexOf("--kind");
   const kind = kindAt >= 0 ? args[kindAt + 1] : null;
 
+  /*
+    الترتيب على العمود "created_at" لا "uploaded_at".
+
+    مساعد now() يسمّي كل عمود "created_at" مهما كان اسم الحقل في
+    TypeScript، فحقل documents.uploadedAt عموده "created_at". مصيدةٌ
+    مكتوبةٌ في CLAUDE.md ووقعتُ فيها.
+  */
   const rows = (
     await db.execute(sql`
       select d.id, d.file_name, d.drive_file_id, d.mime_type, d.kind::text as kind,
              d.extraction_json,
              i.invoice_number, i.invoice_date::text as invoice_date,
              i.subtotal_minor, i.vat_minor, i.total_minor,
-             s.name as supplier_name
+             s.name_ar as supplier_name_ar, s.name_en as supplier_name_en
       from documents d
       join invoices i on i.document_id = d.id
       left join suppliers s on s.id = i.supplier_id
       where i.total_minor is not null
         ${kind ? sql`and d.kind::text = ${kind}` : sql``}
-      order by d.uploaded_at desc
+      order by d.created_at desc
       limit ${limit}
     `)
   ).rows as unknown as Row[];
