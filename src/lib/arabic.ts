@@ -105,3 +105,43 @@ export const PRODUCT: NounForms = {
   many: "صنفاً",
   zero: "لا أصناف",
 };
+
+export const SUPPLIER: NounForms = {
+  one: "مورّد واحد",
+  two: "مورّدان",
+  few: "مورّدين",
+  many: "مورّداً",
+  zero: "لا مورّدين",
+};
+
+export const WARNING: NounForms = {
+  one: "تنبيه واحد",
+  two: "تنبيهان",
+  few: "تنبيهات",
+  many: "تنبيهاً",
+  zero: "لا تنبيهات",
+};
+
+export const SUGGESTION: NounForms = {
+  one: "اقتراح واحد",
+  two: "اقتراحان",
+  few: "اقتراحات",
+  many: "اقتراحاً",
+  zero: "لا اقتراحات",
+};
+
+export const CHECK: NounForms = {
+  one: "فحص واحد",
+  two: "فحصان",
+  few: "فحوص",
+  many: "فحصاً",
+  zero: "لا فحوص",
+};
+
+export const BLOCKER: NounForms = {
+  one: "مانع واحد",
+  two: "مانعان",
+  few: "موانع",
+  many: "مانعاً",
+  zero: "لا موانع",
+};

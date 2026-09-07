@@ -63,7 +63,7 @@ function MoreIcon({ className }: { className?: string }) {
   );
 }
 
-export function Nav({ role }: { role: Role }) {
+export function Nav({ role, pending = 0 }: { role: Role; pending?: number }) {
   const pathname = usePathname() ?? "/";
   const areas = visibleAreas(role);
   const area = activeArea(pathname);
@@ -103,13 +103,22 @@ export function Nav({ role }: { role: Role }) {
               key={c.href}
               href={c.href}
               aria-current={child?.href === c.href ? "page" : undefined}
-              className={`shrink-0 border-b-2 pb-1 text-xs transition-colors ${
+              className={`flex shrink-0 items-center gap-1.5 border-b-2 pb-1 text-xs transition-colors ${
                 child?.href === c.href
                   ? "border-ink font-bold text-ink"
                   : "border-transparent text-muted hover:text-ink-soft"
               }`}
             >
               {c.label}
+              {/*
+                العدد الواحد للعمل الباقي — يُقرأ من مصدرٍ واحد ولا يتغيّر
+                بتغيّر الصفحة. وكان لكلّ شاشةٍ عددُها فيتناقضن.
+              */}
+              {c.href === "/review" && pending > 0 && (
+                <span className="nums rounded-full bg-warn-bg px-1.5 py-0.5 text-[11px] font-bold text-warn">
+                  {pending}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
@@ -145,7 +154,7 @@ export function MobileTabBar({ role }: { role: Role }) {
               type="button"
               onClick={() => setMoreOpen((v) => !v)}
               aria-expanded={moreOpen}
-              className={`flex flex-1 flex-col items-center gap-1 py-2 text-[10px] transition-colors ${
+              className={`flex flex-1 flex-col items-center gap-1 py-2 text-[11px] transition-colors ${
                 moreOpen ? "text-ink" : "text-muted"
               }`}
             >
@@ -192,7 +201,7 @@ function Tab({ area, current }: { area: NavArea; current: boolean }) {
     <Link
       href={area.href}
       aria-current={current ? "page" : undefined}
-      className={`flex flex-1 flex-col items-center gap-1 py-2 text-[10px] transition-colors ${
+      className={`flex flex-1 flex-col items-center gap-1 py-2 text-[11px] transition-colors ${
         current ? "font-bold text-ink" : "text-muted"
       }`}
     >

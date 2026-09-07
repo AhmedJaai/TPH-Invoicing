@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Money } from "./money";
+import { ScrollX } from "./scroll-x";
 
 /**
  * عناصر الواجهة المشتركة.
@@ -136,7 +137,7 @@ export function Badge({
     ? `${TONE_SURFACE[tone]} ${TONE_TEXT[tone]}`
     : "border-line bg-sunken text-ink-soft";
   return (
-    <span className={`inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-bold ${cls}`}>
+    <span className={`inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-bold ${cls}`}>
       {children}
     </span>
   );
@@ -168,11 +169,11 @@ export function Stat({
   return (
     <Card href={href} padded={false}>
       <div className="px-4 py-3.5 sm:px-5 sm:py-4">
-        <p className="text-[11px] font-medium text-muted">{label}</p>
+        <p className="text-xs font-medium text-muted">{label}</p>
         <p className={`nums mt-2 font-display text-2xl font-bold leading-none sm:text-[1.75rem] ${tone ? TONE_TEXT[tone] : ""}`}>
           {minor !== undefined ? <Money minor={minor} /> : value}
         </p>
-        {sub && <p className="mt-2 text-[11px] leading-relaxed text-muted">{sub}</p>}
+        {sub && <p className="mt-2 text-xs leading-relaxed text-muted">{sub}</p>}
       </div>
     </Card>
   );
@@ -208,6 +209,22 @@ export function EmptyState({
   );
 }
 
+/**
+ * صفحةٌ خارج الصلاحية.
+ *
+ * كانت أربع عشرة صياغةً لمعنىً واحد — «محجوبة عن دورك» و«دورك لا يشمل
+ * الأرقام المالية» و«للمالك وحده» — ولا واحدةٌ منها تقول **لمن يُطلَب
+ * الإذن**. فالقارئ يعرف أنّه ممنوع ولا يعرف كيف يُسمَح له.
+ */
+export function NoAccess({ what }: { what?: string }) {
+  return (
+    <EmptyState
+      title={what ? `${what} خارج صلاحيتك.` : "هذه الصفحة خارج صلاحيتك."}
+      hint="اطلب من مالك الحساب توسيع صلاحيتك، ثمّ حدّث الصفحة."
+    />
+  );
+}
+
 export function ErrorState({ message, hint }: { message: string; hint?: string }) {
   return (
     <div className="rounded-2xl border border-danger/40 bg-danger-bg px-5 py-8 text-center">
@@ -237,6 +254,13 @@ export interface Column<T> {
   /** يُعرَض في الجدول وفي البطاقة معاً. */
   cell: (row: T) => React.ReactNode;
   align?: "start" | "end";
+  /**
+   * عمود مال أو عدد — تصطفّ فواصله على خطٍّ واحد.
+   *
+   * يسبق `align`: المال يُصفّ على آخر خانةٍ منه لا على جهةٍ من الجدول،
+   * فلا يصحّ فيه `start` ولا `end` وإنّما اليمين الفيزيائيّ.
+   */
+  numeric?: boolean;
   /** عمودٌ ثانويّ يُخفى على الشاشات الضيّقة داخل الجدول. */
   secondary?: boolean;
   /** عنوان البطاقة على الجوّال — يُعرَض بارزاً بلا تسمية. */
@@ -264,7 +288,21 @@ export function DataTable<T>({
   hrefOf?: (row: T) => string | undefined;
 }) {
   if (rows.length === 0) {
-    return <>{empty ?? <EmptyState title="لا شيء هنا بعد." />}</>;
+    /*
+      الفراغ الافتراضيّ يقول ما يملؤه — وهو الذي يظهر حيث لم تُكتب حالةٌ
+      خاصّة، أي في المواضع التي لم يُفكَّر فيها. و«لا شيء هنا بعد» وحدها
+      تترك القارئ واقفاً لا يدري أهو عطبٌ أم ترتيبٌ صحيح.
+    */
+    return (
+      <>
+        {empty ?? (
+          <EmptyState
+            title="لا شيء في هذا الجدول بعد."
+            hint="يمتلئ حين يصل ما يخصّه — فاتورةً تُرفع، أو كشفاً يُستورَد."
+          />
+        )}
+      </>
+    );
   }
 
   const primary = columns.find((c) => c.primary) ?? columns[0];
@@ -273,7 +311,7 @@ export function DataTable<T>({
   return (
     <>
       {/* الحاسوب: جدول */}
-      <div className="scroll-x hidden rounded-2xl border border-line shadow-raised sm:block">
+      <ScrollX className="hidden rounded-2xl border border-line shadow-raised sm:block">
         <table className="w-full text-xs">
           <thead className="bg-sunken text-muted">
             <tr>
@@ -281,7 +319,8 @@ export function DataTable<T>({
                 <th
                   key={c.key}
                   className={`whitespace-nowrap px-3 py-2.5 font-medium ${
-                    c.align === "end" ? "text-end" : "text-start"
+                    /* رأسُ عمود المال على جهة آخر خانةٍ منه — وهي في العربية جهة البدء */
+                    c.numeric ? "text-start" : c.align === "end" ? "text-end" : "text-start"
                   } ${c.secondary ? "hidden lg:table-cell" : ""}`}
                 >
                   {c.header}
@@ -295,9 +334,9 @@ export function DataTable<T>({
                 {columns.map((c) => (
                   <td
                     key={c.key}
-                    className={`px-3 py-2.5 align-top ${c.align === "end" ? "text-end" : "text-start"} ${
-                      c.secondary ? "hidden lg:table-cell" : ""
-                    }`}
+                    className={`px-3 py-2.5 align-top ${
+                      c.numeric ? "nums-col" : c.align === "end" ? "text-end" : "text-start"
+                    } ${c.secondary ? "hidden lg:table-cell" : ""}`}
                   >
                     {c.cell(row)}
                   </td>
@@ -306,7 +345,7 @@ export function DataTable<T>({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
 
       {/* الجوّال: بطاقات */}
       <ul className="space-y-2.5 sm:hidden">
@@ -318,7 +357,7 @@ export function DataTable<T>({
               <dl className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
                 {rest.map((c) => (
                   <div key={c.key} className="min-w-0">
-                    <dt className="text-[10px] text-muted">{c.header}</dt>
+                    <dt className="text-[11px] text-muted">{c.header}</dt>
                     <dd className="truncate text-xs">{c.cell(row)}</dd>
                   </div>
                 ))}

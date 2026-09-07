@@ -15,6 +15,14 @@ export interface HubTile {
   detail: string;
   value?: React.ReactNode;
   amountMinor?: number;
+  /**
+   * بطاقةٌ تفتح عملاً لا تحمل رقماً.
+   *
+   * وكانت خانة الرقم الكبير تحمل كلمةً أحياناً — «القائمة» و«اعرضها» —
+   * فتُقرأ شبكةُ المال هكذا: ‏2858 · 55,572.00 · «القائمة» · «اعرضها».
+   * والخانة مدرَّبةٌ على الأرقام، ففعلٌ فيها يُقرأ رقماً لحظةً ثمّ يُصحَّح.
+   */
+  actionLabel?: string;
   tone?: Tone;
   disabled?: boolean;
   /** سببُ التعطيل — البطاقة المعطَّلة بلا سبب تُحيّر. */
@@ -30,12 +38,21 @@ export function HubGrid({ tiles }: { tiles: readonly HubTile[] }) {
         const body = (
           <div className="flex h-full flex-col">
             <p className="text-sm font-bold leading-snug">{t.title}</p>
-            <p className={`nums mt-2.5 font-display text-2xl font-bold leading-none ${cls}`}>
-              {t.amountMinor !== undefined ? <Money minor={t.amountMinor} /> : t.value}
-            </p>
-            <p className="mt-2.5 text-[11px] leading-relaxed text-muted">{t.detail}</p>
+
+            {t.actionLabel ? (
+              /* لا رقم هنا — ففعلٌ يبدو فعلاً، لا كلمةٌ في خانة الرقم */
+              <p className="mt-2.5 text-sm font-bold text-ink-soft transition-colors group-hover:text-ink">
+                {t.actionLabel} ←
+              </p>
+            ) : (
+              <p className={`nums mt-2.5 font-display text-2xl font-bold leading-none ${cls}`}>
+                {t.amountMinor !== undefined ? <Money minor={t.amountMinor} /> : t.value}
+              </p>
+            )}
+
+            <p className="mt-2.5 text-xs leading-relaxed text-muted">{t.detail}</p>
             {t.disabled && t.disabledReason && (
-              <p className="mt-2 text-[10px] text-muted">{t.disabledReason}</p>
+              <p className="mt-2 text-[11px] text-muted">{t.disabledReason}</p>
             )}
           </div>
         );

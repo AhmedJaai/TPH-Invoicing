@@ -111,7 +111,7 @@ export function SearchBox() {
       />
 
       {!q && (
-        <kbd className="pointer-events-none absolute inset-y-0 end-2.5 my-auto hidden h-4 items-center rounded border border-line bg-surface px-1 text-[10px] text-muted sm:flex">
+        <kbd className="pointer-events-none absolute inset-y-0 end-2.5 my-auto hidden h-4 items-center rounded border border-line bg-surface px-1 text-[11px] text-muted sm:flex">
           /
         </kbd>
       )}
@@ -147,7 +147,7 @@ export function SearchBox() {
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-xs font-bold">{h.title}</span>
-                      <span className="block truncate text-[10px] text-muted">
+                      <span className="block truncate text-[11px] text-muted">
                         {KIND_LABEL[h.kind]} · {h.subtitle}
                       </span>
                     </span>

@@ -10,6 +10,9 @@ import {
 } from "@/lib/cashflow";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { salesAvailable } from "@/lib/sales/connector";
+import { NoAccess } from "@/components/ui";
+import { TRANSACTION, countNoun } from "@/lib/arabic";
+import { ScrollX } from "@/components/scroll-x";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +28,7 @@ export default async function FinancialStatementPage() {
   if (!can(user.role, "reports:view")) {
     return (
       <PageShell user={user} width="wide" title="التدفّق النقدي وقائمة الدخل">
-        <Empty message="هذه الصفحة محجوبة عن دورك." />
+        <NoAccess />
       </PageShell>
     );
   }
@@ -109,7 +112,7 @@ export default async function FinancialStatementPage() {
 
         {cash.unclassifiedCount > 0 && (
           <p className="mt-3 rounded-lg bg-warn-bg px-3 py-2 text-xs leading-relaxed text-warn">
-            ⚠ {cash.unclassifiedCount} حركة بقيمة{" "}
+            ⚠ {countNoun(cash.unclassifiedCount, TRANSACTION)} بقيمة{" "}
             <Money minor={cash.unclassifiedMinor} /> لم تُصنَّف بعد، فتوزيع المصروف
             أدناه ناقص بقدرها.
           </p>
@@ -133,7 +136,7 @@ export default async function FinancialStatementPage() {
         </div>
 
         {cash.months.length > 0 && (
-          <div className="mt-3 scroll-x rounded-2xl border border-line shadow-raised">
+          <ScrollX className="mt-3 rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[32rem] text-sm">
               <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
@@ -156,7 +159,7 @@ export default async function FinancialStatementPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         )}
       </section>
 
@@ -200,7 +203,7 @@ export default async function FinancialStatementPage() {
             <Empty message="لا مصروفات متكرّرة مسجّلة ولا حركات مصنَّفة بعد." />
           </div>
         ) : (
-          <div className="mt-3 scroll-x rounded-2xl border border-line shadow-raised">
+          <ScrollX className="mt-3 rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[34rem] text-sm">
               <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
@@ -230,7 +233,7 @@ export default async function FinancialStatementPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         )}
       </section>
     </PageShell>

@@ -21,6 +21,9 @@ export function ConfirmAction({
   acknowledgement,
   confirmLabel,
   variant = "danger",
+  tone = "danger",
+  size = "sm",
+  block = false,
   onConfirm,
   disabled,
 }: {
@@ -32,6 +35,16 @@ export function ConfirmAction({
   acknowledgement: string;
   confirmLabel: string;
   variant?: ButtonVariant;
+  /**
+   * حِدّة اللوح: `danger` لما لا رجعة فيه، و`warn` لما يُراجَع ويُفتح
+   * ثانيةً — كإقفال شهرٍ يمكن إعادة فتحه. وصبغُ كل تأكيدٍ بالأحمر
+   * يُبطل معنى الأحمر حين يلزم فعلاً.
+   */
+  tone?: "danger" | "warn";
+  /** حجم الزرّ الذي يفتح اللوح — الفعل الرئيسيّ للصفحة يستحقّ `md`. */
+  size?: "sm" | "md";
+  /** يملأ الزرّ عرض حاويته — للفعل الرئيسيّ في ذيل بطاقة. */
+  block?: boolean;
   onConfirm: () => Promise<void> | void;
   disabled?: boolean;
 }) {
@@ -39,13 +52,18 @@ export function ConfirmAction({
   const [understood, setUnderstood] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const skin =
+    tone === "warn"
+      ? { box: "border-warn/40 bg-warn-bg", title: "text-warn", confirm: "primary" as ButtonVariant }
+      : { box: "border-danger/40 bg-danger-bg", title: "text-danger", confirm: "danger" as ButtonVariant };
+
   if (!open) {
     return (
       <button
         type="button"
         disabled={disabled}
         onClick={() => setOpen(true)}
-        className={buttonClass(variant, "sm")}
+        className={`${buttonClass(variant, size)} ${block ? "w-full" : ""}`}
       >
         {label}
       </button>
@@ -53,8 +71,8 @@ export function ConfirmAction({
   }
 
   return (
-    <div className="rounded-2xl border border-danger/40 bg-danger-bg p-4">
-      <p className="text-sm font-bold text-danger">{title}</p>
+    <div className={`rounded-2xl border p-4 ${skin.box}`}>
+      <p className={`text-sm font-bold ${skin.title}`}>{title}</p>
       <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">{consequence}</p>
 
       <label className="mt-3 flex items-start gap-2 text-xs leading-relaxed">
@@ -81,7 +99,7 @@ export function ConfirmAction({
               setUnderstood(false);
             }
           }}
-          className={buttonClass("danger", "sm")}
+          className={buttonClass(skin.confirm, "sm")}
         >
           {busy ? "يُنفَّذ…" : confirmLabel}
         </button>

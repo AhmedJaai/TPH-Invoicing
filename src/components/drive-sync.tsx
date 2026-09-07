@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
+import { INVOICE, countNoun } from "@/lib/arabic";
 
 interface Summary {
   scope: string;
@@ -238,7 +239,7 @@ export function DriveSync() {
 
           {result?.applied && (
             <p className="mt-3 rounded-lg bg-ok-bg px-3 py-2 text-xs font-bold text-ok">
-              ✓ سُجّل {s.created ?? 0} مستنداً، منها {s.invoicesCreated ?? 0} فاتورة
+              ✓ سُجّل {s.created ?? 0} مستنداً، منها {countNoun(s.invoicesCreated ?? 0, INVOICE)}
               {s.contentRead ? ` · قُرئ محتوى ${s.contentRead}` : ""}
               {s.remainingUnnamed ? ` · بقي ${s.remainingUnnamed} ملفاً يحتاج قراءة` : ""}
             </p>
@@ -260,10 +261,10 @@ export function DriveSync() {
               <ul className="mt-1.5 space-y-1">
                 {result.renameSuggestions.slice(0, 8).map((r) => (
                   <li key={r.fileId} className="leading-relaxed">
-                    <span className="block truncate text-[10px] text-muted line-through" dir="ltr">
+                    <span className="block truncate text-[11px] text-muted line-through" dir="ltr">
                       {r.current}
                     </span>
-                    <span className="block truncate text-[10px] font-bold" dir="ltr">
+                    <span className="block truncate text-[11px] font-bold" dir="ltr">
                       {r.proposed}
                     </span>
                   </li>
@@ -304,7 +305,7 @@ export function DriveSync() {
                 >
                   {renaming ? "يوحّد…" : "وحّد تسميتها في الدرايف"}
                 </button>
-                {renamed && <span className="text-[10px] text-muted">{renamed}</span>}
+                {renamed && <span className="text-[11px] text-muted">{renamed}</span>}
               </div>
             </div>
           )}
@@ -336,7 +337,7 @@ export function DriveSync() {
               {result.files.slice(0, 10).map((f, i) => (
                 <li key={i} className="flex items-center justify-between gap-3 px-3 py-1.5">
                   <span className="min-w-0 truncate font-mono text-[11px]" dir="ltr">{f.name}</span>
-                  <span className={`shrink-0 text-[10px] ${f.understood ? "text-muted" : "text-warn"}`}>
+                  <span className={`shrink-0 text-[11px] ${f.understood ? "text-muted" : "text-warn"}`}>
                     {f.understood ? f.month : "يحتاج قراءة"}
                   </span>
                 </li>

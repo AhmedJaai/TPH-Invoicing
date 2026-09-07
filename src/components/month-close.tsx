@@ -3,6 +3,8 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CheckItem, MonthCloseReport } from "@/lib/month-close";
+import { ConfirmAction } from "./ui-client";
+import { countNoun, BLOCKER, CHECK, WARNING } from "@/lib/arabic";
 
 interface Response {
   report: MonthCloseReport;
@@ -30,8 +32,8 @@ function ChecksSummary({
       <p className="mt-1.5 font-display text-2xl font-bold leading-none">
         {canClose ? "جاهز للإقفال" : "لا يمكن الإقفال بعد"}
       </p>
-      <p className="nums mt-2.5 text-sm font-bold">
-        {passed} من {items.length} فحصاً اجتاز
+      <p className="mt-2.5 text-sm font-bold">
+        اجتاز <span className="nums">{passed}</span> من {countNoun(items.length, CHECK)}
       </p>
 
       <div className="mt-3 flex gap-1" aria-hidden>
@@ -45,11 +47,11 @@ function ChecksSummary({
         ))}
       </div>
 
-      <p className="mt-2.5 text-[11px] leading-relaxed text-muted">
+      <p className="mt-2.5 text-xs leading-relaxed text-muted">
         {blocks > 0
-          ? `${blocks} مانعاً يجب حلّه، و${warns} تنبيهاً لا يمنع.`
+          ? `${countNoun(blocks, BLOCKER)} يجب حلّه، و${countNoun(warns, WARNING)} لا يمنع.`
           : warns > 0
-            ? `لا مانع. و${warns} تنبيهاً ستُقرّ بها عند الإقفال.`
+            ? `لا مانع. و${countNoun(warns, WARNING)} ستُقَرّ بها عند الإقفال.`
             : "لا مانع ولا تنبيه."}
       </p>
     </div>
@@ -188,7 +190,7 @@ export function MonthClose({
                   <p className="text-sm font-bold">
                     {report.warnings.length === 0
                       ? "لا شيء يمنع الإقفال ولا شيء ينبّه."
-                      : `لا مانع من الإقفال، وفيه ${report.warnings.length} تنبيهاً ستُقرّ بها.`}
+                      : `لا مانع من الإقفال، وفيه ${countNoun(report.warnings.length, WARNING)} ستُقَرّ بها.`}
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-ink-soft">
                     بعد الإقفال ترفض الأرشفة إضافة أي مستند إلى هذا الشهر. ويمكنك إعادة فتحه
@@ -203,22 +205,35 @@ export function MonthClose({
                       className="mt-3 w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs outline-none focus:border-ink"
                     />
                   )}
-                  <button
-                    onClick={() => {
-                      if (confirm(`سيُقفل ${month} ولن تُقبل إضافة مستندات إليه. متابعة؟`)) {
-                        void call("close", month);
+                  {/*
+                    كان أخطرُ فعلٍ شهريّ يقع في نافذة المتصفّح الأصليّة،
+                    وأزرارها «OK» و«Cancel» بلغة النظام لا بلغة الفعل.
+                    وهذا اللوح يسمّي ما سيقع ويطلب إقراراً به.
+                  */}
+                  <div className="mt-3">
+                    <ConfirmAction
+                      label={busy === "closing" ? "يُقفل…" : `أقفل ${month}`}
+                      variant="primary"
+                      tone="warn"
+                      size="md"
+                      block
+                      disabled={busy !== null}
+                      title={`إقفال ${month}`}
+                      consequence={
+                        report.warnings.length > 0
+                          ? `بعد الإقفال ترفض الأرشفة أيّ مستند لهذا الشهر، وتُقَرّ ${countNoun(report.warnings.length, WARNING)} على حالها. وتستطيع إعادة فتحه متى وصلتك فاتورة متأخّرة.`
+                          : "بعد الإقفال ترفض الأرشفة أيّ مستند لهذا الشهر. وتستطيع إعادة فتحه متى وصلتك فاتورة متأخّرة."
                       }
-                    }}
-                    disabled={busy !== null}
-                    className="mt-3 w-full rounded-lg bg-inverse-surface px-4 py-2.5 text-sm font-bold text-inverse-ink disabled:opacity-40"
-                  >
-                    {busy === "closing" ? "يُقفل…" : `أقفل ${month}`}
-                  </button>
+                      acknowledgement={`أُقرّ بأنّ فواتير ${month} كلّها وصلت، وأنّ ما بقي من تنبيهات مقصودٌ لا مفوت.`}
+                      confirmLabel={`أقفل ${month}`}
+                      onConfirm={() => call("close", month)}
+                    />
+                  </div>
                 </>
               ) : (
                 <>
                   <p className="text-sm font-bold text-danger">
-                    {report.blockers.length} مانعاً يجب معالجته قبل الإقفال
+                    {countNoun(report.blockers.length, BLOCKER)} يجب معالجته قبل الإقفال
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-ink-soft">
                     هذه أخطاء في البيانات نفسها، لا وقائع تُقرّ بها. عالجها ثم أعد الفحص.
@@ -235,17 +250,19 @@ export function MonthClose({
                 الأرشفة ترفض إضافة مستند إليه. إن وصلتك فاتورة متأخّرة تخصّه، أعد فتحه —
                 ويُسجَّل ذلك في سجل التدقيق باسمك.
               </p>
-              <button
-                onClick={() => {
-                  if (confirm(`سيُعاد فتح ${month} وتُقبل الإضافة إليه. متابعة؟`)) {
-                    void call("reopen", month);
-                  }
-                }}
-                disabled={busy !== null}
-                className="mt-3 rounded-lg border border-line px-4 py-2 text-xs font-bold hover:border-ink-soft disabled:opacity-40"
-              >
-                {busy === "reopening" ? "يفتح…" : "أعد فتح الشهر"}
-              </button>
+              <div className="mt-3">
+                <ConfirmAction
+                  label={busy === "reopening" ? "يفتح…" : "أعد فتح الشهر"}
+                  variant="secondary"
+                  tone="warn"
+                  disabled={busy !== null}
+                  title={`إعادة فتح ${month}`}
+                  consequence="تُقبَل إضافة المستندات إليه من جديد، ويُسجَّل الفتح في سجلّ التدقيق باسمك. وتقارير الشهر تتغيّر بما يُضاف بعده."
+                  acknowledgement="أُقرّ بأنّ لديّ ما يخصّ هذا الشهر ولم يُدرَج فيه."
+                  confirmLabel={`افتح ${month}`}
+                  onConfirm={() => call("reopen", month)}
+                />
+              </div>
             </div>
           )}
         </>

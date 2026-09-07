@@ -11,6 +11,7 @@ import { db } from "@/db";
 import { invoices, paymentAllocations, payments } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { recordAudit } from "@/lib/audit";
+import { INVOICE, countNoun } from "@/lib/arabic";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -36,7 +37,7 @@ export async function POST(request: Request) {  let user;
   try {
     body = (await request.json()) as Body;
   } catch {
-    return NextResponse.json({ error: "طلب غير صالح" }, { status: 400 });
+    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
   }
 
   const conditions = [];
@@ -120,6 +121,6 @@ export async function POST(request: Request) {  let user;
     ok: true,
     marked: pending.length,
     totalMinor,
-    message: `وُسمت ${pending.length} فاتورة بقيمة ${(totalMinor / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })} ريال`,
+    message: `وُسمت ${countNoun(pending.length, INVOICE)} بقيمة ${(totalMinor / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })} ريال`,
   });
 }

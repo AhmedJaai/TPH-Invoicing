@@ -7,12 +7,13 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Badge, DataTable, EmptyState, LinkButton } from "@/components/ui";
+import { Badge, DataTable, EmptyState, LinkButton, NoAccess } from "@/components/ui";
 import {
   OVERDUE_DAYS, PAGE_SIZE, PAID_LABEL, TAX_LABEL,
   describe as describeFilters, hasFilters, linkTo, parseFilters,
 } from "@/lib/invoice-filter";
 import { INVOICE, countNoun } from "@/lib/arabic";
+import { ScrollX } from "@/components/scroll-x";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export default async function InvoicesPage({
   if (!can(user.role, "amounts:view")) {
     return (
       <PageShell user={user} width="wide" title="الفواتير">
-        <EmptyState title="دورك لا يشمل الأرقام المالية." hint="هذه الصفحة محجوبة عنك." />
+        <NoAccess what="الفواتير" />
       </PageShell>
     );
   }
@@ -128,7 +129,7 @@ export default async function InvoicesPage({
         <Box label="المعروض" value={countNoun(Number(t.n), INVOICE)} />
         <Box label="قيمتها" minor={Number(t.billed)} />
         <Box
-          label="ما بقي عليها"
+          label="ما بقي عليك"
           minor={Number(t.outstanding)}
           tone={Number(t.outstanding) > 0 ? "warn" : "ok"}
         />
@@ -195,7 +196,13 @@ export default async function InvoicesPage({
               cell: (r) => (
                 <span>
                   <span className="block font-medium">{r.supplier ?? "بلا مورّد"}</span>
-                  <span className="nums block text-[11px] text-muted" dir="ltr">
+                  {/*
+                    `dir="ltr"` على عنصرٍ كتليّ كان يزيح الرقم إلى الحافّة
+                    المقابلة، فيُقرأ لافتةً منفصلة لا تابعاً للاسم.
+                    و`isolate` يعزل ترتيبه الداخليّ ويُبقي الكتلة في اتّجاه
+                    الصفحة، فيقع تحت الاسم محاذياً له.
+                  */}
+                  <span className="nums block text-[11px] text-muted" style={{ unicodeBidi: "isolate" }}>
                     {r.number ?? "بلا رقم"}
                   </span>
                 </span>
@@ -218,7 +225,7 @@ export default async function InvoicesPage({
             {
               key: "lines",
               header: "البنود",
-              align: "end",
+              numeric: true,
               secondary: true,
               cell: (r) =>
                 Number(r.lineCount) > 0
@@ -228,13 +235,13 @@ export default async function InvoicesPage({
             {
               key: "total",
               header: "الإجمالي",
-              align: "end",
+              numeric: true,
               cell: (r) => <Money minor={r.total} />,
             },
             {
               key: "remaining",
               header: "ما بقي",
-              align: "end",
+              numeric: true,
               cell: (r) => {
                 const rem = r.total - Number(r.allocated);
                 return rem <= 0
@@ -288,7 +295,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   return (
     <div className="flex items-baseline gap-3">
       <span className="w-14 shrink-0 text-[11px] text-muted">{label}</span>
-      <div className="scroll-x flex gap-1.5 pb-1">{children}</div>
+      <ScrollX className="flex gap-1.5 pb-1">{children}</ScrollX>
     </div>
   );
 }

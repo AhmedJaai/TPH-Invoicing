@@ -18,7 +18,7 @@ import { resolveBankAccount } from "@/services/bank-account.service";
 import { allocate, createPayment } from "@/services/payment.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
 import { recordAudit } from "@/lib/audit";
-import { countNoun, TRANSACTION } from "@/lib/arabic";
+import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { applyAdjudication, runReconciliation } from "@/services/reconcile.service";
 import { adjudicate } from "@/services/adjudicator.service";
 import { selectedAdjudicator } from "@/lib/bank/adjudicator-provider";
@@ -785,7 +785,7 @@ export async function POST(request: Request) {  let user;
         event: "POSTED",
         actor: "SYSTEM",
         actorId: user.id,
-        detail: `طُوبقت مع ${plan.allocations.length} فاتورة`,
+        detail: `طُوبقت مع ${countNoun(plan.allocations.length, INVOICE)}`,
         payload: { الدفعة: paymentId, الشهور: plan.months },
       });
     }

@@ -3,7 +3,8 @@ import { MobileTabBar, Nav, UploadButton } from "./nav";
 import { SearchBox } from "./search-box";
 import { TrialBanner } from "./trial-banner";
 import { UserMenu } from "./user-menu";
-import type { Role } from "@/lib/permissions";
+import { can, type Role } from "@/lib/permissions";
+import { countPendingWork } from "@/lib/bank/pending";
 
 /**
  * عرض الصفحة يتبع ما فيها.
@@ -20,7 +21,7 @@ const WIDTH: Record<ShellWidth, string> = {
   wide: "max-w-7xl",
 };
 
-export function PageShell({
+export async function PageShell({
   user,
   title,
   intro,
@@ -38,8 +39,21 @@ export function PageShell({
 }) {
   const w = WIDTH[width];
 
+  /*
+    العدد الواحد للعمل الباقي، يُقرأ في القشرة فيراه صاحب العمل من أيّ
+    صفحة — ولا يتغيّر بتغيّرها. ومن لا يرى البنك لا يُحسَب له عدد.
+  */
+  const pending = can(user.role, "bank:view") ? await countPendingWork() : 0;
+
   return (
     <div className="min-h-screen">
+      {/*
+        القشرة تضع الشعار والبحث وسبع مساحاتٍ وسبعة أقسام قبل المحتوى،
+        فمن يتنقّل بلوحة المفاتيح يمرّ على اثنين وعشرين رابطاً في كل صفحة.
+      */}
+      <a href="#main" className="skip-link">
+        تخطَّ إلى المحتوى
+      </a>
       <TrialBanner />
       <header className="sticky top-0 z-20 border-b border-line bg-surface/85 backdrop-blur-md">
         <div className={`mx-auto ${w} px-4 py-3 sm:px-6`}>
@@ -57,13 +71,13 @@ export function PageShell({
             </div>
           </div>
           <div className="mt-2.5">
-            <Nav role={user.role} />
+            <Nav role={user.role} pending={pending} />
           </div>
         </div>
       </header>
 
       {/* الحشو السفليّ يُخلي مكان الشريط السفليّ على الجوّال */}
-      <main className={`mx-auto ${w} px-4 pb-28 pt-7 sm:px-6 sm:pb-16 sm:pt-10`}>
+      <main id="main" className={`mx-auto ${w} px-4 pb-28 pt-7 sm:px-6 sm:pb-16 sm:pt-10`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="font-display text-[1.65rem] font-black leading-[1.15] tracking-tight sm:text-4xl">

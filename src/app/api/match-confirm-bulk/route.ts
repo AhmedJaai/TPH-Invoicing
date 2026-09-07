@@ -32,6 +32,7 @@ import { loadMerchantMemory } from "@/services/counterparty.service";
 import { loadSupplierProfiles } from "@/services/supplier-profile.service";
 import type { SupplierIdentity } from "@/lib/bank/entities";
 import type { OpenInvoice } from "@/lib/bank/candidates";
+import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as Body;
   } catch {
-    return NextResponse.json({ error: "طلب غير صالح" }, { status: 400 });
+    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
   }
 
   const ids = [...new Set(body.transactionIds ?? [])];
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
   }
   if (ids.length > MAX_BULK) {
     return NextResponse.json(
-      { error: `أقصى ما يُقرَّ دفعةً واحدة ${MAX_BULK} حركة` },
+      { error: `أقصى ما يُقرَّ دفعةً واحدة ${countNoun(MAX_BULK, TRANSACTION)}` },
       { status: 400 },
     );
   }
@@ -248,7 +249,7 @@ export async function POST(request: Request) {
         event: "MATCH_CONFIRMED",
         actor: "HUMAN",
         actorId: user.id,
-        detail: `إقرارٌ جماعيّ بعد إعادة الحساب — ${plan.allocations.length} فاتورة`,
+        detail: `إقرارٌ جماعيّ بعد إعادة الحساب — ${countNoun(plan.allocations.length, INVOICE)}`,
         payload: {
           الدفعة: id,
           الفواتير: plan.allocations.map((a) => a.invoiceId),
@@ -264,7 +265,7 @@ export async function POST(request: Request) {
     outcomes.push({
       transactionId: tx.id,
       ok: true,
-      reason: `أُقرّت على ${plan.allocations.length} فاتورة`,
+      reason: `أُقرّت على ${countNoun(plan.allocations.length, INVOICE)}`,
       paymentId,
       invoiceIds: plan.allocations.map((a) => a.invoiceId),
     });
@@ -291,7 +292,7 @@ export async function POST(request: Request) {
     outcomes,
     message:
       confirmed === ids.length
-        ? `أُقرّت ${confirmed} حركة`
+        ? `أُقرّت ${countNoun(confirmed, TRANSACTION)}`
         : `أُقرّت ${confirmed} من ${ids.length} — والباقي تغيّر حاله فيُراجَع وحده`,
   });
 }

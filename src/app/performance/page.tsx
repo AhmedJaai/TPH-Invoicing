@@ -9,6 +9,8 @@ import { Empty, Money, PageShell } from "@/components/page-shell";
 import { findSameNameCandidates, summarizeItems, type LineRow } from "@/lib/analytics";
 import { buildDataHealth } from "@/lib/data-health";
 import { gatherHealthFacts } from "@/lib/data-health-facts";
+import { NoAccess } from "@/components/ui";
+import { ScrollX } from "@/components/scroll-x";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +26,7 @@ export default async function PerformancePage() {
   if (!can(user.role, "amounts:view")) {
     return (
       <PageShell user={user} width="wide" title="الأداء">
-        <Empty message="دورك لا يشمل الأرقام المالية، فهذه الصفحة محجوبة عنك." />
+        <NoAccess />
       </PageShell>
     );
   }
@@ -118,7 +120,7 @@ export default async function PerformancePage() {
             سعر الوحدة في آخر فاتورة مقابل السعر الذي قبله — عند المورّد نفسه، وبعد
             الخصم والضريبة لا قبلهما.
           </p>
-          <div className="scroll-x rounded-2xl border border-line shadow-raised">
+          <ScrollX className="rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[38rem] text-sm">
               <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
@@ -150,7 +152,7 @@ export default async function PerformancePage() {
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         </section>
       )}
 
@@ -164,7 +166,7 @@ export default async function PerformancePage() {
         {items.length === 0 ? (
           <Empty message="لا بنود بعد. البنود تُسجَّل عند قراءة محتوى الفواتير." />
         ) : (
-          <div className="scroll-x rounded-2xl border border-line shadow-raised">
+          <ScrollX className="rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[40rem] text-sm">
               <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
@@ -187,7 +189,7 @@ export default async function PerformancePage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         )}
       </section>
     </PageShell>

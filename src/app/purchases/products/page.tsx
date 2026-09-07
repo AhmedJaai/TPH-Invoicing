@@ -49,7 +49,7 @@ export default async function ProductsPage() {
       user={user}
      
       title="الأصناف"
-      intro="اسم الصنف عند مورّده ليس مُعرِّفاً له. الربط بصنف معياري هو ما يجمع ما اشتريتَه من مورّدين مختلفين تحت شيء واحد — وهو أساس كل تحليل تكلفة لاحق."
+      intro="اربط اسم الصنف عند كل مورّد بصنفٍ واحد عندك — فتعرف كم يكلّفك البنّ من كل مورّد، لا كم يكلّفك «العنب» عند اثنين."
     >
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">

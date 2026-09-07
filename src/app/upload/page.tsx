@@ -59,13 +59,18 @@ export default async function Home() {
         />
       </div>
 
-        <section className="mt-8 flex flex-wrap items-start gap-3">
-          <DriveSync />
-          <DriveRename />
-        </section>
+      {/*
+        ما تحت منطقة الرفع كان جردَ نظام: زرّا صيانة، ثمّ اسم النموذج
+        القارئ، ثمّ اثنان وعشرون مورّداً بأسماء مجلّداتهم اللاتينية.
+        فصفحةُ المهمّة اليومية أكثرُها ليس المهمّة. وقد طُوي ذلك كلُّه
+        خلف تفصيلٍ يُفتَح عند الحاجة، وبقي فوقَه ما يخصّ الرفع وحده.
+      */}
+      <details className="mt-10 rounded-2xl border border-line bg-raised shadow-raised">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-bold">
+          حالة النظام والمورّدون المسجّلون
+        </summary>
 
-        <section className="mt-10">
-          <h2 className="mb-3 text-sm font-bold">حالة النظام</h2>
+        <div className="border-t border-line px-4 py-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="الموردون" value={String(rows.length)} />
             <Stat
@@ -76,17 +81,20 @@ export default async function Home() {
             <Stat label="مستندات مؤرشفة" value={String(archivedCount)} />
             <Stat label="قارئ الفواتير" value={activeProviderName()} />
           </div>
-        </section>
 
-        <section className="mt-10">
-          <h2 className="mb-3 text-sm font-bold">الموردون المسجّلون</h2>
-          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
+          <div className="mt-6 flex flex-wrap items-start gap-3">
+            <DriveSync />
+            <DriveRename />
+          </div>
+
+          <h3 className="mb-2 mt-8 text-sm font-bold">الموردون المسجّلون</h3>
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line">
             {rows.map((s) => (
               <li key={s.slug} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <span className="min-w-0 truncate text-sm">{s.nameAr}</span>
                 <span className="flex shrink-0 items-center gap-2">
                   {!s.issuesInvoices && (
-                    <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[10px] font-bold text-warn">
+                    <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[11px] font-bold text-warn">
                       بلا فواتير
                     </span>
                   )}
@@ -97,13 +105,15 @@ export default async function Home() {
               </li>
             ))}
           </ul>
-        </section>
+        </div>
+      </details>
 
+      {!showAmounts && (
         <footer className="mt-12 border-t border-line pt-5 text-xs leading-relaxed text-muted">
-          {showAmounts
-            ? "لك صلاحية الاطلاع على الأرقام المالية."
-            : "دورك لا يشمل الأرقام المالية — تظهر لك المستندات دون مبالغها."}
+          دورك لا يشمل الأرقام المالية — تظهر لك المستندات دون مبالغها.
         </footer>
+      )}
+
     </PageShell>
   );
 }

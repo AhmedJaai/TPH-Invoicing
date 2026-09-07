@@ -18,6 +18,8 @@ import {
 } from "@/lib/expenses";
 import { countNoun, ITEM } from "@/lib/arabic";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
+import { NoAccess } from "@/components/ui";
+import { ScrollX } from "@/components/scroll-x";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +39,7 @@ export default async function ExpensesPage({
   if (!can(user.role, "bank:view")) {
     return (
       <PageShell user={user} title="المصروفات">
-        <Empty message="هذه الصفحة محجوبة عن دورك." />
+        <NoAccess />
       </PageShell>
     );
   }
@@ -121,11 +123,11 @@ export default async function ExpensesPage({
         <Box label={`الفعليّ في ${month}`} minor={actualTotal} note={countNoun(actual.length, ITEM)} />
         <Box
           label="الفرق"
-          minor={actualTotal - expectedTotal}
+          minor={expectedTotal === 0 ? null : actualTotal - expectedTotal}
           tone={expectedTotal === 0 ? "muted" : actualTotal > expectedTotal ? "warn" : "ok"}
           note={
             expectedTotal === 0
-              ? "لا مقارنة بلا متوقَّع"
+              ? "سجّل مصروفاتك المتكرّرة في الإعدادات ليُقارَن بها الفعليّ"
               : actualTotal > expectedTotal
                 ? "صُرف أكثر ممّا تُوقّع"
                 : "صُرف أقلّ ممّا تُوقّع"
@@ -165,7 +167,7 @@ export default async function ExpensesPage({
               <li key={e.id} className="flex items-center justify-between gap-3 px-3 py-2">
                 <span className="min-w-0">
                   <span className="block truncate text-xs font-medium">{e.label}</span>
-                  <span className="block truncate text-[10px] text-muted">
+                  <span className="block truncate text-[11px] text-muted">
                     مصنَّفة {CATEGORY_LABEL[e.category]} · تطابق المورّد «{supplier}»
                   </span>
                 </span>
@@ -187,7 +189,7 @@ export default async function ExpensesPage({
         {variance.length === 0 ? (
           <Empty message="لا بيانات لهذا الشهر." />
         ) : (
-          <div className="scroll-x rounded-2xl border border-line shadow-raised">
+          <ScrollX className="rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[34rem] text-xs">
               <thead className="sticky top-0 bg-sunken text-muted">
                 <tr>
@@ -208,7 +210,7 @@ export default async function ExpensesPage({
                     <td className="px-3 py-2 text-end font-bold">
                       <Money minor={v.varianceMinor} tone={v.varianceMinor > 0 ? "warn" : "ok"} />
                       {v.variancePct !== null && (
-                        <span className="ms-1 text-[10px] font-normal text-muted">
+                        <span className="ms-1 text-[11px] font-normal text-muted">
                           {v.variancePct > 0 ? "+" : ""}{Math.round(v.variancePct * 100)}٪
                         </span>
                       )}
@@ -217,7 +219,7 @@ export default async function ExpensesPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         )}
       </section>
 
@@ -259,7 +261,8 @@ function Box({
   label, minor, note, tone,
 }: {
   label: string;
-  minor: number;
+  /** `null` حين لا يصحّ الحساب — والرقم حينئذٍ لا يُعرَض. */
+  minor: number | null;
   note?: string;
   tone?: "warn" | "ok" | "muted";
 }) {
@@ -267,8 +270,15 @@ function Box({
   return (
     <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3.5">
       <p className="text-xs text-muted">{label}</p>
-      <p className={`mt-1.5 text-2xl font-bold leading-none ${cls}`}><Money minor={minor} /></p>
-      {note && <p className="mt-1.5 text-[11px] text-muted">{note}</p>}
+      {/*
+        كانت البطاقة تعرض «الفرق ‎28.20‎» وتحته «لا مقارنة بلا متوقَّع» —
+        رقمٌ وإنكارٌ له في بطاقةٍ واحدة. فإن لم تصحّ المقارنة لم يُعرض
+        رقمٌ أصلاً، ويُقال ما ينقص كي يُستدرَك.
+      */}
+      <p className={`nums mt-1.5 text-2xl font-bold leading-none ${minor === null ? "text-muted" : cls}`}>
+        {minor === null ? "لا يمكن الحساب" : <Money minor={minor} />}
+      </p>
+      {note && <p className="mt-1.5 text-xs text-muted">{note}</p>}
     </div>
   );
 }

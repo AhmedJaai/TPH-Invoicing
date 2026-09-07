@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, NoAccess } from "@/components/ui";
 import { ReviewWorkspace } from "@/components/review-workspace";
 import { bankTransactions, suppliers } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -28,7 +28,7 @@ export default async function ReviewPage() {
   if (!can(user.role, "bank:view")) {
     return (
       <PageShell user={user} width="wide" title="طابور المراجعة">
-        <EmptyState title="طابور المراجعة محجوب عن دورك." />
+        <NoAccess what="طابور المراجعة" />
       </PageShell>
     );
   }
@@ -83,9 +83,13 @@ export default async function ReviewPage() {
       user={user}
       width="wide"
       title="طابور المراجعة"
-      intro="ثلاثة أعمالٍ لا عملٌ واحد: ما يُختَم في ثوانٍ، وما يحتاج عينك، وما يحتاج تعريفاً. وخلطُها في عددٍ واحد يُرهب ولا يُرشد."
+      intro="ما ينتظر قرارك، مقسوماً على ثلاثة: ما يُؤكَّد جمعاً، وما يحتاج نظرةً منك، وجهاتٌ لم يعرفها النظام بعد."
     >
-      <ReviewWorkspace items={items} canApprove={can(user.role, "payment:approve")} />
+      <ReviewWorkspace
+        items={items}
+        canApprove={can(user.role, "payment:approve")}
+        canEdit={can(user.role, "bank:edit")}
+      />
     </PageShell>
   );
 }

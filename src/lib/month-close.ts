@@ -12,6 +12,7 @@
  */
 
 import type { BalanceStatus } from "@/lib/bank/balance-equation";
+import { DOCUMENT, INVOICE, SUPPLIER, TRANSACTION, WARNING, countNoun } from "./arabic";
 
 export type CheckState = "PASS" | "WARN" | "BLOCK";
 
@@ -80,7 +81,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     state: facts.invoiceCount > 0 ? "PASS" : "BLOCK",
     detail:
       facts.invoiceCount > 0
-        ? `${facts.invoiceCount} فاتورة في ${facts.month}`
+        ? `${countNoun(facts.invoiceCount, INVOICE)} في ${facts.month}`
         : "لا فاتورة واحدة في هذا الشهر",
     action: facts.invoiceCount > 0 ? undefined : "ارفع فواتير الشهر أو زامن الدرايف قبل الإقفال",
   });
@@ -92,7 +93,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     detail:
       facts.openBlockerIssues === 0
         ? "لا شيء يمنع"
-        : `${facts.openBlockerIssues} تنبيه مانع لم يُعالَج`,
+        : `${countNoun(facts.openBlockerIssues, WARNING)} مانع لم يُعالَج`,
     action: facts.openBlockerIssues === 0 ? undefined : "عالجها أو تجاوزها بسبب مكتوب",
   });
 
@@ -103,7 +104,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     detail:
       facts.documentsNeedingReview === 0
         ? "كل مستندات الشهر مؤرشفة"
-        : `${facts.documentsNeedingReview} مستند لم يُبتّ فيه`,
+        : `${countNoun(facts.documentsNeedingReview, DOCUMENT)} لم يُبتّ فيه`,
     action: facts.documentsNeedingReview === 0 ? undefined : "راجعها وأرشفها أو ارفضها",
   });
 
@@ -117,7 +118,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
       id: "tax-unknown",
       label: "كل الفواتير قُرئ تفصيلها الضريبي",
       state: "WARN",
-      detail: `${facts.unknownTaxCount} فاتورة لم يُقرأ تفصيلها الضريبي`,
+      detail: `${countNoun(facts.unknownTaxCount, INVOICE)} لم يُقرأ تفصيلها الضريبي`,
       action: "اقرأ محتواها — حالتها مجهولة لا غير صالحة، ولا تُطالِب المورّد قبل ذلك",
     });
   }
@@ -129,7 +130,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     detail:
       facts.notTaxValidCount === 0
         ? "كلّها تصلح لخصم المدخلات"
-        : `${facts.notTaxValidCount} فاتورة لا تصلح لخصم المدخلات`,
+        : `${countNoun(facts.notTaxValidCount, INVOICE)} لا تصلح لخصم المدخلات`,
     action: facts.notTaxValidCount === 0 ? undefined : "اطلب البديل من المورّد قبل السداد",
   });
 
@@ -140,7 +141,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     detail:
       facts.unpaidCount === 0
         ? "لا رصيد مستحق"
-        : `${facts.unpaidCount} فاتورة بقيمة ${riyals(facts.unpaidTotalMinor)} ريال`,
+        : `${countNoun(facts.unpaidCount, INVOICE)} بقيمة ${riyals(facts.unpaidTotalMinor)} ريال`,
     action: facts.unpaidCount === 0 ? undefined : "أدرجها في دفعة أوّل الشهر أو اعتمدها مسدَّدة",
   });
 
@@ -151,7 +152,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     detail:
       facts.unpostedCount === 0
         ? "لا شيء معلّق عن القيد"
-        : `${facts.unpostedCount} فاتورة لم تُقيَّد`,
+        : `${countNoun(facts.unpostedCount, INVOICE)} لم تُقيَّد`,
     action: facts.unpostedCount === 0 ? undefined : "قيّدها — الفاتورة غير المقيَّدة تختفي من التقارير",
   });
 
@@ -162,8 +163,8 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     state: missingStatements === 0 ? "PASS" : "WARN",
     detail:
       missingStatements === 0
-        ? `كشوف ${facts.suppliersWithInvoices} مورّداً كاملة`
-        : `${missingStatements} من ${facts.suppliersWithInvoices} مورّداً لم يصل كشفه`,
+        ? `كشوف ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} كاملة`
+        : `${missingStatements} من ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} لم يصل كشفه`,
     action:
       missingStatements === 0
         ? undefined
@@ -232,7 +233,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
         id: "bank-unexplained",
         label: "لا حركة بنكية بلا تفسير",
         state: "WARN",
-        detail: `${facts.bankUnexplainedCount} حركة بلا تفسير، قيمتها ${riyals(facts.bankUnexplainedMinor)} ريال`,
+        detail: `${countNoun(facts.bankUnexplainedCount, TRANSACTION)} بلا تفسير، قيمتها ${riyals(facts.bankUnexplainedMinor)} ريال`,
         action: "افتح طابور المراجعة واحسم ما بقي",
       });
     }
@@ -243,7 +244,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
       id: "fixed-assets",
       label: "الأصول الثابتة رُوجعت",
       state: "WARN",
-      detail: `${facts.fixedAssetCount} فاتورة فوق حدّ الرسملة`,
+      detail: `${countNoun(facts.fixedAssetCount, INVOICE)} فوق حدّ الرسملة`,
       action: "راجعها مع المحاسب — صرفها دفعة واحدة يشوّه ربح الشهر",
     });
   }

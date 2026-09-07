@@ -16,6 +16,7 @@ import { guard, respondTo } from "@/services/guard";
 import { allocate, createPayment } from "@/services/payment.service";
 import { recordAudit } from "@/lib/audit";
 import { settleSupplierAccount } from "@/lib/allocation";
+import { INVOICE, countNoun } from "@/lib/arabic";
 
 export const runtime = "nodejs";
 
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as Body;
   } catch {
-    return NextResponse.json({ error: "طلب غير صالح" }, { status: 400 });
+    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
   }
 
   if (!body.transactionId) {
@@ -334,7 +335,7 @@ export async function POST(request: Request) {
       event: "MATCH_CONFIRMED",
       actor: "HUMAN",
       actorId: user.id,
-      detail: `أقرّها على ${allocations.length} فاتورة`,
+      detail: `أقرّها على ${countNoun(allocations.length, INVOICE)}`,
       payload: { الدفعة: id, الفواتير: allocations.map((a) => a.invoiceId), الشهور: sorted },
     });
 
@@ -358,7 +359,7 @@ export async function POST(request: Request) {
   const remainder = left > 0 ? ` وبقي ${(left / 100).toFixed(2)} بلا تخصيص` : "";
   return NextResponse.json({
     ok: true,
-    message: `طُوبقت مع ${allocations.length} فاتورة${remainder}`,
+    message: `طُوبقت مع ${countNoun(allocations.length, INVOICE)}${remainder}`,
     allocations,
   });
 }
@@ -455,7 +456,7 @@ async function applyManualSplit(
       event: "MATCH_CONFIRMED",
       actor: "HUMAN",
       actorId: userId,
-      detail: `وزّعها بنفسه على ${split.length} فاتورة`,
+      detail: `وزّعها بنفسه على ${countNoun(split.length, INVOICE)}`,
       payload: { الدفعة: id, التوزيع: split },
     });
 
@@ -481,7 +482,7 @@ async function applyManualSplit(
     message:
       left > 0
         ? `وُزّعت على ${split.length} فاتورة، وبقي ${(left / 100).toFixed(2)} بلا تخصيص`
-        : `وُزّعت على ${split.length} فاتورة بالكامل`,
+        : `وُزّعت على ${countNoun(split.length, INVOICE)} بالكامل`,
   });
 }
 
@@ -627,7 +628,7 @@ async function settleAccounts(
     supplierBalanceAfter: left,
     message: invoiceCount === 0
       ? `قُيّد ${money(allocatedTotal + unappliedTotal)} على حساب المورّد — لا فاتورة مفتوحة تقابله، فبقي غير مخصَّص`
-      : `سُدِّد ${money(allocatedTotal)} على ${invoiceCount} فاتورة بالأقدم أوّلاً (لا رقمَ فاتورةٍ في الحوالة)`
+      : `سُدِّد ${money(allocatedTotal)} على ${countNoun(invoiceCount, INVOICE)} بالأقدم أوّلاً (لا رقمَ فاتورةٍ في الحوالة)`
         + (unappliedTotal > 0 ? ` · وبقي ${money(unappliedTotal)} غير مخصَّص` : "")
         + ` · رصيد المورّد بعدها ${money(left)}`,
   });

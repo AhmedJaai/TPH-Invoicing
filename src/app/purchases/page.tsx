@@ -5,6 +5,8 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, PageShell } from "@/components/page-shell";
 import { HubGrid, type HubTile } from "@/components/hub";
+import { NoAccess } from "@/components/ui";
+import { SUPPLIER, countNoun } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +16,7 @@ export default async function PurchasesPage() {
   if (!can(user.role, "amounts:view")) {
     return (
       <PageShell user={user} width="wide" title="المشتريات">
-        <Empty message="دورك لا يشمل الأرقام المالية، فهذه الصفحة محجوبة عنك." />
+        <NoAccess />
       </PageShell>
     );
   }
@@ -69,7 +71,7 @@ export default async function PurchasesPage() {
     },
     {
       href: "/payments",
-      title: "المستحقّات",
+      title: "المستحقّ للمورّدين",
       amountMinor: Number(f?.outstanding ?? 0),
       detail: "غير مسدَّد للمورّدين",
       tone: Number(f?.outstanding ?? 0) > 0 ? "warn" : "ok",
@@ -80,7 +82,7 @@ export default async function PurchasesPage() {
       value: String(f?.statements ?? 0),
       detail:
         missing > 0
-          ? `${missing} مورّداً لم يصل كشفه — الكشف يكشف الفاتورة الضائعة`
+          ? `${countNoun(missing, SUPPLIER)} لم يصل كشفه — الكشف يكشف الفاتورة الضائعة`
           : "كشوف كل المورّدين وصلت",
       tone: missing > 0 ? "warn" : "ok",
     },

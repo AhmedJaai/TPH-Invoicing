@@ -84,6 +84,7 @@ export interface Reconciliation {
 }
 
 import { reconcile, type Claim } from "./bank/optimizer";
+import { INVOICE, countNoun } from "./arabic";
 
 /** توحيد رقم الفاتورة للمقارنة: بلا رموز ولا فراغ، بحروف كبيرة. */
 export function normalizeRef(value: string | null | undefined): string {
@@ -280,7 +281,7 @@ export function reconcileStatement(
     findings.push({
       code: ISSUE.INVOICE_IN_STATEMENT_NOT_ARCHIVED,
       severity: "WARN",
-      message: `${missingFromArchive.length} فاتورة في كشف المورّد بقيمة ${(total / 100).toFixed(2)} ريال ولا ملف لها عندنا — اطلبها منه`,
+      message: `${countNoun(missingFromArchive.length, INVOICE)} في كشف المورّد بقيمة ${(total / 100).toFixed(2)} ريال ولا ملف لها عندنا — اطلبها منه`,
     });
   }
 
@@ -288,7 +289,7 @@ export function reconcileStatement(
     findings.push({
       code: ISSUE.STATEMENT_AMOUNT_MISMATCH,
       severity: "WARN",
-      message: `${amountMismatches.length} فاتورة يخالف مبلغها في الكشف مبلغها عندنا`,
+      message: `${countNoun(amountMismatches.length, INVOICE)} يخالف مبلغها في الكشف مبلغها عندنا`,
     });
   }
 
@@ -296,7 +297,7 @@ export function reconcileStatement(
     findings.push({
       code: ISSUE.INVOICE_NOT_IN_STATEMENT,
       ...ISSUE_TEXT.INVOICE_NOT_IN_STATEMENT,
-      message: `${notInStatement.length} فاتورة عندنا لم ترد في كشفه — تحقّق أنّها ليست مكرّرة أو لغير هذا المورّد`,
+      message: `${countNoun(notInStatement.length, INVOICE)} عندنا لم ترد في كشفه — تحقّق أنّها ليست مكرّرة أو لغير هذا المورّد`,
     });
   }
 

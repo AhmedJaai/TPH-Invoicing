@@ -119,7 +119,7 @@ export function MatchExplain({ match }: { match: MatchExplanation }) {
 
           {match.evidence?.مطابقة && match.evidence.مطابقة.length > 0 && (
             <div className="mt-2">
-              <p className="text-[10px] text-muted">لماذا هذه الفاتورة</p>
+              <p className="text-[11px] text-muted">لماذا هذه الفاتورة</p>
               <ul className="mt-1 space-y-1">
                 {match.evidence.مطابقة.map((r, i) => (
                   <li key={i} className="text-[11px] leading-relaxed">— {r}</li>
@@ -134,7 +134,7 @@ export function MatchExplain({ match }: { match: MatchExplanation }) {
             </p>
           )}
 
-          <p className="mt-2.5 border-t border-line pt-2 text-[10px] leading-relaxed text-muted">
+          <p className="mt-2.5 border-t border-line pt-2 text-[11px] leading-relaxed text-muted">
             المبلغ <Money minor={match.amountMinor} /> ريالاً. والدرجة ترجيحٌ لا يقين،
             ولذلك تُعرَض وصفاً لا نسبة.
           </p>
@@ -188,9 +188,9 @@ export function MatchExplain({ match }: { match: MatchExplanation }) {
 function Row({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="mt-2 first:mt-0">
-      <p className="text-[10px] text-muted">{label}</p>
+      <p className="text-[11px] text-muted">{label}</p>
       <p className="text-[11px] leading-relaxed">{value}</p>
-      {note && <p className="text-[10px] text-muted">{note}</p>}
+      {note && <p className="text-[11px] text-muted">{note}</p>}
     </div>
   );
 }

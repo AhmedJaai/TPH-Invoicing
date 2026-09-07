@@ -36,28 +36,43 @@ export function Changes({ changes }: { changes: readonly Change[] }) {
             <div className="flex items-baseline justify-between gap-3">
               <p className="text-sm font-bold">{c.label}</p>
               <span className={`shrink-0 text-xs font-bold ${tone}`}>
-                {c.direction === "NEW" ? "جديد" : (
-                  <>
-                    {arrow}{" "}
-                    {c.pct === null ? "" : `${Math.abs(Math.round(c.pct))}٪`}
-                  </>
+                {c.direction === "NEW" ? "جديد" : c.pct === null ? (
+                  /*
+                    السهم وحده يقول الاتّجاه ولا يقول المقدار — وهو ملوّن،
+                    فيُقلق بلا أن يوجّه. فإن جُهل المقدار قيل ذلك.
+                  */
+                  <>{arrow} بلا مقارنة</>
+                ) : (
+                  <>{arrow} {Math.abs(Math.round(c.pct))}٪</>
                 )}
               </span>
             </div>
 
-            {c.currentMinor !== undefined && (
-              <p className="nums mt-2 font-display text-xl font-bold leading-none">
+            {/*
+              لكل بطاقةٍ رقمُها في الخانة نفسها.
+              كانت بطاقتان من الأربع بلا رقمٍ أصلاً، فيختلف تشريح البطاقة
+              داخل الشبكة الواحدة ولا يجد المستعرض عموداً يمسحه بعينه.
+            */}
+            <p className="nums mt-2 font-display text-xl font-bold leading-none">
+              {c.currentMinor !== undefined ? (
                 <Money minor={c.currentMinor} />
-              </p>
-            )}
+              ) : (
+                c.currentCount ?? "—"
+              )}
+            </p>
 
-            <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            <p className="mt-2 text-xs leading-relaxed text-muted">
               {c.detail} · {c.baseline}
             </p>
           </>
         );
 
-        const box = "block rounded-2xl border border-line bg-raised px-4 py-3.5 shadow-raised";
+        /*
+          `h-full` على الصندوق لا على العنصر: الشبكة تمدّ `li` إلى ارتفاع
+          الصفّ، والصندوق داخله كان يقف عند ارتفاع محتواه — فتظهر فجوةٌ
+          أسفل بطاقات العمود الأقصر.
+        */
+        const box = "flex h-full flex-col rounded-2xl border border-line bg-raised px-4 py-3.5 shadow-raised";
         return (
           <li key={c.id}>
             {c.href ? (

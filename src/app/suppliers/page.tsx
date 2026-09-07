@@ -7,6 +7,7 @@ import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { Badge, DataTable, EmptyState, LinkButton } from "@/components/ui";
+import { SUPPLIER, countNoun } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,7 @@ export default async function SuppliersPage() {
       {needAttention.length > 0 && (
         <div className="mb-6 rounded-2xl border border-warn/40 bg-warn-bg p-4 shadow-raised sm:p-5">
           <h2 className="text-sm font-bold text-warn">
-            {needAttention.length} مورّد يحتاج عقد توريد
+            {countNoun(needAttention.length, SUPPLIER)} يحتاج عقد توريد
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-ink-soft">
             {needAttention.map((r) => r.nameAr).join(" · ")} — لا يصدرون فواتير ضريبية، وبلا عقد
@@ -136,7 +137,7 @@ export default async function SuppliersPage() {
           {
             key: "invoices",
             header: "الفواتير",
-            align: "end",
+            numeric: true,
             cell: (r) => <span className="nums">{r.invoiceCount}</span>,
           },
           ...(showAmounts
@@ -144,13 +145,13 @@ export default async function SuppliersPage() {
                 {
                   key: "billed",
                   header: "المفوتر",
-                  align: "end" as const,
+                  numeric: true as const,
                   cell: (r: (typeof rows)[number]) => <Money minor={Number(r.billedMinor)} />,
                 },
                 {
                   key: "balance",
-                  header: "الرصيد",
-                  align: "end" as const,
+                  header: "ما بقي",
+                  numeric: true as const,
                   cell: (r: (typeof rows)[number]) => {
                     const balance = Number(r.billedMinor) - Number(r.paidMinor);
                     return (
@@ -165,7 +166,7 @@ export default async function SuppliersPage() {
           {
             key: "statements",
             header: "الكشوف",
-            align: "end",
+            numeric: true,
             cell: (r) =>
               Number(r.statementCount) > 0 ? (
                 <span className="nums">{r.statementCount}</span>

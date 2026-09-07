@@ -1,3 +1,4 @@
+import { INVOICE, MONTH, SUPPLIER, TRANSACTION, countNoun } from "./arabic";
 /**
  * صحّة البيانات.
  *
@@ -77,7 +78,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     coverage: input.invoices > 0 ? invoiceCoverage : 0,
     known: input.invoices,
     total: input.invoices,
-    detail: input.invoices > 0 ? `${input.invoices} فاتورة` : "لا فواتير بعد",
+    detail: input.invoices > 0 ? `${countNoun(input.invoices, INVOICE)}` : "لا فواتير بعد",
     action: input.invoices > 0 ? undefined : "ارفع فواتيرك أو زامن الدرايف",
   });
 
@@ -89,7 +90,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     coverage: lines,
     known: input.invoicesWithLines,
     total: input.invoices,
-    detail: `${input.invoicesWithLines} من ${input.invoices} فاتورة لها بنود (${pct(lines)})`,
+    detail: `${input.invoicesWithLines} من ${countNoun(input.invoices, INVOICE)} لها بنود (${pct(lines)})`,
     action: lines >= 0.95 ? undefined : "اقرأ محتوى الفواتير الباقية — بلا بنود لا تحليل أصناف",
   });
 
@@ -101,7 +102,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     coverage: tax,
     known: input.invoicesWithTaxDetail,
     total: input.invoices,
-    detail: `${input.invoicesWithTaxDetail} من ${input.invoices} فاتورة عُرفت ضريبتها (${pct(tax)})`,
+    detail: `${input.invoicesWithTaxDetail} من ${countNoun(input.invoices, INVOICE)} عُرفت ضريبتها (${pct(tax)})`,
     action: tax >= 0.95 ? undefined : "الباقي حالته مجهولة لا غير صالحة — اقرأ مستنداتها",
   });
 
@@ -116,7 +117,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     detail:
       input.monthsWithInvoices === 0
         ? "لا أشهر بعد"
-        : `${input.monthsWithBank} من ${input.monthsWithInvoices} شهراً يغطّيه كشف`,
+        : `${input.monthsWithBank} من ${countNoun(input.monthsWithInvoices, MONTH)} يغطّيه كشف`,
     action: bank >= 0.95 ? undefined : "استورد كشف الحساب للأشهر الناقصة",
   });
 
@@ -131,7 +132,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     detail:
       input.bankTx === 0
         ? "لا حركات بعد"
-        : `${input.unclassifiedBankTx} حركة لم تُصنَّف بعد`,
+        : `${countNoun(input.unclassifiedBankTx, TRANSACTION)} لم تُصنَّف بعد`,
     action: input.unclassifiedBankTx === 0 ? undefined : "صنّفها من صفحة المال — تصنيف واحد يسري على أمثاله",
   });
 
@@ -146,7 +147,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     detail:
       input.suppliersWithInvoices === 0
         ? "لا مورّدين بعد"
-        : `${input.suppliersWithStatements} من ${input.suppliersWithInvoices} مورّداً وصل كشفه`,
+        : `${input.suppliersWithStatements} من ${countNoun(input.suppliersWithInvoices, SUPPLIER)} وصل كشفه`,
     action: statements >= 0.95 ? undefined : "اطلب الكشوف — هي وحدها تكشف فاتورة حُمّلت عليك ولم تصلك",
   });
 

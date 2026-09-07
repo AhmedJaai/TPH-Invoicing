@@ -27,7 +27,7 @@ import { groupingIdentity, memoryKeyFor, type IdentityKind } from "@/lib/bank/pa
 import { classify, CLASSIFICATION_VERSION } from "@/lib/bank/classification";
 import { toCategory } from "@/lib/bank/apply";
 import { deriveLifecycle } from "@/lib/bank/lifecycle";
-import { countNoun, TRANSACTION } from "@/lib/arabic";
+import { TRANSACTION, countNoun } from "@/lib/arabic";
 import type { TxCategory } from "@/lib/bank/rules";
 
 export const runtime = "nodejs";
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as Body;
   } catch {
-    return NextResponse.json({ error: "طلب غير صالح" }, { status: 400 });
+    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
   }
 
   const ids = [...new Set([
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
   }
   if (ids.length > MAX_GROUP) {
     return NextResponse.json(
-      { error: `${MAX_GROUP} حركة في المرّة الواحدة على الأكثر` },
+      { error: `${countNoun(MAX_GROUP, TRANSACTION)} في المرّة الواحدة على الأكثر` },
       { status: 400 },
     );
   }

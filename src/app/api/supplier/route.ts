@@ -57,7 +57,7 @@ export async function POST(request: Request) {  let user;
   try {
     body = (await request.json()) as Body;
   } catch {
-    return NextResponse.json({ error: "طلب غير صالح" }, { status: 400 });
+    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
   }
 
   const nameAr = body.nameAr?.trim();

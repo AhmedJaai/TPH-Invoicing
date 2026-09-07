@@ -5,7 +5,7 @@ import { Empty, PageShell } from "@/components/page-shell";
 import { AttentionList } from "@/components/attention-list";
 import { IMPACT_LABEL, buildAttention, countBySeverity, impactByKind } from "@/lib/attention";
 import { Money } from "@/components/money";
-import { LinkButton } from "@/components/ui";
+import { LinkButton, NoAccess } from "@/components/ui";
 import { ITEM, countNoun } from "@/lib/arabic";
 import { gatherAttentionFacts } from "@/lib/attention-facts";
 
@@ -17,7 +17,7 @@ export default async function AttentionPage() {
   if (!can(user.role, "reports:view")) {
     return (
       <PageShell user={user} title="ما يحتاج انتباهك">
-        <Empty message="دورك لا يشمل التقارير المالية، فهذه الصفحة محجوبة عنك." />
+        <NoAccess />
       </PageShell>
     );
   }

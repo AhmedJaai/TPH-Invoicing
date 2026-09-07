@@ -7,6 +7,7 @@
  */
 import { normalizeName } from "@/lib/suppliers-seed";
 import { findRule, type BankRule, type TxCategory } from "./rules";
+import { INVOICE, countNoun } from "@/lib/arabic";
 
 export interface BankTx {
   id: string;
@@ -285,7 +286,7 @@ export function matchBankTransactions(
         confidence: combo.length === 1 ? 0.98 : 0.9,
         category: "SUPPLIER",
         ruleId: rule?.id,
-        note: combo.length > 1 ? `تسدّد ${combo.length} فواتير` : undefined,
+        note: combo.length > 1 ? `تسدّد ${countNoun(combo.length, INVOICE)}` : undefined,
       });
       continue;
     }

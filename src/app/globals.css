@@ -11,7 +11,13 @@
   --sunken: #f4f4f5;
   --ink: #000000;
   --ink-soft: #52525b;
-  --muted: #8b8b93;
+  /*
+   * الرمادي الثانوي يجتاز حدّ التباين (‎4.5:1‎) على الأبيض.
+   * كان `#8b8b93` وهو ‎3.38:1‎ — وعليه تسميةُ كل بطاقة رقم، ورأسُ كل
+   * عمود، وتسميةُ كل لسانٍ في شريط الجوّال. أي أنّ أضعف نصٍّ في الشاشة
+   * كان يحمل أكثر ما يُقرأ فيها.
+   */
+  --muted: #6b6b74;
   --line: #e4e4e7;
   --line-strong: #000000;
   --inverse-surface: #000000;
@@ -41,7 +47,8 @@
     --sunken: #131316;
     --ink: #ffffff;
     --ink-soft: #a1a1aa;
-    --muted: #71717a;
+    /* يجتاز الحدّ على الأسود وعلى أرضيّات الحالات الداكنة جميعاً */
+    --muted: #95959f;
     --line: #26262b;
     --line-strong: #ffffff;
     --inverse-surface: #ffffff;
@@ -98,10 +105,34 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* الأرقام في الجداول المالية بعرض ثابت حتى تصطفّ الخانات */
+/*
+ * الأرقام في الجداول المالية بعرض ثابت حتى تصطفّ الخانات.
+ *
+ * و`tabular-nums` وحدها لا تكفي: خطّ ثمانية سانس لا يحمل مجموعة الأرقام
+ * الجدوليّة أصلاً، فالخاصيّة تُحسَب ولا أثر لها — قيس عليه فكان «11»
+ * بعرض ‎9.08px‎ و«88» بعرض ‎15.31px‎. فيُطلَب للأرقام خطّ الواجهة النظاميّ،
+ * وهو يحملها على أنظمة التشغيل الثلاثة، وعرضُ رقمه ‎15.12px‎ — أي بمقاس
+ * أرقام ثمانية نفسها، فلا يبين الفرق.
+ *
+ * ولا يُخشى على النصّ العربيّ: هذا الصنف لا يوضَع إلّا على أرقامٍ صرفة.
+ */
 .nums {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
+}
+
+/*
+ * عمود مالٍ تصطفّ فواصله.
+ *
+ * `text-align: end` في العربية هو **اليسار** — فكانت الأرقام تلتصق
+ * بحافّتها اليسرى فتتراقص فواصلها العشرية. والمال يُصفّ على آخر خانةٍ
+ * منه: `direction: ltr` مع `text-align: right` يجعل كل الفواصل على خطٍّ
+ * واحد، فيُمسَح العمود بالعين ولا يُقرأ رقماً رقماً.
+ */
+.nums-col {
+  direction: ltr;
+  text-align: right;
 }
 
 /* منطقة الإفلات حين يُسحب ملف فوقها */
@@ -147,6 +178,53 @@ body {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+/*
+ * الحافّة المتدرّجة كانت موصوفةً في تعليق `.scroll-x` وغير مكتوبة — وهي
+ * أشدّ ما يُحتاج إليه في صفّ المرشِّحات على الجوّال: ‎1109px‎ من المورّدين
+ * داخل ‎290px‎، أي ثلاثة أرباعهم خلف الحافّة بلا ما يدلّ عليهم.
+ *
+ * والتدرّج يُوضَع على الجهة التي وراءها مزيدٌ **فعلاً**، لا دائماً:
+ * حافّةٌ تَعِد بما ليس وراءه أسوأ من ألّا تكون. و`data-overflow` يكتبه
+ * `ScrollX` بعد قياس الفيض.
+ */
+[data-overflow="start"] {
+  mask-image: linear-gradient(to left, transparent 0, #000 2rem);
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 2rem);
+}
+
+[data-overflow="end"] {
+  mask-image: linear-gradient(to left, #000 calc(100% - 2rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 2rem), transparent 100%);
+}
+
+[data-overflow="both"] {
+  mask-image: linear-gradient(to left, transparent 0, #000 2rem, #000 calc(100% - 2rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 2rem, #000 calc(100% - 2rem), transparent 100%);
+}
+
+/*
+ * رابط التخطّي: القشرة تضع الشعار والبحث وسبع مساحاتٍ وسبعة أقسام قبل
+ * المحتوى، فمن يتنقّل بلوحة المفاتيح يمرّ على اثنين وعشرين رابطاً في كل
+ * صفحة. وهذا يقفز فوقها، ولا يظهر إلّا لمن يحتاجه.
+ */
+.skip-link {
+  position: absolute;
+  inset-inline-start: 0.75rem;
+  top: -4rem;
+  z-index: 50;
+  border-radius: 0.5rem;
+  background: var(--inverse-surface);
+  color: var(--inverse-ink);
+  padding: 0.6rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus {
+  top: 0.75rem;
 }
 
 /* السطر يُقصّ عند حدّه ولا يمدّ البطاقة */

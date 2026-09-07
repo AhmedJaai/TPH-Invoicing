@@ -6,7 +6,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Card, EmptyState, Section, Stat, StatGrid } from "@/components/ui";
+import { Card, EmptyState, Section, Stat, StatGrid, NoAccess } from "@/components/ui";
 import { BankImport } from "@/components/bank-import";
 import { MatchExplain, type MatchExplanation } from "@/components/match-explain";
 import { ReconcileQueue, type QueueGroup, type QueueItem } from "@/components/reconcile-queue";
@@ -32,7 +32,7 @@ export default async function BankPage() {
   if (!can(user.role, "bank:view")) {
     return (
       <PageShell user={user} width="wide" title="البنك">
-        <EmptyState title="كشف البنك محجوب عن دورك." />
+        <NoAccess what="كشف البنك" />
       </PageShell>
     );
   }
@@ -280,11 +280,17 @@ export default async function BankPage() {
           tone="ok"
           sub="إيراد البطاقات يصل حسابك"
         />
+        {/*
+          الاسم يقول ما يُعَدّ بالضبط. وكان «تحتاج قرارك» — وهو ترادفُ
+          «طابور المراجعة» في العربية بعددٍ مختلف عنه، فيقرأ صاحب العمل
+          رقمين لسؤالٍ واحد ولا يدري أيّهما عملُه الباقي.
+        */}
         <Stat
-          label="تحتاج قرارك"
+          label="مجهولة أو متقاربة المرشّحين"
           value={String(n("review"))}
           tone={n("review") > 0 ? "warn" : "ok"}
-          sub="مجهولة أو مرشّحان متقاربان"
+          sub="جزءٌ من طابور المراجعة، لا كلُّه"
+          href="/review"
         />
         <Stat
           label="فواتير مفتوحة"

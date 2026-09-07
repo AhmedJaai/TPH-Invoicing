@@ -13,6 +13,7 @@ import { gatherHealthFacts } from "@/lib/data-health-facts";
 import { RecurringExpenses, type ExpenseRow } from "@/components/recurring-expenses";
 import { monthlyShare } from "@/lib/cashflow";
 import type { TxCategory } from "@/lib/bank/rules";
+import { NoAccess } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export default async function SettingsPage() {
   if (!can(user.role, "supplier:view")) {
     return (
       <PageShell user={user} title="الإعدادات">
-        <Empty message="هذه الصفحة محجوبة عن دورك." />
+        <NoAccess />
       </PageShell>
     );
   }

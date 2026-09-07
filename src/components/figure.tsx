@@ -40,7 +40,7 @@ export function Figure({
 
   return (
     <div className="rounded-2xl border border-line bg-raised px-4 py-3.5 shadow-raised sm:px-5 sm:py-4">
-      <p className="text-[11px] font-medium text-muted">{label}</p>
+      <p className="text-xs font-medium text-muted">{label}</p>
 
       {href ? (
         <Link href={href} className={`mt-2 block ${big} transition-opacity hover:opacity-70`}>
@@ -50,7 +50,7 @@ export function Figure({
         <p className={`mt-2 ${big}`}>{shown}</p>
       )}
 
-      {note && <p className="mt-2 text-[11px] leading-relaxed text-muted">{note}</p>}
+      {note && <p className="mt-2 text-xs leading-relaxed text-muted">{note}</p>}
 
       {provenance && (
         <>
@@ -58,7 +58,7 @@ export function Figure({
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            className="mt-2 flex items-center gap-1 text-[11px] text-muted underline decoration-dotted underline-offset-4 hover:text-ink-soft"
+            className="mt-1.5 -mx-1 flex min-h-6 items-center gap-1 px-1 py-1 text-xs text-muted underline decoration-dotted underline-offset-4 hover:text-ink-soft"
           >
             {open ? "أخفِ المصدر" : "من أين جاء؟"}
             <Dot confidence={provenance.confidence} />
@@ -90,7 +90,7 @@ function Breakdown({ provenance: p, unit }: { provenance: Provenance; unit: stri
               <span className={c.included ? "" : "text-muted line-through decoration-line"}>
                 {c.label}
               </span>
-              {c.reason && <span className="block text-[10px] text-muted">{c.reason}</span>}
+              {c.reason && <span className="block text-[11px] text-muted">{c.reason}</span>}
             </span>
             <span className="shrink-0 whitespace-nowrap text-muted">
               <span className="nums">{c.count}</span> {c.unit ?? unit}
@@ -106,7 +106,7 @@ function Breakdown({ provenance: p, unit }: { provenance: Provenance; unit: stri
         ))}
       </ul>
 
-      <p className="mt-2.5 text-[10px] leading-relaxed text-muted">
+      <p className="mt-2.5 text-[11px] leading-relaxed text-muted">
         {p.coverage === null
           ? "لا شيء بُني عليه هذا الرقم بعد."
           : `التغطية ${Math.round(p.coverage * 100)}٪ بالعدد. ` +
@@ -125,7 +125,7 @@ function Breakdown({ provenance: p, unit }: { provenance: Provenance; unit: stri
               <Link
                 key={c.id}
                 href={c.href!}
-                className="rounded-lg border border-line px-2.5 py-1 text-[11px] font-medium hover:border-ink-soft"
+                className="inline-flex min-h-6 items-center rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium hover:border-ink-soft"
               >
                 أصلِح: {c.label}
               </Link>

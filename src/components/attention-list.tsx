@@ -29,7 +29,7 @@ export function AttentionCard({ item }: { item: AttentionItem }) {
 
       <div className="flex items-start justify-between gap-3 ps-2">
         <h3 className="font-display text-base font-bold leading-snug">{item.title}</h3>
-        <span className={`shrink-0 whitespace-nowrap text-[10px] font-bold ${s.text}`}>
+        <span className={`shrink-0 whitespace-nowrap text-[11px] font-bold ${s.text}`}>
           {SEVERITY_LABEL[item.severity]} · {AREA_LABEL[item.area]}
         </span>
       </div>
@@ -53,7 +53,7 @@ export function AttentionCard({ item }: { item: AttentionItem }) {
               <li key={i} className="flex items-start justify-between gap-3 px-3 py-1.5">
                 <span className="min-w-0">
                   <span className="block truncate text-[11px] font-medium">{e.label}</span>
-                  {e.sub && <span className="block truncate text-[10px] text-muted">{e.sub}</span>}
+                  {e.sub && <span className="block truncate text-[11px] text-muted">{e.sub}</span>}
                 </span>
                 {e.amountMinor !== undefined && (
                   <span className="shrink-0 text-[11px] font-bold">

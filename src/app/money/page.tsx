@@ -9,6 +9,8 @@ import { Figure } from "@/components/figure";
 import { gatherHomeProvenance } from "@/lib/provenance-facts";
 
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
+import { NoAccess } from "@/components/ui";
+import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,7 @@ export default async function MoneyPage() {
   if (!can(user.role, "bank:view")) {
     return (
       <PageShell user={user} title="المال">
-        <Empty message="هذه الصفحة محجوبة عن دورك." />
+        <NoAccess />
       </PageShell>
     );
   }
@@ -56,11 +58,11 @@ export default async function MoneyPage() {
   const tiles: HubTile[] = [
     {
       href: "/bank",
-      title: "كشف البنك",
+      title: "حركات كشف البنك",
       value: String(f?.tx ?? 0),
       detail:
         Number(f?.unclassified ?? 0) > 0
-          ? `${f?.unclassified} حركة لم تُصنَّف — صنّفها مرّة وتسري القاعدة بعدها`
+          ? `${countNoun(f?.unclassified, TRANSACTION)} لم تُصنَّف — صنّفها مرّة وتسري القاعدة بعدها`
           : `${f?.imports ?? 0} عملية استيراد · كلّها مصنَّفة`,
       tone: Number(f?.unclassified ?? 0) > 0 ? "warn" : "ok",
     },
@@ -84,20 +86,20 @@ export default async function MoneyPage() {
       amountMinor: Number(f?.at_risk ?? 0),
       detail:
         Number(f?.vat_unknown ?? 0) > 0
-          ? `و${f?.vat_unknown} فاتورة لم يُقرأ تفصيلها بعد`
+          ? `و${countNoun(f?.vat_unknown, INVOICE)} لم يُقرأ تفصيلها بعد`
           : "من فواتير لا تصلح للخصم",
       tone: Number(f?.at_risk ?? 0) > 0 ? "danger" : "ok",
     },
     {
       href: "/close",
       title: "إقفال الشهر",
-      value: "القائمة",
+      actionLabel: "افتح القائمة",
       detail: "قائمة تحقّق تُقرأ قبل أن يُقفل الشهر",
     },
     {
       href: "/money/statement",
       title: "التدفّق النقدي وقائمة الدخل",
-      value: "اعرضها",
+      actionLabel: "اعرضها",
       detail: "من كشف بنكك وفواتيرك — وما يحتاج مبيعات معروضٌ بسببه لا بصفر",
     },
   ];
@@ -140,7 +142,7 @@ export default async function MoneyPage() {
                   <span className="block truncate text-sm font-medium">
                     {CATEGORY_LABEL[c.category as TxCategory] ?? c.category}
                   </span>
-                  <span className="block text-[11px] text-muted">{c.n} حركة</span>
+                  <span className="block text-[11px] text-muted">{countNoun(c.n, TRANSACTION)}</span>
                 </span>
                 <span className="shrink-0 text-sm font-bold">
                   <Money minor={Number(c.s)} />

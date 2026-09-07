@@ -19,6 +19,7 @@ import { gatherHomeProvenance } from "@/lib/provenance-facts";
 import { Changes } from "@/components/changes";
 import { buildChanges } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
+import { INVOICE, countNoun } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ function Bar({ label, value, max, note }: { label: string; value: number; max: n
       <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-sunken">
         <div className="h-full rounded-full bg-ink transition-all" style={{ width: `${pct}%` }} />
       </div>
-      {note && <p className="mt-1 text-[10px] text-muted">{note}</p>}
+      {note && <p className="mt-1 text-[11px] text-muted">{note}</p>}
     </div>
   );
 }
@@ -134,7 +135,7 @@ export default async function HomePage() {
         />
 
         <Figure
-          label="الرصيد المستحق"
+          label="المستحقّ للمورّدين"
           provenance={prov.outstanding}
           href="/money"
           tone={prov.outstanding.valueMinor > 0 ? "warn" : "ok"}
@@ -185,7 +186,7 @@ export default async function HomePage() {
               <p className="text-xs text-muted">لا بيانات بعد.</p>
             ) : (
               monthly.map((m) => (
-                <Bar key={m.month} label={m.month} value={m.totalMinor} max={maxMonth} note={`${m.invoiceCount} فاتورة`} />
+                <Bar key={m.month} label={m.month} value={m.totalMinor} max={maxMonth} note={`${countNoun(m.invoiceCount, INVOICE)}`} />
               ))
             )}
             </div>

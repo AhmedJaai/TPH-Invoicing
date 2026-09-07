@@ -6,6 +6,8 @@ import { documents, invoices, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
+import { DOCUMENT, countNoun } from "@/lib/arabic";
+import { ScrollX } from "@/components/scroll-x";
 
 export const dynamic = "force-dynamic";
 
@@ -256,7 +258,7 @@ export default async function DocumentsPage({
       </div>
 
       <p className="mt-4 text-xs text-muted">
-        {Number(total)} مستنداً{hasFilter ? " ضمن الترشيح" : ""}
+        {countNoun(Number(total), DOCUMENT)}{hasFilter ? " ضمن الترشيح" : ""}
         {pages > 1 && ` · صفحة ${page} من ${pages}`}
       </p>
 
@@ -271,11 +273,11 @@ export default async function DocumentsPage({
           />
         </div>
       ) : (
-        <div className="mt-3 scroll-x rounded-2xl border border-line shadow-raised">
+        <ScrollX className="mt-3 rounded-2xl border border-line shadow-raised">
           <table className="w-full min-w-[46rem] text-sm">
             <thead className="sticky top-0 bg-sunken text-xs text-muted">
               <tr>
-                <th className="px-3 py-2 text-right font-medium">الملف</th>
+                <th className="px-3 py-2 text-right font-medium">المستند</th>
                 <th className="px-3 py-2 text-right font-medium">النوع</th>
                 <th className="px-3 py-2 text-right font-medium">المورّد</th>
                 <th className="px-3 py-2 text-right font-medium">الشهر</th>
@@ -289,17 +291,28 @@ export default async function DocumentsPage({
                 const st = STATUS_LABEL[r.status] ?? { text: r.status, cls: "bg-sunken text-ink-soft" };
                 return (
                   <tr key={r.id}>
-                    <td className="max-w-[22rem] px-3 py-2.5">
-                      <p className="truncate font-mono text-[11px]" dir="ltr" title={r.fileName}>
-                        {r.fileName}
+                    {/*
+                      كان العمود الأبرز اسمَ ملفّ الدرايف — ثمانيةً وأربعين
+                      حرفاً لاتينياً في جدولٍ عربيّ، وكلُّ ما فيه معروضٌ في
+                      أعمدةٍ إلى جانبه: المورّد والرقم والشهر والمبلغ. فهو
+                      تكرارٌ خالص يزاحم ما يُقرأ. والاسم يبقى في تلميح المرور
+                      وفي رابط «افتحه» — وكلاهما موجود.
+                    */}
+                    <td className="max-w-[22rem] px-3 py-2.5" title={r.fileName}>
+                      <p className="truncate text-sm font-medium">
+                        {r.supplierName ?? KIND_LABEL[r.kind] ?? "مستند"}
                       </p>
-                      {r.invoiceNumber && (
-                        <p className="text-[11px] text-muted" dir="ltr">
-                          {r.invoiceNumber}
-                          {r.taxStatus === "INVALID" && <span className="text-danger"> · لا خصم</span>}
-                          {r.taxStatus === "UNKNOWN" && <span className="text-warn"> · لم تُقرأ</span>}
-                        </p>
-                      )}
+                      <p className="text-[11px] text-muted">
+                        {r.invoiceNumber ? (
+                          <span className="nums" style={{ unicodeBidi: "isolate" }}>
+                            {r.invoiceNumber}
+                          </span>
+                        ) : (
+                          "بلا رقم"
+                        )}
+                        {r.taxStatus === "INVALID" && <span className="text-danger"> · لا يصلح لخصم الضريبة</span>}
+                        {r.taxStatus === "UNKNOWN" && <span className="text-warn"> · لم تُقرأ ضريبته</span>}
+                      </p>
                     </td>
                     <td className="px-3 py-2.5 text-xs text-ink-soft">
                       {KIND_LABEL[r.kind] ?? r.kind}
@@ -337,7 +350,7 @@ export default async function DocumentsPage({
               })}
             </tbody>
           </table>
-        </div>
+        </ScrollX>
       )}
 
       {pages > 1 && (

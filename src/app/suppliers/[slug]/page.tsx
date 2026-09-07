@@ -150,7 +150,7 @@ export default async function SupplierPage({
         <StatGrid>
           <Stat label="المفوتر" minor={billed} sub={`منذ ${countNoun(n("active_months"), MONTH)}`} />
           <Stat
-            label="الرصيد المستحقّ"
+            label="المستحقّ له"
             minor={balance}
             tone={balance > 0 ? "warn" : "ok"}
             sub={balance > 0 ? "عليك له" : "لا رصيد"}
@@ -242,7 +242,7 @@ export default async function SupplierPage({
               ? [{
                   key: "total",
                   header: "الإجمالي",
-                  align: "end" as const,
+                  numeric: true as const,
                   cell: (r: (typeof recent)[number]) => <Money minor={r.total} />,
                 }]
               : []),

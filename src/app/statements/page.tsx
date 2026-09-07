@@ -6,6 +6,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, PageShell } from "@/components/page-shell";
 import { StatementReconcile } from "@/components/statement-reconcile";
+import { NoAccess } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function StatementsPage() {
   if (!can(user.role, "amounts:view")) {
     return (
       <PageShell user={user} width="wide" title="كشوف المورّدين">
-        <Empty message="دورك لا يشمل الأرقام المالية، فهذه الصفحة محجوبة عنك." />
+        <NoAccess />
       </PageShell>
     );
   }

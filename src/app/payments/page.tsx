@@ -7,6 +7,9 @@ import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
 import { buildPaymentRun, buildSupplierMessage, type PayableInvoice } from "@/lib/payment-run";
 import { previousMonth } from "@/lib/filing";
+import { MarkSupplierPaid } from "@/components/payment-run-actions";
+import { countNoun, INVOICE, SUPPLIER } from "@/lib/arabic";
+import { NoAccess } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +23,7 @@ export default async function PaymentsPage({
   if (!can(user.role, "payment:approve")) {
     return (
       <PageShell user={user} width="wide" title="دفعة أوّل الشهر">
-        <Empty message="اعتماد الدفعات للمالك وحده." />
+        <NoAccess what="اعتماد الدفعات" />
       </PageShell>
     );
   }
@@ -84,14 +87,14 @@ export default async function PaymentsPage({
         <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">جاهز للتحويل</p>
           <p className="mt-1 text-xl font-bold text-ok"><Money minor={run.readyTotalMinor} /></p>
-          <p className="mt-1 text-[11px] text-muted">{run.ready.length} مورّد</p>
+          <p className="mt-1 text-xs text-muted">{countNoun(run.ready.length, SUPPLIER)}</p>
         </div>
         <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">محجوز</p>
           <p className={`mt-1 text-xl font-bold ${run.held.length ? "text-warn" : ""}`}>
             <Money minor={run.heldTotalMinor} />
           </p>
-          <p className="mt-1 text-[11px] text-muted">{run.held.length} فاتورة</p>
+          <p className="mt-1 text-xs text-muted">{countNoun(run.held.length, INVOICE)}</p>
         </div>
         <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">ضريبة معرّضة</p>
@@ -135,10 +138,17 @@ export default async function PaymentsPage({
                       <span className="font-mono text-ink-soft" dir="ltr">
                         {i.invoiceNumber} · {i.invoiceDate.toISOString().slice(0, 10)}
                       </span>
-                      <Money minor={i.totalMinor - i.allocatedMinor} />
+                      <span className="nums-col shrink-0">
+                        <Money minor={i.totalMinor - i.allocatedMinor} />
+                      </span>
                     </li>
                   ))}
                 </ul>
+                <MarkSupplierPaid
+                  supplierName={s.supplierName}
+                  invoiceIds={s.invoices.map((i) => i.invoiceId)}
+                  totalMinor={s.totalMinor}
+                />
               </article>
             ))}
           </div>
@@ -160,13 +170,31 @@ export default async function PaymentsPage({
                     <Money minor={list.reduce((s, h) => s + h.invoice.totalMinor - h.invoice.allocatedMinor, 0)} />
                   </span>
                 </div>
-                <ul className="mt-2 space-y-1">
-                  {list.map((h) => (
-                    <li key={h.invoice.invoiceId} className="text-xs text-ink-soft">
-                      <span className="font-mono" dir="ltr">{h.invoice.invoiceNumber}</span> — {h.message}
-                    </li>
-                  ))}
-                </ul>
+                {/*
+                  السبب يُقال مرّةً للمجموعة، لا في ذيل كل سطر.
+                  كانت الجملة نفسها تتكرّر ثلاث عشرة مرّة تحت مورّدٍ واحد —
+                  خمسمئة حرفٍ لا تضيف شيئاً بعد أوّل قراءة، وتُخفي أرقام
+                  الفواتير وهي المطلوبة لطلب البديل.
+                */}
+                {(() => {
+                  const reasons = [...new Set(list.map((h) => h.message))];
+                  return (
+                    <>
+                      <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                        {list.map((h) => (
+                          <li key={h.invoice.invoiceId} className="font-mono text-xs text-ink-soft" dir="ltr">
+                            {h.invoice.invoiceNumber}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-xs leading-relaxed text-ink-soft">
+                        {reasons.length === 1
+                          ? reasons[0]
+                          : reasons.map((r) => `• ${r}`).join(" ")}
+                      </p>
+                    </>
+                  );
+                })()}
                 <a
                   href={`https://wa.me/?text=${encodeURIComponent(buildSupplierMessage(name, list))}`}
                   target="_blank"

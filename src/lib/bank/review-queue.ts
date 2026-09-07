@@ -9,7 +9,7 @@
  * والأهمّ أنّ الشاشات كانت تخلط ثلاثة أعمالٍ مختلفة في قائمةٍ واحدة،
  * وهي تحتاج ثلاثة أنواعٍ من الانتباه:
  *
- *   • **يُقَرّ** — النظام واثق، ويطلب ختماً. عملُ ثوانٍ، ويُقبَل جمعاً.
+ *   • **يُؤكَّد** — النظام واثق، ويطلب تأكيداً. عملُ ثوانٍ، ويُقبَل جمعاً.
  *   • **يُراجَع** — النظام متردّد بين مرشّحين. عملُ دقيقة، ويحتاج عيناً.
  *   • **يُحسَم** — النظام لا يعرف من هذه الجهة أصلاً. عملُ تعريف، وثمرتُه
  *     تتعدّى هذه الحركة إلى كل ما يشبهها بعدها.
@@ -25,14 +25,14 @@
 export type ReviewBucket = "CONFIRM" | "REVIEW" | "RESOLVE";
 
 export const BUCKET_LABEL: Record<ReviewBucket, string> = {
-  CONFIRM: "يُقَرّ",
+  CONFIRM: "يُؤكَّد",
   REVIEW: "يُراجَع",
   RESOLVE: "يُحسَم",
 };
 
 export const BUCKET_HINT: Record<ReviewBucket, string> = {
-  CONFIRM: "النظام واثق ويطلب ختمك — تُقَرّ جمعاً",
-  REVIEW: "النظام متردّد بين مرشّحين — تحتاج عينك",
+  CONFIRM: "النظام واثق ويطلب تأكيدك — تُؤكَّد جمعاً",
+  REVIEW: "النظام متردّد — أكّدها أو أعلِن أنّها ليست سداداً",
   RESOLVE: "جهةٌ لا يعرفها النظام — تعريفُها يسري على أمثالها",
 };
 
@@ -90,7 +90,7 @@ export function groupForReview(items: readonly ReviewItem[]): Bucketed[] {
 /**
  * جملةٌ واحدة تصف ما بقي.
  *
- * تُقرأ في ثانية: «يُقَرّ ٣٠١ · يُراجَع ١٧ · يُحسَم ٩». وهذا ما كان
+ * تُقرأ في ثانية: «يُؤكَّد ٣٠١ · يُراجَع ١٧ · يُحسَم ٩». وهذا ما كان
  * غائباً — عددٌ واحد يقول «١٢٧ تحتاج مراجعة» يُرهب ولا يُرشد.
  */
 export function describeQueue(groups: readonly Bucketed[]): string {
@@ -101,7 +101,7 @@ export function describeQueue(groups: readonly Bucketed[]): string {
   return parts.length === 0 ? "لا شيء ينتظرك" : parts.join(" · ");
 }
 
-/** ما يصلح للإقرار الجماعيّ — وهو مجموعة «يُقَرّ» وحدها. */
+/** ما يصلح للتأكيد الجماعيّ — وهو مجموعة «يُؤكَّد» وحدها. */
 export function bulkConfirmable(items: readonly ReviewItem[]): string[] {
   return items
     .filter((i) => bucketOf(i) === "CONFIRM" && i.disposition === "SUGGEST")

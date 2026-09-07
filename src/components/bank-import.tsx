@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { ConfirmAction } from "@/components/ui-client";
+import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 
 interface Coverage {
   from: string | null;
@@ -215,7 +216,7 @@ function Steps({ current }: { current: number }) {
             }`}
           />
           <span
-            className={`truncate text-[10px] ${
+            className={`truncate text-[11px] ${
               i === current ? "font-bold text-ink" : "text-muted"
             }`}
           >
@@ -257,7 +258,7 @@ export function BankImport({
       const json = await res.json();
       if (!res.ok) { setError(json.error ?? "فشل الاستيراد"); return; }
       if (apply) {
-        setDone(`طوبقت ${json.summary.matchedInvoices} فاتورة من ${json.created} تحويلاً`);
+        setDone(`طوبقت ${countNoun(json.summary.matchedInvoices, INVOICE)} من ${json.created} تحويلاً`);
         setData(null);
         setLearned(0);
         router.refresh();
@@ -354,7 +355,7 @@ export function BankImport({
                     </li>
                   ))}
                 </ul>
-                <p className="mt-1.5 text-[10px] leading-relaxed text-ink-soft">
+                <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">
                   حركات هذه الأيام غائبة عن النظام، ولن تظهر ناقصةً في أي تقرير — لأنّ
                   الغائب لا يُرى. ارفع كشفها لتكتمل.
                 </p>
@@ -396,7 +397,7 @@ export function BankImport({
                 <p className="text-xs font-bold text-warn">
                   التوزيع تقريبيّ — لا مثبت
                 </p>
-                <p className="mt-1.5 text-[10px] leading-relaxed text-ink-soft">
+                <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">
                   الاحتمالات في هذا الكشف أكثر من أن تُستقصى كلّها، فتوقّف البحث عند
                   أفضل ما بلغه. والتوزيع المعروض صحيحٌ ومتّسق، لكن قد يوجد توزيعٌ أنسب
                   لم يُبلَغ — ولذلك لم تُطابَق حركةٌ تلقائياً هنا: صارت كلّها اقتراحاً
@@ -422,7 +423,7 @@ export function BankImport({
                 <p className="font-display text-2xl font-bold leading-none">
                   {data.sync.added === 0
                     ? "لا جديد في هذا الكشف"
-                    : `${data.sync.added} حركة جديدة`}
+                    : `${countNoun(data.sync.added, TRANSACTION)} جديدة`}
                 </p>
                 <p className="nums mt-1.5 text-xs text-muted">
                   {data.sync.inFile} في الملفّ · {data.sync.alreadyKnown} مسجّلة عندك
@@ -434,7 +435,7 @@ export function BankImport({
                     <p className="text-[11px] font-bold text-warn">تحتاج قرارك — لن تُضاف ولن تُحذف</p>
                     <ul className="mt-1 space-y-1">
                       {(data.sync.ambiguousRows ?? []).map((a, i) => (
-                        <li key={i} className="text-[10px] leading-relaxed text-muted">
+                        <li key={i} className="text-[11px] leading-relaxed text-muted">
                           <span className="nums">{a.date}</span> ·{" "}
                           <span className="nums font-bold">{(a.amountMinor / 100).toFixed(2)}</span> ·{" "}
                           {a.description} — {a.reason}
@@ -449,7 +450,7 @@ export function BankImport({
             <p className="mt-3 font-display text-2xl font-bold leading-none">
               {data.summary.unknown === 0
                 ? "لا شيء يحتاجك"
-                : `${data.summary.unknown} حركة تحتاجك`}
+                : `${countNoun(data.summary.unknown, TRANSACTION)} تحتاجك`}
             </p>
             <p className="mt-1.5 text-xs text-muted">
               من <span className="nums">{data.sync?.added ?? data.summary.totalRows}</span> حركة جديدة —
@@ -493,7 +494,7 @@ export function BankImport({
                     <li key={i} className="flex items-center justify-between gap-3 py-1.5 text-xs">
                       <span className="min-w-0 truncate">
                         <span className="nums text-muted" dir="ltr">{p.date}</span>{" "}
-                        {p.supplierName} — {p.invoiceNumbers.length} فاتورة
+                        {p.supplierName} — {countNoun(p.invoiceNumbers.length, INVOICE)}
                       </span>
                       <span className="nums shrink-0 font-medium" dir="ltr">
                         {formatRiyalsDisplay(p.amountMinor)}
@@ -507,7 +508,7 @@ export function BankImport({
             {data.unknown.length > 0 && (
               <>
                 <p className="mt-5 text-xs font-bold text-warn">
-                  {data.unknown.length} حركة لم يُعرف مستفيدها
+                  {countNoun(data.unknown.length, TRANSACTION)} لم يُعرف مستفيدها
                 </p>
                 <p className="text-[11px] leading-relaxed text-muted">
                   ليست كلّها مورّدين: فيها رواتب وإيجار وزكاة وكهرباء وتحويلاتك الشخصية.
@@ -595,7 +596,7 @@ export function BankImport({
             label="أعلن سدادها يدوياً"
             variant="secondary"
             disabled={marking || openInvoiceCount === 0}
-            title={`ستُعتبر ${openInvoiceCount} فاتورة مسدَّدة بإقرارك`}
+            title={`ستُعتبر ${countNoun(openInvoiceCount, INVOICE)} مسدَّدة بإقرارك`}
             consequence="هذا لا يُثبت سداداً بنكياً. لن تظهر هذه الفواتير في المستحقّات بعدها، وسيحمل سجل التدقيق اسمك مصدراً وحيداً للسداد."
             acknowledgement="أفهم أنّ هذا إقرارٌ منّي لا مطابقةٌ بنكية."
             confirmLabel="أعلن سدادها"

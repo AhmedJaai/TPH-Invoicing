@@ -153,7 +153,7 @@ export function DriveRename() {
                       <span className="block truncate text-[11px] font-bold" dir="ltr">
                         {p.proposed}
                       </span>
-                      <span className="block text-[10px] text-muted">{p.reason}</span>
+                      <span className="block text-[11px] text-muted">{p.reason}</span>
                     </span>
                   </label>
                 </li>
@@ -168,7 +168,7 @@ export function DriveRename() {
               </summary>
               <ul className="mt-1.5 space-y-1">
                 {data.cannot.map((c, i) => (
-                  <li key={i} className="text-[10px] leading-relaxed text-muted">
+                  <li key={i} className="text-[11px] leading-relaxed text-muted">
                     <span dir="ltr">{c.current}</span> — {c.reason}
                   </li>
                 ))}

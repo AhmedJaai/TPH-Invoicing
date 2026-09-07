@@ -10,6 +10,7 @@ import { guard, respondTo } from "@/services/guard";
 import { linkToProduct, unlink } from "@/services/product.service";
 import type { ProductCategory } from "@/lib/products";
 import { recordAudit } from "@/lib/audit";
+import { PRODUCT, countNoun } from "@/lib/arabic";
 
 export const runtime = "nodejs";
 
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as Body;
   } catch {
-    return NextResponse.json({ error: "طلب غير صالح" }, { status: 400 });
+    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
   }
 
   const ids = body.supplierProductIds ?? [];
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
       entityId: ids[0],
       after: { عدد: ids.length },
     });
-    return NextResponse.json({ ok: true, message: `فُكّ ربط ${ids.length} صنف` });
+    return NextResponse.json({ ok: true, message: `فُكّ ربط ${countNoun(ids.length, PRODUCT)}` });
   }
 
   try {
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       ...result,
-      message: `رُبط ${result.linked} صنفاً بـ«${result.productName}»${
+      message: `رُبط ${countNoun(result.linked, PRODUCT)} بـ«${result.productName}»${
         result.createdProduct ? " (أُنشئ الآن)" : ""
       }`,
     });

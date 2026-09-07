@@ -6,6 +6,9 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
 import { findSameNameCandidates, summarizeItems, type LineRow } from "@/lib/analytics";
+import { NoAccess } from "@/components/ui";
+import { PRODUCT, countNoun } from "@/lib/arabic";
+import { ScrollX } from "@/components/scroll-x";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +23,7 @@ export default async function AnalysisPage() {
   if (!can(user.role, "amounts:view")) {
     return (
       <PageShell user={user} width="wide" title="ذكاء الشراء">
-        <Empty message="دورك لا يشمل الأرقام المالية، فهذه الصفحة محجوبة عنك." />
+        <NoAccess />
       </PageShell>
     );
   }
@@ -114,7 +117,7 @@ export default async function AnalysisPage() {
             كيلو بنّ بـ١٥٥ ريالاً، و«عنب» عند لافا زجاجة كمبوتشا بـ١٣٫٥٠. فانظر الوصفين
             بنفسك — فإن كانا صنفاً واحداً فالفارق فرصة، وإلّا فلا معنى للمقارنة.
           </p>
-          <div className="scroll-x rounded-2xl border border-line shadow-raised">
+          <ScrollX className="rounded-2xl border border-line shadow-raised">
             <table className="w-full min-w-[40rem] text-sm">
               <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
@@ -145,7 +148,7 @@ export default async function AnalysisPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         </section>
       )}
 
@@ -190,7 +193,7 @@ export default async function AnalysisPage() {
         <p className="mb-3 max-w-2xl text-xs leading-relaxed text-muted">
           مرتّبة بالأكثر كلفة — أعلى الصفحة هو ما يستحقّ التفاوض عليه.
         </p>
-        <div className="scroll-x rounded-2xl border border-line shadow-raised">
+        <ScrollX className="rounded-2xl border border-line shadow-raised">
           <table className="w-full min-w-[46rem] text-sm">
             <thead className="sticky top-0 bg-sunken text-xs text-muted">
               <tr>
@@ -224,10 +227,10 @@ export default async function AnalysisPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollX>
         {items.length > top.length && (
           <p className="mt-2 text-xs text-muted">
-            تُعرض أعلى {top.length} صنفاً إنفاقاً من {items.length}.
+            تُعرض أعلى {countNoun(top.length, PRODUCT)} إنفاقاً من {items.length}.
           </p>
         )}
       </section>

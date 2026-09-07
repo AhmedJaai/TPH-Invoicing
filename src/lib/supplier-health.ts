@@ -1,4 +1,4 @@
-import { MONTH, STATEMENT, countNoun } from "./arabic";
+import { INVOICE, MONTH, STATEMENT, countNoun } from "./arabic";
 
 /**
  * صحّة العلاقة مع المورّد.
@@ -67,7 +67,7 @@ export function scoreDocuments(f: SupplierFacts): DimensionScore {
     return { dimension: "DOCUMENTS", grade: "UNRATED", reason: "لا فواتير منه بعد." };
   }
   return { dimension: "DOCUMENTS", grade: "GOOD",
-    reason: `${f.invoiceCount} فاتورة محفوظة منه.` };
+    reason: `${countNoun(f.invoiceCount, INVOICE)} محفوظة منه.` };
 }
 
 export function scoreVat(f: SupplierFacts): DimensionScore {
@@ -78,7 +78,7 @@ export function scoreVat(f: SupplierFacts): DimensionScore {
   if (judged === 0) {
     return { dimension: "VAT", grade: "UNRATED",
       reason: f.taxUnknownCount > 0
-        ? `${f.taxUnknownCount} فاتورة لم يُقرأ تفصيلها الضريبي بعد.`
+        ? `${countNoun(f.taxUnknownCount, INVOICE)} لم يُقرأ تفصيلها الضريبي بعد.`
         : "لا فواتير مقروءة بعد." };
   }
   const ratio = f.taxValidCount / judged;
@@ -88,10 +88,10 @@ export function scoreVat(f: SupplierFacts): DimensionScore {
   }
   if (ratio >= FAIR_VAT_RATIO) {
     return { dimension: "VAT", grade: "FAIR",
-      reason: `${pct}٪ فقط مستوفية — ${f.taxInvalidCount} فاتورة ينقصها ركن.` };
+      reason: `${pct}٪ فقط مستوفية — ${countNoun(f.taxInvalidCount, INVOICE)} ينقصها ركن.` };
   }
   return { dimension: "VAT", grade: "POOR",
-    reason: `${pct}٪ مستوفية — ${f.taxInvalidCount} فاتورة ضريبتها معرَّضة للرفض.` };
+    reason: `${pct}٪ مستوفية — ${countNoun(f.taxInvalidCount, INVOICE)} ضريبتها معرَّضة للرفض.` };
 }
 
 export function scoreStatements(f: SupplierFacts): DimensionScore {

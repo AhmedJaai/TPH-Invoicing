@@ -32,6 +32,7 @@ import { parseRiyals } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
 import { recordAudit } from "@/lib/audit";
 import { canonicalName } from "@/lib/canonical-name";
+import { MONTH, countNoun } from "@/lib/arabic";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -209,7 +210,7 @@ export async function POST(request: Request) {  let user;
   const scanned = {
     scope: direct.length > 0
       ? `${direct.length} ملفّاً بعينه`
-      : months ? `${months.length} شهراً` : "الأرشيف كله",
+      : months ? `${countNoun(months.length, MONTH)}` : "الأرشيف كله",
     /** أشهرٌ لم يُمشَ عليها — يكملها الطلب التالي بلا أن يُعيد ما مضى. */
     pendingMonths,
     truncated,

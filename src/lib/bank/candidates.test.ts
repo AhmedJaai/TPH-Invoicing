@@ -215,7 +215,8 @@ describe("generateCandidates", () => {
     const c = generateCandidates(tx({ amountMinor: 2_000_00 }), rows)
       .find((x) => x.outcome === "MULTI_INVOICE")!;
     expect(c.invoiceIds).toHaveLength(2);
-    expect(c.evidence.join(" ")).toContain("2 فواتير");
+    /* المثنّى يحمل عدده، فلا يُكتب معه رقم: «فاتورتان» لا «٢ فواتير» */
+    expect(c.evidence.join(" ")).toContain("فاتورتان مجموعها");
   });
 
   it("الفاتورة الواحدة تسبق المجموعة عند تساوي المبلغ", () => {

@@ -15,6 +15,7 @@
 import type { Outcome } from "./taxonomy";
 import { splitBankFee } from "./fees";
 import { fitToProfile, type SupplierProfile } from "./supplier-profile";
+import { INVOICE, countNoun } from "@/lib/arabic";
 
 export interface OpenInvoice {
   id: string;
@@ -389,7 +390,7 @@ export function generateCandidates(
 
     const parts = { supplier: tx.supplierScore, amount, date, reference };
     const evidence = [
-      `${subset.length} فواتير مجموعها ${sum / 100} ريالاً`,
+      `${countNoun(subset.length, INVOICE)} مجموعها ${sum / 100} ريالاً`,
       ...(amount === 1
         ? ["المجموع يطابق الدفعة تماماً"]
         : [`فرق المجموع ${Math.abs(tx.amountMinor - sum) / 100} ريالاً`]),

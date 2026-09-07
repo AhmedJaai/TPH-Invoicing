@@ -1,3 +1,4 @@
+import { ITEM, countNoun } from "@/lib/arabic";
 /**
  * بوّابة الإنتاج.
  *
@@ -109,8 +110,8 @@ export function buildGate(checks: readonly GateCheck[]): GateReport {
     verdict: ready
       ? "جاهز للإنتاج — كلّ بندٍ فُحص ونجح."
       : failed > 0
-        ? `غير جاهز: ${failed} بنداً فشل${unknown > 0 ? ` و${unknown} لم يُفحَص` : ""}.`
-        : `غير جاهز: ${unknown} بنداً لم يُفحَص. و«لم نتحقّق» ليست «لا بأس».`,
+        ? `غير جاهز: ${countNoun(failed, ITEM)} فشل${unknown > 0 ? ` و${unknown} لم يُفحَص` : ""}.`
+        : `غير جاهز: ${countNoun(unknown, ITEM)} لم يُفحَص. و«لم نتحقّق» ليست «لا بأس».`,
   };
 }
 

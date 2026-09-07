@@ -273,8 +273,8 @@ export function ReconcileQueue({
         <ul className="mt-2 space-y-1 border-r-2 border-line pr-2.5">
           {shown.map((i) => (
             <li key={i.id} className="flex items-baseline justify-between gap-3">
-              <span className="nums shrink-0 text-[10px] text-muted">{i.date}</span>
-              <span className="clamp-1 min-w-0 flex-1 text-[10px] text-muted" dir="auto">
+              <span className="nums shrink-0 text-[11px] text-muted">{i.date}</span>
+              <span className="clamp-1 min-w-0 flex-1 text-[11px] text-muted" dir="auto">
                 {i.description || "بلا وصف"}
               </span>
               <span className="nums shrink-0 text-[11px] font-bold">
@@ -288,7 +288,7 @@ export function ReconcileQueue({
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="mt-1.5 text-[10px] text-muted underline underline-offset-4"
+            className="mt-1.5 text-[11px] text-muted underline underline-offset-4"
           >
             {expanded ? "اطوِ" : `أظهر الـ${group.items.length} كلّها`}
           </button>
@@ -301,7 +301,7 @@ export function ReconcileQueue({
             {group.why.length > 0 && (
               <ul className="mt-1.5 space-y-0.5">
                 {group.why.slice(0, 3).map((w, i) => (
-                  <li key={i} className="text-[10px] leading-relaxed text-muted">— {w}</li>
+                  <li key={i} className="text-[11px] leading-relaxed text-muted">— {w}</li>
                 ))}
               </ul>
             )}
@@ -317,7 +317,7 @@ export function ReconcileQueue({
                   <div className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
                       <span className="block truncate text-xs font-bold">{c.label}</span>
-                      <span className="block text-[10px] text-muted">
+                      <span className="block text-[11px] text-muted">
                         {c.why.slice(0, 2).join(" · ")}
                       </span>
                     </span>
@@ -392,7 +392,7 @@ export function ReconcileQueue({
                 )}
               </p>
             )}
-            <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
               لا رقمَ فاتورةٍ في الحوالة — فتُوزَّع على المفتوح بالأقدم أوّلاً،
               وما بقي يبقى غير مخصَّص. ولا تُخترَع فاتورة.
             </p>
@@ -466,7 +466,7 @@ export function ReconcileQueue({
           )}
         </div>
 
-        <p className="mt-3 border-t border-line pt-2.5 text-[10px] leading-relaxed text-muted">
+        <p className="mt-3 border-t border-line pt-2.5 text-[11px] leading-relaxed text-muted">
           ما تؤكّده هنا يصير ذاكرةً: تُحفَظ أدلّة هذه الجهة — اسمها وحسابها ورقم
           هويّتها ونمط وصفها — فتُعرَف حركاتها في الكشوف السابقة الآن، وفي القادمة
           بلا سؤال.

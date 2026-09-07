@@ -1,3 +1,4 @@
+import { DOCUMENT, PRODUCT, TRANSACTION, countNoun } from "./arabic";
 /**
  * ما الذي تغيّر.
  *
@@ -23,6 +24,12 @@ export interface Change {
   pct: number | null;
   currentMinor?: number;
   previousMinor?: number;
+  /**
+   * الرقم حين لا يكون مالاً — عددُ مستنداتٍ أو حركات.
+   * وبدونه كانت بطاقتان من الأربع تخلوان من الخانة الكبيرة، فيختلف
+   * تشريحُ البطاقة داخل الشبكة الواحدة.
+   */
+  currentCount?: number;
   /** هل هذا التغيّر في صالحه؟ ارتفاع المشتريات ليس كارتفاع المبيعات. */
   favourable: boolean | null;
   detail: string;
@@ -118,8 +125,9 @@ export function buildChanges(f: ChangeFacts): Change[] {
       baseline: "عن الأسبوع السابق",
       direction: dir,
       pct: pctChange(f.documentsLast7, f.documentsPrev7),
+      currentCount: f.documentsLast7,
       favourable: null,
-      detail: `${f.documentsLast7} هذا الأسبوع · ${f.documentsPrev7} الذي قبله`,
+      detail: `${countNoun(f.documentsLast7, DOCUMENT)} هذا الأسبوع · ${f.documentsPrev7} الذي قبله`,
       href: "/documents",
     });
   }
@@ -157,8 +165,8 @@ export function buildChanges(f: ChangeFacts): Change[] {
       favourable: false,
       detail:
         f.risingAnnualMinor > 0
-          ? `${f.risingItems} صنفاً · أثرها السنويّ المقدَّر`
-          : `${f.risingItems} صنفاً`,
+          ? `${countNoun(f.risingItems, PRODUCT)} · أثرها السنويّ المقدَّر`
+          : `${countNoun(f.risingItems, PRODUCT)}`,
       href: "/analysis",
     });
   }
@@ -171,8 +179,9 @@ export function buildChanges(f: ChangeFacts): Change[] {
       baseline: "في آخر استيراد",
       direction: "UP",
       pct: null,
+      currentCount: f.newUnclassified,
       favourable: false,
-      detail: `${f.newUnclassified} حركة تُنسَب إلى المورّدين ظلماً حتى تُصنَّف`,
+      detail: "تُنسَب إلى المورّدين ظلماً حتى تُصنَّف",
       href: "/bank",
     });
   }

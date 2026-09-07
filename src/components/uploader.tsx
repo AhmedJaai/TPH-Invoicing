@@ -568,7 +568,7 @@ export function Uploader({
                   <span className="block truncate font-mono text-[11px]" dir="ltr">{a.fileName}</span>
                   <span className="block truncate text-[11px] text-muted" dir="ltr">{a.folder}</span>
                   {a.renamed && (
-                    <span className="text-[10px] text-warn">أُضيف رقم نسخة — لم يُستبدل ملف قائم</span>
+                    <span className="text-[11px] text-warn">أُضيف رقم نسخة — لم يُستبدل ملف قائم</span>
                   )}
                 </span>
                 {a.link && (
@@ -748,14 +748,14 @@ export function Uploader({
 
                     <div className="mt-4 flex items-center justify-between gap-3">
                       <p className="text-xs text-muted">
-                        {r.canArchive ? "جاهز للأرشفة بعد اعتمادك" : "لا يمكن أرشفته قبل معالجة ما سبق"}
+                        {r.canArchive ? "جاهز للرفع بعد تأكيدك" : "لا يُرفَع قبل معالجة ما فوقه"}
                       </p>
                       <button
                         onClick={() => archive(item.id)}
                         disabled={!r.canArchive || item.archiving}
                         className="shrink-0 rounded-lg bg-inverse-surface px-4 py-2 text-sm font-bold text-inverse-ink transition-opacity hover:opacity-90 disabled:opacity-40"
                       >
-                        {item.archiving ? "يرفع…" : item.archiveError ? "أعد المحاولة" : "اعتمد وارفع"}
+                        {item.archiving ? "يرفع…" : item.archiveError ? "أعد المحاولة" : "أكّد وارفع"}
                       </button>
                     </div>
                   </>

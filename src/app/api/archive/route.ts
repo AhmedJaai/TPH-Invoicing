@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     try {
       body = (await request.json()) as ArchiveBody;
     } catch {
-      throw new InvalidInputError("طلب غير صالح");
+      throw new InvalidInputError("تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب.");
     }
 
     if (!body.fileName || !body.folderName || !MONTH_RE.test(body.periodMonth ?? "")) {

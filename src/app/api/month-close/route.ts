@@ -15,6 +15,7 @@ import { guard, respondTo } from "@/services/guard";
 import { buildMonthClose } from "@/lib/month-close";
 import { gatherMonthFacts } from "@/lib/month-close-facts";
 import { recordAudit } from "@/lib/audit";
+import { WARNING, countNoun } from "@/lib/arabic";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -41,7 +42,7 @@ export async function POST(request: Request) {  let user;
   try {
     body = (await request.json()) as Body;
   } catch {
-    return NextResponse.json({ error: "طلب غير صالح" }, { status: 400 });
+    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
   }
 
   if (!MONTH_RE.test(body.month ?? "")) {
@@ -130,6 +131,6 @@ export async function POST(request: Request) {  let user;
     ok: true,
     report,
     status: "CLOSED",
-    message: `أُقفل ${body.month}${report.warnings.length ? ` مع إقرار ${report.warnings.length} تنبيهاً` : ""}`,
+    message: `أُقفل ${body.month}${report.warnings.length ? ` مع إقرار ${countNoun(report.warnings.length, WARNING)}` : ""}`,
   });
 }
