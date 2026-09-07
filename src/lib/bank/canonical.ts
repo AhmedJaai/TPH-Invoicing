@@ -194,6 +194,47 @@ export function beneficiaryFrom(description: string | null | undefined): string 
 
 /* ─────────────────── التحويل ─────────────────── */
 
+/**
+ * تاريخُ القيمة كما نطق به البنك في الوصف.
+ *
+ * الأهليّ يُصدر الكشف بعمود تاريخٍ **مبدئيّ**، ويكتب في نصّ الحركة
+ * `Value Date:05/07/2026` — وهو التاريخ الحاكم. ثمّ يُصحَّح العمود في
+ * تصديرٍ لاحق فيوافق النصّ.
+ *
+ * وأثرُ ذلك في قاعدة أحمد قِيس على ملفّاته: ثلاث حركات تحمل هذا النصّ،
+ * وتخالف أعمدتُها نصَّها بيومٍ أو يومين — ٣٬٤٠٠ و٧٬٥٠٠ و٨٩١٫٢٥،
+ * مجموعها **١١٬٧٩١٫٢٥ ريالاً**. ولمّا كان التاريخ جزءاً من الهويّة،
+ * فإعادةُ استيراد الكشفين تُدخل الحركة الواحدة مرّتين: مالٌ يتضاعف
+ * بلا أن يظهر خللٌ في أيّ شاشة.
+ *
+ * وهذه هي القاعدة نفسها المطبَّقة على المستفيد: **نصّ البنك يسبق
+ * العمود**. ويُقرأ التاريخ للهويّة والمقارنة؛ وما يُخزَّن يبقى ما قرأه
+ * القارئ من الملفّ، فلا تُعاد كتابة تاريخٍ في القاعدة بأثرٍ رجعيّ.
+ *
+ * والتنسيق `DD/MM/YYYY` — وهو ما يُصدره الأهليّ. ولا يُقبل ما خرج عن
+ * حدود التقويم، ولا ما بعُد عن العمود أكثر من أسبوع: ذلك يدلّ على أنّنا
+ * قرأنا رقماً آخر لا تاريخ قيمة.
+ */
+const STATED_VALUE_DATE = /value\s*date\s*:?\s*(\d{2})\/(\d{2})\/(\d{4})/i;
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function statedValueDate(description: string | null | undefined, column: Date): Date {
+  const m = STATED_VALUE_DATE.exec(description ?? "");
+  if (!m) return column;
+
+  const [, dd, mm, yyyy] = m;
+  const day = Number(dd), month = Number(mm), year = Number(yyyy);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return column;
+
+  const stated = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(stated.getTime())) return column;
+  /* تاريخُ الشهر الزائد ينقلب — فيُرفَض لأنّه لم يكن تاريخاً */
+  if (stated.getUTCDate() !== day || stated.getUTCMonth() !== month - 1) return column;
+  if (Math.abs(stated.getTime() - column.getTime()) > WEEK_MS) return column;
+
+  return stated;
+}
+
 export function toCanonical(row: RawBankRow): CanonicalTransaction {
   /*
     النصّ يُبنى من الحقول كلّها لأنّ البنك يوزّع المعلومة عليها — لكنّ
@@ -205,6 +246,8 @@ export function toCanonical(row: RawBankRow): CanonicalTransaction {
 
   return {
     ...row,
+    /* نصّ البنك يسبق العمود — في التاريخ كما في المستفيد */
+    valueDate: statedValueDate(row.description, row.valueDate),
     searchText,
     references: extractReferences(searchText),
     /*

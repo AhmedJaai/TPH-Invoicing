@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  detectChannel, extractReferences, matchableReferences,
-  normalizeText, toCanonical, toLatinDigits,
-} from "./canonical";
+import { detectChannel, extractReferences, matchableReferences, normalizeText, statedValueDate, toCanonical, toLatinDigits } from "./canonical";
 
 /** النصوص منقولة حرفياً من كشف الأهلي في قاعدة أحمد. */
 const SALARY =
@@ -133,5 +130,50 @@ describe("toCanonical", () => {
     expect(c.searchText).toBe("");
     expect(c.references).toEqual([]);
     expect(c.channel).toBeNull();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   تاريخُ القيمة الذي نطق به البنك
+
+   وُجد على ملفّات أحمد الحقيقية: الأهليّ يُصدر الكشف بعمود تاريخٍ
+   مبدئيّ ويكتب في النصّ `Value Date:DD/MM/YYYY`، ثمّ يُصحَّح العمود
+   في تصديرٍ لاحق. والتاريخ جزءٌ من الهويّة — فإعادةُ استيراد الكشفين
+   كانت تُدخل الحركة مرّتين. ثلاثُ حركات في كشوفه: ٣٬٤٠٠ و٧٬٥٠٠
+   و٨٩١٫٢٥ — مجموعها ١١٬٧٩١٫٢٥ ريالاً.
+   ═══════════════════════════════════════════════════════════════ */
+describe("تاريخُ القيمة: نصّ البنك يسبق العمود", () => {
+  const REAL = "حوالات تحت الطلب NCBK8242 6186AJSX محمصة الغربية بنك الراجحي Buying Goods شراء بضاعة Value Date:05/07/2026";
+  const col = (d: string) => new Date(`${d}T00:00:00Z`);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+  it("يُؤخَذ من النصّ حين خالف العمود", () => {
+    expect(iso(statedValueDate(REAL, col("2026-07-04")))).toBe("2026-07-05");
+  });
+
+  it("والتصديران يتّفقان بعده — فلا تُقيَّد الحركة مرّتين", () => {
+    const one = toCanonical({
+      valueDate: col("2026-07-04"), description: REAL, beneficiaryRaw: null,
+      transactionType: "حوالة محلية صادرة", amountMinor: 89125, direction: "DEBIT",
+    });
+    const two = toCanonical({
+      valueDate: col("2026-07-05"), description: REAL, beneficiaryRaw: null,
+      transactionType: "حوالة محلية صادرة", amountMinor: 89125, direction: "DEBIT",
+    });
+    expect(iso(one.valueDate)).toBe(iso(two.valueDate));
+  });
+
+  it("وبلا نصٍّ يبقى العمود على حاله", () => {
+    expect(iso(statedValueDate("CITY:Digital Channel", col("2026-07-04")))).toBe("2026-07-04");
+    expect(iso(statedValueDate(null, col("2026-07-04")))).toBe("2026-07-04");
+  });
+
+  it("ولا يُقبَل ما ليس تاريخاً ولا ما بعُد عن العمود", () => {
+    /* يومٌ لا وجود له في شهره */
+    expect(iso(statedValueDate("Value Date:31/02/2026", col("2026-02-28")))).toBe("2026-02-28");
+    /* شهرٌ خارج الحدّ */
+    expect(iso(statedValueDate("Value Date:05/13/2026", col("2026-07-04")))).toBe("2026-07-04");
+    /* بعيدٌ عن العمود — رقمٌ آخر لا تاريخ قيمة */
+    expect(iso(statedValueDate("Value Date:05/01/2026", col("2026-07-04")))).toBe("2026-07-04");
   });
 });
