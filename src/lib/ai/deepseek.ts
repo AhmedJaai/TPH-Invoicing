@@ -85,6 +85,36 @@ export interface DeepseekCall {
   /** سقفُ انتظارٍ لكلّ محاولة. المزوّد قد يصمت، والصمت أسوأ من الخطأ. */
   timeoutMs?: number;
   signal?: AbortSignal;
+  /**
+   * أيفكّر النموذج قبل أن يجيب؟
+   *
+   * وبلا تصريحٍ يُقرَّر بالمهمّة، وهو الصواب في أكثر المواضع — انظر
+   * `thinkingFor`.
+   */
+  thinking?: boolean;
+}
+
+/**
+ * التفكير يتبع المهمّة.
+ *
+ * ── ولماذا يُطفَأ في القراءة ──
+ *
+ * قراءةُ الفاتورة **نقلٌ لا استدلال**: يُنسَخ ما هو مطبوع. والتعليمات
+ * تقول ذلك صراحةً — «انسخ الأرقام كما هي حرفياً، لا تحسب ولا تصحّح ولا
+ * تستنتج مبلغاً غائباً». فالتفكير فيها لا يضيف صواباً، وقد يُنقصه:
+ * نموذجٌ يُطيل النظر في رقمٍ مطبوع قد يُقنع نفسه بغيره.
+ *
+ * وكلفتُه قيست: فاتورةٌ من ٢٨٢ كلمة استغرقت ١١١ ثانية ثمّ **انقطع
+ * مخرَجُها عند ١٦٠٠٠ رمز** — لأنّ رموز التفكير تُحسَب من السقف نفسه.
+ * أي أنّ التفكير لم يُبطئ القراءة فحسب، بل منعها.
+ *
+ * ── ويُشعَل في التحكيم ──
+ *
+ * الترجيح بين مرشّحين استدلالٌ فعلاً: أيّ فاتورةٍ تفسّر هذه الحوالة،
+ * وهل يفسّرها مجموعُ اثنتين. وهناك يُدفَع ثمنُ التفكير عن حقّ.
+ */
+export function thinkingFor(task: AiTask): boolean {
+  return task === "REASONING";
 }
 
 /**
@@ -145,11 +175,14 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
     };
   }
 
+  const thinking = call.thinking ?? thinkingFor(call.task);
+
   const body = JSON.stringify({
     model,
     temperature: 0,
     max_tokens: call.maxTokens,
     ...(call.json ? { response_format: { type: "json_object" } } : {}),
+    ...(thinking ? {} : { thinking: { type: "disabled" } }),
     messages: call.messages,
   });
 

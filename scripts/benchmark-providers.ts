@@ -30,9 +30,9 @@ import { sql } from "drizzle-orm";
 import { downloadFile, driveFromEnv } from "@/lib/drive";
 import { extractDocument, activeProviderName } from "@/lib/extraction";
 import { findConflicts } from "@/lib/extraction/validate-extraction";
-import { extractionSchema, type ExtractionResult } from "@/lib/extraction/schema";
 import { parseRiyals } from "@/lib/money";
 import { estimateCostUsd } from "@/lib/ai/models";
+import { mapWithConcurrency } from "@/lib/ai/deepseek";
 
 interface Row {
   id: string;
@@ -68,8 +68,34 @@ const blank = (): Record<Field, Score> =>
 
 const norm = (s: string) => s.normalize("NFKC").replace(/\s+/g, "").toLowerCase();
 
+/**
+ * قراءةٌ مرنة لمخرَجٍ محفوظ.
+ *
+ * `extractionSchema.safeParse` كان يُسقط **كلّ** ما حفظه جيميني: ١٢٦
+ * من ١٢٦ «لم تُقرأ»، فخرج المقياس بصفرٍ في كلّ حقل. وليس في المحفوظ
+ * عطب — فيه `"invoiceNumber":"260138"` و`"totalAmount":"165.00"` — بل
+ * تنقصه ثلاثةُ حقولٍ أُضيفت إلى المخطّط بعده (`openingBalance`
+ * و`closingBalance` و`statementLines`).
+ *
+ * فكان المقياس يقيس **تطوّر مخطّطنا** ويعرضه ضعفاً في المزوّد. وصفرٌ
+ * كهذا يُصدَّق لأنّه يوافق ما نتوقّعه، وذلك أخطر ما فيه.
+ *
+ * فتُقرأ الحقول المقيسة وحدها، ولا يُشترَط مخطّطٌ كامل.
+ */
+type Loose = Partial<Record<
+  "invoiceNumber" | "invoiceDate" | "subtotalAmount" | "vatAmount" | "totalAmount" |
+  "supplierNameAr" | "supplierNameEn", unknown>>;
+
+function loose(raw: unknown): Loose | null {
+  if (raw === null || raw === undefined) return null;
+  const o = typeof raw === "string" ? JSON.parse(raw) : raw;
+  return o && typeof o === "object" ? (o as Loose) : null;
+}
+
+const str = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v : null);
+
 /** يقارن قراءةً بالحقيقة، حقلاً حقلاً. */
-function judge(x: ExtractionResult | null, truth: Row, into: Record<Field, Score>) {
+function judge(x: Loose | null, truth: Row, into: Record<Field, Score>) {
   const check = (f: Field, got: string | null, want: string | null) => {
     if (want === null || want === "") { into[f].unmeasured++; return; }
     if (x === null || got === null || got.trim() === "") { into[f].missing++; return; }
@@ -77,17 +103,47 @@ function judge(x: ExtractionResult | null, truth: Row, into: Record<Field, Score
     else into[f].wrong++;
   };
 
-  const minor = (v: string | undefined) => {
-    if (!v || v.trim() === "") return null;
-    const m = parseRiyals(v);
+  const minor = (v: unknown) => {
+    const t = str(v);
+    if (t === null) return null;
+    const m = parseRiyals(t);
     return m === null ? null : String(m);
   };
 
-  check("invoiceNumber", x?.invoiceNumber ?? null, truth.invoice_number);
-  check("invoiceDate", x?.invoiceDate ?? null, truth.invoice_date?.slice(0, 10) ?? null);
-  check("subtotal", minor(x?.subtotalAmount), truth.subtotal_minor === null ? null : String(truth.subtotal_minor));
-  check("vat", minor(x?.vatAmount), truth.vat_minor === null ? null : String(truth.vat_minor));
-  check("total", minor(x?.totalAmount), truth.total_minor === null ? null : String(truth.total_minor));
+  /*
+    الصفر المؤكَّد والحقل الفارغ يتّفقان.
+
+    فاتورةٌ بلا بند ضريبة يقيّدها أحمد صفراً، والنموذج يترك الحقل
+    فارغاً لأنّه لم يُطبَع. وهما قولٌ واحد: «لا ضريبة هنا». وعدُّ ذلك
+    نقصاً يُنقص الدقّة عن غير حقّ ويُخفي الضعف الحقيقيّ إن وقع.
+  */
+  const money = (f: Field, got: string | null, wantMinor: number | null) => {
+    if (wantMinor === null) { into[f].unmeasured++; return; }
+    if (wantMinor === 0 && got === null) { into[f].right++; return; }
+    check(f, got, String(wantMinor));
+  };
+
+  /*
+    الاشتقاق يُطبَّق على الطرفين.
+
+    `extractDocument` يشتقّ الصافي لديب سيك، فلو لم يُشتقّ لجيميني
+    لقُورن مزوّدٌ بعد المعالجة بمزوّدٍ قبلها. والمقياس الذي يُعامل
+    طرفيه بقاعدتين لا يقيس شيئاً.
+  */
+  let subtotalRead = minor(x?.subtotalAmount);
+  if (subtotalRead === null) {
+    const t = minor(x?.totalAmount);
+    const v = minor(x?.vatAmount);
+    if (t !== null && v !== null && Number(t) - Number(v) >= 0) {
+      subtotalRead = String(Number(t) - Number(v));
+    }
+  }
+
+  check("invoiceNumber", str(x?.invoiceNumber), truth.invoice_number);
+  check("invoiceDate", str(x?.invoiceDate), truth.invoice_date?.slice(0, 10) ?? null);
+  money("subtotal", subtotalRead, truth.subtotal_minor);
+  money("vat", minor(x?.vatAmount), truth.vat_minor);
+  money("total", minor(x?.totalAmount), truth.total_minor);
   /*
     المورّد يُقاس على اسميه معاً.
 
@@ -100,7 +156,7 @@ function judge(x: ExtractionResult | null, truth: Row, into: Record<Field, Score
   if (!wantAr && !wantEn) {
     into.supplier.unmeasured++;
   } else {
-    const got = [x?.supplierNameAr, x?.supplierNameEn].filter((v): v is string => Boolean(v && v.trim()));
+    const got = [str(x?.supplierNameAr), str(x?.supplierNameEn)].filter((v): v is string => v !== null);
     if (x === null || got.length === 0) into.supplier.missing++;
     else {
       const wants = [wantAr, wantEn].filter((v): v is string => Boolean(v));
@@ -174,19 +230,31 @@ async function main() {
   let conflicts = 0, failures = 0, totalMs = 0, inTok = 0, outTok = 0;
   const failed: string[] = [];
 
-  for (const [i, row] of rows.entries()) {
+  /*
+    بتزامنٍ محدود لا بـ`Promise.all`.
+
+    مئةٌ وستّة وعشرون مستنداً في وقتٍ واحد تفتح مئةً وستّاً وعشرين
+    اتصالاً، فيردّ المزوّد ٤٢٩ على أكثرها — فيبدو العطب «حدّ طلبات»
+    وهو سوء إدارةٍ عندنا. وأربعةٌ تكفي: الزمن يقصر أربع مرّات ولا
+    يُضغَط على المزوّد.
+
+    والتقدّم يُكتَب إلى `stderr` لأنّ `stdout` يُخزَّن حين يُوجَّه إلى
+    ملفّ، فلا يُرى شيءٌ حتى ينتهي كلّ شيء.
+  */
+  let done = 0;
+  await mapWithConcurrency(rows, 4, async (row) => {
     /* ما قرأه جيميني وقتها — يُقاس بلا نداء */
-    const old = extractionSchema.safeParse(row.extraction_json);
-    judge(old.success ? old.data : null, row, before);
+    judge(loose(row.extraction_json), row, before);
 
     let file: { data: Buffer; mimeType: string };
     try {
       file = await downloadFile(drive, row.drive_file_id);
     } catch (e) {
-      console.log(`  [${i + 1}/${rows.length}] ✗ تعذّر التنزيل: ${row.file_name} — ${(e as Error).message}`);
       failures++;
+      failed.push(`${row.file_name} — تعذّر التنزيل: ${(e as Error).message}`);
       judge(null, row, now);
-      continue;
+      console.error(`  [${++done}/${rows.length}] ✗ تنزيل: ${row.file_name.slice(0, 44)}`);
+      return;
     }
 
     const t0 = Date.now();
@@ -204,16 +272,16 @@ async function main() {
       failures++;
       failed.push(`${row.file_name} — ${out.reason}`);
       judge(null, row, now);
-      console.log(`  [${i + 1}/${rows.length}] ✗ ${row.file_name}: ${out.reason.slice(0, 70)}`);
-      continue;
+      console.error(`  [${++done}/${rows.length}] ✗ ${row.file_name.slice(0, 40)}: ${out.reason.slice(0, 44)}`);
+      return;
     }
 
     inTok += out.usage?.inputTokens ?? 0;
     outTok += out.usage?.outputTokens ?? 0;
     if (findConflicts(out.value).length > 0) conflicts++;
-    judge(out.value, row, now);
-    console.log(`  [${i + 1}/${rows.length}] ✓ ${row.file_name.slice(0, 50)}`);
-  }
+    judge(out.value as Loose, row, now);
+    console.error(`  [${++done}/${rows.length}] ✓ ${row.file_name.slice(0, 48)}`);
+  });
 
   const n = rows.length;
   console.log(table(`جيميني — المحفوظ وقتها (${n} مستنداً)`, before));

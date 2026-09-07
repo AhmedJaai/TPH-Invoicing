@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findConflicts, describeConflicts } from "./validate-extraction";
+import { findConflicts, describeConflicts, deriveAmounts } from "./validate-extraction";
 import type { ExtractionResult } from "./schema";
 
 /** فاتورة سليمة يُبنى عليها، فيظهر أثر كل تعديل وحده. */
@@ -126,5 +126,32 @@ describe("التحقّق من القراءة", () => {
     expect(text).toContain("totalAmount");
     /* ولا يُطلَب تصحيحٌ — يُطلَب نقلُ ما هو مطبوع */
     expect(text).toContain("لا تحسب");
+  });
+});
+
+describe("اشتقاق الصافي", () => {
+  it("يُشتقّ حين يغيب والإجمالي والضريبة معلومان", () => {
+    const r = deriveAmounts(invoice({ subtotalAmount: "", vatAmount: "150.00", totalAmount: "1150.00" }));
+    expect(r.subtotalAmount).toBe("1000.00");
+  });
+
+  it("والفاتورة بلا ضريبة صافيها إجماليها — وهي ٥٦ فاتورة في الأرشيف", () => {
+    const r = deriveAmounts(invoice({ subtotalAmount: "", vatAmount: "0.00", totalAmount: "280.00" }));
+    expect(r.subtotalAmount).toBe("280.00");
+  });
+
+  it("ولا يُمَسّ صافٍ مقروء", () => {
+    const r = deriveAmounts(invoice({ subtotalAmount: "999.00", vatAmount: "150.00", totalAmount: "1150.00" }));
+    expect(r.subtotalAmount).toBe("999.00");
+  });
+
+  it("ولا يُشتقّ من مجهول — المجهول ليس صفراً", () => {
+    expect(deriveAmounts(invoice({ subtotalAmount: "", vatAmount: "", totalAmount: "1150.00" })).subtotalAmount).toBe("");
+    expect(deriveAmounts(invoice({ subtotalAmount: "", vatAmount: "150.00", totalAmount: "" })).subtotalAmount).toBe("");
+  });
+
+  it("ولا يُشتقّ صافٍ سالب — ضريبةٌ تفوق الإجمالي قراءةٌ خاطئة لا حساب", () => {
+    const r = deriveAmounts(invoice({ subtotalAmount: "", vatAmount: "2000.00", totalAmount: "1150.00" }));
+    expect(r.subtotalAmount).toBe("");
   });
 });
