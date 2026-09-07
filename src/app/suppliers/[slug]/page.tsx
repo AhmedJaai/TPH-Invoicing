@@ -14,6 +14,7 @@ import {
   overallGrade,
   type Grade,
 } from "@/lib/supplier-health";
+import { buildSupplierAccount, describeAccount } from "@/lib/supplier-account";
 import { countNoun, INVOICE, MONTH, PRODUCT } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +63,11 @@ export default async function SupplierPage({
         (select count(*)::int from invoices
           where supplier_id = ${s.id} and tax_status = 'UNKNOWN')                   as tax_unknown,
         (select count(*)::int from statements where supplier_id = ${s.id})          as statement_count,
+        -- آخرُ رصيدٍ ختاميّ قرأناه من كشوفه. وقد يغيب: كشفٌ وصل ولم
+        -- يُقرأ رصيدُه ليس كشفاً يقول «صفر».
+        (select closing_balance_minor from statements
+          where supplier_id = ${s.id} and closing_balance_minor is not null
+          order by period_end desc nulls last limit 1)                              as reported_balance,
         (select count(distinct period_month)::int from invoices
           where supplier_id = ${s.id})                                             as active_months,
         (select count(*)::int from supplier_aliases where supplier_id = ${s.id})    as alias_count,
@@ -72,6 +78,23 @@ export default async function SupplierPage({
   const n = (k: string) => Number(stats?.[k] ?? 0);
   const billed = n("billed");
   const balance = billed - n("paid");
+
+  /*
+    ══ حسابُ المورّد: ما نعرفه مقابل ما يقول ══
+
+    كان المستحقّ `المفوتر − المسدَّد` وحدهما — وذلك يصحّ حين يكون كلُّ
+    ما بيننا وبينه فواتيرَ عندنا. ومورّدو المقهى ليسوا كذلك: منهم من
+    يعطي كشفاً ولا يعطي فواتير. فيقول النظام «لا شيء عليك» ويقول هو
+    «عليك ثلاثة آلاف»، ولا موضع يجمع القولين.
+  */
+  const reportedRaw = stats?.["reported_balance"];
+  const account = buildSupplierAccount({
+    billedMinor: billed,
+    paidMinor: n("paid"),
+    reportedBalanceMinor: reportedRaw === null || reportedRaw === undefined
+      ? null
+      : Number(reportedRaw),
+  });
 
   /*
     تغيّر السعر: متوسّط سعر الوحدة في أوّل شهر مقابل آخر شهر.
@@ -168,6 +191,40 @@ export default async function SupplierPage({
             sub={priceChangePct === null ? "لا تكفي بنوده" : "أوّل شهر مقابل آخره"}
           />
         </StatGrid>
+      )}
+
+      {showAmounts && (
+        <Section
+          title="حسابه"
+          hint="ما نعرفه من فواتيرنا، مقابل ما يقوله آخرُ كشفٍ وصل منه. والفرق ليس اتّهاماً — قد يكون فاتورةً حمّلها علينا ولم تصلنا، أو سداداً لم يصل كشفُه بعد."
+        >
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Stat label="ما نعرفه" minor={account.knownBalanceMinor} sub="المفوتر ناقص المسدَّد" />
+            <Stat
+              label="ما يقوله كشفه"
+              value={
+                account.reportedBalanceMinor === null
+                  ? "لم يصل"
+                  : <Money minor={account.reportedBalanceMinor} />
+              }
+              tone={account.reportedBalanceMinor === null ? "muted" : undefined}
+              sub={account.reportedBalanceMinor === null ? "أو وصل ولم يُقرأ رصيدُه" : "آخر رصيدٍ ختاميّ"}
+            />
+            <Stat
+              label="الفرق"
+              value={
+                account.differenceMinor === null
+                  ? "لا مقارنة"
+                  : <Money minor={Math.abs(account.differenceMinor)} />
+              }
+              tone={
+                account.status === "DIFFERS" ? "warn"
+                : account.status === "AGREED" ? "ok" : "muted"
+              }
+              sub={describeAccount(account)}
+            />
+          </div>
+        </Section>
       )}
 
       <Section
