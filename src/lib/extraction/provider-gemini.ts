@@ -37,7 +37,7 @@ function modelName(): string {
  * السبب: جيميني يقبل مجموعة فرعية من OpenAPI ويرفض مفاتيح JSON Schema
  * مثل additionalProperties و $ref التي يولّدها zod، فالتوليد التلقائي يفشل بصمت.
  */
-const GEMINI_SCHEMA = {
+export const GEMINI_SCHEMA = {
   type: "OBJECT",
   properties: {
     documentKind: {

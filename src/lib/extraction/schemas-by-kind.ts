@@ -61,8 +61,18 @@ export const invoiceExtractionSchema = z.object({
 export const statementExtractionSchema = z.object({
   ...partiesShape,
   statementDate: z.string().describe("تاريخ الكشف YYYY-MM-DD، أو فارغ"),
-  periodStart: z.string().describe("بداية الفترة YYYY-MM-DD، أو فارغ"),
-  periodEnd: z.string().describe("نهاية الفترة YYYY-MM-DD، أو فارغ"),
+  /*
+    ولا يُسأل عن فترة الكشف.
+
+    كانت `periodStart` و`periodEnd` تُطلَبان من النموذج ثمّ يُسقطهما
+    `widen()` — فلا تصلان `extractionSchema` ولا القاعدة. والفترة
+    تُشتقّ من تواريخ الأسطر عمداً لا من قولٍ في رأس الكشف: كشفُ أوراق
+    الزيتون كان تراكمياً (مايو–أغسطس) فأنتج ما قاله رأسُه ستّاً وثلاثين
+    فاتورةً «مفقودة» كذباً.
+
+    وسؤالُ النموذج عمّا يُطرَح جوابُه ليس حياداً: يُشتّت انتباهه عمّا
+    يُقرأ فعلاً، ويُوهم قارئ الشيفرة أنّ الحقل مستعمَل.
+  */
   openingBalance: moneyString.describe("الرصيد الافتتاحي"),
   closingBalance: moneyString.describe("الرصيد الختامي"),
   statementLines: z
@@ -74,8 +84,16 @@ export const statementExtractionSchema = z.object({
 /** إيصال التحويل — المستفيد فيه يخالف اسم المورّد غالباً. */
 export const receiptExtractionSchema = z.object({
   beneficiaryName: z.string().describe("اسم المستفيد كما ورد في الإيصال"),
-  beneficiaryAccount: z.string().describe("حساب المستفيد أو آيبانه، أو فارغ"),
-  senderName: z.string().describe("اسم المحوِّل، أو فارغ"),
+  /*
+    ولا يُسأل عن حساب المستفيد ولا عن اسم المحوِّل — اليوم.
+
+    كلاهما كان يُطلَب ثمّ يُسقطه `widen()`، فلا يبلغ القاعدة ولا يقرؤه
+    أحد. وحسابُ المستفيد **دليلٌ قاطع** على الجهة — أقوى من الاسم بكثير،
+    وهو ما تقوم عليه ذاكرة المستفيدين. فإن أُريد فالطريق أن يُضاف إلى
+    المخطّط المشترك ويُوصَل بـ`counterparty_evidence`، لا أن يُسأل عنه
+    ويُرمى. وحتى ذلك الحين لا يُسأل: السؤالُ عمّا يُطرَح جوابُه يُشتّت
+    النموذج ويُوهم القارئ أنّ الحقل مستعمَل.
+  */
   referenceNumber: z.string().describe("رقم العملية أو المرجع، أو فارغ"),
   transferDate: z.string().describe("تاريخ التحويل YYYY-MM-DD، أو فارغ"),
   totalAmount: moneyString.describe("المبلغ المحوَّل"),
@@ -88,8 +106,7 @@ export const utilityExtractionSchema = z.object({
   accountNumber: z.string().describe("رقم الحساب أو العدّاد، أو فارغ"),
   invoiceNumber: z.string().describe("رقم الفاتورة، أو فارغ"),
   invoiceDate: z.string().describe("تاريخ الفاتورة YYYY-MM-DD، أو فارغ"),
-  periodStart: z.string().describe("بداية فترة الاستهلاك، أو فارغ"),
-  periodEnd: z.string().describe("نهايتها، أو فارغ"),
+  /* ولا تُطلَب فترة الاستهلاك — `widen()` يُسقطها فلا تبلغ القاعدة */
   subtotalAmount: moneyString.describe("قبل الضريبة"),
   vatAmount: moneyString.describe("الضريبة"),
   totalAmount: moneyString.describe("الإجمالي"),
@@ -150,6 +167,16 @@ export function absentFieldsFor(kind: DocumentKind): string[] {
  *
  * ولا يخترع شيئاً: ما لم يُسأل عنه يبقى فارغاً، ويُذكَر أنّه لم يُسأل.
  */
+/**
+ * أسماءٌ يسمّيها النوعُ بلغته ثمّ يترجمها `widen` إلى الحقل المشترك.
+ *
+ * فالكشف يسمّي تاريخه `statementDate`، والإيصال `transferDate`، وكلاهما
+ * يصير `invoiceDate`. وهذه ليست حقولاً ضائعة — لها مترجم. وما ليس فيها
+ * ولا في المخطّط المشترك **يُسأل عنه ثمّ يُطرَح**، وذلك ما يمنعه اختبار
+ * التكافؤ.
+ */
+export const NARROW_ALIASES = ["statementDate", "transferDate", "referenceNumber"] as const;
+
 export function widen(
   kind: DocumentKind,
   narrow: Record<string, unknown>,
