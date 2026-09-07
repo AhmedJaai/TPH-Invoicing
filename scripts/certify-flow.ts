@@ -25,6 +25,9 @@ import {
   allocate, createPayment, refreshPaymentStatus, reversePayment,
 } from "@/services/payment.service";
 import { runReconciliation } from "@/services/reconcile.service";
+import { confirmCounterparty, loadMerchantMemory } from "@/services/counterparty.service";
+import { classify } from "@/lib/bank/classification";
+import { toCanonical } from "@/lib/bank/canonical";
 import { derivePaymentStatus } from "@/lib/payment-state";
 
 interface Result { name: string; pass: boolean; detail: string }
@@ -320,6 +323,63 @@ async function main() {
     });
     if (inDb !== derived) throw new Error(`القاعدة ${inDb} والاشتقاق ${derived}`);
     return `${inDb} في الاثنين`;
+  });
+
+  /*
+    ══ ٩ · يتعلّم مرّةً فيعرف بعدها ══
+
+    وهذا هو الوعد الذي يقوم عليه المنتج كلُّه: إن لم يتحقّق، فكلُّ شهرٍ
+    يبدأ من الصفر مهما بلغ الذكاء. والاختبار الحقيقيّ ليس أنّ المصنِّف
+    يقرأ خريطةً تُمرَّر إليه — ذلك مختبَرٌ في الوحدات — بل أنّ ما يؤكّده
+    الإنسان **يُكتَب في القاعدة ثمّ يُقرأ منها** فيُعرَف به صفٌّ آخر:
+    مبلغُه مختلف، وتاريخُه في شهرٍ آخر، ووصفُه ليس نصّاً واحداً.
+
+    ويُختبَر معه الاتّجاه الآخر: جهةٌ قريبةُ الشبه لا تُلتقَط بالذاكرة —
+    وإلّا صار التعلّم يُخطئ في أضعاف ما يُصيب.
+  */
+  await scenario("٩ · إنسانٌ يعرّف جهةً ← تُعرَف بعدها في شهرٍ آخر", async (tx) => {
+    const [u] = await tx.select({ id: users.id }).from(users).limit(1);
+    if (!u) throw new Error("لا مستخدم في القاعدة");
+
+    const ident = "٧٠٥٢٦٧٣٣٣٧";
+    const first = toCanonical({
+      valueDate: day("2026-06-05"),
+      description: `حوالة شركة الفلاح BEN ID:${ident} شراء بضاعة 1360000119`,
+      beneficiaryRaw: "شركة الفلاح التجارية",
+      transactionType: null, amountMinor: 3_000_00, direction: "DEBIT",
+    });
+
+    await confirmCounterparty({
+      writer: tx, userId: u.id, displayName: "شركة الفلاح التجارية",
+      kind: "SUPPLIER", supplierId: null, transactions: [first],
+    });
+
+    const memory = await loadMerchantMemory(tx);
+
+    /* شهرٌ آخر · مبلغٌ آخر · وصفٌ آخر — والهويّة واحدة */
+    const later = toCanonical({
+      valueDate: day("2026-09-21"),
+      description: `LOCAL TRANSFER BEN ID:${ident} REF 88771122`,
+      beneficiaryRaw: null, transactionType: null,
+      amountMinor: 7_450_00, direction: "DEBIT",
+    });
+    const hit = classify(later, memory);
+    if (hit.source !== "MEMORY") {
+      throw new Error(`لم تُعرَف بالذاكرة — المصدر ${hit.source}`);
+    }
+
+    /* وجهةٌ أخرى بهويّةٍ أخرى لا تُلتقَط */
+    const other = toCanonical({
+      valueDate: day("2026-09-22"),
+      description: "LOCAL TRANSFER BEN ID:٧٠٥٢٦٧٣٣٣٨ REF 99001122",
+      beneficiaryRaw: null, transactionType: null,
+      amountMinor: 7_450_00, direction: "DEBIT",
+    });
+    if (classify(other, memory).source === "MEMORY") {
+      throw new Error("هويّةٌ مغايرة التُقطت بالذاكرة — تعلّمٌ كاذب");
+    }
+
+    return `عُرفت في ${later.valueDate.toISOString().slice(0, 7)} بمبلغٍ آخر · والشبيهة لم تُلتقَط`;
   });
 
   /*

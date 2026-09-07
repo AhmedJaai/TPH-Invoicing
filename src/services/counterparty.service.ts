@@ -217,8 +217,15 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
  *
  * ومفاتيحها بصيغة `merchantKey` نفسها كي يجدها المصنِّف بلا ترجمة.
  */
-export async function loadMerchantMemory(): Promise<Map<string, MerchantMemory>> {
-  const rows = await db
+/**
+ * الذاكرة المحفوظة.
+ *
+ * ويُقبَل مقبضُ معاملةٍ كي **تُقرأ الذاكرة داخل المعاملة التي كتبتها** —
+ * وبدونه لا يمكن إثبات «يتعلّم مرّةً فيعرف بعدها»: الكتابة غير مودَعة
+ * فلا تراها قراءةٌ من اتّصالٍ آخر، فيبدو التعلّم فاشلاً وهو ناجح.
+ */
+export async function loadMerchantMemory(writer?: Writer): Promise<Map<string, MerchantMemory>> {
+  const rows = await (writer ?? db)
     .select({
       kind: counterpartyEvidence.kind,
       normalized: counterpartyEvidence.normalized,
