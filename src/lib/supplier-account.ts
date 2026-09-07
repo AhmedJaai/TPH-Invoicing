@@ -28,15 +28,23 @@ export type AccountStatus =
   /** الطرفان مختلفان، والفرق معلوم. */
   | "DIFFERS"
   /** لا كشفَ وصل، أو وصل بلا رصيدٍ مقروء — فلا مقارنة. */
-  | "NO_STATEMENT";
+  | "NO_STATEMENT"
+  /**
+   * لا نعرف شيئاً أصلاً: لا فاتورة ولا سداد ولا كشف.
+   *
+   * وهذه **ليست صفراً**. الصفر يقول «لا شيء عليك له» — دعوى. ومورّدو
+   * المقهى فيهم من يعطي ورقةً باليد ومن لا يعطي شيئاً، فغيابُ الفاتورة
+   * عندنا غيابُ علمٍ لا غيابُ دَين.
+   */
+  | "UNKNOWN";
 
 export interface SupplierAccount {
   billedMinor: number;
   paidMinor: number;
   creditNoteMinor: number;
   adjustmentMinor: number;
-  /** ما نعرفه نحن. */
-  knownBalanceMinor: number;
+  /** ما نعرفه نحن — و`null` حين لا مستند لدينا أصلاً. */
+  knownBalanceMinor: number | null;
   /** ما يقوله كشفُه — و`null` يعني لم يصل أو لم يُقرأ. */
   reportedBalanceMinor: number | null;
   /** موجبٌ: هو يطالب بأكثر ممّا نعرف. سالبٌ: العكس. */
@@ -74,21 +82,37 @@ export function buildSupplierAccount(input: {
     input.billedMinor - base.creditNoteMinor - input.paidMinor + adjustmentMinor;
 
   const reported = input.reportedBalanceMinor ?? null;
-  const differenceMinor = reported === null ? null : reported - knownBalanceMinor;
+
+  /*
+    ولا شيء عندنا يُبنى عليه رقم.
+
+    مورّدٌ بلا فاتورةٍ ولا سدادٍ ولا تسوية: رصيدُه عندنا **مجهول** لا
+    صفر. وقياسُه على بيانات أحمد أظهر ستّة موردين كذلك، كانوا يُعرَضون
+    «نعرف 0.00» — وهي جملةٌ تقول «لا شيء عليك له»، ونحن لا نعرف.
+  */
+  const nothingKnown =
+    input.billedMinor === 0 && input.paidMinor === 0
+    && base.creditNoteMinor === 0 && adjustmentMinor === 0;
+
+  const known = nothingKnown ? null : knownBalanceMinor;
+  const differenceMinor =
+    reported === null || known === null ? null : reported - known;
 
   const status: AccountStatus =
-    differenceMinor === null
-      ? "NO_STATEMENT"
-      : Math.abs(differenceMinor) <= ACCOUNT_TOLERANCE_MINOR
-        ? "AGREED"
-        : "DIFFERS";
+    known === null && reported === null
+      ? "UNKNOWN"
+      : differenceMinor === null
+        ? "NO_STATEMENT"
+        : Math.abs(differenceMinor) <= ACCOUNT_TOLERANCE_MINOR
+          ? "AGREED"
+          : "DIFFERS";
 
   return {
     billedMinor: input.billedMinor,
     paidMinor: input.paidMinor,
     creditNoteMinor: base.creditNoteMinor,
     adjustmentMinor,
-    knownBalanceMinor,
+    knownBalanceMinor: known,
     reportedBalanceMinor: reported,
     differenceMinor,
     status,
@@ -97,6 +121,12 @@ export function buildSupplierAccount(input: {
 
 /** جملةٌ تصف الحال — تُقرأ ولا تحتاج جدولاً. */
 export function describeAccount(a: SupplierAccount): string {
+  if (a.status === "UNKNOWN") {
+    return "لا فاتورة منه ولا كشف — فرصيدُه عندنا مجهول، وليس صفراً";
+  }
+  if (a.status === "NO_STATEMENT" && a.knownBalanceMinor === null) {
+    return "كشفُه وصل ولا فاتورة منه عندنا — فلا يُقارَن";
+  }
   if (a.status === "NO_STATEMENT") {
     return "لم يصل كشفٌ منه بعد — فلا مقارنة، وما نعرفه من فواتيرنا وحدها";
   }

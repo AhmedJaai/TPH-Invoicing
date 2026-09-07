@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "tph-invoicing",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "AUTH_BYPASS=true npm run dev"],
       "port": 3000
     }
   ]

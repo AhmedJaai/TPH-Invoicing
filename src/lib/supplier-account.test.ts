@@ -86,3 +86,41 @@ describe("حسابُ المورّد — ما نعرفه مقابل ما يقول
     expect(a.adjustmentMinor).toBe(250_00);
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════
+   ولا فاتورة ≠ ولا دَين
+
+   وُجد على بيانات أحمد: ستّةُ موردين بلا فاتورةٍ ولا كشف، كانوا
+   يُعرَضون «نعرف 0.00» — وهي جملةٌ تقول «لا شيء عليك له». ومورّدو
+   المقهى فيهم من يعطي ورقةً باليد ومن لا يعطي شيئاً، فغيابُ الفاتورة
+   عندنا غيابُ علمٍ لا غيابُ دَين.
+   ═══════════════════════════════════════════════════════════════ */
+describe("لا فاتورة ولا كشف ← مجهول لا صفر", () => {
+  it("بلا شيءٍ أصلاً ← UNKNOWN و`null`", () => {
+    const a = buildSupplierAccount({ billedMinor: 0, paidMinor: 0 });
+    expect(a.knownBalanceMinor).toBeNull();
+    expect(a.status).toBe("UNKNOWN");
+    expect(describeAccount(a)).toContain("مجهول");
+  });
+
+  it("وكشفٌ وصل بلا فاتورةٍ عندنا ← لا يُقارَن", () => {
+    const a = buildSupplierAccount({
+      billedMinor: 0, paidMinor: 0, reportedBalanceMinor: 3_000_00,
+    });
+    expect(a.knownBalanceMinor).toBeNull();
+    expect(a.differenceMinor).toBeNull();
+    expect(a.status).toBe("NO_STATEMENT");
+  });
+
+  it("وفاتورةٌ مسدَّدة بالكامل ← صفرٌ حقيقيّ لا مجهول", () => {
+    const a = buildSupplierAccount({ billedMinor: 3_000_00, paidMinor: 3_000_00 });
+    expect(a.knownBalanceMinor).toBe(0);
+    expect(a.status).toBe("NO_STATEMENT");
+  });
+
+  it("وسدادٌ بلا فاتورة ← معلومٌ سالب لا مجهول", () => {
+    const a = buildSupplierAccount({ billedMinor: 0, paidMinor: 500_00 });
+    expect(a.knownBalanceMinor).toBe(-500_00);
+    expect(a.status).not.toBe("UNKNOWN");
+  });
+});

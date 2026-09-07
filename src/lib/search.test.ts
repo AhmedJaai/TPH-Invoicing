@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  AMOUNT_WINDOW_MINOR,
-  amountRange,
-  normalizeArabic,
-  normalizeDigits,
-  parseSearch,
-  rankHits,
-  type SearchHit,
-} from "./search";
+import { AMOUNT_WINDOW_MINOR, amountRange, normalizeArabic, normalizeDigits, parseSearch, rankHits, type SearchHit } from "./search";
 
 describe("parseSearch", () => {
   it("الفراغ لا يُنتج بحثاً", () => {
@@ -138,5 +130,44 @@ describe("rankHits", () => {
   it("لا يُفقد شيء من النتائج", () => {
     const all: SearchHit[] = ["invoice", "supplier", "product", "bankTransaction", "document"].map((k) => hit(k as SearchHit["kind"]));
     expect(rankHits(all, "TEXT")).toHaveLength(5);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   التوحيد يقع على الطرفين
+
+   `parseSearch` يوحّد ما يكتبه المستخدم — يردّ الهمزة إلى ألف والتاء
+   المربوطة إلى هاء. وكان يُقارَن الموحَّدُ بالعمود الخام، فمن كتب
+   «أوراق» صار بحثُه «اوراق» والمخزَّن «أوراق» بهمزته فلا يلتقيان.
+
+   والأثر أنّ كلّ مورّدٍ في اسمه همزة لا يُوجَد باسمه العربيّ — وهو
+   الاسم الذي يُرى في كلّ شاشة. والعلاج في `search.service`:
+   ‏`translate` على العمود بالتحويل نفسه. وهذه تحرس نصفَه الأوّل:
+   أن يبقى التوحيد متطابقاً بين ما يُكتَب وما تحوّله القاعدة.
+   ═══════════════════════════════════════════════════════════════ */
+describe("توحيدُ العربية متطابقٌ مع ما تفعله القاعدة", () => {
+  /** التحويل نفسه المكتوب في `translate(col, 'إأآٱىة', 'اااايه')`. */
+  const asDatabaseWould = (s: string) =>
+    s.replace(/[إأآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه");
+
+  const NAMES = [
+    "أوراق الزيتون", "أفال — بدر", "أوسكا", "محمصة أطلس",
+    "ملتقى الأواني", "مؤسسة الرياض", "بيكوف", "غاناش",
+  ];
+
+  it("ما يوحّده الباحث يوحّده الترجمة نفسها", () => {
+    for (const n of NAMES) {
+      expect(normalizeArabic(n), n).toBe(asDatabaseWould(normalizeArabic(n)));
+    }
+  });
+
+  it("والهمزة تُسقَط من الطرفين فيلتقيان", () => {
+    expect(normalizeArabic("أوراق")).toBe("اوراق");
+    expect(asDatabaseWould("أوراق الزيتون")).toContain("اوراق");
+  });
+
+  it("والتاء المربوطة كذلك", () => {
+    expect(normalizeArabic("محمصة")).toBe("محمصه");
+    expect(asDatabaseWould("محمصة أطلس")).toContain("محمصه");
   });
 });

@@ -7,7 +7,7 @@
  * وكل نتيجة تحمل **وجهة تفتح السجلّ نفسه** لا صفحةً عامّة يبحث فيها
  * المستخدم من جديد.
  */
-import { and, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, ilike, lte, or, sql, type AnyColumn } from "drizzle-orm";
 import { db } from "@/db";
 import {
   bankTransactions, documents, invoices, products, supplierProducts, suppliers,
@@ -42,11 +42,31 @@ export async function search(raw: string): Promise<SearchResult> {
   return { intent, hits: rankHits(hits, intent.kind) };
 }
 
+/**
+ * مقارنةٌ توحّد الطرفين — لا الطرفَ الواحد.
+ *
+ * `parseSearch` يوحّد ما يكتبه المستخدم: يُسقط التشكيل ويردّ الهمزات
+ * إلى ألف والتاء المربوطة إلى هاء. ثمّ كان يُقارَن الموحَّدُ بالعمود
+ * **الخام** — فمن كتب «أوراق» صار بحثُه «اوراق»، والمخزَّن «أوراق
+ * الزيتون» بهمزته، فلا يلتقيان.
+ *
+ * والأثر أنّ كلّ مورّدٍ في اسمه همزةٌ أو تاءٌ مربوطة كان لا يُوجَد
+ * باسمه العربيّ — وهو الاسم الذي يراه أحمد في كلّ شاشة. قِيس على
+ * بياناته: «أوراق الزيتون» و«أفال» و«أوسكا» و«محمصة أطلس» و«ملتقى
+ * الأواني» — خمسةٌ من اثنين وعشرين، ولا يُوجَد واحدٌ منها بصدر اسمه.
+ *
+ * فالتوحيد يقع على العمود أيضاً، بالتحويل نفسه وفي القاعدة:
+ * `translate` أسرع من دالّة، ولا تحتاج امتداداً ولا فهرساً جديداً.
+ */
+function likeNormalized(col: AnyColumn, like: string) {
+  return sql`translate(${col}, 'إأآٱىة', 'اااايه') ilike ${like}`;
+}
+
 async function findInvoices(intent: SearchIntent, like: string): Promise<SearchHit[]> {
   const clauses = [];
 
   if (intent.kind === "NUMBER") clauses.push(ilike(invoices.invoiceNumber, like));
-  if (intent.kind === "TEXT") clauses.push(ilike(suppliers.nameAr, like));
+  if (intent.kind === "TEXT") clauses.push(likeNormalized(suppliers.nameAr, like));
   if (intent.kind === "MONTH") clauses.push(eq(invoices.periodMonth, intent.term));
   if (intent.kind === "DATE") {
     clauses.push(sql`to_char(${invoices.invoiceDate}, 'YYYY-MM-DD') = ${intent.term}`);
@@ -89,9 +109,9 @@ async function findSuppliers(intent: SearchIntent, like: string): Promise<Search
   const clauses = [];
   if (intent.kind === "VAT") clauses.push(eq(suppliers.vatNumber, intent.term));
   if (intent.kind === "TEXT") {
-    clauses.push(ilike(suppliers.nameAr, like));
+    clauses.push(likeNormalized(suppliers.nameAr, like));
     clauses.push(ilike(suppliers.slug, like));
-    clauses.push(ilike(suppliers.driveFolderName, like));
+    clauses.push(likeNormalized(suppliers.driveFolderName, like));
   }
   if (clauses.length === 0) return [];
 
@@ -128,8 +148,8 @@ async function findProducts(like: string): Promise<SearchHit[]> {
     .leftJoin(suppliers, eq(supplierProducts.supplierId, suppliers.id))
     .leftJoin(products, eq(supplierProducts.productId, products.id))
     .where(or(
-      ilike(supplierProducts.displayName, like),
-      ilike(supplierProducts.normalizedDescription, like),
+      likeNormalized(supplierProducts.displayName, like),
+      likeNormalized(supplierProducts.normalizedDescription, like),
     ))
     .limit(PER_KIND);
 
@@ -145,8 +165,8 @@ async function findProducts(like: string): Promise<SearchHit[]> {
 async function findBankTx(intent: SearchIntent, like: string): Promise<SearchHit[]> {
   const clauses = [];
   if (intent.kind === "TEXT" || intent.kind === "NUMBER") {
-    clauses.push(ilike(bankTransactions.description, like));
-    clauses.push(ilike(bankTransactions.beneficiaryRaw, like));
+    clauses.push(likeNormalized(bankTransactions.description, like));
+    clauses.push(likeNormalized(bankTransactions.beneficiaryRaw, like));
     clauses.push(ilike(bankTransactions.ref, like));
   }
   if (intent.kind === "DATE") {

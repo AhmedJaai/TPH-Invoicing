@@ -199,7 +199,20 @@ export default async function SupplierPage({
           hint="ما نعرفه من فواتيرنا، مقابل ما يقوله آخرُ كشفٍ وصل منه. والفرق ليس اتّهاماً — قد يكون فاتورةً حمّلها علينا ولم تصلنا، أو سداداً لم يصل كشفُه بعد."
         >
           <div className="grid gap-3 sm:grid-cols-3">
-            <Stat label="ما نعرفه" minor={account.knownBalanceMinor} sub="المفوتر ناقص المسدَّد" />
+            <Stat
+              label="ما نعرفه"
+              value={
+                account.knownBalanceMinor === null
+                  ? "غير معروف"
+                  : <Money minor={account.knownBalanceMinor} />
+              }
+              tone={account.knownBalanceMinor === null ? "muted" : undefined}
+              sub={
+                account.knownBalanceMinor === null
+                  ? "لا فاتورة منه عندنا — وذلك ليس صفراً"
+                  : "المفوتر ناقص المسدَّد"
+              }
+            />
             <Stat
               label="ما يقوله كشفه"
               value={
