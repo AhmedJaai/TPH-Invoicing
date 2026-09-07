@@ -115,7 +115,22 @@ export async function POST(request: Request) {
   }
 
   if (eligible.length === 0) {
-    return NextResponse.json({ ok: true, confirmed: 0, outcomes });
+    /*
+      لا شيء صالح — والردّ يقول ذلك بنصّه.
+      كان يخرج بلا `message`، فتقرؤه الواجهة نجاحاً بلا خبر وتُظهر
+      نصّها الاحتياطيّ «أُكِّدت». والردّ الذي لا يحمل خبر الرفض يجعل
+      كلّ قارئٍ له يخترع خبراً.
+    */
+    return NextResponse.json({
+      ok: true,
+      confirmed: 0,
+      rejected: outcomes.length,
+      outcomes,
+      message:
+        outcomes.length === 1
+          ? `لم يُكتب شيء — ${outcomes[0].reason}`
+          : `لم يُكتب شيء — ${countNoun(outcomes.length, TRANSACTION)} رُدّت`,
+    });
   }
 
   /* ── الحقائق كما هي الآن، لا كما كانت لحظة الاستيراد ── */

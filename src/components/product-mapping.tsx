@@ -72,8 +72,12 @@ function LinkRow({
       });
       const json = await res.json();
       setMessage(json.message ?? json.error);
-      setError(!res.ok);
-      if (res.ok) onDone();
+      /*
+        الربط الذي لم يربط شيئاً ليس نجاحاً — والنصّ يقوله («لا أصناف»)
+        بينما اللون كان يقول «تمّ». فيُقرأ اللونُ قبل النصّ.
+      */
+      setError(!res.ok || json.linked === 0);
+      if (res.ok && json.linked !== 0) onDone();
     } catch (e) {
       setMessage((e as Error).message);
       setError(true);

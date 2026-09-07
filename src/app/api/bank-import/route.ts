@@ -768,9 +768,23 @@ export async function POST(request: Request) {  let user;
         appliesToMonth: plan.primaryMonth,
       });
 
+      /*
+        الطبقة تتقدّم مع المال، لا بعده بخطوة.
+
+        كان هذا يكتب `matchedPaymentId` وحده ويترك `lifecycle` على
+        `RAW` — بينما يُكتب في `decision_history` حدثٌ اسمه `POSTED`.
+        فيختلف السجلّ عن العمود: الأثر يقول «قُيّدت» والحالُ يقول «خام».
+        وكلُّ شاشةٍ تقرأ `lifecycle` ترى الحركة معلَّقةً وقد سُدّدت،
+        فتُعرَض في طابور المراجعة تطلب تأكيداً لا يقبله الخادم —
+        لأنّها مطابَقةٌ أصلاً. خمسُ حركاتٍ في قاعدة أحمد كذلك.
+      */
       await tx
         .update(bankTransactions)
-        .set({ matchedPaymentId: paymentId })
+        .set({
+          matchedPaymentId: paymentId,
+          matchStatus: "MATCHED",
+          lifecycle: "POSTED",
+        })
         .where(eq(bankTransactions.id, inserted.id));
 
       /*

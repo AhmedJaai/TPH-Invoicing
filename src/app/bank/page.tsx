@@ -10,6 +10,7 @@ import { Card, EmptyState, Section, Stat, StatGrid, NoAccess } from "@/component
 import { BankImport } from "@/components/bank-import";
 import { MatchExplain, type MatchExplanation } from "@/components/match-explain";
 import { ReconcileQueue, type QueueGroup, type QueueItem } from "@/components/reconcile-queue";
+import { pendingDecision } from "@/lib/bank/pending";
 import { toCanonical } from "@/lib/bank/canonical";
 import { groupByIdentity } from "@/lib/bank/pattern";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
@@ -129,10 +130,13 @@ export default async function BankPage() {
         وما عُرف بابُه وليس سداد مورّد لا قرار فيه أصلاً — والرسمُ
         البنكيّ لا يُسأل عنه وقد صُنّف تلقائياً.
       */
-      .where(sql`${bankTransactions.matchedPaymentId} is null
-        and ${bankTransactions.matchStatus} <> 'IGNORED'
-        and ${bankTransactions.lifecycle} not in ('CONFIRMED','POSTED')
-        and ${bankTransactions.classificationSource} is distinct from 'HUMAN'
+      /*
+        الأساس مشترك مع طابور المراجعة — `pendingDecision()` — وما بعده
+        خاصٌّ بهذه الشاشة: تسأل عن الجهة المجهولة وعن سداد المورّد الذي
+        لم يُعرَف مورّده. والأساسُ يُستدعى ولا يُنسَخ، وإلّا افترق
+        العدّان من حيث لا يُقصَد.
+      */
+      .where(sql`${pendingDecision()}
         and (
           ${bankTransactions.category} = 'UNKNOWN'
           or (${bankTransactions.category} = 'SUPPLIER' and (

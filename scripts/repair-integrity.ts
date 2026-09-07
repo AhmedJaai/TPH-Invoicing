@@ -259,6 +259,99 @@ async function main() {
     });
   }
 
+  /*
+    ── الطبقة تخلّفت عن المال ──
+
+    مسارُ الاستيراد كان يكتب `matched_payment_id` وحده ويترك
+    `lifecycle` على `RAW`، بينما يُسجّل في `decision_history` حدثاً
+    اسمه `POSTED`. فالسجلّ يقول «قُيّدت» والعمود يقول «خام».
+
+    وأثرُه أنّ الحركة المدفوعة تبقى في طابور المراجعة تطلب تأكيداً لا
+    يقبله الخادم — لأنّها مطابَقةٌ أصلاً. والمال سليم: الدفعة موجودة
+    وتخصيصاتها مكتوبة؛ الخلل في وصف الحال لا في الحال نفسه.
+
+    فلا يُنشأ هنا مالٌ ولا يُحذَف — تُقدَّم الطبقة إلى ما بلغته فعلاً.
+  */
+  {
+    const stale = await db.execute<{ id: string; amount_minor: number; name_ar: string | null }>(sql`
+      select bt.id, bt.amount_minor, s.name_ar
+      from bank_transactions bt
+      left join suppliers s on s.id = bt.supplier_id
+      where bt.matched_payment_id is not null
+        and bt.lifecycle not in ('CONFIRMED','POSTED')
+        and exists (
+          select 1 from payment_allocations pa where pa.payment_id = bt.matched_payment_id
+        )
+      order by bt.amount_minor desc
+    `);
+
+    steps.push({
+      name: "حركات مدفوعة وطبقتها لم تتقدّم",
+      found: stale.rows.length,
+      detail: stale.rows.map(
+        (r) => `  ${formatRiyalsDisplay(r.amount_minor)} · ${r.name_ar ?? "بلا مورّد"}`,
+      ),
+      apply: async () => {
+        for (const r of stale.rows) {
+          await db
+            .update(bankTransactions)
+            .set({ lifecycle: "POSTED", matchStatus: "MATCHED" })
+            .where(eq(bankTransactions.id, r.id));
+        }
+      },
+    });
+  }
+
+  /*
+    ── حالُ الدفعة يخالف تخصيصاتها ──
+
+    `‎/api/mark-paid` كان يُدرج الدفعة وتخصيصها ولا يستدعي
+    `refreshPaymentStatus`، فيبقى `status` على قيمته الافتراضية
+    `UNAPPLIED` وقد خُصّصت الدفعة بالكامل. والعمود الذي يخالف الحقيقة
+    أسوأ من غيابه: تقارير «ما بقي» تُحسَب من التخصيصات فتصحّ، وأيّ
+    قراءةٍ تعتمد `status` تكذب.
+
+    والاشتقاق هنا هو اشتقاق الخدمة نفسه، لا حسابٌ ثانٍ يُكتب بجانبه.
+  */
+  {
+    const wrong = await db.execute<{
+      id: string; amount_minor: number; stored: string; should_be: string; name_ar: string | null;
+    }>(sql`
+      with derived as (
+        select p.id, p.amount_minor, p.status::text as stored, s.name_ar,
+               (case
+                 when coalesce((select sum(amount_minor)::int from payment_allocations
+                                where payment_id = p.id), 0) = 0
+                   then (case when p.is_advance then 'ADVANCE' else 'UNAPPLIED' end)
+                 when p.amount_minor - p.fee_minor
+                      - coalesce((select sum(amount_minor)::int from payment_allocations
+                                   where payment_id = p.id), 0) > 1 then 'PARTIALLY_APPLIED'
+                 when p.amount_minor - p.fee_minor
+                      - coalesce((select sum(amount_minor)::int from payment_allocations
+                                   where payment_id = p.id), 0) < -1 then 'OVERPAYMENT'
+                 else 'APPLIED' end) as should_be
+        from payments p left join suppliers s on s.id = p.supplier_id
+        where p.reversed_at is null and p.voided_at is null
+      )
+      select * from derived where stored <> should_be order by amount_minor desc
+    `);
+
+    steps.push({
+      name: "دفعات حالُها يخالف تخصيصاتها",
+      found: wrong.rows.length,
+      detail: wrong.rows.map(
+        (r) => `  ${formatRiyalsDisplay(r.amount_minor)} · ${r.name_ar ?? "بلا مورّد"} · ${r.stored} ← ${r.should_be}`,
+      ),
+      apply: async () => {
+        for (const r of wrong.rows) {
+          await db.execute(sql`
+            update payments set status = ${r.should_be}::payment_status where id = ${r.id}
+          `);
+        }
+      },
+    });
+  }
+
   /* ── التقرير ── */
   let total = 0;
   for (const s of steps) {

@@ -11,6 +11,7 @@ import { db } from "@/db";
 import { invoices, paymentAllocations, payments } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { recordAudit } from "@/lib/audit";
+import { refreshPaymentStatus } from "@/services/payment.service";
 import { INVOICE, countNoun } from "@/lib/arabic";
 
 export const runtime = "nodejs";
@@ -97,6 +98,20 @@ export async function POST(request: Request) {  let user;
         invoiceId: inv.id,
         amountMinor: remaining,
       });
+
+      /*
+        الحال يُشتقّ بعد التخصيص، ولا يُترك على قيمته الافتراضية.
+
+        كان هذا المسار يُدرج الدفعة وتخصيصها ثمّ ينصرف، فيبقى
+        `status = 'UNAPPLIED'` على دفعةٍ خُصّصت بالكامل — فتقول بوّابة
+        الإنتاج «حالُها يخالف تخصيصاتها»، وهي محقّة. خمسُ دفعاتٍ في
+        قاعدة أحمد كذلك، كلُّها من استدعاءٍ واحد.
+
+        و`allocate()` في `payment.service` يستدعيه من نفسه؛ وهذا المسار
+        يكتب التخصيص بيده فعليه أن يستدعيه بيده.
+      */
+      await refreshPaymentStatus(tx, pay.id);
+
       totalMinor += remaining;
     }
   });

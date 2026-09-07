@@ -46,12 +46,21 @@ export function MarkSupplierPaid({
           note: `سُجّلت من دفعة أوّل الشهر — ${supplierName}`,
         }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as { error?: string; message?: string; marked?: number };
       if (!res.ok) {
         setResult({ ok: false, message: data.error ?? "تعذّر التسجيل" });
         return;
       }
-      setResult({ ok: true, message: data.message });
+      /*
+        `‎/api/mark-paid` يردّ «٢٠٠» ومعه `marked: 0` حين لا يجد فاتورةً
+        مفتوحة في النطاق — كأن تكون سُدّدت من نافذةٍ أخرى بين العرض
+        والضغط. وعرضُ ذلك في صندوقٍ أخضر يقول «تمّ» عن لا شيء.
+      */
+      if (!data.marked) {
+        setResult({ ok: false, message: data.message ?? "لم تُوسَم فاتورة — راجع حالها." });
+        return;
+      }
+      setResult({ ok: true, message: data.message ?? "سُجّل السداد" });
       setOpen(false);
       router.refresh();
     } catch {

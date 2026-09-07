@@ -131,7 +131,12 @@ export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceP
       شبكته وهي سليمة. ولو انهار الطلب قبل أن يُنشئ جسماً بصيغة JSON
       لجاء الردّ صفحةَ خطأ فيفشل `json()` — وهو أيضاً عطبُ خادم لا شبكة.
     */
-    let data: { error?: string; message?: string } = {};
+    let data: {
+      error?: string;
+      message?: string;
+      confirmed?: number;
+      outcomes?: { transactionId: string; ok: boolean; reason?: string }[];
+    } = {};
     try {
       data = await res.json();
     } catch {
@@ -143,6 +148,20 @@ export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceP
         id,
         message: data.error ?? `تعذّر الحفظ — ردّ الخادم بالرمز ${res.status}. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب.`,
       });
+      setRowBusy(null);
+      return;
+    }
+
+    /*
+      ‏«٢٠٠» تقول إنّ الطلب فُهم، لا إنّ شيئاً كُتب.
+      والمسار الجماعيّ يردّ `ok: true` ومعه `confirmed: 0` حين يرفض كلّ
+      ما أُرسل — لأنّ الحركة مطابَقةٌ أصلاً أو ليست اقتراحاً. وكان هذا
+      يُقرأ نجاحاً، فيُرفَع البند من الشاشة ولم يُكتب شيء؛ فإذا حُدِّثت
+      الصفحة عاد كأنّ الضغطة لم تقع. **والصمتُ عن الرفض أسوأ من الرفض.**
+    */
+    const rejected = (data.outcomes ?? []).filter((o) => !o.ok);
+    if (data.confirmed === 0 && rejected.length > 0) {
+      setRowError({ id, message: rejected[0]?.reason ?? "لم يُكتب شيء — راجع حال الحركة." });
       setRowBusy(null);
       return;
     }
@@ -188,16 +207,15 @@ export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceP
         return;
       }
 
-      setResult({
-        ok: true,
-        message: data.message,
-        rejected: (data.outcomes ?? [])
-          .filter((o: { ok: boolean }) => !o.ok)
-          .map((o: { transactionId: string; reason: string }) => ({
-            transactionId: o.transactionId,
-            reason: o.reason,
-          })),
-      });
+      const rejected = (data.outcomes ?? [])
+        .filter((o: { ok: boolean }) => !o.ok)
+        .map((o: { transactionId: string; reason: string }) => ({
+          transactionId: o.transactionId,
+          reason: o.reason,
+        }));
+
+      /* لم يُكتب شيء — فالنتيجة ليست نجاحاً وإن كان الرمز ٢٠٠ */
+      setResult({ ok: data.confirmed > 0, message: data.message, rejected });
       router.refresh();
     } catch {
       setResult({ ok: false, message: "تعذّر الاتصال. تحقّق من الشبكة ثمّ أعد المحاولة." });

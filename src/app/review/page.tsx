@@ -9,6 +9,7 @@ import { ReviewWorkspace } from "@/components/review-workspace";
 import { bankTransactions, suppliers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { ReviewItem } from "@/lib/bank/review-queue";
+import { pendingDecision } from "@/lib/bank/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -50,11 +51,12 @@ export default async function ReviewPage() {
     .from(bankTransactions)
     .leftJoin(suppliers, eq(suppliers.id, bankTransactions.supplierId))
     /*
-      ما ينتظر قراراً وحده: لا مُقيَّدة ولا مُقَرَّة.
-      و`lifecycle` هي المصدر — لا `match_status` و`match_disposition`
-      معاً، فهما يصفان من جهتين لا تُقرآن معاً.
+      ما ينتظر قراراً وحده — والتعريف في `pending.ts` يُستدعى ولا يُنسَخ.
+      وكان هنا `lifecycle` وحدها، فبقيت في الطابور خمسُ حركاتٍ مدفوعةٍ
+      بالفعل واثنتان وثلاثون أُعلن أنّها ليست سداداً: أسئلةٌ مُجابة
+      تُعرَض معلَّقة، وزرُّ التأكيد عليها يردّه الخادمُ بحقّ.
     */
-    .where(sql`${bankTransactions.lifecycle} in ('RAW', 'INFERRED', 'SUGGESTED')`)
+    .where(pendingDecision())
     .orderBy(desc(bankTransactions.amountMinor))
     .limit(400);
 
