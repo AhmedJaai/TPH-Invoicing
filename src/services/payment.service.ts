@@ -6,7 +6,7 @@
  * واحدة، لكنّها تعني أنّ النظام يخلق مالاً لم يُدفع. فالتخصيص يُحدّ بما
  * بقي، والفائض يُعلَن ولا يُبتلَع.
  */
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { paymentAllocations, payments } from "@/db/schema";
 import { planAllocations, type AllocationRequest } from "@/lib/allocation";
 import {
@@ -37,6 +37,67 @@ export interface CreatePaymentInput {
    * قبل وصول الفاتورة كانت دفعته تبقى معلّقةً إلى الأبد وكأنّها خطأ.
    */
   isAdvance?: boolean;
+}
+
+/**
+ * دفعةٌ سبقتها بنفس المورّد ونفس اليوم ونفس المبلغ.
+ *
+ * **الريال الواحد يُسجَّل مرّتين حين يأتي من بابين.** إيصالُ السداد في
+ * الدرايف يُنشئ دفعة، وحركةُ الكشف نفسُها تُنشئ أخرى، ولا فاحصَ بينهما.
+ * وقِيس على قاعدة أحمد فوُجدت أربع: أفال ٨٬٤٠٢٫٧٧ · بيكوف ٩٠٠ · لافا
+ * ٩٤٥ · كوهي ٨٣٣٫٧٥ — **١١٬٠٨١٫٥٢ ريالاً محسوبةً مرّتين**، تُظهر
+ * المورّد مدفوعاً له أكثر ممّا أخذ فيُطالَب بردٍّ لا يستحقّه.
+ *
+ * والمفتاح ثلاثة: المورّد واليومُ والمبلغ. ولا يُضاف إليه المصدر —
+ * فالمقصود بالضبط أن يلتقي مصدران على واقعةٍ واحدة.
+ *
+ * وهذا **كشفٌ لا قيد**: مورّدٌ قد يُدفع له مرّتين في اليوم بنفس المبلغ
+ * حقيقةً (بيكوف يُسدَّد بمئةٍ وخمسين لكلّ فاتورة). فيُرَدّ ما وُجد
+ * ويُترَك القرارُ لمن استدعى — ومن يقيّد من إيصالٍ يتبنّى، ومن يقيّد
+ * من كشفٍ يُنشئ.
+ */
+export async function findPaymentTwin(
+  tx: Tx,
+  input: { supplierId: string | null; paidAt: Date; amountMinor: number },
+): Promise<{
+  id: string;
+  documentId: string | null;
+  allocatedMinor: number;
+  hasBankRow: boolean;
+} | null> {
+  if (!input.supplierId) return null;
+
+  const [row] = await tx
+    .select({
+      id: payments.id,
+      documentId: payments.documentId,
+      allocatedMinor: sql<number>`coalesce((
+        select sum(pa.amount_minor)::int from payment_allocations pa
+         where pa.payment_id = ${payments}.id
+      ), 0)`,
+      hasBankRow: sql<boolean>`exists (
+        select 1 from bank_transactions bt where bt.matched_payment_id = ${payments}.id
+      )`,
+    })
+    .from(payments)
+    .where(and(
+      eq(payments.supplierId, input.supplierId),
+      eq(payments.amountMinor, input.amountMinor),
+      /* اليومُ نفسه — لا اللحظةُ نفسها: الإيصال يُؤرَّخ بيومه والكشف بوقته */
+      sql`${payments.paidAt}::date = ${input.paidAt.toISOString().slice(0, 10)}::date`,
+      sql`${payments.status} not in ('REVERSED','VOID')`,
+    ))
+    .orderBy(payments.createdAt)
+    .limit(1);
+
+  return row
+    ? {
+        id: row.id,
+        documentId: row.documentId,
+        allocatedMinor: Number(row.allocatedMinor),
+        hasBankRow: Boolean(row.hasBankRow),
+      }
+    : null;
 }
 
 export async function createPayment(tx: Tx, input: CreatePaymentInput): Promise<string> {

@@ -31,6 +31,7 @@ import { reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { parseRiyals } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
 import { recordAudit } from "@/lib/audit";
+import { findPaymentTwin } from "@/services/payment.service";
 import { canonicalName } from "@/lib/canonical-name";
 import { MONTH, countNoun } from "@/lib/arabic";
 
@@ -238,6 +239,8 @@ export async function POST(request: Request) {  let user;
   // ── التسجيل ──
   let created = 0;
   let invoicesCreated = 0;
+  /** إيصالاتٌ وُجدت واقعتُها مقيَّدةً — عُلِّقت ولم تُنسَخ دفعةً ثانية. */
+  let paymentsAdopted = 0;
   const notes: string[] = [];
 
   for (const { entry, parsed } of named.slice(0, MAX_NAMED_PER_CALL)) {
@@ -293,15 +296,43 @@ export async function POST(request: Request) {  let user;
       }
 
       if (plan.createsPayment) {
-        await tx.insert(payments).values({
-          documentId: doc.id,
+        /*
+          الإيصالُ **دليلٌ على دفعة**، لا دفعةٌ ثانية.
+
+          كان هذا المسار يُدرج دفعةً بلا أن يسأل: أعندنا هذه الواقعة
+          أصلاً؟ وحركةُ الكشف تُدرج أخرى، فيصير الريالُ ريالين. وفي
+          قاعدة أحمد أربع كذلك — منها إيصال أفال ٨٬٤٠٢٫٧٧ وإيصال بيكوف
+          ٩٠٠ — تُظهر المورّدَ مدفوعاً له ضعفَ ما أخذ.
+
+          فإن وُجدت الواقعةُ مقيَّدةً بلا مستند، عُلِّق عليها الإيصالُ
+          ولم تُنسَخ. وإن كانت لها مستندٌ آخر فهما إيصالان لواقعةٍ
+          واحدة — يُسجَّل المستند ولا تُقيَّد دفعة، ويُترَك الأمر
+          لفحص الازدواج.
+        */
+        const twin = await findPaymentTwin(tx, {
           supplierId: supplier?.id ?? null,
           paidAt: date,
           amountMinor: p.amountMinor!,
-          method: plan.paymentMethod,
-          beneficiaryNameRaw: p.beneficiary ?? null,
-          appliesToMonth: entry.month,
         });
+
+        if (twin === null) {
+          await tx.insert(payments).values({
+            documentId: doc.id,
+            supplierId: supplier?.id ?? null,
+            paidAt: date,
+            amountMinor: p.amountMinor!,
+            method: plan.paymentMethod,
+            beneficiaryNameRaw: p.beneficiary ?? null,
+            appliesToMonth: entry.month,
+          });
+        } else if (twin.documentId === null) {
+          await tx.update(payments)
+            .set({ documentId: doc.id })
+            .where(eq(payments.id, twin.id));
+          paymentsAdopted++;
+        } else {
+          paymentsAdopted++;
+        }
       }
     });
   }
@@ -464,6 +495,7 @@ export async function POST(request: Request) {  let user;
         ملفات_جديدة: fresh.length,
         سُجّلت: created,
         فواتير: invoicesCreated,
+        "إيصالات عُلِّقت على دفعةٍ قائمة": paymentsAdopted,
         قُرئ_محتواها: read,
       },
     });
@@ -528,7 +560,7 @@ export async function POST(request: Request) {  let user;
   return NextResponse.json({
     ok: true,
     applied: true,
-    summary: { ...scanned, created, invoicesCreated, contentRead: read, remainingUnnamed: remaining },
+    summary: { ...scanned, created, invoicesCreated, paymentsAdopted, contentRead: read, remainingUnnamed: remaining },
     notes: notes.slice(0, 20),
     readFailures,
     renameSuggestions,

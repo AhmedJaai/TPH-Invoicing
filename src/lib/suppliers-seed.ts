@@ -54,8 +54,17 @@ export const SUPPLIER_SEED: SupplierSeed[] = [
     notes: "تظهر في البنك باسم «شركة أنس غالب حمزة خاشقجي التجارية» — لا باسم غاناش",
   },
   { slug: "KohiRoastary", driveFolderName: "Kohi Roastary", nameAr: "كوهي روستري", nameEn: "Kohi Roastary", category: "COFFEE" },
-  { slug: "Rawnah", driveFolderName: "Rawnah (رونة)", nameAr: "رونة", nameEn: "Rawnah", category: "FOOD" },
-  { slug: "AtlasRoastery", driveFolderName: "Atlas Roastery (عمار بن صديق)", nameAr: "محمصة أطلس — عمار بن صديق", nameEn: "Atlas Roastery", category: "COFFEE" },
+  {
+    slug: "Rawnah", driveFolderName: "Rawnah (رونة)", nameAr: "رونة", nameEn: "Rawnah", category: "FOOD",
+    bankAliases: ["شركة عالم رونة التجارية"],
+    notes: "تظهر في البنك «شركة عالم رونة التجارية» — حوالتا ١٠-٠٨ و١٣-٠٨ في دفتر أحمد",
+  },
+  {
+    slug: "AtlasRoastery", driveFolderName: "Atlas Roastery (عمار بن صديق)",
+    nameAr: "محمصة أطلس — عمار بن صديق", nameEn: "Atlas Roastery", category: "COFFEE",
+    bankAliases: ["مؤسسة عمار مصطفى احمد بن صديق"],
+    notes: "تظهر في البنك باسمه الرباعيّ — حوالة ١٣-٠٨ بـ٥٧٥.٠٠ في دفتر أحمد",
+  },
   { slug: "AwaniAlMaida", driveFolderName: "Awani Al-Maida (ملتقى الأواني)", nameAr: "ملتقى الأواني", nameEn: "Awani Al-Maida", category: "EQUIPMENT" },
   { slug: "LavaKombucha", driveFolderName: "Lava of Kombucha", nameAr: "لافا كمبوتشا", nameEn: "Lava of Kombucha", category: "FOOD" },
   {
@@ -71,12 +80,21 @@ export const SUPPLIER_SEED: SupplierSeed[] = [
   {
     slug: "WaterFilters", driveFolderName: "Water Filters (الرعاية المتناهية)", nameAr: "الرعاية المتناهية — فلاتر مياه",
     category: "WATER", issuesInvoices: false,
-    notes: "غير مذكور في قائمة الأسماء المختصرة الأصلية — الاسم المختصر مقترح ويحتاج تأكيد المالك",
+    /*
+      واسمُ الشهرة وحده، لأنّ خانة المستفيد **تُقتطَع**: يكتب الأهليّ
+      «شركة الرعاية المتناهية ال محدود» — بلا تاءٍ في آخرها، مقطوعةً
+      عند ثلاثين حرفاً كما قُطعت «PURE BEVERAGE INDUSTRY CO CLOS».
+      فالاسمُ النظاميّ الكامل لا يلتقي بما في الكشف أبداً، واسمُ الشهرة
+      يلتقي به احتواءً.
+    */
+    bankAliases: ["الرعاية المتناهية", "شركة الرعاية المتناهية المحدودة"],
+    notes: "أكّده أحمد في دفتره: مورّد بلا فواتير · ١٥٠ ريالاً · حوالة ١٠-٠٨",
   },
   {
     slug: "Mariah", driveFolderName: "Mariah (براونيز)", nameAr: "مريم — براونيز",
     category: "FOOD", issuesInvoices: false,
-    notes: "غير مذكور في قائمة الأسماء المختصرة الأصلية — الاسم المختصر مقترح ويحتاج تأكيد المالك",
+    bankAliases: ["ماريه محمد علي بامخشب"],
+    notes: "أكّده أحمد في دفتره: «ماريه بامخشب» — براونيز بلا فواتير · ٢٬٥٦٠ ريالاً",
   },
   {
     slug: "HungryMan", driveFolderName: "Hungry Man Bakery", nameAr: "هنقري مان بيكري", nameEn: "Hungry Man Bakery", category: "FOOD",

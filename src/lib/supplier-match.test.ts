@@ -135,3 +135,66 @@ describe("الاحتواء دليلٌ أقوى من التشابه", () => {
       .toBeUndefined();
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════
+   الأهليّ يقصّ الكلمة بفراغ، ويقتطع الاسم عند حدّه
+
+   قِيس على كشف أحمد الحقيقيّ (٨ مايو ← ١ سبتمبر): تسعةَ عشر مستفيداً
+   أكّد أحمد بنفسه من هُم، **أحدَ عشر منهم لا يعرفهم النظام** — وفيهم
+   من له اسمٌ بديل مكتوبٌ عندنا صحيحاً منذ التأسيس. والسبب أنّ التصدير
+   يلفّ السطر داخل الكلمة: «المحد ودة» و«التجا رية» و«TRA DING».
+   ═══════════════════════════════════════════════════════════════ */
+describe("عيوبُ تصدير الأهليّ في اسم المستفيد", () => {
+  const s = (
+    nameAr: string, aliases: string[] = [], nameEn?: string,
+  ): SupplierRecord => ({
+    id: nameAr, slug: nameAr, nameAr, nameEn, driveFolderName: nameAr,
+    issuesInvoices: true, contractOnFile: false,
+    aliases: aliases.map((a) => ({ normalized: normalizeName(a) })),
+  });
+
+  it("الفراغُ المقحَم داخل الكلمة لا يُبطل الاسم البديل", () => {
+    const list = [s("غاناش", ["شركة أنس غالب حمزة خاشقجي التجارية المحدودة"]), s("زاكوباك")];
+    const m = matchSupplier(list, {
+      supplierNameAr: "شركة انس غالب حمزه خاشقجي التجارية المحد ودة",
+    });
+    expect(m.supplier?.nameAr).toBe("غاناش");
+  });
+
+  it("وفي الإنجليزيّ كذلك — «TRA DING»", () => {
+    const list = [s("بيكوف", ["KHALID SAED BN MAHFUS TRADING"]), s("كوهي")];
+    expect(matchSupplier(list, { supplierNameEn: "KHALID SAED BN MAHFUS TRA DING" })
+      .supplier?.nameAr).toBe("بيكوف");
+  });
+
+  it("والاحتواء يعمل في الجهتين — المخزَّن أطولُ من الكشف", () => {
+    /* الكشف «الكوب الذهبي» والمخزَّن «مصنع الكوب الذهبي» */
+    const list = [s("مصنع الكوب الذهبي"), s("زاكوباك")];
+    expect(matchSupplier(list, { supplierNameAr: "الكوب الذهبي" }).supplier?.nameAr)
+      .toBe("مصنع الكوب الذهبي");
+  });
+
+  it("واسمُ الشهرة يُلتقَط من اسمٍ مقتطَع", () => {
+    /* «شركة الرعاية المتناهية ال محدود» — قُطعت التاء عند حدّ الخانة */
+    const list = [s("الرعاية المتناهية — فلاتر مياه", ["الرعاية المتناهية"])];
+    expect(matchSupplier(list, { supplierNameAr: "شركة الرعاية المتناهية ال محدود" })
+      .supplier?.nameAr).toBe("الرعاية المتناهية — فلاتر مياه");
+  });
+
+  it("ولا يُخلَط «سرد كو» بـ«سرد للتجارة» — وهما اثنان في دفتر أحمد", () => {
+    const list = [
+      s("سرد كو", ["شركة الصرد للتعبئة", "الصرد"]),
+      s("سرد للتجارة — معدات", ["شركة سرد للتجارة"]),
+    ];
+    expect(matchSupplier(list, { supplierNameAr: "شركة الصرد للتعبئة والتغل يف" })
+      .supplier?.nameAr).toBe("سرد كو");
+    expect(matchSupplier(list, { supplierNameAr: "شركة سرد للتجارة" })
+      .supplier?.nameAr).toBe("سرد للتجارة — معدات");
+  });
+
+  it("وإسقاطُ الفراغ لا يُطابق اسمين مختلفين", () => {
+    const list = [s("أوراق الزيتون"), s("أوراق الزيت")];
+    expect(matchSupplier(list, { supplierNameAr: "مؤسسة الرياض للتجارة" }).supplier)
+      .toBeUndefined();
+  });
+});

@@ -4,11 +4,13 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { formatRiyalsDisplay } from "./money";
 import type { AttentionEvidence, AttentionFacts } from "./attention";
 import { previousMonth } from "./filing";
 import { analyzeCoverage } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
 import { findDuplicateExpenses, type Expense } from "./expenses";
+import { findDoublePaid, recoverableMinor, type DoublePaidTx } from "./bank/double-paid";
 
 interface Row {
   [key: string]: unknown;
@@ -200,6 +202,61 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   });
 
   /*
+    السدادُ المزدوج — مالٌ خرج مرّتين في اليوم نفسه لجهةٍ واحدة.
+
+    ويُقرأ من الحركات كلِّها لا من كشفٍ يُستورَد الآن: كان يُحسَب لحظةَ
+    الاستيراد ويُعرَض في نتيجته، فيضيع بإغلاقها. ومن يفتح النظام بعد
+    شهر لا يجد له أثراً — وقد خرج المال.
+  */
+  const outgoing = (
+    await db.execute<{
+      id: string; value_date: Date; amount_minor: number; direction: string;
+      description: string | null; beneficiary_raw: string | null;
+      category: string; operation_ref: string | null;
+    }>(sql`
+      select id, value_date, amount_minor, direction::text as direction,
+             description, beneficiary_raw, category::text as category, operation_ref
+      from bank_transactions
+      where direction = 'DEBIT'
+    `)
+  ).rows;
+
+  /*
+    دفعاتٌ لا فاتورةَ تفسّرها — السؤال الأسبوعيّ الذي كان يُراجَع بيد.
+
+    والمقدَّمةُ المعلَنة تخرج: صاحبُها قال ما هي فليست سؤالاً. والمردودةُ
+    والملغاةُ لم يخرج مالُها أصلاً.
+  */
+  const unbacked = (
+    await db.execute<{
+      name_ar: string | null; d: string; amount_minor: number; unbacked: number;
+    }>(sql`
+      select s.name_ar, p.paid_at::date::text as d, p.amount_minor,
+             p.amount_minor - p.fee_minor
+               - coalesce((select sum(a.amount_minor)::int from payment_allocations a
+                            where a.payment_id = p.id), 0) as unbacked
+        from payments p
+        left join suppliers s on s.id = p.supplier_id
+       where p.status not in ('REVERSED','VOID','ADVANCE')
+         and p.amount_minor - p.fee_minor
+             - coalesce((select sum(a.amount_minor)::int from payment_allocations a
+                          where a.payment_id = p.id), 0) > 100
+       order by unbacked desc
+    `)
+  ).rows;
+
+  const doublePaid = findDoublePaid(outgoing.map((r): DoublePaidTx => ({
+    id: r.id,
+    valueDate: new Date(r.value_date),
+    amountMinor: Number(r.amount_minor),
+    direction: "DEBIT",
+    description: r.description,
+    beneficiaryRaw: r.beneficiary_raw,
+    category: r.category,
+    operationRef: r.operation_ref,
+  })));
+
+  /*
     ازدواج المصروف — يُكشَف ولا يُحذَف.
 
     والكشف في `lib/expenses.ts` دالّةً خالصة، وهي التي تستثني ما اختلف
@@ -238,9 +295,20 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     bankBalanceDifferenceMinor: balance.differenceMinor,
     openBlockers: Number(counts?.open_blockers ?? 0),
     pendingDocuments: Number(counts?.pending_docs ?? 0),
-    // كشف الدفعات المكرّرة يحتاج قراءة الكشف نفسه — يُعرض من صفحة البنك
-    duplicatePayments: 0,
-    duplicatePaymentAmountMinor: 0,
+    /*
+      كان هنا صفرٌ مكتوبٌ بيد، وتعليقٌ يحيل إلى صفحة البنك — وصفحةُ
+      البنك لا تحسبه أيضاً. فالبندُ لم يظهر مرّةً واحدة، والشاشةُ تقول
+      ضمناً «لا سداد مزدوج» وهي دعوى لم تُفحَص. **والصفرُ المكتوب أسوأ
+      من الفراغ**، لأنّه يُقرأ جواباً.
+    */
+    duplicatePayments: doublePaid.length,
+    duplicatePaymentAmountMinor: recoverableMinor(doublePaid),
+    duplicatePaymentEvidence: doublePaid.slice(0, 6).map((g) => ({
+      label: g.payee,
+      sub: `${g.day} · ${g.transactions.length} مرّات`
+        + (g.distinctOperations ? " · بمراجعِ سدادٍ مختلفة" : " · بلا مرجعٍ يفصلهما"),
+      amountMinor: g.excessMinor,
+    })),
     notTaxValidCount: Number(counts?.not_valid ?? 0),
     vatAtRiskMinor: Number(counts?.vat_at_risk ?? 0),
     vatAtRiskEvidence: vatEvidence,
@@ -253,6 +321,13 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     suppliersMissingStatement: missingStatements,
     suppliersWithoutContract: noContract,
     invoicesWithoutLines: Number(counts?.no_lines ?? 0),
+    unbackedPaymentCount: unbacked.length,
+    unbackedPaymentMinor: unbacked.reduce((n, r) => n + Number(r.unbacked), 0),
+    unbackedPaymentEvidence: unbacked.slice(0, 6).map((r) => ({
+      label: r.name_ar ?? "بلا مورّد",
+      sub: `${String(r.d).slice(0, 10)} · من أصل ${formatRiyalsDisplay(Number(r.amount_minor))}`,
+      amountMinor: Number(r.unbacked),
+    })),
     priceRises,
     // الأثر السنوي يحتاج دورة الطلب؛ يُقدَّر هنا بفارق السعر × عشرين طلباً
     priceRiseAnnualMinor: priceRises.reduce((s, r) => s + (r.amountMinor ?? 0) * 20, 0),

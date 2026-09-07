@@ -7,7 +7,8 @@ import { Money } from "./money";
 import { Badge, buttonClass, Card, EmptyState } from "./ui";
 import { countNoun, SUGGESTION, TRANSACTION } from "@/lib/arabic";
 import {
-  BUCKET_HINT, BUCKET_LABEL, bulkConfirmable, groupForReview,
+  BUCKET_HINT, BUCKET_LABEL, bulkConfirmable,
+  settleable, groupForReview,
   type ReviewBucket, type ReviewItem,
 } from "@/lib/bank/review-queue";
 
@@ -183,6 +184,15 @@ export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceP
   const rejectOne = (id: string, kind: string) =>
     post("/api/match-confirm", { transactionId: id, notAPayment: kind }, id, "حُفظت");
 
+  /*
+    السدادُ على حساب المورّد — والسياسة تُقال قبل الضغط لا بعده.
+
+    وهو الفعلُ الذي كان ينقص هذه الشاشة: عشرون حوالةً عرّف أحمد
+    جهاتِها بيده، فخرجت من الطابور بلا أن يُقيَّد ريالٌ منها.
+  */
+  const settleOne = (id: string) =>
+    post("/api/match-confirm", { transactionId: id, settleSupplier: true }, id, "قُيِّدت على حسابه");
+
   const defineOne = (id: string, kind: string, displayName: string) =>
     post("/api/counterparty", { transactionId: id, kind, displayName }, id, "عُرِّفت");
 
@@ -333,6 +343,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceP
             canApprove={canApprove}
             canEdit={canEdit}
             onConfirm={confirmOne}
+            onSettle={settleOne}
             onReject={rejectOne}
             onDefine={defineOne}
           />
@@ -350,7 +361,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceP
  */
 function Bucket({
   bucket, items, twins, done, openOn, setOpenOn, rowBusy, rowError,
-  canApprove, canEdit, onConfirm, onReject, onDefine,
+  canApprove, canEdit, onConfirm, onSettle, onReject, onDefine,
 }: {
   bucket: ReviewBucket;
   items: ReviewItem[];
@@ -363,6 +374,7 @@ function Bucket({
   canApprove: boolean;
   canEdit: boolean;
   onConfirm: (id: string) => void;
+  onSettle: (id: string) => void;
   onReject: (id: string, kind: string) => void;
   onDefine: (id: string, kind: string, name: string) => void;
 }) {
@@ -391,6 +403,7 @@ function Bucket({
             canApprove={canApprove}
             canEdit={canEdit}
             onConfirm={onConfirm}
+            onSettle={onSettle}
             onReject={onReject}
             onDefine={onDefine}
           />
@@ -413,7 +426,7 @@ function Bucket({
 /** بندٌ واحد: ما هو، ولماذا هو هنا، وما الذي تفعله به. */
 function Row({
   item: i, bucket, twin, doneMessage, open, setOpen, busy, error,
-  canApprove, canEdit, onConfirm, onReject, onDefine,
+  canApprove, canEdit, onConfirm, onSettle, onReject, onDefine,
 }: {
   item: ReviewItem;
   bucket: ReviewBucket;
@@ -426,6 +439,7 @@ function Row({
   canApprove: boolean;
   canEdit: boolean;
   onConfirm: (id: string) => void;
+  onSettle: (id: string) => void;
   onReject: (id: string, kind: string) => void;
   onDefine: (id: string, kind: string, name: string) => void;
 }) {
@@ -478,6 +492,25 @@ function Row({
         {/* ── الأفعال ── */}
         {canAct && bucket !== "RESOLVE" && (
           <>
+            {/*
+              الفعلُ يتبع ما تحتاجه الحركة فعلاً.
+
+              ما له اقتراحُ فاتورةٍ يُؤكَّد؛ وما عُرف مورّدُه ولا اقتراحَ
+              له يُقيَّد على حسابه. وكان الزرّ واحداً في الحالين، فيردّ
+              الخادمُ الثانيةَ بحقّ: «ليست اقتراحاً». **وزرٌّ لا يعمل
+              أسوأ من غيابه** — يُقرأ عملاً بقي وهو عملٌ لا سبيل إليه.
+            */}
+            {settleable(i) ? (
+              <button
+                type="button"
+                className={buttonClass("primary", "sm")}
+                disabled={busy}
+                onClick={() => onSettle(i.transactionId)}
+                title="تُقيَّد دفعةً على حساب المورّد، وتُوزَّع على المفتوح بالأقدم أوّلاً، وما بقي يبقى غير مخصَّص"
+              >
+                {busy ? "يُقيَّد…" : "قيّدها على حسابه"}
+              </button>
+            ) : (
             <button
               type="button"
               className={buttonClass("primary", "sm")}
@@ -486,6 +519,7 @@ function Row({
             >
               {busy ? "يُعاد الحساب…" : "أكّد"}
             </button>
+            )}
             <button
               type="button"
               className={buttonClass("secondary", "sm")}
@@ -514,6 +548,14 @@ function Row({
           افتحها في البنك ←
         </Link>
       </div>
+
+      {/* السياسة تُقال قبل الضغط — والمخفيّة تُنتج ثقةً بلا فهم */}
+      {canAct && settleable(i) && (
+        <p className="mt-1.5 text-xs leading-relaxed text-muted">
+          لا رقمَ فاتورةٍ في الحوالة — فتُوزَّع على فواتير {i.supplierName} المفتوحة
+          بالأقدم أوّلاً، وما بقي يبقى على حسابه غير مخصَّص.
+        </p>
+      )}
 
       {/* ── ليست سداداً: السبب ── */}
       {open === "reject" && (

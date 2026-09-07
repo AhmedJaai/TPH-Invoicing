@@ -9,13 +9,14 @@ import {
 
 const quiet: AttentionFacts = {
   openBlockers: 0, pendingDocuments: 0,
-  duplicatePayments: 0, duplicatePaymentAmountMinor: 0,
+  duplicatePayments: 0, duplicatePaymentAmountMinor: 0, duplicatePaymentEvidence: [],
   notTaxValidCount: 0, vatAtRiskMinor: 0, vatAtRiskEvidence: [],
   unknownTaxCount: 0, unknownTaxEvidence: [],
   overdueMinor: 0, overdueSuppliers: [],
   unclassifiedBankTx: 0, unclassifiedBankAmountMinor: 0,
   suppliersMissingStatement: [], suppliersWithoutContract: [],
   invoicesWithoutLines: 0,
+  unbackedPaymentCount: 0, unbackedPaymentMinor: 0, unbackedPaymentEvidence: [],
   priceRises: [], priceRiseAnnualMinor: 0,
   bankGapDays: 0, bankGapRanges: [], bankBalanceDifferenceMinor: 0,
   duplicateExpenses: 0, duplicateExpenseAmountMinor: 0, duplicateExpenseEvidence: [],
@@ -320,5 +321,35 @@ describe("ازدواج المصروف", () => {
 
   it("ولا بند بلا ازدواج", () => {
     expect(ids({})).not.toContain("duplicate-expenses");
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   «لمن دفعنا بلا فاتورة؟»
+
+   السؤال الذي كان أحمد يراجعه بيده كلّ أسبوع في دفتره، ولم يكن في
+   النظام موضعٌ يجيبه. والدفعة غير المخصَّصة حالٌ صحيحة لا خطأ — لكنّها
+   عملٌ باقٍ: تصل الفاتورة، أو يُعلَن أنّ المورّد لا يصدرها فيُطلَب
+   عقدُ توريد. وبلا فاتورةٍ ضريبية لا يُخصَم مدخلُ الضريبة.
+   ═══════════════════════════════════════════════════════════════ */
+describe("مالٌ خرج ولا فاتورة تفسّره", () => {
+  it("يُعرَض بندٌ عالي الأهمّية بأثرٍ «لم يُنسَب»", () => {
+    const items = buildAttention({
+      ...quiet,
+      unbackedPaymentCount: 3,
+      unbackedPaymentMinor: 5_432_60,
+      unbackedPaymentEvidence: [{ label: "غاناش", sub: "2026-09-02", amountMinor: 5_432_60 }],
+    });
+    const item = items.find((i) => i.id === "unbacked-payments");
+    expect(item).toBeDefined();
+    expect(item!.severity).toBe("HIGH");
+    expect(item!.impact.kind).toBe("UNATTRIBUTED");
+    expect(item!.amountMinor).toBe(5_432_60);
+    expect(item!.evidence).toHaveLength(1);
+  });
+
+  it("ولا يُعرَض حين لا شيء معلَّق", () => {
+    expect(buildAttention(quiet).find((i) => i.id === "unbacked-payments"))
+      .toBeUndefined();
   });
 });

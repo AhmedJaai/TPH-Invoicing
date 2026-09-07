@@ -22,7 +22,7 @@ import {
 } from "@/db/schema";
 import { createId } from "@/lib/id";
 import {
-  allocate, createPayment, refreshPaymentStatus, reversePayment,
+  allocate, createPayment, findPaymentTwin, refreshPaymentStatus, reversePayment,
 } from "@/services/payment.service";
 import { runReconciliation } from "@/services/reconcile.service";
 import { confirmCounterparty, loadMerchantMemory } from "@/services/counterparty.service";
@@ -452,6 +452,83 @@ async function main() {
       results.push({ name, pass: false, detail: (e as Error).message.slice(0, 200) });
     }
   }
+
+  /* ── ١٠ · الريال الواحد من بابين ── */
+  await scenario("١٠ · إيصالٌ وحركةُ بنك لواقعةٍ واحدة ← دفعةٌ واحدة", async (tx) => {
+    const { supplierId, invoiceIds } = await seed(tx, [900_00]);
+
+    /* أوّلاً: إيصالُ الدرايف يُنشئ دفعةً معلَّقة بلا حركةِ بنك */
+    const fromReceipt = await createPayment(tx, {
+      supplierId, paidAt: day("2026-08-25"), amountMinor: 900_00,
+      method: "BANK_TRANSFER", appliesToMonth: "2026-08",
+    });
+
+    /* ثمّ يأتي الكشف بالواقعة نفسها — فيجب أن تُعرَف لا أن تُنسَخ */
+    const twin = await findPaymentTwin(tx, {
+      supplierId, paidAt: day("2026-08-25"), amountMinor: 900_00,
+    });
+    if (twin === null) throw new Error("لم تُعرَف الدفعة القائمة — فسيصير الريالُ ريالين");
+    if (twin.id !== fromReceipt) throw new Error("عُرفت دفعةٌ أخرى غير التي كُتبت");
+    if (twin.hasBankRow) throw new Error("قيل إنّ لها حركةَ بنك ولا حركة");
+    if (twin.allocatedMinor !== 0) throw new Error("قيل إنّها مخصَّصة ولم تُخصَّص");
+
+    /* وتُخصَّص هي — فلا تُنشَأ ثانية */
+    await allocate(tx, twin.id, 900_00, [{ invoiceId: invoiceIds[0], amountMinor: 900_00 }]);
+
+    const [row] = (
+      await tx.execute<{ n: number; total: number }>(sql`
+        select count(*)::int as n, coalesce(sum(amount_minor), 0)::int as total
+        from payments where supplier_id = ${supplierId} and status not in ('REVERSED','VOID')
+      `)
+    ).rows;
+
+    if (Number(row?.n) !== 1) {
+      throw new Error(`${row?.n} دفعتان لواقعةٍ واحدة — المال محسوبٌ مرّتين`);
+    }
+    if (Number(row?.total) !== 900_00) {
+      throw new Error(`المجموع ${Number(row?.total) / 100} لا ٩٠٠`);
+    }
+    return `دفعةٌ واحدة بـ٩٠٠٫٠٠ — لا ريالَ زائد`;
+  });
+
+  /* ── ١١ · وواقعتان حقيقيّتان تبقيان اثنتين ── */
+  await scenario("١١ · سدادان حقيقيّان بنفس المبلغ واليوم ← لا يُدمَجان", async (tx) => {
+    const { supplierId, invoiceIds } = await seed(tx, [150_00, 150_00]);
+
+    const first = await createPayment(tx, {
+      supplierId, paidAt: day("2026-08-25"), amountMinor: 150_00, method: "BANK_TRANSFER",
+    });
+    await allocate(tx, first, 150_00, [{ invoiceId: invoiceIds[0], amountMinor: 150_00 }]);
+
+    /*
+      الثانية واقعةٌ أخرى — وبيكوف يُسدَّد كذلك: مئةٌ وخمسون لكلّ فاتورة.
+      و`findPaymentTwin` **يكشف ولا يقيّد**: يردّ الأولى، ومن يقيّد من
+      كشفٍ يُنشئ لأنّ الأولى صار لها تخصيصُها.
+    */
+    const twin = await findPaymentTwin(tx, {
+      supplierId, paidAt: day("2026-08-25"), amountMinor: 150_00,
+    });
+    if (twin === null) throw new Error("لم تُرَدّ الأولى — والكشفُ لا يميّز");
+    if (twin.allocatedMinor !== 150_00) {
+      throw new Error("لم يُقَل إنّها مخصَّصة، فقد تُتبنّى وهي مشغولة");
+    }
+
+    const second = await createPayment(tx, {
+      supplierId, paidAt: day("2026-08-25"), amountMinor: 150_00, method: "BANK_TRANSFER",
+    });
+    await allocate(tx, second, 150_00, [{ invoiceId: invoiceIds[1], amountMinor: 150_00 }]);
+
+    const [row] = (
+      await tx.execute<{ total: number }>(sql`
+        select coalesce(sum(amount_minor), 0)::int as total
+        from payments where supplier_id = ${supplierId} and status not in ('REVERSED','VOID')
+      `)
+    ).rows;
+    if (Number(row?.total) !== 300_00) {
+      throw new Error(`المجموع ${Number(row?.total) / 100} لا ٣٠٠ — واقعتان حقيقيّتان`);
+    }
+    return "دفعتان بـ٣٠٠٫٠٠ — الكشفُ يميّز ولا يبتلع";
+  });
 
   /* ── التقرير ── */
   console.log("");

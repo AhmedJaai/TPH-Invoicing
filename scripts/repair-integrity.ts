@@ -352,6 +352,110 @@ async function main() {
     });
   }
 
+  /* ── ٥) الريال الواحد مقيَّدٌ دفعتين ── */
+  /*
+    إيصالُ الدرايف يُنشئ دفعة، وحركةُ الكشف تُنشئ أخرى، ولا فاحصَ بينهما.
+    فيصير الريالُ ريالين: المورّد يبدو مدفوعاً له ضعفَ ما أخذ، ورصيدُه
+    يخرج سالباً فيُطالَب بردٍّ لا يستحقّه.
+
+    والدمجُ يُبقي **الأغنى**: ما له حركةُ بنك أوّلاً — لأنّها الأثر الذي
+    لا يُستعاد — ثمّ ما له تخصيصات. ويُنقَل إليه مستندُ الزائدة إن كان
+    الباقي بلا مستند، فلا يضيع الإيصال. والزائدةُ لا أثرَ بنكيّ لها ولا
+    تخصيص، فلا يُفكّ بطيّها شيءٌ مقيَّد.
+
+    ولا تُمَسّ مجموعةٌ لكلٍّ من طرفيها حركتُه: هما واقعتان حقيقيّتان
+    بنفس المبلغ في اليوم — كسداد بيكوف بمئةٍ وخمسين لكلّ فاتورة.
+  */
+  const twins = await db.execute<{
+    keep: string; extra: string; name_ar: string | null; d: string;
+    amount_minor: number; extra_doc: string | null; keep_doc: string | null;
+  }>(sql`
+    with ranked as (
+      select p.id, p.supplier_id, p.paid_at::date as d, p.amount_minor, p.document_id,
+             exists (select 1 from bank_transactions bt where bt.matched_payment_id = p.id) as has_bank,
+             coalesce((select sum(amount_minor)::int from payment_allocations a
+                        where a.payment_id = p.id), 0) as alloc
+      from payments p
+      where p.supplier_id is not null
+        and p.status not in ('REVERSED','VOID')
+    ),
+    grouped as (
+      select supplier_id, d, amount_minor,
+             count(*) as n,
+             count(*) filter (where has_bank) as banked,
+             (array_agg(id order by has_bank desc, alloc desc, id))[1] as keep,
+             (array_agg(id order by has_bank desc, alloc desc, id))[2] as extra_id
+      from ranked group by supplier_id, d, amount_minor
+    )
+    select g.keep, g.extra_id as extra, s.name_ar, g.d::text as d, g.amount_minor,
+           x.document_id as extra_doc, kept.document_id as keep_doc
+    from grouped g
+    join suppliers s on s.id = g.supplier_id
+    join ranked kept on kept.id = g.keep
+    join ranked x on x.id = g.extra_id
+    where g.n = 2 and g.banked <= 1 and x.alloc = 0 and not x.has_bank
+    order by g.amount_minor desc
+  `);
+
+  steps.push({
+    name: "الريال الواحد مقيَّدٌ دفعتين — إيصالٌ وحركةُ بنك",
+    found: twins.rows.length,
+    detail: twins.rows.map(
+      (r) => `  ${formatRiyalsDisplay(r.amount_minor)} · ${r.name_ar} · ${r.d}`
+        + (r.extra_doc ? " · ومعها إيصالُها فيُنقَل إلى الباقية" : ""),
+    ),
+    apply: async () => {
+      for (const r of twins.rows) {
+        if (r.extra_doc && !r.keep_doc) {
+          await db.execute(sql`
+            update payments set document_id = null where id = ${r.extra}
+          `);
+          await db.execute(sql`
+            update payments set document_id = ${r.extra_doc} where id = ${r.keep}
+          `);
+        }
+        await db.execute(sql`
+          update payments
+             set voided_at = now(), status = 'VOID'
+           where id = ${r.extra}
+        `);
+      }
+    },
+  });
+
+  /* ── ٦) دفعةٌ بلا أصل: لا إيصال ولا حركةَ بنك ── */
+  /*
+    **تُعرَض ولا تُمَسّ.** الدفعة التي لا مستندَ لها ولا حركةَ بنك مالٌ
+    مكتوبٌ لا يُسنده شيء: قد تكون وسماً يدويّاً صحيحاً («سُدّدت قبل
+    النظام»)، وقد تكون نصفَ دمجٍ قديم. وطيُّها يجعل الفاتورة تعود
+    مستحقّةً بلا سببٍ ظاهر فتُدفَع مرّتين — والنقصُ أسوأ من الزيادة.
+
+    وفي قاعدة أحمد اثنتان: لافا ٩٤٥ وأطلس ٥٧٥ — ولكلٍّ منهما حركةٌ في
+    الكشف غيرُ مربوطة، أي أنّ الرباط انقطع لا أنّ المال اختُلق.
+  */
+  const rootless = await db.execute<{
+    id: string; name_ar: string | null; d: string; amount_minor: number; alloc: number;
+  }>(sql`
+    select p.id, s.name_ar, p.paid_at::date::text as d, p.amount_minor,
+           coalesce((select sum(amount_minor)::int from payment_allocations a
+                      where a.payment_id = p.id), 0) as alloc
+    from payments p left join suppliers s on s.id = p.supplier_id
+    where p.document_id is null
+      and p.status not in ('REVERSED','VOID')
+      and not exists (select 1 from bank_transactions bt where bt.matched_payment_id = p.id)
+    order by p.amount_minor desc
+  `);
+
+  steps.push({
+    name: "دفعاتٌ بلا أصل — تُعرَض ولا تُمَسّ",
+    found: rootless.rows.length,
+    detail: rootless.rows.map(
+      (r) => `  ${formatRiyalsDisplay(r.amount_minor)} · ${r.name_ar ?? "بلا مورّد"} · ${r.d}`
+        + ` · خُصّص منها ${formatRiyalsDisplay(r.alloc)}`,
+    ),
+    apply: async () => { /* كشفٌ لا إصلاح — نسبةُ المال قرارُ إنسان */ },
+  });
+
   /* ── التقرير ── */
   let total = 0;
   for (const s of steps) {

@@ -11,9 +11,9 @@
 import { NextResponse } from "next/server";
 import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bankTransactions, decisionHistory, invoices } from "@/db/schema";
+import { bankTransactions, decisionHistory, invoices, payments } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { allocate, createPayment } from "@/services/payment.service";
+import { allocate, createPayment, findPaymentTwin } from "@/services/payment.service";
 import { recordAudit } from "@/lib/audit";
 import { settleSupplierAccount } from "@/lib/allocation";
 import { INVOICE, countNoun } from "@/lib/arabic";
@@ -531,6 +531,8 @@ async function settleAccounts(
     (a, b) => a.valueDate.getTime() - b.valueDate.getTime());
 
   let paidCount = 0;
+  /** دفعاتٌ كانت مقيَّدةً من إيصالها فتُبنّيت ولم تُنسَخ. */
+  let adopted = 0;
   let allocatedTotal = 0;
   let unappliedTotal = 0;
   let invoiceCount = 0;
@@ -548,15 +550,41 @@ async function settleAccounts(
         .filter((m): m is string => Boolean(m))
         .sort();
 
-      const paymentId = await createPayment(t, {
-        supplierId,
-        paidAt: tx.valueDate,
-        amountMinor: tx.amountMinor,
-        method: "BANK_TRANSFER",
-        beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
-        /* شهر الدفعة هو الأحدث بين فواتيرها — لا شهر أوّلها */
-        appliesToMonth: months.length > 0 ? months[months.length - 1] : null,
+      /*
+        وإن كانت الواقعةُ مقيَّدةً من إيصالها، تُتبنّى ولا تُنسَخ.
+
+        إيصالُ السداد في الدرايف يُنشئ دفعةً معلَّقة بلا حركةِ بنك،
+        ثمّ يأتي الكشف فيُنشئ ثانيةً — والريالُ واحد. فإن وُجدت دفعةٌ
+        بنفس المورّد واليوم والمبلغ، لم تُخصَّص بعدُ ولا حركةَ لها،
+        فهي **هذه**: يُربَط بها الكشفُ وتُوزَّع، ويبقى إيصالُها معلَّقاً
+        عليها دليلاً.
+      */
+      const twin = await findPaymentTwin(t, {
+        supplierId, paidAt: tx.valueDate, amountMinor: tx.amountMinor,
       });
+      const adopt = twin !== null && !twin.hasBankRow && twin.allocatedMinor === 0;
+
+      const paymentId = adopt
+        ? twin!.id
+        : await createPayment(t, {
+            supplierId,
+            paidAt: tx.valueDate,
+            amountMinor: tx.amountMinor,
+            method: "BANK_TRANSFER",
+            beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
+            /* شهر الدفعة هو الأحدث بين فواتيرها — لا شهر أوّلها */
+            appliesToMonth: months.length > 0 ? months[months.length - 1] : null,
+          });
+
+      if (adopt) {
+        adopted++;
+        await t.update(payments)
+          .set({
+            beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
+            appliesToMonth: months.length > 0 ? months[months.length - 1] : null,
+          })
+          .where(eq(payments.id, paymentId));
+      }
 
       if (plan.allocations.length > 0) {
         await allocate(t, paymentId, tx.amountMinor, plan.allocations);
@@ -613,6 +641,7 @@ async function settleAccounts(
       "فواتير سُدِّدت": invoiceCount,
       "خُصِّص": allocatedTotal,
       "بقي غير مخصَّص": unappliedTotal,
+      "دفعاتٌ تُبنّيت من إيصالاتها": adopted,
       السياسة: "الأقدم أوّلاً — لا رقم فاتورة في الحوالة",
     },
   });
@@ -630,6 +659,7 @@ async function settleAccounts(
       ? `قُيّد ${money(allocatedTotal + unappliedTotal)} على حساب المورّد — لا فاتورة مفتوحة تقابله، فبقي غير مخصَّص`
       : `سُدِّد ${money(allocatedTotal)} على ${countNoun(invoiceCount, INVOICE)} بالأقدم أوّلاً (لا رقمَ فاتورةٍ في الحوالة)`
         + (unappliedTotal > 0 ? ` · وبقي ${money(unappliedTotal)} غير مخصَّص` : "")
-        + ` · رصيد المورّد بعدها ${money(left)}`,
+        + ` · رصيد المورّد بعدها ${money(left)}`
+        + (adopted > 0 ? ` · و${adopted} منها كانت مقيَّدةً من إيصالها فلم تُكرَّر` : ""),
   });
 }

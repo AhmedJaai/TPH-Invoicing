@@ -95,9 +95,15 @@ export interface AttentionFacts {
   openBlockers: number;
   /** مستندات لم يُبتّ فيها */
   pendingDocuments: number;
-  /** دفعات يُشتبه بتكرارها */
+  /**
+   * فواتيرُ خرج مالها مرّتين في اليوم نفسه لجهةٍ واحدة.
+   *
+   * والمبلغُ هو **الزائد** لا المجموع: ما دُفع مرّتين يُطالَب بمرّةٍ
+   * واحدة منه، لأنّ الأولى مستحقّة.
+   */
   duplicatePayments: number;
   duplicatePaymentAmountMinor: number;
+  duplicatePaymentEvidence: AttentionEvidence[];
 
   /** فواتير معلوم أنّها لا تصلح لخصم المدخلات، ومبلغ ضريبتها */
   notTaxValidCount: number;
@@ -123,6 +129,20 @@ export interface AttentionFacts {
 
   /** فواتير بلا بنود — تحليل الأصناف لا يراها */
   invoicesWithoutLines: number;
+
+  /**
+   * مالٌ خرج إلى مورّد ولا فاتورةَ تفسّره.
+   *
+   * وهذا السؤال الذي كان أحمد يراجعه بيده كلّ أسبوع: «لمن دفعنا بلا
+   * فاتورة؟» — ولم يكن في النظام موضعٌ يجيبه. والدفعة غير المخصَّصة
+   * حالٌ صحيحة لا خطأ، لكنّها **عملٌ باقٍ**: إمّا أن تصل الفاتورة،
+   * وإمّا أن يُعلَن أنّ المورّد لا يصدر فواتير فيُطلَب عقدُ توريد.
+   *
+   * والمقدَّمةُ المعلَنة تخرج منها: صاحبُها قال ما هي، فليست سؤالاً.
+   */
+  unbackedPaymentCount: number;
+  unbackedPaymentMinor: number;
+  unbackedPaymentEvidence: AttentionEvidence[];
 
   /**
    * مصروفاتٌ تصف حدثاً واحداً وصل من مصدرين.
@@ -229,20 +249,57 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
     });
   }
 
+  /*
+    مالٌ خرج مرّتين — لا صفٌّ دخل مرّتين.
+
+    وكان هذا البند لا يظهر أبداً: `duplicatePayments` **صفرٌ مكتوبٌ بيد**
+    في `attention-facts`، لا محسوب. فتقول الشاشة ضمناً «لا سداد مزدوج»
+    وهي دعوى لم يفحصها أحد — وفي كشف أحمد ٢٬٣٥٠٫٧٧ ريالاً سُدّدت مرّتين
+    في يومٍ واحد، وجدها بمراجعةٍ يدويّة.
+  */
   if (f.duplicatePayments > 0) {
     out.push({
       id: "duplicate-payments",
       area: "BANK",
       severity: "CRITICAL",
-      title: `${f.duplicatePayments} دفعة يُشتبه بتكرارها`,
-      detail: "تحويلان لنفس الجهة بنفس المبلغ في نفس اليوم.",
-      action: "راجعها فوراً — استرداد المكرّر يصعب كلّما تأخّر.",
+      title: `${f.duplicatePayments} فاتورة سُدّدت مرّتين في يومٍ واحد`,
+      detail:
+        "خرج المال مرّتين لنفس الجهة بنفس المبلغ — ولكلٍّ مرجعُ سدادٍ مستقلّ،"
+        + " فهما عمليّتان لا نسخةُ استيراد.",
+      action: "طالِب الجهة بردّ الزائد — والاسترداد يصعب كلّما تأخّر.",
       actionLabel: "افتح الحركات",
       href: "/bank",
       count: f.duplicatePayments,
       amountMinor: f.duplicatePaymentAmountMinor,
       impact: { kind: "RECOVERABLE", amountMinor: f.duplicatePaymentAmountMinor },
-      evidence: [],
+      evidence: f.duplicatePaymentEvidence,
+    });
+  }
+
+  /*
+    مالٌ خرج ولا مستندَ يفسّره.
+
+    وهو أوّل ما يسأل عنه المحاسب، وأوّل ما يسقط في الإقرار الضريبيّ:
+    مصروفٌ بلا فاتورةٍ ضريبية لا يُخصَم مدخلُه، وقد لا يُقبَل مصروفاً
+    أصلاً. وكان أحمد يجمعه بيده في ورقةٍ كلّ أسبوع.
+  */
+  if (f.unbackedPaymentCount > 0) {
+    out.push({
+      id: "unbacked-payments",
+      area: "PAYMENTS",
+      severity: "HIGH",
+      title: `${f.unbackedPaymentCount} دفعة خرجت ولا فاتورة تفسّرها`,
+      detail:
+        "مالٌ وصل المورّد ولا مستندَ يقابله — فلا خصمَ لمدخلاته،"
+        + " ورصيدُ المورّد عندنا غير مُتحقَّق منه.",
+      action:
+        "اطلب الفاتورة من المورّد، أو أعلِن أنّه لا يصدر فواتير واطلب عقد توريد.",
+      actionLabel: "افتح المورّدين",
+      href: "/suppliers",
+      count: f.unbackedPaymentCount,
+      amountMinor: f.unbackedPaymentMinor,
+      impact: { kind: "UNATTRIBUTED", amountMinor: f.unbackedPaymentMinor },
+      evidence: f.unbackedPaymentEvidence,
     });
   }
 

@@ -72,9 +72,9 @@ const digitsOnly = (v?: string | null) => (v ?? "").replace(/\D/g, "");
  * ويُشترَط طولٌ معتبَر للمخزَّن (كلمتان فأكثر، أو كلمةٌ من خمسة أحرف)
  * كي لا يبتلع اسمٌ قصيرٌ كلَّ ما احتواه.
  */
-function containsTradeName(extracted: string, stored: string): boolean {
-  const a = extracted.split(/\s+/).filter(Boolean);
-  const b = stored.split(/\s+/).filter(Boolean);
+function containsWords(haystack: string, needle: string): boolean {
+  const a = haystack.split(/\s+/).filter(Boolean);
+  const b = needle.split(/\s+/).filter(Boolean);
   if (b.length === 0) return false;
   if (b.length === 1 && b[0].length < 5) return false;
   if (b.length > a.length) return false;
@@ -83,6 +83,50 @@ function containsTradeName(extracted: string, stored: string): boolean {
     if (b.every((w, j) => a[i + j] === w)) return true;
   }
   return false;
+}
+
+/**
+ * الاسمُ بلا فراغاته — لأنّ الأهليّ يقصّ الكلمة بفراغ.
+ *
+ * كشفُ الأهليّ يلفّ السطر عند عرضٍ ثابت **داخل الكلمة**، فيخرج اسم
+ * المستفيد مقطوعاً: «المحد ودة» و«التجا رية» و«والتغل يف» و«ال محدود»
+ * و«TRA DING». وهي أسماءٌ صحيحة في الواقع، مكسورةٌ في التصدير.
+ *
+ * فكان الاسمُ البديل المكتوب صواباً لا يلتقي بنفسه: «شركة أنس غالب حمزة
+ * خاشقجي التجارية المحدودة» مخزَّنةً، و«…المحد ودة» في الكشف — فلا
+ * مطابقة. وقيس على كشف أحمد: **أحدَ عشر مستفيداً من تسعةَ عشر** لا
+ * يُعرَفون، وفيهم من له اسمٌ بديل مكتوبٌ عندنا منذ التأسيس.
+ *
+ * والفراغُ يُسقَط كلُّه لا الفراغُ المشبوه وحده: لا سبيل إلى معرفة أيّ
+ * فراغٍ أصليّ وأيّه مقحَم، وإسقاطُ الجميع يجعل السؤال «أهما الحروفُ
+ * نفسها بترتيبها؟» — وهو سؤالٌ لا يلتبس في أسماء المنشآت.
+ */
+const squash = (v: string) => v.replace(/\s+/g, "");
+
+/**
+ * اسمُ الشهرة داخل الاسم النظاميّ — دليلٌ قويّ لا تشابهٌ ضعيف.
+ *
+ * المستندات تحمل الاسم النظاميّ كاملاً: «مؤسسة أوراق الزيتون التجارية».
+ * والمخزَّن اسمُ الشهرة: «أوراق الزيتون». والتشابهُ الحرفيّ بينهما
+ * ‏٠٫٦٧ — دون حدّ الترجيح، فيُردّ الكشفُ بـ«لم يُعرف المورّد» وهو
+ * مذكورٌ في صدر صفحته.
+ *
+ * وقِيس على كشف أوراق الزيتون الحقيقيّ فوقع فعلاً.
+ *
+ * ولا تُحذَف صيغُ الشركات بقائمةٍ ثابتة — «محمصة» في «المحمصة الغربية»
+ * أصلُ الاسم لا زائدة، وحذفُها يُنشئ خلطاً. وإنّما يُسأل سؤالٌ أضيق:
+ * **أكلماتُ أحدهما كلُّها واردةٌ في الآخر بترتيبها؟**
+ *
+ * **والاحتواء في الجهتين.** كان يُسأل في جهةٍ واحدة — أيحوي المستخرَجُ
+ * المخزَّن؟ — فعُرفت «مؤسسة أوراق الزيتون التجارية» ولم تُعرف «الكوب
+ * الذهبي» وهي مخزَّنةٌ «مصنع الكوب الذهبي». والبنكُ يكتب أحياناً أقصرَ
+ * ممّا عندنا وأحياناً أطول، والاحتواءُ دليلٌ في الحالين.
+ *
+ * ويُشترَط طولٌ معتبَر للأقصر (كلمتان فأكثر، أو كلمةٌ من خمسة أحرف)
+ * كي لا يبتلع اسمٌ قصيرٌ كلَّ ما احتواه.
+ */
+function containsTradeName(extracted: string, stored: string): boolean {
+  return containsWords(extracted, stored) || containsWords(stored, extracted);
 }
 
 export function matchSupplier(
@@ -114,13 +158,32 @@ export function matchSupplier(
   }
 
   /*
+    ثمّ الاسمُ بلا فراغاته — والفراغُ المقحَم عيبُ تصديرٍ لا اسمٌ آخر.
+    ويُقارَن بالاسم وبالبدائل معاً، فبدائلُ البنك كُتبت صحيحةً وجاءت
+    من الكشف مكسورة.
+  */
+  for (const name of names) {
+    const flat = squash(name);
+    const bySquash = suppliers.filter(
+      (s) => squash(normalizeName(s.nameAr)) === flat
+        || (s.nameEn ? squash(normalizeName(s.nameEn)) === flat : false)
+        || s.aliases.some((a) => squash(a.normalized) === flat),
+    );
+    if (bySquash.length === 1) {
+      return { supplier: bySquash[0], method: "ALIAS", confidence: 0.93, candidates: [] };
+    }
+  }
+
+  /*
     الاحتواء يسبق التشابه: «مؤسسة أوراق الزيتون التجارية» تحوي
     «أوراق الزيتون» كلمةً كلمة، وذلك أقوى من درجةِ تشابهٍ حرفيّة.
   */
   for (const name of names) {
     const byContain = suppliers.filter(
       (s) => containsTradeName(name, normalizeName(s.nameAr))
-        || (s.nameEn ? containsTradeName(name, normalizeName(s.nameEn)) : false),
+        || (s.nameEn ? containsTradeName(name, normalizeName(s.nameEn)) : false)
+        /* والبدائلُ كذلك — «مقام الثقة» بديلٌ مكتوب، والكشف «شركة مقام الثقة» */
+        || s.aliases.some((a) => containsTradeName(name, a.normalized)),
     );
     /* واحدٌ لا غير — فإن احتواها اسمان لم يعد الاحتواء دليلاً */
     if (byContain.length === 1) {
