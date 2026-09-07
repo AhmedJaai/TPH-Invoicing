@@ -47,6 +47,15 @@ export function evidenceFrom(tx: CanonicalTransaction): EvidenceItem[] {
   }));
 }
 
+/**
+ * مقبضُ الكتابة — القاعدة نفسها أو معاملةٌ جارية.
+ *
+ * تأكيدُ الجهة قرارٌ **واحد** يُطبَّق على ثلاث وثلاثين حركة، فلا يصحّ
+ * أن يقع نصفُه: جهةٌ محفوظة بلا أدلّتها، أو أدلّةٌ بلا الحركات التي
+ * ولّدتها. وكان كلُّ سطرٍ يُكتَب وحده.
+ */
+export type Writer = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export interface ConfirmInput {
   userId: string;
   /** الجهة القائمة، أو اسمٌ لجهةٍ جديدة. */
@@ -62,6 +71,8 @@ export interface ConfirmInput {
    * الاتحاد يجعل الجهة تُعرَف من أيّهما ورد بعد.
    */
   transactions: readonly CanonicalTransaction[];
+  /** يُمرَّر حين يكون التأكيد جزءاً من معاملةٍ أوسع. */
+  writer?: Writer;
 }
 
 export interface ConfirmResult {
@@ -109,13 +120,15 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
         .where(inArray(counterpartyEvidence.normalized, evidence.map((e) => e.normalized)))
     : [];
 
+  const w: Writer = input.writer ?? db;
+
   let counterpartyId = input.counterpartyId;
   let created = false;
 
   if (!counterpartyId) {
     counterpartyId = createId();
     created = true;
-    await db.insert(counterparties).values({
+    await w.insert(counterparties).values({
       id: counterpartyId,
       displayName: input.displayName?.trim()
         || first.beneficiaryRaw?.trim()
@@ -125,7 +138,7 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
       createdById: input.userId,
     });
   } else {
-    await db
+    await w
       .update(counterparties)
       .set({ kind: input.kind, supplierId: input.supplierId ?? null, updatedAt: new Date() })
       .where(eq(counterparties.id, counterpartyId));
@@ -155,7 +168,7 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
 
     if (mine) {
       // الدليل المتكرّر أوثق — يُعدّ ولا يُكرَّر
-      await db
+      await w
         .update(counterpartyEvidence)
         .set({ confirmations: sql`${counterpartyEvidence.confirmations} + 1` })
         .where(and(
@@ -171,7 +184,7 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
       لأنّه لم يعد يدلّ على واحدة. حفظُه ليس عبثاً: هو يوثّق أنّ الاسم
       مشترَك، وبه يُعرَف سببُ سقوطه.
     */
-    await db.insert(counterpartyEvidence).values({
+    await w.insert(counterpartyEvidence).values({
       id: createId(),
       counterpartyId,
       kind: e.kind,

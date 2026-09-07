@@ -76,7 +76,6 @@ export default async function ReviewPage() {
       category: r.category,
       score: r.score,
       reasons: reasons.length > 0 ? reasons : why,
-      candidateCount: reasons.length > 0 ? 1 : 0,
     };
   });
 

@@ -48,8 +48,6 @@ export interface ReviewItem {
   category: string;
   score: number | null;
   reasons: string[];
-  /** عدد المرشّحين — واحدٌ يعني بلا منافس. */
-  candidateCount: number;
 }
 
 export interface Bucketed {

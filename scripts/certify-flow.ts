@@ -84,8 +84,10 @@ async function seed(
  * والمستند إلزاميّ في المخطّط — وذلك قرارٌ مقصود: كلّ فاتورة لها أصلٌ
  * مرفوع. فالشهادة تُنشئ الأصل كما يُنشئه المسار الحقيقيّ.
  */
+type Writer = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 async function makeInvoice(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  tx: Writer,
   supplierId: string,
   number: string,
   totalMinor: number,
@@ -319,6 +321,77 @@ async function main() {
     if (inDb !== derived) throw new Error(`القاعدة ${inDb} والاشتقاق ${derived}`);
     return `${inDb} في الاثنين`;
   });
+
+  /*
+    ══ ٨ · سدادان متزامنان على رصيدٍ واحد ══
+
+    هذا السيناريو **لا يُلغى بمعاملة** — ولا يمكن أن يكون: التزاحم لا
+    يقع داخل معاملةٍ واحدة، فهي لا تُزاحم نفسها. فيلزم اتّصالان
+    حقيقيّان يكتبان معاً، ثمّ يُنظَّف الأثر باليد.
+
+    والسؤال: فاتورةٌ عليها ٣٬٠٠٠، ودفعتان تحاولان سدادها في اللحظة
+    نفسها. أتُكتَب ٦٬٠٠٠ على فاتورةٍ بـ٣٬٠٠٠؟
+
+    والحارس مؤثِّرٌ في القاعدة (`payment_allocations_bounds`) يجمع
+    التخصيصات بعد كلّ إدراج. والسؤال الحقيقيّ: أيكفي تحت العزل
+    `READ COMMITTED`؟ فالثانية قد لا ترى صفَّ الأولى قبل إيداعها.
+    ولا يُجاب هذا بالقراءة — يُجاب بالتشغيل.
+  */
+  {
+    const name = "٨ · سدادان متزامنان على رصيدٍ واحد ← واحدٌ يمرّ";
+    const tag = `certify-race-${createId().slice(0, 8)}`;
+    try {
+      const supplierId = createId();
+      await db.insert(suppliers).values({
+        id: supplierId, nameAr: `مورّد تزاحم ${tag.slice(-6)}`,
+        slug: tag, driveFolderName: tag, isActive: true,
+      });
+      const invoiceId = await makeInvoice(db, supplierId, `RACE-${tag.slice(-4)}`, 3_000_00, "2026-08-10");
+
+      const pay = async () =>
+        db.transaction(async (t) => {
+          const id = await createPayment(t, {
+            supplierId, paidAt: day("2026-08-12"),
+            amountMinor: 3_000_00, method: "BANK_TRANSFER",
+          });
+          await t.insert(paymentAllocations)
+            .values({ paymentId: id, invoiceId, amountMinor: 3_000_00 });
+          return id;
+        });
+
+      const outcomes = await Promise.allSettled([pay(), pay()]);
+      const ok = outcomes.filter((o) => o.status === "fulfilled").length;
+
+      const [row] = (
+        await db.execute<{ total: number }>(sql`
+          select coalesce(sum(amount_minor), 0)::int as total
+          from payment_allocations where invoice_id = ${invoiceId}
+        `)
+      ).rows;
+      const allocated = Number(row?.total ?? 0);
+
+      /* التنظيف قبل الحكم — كي لا يبقى أثرٌ إن فشل */
+      await db.execute(sql`delete from payment_allocations where invoice_id = ${invoiceId}`);
+      await db.execute(sql`delete from payments where supplier_id = ${supplierId}`);
+      await db.execute(sql`delete from invoices where id = ${invoiceId}`);
+      await db.execute(sql`delete from documents where supplier_id = ${supplierId}`);
+      await db.execute(sql`delete from suppliers where id = ${supplierId}`);
+
+      if (allocated > 3_000_00) {
+        results.push({
+          name, pass: false,
+          detail: `خُصّص ${allocated / 100} على فاتورةٍ بـ٣٬٠٠٠ — الحارس لا يمنع التزاحم`,
+        });
+      } else {
+        results.push({
+          name, pass: true,
+          detail: `نجح ${ok} من ٢ · المخصَّص ${allocated / 100} ولم يتجاوز الفاتورة`,
+        });
+      }
+    } catch (e) {
+      results.push({ name, pass: false, detail: (e as Error).message.slice(0, 200) });
+    }
+  }
 
   /* ── التقرير ── */
   console.log("");

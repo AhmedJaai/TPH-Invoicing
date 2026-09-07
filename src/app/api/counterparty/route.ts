@@ -111,6 +111,9 @@ export async function POST(request: Request) {
     );
   }
 
+  /* الباب بعد التحقّق — يُثبَّت لأنّ التضييق لا يعبر إلى داخل المعاملة */
+  const kind = body.kind;
+
   const rows = await db
     .select()
     .from(bankTransactions)
@@ -141,141 +144,157 @@ export async function POST(request: Request) {
     }
   }
 
-  const result = await confirmCounterparty({
-    userId: user.id,
-    counterpartyId: body.counterpartyId,
-    displayName: body.displayName,
-    kind: body.kind,
-    supplierId: body.supplierId,
-    transactions: rows.map((r) => canonical.get(r.id)!),
+  /*
+    ══ قرارٌ واحد، معاملةٌ واحدة ══
+
+    تأكيدُ الجهة قرارٌ واحد يُطبَّق على ثلاث وثلاثين حركة: تُحفَظ الجهة،
+    ثمّ أدلّتها، ثمّ تُصنَّف حركاتُ المجموعة، ثمّ يعمّ التصنيف على
+    أمثالها في الكشوف السابقة. وكان كلُّ سطرٍ من ذلك يُكتَب وحده بلا
+    معاملة — فلو سقط الاتّصال عند الحركة العاشرة بقيت جهةٌ محفوظة
+    وتسعُ حركاتٍ مصنَّفة وأربعٌ وعشرون لا؛ ولا شيء في الشاشة يقول ذلك.
+
+    فإمّا أن يقع القرار كلُّه أو لا يقع منه شيء.
+  */
+  const { result, swept } = await db.transaction(async (t) => {
+    const result = await confirmCounterparty({
+      writer: t,
+      userId: user.id,
+      counterpartyId: body.counterpartyId,
+      displayName: body.displayName,
+      kind,
+      supplierId: body.supplierId,
+      transactions: rows.map((r) => canonical.get(r.id)!),
+    });
+
+    /* ── ٢. تُنسَب المجموعة إلى جهتها، وبأثرٍ مسجَّل ── */
+    const reason = `أكّدتَها بنفسك${identities[0] ? ` — ${identities[0].label}` : ""}`;
+
+    /*
+      والقرارُ القديم يُطوى مع الجواب.
+
+      من قال «هذه رسمٌ بنكيّ» فقد قال ضمناً إنّها ليست سداد فاتورة —
+      فبقاءُ `match_disposition` على «تنتظر مراجعتك» يجعلها تعود إلى
+      الطابور بعد كلّ تحديث، ويقرأ صاحبُ العمل أنّ عمله لم يُحفَظ. وقد
+      حُفظ، والعمود الآخر هو الذي كذب.
+
+      أمّا سدادُ المورّد فيبقى قراره: عُرف صاحبه ولم تُوجد فاتورته بعد،
+      وذاك عملٌ آخر لا يُلغى بمعرفة الجهة.
+    */
+    const notAPayment = kind !== "SUPPLIER";
+
+    for (const r of rows) {
+      await t
+        .update(bankTransactions)
+        .set({
+          counterpartyId: result.counterpartyId,
+          category: kind,
+          supplierId: body.supplierId ?? null,
+          classificationSource: "HUMAN",
+          classificationReason: reason,
+          classificationVersion: CLASSIFICATION_VERSION,
+          ...(notAPayment && r.matchedPaymentId === null
+            ? {
+                matchStatus: "IGNORED" as const,
+                matchDisposition: null,
+                matchOutcome: null,
+                matchScore: null,
+              }
+            : {}),
+          lifecycle: deriveLifecycle({
+            classified: true,
+            hasCandidate: Boolean(body.supplierId),
+            decided: true,
+            posted: r.matchedPaymentId !== null,
+            ignored: notAPayment || r.matchStatus === "IGNORED",
+          }),
+        })
+        .where(eq(bankTransactions.id, r.id));
+
+      await t.insert(decisionHistory).values({
+        bankTransactionId: r.id,
+        event: "ENTITY_LEARNED",
+        actor: "HUMAN",
+        actorId: user.id,
+        detail: reason,
+        payload: {
+          الجهة: body.displayName ?? null,
+          الباب: kind,
+          "حجم المجموعة": rows.length,
+          الهويّة: groupKey,
+        },
+      });
+    }
+
+    /*
+      ── ٣. ويعمّ ──
+
+      الذاكرة تُقرأ من جديد بعد الكتابة، ثمّ يمرّ **المصنِّف نفسه** الذي
+      يمرّ عليه الاستيراد على ما بقي في القاعدة. لا استعلامٌ بنصٍّ يشبه
+      نصّاً: نفس الدالّة، فنفس النتيجة — وإلّا افترق ما يراه صاحب العمل
+      اليوم عمّا سيراه في الكشف القادم.
+
+      وما مسّه إنسان لا يُمَسّ: تصنيفه أوثق من استنتاج الآلة.
+    */
+    const learnedKeys = new Set(
+      result.added.map((e) => memoryKeyFor(e.kind as IdentityKind, e.normalized)),
+    );
+    const memory = await loadMerchantMemory();
+
+    const others = await db
+      .select()
+      .from(bankTransactions)
+      .where(and(
+        isNull(bankTransactions.matchedPaymentId),
+        ne(bankTransactions.matchStatus, "IGNORED"),
+        or(
+          isNull(bankTransactions.classificationSource),
+          ne(bankTransactions.classificationSource, "HUMAN"),
+        ),
+        notInArray(bankTransactions.id, rows.map((r) => r.id)),
+      ));
+
+    let swept = 0;
+    for (const o of others) {
+      const c = classify(canonicalOf(o), memory);
+      if (c.source !== "MEMORY" || !c.merchantKey) continue;
+      if (!learnedKeys.has(c.merchantKey)) continue;
+
+      const known = memory.get(c.merchantKey);
+      const category = toCategory(c.kind);
+      if (o.category === category && o.counterpartyId === (known?.counterpartyId ?? null)) continue;
+
+      await t
+        .update(bankTransactions)
+        .set({
+          category,
+          counterpartyId: known?.counterpartyId ?? null,
+          supplierId: known?.supplierId ?? o.supplierId,
+          classificationSource: "MEMORY",
+          classificationReason: c.reason,
+          classificationVersion: CLASSIFICATION_VERSION,
+          lifecycle: deriveLifecycle({
+            classified: category !== "UNKNOWN",
+            hasCandidate: Boolean(known?.supplierId ?? o.supplierId),
+            decided: false,
+            posted: false,
+            ignored: false,
+          }),
+        })
+        .where(eq(bankTransactions.id, o.id));
+
+      await t.insert(decisionHistory).values({
+        bankTransactionId: o.id,
+        event: "CLASSIFIED",
+        actor: "MEMORY",
+        actorId: user.id,
+        detail: c.reason,
+        payload: { الباب: category, المصدر: "MEMORY", النسخة: CLASSIFICATION_VERSION },
+      });
+      swept++;
+    }
+
+    return { result, swept };
   });
-
-  /* ── ٢. تُنسَب المجموعة إلى جهتها، وبأثرٍ مسجَّل ── */
-  const reason = `أكّدتَها بنفسك${identities[0] ? ` — ${identities[0].label}` : ""}`;
-
-  /*
-    والقرارُ القديم يُطوى مع الجواب.
-
-    من قال «هذه رسمٌ بنكيّ» فقد قال ضمناً إنّها ليست سداد فاتورة —
-    فبقاءُ `match_disposition` على «تنتظر مراجعتك» يجعلها تعود إلى
-    الطابور بعد كلّ تحديث، ويقرأ صاحبُ العمل أنّ عمله لم يُحفَظ. وقد
-    حُفظ، والعمود الآخر هو الذي كذب.
-
-    أمّا سدادُ المورّد فيبقى قراره: عُرف صاحبه ولم تُوجد فاتورته بعد،
-    وذاك عملٌ آخر لا يُلغى بمعرفة الجهة.
-  */
-  const notAPayment = body.kind !== "SUPPLIER";
-
-  for (const r of rows) {
-    await db
-      .update(bankTransactions)
-      .set({
-        counterpartyId: result.counterpartyId,
-        category: body.kind,
-        supplierId: body.supplierId ?? null,
-        classificationSource: "HUMAN",
-        classificationReason: reason,
-        classificationVersion: CLASSIFICATION_VERSION,
-        ...(notAPayment && r.matchedPaymentId === null
-          ? {
-              matchStatus: "IGNORED" as const,
-              matchDisposition: null,
-              matchOutcome: null,
-              matchScore: null,
-            }
-          : {}),
-        lifecycle: deriveLifecycle({
-          classified: true,
-          hasCandidate: Boolean(body.supplierId),
-          decided: true,
-          posted: r.matchedPaymentId !== null,
-          ignored: notAPayment || r.matchStatus === "IGNORED",
-        }),
-      })
-      .where(eq(bankTransactions.id, r.id));
-
-    await db.insert(decisionHistory).values({
-      bankTransactionId: r.id,
-      event: "ENTITY_LEARNED",
-      actor: "HUMAN",
-      actorId: user.id,
-      detail: reason,
-      payload: {
-        الجهة: body.displayName ?? null,
-        الباب: body.kind,
-        "حجم المجموعة": rows.length,
-        الهويّة: groupKey,
-      },
-    });
-  }
-
-  /*
-    ── ٣. ويعمّ ──
-
-    الذاكرة تُقرأ من جديد بعد الكتابة، ثمّ يمرّ **المصنِّف نفسه** الذي
-    يمرّ عليه الاستيراد على ما بقي في القاعدة. لا استعلامٌ بنصٍّ يشبه
-    نصّاً: نفس الدالّة، فنفس النتيجة — وإلّا افترق ما يراه صاحب العمل
-    اليوم عمّا سيراه في الكشف القادم.
-
-    وما مسّه إنسان لا يُمَسّ: تصنيفه أوثق من استنتاج الآلة.
-  */
-  const learnedKeys = new Set(
-    result.added.map((e) => memoryKeyFor(e.kind as IdentityKind, e.normalized)),
-  );
-  const memory = await loadMerchantMemory();
-
-  const others = await db
-    .select()
-    .from(bankTransactions)
-    .where(and(
-      isNull(bankTransactions.matchedPaymentId),
-      ne(bankTransactions.matchStatus, "IGNORED"),
-      or(
-        isNull(bankTransactions.classificationSource),
-        ne(bankTransactions.classificationSource, "HUMAN"),
-      ),
-      notInArray(bankTransactions.id, rows.map((r) => r.id)),
-    ));
-
-  let swept = 0;
-  for (const o of others) {
-    const c = classify(canonicalOf(o), memory);
-    if (c.source !== "MEMORY" || !c.merchantKey) continue;
-    if (!learnedKeys.has(c.merchantKey)) continue;
-
-    const known = memory.get(c.merchantKey);
-    const category = toCategory(c.kind);
-    if (o.category === category && o.counterpartyId === (known?.counterpartyId ?? null)) continue;
-
-    await db
-      .update(bankTransactions)
-      .set({
-        category,
-        counterpartyId: known?.counterpartyId ?? null,
-        supplierId: known?.supplierId ?? o.supplierId,
-        classificationSource: "MEMORY",
-        classificationReason: c.reason,
-        classificationVersion: CLASSIFICATION_VERSION,
-        lifecycle: deriveLifecycle({
-          classified: category !== "UNKNOWN",
-          hasCandidate: Boolean(known?.supplierId ?? o.supplierId),
-          decided: false,
-          posted: false,
-          ignored: false,
-        }),
-      })
-      .where(eq(bankTransactions.id, o.id));
-
-    await db.insert(decisionHistory).values({
-      bankTransactionId: o.id,
-      event: "CLASSIFIED",
-      actor: "MEMORY",
-      actorId: user.id,
-      detail: c.reason,
-      payload: { الباب: category, المصدر: "MEMORY", النسخة: CLASSIFICATION_VERSION },
-    });
-    swept++;
-  }
 
   const [party] = await db
     .select({ name: counterparties.displayName })

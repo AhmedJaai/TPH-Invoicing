@@ -14,7 +14,6 @@ const item = (over: Partial<ReviewItem> & { transactionId: string }): ReviewItem
   category: "SUPPLIER",
   score: 88,
   reasons: [],
-  candidateCount: 1,
   ...over,
 });
 

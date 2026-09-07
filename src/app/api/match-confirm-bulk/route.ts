@@ -227,54 +227,77 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const paymentId = await db.transaction(async (t) => {
-      const id = await createPayment(t, {
-        supplierId: plan.supplierId,
-        paidAt: plan.paidAt,
-        amountMinor: plan.amountMinor,
-        method: "BANK_TRANSFER",
-        beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
-        appliesToMonth: plan.primaryMonth,
-        feeMinor: plan.feeMinor,
-      });
+    /*
+      ══ لماذا معاملةٌ لكلّ حركة، لا معاملةٌ للجميع ══
 
-      await allocate(t, id, plan.amountMinor, plan.allocations);
+      كلُّ حركةٍ هنا **قرارٌ ماليّ مستقلّ**: دفعتُها الخاصّة على فواتيرها،
+      ولها شرطُ سباقها (`matched_payment_id is null`) يمنع كتابتها مرّتين.
+      فجمعُ الخمس عشرة في معاملةٍ واحدة يجعل سقوطَ واحدةٍ يُلغي أربع عشرة
+      صحيحة — وذلك أسوأ لصاحب العمل، لا أسلم.
 
-      await t
-        .update(bankTransactions)
-        .set({
-          matchedPaymentId: id,
-          matchStatus: "MATCHED",
-          matchDisposition: "AUTO",
-          lifecycle: "POSTED",
+      والمطلوب ليس «الكلّ أو لا شيء» بل **أن يُعرَف ما وقع بالضبط**.
+      وكان الخلل أنّ استثناءً في العاشرة يُسقط الطلب كلَّه بـ٥٠٠، فتُكتَب
+      تسعٌ في القاعدة ولا يعلم بها أحد — لا الشاشة ولا السجلّ. فصار كلُّ
+      سقوطٍ يُقيَّد نتيجةً لصاحبه، ويمضي الباقي.
+    */
+    let paymentId: string;
+    try {
+      paymentId = await db.transaction(async (t) => {
+        const id = await createPayment(t, {
           supplierId: plan.supplierId,
-          category: "SUPPLIER",
-        })
-        .where(and(
-          eq(bankTransactions.id, tx.id),
-          /*
-            شرطُ السباق: لو أقرّها أحدٌ آخر بين قراءتنا وكتابتنا لم
-            تُكتَب مرّتين. والفحص في الشيفرة يفلت من طلبين متزامنين.
-          */
-          sql`${bankTransactions.matchedPaymentId} is null`,
-        ));
+          paidAt: plan.paidAt,
+          amountMinor: plan.amountMinor,
+          method: "BANK_TRANSFER",
+          beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
+          appliesToMonth: plan.primaryMonth,
+          feeMinor: plan.feeMinor,
+        });
 
-      await t.insert(decisionHistory).values({
-        bankTransactionId: tx.id,
-        event: "MATCH_CONFIRMED",
-        actor: "HUMAN",
-        actorId: user.id,
-        detail: `إقرارٌ جماعيّ بعد إعادة الحساب — ${countNoun(plan.allocations.length, INVOICE)}`,
-        payload: {
-          الدفعة: id,
-          الفواتير: plan.allocations.map((a) => a.invoiceId),
-          الرسم: plan.feeMinor,
-          "أُعيد الحساب": true,
-        },
+        await allocate(t, id, plan.amountMinor, plan.allocations);
+
+        await t
+          .update(bankTransactions)
+          .set({
+            matchedPaymentId: id,
+            matchStatus: "MATCHED",
+            matchDisposition: "AUTO",
+            lifecycle: "POSTED",
+            supplierId: plan.supplierId,
+            category: "SUPPLIER",
+          })
+          .where(and(
+            eq(bankTransactions.id, tx.id),
+            /*
+              شرطُ السباق: لو أقرّها أحدٌ آخر بين قراءتنا وكتابتنا لم
+              تُكتَب مرّتين. والفحص في الشيفرة يفلت من طلبين متزامنين.
+            */
+            sql`${bankTransactions.matchedPaymentId} is null`,
+          ));
+
+        await t.insert(decisionHistory).values({
+          bankTransactionId: tx.id,
+          event: "MATCH_CONFIRMED",
+          actor: "HUMAN",
+          actorId: user.id,
+          detail: `إقرارٌ جماعيّ بعد إعادة الحساب — ${countNoun(plan.allocations.length, INVOICE)}`,
+          payload: {
+            الدفعة: id,
+            الفواتير: plan.allocations.map((a) => a.invoiceId),
+            الرسم: plan.feeMinor,
+            "أُعيد الحساب": true,
+          },
+        });
+
+        return id;
       });
-
-      return id;
-    });
+    } catch (e) {
+      outcomes.push({
+        transactionId: tx.id,
+        ok: false,
+        reason: `تعذّر التقييد: ${(e as Error).message.slice(0, 120)}`,
+      });
+      continue;
+    }
 
     confirmed++;
     outcomes.push({
