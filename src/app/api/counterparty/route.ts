@@ -253,7 +253,36 @@ export async function POST(request: Request) {
         notInArray(bankTransactions.id, rows.map((r) => r.id)),
       ));
 
+    /*
+      التصنيف يُكتب دفعاتٍ لا صفّاً صفّاً.
+
+      كان لكلّ صفٍّ `update` و`insert` داخل المعاملة نفسها — رحلتان إلى
+      القاعدة في كلّ صفّ. وحركاتُ الكشف بالمئات، فصارت مئاتُ الرحلات
+      في معاملةٍ واحدة تحتجز اتصالاً حتى تنفد المهلة: ردّ الإنتاج
+      «timeout exceeded when trying to connect» ثمّ ٥٠٠ إلى الشاشة.
+
+      والمتشابه يُجمَع: الحركات التي تأخذ الباب نفسه والجهة نفسها
+      تُحدَّث بأمرٍ واحد. فتصير المئاتُ عشراتٍ قليلة، ويُفرَغ الاتصال
+      في ثوانٍ.
+    */
     let swept = 0;
+    /** ما يُكتب على مجموعةٍ متشابهة — شكلٌ صريح لا مستنتَج. */
+    interface Sweep {
+      ids: string[];
+      set: {
+        category: TxCategory;
+        counterpartyId: string | null;
+        supplierId: string | null;
+        classificationSource: "MEMORY";
+        classificationReason: string;
+        classificationVersion: string;
+        lifecycle: ReturnType<typeof deriveLifecycle>;
+      };
+      reason: string;
+      category: TxCategory;
+    }
+    const buckets = new Map<string, Sweep>();
+
     for (const o of others) {
       const c = classify(canonicalOf(o), memory);
       if (c.source !== "MEMORY" || !c.merchantKey) continue;
@@ -263,34 +292,51 @@ export async function POST(request: Request) {
       const category = toCategory(c.kind);
       if (o.category === category && o.counterpartyId === (known?.counterpartyId ?? null)) continue;
 
+      const supplierId = known?.supplierId ?? o.supplierId;
+      const set: Sweep["set"] = {
+        category,
+        counterpartyId: known?.counterpartyId ?? null,
+        supplierId,
+        classificationSource: "MEMORY" as const,
+        classificationReason: c.reason,
+        classificationVersion: CLASSIFICATION_VERSION,
+        lifecycle: deriveLifecycle({
+          classified: category !== "UNKNOWN",
+          hasCandidate: Boolean(supplierId),
+          decided: false,
+          posted: false,
+          ignored: false,
+        }),
+      };
+
+      const key = JSON.stringify(set);
+      const bucket = buckets.get(key) ?? { ids: [], set, reason: c.reason, category };
+      bucket.ids.push(o.id);
+      buckets.set(key, bucket);
+      swept++;
+    }
+
+    for (const bucket of buckets.values()) {
       await t
         .update(bankTransactions)
-        .set({
-          category,
-          counterpartyId: known?.counterpartyId ?? null,
-          supplierId: known?.supplierId ?? o.supplierId,
-          classificationSource: "MEMORY",
-          classificationReason: c.reason,
-          classificationVersion: CLASSIFICATION_VERSION,
-          lifecycle: deriveLifecycle({
-            classified: category !== "UNKNOWN",
-            hasCandidate: Boolean(known?.supplierId ?? o.supplierId),
-            decided: false,
-            posted: false,
-            ignored: false,
-          }),
-        })
-        .where(eq(bankTransactions.id, o.id));
+        .set(bucket.set)
+        .where(inArray(bankTransactions.id, bucket.ids));
 
-      await t.insert(decisionHistory).values({
-        bankTransactionId: o.id,
-        event: "CLASSIFIED",
-        actor: "MEMORY",
-        actorId: user.id,
-        detail: c.reason,
-        payload: { الباب: category, المصدر: "MEMORY", النسخة: CLASSIFICATION_VERSION },
-      });
-      swept++;
+      /* والأثر يُكتب دفعةً أيضاً — وهو صفٌّ لكلّ حركة لا يُختصَر */
+      await t.insert(decisionHistory).values(
+        bucket.ids.map((id) => ({
+          bankTransactionId: id,
+          event: "CLASSIFIED" as const,
+          actor: "MEMORY" as const,
+          actorId: user.id,
+          detail: bucket.reason,
+          payload: {
+            الباب: bucket.category,
+            المصدر: "MEMORY",
+            النسخة: CLASSIFICATION_VERSION,
+          },
+        })),
+      );
     }
 
     return { result, swept };

@@ -81,8 +81,18 @@ ALLOWED_EMAILS="ahmedaljaaidi98@gmail.com:OWNER,acc@example.com:ACCOUNTANT,buy@e
 | القيمة | الكلفة | الخصوصية | الدقة |
 |---|---|---|---|
 | `claude` | ~١٠ هللات للفاتورة | بياناتك ليست مادة تدريب | الأعلى |
+| **`deepseek`** (المستعمل) | مدفوع بالاستخدام — ٦ سنتات لـ١٢٦ فاتورة | بياناتك ليست مادة تدريب | عالية |
 | `gemini` | مجاني (١٥٠٠ طلب يومياً) | ⚠ جوجل تستخدم بيانات الطبقة المجانية لتحسين منتجاتها وقد يراجعها بشر | عالية |
 | `ollama` | مجاني تماماً | لا يخرج شيء من جهازك | الأدنى |
+
+**لديب سيك (المستعمل):** المفتاح من [platform.deepseek.com](https://platform.deepseek.com) → `DEEPSEEK_API_KEY`، ومعه:
+
+```
+EXTRACTION_PROVIDER="deepseek"
+DEEPSEEK_EXTRACTION_MODEL="deepseek-v4-flash-vision-exp"
+DEEPSEEK_TEXT_MODEL="deepseek-v4-flash"
+DEEPSEEK_REASONING_MODEL="deepseek-v4-pro"
+```
 
 **لجيميني:** المفتاح مجاناً من [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → `GEMINI_API_KEY`.
 
@@ -201,6 +211,8 @@ https://tph-invoicing.vercel.app/api/health
 | «لا يوجد تفويض درايف لحسابك» | سجّل خروجاً ثم دخولاً ووافق على صلاحية الدرايف |
 | انتهاء الجلسة كل سبعة أيام | التطبيق ما زال في وضع Testing — انشره (الخطوة ١-ج) |
 | «مفتاح ANTHROPIC_API_KEY غير مضبوط» | اضبط المفتاح أو بدّل `EXTRACTION_PROVIDER` |
+| «رصيد حساب DeepSeek نفد» | اشحن الحساب — المفتاح صحيح والرصيد صفر |
+| «ملفّ PDF مصوَّر بضغطٍ لا يُنتزَع منه صورة» | مسحٌ بضغط JBIG2/CCITT — يُقرأ يدوياً |
 | «تجاوزنا حدّ الطبقة المجانية» | حدّ جيميني ١٥ طلباً في الدقيقة — انتظر قليلاً |
 | `redirect_uri_mismatch` | العنوان غير مضاف في بيانات اعتماد جوجل (الخطوة ١-د) |
 | زرّ الرفع يبقى «يرفع…» بلا نهاية | نقطة اتصال قاعدة البيانات مباشرة لا مجمَّعة — افحص `/api/health` |
