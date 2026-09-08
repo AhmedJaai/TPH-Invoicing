@@ -71,6 +71,32 @@ export function DriveSync() {
   const [pendingIds, setPendingIds] = useState<string[]>([]);
   const [renamed, setRenamed] = useState<string | null>(null);
 
+  /** يُطبّق التسمية على ما اقتُرح — يستدعيها التسجيل والزرّ معاً. */
+  const applyRenames = useCallback(async (fileIds: string[]) => {
+    setRenaming(true);
+    setRenamed(null);
+    try {
+      const res = await fetch("/api/drive-rename", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ apply: true, fileIds }),
+      });
+      /* يُقرأ نصّاً قبل ادّعاء أنّه JSON — صفحةُ خطأٍ ليست JSON */
+      const text = await res.text();
+      let json: { message?: string; error?: string } | null = null;
+      try { json = JSON.parse(text) as { message?: string; error?: string }; }
+      catch { /* ليس JSON */ }
+      setRenamed(
+        !json ? `تعذّرت التسمية — ردّ الخادم بالرمز ${res.status}`
+        : res.ok ? (json.message ?? "تمّت التسمية") : (json.error ?? "تعذّرت التسمية"),
+      );
+    } catch (e) {
+      setRenamed(`تعذّر الاتصال بالخادم — لم يصل الطلب: ${(e as Error).message}`);
+    } finally {
+      setRenaming(false);
+    }
+  }, []);
+
   const call = useCallback(
     async (apply: boolean) => {
       setBusy(apply ? "applying" : "scanning");
@@ -170,6 +196,28 @@ export function DriveSync() {
         json.renameSuggestions = suggestions;
 
         setResult(json);
+
+        /*
+          ── التسمية تقع مع التسجيل، لا في ضغطةٍ ثالثة ──
+
+          كان المسار ثلاث ضغطات: افحص · سجّل · سمِّ. والثلاثة فعلٌ
+          واحد في ذهن صاحب العمل: «اقرأ ما دخل الدرايف، وسمِّه،
+          وأدخِله النظام». فمن ترك الضغطة الثالثة بقي الملفّ مسجَّلاً
+          باسمٍ لا يُقرأ، ولا شيء يذكّره.
+
+          والحرّاس تبقى كما هي — وهي التي تجعل هذا آمناً:
+            · التسميةُ وحدها: لا حذف ولا نقل، والدالّة `renameFile`.
+            · ما له سجلٌّ عندنا وحده — والقائمة من `documents`.
+            · ولا يُمَسّ اسمٌ **يُقرأ**: `canonicalName` لا تقترح إلّا
+              لما عجز قارئُه، فالاسم الذي كتبه إنسان يبقى.
+            · وأثرٌ في سجلّ التدقيق لكلّ إعادة تسمية.
+
+          والمعروض هو ما وقع: القائمة تبقى بعد التنفيذ ليراها.
+        */
+        if (apply && suggestions.length > 0) {
+          await applyRenames(suggestions.map((r) => r.fileId));
+        }
+
         if (apply) router.refresh();
       } catch (e) {
         setError((e as Error).message);
@@ -177,7 +225,7 @@ export function DriveSync() {
         setBusy(null);
       }
     },
-    [full, router, pendingIds],
+    [full, router, pendingIds, applyRenames],
   );
 
   if (!open) {
@@ -220,7 +268,7 @@ export function DriveSync() {
 
       {busy && (
         <p className="mt-3 text-xs text-muted">
-          {busy === "scanning" ? "يفحص الدرايف…" : "يسجّل الجديد ويقرأ ما لا يُفهم اسمه…"}
+          {busy === "scanning" ? "يفحص الدرايف…" : "يسجّل الجديد ويقرأه ويوحّد اسمه في الدرايف…"}
         </p>
       )}
 
@@ -256,7 +304,7 @@ export function DriveSync() {
           {result?.renameSuggestions && result.renameSuggestions.length > 0 && (
             <div className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5">
               <p className="text-[11px] font-bold text-warn">
-                {result.renameSuggestions.length} ملفّاً سُجّل واسمُه خارج الصيغة
+                {result.renameSuggestions.length} ملفّاً اسمُه لا يُقرأ — وُحِّد في الدرايف
               </p>
               <ul className="mt-1.5 space-y-1">
                 {result.renameSuggestions.slice(0, 8).map((r) => (
@@ -274,36 +322,10 @@ export function DriveSync() {
                 <button
                   type="button"
                   disabled={renaming}
-                  onClick={async () => {
-                    setRenaming(true);
-                    setRenamed(null);
-                    try {
-                      const res = await fetch("/api/drive-rename", {
-                        method: "POST",
-                        headers: { "content-type": "application/json" },
-                        body: JSON.stringify({
-                          apply: true,
-                          fileIds: result.renameSuggestions!.map((r) => r.fileId),
-                        }),
-                      });
-                      const text = await res.text();
-                      let json: { message?: string; error?: string } | null = null;
-                      try { json = JSON.parse(text) as { message?: string; error?: string }; }
-                      catch { /* ليس JSON */ }
-                      setRenamed(
-                        !json ? `تعذّرت التسمية (${res.status})`
-                        : res.ok ? (json.message ?? "تمّت") : (json.error ?? "تعذّرت التسمية"),
-                      );
-                      if (res.ok) router.refresh();
-                    } catch (e) {
-                      setRenamed((e as Error).message);
-                    } finally {
-                      setRenaming(false);
-                    }
-                  }}
+                  onClick={() => applyRenames(result.renameSuggestions!.map((r) => r.fileId))}
                   className="rounded-lg border border-line px-2.5 py-1 text-[11px] font-medium hover:border-ink-soft"
                 >
-                  {renaming ? "يوحّد…" : "وحّد تسميتها في الدرايف"}
+                  {renaming ? "يوحّد…" : "أعد المحاولة"}
                 </button>
                 {renamed && <span className="text-[11px] text-muted">{renamed}</span>}
               </div>
@@ -357,7 +379,7 @@ export function DriveSync() {
                 onClick={() => void call(true)}
                 className="rounded-lg bg-inverse-surface px-4 py-2 text-xs font-bold text-inverse-ink"
               >
-                {result?.applied ? "أكمل الباقي" : "سجّل الجديد"}
+                {result?.applied ? "أكمل الباقي" : "سجّل الجديد وسمِّه"}
               </button>
             )}
           </div>
