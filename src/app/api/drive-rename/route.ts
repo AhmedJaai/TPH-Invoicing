@@ -199,9 +199,19 @@ export async function POST(request: Request) {
     remaining: mine.length - targets.length,
     details: done,
     errors: failed,
-    message: failed.length === 0
-      ? `أُعيدت تسمية ${done.length} ملفّاً`
-        + (mine.length > targets.length ? ` · بقي ${mine.length - targets.length} — اضغط ثانيةً` : "")
-      : `أُعيدت تسمية ${done.length} · وتعذّر ${failed.length}`,
+    /*
+      الصفرُ له معنيان، ويجب أن يُفرَّقا.
+
+      «أُعيدت تسمية ٠ ملفّاً» تُقرأ فشلاً — وقد تكون نجاحاً تامّاً وقع
+      في نداءٍ سابق فلم يبقَ شيء. وقد وقع ذلك: سُمّيت ثلاثة ملفّات
+      فعلاً، ثمّ ضُغط الزرّ ثانيةً فقيل «٠» — فحسب صاحب العمل أنّ
+      التسمية لا تعمل، وهي تعمل.
+    */
+    message: failed.length > 0
+      ? `أُعيدت تسمية ${done.length} · وتعذّر ${failed.length}: ${failed[0]?.error.slice(0, 80)}`
+      : done.length === 0
+        ? "لا شيء يحتاج تسمية — أسماؤها موحَّدة أصلاً"
+        : `أُعيدت تسمية ${done.length} ملفّاً`
+          + (mine.length > targets.length ? ` · بقي ${mine.length - targets.length} — اضغط ثانيةً` : ""),
   });
 }

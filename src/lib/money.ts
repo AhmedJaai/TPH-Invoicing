@@ -35,15 +35,46 @@ export function parseRiyals(input: string): number | null {
     // الأرقام العربية الهندية إلى اللاتينية
     .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
     .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    /*
+      رمزُ العملة يُسقَط.
+
+      المورّدون يكتبون المبلغ ومعه عملتُه: «1,151.15 SR». وكان يُردّ
+      `null` — أي «لم يُقرأ» — فلا تُنشَأ فاتورةٌ لمستندٍ قُرئ كاملاً،
+      فيبقى في الأرشيف بلا رقمٍ ولا اسمٍ ولا ظهورٍ في البحث.
+
+      والإسقاط مقصورٌ على رموزٍ معلومة: ما ليس منها يبقى فيُردّ المبلغ،
+      فالحرفُ الغريب في رقمٍ ماليّ خبرٌ لا يُتجاهَل.
+    */
+    .replace(/\b(?:SAR|SR)\b/gi, "")
+    /*
+      والعربيّ بلا `\b`.
+
+      حدُّ الكلمة في JS مبنيٌّ على `\w` وهي محارف لاتينية، فلا يقع بين
+      فراغٍ وحرفٍ عربيّ — و`\bريال\b` لا تطابق «1250 ريال» أبداً.
+      مصيدةٌ وقعت في `bank/parsers/detect.ts` من قبل ومكتوبةٌ في
+      CLAUDE.md، فتُتجنَّب هنا بالمطابقة المباشرة.
+    */
+    .replace(/(?:ريالات|ريالاً|ريالا|ريال|ر\.?\s?س|﷼)/g, "")
     // فاصلة الآلاف العربية واللاتينية
     .replace(/[,٬\s]/g, "")
     // الفاصلة العشرية العربية
     .replace(/٫/g, ".");
 
-  if (!/^-?\d+(\.\d{1,2})?$/.test(normalized)) return null;
+  /*
+    ثلاث منازلٍ آخرُها صفر — «437.000».
 
-  const negative = normalized.startsWith("-");
-  const [whole, fraction = ""] = normalized.replace("-", "").split(".");
+    بعض أنظمة الفوترة تطبع ثلاث منازل. و«437.000» ريالاً هو «437.00»
+    يقيناً، لا تقريباً. فتُقبَل المنزلة الثالثة **إن كانت صفراً وحدها**،
+    ويُردّ ما سواها: «437.005» مبلغٌ لا يُمثَّل بالهللات، وحسمُه تخمين
+    — والمجهول يُعلَن ولا يُقرَّب.
+  */
+  const threeDecimals = /^(-?\d+\.\d{2})0$/.exec(normalized);
+  const cleaned = threeDecimals ? threeDecimals[1] : normalized;
+
+  if (!/^-?\d+(\.\d{1,2})?$/.test(cleaned)) return null;
+
+  const negative = cleaned.startsWith("-");
+  const [whole, fraction = ""] = cleaned.replace("-", "").split(".");
   const halalas = Number(whole) * HALALAS_PER_RIYAL + Number(fraction.padEnd(2, "0"));
   return negative ? -halalas : halalas;
 }
