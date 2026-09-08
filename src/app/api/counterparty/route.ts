@@ -163,9 +163,9 @@ export async function POST(request: Request) {
     ولا يبقى في يده شيء. والعطبُ الذي لا يُسمّى لا يُصلَح.
   */
   let result: Awaited<ReturnType<typeof confirmCounterparty>>;
-  let swept = 0;
+  let learnedKeys: Set<string>;
   try {
-    ({ result, swept } = await db.transaction(async (t) => {
+    ({ result, learnedKeys } = await db.transaction(async (t) => {
     const result = await confirmCounterparty({
       writer: t,
       userId: user.id,
@@ -193,7 +193,7 @@ export async function POST(request: Request) {
     const notAPayment = kind !== "SUPPLIER";
 
     for (const r of rows) {
-      await t
+      await db
         .update(bankTransactions)
         .set({
           counterpartyId: result.counterpartyId,
@@ -220,7 +220,7 @@ export async function POST(request: Request) {
         })
         .where(eq(bankTransactions.id, r.id));
 
-      await t.insert(decisionHistory).values({
+      await db.insert(decisionHistory).values({
         bankTransactionId: r.id,
         event: "ENTITY_LEARNED",
         actor: "HUMAN",
@@ -245,12 +245,25 @@ export async function POST(request: Request) {
 
       وما مسّه إنسان لا يُمَسّ: تصنيفه أوثق من استنتاج الآلة.
     */
-    const learnedKeys = new Set(
-      result.added.map((e) => memoryKeyFor(e.kind as IdentityKind, e.normalized)),
+      const learnedKeys = new Set(
+        result.added.map((e) => memoryKeyFor(e.kind as IdentityKind, e.normalized)),
+      );
+      return { result, learnedKeys };
+    }));
+  } catch (e) {
+    const err = e as Error & { cause?: { message?: string } };
+    console.error("counterparty:", err.cause ?? err);
+    return NextResponse.json(
+      { error: `تعذّر الحفظ: ${(err.cause?.message ?? err.message).slice(0, 200)}` },
+      { status: 500 },
     );
-    const memory = await loadMerchantMemory();
+  }
 
-    const others = await db
+  /* ── المسح: خارج المعاملة، وبـ`db` لا `t` ── */
+  let swept = 0;
+  const memory = await loadMerchantMemory();
+
+  const others = await db
       .select()
       .from(bankTransactions)
       .where(and(
@@ -275,7 +288,6 @@ export async function POST(request: Request) {
       تُحدَّث بأمرٍ واحد. فتصير المئاتُ عشراتٍ قليلة، ويُفرَغ الاتصال
       في ثوانٍ.
     */
-    let swept = 0;
     /** ما يُكتب على مجموعةٍ متشابهة — شكلٌ صريح لا مستنتَج. */
     interface Sweep {
       ids: string[];
@@ -338,11 +350,11 @@ export async function POST(request: Request) {
     for (const bucket of buckets.values()) {
       for (let i = 0; i < bucket.ids.length; i += CHUNK) {
         const slice = bucket.ids.slice(i, i + CHUNK);
-        await t
+        await db
           .update(bankTransactions)
           .set(bucket.set)
           .where(inArray(bankTransactions.id, slice));
-        await t.insert(decisionHistory).values(
+        await db.insert(decisionHistory).values(
           slice.map((id) => ({
             bankTransactionId: id,
             event: "CLASSIFIED" as const,
@@ -359,24 +371,6 @@ export async function POST(request: Request) {
       }
     }
 
-      return { result, swept };
-    }));
-  } catch (e) {
-    /*
-      السببُ الحقيقيّ في `cause` لا في `message`.
-
-      دريزل يلفّ خطأ بوستجرس برسالةٍ تبدأ «Failed query: select …» ثمّ
-      تُقصّ، فيصل المستخدمَ نصُّ الاستعلام ولا يصل سببُ الفشل. والخطأ
-      الذي يعرض السؤال ويكتم الجواب أسوأ من رقمٍ مجرّد.
-    */
-    const err = e as Error & { cause?: { message?: string; code?: string } };
-    const reason = (err.cause?.message ?? err.message).slice(0, 200);
-    console.error("counterparty:", err.cause ?? err);
-    return NextResponse.json(
-      { error: `تعذّر الحفظ: ${reason}` },
-      { status: 500 },
-    );
-  }
 
   const [party] = await db
     .select({ name: counterparties.displayName })
