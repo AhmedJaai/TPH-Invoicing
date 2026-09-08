@@ -37,6 +37,8 @@ interface Result {
   applied: boolean;
   /** ما سُجّل للتوّ واسمُه خارج الصيغة — يُقترَح هنا لا في شاشةٍ أخرى. */
   renameSuggestions?: RenameSuggestion[];
+  quotations?: string[];
+  renamedOnSync?: number;
   summary: Summary;
   files?: ScannedFile[];
   notes?: string[];
@@ -289,6 +291,7 @@ export function DriveSync() {
             <p className="mt-3 rounded-lg bg-ok-bg px-3 py-2 text-xs font-bold text-ok">
               ✓ سُجّل {s.created ?? 0} مستنداً، منها {countNoun(s.invoicesCreated ?? 0, INVOICE)}
               {s.contentRead ? ` · قُرئ محتوى ${s.contentRead}` : ""}
+              {result.renamedOnSync ? ` · وُحِّد اسم ${result.renamedOnSync}` : ""}
               {s.remainingUnnamed ? ` · بقي ${s.remainingUnnamed} ملفاً يحتاج قراءة` : ""}
             </p>
           )}
@@ -301,6 +304,23 @@ export function DriveSync() {
             هذه اللحظة — لا في شاشةٍ أخرى ينظر فيها الفحصُ إلى المسجَّل
             فيقول «لا شيء» لأنّ الجديد لم يكن قد سُجّل بعد.
           */}
+          {result?.quotations && result.quotations.length > 0 && (
+            <div className="mt-3 rounded-xl border border-warn/40 bg-warn-bg px-3 py-2.5">
+              <p className="text-[11px] font-bold text-warn">
+                {result.quotations.length} عرض سعر — لم يُسجَّل
+              </p>
+              <p className="mt-1 text-[11px] text-muted">
+                عرضُ السعر ليس واقعةً ماليّة: لا مالَ خرج ولا التزامَ نشأ. يبقى في
+                الدرايف كما هو، فإن صار فاتورةً سُجّلت الفاتورة.
+              </p>
+              <ul className="mt-1.5 space-y-0.5">
+                {result.quotations.slice(0, 6).map((q) => (
+                  <li key={q} className="truncate text-[11px] text-muted" dir="ltr">{q}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {result?.renameSuggestions && result.renameSuggestions.length > 0 && (
             <div className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5">
               <p className="text-[11px] font-bold text-warn">

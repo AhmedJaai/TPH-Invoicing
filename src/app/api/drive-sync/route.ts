@@ -18,7 +18,7 @@ import {
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { driveForUser, downloadFile, getFileMeta } from "@/lib/drive";
+import { driveForUser, downloadFile, getFileMeta, renameFile } from "@/lib/drive";
 import { recentMonths, walkArchive, type ArchiveEntry } from "@/lib/drive-sync";
 import { parseFileName } from "@/lib/naming";
 import { KNOWN_SLUGS } from "@/lib/suppliers-seed";
@@ -340,6 +340,10 @@ export async function POST(request: Request) {  let user;
   // ── الملفات التي لا يُفهم اسمها: تُقرأ بمحتواها ──
   let read = 0;
   const readFailures: string[] = [];
+  /** التسعيرات: تُعرَض ولا تُقيَّد. */
+  const quotations: string[] = [];
+  /** ما وُحِّد اسمُه قبل تقييده. */
+  let renamedOnSync = 0;
 
   if (body.readContent) {
     for (const entry of unnamed.slice(0, MAX_CONTENT_PER_CALL)) {
@@ -371,6 +375,22 @@ export async function POST(request: Request) {  let user;
       }
 
       const x = extraction.value;
+
+      /*
+        ── التسعيرة تُحذَّر ولا تُسجَّل ──
+
+        عرضُ السعر ليس واقعةً ماليّة: لا مالَ خرج ولا التزامَ نشأ، وقد
+        يُلغى أو يتغيّر سعرُه قبل أن يصير فاتورة. وتقييدُه يُدخل في
+        الأرشيف رقماً يبدو مستحقّاً وليس كذلك.
+
+        فيُعلَن ولا يُقيَّد — ويبقى في الدرايف كما هو، فإن صار فاتورةً
+        سُجّلت الفاتورة.
+      */
+      if (x.documentKind === "QUOTATION") {
+        quotations.push(`${entry.file.name} — عرض سعر، لم يُسجَّل`);
+        continue;
+      }
+
       const folderSupplier = byFolder.get(entry.folderName.trim());
       const matched = matchSupplier(supplierList, {
         sellerVatNumber: x.sellerVatNumber,
@@ -398,11 +418,47 @@ export async function POST(request: Request) {  let user;
         },
       );
 
+      /*
+        ── الاسم يُوحَّد قبل التقييد، لا بعده ──
+
+        كان الملفّ يُسجَّل باسمه الخام ثمّ تُقترَح تسميتُه في خطوةٍ
+        تالية. فمن ترك الخطوة بقي في القيد اسمٌ لا يُقرأ — «S00148» —
+        ولا شيء يذكّره. وأسوأ منه أنّ القيد والدرايف يفترقان إن نُفِّذت
+        التسمية في أحدهما وحده.
+
+        فيُسمّى أوّلاً، ثمّ يُقيَّد بالاسم الذي استقرّ. وإن تعذّرت
+        التسمية سُجّل باسمه الخام ولم يُمنَع التقييد: **الملفّ المقروء
+        خيرٌ من ملفٍّ ضائع**، والتسمية تُعاد لاحقاً.
+
+        والحرّاس كما هي: لا يُمَسّ اسمٌ يُقرأ — `canonicalName` لا
+        تقترح إلّا لما عجز قارئُه.
+      */
+      let finalName = entry.file.name;
+      const verdictNow = canonicalName({
+        driveFileId: entry.file.id,
+        fileName: entry.file.name,
+        kind: x.documentKind,
+        slug: supplier?.slug ?? null,
+        date: /^\d{4}-\d{2}-\d{2}$/.test(x.invoiceDate) ? x.invoiceDate : null,
+        totalMinor: parseRiyals(x.totalAmount),
+        invoiceNumber: x.invoiceNumber?.trim() || null,
+      });
+
+      if (verdictNow.status === "RENAME") {
+        try {
+          await renameFile(drive, entry.file.id, verdictNow.proposed);
+          finalName = verdictNow.proposed;
+          renamedOnSync++;
+        } catch (e) {
+          readFailures.push(`${entry.file.name} — تعذّرت التسمية: ${(e as Error).message.slice(0, 60)}`);
+        }
+      }
+
       await db.transaction(async (tx) => {
         const [doc] = await tx.insert(documents).values({
           driveFileId: entry.file.id,
           driveFolderId: entry.file.parents?.[0] ?? null,
-          fileName: entry.file.name,
+          fileName: finalName,
           mimeType,
           sizeBytes: data.length,
           sha256: createHash("sha256").update(data).digest("hex"),
@@ -563,6 +619,8 @@ export async function POST(request: Request) {  let user;
     summary: { ...scanned, created, invoicesCreated, paymentsAdopted, contentRead: read, remainingUnnamed: remaining },
     notes: notes.slice(0, 20),
     readFailures,
+    quotations,
+    renamedOnSync,
     renameSuggestions,
   });
 }
