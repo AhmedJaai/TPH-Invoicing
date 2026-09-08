@@ -76,7 +76,7 @@ export default async function ExpensesPage({
   const [rows, recurring, supplierRows] = await Promise.all([
     db.select().from(expenses).where(eq(expenses.periodMonth, month)).orderBy(desc(expenses.occurredOn)),
     activeRecurring(),
-    db.select({ nameAr: suppliers.nameAr }).from(suppliers),
+    db.select({ id: suppliers.id, nameAr: suppliers.nameAr }).from(suppliers),
   ]);
 
   const actual: Expense[] = rows.map((r) => ({
@@ -164,12 +164,20 @@ export default async function ExpensesPage({
             تصنيفها سداد مورّد — أكّده هنا، فيسري على أمثاله بلا سؤال.
           </p>
           <ExpenseReclassify
+            /*
+              ومعرّفُ المورّد يُمرَّر لا اسمُه وحده.
+
+              كان يُرسَل الاسم، فيردّ الخادم بحقّ: «سداد المورّد يحتاج
+              تحديد المورّد». والنظام يعرفه أصلاً — به طابق البند —
+              فطلبُه من صاحب العمل سؤالٌ عمّا يُطرَح جوابُه.
+            */
             suspects={suspects.map(({ expense: e, supplier }) => ({
               id: e.id,
               label: e.label,
               amountMinor: e.amountMinor,
               categoryLabel: CATEGORY_LABEL[e.category],
               supplier,
+              supplierId: supplierRows.find((s) => s.nameAr === supplier)?.id ?? null,
               bankTransactionId: e.bankTransactionId ?? null,
             }))}
           />

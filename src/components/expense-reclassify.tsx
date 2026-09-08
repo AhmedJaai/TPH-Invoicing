@@ -32,6 +32,7 @@ export interface Suspect {
   amountMinor: number;
   categoryLabel: string;
   supplier: string;
+  supplierId: string | null;
   bankTransactionId: string | null;
 }
 
@@ -42,7 +43,7 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
   const [error, setError] = useState<{ id: string; message: string } | null>(null);
 
   async function fix(s: Suspect) {
-    if (!s.bankTransactionId) return;
+    if (!s.bankTransactionId || !s.supplierId) return;
     setBusy(s.id);
     setError(null);
 
@@ -54,6 +55,7 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
         body: JSON.stringify({
           transactionId: s.bankTransactionId,
           kind: "SUPPLIER",
+          supplierId: s.supplierId,
           displayName: s.supplier,
         }),
       });
@@ -118,7 +120,7 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
                 </span>
                 <button
                   type="button"
-                  disabled={busy === s.id || !s.bankTransactionId}
+                  disabled={busy === s.id || !s.bankTransactionId || !s.supplierId}
                   onClick={() => fix(s)}
                   className="rounded-lg bg-inverse-surface px-2.5 py-1 text-[11px] font-bold text-inverse-ink disabled:opacity-50"
                 >
