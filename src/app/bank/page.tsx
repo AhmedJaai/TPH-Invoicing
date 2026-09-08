@@ -343,7 +343,7 @@ export default async function BankPage() {
                 evidence: t.matchEvidence as MatchExplanation["evidence"],
               };
               return (
-                <li key={t.id}>
+                <li key={t.id} id={`tx-${t.id}`} className="scroll-mt-28">
                   <Card>
                     <div className="flex items-start justify-between gap-3">
                       <span className="min-w-0">

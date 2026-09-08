@@ -42,10 +42,23 @@ export function pendingDecision(): SQL {
   return sql`${bankTransactions.matchedPaymentId} is null
     and ${bankTransactions.matchStatus} <> 'IGNORED'
     and (
-      /* ١ · لم يُعرَف بعدُ من الجهة */
+      /*
+        ١ · لم يُعرَف بعدُ من الجهة — **والبابُ مجهول**.
+
+        وكان الشرط المصدرَ والطبقة وحدهما، فدخل الطابورَ كلُّ ما لم
+        يقرّره إنسان ولو كان بابُه معلوماً. فظهرت رسومُ القناة الرقمية
+        (١٫٠٥ و٠٫٧٥ و٠٫١٥ ريال) تُسأل «من هذه الجهة؟» — **ورسمُ البنك
+        لا جهةَ له بطبعه**، وقد صُنّف صحيحاً بحكم مقداره ووصفه، وسببُه
+        معروضٌ في البند نفسه: «رسم القناة الرقمية».
+
+        فالسؤال يقع على المجهول وحده. وما عُرف بابُه لا قرار فيه هنا —
+        وإن أخطأ التصنيف فموضعُ تصحيحه صفحةُ البنك، لا طابورٌ يسأل عن
+        جهةٍ لا وجود لها.
+      */
       (
         ${bankTransactions.lifecycle} not in ('CONFIRMED','POSTED')
         and ${bankTransactions.classificationSource} is distinct from 'HUMAN'
+        and ${bankTransactions.category} = 'UNKNOWN'
       )
       /*
         ٢ · أو عُرفت الجهة وهي مورّد — فالمال لم يُقيَّد بعد.

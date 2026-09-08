@@ -362,8 +362,16 @@ export async function POST(request: Request) {
       return { result, swept };
     }));
   } catch (e) {
-    const reason = (e as Error).message.slice(0, 200);
-    console.error("counterparty:", e);
+    /*
+      السببُ الحقيقيّ في `cause` لا في `message`.
+
+      دريزل يلفّ خطأ بوستجرس برسالةٍ تبدأ «Failed query: select …» ثمّ
+      تُقصّ، فيصل المستخدمَ نصُّ الاستعلام ولا يصل سببُ الفشل. والخطأ
+      الذي يعرض السؤال ويكتم الجواب أسوأ من رقمٍ مجرّد.
+    */
+    const err = e as Error & { cause?: { message?: string; code?: string } };
+    const reason = (err.cause?.message ?? err.message).slice(0, 200);
+    console.error("counterparty:", err.cause ?? err);
     return NextResponse.json(
       { error: `تعذّر الحفظ: ${reason}` },
       { status: 500 },

@@ -159,21 +159,43 @@ export default async function ExpensesPage({
             مصروفات تحمل أسماء مورّدين مسجّلين ({countNoun(suspects.length, ITEM)})
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-            إن كانت هذه مشتريات فهي محسوبة مرّتين: في المشتريات وهنا. صحّح تصنيفها في
-            كشف البنك مرّة، فتسري القاعدة على أمثالها.
+            إن كانت هذه مشتريات فهي محسوبة مرّتين: في المشتريات وهنا. اضغط البند
+            ليفتح حركته في كشف البنك، وصحّح تصنيفها مرّة — فتسري القاعدة على أمثالها.
           </p>
           <ul className="mt-3 divide-y divide-line/60 rounded-lg border border-line/60 bg-surface/60">
-            {suspects.map(({ expense: e, supplier }) => (
-              <li key={e.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                <span className="min-w-0">
-                  <span className="block truncate text-xs font-medium">{e.label}</span>
-                  <span className="block truncate text-[11px] text-muted">
-                    مصنَّفة {CATEGORY_LABEL[e.category]} · تطابق المورّد «{supplier}»
+            {/*
+              كلّ بندٍ يفتح حركته بعينها.
+
+              كان التحذير يسمّي البنود ثمّ يُلقي بصاحبه في صفحة البنك
+              كلّها ليبحث عنها بين مئات الحركات. **والتنبيه الذي يعرف
+              موضع الإصلاح ولا يدلّ عليه يُنقص من العمل حرفاً ويزيد
+              عليه بحثاً.**
+            */}
+            {suspects.map(({ expense: e, supplier }) => {
+              const row = (
+                <>
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-medium">{e.label}</span>
+                    <span className="block truncate text-[11px] text-muted">
+                      مصنَّفة {CATEGORY_LABEL[e.category]} · تطابق المورّد «{supplier}»
+                    </span>
                   </span>
-                </span>
-                <span className="shrink-0 text-xs font-bold"><Money minor={e.amountMinor} /></span>
-              </li>
-            ))}
+                  <span className="shrink-0 text-xs font-bold"><Money minor={e.amountMinor} /></span>
+                </>
+              );
+              const cls = "flex items-center justify-between gap-3 px-3 py-2";
+              return (
+                <li key={e.id}>
+                  {e.bankTransactionId ? (
+                    <a href={`/bank#tx-${e.bankTransactionId}`} className={`${cls} hover:bg-raised`}>
+                      {row}
+                    </a>
+                  ) : (
+                    <span className={cls}>{row}</span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
           <a
             href="/bank"
