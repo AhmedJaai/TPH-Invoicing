@@ -40,47 +40,29 @@ interface TextItem {
 /**
  * يقرأ الكلمات ومواضعها.
  *
- * يُحمَّل `pdfjs-dist` عند الطلب لا عند بدء التطبيق: هو ثقيل، وأكثر
+ * تُحمَّل `unpdf` عند الطلب لا عند بدء التطبيق: هي ثقيلة، وأكثر
  * الكشوف جداول لا PDF، فلا يُدفَع ثمنه إلّا عند الحاجة.
  */
 export async function extractPdfWords(buffer: Buffer): Promise<PdfExtraction> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-
   /*
-    مسارُ العامل يُحلّ صراحةً.
+    `unpdf` لا `pdfjs-dist` مباشرةً.
 
-    `pdfjs` بلا `workerSrc` يبني «عاملاً وهمياً» يستورد `pdf.worker.mjs`
-    استيراداً ديناميكياً. والحازم لا يتتبّع ذلك، فيسقط في الإنتاج:
+    وهي بناءٌ من pdfjs نفسه مهيَّأ للبيئات بلا خادم: العامل مضمَّنٌ فيها
+    فلا تستورده استيراداً ديناميكياً. والاستيراد الديناميكيّ هو الذي
+    كان يسقط في الإنتاج وحده:
 
       Setting up fake worker failed: Cannot find module
       '/var/task/.next/server/chunks/pdf.worker.mjs'
 
-    و`serverExternalPackages` وحده لم يكفِ — فالمسار الذي يبحث فيه
-    مشتقٌّ من موضع الوحدة المحزومة لا من `node_modules`. فيُحلّ هنا
-    بـ`require.resolve` من موضع هذا الملفّ، ويُثبَّت مرّةً واحدة.
+    ولم يُصلحه إخراجُ الحزمة من التحزيم ولا حلُّ المسار بـ`require.resolve`
+    — لأنّ الملفّ لا يبلغ حزمةَ النشر أصلاً. **والعطب في الحزم لا في
+    المسار، فيُعالَج بحزمةٍ لا تحتاج ملفّاً خارجها.**
 
-    ولا يُرمى إن تعذّر: بعض البيئات لا تحتاجه أصلاً، والرمي هنا يمنع
-    القراءة حيث كانت تعمل.
+    والواجهة هي هي: `getTextContent()` يعطي العناصر بمصفوفة `transform`
+    نفسها، فما بعد هذه الدالّة لم يتغيّر حرفاً.
   */
-  if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    try {
-      const { createRequire } = await import("node:module");
-      const req = createRequire(import.meta.url);
-      pdfjs.GlobalWorkerOptions.workerSrc = req.resolve(
-        "pdfjs-dist/legacy/build/pdf.worker.mjs",
-      );
-    } catch {
-      /* يبقى الافتراضيّ — وقد يعمل في بيئةٍ فيها الملفّ */
-    }
-  }
-
-  const doc = await pdfjs.getDocument({
-    data: new Uint8Array(buffer),
-    // لا خطوط نظام ولا شبكة: القراءة محلّية بحتة
-    disableFontFace: true,
-    useSystemFonts: false,
-    isEvalSupported: false,
-  }).promise;
+  const { getDocumentProxy } = await import("unpdf");
+  const doc = await getDocumentProxy(new Uint8Array(buffer));
 
   const words: PdfWord[] = [];
 
@@ -97,8 +79,6 @@ export async function extractPdfWords(buffer: Buffer): Promise<PdfExtraction> {
       });
     }
   }
-
-  await doc.destroy();
 
   return { words, pageCount: doc.numPages, hasText: words.length >= MIN_WORDS };
 }

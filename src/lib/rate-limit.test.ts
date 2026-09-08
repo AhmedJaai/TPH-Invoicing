@@ -48,7 +48,11 @@ describe("decide", () => {
 describe("RULES", () => {
   it("الواجهات المستهلكة للنموذج أضيق حدّاً", () => {
     expect(RULES.analyze.limit).toBeLessThan(RULES["supplier-alias"].limit);
-    expect(RULES["drive-sync"].limit).toBeLessThan(RULES.archive.limit);
+    /*
+      والمزامنة خرجت من هذه القاعدة بقرارٍ صريح من صاحب العمل: حدُّها
+      كان يوقفه عن إصلاح نظامه. وما يحميها الحارسُ والصلاحية، لا العدّاد.
+    */
+    expect(RULES["drive-sync"].limit).toBeGreaterThan(RULES.archive.limit);
   });
 
   it("الواجهة غير المعروفة لها حدّ افتراضي لا فراغ", () => {
