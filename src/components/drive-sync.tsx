@@ -304,7 +304,7 @@ export function DriveSync() {
           {result?.renameSuggestions && result.renameSuggestions.length > 0 && (
             <div className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5">
               <p className="text-[11px] font-bold text-warn">
-                {result.renameSuggestions.length} ملفّاً اسمُه لا يُقرأ — وُحِّد في الدرايف
+                {result.renameSuggestions.length} ملفّاً اسمُه لا يُقرأ
               </p>
               <ul className="mt-1.5 space-y-1">
                 {result.renameSuggestions.slice(0, 8).map((r) => (

@@ -17,7 +17,7 @@
  *      الاسم بنفسه** ولا يأخذه من المتصفّح.
  */
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, documents, invoices, statements, suppliers } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
@@ -55,7 +55,19 @@ async function load(): Promise<NamedDocument[]> {
     .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
     .leftJoin(invoices, eq(invoices.documentId, documents.id))
     .leftJoin(statements, eq(statements.documentId, documents.id))
-    .where(eq(documents.status, "ARCHIVED"));
+    /*
+      كلُّ ما له سجلٌّ عندنا — لا المؤرشَف وحده.
+
+      كان الشرط `status = ARCHIVED`، والملفّ الذي تسجّله المزامنة للتوّ
+      يكون `PENDING` أو `NEEDS_REVIEW`. فتقترح المزامنة تسميته، ثمّ
+      تطلبها، فلا يجده هذا المسار في قائمته فيردّ «أُعيدت تسمية ٠
+      ملفّاً» — طلبٌ نُفِّذ وأثرُه صفر، ولا يُقال السبب.
+
+      والضمان المعلَن «ما له سجلٌّ عندنا وحده» لا يشترط الأرشفة؛ يشترط
+      أن نعرف الملفّ. والمرفوض يُستثنى: قررنا ألّا نقيّده، فلا نكتب في
+      اسمه.
+    */
+    .where(ne(documents.status, "REJECTED"));
 
   return rows
     .filter((r): r is typeof r & { driveFileId: string } => Boolean(r.driveFileId))
