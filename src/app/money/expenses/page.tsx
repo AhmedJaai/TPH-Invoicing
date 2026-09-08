@@ -20,6 +20,7 @@ import { countNoun, ITEM } from "@/lib/arabic";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
 import { NoAccess } from "@/components/ui";
 import { ScrollX } from "@/components/scroll-x";
+import { ExpenseReclassify } from "@/components/expense-reclassify";
 
 export const dynamic = "force-dynamic";
 
@@ -159,50 +160,19 @@ export default async function ExpensesPage({
             مصروفات تحمل أسماء مورّدين مسجّلين ({countNoun(suspects.length, ITEM)})
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-            إن كانت هذه مشتريات فهي محسوبة مرّتين: في المشتريات وهنا. اضغط البند
-            ليفتح حركته في كشف البنك، وصحّح تصنيفها مرّة — فتسري القاعدة على أمثالها.
+            إن كانت هذه مشتريات فهي محسوبة مرّتين: في المشتريات وهنا. والنظام يقترح
+            تصنيفها سداد مورّد — أكّده هنا، فيسري على أمثاله بلا سؤال.
           </p>
-          <ul className="mt-3 divide-y divide-line/60 rounded-lg border border-line/60 bg-surface/60">
-            {/*
-              كلّ بندٍ يفتح حركته بعينها.
-
-              كان التحذير يسمّي البنود ثمّ يُلقي بصاحبه في صفحة البنك
-              كلّها ليبحث عنها بين مئات الحركات. **والتنبيه الذي يعرف
-              موضع الإصلاح ولا يدلّ عليه يُنقص من العمل حرفاً ويزيد
-              عليه بحثاً.**
-            */}
-            {suspects.map(({ expense: e, supplier }) => {
-              const row = (
-                <>
-                  <span className="min-w-0">
-                    <span className="block truncate text-xs font-medium">{e.label}</span>
-                    <span className="block truncate text-[11px] text-muted">
-                      مصنَّفة {CATEGORY_LABEL[e.category]} · تطابق المورّد «{supplier}»
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-xs font-bold"><Money minor={e.amountMinor} /></span>
-                </>
-              );
-              const cls = "flex items-center justify-between gap-3 px-3 py-2";
-              return (
-                <li key={e.id}>
-                  {e.bankTransactionId ? (
-                    <a href={`/bank#tx-${e.bankTransactionId}`} className={`${cls} hover:bg-raised`}>
-                      {row}
-                    </a>
-                  ) : (
-                    <span className={cls}>{row}</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          <a
-            href="/bank"
-            className="mt-3 inline-block rounded-lg bg-inverse-surface px-3.5 py-1.5 text-[11px] font-bold text-inverse-ink"
-          >
-            صحّح التصنيف ←
-          </a>
+          <ExpenseReclassify
+            suspects={suspects.map(({ expense: e, supplier }) => ({
+              id: e.id,
+              label: e.label,
+              amountMinor: e.amountMinor,
+              categoryLabel: CATEGORY_LABEL[e.category],
+              supplier,
+              bankTransactionId: e.bankTransactionId ?? null,
+            }))}
+          />
         </section>
       )}
 
