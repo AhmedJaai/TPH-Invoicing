@@ -13,6 +13,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --env-file=.env scripts/seed-suppliers.ts",
+    "db:missing-invoices": "tsx --env-file=.env scripts/missing-invoices.ts",
     "db:backfill-invoices": "tsx --env-file=.env scripts/backfill-missing-invoices.ts",
     "bench:extraction": "tsx --env-file=.env scripts/benchmark-providers.ts",
     "drive:auth": "tsx --env-file=.env scripts/drive-auth.ts",
