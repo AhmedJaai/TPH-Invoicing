@@ -155,7 +155,17 @@ export async function POST(request: Request) {
 
     فإمّا أن يقع القرار كلُّه أو لا يقع منه شيء.
   */
-  const { result, swept } = await db.transaction(async (t) => {
+  /*
+    الخطأ يُعاد نصّاً، لا ٥٠٠ صامتاً.
+
+    لم يكن حول هذا المسار `try` أصلاً، فأيّ رمية تخرج ٥٠٠ بلا جسم —
+    فتعرض الشاشة رسالتها العامّة «أبلِغ مالك الحساب» وهو المالك نفسه،
+    ولا يبقى في يده شيء. والعطبُ الذي لا يُسمّى لا يُصلَح.
+  */
+  let result: Awaited<ReturnType<typeof confirmCounterparty>>;
+  let swept = 0;
+  try {
+    ({ result, swept } = await db.transaction(async (t) => {
     const result = await confirmCounterparty({
       writer: t,
       userId: user.id,
@@ -316,31 +326,49 @@ export async function POST(request: Request) {
       swept++;
     }
 
-    for (const bucket of buckets.values()) {
-      await t
-        .update(bankTransactions)
-        .set(bucket.set)
-        .where(inArray(bankTransactions.id, bucket.ids));
+    /*
+      وتُقطَّع الدفعة.
 
-      /* والأثر يُكتب دفعةً أيضاً — وهو صفٌّ لكلّ حركة لا يُختصَر */
-      await t.insert(decisionHistory).values(
-        bucket.ids.map((id) => ({
-          bankTransactionId: id,
-          event: "CLASSIFIED" as const,
-          actor: "MEMORY" as const,
-          actorId: user.id,
-          detail: bucket.reason,
-          payload: {
-            الباب: bucket.category,
-            المصدر: "MEMORY",
-            النسخة: CLASSIFICATION_VERSION,
-          },
-        })),
-      );
+      لبوستجرس سقفٌ لعدد الوسائط في الأمر الواحد (٦٥٥٣٥). وحركاتُ
+      الكشف بالمئات، وصفُّ الأثر يحمل ستّة أعمدة — فدفعةٌ واحدة كبيرة
+      تكفي لتجاوزه، وتخرج رميةً لا يفهمها أحد. والقطعُ إلى مئتين يبقي
+      عدد الرحلات صغيراً ويأمن السقف.
+    */
+    const CHUNK = 200;
+    for (const bucket of buckets.values()) {
+      for (let i = 0; i < bucket.ids.length; i += CHUNK) {
+        const slice = bucket.ids.slice(i, i + CHUNK);
+        await t
+          .update(bankTransactions)
+          .set(bucket.set)
+          .where(inArray(bankTransactions.id, slice));
+        await t.insert(decisionHistory).values(
+          slice.map((id) => ({
+            bankTransactionId: id,
+            event: "CLASSIFIED" as const,
+            actor: "MEMORY" as const,
+            actorId: user.id,
+            detail: bucket.reason,
+            payload: {
+              الباب: bucket.category,
+              المصدر: "MEMORY",
+              النسخة: CLASSIFICATION_VERSION,
+            },
+          })),
+        );
+      }
     }
 
-    return { result, swept };
-  });
+      return { result, swept };
+    }));
+  } catch (e) {
+    const reason = (e as Error).message.slice(0, 200);
+    console.error("counterparty:", e);
+    return NextResponse.json(
+      { error: `تعذّر الحفظ: ${reason}` },
+      { status: 500 },
+    );
+  }
 
   const [party] = await db
     .select({ name: counterparties.displayName })

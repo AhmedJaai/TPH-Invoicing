@@ -26,7 +26,7 @@
  */
 import { db } from "@/db";
 import { documents, invoices, suppliers } from "@/db/schema";
-import { and, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { parseRiyals } from "@/lib/money";
 import { reviewConfirmed } from "@/lib/confirm";
 import { extractionSchema } from "@/lib/extraction/schema";
