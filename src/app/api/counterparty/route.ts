@@ -17,15 +17,14 @@
  * لا يُصنِّف بها سبعين حركة بضغطة.
  */
 import { NextResponse } from "next/server";
-import { and, eq, inArray, isNull, ne, notInArray, or } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { bankTransactions, counterparties, decisionHistory } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { confirmCounterparty, loadMerchantMemory } from "@/services/counterparty.service";
+import { confirmCounterparty } from "@/services/counterparty.service";
 import { toCanonical, type CanonicalTransaction } from "@/lib/bank/canonical";
 import { groupingIdentity, memoryKeyFor, type IdentityKind } from "@/lib/bank/pattern";
-import { classify, CLASSIFICATION_VERSION } from "@/lib/bank/classification";
-import { toCategory } from "@/lib/bank/apply";
+import { CLASSIFICATION_VERSION } from "@/lib/bank/classification";
 import { deriveLifecycle } from "@/lib/bank/lifecycle";
 import { TRANSACTION, countNoun } from "@/lib/arabic";
 import type { TxCategory } from "@/lib/bank/rules";
@@ -163,9 +162,8 @@ export async function POST(request: Request) {
     ولا يبقى في يده شيء. والعطبُ الذي لا يُسمّى لا يُصلَح.
   */
   let result: Awaited<ReturnType<typeof confirmCounterparty>>;
-  let learnedKeys: Set<string>;
   try {
-    ({ result, learnedKeys } = await db.transaction(async (t) => {
+    result = await db.transaction(async (t) => {
     const result = await confirmCounterparty({
       writer: t,
       userId: user.id,
@@ -245,11 +243,8 @@ export async function POST(request: Request) {
 
       وما مسّه إنسان لا يُمَسّ: تصنيفه أوثق من استنتاج الآلة.
     */
-      const learnedKeys = new Set(
-        result.added.map((e) => memoryKeyFor(e.kind as IdentityKind, e.normalized)),
-      );
-      return { result, learnedKeys };
-    }));
+      return result;
+    });
   } catch (e) {
     const err = e as Error & { cause?: { message?: string } };
     console.error("counterparty:", err.cause ?? err);
@@ -259,118 +254,23 @@ export async function POST(request: Request) {
     );
   }
 
-  /* ── المسح: خارج المعاملة، وبـ`db` لا `t` ── */
-  let swept = 0;
-  const memory = await loadMerchantMemory();
+  /*
+    ── النشر لا يقع في الطلب ──
 
-  const others = await db
-      .select()
-      .from(bankTransactions)
-      .where(and(
-        isNull(bankTransactions.matchedPaymentId),
-        ne(bankTransactions.matchStatus, "IGNORED"),
-        or(
-          isNull(bankTransactions.classificationSource),
-          ne(bankTransactions.classificationSource, "HUMAN"),
-        ),
-        notInArray(bankTransactions.id, rows.map((r) => r.id)),
-      ));
+    كان يُقرأ كلّ ما لم يُطابَق — وهي مئات الحركات — ويُصنَّف ويُكتب،
+    قبل أن يُردّ على المستخدم. فتنفد مهلة الاتصال بالقاعدة ويسقط الطلب
+    كلُّه: **فلا يُحفظ حتى التأكيد**، ولا يرى صاحب العمل إلّا خطأً.
 
-    /*
-      التصنيف يُكتب دفعاتٍ لا صفّاً صفّاً.
+    وإخراجُه من المعاملة لم يكفِ، لأنّ الزمن نفسه هو المشكلة لا موضعُ
+    المعاملة. فخرج من الطلب كلّه.
 
-      كان لكلّ صفٍّ `update` و`insert` داخل المعاملة نفسها — رحلتان إلى
-      القاعدة في كلّ صفّ. وحركاتُ الكشف بالمئات، فصارت مئاتُ الرحلات
-      في معاملةٍ واحدة تحتجز اتصالاً حتى تنفد المهلة: ردّ الإنتاج
-      «timeout exceeded when trying to connect» ثمّ ٥٠٠ إلى الشاشة.
+    والتأكيد يُحفظ ويُردّ فوراً — وهو ما يطلبه المستخدم. والنشرُ على
+    الأمثال يقع في موضعين قائمين: الاستيراد القادم يمرّ بالمصنِّف نفسه
+    فيقرأ الذاكرة الجديدة، و`npm run db:reclassify` ينشره على ما مضى.
 
-      والمتشابه يُجمَع: الحركات التي تأخذ الباب نفسه والجهة نفسها
-      تُحدَّث بأمرٍ واحد. فتصير المئاتُ عشراتٍ قليلة، ويُفرَغ الاتصال
-      في ثوانٍ.
-    */
-    /** ما يُكتب على مجموعةٍ متشابهة — شكلٌ صريح لا مستنتَج. */
-    interface Sweep {
-      ids: string[];
-      set: {
-        category: TxCategory;
-        counterpartyId: string | null;
-        supplierId: string | null;
-        classificationSource: "MEMORY";
-        classificationReason: string;
-        classificationVersion: string;
-        lifecycle: ReturnType<typeof deriveLifecycle>;
-      };
-      reason: string;
-      category: TxCategory;
-    }
-    const buckets = new Map<string, Sweep>();
-
-    for (const o of others) {
-      const c = classify(canonicalOf(o), memory);
-      if (c.source !== "MEMORY" || !c.merchantKey) continue;
-      if (!learnedKeys.has(c.merchantKey)) continue;
-
-      const known = memory.get(c.merchantKey);
-      const category = toCategory(c.kind);
-      if (o.category === category && o.counterpartyId === (known?.counterpartyId ?? null)) continue;
-
-      const supplierId = known?.supplierId ?? o.supplierId;
-      const set: Sweep["set"] = {
-        category,
-        counterpartyId: known?.counterpartyId ?? null,
-        supplierId,
-        classificationSource: "MEMORY" as const,
-        classificationReason: c.reason,
-        classificationVersion: CLASSIFICATION_VERSION,
-        lifecycle: deriveLifecycle({
-          classified: category !== "UNKNOWN",
-          hasCandidate: Boolean(supplierId),
-          decided: false,
-          posted: false,
-          ignored: false,
-        }),
-      };
-
-      const key = JSON.stringify(set);
-      const bucket = buckets.get(key) ?? { ids: [], set, reason: c.reason, category };
-      bucket.ids.push(o.id);
-      buckets.set(key, bucket);
-      swept++;
-    }
-
-    /*
-      وتُقطَّع الدفعة.
-
-      لبوستجرس سقفٌ لعدد الوسائط في الأمر الواحد (٦٥٥٣٥). وحركاتُ
-      الكشف بالمئات، وصفُّ الأثر يحمل ستّة أعمدة — فدفعةٌ واحدة كبيرة
-      تكفي لتجاوزه، وتخرج رميةً لا يفهمها أحد. والقطعُ إلى مئتين يبقي
-      عدد الرحلات صغيراً ويأمن السقف.
-    */
-    const CHUNK = 200;
-    for (const bucket of buckets.values()) {
-      for (let i = 0; i < bucket.ids.length; i += CHUNK) {
-        const slice = bucket.ids.slice(i, i + CHUNK);
-        await db
-          .update(bankTransactions)
-          .set(bucket.set)
-          .where(inArray(bankTransactions.id, slice));
-        await db.insert(decisionHistory).values(
-          slice.map((id) => ({
-            bankTransactionId: id,
-            event: "CLASSIFIED" as const,
-            actor: "MEMORY" as const,
-            actorId: user.id,
-            detail: bucket.reason,
-            payload: {
-              الباب: bucket.category,
-              المصدر: "MEMORY",
-              النسخة: CLASSIFICATION_VERSION,
-            },
-          })),
-        );
-      }
-    }
-
+    **وحفظٌ يقع خيرٌ من نشرٍ يُسقط الحفظ معه.**
+  */
+  const swept = 0;
 
   const [party] = await db
     .select({ name: counterparties.displayName })
