@@ -46,6 +46,34 @@ interface TextItem {
 export async function extractPdfWords(buffer: Buffer): Promise<PdfExtraction> {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
+  /*
+    مسارُ العامل يُحلّ صراحةً.
+
+    `pdfjs` بلا `workerSrc` يبني «عاملاً وهمياً» يستورد `pdf.worker.mjs`
+    استيراداً ديناميكياً. والحازم لا يتتبّع ذلك، فيسقط في الإنتاج:
+
+      Setting up fake worker failed: Cannot find module
+      '/var/task/.next/server/chunks/pdf.worker.mjs'
+
+    و`serverExternalPackages` وحده لم يكفِ — فالمسار الذي يبحث فيه
+    مشتقٌّ من موضع الوحدة المحزومة لا من `node_modules`. فيُحلّ هنا
+    بـ`require.resolve` من موضع هذا الملفّ، ويُثبَّت مرّةً واحدة.
+
+    ولا يُرمى إن تعذّر: بعض البيئات لا تحتاجه أصلاً، والرمي هنا يمنع
+    القراءة حيث كانت تعمل.
+  */
+  if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+    try {
+      const { createRequire } = await import("node:module");
+      const req = createRequire(import.meta.url);
+      pdfjs.GlobalWorkerOptions.workerSrc = req.resolve(
+        "pdfjs-dist/legacy/build/pdf.worker.mjs",
+      );
+    } catch {
+      /* يبقى الافتراضيّ — وقد يعمل في بيئةٍ فيها الملفّ */
+    }
+  }
+
   const doc = await pdfjs.getDocument({
     data: new Uint8Array(buffer),
     // لا خطوط نظام ولا شبكة: القراءة محلّية بحتة

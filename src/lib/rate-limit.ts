@@ -62,7 +62,14 @@ export const RULES: Record<string, RateLimitRule> = {
   analyze: { limit: 40, windowSeconds: 3600 },
   archive: { limit: 60, windowSeconds: 3600 },
   "statement-reconcile": { limit: 20, windowSeconds: 3600 },
-  "drive-sync": { limit: 12, windowSeconds: 3600 },
+  /*
+    المزامنة قراءةٌ في الأكثر: تمشي الدرايف وتقارن بما عندنا. واثنا عشر
+    في الساعة كانت تكفي استعمالاً هادئاً، فلمّا صار الفحص والتسجيل
+    والتسمية فعلاً واحداً يُعاد حتى يستقيم، نفدت في دقائق فأوقفت العمل
+    ثمانياً وأربعين دقيقة. والحدّ الذي يمنع صاحب النظام من إصلاح نظامه
+    يحمي من لا شيء.
+  */
+  "drive-sync": { limit: 40, windowSeconds: 3600 },
   "bank-import": { limit: 12, windowSeconds: 3600 },
   "mark-paid": { limit: 10, windowSeconds: 3600 },
   "match-undo": { limit: 60, windowSeconds: 3600 },
