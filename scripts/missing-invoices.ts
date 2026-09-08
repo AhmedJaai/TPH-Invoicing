@@ -127,6 +127,44 @@ async function main() {
     `)
   ).rows as unknown as { file_name: string; kind: string; period_month: string; sup: string; same_month: number }[];
 
+  /*
+    ── دفعاتٌ بلا أصل ──
+
+    دفعةٌ لا إيصالَ لها ولا حركةَ بنك: لا دليلَ على أنّ المال خرج. وهي
+    ترفع «ما دُفع» فتُوسّع الفجوة، فيبدو المورّد ناقصَ الفواتير وهو
+    ليس كذلك — وقد وقع: فجوةُ «محمصة أطلس» كلُّها ٥٧٥ ريالاً، ولها
+    دفعةٌ بلا أصل بـ٥٧٥ بالضبط.
+
+    **وتُعرَض ولا تُطوى.** قد تكون وسماً يدويّاً صحيحاً، وقد تكون نصفَ
+    دمجٍ قديم. وطيُّها يُعيد الفاتورة مستحقّةً بلا سببٍ ظاهر فتُدفَع
+    مرّتين.
+  */
+  const orphans = (
+    await db.execute(sql`
+      select coalesce(s.name_ar, s.name_en) sup, p.paid_at::date d,
+             p.amount_minor a, p.status::text st
+      from payments p
+      join suppliers s on s.id = p.supplier_id
+      left join bank_transactions bt on bt.matched_payment_id = p.id
+      where p.document_id is null and bt.id is null and p.status <> 'REVERSED'
+      order by p.amount_minor desc
+    `)
+  ).rows as unknown as { sup: string; d: string; a: string; st: string }[];
+
+  console.log("\n═══ دفعات بلا أصل — لا إيصال ولا حركة بنك ═══\n");
+  let orphanTotal = 0;
+  for (const o of orphans) {
+    if (o.st !== "VOID") orphanTotal += Number(o.a);
+    console.log(
+      `${String(o.d).slice(0, 10)} ${riyals(o.a).padStart(12)} ` +
+        `${String(o.sup).slice(0, 24).padEnd(26)} ${o.st}`,
+    );
+  }
+  console.log(
+    `\nقائمةٌ منها (غير الملغاة): ${riyals(orphanTotal)} ريالاً — ` +
+      "تُعرَض ولا تُطوى، وطيُّها يُعيد الفاتورة مستحقّةً فتُدفَع مرّتين.",
+  );
+
   console.log("\n═══ عروض أسعار ومبدئيّات ═══\n");
   for (const q of quotes) {
     const mark = q.same_month === 0 ? "⚠ لا فاتورة لهذا المورّد في الشهر" : `${q.same_month} فاتورة في الشهر`;
