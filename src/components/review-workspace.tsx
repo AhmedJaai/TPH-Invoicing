@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Money } from "./money";
 import { Badge, buttonClass, Card, EmptyState } from "./ui";
 import { countNoun, SUGGESTION, TRANSACTION } from "@/lib/arabic";
+import { postJson } from "@/lib/http-client";
+import { strength } from "@/lib/bank/strength";
 import {
   BUCKET_HINT, BUCKET_LABEL, bulkConfirmable,
   settleable, groupForReview,
@@ -34,6 +36,8 @@ export interface ReviewWorkspaceProps {
   canApprove: boolean;
   /** هل يملك صلاحية تعريف الجهات وتصنيفها؟ */
   canEdit: boolean;
+  /** المورّدون — «سداد مورّد» بلا قائمةٍ يُختار منها زرٌّ يردّه الخادم. */
+  suppliers?: readonly { id: string; nameAr: string }[];
 }
 
 const BUCKET_TONE: Record<ReviewBucket, string> = {
@@ -58,6 +62,11 @@ const KINDS: { value: string; label: string }[] = [
 
 /** ما يُعلَن به أنّ الحركة ليست سداد فاتورة — مطابقٌ لما يقبله الخادم. */
 const NOT_PAYMENT: { value: string; label: string }[] = [
+  /*
+    الدفعة المقدَّمة كانت تُحال إلى «صفحة البنك» — وزرُّها هناك لا يظهر
+    أبداً. فصارت هنا حيث عُرف المورّد، وتُقيَّد دفعةً حالُها «مقدَّمة».
+  */
+  { value: "ADVANCE", label: "دفعة مقدَّمة لمورّد" },
   { value: "INTERNAL", label: "تحويل داخلي" },
   { value: "PERSONAL", label: "تحويل شخصي" },
   { value: "BANK_FEE", label: "رسم بنكيّ" },
@@ -75,7 +84,7 @@ function twinKey(i: ReviewItem): string {
   return `${i.supplierName ?? "—"}|${i.amountMinor}|${i.valueDate}`;
 }
 
-export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceProps) {
+export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: ReviewWorkspaceProps) {
   const router = useRouter();
   const groups = useMemo(() => groupForReview(items), [items]);
 
@@ -90,8 +99,22 @@ export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceP
   const [done, setDone] = useState<Map<string, string>>(new Map());
   /** البند المفتوح عليه محرِّرٌ، وأيّ محرِّر. */
   const [openOn, setOpenOn] = useState<{ id: string; mode: "reject" | "define" } | null>(null);
-  const [rowBusy, setRowBusy] = useState<string | null>(null);
-  const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
+  /* انشغالٌ لكلّ صفّ — نقرتان على صفّين لا تتداخل رسالتاهما */
+  const [rowBusy, setRowBusy] = useState<Set<string>>(new Set());
+  const [rowError, setRowError] = useState<Map<string, string>>(new Map());
+
+  const busyOn = (id: string, on: boolean) =>
+    setRowBusy((s) => {
+      const next = new Set(s);
+      if (on) next.add(id); else next.delete(id);
+      return next;
+    });
+  const errorOn = (id: string, message: string | null) =>
+    setRowError((m) => {
+      const next = new Map(m);
+      if (message) next.set(id, message); else next.delete(id);
+      return next;
+    });
 
   const confirmable = useMemo(
     () => bulkConfirmable(items).filter((id) => !done.has(id)),
@@ -109,49 +132,25 @@ export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceP
   }, [items]);
 
   async function post(url: string, body: unknown, id: string, doneLabel: string) {
-    setRowBusy(id);
-    setRowError(null);
-
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-    } catch {
-      /* لم يصل الطلب أصلاً — وهذا وحده عطبُ شبكة */
-      setRowError({ id, message: "تعذّر الاتصال بالخادم. تحقّق من الشبكة ثمّ أعد المحاولة." });
-      setRowBusy(null);
-      return;
-    }
+    busyOn(id, true);
+    errorOn(id, null);
 
     /*
-      الخادم ردّ — فالعطب عنده لا في الشبكة.
-      وكان كلا الحالين يُعرَض «تعذّر الاتصال»، فيُرسَل صاحب العمل يفحص
-      شبكته وهي سليمة. ولو انهار الطلب قبل أن يُنشئ جسماً بصيغة JSON
-      لجاء الردّ صفحةَ خطأ فيفشل `json()` — وهو أيضاً عطبُ خادم لا شبكة.
+      الردّ يُقرأ نصّاً قبل JSON، و«تعذّر الاتصال» حين لا يصل الطلب
+      وحده — والقاعدتان في `http-client` لا منسوختان هنا.
     */
-    let data: {
-      error?: string;
+    const r = await postJson<{
       message?: string;
       confirmed?: number;
       outcomes?: { transactionId: string; ok: boolean; reason?: string }[];
-    } = {};
-    try {
-      data = await res.json();
-    } catch {
-      data = {};
-    }
+    }>(url, body);
 
-    if (!res.ok) {
-      setRowError({
-        id,
-        message: data.error ?? `تعذّر الحفظ — ردّ الخادم بالرمز ${res.status}. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب.`,
-      });
-      setRowBusy(null);
+    if (!r.ok) {
+      errorOn(id, r.error);
+      busyOn(id, false);
       return;
     }
+    const data = r.data;
 
     /*
       ‏«٢٠٠» تقول إنّ الطلب فُهم، لا إنّ شيئاً كُتب.
@@ -162,14 +161,14 @@ export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceP
     */
     const rejected = (data.outcomes ?? []).filter((o) => !o.ok);
     if (data.confirmed === 0 && rejected.length > 0) {
-      setRowError({ id, message: rejected[0]?.reason ?? "لم يُكتب شيء — راجع حال الحركة." });
-      setRowBusy(null);
+      errorOn(id, rejected[0]?.reason ?? "لم يُكتب شيء — راجع حال الحركة.");
+      busyOn(id, false);
       return;
     }
 
     setDone((d) => new Map(d).set(id, data.message ?? doneLabel));
     setOpenOn(null);
-    setRowBusy(null);
+    busyOn(id, false);
     router.refresh();
   }
 
@@ -193,42 +192,36 @@ export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceP
   const settleOne = (id: string) =>
     post("/api/match-confirm", { transactionId: id, settleSupplier: true }, id, "قُيِّدت على حسابه");
 
-  const defineOne = (id: string, kind: string, displayName: string) =>
-    post("/api/counterparty", { transactionId: id, kind, displayName }, id, "عُرِّفت");
+  const defineOne = (id: string, kind: string, displayName: string, supplierId: string | null) =>
+    post("/api/counterparty", { transactionId: id, kind, displayName, supplierId }, id, "عُرِّفت");
 
   async function confirmAll() {
     setBusy(true);
     setResult(null);
     try {
-      const res = await fetch("/api/match-confirm-bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        /*
-          تُرسَل المعرّفات وحدها — لا فواتير ولا مبالغ ولا مورّد.
-          الخادم يُعيد الحساب على الفواتير كما هي الآن، لأنّ الاقتراح
-          حُسب لحظةَ الاستيراد وقد تكون فاتورته سُدّدت بعده.
-        */
-        body: JSON.stringify({ transactionIds: confirmable.slice(0, 50) }),
-      });
-      const data = await res.json();
+      /*
+        تُرسَل المعرّفات وحدها — لا فواتير ولا مبالغ ولا مورّد.
+        الخادم يُعيد الحساب على الفواتير كما هي الآن، لأنّ الاقتراح
+        حُسب لحظةَ الاستيراد وقد تكون فاتورته سُدّدت بعده.
+      */
+      const r = await postJson<{
+        message?: string;
+        confirmed?: number;
+        outcomes?: { transactionId: string; ok: boolean; reason?: string }[];
+      }>("/api/match-confirm-bulk", { transactionIds: confirmable.slice(0, 50) });
 
-      if (!res.ok) {
-        setResult({ ok: false, message: data.error ?? "تعذّر التأكيد" });
+      if (!r.ok) {
+        setResult({ ok: false, message: r.error });
         return;
       }
 
-      const rejected = (data.outcomes ?? [])
-        .filter((o: { ok: boolean }) => !o.ok)
-        .map((o: { transactionId: string; reason: string }) => ({
-          transactionId: o.transactionId,
-          reason: o.reason,
-        }));
+      const rejected = (r.data.outcomes ?? [])
+        .filter((o) => !o.ok)
+        .map((o) => ({ transactionId: o.transactionId, reason: o.reason ?? "رُدّ" }));
 
       /* لم يُكتب شيء — فالنتيجة ليست نجاحاً وإن كان الرمز ٢٠٠ */
-      setResult({ ok: data.confirmed > 0, message: data.message, rejected });
+      setResult({ ok: (r.data.confirmed ?? 0) > 0, message: r.data.message ?? "", rejected });
       router.refresh();
-    } catch {
-      setResult({ ok: false, message: "تعذّر الاتصال. تحقّق من الشبكة ثمّ أعد المحاولة." });
     } finally {
       setBusy(false);
     }
@@ -340,6 +333,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceP
             setOpenOn={setOpenOn}
             rowBusy={rowBusy}
             rowError={rowError}
+            suppliers={suppliers}
             canApprove={canApprove}
             canEdit={canEdit}
             onConfirm={confirmOne}
@@ -360,7 +354,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit }: ReviewWorkspaceP
  * أصلاً. فصار يُوسَّع أربعين أربعين.
  */
 function Bucket({
-  bucket, items, twins, done, openOn, setOpenOn, rowBusy, rowError,
+  bucket, items, twins, done, openOn, setOpenOn, rowBusy, rowError, suppliers,
   canApprove, canEdit, onConfirm, onSettle, onReject, onDefine,
 }: {
   bucket: ReviewBucket;
@@ -369,14 +363,15 @@ function Bucket({
   done: Map<string, string>;
   openOn: { id: string; mode: "reject" | "define" } | null;
   setOpenOn: (v: { id: string; mode: "reject" | "define" } | null) => void;
-  rowBusy: string | null;
-  rowError: { id: string; message: string } | null;
+  rowBusy: Set<string>;
+  rowError: Map<string, string>;
+  suppliers: readonly { id: string; nameAr: string }[];
   canApprove: boolean;
   canEdit: boolean;
   onConfirm: (id: string) => void;
   onSettle: (id: string) => void;
   onReject: (id: string, kind: string) => void;
-  onDefine: (id: string, kind: string, name: string) => void;
+  onDefine: (id: string, kind: string, name: string, supplierId: string | null) => void;
 }) {
   const [shown, setShown] = useState(40);
   const visible = items.slice(0, shown);
@@ -398,8 +393,9 @@ function Bucket({
             doneMessage={done.get(i.transactionId)}
             open={openOn?.id === i.transactionId ? openOn.mode : null}
             setOpen={(mode) => setOpenOn(mode ? { id: i.transactionId, mode } : null)}
-            busy={rowBusy === i.transactionId}
-            error={rowError?.id === i.transactionId ? rowError.message : null}
+            busy={rowBusy.has(i.transactionId)}
+            error={rowError.get(i.transactionId) ?? null}
+            suppliers={suppliers}
             canApprove={canApprove}
             canEdit={canEdit}
             onConfirm={onConfirm}
@@ -425,7 +421,7 @@ function Bucket({
 
 /** بندٌ واحد: ما هو، ولماذا هو هنا، وما الذي تفعله به. */
 function Row({
-  item: i, bucket, twin, doneMessage, open, setOpen, busy, error,
+  item: i, bucket, twin, doneMessage, open, setOpen, busy, error, suppliers,
   canApprove, canEdit, onConfirm, onSettle, onReject, onDefine,
 }: {
   item: ReviewItem;
@@ -436,14 +432,16 @@ function Row({
   setOpen: (mode: "reject" | "define" | null) => void;
   busy: boolean;
   error: string | null;
+  suppliers: readonly { id: string; nameAr: string }[];
   canApprove: boolean;
   canEdit: boolean;
   onConfirm: (id: string) => void;
   onSettle: (id: string) => void;
   onReject: (id: string, kind: string) => void;
-  onDefine: (id: string, kind: string, name: string) => void;
+  onDefine: (id: string, kind: string, name: string, supplierId: string | null) => void;
 }) {
   const [kind, setKind] = useState("");
+  const [supplierId, setSupplierId] = useState(i.supplierId ?? "");
 
   if (doneMessage) {
     return (
@@ -468,8 +466,9 @@ function Row({
         </span>
       </div>
 
-      <p className="nums mt-0.5 text-xs text-muted" dir="ltr">
-        {i.valueDate} · {i.description.slice(0, 80)}
+      {/* الوصف عربيّ أو لاتينيّ بحسب البنك — `auto` لا `ltr`، والتاريخ معزول */}
+      <p className="mt-0.5 text-xs text-muted" dir="auto">
+        <bdi className="nums">{i.valueDate}</bdi> · {i.description.slice(0, 80)}
       </p>
 
       {i.reasons.length > 0 && (
@@ -484,9 +483,8 @@ function Row({
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {i.score !== null && (
-          <Badge tone={i.score >= 85 ? "ok" : "warn"}>
-            <span className="nums">{i.score}٪</span>
-          </Badge>
+          /* وصفُ الترجيح لا نسبة — «٩٨٪» تُقرأ يقيناً وليست كذلك */
+          <Badge tone={i.score >= 85 ? "ok" : "warn"}>{strength(i.score)}</Badge>
         )}
 
         {/* ── الأفعال ── */}
@@ -544,7 +542,7 @@ function Row({
           </button>
         )}
 
-        <Link href="/bank" className={buttonClass("quiet", "sm")}>
+        <Link href={`/bank?tx=${i.transactionId}`} className={buttonClass("quiet", "sm")}>
           افتحها في البنك ←
         </Link>
       </div>
@@ -575,8 +573,8 @@ function Row({
             ))}
           </div>
           <p className="mt-2 text-xs leading-relaxed text-muted">
-            وما دُفع للمورّد قبل وصول فاتورته ليس من هذه — يُقيَّد دفعةً مقدَّمة من صفحة البنك،
-            كي يبقى له أثرٌ يُخصَّص على الفاتورة حين تصل.
+            «دفعة مقدَّمة» تُقيَّد لمورّدها مالاً خرج قبل فاتورته، فيُخصَّص عليها حين تصل —
+            ولا تُتجاهَل كالتحويل الداخليّ.
           </p>
         </div>
       )}
@@ -598,12 +596,36 @@ function Row({
               </button>
             ))}
           </div>
+          {kind === "SUPPLIER" && (
+            <label className="mt-2.5 block">
+              <span className="text-xs text-muted">أيّ مورّد؟</span>
+              <select
+                value={supplierId}
+                onChange={(e) => setSupplierId(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+              >
+                <option value="">اختر…</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.nameAr}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <button
               type="button"
               className={buttonClass("primary", "sm")}
-              disabled={busy || !kind}
-              onClick={() => onDefine(i.transactionId, kind, i.description.slice(0, 60))}
+              disabled={busy || !kind || (kind === "SUPPLIER" && !supplierId)}
+              onClick={() =>
+                onDefine(
+                  i.transactionId,
+                  kind,
+                  /* الاسم من نصّ البنك، لا من الوصف الخام ولا من العمود الملوَّث */
+                  (i.beneficiary ?? "").slice(0, 60)
+                    || (kind === "SUPPLIER" ? suppliers.find((s) => s.id === supplierId)?.nameAr ?? "" : ""),
+                  kind === "SUPPLIER" ? supplierId : null,
+                )
+              }
             >
               {busy ? "يُحفظ…" : "أكّد التعريف"}
             </button>

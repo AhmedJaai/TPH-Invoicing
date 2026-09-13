@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Money } from "./money";
 import { Badge, buttonClass } from "./ui";
+import { postJson } from "@/lib/http-client";
+import { strength } from "@/lib/bank/strength";
 
 /**
  * لماذا طُوبقت هذه الحركة؟ وكيف أتراجع؟
@@ -34,17 +36,8 @@ export interface MatchExplanation {
 const DISPOSITION: Record<string, { label: string; tone: "ok" | "warn" | "danger" }> = {
   AUTO: { label: "طُوبقت تلقائياً", tone: "ok" },
   SUGGEST: { label: "اقتراح ينتظر تأكيدك", tone: "warn" },
-  REVIEW: { label: "تحتاج قرارك", tone: "danger" },
+  REVIEW: { label: "تنتظر مراجعتك", tone: "danger" },
 };
-
-/** وصفٌ يُقرأ بدل نسبةٍ تُوهم يقيناً. */
-function strength(score: number | null): string {
-  if (score === null) return "لا ترجيح";
-  if (score >= 85) return "ترجيح قوي";
-  if (score >= 70) return "ترجيح معتبر";
-  if (score >= 50) return "ترجيح ضعيف";
-  return "لا ترجيح";
-}
 
 export function MatchExplain({ match }: { match: MatchExplanation }) {
   const router = useRouter();
@@ -58,29 +51,30 @@ export function MatchExplain({ match }: { match: MatchExplanation }) {
     setUndoing(true);
     setFailed(false);
     try {
-      const res = await fetch("/api/match-undo", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ transactionId: match.transactionId, reason: "تراجع من الشاشة" }),
+      const r = await postJson<{ message?: string }>("/api/match-undo", {
+        transactionId: match.transactionId,
+        reason: "تراجع من الشاشة",
       });
-      const data = (await res.json()) as { message?: string; error?: string };
-      if (!res.ok) {
+      if (!r.ok) {
         setFailed(true);
-        setMessage(data.error ?? "تعذّر التراجع");
+        setMessage(r.error);
       } else {
-        setMessage(data.message ?? "فُكّت المطابقة");
+        setMessage(r.data.message ?? "فُكّت المطابقة");
         router.refresh();
       }
-    } catch {
-      setFailed(true);
-      setMessage("تعذّر الاتصال بالخادم");
     } finally {
       setUndoing(false);
       setConfirming(false);
     }
   }
 
-  const d = match.disposition ? DISPOSITION[match.disposition] : null;
+  /*
+    ما قُيّد بدفعةٍ انتهى أمره — وكان قرارُ المطابقة القديم يبقى «تنتظر
+    مراجعتك» بالأحمر على حركاتٍ مقيَّدة، والطابور فارغ.
+  */
+  const d = match.matched && match.disposition !== "AUTO"
+    ? { label: "مقيَّدة بدفعة", tone: "ok" as const }
+    : match.disposition ? DISPOSITION[match.disposition] : null;
 
   return (
     <div className="mt-2">
@@ -152,7 +146,7 @@ export function MatchExplain({ match }: { match: MatchExplanation }) {
               ) : (
                 <div className="rounded-lg border border-danger/40 bg-danger-bg p-2.5">
                   <p className="text-[11px] leading-relaxed">
-                    ستُفكّ التخصيصات، وتُحذف الدفعة إن لم تعد تفسّر حركةً أخرى، وتعود
+                    ستُفكّ التخصيصات، وتُردّ الدفعة وتبقى في السجلّ مردودةً بسببها، وتعود
                     الفاتورة مستحقّة. ويُكتب ذلك في سجلّ التدقيق باسمك.
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { NETWORK_ERROR, postJson, readResponse, request } from "@/lib/http-client";
 
 interface Finding {
   code: string;
@@ -210,18 +211,11 @@ function SupplierPicker({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/supplier", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ nameAr }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setError(json.error ?? "تعذّر الإنشاء"); return; }
-      onCreated({ id: json.supplier.id, nameAr: json.supplier.nameAr });
+      const r = await postJson<{ supplier: { id: string; nameAr: string } }>("/api/supplier", { nameAr });
+      if (!r.ok) { setError(r.error); return; }
+      onCreated({ id: r.data.supplier.id, nameAr: r.data.supplier.nameAr });
       setCreating(false);
       setName("");
-    } catch (e) {
-      setError((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -351,19 +345,18 @@ export function Uploader({
     try {
       const body = new FormData();
       body.append("file", file);
-      const res = await fetch("/api/analyze", { method: "POST", body });
-      const json = await res.json();
+      const r = await request<AnalysisResponse>("/api/analyze", { method: "POST", body });
 
-      if (!res.ok) {
+      if (!r.ok) {
         setItems((prev) =>
           prev.map((it) =>
-            it.id === id ? { id, fileName: file.name, state: "failed", error: json.error ?? "فشل التحليل" } : it,
+            it.id === id ? { id, fileName: file.name, state: "failed", error: r.error } : it,
           ),
         );
         return;
       }
 
-      const data = json as AnalysisResponse;
+      const data = r.data;
       setItems((prev) =>
         prev.map((it) =>
           it.id === id
@@ -450,9 +443,10 @@ export function Uploader({
           lines: (it.data.extraction as { lines?: unknown[] } | undefined)?.lines ?? [],
         }),
       });
-      const json = await res.json();
+      const read = await readResponse<{ fileName: string; webViewLink?: string; renamed?: boolean }>(res);
 
-      if (res.ok) {
+      if (read.ok) {
+        const json = read.data;
         // البطاقة أدّت غرضها. ننقلها إلى سجل مختصر ونُخلي الشاشة للملف التالي.
         setArchived((prev) => [
           {
@@ -476,7 +470,7 @@ export function Uploader({
                   ...x,
                   archiving: false,
                   finishedInMs: Date.now() - (x.startedAt ?? Date.now()),
-                  archiveError: json.error ?? "فشل الرفع",
+                  archiveError: read.error,
                 }
               : x,
           ),
@@ -493,7 +487,7 @@ export function Uploader({
                 finishedInMs: Date.now() - (x.startedAt ?? Date.now()),
                 archiveError: aborted
                   ? "تأخّر الخادم أكثر من دقيقتين ولم يردّ. تحقّق من الدرايف قبل إعادة المحاولة."
-                  : (e as Error).message,
+                  : NETWORK_ERROR,
               }
             : x,
         ),

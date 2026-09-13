@@ -1,4 +1,4 @@
-import { DOCUMENT, PRODUCT, TRANSACTION, countNoun } from "./arabic";
+import { DOCUMENT, PRODUCT, countNoun } from "./arabic";
 /**
  * ما الذي تغيّر.
  *

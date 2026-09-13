@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Money } from "./money";
 import { buttonClass } from "./ui";
 import { countNoun, INVOICE } from "@/lib/arabic";
+import { postJson } from "@/lib/http-client";
 
 /**
  * تسجيل أنّ الدفعة خرجت.
@@ -38,19 +39,15 @@ export function MarkSupplierPaid({
     setBusy(true);
     setResult(null);
     try {
-      const res = await fetch("/api/mark-paid", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          invoiceIds,
-          note: `سُجّلت من دفعة أوّل الشهر — ${supplierName}`,
-        }),
+      const r = await postJson<{ message?: string; marked?: number }>("/api/mark-paid", {
+        invoiceIds,
+        note: `سُجّلت من دفعة أوّل الشهر — ${supplierName}`,
       });
-      const data = (await res.json()) as { error?: string; message?: string; marked?: number };
-      if (!res.ok) {
-        setResult({ ok: false, message: data.error ?? "تعذّر التسجيل" });
+      if (!r.ok) {
+        setResult({ ok: false, message: r.error });
         return;
       }
+      const data = r.data;
       /*
         `‎/api/mark-paid` يردّ «٢٠٠» ومعه `marked: 0` حين لا يجد فاتورةً
         مفتوحة في النطاق — كأن تكون سُدّدت من نافذةٍ أخرى بين العرض
@@ -63,8 +60,6 @@ export function MarkSupplierPaid({
       setResult({ ok: true, message: data.message ?? "سُجّل السداد" });
       setOpen(false);
       router.refresh();
-    } catch {
-      setResult({ ok: false, message: "تعذّر الاتصال. تحقّق من الشبكة ثمّ أعد المحاولة." });
     } finally {
       setBusy(false);
     }

@@ -4,7 +4,7 @@
     {
       "name": "tph-invoicing",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "AUTH_BYPASS=true npm run dev"],
+      "runtimeArgs": ["-c", "AUTH_BYPASS=true npx next dev -H 127.0.0.1"],
       "port": 3000
     }
   ]

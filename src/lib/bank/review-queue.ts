@@ -44,6 +44,13 @@ export interface ReviewItem {
   description: string;
   /** المورّد المرجَّح، إن رُجّح. */
   supplierName: string | null;
+  /** معرّفه — به تُقيَّد الدفعة المقدَّمة بلا سؤالٍ عمّا يعرفه النظام. */
+  supplierId?: string | null;
+  /**
+   * اسم المستفيد كما يقوله نصُّ البنك — لا `beneficiary_raw` الملوَّث
+   * في الصفوف القديمة باسم المورّد الذي طابقه نظامُنا.
+   */
+  beneficiary?: string | null;
   disposition: "AUTO" | "SUGGEST" | "REVIEW" | null;
   category: string;
   score: number | null;

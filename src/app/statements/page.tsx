@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { documents, statements, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
-import { Empty, PageShell } from "@/components/page-shell";
+import { PageShell } from "@/components/page-shell";
 import { StatementReconcile } from "@/components/statement-reconcile";
 import { NoAccess } from "@/components/ui";
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type MergeSuggestion, type ProductCategory } from "@/lib/products";
 import { buttonClass } from "@/components/ui";
+import { postJson } from "@/lib/http-client";
 
 export interface SupplierProductView {
   id: string;
@@ -59,28 +60,20 @@ function LinkRow({
     setBusy(true);
     setError(false);
     try {
-      const res = await fetch("/api/product", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action: "link",
-          supplierProductIds: items.map((i) => i.id),
-          productId: productId || undefined,
-          newProductName: creating ? newName.trim() : undefined,
-          category: creating ? category : undefined,
-        }),
+      const r = await postJson<{ message?: string; linked?: number }>("/api/product", {
+        action: "link",
+        supplierProductIds: items.map((i) => i.id),
+        productId: productId || undefined,
+        newProductName: creating ? newName.trim() : undefined,
+        category: creating ? category : undefined,
       });
-      const json = await res.json();
-      setMessage(json.message ?? json.error);
+      setMessage(r.ok ? (r.data.message ?? "رُبطت") : r.error);
       /*
         الربط الذي لم يربط شيئاً ليس نجاحاً — والنصّ يقوله («لا أصناف»)
         بينما اللون كان يقول «تمّ». فيُقرأ اللونُ قبل النصّ.
       */
-      setError(!res.ok || json.linked === 0);
-      if (res.ok && json.linked !== 0) onDone();
-    } catch (e) {
-      setMessage((e as Error).message);
-      setError(true);
+      setError(!r.ok || r.data.linked === 0);
+      if (r.ok && r.data.linked !== 0) onDone();
     } finally {
       setBusy(false);
     }
@@ -187,7 +180,9 @@ function Triage({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const item = queue[index];
+  /* ما تجاوز آخر الطابور يعود إلى أوّله: المتخطّى لم يُحسَم بعد */
+  const position = queue.length > 0 ? index % queue.length : 0;
+  const item = queue[position];
   if (!item) {
     return (
       <div className="rounded-2xl border border-ok/40 bg-ok-bg px-5 py-10 text-center">
@@ -210,20 +205,19 @@ function Triage({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/product", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const d = (await res.json()) as { error?: string };
-        setError(d.error ?? "تعذّر الحفظ");
+      const r = await postJson("/api/product", body);
+      if (!r.ok) {
+        setError(r.error);
         return;
       }
+      /*
+        الفهرس لا يتقدّم بعد الحسم.
+
+        الطابور يُبنى ممّا لم يُحسَم، فيقصر بواحد حين يُحسَم بندٌ — والفهرس
+        كان يتقدّم بواحد أيضاً، فيُتخطّى البند التالي صامتاً في كلّ قرار:
+        [أ، ب، ج] ← حُسم أ ← [ب، ج] والفهرس ١ ← يُعرض ج ويضيع ب.
+      */
       onResolved(item.id);
-      setIndex((i) => i + 1);
-    } catch {
-      setError("تعذّر الاتصال بالخادم");
     } finally {
       setBusy(false);
     }
@@ -244,12 +238,12 @@ function Triage({
     <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-[11px] text-muted">
-          <span className="nums">{index + 1}</span> من <span className="nums">{queue.length}</span>
+          <span className="nums">{position + 1}</span> من <span className="nums">{queue.length}</span>
         </p>
-        {index > 0 && (
+        {position > 0 && (
           <button
             type="button"
-            onClick={() => setIndex((i) => i - 1)}
+            onClick={() => setIndex(position - 1)}
             className="text-[11px] text-muted underline underline-offset-4 hover:text-ink"
           >
             رجوع
@@ -259,7 +253,7 @@ function Triage({
 
       <div className="mt-1 flex gap-1" aria-hidden>
         {queue.map((_, i) => (
-          <span key={i} className={`h-1 flex-1 rounded-full ${i < index ? "bg-ink" : "bg-sunken"}`} />
+          <span key={i} className={`h-1 flex-1 rounded-full ${i < position ? "bg-ink" : "bg-sunken"}`} />
         ))}
       </div>
 
@@ -297,7 +291,7 @@ function Triage({
         </button>
         <button
           type="button"
-          onClick={() => setIndex((i) => i + 1)}
+          onClick={() => setIndex(position + 1)}
           disabled={busy}
           className={buttonClass("quiet", "sm")}
         >

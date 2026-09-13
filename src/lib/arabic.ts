@@ -145,3 +145,76 @@ export const BLOCKER: NounForms = {
   many: "مانعاً",
   zero: "لا موانع",
 };
+
+export const PAYMENT: NounForms = {
+  one: "سدادٌ واحد",
+  two: "سدادان",
+  few: "مدفوعات",
+  many: "سداداً",
+  zero: "لا مدفوعات",
+};
+
+export const DAY: NounForms = {
+  one: "يوم واحد",
+  two: "يومان",
+  few: "أيّام",
+  many: "يوماً",
+  zero: "لا أيّام",
+};
+
+export const IMPORT: NounForms = {
+  one: "عملية استيراد واحدة",
+  two: "عمليّتا استيراد",
+  few: "عمليات استيراد",
+  many: "عملية استيراد",
+  zero: "لا عمليات استيراد",
+};
+
+export const ALIAS: NounForms = {
+  one: "اسم بديل واحد",
+  two: "اسمان بديلان",
+  few: "أسماء بديلة",
+  many: "اسماً بديلاً",
+  zero: "لا أسماء بديلة",
+};
+
+export const LINE: NounForms = {
+  one: "سطر واحد",
+  two: "سطران",
+  few: "أسطر",
+  many: "سطراً",
+  zero: "لا أسطر",
+};
+
+export const GROUP: NounForms = {
+  one: "مجموعة واحدة",
+  two: "مجموعتان",
+  few: "مجموعات",
+  many: "مجموعة",
+  zero: "لا مجموعات",
+};
+
+export const FILE: NounForms = {
+  one: "ملفّ واحد",
+  two: "ملفّان",
+  few: "ملفّات",
+  many: "ملفّاً",
+  zero: "لا ملفّات",
+};
+
+export const TRANSFER: NounForms = {
+  one: "تحويل واحد",
+  two: "تحويلان",
+  few: "تحويلات",
+  many: "تحويلاً",
+  zero: "لا تحويلات",
+};
+
+/** الدفعة المسجَّلة (سجلٌّ في `payments`) — غيرُ «السداد» فعلاً. */
+export const PAYMENT_RECORD: NounForms = {
+  one: "دفعة واحدة",
+  two: "دفعتان",
+  few: "دفعات",
+  many: "دفعة",
+  zero: "لا دفعات",
+};

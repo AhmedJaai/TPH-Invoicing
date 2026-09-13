@@ -7,6 +7,15 @@
 import { db } from "@/db";
 import { auditLogs } from "@/db/schema";
 
+/**
+ * مقبض الكتابة: القاعدة أو معاملةٌ جارية.
+ *
+ * القيد يُكتب **داخل** المعاملة التي كتبت المال حين تُمرَّر، فإن أُلغيت
+ * أُلغي معها. وكان يُكتب بـ`db` دائماً، فبقي في السجلّ ١٤ «تعلّماً»
+ * لجهاتٍ أُلغي إنشاؤها — سجلٌّ لا يُحذف منه شيء يشهد بما لم يقع.
+ */
+type AuditWriter = Pick<typeof db, "insert">;
+
 export type AuditAction =
   | "DOCUMENT_UPLOADED"
   | "DOCUMENT_ARCHIVED"
@@ -29,7 +38,18 @@ export type AuditAction =
   | "INVOICE_PAID_BY_OWNER"
   | "SUPPLIER_CREDIT_APPLIED"
   | "AI_ANALYSIS_RUN"
-  | "AI_FINDING_DECIDED";
+  | "AI_FINDING_DECIDED"
+  | "COUNTERPARTY_CONFIRMED"
+  | "BANK_RULE_LEARNED"
+  | "MONTH_REOPENED"
+  | "MATCH_CONFIRMED"
+  | "MATCH_UNDONE"
+  | "MATCH_REJECTED"
+  | "PAYMENT_RECORDED"
+  | "DRIVE_FILE_RENAMED"
+  | "PAYMENT_RUN_EXPORTED"
+  | "EXPENSES_DERIVED"
+  | "EXPENSE_RECLASSIFIED";
 
 export async function recordAudit(entry: {
   actorId?: string | null;
@@ -38,8 +58,8 @@ export async function recordAudit(entry: {
   entityId: string;
   before?: unknown;
   after?: unknown;
-}): Promise<void> {
-  await db.insert(auditLogs).values({
+}, writer: AuditWriter = db): Promise<void> {
+  await writer.insert(auditLogs).values({
     actorId: entry.actorId ?? null,
     action: entry.action,
     entityType: entry.entityType,

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
-import { Empty, PageShell } from "@/components/page-shell";
+import { PageShell } from "@/components/page-shell";
 import { AttentionList } from "@/components/attention-list";
 import { IMPACT_LABEL, buildAttention, countBySeverity, impactByKind } from "@/lib/attention";
 import { Money } from "@/components/money";

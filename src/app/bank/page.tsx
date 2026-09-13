@@ -6,7 +6,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Card, EmptyState, Section, Stat, StatGrid, NoAccess } from "@/components/ui";
+import { Card, Section, Stat, StatGrid, NoAccess } from "@/components/ui";
 import { BankImport } from "@/components/bank-import";
 import { MatchExplain, type MatchExplanation } from "@/components/match-explain";
 import { ReconcileQueue, type QueueGroup, type QueueItem } from "@/components/reconcile-queue";
@@ -14,7 +14,9 @@ import { pendingDecision } from "@/lib/bank/pending";
 import { toCanonical } from "@/lib/bank/canonical";
 import { groupByIdentity } from "@/lib/bank/pattern";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
-import { countNoun, ITEM, TRANSACTION } from "@/lib/arabic";
+import { countNoun, ITEM, PAYMENT_RECORD, TIME, TRANSACTION } from "@/lib/arabic";
+import { findDoublePaid, recoverableMinor, type DoublePaidTx } from "@/lib/bank/double-paid";
+import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +29,12 @@ export const dynamic = "force-dynamic";
  * وكل مطابقة هنا تحمل «لماذا؟» — الأدلّة بنصّها — وزرَّ تراجع. فمن
  * وافق على مطابقة خاطئة لا يبقى أسيرها.
  */
-export default async function BankPage() {
+export default async function BankPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tx?: string; doublePaid?: string }>;
+}) {
+  const params = await searchParams;
   const user = await currentUser();
   if (!user) redirect("/login");
   if (!can(user.role, "bank:view")) {
@@ -38,7 +45,7 @@ export default async function BankPage() {
     );
   }
 
-  const [counts, supplierRows, balances, recent, pending] = await Promise.all([
+  const [counts, supplierRows, balances, recent, pending, outgoing, focus] = await Promise.all([
     db.execute<Record<string, number>>(sql`
       select
         (select count(*)::int from bank_transactions)                                as tx,
@@ -46,20 +53,35 @@ export default async function BankPage() {
           where match_disposition = 'AUTO')                                         as auto,
         (select count(*)::int from bank_transactions
           where match_disposition = 'SUGGEST')                                      as suggest,
-        (select count(*)::int from bank_transactions
-          where match_disposition = 'REVIEW' or category = 'UNKNOWN')               as review,
+        /*
+          العدد الواحد للعمل الباقي — الشرطُ نفسه الذي يقرؤه الطابور والشارة.
+          وكانت البطاقة تعدّ match_disposition = REVIEW فتقول «٢٢» وتفتح
+          طابوراً فارغاً: التقاطع بين العدّين كان صفراً.
+        */
+        (select count(*)::int from ${bankTransactions} where ${pendingDecision()})  as pending,
         (select coalesce(sum(amount_minor),0)::bigint from bank_transactions
           where direction = 'CREDIT' and category = 'POS_SETTLEMENT')               as settled,
         (select count(*)::int from invoices i
           where i.total_minor > coalesce((select sum(pa.amount_minor)::int
-            from payment_allocations pa where pa.invoice_id = i.id), 0) + 1)        as open,
-        /* سدادُ مورّدٍ عُرف صاحبه ولم تُوجد فاتورته — ليس مجهولاً ولا مطابَقاً */
-        (select count(*)::int from bank_transactions
-          where matched_payment_id is null and match_status <> 'IGNORED'
-            and category = 'SUPPLIER' and supplier_id is not null)                  as unapplied,
-        (select coalesce(sum(amount_minor),0)::bigint from bank_transactions
-          where matched_payment_id is null and match_status <> 'IGNORED'
-            and category = 'SUPPLIER' and supplier_id is not null)                  as unapplied_sum
+            from payment_allocations pa where pa.invoice_id = i.id), 0) + ${SETTLED_TOLERANCE_MINOR}) as open,
+        /*
+          «سداد بلا فاتورة» من **الدفعات** لا من الحركات — المصدر نفسه الذي
+          يقرأ منه بند «يحتاج انتباهك». وكانت البطاقة تعدّ حركاتٍ بلا دفعة
+          فتقول «٠٫٠٠» بالأخضر، والرئيسة تقول «١٤ دفعة بـ٣٨٬٦٠٥».
+        */
+        (select count(*)::int from payments p
+          where p.status not in ('REVERSED','VOID','ADVANCE')
+            and p.amount_minor - p.fee_minor - coalesce((select sum(a.amount_minor)::int
+              from payment_allocations a where a.payment_id = p.id), 0) > 100)       as unapplied,
+        (select coalesce(sum(p.amount_minor - p.fee_minor - coalesce((select sum(a.amount_minor)::int
+              from payment_allocations a where a.payment_id = p.id), 0)), 0)::bigint
+           from payments p
+          where p.status not in ('REVERSED','VOID','ADVANCE')
+            and p.amount_minor - p.fee_minor - coalesce((select sum(a.amount_minor)::int
+              from payment_allocations a where a.payment_id = p.id), 0) > 100)       as unapplied_sum,
+        (select count(*)::int from payments where status = 'ADVANCE')              as advance,
+        (select coalesce(sum(amount_minor),0)::bigint from payments
+          where status = 'ADVANCE')                                                 as advance_sum
     `),
 
     db.select({ id: suppliers.id, nameAr: suppliers.nameAr })
@@ -152,7 +174,56 @@ export default async function BankPage() {
         القاعدة أخواتٍ لما يُسأل عنه — فيُجاب عن سبعٍ ويبقى ثمانٍ.
       */
       .limit(400),
+
+    /* الصادر كلّه — لكشف ما خرج مرّتين في يومٍ واحد */
+    db.select({
+      id: bankTransactions.id,
+      valueDate: bankTransactions.valueDate,
+      amountMinor: bankTransactions.amountMinor,
+      description: bankTransactions.description,
+      beneficiaryRaw: bankTransactions.beneficiaryRaw,
+      category: bankTransactions.category,
+      operationRef: bankTransactions.operationRef,
+    })
+      .from(bankTransactions)
+      .where(eq(bankTransactions.direction, "DEBIT")),
+
+    /* الحركة التي فُتحت الصفحة عليها — من الطابور أو من بحث */
+    params.tx
+      ? db.select({
+          id: bankTransactions.id,
+          valueDate: bankTransactions.valueDate,
+          description: bankTransactions.description,
+          beneficiaryRaw: bankTransactions.beneficiaryRaw,
+          transactionType: bankTransactions.transactionType,
+          amountMinor: bankTransactions.amountMinor,
+          direction: bankTransactions.direction,
+          category: bankTransactions.category,
+          matchedPaymentId: bankTransactions.matchedPaymentId,
+          matchDisposition: bankTransactions.matchDisposition,
+          matchScore: bankTransactions.matchScore,
+          matchOutcome: bankTransactions.matchOutcome,
+          matchEvidence: bankTransactions.matchEvidence,
+        })
+          .from(bankTransactions)
+          .where(eq(bankTransactions.id, params.tx))
+          .limit(1)
+      : Promise.resolve([]),
   ]);
+
+  const doublePaid = findDoublePaid(outgoing.map((r): DoublePaidTx => ({
+    id: r.id,
+    valueDate: r.valueDate,
+    amountMinor: r.amountMinor,
+    direction: "DEBIT",
+    description: r.description,
+    beneficiaryRaw: r.beneficiaryRaw,
+    category: r.category,
+    operationRef: r.operationRef,
+  })));
+  const focused = focus[0] ?? null;
+  const canApprove = can(user.role, "payment:approve");
+  const canEdit = can(user.role, "bank:edit");
 
   /** يترجم ما قرّره المحرّك إلى سببٍ يُقرأ. */
   function reasonOf(t: (typeof pending)[number]): QueueItem["reason"] {
@@ -276,53 +347,133 @@ export default async function BankPage() {
       title="البنك"
       intro="أين تحرّكت الأموال. وكل مطابقة هنا تقول لماذا طُوبقت، ويمكن التراجع عنها."
     >
+      {/* ── الحركة التي فُتحت عليها الصفحة ── */}
+      {focused && (
+        <Section title="الحركة المطلوبة" hint="فُتحت من الطابور أو البحث — ولماذا طُوبقت، وبابُ التراجع عنها.">
+          <Card>
+            <div className="flex items-start justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block text-sm font-bold" dir="auto">
+                  {toCanonical({
+                    valueDate: focused.valueDate,
+                    description: focused.description,
+                    beneficiaryRaw: focused.beneficiaryRaw,
+                    transactionType: focused.transactionType,
+                    amountMinor: focused.amountMinor,
+                    direction: focused.direction as "DEBIT" | "CREDIT",
+                  }).beneficiary ?? focused.description?.slice(0, 60) ?? "حركة"}
+                </span>
+                <span className="mt-0.5 block text-[11px] text-muted" dir="auto">
+                  <bdi className="nums">{focused.valueDate.toISOString().slice(0, 10)}</bdi> ·{" "}
+                  {focused.direction === "DEBIT" ? "صادر" : "وارد"} ·{" "}
+                  {CATEGORY_LABEL[focused.category] ?? focused.category}
+                </span>
+                <span className="mt-1 block text-[11px] text-ink-soft" dir="auto">{focused.description}</span>
+              </span>
+              <span className="nums shrink-0 text-sm font-bold"><Money minor={focused.amountMinor} /></span>
+            </div>
+            <MatchExplain
+              match={{
+                transactionId: focused.id,
+                disposition: focused.matchDisposition,
+                score: focused.matchScore,
+                outcome: focused.matchOutcome,
+                amountMinor: focused.amountMinor,
+                matched: focused.matchedPaymentId !== null,
+                evidence: focused.matchEvidence as MatchExplanation["evidence"],
+              }}
+            />
+          </Card>
+        </Section>
+      )}
+      {params.tx && !focused && (
+        <p className="mb-4 rounded-lg border border-warn/40 bg-warn-bg px-3 py-2 text-xs text-warn">
+          لا توجد الحركة المطلوبة — ربما دُمجت بنسختها. هذه الصفحة كاملةً.
+        </p>
+      )}
+
       <StatGrid>
-        <Stat label="حركات مخزّنة" value={String(n("tx"))} sub="بعد إزالة المكرَّر" />
+        <Stat
+          label="طابور المراجعة"
+          value={String(n("pending"))}
+          tone={n("pending") > 0 ? "warn" : "ok"}
+          sub={n("pending") > 0 ? "حركاتٌ تنتظر قراراً" : "لا حركة تنتظر قراراً"}
+          href="/review"
+        />
+        <Stat
+          label="سداد بلا فاتورة"
+          minor={n("unapplied_sum")}
+          tone={n("unapplied") > 0 ? "warn" : "ok"}
+          sub={`${countNoun(n("unapplied"), PAYMENT_RECORD)} لم تُخصَّص على فاتورة`
+            + (n("advance") > 0 ? ` · ومقدَّمة معلَنة ${(n("advance_sum") / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "")}
+          href="/attention"
+        />
+        <Stat
+          label="فواتير مفتوحة"
+          value={String(n("open"))}
+          href="/purchases/invoices?paid=OPEN"
+          sub="ما زال عليها رصيد"
+        />
         <Stat
           label="تسويات الشبكة"
           minor={n("settled")}
           tone="ok"
           sub="إيراد البطاقات يصل حسابك"
         />
-        {/*
-          الاسم يقول ما يُعَدّ بالضبط. وكان «تحتاج قرارك» — وهو ترادفُ
-          «طابور المراجعة» في العربية بعددٍ مختلف عنه، فيقرأ صاحب العمل
-          رقمين لسؤالٍ واحد ولا يدري أيّهما عملُه الباقي.
-        */}
-        <Stat
-          label="مجهولة أو متقاربة المرشّحين"
-          value={String(n("review"))}
-          tone={n("review") > 0 ? "warn" : "ok"}
-          sub="جزءٌ من طابور المراجعة، لا كلُّه"
-          href="/review"
-        />
-        <Stat
-          label="فواتير مفتوحة"
-          value={String(n("open"))}
-          href="/payments"
-          sub="ما زال عليها رصيد"
-        />
-        {/*
-          سدادٌ عُرف مورّده ولم تُوجد فاتورته.
-
-          يُعرَض عدداً ومبلغاً لا في الطابور: السؤال عنه ليس «ما هذه؟»
-          — ذاك عُرف — بل «أيّ فاتورة تفسّرها؟»، وهو عملٌ آخر. وإخفاؤه
-          يجعل مئتي ألف ريال تختفي من الشاشة بلا أثر.
-        */}
-        <Stat
-          label="سداد بلا فاتورة"
-          minor={n("unapplied_sum")}
-          tone={n("unapplied") > 0 ? "warn" : "ok"}
-          sub={`${countNoun(n("unapplied"), TRANSACTION)} · المورّد معروف ولا فاتورة تقابله`}
-        />
       </StatGrid>
+      <p className="mt-2 text-[11px] text-muted">
+        {countNoun(n("tx"), TRANSACTION)} مخزّنة بعد إزالة المكرَّر.
+      </p>
+
+      {/* ── ما خرج مرّتين ── */}
+      {doublePaid.length > 0 && (
+        <div id="double-paid" className="scroll-mt-28">
+          <Section
+            title="سُدّد مرّتين في يومٍ واحد"
+            hint={`${recoverableMinor(doublePaid) > 0 ? "مالٌ يُطالَب به الجهةُ ويُسترَدّ — لا يُصلَح في قيدنا، فالمال خرج فعلاً. " : ""}ومرجعان مختلفان يعنيان عمليّتين قطعاً.`}
+          >
+            <ul className="space-y-2.5">
+              {doublePaid.map((g) => (
+                <li key={`${g.day}|${g.payee}|${g.amountMinor}`}>
+                  <Card>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold" dir="auto">{g.payee}</span>
+                        <span className="block text-[11px] text-muted">
+                          <bdi className="nums">{g.day}</bdi> · {countNoun(g.transactions.length, TIME)} ·{" "}
+                          {CATEGORY_LABEL[g.category as keyof typeof CATEGORY_LABEL] ?? g.category}
+                          {g.distinctOperations ? " · بمراجعِ سدادٍ مختلفة" : " · بلا مرجعٍ يفصلهما — قد تكون نسخة استيراد"}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-end">
+                        <span className="block text-[11px] text-muted">الزائد</span>
+                        <span className="nums block text-sm font-bold text-danger"><Money minor={g.excessMinor} /></span>
+                      </span>
+                    </div>
+                    <ul className="mt-2 space-y-1 border-s-2 border-line ps-2.5">
+                      {g.transactions.map((t) => (
+                        <li key={t.id} className="flex flex-wrap items-baseline justify-between gap-2 text-[11px]">
+                          <span className="min-w-0 text-muted" dir="auto">
+                            المرجع: <bdi className="nums font-bold text-ink">{t.operationRef ?? "غير مذكور"}</bdi>
+                          </span>
+                          <span className="nums font-bold"><Money minor={t.amountMinor} /></span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        </div>
+      )}
 
       {groups.length > 0 && (
         <Section
           title="حلّ المعلّقات"
           hint="سؤالٌ واحد عن كلّ ما يتشابه، ثمّ ننتقل. وما تؤكّده يصير ذاكرةً تعمّ على أمثاله — في الكشوف السابقة الآن، وفي القادمة بلا سؤال."
         >
-          <ReconcileQueue groups={groups} suppliers={supplierRows} />
+          <ReconcileQueue groups={groups} suppliers={supplierRows} canApprove={canApprove} canEdit={canEdit} />
         </Section>
       )}
 
@@ -347,8 +498,8 @@ export default async function BankPage() {
                   <Card>
                     <div className="flex items-start justify-between gap-3">
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-bold">
-                          {t.beneficiaryRaw ?? t.description?.slice(0, 60) ?? "حركة"}
+                        <span className="block truncate text-sm font-bold" dir="auto">
+                          {t.description?.slice(0, 60) ?? "حركة"}
                         </span>
                         <span className="nums block truncate text-[11px] text-muted">
                           {t.valueDate.toISOString().slice(0, 10)} ·{" "}
@@ -370,7 +521,9 @@ export default async function BankPage() {
       )}
 
       <Section title="استيراد كشف" hint="الملف الذي استُورد من قبل لا يتكرّر — تُقيَّد الحركات الجديدة وحدها.">
-        <BankImport openInvoiceCount={n("open")} suppliers={supplierRows} />
+        {canEdit
+          ? <BankImport openInvoiceCount={n("open")} suppliers={supplierRows} />
+          : <p className="text-xs text-muted">استيراد الكشف خارج صلاحيتك.</p>}
       </Section>
     </PageShell>
   );

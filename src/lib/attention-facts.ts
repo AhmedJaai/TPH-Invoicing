@@ -89,7 +89,19 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     amountMinor: Number(r.owed),
   }));
 
-  // مورّدون لهم فواتير ولم يصل كشفهم عن الشهر المنقضي
+  // مورّدون لهم فواتير ولم يصل كشفهم عن الشهر المنقضي — العدد كاملاً، والقائمة دليل
+  const [missingCountRow] = (
+    await db.execute<Row>(sql`
+      select count(distinct i.supplier_id)::int as n
+      from invoices i
+      where i.supplier_id is not null and not exists (
+        select 1 from statements st
+        where st.supplier_id = i.supplier_id
+          and to_char(st.period_end, 'YYYY-MM') = ${lastMonth}
+      )
+    `)
+  ).rows;
+
   const missingStatements = (
     await db.execute<Row>(sql`
       select distinct s.name_ar
@@ -319,6 +331,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     unclassifiedBankTx: Number(counts?.unclassified ?? 0),
     unclassifiedBankAmountMinor: Number(counts?.unclassified_amount ?? 0),
     suppliersMissingStatement: missingStatements,
+    suppliersMissingStatementCount: Number(missingCountRow?.n ?? missingStatements.length),
     suppliersWithoutContract: noContract,
     invoicesWithoutLines: Number(counts?.no_lines ?? 0),
     unbackedPaymentCount: unbacked.length,

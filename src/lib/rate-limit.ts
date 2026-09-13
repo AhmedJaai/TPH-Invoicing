@@ -78,7 +78,12 @@ export const RULES: Record<string, RateLimitRule> = {
   */
   "drive-sync": { limit: Number.MAX_SAFE_INTEGER, windowSeconds: 3600 },
   "bank-import": { limit: 12, windowSeconds: 3600 },
-  "mark-paid": { limit: 10, windowSeconds: 3600 },
+  /*
+    كان عشرة في الساعة، وزرُّه في كلّ صفّ من قائمة الفواتير: فالحادية
+    عشرة تُردّ وأحمد يرتّب دفاتره القديمة. والوسم الجماعيّ الذي كان
+    الحدّ يحرسه أُزيل.
+  */
+  "mark-paid": { limit: 200, windowSeconds: 3600 },
   "match-undo": { limit: 60, windowSeconds: 3600 },
   counterparty: { limit: 300, windowSeconds: 3600 },
   "match-confirm": { limit: 200, windowSeconds: 3600 },

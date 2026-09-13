@@ -18,7 +18,7 @@ import {
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { driveForUser, downloadFile, getFileMeta, renameFile } from "@/lib/drive";
+import { driveForUser, downloadFile, getFileMeta } from "@/lib/drive";
 import { recentMonths, walkArchive, type ArchiveEntry } from "@/lib/drive-sync";
 import { parseFileName } from "@/lib/naming";
 import { KNOWN_SLUGS } from "@/lib/suppliers-seed";
@@ -344,8 +344,6 @@ export async function POST(request: Request) {  let user;
   const readFailures: string[] = [];
   /** التسعيرات: تُعرَض ولا تُقيَّد. */
   const quotations: string[] = [];
-  /** ما وُحِّد اسمُه قبل تقييده. */
-  let renamedOnSync = 0;
 
   if (body.readContent) {
     for (const entry of unnamed.slice(0, MAX_CONTENT_PER_CALL)) {
@@ -421,40 +419,19 @@ export async function POST(request: Request) {  let user;
       );
 
       /*
-        ── الاسم يُوحَّد قبل التقييد، لا بعده ──
+        ── المزامنة لا تسمّي شيئاً ──
 
-        كان الملفّ يُسجَّل باسمه الخام ثمّ تُقترَح تسميتُه في خطوةٍ
-        تالية. فمن ترك الخطوة بقي في القيد اسمٌ لا يُقرأ — «S00148» —
-        ولا شيء يذكّره. وأسوأ منه أنّ القيد والدرايف يفترقان إن نُفِّذت
-        التسمية في أحدهما وحده.
+        كانت تعيد تسمية الملفّ في الدرايف قبل تقييده، بلا اختيارٍ لكلّ
+        ملفّ ولا أثرٍ في سجلّ التدقيق، والاسم الأصليّ لا يُحفَظ في موضع —
+        فضاع اسمٌ كتبه مورّد (لوريفا)، واستُبدل رقمٌ كتبه إنسان بقراءةٍ
+        خاطئة (غاناش). وهذا خرقٌ للقيد الأوّل نصّاً: «لا شيء بلا اختيار
+        الإنسان ملفّاً ملفّاً وأثرٍ في سجلّ التدقيق».
 
-        فيُسمّى أوّلاً، ثمّ يُقيَّد بالاسم الذي استقرّ. وإن تعذّرت
-        التسمية سُجّل باسمه الخام ولم يُمنَع التقييد: **الملفّ المقروء
-        خيرٌ من ملفٍّ ضائع**، والتسمية تُعاد لاحقاً.
-
-        والحرّاس كما هي: لا يُمَسّ اسمٌ يُقرأ — `canonicalName` لا
-        تقترح إلّا لما عجز قارئُه.
+        فيُقيَّد الملفّ باسمه كما هو، ثمّ يُقترَح اسمُه القياسيّ في
+        الردّ (`renameSuggestions`) ليختار صاحبُ العمل ما يُسمّى، والفعلُ
+        في `/api/drive-rename` وحده بالاسمين في السجلّ.
       */
-      let finalName = entry.file.name;
-      const verdictNow = canonicalName({
-        driveFileId: entry.file.id,
-        fileName: entry.file.name,
-        kind: x.documentKind,
-        slug: supplier?.slug ?? null,
-        date: /^\d{4}-\d{2}-\d{2}$/.test(x.invoiceDate) ? x.invoiceDate : null,
-        totalMinor: parseRiyals(x.totalAmount),
-        invoiceNumber: x.invoiceNumber?.trim() || null,
-      });
-
-      if (verdictNow.status === "RENAME") {
-        try {
-          await renameFile(drive, entry.file.id, verdictNow.proposed);
-          finalName = verdictNow.proposed;
-          renamedOnSync++;
-        } catch (e) {
-          readFailures.push(`${entry.file.name} — تعذّرت التسمية: ${(e as Error).message.slice(0, 60)}`);
-        }
-      }
+      const finalName = entry.file.name;
 
       await db.transaction(async (tx) => {
         const [doc] = await tx.insert(documents).values({
@@ -625,7 +602,6 @@ export async function POST(request: Request) {  let user;
     notes: notes.slice(0, 20),
     readFailures,
     quotations,
-    renamedOnSync,
     renameSuggestions,
   });
 }

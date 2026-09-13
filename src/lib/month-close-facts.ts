@@ -12,6 +12,7 @@ import { nextMonth } from "./filing";
 import { analyzeCoverage } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
 import type { MonthFacts } from "./month-close";
+import { SETTLED_TOLERANCE_MINOR } from "./supplier-balances";
 
 export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
   const start = new Date(`${month}-01T00:00:00Z`);
@@ -25,16 +26,15 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
       unpostedCount: sql<number>`count(*) filter (where not ${invoices.postedToAccounting})::int`,
       fixedAssetCount: sql<number>`count(*) filter (where ${invoices.isFixedAsset})::int`,
       suppliersWithInvoices: sql<number>`count(distinct ${invoices.supplierId})::int`,
-      unpaidCount: sql<number>`count(*) filter (where ${invoices.totalMinor} > coalesce((
-        select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = invoices.id
-      ), 0) + 1)::int`,
-      unpaidTotalMinor: sql<number>`coalesce(sum(
-        greatest(0, ${invoices.totalMinor} - coalesce((
-          select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = invoices.id
-        ), 0))
-      ) filter (where ${invoices.totalMinor} > coalesce((
-        select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = invoices.id
-      ), 0) + 1), 0)::int`,
+      /* العتبة نفسها في كلّ شاشةٍ تقول «عليك»: ما بقي فوق هللة */
+      unpaidCount: sql<number>`count(*) filter (where invoices.total_minor - coalesce((
+        select sum(pa.amount_minor)::bigint from payment_allocations pa where pa.invoice_id = invoices.id
+      ), 0) > ${SETTLED_TOLERANCE_MINOR})::int`,
+      unpaidTotalMinor: sql<number>`coalesce(sum(invoices.total_minor - coalesce((
+          select sum(pa.amount_minor)::bigint from payment_allocations pa where pa.invoice_id = invoices.id
+        ), 0)) filter (where invoices.total_minor - coalesce((
+        select sum(pa.amount_minor)::bigint from payment_allocations pa where pa.invoice_id = invoices.id
+      ), 0) > ${SETTLED_TOLERANCE_MINOR}), 0)::bigint`,
     })
     .from(invoices)
     .where(eq(invoices.periodMonth, month));
@@ -51,7 +51,7 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     .select({ n: sql<number>`count(*)::int` })
     .from(issues)
     .where(sql`${issues.status} = 'OPEN' and ${issues.severity} = 'BLOCKER' and exists (
-      select 1 from documents d where d.id = ${issues.entityId} and d.period_month = ${month}
+      select 1 from documents d where d.id = ${issues}.entity_id and d.period_month = ${month}
     )`);
 
   const [stmt] = await db

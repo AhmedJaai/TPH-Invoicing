@@ -1,4 +1,4 @@
-import { DOCUMENT, INVOICE, PRODUCT, SUPPLIER, TRANSACTION, WARNING, countNoun } from "./arabic";
+import { DOCUMENT, INVOICE, PAYMENT, PRODUCT, SUPPLIER, TRANSACTION, WARNING, countNoun } from "./arabic";
 /**
  * ما يحتاج انتباهك.
  *
@@ -124,6 +124,11 @@ export interface AttentionFacts {
 
   /** مورّدون لهم فواتير ولم يصل كشفهم */
   suppliersMissingStatement: string[];
+  /**
+   * العدد الحقّ — والقائمة دليلٌ مقصوص. وكان العنوان يأخذ طول القائمة
+   * المقصوصة عند ثمانية، والحقيقة ثلاثة عشر.
+   */
+  suppliersMissingStatementCount?: number;
   /** مورّدون لا يصدرون فواتير وبلا عقد */
   suppliersWithoutContract: string[];
 
@@ -262,13 +267,13 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "duplicate-payments",
       area: "BANK",
       severity: "CRITICAL",
-      title: `${f.duplicatePayments} فاتورة سُدّدت مرّتين في يومٍ واحد`,
+      title: `${countNoun(f.duplicatePayments, PAYMENT)} خرج مرّتين في يومٍ واحد`,
       detail:
         "خرج المال مرّتين لنفس الجهة بنفس المبلغ — ولكلٍّ مرجعُ سدادٍ مستقلّ،"
         + " فهما عمليّتان لا نسخةُ استيراد.",
       action: "طالِب الجهة بردّ الزائد — والاسترداد يصعب كلّما تأخّر.",
-      actionLabel: "افتح الحركات",
-      href: "/bank",
+      actionLabel: "افتح الحركات ومراجعها",
+      href: "/bank?doublePaid=1#double-paid",
       count: f.duplicatePayments,
       amountMinor: f.duplicatePaymentAmountMinor,
       impact: { kind: "RECOVERABLE", amountMinor: f.duplicatePaymentAmountMinor },
@@ -389,17 +394,18 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
   }
 
   /* ── متوسّط ── */
-  if (f.suppliersMissingStatement.length > 0) {
+  if ((f.suppliersMissingStatementCount ?? f.suppliersMissingStatement.length) > 0) {
+    const missingCount = f.suppliersMissingStatementCount ?? f.suppliersMissingStatement.length;
     out.push({
       id: "missing-statements",
       area: "SUPPLIERS",
       severity: "MEDIUM",
-      title: `${countNoun(f.suppliersMissingStatement.length, SUPPLIER)} لم يصل كشفه`,
+      title: `${countNoun(missingCount, SUPPLIER)} لم يصل كشفه`,
       detail: "الكشف وحده يكشف فاتورة حُمّلت عليك ولم تصلك — ولا يظهر ذلك في أرشيفك مهما فتّشته.",
       action: "اطلب الكشف الشهري منهم، ثمّ طابقه.",
       actionLabel: "اطلب الكشوف",
       href: "/statements",
-      count: f.suppliersMissingStatement.length,
+      count: missingCount,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: f.suppliersMissingStatement.map((name) => ({ label: name })),
     });

@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { currentUser } from "@/lib/session";
 import { can, ROLE_LABEL } from "@/lib/permissions";
-import { Empty, PageShell } from "@/components/page-shell";
+import { PageShell } from "@/components/page-shell";
 import { HubGrid, type HubTile } from "@/components/hub";
 import { activeProviderName } from "@/lib/extraction";
 import { isAuthBypassed } from "@/lib/session";

@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { request } from "@/lib/http-client";
 
 export interface ArchivedStatement {
   id: string;
@@ -68,16 +69,13 @@ export function StatementReconcile({
       setError(null);
       setResult(null);
       try {
-        const res = await fetch("/api/statement-reconcile", { method: "POST", body });
-        const json = await res.json();
-        if (!res.ok) {
-          setError(json.error ?? "تعذّرت المطابقة");
+        const r = await request<Result & { persisted?: boolean }>("/api/statement-reconcile", { method: "POST", body });
+        if (!r.ok) {
+          setError(r.error);
           return;
         }
-        setResult(json as Result);
-        if (json.persisted) router.refresh();
-      } catch (e) {
-        setError((e as Error).message);
+        setResult(r.data);
+        if (r.data.persisted) router.refresh();
       } finally {
         setBusy(null);
       }
@@ -296,9 +294,14 @@ export function StatementReconcile({
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               onClick={async () => {
-                await navigator.clipboard.writeText(result.memo);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
+                /* رفضُ إذن الحافظة يُسمَع ولا يمرّ صامتاً */
+                try {
+                  await navigator.clipboard.writeText(result.memo);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                } catch {
+                  setError("تعذّر النسخ — المتصفّح منع الوصول إلى الحافظة. حدّد نصّ المذكّرة وانسخه بيدك.");
+                }
               }}
               className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-bold hover:border-ink-soft"
             >

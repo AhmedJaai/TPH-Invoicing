@@ -10,7 +10,12 @@
  */
 
 export type TaxFilter = "VALID" | "INVALID" | "UNKNOWN" | "NOT_APPLICABLE";
-export type PaidFilter = "UNPAID" | "PARTIAL" | "PAID";
+/**
+ * `OPEN` = ما بقي عليه أكثر من هللة، مسدَّداً جزئياً كان أو لم يُسدَّد.
+ * وكان «المستحقّ عليك» يفتح `UNPAID` (لا تخصيص أصلاً) فتسقط منه الفواتير
+ * المسدَّدة جزئياً — رقمٌ في التنقّل غيرُ الرقم في الرئيسية.
+ */
+export type PaidFilter = "OPEN" | "UNPAID" | "PARTIAL" | "PAID";
 
 export interface InvoiceFilters {
   month?: string;
@@ -28,7 +33,7 @@ export const OVERDUE_DAYS = 60;
 export const PAGE_SIZE = 40;
 
 const TAX_VALUES: readonly string[] = ["VALID", "INVALID", "UNKNOWN", "NOT_APPLICABLE"];
-const PAID_VALUES: readonly string[] = ["UNPAID", "PARTIAL", "PAID"];
+const PAID_VALUES: readonly string[] = ["OPEN", "UNPAID", "PARTIAL", "PAID"];
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
 export function parseFilters(raw: Record<string, string | undefined>): InvoiceFilters {
@@ -80,6 +85,7 @@ export const TAX_LABEL: Record<TaxFilter, string> = {
 };
 
 export const PAID_LABEL: Record<PaidFilter, string> = {
+  OPEN: "عليها رصيد",
   UNPAID: "لم تُسدَّد",
   PARTIAL: "سُدّدت جزئياً",
   PAID: "مسدَّدة",

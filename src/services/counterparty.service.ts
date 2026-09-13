@@ -107,8 +107,11 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
   }
   const evidence = [...merged.values()];
 
+  const w: Writer = input.writer ?? db;
+
+  /* يُقرأ بمقبض المعاملة: اتّصالٌ ثانٍ من داخلها ينتظر اتّصالاً محجوزاً */
   const existingOwners = evidence.length > 0
-    ? await db
+    ? await w
         .select({
           kind: counterpartyEvidence.kind,
           normalized: counterpartyEvidence.normalized,
@@ -120,10 +123,27 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
         .where(inArray(counterpartyEvidence.normalized, evidence.map((e) => e.normalized)))
     : [];
 
-  const w: Writer = input.writer ?? db;
-
   let counterpartyId = input.counterpartyId;
   let created = false;
+
+  /*
+    ── جهةٌ قائمة تُعرَف بدليلها قبل أن تُنشأ أخرى ──
+
+    كان كلُّ تعريفٍ بلا معرّف يُنشئ جهةً جديدة — والشاشات لا ترسل
+    المعرّف — فمن عرّف «الفلاح» مرّتين صار في النظام فلاحان، ودليلُهما
+    الظنّيّ المشترك يسقط من الذاكرة فيضعف التعميم بدل أن يقوى.
+
+    فإن ملكَ الدليلَ **القاطع** جهةٌ واحدة لا غير، أو ملكَ **النمطَ**
+    جهةٌ واحدة لا غير، فهي هي. والاسم وحده لا يكفي: الاسم ليس هويّة.
+  */
+  if (!counterpartyId) {
+    const decisive = (k: EvidenceKind) => isExclusive(k) || k === "PATTERN";
+    const owners = new Set(
+      existingOwners.filter((o) => decisive(o.kind as EvidenceKind)).map((o) => o.counterpartyId),
+    );
+    if (owners.size === 1) counterpartyId = [...owners][0];
+  }
+  const reused = Boolean(counterpartyId) && !input.counterpartyId;
 
   if (!counterpartyId) {
     counterpartyId = createId();
@@ -131,7 +151,7 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
     await w.insert(counterparties).values({
       id: counterpartyId,
       displayName: input.displayName?.trim()
-        || first.beneficiaryRaw?.trim()
+        || first.beneficiary?.trim()
         || "جهة بلا اسم",
       kind: input.kind,
       supplierId: input.supplierId ?? null,
@@ -197,17 +217,18 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
 
   await recordAudit({
     actorId: input.userId,
-    action: "SUPPLIER_ALIAS_LEARNED",
+    action: "COUNTERPARTY_CONFIRMED",
     entityType: "counterparty",
     entityId: counterpartyId,
     after: {
-      الجهة: input.displayName ?? first.beneficiaryRaw ?? "—",
+      الجهة: input.displayName ?? first.beneficiary ?? "—",
       "حركات أُكِّدت": input.transactions.length,
       الباب: input.kind,
       "أدلّة أُضيفت": added.map((a) => `${a.kind}:${a.value}`),
       تضارب: conflicts.map((c) => `${c.evidence.kind}:${c.evidence.value} → ${c.ownedBy}`),
+      ...(reused ? { "عُرفت بدليلها": true } : {}),
     },
-  });
+  }, w);
 
   return { counterpartyId, created, added, conflicts };
 }

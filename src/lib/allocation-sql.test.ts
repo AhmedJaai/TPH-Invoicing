@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
 
 /**
  * حارسُ مصيدةٍ تُسقِط المال، ولا يراها المترجم ولا تُصدر خطأً.
@@ -31,13 +32,23 @@ import { readFileSync } from "node:fs";
  * والصواب `${invoices}.id` — مرجعُ الجدول ثمّ الاسم حرفياً.
  */
 
-/** ملفّات فيها استعلاماتٌ فرعية مرتبطة على المال. */
-const GUARDED = [
-  "src/app/api/match-confirm/route.ts",
-  "src/app/api/match-confirm-bulk/route.ts",
-  "src/app/api/payment-run/route.ts",
-  "src/app/api/bank-import/route.ts",
-];
+/**
+ * كلُّ ملفٍّ في `src` — لا قائمةٌ تُكتب باليد.
+ *
+ * كانت القائمة أربعة ملفّات، والشكلُ الممنوع قائمٌ خارجها في صفحة
+ * الفواتير — سليماً بالمصادفة لأنّ فيها `leftJoin`. والقائمة اليدويّة
+ * هي ما قرّر المستودع ضدّه في عدد الهجرات: ما يُكتب باليد يُنسى.
+ */
+function walk(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const full = path.join(dir, name);
+    if (statSync(full).isDirectory()) walk(full, out);
+    else if (/\.(ts|tsx)$/.test(name) && !/\.test\.ts$/.test(name)) out.push(full);
+  }
+  return out;
+}
+
+const GUARDED = walk("src");
 
 /**
  * الشكل الممنوع: `${table.column}` داخل `select ... where` فرعيّ.
@@ -46,9 +57,23 @@ const GUARDED = [
  * عاديّ على الاستعلام الرئيس صحيحٌ وشائع، فمنعُه كلّه يُنتج حارساً
  * يُتجاوَز بدل أن يُصلَح.
  */
-const CORRELATED = /select[\s\S]{0,200}?where[^`]{0,120}?\$\{[a-zA-Z]+\.[a-zA-Z]+\}/i;
+const TABLES = [...readFileSync("src/db/schema.ts", "utf8").matchAll(/export const (\w+) = pgTable\(/g)]
+  .map((m) => m[1]);
+
+/*
+  يُضيَّق على جداول المخطّط وحدها وعلى استعلامٍ فرعيّ يُفتح بقوس: `${s.id}`
+  قيمةٌ من الشيفرة لا عمود، ومنعُها يُنتج حارساً يُتجاوَز بدل أن يُصلَح.
+*/
+const CORRELATED = new RegExp(
+  `\\(\\s*select[\\s\\S]{0,200}?where[^\`)]{0,120}?\\$\\{(?:${TABLES.join("|")})\\.[a-zA-Z]+\\}`,
+  "i",
+);
 
 describe("الاستعلام الفرعيّ المرتبط يُكتب بالمرجع لا بالعمود", () => {
+  it("كلّ ملفّات src تحت الحراسة", () => {
+    expect(GUARDED.length).toBeGreaterThan(100);
+  });
+
   for (const file of GUARDED) {
     it(`${file} لا يحمل الشكل الصامت`, () => {
       const source = readFileSync(file, "utf8");

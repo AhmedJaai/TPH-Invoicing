@@ -53,7 +53,7 @@ export const AREAS: readonly NavArea[] = [
     children: [
       { href: "/purchases", label: "النظرة العامة" },
       { href: "/purchases/invoices", label: "الفواتير" },
-      { href: "/purchases/invoices?paid=UNPAID", label: "المستحقّ عليك" },
+      { href: "/purchases/invoices?paid=OPEN", label: "المستحقّ عليك" },
       { href: "/purchases/insights", label: "تحليل الذكاء" },
       { href: "/suppliers", label: "المورّدون", needs: "supplier:view" },
       { href: "/purchases/products", label: "الأصناف" },

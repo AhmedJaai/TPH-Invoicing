@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Money } from "./money";
 import { KIND_LABEL, type SearchHit } from "@/lib/search";
+import { request } from "@/lib/http-client";
 
 /**
  * البحث في كل شيء من مكان واحد.
@@ -27,7 +28,8 @@ export function SearchBox() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [active, setActive] = useState(0);
-  const [failed, setFailed] = useState(false);
+  /** سببُ الفشل بنصّه: حدّ الاستعمال غير انتهاء الجلسة غير الشبكة. */
+  const [failed, setFailed] = useState<string | null>(null);
 
   // «/» يفتح البحث، ما لم يكن المستخدم يكتب في حقل آخر
   useEffect(() => {
@@ -50,25 +52,38 @@ export function SearchBox() {
   useEffect(() => {
     if (q.trim().length < MIN_CHARS) return;
 
+    /*
+      الطلبُ الأقدم يُلغى حين يُكتب حرفٌ جديد — وإلّا ردّ بطيءٌ عن «لا»
+      يصل بعد ردّ «لافا» فيغلبه، ويرى صاحب العمل نتائج ما لم يعد يكتبه.
+    */
+    const abort = new AbortController();
     const timer = setTimeout(async () => {
       setBusy(true);
-      setFailed(false);
+      setFailed(null);
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-        if (!res.ok) throw new Error();
-        const data = (await res.json()) as { hits: SearchHit[] };
-        setHits(data.hits);
+        const r = await request<{ hits: SearchHit[] }>(`/api/search?q=${encodeURIComponent(q)}`, {
+          signal: abort.signal,
+        });
+        if (abort.signal.aborted) return;
+        if (!r.ok) {
+          setFailed(r.error);
+          setHits([]);
+          setOpen(true);
+          return;
+        }
+        setHits(r.data.hits);
         setActive(0);
         setOpen(true);
       } catch {
-        setFailed(true);
-        setHits([]);
-        setOpen(true);
+        /* أُلغي لأنّ بحثاً أحدث بدأ — لا عطب */
       } finally {
-        setBusy(false);
+        if (!abort.signal.aborted) setBusy(false);
       }
     }, DEBOUNCE_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      abort.abort();
+    };
   }, [q]);
 
   /* الحالة تُصفَّر عند الكتابة نفسها لا داخل أثرٍ جانبيّ */

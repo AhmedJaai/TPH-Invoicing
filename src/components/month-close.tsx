@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { CheckItem, MonthCloseReport } from "@/lib/month-close";
 import { ConfirmAction } from "./ui-client";
 import { countNoun, BLOCKER, CHECK, WARNING } from "@/lib/arabic";
+import { postJson } from "@/lib/http-client";
 
 interface Response {
   report: MonthCloseReport;
@@ -91,21 +92,16 @@ export function MonthClose({
       setBusy(action === "check" ? "checking" : action === "close" ? "closing" : "reopening");
       setError(null);
       try {
-        const res = await fetch("/api/month-close", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ month: forMonth, action, note: note.trim() || undefined }),
+        const r = await postJson<Response>("/api/month-close", {
+          month: forMonth, action, note: note.trim() || undefined,
         });
-        const json = (await res.json()) as Response;
-        if (!res.ok) {
-          setError(json.error ?? "تعذّر التنفيذ");
-          if (json.report) setData(json);
+        if (!r.ok) {
+          setError(r.error);
+          if (r.data.report && r.data.status) setData(r.data as Response);
           return;
         }
-        setData(json);
+        setData(r.data);
         if (action !== "check") router.refresh();
-      } catch (e) {
-        setError((e as Error).message);
       } finally {
         setBusy(null);
       }

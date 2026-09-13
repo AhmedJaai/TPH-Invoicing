@@ -5,7 +5,7 @@ import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
-import { ConfirmAction } from "@/components/ui-client";
+import { postJson, request } from "@/lib/http-client";
 import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 
 interface Coverage {
@@ -111,24 +111,14 @@ function UnknownRow({
   const save = async () => {
     if (!ready) return;
     setState("saving");
-    try {
-      const res = await fetch("/api/bank-rule", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          pattern: pattern.trim(),
-          category,
-          supplierId: needsSupplier ? supplierId : undefined,
-        }),
-      });
-      const json = await res.json();
-      setMessage(json.message ?? json.error);
-      setState(res.ok ? "saved" : "error");
-      if (res.ok) onLearned();
-    } catch (e) {
-      setMessage((e as Error).message);
-      setState("error");
-    }
+    const r = await postJson<{ message?: string }>("/api/bank-rule", {
+      pattern: pattern.trim(),
+      category,
+      supplierId: needsSupplier ? supplierId : undefined,
+    });
+    setMessage(r.ok ? (r.data.message ?? "حُفظت") : r.error);
+    setState(r.ok ? "saved" : "error");
+    if (r.ok) onLearned();
   };
 
   return (
@@ -242,8 +232,6 @@ export function BankImport({
   const [data, setData] = useState<Preview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
-  const [marking, setMarking] = useState(false);
-  const [markResult, setMarkResult] = useState<string | null>(null);
   /** كم اسماً بنكياً تعلّمه النظام في هذه الجلسة — يفتح زرّ إعادة المطابقة */
   const [learned, setLearned] = useState(0);
 
@@ -254,42 +242,26 @@ export function BankImport({
       const body = new FormData();
       body.append("file", file);
       if (apply) body.append("apply", "true");
-      const res = await fetch("/api/bank-import", { method: "POST", body });
-      const json = await res.json();
-      if (!res.ok) { setError(json.error ?? "فشل الاستيراد"); return; }
+      const r = await request<Preview & { message?: string }>("/api/bank-import", { method: "POST", body });
+      if (!r.ok) { setError(r.error); return; }
       if (apply) {
-        setDone(`طوبقت ${countNoun(json.summary.matchedInvoices, INVOICE)} من ${json.created} تحويلاً`);
+        /*
+          رسالةُ الخادم تُعرض كما قالها — وكانت الشاشة تكتب نصّها هي:
+          «طوبقت ٠ فاتورة من ٠ تحويلاً» عن كشفٍ مقيَّدٍ كلُّه من قبل،
+          والخادم يقول «هذا الكشف مقيَّد عندك من قبل».
+        */
+        setDone(r.data.message ?? "اكتمل الاستيراد");
         setData(null);
         setLearned(0);
         router.refresh();
       } else {
-        setData(json as Preview);
+        setData(r.data);
       }
-    } catch (e) {
-      setError((e as Error).message);
     } finally {
       setBusy(null);
     }
   }, [router]);
 
-  const markPaid = useCallback(async () => {
-    setMarking(true);
-    setMarkResult(null);
-    try {
-      const res = await fetch("/api/mark-paid", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ throughMonth: new Date().toISOString().slice(0, 7), note: "إقرار المالك: سُدّدت قبل النظام" }),
-      });
-      const json = await res.json();
-      setMarkResult(res.ok ? json.message : json.error);
-      if (res.ok) router.refresh();
-    } catch (e) {
-      setMarkResult((e as Error).message);
-    } finally {
-      setMarking(false);
-    }
-  }, [router]);
 
   /*
     الخطوة الحالية تُشتقّ من الحال لا تُخزَّن.
@@ -574,36 +546,26 @@ export function BankImport({
       {/*
         ── طريقة سداد أخرى ──
 
-        هذا الفعل لا يُثبت أنّ مالاً خرج، بل يُثبت أنّك قلتَ إنّه خرج.
-        وكان زرّاً عادياً بجانب مسار البنك فبدا خياراً ثانياً كالأوّل.
-
-        (وقد أُعيد هذا الحارس بعد أن ضاع في إعادة كتابة المكوّن معالِجاً —
-        فالارتداد في فعلٍ خطر أسوأ من غيابه ابتداءً.)
+        كان هنا زرٌّ واحد «أعلن سدادها يدوياً» يسِم **كلّ** المفتوح حتى
+        الشهر الجاري مسدَّداً بتحويلٍ بنكيّ، بتاريخ الفاتورة، ولا ردّ له:
+        ستّ عشرة فاتورة بـ١٨٬٤٤٧٫٦٥ تختفي بضغطتين، ثمّ تصل الحوالة
+        الحقيقيّة فلا تجد فاتورةً مفتوحة فتُقيَّد دفعةً ثانية. فأُزيل،
+        والسداد اليدويّ صار فاتورةً فاتورة حيث تُرى — ويُسأل فيه من أين دُفعت.
       */}
       <section className="border-t border-line pt-8">
         <h2 className="font-display text-lg font-bold leading-tight">طريقة سداد أخرى</h2>
         <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-ink-soft">
-          حين تُدفع الفواتير نقداً أو من حساب لا يصل كشفه، تُعلن سدادها بنفسك.
-          ويُسجَّل في سجل التدقيق أنّ مصدر السداد إقرارك لا مطابقة بنكية، فلا يلتبس
-          الأمر على من يراجع لاحقاً.
+          ما دُفع نقداً أو من حسابك الشخصيّ يُسجَّل لكلّ فاتورةٍ وحدها من قائمة الفواتير:
+          «سجّل أنّها سُدّدت»، ويُسأل فيه من أين دُفعت.
         </p>
-
-        <div className="mt-4">
-          <p className="mb-3 text-sm font-bold">
-            <span className="nums">{openInvoiceCount}</span> فاتورة مفتوحة الآن
-          </p>
-          <ConfirmAction
-            label="أعلن سدادها يدوياً"
-            variant="secondary"
-            disabled={marking || openInvoiceCount === 0}
-            title={`ستُعتبر ${countNoun(openInvoiceCount, INVOICE)} مسدَّدة بإقرارك`}
-            consequence="هذا لا يُثبت سداداً بنكياً. لن تظهر هذه الفواتير في المستحقّات بعدها، وسيحمل سجل التدقيق اسمك مصدراً وحيداً للسداد."
-            acknowledgement="أفهم أنّ هذا إقرارٌ منّي لا مطابقةٌ بنكية."
-            confirmLabel="أعلن سدادها"
-            onConfirm={markPaid}
-          />
-          {markResult && <p className="mt-3 text-xs text-ink-soft">{markResult}</p>}
-        </div>
+        <a
+          href="/purchases/invoices?paid=OPEN"
+          className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-line px-3 text-xs font-medium hover:border-ink-soft"
+        >
+          {openInvoiceCount > 0
+            ? `${countNoun(openInvoiceCount, INVOICE)} مفتوحة — افتحها ←`
+            : "افتح قائمة الفواتير ←"}
+        </a>
       </section>
     </div>
   );

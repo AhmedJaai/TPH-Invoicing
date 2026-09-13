@@ -60,7 +60,8 @@ export function DriveRename() {
     try {
       const json = await post({});
       setData(json);
-      setChosen(new Set(json.proposals.map((p) => p.fileId)));
+      /* لا شيء مختاراً سلفاً: «اختيارُ ملفٍّ ملفّاً» لا «إلغاءُ اختيارِ ملفٍّ ملفّاً» */
+      setChosen(new Set());
     } catch (e) {
       setFailed(true);
       setMessage((e as Error).message);

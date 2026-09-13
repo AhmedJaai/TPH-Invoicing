@@ -16,6 +16,7 @@ import {
 } from "@/lib/invoice-filter";
 import { INVOICE, countNoun } from "@/lib/arabic";
 import { ScrollX } from "@/components/scroll-x";
+import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 
 export const dynamic = "force-dynamic";
 
@@ -46,21 +47,28 @@ export default async function InvoicesPage({
 
   const f = parseFilters(await searchParams);
 
+  /*
+    `${invoices}.id` لا `${invoices.id}`: الثاني يُصيَّر عموداً مجرّداً في
+    استعلامٍ على جدولٍ واحد فيُحلّ إلى `pa.id` ويصمت. وكانت هذه الصفحة
+    سليمةً بفضل `leftJoin` وحده — من يحذفه يجعل كلّ فاتورة «غير مسدَّدة».
+  */
   const allocated = sql<number>`coalesce((
-    select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = ${invoices.id}
+    select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = ${invoices}.id
   ), 0)`;
   const remaining = sql<number>`${invoices.totalMinor} - ${allocated}`;
   const lineCount = sql<number>`(
-    select count(*)::int from invoice_lines l where l.invoice_id = ${invoices.id}
+    select count(*)::int from invoice_lines l where l.invoice_id = ${invoices}.id
   )`;
 
   const clauses: SQL[] = [];
   if (f.month) clauses.push(eq(invoices.periodMonth, f.month));
   if (f.supplier) clauses.push(eq(suppliers.slug, f.supplier));
   if (f.tax) clauses.push(eq(invoices.taxStatus, f.tax));
+  /* ما بقي عليه أكثر من هللة — العتبة نفسها في كلّ شاشةٍ تقول «عليك» */
+  if (f.paid === "OPEN") clauses.push(sql`${remaining} > ${SETTLED_TOLERANCE_MINOR}`);
   if (f.paid === "UNPAID") clauses.push(sql`${allocated} = 0`);
   if (f.paid === "PARTIAL") clauses.push(sql`${allocated} > 0 and ${allocated} < ${invoices.totalMinor}`);
-  if (f.paid === "PAID") clauses.push(sql`${allocated} >= ${invoices.totalMinor}`);
+  if (f.paid === "PAID") clauses.push(sql`${remaining} <= ${SETTLED_TOLERANCE_MINOR}`);
   if (f.noLines) clauses.push(sql`${lineCount} = 0`);
   if (f.overdue) {
     clauses.push(sql`${remaining} > 0`);
@@ -93,7 +101,7 @@ export default async function InvoicesPage({
       .select({
         n: sql<number>`count(*)::int`,
         billed: sql<number>`coalesce(sum(${invoices.totalMinor}), 0)::bigint`,
-        outstanding: sql<number>`coalesce(sum(greatest(0, ${remaining})), 0)::bigint`,
+        outstanding: sql<number>`coalesce(sum(${remaining}) filter (where ${remaining} > ${SETTLED_TOLERANCE_MINOR}), 0)::bigint`,
       })
       .from(invoices)
       .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
@@ -127,7 +135,7 @@ export default async function InvoicesPage({
           : <LinkButton href="/upload" variant="primary" size="sm">أضف فاتورة</LinkButton>
       }
     >
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
         <Box label="المعروض" value={countNoun(Number(t.n), INVOICE)} />
         <Box label="قيمتها" minor={Number(t.billed)} />
         <Box
@@ -148,7 +156,7 @@ export default async function InvoicesPage({
         </Row>
 
         <Row label="السداد">
-          {(["UNPAID", "PARTIAL", "PAID"] as const).map((v) => (
+          {(["OPEN", "UNPAID", "PARTIAL", "PAID"] as const).map((v) => (
             <Chip key={v} href={linkTo(f, { paid: f.paid === v ? undefined : v })} on={f.paid === v}>
               {PAID_LABEL[v]}
             </Chip>
@@ -170,7 +178,8 @@ export default async function InvoicesPage({
         </Row>
 
         <Row label="المورّد">
-          {supplierList.slice(0, 12).map((s) => (
+          {/* كلّ المورّدين — كان يُعرض اثنا عشر من اثنين وعشرين بلا إشارة */}
+          {supplierList.map((s) => (
             <Chip key={s.slug} href={linkTo(f, { supplier: f.supplier === s.slug ? undefined : s.slug })} on={f.supplier === s.slug}>
               {s.nameAr}
             </Chip>
@@ -246,7 +255,7 @@ export default async function InvoicesPage({
               numeric: true,
               cell: (r) => {
                 const rem = r.total - Number(r.allocated);
-                return rem <= 0
+                return rem <= SETTLED_TOLERANCE_MINOR
                   ? <Badge tone="ok">مسدَّدة</Badge>
                   : <span className="font-bold"><Money minor={rem} tone="warn" /></span>;
               },
@@ -264,7 +273,7 @@ export default async function InvoicesPage({
               header: "",
               cell: (r) => {
                 const rem = r.total - Number(r.allocated);
-                if (rem <= 0) return null;
+                if (rem <= SETTLED_TOLERANCE_MINOR) return null;
                 return <MarkInvoicePaid invoiceId={r.id} label={formatRiyals(rem)} />;
               },
             },
@@ -323,8 +332,8 @@ function Chip({ href, on, children }: { href: string; on: boolean; children: Rea
   return (
     <Link
       href={href}
-      aria-pressed={on}
-      className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors ${
+      aria-current={on ? "true" : undefined}
+      className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-2.5 text-[11px] font-medium transition-colors sm:min-h-0 sm:py-1 ${
         on ? "bg-inverse-surface text-inverse-ink" : "border border-line hover:border-ink-soft"
       }`}
     >

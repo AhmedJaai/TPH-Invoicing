@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Money } from "./money";
 import { Badge, buttonClass, Card, EmptyState } from "./ui";
-import { countNoun, TRANSACTION } from "@/lib/arabic";
+import { countNoun, GROUP, TRANSACTION } from "@/lib/arabic";
+import { postJson } from "@/lib/http-client";
 
 /**
  * حلّ المعلّقات — **مجموعةً مجموعة** لا حركةً حركة.
@@ -37,18 +38,11 @@ export const REASON_LABEL: Record<QueueReason, string> = {
   AMOUNT_MISMATCH: "المبلغ لا يوافق فاتورة",
   PARTIAL_PAYMENT: "سداد جزئي",
   OVERPAYMENT: "أكثر من المستحقّ",
-  SUGGESTED: "اقتراح ينتظر إقرارك",
+  SUGGESTED: "اقتراح ينتظر تأكيدك",
   APPROXIMATE: "حلٌّ تقريبيّ",
   KNOWN_SUPPLIER_NO_INVOICE: "المورّد معروف ولا فاتورة تقابله",
 };
 
-export interface CandidateOption {
-  invoiceIds: string[];
-  label: string;
-  amountMinor: number;
-  score: number;
-  why: string[];
-}
 
 export interface QueueItem {
   id: string;
@@ -61,7 +55,6 @@ export interface QueueItem {
   guessName: string | null;
   guessKind: string | null;
   why: string[];
-  candidates?: CandidateOption[];
 }
 
 /**
@@ -107,30 +100,18 @@ const KINDS: { value: string; label: string }[] = [
   { value: "OTHER", label: "أخرى" },
 ];
 
-/**
- * يقرأ الردّ نصّاً ثمّ يحاول تحليله.
- *
- * القاعدة: **كلّ واجهةٍ تقرأ ردّاً تقرأه نصّاً قبل أن تدّعي أنّه JSON.**
- * وكان `res.json()` يقع داخل `try` مع الطلب نفسه، فإذا ردّ الخادم ٥٠٠
- * بصفحة خطأ — وهي ليست JSON — انفجر التحليل وسقط في `catch` فقيل
- * «تعذّر الاتصال بالخادم». فأُرسل صاحب العمل يفحص شبكةً سليمة بينما
- * العطب في الخادم ومعه رمزُ حالةٍ يدلّ عليه.
- */
-async function readBody(res: Response): Promise<{ message?: string; error?: string }> {
-  const text = await res.text().catch(() => "");
-  try {
-    return text ? (JSON.parse(text) as { message?: string; error?: string }) : {};
-  } catch {
-    return {};
-  }
-}
-
 export function ReconcileQueue({
   groups,
   suppliers,
+  canApprove = true,
+  canEdit = true,
 }: {
   groups: readonly QueueGroup[];
   suppliers: readonly SupplierOption[];
+  /** السداد على حساب المورّد يحتاج `payment:approve` — والزرّ لا يُعرض لمن لا يملكه. */
+  canApprove?: boolean;
+  /** تعريف الجهة يحتاج `bank:edit`. */
+  canEdit?: boolean;
 }) {
   const router = useRouter();
   const [kind, setKind] = useState<string | null>(null);
@@ -168,23 +149,15 @@ export function ReconcileQueue({
     setBusy(true);
     setFailed(false);
     try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await readBody(res);
-      if (!res.ok) {
+      const r = await postJson<{ message?: string }>(url, payload);
+      if (!r.ok) {
         setFailed(true);
-        setMessage(data.error ?? `تعذّر الحفظ — ردّ الخادم بالرمز ${res.status}`);
+        setMessage(r.error);
       } else {
-        setMessage(data.message ?? "حُفظت");
+        setMessage(r.data.message ?? "حُفظت");
         router.refresh();
         onOk();
       }
-    } catch {
-      setFailed(true);
-      setMessage("تعذّر الاتصال بالخادم — لم يصل الطلب. تحقّق من الشبكة.");
     } finally {
       setBusy(false);
     }
@@ -192,12 +165,13 @@ export function ReconcileQueue({
 
   const single = group.items.length === 1 ? group.items[0] : null;
 
-  /** يقبل مرشّحاً بعينه — ولا يكون إلّا لحركةٍ مفردة. */
-  const acceptCandidate = (option: CandidateOption) =>
-    post("/api/match-confirm",
-      { transactionId: single!.id, invoiceIds: option.invoiceIds }, next);
+  /*
+    الدفعة المقدَّمة لحركةٍ مفردة عُرف مورّدها.
 
-  const markNotAPayment = () =>
+    كان زرّها داخل كتلة «أيّ فاتورة تفسّرها؟» المشروطة بمرشّحين، والصفحة
+    لا تملأ المرشّحين أبداً — فلم يظهر قطّ، والطابور يحيل إليه.
+  */
+  const markAdvance = () =>
     post("/api/match-confirm", { transactionId: single!.id, notAPayment: "ADVANCE" }, next);
 
   /**
@@ -209,33 +183,17 @@ export function ReconcileQueue({
    * وسبعين ألف ريال.
    */
   async function settleAccount() {
-    setBusy(true);
-    setFailed(false);
-    try {
-      /*
-        المجموعة تُرسَل معاً — والخادم يقيّدها في معاملةٍ واحدة.
+    /*
+      المجموعة تُرسَل معاً — والخادم يقيّدها في معاملةٍ واحدة.
 
-        وكانت تُرسَل حركةً حركة: خمسةَ عشر طلباً لمجموعةٍ واحدة، فإن
-        نجح ثمانية وفشل التاسع بقيت نصفَ مقيَّدة ولا أحد يعرف أين وقفت.
-      */
-      const res = await fetch("/api/match-confirm", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          transactionId: group!.items[0].id,
-          transactionIds: group!.items.map((i) => i.id),
-          settleSupplier: true,
-        }),
-      });
-      const data = await readBody(res);
-      if (!res.ok) { setFailed(true); setMessage(data.error ?? `تعذّر السداد — ردّ الخادم بالرمز ${res.status}`); }
-      else { setMessage(data.message ?? "سُدِّد"); router.refresh(); next(); }
-    } catch {
-      setFailed(true);
-      setMessage("تعذّر الاتصال بالخادم — لم يصل الطلب. تحقّق من الشبكة.");
-    } finally {
-      setBusy(false);
-    }
+      وكانت تُرسَل حركةً حركة: خمسةَ عشر طلباً لمجموعةٍ واحدة، فإن
+      نجح ثمانية وفشل التاسع بقيت نصفَ مقيَّدة ولا أحد يعرف أين وقفت.
+    */
+    await post("/api/match-confirm", {
+      transactionId: group!.items[0].id,
+      transactionIds: group!.items.map((i) => i.id),
+      settleSupplier: true,
+    }, next);
   }
 
   /** يؤكّد المجموعة كلّها — والخادم يعيد التحقّق من أنّها مجموعة. */
@@ -254,8 +212,7 @@ export function ReconcileQueue({
     <div>
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <p className="text-xs text-muted">
-          بقيت <span className="nums font-bold">{remaining.length}</span> مجموعة ·{" "}
-          <span className="nums">{pendingCount}</span> حركة
+          بقيت {countNoun(remaining.length, GROUP)} · {countNoun(pendingCount, TRANSACTION)}
         </p>
         <button
           type="button"
@@ -288,7 +245,7 @@ export function ReconcileQueue({
 
           لأنّ من يُقرّر على سبعٍ لم يرَها لا يُقرّر، بل يوافق.
         */}
-        <ul className="mt-2 space-y-1 border-r-2 border-line pr-2.5">
+        <ul className="mt-2 space-y-1 border-s-2 border-line ps-2.5">
           {shown.map((i) => (
             <li key={i.id} className="flex items-baseline justify-between gap-3">
               <span className="nums shrink-0 text-[11px] text-muted">{i.date}</span>
@@ -326,50 +283,11 @@ export function ReconcileQueue({
           </div>
         )}
 
-        {single && single.candidates && single.candidates.length > 0 && (
-          <div className="mt-4">
-            <p className="text-xs font-bold">أيّ فاتورة تفسّرها؟</p>
-            <ul className="mt-2 space-y-2">
-              {single.candidates.map((c, i) => (
-                <li key={i} className="rounded-xl border border-line px-3 py-2.5">
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="min-w-0">
-                      <span className="block truncate text-xs font-bold">{c.label}</span>
-                      <span className="block text-[11px] text-muted">
-                        {c.why.slice(0, 2).join(" · ")}
-                      </span>
-                    </span>
-                    <span className="nums shrink-0 text-xs font-bold">
-                      <Money minor={c.amountMinor} />
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => acceptCandidate(c)}
-                    className={`${buttonClass("primary", "sm")} mt-2`}
-                  >
-                    هذه هي
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={markNotAPayment}
-              className={`${buttonClass("secondary", "sm")} mt-2`}
-            >
-              ليست سداد فاتورة — دفعة مقدَّمة
-            </button>
-          </div>
-        )}
-
         {/*
           المورّد معروف: فالسؤال ليس «ما هذه؟» بل «أتُسدَّد على حسابه؟».
           والفواتير تفصيلٌ داخل الحساب لا شرطٌ لقبوله.
         */}
-        {group.supplierId && (
+        {group.supplierId && canApprove && (
           <div className="mt-4 rounded-xl border border-line bg-sunken px-3 py-2.5">
             <p className="text-[11px] text-muted">
               المورّد معروف: <span className="font-bold text-ink">{group.supplierName}</span>
@@ -387,8 +305,18 @@ export function ReconcileQueue({
               onClick={settleAccount}
               className={`${buttonClass("primary", "sm")} mt-2`}
             >
-              {busy ? "يقيّد…" : "سدِّد على حساب المورّد — بالأقدم أوّلاً"}
+              {busy ? "يقيّد…" : "قيّدها على حسابه"}
             </button>
+            {single && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={markAdvance}
+                className={`${buttonClass("secondary", "sm")} ms-2 mt-2`}
+              >
+                دفعة مقدَّمة — قبل فاتورتها
+              </button>
+            )}
             {/* ما سيحدث يُقال قبل الضغط لا بعده */}
             {typeof group.outstandingMinor === "number" && (
               <p className="nums mt-1.5 text-[11px] text-muted">
@@ -417,6 +345,7 @@ export function ReconcileQueue({
           </div>
         )}
 
+        {canEdit && <>
         <p className="mt-4 text-xs font-bold">
           {group.items.length > 1 ? "ما هذه الحركات؟" : "ما هذه الحركة؟"}
         </p>
@@ -479,10 +408,11 @@ export function ReconcileQueue({
                 ? `أكّد — وطبّقها على ${countNoun(group.items.length, TRANSACTION)}`
                 : "أكّد وانتقل"}
           </button>
-          {message && (
-            <span className={`text-[11px] ${failed ? "text-danger" : "text-ok"}`}>{message}</span>
-          )}
         </div>
+        </>}
+        {message && (
+          <p className={`mt-2 text-[11px] ${failed ? "text-danger" : "text-ok"}`} role="status">{message}</p>
+        )}
 
         <p className="mt-3 border-t border-line pt-2.5 text-[11px] leading-relaxed text-muted">
           ما تؤكّده هنا يصير ذاكرةً: تُحفَظ أدلّة هذه الجهة — اسمها وحسابها ورقم

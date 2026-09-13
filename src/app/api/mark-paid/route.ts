@@ -17,7 +17,7 @@
  * بين فواتير يُرى قبل الإقرار.
  */
 import { NextResponse } from "next/server";
-import { and, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { invoices, paymentAllocations, payments } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
@@ -33,7 +33,6 @@ export const maxDuration = 60;
 interface Body {
   /** فواتير بعينها، أو كل ما يسبق شهراً */
   invoiceIds?: string[];
-  throughMonth?: string;
   supplierId?: string;
   note?: string;
   /** من أين دُفعت: حوالة من حساب المقهى (الافتراضيّ) أو من حساب المالك. */
@@ -108,19 +107,21 @@ export async function POST(request: Request) {
     }
   }
 
-  const conditions = [];
-  if (body.invoiceIds?.length) conditions.push(inArray(invoices.id, body.invoiceIds));
-  if (body.throughMonth) {
-    if (!/^\d{4}-\d{2}$/.test(body.throughMonth)) {
-      return NextResponse.json({ error: "شهر غير صالح" }, { status: 400 });
-    }
-    conditions.push(lte(invoices.periodMonth, body.throughMonth));
-  }
-  if (body.supplierId) conditions.push(eq(invoices.supplierId, body.supplierId));
+  /*
+    ── الفواتير تُسمّى بأعيانها ──
 
-  if (conditions.length === 0) {
-    return NextResponse.json({ error: "حدّد فواتير أو شهراً" }, { status: 400 });
+    كان يُقبَل `throughMonth` وحده، فيُوسَم كلُّ ما شهرُه دون ذلك
+    مسدَّداً — ستّ عشرة فاتورة بضغطة، بتاريخٍ وطريقةٍ لم يُقرآ من
+    مستند. والإقرار بالسداد إقرارٌ عن فاتورةٍ يراها صاحبها، لا عن نطاق.
+  */
+  if (!body.invoiceIds?.length) {
+    return NextResponse.json({ error: "حدّد الفواتير التي سُدّدت — واحدةً واحدة" }, { status: 400 });
   }
+  if (body.invoiceIds.length > 50) {
+    return NextResponse.json({ error: "خمسون فاتورة في المرّة الواحدة على الأكثر" }, { status: 400 });
+  }
+  const conditions = [inArray(invoices.id, body.invoiceIds)];
+  if (body.supplierId) conditions.push(eq(invoices.supplierId, body.supplierId));
 
   // ما بقي منه شيء غير مسدَّد فقط
   const rows = await db
@@ -183,12 +184,12 @@ export async function POST(request: Request) {
     actorId: user.id,
     action: "INVOICES_MARKED_PAID",
     entityType: "payment_run",
-    entityId: body.throughMonth ?? body.supplierId ?? "manual",
+    entityId: body.supplierId ?? "manual",
     after: {
       نوع: "وسم يدوي بالسداد",
       عدد_الفواتير: pending.length,
       المبلغ: totalMinor / 100,
-      النطاق: body.throughMonth ? `حتى ${body.throughMonth}` : body.supplierId ? "مورّد بعينه" : "فواتير محدّدة",
+      الفواتير: pending.map((p) => p.invoiceNumber),
       ملاحظة: body.note ?? null,
       // لم يأتِ من كشف بنك — تمييزه مهم عند أي مراجعة لاحقة
       مصدر_السداد: "إقرار المالك لا مطابقة بنكية",

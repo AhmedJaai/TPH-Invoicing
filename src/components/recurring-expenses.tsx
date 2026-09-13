@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
+import { postJson } from "@/lib/http-client";
 
 export interface ExpenseRow {
   id: string;
@@ -40,22 +41,14 @@ export function RecurringExpenses({ rows }: { rows: ExpenseRow[] }) {
     setBusy(true);
     setError(false);
     try {
-      const res = await fetch("/api/expense", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      setMessage(json.message ?? json.error);
-      setError(!res.ok);
-      if (res.ok) {
+      const r = await postJson<{ message?: string }>("/api/expense", payload);
+      setMessage(r.ok ? (r.data.message ?? "حُفظ") : r.error);
+      setError(!r.ok);
+      if (r.ok) {
         setLabel("");
         setAmount("");
         router.refresh();
       }
-    } catch (e) {
-      setMessage((e as Error).message);
-      setError(true);
     } finally {
       setBusy(false);
     }

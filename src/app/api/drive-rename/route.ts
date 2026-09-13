@@ -163,23 +163,35 @@ export async function POST(request: Request) {
   const failed: { from: string; error: string }[] = [];
 
   for (const t of targets) {
+    let renamedInDrive = false;
     try {
       await renameFile(drive, t.doc.driveFileId, t.proposed);
+      renamedInDrive = true;
       await db
         .update(documents)
         .set({ fileName: t.proposed })
         .where(eq(documents.driveFileId, t.doc.driveFileId));
       done.push({ from: t.doc.fileName, to: t.proposed });
     } catch (e) {
-      /* فشلُ ملفٍّ لا يوقف البقيّة — ويُعلَن ولا يُبتلَع */
-      failed.push({ from: t.doc.fileName, error: (e as Error).message });
+      /*
+        فشلُ ملفٍّ لا يوقف البقيّة — ويُعلَن ولا يُبتلَع. وإن سُمّي في
+        الدرايف وتعذّر قيدُه عندنا فهو **تسميةٌ وقعت**: تُسجَّل في الأثر
+        بالاسمين، وإلّا بقي في الأرشيف تغييرٌ لا يعرف أحدٌ مصدره.
+      */
+      if (renamedInDrive) done.push({ from: t.doc.fileName, to: t.proposed });
+      failed.push({
+        from: t.doc.fileName,
+        error: renamedInDrive
+          ? `سُمّي في الدرايف وتعذّر تحديث القيد: ${(e as Error).message}`
+          : (e as Error).message,
+      });
     }
   }
 
   if (done.length > 0) {
     await recordAudit({
       actorId: user.id,
-      action: "DOCUMENT_ARCHIVED",
+      action: "DRIVE_FILE_RENAMED",
       entityType: "drive",
       entityId: "rename",
       after: {

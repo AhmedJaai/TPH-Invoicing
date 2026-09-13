@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { postJson } from "@/lib/http-client";
 
 /**
  * اشتقاق المصروفات الفعلية من كشف البنك.
@@ -20,22 +21,14 @@ export function DeriveExpenses({ month }: { month?: string }) {
     setMessage(null);
     setFailed(false);
     try {
-      const res = await fetch("/api/expense-actual", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "derive", month }),
-      });
-      const data = (await res.json()) as { message?: string; error?: string };
-      if (!res.ok) {
+      const r = await postJson<{ message?: string }>("/api/expense-actual", { action: "derive", month });
+      if (!r.ok) {
         setFailed(true);
-        setMessage(data.error ?? "تعذّر الاشتقاق");
+        setMessage(r.error);
       } else {
-        setMessage(data.message ?? "تمّ");
+        setMessage(r.data.message ?? "تمّ");
         router.refresh();
       }
-    } catch {
-      setFailed(true);
-      setMessage("تعذّر الاتصال بالخادم");
     } finally {
       setBusy(false);
     }

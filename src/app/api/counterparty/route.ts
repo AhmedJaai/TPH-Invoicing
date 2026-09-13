@@ -23,7 +23,7 @@ import { bankTransactions, counterparties, decisionHistory } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { confirmCounterparty } from "@/services/counterparty.service";
 import { toCanonical, type CanonicalTransaction } from "@/lib/bank/canonical";
-import { groupingIdentity, memoryKeyFor, type IdentityKind } from "@/lib/bank/pattern";
+import { groupingIdentity } from "@/lib/bank/pattern";
 import { CLASSIFICATION_VERSION } from "@/lib/bank/classification";
 import { deriveLifecycle } from "@/lib/bank/lifecycle";
 import { TRANSACTION, countNoun } from "@/lib/arabic";
@@ -190,8 +190,31 @@ export async function POST(request: Request) {
     */
     const notAPayment = kind !== "SUPPLIER";
 
+    /*
+      ── الكتابة بمقبض المعاملة `t`، لا بـ`db` ──
+
+      كانت هذه الحلقة تكتب بـ`db` من داخل `db.transaction(t)`. وعلى
+      Vercel في المجمَّع اتّصالٌ واحد تحجزه المعاملة، فينتظر `db` اتّصالاً
+      لن يتحرّر عشر ثوانٍ ثمّ يسقط: «timeout exceeded when trying to
+      connect». ومحلّياً (عشرة اتّصالات) كان يسقط بالمفتاح الأجنبيّ، لأنّ
+      الجهة الجديدة لم تُودَع بعد فلا يراها اتّصالٌ آخر. فلم يُحفَظ تعريفُ
+      جهةٍ واحد من الواجهة منذ ٨ سبتمبر.
+
+      والتحديث دفعاتٌ لا صفّاً صفّاً: الحركات تختلف في حالين فقط (أمقيَّدة
+      بدفعة؟ أمتجاهَلة؟) فتُجمَع عليهما، وسجلّ القرار إدراجٌ واحد.
+    */
+    const buckets = new Map<string, { posted: boolean; ignored: boolean; ids: string[] }>();
     for (const r of rows) {
-      await db
+      const posted = r.matchedPaymentId !== null;
+      const ignored = r.matchStatus === "IGNORED";
+      const key = `${posted}:${ignored}`;
+      const b = buckets.get(key) ?? { posted, ignored, ids: [] };
+      b.ids.push(r.id);
+      buckets.set(key, b);
+    }
+
+    for (const b of buckets.values()) {
+      await t
         .update(bankTransactions)
         .set({
           counterpartyId: result.counterpartyId,
@@ -200,7 +223,7 @@ export async function POST(request: Request) {
           classificationSource: "HUMAN",
           classificationReason: reason,
           classificationVersion: CLASSIFICATION_VERSION,
-          ...(notAPayment && r.matchedPaymentId === null
+          ...(notAPayment && !b.posted
             ? {
                 matchStatus: "IGNORED" as const,
                 matchDisposition: null,
@@ -212,26 +235,26 @@ export async function POST(request: Request) {
             classified: true,
             hasCandidate: Boolean(body.supplierId),
             decided: true,
-            posted: r.matchedPaymentId !== null,
-            ignored: notAPayment || r.matchStatus === "IGNORED",
+            posted: b.posted,
+            ignored: notAPayment || b.ignored,
           }),
         })
-        .where(eq(bankTransactions.id, r.id));
-
-      await db.insert(decisionHistory).values({
-        bankTransactionId: r.id,
-        event: "ENTITY_LEARNED",
-        actor: "HUMAN",
-        actorId: user.id,
-        detail: reason,
-        payload: {
-          الجهة: body.displayName ?? null,
-          الباب: kind,
-          "حجم المجموعة": rows.length,
-          الهويّة: groupKey,
-        },
-      });
+        .where(inArray(bankTransactions.id, b.ids));
     }
+
+    await t.insert(decisionHistory).values(rows.map((r) => ({
+      bankTransactionId: r.id,
+      event: "ENTITY_LEARNED" as const,
+      actor: "HUMAN" as const,
+      actorId: user.id,
+      detail: reason,
+      payload: {
+        الجهة: body.displayName ?? null,
+        الباب: kind,
+        "حجم المجموعة": rows.length,
+        الهويّة: groupKey,
+      },
+    })));
 
     /*
       ── ٣. ويعمّ ──
@@ -246,10 +269,15 @@ export async function POST(request: Request) {
       return result;
     });
   } catch (e) {
-    const err = e as Error & { cause?: { message?: string } };
+    /*
+      نصُّ القاعدة الإنجليزيّ إلى سجلّ الخادم، ولصاحب العمل خبرٌ يفهمه:
+      لم يُحفَظ شيء، فالمعاملة أُلغيت كلُّها.
+    */
+    const err = e as Error & { cause?: { message?: string; code?: string } };
     console.error("counterparty:", err.cause ?? err);
+    const code = err.cause?.code ? ` (رمز ${err.cause.code})` : "";
     return NextResponse.json(
-      { error: `تعذّر الحفظ: ${(err.cause?.message ?? err.message).slice(0, 200)}` },
+      { error: `تعذّر حفظ التعريف، ولم يُكتب منه شيء — أعد المحاولة${code}` },
       { status: 500 },
     );
   }
@@ -270,8 +298,6 @@ export async function POST(request: Request) {
 
     **وحفظٌ يقع خيرٌ من نشرٍ يُسقط الحفظ معه.**
   */
-  const swept = 0;
-
   const [party] = await db
     .select({ name: counterparties.displayName })
     .from(counterparties)
@@ -279,7 +305,6 @@ export async function POST(request: Request) {
 
   const parts = [`حُفظت «${party?.name}»`];
   parts.push(`وطُبّقت على ${countNoun(rows.length, TRANSACTION)}`);
-  if (swept > 0) parts.push(`وعُرفت بها ${countNoun(swept, TRANSACTION)} في كشوفٍ سابقة`);
   if (result.conflicts.length > 0) {
     parts.push(`ودليلٌ أو أكثر (${result.conflicts.length}) يدلّ على جهةٍ أخرى — راجعها`);
   }
@@ -288,7 +313,6 @@ export async function POST(request: Request) {
     ok: true,
     ...result,
     confirmed: rows.length,
-    swept,
     message: parts.join("، "),
   });
 }

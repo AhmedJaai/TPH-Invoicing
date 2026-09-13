@@ -38,7 +38,6 @@ interface Result {
   /** ما سُجّل للتوّ واسمُه خارج الصيغة — يُقترَح هنا لا في شاشةٍ أخرى. */
   renameSuggestions?: RenameSuggestion[];
   quotations?: string[];
-  renamedOnSync?: number;
   summary: Summary;
   files?: ScannedFile[];
   notes?: string[];
@@ -71,7 +70,9 @@ export function DriveSync() {
   const [renaming, setRenaming] = useState(false);
   /** معرّفاتُ ما لا يُفهم اسمُه — تُقرأ بها بلا إعادة مشي. */
   const [pendingIds, setPendingIds] = useState<string[]>([]);
-  const [renamed, setRenamed] = useState<string | null>(null);
+  const [renamed, setRenamed] = useState<{ ok: boolean; text: string } | null>(null);
+  /** ما اختاره صاحب العمل للتسمية — فارغٌ حتى يختار. */
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
 
   /** يُطبّق التسمية على ما اقتُرح — يستدعيها التسجيل والزرّ معاً. */
   const applyRenames = useCallback(async (fileIds: string[]) => {
@@ -89,11 +90,13 @@ export function DriveSync() {
       try { json = JSON.parse(text) as { message?: string; error?: string }; }
       catch { /* ليس JSON */ }
       setRenamed(
-        !json ? `تعذّرت التسمية — ردّ الخادم بالرمز ${res.status}`
-        : res.ok ? (json.message ?? "تمّت التسمية") : (json.error ?? "تعذّرت التسمية"),
+        !json ? { ok: false, text: `تعذّرت التسمية — ردّ الخادم بالرمز ${res.status}` }
+        : res.ok ? { ok: true, text: json.message ?? "تمّت التسمية" }
+        : { ok: false, text: json.error ?? "تعذّرت التسمية" },
       );
-    } catch (e) {
-      setRenamed(`تعذّر الاتصال بالخادم — لم يصل الطلب: ${(e as Error).message}`);
+      if (res.ok) setChosen(new Set());
+    } catch {
+      setRenamed({ ok: false, text: "تعذّر الاتصال بالخادم — لم يصل الطلب. تحقّق من الشبكة ثمّ أعد المحاولة." });
     } finally {
       setRenaming(false);
     }
@@ -200,25 +203,14 @@ export function DriveSync() {
         setResult(json);
 
         /*
-          ── التسمية تقع مع التسجيل، لا في ضغطةٍ ثالثة ──
+          ── التسمية تُقترَح هنا، ولا تقع إلّا باختيار ──
 
-          كان المسار ثلاث ضغطات: افحص · سجّل · سمِّ. والثلاثة فعلٌ
-          واحد في ذهن صاحب العمل: «اقرأ ما دخل الدرايف، وسمِّه،
-          وأدخِله النظام». فمن ترك الضغطة الثالثة بقي الملفّ مسجَّلاً
-          باسمٍ لا يُقرأ، ولا شيء يذكّره.
-
-          والحرّاس تبقى كما هي — وهي التي تجعل هذا آمناً:
-            · التسميةُ وحدها: لا حذف ولا نقل، والدالّة `renameFile`.
-            · ما له سجلٌّ عندنا وحده — والقائمة من `documents`.
-            · ولا يُمَسّ اسمٌ **يُقرأ**: `canonicalName` لا تقترح إلّا
-              لما عجز قارئُه، فالاسم الذي كتبه إنسان يبقى.
-            · وأثرٌ في سجلّ التدقيق لكلّ إعادة تسمية.
-
-          والمعروض هو ما وقع: القائمة تبقى بعد التنفيذ ليراها.
+          كانت تقع مع التسجيل على كلّ المقترَح قبل أن يراه أحد. والقيد
+          الأوّل صريح: «لا شيء بلا اختيار الإنسان ملفّاً ملفّاً». فالسؤال
+          يبقى في موضعه — حيث يُعرَف الملفّ للتوّ — والقائمة تبدأ فارغة،
+          ويختار صاحب العمل ما يُسمّى، ويُكتب كلُّ اسمٍ بالاسمين في السجلّ.
         */
-        if (apply && suggestions.length > 0) {
-          await applyRenames(suggestions.map((r) => r.fileId));
-        }
+        setChosen(new Set());
 
         if (apply) router.refresh();
       } catch (e) {
@@ -227,7 +219,7 @@ export function DriveSync() {
         setBusy(null);
       }
     },
-    [full, router, pendingIds, applyRenames],
+    [full, router, pendingIds],
   );
 
   if (!open) {
@@ -270,7 +262,7 @@ export function DriveSync() {
 
       {busy && (
         <p className="mt-3 text-xs text-muted">
-          {busy === "scanning" ? "يفحص الدرايف…" : "يسجّل الجديد ويقرأه ويوحّد اسمه في الدرايف…"}
+          {busy === "scanning" ? "يفحص الدرايف…" : "يسجّل الجديد ويقرؤه…"}
         </p>
       )}
 
@@ -291,7 +283,6 @@ export function DriveSync() {
             <p className="mt-3 rounded-lg bg-ok-bg px-3 py-2 text-xs font-bold text-ok">
               ✓ سُجّل {s.created ?? 0} مستنداً، منها {countNoun(s.invoicesCreated ?? 0, INVOICE)}
               {s.contentRead ? ` · قُرئ محتوى ${s.contentRead}` : ""}
-              {result.renamedOnSync ? ` · وُحِّد اسم ${result.renamedOnSync}` : ""}
               {s.remainingUnnamed ? ` · بقي ${s.remainingUnnamed} ملفاً يحتاج قراءة` : ""}
             </p>
           )}
@@ -322,34 +313,57 @@ export function DriveSync() {
           )}
 
           {result?.renameSuggestions && result.renameSuggestions.length > 0 && (
-            <div className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5">
-              <p className="text-[11px] font-bold text-warn">
-                {result.renameSuggestions.length} ملفّاً اسمُه لا يُقرأ
+            <fieldset className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5">
+              <legend className="px-1 text-[11px] font-bold text-warn">
+                {result.renameSuggestions.length} ملفّاً اسمُه لا يُقرأ — اختر ما يُسمّى
+              </legend>
+              <p className="text-[11px] leading-relaxed text-muted">
+                لا يُسمّى شيءٌ إلّا ما تختاره، ويُكتب الاسمان في سجلّ التدقيق. ولا حذف ولا نقل.
               </p>
               <ul className="mt-1.5 space-y-1">
-                {result.renameSuggestions.slice(0, 8).map((r) => (
-                  <li key={r.fileId} className="leading-relaxed">
-                    <span className="block truncate text-[11px] text-muted line-through" dir="ltr">
-                      {r.current}
-                    </span>
-                    <span className="block truncate text-[11px] font-bold" dir="ltr">
-                      {r.proposed}
-                    </span>
+                {result.renameSuggestions.map((r) => (
+                  <li key={r.fileId}>
+                    <label className="flex min-h-11 cursor-pointer items-start gap-2 leading-relaxed">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={chosen.has(r.fileId)}
+                        onChange={() =>
+                          setChosen((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(r.fileId)) next.delete(r.fileId); else next.add(r.fileId);
+                            return next;
+                          })
+                        }
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-[11px] text-muted line-through" dir="ltr">
+                          {r.current}
+                        </span>
+                        <span className="block truncate text-[11px] font-bold" dir="ltr">
+                          {r.proposed}
+                        </span>
+                      </span>
+                    </label>
                   </li>
                 ))}
               </ul>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  disabled={renaming}
-                  onClick={() => applyRenames(result.renameSuggestions!.map((r) => r.fileId))}
-                  className="rounded-lg border border-line px-2.5 py-1 text-[11px] font-medium hover:border-ink-soft"
+                  disabled={renaming || chosen.size === 0}
+                  onClick={() => applyRenames([...chosen])}
+                  className="min-h-11 rounded-lg border border-line px-3 text-[11px] font-medium hover:border-ink-soft disabled:opacity-50"
                 >
-                  {renaming ? "يوحّد…" : "أعد المحاولة"}
+                  {renaming ? "يسمّي…" : `سمِّ المختار (${chosen.size})`}
                 </button>
-                {renamed && <span className="text-[11px] text-muted">{renamed}</span>}
+                {renamed && (
+                  <span className={`text-[11px] ${renamed.ok ? "text-ok" : "text-danger"}`} role="status">
+                    {renamed.text}
+                  </span>
+                )}
               </div>
-            </div>
+            </fieldset>
           )}
 
           {result?.notes && result.notes.length > 0 && (
@@ -399,7 +413,7 @@ export function DriveSync() {
                 onClick={() => void call(true)}
                 className="rounded-lg bg-inverse-surface px-4 py-2 text-xs font-bold text-inverse-ink"
               >
-                {result?.applied ? "أكمل الباقي" : "سجّل الجديد وسمِّه"}
+                {result?.applied ? "أكمل الباقي" : "سجّل الجديد"}
               </button>
             )}
           </div>
