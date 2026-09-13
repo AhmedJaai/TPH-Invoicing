@@ -36,11 +36,14 @@ export default async function SuppliersPage() {
       billedMinor: sql<number>`(
         select coalesce(sum(i.total_minor), 0)::int from invoices i where i.supplier_id = suppliers.id
       )`,
+      /*
+        كلُّ ما دُفع له فعلاً — لا ما خُصّص على فواتيره وحده. مالٌ دُفع ولم
+        يُخصّص كان لا يُرى، فيبدو المورّد مديناً وقد سُدّد.
+      */
       paidMinor: sql<number>`(
-        select coalesce(sum(pa.amount_minor), 0)::int
-        from payment_allocations pa
-        join invoices i on i.id = pa.invoice_id
-        where i.supplier_id = suppliers.id
+        select coalesce(sum(p.amount_minor - p.fee_minor), 0)::int
+        from payments p
+        where p.supplier_id = suppliers.id and p.status not in ('REVERSED', 'VOID')
       )`,
       statementCount: sql<number>`(
         select count(*)::int from statements st where st.supplier_id = suppliers.id
@@ -150,11 +153,15 @@ export default async function SuppliersPage() {
                 },
                 {
                   key: "balance",
-                  header: "ما بقي",
+                  header: "الصافي",
                   numeric: true as const,
                   cell: (r: (typeof rows)[number]) => {
                     const balance = Number(r.billedMinor) - Number(r.paidMinor);
-                    return (
+                    return balance < 0 ? (
+                      <span className="text-xs font-bold text-ok">
+                        لك عنده <Money minor={-balance} />
+                      </span>
+                    ) : (
                       <span className="font-bold">
                         <Money minor={balance} tone={balance > 0 ? "warn" : "ok"} />
                       </span>

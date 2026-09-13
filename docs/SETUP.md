@@ -89,8 +89,9 @@ ALLOWED_EMAILS="ahmedaljaaidi98@gmail.com:OWNER,acc@example.com:ACCOUNTANT,buy@e
 
 ```
 EXTRACTION_PROVIDER="deepseek"
-DEEPSEEK_EXTRACTION_MODEL="deepseek-v4-flash-vision-exp"
-DEEPSEEK_TEXT_MODEL="deepseek-v4-flash"
+# اختياريّة — الافتراضيّ في src/lib/ai/models.ts هو نفسه
+DEEPSEEK_EXTRACTION_MODEL="deepseek-flash"
+DEEPSEEK_TEXT_MODEL="deepseek-flash"
 DEEPSEEK_REASONING_MODEL="deepseek-v4-pro"
 ```
 

@@ -335,6 +335,11 @@ export const paymentMethodEnum = pgEnum("payment_method", [
   "BANK_TRANSFER",
   "CASH",
   "EMPLOYEE_ADVANCE", // تحويل لموظف — يفتح تنبيهاً حتى تصل الإيصالات
+  /*
+    من حساب المالك الشخصيّ لصالح المقهى — لا يظهر في كشف المقهى أبداً،
+    فلا يُنتظَر له توأمٌ من البنك. انظر `027`.
+  */
+  "OWNER_ACCOUNT",
 ]);
 
 /**
@@ -1240,3 +1245,40 @@ export const decisionHistory = pgTable("decision_history", {
   payload: jsonb("payload"),
   createdAt: now(),
 }, (t) => [index("decision_history_tx_idx").on(t.bankTransactionId, t.createdAt)]);
+
+/* ───────────────────────── اقتراحات تحليل الذكاء ───────────────────────── */
+
+/**
+ * ما يقترحه تحليلُ حساب المورّد — وما قرّره فيه إنسان.
+ *
+ * حكمُ النموذج **اقتراحٌ لا مطابقة**: لا يُكتب في المال شيءٌ حتى يُقرّه
+ * صاحب العمل. والمبلغ يحسبه الخادم من الوقائع لا يُنقل من النموذج،
+ * والإشارات إلى الفواتير والدفعات تُطابَق بمعرّفاتٍ حُسبت لا بنصٍّ كتبه.
+ *
+ * والقرار يبقى: ما رُفض يُقرأ في التحليل القادم فلا يُقترَح ثانيةً بلا
+ * دليلٍ جديد — وبه يتحسّن التحليل مع الاستعمال. انظر `027`.
+ */
+export const aiFindings = pgTable("ai_findings", {
+  id: id(),
+  supplierId: text("supplier_id").notNull().references(() => suppliers.id, { onDelete: "cascade" }),
+  runId: text("run_id").notNull(),
+  kind: text("kind").notNull(),
+  severity: text("severity").notNull(),
+  title: text("title").notNull(),
+  explanation: text("explanation").notNull(),
+  amountMinor: integer("amount_minor"),
+  action: jsonb("action"),
+  refs: jsonb("refs").notNull().default([]),
+  status: text("status").notNull().default("OPEN"),
+  model: text("model").notNull(),
+  promptVersion: text("prompt_version").notNull(),
+  modelConfidence: numeric("model_confidence", { precision: 4, scale: 3 }),
+  costMicroUsd: integer("cost_micro_usd").notNull().default(0),
+  createdAt: now(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  decidedById: text("decided_by_id").references(() => users.id),
+  decisionNote: text("decision_note"),
+}, (t) => [
+  index("ai_findings_supplier_status_idx").on(t.supplierId, t.status),
+  index("ai_findings_status_created_idx").on(t.status, t.createdAt),
+]);

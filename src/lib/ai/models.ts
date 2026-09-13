@@ -6,40 +6,37 @@
  * (`"deepseek-chat"` و`"qwen-max"`) في `bank/adjudicator-provider.ts`.
  * فمن بدّل نموذجاً بدّل واحداً وترك ثلاثة.
  *
- * وكشف ذلك نفسه: الافتراضي المكتوب كان `deepseek-chat`، وحساب أحمد لا
- * يعرض هذا النموذج أصلاً — يعرض ثلاثةً غيره. فالسلسلة الحرفيّة تُكتب
- * مرّةً ثمّ لا يعود أحد يسأل أصحيحةٌ هي.
- *
  * ── المهمّة تحدّد النموذج، لا العكس ──
- *
- * ثلاث مهامّ مختلفة الطبيعة، فثلاثة نماذج:
  *
  *   VISION     — يقرأ صورة مستند ويستخرج حقولاً. أكثر ما يُستدعى.
  *   TEXT       — يصنّف ويوحّد نصّاً قُرئ أصلاً. أرخص، ولا يحتاج عيناً.
- *   REASONING  — يوازن بين مرشّحين حُسبوا. الأغلى، وللملتبس وحده.
+ *   REASONING  — يوازن بين معلوماتٍ حُسبت: التحكيم، وتحليل حساب المورّد.
  *
- * والتفريق ليس ترفاً: استدعاء نموذج الاستدلال على كل فاتورة يضاعف
- * الكلفة بلا فائدة، لأنّ قراءة الفاتورة ليست استدلالاً.
+ * ── إصدار ١٠ سبتمبر ٢٠٢٦ ──
+ *
+ * أصدرت DeepSeek نموذج V4.1 Flash باسم `deepseek-flash`، **متعدّد الوسائط
+ * أصلاً**: يقرأ الصورة والنصّ بنموذجٍ واحد. وسُحب V4 Flash وV4 Flash
+ * Vision Exp، واسماهما يُوجَّهان إلى الجديد **مؤقّتاً** — فالبقاء عليهما
+ * انتظارٌ لانقطاعٍ لا يُعلَن موعده.
+ *
+ * فصارت الرؤية والنصّ نموذجاً واحداً، وزالت لاحقة `-exp` التي كانت
+ * تجعل أكثر مسارٍ استدعاءً قائماً على نموذجٍ تجريبيّ. والاستدلال بقي
+ * على `deepseek-v4-pro` — أعلنت الشركة استمراره بعد ١٤ سبتمبر بنفس
+ * التسعير. وتحقّقنا من القائمة التي يعرضها مفتاح أحمد نفسه
+ * (`GET /models`): النموذجان كلاهما فيها.
+ *
+ * والمتغيّرات (`DEEPSEEK_*_MODEL`) تبقى للطوارئ وحدها. كانت مضبوطةً في
+ * Vercel بالأسماء القديمة، فتغلب الافتراضيَّ هنا بصمت — والإعداد الذي
+ * يُكتب في موضعين يفترق.
  */
 
 /** المهامّ التي تُسأل عنها النماذج. */
 export type AiTask = "VISION" | "TEXT" | "REASONING";
 
-/**
- * النماذج المثبَّتة.
- *
- * لا اسم عائم في مسارٍ يقرأ أرقام فواتير. وكان في هذا النظام
- * `gemini-flash-latest` — وقد قرأ خمسة مستندات فعلاً، وهي مسجّلة في
- * `documents.extraction_model` إلى اليوم: نموذجٌ لا يُعرف ما كان.
- *
- * و`-exp` في اسم نموذج الرؤية لاحقةُ تجربة: قد يُسحَب أو يتغيّر سلوكه.
- * وهو مقبولٌ لأنّه الوحيد الذي يقرأ الصور عند هذا المزوّد — لكنّه
- * يُعلَن في `docs/` ويُراقَب، ولا يُنسى أنّه تجريبيّ.
- */
-export const DEEPSEEK_MODELS: Record<AiTask, string> = {
-  VISION: process.env.DEEPSEEK_EXTRACTION_MODEL || "deepseek-v4-flash-vision-exp",
-  TEXT: process.env.DEEPSEEK_TEXT_MODEL || "deepseek-v4-flash",
-  REASONING: process.env.DEEPSEEK_REASONING_MODEL || "deepseek-v4-pro",
+const DEFAULT_MODELS: Record<AiTask, string> = {
+  VISION: "deepseek-flash",
+  TEXT: "deepseek-flash",
+  REASONING: "deepseek-v4-pro",
 };
 
 /**
@@ -52,11 +49,11 @@ export const DEEPSEEK_MODELS: Record<AiTask, string> = {
 export function modelFor(task: AiTask): string {
   switch (task) {
     case "VISION":
-      return process.env.DEEPSEEK_EXTRACTION_MODEL || "deepseek-v4-flash-vision-exp";
+      return process.env.DEEPSEEK_EXTRACTION_MODEL || DEFAULT_MODELS.VISION;
     case "TEXT":
-      return process.env.DEEPSEEK_TEXT_MODEL || "deepseek-v4-flash";
+      return process.env.DEEPSEEK_TEXT_MODEL || DEFAULT_MODELS.TEXT;
     case "REASONING":
-      return process.env.DEEPSEEK_REASONING_MODEL || "deepseek-v4-pro";
+      return process.env.DEEPSEEK_REASONING_MODEL || DEFAULT_MODELS.REASONING;
   }
 }
 
@@ -85,9 +82,9 @@ export function isDeepseekConfigured(): boolean {
  * ردّ الخادم حرفيّاً حين أُرسل PDF:
  *   «has one of the following formats: webp, png, jpeg, and gif»
  *
- * و**الـPDF ليس منها**. وهذا أهمّ قيدٍ في الهجرة كلّها: ١٥٧ من ١٥٨
- * مستنداً في الأرشيف PDF، فلا يبلغ النموذجَ منها واحدٌ إلّا بعد
- * تحويل — نصّاً يُقرأ حسابياً، أو صورةً تُرسَم.
+ * و**الـPDF ليس منها**. ١٥٧ من ١٥٨ مستنداً في الأرشيف PDF، فلا يبلغ
+ * النموذجَ منها واحدٌ إلّا بعد تحويل — نصّاً يُقرأ حسابياً، أو صورةً
+ * تُنتزَع.
  */
 export const DEEPSEEK_IMAGE_TYPES = [
   "image/webp",
@@ -103,14 +100,14 @@ export function isDeepseekImageType(mimeType: string): boolean {
 /**
  * تسعيرة المزوّد بالدولار لكل مليون رمز — لتقدير الكلفة وحده.
  *
- * تقديرٌ يُعلَن أنّه تقدير: يُراجَع عند تغيّر التسعيرة، ولا يُبنى عليه
- * قرارٌ ماليّ. وهو هنا لأنّ «كم كلّفنا هذا الشهر؟» سؤالٌ يُسأل، وجوابُه
- * بلا أرقامٍ تخمين.
+ * أسعار **الذروة** (١٠ سبتمبر ٢٠٢٦، بلا خزين): المزوّد ينصفها خارج
+ * الذروة، والتقدير يأخذ الأعلى كي لا يَعِد بأقلّ ممّا يُدفع. ويُراجَع
+ * عند تغيّر التسعيرة، ولا يُبنى عليه قرارٌ ماليّ.
  */
 export const PRICE_PER_MTOK: Record<AiTask, { input: number; output: number }> = {
-  VISION: { input: 0.07, output: 0.28 },
-  TEXT: { input: 0.07, output: 0.28 },
-  REASONING: { input: 0.28, output: 1.12 },
+  VISION: { input: 0.3, output: 1.2 },
+  TEXT: { input: 0.3, output: 1.2 },
+  REASONING: { input: 1.32, output: 3.96 },
 };
 
 /** كلفة نداءٍ بالدولار — تقديراً. */

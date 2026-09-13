@@ -25,7 +25,11 @@ export type AuditAction =
   | "PRODUCT_LINKED"
   | "PRODUCT_UNLINKED"
   | "EXPENSE_ADDED"
-  | "EXPENSE_REMOVED";
+  | "EXPENSE_REMOVED"
+  | "INVOICE_PAID_BY_OWNER"
+  | "SUPPLIER_CREDIT_APPLIED"
+  | "AI_ANALYSIS_RUN"
+  | "AI_FINDING_DECIDED";
 
 export async function recordAudit(entry: {
   actorId?: string | null;

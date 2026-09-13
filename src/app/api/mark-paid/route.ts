@@ -3,7 +3,18 @@
  *
  * الواقع أنّ أغلب الفواتير سُدّدت قبل وجود النظام، ومطابقة كشف البنك لا
  * تلتقط كلّ شيء. فبدل أن تبقى مئة فاتورة «غير مسدَّدة» زوراً، يعتمدها المالك
- * دفعةً واحدة — ويُسجَّل ذلك في سجل التدقيق باسمه لا كأنّه حقيقة مثبتة.
+ * — ويُسجَّل ذلك في سجل التدقيق باسمه لا كأنّه حقيقة مثبتة.
+ *
+ * ── ومن أين دُفعت؟ ──
+ *
+ * `source: "OWNER"` — من حساب المالك الشخصيّ أو نقداً، أي من خارج حساب
+ * المقهى. وهذا غيرُ «حوالة»: لا يظهر في كشف البنك أبداً، فلا يُنتظَر له
+ * توأم. وأهمّ منه: **ما كان من حوالات المقهى مخصَّصاً على هذه الفاتورة
+ * يُفَكّ عنها ويُخصم من فواتير المورّد الأخرى** — لأنّ تلك الحوالات لم
+ * تكن لها. وهذا ما أبقى فاتورة يوليو للكوب الذهبي مفتوحةً وقد سُدّدت.
+ *
+ * و`preview: true` يعرض ما سينتقل قبل أن يقع — الفعلُ الذي ينقل مالاً
+ * بين فواتير يُرى قبل الإقرار.
  */
 import { NextResponse } from "next/server";
 import { and, eq, inArray, lte, sql } from "drizzle-orm";
@@ -12,7 +23,9 @@ import { invoices, paymentAllocations, payments } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { recordAudit } from "@/lib/audit";
 import { refreshPaymentStatus } from "@/services/payment.service";
+import { CreditError, markPaidByOwner, previewOwnerPaid } from "@/services/supplier-credit.service";
 import { INVOICE, countNoun } from "@/lib/arabic";
+import { formatRiyalsDisplay } from "@/lib/money";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -23,9 +36,14 @@ interface Body {
   throughMonth?: string;
   supplierId?: string;
   note?: string;
+  /** من أين دُفعت: حوالة من حساب المقهى (الافتراضيّ) أو من حساب المالك. */
+  source?: "BANK" | "OWNER";
+  /** يُعرض ما سيقع ولا يُكتب شيء — للسداد من حساب المالك. */
+  preview?: boolean;
 }
 
-export async function POST(request: Request) {  let user;
+export async function POST(request: Request) {
+  let user;
   try {
     user = await guard("mark-paid", "payment:approve");
   } catch (e) {
@@ -39,6 +57,55 @@ export async function POST(request: Request) {  let user;
     body = (await request.json()) as Body;
   } catch {
     return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
+  }
+
+  /* ── من حساب المالك: فاتورةٌ واحدة، بمعاينةٍ ثمّ إقرار ── */
+  if (body.source === "OWNER") {
+    const invoiceId = body.invoiceIds?.length === 1 ? body.invoiceIds[0] : null;
+    if (!invoiceId) {
+      return NextResponse.json({ error: "السداد من حساب المالك يُسجَّل لفاتورةٍ واحدة في كلّ مرّة" }, { status: 400 });
+    }
+
+    try {
+      if (body.preview) {
+        const plan = await previewOwnerPaid(db, invoiceId);
+        return NextResponse.json({ ok: true, preview: plan });
+      }
+
+      const outcome = await db.transaction((tx) => markPaidByOwner(tx, invoiceId));
+
+      await recordAudit({
+        actorId: user.id,
+        action: "INVOICE_PAID_BY_OWNER",
+        entityType: "invoice",
+        entityId: invoiceId,
+        after: {
+          الفاتورة: outcome.invoiceNumber,
+          سداد_المالك_بالهللات: outcome.ownerPaymentMinor,
+          فُكّ_عنها: outcome.freed,
+          خُصم_من: outcome.reapplied,
+          بقي_لك_عنده_بالهللات: outcome.creditLeftMinor,
+          ملاحظة: body.note ?? null,
+          مصدر_السداد: "إقرار المالك: من حسابه الشخصيّ أو نقداً",
+        },
+      });
+
+      const moved = outcome.reapplied.reduce((s, r) => s + r.amountMinor, 0);
+      return NextResponse.json({
+        ok: true,
+        marked: 1,
+        totalMinor: outcome.ownerPaymentMinor,
+        message:
+          `قُيّدت فاتورة ${outcome.invoiceNumber} مسدَّدةً من حسابك بـ${formatRiyalsDisplay(outcome.ownerPaymentMinor)} ريال`
+          + (moved > 0 ? ` · وانتقل ${formatRiyalsDisplay(moved)} من حوالات المقهى إلى فواتيره الأخرى` : "")
+          + (outcome.creditLeftMinor > 0 ? ` · وبقي لك عنده ${formatRiyalsDisplay(outcome.creditLeftMinor)}` : ""),
+      });
+    } catch (e) {
+      if (e instanceof CreditError) {
+        return NextResponse.json({ error: e.message }, { status: e.status });
+      }
+      throw e;
+    }
   }
 
   const conditions = [];
@@ -104,11 +171,7 @@ export async function POST(request: Request) {  let user;
 
         كان هذا المسار يُدرج الدفعة وتخصيصها ثمّ ينصرف، فيبقى
         `status = 'UNAPPLIED'` على دفعةٍ خُصّصت بالكامل — فتقول بوّابة
-        الإنتاج «حالُها يخالف تخصيصاتها»، وهي محقّة. خمسُ دفعاتٍ في
-        قاعدة أحمد كذلك، كلُّها من استدعاءٍ واحد.
-
-        و`allocate()` في `payment.service` يستدعيه من نفسه؛ وهذا المسار
-        يكتب التخصيص بيده فعليه أن يستدعيه بيده.
+        الإنتاج «حالُها يخالف تخصيصاتها»، وهي محقّة.
       */
       await refreshPaymentStatus(tx, pay.id);
 

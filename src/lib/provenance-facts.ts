@@ -5,6 +5,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { buildProvenance, type Contribution, type Provenance } from "./provenance";
+import { loadBalanceTotals } from "@/services/supplier-balance.service";
 
 export interface HomeProvenance {
   purchases: Provenance;
@@ -29,8 +30,6 @@ interface Row extends Record<string, unknown> {
   unread_docs: number;
   review_docs: number;
   quarantined_docs: number;
-  unpaid_count: number;
-  unpaid_amount: number;
   disputed_count: number;
   vat_valid_count: number;
   vat_valid_amount: number;
@@ -57,12 +56,6 @@ export async function gatherHomeProvenance(): Promise<HomeProvenance> {
       (select count(*)::int from documents where status = 'NEEDS_REVIEW')    as review_docs,
       (select count(*)::int from documents where status = 'REJECTED')        as quarantined_docs,
 
-      (select count(*)::int from invoices i
-        where i.total_minor > coalesce((select sum(pa.amount_minor)::int
-          from payment_allocations pa where pa.invoice_id = i.id), 0))       as unpaid_count,
-      (select coalesce(sum(greatest(0, i.total_minor - coalesce((select sum(pa.amount_minor)::int
-          from payment_allocations pa where pa.invoice_id = i.id), 0))), 0)::int
-        from invoices i)                                                     as unpaid_amount,
       (select count(*)::int from invoices where tax_status = 'NOT_APPLICABLE')
                                                                              as disputed_count,
 
@@ -133,15 +126,47 @@ export async function gatherHomeProvenance(): Promise<HomeProvenance> {
     });
   }
 
+  /*
+    «كم أدين؟» بالمورّد لا بالفاتورة.
+
+    كان الرقم مجموعَ ما بقي على كلّ فاتورة — فمالٌ دُفع للمورّد ولم
+    يُخصم من فاتورةٍ بعينها لا يُنقص شيئاً. والآن: ما بقي على فواتير
+    كلّ مورّد ناقصاً رصيدَنا عنده، ولا يُخصم رصيدُ مورّدٍ من دين آخر.
+    والبنود تُعلن الطرح نفسه كي يُرى من أين نقص الرقم.
+  */
+  const { totals } = await loadBalanceTotals();
   const outstanding: Contribution[] = [
     {
       id: "unpaid",
       label: "فواتير عليها رصيد",
-      count: Number(r?.unpaid_count ?? 0),
-      amountMinor: Number(r?.unpaid_amount ?? 0),
+      count: totals.openInvoiceCount,
+      amountMinor: totals.openInvoicesMinor,
       included: true,
     },
   ];
+  if (totals.offsetMinor > 0) {
+    outstanding.push({
+      id: "credit-offset",
+      label: "يُخصم: مالٌ دفعتَه لنفس المورّدين ولم يُخصم من فاتورة",
+      unit: "مورّد",
+      count: 0,
+      amountMinor: -totals.offsetMinor,
+      included: true,
+      href: "/purchases/insights",
+    });
+  }
+  if (totals.creditLeftMinor > 0) {
+    outstanding.push({
+      id: "credit-left",
+      label: "لك عند مورّدين بلا فواتير مفتوحة",
+      unit: "مورّد",
+      count: totals.creditSuppliers,
+      amountMinor: totals.creditLeftMinor,
+      included: false,
+      reason: "لا يُخصم من دَين مورّدٍ آخر — اطلب فواتيره أو استرداده",
+      href: "/purchases/insights",
+    });
+  }
   if (Number(r?.disputed_count ?? 0) > 0) {
     outstanding.push({
       id: "not-applicable",

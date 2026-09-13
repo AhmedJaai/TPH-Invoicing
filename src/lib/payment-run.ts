@@ -29,8 +29,11 @@ export interface SupplierPayment {
   supplierId: string;
   supplierName: string;
   invoices: PayableInvoice[];
+  /** ما يُحوَّل فعلاً — بعد خصم رصيدٍ لنا عنده. */
   totalMinor: number;
   invoiceCount: number;
+  /** رصيدٌ لنا عند المورّد خُصم من هذه الدفعة. */
+  creditAppliedMinor: number;
 }
 
 export interface HeldInvoice {
@@ -43,6 +46,13 @@ export interface PaymentRun {
   month: string;
   /** جاهز للاعتماد والتحويل */
   ready: SupplierPayment[];
+  /**
+   * ما يغطّيه رصيدٌ لنا عند المورّد كلّه — فلا يُحوَّل له شيء.
+   *
+   * كانت الدفعة تقترح تحويلاً لمورّدٍ عنده لنا مالٌ دُفع ولم يُخصم،
+   * فيُدفع الريال مرّتين. والرصيد يُخصم هنا من المورّد نفسه وحده.
+   */
+  coveredByCredit: SupplierPayment[];
   readyTotalMinor: number;
   /** محجوز حتى تُعالَج المشكلة */
   held: HeldInvoice[];
@@ -67,7 +77,11 @@ const HOLD_TEXT: Record<HoldReason, string> = {
 export function buildPaymentRun(
   invoices: readonly PayableInvoice[],
   month: string,
-  options: { includeOlderUnpaid?: boolean } = {},
+  options: {
+    includeOlderUnpaid?: boolean;
+    /** رصيدٌ لنا عند كلّ مورّد لم يُخصم من فاتورة — يُخصم من دفعته. */
+    creditBySupplier?: ReadonlyMap<string, number>;
+  } = {},
 ): PaymentRun {
   const inScope = invoices.filter((i) => {
     const remaining = i.totalMinor - i.allocatedMinor;
@@ -94,18 +108,28 @@ export function buildPaymentRun(
   for (const inv of payable) {
     const entry =
       bySupplier.get(inv.supplierId) ??
-      { supplierId: inv.supplierId, supplierName: inv.supplierName, invoices: [], totalMinor: 0, invoiceCount: 0 };
+      { supplierId: inv.supplierId, supplierName: inv.supplierName, invoices: [], totalMinor: 0, invoiceCount: 0, creditAppliedMinor: 0 };
     entry.invoices.push(inv);
     entry.totalMinor += inv.totalMinor - inv.allocatedMinor;
     entry.invoiceCount++;
     bySupplier.set(inv.supplierId, entry);
   }
 
-  const ready = [...bySupplier.values()].sort((a, b) => b.totalMinor - a.totalMinor);
+  for (const entry of bySupplier.values()) {
+    const credit = Math.max(0, options.creditBySupplier?.get(entry.supplierId) ?? 0);
+    const applied = Math.min(credit, entry.totalMinor);
+    entry.creditAppliedMinor = applied;
+    entry.totalMinor -= applied;
+  }
+
+  const all = [...bySupplier.values()];
+  const ready = all.filter((s) => s.totalMinor > 0).sort((a, b) => b.totalMinor - a.totalMinor);
+  const coveredByCredit = all.filter((s) => s.totalMinor === 0);
 
   return {
     month,
     ready,
+    coveredByCredit,
     readyTotalMinor: ready.reduce((s, r) => s + r.totalMinor, 0),
     held,
     heldTotalMinor: held.reduce((s, h) => s + (h.invoice.totalMinor - h.invoice.allocatedMinor), 0),

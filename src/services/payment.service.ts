@@ -22,7 +22,7 @@ export interface CreatePaymentInput {
   supplierId?: string | null;
   paidAt: Date;
   amountMinor: number;
-  method: "BANK_TRANSFER" | "CASH" | "EMPLOYEE_ADVANCE";
+  method: "BANK_TRANSFER" | "CASH" | "EMPLOYEE_ADVANCE" | "OWNER_ACCOUNT";
   beneficiaryNameRaw?: string | null;
   appliesToMonth?: string | null;
   /**

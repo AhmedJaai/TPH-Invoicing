@@ -219,7 +219,7 @@ reconciliation:    OPEN | IN_PROGRESS | RECONCILED | DISCREPANCY
 
 | | |
 |---|---|
-| النموذج المستعمل | `deepseek-v4-flash` نصّاً · `deepseek-v4-flash-vision-exp` رؤيةً · `deepseek-v4-pro` تحكيماً — مثبَّتة في `src/lib/ai/models.ts` |
+| النموذج المستعمل | `deepseek-flash` (V4.1، متعدّد الوسائط) نصّاً ورؤيةً · `deepseek-v4-pro` تحكيماً وتحليلاً — مثبَّتة في `src/lib/ai/models.ts` |
 | ما يفعله | **نسخ** حقول المستند نصّاً، لا أكثر |
 | ما لا يفعله | **لا يحسب شيئاً** · لا أدوات · لا وصول للقاعدة · لا وصول للدرايف |
 | المخرجات | مقيَّدة بمخطّط، ثمّ تُفحص بـzod، ثمّ يعيد الخادم حسابها |
@@ -361,8 +361,8 @@ npm run ops:isolation    # بصمةُ القاعدة — بمعرّف العنق
 ### المسار
 
 ```
-مستند ─► resolveDocumentInput ─┬─ نصّ PDF مقروء ─► deepseek-v4-flash
-                               ├─ صورة/مسح      ─► deepseek-v4-flash-vision-exp
+مستند ─► resolveDocumentInput ─┬─ نصّ PDF مقروء ─► deepseek-flash
+                               ├─ صورة/مسح      ─► deepseek-flash
                                └─ لا نصّ ولا صورة ─► «لم يُقرأ» (لا يُخمَّن)
         ─► تصنيف ─► مخطّط النوع ─► تحقّق zod ─► تحقّق حسابيّ
         ─► إعادة سؤالٍ موجَّهة عند الاختلال ─► اشتقاق الصافي حتمياً

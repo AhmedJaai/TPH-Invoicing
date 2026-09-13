@@ -16,6 +16,10 @@ import {
 } from "@/lib/supplier-health";
 import { buildSupplierAccount, describeAccount } from "@/lib/supplier-account";
 import { countNoun, INVOICE, MONTH, PRODUCT } from "@/lib/arabic";
+import { loadSupplierBalances } from "@/services/supplier-balance.service";
+import { listOpenFindings } from "@/services/supplier-analysis.service";
+import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
+import { formatRiyalsDisplay } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +81,29 @@ export default async function SupplierPage({
 
   const n = (k: string) => Number(stats?.[k] ?? 0);
   const billed = n("billed");
-  const balance = billed - n("paid");
+
+  /*
+    ما عليك له = فواتيره المفتوحة ناقصَ ما دفعتَه له ولم يُخصم من فاتورة.
+
+    كان «المسدَّد» التخصيصاتِ وحدها، فمالٌ دُفع ولم يُخصّص لا يُرى: غاناش
+    دُفع له ٢٩ ألفاً فوق فواتيره والصفحة تقول «يطالب بأكثر ممّا نعرف».
+  */
+  const [bal] = await loadSupplierBalances(db, s.id);
+  const balance = bal?.owedMinor ?? 0;
+  const creditLeft = bal?.creditLeftMinor ?? 0;
+  const paidNet = bal?.paidNetMinor ?? n("paid");
+
+  const canAnalyze = can(user.role, "supplier:edit");
+  const canApprove = can(user.role, "payment:approve");
+  const findings: FindingView[] = showAmounts
+    ? (await listOpenFindings(s.id)).map((f) => ({
+        id: f.id, supplierId: f.supplierId, supplierName: f.supplierName, supplierSlug: f.supplierSlug,
+        kind: f.kind, severity: f.severity, title: f.title, explanation: f.explanation,
+        amountMinor: f.amountMinor, action: f.action,
+        refs: f.refs.map((r) => ({ label: r.label, type: r.type })),
+        createdAt: f.createdAt.toISOString(),
+      }))
+    : [];
 
   /*
     ══ حسابُ المورّد: ما نعرفه مقابل ما يقول ══
@@ -90,7 +116,7 @@ export default async function SupplierPage({
   const reportedRaw = stats?.["reported_balance"];
   const account = buildSupplierAccount({
     billedMinor: billed,
-    paidMinor: n("paid"),
+    paidMinor: paidNet,
     reportedBalanceMinor: reportedRaw === null || reportedRaw === undefined
       ? null
       : Number(reportedRaw),
@@ -176,7 +202,13 @@ export default async function SupplierPage({
             label="المستحقّ له"
             minor={balance}
             tone={balance > 0 ? "warn" : "ok"}
-            sub={balance > 0 ? "عليك له" : "لا رصيد"}
+            sub={
+              creditLeft > 0
+                ? `لك عنده ${formatRiyalsDisplay(creditLeft)} دفعتَها بلا فاتورة`
+                : balance > 0
+                  ? "بعد خصم ما دفعتَه له"
+                  : "لا رصيد"
+            }
           />
           <Stat
             label="حال العلاقة"
@@ -210,7 +242,7 @@ export default async function SupplierPage({
               sub={
                 account.knownBalanceMinor === null
                   ? "لا فاتورة منه عندنا — وذلك ليس صفراً"
-                  : "المفوتر ناقص المسدَّد"
+                  : "المفوتر ناقص كلِّ ما دفعتَه له"
               }
             />
             <Stat
@@ -237,6 +269,20 @@ export default async function SupplierPage({
               sub={describeAccount(account)}
             />
           </div>
+        </Section>
+      )}
+
+      {showAmounts && canAnalyze && (
+        <Section
+          title="تحليل الذكاء"
+          hint="يقرأ فواتيره ودفعاته وكشوفه وحوالات البنك، ويقترح ما يصحّح حسابه. لا يُكتب شيءٌ حتى تُقرّه."
+          action={<RunAnalysis suppliers={[{ id: s.id, name: s.nameAr }]} label="حلّل حسابه" />}
+        >
+          {findings.length === 0 ? (
+            <p className="text-xs text-muted">لا اقتراحات مفتوحة. حلّل حسابه لترى ما يقوله التحليل.</p>
+          ) : (
+            <FindingsList findings={findings} canApprove={canApprove} showSupplier={false} />
+          )}
         </Section>
       )}
 

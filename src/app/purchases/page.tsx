@@ -7,6 +7,7 @@ import { Empty, PageShell } from "@/components/page-shell";
 import { HubGrid, type HubTile } from "@/components/hub";
 import { NoAccess } from "@/components/ui";
 import { SUPPLIER, countNoun } from "@/lib/arabic";
+import { loadBalanceTotals } from "@/services/supplier-balance.service";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,10 @@ export default async function PurchasesPage() {
     );
   }
 
+  /* «عليك» بالمورّد: فواتيره المفتوحة ناقصَ رصيدِنا عنده — مصدرٌ واحد */
+  const { totals: balanceTotals } = await loadBalanceTotals();
+  const owedMinor = balanceTotals.owedMinor;
+
   const [f] = (
     await db.execute<Record<string, number>>(sql`
       select
@@ -33,9 +38,6 @@ export default async function PurchasesPage() {
         (select count(*)::int from supplier_products where product_id is not null) as sp_mapped,
         (select count(distinct supplier_id)::int from invoices)                  as active_suppliers,
         (select count(distinct supplier_id)::int from statements)                as with_statements,
-        (select coalesce(sum(greatest(0, total_minor - coalesce((
-            select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = invoices.id
-          ),0))),0)::bigint from invoices)                                       as outstanding,
         (select count(*)::int from invoices where tax_status = 'INVALID')        as not_valid,
         (select count(*)::int from invoices where tax_status = 'UNKNOWN')        as unknown_tax
     `)
@@ -72,9 +74,9 @@ export default async function PurchasesPage() {
     {
       href: "/payments",
       title: "المستحقّ للمورّدين",
-      amountMinor: Number(f?.outstanding ?? 0),
+      amountMinor: owedMinor,
       detail: "غير مسدَّد للمورّدين",
-      tone: Number(f?.outstanding ?? 0) > 0 ? "warn" : "ok",
+      tone: owedMinor > 0 ? "warn" : "ok",
     },
     {
       href: "/statements",

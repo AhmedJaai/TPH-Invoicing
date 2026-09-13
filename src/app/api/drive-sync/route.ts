@@ -32,6 +32,8 @@ import { parseRiyals } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
 import { recordAudit } from "@/lib/audit";
 import { findPaymentTwin } from "@/services/payment.service";
+import { applySupplierCredit } from "@/services/supplier-credit.service";
+import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { canonicalName } from "@/lib/canonical-name";
 import { MONTH, countNoun } from "@/lib/arabic";
 
@@ -534,6 +536,9 @@ export async function POST(request: Request) {  let user;
             supplierId: supplier.id,
           });
         }
+
+        /* مالٌ دُفع لهذا المورّد قبل وصول فاتورته يُخصم منها — كما في الرفع */
+        await applySupplierCredit(tx, supplier.id, { forwardDays: SETTLEMENT_FORWARD_DAYS });
       });
     }
   }

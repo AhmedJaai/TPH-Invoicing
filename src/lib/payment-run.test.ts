@@ -167,3 +167,21 @@ describe("المجهول لا يُسدَّد ولا يُطالَب صاحبه", 
     expect(run.vatAtRiskMinor).toBe(0);
   });
 });
+
+describe("دفعة أوّل الشهر — رصيدٌ لنا عند المورّد", () => {
+  it("يُخصم الرصيد من دفعة صاحبه وحده، ولا يُحوَّل ما يغطّيه", () => {
+    const run = buildPaymentRun([
+      inv({ invoiceId: "1", supplierId: "loreva", supplierName: "لوريفا", totalMinor: 101_200 }),
+      inv({ invoiceId: "2", supplierId: "olive", supplierName: "أوراق الزيتون", totalMinor: 70_000 }),
+      inv({ invoiceId: "3", supplierId: "kohi", supplierName: "كوهي", totalMinor: 50_000 }),
+    ], "2026-08", { creditBySupplier: new Map([["loreva", 63_250], ["kohi", 83_375]]) });
+
+    const loreva = run.ready.find((s) => s.supplierId === "loreva")!;
+    expect(loreva.totalMinor).toBe(37_950);
+    expect(loreva.creditAppliedMinor).toBe(63_250);
+    expect(run.ready.find((s) => s.supplierId === "olive")!.creditAppliedMinor).toBe(0);
+    expect(run.coveredByCredit.map((s) => s.supplierId)).toEqual(["kohi"]);
+    expect(run.readyTotalMinor).toBe(37_950 + 70_000);
+    expect(toBankTransferCsv(run)).not.toContain("كوهي");
+  });
+});

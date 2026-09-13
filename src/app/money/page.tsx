@@ -7,6 +7,7 @@ import { Empty, Money, PageShell } from "@/components/page-shell";
 import { HubGrid, type HubTile } from "@/components/hub";
 import { Figure } from "@/components/figure";
 import { gatherHomeProvenance } from "@/lib/provenance-facts";
+import { loadBalanceTotals } from "@/services/supplier-balance.service";
 
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { NoAccess } from "@/components/ui";
@@ -27,15 +28,16 @@ export default async function MoneyPage() {
 
   const prov = await gatherHomeProvenance();
 
+  /* «عليك» بالمورّد: فواتيره المفتوحة ناقصَ رصيدِنا عنده — مصدرٌ واحد */
+  const { totals: balanceTotals } = await loadBalanceTotals();
+  const owedMinor = balanceTotals.owedMinor;
+
   const [f] = (
     await db.execute<Record<string, number>>(sql`
       select
         (select count(*)::int from bank_transactions)                            as tx,
         (select count(*)::int from bank_transactions where category='UNKNOWN')   as unclassified,
         (select count(*)::int from bank_imports)                                 as imports,
-        (select coalesce(sum(greatest(0, total_minor - coalesce((
-            select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = invoices.id
-          ),0))),0)::bigint from invoices)                                       as outstanding,
         (select coalesce(sum(vat_minor),0)::bigint from invoices
            where input_vat_status='ELIGIBLE')                                    as recoverable,
         (select coalesce(sum(vat_minor),0)::bigint from invoices
@@ -79,9 +81,9 @@ export default async function MoneyPage() {
       */
       href: "/purchases/invoices",
       title: "المستحقّ للمورّدين",
-      amountMinor: Number(f?.outstanding ?? 0),
+      amountMinor: owedMinor,
       detail: `على فواتير لم تُسدَّد · ${f?.payments ?? 0} دفعة مسجّلة`,
-      tone: Number(f?.outstanding ?? 0) > 0 ? "warn" : "ok",
+      tone: owedMinor > 0 ? "warn" : "ok",
     },
     {
       href: "/performance",

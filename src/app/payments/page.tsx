@@ -10,6 +10,7 @@ import { previousMonth } from "@/lib/filing";
 import { MarkSupplierPaid } from "@/components/payment-run-actions";
 import { countNoun, INVOICE, SUPPLIER } from "@/lib/arabic";
 import { NoAccess } from "@/components/ui";
+import { loadSupplierBalances } from "@/services/supplier-balance.service";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,10 @@ export default async function PaymentsPage({
     .leftJoin(paymentAllocations, eq(paymentAllocations.invoiceId, invoices.id))
     .groupBy(invoices.id, suppliers.nameAr);
 
+  /* رصيدٌ لنا عند كلّ مورّد — يُخصم من دفعته فلا يُحوَّل الريال مرّتين */
+  const balances = await loadSupplierBalances();
+  const creditBySupplier = new Map(balances.map((b) => [b.supplierId, b.creditMinor]));
+
   const run = buildPaymentRun(
     rows.map<PayableInvoice>((r) => ({
       invoiceId: r.invoiceId,
@@ -67,6 +72,7 @@ export default async function PaymentsPage({
       vatMinor: r.vatMinor,
     })),
     month,
+    { creditBySupplier },
   );
 
   const heldBySupplier = new Map<string, typeof run.held>();
@@ -144,14 +150,40 @@ export default async function PaymentsPage({
                     </li>
                   ))}
                 </ul>
-                <MarkSupplierPaid
-                  supplierName={s.supplierName}
-                  invoiceIds={s.invoices.map((i) => i.invoiceId)}
-                  totalMinor={s.totalMinor}
-                />
+                {s.creditAppliedMinor > 0 ? (
+                  <p className="mt-2 text-xs leading-relaxed text-ink-soft">
+                    خُصم <Money minor={s.creditAppliedMinor} /> رصيداً لك عنده دفعتَه ولم يُخصم من فاتورة —
+                    فحوِّل الباقي وحده، ثمّ اخصم الرصيد من «تحليل الذكاء».
+                  </p>
+                ) : (
+                  <MarkSupplierPaid
+                    supplierName={s.supplierName}
+                    invoiceIds={s.invoices.map((i) => i.invoiceId)}
+                    totalMinor={s.totalMinor}
+                  />
+                )}
               </article>
             ))}
           </div>
+        </section>
+      )}
+
+      {run.coveredByCredit.length > 0 && (
+        <section className="mt-10">
+          <h2 className="mb-1 text-base font-bold">يغطّيها رصيدُك عندهم</h2>
+          <p className="mb-3 text-xs text-muted">
+            دفعتَ لهؤلاء مالاً لم يُخصم بعد، ويكفي لفواتير الشهر كلّها — فلا تحوِّل لهم شيئاً.
+          </p>
+          <ul className="space-y-2">
+            {run.coveredByCredit.map((s) => (
+              <li key={s.supplierId} className="flex items-baseline justify-between gap-3 rounded-2xl border border-ok/40 bg-ok-bg px-4 py-3 text-sm">
+                <span className="font-bold">{s.supplierName}</span>
+                <span className="text-xs text-ink-soft">
+                  رصيدك يغطّي <Money minor={s.creditAppliedMinor} />
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

@@ -27,6 +27,8 @@ import {
 import { createInvoice, createStatement, replaceLines } from "@/services/invoice.service";
 import { parseStatementExtras } from "@/lib/extraction/statement-extras";
 import { createPayment } from "@/services/payment.service";
+import { applySupplierCredit } from "@/services/supplier-credit.service";
+import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import type { RawLine } from "@/services/types";
 
 export const runtime = "nodejs";
@@ -238,6 +240,14 @@ export async function POST(request: Request) {
             subtotalMinor,
             lines: body.lines ?? [],
           });
+
+          /*
+            مالٌ دفعتَه لهذا المورّد قبل وصول فاتورته يُخصم منها الآن.
+            وكان لا يُخصم أبداً: الحوالة تُوزَّع يوم قيدها على ما هو مفتوح
+            يومئذٍ، فتصل الفاتورة بعدها «مستحقّة» والمال عند المورّد.
+            والنافذة سبعة أيّام — ما جاوزها قرارُ إنسان.
+          */
+          await applySupplierCredit(tx, body.supplierId, { forwardDays: SETTLEMENT_FORWARD_DAYS });
         }
       }
 
