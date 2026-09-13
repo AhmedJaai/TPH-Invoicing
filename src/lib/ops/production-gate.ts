@@ -56,6 +56,7 @@ export const GATE_ORDER: readonly string[] = [
   "drive_integrity",
   "preview_isolation",
   "security_scan",
+  "backup_restore",
   "end_to_end_tests",
   "real_data_verification",
 ];
@@ -68,6 +69,7 @@ export const GATE_LABEL: Record<string, string> = {
   invoice_lifecycle: "دورة حياة الفاتورة",
   payment_lifecycle: "دورة حياة الدفعة",
   supplier_statements: "كشوف المورّدين",
+  backup_restore: "النسخة الاحتياطيّة واستعادتها",
   month_close: "إقفال الشهر",
   review_workflow: "مسار المراجعة",
   audit_trail: "سجلّ التدقيق",

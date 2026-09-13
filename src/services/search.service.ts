@@ -25,7 +25,22 @@ export interface SearchResult {
   hits: SearchHit[];
 }
 
-export async function search(raw: string): Promise<SearchResult> {
+/**
+ * ما يُسمح لقارئ النتائج أن يراه.
+ *
+ * كان البحث محروساً بـ`document:view` وحدها ثمّ يُرجع حركات البنك
+ * ومبالغ الفواتير لكلّ دور — فمدير المشتريات، وقد مُنع من الأرقام ومن
+ * البنك في كلّ شاشة، يجدها كلّها من خانة البحث.
+ */
+export interface SearchAccess {
+  amounts: boolean;
+  bank: boolean;
+}
+
+export async function search(
+  raw: string,
+  access: SearchAccess = { amounts: true, bank: true },
+): Promise<SearchResult> {
   const intent = parseSearch(raw);
   if (!intent) return { intent: null, hits: [] };
 
@@ -35,10 +50,11 @@ export async function search(raw: string): Promise<SearchResult> {
   if (intent.targets.includes("invoices")) jobs.push(findInvoices(intent, like));
   if (intent.targets.includes("suppliers")) jobs.push(findSuppliers(intent, like));
   if (intent.targets.includes("products")) jobs.push(findProducts(like));
-  if (intent.targets.includes("bankTransactions")) jobs.push(findBankTx(intent, like));
+  if (access.bank && intent.targets.includes("bankTransactions")) jobs.push(findBankTx(intent, like));
   if (intent.targets.includes("documents")) jobs.push(findDocuments(intent, like));
 
-  const hits = (await Promise.all(jobs)).flat();
+  const hits = (await Promise.all(jobs)).flat()
+    .map((h) => (access.amounts ? h : { ...h, amountMinor: undefined }));
   return { intent, hits: rankHits(hits, intent.kind) };
 }
 
@@ -203,7 +219,7 @@ async function findBankTx(intent: SearchIntent, like: string): Promise<SearchHit
       r.direction === "DEBIT" ? "صادر" : "وارد"
     }${r.category === "UNKNOWN" ? " · غير مصنَّفة" : ""}`,
     amountMinor: r.amount,
-    href: "/bank",
+    href: `/bank?tx=${r.id}`,
   }));
 }
 

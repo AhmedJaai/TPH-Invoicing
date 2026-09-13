@@ -7,12 +7,14 @@
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import { search } from "@/services/search.service";
+import { can } from "@/lib/permissions";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  let user;
   try {
-    await guard("search", "document:view");
+    user = await guard("search", "document:view");
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
@@ -24,6 +26,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ hits: [], intent: null });
   }
 
-  const { intent, hits } = await search(q);
+  const { intent, hits } = await search(q, {
+    amounts: can(user.role, "amounts:view"),
+    bank: can(user.role, "bank:view"),
+  });
   return NextResponse.json({ intent: intent?.kind ?? null, hits });
 }

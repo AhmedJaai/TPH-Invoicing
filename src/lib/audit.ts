@@ -6,6 +6,7 @@
  */
 import { db } from "@/db";
 import { auditLogs } from "@/db/schema";
+import { previewAllowed } from "./preview-mode";
 
 /**
  * مقبض الكتابة: القاعدة أو معاملةٌ جارية.
@@ -67,7 +68,18 @@ export async function recordAudit(entry: {
     entityType: entry.entityType,
     entityId: entry.entityId,
     before: (entry.before ?? null) as never,
-    after: (entry.after ?? null) as never,
+    /*
+      وضعُ التجربة يستعير معرّف المالك لأنّ القيود مقيَّدةٌ بمفتاحٍ أجنبيّ —
+      فيُوسَم القيد كي لا يُقرأ فعلاً وقع من المالك نفسه.
+    */
+    after: (previewAllowed(process.env)
+      ? {
+          ...(entry.after && typeof entry.after === "object" && !Array.isArray(entry.after)
+            ? entry.after as Record<string, unknown>
+            : { القيمة: entry.after ?? null }),
+          "وضع التجربة": true,
+        }
+      : entry.after ?? null) as never,
   });
 }
 

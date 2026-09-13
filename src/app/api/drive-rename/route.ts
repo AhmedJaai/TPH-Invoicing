@@ -17,13 +17,14 @@
  *      الاسم بنفسه** ولا يأخذه من المتصفّح.
  */
 import { NextResponse } from "next/server";
-import { and, eq, ne } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, documents, invoices, statements, suppliers } from "@/db/schema";
+import { documents, invoices, statements, suppliers } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { driveForUser, renameFile } from "@/lib/drive";
 import { canonicalName, type NamedDocument } from "@/lib/canonical-name";
 import { recordAudit } from "@/lib/audit";
+import { refreshTokenFor } from "@/services/drive.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -136,19 +137,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "لم تُختَر ملفّات" }, { status: 400 });
   }
 
-  const [tokenRow] = await db
-    .select({ token: accounts.refresh_token })
-    .from(accounts)
-    .where(and(eq(accounts.userId, user.id), eq(accounts.provider, "google")))
-    .limit(1);
+  /* وضعُ التجربة لا يحمل تفويضاً — لا يُسمّى ملفٌّ في الأرشيف الحقيقيّ منه */
+  const token = await refreshTokenFor(user.id);
 
-  if (!tokenRow?.token) {
+  if (!token) {
     return NextResponse.json(
       { error: "لا يوجد تفويض درايف لحسابك. سجّل الخروج ثم الدخول ووافق على صلاحية الدرايف." },
       { status: 428 },
     );
   }
-  const drive = driveForUser(tokenRow.token);
+  const drive = driveForUser(token);
 
   /*
     الخادم يعيد اشتقاق الاسم ولا يأخذه من المتصفّح.

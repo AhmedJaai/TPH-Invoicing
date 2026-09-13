@@ -36,6 +36,8 @@ import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { canonicalName } from "@/lib/canonical-name";
 import { MONTH, countNoun } from "@/lib/arabic";
+import { withDeadline } from "@/lib/ai/deadline";
+import { consume } from "@/services/rate-limit.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -105,7 +107,8 @@ async function loadSuppliers(): Promise<SupplierRecord[]> {
   }));
 }
 
-export async function POST(request: Request) {  let user;
+async function handle(request: Request) {
+  let user;
   try {
     user = await guard("drive-sync", "document:upload");
   } catch (e) {
@@ -346,6 +349,14 @@ export async function POST(request: Request) {  let user;
   const quotations: string[] = [];
 
   if (body.readContent) {
+    try {
+      await consume("drive-sync-content", user.id);
+    } catch (e) {
+      const mapped = respondTo(e);
+      if (mapped) return mapped;
+      throw e;
+    }
+
     for (const entry of unnamed.slice(0, MAX_CONTENT_PER_CALL)) {
       /*
         الوقوف قبل بدء ملفٍّ لا في وسطه: الاستخراج يستغرق ما يستغرق،
@@ -604,4 +615,9 @@ export async function POST(request: Request) {  let user;
     quotations,
     renameSuggestions,
   });
+}
+
+/* النداءات تحت عمر المسار — تقف بمهلةٍ معلَنة قبل أن تقتلها المنصّة */
+export async function POST(request: Request) {
+  return withDeadline(55_000, () => handle(request));
 }

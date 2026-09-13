@@ -27,7 +27,8 @@ import {
 import { createInvoice, createStatement, replaceLines } from "@/services/invoice.service";
 import { parseStatementExtras } from "@/lib/extraction/statement-extras";
 import { createPayment, findPaymentTwin } from "@/services/payment.service";
-import { payments } from "@/db/schema";
+import { extractionCache, payments } from "@/db/schema";
+import { can, ForbiddenError } from "@/lib/permissions";
 import { eq } from "drizzle-orm";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
@@ -42,7 +43,32 @@ export const runtime = "nodejs";
  * فيمرّ ما لم يُقرأ أصلاً. والنوع كان يُصدَّق من المتصفّح ويُمرَّر إلى
  * درايف كما هو، فيمكن أن يُحفظ ملفٌ بنوعٍ يخالف محتواه.
  */
-const MAX_ARCHIVE_BYTES = 25 * 1024 * 1024;
+/*
+  الملفّ يُرسَل base64 داخل JSON (زيادة الثلث)، وحدّ المنصّة للجسم ٤٫٥
+  ميجابايت. فالحدّ ٣ ميجابايت للملفّ، ويُفحَص طولُ الجسم قبل تحليله.
+*/
+const MAX_ARCHIVE_BYTES = 3 * 1024 * 1024;
+const MAX_BODY_BYTES = Math.ceil(MAX_ARCHIVE_BYTES * 1.4) + 256 * 1024;
+
+/**
+ * البايتات الأولى تطابق النوع المعلَن — لا يُصدَّق المتصفّح في نوع الملفّ.
+ */
+function signatureMatches(mimeType: string, data: Buffer): boolean {
+  const head = data.subarray(0, 16);
+  const hex = head.toString("hex");
+  if (mimeType === "application/pdf") return head.subarray(0, 5).toString("latin1") === "%PDF-";
+  if (mimeType === "image/jpeg") return hex.startsWith("ffd8ff");
+  if (mimeType === "image/png") return hex.startsWith("89504e470d0a1a0a");
+  if (mimeType === "image/gif") return head.subarray(0, 4).toString("latin1") === "GIF8";
+  if (mimeType === "image/webp") {
+    return head.subarray(0, 4).toString("latin1") === "RIFF" && head.subarray(8, 12).toString("latin1") === "WEBP";
+  }
+  if (mimeType === "image/heic" || mimeType === "image/heif") return head.subarray(4, 8).toString("latin1") === "ftyp";
+  return false;
+}
+
+/** اسمٌ لا يصعد مجلّداً ولا يُنشئ مسارات. */
+const SAFE_NAME = /^(?!\.{1,2}$)[^/\\\u0000-\u001f]{1,160}$/;
 
 const ARCHIVABLE_TYPES: readonly string[] = [
   "application/pdf",
@@ -100,12 +126,23 @@ function toResponse(e: unknown): NextResponse | null {
     );
   }
   if (e instanceof DriveUnavailableError) return NextResponse.json({ error: e.message }, { status: 502 });
+  /* سباقُ رفعين للملفّ نفسه: القيدُ الفريد ردّ الثاني — خبرٌ لا عطب */
+  const code = (e as { code?: string; cause?: { code?: string } }).code ?? (e as { cause?: { code?: string } }).cause?.code;
+  if (code === "23505") {
+    return NextResponse.json({ error: "رُفع هذا الملف أو هذه الفاتورة للتوّ من نافذةٍ أخرى — لم يُقيَّد ثانيةً" }, { status: 409 });
+  }
   return null;
 }
 
 export async function POST(request: Request) {
   try {
     const user = await guard("archive", "document:upload");
+
+    /* يُردّ الجسم الكبير قبل أن يُحلَّل كلّه في الذاكرة */
+    const declared = Number(request.headers.get("content-length") ?? "0");
+    if (declared > MAX_BODY_BYTES) {
+      throw new InvalidInputError(`الملف أكبر من ${MAX_ARCHIVE_BYTES / (1024 * 1024)} ميجابايت — صغّره ثمّ أعد المحاولة`);
+    }
 
     let body: ArchiveBody;
     try {
@@ -122,13 +159,24 @@ export async function POST(request: Request) {
       throw new InvalidInputError(`نوع الملف غير مقبول: ${body.mimeType}`);
     }
 
-    let data: Buffer;
-    try {
-      data = Buffer.from(body.fileBase64, "base64");
-    } catch {
-      throw new InvalidInputError("محتوى الملف غير صالح");
+    if (!SAFE_NAME.test(body.fileName) || !SAFE_NAME.test(body.folderName)) {
+      throw new InvalidInputError("اسم الملف أو المجلد فيه ما لا يُقبل");
     }
+
+    /* `Buffer.from(…, "base64")` لا يرمي أبداً — فالتحقّق بالبايتات لا بـ`try` */
+    const data = Buffer.from(typeof body.fileBase64 === "string" ? body.fileBase64 : "", "base64");
     if (data.length === 0) throw new InvalidInputError("الملف فارغ");
+    if (!signatureMatches(body.mimeType, data)) {
+      throw new InvalidInputError("محتوى الملف لا يطابق نوعه المعلَن");
+    }
+
+    /*
+      إيصالُ السداد يُنشئ دفعة — كتابةُ مالٍ بصلاحية الرفع وحدها. ومدير
+      المشتريات مُنع من الأرقام في كلّ شاشة ثمّ يُنشئ دفعةً من هنا.
+    */
+    if (PAYMENT_KINDS.has(body.documentKind) && !can(user.role, "payment:approve")) {
+      throw new ForbiddenError("payment:approve");
+    }
     if (data.length > MAX_ARCHIVE_BYTES) {
       throw new InvalidInputError(
         `الملف أكبر من ${MAX_ARCHIVE_BYTES / (1024 * 1024)} ميجابايت`,
@@ -171,6 +219,18 @@ export async function POST(request: Request) {
     // ── فحوص تسبق أي كتابة ──
     const sha256 = sha256Of(data);
     await assertNotDuplicate(sha256);
+
+    /*
+      ما قرأه النموذج من الخادم لا من المتصفّح: أسطر الكشف ورصيده و«ما
+      عُدِّل يدوياً» في التدقيق تُبنى منه. وإن غاب (ملفٌّ لم يُقرأ في هذا
+      الخادم) فلا أسطر ولا دعوى — لا يُصدَّق ما أُرسل بدلاً منه.
+    */
+    const [cached] = await db
+      .select({ extraction: extractionCache.extraction, model: extractionCache.model })
+      .from(extractionCache)
+      .where(eq(extractionCache.sha256, sha256))
+      .limit(1);
+    const serverRaw = (cached?.extraction ?? null) as Record<string, unknown> | null;
     await assertMonthOpen(periodMonth);
 
     const subtotalMinor = parseRiyals(body.subtotal ?? "");
@@ -211,9 +271,9 @@ export async function POST(request: Request) {
         kind: body.documentKind,
         periodMonth,
         supplierId: body.supplierId,
-        rawExtraction: body.rawExtraction,
-        extractionModel: body.extractionModel,
-        fieldConfidence: (body.rawExtraction as { confidence?: unknown } | undefined)?.confidence,
+        rawExtraction: serverRaw ?? undefined,
+        extractionModel: cached?.model ?? undefined,
+        fieldConfidence: (serverRaw as { confidence?: unknown } | null)?.confidence,
         uploadedById: user.id,
       });
 
@@ -262,7 +322,7 @@ export async function POST(request: Request) {
           وكانا يُهمَلان تماماً، فيُحفَظ الكشف برصيدٍ ختاميّ وحده وبلا
           سطر — فلا يُطابَق أبداً.
         */
-        const parsed = parseStatementExtras(body.rawExtraction);
+        const parsed = parseStatementExtras(serverRaw);
         await createStatement(tx, {
           documentId: docId,
           supplierId: body.supplierId,
@@ -314,7 +374,7 @@ export async function POST(request: Request) {
       return docId;
     });
 
-    const corrections = diffCorrections(body.rawExtraction ?? {}, {
+    const corrections = diffCorrections(serverRaw ?? {}, {
       invoiceNumber: body.invoiceNumber ?? "",
       invoiceDate: body.invoiceDate ?? "",
       totalAmount: body.total ?? "",
@@ -326,7 +386,7 @@ export async function POST(request: Request) {
       action: "DOCUMENT_ARCHIVED",
       entityType: "document",
       entityId: documentId,
-      before: body.rawExtraction ?? null,
+      before: serverRaw,
       after: {
         fileName: uploaded.fileName,
         driveFileId: uploaded.fileId,

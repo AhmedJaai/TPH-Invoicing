@@ -9,7 +9,8 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
-import { selectedProviderName } from "@/lib/extraction/provider";
+import { activeProviderName } from "@/lib/extraction";
+import { deepseekBaseUrl, deepseekKey } from "@/lib/ai/models";
 import { isAuthBypassed } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -50,7 +51,7 @@ export async function GET() {
     database = { ok: false, error: (e as Error).message.slice(0, 160) };
   }
 
-  const provider = selectedProviderName();
+  const provider = activeProviderName();
   const providerKeyPresent =
     provider === "deepseek"
       ? Boolean(process.env.DEEPSEEK_API_KEY)
@@ -83,6 +84,24 @@ export async function GET() {
     checks.google.clientConfigured &&
     checks.drive.foldersConfigured;
 
+  /*
+    وجودُ المفتاح غيرُ صلاحيّته. كان الفحص يقول «سليم» والرصيدُ صفر أو
+    المفتاح مُلغى — فلا يُعرف العطب إلّا حين تسقط أوّل فاتورة. فللمخوَّل
+    وحده (لئلّا يُستنزَف بطلباتٍ مجهولة) يُسأل المزوّد: أيعرف هذا المفتاح؟
+  */
+  let providerReachable: { ok: boolean; status?: number; error?: string } | undefined;
+  if (detailed && provider === "deepseek" && providerKeyPresent) {
+    try {
+      const res = await fetch(`${deepseekBaseUrl()}/models`, {
+        headers: { Authorization: `Bearer ${deepseekKey()}` },
+        signal: AbortSignal.timeout(5_000),
+      });
+      providerReachable = { ok: res.ok, status: res.status };
+    } catch (e) {
+      providerReachable = { ok: false, error: (e as Error).name };
+    }
+  }
+
   if (!detailed) {
     return NextResponse.json(
       { healthy, at: new Date().toISOString() },
@@ -91,7 +110,7 @@ export async function GET() {
   }
 
   return NextResponse.json(
-    { healthy, checks, at: new Date().toISOString() },
+    { healthy: healthy && (providerReachable?.ok ?? true), checks: { ...checks, providerReachable }, at: new Date().toISOString() },
     { status: healthy ? 200 : 503 },
   );
 }

@@ -77,6 +77,8 @@ export const RULES: Record<string, RateLimitRule> = {
     ويبقى العدّاد قائماً على ما سواها.
   */
   "drive-sync": { limit: Number.MAX_SAFE_INTEGER, windowSeconds: 3600 },
+  /* قراءةُ المحتوى تكلّف نداءات نموذج — المشي بلا حدّ، والقراءة بحدّ */
+  "drive-sync-content": { limit: 120, windowSeconds: 3600 },
   "bank-import": { limit: 12, windowSeconds: 3600 },
   /*
     كان عشرة في الساعة، وزرُّه في كلّ صفّ من قائمة الفواتير: فالحادية

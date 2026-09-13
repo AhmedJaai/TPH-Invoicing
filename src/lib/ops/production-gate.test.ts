@@ -57,6 +57,6 @@ describe("بوّابة الإنتاج", () => {
   });
 
   it("والبنود خمسة عشر — كما طُلبت", () => {
-    expect(GATE_ORDER).toHaveLength(15);
+    expect(GATE_ORDER).toHaveLength(16);
   });
 });

@@ -19,6 +19,7 @@
  * والأوّل يُصلحه أحمد بنفسه ولا ينتظر أحداً.
  */
 import { createHash } from "node:crypto";
+import { attemptTimeout, currentDeadline } from "./deadline";
 import {
   deepseekBaseUrl,
   deepseekKey,
@@ -93,6 +94,8 @@ export interface DeepseekCall {
   /** سقفُ انتظارٍ لكلّ محاولة. المزوّد قد يصمت، والصمت أسوأ من الخطأ. */
   timeoutMs?: number;
   signal?: AbortSignal;
+  /** موعدٌ لا يُتجاوَز (ms منذ epoch) — وإن غاب يُقرأ من `withDeadline` في المسار. */
+  deadlineAt?: number;
   /**
    * أيفكّر النموذج قبل أن يجيب؟
    *
@@ -205,8 +208,19 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
       وجب أن ينقطع النداء، وإلّا بقي معلَّقاً يستهلك اتصالاً بعد أن
       انصرف صاحبه.
     */
+    const budget = attemptTimeout(call.timeoutMs ?? DEFAULT_TIMEOUT_MS, call.deadlineAt ?? currentDeadline());
+    if (budget === null) {
+      return {
+        ok: false, kind: "AI_UNAVAILABLE",
+        reason: lastReason
+          ? `${lastReason} — ولم يبقَ من عمر الطلب ما يكفي لمحاولةٍ أخرى`
+          : "لم يبقَ من عمر الطلب ما يكفي لنداء القارئ — أُوقف بمهلةٍ معلَنة، أعد المحاولة",
+        model, task: call.task, durationMs: Date.now() - started, attempts: attempt - 1,
+        ...(lastStatus !== undefined ? { status: lastStatus } : {}),
+      };
+    }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), call.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), budget);
     const onAbort = () => controller.abort();
     call.signal?.addEventListener("abort", onAbort);
 
@@ -221,7 +235,7 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
     } catch (e) {
       lastReason =
         (e as Error).name === "AbortError"
-          ? `تجاوز النداء المهلة (${(call.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000} ثانية)`
+          ? `تجاوز النداء المهلة (${Math.round(budget / 1000)} ثانية)`
           : `تعذّر الوصول إلى المزوّد: ${(e as Error).message}`;
       if (attempt < MAX_ATTEMPTS) {
         await wait(retryBaseMs() * 2 ** (attempt - 1));

@@ -10,6 +10,7 @@ import { accounts } from "@/db/schema";
 import { driveConfig } from "@/config/drive";
 import { driveForUser, existingNamesIn, findOrCreateFolder, uploadFile } from "@/lib/drive";
 import { resolveNameCollision } from "@/lib/naming";
+import { previewAllowed } from "@/lib/preview-mode";
 
 /** خطأ يُترجم في الواجهة إلى ٤٢٨: لا تفويض درايف لهذا المستخدم. */
 export class NoDriveAuthorizationError extends Error {
@@ -37,6 +38,11 @@ export class UnknownYearError extends Error {
 
 /** تفويض الدرايف الخاصّ بالمستخدم — الرفع بصلاحيته هو ما يجعل سجلّ الدرايف صادقاً. */
 export async function refreshTokenFor(userId: string): Promise<string | null> {
+  /*
+    وضعُ التجربة يستعير معرّف المالك — فكان يستعير تفويضَ درايفه معه،
+    ويرفع إلى الأرشيف الحقيقيّ باسمه من بيئةٍ بلا دخول. فلا تفويض فيه.
+  */
+  if (previewAllowed(process.env)) return null;
   const [row] = await db
     .select({ token: accounts.refresh_token })
     .from(accounts)

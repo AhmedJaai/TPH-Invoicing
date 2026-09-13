@@ -34,7 +34,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 
 **النشر:** Vercel `tph4/tph-invoicing` · GitHub `AhmedJaai/TPH-Invoicing` · الفرع `main`.
 
-## القاعدة — ٤٠ جدولاً
+## القاعدة — ٤١ جدولاً
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` · `payments` `payment_allocations`
@@ -43,7 +43,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 `audit_logs` `rate_limits` `expenses`
 `counterparties` `counterparty_evidence` · `branches` `bank_accounts` `reconciliation_periods`
 `sale_payments` `refunds` `refund_lines` `settlement_batches`
-`adjudications` `decision_history` · `ai_findings`
+`adjudications` `decision_history` · `ai_findings` · `extraction_cache`
 
 التعريف في `src/db/schema.ts`.
 
@@ -84,6 +84,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | `027_owner_account_and_ai_findings.sql` | `OWNER_ACCOUNT` طريقةَ سداد، وجدول `ai_findings` لاقتراحات تحليل الذكاء وقرار الإنسان فيها |
 | `028_month_lock.sql` | الشهر المقفل لا يُكتب فيه: مؤثِّرات على الفواتير والدفعات والتخصيصات — وتحديث الحال مقبول |
 | `029_ops_indexes.sql` | فهارس ناقصة: `payment_allocations.invoice_id` و`matched_payment_id` و`bank_import_id` و`user_id` |
+| `030_extraction_cache.sql` | `extraction_cache` — ما قرأه النموذج بيد الخادم ببصمة الملفّ، لا من المتصفّح |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 
@@ -123,6 +124,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | `src/lib/bank/parsers/detect.ts` | كشف البنك من الملفّ — و`\b` لا تفصل عند `_` وأسماء الملفّات مليئة بها |
 | `src/lib/bank/parsers/pdf-text.ts` | نصّ PDF ومواضعه — ولا يُرمى ملفٌّ كامل إلى نموذج |
 | `src/lib/ai/models.ts` | النموذج يتبع المهمّة — وموضعٌ واحد لأسمائها، فلا سلسلةٌ حرفيّة تُكتب مرّةً ولا يُسأل عنها |
+| `src/lib/ai/deadline.ts` | `withDeadline` — المسار يعلن عمره، وكلّ محاولة نداءٍ تأخذ ما بقي منه. **مسارٌ جديد يستدعي الذكاء يُلفّ بها** |
 | `src/lib/ai/deepseek.ts` | النداء: مهلةٌ معلَنة، وإعادةٌ على العابر وحده، و**عطبٌ مصنَّف** — الرصيد الناضب غير انقطاع الشبكة |
 | `src/lib/ai/document-input.ts` | كيف يبلغ المستندُ النموذج: نصّاً يُقرأ حسابياً، أو صورةً تُنتزَع، أو **لا يُقرأ فيُعلَن** |
 | `src/lib/ai/pdf-images.ts` | ينتزع JPEG المضمَّن — الماسح وضعه في الملفّ كما هو، فلا يُرسَم ولا تُضاف حزمة |
@@ -322,7 +324,8 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 ## المصائد المعروفة
 
 - **الأسماء القديمة `deepseek-v4-flash` و`deepseek-v4-flash-vision-exp` سُحبت** (١٠ سبتمبر ٢٠٢٦) وتُوجَّه إلى `deepseek-flash` مؤقّتاً. ومتغيّرات `DEEPSEEK_*_MODEL` في Vercel كانت تحملها فتغلب الافتراضيّ بصمت — أُزيلت، والافتراضيّ في `models.ts` هو المصدر.
-- **جيميني ما زال في الشيفرة، خاملاً.** لم يُحذَف لأنّ حذفه مشروطٌ باجتياز القياس على مستندات حقيقية، ولم يُقَس بعد. ولا احتياط إليه: المتغيّرات كلّها `deepseek`.
+- **ما قرأه النموذج لا يُؤخذ من المتصفّح** — `/api/analyze` يحفظه في `extraction_cache` ببصمة الملفّ، و`/api/archive` يقرؤه منها. من يضيف حقلاً يُبنى من القراءة يقرؤه من هناك.
+- **جيميني ما زال في الشيفرة، خاملاً** — ولا يُختار إلّا بـ`EXTRACTION_ALLOW_ALT_PROVIDER=true` فوق `EXTRACTION_PROVIDER`. لم يُحذَف لأنّ حذفه مشروطٌ باجتياز القياس على مستندات حقيقية، ولم يُقَس بعد. ولا احتياط إليه: المتغيّرات كلّها `deepseek`.
 - **حصّة Gemini المجانية = ٢٠ طلباً/اليوم لكل نموذج** (لا في الدقيقة). لذلك تدوير سبعة نماذج.
 - **الطبقة المجانية تتدرّب على الفواتير ويراجعها بشر.** التبديل سطر: `EXTRACTION_PROVIDER=claude`.
 - **`AUTH_BYPASS`** يفتح كل الأبواب في التطوير، ولا يعمل في الإنتاج مهما فُعِّل — الحارس مزدوج في `src/lib/preview-mode.ts`.
@@ -338,7 +341,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 
 ## الأوامر
 
-`npm test` (١٧١٤ اختباراً · ٩٩ ملفاً) · `npm run typecheck` · `npm run lint`
+`npm test` (١٧٢٠ اختباراً · ٩٨ ملفاً) · `npm run typecheck` · `npm run lint`
 `npm run db:migrate` · `db:verify` · `db:dedupe` · `db:rematch` · `db:reclassify` · `db:learn` · `db:link` · `db:split-check`
 `npm run db:expenses` · `db:audit` · `db:measure` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules` · `db:repair-scope` · `db:identity` · `db:unpaid`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`

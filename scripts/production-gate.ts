@@ -39,6 +39,8 @@ function migrationsOnDisk(): string[] {
 interface ManualAttestation {
   secretsRotated?: { at: string; by: string };
   backupTaken?: { at: string; by: string };
+  /** نسخةٌ لم تُجرَّب استعادتُها أملٌ لا نسخة. */
+  backupRestored?: { at: string; by: string; into: string };
   isolationVerified?: { at: string; by: string; productionId: string; previewId: string };
 }
 
@@ -48,6 +50,13 @@ function readJson<T>(file: string): T | null {
   } catch {
     return null;
   }
+}
+
+/** ما جاوز هذا العمر لا يُعدّ فحصاً لليوم — يُعلَن مجهولاً لا ناجحاً. */
+const STALE_DAYS = 7;
+
+function isStale(iso: string): boolean {
+  return Date.now() - new Date(iso).getTime() > STALE_DAYS * 86_400_000;
 }
 
 /** عمرُ النتيجة — شهادةٌ عمرُها أسبوع لا تصف اليوم. */
@@ -391,6 +400,18 @@ async function main() {
     true,
   );
 
+  add(
+    "backup_restore",
+    att.backupRestored ? "PASS" : "UNKNOWN",
+    att.backupRestored
+      ? `استُعيدت نسخةٌ في ${att.backupRestored.at} إلى ${att.backupRestored.into}`
+      : att.backupTaken
+        ? `أُخذت نسخةٌ في ${att.backupTaken.at} — ولم تُجرَّب استعادتها`
+        : "لا نسخةَ مُقَرّة ولا استعادة",
+    "افتح فرعاً من نقطةٍ زمنيّة في Neon، وشغّل عليه db:verify، ثمّ سجّل backupRestored في ops-attestation.json",
+    true,
+  );
+
   /*
     والنتيجتان تُقرآن من ملفّيهما لا تُنقَلان باليد — وما يُنقَل باليد
     يُنقَل خطأً. وقِدَمُ الملفّ يُعلَن: شهادةٌ عمرُها أسبوع لا تصف اليوم.
@@ -398,10 +419,13 @@ async function main() {
   const certify = readJson<{ at: string; total: number; passed: number }>("certify-result.json");
   add(
     "end_to_end_tests",
-    certify === null ? "UNKNOWN" : certify.passed === certify.total ? "PASS" : "FAIL",
+    certify === null ? "UNKNOWN"
+      : certify.passed !== certify.total ? "FAIL"
+      : isStale(certify.at) ? "UNKNOWN" : "PASS",
     certify === null
       ? "لم تُشغَّل الشهادة بعد"
-      : `${certify.passed} من ${certify.total} سيناريو · ${ageOf(certify.at)}`,
+      : `${certify.passed} من ${certify.total} سيناريو · ${ageOf(certify.at)}` +
+        (isStale(certify.at) ? ` — أقدم من ${STALE_DAYS} أيّام، ولا تصف الشيفرة الحاليّة` : ""),
     "npm run ops:certify",
   );
 
@@ -410,7 +434,8 @@ async function main() {
   add(
     "real_data_verification",
     truth === null ? "UNKNOWN"
-      : (c?.CORRECTED ?? 0) + (c?.DUPLICATE ?? 0) + (c?.MISSING ?? 0) === 0 ? "PASS" : "FAIL",
+      : (c?.CORRECTED ?? 0) + (c?.DUPLICATE ?? 0) + (c?.MISSING ?? 0) !== 0 ? "FAIL"
+      : isStale(truth.at) ? "UNKNOWN" : "PASS",
     truth === null
       ? "لم يُشغَّل تدقيق الحقيقة بعد"
       : `مطابق ${c?.VERIFIED ?? 0} · يحتاج تصحيحاً ${c?.CORRECTED ?? 0} · ` +

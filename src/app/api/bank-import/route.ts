@@ -26,13 +26,15 @@ import { loadSupplierProfiles } from "@/services/supplier-profile.service";
 import { analyzeCoverage, describeCoverage } from "@/lib/bank/coverage";
 import type { SupplierIdentity } from "@/lib/bank/entities";
 import { monthBalancesFromStatement } from "@/lib/bank/statement-balances";
+import { withDeadline } from "@/lib/ai/deadline";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MAX_BYTES = 15 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024 /* تحت حدّ المنصّة لجسم الطلب (٤٫٥) */;
 
-export async function POST(request: Request) {  let user;
+async function handle(request: Request) {
+  let user;
   try {
     user = await guard("bank-import", "bank:edit");
   } catch (e) {
@@ -46,7 +48,7 @@ export async function POST(request: Request) {  let user;
   const apply = form?.get("apply") === "true";
 
   if (!(file instanceof File)) return NextResponse.json({ error: "لم يصل ملف" }, { status: 400 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: "الملف أكبر من ١٥ ميجابايت" }, { status: 400 });
+  if (file.size > MAX_BYTES) return NextResponse.json({ error: "الملف أكبر من ٤ ميجابايت" }, { status: 400 });
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const fileSha256 = fileFingerprint(buffer);
@@ -898,4 +900,9 @@ export async function POST(request: Request) {  let user;
             sync.conflict.length > 0 ? ` · ${sync.conflict.length} تضارب هويّة — لم تُقيَّد` : ""
           }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} ردّها قيد القاعدة` : ""}.`,
   });
+}
+
+/* النداءات تحت عمر المسار — تقف بمهلةٍ معلَنة قبل أن تقتلها المنصّة */
+export async function POST(request: Request) {
+  return withDeadline(55_000, () => handle(request));
 }

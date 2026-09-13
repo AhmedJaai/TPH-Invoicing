@@ -1,5 +1,5 @@
 /**
- * حارس المسارات.
+ * حارس المسارات — `proxy` في Next 16 (كان `middleware` وأُهمل اسمه).
  *
  * يمنع الوصول قبل تسجيل الدخول. وهذا الحارس طبقة أولى لا وحيدة —
  * كل واجهة برمجية تفحص صلاحيتها بنفسها أيضاً.
@@ -10,7 +10,7 @@ import { previewAllowed } from "@/lib/preview-mode";
 
 const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health"];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // وضع التجربة يفتح الأبواب عمداً، ولا يعمل في الإنتاج — راجع lib/preview-mode.ts

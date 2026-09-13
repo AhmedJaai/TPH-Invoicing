@@ -6,9 +6,10 @@
  */
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { documents, invoices, supplierAliases, suppliers } from "@/db/schema";
+import { documents, extractionCache, invoices, supplierAliases, suppliers } from "@/db/schema";
+import { withDeadline } from "@/lib/ai/deadline";
 import { extractDocument, isSupportedUpload } from "@/lib/extraction";
 import { runPipeline } from "@/lib/extraction/pipeline";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
@@ -18,7 +19,11 @@ import { guard, respondTo } from "@/services/guard";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MAX_BYTES = 25 * 1024 * 1024;
+/*
+  حدُّ المنصّة لجسم الطلب ٤٫٥ ميجابايت — فالحدّ هنا تحته، ويُقال قبل
+  الإرسال. كان ٢٥ فيردّ Vercel بـ٤١٣ نصّيّ قبل أن تبلغ الشيفرة.
+*/
+const MAX_BYTES = 4 * 1024 * 1024;
 
 async function loadSuppliers(): Promise<SupplierRecord[]> {
   const rows = await db
@@ -50,9 +55,15 @@ async function loadSuppliers(): Promise<SupplierRecord[]> {
 }
 
 export async function POST(request: Request) {
+  /* النداء لا يعيش أطول من المسار — يقف بمهلةٍ معلَنة قبل أن يُقتَل */
+  return withDeadline(55_000, () => handle(request));
+}
+
+async function handle(request: Request) {
   // المحرس طبقة أولى؛ هذا الفحص هو الحاجز الفعلي.
+  let user;
   try {
-    await guard("analyze", "document:upload");
+    user = await guard("analyze", "document:upload");
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
@@ -74,7 +85,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "الملف فارغ" }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "حجم الملف يتجاوز ٢٥ ميجابايت" }, { status: 400 });
+    return NextResponse.json({ error: "حجم الملف يتجاوز ٤ ميجابايت — صغّره (صوّره بدقّة أقلّ) ثمّ أعد المحاولة" }, { status: 400 });
   }
   if (!isSupportedUpload(file.type)) {
     return NextResponse.json(
@@ -85,6 +96,27 @@ export async function POST(request: Request) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const sha256 = createHash("sha256").update(buffer).digest("hex");
+
+  /*
+    ── «أعندنا هو؟» قبل «ما فيه؟» ──
+
+    كان الملفّ يُقرأ بالذكاء ويُدفع ثمنه، ثمّ يُقال في آخرها «رُفع من قبل».
+    فيُسأل بالبصمة أوّلاً — والمرفوض لا يُعدّ مرفوعاً.
+  */
+  const [duplicateFile] = await db
+    .select({ id: documents.id, fileName: documents.fileName })
+    .from(documents)
+    .where(and(eq(documents.sha256, sha256), ne(documents.status, "REJECTED")))
+    .limit(1);
+  if (duplicateFile) {
+    return NextResponse.json(
+      {
+        error: `هذا الملف رُفع من قبل («${duplicateFile.fileName}») — لم يُقرأ ثانيةً`,
+        duplicateDocumentId: duplicateFile.id,
+      },
+      { status: 409 },
+    );
+  }
 
   const supplierList = await loadSuppliers();
 
@@ -100,18 +132,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: extraction.reason }, { status: 502 });
   }
 
+  /* ما قرأه النموذج يُحفظ هنا، وتقرؤه الأرشفة ببصمة الملفّ — لا من المتصفّح */
+  await db.insert(extractionCache).values({
+    sha256,
+    extraction: extraction.value as never,
+    model: extraction.model,
+    userId: user.id,
+  }).onConflictDoUpdate({
+    target: extractionCache.sha256,
+    set: { extraction: extraction.value as never, model: extraction.model, userId: user.id, createdAt: new Date() },
+  });
+
   const match = matchSupplier(supplierList, {
     sellerVatNumber: extraction.value.sellerVatNumber,
     supplierNameAr: extraction.value.supplierNameAr,
     supplierNameEn: extraction.value.supplierNameEn,
   });
-
-  // بصمة الملف تكشف رفع النسخة نفسها ولو تغيّر اسمها
-  const [duplicateFile] = await db
-    .select({ id: documents.id })
-    .from(documents)
-    .where(eq(documents.sha256, sha256))
-    .limit(1);
 
   const existingInvoiceNumbers = match.supplier
     ? (
@@ -128,7 +164,7 @@ export async function POST(request: Request) {
     companyVat: companyConfig.vatNumber,
     originalFileName: file.name,
     existingInvoiceNumbers,
-    fileAlreadyUploaded: Boolean(duplicateFile),
+    fileAlreadyUploaded: false,
   });
 
   return NextResponse.json({

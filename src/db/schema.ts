@@ -1282,3 +1282,21 @@ export const aiFindings = pgTable("ai_findings", {
   index("ai_findings_supplier_status_idx").on(t.supplierId, t.status),
   index("ai_findings_status_created_idx").on(t.status, t.createdAt),
 ]);
+
+/* ──────────────────── ما قرأه النموذج — بيد الخادم ──────────────────── */
+
+/**
+ * مخرَج النموذج كما حُسب في `/api/analyze` — مفهرساً ببصمة الملفّ.
+ *
+ * كانت الأرشفة تأخذ «ما قرأه النموذج» من المتصفّح، وتبني منه أسطر الكشف
+ * ورصيده الافتتاحيّ وأثرَ «ما عُدِّل يدوياً» في سجلّ التدقيق. فمن أرسل
+ * طلباً بيده كتب أسطر كشفٍ مخترَعة، وسجلّاً يقول «لم يُعدَّل شيء».
+ * فصار الخادم يحفظ ما قرأه ويقرؤه عند الأرشفة ببصمة الملفّ المرفوع.
+ */
+export const extractionCache = pgTable("extraction_cache", {
+  sha256: text("sha256").primaryKey(),
+  extraction: jsonb("extraction").notNull(),
+  model: text("model"),
+  userId: text("user_id").references(() => users.id),
+  createdAt: now(),
+});

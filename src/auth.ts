@@ -54,7 +54,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
 
-  session: { strategy: "database" },
+  /*
+    سبعة أيّام لا ثلاثون افتراضيّاً — جهازُ الكاشير يحمل صلاحية اعتماد السداد.
+    والجلسة تتجدّد يوميّاً ما دام صاحبها يستعملها.
+  */
+  session: { strategy: "database", maxAge: 7 * 24 * 60 * 60, updateAge: 24 * 60 * 60 },
   pages: { signIn: "/login", error: "/login" },
 
   callbacks: {
@@ -81,6 +85,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         .from(users)
         .where(eq(users.id, user.id))
         .limit(1);
+
+      /*
+        التعطيل وحذفُ البريد من القائمة البيضاء يُنهيان الجلسة القائمة.
+        كانت القائمة تُفحَص عند الدخول وحده و`isActive` يُقرأ ويُهمَل، فمن
+        عُطِّل بقي بصلاحياته حتى تنتهي جلسةُ ثلاثين يوماً.
+      */
+      const email = (user.email ?? session.user?.email ?? "").toLowerCase();
+      if (!row?.isActive || !email || !allowlist().has(email)) {
+        await db.delete(sessions).where(eq(sessions.userId, user.id));
+        return { expires: session.expires } as unknown as typeof session;
+      }
 
       session.user.id = user.id;
       session.user.role = (row?.role as Role) ?? "PURCHASING";

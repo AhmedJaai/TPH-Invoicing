@@ -340,6 +340,16 @@ export function Uploader({
 
   const analyze = useCallback(async (file: File) => {
     const id = `${file.name}-${Date.now()}-${Math.random()}`;
+
+    /* الحدّ يُقال قبل الإرسال — لا ٤١٣ نصّيّ من المنصّة بعده */
+    if (file.size > 3 * 1024 * 1024) {
+      setItems((prev) => [{
+        id, fileName: file.name, state: "failed",
+        error: "الملف أكبر من ٣ ميجابايت — حدّ الأرشفة. صغّره (صوّره بدقّة أقلّ أو اضغط الـPDF) ثمّ أعد المحاولة.",
+      }, ...prev]);
+      return;
+    }
+
     setItems((prev) => [{ id, fileName: file.name, state: "reading" }, ...prev]);
 
     // نحتفظ بالبايتات لأنّ الأرشفة ترفع الملف الأصلي نفسه لا نسخة معاد بناؤها
@@ -445,8 +455,6 @@ export function Uploader({
           isTaxValid: r.isTaxValid,
           inputVatEligible: r.inputVatEligible,
           isFixedAsset: r.isFixedAsset,
-          rawExtraction: it.data.extraction,
-          extractionModel: it.data.model,
           findings: r.findings,
           lines: (it.data.extraction as { lines?: unknown[] } | undefined)?.lines ?? [],
         }),

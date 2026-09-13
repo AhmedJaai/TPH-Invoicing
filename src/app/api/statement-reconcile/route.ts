@@ -27,6 +27,7 @@ import {
 import { parseRiyals } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
 import { recordAudit } from "@/lib/audit";
+import { withDeadline } from "@/lib/ai/deadline";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -53,7 +54,8 @@ async function loadSuppliers(): Promise<SupplierRecord[]> {
   }));
 }
 
-export async function POST(request: Request) {  let user;
+async function handle(request: Request) {
+  let user;
   try {
     user = await guard("statement-reconcile", "supplier:edit");
   } catch (e) {
@@ -383,4 +385,9 @@ export async function POST(request: Request) {  let user;
   });
 
   return NextResponse.json({ ...payload, persisted: true });
+}
+
+/* النداءات تحت عمر المسار — تقف بمهلةٍ معلَنة قبل أن تقتلها المنصّة */
+export async function POST(request: Request) {
+  return withDeadline(55_000, () => handle(request));
 }
