@@ -6,6 +6,8 @@ import { invoices, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
+import { MarkInvoicePaid } from "@/components/mark-invoice-paid";
+import { formatRiyals } from "@/lib/money";
 import { Money } from "@/components/money";
 import { Badge, DataTable, EmptyState, LinkButton, NoAccess } from "@/components/ui";
 import {
@@ -247,6 +249,23 @@ export default async function InvoicesPage({
                 return rem <= 0
                   ? <Badge tone="ok">مسدَّدة</Badge>
                   : <span className="font-bold"><Money minor={rem} tone="warn" /></span>;
+              },
+            },
+            {
+              /*
+                ── تسجيل السداد حيث تُرى الفاتورة ──
+
+                كان الزرّ في «دفعة أوّل الشهر» وحدها، وهي تعرض شهراً
+                واحداً: ما جاز تحويلُه من الشهر المنقضي. فالفاتورة التي
+                سُدّدت نقداً أو من شهرٍ أقدم لا موضعَ لتسجيلها — تبقى
+                «غير مسدَّدة» أبداً، ويبقى المستحقّ أكبر من الحقّ.
+              */
+              key: "pay",
+              header: "",
+              cell: (r) => {
+                const rem = r.total - Number(r.allocated);
+                if (rem <= 0) return null;
+                return <MarkInvoicePaid invoiceId={r.id} label={formatRiyals(rem)} />;
               },
             },
           ]}
