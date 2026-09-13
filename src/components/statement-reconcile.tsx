@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { request } from "@/lib/http-client";
+import { LINE, countNoun } from "@/lib/arabic";
 
 export interface ArchivedStatement {
   id: string;
@@ -35,6 +36,8 @@ interface Result {
   missing: { date: string; ref: string; amountMinor: number }[];
   mismatches: { invoiceNumber: string; theirsMinor: number; oursMinor: number; differenceMinor: number }[];
   extra: { invoiceNumber: string; date: string; amountMinor: number }[];
+  /** أسطرٌ لم يُقرأ مبلغها أو تاريخها — لم تُطابَق ولم تُحذف. */
+  unreadLines?: { date: string; description: string; amountText: string }[];
   memo: string;
 }
 
@@ -216,6 +219,23 @@ export function StatementReconcile({
             />
             <Stat label="ما سدّدناه في كشفه" value={formatRiyalsDisplay(s.theirPaidMinor)} />
           </div>
+
+          {result.unreadLines && result.unreadLines.length > 0 && (
+            <div className="mt-3 rounded-lg border border-warn/40 bg-warn-bg px-3 py-2">
+              <p className="text-xs font-bold text-warn">
+                {countNoun(result.unreadLines.length, LINE)} في كشفه لم يُقرأ مبلغه أو تاريخه — لم تُطابَق
+                ولم تُحذف، فراجعها في الكشف نفسه
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {result.unreadLines.slice(0, 12).map((u, i) => (
+                  <li key={i} className="text-[11px] text-ink-soft" dir="auto">
+                    <bdi className="nums">{u.date || "بلا تاريخ"}</bdi> · {u.description || "بلا وصف"} ·{" "}
+                    <bdi className="nums">{u.amountText || "بلا مبلغ"}</bdi>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {s.balanceArithmeticOk === false && (
             <p className="mt-3 rounded-lg bg-warn-bg px-3 py-2 text-xs text-warn">

@@ -6,8 +6,9 @@
  * واحدة، لكنّها تعني أنّ النظام يخلق مالاً لم يُدفع. فالتخصيص يُحدّ بما
  * بقي، والفائض يُعلَن ولا يُبتلَع.
  */
-import { and, eq, sql } from "drizzle-orm";
-import { paymentAllocations, payments } from "@/db/schema";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { bankTransactions, invoices, paymentAllocations, payments } from "@/db/schema";
+import { assertMonthsOpen } from "./month-guard";
 import { planAllocations, type AllocationRequest } from "@/lib/allocation";
 import {
   derivePaymentStatus, planReversal, type PaymentStatus,
@@ -37,6 +38,32 @@ export interface CreatePaymentInput {
    * قبل وصول الفاتورة كانت دفعته تبقى معلّقةً إلى الأبد وكأنّها خطأ.
    */
   isAdvance?: boolean;
+  /**
+   * أُقِرّ أنّ دفعةً بنفس المورّد واليوم والمبلغ **واقعةٌ أخرى**.
+   *
+   * بلا هذا يرمي `createPayment` بـ`PaymentTwinError` إن وجد توأماً —
+   * فالسؤال يقع في الموضع الذي يمرّ به كلُّ باب، لا في مسارين من ثمانية.
+   * وبيكوف يُدفَع له مرّتين في اليوم حقيقةً، فهو إقرارٌ لا منع.
+   */
+  acknowledgeTwin?: boolean;
+}
+
+/** توأمٌ وُجد ولم يُقَرّ بأنّه واقعةٌ أخرى. */
+export class PaymentTwinError extends Error {
+  readonly status = 409;
+  constructor(readonly twin: { id: string; hasBankRow: boolean; allocatedMinor: number }) {
+    super("سدادٌ بنفس المورّد والمبلغ في اليوم نفسه مقيَّدٌ من قبل — افتحه قبل أن تسجّل ثانيةً");
+    this.name = "PaymentTwinError";
+  }
+}
+
+/** الحركة قُيّدت بدفعةٍ بين قراءتها وكتابتها — ضغطتان أو تبويبان. */
+export class AlreadyMatchedError extends Error {
+  readonly status = 409;
+  constructor() {
+    super("قُيّدت هذه الحركة من قبل — لم يُكتب شيءٌ ثانيةً. افتحها في صفحة البنك لترى دفعتها");
+    this.name = "AlreadyMatchedError";
+  }
 }
 
 /**
@@ -87,7 +114,11 @@ export async function findPaymentTwin(
       sql`${payments.paidAt}::date = ${input.paidAt.toISOString().slice(0, 10)}::date`,
       sql`${payments.status} not in ('REVERSED','VOID')`,
     ))
-    .orderBy(payments.createdAt)
+    /* ما لا حركةَ بنكٍ له أوّلاً: هو الذي يُتبنّى، وما له حركة واقعةٌ أخرى */
+    .orderBy(
+      sql`exists (select 1 from bank_transactions bt where bt.matched_payment_id = ${payments}.id)`,
+      payments.createdAt,
+    )
     .limit(1);
 
   return row
@@ -101,6 +132,25 @@ export async function findPaymentTwin(
 }
 
 export async function createPayment(tx: Tx, input: CreatePaymentInput): Promise<string> {
+  await assertMonthsOpen(tx, [input.appliesToMonth ?? input.paidAt.toISOString().slice(0, 7)]);
+
+  /*
+    ── الواقعة الواحدة لا تُقيَّد دفعتين ──
+
+    كان `findPaymentTwin` يُسأل في مسارين من ثمانية تُنشئ دفعة، وحتى
+    هناك يُنشأ ثانٍ إن كان التوأم مخصَّصاً. فبقيت لافا ٩٤٥ دفعتين على
+    فاتورتين وأطلس ٥٧٥ رصيداً وهميّاً. فصار السؤال هنا، ومن أراد
+    الإنشاء مع وجود التوأم يُقِرّ بذلك صراحةً.
+  */
+  if (input.supplierId && !input.acknowledgeTwin) {
+    const twin = await findPaymentTwin(tx, {
+      supplierId: input.supplierId,
+      paidAt: input.paidAt,
+      amountMinor: input.amountMinor,
+    });
+    if (twin) throw new PaymentTwinError(twin);
+  }
+
   const [row] = await tx
     .insert(payments)
     .values({
@@ -121,6 +171,64 @@ export async function createPayment(tx: Tx, input: CreatePaymentInput): Promise<
     })
     .returning({ id: payments.id });
   return row.id;
+}
+
+/**
+ * دفعةٌ من حركة بنك — تُتبنّى إن كانت الواقعةُ مقيَّدةً بلا حركة.
+ *
+ * إيصالٌ في الدرايف أو قيدٌ يدويّ سبق الكشف: هو **هذه** الحوالة، فتُربَط
+ * بها ولا تُنسَخ — مخصَّصةً كانت أو لا. وكان التبنّي مشروطاً بألّا يكون
+ * التوأم مخصَّصاً، فأُنشئ لأطلس ثانٍ غير مخصَّص بجانب الأوّل المخصَّص.
+ * وتوأمٌ له حركةُ بنكٍ أخرى واقعةٌ أخرى، فيُنشأ مع الإقرار.
+ */
+export async function recordBankPayment(
+  tx: Tx,
+  input: CreatePaymentInput,
+): Promise<{ id: string; adopted: boolean }> {
+  const twin = await findPaymentTwin(tx, {
+    supplierId: input.supplierId ?? null,
+    paidAt: input.paidAt,
+    amountMinor: input.amountMinor,
+  });
+
+  if (twin && !twin.hasBankRow) {
+    await assertMonthsOpen(tx, [input.appliesToMonth]);
+    await tx
+      .update(payments)
+      .set({
+        beneficiaryNameRaw: sql`coalesce(${payments.beneficiaryNameRaw}, ${input.beneficiaryNameRaw ?? null})`,
+        appliesToMonth: sql`coalesce(${payments.appliesToMonth}, ${input.appliesToMonth ?? null})`,
+      })
+      .where(eq(payments.id, twin.id));
+    return { id: twin.id, adopted: true };
+  }
+
+  const id = await createPayment(tx, { ...input, acknowledgeTwin: true });
+  return { id, adopted: false };
+}
+
+/**
+ * يربط الحركة بدفعتها — **بشرط ألّا تكون مربوطة**، ويرمي إن لم يُكتب صفّ.
+ *
+ * كان الفحص قبل المعاملة والتحديثُ بالمعرّف وحده، فطلبان متزامنان
+ * (ضغطتان، أو تبويبان) يمرّان كلاهما ويُنشئان دفعتين والحركةُ تشير إلى
+ * الثانية. ومؤثِّر `026` يمنع تجاوز الفاتورة لا تكرار الدفعة للحركة.
+ * والرمي داخل المعاملة يُلغي الدفعة وتخصيصها معاً.
+ */
+export async function claimBankTransaction(
+  tx: Tx,
+  bankTransactionId: string,
+  set: Partial<typeof bankTransactions.$inferInsert> & { matchedPaymentId: string },
+): Promise<void> {
+  const rows = await tx
+    .update(bankTransactions)
+    .set(set)
+    .where(and(
+      eq(bankTransactions.id, bankTransactionId),
+      sql`${bankTransactions.matchedPaymentId} is null`,
+    ))
+    .returning({ id: bankTransactions.id });
+  if (rows.length === 0) throw new AlreadyMatchedError();
 }
 
 /**
@@ -244,6 +352,14 @@ export async function allocate(
   paymentAmountMinor: number,
   requests: readonly AllocationRequest[],
 ): Promise<AllocationOutcome> {
+  if (requests.length > 0) {
+    const months = await tx
+      .select({ month: invoices.periodMonth })
+      .from(invoices)
+      .where(inArray(invoices.id, requests.map((r) => r.invoiceId)));
+    await assertMonthsOpen(tx, months.map((m) => m.month));
+  }
+
   const already = await tx
     .select({ sum: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}), 0)::int` })
     .from(paymentAllocations)

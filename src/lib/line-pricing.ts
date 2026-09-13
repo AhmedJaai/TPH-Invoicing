@@ -164,18 +164,30 @@ export function reconcileInvoiceLines<T extends LineToReconcile>(
   if (near(sum, subtotalMinor)) return { lines: [...lines], verdict: "NET" };
 
   if (near(sum, subtotalMinor * (1 + VAT_RATE))) {
-    const factor = 1 + VAT_RATE;
-    return {
-      verdict: "WAS_VAT_INCLUSIVE",
-      lines: lines.map((l) => ({
-        ...l,
-        effectiveUnitMinor: Math.round(l.effectiveUnitMinor / factor),
-        netTotalMinor: Math.round(l.netTotalMinor / factor),
-        listUnitMinor: l.listUnitMinor === null ? null : Math.round(l.listUnitMinor / factor),
-        discountMinor: Math.round(l.discountMinor / factor),
-        basis: l.basis === "CONSISTENT" ? ("TOTAL_INCLUDES_VAT" as PricingBasis) : l.basis,
-      })),
-    };
+    /*
+      القسمة بأعدادٍ صحيحة (×١٠٠ ÷ ١١٥) ثمّ يُردّ فرقُ التقريب إلى أكبر
+      بند — فيجمع الصافي إلى الصافي بالهللة. وكان كلّ بندٍ يُقرَّب وحده
+      بعددٍ عشريّ فيفترق المجموع عن الصافي بهللات.
+    */
+    const pct = Math.round(VAT_RATE * 100);
+    const shrink = (m: number) => Math.round((m * 100) / (100 + pct));
+    const scaled = lines.map((l) => ({
+      ...l,
+      effectiveUnitMinor: shrink(l.effectiveUnitMinor),
+      netTotalMinor: shrink(l.netTotalMinor),
+      listUnitMinor: l.listUnitMinor === null ? null : shrink(l.listUnitMinor),
+      discountMinor: shrink(l.discountMinor),
+      basis: l.basis === "CONSISTENT" ? ("TOTAL_INCLUDES_VAT" as PricingBasis) : l.basis,
+    }));
+    const drift = subtotalMinor - scaled.reduce((s, l) => s + l.netTotalMinor, 0);
+    if (drift !== 0 && Math.abs(drift) <= scaled.length) {
+      let largest = 0;
+      for (let k = 1; k < scaled.length; k++) {
+        if (scaled[k].netTotalMinor > scaled[largest].netTotalMinor) largest = k;
+      }
+      scaled[largest] = { ...scaled[largest], netTotalMinor: scaled[largest].netTotalMinor + drift };
+    }
+    return { verdict: "WAS_VAT_INCLUSIVE", lines: scaled };
   }
 
   return { lines: [...lines], verdict: "UNVERIFIED" };

@@ -5,14 +5,17 @@
  * يُقيَّد سداد المورّد مصروفاً — فيصير محسوباً مرّتين: في المشتريات
  * وفي المصروفات. القرار في `lib/expenses.ts` مختبَراً، وهذه تُنفّذه.
  */
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bankTransactions, expenses, recurringExpenses } from "@/db/schema";
 import { createId } from "@/lib/id";
 import { expenseEventKey } from "@/lib/expenses";
 import { recordAudit } from "@/lib/audit";
+import type { Tx } from "./types";
 import {
   deriveFromBank,
+  isExpenseCategory,
+  looksLikeGoodsPurchase,
   matchRecurring,
   type BankTx,
   type Expense,
@@ -28,6 +31,10 @@ export interface DeriveResult {
   skippedGoodsPurchase: number;
   goodsPurchaseMinor: number;
   linkedToRecurring: number;
+  /** ما تغيّر بابُه بعد إعادة تصنيف حركته. */
+  updated: number;
+  /** ما لم يعد مصروفاً — حُذف صفُّه المشتقّ وحُفظ نصُّه في التدقيق. */
+  removed: number;
 }
 
 /**
@@ -107,15 +114,27 @@ export async function deriveExpensesFromBank(
     };
   });
 
-  if (values.length > 0) {
-    // تُقسَّم دفعاتٍ كي لا يتجاوز الاستعلام حدّ المعاملات في بروتوكول pg
-    const CHUNK = 500;
-    await db.transaction(async (tx) => {
-      for (let i = 0; i < values.length; i += CHUNK) {
-        await tx.insert(expenses).values(values.slice(i, i + CHUNK)).onConflictDoNothing();
-      }
-    });
-  }
+  let sync = { updated: 0, removed: 0 };
+  // تُقسَّم دفعاتٍ كي لا يتجاوز الاستعلام حدّ المعاملات في بروتوكول pg
+  const CHUNK = 500;
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < values.length; i += CHUNK) {
+      await tx.insert(expenses).values(values.slice(i, i + CHUNK)).onConflictDoNothing();
+    }
+    /* وما قُيّد من قبل يتبع التصنيف الحاليّ — لا يبقى على ما كان */
+    sync = await resyncBankExpenses(tx, userId, { month });
+
+    /* ألفُ مصروفٍ قُيّد بلا أثر في التدقيق — صار له قيدٌ واحد بعدده */
+    if (values.length > 0 || sync.updated > 0 || sync.removed > 0) {
+      await recordAudit({
+        actorId: userId,
+        action: "EXPENSES_DERIVED",
+        entityType: "expense",
+        entityId: month ?? "all",
+        after: { قُيّدت: values.length, "تغيّر بابها": sync.updated, "لم تعد مصروفاً": sync.removed },
+      }, tx);
+    }
+  });
 
   const debits = txs.filter((t) => t.direction === "DEBIT");
   const alreadyCount = debits.filter((t) => already.has(t.id)).length;
@@ -128,7 +147,113 @@ export async function deriveExpensesFromBank(
     skippedGoodsPurchase: goodsPurchases.length,
     goodsPurchaseMinor: goodsPurchases.reduce((s, g) => s + g.amountMinor, 0),
     linkedToRecurring: linked,
+    updated: sync.updated,
+    removed: sync.removed,
   };
+}
+
+/**
+ * المصروف المقيَّد من البنك يتبع تصنيف حركته — لا يبقى على ما كان.
+ *
+ * كان الاشتقاق يُدرج ولا يحدّث ولا يحذف. فحركةٌ قُيّدت «راتباً» ثمّ
+ * عرّفها أحمد «تحويلاً شخصيّاً» بقيت مصروفاً (٢٢٬٧٢٤ ريالاً)، وحركةٌ
+ * صار بابُها «ضريبة رسم» بقيت «رسماً»، وشاشة المصروفات تخالف قائمة
+ * الدخل لنفس الشهر.
+ *
+ * يُمرَّر مقبض المعاملة كي يقع مع القرار الذي غيّر التصنيف أو لا يقع.
+ * والحذف هنا حذفُ صفٍّ **مشتقّ** يُعاد اشتقاقه، ويُحفَظ ما حُذف في
+ * سجلّ التدقيق بنصّه.
+ */
+export async function resyncBankExpenses(
+  tx: Tx,
+  userId: string | null,
+  scope: { month?: string; transactionIds?: readonly string[]; insertMissing?: boolean } = {},
+): Promise<{ updated: number; removed: number; created: number }> {
+  const where = scope.transactionIds
+    ? inArray(expenses.bankTransactionId, [...scope.transactionIds])
+    : scope.month
+      ? and(eq(expenses.periodMonth, scope.month), sql`${expenses.bankTransactionId} is not null`)
+      : sql`${expenses.bankTransactionId} is not null`;
+
+  if (scope.transactionIds && scope.transactionIds.length === 0) return { updated: 0, removed: 0, created: 0 };
+
+  const rows = await tx
+    .select({
+      expenseId: expenses.id,
+      expenseCategory: expenses.category,
+      label: expenses.label,
+      amountMinor: expenses.amountMinor,
+      occurredOn: expenses.occurredOn,
+      txId: bankTransactions.id,
+      category: bankTransactions.category,
+      direction: bankTransactions.direction,
+      description: bankTransactions.description,
+      beneficiaryRaw: bankTransactions.beneficiaryRaw,
+    })
+    .from(expenses)
+    .innerJoin(bankTransactions, eq(bankTransactions.id, expenses.bankTransactionId))
+    .where(and(where, eq(expenses.source, "BANK")));
+
+  const remove = rows.filter((r) =>
+    r.direction !== "DEBIT"
+    || !isExpenseCategory(r.category)
+    || looksLikeGoodsPurchase(r.description, r.beneficiaryRaw));
+  const removeIds = new Set(remove.map((r) => r.expenseId));
+  const update = rows.filter((r) => !removeIds.has(r.expenseId) && r.expenseCategory !== r.category);
+
+  if (remove.length > 0) {
+    await tx.delete(expenses).where(inArray(expenses.id, remove.map((r) => r.expenseId)));
+    await recordAudit({
+      actorId: userId,
+      action: "EXPENSE_RECLASSIFIED",
+      entityType: "expense",
+      entityId: scope.month ?? "reclassification",
+      before: remove.map((r) => ({
+        المصروف: r.expenseId, الحركة: r.txId, كان: r.expenseCategory, صار: r.category,
+        المبلغ_بالهللات: r.amountMinor, التاريخ: r.occurredOn,
+      })),
+      after: { الفعل: "لم تعد مصروفاً بعد إعادة تصنيف حركتها", العدد: remove.length },
+    }, tx);
+  }
+
+  for (const r of update) {
+    await tx.update(expenses).set({ category: r.category }).where(eq(expenses.id, r.expenseId));
+  }
+
+  let created = 0;
+  if (scope.insertMissing && scope.transactionIds) {
+    const txs = await tx
+      .select({
+        id: bankTransactions.id, valueDate: bankTransactions.valueDate,
+        description: bankTransactions.description, beneficiaryRaw: bankTransactions.beneficiaryRaw,
+        amountMinor: bankTransactions.amountMinor, direction: bankTransactions.direction,
+        category: bankTransactions.category,
+      })
+      .from(bankTransactions)
+      .where(inArray(bankTransactions.id, [...scope.transactionIds]));
+    const already = new Set(rows.filter((r) => !removeIds.has(r.expenseId)).map((r) => r.txId));
+    const { candidates } = deriveFromBank(
+      txs.map((t) => ({ ...t, direction: t.direction as "DEBIT" | "CREDIT" })),
+      already,
+    );
+    if (candidates.length > 0) {
+      await tx.insert(expenses).values(candidates.map((c) => ({
+        id: createId(),
+        periodMonth: c.periodMonth,
+        occurredOn: c.occurredOn,
+        category: c.category,
+        label: c.label,
+        amountMinor: c.amountMinor,
+        source: "BANK" as const,
+        bankTransactionId: c.bankTransactionId,
+        eventKey: expenseEventKey(c),
+        createdById: userId,
+      }))).onConflictDoNothing();
+      created = candidates.length;
+    }
+  }
+
+  return { updated: update.length, removed: remove.length, created };
 }
 
 export async function activeRecurring(): Promise<RecurringExpense[]> {

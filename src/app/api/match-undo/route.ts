@@ -33,7 +33,8 @@ interface Body {
 export async function POST(request: Request) {
   let user;
   try {
-    user = await guard("match-undo", "bank:edit");
+    /* الردّ فكُّ مالٍ عن فواتير — بصلاحية من يقيّده، لا بصلاحية التصنيف */
+    user = await guard("match-undo", "payment:approve");
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
@@ -58,6 +59,38 @@ export async function POST(request: Request) {
 
   if (!tx) return NextResponse.json({ error: "لا توجد هذه الحركة" }, { status: 404 });
   if (!tx.matchedPaymentId) {
+    /*
+      «ليست سداداً» كانت بلا تراجع: من أعلنها خطأً لا يملك ردّها.
+      فتعود الحركة إلى «مقترَحة» بلا قرار، ويبقى أثرُ الإعلان وردُّه.
+    */
+    if (tx.matchOutcome === "NOT_A_PAYMENT") {
+      const reason = body.reason?.trim() || "تراجعٌ عن «ليست سداداً»";
+      await db.transaction(async (t) => {
+        await t.update(bankTransactions).set({
+          matchStatus: "UNMATCHED",
+          matchOutcome: null,
+          matchDisposition: "REVIEW",
+          lifecycle: "SUGGESTED",
+        }).where(eq(bankTransactions.id, tx.id));
+        await t.insert(decisionHistory).values({
+          bankTransactionId: tx.id,
+          event: "MATCH_REVERSED",
+          actor: "HUMAN",
+          actorId: user.id,
+          detail: reason,
+          payload: { "كانت": "ليست سداداً", الباب: tx.category },
+        });
+        await recordAudit({
+          actorId: user.id,
+          action: "MATCH_UNDONE",
+          entityType: "bank_transaction",
+          entityId: tx.id,
+          before: { النتيجة: "NOT_A_PAYMENT", الباب: tx.category },
+          after: { الفعل: "تراجعٌ عن «ليست سداداً»", السبب: reason },
+        }, t);
+      });
+      return NextResponse.json({ ok: true, message: "رُدّ إعلان «ليست سداداً» — عادت الحركة تنتظر قراراً" });
+    }
     return NextResponse.json({ error: "هذه الحركة غير مطابَقة أصلاً" }, { status: 409 });
   }
 
@@ -138,7 +171,7 @@ export async function POST(request: Request) {
 
   await recordAudit({
     actorId: user.id,
-    action: "INVOICES_MARKED_PAID",
+    action: "MATCH_UNDONE",
     entityType: "bank_transaction",
     entityId: tx.id,
     before: {

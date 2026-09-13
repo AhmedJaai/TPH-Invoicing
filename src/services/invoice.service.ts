@@ -12,6 +12,7 @@ import { reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { parseRiyals } from "@/lib/money";
 import type { InputVatStatus, TaxStatus } from "@/lib/validation";
 import type { RawLine, Tx } from "./types";
+import { assertMonthsOpen } from "./month-guard";
 
 export interface CreateInvoiceInput {
   documentId: string;
@@ -31,6 +32,8 @@ export interface CreateInvoiceInput {
 }
 
 export async function createInvoice(tx: Tx, input: CreateInvoiceInput): Promise<string | null> {
+  await assertMonthsOpen(tx, [input.periodMonth]);
+
   const [inv] = await tx
     .insert(invoices)
     .values({

@@ -175,12 +175,22 @@ export async function POST(request: Request) {  let user;
 
   // سطور الكشف كما قرأها النموذج — بلا حساب ولا تلفيق
   const parsedLines: StatementLineInput[] = [];
+  /* ما لم يُقرأ مبلغُه أو تاريخُه يُعلَن — كان يصير صفراً فيُسقَط صامتاً */
+  const unreadLines: { date: string; description: string; amountText: string }[] = [];
   for (const l of x.statementLines) {
-    const debit = parseRiyals(l.debit ?? "") ?? 0;
-    const credit = parseRiyals(l.credit ?? "") ?? 0;
+    const debitText = (l.debit ?? "").trim();
+    const creditText = (l.credit ?? "").trim();
+    const debitRead = debitText ? parseRiyals(debitText) : 0;
+    const creditRead = creditText ? parseRiyals(creditText) : 0;
+    const unread = () => unreadLines.push({
+      date: l.date ?? "", description: l.description ?? "", amountText: debitText || creditText,
+    });
+    if (debitRead === null || creditRead === null) { unread(); continue; }
+    const debit = debitRead;
+    const credit = creditRead;
     if (debit === 0 && credit === 0) continue;
     const date = DATE_RE.test(l.date) ? new Date(`${l.date}T00:00:00Z`) : null;
-    if (!date) continue;
+    if (!date) { unread(); continue; }
     parsedLines.push({ date, ref: l.ref || null, description: l.description || null, debitMinor: debit, creditMinor: credit });
   }
 
@@ -297,6 +307,7 @@ export async function POST(request: Request) {  let user;
       amountMinor: i.totalMinor,
     })),
     findings: result.findings,
+    unreadLines,
     memo,
   };
 
@@ -332,6 +343,17 @@ export async function POST(request: Request) {  let user;
       openingBalanceMinor: opening ?? null,
       closingBalanceMinor: closing ?? null,
     }).where(eq(statements.id, statementId));
+
+    /*
+      التنبيهات تُستبدَل كما تُستبدَل الأسطر: كان «أعِد المطابقة» يُدرجها
+      فوق السابقة، فتتضاعف في «يحتاج انتباهك» وفي موانع الإقفال مع كلّ ضغطة.
+      والمحسومُ بيد إنسان يبقى — لا يُمحى قرارُه بإعادة حساب.
+    */
+    await tx.delete(issues).where(and(
+      eq(issues.entityType, "statement"),
+      eq(issues.entityId, statementId),
+      eq(issues.status, "OPEN"),
+    ));
 
     for (const f of result.findings) {
       await tx.insert(issues).values({

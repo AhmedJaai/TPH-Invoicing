@@ -289,6 +289,8 @@ export async function markPaidByOwner(tx: Tx, invoiceId: string): Promise<OwnerP
     amountMinor: plan.ownerPaymentMinor,
     method: "OWNER_ACCOUNT",
     appliesToMonth: inv.period_month,
+    /* إقرارُ المالك صريحٌ بفاتورةٍ بعينها، ولا يظهر في كشف المقهى */
+    acknowledgeTwin: true,
   });
   await allocate(tx, ownerPaymentId, plan.ownerPaymentMinor, [
     { invoiceId, amountMinor: plan.ownerPaymentMinor },

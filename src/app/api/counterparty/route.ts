@@ -22,6 +22,7 @@ import { db } from "@/db";
 import { bankTransactions, counterparties, decisionHistory } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { confirmCounterparty } from "@/services/counterparty.service";
+import { resyncBankExpenses } from "@/services/expense.service";
 import { toCanonical, type CanonicalTransaction } from "@/lib/bank/canonical";
 import { groupingIdentity } from "@/lib/bank/pattern";
 import { CLASSIFICATION_VERSION } from "@/lib/bank/classification";
@@ -255,6 +256,9 @@ export async function POST(request: Request) {
         الهويّة: groupKey,
       },
     })));
+
+    /* المصروف المقيَّد من هذه الحركات يتبع بابها الجديد — في المعاملة نفسها */
+    await resyncBankExpenses(t, user.id, { transactionIds: rows.map((r) => r.id), insertMissing: true });
 
     /*
       ── ٣. ويعمّ ──

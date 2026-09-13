@@ -63,15 +63,26 @@ export interface ValidationResult {
   lowConfidenceFields: string[];
 }
 
+/**
+ * الأرقام العربية والفارسية إلى لاتينية قبل الحذف — وإلّا حذف `\D`
+ * «٣١٠٠٠٧٩٧١٦٠٠٠٠٣» كلَّه فصار طوله صفراً، وحُكم على فاتورةٍ سليمة أنّها
+ * بلا رقمٍ ضريبيّ فضاعت ضريبتها.
+ */
+function latinDigits(value: string): string {
+  return value
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
+}
+
 /** الرقم الضريبي السعودي: ١٥ رقماً يبدأ بـ٣ وينتهي بـ٣. */
 export function isValidSaudiVat(value: string | null | undefined): boolean {
   if (!value) return false;
-  const digits = value.replace(/\D/g, "");
+  const digits = latinDigits(value).replace(/\D/g, "");
   return digits.length === 15 && digits.startsWith("3") && digits.endsWith("3");
 }
 
 function normalizeVat(value: string | null | undefined): string {
-  return (value ?? "").replace(/\D/g, "");
+  return latinDigits(value ?? "").replace(/\D/g, "");
 }
 
 function finding(code: IssueCode, override?: Partial<Finding>): Finding {

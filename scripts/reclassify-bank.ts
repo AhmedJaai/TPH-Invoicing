@@ -22,6 +22,7 @@ import { classify, CLASSIFICATION_VERSION } from "../src/lib/bank/classification
 import { toCategory } from "../src/lib/bank/apply";
 import { CATEGORY_LABEL } from "../src/lib/bank/rules";
 import { loadMerchantMemory } from "../src/services/counterparty.service";
+import { resyncBankExpenses } from "../src/services/expense.service";
 
 const APPLY = process.argv.includes("apply");
 
@@ -113,6 +114,13 @@ async function main() {
   }
 
   console.log(`\n✓ حُدّثت ${updates.length} حركة — بابها ومصدرها وسببها وأثرها`);
+
+  /*
+    والمصروف المقيَّد يتبع الباب الجديد — كان الاشتقاق يُدرج ولا يحدّث،
+    فبقيت رواتبُ صارت تحويلاتٍ شخصيّة مصروفاً في شاشة المصروفات.
+  */
+  const sync = await db.transaction((t) => resyncBankExpenses(t, null, {}));
+  console.log(`✓ المصروفات: تغيّر بابُ ${sync.updated} · ولم يعد مصروفاً ${sync.removed}`);
 
   /*
     ── وتُطوى القرارات التي لم يعد لها موضوع ──

@@ -515,6 +515,7 @@ async function main() {
 
     const second = await createPayment(tx, {
       supplierId, paidAt: day("2026-08-25"), amountMinor: 150_00, method: "BANK_TRANSFER",
+      acknowledgeTwin: true,
     });
     await allocate(tx, second, 150_00, [{ invoiceId: invoiceIds[1], amountMinor: 150_00 }]);
 

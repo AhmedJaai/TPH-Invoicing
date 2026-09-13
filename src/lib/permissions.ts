@@ -27,6 +27,7 @@ export type Capability =
   | "payroll:view"
   | "payment:approve"
   | "month:close"
+  | "month:reopen"
   | "users:manage"
   | "audit:view";
 
@@ -34,7 +35,7 @@ const MATRIX: Record<Role, readonly Capability[]> = {
   OWNER: [
     "document:upload", "document:view", "supplier:view", "supplier:edit",
     "amounts:view", "reports:view", "bank:view", "bank:edit", "payroll:view",
-    "expense:edit", "payment:approve", "month:close", "users:manage", "audit:view",
+    "expense:edit", "payment:approve", "month:close", "month:reopen", "users:manage", "audit:view",
   ],
   // المحاسب يرى كل المالية ولا يدير المستخدمين
   ACCOUNTANT: [
@@ -55,11 +56,30 @@ export function capabilitiesOf(role: Role): readonly Capability[] {
   return MATRIX[role];
 }
 
+/** اسمُ القدرة لقارئ الرسالة — لا «payment:approve» لمن يُحجَب. */
+export const CAPABILITY_LABEL: Record<Capability, string> = {
+  "document:upload": "رفع المستندات",
+  "document:view": "عرض المستندات",
+  "supplier:view": "عرض المورّدين",
+  "supplier:edit": "تعديل المورّدين والأصناف",
+  "amounts:view": "رؤية المبالغ",
+  "reports:view": "عرض التقارير",
+  "bank:view": "عرض كشف البنك",
+  "bank:edit": "تصنيف حركات البنك",
+  "expense:edit": "تعديل المصروفات",
+  "payroll:view": "عرض الرواتب",
+  "payment:approve": "اعتماد السداد",
+  "month:close": "إقفال الشهر",
+  "month:reopen": "إعادة فتح الشهر",
+  "users:manage": "إدارة المستخدمين",
+  "audit:view": "عرض سجلّ التدقيق",
+};
+
 /** يُرمى داخل الواجهات البرمجية ليُترجم إلى 403. */
 export class ForbiddenError extends Error {
   readonly capability: Capability;
   constructor(capability: Capability) {
-    super(`لا تملك صلاحية: ${capability}`);
+    super(`هذا الفعل يحتاج صلاحية «${CAPABILITY_LABEL[capability]}» — اطلبها من مالك الحساب.`);
     this.name = "ForbiddenError";
     this.capability = capability;
   }

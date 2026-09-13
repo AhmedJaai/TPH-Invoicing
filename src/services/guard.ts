@@ -8,6 +8,8 @@ import { NextResponse } from "next/server";
 import { requireUser, UnauthenticatedError, type CurrentUser } from "@/lib/session";
 import { ForbiddenError, type Capability } from "@/lib/permissions";
 import { consume, RateLimitedError } from "./rate-limit.service";
+import { MonthClosedError } from "./validation.service";
+import { AlreadyMatchedError, PaymentTwinError } from "./payment.service";
 
 export { RateLimitedError };
 
@@ -28,6 +30,10 @@ export function respondTo(e: unknown): NextResponse | null {
   }
   if (e instanceof ForbiddenError) {
     return NextResponse.json({ error: e.message }, { status: 403 });
+  }
+  /* أخطاءُ المال المعروفة تُقال لقارئها بـ409، لا ٥٠٠ صامتة */
+  if (e instanceof MonthClosedError || e instanceof AlreadyMatchedError || e instanceof PaymentTwinError) {
+    return NextResponse.json({ error: e.message }, { status: 409 });
   }
   if (e instanceof RateLimitedError) {
     return NextResponse.json(

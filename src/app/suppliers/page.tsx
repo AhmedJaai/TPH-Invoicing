@@ -34,14 +34,14 @@ export default async function SuppliersPage() {
         select count(*)::int from invoices i where i.supplier_id = suppliers.id
       )`,
       billedMinor: sql<number>`(
-        select coalesce(sum(i.total_minor), 0)::int from invoices i where i.supplier_id = suppliers.id
+        select coalesce(sum(i.total_minor), 0)::bigint from invoices i where i.supplier_id = suppliers.id
       )`,
       /*
         كلُّ ما دُفع له فعلاً — لا ما خُصّص على فواتيره وحده. مالٌ دُفع ولم
         يُخصّص كان لا يُرى، فيبدو المورّد مديناً وقد سُدّد.
       */
       paidMinor: sql<number>`(
-        select coalesce(sum(p.amount_minor - p.fee_minor), 0)::int
+        select coalesce(sum(p.amount_minor - p.fee_minor), 0)::bigint
         from payments p
         where p.supplier_id = suppliers.id and p.status not in ('REVERSED', 'VOID')
       )`,

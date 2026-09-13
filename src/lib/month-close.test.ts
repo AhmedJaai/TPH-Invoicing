@@ -75,10 +75,10 @@ describe("buildMonthClose", () => {
     expect(state(r, "statements")).toBe("PASS");
   });
 
-  it("غياب كشف البنك ينبّه", () => {
+  it("غياب كشف البنك يمنع الإقفال — أيّام الشهر كلّها فجوة", () => {
     const r = buildMonthClose({ ...clean, bankImportCoversMonth: false });
-    expect(state(r, "bank")).toBe("WARN");
-    expect(r.canClose).toBe(true);
+    expect(state(r, "bank")).toBe("BLOCK");
+    expect(r.canClose).toBe(false);
   });
 
   it("بند الأصول الثابتة لا يظهر إلا حين توجد", () => {
@@ -150,8 +150,8 @@ describe("تغطية البنك ومعادلته", () => {
     const r = buildMonthClose({
       ...clean, bankBalanceStatus: "UNKNOWN", bankBalanceDifferenceMinor: null,
     });
-    expect(state(r, "bank-balance")).toBe("WARN");
-    expect(r.canClose).toBe(true);
+    expect(state(r, "bank-balance")).toBe("BLOCK");
+    expect(r.canClose).toBe(false);
   });
 
   it("هللةٌ واحدة تمرّ", () => {
@@ -169,10 +169,29 @@ describe("تغطية البنك ومعادلته", () => {
   });
 
   /* بلا كشفٍ أصلاً لا يُسأل عن فجوةٍ ولا معادلة — السؤال سابقٌ لأوانه */
-  it("بلا كشف: لا فحص تغطية ولا معادلة", () => {
+  it("بلا كشف: لا فحص تغطية ولا معادلة — وغيابه نفسه يمنع الإقفال", () => {
     const r = buildMonthClose({ ...clean, bankImportCoversMonth: false, bankGapDays: 30 });
     expect(state(r, "bank-coverage")).toBeUndefined();
     expect(state(r, "bank-balance")).toBeUndefined();
-    expect(r.canClose).toBe(true);
+    expect(state(r, "bank")).toBe("BLOCK");
+    expect(r.canClose).toBe(false);
   });
 });
+
+describe("لكلّ بندٍ غير ناجحٍ موضعُ إصلاحه", () => {
+  it("كلّ WARN وBLOCK يحمل رابطاً", () => {
+    const r = buildMonthClose({
+      ...clean, invoiceCount: 0, openBlockerIssues: 2, documentsNeedingReview: 1,
+      unknownTaxCount: 1, notTaxValidCount: 1, unpaidCount: 1, suppliersWithStatement: 0,
+      bankImportCoversMonth: false, fixedAssetCount: 1,
+    });
+    const notPass = r.items.filter((i) => i.state !== "PASS");
+    expect(notPass.length).toBeGreaterThan(5);
+    expect(notPass.every((i) => Boolean(i.href))).toBe(true);
+  });
+
+  it("ولا بند «مقيَّدة محاسبياً» — التصدير غير مبنيّ فلا يمرّ أبداً", () => {
+    expect(buildMonthClose({ ...clean, unpostedCount: 52 }).items.some((i) => i.id === "posted")).toBe(false);
+  });
+});
+

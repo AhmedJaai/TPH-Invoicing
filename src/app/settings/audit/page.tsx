@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, PageShell } from "@/components/page-shell";
+import { NoAccess } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +67,7 @@ export default async function AuditTrailPage({
   if (!can(user.role, "audit:view")) {
     return (
       <PageShell user={user} width="wide" title="سجل التدقيق">
-        <Empty message="سجل التدقيق للمالك والمحاسب." />
+        <NoAccess what="سجلّ التدقيق" />
       </PageShell>
     );
   }

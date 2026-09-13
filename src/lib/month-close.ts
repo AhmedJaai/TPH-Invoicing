@@ -22,6 +22,11 @@ export interface CheckItem {
   state: CheckState;
   detail: string;
   action?: string;
+  /**
+   * موضعُ الإصلاح — كما في «يحتاج انتباهك». كانت الموانع نصّاً بلا رابط:
+   * «راجعها وأرشفها» تُقرأ ثمّ يُبحث عن مكانها بيد.
+   */
+  href?: string;
 }
 
 export interface MonthFacts {
@@ -66,6 +71,24 @@ export interface MonthCloseReport {
 
 const riyals = (m: number) =>
   (m / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** أين يُصلَح كلُّ بند — مرشَّحاً بالشهر حيث يقبل الترشيح. */
+export function fixHref(id: string, month: string): string {
+  switch (id) {
+    case "has-invoices": return "/upload";
+    case "no-blockers": return "/attention";
+    case "no-pending-review": return "/documents?status=NEEDS_REVIEW";
+    case "tax-unknown": return `/purchases/invoices?tax=UNKNOWN&month=${month}`;
+    case "tax-valid": return `/purchases/invoices?tax=INVALID&month=${month}`;
+    case "paid": return `/purchases/invoices?paid=OPEN&month=${month}`;
+    case "statements": return "/statements";
+    case "bank": case "bank-coverage": return "/bank";
+    case "bank-balance": return "#balances";
+    case "bank-unexplained": return "/review";
+    case "fixed-assets": return `/purchases/invoices?month=${month}`;
+    default: return "/attention";
+  }
+}
 
 export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   const items: CheckItem[] = [];
@@ -145,16 +168,12 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     action: facts.unpaidCount === 0 ? undefined : "أدرجها في دفعة أوّل الشهر أو اعتمدها مسدَّدة",
   });
 
-  items.push({
-    id: "posted",
-    label: "كل الفواتير مقيَّدة محاسبياً",
-    state: facts.unpostedCount === 0 ? "PASS" : "WARN",
-    detail:
-      facts.unpostedCount === 0
-        ? "لا شيء معلّق عن القيد"
-        : `${countNoun(facts.unpostedCount, INVOICE)} لم تُقيَّد`,
-    action: facts.unpostedCount === 0 ? undefined : "قيّدها — الفاتورة غير المقيَّدة تختفي من التقارير",
-  });
+  /*
+    «كل الفواتير مقيَّدة محاسبياً» كان بنداً لا يمرّ أبداً: التصدير
+    المحاسبيّ غير مبنيّ عمداً، فيبقى اثنان وخمسون من اثنين وخمسين
+    «لم تُقيَّد» مهما فعل صاحب العمل — تنبيهٌ دائم يعلّم تجاهل التنبيهات.
+    يعود حين يُبنى مسار القيد.
+  */
 
   const missingStatements = Math.max(0, facts.suppliersWithInvoices - facts.suppliersWithStatement);
   items.push({
@@ -174,9 +193,13 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   items.push({
     id: "bank",
     label: "كشف البنك مستورد ويغطّي الشهر",
-    state: facts.bankImportCoversMonth ? "PASS" : "WARN",
-    detail: facts.bankImportCoversMonth ? "السداد مثبت بحركات بنكية" : "لم يُستورد كشف بنك يغطّي الشهر",
-    action: facts.bankImportCoversMonth ? undefined : "استورد كشف الحساب من صفحة السداد",
+    /*
+      غيابُ الكشف مانع لا تنبيه: أيّام الشهر كلّها فجوة، والفجوة يقين.
+      وكان «تنبيهاً» فيُقفَل شهرٌ لم يُقرأ منه ريالٌ بنكيّ.
+    */
+    state: facts.bankImportCoversMonth ? "PASS" : "BLOCK",
+    detail: facts.bankImportCoversMonth ? "السداد مثبت بحركات بنكية" : "لم يُستورد كشف بنك يغطّي الشهر — أيّامه كلّها فجوة",
+    action: facts.bankImportCoversMonth ? undefined : "استورد كشف الحساب من صفحة البنك",
   });
 
   /*
@@ -211,9 +234,8 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
       state:
         facts.bankBalanceStatus === "BALANCED" || facts.bankBalanceStatus === "WITHIN_TOLERANCE"
           ? "PASS"
-          : facts.bankBalanceStatus === "UNKNOWN"
-            ? "WARN"
-            : "BLOCK",
+          /* «لم يُفحَص» يمنع كما يمنع «فشل» — والرصيدان يُكتبان أدناه */
+          : "BLOCK",
       detail:
         facts.bankBalanceStatus === "UNKNOWN"
           ? "الكشف لا يحمل رصيداً افتتاحياً أو ختامياً — المعادلة لا تُفحَص"
@@ -224,7 +246,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
         facts.bankBalanceStatus === "UNEXPLAINED"
           ? "راجع الكشف — الفرق يعني حركاتٍ لم تُقرأ، لا خطأ مطابقة"
           : facts.bankBalanceStatus === "UNKNOWN"
-            ? "أدخل رصيدَي أوّل المدّة وآخرها كي تُفحَص المعادلة"
+            ? "اكتب رصيدَي أوّل الشهر وآخره كما في كشف البنك — أو استورد كشفاً فيه عمود الرصيد"
             : undefined,
     });
 
@@ -247,6 +269,10 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
       detail: `${countNoun(facts.fixedAssetCount, INVOICE)} فوق حدّ الرسملة`,
       action: "راجعها مع المحاسب — صرفها دفعة واحدة يشوّه ربح الشهر",
     });
+  }
+
+  for (const i of items) {
+    if (i.state !== "PASS" && !i.href) i.href = fixHref(i.id, facts.month);
   }
 
   const blockers = items.filter((i) => i.state === "BLOCK");

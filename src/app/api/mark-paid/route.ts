@@ -19,10 +19,11 @@
 import { NextResponse } from "next/server";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { invoices, paymentAllocations, payments } from "@/db/schema";
+import { invoices, paymentAllocations } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { recordAudit } from "@/lib/audit";
-import { refreshPaymentStatus } from "@/services/payment.service";
+import { createPayment, refreshPaymentStatus } from "@/services/payment.service";
+import { assertMonthsOpen } from "@/services/month-guard";
 import { CreditError, markPaidByOwner, previewOwnerPaid } from "@/services/supplier-credit.service";
 import { INVOICE, countNoun } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -42,6 +43,16 @@ interface Body {
 }
 
 export async function POST(request: Request) {
+  try {
+    return await handle(request);
+  } catch (e) {
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
+    throw e;
+  }
+}
+
+async function handle(request: Request) {
   let user;
   try {
     user = await guard("mark-paid", "payment:approve");
@@ -149,18 +160,21 @@ export async function POST(request: Request) {
   await db.transaction(async (tx) => {
     for (const inv of pending) {
       const remaining = inv.totalMinor - Number(inv.allocated);
-      const [pay] = await tx
-        .insert(payments)
-        .values({
-          supplierId: inv.supplierId,
-          paidAt: inv.invoiceDate,
-          amountMinor: remaining,
-          method: "BANK_TRANSFER",
-          beneficiaryNameRaw: null,
-          appliesToMonth: inv.periodMonth,
-        })
-        .returning({ id: payments.id });
+      /*
+        عبر `createPayment` لا إدراجاً باليد: فيُسأل التوأم (الواقعة الواحدة
+        لا تُقيَّد دفعتين) ويُحرَس الشهر المقفل.
+      */
+      const payId = await createPayment(tx, {
+        supplierId: inv.supplierId,
+        paidAt: inv.invoiceDate,
+        amountMinor: remaining,
+        method: "BANK_TRANSFER",
+        beneficiaryNameRaw: null,
+        appliesToMonth: inv.periodMonth,
+      });
+      const pay = { id: payId };
 
+      await assertMonthsOpen(tx, [inv.periodMonth]);
       await tx.insert(paymentAllocations).values({
         paymentId: pay.id,
         invoiceId: inv.id,
@@ -183,12 +197,12 @@ export async function POST(request: Request) {
   await recordAudit({
     actorId: user.id,
     action: "INVOICES_MARKED_PAID",
-    entityType: "payment_run",
+    entityType: "invoice",
     entityId: body.supplierId ?? "manual",
     after: {
       نوع: "وسم يدوي بالسداد",
       عدد_الفواتير: pending.length,
-      المبلغ: totalMinor / 100,
+      المبلغ_بالهللات: totalMinor,
       الفواتير: pending.map((p) => p.invoiceNumber),
       ملاحظة: body.note ?? null,
       // لم يأتِ من كشف بنك — تمييزه مهم عند أي مراجعة لاحقة
@@ -200,6 +214,6 @@ export async function POST(request: Request) {
     ok: true,
     marked: pending.length,
     totalMinor,
-    message: `وُسمت ${countNoun(pending.length, INVOICE)} بقيمة ${(totalMinor / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })} ريال`,
+    message: `سُجّل سداد ${countNoun(pending.length, INVOICE)} بقيمة ${formatRiyalsDisplay(totalMinor)} ريال`,
   });
 }

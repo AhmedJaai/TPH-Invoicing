@@ -12,6 +12,7 @@ import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { salesAvailable } from "@/lib/sales/connector";
 import { NoAccess } from "@/components/ui";
 import { TRANSACTION, countNoun } from "@/lib/arabic";
+import { isExpenseCategory, looksLikeGoodsPurchase } from "@/lib/expenses";
 import { ScrollX } from "@/components/scroll-x";
 
 export const dynamic = "force-dynamic";
@@ -57,16 +58,35 @@ export default async function FinancialStatementPage() {
     `)
   ).rows;
 
-  // المصروف التشغيلي: من كشف البنك، بلا سداد المورّدين ولا الحركات التشغيلية
-  const operating = (
-    await db.execute<{ category: string; s: string }>(sql`
-      select category::text as category, sum(amount_minor)::bigint as s
+  /*
+    المصروف التشغيليّ بالقاعدة نفسها التي يُقيَّد بها المصروف (`lib/expenses`):
+    لا سدادُ مورّد (محسوبٌ في المشتريات)، ولا تحويلٌ داخليّ، ولا **سحبُ
+    المالك** (توزيعٌ لا مصروف)، ولا ما يقول وصفُه «شراء بضاعة».
+
+    وكان الشرط يستثني الداخليّ والمجهول والمورّد وحدها، فدخلت تحويلات
+    أحمد الشخصيّة (١١٢٬٧٢٢٫١٨) «مصروفاً تشغيلياً» فتضاعف المجموع، وبأسماء
+    تعداداتٍ إنجليزية. والمستبعَد يُعلَن بمبلغه لا يُحذف بصمت.
+  */
+  const debits = (
+    await db.execute<{ category: string; description: string | null; beneficiary_raw: string | null; amount_minor: string }>(sql`
+      select category::text as category, description, beneficiary_raw, amount_minor::bigint as amount_minor
         from bank_transactions
        where direction = 'DEBIT'
-         and category not in ('INTERNAL', 'UNKNOWN', 'SUPPLIER')
-       group by 1
     `)
-  ).rows.map((r) => ({ category: r.category as TxCategory, amountMinor: Number(r.s) }));
+  ).rows;
+
+  const operatingMap = new Map<TxCategory, number>();
+  let personalMinor = 0;
+  let goodsMinor = 0;
+  for (const r of debits) {
+    const category = r.category as TxCategory;
+    const amount = Number(r.amount_minor);
+    if (category === "PERSONAL") { personalMinor += amount; continue; }
+    if (!isExpenseCategory(category) || category === "POS_SETTLEMENT") continue;
+    if (looksLikeGoodsPurchase(r.description, r.beneficiary_raw)) { goodsMinor += amount; continue; }
+    operatingMap.set(category, (operatingMap.get(category) ?? 0) + amount);
+  }
+  const operating = [...operatingMap].map(([category, amountMinor]) => ({ category, amountMinor }));
 
   const recurring = (
     await db.execute<{ id: string; label: string; category: string; amount_minor: number; cadence: string }>(sql`
@@ -118,7 +138,7 @@ export default async function FinancialStatementPage() {
           </p>
         )}
 
-        <div className="mt-3 grid grid-cols-3 gap-3">
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
             <p className="text-xs text-muted">الوارد</p>
             <p className="mt-1 text-xl font-bold text-ok"><Money minor={cash.totalInMinor} /></p>
@@ -169,6 +189,14 @@ export default async function FinancialStatementPage() {
         <p className="mt-1 text-xs leading-relaxed text-muted">
           ناقصةٌ معلَنة. ينقصها: {pl.missing.join(" · ")} — ولن تُعرض بأرقام مقدَّرة.
         </p>
+        {(personalMinor > 0 || goodsMinor > 0) && (
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            مستبعَدٌ من المصروف التشغيليّ:
+            {personalMinor > 0 && <> تحويلاتٌ شخصيّة <Money minor={personalMinor} /> (سحبُ مالكٍ لا مصروف)</>}
+            {personalMinor > 0 && goodsMinor > 0 && " · "}
+            {goodsMinor > 0 && <> ما وصفُه «شراء بضاعة» <Money minor={goodsMinor} /> (محسوبٌ في المشتريات)</>}
+          </p>
+        )}
         <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
           {pl.lines.map((l) => (
             <li key={l.id} className="flex items-center justify-between gap-3 px-4 py-2.5">

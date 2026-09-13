@@ -48,7 +48,7 @@ export async function gatherHomeProvenance(): Promise<HomeProvenance> {
 
       (select count(*)::int from invoices where period_month = (select month from latest))
                                                                              as invoices_in_month,
-      (select coalesce(sum(total_minor), 0)::int from invoices
+      (select coalesce(sum(total_minor), 0)::bigint from invoices
         where period_month = (select month from latest))                     as amount_in_month,
 
       (select count(*)::int from documents where status in ('PENDING', 'EXTRACTED'))
@@ -61,20 +61,20 @@ export async function gatherHomeProvenance(): Promise<HomeProvenance> {
 
       (select count(*)::int from invoices where tax_status = 'VALID' and vat_minor is not null)
                                                                              as vat_valid_count,
-      (select coalesce(sum(vat_minor), 0)::int from invoices
+      (select coalesce(sum(vat_minor), 0)::bigint from invoices
         where tax_status = 'VALID' and vat_minor is not null)                as vat_valid_amount,
       (select count(*)::int from invoices where tax_status = 'UNKNOWN')      as vat_unknown_count,
       (select count(*)::int from invoices where tax_status = 'INVALID')      as vat_invalid_count,
 
       (select count(*)::int from bank_transactions
         where direction = 'DEBIT' and category = 'UNKNOWN')                  as bank_unknown_count,
-      (select coalesce(sum(amount_minor), 0)::int from bank_transactions
+      (select coalesce(sum(amount_minor), 0)::bigint from bank_transactions
         where direction = 'DEBIT' and category = 'UNKNOWN')                  as bank_unknown_minor,
       (select count(*)::int from bank_transactions
         where direction = 'DEBIT' and category <> 'UNKNOWN')                 as bank_known_count,
-      (select coalesce(sum(amount_minor), 0)::int from bank_transactions
+      (select coalesce(sum(amount_minor), 0)::bigint from bank_transactions
         where direction = 'DEBIT' and category <> 'UNKNOWN')                 as bank_known_minor,
-      (select coalesce(sum(vat_minor), 0)::int from invoices
+      (select coalesce(sum(vat_minor), 0)::bigint from invoices
         where tax_status = 'INVALID' and vat_minor is not null)              as vat_invalid_amount
   `)).rows;
 

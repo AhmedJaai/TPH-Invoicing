@@ -18,14 +18,15 @@
  * وما لم يعد يصلح لا يُقرَّ ولا يُرَدّ صامتاً: يُعاد في القائمة بسببه.
  */
 import { NextResponse } from "next/server";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   bankTransactions, decisionHistory, invoices, paymentAllocations,
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { allocate, createPayment } from "@/services/payment.service";
+import { allocate, recordBankPayment, claimBankTransaction, AlreadyMatchedError } from "@/services/payment.service";
+import { MonthClosedError } from "@/services/validation.service";
 import { recordAudit } from "@/lib/audit";
 import { runReconciliation } from "@/services/reconcile.service";
 import { loadMerchantMemory } from "@/services/counterparty.service";
@@ -243,7 +244,7 @@ export async function POST(request: Request) {
     let paymentId: string;
     try {
       paymentId = await db.transaction(async (t) => {
-        const id = await createPayment(t, {
+        const { id } = await recordBankPayment(t, {
           supplierId: plan.supplierId,
           paidAt: plan.paidAt,
           amountMinor: plan.amountMinor,
@@ -255,24 +256,19 @@ export async function POST(request: Request) {
 
         await allocate(t, id, plan.amountMinor, plan.allocations);
 
-        await t
-          .update(bankTransactions)
-          .set({
-            matchedPaymentId: id,
-            matchStatus: "MATCHED",
-            matchDisposition: "AUTO",
-            lifecycle: "POSTED",
-            supplierId: plan.supplierId,
-            category: "SUPPLIER",
-          })
-          .where(and(
-            eq(bankTransactions.id, tx.id),
-            /*
-              شرطُ السباق: لو أقرّها أحدٌ آخر بين قراءتنا وكتابتنا لم
-              تُكتَب مرّتين. والفحص في الشيفرة يفلت من طلبين متزامنين.
-            */
-            sql`${bankTransactions.matchedPaymentId} is null`,
-          ));
+        /*
+          شرطُ السباق، ويُفحَص أثرُه: كان الشرط في `where` ولا يُعدّ ما
+          كُتب، فتُودَع الدفعة وتخصيصها ولو خسرت السباق. `claim` يرمي
+          عند صفر صفوف فتُلغى المعاملة كلّها.
+        */
+        await claimBankTransaction(t, tx.id, {
+          matchedPaymentId: id,
+          matchStatus: "MATCHED",
+          matchDisposition: "AUTO",
+          lifecycle: "POSTED",
+          supplierId: plan.supplierId,
+          category: "SUPPLIER",
+        });
 
         await t.insert(decisionHistory).values({
           bankTransactionId: tx.id,
@@ -294,7 +290,9 @@ export async function POST(request: Request) {
       outcomes.push({
         transactionId: tx.id,
         ok: false,
-        reason: `تعذّر التقييد: ${(e as Error).message.slice(0, 120)}`,
+        reason: e instanceof AlreadyMatchedError || e instanceof MonthClosedError
+          ? e.message
+          : "تعذّر التقييد — لم يُكتب منها شيء. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب.",
       });
       continue;
     }
@@ -311,7 +309,7 @@ export async function POST(request: Request) {
 
   await recordAudit({
     actorId: user.id,
-    action: "INVOICES_MARKED_PAID",
+    action: "MATCH_CONFIRMED",
     entityType: "bank_transaction",
     entityId: `bulk:${confirmed}`,
     after: {

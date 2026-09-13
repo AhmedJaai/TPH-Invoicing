@@ -26,7 +26,9 @@ import {
 } from "@/services/validation.service";
 import { createInvoice, createStatement, replaceLines } from "@/services/invoice.service";
 import { parseStatementExtras } from "@/lib/extraction/statement-extras";
-import { createPayment } from "@/services/payment.service";
+import { createPayment, findPaymentTwin } from "@/services/payment.service";
+import { payments } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import type { RawLine } from "@/services/types";
@@ -272,15 +274,30 @@ export async function POST(request: Request) {
       }
 
       if (PAYMENT_KINDS.has(body.documentKind) && invoiceDate && totalMinor !== null) {
-        await createPayment(tx, {
-          documentId: docId,
-          supplierId: body.supplierId,
+        /*
+          الإيصالُ دليلٌ على دفعة، لا دفعةٌ ثانية — كما في المزامنة.
+          فإن كانت الواقعةُ مقيَّدة (من الكشف أو بيد) عُلِّق عليها إن لم
+          يكن لها مستند، ولم تُنشأ أخرى.
+        */
+        const twin = await findPaymentTwin(tx, {
+          supplierId: body.supplierId ?? null,
           paidAt: invoiceDate,
           amountMinor: totalMinor,
-          method: body.documentKind === "CASH_RECEIPT" ? "CASH" : "BANK_TRANSFER",
-          beneficiaryNameRaw: body.beneficiary,
-          appliesToMonth: periodMonth,
         });
+        if (twin === null) {
+          await createPayment(tx, {
+            documentId: docId,
+            supplierId: body.supplierId,
+            paidAt: invoiceDate,
+            amountMinor: totalMinor,
+            method: body.documentKind === "CASH_RECEIPT" ? "CASH" : "BANK_TRANSFER",
+            beneficiaryNameRaw: body.beneficiary,
+            appliesToMonth: periodMonth,
+            acknowledgeTwin: true,
+          });
+        } else if (twin.documentId === null) {
+          await tx.update(payments).set({ documentId: docId }).where(eq(payments.id, twin.id));
+        }
       }
 
       /*

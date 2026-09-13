@@ -82,6 +82,10 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | `025_identity_supersedes_natural.sql` | قيدٌ واحد للهويّة — لا قيدان بتوحيدين مختلفين |
 | `026_allocation_bounds_serialize.sql` | مؤثِّر التخصيص يقفل الفاتورة والدفعة قبل الجمع — فلا يُخدَع بالتزاحم |
 | `027_owner_account_and_ai_findings.sql` | `OWNER_ACCOUNT` طريقةَ سداد، وجدول `ai_findings` لاقتراحات تحليل الذكاء وقرار الإنسان فيها |
+| `028_month_lock.sql` | الشهر المقفل لا يُكتب فيه: مؤثِّرات على الفواتير والدفعات والتخصيصات — وتحديث الحال مقبول |
+| `029_ops_indexes.sql` | فهارس ناقصة: `payment_allocations.invoice_id` و`matched_payment_id` و`bank_import_id` و`user_id` |
+
+والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 
 ## المكتبات التي يجب معرفتها
 
@@ -101,7 +105,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | `src/lib/bank/optimizer.ts` | تفريعٌ وتحديد: أعلى **مجموع** لا أعلى درجة. وميزانيّة عقد، فإن نفدت رجع للجشع وأعلن `exact: false` |
 | `src/lib/bank/coverage.ts` | فجوات التغطية — الغائب لا يُرى فيجب أن يُحسَب |
 | `src/lib/bank/balance-equation.ts` | **افتتاحي + وارد − صادر = ختامي.** وهذه التسوية؛ وعدُّ المطابقات ليس تسوية |
-| `src/lib/bank/lifecycle.ts` | طبقات الحركة: خام ← مُستنتَجة ← مقترَحة ← مُقَرَّة ← مُقيَّدة · **`detectAnomalies` لا يستدعيها شيء — الأعطاب تُحسَب ولا تُعرَض** |
+| `src/lib/bank/lifecycle.ts` | طبقات الحركة: خام ← مُستنتَجة ← مقترَحة ← مُقَرَّة ← مُقيَّدة · و`detectAnomalies` موصولةٌ ببندٍ في «يحتاج انتباهك» |
 | `src/lib/bank/review-queue.ts` | ثلاثة أعمالٍ لا عملٌ واحد: يُقَرّ · يُراجَع · يُحسَم |
 | `src/lib/bank/evidence-uniqueness.ts` | القاطع يُحتكَر ويُعلَن تضاربه، والظنّيّ يُشترَك — والاسم ليس هويّة |
 | `src/lib/bank/supplier-profile.ts` | عادةُ سداد المورّد — ترجّح ولا تحسم، ولا تُبنى على أقلّ من خمس سابقات |
@@ -109,7 +113,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | `src/lib/bank/metrics.ts` | أنتحسّن أم نسوء — ويُحسَب على ما فعله الإنسان وحده |
 | `src/lib/bank/parsers/adapters.ts` | محوِّل لكل بنك، و`verified` يُعرَض للمستخدم لا يُدفَن في تعليق |
 | `src/lib/payment-state.ts` | سبعُ حالاتٍ للدفعة — والمردودة لا تُحسَب مدفوعة |
-| `src/services/payment.service.ts` | `findPaymentTwin` — الواقعة الواحدة تأتي من بابين، فلا تُقيَّد مرّتين |
+| `src/services/payment.service.ts` | `createPayment` يسأل التوأم ويرمي ما لم يُقَرّ · `recordBankPayment` يتبنّى المقيَّد بلا حركة · `claimBankTransaction` يربط بشرط ألّا تكون مربوطة ويرمي |
 | `src/lib/unit-conversion.ts` | لا جسر بين وزنٍ وحجم، والمجهول لا يُحوَّل · **لا تصل إليها شاشة** |
 | `src/lib/bank/fees.ts` | الرسم البنكيّ داخل الدفعة — والنقص سدادٌ جزئيّ لا رسم |
 | `src/lib/bank/reversal.ts` | ما خرج ثمّ عاد — لا إيراد ولا تحويل داخليّ · **لا تصل إليها شاشة** |
@@ -154,6 +158,9 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | `src/services/supplier-analysis.service.ts` | الوقائع ← النداء (بمهلةٍ تحت عمر المسار) ← `ai_findings` · والإقرار يمرّ بالخدمات نفسها، والرفض يقرؤه التحليل القادم |
 | `src/lib/http-client.ts` | **قراءة الردّ في المتصفّح**: نصّاً قبل JSON، و«تعذّر الاتصال» حين لا يصل الطلب وحده. ويمنع `code-guards.test.ts` ‏`await res.json()` في الشاشات |
 | `src/lib/code-guards.test.ts` | حرّاسٌ نصّيّة: لا `db.` داخل معاملة · لا `renameFile` خارج `/api/drive-rename` · لا `res.json()` خامّ |
+| `src/services/month-guard.ts` | `assertMonthsOpen(tx, months)` — في `createPayment` و`allocate` و`createInvoice`، ومؤثِّرات ٠٢٨ خلفه |
+| `src/lib/bank/statement-balances.ts` | رصيدا كلّ شهرٍ من عمود الرصيد، إن استقامت السلسلة — وإلّا مجهول |
+| `src/lib/riyadh-time.ts` | «اليوم» و«الشهر الجاري» بتوقيت الرياض — لا `toISOString().slice(0, 7)` |
 | `src/services/guard.ts` | `guard(route, capability)` + `respondTo(e)` → 401/403/429. **مدخل كل واجهة** |
 
 ## القرارات وأسبابها
@@ -303,6 +310,11 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 
 - **الكتابة داخل المعاملة بمقبضها `t` — لا بـ`db` أبداً.** على Vercel في المجمَّع اتّصالٌ واحد تحجزه المعاملة، فينتظر `db` عشر ثوانٍ ثمّ يسقط؛ ومحلّياً (عشرة اتّصالات) يسقط بالمفتاح الأجنبيّ لأنّ الصفّ الأب لم يُودَع. فلم يُحفَظ تعريفُ جهةٍ من الواجهة خمسة أيّام، ولم يكشفه اختبار. و`recordAudit(entry, writer)` يأخذ المقبض كي لا يبقى في السجلّ «تعلّمٌ» أُلغي. ويحرسه `code-guards.test.ts`.
 - **المزامنة لا تسمّي.** تُقيِّد الملفّ باسمه وتقترح، والتسمية في `/api/drive-rename` وحده باختيارٍ ملفّاً ملفّاً (القائمة تبدأ فارغة) وقيدٍ بالاسمين. وكانت تسمّي قبل التقييد بلا أثر — خرقاً للقيد الأوّل.
+- **التوأم يُسأل في `createPayment` نفسها** لا في المستدعين — كان يُسأل في مسارين من ثمانية فبقيت لافا ٩٤٥ دفعتين. ومن قيّد من حركة بنك يمرّ بـ`recordBankPayment`: المقيَّد بلا حركة يُتبنّى مخصَّصاً كان أو لا.
+- **الحركة تُربط بدفعتها بشرطٍ يُعدّ أثره** (`claimBankTransaction`): الشرط في `where` بلا فحص عدد الصفوف لا يمنع ضغطتين.
+- **الإقفال يمنع بلا كشف وبلا معادلة، والشهر المقفل لا يُكتب فيه من أيّ باب** — في الخدمات وفي القاعدة (٠٢٨). وإعادة الفتح للمالك وحده.
+- **`db:verify` يطابق القيد الذي يسمّيه** — أيُّ خطأٍ كان يُعدّ رفضاً، ففحصٌ ماليّ كان يمرّ بقيد فرادةٍ لا علاقة له.
+- **المصروف المقيَّد يتبع تصنيف حركته** (`resyncBankExpenses`) — والحذف لصفٍّ مشتقّ، بنصّه في التدقيق.
 - **لا وسمَ جماعيّ بالسداد.** «أعلن سدادها يدوياً» كان يسِم كلّ المفتوح بضغطتين؛ و`mark-paid` صار يقبل الفواتير بأعيانها.
 
 ## المصائد المعروفة
@@ -324,7 +336,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 
 ## الأوامر
 
-`npm test` (١٣٨٨ اختباراً · ٩٤ ملفاً) · `npm run typecheck` · `npm run lint`
+`npm test` (١٧١٠ اختباراً · ٩٨ ملفاً) · `npm run typecheck` · `npm run lint`
 `npm run db:migrate` · `db:verify` · `db:dedupe` · `db:rematch` · `db:reclassify` · `db:learn` · `db:link` · `db:split-check`
 `npm run db:expenses` · `db:audit` · `db:measure` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules` · `db:repair-scope` · `db:identity` · `db:unpaid`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`
@@ -353,8 +365,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | `src/lib/bank/reversal.ts` | الردّ لا يُكشَف آلياً — حالةٌ واحدة محتملة في البيانات |
 | `src/lib/unit-conversion.ts` | مقارنة الأسعار لا تعبر الوحدات — والأصناف ١٠٩ ولم يُربَط منها إلّا واحد |
 | `src/lib/extraction/benchmark.ts` | لا يُقاس أيّ نموذجٍ أدقّ |
-| `detectAnomalies` في `lifecycle.ts` | «أُقرَّت ولم تُقيَّد» لا تظهر — وفي البيانات حركتان كذلك بـ٩٬٤٦٢٫٧٧ ريالاً |
-| `branches` · `bank_accounts` · `reconciliation_periods` | مخطَّطٌ بلا شيفرة: `branchId` لا يرد في استعلامٍ واحد، و`bank_account_id` فارغ في ١٤٢٢ حركة — فتقييد الفرادة بالحساب في `014` لا أثر له |
+| `branches` | مخطَّطٌ بلا شيفرة: `branchId` لا يرد في استعلامٍ واحد. (أمّا `bank_accounts` فممتلئٌ في كلّ حركة، و`reconciliation_periods` يكتبه الاستيراد ونموذج الإقفال.) |
 
 **قبل أن تُضيف وحدةً جديدة: أوصِل واحدةً من هذه.**
 

@@ -11,7 +11,7 @@ import { loadBalanceTotals } from "@/services/supplier-balance.service";
 
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { NoAccess } from "@/components/ui";
-import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
+import { IMPORT, INVOICE, PAYMENT_RECORD, TRANSACTION, countNoun } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +52,7 @@ export default async function MoneyPage() {
     await db.execute<{ category: string; n: number; s: string }>(sql`
       select category::text as category, count(*)::int as n, sum(amount_minor)::bigint as s
       from bank_transactions
-      where direction = 'DEBIT' and category not in ('INTERNAL','UNKNOWN','SUPPLIER')
+      where direction = 'DEBIT' and category not in ('INTERNAL','UNKNOWN','SUPPLIER','PERSONAL','POS_SETTLEMENT')
       group by 1 order by s desc
     `)
   ).rows;
@@ -65,7 +65,7 @@ export default async function MoneyPage() {
       detail:
         Number(f?.unclassified ?? 0) > 0
           ? `${countNoun(f?.unclassified, TRANSACTION)} لم تُصنَّف — صنّفها مرّة وتسري القاعدة بعدها`
-          : `${f?.imports ?? 0} عملية استيراد · كلّها مصنَّفة`,
+          : `${countNoun(Number(f?.imports ?? 0), IMPORT)} · كلّها مصنَّفة`,
       tone: Number(f?.unclassified ?? 0) > 0 ? "warn" : "ok",
     },
     {
@@ -79,14 +79,14 @@ export default async function MoneyPage() {
         وصفحةُ الفواتير هي التي تحمل المستحقّ مورّداً مورّداً. **والرقمُ
         الذي لا تفتح وجهتُه تفصيلَه يُفقد الثقة به.**
       */
-      href: "/purchases/invoices",
+      href: "/purchases/invoices?paid=OPEN",
       title: "المستحقّ للمورّدين",
       amountMinor: owedMinor,
-      detail: `على فواتير لم تُسدَّد · ${f?.payments ?? 0} دفعة مسجّلة`,
+      detail: `على فواتير لم تُسدَّد · ${countNoun(Number(f?.payments ?? 0), PAYMENT_RECORD)} مسجّلة`,
       tone: owedMinor > 0 ? "warn" : "ok",
     },
     {
-      href: "/performance",
+      href: "/purchases/invoices?tax=VALID",
       title: "ضريبة قابلة للاسترداد",
       amountMinor: Number(f?.recoverable ?? 0),
       detail: "من فواتير ضريبية كاملة",
@@ -142,7 +142,7 @@ export default async function MoneyPage() {
       <section className="mt-10">
         <h2 className="mb-1 text-base font-bold">المصروف حسب نوعه</h2>
         <p className="mb-3 text-xs leading-relaxed text-muted">
-          من كشف البنك، بحسب ما صنّفتَه بنفسك. وسداد المورّدين مستثنى — له صفحته.
+          من كشف البنك، بحسب ما صنّفتَه بنفسك. وسداد المورّدين والتحويل الشخصيّ مستثنيان — الأوّل له صفحته، والثاني سحبُ مالكٍ لا مصروف.
         </p>
         {byCategory.length === 0 ? (
           <Empty message="لا حركات مصنَّفة بعد. صنّف حركاتك من صفحة كشف البنك." />

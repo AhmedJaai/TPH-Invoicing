@@ -72,6 +72,15 @@ export default async function SupplierPage({
         (select closing_balance_minor from statements
           where supplier_id = ${s.id} and closing_balance_minor is not null
           order by period_end desc nulls last limit 1)                              as reported_balance,
+        (select to_char(period_end, 'YYYY-MM-DD') from statements
+          where supplier_id = ${s.id} and closing_balance_minor is not null
+          order by period_end desc nulls last limit 1)                              as reported_at,
+        -- الأشهر التي تغطّيها كشوفه لا عددُ ملفّاتها: كشفٌ تراكميّ لأربعة أشهر أربعة
+        (select count(distinct to_char(m, 'YYYY-MM'))::int
+           from statements st,
+                generate_series(date_trunc('month', coalesce(st.period_start, st.period_end)),
+                                date_trunc('month', st.period_end), interval '1 month') m
+          where st.supplier_id = ${s.id} and st.period_end is not null)            as statement_months,
         (select count(distinct period_month)::int from invoices
           where supplier_id = ${s.id})                                             as active_months,
         (select count(*)::int from supplier_aliases where supplier_id = ${s.id})    as alias_count,
@@ -114,9 +123,31 @@ export default async function SupplierPage({
     «عليك ثلاثة آلاف»، ولا موضع يجمع القولين.
   */
   const reportedRaw = stats?.["reported_balance"];
+  const reportedAt = typeof stats?.["reported_at"] === "string" ? (stats["reported_at"] as string) : null;
+
+  /*
+    ── المقارنة بالكشف في زمنه ──
+
+    كان آخرُ رصيدٍ في كشفه (بتاريخ ١٥ يوليو) يُقارَن بحساب **اليوم**.
+    فمصنع الكوب الذهبي: «الفرق ١٥٢٫٣٧ — نعرف أكثر ممّا يطالب»، وقد دُفع
+    له ٥٬٨٥٤٫٣٨ بعد تاريخ الكشف؛ والفرق الحقيقيّ عند ذلك التاريخ ٦٬٠٠٦٫٧٥.
+    فيُحسب ما نعرفه حتى تاريخ الكشف، ويُعرَض ما دُفع بعده بجانبه.
+  */
+  const [atStatement] = reportedAt
+    ? (await db.execute<{ billed: string; paid: string }>(sql`
+        select
+          (select coalesce(sum(total_minor), 0)::bigint from invoices
+            where supplier_id = ${s.id} and invoice_date::date <= ${reportedAt}::date) as billed,
+          (select coalesce(sum(amount_minor - fee_minor), 0)::bigint from payments
+            where supplier_id = ${s.id} and status not in ('REVERSED','VOID')
+              and paid_at::date <= ${reportedAt}::date)                                as paid
+      `)).rows
+    : [];
+  const paidAfterStatement = atStatement ? paidNet - Number(atStatement.paid) : 0;
+
   const account = buildSupplierAccount({
-    billedMinor: billed,
-    paidMinor: paidNet,
+    billedMinor: atStatement ? Number(atStatement.billed) : billed,
+    paidMinor: atStatement ? Number(atStatement.paid) : paidNet,
     reportedBalanceMinor: reportedRaw === null || reportedRaw === undefined
       ? null
       : Number(reportedRaw),
@@ -155,7 +186,7 @@ export default async function SupplierPage({
     issuesInvoices: s.issuesInvoices,
     contractOnFile: s.contractOnFile,
     hasVatNumber: Boolean(s.vatNumber),
-    statementCount: n("statement_count"),
+    statementCount: n("statement_months"),
     activeMonths: n("active_months"),
     priceChangePct,
   });
@@ -190,14 +221,14 @@ export default async function SupplierPage({
       intro={`${countNoun(n("invoice_count"), INVOICE)} · ${countNoun(n("active_months"), MONTH)} من التعامل · ${countNoun(n("product_count"), PRODUCT)}`}
       actions={
         <>
-          <LinkButton href="/statements" size="sm">راجع كشوفه</LinkButton>
-          <LinkButton href="/settings" size="sm">عدّل بياناته</LinkButton>
+          <LinkButton href="/statements" size="sm">كشوفه</LinkButton>
+          <LinkButton href={`/purchases/invoices?supplier=${s.slug}`} size="sm">فواتيره</LinkButton>
         </>
       }
     >
       {showAmounts && (
         <StatGrid>
-          <Stat label="المفوتر" minor={billed} sub={`منذ ${countNoun(n("active_months"), MONTH)}`} />
+          <Stat label="المفوتر" minor={billed} sub={`${countNoun(n("active_months"), MONTH)} من التعامل`} />
           <Stat
             label="المستحقّ له"
             minor={balance}
@@ -242,7 +273,9 @@ export default async function SupplierPage({
               sub={
                 account.knownBalanceMinor === null
                   ? "لا فاتورة منه عندنا — وذلك ليس صفراً"
-                  : "المفوتر ناقص كلِّ ما دفعتَه له"
+                  : reportedAt
+                    ? `حتى ${reportedAt} — تاريخ كشفه${paidAfterStatement > 0 ? ` · ودفعتَ بعده ${formatRiyalsDisplay(paidAfterStatement)}` : ""}`
+                    : "المفوتر ناقص كلِّ ما دفعتَه له"
               }
             />
             <Stat
@@ -253,7 +286,7 @@ export default async function SupplierPage({
                   : <Money minor={account.reportedBalanceMinor} />
               }
               tone={account.reportedBalanceMinor === null ? "muted" : undefined}
-              sub={account.reportedBalanceMinor === null ? "أو وصل ولم يُقرأ رصيدُه" : "آخر رصيدٍ ختاميّ"}
+              sub={account.reportedBalanceMinor === null ? "أو وصل ولم يُقرأ رصيدُه" : `آخر رصيدٍ ختاميّ · ${reportedAt}`}
             />
             <Stat
               label="الفرق"
@@ -326,7 +359,7 @@ export default async function SupplierPage({
 
       <Section
         title="آخر فواتيره"
-        action={<LinkButton href="/purchases" size="sm">كلّها</LinkButton>}
+        action={<LinkButton href={`/purchases/invoices?supplier=${s.slug}`} size="sm">كلّها</LinkButton>}
       >
         <DataTable
           rows={recent}

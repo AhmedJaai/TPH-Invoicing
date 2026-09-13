@@ -7,7 +7,7 @@
  *
  * دوال خالصة: تأخذ حركات وتُرجع نتائج.
  */
-import type { TxCategory } from "./bank/rules";
+import { CATEGORY_LABEL, type TxCategory } from "./bank/rules";
 
 export interface CashMovement {
   /** YYYY-MM */
@@ -171,7 +171,8 @@ export function buildProfitLoss(input: ProfitLossInput): ProfitLoss {
   for (const c of operating) {
     lines.push({
       id: `op-${c.category}`,
-      label: CATEGORY_LABEL_PL[c.category] ?? String(c.category),
+      /* لا اسمَ تعدادٍ إنجليزيّ أمام صاحب العمل — «PERSONAL» و«POS_FEE» ظهرتا في القائمة */
+      label: CATEGORY_LABEL_PL[c.category] ?? CATEGORY_LABEL[c.category] ?? "مصروفات أخرى",
       amountMinor: c.amountMinor,
     });
   }

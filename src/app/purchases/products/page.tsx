@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, PageShell } from "@/components/page-shell";
+import { NoAccess } from "@/components/ui";
 import { ProductMapping } from "@/components/product-mapping";
 import { listProducts, listSupplierProducts, mappingCoverage } from "@/services/product.service";
 import { suggestMerges, type SupplierItem } from "@/lib/products";
@@ -14,7 +15,7 @@ export default async function ProductsPage() {
   if (!can(user.role, "supplier:edit")) {
     return (
       <PageShell user={user} width="wide" title="الأصناف">
-        <Empty message="تعديل الأصناف للمالك والمحاسب." />
+        <NoAccess what="تعديل الأصناف" />
       </PageShell>
     );
   }

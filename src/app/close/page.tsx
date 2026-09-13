@@ -5,10 +5,12 @@ import { invoices, monthCloses } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, PageShell } from "@/components/page-shell";
+import { NoAccess } from "@/components/ui";
 import { MonthClose } from "@/components/month-close";
 import { previousMonth } from "@/lib/filing";
 import { buildMonthClose } from "@/lib/month-close";
 import { gatherMonthFacts } from "@/lib/month-close-facts";
+import { currentMonthRiyadh } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,7 @@ export default async function ClosePage() {
   if (!can(user.role, "month:close")) {
     return (
       <PageShell user={user} title="إقفال الشهر">
-        <Empty message="إقفال الشهر للمالك والمحاسب." />
+        <NoAccess what="إقفال الشهر" />
       </PageShell>
     );
   }
@@ -30,7 +32,7 @@ export default async function ClosePage() {
     .groupBy(invoices.periodMonth)
     .orderBy(desc(invoices.periodMonth));
 
-  const previous = previousMonth(new Date().toISOString().slice(0, 7));
+  const previous = previousMonth(currentMonthRiyadh());
   const months = [...new Set([previous, ...rows.map((r) => r.month)])].sort().reverse();
 
   const closed = await db

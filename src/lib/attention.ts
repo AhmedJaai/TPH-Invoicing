@@ -129,6 +129,13 @@ export interface AttentionFacts {
    * المقصوصة عند ثمانية، والحقيقة ثلاثة عشر.
    */
   suppliersMissingStatementCount?: number;
+  /**
+   * حركاتٌ قرارُها والمالُ فيها متناقضان (`detectAnomalies`): حُسمت ولم
+   * تُقيَّد، أو قُيّدت وأُعلنت ليست سداداً. كانت الدالّة تُحسب ولا تُعرض.
+   */
+  lifecycleAnomalies?: AttentionEvidence[];
+  lifecycleAnomalyMinor?: number;
+  firstAnomalyTransactionId?: string | null;
   /** مورّدون لا يصدرون فواتير وبلا عقد */
   suppliersWithoutContract: string[];
 
@@ -267,7 +274,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "duplicate-payments",
       area: "BANK",
       severity: "CRITICAL",
-      title: `${countNoun(f.duplicatePayments, PAYMENT)} خرج مرّتين في يومٍ واحد`,
+      title: `مالٌ خرج مرّتين في يومٍ واحد — ${countNoun(f.duplicatePayments, PAYMENT)}`,
       detail:
         "خرج المال مرّتين لنفس الجهة بنفس المبلغ — ولكلٍّ مرجعُ سدادٍ مستقلّ،"
         + " فهما عمليّتان لا نسخةُ استيراد.",
@@ -390,6 +397,24 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       amountMinor: f.priceRiseAnnualMinor,
       impact: { kind: "ANNUAL", amountMinor: f.priceRiseAnnualMinor },
       evidence: f.priceRises,
+    });
+  }
+
+  if ((f.lifecycleAnomalies?.length ?? 0) > 0) {
+    const n = f.lifecycleAnomalies!.length;
+    out.push({
+      id: "lifecycle-anomalies",
+      area: "BANK",
+      severity: "HIGH",
+      title: `${countNoun(n, TRANSACTION)} قرارُها والمالُ فيها متناقضان`,
+      detail: "حُسمت ولم تُقيَّد بدفعة، أو قُيّدت وأُعلن أنّها ليست سداداً — عطبٌ يُعرَض ولا يُصحَّح آلياً، فقد يكون فشلَ كتابة أو حذفاً بيد.",
+      action: "افتح الحركة وقرّر أيّ الطرفين الصحيح.",
+      actionLabel: "افتح الحركة",
+      href: f.firstAnomalyTransactionId ? `/bank?tx=${f.firstAnomalyTransactionId}` : "/bank",
+      count: n,
+      amountMinor: f.lifecycleAnomalyMinor ?? undefined,
+      impact: { kind: "UNATTRIBUTED", amountMinor: f.lifecycleAnomalyMinor ?? null },
+      evidence: f.lifecycleAnomalies!.slice(0, 6),
     });
   }
 

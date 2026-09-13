@@ -2,10 +2,7 @@
 import { NextResponse } from "next/server";
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  adjudications, bankImports, bankRules, bankTransactions, decisionHistory, invoices, paymentAllocations,
-  supplierAliases, suppliers,
-} from "@/db/schema";
+import { adjudications, bankImports, bankRules, bankTransactions, decisionHistory, invoices, paymentAllocations, supplierAliases, suppliers, reconciliationPeriods } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { readStatementFile } from "@/services/statement-file.service";
 import {
@@ -15,7 +12,7 @@ import {
 import { fileFingerprint, operationRef, operationRefs } from "@/lib/bank/identity";
 import { beneficiaryKey, factKey, looseKey, syncRows, type KnownRow } from "@/lib/bank/sync";
 import { resolveBankAccount } from "@/services/bank-account.service";
-import { allocate, createPayment } from "@/services/payment.service";
+import { allocate, recordBankPayment } from "@/services/payment.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
 import { recordAudit } from "@/lib/audit";
 import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
@@ -28,6 +25,7 @@ import { loadMerchantMemory } from "@/services/counterparty.service";
 import { loadSupplierProfiles } from "@/services/supplier-profile.service";
 import { analyzeCoverage, describeCoverage } from "@/lib/bank/coverage";
 import type { SupplierIdentity } from "@/lib/bank/entities";
+import { monthBalancesFromStatement } from "@/lib/bank/statement-balances";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -765,7 +763,8 @@ export async function POST(request: Request) {  let user;
       }
       if (!plan) continue;
 
-      const paymentId = await createPayment(tx, {
+      /* الإيصال أو القيد اليدويّ الذي سبق الكشف يُتبنّى ولا يُنسَخ */
+      const { id: paymentId } = await recordBankPayment(tx, {
         supplierId: plan.supplierId,
         paidAt: plan.paidAt,
         amountMinor: plan.amountMinor,
@@ -819,6 +818,30 @@ export async function POST(request: Request) {  let user;
       });
     }
   });
+
+  /*
+    ── رصيدا كلّ شهرٍ من عمود الرصيد ──
+
+    القارئ يقرأ الرصيد من كلّ صفّ وكان يرميه، فتبقى معادلة التسوية بلا
+    مُدخلات. يُحفَظ لكلّ شهرٍ تستقيم سلسلةُ أرصدته، ولا يغلب ما أدخله
+    إنسان، ولا يستبدل ما قُرئ من كشفٍ أوسع بكشفٍ أضيق.
+  */
+  if (bankAccountId) {
+    for (const mb of monthBalancesFromStatement(parsed.rows)) {
+      await db.insert(reconciliationPeriods).values({
+        bankAccountId,
+        periodStart: mb.periodStart,
+        periodEnd: mb.periodEnd,
+        openingBalanceMinor: mb.openingMinor,
+        closingBalanceMinor: mb.closingMinor,
+        importedCount: mb.rows,
+      }).onConflictDoUpdate({
+        target: [reconciliationPeriods.bankAccountId, reconciliationPeriods.periodStart, reconciliationPeriods.periodEnd],
+        set: { openingBalanceMinor: mb.openingMinor, closingBalanceMinor: mb.closingMinor, importedCount: mb.rows },
+        setWhere: sql`reconciliation_periods.reviewed_by_id is null and reconciliation_periods.imported_count <= ${mb.rows}`,
+      });
+    }
+  }
 
   await recordAudit({
     actorId: user.id,

@@ -6,6 +6,7 @@
  */
 import { detectPriceChange, normalizeItem, type PriceChange } from "./items";
 import type { InputVatStatus } from "./validation";
+import { currentMonthRiyadh, dayOfMonthRiyadh } from "./riyadh-time";
 
 /* ───────────────────────── حالة السداد ───────────────────────── */
 
@@ -356,8 +357,9 @@ export function spendTrend(
   const prev = months[months.length - 2];
   if (!cur || !prev) return { pct: null, basisDays: null, prevMonth: prev ?? null };
 
-  const runningMonth = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}`;
-  const basisDays = cur === runningMonth ? today.getUTCDate() : null;
+  /* الشهر الجاري ويومُه بتوقيت الرياض — لا UTC الذي يخطئ أوّل الشهر فجراً */
+  const runningMonth = currentMonthRiyadh(today);
+  const basisDays = cur === runningMonth ? dayOfMonthRiyadh(today) : null;
 
   const sum = (month: string, capDay: number | null) =>
     rows

@@ -9,14 +9,16 @@
  * تتجاوز قيمةَ الدفعة ولا قيمةَ الفاتورة — تحرسه قيود القاعدة نفسها.
  */
 import { NextResponse } from "next/server";
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bankTransactions, decisionHistory, invoices, payments } from "@/db/schema";
+import { bankTransactions, decisionHistory, invoices } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { allocate, createPayment, findPaymentTwin } from "@/services/payment.service";
+import { allocate, claimBankTransaction, recordBankPayment } from "@/services/payment.service";
 import { recordAudit } from "@/lib/audit";
+import { resyncBankExpenses } from "@/services/expense.service";
 import { settleSupplierAccount } from "@/lib/allocation";
 import { INVOICE, countNoun } from "@/lib/arabic";
+import { formatRiyalsDisplay } from "@/lib/money";
 
 export const runtime = "nodejs";
 
@@ -57,7 +59,21 @@ interface Body {
   settleSupplier?: boolean;
 }
 
+/**
+ * أخطاءُ المال المعروفة تُترجَم هنا مرّةً لكلّ المسارات: شهرٌ مقفل،
+ * أو حركةٌ قُيّدت بين قراءتها وكتابتها، أو توأمٌ لم يُقَرّ.
+ */
 export async function POST(request: Request) {
+  try {
+    return await handle(request);
+  } catch (e) {
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
+    throw e;
+  }
+}
+
+async function handle(request: Request) {
   let user;
   try {
     user = await guard("match-confirm", "payment:approve");
@@ -85,8 +101,27 @@ export async function POST(request: Request) {
 
   if (!tx) return NextResponse.json({ error: "لا توجد هذه الحركة" }, { status: 404 });
   if (tx.matchedPaymentId) {
+    /*
+      ضغطةٌ ثانية بعد انقطاعٍ نجح فيه الطلب الأوّل ليست خطأً من صاحبها.
+      وكان يُقال له «تراجع عنها أوّلاً» — فيُدفَع إلى هدم عملٍ صحيح. فإن
+      كان هو من قيّدها في الدقائق الأخيرة، يُقال له إنّها قُيّدت.
+    */
+    const [recent] = await db
+      .select({ at: decisionHistory.createdAt })
+      .from(decisionHistory)
+      .where(and(
+        eq(decisionHistory.bankTransactionId, tx.id),
+        eq(decisionHistory.actorId, user.id),
+        eq(decisionHistory.event, "MATCH_CONFIRMED"),
+        gte(decisionHistory.createdAt, new Date(Date.now() - 15 * 60_000)),
+      ))
+      .orderBy(desc(decisionHistory.createdAt))
+      .limit(1);
+    if (recent) {
+      return NextResponse.json({ ok: true, message: "قُيّدت من قبل — لم يُكتب شيءٌ ثانيةً" });
+    }
     return NextResponse.json(
-      { error: "هذه الحركة مطابَقة أصلاً — تراجع عنها أوّلاً" },
+      { error: "هذه الحركة مقيَّدة بدفعة من قبل — افتحها في صفحة البنك لترى دفعتها" },
       { status: 409 },
     );
   }
@@ -114,8 +149,8 @@ export async function POST(request: Request) {
         );
       }
 
-      const advanceId = await db.transaction(async (t) => {
-        const id = await createPayment(t, {
+      await db.transaction(async (t) => {
+        const { id } = await recordBankPayment(t, {
           supplierId,
           paidAt: tx.valueDate,
           amountMinor: tx.amountMinor,
@@ -124,18 +159,15 @@ export async function POST(request: Request) {
           isAdvance: true,
         });
 
-        await t
-          .update(bankTransactions)
-          .set({
-            category: "SUPPLIER",
-            matchedPaymentId: id,
-            matchStatus: "MATCHED",
-            matchDisposition: "AUTO",
-            matchOutcome: "ADVANCE",
-            lifecycle: "POSTED",
-            supplierId,
-          })
-          .where(eq(bankTransactions.id, tx.id));
+        await claimBankTransaction(t, tx.id, {
+          category: "SUPPLIER",
+          matchedPaymentId: id,
+          matchStatus: "MATCHED",
+          matchDisposition: "AUTO",
+          matchOutcome: "ADVANCE",
+          lifecycle: "POSTED",
+          supplierId,
+        });
 
         await t.insert(decisionHistory).values({
           bankTransactionId: tx.id,
@@ -146,15 +178,13 @@ export async function POST(request: Request) {
           payload: { الدفعة: id, المورّد: supplierId, المبلغ: tx.amountMinor },
         });
 
-        return id;
-      });
-
-      await recordAudit({
-        actorId: user.id,
-        action: "INVOICES_MARKED_PAID",
-        entityType: "bank_transaction",
-        entityId: tx.id,
-        after: { الفعل: "قُيّدت دفعةً مقدَّمة", الدفعة: advanceId, المورّد: supplierId },
+        await recordAudit({
+          actorId: user.id,
+          action: "PAYMENT_RECORDED",
+          entityType: "bank_transaction",
+          entityId: tx.id,
+          after: { الفعل: "قُيّدت دفعةً مقدَّمة", الدفعة: id, المورّد: supplierId, المبلغ_بالهللات: tx.amountMinor },
+        }, t);
       });
 
       return NextResponse.json({
@@ -182,16 +212,19 @@ export async function POST(request: Request) {
         actor: "HUMAN",
         actorId: user.id,
         detail: `أُعلنت ليست سداد فاتورة: ${kind.label}`,
-        payload: { الباب: kind.category },
+        payload: { الباب: kind.category, "الباب السابق": tx.category },
       });
-    });
 
-    await recordAudit({
-      actorId: user.id,
-      action: "INVOICES_MARKED_PAID",
-      entityType: "bank_transaction",
-      entityId: tx.id,
-      after: { الفعل: "أُعلنت ليست سداد فاتورة", السبب: kind.label },
+      await resyncBankExpenses(t, user.id, { transactionIds: [tx.id], insertMissing: true });
+
+      await recordAudit({
+        actorId: user.id,
+        action: "MATCH_REJECTED",
+        entityType: "bank_transaction",
+        entityId: tx.id,
+        before: { الباب: tx.category, القرار: tx.matchDisposition },
+        after: { الفعل: "أُعلنت ليست سداد فاتورة", السبب: kind.label },
+      }, t);
     });
 
     return NextResponse.json({ ok: true, message: `حُفظت: ${kind.label}` });
@@ -306,8 +339,8 @@ export async function POST(request: Request) {
     فلو أُنشئت الدفعة ثمّ فشل التخصيص لبقيت دفعةٌ لا تفسّر شيئاً،
     وحركةٌ تبدو مطابَقة وليست كذلك.
   */
-  const paymentId = await db.transaction(async (t) => {
-    const id = await createPayment(t, {
+  await db.transaction(async (t) => {
+    const { id } = await recordBankPayment(t, {
       supplierId: chosen[0].supplierId,
       paidAt: tx.valueDate,
       amountMinor: tx.amountMinor,
@@ -318,17 +351,14 @@ export async function POST(request: Request) {
 
     await allocate(t, id, tx.amountMinor, allocations);
 
-    await t
-      .update(bankTransactions)
-      .set({
-        matchedPaymentId: id,
-        matchStatus: "MATCHED",
-        matchDisposition: "AUTO",
-        lifecycle: "POSTED",
-        supplierId: chosen[0].supplierId,
-        category: "SUPPLIER",
-      })
-      .where(eq(bankTransactions.id, tx.id));
+    await claimBankTransaction(t, tx.id, {
+      matchedPaymentId: id,
+      matchStatus: "MATCHED",
+      matchDisposition: "AUTO",
+      lifecycle: "POSTED",
+      supplierId: chosen[0].supplierId,
+      category: "SUPPLIER",
+    });
 
     await t.insert(decisionHistory).values({
       bankTransactionId: tx.id,
@@ -339,24 +369,23 @@ export async function POST(request: Request) {
       payload: { الدفعة: id, الفواتير: allocations.map((a) => a.invoiceId), الشهور: sorted },
     });
 
-    return id;
+    /* التدقيق داخل المعاملة، والمبالغ بالهللات — السجلّ لا يُعدَّل فلا يحفظ عشريّاً */
+    await recordAudit({
+      actorId: user.id,
+      action: "MATCH_CONFIRMED",
+      entityType: "bank_transaction",
+      entityId: tx.id,
+      after: {
+        الفعل: "قبِلَ المطابقة بنفسه",
+        الدفعة: id,
+        "الفواتير بالهللات": allocations.map((a) => `${a.invoiceId}:${a.amountMinor}`),
+        الشهور: sorted,
+        "المتبقّي بلا تخصيص بالهللات": left,
+      },
+    }, t);
   });
 
-  await recordAudit({
-    actorId: user.id,
-    action: "INVOICES_MARKED_PAID",
-    entityType: "bank_transaction",
-    entityId: tx.id,
-    after: {
-      الفعل: "قبِلَ المطابقة بنفسه",
-      الدفعة: paymentId,
-      الفواتير: allocations.map((a) => `${a.invoiceId}:${a.amountMinor / 100}`),
-      الشهور: sorted,
-      "المتبقّي بلا تخصيص": left / 100,
-    },
-  });
-
-  const remainder = left > 0 ? ` وبقي ${(left / 100).toFixed(2)} بلا تخصيص` : "";
+  const remainder = left > 0 ? ` وبقي ${formatRiyalsDisplay(left)} بلا تخصيص` : "";
   return NextResponse.json({
     ok: true,
     message: `طُوبقت مع ${countNoun(allocations.length, INVOICE)}${remainder}`,
@@ -427,8 +456,8 @@ async function applyManualSplit(
 
   const months = [...new Set(rows.map((r) => r.periodMonth))].sort();
 
-  const paymentId = await db.transaction(async (t) => {
-    const id = await createPayment(t, {
+  await db.transaction(async (t) => {
+    const { id } = await recordBankPayment(t, {
       supplierId: rows[0].supplierId,
       paidAt: tx.valueDate,
       amountMinor: tx.amountMinor,
@@ -439,17 +468,14 @@ async function applyManualSplit(
 
     await allocate(t, id, tx.amountMinor, split);
 
-    await t
-      .update(bankTransactions)
-      .set({
-        matchedPaymentId: id,
-        matchStatus: "MATCHED",
-        matchDisposition: "AUTO",
-        lifecycle: "POSTED",
-        supplierId: rows[0].supplierId,
-        category: "SUPPLIER",
-      })
-      .where(eq(bankTransactions.id, tx.id));
+    await claimBankTransaction(t, tx.id, {
+      matchedPaymentId: id,
+      matchStatus: "MATCHED",
+      matchDisposition: "AUTO",
+      lifecycle: "POSTED",
+      supplierId: rows[0].supplierId,
+      category: "SUPPLIER",
+    });
 
     await t.insert(decisionHistory).values({
       bankTransactionId: tx.id,
@@ -460,20 +486,18 @@ async function applyManualSplit(
       payload: { الدفعة: id, التوزيع: split },
     });
 
-    return id;
-  });
-
-  await recordAudit({
-    actorId: userId,
-    action: "INVOICES_MARKED_PAID",
-    entityType: "bank_transaction",
-    entityId: tx.id,
-    after: {
-      الفعل: "وزّعها بنفسه",
-      الدفعة: paymentId,
-      التوزيع: split.map((s) => `${s.invoiceId}:${s.amountMinor / 100}`),
-      "بلا تخصيص": (tx.amountMinor - total) / 100,
-    },
+    await recordAudit({
+      actorId: userId,
+      action: "MATCH_CONFIRMED",
+      entityType: "bank_transaction",
+      entityId: tx.id,
+      after: {
+        الفعل: "وزّعها بنفسه",
+        الدفعة: id,
+        "التوزيع بالهللات": split.map((s) => `${s.invoiceId}:${s.amountMinor}`),
+        "بلا تخصيص بالهللات": tx.amountMinor - total,
+      },
+    }, t);
   });
 
   const left = tx.amountMinor - total;
@@ -481,7 +505,7 @@ async function applyManualSplit(
     ok: true,
     message:
       left > 0
-        ? `وُزّعت على ${split.length} فاتورة، وبقي ${(left / 100).toFixed(2)} بلا تخصيص`
+        ? `وُزّعت على ${countNoun(split.length, INVOICE)}، وبقي ${formatRiyalsDisplay(left)} بلا تخصيص`
         : `وُزّعت على ${countNoun(split.length, INVOICE)} بالكامل`,
   });
 }
@@ -551,40 +575,19 @@ async function settleAccounts(
         .sort();
 
       /*
-        وإن كانت الواقعةُ مقيَّدةً من إيصالها، تُتبنّى ولا تُنسَخ.
-
-        إيصالُ السداد في الدرايف يُنشئ دفعةً معلَّقة بلا حركةِ بنك،
-        ثمّ يأتي الكشف فيُنشئ ثانيةً — والريالُ واحد. فإن وُجدت دفعةٌ
-        بنفس المورّد واليوم والمبلغ، لم تُخصَّص بعدُ ولا حركةَ لها،
-        فهي **هذه**: يُربَط بها الكشفُ وتُوزَّع، ويبقى إيصالُها معلَّقاً
-        عليها دليلاً.
+        وإن كانت الواقعةُ مقيَّدةً بلا حركة — من إيصالها أو بيدٍ سبقت —
+        تُتبنّى ولا تُنسَخ، مخصَّصةً كانت أو لا (`recordBankPayment`).
       */
-      const twin = await findPaymentTwin(t, {
-        supplierId, paidAt: tx.valueDate, amountMinor: tx.amountMinor,
+      const { id: paymentId, adopted: wasAdopted } = await recordBankPayment(t, {
+        supplierId,
+        paidAt: tx.valueDate,
+        amountMinor: tx.amountMinor,
+        method: "BANK_TRANSFER",
+        beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
+        /* شهر الدفعة هو الأحدث بين فواتيرها — لا شهر أوّلها */
+        appliesToMonth: months.length > 0 ? months[months.length - 1] : null,
       });
-      const adopt = twin !== null && !twin.hasBankRow && twin.allocatedMinor === 0;
-
-      const paymentId = adopt
-        ? twin!.id
-        : await createPayment(t, {
-            supplierId,
-            paidAt: tx.valueDate,
-            amountMinor: tx.amountMinor,
-            method: "BANK_TRANSFER",
-            beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
-            /* شهر الدفعة هو الأحدث بين فواتيرها — لا شهر أوّلها */
-            appliesToMonth: months.length > 0 ? months[months.length - 1] : null,
-          });
-
-      if (adopt) {
-        adopted++;
-        await t.update(payments)
-          .set({
-            beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
-            appliesToMonth: months.length > 0 ? months[months.length - 1] : null,
-          })
-          .where(eq(payments.id, paymentId));
-      }
+      if (wasAdopted) adopted++;
 
       if (plan.allocations.length > 0) {
         await allocate(t, paymentId, tx.amountMinor, plan.allocations);
@@ -593,18 +596,15 @@ async function settleAccounts(
         }
       }
 
-      await t
-        .update(bankTransactions)
-        .set({
-          matchedPaymentId: paymentId,
-          supplierId,
-          category: "SUPPLIER",
-          matchStatus: "MATCHED",
-          matchDisposition: null,
-          matchOutcome: plan.remainingMinor > 0 ? "SUPPLIER_ON_ACCOUNT" : "SUPPLIER_SETTLED",
-          lifecycle: "POSTED",
-        })
-        .where(eq(bankTransactions.id, tx.id));
+      await claimBankTransaction(t, tx.id, {
+        matchedPaymentId: paymentId,
+        supplierId,
+        category: "SUPPLIER",
+        matchStatus: "MATCHED",
+        matchDisposition: null,
+        matchOutcome: plan.remainingMinor > 0 ? "SUPPLIER_ON_ACCOUNT" : "SUPPLIER_SETTLED",
+        lifecycle: "POSTED",
+      });
 
       await t.insert(decisionHistory).values({
         bankTransactionId: tx.id,
@@ -632,7 +632,7 @@ async function settleAccounts(
 
   await recordAudit({
     actorId: userId,
-    action: "INVOICES_MARKED_PAID",
+    action: "MATCH_CONFIRMED",
     entityType: "supplier",
     entityId: supplierId,
     after: {
@@ -646,7 +646,7 @@ async function settleAccounts(
     },
   });
 
-  const money = (m: number) => (m / 100).toFixed(2);
+  const money = formatRiyalsDisplay;
   const left = [...remaining.values()].reduce((n, v) => n + Math.max(0, v), 0);
 
   return NextResponse.json({

@@ -19,6 +19,12 @@ export interface StatementExtras {
   openingBalanceMinor: number | null;
   closingBalanceMinor: number | null;
   lines: RawStatementLine[];
+  /**
+   * أسطرٌ فيها مبلغٌ لم يُقرأ أو تاريخٌ لم يُقرأ — تُعلَن ولا تُسقَط.
+   * كان «1,2O0.00» يصير صفراً فيُحذف السطر، فتظهر فاتورته «عندنا ولم ترد
+   * في كشفه» والمجهول صار نفياً.
+   */
+  unreadLines: { date: string; description: string; amountText: string }[];
 }
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -43,21 +49,32 @@ function parseDay(v: unknown): Date | null {
 
 export function parseStatementExtras(raw: unknown): StatementExtras {
   const rec = asRecord(raw);
-  if (!rec) return { openingBalanceMinor: null, closingBalanceMinor: null, lines: [] };
+  if (!rec) return { openingBalanceMinor: null, closingBalanceMinor: null, lines: [], unreadLines: [] };
 
   const rawLines = Array.isArray(rec.statementLines) ? rec.statementLines : [];
   const lines: RawStatementLine[] = [];
+  const unreadLines: StatementExtras["unreadLines"] = [];
 
   for (const item of rawLines) {
     const l = asRecord(item);
     if (!l) continue;
 
-    const date = parseDay(l.date);
-    if (!date) continue; // سطرٌ بلا تاريخ لا يُقيَّد — التاريخ هو ما يُطابَق به
+    const debitText = asText(l.debit);
+    const creditText = asText(l.credit);
+    const debitRead = debitText ? parseRiyals(debitText) : 0;
+    const creditRead = creditText ? parseRiyals(creditText) : 0;
+    const unread = () => unreadLines.push({
+      date: asText(l.date), description: asText(l.description), amountText: debitText || creditText,
+    });
 
-    const debitMinor = parseRiyals(asText(l.debit)) ?? 0;
-    const creditMinor = parseRiyals(asText(l.credit)) ?? 0;
+    if (debitRead === null || creditRead === null) { unread(); continue; }
+    const debitMinor = debitRead;
+    const creditMinor = creditRead;
     if (debitMinor === 0 && creditMinor === 0) continue; // سطرُ رصيدٍ أو ترويسة
+
+    const date = parseDay(l.date);
+    // سطرٌ بلا تاريخ لا يُقيَّد — التاريخ هو ما يُطابَق به — ويُعلَن
+    if (!date) { unread(); continue; }
 
     lines.push({
       date,
@@ -72,5 +89,6 @@ export function parseStatementExtras(raw: unknown): StatementExtras {
     openingBalanceMinor: parseRiyals(asText(rec.openingBalance)),
     closingBalanceMinor: parseRiyals(asText(rec.closingBalance)),
     lines,
+    unreadLines,
   };
 }

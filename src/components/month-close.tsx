@@ -83,17 +83,19 @@ export function MonthClose({
   const router = useRouter();
   const [month, setMonth] = useState(initialMonth);
   const [data, setData] = useState<Response | null>({ report: initialReport, status: initialStatus });
-  const [busy, setBusy] = useState<"checking" | "closing" | "reopening" | null>(null);
+  const [busy, setBusy] = useState<"checking" | "closing" | "reopening" | "balancing" | null>(null);
+  const [opening, setOpening] = useState("");
+  const [closing, setClosing] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
 
   const call = useCallback(
-    async (action: "check" | "close" | "reopen", forMonth: string) => {
-      setBusy(action === "check" ? "checking" : action === "close" ? "closing" : "reopening");
+    async (action: "check" | "close" | "reopen" | "balances", forMonth: string, extra?: Record<string, string>) => {
+      setBusy(action === "check" ? "checking" : action === "close" ? "closing" : action === "balances" ? "balancing" : "reopening");
       setError(null);
       try {
         const r = await postJson<Response>("/api/month-close", {
-          month: forMonth, action, note: note.trim() || undefined,
+          month: forMonth, action, note: note.trim() || undefined, ...extra,
         });
         if (!r.ok) {
           setError(r.error);
@@ -172,12 +174,68 @@ export function MonthClose({
                           {i.action}
                         </p>
                       )}
+                      {i.href && i.state !== "PASS" && (
+                        <a
+                          href={i.href}
+                          className="mt-1 inline-flex min-h-11 items-center text-xs font-bold underline underline-offset-4 sm:min-h-0"
+                        >
+                          أصلِح ←
+                        </a>
+                      )}
                     </div>
                   </div>
                 </li>
               );
             })}
           </ul>
+
+          {!isClosed && report.items.some((i) => i.id === "bank-balance" && i.state !== "PASS") && (
+            <form
+              id="balances"
+              className="scroll-mt-28 rounded-2xl border border-line bg-raised p-4 shadow-raised"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void call("balances", month, { openingBalance: opening, closingBalance: closing });
+              }}
+            >
+              <p className="text-sm font-bold">رصيدا الحساب في {month}</p>
+              <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+                كما في كشف البنك: الرصيد قبل أوّل حركةٍ في الشهر، والرصيد بعد آخرها. بهما تُفحَص
+                المعادلة: الافتتاحيّ + الوارد − الصادر = الختاميّ.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="block text-xs">
+                  <span className="text-muted">الرصيد الافتتاحيّ</span>
+                  <input
+                    value={opening}
+                    onChange={(e) => setOpening(e.target.value)}
+                    inputMode="decimal"
+                    dir="ltr"
+                    required
+                    className="nums mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+                  />
+                </label>
+                <label className="block text-xs">
+                  <span className="text-muted">الرصيد الختاميّ</span>
+                  <input
+                    value={closing}
+                    onChange={(e) => setClosing(e.target.value)}
+                    inputMode="decimal"
+                    dir="ltr"
+                    required
+                    className="nums mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+                  />
+                </label>
+              </div>
+              <button
+                type="submit"
+                disabled={busy !== null || !opening.trim() || !closing.trim()}
+                className="mt-3 min-h-11 rounded-lg bg-inverse-surface px-4 text-xs font-bold text-inverse-ink disabled:opacity-40"
+              >
+                {busy === "balancing" ? "يحفظ…" : "احفظ الرصيدين وأعد الفحص"}
+              </button>
+            </form>
+          )}
 
           {!isClosed && (
             <div className="rounded-2xl border border-line bg-raised shadow-raised p-4">

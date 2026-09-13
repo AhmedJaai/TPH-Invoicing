@@ -11,6 +11,7 @@ import { MarkSupplierPaid } from "@/components/payment-run-actions";
 import { countNoun, INVOICE, SUPPLIER } from "@/lib/arabic";
 import { NoAccess } from "@/components/ui";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
+import { currentMonthRiyadh } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function PaymentsPage({
   const { month: raw } = await searchParams;
   const month = /^\d{4}-\d{2}$/.test(raw ?? "")
     ? raw!
-    : previousMonth(new Date().toISOString().slice(0, 7));
+    : previousMonth(currentMonthRiyadh());
 
   const rows = await db
     .select({

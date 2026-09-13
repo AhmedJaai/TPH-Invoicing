@@ -5,13 +5,16 @@
  * المانع خللٌ في البيانات لا يجوز إقفال شهر عليه، والتنبيه واقعٌ يقرّ به
  * المالك ويمضي.
  *
- * وبعد الإقفال يُقفَل الشهر فعلاً: واجهة الأرشفة ترفض إضافة مستند إليه.
+ * وبعد الإقفال يُقفَل الشهر فعلاً: كلُّ ما يكتب مالاً فيه يُرفض — في طبقة
+ * الخدمات (`month-guard.ts`) وفي القاعدة (الهجرة ٠٢٨).
  */
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { monthCloses } from "@/db/schema";
+import { bankAccounts, monthCloses, reconciliationPeriods } from "@/db/schema";
+import { parseRiyals } from "@/lib/money";
 import { guard, respondTo } from "@/services/guard";
+import { can } from "@/lib/permissions";
 import { buildMonthClose } from "@/lib/month-close";
 import { gatherMonthFacts } from "@/lib/month-close-facts";
 import { recordAudit } from "@/lib/audit";
@@ -24,12 +27,16 @@ const MONTH_RE = /^\d{4}-\d{2}$/;
 
 interface Body {
   month: string;
-  action?: "check" | "close" | "reopen";
+  action?: "check" | "close" | "reopen" | "balances";
+  /** رصيدا الشهر كما في كشف البنك — نصّاً يُقرأ في الخادم. */
+  openingBalance?: string;
+  closingBalance?: string;
   /** سبب مكتوب حين يُقفل الشهر وفيه تنبيهات */
   note?: string;
 }
 
-export async function POST(request: Request) {  let user;
+export async function POST(request: Request) {
+  let user;
   try {
     user = await guard("month-close", "month:close");
   } catch (e) {
@@ -59,11 +66,68 @@ export async function POST(request: Request) {  let user;
     .where(eq(monthCloses.month, body.month))
     .limit(1);
 
+  /*
+    ── رصيدا الشهر ──
+
+    «أدخل رصيدَي أوّل المدّة» كان بلا مكانٍ يُدخلان فيه، و`reconciliation_periods`
+    بلا كاتب — فالمعادلة «لا تُفحَص» كلّ شهر. والإدخال اليدويّ يغلب ما
+    قُرئ من الكشف، ويُسجَّل باسم من أدخله.
+  */
+  if (action === "balances") {
+    const openingMinor = parseRiyals(body.openingBalance ?? "");
+    const closingMinor = parseRiyals(body.closingBalance ?? "");
+    if (openingMinor === null || closingMinor === null) {
+      return NextResponse.json({ error: "اكتب الرصيدين كما في كشف البنك — أرقاماً" }, { status: 400 });
+    }
+    if (existing?.status === "CLOSED") {
+      return NextResponse.json({ error: "الشهر مقفل — أعِد فتحه قبل تغيير رصيديه" }, { status: 409 });
+    }
+    const [account] = await db.select({ id: bankAccounts.id }).from(bankAccounts).orderBy(bankAccounts.id).limit(1);
+    if (!account) {
+      return NextResponse.json({ error: "لا حساب بنكيّ معروف بعد — استورد كشفاً أوّلاً" }, { status: 409 });
+    }
+    const [y, m] = body.month.split("-").map(Number);
+    const periodEnd = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+
+    await db.transaction(async (t) => {
+      await t.insert(reconciliationPeriods).values({
+        bankAccountId: account.id,
+        periodStart: `${body.month}-01`,
+        periodEnd,
+        openingBalanceMinor: openingMinor,
+        closingBalanceMinor: closingMinor,
+        reviewedById: user.id,
+        reviewedAt: new Date(),
+      }).onConflictDoUpdate({
+        target: [reconciliationPeriods.bankAccountId, reconciliationPeriods.periodStart, reconciliationPeriods.periodEnd],
+        set: { openingBalanceMinor: openingMinor, closingBalanceMinor: closingMinor, reviewedById: user.id, reviewedAt: new Date() },
+      });
+      await recordAudit({
+        actorId: user.id,
+        action: "RECONCILIATION_BALANCES_SET",
+        entityType: "month_close",
+        entityId: body.month,
+        after: { الافتتاحي_بالهللات: openingMinor, الختامي_بالهللات: closingMinor, المصدر: "إدخالٌ يدويّ" },
+      }, t);
+    });
+
+    const nextFacts = await gatherMonthFacts(body.month);
+    const nextReport = buildMonthClose(nextFacts);
+    return NextResponse.json({
+      ok: true, report: nextReport, facts: nextFacts, status: existing?.status ?? "OPEN",
+      message: "حُفظ الرصيدان وأُعيد الفحص",
+    });
+  }
+
   if (action === "check") {
     return NextResponse.json({ ok: true, report, facts, status: existing?.status ?? "OPEN" });
   }
 
   if (action === "reopen") {
+    /* إعادة فتح شهرٍ شُهد عليه للمالك وحده — الإقفالُ شهادةٌ لا تُنقَض بصلاحية الإقفال */
+    if (!can(user.role, "month:reopen")) {
+      return NextResponse.json({ error: "إعادة فتح الشهر للمالك وحده" }, { status: 403 });
+    }
     if (!existing || existing.status !== "CLOSED") {
       return NextResponse.json({ error: "هذا الشهر ليس مقفلاً" }, { status: 409 });
     }
@@ -73,7 +137,7 @@ export async function POST(request: Request) {  let user;
 
     await recordAudit({
       actorId: user.id,
-      action: "MONTH_CLOSED",
+      action: "MONTH_REOPENED",
       entityType: "month_close",
       entityId: body.month,
       before: { الحالة: "CLOSED" },

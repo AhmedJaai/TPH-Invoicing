@@ -7,17 +7,19 @@ import { db } from "@/db";
 import { formatRiyalsDisplay } from "./money";
 import type { AttentionEvidence, AttentionFacts } from "./attention";
 import { previousMonth } from "./filing";
+import { currentMonthRiyadh } from "./riyadh-time";
 import { analyzeCoverage } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
 import { findDuplicateExpenses, type Expense } from "./expenses";
 import { findDoublePaid, recoverableMinor, type DoublePaidTx } from "./bank/double-paid";
+import { detectAnomalies } from "./bank/lifecycle";
 
 interface Row {
   [key: string]: unknown;
 }
 
 export async function gatherAttentionFacts(): Promise<AttentionFacts> {
-  const lastMonth = previousMonth(new Date().toISOString().slice(0, 7));
+  const lastMonth = previousMonth(currentMonthRiyadh());
 
   const [counts] = (
     await db.execute<Row>(sql`
@@ -192,23 +194,23 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   */
   const [totals] = (
     await db.execute<{ credits: number | null; debits: number | null }>(sql`
-      select coalesce(sum(amount_minor) filter (where direction = 'CREDIT'), 0)::int as credits,
-             coalesce(sum(amount_minor) filter (where direction = 'DEBIT'), 0)::int  as debits
+      select coalesce(sum(amount_minor) filter (where direction = 'CREDIT'), 0)::bigint as credits,
+             coalesce(sum(amount_minor) filter (where direction = 'DEBIT'), 0)::bigint  as debits
       from bank_transactions
     `)
   ).rows;
 
   const [balances] = (
     await db.execute<{ opening: number | null; closing: number | null }>(sql`
-      select sum(opening_balance_minor)::int as opening,
-             sum(closing_balance_minor)::int as closing
+      select sum(opening_balance_minor)::bigint as opening,
+             sum(closing_balance_minor)::bigint as closing
       from reconciliation_periods
     `)
   ).rows;
 
   const balance = checkBalance({
-    openingMinor: balances?.opening ?? null,
-    closingMinor: balances?.closing ?? null,
+    openingMinor: balances?.opening == null ? null : Number(balances.opening),
+    closingMinor: balances?.closing == null ? null : Number(balances.closing),
     creditsMinor: Number(totals?.credits ?? 0),
     debitsMinor: Number(totals?.debits ?? 0),
   });
@@ -294,7 +296,41 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
   const dupExpenses = findDuplicateExpenses(expenseRows);
 
+  /* ── حركاتٌ يتناقض قرارُها ومالُها — `detectAnomalies` موصولةً أخيراً ── */
+  const anomalyRows = (
+    await db.execute<{
+      id: string; amount_minor: number; lifecycle: string; match_status: string;
+      matched_payment_id: string | null; description: string | null; value_date: string;
+    }>(sql`
+      select id, amount_minor, lifecycle::text as lifecycle, match_status::text as match_status,
+             matched_payment_id, description, to_char(value_date, 'YYYY-MM-DD') as value_date
+        from bank_transactions
+       where (matched_payment_id is not null
+               and (match_status = 'IGNORED' or lifecycle not in ('CONFIRMED','POSTED')))
+          or (lifecycle in ('CONFIRMED','POSTED') and matched_payment_id is null
+               and match_status <> 'IGNORED' and category = 'SUPPLIER' and direction = 'DEBIT')
+       order by amount_minor desc
+       limit 50
+    `)
+  ).rows;
+  const anomalies = anomalyRows.flatMap((r) =>
+    detectAnomalies({
+      classified: true,
+      hasCandidate: true,
+      decided: r.lifecycle === "CONFIRMED" || r.lifecycle === "POSTED",
+      posted: r.matched_payment_id !== null,
+      ignored: r.match_status === "IGNORED",
+    }).map((a) => ({ r, a })),
+  );
+
   return {
+    lifecycleAnomalies: anomalies.map(({ r, a }) => ({
+      label: (r.description ?? "حركة").slice(0, 45),
+      sub: `${r.value_date} · ${a.detail}`,
+      amountMinor: Number(r.amount_minor),
+    })),
+    lifecycleAnomalyMinor: anomalies.reduce((s, { r }) => s + Number(r.amount_minor), 0),
+    firstAnomalyTransactionId: anomalies[0]?.r.id ?? null,
     duplicateExpenses: dupExpenses.length,
     duplicateExpenseAmountMinor: dupExpenses.reduce((s, d) => s + d.amountMinor, 0),
     duplicateExpenseEvidence: dupExpenses.slice(0, 6).map<AttentionEvidence>((d) => ({

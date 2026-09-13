@@ -7,7 +7,7 @@
  */
 import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bankTransactions, documents, invoices, issues, statements } from "@/db/schema";
+import { bankTransactions, documents, invoices, issues } from "@/db/schema";
 import { nextMonth } from "./filing";
 import { analyzeCoverage } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
@@ -54,10 +54,20 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
       select 1 from documents d where d.id = ${issues}.entity_id and d.period_month = ${month}
     )`);
 
-  const [stmt] = await db
-    .select({ n: sql<number>`count(distinct ${statements.supplierId})::int` })
-    .from(statements)
-    .where(and(gte(statements.periodEnd, start), lt(statements.periodEnd, end)));
+  /*
+    من له فواتير في الشهر ووصل كشفه — لا كلُّ من وصل كشفه. كان الطرح بين
+    عدّين مختلفَي الأصل يُعطي «١٠ من ١٤» والصحيح غيره.
+  */
+  const [stmt] = (await db.execute<{ n: number }>(sql`
+    select count(distinct i.supplier_id)::int as n
+      from invoices i
+     where i.period_month = ${month}
+       and exists (
+         select 1 from statements st
+          where st.supplier_id = i.supplier_id
+            and st.period_end >= ${start} and st.period_end < ${end}
+       )
+  `)).rows;
 
   const [bank] = await db
     .select({
@@ -73,11 +83,11 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
       unexplainedMinor: sql<number>`coalesce(sum(${bankTransactions.amountMinor}) filter (
         where ${bankTransactions.matchStatus} = 'UNMATCHED'
           and ${bankTransactions.category} = 'UNKNOWN'
-      ), 0)::int`,
+      ), 0)::bigint`,
       creditsMinor: sql<number>`coalesce(sum(${bankTransactions.amountMinor})
-        filter (where ${bankTransactions.direction} = 'CREDIT'), 0)::int`,
+        filter (where ${bankTransactions.direction} = 'CREDIT'), 0)::bigint`,
       debitsMinor: sql<number>`coalesce(sum(${bankTransactions.amountMinor})
-        filter (where ${bankTransactions.direction} = 'DEBIT'), 0)::int`,
+        filter (where ${bankTransactions.direction} = 'DEBIT'), 0)::bigint`,
     })
     .from(bankTransactions)
     .where(and(gte(bankTransactions.valueDate, start), lt(bankTransactions.valueDate, end)));
@@ -130,15 +140,15 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     — لا صفراً: افتراضُ الصفر يخترع فرقاً بحجم الرصيد كلِّه.
   */
   const [period] = await db.execute<{ opening: number | null; closing: number | null }>(sql`
-    select sum(opening_balance_minor)::int as opening,
-           sum(closing_balance_minor)::int as closing
+    select sum(opening_balance_minor)::bigint as opening,
+           sum(closing_balance_minor)::bigint as closing
     from reconciliation_periods
     where period_start >= ${monthStartIso} and period_end <= ${monthEndIso}
   `).then((r) => r.rows);
 
   const balance = checkBalance({
-    openingMinor: period?.opening ?? null,
-    closingMinor: period?.closing ?? null,
+    openingMinor: period?.opening == null ? null : Number(period.opening),
+    closingMinor: period?.closing == null ? null : Number(period.closing),
     creditsMinor: Number(bank?.creditsMinor ?? 0),
     debitsMinor: Number(bank?.debitsMinor ?? 0),
   });
