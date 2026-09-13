@@ -106,7 +106,7 @@ describe("الشهر الجاري يُقارَن بمثله", () => {
   */
   it("الشهر الناقص يقول في أساسه كم يوماً قِيس", () => {
     const c = buildChanges(f({ daysElapsedInMonth: 6 })).find((x) => x.id === "purchases");
-    expect(c?.baseline).toBe("عن أوّل 6 يوماً من 2026-08");
+    expect(c?.baseline).toBe("عن أوّل 6 أيّام من 2026-08");
   });
 
   it("الشهر التامّ يُقارَن بالشهر كلّه", () => {

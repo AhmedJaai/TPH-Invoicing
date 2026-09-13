@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -14,6 +13,7 @@ import { RecurringExpenses, type ExpenseRow } from "@/components/recurring-expen
 import { monthlyShare } from "@/lib/cashflow";
 import type { TxCategory } from "@/lib/bank/rules";
 import { NoAccess } from "@/components/ui";
+import { ALIAS, countNoun } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +64,7 @@ export default async function SettingsPage() {
       href: "/suppliers",
       title: "المورّدون",
       value: String(f?.suppliers ?? 0),
-      detail: `${f?.aliases ?? 0} اسماً بديلاً · ${f?.inactive ?? 0} معطَّل بعد الدمج`,
+      detail: `${countNoun(Number(f?.aliases ?? 0), ALIAS)} · ${Number(f?.inactive ?? 0) === 0 ? "لا معطَّل" : `${f?.inactive} معطَّلة بعد الدمج`}`,
     },
     {
       href: "/bank",
@@ -76,8 +76,9 @@ export default async function SettingsPage() {
       href: "/settings",
       title: "قارئ المستندات",
       value: activeProviderName(),
-      detail: "يُبدَّل بمتغيّر بيئة واحد — لا يُعيد بناء شيء",
+      detail: "الذي يقرأ الفواتير والكشوف الآن",
       disabled: true,
+      disabledReason: "يُضبط عند النشر لا من هذه الشاشة",
     },
     {
       href: "/settings",
@@ -85,9 +86,10 @@ export default async function SettingsPage() {
       value: String(f?.users ?? 0),
       detail: isAuthBypassed()
         ? "⚠ وضع التجربة مفعَّل — الدخول معطَّل"
-        : `دورك: ${ROLE_LABEL[user.role]} · تُدار القائمة البيضاء من متغيّر البيئة`,
+        : `دورك: ${ROLE_LABEL[user.role]}`,
       tone: isAuthBypassed() ? "danger" : undefined,
       disabled: true,
+      disabledReason: "إضافة مستخدم أو تغيير دوره يطلبه المالك ممّن يدير النشر",
     },
     {
       href: "/settings/audit",
@@ -101,6 +103,7 @@ export default async function SettingsPage() {
       value: String(f?.migrations ?? 0),
       detail: "مطبَّقة بالترتيب ومسجَّلة",
       disabled: true,
+      disabledReason: "تُطبَّق مع كلّ نشر — للاطّلاع وحده",
     },
   ];
 
@@ -156,9 +159,7 @@ export default async function SettingsPage() {
       </section>
 
       <p className="mt-8 text-xs leading-relaxed text-muted">
-        المعمارية الفعلية موثّقة في{" "}
-        <Link href="/settings" className="underline underline-offset-4">docs/ARCHITECTURE.md</Link>{" "}
-        داخل المستودع.
+        المعمارية الفعلية موثّقة في <bdi className="font-mono">docs/ARCHITECTURE.md</bdi> داخل المستودع.
       </p>
     </PageShell>
   );

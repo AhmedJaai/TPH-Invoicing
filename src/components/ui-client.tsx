@@ -45,7 +45,8 @@ export function ConfirmAction({
   size?: "sm" | "md";
   /** يملأ الزرّ عرض حاويته — للفعل الرئيسيّ في ذيل بطاقة. */
   block?: boolean;
-  onConfirm: () => Promise<void> | void;
+  /** يُرجع `false` إن فشل — فيبقى اللوح مفتوحاً ولا يُعاد الإقرار. */
+  onConfirm: () => Promise<void | boolean> | void | boolean;
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -91,12 +92,18 @@ export function ConfirmAction({
           disabled={!understood || busy}
           onClick={async () => {
             setBusy(true);
+            let ok = true;
             try {
-              await onConfirm();
+              ok = (await onConfirm()) !== false;
+            } catch {
+              ok = false;
             } finally {
               setBusy(false);
-              setOpen(false);
-              setUnderstood(false);
+              /* اللوح يُغلق عند النجاح وحده — كان يُغلق بعد الفشل فيُعاد الإقرار كلُّه */
+              if (ok) {
+                setOpen(false);
+                setUnderstood(false);
+              }
             }
           }}
           className={buttonClass(skin.confirm, "sm")}

@@ -103,6 +103,15 @@ export const RULES: Record<string, RateLimitRule> = {
   */
   "ai-analysis": { limit: 80, windowSeconds: 3600 },
   "ai-findings": { limit: 300, windowSeconds: 3600 },
+  /*
+    دِلاءٌ صريحة لما كان يقع في الافتراضيّ: الإقرار الجماعيّ كان يشارك
+    لا دلوَ «أكّد» ولا دلوَه، والتسمية والتصدير بلا حدٍّ مسمّى.
+  */
+  "match-confirm-bulk": { limit: 100, windowSeconds: 3600 },
+  "drive-rename": { limit: 60, windowSeconds: 3600 },
+  "payment-run": { limit: 60, windowSeconds: 3600 },
+  "ops-db-identity": { limit: 30, windowSeconds: 3600 },
+  "document-status": { limit: 120, windowSeconds: 3600 },
 };
 
 export function ruleFor(route: string): RateLimitRule {

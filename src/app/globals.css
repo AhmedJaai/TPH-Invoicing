@@ -37,7 +37,8 @@
    */
   --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.06);
   --shadow-lifted: 0 2px 4px rgb(0 0 0 / 0.05), 0 4px 12px rgb(0 0 0 / 0.08);
-  --ring: color-mix(in oklab, var(--ink) 22%, transparent);
+  /* حلقة التركيز ٣:١ على الأقلّ — كانت ‎1.69:1‎ فاتحاً، فلا يُرى أين التركيز بلا فأرة */
+  --ring: color-mix(in oklab, var(--ink) 55%, transparent);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -64,7 +65,7 @@
     /* في الظلام لا يُرى الظلّ — فالطبقة تُصنع بالحدّ والأرضية */
     --shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.02);
     --shadow-lifted: 0 4px 16px rgb(0 0 0 / 0.5);
-    --ring: color-mix(in oklab, var(--ink) 35%, transparent);
+    --ring: color-mix(in oklab, var(--ink) 50%, transparent);
   }
 }
 

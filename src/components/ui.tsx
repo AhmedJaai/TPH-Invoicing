@@ -102,7 +102,13 @@ export const BUTTON_CLASS: Record<ButtonVariant, string> = {
 };
 
 export function buttonClass(variant: ButtonVariant = "secondary", size: "sm" | "md" = "md") {
-  const pad = size === "sm" ? "px-3 py-1.5 text-[11px]" : "px-4 py-2.5 text-sm";
+  /*
+    ارتفاعُ اللمس ٤٤ بكسل على الجوّال — كان زرّ «sm» ٢٨ بكسلاً في كلّ أزرار
+    الطابور، وأحمد يضغطها بإبهامه عند الكاشير. وعلى الحاسوب يبقى مضغوطاً.
+  */
+  const pad = size === "sm"
+    ? "min-h-11 px-3 py-1.5 text-[11px] sm:min-h-0"
+    : "min-h-11 px-4 py-2.5 text-sm";
   return `inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl font-bold transition-all disabled:opacity-50 ${pad} ${BUTTON_CLASS[variant]}`;
 }
 
@@ -170,13 +176,22 @@ export function Stat({
     <Card href={href} padded={false}>
       <div className="px-4 py-3.5 sm:px-5 sm:py-4">
         <p className="text-xs font-medium text-muted">{label}</p>
-        <p className={`nums mt-2 font-display text-2xl font-bold leading-none sm:text-[1.75rem] ${tone ? TONE_TEXT[tone] : ""}`}>
+        {/*
+          `.nums` يخطّ بخطّ النظام — فيوضع على الرقم وحده. كان على الحاوية،
+          فكُتبت «غير معروف» و«لم يصل» بخطٍّ غير خطّ الواجهة.
+        */}
+        <p className={`${isNumeric(value) ? "nums " : ""}mt-2 font-display text-2xl font-bold leading-none sm:text-[1.75rem] ${tone ? TONE_TEXT[tone] : ""}`}>
           {minor !== undefined ? <Money minor={minor} /> : value}
         </p>
         {sub && <p className="mt-2 text-xs leading-relaxed text-muted">{sub}</p>}
       </div>
     </Card>
   );
+}
+
+/** قيمةٌ نصّها أرقامٌ صرفة — وحدها تستحقّ خطّ الأرقام. */
+export function isNumeric(value: React.ReactNode): boolean {
+  return typeof value === "number" || (typeof value === "string" && /^[\d\s.,٫٬%٪+\-/]+$/.test(value));
 }
 
 export function StatGrid({ children }: { children: React.ReactNode }) {

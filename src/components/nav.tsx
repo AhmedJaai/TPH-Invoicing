@@ -95,7 +95,7 @@ export function Nav({ role, pending = 0 }: { role: Role; pending?: number }) {
 
       {children.length > 0 && (
         <nav
-          className="mt-2 flex items-center gap-4 overflow-x-auto border-t border-line pt-2"
+          className="scroll-x mt-2 flex items-center gap-4 overflow-x-auto border-t border-line pt-2"
           aria-label={area?.label}
         >
           {children.map((c) => (
@@ -103,7 +103,7 @@ export function Nav({ role, pending = 0 }: { role: Role; pending?: number }) {
               key={c.href}
               href={c.href}
               aria-current={child?.href === c.href ? "page" : undefined}
-              className={`flex shrink-0 items-center gap-1.5 border-b-2 pb-1 text-xs transition-colors ${
+              className={`flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 pb-1 text-xs transition-colors sm:min-h-0 ${
                 child?.href === c.href
                   ? "border-ink font-bold text-ink"
                   : "border-transparent text-muted hover:text-ink-soft"
@@ -226,7 +226,7 @@ export function UploadButton({
   return (
     <Link
       href="/upload"
-      className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
+      className={`inline-flex min-h-11 shrink-0 items-center rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors sm:min-h-0 ${
         active ? "border-ink bg-inverse-surface text-inverse-ink" : "border-line hover:border-ink-soft"
       } ${className}`}
     >

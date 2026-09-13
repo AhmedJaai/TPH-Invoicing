@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -106,15 +107,16 @@ export default async function ExpensesPage({
     >
       <div className="flex flex-wrap items-center gap-2">
         {months.map((m) => (
-          <a
+          <Link
             key={m}
             href={`/money/expenses?month=${m}`}
-            className={`nums rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+            aria-current={m === month ? "true" : undefined}
+            className={`nums inline-flex min-h-11 items-center rounded-lg px-3 text-xs font-medium transition-colors sm:min-h-0 sm:py-1.5 ${
               m === month ? "bg-inverse-surface text-inverse-ink" : "border border-line hover:border-ink-soft"
             }`}
           >
             {m}
-          </a>
+          </Link>
         ))}
       </div>
 
@@ -194,20 +196,21 @@ export default async function ExpensesPage({
               <thead className="sticky top-0 bg-sunken text-muted">
                 <tr>
                   <th className="px-3 py-2 text-start font-medium">الباب</th>
-                  <th className="px-3 py-2 text-end font-medium">المتوقَّع</th>
-                  <th className="px-3 py-2 text-end font-medium">الفعليّ</th>
-                  <th className="px-3 py-2 text-end font-medium">الفرق</th>
+                  {/* المال يُصفّ على آخر خانةٍ منه — `text-end` في العربية يسار */}
+                  <th className="px-3 py-2 text-start font-medium">المتوقَّع</th>
+                  <th className="px-3 py-2 text-start font-medium">الفعليّ</th>
+                  <th className="px-3 py-2 text-start font-medium">الفرق</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {variance.map((v) => (
                   <tr key={v.category}>
                     <td className="px-3 py-2">{v.label}</td>
-                    <td className="px-3 py-2 text-end">
+                    <td className="nums-col px-3 py-2">
                       {v.expectedMinor === 0 ? <span className="text-muted">لم يُتوقَّع</span> : <Money minor={v.expectedMinor} />}
                     </td>
-                    <td className="px-3 py-2 text-end"><Money minor={v.actualMinor} /></td>
-                    <td className="px-3 py-2 text-end font-bold">
+                    <td className="nums-col px-3 py-2"><Money minor={v.actualMinor} /></td>
+                    <td className="nums-col px-3 py-2 font-bold">
                       <Money minor={v.varianceMinor} tone={v.varianceMinor > 0 ? "warn" : "ok"} />
                       {v.variancePct !== null && (
                         <span className="ms-1 text-[11px] font-normal text-muted">

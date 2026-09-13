@@ -78,6 +78,13 @@ export async function POST(request: Request) {  let user;
     supplierName = sup.nameAr;
   }
 
+  /* ما يُستبدَل يُقال — كانت القاعدة القائمة تُكتب فوقها بصمت */
+  const [previous] = await db
+    .select({ category: bankRules.category })
+    .from(bankRules)
+    .where(eq(bankRules.normalized, normalized))
+    .limit(1);
+
   const inserted = await db
     .insert(bankRules)
     .values({
@@ -115,12 +122,13 @@ export async function POST(request: Request) {  let user;
 
   await recordAudit({
     actorId: user.id,
-    action: "SUPPLIER_ALIAS_LEARNED",
+    action: "BANK_RULE_LEARNED",
     entityType: "bank_rule",
     entityId: inserted[0].id,
     after: {
       النمط: pattern,
       التصنيف: CATEGORY_LABEL[body.category],
+      ...(previous ? { "كان": CATEGORY_LABEL[previous.category as keyof typeof CATEGORY_LABEL] ?? previous.category } : {}),
       المورّد: supplierName,
     },
   });
@@ -129,8 +137,11 @@ export async function POST(request: Request) {  let user;
     ok: true,
     id: inserted[0].id,
     message:
-      body.category === "SUPPLIER"
+      (body.category === "SUPPLIER"
         ? `«${pattern}» صار اسماً بنكياً لـ${supplierName}`
-        : `«${pattern}» صُنّف ${CATEGORY_LABEL[body.category]}`,
+        : `«${pattern}» صُنّف ${CATEGORY_LABEL[body.category]}`)
+      + (previous && previous.category !== body.category
+        ? ` — واستُبدلت قاعدةٌ كانت تصنّفه ${CATEGORY_LABEL[previous.category as keyof typeof CATEGORY_LABEL] ?? previous.category}`
+        : ""),
   });
 }

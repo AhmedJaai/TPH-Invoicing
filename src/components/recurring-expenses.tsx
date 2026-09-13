@@ -36,6 +36,8 @@ export function RecurringExpenses({ rows }: { rows: ExpenseRow[] }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState(false);
+  /* «عطّله» يُسأل عنه قبل أن يقع — نقرةٌ خاطئة كانت تُخرج الإيجار من المتوقَّع بلا رجوع */
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const send = async (payload: Record<string, unknown>) => {
     setBusy(true);
@@ -74,13 +76,31 @@ export function RecurringExpenses({ rows }: { rows: ExpenseRow[] }) {
                   <span className="nums text-sm font-bold" dir="ltr">
                     {formatRiyalsDisplay(r.monthlyMinor)}
                   </span>
-                  <button
-                    onClick={() => void send({ action: "delete", id: r.id })}
-                    disabled={busy}
-                    className="text-[11px] text-muted hover:text-danger disabled:opacity-40"
-                  >
-                    عطّله
-                  </button>
+                  {confirmId === r.id ? (
+                    <span className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => { setConfirmId(null); void send({ action: "delete", id: r.id }); }}
+                        disabled={busy}
+                        className="inline-flex min-h-11 items-center rounded-lg border border-danger/40 bg-danger-bg px-2.5 text-[11px] font-bold text-danger disabled:opacity-40 sm:min-h-0 sm:py-1"
+                      >
+                        نعم، عطّله
+                      </button>
+                      <button
+                        onClick={() => setConfirmId(null)}
+                        className="inline-flex min-h-11 items-center px-2 text-[11px] text-muted sm:min-h-0"
+                      >
+                        إلغاء
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmId(r.id)}
+                      disabled={busy}
+                      className="inline-flex min-h-11 items-center px-2 text-[11px] text-muted hover:text-danger disabled:opacity-40 sm:min-h-0"
+                    >
+                      عطّله
+                    </button>
+                  )}
                 </span>
               </li>
             ))}
@@ -97,6 +117,7 @@ export function RecurringExpenses({ rows }: { rows: ExpenseRow[] }) {
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder="اسم المصروف — إيجار المحل"
+          aria-label="اسم المصروف"
           dir="auto"
           className="min-w-[10rem] flex-1 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-ink"
         />
@@ -104,12 +125,15 @@ export function RecurringExpenses({ rows }: { rows: ExpenseRow[] }) {
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="المبلغ"
+          aria-label="المبلغ بالريال"
+          inputMode="decimal"
           dir="ltr"
           className="nums w-24 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-ink"
         />
         <select
           value={cadence}
           onChange={(e) => setCadence(e.target.value as ExpenseRow["cadence"])}
+          aria-label="الدورة"
           className="rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
         >
           {(Object.keys(CADENCE_LABEL) as ExpenseRow["cadence"][]).map((c) => (
@@ -119,6 +143,7 @@ export function RecurringExpenses({ rows }: { rows: ExpenseRow[] }) {
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value as TxCategory)}
+          aria-label="الباب"
           className="rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
         >
           {CATEGORIES.map((c) => (

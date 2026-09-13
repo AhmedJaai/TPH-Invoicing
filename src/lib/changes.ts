@@ -1,4 +1,4 @@
-import { DOCUMENT, PRODUCT, countNoun } from "./arabic";
+import { DOCUMENT, PRODUCT, countNoun, DAY } from "./arabic";
 /**
  * ما الذي تغيّر.
  *
@@ -99,7 +99,7 @@ export function buildChanges(f: ChangeFacts): Change[] {
         السابق — أوّل ستّة أيامٍ بأوّل ستّة — لا بشهرٍ تامّ.
       */
       baseline: partial
-        ? `عن أوّل ${f.daysElapsedInMonth} يوماً من ${f.prevMonthLabel}`
+        ? `عن أوّل ${countNoun(f.daysElapsedInMonth ?? 0, DAY)} من ${f.prevMonthLabel}`
         : `عن ${f.prevMonthLabel}`,
       direction: dir,
       pct,

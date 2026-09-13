@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { postJson, request } from "@/lib/http-client";
-import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
+import { DAY, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 
 interface Coverage {
   from: string | null;
@@ -281,15 +281,14 @@ export function BankImport({
 
         <Steps current={step} />
 
-        <div
-          onClick={() => inputRef.current?.click()}
-          className="mt-3 cursor-pointer rounded-xl border-2 border-dashed border-line px-5 py-8 text-center hover:border-ink-soft"
+        <label
+          className="mt-3 block cursor-pointer rounded-xl border-2 border-dashed border-line px-5 py-8 text-center focus-within:border-ink hover:border-ink-soft"
         >
           <input
             ref={inputRef}
             type="file"
             accept=".xlsx,.xls,.csv,.pdf"
-            className="hidden"
+            className="sr-only"
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) { fileRef.current = f; void send(f, false); }
@@ -299,7 +298,7 @@ export function BankImport({
             {busy === "reading" ? "يقرأ الكشف…" : "اختر ملف كشف الحساب"}
           </p>
           <p className="mt-1 text-xs text-muted">Excel أو PDF نصّيّ من بنكك — لا يُحفظ شيء قبل مراجعتك</p>
-        </div>
+        </label>
 
         {error && <p className="mt-3 rounded-lg bg-danger-bg px-3 py-2 text-xs text-danger">{error}</p>}
         {done && <p className="mt-3 rounded-lg bg-ok-bg px-3 py-2 text-xs font-bold text-ok">✓ {done}</p>}
@@ -323,7 +322,7 @@ export function BankImport({
                 <ul className="mt-1.5 space-y-0.5">
                   {data.summary.coverage.gaps.slice(0, 4).map((g, i) => (
                     <li key={i} className="nums text-[11px] leading-relaxed">
-                      {g.start} ← {g.end} ({g.days} يوماً)
+                      <bdi>{g.start}</bdi> إلى <bdi>{g.end}</bdi> ({countNoun(g.days, DAY)})
                     </li>
                   ))}
                 </ul>
@@ -409,7 +408,7 @@ export function BankImport({
                       {(data.sync.ambiguousRows ?? []).map((a, i) => (
                         <li key={i} className="text-[11px] leading-relaxed text-muted">
                           <span className="nums">{a.date}</span> ·{" "}
-                          <span className="nums font-bold">{(a.amountMinor / 100).toFixed(2)}</span> ·{" "}
+                          <span className="nums font-bold">{formatRiyalsDisplay(a.amountMinor)}</span> ·{" "}
                           {a.description} — {a.reason}
                         </li>
                       ))}

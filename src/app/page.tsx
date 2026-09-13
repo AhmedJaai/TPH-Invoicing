@@ -19,7 +19,7 @@ import { gatherHomeProvenance } from "@/lib/provenance-facts";
 import { Changes } from "@/components/changes";
 import { buildChanges } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
-import { INVOICE, countNoun } from "@/lib/arabic";
+import { DAY, INVOICE, countNoun } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
 
@@ -108,16 +108,19 @@ export default async function HomePage() {
       width="wide"
      
       title="حال المقهى"
-      intro="ما تحتاج معرفته أو فعله اليوم — لا ما في قاعدة البيانات من سجلات."
+      intro="ما تحتاج معرفته أو فعله اليوم."
+      actions={<LinkButton href="/upload" variant="primary" size="sm">+ ارفع فاتورة</LinkButton>}
     >
       {/* ── الأرقام ── */}
       <StatGrid>
-        {/*
-          المبيعات وهامش الربح يحتاجان مصدر مبيعات لم يُوصَل بعد.
-          صفرٌ هنا يوحي بأنّ المقهى لم يبع شيئاً — والفراغ الصادق خير منه.
-        */}
-        <Figure label="مبيعات اليوم" value="غير موصولة" tone="muted" note="لا مصدر مبيعات بعد" />
-
+        {/* سؤال أحمد الأوّل «كم أدين؟» أوّلاً — والخانة الأبرز لم تعد لغياب */}
+        <Figure
+          label="المستحقّ للمورّدين"
+          provenance={prov.outstanding}
+          href="/purchases/invoices?paid=OPEN"
+          tone={prov.outstanding.valueMinor > 0 ? "warn" : "ok"}
+          note="للمورّدين الآن"
+        />
         <Figure
           label={`مشتريات ${prov.month ?? "الشهر"}`}
           provenance={prov.purchases}
@@ -129,31 +132,30 @@ export default async function HomePage() {
               : `${trend > 0 ? "▲" : "▼"} ${Math.abs(Math.round(trend * 100))}٪ عن ${
                   trendResult.basisDays === null
                     ? trendResult.prevMonth
-                    : `أوّل ${trendResult.basisDays} يوماً من ${trendResult.prevMonth}`
+                    : `أوّل ${countNoun(trendResult.basisDays, DAY)} من ${trendResult.prevMonth}`
                 }`
           }
         />
 
-        <Figure
-          label="المستحقّ للمورّدين"
-          provenance={prov.outstanding}
-          href="/money"
-          tone={prov.outstanding.valueMinor > 0 ? "warn" : "ok"}
-          note="للمورّدين الآن"
-        />
 
         <Figure
           label="ضريبة مدخلات مؤكَّدة"
           provenance={prov.vat}
-          href="/attention"
+          href="/purchases/invoices?tax=VALID"
           note="من فواتير مستوفية الأركان وحدها"
         />
+        {/*
+          المبيعات وهامش الربح يحتاجان مصدر مبيعات لم يُوصَل بعد.
+          صفرٌ هنا يوحي بأنّ المقهى لم يبع شيئاً — والفراغ الصادق خير منه.
+        */}
+        <Figure label="مبيعات اليوم" value="غير موصولة" tone="muted" note="لا مصدر مبيعات بعد" />
+
       </StatGrid>
 
       {/* ── ما الذي تغيّر ── */}
       <Section
         title="ما الذي تغيّر"
-        hint="كل ما سواه في هذه الصفحة يصف الحال. وهذا وحده يصف الحركة — وهو ما يستحقّ نظرةً كل صباح."
+        hint="ما تحرّك منذ آخر مرّة."
       >
         <Changes changes={changes} />
       </Section>

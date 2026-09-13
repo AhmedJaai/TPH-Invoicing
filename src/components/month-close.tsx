@@ -100,10 +100,11 @@ export function MonthClose({
         if (!r.ok) {
           setError(r.error);
           if (r.data.report && r.data.status) setData(r.data as Response);
-          return;
+          return false;
         }
         setData(r.data);
         if (action !== "check") router.refresh();
+        return true;
       } finally {
         setBusy(null);
       }

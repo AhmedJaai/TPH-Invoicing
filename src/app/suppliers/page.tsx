@@ -7,7 +7,7 @@ import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { Badge, DataTable, EmptyState, LinkButton } from "@/components/ui";
-import { SUPPLIER, countNoun } from "@/lib/arabic";
+import { SUPPLIER, countNoun, ALIAS } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
 
@@ -61,8 +61,8 @@ export default async function SuppliersPage() {
       <PageShell user={user} width="wide" title="المورّدون">
         <EmptyState
           title="لا مورّدين بعد."
-          hint="يُنشَأ المورّد تلقائياً حين تُقرأ أوّل فاتورة منه — أو أضفه بنفسك من الإعدادات."
-          action={<LinkButton href="/settings" variant="primary">أضف مورّداً</LinkButton>}
+          hint="يُنشَأ المورّد حين تُقرأ أوّل فاتورة منه — أو تختاره «مورّداً جديداً» في شاشة الرفع."
+          action={<LinkButton href="/upload" variant="primary">ارفع فاتورته</LinkButton>}
         />
       </PageShell>
     );
@@ -105,12 +105,11 @@ export default async function SuppliersPage() {
             primary: true,
             cell: (r) => (
               <span>
-                <a href={`/suppliers/${r.slug}`} className="block font-medium hover:underline hover:underline-offset-4">
-                  {r.nameAr}
-                </a>
-                <span className="block font-mono text-[11px] text-muted" dir="ltr">
-                  {r.slug}
-                  {Number(r.aliasCount) > 0 && ` · ${r.aliasCount} اسم بديل`}
+                {/* الصفّ رابطٌ أصلاً — ورابطٌ داخل رابط يُسقط الترطيب */}
+                <span className="block font-medium">{r.nameAr}</span>
+                <span className="block text-[11px] text-muted">
+                  <bdi className="font-mono">{r.slug}</bdi>
+                  {Number(r.aliasCount) > 0 && ` · ${countNoun(Number(r.aliasCount), ALIAS)}`}
                 </span>
                 {!r.issuesInvoices && (
                   <span className="mt-1 inline-block">
@@ -185,8 +184,8 @@ export default async function SuppliersPage() {
         empty={
           <EmptyState
             title="لا مورّدين بعد."
-            hint="يُنشَأ المورّد تلقائياً حين تُقرأ أوّل فاتورة منه، أو أضفه من الإعدادات."
-            action={<LinkButton href="/settings" variant="primary">أضف مورّداً</LinkButton>}
+            hint="يُنشَأ المورّد حين تُقرأ أوّل فاتورة منه — أو تختاره «مورّداً جديداً» في شاشة الرفع."
+            action={<LinkButton href="/upload" variant="primary">ارفع فاتورته</LinkButton>}
           />
         }
       />

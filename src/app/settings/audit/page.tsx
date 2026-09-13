@@ -27,9 +27,54 @@ const ACTION_LABEL: Record<string, string> = {
   STATEMENT_RECONCILED: "مطابقة كشف مورّد",
   PRODUCT_LINKED: "ربط صنف معياري",
   PRODUCT_UNLINKED: "فكّ ربط صنف",
-  EXPENSE_ADDED: "إضافة مصروف متكرّر",
-  EXPENSE_REMOVED: "تعطيل مصروف متكرّر",
+  EXPENSE_ADDED: "إضافة مصروف",
+  EXPENSE_REMOVED: "حذف مصروف أو تعطيله",
+  INVOICE_PAID_BY_OWNER: "سداد فاتورة من حساب المالك",
+  SUPPLIER_CREDIT_APPLIED: "خصم رصيد المورّد من فاتورة",
+  AI_ANALYSIS_RUN: "تحليل الذكاء لحساب مورّد",
+  AI_FINDING_DECIDED: "قرارٌ في اقتراح الذكاء",
+  COUNTERPARTY_CONFIRMED: "تعريف جهة",
+  BANK_RULE_LEARNED: "قاعدة تصنيف بنكية",
+  MONTH_REOPENED: "إعادة فتح شهر",
+  MATCH_CONFIRMED: "تقييد حوالة على فواتير",
+  MATCH_UNDONE: "تراجع عن مطابقة",
+  MATCH_REJECTED: "إعلان «ليست سداداً»",
+  PAYMENT_RECORDED: "قيد دفعة",
+  DRIVE_FILE_RENAMED: "إعادة تسمية في الدرايف",
+  PAYMENT_RUN_EXPORTED: "تنزيل ملف التحويلات",
+  EXPENSES_DERIVED: "اشتقاق المصروفات من البنك",
+  EXPENSE_RECLASSIFIED: "مصروفٌ تبع تصنيف حركته",
+  RECONCILIATION_BALANCES_SET: "رصيدا الشهر في التسوية",
+  DOCUMENT_STATUS_CHANGED: "تغيير حال مستند",
+  /* قيودٌ قديمة كُتبت قبل أن يكون لها اسم */
+  DELETE_DUPLICATE_TRANSACTION: "حذف حركة مكرَّرة",
+  BANK_MATCH_UNDONE: "تراجع عن مطابقة",
 };
+
+/** نوعُ ما وقع عليه الفعل — بالعربية لا باسم الجدول. */
+const ENTITY_LABEL: Record<string, string> = {
+  bank_transaction: "حركة بنك",
+  bank_import: "استيراد كشف",
+  bank_rule: "قاعدة بنك",
+  document: "مستند",
+  invoice: "فاتورة",
+  supplier: "مورّد",
+  counterparty: "جهة",
+  statement: "كشف مورّد",
+  month_close: "إقفال شهر",
+  expense: "مصروف",
+  drive: "الدرايف",
+  drive_sync: "مزامنة الدرايف",
+  payment_run: "دفعة الشهر",
+  product: "صنف",
+  ai_finding: "اقتراح ذكاء",
+};
+
+/** الوقت بتوقيت الرياض — كان يُعرض UTC بلا إشارة، فالعاشرة صباحاً «07:00». */
+const WHEN = new Intl.DateTimeFormat("ar-SA-u-nu-latn-ca-gregory", {
+  timeZone: "Asia/Riyadh", year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", hour12: false,
+});
 
 /** يعرض محتوى jsonb سطراً سطراً بلا حشو. */
 function Detail({ value }: { value: unknown }) {
@@ -99,7 +144,7 @@ export default async function AuditTrailPage({
       user={user}
      
       title="سجل التدقيق"
-      intro="ما فُعل، ومن فعله، ومتى. لا يُعدَّل ولا يُحذَف — ولا أحد يملك ذلك، ولا أنت."
+      intro="ما فُعل، ومن فعله، ومتى — بتوقيت الرياض."
     >
       {rows.length === 0 ? (
         <Empty message="لا سجلات بعد." />
@@ -111,12 +156,12 @@ export default async function AuditTrailPage({
                 <span className="text-sm font-bold">
                   {ACTION_LABEL[r.action] ?? r.action}
                 </span>
-                <span className="nums text-[11px] text-muted" dir="ltr">
-                  {r.at.toISOString().replace("T", " ").slice(0, 16)}
+                <span className="nums text-[11px] text-muted">
+                  <bdi>{WHEN.format(r.at)}</bdi>
                 </span>
               </div>
               <p className="mt-0.5 text-[11px] text-muted">
-                {r.actorName ?? r.actorEmail ?? "النظام"} · {r.entityType}
+                {r.actorName ?? r.actorEmail ?? "النظام"} · {ENTITY_LABEL[r.entityType] ?? "سجلّ"}
               </p>
               <Detail value={r.after} />
             </li>

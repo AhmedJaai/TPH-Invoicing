@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Money } from "./money";
-import { TONE_TEXT, type Tone } from "./ui";
+import { TONE_TEXT, type Tone, isNumeric } from "./ui";
 import type { Provenance } from "@/lib/provenance";
 
 /**
@@ -36,7 +36,8 @@ export function Figure({
 
   const cls = tone ? TONE_TEXT[tone] : "";
   const shown = value ?? (provenance ? <Money minor={provenance.valueMinor} /> : "—");
-  const big = `nums font-display text-2xl font-bold leading-none sm:text-[1.75rem] ${cls}`;
+  /* خطّ الأرقام للرقم وحده — «غير موصولة» تُكتب بخطّ الواجهة */
+  const big = `${value === undefined || isNumeric(value) ? "nums " : ""}font-display text-2xl font-bold leading-none sm:text-[1.75rem] ${cls}`;
 
   return (
     <div className="rounded-2xl border border-line bg-raised px-4 py-3.5 shadow-raised sm:px-5 sm:py-4">
@@ -58,7 +59,7 @@ export function Figure({
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            className="mt-1.5 -mx-1 flex min-h-6 items-center gap-1 px-1 py-1 text-xs text-muted underline decoration-dotted underline-offset-4 hover:text-ink-soft"
+            className="mt-1.5 -mx-1 flex min-h-11 items-center gap-1 px-1 py-1 text-xs text-muted underline decoration-dotted underline-offset-4 hover:text-ink-soft sm:min-h-6"
           >
             {open ? "أخفِ المصدر" : "من أين جاء؟"}
             <Dot confidence={provenance.confidence} />

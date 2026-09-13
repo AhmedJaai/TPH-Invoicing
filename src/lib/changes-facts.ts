@@ -46,11 +46,12 @@ export async function gatherChangeFacts(
         (select coalesce(sum(total_minor),0)::bigint from invoices
           where period_month = (select m from prv)
             and (
-              (select m from cur) <> to_char(now(), 'YYYY-MM')
-              or extract(day from invoice_date) <= extract(day from now())
+              (select m from cur) <> to_char(now() at time zone 'Asia/Riyadh', 'YYYY-MM')
+              or extract(day from invoice_date) <= extract(day from now() at time zone 'Asia/Riyadh')
             ))                                                                    as purchases_prev,
-        (select case when (select m from cur) = to_char(now(), 'YYYY-MM')
-                     then extract(day from now())::int end)                       as days_elapsed,
+        /* يومُ الشهر بتوقيت الرياض — كما في بطاقة المشتريات، فلا يقول أحدهما ١٣ والآخر ١٤ */
+        (select case when (select m from cur) = to_char(now() at time zone 'Asia/Riyadh', 'YYYY-MM')
+                     then extract(day from now() at time zone 'Asia/Riyadh')::int end)                       as days_elapsed,
         (select count(*)::int from documents
           where created_at >= now() - interval '7 days')                         as docs_7,
         (select count(*)::int from documents

@@ -58,11 +58,16 @@ export function HubGrid({ tiles }: { tiles: readonly HubTile[] }) {
         );
 
         const box = "rounded-2xl border border-line bg-raised px-4 py-4 shadow-raised sm:px-5";
+        /*
+          المعطَّلة تُميَّز بحدٍّ متقطّع لا بشفافيةٍ على النصّ — كانت
+          `opacity-55` تُنزل تباين تفصيلها إلى ‎2.21:1‎. والمفتاح العنوان: كانت
+          ثلاثٌ منها تتشارك `href` واحداً فيحذّر React من مفتاحٍ مكرَّر.
+        */
         return t.disabled ? (
-          <div key={t.href} className={`${box} opacity-55`}>{body}</div>
+          <div key={t.title} className={`${box} border-dashed shadow-none`} aria-disabled="true">{body}</div>
         ) : (
           <Link
-            key={t.href}
+            key={t.title}
             href={t.href}
             className={`${box} group transition-all hover:border-ink-soft hover:shadow-lifted`}
           >

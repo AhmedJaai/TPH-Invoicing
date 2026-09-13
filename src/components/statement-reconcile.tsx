@@ -99,7 +99,7 @@ export function StatementReconcile({
 
         {archived.length === 0 ? (
           <p className="mt-3 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-xs text-muted">
-            لا كشوف مؤرشفة بعد. ارفع كشف المورّد من الصفحة الرئيسية أوّلاً.
+            لا كشوف مؤرشفة بعد. ارفع كشف المورّد من صفحة الرفع (/upload) أوّلاً.
           </p>
         ) : (
           <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
@@ -110,7 +110,7 @@ export function StatementReconcile({
                   <span className="nums block text-[11px] text-muted" dir="ltr">
                     {a.periodStart} → {a.periodEnd}
                     {a.lineCount > 0
-                      ? ` · ${a.lineCount} سطر مطابَق`
+                      ? ` · ${countNoun(a.lineCount, LINE)} مطابَقة`
                       : " · بلا أسطر — طابِقه لتُقرأ"}
                   </span>
                 </span>
@@ -189,7 +189,7 @@ export function StatementReconcile({
         <section className="border-t border-line pt-8">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-base font-bold">
-              {result.supplier.nameAr} · {result.period.start} → {result.period.end}
+              {result.supplier.nameAr} · <bdi className="nums">{result.period.start}</bdi> إلى <bdi className="nums">{result.period.end}</bdi>
             </h2>
             {result.persisted && <span className="text-[11px] font-bold text-ok">✓ حُفظ الناتج</span>}
           </div>

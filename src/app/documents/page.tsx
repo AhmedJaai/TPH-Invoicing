@@ -8,6 +8,7 @@ import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
 import { DOCUMENT, countNoun } from "@/lib/arabic";
 import { ScrollX } from "@/components/scroll-x";
+import { RejectDocument } from "@/components/reject-document";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +27,14 @@ const KIND_LABEL: Record<string, string> = {
   UNKNOWN: "غير محدَّد",
 };
 
+/*
+  اسمٌ واحد لكلّ حال — في الشارة وفي الترشيح. كانت «قيد القراءة» في
+  الترشيح «مقروءاً» في الصفّ (عكس المعنى)، و«محجور» هناك «مرفوضاً» هنا.
+*/
 const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
   ARCHIVED: { text: "مؤرشف", cls: "bg-ok-bg text-ok" },
-  PENDING: { text: "معلّق", cls: "bg-warn-bg text-warn" },
-  EXTRACTED: { text: "مقروء", cls: "bg-sunken text-ink-soft" },
+  PENDING: { text: "جديد", cls: "bg-warn-bg text-warn" },
+  EXTRACTED: { text: "مقروء ولم يُعتمد", cls: "bg-sunken text-ink-soft" },
   NEEDS_REVIEW: { text: "يحتاج مراجعة", cls: "bg-warn-bg text-warn" },
   REJECTED: { text: "مرفوض", cls: "bg-danger-bg text-danger" },
 };
@@ -53,11 +58,11 @@ interface Params {
  * ملفاً، بل يحتاج معرفة أيّها ينتظره. فالحالة أوّل ما يُرشَّح به.
  */
 const STATUS_BUCKETS: { id: string; label: string; tone?: "warn" | "ok" }[] = [
-  { id: "PENDING", label: "جديد", tone: "warn" },
-  { id: "EXTRACTED", label: "قيد القراءة" },
-  { id: "NEEDS_REVIEW", label: "يحتاج مراجعة", tone: "warn" },
-  { id: "ARCHIVED", label: "مؤرشف", tone: "ok" },
-  { id: "REJECTED", label: "محجور" },
+  { id: "PENDING", label: STATUS_LABEL.PENDING.text, tone: "warn" },
+  { id: "EXTRACTED", label: STATUS_LABEL.EXTRACTED.text },
+  { id: "NEEDS_REVIEW", label: STATUS_LABEL.NEEDS_REVIEW.text, tone: "warn" },
+  { id: "ARCHIVED", label: STATUS_LABEL.ARCHIVED.text, tone: "ok" },
+  { id: "REJECTED", label: STATUS_LABEL.REJECTED.text },
 ];
 
 function Chip({
@@ -91,6 +96,7 @@ export default async function DocumentsPage({
 
   const p = await searchParams;
   const showAmounts = can(user.role, "amounts:view");
+  const canDecide = can(user.role, "document:upload");
   const page = Math.max(1, Number(p.page ?? "1") || 1);
 
   const filters: SQL[] = [];
@@ -192,6 +198,7 @@ export default async function DocumentsPage({
           name="q"
           defaultValue={p.q ?? ""}
           placeholder="ابحث في اسم الملف…"
+          aria-label="ابحث في اسم الملف"
           dir="auto"
           className="min-w-[12rem] flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
         />
@@ -268,7 +275,7 @@ export default async function DocumentsPage({
             message={
               hasFilter
                 ? "لا مستندات تطابق الترشيح. جرّب توسيعه."
-                : "لا مستندات بعد. ارفع فواتيرك أو زامن الدرايف من الصفحة الرئيسية."
+                : "لا مستندات بعد. ارفع فواتيرك أو زامن الدرايف من صفحة الرفع (/upload)."
             }
           />
         </div>
@@ -330,6 +337,10 @@ export default async function DocumentsPage({
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>
                         {st.text}
                       </span>
+                      {/* ما ينتظر قراراً له فعلٌ في موضعه — لا «راجعه» بلا زرّ */}
+                      {canDecide && ["PENDING", "EXTRACTED", "NEEDS_REVIEW"].includes(r.status) && (
+                        <span className="mt-1 block"><RejectDocument documentId={r.id} /></span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5">
                       {r.driveFileId ? (

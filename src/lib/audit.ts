@@ -50,7 +50,8 @@ export type AuditAction =
   | "PAYMENT_RUN_EXPORTED"
   | "EXPENSES_DERIVED"
   | "EXPENSE_RECLASSIFIED"
-  | "RECONCILIATION_BALANCES_SET";
+  | "RECONCILIATION_BALANCES_SET"
+  | "DOCUMENT_STATUS_CHANGED";
 
 export async function recordAudit(entry: {
   actorId?: string | null;

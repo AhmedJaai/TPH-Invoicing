@@ -315,6 +315,8 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 - **الإقفال يمنع بلا كشف وبلا معادلة، والشهر المقفل لا يُكتب فيه من أيّ باب** — في الخدمات وفي القاعدة (٠٢٨). وإعادة الفتح للمالك وحده.
 - **`db:verify` يطابق القيد الذي يسمّيه** — أيُّ خطأٍ كان يُعدّ رفضاً، ففحصٌ ماليّ كان يمرّ بقيد فرادةٍ لا علاقة له.
 - **المصروف المقيَّد يتبع تصنيف حركته** (`resyncBankExpenses`) — والحذف لصفٍّ مشتقّ، بنصّه في التدقيق.
+- **`.nums` على الرقم وحده، وأهداف اللمس ٤٤ بكسل على الجوّال** (`buttonClass` يحملها)، ومنطقة الرفع `label` تلفّ حقلاً `sr-only` لا `hidden` — `display:none` لا يُركَّز عليه فلا يرفع من لا يستعمل الفأرة.
+- **لوح الإقرار يُغلق عند النجاح وحده** — `onConfirm` يُرجع `false` إن فشل.
 - **لا وسمَ جماعيّ بالسداد.** «أعلن سدادها يدوياً» كان يسِم كلّ المفتوح بضغطتين؛ و`mark-paid` صار يقبل الفواتير بأعيانها.
 
 ## المصائد المعروفة
@@ -336,7 +338,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 
 ## الأوامر
 
-`npm test` (١٧١٠ اختباراً · ٩٨ ملفاً) · `npm run typecheck` · `npm run lint`
+`npm test` (١٧١٤ اختباراً · ٩٩ ملفاً) · `npm run typecheck` · `npm run lint`
 `npm run db:migrate` · `db:verify` · `db:dedupe` · `db:rematch` · `db:reclassify` · `db:learn` · `db:link` · `db:split-check`
 `npm run db:expenses` · `db:audit` · `db:measure` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules` · `db:repair-scope` · `db:identity` · `db:unpaid`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`

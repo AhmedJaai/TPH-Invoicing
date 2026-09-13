@@ -5,11 +5,14 @@ import { db } from "@/db";
 import { invoices, paymentAllocations, suppliers } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { buildPaymentRun, toBankTransferCsv, type PayableInvoice } from "@/lib/payment-run";
+import { recordAudit } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
-export async function GET(request: Request) {  try {
-    await guard("payment-run", "payment:approve");
+export async function GET(request: Request) {
+  let user;
+  try {
+    user = await guard("payment-run", "payment:approve");
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
@@ -56,6 +59,15 @@ export async function GET(request: Request) {  try {
     })),
     month,
   );
+
+  /* ملفٌّ يُرفع إلى البنك فيُحوَّل به مال — تنزيلُه أثرٌ لا يُترك بلا قيد */
+  await recordAudit({
+    actorId: user.id,
+    action: "PAYMENT_RUN_EXPORTED",
+    entityType: "payment_run",
+    entityId: month,
+    after: { الشهر: month, "جاهز بالهللات": run.readyTotalMinor, "محجوز بالهللات": run.heldTotalMinor, مورّدون: run.ready.length },
+  });
 
   return new NextResponse(toBankTransferCsv(run), {
     headers: {

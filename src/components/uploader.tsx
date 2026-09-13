@@ -119,11 +119,17 @@ function Field({
   value,
   needsReview,
   onChange,
+  type = "text",
+  inputMode,
 }: {
   label: string;
   value: string;
   needsReview?: boolean;
   onChange: (v: string) => void;
+  /** التاريخ `date` يفتح منتقي التاريخ على الجوّال بدل لوحة الأحرف. */
+  type?: "text" | "date";
+  /** المبالغ `decimal` تفتح لوحة الأرقام. */
+  inputMode?: "decimal" | "numeric" | "text";
 }) {
   return (
     <label className="block min-w-0">
@@ -134,6 +140,8 @@ function Field({
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        type={type}
+        inputMode={inputMode}
         dir="auto"
         className={`nums mt-1 w-full rounded-lg border bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-ink ${
           needsReview ? "border-warn" : "border-line"
@@ -225,8 +233,8 @@ function SupplierPicker({
     <div className="rounded-lg bg-sunken px-3 py-2">
       <p className="text-xs text-muted">
         المورد
-        {!active && <span className="mr-1 font-bold text-danger">— لم يُعرف، اختره أو أنشئه</span>}
-        {chosen && <span className="mr-1 text-ok">— اخترتَه</span>}
+        {!active && <span className="ms-1 font-bold text-danger">— لم يُعرف، اختره أو أنشئه</span>}
+        {chosen && <span className="ms-1 text-ok">— اخترتَه</span>}
       </p>
 
       <select
@@ -519,7 +527,12 @@ export function Uploader({
         </div>
       )}
 
-      <div
+      {/*
+        منطقة الرفع `label` يلفّ الحقل — فتُبلَغ بلوحة المفاتيح وتُقرأ بقارئ
+        الشاشة. كانت `div` بنقرة والحقل `hidden` (أي `display:none`) فلا
+        يُركَّز عليه أصلاً: من لا يستعمل الفأرة لا يرفع فاتورة.
+      */}
+      <label
         onDragOver={(e) => {
           e.preventDefault();
           setDragging(true);
@@ -530,8 +543,7 @@ export function Uploader({
           setDragging(false);
           handleFiles(e.dataTransfer.files);
         }}
-        onClick={() => inputRef.current?.click()}
-        className={`cursor-pointer rounded-2xl border-2 border-dashed border-line px-6 py-12 text-center transition-colors hover:border-ink-soft sm:py-16 ${
+        className={`block cursor-pointer rounded-2xl border-2 border-dashed border-line px-6 py-12 text-center transition-colors focus-within:border-ink hover:border-ink-soft sm:py-16 ${
           dragging ? "dropping" : ""
         }`}
       >
@@ -540,7 +552,7 @@ export function Uploader({
           type="file"
           multiple
           accept=".pdf,image/*"
-          className="hidden"
+          className="sr-only"
           onChange={(e) => handleFiles(e.target.files)}
         />
         <p className="text-lg font-bold sm:text-xl">اسحب الفواتير هنا</p>
@@ -550,7 +562,7 @@ export function Uploader({
         <p className="mt-4 text-xs text-muted">
           يقرأ النظام الملف نفسه ويستخرج حقوله. اسم الملف الأصلي لا يهم.
         </p>
-      </div>
+      </label>
 
       {archived.length > 0 && (
         <section className="mt-6">
@@ -585,12 +597,18 @@ export function Uploader({
         <div className="mt-6 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold">المستندات المقروءة</h2>
-            <button
-              onClick={() => setItems([])}
-              className="text-xs text-muted underline underline-offset-4 hover:text-ink"
-            >
-              مسح
-            </button>
+            {/*
+              «مسح» كان يرمي كلّ القراءات — ومنها ما دُفع ثمنُ قراءته ولم يُرفع
+              بعد. فصار يمسح ما فشل وحده.
+            */}
+            {items.some((it) => it.state === "failed") && (
+              <button
+                onClick={() => setItems((prev) => prev.filter((it) => it.state !== "failed"))}
+                className="inline-flex min-h-11 items-center text-xs text-muted underline underline-offset-4 hover:text-ink sm:min-h-0"
+              >
+                امسح ما فشل
+              </button>
+            )}
           </div>
 
           {items.map((item) => {
@@ -646,6 +664,7 @@ export function Uploader({
                 <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <Field
                     label="التاريخ"
+                    type="date"
                     value={item.edited.invoiceDate}
                     needsReview={low.has("التاريخ")}
                     onChange={(v) => editField(item.id, "invoiceDate", v)}
@@ -660,12 +679,14 @@ export function Uploader({
                     <>
                       <Field
                         label="الضريبة"
+                        inputMode="decimal"
                         value={item.edited.vat}
                         needsReview={low.has("المبالغ")}
                         onChange={(v) => editField(item.id, "vat", v)}
                       />
                       <Field
                         label="الإجمالي"
+                        inputMode="decimal"
                         value={item.edited.total}
                         needsReview={low.has("المبالغ")}
                         onChange={(v) => editField(item.id, "total", v)}
