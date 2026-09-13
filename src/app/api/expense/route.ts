@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     action: "EXPENSE_ADDED",
     entityType: "recurring_expense",
     entityId: row.id,
-    after: { البند: label, المبلغ: amountMinor / 100, الدورة: cadence, التصنيف: body.category },
+    after: { البند: label, المبلغ_بالهللة: amountMinor, الدورة: cadence, التصنيف: body.category },
   });
 
   return NextResponse.json({ ok: true, id: row.id, message: `أُضيف «${label}»` });

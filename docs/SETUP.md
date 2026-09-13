@@ -112,7 +112,8 @@ ollama pull qwen2.5vl:7b
 
 ```bash
 npm install
-npm run db:push      # ينشئ الجداول
+npm run db:bootstrap # ينشئ الجداول — على قاعدةٍ فارغة وحدها
+npm run db:migrate   # يطبّق الهجرات
 npm run db:seed      # يؤسّس سجل الموردين
 npm run dev          # http://localhost:3000
 ```
@@ -176,15 +177,14 @@ printf '%s' "القيمة" | vercel env add اسم_المتغير production --f
 | الأمر | ما يفعله |
 |---|---|
 | `npm run dev` | التشغيل للتطوير |
-| `npm test` | ١١٢ اختباراً لمنطق الأعمال |
+| `npm test` | اختبارات منطق الأعمال |
 | `npm run typecheck` | فحص الأنواع |
 | `npm run lint` | فحص الأسلوب |
 | `npm run build` | البناء للإنتاج |
-| `npm run db:push` | مزامنة المخطط |
-| `npm run db:seed` | تأسيس الموردين (قابل للتكرار) |
-| `npm run db:demo` | بيانات تجريبية لتجربة الصفحات التحليلية |
+| `npm run db:bootstrap` | تأسيس الجداول على قاعدةٍ فارغة (مرّة) |
+| `npm run db:seed -- --i-know-this-is-production` | تأسيس الموردين (قابل للتكرار) |
+| `npm run db:demo` | بيانات تجريبية — **يكتب في القاعدة**، ويرفض بلا `--i-know-this-is-production` |
 | `npm run db:demo -- --clear` | حذف البيانات التجريبية وحدها |
-| `npm run db:studio` | متصفح بيانات رسومي |
 | `npm run drive:auth` | مفتاح الدرايف — قراءة فقط |
 | `npm run drive:auth -- --write` | مفتاح بصلاحية الكتابة |
 | `npm run drive:inventory` | جرد الأرشيف |

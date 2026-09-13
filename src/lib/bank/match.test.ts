@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  findDuplicatePayments, findInvoiceCombination, findSupplierInText,
-  isInternalNoise, matchBankTransactions,
-  type BankTx, type OpenInvoice, type SupplierAliasIndex, suggestAlias } from "./match";
+  findDuplicatePayments, findSupplierInText,
+  isInternalNoise,
+  type BankTx, type SupplierAliasIndex, suggestAlias } from "./match";
 import { normalizeName } from "@/lib/suppliers-seed";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
@@ -10,11 +10,6 @@ const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const tx = (o: Partial<BankTx> & { id: string }): BankTx => ({
   valueDate: d("2026-09-02"), description: "", transactionType: "تحويل داخلي صادر",
   amountMinor: 10_000, direction: "DEBIT", ...o,
-});
-
-const inv = (o: Partial<OpenInvoice> & { invoiceId: string }): OpenInvoice => ({
-  supplierId: "s1", supplierName: "غاناش", invoiceNumber: o.invoiceId,
-  invoiceDate: d("2026-08-15"), periodMonth: "2026-08", outstandingMinor: 10_000, ...o,
 });
 
 const index: SupplierAliasIndex[] = [
@@ -71,85 +66,6 @@ describe("التعرّف على المورّد من وصف البنك", () => {
   });
 });
 
-describe("إيجاد الفواتير التي تفسّر المبلغ", () => {
-  it("فاتورة واحدة بالمبلغ نفسه", () => {
-    const c = findInvoiceCombination([inv({ invoiceId: "a", outstandingMinor: 25_000 })], 25_000);
-    expect(c).toHaveLength(1);
-  });
-
-  it("يتسامح بريال في فروق التقريب", () => {
-    expect(findInvoiceCombination([inv({ invoiceId: "a", outstandingMinor: 25_000 })], 25_050)).toHaveLength(1);
-  });
-
-  it("يجمع فواتير الشهر كلّها — النمط الشائع", () => {
-    const c = findInvoiceCombination([
-      inv({ invoiceId: "a", outstandingMinor: 10_000 }),
-      inv({ invoiceId: "b", outstandingMinor: 15_000 }),
-      inv({ invoiceId: "c", outstandingMinor: 20_000 }),
-    ], 45_000);
-    expect(c).toHaveLength(3);
-  });
-
-  it("يجمع فاتورتين من بين ثلاث", () => {
-    const c = findInvoiceCombination([
-      inv({ invoiceId: "a", outstandingMinor: 10_000 }),
-      inv({ invoiceId: "b", outstandingMinor: 15_000 }),
-      inv({ invoiceId: "c", outstandingMinor: 99_999 }),
-    ], 25_000);
-    expect(c?.map((x) => x.invoiceId).sort()).toEqual(["a", "b"]);
-  });
-
-  it("لا يخترع تركيبة غير موجودة", () => {
-    expect(findInvoiceCombination([inv({ invoiceId: "a", outstandingMinor: 10_000 })], 77_777)).toBeNull();
-  });
-});
-
-describe("المطابقة الكاملة", () => {
-  it("تطابق تحويلاً بفاتورة وتسمّي المورّد", () => {
-    const r = matchBankTransactions(
-      [tx({ id: "t1", description: "شركة انس غالب حمزه خاشقجي التجارية", amountMinor: 993_140 })],
-      [inv({ invoiceId: "i1", outstandingMinor: 993_140 })],
-      index,
-    );
-    expect(r[0].kind).toBe("EXACT_INVOICE");
-    expect(r[0].supplierName).toBe("غاناش");
-    expect(r[0].invoices).toHaveLength(1);
-  });
-
-  it("لا تطابق فاتورة صدرت بعد تاريخ التحويل", () => {
-    const r = matchBankTransactions(
-      [tx({ id: "t1", description: "خاشقجي", valueDate: d("2026-08-01"), amountMinor: 10_000 })],
-      [inv({ invoiceId: "i1", invoiceDate: d("2026-08-20") })],
-      index,
-    );
-    expect(r[0].kind).toBe("SUPPLIER_ONLY");
-  });
-
-  it("لا تخصّص الفاتورة نفسها لتحويلين", () => {
-    const r = matchBankTransactions(
-      [tx({ id: "t1", description: "خاشقجي" }), tx({ id: "t2", description: "خاشقجي" })],
-      [inv({ invoiceId: "i1", outstandingMinor: 10_000 })],
-      index,
-    );
-    expect(r[0].kind).toBe("EXACT_INVOICE");
-    expect(r[1].kind).toBe("SUPPLIER_ONLY");
-  });
-
-  it("تصنّف الوارد ونقاط البيع كحركات تشغيلية", () => {
-    const r = matchBankTransactions([
-      tx({ id: "t1", direction: "CREDIT", amountMinor: 50_000 }),
-      tx({ id: "t2", transactionType: "نقاط بيع ودفع إلكتروني" }),
-    ], [], index);
-    expect(r.every((x) => x.kind === "INTERNAL")).toBe(true);
-  });
-
-  it("ترفع الحركة المجهولة للمراجعة بدل تخمينها", () => {
-    const r = matchBankTransactions([tx({ id: "t1", description: "جهة مجهولة" })], [], index);
-    expect(r[0].kind).toBe("NONE");
-    expect(r[0].confidence).toBe(0);
-  });
-});
-
 describe("كشف الدفع المكرر", () => {
   it("يكشف تحويلين متطابقين في اليوم نفسه", () => {
     const dups = findDuplicatePayments([
@@ -191,71 +107,6 @@ describe("suggestAlias", () => {
   it("يحدّ عدد الكلمات", () => {
     const s = suggestAlias("مطاعم ومقاهي الوجبات السريعة الشهية اللذيذة الفاخرة", 3);
     expect(s.split(" ")).toHaveLength(3);
-  });
-});
-
-describe("التصنيف يسبق التخمين", () => {
-  const index: SupplierAliasIndex[] = [
-    { supplierId: "s1", supplierName: "سابع جار", normalizedNames: ["سابع جار"] },
-  ];
-
-  it("قاعدة الإيجار تمنع عدّ الحوالة سداد مورّد", () => {
-    const tx: BankTx = {
-      id: "t1", valueDate: new Date("2026-08-01T00:00:00Z"),
-      description: "تحويل الى مؤسسة سابع جار", transactionType: "حوالة",
-      amountMinor: 4_750_000, direction: "DEBIT",
-    };
-    const withoutRule = matchBankTransactions([tx], [], index);
-    expect(withoutRule[0].kind).toBe("SUPPLIER_ONLY");
-
-    const withRule = matchBankTransactions([tx], [], index, [
-      { id: "r1", normalized: "سابع جار", category: "RENT" },
-    ]);
-    expect(withRule[0].kind).toBe("CLASSIFIED");
-    expect(withRule[0].category).toBe("RENT");
-    expect(withRule[0].ruleId).toBe("r1");
-    expect(withRule[0].invoices).toHaveLength(0);
-  });
-
-  it("قاعدة التحويل الشخصي تُخرج المالك من قائمة المورّدين", () => {
-    const tx: BankTx = {
-      id: "t2", valueDate: new Date("2026-08-02T00:00:00Z"),
-      description: "تحويل الى احمد الجعيدي", transactionType: "حوالة",
-      amountMinor: 500_000, direction: "DEBIT",
-    };
-    const r = matchBankTransactions([tx], [], [], [
-      { id: "r2", normalized: "احمد الجعيدي", category: "PERSONAL" },
-    ]);
-    expect(r[0].category).toBe("PERSONAL");
-    expect(r[0].kind).toBe("CLASSIFIED");
-  });
-
-  it("قاعدة المورّد تربط الحركة بمورّدها ولو لم يُعرف من الوصف", () => {
-    const tx: BankTx = {
-      id: "t3", valueDate: new Date("2026-08-05T00:00:00Z"),
-      description: "حوالة صادرة 8891231", transactionType: "حوالة",
-      amountMinor: 42_000, direction: "DEBIT",
-    };
-    const open: OpenInvoice[] = [{
-      invoiceId: "i1", supplierId: "s1", supplierName: "سابع جار",
-      invoiceNumber: "1", invoiceDate: new Date("2026-08-01T00:00:00Z"),
-      periodMonth: "2026-08", outstandingMinor: 42_000,
-    }];
-    const r = matchBankTransactions([tx], open, index, [
-      { id: "r3", normalized: "حواله صادره 8891231", category: "SUPPLIER", supplierId: "s1" },
-    ]);
-    expect(r[0].kind).toBe("EXACT_INVOICE");
-    expect(r[0].supplierId).toBe("s1");
-    expect(r[0].category).toBe("SUPPLIER");
-  });
-
-  it("بلا قواعد يبقى السلوك كما كان", () => {
-    const tx: BankTx = {
-      id: "t4", valueDate: new Date("2026-08-01T00:00:00Z"),
-      description: "نقاط بيع", transactionType: "نقاط بيع",
-      amountMinor: 100, direction: "DEBIT",
-    };
-    expect(matchBankTransactions([tx], [], index)[0].category).toBe("INTERNAL");
   });
 });
 

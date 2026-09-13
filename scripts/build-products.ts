@@ -10,6 +10,9 @@
 import { buildSupplierProducts, listSupplierProducts, mappingCoverage } from "@/services/product.service";
 import { suggestMerges, type SupplierItem } from "@/lib/products";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { assertWriteAllowed } from "./lib/guard-write";
+
+assertWriteAllowed("db:products (بناء الأصناف)");
 
 async function main() {
   const result = await buildSupplierProducts();

@@ -10,6 +10,9 @@ import { db } from "@/db";
 import { suppliers, supplierAliases } from "@/db/schema";
 import { SUPPLIER_SEED, normalizeName } from "@/lib/suppliers-seed";
 import { eq } from "drizzle-orm";
+import { assertWriteAllowed } from "./lib/guard-write";
+
+assertWriteAllowed("db:seed (سجلّ المورّدين)");
 
 async function main() {
   let created = 0;

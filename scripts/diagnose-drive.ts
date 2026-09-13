@@ -2,7 +2,7 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, users } from "@/db/schema";
-import { driveForUser, findOrCreateFolder, existingNamesIn } from "@/lib/drive";
+import { driveForUser, findFolder, existingNamesIn } from "@/lib/drive";
 import { resolveNameCollision } from "@/lib/naming";
 import { driveConfig } from "@/config/drive";
 
@@ -33,8 +33,16 @@ async function main() {
   const drive = driveForUser(acc.token);
   const year = driveConfig.yearFolderIds["2026"];
 
-  const monthId = await step("إيجاد مجلد الشهر 2026-08", () => findOrCreateFolder(drive, year, "2026-08"));
-  const folderId = await step("إيجاد مجلد المورّد BeCof (بيكوف)", () => findOrCreateFolder(drive, monthId, "BeCof (بيكوف)"));
+  const monthId = await step("إيجاد مجلد الشهر 2026-08", async () => {
+    const id = await findFolder(drive, year, "2026-08");
+    if (!id) throw new Error("لا مجلد 2026-08 — والتشخيص لا يُنشئه");
+    return id;
+  });
+  const folderId = await step("إيجاد مجلد المورّد BeCof (بيكوف)", async () => {
+    const id = await findFolder(drive, monthId, "BeCof (بيكوف)");
+    if (!id) throw new Error("لا مجلد BeCof (بيكوف) — والتشخيص لا يُنشئه");
+    return id;
+  });
   const names = await step("قراءة أسماء الملفات في المجلد", () => existingNamesIn(drive, folderId));
 
   console.log(`\n  الملفات الموجودة: ${names.length}`);

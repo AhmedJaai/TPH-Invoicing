@@ -8,6 +8,9 @@
  *   npm run db:expenses 2026-08    شهراً بعينه
  */
 import { deriveExpensesFromBank } from "../src/services/expense.service";
+import { assertWriteAllowed } from "./lib/guard-write";
+
+assertWriteAllowed("db:expenses (اشتقاق المصروف)");
 
 async function main() {
   const month = process.argv[2]?.match(/^\d{4}-\d{2}$/) ? process.argv[2] : undefined;

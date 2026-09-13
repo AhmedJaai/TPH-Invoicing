@@ -109,6 +109,26 @@ export function driveForUser(refreshToken: string): drive_v3.Drive {
   return google.drive({ version: "v3", auth });
 }
 
+/**
+ * يبحث عن مجلدٍ باسمه داخل أب — ولا يُنشئه. لأدوات التشخيص: «بلا رفع»
+ * يجب أن تعني «لا يُكتب في الأرشيف شيء»، ومجلّدٌ يُنشأ كتابة.
+ */
+export async function findFolder(
+  drive: drive_v3.Drive,
+  parentId: string,
+  name: string,
+): Promise<string | null> {
+  const escaped = name.replace(/'/g, "\\'");
+  const res = await drive.files.list({
+    q: `'${parentId}' in parents and name = '${escaped}' and mimeType = '${FOLDER_MIME}' and trashed = false`,
+    fields: "files(id, name)",
+    pageSize: 1,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+  return res.data.files?.[0]?.id ?? null;
+}
+
 /** يبحث عن مجلد باسمه داخل أب، أو ينشئه. لا يحذف ولا ينقل شيئاً. */
 export async function findOrCreateFolder(
   drive: drive_v3.Drive,

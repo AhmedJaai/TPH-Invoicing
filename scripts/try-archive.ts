@@ -4,7 +4,8 @@ import { readFileSync } from "node:fs";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, documents, users } from "@/db/schema";
-import { driveForUser, findOrCreateFolder, existingNamesIn, uploadFile } from "@/lib/drive";
+import { driveForUser, findFolder, findOrCreateFolder, existingNamesIn, uploadFile } from "@/lib/drive";
+import { assertWriteAllowed } from "./lib/guard-write";
 import { resolveNameCollision } from "@/lib/naming";
 import { driveConfig } from "@/config/drive";
 
@@ -26,6 +27,8 @@ const step = async <T>(label: string, fn: () => Promise<T>): Promise<T> => {
 async function main() {
   const path = process.argv[2];
   const doUpload = process.argv.includes("--upload");
+  /* الرفع يضع ملفّاً في الأرشيف الحقيقيّ بلا قيدٍ في القاعدة — ملفّاً يتيماً */
+  if (doUpload) assertWriteAllowed("try:archive --upload (رفعٌ إلى الأرشيف)");
   const data = readFileSync(path);
   console.log(`\nالملف: ${path.split("/").pop()}  (${data.length} بايت)`);
   console.log(`الوضع: ${doUpload ? "رفع فعلي" : "تشخيص بلا رفع"}\n`);
@@ -46,12 +49,15 @@ async function main() {
   );
 
   const drive = driveForUser(acc.token);
-  const monthId = await step("مجلد الشهر", () =>
-    findOrCreateFolder(drive, driveConfig.yearFolderIds["2026"], "2026-08"),
-  );
-  const folderId = await step("مجلد المورّد", () =>
-    findOrCreateFolder(drive, monthId, "BeCof (بيكوف)"),
-  );
+  /* «تشخيص بلا رفع» لا يُنشئ مجلّداً — والرفع وحده يُنشئ ما غاب */
+  const folder = (parent: string, name: string) => doUpload
+    ? findOrCreateFolder(drive, parent, name)
+    : findFolder(drive, parent, name).then((id) => {
+        if (!id) throw new Error(`لا مجلد «${name}» — والتشخيص لا يُنشئه`);
+        return id;
+      });
+  const monthId = await step("مجلد الشهر", () => folder(driveConfig.yearFolderIds["2026"], "2026-08"));
+  const folderId = await step("مجلد المورّد", () => folder(monthId, "BeCof (بيكوف)"));
   const names = await step("أسماء الملفات الموجودة", () => existingNamesIn(drive, folderId));
 
   const desired = "2026-08-13_BeCof_Invoice_00282_SAR150.00.pdf";

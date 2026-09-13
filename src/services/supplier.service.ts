@@ -136,12 +136,20 @@ export async function createSupplier(input: CreateSupplierInput): Promise<Create
   return { ...created, existed: false };
 }
 
-/** يحفظ اسماً بنكياً للمورّد — يُطابَق به مستقبلاً. */
+/**
+ * يحفظ اسماً بنكياً للمورّد — يُطابَق به مستقبلاً.
+ *
+ * والاسم القصير يطابق الجميع فيفسد المطابقة كلّها: ثلاثة أحرف بعد
+ * التطبيع حدٌّ أدنى، وما دونه يُرَدّ `false` ولا يُحفَظ.
+ */
+export const MIN_ALIAS_LENGTH = 3;
+
 export async function learnAlias(
   tx: Tx | typeof db,
   supplierId: string,
   value: string,
-): Promise<void> {
+): Promise<boolean> {
+  if (normalizeName(value).length < MIN_ALIAS_LENGTH) return false;
   await tx
     .insert(supplierAliases)
     .values({
@@ -152,4 +160,5 @@ export async function learnAlias(
       source: "LEARNED",
     })
     .onConflictDoNothing();
+  return true;
 }

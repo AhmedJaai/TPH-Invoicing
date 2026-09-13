@@ -7,7 +7,6 @@
  */
 import { normalizeName } from "@/lib/suppliers-seed";
 import { findRule, type BankRule, type TxCategory } from "./rules";
-import { INVOICE, countNoun } from "@/lib/arabic";
 
 export interface BankTx {
   id: string;
@@ -188,123 +187,6 @@ export function findSupplierInText(
   }
 
   return best;
-}
-
-/** مجموعات الفواتير التي يساوي مجموعها المبلغ — لدفعة تسدّد عدة فواتير. */
-export function findInvoiceCombination(
-  invoices: readonly OpenInvoice[],
-  targetMinor: number,
-  tolerance = 100,
-): OpenInvoice[] | null {
-  const pool = invoices.filter((i) => i.outstandingMinor > 0).slice(0, 14);
-
-  for (const inv of pool) {
-    if (Math.abs(inv.outstandingMinor - targetMinor) <= tolerance) return [inv];
-  }
-  // مجموع كامل المجموعة أوّلاً — النمط الشائع: سداد كل فواتير الشهر دفعةً
-  const all = pool.reduce((s, i) => s + i.outstandingMinor, 0);
-  if (pool.length > 1 && Math.abs(all - targetMinor) <= tolerance) return [...pool];
-
-  for (let i = 0; i < pool.length; i++) {
-    for (let j = i + 1; j < pool.length; j++) {
-      if (Math.abs(pool[i].outstandingMinor + pool[j].outstandingMinor - targetMinor) <= tolerance) {
-        return [pool[i], pool[j]];
-      }
-      for (let k = j + 1; k < pool.length; k++) {
-        const sum = pool[i].outstandingMinor + pool[j].outstandingMinor + pool[k].outstandingMinor;
-        if (Math.abs(sum - targetMinor) <= tolerance) return [pool[i], pool[j], pool[k]];
-      }
-    }
-  }
-  return null;
-}
-
-export function matchBankTransactions(
-  transactions: readonly BankTx[],
-  openInvoices: readonly OpenInvoice[],
-  aliasIndex: readonly SupplierAliasIndex[],
-  /** قواعد صنّفها المالك — تُقدَّم على التخمين لأنّها إقراره هو */
-  rules: readonly BankRule[] = [],
-): BankMatch[] {
-  const bySupplier = new Map<string, OpenInvoice[]>();
-  for (const inv of openInvoices) {
-    const list = bySupplier.get(inv.supplierId) ?? [];
-    list.push(inv);
-    bySupplier.set(inv.supplierId, list);
-  }
-
-  const claimed = new Set<string>();
-  const results: BankMatch[] = [];
-
-  for (const tx of transactions) {
-    if (tx.direction === "CREDIT" || isInternalNoise(tx)) {
-      results.push({
-        tx, kind: "INTERNAL", invoices: [], confidence: 1,
-        category: "INTERNAL", note: "حركة تشغيلية لا سداد مورّد",
-      });
-      continue;
-    }
-
-    const text = `${tx.description} ${tx.transactionType}`;
-    const rule = findRule(text, rules);
-
-    /*
-     * قاعدة المالك تسبق كل تخمين. فحوالة الإيجار إلى «سابع جار» تبدو
-     * سداد مورّد، وتحويله إلى نفسه يبدو مستفيداً — ولا يُصحّح ذلك إلا هو.
-     */
-    if (rule && rule.category !== "SUPPLIER") {
-      results.push({
-        tx, kind: "CLASSIFIED", invoices: [], confidence: 1,
-        category: rule.category, ruleId: rule.id,
-        note: "صنّفتَها بقاعدة سابقة",
-      });
-      continue;
-    }
-
-    const supplier =
-      (rule?.supplierId
-        ? aliasIndex.find((a) => a.supplierId === rule.supplierId)
-        : undefined) ?? findSupplierInText(text, aliasIndex);
-
-    if (!supplier) {
-      results.push({ tx, kind: "NONE", invoices: [], confidence: 0, category: "UNKNOWN" });
-      continue;
-    }
-
-    const candidates = (bySupplier.get(supplier.supplierId) ?? [])
-      .filter((i) => !claimed.has(i.invoiceId) && i.invoiceDate <= tx.valueDate);
-
-    const combo = findInvoiceCombination(candidates, tx.amountMinor);
-    if (combo) {
-      for (const i of combo) claimed.add(i.invoiceId);
-      results.push({
-        tx,
-        kind: combo.length === 1 ? "EXACT_INVOICE" : "INVOICE_GROUP",
-        supplierId: supplier.supplierId,
-        supplierName: supplier.supplierName,
-        invoices: combo,
-        confidence: combo.length === 1 ? 0.98 : 0.9,
-        category: "SUPPLIER",
-        ruleId: rule?.id,
-        note: combo.length > 1 ? `تسدّد ${countNoun(combo.length, INVOICE)}` : undefined,
-      });
-      continue;
-    }
-
-    results.push({
-      tx,
-      kind: "SUPPLIER_ONLY",
-      supplierId: supplier.supplierId,
-      supplierName: supplier.supplierName,
-      invoices: [],
-      confidence: 0.6,
-      category: "SUPPLIER",
-      ruleId: rule?.id,
-      note: "عُرف المورّد ولم تُطابَق فاتورة بعينها",
-    });
-  }
-
-  return results;
 }
 
 /**

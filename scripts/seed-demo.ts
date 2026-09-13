@@ -10,6 +10,9 @@ import { eq, like } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoiceLines, invoices, paymentAllocations, payments, suppliers } from "@/db/schema";
 import { normalizeItem } from "@/lib/items";
+import { assertWriteAllowed } from "./lib/guard-write";
+
+assertWriteAllowed("db:demo (فواتير ودفعات تجريبية)");
 
 const clear = process.argv.includes("--clear");
 const MARK = "DEMO-";

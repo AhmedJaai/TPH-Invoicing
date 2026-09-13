@@ -47,7 +47,7 @@ describe("decide", () => {
 
 describe("RULES", () => {
   it("الواجهات المستهلكة للنموذج أضيق حدّاً", () => {
-    expect(RULES.analyze.limit).toBeLessThan(RULES["supplier-alias"].limit);
+    expect(RULES.analyze.limit).toBeLessThan(RULES["mark-paid"].limit);
     /*
       والمزامنة خرجت من هذه القاعدة بقرارٍ صريح من صاحب العمل: حدُّها
       كان يوقفه عن إصلاح نظامه. وما يحميها الحارسُ والصلاحية، لا العدّاد.
