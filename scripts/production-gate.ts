@@ -15,6 +15,7 @@ import {
   GATE_LABEL, GATE_MARK, buildGate, type GateCheck,
 } from "@/lib/ops/production-gate";
 import { checkBalance } from "@/lib/bank/balance-equation";
+import { countNoun, DAY } from "@/lib/arabic";
 
 /**
  * الهجرات المتوقَّعة تُقرأ من المجلّد لا تُكتَب عدداً.
@@ -64,7 +65,7 @@ function ageOf(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
   if (days <= 0) return "اليوم";
   if (days === 1) return "أمس";
-  return `قبل ${days} يوماً`;
+  return `قبل ${countNoun(days, DAY)}`;
 }
 
 function readAttestation(): ManualAttestation {
@@ -105,7 +106,7 @@ async function main() {
     onDisk.length === 0
       ? "لم يُقرأ مجلّد الهجرات — لا يُحكَم"
       : pending.length === 0 && orphaned.length === 0
-        ? `${applied.length} هجرةً مطبَّقة — وهي عينُ ما في المستودع`
+        ? `الهجرات المطبَّقة: ${applied.length} — وهي عينُ ما في المستودع`
         : [
             pending.length > 0 ? `${pending.length} لم تُطبَّق: ${pending.join("، ")}` : "",
             orphaned.length > 0
@@ -136,7 +137,7 @@ async function main() {
     "database_integrity",
     missing.length === 0 ? "PASS" : "FAIL",
     missing.length === 0
-      ? `${need.length} عموداً تكتب فيه الشيفرة — كلّها موجودة`
+      ? `الأعمدة التي تكتب فيها الشيفرة: ${need.length} — كلّها موجودة`
       : `أعمدة ناقصة: ${missing.join("، ")}`,
     missing.length > 0 ? "npm run db:migrate" : undefined,
   );
@@ -155,7 +156,7 @@ async function main() {
   add(
     "financial_invariants",
     Number(constraints?.n ?? 0) >= 5 ? "PASS" : "FAIL",
-    `${Number(constraints?.n ?? 0)} من ٥ قيودٍ ماليّة مفروضة في القاعدة`,
+    `القيود الماليّة المفروضة في القاعدة: ${Number(constraints?.n ?? 0)} من 5`,
     "npm run db:migrate ثمّ npm run db:verify",
   );
 
@@ -182,7 +183,7 @@ async function main() {
     "bank_reconciliation",
     balance.status === "BALANCED" || balance.status === "WITHIN_TOLERANCE" ? "PASS"
       : balance.status === "UNKNOWN" ? "UNKNOWN" : "FAIL",
-    `${Number(bank?.total ?? 0)} حركة · ${balance.reason}`,
+    `الحركات: ${Number(bank?.total ?? 0)} · ${balance.reason}`,
     balance.status === "UNKNOWN"
       ? "أدخل رصيدَي أوّل المدّة وآخرها في reconciliation_periods"
       : "راجع الكشف — الفرق يعني حركاتٍ لم تُقرأ",
@@ -204,7 +205,7 @@ async function main() {
     "invoice_lifecycle",
     invBad === 0 ? "PASS" : "FAIL",
     invBad === 0
-      ? `${Number(inv?.total ?? 0)} فاتورة — لكلٍّ أصلُها، ولا تخصيص فوق قيمتها`
+      ? `الفواتير: ${Number(inv?.total ?? 0)} — لكلٍّ أصلُها، ولا تخصيص فوق قيمتها`
       : `${Number(inv?.orphan ?? 0)} بلا أصل · ${Number(inv?.overallocated ?? 0)} مخصَّصٌ فوقها`,
     "npm run db:repair — بعد مراجعة db:audit",
   );
@@ -270,10 +271,10 @@ async function main() {
     stmtTotal === 0
       ? "لا كشف مورّدٍ مؤرشَف — لم يُفحَص المسار"
       : stmtEmpty === stmtTotal
-        ? `${stmtTotal} كشفاً مؤرشَفاً، ولم يُطابَق منها واحد — المسار لم يُجرَّب`
+        ? `الكشوف المؤرشَفة: ${stmtTotal}، ولم يُطابَق منها واحد — المسار لم يُجرَّب`
         : stmtEmpty > 0
-          ? `${stmtEmpty} من ${stmtTotal} كشفاً مؤرشَفاً بلا مطابقة`
-          : `${stmtTotal} كشفاً · ${Number(stmt?.lines ?? 0)} سطراً مطابَقاً`,
+          ? `كشوفٌ مؤرشَفة بلا مطابقة: ${stmtEmpty} من ${stmtTotal}`
+          : `الكشوف: ${stmtTotal} · الأسطر المطابَقة: ${Number(stmt?.lines ?? 0)}`,
     "طابِق كشفاً واحداً على الأقلّ من /statements",
   );
 
@@ -331,7 +332,7 @@ async function main() {
     const legacy = Number(rev?.legacy ?? 0);
     const confirmed = Number(rev?.confirmed ?? 0);
     const since = rev?.since ? String(rev.since) : null;
-    const legacyNote = legacy > 0 ? ` (و${legacy} حركةً أقدم من السجلّ نفسه — لا تُسأل)` : "";
+    const legacyNote = legacy > 0 ? ` (وحركاتٌ أقدم من السجلّ نفسه: ${legacy} — لا تُسأل)` : "";
 
     add(
       "review_workflow",
@@ -339,10 +340,10 @@ async function main() {
         : confirmed > 0 || since !== null ? "PASS"
         : "UNKNOWN",
       silent > 0
-        ? `${silent} حركةً قُيّدت بعد ${since} بلا أثرٍ في تاريخ القرار${legacyNote}`
+        ? `حركاتٌ قُيّدت بعد ${since} بلا أثرٍ في تاريخ القرار: ${silent}${legacyNote}`
         : since === null
           ? "لا سجلَّ قرارٍ بعد — لم يُفحَص المسار"
-          : `${confirmed} إقراراً · ${Number(rev?.reversed ?? 0)} ردّاً — ولا حركةَ قُيّدت صامتةً منذ ${since}${legacyNote}`,
+          : `الإقرارات: ${confirmed} · الردود: ${Number(rev?.reversed ?? 0)} — ولا حركةَ قُيّدت صامتةً منذ ${since}${legacyNote}`,
       "أقِرّ اقتراحاً واحداً من /review",
     );
   }
@@ -358,7 +359,7 @@ async function main() {
   add(
     "audit_trail",
     Number(audit?.guards ?? 0) > 0 && Number(audit?.rows ?? 0) > 0 ? "PASS" : "FAIL",
-    `${Number(audit?.rows ?? 0)} سجلاًّ · ${Number(audit?.guards ?? 0)} مؤثِّراً يمنع التعديل والحذف`,
+    `سجلّات التدقيق: ${Number(audit?.rows ?? 0)} · المؤثِّرات التي تمنع التعديل والحذف: ${Number(audit?.guards ?? 0)}`,
     "npm run db:migrate — المؤثِّرات في 001",
   );
 
@@ -375,7 +376,7 @@ async function main() {
       : Number(drive?.unlinked ?? 0) === 0 ? "PASS" : "FAIL",
     Number(drive?.docs ?? 0) === 0
       ? "لا مستند — لم يُفحَص"
-      : `${Number(drive?.docs ?? 0)} مستنداً · ${Number(drive?.unlinked ?? 0)} بلا رابطٍ إلى أصله`,
+      : `المستندات: ${Number(drive?.docs ?? 0)} · بلا رابطٍ إلى أصله: ${Number(drive?.unlinked ?? 0)}`,
     "npm run ops:truth — للمقابلة الكاملة",
   );
 

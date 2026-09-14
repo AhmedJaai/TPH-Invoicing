@@ -101,14 +101,22 @@ export default async function DocumentsPage({
   const canDecide = can(user.role, "document:upload");
   const page = Math.max(1, Number(p.page ?? "1") || 1);
 
-  const filters: SQL[] = [];
-  if (p.month) filters.push(eq(documents.periodMonth, p.month));
-  if (p.supplier) filters.push(eq(documents.supplierId, p.supplier));
-  if (p.kind) filters.push(sql`${documents.kind}::text = ${p.kind}`);
-  if (p.status) filters.push(sql`${documents.status}::text = ${p.status}`);
+  /*
+    الترشيحات بلا الحالة أوّلاً، ثمّ الحالة فوقها — لأنّ «الكل» يعني كلَّ
+    الحالات تحت الترشيحات الأخرى. كان يُحسَب بالحالة المختارة فيقول
+    «الكل (٠)» تحت «يحتاج مراجعة» والمؤرشف ١٦٥.
+  */
+  const baseFilters: SQL[] = [];
+  if (p.month) baseFilters.push(eq(documents.periodMonth, p.month));
+  if (p.supplier) baseFilters.push(eq(documents.supplierId, p.supplier));
+  if (p.kind) baseFilters.push(sql`${documents.kind}::text = ${p.kind}`);
   // البحث في اسم الملف كما هو في الدرايف — وهو ما يتذكّره المستخدم عادةً
-  if (p.q?.trim()) filters.push(ilike(documents.fileName, `%${p.q.trim()}%`));
+  if (p.q?.trim()) baseFilters.push(ilike(documents.fileName, `%${p.q.trim()}%`));
+  const filters: SQL[] = p.status
+    ? [...baseFilters, sql`${documents.status}::text = ${p.status}`]
+    : baseFilters;
   const where = filters.length ? and(...filters) : undefined;
+  const whereAllStatuses = baseFilters.length ? and(...baseFilters) : undefined;
 
   /*
     ستّة استعلامات متوازية لا متسلسلة.
@@ -117,7 +125,7 @@ export default async function DocumentsPage({
     تأخيرها كلّه قبل أوّل رسم. ولا يعتمد أيّها على الآخر، فلا سبب
     لتسلسلها.
   */
-  const [totalRows, rows, monthRows, supplierRows, statusRows, kindRows] = await Promise.all([
+  const [totalRows, rows, monthRows, supplierRows, statusRows, kindRows, allStatusRows] = await Promise.all([
     db.select({ total: count() }).from(documents).where(where),
 
     db
@@ -164,6 +172,8 @@ export default async function DocumentsPage({
       .from(documents)
       .groupBy(documents.kind)
       .orderBy(desc(sql`count(*)`)),
+
+    db.select({ total: count() }).from(documents).where(whereAllStatuses),
   ]);
 
   const total = totalRows[0].total;
@@ -227,7 +237,7 @@ export default async function DocumentsPage({
       <div className="mt-3 space-y-2">
         {/* الحالة أوّلاً: ما ينتظرك قبل ما مضى */}
         <ScrollX className="flex gap-1.5 pb-1">
-          <Chip href={link({ status: undefined })} active={!p.status}>الكل ({Number(total)})</Chip>
+          <Chip href={link({ status: undefined })} active={!p.status}>الكل ({Number(allStatusRows[0].total)})</Chip>
           {STATUS_BUCKETS.map((b) => {
             const n = statusCount.get(b.id) ?? 0;
             if (n === 0 && p.status !== b.id) return null;
