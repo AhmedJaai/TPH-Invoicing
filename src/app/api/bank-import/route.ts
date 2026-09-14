@@ -895,7 +895,7 @@ async function handle(request: Request) {
       newRows === 0
         ? `هذا الكشف مقيَّد عندك من قبل — ${countNoun(canonicalRows.length, TRANSACTION)} كلّها مسجَّلة، فلم تُضَف واحدة.`
         : `تمّت المزامنة: ${countNoun(canonicalRows.length, TRANSACTION)} في الملفّ · ${sync.known.length} موجودة · ${newRows} جديدة${
-            sync.ambiguous.length > 0 ? ` · ${sync.ambiguous.length} تحتاج قرارك` : ""
+            sync.ambiguous.length > 0 ? ` · ${sync.ambiguous.length} للمراجعة` : ""
           }${
             sync.conflict.length > 0 ? ` · ${sync.conflict.length} تضارب هويّة — لم تُقيَّد` : ""
           }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} ردّها قيد القاعدة` : ""}.`,

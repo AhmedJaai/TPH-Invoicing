@@ -284,13 +284,13 @@ export default async function DocumentsPage({
           <table className="w-full min-w-[46rem] text-sm">
             <thead className="sticky top-0 bg-sunken text-xs text-muted">
               <tr>
-                <th className="px-3 py-2 text-right font-medium">المستند</th>
-                <th className="px-3 py-2 text-right font-medium">النوع</th>
-                <th className="px-3 py-2 text-right font-medium">المورّد</th>
-                <th className="px-3 py-2 text-right font-medium">الشهر</th>
-                {showAmounts && <th className="px-3 py-2 text-right font-medium">المبلغ</th>}
-                <th className="px-3 py-2 text-right font-medium">الحالة</th>
-                <th className="px-3 py-2 text-right font-medium">الدرايف</th>
+                <th className="px-3 py-2 text-start font-medium">المستند</th>
+                <th className="px-3 py-2 text-start font-medium">النوع</th>
+                <th className="px-3 py-2 text-start font-medium">المورّد</th>
+                <th className="px-3 py-2 text-start font-medium">الشهر</th>
+                {showAmounts && <th className="px-3 py-2 text-start font-medium">المبلغ</th>}
+                <th className="px-3 py-2 text-start font-medium">الحالة</th>
+                <th className="px-3 py-2 text-start font-medium">الدرايف</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line bg-raised">

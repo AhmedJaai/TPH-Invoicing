@@ -27,7 +27,17 @@ const CADENCE_LABEL: Record<ExpenseRow["cadence"], string> = {
  * الإيجار السنوي يُسجَّل مرّة، ويُعرض بحصّته الشهرية — فلا يبدو شهرٌ ضخماً
  * وأحد عشر خفيفة.
  */
-export function RecurringExpenses({ rows }: { rows: ExpenseRow[] }) {
+export function RecurringExpenses({
+  rows,
+  inactive = [],
+  canEdit = true,
+}: {
+  rows: ExpenseRow[];
+  /** المعطَّل يُعرض ليُعاد — التعطيل بلا باب رجوع نقرةٌ لا تُصلَح */
+  inactive?: ExpenseRow[];
+  /** من لا يملك `expense:edit` يرى القائمة ولا يرى أزرارها */
+  canEdit?: boolean;
+}) {
   const router = useRouter();
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
@@ -76,7 +86,7 @@ export function RecurringExpenses({ rows }: { rows: ExpenseRow[] }) {
                   <span className="nums text-sm font-bold" dir="ltr">
                     {formatRiyalsDisplay(r.monthlyMinor)}
                   </span>
-                  {confirmId === r.id ? (
+                  {!canEdit ? null : confirmId === r.id ? (
                     <span className="flex items-center gap-1.5">
                       <button
                         onClick={() => { setConfirmId(null); void send({ action: "delete", id: r.id }); }}
@@ -112,6 +122,30 @@ export function RecurringExpenses({ rows }: { rows: ExpenseRow[] }) {
         </>
       )}
 
+      {inactive.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-[11px] text-muted">معطَّلة ({inactive.length})</summary>
+          <ul className="mt-2 divide-y divide-line overflow-hidden rounded-2xl border border-dashed border-line">
+            {inactive.map((r) => (
+              <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-2 text-muted">
+                <span className="min-w-0 truncate text-xs">{r.label} · {CATEGORY_LABEL[r.category]}</span>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => void send({ action: "activate", id: r.id })}
+                    disabled={busy}
+                    className="inline-flex min-h-11 shrink-0 items-center px-2 text-[11px] text-ink-soft hover:text-ink disabled:opacity-40 sm:min-h-0"
+                  >
+                    فعِّله
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {canEdit && (
       <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-raised shadow-raised p-3">
         <input
           value={label}
@@ -158,6 +192,7 @@ export function RecurringExpenses({ rows }: { rows: ExpenseRow[] }) {
           {busy ? "…" : "أضِف"}
         </button>
       </div>
+      )}
 
       {message && (
         <p className={`mt-2 text-[11px] font-bold ${error ? "text-danger" : "text-ok"}`}>

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { postJson, request } from "@/lib/http-client";
-import { DAY, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
+import { DAY, INVOICE, TRANSACTION, countNoun, GROUP } from "@/lib/arabic";
 
 interface Coverage {
   from: string | null;
@@ -372,7 +372,7 @@ export function BankImport({
                   الاحتمالات في هذا الكشف أكثر من أن تُستقصى كلّها، فتوقّف البحث عند
                   أفضل ما بلغه. والتوزيع المعروض صحيحٌ ومتّسق، لكن قد يوجد توزيعٌ أنسب
                   لم يُبلَغ — ولذلك لم تُطابَق حركةٌ تلقائياً هنا: صارت كلّها اقتراحاً
-                  ينتظر إقرارك. راجعها بعينك.
+                  ينتظر تأكيدك. راجعها بعينك.
                 </p>
               </div>
             )}
@@ -403,7 +403,7 @@ export function BankImport({
                 </p>
                 {data.sync.ambiguous > 0 && (
                   <div className="mt-2 border-t border-line pt-2">
-                    <p className="text-[11px] font-bold text-warn">تحتاج قرارك — لن تُضاف ولن تُحذف</p>
+                    <p className="text-[11px] font-bold text-warn">للمراجعة — لن تُضاف ولن تُحذف</p>
                     <ul className="mt-1 space-y-1">
                       {(data.sync.ambiguousRows ?? []).map((a, i) => (
                         <li key={i} className="text-[11px] leading-relaxed text-muted">
@@ -453,7 +453,7 @@ export function BankImport({
 
             {data.summary.duplicateGroups > 0 && (
               <p className="mt-3 rounded-lg bg-danger-bg px-3 py-2 text-xs text-danger">
-                ⚠ {data.summary.duplicateGroups} مجموعة يُشتبه بتكرار دفعها — راجعها بعد الاستيراد
+                ⚠ {countNoun(data.summary.duplicateGroups, GROUP)} يُشتبه بتكرار دفعها — راجعها بعد الاستيراد
               </p>
             )}
 
@@ -536,7 +536,7 @@ export function BankImport({
               disabled={busy !== null}
               className="mt-4 w-full rounded-lg bg-inverse-surface px-4 py-2.5 text-sm font-bold text-inverse-ink disabled:opacity-40"
             >
-              {busy === "applying" ? "يطبّق…" : "اعتمد وطابِق"}
+              {busy === "applying" ? "يطبّق…" : "أكّد وطابِق"}
             </button>
           </div>
         )}

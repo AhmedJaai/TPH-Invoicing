@@ -342,7 +342,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 
 ## الأوامر
 
-`npm test` (١٧٢٠ اختباراً · ٩٨ ملفاً) · `npm run typecheck` · `npm run lint`
+`npm test` (١٧٨٥ اختباراً · ٩٩ ملفاً) · `npm run typecheck` · `npm run lint`
 `npm run db:migrate` · `db:verify` · `db:dedupe` · `db:rematch` · `db:reclassify` · `db:learn` · `db:link` · `db:split-check`
 `npm run db:expenses` · `db:audit` · `db:measure` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules` · `db:repair-scope` · `db:identity` · `db:unpaid`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`

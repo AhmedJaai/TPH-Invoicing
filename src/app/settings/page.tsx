@@ -43,10 +43,10 @@ export default async function SettingsPage() {
 
   const health = buildDataHealth(await gatherHealthFacts());
 
-  const expenses: ExpenseRow[] = (
-    await db.execute<{ id: string; label: string; category: string; amount_minor: number; cadence: string }>(sql`
-      select id, label, category::text as category, amount_minor, cadence
-        from recurring_expenses where is_active order by amount_minor desc
+  const allExpenses = (
+    await db.execute<{ id: string; label: string; category: string; amount_minor: number; cadence: string; is_active: boolean }>(sql`
+      select id, label, category::text as category, amount_minor, cadence, is_active
+        from recurring_expenses order by amount_minor desc
     `)
   ).rows.map((r) => {
     const row = {
@@ -56,8 +56,14 @@ export default async function SettingsPage() {
       amountMinor: Number(r.amount_minor),
       cadence: r.cadence as ExpenseRow["cadence"],
     };
-    return { ...row, monthlyMinor: monthlyShare(row) };
+    return { ...row, monthlyMinor: monthlyShare(row), isActive: r.is_active };
   });
+  const toRow = (r: (typeof allExpenses)[number]): ExpenseRow => ({
+    id: r.id, label: r.label, category: r.category, amountMinor: r.amountMinor,
+    cadence: r.cadence, monthlyMinor: r.monthlyMinor,
+  });
+  const expenses: ExpenseRow[] = allExpenses.filter((r) => r.isActive).map(toRow);
+  const inactiveExpenses: ExpenseRow[] = allExpenses.filter((r) => !r.isActive).map(toRow);
 
   const tiles: HubTile[] = [
     {
@@ -123,7 +129,7 @@ export default async function SettingsPage() {
           «أين ذهب المال»، وهذه تقول «كم يُتوقَّع» — فيُقابَل المتوقَّع بالفعلي في
           قائمة الدخل.
         </p>
-        <RecurringExpenses rows={expenses} />
+        <RecurringExpenses rows={expenses} inactive={inactiveExpenses} canEdit={can(user.role, "expense:edit")} />
       </section>
 
       <section className="mt-10">

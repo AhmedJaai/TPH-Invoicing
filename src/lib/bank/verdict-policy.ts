@@ -148,6 +148,6 @@ export function weighVerdict(input: VerdictInput): VerdictDecision {
     return { disposition: "REVIEW", reasons, signals };
   }
 
-  reasons.push("ترجيحٌ ينتظر إقرارك — النموذج لا يُقرّر مالاً");
+  reasons.push("ترجيحٌ ينتظر تأكيدك — النموذج لا يُقرّر مالاً");
   return { disposition: "SUGGEST", reasons, signals };
 }

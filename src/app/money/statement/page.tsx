@@ -160,10 +160,10 @@ export default async function FinancialStatementPage() {
             <table className="w-full min-w-[32rem] text-sm">
               <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
-                  <th className="px-3 py-2 text-right font-medium">الشهر</th>
-                  <th className="px-3 py-2 text-right font-medium">وارد</th>
-                  <th className="px-3 py-2 text-right font-medium">صادر</th>
-                  <th className="px-3 py-2 text-right font-medium">الصافي</th>
+                  <th className="px-3 py-2 text-start font-medium">الشهر</th>
+                  <th className="px-3 py-2 text-start font-medium">وارد</th>
+                  <th className="px-3 py-2 text-start font-medium">صادر</th>
+                  <th className="px-3 py-2 text-start font-medium">الصافي</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line bg-raised">
@@ -235,10 +235,10 @@ export default async function FinancialStatementPage() {
             <table className="w-full min-w-[34rem] text-sm">
               <thead className="sticky top-0 bg-sunken text-xs text-muted">
                 <tr>
-                  <th className="px-3 py-2 text-right font-medium">البند</th>
-                  <th className="px-3 py-2 text-right font-medium">المتوقَّع شهرياً</th>
-                  <th className="px-3 py-2 text-right font-medium">الفعلي</th>
-                  <th className="px-3 py-2 text-right font-medium">الفرق</th>
+                  <th className="px-3 py-2 text-start font-medium">البند</th>
+                  <th className="px-3 py-2 text-start font-medium">المتوقَّع شهرياً</th>
+                  <th className="px-3 py-2 text-start font-medium">الفعلي</th>
+                  <th className="px-3 py-2 text-start font-medium">الفرق</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line bg-raised">

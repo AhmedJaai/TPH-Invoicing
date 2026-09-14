@@ -305,7 +305,7 @@ export function ReconcileQueue({
               onClick={settleAccount}
               className={`${buttonClass("primary", "sm")} mt-2`}
             >
-              {busy ? "يقيّد…" : "قيّدها على حسابه"}
+              {busy ? "يقيّد…" : "سدِّد على حساب المورّد"}
             </button>
             {single && (
               <button

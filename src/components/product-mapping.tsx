@@ -6,6 +6,7 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type MergeSuggestion, type ProductCategory } from "@/lib/products";
 import { buttonClass } from "@/components/ui";
 import { postJson } from "@/lib/http-client";
+import { countNoun, TIME } from "@/lib/arabic";
 
 export interface SupplierProductView {
   id: string;
@@ -87,7 +88,7 @@ function LinkRow({
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium">{i.displayName}</span>
               <span className="block text-[11px] text-muted">
-                {i.supplierName} · طُلب {i.orderCount} مرة
+                {i.supplierName} · طُلب {countNoun(i.orderCount, TIME)}
               </span>
             </span>
             <span className="nums shrink-0 text-xs" dir="ltr">
@@ -259,7 +260,7 @@ function Triage({
 
       <p className="mt-4 font-display text-xl font-bold leading-snug">{item.displayName}</p>
       <p className="mt-1.5 text-xs text-muted">
-        {item.supplierName} · اشتريته {item.orderCount} مرّة ·{" "}
+        {item.supplierName} · اشتريته {countNoun(item.orderCount, TIME)} ·{" "}
         {formatRiyalsDisplay(item.totalSpentMinor)} ريال
       </p>
 
@@ -268,7 +269,7 @@ function Triage({
           <p className="text-[11px] text-muted">صنف معياري بالاسم نفسه</p>
           <p className="mt-1 text-sm font-bold">{candidate.nameAr}</p>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
-            الاسم متطابق — والاسم وحده يخدع أحياناً. أقرَّه إن كان هو فعلاً.
+            الاسم متطابق — والاسم وحده يخدع أحياناً. أكّده إن كان هو فعلاً.
           </p>
         </div>
       ) : (

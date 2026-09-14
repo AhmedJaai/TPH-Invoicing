@@ -121,6 +121,11 @@ export function SearchBox() {
         type="search"
         dir="auto"
         aria-label="ابحث"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls="search-results"
+        aria-autocomplete="list"
+        aria-activedescendant={open && hits.length > 0 ? `search-hit-${active}` : undefined}
         placeholder="ابحث برقم أو مبلغ أو اسم…"
         className="w-full rounded-xl border border-line bg-sunken px-3 py-1.5 text-xs outline-none transition-colors placeholder:text-muted focus:border-ink-soft focus:bg-surface"
       />
@@ -130,6 +135,11 @@ export function SearchBox() {
           /
         </kbd>
       )}
+
+      {/* عددُ النتائج يُعلَن لقارئ الشاشة — القائمة وحدها لا تُسمَع */}
+      <p className="sr-only" aria-live="polite">
+        {open && !busy ? (failed ? "تعذّر البحث" : hits.length === 0 ? "لا نتائج" : `النتائج: ${hits.length}`) : ""}
+      </p>
 
       {open && (
         <div className="absolute inset-x-0 top-full z-40 mt-1.5 overflow-hidden rounded-2xl border border-line bg-surface shadow-lifted">
@@ -148,11 +158,12 @@ export function SearchBox() {
           )}
 
           {hits.length > 0 && (
-            <ul className="max-h-[60vh] divide-y divide-line overflow-y-auto">
+            <ul id="search-results" role="listbox" aria-label="نتائج البحث" className="max-h-[60vh] divide-y divide-line overflow-y-auto">
               {hits.map((h, i) => (
-                <li key={`${h.kind}-${h.id}`}>
+                <li key={`${h.kind}-${h.id}`} id={`search-hit-${i}`} role="option" aria-selected={i === active}>
                   <button
                     type="button"
+                    tabIndex={-1}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => go(h)}
                     onMouseEnter={() => setActive(i)}

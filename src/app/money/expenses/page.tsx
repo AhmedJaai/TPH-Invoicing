@@ -8,6 +8,7 @@ import { can } from "@/lib/permissions";
 import { Empty, PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { DeriveExpenses } from "@/components/derive-expenses";
+import { ManualExpense } from "@/components/manual-expense";
 import { activeRecurring } from "@/services/expense.service";
 import {
   expectedVsActual,
@@ -67,6 +68,7 @@ export default async function ExpensesPage({
         intro="ما صُرف فعلاً، مقابل ما كان متوقَّعاً."
       >
         <DeriveExpenses />
+        {can(user.role, "expense:edit") && <div className="mt-3"><ManualExpense /></div>}
         <div className="mt-4">
           <Empty message="لا مصروفات مقيَّدة بعد. اشتقّها من كشف البنك أعلاه." />
         </div>
@@ -229,7 +231,10 @@ export default async function ExpensesPage({
       <section className="mt-8">
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
           <h2 className="text-base font-bold">القيود</h2>
-          <DeriveExpenses month={month} />
+          <>
+            <DeriveExpenses month={month} />
+            {can(user.role, "expense:edit") && <div className="mt-3"><ManualExpense /></div>}
+          </>
         </div>
         {actual.length === 0 ? (
           <Empty message="لا قيود في هذا الشهر." />

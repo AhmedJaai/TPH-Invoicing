@@ -131,7 +131,7 @@ export default async function PaymentsPage({
 
       {run.ready.length > 0 && (
         <section className="mt-10">
-          <h2 className="mb-3 text-base font-bold">جاهز للاعتماد</h2>
+          <h2 className="mb-3 text-base font-bold">جاهز للتحويل</h2>
           <div className="space-y-3">
             {run.ready.map((s) => (
               <article key={s.supplierId} className="rounded-2xl border border-line bg-raised shadow-raised p-4">

@@ -9,8 +9,8 @@ import { Empty, Money, PageShell } from "@/components/page-shell";
 import { findSameNameCandidates, summarizeItems, type LineRow } from "@/lib/analytics";
 import { buildDataHealth } from "@/lib/data-health";
 import { gatherHealthFacts } from "@/lib/data-health-facts";
-import { NoAccess } from "@/components/ui";
-import { ScrollX } from "@/components/scroll-x";
+import { NoAccess, DataTable } from "@/components/ui";
+import { countNoun, TIME } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
 
@@ -64,8 +64,8 @@ export default async function PerformancePage() {
 
   const priceMoves = items
     .filter((i) => i.priceChange && Math.abs(i.priceChange.deltaRatio) >= 0.03)
-    .sort((a, b) => Math.abs(b.priceChange!.deltaRatio) - Math.abs(a.priceChange!.deltaRatio))
-    .slice(0, 25);
+    .sort((a, b) => Math.abs(b.priceChange!.deltaRatio) - Math.abs(a.priceChange!.deltaRatio));
+  const priceMovesShown = priceMoves.slice(0, 25);
 
   const sameName = findSameNameCandidates(items);
   const totalSpend = items.reduce((s, i) => s + i.totalSpentMinor, 0);
@@ -120,39 +120,33 @@ export default async function PerformancePage() {
             سعر الوحدة في آخر فاتورة مقابل السعر الذي قبله — عند المورّد نفسه، وبعد
             الخصم والضريبة لا قبلهما.
           </p>
-          <ScrollX className="rounded-2xl border border-line shadow-raised">
-            <table className="w-full min-w-[38rem] text-sm">
-              <thead className="sticky top-0 bg-sunken text-xs text-muted">
-                <tr>
-                  <th className="px-3 py-2 text-right font-medium">الصنف</th>
-                  <th className="px-3 py-2 text-right font-medium">السابق</th>
-                  <th className="px-3 py-2 text-right font-medium">الحالي</th>
-                  <th className="px-3 py-2 text-right font-medium">التغيّر</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line bg-raised">
-                {priceMoves.map((i) => {
-                  const c = i.priceChange!;
-                  const up = c.direction === "up";
-                  return (
-                    <tr key={i.key}>
-                      <td className="px-3 py-2.5">
-                        <p className="font-medium">{i.displayName}</p>
-                        <p className="text-[11px] text-muted">
-                          {i.supplierName} · طُلب {i.orderCount} مرة
-                        </p>
-                      </td>
-                      <td className="px-3 py-2.5 text-ink-soft"><Money minor={c.previousMinor} /></td>
-                      <td className="px-3 py-2.5 font-medium"><Money minor={c.currentMinor} /></td>
-                      <td className={`px-3 py-2.5 font-bold ${up ? "text-danger" : "text-ok"}`}>
-                        {up ? "▲" : "▼"} {Math.abs(Math.round(c.deltaRatio * 100))}٪
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </ScrollX>
+          <DataTable
+            rows={priceMovesShown}
+            keyOf={(i) => i.key}
+            columns={[
+              {
+                key: "item", header: "الصنف", primary: true,
+                cell: (i) => (
+                  <span>
+                    <span className="block font-medium">{i.displayName}</span>
+                    <span className="block text-[11px] text-muted">{i.supplierName} · طُلب {countNoun(i.orderCount, TIME)}</span>
+                  </span>
+                ),
+              },
+              { key: "prev", header: "السابق", numeric: true, cell: (i) => <span className="text-ink-soft"><Money minor={i.priceChange!.previousMinor} /></span> },
+              { key: "now", header: "الحالي", numeric: true, cell: (i) => <span className="font-medium"><Money minor={i.priceChange!.currentMinor} /></span> },
+              {
+                key: "delta", header: "التغيّر", numeric: true,
+                cell: (i) => {
+                  const up = i.priceChange!.direction === "up";
+                  return <span className={`font-bold ${up ? "text-danger" : "text-ok"}`}>{up ? "▲" : "▼"} {Math.abs(Math.round(i.priceChange!.deltaRatio * 100))}٪</span>;
+                },
+              },
+            ]}
+          />
+          {priceMoves.length > priceMovesShown.length && (
+            <p className="mt-2 text-xs text-muted">تُعرض أكبرُ 25 حركة من {priceMoves.length}.</p>
+          )}
         </section>
       )}
 
@@ -166,30 +160,22 @@ export default async function PerformancePage() {
         {items.length === 0 ? (
           <Empty message="لا بنود بعد. البنود تُسجَّل عند قراءة محتوى الفواتير." />
         ) : (
-          <ScrollX className="rounded-2xl border border-line shadow-raised">
-            <table className="w-full min-w-[40rem] text-sm">
-              <thead className="sticky top-0 bg-sunken text-xs text-muted">
-                <tr>
-                  <th className="px-3 py-2 text-right font-medium">الصنف</th>
-                  <th className="px-3 py-2 text-right font-medium">المورّد</th>
-                  <th className="px-3 py-2 text-right font-medium">مرات الطلب</th>
-                  <th className="px-3 py-2 text-right font-medium">متوسّط الوحدة</th>
-                  <th className="px-3 py-2 text-right font-medium">الإجمالي</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line bg-raised">
-                {items.slice(0, 25).map((i) => (
-                  <tr key={i.key}>
-                    <td className="px-3 py-2.5 font-medium">{i.displayName}</td>
-                    <td className="px-3 py-2.5 text-xs text-ink-soft">{i.supplierName}</td>
-                    <td className="nums px-3 py-2.5">{i.orderCount}</td>
-                    <td className="px-3 py-2.5"><Money minor={i.averageUnitPriceMinor} /></td>
-                    <td className="px-3 py-2.5 font-medium"><Money minor={i.totalSpentMinor} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </ScrollX>
+          <>
+            <DataTable
+              rows={items.slice(0, 25)}
+              keyOf={(i) => i.key}
+              columns={[
+                { key: "item", header: "الصنف", primary: true, cell: (i) => <span className="font-medium">{i.displayName}</span> },
+                { key: "supplier", header: "المورّد", cell: (i) => <span className="text-xs text-ink-soft">{i.supplierName}</span> },
+                { key: "orders", header: "مرات الطلب", numeric: true, cell: (i) => i.orderCount },
+                { key: "unit", header: "متوسّط الوحدة", numeric: true, secondary: true, cell: (i) => <Money minor={i.averageUnitPriceMinor} /> },
+                { key: "total", header: "الإجمالي", numeric: true, cell: (i) => <span className="font-medium"><Money minor={i.totalSpentMinor} /></span> },
+              ]}
+            />
+            {items.length > 25 && (
+              <p className="mt-2 text-xs text-muted">تُعرض أعلى 25 إنفاقاً من {items.length} — والكلّ في التحليل الكامل.</p>
+            )}
+          </>
         )}
       </section>
     </PageShell>

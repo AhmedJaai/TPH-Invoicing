@@ -54,7 +54,8 @@ export default async function Home() {
     >
       <div>
         <Uploader
-            canSeeAmounts={showAmounts}
+          canSeeAmounts={showAmounts}
+          canCreateSupplier={can(user.role, "supplier:edit")}
           suppliers={rows.map((s) => ({ id: s.id, nameAr: s.nameAr }))}
         />
       </div>

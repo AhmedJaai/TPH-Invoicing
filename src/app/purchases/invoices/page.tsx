@@ -274,7 +274,10 @@ export default async function InvoicesPage({
               cell: (r) => {
                 const rem = r.total - Number(r.allocated);
                 if (rem <= SETTLED_TOLERANCE_MINOR) return null;
-                return <MarkInvoicePaid invoiceId={r.id} label={formatRiyals(rem)} />;
+                /* تسجيل السداد كتابةُ مال — من لا يعتمد السداد يرى المتبقّي ولا يرى الزرّ */
+                return can(user.role, "payment:approve")
+                  ? <MarkInvoicePaid invoiceId={r.id} label={formatRiyals(rem)} />
+                  : <span className="nums text-[11px] text-muted" dir="ltr">{formatRiyals(rem)}</span>;
               },
             },
           ]}

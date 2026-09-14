@@ -77,7 +77,7 @@ export function MarkSupplierPaid({
     <div className="mt-3">
       {!open ? (
         <button type="button" className={buttonClass("secondary", "sm")} onClick={() => setOpen(true)}>
-          سجّل أنّها سُدِّدت
+          سجّل أنّها سُدّدت
         </button>
       ) : (
         <div className="rounded-xl border border-line bg-sunken px-3 py-2.5">

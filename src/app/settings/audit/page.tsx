@@ -29,6 +29,7 @@ const ACTION_LABEL: Record<string, string> = {
   PRODUCT_UNLINKED: "فكّ ربط صنف",
   EXPENSE_ADDED: "إضافة مصروف",
   EXPENSE_REMOVED: "حذف مصروف أو تعطيله",
+  EXPENSE_REACTIVATED: "إعادة تفعيل مصروف متكرّر",
   INVOICE_PAID_BY_OWNER: "سداد فاتورة من حساب المالك",
   SUPPLIER_CREDIT_APPLIED: "خصم رصيد المورّد من فاتورة",
   AI_ANALYSIS_RUN: "تحليل الذكاء لحساب مورّد",

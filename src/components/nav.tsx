@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { can, type Role } from "@/lib/permissions";
 import {
   activeArea,
@@ -139,6 +139,13 @@ export function Nav({ role, pending = 0 }: { role: Role; pending?: number }) {
 export function MobileTabBar({ role }: { role: Role }) {
   const pathname = usePathname() ?? "/";
   const [moreOpen, setMoreOpen] = useState(false);
+  /* الدرج يُغلق بـEscape — من فتحه بلوحة المفاتيح لا يُحبَس فيه */
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMoreOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [moreOpen]);
   const area = activeArea(pathname);
   const { tabs, more } = mobileTabs(role, pathname);
 
@@ -173,7 +180,7 @@ export function MobileTabBar({ role }: { role: Role }) {
             onClick={() => setMoreOpen(false)}
             className="fixed inset-0 z-30 bg-black/25 sm:hidden"
           />
-          <div className="fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border-t border-line bg-surface pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 sm:hidden">
+          <div role="dialog" aria-modal="true" aria-label="المزيد" className="fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border-t border-line bg-surface pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 sm:hidden">
             <div className="mx-auto mb-2 h-1 w-9 rounded-full bg-line" />
             <ul className="divide-y divide-line">
               {more.map((a) => (

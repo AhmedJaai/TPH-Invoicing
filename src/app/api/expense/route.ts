@@ -22,7 +22,7 @@ const CATEGORIES: readonly TxCategory[] = [
 const CADENCES = ["MONTHLY", "QUARTERLY", "ANNUAL"] as const;
 
 interface Body {
-  action?: "create" | "delete";
+  action?: "create" | "delete" | "activate";
   id?: string;
   label?: string;
   category?: TxCategory;
@@ -65,6 +65,26 @@ export async function POST(request: Request) {
       after: { الحالة: "معطَّل" },
     });
     return NextResponse.json({ ok: true, message: "عُطّل المصروف ولم يُحذف" });
+  }
+
+  /* المعطَّل يُعاد — نقرةٌ خاطئة على «عطّله» لم يكن لها رجوع */
+  if (body.action === "activate") {
+    if (!body.id) return NextResponse.json({ error: "حدّد المصروف" }, { status: 400 });
+    const [row] = await db
+      .update(recurringExpenses)
+      .set({ isActive: true })
+      .where(eq(recurringExpenses.id, body.id))
+      .returning({ label: recurringExpenses.label });
+    if (!row) return NextResponse.json({ error: "المصروف غير موجود" }, { status: 404 });
+
+    await recordAudit({
+      actorId: user.id,
+      action: "EXPENSE_REACTIVATED",
+      entityType: "recurring_expense",
+      entityId: body.id,
+      after: { البند: row.label, الحالة: "مفعَّل" },
+    });
+    return NextResponse.json({ ok: true, message: `أُعيد «${row.label}» إلى المتوقَّع` });
   }
 
   const label = body.label?.trim();

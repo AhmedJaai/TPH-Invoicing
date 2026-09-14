@@ -6,9 +6,8 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
 import { findSameNameCandidates, summarizeItems, type LineRow } from "@/lib/analytics";
-import { NoAccess } from "@/components/ui";
-import { PRODUCT, countNoun } from "@/lib/arabic";
-import { ScrollX } from "@/components/scroll-x";
+import { NoAccess, DataTable } from "@/components/ui";
+import { PRODUCT, countNoun, DAY } from "@/lib/arabic";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +79,9 @@ export default async function AnalysisPage() {
     .filter((x) => x.since >= x.cycle * 0.85)
     .sort((a, b) => b.since / b.cycle - a.since / a.cycle)
     .slice(0, 12);
+  const dueSoonTotal = items
+    .filter((i) => i.averageDaysBetweenOrders && i.lastOrderedAt)
+    .filter((i) => daysSince(i.lastOrderedAt)! >= i.averageDaysBetweenOrders! * 0.85).length;
 
   return (
     <PageShell
@@ -117,38 +119,37 @@ export default async function AnalysisPage() {
             كيلو بنّ بـ١٥٥ ريالاً، و«عنب» عند لافا زجاجة كمبوتشا بـ١٣٫٥٠. فانظر الوصفين
             بنفسك — فإن كانا صنفاً واحداً فالفارق فرصة، وإلّا فلا معنى للمقارنة.
           </p>
-          <ScrollX className="rounded-2xl border border-line shadow-raised">
-            <table className="w-full min-w-[40rem] text-sm">
-              <thead className="sticky top-0 bg-sunken text-xs text-muted">
-                <tr>
-                  <th className="px-3 py-2 text-right font-medium">الاسم المشترك</th>
-                  <th className="px-3 py-2 text-right font-medium">الأرخص</th>
-                  <th className="px-3 py-2 text-right font-medium">الأغلى</th>
-                  <th className="px-3 py-2 text-right font-medium">الفارق</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line bg-raised">
-                {sameName.slice(0, 20).map((g) => (
-                  <tr key={g.normalized}>
-                    <td className="px-3 py-2.5 font-medium">{g.normalized}</td>
-                    <td className="px-3 py-2.5">
-                      <span className="block text-xs text-muted">{g.cheaper.supplierName}</span>
-                      <span className="block text-[11px]">{g.cheaper.displayName}</span>
-                      <Money minor={g.cheaper.lastUnitPriceMinor} tone="ok" />
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="block text-xs text-muted">{g.dearer.supplierName}</span>
-                      <span className="block text-[11px]">{g.dearer.displayName}</span>
-                      <Money minor={g.dearer.lastUnitPriceMinor} tone="danger" />
-                    </td>
-                    <td className="nums px-3 py-2.5 font-bold text-warn">
-                      {Math.round(g.gapRatio * 100)}٪
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </ScrollX>
+          <DataTable
+            rows={sameName.slice(0, 20)}
+            keyOf={(g) => g.normalized}
+            columns={[
+              { key: "name", header: "الاسم المشترك", primary: true, cell: (g) => <span className="font-medium">{g.normalized}</span> },
+              {
+                key: "cheaper", header: "الأرخص",
+                cell: (g) => (
+                  <span>
+                    <span className="block text-xs text-muted">{g.cheaper.supplierName}</span>
+                    <span className="block text-[11px]">{g.cheaper.displayName}</span>
+                    <Money minor={g.cheaper.lastUnitPriceMinor} tone="ok" />
+                  </span>
+                ),
+              },
+              {
+                key: "dearer", header: "الأغلى",
+                cell: (g) => (
+                  <span>
+                    <span className="block text-xs text-muted">{g.dearer.supplierName}</span>
+                    <span className="block text-[11px]">{g.dearer.displayName}</span>
+                    <Money minor={g.dearer.lastUnitPriceMinor} tone="danger" />
+                  </span>
+                ),
+              },
+              { key: "gap", header: "الفارق", numeric: true, cell: (g) => <span className="font-bold text-warn">{Math.round(g.gapRatio * 100)}٪</span> },
+            ]}
+          />
+          {sameName.length > 20 && (
+            <p className="mt-2 text-xs text-muted">تُعرض أوّل 20 من {sameName.length} — الأكبر فارقاً.</p>
+          )}
         </section>
       )}
 
@@ -172,7 +173,7 @@ export default async function AnalysisPage() {
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{x.item.displayName}</span>
                   <span className="block text-[11px] leading-relaxed text-muted">
-                    عادةً تشتريه كل {x.cycle} يوماً · آخر شراء قبل {x.since} يوماً
+                    عادةً تشتريه كل {countNoun(x.cycle, DAY)} · آخر شراء قبل {countNoun(x.since, DAY)}
                   </span>
                 </span>
                 <span
@@ -185,6 +186,9 @@ export default async function AnalysisPage() {
               </li>
             ))}
           </ul>
+          {dueSoonTotal > dueSoon.length && (
+            <p className="mt-2 text-xs text-muted">تُعرض أقربُ 12 من {dueSoonTotal}.</p>
+          )}
         </section>
       )}
 
@@ -193,41 +197,33 @@ export default async function AnalysisPage() {
         <p className="mb-3 max-w-2xl text-xs leading-relaxed text-muted">
           مرتّبة بالأكثر كلفة — أعلى الصفحة هو ما يستحقّ التفاوض عليه.
         </p>
-        <ScrollX className="rounded-2xl border border-line shadow-raised">
-          <table className="w-full min-w-[46rem] text-sm">
-            <thead className="sticky top-0 bg-sunken text-xs text-muted">
-              <tr>
-                <th className="px-3 py-2 text-right font-medium">الصنف</th>
-                <th className="px-3 py-2 text-right font-medium">مرات الطلب</th>
-                <th className="px-3 py-2 text-right font-medium">الكميّة</th>
-                <th className="px-3 py-2 text-right font-medium">متوسط سعر الوحدة</th>
-                <th className="px-3 py-2 text-right font-medium">الإجمالي</th>
-                <th className="px-3 py-2 text-right font-medium">الدورة</th>
-                <th className="px-3 py-2 text-right font-medium">آخر طلب</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line bg-raised">
-              {top.map((i) => (
-                <tr key={i.key}>
-                  <td className="px-3 py-2.5">
-                    <p className="font-medium">{i.displayName}</p>
-                    <p className="text-[11px] text-muted">{i.supplierName}</p>
-                  </td>
-                  <td className="nums px-3 py-2.5">{i.orderCount}</td>
-                  <td className="nums px-3 py-2.5">{Math.round(i.totalQuantity * 100) / 100}</td>
-                  <td className="px-3 py-2.5"><Money minor={i.averageUnitPriceMinor} /></td>
-                  <td className="px-3 py-2.5 font-medium"><Money minor={i.totalSpentMinor} /></td>
-                  <td className="nums px-3 py-2.5 text-xs text-ink-soft">
-                    {i.averageDaysBetweenOrders ? `كل ${i.averageDaysBetweenOrders} يوم` : "—"}
-                  </td>
-                  <td className="nums px-3 py-2.5 text-xs text-ink-soft" dir="ltr">
-                    {i.lastOrderedAt ? i.lastOrderedAt.toISOString().slice(0, 10) : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </ScrollX>
+        <DataTable
+          rows={top}
+          keyOf={(i) => i.key}
+          columns={[
+            {
+              key: "item", header: "الصنف", primary: true,
+              cell: (i) => (
+                <span>
+                  <span className="block font-medium">{i.displayName}</span>
+                  <span className="block text-[11px] text-muted">{i.supplierName}</span>
+                </span>
+              ),
+            },
+            { key: "orders", header: "مرات الطلب", numeric: true, cell: (i) => i.orderCount },
+            { key: "qty", header: "الكميّة", numeric: true, secondary: true, cell: (i) => Math.round(i.totalQuantity * 100) / 100 },
+            { key: "unit", header: "متوسط سعر الوحدة", numeric: true, cell: (i) => <Money minor={i.averageUnitPriceMinor} /> },
+            { key: "total", header: "الإجمالي", numeric: true, cell: (i) => <span className="font-medium"><Money minor={i.totalSpentMinor} /></span> },
+            {
+              key: "cycle", header: "الدورة", secondary: true,
+              cell: (i) => <span className="text-xs text-ink-soft">{i.averageDaysBetweenOrders ? `كل ${countNoun(i.averageDaysBetweenOrders, DAY)}` : "—"}</span>,
+            },
+            {
+              key: "last", header: "آخر طلب", secondary: true,
+              cell: (i) => <span className="nums text-xs text-ink-soft" dir="ltr">{i.lastOrderedAt ? i.lastOrderedAt.toISOString().slice(0, 10) : "—"}</span>,
+            },
+          ]}
+        />
         {items.length > top.length && (
           <p className="mt-2 text-xs text-muted">
             تُعرض أعلى {countNoun(top.length, PRODUCT)} إنفاقاً من {items.length}.

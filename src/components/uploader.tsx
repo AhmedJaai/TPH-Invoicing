@@ -198,7 +198,10 @@ function SupplierPicker({
   chosen,
   onChoose,
   onCreated,
+  canCreate = true,
 }: {
+  /** إنشاء المورّد يحتاج `supplier:edit` — مدير المشتريات يختار ولا يُنشئ */
+  canCreate?: boolean;
   detected?: SupplierOption;
   candidates: { id: string; nameAr: string }[];
   suppliers: SupplierOption[];
@@ -288,14 +291,14 @@ function SupplierPicker({
             إلغاء
           </button>
         </div>
-      ) : (
+      ) : canCreate ? (
         <button
           onClick={() => setCreating(true)}
           className="mt-1.5 text-[11px] text-ink-soft underline underline-offset-4 hover:text-ink"
         >
           مورّد جديد…
         </button>
-      )}
+      ) : null}
 
       {error && <p className="mt-1 text-[11px] text-danger">{error}</p>}
     </div>
@@ -313,9 +316,11 @@ interface Archived {
 
 export function Uploader({
   canSeeAmounts = true,
+  canCreateSupplier = true,
   suppliers: initialSuppliers = [],
 }: {
   canSeeAmounts?: boolean;
+  canCreateSupplier?: boolean;
   suppliers?: SupplierOption[];
 }) {
   const router = useRouter();
@@ -705,6 +710,7 @@ export function Uploader({
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <SupplierPicker
+                canCreate={canCreateSupplier}
                     detected={r.supplier}
                     candidates={r.supplierCandidates}
                     suppliers={suppliers}

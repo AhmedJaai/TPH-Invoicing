@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { INVOICE, countNoun } from "@/lib/arabic";
+import { INVOICE, countNoun, FILE } from "@/lib/arabic";
 
 interface Summary {
   scope: string;
@@ -283,7 +283,7 @@ export function DriveSync() {
             <p className="mt-3 rounded-lg bg-ok-bg px-3 py-2 text-xs font-bold text-ok">
               ✓ سُجّل {s.created ?? 0} مستنداً، منها {countNoun(s.invoicesCreated ?? 0, INVOICE)}
               {s.contentRead ? ` · قُرئ محتوى ${s.contentRead}` : ""}
-              {s.remainingUnnamed ? ` · بقي ${s.remainingUnnamed} ملفاً يحتاج قراءة` : ""}
+              {s.remainingUnnamed ? ` · بقي ${countNoun(s.remainingUnnamed, FILE)} يحتاج قراءة` : ""}
             </p>
           )}
 
@@ -315,7 +315,7 @@ export function DriveSync() {
           {result?.renameSuggestions && result.renameSuggestions.length > 0 && (
             <fieldset className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5">
               <legend className="px-1 text-[11px] font-bold text-warn">
-                {result.renameSuggestions.length} ملفّاً اسمُه لا يُقرأ — اختر ما يُسمّى
+                {countNoun(result.renameSuggestions.length, FILE)} اسمُه لا يُقرأ — اختر ما يُسمّى
               </legend>
               <p className="text-[11px] leading-relaxed text-muted">
                 لا يُسمّى شيءٌ إلّا ما تختاره، ويُكتب الاسمان في سجلّ التدقيق. ولا حذف ولا نقل.

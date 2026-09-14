@@ -97,5 +97,5 @@ export type Disposition = "AUTO" | "SUGGEST" | "REVIEW";
 export const DISPOSITION_LABEL: Record<Disposition, string> = {
   AUTO: "طُوبقت تلقائياً",
   SUGGEST: "اقتراح ينتظر تأكيدك",
-  REVIEW: "تحتاج قرارك",
+  REVIEW: "للمراجعة",
 };
