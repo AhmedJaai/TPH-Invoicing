@@ -18,7 +18,7 @@ import {
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { driveForUser, downloadFile, getFileMeta } from "@/lib/drive";
+import { DriveAuthExpiredError, driveForUser, downloadFile, getFileMeta, isDriveAuthError } from "@/lib/drive";
 import { recentMonths, walkArchive, type ArchiveEntry } from "@/lib/drive-sync";
 import { parseFileName } from "@/lib/naming";
 import { KNOWN_SLUGS } from "@/lib/suppliers-seed";
@@ -170,6 +170,7 @@ async function handle(request: Request) {
       المتصفّح: من أرسل معرّفاً لا يُملي علينا أين هو.
     */
     const entries: ArchiveEntry[] = [];
+    try {
     for (const id of direct) {
       /* ما هو مسجَّل لا يُقرأ ثانيةً — استخراجٌ بلا سبب */
       if (known.has(id)) continue;
@@ -182,6 +183,12 @@ async function handle(request: Request) {
       if (!folder || !monthFolder || !/^\d{4}-\d{2}$/.test(monthFolder.name)) continue;
       entries.push({ month: monthFolder.name, folderName: folder.name, file });
     }
+    } catch (e) {
+      if (e instanceof DriveAuthExpiredError) {
+        return NextResponse.json({ error: e.message }, { status: 428 });
+      }
+      throw e;
+    }
     fresh = entries;
   } else {
     try {
@@ -190,6 +197,10 @@ async function handle(request: Request) {
       pendingMonths = walked.pendingMonths;
       truncated = walked.truncated;
     } catch (e) {
+      /* التفويض المنتهي خبرٌ يُصلحه صاحبه — لا «لا جديد» ولا عطبٌ مبهم */
+      if (e instanceof DriveAuthExpiredError) {
+        return NextResponse.json({ error: e.message }, { status: 428 });
+      }
       return NextResponse.json(
         { error: `تعذّرت قراءة الدرايف: ${(e as Error).message}` },
         { status: 502 },
@@ -369,7 +380,10 @@ async function handle(request: Request) {
       let mimeType: string;
       try {
         ({ data, mimeType } = await downloadFile(drive, entry.file.id));
-      } catch {
+      } catch (e) {
+        if (isDriveAuthError(e)) {
+          return NextResponse.json({ error: new DriveAuthExpiredError().message }, { status: 428 });
+        }
         readFailures.push(`${entry.file.name} — تعذّر التنزيل`);
         continue;
       }

@@ -339,11 +339,12 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 - **الاستعلام الفرعيّ المرتبط يُكتب `${table}.id` لا `${table.id}`** — الثاني يُصيّر العمود مجرّداً فيصمت ويُرجع صفراً **لا خطأً**. وقع في `/api/match-confirm` فبدت كلّ فاتورةٍ مسدَّدة مفتوحةً، ورُدَّ السدادُ المزدوج من القاعدة لا من الشيفرة. ويحرسه `src/lib/allocation-sql.test.ts` بقراءة الملفّ نصّاً — إذ لا يراه المترجم ولا يرميه التشغيل.
 - **الكتابة على مئات الصفوف تُجمَع دفعاتٍ** — `/api/counterparty` كان يحدّث صفّاً صفّاً داخل معاملة، فنفدت مهلة الاتصال (`timeout exceeded when trying to connect`) وخرج ٥٠٠.
 - **النصوص الكاتبة ترفض بلا `--i-know-this-is-production`** (`scripts/lib/guard-write.ts`) — `db:demo` و`db:seed` و`db:expenses` و`db:products` و`try:archive --upload`. والتأسيس `db:bootstrap` يرفض قاعدةً فيها جداول؛ وأمرُ دفع المخطّط بلا هجرة حُذف من package.json.
+- **رمز الدرايف يُحدَّث في كلّ دخول بجوجل** (`events.signIn` في `src/auth.ts`) — Auth.js لا يكتب الرموز إلّا عند ربط الحساب أوّل مرّة، فلمّا انتهى الرمز (`invalid_grant`) لم يُصلحه الخروج والدخول. **ومشيُ الأرشيف لا يبتلع إلّا ٤٠٤**: كان يبتلع كلّ خطأ عند مجلّد السنة فتقول المزامنة «٠ ملفّات جديدة» والدرايف لم يُقرأ. وإن كانت شاشة موافقة جوجل في وضع «Testing» فرمز التجديد ينتهي كلّ سبعة أيّام.
 - **بيئة المعاينة في Vercel** — لم يُتحقّق أتشارك قاعدة الإنتاج أم لا. إن كانت تشاركها فكل نشر تجريبي يكتب في البيانات الحقيقية.
 
 ## الأوامر
 
-`npm test` (١٧٨٧ اختباراً · ١٠٠ ملفاً) · `npm run typecheck` · `npm run lint`
+`npm test` (١٧٩١ اختباراً · ١٠١ ملفاً) · `npm run typecheck` · `npm run lint`
 `npm run db:migrate` · `db:verify` · `db:dedupe` · `db:rematch` · `db:reclassify` · `db:learn` · `db:link` · `db:split-check`
 `npm run db:expenses` · `db:audit` · `db:measure` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules` · `db:repair-scope` · `db:identity` · `db:unpaid`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`

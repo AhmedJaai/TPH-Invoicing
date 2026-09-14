@@ -11,7 +11,7 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, sessions, users, verificationTokens } from "@/db/schema";
 import { allowlist, type Role } from "@/lib/permissions";
@@ -104,6 +104,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 
   events: {
+    /**
+     * كلُّ دخولٍ بجوجل يُحدِّث رمز الدرايف المخزَّن.
+     *
+     * Auth.js لا يكتب الرموز إلّا عند ربط الحساب أوّل مرّة؛ والحساب
+     * المربوط يدخل فيُعطى رمزاً جديداً ويُرمى. فلمّا انتهى الرمز الأوّل
+     * (`invalid_grant`) لم يكن الخروجُ والدخول يُصلحانه — وتوقّفت
+     * المزامنة والأرشفة وهي تقول «لا جديد». فيُكتب هنا ما أُعطي.
+     */
+    async signIn({ account }) {
+      if (account?.provider !== "google" || !account.providerAccountId) return;
+      if (!account.access_token && !account.refresh_token) return;
+      await db
+        .update(accounts)
+        .set({
+          access_token: account.access_token ?? null,
+          expires_at: account.expires_at ?? null,
+          scope: account.scope ?? null,
+          id_token: account.id_token ?? null,
+          token_type: account.token_type ?? null,
+          /* جوجل لا تُعيد رمز التجديد في كلّ دخول — لا يُمحى القائم بفراغ */
+          ...(account.refresh_token ? { refresh_token: account.refresh_token } : {}),
+        })
+        .where(and(
+          eq(accounts.provider, "google"),
+          eq(accounts.providerAccountId, account.providerAccountId),
+        ));
+    },
+
     /** أول دخول: نثبّت الدور من القائمة البيضاء مرة واحدة. */
     async createUser({ user }) {
       const email = user.email?.toLowerCase();

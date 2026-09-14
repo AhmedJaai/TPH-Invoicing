@@ -17,7 +17,7 @@ import {
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { driveForUser, downloadFile } from "@/lib/drive";
+import { DriveAuthExpiredError, driveForUser, downloadFile, isDriveAuthError } from "@/lib/drive";
 import { extractDocument, isSupportedUpload } from "@/lib/extraction";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import {
@@ -116,6 +116,9 @@ async function handle(request: Request) {
     try {
       ({ data, mimeType } = await downloadFile(driveForUser(tokenRow.token), row.driveFileId));
     } catch (e) {
+      if (isDriveAuthError(e)) {
+        return NextResponse.json({ error: new DriveAuthExpiredError().message }, { status: 428 });
+      }
       return NextResponse.json(
         { error: `تعذّر تنزيل الكشف من الدرايف: ${(e as Error).message}` },
         { status: 502 },

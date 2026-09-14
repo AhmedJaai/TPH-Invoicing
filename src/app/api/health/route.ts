@@ -11,6 +11,9 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { activeProviderName } from "@/lib/extraction";
 import { deepseekBaseUrl, deepseekKey } from "@/lib/ai/models";
+import { createOAuthClient } from "@/lib/drive";
+import { accounts } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 import { isAuthBypassed } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -102,6 +105,31 @@ export async function GET() {
     }
   }
 
+  /*
+    ورمزُ الدرايف: كان منتهياً والمزامنة تقول «لا جديد» والفحص أخضر.
+    فللمخوَّل وحده يُجدَّد رمزُه — قراءةٌ لا تمسّ الأرشيف.
+  */
+  let driveToken: { ok: boolean; error?: string } | undefined;
+  if (detailed && viewer) {
+    const [row] = await db
+      .select({ token: accounts.refresh_token })
+      .from(accounts)
+      .where(and(eq(accounts.userId, viewer.id), eq(accounts.provider, "google")))
+      .limit(1);
+    if (!row?.token) {
+      driveToken = { ok: false, error: "لا رمز درايف لهذا الحساب" };
+    } else {
+      try {
+        const client = createOAuthClient();
+        client.setCredentials({ refresh_token: row.token });
+        const t = await client.getAccessToken();
+        driveToken = t.token ? { ok: true } : { ok: false, error: "لم يصدر رمز وصول" };
+      } catch (e) {
+        driveToken = { ok: false, error: (e as Error).message.slice(0, 80) };
+      }
+    }
+  }
+
   if (!detailed) {
     return NextResponse.json(
       { healthy, at: new Date().toISOString() },
@@ -110,7 +138,11 @@ export async function GET() {
   }
 
   return NextResponse.json(
-    { healthy: healthy && (providerReachable?.ok ?? true), checks: { ...checks, providerReachable }, at: new Date().toISOString() },
+    {
+      healthy: healthy && (providerReachable?.ok ?? true) && (driveToken?.ok ?? true),
+      checks: { ...checks, providerReachable, driveToken },
+      at: new Date().toISOString(),
+    },
     { status: healthy ? 200 : 503 },
   );
 }

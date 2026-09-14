@@ -102,6 +102,44 @@ export async function listChildren(
 
 export const isFolder = (f: DriveFile): boolean => f.mimeType === FOLDER_MIME;
 
+/**
+ * تفويضُ الدرايف انتهى أو أُلغي.
+ *
+ * وقع فعلاً: رمزُ التجديد المخزَّن صار يُردّ بـ`invalid_grant`، ومشيُ
+ * الأرشيف كان يبتلع كلّ خطأٍ عند مجلّد السنة («سنة غير مهيّأة») —
+ * فتقول الشاشة «٠ ملفّات جديدة» والدرايف لم يُقرأ منه حرف. والصمتُ هنا
+ * أسوأ من العطب: يُطمئن صاحب العمل إلى أنّ أرشيفه كلّه مقيَّد.
+ */
+export class DriveAuthExpiredError extends Error {
+  constructor() {
+    super(
+      "انتهى تفويض الدرايف فلم يُقرأ منه شيء — سجّل الخروج ثمّ الدخول بحساب جوجل ووافق على صلاحية الدرايف، ثمّ أعد الفحص.",
+    );
+    this.name = "DriveAuthExpiredError";
+  }
+}
+
+interface GoogleishError {
+  message?: string;
+  code?: number | string;
+  status?: number;
+  response?: { status?: number; data?: { error?: string } };
+}
+
+/** رمزٌ مُلغى أو منتهٍ، أو اعتمادٌ مرفوض — لا «ملفٌّ غير موجود». */
+export function isDriveAuthError(e: unknown): boolean {
+  const err = (e ?? {}) as GoogleishError;
+  const text = `${err.message ?? ""} ${err.response?.data?.error ?? ""}`;
+  if (/invalid_grant|invalid_client|unauthorized_client|invalid credentials|login required/i.test(text)) return true;
+  return err.code === 401 || err.status === 401 || err.response?.status === 401;
+}
+
+/** المجلّد أو الملفّ غير موجود — وهذا وحده يُتخطّى بصمت. */
+export function isDriveNotFound(e: unknown): boolean {
+  const err = (e ?? {}) as GoogleishError;
+  return err.code === 404 || err.status === 404 || err.response?.status === 404;
+}
+
 /** عميل درايف بصلاحية مستخدم بعينه — الرفع يتم باسمه لا باسم حساب مشترك. */
 export function driveForUser(refreshToken: string): drive_v3.Drive {
   const auth = createOAuthClient();
@@ -255,7 +293,9 @@ export async function getFileMeta(
       modifiedTime: f.modifiedTime ?? undefined,
       parents: f.parents ?? undefined,
     };
-  } catch {
+  } catch (e) {
+    /* الغائب يُتخطّى، أمّا التفويض المنتهي فيُعلَن — لا يُقرأ «غير موجود» */
+    if (isDriveAuthError(e)) throw new DriveAuthExpiredError();
     return null;
   }
 }

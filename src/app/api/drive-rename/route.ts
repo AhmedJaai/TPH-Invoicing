@@ -21,7 +21,7 @@ import { eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, statements, suppliers } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { driveForUser, renameFile } from "@/lib/drive";
+import { DriveAuthExpiredError, driveForUser, isDriveAuthError, renameFile } from "@/lib/drive";
 import { canonicalName, type NamedDocument } from "@/lib/canonical-name";
 import { recordAudit } from "@/lib/audit";
 import { refreshTokenFor } from "@/services/drive.service";
@@ -159,6 +159,7 @@ export async function POST(request: Request) {
 
   const done: { from: string; to: string }[] = [];
   const failed: { from: string; error: string }[] = [];
+  let authExpired = false;
 
   for (const t of targets) {
     let renamedInDrive = false;
@@ -176,6 +177,11 @@ export async function POST(request: Request) {
         الدرايف وتعذّر قيدُه عندنا فهو **تسميةٌ وقعت**: تُسجَّل في الأثر
         بالاسمين، وإلّا بقي في الأرشيف تغييرٌ لا يعرف أحدٌ مصدره.
       */
+      /* التفويض المنتهي يوقف البقيّة — كلُّها ستُردّ بالسبب نفسه */
+      if (!renamedInDrive && isDriveAuthError(e)) {
+        authExpired = true;
+        break;
+      }
       if (renamedInDrive) done.push({ from: t.doc.fileName, to: t.proposed });
       failed.push({
         from: t.doc.fileName,
@@ -200,6 +206,10 @@ export async function POST(request: Request) {
       },
     });
   }
+  if (authExpired && done.length === 0) {
+    return NextResponse.json({ error: new DriveAuthExpiredError().message }, { status: 428 });
+  }
+
 
   return NextResponse.json({
     ok: true,

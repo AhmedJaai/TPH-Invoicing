@@ -5,7 +5,7 @@
  * السكربت عن سلوك التطبيق. قراءة فقط — لا حذف ولا نقل ولا تعديل.
  */
 import type { drive_v3 } from "googleapis";
-import { isFolder, listChildren, type DriveFile } from "./drive";
+import { DriveAuthExpiredError, isDriveAuthError, isDriveNotFound, isFolder, listChildren, type DriveFile } from "./drive";
 import { driveConfig, SUPPLIER_INFO_CARD } from "@/config/drive";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -80,9 +80,14 @@ export async function walkArchive(
     let months: DriveFile[];
     try {
       months = await listChildren(drive, yearFolderId);
-    } catch {
-      // سنة غير مهيّأة في الدرايف بعد — ليست خطأً يوقف المزامنة
-      continue;
+    } catch (e) {
+      /*
+        السنة غير المهيّأة وحدها تُتخطّى. وكان كلُّ خطأٍ يُتخطّى هنا —
+        فرمزٌ منتهٍ صار «لا ملفّات جديدة» ولم يُقرأ من الدرايف شيء.
+      */
+      if (isDriveAuthError(e)) throw new DriveAuthExpiredError();
+      if (isDriveNotFound(e)) continue;
+      throw e;
     }
 
     for (const month of months.filter(isFolder)) {

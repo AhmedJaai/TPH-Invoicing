@@ -8,14 +8,18 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts } from "@/db/schema";
 import { driveConfig } from "@/config/drive";
-import { driveForUser, existingNamesIn, findOrCreateFolder, uploadFile } from "@/lib/drive";
+import { driveForUser, existingNamesIn, findOrCreateFolder, isDriveAuthError, uploadFile } from "@/lib/drive";
 import { resolveNameCollision } from "@/lib/naming";
 import { previewAllowed } from "@/lib/preview-mode";
 
 /** خطأ يُترجم في الواجهة إلى ٤٢٨: لا تفويض درايف لهذا المستخدم. */
 export class NoDriveAuthorizationError extends Error {
-  constructor() {
-    super("لا يوجد تفويض درايف لحسابك. سجّل الخروج ثم الدخول ووافق على صلاحية الدرايف.");
+  constructor(expired = false) {
+    super(
+      expired
+        ? "انتهى تفويض الدرايف فلم يُرفع الملف ولم يُقيَّد شيء — سجّل الخروج ثمّ الدخول بحساب جوجل ووافق على صلاحية الدرايف."
+        : "لا يوجد تفويض درايف لحسابك. سجّل الخروج ثم الدخول ووافق على صلاحية الدرايف.",
+    );
     this.name = "NoDriveAuthorizationError";
   }
 }
@@ -101,6 +105,7 @@ export async function archiveToDrive(input: ArchiveToDriveInput): Promise<Archiv
     };
   } catch (e) {
     if (e instanceof UnknownYearError) throw e;
+    if (isDriveAuthError(e)) throw new NoDriveAuthorizationError(true);
     throw new DriveUnavailableError((e as Error).message);
   }
 }
