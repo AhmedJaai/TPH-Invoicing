@@ -6,6 +6,7 @@
  */
 import { google, type drive_v3 } from "googleapis";
 import { OAuth2Client } from "google-auth-library";
+import { openToken } from "./token-crypto";
 
 export const DRIVE_SCOPE_READONLY = "https://www.googleapis.com/auth/drive.readonly";
 export const DRIVE_SCOPE_FULL = "https://www.googleapis.com/auth/drive";
@@ -49,7 +50,7 @@ export async function driveForCli(
     );
   }
   const auth = createOAuthClient();
-  auth.setCredentials({ refresh_token: token });
+  auth.setCredentials({ refresh_token: openToken(token) });
   return google.drive({ version: "v3", auth });
 }
 
@@ -60,7 +61,7 @@ export function driveFromEnv(): drive_v3.Drive {
     throw new Error("GOOGLE_DRIVE_REFRESH_TOKEN غير مضبوط. شغّل: npm run drive:auth");
   }
   const auth = createOAuthClient();
-  auth.setCredentials({ refresh_token: token });
+  auth.setCredentials({ refresh_token: openToken(token) });
   return google.drive({ version: "v3", auth });
 }
 
@@ -143,7 +144,7 @@ export function isDriveNotFound(e: unknown): boolean {
 /** عميل درايف بصلاحية مستخدم بعينه — الرفع يتم باسمه لا باسم حساب مشترك. */
 export function driveForUser(refreshToken: string): drive_v3.Drive {
   const auth = createOAuthClient();
-  auth.setCredentials({ refresh_token: refreshToken });
+  auth.setCredentials({ refresh_token: openToken(refreshToken) });
   return google.drive({ version: "v3", auth });
 }
 

@@ -20,8 +20,7 @@ import {
 } from "@/lib/expenses";
 import { countNoun, ITEM } from "@/lib/arabic";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
-import { NoAccess } from "@/components/ui";
-import { ScrollX } from "@/components/scroll-x";
+import { NoAccess, DataTable } from "@/components/ui";
 import { ExpenseReclassify } from "@/components/expense-reclassify";
 
 export const dynamic = "force-dynamic";
@@ -193,38 +192,28 @@ export default async function ExpensesPage({
         {variance.length === 0 ? (
           <Empty message="لا بيانات لهذا الشهر." />
         ) : (
-          <ScrollX className="rounded-2xl border border-line shadow-raised">
-            <table className="w-full min-w-[34rem] text-xs">
-              <thead className="sticky top-0 bg-sunken text-muted">
-                <tr>
-                  <th className="px-3 py-2 text-start font-medium">الباب</th>
-                  {/* المال يُصفّ على آخر خانةٍ منه — `text-end` في العربية يسار */}
-                  <th className="px-3 py-2 text-start font-medium">المتوقَّع</th>
-                  <th className="px-3 py-2 text-start font-medium">الفعليّ</th>
-                  <th className="px-3 py-2 text-start font-medium">الفرق</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {variance.map((v) => (
-                  <tr key={v.category}>
-                    <td className="px-3 py-2">{v.label}</td>
-                    <td className="nums-col px-3 py-2">
-                      {v.expectedMinor === 0 ? <span className="text-muted">لم يُتوقَّع</span> : <Money minor={v.expectedMinor} />}
-                    </td>
-                    <td className="nums-col px-3 py-2"><Money minor={v.actualMinor} /></td>
-                    <td className="nums-col px-3 py-2 font-bold">
-                      <Money minor={v.varianceMinor} tone={v.varianceMinor > 0 ? "warn" : "ok"} />
-                      {v.variancePct !== null && (
-                        <span className="ms-1 text-[11px] font-normal text-muted">
-                          {v.variancePct > 0 ? "+" : ""}{Math.round(v.variancePct * 100)}٪
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </ScrollX>
+          <DataTable
+            rows={variance}
+            keyOf={(v) => v.category}
+            columns={[
+              { key: "category", header: "الباب", primary: true, cell: (v) => v.label },
+              { key: "expected", header: "المتوقَّع", numeric: true, cell: (v) => v.expectedMinor === 0 ? <span className="text-muted">لم يُتوقَّع</span> : <Money minor={v.expectedMinor} /> },
+              { key: "actual", header: "الفعليّ", numeric: true, cell: (v) => <Money minor={v.actualMinor} /> },
+              {
+                key: "variance", header: "الفرق", numeric: true,
+                cell: (v) => (
+                  <span className="font-bold">
+                    <Money minor={v.varianceMinor} tone={v.varianceMinor > 0 ? "warn" : "ok"} />
+                    {v.variancePct !== null && (
+                      <span className="ms-1 text-[11px] font-normal text-muted">
+                        {v.variancePct > 0 ? "+" : ""}{Math.round(v.variancePct * 100)}٪
+                      </span>
+                    )}
+                  </span>
+                ),
+              },
+            ]}
+          />
         )}
       </section>
 

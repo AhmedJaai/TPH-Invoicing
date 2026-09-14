@@ -10,10 +10,9 @@ import {
 } from "@/lib/cashflow";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { salesAvailable } from "@/lib/sales/connector";
-import { NoAccess } from "@/components/ui";
+import { NoAccess, DataTable } from "@/components/ui";
 import { TRANSACTION, countNoun } from "@/lib/arabic";
 import { isExpenseCategory, looksLikeGoodsPurchase } from "@/lib/expenses";
-import { ScrollX } from "@/components/scroll-x";
 
 export const dynamic = "force-dynamic";
 
@@ -156,30 +155,18 @@ export default async function FinancialStatementPage() {
         </div>
 
         {cash.months.length > 0 && (
-          <ScrollX className="mt-3 rounded-2xl border border-line shadow-raised">
-            <table className="w-full min-w-[32rem] text-sm">
-              <thead className="sticky top-0 bg-sunken text-xs text-muted">
-                <tr>
-                  <th className="px-3 py-2 text-start font-medium">الشهر</th>
-                  <th className="px-3 py-2 text-start font-medium">وارد</th>
-                  <th className="px-3 py-2 text-start font-medium">صادر</th>
-                  <th className="px-3 py-2 text-start font-medium">الصافي</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line bg-raised">
-                {cash.months.map((m) => (
-                  <tr key={m.month}>
-                    <td className="nums px-3 py-2.5 font-medium" dir="ltr">{m.month}</td>
-                    <td className="px-3 py-2.5"><Money minor={m.inMinor} tone="ok" /></td>
-                    <td className="px-3 py-2.5"><Money minor={m.outMinor} tone="warn" /></td>
-                    <td className="px-3 py-2.5 font-bold">
-                      <Money minor={m.netMinor} tone={m.netMinor >= 0 ? "ok" : "danger"} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </ScrollX>
+          <div className="mt-3">
+            <DataTable
+              rows={cash.months}
+              keyOf={(m) => m.month}
+              columns={[
+                { key: "month", header: "الشهر", primary: true, cell: (m) => <span className="nums" dir="ltr">{m.month}</span> },
+                { key: "in", header: "وارد", numeric: true, cell: (m) => <Money minor={m.inMinor} tone="ok" /> },
+                { key: "out", header: "صادر", numeric: true, cell: (m) => <Money minor={m.outMinor} tone="warn" /> },
+                { key: "net", header: "الصافي", numeric: true, cell: (m) => <span className="font-bold"><Money minor={m.netMinor} tone={m.netMinor >= 0 ? "ok" : "danger"} /></span> },
+              ]}
+            />
+          </div>
         )}
       </section>
 
@@ -231,37 +218,26 @@ export default async function FinancialStatementPage() {
             <Empty message="لا مصروفات متكرّرة مسجّلة ولا حركات مصنَّفة بعد." />
           </div>
         ) : (
-          <ScrollX className="mt-3 rounded-2xl border border-line shadow-raised">
-            <table className="w-full min-w-[34rem] text-sm">
-              <thead className="sticky top-0 bg-sunken text-xs text-muted">
-                <tr>
-                  <th className="px-3 py-2 text-start font-medium">البند</th>
-                  <th className="px-3 py-2 text-start font-medium">المتوقَّع شهرياً</th>
-                  <th className="px-3 py-2 text-start font-medium">الفعلي</th>
-                  <th className="px-3 py-2 text-start font-medium">الفرق</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line bg-raised">
-                {comparison.map((c) => (
-                  <tr key={c.category}>
-                    <td className="px-3 py-2.5">
-                      <p className="font-medium">{CATEGORY_LABEL[c.category] ?? c.category}</p>
-                      {c.expectedMinor > 0 && (
-                        <p className="text-[11px] text-muted">{c.label}</p>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {c.expectedMinor > 0 ? <Money minor={c.expectedMinor} /> : <span className="text-muted">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5"><Money minor={c.actualMinor} /></td>
-                    <td className="px-3 py-2.5 font-bold">
-                      <Money minor={c.varianceMinor} tone={c.overspent ? "warn" : "ok"} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </ScrollX>
+          <div className="mt-3">
+            <DataTable
+              rows={comparison}
+              keyOf={(c) => c.category}
+              columns={[
+                {
+                  key: "item", header: "البند", primary: true,
+                  cell: (c) => (
+                    <span>
+                      <span className="block font-medium">{CATEGORY_LABEL[c.category] ?? c.category}</span>
+                      {c.expectedMinor > 0 && <span className="block text-[11px] font-normal text-muted">{c.label}</span>}
+                    </span>
+                  ),
+                },
+                { key: "expected", header: "المتوقَّع شهرياً", numeric: true, cell: (c) => c.expectedMinor > 0 ? <Money minor={c.expectedMinor} /> : <span className="text-muted">—</span> },
+                { key: "actual", header: "الفعلي", numeric: true, cell: (c) => <Money minor={c.actualMinor} /> },
+                { key: "variance", header: "الفرق", numeric: true, cell: (c) => <span className="font-bold"><Money minor={c.varianceMinor} tone={c.overspent ? "warn" : "ok"} /></span> },
+              ]}
+            />
+          </div>
         )}
       </section>
     </PageShell>

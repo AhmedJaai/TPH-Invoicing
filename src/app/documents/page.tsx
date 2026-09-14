@@ -10,6 +10,7 @@ import { DOCUMENT, countNoun } from "@/lib/arabic";
 import { ScrollX } from "@/components/scroll-x";
 import { RejectDocument } from "@/components/reject-document";
 import { ConfirmDocument } from "@/components/confirm-document";
+import { DataTable } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -281,63 +282,44 @@ export default async function DocumentsPage({
           />
         </div>
       ) : (
-        <ScrollX className="mt-3 rounded-2xl border border-line shadow-raised">
-          <table className="w-full min-w-[46rem] text-sm">
-            <thead className="sticky top-0 bg-sunken text-xs text-muted">
-              <tr>
-                <th className="px-3 py-2 text-start font-medium">المستند</th>
-                <th className="px-3 py-2 text-start font-medium">النوع</th>
-                <th className="px-3 py-2 text-start font-medium">المورّد</th>
-                <th className="px-3 py-2 text-start font-medium">الشهر</th>
-                {showAmounts && <th className="px-3 py-2 text-start font-medium">المبلغ</th>}
-                <th className="px-3 py-2 text-start font-medium">الحالة</th>
-                <th className="px-3 py-2 text-start font-medium">الدرايف</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line bg-raised">
-              {rows.map((r) => {
-                const st = STATUS_LABEL[r.status] ?? { text: r.status, cls: "bg-sunken text-ink-soft" };
-                return (
-                  <tr key={r.id}>
-                    {/*
-                      كان العمود الأبرز اسمَ ملفّ الدرايف — ثمانيةً وأربعين
-                      حرفاً لاتينياً في جدولٍ عربيّ، وكلُّ ما فيه معروضٌ في
-                      أعمدةٍ إلى جانبه: المورّد والرقم والشهر والمبلغ. فهو
-                      تكرارٌ خالص يزاحم ما يُقرأ. والاسم يبقى في تلميح المرور
-                      وفي رابط «افتحه» — وكلاهما موجود.
-                    */}
-                    <td className="max-w-[22rem] px-3 py-2.5" title={r.fileName}>
-                      <p className="truncate text-sm font-medium">
-                        {r.supplierName ?? KIND_LABEL[r.kind] ?? "مستند"}
-                      </p>
-                      <p className="text-[11px] text-muted">
-                        {r.invoiceNumber ? (
-                          <span className="nums" style={{ unicodeBidi: "isolate" }}>
-                            {r.invoiceNumber}
-                          </span>
-                        ) : (
-                          "بلا رقم"
-                        )}
-                        {r.taxStatus === "INVALID" && <span className="text-danger"> · لا يصلح لخصم الضريبة</span>}
-                        {r.taxStatus === "UNKNOWN" && <span className="text-warn"> · لم تُقرأ ضريبته</span>}
-                      </p>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-ink-soft">
-                      {KIND_LABEL[r.kind] ?? r.kind}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs">{r.supplierName ?? "—"}</td>
-                    <td className="nums px-3 py-2.5 text-xs text-muted" dir="ltr">
-                      {r.periodMonth ?? "—"}
-                    </td>
-                    {showAmounts && (
-                      <td className="px-3 py-2.5">
-                        {r.totalMinor !== null ? <Money minor={r.totalMinor} /> : <span className="text-muted">—</span>}
-                      </td>
-                    )}
-                    <td className="px-3 py-2.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>
-                        {st.text}
-                      </span>
+        <div className="mt-3">
+          {/*
+            جدولٌ يصير بطاقات على الجوّال — كان عرضه ٤٦ ريم فيُسحب أفقيّاً.
+            والعمود الأبرز المورّدُ والرقم لا اسمُ ملفّ الدرايف: الاسم
+            يبقى في رابط «افتحه».
+          */}
+          <DataTable
+            rows={rows}
+            keyOf={(r) => r.id}
+            columns={[
+              {
+                key: "doc", header: "المستند", primary: true,
+                cell: (r) => (
+                  <span title={r.fileName}>
+                    <span className="block truncate font-medium">{r.supplierName ?? KIND_LABEL[r.kind] ?? "مستند"}</span>
+                    <span className="block text-[11px] font-normal text-muted">
+                      {r.invoiceNumber ? <span className="nums" style={{ unicodeBidi: "isolate" }}>{r.invoiceNumber}</span> : "بلا رقم"}
+                      {r.taxStatus === "INVALID" && <span className="text-danger"> · لا يصلح لخصم الضريبة</span>}
+                      {r.taxStatus === "UNKNOWN" && <span className="text-warn"> · لم تُقرأ ضريبته</span>}
+                    </span>
+                  </span>
+                ),
+              },
+              { key: "kind", header: "النوع", secondary: true, cell: (r) => <span className="text-ink-soft">{KIND_LABEL[r.kind] ?? r.kind}</span> },
+              { key: "month", header: "الشهر", cell: (r) => <span className="nums text-muted" dir="ltr">{r.periodMonth ?? "—"}</span> },
+              ...(showAmounts
+                ? [{
+                    key: "amount", header: "المبلغ", numeric: true,
+                    cell: (r: (typeof rows)[number]) => r.totalMinor !== null ? <Money minor={r.totalMinor} /> : <span className="text-muted">—</span>,
+                  }]
+                : []),
+              {
+                key: "status", header: "الحالة",
+                cell: (r) => {
+                  const st = STATUS_LABEL[r.status] ?? { text: r.status, cls: "bg-sunken text-ink-soft" };
+                  return (
+                    <span className="block">
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>{st.text}</span>
                       {/* ما ينتظر قراراً له فعلٌ في موضعه — لا «راجعه» بلا زرّ */}
                       {canDecide && ["PENDING", "EXTRACTED", "NEEDS_REVIEW"].includes(r.status) && (
                         <span className="mt-1 flex flex-wrap gap-1.5">
@@ -345,27 +327,21 @@ export default async function DocumentsPage({
                           <RejectDocument documentId={r.id} />
                         </span>
                       )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {r.driveFileId ? (
-                        <a
-                          href={driveUrl(r.driveFileId)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs underline underline-offset-4 hover:text-ink"
-                        >
-                          افتحه
-                        </a>
-                      ) : (
-                        <span className="text-xs text-muted">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </ScrollX>
+                    </span>
+                  );
+                },
+              },
+              {
+                key: "drive", header: "الدرايف",
+                cell: (r) => r.driveFileId ? (
+                  <a href={driveUrl(r.driveFileId)} target="_blank" rel="noreferrer" className="underline underline-offset-4 hover:text-ink">
+                    افتحه
+                  </a>
+                ) : <span className="text-muted">—</span>,
+              },
+            ]}
+          />
+        </div>
       )}
 
       {pages > 1 && (

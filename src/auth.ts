@@ -15,6 +15,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, sessions, users, verificationTokens } from "@/db/schema";
 import { allowlist, type Role } from "@/lib/permissions";
+import { sealToken } from "@/lib/token-crypto";
 
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 
@@ -124,7 +125,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id_token: account.id_token ?? null,
           token_type: account.token_type ?? null,
           /* جوجل لا تُعيد رمز التجديد في كلّ دخول — لا يُمحى القائم بفراغ */
-          ...(account.refresh_token ? { refresh_token: account.refresh_token } : {}),
+          /* ويُشفَّر إن ضُبط TOKEN_ENCRYPTION_KEY — فمن قرأ القاعدة لا يملك الدرايف */
+          ...(account.refresh_token ? { refresh_token: sealToken(account.refresh_token) } : {}),
         })
         .where(and(
           eq(accounts.provider, "google"),

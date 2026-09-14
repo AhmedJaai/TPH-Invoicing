@@ -12,6 +12,7 @@ import { can } from "@/lib/permissions";
 import { activeProviderName } from "@/lib/extraction";
 import { deepseekBaseUrl, deepseekKey } from "@/lib/ai/models";
 import { createOAuthClient } from "@/lib/drive";
+import { openToken } from "@/lib/token-crypto";
 import { accounts } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { isAuthBypassed } from "@/lib/session";
@@ -121,7 +122,7 @@ export async function GET() {
     } else {
       try {
         const client = createOAuthClient();
-        client.setCredentials({ refresh_token: row.token });
+        client.setCredentials({ refresh_token: openToken(row.token) });
         const t = await client.getAccessToken();
         driveToken = t.token ? { ok: true } : { ok: false, error: "لم يصدر رمز وصول" };
       } catch (e) {

@@ -147,6 +147,9 @@ npm run drive:migrate -- --commit   # الكتابة فعلاً
 > والمقهى نشاطٌ تجاريّ، فالخطّة المناسبة Pro. ويُنشَر اليوم من سطر الأوامر
 > (`vercel --prod`) لا من ربط GitHub — فالنشر لا ينتظر CI.
 >
+> **رمز الدرايف يُشفَّر** إن ضُبط `TOKEN_ENCRYPTION_KEY` (٣٢ حرفاً فأكثر) في
+> Vercel وفي `.env` بالقيمة نفسها، ثمّ خروجٌ ودخول — انظر `SECURITY.md` §٣·١.
+>
 > **والتطوير يكتب في قاعدة الإنتاج** ما لم يُضبط `DATABASE_URL` في
 > `.env.local` على فرعٍ من Neon. و`npm run ops:isolation` يرفض ذلك حين
 > يُقَرّ معرّف الإنتاج في `ops-attestation.json`.

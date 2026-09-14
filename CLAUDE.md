@@ -164,6 +164,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | `src/services/month-guard.ts` | `assertMonthsOpen(tx, months)` — في `createPayment` و`allocate` و`createInvoice`، ومؤثِّرات ٠٢٨ خلفه |
 | `src/lib/bank/statement-balances.ts` | رصيدا كلّ شهرٍ من عمود الرصيد، إن استقامت السلسلة — وإلّا مجهول |
 | `src/lib/riyadh-time.ts` | «اليوم» و«الشهر الجاري» بتوقيت الرياض — لا `toISOString().slice(0, 7)` |
+| `src/lib/token-crypto.ts` | رمز الدرايف مشفَّراً (`sealToken`/`openToken`) — يُفعَّل بـ`TOKEN_ENCRYPTION_KEY`، وبلا مفتاحٍ لا يتغيّر شيء. **كلّ `setCredentials` يمرّ بـ`openToken`** |
 | `src/services/guard.ts` | `guard(route, capability)` + `respondTo(e)` → 401/403/429. **مدخل كل واجهة** |
 
 ## القرارات وأسبابها
@@ -345,7 +346,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 
 ## الأوامر
 
-`npm test` (١٧٩٥ اختباراً · ١٠١ ملفاً) · `npm run typecheck` · `npm run lint`
+`npm test` (١٨٠١ اختباراً · ١٠٢ ملفاً) · `npm run typecheck` · `npm run lint`
 `npm run db:migrate` · `db:verify` · `db:dedupe` · `db:rematch` · `db:reclassify` · `db:learn` · `db:link` · `db:split-check`
 `npm run db:expenses` · `db:audit` · `db:measure` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules` · `db:repair-scope` · `db:identity` · `db:unpaid`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`
