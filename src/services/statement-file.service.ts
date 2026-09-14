@@ -76,7 +76,14 @@ export async function readStatementFile(
       واسم البنك للعرض والأثر.
     */
     const detected = detectBank({
-      text: [...parsed.rows.slice(0, 5).map((r) => r.description), parsed.accountNumber ?? ""].join(" "),
+      /*
+        ما بعد `BENBK`/`BEN ID` بنكُ المستفيد لا بنكُ الكشف — حوالةٌ إلى
+        حسابٍ في الراجحي كانت تنسب الكشف كلّه إلى الراجحي.
+      */
+      text: [
+        ...parsed.rows.slice(0, 5).map((r) => r.description.split(/\bBEN\s*BK|\bBEN\s*ID/i)[0]),
+        parsed.accountNumber ?? "",
+      ].join(" "),
       fileName,
     });
     return {

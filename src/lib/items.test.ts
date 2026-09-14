@@ -77,10 +77,20 @@ describe("كشف تغيّر السعر", () => {
     expect(c!.previousMinor).toBe(1000);
   });
 
-  it("لا يقسم على صفر", () => {
+  it("لا يقسم على صفر — والنسبة من صفرٍ مجهولةٌ لا صفر", () => {
     const c = detectPriceChange([at("2026-07-01", 0), at("2026-08-01", 500)]);
-    expect(c!.deltaRatio).toBe(0);
-    expect(Number.isFinite(c!.deltaRatio)).toBe(true);
+    expect(c!.deltaRatio).toBeNull();
+    expect(c!.deltaMinor).toBe(500);
+  });
+});
+
+describe("الفاصلة العشرية في وصف الصنف", () => {
+  it("«١٫٥ لتر» و«1.5 لتر» صنفٌ واحد", () => {
+    expect(normalizeItem("حليب ١٫٥ لتر")).toBe(normalizeItem("حليب 1.5 لتر"));
+  });
+
+  it("ولا تلتقي بـ«١٥ لتر»", () => {
+    expect(normalizeItem("حليب ١٫٥ لتر")).not.toBe(normalizeItem("حليب ١٥ لتر"));
   });
 });
 

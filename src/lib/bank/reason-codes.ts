@@ -98,8 +98,12 @@ export function auditReasons(
   const refuted: ReasonCode[] = [];
   const unknown: string[] = [];
 
+  /* الدليل المكرَّر دليلٌ واحد — تكرارُه ثلاثاً كان يرفع نسبة ما صحّ */
+  const seen = new Set<string>();
   for (const raw of claimed) {
     const code = raw.trim().toUpperCase() as ReasonCode;
+    if (seen.has(code)) continue;
+    seen.add(code);
     if (!ALL_REASON_CODES.includes(code)) {
       unknown.push(raw);
       continue;

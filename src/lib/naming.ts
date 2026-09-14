@@ -252,8 +252,12 @@ export function buildInvoiceFileName(
   return withSuffix(base, o.extension ?? "pdf", o.duplicateIndex);
 }
 
-export function buildStatementFileName(o: BuildOptions & { slug: string }): string {
-  const base = `${o.date}_${o.slug}_Statement_SAR${formatRiyals(o.amountMinor)}`;
+export function buildStatementFileName(
+  o: Omit<BuildOptions, "amountMinor"> & { slug: string; amountMinor?: number },
+): string {
+  /* الكشف بلا رصيدٍ مقروء يُسمَّى بلا مبلغ — لا يُكتب له صفر */
+  const amount = o.amountMinor === undefined ? "" : `_SAR${formatRiyals(o.amountMinor)}`;
+  const base = `${o.date}_${o.slug}_Statement${amount}`;
   return withSuffix(base, o.extension ?? "pdf", o.duplicateIndex);
 }
 

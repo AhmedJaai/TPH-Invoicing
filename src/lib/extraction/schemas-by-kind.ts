@@ -12,14 +12,14 @@
  * نوعه وحده. والتصنيف رخيص لأنّه سؤالٌ واحد.
  */
 import { z } from "zod";
-import { DOCUMENT_KINDS, invoiceLineSchema, statementLineSchema, moneyString } from "./schema";
+import { DOCUMENT_KINDS, confidenceScore, invoiceLineSchema, statementLineSchema, moneyString } from "./schema";
 
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
 /** المرحلة الأولى: ما هذا المستند؟ */
 export const classifierSchema = z.object({
   documentKind: z.enum(DOCUMENT_KINDS).describe("نوع المستند"),
-  confidence: z.number().describe("ثقتك في التصنيف بين 0 و 1"),
+  confidence: confidenceScore.describe("ثقتك في التصنيف بين 0 و 1"),
   reason: z.string().describe("لماذا صنّفته هكذا، بجملة قصيرة"),
 });
 
@@ -33,11 +33,11 @@ const partiesShape = {
 const confidenceShape = {
   confidence: z
     .object({
-      supplierName: z.number(),
-      invoiceNumber: z.number(),
-      invoiceDate: z.number(),
-      amounts: z.number(),
-      vatNumbers: z.number(),
+      supplierName: confidenceScore,
+      invoiceNumber: confidenceScore,
+      invoiceDate: confidenceScore,
+      amounts: confidenceScore,
+      vatNumbers: confidenceScore,
     })
     .describe("ثقتك في كل مجموعة بين 0 و 1. كن صادقاً: الحقل غير الواضح ثقته منخفضة."),
   notes: z.string().describe("ملاحظة قصيرة عن أي غموض أو تلف، أو فارغ"),

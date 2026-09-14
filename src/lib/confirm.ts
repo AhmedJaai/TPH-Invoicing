@@ -120,7 +120,8 @@ export function reviewConfirmed(
     });
   }
 
-  if (fields.totalMinor === null || fields.totalMinor === undefined) {
+  /* الكشف يُقيَّد ولو لم يُقرأ رصيده — هويّته مورّدُه وفترتُه */
+  if ((fields.totalMinor === null || fields.totalMinor === undefined) && kind !== "STATEMENT") {
     findings.push({
       code: ISSUE.LOW_CONFIDENCE_FIELD,
       severity: "BLOCKER",

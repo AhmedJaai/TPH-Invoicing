@@ -27,6 +27,8 @@ export interface PdfExtraction {
    * تُعالَج بصمت بإرجاع صفوف فارغة.
    */
   hasText: boolean;
+  /** بلغ الملفّ سقف الصفحات المقروءة نصّاً — وما بعده لم يُقرأ. */
+  pagesTruncated?: boolean;
 }
 
 /** أقلّ عدد كلمات يُعتدّ به نصّاً — ما دونه ملفٌّ مصوَّر أو غلاف. */
@@ -43,6 +45,9 @@ interface TextItem {
  * تُحمَّل `unpdf` عند الطلب لا عند بدء التطبيق: هي ثقيلة، وأكثر
  * الكشوف جداول لا PDF، فلا يُدفَع ثمنه إلّا عند الحاجة.
  */
+/** أكثرُ ما يُقرأ نصّاً من ملفٍّ واحد — كشفُ سنةٍ لا يبلغه. */
+export const MAX_TEXT_PAGES = 60;
+
 export async function extractPdfWords(buffer: Buffer): Promise<PdfExtraction> {
   /*
     `unpdf` لا `pdfjs-dist` مباشرةً.
@@ -66,7 +71,13 @@ export async function extractPdfWords(buffer: Buffer): Promise<PdfExtraction> {
 
   const words: PdfWord[] = [];
 
-  for (let page = 1; page <= doc.numPages; page++) {
+  /*
+    سقفٌ للصفحات يُعلَن — ملفٌّ بآلاف الصفحات كان يُقرأ كلّه داخل الطلب
+    ثمّ يُقتل بمهلة المنصّة صامتاً. والمستند يُحرَّر في `finally`.
+  */
+  const pages = Math.min(doc.numPages, MAX_TEXT_PAGES);
+  try {
+  for (let page = 1; page <= pages; page++) {
     const content = await (await doc.getPage(page)).getTextContent();
     for (const item of content.items as TextItem[]) {
       const text = item.str?.trim();
@@ -80,7 +91,16 @@ export async function extractPdfWords(buffer: Buffer): Promise<PdfExtraction> {
     }
   }
 
-  return { words, pageCount: doc.numPages, hasText: words.length >= MIN_WORDS };
+  } finally {
+    await doc.destroy().catch(() => undefined);
+  }
+
+  return {
+    words,
+    pageCount: doc.numPages,
+    hasText: words.length >= MIN_WORDS,
+    pagesTruncated: doc.numPages > MAX_TEXT_PAGES,
+  };
 }
 
 /**

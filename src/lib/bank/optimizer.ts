@@ -150,6 +150,18 @@ export function reconcile(claims: readonly Claim[]): Reconciliation {
   */
   if (exhausted || bestScore < 0) {
     const fallback = greedy(groups);
+    /*
+      وما وجده البحث قبل النفاد لا يُرمى إن كان أعلى من الجشع — كان
+      يُرجَع حلٌّ مجموعه ٩٥ وفي اليد ١٨٧. ويبقى `exact: false` في الحالين.
+    */
+    const fallbackScore = fallback.assigned.reduce((s, a) => s + a.candidate.score, 0);
+    if (bestScore > fallbackScore) {
+      const found = new Map<string, Claim>();
+      bestChoice.forEach((claim, i) => {
+        if (claim) found.set(groups[i].transactionId, claim);
+      });
+      return { ...collect(groups, found), exact: false };
+    }
     return { ...fallback, exact: false };
   }
 

@@ -20,6 +20,7 @@ import { ISSUE, ISSUE_TEXT } from "@/lib/issue-codes";
 import { SERVICE_FOLDERS } from "@/config/drive";
 import type { ExtractionResult } from "./schema";
 import type { SupplierMatch, SupplierRecord } from "@/lib/supplier-match";
+import { isCalendarDate } from "./validate-extraction";
 
 export interface PipelineInput {
   extraction: ExtractionResult;
@@ -60,7 +61,6 @@ export interface PipelineResult {
   canArchive: boolean;
 }
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function extensionOf(fileName: string): string {
   const dot = fileName.lastIndexOf(".");
@@ -99,7 +99,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   const subtotalMinor = parseRiyals(x.subtotalAmount) ?? undefined;
   const vatMinor = parseRiyals(x.vatAmount) ?? undefined;
   const totalMinor = parseRiyals(x.totalAmount) ?? undefined;
-  const invoiceDate = DATE_RE.test(x.invoiceDate) ? x.invoiceDate : undefined;
+  const invoiceDate = isCalendarDate(x.invoiceDate) ? x.invoiceDate : undefined;
   const invoiceNumber = x.invoiceNumber.trim() || undefined;
 
   const isPaymentDoc = x.documentKind === "RECEIPT" || x.documentKind === "CASH_RECEIPT";
@@ -223,6 +223,18 @@ export function runPipeline(input: PipelineInput): PipelineResult {
         });
       }
     }
+  } else if (invoiceDate && x.documentKind === "STATEMENT") {
+    /*
+      الكشف يُقيَّد ولو لم يُقرأ رصيده — هويّته مورّدُه وفترتُه. كان
+      الرفع يمنعه ومسار الدرايف يقبله، فيظهر المورّد في «لم يصل كشفه».
+    */
+    const date = new Date(`${invoiceDate}T00:00:00Z`);
+    periodMonth = monthOf(date);
+    proposedFolderName = match.supplier?.driveFolderName ?? SERVICE_FOLDERS.OTHER;
+    const slug = match.supplier?.slug ?? toSlugToken(x.supplierNameEn || x.supplierNameAr);
+    if (slug) {
+      proposedFileName = buildStatementFileName({ date: invoiceDate, slug, extension: ext });
+    }
   }
 
   if (!invoiceDate) {
@@ -232,7 +244,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
       message: "لم يُقرأ تاريخ المستند — لا يمكن تحديد الشهر بدونه",
     });
   }
-  if (amountForName === undefined) {
+  if (amountForName === undefined && x.documentKind !== "STATEMENT") {
     findings.push({
       code: ISSUE.LOW_CONFIDENCE_FIELD,
       severity: "BLOCKER",

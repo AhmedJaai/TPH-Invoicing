@@ -63,8 +63,8 @@ export default async function PerformancePage() {
   const lineCoverage = health.metrics.find((m) => m.id === "lines");
 
   const priceMoves = items
-    .filter((i) => i.priceChange && Math.abs(i.priceChange.deltaRatio) >= 0.03)
-    .sort((a, b) => Math.abs(b.priceChange!.deltaRatio) - Math.abs(a.priceChange!.deltaRatio));
+    .filter((i) => i.priceChange && i.priceChange.deltaRatio !== null && Math.abs(i.priceChange.deltaRatio) >= 0.03)
+    .sort((a, b) => Math.abs(b.priceChange!.deltaRatio!) - Math.abs(a.priceChange!.deltaRatio!));
   const priceMovesShown = priceMoves.slice(0, 25);
 
   const sameName = findSameNameCandidates(items);
@@ -139,7 +139,7 @@ export default async function PerformancePage() {
                 key: "delta", header: "التغيّر", numeric: true,
                 cell: (i) => {
                   const up = i.priceChange!.direction === "up";
-                  return <span className={`font-bold ${up ? "text-danger" : "text-ok"}`}>{up ? "▲" : "▼"} {Math.abs(Math.round(i.priceChange!.deltaRatio * 100))}٪</span>;
+                  return <span className={`font-bold ${up ? "text-danger" : "text-ok"}`}>{up ? "▲" : "▼"} {Math.abs(Math.round(i.priceChange!.deltaRatio! * 100))}٪</span>;
                 },
               },
             ]}

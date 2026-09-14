@@ -14,8 +14,13 @@ import { db } from "@/db";
 import { bankAccounts } from "@/db/schema";
 import { createId } from "@/lib/id";
 
-/** أقلّ عددٍ من الخانات يصلح لتمييز حساب. */
-export const MIN_ACCOUNT_DIGITS = 4;
+/**
+ * أقلّ عددٍ من الخانات يصلح لتمييز حساب.
+ *
+ * كان أربعاً — فـ«****2005» من بنكٍ وحسابٌ آخر ينتهي بـ2005 من بنكٍ آخر
+ * يصلان إلى صفٍّ واحد، ويندمج نطاقا حسابين فتبتلع الحركةُ أختها.
+ */
+export const MIN_ACCOUNT_DIGITS = 10;
 
 /**
  * يوحّد رقم الحساب: الفراغات والشرَط والأقواس عرضٌ لا معنى.
@@ -23,6 +28,8 @@ export const MIN_ACCOUNT_DIGITS = 4;
  */
 export function normalizeAccountNumber(raw: string | null | undefined): string | null {
   if (!raw) return null;
+  /* الرقم المحجوب لا يُعرِّف حساباً — ما بقي منه ذيلٌ يشترك فيه كثيرون */
+  if (/[*•xX]{2,}/.test(raw)) return null;
   const cleaned = raw.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
   const digits = cleaned.replace(/[^0-9]/g, "");
   if (digits.length < MIN_ACCOUNT_DIGITS) return null;

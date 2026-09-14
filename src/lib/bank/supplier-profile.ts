@@ -44,7 +44,7 @@ export interface SupplierProfile {
   sampleSize: number;
   /** وسيط المهلة — الوسيط لا المتوسّط: دفعةٌ متأخّرة شهرين لا تزيح العادة. */
   medianLagDays: number | null;
-  /** أوسع مهلة معتادة — الرُّبيع الأعلى. */
+  /** أوسع مهلة معتادة — المئين التسعون. */
   usualMaxLagDays: number | null;
   /** هل يُسدَّد جمعاً عادةً؟ */
   batches: boolean;

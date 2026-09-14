@@ -35,12 +35,20 @@ function latinDigits(value: string): string {
 export function normalizeItem(description: string): string {
   const base = latinDigits(description)
     .toLowerCase()
-    .replace(/[ً-ٰٟ]/g, "") // التشكيل
+    /*
+      الفاصلة العشرية العربية «٫» تُحوَّل قبل الحذف، وفاصل الآلاف «٬» يُسقَط —
+      كان نطاق التشكيل يشملهما فيصير «١٫٥ لتر» «15 l».
+    */
+    .replace(/(\d)[\u066B.,](\d)/g, "$1.$2")
+    .replace(/\u066C/g, "")
+    .replace(/[\u064B-\u065F\u0670]/g, "") // التشكيل — لا الأرقام ولا الفواصل
     .replace(/ـ/g, "") // التطويل
     .replace(/[أإآٱ]/g, "ا")
     .replace(/ى/g, "ي")
     .replace(/ة/g, "ه")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    /* النقطة تبقى بين رقمين وحدهما: «1.5» عددٌ واحد لا «1 5» */
+    .replace(/(?<!\d)\.|\.(?!\d)/g, " ")
+    .replace(/[^\p{L}\p{N}.]+/gu, " ")
     .trim();
 
   // يفصل الرقم عن الوحدة الملتصقة به: "2l" ← "2 l"
@@ -67,8 +75,8 @@ export interface PriceChange {
   /** السعر السابق له */
   previousMinor: number;
   deltaMinor: number;
-  /** نسبة التغيّر: 0.15 تعني ارتفاعاً بخمسة عشر بالمئة */
-  deltaRatio: number;
+  /** نسبة التغيّر: 0.15 تعني ارتفاعاً بخمسة عشر بالمئة — و`null` إن كان السابق صفراً */
+  deltaRatio: number | null;
   direction: "up" | "down";
   currentDate: Date;
   previousDate: Date;
@@ -94,7 +102,8 @@ export function detectPriceChange(history: readonly PricePoint[]): PriceChange |
     currentMinor: current.unitPriceMinor,
     previousMinor: previous.unitPriceMinor,
     deltaMinor,
-    deltaRatio: previous.unitPriceMinor === 0 ? 0 : deltaMinor / previous.unitPriceMinor,
+    /* النسبة من صفرٍ مجهولةٌ لا صفر — والصفر كان يُعرض «لا تغيير» */
+    deltaRatio: previous.unitPriceMinor === 0 ? null : deltaMinor / previous.unitPriceMinor,
     direction: deltaMinor > 0 ? "up" : "down",
     currentDate: current.date,
     previousDate: previous.date,

@@ -57,6 +57,17 @@ function quantity(v: string): number | null {
   return m ? Number(m[0]) : null;
 }
 
+/**
+ * يومٌ في التقويم لا شكلُه وحده — «2026-13-01» كان يُفسد الشهر
+ * («NaN-NaN»)، و«2026-02-30» ينقلب إلى مارس صامتاً.
+ */
+export function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+
 export function findConflicts(x: ExtractionResult): ExtractionConflict[] {
   const conflicts: ExtractionConflict[] = [];
 
@@ -79,11 +90,13 @@ export function findConflicts(x: ExtractionResult): ExtractionConflict[] {
   }
 
   /* ── التاريخ ── */
-  if (x.invoiceDate.trim() !== "" && !DATE_RE.test(x.invoiceDate)) {
+  if (x.invoiceDate.trim() !== "" && !isCalendarDate(x.invoiceDate)) {
     conflicts.push({
       code: "DATE_INVALID",
       fields: ["invoiceDate"],
-      message: `التاريخ «${x.invoiceDate}» ليس بصيغة YYYY-MM-DD`,
+      message: DATE_RE.test(x.invoiceDate)
+        ? `التاريخ «${x.invoiceDate}» ليس يوماً في التقويم`
+        : `التاريخ «${x.invoiceDate}» ليس بصيغة YYYY-MM-DD`,
     });
   }
 

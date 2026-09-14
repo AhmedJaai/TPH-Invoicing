@@ -282,8 +282,9 @@ async function handle(request: Request) {
           invoiceNumber: p.invoiceNumber!,
           invoiceDate: date,
           periodMonth: entry.month,
-          subtotalMinor: 0,
-          vatMinor: 0,
+          /* الاسم يعطي الإجماليّ وحده — الصافي والضريبة مجهولان لا صفر */
+          subtotalMinor: null,
+          vatMinor: null,
           totalMinor: p.amountMinor!,
         }).onConflictDoNothing();
         invoicesCreated++;

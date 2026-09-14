@@ -12,8 +12,8 @@ describe("توحيد رقم الحساب", () => {
       .toBe(normalizeAccountNumber("sa0380000000608010167519"));
   });
 
-  it("الرقم المحجوب يُقاس بما بقي منه", () => {
-    expect(normalizeAccountNumber("****2005")).toBe("2005");
+  it("الرقم المحجوب لا يُعرِّف حساباً — ذيلُه يشترك فيه كثيرون", () => {
+    expect(normalizeAccountNumber("****2005")).toBeNull();
     expect(normalizeAccountNumber("****")).toBeNull();
     expect(normalizeAccountNumber("**5")).toBeNull();
   });
@@ -24,9 +24,10 @@ describe("توحيد رقم الحساب", () => {
     expect(normalizeAccountNumber("  ")).toBeNull();
   });
 
-  it("أقلّ من أربع خانات لا يميّز حساباً", () => {
-    expect(MIN_ACCOUNT_DIGITS).toBe(4);
-    expect(normalizeAccountNumber("123")).toBeNull();
-    expect(normalizeAccountNumber("1234")).toBe("1234");
+  it("أقلّ من عشر خانات لا يميّز حساباً — كان أربعاً فاندمج حسابان", () => {
+    expect(MIN_ACCOUNT_DIGITS).toBe(10);
+    expect(normalizeAccountNumber("2005")).toBeNull();
+    expect(normalizeAccountNumber("123456789")).toBeNull();
+    expect(normalizeAccountNumber("1234567890")).toBe("1234567890");
   });
 });

@@ -169,8 +169,12 @@ async function handle(request: Request) {
     })
     .from(bankTransactions)
     .where(and(
-      gte(bankTransactions.valueDate, new Date(Math.min(...times))),
-      lte(bankTransactions.valueDate, new Date(Math.max(...times))),
+      /*
+        تُوسَّع النافذة أسبوعاً من كلّ طرف — حدُّ `statedValueDate` نفسه:
+        حركةٌ خُزّنت بتاريخ عمودها ويقول نصُّها غيره كانت تقع خارجها فتُدرَج ثانية.
+      */
+      gte(bankTransactions.valueDate, new Date(Math.min(...times) - 7 * 86_400_000)),
+      lte(bankTransactions.valueDate, new Date(Math.max(...times) + 7 * 86_400_000)),
     ));
 
   const knownRows: KnownRow[] = priorRows.map((r) => {

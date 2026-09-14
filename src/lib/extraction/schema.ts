@@ -1,8 +1,8 @@
 /**
  * مخطط استخراج بيانات المستند.
  *
- * يُمرَّر إلى Claude كمخرجات منظّمة، فيلتزم النموذج بالبنية حرفياً
- * ولا نحتاج تحليل نصّ حرّ ولا تخمين شكل الإجابة.
+ * يُوصَف لـDeepSeek في الموجِّه — المزوّد لا يفرض مخطّطاً صارماً — ثمّ
+ * يُتحقَّق من الجواب به بعد القراءة. فالبنية مفحوصةٌ لا مضمونة.
  */
 import { z } from "zod";
 
@@ -39,6 +39,18 @@ export const statementLineSchema = z.object({
   debit: moneyString.describe("المبلغ المحمَّل علينا (مدين)، أو فارغ"),
   credit: moneyString.describe("المبلغ المسدَّد منّا (دائن)، أو فارغ"),
 });
+
+/**
+ * ثقةٌ بين صفرٍ وواحد.
+ *
+ * كانت `z.number()` بلا حدّ، فثقةُ «95» من نموذجٍ كتبها نسبةً مئويّة تمرّ
+ * على أنّها أعلى من كلّ حدّ. فما بين ١ و١٠٠ يُقرأ نسبةً ويُقسَم، وما
+ * خرج عن ذلك يُردّ.
+ */
+export const confidenceScore = z.preprocess(
+  (v) => (typeof v === "number" && v > 1 && v <= 100 ? v / 100 : v),
+  z.number().min(0).max(1),
+);
 
 export const extractionSchema = z.object({
   documentKind: z
@@ -85,12 +97,12 @@ export const extractionSchema = z.object({
 
   confidence: z
     .object({
-      documentKind: z.number(),
-      supplierName: z.number(),
-      invoiceNumber: z.number(),
-      invoiceDate: z.number(),
-      amounts: z.number(),
-      vatNumbers: z.number(),
+      documentKind: confidenceScore,
+      supplierName: confidenceScore,
+      invoiceNumber: confidenceScore,
+      invoiceDate: confidenceScore,
+      amounts: confidenceScore,
+      vatNumbers: confidenceScore,
     })
     .describe("ثقتك في كل مجموعة حقول بين 0 و 1. كن صادقاً: الحقل غير الواضح ثقته منخفضة."),
 

@@ -1,18 +1,14 @@
 /**
  * قراءةُ جدولٍ من ملفٍّ يرفعه مستخدم — بحرسٍ حول `xlsx`.
  *
- * `xlsx@0.18.5` على npm فيه ثغرتان عاليتان **بلا إصلاحٍ على npm**:
- * تلويثُ النموذج الأوّليّ (`GHSA-4r6h-8v6p-xvw6`)، وحجبُ خدمةٍ بتعبيرٍ
- * نمطيّ (`GHSA-5pgg-2g8v-p4x9`). والمشروع يقرأ بها ملفّات **يرفعها
- * مستخدم** — وهو بالضبط مدخل الاستغلال.
+ * `xlsx@0.18.5` على npm فيه ثغرتان عاليتان (تلويثُ النموذج الأوّليّ
+ * `GHSA-4r6h-8v6p-xvw6`، وحجبُ خدمةٍ بتعبيرٍ نمطيّ `GHSA-5pgg-2g8v-p4x9`).
+ * **والمثبَّت اليوم 0.20.3 المُصلَحة** من موقع SheetJS (انظر `package.json`)
+ * — فالثغرتان مغلقتان في المصدر.
  *
- * **والإصلاح الحقيقي ليس هنا:** SheetJS خرجت من npm، والنسخة المُصلَحة
- * تُجلَب من موقعها:
- *
- *     npm install "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
- *
- * وهذا الملفّ حرسٌ يُقلّل الأثر حتى يقع ذلك، ويبقى نافعاً بعده —
- * فالحدود التي يفرضها صحيحةٌ في ذاتها.
+ * وهذا الملفّ يبقى لأنّ الحدود التي يفرضها صحيحةٌ في ذاتها: الملفّ
+ * يرفعه مستخدم، وورقةٌ بمليون صفّ كلفةٌ ولو لم يُرَد بها سوء. وما قُصّ
+ * يُعلَن — صفوفاً وأعمدةً وخلايا.
  *
  * ثلاثة حروس:
  *
@@ -84,7 +80,8 @@ export function readWorkbookSafely(buffer: Buffer): SafeWorkbook {
     type: "buffer",
     cellDates: false,
     /* يتوقّف التحليل عند الحدّ — لا يقرأ الكلّ ثمّ نقصّه */
-    sheetRows: MAX_ROWS,
+    /* صفٌّ زائد يُطلَب ليُعرَف أنّ الورقة أطول — لا ليُقرأ */
+    sheetRows: MAX_ROWS + 1,
     /* ولا حاجة إلى الصيغ ولا التنسيق ولا الخصائص: كلّها سطحُ هجومٍ بلا نفع */
     cellFormula: false,
     cellHTML: false,
@@ -104,21 +101,30 @@ export function readWorkbookSafely(buffer: Buffer): SafeWorkbook {
       header: 1, raw: false, defval: "",
     });
 
-    const rowsTruncated = raw.length >= MAX_ROWS;
+    const rowsTruncated = raw.length > MAX_ROWS;
     const clipped = raw.slice(0, MAX_ROWS);
 
     let colsTruncated = false;
+    let cellsTruncated = 0;
     const grid = clipped.map((row) => {
       const cells = Array.isArray(row) ? row : [];
       if (cells.length > MAX_COLS) colsTruncated = true;
       return cells.slice(0, MAX_COLS).map((c) => {
         const text = typeof c === "string" ? c : String(c ?? "");
-        return text.length > MAX_CELL_CHARS ? text.slice(0, MAX_CELL_CHARS) : text;
+        if (text.length > MAX_CELL_CHARS) {
+          cellsTruncated++;
+          return text.slice(0, MAX_CELL_CHARS);
+        }
+        return text;
       });
     });
 
     if (rowsTruncated) {
       warnings.push(`الورقة «${name}» أطول من ${MAX_ROWS} صفّاً — قُرئ أوّلُها فقط.`);
+    }
+    /* القصّ يُعلَن — وصفٌ مبتور بلا علمٍ يُطابَق على ما ليس فيه */
+    if (cellsTruncated > 0) {
+      warnings.push(`في الورقة «${name}» ${cellsTruncated} خليّةٌ أطول من ${MAX_CELL_CHARS} حرفاً — قُصّت.`);
     }
     if (colsTruncated) {
       warnings.push(`الورقة «${name}» أعرض من ${MAX_COLS} عموداً — قُرئ أوّلُها فقط.`);

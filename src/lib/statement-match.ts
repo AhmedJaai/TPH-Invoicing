@@ -45,7 +45,9 @@ export type LineStatus =
   | "DUPLICATE_LINE"
   | "REFERENCE_CONFLICT"
   | "CREDIT_NOTE"
-  | "PAYMENT";
+  | "PAYMENT"
+  /** طابقه حلٌّ تقريبيّ — نفدت ميزانيّة البحث فلم يُثبَت أنّه الأفضل */
+  | "APPROXIMATE";
 
 export interface LineMatch {
   line: StatementLineInput;
@@ -236,6 +238,8 @@ export function reconcileStatement(
       contested ? "REFERENCE_CONFLICT"
       : Math.abs(difference) > tolerance ? "AMOUNT_MISMATCH"
       : !dateClose ? "DATE_MISMATCH"
+      /* الحلّ التقريبيّ لا يُطابَق تلقائياً — يُعرَض ولا يُحفَظ «مطابَقاً» */
+      : !resolved.exact ? "APPROXIMATE"
       : "MATCHED";
 
     lines.push({

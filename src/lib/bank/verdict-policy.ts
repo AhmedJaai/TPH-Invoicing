@@ -124,6 +124,15 @@ export function weighVerdict(input: VerdictInput): VerdictDecision {
 
   /* ── ما يُسقِط الحكم إلى مراجعة ── */
 
+  /*
+    حكمٌ بلا دليلٍ واحد يُفحَص ليس «أثبت النموذج» — كان `null` يتخطّى شرط
+    الجودة فيصير اقتراحاً بثقة النموذج وحدها.
+  */
+  if (quality === null) {
+    reasons.push("لم يذكر النموذج دليلاً واحداً يُفحَص — فلا يُقترَح حكمه");
+    return { disposition: "REVIEW", reasons, signals };
+  }
+
   if (quality !== null && quality < MIN_EVIDENCE_QUALITY) {
     reasons.push("أكثر ما ادّعاه النموذج لم يقع — فلا يُقترَح حكمه");
     return { disposition: "REVIEW", reasons, signals };

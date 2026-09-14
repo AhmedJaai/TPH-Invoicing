@@ -265,7 +265,8 @@ function buildRows(
   const dates = rows.map((r) => r.valueDate.getTime());
 
   return {
-    bank: ctx.bank ?? "الأهلي (SNB)",
+    /* ما لم يُعرَف بنكُه لا يُنسَب إلى الأهليّ لأنّه الأكثر */
+    bank: ctx.bank ?? "بنك غير محدَّد",
     accountNumber: ctx.accountNumber,
     rows,
     warnings,

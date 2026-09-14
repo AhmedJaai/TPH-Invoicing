@@ -30,6 +30,9 @@ export interface SupplierIdentity {
   accounts?: readonly string[];
 }
 
+/** أقصرُ اسمٍ بديل يُقبَل احتواؤه دليلاً قاطعاً. */
+export const MIN_CONTAINED_ALIAS = 6;
+
 export type EvidenceKind = "ACCOUNT" | "ALIAS" | "NATIONAL_ID" | "NAME" | "TOKEN";
 
 export interface Evidence {
@@ -133,7 +136,12 @@ export function resolveSupplier(
 
     for (const alias of s.aliases) {
       if (alias.trim().length === 0) continue;
-      if (tokenAppears(alias, text) || text.includes(normalizeText(alias))) {
+      /*
+        الاحتواء قاطعٌ للاسم الطويل وحده: «AVAL» تقع داخل «TRAVAL»،
+        و«محفوظ» داخل «المحفوظي». والقصير يُطابَق على حدود الكلمة.
+      */
+      const normalizedAlias = normalizeText(alias);
+      if (tokenAppears(alias, text) || (normalizedAlias.length >= MIN_CONTAINED_ALIAS && text.includes(normalizedAlias))) {
         evidence.push({ kind: "ALIAS", detail: `الاسم البديل «${alias}» أكّدتَه من قبل`, weight: WEIGHT.ALIAS, decisive: true });
         break;
       }
