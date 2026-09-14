@@ -76,7 +76,8 @@ describe("buildAttention", () => {
 
   it("الحركات غير المصنَّفة تُوجَّه إلى الحركات نفسها لا إلى صفحة جامعة", () => {
     const item = buildAttention({ ...quiet, unclassifiedBankTx: 20, unclassifiedBankAmountMinor: 5_000 })[0];
-    expect(item.href).toBe("/bank");
+    /* طابور المراجعة يعرضها بأفعالها — وأعلى صفحة البنك فوقه ألفُ حركة */
+    expect(item.href).toBe("/review");
     expect(item.area).toBe("BANK");
   });
 

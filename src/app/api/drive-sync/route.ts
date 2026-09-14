@@ -468,7 +468,13 @@ async function handle(request: Request) {
           sizeBytes: data.length,
           sha256: createHash("sha256").update(data).digest("hex"),
           kind: x.documentKind as never,
-          status: "ARCHIVED",
+          /*
+            ما قرأه النموذج من ملفٍّ لا يُفهم اسمُه ينتظر إنساناً: كان يُقيَّد
+            «مؤرشفاً» فيدخل ملفّ التحويلات للبنك وما رآه أحد — وفاتورةٌ
+            منفوخة حسابُها مستقيم تمرّ كلَّ فحص. والاسمُ الذي كتبه إنسانٌ
+            (المسار السابق) يبقى مؤرشفاً.
+          */
+          status: "NEEDS_REVIEW",
           periodMonth: entry.month,
           supplierId: supplier?.id ?? null,
           extractionJson: x as never,

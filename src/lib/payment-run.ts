@@ -21,9 +21,11 @@ export interface PayableInvoice {
   inputVatStatus: InputVatStatus;
   /** `null` تعني «لم تُقرأ» */
   vatMinor: number | null;
+  /** مستندُها قرأه النموذج في المزامنة ولم يُؤكِّده إنسان */
+  needsReview?: boolean;
 }
 
-export type HoldReason = "NOT_TAX_VALID" | "NO_VAT_DEDUCTION" | "TAX_UNKNOWN";
+export type HoldReason = "NEEDS_REVIEW" | "NOT_TAX_VALID" | "NO_VAT_DEDUCTION" | "TAX_UNKNOWN";
 
 export interface SupplierPayment {
   supplierId: string;
@@ -62,6 +64,11 @@ export interface PaymentRun {
 }
 
 const HOLD_TEXT: Record<HoldReason, string> = {
+  /*
+    ملفُّ التحويلات يُرفع إلى البنك فيُحوَّل به مال — وما قرأه النموذج
+    ولم يره إنسان لا يدخله. فاتورةٌ منفوخة حسابُها مستقيم تمرّ كلّ فحص.
+  */
+  NEEDS_REVIEW: "قرأها النموذج من الدرايف ولم تُؤكَّد — افتح المستند وأكّده قبل السداد",
   NOT_TAX_VALID: "ليست فاتورة ضريبية كاملة — اطلب البديل قبل السداد",
   NO_VAT_DEDUCTION: "لا تصلح لخصم ضريبة المدخلات — اطلب فاتورة ضريبية",
   // المجهول لا يُسدَّد ولا يُطالَب صاحبه: يُقرأ أوّلاً
@@ -93,7 +100,9 @@ export function buildPaymentRun(
   const payable: PayableInvoice[] = [];
 
   for (const inv of inScope) {
-    if (inv.taxStatus === "UNKNOWN") {
+    if (inv.needsReview) {
+      held.push({ invoice: inv, reason: "NEEDS_REVIEW", message: HOLD_TEXT.NEEDS_REVIEW });
+    } else if (inv.taxStatus === "UNKNOWN") {
       held.push({ invoice: inv, reason: "TAX_UNKNOWN", message: HOLD_TEXT.TAX_UNKNOWN });
     } else if (inv.taxStatus !== "VALID") {
       held.push({ invoice: inv, reason: "NOT_TAX_VALID", message: HOLD_TEXT.NOT_TAX_VALID });

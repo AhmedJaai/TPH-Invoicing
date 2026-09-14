@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { invoices, paymentAllocations, suppliers } from "@/db/schema";
+import { documents, invoices, paymentAllocations, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
@@ -47,10 +47,12 @@ export default async function PaymentsPage({
       vatMinor: invoices.vatMinor,
       taxStatus: invoices.taxStatus,
       inputVatStatus: invoices.inputVatStatus,
-      allocatedMinor: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}), 0)::int`,
+      allocatedMinor: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}), 0)::bigint`,
+      needsReview: sql<boolean>`coalesce(bool_or(${documents.status} = 'NEEDS_REVIEW'), false)`,
     })
     .from(invoices)
     .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
+    .leftJoin(documents, eq(documents.id, invoices.documentId))
     .leftJoin(paymentAllocations, eq(paymentAllocations.invoiceId, invoices.id))
     .groupBy(invoices.id, suppliers.nameAr);
 
@@ -71,6 +73,7 @@ export default async function PaymentsPage({
       taxStatus: r.taxStatus,
       inputVatStatus: r.inputVatStatus,
       vatMinor: r.vatMinor,
+      needsReview: Boolean(r.needsReview),
     })),
     month,
     { creditBySupplier },

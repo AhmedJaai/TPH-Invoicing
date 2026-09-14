@@ -9,6 +9,7 @@ import { Empty, Money, PageShell } from "@/components/page-shell";
 import { DOCUMENT, countNoun } from "@/lib/arabic";
 import { ScrollX } from "@/components/scroll-x";
 import { RejectDocument } from "@/components/reject-document";
+import { ConfirmDocument } from "@/components/confirm-document";
 
 export const dynamic = "force-dynamic";
 
@@ -339,7 +340,10 @@ export default async function DocumentsPage({
                       </span>
                       {/* ما ينتظر قراراً له فعلٌ في موضعه — لا «راجعه» بلا زرّ */}
                       {canDecide && ["PENDING", "EXTRACTED", "NEEDS_REVIEW"].includes(r.status) && (
-                        <span className="mt-1 block"><RejectDocument documentId={r.id} /></span>
+                        <span className="mt-1 flex flex-wrap gap-1.5">
+                          {r.status === "NEEDS_REVIEW" && showAmounts && <ConfirmDocument documentId={r.id} />}
+                          <RejectDocument documentId={r.id} />
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-2.5">

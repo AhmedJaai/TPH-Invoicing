@@ -47,7 +47,7 @@ export default async function PurchasesPage() {
 
   const tiles: HubTile[] = [
     {
-      href: "/documents?kind=TAX_INVOICE",
+      href: "/purchases/invoices",
       title: "الفواتير",
       value: String(f?.invoices ?? 0),
       detail: `بقيمة ${((Number(f?.billed ?? 0)) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })} ريال`,
@@ -72,7 +72,8 @@ export default async function PurchasesPage() {
       detail: "صنفاً تُتبَّع أسعاره عند مورّده",
     },
     {
-      href: "/payments",
+      /* الرقم يفتح تفصيلَه: كلُّ فاتورةٍ عليها رصيد — لا دفعةَ الشهر المنقضي وحده */
+      href: "/purchases/invoices?paid=OPEN",
       title: "المستحقّ للمورّدين",
       amountMinor: owedMinor,
       detail: "غير مسدَّد للمورّدين",

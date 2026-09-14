@@ -185,3 +185,20 @@ describe("دفعة أوّل الشهر — رصيدٌ لنا عند المورّ
     expect(toBankTransferCsv(run)).not.toContain("كوهي");
   });
 });
+
+describe("ما قرأه النموذج ولم يُؤكَّد لا يدخل ملفّ التحويلات", () => {
+  it("يُحجَز بسببه ولو كان صالحاً ضريبياً", () => {
+    const run = buildPaymentRun([
+      {
+        invoiceId: "i-review", supplierId: "s1", supplierName: "مورّد", invoiceNumber: "1",
+        invoiceDate: new Date("2026-08-10T00:00:00Z"), periodMonth: "2026-08",
+        totalMinor: 50_000, allocatedMinor: 0, taxStatus: "VALID", inputVatStatus: "ELIGIBLE",
+        vatMinor: 6_522, needsReview: true,
+      },
+    ], "2026-08");
+    expect(run.ready).toHaveLength(0);
+    expect(run.held[0]?.reason).toBe("NEEDS_REVIEW");
+    expect(run.heldTotalMinor).toBe(50_000);
+  });
+});
+

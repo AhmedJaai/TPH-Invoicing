@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { invoices, paymentAllocations, suppliers } from "@/db/schema";
+import { documents, invoices, paymentAllocations, suppliers } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { buildPaymentRun, toBankTransferCsv, type PayableInvoice } from "@/lib/payment-run";
 import { recordAudit } from "@/lib/audit";
@@ -36,10 +36,12 @@ export async function GET(request: Request) {
       vatMinor: invoices.vatMinor,
       taxStatus: invoices.taxStatus,
       inputVatStatus: invoices.inputVatStatus,
-      allocatedMinor: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}), 0)::int`,
+      allocatedMinor: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}), 0)::bigint`,
+      needsReview: sql<boolean>`coalesce(bool_or(${documents.status} = 'NEEDS_REVIEW'), false)`,
     })
     .from(invoices)
     .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
+    .leftJoin(documents, eq(documents.id, invoices.documentId))
     .leftJoin(paymentAllocations, eq(paymentAllocations.invoiceId, invoices.id))
     .groupBy(invoices.id, suppliers.nameAr);
 
@@ -56,6 +58,7 @@ export async function GET(request: Request) {
       taxStatus: r.taxStatus,
       inputVatStatus: r.inputVatStatus,
       vatMinor: r.vatMinor,
+      needsReview: Boolean(r.needsReview),
     })),
     month,
   );

@@ -374,8 +374,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `${countNoun(f.unclassifiedBankTx, TRANSACTION)} بنكية لم تُصنَّف`,
       detail: `بقيمة ${riyals(f.unclassifiedBankAmountMinor)} ريال. ما لم يُصنَّف يبقى محسوباً على المورّدين ظلماً.`,
       action: "صنّفها مرّة — يُحفظ التصنيف قاعدةً تسري على أمثاله في كل كشف بعده.",
-      actionLabel: "افتح الحركات",
-      href: "/bank",
+      actionLabel: "صنّفها في طابور المراجعة",
+      /* التصنيف في الطابور — لا أعلى صفحة البنك وألفُ حركةٍ فوقها */
+      href: "/review",
       count: f.unclassifiedBankTx,
       amountMinor: f.unclassifiedBankAmountMinor,
       impact: { kind: "UNATTRIBUTED", amountMinor: f.unclassifiedBankAmountMinor },
