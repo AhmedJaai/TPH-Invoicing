@@ -55,6 +55,8 @@ export interface CreateDocumentInput {
   extractionModel?: string | null;
   fieldConfidence?: unknown;
   uploadedById: string;
+  /** من أين قُرئ — نصّاً أم صورة. */
+  textSource?: string;
 }
 
 const KINDS = new Set([
@@ -79,6 +81,7 @@ export async function createDocument(tx: Tx, input: CreateDocumentInput): Promis
       // مخرجات النموذج الخام تُحفظ كما هي ولا تُعدَّل — هي المرجع عند أي مراجعة
       extractionJson: (input.rawExtraction ?? null) as never,
       extractionModel: input.extractionModel ?? null,
+      textSource: input.textSource ?? null,
       fieldConfidence: (input.fieldConfidence ?? null) as never,
       uploadedById: input.uploadedById,
     })

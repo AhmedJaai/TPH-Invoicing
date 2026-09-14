@@ -115,7 +115,7 @@ export function Nav({ role, pending = 0 }: { role: Role; pending?: number }) {
                 بتغيّر الصفحة. وكان لكلّ شاشةٍ عددُها فيتناقضن.
               */}
               {c.href === "/review" && pending > 0 && (
-                <span className="nums rounded-full bg-warn-bg px-1.5 py-0.5 text-[11px] font-bold text-warn">
+                <span className="nums rounded-full bg-warn-bg px-1.5 py-0.5 text-[11px] font-bold text-warn" title={`حركات بنك تنتظر قراراً: ${pending} — والسداد المزدوج والدفعات بلا فاتورة في «ما يحتاج انتباهك»`} aria-label={`حركات بنك تنتظر قراراً: ${pending}`}>
                   {pending}
                 </span>
               )}

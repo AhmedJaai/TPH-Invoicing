@@ -16,6 +16,7 @@ import type { Candidate } from "./candidates";
 import type { Decision } from "./decision";
 import type { EntityCandidate } from "./entity-candidates";
 import { highValueThreshold } from "./verdict-policy";
+import { formatRiyalsDisplay } from "@/lib/money";
 
 export type AdjudicationReason =
   | "CLOSE_CANDIDATES"     // مرشّحان متقاربان — النظام لا يعرف أيّهما
@@ -110,7 +111,7 @@ export function needsAdjudication(input: CaseInput): AdjudicationCase | null {
       candidates: [],
       entityCandidates: [...entities],
       note:
-        `مبلغ كبير (${(input.amountMinor / 100).toFixed(2)} ريالاً) ومستفيده مجهول — ` +
+        `مبلغ كبير (${formatRiyalsDisplay(input.amountMinor)} ريالاً) ومستفيده مجهول — ` +
         `و${entities.length} جهةً مرشَّحة`,
     };
   }

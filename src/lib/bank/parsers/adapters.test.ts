@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SIGNATURES } from "./detect";
 import {
-  ADAPTERS, GENERIC_ADAPTER, adapterFor, adapterNotices, headersFor,
+  ADAPTERS, GENERIC_ADAPTER, adapterFor, adapterNotices,
 } from "./adapters";
 
 describe("محوِّلات البنوك", () => {
@@ -40,23 +40,5 @@ describe("محوِّلات البنوك", () => {
 
   it("كلّ محوِّل يحمل عِلّةً واحدة على الأقلّ", () => {
     for (const a of ADAPTERS) expect(a.quirks.length).toBeGreaterThan(0);
-  });
-});
-
-describe("دمج رؤوس الأعمدة", () => {
-  it("العامّ يبقى، وما يخصّ البنك يُزاد", () => {
-    const merged = headersFor(adapterFor("SNB"), { description: ["description", "الوصف"] });
-    expect(merged.description).toContain("description");
-    expect(merged.description).toContain("البيان");
-  });
-
-  it("لا يتكرّر رأسٌ واحد", () => {
-    const merged = headersFor(adapterFor("SNB"), { description: ["البيان"] });
-    expect(merged.description.filter((h) => h === "البيان")).toHaveLength(1);
-  });
-
-  it("المحوِّل العامّ لا يزيد شيئاً", () => {
-    const base = { description: ["الوصف"] };
-    expect(headersFor(GENERIC_ADAPTER, base).description).toEqual(["الوصف"]);
   });
 });

@@ -224,7 +224,7 @@ export default async function DocumentsPage({
 
       <div className="mt-3 space-y-2">
         {/* الحالة أوّلاً: ما ينتظرك قبل ما مضى */}
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
+        <ScrollX className="flex gap-1.5 pb-1">
           <Chip href={link({ status: undefined })} active={!p.status}>الكل ({Number(total)})</Chip>
           {STATUS_BUCKETS.map((b) => {
             const n = statusCount.get(b.id) ?? 0;
@@ -237,31 +237,31 @@ export default async function DocumentsPage({
               </Chip>
             );
           })}
-        </div>
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
+        </ScrollX>
+        <ScrollX className="flex gap-1.5 pb-1">
           <Chip href={link({ month: undefined })} active={!p.month}>كل الأشهر</Chip>
           {monthRows.map((m) => (
             <Chip key={m.month} href={link({ month: m.month ?? undefined })} active={p.month === m.month}>
               <span dir="ltr">{m.month}</span>
             </Chip>
           ))}
-        </div>
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
+        </ScrollX>
+        <ScrollX className="flex gap-1.5 pb-1">
           <Chip href={link({ kind: undefined })} active={!p.kind}>كل الأنواع</Chip>
           {kindRows.map((k) => (
             <Chip key={k.kind} href={link({ kind: k.kind })} active={p.kind === k.kind}>
               {KIND_LABEL[k.kind] ?? k.kind} ({k.n})
             </Chip>
           ))}
-        </div>
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
+        </ScrollX>
+        <ScrollX className="flex gap-1.5 pb-1">
           <Chip href={link({ supplier: undefined })} active={!p.supplier}>كل المورّدين</Chip>
           {supplierRows.map((s) => (
             <Chip key={s.id} href={link({ supplier: s.id })} active={p.supplier === s.id}>
               {s.nameAr}
             </Chip>
           ))}
-        </div>
+        </ScrollX>
       </div>
 
       <p className="mt-4 text-xs text-muted">

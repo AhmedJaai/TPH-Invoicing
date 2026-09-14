@@ -10,6 +10,7 @@
  */
 import { ISSUE, ISSUE_TEXT } from "./issue-codes";
 import type { Finding } from "./validation";
+import { formatRiyalsDisplay } from "@/lib/money";
 
 export interface StatementLineInput {
   date: Date;
@@ -285,7 +286,7 @@ export function reconcileStatement(
     findings.push({
       code: ISSUE.INVOICE_IN_STATEMENT_NOT_ARCHIVED,
       severity: "WARN",
-      message: `${countNoun(missingFromArchive.length, INVOICE)} في كشف المورّد بقيمة ${(total / 100).toFixed(2)} ريال ولا ملف لها عندنا — اطلبها منه`,
+      message: `${countNoun(missingFromArchive.length, INVOICE)} في كشف المورّد بقيمة ${formatRiyalsDisplay(total)} ريال ولا ملف لها عندنا — اطلبها منه`,
     });
   }
 
@@ -309,7 +310,7 @@ export function reconcileStatement(
     findings.push({
       code: ISSUE.STATEMENT_AMOUNT_MISMATCH,
       severity: "WARN",
-      message: `حساب الكشف نفسه لا يستقيم: افتتاحي وحركات تعطي ${(computedClosingMinor! / 100).toFixed(2)} والختامي المكتوب ${(options.closingBalanceMinor! / 100).toFixed(2)}`,
+      message: `حساب الكشف نفسه لا يستقيم: افتتاحي وحركات تعطي ${formatRiyalsDisplay(computedClosingMinor!)} والختامي المكتوب ${formatRiyalsDisplay(options.closingBalanceMinor!)}`,
     });
   }
 

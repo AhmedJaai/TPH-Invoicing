@@ -1297,6 +1297,7 @@ export const extractionCache = pgTable("extraction_cache", {
   sha256: text("sha256").primaryKey(),
   extraction: jsonb("extraction").notNull(),
   model: text("model"),
+  textSource: text("text_source"),
   userId: text("user_id").references(() => users.id),
   createdAt: now(),
 });

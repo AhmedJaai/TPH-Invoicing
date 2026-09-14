@@ -1,3 +1,4 @@
+import { formatRiyalsDisplay } from "@/lib/money";
 /**
  * تدقيق الحقيقة: هل يوافق ما في القاعدة ما في الأصل؟
  *
@@ -152,8 +153,8 @@ export function auditTruth(
         verdict: "CORRECTED",
         label: file.fileName,
         detail:
-          `الأصل ${(file.totalMinor / 100).toFixed(2)} والقيد ` +
-          `${(record.totalMinor / 100).toFixed(2)} — فرق ${(diff / 100).toFixed(2)}`,
+          `الأصل ${formatRiyalsDisplay(file.totalMinor)} والقيد ` +
+          `${formatRiyalsDisplay(record.totalMinor)} — فرق ${formatRiyalsDisplay(diff)}`,
         driveId: file.driveId,
         documentId: record.documentId,
         suggestion: "افتح الأصل واحسم أيّهما الصحيح — لا يُصحَّح آلياً",
@@ -180,7 +181,7 @@ export function auditTruth(
     out.push({
       verdict: "VERIFIED",
       label: file.fileName,
-      detail: `${(record.totalMinor / 100).toFixed(2)} · ${record.periodMonth ?? "—"}`,
+      detail: `${formatRiyalsDisplay(record.totalMinor)} · ${record.periodMonth ?? "—"}`,
       driveId: file.driveId,
       documentId: record.documentId,
       suggestion: null,

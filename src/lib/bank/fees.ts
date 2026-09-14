@@ -1,3 +1,4 @@
+import { formatRiyalsDisplay } from "@/lib/money";
 /**
  * الرسم البنكيّ داخل الدفعة.
  *
@@ -50,7 +51,7 @@ export function splitBankFee(
     allocatedMinor: invoiceTotalMinor,
     feeMinor: excess,
     reason:
-      `الخصم يزيد ${(excess / 100).toFixed(2)} عن الفاتورة — ` +
+      `الخصم يزيد ${formatRiyalsDisplay(excess)} عن الفاتورة — ` +
       "وهو في حدّ رسم التحويل، فيُقيَّد رسماً لا اختلافاً",
   };
 }

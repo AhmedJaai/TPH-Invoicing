@@ -21,6 +21,7 @@
 import type { ReasonAudit } from "./reason-codes";
 import { evidenceQuality } from "./reason-codes";
 import type { TxKind } from "./taxonomy";
+import { formatRiyalsDisplay } from "@/lib/money";
 
 /** أدنى ثقةٍ يُلتفَت عندها إلى حكم النموذج أصلاً. */
 export const MIN_MODEL_CONFIDENCE = 0.6;
@@ -152,7 +153,7 @@ export function weighVerdict(input: VerdictInput): VerdictDecision {
 
   if (highValue) {
     reasons.push(
-      `مبلغٌ كبير (${(input.amountMinor / 100).toFixed(2)} · الحدّ ${(threshold / 100).toFixed(2)}) — يُنظَر فيه`,
+      `مبلغٌ كبير (${formatRiyalsDisplay(input.amountMinor)} · الحدّ ${formatRiyalsDisplay(threshold)}) — يُنظَر فيه`,
     );
     return { disposition: "REVIEW", reasons, signals };
   }

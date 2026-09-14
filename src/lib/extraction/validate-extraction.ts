@@ -20,7 +20,7 @@
  * صفراً، والمحسوب عندنا ليس ما في المستند.** يُكشَف التعارض ويُعاد
  * السؤال؛ فإن بقي رُفع إلى إنسان.
  */
-import { parseRiyals, isSupplierRounding, TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
+import { parseRiyals, isSupplierRounding, TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
 import { VAT_RATE } from "@/config/drive";
 import type { ExtractionResult } from "./schema";
 
@@ -135,7 +135,7 @@ export function findConflicts(x: ExtractionResult): ExtractionConflict[] {
           fields: ["subtotalAmount", "vatAmount"],
           message:
             `الضريبة ${x.vatAmount} تخالف ١٥٪ من الصافي ` +
-            `(المتوقَّع ${(expected / 100).toFixed(2)})`,
+            `(المتوقَّع ${formatRiyalsDisplay(expected)})`,
         });
       }
     }
@@ -173,7 +173,7 @@ export function findConflicts(x: ExtractionResult): ExtractionConflict[] {
           code: "LINES_NOT_SUBTOTAL",
           fields: ["lines", "subtotalAmount"],
           message:
-            `مجموع البنود ${(lineSum / 100).toFixed(2)} لا يوافق ` +
+            `مجموع البنود ${formatRiyalsDisplay(lineSum)} لا يوافق ` +
             `الصافي ${x.subtotalAmount}`,
         });
       }

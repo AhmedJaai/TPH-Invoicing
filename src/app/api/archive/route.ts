@@ -226,7 +226,7 @@ export async function POST(request: Request) {
       الخادم) فلا أسطر ولا دعوى — لا يُصدَّق ما أُرسل بدلاً منه.
     */
     const [cached] = await db
-      .select({ extraction: extractionCache.extraction, model: extractionCache.model })
+      .select({ extraction: extractionCache.extraction, model: extractionCache.model, textSource: extractionCache.textSource })
       .from(extractionCache)
       .where(eq(extractionCache.sha256, sha256))
       .limit(1);
@@ -273,6 +273,7 @@ export async function POST(request: Request) {
         supplierId: body.supplierId,
         rawExtraction: serverRaw ?? undefined,
         extractionModel: cached?.model ?? undefined,
+        textSource: cached?.textSource ?? undefined,
         fieldConfidence: (serverRaw as { confidence?: unknown } | null)?.confidence,
         uploadedById: user.id,
       });

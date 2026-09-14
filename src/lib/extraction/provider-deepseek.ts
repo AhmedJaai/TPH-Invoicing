@@ -280,6 +280,7 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
     if (conflicts.length === 0 || pass === 2) {
       return {
         ok: true,
+        textSource: input.mode === "TEXT" ? "TEXT" : input.source,
         provider: "deepseek",
         value,
         model: response.model,

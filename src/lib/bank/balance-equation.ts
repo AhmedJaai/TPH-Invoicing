@@ -1,4 +1,5 @@
 import { TRANSACTION, countNoun } from "@/lib/arabic";
+import { formatRiyalsDisplay } from "@/lib/money";
 /**
  * معادلة الكشف: **الرصيد الافتتاحي + الوارد − الصادر = الرصيد الختامي.**
  *
@@ -178,11 +179,9 @@ export function reconcileAccount(
   };
 }
 
+/* المنسّق الواحد — لا نسخةٌ محلّية تختلف في الفواصل */
 function riyals(minor: number): string {
-  return `${(minor / 100).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} ريال`;
+  return `${formatRiyalsDisplay(minor)} ريال`;
 }
 
 /** جملةٌ عربية تصف الحال — تُعرَض كما هي. */

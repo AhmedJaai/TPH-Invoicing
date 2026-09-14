@@ -23,6 +23,7 @@
  * بين نظامٍ محاسبيّ وآلةٍ تخمّن.
  */
 import { z } from "zod";
+import { formatRiyalsDisplay } from "@/lib/money";
 
 /** أقصى عدد صفحاتٍ تُقرأ بصرياً — الكشف الطويل يُطلَب نصّاً. */
 export const MAX_VISION_PAGES = 20;
@@ -182,7 +183,7 @@ export function validateVision(
         closingMinor,
         blocked:
           `القراءة البصرية لا تُطابق رصيد الكشف — فرقُ ` +
-          `${(Math.abs(diff) / 100).toFixed(2)} ريالاً. ` +
+          `${formatRiyalsDisplay(Math.abs(diff))} ريالاً. ` +
           "أي أنّ سطراً سقط أو رقماً قُرئ خطأً، ولا يُعرَف أيّهما. " +
           "اطلب الكشف نصّاً أو بصيغة Excel.",
       };

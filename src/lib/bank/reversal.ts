@@ -1,3 +1,4 @@
+import { formatRiyalsDisplay } from "@/lib/money";
 /**
  * عكس الدفعة.
  *
@@ -89,7 +90,7 @@ function sameParty(a: string | null, b: string | null): boolean {
  * فقد يكون المبلغان متساويين بالمصادفة.
  */
 export function describeReversal(r: Reversal): string {
-  const amount = (r.outgoing.amountMinor / 100).toFixed(2);
+  const amount = formatRiyalsDisplay(r.outgoing.amountMinor);
   const base =
     `خرج ${amount} في ${r.outgoing.valueDate.toISOString().slice(0, 10)} ` +
     `وعاد بعد ${r.daysApart} ${r.daysApart === 1 ? "يوم" : "أيام"}`;

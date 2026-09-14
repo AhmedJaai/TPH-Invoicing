@@ -113,3 +113,29 @@ describe("المكوّنات لا تقرأ الردّ JSON مباشرة", () => 
     expect(BARE_JSON.test("const json = await res.json();")).toBe(true);
   });
 });
+
+/* ── ٤. المال المعروض يمرّ بمنسّقٍ واحد ── */
+
+/**
+ * كان المبلغ نفسه يُكتب «1500.00» في رسالة و«1,500.00» في أخرى: تسع
+ * دوالّ محلّية وخمسٌ وعشرون قسمةً مضمَّنة. فما يُعرض لإنسان يمرّ بـ
+ * `formatRiyalsDisplay`. والمستثنى ما يُقرأ آلةً: ملفّ التحويل للبنك،
+ * ونصُّ النموذج، والمبلغ المشتقّ نصّاً في مخرَج القراءة.
+ */
+const RAW_RIYALS = /\/ 100\)\.toFixed\(2\)/;
+const RAW_RIYALS_ALLOWED = new Set([
+  path.join("src", "lib", "payment-run.ts"),
+  path.join("src", "lib", "extraction", "validate-extraction.ts"),
+  path.join("src", "services", "adjudicator.service.ts"),
+  path.join("src", "lib", "bank", "adjudicator-prompt.ts"),
+  path.join("src", "lib", "money.ts"),
+]);
+
+describe("لا قسمةَ مال مضمَّنة في نصٍّ يُعرض", () => {
+  it("كلّ مبلغٍ معروض عبر formatRiyalsDisplay", () => {
+    const offenders = SRC.filter(
+      (f) => !RAW_RIYALS_ALLOWED.has(f) && RAW_RIYALS.test(readFileSync(f, "utf8")),
+    );
+    expect(offenders).toEqual([]);
+  });
+});

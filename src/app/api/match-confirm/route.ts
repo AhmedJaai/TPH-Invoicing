@@ -415,7 +415,7 @@ async function applyManualSplit(
   const total = split.reduce((sum, s) => sum + s.amountMinor, 0);
   if (total > tx.amountMinor) {
     return NextResponse.json(
-      { error: `المجموع ${(total / 100).toFixed(2)} يتجاوز الدفعة ${(tx.amountMinor / 100).toFixed(2)}` },
+      { error: `المجموع ${formatRiyalsDisplay(total)} يتجاوز الدفعة ${formatRiyalsDisplay(tx.amountMinor)}` },
       { status: 400 },
     );
   }
@@ -448,7 +448,7 @@ async function applyManualSplit(
     const outstanding = inv.totalMinor - Number(inv.allocated);
     if (s.amountMinor > outstanding) {
       return NextResponse.json(
-        { error: `تخصيصٌ فوق المتبقّي على فاتورة: ${(outstanding / 100).toFixed(2)} متبقٍّ` },
+        { error: `تخصيصٌ فوق المتبقّي على فاتورة: ${formatRiyalsDisplay(outstanding)} متبقٍّ` },
         { status: 400 },
       );
     }

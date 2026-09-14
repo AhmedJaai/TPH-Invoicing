@@ -85,6 +85,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | `028_month_lock.sql` | الشهر المقفل لا يُكتب فيه: مؤثِّرات على الفواتير والدفعات والتخصيصات — وتحديث الحال مقبول |
 | `029_ops_indexes.sql` | فهارس ناقصة: `payment_allocations.invoice_id` و`matched_payment_id` و`bank_import_id` و`user_id` |
 | `030_extraction_cache.sql` | `extraction_cache` — ما قرأه النموذج بيد الخادم ببصمة الملفّ، لا من المتصفّح |
+| `031_extraction_text_source.sql` | مصدرُ القراءة (نصّ · صورة مضمَّنة · صورة) يُحفَظ مع ما قُرئ ويُنقل إلى `documents.text_source` |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 
@@ -342,7 +343,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 
 ## الأوامر
 
-`npm test` (١٧٨٩ اختباراً · ١٠٠ ملفاً) · `npm run typecheck` · `npm run lint`
+`npm test` (١٧٨٧ اختباراً · ١٠٠ ملفاً) · `npm run typecheck` · `npm run lint`
 `npm run db:migrate` · `db:verify` · `db:dedupe` · `db:rematch` · `db:reclassify` · `db:learn` · `db:link` · `db:split-check`
 `npm run db:expenses` · `db:audit` · `db:measure` · `db:repair` · `db:products` · `db:merge` · `db:reprice` · `db:repair-rules` · `db:repair-scope` · `db:identity` · `db:unpaid`
 `npm run drive:auth` · `drive:inventory` · `drive:backfill` · `drive:diagnose`

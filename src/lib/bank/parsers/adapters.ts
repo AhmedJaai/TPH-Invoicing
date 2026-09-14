@@ -9,25 +9,19 @@
  * ومعرفةُ البنك بلا استعمالها أسوأ من الجهل به: توحي بأنّ النظام يدعم
  * ستّة بنوك وهو يقرأ واحداً ويحاول في الباقي.
  *
- * فالمحوِّل هنا يحمل ما يخصّ كلّ بنك:
- *   • أسماء أعمدته كما يكتبها هو،
- *   • كيف يعبّر عن الاتّجاه: عمودان (مدين/دائن) أم مبلغٌ بإشارة،
- *   • تقويمه: ميلاديّ أم هجريّ،
- *   • وعِلَلُه المعروفة.
+ * فالمحوِّل هنا يحمل ما يُستعمَل فعلاً: اسمَ البنك، وهل جُرِّب، وعِلَلَه
+ * المعروفة تُعرَض لمن يقرأ الكشف.
+ *
+ * وكانت فيه أسماءُ أعمدةٍ لكلّ بنك وأسلوبُ اتّجاهه وتقويمُه — ولا يقرؤها
+ * شيء: القراءة في `parse.ts` على قاموسٍ عامّ، والاتّجاه يُستنبَط من بنية
+ * الأعمدة. فحُذفت، لأنّ معرفةً مكتوبة لا تُستعمَل توحي بدعمٍ غير واقع.
+ * ومن يُوصِل قراءةً خاصّة ببنك يُضيف حقلها مع مستعمِله في الكوميت نفسه.
  *
  * **و`verified` ليس زينة.** الأهليّ وحده جُرِّب على ملفّات حقيقية،
  * والبقيّة محوِّلاتٌ معقولة لم تُختبَر على كشفٍ فعليّ. وهذا يُعلَن
  * للمستخدم عند القراءة — لا يُدفَن في تعليق. فمن يستورد كشف الراجحي
  * يجب أن يعرف أنّ النظام يقرؤه على أفضل تقديرٍ لا على تجربة.
  */
-
-export type DirectionStyle =
-  /** عمودان منفصلان: مدين ودائن. */
-  | "TWO_COLUMNS"
-  /** عمودٌ واحد بإشارة: السالب صادر. */
-  | "SIGNED_AMOUNT"
-  /** عمود مبلغ وعمود نوعٍ نصّيّ يقول مدين أو دائن. */
-  | "TYPE_COLUMN";
 
 export interface BankAdapter {
   bankId: string;
@@ -39,17 +33,9 @@ export interface BankAdapter {
    * صاحب العمل بلا شيء، والادّعاء يتركه بأرقامٍ لا يعرف صحّتها.
    */
   verified: boolean;
-  /** رؤوس أعمدةٍ يزيدها هذا البنك على العامّ. */
-  headers: Partial<Record<HeaderKey, readonly string[]>>;
-  directionStyle: DirectionStyle;
-  calendar: "GREGORIAN" | "HIJRI";
   /** عِلَلٌ معروفة تُعرَض لمن يقرأ الكشف. */
   quirks: readonly string[];
 }
-
-export type HeaderKey =
-  | "date" | "postingDate" | "type" | "description"
-  | "beneficiary" | "debit" | "credit" | "amount" | "balance" | "reference";
 
 /**
  * المحوِّل العامّ — لبنكٍ لم يُعرَف.
@@ -61,9 +47,6 @@ export const GENERIC_ADAPTER: BankAdapter = {
   bankId: "GENERIC",
   bankName: "بنك غير محدَّد",
   verified: false,
-  headers: {},
-  directionStyle: "TWO_COLUMNS",
-  calendar: "GREGORIAN",
   quirks: [
     "لم يُعرَف البنك من الملفّ — القراءة على بنية الأعمدة وحدها",
   ],
@@ -75,14 +58,6 @@ export const ADAPTERS: readonly BankAdapter[] = [
     bankName: "الأهلي (SNB)",
     /* المجرَّب وحده على ملفّات حقيقية — ألفٌ وأربعمئة حركة */
     verified: true,
-    headers: {
-      description: ["البيان", "تفاصيل العملية"],
-      beneficiary: ["اسم المستفيد", "المستفيد", "beneficiary name"],
-      type: ["نوع العملية", "نوع العمليه"],
-      reference: ["الرقم المرجعي", "رقم العملية"],
-    },
-    directionStyle: "TWO_COLUMNS",
-    calendar: "GREGORIAN",
     quirks: [
       "المرجع في الوصف مرجعُ البنك نفسه لا رقمُ فاتورة المورّد — فعدم تطابقه لا ينفي المطابقة",
       "عمود المستفيد قد يغيب في بعض صيغ التصدير، ويُنبَش الاسم حينئذ من الوصف قبل BEN ID",
@@ -93,49 +68,30 @@ export const ADAPTERS: readonly BankAdapter[] = [
     bankId: "RAJHI",
     bankName: "الراجحي",
     verified: false,
-    headers: {
-      description: ["بيان العملية", "التفاصيل"],
-      debit: ["مدين", "debit amount"],
-      credit: ["دائن", "credit amount"],
-    },
-    directionStyle: "TWO_COLUMNS",
-    calendar: "GREGORIAN",
     quirks: ["لم يُجرَّب على كشفٍ فعليّ — راجع أوّل استيرادٍ سطراً سطراً"],
   },
   {
     bankId: "RIYAD",
     bankName: "الرياض",
     verified: false,
-    headers: { description: ["تفاصيل الحركة"], amount: ["المبلغ", "amount"] },
-    directionStyle: "SIGNED_AMOUNT",
-    calendar: "GREGORIAN",
-    quirks: ["لم يُجرَّب على كشفٍ فعليّ — والمبلغ فيه بإشارة، فالسالب صادر"],
+    quirks: ["لم يُجرَّب على كشفٍ فعليّ — والمبلغ فيه بإشارة؛ والقراءة تستنبط الاتّجاه من بنية الأعمدة"],
   },
   {
     bankId: "ALINMA",
     bankName: "الإنماء",
     verified: false,
-    headers: { description: ["الوصف", "البيان"] },
-    directionStyle: "TWO_COLUMNS",
-    calendar: "GREGORIAN",
     quirks: ["لم يُجرَّب على كشفٍ فعليّ"],
   },
   {
     bankId: "SAB",
     bankName: "SAB",
     verified: false,
-    headers: { description: ["details", "narrative"] },
-    directionStyle: "TWO_COLUMNS",
-    calendar: "GREGORIAN",
     quirks: ["لم يُجرَّب على كشفٍ فعليّ"],
   },
   {
     bankId: "ANB",
     bankName: "العربي الوطني",
     verified: false,
-    headers: { description: ["البيان", "details"] },
-    directionStyle: "TWO_COLUMNS",
-    calendar: "GREGORIAN",
     quirks: ["لم يُجرَّب على كشفٍ فعليّ"],
   },
 ];
@@ -163,15 +119,3 @@ export function adapterNotices(adapter: BankAdapter): string[] {
   return out;
 }
 
-/** رؤوس الأعمدة كاملةً لهذا البنك: العامّ ثمّ ما يخصّه. */
-export function headersFor(
-  adapter: BankAdapter,
-  base: Record<string, readonly string[]>,
-): Record<string, string[]> {
-  const merged: Record<string, string[]> = {};
-  for (const [key, values] of Object.entries(base)) merged[key] = [...values];
-  for (const [key, values] of Object.entries(adapter.headers)) {
-    merged[key] = [...new Set([...(merged[key] ?? []), ...(values ?? [])])];
-  }
-  return merged;
-}

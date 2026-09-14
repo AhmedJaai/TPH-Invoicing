@@ -459,6 +459,7 @@ async function handle(request: Request) {
           supplierId: supplier?.id ?? null,
           extractionJson: x as never,
           extractionModel: extraction.model,
+          textSource: extraction.textSource ?? null,
           fieldConfidence: x.confidence as never,
           uploadedById: user.id,
         }).onConflictDoNothing().returning({ id: documents.id });

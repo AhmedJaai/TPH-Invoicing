@@ -5,7 +5,7 @@
  * أمّا ربط أصناف مورّدين مختلفين بصنف معياري واحد فلا يقع آلياً أبداً:
  * درس «العنب» أنّ الاسم الواحد قد يخفي شيئين. يُقترح، ويؤكّده إنسان.
  */
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { invoiceLines, products, supplierProducts } from "@/db/schema";
 import { suggestCategory, type ProductCategory } from "@/lib/products";
@@ -36,21 +36,26 @@ export async function buildSupplierProducts(): Promise<BuildResult> {
   let created = 0;
   let existing = 0;
 
-  for (const g of groups) {
-    if (!g.supplierId) continue;
+  /*
+    دفعاتٌ لا رحلةٌ لكلّ مجموعة — مئةُ صنفٍ كانت مئةَ ذهابٍ إلى القاعدة.
+    والقائم يُتخطّى بالقيد الفريد، فما لم يُرجَع كان موجوداً.
+  */
+  const rows = groups
+    .filter((g): g is typeof g & { supplierId: string } => Boolean(g.supplierId))
+    .map((g) => ({
+      supplierId: g.supplierId,
+      normalizedDescription: g.normalized,
+      displayName: g.displayName ?? g.normalized,
+    }));
+  for (let i = 0; i < rows.length; i += 500) {
     const inserted = await db
       .insert(supplierProducts)
-      .values({
-        supplierId: g.supplierId,
-        normalizedDescription: g.normalized,
-        displayName: g.displayName ?? g.normalized,
-      })
+      .values(rows.slice(i, i + 500))
       .onConflictDoNothing()
       .returning({ id: supplierProducts.id });
-
-    if (inserted.length > 0) created++;
-    else existing++;
+    created += inserted.length;
   }
+  existing = rows.length - created;
 
   // ربط البنود بأصنافها — بالمورّد والوصف المطبَّع معاً
   const linked = await db.execute(sql`
@@ -178,16 +183,14 @@ export async function linkToProduct(input: LinkInput): Promise<LinkResult> {
     productName = row.nameAr;
   }
 
-  const now = new Date();
-  let linked = 0;
-  for (const id of input.supplierProductIds) {
-    const res = await db
+  /* تحديثٌ واحد للمختار كلّه — لا تحديثٌ لكلّ صنف */
+  const linked = input.supplierProductIds.length === 0 ? 0 : (
+    await db
       .update(supplierProducts)
-      .set({ productId, confirmedById: input.actorId, confirmedAt: now })
-      .where(eq(supplierProducts.id, id))
-      .returning({ id: supplierProducts.id });
-    linked += res.length;
-  }
+      .set({ productId, confirmedById: input.actorId, confirmedAt: new Date() })
+      .where(inArray(supplierProducts.id, [...input.supplierProductIds]))
+      .returning({ id: supplierProducts.id })
+  ).length;
 
   return { productId, productName, linked, createdProduct };
 }

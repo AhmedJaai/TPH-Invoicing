@@ -49,6 +49,30 @@ async function main() {
 
   for (const w of connectionWarnings(print)) console.log(`\n  ⚠ ${w}`);
 
+  /*
+    التطوير على قاعدة الإنتاج يكتب في مال المقهى — هكذا كتبت الشهادة
+    مورّداً وفاتورةً ودفعتين. فإن أُقِرّ معرّفُ الإنتاج في
+    ops-attestation.json وطابقه معرّفُ هذه البيئة وهي تطوير: يُرفَض صراحةً.
+  */
+  let productionId: string | undefined;
+  try {
+    productionId = (JSON.parse(readFileSync("ops-attestation.json", "utf8")) as {
+      isolationVerified?: { productionId?: string };
+    }).isolationVerified?.productionId;
+  } catch {
+    productionId = undefined;
+  }
+  if (print.environment === "development") {
+    if (productionId && productionId === print.systemIdentifier) {
+      console.log("\n  ✕ هذه بيئة تطوير وقاعدتها قاعدةُ الإنتاج — كلّ تجربةٍ هنا تكتب في المال الحقيقيّ.");
+      console.log("    افتح فرعاً في Neon وضع DATABASE_URL الخاصّ به في .env.local.\n");
+      process.exit(1);
+    }
+    if (!productionId) {
+      console.log("\n  ⚠ معرّف الإنتاج غير مُقَرّ في ops-attestation.json — فلا يُعرف أهذه القاعدة هي الإنتاج.");
+    }
+  }
+
   const file = process.argv[2];
   if (file) {
     const collected = JSON.parse(readFileSync(file, "utf8")) as DbFingerprint[];

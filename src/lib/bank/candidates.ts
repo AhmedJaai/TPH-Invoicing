@@ -16,6 +16,7 @@ import type { Outcome } from "./taxonomy";
 import { splitBankFee } from "./fees";
 import { fitToProfile, type SupplierProfile } from "./supplier-profile";
 import { INVOICE, countNoun } from "@/lib/arabic";
+import { formatRiyalsDisplay } from "@/lib/money";
 
 export interface OpenInvoice {
   id: string;
@@ -356,7 +357,7 @@ export function generateCandidates(
     const evidence = [`المورّد مرجَّح بدرجة ${Math.round(tx.supplierScore * 100)}٪`];
     if (amount === 1) {
       evidence.push(
-        fee ? `المبلغ يطابق المتبقّي مع رسم تحويل ${(fee.feeMinor / 100).toFixed(2)}`
+        fee ? `المبلغ يطابق المتبقّي مع رسم تحويل ${formatRiyalsDisplay(fee.feeMinor)}`
             : "المبلغ يطابق المتبقّي تماماً",
       );
     }

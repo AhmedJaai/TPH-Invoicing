@@ -30,6 +30,11 @@ export interface ExtractionSuccess {
   model: string;
   provider: ProviderName;
   usage?: { inputTokens: number; outputTokens: number };
+  /**
+   * من أين قُرئ: نصُّ الملفّ، أم صورةٌ مضمَّنة في PDF ممسوح، أم صورةٌ
+   * رُفعت. به يُقاس كم من الأرشيف يعتمد على نموذج الرؤية.
+   */
+  textSource?: "TEXT" | "PDF_EMBEDDED" | "DIRECT";
 }
 
 export interface ExtractionFailure {

@@ -158,7 +158,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
   const priceRises = rises.map<AttentionEvidence>((r) => ({
     label: String(r.description).slice(0, 40),
-    sub: `${r.name_ar ?? "—"} · ${(Number(r.then_price) / 100).toFixed(2)} ← ${(Number(r.now_price) / 100).toFixed(2)}`,
+    sub: `${r.name_ar ?? "—"} · ${formatRiyalsDisplay(Number(r.then_price))} ← ${formatRiyalsDisplay(Number(r.now_price))}`,
     amountMinor: Number(r.now_price) - Number(r.then_price),
   }));
 

@@ -137,10 +137,14 @@ async function handle(request: Request) {
     sha256,
     extraction: extraction.value as never,
     model: extraction.model,
+    textSource: extraction.textSource ?? null,
     userId: user.id,
   }).onConflictDoUpdate({
     target: extractionCache.sha256,
-    set: { extraction: extraction.value as never, model: extraction.model, userId: user.id, createdAt: new Date() },
+    set: {
+      extraction: extraction.value as never, model: extraction.model,
+      textSource: extraction.textSource ?? null, userId: user.id, createdAt: new Date(),
+    },
   });
 
   const match = matchSupplier(supplierList, {
