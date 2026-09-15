@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 
 /**
  * حرّاسٌ يقرؤون الشيفرة نصّاً — لأخطاءٍ لا يراها المترجم ولا يرميها التشغيل.
@@ -24,53 +25,114 @@ const SRC = walk("src");
 /* ── ١. الكتابة داخل المعاملة بمقبضها، لا بـ`db` ── */
 
 /**
- * يُرجع أجسام كتل `transaction(async (x) => { … })` مع اسم مقبضها.
+ * يُرجع كلَّ وصولٍ إلى `db` داخل دالّةٍ مُمرَّرة إلى `transaction(…)`.
  *
  * وقع في `/api/counterparty`: الكتابة بـ`db` داخل `db.transaction(t)`.
  * على Vercel في المجمَّع اتّصالٌ واحد تحجزه المعاملة، فينتظر `db` عشر
  * ثوانٍ ثمّ يسقط؛ ومحلّياً يسقط بالمفتاح الأجنبيّ. فلم يُحفَظ تعريفُ
  * جهةٍ واحد من الواجهة خمسة أيّام.
+ *
+ * وكان الحارس انتظاماً يرى صياغةً واحدة — `async (t) => {` — فيفلت منه
+ * المعامل المنمَّط، والسهم بلا أقواس، و`function`، والجسم تعبيراً، و`db`
+ * مُمرَّراً حجّةً. والصياغة تتغيّر بلا قصد، فالحارس يقرأ شجرة المترجم لا
+ * النصّ: كلُّ دالّةٍ حجّةٍ لـ`transaction` بأيّ شكل، وكلُّ معرِّفٍ اسمه `db`
+ * داخلها ليس اسمَ خاصيّة.
  */
-export function transactionBodies(source: string): string[] {
-  const bodies: string[] = [];
-  const re = /\.transaction\(\s*async\s*\(\s*[a-zA-Z_]+\s*\)\s*=>\s*\{/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(source))) {
-    let depth = 1;
-    let i = m.index + m[0].length;
-    const start = i;
-    while (i < source.length && depth > 0) {
-      const c = source[i];
-      if (c === "{") depth++;
-      else if (c === "}") depth--;
-      i++;
+export function dbInsideTransactions(source: string, fileName = "x.ts"): string[] {
+  const sf = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const hits: string[] = [];
+  const lineOf = (n: ts.Node) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
+
+  const isTransactionCall = (n: ts.CallExpression) => {
+    const callee = n.expression;
+    const name = ts.isPropertyAccessExpression(callee)
+      ? callee.name.text
+      : ts.isIdentifier(callee)
+        ? callee.text
+        : null;
+    return name === "transaction";
+  };
+
+  // المعرِّف `db` بمعنى الكائن العامّ — لا `x.db` ولا `{ db: … }` ولا اسمَ معاملٍ يحجبه.
+  const isGlobalDbRef = (id: ts.Identifier) => {
+    const p = id.parent;
+    if (ts.isPropertyAccessExpression(p) && p.name === id) return false;
+    if ((ts.isPropertyAssignment(p) || ts.isPropertySignature(p) || ts.isPropertyDeclaration(p)) && p.name === id) return false;
+    if (ts.isParameter(p) || ts.isVariableDeclaration(p) || ts.isBindingElement(p)) return false;
+    return true;
+  };
+
+  const scan = (fn: ts.ArrowFunction | ts.FunctionExpression) => {
+    const shadowed = fn.parameters.some((prm) => ts.isIdentifier(prm.name) && prm.name.text === "db");
+    if (shadowed) return;
+    const inner = (x: ts.Node) => {
+      if (ts.isIdentifier(x) && x.text === "db" && isGlobalDbRef(x)) {
+        hits.push(`${lineOf(x)}: ${x.parent.getText(sf).replace(/\s+/g, " ").slice(0, 60)}`);
+      }
+      ts.forEachChild(x, inner);
+    };
+    inner(fn.body);
+  };
+
+  const visit = (n: ts.Node) => {
+    if (ts.isCallExpression(n) && isTransactionCall(n)) {
+      for (const arg of n.arguments) {
+        if (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) scan(arg);
+      }
     }
-    bodies.push(source.slice(start, i - 1));
-  }
-  return bodies;
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return hits;
 }
 
-const GLOBAL_DB_WRITE = /\bdb\s*\.\s*(insert|update|delete|select|execute)\s*\(/;
+describe("لا وصولَ إلى db داخل معاملة", () => {
+  const withTx = SRC.filter((f) => readFileSync(f, "utf8").includes("transaction("));
 
-describe("لا كتابة بـdb داخل معاملة", () => {
-  for (const file of SRC.filter((f) => f.includes(`${path.sep}api${path.sep}`) || f.includes(`${path.sep}services${path.sep}`))) {
-    const source = readFileSync(file, "utf8");
-    if (!source.includes(".transaction(")) continue;
+  it("الحارس يرى معاملاتٍ فعلاً — لا يمرّ لأنّه لم يجد شيئاً", () => {
+    expect(withTx.length).toBeGreaterThan(10);
+  });
+
+  for (const file of withTx) {
     it(file, () => {
-      const hit = transactionBodies(source).find((b) => GLOBAL_DB_WRITE.test(b));
-      expect(hit ? `db. داخل معاملة: «${GLOBAL_DB_WRITE.exec(hit)?.[0]}»` : null).toBeNull();
+      expect(dbInsideTransactions(readFileSync(file, "utf8"), file)).toEqual([]);
     });
   }
 
-  it("والحارس يُمسك الشكل الخاطئ", () => {
-    const bad = "await db.transaction(async (t) => { await t.insert(a); await db.update(b).set({}); });";
-    expect(transactionBodies(bad).some((b) => GLOBAL_DB_WRITE.test(b))).toBe(true);
-  });
+  // الأشكال الستّة التي أفلت منها الانتظام القديم إلّا أوّلها — ومعها ما حوله.
+  const BAD: Record<string, string> = {
+    "سهمٌ بجسم": "await db.transaction(async (tx) => { await tx.insert(a); await db.insert(b); });",
+    "معاملٌ منمَّط": "await db.transaction(async (tx: Tx) => { await db.update(b).set({}); });",
+    "سهمٌ بلا async يُرجع": "await db.transaction((tx) => { return db.insert(a); });",
+    "function": "await db.transaction(async function (tx) { await db.delete(a); });",
+    "معاملٌ بلا أقواس": "await db.transaction(async tx => { await db.select().from(a); });",
+    "db حجّةً في جسمٍ تعبير": "await db.transaction(async (tx) => write(tx, db));",
+    "جسمٌ تعبيرٌ مباشر": "await db.transaction((tx) => db.insert(a).values(v));",
+    "متداخلٌ في دالّةٍ داخلها": "await db.transaction(async (tx) => { await Promise.all(xs.map((x) => db.insert(x))); });",
+  };
+  for (const [label, code] of Object.entries(BAD)) {
+    it(`والحارس يُمسك: ${label}`, () => {
+      expect(dbInsideTransactions(code).length).toBeGreaterThan(0);
+    });
+  }
 
-  it("ولا يُمسك الصواب", () => {
-    const good = "await db.transaction(async (t) => { await t.insert(a); await t.update(b).set({}); });";
-    expect(transactionBodies(good).some((b) => GLOBAL_DB_WRITE.test(b))).toBe(false);
-  });
+  const GOOD: Record<string, string> = {
+    "المقبض وحده": "await db.transaction(async (t) => { await t.insert(a); await t.update(b).set({}); });",
+    "مقبضٌ منمَّط يُمرَّر": "await db.transaction((tx: Tx) => markPaidByOwner(tx, invoiceId));",
+    "db خارج المعاملة": "const rows = await db.select().from(a); await db.transaction(async (tx) => tx.insert(b));",
+    "خاصيّةٌ اسمها db": "await db.transaction(async (tx) => { log({ db: 1 }); cfg.db.name; });",
+  };
+  for (const [label, code] of Object.entries(GOOD)) {
+    it(`ولا يُمسك الصواب: ${label}`, () => {
+      expect(dbInsideTransactions(code)).toEqual([]);
+    });
+  }
 });
 
 /* ── ٢. تسمية ملفّات الدرايف في موضعٍ واحد ── */
