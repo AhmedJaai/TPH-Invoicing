@@ -397,6 +397,7 @@ export default async function BankPage({
                 matched: focused.matchedPaymentId !== null,
                 evidence: focused.matchEvidence as MatchExplanation["evidence"],
               }}
+              canUndo={canApprove}
             />
           </Card>
         </Section>
@@ -519,7 +520,7 @@ export default async function BankPage({
                         <Money minor={t.amountMinor} />
                       </span>
                     </div>
-                    <MatchExplain match={explanation} />
+                    <MatchExplain match={explanation} canUndo={canApprove} />
                   </Card>
                 </li>
               );
