@@ -64,6 +64,10 @@ export interface FactPayment {
   allocatedMinor: number;
   bankDescription: string | null;
   reversalReason: string | null;
+  /** لها حركةُ بنك مربوطة — أصلٌ يُثبت أنّ المال خرج */
+  hasBankRow?: boolean;
+  /** لها مستند (إيصال) */
+  hasDocument?: boolean;
 }
 
 export interface FactStatement {
@@ -370,6 +374,15 @@ export function validateAnalysis(raw: unknown, f: SupplierFacts, s: Signals): An
         const same = pays.length >= 2 && pays.every((p) => p.amountMinor === pays[0].amountMinor);
         if (!same) { dropped.push({ kind, reason: "لا دفعتان قائمتان بمبلغٍ واحد" }); continue; }
         amountMinor = pays[0].amountMinor;
+        /*
+          «هي دفعةٌ واحدة» كان لا فعل لها إلّا «ليس صحيحاً» — فيُسكت الرفضُ
+          الاقتراح ويبقى التوأم (لافا ٩٤٥ وأطلس ٥٧٥). فإن كانت إحداهما وحدها
+          بلا أصل وللأخرى أصل، فالإقرار يلغي التي بلا أصل.
+        */
+        const orphans = pays.filter((p) => p.hasBankRow === false && p.hasDocument === false);
+        if (orphans.length === 1 && pays.length - orphans.length >= 1) {
+          action = { type: "VOID_DUPLICATE", paymentId: orphans[0].id };
+        }
         break;
       }
       case "STATEMENT_GAP": {

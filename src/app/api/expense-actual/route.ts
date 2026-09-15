@@ -4,6 +4,10 @@
  * الاشتقاق قابل لإعادة التشغيل: الحركة المقيَّدة لا تُقيَّد ثانيةً،
  * يحرسه فهرس فريد في القاعدة لا الشيفرة وحدها.
  */
+import { and, eq, gt } from "drizzle-orm";
+import { db } from "@/db";
+import { expenses } from "@/db/schema";
+import { recordAudit } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import { parseRiyals } from "@/lib/money";
@@ -26,6 +30,8 @@ interface Body {
   label?: string;
   amount?: string;
   note?: string;
+  /** أقرّ صاحبه بأنّه مصروفٌ ثانٍ بالقيمة نفسها */
+  confirmDuplicate?: boolean;
 }
 
 export async function POST(request: Request) {
@@ -83,12 +89,44 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "اكتب مبلغاً صالحاً" }, { status: 400 });
   }
 
+  /*
+    ضغطتان على «قيّده» كانتا مصروفين بلا سؤال، ولا باب حذف. فالمصروف نفسه
+    (البند والمبلغ واليوم) خلال دقيقتين يُسأل عنه — لا يُمنع: مصروفان
+    حقيقيّان بالقيمة نفسها في يومٍ واحد ممكنان، فيُقرّ بهما صاحبهما.
+  */
+  if (!body.confirmDuplicate) {
+    const [twin] = await db
+      .select({ id: expenses.id })
+      .from(expenses)
+      .where(and(
+        eq(expenses.label, label),
+        eq(expenses.amountMinor, amountMinor),
+        eq(expenses.occurredOn, body.occurredOn),
+        gt(expenses.createdAt, new Date(Date.now() - 2 * 60 * 1000)),
+      ))
+      .limit(1);
+    if (twin) {
+      return NextResponse.json(
+        { error: `قُيّد «${label}» بالمبلغ نفسه قبل لحظات — إن كان مصروفاً ثانياً فأكّد ذلك`, duplicateOf: twin.id },
+        { status: 409 },
+      );
+    }
+  }
+
   const id = await recordManualExpense(user.id, {
     occurredOn: body.occurredOn,
     category: body.category,
     label,
     amountMinor,
     note: body.note?.trim() || undefined,
+  });
+
+  await recordAudit({
+    actorId: user.id,
+    action: "EXPENSE_ADDED",
+    entityType: "expense",
+    entityId: id,
+    after: { البند: label, المبلغ: amountMinor, اليوم: body.occurredOn, التصنيف: body.category, المصدر: "يدويّ" },
   });
 
   return NextResponse.json({ ok: true, id, message: `قُيّد «${label}»` });

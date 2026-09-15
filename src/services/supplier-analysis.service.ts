@@ -9,6 +9,7 @@
  *     (`markPaidByOwner`، `applySupplierCredit`) — فيحرسه مؤثِّر القاعدة.
  *   - كلّ تحليلٍ وكلّ قرارٍ في سجلّ التدقيق.
  */
+import { reversePayment } from "@/services/payment.service";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { aiFindings, suppliers, supplierAliases } from "@/db/schema";
@@ -71,12 +72,14 @@ export async function gatherSupplierFacts(supplierId: string): Promise<SupplierF
   const payRows = (
     await db.execute<{
       id: string; paid_at: Date | string; amount_minor: number; fee_minor: number; method: string;
-      status: string; allocated: string | number; bank: string | null; reversal_reason: string | null;
+      status: string; allocated: string | number; bank: string | null; reversal_reason: string | null; has_bank: boolean; has_doc: boolean;
     }>(sql`
       select p.id, p.paid_at, p.amount_minor, p.fee_minor, p.method::text as method, p.status::text as status,
              coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.payment_id = p.id), 0) as allocated,
              (select t.description from bank_transactions t where t.matched_payment_id = p.id limit 1) as bank,
-             p.reversal_reason
+             p.reversal_reason,
+             exists (select 1 from bank_transactions t2 where t2.matched_payment_id = p.id) as has_bank,
+             (p.document_id is not null) as has_doc
         from payments p where p.supplier_id = ${supplierId}
        order by p.paid_at, p.id
     `)
@@ -153,6 +156,7 @@ export async function gatherSupplierFacts(supplierId: string): Promise<SupplierF
       ref: `P${k + 1}`, id: r.id, date: iso(r.paid_at)!, amountMinor: Number(r.amount_minor),
       feeMinor: Number(r.fee_minor), method: r.method, status: r.status, allocatedMinor: Number(r.allocated),
       bankDescription: r.bank, reversalReason: r.reversal_reason,
+      hasBankRow: Boolean(r.has_bank), hasDocument: Boolean(r.has_doc),
     })),
     statements: stRows.map((r, k) => ({
       ref: `K${k + 1}`, id: r.id, periodStart: iso(r.period_start), periodEnd: iso(r.period_end)!,
@@ -415,6 +419,29 @@ export async function decideFinding(input: {
           خُصم_من: outcome.reapplied,
           بقي_لك_عنده_بالهللات: outcome.creditLeftMinor,
         };
+      } else if (finding.action?.type === "VOID_DUPLICATE") {
+        const paymentId = finding.action.paymentId;
+        /* يُعاد التحقّق لحظة الإقرار: ما زالت قائمة، وبلا حركة بنك ولا مستند */
+        const [still] = (
+          await tx.execute<{ status: string; doc: string | null; bank: boolean; amount: number }>(sql`
+            select p.status::text as status, p.document_id as doc, p.amount_minor as amount,
+                   exists (select 1 from bank_transactions t where t.matched_payment_id = p.id) as bank
+              from payments p where p.id = ${paymentId} for update
+          `)
+        ).rows;
+        if (!still || still.status === "REVERSED" || still.status === "VOID" || still.doc || still.bank) {
+          throw new FindingDecisionError("تغيّرت الدفعة منذ التحليل — لم يُلغَ شيء. أعد التحليل");
+        }
+        const outcome = await reversePayment(tx, {
+          paymentId,
+          kind: "VOID",
+          reason: "دفعةٌ مكرّرة بلا أصل — أقرّ المالك أنّها واقعةٌ واحدة",
+          userId: input.userId,
+        });
+        message = outcome.freedMinor > 0
+          ? "أُلغيت الدفعة المكرّرة — والفواتير التي كانت تغطّيها عادت مستحقّةً إن لم تُسدَّد بغيرها"
+          : "أُلغيت الدفعة المكرّرة";
+        detail = { الدفعة: paymentId, المبلغ_بالهللات: Number(still.amount), كانت_مخصَّصة_على: outcome.previousAllocations };
       } else if (finding.action?.type === "APPLY_CREDIT") {
         const outcome = await applySupplierCredit(tx, finding.supplierId, { forwardDays: null });
         message = outcome.appliedMinor > 0 ? "خُصم رصيدُك عنده من فواتيره" : "لم يبقَ رصيدٌ يُخصم — تغيّر الحساب منذ التحليل";
@@ -445,6 +472,7 @@ export async function decideFinding(input: {
     actorId: input.userId,
     action: finding.action?.type === "OWNER_PAID" ? "INVOICE_PAID_BY_OWNER"
       : finding.action?.type === "APPLY_CREDIT" ? "SUPPLIER_CREDIT_APPLIED"
+      : finding.action?.type === "VOID_DUPLICATE" ? "PAYMENT_VOIDED"
       : "AI_FINDING_DECIDED",
     entityType: "ai_finding",
     entityId: finding.id,

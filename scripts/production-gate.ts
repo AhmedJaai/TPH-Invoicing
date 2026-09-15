@@ -7,6 +7,7 @@
  * و«لم يُفحَص» تمنع الجاهزية كما يمنعها الفشل: بوّابةٌ تعدّ غير المفحوص
  * ناجحاً تُنتج ثقةً بلا سند.
  */
+import { execSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { sql } from "drizzle-orm";
@@ -417,16 +418,20 @@ async function main() {
     والنتيجتان تُقرآن من ملفّيهما لا تُنقَلان باليد — وما يُنقَل باليد
     يُنقَل خطأً. وقِدَمُ الملفّ يُعلَن: شهادةٌ عمرُها أسبوع لا تصف اليوم.
     */
-  const certify = readJson<{ at: string; total: number; passed: number }>("certify-result.json");
+  const certify = readJson<{ at: string; total: number; passed: number; commit?: string | null }>("certify-result.json");
+  /* شهادةٌ على كوميتٍ آخر (أو بلا كوميت) لا تصف هذه الشيفرة — «لم يُفحَص» */
+  const head = (() => { try { return execSync("git rev-parse HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return null; } })();
+  const certifyOtherCommit = certify !== null && (!certify.commit || certify.commit !== head);
   add(
     "end_to_end_tests",
     certify === null ? "UNKNOWN"
       : certify.passed !== certify.total ? "FAIL"
-      : isStale(certify.at) ? "UNKNOWN" : "PASS",
+      : isStale(certify.at) || certifyOtherCommit ? "UNKNOWN" : "PASS",
     certify === null
       ? "لم تُشغَّل الشهادة بعد"
       : `${certify.passed} من ${certify.total} سيناريو · ${ageOf(certify.at)}` +
-        (isStale(certify.at) ? ` — أقدم من ${STALE_DAYS} أيّام، ولا تصف الشيفرة الحاليّة` : ""),
+        (isStale(certify.at) ? ` — أقدم من ${STALE_DAYS} أيّام، ولا تصف الشيفرة الحاليّة` : "") +
+        (certifyOtherCommit ? " — على كوميتٍ غير الحاليّ، فأعد تشغيلها" : ""),
     "npm run ops:certify",
   );
 

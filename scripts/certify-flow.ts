@@ -15,6 +15,11 @@
  * وستّة سيناريوهات، آخرها هو الذي كاد يكلّف مالاً حقيقياً.
  */
 import { writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
+
+function currentCommit(): string | null {
+  try { return execSync("git rev-parse HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return null; }
+}
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -548,7 +553,9 @@ async function main() {
     وبلا ذلك يبقى بندُ «اختبار الدورة كاملةً» مجهولاً أبداً، ويُطلَب من
     الإنسان أن ينقل نتيجةً بيده — وما يُنقَل باليد يُنقَل خطأً.
   */
+  /* الشهادة تُربط بالكوميت الذي شهدت عليه — شهادةٌ على شيفرةٍ غيرها لا تُعدّ */
   writeFileSync("certify-result.json", JSON.stringify({
+    commit: currentCommit(),
     at: new Date().toISOString(),
     total: results.length,
     passed: results.length - failed,

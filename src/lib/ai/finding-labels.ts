@@ -36,7 +36,9 @@ export const SEVERITY_LABEL: Record<Severity, string> = {
 
 export type FindingAction =
   | { type: "OWNER_PAID"; invoiceId: string }
-  | { type: "APPLY_CREDIT" };
+  | { type: "APPLY_CREDIT" }
+  /** دفعةٌ مكرّرة بلا أصل (لا حركة بنك ولا مستند) بجانب توأمٍ له أصل — تُلغى */
+  | { type: "VOID_DUPLICATE"; paymentId: string };
 
 export interface FindingRef {
   ref: string;
