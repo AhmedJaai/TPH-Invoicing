@@ -86,6 +86,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | `029_ops_indexes.sql` | فهارس ناقصة: `payment_allocations.invoice_id` و`matched_payment_id` و`bank_import_id` و`user_id` |
 | `030_extraction_cache.sql` | `extraction_cache` — ما قرأه النموذج بيد الخادم ببصمة الملفّ، لا من المتصفّح |
 | `031_extraction_text_source.sql` | مصدرُ القراءة (نصّ · صورة مضمَّنة · صورة) يُحفَظ مع ما قُرئ ويُنقل إلى `documents.text_source` |
+| `032_payment_month_stable.sql` | `payment_month` تُوسَم `STABLE` لا `IMMUTABLE` — `to_char(timestamptz)` يتبع منطقة الجلسة |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

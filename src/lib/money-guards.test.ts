@@ -49,3 +49,31 @@ describe("إدراج الفاتورة والدفعة والتخصيص في خد�
     expect(MONEY_INSERT.test("await tx.insert(documents).values({})")).toBe(false);
   });
 });
+
+/* ── ٢. تاريخُ السداد والحركة يومٌ مدنيّ لا لحظةُ الخادم ── */
+
+/**
+ * الاصطلاح: التاريخ المدنيّ يُكتب `00:00Z` ليومه. والشهرُ يُشتقّ منه
+ * (`payment_month` في القاعدة، و`toISOString().slice(0, 7)` في الخدمات)
+ * — فلحظةُ `new Date()` في الحادية عشرة ليلاً بتوقيت الرياض آخرَ الشهر
+ * تقع في الشهر التالي بـUTC أو العكس، فتُكتب الدفعة في شهرٍ غير شهرها
+ * ويُحرَس الإقفال على الشهر الخطأ. واليومُ يُؤخذ من `todayInRiyadh()`.
+ */
+export const NOW_AS_CIVIL_DATE = /\b(paidAt|valueDate)\s*:\s*new\s+Date\(\s*\)/;
+
+describe("paidAt وvalueDate لا يُكتبان بلحظة الخادم", () => {
+  it("لا `paidAt: new Date()` ولا `valueDate: new Date()` في src", () => {
+    const offenders = SRC.filter((f) => NOW_AS_CIVIL_DATE.test(readFileSync(f, "utf8")));
+    expect(offenders).toEqual([]);
+  });
+
+  it("والحارس يُمسك الشكل الخاطئ", () => {
+    expect(NOW_AS_CIVIL_DATE.test("createPayment(tx, { paidAt: new Date(), amountMinor })")).toBe(true);
+    expect(NOW_AS_CIVIL_DATE.test("{ valueDate:new Date( ) }")).toBe(true);
+  });
+
+  it("ولا يُمسك اليومَ المدنيّ", () => {
+    expect(NOW_AS_CIVIL_DATE.test("paidAt: new Date(`${paidOn}T00:00:00Z`)")).toBe(false);
+    expect(NOW_AS_CIVIL_DATE.test("createdAt: new Date()")).toBe(false);
+  });
+});
