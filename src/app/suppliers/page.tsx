@@ -10,7 +10,7 @@ import { Money } from "@/components/money";
 import Link from "next/link";
 import { Badge, Card, DataTable, EmptyState, LinkButton, Section, buttonClass } from "@/components/ui";
 import { SUPPLIER, countNoun, ALIAS, PAYMENT_RECORD } from "@/lib/arabic";
-import { buildInvoiceRequest, groupUnbackedBySupplier } from "@/lib/supplier-requests";
+import { buildInvoiceRequest, groupUnbackedBySupplier, splitSupplierCredit } from "@/lib/supplier-requests";
 import { loadUnbackedPayments } from "@/services/supplier-followups.service";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +59,12 @@ export default async function SuppliersPage({
         select coalesce(sum(p.amount_minor - p.fee_minor), 0)::bigint
         from payments p
         where p.supplier_id = suppliers.id and p.status not in ('REVERSED', 'VOID')
+      )`,
+      /* المقدَّمة المعلَنة — وحدها تُسمّى «لك عنده» (SCN-105) */
+      advanceMinor: sql<number>`(
+        select coalesce(sum(p.amount_minor - p.fee_minor), 0)::bigint
+        from payments p
+        where p.supplier_id = suppliers.id and p.status = 'ADVANCE'
       )`,
       statementCount: sql<number>`(
         select count(*)::int from statements st where st.supplier_id = suppliers.id
@@ -253,9 +259,23 @@ export default async function SuppliersPage({
                     /* بعتبة التسوية نفسها التي في supplier-balances — «0.02» هنا و«لا رصيد» في صفحته كانا رقمين لشيءٍ واحد */
                     const raw = Number(r.billedMinor) - Number(r.paidMinor);
                     const balance = Math.abs(raw) <= SETTLED_TOLERANCE_MINOR ? 0 : raw;
+                    /*
+                      ما دُفع فوق الفواتير ليس ديناً على المورّد بالضرورة — غالبُه
+                      فواتير لم تصل. فيُسمّى بما هو، والمقدَّمة المعلَنة وحدها «لك عنده».
+                    */
+                    const split = splitSupplierCredit(-balance, Number(r.advanceMinor));
                     return balance < 0 ? (
-                      <span className="text-xs font-bold text-ok">
-                        لك عنده <Money minor={-balance} />
+                      <span className="text-xs font-bold">
+                        {split.unbackedMinor > 0 && (
+                          <span className="block text-warn">
+                            دفعتَ له بلا فاتورة: <Money minor={split.unbackedMinor} />
+                          </span>
+                        )}
+                        {split.advanceMinor > 0 && (
+                          <span className="block text-ok">
+                            لك عنده مقدَّمةً: <Money minor={split.advanceMinor} />
+                          </span>
+                        )}
                       </span>
                     ) : (
                       <span className="font-bold">

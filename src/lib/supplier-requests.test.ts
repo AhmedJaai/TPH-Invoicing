@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildInvoiceRequest, buildStatementRequest, groupUnbackedBySupplier, type UnbackedPayment,
+  buildInvoiceRequest, buildStatementRequest, groupUnbackedBySupplier, splitSupplierCredit, type UnbackedPayment,
 } from "./supplier-requests";
 
 const pay = (o: Partial<UnbackedPayment> & { paymentId: string }): UnbackedPayment => ({
@@ -38,5 +38,18 @@ describe("الدفعات بلا فاتورة مورّداً مورّداً (BTN-
 
   it("رسالة الكشف تسمّي الشهر", () => {
     expect(buildStatementRequest("أوراق الزيتون", "2026-08")).toContain("2026-08");
+  });
+});
+
+describe("المال نفسه باسمٍ واحد (SCN-105)", () => {
+  it("بلا مقدَّمةٍ معلَنة: كلُّه «دفعتَ له بلا فاتورة»", () => {
+    expect(splitSupplierCredit(26_767_40, 0)).toEqual({ advanceMinor: 0, unbackedMinor: 26_767_40 });
+  });
+  it("المقدَّمة وحدها «لك عنده»، ولا تتجاوز ما بقي", () => {
+    expect(splitSupplierCredit(5_000_00, 2_000_00)).toEqual({ advanceMinor: 2_000_00, unbackedMinor: 3_000_00 });
+    expect(splitSupplierCredit(1_000_00, 2_000_00)).toEqual({ advanceMinor: 1_000_00, unbackedMinor: 0 });
+  });
+  it("لا رصيد لا اسم", () => {
+    expect(splitSupplierCredit(-5, 100)).toEqual({ advanceMinor: 0, unbackedMinor: 0 });
   });
 });

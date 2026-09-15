@@ -82,3 +82,20 @@ export function buildStatementRequest(supplierName: string, month: string): stri
     `شاكرين لكم.`,
   ].join("\n");
 }
+
+/**
+ * «لك عنده» أم «دفعتَ له بلا فاتورة»؟ (SCN-105)
+ *
+ * كانت الصفحة تكتب «لك عنده ٢٦٬٧٦٧» لكلّ مالٍ دُفع فوق الفواتير — وهي
+ * تُقرأ ديناً على المورّد، فيُطالَب غاناش بمالٍ هو في الغالب فواتير لم
+ * تصلنا. والتنبيه يسمّي المال نفسه «لم يُنسب بعد». فالاسم يتبع ما نعرف:
+ * المقدَّمة المعلَنة وحدها «لك عنده»، وما عداها «دفعتَ له بلا فاتورة».
+ */
+export function splitSupplierCredit(creditMinor: number, advanceMinor: number): {
+  advanceMinor: number;
+  unbackedMinor: number;
+} {
+  const credit = Math.max(0, creditMinor);
+  const advance = Math.min(credit, Math.max(0, advanceMinor));
+  return { advanceMinor: advance, unbackedMinor: credit - advance };
+}
