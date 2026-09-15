@@ -202,14 +202,6 @@ export const FILE: NounForms = {
   zero: "لا ملفّات",
 };
 
-export const TRANSFER: NounForms = {
-  one: "تحويل واحد",
-  two: "تحويلان",
-  few: "تحويلات",
-  many: "تحويلاً",
-  zero: "لا تحويلات",
-};
-
 /** الدفعة المسجَّلة (سجلٌّ في `payments`) — غيرُ «السداد» فعلاً. */
 export const PAYMENT_RECORD: NounForms = {
   one: "دفعة واحدة",

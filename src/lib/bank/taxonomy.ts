@@ -46,22 +46,6 @@ export const KIND_LABEL: Record<TxKind, string> = {
 };
 
 /**
- * هذه وحدها إيرادٌ يصل الحساب.
- *
- * تُفصل عن غيرها لأنّ ربطها بالمبيعات لاحقاً هو ما يجيب: «بعتُ تسعة
- * آلاف ووصلني ثمانية آلاف وسبعمئة وستّون — أين الفرق؟»
- */
-export const REVENUE_KINDS: readonly TxKind[] = ["POS_SETTLEMENT"];
-
-/** ما يُخصم من إيراد الشبكة قبل أن يصل. */
-export const POS_COST_KINDS: readonly TxKind[] = ["POS_FEE", "POS_VAT"];
-
-/** ما لا يُقيَّد مصروفاً ولا يُنسب إلى مورّد. */
-export const NON_OPERATIONAL: readonly TxKind[] = [
-  "POS_SETTLEMENT", "INTERNAL_TRANSFER", "OWNER_TRANSFER", "UNKNOWN",
-];
-
-/**
  * نتيجة محاولة نسبة حركةٍ إلى فواتير.
  *
  * كل حالة تُسمّى بما هي، لا بـ«لم تُطابَق» — لأنّ الفعل المطلوب يختلف:
@@ -77,25 +61,7 @@ export type Outcome =
   | "KNOWN_SUPPLIER_NO_INVOICE" // مورّد معروف بلا فاتورة مفتوحة
   | "UNKNOWN_ENTITY"          // لم يُعرف المستفيد
   | "DUPLICATE_PAYMENT"       // يُشتبه بتكرارها
-  | "NOT_A_PAYMENT";          // ليست سداد مورّد أصلاً
-
-export const OUTCOME_LABEL: Record<Outcome, string> = {
-  EXACT_INVOICE: "فاتورة بعينها",
-  MULTI_INVOICE: "دفعة لعدّة فواتير",
-  PARTIAL_PAYMENT: "سداد جزئي",
-  OVERPAYMENT: "أكثر من المستحقّ",
-  AMOUNT_MISMATCH: "المبلغ لا يوافق فاتورة",
-  KNOWN_SUPPLIER_NO_INVOICE: "مورّد معروف بلا فاتورة مفتوحة",
-  UNKNOWN_ENTITY: "مستفيد غير معروف",
-  DUPLICATE_PAYMENT: "يُشتبه بتكرارها",
-  NOT_A_PAYMENT: "ليست سداد مورّد",
-};
+  | "NOT_A_PAYMENT";
 
 /** ماذا يفعل النظام بالنتيجة. */
 export type Disposition = "AUTO" | "SUGGEST" | "REVIEW";
-
-export const DISPOSITION_LABEL: Record<Disposition, string> = {
-  AUTO: "طُوبقت تلقائياً",
-  SUGGEST: "اقتراح ينتظر تأكيدك",
-  REVIEW: "للمراجعة",
-};

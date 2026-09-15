@@ -24,6 +24,9 @@ jobs:
       - name: فحص الأسلوب
         run: npm run lint
 
+      - name: لا صادرَ ميّتاً
+        run: npm run lint:dead
+
       - name: اختبارات منطق الأعمال
         run: npm test
 

@@ -36,7 +36,7 @@ import {
 } from "./finding-labels";
 
 export {
-  FINDING_KINDS, FINDING_LABEL, SEVERITY_LABEL,
+  FINDING_KINDS,
   type FindingAction, type FindingKind, type FindingRef, type Severity,
 } from "./finding-labels";
 

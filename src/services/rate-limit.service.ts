@@ -5,7 +5,7 @@
  * ثمّ يُقارَن الراجع بالحدّ. فلا يقع سباق بين قراءة وكتابة، ولا يفلت طلبان
  * متزامنان من العدّ.
  */
-import { and, eq, lt, sql } from "drizzle-orm";
+import { lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { rateLimits } from "@/db/schema";
 import { decide, ruleFor, windowStart, type RateLimitDecision } from "@/lib/rate-limit";
@@ -57,16 +57,4 @@ export async function consume(route: string, actorId: string): Promise<RateLimit
 
   if (!decision.allowed) throw new RateLimitedError(decision, route);
   return decision;
-}
-
-/** يُستعمل في الاختبار والتشخيص. */
-export async function currentCount(route: string, actorId: string): Promise<number> {
-  const rule = ruleFor(route);
-  const start = windowStart(new Date(), rule.windowSeconds);
-  const [row] = await db
-    .select({ count: rateLimits.count })
-    .from(rateLimits)
-    .where(and(eq(rateLimits.key, `${route}:${actorId}`), eq(rateLimits.windowStart, start)))
-    .limit(1);
-  return Number(row?.count ?? 0);
 }

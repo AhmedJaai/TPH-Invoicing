@@ -100,19 +100,6 @@ export const receiptExtractionSchema = z.object({
   ...confidenceShape,
 });
 
-/** فاتورة مرافق — عدّاد وفترة، لا بنود ولا مورّد بالمعنى المعتاد. */
-export const utilityExtractionSchema = z.object({
-  ...partiesShape,
-  accountNumber: z.string().describe("رقم الحساب أو العدّاد، أو فارغ"),
-  invoiceNumber: z.string().describe("رقم الفاتورة، أو فارغ"),
-  invoiceDate: z.string().describe("تاريخ الفاتورة YYYY-MM-DD، أو فارغ"),
-  /* ولا تُطلَب فترة الاستهلاك — `widen()` يُسقطها فلا تبلغ القاعدة */
-  subtotalAmount: moneyString.describe("قبل الضريبة"),
-  vatAmount: moneyString.describe("الضريبة"),
-  totalAmount: moneyString.describe("الإجمالي"),
-  ...confidenceShape,
-});
-
 /**
  * أيّ مخطّط لأيّ نوع.
  *

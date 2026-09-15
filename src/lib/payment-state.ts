@@ -38,11 +38,6 @@ export type PaymentStatus =
 /** حالاتٌ لا تُحسَب في «ما دُفع للمورّد». */
 export const NON_CASH_STATUSES: readonly PaymentStatus[] = ["REVERSED", "VOID"];
 
-/** حالاتٌ فيها مالٌ لم يستقرّ على فاتورة. */
-export const OPEN_STATUSES: readonly PaymentStatus[] = [
-  "UNAPPLIED", "PARTIALLY_APPLIED", "OVERPAYMENT", "ADVANCE",
-];
-
 export function countsAsPaid(status: PaymentStatus): boolean {
   return !NON_CASH_STATUSES.includes(status);
 }

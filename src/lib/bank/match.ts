@@ -6,7 +6,7 @@
  * لذلك المطابقة تمرّ على الأسماء البديلة، وتتعلّم كل اسم جديد بعد إقراره.
  */
 import { normalizeName } from "@/lib/suppliers-seed";
-import { findRule, type BankRule, type TxCategory } from "./rules";
+import { findRule, type BankRule } from "./rules";
 
 export interface BankTx {
   id: string;
@@ -34,29 +34,6 @@ export interface SupplierAliasIndex {
   supplierName: string;
   /** كل الأسماء المطبَّعة التي يُعرف بها: اسمه ومجلده وأسماؤه البنكية */
   normalizedNames: string[];
-}
-
-export type BankMatchKind =
-  | "EXACT_INVOICE"
-  | "INVOICE_GROUP"
-  | "SUPPLIER_ONLY"
-  | "INTERNAL"
-  /** صنّفها المالك بقاعدة: راتب أو إيجار أو زكاة… فلا تُطابَق بفاتورة */
-  | "CLASSIFIED"
-  | "NONE";
-
-export interface BankMatch {
-  tx: BankTx;
-  kind: BankMatchKind;
-  supplierId?: string;
-  supplierName?: string;
-  /** الفواتير التي تفسّر هذه الحركة */
-  invoices: OpenInvoice[];
-  confidence: number;
-  note?: string;
-  category: TxCategory;
-  /** القاعدة التي صنّفتها، إن وُجدت */
-  ruleId?: string;
 }
 
 /** حركات لا علاقة لها بالمورّدين — نستبعدها قبل المطابقة لتصفو النتيجة. */

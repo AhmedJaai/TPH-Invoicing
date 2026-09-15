@@ -272,25 +272,6 @@ export async function activeRecurring(): Promise<RecurringExpense[]> {
   }));
 }
 
-export async function expensesOfMonth(month: string): Promise<Expense[]> {
-  const rows = await db
-    .select()
-    .from(expenses)
-    .where(eq(expenses.periodMonth, month));
-
-  return rows.map((r) => ({
-    id: r.id,
-    periodMonth: r.periodMonth,
-    occurredOn: r.occurredOn,
-    category: r.category,
-    label: r.label,
-    amountMinor: r.amountMinor,
-    source: r.source,
-    bankTransactionId: r.bankTransactionId,
-    recurringExpenseId: r.recurringExpenseId,
-  }));
-}
-
 /** مصروف يدويّ — نقداً أو بغير كشف البنك. */
 export async function recordManualExpense(
   userId: string,

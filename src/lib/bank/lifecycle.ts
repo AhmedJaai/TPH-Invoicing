@@ -30,14 +30,6 @@ export const LIFECYCLE_ORDER: readonly Lifecycle[] = [
   "RAW", "INFERRED", "SUGGESTED", "CONFIRMED", "POSTED",
 ];
 
-export const LIFECYCLE_LABEL: Record<Lifecycle, string> = {
-  RAW: "خام — كما قاله البنك",
-  INFERRED: "مُستنتَجة — عُرف بابها",
-  SUGGESTED: "مقترَحة — تنتظر إقرارك",
-  CONFIRMED: "مُقَرَّة — لم تُقيَّد بعد",
-  POSTED: "مُقيَّدة — صارت مالاً",
-};
-
 export interface LifecycleFacts {
   /** صُنّفت باباً معروفاً (غير `UNKNOWN`). */
   classified: boolean;

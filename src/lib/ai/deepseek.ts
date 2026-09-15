@@ -18,7 +18,6 @@
  * والفرق ليس تجميلاً: الثلاثة الأخيرة تُوقف المستند إلى مراجعةٍ بشرية،
  * والأوّل يُصلحه أحمد بنفسه ولا ينتظر أحداً.
  */
-import { createHash } from "node:crypto";
 import { attemptTimeout, currentDeadline } from "./deadline";
 import {
   deepseekBaseUrl,
@@ -145,11 +144,6 @@ function retryBaseMs(): number {
 }
 
 const wait = (ms: number) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
-
-/** بصمة محتوى — للأثر والخزين، ولا تحمل المحتوى نفسه. */
-export function contentHash(input: string | Buffer): string {
-  return createHash("sha256").update(input).digest("hex").slice(0, 32);
-}
 
 interface RawResponse {
   choices?: { message?: { content?: string }; finish_reason?: string }[];

@@ -22,7 +22,7 @@
  * فاتورةً ولا دفعة.
  */
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { invoices, paymentAllocations } from "@/db/schema";
+import { paymentAllocations } from "@/db/schema";
 import {
   planCreditApplication,
   type AvailableCredit,
@@ -301,14 +301,4 @@ export async function markPaidByOwner(tx: Tx, invoiceId: string): Promise<OwnerP
     : { appliedMinor: 0, creditLeftMinor: 0, allocations: [] };
 
   return { ...plan, ownerPaymentId, appliedMinor: credit.appliedMinor };
-}
-
-/** يُستعمل للتأكّد أنّ الفاتورة لمورّدٍ بعينه قبل الفعل. */
-export async function invoiceSupplier(executor: Executor, invoiceId: string): Promise<string | null> {
-  const [row] = await executor
-    .select({ supplierId: invoices.supplierId })
-    .from(invoices)
-    .where(eq(invoices.id, invoiceId))
-    .limit(1);
-  return row?.supplierId ?? null;
 }

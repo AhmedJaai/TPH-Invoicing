@@ -240,15 +240,6 @@ export function NoAccess({ what }: { what?: string }) {
   );
 }
 
-export function ErrorState({ message, hint }: { message: string; hint?: string }) {
-  return (
-    <div className="rounded-2xl border border-danger/40 bg-danger-bg px-5 py-8 text-center">
-      <p className="text-sm font-bold text-danger">{message}</p>
-      {hint && <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-ink-soft">{hint}</p>}
-    </div>
-  );
-}
-
 /** هيكل الانتظار: يدلّ على أين سيقع المحتوى، بلا نسبة مخترَعة. */
 export function Skeleton({ rows = 3 }: { rows?: number }) {
   return (

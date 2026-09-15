@@ -35,12 +35,6 @@ export const CATEGORY_LABEL: Record<TxCategory, string> = {
   BANK_VAT: "ضريبة رسوم البنك",
 };
 
-/** التصنيفات التي لا تدخل حساب مستحقّات المورّدين. */
-export const NON_SUPPLIER_CATEGORIES: readonly TxCategory[] = [
-  "SALARY", "RENT", "ZAKAT", "UTILITY", "GOVERNMENT", "PERSONAL", "INTERNAL", "OTHER",
-  "POS_SETTLEMENT", "POS_FEE", "POS_VAT", "BANK_FEE", "BANK_VAT",
-];
-
 export interface BankRule {
   id: string;
   /** النمط بعد التطبيع */

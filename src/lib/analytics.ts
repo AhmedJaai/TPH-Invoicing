@@ -46,14 +46,6 @@ export function paymentStatus(row: InvoicePaymentRow): PaymentStatus {
 
 export type AgeBucket = "current" | "d30" | "d60" | "d90" | "older";
 
-export const AGE_LABEL: Record<AgeBucket, string> = {
-  current: "أقل من ٣٠ يوماً",
-  d30: "٣٠ إلى ٥٩ يوماً",
-  d60: "٦٠ إلى ٨٩ يوماً",
-  d90: "٩٠ إلى ١١٩ يوماً",
-  older: "١٢٠ يوماً فأكثر",
-};
-
 export function ageBucket(invoiceDate: Date, asOf: Date): AgeBucket {
   const days = Math.floor((asOf.getTime() - invoiceDate.getTime()) / 86_400_000);
   if (days < 30) return "current";

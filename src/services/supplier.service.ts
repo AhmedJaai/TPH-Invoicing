@@ -5,10 +5,9 @@
  * لا يُطالَب بما لا يملك، والذي بلا عقد يُنبَّه عليه. فجمعُ ذلك في مكان
  * واحد يمنع أن يفحص كل مسار بقواعد مختلفة.
  */
-import { eq, inArray, or } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import { supplierAliases, suppliers } from "@/db/schema";
-import type { SupplierRecord } from "@/lib/supplier-match";
 import { normalizeName } from "@/lib/suppliers-seed";
 import type { Tx } from "./types";
 
@@ -17,36 +16,6 @@ export interface SupplierContext {
   nameAr: string;
   issuesInvoices: boolean;
   contractOnFile: boolean;
-}
-
-/** كل المورّدين النشطين مع أسمائهم البديلة — ما تحتاجه المطابقة. */
-export async function loadActiveSuppliers(): Promise<SupplierRecord[]> {
-  const rows = await db
-    .select({
-      id: suppliers.id,
-      slug: suppliers.slug,
-      nameAr: suppliers.nameAr,
-      nameEn: suppliers.nameEn,
-      driveFolderName: suppliers.driveFolderName,
-      vatNumber: suppliers.vatNumber,
-      issuesInvoices: suppliers.issuesInvoices,
-      contractOnFile: suppliers.contractOnFile,
-    })
-    .from(suppliers)
-    .where(eq(suppliers.isActive, true));
-
-  const ids = rows.map((r) => r.id);
-  const aliasRows = ids.length
-    ? await db
-        .select({ supplierId: supplierAliases.supplierId, normalized: supplierAliases.normalized })
-        .from(supplierAliases)
-        .where(inArray(supplierAliases.supplierId, ids))
-    : [];
-
-  return rows.map((r) => ({
-    ...r,
-    aliases: aliasRows.filter((a) => a.supplierId === r.id).map((a) => ({ normalized: a.normalized })),
-  }));
 }
 
 /** سياق مورّد بعينه، أو null إن لم يوجد. */

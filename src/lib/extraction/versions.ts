@@ -34,34 +34,3 @@ export const PINNED_MODELS = {
   gemini: "gemini-2.5-flash",
   ollama: "qwen2.5vl:7b",
 } as const;
-
-export interface ExtractionProvenance {
-  provider: string;
-  model: string;
-  promptVersion: string;
-  schemaVersion: string;
-  /** كم استغرق الطلب — أساس المقارنة بين المزوّدين. */
-  durationMs: number;
-  /** ما استُهلك، إن أخبر المزوّد. */
-  inputTokens?: number;
-  outputTokens?: number;
-  at: string;
-}
-
-export function provenance(
-  provider: string,
-  model: string,
-  durationMs: number,
-  usage?: { inputTokens?: number; outputTokens?: number },
-): ExtractionProvenance {
-  return {
-    provider,
-    model,
-    promptVersion: PROMPT_VERSION,
-    schemaVersion: SCHEMA_VERSION,
-    durationMs,
-    inputTokens: usage?.inputTokens,
-    outputTokens: usage?.outputTokens,
-    at: new Date().toISOString(),
-  };
-}

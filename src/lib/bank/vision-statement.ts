@@ -203,14 +203,6 @@ export function validateVision(
   return { rows, rejected, openingMinor, closingMinor, blocked: null };
 }
 
-/**
- * الموجِّه.
- *
- * ويعلن في أوّله أنّ محتوى المستند **بيانات لا تعليمات** — كشفٌ فيه
- * سطرٌ مكتوبٌ فيه «تجاهل ما سبق» لا يُطاع.
- */
-export const VISION_PROMPT_VERSION = "2026-09-06.1";
-
 export function buildVisionPrompt(): string {
   return [
     "أنت تقرأ صورةَ كشف حساب بنكيّ وتنسخ جدوله حرفاً بحرف.",

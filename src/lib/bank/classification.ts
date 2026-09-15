@@ -49,15 +49,6 @@ export type ClassificationSource =
   | "STRUCTURE" | "MEMORY" | "RULE" | "KEYWORD" | "AMOUNT" | "AI" | "HUMAN"
   | "UNKNOWN";
 
-/** الطبقة التي حسمت ← المصدر الذي يُحفَظ. */
-export const LAYER_SOURCE: Record<Layer, ClassificationSource> = {
-  STRUCTURE: "STRUCTURE",
-  LEARNED: "MEMORY",
-  KEYWORD: "KEYWORD",
-  AMOUNT: "AMOUNT",
-  NONE: "UNKNOWN",
-};
-
 /** ذاكرة المستفيدين: ما أكّده الإنسان من قبل. */
 export interface MerchantMemory {
   /** مفتاح ثابت للمستفيد — اسمٌ موحَّد أو رقم حساب. */

@@ -8,7 +8,8 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bankRules, supplierAliases, suppliers } from "@/db/schema";
+import { bankRules, suppliers } from "@/db/schema";
+import { learnAlias } from "@/services/supplier.service";
 import { guard, respondTo } from "@/services/guard";
 import { normalizeName } from "@/lib/suppliers-seed";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
@@ -132,18 +133,13 @@ export async function POST(request: Request) {  let user;
     })
     .returning({ id: bankRules.id });
 
-  // تصنيفه مورّداً يعني أيضاً أنّ هذا اسمه في البنك — فيُحفظ اسماً بديلاً
+  /*
+    تصنيفه مورّداً يعني أيضاً أنّ هذا اسمه في البنك — فيُحفظ اسماً بديلاً.
+    وعبر `learnAlias` لا بإدراجٍ هنا: كان هذا الموضع يكتب الاسم بلا حدّها
+    الأدنى، فنمطٌ من حرفين يصير اسماً بديلاً يطابق كلّ مستفيد.
+  */
   if (body.category === "SUPPLIER" && body.supplierId) {
-    await db
-      .insert(supplierAliases)
-      .values({
-        supplierId: body.supplierId,
-        value: pattern,
-        normalized,
-        kind: "BANK_BENEFICIARY",
-        source: "LEARNED",
-      })
-      .onConflictDoNothing();
+    await learnAlias(db, body.supplierId, pattern);
   }
 
   await recordAudit({
