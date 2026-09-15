@@ -124,3 +124,66 @@ describe("لا فاتورة ولا كشف ← مجهول لا صفر", () => {
     expect(a.status).not.toBe("UNKNOWN");
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════
+   «فاتورةٌ لم تصلنا» تُنفى بالحساب قبل أن تُكتب — مصنع الكوب الذهبي
+
+   فاتورتان: مايو INV263287 بـ١٣٬٥٠٦٫٧٥، ويوليو INV264916 بـ١٢٬٠٠٣٫١٣.
+   حتى كشفه (١٥ يوليو) دُفع ١٥٢٫٣٧ و٧٬٥٠٠ حوالةً، و١٢٬٠٠٣٫١٣ من حساب
+   المالك على يوليو. فنعرف ٥٬٨٥٤٫٣٨ (بقيّة مايو)، ويقول كشفُه ١٢٬٠٠٣٫١٣.
+   وبعده خُصّص على مايو ٤٬٥٠٣٫١٣ و١٬١٥٠ و٢٠١٫٢٥ = ٥٬٨٥٤٫٣٨.
+   ═══════════════════════════════════════════════════════════════ */
+describe("الكوب الذهبي: الفرق ليس فاتورةً غائبة", () => {
+  const golden = () => buildSupplierAccount({
+    billedMinor: 1_350_675 + 1_200_313,
+    paidMinor: 15_237 + 750_000 + 1_200_313,
+    reportedBalanceMinor: 1_200_313,
+    allocatedAfterStatementMinor: 450_313 + 115_000 + 20_125,
+    invoicesAtStatement: [
+      { invoiceNumber: "INV263287", totalMinor: 1_350_675 },
+      { invoiceNumber: "INV264916", totalMinor: 1_200_313 },
+    ],
+  });
+
+  it("الأرقام كما في الصفحة", () => {
+    const a = golden();
+    expect(a.knownBalanceMinor).toBe(585_438);
+    expect(a.differenceMinor).toBe(614_875);
+    expect(a.allocatedAfterStatementMinor).toBe(585_438);
+    expect(a.status).toBe("DIFFERS");
+  });
+
+  it("رصيدُ كشفه فاتورةٌ عندنا — فلا يُكتب «لم تصلنا»", () => {
+    const a = golden();
+    expect(a.explanation).toEqual({ kind: "INVOICE_ON_FILE", invoiceNumber: "INV264916" });
+    expect(describeAccount(a)).not.toContain("لم تصلنا");
+    expect(describeAccount(a)).toContain("INV264916");
+  });
+
+  it("وإن ساوى الفرقُ ما خُصّص بعد الكشف فهو ترتيبُ تخصيص", () => {
+    const a = buildSupplierAccount({
+      billedMinor: 1_350_675, paidMinor: 765_237,
+      reportedBalanceMinor: 585_438 + 585_438,
+      allocatedAfterStatementMinor: 585_438,
+    });
+    expect(a.explanation).toEqual({ kind: "ALLOCATED_AFTER_STATEMENT" });
+    expect(describeAccount(a)).toContain("ترتيبُ تخصيص");
+    expect(describeAccount(a)).not.toContain("لم تصلنا");
+  });
+
+  it("وبلا تفسيرٍ يُثبَت يبقى الاحتمال مكتوباً", () => {
+    const a = buildSupplierAccount({
+      billedMinor: 5_000_00, paidMinor: 2_000_00, reportedBalanceMinor: 4_000_00,
+      allocatedAfterStatementMinor: 300_00,
+      invoicesAtStatement: [{ invoiceNumber: "X1", totalMinor: 5_000_00 }],
+    });
+    expect(a.explanation).toBeNull();
+    expect(describeAccount(a)).toContain("لم تصلنا");
+  });
+
+  it("وبلا كشفٍ لا يُحسَب ما بعده — مجهول لا صفر", () => {
+    const a = buildSupplierAccount({ billedMinor: 5_000_00, paidMinor: 2_000_00 });
+    expect(a.allocatedAfterStatementMinor).toBeNull();
+    expect(a.explanation).toBeNull();
+  });
+});

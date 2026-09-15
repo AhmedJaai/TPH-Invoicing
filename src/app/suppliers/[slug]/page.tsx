@@ -134,14 +134,28 @@ export default async function SupplierPage({
     فيُحسب ما نعرفه حتى تاريخ الكشف، ويُعرَض ما دُفع بعده بجانبه.
   */
   const [atStatement] = reportedAt
-    ? (await db.execute<{ billed: string; paid: string }>(sql`
+    ? (await db.execute<{ billed: string; paid: string; allocated_after: string }>(sql`
         select
           (select coalesce(sum(total_minor), 0)::bigint from invoices
             where supplier_id = ${s.id} and invoice_date::date <= ${reportedAt}::date) as billed,
           (select coalesce(sum(amount_minor - fee_minor), 0)::bigint from payments
             where supplier_id = ${s.id} and status not in ('REVERSED','VOID')
-              and paid_at::date <= ${reportedAt}::date)                                as paid
+              and paid_at::date <= ${reportedAt}::date)                                as paid,
+          /* ما سُدّد بعد الكشف من فواتير سبقته — يبدو مفتوحاً عنده ومسدَّداً اليوم */
+          (select coalesce(sum(pa.amount_minor), 0)::bigint
+             from payment_allocations pa
+             join payments p on p.id = pa.payment_id
+             join invoices i on i.id = pa.invoice_id
+            where p.supplier_id = ${s.id} and p.status not in ('REVERSED','VOID')
+              and p.paid_at::date > ${reportedAt}::date
+              and i.invoice_date::date <= ${reportedAt}::date)                         as allocated_after
       `)).rows
+    : [];
+  const invoicesAtStatement = reportedAt
+    ? (await db.execute<{ invoice_number: string; total_minor: string }>(sql`
+        select invoice_number, total_minor from invoices
+         where supplier_id = ${s.id} and invoice_date::date <= ${reportedAt}::date
+      `)).rows.map((r) => ({ invoiceNumber: r.invoice_number, totalMinor: Number(r.total_minor) }))
     : [];
   const paidAfterStatement = atStatement ? paidNet - Number(atStatement.paid) : 0;
 
@@ -151,6 +165,8 @@ export default async function SupplierPage({
     reportedBalanceMinor: reportedRaw === null || reportedRaw === undefined
       ? null
       : Number(reportedRaw),
+    allocatedAfterStatementMinor: atStatement ? Number(atStatement.allocated_after) : null,
+    invoicesAtStatement,
   });
 
   /*
@@ -299,7 +315,12 @@ export default async function SupplierPage({
                 account.status === "DIFFERS" ? "warn"
                 : account.status === "AGREED" ? "ok" : "muted"
               }
-              sub={describeAccount(account)}
+              sub={
+                describeAccount(account)
+                + (account.allocatedAfterStatementMinor
+                  ? ` · وخُصّص بعد كشفه على فواتير سبقته ${formatRiyalsDisplay(account.allocatedAfterStatementMinor)}`
+                  : "")
+              }
             />
           </div>
         </Section>
