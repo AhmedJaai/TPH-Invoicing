@@ -11,7 +11,7 @@ import { currentMonthRiyadh } from "./riyadh-time";
 import { analyzeCoverage } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
 import { findDuplicateExpenses, type Expense } from "./expenses";
-import { findDoublePaid, recoverableMinor, type DoublePaidTx } from "./bank/double-paid";
+import { findDoublePaid, partitionDoublePaid, recoverableMinor, type DoublePaidGroup, type DoublePaidTx } from "./bank/double-paid";
 import { detectAnomalies } from "./bank/lifecycle";
 import { DAY, TIME, countNoun } from "./arabic";
 
@@ -118,12 +118,20 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     `)
   ).rows.map((r) => String(r.name_ar));
 
-  const noContract = (
+  const noContractRows = (
     await db.execute<Row>(sql`
-      select name_ar from suppliers
-      where is_active and not issues_invoices and not contract_on_file
+      select s.name_ar,
+             (select coalesce(sum(greatest(0, p.amount_minor - p.fee_minor
+                - coalesce((select sum(a.amount_minor)::int from payment_allocations a
+                             where a.payment_id = p.id), 0))), 0)::bigint
+                from payments p
+               where p.supplier_id = s.id and p.status not in ('REVERSED','VOID')) as unbacked
+      from suppliers s
+      where s.is_active and not s.issues_invoices and not s.contract_on_file
+      order by unbacked desc
     `)
-  ).rows.map((r) => String(r.name_ar));
+  ).rows;
+  const noContract = noContractRows.map((r) => String(r.name_ar));
 
   /*
    * ارتفاعات الأسعار: تُقارَن آخر قراءتين مختلفتين للصنف عند مورّده.
@@ -241,6 +249,10 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
     والمقدَّمةُ المعلَنة تخرج: صاحبُها قال ما هي فليست سؤالاً. والمردودةُ
     والملغاةُ لم يخرج مالُها أصلاً.
+
+    ومورّدٌ أُعلن أنّه لا يصدر فواتير يخرج كذلك (SCN-104): «اطلب الفاتورة»
+    سؤالٌ جوابُه معروف — مريم وأوسكا كانتا فيه أبداً. وسؤالُه الحقّ «عقد
+    التوريد»، وهو بندٌ قائم يُعطى مالَه دليلاً.
   */
   const unbacked = (
     await db.execute<{
@@ -253,6 +265,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         from payments p
         left join suppliers s on s.id = p.supplier_id
        where p.status not in ('REVERSED','VOID','ADVANCE')
+         and coalesce(s.issues_invoices, true)
          and p.amount_minor - p.fee_minor
              - coalesce((select sum(a.amount_minor)::int from payment_allocations a
                           where a.payment_id = p.id), 0) > 100
@@ -260,7 +273,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     `)
   ).rows;
 
-  const doublePaid = findDoublePaid(outgoing.map((r): DoublePaidTx => ({
+  const doublePaidAll = findDoublePaid(outgoing.map((r): DoublePaidTx => ({
     id: r.id,
     valueDate: new Date(r.value_date),
     amountMinor: Number(r.amount_minor),
@@ -270,6 +283,22 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     category: r.category,
     operationRef: r.operation_ref,
   })));
+
+  /*
+    قرارُ الإنسان يُقرأ قبل العدّ (SCN-104). كان البند حرجاً دائماً لا
+    يُغلَق: «استُردّ» و«ليس ازدواجاً» يُخرجانه، و«طالبتُ» يُبقيه بندٌ
+    أهدأ — فالمال لم يعد بعد، ونسيانُه بعد المطالبة ضياعٌ ثانٍ.
+  */
+  const resolutions = (
+    await db.execute<{ key: string; decision: string }>(sql`
+      select key, decision from alert_resolutions where key like 'double:%'
+    `)
+  ).rows;
+  const doublePaidSplit = partitionDoublePaid(
+    doublePaidAll,
+    new Map(resolutions.map((r) => [r.key, r.decision])),
+  );
+  const doublePaid = doublePaidSplit.open;
 
   /*
     ازدواج المصروف — يُكشَف ولا يُحذَف.
@@ -352,12 +381,10 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     */
     duplicatePayments: doublePaid.length,
     duplicatePaymentAmountMinor: recoverableMinor(doublePaid),
-    duplicatePaymentEvidence: doublePaid.slice(0, 6).map((g) => ({
-      label: g.payee,
-      sub: `${g.day} · ${countNoun(g.transactions.length, TIME)}`
-        + (g.distinctOperations ? " · بمراجعِ سدادٍ مختلفة" : " · بلا مرجعٍ يفصلهما"),
-      amountMinor: g.excessMinor,
-    })),
+    duplicatePaymentEvidence: doublePaid.slice(0, 6).map(doublePaidEvidence),
+    duplicatePaymentsClaimed: doublePaidSplit.claimed.length,
+    duplicatePaymentClaimedMinor: recoverableMinor(doublePaidSplit.claimed),
+    duplicatePaymentClaimedEvidence: doublePaidSplit.claimed.slice(0, 6).map(doublePaidEvidence),
     notTaxValidCount: Number(counts?.not_valid ?? 0),
     vatAtRiskMinor: Number(counts?.vat_at_risk ?? 0),
     vatAtRiskEvidence: vatEvidence,
@@ -370,6 +397,11 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     suppliersMissingStatement: missingStatements,
     suppliersMissingStatementCount: Number(missingCountRow?.n ?? missingStatements.length),
     suppliersWithoutContract: noContract,
+    suppliersWithoutContractEvidence: noContractRows.map((r) => ({
+      label: String(r.name_ar),
+      sub: Number(r.unbacked) > 0 ? "دفعتَ له بلا فاتورة — والعقد هو مستندُه" : "لا دفعات بلا مستند",
+      amountMinor: Number(r.unbacked) > 0 ? Number(r.unbacked) : undefined,
+    })),
     invoicesWithoutLines: Number(counts?.no_lines ?? 0),
     unbackedPaymentCount: unbacked.length,
     unbackedPaymentMinor: unbacked.reduce((n, r) => n + Number(r.unbacked), 0),
@@ -381,5 +413,14 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     priceRises,
     // الأثر السنوي يحتاج دورة الطلب؛ يُقدَّر هنا بفارق السعر × عشرين طلباً
     priceRiseAnnualMinor: priceRises.reduce((s, r) => s + (r.amountMinor ?? 0) * 20, 0),
+  };
+}
+
+function doublePaidEvidence(g: DoublePaidGroup): AttentionEvidence {
+  return {
+    label: g.payee,
+    sub: `${g.day} · ${countNoun(g.transactions.length, TIME)}`
+      + (g.distinctOperations ? " · بمراجعِ سدادٍ مختلفة" : " · بلا مرجعٍ يفصلهما"),
+    amountMinor: g.excessMinor,
   };
 }

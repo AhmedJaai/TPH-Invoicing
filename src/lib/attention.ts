@@ -106,6 +106,13 @@ export interface AttentionFacts {
   duplicatePayments: number;
   duplicatePaymentAmountMinor: number;
   duplicatePaymentEvidence: AttentionEvidence[];
+  /**
+   * ما طُولبت به الجهة ولم يعد بعد — بندٌ أهدأ لا يُطوى (SCN-104).
+   * و«استُردّ» و«ليس ازدواجاً» لا يُعدّان أصلاً.
+   */
+  duplicatePaymentsClaimed?: number;
+  duplicatePaymentClaimedMinor?: number;
+  duplicatePaymentClaimedEvidence?: AttentionEvidence[];
 
   /** فواتير معلوم أنّها لا تصلح لخصم المدخلات، ومبلغ ضريبتها */
   notTaxValidCount: number;
@@ -140,6 +147,8 @@ export interface AttentionFacts {
   firstAnomalyTransactionId?: string | null;
   /** مورّدون لا يصدرون فواتير وبلا عقد */
   suppliersWithoutContract: string[];
+  /** والمال الذي دُفع لهم بلا مستند — دليلُ البند لا أسماءٌ وحدها. */
+  suppliersWithoutContractEvidence?: AttentionEvidence[];
 
   /** فواتير بلا بنود — تحليل الأصناف لا يراها */
   invoicesWithoutLines: number;
@@ -287,6 +296,28 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       amountMinor: f.duplicatePaymentAmountMinor,
       impact: { kind: "RECOVERABLE", amountMinor: f.duplicatePaymentAmountMinor },
       evidence: f.duplicatePaymentEvidence,
+    });
+  }
+
+  /*
+    ما طُولبت به الجهة ولم يعد — لا يُحذف من القائمة ولا يبقى حرجاً.
+    الحرجُ الذي يبقى بعد أن فعل صاحبه ما عليه يعلّمه تجاهلَ الحرج.
+  */
+  if ((f.duplicatePaymentsClaimed ?? 0) > 0) {
+    const claimedMinor = f.duplicatePaymentClaimedMinor ?? 0;
+    out.push({
+      id: "duplicate-payments-claimed",
+      area: "BANK",
+      severity: "MEDIUM",
+      title: `مطالبةٌ بمالٍ خرج مرّتين تنتظر الردّ — ${countNoun(f.duplicatePaymentsClaimed ?? 0, ITEM)}`,
+      detail: "طالبتَ الجهة بردّ الزائد، ولم يُعلَن أنّه عاد.",
+      action: "تابع الجهة. وإن عاد المال فاضغط «استُردّ» عند الحركتين.",
+      actionLabel: "افتح المطالبات",
+      href: "/bank?doublePaid=1#double-paid",
+      count: f.duplicatePaymentsClaimed ?? 0,
+      amountMinor: claimedMinor,
+      impact: { kind: "RECOVERABLE", amountMinor: claimedMinor },
+      evidence: f.duplicatePaymentClaimedEvidence ?? [],
     });
   }
 
@@ -500,7 +531,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       href: "/suppliers",
       count: f.suppliersWithoutContract.length,
       impact: { kind: "AT_RISK", amountMinor: null },
-      evidence: f.suppliersWithoutContract.map((name) => ({ label: name })),
+      evidence: f.suppliersWithoutContractEvidence ?? f.suppliersWithoutContract.map((name) => ({ label: name })),
     });
   }
 

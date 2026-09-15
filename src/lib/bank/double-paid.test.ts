@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  findDoublePaid, payeeKey, recoverableMinor, type DoublePaidTx,
+  buildDoublePaidClaim, doublePaidKey, findDoublePaid, partitionDoublePaid, payeeKey, recoverableMinor,
+  type DoublePaidTx,
 } from "./double-paid";
 
 const tx = (o: Partial<DoublePaidTx> & { id: string }): DoublePaidTx => ({
@@ -115,5 +116,45 @@ describe("الفاتورة سُدّدت مرّتين", () => {
       tx({ id: "a", ...same }), tx({ id: "b", ...same }), tx({ id: "c", ...same }),
     ]);
     expect(g[0].excessMinor).toBe(200000);
+  });
+});
+
+describe("قرار الإنسان في «سُدّد مرّتين» (SCN-104)", () => {
+  const tx = (id: string, ref: string | null): DoublePaidTx => ({
+    id, valueDate: new Date("2026-07-15T00:00:00Z"), amountMinor: 50_000, direction: "DEBIT",
+    description: "SADAD رقم السداد 100200300", beneficiaryRaw: null, category: "UTILITIES", operationRef: ref,
+  });
+  const groups = findDoublePaid([tx("b", "R2"), tx("a", "R1")]);
+
+  it("المفتاح من المعرّفات مرتَّبةً — لا من ترتيب الصفوف", () => {
+    expect(doublePaidKey(groups[0])).toBe("double:a:b");
+    expect(doublePaidKey(findDoublePaid([tx("a", "R1"), tx("b", "R2")])[0])).toBe("double:a:b");
+  });
+
+  it("المجموعة التي صارت ثلاثاً يتغيّر مفتاحها فيعود السؤال", () => {
+    const three = findDoublePaid([tx("a", "R1"), tx("b", "R2"), tx("c", "R3")]);
+    const p = partitionDoublePaid(three, new Map([["double:a:b", "RECOVERED"]]));
+    expect(p.open).toHaveLength(1);
+  });
+
+  it("«استُردّ» و«ليس ازدواجاً» يُغلقان، و«طالبتُ» يُبقي بحالٍ أهدأ", () => {
+    expect(partitionDoublePaid(groups, new Map([["double:a:b", "RECOVERED"]])).closed).toHaveLength(1);
+    expect(partitionDoublePaid(groups, new Map([["double:a:b", "NOT_DUPLICATE"]])).open).toHaveLength(0);
+    const claimed = partitionDoublePaid(groups, new Map([["double:a:b", "CLAIMED"]]));
+    expect(claimed.claimed).toHaveLength(1);
+    expect(claimed.open).toHaveLength(0);
+  });
+
+  it("القرار المجهول لا يُغلق شيئاً", () => {
+    expect(partitionDoublePaid(groups, new Map([["double:a:b", "WHATEVER"]])).open).toHaveLength(1);
+  });
+
+  it("رسالة المطالبة تحمل المرجعين والزائد", () => {
+    const msg = buildDoublePaidClaim(groups[0]);
+    expect(msg).toContain("R1");
+    expect(msg).toContain("R2");
+    expect(msg).toContain("500.00");
+    expect(msg).toContain("310007971600003");
+    expect(msg).toContain("2026-07-15");
   });
 });

@@ -113,6 +113,7 @@ export const RULES: Record<string, RateLimitRule> = {
   "payment-run": { limit: 60, windowSeconds: 3600 },
   "ops-db-identity": { limit: 30, windowSeconds: 3600 },
   "document-status": { limit: 120, windowSeconds: 3600 },
+  "alert-resolve": { limit: 120, windowSeconds: 3600 },
 };
 
 export function ruleFor(route: string): RateLimitRule {
