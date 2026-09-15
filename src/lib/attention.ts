@@ -339,8 +339,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
         + " ورصيدُ المورّد عندنا غير مُتحقَّق منه.",
       action:
         "اطلب الفاتورة من المورّد، أو أعلِن أنّه لا يصدر فواتير واطلب عقد توريد.",
-      actionLabel: "افتح المورّدين",
-      href: "/suppliers",
+      actionLabel: "افتح الدفعات بلا فاتورة",
+      /* القائمة نفسها التي عُدّت — لا جدول المورّدين العامّ (BTN-110) */
+      href: "/suppliers?unbacked=1#unbacked",
       count: f.unbackedPaymentCount,
       amountMinor: f.unbackedPaymentMinor,
       impact: { kind: "UNATTRIBUTED", amountMinor: f.unbackedPaymentMinor },
@@ -463,7 +464,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       detail: "الكشف وحده يكشف فاتورة حُمّلت عليك ولم تصلك — ولا يظهر ذلك في أرشيفك مهما فتّشته.",
       action: "اطلب الكشف الشهري منهم، ثمّ طابقه.",
       actionLabel: "اطلب الكشوف",
-      href: "/statements",
+      /* تسمّي الغائبين — والصفحة بلا مرشِّح تعرض ما وصل لا ما غاب (BTN-110) */
+      href: "/statements?missing=1",
       count: missingCount,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: f.suppliersMissingStatement.map((name) => ({ label: name })),

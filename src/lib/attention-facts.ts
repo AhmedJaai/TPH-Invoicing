@@ -14,6 +14,7 @@ import { findDuplicateExpenses, type Expense } from "./expenses";
 import { findDoublePaid, partitionDoublePaid, recoverableMinor, type DoublePaidGroup, type DoublePaidTx } from "./bank/double-paid";
 import { detectAnomalies } from "./bank/lifecycle";
 import { DAY, TIME, countNoun } from "./arabic";
+import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
 
 interface Row {
   [key: string]: unknown;
@@ -92,31 +93,9 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     amountMinor: Number(r.owed),
   }));
 
-  // مورّدون لهم فواتير ولم يصل كشفهم عن الشهر المنقضي — العدد كاملاً، والقائمة دليل
-  const [missingCountRow] = (
-    await db.execute<Row>(sql`
-      select count(distinct i.supplier_id)::int as n
-      from invoices i
-      where i.supplier_id is not null and not exists (
-        select 1 from statements st
-        where st.supplier_id = i.supplier_id
-          and to_char(st.period_end, 'YYYY-MM') = ${lastMonth}
-      )
-    `)
-  ).rows;
-
-  const missingStatements = (
-    await db.execute<Row>(sql`
-      select distinct s.name_ar
-      from invoices i join suppliers s on s.id = i.supplier_id
-      where not exists (
-        select 1 from statements st
-        where st.supplier_id = i.supplier_id
-          and to_char(st.period_end, 'YYYY-MM') = ${lastMonth}
-      )
-      limit 8
-    `)
-  ).rows.map((r) => String(r.name_ar));
+  // مورّدون لهم فواتير ولم يصل كشفهم عن الشهر المنقضي — المصدر نفسه الذي تقرؤه /statements?missing=1
+  const missingStatementRows = await loadMissingStatementSuppliers(lastMonth);
+  const missingStatements = missingStatementRows.slice(0, 8).map((r) => r.nameAr);
 
   const noContractRows = (
     await db.execute<Row>(sql`
@@ -246,32 +225,10 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
   /*
     دفعاتٌ لا فاتورةَ تفسّرها — السؤال الأسبوعيّ الذي كان يُراجَع بيد.
-
-    والمقدَّمةُ المعلَنة تخرج: صاحبُها قال ما هي فليست سؤالاً. والمردودةُ
-    والملغاةُ لم يخرج مالُها أصلاً.
-
-    ومورّدٌ أُعلن أنّه لا يصدر فواتير يخرج كذلك (SCN-104): «اطلب الفاتورة»
-    سؤالٌ جوابُه معروف — مريم وأوسكا كانتا فيه أبداً. وسؤالُه الحقّ «عقد
-    التوريد»، وهو بندٌ قائم يُعطى مالَه دليلاً.
+    والاستعلام في `supplier-followups.service` يقرؤه التنبيه والصفحة التي
+    يفتحها (/suppliers?unbacked=1)، فلا يفترق العدّان (BTN-110).
   */
-  const unbacked = (
-    await db.execute<{
-      name_ar: string | null; d: string; amount_minor: number; unbacked: number;
-    }>(sql`
-      select s.name_ar, p.paid_at::date::text as d, p.amount_minor,
-             p.amount_minor - p.fee_minor
-               - coalesce((select sum(a.amount_minor)::int from payment_allocations a
-                            where a.payment_id = p.id), 0) as unbacked
-        from payments p
-        left join suppliers s on s.id = p.supplier_id
-       where p.status not in ('REVERSED','VOID','ADVANCE')
-         and coalesce(s.issues_invoices, true)
-         and p.amount_minor - p.fee_minor
-             - coalesce((select sum(a.amount_minor)::int from payment_allocations a
-                          where a.payment_id = p.id), 0) > 100
-       order by unbacked desc
-    `)
-  ).rows;
+  const unbacked = await loadUnbackedPayments();
 
   const doublePaidAll = findDoublePaid(outgoing.map((r): DoublePaidTx => ({
     id: r.id,
@@ -395,7 +352,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     unclassifiedBankTx: Number(counts?.unclassified ?? 0),
     unclassifiedBankAmountMinor: Number(counts?.unclassified_amount ?? 0),
     suppliersMissingStatement: missingStatements,
-    suppliersMissingStatementCount: Number(missingCountRow?.n ?? missingStatements.length),
+    suppliersMissingStatementCount: missingStatementRows.length,
     suppliersWithoutContract: noContract,
     suppliersWithoutContractEvidence: noContractRows.map((r) => ({
       label: String(r.name_ar),
@@ -404,11 +361,11 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     })),
     invoicesWithoutLines: Number(counts?.no_lines ?? 0),
     unbackedPaymentCount: unbacked.length,
-    unbackedPaymentMinor: unbacked.reduce((n, r) => n + Number(r.unbacked), 0),
+    unbackedPaymentMinor: unbacked.reduce((n, r) => n + r.unbackedMinor, 0),
     unbackedPaymentEvidence: unbacked.slice(0, 6).map((r) => ({
-      label: r.name_ar ?? "بلا مورّد",
-      sub: `${String(r.d).slice(0, 10)} · من أصل ${formatRiyalsDisplay(Number(r.amount_minor))}`,
-      amountMinor: Number(r.unbacked),
+      label: r.supplierName ?? "بلا مورّد",
+      sub: `${r.paidOn} · من أصل ${formatRiyalsDisplay(r.amountMinor)}`,
+      amountMinor: r.unbackedMinor,
     })),
     priceRises,
     // الأثر السنوي يحتاج دورة الطلب؛ يُقدَّر هنا بفارق السعر × عشرين طلباً

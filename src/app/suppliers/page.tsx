@@ -7,16 +7,30 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Badge, DataTable, EmptyState, LinkButton } from "@/components/ui";
-import { SUPPLIER, countNoun, ALIAS } from "@/lib/arabic";
+import Link from "next/link";
+import { Badge, Card, DataTable, EmptyState, LinkButton, Section, buttonClass } from "@/components/ui";
+import { SUPPLIER, countNoun, ALIAS, PAYMENT_RECORD } from "@/lib/arabic";
+import { buildInvoiceRequest, groupUnbackedBySupplier } from "@/lib/supplier-requests";
+import { loadUnbackedPayments } from "@/services/supplier-followups.service";
 
 export const dynamic = "force-dynamic";
 
-export default async function SuppliersPage() {
+export default async function SuppliersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unbacked?: string }>;
+}) {
   const user = await currentUser();
   if (!user) redirect("/login?from=/suppliers");
 
   const showAmounts = can(user.role, "amounts:view");
+  /*
+    «دفعاتٌ بلا فاتورة» — القائمة التي يفتحها التنبيه (BTN-110). كان يفتح
+    هذا الجدول العامّ فلا يجد صاحب العمل دفعةً واحدة مذكورة.
+  */
+  const unbackedView = (await searchParams).unbacked === "1";
+  const unbackedPayments = unbackedView && showAmounts ? await loadUnbackedPayments() : [];
+  const unbackedGroups = groupUnbackedBySupplier(unbackedPayments);
 
   const rows = await db
     .select({
@@ -83,6 +97,86 @@ export default async function SuppliersPage() {
       title="المورّدون"
       intro="سجلّ كل مورّد: بياناته الضريبية، ودورة فوترته، وما فُوتر وما سُدّد، والأسماء البديلة التي يُعرف بها في البنك."
     >
+      {unbackedView && (
+        <div id="unbacked" className="mb-8 scroll-mt-28">
+          <Section
+            title="دفعاتٌ خرجت بلا فاتورة"
+            hint={
+              showAmounts
+                ? `${countNoun(unbackedPayments.length, PAYMENT_RECORD)} عند ${countNoun(unbackedGroups.filter((g) => g.supplierId).length, SUPPLIER)}. اطلب فاتورة كلٍّ منها — بلا فاتورةٍ ضريبية لا يُخصَم مدخلُها. والمورّد الذي لا يصدر فواتير يُعلَن في ملفّه فيُطلَب منه عقد توريد بدلها.`
+                : "المبالغ محجوبة عن دورك."
+            }
+            action={<LinkButton href="/suppliers" size="sm" variant="quiet">كلّ المورّدين</LinkButton>}
+          >
+            {showAmounts && unbackedGroups.length === 0 && (
+              <p className="text-xs text-ok">لا دفعة بلا فاتورة — كلّ ما دُفع له مستندُه.</p>
+            )}
+            <ul className="space-y-2.5">
+              {unbackedGroups.map((g) => (
+                <li
+                  key={g.supplierId ?? "none"}
+                  id={g.supplierSlug ? `unbacked-${g.supplierSlug}` : undefined}
+                  className="scroll-mt-28"
+                >
+                  <Card>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="min-w-0">
+                        {g.supplierSlug ? (
+                          <Link href={`/suppliers/${g.supplierSlug}`} className="block text-sm font-bold underline-offset-4 hover:underline">
+                            {g.supplierName}
+                          </Link>
+                        ) : (
+                          <span className="block text-sm font-bold">{g.supplierName}</span>
+                        )}
+                        <span className="block text-[11px] text-muted">
+                          {countNoun(g.payments.length, PAYMENT_RECORD)}
+                          {g.supplierId ? " بلا فاتورة" : " لم تُعرَف جهتها — افتح حركتها وحدّد مورّدها"}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-end">
+                        <span className="block text-[11px] text-muted">دفعتَ له بلا فاتورة</span>
+                        <span className="nums block text-sm font-bold text-warn"><Money minor={g.totalMinor} /></span>
+                      </span>
+                    </div>
+                    <ul className="mt-2 space-y-1 border-s-2 border-line ps-2.5">
+                      {g.payments.map((p) => (
+                        <li key={p.paymentId} className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                          <span className="min-w-0 text-muted">
+                            <bdi className="nums">{p.paidOn}</bdi> · من أصل <Money minor={p.amountMinor} />
+                            {p.bankTransactionId && (
+                              <>
+                                {" · "}
+                                <Link href={`/bank?tx=${p.bankTransactionId}`} className="inline-flex min-h-11 items-center underline underline-offset-4 sm:min-h-0">
+                                  حركتها
+                                </Link>
+                              </>
+                            )}
+                          </span>
+                          <span className="nums font-bold"><Money minor={p.unbackedMinor} /></span>
+                        </li>
+                      ))}
+                    </ul>
+                    {g.supplierId && (
+                      <div className="mt-2.5 flex flex-wrap gap-2">
+                        <a
+                          href={`https://wa.me/?text=${encodeURIComponent(buildInvoiceRequest(g))}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={buttonClass("primary", "sm")}
+                        >
+                          اطلب الفاتورة (واتساب)
+                        </a>
+                        {g.supplierSlug && <LinkButton href={`/suppliers/${g.supplierSlug}`} size="sm">ملفّه</LinkButton>}
+                      </div>
+                    )}
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        </div>
+      )}
+
       {needAttention.length > 0 && (
         <div className="mb-6 rounded-2xl border border-warn/40 bg-warn-bg p-4 shadow-raised sm:p-5">
           <h2 className="text-sm font-bold text-warn">
