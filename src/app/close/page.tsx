@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ClosePage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/close");
   if (!can(user.role, "month:close")) {
     return (
       <PageShell user={user} title="إقفال الشهر">

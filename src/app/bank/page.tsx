@@ -36,7 +36,7 @@ export default async function BankPage({
 }) {
   const params = await searchParams;
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/bank");
   if (!can(user.role, "bank:view")) {
     return (
       <PageShell user={user} width="wide" title="البنك">

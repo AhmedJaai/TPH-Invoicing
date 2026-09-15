@@ -94,7 +94,7 @@ export default async function DocumentsPage({
   searchParams: Promise<Params>;
 }) {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/documents");
 
   const p = await searchParams;
   const showAmounts = can(user.role, "amounts:view");

@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ProductsPage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/purchases/products");
   if (!can(user.role, "supplier:edit")) {
     return (
       <PageShell user={user} width="wide" title="الأصناف">

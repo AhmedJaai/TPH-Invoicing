@@ -23,7 +23,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "wa
 
 export default async function Home() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/upload");
 
   const showAmounts = can(user.role, "amounts:view");
 

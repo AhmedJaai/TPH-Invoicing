@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function FinancialStatementPage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/money/statement");
   if (!can(user.role, "reports:view")) {
     return (
       <PageShell user={user} width="wide" title="التدفّق النقدي وقائمة الدخل">

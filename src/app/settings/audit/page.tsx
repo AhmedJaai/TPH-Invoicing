@@ -109,7 +109,7 @@ export default async function AuditTrailPage({
   searchParams: Promise<{ action?: string; page?: string }>;
 }) {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/settings/audit");
   if (!can(user.role, "audit:view")) {
     return (
       <PageShell user={user} width="wide" title="سجل التدقيق">

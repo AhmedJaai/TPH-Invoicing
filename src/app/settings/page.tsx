@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/settings");
   if (!can(user.role, "supplier:view")) {
     return (
       <PageShell user={user} title="الإعدادات">

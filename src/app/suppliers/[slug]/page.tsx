@@ -44,7 +44,7 @@ export default async function SupplierPage({
   params: Promise<{ slug: string }>;
 }) {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/suppliers");
 
   const { slug } = await params;
   const showAmounts = can(user.role, "amounts:view");

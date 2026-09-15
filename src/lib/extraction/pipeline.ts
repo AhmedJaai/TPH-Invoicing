@@ -158,6 +158,18 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     });
   }
 
+  /*
+    «TPH-…» صيغةُ رقمٍ اختلقه النموذج بثقة ١٫٠٠ من قبل — ولا مورّد يرقّم
+    فواتيره باسم المقهى. فيُنبَّه قبل الأرشفة: يُنقل من الورقة لا من القراءة.
+  */
+  if (invoiceNumber && /^TPH[-_\s]?\d/i.test(invoiceNumber)) {
+    findings.push({
+      code: ISSUE.LOW_CONFIDENCE_FIELD,
+      severity: "WARN",
+      message: "رقم الفاتورة بصيغة «TPH-…» — صيغةٌ اختلقها النموذج من قبل. انقله من الورقة نفسها",
+    });
+  }
+
   if (!match.supplier) {
     findings.push({
       code: ISSUE.LOW_CONFIDENCE_FIELD,

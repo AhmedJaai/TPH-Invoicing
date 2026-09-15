@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function InsightsPage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/purchases/insights");
   if (!can(user.role, "amounts:view")) {
     return (
       <PageShell user={user} title="تحليل الذكاء">

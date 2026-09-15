@@ -18,7 +18,7 @@ function daysSince(date: Date | null): number | null {
 
 export default async function AnalysisPage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/analysis");
   if (!can(user.role, "amounts:view")) {
     return (
       <PageShell user={user} width="wide" title="ذكاء الشراء">

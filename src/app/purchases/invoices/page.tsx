@@ -36,7 +36,7 @@ export default async function InvoicesPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/purchases/invoices");
   if (!can(user.role, "amounts:view")) {
     return (
       <PageShell user={user} width="wide" title="الفواتير">

@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AttentionPage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/attention");
   if (!can(user.role, "reports:view")) {
     return (
       <PageShell user={user} title="ما يحتاج انتباهك">

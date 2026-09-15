@@ -21,7 +21,7 @@ export default async function PaymentsPage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/payments");
   if (!can(user.role, "payment:approve")) {
     return (
       <PageShell user={user} width="wide" title="دفعة أوّل الشهر">

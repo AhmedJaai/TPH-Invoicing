@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function PerformancePage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/performance");
   if (!can(user.role, "amounts:view")) {
     return (
       <PageShell user={user} width="wide" title="الأداء">

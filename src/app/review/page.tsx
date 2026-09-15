@@ -29,7 +29,7 @@ const LIMIT = 400;
  */
 export default async function ReviewPage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/review");
   if (!can(user.role, "bank:view")) {
     return (
       <PageShell user={user} width="wide" title="طابور المراجعة">

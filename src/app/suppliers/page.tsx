@@ -1,3 +1,4 @@
+import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { redirect } from "next/navigation";
 import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SuppliersPage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/suppliers");
 
   const showAmounts = can(user.role, "amounts:view");
 
@@ -155,7 +156,9 @@ export default async function SuppliersPage() {
                   header: "الصافي",
                   numeric: true as const,
                   cell: (r: (typeof rows)[number]) => {
-                    const balance = Number(r.billedMinor) - Number(r.paidMinor);
+                    /* بعتبة التسوية نفسها التي في supplier-balances — «0.02» هنا و«لا رصيد» في صفحته كانا رقمين لشيءٍ واحد */
+                    const raw = Number(r.billedMinor) - Number(r.paidMinor);
+                    const balance = Math.abs(raw) <= SETTLED_TOLERANCE_MINOR ? 0 : raw;
                     return balance < 0 ? (
                       <span className="text-xs font-bold text-ok">
                         لك عنده <Money minor={-balance} />

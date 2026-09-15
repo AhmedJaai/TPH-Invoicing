@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MoneyPage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/money");
   if (!can(user.role, "bank:view")) {
     return (
       <PageShell user={user} title="المال">

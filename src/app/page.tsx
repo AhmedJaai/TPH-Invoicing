@@ -49,7 +49,7 @@ function Bar({ label, value, max, note }: { label: string; value: number; max: n
 
 export default async function HomePage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/");
 
   const showAmounts = can(user.role, "amounts:view");
 

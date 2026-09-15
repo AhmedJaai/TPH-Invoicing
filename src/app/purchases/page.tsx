@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PurchasesPage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/purchases");
   if (!can(user.role, "amounts:view")) {
     return (
       <PageShell user={user} width="wide" title="المشتريات">

@@ -6,12 +6,13 @@
  */
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, gt, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, extractionCache, invoices, supplierAliases, suppliers } from "@/db/schema";
 import { withDeadline } from "@/lib/ai/deadline";
 import { extractDocument, isSupportedUpload } from "@/lib/extraction";
 import { runPipeline } from "@/lib/extraction/pipeline";
+import type { ExtractionOutcome, ExtractionSuccess } from "@/lib/extraction/provider";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import { companyConfig } from "@/config/drive";
 import { guard, respondTo } from "@/services/guard";
@@ -120,13 +121,35 @@ async function handle(request: Request) {
 
   const supplierList = await loadSuppliers();
 
-  const extraction = await extractDocument({
-    data: buffer,
-    mimeType: file.type,
-    companyVat: companyConfig.vatNumber,
-    companyName: companyConfig.nameAr,
-    supplierNames: supplierList.map((s) => `${s.nameAr} (${s.slug})`),
-  });
+  /*
+    قراءةٌ حُفظت لهذا الملفّ خلال الساعة لا تُدفع ثانيةً.
+
+    انقطع الردُّ على الجوّال فأُعيد الرفع: كان يُقرأ بالذكاء من جديد وقد
+    حُفظت قراءتُه قبل ثوانٍ في extraction_cache — نداءان إلى أربعة تُدفع
+    ثانيةً عن الملفّ نفسه.
+  */
+  const [recent] = await db
+    .select({ extraction: extractionCache.extraction, model: extractionCache.model, textSource: extractionCache.textSource })
+    .from(extractionCache)
+    .where(and(eq(extractionCache.sha256, sha256), gt(extractionCache.createdAt, new Date(Date.now() - 60 * 60 * 1000))))
+    .limit(1);
+
+  const extraction: ExtractionOutcome = recent
+    ? {
+        ok: true,
+        value: recent.extraction as ExtractionSuccess["value"],
+        model: recent.model ?? "cache",
+        provider: "deepseek",
+        usage: { inputTokens: 0, outputTokens: 0 },
+        textSource: (recent.textSource ?? undefined) as ExtractionSuccess["textSource"],
+      }
+    : await extractDocument({
+        data: buffer,
+        mimeType: file.type,
+        companyVat: companyConfig.vatNumber,
+        companyName: companyConfig.nameAr,
+        supplierNames: supplierList.map((s) => `${s.nameAr} (${s.slug})`),
+      });
 
   if (!extraction.ok) {
     return NextResponse.json({ error: extraction.reason }, { status: 502 });

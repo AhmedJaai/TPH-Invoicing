@@ -37,7 +37,7 @@ export default async function ExpensesPage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/money/expenses");
   if (!can(user.role, "bank:view")) {
     return (
       <PageShell user={user} title="المصروفات">
