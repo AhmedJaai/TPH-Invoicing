@@ -27,6 +27,7 @@ import { allocate, createPayment } from "@/services/payment.service";
 import { CreditError, markPaidByOwner, previewOwnerPaid } from "@/services/supplier-credit.service";
 import { INVOICE, countNoun } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -152,7 +153,8 @@ async function handle(request: Request) {
     .from(invoices)
     .where(and(...conditions));
 
-  const pending = rows.filter((r) => r.totalMinor - Number(r.allocated) > 1);
+  /* العتبة نفسها في كلّ شاشةٍ تقول «عليك»: ما بقي فوق هللة */
+  const pending = rows.filter((r) => r.totalMinor - Number(r.allocated) > SETTLED_TOLERANCE_MINOR);
   if (pending.length === 0) {
     return NextResponse.json({ ok: true, marked: 0, message: "لا فواتير مفتوحة ضمن النطاق" });
   }

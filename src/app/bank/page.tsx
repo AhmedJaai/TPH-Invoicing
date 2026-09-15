@@ -17,6 +17,7 @@ import { CATEGORY_LABEL } from "@/lib/bank/rules";
 import { countNoun, ITEM, PAYMENT_RECORD, TIME, TRANSACTION } from "@/lib/arabic";
 import { findDoublePaid, recoverableMinor, type DoublePaidTx } from "@/lib/bank/double-paid";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
+import { loadSupplierBalances } from "@/services/supplier-balance.service";
 
 export const dynamic = "force-dynamic";
 
@@ -87,16 +88,13 @@ export default async function BankPage({
     db.select({ id: suppliers.id, nameAr: suppliers.nameAr })
       .from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.nameAr)),
 
-    /* ما على كلّ مورّد الآن — ليُعرَض قبل السداد على حسابه لا بعده */
-    db.execute<{ supplier_id: string; outstanding: string }>(sql`
-      select i.supplier_id,
-             sum(i.total_minor - coalesce((select sum(pa.amount_minor)::int
-               from payment_allocations pa where pa.invoice_id = i.id), 0))::bigint as outstanding
-      from invoices i
-      group by i.supplier_id
-      having sum(i.total_minor - coalesce((select sum(pa.amount_minor)::int
-        from payment_allocations pa where pa.invoice_id = i.id), 0)) > 0
-    `),
+    /*
+      ما على كلّ مورّد الآن — ليُعرَض قبل السداد على حسابه لا بعده.
+      من المصدر الواحد لـ«عليك»: كان يجمع ما بقي على الفواتير بلا عتبة
+      الهللة ولا رصيدنا عنده، فقالت المعاينة «سيُخصَّص ٠٫٠٢» لسرد كو وهو
+      لا يُدان بشيء.
+    */
+    loadSupplierBalances(db),
 
     db.select({
       id: bankTransactions.id,
@@ -244,7 +242,7 @@ export default async function BankPage({
 
   const supplierName = new Map(supplierRows.map((s) => [s.id, s.nameAr]));
   const outstanding = new Map(
-    balances.rows.map((b) => [b.supplier_id, Number(b.outstanding)]),
+    balances.filter((b) => b.owedMinor > 0).map((b) => [b.supplierId, b.owedMinor]),
   );
 
   /*

@@ -8,6 +8,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   SETTLED_TOLERANCE_MINOR,
+  overdueOwedMinor,
   supplierBalance,
   totalBalances,
   type BalanceTotals,
@@ -83,6 +84,84 @@ export async function loadSupplierBalances(
       creditMinor: Number(r.credit),
     }),
   );
+}
+
+export interface OverdueBalance {
+  supplierId: string;
+  nameAr: string;
+  /** ما بقي فوق الهللة على فواتيره الأقدم من المهلة */
+  overdueOpenMinor: number;
+  /** ما دفعناه له ولم يُخصم من فاتورة */
+  creditMinor: number;
+  /** المتأخّر بعد خصم رصيدنا عنده */
+  owedMinor: number;
+  /** عمرُ أقدم فاتورةٍ مفتوحة له بالأيّام */
+  oldestDays: number;
+}
+
+/**
+ * «مورّدون تأخّرت مستحقّاتهم» — بالمعادلة نفسها التي تحسب «عليك».
+ *
+ * المفتوحُ على الفواتير الأقدم من `olderThanDays` بعتبة الهللة، ناقصاً
+ * رصيدَنا عند المورّد (`overdueOwedMinor`). ولا يُعرَض مورّدٌ رصيدُه
+ * يغطّي متأخّره.
+ */
+export async function loadOverdueBalances(
+  executor: Executor = db,
+  olderThanDays = 60,
+): Promise<OverdueBalance[]> {
+  const rows = (
+    await executor.execute<{
+      supplier_id: string; name_ar: string; overdue_open: string | number;
+      credit: string | number; oldest: string | number;
+    }>(sql`
+      with alloc_by_invoice as (
+        select invoice_id, sum(amount_minor)::bigint as s from payment_allocations group by invoice_id
+      ),
+      alloc_by_payment as (
+        select payment_id, sum(amount_minor)::bigint as s from payment_allocations group by payment_id
+      ),
+      inv as (
+        select i.supplier_id,
+               sum(i.total_minor - coalesce(a.s, 0))::bigint as overdue_open,
+               max(extract(day from now() - i.invoice_date))::int as oldest
+          from invoices i
+          left join alloc_by_invoice a on a.invoice_id = i.id
+         where i.supplier_id is not null
+           and i.invoice_date < now() - make_interval(days => ${olderThanDays})
+           and i.total_minor - coalesce(a.s, 0) > ${SETTLED_TOLERANCE_MINOR}
+         group by i.supplier_id
+      ),
+      pay as (
+        select p.supplier_id,
+               sum(greatest(0, p.amount_minor - p.fee_minor - coalesce(b.s, 0)))::bigint as credit
+          from payments p
+          left join alloc_by_payment b on b.payment_id = p.id
+         where p.supplier_id is not null and p.status not in ('REVERSED', 'VOID')
+         group by p.supplier_id
+      )
+      select s.id as supplier_id, s.name_ar, inv.overdue_open, coalesce(pay.credit, 0) as credit, inv.oldest
+        from inv
+        join suppliers s on s.id = inv.supplier_id
+        left join pay on pay.supplier_id = inv.supplier_id
+    `)
+  ).rows;
+
+  return rows
+    .map((r) => {
+      const overdueOpenMinor = Number(r.overdue_open);
+      const creditMinor = Number(r.credit);
+      return {
+        supplierId: r.supplier_id,
+        nameAr: r.name_ar,
+        overdueOpenMinor,
+        creditMinor,
+        owedMinor: overdueOwedMinor(overdueOpenMinor, creditMinor),
+        oldestDays: Number(r.oldest),
+      };
+    })
+    .filter((r) => r.owedMinor > 0)
+    .sort((a, b) => b.owedMinor - a.owedMinor);
 }
 
 export async function loadBalanceTotals(executor: Executor = db): Promise<{

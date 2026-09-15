@@ -13,6 +13,7 @@ import { checkBalance } from "./bank/balance-equation";
 import { findDuplicateExpenses, type Expense } from "./expenses";
 import { findDoublePaid, recoverableMinor, type DoublePaidTx } from "./bank/double-paid";
 import { detectAnomalies } from "./bank/lifecycle";
+import { loadOverdueBalances } from "@/services/supplier-balance.service";
 
 interface Row {
   [key: string]: unknown;
@@ -34,15 +35,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         (select coalesce(sum(amount_minor),0)::bigint from bank_transactions
            where category='UNKNOWN')                                                       as unclassified_amount,
         (select count(*)::int from invoices i
-           where not exists (select 1 from invoice_lines l where l.invoice_id=i.id))       as no_lines,
-        (select coalesce(sum(greatest(0, i.total_minor - coalesce((
-             select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id=i.id
-           ),0))),0)::bigint
-         from invoices i
-         where i.invoice_date < now() - interval '60 days'
-           and i.total_minor > coalesce((
-             select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id=i.id
-           ),0) + 1)                                                                       as overdue
+           where not exists (select 1 from invoice_lines l where l.invoice_id=i.id))       as no_lines
     `)
   ).rows;
 
@@ -71,24 +64,19 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     amountMinor: Number(r.total_minor),
   }));
 
-  const overdueSuppliers = (
-    await db.execute<Row>(sql`
-      select s.name_ar,
-             sum(greatest(0, i.total_minor - coalesce((
-               select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id=i.id
-             ),0)))::bigint as owed,
-             max(extract(day from now() - i.invoice_date))::int as oldest
-      from invoices i left join suppliers s on s.id = i.supplier_id
-      where i.invoice_date < now() - interval '60 days'
-        and i.total_minor > coalesce((
-          select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id=i.id
-        ),0) + 1
-      group by s.name_ar order by owed desc limit 10
-    `)
-  ).rows.map<AttentionEvidence>((r) => ({
-    label: String(r.name_ar ?? "—"),
-    sub: `أقدم دين منذ ${r.oldest} يوماً`,
-    amountMinor: Number(r.owed),
+  /*
+    المتأخّر بالمورّد لا بالفاتورة — والمصدر الذي يقول «عليك» في كلّ شاشة.
+    كان يُجمع ما بقي على الفواتير القديمة بلا خصم رصيدنا عند المورّد ولا
+    عتبة الهللة، فيقول «مستحقّ عليك» عن مالٍ دفعناه.
+  */
+  const overdue = await loadOverdueBalances(db, 60);
+  const overdueMinor = overdue.reduce((s, r) => s + r.owedMinor, 0);
+  const overdueSuppliers = overdue.slice(0, 10).map<AttentionEvidence>((r) => ({
+    label: r.nameAr,
+    sub: r.creditMinor > 0 && r.owedMinor < r.overdueOpenMinor
+      ? `أقدم دين منذ ${r.oldestDays} يوماً · بعد خصم ما لك عنده ${formatRiyalsDisplay(r.creditMinor)}`
+      : `أقدم دين منذ ${r.oldestDays} يوماً`,
+    amountMinor: r.owedMinor,
   }));
 
   // مورّدون لهم فواتير ولم يصل كشفهم عن الشهر المنقضي — العدد كاملاً، والقائمة دليل
@@ -362,7 +350,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     vatAtRiskEvidence: vatEvidence,
     unknownTaxCount: Number(counts?.unknown_tax ?? 0),
     unknownTaxEvidence: unknownEvidence,
-    overdueMinor: Number(counts?.overdue ?? 0),
+    overdueMinor,
     overdueSuppliers,
     unclassifiedBankTx: Number(counts?.unclassified ?? 0),
     unclassifiedBankAmountMinor: Number(counts?.unclassified_amount ?? 0),

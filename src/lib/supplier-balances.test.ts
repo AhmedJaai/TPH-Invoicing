@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { supplierBalance, totalBalances } from "./supplier-balances";
+import { overdueOwedMinor, supplierBalance, totalBalances } from "./supplier-balances";
 
 const row = (id: string, openMinor: number, creditMinor: number, openCount = 1) =>
   supplierBalance({ supplierId: id, billedMinor: 0, openMinor, openCount, paidNetMinor: 0, creditMinor });
@@ -34,5 +34,26 @@ describe("totalBalances", () => {
     expect(t.offsetMinor).toBe(63_250);
     expect(t.owedMinor).toBe(266_915 - 63_250);
     expect(t.openInvoiceCount).toBe(5);
+  });
+});
+
+describe("overdueOwedMinor", () => {
+  it("رصيدُنا عند المورّد يُخصم من متأخّره أوّلاً — الأقدم أوّلاً", () => {
+    // فاتورة ١٬٧٩٦٫٠٠ عمرها ١٠٧ أيّام، ولنا عنده ٥٠٠ من حوالةٍ لم تُخصَّص
+    expect(overdueOwedMinor(179_600, 50_000)).toBe(129_600);
+  });
+
+  it("الرصيد الذي يغطّي المتأخّر لا يترك «مستحقّاً عليك»", () => {
+    expect(overdueOwedMinor(179_600, 200_000)).toBe(0);
+  });
+
+  it("ولا رصيد: المتأخّر كما هو", () => {
+    expect(overdueOwedMinor(179_600, 0)).toBe(179_600);
+  });
+
+  it("ولا يزيد على «عليك له» أبداً", () => {
+    const open = 179_600 + 69_000; // متأخّرة وحديثة
+    const credit = 100_000;
+    expect(overdueOwedMinor(179_600, credit)).toBeLessThanOrEqual(row("x", open, credit).owedMinor);
   });
 });
