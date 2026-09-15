@@ -158,6 +158,11 @@ export const documents = pgTable("documents", {
   sizeBytes: integer("size_bytes"),
   /** بصمة المحتوى — تكشف رفع نفس الملف مرتين ولو اختلف اسمه */
   sha256: text("sha256"),
+  /**
+   * بصمةُ الدرايف (`md5Checksum`) — تُقرأ من القائمة بلا تنزيل. بها يُعرَف
+   * الملفّ المرفوع من الجهاز وقد قيّدته المزامنةُ بالاسم ولا `sha256` له.
+   */
+  driveMd5: text("drive_md5"),
 
   kind: documentKindEnum("kind").notNull().default("UNKNOWN"),
   status: documentStatusEnum("status").notNull().default("PENDING"),

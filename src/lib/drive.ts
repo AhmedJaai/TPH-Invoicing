@@ -18,6 +18,8 @@ export interface DriveFile {
   size?: number;
   modifiedTime?: string;
   parents?: string[];
+  /** بصمةُ المحتوى من الدرايف — قراءةٌ بلا تنزيل. غائبةٌ لمستندات جوجل والمجلّدات. */
+  md5Checksum?: string;
 }
 
 export const FOLDER_MIME = "application/vnd.google-apps.folder";
@@ -76,7 +78,7 @@ export async function listChildren(
   do {
     const res = await drive.files.list({
       q: `'${folderId}' in parents and trashed = false`,
-      fields: "nextPageToken, files(id, name, mimeType, size, modifiedTime, parents)",
+      fields: "nextPageToken, files(id, name, mimeType, size, modifiedTime, parents, md5Checksum)",
       pageSize: 1000,
       orderBy: "name",
       pageToken,
@@ -93,6 +95,7 @@ export async function listChildren(
         size: f.size ? Number(f.size) : undefined,
         modifiedTime: f.modifiedTime ?? undefined,
         parents: f.parents ?? undefined,
+        md5Checksum: f.md5Checksum ?? undefined,
       });
     }
     pageToken = res.data.nextPageToken ?? undefined;
@@ -281,7 +284,7 @@ export async function getFileMeta(
   try {
     const res = await drive.files.get({
       fileId,
-      fields: "id, name, mimeType, size, modifiedTime, parents",
+      fields: "id, name, mimeType, size, modifiedTime, parents, md5Checksum",
       supportsAllDrives: true,
     });
     const f = res.data;
@@ -293,6 +296,7 @@ export async function getFileMeta(
       size: f.size ? Number(f.size) : undefined,
       modifiedTime: f.modifiedTime ?? undefined,
       parents: f.parents ?? undefined,
+      md5Checksum: f.md5Checksum ?? undefined,
     };
   } catch (e) {
     /* الغائب يُتخطّى، أمّا التفويض المنتهي فيُعلَن — لا يُقرأ «غير موجود» */

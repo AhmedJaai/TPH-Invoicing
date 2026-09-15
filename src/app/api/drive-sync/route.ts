@@ -288,6 +288,8 @@ async function handle(request: Request) {
         fileName: entry.file.name,
         mimeType: entry.file.mimeType,
         sizeBytes: entry.file.size ?? null,
+        /* لا تنزيل هنا فلا `sha256` — وبصمةُ الدرايف تكفي لمعرفته إن رُفع ثانيةً */
+        driveMd5: entry.file.md5Checksum ?? null,
         kind: plan.documentKind as never,
         status: "ARCHIVED",
         periodMonth: entry.month,
@@ -509,6 +511,7 @@ async function handle(request: Request) {
           mimeType,
           sizeBytes: data.length,
           sha256: createHash("sha256").update(data).digest("hex"),
+          driveMd5: entry.file.md5Checksum ?? createHash("md5").update(data).digest("hex"),
           kind: x.documentKind as never,
           /*
             ما قرأه النموذج من ملفٍّ لا يُفهم اسمُه ينتظر إنساناً: كان يُقيَّد
