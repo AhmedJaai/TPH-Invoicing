@@ -354,3 +354,29 @@ describe("مالٌ خرج ولا فاتورة تفسّره", () => {
       .toBeUndefined();
   });
 });
+
+describe("كلّ عددٍ في العنوان يمرّ بتمييزه (CODE-107)", () => {
+  /*
+    كان «1 مصروفاً يصف حدثاً» و«13 دفعة خرجت» يُكتبان بالرقم خامّاً —
+    والواحد والاثنان صيغتان لا رقمان: «دفعة واحدة» و«دفعتان».
+  */
+  const facts = (n: number): Partial<AttentionFacts> => ({
+    bankGapDays: n, duplicateExpenses: n, duplicateExpenseAmountMinor: 100,
+    unbackedPaymentCount: n, unbackedPaymentMinor: 100, openBlockers: n,
+  });
+
+  it("الواحد والاثنان بلا رقم", () => {
+    for (const n of [1, 2]) {
+      for (const i of buildAttention({ ...quiet, ...facts(n) })) {
+        expect(i.title, i.id).not.toMatch(new RegExp(`(^|\\s)${n}\\s`));
+      }
+    }
+  });
+
+  it("وما فوق العشرة مفردٌ منصوب", () => {
+    const titles = buildAttention({ ...quiet, ...facts(13) }).map((i) => i.title);
+    expect(titles).toContain("13 يوماً بلا كشف بنكيّ");
+    expect(titles).toContain("13 دفعة بلا فاتورة تفسّرها");
+    expect(titles).toContain("13 مانعاً لم يُعالَج");
+  });
+});

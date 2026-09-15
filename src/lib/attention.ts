@@ -1,4 +1,6 @@
-import { DOCUMENT, INVOICE, PAYMENT, PRODUCT, SUPPLIER, TRANSACTION, WARNING, countNoun } from "./arabic";
+import {
+  BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, countNoun,
+} from "./arabic";
 /**
  * ما يحتاج انتباهك.
  *
@@ -208,7 +210,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "bank-coverage-gap",
       area: "BANK",
       severity: "CRITICAL",
-      title: `${f.bankGapDays} يوماً بلا كشف بنكيّ`,
+      title: `${countNoun(f.bankGapDays, DAY)} بلا كشف بنكيّ`,
       detail: "حركات هذه الأيام غائبة لا معدومة — ولا يظهر غيابها في أي عدّاد.",
       action: "استورد الكشف الذي يغطّيها قبل أن تُقرأ أرقام الشهر.",
       actionLabel: "استورد كشفاً",
@@ -249,7 +251,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "duplicate-expenses",
       area: "DATA",
       severity: "HIGH",
-      title: `${f.duplicateExpenses} مصروفاً يصف حدثاً وصل مرّتين`,
+      title: `مصروفٌ وصل مرّتين — ${countNoun(f.duplicateExpenses, ITEM)}`,
       detail: "الحدث الواحد يصل من كشف البنك ومن مستندٍ رُفع — فيُقيَّد مرّتين ويعلو مصروف الشهر.",
       action: "راجعها واحذف الزائد بيدك — أيّهما الصحيح قرارُك لا قرارُ النظام.",
       actionLabel: "افتح المصروفات",
@@ -300,7 +302,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "unbacked-payments",
       area: "PAYMENTS",
       severity: "HIGH",
-      title: `${f.unbackedPaymentCount} دفعة خرجت ولا فاتورة تفسّرها`,
+      title: `${countNoun(f.unbackedPaymentCount, PAYMENT_RECORD)} بلا فاتورة تفسّرها`,
       detail:
         "مالٌ وصل المورّد ولا مستندَ يقابله — فلا خصمَ لمدخلاته،"
         + " ورصيدُ المورّد عندنا غير مُتحقَّق منه.",
@@ -320,7 +322,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "open-blockers",
       area: "DATA",
       severity: "CRITICAL",
-      title: `${countNoun(f.openBlockers, WARNING)} مانع لم يُعالَج`,
+      title: `${countNoun(f.openBlockers, BLOCKER)} لم يُعالَج`,
       detail: "يمنع إقفال الشهر ويشوّه أرقامه.",
       action: "عالجها أو تجاوزها بسبب مكتوب.",
       actionLabel: "افتح ما يحتاج مراجعة",

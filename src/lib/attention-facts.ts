@@ -13,6 +13,7 @@ import { checkBalance } from "./bank/balance-equation";
 import { findDuplicateExpenses, type Expense } from "./expenses";
 import { findDoublePaid, recoverableMinor, type DoublePaidTx } from "./bank/double-paid";
 import { detectAnomalies } from "./bank/lifecycle";
+import { DAY, TIME, countNoun } from "./arabic";
 
 interface Row {
   [key: string]: unknown;
@@ -184,7 +185,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
   const bankGapRanges = gaps.slice(0, 8).map<AttentionEvidence>((g) => ({
     label: `${g.start} ← ${g.end}`,
-    sub: `${g.days} يوماً بلا كشف`,
+    sub: `${countNoun(g.days, DAY)} بلا كشف`,
   }));
 
   /*
@@ -353,7 +354,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     duplicatePaymentAmountMinor: recoverableMinor(doublePaid),
     duplicatePaymentEvidence: doublePaid.slice(0, 6).map((g) => ({
       label: g.payee,
-      sub: `${g.day} · ${g.transactions.length} مرّات`
+      sub: `${g.day} · ${countNoun(g.transactions.length, TIME)}`
         + (g.distinctOperations ? " · بمراجعِ سدادٍ مختلفة" : " · بلا مرجعٍ يفصلهما"),
       amountMinor: g.excessMinor,
     })),
