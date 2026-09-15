@@ -37,7 +37,8 @@ export async function GET(request: Request) {
       taxStatus: invoices.taxStatus,
       inputVatStatus: invoices.inputVatStatus,
       allocatedMinor: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}), 0)::bigint`,
-      needsReview: sql<boolean>`coalesce(bool_or(${documents.status} = 'NEEDS_REVIEW'), false)`,
+      /* ما لم يُؤرشَف لم يُقَرّ — ينتظر مراجعةً أو رُفض — فلا يدخل ملفّ التحويلات */
+      needsReview: sql<boolean>`coalesce(bool_or(${documents.status} <> 'ARCHIVED'), false)`,
     })
     .from(invoices)
     .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))

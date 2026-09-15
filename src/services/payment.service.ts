@@ -173,6 +173,29 @@ export async function createPayment(tx: Tx, input: CreatePaymentInput): Promise<
   return row.id;
 }
 
+/** قيدٌ يدويّ قريبٌ من الحوالة: بلا مستند ولا حركة بنك، للمورّد والمبلغ نفسيهما. */
+export async function findManualTwin(
+  tx: Tx,
+  input: { supplierId: string | null; paidAt: Date; amountMinor: number },
+): Promise<{ id: string; paidAt: Date } | null> {
+  if (!input.supplierId) return null;
+  const day = input.paidAt.toISOString().slice(0, 10);
+  const [row] = await tx
+    .select({ id: payments.id, paidAt: payments.paidAt })
+    .from(payments)
+    .where(and(
+      eq(payments.supplierId, input.supplierId),
+      eq(payments.amountMinor, input.amountMinor),
+      sql`${payments.documentId} is null`,
+      sql`${payments.status} not in ('REVERSED','VOID')`,
+      sql`not exists (select 1 from bank_transactions bt where bt.matched_payment_id = ${payments}.id)`,
+      sql`${payments.paidAt}::date between ${day}::date - 14 and ${day}::date + 3`,
+    ))
+    .orderBy(sql`abs(${payments.paidAt}::date - ${day}::date)`, payments.createdAt)
+    .limit(1);
+  return row ?? null;
+}
+
 /**
  * دفعةٌ من حركة بنك — تُتبنّى إن كانت الواقعةُ مقيَّدةً بلا حركة.
  *
@@ -190,6 +213,34 @@ export async function recordBankPayment(
     paidAt: input.paidAt,
     amountMinor: input.amountMinor,
   });
+
+  /*
+    والقيدُ اليدويّ («سجّل أنّها سُدّدت») لا يعرف يوم الخصم: يُؤرَّخ بيوم
+    الإقرار، والحوالة في الكشف بيومها. فإن لم يُوجد توأمٌ في اليوم نفسه
+    يُتبنّى قيدٌ يدويّ بلا مستند ولا حركة، للمورّد والمبلغ نفسيهما، في
+    نافذة أسبوعين قبل الحوالة وثلاثة أيّام بعدها — الأقرب أوّلاً. ويُنقل
+    تاريخه إلى تاريخ الكشف، فالكشف أصدق في اليوم.
+  */
+  if (!twin || twin.hasBankRow) {
+    const manual = await findManualTwin(tx, {
+      supplierId: input.supplierId ?? null,
+      paidAt: input.paidAt,
+      amountMinor: input.amountMinor,
+    });
+    if (manual) {
+      await assertMonthsOpen(tx, [manual.paidAt.toISOString().slice(0, 7), input.appliesToMonth]);
+      await tx
+        .update(payments)
+        .set({
+          paidAt: input.paidAt,
+          method: input.method,
+          beneficiaryNameRaw: sql`coalesce(${payments.beneficiaryNameRaw}, ${input.beneficiaryNameRaw ?? null})`,
+          appliesToMonth: sql`coalesce(${payments.appliesToMonth}, ${input.appliesToMonth ?? null})`,
+        })
+        .where(eq(payments.id, manual.id));
+      return { id: manual.id, adopted: true };
+    }
+  }
 
   if (twin && !twin.hasBankRow) {
     await assertMonthsOpen(tx, [input.appliesToMonth]);

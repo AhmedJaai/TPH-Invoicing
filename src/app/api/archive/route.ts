@@ -131,6 +131,13 @@ function toResponse(e: unknown): NextResponse | null {
   if (code === "23505") {
     return NextResponse.json({ error: "رُفع هذا الملف أو هذه الفاتورة للتوّ من نافذةٍ أخرى — لم يُقيَّد ثانيةً" }, { status: 409 });
   }
+  /* قيودُ المال في القاعدة تُقال لقارئها — لا ٥٠٠ بجسمٍ فارغ */
+  if (code === "23514" || code === "23503") {
+    return NextResponse.json({ error: "رفضت القاعدة هذه القيم فلم يُقيَّد شيء — راجع المبالغ والمورّد" }, { status: 409 });
+  }
+  if (code === "22003") {
+    return NextResponse.json({ error: "مبلغٌ أكبر من المعقول — راجع الأصفار" }, { status: 400 });
+  }
   return null;
 }
 
@@ -259,6 +266,16 @@ export async function POST(request: Request) {
       data,
     });
 
+    /*
+      من لا يرى المبالغ لا يُقِرّها.
+
+      مدير المشتريات يرفع — ومبالغُ ما يرفعه تُكتب كما في الورقة، لكنّها
+      إقرارٌ بمالٍ مستحقّ لم يره صاحبه. فكانت فاتورتُه تُقيَّد مؤرشفة وتدخل
+      ملفّ التحويلات. فتُقيَّد «تنتظر المراجعة» (يحجزها ملفّ التحويلات)،
+      ولا يُخصم عليها رصيد المورّد حتى يؤكّدها من يرى المبالغ.
+    */
+    const needsReview = !can(user.role, "amounts:view");
+
     // ── القاعدة ──
     const documentId = await db.transaction(async (tx) => {
       const docId = await createDocument(tx, {
@@ -276,6 +293,7 @@ export async function POST(request: Request) {
         textSource: cached?.textSource ?? undefined,
         fieldConfidence: (serverRaw as { confidence?: unknown } | null)?.confidence,
         uploadedById: user.id,
+        status: needsReview ? "NEEDS_REVIEW" : "ARCHIVED",
       });
 
       if (review.canCreateInvoice && body.supplierId && invoiceDate && totalMinor !== null) {
@@ -310,7 +328,9 @@ export async function POST(request: Request) {
             يومئذٍ، فتصل الفاتورة بعدها «مستحقّة» والمال عند المورّد.
             والنافذة سبعة أيّام — ما جاوزها قرارُ إنسان.
           */
-          await applySupplierCredit(tx, body.supplierId, { forwardDays: SETTLEMENT_FORWARD_DAYS });
+          if (!needsReview) {
+            await applySupplierCredit(tx, body.supplierId, { forwardDays: SETTLEMENT_FORWARD_DAYS });
+          }
         }
       }
 
@@ -409,6 +429,7 @@ export async function POST(request: Request) {
       driveFileId: uploaded.fileId,
       webViewLink: uploaded.webViewLink,
       taxStatus: review.taxStatus,
+      needsReview,
       correctedFields: Object.keys(corrections),
       /* ويُعاد إلى الشاشة كي يراه من رفع، لا يُصحَّح خلف ظهره */
       periodMonth,

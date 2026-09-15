@@ -57,6 +57,8 @@ export interface CreateDocumentInput {
   uploadedById: string;
   /** من أين قُرئ — نصّاً أم صورة. */
   textSource?: string;
+  /** «ينتظر المراجعة» حين يرفعه من لا يرى المبالغ — والافتراضيّ مؤرشف */
+  status?: "ARCHIVED" | "NEEDS_REVIEW";
 }
 
 const KINDS = new Set([
@@ -75,7 +77,7 @@ export async function createDocument(tx: Tx, input: CreateDocumentInput): Promis
       sizeBytes: input.sizeBytes,
       sha256: input.sha256,
       kind: (KINDS.has(input.kind) ? input.kind : "UNKNOWN") as never,
-      status: "ARCHIVED",
+      status: input.status ?? "ARCHIVED",
       periodMonth: input.periodMonth,
       supplierId: input.supplierId ?? null,
       // مخرجات النموذج الخام تُحفظ كما هي ولا تُعدَّل — هي المرجع عند أي مراجعة

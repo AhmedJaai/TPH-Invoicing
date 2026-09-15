@@ -247,7 +247,8 @@ async function handle(request: Request) {
       ولا حركةَ مقيَّدة بدفعة. فمن أرسل معرّفاتٍ لا يجمعها مورّد لا
       يقيّد بها سداداً بضغطة.
     */
-    const suppliers = new Set(group.map((g) => g.supplierId ?? body.supplierId ?? ""));
+    /* المورّد من الحركات وحدها — لا من جسم الطلب: كان `supplierId` المُرسَل يحوّل تحويلاً شخصيّاً رصيداً عند مورّدٍ يختاره الطالب */
+    const suppliers = new Set(group.map((g) => g.supplierId ?? ""));
     const supplierId = [...suppliers][0];
     if (suppliers.size !== 1 || !supplierId) {
       return NextResponse.json(
@@ -269,262 +270,19 @@ async function handle(request: Request) {
     return await settleAccounts(user.id, group, supplierId);
   }
 
-  /* ── توزيعٌ يدويّ ── */
-  if (body.split && body.split.length > 0) {
-    return await applyManualSplit(user.id, tx, body.split);
-  }
-
-  /* ── قبول مطابقة ── */
-  const ids = body.invoiceIds ?? [];
-  if (ids.length === 0) {
-    return NextResponse.json({ error: "حدّد الفاتورة أو السبب" }, { status: 400 });
-  }
-
-  const chosen = await db
-    .select({
-      id: invoices.id,
-      supplierId: invoices.supplierId,
-      periodMonth: invoices.periodMonth,
-      invoiceDate: invoices.invoiceDate,
-      totalMinor: invoices.totalMinor,
-      allocated: sql<number>`coalesce((select sum(pa.amount_minor)::int
-        from payment_allocations pa where pa.invoice_id = invoices.id), 0)`,
-    })
-    .from(invoices)
-    .where(inArray(invoices.id, ids));
-
-  if (chosen.length !== ids.length) {
-    return NextResponse.json({ error: "بعض الفواتير غير موجودة" }, { status: 400 });
-  }
-
-  const suppliers = new Set(chosen.map((c) => c.supplierId));
-  if (suppliers.size > 1) {
-    return NextResponse.json(
-      { error: "لا تُجمَع فواتير مورّدين مختلفين في دفعة واحدة" },
-      { status: 400 },
-    );
-  }
-
   /*
-    التخصيص بترتيب التاريخ — الأقدم أوّلاً — ولا يتجاوز قيمة الدفعة
-    ولا المتبقّي على أيّ فاتورة. وقيود القاعدة تحرس هذا أيضاً، فالحارس
-    مزدوج.
+    كان هنا فرعان: «قبولُ مطابقةٍ بفواتير يسمّيها الطلب» و«توزيعٌ يدويّ».
+    لا شاشة تستدعيهما، وكانا يقيّدان حركةً **واردة** سداداً لفاتورة، ويقيّدان
+    حوالةَ مورّدٍ على فاتورة مورّدٍ آخر ويعيدان كتابة مورّد الحركة — خلافاً
+    لـ«المال الداخل ليس سداداً». فحُذفا. والتأكيد يمرّ بـ match-confirm-bulk
+    (يعيد الحساب في الخادم)، والسداد على الحساب بـ settleSupplier أعلاه.
   */
-  let left = tx.amountMinor;
-  const allocations: { invoiceId: string; amountMinor: number }[] = [];
-  const months = new Set<string>();
-
-  for (const inv of [...chosen].sort((a, b) => a.invoiceDate.getTime() - b.invoiceDate.getTime())) {
-    if (left <= 0) break;
-    const outstanding = inv.totalMinor - Number(inv.allocated);
-    const take = Math.min(left, outstanding);
-    if (take <= 0) continue;
-    allocations.push({ invoiceId: inv.id, amountMinor: take });
-    months.add(inv.periodMonth);
-    left -= take;
-  }
-
-  if (allocations.length === 0) {
-    return NextResponse.json(
-      { error: "الفواتير المختارة مسدَّدة بالكامل — لا شيء يُخصَّص" },
-      { status: 409 },
-    );
-  }
-
-  const sorted = [...months].sort();
-
-  /*
-    الدفعة والتخصيص ووسم الحركة عملٌ واحد.
-
-    فلو أُنشئت الدفعة ثمّ فشل التخصيص لبقيت دفعةٌ لا تفسّر شيئاً،
-    وحركةٌ تبدو مطابَقة وليست كذلك.
-  */
-  await db.transaction(async (t) => {
-    const { id } = await recordBankPayment(t, {
-      supplierId: chosen[0].supplierId,
-      paidAt: tx.valueDate,
-      amountMinor: tx.amountMinor,
-      method: "BANK_TRANSFER",
-      beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
-      appliesToMonth: sorted[sorted.length - 1],
-    });
-
-    await allocate(t, id, tx.amountMinor, allocations);
-
-    await claimBankTransaction(t, tx.id, {
-      matchedPaymentId: id,
-      matchStatus: "MATCHED",
-      matchDisposition: "AUTO",
-      lifecycle: "POSTED",
-      supplierId: chosen[0].supplierId,
-      category: "SUPPLIER",
-    });
-
-    await t.insert(decisionHistory).values({
-      bankTransactionId: tx.id,
-      event: "MATCH_CONFIRMED",
-      actor: "HUMAN",
-      actorId: user.id,
-      detail: `أقرّها على ${countNoun(allocations.length, INVOICE)}`,
-      payload: { الدفعة: id, الفواتير: allocations.map((a) => a.invoiceId), الشهور: sorted },
-    });
-
-    /* التدقيق داخل المعاملة، والمبالغ بالهللات — السجلّ لا يُعدَّل فلا يحفظ عشريّاً */
-    await recordAudit({
-      actorId: user.id,
-      action: "MATCH_CONFIRMED",
-      entityType: "bank_transaction",
-      entityId: tx.id,
-      after: {
-        الفعل: "قبِلَ المطابقة بنفسه",
-        الدفعة: id,
-        "الفواتير بالهللات": allocations.map((a) => `${a.invoiceId}:${a.amountMinor}`),
-        الشهور: sorted,
-        "المتبقّي بلا تخصيص بالهللات": left,
-      },
-    }, t);
-  });
-
-  const remainder = left > 0 ? ` وبقي ${formatRiyalsDisplay(left)} بلا تخصيص` : "";
-  return NextResponse.json({
-    ok: true,
-    message: `طُوبقت مع ${countNoun(allocations.length, INVOICE)}${remainder}`,
-    allocations,
-  });
+  return NextResponse.json(
+    { error: "حدّد الفعل: سدادٌ على حساب المورّد، أو «ليست سداداً»" },
+    { status: 400 },
+  );
 }
 
-
-/**
- * توزيعٌ يكتبه صاحب العمل.
- *
- * ويُتحقَّق منه في الخادم كما يُتحقَّق من أي رقم: لا مبلغ سالب، ولا
- * مجموعٌ يتجاوز الدفعة، ولا تخصيصٌ فوق المتبقّي على الفاتورة. وقيود
- * القاعدة تحرسه أيضاً — فالحارس مزدوج.
- */
-async function applyManualSplit(
-  userId: string,
-  tx: { id: string; amountMinor: number; valueDate: Date; beneficiaryRaw: string | null; description: string | null },
-  split: { invoiceId: string; amountMinor: number }[],
-): Promise<NextResponse> {
-  for (const s of split) {
-    if (!Number.isInteger(s.amountMinor) || s.amountMinor <= 0) {
-      return NextResponse.json({ error: "كل مبلغ يجب أن يكون موجباً" }, { status: 400 });
-    }
-  }
-
-  const total = split.reduce((sum, s) => sum + s.amountMinor, 0);
-  if (total > tx.amountMinor) {
-    return NextResponse.json(
-      { error: `المجموع ${formatRiyalsDisplay(total)} يتجاوز الدفعة ${formatRiyalsDisplay(tx.amountMinor)}` },
-      { status: 400 },
-    );
-  }
-
-  const rows = await db
-    .select({
-      id: invoices.id,
-      supplierId: invoices.supplierId,
-      periodMonth: invoices.periodMonth,
-      totalMinor: invoices.totalMinor,
-      allocated: sql<number>`coalesce((select sum(pa.amount_minor)::int
-        from payment_allocations pa where pa.invoice_id = invoices.id), 0)`,
-    })
-    .from(invoices)
-    .where(inArray(invoices.id, split.map((s) => s.invoiceId)));
-
-  if (rows.length !== split.length) {
-    return NextResponse.json({ error: "بعض الفواتير غير موجودة" }, { status: 400 });
-  }
-
-  if (new Set(rows.map((r) => r.supplierId)).size > 1) {
-    return NextResponse.json(
-      { error: "لا تُجمَع فواتير مورّدين مختلفين في دفعة واحدة" },
-      { status: 400 },
-    );
-  }
-
-  for (const s of split) {
-    const inv = rows.find((r) => r.id === s.invoiceId)!;
-    const outstanding = inv.totalMinor - Number(inv.allocated);
-    if (s.amountMinor > outstanding) {
-      return NextResponse.json(
-        { error: `تخصيصٌ فوق المتبقّي على فاتورة: ${formatRiyalsDisplay(outstanding)} متبقٍّ` },
-        { status: 400 },
-      );
-    }
-  }
-
-  const months = [...new Set(rows.map((r) => r.periodMonth))].sort();
-
-  await db.transaction(async (t) => {
-    const { id } = await recordBankPayment(t, {
-      supplierId: rows[0].supplierId,
-      paidAt: tx.valueDate,
-      amountMinor: tx.amountMinor,
-      method: "BANK_TRANSFER",
-      beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
-      appliesToMonth: months[months.length - 1],
-    });
-
-    await allocate(t, id, tx.amountMinor, split);
-
-    await claimBankTransaction(t, tx.id, {
-      matchedPaymentId: id,
-      matchStatus: "MATCHED",
-      matchDisposition: "AUTO",
-      lifecycle: "POSTED",
-      supplierId: rows[0].supplierId,
-      category: "SUPPLIER",
-    });
-
-    await t.insert(decisionHistory).values({
-      bankTransactionId: tx.id,
-      event: "MATCH_CONFIRMED",
-      actor: "HUMAN",
-      actorId: userId,
-      detail: `وزّعها بنفسه على ${countNoun(split.length, INVOICE)}`,
-      payload: { الدفعة: id, التوزيع: split },
-    });
-
-    await recordAudit({
-      actorId: userId,
-      action: "MATCH_CONFIRMED",
-      entityType: "bank_transaction",
-      entityId: tx.id,
-      after: {
-        الفعل: "وزّعها بنفسه",
-        الدفعة: id,
-        "التوزيع بالهللات": split.map((s) => `${s.invoiceId}:${s.amountMinor}`),
-        "بلا تخصيص بالهللات": tx.amountMinor - total,
-      },
-    }, t);
-  });
-
-  const left = tx.amountMinor - total;
-  return NextResponse.json({
-    ok: true,
-    message:
-      left > 0
-        ? `وُزّعت على ${countNoun(split.length, INVOICE)}، وبقي ${formatRiyalsDisplay(left)} بلا تخصيص`
-        : `وُزّعت على ${countNoun(split.length, INVOICE)} بالكامل`,
-  });
-}
-
-/**
- * يقيّد سداداً على حساب المورّد لحركةٍ أو لمجموعة — في معاملةٍ واحدة.
- *
- * **والمجموعة تُسدَّد معاً لا واحدةً واحدة.** كانت الشاشة ترسل خمسةَ
- * عشر طلباً متتابعاً لمجموعةٍ واحدة، فإن نجح ثمانية وفشل التاسع بقيت
- * المجموعة نصفَ مقيَّدة — ولا أحد يعرف أين وقفت.
- *
- * **والخادم لا يأخذ من المتصفّح إلّا معرّفات الحركات.** الفواتير تُقرأ
- * الآن، والمستحقّ يُحسَب الآن — لأنّ ما رُجّح لحظةَ الاستيراد قد تكون
- * فاتورتُه سُدّدت بعده من دفعةٍ أخرى.
- *
- * **والمستحقّ يتناقص بين حركةٍ وأختها داخل المعاملة نفسها**، فلا
- * تُخصَّص فاتورةٌ واحدة لدفعتين. والقاعدة تحرس ذلك بمؤثِّرٍ يرفض
- * تجاوز إجمالي الفاتورة — فالسباق محسوم في القاعدة لا في الترتيب.
- */
 async function settleAccounts(
   userId: string,
   group: (typeof bankTransactions.$inferSelect)[],

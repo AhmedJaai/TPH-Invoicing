@@ -138,7 +138,7 @@ export function buildChanges(f: ChangeFacts): Change[] {
     out.push({
       id: "outstanding",
       label: "المستحقّ عليك",
-      baseline: "عن قبل ثلاثين يوماً",
+      baseline: "عن قبل ثلاثين يوماً (تقديرٌ من تواريخ الفواتير والدفعات)",
       direction: dir,
       pct: pctChange(f.outstandingNow, f.outstandingThen),
       currentMinor: f.outstandingNow,
@@ -149,7 +149,8 @@ export function buildChanges(f: ChangeFacts): Change[] {
         dir === "UP" ? "تراكم أكثر ممّا سدَّدتَ"
         : dir === "DOWN" ? "سدَّدتَ أكثر ممّا تراكم"
         : "لم يتغيّر كثيراً",
-      href: "/purchases/invoices?paid=UNPAID",
+      /* «المفتوح» لا «لم يُسدَّد»: الثاني يُسقط المسدَّدة جزئيّاً (invoice-filter.ts) */
+      href: "/purchases/invoices?paid=OPEN",
     });
   }
 

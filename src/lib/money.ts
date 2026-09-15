@@ -6,6 +6,9 @@
 
 export const HALALAS_PER_RIYAL = 100;
 
+/** أقصى ما يتّسع له عمود المال (`integer`) بالهللات. */
+export const MAX_AMOUNT_MINOR = 2_147_483_647;
+
 /**
  * ما يُتسامح فيه بين (الصافي + الضريبة) والإجمالي المطبوع.
  *
@@ -76,6 +79,14 @@ export function parseRiyals(input: string): number | null {
   const negative = cleaned.startsWith("-");
   const [whole, fraction = ""] = cleaned.replace("-", "").split(".");
   const halalas = Number(whole) * HALALAS_PER_RIYAL + Number(fraction.padEnd(2, "0"));
+  /*
+    والمبلغ الذي لا يتّسع له عمودُ المال لا يُقبل.
+
+    أعمدة المال `integer` (أقصاها ٢١٬٤٧٤٬٨٣٦٫٤٧ ريالاً). وكان «99999999999999999»
+    يُقرأ ثمّ يُسقط الخادم بـ500 عند الكتابة — أصفارٌ زائدة من لوحة الجوّال
+    تصير عطباً بلا رسالة. فيُردّ `null` («لم يُقرأ») وتقول الشاشة لماذا.
+  */
+  if (!Number.isSafeInteger(halalas) || halalas > MAX_AMOUNT_MINOR) return null;
   return negative ? -halalas : halalas;
 }
 

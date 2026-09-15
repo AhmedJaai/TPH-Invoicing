@@ -17,6 +17,7 @@
  * بين فواتير يُرى قبل الإقرار.
  */
 import { NextResponse } from "next/server";
+import { todayInRiyadh } from "@/lib/riyadh-time";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { invoices, paymentAllocations } from "@/db/schema";
@@ -32,6 +33,8 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 interface Body {
+  /** يوم السداد (YYYY-MM-DD) — وإن غاب فاليوم بتوقيت الرياض، لا تاريخ الفاتورة */
+  paidOn?: string;
   /** فواتير بعينها، أو كل ما يسبق شهراً */
   invoiceIds?: string[];
   supplierId?: string;
@@ -155,6 +158,19 @@ async function handle(request: Request) {
     return NextResponse.json({ ok: true, marked: 0, message: "لا فواتير مفتوحة ضمن النطاق" });
   }
 
+  /*
+    يوم السداد لا يوم الفاتورة.
+
+    كانت الدفعة تُؤرَّخ بتاريخ الفاتورة، والحوالة الحقيقيّة تظهر في الكشف
+    بيوم خصمها — بعده بأيّام. والتوأمة تطابق اليوم، فتفوتها: الواقعة
+    الواحدة تُقيَّد دفعتين، والثانية تُخصَّص على فواتير أخرى لم تُدفع.
+  */
+  const today = todayInRiyadh();
+  const paidOn = typeof body.paidOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.paidOn) && body.paidOn <= today
+    ? body.paidOn
+    : today;
+  const paidAt = new Date(`${paidOn}T00:00:00Z`);
+
   let totalMinor = 0;
 
   await db.transaction(async (tx) => {
@@ -166,7 +182,7 @@ async function handle(request: Request) {
       */
       const payId = await createPayment(tx, {
         supplierId: inv.supplierId,
-        paidAt: inv.invoiceDate,
+        paidAt,
         amountMinor: remaining,
         method: "BANK_TRANSFER",
         beneficiaryNameRaw: null,
@@ -207,6 +223,7 @@ async function handle(request: Request) {
       ملاحظة: body.note ?? null,
       // لم يأتِ من كشف بنك — تمييزه مهم عند أي مراجعة لاحقة
       مصدر_السداد: "إقرار المالك لا مطابقة بنكية",
+      يوم_السداد: paidOn,
     },
   });
 

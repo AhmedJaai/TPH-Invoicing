@@ -66,3 +66,13 @@ describe("تحويل المبالغ", () => {
     expect(formatRiyals(total)).toBe("10100.00");
   });
 });
+
+describe("parseRiyals — سقف عمود المال", () => {
+  it("يردّ ما لا يتّسع له العمود بدل أن يُسقط الخادم", () => {
+    expect(parseRiyals("99999999999999999")).toBeNull();
+    expect(parseRiyals("21474836.48")).toBeNull();
+  });
+  it("يقبل أقصى ما يتّسع", () => {
+    expect(parseRiyals("21474836.47")).toBe(2147483647);
+  });
+});

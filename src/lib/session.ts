@@ -1,5 +1,8 @@
 /** مساعدات الجلسة للواجهات البرمجية وصفحات الخادم. */
+import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
+import { db } from "@/db";
+import { users } from "@/db/schema";
 import { can, ForbiddenError, type Capability, type Role } from "./permissions";
 import { previewAllowed } from "./preview-mode";
 
@@ -68,6 +71,21 @@ export async function currentUser(): Promise<CurrentUser | null> {
 
   const session = await auth();
   if (!session?.user?.id || !session.user.email) return null;
+
+  /*
+    المعطَّل لا يمرّ — ولا طلبُه الأوّل.
+
+    مستدعي الجلسة في `auth.ts` يحذف جلسة المعطَّل ويُرجع جلسةً بلا مستخدم،
+    لكنّ غلاف Auth.js يضمّ صفَّ المستخدم إلى ما يُرجعه، فكان الطلب الجاري
+    يرى مستخدماً كاملاً بدوره: محاسبٌ عُطِّل كتب مصروفاً بعد تعطيله. فالحال
+    تُقرأ هنا من القاعدة، في كلّ طلب.
+  */
+  const [row] = await db
+    .select({ isActive: users.isActive })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+  if (!row?.isActive) return null;
   return {
     id: session.user.id,
     email: session.user.email,

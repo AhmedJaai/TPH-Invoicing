@@ -8,7 +8,8 @@
  * ومخرجات النموذج تُعامَل معاملة مُدخَل غير موثوق مثلها مثل المتصفّح:
  * تُقرأ، وتُفحص، ولا يُبنى عليها قرار مالي بلا إعادة حساب.
  */
-import { and, eq } from "drizzle-orm";
+import { sameInvoiceNumber } from "@/lib/invoice-number";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { invoices, monthCloses } from "@/db/schema";
 import { reviewConfirmed, type ConfirmedFields, type ConfirmReview } from "@/lib/confirm";
@@ -63,20 +64,40 @@ export interface ReviewResult extends ConfirmReview {
  * يفحص المستند المعتمَد فحصاً كاملاً على الخادم.
  * يرمي عند وجود مانع؛ ويرجع الحالة الضريبية المحسوبة هنا لا المرسلة.
  */
+const INVOICE_KINDS = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE", "UTILITY"]);
+
 export async function reviewForArchive(fields: ConfirmedFields): Promise<ReviewResult> {
   const supplier = await supplierContext(fields.supplierId);
   if (fields.supplierId && !supplier) throw new InvalidInputError("المورد المحدَّد غير موجود");
 
+  /*
+    الإجماليّ صفرٌ أو سالب لا يُقيَّد فاتورة.
+
+    كان يمرّ الفحص فيُرفع الملفّ إلى الدرايف ثمّ يردّه قيدُ القاعدة
+    (`invoices_total_positive`) بـ500 — فيبقى في الأرشيف ملفٌّ لا سجلّ له.
+    والإجماليّ الصفر أوّلُ ما يطلبه موجِّهٌ محقون في مستند.
+  */
+  if (
+    INVOICE_KINDS.has(fields.documentKind) &&
+    fields.totalMinor !== null && fields.totalMinor !== undefined &&
+    fields.totalMinor <= 0
+  ) {
+    throw new BlockedError(["الإجماليّ صفرٌ أو سالب — لا تُقيَّد فاتورةٌ بلا مبلغ. صحّحه من المستند نفسه"]);
+  }
+
+  /*
+    «مسجّلة مسبقاً» بالرقم موحَّداً لا حرفيّاً: «04» و«4» فاتورةٌ واحدة
+    (`invoice-number.ts`). والمقارنة في الشيفرة لأنّ القيد في القاعدة حرفيّ.
+  */
   const trimmedNumber = fields.invoiceNumber?.trim();
   const duplicateInvoiceNumber =
     Boolean(fields.supplierId && trimmedNumber) &&
     (
       await db
-        .select({ id: invoices.id })
+        .select({ number: invoices.invoiceNumber })
         .from(invoices)
-        .where(and(eq(invoices.supplierId, fields.supplierId!), eq(invoices.invoiceNumber, trimmedNumber!)))
-        .limit(1)
-    ).length > 0;
+        .where(eq(invoices.supplierId, fields.supplierId!))
+    ).some((r) => sameInvoiceNumber(r.number, trimmedNumber));
 
   const review = reviewConfirmed(fields, {
     companyVat: companyConfig.vatNumber,

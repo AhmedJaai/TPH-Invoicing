@@ -20,7 +20,8 @@ export const onRequestError: Instrumentation.onRequestError = async (err, reques
     routeType: context.routeType,
     digest: e.digest,
     code: e.code,
-    message: (e.message ?? String(err)).slice(0, 300),
+    /* رسالة Drizzle تُلحق `params:` بقيم الإدخال — مبالغ وأسماء — فتُقصّ قبل التسجيل */
+    message: (e.message ?? String(err)).split("\nparams:")[0].slice(0, 300),
     stack: e.stack?.split("\n").slice(0, 4).join(" | "),
   }));
 };

@@ -334,7 +334,7 @@ export default async function DocumentsPage({
                       {canDecide && ["PENDING", "EXTRACTED", "NEEDS_REVIEW"].includes(r.status) && (
                         <span className="mt-1 flex flex-wrap gap-1.5">
                           {r.status === "NEEDS_REVIEW" && showAmounts && <ConfirmDocument documentId={r.id} />}
-                          <RejectDocument documentId={r.id} />
+                          {(showAmounts || r.totalMinor === null) && <RejectDocument documentId={r.id} />}
                         </span>
                       )}
                     </span>

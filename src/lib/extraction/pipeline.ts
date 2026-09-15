@@ -4,6 +4,7 @@
  *
  * دالة خالصة عمداً — لا تلمس الشبكة ولا قاعدة البيانات، فتُختبر كلها.
  */
+import { sameInvoiceNumber } from "@/lib/invoice-number";
 import { parseRiyals } from "@/lib/money";
 import { drivePathFor, monthOf, resolveReceiptFiling } from "@/lib/filing";
 import {
@@ -149,7 +150,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     findings.push({ code: ISSUE.DUPLICATE_FILE, ...ISSUE_TEXT.DUPLICATE_FILE });
   }
 
-  if (invoiceNumber && input.existingInvoiceNumbers?.includes(invoiceNumber)) {
+  if (invoiceNumber && input.existingInvoiceNumbers?.some((n) => sameInvoiceNumber(n, invoiceNumber))) {
     findings.push({
       code: ISSUE.DUPLICATE_INVOICE,
       ...ISSUE_TEXT.DUPLICATE_INVOICE,

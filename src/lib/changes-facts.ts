@@ -2,6 +2,8 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import type { ChangeFacts } from "./changes";
+import { SETTLED_TOLERANCE_MINOR } from "./supplier-balances";
+import { loadBalanceTotals } from "@/services/supplier-balance.service";
 
 interface Row extends Record<string, unknown> {
   this_month: string | null;
@@ -10,7 +12,6 @@ interface Row extends Record<string, unknown> {
   purchases_prev: number;
   docs_7: number;
   docs_prev_7: number;
-  outstanding_now: number;
   outstanding_then: number;
   new_unclassified: number;
   days_elapsed: number | null;
@@ -20,8 +21,9 @@ export async function gatherChangeFacts(
   risingItems: number,
   risingAnnualMinor: number,
 ): Promise<ChangeFacts> {
-  const [r] = (
-    await db.execute<Row>(sql`
+  const [{ totals }, rows] = await Promise.all([
+    loadBalanceTotals(),
+    db.execute<Row>(sql`
       with months as (
         select period_month as m
         from invoices
@@ -57,21 +59,45 @@ export async function gatherChangeFacts(
         (select count(*)::int from documents
           where created_at >= now() - interval '14 days'
             and created_at <  now() - interval '7 days')                         as docs_prev_7,
-        (select coalesce(sum(greatest(0, i.total_minor - coalesce((
-            select sum(pa.amount_minor)::int from payment_allocations pa
-            where pa.invoice_id = i.id), 0))), 0)::bigint from invoices i)        as outstanding_now,
         /*
-          ما كان مستحقّاً قبل ثلاثين يوماً: فواتير كانت قد صدرت حينها،
-          مطروحاً منها ما سُدّد لها. تقديرٌ معلَن، إذ لا سجلّ تاريخيّ
-          للرصيد — والتقدير المعلَن خير من رقمٍ لا أساس له.
+          ما كان «عليك» قبل ثلاثين يوماً — بالمعادلة نفسها التي تحسب «عليك» الآن
+          (supplier-balance.service.ts): مورّداً مورّداً، فواتيره المفتوحة يومها
+          ناقصاً رصيدَنا عنده يومها. ولا يُطرح من رصيد ذلك اليوم إلّا ما دُفع قبله:
+          كان يُطرح كلُّ ما خُصّص حتى اليوم، فقالت الصفحة «▲ 281٪ تراكم أكثر ممّا
+          سدَّدتَ» والدَّين نزل ٥٤٪. وهو تقديرٌ من التواريخ لا سجلٌّ تاريخيّ للرصيد.
         */
-        (select coalesce(sum(greatest(0, i.total_minor - coalesce((
-            select sum(pa.amount_minor)::int from payment_allocations pa
-            where pa.invoice_id = i.id), 0))), 0)::bigint from invoices i
-          where i.invoice_date < now() - interval '30 days')                      as outstanding_then,
+        (with t as (select now() - interval '30 days' as at),
+          inv as (
+            select i.supplier_id,
+                   sum(case when i.total_minor - coalesce(a.s, 0) > ${SETTLED_TOLERANCE_MINOR}
+                            then i.total_minor - coalesce(a.s, 0) else 0 end) as open_minor
+              from invoices i
+              left join lateral (
+                select sum(pa.amount_minor) as s
+                  from payment_allocations pa join payments p on p.id = pa.payment_id
+                 where pa.invoice_id = i.id and p.paid_at < (select at from t)
+                   and p.status not in ('REVERSED', 'VOID')) a on true
+             where i.supplier_id is not null and i.invoice_date < (select at from t)
+             group by i.supplier_id),
+          pay as (
+            select p.supplier_id,
+                   sum(greatest(0, p.amount_minor - p.fee_minor - coalesce(b.s, 0))) as credit
+              from payments p
+              left join lateral (
+                select sum(pa.amount_minor) as s
+                  from payment_allocations pa join invoices i on i.id = pa.invoice_id
+                 where pa.payment_id = p.id and i.invoice_date < (select at from t)) b on true
+             where p.supplier_id is not null and p.paid_at < (select at from t)
+               and p.status not in ('REVERSED', 'VOID')
+             group by p.supplier_id)
+          select coalesce(sum(greatest(0, coalesce(inv.open_minor, 0) - coalesce(pay.credit, 0))), 0)::bigint
+            from (select supplier_id from inv union select supplier_id from pay) su
+            left join inv using (supplier_id)
+            left join pay using (supplier_id))                                     as outstanding_then,
         (select count(*)::int from bank_transactions where category = 'UNKNOWN')  as new_unclassified
-    `)
-  ).rows;
+    `),
+  ]);
+  const [r] = rows.rows;
 
   return {
     purchasesThisMonth: Number(r?.purchases_this ?? 0),
@@ -81,7 +107,8 @@ export async function gatherChangeFacts(
     daysElapsedInMonth: r?.days_elapsed == null ? null : Number(r.days_elapsed),
     documentsLast7: Number(r?.docs_7 ?? 0),
     documentsPrev7: Number(r?.docs_prev_7 ?? 0),
-    outstandingNow: Number(r?.outstanding_now ?? 0),
+    /* «عليك» الآن من المصدر الواحد — الرقم نفسه الذي في بطاقة الصفحة الأولى */
+    outstandingNow: totals.owedMinor,
     outstandingThen: Number(r?.outstanding_then ?? 0),
     risingItems,
     risingAnnualMinor,
