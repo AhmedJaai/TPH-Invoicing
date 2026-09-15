@@ -163,6 +163,17 @@ export async function POST(request: Request) {
     );
   }
 
+  /*
+    الإقفالُ شهادة، والتنبيهُ المُقَرّ بلا سببٍ مكتوب إقرارٌ لا يُفهم بعد شهر.
+    كان يُقفل «مع إقرار ٥ تنبيهات» بلا كلمة.
+  */
+  if (report.warnings.length > 0 && !body.note?.trim()) {
+    return NextResponse.json(
+      { error: `اكتب سطراً يقول لِمَ تُقفل مع ${countNoun(report.warnings.length, WARNING)} — يُحفَظ في شهادة الإقفال` },
+      { status: 400 },
+    );
+  }
+
   const checklist = {
     بنود: report.items.map((i) => ({ البند: i.label, الحالة: i.state, التفصيل: i.detail })),
     تنبيهات_أُقرَّت: report.warnings.length,

@@ -1,3 +1,4 @@
+import { looksLikeGoodsPurchase } from "@/lib/expenses";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -48,14 +49,26 @@ export default async function MoneyPage() {
   ).rows;
 
   // المصروف حسب تصنيفه — من كشف البنك، وهو الموجود فعلاً
-  const byCategory = (
-    await db.execute<{ category: string; n: number; s: string }>(sql`
-      select category::text as category, count(*)::int as n, sum(amount_minor)::bigint as s
+  /*
+    «شراء بضاعة» يُستبعَد بالدالّة نفسها التي تستبعده في قائمة الدخل.
+    كان يُحسب هنا راتباً ويُستبعَد هناك، فللرواتب رقمان في شاشتين.
+  */
+  const debitRows = (
+    await db.execute<{ category: string; amount_minor: string; description: string | null; beneficiary_raw: string | null }>(sql`
+      select category::text as category, amount_minor, description, beneficiary_raw
       from bank_transactions
       where direction = 'DEBIT' and category not in ('INTERNAL','UNKNOWN','SUPPLIER','PERSONAL','POS_SETTLEMENT')
-      group by 1 order by s desc
     `)
   ).rows;
+  const categoryTotals = new Map<string, { category: string; n: number; s: number }>();
+  for (const r of debitRows) {
+    if (looksLikeGoodsPurchase(r.description ?? "", r.beneficiary_raw)) continue;
+    const e = categoryTotals.get(r.category) ?? { category: r.category, n: 0, s: 0 };
+    e.n++;
+    e.s += Number(r.amount_minor);
+    categoryTotals.set(r.category, e);
+  }
+  const byCategory = [...categoryTotals.values()].sort((a, b) => b.s - a.s);
 
   const tiles: HubTile[] = [
     {

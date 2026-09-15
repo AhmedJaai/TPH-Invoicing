@@ -15,7 +15,7 @@
  * **كيف تطوّر هذا القرار؟**
  */
 import { NextResponse } from "next/server";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bankTransactions, decisionHistory } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
@@ -65,20 +65,37 @@ export async function POST(request: Request) {
     */
     if (tx.matchOutcome === "NOT_A_PAYMENT") {
       const reason = body.reason?.trim() || "تراجعٌ عن «ليست سداداً»";
-      await db.transaction(async (t) => {
-        await t.update(bankTransactions).set({
+      /*
+        والبابُ يعود إلى ما كان قبل الإعلان (محفوظٌ في تاريخ القرار) — كان
+        يبقى «تحويلاً داخليّاً» فلا تعود الحركة إلى الطابور وتقول الرسالة
+        «عادت تنتظر قراراً». ومشروطٌ بأنّها ما زالت «ليست سداداً»: ضغطتان
+        لا تكتبان ردَّين.
+      */
+      const [prior] = (
+        await db.execute<{ category: string | null }>(sql`
+          select payload->>'الباب السابق' as category from decision_history
+           where bank_transaction_id = ${tx.id} and event = 'MATCH_REJECTED'
+           order by created_at desc limit 1
+        `)
+      ).rows;
+      const restored = (prior?.category ?? "UNKNOWN") as typeof tx.category;
+      const undone = await db.transaction(async (t) => {
+        const rows = await t.update(bankTransactions).set({
           matchStatus: "UNMATCHED",
           matchOutcome: null,
           matchDisposition: "REVIEW",
           lifecycle: "SUGGESTED",
-        }).where(eq(bankTransactions.id, tx.id));
+          category: restored,
+        }).where(and(eq(bankTransactions.id, tx.id), eq(bankTransactions.matchOutcome, "NOT_A_PAYMENT")))
+          .returning({ id: bankTransactions.id });
+        if (rows.length === 0) return false;
         await t.insert(decisionHistory).values({
           bankTransactionId: tx.id,
           event: "MATCH_REVERSED",
           actor: "HUMAN",
           actorId: user.id,
           detail: reason,
-          payload: { "كانت": "ليست سداداً", الباب: tx.category },
+          payload: { "كانت": "ليست سداداً", الباب: tx.category, "عاد إلى": restored },
         });
         await recordAudit({
           actorId: user.id,
@@ -86,9 +103,13 @@ export async function POST(request: Request) {
           entityType: "bank_transaction",
           entityId: tx.id,
           before: { النتيجة: "NOT_A_PAYMENT", الباب: tx.category },
-          after: { الفعل: "تراجعٌ عن «ليست سداداً»", السبب: reason },
+          after: { الفعل: "تراجعٌ عن «ليست سداداً»", السبب: reason, "عاد الباب إلى": restored },
         }, t);
+        return true;
       });
+      if (!undone) {
+        return NextResponse.json({ error: "رُدّ هذا الإعلان من قبل — حدّث الصفحة" }, { status: 409 });
+      }
       return NextResponse.json({ ok: true, message: "رُدّ إعلان «ليست سداداً» — عادت الحركة تنتظر قراراً" });
     }
     return NextResponse.json({ error: "هذه الحركة غير مطابَقة أصلاً" }, { status: 409 });
@@ -101,8 +122,8 @@ export async function POST(request: Request) {
   let reversedPayment = false;
   let previousAllocations: { invoiceId: string; amountMinor: number }[] = [];
 
-  await db.transaction(async (t) => {
-    await t
+  const done = await db.transaction(async (t) => {
+    const unlinked = await t
       .update(bankTransactions)
       .set({
         matchedPaymentId: null,
@@ -116,7 +137,10 @@ export async function POST(request: Request) {
         */
         lifecycle: "SUGGESTED",
       })
-      .where(eq(bankTransactions.id, tx.id));
+      /* ضغطتان متزامنتان كانتا تُنتجان ردَّين وقيدَي تدقيق لدفعةٍ واحدة */
+      .where(and(eq(bankTransactions.id, tx.id), eq(bankTransactions.matchedPaymentId, paymentId)))
+      .returning({ id: bankTransactions.id });
+    if (unlinked.length === 0) return false;
 
     /*
       الدفعة تُردّ إن لم تعد تفسّر حركة. أمّا إن بقيت لها حركة أخرى
@@ -167,9 +191,8 @@ export async function POST(request: Request) {
         "كانت مخصَّصة على": previousAllocations,
       },
     });
-  });
 
-  await recordAudit({
+    await recordAudit({
     actorId: user.id,
     action: "MATCH_UNDONE",
     entityType: "bank_transaction",
@@ -189,7 +212,13 @@ export async function POST(request: Request) {
       "مبلغ تحرّر": freedMinor,
       "كانت مخصَّصة على": previousAllocations,
     },
+    }, t);
+    return true;
   });
+
+  if (!done) {
+    return NextResponse.json({ error: "فُكّت هذه المطابقة من قبل — حدّث الصفحة" }, { status: 409 });
+  }
 
   return NextResponse.json({
     ok: true,

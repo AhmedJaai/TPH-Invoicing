@@ -471,7 +471,7 @@ export default async function BankPage({
       {groups.length > 0 && (
         <Section
           title="حلّ المعلّقات"
-          hint="سؤالٌ واحد عن كلّ ما يتشابه، ثمّ ننتقل. وما تؤكّده يصير ذاكرةً تعمّ على أمثاله — في الكشوف السابقة الآن، وفي القادمة بلا سؤال."
+          hint="سؤالٌ واحد عن كلّ ما يتشابه، ثمّ ننتقل. وما تؤكّده يصير ذاكرة: يُطبَّق الآن على ما اخترتَه، ويُعرَف به ما يشبهه في الكشوف القادمة بلا سؤال."
         >
           <ReconcileQueue groups={groups} suppliers={supplierRows} canApprove={canApprove} canEdit={canEdit} />
         </Section>

@@ -1,3 +1,4 @@
+import { currentMonthRiyadh } from "@/lib/riyadh-time";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -67,13 +68,21 @@ export default async function FinancialStatementPage() {
     تعداداتٍ إنجليزية. والمستبعَد يُعلَن بمبلغه لا يُحذف بصمت.
   */
   const debits = (
-    await db.execute<{ category: string; description: string | null; beneficiary_raw: string | null; amount_minor: string }>(sql`
-      select category::text as category, description, beneficiary_raw, amount_minor::bigint as amount_minor
+    await db.execute<{ category: string; description: string | null; beneficiary_raw: string | null; amount_minor: string; month: string }>(sql`
+      select category::text as category, description, beneficiary_raw, amount_minor::bigint as amount_minor,
+             to_char(value_date, 'YYYY-MM') as month
         from bank_transactions
        where direction = 'DEBIT'
     `)
   ).rows;
 
+  /*
+    المتوسّط الشهريّ «الفعليّ» يُقسَم على الأشهر التامّة وحدها.
+    كان القاسم يعدّ الشهر الجاري (أيّاماً منه) فيُنقص كلّ متوسّط بخُمسه،
+    فتقول المقارنة «أنفقتَ دون المتوقَّع» — والنقص أيّامٌ لا سلوك.
+  */
+  const thisMonth = currentMonthRiyadh();
+  const fullMonthsMap = new Map<TxCategory, number>();
   const operatingMap = new Map<TxCategory, number>();
   let personalMinor = 0;
   let goodsMinor = 0;
@@ -84,6 +93,7 @@ export default async function FinancialStatementPage() {
     if (!isExpenseCategory(category) || category === "POS_SETTLEMENT") continue;
     if (looksLikeGoodsPurchase(r.description, r.beneficiary_raw)) { goodsMinor += amount; continue; }
     operatingMap.set(category, (operatingMap.get(category) ?? 0) + amount);
+    if (r.month !== thisMonth) fullMonthsMap.set(category, (fullMonthsMap.get(category) ?? 0) + amount);
   }
   const operating = [...operatingMap].map(([category, amountMinor]) => ({ category, amountMinor }));
 
@@ -100,10 +110,10 @@ export default async function FinancialStatementPage() {
     cadence: r.cadence as RecurringExpense["cadence"],
   }));
 
-  const monthsCount = Math.max(1, cash.months.length);
-  const monthlyActual = operating.map((o) => ({
-    category: o.category,
-    amountMinor: Math.round(o.amountMinor / monthsCount),
+  const monthsCount = Math.max(1, cash.months.filter((m) => m.month !== thisMonth).length);
+  const monthlyActual = [...fullMonthsMap].map(([category, amountMinor]) => ({
+    category,
+    amountMinor: Math.round(amountMinor / monthsCount),
   }));
   const comparison = compareExpenses(recurring, monthlyActual);
 

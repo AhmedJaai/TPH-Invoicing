@@ -242,10 +242,6 @@ export default async function HomePage() {
         </ul>
       </Section>
 
-      <div className="mt-8 flex flex-wrap gap-2">
-        <LinkButton href="/upload" variant="primary">أضف مستنداً</LinkButton>
-        <LinkButton href="/documents">الأرشيف</LinkButton>
-      </div>
     </PageShell>
   );
 }

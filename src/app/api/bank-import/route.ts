@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { adjudications, bankImports, bankRules, bankTransactions, decisionHistory, invoices, paymentAllocations, supplierAliases, suppliers, reconciliationPeriods } from "@/db/schema";
+import { adjudications, bankImports, bankRules, bankTransactions, decisionHistory, invoices, paymentAllocations, supplierAliases, suppliers, reconciliationPeriods, monthCloses } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { readStatementFile } from "@/services/statement-file.service";
 import {
@@ -202,7 +202,26 @@ async function handle(request: Request) {
     bankAccountId,
   );
 
-  const freshRows = sync.fresh;
+  /*
+    ── الشهر المقفل لا يُكتب فيه من أيّ باب ──
+
+    كان الاستيراد باباً مفتوحاً: أُقفل أغسطس ثمّ دخلت حركتان بتاريخه،
+    فانكسرت معادلة الشهر المقفل بصمت، وعلقت الحوالة في الطابور لأنّ
+    قيدها يُردّ 409. فالجديدُ في شهرٍ مقفل لا يُقيَّد، ويُعدّ ويُقال —
+    ويُعاد فتح الشهر إن كان مقصوداً. (المعروف من قبل لا يمسّه هذا.)
+  */
+  const monthOfRow = (f: (typeof sync.fresh)[number]) => f.row.raw.valueDate.toISOString().slice(0, 7);
+  const freshMonths = [...new Set(sync.fresh.map(monthOfRow))];
+  const closedMonths = freshMonths.length === 0
+    ? []
+    : (await db
+        .select({ month: monthCloses.month })
+        .from(monthCloses)
+        .where(and(inArray(monthCloses.month, freshMonths), eq(monthCloses.status, "CLOSED")))
+      ).map((r) => r.month);
+  const closedSet = new Set(closedMonths);
+  const inClosedMonth = sync.fresh.filter((f) => closedSet.has(monthOfRow(f)));
+  const freshRows = sync.fresh.filter((f) => !closedSet.has(monthOfRow(f)));
 
   /*
     محرّك التسوية الجديد.
@@ -447,6 +466,8 @@ async function handle(request: Request) {
         inFile: canonicalRows.length,
         alreadyKnown: sync.known.length,
         added: freshRows.length,
+      closedMonthRows: inClosedMonth.length,
+      closedMonths,
         ambiguous: sync.ambiguous.length,
         /*
           التضارب يُعدّ ويُعرَض وحده — لا يُجمَع مع الالتباس.

@@ -354,7 +354,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "overdue",
       area: "PAYMENTS",
       severity: "HIGH",
-      title: "مستحقّات تأخّرت أكثر من ٦٠ يوماً",
+      title: "مورّدون تأخّرت مستحقّاتهم أكثر من ٦٠ يوماً",
       detail: "التأخّر الطويل يفسد شروط التوريد ويضعف تفاوضك.",
       action: "أدرجها في دفعة أوّل الشهر.",
       actionLabel: "افتح المتأخّرة",

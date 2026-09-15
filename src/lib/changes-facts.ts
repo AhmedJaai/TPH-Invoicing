@@ -54,11 +54,18 @@ export async function gatherChangeFacts(
         /* يومُ الشهر بتوقيت الرياض — كما في بطاقة المشتريات، فلا يقول أحدهما ١٣ والآخر ١٤ */
         (select case when (select m from cur) = to_char(now() at time zone 'Asia/Riyadh', 'YYYY-MM')
                      then extract(day from now() at time zone 'Asia/Riyadh')::int end)                       as days_elapsed,
+        /*
+          «وصل» يعني مستنداً جديداً — لا ملفّاً قديماً رُفع من الأرشيف.
+          كان أسبوعُ رفعِ أرشيف مايو–أغسطس (١٥٨ ملفّاً) أساساً للمقارنة، فقالت
+          الصفحة «▼ ٨٩٪» عن أسبوعٍ عاديّ. فيُعدّ ما شهرُه في آخر خمسةٍ وأربعين يوماً.
+        */
         (select count(*)::int from documents
-          where created_at >= now() - interval '7 days')                         as docs_7,
+          where created_at >= now() - interval '7 days'
+            and (period_month is null or period_month >= to_char((now() at time zone 'Asia/Riyadh') - interval '45 days', 'YYYY-MM'))) as docs_7,
         (select count(*)::int from documents
           where created_at >= now() - interval '14 days'
-            and created_at <  now() - interval '7 days')                         as docs_prev_7,
+            and created_at <  now() - interval '7 days'
+            and (period_month is null or period_month >= to_char((now() at time zone 'Asia/Riyadh') - interval '52 days', 'YYYY-MM'))) as docs_prev_7,
         /*
           ما كان «عليك» قبل ثلاثين يوماً — بالمعادلة نفسها التي تحسب «عليك» الآن
           (supplier-balance.service.ts): مورّداً مورّداً، فواتيره المفتوحة يومها

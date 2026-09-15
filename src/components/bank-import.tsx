@@ -50,6 +50,9 @@ const CATEGORY_OPTIONS: TxCategory[] = [
 
 /** حصيلة المزامنة — ما الجديد قبل ما المعنى. */
 interface SyncSummary {
+  /** جديدٌ في شهرٍ مقفل — لا يُقيَّد */
+  closedMonthRows?: number;
+  closedMonths?: string[];
   inFile: number;
   alreadyKnown: number;
   added: number;
@@ -396,6 +399,12 @@ export function BankImport({
                     ? "لا جديد في هذا الكشف"
                     : `${countNoun(data.sync.added, TRANSACTION)} جديدة`}
                 </p>
+                {(data.sync.closedMonthRows ?? 0) > 0 && (
+                  <p className="mt-2 rounded-lg border border-warn/40 bg-warn-bg px-2.5 py-1.5 text-xs leading-relaxed" role="status">
+                    {countNoun(data.sync.closedMonthRows ?? 0, TRANSACTION)} في شهرٍ مقفل ({(data.sync.closedMonths ?? []).join("، ")}) — لا تُقيَّد.
+                    إن كانت مقصودة فأعد فتح الشهر من «إقفال الشهر» ثمّ استورد الكشف ثانيةً.
+                  </p>
+                )}
                 <p className="nums mt-1.5 text-xs text-muted">
                   {data.sync.inFile} في الملفّ · {data.sync.alreadyKnown} مسجّلة عندك
                   {data.sync.byReference > 0 && ` (${data.sync.byReference} عُرفت بمرجع عمليّتها)`}
@@ -531,13 +540,18 @@ export function BankImport({
               </>
             )}
 
-            <button
-              onClick={() => fileRef.current && send(fileRef.current, true)}
-              disabled={busy !== null}
-              className="mt-4 w-full rounded-lg bg-inverse-surface px-4 py-2.5 text-sm font-bold text-inverse-ink disabled:opacity-40"
-            >
-              {busy === "applying" ? "يطبّق…" : "أكّد وطابِق"}
-            </button>
+            {/* «لا جديد» ثمّ «أكّد وطابِق» كان يكتب استيراداً عن لا شيء */}
+            {data.sync && data.sync.added === 0 ? (
+              <p className="mt-4 text-center text-sm text-muted">لا شيء يُقيَّد من هذا الملفّ.</p>
+            ) : (
+              <button
+                onClick={() => fileRef.current && send(fileRef.current, true)}
+                disabled={busy !== null}
+                className="mt-4 w-full rounded-lg bg-inverse-surface px-4 py-2.5 text-sm font-bold text-inverse-ink disabled:opacity-40"
+              >
+                {busy === "applying" ? "يطبّق…" : "أكّد وطابِق"}
+              </button>
+            )}
           </div>
         )}
       </section>

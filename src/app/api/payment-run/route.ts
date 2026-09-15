@@ -6,6 +6,7 @@ import { documents, invoices, paymentAllocations, suppliers } from "@/db/schema"
 import { guard, respondTo } from "@/services/guard";
 import { buildPaymentRun, toBankTransferCsv, type PayableInvoice } from "@/lib/payment-run";
 import { recordAudit } from "@/lib/audit";
+import { loadSupplierBalances } from "@/services/supplier-balance.service";
 
 export const runtime = "nodejs";
 
@@ -46,6 +47,14 @@ export async function GET(request: Request) {
     .leftJoin(paymentAllocations, eq(paymentAllocations.invoiceId, invoices.id))
     .groupBy(invoices.id, suppliers.nameAr);
 
+  /*
+    الملفّ يطابق الصفحة: رصيدٌ لنا عند المورّد يُخصم، والمتأخّر يُدرج.
+    كان الملفّ يُبنى بلا خصم الرصيد والصفحةُ تخصمه — فيُحوَّل ما قالت
+    الصفحة إنّه مغطّى.
+  */
+  const balances = await loadSupplierBalances();
+  const creditBySupplier = new Map(balances.map((b) => [b.supplierId, b.creditMinor]));
+
   const run = buildPaymentRun(
     rows.map<PayableInvoice>((r) => ({
       invoiceId: r.invoiceId,
@@ -62,6 +71,7 @@ export async function GET(request: Request) {
       needsReview: Boolean(r.needsReview),
     })),
     month,
+    { creditBySupplier, includeOlderUnpaid: true },
   );
 
   /* ملفٌّ يُرفع إلى البنك فيُحوَّل به مال — تنزيلُه أثرٌ لا يُترك بلا قيد */

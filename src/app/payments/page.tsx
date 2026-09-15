@@ -77,7 +77,8 @@ export default async function PaymentsPage({
       needsReview: Boolean(r.needsReview),
     })),
     month,
-    { creditBySupplier },
+    /* «أدرجها في دفعة أوّل الشهر» كانت خطوةً لا تُنفَّذ: ما فات شهرُه لا يدخل الدفعة أبداً */
+    { creditBySupplier, includeOlderUnpaid: true },
   );
 
   const heldBySupplier = new Map<string, typeof run.held>();
@@ -92,7 +93,7 @@ export default async function PaymentsPage({
       user={user}
      
       title={`دفعة ${month}`}
-      intro="مستحقّات الشهر المنقضي مورّداً مورّداً. ما ليس فاتورة ضريبية كاملة يُحجز — السداد قبل الحصول عليها يفقدك ورقة التفاوض الوحيدة."
+      intro="مستحقّات الشهر المنقضي وما تأخّر قبله، مورّداً مورّداً. ما ليس فاتورة ضريبية كاملة يُحجز — السداد قبل الحصول عليها يفقدك ورقة التفاوض الوحيدة."
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
