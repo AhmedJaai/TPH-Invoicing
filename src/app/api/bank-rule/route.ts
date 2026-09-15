@@ -22,6 +22,9 @@ const CATEGORIES: readonly TxCategory[] = [
 ];
 
 interface Body {
+  /** «delete» يحذف قاعدةً بمعرّفها — والافتراضيّ الإنشاء */
+  action?: "delete";
+  id?: string;
   /** النصّ المميِّز الذي تُعرف به هذه الحركة وأمثالها */
   pattern: string;
   category: TxCategory;
@@ -44,6 +47,29 @@ export async function POST(request: Request) {  let user;
     body = (await request.json()) as Body;
   } catch {
     return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
+  }
+
+  /*
+    ── حذف قاعدة ──
+
+    قاعدةٌ خاطئة كانت لا تُرى ولا تُمحى من الواجهة، وتسري على كلّ كشفٍ بعدها.
+    والحذف يوقف سريانها على القادم؛ وما صنّفته من قبل يبقى حتى يُعاد تصنيفه.
+  */
+  if (body.action === "delete") {
+    if (typeof body.id !== "string" || !body.id) return NextResponse.json({ error: "حدّد القاعدة" }, { status: 400 });
+    const [gone] = await db
+      .delete(bankRules)
+      .where(eq(bankRules.id, body.id))
+      .returning({ id: bankRules.id, pattern: bankRules.pattern, category: bankRules.category });
+    if (!gone) return NextResponse.json({ error: "القاعدة غير موجودة — ربما حُذفت من نافذةٍ أخرى" }, { status: 404 });
+    await recordAudit({
+      actorId: user.id,
+      action: "BANK_RULE_DELETED",
+      entityType: "bank_rule",
+      entityId: gone.id,
+      before: { النمط: gone.pattern, التصنيف: CATEGORY_LABEL[gone.category as TxCategory] ?? gone.category },
+    });
+    return NextResponse.json({ ok: true, message: `حُذفت قاعدة «${gone.pattern}» — ولا تسري على الكشوف القادمة` });
   }
 
   const pattern = body.pattern?.trim();

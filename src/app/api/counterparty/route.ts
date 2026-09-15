@@ -17,7 +17,7 @@
  * لا يُصنِّف بها سبعين حركة بضغطة.
  */
 import { NextResponse } from "next/server";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bankTransactions, counterparties, decisionHistory } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
@@ -223,6 +223,8 @@ export async function POST(request: Request) {
           supplierId: body.supplierId ?? null,
           classificationSource: "HUMAN",
           classificationReason: reason,
+          /* الطابور يعرض سبب الأدلّة — كان يبقى «لم يُعرَف المستفيد» بعد تعريفه */
+          matchEvidence: sql`jsonb_set(coalesce(${bankTransactions.matchEvidence}, '{}'::jsonb), '{reason}', to_jsonb(${reason}::text))`,
           classificationVersion: CLASSIFICATION_VERSION,
           ...(notAPayment && !b.posted
             ? {

@@ -1,3 +1,5 @@
+import { BankRules, type BankRuleRow } from "@/components/bank-rules";
+import { CATEGORY_LABEL } from "@/lib/bank/rules";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -41,6 +43,20 @@ export default async function SettingsPage() {
     `)
   ).rows;
 
+  const rules: BankRuleRow[] = (
+    await db.execute<{ id: string; pattern: string; category: string; supplier: string | null; note: string | null }>(sql`
+      select r.id, r.pattern, r.category::text as category, s.name_ar as supplier, r.note
+        from bank_rules r left join suppliers s on s.id = r.supplier_id
+       order by r.created_at desc
+    `)
+  ).rows.map((r) => ({
+    id: r.id,
+    pattern: r.pattern,
+    categoryLabel: CATEGORY_LABEL[r.category as TxCategory] ?? r.category,
+    supplier: r.supplier,
+    note: r.note,
+  }));
+
   const health = buildDataHealth(await gatherHealthFacts());
 
   const allExpenses = (
@@ -73,10 +89,11 @@ export default async function SettingsPage() {
       detail: `${countNoun(Number(f?.aliases ?? 0), ALIAS)} · ${Number(f?.inactive ?? 0) === 0 ? "لا معطَّل" : `${f?.inactive} معطَّلة بعد الدمج`}`,
     },
     {
-      href: "/bank",
+      /* كانت تفتح /bank ولا قاعدة فيها — فالقائمة هنا */
+      href: "/settings#rules",
       title: "قواعد تصنيف الحركات",
       value: String(f?.rules ?? 0),
-      detail: "تُنشأ من صفحة كشف البنك، وتسري على ما يشبهها بعدها",
+      detail: "تُنشأ عند استيراد كشف البنك، وتُرى وتُحذف هنا",
     },
     {
       href: "/settings",
@@ -121,6 +138,14 @@ export default async function SettingsPage() {
       intro="ما يُضبط مرّة: المورّدون وقواعد التصنيف وحال الربط."
     >
       <HubGrid tiles={tiles} />
+
+      <section id="rules" className="mt-10 scroll-mt-24">
+        <h2 className="text-base font-bold">قواعد تصنيف الحركات</h2>
+        <p className="mb-3 mt-1 text-xs leading-relaxed text-muted">
+          ما قرّرتَه مرّةً عند استيراد كشف: حركةٌ فيها هذا النصّ تُصنَّف هكذا في كلّ كشفٍ بعده.
+        </p>
+        <BankRules rows={rules} canEdit={can(user.role, "bank:edit")} />
+      </section>
 
       <section className="mt-10">
         <h2 className="text-base font-bold">المصروفات المتكرّرة</h2>
