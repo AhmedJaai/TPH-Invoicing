@@ -1,21 +1,14 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
-import {
-  adjudicatorNames, claudeProvider, deepseekProvider, geminiProvider,
-  qwenProvider, selectedAdjudicator, verdictSchema,
-} from "./adjudicator-provider";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { deepseekProvider, selectedAdjudicator, verdictSchema } from "./adjudicator-provider";
 
 const ENV = { ...process.env };
 afterEach(() => { process.env = { ...ENV }; vi.restoreAllMocks(); });
 
-describe("المزوّدون — التحكيم محايد", () => {
-  it("أربعة مزوّدين معرَّفون", () => {
-    expect(adjudicatorNames().sort()).toEqual(["claude", "deepseek", "gemini", "qwen"]);
-  });
+describe("مزوّد الحَكَم", () => {
 
-  it("يُختار بمتغيّر منفصل عن الاستخراج", () => {
+  it("DeepSeek وحده — ولا يُختار غيره بمتغيّر", () => {
     process.env.ADJUDICATOR_PROVIDER = "claude";
-    process.env.EXTRACTION_PROVIDER = "gemini";
-    expect(selectedAdjudicator().name).toBe("claude");
+    expect(selectedAdjudicator().name).toBe("deepseek");
   });
 
   it("والاسم المجهول يرجع إلى الافتراضيّ لا يكسر", () => {
@@ -28,15 +21,12 @@ describe("المزوّدون — التحكيم محايد", () => {
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.DEEPSEEK_API_KEY;
     delete process.env.QWEN_API_KEY;
-    expect(geminiProvider().isConfigured()).toBe(false);
-    expect(claudeProvider().isConfigured()).toBe(false);
     expect(deepseekProvider().isConfigured()).toBe(false);
-    expect(qwenProvider().isConfigured()).toBe(false);
   });
 
   it("النموذج مثبَّت لا عائم", () => {
     delete process.env.ADJUDICATOR_MODEL;
-    for (const p of [geminiProvider(), claudeProvider()]) {
+    for (const p of [deepseekProvider()]) {
       expect(p.model).not.toContain("latest");
       expect(p.model.length).toBeGreaterThan(0);
     }
@@ -67,20 +57,6 @@ describe("قراءة المخرَج", () => {
 });
 
 describe("الاستدعاء الفعليّ", () => {
-  it("يقرأ مخرَج جيميني ويحسب المدّة", async () => {
-    process.env.GEMINI_API_KEY = "k";
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        candidates: [{ content: { parts: [{
-          text: '{"choice":"c1","reasonCodes":["AMOUNT_EXACT"],"confidence":0.9,"reason":"م"}',
-        }] } }],
-      }),
-    })));
-    const r = await geminiProvider().judge("س");
-    expect(r.verdict.choice).toBe("c1");
-    expect(r.durationMs).toBeGreaterThanOrEqual(0);
-  });
 
   it("ويقرأ مخرَج ما يتكلّم لغة OpenAI", async () => {
     process.env.DEEPSEEK_API_KEY = "k";
@@ -92,22 +68,5 @@ describe("الاستدعاء الفعليّ", () => {
     })));
     const r = await deepseekProvider().judge("س");
     expect(r.verdict.choice).toBe("NONE");
-  });
-
-  it("ويُزيل سياج الشيفرة إن أحاط بالمخرَج", async () => {
-    process.env.ANTHROPIC_API_KEY = "k";
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        content: [{ text: '```json\n{"choice":"c2","reasonCodes":[],"confidence":0.7}\n```' }],
-      }),
-    })));
-    expect((await claudeProvider().judge("س")).verdict.choice).toBe("c2");
-  });
-
-  it("والفشل يُرفَع خطأً لا يُبتلَع", async () => {
-    process.env.GEMINI_API_KEY = "k";
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 429 })));
-    await expect(geminiProvider().judge("س")).rejects.toThrow("429");
   });
 });
