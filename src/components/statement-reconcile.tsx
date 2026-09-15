@@ -54,16 +54,19 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "ok
 export function StatementReconcile({
   archived,
   suppliers,
+  initialSupplierId,
 }: {
   archived: ArchivedStatement[];
   suppliers: SupplierOption[];
+  /** المورّد الذي فُتحت الصفحة عليه من ملفّه — يُختار سلفاً في رفع الكشف. */
+  initialSupplierId?: string;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [supplierId, setSupplierId] = useState("");
+  const [supplierId, setSupplierId] = useState(initialSupplierId ?? "");
   const [copied, setCopied] = useState(false);
 
   const send = useCallback(

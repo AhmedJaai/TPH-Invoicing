@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function StatementsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ missing?: string }>;
+  searchParams: Promise<{ missing?: string; supplier?: string }>;
 }) {
   const params = await searchParams;
   const user = await currentUser();
@@ -47,6 +47,11 @@ export default async function StatementsPage({
     .from(statements)
     .leftJoin(suppliers, eq(statements.supplierId, suppliers.id))
     .leftJoin(documents, eq(statements.documentId, documents.id))
+    /*
+      «كشوفه» و«طابقها» في ملفّ المورّد كانت تفتح كشوف الجميع (BTN-032) —
+      فالمرشِّح بالمعرّف المختصر، ويُختار المورّد سلفاً في رفع الكشف.
+    */
+    .where(params.supplier ? eq(suppliers.slug, params.supplier) : undefined)
     .orderBy(desc(statements.periodEnd));
 
   /*
@@ -58,10 +63,12 @@ export default async function StatementsPage({
   const missing = params.missing === "1" ? await loadMissingStatementSuppliers(missingMonth) : null;
 
   const supplierRows = await db
-    .select({ id: suppliers.id, nameAr: suppliers.nameAr })
+    .select({ id: suppliers.id, nameAr: suppliers.nameAr, slug: suppliers.slug })
     .from(suppliers)
     .where(eq(suppliers.isActive, true))
     .orderBy(asc(suppliers.nameAr));
+
+  const focusSupplier = params.supplier ? supplierRows.find((r) => r.slug === params.supplier) ?? null : null;
 
   return (
     <PageShell
@@ -107,6 +114,15 @@ export default async function StatementsPage({
         </div>
       )}
 
+      {params.supplier && (
+        <p className="mb-4 flex flex-wrap items-center gap-2 text-xs text-muted">
+          {focusSupplier
+            ? <>كشوف <span className="font-bold text-ink">{focusSupplier.nameAr}</span> وحده.</>
+            : <>لا مورّد نشطاً بهذا المعرّف.</>}
+          <Link href="/statements" className="inline-flex min-h-11 items-center underline underline-offset-4 sm:min-h-0">كشوف كلّ المورّدين</Link>
+        </p>
+      )}
+
       <StatementReconcile
         archived={rows.map((r) => ({
           id: r.id,
@@ -117,7 +133,8 @@ export default async function StatementsPage({
           closingBalanceMinor: r.closingBalanceMinor,
           lineCount: Number(r.lineCount),
         }))}
-        suppliers={supplierRows}
+        suppliers={supplierRows.map(({ id, nameAr }) => ({ id, nameAr }))}
+        initialSupplierId={focusSupplier?.id}
       />
     </PageShell>
   );

@@ -221,7 +221,8 @@ export default async function SupplierPage({
       intro={`${countNoun(n("invoice_count"), INVOICE)} · ${countNoun(n("active_months"), MONTH)} من التعامل · ${countNoun(n("product_count"), PRODUCT)}`}
       actions={
         <>
-          <LinkButton href="/statements" size="sm">كشوفه</LinkButton>
+          {/* كان يفتح كشوف كلّ المورّدين — فيُبحث عنه من جديد (BTN-032) */}
+          <LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} size="sm">كشوفه</LinkButton>
           <LinkButton href={`/purchases/invoices?supplier=${s.slug}`} size="sm">فواتيره</LinkButton>
         </>
       }
@@ -402,13 +403,13 @@ export default async function SupplierPage({
       <Section
         title="كشوفه"
         hint="الكشف هو ما يكشف الفاتورة التي لم تصلك — والمورّد بلا كشوف حسابه غير مُتحقَّق منه."
-        action={<LinkButton href="/statements" size="sm">طابقها</LinkButton>}
+        action={<LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} size="sm">طابقها</LinkButton>}
       >
         {statementRows.length === 0 ? (
           <EmptyState
             title="لا كشف حساب واحد منه."
             hint={`تعاملتَ معه ${countNoun(n("active_months"), MONTH)} بلا كشف. اطلب كشفاً وطابقه — فهو ما يكشف ما لم يصلك.`}
-            action={<LinkButton href="/statements" variant="primary">ارفع كشفاً</LinkButton>}
+            action={<LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} variant="primary">ارفع كشفاً</LinkButton>}
           />
         ) : (
           <ul className="flex flex-wrap gap-2">
