@@ -7,7 +7,6 @@
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { expenses } from "@/db/schema";
-import { recordAudit } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import { parseRiyals } from "@/lib/money";
@@ -66,8 +65,17 @@ export async function POST(request: Request) {
 
   if (body.action === "delete") {
     if (!body.id) return NextResponse.json({ error: "حدّد المصروف" }, { status: 400 });
-    await deleteExpense(user.id, body.id);
-    return NextResponse.json({ ok: true, message: "حُذف القيد" });
+    const outcome = await deleteExpense(user.id, body.id);
+    if (outcome === "NOT_FOUND") {
+      return NextResponse.json({ error: "حُذف هذا القيد من قبل — حدّث الصفحة" }, { status: 404 });
+    }
+    if (outcome === "BANK_DERIVED") {
+      return NextResponse.json(
+        { error: "هذا القيد مشتقٌّ من كشف البنك ويعود عند الاشتقاق — احذف الآخر، أو صحّح تصنيف الحركة" },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ ok: true, message: "حُذف القيد — وأثره في سجلّ التدقيق" });
   }
 
   const label = body.label?.trim();
@@ -121,13 +129,7 @@ export async function POST(request: Request) {
     note: body.note?.trim() || undefined,
   });
 
-  await recordAudit({
-    actorId: user.id,
-    action: "EXPENSE_ADDED",
-    entityType: "expense",
-    entityId: id,
-    after: { البند: label, المبلغ: amountMinor, اليوم: body.occurredOn, التصنيف: body.category, المصدر: "يدويّ" },
-  });
+  /* التدقيق في recordManualExpense — كان يُكتب هنا ثانيةً فيُقيَّد الحدث مرّتين */
 
   return NextResponse.json({ ok: true, id, message: `قُيّد «${label}»` });
 }

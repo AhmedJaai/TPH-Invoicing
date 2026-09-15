@@ -4,6 +4,7 @@ import {
   deriveFromBank,
   expectedVsActual,
   expenseEventKey,
+  deletableExpense,
   findDuplicateExpenses,
   isExpenseCategory,
   suspectedSupplierExpenses,
@@ -468,5 +469,23 @@ describe("ازدواج المصروف عن حدثٍ واحد", () => {
     ]);
     expect(dups[0].count).toBe(3);
     expect(dups[0].amountMinor).toBe(2_400_00);
+  });
+});
+
+describe("الزائد يُحذف بعينه (BTN-111)", () => {
+  const e = (id: string, source: "BANK" | "INVOICE" | "MANUAL", tx: string | null = null) => ({
+    id, periodMonth: "2026-08", occurredOn: "2026-08-10", category: "UTILITY" as const,
+    label: "كهرباء", amountMinor: 450_00, source, bankTransactionId: tx,
+  });
+
+  it("المجموعة تحمل قيودها كي يُعرَض كلٌّ بمصدره", () => {
+    const [d] = findDuplicateExpenses([e("b", "BANK", "tx1"), e("m", "MANUAL")]);
+    expect(d.members.map((m) => m.id).sort()).toEqual(["b", "m"]);
+  });
+
+  it("المشتقّ من البنك لا يُحذف — الاشتقاق يعيده", () => {
+    expect(deletableExpense({ source: "BANK" })).toBe(false);
+    expect(deletableExpense({ source: "MANUAL" })).toBe(true);
+    expect(deletableExpense({ source: "INVOICE" })).toBe(true);
   });
 });

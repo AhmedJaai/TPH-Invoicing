@@ -372,6 +372,19 @@ export interface DuplicateExpense {
   sources: ExpenseSource[];
   label: string;
   occurredOn: string;
+  /** القيود نفسها — كي يُعرَض كلٌّ بمصدره ويُحذف الزائد بعينه. */
+  members: Expense[];
+}
+
+/**
+ * أيُّ قيود المجموعة يُحذف من الشاشة.
+ *
+ * المشتقّ من حركة بنك لا يُحذف: الاشتقاق يعيده في أوّل تشغيل، فيعود
+ * الازدواج كأنّ شيئاً لم يُفعل — والمصروف البنكيّ يتبع تصنيف حركته، فإن
+ * كان خطأً صُحّح التصنيف. فالزائد هو الآخر: المستند أو القيد اليدويّ.
+ */
+export function deletableExpense(e: Pick<Expense, "source">): boolean {
+  return e.source !== "BANK";
 }
 
 /**
@@ -409,6 +422,7 @@ export function findDuplicateExpenses(rows: readonly Expense[]): DuplicateExpens
       sources: [...new Set(list.map((e) => e.source))],
       label: list[0].label,
       occurredOn: list[0].occurredOn,
+      members: list,
     }))
     .sort((a, b) => b.amountMinor - a.amountMinor);
 }
