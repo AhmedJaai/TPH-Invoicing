@@ -357,16 +357,30 @@ export async function recordManualExpense(
   return id;
 }
 
-export async function deleteExpense(userId: string, id: string): Promise<void> {
-  const [row] = await db.select().from(expenses).where(eq(expenses.id, id));
-  if (!row) return;
+export type DeleteExpenseOutcome = "DELETED" | "NOT_FOUND" | "BANK_DERIVED";
 
-  await db.delete(expenses).where(eq(expenses.id, id));
-  await recordAudit({
-    actorId: userId,
-    action: "EXPENSE_REMOVED",
-    entityType: "expense",
-    entityId: id,
-    before: row,
+/**
+ * حذف قيد مصروف — في معاملةٍ مع أثره في سجلّ التدقيق (BTN-111).
+ *
+ * كان الحذف ثمّ التدقيق كتابتين منفصلتين، فيُحذف القيد ويسقط أثره إن
+ * فشلت الثانية. والمشتقّ من حركة بنك يُردّ: الاشتقاق يعيده، فحذفُه
+ * يُوهم بإصلاحٍ لا يبقى — يُصحَّح تصنيف حركته بدلاً منه.
+ */
+export async function deleteExpense(userId: string, id: string): Promise<DeleteExpenseOutcome> {
+  return db.transaction(async (t) => {
+    const [row] = await t.select().from(expenses).where(eq(expenses.id, id)).for("update");
+    if (!row) return "NOT_FOUND";
+    if (row.source === "BANK") return "BANK_DERIVED";
+
+    await t.delete(expenses).where(eq(expenses.id, id));
+    await recordAudit({
+      actorId: userId,
+      action: "EXPENSE_REMOVED",
+      entityType: "expense",
+      entityId: id,
+      before: row,
+      after: { الفعل: "حُذف القيد", المصدر: row.source },
+    }, t);
+    return "DELETED";
   });
 }

@@ -1306,3 +1306,20 @@ export const extractionCache = pgTable("extraction_cache", {
   userId: text("user_id").references(() => users.id),
   createdAt: now(),
 });
+
+/* ──────────────────── قرارُ الإنسان في تنبيه ──────────────────── */
+
+/**
+ * تنبيهٌ حُسم — «طالبتُ الجهة» · «استُردّ» · «ليس ازدواجاً».
+ *
+ * كان «سُدّد مرّتين» حرجاً دائماً لا فعلَ له، فيتعلّم صاحب العمل تجاهل
+ * الحرج. والمفتاح يُشتقّ من الحركات نفسها (`doublePaidKey`) لا يُولَّد:
+ * فإن تغيّرت المجموعة تغيّر المفتاح وعاد السؤال. انظر `034`.
+ */
+export const alertResolutions = pgTable("alert_resolutions", {
+  key: text("key").primaryKey(),
+  decision: text("decision").notNull(),
+  note: text("note"),
+  userId: text("user_id").references(() => users.id),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+});

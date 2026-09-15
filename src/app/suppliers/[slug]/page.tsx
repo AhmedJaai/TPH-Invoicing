@@ -20,6 +20,7 @@ import { loadSupplierBalances } from "@/services/supplier-balance.service";
 import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { splitSupplierCredit } from "@/lib/supplier-requests";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,10 @@ export default async function SupplierPage({
         (select count(distinct period_month)::int from invoices
           where supplier_id = ${s.id})                                             as active_months,
         (select count(*)::int from supplier_aliases where supplier_id = ${s.id})    as alias_count,
-        (select count(*)::int from supplier_products where supplier_id = ${s.id})   as product_count
+        (select count(*)::int from supplier_products where supplier_id = ${s.id})   as product_count,
+        -- المقدَّمة المعلَنة — وحدها «لك عنده» (SCN-105)
+        (select coalesce(sum(amount_minor - fee_minor), 0)::bigint from payments
+          where supplier_id = ${s.id} and status = 'ADVANCE')                       as advance
     `)
   ).rows;
 
@@ -101,6 +105,7 @@ export default async function SupplierPage({
   const balance = bal?.owedMinor ?? 0;
   const creditLeft = bal?.creditLeftMinor ?? 0;
   const paidNet = bal?.paidNetMinor ?? n("paid");
+  const creditSplit = splitSupplierCredit(creditLeft, n("advance"));
 
   const canAnalyze = can(user.role, "supplier:edit");
   const canApprove = can(user.role, "payment:approve");
@@ -237,7 +242,8 @@ export default async function SupplierPage({
       intro={`${countNoun(n("invoice_count"), INVOICE)} · ${countNoun(n("active_months"), MONTH)} من التعامل · ${countNoun(n("product_count"), PRODUCT)}`}
       actions={
         <>
-          <LinkButton href="/statements" size="sm">كشوفه</LinkButton>
+          {/* كان يفتح كشوف كلّ المورّدين — فيُبحث عنه من جديد (BTN-032) */}
+          <LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} size="sm">كشوفه</LinkButton>
           <LinkButton href={`/purchases/invoices?supplier=${s.slug}`} size="sm">فواتيره</LinkButton>
         </>
       }
@@ -249,9 +255,13 @@ export default async function SupplierPage({
             label="المستحقّ له"
             minor={balance}
             tone={balance > 0 ? "warn" : "ok"}
+            href={creditSplit.unbackedMinor > 0 ? `/suppliers?unbacked=1#unbacked-${s.slug}` : undefined}
             sub={
               creditLeft > 0
-                ? `لك عنده ${formatRiyalsDisplay(creditLeft)} دفعتَها بلا فاتورة`
+                ? [
+                    creditSplit.unbackedMinor > 0 ? `دفعتَ له بلا فاتورة: ${formatRiyalsDisplay(creditSplit.unbackedMinor)}` : null,
+                    creditSplit.advanceMinor > 0 ? `لك عنده مقدَّمةً: ${formatRiyalsDisplay(creditSplit.advanceMinor)}` : null,
+                  ].filter(Boolean).join(" · ")
                 : balance > 0
                   ? "بعد خصم ما دفعتَه له"
                   : "لا رصيد"
@@ -423,13 +433,13 @@ export default async function SupplierPage({
       <Section
         title="كشوفه"
         hint="الكشف هو ما يكشف الفاتورة التي لم تصلك — والمورّد بلا كشوف حسابه غير مُتحقَّق منه."
-        action={<LinkButton href="/statements" size="sm">طابقها</LinkButton>}
+        action={<LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} size="sm">طابقها</LinkButton>}
       >
         {statementRows.length === 0 ? (
           <EmptyState
             title="لا كشف حساب واحد منه."
             hint={`تعاملتَ معه ${countNoun(n("active_months"), MONTH)} بلا كشف. اطلب كشفاً وطابقه — فهو ما يكشف ما لم يصلك.`}
-            action={<LinkButton href="/statements" variant="primary">ارفع كشفاً</LinkButton>}
+            action={<LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} variant="primary">ارفع كشفاً</LinkButton>}
           />
         ) : (
           <ul className="flex flex-wrap gap-2">

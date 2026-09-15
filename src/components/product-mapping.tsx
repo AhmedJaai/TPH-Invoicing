@@ -420,12 +420,49 @@ export function ProductMapping({
                   <span className="block truncate text-sm">{r.displayName}</span>
                   <span className="block text-[11px] text-muted">{r.supplierName}</span>
                 </span>
-                <span className="shrink-0 text-xs font-bold text-ok">← {r.productName}</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="text-xs font-bold text-ok">← {r.productName}</span>
+                  <UnlinkButton id={r.id} />
+                </span>
               </li>
             ))}
           </ul>
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * «فُكّ الربط» — كان الخادم يقبله ولا زرّ له، فالربط الخاطئ (عنبُ المحمصة
+ * تحت عنب الكمبوتشا) لا يُردّ إلّا بيد مبرمج (BTN-115).
+ */
+function UnlinkButton({ id }: { id: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <span className="flex flex-col items-end">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            const r = await postJson("/api/product", { action: "unlink", supplierProductIds: [id] });
+            if (!r.ok) setError(r.error);
+            else router.refresh();
+          } finally {
+            setBusy(false);
+          }
+        }}
+        className={buttonClass("quiet", "sm")}
+      >
+        {busy ? "يفكّ…" : "فُكّ الربط"}
+      </button>
+      {error && <span role="alert" className="text-[11px] font-bold text-danger">{error}</span>}
+    </span>
   );
 }

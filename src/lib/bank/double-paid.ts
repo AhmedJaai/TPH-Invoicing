@@ -143,3 +143,78 @@ export function findDoublePaid(
 export function recoverableMinor(groups: readonly DoublePaidGroup[]): number {
   return groups.reduce((sum, g) => sum + g.excessMinor, 0);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   قرارُ الإنسان — التنبيه الذي لا يُغلَق يُعلّم تجاهلَ الحرج
+   ═══════════════════════════════════════════════════════════════ */
+
+/** ما يقوله صاحب العمل عن مالٍ خرج مرّتين. */
+export type DoublePaidDecision = "CLAIMED" | "RECOVERED" | "NOT_DUPLICATE";
+
+export const DOUBLE_PAID_DECISIONS: readonly DoublePaidDecision[] = ["CLAIMED", "RECOVERED", "NOT_DUPLICATE"];
+
+export const DOUBLE_PAID_DECISION_LABEL: Record<DoublePaidDecision, string> = {
+  CLAIMED: "طُولبت الجهة",
+  RECOVERED: "استُردّ",
+  NOT_DUPLICATE: "ليس ازدواجاً",
+};
+
+/**
+ * مفتاح المجموعة — من معرّفات حركاتها مرتَّبةً.
+ *
+ * يُشتقّ ولا يُولَّد: الخادم يعيد حسابه من الحركات فلا يُصدَّق المتصفّح
+ * في أنّها مجموعة. وإن دخلت حركةٌ ثالثة تغيّر المفتاح فعاد السؤال —
+ * فقرارٌ عن مرّتين لا يُطوى به ما صار ثلاثاً.
+ */
+export function doublePaidKey(group: Pick<DoublePaidGroup, "transactions">): string {
+  return `double:${group.transactions.map((t) => t.id).sort().join(":")}`;
+}
+
+export interface PartitionedDoublePaid {
+  /** لم يُقَل فيها شيء — حرج. */
+  open: DoublePaidGroup[];
+  /** طُولبت الجهة ولم يعد المال — بحالٍ أهدأ لا تُطوى. */
+  claimed: DoublePaidGroup[];
+  /** استُردّ، أو ليس ازدواجاً — خرجت من العمل. */
+  closed: { group: DoublePaidGroup; decision: DoublePaidDecision }[];
+}
+
+/**
+ * يفرز المجموعات بقرار الإنسان. وما لا قرار له مفتوح — والقرار المجهول
+ * (قيمةٌ لا نعرفها) لا يُغلق شيئاً: الشكّ يُبقي البند لا يطويه.
+ */
+export function partitionDoublePaid(
+  groups: readonly DoublePaidGroup[],
+  decisions: ReadonlyMap<string, string>,
+): PartitionedDoublePaid {
+  const out: PartitionedDoublePaid = { open: [], claimed: [], closed: [] };
+  for (const g of groups) {
+    const d = decisions.get(doublePaidKey(g));
+    if (d === "CLAIMED") out.claimed.push(g);
+    else if (d === "RECOVERED" || d === "NOT_DUPLICATE") out.closed.push({ group: g, decision: d });
+    else out.open.push(g);
+  }
+  return out;
+}
+
+/**
+ * رسالة المطالبة — بالمرجعين والمبلغ، لتُرسَل كما هي.
+ *
+ * كان القسم يقول «يُطالَب به» ولا يعطي ما يُطالَب به. والجهة لا تردّ
+ * مالاً بلا مرجعٍ تبحث به في سجلّها.
+ */
+export function buildDoublePaidClaim(group: DoublePaidGroup): string {
+  const riyals = (m: number) =>
+    new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(m / 100);
+  const refs = group.transactions.map((t, i) => `• السداد ${i + 1}: المرجع ${t.operationRef ?? "غير مذكور في الكشف"}`);
+  return [
+    `السلام عليكم،`,
+    ``,
+    `خرج من حساب مؤسسة ذا بوبليك هاوس (الرقم الضريبي 310007971600003) مبلغ ${riyals(group.amountMinor)} ريال`
+      + ` ${group.transactions.length === 2 ? "مرّتين" : `${group.transactions.length} مرّات`} بتاريخ ${group.day} لـ«${group.payee}»:`,
+    ...refs,
+    ``,
+    `المستحقّ مرّةٌ واحدة، فنرجو ردّ الزائد وقدره ${riyals(group.excessMinor)} ريال، أو إفادتنا إن كان السدادان لعمليّتين مختلفتين.`,
+    `شاكرين لكم.`,
+  ].join("\n");
+}
