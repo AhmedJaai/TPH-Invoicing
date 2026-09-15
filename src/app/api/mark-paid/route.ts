@@ -173,6 +173,7 @@ async function handle(request: Request) {
 
   let totalMinor = 0;
 
+  try {
   await db.transaction(async (tx) => {
     for (const inv of pending) {
       const remaining = inv.totalMinor - Number(inv.allocated);
@@ -209,6 +210,11 @@ async function handle(request: Request) {
       totalMinor += remaining;
     }
   });
+  } catch (e) {
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
+    throw e;
+  }
 
   await recordAudit({
     actorId: user.id,

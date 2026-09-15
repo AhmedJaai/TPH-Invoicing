@@ -886,6 +886,10 @@ async function handle(request: Request) {
     },
   });
 
+  /* الصفّ المحفوظ يقول ما دخل فعلاً — لا ما أجازه الفحص ثمّ ردّه القيد */
+  if (rejectedByConstraint > 0 && importId) {
+    await db.update(bankImports).set({ newRowCount: newRows - rejectedByConstraint }).where(eq(bankImports.id, importId));
+  }
   return NextResponse.json({
     ok: true,
     applied: true,

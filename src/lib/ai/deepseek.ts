@@ -202,6 +202,19 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     /*
+      إشارةُ المستدعي التي انقضت لا تُطلق حدثها ثانيةً — فكانت المحاولة
+      التالية تعيش مهلتها كاملة: تحليلُ مورّدٍ بمهلة ٤٨ ثانية عاش ١٤٤ ثانية
+      (ثلاث محاولات) والمسار يُقتَل عند ٦٠. فالإشارة تُفحَص قبل كلّ محاولة.
+    */
+    if (call.signal?.aborted) {
+      return {
+        ok: false, kind: "AI_UNAVAILABLE",
+        reason: lastReason || "أُلغي النداء قبل أن يكتمل",
+        model, task: call.task, durationMs: Date.now() - started, attempts: attempt - 1,
+        ...(lastStatus !== undefined ? { status: lastStatus } : {}),
+      };
+    }
+    /*
       مهلةٌ لكلّ محاولة على حدة.
 
       ووصلُ إشارة المستدعي بإشارتنا مقصود: إن ألغى الطلبَ من فوقنا
@@ -223,6 +236,7 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
     const timer = setTimeout(() => controller.abort(), budget);
     const onAbort = () => controller.abort();
     call.signal?.addEventListener("abort", onAbort);
+    if (call.signal?.aborted) controller.abort();
 
     let response: Response;
     try {

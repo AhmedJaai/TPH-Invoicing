@@ -277,6 +277,8 @@ export async function POST(request: Request) {
       نصُّ القاعدة الإنجليزيّ إلى سجلّ الخادم، ولصاحب العمل خبرٌ يفهمه:
       لم يُحفَظ شيء، فالمعاملة أُلغيت كلُّها.
     */
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
     const err = e as Error & { cause?: { message?: string; code?: string } };
     console.error("counterparty:", err.cause ?? err);
     const code = err.cause?.code ? ` (رمز ${err.cause.code})` : "";

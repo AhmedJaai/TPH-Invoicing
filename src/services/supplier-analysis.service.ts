@@ -223,7 +223,7 @@ export async function analyzeSupplier(
     maxTokens: 6000,
     thinking: false,
     timeoutMs: deadline,
-    signal: AbortSignal.timeout(deadline),
+    /* الموعد يُقرأ من withDeadline في المسار — وإشارةٌ منقضية كانت تُعيد المحاولة كاملة */
   });
 
   if (!result.ok) {

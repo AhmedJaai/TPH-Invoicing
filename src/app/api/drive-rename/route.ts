@@ -16,6 +16,7 @@
  *      يُعيد تسمية إلّا ما أرسل المتصفّح معرّفَه، ثمّ **يُعيد اشتقاق
  *      الاسم بنفسه** ولا يأخذه من المتصفّح.
  */
+import { can } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 import { eq, ne } from "drizzle-orm";
 import { db } from "@/db";
@@ -132,6 +133,9 @@ export async function POST(request: Request) {
   }
 
   /* ── التنفيذ ── */
+  if (!can(user.role, "supplier:edit")) {
+    return NextResponse.json({ error: "تسمية ملفّات الأرشيف تحتاج صلاحية «تعديل المورّدين والأصناف» — اطلبها من مالك الحساب" }, { status: 403 });
+  }
   const chosen = new Set(Array.isArray(body.fileIds) ? body.fileIds : []);
   if (chosen.size === 0) {
     return NextResponse.json({ error: "لم تُختَر ملفّات" }, { status: 400 });

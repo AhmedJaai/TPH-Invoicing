@@ -37,6 +37,14 @@ export interface SearchAccess {
   bank: boolean;
 }
 
+/*
+  أسماء الملفّات القياسيّة تحمل المبلغ («…_SAR4151.50.pdf»). وكان يُنزع
+  `amountMinor` ويبقى المبلغ في العنوان — فالحجب عن المشتريات شكليّ.
+*/
+export function stripAmount(text: string): string {
+  return text.replace(/[_\s-]?SAR\s?[\d.,]+/gi, "").replace(/[_\s-]?[\d.,]+\s?(?:SAR|ريال)/gi, "");
+}
+
 export async function search(
   raw: string,
   access: SearchAccess = { amounts: true, bank: true },
@@ -54,7 +62,7 @@ export async function search(
   if (intent.targets.includes("documents")) jobs.push(findDocuments(intent, like));
 
   const hits = (await Promise.all(jobs)).flat()
-    .map((h) => (access.amounts ? h : { ...h, amountMinor: undefined }));
+    .map((h) => (access.amounts ? h : { ...h, amountMinor: undefined, title: stripAmount(h.title), subtitle: h.subtitle && stripAmount(h.subtitle) }));
   return { intent, hits: rankHits(hits, intent.kind) };
 }
 

@@ -9,12 +9,13 @@
  * والملف الذي لا يُفهم اسمه — وهو حال ما يُرفع يدوياً — يُقرأ محتواه.
  * وذلك أبطأ، فيُعالَج عدد محدود في كل طلب والباقي في الطلب التالي.
  */
+import { refreshTokenFor } from "@/services/drive.service";
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  accounts, documents, invoiceLines, invoices, payments, statements,
+  documents, invoiceLines, invoices, payments, statements,
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
@@ -120,20 +121,17 @@ async function handle(request: Request) {
   const body = ((await request.json().catch(() => ({}))) ?? {}) as Body;
   const apply = body.apply === true;
 
-  const [tokenRow] = await db
-    .select({ token: accounts.refresh_token })
-    .from(accounts)
-    .where(and(eq(accounts.userId, user.id), eq(accounts.provider, "google")))
-    .limit(1);
+  /* من الحارس وحده: وضعُ التجربة لا يستعير تفويض المالك (drive.service.ts) */
+  const token = await refreshTokenFor(user.id);
 
-  if (!tokenRow?.token) {
+  if (!token) {
     return NextResponse.json(
       { error: "لا يوجد تفويض درايف لحسابك. سجّل الخروج ثم الدخول ووافق على صلاحية الدرايف." },
       { status: 428 },
     );
   }
 
-  const drive = driveForUser(tokenRow.token);
+  const drive = driveForUser(token);
 
   const known = new Set(
     (await db.select({ id: documents.driveFileId }).from(documents))

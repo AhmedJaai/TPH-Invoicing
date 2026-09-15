@@ -138,12 +138,14 @@ export async function GET() {
     );
   }
 
+  /* المستطلِع يقرأ الرمز لا الجسم: قارئٌ معطَّل أو رمزُ درايف منتهٍ = 503 */
+  const overall = healthy && (providerReachable?.ok ?? true) && (driveToken?.ok ?? true);
   return NextResponse.json(
     {
-      healthy: healthy && (providerReachable?.ok ?? true) && (driveToken?.ok ?? true),
+      healthy: overall,
       checks: { ...checks, providerReachable, driveToken },
       at: new Date().toISOString(),
     },
-    { status: healthy ? 200 : 503 },
+    { status: overall ? 200 : 503 },
   );
 }

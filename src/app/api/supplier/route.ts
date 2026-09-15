@@ -42,12 +42,19 @@ export async function POST(request: Request) {
   }
 
   /* الإنشاء في الخدمة وحدها — كان مكتوباً هنا مرّةً ثانية بقواعده */
-  const created = await createSupplier({
-    nameAr,
-    nameEn: body.nameEn,
-    driveFolderName: body.driveFolderName,
-    vatNumber: body.vatNumber,
-  });
+  let created;
+  try {
+    created = await createSupplier({
+      nameAr,
+      nameEn: body.nameEn,
+      driveFolderName: body.driveFolderName,
+      vatNumber: body.vatNumber,
+    });
+  } catch (e) {
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
+    throw e;
+  }
 
   if (created.existed) {
     return NextResponse.json({

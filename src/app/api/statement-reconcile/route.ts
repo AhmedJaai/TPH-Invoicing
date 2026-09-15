@@ -9,11 +9,12 @@
  *   statementId — كشف مؤرشف في الدرايف: يُقرأ محتواه وتُحفظ سطوره ونتيجته.
  *   file        — كشف وصل توّاً: يُقرأ ويُطابَق ويُعرض، ولا يُحفظ شيء.
  */
+import { refreshTokenFor } from "@/services/drive.service";
 import { NextResponse } from "next/server";
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  accounts, documents, invoices, issues, statementLines, statements,
+  documents, invoices, issues, statementLines, statements,
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
@@ -32,7 +33,7 @@ import { withDeadline } from "@/lib/ai/deadline";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MAX_BYTES = 25 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 async function loadSuppliers(): Promise<SupplierRecord[]> {
@@ -100,13 +101,10 @@ async function handle(request: Request) {
       return NextResponse.json({ error: "لا ملف في الدرايف لهذا الكشف" }, { status: 400 });
     }
 
-    const [tokenRow] = await db
-      .select({ token: accounts.refresh_token })
-      .from(accounts)
-      .where(and(eq(accounts.userId, user.id), eq(accounts.provider, "google")))
-      .limit(1);
+    /* من الحارس وحده: وضعُ التجربة لا يستعير تفويض المالك (drive.service.ts) */
+  const token = await refreshTokenFor(user.id);
 
-    if (!tokenRow?.token) {
+    if (!token) {
       return NextResponse.json(
         { error: "لا يوجد تفويض درايف لحسابك. سجّل الخروج ثم الدخول ووافق على صلاحية الدرايف." },
         { status: 428 },
@@ -114,7 +112,7 @@ async function handle(request: Request) {
     }
 
     try {
-      ({ data, mimeType } = await downloadFile(driveForUser(tokenRow.token), row.driveFileId));
+      ({ data, mimeType } = await downloadFile(driveForUser(token), row.driveFileId));
     } catch (e) {
       if (isDriveAuthError(e)) {
         return NextResponse.json({ error: new DriveAuthExpiredError().message }, { status: 428 });
@@ -133,7 +131,7 @@ async function handle(request: Request) {
   } else {
     if (!(file instanceof File)) return NextResponse.json({ error: "لم يصل ملف" }, { status: 400 });
     if (file.size === 0) return NextResponse.json({ error: "الملف فارغ" }, { status: 400 });
-    if (file.size > MAX_BYTES) return NextResponse.json({ error: "حجم الملف يتجاوز ٢٥ ميجابايت" }, { status: 400 });
+    if (file.size > MAX_BYTES) return NextResponse.json({ error: "حجم الملف يتجاوز ٤ ميجابايت — حدّ المنصّة" }, { status: 400 });
     if (!isSupportedUpload(file.type)) {
       return NextResponse.json({ error: "نوع غير مدعوم — المقبول PDF أو صورة" }, { status: 400 });
     }

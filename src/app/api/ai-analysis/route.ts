@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import { analyzeSupplier } from "@/services/supplier-analysis.service";
+import { withDeadline } from "@/lib/ai/deadline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +34,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "حدّد المورّد" }, { status: 400 });
   }
 
-  const outcome = await analyzeSupplier(body.supplierId, { persist: true, actorId: user.id, deadlineMs: 48_000 });
+  const supplierId = body.supplierId;
+  /* المسار يعلن عمره (تحت الستّين) وكلّ محاولةٍ تأخذ ما بقي منه — كما في analyze */
+  const outcome = await withDeadline(55_000, () =>
+    analyzeSupplier(supplierId, { persist: true, actorId: user.id, deadlineMs: 48_000 }),
+  );
   if (!outcome.ok) {
     return NextResponse.json({ error: outcome.reason }, { status: outcome.status });
   }

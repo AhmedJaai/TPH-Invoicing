@@ -87,7 +87,7 @@ export function MatchExplain({ match }: { match: MatchExplanation }) {
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="text-[11px] text-muted underline decoration-dotted underline-offset-4 hover:text-ink-soft"
+          className="inline-flex min-h-11 items-center px-2 text-[11px] text-muted underline decoration-dotted underline-offset-4 hover:text-ink-soft sm:min-h-0 sm:px-0"
         >
           {open ? "أخفِ السبب" : "لماذا؟"}
         </button>

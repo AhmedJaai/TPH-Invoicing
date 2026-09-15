@@ -166,9 +166,11 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
         kindConfidence = c.data.confidence;
       }
     }
-  } else if (classified.kind === "NOT_CONFIGURED" || classified.kind === "NO_BALANCE") {
+  } else if (classified.kind !== "INVALID_RESPONSE") {
     /*
-      عطبٌ لا يزول بالمضيّ — لا يُكمَل إلى المرحلة الثانية.
+      عطبٌ لا يزول بالمضيّ — لا يُكمَل إلى المرحلة الثانية. ومنه انقطاعُ
+      المزوّد (AI_UNAVAILABLE): كان يُكمَل فتصير المحاولات ستّاً للمستند
+      الواحد ويضيع السبب. أمّا الجوابُ غير الصالح فيمضي بالمخطّط الكامل.
       وإكمالُها يعني نداءً ثانياً يفشل بالسبب نفسه ويُضاعف الانتظار.
     */
     return { ok: false, provider: "deepseek", reason: classified.reason };
@@ -202,7 +204,7 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
   ];
 
   /* ── المرحلة الثانية، ومعها إعادةٌ موجَّهة عند الاختلال ── */
-  let lastReason = "";
+  let lastReason = classified.ok ? "" : classified.reason;
   let ceiling = ceilingFor(kind);
 
   for (let pass = 1; pass <= 3; pass++) {
