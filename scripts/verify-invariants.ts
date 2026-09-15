@@ -92,7 +92,16 @@ async function main() {
   `);
   const tx = await one<{ id: string }>(`select id from bank_transactions order by amount_minor desc limit 1`);
 
-  if (!inv) { console.log("لا بيانات كافية للفحص."); await pool.end(); process.exit(0); }
+  /*
+    بلا بياناتٍ لا يُفحَص قيد — و«لم يُفحَص» ليس نجاحاً. فعلى الجهاز يُقال
+    ويخرج بسلام، وفي CI (`--require-data`) يُعدّ فشلاً كي لا يخضرّ فحصُ صفرٍ من القيود.
+  */
+  if (!inv || !tx) {
+    const strict = process.argv.includes("--require-data");
+    console.log(`لا بيانات كافية للفحص${!inv ? " (لا فاتورة)" : " (لا حركة بنك)"}${strict ? " — ولم يُفحَص شيء." : "."}`);
+    await pool.end();
+    process.exit(strict ? 1 : 0);
+  }
 
   const total = Number(inv.total);
   const room = total - Number(inv.allocated);

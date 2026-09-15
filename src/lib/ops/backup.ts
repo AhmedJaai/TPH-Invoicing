@@ -186,3 +186,29 @@ export function compareTables(
     return { table, expected, actual: got, ok: got !== null && got.n === expected.n && got.h === expected.h };
   });
 }
+
+/**
+ * أساسُ المخطّط لقاعدةٍ فارغة — مخطّطُ `public` كما هو في الإنتاج، ومعه
+ * أسماءُ الهجرات المطبَّقة وبصماتها، بلا صفٍّ من البيانات.
+ *
+ * كان التأسيس `drizzle-kit push` ثمّ `db:migrate`: الأوّل يطلب طرفيّةً فلا
+ * يعمل في CI، والثاني يسقط عند `002` لأنّها تقرأ عموداً قديماً لم يعد في
+ * `schema.ts`. ولو نجحا لما أنتجا مخطّط الإنتاج: جداول أنشأها push تتخطّاها
+ * هجراتٌ مكتوبة `IF NOT EXISTS` فتسقط قيودُ `CHECK` فيها صامتة. فالأساس
+ * يُؤخذ من القاعدة الحقيقيّة، وما بعده هجراتٌ تُطبَّق فوقه كما تُطبَّق في
+ * الإنتاج.
+ */
+export function buildBaselineSql(
+  cat: Catalog,
+  migrations: readonly { name: string; sha256: string }[],
+): string {
+  const { pre, post } = buildSchemaSql(cat, ["public"]);
+  const rows = migrations.map((m) => `  (${lit(m.name)}, ${lit(m.sha256)})`).join(",\n");
+  return [
+    "-- أساس المخطّط — يُولَّد بـ npm run db:backup -- --baseline drizzle/baseline.sql ولا يُحرَّر باليد.",
+    "-- يُطبَّق على قاعدةٍ فارغة وحدها (npm run db:bootstrap)، ثمّ تُطبَّق فوقه الهجرات اللاحقة.",
+    pre,
+    post,
+    migrations.length > 0 ? `insert into "public"."schema_migrations" (name, sha256) values\n${rows};\n` : "",
+  ].join("\n");
+}

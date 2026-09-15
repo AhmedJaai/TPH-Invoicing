@@ -17,7 +17,7 @@ import path from "node:path";
 import { gzipSync } from "node:zlib";
 import { Client } from "pg";
 import {
-  BACKUP_SECTIONS, buildSchemaSql, catalogQueries, contentHashSql, dataFileName, exclusionOf,
+  BACKUP_SECTIONS, buildBaselineSql, buildSchemaSql, catalogQueries, contentHashSql, dataFileName, exclusionOf,
   qualified, tableSelect, type Catalog, type Manifest,
 } from "@/lib/ops/backup";
 
@@ -27,7 +27,37 @@ function commit(): string | null {
   try { return execSync("git rev-parse HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return null; }
 }
 
+/**
+ * `--baseline <ملفّ>`: مخطّط `public` وأسماء الهجرات المطبَّقة، بلا بيانات.
+ * يُولَّد من قاعدةٍ مخطّطُها مخطّطُ الإنتاج، ويُطبّقه `db:bootstrap` على قاعدةٍ فارغة.
+ */
+async function baseline(file: string) {
+  const src = new Client({ connectionString: process.env.DATABASE_URL });
+  await src.connect();
+  await src.query("set default_transaction_read_only = on");
+  await src.query("begin isolation level repeatable read read only");
+  try {
+    const cat = {} as Catalog;
+    for (const [k, q] of Object.entries(catalogQueries(["public"]))) {
+      (cat as unknown as Record<string, unknown[]>)[k] = (await src.query(q)).rows;
+    }
+    const migrations = (await src.query<{ name: string; sha256: string }>(
+      "select name, sha256 from schema_migrations order by name",
+    )).rows;
+    writeFileSync(file, buildBaselineSql(cat, migrations));
+    console.log(`✓ ${file}: ${cat.tables.length} جدولاً · ${migrations.length} هجرة · آخرها ${migrations.at(-1)?.name ?? "—"}`);
+  } finally {
+    await src.query("rollback").catch(() => undefined);
+    await src.end();
+  }
+}
+
 async function main() {
+  const bi = process.argv.indexOf("--baseline");
+  if (bi >= 0) {
+    if (!process.argv[bi + 1]) { console.error("✕ --baseline <ملفّ>"); process.exit(2); }
+    return baseline(process.argv[bi + 1]);
+  }
   const out = process.argv.slice(2).find((a) => !a.startsWith("--"));
   if (!out) {
     console.error("✕ سمِّ المجلّد:  npm run db:backup -- <المجلّد>");

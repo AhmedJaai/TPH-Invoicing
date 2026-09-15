@@ -1,0 +1,104 @@
+/**
+ * أدوات اختبارات القاعدة — `*.db.test.ts` وحدها.
+ *
+ * كلّ اختبارٍ يجري في معاملةٍ تُلغى في آخرها عمداً، على نمط `ops:certify`:
+ * الخدمات نفسها على المخطّط الحقيقيّ، ولا يبقى صفّ. والإلغاء جزءٌ من
+ * التصميم لا تنظيفٌ بعده: ما يُكتب ثمّ يُحذف يترك أثراً في سجلّ التدقيق،
+ * وهو جدولٌ لا يُحذَف منه شيء.
+ */
+import { db } from "@/db";
+import { documents, invoices, suppliers } from "@/db/schema";
+import { createId } from "@/lib/id";
+import type { Tx } from "@/services/types";
+
+class Rollback extends Error {}
+
+/** يُجري `body` في معاملةٍ ثمّ يُلغيها — نجح أو رمى. وما رماه `body` يُعاد رميُه. */
+export async function withRollback(body: (tx: Tx) => Promise<void>): Promise<void> {
+  try {
+    await db.transaction(async (tx) => {
+      await body(tx);
+      throw new Rollback();
+    });
+  } catch (e) {
+    if (!(e instanceof Rollback)) throw e;
+  }
+}
+
+export const day = (iso: string) => new Date(`${iso}T00:00:00Z`);
+
+/** خطأ Postgres تحت غلاف drizzle — الرمز والنصّ. */
+export function pgErrorOf(e: unknown): { code?: string; message: string } | null {
+  let cur: unknown = e;
+  for (let i = 0; i < 5 && cur; i++) {
+    const c = cur as { code?: unknown; message?: unknown; cause?: unknown };
+    if (typeof c.code === "string") return { code: c.code, message: String(c.message ?? "") };
+    cur = c.cause;
+  }
+  return null;
+}
+
+/** يُرجع ما رُمي — ويفشل إن لم يُرمَ شيء. */
+export async function caught(p: Promise<unknown>): Promise<unknown> {
+  try {
+    await p;
+  } catch (e) {
+    return e;
+  }
+  throw new Error("كان متوقَّعاً أن يُرفَض — فمرّ");
+}
+
+export async function makeSupplier(tx: Tx): Promise<string> {
+  const id = createId();
+  await tx.insert(suppliers).values({
+    id,
+    nameAr: `مورّد اختبار ${id.slice(0, 6)}`,
+    slug: `dbtest-${id.slice(0, 10)}`,
+    driveFolderName: `dbtest-${id.slice(0, 10)}`,
+    isActive: true,
+  });
+  return id;
+}
+
+/** فاتورةٌ بمستندها — والمستند إلزاميّ في المخطّط، كما في المسار الحقيقيّ. */
+export async function makeInvoice(tx: Tx, supplierId: string, totalMinor: number, isoDate: string): Promise<string> {
+  const documentId = createId();
+  await tx.insert(documents).values({
+    id: documentId,
+    fileName: `dbtest-${documentId}.pdf`,
+    mimeType: "application/pdf",
+    supplierId,
+    periodMonth: isoDate.slice(0, 7),
+    kind: "TAX_INVOICE",
+    status: "ARCHIVED",
+  });
+  const id = createId();
+  const subtotal = Math.round(totalMinor / 1.15);
+  await tx.insert(invoices).values({
+    id,
+    documentId,
+    supplierId,
+    invoiceNumber: `DBT-${id.slice(0, 8)}`,
+    invoiceDate: day(isoDate),
+    periodMonth: isoDate.slice(0, 7),
+    subtotalMinor: subtotal,
+    vatMinor: totalMinor - subtotal,
+    totalMinor,
+  });
+  return id;
+}
+
+/** مستندٌ بلا فاتورة — لما يُنشئ الفاتورة بنفسه. */
+export async function makeDocument(tx: Tx, supplierId: string, isoDate: string): Promise<string> {
+  const id = createId();
+  await tx.insert(documents).values({
+    id,
+    fileName: `dbtest-${id}.pdf`,
+    mimeType: "application/pdf",
+    supplierId,
+    periodMonth: isoDate.slice(0, 7),
+    kind: "TAX_INVOICE",
+    status: "ARCHIVED",
+  });
+  return id;
+}
