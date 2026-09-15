@@ -354,8 +354,10 @@ export function ReconcileQueue({
             <button
               key={k.value}
               type="button"
+              /* الباب لا يتغيّر أثناء الحفظ — وإلّا حُفظ بابٌ وظهر غيره (BTN-115) */
+              disabled={busy}
               onClick={() => setKind(k.value)}
-              className={`rounded-xl border px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+              className={`rounded-xl border px-2.5 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-50 ${
                 kind === k.value
                   ? "border-ink bg-inverse-surface text-inverse-ink"
                   : "border-line hover:border-ink-soft"
