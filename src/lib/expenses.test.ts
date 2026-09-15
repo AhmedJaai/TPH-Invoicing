@@ -14,6 +14,7 @@ import {
   totalActual,
   totalExpected,
   unmetRecurring,
+  unrecordedFromBank,
   type BankTx,
   type Expense,
   type RecurringExpense,
@@ -468,5 +469,23 @@ describe("ازدواج المصروف عن حدثٍ واحد", () => {
     ]);
     expect(dups[0].count).toBe(3);
     expect(dups[0].amountMinor).toBe(2_400_00);
+  });
+});
+
+describe("unrecordedFromBank — الفعليّ الناقص يُعلَن", () => {
+  it("يعدّ ما سيقيّده الاشتقاق وحده: لا الوارد ولا المورّد ولا البضاعة ولا المقيَّد", () => {
+    const txs = [
+      tx({ id: "fee", category: "POS_FEE", amountMinor: 10_000 }),
+      tx({ id: "vat", category: "POS_VAT", amountMinor: 1_500 }),
+      tx({ id: "in", direction: "CREDIT", category: "POS_SETTLEMENT", amountMinor: 99_000 }),
+      tx({ id: "sup", category: "SUPPLIER", amountMinor: 50_000 }),
+      tx({ id: "goods", category: "SALARY", description: "شراء بضاعة", amountMinor: 567_800 }),
+      tx({ id: "done", category: "BANK_FEE", amountMinor: 173 }),
+    ];
+    expect(unrecordedFromBank(deriveFromBank(txs, new Set(["done"])))).toEqual({ count: 2, amountMinor: 11_500 });
+  });
+
+  it("ولا شيء ناقص ← صفرٌ حقيقيّ", () => {
+    expect(unrecordedFromBank(deriveFromBank([tx({ id: "a" })], new Set(["a"])))).toEqual({ count: 0, amountMinor: 0 });
   });
 });

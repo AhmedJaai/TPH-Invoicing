@@ -9,7 +9,8 @@ import { Empty, PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { DeriveExpenses } from "@/components/derive-expenses";
 import { ManualExpense } from "@/components/manual-expense";
-import { activeRecurring } from "@/services/expense.service";
+import { activeRecurring, countUnrecordedBankExpenses } from "@/services/expense.service";
+import { formatRiyalsDisplay } from "@/lib/money";
 import {
   expectedVsActual,
   totalActual,
@@ -18,7 +19,7 @@ import {
   unmetRecurring,
   type Expense,
 } from "@/lib/expenses";
-import { countNoun, ITEM } from "@/lib/arabic";
+import { countNoun, ITEM, TRANSACTION } from "@/lib/arabic";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
 import { NoAccess, DataTable } from "@/components/ui";
 import { ExpenseReclassify } from "@/components/expense-reclassify";
@@ -59,6 +60,7 @@ export default async function ExpensesPage({
   const month = p.month && months.includes(p.month) ? p.month : months[0];
 
   if (!month) {
+    const pendingAll = await countUnrecordedBankExpenses();
     return (
       <PageShell
         user={user}
@@ -66,6 +68,7 @@ export default async function ExpensesPage({
         title="المصروفات"
         intro="ما صُرف فعلاً، مقابل ما كان متوقَّعاً."
       >
+        <UnrecordedNotice pending={pendingAll} />
         <DeriveExpenses />
         {can(user.role, "expense:edit") && <div className="mt-3"><ManualExpense /></div>}
         <div className="mt-4">
@@ -75,10 +78,12 @@ export default async function ExpensesPage({
     );
   }
 
-  const [rows, recurring, supplierRows] = await Promise.all([
+  const [rows, recurring, supplierRows, pending] = await Promise.all([
     db.select().from(expenses).where(eq(expenses.periodMonth, month)).orderBy(desc(expenses.occurredOn)),
     activeRecurring(),
     db.select({ id: suppliers.id, nameAr: suppliers.nameAr }).from(suppliers),
+    /* الفعليّ لا يُعرَض كاملاً وفي الكشف مصروفٌ لم يُقيَّد — النقصُ يُعلَن */
+    countUnrecordedBankExpenses(month),
   ]);
 
   const actual: Expense[] = rows.map((r) => ({
@@ -124,7 +129,16 @@ export default async function ExpensesPage({
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <Box label="المتوقَّع شهرياً" minor={expectedTotal}
              note={recurring.length === 0 ? "لم تُسجَّل مصروفات متكرّرة بعد" : countNoun(recurring.length, ITEM)} />
-        <Box label={`الفعليّ في ${month}`} minor={actualTotal} note={countNoun(actual.length, ITEM)} />
+        <Box
+          label={`الفعليّ في ${month}`}
+          minor={actualTotal}
+          tone={pending.count > 0 ? "warn" : undefined}
+          note={
+            pending.count > 0
+              ? `${countNoun(actual.length, ITEM)} · وناقصٌ منه ما لم يُقيَّد من الكشف`
+              : countNoun(actual.length, ITEM)
+          }
+        />
         <Box
           label="الفرق"
           minor={expectedTotal === 0 ? null : actualTotal - expectedTotal}
@@ -138,6 +152,8 @@ export default async function ExpensesPage({
           }
         />
       </div>
+
+      <UnrecordedNotice pending={pending} month={month} />
 
       {unmet.length > 0 && (
         <section className="mt-6 rounded-xl border border-warn/40 bg-warn-bg p-4">
@@ -245,6 +261,26 @@ export default async function ExpensesPage({
         )}
       </section>
     </PageShell>
+  );
+}
+
+/**
+ * «الفعليّ» ناقص — ويُقال بعدده ومبلغه ومعه زرُّ الاشتقاق نفسه.
+ * ولا يُعرَض شيءٌ حين لا نقص: الإنذارُ الدائم يُفقد الثقة بما عداه.
+ */
+function UnrecordedNotice({ pending, month }: { pending: { count: number; amountMinor: number }; month?: string }) {
+  if (pending.count === 0) return null;
+  return (
+    <section className="mt-6 rounded-xl border border-warn/40 bg-warn-bg p-4">
+      <h2 className="text-sm font-bold text-warn">
+        في الكشف {countNoun(pending.count, TRANSACTION)} من أبواب المصروف لم تُقيَّد بعد ({formatRiyalsDisplay(pending.amountMinor)} ريال)
+      </h2>
+      <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+        {month ? `فالفعليّ في ${month} أقلّ من الواقع بهذا القدر.` : "فالمصروف الفعليّ أقلّ من الواقع بهذا القدر."}
+        {" "}ولا يُعدّ هنا سدادُ المورّدين ولا ما يقول وصفُه شراءَ بضاعة — فذلك في المشتريات.
+      </p>
+      <div className="mt-3"><DeriveExpenses month={month} /></div>
+    </section>
   );
 }
 

@@ -143,6 +143,22 @@ export function deriveFromBank(
   return { candidates: out, goodsPurchases };
 }
 
+/**
+ * ما في الكشف من مصروفٍ لم يُقيَّد بعد — عدداً ومبلغاً.
+ *
+ * الاشتقاقُ بزرٍّ لا عند الاستيراد، فالشهرُ في جدول المصروف قد يكون
+ * ناقصاً والشاشةُ تعرض «الفعليّ» كأنّه كامل: سبتمبر ٢٨٫٢٠ وضريبةُ رسوم
+ * الشبكة غائبة. والنقصُ الذي لا يُعلَن صفرٌ كاذب. فيُحسَب بالقاعدة نفسها
+ * التي يقيّد بها الاشتقاق — ما يستثنيه (الوارد، وغيرُ المصروف، وشراءُ
+ * البضاعة) لا يُعدّ ناقصاً.
+ */
+export function unrecordedFromBank(derived: DerivedExpenses): { count: number; amountMinor: number } {
+  return {
+    count: derived.candidates.length,
+    amountMinor: derived.candidates.reduce((s, c) => s + c.amountMinor, 0),
+  };
+}
+
 /** حصّة الشهر من مصروف متكرّر. */
 export function monthlyShare(e: Pick<RecurringExpense, "amountMinor" | "cadence">): number {
   if (e.cadence === "MONTHLY") return e.amountMinor;
