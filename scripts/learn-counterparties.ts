@@ -17,7 +17,10 @@ import { evidenceFrom } from "../src/services/counterparty.service";
 import { createId } from "../src/lib/id";
 import type { TxCategory } from "../src/lib/bank/rules";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 const APPLY = process.argv.includes("apply");
+/* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+if (APPLY) assertWriteAllowed("db:learn");
 
 /**
  * ما يقوله الوصف الصريح عن باب الحركة.

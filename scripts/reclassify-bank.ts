@@ -24,7 +24,10 @@ import { CATEGORY_LABEL } from "../src/lib/bank/rules";
 import { loadMerchantMemory } from "../src/services/counterparty.service";
 import { resyncBankExpenses } from "../src/services/expense.service";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 const APPLY = process.argv.includes("apply");
+/* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+if (APPLY) assertWriteAllowed("db:reclassify");
 
 async function main() {
   const rows = (await db.execute<{

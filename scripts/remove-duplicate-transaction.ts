@@ -30,8 +30,11 @@
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 const args = process.argv.slice(2);
 const APPLY = args.includes("--apply");
+/* الحذف في «قاعدة الإنتاج» يحتاج إقراراً مكتوباً */
+if (APPLY) assertWriteAllowed("db:remove-dupe");
 const id = args[args.indexOf("--id") + 1];
 
 const riyals = (m: unknown) => (Number(m) / 100).toFixed(2);

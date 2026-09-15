@@ -19,7 +19,10 @@ import { toCanonical } from "../src/lib/bank/canonical";
 import { operationRef, operationRefs } from "../src/lib/bank/identity";
 import { factKey, identityKeyOf, looseKey } from "../src/lib/bank/sync";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 const APPLY = process.argv.includes("apply");
+/* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+if (APPLY) assertWriteAllowed("db:identity -- apply");
 
 async function main() {
   const rows = (await db.execute<{

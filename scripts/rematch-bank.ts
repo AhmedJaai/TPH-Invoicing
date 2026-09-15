@@ -16,7 +16,10 @@ import { loadMerchantMemory } from "../src/services/counterparty.service";
 import type { SupplierIdentity } from "../src/lib/bank/entities";
 import type { OpenInvoice } from "../src/lib/bank/candidates";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 const APPLY = process.argv.includes("apply");
+/* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+if (APPLY) assertWriteAllowed("db:rematch");
 
 async function main() {
   const suppliers: SupplierIdentity[] = (

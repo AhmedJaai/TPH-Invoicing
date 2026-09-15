@@ -20,8 +20,11 @@ import { monthOf } from "@/lib/filing";
 import { recordAudit } from "@/lib/audit";
 import { users } from "@/db/schema";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 async function main() {
   const apply = process.argv.includes("--apply");
+  /* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+  if (apply) assertWriteAllowed("db:repair-months");
 
   const rows = await db
     .select({

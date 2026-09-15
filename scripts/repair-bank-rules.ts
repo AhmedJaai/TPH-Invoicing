@@ -18,7 +18,10 @@ import { bankRules } from "@/db/schema";
 import { suggestAlias } from "@/lib/bank/match";
 import { normalizeName } from "@/lib/suppliers-seed";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 const commit = process.argv.includes("--commit");
+/* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+if (commit) assertWriteAllowed("db:repair-rules");
 
 async function main() {
   const rows = await db

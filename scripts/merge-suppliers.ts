@@ -13,11 +13,14 @@
  */
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { assertWriteAllowed } from "./lib/guard-write";
 import {
   documents, invoiceLines, invoices, payments, statements, supplierAliases, suppliers,
 } from "@/db/schema";
 
 const commit = process.argv.includes("--commit");
+/* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+if (commit) assertWriteAllowed("db:merge");
 const [fromSlug, toSlug] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 
 async function main() {

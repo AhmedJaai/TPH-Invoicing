@@ -17,6 +17,7 @@ import { driveConfig, SUPPLIER_INFO_CARD } from "@/config/drive";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { KNOWN_SLUGS, normalizeName } from "@/lib/suppliers-seed";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 /** يقرأ تفويض الدرايف من أول مستخدم سجّل دخوله. */
 async function storedDrive() {
   return driveForCli(async () => {
@@ -31,6 +32,8 @@ async function storedDrive() {
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const commit = process.argv.includes("--commit");
+/* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+if (commit) assertWriteAllowed("drive:migrate");
 
 interface Row {
   month: string;

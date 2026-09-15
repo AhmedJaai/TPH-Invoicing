@@ -28,7 +28,10 @@ import { db } from "../src/db";
 import { bankTransactions } from "../src/db/schema";
 import { recordAudit } from "../src/lib/audit";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 const APPLY = process.argv.includes("apply");
+/* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+if (APPLY) assertWriteAllowed("db:repair-scope");
 
 interface Row extends Record<string, unknown> {
   id: string; k: string; acct: string | null; a: number;

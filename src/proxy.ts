@@ -10,8 +10,35 @@ import { previewAllowed } from "@/lib/preview-mode";
 
 const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health"];
 
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const ACCEPTED_BODIES = /^(application\/json|multipart\/form-data|application\/x-www-form-urlencoded)/i;
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  /*
+    ── طلبٌ كاتب من موقعٍ آخر لا يُقبل ──
+
+    كانت الواجهات تقبل POST بـ«text/plain» من أصلٍ آخر مع الكعكة، ولا
+    يحمي إلّا SameSite=Lax — طلبٌ «بسيط» بلا فحصٍ مسبق يكفيه نموذج HTML
+    واحد لو ضعف Lax يوماً. فالأصلُ المختلف يُردّ، والجسم بغير نوعٍ نعرفه
+    يُردّ. (والنداء بلا Origin — نصٌّ محلّيّ — يمرّ: غيابُ الترويسة غيرُ اختلافها.)
+    وAuth.js يحرس مساراته بنفسه برمز CSRF.
+  */
+  if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth") && WRITE_METHODS.has(request.method)) {
+    const origin = request.headers.get("origin");
+    if (origin) {
+      let sameHost = false;
+      try { sameHost = new URL(origin).host === request.nextUrl.host; } catch { sameHost = false; }
+      if (!sameHost) {
+        return NextResponse.json({ error: "طلبٌ من موقعٍ آخر — رُفض" }, { status: 403 });
+      }
+    }
+    const type = request.headers.get("content-type");
+    if (type && !ACCEPTED_BODIES.test(type)) {
+      return NextResponse.json({ error: "نوع الطلب غير مقبول" }, { status: 415 });
+    }
+  }
 
   // وضع التجربة يفتح الأبواب عمداً، ولا يعمل في الإنتاج — راجع lib/preview-mode.ts
   if (previewAllowed(process.env)) return NextResponse.next();

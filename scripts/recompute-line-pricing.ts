@@ -14,7 +14,10 @@ import { invoiceLines, invoices, suppliers } from "@/db/schema";
 import { reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { formatRiyalsDisplay } from "@/lib/money";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 const commit = process.argv.includes("--commit");
+/* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+if (commit) assertWriteAllowed("db:reprice");
 
 async function main() {
   const rows = await db

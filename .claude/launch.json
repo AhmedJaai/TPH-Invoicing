@@ -4,7 +4,10 @@
     {
       "name": "tph-invoicing",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "AUTH_BYPASS=true npx next dev -H 127.0.0.1"],
+      "runtimeArgs": [
+        "-c",
+        "AUTH_BYPASS=true DATABASE_URL=\"${DEV_DATABASE_URL:?اضبط DEV_DATABASE_URL على فرع Neon للتطوير — .env يشير إلى قاعدة الإنتاج ووضع التجربة يكتب فيها باسم المالك}\" npx next dev -H 127.0.0.1"
+      ],
       "port": 3000
     }
   ]

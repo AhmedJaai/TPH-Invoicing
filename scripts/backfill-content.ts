@@ -35,7 +35,10 @@ import { reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { parseRiyals, formatRiyalsDisplay } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 const commit = process.argv.includes("--commit");
+/* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+if (commit) assertWriteAllowed("drive:backfill");
 const argOf = (name: string, fallback: number): number => {
   const i = process.argv.indexOf(name);
   if (i === -1) return fallback;

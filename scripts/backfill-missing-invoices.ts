@@ -32,7 +32,10 @@ import { reviewConfirmed } from "@/lib/confirm";
 import { extractionSchema } from "@/lib/extraction/schema";
 import { companyConfig } from "@/config/drive";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 const APPLY = process.argv.includes("--apply");
+/* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+if (APPLY) assertWriteAllowed("db:backfill-invoices");
 
 /** الأنواع التي لها فاتورة — وعرضُ السعر والإيصال ليسا منها. */
 const INVOICE_KINDS = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE", "UTILITY"]);

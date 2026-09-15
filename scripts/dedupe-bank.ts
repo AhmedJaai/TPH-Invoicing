@@ -41,7 +41,10 @@ import { bankTransactions } from "../src/db/schema";
 import { toCanonical } from "../src/lib/bank/canonical";
 import { operationRef } from "../src/lib/bank/identity";
 
+import { assertWriteAllowed } from "./lib/guard-write";
 const APPLY = process.argv.includes("apply");
+/* الكتابة في «قاعدة الإنتاج» تحتاج إقراراً مكتوباً — لا «apply» تُكتب في تجربةٍ عابرة */
+if (APPLY) assertWriteAllowed("db:dedupe");
 
 async function main() {
   const before = (await db.execute<{ n: number }>(sql`
