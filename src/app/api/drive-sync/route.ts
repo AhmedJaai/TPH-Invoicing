@@ -15,7 +15,7 @@ import { NextResponse } from "next/server";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  documents, invoiceLines, invoices, payments, statements,
+  documents, invoices, payments, statements,
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
@@ -27,12 +27,13 @@ import { planImport } from "@/lib/archive-import";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import { extractDocument } from "@/lib/extraction";
 import { reviewConfirmed } from "@/lib/confirm";
-import { normalizeItem } from "@/lib/items";
-import { reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { parseRiyals } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
 import { recordAudit } from "@/lib/audit";
-import { findPaymentTwin } from "@/services/payment.service";
+import { createPayment, PaymentTwinError } from "@/services/payment.service";
+import { createInvoice, replaceLines } from "@/services/invoice.service";
+import { firstClosedMonth } from "@/services/month-guard";
+import { MonthClosedError } from "@/services/validation.service";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { canonicalName } from "@/lib/canonical-name";
@@ -255,6 +256,8 @@ async function handle(request: Request) {
   let invoicesCreated = 0;
   /** إيصالاتٌ وُجدت واقعتُها مقيَّدةً — عُلِّقت ولم تُنسَخ دفعةً ثانية. */
   let paymentsAdopted = 0;
+  /** ملفّاتٌ شهرُها مقفل — تُعرَض ولا تُسجَّل حتى يُفتَح. */
+  let closedMonthSkipped = 0;
   const notes: string[] = [];
 
   for (const { entry, parsed } of named.slice(0, MAX_NAMED_PER_CALL)) {
@@ -266,6 +269,18 @@ async function handle(request: Request) {
 
     const date = new Date(`${p.date}T00:00:00Z`);
 
+    /*
+      ── الشهر المقفل يُتخطّى برسالة، لا ٥٠٠ ──
+
+      الكتابةُ عبر الخدمات (`createInvoice` و`createPayment`) وهي تسأل عن
+      الإقفال قبل أن تكتب. فإن رمت رُدّت المعاملة كلّها — المستندُ معها —
+      فيُعاد عرضُه في المزامنة التالية بعد فتح الشهر، ولا يبقى مستندٌ مؤرشف
+      بلا فاتورته. وكان المسار يُدرج بيده فيصل إلى مؤثِّر ٠٢٨ بخطأ قاعدةٍ
+      يقطع حلقة المزامنة كلّها.
+    */
+    /* تُعدّ بعد نجاح المعاملة — ما رُدّ لم يُسجَّل */
+    let done = { doc: false, invoice: false, adopted: false };
+    try {
     await db.transaction(async (tx) => {
       const [doc] = await tx.insert(documents).values({
         driveFileId: entry.file.id,
@@ -281,11 +296,10 @@ async function handle(request: Request) {
       }).onConflictDoNothing().returning({ id: documents.id });
 
       if (!doc) return; // سُجّل بين الفحص والكتابة — لا نكرّره
-      created++;
-      recordedFileIds.add(entry.file.id);
+      done = { ...done, doc: true };
 
       if (plan.createsInvoice && supplier) {
-        await tx.insert(invoices).values({
+        const invoiceId = await createInvoice(tx, {
           documentId: doc.id,
           supplierId: supplier.id,
           invoiceNumber: p.invoiceNumber!,
@@ -295,8 +309,12 @@ async function handle(request: Request) {
           subtotalMinor: null,
           vatMinor: null,
           totalMinor: p.amountMinor!,
-        }).onConflictDoNothing();
-        invoicesCreated++;
+          /* ولا يُعرَف من الاسم أصالحةٌ ضريبياً — فالمجهول يُعلَن */
+          taxStatus: "UNKNOWN",
+          inputVatStatus: "UNKNOWN",
+          isFixedAsset: false,
+        });
+        if (invoiceId) done = { ...done, invoice: true };
       }
 
       if (plan.createsStatement && supplier) {
@@ -324,14 +342,13 @@ async function handle(request: Request) {
           واحدة — يُسجَّل المستند ولا تُقيَّد دفعة، ويُترَك الأمر
           لفحص الازدواج.
         */
-        const twin = await findPaymentTwin(tx, {
-          supplierId: supplier?.id ?? null,
-          paidAt: date,
-          amountMinor: p.amountMinor!,
-        });
-
-        if (twin === null) {
-          await tx.insert(payments).values({
+        /*
+          والسؤالُ في `createPayment` نفسها لا منسوخاً هنا: كان هذا المسار
+          يسأل `findPaymentTwin` بيده، فأوّلُ تغييرٍ في سياسة التوأم لا
+          يبلغه. فيُنشئ عبر الخدمة، وإن ردّت بتوأمٍ تبنّاه.
+        */
+        try {
+          await createPayment(tx, {
             documentId: doc.id,
             supplierId: supplier?.id ?? null,
             paidAt: date,
@@ -340,16 +357,26 @@ async function handle(request: Request) {
             beneficiaryNameRaw: p.beneficiary ?? null,
             appliesToMonth: entry.month,
           });
-        } else if (twin.documentId === null) {
-          await tx.update(payments)
-            .set({ documentId: doc.id })
-            .where(eq(payments.id, twin.id));
-          paymentsAdopted++;
-        } else {
-          paymentsAdopted++;
+        } catch (e) {
+          if (!(e instanceof PaymentTwinError)) throw e;
+          /* الرميُ قبل أيّ كتابة — فالمعاملة سليمةٌ تُكمَل */
+          if (e.twin.documentId === null) {
+            await tx.update(payments)
+              .set({ documentId: doc.id })
+              .where(eq(payments.id, e.twin.id));
+          }
+          done = { ...done, adopted: true };
         }
       }
     });
+    if (done.doc) { created++; recordedFileIds.add(entry.file.id); }
+    if (done.invoice) invoicesCreated++;
+    if (done.adopted) paymentsAdopted++;
+    } catch (e) {
+      if (!(e instanceof MonthClosedError)) throw e;
+      notes.push(`${entry.file.name} — لم يُسجَّل: ${e.message}`);
+      closedMonthSkipped++;
+    }
   }
 
   // ── الملفات التي لا يُفهم اسمها: تُقرأ بمحتواها ──
@@ -374,6 +401,19 @@ async function handle(request: Request) {
         عند الباب، ومن دخل أُتِمّ له.
       */
       if (Date.now() - startedAt >= CONTENT_BUDGET_MS) break;
+
+      /*
+        والشهرُ يُسأل عند الباب أيضاً — قبل التنزيل والقراءة. فالقراءةُ
+        نداءٌ مدفوع، وكتابتُها في شهرٍ مقفل تُرَدّ فيضيع ثمنُها ويُعاد في
+        كلّ مزامنة. والخدمة تسأل ثانيةً وقت الكتابة.
+      */
+      const closed = await firstClosedMonth(db, [entry.month]);
+      if (closed) {
+        notes.push(`${entry.file.name} — لم يُقرأ: ${new MonthClosedError(closed).message}`);
+        closedMonthSkipped++;
+        continue;
+      }
+
       let data: Buffer;
       let mimeType: string;
       try {
@@ -457,6 +497,10 @@ async function handle(request: Request) {
       */
       const finalName = entry.file.name;
 
+      /* تُعدّ بعد نجاح المعاملة — ما رُدّ لم يُسجَّل ولم يُقرأ */
+      let recorded = false;
+      let invoiceCreated = false;
+      try {
       await db.transaction(async (tx) => {
         const [doc] = await tx.insert(documents).values({
           driveFileId: entry.file.id,
@@ -483,18 +527,22 @@ async function handle(request: Request) {
         }).onConflictDoNothing().returning({ id: documents.id });
 
         if (!doc) return;
-        created++;
-        read++;
-        recordedFileIds.add(entry.file.id);
+        recorded = true;
 
         if (!review.canCreateInvoice || !supplier) return;
 
         const totalMinor = parseRiyals(x.totalAmount)!;
-        const [inv] = await tx.insert(invoices).values({
+        const invoiceDate = new Date(`${x.invoiceDate}T00:00:00Z`);
+        /*
+          عبر `createInvoice` و`replaceLines` لا إدراجاً باليد: فيُحرَس
+          الشهر المقفل، وتُسوّى البنود بالحساب نفسه الذي يمرّ به الرفع —
+          ثلاثةُ مساراتٍ تُنشئ فواتير، وافتراقُها في السعر أنتج «ارتفاعاً» لم يقع.
+        */
+        const invoiceId = await createInvoice(tx, {
           documentId: doc.id,
           supplierId: supplier.id,
           invoiceNumber: x.invoiceNumber.trim(),
-          invoiceDate: new Date(`${x.invoiceDate}T00:00:00Z`),
+          invoiceDate,
           periodMonth: entry.month || x.invoiceDate.slice(0, 7),
           // الفراغ يبقى فراغاً — المجهول لا يصير صفراً
           subtotalMinor: parseRiyals(x.subtotalAmount),
@@ -505,49 +553,30 @@ async function handle(request: Request) {
           taxStatus: review.taxStatus,
           inputVatStatus: review.inputVatStatus,
           isFixedAsset: review.isFixedAsset,
-        }).onConflictDoNothing().returning({ id: invoices.id });
+        });
 
-        if (!inv) return;
-        invoicesCreated++;
+        if (!invoiceId) return;
+        invoiceCreated = true;
 
-        const resolved: (NonNullable<ReturnType<typeof resolveLinePricing>> & {
-          description: string; quantity: number;
-        })[] = [];
-
-        for (const l of x.lines) {
-          const description = l.description?.trim();
-          if (!description) continue;
-          const qty = Number((l.quantity ?? "1").replace(/[^\d.]/g, "")) || 1;
-          const pricing = resolveLinePricing({
-            quantity: qty,
-            unitPriceMinor: parseRiyals(l.unitPrice ?? ""),
-            lineTotalMinor: parseRiyals(l.lineTotal ?? ""),
-          });
-          if (!pricing) continue;
-          resolved.push({ ...pricing, description, quantity: qty });
-        }
-
-        const { lines: finalLines } = reconcileInvoiceLines(resolved, parseRiyals(x.subtotalAmount));
-
-        for (const l of finalLines) {
-          await tx.insert(invoiceLines).values({
-            invoiceId: inv.id,
-            description: l.description,
-            normalizedDescription: normalizeItem(l.description),
-            qty: String(l.quantity),
-            unitPriceMinor: l.effectiveUnitMinor,
-            lineTotalMinor: l.netTotalMinor,
-            listUnitPriceMinor: l.listUnitMinor,
-            discountMinor: l.discountMinor,
-            pricingBasis: l.basis,
-            invoiceDate: new Date(`${x.invoiceDate}T00:00:00Z`),
-            supplierId: supplier.id,
-          });
-        }
+        await replaceLines(tx, {
+          invoiceId,
+          supplierId: supplier.id,
+          invoiceDate,
+          subtotalMinor: parseRiyals(x.subtotalAmount),
+          lines: x.lines,
+        });
 
         /* مالٌ دُفع لهذا المورّد قبل وصول فاتورته يُخصم منها — كما في الرفع */
         await applySupplierCredit(tx, supplier.id, { forwardDays: SETTLEMENT_FORWARD_DAYS });
       });
+      if (recorded) { created++; read++; recordedFileIds.add(entry.file.id); }
+      if (invoiceCreated) invoicesCreated++;
+      } catch (e) {
+        /* أُقفل الشهر بين السؤال عند الباب والكتابة — يُتخطّى برسالة */
+        if (!(e instanceof MonthClosedError)) throw e;
+        notes.push(`${entry.file.name} — لم يُسجَّل: ${e.message}`);
+        closedMonthSkipped++;
+      }
     }
   }
 
@@ -629,7 +658,7 @@ async function handle(request: Request) {
   return NextResponse.json({
     ok: true,
     applied: true,
-    summary: { ...scanned, created, invoicesCreated, paymentsAdopted, contentRead: read, remainingUnnamed: remaining },
+    summary: { ...scanned, created, invoicesCreated, paymentsAdopted, closedMonthSkipped, contentRead: read, remainingUnnamed: remaining },
     notes: notes.slice(0, 20),
     readFailures,
     quotations,

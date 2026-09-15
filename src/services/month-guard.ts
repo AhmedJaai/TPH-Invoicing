@@ -10,10 +10,32 @@
  * ويُقرأ بمقبض المعاملة: قراءةٌ بـ`db` من داخل معاملة تنتظر اتّصالاً
  * محجوزاً على Vercel.
  */
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import type { db } from "@/db";
 import { monthCloses } from "@/db/schema";
 import { MonthClosedError } from "./validation.service";
 import type { Tx } from "./types";
+
+/**
+ * أوّلُ شهرٍ مقفل من القائمة، أو `null` — قراءةٌ بلا رمي.
+ *
+ * لمن يسأل **قبل** عملٍ مكلف: المزامنة تقرأ الملفّ بالذكاء ثمّ تكتب،
+ * فإن كان شهرُه مقفلاً رُدّت الكتابة وضاع ثمنُ القراءة. فتسأل هنا عند
+ * الباب، ويبقى `assertMonthsOpen` في الخدمة حارساً ثانياً وقت الكتابة.
+ */
+export async function firstClosedMonth(
+  executor: typeof db | Tx,
+  months: readonly (string | null | undefined)[],
+): Promise<string | null> {
+  const list = [...new Set(months.filter((m): m is string => Boolean(m)))];
+  if (list.length === 0) return null;
+  const { rows } = await executor.execute<{ month: string }>(sql`
+    select month from month_closes
+     where status = 'CLOSED' and month in (${sql.join(list.map((m) => sql`${m}`), sql`, `)})
+     order by month limit 1
+  `);
+  return rows[0]?.month ?? null;
+}
 
 export async function assertMonthsOpen(
   tx: Tx,

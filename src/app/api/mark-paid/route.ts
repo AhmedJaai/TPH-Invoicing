@@ -20,11 +20,10 @@ import { NextResponse } from "next/server";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { invoices, paymentAllocations } from "@/db/schema";
+import { invoices } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { recordAudit } from "@/lib/audit";
-import { createPayment, refreshPaymentStatus } from "@/services/payment.service";
-import { assertMonthsOpen } from "@/services/month-guard";
+import { allocate, createPayment } from "@/services/payment.service";
 import { CreditError, markPaidByOwner, previewOwnerPaid } from "@/services/supplier-credit.service";
 import { INVOICE, countNoun } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -189,23 +188,13 @@ async function handle(request: Request) {
         beneficiaryNameRaw: null,
         appliesToMonth: inv.periodMonth,
       });
-      const pay = { id: payId };
-
-      await assertMonthsOpen(tx, [inv.periodMonth]);
-      await tx.insert(paymentAllocations).values({
-        paymentId: pay.id,
-        invoiceId: inv.id,
-        amountMinor: remaining,
-      });
-
       /*
-        الحال يُشتقّ بعد التخصيص، ولا يُترك على قيمته الافتراضية.
-
-        كان هذا المسار يُدرج الدفعة وتخصيصها ثمّ ينصرف، فيبقى
-        `status = 'UNAPPLIED'` على دفعةٍ خُصّصت بالكامل — فتقول بوّابة
-        الإنتاج «حالُها يخالف تخصيصاتها»، وهي محقّة.
+        والتخصيص عبر `allocate` لا إدراجاً باليد: فيُحرَس شهرُ الفاتورة،
+        ويُطرَح الرسم، ويُشتقّ حالُ الدفعة بعده — كان هذا المسار يُدرج
+        التخصيص وينسى الحال، فبقيت دفعةٌ مخصَّصة كاملةً «غير مخصَّصة».
+        وسياسةٌ تتغيّر في الخدمة تبلغ هذا الباب بلا أن يُنسَخ إليه شيء.
       */
-      await refreshPaymentStatus(tx, pay.id);
+      await allocate(tx, payId, remaining, [{ invoiceId: inv.id, amountMinor: remaining }]);
 
       totalMinor += remaining;
     }

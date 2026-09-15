@@ -51,7 +51,11 @@ export interface CreatePaymentInput {
 /** توأمٌ وُجد ولم يُقَرّ بأنّه واقعةٌ أخرى. */
 export class PaymentTwinError extends Error {
   readonly status = 409;
-  constructor(readonly twin: { id: string; hasBankRow: boolean; allocatedMinor: number }) {
+  /*
+    `documentId` يحمله الخطأ لأنّ من يقيّد من إيصالٍ يتبنّى التوأم إن كان
+    بلا مستند — ولا يسأل عنه ثانيةً فيكرّر السؤال الذي سُئل هنا.
+  */
+  constructor(readonly twin: { id: string; documentId: string | null; hasBankRow: boolean; allocatedMinor: number }) {
     super("سدادٌ بنفس المورّد والمبلغ في اليوم نفسه مقيَّدٌ من قبل — افتحه قبل أن تسجّل ثانيةً");
     this.name = "PaymentTwinError";
   }
