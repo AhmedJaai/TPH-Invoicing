@@ -131,3 +131,24 @@ export function connectionWarnings(p: DbFingerprint): string[] {
   }
   return out;
 }
+
+/**
+ * أتعمل البيئة السحابيّة على نقطة Neon غير المجمَّعة؟
+ *
+ * «يجب استعمال النقطة المجمَّعة» كان في الوثيقة لا في الشيفرة: `db/index.ts`
+ * يقبل أيّ سلسلة، و`/api/health` يعرض `pooled:false` ويردّ ٢٠٠. فمن يلصق
+ * سلسلة Neon المباشرة في Vercel يعود إلى الوقوف الصامت — تنفد الاتّصالات
+ * وينتظر pg بلا خطأ.
+ *
+ * والمخالفة ثلاثة شروطٍ معاً: بيئةٌ سحابيّة، ومضيفٌ في Neon، وبلا `-pooler`.
+ * فالجهاز المحلّيّ لا يُنبَّه، ولا قاعدةٌ في مزوّدٍ آخر لا يعرف هذا الاسم.
+ */
+export function requiresPooler(
+  env: Record<string, string | undefined>,
+  url: string | undefined,
+): { serverless: boolean; pooled: boolean; violation: boolean } {
+  const serverless = Boolean(env.VERCEL || env.AWS_LAMBDA_FUNCTION_NAME);
+  const conn = parseConnection(url);
+  const neon = conn.host.endsWith(".neon.tech");
+  return { serverless, pooled: conn.pooled, violation: serverless && neon && !conn.pooled };
+}

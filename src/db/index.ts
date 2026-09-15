@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
+import { requiresPooler } from "@/lib/ops/db-identity";
 
 declare global {
   var __tphPool: Pool | undefined;
@@ -32,6 +33,18 @@ const pool =
   });
 
 if (!isServerless) globalThis.__tphPool = pool;
+
+/*
+  والنقطة المجمَّعة لا تُفرَض بالوثيقة وحدها: سطرٌ في السجلّ عند كلّ بدء
+  تشغيلٍ سحابيّ على النقطة المباشرة، و`/api/health` يُسقط الحكم بها.
+  ولا يُرمى: قاعدةٌ تعمل ببطء خيرٌ من موقعٍ لا يفتح.
+*/
+{
+  const pooler = requiresPooler(process.env, process.env.DATABASE_URL);
+  if (pooler.violation) {
+    console.error(JSON.stringify({ kind: "db-not-pooled", message: "DATABASE_URL يشير إلى نقطة Neon غير المجمَّعة في بيئة سحابيّة" }));
+  }
+}
 
 export const db = drizzle(pool, { schema, casing: "snake_case" });
 export { schema };

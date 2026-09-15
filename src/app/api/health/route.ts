@@ -16,6 +16,7 @@ import { openToken } from "@/lib/token-crypto";
 import { accounts } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { isAuthBypassed } from "@/lib/session";
+import { requiresPooler } from "@/lib/ops/db-identity";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,7 +69,9 @@ export async function GET() {
   const checks = {
     database,
     // النقطة المباشرة تستنفد حصّتها في البيئة السحابية فتقف الطلبات صامتة
-    dbEndpoint: info ? { host: info.host, pooled: info.pooled } : { error: "DATABASE_URL غير مضبوط" },
+    dbEndpoint: info
+      ? { host: info.host, pooled: info.pooled, poolerRequired: requiresPooler(process.env, process.env.DATABASE_URL).serverless }
+      : { error: "DATABASE_URL غير مضبوط" },
     extraction: { provider, keyPresent: providerKeyPresent },
     google: {
       clientConfigured: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
@@ -84,6 +87,8 @@ export async function GET() {
 
   const healthy =
     database.ok &&
+    // في السحابة على نقطة Neon المباشرة: يعمل اليوم ويقف صامتاً غداً
+    !requiresPooler(process.env, process.env.DATABASE_URL).violation &&
     providerKeyPresent &&
     checks.google.clientConfigured &&
     checks.drive.foldersConfigured;

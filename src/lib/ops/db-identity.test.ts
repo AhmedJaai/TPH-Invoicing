@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  checkIsolation, connectionWarnings, environmentOf, parseConnection,
+  checkIsolation, connectionWarnings, environmentOf, parseConnection, requiresPooler,
   type DbFingerprint,
 } from "./db-identity";
 
@@ -102,5 +102,31 @@ describe("تحذيرات الاتصال", () => {
 
   it("والمجمَّعة المعروفة بلا تحذير", () => {
     expect(connectionWarnings(print({}))).toEqual([]);
+  });
+});
+
+describe("المجمَّعة إلزاماً في السحابة", () => {
+  const direct = "postgresql://u:p@ep-cool-1.c-2.us-east-2.aws.neon.tech/neondb";
+  const pooled = "postgresql://u:p@ep-cool-1-pooler.c-2.us-east-2.aws.neon.tech/neondb";
+
+  it("Vercel على النقطة المباشرة ← مخالفة", () => {
+    expect(requiresPooler({ VERCEL: "1" }, direct)).toEqual({ serverless: true, pooled: false, violation: true });
+  });
+
+  it("Vercel على المجمَّعة ← سليم", () => {
+    expect(requiresPooler({ VERCEL: "1" }, pooled).violation).toBe(false);
+  });
+
+  it("الجهاز المحلّيّ لا يُنبَّه ولو على المباشرة", () => {
+    expect(requiresPooler({}, direct).violation).toBe(false);
+    expect(requiresPooler({}, "postgres://tph@127.0.0.1:55432/tph_x").violation).toBe(false);
+  });
+
+  it("وقاعدةٌ ليست في Neon لا تُطالَب باسمٍ لا تعرفه", () => {
+    expect(requiresPooler({ AWS_LAMBDA_FUNCTION_NAME: "f" }, "postgres://u:p@db.example.com/x").violation).toBe(false);
+  });
+
+  it("والسلسلة الغائبة ليست مخالفة — غيابها عطبٌ آخر يُعلَن في موضعه", () => {
+    expect(requiresPooler({ VERCEL: "1" }, undefined).violation).toBe(false);
   });
 });
