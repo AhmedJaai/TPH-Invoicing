@@ -6,6 +6,7 @@ import { Money } from "./money";
 import { Badge, buttonClass } from "./ui";
 import { postJson } from "@/lib/http-client";
 import { strength } from "@/lib/bank/strength";
+import { ACT } from "@/lib/ui-terms";
 
 /**
  * لماذا طُوبقت هذه الحركة؟ وكيف أتراجع؟
@@ -171,7 +172,7 @@ export function MatchExplain({
                       onClick={undo}
                       className={buttonClass("danger", "sm")}
                     >
-                      {undoing ? "يُردّ…" : "أكّد التراجع"}
+                      {undoing ? "يُردّ…" : notAPayment ? ACT.restoreToQueue : ACT.undoMatch}
                     </button>
                     <button
                       type="button"

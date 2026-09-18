@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
+import { ACT } from "@/lib/ui-terms";
 
 /**
  * «أكّده» لما قرأه النموذج من المزامنة — افتح الملفّ وقارن ثمّ أكّد.
@@ -29,7 +30,7 @@ export function ConfirmDocument({ documentId }: { documentId: string }) {
           router.refresh();
         }}
       >
-        {busy ? "يؤكّد…" : "أكّده"}
+        {busy ? "يؤكّد…" : ACT.approveDocument}
       </button>
       {error && <span className="text-[11px] text-danger" role="alert">{error}</span>}
     </span>

@@ -13,6 +13,7 @@ import {
   settleable, groupForReview,
   type ReviewBucket, type ReviewItem,
 } from "@/lib/bank/review-queue";
+import { ACT, recordBatch } from "@/lib/ui-terms";
 
 /**
  * طابور المراجعة الموحَّد.
@@ -291,7 +292,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
               disabled={busy}
               onClick={confirmAll}
             >
-              {busy ? "يُعاد الحساب…" : `أكّد ${Math.min(50, confirmable.length)}`}
+              {busy ? "يُعاد الحساب…" : recordBatch(Math.min(50, confirmable.length))}
             </button>
           </div>
 
@@ -506,7 +507,7 @@ function Row({
                 onClick={() => onSettle(i.transactionId)}
                 title="تُسجَّل سداداً لهذا المورّد وتُخصم من أقدم فواتيره، وما بقي يبقى بلا فاتورة"
               >
-                {busy ? "يُقيَّد…" : "سدِّد على حساب المورّد"}
+                {busy ? "يُقيَّد…" : ACT.settleOnAccount}
               </button>
             ) : (
             <button
@@ -515,7 +516,7 @@ function Row({
               disabled={busy}
               onClick={() => onConfirm(i.transactionId)}
             >
-              {busy ? "يُعاد الحساب…" : "أكّد"}
+              {busy ? "يُعاد الحساب…" : ACT.recordAgainstInvoice}
             </button>
             )}
             <button
@@ -627,7 +628,7 @@ function Row({
                 )
               }
             >
-              {busy ? "يُحفظ…" : "أكّد التعريف"}
+              {busy ? "يُحفظ…" : ACT.saveIdentity}
             </button>
             <span className="text-xs leading-relaxed text-muted">
               ما تؤكّده يصير ذاكرة: يُطبَّق الآن على ما اخترتَه، ويُعرَف به ما يشبهه في الكشوف القادمة بلا سؤال.

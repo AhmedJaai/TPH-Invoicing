@@ -12,6 +12,7 @@ import {
   type Severity,
 } from "@/lib/ai/finding-labels";
 import { SUGGESTION, countNoun } from "@/lib/arabic";
+import { ACT } from "@/lib/ui-terms";
 
 /**
  * اقتراحاتُ تحليل الذكاء — وقرارُ صاحب العمل فيها.
@@ -280,7 +281,7 @@ function FindingCard({
                   onClick={() => decide("accept")}
                   title={canApprove ? undefined : "إقرار ما يكتب سداداً لمن يعتمد السداد"}
                 >
-                  {state === "busy" ? "يحفظ…" : f.action?.type === "OWNER_PAID" ? "أكّد — قيّدها من حسابي" : f.action?.type === "VOID_DUPLICATE" ? "هي دفعةٌ واحدة — ألغِ المكرّرة" : "اخصم الرصيد من فواتيره"}
+                  {state === "busy" ? "يحفظ…" : f.action?.type === "OWNER_PAID" ? ACT.paidFromOwner : f.action?.type === "VOID_DUPLICATE" ? "هي دفعةٌ واحدة — ألغِ المكرّرة" : "اخصم الرصيد من فواتيره"}
                 </button>
               )}
               <button type="button" disabled={state === "busy"} className={`${btn} text-ink-soft`} onClick={() => setState("dismissing")}>

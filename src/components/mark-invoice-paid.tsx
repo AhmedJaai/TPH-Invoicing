@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { ACT } from "@/lib/ui-terms";
 
 /**
  * «سجّل أنّها سُدّدت» — في صفحة الفواتير نفسها.
@@ -179,7 +180,7 @@ export function MarkInvoicePaid({
             onClick={() => run("OWNER")}
             className={`${small} bg-inverse-surface font-bold text-inverse-ink disabled:opacity-50`}
           >
-            {state === "busy" ? "يحفظ…" : "أكّد"}
+            {state === "busy" ? "يحفظ…" : ACT.paidFromOwner}
           </button>
           <button type="button" onClick={() => { setState("choose"); setPreview(null); setMessage(null); }} className="text-[11px] underline">
             تراجع
@@ -196,7 +197,7 @@ export function MarkInvoicePaid({
             onClick={() => run("BANK")}
             className={`${small} bg-inverse-surface font-bold text-inverse-ink disabled:opacity-50`}
           >
-            {state === "busy" ? "يحفظ…" : "أكّد"}
+            {state === "busy" ? "يحفظ…" : ACT.recordBankTransfer}
           </button>
           <button type="button" onClick={() => { setState("choose"); setMessage(null); }} className="text-[11px] underline">
             تراجع

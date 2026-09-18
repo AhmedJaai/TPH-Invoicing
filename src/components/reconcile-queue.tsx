@@ -6,6 +6,7 @@ import { Money } from "./money";
 import { Badge, buttonClass, Card, EmptyState } from "./ui";
 import { countNoun, GROUP, TRANSACTION } from "@/lib/arabic";
 import { postJson } from "@/lib/http-client";
+import { ACT } from "@/lib/ui-terms";
 
 /**
  * حلّ المعلّقات — **مجموعةً مجموعة** لا حركةً حركة.
@@ -305,7 +306,7 @@ export function ReconcileQueue({
               onClick={settleAccount}
               className={`${buttonClass("primary", "sm")} mt-2`}
             >
-              {busy ? "يقيّد…" : "سدِّد على حساب المورّد"}
+              {busy ? "يقيّد…" : ACT.settleOnAccount}
             </button>
             {single && (
               <button
@@ -407,8 +408,8 @@ export function ReconcileQueue({
             {busy
               ? "يحفظ…"
               : group.items.length > 1
-                ? `أكّد — وطبّقها على ${countNoun(group.items.length, TRANSACTION)}`
-                : "أكّد وانتقل"}
+                ? `${ACT.defineGroup} — وطبّقها على ${countNoun(group.items.length, TRANSACTION)}`
+                : ACT.saveIdentityAndNext}
           </button>
         </div>
         </>}
