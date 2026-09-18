@@ -419,8 +419,8 @@ export default async function BankPage({
           label="سداد بلا فاتورة"
           minor={n("unapplied_sum")}
           tone={n("unapplied") > 0 ? "warn" : "ok"}
-          sub={`${countNoun(n("unapplied"), PAYMENT_RECORD)} لم تُخصَّص على فاتورة`
-            + (n("advance") > 0 ? ` · ومقدَّمة معلَنة ${formatRiyalsDisplay(n("advance_sum"))}` : "")}
+          sub={`${countNoun(n("unapplied"), PAYMENT_RECORD)} لم تُربط بفاتورة`
+            + (n("advance") > 0 ? ` · ودفعة مقدَّمة ${formatRiyalsDisplay(n("advance_sum"))}` : "")}
           href="/attention"
         />
         <Stat
@@ -430,7 +430,7 @@ export default async function BankPage({
           sub="ما زال عليها رصيد"
         />
         <Stat
-          label="تسويات الشبكة"
+          label="إيداعات مدى (نقاط البيع)"
           minor={n("settled")}
           tone="ok"
           sub="إيراد البطاقات يصل حسابك"
@@ -487,8 +487,8 @@ export default async function BankPage({
 
       {recent.length > 0 && (
         <Section
-          title="آخر ما قرّره المحرّك"
-          hint={`${countNoun(n("auto"), ITEM)} طُوبقت تلقائياً · ${countNoun(n("suggest"), ITEM)} تنتظر تأكيدك. والدرجة ترجيحٌ لا يقين، فتُعرَض وصفاً لا نسبة.`}
+          title="آخر ما طابقه النظام"
+          hint={`${countNoun(n("auto"), ITEM)} طُوبقت تلقائياً · ${countNoun(n("suggest"), ITEM)} تنتظر تأكيدك. وهذا ترجيح، فراجِع ما يبدو غريباً.`}
         >
           <ul className="space-y-2.5">
             {recent.map((t) => {
@@ -572,7 +572,8 @@ function DoublePaidCard({
         {g.transactions.map((t) => (
           <li key={t.id} className="flex flex-wrap items-baseline justify-between gap-2 text-[11px]">
             <span className="min-w-0 text-muted" dir="auto">
-              المرجع: <bdi className="nums font-bold text-ink">{t.operationRef ?? "غير مذكور"}</bdi>
+              {/* `BANK_REF:` بادئةٌ داخليّة — وأحمد ينسخ الرقم ليطالب الجهة */}
+              مرجع البنك: <bdi className="nums font-bold text-ink">{t.operationRef?.replace(/^[A-Z_]+:/, "") ?? "غير مذكور"}</bdi>
             </span>
             <span className="nums font-bold"><Money minor={t.amountMinor} /></span>
           </li>

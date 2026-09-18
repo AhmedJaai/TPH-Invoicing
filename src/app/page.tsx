@@ -217,7 +217,7 @@ export default async function HomePage() {
         hint="الرقم بلا بيان تغطيته يخدع. هذه نسبة ما بُنيت عليه أرقام الصفحة — وما لم يُوصَل يُقال عنه «غير موصول» ولا يُملأ بصفر."
         action={
           <span className="nums text-sm font-bold">
-            ثقة الأرقام {Math.round(health.confidence * 100)}٪
+            اكتمال البيانات {Math.round(health.confidence * 100)}٪
           </span>
         }
       >

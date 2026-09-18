@@ -207,7 +207,7 @@ export function partitionDoublePaid(
 export function buildDoublePaidClaim(group: DoublePaidGroup): string {
   const riyals = (m: number) =>
     new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(m / 100);
-  const refs = group.transactions.map((t, i) => `• السداد ${i + 1}: المرجع ${t.operationRef ?? "غير مذكور في الكشف"}`);
+  const refs = group.transactions.map((t, i) => `• السداد ${i + 1}: المرجع ${t.operationRef?.replace(/^[A-Z_]+:/, "") ?? "غير مذكور في الكشف"}`);
   return [
     `السلام عليكم،`,
     ``,

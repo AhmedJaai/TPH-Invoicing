@@ -504,7 +504,7 @@ function Row({
                 className={buttonClass("primary", "sm")}
                 disabled={busy}
                 onClick={() => onSettle(i.transactionId)}
-                title="تُقيَّد دفعةً على حساب المورّد، وتُوزَّع على المفتوح بالأقدم أوّلاً، وما بقي يبقى غير مخصَّص"
+                title="تُسجَّل سداداً لهذا المورّد وتُخصم من أقدم فواتيره، وما بقي يبقى بلا فاتورة"
               >
                 {busy ? "يُقيَّد…" : "سدِّد على حساب المورّد"}
               </button>

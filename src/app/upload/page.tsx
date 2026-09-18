@@ -78,7 +78,7 @@ export default async function Home() {
         من غير هذه الصفحة.
       */}
       <section className="mt-10 rounded-2xl border border-line bg-raised p-4 shadow-raised">
-        <h2 className="mb-1 text-sm font-bold">مزامنة الأرشيف</h2>
+        <h2 className="mb-1 text-sm font-bold">افحص الدرايف</h2>
         <p className="mb-4 text-sm text-muted">
           تبحث في درايف عن ملفّات لم تُسجَّل بعد، فتقرأها وتقيّدها وتقترح توحيد أسمائها.
         </p>

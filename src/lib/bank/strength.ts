@@ -6,9 +6,9 @@
  * فصارت دالّةً واحدة يستوردها الموضعان، كي لا تعود من بابٍ ثالث.
  */
 export function strength(score: number | null): string {
-  if (score === null) return "لا ترجيح";
+  if (score === null) return "لم تُحدَّد فاتورتها";
   if (score >= 85) return "ترجيح قوي";
   if (score >= 70) return "ترجيح معتبر";
   if (score >= 50) return "ترجيح ضعيف";
-  return "لا ترجيح";
+  return "لم تُحدَّد فاتورتها";
 }

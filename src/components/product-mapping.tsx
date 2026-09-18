@@ -369,7 +369,7 @@ export function ProductMapping({
 
       {suggestionGroups.length > 0 && (
         <section>
-          <h2 className="text-base font-bold">مرشّحات للجمع</h2>
+          <h2 className="text-base font-bold">أصناف قد تكون صنفاً واحداً</h2>
           <p className="mt-1 text-xs leading-relaxed text-muted">
             أصناف تحمل الاسم نفسه عند مورّدين. وتطابق الاسم لا يعني تطابق الصنف —
             «عنب» عند المحمصة الغربية كيلو بنّ، وعند لافا زجاجة كمبوتشا. فما يُضعف

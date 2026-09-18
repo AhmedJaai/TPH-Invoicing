@@ -115,7 +115,7 @@ export default async function ReviewPage() {
       user={user}
       width="wide"
       title="طابور المراجعة"
-      intro="ما ينتظر قرارك، مقسوماً على ثلاثة: ما يُؤكَّد جمعاً، وما يحتاج نظرةً منك، وجهاتٌ لم يعرفها النظام بعد."
+      intro="ما ينتظر قرارك، مقسوماً على ثلاثة: ما تؤكّده دفعةً واحدة، وما يحتاج نظرةً منك، وجهاتٌ لم يعرفها النظام بعد."
     >
       {truncated && (
         <p className="mb-4 rounded-lg border border-warn/40 bg-warn-bg px-3 py-2 text-xs text-warn">

@@ -178,7 +178,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   const missingStatements = Math.max(0, facts.suppliersWithInvoices - facts.suppliersWithStatement);
   items.push({
     id: "statements",
-    label: "كشوف المورّدين وصلت وطوبقت",
+    label: "كشوف المورّدين وصلت وتطابقت",
     state: missingStatements === 0 ? "PASS" : "WARN",
     detail:
       missingStatements === 0
@@ -212,7 +212,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   if (facts.bankImportCoversMonth) {
     items.push({
       id: "bank-coverage",
-      label: "لا فجوة في تغطية الشهر",
+      label: "لا أيّام بلا كشف",
       state: facts.bankGapDays === 0 ? "PASS" : "BLOCK",
       detail:
         facts.bankGapDays === 0
@@ -230,7 +230,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     */
     items.push({
       id: "bank-balance",
-      label: "معادلة كشف البنك صحيحة",
+      label: "رصيد البنك يتطابق",
       state:
         facts.bankBalanceStatus === "BALANCED" || facts.bankBalanceStatus === "WITHIN_TOLERANCE"
           ? "PASS"
@@ -238,7 +238,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
           : "BLOCK",
       detail:
         facts.bankBalanceStatus === "UNKNOWN"
-          ? "الكشف لا يحمل رصيداً افتتاحياً أو ختامياً — المعادلة لا تُفحَص"
+          ? "الكشف لا يحمل رصيداً افتتاحياً أو ختامياً — فالرصيد لا يمكن فحصه"
           : facts.bankBalanceDifferenceMinor === null || facts.bankBalanceDifferenceMinor === 0
             ? "الافتتاحي والحركات يعطيان الختامي"
             : `فرقٌ غير مفسَّر: ${riyals(Math.abs(facts.bankBalanceDifferenceMinor))} ريال`,

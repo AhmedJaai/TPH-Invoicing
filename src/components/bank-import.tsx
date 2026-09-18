@@ -410,8 +410,8 @@ export function BankImport({
                 )}
                 <p className="nums mt-1.5 text-xs text-muted">
                   {data.sync.inFile} في الملفّ · {data.sync.alreadyKnown} مسجّلة عندك
-                  {data.sync.byReference > 0 && ` (${countNoun(data.sync.byReference, TRANSACTION)} عُرفت بمرجع عمليّتها)`}
-                  {data.sync.ambiguous > 0 && ` · ${countNoun(data.sync.ambiguous, TRANSACTION)} ملتبسة`}
+                  {data.sync.byReference > 0 && ` (${countNoun(data.sync.byReference, TRANSACTION)} عرفناها برقم العمليّة)`}
+                  {data.sync.ambiguous > 0 && ` · ${countNoun(data.sync.ambiguous, TRANSACTION)} قد تكون مكرَّرة`}
                 </p>
                 {data.sync.ambiguous > 0 && (
                   <div className="mt-2 border-t border-line pt-2">

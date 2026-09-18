@@ -351,7 +351,7 @@ export default async function SupplierPage({
       )}
 
       <Section
-        title="أبعاد العلاقة"
+        title="تعاملك معه"
         hint="ليست درجةً واحدة من مئة — رقمٌ كهذا يُخفي سببه فلا يُفيد عند التفاوض. وما لا تكفي بياناته يبقى غير مقيَّم، ولا يُعطى صفراً."
       >
         <div className="grid gap-3 sm:grid-cols-2">
