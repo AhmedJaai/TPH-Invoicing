@@ -1,5 +1,5 @@
 import { PageSkeleton } from "@/components/page-skeleton";
 
 export default function Loading() {
-  return <PageSkeleton title="الإنفاق على الأصناف" stats={4} />;
+  return <PageSkeleton title="التدفّق وقائمة الدخل" stats={0} />;
 }

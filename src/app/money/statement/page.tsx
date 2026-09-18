@@ -28,7 +28,7 @@ export default async function FinancialStatementPage() {
   if (!user) redirect("/login?from=/money/statement");
   if (!can(user.role, "reports:view")) {
     return (
-      <PageShell user={user} width="wide" title="التدفّق النقدي وقائمة الدخل">
+      <PageShell user={user} width="wide" title="التدفّق وقائمة الدخل">
         <NoAccess />
       </PageShell>
     );
@@ -128,7 +128,7 @@ export default async function FinancialStatementPage() {
     <PageShell
       user={user}
      
-      title="التدفّق النقدي وقائمة الدخل"
+      title="التدفّق وقائمة الدخل"
       intro="مبنيّة على كشف بنكك وفواتيرك. وما يحتاج مبيعات أو مخزوناً معروضٌ بسببه لا بصفر."
     >
       {/* ── التدفّق النقدي ── */}

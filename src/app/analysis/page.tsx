@@ -21,7 +21,7 @@ export default async function AnalysisPage() {
   if (!user) redirect("/login?from=/analysis");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} width="wide" title="ذكاء الشراء">
+      <PageShell user={user} width="wide" title="الإنفاق على الأصناف">
         <NoAccess />
       </PageShell>
     );
@@ -60,7 +60,7 @@ export default async function AnalysisPage() {
       <PageShell
         user={user}
        
-        title="ذكاء الشراء"
+        title="الإنفاق على الأصناف"
         intro="كل صنف اشتريته: كم مرة طُلب، وبأي كميّة، وكم كلّف، ومن أي مورّد، وكل كم يوم تحتاجه."
       >
         <Empty message="لا توجد بنود فواتير بعد. البنود تُسجَّل عند أرشفة الفواتير — ارفع فاتورة وستظهر هنا." />
@@ -87,7 +87,7 @@ export default async function AnalysisPage() {
     <PageShell
       user={user}
      
-      title="ذكاء الشراء"
+      title="الإنفاق على الأصناف"
       intro="كل صنف اشتريته: كم مرة طُلب، وبأي كميّة، وكم كلّف، ومن أي مورّد، وكل كم يوم تحتاجه."
     >
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -15,7 +15,7 @@ import { countNoun, TIME } from "@/lib/arabic";
 export const dynamic = "force-dynamic";
 
 /**
- * الأداء: ما تدعمه البيانات الموجودة فعلاً.
+ * الأسعار: ما تدعمه البيانات الموجودة فعلاً.
  *
  * لا هامش ربح ولا تكلفة مبيعات — كلاهما يحتاج مصدر مبيعات لم يُوصَل.
  * وما لا يُدعم يُقال عنه ذلك صراحةً بدل أن يُملأ برقم يبدو دقيقاً.
@@ -25,7 +25,7 @@ export default async function PerformancePage() {
   if (!user) redirect("/login?from=/performance");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} width="wide" title="الأداء">
+      <PageShell user={user} width="wide" title="الأسعار">
         <NoAccess />
       </PageShell>
     );
@@ -74,7 +74,7 @@ export default async function PerformancePage() {
     <PageShell
       user={user}
      
-      title="الأداء"
+      title="الأسعار"
       intro="ما تدعمه بياناتك الموجودة: الأصناف وأسعارها ومورّدوها. وما يحتاج مبيعات — الهامش والتكلفة — مذكور صراحةً أنّه غير متاح."
     >
       {/* ── ما هو غير متاح، صراحةً ── */}
@@ -154,7 +154,7 @@ export default async function PerformancePage() {
         <div className="mb-3 flex items-baseline justify-between gap-3">
           <h2 className="text-base font-bold">الأصناف حسب الإنفاق</h2>
           <Link href="/analysis" className="text-xs underline underline-offset-4 hover:text-ink">
-            التحليل الكامل ←
+            الإنفاق على الأصناف ←
           </Link>
         </div>
         {items.length === 0 ? (

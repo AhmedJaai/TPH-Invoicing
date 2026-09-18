@@ -72,8 +72,8 @@ export default async function PurchasesPage() {
       detail: "صنفاً تُتبَّع أسعاره عند مورّده",
     },
     {
-      /* الرقم يفتح تفصيلَه: كلُّ فاتورةٍ عليها رصيد — لا دفعةَ الشهر المنقضي وحده */
-      href: "/purchases/invoices?paid=OPEN",
+      /* الرقم يفتح تفصيلَه بالمورّد — لا بالفاتورة، فما دُفع ولم يُخصَّص يُخصم */
+      href: "/purchases/insights",
       title: "المستحقّ للمورّدين",
       amountMinor: owedMinor,
       detail: "غير مسدَّد للمورّدين",

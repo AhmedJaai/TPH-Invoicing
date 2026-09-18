@@ -24,7 +24,7 @@ export default async function PaymentsPage({
   if (!user) redirect("/login?from=/payments");
   if (!can(user.role, "payment:approve")) {
     return (
-      <PageShell user={user} width="wide" title="دفعة أوّل الشهر">
+      <PageShell user={user} width="wide" title="دفعة الشهر">
         <NoAccess what="اعتماد الدفعات" />
       </PageShell>
     );
@@ -92,7 +92,7 @@ export default async function PaymentsPage({
     <PageShell
       user={user}
      
-      title={`دفعة ${month}`}
+      title={`دفعة الشهر — ${month}`}
       intro="مستحقّات الشهر المنقضي وما تأخّر قبله، مورّداً مورّداً. ما ليس فاتورة ضريبية كاملة يُحجز — السداد قبل الحصول عليها يفقدك ورقة التفاوض الوحيدة."
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

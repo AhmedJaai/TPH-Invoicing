@@ -112,7 +112,7 @@ export default async function AuditTrailPage({
   if (!user) redirect("/login?from=/settings/audit");
   if (!can(user.role, "audit:view")) {
     return (
-      <PageShell user={user} width="wide" title="سجل التدقيق">
+      <PageShell user={user} width="wide" title="سجلّ التدقيق">
         <NoAccess what="سجلّ التدقيق" />
       </PageShell>
     );
@@ -144,7 +144,7 @@ export default async function AuditTrailPage({
     <PageShell
       user={user}
      
-      title="سجل التدقيق"
+      title="سجلّ التدقيق"
       intro="ما فُعل، ومن فعله، ومتى — بتوقيت الرياض."
     >
       {rows.length === 0 ? (

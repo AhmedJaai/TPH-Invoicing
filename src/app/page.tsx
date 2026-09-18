@@ -117,7 +117,7 @@ export default async function HomePage() {
         <Figure
           label="المستحقّ للمورّدين"
           provenance={prov.outstanding}
-          href="/purchases/invoices?paid=OPEN"
+          href="/purchases/insights"
           tone={prov.outstanding.valueMinor > 0 ? "warn" : "ok"}
           note="للمورّدين الآن"
         />

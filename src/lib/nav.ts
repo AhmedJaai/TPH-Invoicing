@@ -27,6 +27,11 @@ export interface NavArea extends NavLink {
 /**
  * المساحات الستّ. الترتيب مقصود: يبدأ بما يُفتح كل صباح، وينتهي بما
  * يُفتح مرّة في العمر.
+ *
+ * واسم القسم هو عنوان الصفحة التي يفتحها — حرفاً بحرف. وكان «كشف
+ * الحساب» يفتح «التدفّق النقدي وقائمة الدخل»، والعبارة في البنوك
+ * السعوديّة تعني كشف البنك: فيضغطها صاحب العمل يطلب حركاته فيجد قائمة
+ * دخل. وهذا نصّ شكواه: «تودّي على أماكن غلط».
  */
 export const AREAS: readonly NavArea[] = [
   {
@@ -49,16 +54,23 @@ export const AREAS: readonly NavArea[] = [
     label: "المشتريات",
     short: "المشتريات",
     needs: "amounts:view",
-    owns: ["/suppliers", "/statements", "/analysis"],
+    owns: ["/suppliers", "/statements", "/analysis", "/performance"],
+    /*
+      «كم أدين ولمن؟» سؤال أحمد الأوّل، فهو أوّل الأقسام وباسمه لا باسم
+      الأداة التي تحسبه. وكان تحت «تحليل الذكاء»، وبجانبه «المستحقّ عليك»
+      يفتح قائمة فواتير لا يُخصم منها ما دُفع ولم يُخصَّص — فيظنّ من فتحه
+      أنّه مدين لمورّدٍ دفع له مقدَّماً. والمرشِّح `?paid=OPEN` بقي داخل
+      صفحة الفواتير، ولا يُرفع إلى التنقّل: القسم وجهةٌ لا ترشيح.
+    */
     children: [
+      { href: "/purchases/insights", label: "عليك لكلّ مورّد" },
       { href: "/purchases", label: "النظرة العامة" },
       { href: "/purchases/invoices", label: "الفواتير" },
-      { href: "/purchases/invoices?paid=OPEN", label: "المستحقّ عليك" },
-      { href: "/purchases/insights", label: "تحليل الذكاء" },
       { href: "/suppliers", label: "المورّدون", needs: "supplier:view" },
       { href: "/purchases/products", label: "الأصناف" },
-      { href: "/analysis", label: "ذكاء الشراء", needs: "reports:view" },
-      { href: "/statements", label: "مطابقة الكشوف", needs: "supplier:view" },
+      { href: "/performance", label: "الأسعار" },
+      { href: "/analysis", label: "الإنفاق على الأصناف", needs: "reports:view" },
+      { href: "/statements", label: "كشوف المورّدين", needs: "supplier:view" },
     ],
   },
   {
@@ -69,21 +81,13 @@ export const AREAS: readonly NavArea[] = [
     owns: ["/bank", "/review", "/payments", "/close"],
     children: [
       { href: "/money", label: "النظرة العامة" },
-      { href: "/payments", label: "دفعة أوّل الشهر", needs: "payment:approve" },
+      { href: "/payments", label: "دفعة الشهر", needs: "payment:approve" },
       { href: "/money/expenses", label: "المصروفات" },
       { href: "/bank", label: "البنك" },
       { href: "/review", label: "طابور المراجعة", needs: "bank:view" },
-      { href: "/money/statement", label: "كشف الحساب" },
+      { href: "/money/statement", label: "التدفّق وقائمة الدخل" },
       { href: "/close", label: "إقفال الشهر", needs: "month:close" },
     ],
-  },
-  {
-    href: "/performance",
-    label: "الأداء",
-    short: "الأداء",
-    needs: "amounts:view",
-    owns: [],
-    children: [],
   },
   {
     href: "/documents",
@@ -91,8 +95,8 @@ export const AREAS: readonly NavArea[] = [
     short: "المستندات",
     owns: ["/upload"],
     children: [
-      { href: "/documents", label: "الوارد والأرشيف" },
-      { href: "/upload", label: "رفع مستند", needs: "document:upload" },
+      { href: "/documents", label: "المستندات" },
+      { href: "/upload", label: "ارفع مستنداً", needs: "document:upload" },
     ],
   },
   {
