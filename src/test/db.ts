@@ -7,8 +7,9 @@
  * وهو جدولٌ لا يُحذَف منه شيء.
  */
 import { db } from "@/db";
-import { documents, invoices, suppliers } from "@/db/schema";
+import { documents, suppliers } from "@/db/schema";
 import { createId } from "@/lib/id";
+import { createInvoice } from "@/services/invoice.service";
 import type { Tx } from "@/services/types";
 
 class Rollback extends Error {}
@@ -60,31 +61,30 @@ export async function makeSupplier(tx: Tx): Promise<string> {
   return id;
 }
 
-/** فاتورةٌ بمستندها — والمستند إلزاميّ في المخطّط، كما في المسار الحقيقيّ. */
+/**
+ * فاتورةٌ بمستندها — بخدمتها لا بإدراجٍ باليد.
+ *
+ * والمستند إلزاميّ في المخطّط، كما في المسار الحقيقيّ. وتمرّ الفاتورة
+ * بـ`createInvoice` كي تمرّ بسياستها (حارس الشهر المقفل وغيره): تجهيزٌ
+ * يكتب بيده يختبر مخطّطاً لا مساراً.
+ */
 export async function makeInvoice(tx: Tx, supplierId: string, totalMinor: number, isoDate: string): Promise<string> {
-  const documentId = createId();
-  await tx.insert(documents).values({
-    id: documentId,
-    fileName: `dbtest-${documentId}.pdf`,
-    mimeType: "application/pdf",
-    supplierId,
-    periodMonth: isoDate.slice(0, 7),
-    kind: "TAX_INVOICE",
-    status: "ARCHIVED",
-  });
-  const id = createId();
+  const documentId = await makeDocument(tx, supplierId, isoDate);
   const subtotal = Math.round(totalMinor / 1.15);
-  await tx.insert(invoices).values({
-    id,
+  const id = await createInvoice(tx, {
     documentId,
     supplierId,
-    invoiceNumber: `DBT-${id.slice(0, 8)}`,
+    invoiceNumber: `DBT-${documentId.slice(0, 8)}`,
     invoiceDate: day(isoDate),
     periodMonth: isoDate.slice(0, 7),
     subtotalMinor: subtotal,
     vatMinor: totalMinor - subtotal,
     totalMinor,
+    taxStatus: "VALID",
+    inputVatStatus: "ELIGIBLE",
+    isFixedAsset: false,
   });
+  if (!id) throw new Error("لم تُنشَأ فاتورة التجهيز");
   return id;
 }
 
