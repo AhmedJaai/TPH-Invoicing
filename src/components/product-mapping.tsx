@@ -113,6 +113,7 @@ function LinkRow({
       ) : (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <select
+            aria-label="الصنف المعياريّ"
             value={productId}
             onChange={(e) => setProductId(e.target.value)}
             className="min-w-[9rem] rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
@@ -126,6 +127,7 @@ function LinkRow({
           {creating && (
             <>
               <input
+                aria-label="اسم صنفٍ معياريٍّ جديد"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="اسم الصنف المعياري"
@@ -133,6 +135,7 @@ function LinkRow({
                 className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
               />
               <select
+                aria-label="فئة الصنف"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as ProductCategory)}
                 className="rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"

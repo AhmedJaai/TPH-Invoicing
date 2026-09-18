@@ -139,3 +139,72 @@ describe("لا قسمةَ مال مضمَّنة في نصٍّ يُعرض", () =>
     expect(offenders).toEqual([]);
   });
 });
+
+/* ── ٥. كلّ حقلٍ وقائمة لهما اسمٌ يُقرأ ── */
+
+/**
+ * قرار الإقفال — أخطر فعلٍ شهريّ — كان يبدأ بقائمةٍ بلا اسم: يقول قارئ
+ * الشاشة «قائمة منبثقة، 2026-09» ولا يقول ما هي. وينتهي بحقلٍ تسميتُه
+ * نصُّه المؤقّت وحده، فتختفي التسمية عند أوّل حرفٍ يُكتب.
+ *
+ * والاسم يقع بأحد ثلاثة: `aria-label`، أو `aria-labelledby`، أو `label`
+ * يلفّ الحقل. والنصّ المؤقّت ليس اسماً.
+ */
+const FIELD_TAG = /<(input|select|textarea)\b/g;
+
+/** أداخلَ `<label>` يقع الحقلُ الذي يبدأ عند `at`؟ */
+export function insideLabel(source: string, at: number): boolean {
+  const before = source.slice(0, at);
+  return before.lastIndexOf("<label") > before.lastIndexOf("</label>");
+}
+
+/** وسمُ الحقل كاملاً من `<` إلى `>` — مع تخطّي ما بين الأقواس المعقوفة. */
+export function tagAt(source: string, at: number): string {
+  let depth = 0;
+  for (let i = at; i < source.length; i++) {
+    const c = source[i];
+    if (c === "{") depth++;
+    else if (c === "}") depth--;
+    else if (c === ">" && depth === 0) return source.slice(at, i + 1);
+  }
+  return source.slice(at);
+}
+
+export function unnamedFields(source: string): string[] {
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  FIELD_TAG.lastIndex = 0;
+  while ((m = FIELD_TAG.exec(source))) {
+    const tag = tagAt(source, m.index);
+    if (/\baria-label(ledby)?=/.test(tag)) continue;
+    if (/\btype="hidden"/.test(tag)) continue;
+    if (insideLabel(source, m.index)) continue;
+    /* `id` يشير إليه `htmlFor` في الملفّ نفسه — تسميةٌ ظاهرة لا مخفيّة */
+    const id = /\bid=(\{[^}]*\}|"[^"]*")/.exec(tag)?.[1];
+    if (id && source.includes(`htmlFor=${id}`)) continue;
+    out.push(tag.replace(/\s+/g, " ").slice(0, 80));
+  }
+  return out;
+}
+
+describe("لا حقلَ ولا قائمةَ بلا اسم", () => {
+  for (const file of SRC.filter((f) => f.endsWith(".tsx"))) {
+    const source = readFileSync(file, "utf8");
+    if (!FIELD_TAG.test(source)) continue;
+    it(file, () => {
+      expect(unnamedFields(source)).toEqual([]);
+    });
+  }
+
+  it("والحارس يُمسك الشكل الخاطئ", () => {
+    expect(unnamedFields('<select value={m}>')).toHaveLength(1);
+    expect(unnamedFields('<input placeholder="سبب الإقفال" />')).toHaveLength(1);
+  });
+
+  it("ولا يُمسك الصواب", () => {
+    expect(unnamedFields('<select aria-label="الشهر" value={m}>')).toEqual([]);
+    expect(unnamedFields('<label><span>الشهر</span><input value={m} /></label>')).toEqual([]);
+    expect(unnamedFields('<input type="hidden" name="x" />')).toEqual([]);
+    expect(unnamedFields('<label htmlFor="a">الاسم</label><input id="a" value={x} />')).toEqual([]);
+  });
+});

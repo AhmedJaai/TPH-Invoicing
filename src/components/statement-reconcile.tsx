@@ -152,6 +152,7 @@ export function StatementReconcile({
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <select
+            aria-label="المورّد صاحب الكشف"
             value={supplierId}
             onChange={(e) => setSupplierId(e.target.value)}
             className="min-w-[11rem] flex-1 rounded-lg border border-line bg-surface px-2.5 py-2 text-xs outline-none focus:border-ink"
@@ -170,6 +171,7 @@ export function StatementReconcile({
           </button>
           <input
             ref={inputRef}
+            aria-label="ملفّ كشف المورّد"
             type="file"
             accept=".pdf,image/*"
             className="hidden"

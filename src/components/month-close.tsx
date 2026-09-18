@@ -119,6 +119,7 @@ export function MonthClose({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2">
         <select
+          aria-label="الشهر"
           value={month}
           onChange={(e) => {
             setMonth(e.target.value);
@@ -252,13 +253,18 @@ export function MonthClose({
                     متى وجدت فاتورة متأخّرة.
                   </p>
                   {report.warnings.length > 0 && (
-                    <input
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder="سبب الإقفال مع التنبيهات — يُحفظ في سجل التدقيق"
-                      dir="auto"
-                      className="mt-3 w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs outline-none focus:border-ink"
-                    />
+                    /* النصّ المؤقّت ليس اسماً: يختفي عند أوّل حرفٍ يُكتب، فيبقى
+                       أخطرُ حقلٍ في الشهر بلا ما يقول ما هو */
+                    <label className="mt-3 block text-xs">
+                      <span className="text-muted">سبب الإقفال مع التنبيهات</span>
+                      <input
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="يُحفظ في سجلّ التدقيق"
+                        dir="auto"
+                        className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs outline-none focus:border-ink"
+                      />
+                    </label>
                   )}
                   {/*
                     كان أخطرُ فعلٍ شهريّ يقع في نافذة المتصفّح الأصليّة،

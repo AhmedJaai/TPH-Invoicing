@@ -141,6 +141,7 @@ function UnknownRow({
       ) : (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <select
+            aria-label="باب الحركة"
             value={category}
             onChange={(e) => setCategory(e.target.value as TxCategory)}
             className="min-w-[8rem] rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
@@ -152,6 +153,7 @@ function UnknownRow({
 
           {needsSupplier && (
             <select
+              aria-label="المورّد"
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
               className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
@@ -164,6 +166,7 @@ function UnknownRow({
           )}
 
           <input
+            aria-label="النصّ المميِّز في وصف الحركة"
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
             placeholder="النصّ المميِّز في وصف الحركة"

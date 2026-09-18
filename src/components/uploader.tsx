@@ -241,6 +241,7 @@ function SupplierPicker({
       </p>
 
       <select
+        aria-label="المورّد"
         value={active?.id ?? ""}
         onChange={(e) => {
           const sup = suppliers.find((x) => x.id === e.target.value)
@@ -269,6 +270,7 @@ function SupplierPicker({
       {creating ? (
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <input
+            aria-label="اسم المورّد الجديد"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") void create(); }}
@@ -731,8 +733,9 @@ export function Uploader({
 
                 {r.proposedFileName && (
                   <div className="mt-3 rounded-lg border border-line px-3 py-2">
-                    <p className="text-xs text-muted">الاسم الجديد</p>
+                    <label htmlFor={`file-name-${item.id}`} className="block text-xs text-muted">الاسم الجديد</label>
                     <input
+                      id={`file-name-${item.id}`}
                       value={item.edited.fileName}
                       onChange={(e) => editField(item.id, "fileName", e.target.value)}
                       dir="ltr"
