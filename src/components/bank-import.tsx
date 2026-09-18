@@ -410,8 +410,8 @@ export function BankImport({
                 )}
                 <p className="nums mt-1.5 text-xs text-muted">
                   {data.sync.inFile} في الملفّ · {data.sync.alreadyKnown} مسجّلة عندك
-                  {data.sync.byReference > 0 && ` (${data.sync.byReference} عُرفت بمرجع عمليّتها)`}
-                  {data.sync.ambiguous > 0 && ` · ${data.sync.ambiguous} ملتبسة`}
+                  {data.sync.byReference > 0 && ` (${countNoun(data.sync.byReference, TRANSACTION)} عُرفت بمرجع عمليّتها)`}
+                  {data.sync.ambiguous > 0 && ` · ${countNoun(data.sync.ambiguous, TRANSACTION)} ملتبسة`}
                 </p>
                 {data.sync.ambiguous > 0 && (
                   <div className="mt-2 border-t border-line pt-2">
@@ -497,7 +497,7 @@ export function BankImport({
                   ليست كلّها مورّدين: فيها رواتب وإيجار وزكاة وكهرباء وتحويلاتك الشخصية.
                   صنّف كلّ حركة مرّة واحدة — يُحفظ التصنيف قاعدةً تسري على ما يشبهها في كل
                   كشف بعده، فتُخرَج من حساب مستحقّات المورّدين.
-                  {learned > 0 && ` — صُنّف ${learned} حتى الآن.`}
+                  {learned > 0 && ` — صُنّف منها ${countNoun(learned, TRANSACTION)} حتى الآن.`}
                 </p>
 
                 <ul className="mt-2 max-h-[26rem] divide-y divide-line overflow-y-auto rounded-lg border border-line">

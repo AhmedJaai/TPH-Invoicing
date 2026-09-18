@@ -22,6 +22,7 @@ import {
 import { DoublePaidActions } from "@/components/double-paid-actions";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
+import { formatRiyalsDisplay } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -419,7 +420,7 @@ export default async function BankPage({
           minor={n("unapplied_sum")}
           tone={n("unapplied") > 0 ? "warn" : "ok"}
           sub={`${countNoun(n("unapplied"), PAYMENT_RECORD)} لم تُخصَّص على فاتورة`
-            + (n("advance") > 0 ? ` · ومقدَّمة معلَنة ${(n("advance_sum") / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "")}
+            + (n("advance") > 0 ? ` · ومقدَّمة معلَنة ${formatRiyalsDisplay(n("advance_sum"))}` : "")}
           href="/attention"
         />
         <Stat

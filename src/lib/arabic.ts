@@ -218,3 +218,35 @@ export const PAYMENT_RECORD: NounForms = {
   many: "دفعة",
   zero: "لا دفعات",
 };
+
+export const GAP: NounForms = {
+  one: "فجوة واحدة",
+  two: "فجوتان",
+  few: "فجوات",
+  many: "فجوة",
+  zero: "لا فجوات",
+};
+
+export const OPPORTUNITY: NounForms = {
+  one: "فرصة واحدة",
+  two: "فرصتان",
+  few: "فرص",
+  many: "فرصة",
+  zero: "لا فرص",
+};
+
+export const FIELD: NounForms = {
+  one: "حقلٌ واحد",
+  two: "حقلان",
+  few: "حقول",
+  many: "حقلاً",
+  zero: "لا حقول",
+};
+
+export const QUOTATION: NounForms = {
+  one: "عرض سعر واحد",
+  two: "عرضا سعر",
+  few: "عروض أسعار",
+  many: "عرض سعر",
+  zero: "لا عروض أسعار",
+};

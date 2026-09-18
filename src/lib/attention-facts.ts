@@ -76,8 +76,8 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   const overdueSuppliers = overdue.slice(0, 10).map<AttentionEvidence>((r) => ({
     label: r.nameAr,
     sub: r.creditMinor > 0 && r.owedMinor < r.overdueOpenMinor
-      ? `أقدم دين منذ ${r.oldestDays} يوماً · بعد خصم ما لك عنده ${formatRiyalsDisplay(r.creditMinor)}`
-      : `أقدم دين منذ ${r.oldestDays} يوماً`,
+      ? `أقدم دين منذ ${countNoun(r.oldestDays, DAY)} · بعد خصم ما لك عنده ${formatRiyalsDisplay(r.creditMinor)}`
+      : `أقدم دين منذ ${countNoun(r.oldestDays, DAY)}`,
     amountMinor: r.owedMinor,
   }));
 

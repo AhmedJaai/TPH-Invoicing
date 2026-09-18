@@ -1,4 +1,5 @@
 import { normalizeText } from "./canonical";
+import { TIME, countNoun } from "@/lib/arabic";
 
 /**
  * الفاتورة الواحدة سُدّدت مرّتين.
@@ -211,7 +212,7 @@ export function buildDoublePaidClaim(group: DoublePaidGroup): string {
     `السلام عليكم،`,
     ``,
     `خرج من حساب مؤسسة ذا بوبليك هاوس (الرقم الضريبي 310007971600003) مبلغ ${riyals(group.amountMinor)} ريال`
-      + ` ${group.transactions.length === 2 ? "مرّتين" : `${group.transactions.length} مرّات`} بتاريخ ${group.day} لـ«${group.payee}»:`,
+      + ` ${countNoun(group.transactions.length, TIME)} بتاريخ ${group.day} لـ«${group.payee}»:`,
     ...refs,
     ``,
     `المستحقّ مرّةٌ واحدة، فنرجو ردّ الزائد وقدره ${riyals(group.excessMinor)} ريال، أو إفادتنا إن كان السدادان لعمليّتين مختلفتين.`,

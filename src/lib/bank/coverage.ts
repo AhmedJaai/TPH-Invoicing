@@ -7,6 +7,7 @@
  *
  * ودوالّ خالصة: تأخذ فترات وتُرجع تداخلها وفجواتها.
  */
+import { DAY as DAY_NOUN, GAP, countNoun } from "@/lib/arabic";
 
 export interface Period {
   start: string;
@@ -123,8 +124,8 @@ export function describeCoverage(c: Coverage): string {
     const worst = [...c.gaps].sort((a, b) => b.days - a.days)[0];
     parts.push(
       c.gaps.length === 1
-        ? `وفيها فجوة من ${worst.start} إلى ${worst.end} (${worst.days} يوماً) لم تُستورَد`
-        : `وفيها ${c.gaps.length} فجوات، أطولها ${worst.days} يوماً من ${worst.start}`,
+        ? `وفيها فجوة من ${worst.start} إلى ${worst.end} (${countNoun(worst.days, DAY_NOUN)}) لم تُستورَد`
+        : `وفيها ${countNoun(c.gaps.length, GAP)}، أطولها ${countNoun(worst.days, DAY_NOUN)} من ${worst.start}`,
     );
   }
   if (c.overlaps.length > 0) {

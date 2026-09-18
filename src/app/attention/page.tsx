@@ -6,7 +6,7 @@ import { AttentionList } from "@/components/attention-list";
 import { IMPACT_LABEL, buildAttention, countBySeverity, impactByKind } from "@/lib/attention";
 import { Money } from "@/components/money";
 import { LinkButton, NoAccess } from "@/components/ui";
-import { ITEM, countNoun } from "@/lib/arabic";
+import { ITEM, OPPORTUNITY, countNoun } from "@/lib/arabic";
 import { gatherAttentionFacts } from "@/lib/attention-facts";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +55,7 @@ export default async function AttentionPage() {
       {items.length > 0 && (
         <p className="mb-6 text-xs leading-relaxed text-muted">
           {counts.CRITICAL} حرج · {counts.HIGH} عالٍ · {counts.MEDIUM} متوسّط
-          {counts.OPPORTUNITY > 0 && ` · ${counts.OPPORTUNITY} فرصة`}. والمبالغ أعلاه لا
+          {counts.OPPORTUNITY > 0 && ` · ${countNoun(counts.OPPORTUNITY, OPPORTUNITY)}`}. والمبالغ أعلاه لا
           تُجمع بعضها إلى بعض: ريالٌ قد يُسترد ليس كريالٍ معرَّض للرفض وليس كتقديرٍ سنويّ.
         </p>
       )}

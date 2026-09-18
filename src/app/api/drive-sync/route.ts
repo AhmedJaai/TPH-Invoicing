@@ -37,7 +37,7 @@ import { MonthClosedError } from "@/services/validation.service";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { canonicalName } from "@/lib/canonical-name";
-import { MONTH, countNoun } from "@/lib/arabic";
+import { FILE, MONTH, countNoun } from "@/lib/arabic";
 import { withDeadline } from "@/lib/ai/deadline";
 import { consume } from "@/services/rate-limit.service";
 
@@ -225,7 +225,7 @@ async function handle(request: Request) {
 
   const scanned = {
     scope: direct.length > 0
-      ? `${direct.length} ملفّاً بعينه`
+      ? countNoun(direct.length, FILE)
       : months ? `${countNoun(months.length, MONTH)}` : "الأرشيف كله",
     /** أشهرٌ لم يُمشَ عليها — يكملها الطلب التالي بلا أن يُعيد ما مضى. */
     pendingMonths,

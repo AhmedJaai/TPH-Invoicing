@@ -12,7 +12,7 @@
  */
 
 import type { BalanceStatus } from "@/lib/bank/balance-equation";
-import { DOCUMENT, INVOICE, SUPPLIER, TRANSACTION, WARNING, countNoun } from "./arabic";
+import { DAY, DOCUMENT, INVOICE, SUPPLIER, TRANSACTION, WARNING, countNoun } from "./arabic";
 
 export type CheckState = "PASS" | "WARN" | "BLOCK";
 
@@ -217,7 +217,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
       detail:
         facts.bankGapDays === 0
           ? "أيّام الشهر كلّها مغطّاة بكشف"
-          : `${facts.bankGapDays} يوماً من الشهر بلا كشف — حركاتها غائبة لا معدومة`,
+          : `${countNoun(facts.bankGapDays, DAY)} من الشهر بلا كشف — حركاتها غائبة لا معدومة`,
       action:
         facts.bankGapDays === 0 ? undefined : "استورد الكشف الذي يغطّي الأيام الناقصة",
     });

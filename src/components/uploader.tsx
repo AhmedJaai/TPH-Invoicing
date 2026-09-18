@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { NETWORK_ERROR, postJson, readResponse, request } from "@/lib/http-client";
+import { FIELD, countNoun } from "@/lib/arabic";
 
 interface Finding {
   code: string;
@@ -172,7 +173,7 @@ function DecisionBanner({ count }: { count: number }) {
     <div className="mt-3 flex items-center gap-2 rounded-xl border border-warn/40 bg-warn-bg px-3 py-2.5">
       <span className="text-warn" aria-hidden>⚠</span>
       <p className="text-xs font-bold text-warn">
-        {count === 1 ? "حقلٌ واحد يحتاج انتباهك" : count === 2 ? "حقلان يحتاجان انتباهك" : `${count} حقول تحتاج انتباهك`}
+        {count === 1 ? "حقلٌ واحد يحتاج انتباهك" : count === 2 ? "حقلان يحتاجان انتباهك" : `${countNoun(count, FIELD)} تحتاج انتباهك`}
         {" "}قبل الأرشفة.
       </p>
     </div>

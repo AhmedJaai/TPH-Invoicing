@@ -8,6 +8,7 @@ import { HubGrid, type HubTile } from "@/components/hub";
 import { NoAccess } from "@/components/ui";
 import { SUPPLIER, countNoun } from "@/lib/arabic";
 import { loadBalanceTotals } from "@/services/supplier-balance.service";
+import { formatRiyalsDisplay } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,7 @@ export default async function PurchasesPage() {
       href: "/purchases/invoices",
       title: "الفواتير",
       value: String(f?.invoices ?? 0),
-      detail: `بقيمة ${((Number(f?.billed ?? 0)) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })} ريال`,
+      detail: `بقيمة ${formatRiyalsDisplay(Number(f?.billed ?? 0))} ريال`,
     },
     {
       href: "/suppliers",

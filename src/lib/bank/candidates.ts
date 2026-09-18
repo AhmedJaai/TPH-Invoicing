@@ -15,7 +15,7 @@
 import type { Outcome } from "./taxonomy";
 import { splitBankFee } from "./fees";
 import { fitToProfile, type SupplierProfile } from "./supplier-profile";
-import { INVOICE, countNoun } from "@/lib/arabic";
+import { DAY, INVOICE, countNoun } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
 
 export interface OpenInvoice {
@@ -365,7 +365,7 @@ export function generateCandidates(
     else if (outcome === "OVERPAYMENT") evidence.push(`يزيد ${diff / 100} ريالاً عن المتبقّي`);
     if (reference === 1) evidence.push("المرجع يطابق رقم الفاتورة");
     else if (reference > 0) evidence.push("المرجع يشبه رقم الفاتورة");
-    evidence.push(`فرق التاريخ ${Math.round(daysBetween(tx.valueDate, inv.invoiceDate))} يوماً`);
+    evidence.push(`فرق التاريخ ${countNoun(Math.round(daysBetween(tx.valueDate, inv.invoiceDate)), DAY)}`);
 
     out.push({
       invoiceIds: [inv.id],

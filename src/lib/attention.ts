@@ -1,6 +1,7 @@
 import {
   BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, countNoun,
 } from "./arabic";
+import { OVERDUE_DAYS } from "./invoice-filter";
 /**
  * ما يحتاج انتباهك.
  *
@@ -388,7 +389,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "overdue",
       area: "PAYMENTS",
       severity: "HIGH",
-      title: "مورّدون تأخّرت مستحقّاتهم أكثر من ٦٠ يوماً",
+      title: `مورّدون تأخّرت مستحقّاتهم أكثر من ${countNoun(OVERDUE_DAYS, DAY)}`,
       detail: "التأخّر الطويل يفسد شروط التوريد ويضعف تفاوضك.",
       action: "أدرجها في دفعة أوّل الشهر.",
       actionLabel: "افتح المتأخّرة",

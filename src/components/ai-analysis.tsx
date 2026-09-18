@@ -11,6 +11,7 @@ import {
   type FindingKind,
   type Severity,
 } from "@/lib/ai/finding-labels";
+import { SUGGESTION, countNoun } from "@/lib/arabic";
 
 /**
  * اقتراحاتُ تحليل الذكاء — وقرارُ صاحب العمل فيها.
@@ -97,7 +98,7 @@ export function RunAnalysis({
       setProgress(suppliers.length > 1 ? `يحلّل ${k + 1} من ${suppliers.length} — ${s.name}` : "يحلّل… قد يستغرق نصف دقيقة");
       const r = await postJson("/api/ai-analysis", { supplierId: s.id });
       const text = r && r.ok
-        ? `${String(r.data.summary ?? "")}${Number(r.data.count ?? 0) > 0 ? ` — ${r.data.count} اقتراح` : ""}`
+        ? `${String(r.data.summary ?? "")}${Number(r.data.count ?? 0) > 0 ? ` — ${countNoun(Number(r.data.count ?? 0), SUGGESTION)}` : ""}`
         : errorOf(r);
       setLines((prev) => [...prev, { name: s.name, text, bad: !(r && r.ok) }]);
       if (r && r.status === 402) break; // الرصيد نفد — لا فائدة من الباقي
