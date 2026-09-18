@@ -6,7 +6,7 @@
  */
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { and, eq, gt, inArray, ne } from "drizzle-orm";
+import { and, eq, gt, inArray, ne, or } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, extractionCache, invoices, supplierAliases, suppliers } from "@/db/schema";
 import { withDeadline } from "@/lib/ai/deadline";
@@ -97,6 +97,8 @@ async function handle(request: Request) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const sha256 = createHash("sha256").update(buffer).digest("hex");
+  /* بصمةُ الدرايف — لما قيّدته المزامنةُ بالاسم بلا تنزيل فلا `sha256` له */
+  const md5 = createHash("md5").update(buffer).digest("hex");
 
   /*
     ── «أعندنا هو؟» قبل «ما فيه؟» ──
@@ -107,7 +109,10 @@ async function handle(request: Request) {
   const [duplicateFile] = await db
     .select({ id: documents.id, fileName: documents.fileName })
     .from(documents)
-    .where(and(eq(documents.sha256, sha256), ne(documents.status, "REJECTED")))
+    .where(and(
+      or(eq(documents.sha256, sha256), eq(documents.driveMd5, md5)),
+      ne(documents.status, "REJECTED"),
+    ))
     .limit(1);
   if (duplicateFile) {
     return NextResponse.json(

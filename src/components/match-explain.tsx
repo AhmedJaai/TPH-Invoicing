@@ -39,7 +39,14 @@ const DISPOSITION: Record<string, { label: string; tone: "ok" | "warn" | "danger
   REVIEW: { label: "تنتظر مراجعتك", tone: "danger" },
 };
 
-export function MatchExplain({ match }: { match: MatchExplanation }) {
+export function MatchExplain({
+  match,
+  canUndo = true,
+}: {
+  match: MatchExplanation;
+  /** الردّ بصلاحية «اعتماد السداد» — ومن لا يملكها لا يُعرَض له زرٌّ يردّه الخادم. */
+  canUndo?: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
@@ -72,9 +79,16 @@ export function MatchExplain({ match }: { match: MatchExplanation }) {
     ما قُيّد بدفعةٍ انتهى أمره — وكان قرارُ المطابقة القديم يبقى «تنتظر
     مراجعتك» بالأحمر على حركاتٍ مقيَّدة، والطابور فارغ.
   */
-  const d = match.matched && match.disposition !== "AUTO"
-    ? { label: "مقيَّدة بدفعة", tone: "ok" as const }
-    : match.disposition ? DISPOSITION[match.disposition] : null;
+  /*
+    «ليست سداداً» كان الخادم يردّها (match-undo) ولا زرّ لها — فمن أعلنها
+    خطأً يرى الحركة خارج الطابور ولا يملك إعادتها (BTN-106).
+  */
+  const notAPayment = !match.matched && match.outcome === "NOT_A_PAYMENT";
+  const d = notAPayment
+    ? { label: "أُعلنت ليست سداداً", tone: "muted" as const }
+    : match.matched && match.disposition !== "AUTO"
+      ? { label: "مقيَّدة بدفعة", tone: "ok" as const }
+      : match.disposition ? DISPOSITION[match.disposition] : null;
 
   return (
     <div className="mt-2">
@@ -133,7 +147,7 @@ export function MatchExplain({ match }: { match: MatchExplanation }) {
             ولذلك تُعرَض وصفاً لا نسبة.
           </p>
 
-          {match.matched && (
+          {canUndo && (match.matched || notAPayment) && (
             <div className="mt-2.5">
               {!confirming ? (
                 <button
@@ -141,13 +155,14 @@ export function MatchExplain({ match }: { match: MatchExplanation }) {
                   onClick={() => setConfirming(true)}
                   className={buttonClass("danger", "sm")}
                 >
-                  تراجع عن المطابقة
+                  {notAPayment ? "تراجع عن «ليست سداداً»" : "تراجع عن المطابقة"}
                 </button>
               ) : (
                 <div className="rounded-lg border border-danger/40 bg-danger-bg p-2.5">
                   <p className="text-[11px] leading-relaxed">
-                    ستُفكّ التخصيصات، وتُردّ الدفعة وتبقى في السجلّ مردودةً بسببها، وتعود
-                    الفاتورة مستحقّة. ويُكتب ذلك في سجلّ التدقيق باسمك.
+                    {notAPayment
+                      ? "يعود باب الحركة إلى ما كان قبل الإعلان، وتعود إلى طابور المراجعة تنتظر قراراً: من الجهة، وأيّ فاتورة. لا يُكتب مالٌ الآن، ويُكتب الردّ في سجلّ التدقيق باسمك."
+                      : "ستُفكّ التخصيصات، وتُردّ الدفعة وتبقى في السجلّ مردودةً بسببها، وتعود الفاتورة مستحقّة. ويُكتب ذلك في سجلّ التدقيق باسمك."}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button
@@ -156,10 +171,11 @@ export function MatchExplain({ match }: { match: MatchExplanation }) {
                       onClick={undo}
                       className={buttonClass("danger", "sm")}
                     >
-                      {undoing ? "يُفكّ…" : "أكّد التراجع"}
+                      {undoing ? "يُردّ…" : "أكّد التراجع"}
                     </button>
                     <button
                       type="button"
+                      disabled={undoing}
                       onClick={() => setConfirming(false)}
                       className={buttonClass("quiet", "sm")}
                     >

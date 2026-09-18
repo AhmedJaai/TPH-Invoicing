@@ -17,6 +17,7 @@ import {
   isExpenseCategory,
   looksLikeGoodsPurchase,
   matchRecurring,
+  unrecordedFromBank,
   type BankTx,
   type Expense,
   type RecurringExpense,
@@ -43,11 +44,11 @@ export interface DeriveResult {
  * قابل لإعادة التشغيل: الحركة المقيَّدة لا تُقيَّد ثانيةً — يحرسه فهرس
  * فريد في القاعدة، لا الشيفرة وحدها.
  */
-export async function deriveExpensesFromBank(
-  /** `null` حين يُشتقّ آلياً لا بطلب مستخدم. */
-  userId: string | null,
-  month?: string,
-): Promise<DeriveResult> {
+/**
+ * حركاتُ الكشف وما قُيّد منها — القراءةُ التي يبني عليها الاشتقاق وعدّادُ
+ * ما لم يُقيَّد معاً، فلا يعدّ العدّادُ شيئاً لا يقيّده الزرّ.
+ */
+async function loadBankForExpenses(month?: string): Promise<{ txs: BankTx[]; already: Set<string> }> {
   const rows = await db
     .select({
       id: bankTransactions.id,
@@ -80,7 +81,21 @@ export async function deriveExpensesFromBank(
     direction: r.direction as "DEBIT" | "CREDIT",
     category: r.category,
   }));
+  return { txs, already };
+}
 
+/** حركاتُ مصروفٍ في الكشف لم تُقيَّد بعد — لشهرٍ أو للكلّ. */
+export async function countUnrecordedBankExpenses(month?: string): Promise<{ count: number; amountMinor: number }> {
+  const { txs, already } = await loadBankForExpenses(month);
+  return unrecordedFromBank(deriveFromBank(txs, already));
+}
+
+export async function deriveExpensesFromBank(
+  /** `null` حين يُشتقّ آلياً لا بطلب مستخدم. */
+  userId: string | null,
+  month?: string,
+): Promise<DeriveResult> {
+  const { txs, already } = await loadBankForExpenses(month);
   const { candidates, goodsPurchases } = deriveFromBank(txs, already);
   const recurring = await activeRecurring();
 
@@ -323,16 +338,30 @@ export async function recordManualExpense(
   return id;
 }
 
-export async function deleteExpense(userId: string, id: string): Promise<void> {
-  const [row] = await db.select().from(expenses).where(eq(expenses.id, id));
-  if (!row) return;
+export type DeleteExpenseOutcome = "DELETED" | "NOT_FOUND" | "BANK_DERIVED";
 
-  await db.delete(expenses).where(eq(expenses.id, id));
-  await recordAudit({
-    actorId: userId,
-    action: "EXPENSE_REMOVED",
-    entityType: "expense",
-    entityId: id,
-    before: row,
+/**
+ * حذف قيد مصروف — في معاملةٍ مع أثره في سجلّ التدقيق (BTN-111).
+ *
+ * كان الحذف ثمّ التدقيق كتابتين منفصلتين، فيُحذف القيد ويسقط أثره إن
+ * فشلت الثانية. والمشتقّ من حركة بنك يُردّ: الاشتقاق يعيده، فحذفُه
+ * يُوهم بإصلاحٍ لا يبقى — يُصحَّح تصنيف حركته بدلاً منه.
+ */
+export async function deleteExpense(userId: string, id: string): Promise<DeleteExpenseOutcome> {
+  return db.transaction(async (t) => {
+    const [row] = await t.select().from(expenses).where(eq(expenses.id, id)).for("update");
+    if (!row) return "NOT_FOUND";
+    if (row.source === "BANK") return "BANK_DERIVED";
+
+    await t.delete(expenses).where(eq(expenses.id, id));
+    await recordAudit({
+      actorId: userId,
+      action: "EXPENSE_REMOVED",
+      entityType: "expense",
+      entityId: id,
+      before: row,
+      after: { الفعل: "حُذف القيد", المصدر: row.source },
+    }, t);
+    return "DELETED";
   });
 }

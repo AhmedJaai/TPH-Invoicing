@@ -158,6 +158,11 @@ export const documents = pgTable("documents", {
   sizeBytes: integer("size_bytes"),
   /** بصمة المحتوى — تكشف رفع نفس الملف مرتين ولو اختلف اسمه */
   sha256: text("sha256"),
+  /**
+   * بصمةُ الدرايف (`md5Checksum`) — تُقرأ من القائمة بلا تنزيل. بها يُعرَف
+   * الملفّ المرفوع من الجهاز وقد قيّدته المزامنةُ بالاسم ولا `sha256` له.
+   */
+  driveMd5: text("drive_md5"),
 
   kind: documentKindEnum("kind").notNull().default("UNKNOWN"),
   status: documentStatusEnum("status").notNull().default("PENDING"),
@@ -1300,4 +1305,21 @@ export const extractionCache = pgTable("extraction_cache", {
   textSource: text("text_source"),
   userId: text("user_id").references(() => users.id),
   createdAt: now(),
+});
+
+/* ──────────────────── قرارُ الإنسان في تنبيه ──────────────────── */
+
+/**
+ * تنبيهٌ حُسم — «طالبتُ الجهة» · «استُردّ» · «ليس ازدواجاً».
+ *
+ * كان «سُدّد مرّتين» حرجاً دائماً لا فعلَ له، فيتعلّم صاحب العمل تجاهل
+ * الحرج. والمفتاح يُشتقّ من الحركات نفسها (`doublePaidKey`) لا يُولَّد:
+ * فإن تغيّرت المجموعة تغيّر المفتاح وعاد السؤال. انظر `034`.
+ */
+export const alertResolutions = pgTable("alert_resolutions", {
+  key: text("key").primaryKey(),
+  decision: text("decision").notNull(),
+  note: text("note"),
+  userId: text("user_id").references(() => users.id),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
 });

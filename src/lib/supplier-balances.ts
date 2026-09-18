@@ -49,6 +49,19 @@ export function supplierBalance(input: SupplierBalanceInput): SupplierBalance {
   };
 }
 
+/**
+ * المتأخّرُ عليك بالمورّد لا بالفاتورة.
+ *
+ * كان بند «ديون أقدم من ٦٠ يوماً» يجمع ما بقي على الفواتير القديمة
+ * وحدها، فمالٌ دفعناه للمورّد ولم يُخصم من فاتورةٍ بعينها لا يُنقصه —
+ * وهو خطأ «عليك ١٨ ألفاً» نفسه في بندٍ آخر. وسياسةُ السداد الأقدمُ أوّلاً،
+ * فرصيدُنا عنده يُخصم من أقدم فواتيره قبل حديثها: من المتأخّر أوّلاً.
+ * ولذا لا يزيد المتأخّر أبداً على «عليك له».
+ */
+export function overdueOwedMinor(overdueOpenMinor: number, creditMinor: number): number {
+  return Math.max(0, Math.max(0, overdueOpenMinor) - Math.max(0, creditMinor));
+}
+
 export interface BalanceTotals {
   owedMinor: number;
   /** عدد المورّدين الذين علينا لهم. */

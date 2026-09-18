@@ -127,7 +127,7 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
                   {busy === s.id ? "يحفظ…" : "صنّفها سداد مورّد"}
                 </button>
                 {s.bankTransactionId && (
-                  <a href={`/bank#tx-${s.bankTransactionId}`} className="text-[11px] underline">
+                  <a href={`/bank?tx=${s.bankTransactionId}`} className="inline-flex min-h-11 items-center text-[11px] underline sm:min-h-0">
                     أو افتحها في البنك ←
                   </a>
                 )}

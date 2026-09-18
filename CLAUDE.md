@@ -34,7 +34,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 
 **النشر:** Vercel `tph4/tph-invoicing` · GitHub `AhmedJaai/TPH-Invoicing` · الفرع `main`.
 
-## القاعدة — ٤١ جدولاً
+## القاعدة — ٤٢ جدولاً
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` · `payments` `payment_allocations`
@@ -43,7 +43,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 `audit_logs` `rate_limits` `expenses`
 `counterparties` `counterparty_evidence` · `branches` `bank_accounts` `reconciliation_periods`
 `sale_payments` `refunds` `refund_lines` `settlement_batches`
-`adjudications` `decision_history` · `ai_findings` · `extraction_cache`
+`adjudications` `decision_history` · `ai_findings` · `extraction_cache` · `alert_resolutions`
 
 التعريف في `src/db/schema.ts`.
 
@@ -86,6 +86,9 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | `029_ops_indexes.sql` | فهارس ناقصة: `payment_allocations.invoice_id` و`matched_payment_id` و`bank_import_id` و`user_id` |
 | `030_extraction_cache.sql` | `extraction_cache` — ما قرأه النموذج بيد الخادم ببصمة الملفّ، لا من المتصفّح |
 | `031_extraction_text_source.sql` | مصدرُ القراءة (نصّ · صورة مضمَّنة · صورة) يُحفَظ مع ما قُرئ ويُنقل إلى `documents.text_source` |
+| `032_payment_month_stable.sql` | `payment_month` تُوسَم `STABLE` لا `IMMUTABLE` — `to_char(timestamptz)` يتبع منطقة الجلسة |
+| `033_document_drive_md5.sql` | `documents.drive_md5` — بصمةُ الدرايف لما قيّدته المزامنةُ بالاسم، يقابلها `/api/analyze` قبل القراءة |
+| `034_alert_resolutions.sql` | قرارُ الإنسان في تنبيه «سُدّد مرّتين»: طالبتُ · استُردّ · ليس ازدواجاً — بمفتاحٍ يُشتقّ من الحركات |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

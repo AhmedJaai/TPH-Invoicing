@@ -16,6 +16,7 @@
     "db:remove-dupe": "tsx --env-file=.env scripts/remove-duplicate-transaction.ts",
     "db:missing-invoices": "tsx --env-file=.env scripts/missing-invoices.ts",
     "db:backfill-invoices": "tsx --env-file=.env scripts/backfill-missing-invoices.ts",
+    "db:backfill-md5": "tsx --env-file=.env scripts/backfill-drive-md5.ts",
     "bench:extraction": "tsx --env-file=.env scripts/benchmark-providers.ts",
     "drive:auth": "tsx --env-file=.env scripts/drive-auth.ts",
     "drive:inventory": "tsx --env-file=.env scripts/drive-inventory.ts",

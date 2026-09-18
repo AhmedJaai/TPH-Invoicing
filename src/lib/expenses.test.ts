@@ -4,6 +4,7 @@ import {
   deriveFromBank,
   expectedVsActual,
   expenseEventKey,
+  deletableExpense,
   findDuplicateExpenses,
   isExpenseCategory,
   suspectedSupplierExpenses,
@@ -14,6 +15,7 @@ import {
   totalActual,
   totalExpected,
   unmetRecurring,
+  unrecordedFromBank,
   type BankTx,
   type Expense,
   type RecurringExpense,
@@ -468,5 +470,41 @@ describe("ازدواج المصروف عن حدثٍ واحد", () => {
     ]);
     expect(dups[0].count).toBe(3);
     expect(dups[0].amountMinor).toBe(2_400_00);
+  });
+});
+
+describe("unrecordedFromBank — الفعليّ الناقص يُعلَن", () => {
+  it("يعدّ ما سيقيّده الاشتقاق وحده: لا الوارد ولا المورّد ولا البضاعة ولا المقيَّد", () => {
+    const txs = [
+      tx({ id: "fee", category: "POS_FEE", amountMinor: 10_000 }),
+      tx({ id: "vat", category: "POS_VAT", amountMinor: 1_500 }),
+      tx({ id: "in", direction: "CREDIT", category: "POS_SETTLEMENT", amountMinor: 99_000 }),
+      tx({ id: "sup", category: "SUPPLIER", amountMinor: 50_000 }),
+      tx({ id: "goods", category: "SALARY", description: "شراء بضاعة", amountMinor: 567_800 }),
+      tx({ id: "done", category: "BANK_FEE", amountMinor: 173 }),
+    ];
+    expect(unrecordedFromBank(deriveFromBank(txs, new Set(["done"])))).toEqual({ count: 2, amountMinor: 11_500 });
+  });
+
+  it("ولا شيء ناقص ← صفرٌ حقيقيّ", () => {
+    expect(unrecordedFromBank(deriveFromBank([tx({ id: "a" })], new Set(["a"])))).toEqual({ count: 0, amountMinor: 0 });
+  });
+});
+
+describe("الزائد يُحذف بعينه (BTN-111)", () => {
+  const e = (id: string, source: "BANK" | "INVOICE" | "MANUAL", tx: string | null = null) => ({
+    id, periodMonth: "2026-08", occurredOn: "2026-08-10", category: "UTILITY" as const,
+    label: "كهرباء", amountMinor: 450_00, source, bankTransactionId: tx,
+  });
+
+  it("المجموعة تحمل قيودها كي يُعرَض كلٌّ بمصدره", () => {
+    const [d] = findDuplicateExpenses([e("b", "BANK", "tx1"), e("m", "MANUAL")]);
+    expect(d.members.map((m) => m.id).sort()).toEqual(["b", "m"]);
+  });
+
+  it("المشتقّ من البنك لا يُحذف — الاشتقاق يعيده", () => {
+    expect(deletableExpense({ source: "BANK" })).toBe(false);
+    expect(deletableExpense({ source: "MANUAL" })).toBe(true);
+    expect(deletableExpense({ source: "INVOICE" })).toBe(true);
   });
 });

@@ -143,6 +143,22 @@ export function deriveFromBank(
   return { candidates: out, goodsPurchases };
 }
 
+/**
+ * ما في الكشف من مصروفٍ لم يُقيَّد بعد — عدداً ومبلغاً.
+ *
+ * الاشتقاقُ بزرٍّ لا عند الاستيراد، فالشهرُ في جدول المصروف قد يكون
+ * ناقصاً والشاشةُ تعرض «الفعليّ» كأنّه كامل: سبتمبر ٢٨٫٢٠ وضريبةُ رسوم
+ * الشبكة غائبة. والنقصُ الذي لا يُعلَن صفرٌ كاذب. فيُحسَب بالقاعدة نفسها
+ * التي يقيّد بها الاشتقاق — ما يستثنيه (الوارد، وغيرُ المصروف، وشراءُ
+ * البضاعة) لا يُعدّ ناقصاً.
+ */
+export function unrecordedFromBank(derived: DerivedExpenses): { count: number; amountMinor: number } {
+  return {
+    count: derived.candidates.length,
+    amountMinor: derived.candidates.reduce((s, c) => s + c.amountMinor, 0),
+  };
+}
+
 /** حصّة الشهر من مصروف متكرّر. */
 export function monthlyShare(e: Pick<RecurringExpense, "amountMinor" | "cadence">): number {
   if (e.cadence === "MONTHLY") return e.amountMinor;
@@ -372,6 +388,19 @@ export interface DuplicateExpense {
   sources: ExpenseSource[];
   label: string;
   occurredOn: string;
+  /** القيود نفسها — كي يُعرَض كلٌّ بمصدره ويُحذف الزائد بعينه. */
+  members: Expense[];
+}
+
+/**
+ * أيُّ قيود المجموعة يُحذف من الشاشة.
+ *
+ * المشتقّ من حركة بنك لا يُحذف: الاشتقاق يعيده في أوّل تشغيل، فيعود
+ * الازدواج كأنّ شيئاً لم يُفعل — والمصروف البنكيّ يتبع تصنيف حركته، فإن
+ * كان خطأً صُحّح التصنيف. فالزائد هو الآخر: المستند أو القيد اليدويّ.
+ */
+export function deletableExpense(e: Pick<Expense, "source">): boolean {
+  return e.source !== "BANK";
 }
 
 /**
@@ -409,6 +438,7 @@ export function findDuplicateExpenses(rows: readonly Expense[]): DuplicateExpens
       sources: [...new Set(list.map((e) => e.source))],
       label: list[0].label,
       occurredOn: list[0].occurredOn,
+      members: list,
     }))
     .sort((a, b) => b.amountMinor - a.amountMinor);
 }

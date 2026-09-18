@@ -354,3 +354,53 @@ describe("مالٌ خرج ولا فاتورة تفسّره", () => {
       .toBeUndefined();
   });
 });
+
+describe("كلّ عددٍ في العنوان يمرّ بتمييزه (CODE-107)", () => {
+  /*
+    كان «1 مصروفاً يصف حدثاً» و«13 دفعة خرجت» يُكتبان بالرقم خامّاً —
+    والواحد والاثنان صيغتان لا رقمان: «دفعة واحدة» و«دفعتان».
+  */
+  const facts = (n: number): Partial<AttentionFacts> => ({
+    bankGapDays: n, duplicateExpenses: n, duplicateExpenseAmountMinor: 100,
+    unbackedPaymentCount: n, unbackedPaymentMinor: 100, openBlockers: n,
+  });
+
+  it("الواحد والاثنان بلا رقم", () => {
+    for (const n of [1, 2]) {
+      for (const i of buildAttention({ ...quiet, ...facts(n) })) {
+        expect(i.title, i.id).not.toMatch(new RegExp(`(^|\\s)${n}\\s`));
+      }
+    }
+  });
+
+  it("وما فوق العشرة مفردٌ منصوب", () => {
+    const titles = buildAttention({ ...quiet, ...facts(13) }).map((i) => i.title);
+    expect(titles).toContain("13 يوماً بلا كشف بنكيّ");
+    expect(titles).toContain("13 دفعة بلا فاتورة تفسّرها");
+    expect(titles).toContain("13 مانعاً لم يُعالَج");
+  });
+});
+
+describe("التنبيه يُغلَق بقرار (SCN-104)", () => {
+  it("المُطالَب به بندٌ متوسّط لا حرج", () => {
+    const items = buildAttention({
+      ...quiet, duplicatePaymentsClaimed: 1, duplicatePaymentClaimedMinor: 2_350_77,
+    });
+    expect(items.map((i) => i.id)).toEqual(["duplicate-payments-claimed"]);
+    expect(items[0].severity).toBe("MEDIUM");
+    expect(items[0].href).toContain("#double-paid");
+  });
+
+  it("المجموعة المحسومة لا تُعدّ — لا بند حرج ولا متوسّط", () => {
+    expect(ids({ duplicatePayments: 0, duplicatePaymentsClaimed: 0 })).toEqual([]);
+  });
+
+  it("مورّدٌ بلا فواتير يُعرَض في «عقد التوريد» بمالِه", () => {
+    const item = buildAttention({
+      ...quiet,
+      suppliersWithoutContract: ["مريم"],
+      suppliersWithoutContractEvidence: [{ label: "مريم", amountMinor: 2_560_00 }],
+    }).find((i) => i.id === "no-contract");
+    expect(item?.evidence[0].amountMinor).toBe(2_560_00);
+  });
+});

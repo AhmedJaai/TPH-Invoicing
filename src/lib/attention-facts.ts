@@ -11,8 +11,11 @@ import { currentMonthRiyadh } from "./riyadh-time";
 import { analyzeCoverage } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
 import { findDuplicateExpenses, type Expense } from "./expenses";
-import { findDoublePaid, recoverableMinor, type DoublePaidTx } from "./bank/double-paid";
+import { findDoublePaid, partitionDoublePaid, recoverableMinor, type DoublePaidGroup, type DoublePaidTx } from "./bank/double-paid";
 import { detectAnomalies } from "./bank/lifecycle";
+import { loadOverdueBalances } from "@/services/supplier-balance.service";
+import { DAY, TIME, countNoun } from "./arabic";
+import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
 
 interface Row {
   [key: string]: unknown;
@@ -34,15 +37,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         (select coalesce(sum(amount_minor),0)::bigint from bank_transactions
            where category='UNKNOWN')                                                       as unclassified_amount,
         (select count(*)::int from invoices i
-           where not exists (select 1 from invoice_lines l where l.invoice_id=i.id))       as no_lines,
-        (select coalesce(sum(greatest(0, i.total_minor - coalesce((
-             select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id=i.id
-           ),0))),0)::bigint
-         from invoices i
-         where i.invoice_date < now() - interval '60 days'
-           and i.total_minor > coalesce((
-             select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id=i.id
-           ),0) + 1)                                                                       as overdue
+           where not exists (select 1 from invoice_lines l where l.invoice_id=i.id))       as no_lines
     `)
   ).rows;
 
@@ -71,58 +66,39 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     amountMinor: Number(r.total_minor),
   }));
 
-  const overdueSuppliers = (
-    await db.execute<Row>(sql`
-      select s.name_ar,
-             sum(greatest(0, i.total_minor - coalesce((
-               select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id=i.id
-             ),0)))::bigint as owed,
-             max(extract(day from now() - i.invoice_date))::int as oldest
-      from invoices i left join suppliers s on s.id = i.supplier_id
-      where i.invoice_date < now() - interval '60 days'
-        and i.total_minor > coalesce((
-          select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id=i.id
-        ),0) + 1
-      group by s.name_ar order by owed desc limit 10
-    `)
-  ).rows.map<AttentionEvidence>((r) => ({
-    label: String(r.name_ar ?? "—"),
-    sub: `أقدم دين منذ ${r.oldest} يوماً`,
-    amountMinor: Number(r.owed),
+  /*
+    المتأخّر بالمورّد لا بالفاتورة — والمصدر الذي يقول «عليك» في كلّ شاشة.
+    كان يُجمع ما بقي على الفواتير القديمة بلا خصم رصيدنا عند المورّد ولا
+    عتبة الهللة، فيقول «مستحقّ عليك» عن مالٍ دفعناه.
+  */
+  const overdue = await loadOverdueBalances(db, 60);
+  const overdueMinor = overdue.reduce((s, r) => s + r.owedMinor, 0);
+  const overdueSuppliers = overdue.slice(0, 10).map<AttentionEvidence>((r) => ({
+    label: r.nameAr,
+    sub: r.creditMinor > 0 && r.owedMinor < r.overdueOpenMinor
+      ? `أقدم دين منذ ${r.oldestDays} يوماً · بعد خصم ما لك عنده ${formatRiyalsDisplay(r.creditMinor)}`
+      : `أقدم دين منذ ${r.oldestDays} يوماً`,
+    amountMinor: r.owedMinor,
   }));
 
-  // مورّدون لهم فواتير ولم يصل كشفهم عن الشهر المنقضي — العدد كاملاً، والقائمة دليل
-  const [missingCountRow] = (
+  // مورّدون لهم فواتير ولم يصل كشفهم عن الشهر المنقضي — المصدر نفسه الذي تقرؤه /statements?missing=1
+  const missingStatementRows = await loadMissingStatementSuppliers(lastMonth);
+  const missingStatements = missingStatementRows.slice(0, 8).map((r) => r.nameAr);
+
+  const noContractRows = (
     await db.execute<Row>(sql`
-      select count(distinct i.supplier_id)::int as n
-      from invoices i
-      where i.supplier_id is not null and not exists (
-        select 1 from statements st
-        where st.supplier_id = i.supplier_id
-          and to_char(st.period_end, 'YYYY-MM') = ${lastMonth}
-      )
+      select s.name_ar,
+             (select coalesce(sum(greatest(0, p.amount_minor - p.fee_minor
+                - coalesce((select sum(a.amount_minor)::int from payment_allocations a
+                             where a.payment_id = p.id), 0))), 0)::bigint
+                from payments p
+               where p.supplier_id = s.id and p.status not in ('REVERSED','VOID')) as unbacked
+      from suppliers s
+      where s.is_active and not s.issues_invoices and not s.contract_on_file
+      order by unbacked desc
     `)
   ).rows;
-
-  const missingStatements = (
-    await db.execute<Row>(sql`
-      select distinct s.name_ar
-      from invoices i join suppliers s on s.id = i.supplier_id
-      where not exists (
-        select 1 from statements st
-        where st.supplier_id = i.supplier_id
-          and to_char(st.period_end, 'YYYY-MM') = ${lastMonth}
-      )
-      limit 8
-    `)
-  ).rows.map((r) => String(r.name_ar));
-
-  const noContract = (
-    await db.execute<Row>(sql`
-      select name_ar from suppliers
-      where is_active and not issues_invoices and not contract_on_file
-    `)
-  ).rows.map((r) => String(r.name_ar));
+  const noContract = noContractRows.map((r) => String(r.name_ar));
 
   /*
    * ارتفاعات الأسعار: تُقارَن آخر قراءتين مختلفتين للصنف عند مورّده.
@@ -184,7 +160,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
   const bankGapRanges = gaps.slice(0, 8).map<AttentionEvidence>((g) => ({
     label: `${g.start} ← ${g.end}`,
-    sub: `${g.days} يوماً بلا كشف`,
+    sub: `${countNoun(g.days, DAY)} بلا كشف`,
   }));
 
   /*
@@ -237,29 +213,12 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
   /*
     دفعاتٌ لا فاتورةَ تفسّرها — السؤال الأسبوعيّ الذي كان يُراجَع بيد.
-
-    والمقدَّمةُ المعلَنة تخرج: صاحبُها قال ما هي فليست سؤالاً. والمردودةُ
-    والملغاةُ لم يخرج مالُها أصلاً.
+    والاستعلام في `supplier-followups.service` يقرؤه التنبيه والصفحة التي
+    يفتحها (/suppliers?unbacked=1)، فلا يفترق العدّان (BTN-110).
   */
-  const unbacked = (
-    await db.execute<{
-      name_ar: string | null; d: string; amount_minor: number; unbacked: number;
-    }>(sql`
-      select s.name_ar, p.paid_at::date::text as d, p.amount_minor,
-             p.amount_minor - p.fee_minor
-               - coalesce((select sum(a.amount_minor)::int from payment_allocations a
-                            where a.payment_id = p.id), 0) as unbacked
-        from payments p
-        left join suppliers s on s.id = p.supplier_id
-       where p.status not in ('REVERSED','VOID','ADVANCE')
-         and p.amount_minor - p.fee_minor
-             - coalesce((select sum(a.amount_minor)::int from payment_allocations a
-                          where a.payment_id = p.id), 0) > 100
-       order by unbacked desc
-    `)
-  ).rows;
+  const unbacked = await loadUnbackedPayments();
 
-  const doublePaid = findDoublePaid(outgoing.map((r): DoublePaidTx => ({
+  const doublePaidAll = findDoublePaid(outgoing.map((r): DoublePaidTx => ({
     id: r.id,
     valueDate: new Date(r.value_date),
     amountMinor: Number(r.amount_minor),
@@ -269,6 +228,22 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     category: r.category,
     operationRef: r.operation_ref,
   })));
+
+  /*
+    قرارُ الإنسان يُقرأ قبل العدّ (SCN-104). كان البند حرجاً دائماً لا
+    يُغلَق: «استُردّ» و«ليس ازدواجاً» يُخرجانه، و«طالبتُ» يُبقيه بندٌ
+    أهدأ — فالمال لم يعد بعد، ونسيانُه بعد المطالبة ضياعٌ ثانٍ.
+  */
+  const resolutions = (
+    await db.execute<{ key: string; decision: string }>(sql`
+      select key, decision from alert_resolutions where key like 'double:%'
+    `)
+  ).rows;
+  const doublePaidSplit = partitionDoublePaid(
+    doublePaidAll,
+    new Map(resolutions.map((r) => [r.key, r.decision])),
+  );
+  const doublePaid = doublePaidSplit.open;
 
   /*
     ازدواج المصروف — يُكشَف ولا يُحذَف.
@@ -351,34 +326,46 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     */
     duplicatePayments: doublePaid.length,
     duplicatePaymentAmountMinor: recoverableMinor(doublePaid),
-    duplicatePaymentEvidence: doublePaid.slice(0, 6).map((g) => ({
-      label: g.payee,
-      sub: `${g.day} · ${g.transactions.length} مرّات`
-        + (g.distinctOperations ? " · بمراجعِ سدادٍ مختلفة" : " · بلا مرجعٍ يفصلهما"),
-      amountMinor: g.excessMinor,
-    })),
+    duplicatePaymentEvidence: doublePaid.slice(0, 6).map(doublePaidEvidence),
+    duplicatePaymentsClaimed: doublePaidSplit.claimed.length,
+    duplicatePaymentClaimedMinor: recoverableMinor(doublePaidSplit.claimed),
+    duplicatePaymentClaimedEvidence: doublePaidSplit.claimed.slice(0, 6).map(doublePaidEvidence),
     notTaxValidCount: Number(counts?.not_valid ?? 0),
     vatAtRiskMinor: Number(counts?.vat_at_risk ?? 0),
     vatAtRiskEvidence: vatEvidence,
     unknownTaxCount: Number(counts?.unknown_tax ?? 0),
     unknownTaxEvidence: unknownEvidence,
-    overdueMinor: Number(counts?.overdue ?? 0),
+    overdueMinor,
     overdueSuppliers,
     unclassifiedBankTx: Number(counts?.unclassified ?? 0),
     unclassifiedBankAmountMinor: Number(counts?.unclassified_amount ?? 0),
     suppliersMissingStatement: missingStatements,
-    suppliersMissingStatementCount: Number(missingCountRow?.n ?? missingStatements.length),
+    suppliersMissingStatementCount: missingStatementRows.length,
     suppliersWithoutContract: noContract,
+    suppliersWithoutContractEvidence: noContractRows.map((r) => ({
+      label: String(r.name_ar),
+      sub: Number(r.unbacked) > 0 ? "دفعتَ له بلا فاتورة — والعقد هو مستندُه" : "لا دفعات بلا مستند",
+      amountMinor: Number(r.unbacked) > 0 ? Number(r.unbacked) : undefined,
+    })),
     invoicesWithoutLines: Number(counts?.no_lines ?? 0),
     unbackedPaymentCount: unbacked.length,
-    unbackedPaymentMinor: unbacked.reduce((n, r) => n + Number(r.unbacked), 0),
+    unbackedPaymentMinor: unbacked.reduce((n, r) => n + r.unbackedMinor, 0),
     unbackedPaymentEvidence: unbacked.slice(0, 6).map((r) => ({
-      label: r.name_ar ?? "بلا مورّد",
-      sub: `${String(r.d).slice(0, 10)} · من أصل ${formatRiyalsDisplay(Number(r.amount_minor))}`,
-      amountMinor: Number(r.unbacked),
+      label: r.supplierName ?? "بلا مورّد",
+      sub: `${r.paidOn} · من أصل ${formatRiyalsDisplay(r.amountMinor)}`,
+      amountMinor: r.unbackedMinor,
     })),
     priceRises,
     // الأثر السنوي يحتاج دورة الطلب؛ يُقدَّر هنا بفارق السعر × عشرين طلباً
     priceRiseAnnualMinor: priceRises.reduce((s, r) => s + (r.amountMinor ?? 0) * 20, 0),
+  };
+}
+
+function doublePaidEvidence(g: DoublePaidGroup): AttentionEvidence {
+  return {
+    label: g.payee,
+    sub: `${g.day} · ${countNoun(g.transactions.length, TIME)}`
+      + (g.distinctOperations ? " · بمراجعِ سدادٍ مختلفة" : " · بلا مرجعٍ يفصلهما"),
+    amountMinor: g.excessMinor,
   };
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { expenses, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
@@ -9,19 +9,23 @@ import { Empty, PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { DeriveExpenses } from "@/components/derive-expenses";
 import { ManualExpense } from "@/components/manual-expense";
-import { activeRecurring } from "@/services/expense.service";
+import { activeRecurring, countUnrecordedBankExpenses } from "@/services/expense.service";
+import { formatRiyalsDisplay } from "@/lib/money";
 import {
+  deletableExpense,
   expectedVsActual,
+  findDuplicateExpenses,
   totalActual,
   suspectedSupplierExpenses,
   totalExpected,
   unmetRecurring,
   type Expense,
 } from "@/lib/expenses";
-import { countNoun, ITEM } from "@/lib/arabic";
+import { countNoun, ITEM, TRANSACTION } from "@/lib/arabic";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
 import { NoAccess, DataTable } from "@/components/ui";
 import { ExpenseReclassify } from "@/components/expense-reclassify";
+import { ExpenseDelete } from "@/components/expense-delete";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +63,7 @@ export default async function ExpensesPage({
   const month = p.month && months.includes(p.month) ? p.month : months[0];
 
   if (!month) {
+    const pendingAll = await countUnrecordedBankExpenses();
     return (
       <PageShell
         user={user}
@@ -66,6 +71,7 @@ export default async function ExpensesPage({
         title="المصروفات"
         intro="ما صُرف فعلاً، مقابل ما كان متوقَّعاً."
       >
+        <UnrecordedNotice pending={pendingAll} />
         <DeriveExpenses />
         {can(user.role, "expense:edit") && <div className="mt-3"><ManualExpense /></div>}
         <div className="mt-4">
@@ -75,11 +81,29 @@ export default async function ExpensesPage({
     );
   }
 
-  const [rows, recurring, supplierRows] = await Promise.all([
+  const [rows, recurring, supplierRows, pending] = await Promise.all([
     db.select().from(expenses).where(eq(expenses.periodMonth, month)).orderBy(desc(expenses.occurredOn)),
     activeRecurring(),
     db.select({ id: suppliers.id, nameAr: suppliers.nameAr }).from(suppliers),
+    /* الفعليّ لا يُعرَض كاملاً وفي الكشف مصروفٌ لم يُقيَّد — النقصُ يُعلَن */
+    countUnrecordedBankExpenses(month),
   ]);
+
+  /*
+    «مصروفٌ وصل مرّتين» — الأزواج التي يعدّها التنبيه، بالنافذة نفسها
+    (مئةٌ وعشرون يوماً) لا بالشهر المعروض: كان التنبيه يقول «احذف الزائد
+    بيدك» والصفحة لا تعرض زوجاً ولا زرّاً (BTN-111).
+  */
+  const duplicates = findDuplicateExpenses(
+    (await db.select().from(expenses)
+      .where(sql`${expenses.occurredOn} >= to_char(now() - interval '120 days', 'YYYY-MM-DD')`))
+      .map((r) => ({
+        id: r.id, periodMonth: r.periodMonth, occurredOn: r.occurredOn, category: r.category,
+        label: r.label, amountMinor: r.amountMinor, source: r.source,
+        bankTransactionId: r.bankTransactionId, recurringExpenseId: r.recurringExpenseId,
+      })),
+  );
+  const canEditExpenses = can(user.role, "expense:edit");
 
   const actual: Expense[] = rows.map((r) => ({
     id: r.id,
@@ -124,7 +148,16 @@ export default async function ExpensesPage({
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <Box label="المتوقَّع شهرياً" minor={expectedTotal}
              note={recurring.length === 0 ? "لم تُسجَّل مصروفات متكرّرة بعد" : countNoun(recurring.length, ITEM)} />
-        <Box label={`الفعليّ في ${month}`} minor={actualTotal} note={countNoun(actual.length, ITEM)} />
+        <Box
+          label={`الفعليّ في ${month}`}
+          minor={actualTotal}
+          tone={pending.count > 0 ? "warn" : undefined}
+          note={
+            pending.count > 0
+              ? `${countNoun(actual.length, ITEM)} · وناقصٌ منه ما لم يُقيَّد من الكشف`
+              : countNoun(actual.length, ITEM)
+          }
+        />
         <Box
           label="الفرق"
           minor={expectedTotal === 0 ? null : actualTotal - expectedTotal}
@@ -138,6 +171,48 @@ export default async function ExpensesPage({
           }
         />
       </div>
+
+      <UnrecordedNotice pending={pending} month={month} />
+      {duplicates.length > 0 && (
+        <section id="duplicates" className="mt-6 scroll-mt-28 rounded-xl border border-danger/40 bg-danger-bg p-4">
+          <h2 className="text-sm font-bold text-danger">مصروفٌ وصل مرّتين ({countNoun(duplicates.length, ITEM)})</h2>
+          <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+            الحدث نفسه قُيّد من مصدرين، فعلا مصروف الشهر بقدر الزائد. أبقِ واحداً واحذف الآخر —
+            وما اشتُقّ من كشف البنك يبقى، لأنّ الاشتقاق يعيده.
+          </p>
+          <ul className="mt-3 space-y-2.5">
+            {duplicates.map((d) => (
+              <li key={d.key} className="rounded-lg border border-line/60 bg-surface/60 px-3 py-2.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 truncate text-xs font-bold">{d.label}</span>
+                  <span className="shrink-0 text-[11px] text-muted">الزائد <Money minor={d.amountMinor} /></span>
+                </div>
+                <ul className="mt-2 divide-y divide-line/60">
+                  {d.members.map((e) => (
+                    <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                      <span className="min-w-0 text-[11px] text-muted">
+                        <bdi className="nums">{e.occurredOn}</bdi> · {SOURCE_LABEL[e.source]} ·{" "}
+                        <Money minor={e.amountMinor} />
+                        {e.bankTransactionId && (
+                          <>
+                            {" · "}
+                            <Link href={`/bank?tx=${e.bankTransactionId}`} className="inline-flex min-h-11 items-center underline underline-offset-4 sm:min-h-0">
+                              حركته
+                            </Link>
+                          </>
+                        )}
+                      </span>
+                      {canEditExpenses && deletableExpense(e)
+                        ? <ExpenseDelete id={e.id} label={e.label} />
+                        : <span className="text-[11px] text-muted">{e.source === "BANK" ? "يبقى — من كشف البنك" : ""}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {unmet.length > 0 && (
         <section className="mt-6 rounded-xl border border-warn/40 bg-warn-bg p-4">
@@ -238,13 +313,37 @@ export default async function ExpensesPage({
                     {e.recurringExpenseId && " · مربوط بمتوقَّع"}
                   </span>
                 </span>
-                <span className="shrink-0 text-sm font-bold"><Money minor={e.amountMinor} /></span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="text-sm font-bold"><Money minor={e.amountMinor} /></span>
+                  {/* القيد اليدويّ كان بلا باب حذف — فضغطتان على «قيّده» مصروفان إلى الأبد (BTN-114) */}
+                  {canEditExpenses && e.source === "MANUAL" && <ExpenseDelete id={e.id} label={e.label} />}
+                </span>
               </li>
             ))}
           </ul>
         )}
       </section>
     </PageShell>
+  );
+}
+
+/**
+ * «الفعليّ» ناقص — ويُقال بعدده ومبلغه ومعه زرُّ الاشتقاق نفسه.
+ * ولا يُعرَض شيءٌ حين لا نقص: الإنذارُ الدائم يُفقد الثقة بما عداه.
+ */
+function UnrecordedNotice({ pending, month }: { pending: { count: number; amountMinor: number }; month?: string }) {
+  if (pending.count === 0) return null;
+  return (
+    <section className="mt-6 rounded-xl border border-warn/40 bg-warn-bg p-4">
+      <h2 className="text-sm font-bold text-warn">
+        في الكشف {countNoun(pending.count, TRANSACTION)} من أبواب المصروف لم تُقيَّد بعد ({formatRiyalsDisplay(pending.amountMinor)} ريال)
+      </h2>
+      <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+        {month ? `فالفعليّ في ${month} أقلّ من الواقع بهذا القدر.` : "فالمصروف الفعليّ أقلّ من الواقع بهذا القدر."}
+        {" "}ولا يُعدّ هنا سدادُ المورّدين ولا ما يقول وصفُه شراءَ بضاعة — فذلك في المشتريات.
+      </p>
+      <div className="mt-3"><DeriveExpenses month={month} /></div>
+    </section>
   );
 }
 

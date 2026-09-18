@@ -1,4 +1,6 @@
-import { DOCUMENT, INVOICE, PAYMENT, PRODUCT, SUPPLIER, TRANSACTION, WARNING, countNoun } from "./arabic";
+import {
+  BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, countNoun,
+} from "./arabic";
 /**
  * ما يحتاج انتباهك.
  *
@@ -104,6 +106,13 @@ export interface AttentionFacts {
   duplicatePayments: number;
   duplicatePaymentAmountMinor: number;
   duplicatePaymentEvidence: AttentionEvidence[];
+  /**
+   * ما طُولبت به الجهة ولم يعد بعد — بندٌ أهدأ لا يُطوى (SCN-104).
+   * و«استُردّ» و«ليس ازدواجاً» لا يُعدّان أصلاً.
+   */
+  duplicatePaymentsClaimed?: number;
+  duplicatePaymentClaimedMinor?: number;
+  duplicatePaymentClaimedEvidence?: AttentionEvidence[];
 
   /** فواتير معلوم أنّها لا تصلح لخصم المدخلات، ومبلغ ضريبتها */
   notTaxValidCount: number;
@@ -138,6 +147,8 @@ export interface AttentionFacts {
   firstAnomalyTransactionId?: string | null;
   /** مورّدون لا يصدرون فواتير وبلا عقد */
   suppliersWithoutContract: string[];
+  /** والمال الذي دُفع لهم بلا مستند — دليلُ البند لا أسماءٌ وحدها. */
+  suppliersWithoutContractEvidence?: AttentionEvidence[];
 
   /** فواتير بلا بنود — تحليل الأصناف لا يراها */
   invoicesWithoutLines: number;
@@ -208,7 +219,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "bank-coverage-gap",
       area: "BANK",
       severity: "CRITICAL",
-      title: `${f.bankGapDays} يوماً بلا كشف بنكيّ`,
+      title: `${countNoun(f.bankGapDays, DAY)} بلا كشف بنكيّ`,
       detail: "حركات هذه الأيام غائبة لا معدومة — ولا يظهر غيابها في أي عدّاد.",
       action: "استورد الكشف الذي يغطّيها قبل أن تُقرأ أرقام الشهر.",
       actionLabel: "استورد كشفاً",
@@ -249,7 +260,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "duplicate-expenses",
       area: "DATA",
       severity: "HIGH",
-      title: `${f.duplicateExpenses} مصروفاً يصف حدثاً وصل مرّتين`,
+      title: `مصروفٌ وصل مرّتين — ${countNoun(f.duplicateExpenses, ITEM)}`,
       detail: "الحدث الواحد يصل من كشف البنك ومن مستندٍ رُفع — فيُقيَّد مرّتين ويعلو مصروف الشهر.",
       action: "راجعها واحذف الزائد بيدك — أيّهما الصحيح قرارُك لا قرارُ النظام.",
       actionLabel: "افتح المصروفات",
@@ -289,6 +300,28 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
   }
 
   /*
+    ما طُولبت به الجهة ولم يعد — لا يُحذف من القائمة ولا يبقى حرجاً.
+    الحرجُ الذي يبقى بعد أن فعل صاحبه ما عليه يعلّمه تجاهلَ الحرج.
+  */
+  if ((f.duplicatePaymentsClaimed ?? 0) > 0) {
+    const claimedMinor = f.duplicatePaymentClaimedMinor ?? 0;
+    out.push({
+      id: "duplicate-payments-claimed",
+      area: "BANK",
+      severity: "MEDIUM",
+      title: `مطالبةٌ بمالٍ خرج مرّتين تنتظر الردّ — ${countNoun(f.duplicatePaymentsClaimed ?? 0, ITEM)}`,
+      detail: "طالبتَ الجهة بردّ الزائد، ولم يُعلَن أنّه عاد.",
+      action: "تابع الجهة. وإن عاد المال فاضغط «استُردّ» عند الحركتين.",
+      actionLabel: "افتح المطالبات",
+      href: "/bank?doublePaid=1#double-paid",
+      count: f.duplicatePaymentsClaimed ?? 0,
+      amountMinor: claimedMinor,
+      impact: { kind: "RECOVERABLE", amountMinor: claimedMinor },
+      evidence: f.duplicatePaymentClaimedEvidence ?? [],
+    });
+  }
+
+  /*
     مالٌ خرج ولا مستندَ يفسّره.
 
     وهو أوّل ما يسأل عنه المحاسب، وأوّل ما يسقط في الإقرار الضريبيّ:
@@ -300,14 +333,15 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "unbacked-payments",
       area: "PAYMENTS",
       severity: "HIGH",
-      title: `${f.unbackedPaymentCount} دفعة خرجت ولا فاتورة تفسّرها`,
+      title: `${countNoun(f.unbackedPaymentCount, PAYMENT_RECORD)} بلا فاتورة تفسّرها`,
       detail:
         "مالٌ وصل المورّد ولا مستندَ يقابله — فلا خصمَ لمدخلاته،"
         + " ورصيدُ المورّد عندنا غير مُتحقَّق منه.",
       action:
         "اطلب الفاتورة من المورّد، أو أعلِن أنّه لا يصدر فواتير واطلب عقد توريد.",
-      actionLabel: "افتح المورّدين",
-      href: "/suppliers",
+      actionLabel: "افتح الدفعات بلا فاتورة",
+      /* القائمة نفسها التي عُدّت — لا جدول المورّدين العامّ (BTN-110) */
+      href: "/suppliers?unbacked=1#unbacked",
       count: f.unbackedPaymentCount,
       amountMinor: f.unbackedPaymentMinor,
       impact: { kind: "UNATTRIBUTED", amountMinor: f.unbackedPaymentMinor },
@@ -320,7 +354,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "open-blockers",
       area: "DATA",
       severity: "CRITICAL",
-      title: `${countNoun(f.openBlockers, WARNING)} مانع لم يُعالَج`,
+      title: `${countNoun(f.openBlockers, BLOCKER)} لم يُعالَج`,
       detail: "يمنع إقفال الشهر ويشوّه أرقامه.",
       action: "عالجها أو تجاوزها بسبب مكتوب.",
       actionLabel: "افتح ما يحتاج مراجعة",
@@ -430,7 +464,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       detail: "الكشف وحده يكشف فاتورة حُمّلت عليك ولم تصلك — ولا يظهر ذلك في أرشيفك مهما فتّشته.",
       action: "اطلب الكشف الشهري منهم، ثمّ طابقه.",
       actionLabel: "اطلب الكشوف",
-      href: "/statements",
+      /* تسمّي الغائبين — والصفحة بلا مرشِّح تعرض ما وصل لا ما غاب (BTN-110) */
+      href: "/statements?missing=1",
       count: missingCount,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: f.suppliersMissingStatement.map((name) => ({ label: name })),
@@ -498,7 +533,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       href: "/suppliers",
       count: f.suppliersWithoutContract.length,
       impact: { kind: "AT_RISK", amountMinor: null },
-      evidence: f.suppliersWithoutContract.map((name) => ({ label: name })),
+      evidence: f.suppliersWithoutContractEvidence ?? f.suppliersWithoutContract.map((name) => ({ label: name })),
     });
   }
 
