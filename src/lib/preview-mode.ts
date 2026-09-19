@@ -14,9 +14,33 @@ export interface PreviewEnv {
   VERCEL_ENV?: string;
 }
 
-/** بيئة يُمنع فيها التخطّي مهما كان المتغيّر. */
+/**
+ * بيئة يُمنع فيها التخطّي مهما كان المتغيّر.
+ *
+ * ── ولِمَ لا يُقرأ `NODE_ENV` على Vercel ──
+ *
+ * كان الشرط `VERCEL_ENV === "production" || NODE_ENV === "production"`،
+ * وNext.js يبني **كلّ** نشرٍ بـ`NODE_ENV=production` — المعاينةَ
+ * والإنتاجَ سواء. فوضعُ المعاينة كان **متعذّراً على Vercel أصلاً**: لا
+ * يعمل إلّا في `next dev` على جهازٍ محلّيّ.
+ *
+ * وأسوأُ من ذلك أنّ اختباراً كان يقول «يعمل في بيئة معاينة Vercel»
+ * ويمرّ — لأنّه يمرّر `NODE_ENV: "development"` مع `VERCEL_ENV:
+ * "preview"`، وهي حالةٌ **لا تقع في نشرٍ حقيقيّ**. فالأخضر كان يشهد
+ * لتركيبةٍ لا وجود لها، والميزةُ ميّتةٌ ولا أحد يعلم.
+ *
+ * فصار `VERCEL_ENV` هو الحاكم حيث يوجد: هو الذي يفرّق المعاينةَ من
+ * الإنتاج على Vercel، و`NODE_ENV` لا يفرّق بينهما. وحيث لا وجود له
+ * (بناءٌ مستضاف بنفسه يُشغَّل بـ`next start`) يبقى `NODE_ENV` هو
+ * الحاكم كما كان.
+ *
+ * والحمايةُ لم تُنقَص: إنتاجُ Vercel ممنوعٌ بنصّه، والإنتاجُ خارجه
+ * ممنوعٌ بنصّه. والمسموحُ الجديد هو معاينةُ Vercel وحدها — وهي الحالة
+ * التي بُنيت لها هذه الدالّة واسمُها.
+ */
 export function isProductionEnv(env: PreviewEnv): boolean {
-  return env.VERCEL_ENV === "production" || env.NODE_ENV === "production";
+  if (env.VERCEL_ENV) return env.VERCEL_ENV === "production";
+  return env.NODE_ENV === "production";
 }
 
 export function previewAllowed(env: PreviewEnv): boolean {
@@ -31,6 +55,6 @@ export function previewAllowed(env: PreviewEnv): boolean {
 export function refusalReason(env: PreviewEnv): string | null {
   if (env.AUTH_BYPASS !== "true") return null;
   if (env.VERCEL_ENV === "production") return "وضع المعاينة مرفوض: البيئة إنتاج على Vercel.";
-  if (env.NODE_ENV === "production") return "وضع المعاينة مرفوض: البناء إنتاجيّ.";
+  if (!env.VERCEL_ENV && env.NODE_ENV === "production") return "وضع المعاينة مرفوض: البناء إنتاجيّ.";
   return null;
 }

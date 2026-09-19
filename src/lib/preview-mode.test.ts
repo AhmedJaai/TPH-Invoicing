@@ -23,23 +23,34 @@ describe("previewAllowed", () => {
     expect(previewAllowed({ AUTH_BYPASS: "true", NODE_ENV: "production" })).toBe(false);
   });
 
-  it("يعمل في بيئة معاينة Vercel — وهي ليست إنتاجاً", () => {
-    // نُبقيها ممكنة عمداً: بيئة المعاينة موضع التجربة
-    expect(previewAllowed({ AUTH_BYPASS: "true", VERCEL_ENV: "preview", NODE_ENV: "development" }))
+  /*
+    هذه هي التركيبة التي تقع فعلاً في نشر معاينةٍ على Vercel: Next.js
+    يبني كلّ نشرٍ بـ`NODE_ENV=production`. وكان الاختبار يمرّر
+    `development` معها — فيشهد الأخضرُ لحالةٍ لا وجود لها، والميزةُ
+    ميّتةٌ على Vercel ولا أحد يعلم.
+  */
+  it("يعمل في معاينة Vercel — وهي تُبنى بـNODE_ENV=production كالإنتاج", () => {
+    expect(previewAllowed({ AUTH_BYPASS: "true", VERCEL_ENV: "preview", NODE_ENV: "production" }))
       .toBe(true);
   });
 
-  it("بناء إنتاجيّ في بيئة معاينة يبقى مرفوضاً", () => {
-    expect(previewAllowed({ AUTH_BYPASS: "true", VERCEL_ENV: "preview", NODE_ENV: "production" }))
+  it("ولا يعمل في إنتاج Vercel بالتركيبة نفسها", () => {
+    expect(previewAllowed({ AUTH_BYPASS: "true", VERCEL_ENV: "production", NODE_ENV: "production" }))
       .toBe(false);
   });
 });
 
 describe("isProductionEnv", () => {
-  it("تكفي إحدى العلامتين", () => {
-    expect(isProductionEnv({ VERCEL_ENV: "production" })).toBe(true);
+  it("VERCEL_ENV هو الحاكم حيث يوجد", () => {
+    expect(isProductionEnv({ VERCEL_ENV: "production", NODE_ENV: "production" })).toBe(true);
+    expect(isProductionEnv({ VERCEL_ENV: "preview", NODE_ENV: "production" })).toBe(false);
+    expect(isProductionEnv({ VERCEL_ENV: "development", NODE_ENV: "production" })).toBe(false);
+  });
+
+  it("وNODE_ENV هو الحاكم حيث لا وجود له — بناءٌ مستضاف بنفسه", () => {
     expect(isProductionEnv({ NODE_ENV: "production" })).toBe(true);
     expect(isProductionEnv({ NODE_ENV: "test" })).toBe(false);
+    expect(isProductionEnv({})).toBe(false);
   });
 });
 
