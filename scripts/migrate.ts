@@ -36,14 +36,53 @@ function reapplyTargets(argv: readonly string[]): Set<string> {
 }
 
 async function main() {
+  /*
+    ── المتغيّرُ الغائب يُقال باسمه ──
+
+    `pg` بلا سلسلةِ اتّصالٍ يتّصل بـ`localhost:5432` افتراضاً، فيسقط
+    بـ`ECONNREFUSED ::1:5432` — رسالةٌ عن مقبسٍ لا عن السبب. ومن يقرؤها
+    في سجلّ بناءٍ يظنّ أنّ القاعدة ساقطة، والحقيقةُ أنّ المتغيّر لم
+    يصل إلى البناء أصلاً.
+
+    وهذه الهجراتُ تجري الآن في بناء المنصّة، فسجلُّها هو ما يُقرأ عند
+    العطب. فيُقال ما نقص.
+  */
+  if (!process.env.DATABASE_URL) {
+    console.error("✕ DATABASE_URL غير مضبوط — لا قاعدةَ تُهاجَر.");
+    console.error("  محلّياً:  npm run db:migrate   (يقرأ .env)");
+    console.error("  في النشر: يُحقَن من متغيّرات المشروع في المنصّة.");
+    process.exit(1);
+  }
+
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
 
-  const locked = (await client.query<{ ok: boolean }>(
-    "select pg_try_advisory_lock(hashtext('tph-migrate')) as ok",
-  )).rows[0]?.ok;
+  /*
+    ── القفل يُنتظَر ولا يُفشَل عنده فوراً ──
+
+    كان `pg_try_advisory_lock` يُسأل مرّةً، فإن وجد القفلَ مأخوذاً خرج
+    بـ1. وذلك يصحّ حين يشغّلها إنسانٌ بيده: يرى الرسالة ويعيد.
+
+    وقد صارت تُشغَّل في **بناء Vercel** (انظر `vercel-build`)، وهناك
+    يقع البناءان معاً عادةً — نشرُ المعاينة ونشرُ الإنتاج، أو دفعتان
+    متتابعتان. فيفشل أحدُهما لا لعطبٍ بل لأنّ الآخر سبقه بثانية،
+    **ويُقرأ الفشلُ عطباً في الهجرة وليس كذلك**.
+
+    فيُنتظَر القفل عشر مرّات بثانيتين — وهي أطولُ ممّا تستغرقه هجرةٌ
+    عاديّة بكثير. وإن لم يُفرَج عنه فذلك تعلّقٌ حقيقيّ يستحقّ الفشل.
+  */
+  let locked = false;
+  for (let attempt = 1; attempt <= 10 && !locked; attempt++) {
+    locked = (await client.query<{ ok: boolean }>(
+      "select pg_try_advisory_lock(hashtext('tph-migrate')) as ok",
+    )).rows[0]?.ok ?? false;
+    if (!locked) {
+      console.log(`… القفل مأخوذ — انتظارٌ (${attempt}/10)`);
+      await new Promise((r) => setTimeout(r, 2_000));
+    }
+  }
   if (!locked) {
-    console.error("✕ تشغيلٌ آخر للهجرات جارٍ الآن — انتظره ثمّ أعد المحاولة.");
+    console.error("✕ تشغيلٌ آخر للهجرات لم يُفرِج عن القفل بعد عشرين ثانية — افحصه.");
     await client.end();
     process.exit(1);
   }
