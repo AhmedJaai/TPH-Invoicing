@@ -95,6 +95,8 @@ const html = `<!doctype html>
   .toc ol { list-style: none; padding: 0; counter-reset: none; }
   .toc li { display: flex; gap: 8pt; align-items: baseline; padding: 3.5pt 0; border-bottom: 1px dotted #e5e7eb; }
   .toc .n { color: #6b7280; min-width: 16pt; font-weight: 700; }
+  /* الفهرسُ روابطُ تعمل في نسخة HTML، وتُطبَع سوداءَ بلا خطٍّ تحتها */
+  .toc a { color: inherit; text-decoration: none; }
 
   h2 { font-size: 17pt; margin: 0 0 10pt; padding-bottom: 5pt; border-bottom: 2px solid #111827; page-break-after: avoid; }
   h2 .num { display: inline-block; color: #6b7280; margin-left: 8pt; font-size: 13pt; }
@@ -164,7 +166,7 @@ const html = `<!doctype html>
 <section class="toc">
   <h2 style="border:none;padding:0">المحتويات</h2>
   <ol>
-    ${TOC.map(([id, n, t]) => `<li><span class="n">${esc(n)}</span><span>${esc(t)}</span></li>`).join("")}
+    ${TOC.map(([id, n, t]) => `<li><span class="n">${esc(n)}</span><a href="#${esc(id)}">${esc(t)}</a></li>`).join("")}
   </ol>
 </section>
 
