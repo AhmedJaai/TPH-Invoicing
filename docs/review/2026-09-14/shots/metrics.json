@@ -1,0 +1,7083 @@
+[
+  {
+    "page": "/",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 122,
+    "errors": [],
+    "url": "/",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "حال المقهى",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 26,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 114,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2410,
+    "shot": "home--desktop-light.jpg"
+  },
+  {
+    "page": "/",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 48,
+    "errors": [],
+    "url": "/",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "حال المقهى",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "انتباهك",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 12,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "6,851.34"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "6,059.84"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "11,994.91"
+      },
+      {
+        "tag": "A",
+        "w": 80,
+        "h": 15,
+        "text": "1 حرج · 3 عالٍ ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (3)"
+      },
+      {
+        "tag": "A",
+        "w": 157,
+        "h": 32,
+        "text": "افتح الحركات ومراجعها ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (6)"
+      },
+      {
+        "tag": "A",
+        "w": 115,
+        "h": 32,
+        "text": "افتح المورّدين ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (1)"
+      },
+      {
+        "tag": "A",
+        "w": 112,
+        "h": 32,
+        "text": "افتح المتأخّرة ←"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 114,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2368,
+    "shot": "home--mobile-light.jpg"
+  },
+  {
+    "page": "/",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 48,
+    "errors": [],
+    "url": "/",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "حال المقهى",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 12,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "6,851.34"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "6,059.84"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "11,994.91"
+      },
+      {
+        "tag": "A",
+        "w": 80,
+        "h": 15,
+        "text": "1 حرج · 3 عالٍ ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (3)"
+      },
+      {
+        "tag": "A",
+        "w": 157,
+        "h": 32,
+        "text": "افتح الحركات ومراجعها ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (6)"
+      },
+      {
+        "tag": "A",
+        "w": 115,
+        "h": 32,
+        "text": "افتح المورّدين ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (1)"
+      },
+      {
+        "tag": "A",
+        "w": 112,
+        "h": 32,
+        "text": "افتح المتأخّرة ←"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 114,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2368,
+    "shot": "home--mobile-dark.jpg"
+  },
+  {
+    "page": "/attention",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 50,
+    "errors": [],
+    "url": "/attention",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "ما يحتاج انتباهك",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 19,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 27,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1268,
+    "shot": "attention--desktop-light.jpg"
+  },
+  {
+    "page": "/attention",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 36,
+    "errors": [],
+    "url": "/attention",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "ما يحتاج انتباهك",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "انتباهك",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 8,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (3)"
+      },
+      {
+        "tag": "A",
+        "w": 157,
+        "h": 32,
+        "text": "افتح الحركات ومراجعها ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (6)"
+      },
+      {
+        "tag": "A",
+        "w": 115,
+        "h": 32,
+        "text": "افتح المورّدين ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (1)"
+      },
+      {
+        "tag": "A",
+        "w": 112,
+        "h": 32,
+        "text": "افتح المتأخّرة ←"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 27,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1226,
+    "shot": "attention--mobile-light.jpg"
+  },
+  {
+    "page": "/attention",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 36,
+    "errors": [],
+    "url": "/attention",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "ما يحتاج انتباهك",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 8,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (3)"
+      },
+      {
+        "tag": "A",
+        "w": 157,
+        "h": 32,
+        "text": "افتح الحركات ومراجعها ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (6)"
+      },
+      {
+        "tag": "A",
+        "w": 115,
+        "h": 32,
+        "text": "افتح المورّدين ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (1)"
+      },
+      {
+        "tag": "A",
+        "w": 112,
+        "h": 32,
+        "text": "افتح المتأخّرة ←"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 27,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1226,
+    "shot": "attention--mobile-dark.jpg"
+  },
+  {
+    "page": "/review",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 43,
+    "errors": [],
+    "url": "/review",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "طابور المراجعة",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 19,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 0,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 427,
+    "shot": "review--desktop-light.jpg"
+  },
+  {
+    "page": "/review",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 27,
+    "errors": [],
+    "url": "/review",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "طابور المراجعة",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المال",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 3,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 25,
+        "h": 44,
+        "text": "البنك"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 0,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 386,
+    "shot": "review--mobile-light.jpg"
+  },
+  {
+    "page": "/review",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 27,
+    "errors": [],
+    "url": "/review",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "طابور المراجعة",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 3,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 25,
+        "h": 44,
+        "text": "البنك"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 0,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 386,
+    "shot": "review--mobile-dark.jpg"
+  },
+  {
+    "page": "/bank",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 65,
+    "errors": [],
+    "url": "/bank",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "البنك",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 45,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 247,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 4862,
+    "shot": "bank--desktop-light.jpg"
+  },
+  {
+    "page": "/bank",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 31,
+    "errors": [],
+    "url": "/bank",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "البنك",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المال",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 29,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 26,
+        "h": 44,
+        "text": "البنك"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 247,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 4820,
+    "shot": "bank--mobile-light.jpg"
+  },
+  {
+    "page": "/bank",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 30,
+    "errors": [],
+    "url": "/bank",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "البنك",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 29,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 26,
+        "h": 44,
+        "text": "البنك"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 26,
+        "h": 17,
+        "text": "لماذا؟"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 247,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 4820,
+    "shot": "bank--mobile-dark.jpg"
+  },
+  {
+    "page": "/payments",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 43,
+    "errors": [],
+    "url": "/payments",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "دفعة 2026-08",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 22,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 37,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 640,
+    "shot": "payments--desktop-light.jpg"
+  },
+  {
+    "page": "/payments",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 27,
+    "errors": [],
+    "url": "/payments",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "دفعة 2026-08",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المال",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 4,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 25,
+        "h": 44,
+        "text": "البنك"
+      },
+      {
+        "tag": "A",
+        "w": 132,
+        "h": 32,
+        "text": "نزّل ملف التحويلات"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 37,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 598,
+    "shot": "payments--mobile-light.jpg"
+  },
+  {
+    "page": "/payments",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 45,
+    "errors": [],
+    "url": "/payments",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "دفعة 2026-08",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 4,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 25,
+        "h": 44,
+        "text": "البنك"
+      },
+      {
+        "tag": "A",
+        "w": 132,
+        "h": 32,
+        "text": "نزّل ملف التحويلات"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 37,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 598,
+    "shot": "payments--mobile-dark.jpg"
+  },
+  {
+    "page": "/suppliers",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 46,
+    "errors": [],
+    "url": "/suppliers",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المورّدون",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 20,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 160,
+      "arabicRuns": 0
+    },
+    "tables": 1,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2360,
+    "shot": "suppliers--desktop-light.jpg"
+  },
+  {
+    "page": "/suppliers",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 47,
+    "errors": [],
+    "url": "/suppliers",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المورّدون",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 3,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المشتريات",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 4,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 160,
+      "arabicRuns": 0
+    },
+    "tables": 1,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 3425,
+    "shot": "suppliers--mobile-light.jpg"
+  },
+  {
+    "page": "/suppliers",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 27,
+    "errors": [],
+    "url": "/suppliers",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المورّدون",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 3,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 4,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 160,
+      "arabicRuns": 0
+    },
+    "tables": 1,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 3425,
+    "shot": "suppliers--mobile-dark.jpg"
+  },
+  {
+    "page": "/suppliers/GoldenCup",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 59,
+    "errors": [],
+    "url": "/suppliers/GoldenCup",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "مصنع الكوب الذهبي",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 24,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 50,
+      "arabicRuns": 0
+    },
+    "tables": 1,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1814,
+    "shot": "suppliers_GoldenCup--desktop-light.jpg"
+  },
+  {
+    "page": "/suppliers/GoldenCup",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 26,
+    "errors": [],
+    "url": "/suppliers/GoldenCup",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "مصنع الكوب الذهبي",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 3,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المشتريات",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 5,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      },
+      {
+        "tag": "A",
+        "w": 43,
+        "h": 44,
+        "text": "كلّها"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 50,
+      "arabicRuns": 0
+    },
+    "tables": 1,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1794,
+    "shot": "suppliers_GoldenCup--mobile-light.jpg"
+  },
+  {
+    "page": "/suppliers/GoldenCup",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 26,
+    "errors": [],
+    "url": "/suppliers/GoldenCup",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "مصنع الكوب الذهبي",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 3,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 5,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      },
+      {
+        "tag": "A",
+        "w": 43,
+        "h": 44,
+        "text": "كلّها"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 50,
+      "arabicRuns": 0
+    },
+    "tables": 1,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1794,
+    "shot": "suppliers_GoldenCup--mobile-dark.jpg"
+  },
+  {
+    "page": "/purchases",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 39,
+    "errors": [],
+    "url": "/purchases",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المشتريات",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 20,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 16,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 704,
+    "shot": "purchases--desktop-light.jpg"
+  },
+  {
+    "page": "/purchases",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 26,
+    "errors": [],
+    "url": "/purchases",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المشتريات",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 3,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المشتريات",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 5,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "المورّدون"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 16,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 663,
+    "shot": "purchases--mobile-light.jpg"
+  },
+  {
+    "page": "/purchases",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 37,
+    "errors": [],
+    "url": "/purchases",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المشتريات",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 3,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 5,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "المورّدون"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 16,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 663,
+    "shot": "purchases--mobile-dark.jpg"
+  },
+  {
+    "page": "/purchases/invoices",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 47,
+    "errors": [],
+    "url": "/purchases/invoices",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "الفواتير",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 10,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 71,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 333,
+      "arabicRuns": 0
+    },
+    "tables": 45,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 3763,
+    "shot": "purchases_invoices--desktop-light.jpg"
+  },
+  {
+    "page": "/purchases/invoices",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 44,
+    "errors": [],
+    "url": "/purchases/invoices",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "الفواتير",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 27,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المشتريات",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 20,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 33,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "المورّدون"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      },
+      {
+        "tag": "A",
+        "w": 40,
+        "h": 44,
+        "text": "رونة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 97,
+        "h": 32,
+        "text": "سجّل أنّها سُدّدت"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 97,
+        "h": 32,
+        "text": "سجّل أنّها سُدّدت"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 97,
+        "h": 32,
+        "text": "سجّل أنّها سُدّدت"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 97,
+        "h": 32,
+        "text": "سجّل أنّها سُدّدت"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 97,
+        "h": 32,
+        "text": "سجّل أنّها سُدّدت"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 97,
+        "h": 32,
+        "text": "سجّل أنّها سُدّدت"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 333,
+      "arabicRuns": 0
+    },
+    "tables": 45,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 5180,
+    "shot": "purchases_invoices--mobile-light.jpg"
+  },
+  {
+    "page": "/purchases/invoices",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 37,
+    "errors": [],
+    "url": "/purchases/invoices",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "الفواتير",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 27,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 20,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 33,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "المورّدون"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      },
+      {
+        "tag": "A",
+        "w": 40,
+        "h": 44,
+        "text": "رونة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 97,
+        "h": 32,
+        "text": "سجّل أنّها سُدّدت"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 97,
+        "h": 32,
+        "text": "سجّل أنّها سُدّدت"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 97,
+        "h": 32,
+        "text": "سجّل أنّها سُدّدت"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 97,
+        "h": 32,
+        "text": "سجّل أنّها سُدّدت"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 97,
+        "h": 32,
+        "text": "سجّل أنّها سُدّدت"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 97,
+        "h": 32,
+        "text": "سجّل أنّها سُدّدت"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 333,
+      "arabicRuns": 0
+    },
+    "tables": 45,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 5180,
+    "shot": "purchases_invoices--mobile-dark.jpg"
+  },
+  {
+    "page": "/purchases/products",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 56,
+    "errors": [],
+    "url": "/purchases/products",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "الأصناف",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 266,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 662,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 20997,
+    "shot": "purchases_products--desktop-light.jpg"
+  },
+  {
+    "page": "/purchases/products",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 47,
+    "errors": [],
+    "url": "/purchases/products",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "الأصناف",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 5,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المشتريات",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 249,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "المورّدون"
+      },
+      {
+        "tag": "A",
+        "w": 40,
+        "h": 44,
+        "text": "الأصناف"
+      },
+      {
+        "tag": "SELECT",
+        "w": 317,
+        "h": 31,
+        "text": "صنف معياري جديد…1003 دولتشي[10"
+      },
+      {
+        "tag": "INPUT",
+        "w": 175,
+        "h": 30,
+        "text": "اسم الصنف المعياري"
+      },
+      {
+        "tag": "SELECT",
+        "w": 134,
+        "h": 31,
+        "text": "بنّ ومشروبات ساخنةألبانمخبوزات"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 71,
+        "h": 29,
+        "text": "اربط 2 معاً"
+      },
+      {
+        "tag": "SELECT",
+        "w": 317,
+        "h": 31,
+        "text": "صنف معياري جديد…1003 دولتشي[10"
+      },
+      {
+        "tag": "INPUT",
+        "w": 175,
+        "h": 30,
+        "text": "اسم الصنف المعياري"
+      },
+      {
+        "tag": "SELECT",
+        "w": 134,
+        "h": 31,
+        "text": "بنّ ومشروبات ساخنةألبانمخبوزات"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 662,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 20955,
+    "shot": "purchases_products--mobile-light.jpg"
+  },
+  {
+    "page": "/purchases/products",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 40,
+    "errors": [],
+    "url": "/purchases/products",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "الأصناف",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 5,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 249,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "المورّدون"
+      },
+      {
+        "tag": "A",
+        "w": 40,
+        "h": 44,
+        "text": "الأصناف"
+      },
+      {
+        "tag": "SELECT",
+        "w": 317,
+        "h": 31,
+        "text": "صنف معياري جديد…1003 دولتشي[10"
+      },
+      {
+        "tag": "INPUT",
+        "w": 175,
+        "h": 30,
+        "text": "اسم الصنف المعياري"
+      },
+      {
+        "tag": "SELECT",
+        "w": 134,
+        "h": 31,
+        "text": "بنّ ومشروبات ساخنةألبانمخبوزات"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 71,
+        "h": 29,
+        "text": "اربط 2 معاً"
+      },
+      {
+        "tag": "SELECT",
+        "w": 317,
+        "h": 31,
+        "text": "صنف معياري جديد…1003 دولتشي[10"
+      },
+      {
+        "tag": "INPUT",
+        "w": 175,
+        "h": 30,
+        "text": "اسم الصنف المعياري"
+      },
+      {
+        "tag": "SELECT",
+        "w": 134,
+        "h": 31,
+        "text": "بنّ ومشروبات ساخنةألبانمخبوزات"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 662,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 20955,
+    "shot": "purchases_products--mobile-dark.jpg"
+  },
+  {
+    "page": "/purchases/insights",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 30,
+    "errors": [],
+    "url": "/purchases/insights",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "تحليل الذكاء",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 37,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 139,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2233,
+    "shot": "purchases_insights--desktop-light.jpg"
+  },
+  {
+    "page": "/purchases/insights",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 21,
+    "errors": [],
+    "url": "/purchases/insights",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "تحليل الذكاء",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 3,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المشتريات",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 22,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "المورّدون"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      },
+      {
+        "tag": "A",
+        "w": 51,
+        "h": 17,
+        "text": "أفال — بدر"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 101,
+        "h": 40,
+        "text": "صحيح — عُلم"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 85,
+        "h": 40,
+        "text": "ليس صحيحاً"
+      },
+      {
+        "tag": "A",
+        "w": 46,
+        "h": 17,
+        "text": "لوريفا كيك"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 145,
+        "h": 40,
+        "text": "اخصم الرصيد من فواتيره"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 85,
+        "h": 40,
+        "text": "ليس صحيحاً"
+      },
+      {
+        "tag": "A",
+        "w": 309,
+        "h": 20,
+        "text": "غاناش"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 139,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2191,
+    "shot": "purchases_insights--mobile-light.jpg"
+  },
+  {
+    "page": "/purchases/insights",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 27,
+    "errors": [],
+    "url": "/purchases/insights",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "تحليل الذكاء",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 3,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 22,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "المورّدون"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      },
+      {
+        "tag": "A",
+        "w": 51,
+        "h": 17,
+        "text": "أفال — بدر"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 101,
+        "h": 40,
+        "text": "صحيح — عُلم"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 85,
+        "h": 40,
+        "text": "ليس صحيحاً"
+      },
+      {
+        "tag": "A",
+        "w": 46,
+        "h": 17,
+        "text": "لوريفا كيك"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 145,
+        "h": 40,
+        "text": "اخصم الرصيد من فواتيره"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 85,
+        "h": 40,
+        "text": "ليس صحيحاً"
+      },
+      {
+        "tag": "A",
+        "w": 309,
+        "h": 20,
+        "text": "غاناش"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 139,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2191,
+    "shot": "purchases_insights--mobile-dark.jpg"
+  },
+  {
+    "page": "/documents",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 56,
+    "errors": [],
+    "url": "/documents",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المستندات",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 10,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 119,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 255,
+      "arabicRuns": 0
+    },
+    "tables": 50,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 4661,
+    "shot": "documents--desktop-light.jpg"
+  },
+  {
+    "page": "/documents",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 38,
+    "errors": [],
+    "url": "/documents",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المستندات",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 27,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المستندات",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 95,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "INPUT",
+        "w": 276,
+        "h": 38,
+        "text": "ابحث في اسم الملف"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 59,
+        "h": 32,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 65,
+        "h": 27,
+        "text": "الكل (175)"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 27,
+        "text": "يحتاج مراجعة (7)"
+      },
+      {
+        "tag": "A",
+        "w": 83,
+        "h": 27,
+        "text": "مؤرشف (167)"
+      },
+      {
+        "tag": "A",
+        "w": 70,
+        "h": 27,
+        "text": "مرفوض (1)"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 27,
+        "text": "كل الأشهر"
+      },
+      {
+        "tag": "A",
+        "w": 69,
+        "h": 27,
+        "text": "2026-09"
+      },
+      {
+        "tag": "A",
+        "w": 69,
+        "h": 27,
+        "text": "2026-08"
+      },
+      {
+        "tag": "A",
+        "w": 68,
+        "h": 27,
+        "text": "2026-07"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 255,
+      "arabicRuns": 0
+    },
+    "tables": 50,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 6180,
+    "shot": "documents--mobile-light.jpg"
+  },
+  {
+    "page": "/documents",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 36,
+    "errors": [],
+    "url": "/documents",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المستندات",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 27,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 95,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "INPUT",
+        "w": 276,
+        "h": 38,
+        "text": "ابحث في اسم الملف"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 59,
+        "h": 32,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 65,
+        "h": 27,
+        "text": "الكل (175)"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 27,
+        "text": "يحتاج مراجعة (7)"
+      },
+      {
+        "tag": "A",
+        "w": 83,
+        "h": 27,
+        "text": "مؤرشف (167)"
+      },
+      {
+        "tag": "A",
+        "w": 70,
+        "h": 27,
+        "text": "مرفوض (1)"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 27,
+        "text": "كل الأشهر"
+      },
+      {
+        "tag": "A",
+        "w": 69,
+        "h": 27,
+        "text": "2026-09"
+      },
+      {
+        "tag": "A",
+        "w": 69,
+        "h": 27,
+        "text": "2026-08"
+      },
+      {
+        "tag": "A",
+        "w": 68,
+        "h": 27,
+        "text": "2026-07"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 255,
+      "arabicRuns": 0
+    },
+    "tables": 50,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 6180,
+    "shot": "documents--mobile-dark.jpg"
+  },
+  {
+    "page": "/upload",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 42,
+    "errors": [],
+    "url": "/upload",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "أضف مستنداً",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 17,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 0,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 654,
+    "shot": "upload--desktop-light.jpg"
+  },
+  {
+    "page": "/upload",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 31,
+    "errors": [],
+    "url": "/upload",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "أضف مستنداً",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المستندات",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 5,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "INPUT",
+        "w": 1,
+        "h": 1,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "w": 184,
+        "h": 30,
+        "text": "افحص الدرايف عن ملفات جديدة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 136,
+        "h": 30,
+        "text": "افحص تسمية الأرشيف"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 0,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 616,
+    "shot": "upload--mobile-light.jpg"
+  },
+  {
+    "page": "/upload",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 23,
+    "errors": [],
+    "url": "/upload",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "أضف مستنداً",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 5,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "INPUT",
+        "w": 1,
+        "h": 1,
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "w": 184,
+        "h": 30,
+        "text": "افحص الدرايف عن ملفات جديدة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 136,
+        "h": 30,
+        "text": "افحص تسمية الأرشيف"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 0,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 616,
+    "shot": "upload--mobile-dark.jpg"
+  },
+  {
+    "page": "/statements",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 40,
+    "errors": [],
+    "url": "/statements",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "كشوف المورّدين",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 36,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 134,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2010,
+    "shot": "statements--desktop-light.jpg"
+  },
+  {
+    "page": "/statements",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 22,
+    "errors": [],
+    "url": "/statements",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "كشوف المورّدين",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 3,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المشتريات",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 21,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "المورّدون"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 134,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1968,
+    "shot": "statements--mobile-light.jpg"
+  },
+  {
+    "page": "/statements",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 36,
+    "errors": [],
+    "url": "/statements",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "كشوف المورّدين",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 3,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 21,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "المورّدون"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 31,
+        "text": "أعد المطابقة"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 134,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1968,
+    "shot": "statements--mobile-dark.jpg"
+  },
+  {
+    "page": "/money",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 40,
+    "errors": [],
+    "url": "/money",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المال",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 21,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 45,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1206,
+    "shot": "money--desktop-light.jpg"
+  },
+  {
+    "page": "/money",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 23,
+    "errors": [],
+    "url": "/money",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المال",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المال",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 4,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 25,
+        "h": 44,
+        "text": "البنك"
+      },
+      {
+        "tag": "A",
+        "w": 309,
+        "h": 24,
+        "text": "367,946.74"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 45,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1164,
+    "shot": "money--mobile-light.jpg"
+  },
+  {
+    "page": "/money",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 27,
+    "errors": [],
+    "url": "/money",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المال",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 4,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 25,
+        "h": 44,
+        "text": "البنك"
+      },
+      {
+        "tag": "A",
+        "w": 309,
+        "h": 24,
+        "text": "367,946.74"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 45,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1164,
+    "shot": "money--mobile-dark.jpg"
+  },
+  {
+    "page": "/money/expenses",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 45,
+    "errors": [],
+    "url": "/money/expenses",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المصروفات",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 26,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 145,
+      "arabicRuns": 0
+    },
+    "tables": 1,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1668,
+    "shot": "money_expenses--desktop-light.jpg"
+  },
+  {
+    "page": "/money/expenses",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 25,
+    "errors": [],
+    "url": "/money/expenses",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المصروفات",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المال",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 4,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 25,
+        "h": 44,
+        "text": "البنك"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 157,
+        "h": 30,
+        "text": "اشتقّ من كشف 2026-09"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 145,
+      "arabicRuns": 0
+    },
+    "tables": 1,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1648,
+    "shot": "money_expenses--mobile-light.jpg"
+  },
+  {
+    "page": "/money/expenses",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 27,
+    "errors": [],
+    "url": "/money/expenses",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "المصروفات",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 4,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 25,
+        "h": 44,
+        "text": "البنك"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 157,
+        "h": 30,
+        "text": "اشتقّ من كشف 2026-09"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 145,
+      "arabicRuns": 0
+    },
+    "tables": 1,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1648,
+    "shot": "money_expenses--mobile-dark.jpg"
+  },
+  {
+    "page": "/money/statement",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 43,
+    "errors": [],
+    "url": "/money/statement",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "التدفّق النقدي وقائمة الدخل",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 19,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 137,
+      "arabicRuns": 0
+    },
+    "tables": 8,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1808,
+    "shot": "money_statement--desktop-light.jpg"
+  },
+  {
+    "page": "/money/statement",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 27,
+    "errors": [],
+    "url": "/money/statement",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "التدفّق النقدي وقائمة الدخل",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المال",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 3,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 25,
+        "h": 44,
+        "text": "البنك"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 137,
+      "arabicRuns": 0
+    },
+    "tables": 8,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2040,
+    "shot": "money_statement--mobile-light.jpg"
+  },
+  {
+    "page": "/money/statement",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 25,
+    "errors": [],
+    "url": "/money/statement",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "التدفّق النقدي وقائمة الدخل",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 3,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 25,
+        "h": 44,
+        "text": "البنك"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 137,
+      "arabicRuns": 0
+    },
+    "tables": 8,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2040,
+    "shot": "money_statement--mobile-dark.jpg"
+  },
+  {
+    "page": "/close",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 32,
+    "errors": [],
+    "url": "/close",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "إقفال الشهر",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 29,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 27,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1937,
+    "shot": "close--desktop-light.jpg"
+  },
+  {
+    "page": "/close",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 25,
+    "errors": [],
+    "url": "/close",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "إقفال الشهر",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المال",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 13,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 25,
+        "h": 44,
+        "text": "البنك"
+      },
+      {
+        "tag": "SELECT",
+        "w": 105,
+        "h": 37,
+        "text": "2026-092026-082026-072026-0620"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 34,
+        "text": "أعد الفحص"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "أصلِح ←"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "أصلِح ←"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "أصلِح ←"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "أصلِح ←"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "أصلِح ←"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "أصلِح ←"
+      },
+      {
+        "tag": "INPUT",
+        "w": 309,
+        "h": 38,
+        "text": ""
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 27,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1896,
+    "shot": "close--mobile-light.jpg"
+  },
+  {
+    "page": "/close",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 28,
+    "errors": [],
+    "url": "/close",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "إقفال الشهر",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 2,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 13,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 25,
+        "h": 44,
+        "text": "البنك"
+      },
+      {
+        "tag": "SELECT",
+        "w": 105,
+        "h": 37,
+        "text": "2026-092026-082026-072026-0620"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 83,
+        "h": 34,
+        "text": "أعد الفحص"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "أصلِح ←"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "أصلِح ←"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "أصلِح ←"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "أصلِح ←"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "أصلِح ←"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "أصلِح ←"
+      },
+      {
+        "tag": "INPUT",
+        "w": 309,
+        "h": 38,
+        "text": ""
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 27,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1896,
+    "shot": "close--mobile-dark.jpg"
+  },
+  {
+    "page": "/analysis",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 57,
+    "errors": [],
+    "url": "/analysis",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "ذكاء الشراء",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 20,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 493,
+      "arabicRuns": 3
+    },
+    "tables": 46,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 5484,
+    "shot": "analysis--desktop-light.jpg"
+  },
+  {
+    "page": "/analysis",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 33,
+    "errors": [],
+    "url": "/analysis",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "ذكاء الشراء",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 3,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "المشتريات",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 5,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "المورّدون"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 493,
+      "arabicRuns": 3
+    },
+    "tables": 46,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 7761,
+    "shot": "analysis--mobile-light.jpg"
+  },
+  {
+    "page": "/analysis",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 32,
+    "errors": [],
+    "url": "/analysis",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "ذكاء الشراء",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 3,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 5,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 31,
+        "h": 44,
+        "text": "الفواتير"
+      },
+      {
+        "tag": "A",
+        "w": 42,
+        "h": 44,
+        "text": "المورّدون"
+      },
+      {
+        "tag": "A",
+        "w": 39,
+        "h": 44,
+        "text": "الأصناف"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 493,
+      "arabicRuns": 3
+    },
+    "tables": 46,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 7761,
+    "shot": "analysis--mobile-dark.jpg"
+  },
+  {
+    "page": "/performance",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 41,
+    "errors": [],
+    "url": "/performance",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "الأداء",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 13,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 234,
+      "arabicRuns": 0
+    },
+    "tables": 33,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2991,
+    "shot": "performance--desktop-light.jpg"
+  },
+  {
+    "page": "/performance",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 28,
+    "errors": [],
+    "url": "/performance",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "الأداء",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الأداء",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 3,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 83,
+        "h": 16,
+        "text": "التحليل الكامل ←"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 234,
+      "arabicRuns": 0
+    },
+    "tables": 33,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 4106,
+    "shot": "performance--mobile-light.jpg"
+  },
+  {
+    "page": "/performance",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 28,
+    "errors": [],
+    "url": "/performance",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "الأداء",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 3,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 83,
+        "h": 16,
+        "text": "التحليل الكامل ←"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 234,
+      "arabicRuns": 0
+    },
+    "tables": 33,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 4106,
+    "shot": "performance--mobile-dark.jpg"
+  },
+  {
+    "page": "/dashboard",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 33,
+    "errors": [],
+    "url": "/",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "حال المقهى",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 26,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 114,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2410,
+    "shot": "dashboard--desktop-light.jpg"
+  },
+  {
+    "page": "/dashboard",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 22,
+    "errors": [],
+    "url": "/",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "حال المقهى",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "انتباهك",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 12,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "6,851.34"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "6,059.84"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "11,994.91"
+      },
+      {
+        "tag": "A",
+        "w": 80,
+        "h": 15,
+        "text": "1 حرج · 3 عالٍ ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (3)"
+      },
+      {
+        "tag": "A",
+        "w": 157,
+        "h": 32,
+        "text": "افتح الحركات ومراجعها ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (6)"
+      },
+      {
+        "tag": "A",
+        "w": 115,
+        "h": 32,
+        "text": "افتح المورّدين ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (1)"
+      },
+      {
+        "tag": "A",
+        "w": 112,
+        "h": 32,
+        "text": "افتح المتأخّرة ←"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 114,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2368,
+    "shot": "dashboard--mobile-light.jpg"
+  },
+  {
+    "page": "/dashboard",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 24,
+    "errors": [],
+    "url": "/",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "حال المقهى",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 12,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "6,851.34"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "6,059.84"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "11,994.91"
+      },
+      {
+        "tag": "A",
+        "w": 80,
+        "h": 15,
+        "text": "1 حرج · 3 عالٍ ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (3)"
+      },
+      {
+        "tag": "A",
+        "w": 157,
+        "h": 32,
+        "text": "افتح الحركات ومراجعها ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (6)"
+      },
+      {
+        "tag": "A",
+        "w": 115,
+        "h": 32,
+        "text": "افتح المورّدين ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (1)"
+      },
+      {
+        "tag": "A",
+        "w": 112,
+        "h": 32,
+        "text": "افتح المتأخّرة ←"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 114,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2368,
+    "shot": "dashboard--mobile-dark.jpg"
+  },
+  {
+    "page": "/audit",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 40,
+    "errors": [],
+    "url": "/attention",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "ما يحتاج انتباهك",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 19,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 27,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1268,
+    "shot": "audit--desktop-light.jpg"
+  },
+  {
+    "page": "/audit",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 19,
+    "errors": [],
+    "url": "/attention",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "ما يحتاج انتباهك",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "انتباهك",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 8,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (3)"
+      },
+      {
+        "tag": "A",
+        "w": 157,
+        "h": 32,
+        "text": "افتح الحركات ومراجعها ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (6)"
+      },
+      {
+        "tag": "A",
+        "w": 115,
+        "h": 32,
+        "text": "افتح المورّدين ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (1)"
+      },
+      {
+        "tag": "A",
+        "w": 112,
+        "h": 32,
+        "text": "افتح المتأخّرة ←"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 27,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1226,
+    "shot": "audit--mobile-light.jpg"
+  },
+  {
+    "page": "/audit",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 25,
+    "errors": [],
+    "url": "/attention",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "ما يحتاج انتباهك",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 8,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (3)"
+      },
+      {
+        "tag": "A",
+        "w": 157,
+        "h": 32,
+        "text": "افتح الحركات ومراجعها ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (6)"
+      },
+      {
+        "tag": "A",
+        "w": 115,
+        "h": 32,
+        "text": "افتح المورّدين ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (1)"
+      },
+      {
+        "tag": "A",
+        "w": 112,
+        "h": 32,
+        "text": "افتح المتأخّرة ←"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 27,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 1226,
+    "shot": "audit--mobile-dark.jpg"
+  },
+  {
+    "page": "/settings",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 41,
+    "errors": [],
+    "url": "/settings",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "الإعدادات",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 19,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 25,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      },
+      {
+        "name": "",
+        "type": "text",
+        "inputMode": "decimal"
+      }
+    ],
+    "bodyChars": 1754,
+    "shot": "settings--desktop-light.jpg"
+  },
+  {
+    "page": "/settings",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 25,
+    "errors": [],
+    "url": "/settings",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "الإعدادات",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الإعدادات",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 8,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 17,
+        "h": 44,
+        "text": "عام"
+      },
+      {
+        "tag": "INPUT",
+        "w": 213,
+        "h": 30,
+        "text": "اسم المصروف"
+      },
+      {
+        "tag": "INPUT",
+        "w": 96,
+        "h": 30,
+        "text": "المبلغ بالريال"
+      },
+      {
+        "tag": "SELECT",
+        "w": 84,
+        "h": 31,
+        "text": "الدورة"
+      },
+      {
+        "tag": "SELECT",
+        "w": 153,
+        "h": 31,
+        "text": "الباب"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 48,
+        "h": 29,
+        "text": "أضِف"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 25,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      },
+      {
+        "name": "",
+        "type": "text",
+        "inputMode": "decimal"
+      }
+    ],
+    "bodyChars": 1717,
+    "shot": "settings--mobile-light.jpg"
+  },
+  {
+    "page": "/settings",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 30,
+    "errors": [],
+    "url": "/settings",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "الإعدادات",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 8,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 17,
+        "h": 44,
+        "text": "عام"
+      },
+      {
+        "tag": "INPUT",
+        "w": 213,
+        "h": 30,
+        "text": "اسم المصروف"
+      },
+      {
+        "tag": "INPUT",
+        "w": 96,
+        "h": 30,
+        "text": "المبلغ بالريال"
+      },
+      {
+        "tag": "SELECT",
+        "w": 84,
+        "h": 31,
+        "text": "الدورة"
+      },
+      {
+        "tag": "SELECT",
+        "w": 153,
+        "h": 31,
+        "text": "الباب"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 48,
+        "h": 29,
+        "text": "أضِف"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 25,
+      "arabicRuns": 0
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      },
+      {
+        "name": "",
+        "type": "text",
+        "inputMode": "decimal"
+      }
+    ],
+    "bodyChars": 1717,
+    "shot": "settings--mobile-dark.jpg"
+  },
+  {
+    "page": "/settings/audit",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 40,
+    "errors": [],
+    "url": "/settings/audit",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "سجل التدقيق",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 15,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 756,
+      "arabicRuns": 6
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 13371,
+    "shot": "settings_audit--desktop-light.jpg"
+  },
+  {
+    "page": "/settings/audit",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 27,
+    "errors": [],
+    "url": "/settings/audit",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "سجل التدقيق",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الإعدادات",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 4,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 16,
+        "h": 44,
+        "text": "عام"
+      },
+      {
+        "tag": "A",
+        "w": 56,
+        "h": 34,
+        "text": "الأقدم"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 756,
+      "arabicRuns": 6
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 13333,
+    "shot": "settings_audit--mobile-light.jpg"
+  },
+  {
+    "page": "/settings/audit",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 37,
+    "errors": [],
+    "url": "/settings/audit",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "سجل التدقيق",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 4,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 16,
+        "h": 44,
+        "text": "عام"
+      },
+      {
+        "tag": "A",
+        "w": 56,
+        "h": 34,
+        "text": "الأقدم"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 756,
+      "arabicRuns": 6
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 13333,
+    "shot": "settings_audit--mobile-dark.jpg"
+  },
+  {
+    "page": "/login",
+    "mode": "desktop-light",
+    "httpStatus": 200,
+    "loadMs": 27,
+    "errors": [],
+    "url": "/",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "حال المقهى",
+    "innerWidth": 1280,
+    "scrollWidth": 1280,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 26,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "A",
+        "w": 96,
+        "h": 20,
+        "text": "ذا بوبليك هاوس"
+      },
+      {
+        "tag": "INPUT",
+        "w": 384,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "BUTTON",
+        "w": 45,
+        "h": 27,
+        "text": "خروج"
+      },
+      {
+        "tag": "A",
+        "w": 62,
+        "h": 28,
+        "text": "الرئيسية"
+      },
+      {
+        "tag": "A",
+        "w": 91,
+        "h": 28,
+        "text": "يحتاج انتباهك"
+      },
+      {
+        "tag": "A",
+        "w": 74,
+        "h": 28,
+        "text": "المشتريات"
+      },
+      {
+        "tag": "A",
+        "w": 48,
+        "h": 28,
+        "text": "المال"
+      },
+      {
+        "tag": "A",
+        "w": 49,
+        "h": 28,
+        "text": "الأداء"
+      },
+      {
+        "tag": "A",
+        "w": 77,
+        "h": 28,
+        "text": "المستندات"
+      },
+      {
+        "tag": "A",
+        "w": 71,
+        "h": 28,
+        "text": "الإعدادات"
+      },
+      {
+        "tag": "A",
+        "w": 52,
+        "h": 30,
+        "text": "+ رفع"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 114,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2410,
+    "shot": "login--desktop-light.jpg"
+  },
+  {
+    "page": "/login",
+    "mode": "mobile-light",
+    "httpStatus": 200,
+    "loadMs": 21,
+    "errors": [],
+    "url": "/",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "حال المقهى",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [
+      {
+        "ratio": 1,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(0, 0, 0)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "الرئيسية",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      },
+      {
+        "ratio": 3.98,
+        "need": 4.5,
+        "size": 11,
+        "color": "rgb(107, 107, 116)",
+        "bg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)",
+        "text": "انتباهك",
+        "cls": "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] tra"
+      }
+    ],
+    "contrastFailCount": 2,
+    "smallTargets": 12,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "6,851.34"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "6,059.84"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "11,994.91"
+      },
+      {
+        "tag": "A",
+        "w": 80,
+        "h": 15,
+        "text": "1 حرج · 3 عالٍ ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (3)"
+      },
+      {
+        "tag": "A",
+        "w": 157,
+        "h": 32,
+        "text": "افتح الحركات ومراجعها ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (6)"
+      },
+      {
+        "tag": "A",
+        "w": 115,
+        "h": 32,
+        "text": "افتح المورّدين ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (1)"
+      },
+      {
+        "tag": "A",
+        "w": 112,
+        "h": 32,
+        "text": "افتح المتأخّرة ←"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 114,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2368,
+    "shot": "login--mobile-light.jpg"
+  },
+  {
+    "page": "/login",
+    "mode": "mobile-dark",
+    "httpStatus": 200,
+    "loadMs": 36,
+    "errors": [],
+    "url": "/",
+    "status": "فواتير ذا بوبليك هاوس",
+    "h1": "حال المقهى",
+    "innerWidth": 375,
+    "scrollWidth": 375,
+    "overflowingEls": 0,
+    "contrastFails": [],
+    "contrastFailCount": 0,
+    "smallTargets": 12,
+    "smallTargetSample": [
+      {
+        "tag": "A",
+        "w": 122,
+        "h": 39,
+        "text": "تخطَّ إلى المحتوى"
+      },
+      {
+        "tag": "INPUT",
+        "w": 178,
+        "h": 30,
+        "text": "ابحث"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "6,851.34"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "6,059.84"
+      },
+      {
+        "tag": "A",
+        "w": 133,
+        "h": 24,
+        "text": "11,994.91"
+      },
+      {
+        "tag": "A",
+        "w": 80,
+        "h": 15,
+        "text": "1 حرج · 3 عالٍ ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (3)"
+      },
+      {
+        "tag": "A",
+        "w": 157,
+        "h": 32,
+        "text": "افتح الحركات ومراجعها ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (6)"
+      },
+      {
+        "tag": "A",
+        "w": 115,
+        "h": 32,
+        "text": "افتح المورّدين ←"
+      },
+      {
+        "tag": "SUMMARY",
+        "w": 301,
+        "h": 17,
+        "text": "اعرض التفاصيل (1)"
+      },
+      {
+        "tag": "A",
+        "w": 112,
+        "h": 32,
+        "text": "افتح المتأخّرة ←"
+      }
+    ],
+    "unnamedControls": 0,
+    "digits": {
+      "latinRuns": 114,
+      "arabicRuns": 1
+    },
+    "tables": 0,
+    "inputsNumeric": [
+      {
+        "name": "",
+        "type": "search",
+        "inputMode": ""
+      }
+    ],
+    "bodyChars": 2368,
+    "shot": "login--mobile-dark.jpg"
+  }
+]
