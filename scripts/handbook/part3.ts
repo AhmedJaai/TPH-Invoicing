@@ -1,6 +1,5 @@
 /** الدليل — الجزء الثالث: الذكاء، والقرارات وأسبابُها، والاختبارات، والمصائد. */
-import { code, figure, h2, h3, h4, note, p, pageBreak, table, ul, warn } from "./render";
-import * as D from "./diagrams";
+import { h2, h3, h4, note, p, pageBreak, table, ul, warn } from "./render";
 import type * as C from "./collect";
 
 export function part3(data: { files: C.FileInfo[]; tests: { files: number; cases: number; exact: boolean } }): string {

@@ -1,5 +1,5 @@
 /** الدليل — الجزء الأوّل: ما هو النظام، ومعماريّتُه، وأمنُه، وقاعدتُه. */
-import { code, esc, figure, h2, h3, h4, note, p, pageBreak, table, ul, warn } from "./render";
+import { esc, figure, h2, h3, h4, note, p, pageBreak, table, ul, warn } from "./render";
 import * as D from "./diagrams";
 import type * as C from "./collect";
 

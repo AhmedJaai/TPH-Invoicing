@@ -1,5 +1,5 @@
 /** الدليل — الجزء الثاني: معمارية الشيفرة، وكلُّ صفحة، وكلُّ زرّ، وكلُّ مسار. */
-import { code, esc, figure, h2, h3, h4, note, p, pageBreak, table, ul, warn } from "./render";
+import { figure, h2, h3, h4, note, p, pageBreak, table, ul } from "./render";
 import * as D from "./diagrams";
 import type * as C from "./collect";
 import { PAGE_GUIDE, BUTTONS, KEY_MODULES, WORKFLOWS } from "./content";
