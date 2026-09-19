@@ -14,7 +14,7 @@
  * من اسمٍ يبدو قياسيّاً ويحمل معلومةً مخترَعة.
  */
 import {
-  buildInvoiceFileName, buildStatementFileName, parseFileName,
+  buildInvoiceFileName, buildStatementFileName, looksLikeExtension, parseFileName,
 } from "./naming";
 
 export interface NamedDocument {
@@ -27,6 +27,8 @@ export interface NamedDocument {
   date: string | null;
   totalMinor: number | null;
   invoiceNumber: string | null;
+  /** نوعُ المحتوى المقيَّد — منه يُعرَف الامتداد حين لا يحمله الاسم. */
+  mimeType?: string | null;
 }
 
 export type NameVerdict =
@@ -37,10 +39,35 @@ export type NameVerdict =
   /** ينقصه ما يُبنى به الاسم — يُعرَض ولا يُقترَح له شيء. */
   | { status: "CANNOT"; reason: string };
 
-/** الامتداد يبقى كما هو — تغييرُه يكسر فتح الملفّ. */
-function extensionOf(fileName: string): string {
-  const m = fileName.match(/\.([A-Za-z0-9]{1,5})$/);
-  return m ? m[1] : "pdf";
+/**
+ * الامتداد يبقى كما هو — تغييرُه يكسر فتح الملفّ.
+ *
+ * وكان يُؤخَذ كلُّ ما بعد آخر نقطة. وأسماءُ الأرشيف تنتهي بالمبلغ —
+ * «‏…_SAR996.19» — وكثيرٌ ممّا يصل بلا امتدادٍ أصلاً، فقُرئت «19»
+ * امتداداً وأُلحقت باسمٍ مبنيٍّ ينتهي بالمبلغ نفسه: «‏…_SAR996.19.19».
+ * وقع ذلك في **أربعة ملفّاتٍ حقيقيّة** في الدرايف يوم ١٤ سبتمبر ٢٠٢٦
+ * (سجلّ `DRIVE_FILE_RENAMED`) — فخرجت من الأرشيف بأسماءٍ بلا امتدادٍ
+ * يُفتَح به، وهو بعينه ما يمنعه هذا التعليق.
+ *
+ * فلا يُقرأ امتداداً إلّا ما كان امتداداً معروفاً؛ وإلّا فمن نوع
+ * المحتوى المقيَّد، وإلّا `pdf`. والمبلغُ ليس امتداداً.
+ */
+const EXTENSION_BY_MIME: Record<string, string> = {
+  "application/pdf": "pdf",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/heic": "heic",
+  "image/heif": "heif",
+  "image/webp": "webp",
+  "image/tiff": "tif",
+  "image/gif": "gif",
+};
+
+function extensionOf(fileName: string, mimeType?: string | null): string {
+  const dot = fileName.lastIndexOf(".");
+  const candidate = dot > 0 ? fileName.slice(dot + 1) : "";
+  if (looksLikeExtension(candidate)) return candidate.toLowerCase();
+  return EXTENSION_BY_MIME[(mimeType ?? "").toLowerCase()] ?? "pdf";
 }
 
 /**
@@ -76,7 +103,7 @@ export function canonicalName(doc: NamedDocument): NameVerdict {
   if (!doc.date) return { status: "CANNOT", reason: "لا تاريخ مقيَّد له" };
   if (doc.totalMinor === null) return { status: "CANNOT", reason: "لا إجماليّ مقيَّد له" };
 
-  const extension = extensionOf(doc.fileName);
+  const extension = extensionOf(doc.fileName, doc.mimeType);
   const shared = { date: doc.date, amountMinor: doc.totalMinor, extension };
 
   let proposed: string;

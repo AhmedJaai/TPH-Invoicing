@@ -625,6 +625,7 @@ async function handle(request: Request) {
       .select({
         driveFileId: documents.driveFileId,
         fileName: documents.fileName,
+        mimeType: documents.mimeType,
         kind: documents.kind,
         slug: suppliers.slug,
         invoiceDate: invoices.invoiceDate,
@@ -644,6 +645,7 @@ async function handle(request: Request) {
       const verdict = canonicalName({
         driveFileId: r.driveFileId,
         fileName: r.fileName,
+        mimeType: r.mimeType,
         kind: r.kind,
         slug: r.slug,
         date: (r.invoiceDate ?? r.statementEnd)?.toISOString().slice(0, 10) ?? null,

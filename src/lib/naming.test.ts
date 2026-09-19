@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCashFileName, buildInvoiceFileName, buildReceiptFileName, buildStatementFileName,
-  parseFileName, resolveNameCollision, splitSlugAndBeneficiary,
+  looksLikeExtension, parseFileName, resolveNameCollision, splitSlugAndBeneficiary,
 } from "./naming";
 
 /** الأسماء المختصرة المعروفة — لاحظ PURE-Oska الذي يحمل شرطة داخله. */
@@ -216,5 +216,43 @@ describe("صيغ نوع ظهرت في الأرشيف الفعلي", () => {
     expect(r.value.invoiceNumber).toBe("124001345");
     expect(r.value.amountMinor).toBe(1_160_000);
     expect(r.value.date).toBe("2026-08-18");
+  });
+});
+
+describe("الامتدادُ حروفٌ لا أرقام — والمبلغُ ليس امتداداً", () => {
+  /*
+    «‏…_SAR996.19» اسمٌ بلا امتداد ينتهي بالمبلغ. وكان كلُّ ما بعد آخر
+    نقطة يُعدّ امتداداً، فقُرئت «19» امتداداً وأُلحقت بالاسم المبنيّ —
+    فصار «‏…_SAR996.19.19»، وهو **يُقرأ صحيحاً** فلا يُقترَح إصلاحُه
+    أبداً. أربعةُ ملفّاتٍ حقيقيّة خرجت هكذا في ١٤ سبتمبر ٢٠٢٦.
+  */
+  it("لا تُقرأ عشراتُ المبلغ امتداداً", () => {
+    for (const name of [
+      "2026-09-08_CoffeeLabs_Invoice_V405669_SAR638.00.71",
+      "2026-09-06_AVAL_Invoice_INV-2026-00130_SAR996.19.19",
+      "2026-09-10_Loreva_Invoice_SI-0057_SAR632.50.5",
+      "2026-07-23_Ganache_Invoice_CIV-008504960_SAR1030.40.40F",
+    ]) {
+      const r = parseFileName(name, SLUGS);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.reason).toContain("امتداد");
+    }
+  });
+
+  it("ويبقى الامتدادُ الحقيقيّ كما هو — ولا يُقصَر على قائمةٍ معدودة", () => {
+    for (const ext of ["pdf", "jpg", "jpeg", "png", "heic", "webp", "xlsx", "csv"]) {
+      const r = parseFileName(`2026-08-17_OliveLeaves_Invoice_260302_SAR130.00.${ext}`, SLUGS);
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.value.extension).toBe(ext);
+    }
+  });
+
+  it("والحدّ حروفٌ من حرفين إلى أربعة", () => {
+    for (const good of ["pdf", "md", "xlsx", "JPG"]) {
+      expect(looksLikeExtension(good)).toBe(true);
+    }
+    for (const bad of ["19", "71", "5", "40F", "a", "pdfxx", ""]) {
+      expect(looksLikeExtension(bad)).toBe(false);
+    }
   });
 });

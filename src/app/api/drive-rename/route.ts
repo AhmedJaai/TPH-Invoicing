@@ -45,6 +45,7 @@ async function load(): Promise<NamedDocument[]> {
     .select({
       driveFileId: documents.driveFileId,
       fileName: documents.fileName,
+      mimeType: documents.mimeType,
       kind: documents.kind,
       slug: suppliers.slug,
       invoiceDate: invoices.invoiceDate,
@@ -76,6 +77,7 @@ async function load(): Promise<NamedDocument[]> {
     .map((r) => ({
       driveFileId: r.driveFileId,
       fileName: r.fileName,
+      mimeType: r.mimeType,
       kind: r.kind,
       slug: r.slug,
       date: (r.invoiceDate ?? r.statementEnd)?.toISOString().slice(0, 10) ?? null,

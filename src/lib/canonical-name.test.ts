@@ -74,4 +74,47 @@ describe("الاسم القياسيّ يُشتقّ من المقيَّد لا م
       fileName: "2026-05-31_Ganache-AGK_Statement_May_SAR6371.00.pdf",
     })).status).toBe("OK");
   });
+
+  it("المبلغُ ليس امتداداً — ولا يُلحَق بالاسم مرّتين", () => {
+    /*
+      وقع هذا في الدرايف يوم ١٤ سبتمبر ٢٠٢٦ (سجلّ `DRIVE_FILE_RENAMED`):
+      «‏…_SAR638.71» بلا امتداد، فقُرئت «71» امتداداً وأُلحقت باسمٍ
+      مبنيٍّ ينتهي بالمبلغ — فخرج الملفّ باسمٍ لا يُفتَح.
+    */
+    const v = canonicalName(doc({
+      fileName: "2026-09-08_CoffeeLabs_Invoice_V405669_SAR638.71",
+      slug: "CoffeeLabs", date: "2026-09-08", totalMinor: 638_00,
+      invoiceNumber: "V405669", mimeType: "application/pdf",
+    }));
+    expect(v.status).toBe("RENAME");
+    if (v.status === "RENAME") {
+      expect(v.proposed).toBe("2026-09-08_CoffeeLabs_Invoice_V405669_SAR638.00.pdf");
+    }
+  });
+
+  it("والاسمُ الذي أُفسد يُقترَح إصلاحُه — لا يُقرأ صحيحاً فيبقى", () => {
+    const v = canonicalName(doc({
+      fileName: "2026-09-06_AVAL_Invoice_INV-2026-00130_SAR996.19.19",
+      slug: "AVAL", date: "2026-09-06", totalMinor: 996_19,
+      invoiceNumber: "INV-2026-00130", mimeType: "application/pdf",
+    }));
+    expect(v.status).toBe("RENAME");
+    if (v.status === "RENAME") {
+      expect(v.proposed).toBe("2026-09-06_AVAL_Invoice_INV-2026-00130_SAR996.19.pdf");
+    }
+  });
+
+  it("وحين لا يحمل الاسمُ امتداداً يُؤخَذ من نوع المحتوى المقيَّد", () => {
+    const v = canonicalName(doc({ fileName: "IMG_2041", mimeType: "image/jpeg" }));
+    expect(v.status).toBe("RENAME");
+    if (v.status === "RENAME") expect(v.proposed.endsWith(".jpg")).toBe(true);
+  });
+
+  it("ولا يُبدَّل امتدادٌ حقيقيّ بامتدادِ نوعِ المحتوى — ذاك كسرُ الملفّ", () => {
+    const v = canonicalName(doc({
+      fileName: "كشف الحساب.xlsx", mimeType: "application/pdf",
+    }));
+    expect(v.status).toBe("RENAME");
+    if (v.status === "RENAME") expect(v.proposed.endsWith(".xlsx")).toBe(true);
+  });
 });

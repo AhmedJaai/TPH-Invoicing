@@ -81,10 +81,32 @@ function isRealDate(value: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
 
+/**
+ * الامتداد حروفٌ لا أرقام — والمبلغُ ليس امتداداً.
+ *
+ * أسماءُ الأرشيف تنتهي بالمبلغ: «‏…_SAR996.19». وكان كلُّ ما بعد آخر
+ * نقطة يُعدّ امتداداً، فصارت «19» امتداداً و«‏…_SAR996» أساساً — واسمٌ
+ * أُفسد بإلحاق المبلغ مرّتين («‏…_SAR996.19.19») **يُقرأ صحيحاً**، فلا
+ * يُقترَح إصلاحُه أبداً. وقع ذلك في أربعة ملفّاتٍ حقيقيّة في الدرايف
+ * يوم ١٤ سبتمبر ٢٠٢٦ (سجلّ `DRIVE_FILE_RENAMED`).
+ *
+ * والحدّ حروفٌ فقط من حرفين إلى أربعة: يقبل `pdf` و`jpg` و`heic`
+ * و`xlsx` و`csv` و`md`، ويردّ «19» و«71» و«5» و«40F». ولا يُقصَر على
+ * قائمةٍ معدودة: امتدادٌ صحيح خارجها يصير «بلا امتداد» فيُقترَح له
+ * اسمٌ بامتدادٍ آخر — وذاك كسرُ الملفّ بعينه.
+ */
+const EXTENSION_TOKEN_RE = /^[A-Za-z]{2,4}$/;
+
+export function looksLikeExtension(token: string): boolean {
+  return EXTENSION_TOKEN_RE.test(token);
+}
+
 function splitExtension(fileName: string): { base: string; extension: string } {
   const dot = fileName.lastIndexOf(".");
   if (dot <= 0) return { base: fileName, extension: "" };
-  return { base: fileName.slice(0, dot), extension: fileName.slice(dot + 1).toLowerCase() };
+  const candidate = fileName.slice(dot + 1);
+  if (!looksLikeExtension(candidate)) return { base: fileName, extension: "" };
+  return { base: fileName.slice(0, dot), extension: candidate.toLowerCase() };
 }
 
 /**
