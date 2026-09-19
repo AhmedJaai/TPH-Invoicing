@@ -364,26 +364,43 @@ export function DataTable<T>({
         </table>
       </ScrollX>
 
-      {/* الجوّال: بطاقات */}
+      {/*
+        ── الجوّال: بطاقات، ورابطُ البطاقة طبقةٌ لا غلاف ──
+
+        كانت البطاقة كلُّها `<Link>` يلفّ خلاياها. فأيُّ خليّةٍ فيها
+        رابطٌ تُنتج `<a>` داخل `<a>` — وهو ترميزٌ باطل يرفضه المتصفّح
+        فيعيد بناء الشجرة، **ويسقط الترطيب فيتوقّف تفاعلُ الصفحة
+        كلّها**. وقد وقع حين صارت شارةُ الضريبة تفتح سببَها.
+
+        والعلاج أنّ الرابط طبقةٌ مطلقة تحت المحتوى لا غلافٌ حوله:
+        الضغطُ على الفراغ يبلغها، والضغطُ على رابطٍ داخليّ يبلغه هو —
+        لأنّ المحتوى يُرسَم بعدها فيعلوها. ولا `<a>` داخل `<a>`.
+      */}
       <ul className="space-y-2.5 sm:hidden">
         {rows.map((row) => {
           const href = hrefOf?.(row);
-          const body = (
-            <>
-              <p className="text-sm font-bold leading-snug">{primary.cell(row)}</p>
-              <dl className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
-                {rest.map((c) => (
-                  <div key={c.key} className="min-w-0">
-                    <dt className="text-[11px] text-muted">{c.header}</dt>
-                    <dd className="truncate text-xs">{c.cell(row)}</dd>
-                  </div>
-                ))}
-              </dl>
-            </>
-          );
           return (
             <li key={keyOf(row)}>
-              <Card href={href}>{body}</Card>
+              <Card className={href ? "relative card-rows" : ""}>
+                {href && (
+                  <Link
+                    href={href}
+                    aria-label="افتح التفصيل"
+                    className="absolute inset-0 rounded-2xl"
+                  />
+                )}
+                <div>
+                  <p className="text-sm font-bold leading-snug">{primary.cell(row)}</p>
+                  <dl className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                    {rest.map((c) => (
+                      <div key={c.key} className="min-w-0">
+                        <dt className="text-[11px] text-muted">{c.header}</dt>
+                        <dd className="truncate text-xs">{c.cell(row)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </Card>
             </li>
           );
         })}

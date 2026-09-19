@@ -58,6 +58,8 @@ export type AuditAction =
   | "EXPENSE_RECLASSIFIED"
   | "RECONCILIATION_BALANCES_SET"
   | "DOCUMENT_STATUS_CHANGED"
+  /* أُعيدت قراءةُ مستندٍ مؤرشف — بما قُرئ وبعدد ما كُتب من بنود */
+  | "DOCUMENT_REREAD"
   | "ALERT_RESOLVED";
 
 export async function recordAudit(entry: {

@@ -21,6 +21,7 @@ import { formatDay } from "@/lib/riyadh-time";
 import { documents } from "@/db/schema";
 import { invoiceReasons } from "@/lib/invoice-findings";
 import { InvoiceFix } from "@/components/invoice-fix";
+import { DocumentReread } from "@/components/document-reread";
 import { companyConfig } from "@/config/drive";
 import { Section } from "@/components/ui";
 
@@ -138,6 +139,7 @@ export default async function InvoicesPage({
       ? db
           .select({
             id: invoices.id,
+            documentId: invoices.documentId,
             kind: documents.kind,
             invoiceNumber: invoices.invoiceNumber,
             sellerVat: invoices.sellerVat,
@@ -280,6 +282,15 @@ export default async function InvoicesPage({
             </Link>
           }
         >
+          {/*
+            بابان لعطبٍ واحد: ما أخطأت القراءةُ فيه يُصحَّح بيد الإنسان،
+            وما لم تقرأه أصلاً (البنود · التفصيل الضريبيّ) يُعاد قراءتُه.
+            وكان أحدهما غائباً والآخر غائباً معه.
+          */}
+          <div className="mb-3">
+            <DocumentReread documentId={fix.documentId} canEdit={canEditInvoices} />
+          </div>
+
           <InvoiceFix
             invoiceId={fix.id}
             canEdit={canEditInvoices}

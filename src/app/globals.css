@@ -391,3 +391,20 @@ html[data-amounts="hidden"] .nums-col .nums::after {
 .icon-hidden { display: none; }
 html[data-amounts="hidden"] .icon-shown { display: none; }
 html[data-amounts="hidden"] .icon-hidden { display: block; }
+
+
+/*
+ * ── بطاقةُ الصفّ على الجوّال: رابطُها طبقةٌ لا غلاف ──
+ *
+ * كان الصفُّ كلُّه `<Link>` يلفّ خلاياه، فأيُّ خليّةٍ فيها رابطٌ تُنتج
+ * `<a>` داخل `<a>` — ترميزٌ باطل يرفضه المتصفّح فيعيد بناء الشجرة،
+ * **ويسقط الترطيب فيتوقّف تفاعلُ الصفحة كلّها**.
+ *
+ * فصار الرابطُ طبقةً مطلقةً تملأ البطاقة، والمحتوى فوقها غيرُ مموضَع —
+ * فتبقى الطبقةُ هي ما يُضغَط في الفراغ. وما كان تفاعليّاً داخل المحتوى
+ * (رابطٌ أو زرٌّ أو حقل) يُرفَع فوقها بـ`position: relative` فيبلغه
+ * الضغطُ هو. فلا يضيع اتّساعُ هدف اللمس، ولا يُحجَب فعلٌ داخليّ.
+ */
+.card-rows :where(a, button, input, select, label, summary):not([aria-label="افتح التفصيل"]) {
+  position: relative;
+}
