@@ -21,6 +21,7 @@ import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { splitSupplierCredit } from "@/lib/supplier-requests";
+import { SupplierPolicy } from "@/components/supplier-policy";
 import { formatDay, formatRange } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
@@ -571,6 +572,21 @@ export default async function SupplierPage({
 
         {tab === "profile" && (
           <div className="space-y-4">
+            {/*
+              السياسةُ أوّلاً: هي الشيء الوحيد في هذا اللسان الذي
+              **يُغيَّر**، وما تحتها عرضٌ وتقييم.
+            */}
+            <SupplierPolicy
+              supplierId={s.id}
+              canEdit={canAnalyze}
+              initial={{
+                issuesInvoices: s.issuesInvoices,
+                paperInvoices: s.paperInvoices,
+                contractRequired: s.contractRequired,
+                contractOnFile: s.contractOnFile,
+              }}
+            />
+
             <Card>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
                 <Fact label="الرقم الضريبي" value={s.vatNumber} missing="ناقص" ltr />
@@ -579,12 +595,19 @@ export default async function SupplierPage({
                 <Fact
                   label="عقد التوريد"
                   value={s.contractOnFile ? "موجود" : null}
-                  missing={s.issuesInvoices ? "غير مطلوب" : "ناقص"}
+                  missing={s.contractRequired && !s.issuesInvoices ? "ناقص" : "غير مطلوب"}
                 />
                 <Fact label="الاسم في الدرايف" value={s.driveFolderName} ltr />
                 <Fact label="المعرّف" value={s.slug} ltr />
                 <Fact label="أسماء بديلة" value={String(n("alias_count"))} />
-                <Fact label="يصدر فواتير ضريبية" value={s.issuesInvoices ? "نعم" : "لا"} />
+                <Fact
+                  label="فواتيره"
+                  value={
+                    !s.issuesInvoices ? "لا يصدر فواتير"
+                    : s.paperInvoices ? "ضريبية — ورقيّة باليد"
+                    : "ضريبية"
+                  }
+                />
               </dl>
             </Card>
 

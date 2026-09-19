@@ -1,6 +1,5 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
 
 /**
  * ضبطُ العرض: الظلامُ، وإخفاءُ الأرقام.
@@ -24,68 +23,45 @@ const AMOUNTS_KEY = "tph.amounts";
 
 type Theme = "light" | "dark" | "system";
 
-/*
-  ── الحالةُ تُقرأ من `<html>` لا من متغيّرٍ في React ──
-
-  لأنّ النصّ الذي يسبق الرسمَ كتبها هناك. ولو نُسخت إلى حالةٍ داخليّة
-  لصار لها مصدران يفترقان. و`useSyncExternalStore` هي السبيل الذي تُقرأ
-  به حالةٌ خارج React بلا مزامنةٍ في أثر.
-*/
-const EVENT = "tph:view-change";
-
-function subscribe(onChange: () => void): () => void {
-  window.addEventListener(EVENT, onChange);
-  const mq = window.matchMedia("(prefers-color-scheme: dark)");
-  mq.addEventListener("change", onChange);
-  return () => {
-    window.removeEventListener(EVENT, onChange);
-    mq.removeEventListener("change", onChange);
-  };
-}
-
-function announce() {
-  window.dispatchEvent(new Event(EVENT));
-}
-
-/** أهو داكنٌ الآن؟ — الاختيارُ أوّلاً، ثمّ تفضيلُ الجهاز. */
-function darkNow(): boolean {
-  const v = document.documentElement.getAttribute("data-theme");
-  if (v === "dark") return true;
-  if (v === "light") return false;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-function hiddenNow(): boolean {
-  return document.documentElement.getAttribute("data-amounts") === "hidden";
-}
-
 export function ViewControls() {
-  /* الخادم لا يعرف تفضيل الجهاز — فيرسم المحايد، ويُصحَّح عند التركيب. */
-  const dark = useSyncExternalStore(subscribe, darkNow, () => false);
-  const hidden = useSyncExternalStore(subscribe, hiddenNow, () => false);
+  /*
+    ── لا حالةَ في الترميز ──
 
+    الحالةُ مكتوبةٌ على `<html>` بنصٍّ يسبق أوّل رسم، والخادمُ لا يعرفها.
+    فلو رُسم الزرُّ من حالةٍ في React لاختلف ما يرسمه الخادمُ عمّا يرسمه
+    المتصفّح — وذلك **خطأُ ترطيب** يُبطل تفاعلَ الشجرة كلّها، لا تحذيرٌ
+    في السجلّ وحده. وقد وقع فعلاً.
+
+    فالأيقونتان تُرسَمان معاً ويُظهر CSS إحداهما، والوصفُ يصف **الفعل**
+    لا الحال («بدّل الوضع») فلا يختلف بين الخادم والمتصفّح. والقارئُ
+    يعرف الحالَ من الصفحة نفسها لا من نصّ الزرّ.
+  */
   function toggleTheme() {
-    /* الدورة ثنائيّة لا ثلاثيّة: من ضغط الزرّ يريد الضدّ، لا «اتبع النظام». */
-    const next: Theme = dark ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", next);
+    const root = document.documentElement;
+    const chosen = root.getAttribute("data-theme");
+    const darkNow =
+      chosen === "dark"
+      || (chosen !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    /* الدورة ثنائيّة: من ضغط الزرّ يريد الضدّ، لا «اتبع النظام». */
+    const next: Theme = darkNow ? "light" : "dark";
+    root.setAttribute("data-theme", next);
     try {
       localStorage.setItem(THEME_KEY, next);
     } catch {
       /* متصفّحٌ يمنع التخزين — يبقى الاختيار لهذه الجلسة وحدها */
     }
-    announce();
   }
 
   function toggleAmounts() {
-    const next = !hidden;
-    if (next) document.documentElement.setAttribute("data-amounts", "hidden");
-    else document.documentElement.removeAttribute("data-amounts");
+    const root = document.documentElement;
+    const next = root.getAttribute("data-amounts") !== "hidden";
+    if (next) root.setAttribute("data-amounts", "hidden");
+    else root.removeAttribute("data-amounts");
     try {
       localStorage.setItem(AMOUNTS_KEY, next ? "hidden" : "shown");
     } catch {
       /* كما سبق */
     }
-    announce();
   }
 
   const btn =
@@ -97,21 +73,22 @@ export function ViewControls() {
         type="button"
         onClick={toggleAmounts}
         className={btn}
-        aria-pressed={hidden}
-        title={hidden ? "أظهر المبالغ" : "أخفِ المبالغ — للعرض على غيرك"}
-        aria-label={hidden ? "أظهر المبالغ" : "أخفِ المبالغ"}
+        title="أخفِ المبالغ أو أظهرها — للعرض على غيرك"
+        aria-label="بدّل إخفاء المبالغ"
       >
-        {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        <Eye className="icon-shown h-4 w-4" />
+        <EyeOff className="icon-hidden h-4 w-4" />
       </button>
 
       <button
         type="button"
         onClick={toggleTheme}
         className={btn}
-        title={dark ? "الوضع الفاتح" : "الوضع الداكن"}
-        aria-label={dark ? "الوضع الفاتح" : "الوضع الداكن"}
+        title="بدّل بين الوضع الفاتح والداكن"
+        aria-label="بدّل الوضع الفاتح والداكن"
       >
-        {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        <Sun className="icon-dark h-4 w-4" />
+        <Moon className="icon-light h-4 w-4" />
       </button>
     </div>
   );

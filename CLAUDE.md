@@ -89,6 +89,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 | `032_payment_month_stable.sql` | `payment_month` تُوسَم `STABLE` لا `IMMUTABLE` — `to_char(timestamptz)` يتبع منطقة الجلسة |
 | `033_document_drive_md5.sql` | `documents.drive_md5` — بصمةُ الدرايف لما قيّدته المزامنةُ بالاسم، يقابلها `/api/analyze` قبل القراءة |
 | `034_alert_resolutions.sql` | قرارُ الإنسان في تنبيه «سُدّد مرّتين»: طالبتُ · استُردّ · ليس ازدواجاً — بمفتاحٍ يُشتقّ من الحركات |
+| `035_supplier_document_policy.sql` | سياسةُ مستندات المورّد: `contract_required` و`paper_invoices` — يكتبهما الإنسان ولا يُشتقّان، وقيدٌ يمنع «ورقيّة» مع «لا يصدر فواتير» |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

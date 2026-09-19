@@ -361,3 +361,33 @@ html[data-amounts="hidden"] .nums::after {
 html[data-amounts="hidden"] .nums-col .nums::after {
   justify-content: flex-end;
 }
+
+
+/*
+ * ── أيقونتا زرّي العرض: يقرّرهما CSS لا JavaScript ──
+ *
+ * الحالةُ مكتوبةٌ على `<html>` بنصٍّ يسبق الرسم، والخادمُ لا يعرفها.
+ * فلو رُسمت الأيقونةُ من حالةٍ في React لاختلف ما رسمه الخادمُ عمّا
+ * يرسمه المتصفّح — وهو خطأُ ترطيبٍ يُبطل تفاعلَ الشجرة كلّها، لا
+ * تحذيرٌ في السجلّ وحده.
+ *
+ * فيُرسَم الرمزان معاً ويُظهر CSS أحدَهما. ولا حالةَ في الترميز أصلاً،
+ * فلا شيء يختلف بين الخادم والمتصفّح.
+ */
+.icon-dark { display: none; }
+.icon-light { display: block; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .icon-dark { display: block; }
+  :root:not([data-theme="light"]) .icon-light { display: none; }
+}
+
+:root[data-theme="dark"] .icon-dark { display: block; }
+:root[data-theme="dark"] .icon-light { display: none; }
+:root[data-theme="light"] .icon-dark { display: none; }
+:root[data-theme="light"] .icon-light { display: block; }
+
+.icon-shown { display: block; }
+.icon-hidden { display: none; }
+html[data-amounts="hidden"] .icon-shown { display: none; }
+html[data-amounts="hidden"] .icon-hidden { display: block; }

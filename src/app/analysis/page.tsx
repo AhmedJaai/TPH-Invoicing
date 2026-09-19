@@ -5,7 +5,7 @@ import { invoiceLines, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
-import { findSameNameCandidates, summarizeItems, type LineRow } from "@/lib/analytics";
+import { summarizeItems, type LineRow } from "@/lib/analytics";
 import { NoAccess, DataTable, EmptyState, Section, Stat, StatGrid } from "@/components/ui";
 import { PRODUCT, countNoun, DAY, TIME } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
@@ -98,7 +98,6 @@ export default async function ItemsAndPricesPage() {
 
   const lineCoverage = health.metrics.find((m) => m.id === "lines");
   const totalSpend = items.reduce((s, i) => s + i.totalSpentMinor, 0);
-  const sameName = findSameNameCandidates(items);
 
   const priceMoves = items
     .filter((i) => i.priceChange && i.priceChange.deltaRatio !== null && Math.abs(i.priceChange.deltaRatio) >= 0.03)
@@ -135,7 +134,6 @@ export default async function ItemsAndPricesPage() {
           value={String(priceMoves.length)}
           tone={priceMoves.length > 0 ? "warn" : undefined}
         />
-        <Stat label="أسماء تتكرّر عند مورّدين" value={String(sameName.length)} />
       </StatGrid>
 
       {lineCoverage && lineCoverage.state !== "GOOD" && (
@@ -197,44 +195,22 @@ export default async function ItemsAndPricesPage() {
         </Section>
       )}
 
-      {sameName.length > 0 && (
-        <Section
-          title="اسمٌ واحد عند مورّدين — للمراجعة"
-          hint="هذه مرشّحات لا نتائج. تطابقُ الاسم لا يعني تطابقَ الصنف: «عنب» عند المحمصة الغربية كيلو بنٍّ بـ١٥٥ ريالاً، و«عنب» عند لافا زجاجةُ كمبوتشا بـ١٣٫٥٠. فانظر الوصفين بنفسك — فإن كانا صنفاً واحداً فالفارق فرصة، وإلّا فلا معنى للمقارنة."
-        >
-          <DataTable
-            rows={sameName.slice(0, 20)}
-            keyOf={(g) => g.normalized}
-            columns={[
-              { key: "name", header: "الاسم المشترك", primary: true, cell: (g) => <span className="font-medium">{g.normalized}</span> },
-              {
-                key: "cheaper", header: "الأرخص",
-                cell: (g) => (
-                  <span>
-                    <span className="block text-xs text-muted">{g.cheaper.supplierName}</span>
-                    <span className="block text-[11px]">{g.cheaper.displayName}</span>
-                    <Money minor={g.cheaper.lastUnitPriceMinor} tone="ok" />
-                  </span>
-                ),
-              },
-              {
-                key: "dearer", header: "الأغلى",
-                cell: (g) => (
-                  <span>
-                    <span className="block text-xs text-muted">{g.dearer.supplierName}</span>
-                    <span className="block text-[11px]">{g.dearer.displayName}</span>
-                    <Money minor={g.dearer.lastUnitPriceMinor} tone="danger" />
-                  </span>
-                ),
-              },
-              { key: "gap", header: "الفارق", numeric: true, cell: (g) => <span className="font-bold text-warn">{Math.round(g.gapRatio * 100)}٪</span> },
-            ]}
-          />
-          {sameName.length > 20 && (
-            <p className="mt-2 text-xs text-muted">تُعرض أوّل 20 من {sameName.length} — الأكبر فارقاً.</p>
-          )}
-        </Section>
-      )}
+      {/*
+        ── «اسمٌ واحد عند مورّدين» حُذف من هنا ──
+
+        كان قسماً يعرض مرشّحاتٍ لا نتائج، ويقول ذلك عن نفسه: «تطابقُ
+        الاسم لا يعني تطابقَ الصنف». وفي بيانات المقهى مرشَّحٌ واحد —
+        «عنب» عند المحمصة الغربية كيلو بنٍّ بـ١٥٥ ريالاً، وعند لافا
+        زجاجةُ كمبوتشا بـ١٣٫٥٠ — وهو **ليس** صنفاً واحداً.
+
+        فالقسمُ يعرض في كلّ مرّةٍ شيئاً لا يُفعَل به شيء، ولا سبيلَ إلى
+        إسكاته. **والتنبيهُ الذي لا يُسكَت ولا يُفعَل فيه شيء يُعلّم
+        صاحبَه تجاهلَ ما عداه.**
+
+        والقدرةُ لم تُحذَف: اقتراحُ الدمج باقٍ في «اربط أصناف المورّدين»
+        أسفلَ الصفحة — وهو الموضع الذي **يُفعَل** فيه شيء، إذ يُربَط
+        الصنفان أو يُتخطّيان، فلا يُعرَض الاقتراح ثانية.
+      */}
 
       {dueSoon.length > 0 && (
         <Section

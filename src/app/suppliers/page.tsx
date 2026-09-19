@@ -70,6 +70,8 @@ export default async function SuppliersPage({
         nameAr: suppliers.nameAr,
         issuesInvoices: suppliers.issuesInvoices,
         contractOnFile: suppliers.contractOnFile,
+        contractRequired: suppliers.contractRequired,
+        paperInvoices: suppliers.paperInvoices,
         invoiceCount: sql<number>`(
           select count(*)::int from invoices i where i.supplier_id = suppliers.id
         )`,
@@ -124,7 +126,16 @@ export default async function SuppliersPage({
       a.nameAr.localeCompare(b.nameAr, "ar"),
     );
 
-  const needContract = meta.filter((r) => !r.issuesInvoices && !r.contractOnFile);
+  /*
+    من أُعلن أنّه لا يُطلَب منه عقد يخرج، ومن فواتيرُه ورقيّةٌ يخرج كذلك:
+    الأولى قرارُ صاحب العمل، والثانية تقول إنّ الفاتورة موجودةٌ ولم
+    تُرفَع — فمطلبُها رفعُ الورقة لا عقدُ توريد. (الهجرة 035)
+  */
+  const needContract = meta.filter(
+    (r) => !r.issuesInvoices && !r.contractOnFile && r.contractRequired && !r.paperInvoices,
+  );
+  /* ومن فواتيرُه ورقيّة يُذكَر بمطلبه هو: ارفع الورقة. */
+  const paperOnly = meta.filter((r) => r.paperInvoices);
 
   const findings: FindingView[] = open.map((f) => ({
     id: f.id, supplierId: f.supplierId, supplierName: f.supplierName, supplierSlug: f.supplierSlug,
@@ -278,7 +289,22 @@ export default async function SuppliersPage({
                 {countNoun(needContract.length, SUPPLIER)} يحتاج عقد توريد:
               </span>{" "}
               {needContract.map((r) => r.nameAr).join(" · ")} — لا يصدرون فواتير ضريبية، وبلا عقدٍ
-              مكتوب لا خصم ضريبة ولا إثبات مصروف.
+              مكتوب لا خصم ضريبة ولا إثبات مصروف.{" "}
+              <span className="text-muted">
+                ومن لا يحتاج عقداً تُطفئه من ملفّه: «ما يُطلَب من هذا المورّد».
+              </span>
+            </p>
+          </div>
+        )}
+
+        {paperOnly.length > 0 && (
+          <div className="mb-3 rounded-xl border border-line bg-sunken px-4 py-3">
+            <p className="text-xs leading-relaxed">
+              <span className="font-bold">
+                {countNoun(paperOnly.length, SUPPLIER)} فواتيرُه ورقيّة:
+              </span>{" "}
+              {paperOnly.map((r) => r.nameAr).join(" · ")} — فاتورتُه موجودةٌ باليد ولم تُرفَع،
+              فالمطلوبُ تصويرُها ورفعُها لا طلبُ عقدٍ منه.
             </p>
           </div>
         )}
