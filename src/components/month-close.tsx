@@ -6,6 +6,7 @@ import type { CheckItem, MonthCloseReport } from "@/lib/month-close";
 import { ConfirmAction } from "./ui-client";
 import { countNoun, BLOCKER, CHECK, WARNING } from "@/lib/arabic";
 import { postJson } from "@/lib/http-client";
+import { buttonClass } from "./ui";
 
 interface Response {
   report: MonthCloseReport;
@@ -119,12 +120,13 @@ export function MonthClose({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2">
         <select
+          aria-label="الشهر"
           value={month}
           onChange={(e) => {
             setMonth(e.target.value);
             void call("check", e.target.value);
           }}
-          className="nums rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+          className="nums rounded-lg border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
           dir="ltr"
         >
           {months.map((m) => (
@@ -134,7 +136,7 @@ export function MonthClose({
         <button
           onClick={() => void call("check", month)}
           disabled={busy !== null}
-          className="rounded-lg border border-line px-3 py-2 text-xs font-medium hover:border-ink-soft disabled:opacity-40"
+          className={buttonClass("secondary", "sm")}
         >
           {busy === "checking" ? "يفحص…" : "أعد الفحص"}
         </button>
@@ -213,7 +215,7 @@ export function MonthClose({
                     inputMode="decimal"
                     dir="ltr"
                     required
-                    className="nums mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+                    className="nums mt-1 w-full rounded-lg border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
                   />
                 </label>
                 <label className="block text-xs">
@@ -224,7 +226,7 @@ export function MonthClose({
                     inputMode="decimal"
                     dir="ltr"
                     required
-                    className="nums mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+                    className="nums mt-1 w-full rounded-lg border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
                   />
                 </label>
               </div>
@@ -252,13 +254,18 @@ export function MonthClose({
                     متى وجدت فاتورة متأخّرة.
                   </p>
                   {report.warnings.length > 0 && (
-                    <input
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder="سبب الإقفال مع التنبيهات — يُحفظ في سجل التدقيق"
-                      dir="auto"
-                      className="mt-3 w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs outline-none focus:border-ink"
-                    />
+                    /* النصّ المؤقّت ليس اسماً: يختفي عند أوّل حرفٍ يُكتب، فيبقى
+                       أخطرُ حقلٍ في الشهر بلا ما يقول ما هو */
+                    <label className="mt-3 block text-xs">
+                      <span className="text-muted">سبب الإقفال مع التنبيهات</span>
+                      <input
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="يُحفظ في سجلّ التدقيق"
+                        dir="auto"
+                        className="mt-1 w-full rounded-lg border border-line-input bg-surface px-3 py-2 text-xs outline-none focus:border-ink"
+                      />
+                    </label>
                   )}
                   {/*
                     كان أخطرُ فعلٍ شهريّ يقع في نافذة المتصفّح الأصليّة،

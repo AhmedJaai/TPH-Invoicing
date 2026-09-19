@@ -160,7 +160,7 @@ export default async function SettingsPage() {
       <section className="mt-10">
         <div className="mb-1 flex items-baseline justify-between gap-3">
           <h2 className="text-base font-bold">حال الربط وصحّة البيانات</h2>
-          <span className="text-xs font-bold">ثقة الأرقام {Math.round(health.confidence * 100)}٪</span>
+          <span className="text-xs font-bold">اكتمال البيانات {Math.round(health.confidence * 100)}٪</span>
         </div>
         <p className="mb-3 text-xs leading-relaxed text-muted">
           ما ليس موصولاً يُقال عنه ذلك، ولا يُملأ بصفر ولا ببيانات وهمية.

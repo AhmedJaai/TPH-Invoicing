@@ -11,6 +11,8 @@ import {
   type FindingKind,
   type Severity,
 } from "@/lib/ai/finding-labels";
+import { SUGGESTION, countNoun } from "@/lib/arabic";
+import { ACT } from "@/lib/ui-terms";
 
 /**
  * اقتراحاتُ تحليل الذكاء — وقرارُ صاحب العمل فيها.
@@ -97,7 +99,7 @@ export function RunAnalysis({
       setProgress(suppliers.length > 1 ? `يحلّل ${k + 1} من ${suppliers.length} — ${s.name}` : "يحلّل… قد يستغرق نصف دقيقة");
       const r = await postJson("/api/ai-analysis", { supplierId: s.id });
       const text = r && r.ok
-        ? `${String(r.data.summary ?? "")}${Number(r.data.count ?? 0) > 0 ? ` — ${r.data.count} اقتراح` : ""}`
+        ? `${String(r.data.summary ?? "")}${Number(r.data.count ?? 0) > 0 ? ` — ${countNoun(Number(r.data.count ?? 0), SUGGESTION)}` : ""}`
         : errorOf(r);
       setLines((prev) => [...prev, { name: s.name, text, bad: !(r && r.ok) }]);
       if (r && r.status === 402) break; // الرصيد نفد — لا فائدة من الباقي
@@ -249,7 +251,7 @@ function FindingCard({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             maxLength={500}
-            className="mt-1 block min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm"
+            className="mt-1 block min-h-11 w-full rounded-xl border border-line-input bg-surface px-3 text-sm"
             placeholder="مثلاً: سدّدتُها بحوالةٍ من حسابٍ آخر"
           />
         </label>
@@ -279,7 +281,7 @@ function FindingCard({
                   onClick={() => decide("accept")}
                   title={canApprove ? undefined : "إقرار ما يكتب سداداً لمن يعتمد السداد"}
                 >
-                  {state === "busy" ? "يحفظ…" : f.action?.type === "OWNER_PAID" ? "أكّد — قيّدها من حسابي" : f.action?.type === "VOID_DUPLICATE" ? "هي دفعةٌ واحدة — ألغِ المكرّرة" : "اخصم الرصيد من فواتيره"}
+                  {state === "busy" ? "يحفظ…" : f.action?.type === "OWNER_PAID" ? ACT.paidFromOwner : f.action?.type === "VOID_DUPLICATE" ? "هي دفعةٌ واحدة — ألغِ المكرّرة" : "اخصم الرصيد من فواتيره"}
                 </button>
               )}
               <button type="button" disabled={state === "busy"} className={`${btn} text-ink-soft`} onClick={() => setState("dismissing")}>

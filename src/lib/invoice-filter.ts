@@ -8,6 +8,7 @@
  * والمُرشِّحات هنا دوالّ خالصة تُبنى منها الروابط وتُقرأ منها، فلا
  * يُكتب اسم مُرشِّح في مكانين ويُنسى أحدهما.
  */
+import { DAY, countNoun } from "./arabic";
 
 export type TaxFilter = "VALID" | "INVALID" | "UNKNOWN" | "NOT_APPLICABLE";
 /**
@@ -100,7 +101,7 @@ export function describe(f: InvoiceFilters): string {
   const parts: string[] = [];
   if (f.tax) parts.push(TAX_LABEL[f.tax]);
   if (f.paid) parts.push(PAID_LABEL[f.paid]);
-  if (f.overdue) parts.push(`مضى على استحقاقها ${OVERDUE_DAYS} يوماً`);
+  if (f.overdue) parts.push(`مضى على استحقاقها ${countNoun(OVERDUE_DAYS, DAY)}`);
   if (f.noLines) parts.push("بلا بنود مقروءة");
   if (f.month) parts.push(`في ${f.month}`);
   return parts.length === 0 ? "كل الفواتير" : parts.join(" · ");

@@ -16,7 +16,13 @@ import { countNoun, SUPPLIER } from "@/lib/arabic";
 export const dynamic = "force-dynamic";
 
 /**
- * تحليل الذكاء — حسابُ كلّ مورّد، وما يقترحه التحليل لتصحيحه.
+ * «عليك لكلّ مورّد» — جوابُ سؤال أحمد الأوّل، وتحته ما يقترحه التحليل
+ * لتصحيح حسابٍ بدا معوجّاً.
+ *
+ * وكان اسمُها «تحليل الذكاء»: الصفحةُ التي تحمل الجواب الوحيد لـ«كم أدين
+ * ولمن؟» مسمّاةٌ بالأداة التي تحسبه لا بالسؤال الذي تجيبه — فلا يفتحها
+ * من يسأله. والجدول أوّلاً لأنّه المقصود، والاقتراحات تحته لأنّها عملٌ
+ * آخر يُفتح حين يُراد.
  *
  * الأرقام في أعلى الصفحة محسوبة (لا يكتبها النموذج): ما عليك بعد خصم ما
  * دفعتَه، وما لك عند مورّدين بلا فواتير. والاقتراحات تحتها تنتظر قرارك:
@@ -28,7 +34,7 @@ export default async function InsightsPage() {
   if (!user) redirect("/login?from=/purchases/insights");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} title="تحليل الذكاء">
+      <PageShell user={user} title="عليك لكلّ مورّد">
         <NoAccess what="حسابات المورّدين" />
       </PageShell>
     );
@@ -63,7 +69,7 @@ export default async function InsightsPage() {
     <PageShell
       user={user}
       width="wide"
-      title="تحليل الذكاء"
+      title="عليك لكلّ مورّد"
       intro="كم عليك لكلّ مورّد بعد خصم ما دفعتَه له، وما يقترحه التحليل لتصحيح حسابه."
     >
       <StatGrid>
@@ -92,26 +98,7 @@ export default async function InsightsPage() {
         />
       </StatGrid>
 
-      {canAnalyze && (
-        <Section
-          title="حلّل الحسابات"
-          hint="يمرّ على كلّ مورّدٍ عليك له أو لك عنده، واحداً واحداً. التحليل القديم يُستبدل، وقراراتك السابقة يقرؤها التحليل الجديد."
-        >
-          <RunAnalysis
-            suppliers={worth.map((r) => ({ id: r.supplierId, name: nameOf.get(r.supplierId)?.nameAr ?? "مورّد" }))}
-            label={`حلّل ${countNoun(worth.length, SUPPLIER)} بالذكاء`}
-          />
-        </Section>
-      )}
-
-      <Section title="اقتراحات تنتظر قرارك">
-        {findings.length === 0 ? (
-          <p className="text-sm text-muted">لا اقتراحات مفتوحة.</p>
-        ) : (
-          <FindingsList findings={findings} canApprove={canApprove} showSupplier />
-        )}
-      </Section>
-
+      {/* الجدول أوّلاً: هو الجواب، وما تحته عملٌ يُفتح حين يُراد */}
       <Section title="حساب كلّ مورّد" hint="المفتوح على فواتيره، وما دفعتَه له ولم يُخصم، والصافي.">
         <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
           {worth.map((r) => {
@@ -135,6 +122,26 @@ export default async function InsightsPage() {
           })}
         </ul>
       </Section>
+
+      <Section title="اقتراحات تنتظر قرارك">
+        {findings.length === 0 ? (
+          <p className="text-sm text-muted">لا اقتراحات مفتوحة.</p>
+        ) : (
+          <FindingsList findings={findings} canApprove={canApprove} showSupplier />
+        )}
+      </Section>
+
+      {canAnalyze && (
+        <Section
+          title="حلّل الحسابات"
+          hint="يمرّ على كلّ مورّدٍ عليك له أو لك عنده، واحداً واحداً. التحليل القديم يُستبدل، وقراراتك السابقة يقرؤها التحليل الجديد."
+        >
+          <RunAnalysis
+            suppliers={worth.map((r) => ({ id: r.supplierId, name: nameOf.get(r.supplierId)?.nameAr ?? "مورّد" }))}
+            label={`حلّل ${countNoun(worth.length, SUPPLIER)} بالذكاء`}
+          />
+        </Section>
+      )}
     </PageShell>
   );
 }

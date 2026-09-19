@@ -2,7 +2,8 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { INVOICE, countNoun, FILE } from "@/lib/arabic";
+import { INVOICE, QUOTATION, countNoun, FILE } from "@/lib/arabic";
+import { buttonClass } from "./ui";
 
 interface Summary {
   scope: string;
@@ -226,7 +227,7 @@ export function DriveSync() {
     return (
       <button
         onClick={() => { setOpen(true); void call(false); }}
-        className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-soft hover:border-ink-soft"
+        className={buttonClass("secondary", "sm")}
       >
         افحص الدرايف عن ملفات جديدة
       </button>
@@ -298,7 +299,7 @@ export function DriveSync() {
           {result?.quotations && result.quotations.length > 0 && (
             <div className="mt-3 rounded-xl border border-warn/40 bg-warn-bg px-3 py-2.5">
               <p className="text-[11px] font-bold text-warn">
-                {result.quotations.length} عرض سعر — لم يُسجَّل
+                {countNoun(result.quotations.length, QUOTATION)} — لم يُسجَّل
               </p>
               <p className="mt-1 text-[11px] text-muted">
                 عرضُ السعر ليس واقعةً ماليّة: لا مالَ خرج ولا التزامَ نشأ. يبقى في
@@ -404,14 +405,14 @@ export function DriveSync() {
           <div className="mt-3 flex gap-2">
             <button
               onClick={() => void call(false)}
-              className="rounded-lg border border-line px-3 py-2 text-xs font-medium hover:border-ink-soft"
+              className={buttonClass("secondary", "sm")}
             >
               أعد الفحص
             </button>
             {s.newFiles > 0 && (
               <button
                 onClick={() => void call(true)}
-                className="rounded-lg bg-inverse-surface px-4 py-2 text-xs font-bold text-inverse-ink"
+                className={buttonClass("primary", "sm")}
               >
                 {result?.applied ? "أكمل الباقي" : "سجّل الجديد"}
               </button>

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { NETWORK_ERROR, postJson, readResponse, request } from "@/lib/http-client";
+import { FIELD, countNoun } from "@/lib/arabic";
+import { buttonClass } from "./ui";
 
 interface Finding {
   code: string;
@@ -144,7 +146,7 @@ function Field({
         inputMode={inputMode}
         dir="auto"
         className={`nums mt-1 w-full rounded-lg border bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-ink ${
-          needsReview ? "border-warn" : "border-line"
+          needsReview ? "border-warn" : "border-line-input"
         }`}
       />
     </label>
@@ -172,7 +174,7 @@ function DecisionBanner({ count }: { count: number }) {
     <div className="mt-3 flex items-center gap-2 rounded-xl border border-warn/40 bg-warn-bg px-3 py-2.5">
       <span className="text-warn" aria-hidden>⚠</span>
       <p className="text-xs font-bold text-warn">
-        {count === 1 ? "حقلٌ واحد يحتاج انتباهك" : count === 2 ? "حقلان يحتاجان انتباهك" : `${count} حقول تحتاج انتباهك`}
+        {count === 1 ? "حقلٌ واحد يحتاج انتباهك" : count === 2 ? "حقلان يحتاجان انتباهك" : `${countNoun(count, FIELD)} تحتاج انتباهك`}
         {" "}قبل الأرشفة.
       </p>
     </div>
@@ -241,6 +243,7 @@ function SupplierPicker({
       </p>
 
       <select
+        aria-label="المورّد"
         value={active?.id ?? ""}
         onChange={(e) => {
           const sup = suppliers.find((x) => x.id === e.target.value)
@@ -248,7 +251,7 @@ function SupplierPicker({
           if (sup) onChoose({ id: sup.id, nameAr: sup.nameAr });
         }}
         className={`mt-1 w-full rounded border bg-surface px-2 py-1.5 text-sm outline-none focus:border-ink ${
-          active ? "border-line" : "border-danger"
+          active ? "border-line-input" : "border-danger"
         }`}
       >
         <option value="">اختر المورّد…</option>
@@ -269,18 +272,19 @@ function SupplierPicker({
       {creating ? (
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <input
+            aria-label="اسم المورّد الجديد"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") void create(); }}
             placeholder="اسم المورّد الجديد"
             dir="auto"
             autoFocus
-            className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-ink"
+            className="min-w-0 flex-1 rounded border border-line-input bg-surface px-2 py-1 text-xs outline-none focus:border-ink"
           />
           <button
             onClick={() => void create()}
             disabled={busy || name.trim().length < 2}
-            className="shrink-0 rounded bg-inverse-surface px-2.5 py-1 text-[11px] font-bold text-inverse-ink disabled:opacity-30"
+            className={buttonClass("primary", "sm")}
           >
             {busy ? "…" : "أنشئه"}
           </button>
@@ -533,7 +537,7 @@ export function Uploader({
       {justArchived && (
         <div className="mb-4 rounded-xl border border-ok/40 bg-ok-bg px-4 py-3">
           <p className="text-sm font-bold text-ok">✓ تم الرفع بنجاح</p>
-          <p className="mt-1 truncate font-mono text-[11px] text-ok/80" dir="ltr">
+          <p className="mt-1 truncate font-mono text-[11px] text-ok" dir="ltr">
             {archived[0].fileName}
           </p>
           <p className="mt-1 text-xs text-ink-soft">الشاشة جاهزة للملف التالي.</p>
@@ -731,12 +735,13 @@ export function Uploader({
 
                 {r.proposedFileName && (
                   <div className="mt-3 rounded-lg border border-line px-3 py-2">
-                    <p className="text-xs text-muted">الاسم الجديد</p>
+                    <label htmlFor={`file-name-${item.id}`} className="block text-xs text-muted">الاسم الجديد</label>
                     <input
+                      id={`file-name-${item.id}`}
                       value={item.edited.fileName}
                       onChange={(e) => editField(item.id, "fileName", e.target.value)}
                       dir="ltr"
-                      className="mt-1 w-full rounded border border-line bg-surface px-2 py-1 font-mono text-xs outline-none focus:border-ink"
+                      className="mt-1 w-full rounded border border-line-input bg-surface px-2 py-1 font-mono text-xs outline-none focus:border-ink"
                     />
                     <p className="mt-2 text-xs text-muted">وجهته في الدرايف</p>
                     <p className="mt-0.5 truncate text-xs font-medium" dir="ltr">
@@ -782,7 +787,7 @@ export function Uploader({
                       <button
                         onClick={() => archive(item.id)}
                         disabled={!r.canArchive || item.archiving}
-                        className="shrink-0 rounded-lg bg-inverse-surface px-4 py-2 text-sm font-bold text-inverse-ink transition-opacity hover:opacity-90 disabled:opacity-40"
+                        className={`shrink-0 ${buttonClass("primary")}`}
                       >
                         {item.archiving ? "يرفع…" : item.archiveError ? "أعد المحاولة" : "أكّد وارفع"}
                       </button>

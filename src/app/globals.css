@@ -19,6 +19,14 @@
    */
   --muted: #6b6b74;
   --line: #e4e4e7;
+  /*
+   * حدّ الحقل غير الحدّ الفاصل.
+   *
+   * `--line` على الأبيض ‎1.27:1‎ وعلى `--sunken` ‎1.15:1‎ — وهو الحدّ
+   * الوحيد لأربعة وثلاثين حقلاً. ومع ضوء النافذة عند الكاشير يختفي، فلا
+   * يُعرف أين يُكتب. وWCAG يطلب ‎3:1‎ لغير النصّ، وهذا نحو ‎3.4:1‎.
+   */
+  --line-input: #8c8c96;
   --line-strong: #000000;
   --inverse-surface: #000000;
   --inverse-ink: #ffffff;
@@ -51,6 +59,8 @@
     /* يجتاز الحدّ على الأسود وعلى أرضيّات الحالات الداكنة جميعاً */
     --muted: #95959f;
     --line: #26262b;
+    /* ‎#26262b‎ على ‎#0a0a0b‎ هو ‎1.31:1‎ — وهذا نحو ‎3.9:1‎ */
+    --line-input: #6b6b74;
     --line-strong: #ffffff;
     --inverse-surface: #ffffff;
     --inverse-ink: #000000;
@@ -80,6 +90,7 @@
   --color-ink-soft: var(--ink-soft);
   --color-muted: var(--muted);
   --color-line: var(--line);
+  --color-line-input: var(--line-input);
   --color-line-strong: var(--line-strong);
   --color-inverse-surface: var(--inverse-surface);
   --color-inverse-ink: var(--inverse-ink);
@@ -104,6 +115,17 @@ body {
   color: var(--ink);
   /* مساحة آمنة أسفل شاشات الآيفون ذات الشريط السفلي */
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/*
+ * النصّ المؤقّت يُقرأ.
+ *
+ * Tailwind v4 يجعله نصفَ لون النصّ، أي ‎3.98:1‎ على الأبيض — وهو في حقولٍ
+ * كانت تسميتُها هو وحده قبل UX-103. فيُضبط على `--muted` بلا شفافيّة: ‎5.28:1‎.
+ */
+::placeholder {
+  color: var(--muted);
+  opacity: 1;
 }
 
 /*

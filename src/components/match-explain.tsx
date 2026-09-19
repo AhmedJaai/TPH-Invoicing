@@ -6,6 +6,7 @@ import { Money } from "./money";
 import { Badge, buttonClass } from "./ui";
 import { postJson } from "@/lib/http-client";
 import { strength } from "@/lib/bank/strength";
+import { ACT } from "@/lib/ui-terms";
 
 /**
  * لماذا طُوبقت هذه الحركة؟ وكيف أتراجع؟
@@ -87,7 +88,7 @@ export function MatchExplain({
   const d = notAPayment
     ? { label: "أُعلنت ليست سداداً", tone: "muted" as const }
     : match.matched && match.disposition !== "AUTO"
-      ? { label: "مقيَّدة بدفعة", tone: "ok" as const }
+      ? { label: "سُجّلت سداداً", tone: "ok" as const }
       : match.disposition ? DISPOSITION[match.disposition] : null;
 
   return (
@@ -143,8 +144,8 @@ export function MatchExplain({
           )}
 
           <p className="mt-2.5 border-t border-line pt-2 text-[11px] leading-relaxed text-muted">
-            المبلغ <Money minor={match.amountMinor} /> ريالاً. والدرجة ترجيحٌ لا يقين،
-            ولذلك تُعرَض وصفاً لا نسبة.
+            المبلغ <Money minor={match.amountMinor} /> ريالاً. وهذا ترجيح، فراجِع ما
+            يبدو غريباً.
           </p>
 
           {canUndo && (match.matched || notAPayment) && (
@@ -171,7 +172,7 @@ export function MatchExplain({
                       onClick={undo}
                       className={buttonClass("danger", "sm")}
                     >
-                      {undoing ? "يُردّ…" : "أكّد التراجع"}
+                      {undoing ? "يُردّ…" : notAPayment ? ACT.restoreToQueue : ACT.undoMatch}
                     </button>
                     <button
                       type="button"

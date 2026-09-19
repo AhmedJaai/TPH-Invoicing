@@ -20,6 +20,7 @@ import { Changes } from "@/components/changes";
 import { buildChanges } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
 import { DAY, INVOICE, countNoun } from "@/lib/arabic";
+import { formatMonth } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -117,12 +118,12 @@ export default async function HomePage() {
         <Figure
           label="المستحقّ للمورّدين"
           provenance={prov.outstanding}
-          href="/purchases/invoices?paid=OPEN"
+          href="/purchases/insights"
           tone={prov.outstanding.valueMinor > 0 ? "warn" : "ok"}
           note="للمورّدين الآن"
         />
         <Figure
-          label={`مشتريات ${prov.month ?? "الشهر"}`}
+          label={`مشتريات ${prov.month ? formatMonth(prov.month) : "الشهر"}`}
           provenance={prov.purchases}
           href="/purchases"
           tone={trend !== null && trend > 0.15 ? "warn" : undefined}
@@ -217,7 +218,7 @@ export default async function HomePage() {
         hint="الرقم بلا بيان تغطيته يخدع. هذه نسبة ما بُنيت عليه أرقام الصفحة — وما لم يُوصَل يُقال عنه «غير موصول» ولا يُملأ بصفر."
         action={
           <span className="nums text-sm font-bold">
-            ثقة الأرقام {Math.round(health.confidence * 100)}٪
+            اكتمال البيانات {Math.round(health.confidence * 100)}٪
           </span>
         }
       >

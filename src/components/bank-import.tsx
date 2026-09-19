@@ -7,6 +7,7 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { postJson, request } from "@/lib/http-client";
 import { DAY, INVOICE, TRANSACTION, countNoun, GROUP } from "@/lib/arabic";
+import { buttonClass } from "./ui";
 
 interface Coverage {
   from: string | null;
@@ -141,9 +142,10 @@ function UnknownRow({
       ) : (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <select
+            aria-label="باب الحركة"
             value={category}
             onChange={(e) => setCategory(e.target.value as TxCategory)}
-            className="min-w-[8rem] rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+            className="min-w-[8rem] rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
           >
             {CATEGORY_OPTIONS.map((c) => (
               <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>
@@ -152,9 +154,10 @@ function UnknownRow({
 
           {needsSupplier && (
             <select
+              aria-label="المورّد"
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+              className="min-w-[9rem] flex-1 rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
             >
               <option value="">اختر المورّد…</option>
               {suppliers.map((s) => (
@@ -164,17 +167,18 @@ function UnknownRow({
           )}
 
           <input
+            aria-label="النصّ المميِّز في وصف الحركة"
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
             placeholder="النصّ المميِّز في وصف الحركة"
             dir="auto"
-            className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+            className="min-w-[9rem] flex-1 rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
           />
 
           <button
             onClick={save}
             disabled={!ready || state === "saving"}
-            className="shrink-0 rounded-lg bg-inverse-surface px-3 py-1.5 text-[11px] font-bold text-inverse-ink disabled:opacity-30"
+            className={buttonClass("primary", "sm")}
           >
             {state === "saving" ? "يحفظ…" : "صنّفها"}
           </button>
@@ -407,8 +411,8 @@ export function BankImport({
                 )}
                 <p className="nums mt-1.5 text-xs text-muted">
                   {data.sync.inFile} في الملفّ · {data.sync.alreadyKnown} مسجّلة عندك
-                  {data.sync.byReference > 0 && ` (${data.sync.byReference} عُرفت بمرجع عمليّتها)`}
-                  {data.sync.ambiguous > 0 && ` · ${data.sync.ambiguous} ملتبسة`}
+                  {data.sync.byReference > 0 && ` (${countNoun(data.sync.byReference, TRANSACTION)} عرفناها برقم العمليّة)`}
+                  {data.sync.ambiguous > 0 && ` · ${countNoun(data.sync.ambiguous, TRANSACTION)} قد تكون مكرَّرة`}
                 </p>
                 {data.sync.ambiguous > 0 && (
                   <div className="mt-2 border-t border-line pt-2">
@@ -494,7 +498,7 @@ export function BankImport({
                   ليست كلّها مورّدين: فيها رواتب وإيجار وزكاة وكهرباء وتحويلاتك الشخصية.
                   صنّف كلّ حركة مرّة واحدة — يُحفظ التصنيف قاعدةً تسري على ما يشبهها في كل
                   كشف بعده، فتُخرَج من حساب مستحقّات المورّدين.
-                  {learned > 0 && ` — صُنّف ${learned} حتى الآن.`}
+                  {learned > 0 && ` — صُنّف منها ${countNoun(learned, TRANSACTION)} حتى الآن.`}
                 </p>
 
                 <ul className="mt-2 max-h-[26rem] divide-y divide-line overflow-y-auto rounded-lg border border-line">
@@ -512,7 +516,7 @@ export function BankImport({
                   <button
                     onClick={() => fileRef.current && send(fileRef.current, false)}
                     disabled={busy !== null}
-                    className="mt-2 w-full rounded-lg border border-line px-4 py-2 text-xs font-bold hover:border-ink-soft disabled:opacity-40"
+                    className={`mt-2 w-full ${buttonClass("secondary", "sm")}`}
                   >
                     {busy === "reading" ? "يعيد المطابقة…" : "أعد المطابقة بالأسماء الجديدة"}
                   </button>
@@ -547,7 +551,7 @@ export function BankImport({
               <button
                 onClick={() => fileRef.current && send(fileRef.current, true)}
                 disabled={busy !== null}
-                className="mt-4 w-full rounded-lg bg-inverse-surface px-4 py-2.5 text-sm font-bold text-inverse-ink disabled:opacity-40"
+                className={`mt-4 w-full ${buttonClass("primary")}`}
               >
                 {busy === "applying" ? "يطبّق…" : "أكّد وطابِق"}
               </button>

@@ -127,7 +127,7 @@ export function SearchBox() {
         aria-autocomplete="list"
         aria-activedescendant={open && hits.length > 0 ? `search-hit-${active}` : undefined}
         placeholder="ابحث برقم أو مبلغ أو اسم…"
-        className="w-full rounded-xl border border-line bg-sunken px-3 py-1.5 text-xs outline-none transition-colors placeholder:text-muted focus:border-ink-soft focus:bg-surface"
+        className="w-full rounded-xl border border-line-input bg-sunken px-3 py-1.5 text-xs outline-none transition-colors placeholder:text-muted focus:border-ink-soft focus:bg-surface"
       />
 
       {!q && (
@@ -167,7 +167,7 @@ export function SearchBox() {
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => go(h)}
                     onMouseEnter={() => setActive(i)}
-                    className={`flex w-full items-start justify-between gap-3 px-3.5 py-2.5 text-start transition-colors ${
+                    className={`flex min-h-11 w-full items-start justify-between gap-3 px-3.5 py-2.5 text-start transition-colors ${
                       i === active ? "bg-sunken" : ""
                     }`}
                   >

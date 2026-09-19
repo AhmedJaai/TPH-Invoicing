@@ -10,7 +10,7 @@ import { MonthClose } from "@/components/month-close";
 import { previousMonth } from "@/lib/filing";
 import { buildMonthClose } from "@/lib/month-close";
 import { gatherMonthFacts } from "@/lib/month-close-facts";
-import { currentMonthRiyadh } from "@/lib/riyadh-time";
+import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -73,9 +73,9 @@ export default async function ClosePage() {
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {closed.map((c) => (
               <li key={c.month} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span className="nums font-medium" dir="ltr">{c.month}</span>
-                <span className="nums text-[11px] text-muted" dir="ltr">
-                  {c.closedAt?.toISOString().slice(0, 10) ?? ""}
+                <span className="font-medium">{formatMonth(c.month)}</span>
+                <span className="text-[11px] text-muted">
+                  {formatDay(c.closedAt)}
                 </span>
               </li>
             ))}

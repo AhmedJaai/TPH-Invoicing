@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { request } from "@/lib/http-client";
 import { LINE, countNoun } from "@/lib/arabic";
+import { formatRange } from "@/lib/riyadh-time";
+import { buttonClass } from "./ui";
 
 export interface ArchivedStatement {
   id: string;
@@ -110,8 +112,8 @@ export function StatementReconcile({
               <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{a.supplierName}</span>
-                  <span className="nums block text-[11px] text-muted" dir="ltr">
-                    {a.periodStart} → {a.periodEnd}
+                  <span className="block text-[11px] text-muted" dir="auto">
+                    {formatRange(a.periodStart, a.periodEnd)}
                     {a.lineCount > 0
                       ? ` · ${countNoun(a.lineCount, LINE)} مطابَقة`
                       : " · بلا أسطر — طابِقه لتُقرأ"}
@@ -132,7 +134,7 @@ export function StatementReconcile({
                       void send(f, a.id);
                     }}
                     disabled={busy !== null}
-                    className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-bold hover:border-ink-soft disabled:opacity-40"
+                    className={buttonClass("secondary", "sm")}
                   >
                     {busy === a.id ? "يقرأ ويطابق…" : a.lineCount > 0 ? "أعد المطابقة" : "طابِق"}
                   </button>
@@ -152,9 +154,10 @@ export function StatementReconcile({
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <select
+            aria-label="المورّد صاحب الكشف"
             value={supplierId}
             onChange={(e) => setSupplierId(e.target.value)}
-            className="min-w-[11rem] flex-1 rounded-lg border border-line bg-surface px-2.5 py-2 text-xs outline-none focus:border-ink"
+            className="min-w-[11rem] flex-1 rounded-lg border border-line-input bg-surface px-2.5 py-2 text-xs outline-none focus:border-ink"
           >
             <option value="">المورّد: يُستنتج من الكشف</option>
             {suppliers.map((x) => (
@@ -164,12 +167,13 @@ export function StatementReconcile({
           <button
             onClick={() => inputRef.current?.click()}
             disabled={busy !== null}
-            className="rounded-lg bg-inverse-surface px-4 py-2 text-xs font-bold text-inverse-ink disabled:opacity-40"
+            className={buttonClass("primary", "sm")}
           >
             {busy === "upload" ? "يقرأ…" : "اختر ملف الكشف"}
           </button>
           <input
             ref={inputRef}
+            aria-label="ملفّ كشف المورّد"
             type="file"
             accept=".pdf,image/*"
             className="hidden"
@@ -326,7 +330,7 @@ export function StatementReconcile({
                   setError("تعذّر النسخ — المتصفّح منع الوصول إلى الحافظة. حدّد نصّ المذكّرة وانسخه بيدك.");
                 }
               }}
-              className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-bold hover:border-ink-soft"
+              className={buttonClass("secondary", "sm")}
             >
               {copied ? "✓ نُسخت" : "انسخ المذكّرة"}
             </button>
@@ -334,7 +338,7 @@ export function StatementReconcile({
               href={`https://wa.me/?text=${encodeURIComponent(result.memo)}`}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-bold hover:border-ink-soft"
+              className={buttonClass("secondary", "sm")}
             >
               أرسلها واتساب
             </a>

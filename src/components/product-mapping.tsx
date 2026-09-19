@@ -113,9 +113,10 @@ function LinkRow({
       ) : (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <select
+            aria-label="الصنف المعياريّ"
             value={productId}
             onChange={(e) => setProductId(e.target.value)}
-            className="min-w-[9rem] rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+            className="min-w-[9rem] rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
           >
             <option value="">صنف معياري جديد…</option>
             {products.map((p) => (
@@ -126,16 +127,18 @@ function LinkRow({
           {creating && (
             <>
               <input
+                aria-label="اسم صنفٍ معياريٍّ جديد"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="اسم الصنف المعياري"
                 dir="auto"
-                className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+                className="min-w-[9rem] flex-1 rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
               />
               <select
+                aria-label="فئة الصنف"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as ProductCategory)}
-                className="rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+                className="rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>
@@ -147,7 +150,7 @@ function LinkRow({
           <button
             onClick={() => void save()}
             disabled={busy || (creating && newName.trim().length < 2)}
-            className="shrink-0 rounded-lg bg-inverse-surface px-3 py-1.5 text-[11px] font-bold text-inverse-ink disabled:opacity-30"
+            className={buttonClass("primary", "sm")}
           >
             {busy ? "يحفظ…" : items.length > 1 ? `اربط ${items.length} معاً` : "اربط"}
           </button>
@@ -366,7 +369,7 @@ export function ProductMapping({
 
       {suggestionGroups.length > 0 && (
         <section>
-          <h2 className="text-base font-bold">مرشّحات للجمع</h2>
+          <h2 className="text-base font-bold">أصناف قد تكون صنفاً واحداً</h2>
           <p className="mt-1 text-xs leading-relaxed text-muted">
             أصناف تحمل الاسم نفسه عند مورّدين. وتطابق الاسم لا يعني تطابق الصنف —
             «عنب» عند المحمصة الغربية كيلو بنّ، وعند لافا زجاجة كمبوتشا. فما يُضعف

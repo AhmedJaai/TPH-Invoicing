@@ -8,6 +8,7 @@ import { Empty, Money, PageShell } from "@/components/page-shell";
 import { findSameNameCandidates, summarizeItems, type LineRow } from "@/lib/analytics";
 import { NoAccess, DataTable } from "@/components/ui";
 import { PRODUCT, countNoun, DAY } from "@/lib/arabic";
+import { formatDay } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function AnalysisPage() {
   if (!user) redirect("/login?from=/analysis");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} width="wide" title="ذكاء الشراء">
+      <PageShell user={user} width="wide" title="الإنفاق على الأصناف">
         <NoAccess />
       </PageShell>
     );
@@ -60,7 +61,7 @@ export default async function AnalysisPage() {
       <PageShell
         user={user}
        
-        title="ذكاء الشراء"
+        title="الإنفاق على الأصناف"
         intro="كل صنف اشتريته: كم مرة طُلب، وبأي كميّة، وكم كلّف، ومن أي مورّد، وكل كم يوم تحتاجه."
       >
         <Empty message="لا توجد بنود فواتير بعد. البنود تُسجَّل عند أرشفة الفواتير — ارفع فاتورة وستظهر هنا." />
@@ -87,7 +88,7 @@ export default async function AnalysisPage() {
     <PageShell
       user={user}
      
-      title="ذكاء الشراء"
+      title="الإنفاق على الأصناف"
       intro="كل صنف اشتريته: كم مرة طُلب، وبأي كميّة، وكم كلّف، ومن أي مورّد، وكل كم يوم تحتاجه."
     >
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -116,7 +117,7 @@ export default async function AnalysisPage() {
           <h2 className="mb-1 text-base font-bold">اسم واحد عند مورّدين — للمراجعة</h2>
           <p className="mb-3 text-xs leading-relaxed text-muted">
             هذه مرشّحات لا نتائج. تطابق الاسم لا يعني تطابق الصنف: «عنب» عند المحمصة الغربية
-            كيلو بنّ بـ١٥٥ ريالاً، و«عنب» عند لافا زجاجة كمبوتشا بـ١٣٫٥٠. فانظر الوصفين
+            كيلو بنّ بـ155 ريالاً، و«عنب» عند لافا زجاجة كمبوتشا بـ13.50. فانظر الوصفين
             بنفسك — فإن كانا صنفاً واحداً فالفارق فرصة، وإلّا فلا معنى للمقارنة.
           </p>
           <DataTable
@@ -220,7 +221,7 @@ export default async function AnalysisPage() {
             },
             {
               key: "last", header: "آخر طلب", secondary: true,
-              cell: (i) => <span className="nums text-xs text-ink-soft" dir="ltr">{i.lastOrderedAt ? i.lastOrderedAt.toISOString().slice(0, 10) : "—"}</span>,
+              cell: (i) => <span className="text-xs text-ink-soft">{formatDay(i.lastOrderedAt)}</span>,
             },
           ]}
         />

@@ -11,7 +11,7 @@ import { MarkSupplierPaid } from "@/components/payment-run-actions";
 import { countNoun, INVOICE, SUPPLIER } from "@/lib/arabic";
 import { NoAccess } from "@/components/ui";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
-import { currentMonthRiyadh } from "@/lib/riyadh-time";
+import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export default async function PaymentsPage({
   if (!user) redirect("/login?from=/payments");
   if (!can(user.role, "payment:approve")) {
     return (
-      <PageShell user={user} width="wide" title="دفعة أوّل الشهر">
+      <PageShell user={user} width="wide" title="دفعة الشهر">
         <NoAccess what="اعتماد الدفعات" />
       </PageShell>
     );
@@ -92,7 +92,7 @@ export default async function PaymentsPage({
     <PageShell
       user={user}
      
-      title={`دفعة ${month}`}
+      title={`دفعة الشهر — ${formatMonth(month)}`}
       intro="مستحقّات الشهر المنقضي وما تأخّر قبله، مورّداً مورّداً. ما ليس فاتورة ضريبية كاملة يُحجز — السداد قبل الحصول عليها يفقدك ورقة التفاوض الوحيدة."
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -147,8 +147,8 @@ export default async function PaymentsPage({
                 <ul className="mt-2 divide-y divide-line">
                   {s.invoices.map((i) => (
                     <li key={i.invoiceId} className="flex items-center justify-between gap-3 py-1.5 text-xs">
-                      <span className="font-mono text-ink-soft" dir="ltr">
-                        {i.invoiceNumber} · {i.invoiceDate.toISOString().slice(0, 10)}
+                      <span className="text-ink-soft" dir="auto">
+                        <bdi className="font-mono">{i.invoiceNumber}</bdi> · {formatDay(i.invoiceDate)}
                       </span>
                       <span className="nums-col shrink-0">
                         <Money minor={i.totalMinor - i.allocatedMinor} />

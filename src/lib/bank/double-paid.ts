@@ -1,4 +1,5 @@
 import { normalizeText } from "./canonical";
+import { TIME, countNoun } from "@/lib/arabic";
 
 /**
  * الفاتورة الواحدة سُدّدت مرّتين.
@@ -206,12 +207,12 @@ export function partitionDoublePaid(
 export function buildDoublePaidClaim(group: DoublePaidGroup): string {
   const riyals = (m: number) =>
     new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(m / 100);
-  const refs = group.transactions.map((t, i) => `• السداد ${i + 1}: المرجع ${t.operationRef ?? "غير مذكور في الكشف"}`);
+  const refs = group.transactions.map((t, i) => `• السداد ${i + 1}: المرجع ${t.operationRef?.replace(/^[A-Z_]+:/, "") ?? "غير مذكور في الكشف"}`);
   return [
     `السلام عليكم،`,
     ``,
     `خرج من حساب مؤسسة ذا بوبليك هاوس (الرقم الضريبي 310007971600003) مبلغ ${riyals(group.amountMinor)} ريال`
-      + ` ${group.transactions.length === 2 ? "مرّتين" : `${group.transactions.length} مرّات`} بتاريخ ${group.day} لـ«${group.payee}»:`,
+      + ` ${countNoun(group.transactions.length, TIME)} بتاريخ ${group.day} لـ«${group.payee}»:`,
     ...refs,
     ``,
     `المستحقّ مرّةٌ واحدة، فنرجو ردّ الزائد وقدره ${riyals(group.excessMinor)} ريال، أو إفادتنا إن كان السدادان لعمليّتين مختلفتين.`,

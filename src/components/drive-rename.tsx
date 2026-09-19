@@ -90,7 +90,7 @@ export function DriveRename() {
     return (
       <button
         onClick={() => { setOpen(true); void scan(); }}
-        className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-soft hover:border-ink-soft"
+        className={buttonClass("secondary", "sm")}
       >
         افحص تسمية الأرشيف
       </button>

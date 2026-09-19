@@ -161,7 +161,7 @@ export function MobileTabBar({ role }: { role: Role }) {
               type="button"
               onClick={() => setMoreOpen((v) => !v)}
               aria-expanded={moreOpen}
-              className={`flex flex-1 flex-col items-center gap-1 py-2 text-[11px] transition-colors ${
+              className={`flex min-h-11 flex-1 flex-col items-center gap-1 py-2 text-[11px] transition-colors ${
                 moreOpen ? "text-ink" : "text-muted"
               }`}
             >
@@ -208,7 +208,7 @@ function Tab({ area, current }: { area: NavArea; current: boolean }) {
     <Link
       href={area.href}
       aria-current={current ? "page" : undefined}
-      className={`flex flex-1 flex-col items-center gap-1 py-2 text-[11px] transition-colors ${
+      className={`flex min-h-11 flex-1 flex-col items-center gap-1 py-2 text-[11px] transition-colors ${
         current ? "font-bold text-ink" : "text-muted"
       }`}
     >

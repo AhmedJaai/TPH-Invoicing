@@ -7,6 +7,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, PageShell } from "@/components/page-shell";
 import { NoAccess } from "@/components/ui";
+import { labelValue } from "@/lib/audit-labels";
 
 export const dynamic = "force-dynamic";
 
@@ -71,10 +72,15 @@ const ENTITY_LABEL: Record<string, string> = {
   ai_finding: "اقتراح ذكاء",
 };
 
-/** الوقت بتوقيت الرياض — كان يُعرض UTC بلا إشارة، فالعاشرة صباحاً «07:00». */
+/**
+ * الوقت بتوقيت الرياض — كان يُعرض UTC بلا إشارة، فالعاشرة صباحاً «07:00».
+ *
+ * و`hour12: false` يُخرج منتصف الليل «24:02» بتاريخ يومه السابق، فيُقرأ
+ * اليومُ خطأً في سجلٍّ مرجعُه الزمن. و`hourCycle: "h23"` يُخرجها «00:02».
+ */
 const WHEN = new Intl.DateTimeFormat("ar-SA-u-nu-latn-ca-gregory", {
   timeZone: "Asia/Riyadh", year: "numeric", month: "2-digit", day: "2-digit",
-  hour: "2-digit", minute: "2-digit", hour12: false,
+  hour: "2-digit", minute: "2-digit", hourCycle: "h23",
 });
 
 /** يعرض محتوى jsonb سطراً سطراً بلا حشو. */
@@ -95,7 +101,7 @@ function Detail({ value }: { value: unknown }) {
         <div key={k} className="flex gap-2 text-[11px]">
           <dt className="shrink-0 text-muted">{k.replace(/_/g, " ")}:</dt>
           <dd className="min-w-0 truncate text-ink-soft" dir="auto">
-            {typeof v === "object" ? JSON.stringify(v).slice(0, 90) : String(v).slice(0, 90)}
+            {labelValue(v).slice(0, 90)}
           </dd>
         </div>
       ))}
@@ -112,7 +118,7 @@ export default async function AuditTrailPage({
   if (!user) redirect("/login?from=/settings/audit");
   if (!can(user.role, "audit:view")) {
     return (
-      <PageShell user={user} width="wide" title="سجل التدقيق">
+      <PageShell user={user} width="wide" title="سجلّ التدقيق">
         <NoAccess what="سجلّ التدقيق" />
       </PageShell>
     );
@@ -144,7 +150,7 @@ export default async function AuditTrailPage({
     <PageShell
       user={user}
      
-      title="سجل التدقيق"
+      title="سجلّ التدقيق"
       intro="ما فُعل، ومن فعله، ومتى — بتوقيت الرياض."
     >
       {rows.length === 0 ? (

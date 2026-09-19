@@ -6,6 +6,8 @@ import { Money } from "./money";
 import { Badge, buttonClass, Card, EmptyState } from "./ui";
 import { countNoun, GROUP, TRANSACTION } from "@/lib/arabic";
 import { postJson } from "@/lib/http-client";
+import { ACT } from "@/lib/ui-terms";
+import { formatDay } from "@/lib/riyadh-time";
 
 /**
  * حلّ المعلّقات — **مجموعةً مجموعة** لا حركةً حركة.
@@ -248,7 +250,7 @@ export function ReconcileQueue({
         <ul className="mt-2 space-y-1 border-s-2 border-line ps-2.5">
           {shown.map((i) => (
             <li key={i.id} className="flex items-baseline justify-between gap-3">
-              <span className="nums shrink-0 text-[11px] text-muted">{i.date}</span>
+              <span className="shrink-0 text-[11px] text-muted">{formatDay(i.date)}</span>
               <span className="clamp-1 min-w-0 flex-1 text-[11px] text-muted" dir="auto">
                 {i.description || "بلا وصف"}
               </span>
@@ -305,7 +307,7 @@ export function ReconcileQueue({
               onClick={settleAccount}
               className={`${buttonClass("primary", "sm")} mt-2`}
             >
-              {busy ? "يقيّد…" : "سدِّد على حساب المورّد"}
+              {busy ? "يقيّد…" : ACT.settleOnAccount}
             </button>
             {single && (
               <button
@@ -357,7 +359,7 @@ export function ReconcileQueue({
               /* الباب لا يتغيّر أثناء الحفظ — وإلّا حُفظ بابٌ وظهر غيره (BTN-115) */
               disabled={busy}
               onClick={() => setKind(k.value)}
-              className={`rounded-xl border px-2.5 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-50 ${
+              className={`inline-flex min-h-11 items-center rounded-xl border px-2.5 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-50 sm:min-h-0 ${
                 kind === k.value
                   ? "border-ink bg-inverse-surface text-inverse-ink"
                   : "border-line hover:border-ink-soft"
@@ -374,7 +376,7 @@ export function ReconcileQueue({
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+              className="mt-1 w-full rounded-xl border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
             >
               <option value="">اختر…</option>
               {suppliers.map((s) => (
@@ -392,7 +394,7 @@ export function ReconcileQueue({
               onChange={(e) => setName(e.target.value)}
               dir="auto"
               placeholder={group.items[0].beneficiaryRaw ?? group.title.slice(0, 40)}
-              className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-ink"
+              className="mt-1 w-full rounded-xl border border-line-input bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-ink"
             />
           </label>
         )}
@@ -407,8 +409,8 @@ export function ReconcileQueue({
             {busy
               ? "يحفظ…"
               : group.items.length > 1
-                ? `أكّد — وطبّقها على ${countNoun(group.items.length, TRANSACTION)}`
-                : "أكّد وانتقل"}
+                ? `${ACT.defineGroup} — وطبّقها على ${countNoun(group.items.length, TRANSACTION)}`
+                : ACT.saveIdentityAndNext}
           </button>
         </div>
         </>}

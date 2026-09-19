@@ -26,6 +26,7 @@
  * مطابقةً بلا دليل. فمن سُدّد مئةَ مرّةٍ في يومين قد يُسدَّد اليوم بعد
  * شهر، وذلك لا يجعل السداد غيرَ سداد.
  */
+import { DAY, countNoun } from "@/lib/arabic";
 
 /** أقلّ عدد دفعاتٍ سابقة تُبنى عليها ملامح. */
 export const MIN_HISTORY = 5;
@@ -136,10 +137,10 @@ export function fitToProfile(
 
     if (off <= spread) {
       adjustment += 0.05;
-      notes.push(`المهلة ${candidate.lagDays} يوماً، وعادتُه ${profile.medianLagDays}`);
+      notes.push(`المهلة ${countNoun(candidate.lagDays, DAY)}، وعادتُه ${profile.medianLagDays}`);
     } else if (off > spread * 3) {
       adjustment -= 0.05;
-      notes.push(`المهلة ${candidate.lagDays} يوماً، وعادتُه ${profile.medianLagDays} — بعيدة`);
+      notes.push(`المهلة ${countNoun(candidate.lagDays, DAY)}، وعادتُه ${profile.medianLagDays} — بعيدة`);
     }
   }
 

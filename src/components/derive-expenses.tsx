@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { postJson } from "@/lib/http-client";
+import { buttonClass } from "./ui";
 
 /**
  * اشتقاق المصروفات الفعلية من كشف البنك.
@@ -40,7 +41,7 @@ export function DeriveExpenses({ month }: { month?: string }) {
         type="button"
         onClick={run}
         disabled={busy}
-        className="rounded-lg border border-line px-3 py-1.5 text-xs font-bold transition-colors hover:border-ink-soft disabled:opacity-50"
+        className={buttonClass("secondary", "sm")}
       >
         {busy ? "يشتقّ…" : month ? `اشتقّ من كشف ${month}` : "اشتقّ من كشف البنك"}
       </button>

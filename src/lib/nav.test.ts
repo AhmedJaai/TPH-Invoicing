@@ -65,12 +65,19 @@ describe("visibleAreas", () => {
     expect(visibleAreas("OWNER")).toHaveLength(AREAS.length);
   });
 
-  it("مدير المشتريات لا يرى المال ولا الأداء", () => {
+  it("مدير المشتريات لا يرى المال ولا ما يحتاج انتباهك", () => {
     const hrefs = visibleAreas("PURCHASING").map((a) => a.href);
     expect(hrefs).not.toContain("/money");
-    expect(hrefs).not.toContain("/performance");
     expect(hrefs).not.toContain("/attention");
     expect(hrefs).toContain("/documents");
+  });
+
+  it("«الأداء» لم تعد مساحةً — صارت قسم «الأسعار» تحت المشتريات", () => {
+    // ثلاث مساحاتٍ بأسماء متقاربة عن شيءٍ واحد: الأصناف وأسعارها
+    expect(AREAS.map((a) => a.href)).not.toContain("/performance");
+    const purchases = AREAS.find((a) => a.href === "/purchases")!;
+    expect(purchases.children.find((c) => c.href === "/performance")?.label).toBe("الأسعار");
+    expect(activeArea("/performance")?.href).toBe("/purchases");
   });
 
   it("المحاسب يرى المال ولا يرى شيئاً يحتاج صلاحية ليست له", () => {
@@ -138,6 +145,27 @@ describe("mobileTabs", () => {
   });
 });
 
+describe("«كم أدين ولمن؟»", () => {
+  const purchases = AREAS.find((a) => a.href === "/purchases")!;
+
+  it("أوّل أقسام المشتريات يفتح الجدول بالمورّد", () => {
+    expect(purchases.children[0]).toMatchObject({
+      href: "/purchases/insights",
+      label: "عليك لكلّ مورّد",
+    });
+  });
+
+  it("لا مرشِّح في مسار قسم — القسم وجهةٌ لا ترشيح", () => {
+    // كان «المستحقّ عليك» يفتح `?paid=OPEN`: فواتيرُ مورّدٍ دُفع له
+    // مقدَّماً تظهر فيه «مستحقّة»، وهي مسدَّدة.
+    for (const area of AREAS) {
+      for (const child of area.children) {
+        expect(child.href).not.toContain("?");
+      }
+    }
+  });
+});
+
 describe("سلامة البنية", () => {
   it("لا مسار مملوك لمساحتين", () => {
     const seen = new Map<string, string>();
@@ -147,6 +175,22 @@ describe("سلامة البنية", () => {
         seen.set(base, area.href);
       }
     }
+  });
+
+  it("اسم القسم هو عنوان صفحته", () => {
+    // الأسماء التي اختلفت عن عناوين صفحاتها فأرسلت صاحب العمل إلى غير
+    // ما طلب — «كشف الحساب» أخطرُها: في البنوك السعوديّة تعني حركاته.
+    const money = AREAS.find((a) => a.href === "/money")!;
+    const documents = AREAS.find((a) => a.href === "/documents")!;
+    const purchases = AREAS.find((a) => a.href === "/purchases")!;
+    const labels = new Map(
+      [...money.children, ...documents.children, ...purchases.children].map((c) => [c.href, c.label]),
+    );
+    expect(labels.get("/money/statement")).toBe("التدفّق وقائمة الدخل");
+    expect(labels.get("/payments")).toBe("دفعة الشهر");
+    expect(labels.get("/statements")).toBe("كشوف المورّدين");
+    expect(labels.get("/documents")).toBe("المستندات");
+    expect(labels.get("/upload")).toBe("ارفع مستنداً");
   });
 
   it("كل قسم يقع تحت مساحته", () => {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Money } from "./money";
+import { buttonClass } from "./ui";
 
 /**
  * تصحيحُ التصنيف في موضع التنبيه.
@@ -122,7 +123,7 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
                   type="button"
                   disabled={busy === s.id || !s.bankTransactionId || !s.supplierId}
                   onClick={() => fix(s)}
-                  className="rounded-lg bg-inverse-surface px-2.5 py-1 text-[11px] font-bold text-inverse-ink disabled:opacity-50"
+                  className={buttonClass("primary", "sm")}
                 >
                   {busy === s.id ? "يحفظ…" : "صنّفها سداد مورّد"}
                 </button>
