@@ -6,6 +6,7 @@ import type { CheckItem, MonthCloseReport } from "@/lib/month-close";
 import { ConfirmAction } from "./ui-client";
 import { countNoun, BLOCKER, CHECK, WARNING } from "@/lib/arabic";
 import { postJson } from "@/lib/http-client";
+import { buttonClass } from "./ui";
 
 interface Response {
   report: MonthCloseReport;
@@ -135,7 +136,7 @@ export function MonthClose({
         <button
           onClick={() => void call("check", month)}
           disabled={busy !== null}
-          className="rounded-lg border border-line px-3 py-2 text-xs font-medium hover:border-ink-soft disabled:opacity-40"
+          className={buttonClass("secondary", "sm")}
         >
           {busy === "checking" ? "يفحص…" : "أعد الفحص"}
         </button>

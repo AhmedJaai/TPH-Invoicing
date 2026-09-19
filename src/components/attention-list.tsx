@@ -8,6 +8,7 @@ import {
   AREA_LABEL, IMPACT_LABEL, SEVERITY_LABEL, prioritize,
   type AttentionItem, type AttentionSeverity,
 } from "@/lib/attention";
+import { buttonClass } from "./ui";
 
 const STYLE: Record<AttentionSeverity, { box: string; text: string; rail: string }> = {
   CRITICAL: { box: "border-danger/40 bg-danger-bg", text: "text-danger", rail: "bg-danger" },
@@ -69,7 +70,7 @@ export function AttentionCard({ item }: { item: AttentionItem }) {
       <div className="mt-4 ps-2">
         <Link
           href={item.href}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-inverse-surface px-4 py-2 text-xs font-bold text-inverse-ink transition-opacity hover:opacity-90"
+          className={buttonClass("primary", "sm")}
         >
           {item.actionLabel ?? "عالِجها"} ←
         </Link>
@@ -138,7 +139,7 @@ export function AttentionList({
           type="button"
           onClick={() => setShowAll((v) => !v)}
           aria-expanded={showAll}
-          className="w-full rounded-2xl border border-dashed border-line px-4 py-3.5 text-xs font-medium text-ink-soft transition-colors hover:border-ink-soft hover:bg-sunken/50"
+          className="min-h-11 w-full rounded-2xl border border-dashed border-line px-4 py-3.5 text-xs font-medium text-ink-soft transition-colors hover:border-ink-soft hover:bg-sunken/50"
         >
           {showAll ? "اطوِ الباقي" : `بقي ${countNoun(rest.length, ITEM)} أقلّ أهمّية`}
         </button>

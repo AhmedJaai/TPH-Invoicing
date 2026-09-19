@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { INVOICE, QUOTATION, countNoun, FILE } from "@/lib/arabic";
+import { buttonClass } from "./ui";
 
 interface Summary {
   scope: string;
@@ -226,7 +227,7 @@ export function DriveSync() {
     return (
       <button
         onClick={() => { setOpen(true); void call(false); }}
-        className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-soft hover:border-ink-soft"
+        className={buttonClass("secondary", "sm")}
       >
         افحص الدرايف عن ملفات جديدة
       </button>
@@ -404,14 +405,14 @@ export function DriveSync() {
           <div className="mt-3 flex gap-2">
             <button
               onClick={() => void call(false)}
-              className="rounded-lg border border-line px-3 py-2 text-xs font-medium hover:border-ink-soft"
+              className={buttonClass("secondary", "sm")}
             >
               أعد الفحص
             </button>
             {s.newFiles > 0 && (
               <button
                 onClick={() => void call(true)}
-                className="rounded-lg bg-inverse-surface px-4 py-2 text-xs font-bold text-inverse-ink"
+                className={buttonClass("primary", "sm")}
               >
                 {result?.applied ? "أكمل الباقي" : "سجّل الجديد"}
               </button>

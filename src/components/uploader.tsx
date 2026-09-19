@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { NETWORK_ERROR, postJson, readResponse, request } from "@/lib/http-client";
 import { FIELD, countNoun } from "@/lib/arabic";
+import { buttonClass } from "./ui";
 
 interface Finding {
   code: string;
@@ -283,7 +284,7 @@ function SupplierPicker({
           <button
             onClick={() => void create()}
             disabled={busy || name.trim().length < 2}
-            className="shrink-0 rounded bg-inverse-surface px-2.5 py-1 text-[11px] font-bold text-inverse-ink disabled:opacity-30"
+            className={buttonClass("primary", "sm")}
           >
             {busy ? "…" : "أنشئه"}
           </button>
@@ -786,7 +787,7 @@ export function Uploader({
                       <button
                         onClick={() => archive(item.id)}
                         disabled={!r.canArchive || item.archiving}
-                        className="shrink-0 rounded-lg bg-inverse-surface px-4 py-2 text-sm font-bold text-inverse-ink transition-opacity hover:opacity-90 disabled:opacity-40"
+                        className={`shrink-0 ${buttonClass("primary")}`}
                       >
                         {item.archiving ? "يرفع…" : item.archiveError ? "أعد المحاولة" : "أكّد وارفع"}
                       </button>

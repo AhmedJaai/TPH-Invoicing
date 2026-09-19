@@ -7,6 +7,7 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { postJson, request } from "@/lib/http-client";
 import { DAY, INVOICE, TRANSACTION, countNoun, GROUP } from "@/lib/arabic";
+import { buttonClass } from "./ui";
 
 interface Coverage {
   from: string | null;
@@ -177,7 +178,7 @@ function UnknownRow({
           <button
             onClick={save}
             disabled={!ready || state === "saving"}
-            className="shrink-0 rounded-lg bg-inverse-surface px-3 py-1.5 text-[11px] font-bold text-inverse-ink disabled:opacity-30"
+            className={buttonClass("primary", "sm")}
           >
             {state === "saving" ? "يحفظ…" : "صنّفها"}
           </button>
@@ -515,7 +516,7 @@ export function BankImport({
                   <button
                     onClick={() => fileRef.current && send(fileRef.current, false)}
                     disabled={busy !== null}
-                    className="mt-2 w-full rounded-lg border border-line px-4 py-2 text-xs font-bold hover:border-ink-soft disabled:opacity-40"
+                    className={`mt-2 w-full ${buttonClass("secondary", "sm")}`}
                   >
                     {busy === "reading" ? "يعيد المطابقة…" : "أعد المطابقة بالأسماء الجديدة"}
                   </button>
@@ -550,7 +551,7 @@ export function BankImport({
               <button
                 onClick={() => fileRef.current && send(fileRef.current, true)}
                 disabled={busy !== null}
-                className="mt-4 w-full rounded-lg bg-inverse-surface px-4 py-2.5 text-sm font-bold text-inverse-ink disabled:opacity-40"
+                className={`mt-4 w-full ${buttonClass("primary")}`}
               >
                 {busy === "applying" ? "يطبّق…" : "أكّد وطابِق"}
               </button>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { postJson } from "@/lib/http-client";
+import { buttonClass } from "./ui";
 
 export interface ExpenseRow {
   id: string;
@@ -187,7 +188,7 @@ export function RecurringExpenses({
         <button
           onClick={() => void send({ action: "create", label, amount, category, cadence })}
           disabled={busy || label.trim().length < 2 || !amount.trim()}
-          className="rounded-lg bg-inverse-surface px-3 py-1.5 text-[11px] font-bold text-inverse-ink disabled:opacity-30"
+          className={buttonClass("primary", "sm")}
         >
           {busy ? "…" : "أضِف"}
         </button>

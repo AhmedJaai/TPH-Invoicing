@@ -10,7 +10,7 @@ import { DOCUMENT, countNoun } from "@/lib/arabic";
 import { ScrollX } from "@/components/scroll-x";
 import { RejectDocument } from "@/components/reject-document";
 import { ConfirmDocument } from "@/components/confirm-document";
-import { DataTable } from "@/components/ui";
+import { DataTable, buttonClass } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +79,7 @@ function Chip({
   return (
     <Link
       href={href}
-      className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors ${
+      className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors sm:min-h-0 ${
         active ? "bg-inverse-surface text-inverse-ink" : "border border-line text-ink-soft hover:border-ink-soft"
       }`}
     >
@@ -220,14 +220,14 @@ export default async function DocumentsPage({
         {p.status && <input type="hidden" name="status" value={p.status} />}
         <button
           type="submit"
-          className="rounded-lg bg-inverse-surface px-4 py-2 text-xs font-bold text-inverse-ink"
+          className={buttonClass("primary", "sm")}
         >
           ابحث
         </button>
         {hasFilter && (
           <Link
             href="/documents"
-            className="rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink-soft hover:border-ink-soft"
+            className={buttonClass("secondary", "sm")}
           >
             امسح الترشيح
           </Link>

@@ -6,6 +6,7 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { request } from "@/lib/http-client";
 import { LINE, countNoun } from "@/lib/arabic";
 import { formatRange } from "@/lib/riyadh-time";
+import { buttonClass } from "./ui";
 
 export interface ArchivedStatement {
   id: string;
@@ -133,7 +134,7 @@ export function StatementReconcile({
                       void send(f, a.id);
                     }}
                     disabled={busy !== null}
-                    className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-bold hover:border-ink-soft disabled:opacity-40"
+                    className={buttonClass("secondary", "sm")}
                   >
                     {busy === a.id ? "يقرأ ويطابق…" : a.lineCount > 0 ? "أعد المطابقة" : "طابِق"}
                   </button>
@@ -166,7 +167,7 @@ export function StatementReconcile({
           <button
             onClick={() => inputRef.current?.click()}
             disabled={busy !== null}
-            className="rounded-lg bg-inverse-surface px-4 py-2 text-xs font-bold text-inverse-ink disabled:opacity-40"
+            className={buttonClass("primary", "sm")}
           >
             {busy === "upload" ? "يقرأ…" : "اختر ملف الكشف"}
           </button>
@@ -329,7 +330,7 @@ export function StatementReconcile({
                   setError("تعذّر النسخ — المتصفّح منع الوصول إلى الحافظة. حدّد نصّ المذكّرة وانسخه بيدك.");
                 }
               }}
-              className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-bold hover:border-ink-soft"
+              className={buttonClass("secondary", "sm")}
             >
               {copied ? "✓ نُسخت" : "انسخ المذكّرة"}
             </button>
@@ -337,7 +338,7 @@ export function StatementReconcile({
               href={`https://wa.me/?text=${encodeURIComponent(result.memo)}`}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-bold hover:border-ink-soft"
+              className={buttonClass("secondary", "sm")}
             >
               أرسلها واتساب
             </a>

@@ -167,7 +167,7 @@ export function SearchBox() {
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => go(h)}
                     onMouseEnter={() => setActive(i)}
-                    className={`flex w-full items-start justify-between gap-3 px-3.5 py-2.5 text-start transition-colors ${
+                    className={`flex min-h-11 w-full items-start justify-between gap-3 px-3.5 py-2.5 text-start transition-colors ${
                       i === active ? "bg-sunken" : ""
                     }`}
                   >

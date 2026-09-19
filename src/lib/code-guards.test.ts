@@ -208,3 +208,44 @@ describe("لا حقلَ ولا قائمةَ بلا اسم", () => {
     expect(unnamedFields('<label htmlFor="a">الاسم</label><input id="a" value={x} />')).toEqual([]);
   });
 });
+
+/* ── ٦. الزرّ يُلمَس بالإبهام — ٤٤ بكسل على الجوّال ── */
+
+/**
+ * `py-2` مع سطر `text-xs` نحو ٣٢ بكسلاً، و`py-1.5` مع `text-[11px]` نحو
+ * ٢٨ — وأحمد يضغطها بإبهامه على جهاز الكاشير. وأوّلُها «عالِجها ←»، وهو
+ * الفعل الرئيس لكلّ تنبيه في الصفحة الأولى.
+ *
+ * و`buttonClass` يحمل `min-h-11`، فالحارس يقبله أو يقبل `min-h-` صريحاً.
+ */
+export function shortButtons(source: string): string[] {
+  const out: string[] = [];
+  const re = /<button\b/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source))) {
+    const tag = tagAt(source, m.index);
+    if (!/\bp[yb]-/.test(tag)) continue;
+    if (/min-h-/.test(tag) || /buttonClass\(/.test(tag)) continue;
+    out.push(tag.replace(/\s+/g, " ").slice(0, 90));
+  }
+  return out;
+}
+
+describe("لا زرَّ أقصر من إبهام", () => {
+  for (const file of SRC.filter((f) => f.endsWith(".tsx"))) {
+    const source = readFileSync(file, "utf8");
+    if (!source.includes("<button")) continue;
+    it(file, () => {
+      expect(shortButtons(source)).toEqual([]);
+    });
+  }
+
+  it("والحارس يُمسك الشكل الخاطئ", () => {
+    expect(shortButtons('<button className="px-3 py-1.5 text-xs">أ</button>')).toHaveLength(1);
+  });
+
+  it("ولا يُمسك الصواب", () => {
+    expect(shortButtons('<button className="min-h-11 px-3 py-1.5">أ</button>')).toEqual([]);
+    expect(shortButtons('<button className={buttonClass("primary", "sm")}>أ</button>')).toEqual([]);
+  });
+});

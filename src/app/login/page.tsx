@@ -67,7 +67,7 @@ export default async function LoginPage({
       >
         <button
           type="submit"
-          className="w-full rounded-xl bg-inverse-surface px-5 py-3.5 text-sm font-bold text-inverse-ink transition-opacity hover:opacity-90"
+          className="min-h-11 w-full rounded-xl bg-inverse-surface px-5 py-3.5 text-sm font-bold text-inverse-ink transition-opacity hover:opacity-90"
         >
           الدخول بحساب جوجل
         </button>

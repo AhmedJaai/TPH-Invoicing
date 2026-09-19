@@ -150,7 +150,7 @@ function LinkRow({
           <button
             onClick={() => void save()}
             disabled={busy || (creating && newName.trim().length < 2)}
-            className="shrink-0 rounded-lg bg-inverse-surface px-3 py-1.5 text-[11px] font-bold text-inverse-ink disabled:opacity-30"
+            className={buttonClass("primary", "sm")}
           >
             {busy ? "يحفظ…" : items.length > 1 ? `اربط ${items.length} معاً` : "اربط"}
           </button>
