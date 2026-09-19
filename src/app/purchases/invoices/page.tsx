@@ -133,7 +133,7 @@ export default async function InvoicesPage({
       actions={
         hasFilters(f)
           ? <LinkButton href="/purchases/invoices" size="sm">امسح الترشيح</LinkButton>
-          : <LinkButton href="/upload" variant="primary" size="sm">أضف فاتورة</LinkButton>
+          : <LinkButton href="/upload" variant="primary" size="sm">ارفع مستنداً</LinkButton>
       }
     >
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">

@@ -92,7 +92,7 @@ export default async function SuppliersPage({
         <EmptyState
           title="لا مورّدين بعد."
           hint="يُنشَأ المورّد حين تُقرأ أوّل فاتورة منه — أو تختاره «مورّداً جديداً» في شاشة الرفع."
-          action={<LinkButton href="/upload" variant="primary">ارفع فاتورته</LinkButton>}
+          action={<LinkButton href="/upload" variant="primary">ارفع مستنداً</LinkButton>}
         />
       </PageShell>
     );
