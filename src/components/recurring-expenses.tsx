@@ -154,7 +154,7 @@ export function RecurringExpenses({
           placeholder="اسم المصروف — إيجار المحل"
           aria-label="اسم المصروف"
           dir="auto"
-          className="min-w-[10rem] flex-1 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-ink"
+          className="min-w-[10rem] flex-1 rounded-lg border border-line-input bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-ink"
         />
         <input
           value={amount}
@@ -163,13 +163,13 @@ export function RecurringExpenses({
           aria-label="المبلغ بالريال"
           inputMode="decimal"
           dir="ltr"
-          className="nums w-24 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-ink"
+          className="nums w-24 rounded-lg border border-line-input bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-ink"
         />
         <select
           value={cadence}
           onChange={(e) => setCadence(e.target.value as ExpenseRow["cadence"])}
           aria-label="الدورة"
-          className="rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+          className="rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
         >
           {(Object.keys(CADENCE_LABEL) as ExpenseRow["cadence"][]).map((c) => (
             <option key={c} value={c}>{CADENCE_LABEL[c]}</option>
@@ -179,7 +179,7 @@ export function RecurringExpenses({
           value={category}
           onChange={(e) => setCategory(e.target.value as TxCategory)}
           aria-label="الباب"
-          className="rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+          className="rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
         >
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>

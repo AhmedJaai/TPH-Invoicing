@@ -126,7 +126,7 @@ export function MonthClose({
             setMonth(e.target.value);
             void call("check", e.target.value);
           }}
-          className="nums rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+          className="nums rounded-lg border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
           dir="ltr"
         >
           {months.map((m) => (
@@ -215,7 +215,7 @@ export function MonthClose({
                     inputMode="decimal"
                     dir="ltr"
                     required
-                    className="nums mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+                    className="nums mt-1 w-full rounded-lg border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
                   />
                 </label>
                 <label className="block text-xs">
@@ -226,7 +226,7 @@ export function MonthClose({
                     inputMode="decimal"
                     dir="ltr"
                     required
-                    className="nums mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+                    className="nums mt-1 w-full rounded-lg border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
                   />
                 </label>
               </div>
@@ -263,7 +263,7 @@ export function MonthClose({
                         onChange={(e) => setNote(e.target.value)}
                         placeholder="يُحفظ في سجلّ التدقيق"
                         dir="auto"
-                        className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs outline-none focus:border-ink"
+                        className="mt-1 w-full rounded-lg border border-line-input bg-surface px-3 py-2 text-xs outline-none focus:border-ink"
                       />
                     </label>
                   )}

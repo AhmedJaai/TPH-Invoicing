@@ -251,7 +251,7 @@ function FindingCard({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             maxLength={500}
-            className="mt-1 block min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm"
+            className="mt-1 block min-h-11 w-full rounded-xl border border-line-input bg-surface px-3 text-sm"
             placeholder="مثلاً: سدّدتُها بحوالةٍ من حسابٍ آخر"
           />
         </label>

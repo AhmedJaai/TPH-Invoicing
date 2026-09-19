@@ -212,7 +212,7 @@ export default async function DocumentsPage({
           placeholder="ابحث في اسم الملف…"
           aria-label="ابحث في اسم الملف"
           dir="auto"
-          className="min-w-[12rem] flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+          className="min-w-[12rem] flex-1 rounded-lg border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
         />
         {p.month && <input type="hidden" name="month" value={p.month} />}
         {p.supplier && <input type="hidden" name="supplier" value={p.supplier} />}

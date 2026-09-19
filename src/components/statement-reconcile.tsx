@@ -157,7 +157,7 @@ export function StatementReconcile({
             aria-label="المورّد صاحب الكشف"
             value={supplierId}
             onChange={(e) => setSupplierId(e.target.value)}
-            className="min-w-[11rem] flex-1 rounded-lg border border-line bg-surface px-2.5 py-2 text-xs outline-none focus:border-ink"
+            className="min-w-[11rem] flex-1 rounded-lg border border-line-input bg-surface px-2.5 py-2 text-xs outline-none focus:border-ink"
           >
             <option value="">المورّد: يُستنتج من الكشف</option>
             {suppliers.map((x) => (

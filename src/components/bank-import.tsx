@@ -145,7 +145,7 @@ function UnknownRow({
             aria-label="باب الحركة"
             value={category}
             onChange={(e) => setCategory(e.target.value as TxCategory)}
-            className="min-w-[8rem] rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+            className="min-w-[8rem] rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
           >
             {CATEGORY_OPTIONS.map((c) => (
               <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>
@@ -157,7 +157,7 @@ function UnknownRow({
               aria-label="المورّد"
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+              className="min-w-[9rem] flex-1 rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
             >
               <option value="">اختر المورّد…</option>
               {suppliers.map((s) => (
@@ -172,7 +172,7 @@ function UnknownRow({
             onChange={(e) => setPattern(e.target.value)}
             placeholder="النصّ المميِّز في وصف الحركة"
             dir="auto"
-            className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+            className="min-w-[9rem] flex-1 rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
           />
 
           <button

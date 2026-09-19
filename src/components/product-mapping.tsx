@@ -116,7 +116,7 @@ function LinkRow({
             aria-label="الصنف المعياريّ"
             value={productId}
             onChange={(e) => setProductId(e.target.value)}
-            className="min-w-[9rem] rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+            className="min-w-[9rem] rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
           >
             <option value="">صنف معياري جديد…</option>
             {products.map((p) => (
@@ -132,13 +132,13 @@ function LinkRow({
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="اسم الصنف المعياري"
                 dir="auto"
-                className="min-w-[9rem] flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+                className="min-w-[9rem] flex-1 rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
               />
               <select
                 aria-label="فئة الصنف"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as ProductCategory)}
-                className="rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+                className="rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>

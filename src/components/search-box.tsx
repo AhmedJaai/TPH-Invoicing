@@ -127,7 +127,7 @@ export function SearchBox() {
         aria-autocomplete="list"
         aria-activedescendant={open && hits.length > 0 ? `search-hit-${active}` : undefined}
         placeholder="ابحث برقم أو مبلغ أو اسم…"
-        className="w-full rounded-xl border border-line bg-sunken px-3 py-1.5 text-xs outline-none transition-colors placeholder:text-muted focus:border-ink-soft focus:bg-surface"
+        className="w-full rounded-xl border border-line-input bg-sunken px-3 py-1.5 text-xs outline-none transition-colors placeholder:text-muted focus:border-ink-soft focus:bg-surface"
       />
 
       {!q && (

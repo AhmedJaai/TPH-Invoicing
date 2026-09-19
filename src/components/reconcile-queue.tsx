@@ -376,7 +376,7 @@ export function ReconcileQueue({
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+              className="mt-1 w-full rounded-xl border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
             >
               <option value="">اختر…</option>
               {suppliers.map((s) => (
@@ -394,7 +394,7 @@ export function ReconcileQueue({
               onChange={(e) => setName(e.target.value)}
               dir="auto"
               placeholder={group.items[0].beneficiaryRaw ?? group.title.slice(0, 40)}
-              className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-ink"
+              className="mt-1 w-full rounded-xl border border-line-input bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-ink"
             />
           </label>
         )}

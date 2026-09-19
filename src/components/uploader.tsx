@@ -146,7 +146,7 @@ function Field({
         inputMode={inputMode}
         dir="auto"
         className={`nums mt-1 w-full rounded-lg border bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-ink ${
-          needsReview ? "border-warn" : "border-line"
+          needsReview ? "border-warn" : "border-line-input"
         }`}
       />
     </label>
@@ -251,7 +251,7 @@ function SupplierPicker({
           if (sup) onChoose({ id: sup.id, nameAr: sup.nameAr });
         }}
         className={`mt-1 w-full rounded border bg-surface px-2 py-1.5 text-sm outline-none focus:border-ink ${
-          active ? "border-line" : "border-danger"
+          active ? "border-line-input" : "border-danger"
         }`}
       >
         <option value="">اختر المورّد…</option>
@@ -279,7 +279,7 @@ function SupplierPicker({
             placeholder="اسم المورّد الجديد"
             dir="auto"
             autoFocus
-            className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-ink"
+            className="min-w-0 flex-1 rounded border border-line-input bg-surface px-2 py-1 text-xs outline-none focus:border-ink"
           />
           <button
             onClick={() => void create()}
@@ -537,7 +537,7 @@ export function Uploader({
       {justArchived && (
         <div className="mb-4 rounded-xl border border-ok/40 bg-ok-bg px-4 py-3">
           <p className="text-sm font-bold text-ok">✓ تم الرفع بنجاح</p>
-          <p className="mt-1 truncate font-mono text-[11px] text-ok/80" dir="ltr">
+          <p className="mt-1 truncate font-mono text-[11px] text-ok" dir="ltr">
             {archived[0].fileName}
           </p>
           <p className="mt-1 text-xs text-ink-soft">الشاشة جاهزة للملف التالي.</p>
@@ -741,7 +741,7 @@ export function Uploader({
                       value={item.edited.fileName}
                       onChange={(e) => editField(item.id, "fileName", e.target.value)}
                       dir="ltr"
-                      className="mt-1 w-full rounded border border-line bg-surface px-2 py-1 font-mono text-xs outline-none focus:border-ink"
+                      className="mt-1 w-full rounded border border-line-input bg-surface px-2 py-1 font-mono text-xs outline-none focus:border-ink"
                     />
                     <p className="mt-2 text-xs text-muted">وجهته في الدرايف</p>
                     <p className="mt-0.5 truncate text-xs font-medium" dir="ltr">
