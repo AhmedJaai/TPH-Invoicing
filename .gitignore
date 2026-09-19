@@ -55,3 +55,6 @@ bench-*.json
 
 # تقارير الجرد — نتيجةُ تشغيلٍ لا شيفرة
 reports/
+
+# نسخةُ HTML الوسيطة للدليل — تُولَّد بـnpm run docs:handbook
+docs/handbook/handbook.html

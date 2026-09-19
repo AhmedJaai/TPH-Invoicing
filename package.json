@@ -57,7 +57,8 @@
     "ops:real-bank": "tsx --env-file=.env scripts/certify-real-bank.ts",
     "db:backup": "tsx --env-file=.env scripts/backup.ts",
     "db:restore-verify": "tsx --env-file=.env scripts/restore-verify.ts",
-    "db:backfill-layers": "tsx --env-file=.env scripts/backfill-layers.ts"
+    "db:backfill-layers": "tsx --env-file=.env scripts/backfill-layers.ts",
+    "docs:handbook": "tsx scripts/build-handbook.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
