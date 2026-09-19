@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   AREAS,
+  ACCOUNT_LINKS,
   MOBILE_TABS,
   activeArea,
   activeChild,
   mobileTabs,
+  visibleAccountLinks,
   visibleAreas,
   visibleChildren,
 } from "./nav";
@@ -16,19 +18,20 @@ describe("activeArea", () => {
   });
 
   it("تنسب الصفحة الفرعية إلى مساحتها", () => {
-    expect(activeArea("/purchases/products")?.href).toBe("/purchases");
-    expect(activeArea("/money/statement")?.href).toBe("/money");
-    expect(activeArea("/settings/audit")?.href).toBe("/settings");
+    expect(activeArea("/purchases/invoices")?.href).toBe("/suppliers");
+    expect(activeArea("/money/expenses")?.href).toBe("/money");
+    expect(activeArea("/suppliers/Ganache")?.href).toBe("/suppliers");
   });
 
-  it("تنسب الصفحات القديمة إلى مساحاتها الجديدة", () => {
-    expect(activeArea("/suppliers")?.href).toBe("/purchases");
-    expect(activeArea("/statements")?.href).toBe("/purchases");
-    expect(activeArea("/analysis")?.href).toBe("/purchases");
+  it("تنسب الصفحات إلى مساحاتها بعد دمج «المشتريات» في «المورّدون»", () => {
+    expect(activeArea("/statements")?.href).toBe("/suppliers");
+    expect(activeArea("/analysis")?.href).toBe("/suppliers");
+    expect(activeArea("/purchases")?.href).toBe("/suppliers");
     expect(activeArea("/bank")?.href).toBe("/money");
     expect(activeArea("/payments")?.href).toBe("/money");
     expect(activeArea("/close")?.href).toBe("/money");
     expect(activeArea("/audit")?.href).toBe("/attention");
+    expect(activeArea("/review")?.href).toBe("/attention");
     expect(activeArea("/upload")?.href).toBe("/documents");
   });
 
@@ -47,48 +50,69 @@ describe("activeArea", () => {
 });
 
 describe("activeChild", () => {
-  const purchases = AREAS.find((a) => a.href === "/purchases")!;
+  const suppliers = AREAS.find((a) => a.href === "/suppliers")!;
 
   it("تختار أطول بادئة لا أوّل تطابق", () => {
-    // `/purchases` و`/purchases/products` كلاهما يطابق — والأطول أصدق
-    expect(activeChild("/purchases/products", purchases)?.href).toBe("/purchases/products");
-    expect(activeChild("/purchases", purchases)?.href).toBe("/purchases");
+    expect(activeChild("/purchases/invoices", suppliers)?.href).toBe("/purchases/invoices");
+    expect(activeChild("/suppliers", suppliers)?.href).toBe("/suppliers");
+    // صفحةُ مورّدٍ بعينه تبقى تحت لسان «الحسابات»
+    expect(activeChild("/suppliers/Ganache", suppliers)?.href).toBe("/suppliers");
   });
 
   it("ترجع غير معرَّف لقسم خارج المساحة", () => {
-    expect(activeChild("/bank", purchases)).toBeUndefined();
+    expect(activeChild("/bank", suppliers)).toBeUndefined();
   });
 });
 
 describe("visibleAreas", () => {
-  it("المالك يرى الستّ كلّها", () => {
+  it("المالك يرى الخمس كلّها", () => {
     expect(visibleAreas("OWNER")).toHaveLength(AREAS.length);
+    expect(AREAS).toHaveLength(5);
   });
 
-  it("مدير المشتريات لا يرى المال ولا ما يحتاج انتباهك", () => {
+  it("مدير المشتريات لا يرى المال ولا ما يحتاج قراراً", () => {
     const hrefs = visibleAreas("PURCHASING").map((a) => a.href);
     expect(hrefs).not.toContain("/money");
     expect(hrefs).not.toContain("/attention");
     expect(hrefs).toContain("/documents");
   });
 
-  it("«الأداء» لم تعد مساحةً — صارت قسم «الأسعار» تحت المشتريات", () => {
-    // ثلاث مساحاتٍ بأسماء متقاربة عن شيءٍ واحد: الأصناف وأسعارها
-    expect(AREAS.map((a) => a.href)).not.toContain("/performance");
-    const purchases = AREAS.find((a) => a.href === "/purchases")!;
-    expect(purchases.children.find((c) => c.href === "/performance")?.label).toBe("الأسعار");
-    expect(activeArea("/performance")?.href).toBe("/purchases");
-  });
-
-  it("المحاسب يرى المال ولا يرى شيئاً يحتاج صلاحية ليست له", () => {
+  it("المحاسب يرى المال وما يحتاج قراراً", () => {
     const hrefs = visibleAreas("ACCOUNTANT").map((a) => a.href);
     expect(hrefs).toContain("/money");
     expect(hrefs).toContain("/attention");
   });
+
+  /*
+    ── ما خرج من التنقّل عمداً ──
+
+    كانت ستَّ مساحاتٍ وسبعةَ عشر رابطاً في شريطٍ من صفّين. وثلاثٌ من
+    تلك الوجهات لم تكن وجهاتٍ أصلاً: «الإعدادات» تُضبَط مرّةً في العمر،
+    و«الأداء» و«المشتريات» تكرّران ما في غيرهما.
+  */
+  it("لا مساحةَ لما يُضبط مرّةً في العمر ولا لصفحةٍ حُذفت", () => {
+    const hrefs = AREAS.map((a) => a.href);
+    expect(hrefs).not.toContain("/settings");
+    expect(hrefs).not.toContain("/performance");
+    expect(hrefs).not.toContain("/purchases");
+    expect(hrefs).not.toContain("/review");
+  });
+
+  it("الإعدادات وسجلّ التدقيق في روابط الحساب لا في المساحات", () => {
+    const hrefs = visibleAccountLinks("OWNER").map((l) => l.href);
+    expect(hrefs).toEqual(["/settings", "/settings/audit"]);
+    // ومدير المشتريات لا يرى سجلّ التدقيق
+    expect(visibleAccountLinks("PURCHASING").map((l) => l.href)).toEqual(["/settings"]);
+  });
+
+  it("عددُ روابط التنقّل الظاهرة خمسة — كان سبعةَ عشر", () => {
+    const owner = visibleAreas("OWNER");
+    expect(owner).toHaveLength(5);
+  });
 });
 
 describe("visibleChildren", () => {
-  it("تحجب القسم الذي لا يملك الدور صلاحيته", () => {
+  it("تحجب اللسان الذي لا يملك الدور صلاحيته", () => {
     const money = AREAS.find((a) => a.href === "/money")!;
     const forAccountant = visibleChildren("ACCOUNTANT", money).map((c) => c.href);
     // المحاسب لا يعتمد الدفعات
@@ -97,13 +121,17 @@ describe("visibleChildren", () => {
     expect(forAccountant).toContain("/close");
   });
 
-  it("لا تعرض شريط أقسام لمساحة بقسم واحد أو بلا أقسام", () => {
+  it("لا تعرض شريط ألسنة لمساحة بلسانٍ واحد أو بلا ألسنة", () => {
     const home = AREAS.find((a) => a.href === "/")!;
     expect(visibleChildren("OWNER", home)).toEqual([]);
 
+    // «المستندات» صارت وجهةً واحدة — والرفع فعلٌ لا لسان
     const documents = AREAS.find((a) => a.href === "/documents")!;
-    // مدير المشتريات يرى الرفع والأرشيف كليهما
-    expect(visibleChildren("PURCHASING", documents)).toHaveLength(2);
+    expect(visibleChildren("OWNER", documents)).toEqual([]);
+
+    // و«يحتاج قرارك» مكانٌ واحد للعمل كلّه
+    const attention = AREAS.find((a) => a.href === "/attention")!;
+    expect(visibleChildren("OWNER", attention)).toEqual([]);
   });
 });
 
@@ -115,19 +143,19 @@ describe("mobileTabs", () => {
   });
 
   it("لا تكرّر مساحةً بين الشريط والمزيد", () => {
-    const { tabs, more } = mobileTabs("OWNER", "/settings");
+    const { tabs, more } = mobileTabs("OWNER", "/documents");
     const all = [...tabs, ...more].map((a) => a.href);
     expect(new Set(all).size).toBe(all.length);
   });
 
   it("ترفع المساحة المفتوحة إلى الشريط كي لا يفقد المستخدم موضعه", () => {
-    const { tabs } = mobileTabs("OWNER", "/settings/audit");
-    expect(tabs.map((a) => a.href)).toContain("/settings");
+    const { tabs } = mobileTabs("OWNER", "/documents");
+    expect(tabs.map((a) => a.href)).toContain("/documents");
     expect(tabs).toHaveLength(MOBILE_TABS);
   });
 
   it("تبقي الرئيسية في الشريط حتى حين تُرفع مساحة بعيدة", () => {
-    const { tabs } = mobileTabs("OWNER", "/settings");
+    const { tabs } = mobileTabs("OWNER", "/documents");
     expect(tabs[0].href).toBe("/");
   });
 
@@ -146,16 +174,16 @@ describe("mobileTabs", () => {
 });
 
 describe("«كم أدين ولمن؟»", () => {
-  const purchases = AREAS.find((a) => a.href === "/purchases")!;
+  const suppliers = AREAS.find((a) => a.href === "/suppliers")!;
 
-  it("أوّل أقسام المشتريات يفتح الجدول بالمورّد", () => {
-    expect(purchases.children[0]).toMatchObject({
-      href: "/purchases/insights",
-      label: "عليك لكلّ مورّد",
+  it("أوّل ألسنة المورّدين يفتح الجدول بالمورّد لا بالفاتورة", () => {
+    expect(suppliers.children[0]).toMatchObject({
+      href: "/suppliers",
+      label: "الحسابات",
     });
   });
 
-  it("لا مرشِّح في مسار قسم — القسم وجهةٌ لا ترشيح", () => {
+  it("لا مرشِّح في مسار لسان — اللسان وجهةٌ لا ترشيح", () => {
     // كان «المستحقّ عليك» يفتح `?paid=OPEN`: فواتيرُ مورّدٍ دُفع له
     // مقدَّماً تظهر فيه «مستحقّة»، وهي مسدَّدة.
     for (const area of AREAS) {
@@ -177,27 +205,27 @@ describe("سلامة البنية", () => {
     }
   });
 
-  it("اسم القسم هو عنوان صفحته", () => {
+  it("اسم اللسان هو عنوان صفحته", () => {
     // الأسماء التي اختلفت عن عناوين صفحاتها فأرسلت صاحب العمل إلى غير
     // ما طلب — «كشف الحساب» أخطرُها: في البنوك السعوديّة تعني حركاته.
-    const money = AREAS.find((a) => a.href === "/money")!;
-    const documents = AREAS.find((a) => a.href === "/documents")!;
-    const purchases = AREAS.find((a) => a.href === "/purchases")!;
-    const labels = new Map(
-      [...money.children, ...documents.children, ...purchases.children].map((c) => [c.href, c.label]),
-    );
-    expect(labels.get("/money/statement")).toBe("التدفّق وقائمة الدخل");
+    const labels = new Map(AREAS.flatMap((a) => a.children.map((c) => [c.href, c.label] as const)));
     expect(labels.get("/payments")).toBe("دفعة الشهر");
-    expect(labels.get("/statements")).toBe("كشوف المورّدين");
-    expect(labels.get("/documents")).toBe("المستندات");
-    expect(labels.get("/upload")).toBe("ارفع مستنداً");
+    expect(labels.get("/statements")).toBe("الكشوف");
+    expect(labels.get("/bank")).toBe("حركة البنك");
+    expect(labels.get("/analysis")).toBe("الأصناف والأسعار");
+    // ولا لسان يحمل اسم «التدفّق وقائمة الدخل» — صار التدفّق في «المال»
+    expect([...labels.values()]).not.toContain("التدفّق وقائمة الدخل");
   });
 
-  it("كل قسم يقع تحت مساحته", () => {
+  it("كل لسان يقع تحت مساحته", () => {
     for (const area of AREAS) {
       for (const child of area.children) {
         expect(activeArea(child.href)?.href).toBe(area.href);
       }
     }
+  });
+
+  it("كل رابط حساب له صلاحيته", () => {
+    for (const link of ACCOUNT_LINKS) expect(link.needs).toBeDefined();
   });
 });

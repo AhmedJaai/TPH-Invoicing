@@ -38,8 +38,7 @@ export default async function SettingsPage() {
         (select count(*)::int from supplier_aliases)                       as aliases,
         (select count(*)::int from bank_rules)                             as rules,
         (select count(*)::int from users)                                  as users,
-        (select count(*)::int from audit_logs)                             as audit,
-        (select count(*)::int from schema_migrations)                      as migrations
+        (select count(*)::int from audit_logs)                             as audit
     `)
   ).rows;
 
@@ -120,14 +119,12 @@ export default async function SettingsPage() {
       value: String(f?.audit ?? 0),
       detail: "ما فُعل ومن فعله ومتى — غير قابل للتعديل ولا الحذف",
     },
-    {
-      href: "/settings",
-      title: "هجرات القاعدة",
-      value: String(f?.migrations ?? 0),
-      detail: "مطبَّقة بالترتيب ومسجَّلة",
-      disabled: true,
-      disabledReason: "تُطبَّق مع كلّ نشر — للاطّلاع وحده",
-    },
+    /*
+      «هجرات القاعدة: ٣٤» حُذفت — بطاقةٌ معطَّلة تعرض عدداً لا يعني شيئاً
+      لصاحب المقهى ولا يُفعَل به شيء، وتقول عن نفسها «للاطّلاع وحده».
+      وعددُ الهجرات يُفحَص في بوّابة الإنتاج (`ops:gate`) حيث يُقرأ من
+      المجلّد ويُقارَن بالمطبَّق — وهناك موضعُه.
+    */
   ];
 
   return (

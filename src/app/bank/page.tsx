@@ -6,7 +6,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Badge, Card, Section, Stat, StatGrid, NoAccess } from "@/components/ui";
+import { Card, LinkButton, Section, Stat, StatGrid, NoAccess } from "@/components/ui";
 import { BankImport } from "@/components/bank-import";
 import { MatchExplain, type MatchExplanation } from "@/components/match-explain";
 import { ReconcileQueue, type QueueGroup, type QueueItem } from "@/components/reconcile-queue";
@@ -14,14 +14,14 @@ import { pendingDecision } from "@/lib/bank/pending";
 import { toCanonical } from "@/lib/bank/canonical";
 import { groupByIdentity } from "@/lib/bank/pattern";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
-import { countNoun, ITEM, PAYMENT_RECORD, TIME, TRANSACTION } from "@/lib/arabic";
+import { countNoun, ITEM, PAYMENT_RECORD, TRANSACTION } from "@/lib/arabic";
 import {
-  buildDoublePaidClaim, doublePaidKey, findDoublePaid, partitionDoublePaid, recoverableMinor,
-  DOUBLE_PAID_DECISION_LABEL, type DoublePaidDecision, type DoublePaidGroup, type DoublePaidTx,
+  findDoublePaid, partitionDoublePaid,
+  type DoublePaidTx,
 } from "@/lib/bank/double-paid";
-import { DoublePaidActions } from "@/components/double-paid-actions";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
+import { loadUnbackedPayments } from "@/services/supplier-followups.service";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { formatDay } from "@/lib/riyadh-time";
 
@@ -46,7 +46,7 @@ export default async function BankPage({
   if (!user) redirect("/login?from=/bank");
   if (!can(user.role, "bank:view")) {
     return (
-      <PageShell user={user} width="wide" title="البنك">
+      <PageShell user={user} width="wide" title="حركة البنك">
         <NoAccess what="كشف البنك" />
       </PageShell>
     );
@@ -236,6 +236,16 @@ export default async function BankPage({
           .map((r) => [r.key, r.decision] as const),
   );
   const doublePaidSplit = partitionDoublePaid(doublePaid, doublePaidDecisions);
+  /* ما لم يُحسَم بعد — وهو ما يستحقّ الإحالة. وما حُسم لا يُذكَر. */
+  const doublePaidCount = doublePaidSplit.open.length + doublePaidSplit.claimed.length;
+
+  /*
+    «دفعات لم تُنسب» من المصدر الواحد — هو نفسه الذي يقرؤه التنبيه
+    وصفحةُ حسابات المورّدين. وكان هنا استعلامٌ ثالثٌ مستقلّ بشرطٍ ثالث.
+  */
+  const unbacked = await loadUnbackedPayments();
+  const unbackedCount = unbacked.length;
+  const unbackedTotalMinor = unbacked.reduce((sum, p) => sum + p.unbackedMinor, 0);
   const focused = focus[0] ?? null;
   const canApprove = can(user.role, "payment:approve");
   const canEdit = can(user.role, "bank:edit");
@@ -359,8 +369,9 @@ export default async function BankPage({
     <PageShell
       user={user}
       width="wide"
-      title="البنك"
-      intro="أين تحرّكت الأموال. وكل مطابقة هنا تقول لماذا طُوبقت، ويمكن التراجع عنها."
+      /* اسمُ الصفحة هو اسمُ لسانها حرفاً بحرف — «فعلٌ واحد باسمٍ واحد» */
+      title="حركة البنك"
+      intro="أين تحرّكت الأموال. وكلّ مطابقةٍ هنا تقول لماذا طُوبقت، ويمكن التراجع عنها."
     >
       {/* ── الحركة التي فُتحت عليها الصفحة ── */}
       {focused && (
@@ -409,20 +420,21 @@ export default async function BankPage({
       )}
 
       <StatGrid>
+        {/*
+          «طابور المراجعة» كان بطاقةً هنا تفتح صفحةً فارغة، وعددُها عدٌّ
+          ثانٍ للعمل الباقي بجانب عدّ «يحتاج قرارك». فعدٌّ واحد وموضعٌ واحد.
+
+          و«سداد بلا فاتورة» كان يعدّ ١٣ دفعة بينما التنبيه يعدّ ١٠ —
+          الفرقُ أنّ أحدهما يستثني من لا يصدر فواتير. فصار التعريف واحداً
+          في `loadUnbackedPayments`، والعددُ يفتح تلك الدفعات بعينها.
+        */}
         <Stat
-          label="طابور المراجعة"
-          value={String(n("pending"))}
-          tone={n("pending") > 0 ? "warn" : "ok"}
-          sub={n("pending") > 0 ? "حركاتٌ تنتظر قراراً" : "لا حركة تنتظر قراراً"}
-          href="/review"
-        />
-        <Stat
-          label="سداد بلا فاتورة"
-          minor={n("unapplied_sum")}
-          tone={n("unapplied") > 0 ? "warn" : "ok"}
-          sub={`${countNoun(n("unapplied"), PAYMENT_RECORD)} لم تُربط بفاتورة`
+          label="دفعات لم تُنسب إلى فاتورة"
+          minor={unbackedTotalMinor}
+          tone={unbackedCount > 0 ? "warn" : "ok"}
+          sub={`${countNoun(unbackedCount, PAYMENT_RECORD)} بلا مستند`
             + (n("advance") > 0 ? ` · ودفعة مقدَّمة ${formatRiyalsDisplay(n("advance_sum"))}` : "")}
-          href="/attention"
+          href="/suppliers?unbacked=1#unbacked"
         />
         <Stat
           label="فواتير مفتوحة"
@@ -441,39 +453,28 @@ export default async function BankPage({
         {countNoun(n("tx"), TRANSACTION)} مخزّنة بعد إزالة المكرَّر.
       </p>
 
-      {/* ── ما خرج مرّتين ── */}
-      {doublePaid.length > 0 && (
-        <div id="double-paid" className="scroll-mt-28">
-          <Section
-            title="سُدّد مرّتين في يومٍ واحد"
-            hint={`${recoverableMinor(doublePaidSplit.open) + recoverableMinor(doublePaidSplit.claimed) > 0 ? "مالٌ يُطالَب به الجهةُ ويُسترَدّ — لا يُصلَح في قيدنا، فالمال خرج فعلاً. " : ""}أرسل رسالة المطالبة، ثمّ قل ما جرى: «طالبتُ» يُبقي التنبيه أهدأ، و«استُردّ» و«ليس ازدواجاً» يُغلقانه. ومرجعان مختلفان يعنيان عمليّتين قطعاً.`}
-          >
-            {doublePaidSplit.open.length + doublePaidSplit.claimed.length === 0 ? (
-              <p className="text-xs text-ok">كلّها حُسمت — لا مطالبة مفتوحة.</p>
-            ) : (
-              <ul className="space-y-2.5">
-                {[...doublePaidSplit.open, ...doublePaidSplit.claimed].map((g) => (
-                  <li key={doublePaidKey(g)}>
-                    <DoublePaidCard group={g} decision={(doublePaidDecisions.get(doublePaidKey(g)) as DoublePaidDecision | undefined) ?? null} canEdit={canEdit} />
-                  </li>
-                ))}
-              </ul>
-            )}
-            {doublePaidSplit.closed.length > 0 && (
-              <details className="mt-3">
-                <summary className="inline-flex min-h-11 cursor-pointer items-center text-xs text-muted underline decoration-dotted underline-offset-4 sm:min-h-0">
-                  ما حُسم ({countNoun(doublePaidSplit.closed.length, ITEM)})
-                </summary>
-                <ul className="mt-2 space-y-2.5">
-                  {doublePaidSplit.closed.map(({ group: g, decision }) => (
-                    <li key={doublePaidKey(g)}>
-                      <DoublePaidCard group={g} decision={decision} canEdit={canEdit} />
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </Section>
+      {/*
+        «سُدّد مرّتين» كان معروضاً هنا كاملاً — البند نفسه والمبالغ نفسها
+        والأزرار نفسها الموجودة في «يحتاج قرارك». فبقي في موضعٍ واحد،
+        وهذه إحالةٌ إليه لا نسخةٌ منه.
+      */}
+      {doublePaidCount > 0 && (
+        <div id="double-paid" className="mt-8 scroll-mt-28">
+          <Card tone="danger">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="min-w-0 text-xs leading-relaxed">
+                <span className="font-bold text-danger">
+                  مالٌ خرج مرّتين في يومٍ واحد — {countNoun(doublePaidCount, ITEM)}
+                </span>
+                <span className="block text-muted">
+                  يُطالَب به الجهةُ ويُسترَدّ، ولا يُصلَح في قيدنا. ومكانُ حسمه واحد.
+                </span>
+              </p>
+              <LinkButton href="/attention?item=duplicate-payments" variant="primary" size="sm">
+                افتحه في «يحتاج قرارك»
+              </LinkButton>
+            </div>
+          </Card>
         </div>
       )}
 
@@ -529,63 +530,11 @@ export default async function BankPage({
         </Section>
       )}
 
-      <Section title="استيراد كشف" hint="الملف الذي استُورد من قبل لا يتكرّر — تُقيَّد الحركات الجديدة وحدها.">
+      <Section id="import" className="scroll-mt-24" title="استيراد كشف" hint="الملف الذي استُورد من قبل لا يتكرّر — تُقيَّد الحركات الجديدة وحدها.">
         {canEdit
           ? <BankImport openInvoiceCount={n("open")} suppliers={supplierRows} />
           : <p className="text-xs text-muted">استيراد الكشف خارج صلاحيتك.</p>}
       </Section>
     </PageShell>
-  );
-}
-
-/** بطاقةُ مالٍ خرج مرّتين — مراجعُه، والزائد، وقرارُ صاحب العمل فيه. */
-function DoublePaidCard({
-  group: g,
-  decision,
-  canEdit,
-}: {
-  group: DoublePaidGroup;
-  decision: DoublePaidDecision | null;
-  canEdit: boolean;
-}) {
-  return (
-    <Card>
-      <div className="flex items-start justify-between gap-3">
-        <span className="min-w-0">
-          <span className="block text-sm font-bold" dir="auto">{g.payee}</span>
-          <span className="block text-[11px] text-muted">
-            <bdi className="nums">{g.day}</bdi> · {countNoun(g.transactions.length, TIME)} ·{" "}
-            {CATEGORY_LABEL[g.category as keyof typeof CATEGORY_LABEL] ?? g.category}
-            {g.distinctOperations ? " · بمراجعِ سدادٍ مختلفة" : " · بلا مرجعٍ يفصلهما — قد تكون نسخة استيراد"}
-          </span>
-          {decision && (
-            <span className="mt-1 inline-block">
-              <Badge tone={decision === "CLAIMED" ? "warn" : "ok"}>{DOUBLE_PAID_DECISION_LABEL[decision]}</Badge>
-            </span>
-          )}
-        </span>
-        <span className="shrink-0 text-end">
-          <span className="block text-[11px] text-muted">الزائد</span>
-          <span className={`nums block text-sm font-bold ${decision ? "text-ink-soft" : "text-danger"}`}><Money minor={g.excessMinor} /></span>
-        </span>
-      </div>
-      <ul className="mt-2 space-y-1 border-s-2 border-line ps-2.5">
-        {g.transactions.map((t) => (
-          <li key={t.id} className="flex flex-wrap items-baseline justify-between gap-2 text-[11px]">
-            <span className="min-w-0 text-muted" dir="auto">
-              {/* `BANK_REF:` بادئةٌ داخليّة — وأحمد ينسخ الرقم ليطالب الجهة */}
-              مرجع البنك: <bdi className="nums font-bold text-ink">{t.operationRef?.replace(/^[A-Z_]+:/, "") ?? "غير مذكور"}</bdi>
-            </span>
-            <span className="nums font-bold"><Money minor={t.amountMinor} /></span>
-          </li>
-        ))}
-      </ul>
-      <DoublePaidActions
-        transactionIds={g.transactions.map((t) => t.id)}
-        decision={decision}
-        claimText={buildDoublePaidClaim(g)}
-        canEdit={canEdit}
-      />
-    </Card>
   );
 }

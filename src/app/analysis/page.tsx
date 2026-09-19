@@ -6,42 +6,71 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
 import { findSameNameCandidates, summarizeItems, type LineRow } from "@/lib/analytics";
-import { NoAccess, DataTable } from "@/components/ui";
-import { PRODUCT, countNoun, DAY } from "@/lib/arabic";
+import { NoAccess, DataTable, EmptyState, Section, Stat, StatGrid } from "@/components/ui";
+import { PRODUCT, countNoun, DAY, TIME } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
+import { buildDataHealth } from "@/lib/data-health";
+import { gatherHealthFacts } from "@/lib/data-health-facts";
+import { ProductMapping } from "@/components/product-mapping";
+import { listProducts, listSupplierProducts, mappingCoverage } from "@/services/product.service";
+import { suggestMerges, type SupplierItem } from "@/lib/products";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * الأصناف والأسعار — صفحةٌ واحدة كانت ثلاثاً.
+ *
+ * `/analysis` و`/performance` كانتا **تشغّلان الاستعلام نفسه حرفاً
+ * بحرف** (عشرون ألف سطرِ فاتورة)، وتعرضان جدول «الأصناف حسب الإنفاق»
+ * نفسَه، وبطاقتَي «أصناف مختلفة» و«أسماء تتكرّر عند مورّدين» بالرقمين
+ * نفسيهما. وتفترقان في شيءٍ واحد: جدولُ تغيّر الأسعار في الثانية.
+ *
+ * و`/purchases/products` ثالثةٌ عن الأصناف كذلك — عملُ ربطِ اسمِ الصنف
+ * عند المورّد بصنفٍ معياريّ. وهو عملٌ على الأصناف لا صفحةٌ عنها.
+ *
+ * ومعها كان بند «ارتفعت أسعار أصناف» في التنبيهات يفتح `/analysis` —
+ * **وجدول الأسعار لم يكن فيها**. فمن ضغط الزرّ وصل إلى صفحةٍ لا تحمل
+ * ما وُعد به. وقد صار يحمله.
+ */
 
 function daysSince(date: Date | null): number | null {
   if (!date) return null;
   return Math.floor((Date.now() - date.getTime()) / 86_400_000);
 }
 
-export default async function AnalysisPage() {
+export default async function ItemsAndPricesPage() {
   const user = await currentUser();
   if (!user) redirect("/login?from=/analysis");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} width="wide" title="الإنفاق على الأصناف">
+      <PageShell user={user} width="wide" title="الأصناف والأسعار">
         <NoAccess />
       </PageShell>
     );
   }
 
-  const rows = await db
-    .select({
-      normalizedDescription: invoiceLines.normalizedDescription,
-      description: invoiceLines.description,
-      supplierId: invoiceLines.supplierId,
-      supplierName: suppliers.nameAr,
-      invoiceDate: invoiceLines.invoiceDate,
-      quantity: invoiceLines.qty,
-      unitPriceMinor: invoiceLines.unitPriceMinor,
-      lineTotalMinor: invoiceLines.lineTotalMinor,
-    })
-    .from(invoiceLines)
-    .leftJoin(suppliers, eq(invoiceLines.supplierId, suppliers.id))
-    .limit(20000);
+  const canMap = can(user.role, "supplier:edit");
+
+  const [rows, health, mapping] = await Promise.all([
+    db
+      .select({
+        normalizedDescription: invoiceLines.normalizedDescription,
+        description: invoiceLines.description,
+        supplierId: invoiceLines.supplierId,
+        supplierName: suppliers.nameAr,
+        invoiceDate: invoiceLines.invoiceDate,
+        quantity: invoiceLines.qty,
+        unitPriceMinor: invoiceLines.unitPriceMinor,
+        lineTotalMinor: invoiceLines.lineTotalMinor,
+      })
+      .from(invoiceLines)
+      .leftJoin(suppliers, eq(invoiceLines.supplierId, suppliers.id))
+      .limit(20000),
+    gatherHealthFacts().then(buildDataHealth),
+    canMap
+      ? Promise.all([listSupplierProducts(), listProducts(), mappingCoverage()])
+      : Promise.resolve(null),
+  ]);
 
   const items = summarizeItems(
     rows.map<LineRow>((r) => ({
@@ -58,68 +87,121 @@ export default async function AnalysisPage() {
 
   if (items.length === 0) {
     return (
-      <PageShell
-        user={user}
-       
-        title="الإنفاق على الأصناف"
-        intro="كل صنف اشتريته: كم مرة طُلب، وبأي كميّة، وكم كلّف، ومن أي مورّد، وكل كم يوم تحتاجه."
-      >
-        <Empty message="لا توجد بنود فواتير بعد. البنود تُسجَّل عند أرشفة الفواتير — ارفع فاتورة وستظهر هنا." />
+      <PageShell user={user} width="wide" title="الأصناف والأسعار">
+        <EmptyState
+          title="لا بنود فواتير بعد."
+          hint="تُبنى الأصناف من بنود الفواتير — يمتلئ هذا حين يُقرأ محتوى أوّل فاتورة."
+        />
       </PageShell>
     );
   }
 
+  const lineCoverage = health.metrics.find((m) => m.id === "lines");
   const totalSpend = items.reduce((s, i) => s + i.totalSpentMinor, 0);
   const sameName = findSameNameCandidates(items);
-  const top = items.slice(0, 40);
 
-  // الأصناف التي قاربت دورة إعادة طلبها
-  const dueSoon = items
-    .filter((i) => i.averageDaysBetweenOrders && i.lastOrderedAt)
-    .map((i) => ({ item: i, since: daysSince(i.lastOrderedAt)!, cycle: i.averageDaysBetweenOrders! }))
-    .filter((x) => x.since >= x.cycle * 0.85)
-    .sort((a, b) => b.since / b.cycle - a.since / a.cycle)
-    .slice(0, 12);
-  const dueSoonTotal = items
-    .filter((i) => i.averageDaysBetweenOrders && i.lastOrderedAt)
-    .filter((i) => daysSince(i.lastOrderedAt)! >= i.averageDaysBetweenOrders! * 0.85).length;
+  const priceMoves = items
+    .filter((i) => i.priceChange && i.priceChange.deltaRatio !== null && Math.abs(i.priceChange.deltaRatio) >= 0.03)
+    .sort((a, b) => Math.abs(b.priceChange!.deltaRatio!) - Math.abs(a.priceChange!.deltaRatio!));
+  const priceMovesShown = priceMoves.slice(0, 25);
+
+  const withCycle = items.filter(
+    (i) => i.averageDaysBetweenOrders !== null && daysSince(i.lastOrderedAt) !== null,
+  );
+  const dueSoonAll = withCycle
+    .filter((i) => daysSince(i.lastOrderedAt)! >= i.averageDaysBetweenOrders! * 0.85)
+    .map((item) => ({
+      item,
+      cycle: item.averageDaysBetweenOrders!,
+      since: daysSince(item.lastOrderedAt)!,
+    }))
+    .sort((a, b) => b.since / b.cycle - a.since / a.cycle);
+  const dueSoon = dueSoonAll.slice(0, 12);
+
+  const top = items.slice(0, 40);
 
   return (
     <PageShell
       user={user}
-     
-      title="الإنفاق على الأصناف"
-      intro="كل صنف اشتريته: كم مرة طُلب، وبأي كميّة، وكم كلّف، ومن أي مورّد، وكل كم يوم تحتاجه."
+      width="wide"
+      title="الأصناف والأسعار"
+      intro="كلّ صنفٍ اشتريتَه: كم كلّف، ومن أيّ مورّد، وكيف تحرّك سعرُه."
     >
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
-          <p className="text-xs text-muted">أصناف مختلفة</p>
-          <p className="nums mt-1 text-xl font-bold">{items.length}</p>
-        </div>
-        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
-          <p className="text-xs text-muted">إجمالي المشتريات</p>
-          <p className="mt-1 text-xl font-bold"><Money minor={totalSpend} /></p>
-        </div>
-        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
-          <p className="text-xs text-muted">أسماء تتكرّر عند مورّدين</p>
-          <p className="nums mt-1 text-xl font-bold">{sameName.length}</p>
-        </div>
-        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
-          <p className="text-xs text-muted">مورّدون</p>
-          <p className="nums mt-1 text-xl font-bold">
-            {new Set(items.map((i) => i.supplierId).filter(Boolean)).size}
-          </p>
-        </div>
-      </div>
+      <StatGrid>
+        <Stat label="أصناف مختلفة" value={String(items.length)} />
+        <Stat label="مشتريات محسوبة بالبنود" minor={totalSpend} />
+        <Stat
+          label="أسعار تحرّكت"
+          value={String(priceMoves.length)}
+          tone={priceMoves.length > 0 ? "warn" : undefined}
+        />
+        <Stat label="أسماء تتكرّر عند مورّدين" value={String(sameName.length)} />
+      </StatGrid>
+
+      {lineCoverage && lineCoverage.state !== "GOOD" && (
+        <p className="mt-3 rounded-lg bg-warn-bg px-3 py-2 text-xs leading-relaxed text-warn">
+          ⚠ أرقام هذه الصفحة مبنيّة على {lineCoverage.detail}. الباقي غير محسوب فيها.
+        </p>
+      )}
+      {/*
+        ما لا يُحسَب يُقال، ولا يُعرَض صفراً — والمبيعات غير موصولة، فكلّ
+        ما يُبنى عليها غير متاح.
+      */}
+      <p className="mt-2 rounded-lg border border-dashed border-line px-3 py-2 text-xs leading-relaxed text-muted">
+        <span className="font-bold text-ink-soft">غير متاح بعد: </span>
+        هامش الربح · تكلفة المبيعات · ربحيّة الصنف — كلُّها تحتاج مصدرَ مبيعاتٍ لم يُوصَل،
+        ولن تُعرَض بأرقامٍ مقدَّرة.
+      </p>
+
+      {/* ── ما تحرّك سعرُه — وهو ما يفتحه بندُ التنبيه ── */}
+      {priceMoves.length > 0 && (
+        <Section
+          className="scroll-mt-24"
+          id="price-moves"
+          title="تغيّر أسعار الأصناف"
+          hint="سعرُ الوحدة في آخر فاتورة مقابل الذي قبله — عند المورّد نفسه، وبعد الخصم والضريبة لا قبلهما."
+        >
+          <DataTable
+            rows={priceMovesShown}
+            keyOf={(i) => i.key}
+            columns={[
+              {
+                key: "item", header: "الصنف", primary: true,
+                cell: (i) => (
+                  <span>
+                    <span className="block font-medium">{i.displayName}</span>
+                    <span className="block text-[11px] text-muted">
+                      {i.supplierName} · طُلب {countNoun(i.orderCount, TIME)}
+                    </span>
+                  </span>
+                ),
+              },
+              { key: "prev", header: "السابق", numeric: true, cell: (i) => <span className="text-ink-soft"><Money minor={i.priceChange!.previousMinor} /></span> },
+              { key: "now", header: "الحالي", numeric: true, cell: (i) => <span className="font-medium"><Money minor={i.priceChange!.currentMinor} /></span> },
+              {
+                key: "delta", header: "التغيّر", numeric: true,
+                cell: (i) => {
+                  const up = i.priceChange!.direction === "up";
+                  return (
+                    <span className={`font-bold ${up ? "text-danger" : "text-ok"}`}>
+                      {up ? "▲" : "▼"} {Math.abs(Math.round(i.priceChange!.deltaRatio! * 100))}٪
+                    </span>
+                  );
+                },
+              },
+            ]}
+          />
+          {priceMoves.length > priceMovesShown.length && (
+            <p className="mt-2 text-xs text-muted">تُعرض أكبرُ 25 حركة من {priceMoves.length}.</p>
+          )}
+        </Section>
+      )}
 
       {sameName.length > 0 && (
-        <section className="mt-10">
-          <h2 className="mb-1 text-base font-bold">اسم واحد عند مورّدين — للمراجعة</h2>
-          <p className="mb-3 text-xs leading-relaxed text-muted">
-            هذه مرشّحات لا نتائج. تطابق الاسم لا يعني تطابق الصنف: «عنب» عند المحمصة الغربية
-            كيلو بنّ بـ155 ريالاً، و«عنب» عند لافا زجاجة كمبوتشا بـ13.50. فانظر الوصفين
-            بنفسك — فإن كانا صنفاً واحداً فالفارق فرصة، وإلّا فلا معنى للمقارنة.
-          </p>
+        <Section
+          title="اسمٌ واحد عند مورّدين — للمراجعة"
+          hint="هذه مرشّحات لا نتائج. تطابقُ الاسم لا يعني تطابقَ الصنف: «عنب» عند المحمصة الغربية كيلو بنٍّ بـ١٥٥ ريالاً، و«عنب» عند لافا زجاجةُ كمبوتشا بـ١٣٫٥٠. فانظر الوصفين بنفسك — فإن كانا صنفاً واحداً فالفارق فرصة، وإلّا فلا معنى للمقارنة."
+        >
           <DataTable
             rows={sameName.slice(0, 20)}
             keyOf={(g) => g.normalized}
@@ -151,23 +233,18 @@ export default async function AnalysisPage() {
           {sameName.length > 20 && (
             <p className="mt-2 text-xs text-muted">تُعرض أوّل 20 من {sameName.length} — الأكبر فارقاً.</p>
           )}
-        </section>
+        </Section>
       )}
 
       {dueSoon.length > 0 && (
-        <section className="mt-10">
-          {/*
+        <Section
+          title="أصناف مضى على آخر شرائها ما يقارب دورتك المعتادة"
+          /*
             «قارب موعد طلبها» توحي بأنّ النظام يعرف المخزون، وهو لا يعرفه.
-            كلّ ما يعرفه سلوك شرائك: كم يوماً بين طلب وطلب، ومتى كان آخره.
-            فتُقال الملاحظة كما هي، ويُترك الاستنتاج لصاحبها.
-          */}
-          <h2 className="mb-1 font-display text-lg font-bold leading-tight">
-            أصناف مضى على آخر شرائها ما يقارب دورتك المعتادة
-          </h2>
-          <p className="mb-3 max-w-2xl text-xs leading-relaxed text-muted">
-            هذه ليست توصية بإعادة الطلب — النظام لا يعرف مخزونك. هو يعرف كم يوماً يمرّ
-            عادةً بين شرائك للصنف ومتى اشتريتَه آخر مرّة، فيعرض المقارنة وحدها.
-          </p>
+            كلّ ما يعرفه سلوك شرائك: كم يوماً بين طلبٍ وطلب، ومتى كان آخره.
+          */
+          hint="ليست توصيةً بإعادة الطلب — النظام لا يعرف مخزونك. هو يعرف كم يوماً يمرّ عادةً بين شرائك للصنف ومتى اشتريتَه آخر مرّة، فيعرض المقارنة وحدها."
+        >
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {dueSoon.map((x) => (
               <li key={x.item.key} className="flex items-center justify-between gap-3 px-4 py-2.5">
@@ -187,17 +264,16 @@ export default async function AnalysisPage() {
               </li>
             ))}
           </ul>
-          {dueSoonTotal > dueSoon.length && (
-            <p className="mt-2 text-xs text-muted">تُعرض أقربُ 12 من {dueSoonTotal}.</p>
+          {dueSoonAll.length > dueSoon.length && (
+            <p className="mt-2 text-xs text-muted">تُعرض أقربُ 12 من {dueSoonAll.length}.</p>
           )}
-        </section>
+        </Section>
       )}
 
-      <section className="mt-10">
-        <h2 className="mb-1 font-display text-lg font-bold leading-tight">الأصناف حسب الإنفاق</h2>
-        <p className="mb-3 max-w-2xl text-xs leading-relaxed text-muted">
-          مرتّبة بالأكثر كلفة — أعلى الصفحة هو ما يستحقّ التفاوض عليه.
-        </p>
+      <Section
+        title="الأصناف حسب الإنفاق"
+        hint="مرتّبةً بالأكثر كلفة — أعلى الجدول هو ما يستحقّ التفاوض عليه."
+      >
         <DataTable
           rows={top}
           keyOf={(i) => i.key}
@@ -230,7 +306,34 @@ export default async function AnalysisPage() {
             تُعرض أعلى {countNoun(top.length, PRODUCT)} إنفاقاً من {items.length}.
           </p>
         )}
-      </section>
+      </Section>
+
+      {/* ── الربط: عملٌ على الأصناف، وكان صفحةً ثالثة عنها ── */}
+      {canMap && mapping && (
+        <Section
+          title="اربط أصناف المورّدين"
+          hint={`${mapping[2].mapped} من ${mapping[2].total} مربوطة بصنفٍ معياريّ. والربط أساسُ كلّ مقارنة تكلفة: بلا وحدةٍ واحدة تُجمَع، «العنب» عند مورّدَين صنفان لا واحد.`}
+        >
+          {mapping[0].length === 0 ? (
+            <Empty message="لا أصناف بعد. تُبنى من بنود الفواتير — اقرأ محتوى فواتيرك أوّلاً." />
+          ) : (
+            <ProductMapping
+              rows={mapping[0]}
+              products={mapping[1]}
+              suggestions={suggestMerges(
+                mapping[0].map<SupplierItem>((r) => ({
+                  supplierId: r.supplierId,
+                  supplierName: r.supplierName,
+                  normalized: r.normalized,
+                  displayName: r.displayName,
+                  lastUnitPriceMinor: r.lastUnitPriceMinor,
+                  orderCount: r.orderCount,
+                })),
+              )}
+            />
+          )}
+        </Section>
+      )}
     </PageShell>
   );
 }

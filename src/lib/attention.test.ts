@@ -76,8 +76,11 @@ describe("buildAttention", () => {
 
   it("الحركات غير المصنَّفة تُوجَّه إلى الحركات نفسها لا إلى صفحة جامعة", () => {
     const item = buildAttention({ ...quiet, unclassifiedBankTx: 20, unclassifiedBankAmountMinor: 5_000 })[0];
-    /* طابور المراجعة يعرضها بأفعالها — وأعلى صفحة البنك فوقه ألفُ حركة */
-    expect(item.href).toBe("/review");
+    /*
+      ورشةُ القرار صارت لوحاً داخل البند نفسه، لا صفحةً مستقلّة تُسمّى
+      «طابور المراجعة» وتُفتَح فارغة. والرابط يفتح البند وورشتَه معاً.
+    */
+    expect(item.href).toBe("/attention?item=unclassified-bank");
     expect(item.area).toBe("BANK");
   });
 
@@ -247,7 +250,7 @@ describe("كل تنبيه يفتح سجلّه بعينه", () => {
    * الصفحات الجامعة تعرض بطاقاتٍ لا سجلات، فالوصول إليها من تنبيه
    * يترك المستخدم يبحث من جديد — وهو ما كان يفعله قبل هذا.
    */
-  const HUBS = ["/money", "/purchases", "/performance", "/"];
+  const HUBS = ["/money", "/purchases", "/performance", "/analysis", "/suppliers", "/bank", "/"];
 
   it("لا تنبيه يُرسل إلى صفحة جامعة", () => {
     expect(noisy.length).toBeGreaterThan(6);
@@ -286,7 +289,8 @@ describe("الغائب يُرى", () => {
     const gap = items.find((i) => i.id === "bank-coverage-gap");
     expect(gap?.severity).toBe("CRITICAL");
     expect(gap?.evidence).toHaveLength(1);
-    expect(gap?.href).toBe("/bank");
+    /* المرساةُ تنزل به إلى الاستيراد — وهو ما يسدّ الفجوة */
+    expect(gap?.href).toBe("/bank#import");
   });
 
   it("فرق المعادلة بندٌ حرج بمبلغه", () => {
@@ -376,7 +380,7 @@ describe("كلّ عددٍ في العنوان يمرّ بتمييزه (CODE-107)
   it("وما فوق العشرة مفردٌ منصوب", () => {
     const titles = buildAttention({ ...quiet, ...facts(13) }).map((i) => i.title);
     expect(titles).toContain("13 يوماً بلا كشف بنكيّ");
-    expect(titles).toContain("13 دفعة بلا فاتورة تفسّرها");
+    expect(titles).toContain("13 دفعة لم تُنسب إلى فاتورة");
     expect(titles).toContain("13 مانعاً لم يُعالَج");
   });
 });
@@ -388,7 +392,8 @@ describe("التنبيه يُغلَق بقرار (SCN-104)", () => {
     });
     expect(items.map((i) => i.id)).toEqual(["duplicate-payments-claimed"]);
     expect(items[0].severity).toBe("MEDIUM");
-    expect(items[0].href).toContain("#double-paid");
+    /* الحسمُ صار لوحاً داخل البند — والرابط يفتح البندَ بعينه */
+    expect(items[0].href).toBe("/attention?item=duplicate-payments-claimed");
   });
 
   it("المجموعة المحسومة لا تُعدّ — لا بند حرج ولا متوسّط", () => {

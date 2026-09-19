@@ -224,7 +224,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       detail: "حركات هذه الأيام غائبة لا معدومة — ولا يظهر غيابها في أي عدّاد.",
       action: "استورد الكشف الذي يغطّيها قبل أن تُقرأ أرقام الشهر.",
       actionLabel: "استورد كشفاً",
-      href: "/bank",
+      /* الفجوة تُسدّ بالاستيراد — فيُفتَح موضعُه لا رأسُ الصفحة وفوقه ألفُ حركة */
+      href: "/bank#import",
       count: f.bankGapDays,
       impact: { kind: "BLOCKED", amountMinor: null },
       evidence: f.bankGapRanges,
@@ -247,8 +248,12 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
           ? "البنك يقول رصيداً أعلى — حركاتٌ واردة لم تُقرأ."
           : "البنك يقول رصيداً أقلّ — حركاتٌ صادرة لم تُقرأ.",
       action: "راجع الكشف: الفرق يعني حركاتٍ لم تصل، لا خطأ في المطابقة.",
-      actionLabel: "افتح الحركات",
-      href: "/bank",
+      actionLabel: "اكتب رصيدَي الشهر",
+      /*
+        الفرق يُفحَص بالمعادلة، ومكانُ كتابة الرصيدين قائمةُ الإقفال —
+        وكان يفتح صفحة البنك عاريةً فلا يجد صاحبُ المقهى فيها ما يفعله.
+      */
+      href: "/close",
       count: 1,
       amountMinor: diff,
       impact: { kind: "BLOCKED", amountMinor: diff },
@@ -292,7 +297,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
         + " فهما عمليّتان لا نسخةُ استيراد.",
       action: "طالِب الجهة بردّ الزائد — والاسترداد يصعب كلّما تأخّر.",
       actionLabel: "افتح الحركات ومراجعها",
-      href: "/bank?doublePaid=1#double-paid",
+      /* الحسمُ صار في البند نفسه — ولوحُ فعله تحته، لا في صفحةٍ أخرى */
+      href: "/attention?item=duplicate-payments",
       count: f.duplicatePayments,
       amountMinor: f.duplicatePaymentAmountMinor,
       impact: { kind: "RECOVERABLE", amountMinor: f.duplicatePaymentAmountMinor },
@@ -314,7 +320,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       detail: "طالبتَ الجهة بردّ الزائد، ولم يُعلَن أنّه عاد.",
       action: "تابع الجهة. وإن عاد المال فاضغط «استُردّ» عند الحركتين.",
       actionLabel: "افتح المطالبات",
-      href: "/bank?doublePaid=1#double-paid",
+      /* الحسمُ صار في البند نفسه — ولوحُ فعله تحته، لا في صفحةٍ أخرى */
+      href: "/attention?item=duplicate-payments-claimed",
       count: f.duplicatePaymentsClaimed ?? 0,
       amountMinor: claimedMinor,
       impact: { kind: "RECOVERABLE", amountMinor: claimedMinor },
@@ -334,13 +341,14 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "unbacked-payments",
       area: "PAYMENTS",
       severity: "HIGH",
-      title: `${countNoun(f.unbackedPaymentCount, PAYMENT_RECORD)} بلا فاتورة تفسّرها`,
+      /* الاسم نفسه المعروض في «حسابات المورّدين» وفي «حركة البنك» — حرفاً بحرف */
+      title: `${countNoun(f.unbackedPaymentCount, PAYMENT_RECORD)} لم تُنسب إلى فاتورة`,
       detail:
         "مالٌ وصل المورّد ولا مستندَ يقابله — فلا خصمَ لمدخلاته،"
         + " ورصيدُ المورّد عندنا غير مُتحقَّق منه.",
       action:
         "اطلب الفاتورة من المورّد، أو أعلِن أنّه لا يصدر فواتير واطلب عقد توريد.",
-      actionLabel: "افتح الدفعات بلا فاتورة",
+      actionLabel: "افتح الدفعات وسجّل مستنداتها",
       /* القائمة نفسها التي عُدّت — لا جدول المورّدين العامّ (BTN-110) */
       href: "/suppliers?unbacked=1#unbacked",
       count: f.unbackedPaymentCount,
@@ -411,7 +419,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       action: "صنّفها مرّة — يُحفظ التصنيف قاعدةً تسري على أمثاله في كل كشف بعده.",
       actionLabel: "صنّفها في طابور المراجعة",
       /* التصنيف في الطابور — لا أعلى صفحة البنك وألفُ حركةٍ فوقها */
-      href: "/review",
+      href: "/attention?item=unclassified-bank",
       count: f.unclassifiedBankTx,
       amountMinor: f.unclassifiedBankAmountMinor,
       impact: { kind: "UNATTRIBUTED", amountMinor: f.unclassifiedBankAmountMinor },
@@ -427,8 +435,13 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: "ارتفاع أسعار المورّدين",
       detail: `${countNoun(f.priceRises.length, PRODUCT)} ارتفع سعره عند مورّده.`,
       action: "فاوض على الثلاثة الأعلى أثراً، واطلب عرضاً من مورّد بديل لتفاوض بورقة في يدك.",
-      actionLabel: "افتح الأصناف",
-      href: "/analysis",
+      actionLabel: "افتح جدول الأسعار",
+      /*
+        كان يفتح `/analysis` وجدولُ ارتفاع الأسعار في `/performance` —
+        فمن ضغط الزرّ وصل إلى صفحةٍ لا تحمل ما وُعد به. وقد صارتا
+        واحدة، والمرساة تنزل به إلى الجدول نفسه.
+      */
+      href: "/analysis#price-moves",
       count: f.priceRises.length,
       amountMinor: f.priceRiseAnnualMinor,
       impact: { kind: "ANNUAL", amountMinor: f.priceRiseAnnualMinor },
@@ -530,8 +543,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `${countNoun(f.suppliersWithoutContract.length, SUPPLIER)} لا يصدر فواتير وبلا عقد`,
       detail: `${f.suppliersWithoutContract.join(" · ")} — بلا عقد لا خصم ضريبة ولا إثبات مصروف.`,
       action: "وقّع عقد توريد مكتوباً، أو استبدله بمورّد يصدر فواتير ضريبية.",
-      actionLabel: "افتح المورّدين",
-      href: "/suppliers",
+      actionLabel: "افتح من يحتاج عقداً",
+      href: "/suppliers#no-contract",
       count: f.suppliersWithoutContract.length,
       impact: { kind: "AT_RISK", amountMinor: null },
       evidence: f.suppliersWithoutContractEvidence ?? f.suppliersWithoutContract.map((name) => ({ label: name })),

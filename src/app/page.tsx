@@ -1,50 +1,82 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { eq, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { invoices, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Card, LinkButton, Section, StatGrid } from "@/components/ui";
+import { Card, LinkButton, Section } from "@/components/ui";
 import { AttentionList } from "@/components/attention-list";
-import { buildAttention, countBySeverity } from "@/lib/attention";
-import { gatherAttentionFacts } from "@/lib/attention-facts";
-import { buildDataHealth } from "@/lib/data-health";
-import { gatherHealthFacts } from "@/lib/data-health-facts";
-import { spendByMonth, spendTrend } from "@/lib/analytics";
-import { Figure } from "@/components/figure";
-import { gatherHomeProvenance } from "@/lib/provenance-facts";
+import { countBySeverity, impactByKind } from "@/lib/attention";
+import { formatRiyalsDisplay } from "@/lib/money";
+import { attentionItems } from "@/lib/work";
 import { Changes } from "@/components/changes";
-import { buildChanges } from "@/lib/changes";
+import { buildChanges, notable } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
-import { DAY, INVOICE, countNoun } from "@/lib/arabic";
+import { DAY, SUPPLIER, countNoun } from "@/lib/arabic";
 import { formatMonth } from "@/lib/riyadh-time";
+import { loadBalanceTotals, loadOverdueBalances } from "@/services/supplier-balance.service";
 
 export const dynamic = "force-dynamic";
 
 /**
- * الصفحة الرئيسية: حال المقهى، لا شاشة رفع.
+ * الرئيسية: مركزُ قيادة، لا لوحةَ مؤشّرات.
  *
- * كانت `/` هي المُرفِع — وهو منطقي في «نظام فواتير»، لا في نظام يُفتح كل
- * صباح. فصار أوّل ما يُرى: ماذا يحتاج انتباهك، وأين المال، وما مدى اكتمال
- * ما بُنيت عليه هذه الأرقام. والرفع زرٌّ ظاهر لا صفحة أولى.
+ * كانت أربعَ بطاقاتِ أرقام، ثمّ «ما الذي تغيّر»، ثمّ التنبيهات، ثمّ
+ * مخطّطَ المصروف الشهريّ، ثمّ مخطّطَ أعلى المورّدين، ثمّ سبعةَ مقاييس
+ * لـ«صحّة البيانات». ستّةُ أقسامٍ يملأها الرقم، وواحدٌ فيها فعل.
+ *
+ * وثلاثةُ أشياءَ حُذفت وأسبابُها:
+ *
+ *   • **المخطّطان.** لا فعلَ لهما، وأرقامُهما موجودةٌ حيث يُفعَل بها
+ *     شيء — المصروف الشهريّ في «المال»، وأعلى المورّدين في
+ *     «المورّدون». والمخطّط الذي لا يُغيّر قراراً زينةٌ تُطيل الصفحة.
+ *
+ *   • **«صحّة البيانات».** سبعُ نسبِ تغطيةٍ («٩٥٪ من الفواتير لها
+ *     بنود») — وهي سؤالُ من بنى النظام لا سؤالُ من يديره. وما ينقص
+ *     منها فعلاً يظهر بنداً في «يحتاج قرارك» ومعه فعلُه.
+ *
+ *   • **الرقمان المكرّران.** كان ١٠٬٥٠٢٫٤٩ معروضاً في بطاقةٍ أعلى
+ *     الشاشة ثمّ في «ما الذي تغيّر» تحتها مباشرةً، وكذلك ١١٬١١٩٫٧٤.
+ *     رقمٌ واحدٌ مرّتين في شاشةٍ واحدة يجعل القارئ يبحث عن الفرق
+ *     بينهما — ولا فرق.
+ *
+ * فبقي ثلاثة: **كم عليّ** ثمّ **ما ينتظرني** ثمّ **ما تحرّك**.
  */
 
-function Bar({ label, value, max, note }: { label: string; value: number; max: number; note?: string }) {
-  const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
+/** بطاقةُ الرقم الأوّل — أكبر ممّا عداها لأنّها جواب السؤال الأوّل. */
+function Headline({
+  label,
+  minor,
+  sub,
+  aside,
+  href,
+  action,
+  tone,
+}: {
+  label: string;
+  minor: number;
+  sub: string;
+  aside?: React.ReactNode;
+  href: string;
+  action: string;
+  tone?: "warn";
+}) {
   return (
-    <div>
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="min-w-0 truncate text-xs font-medium">{label}</span>
-        <span className="nums shrink-0 text-xs font-bold"><Money minor={value} /></span>
+    <Card className="flex flex-col">
+      <p className="text-xs font-medium text-muted">{label}</p>
+      <p
+        className={`nums mt-2 font-display text-[2.4rem] font-black leading-none sm:text-[2.9rem] ${
+          tone === "warn" ? "text-warn" : ""
+        }`}
+      >
+        <Money minor={minor} />
+      </p>
+      <p className="mt-2.5 text-xs leading-relaxed text-muted">{sub}</p>
+      {aside}
+      <div className="mt-4 pt-1">
+        <LinkButton href={href} size="sm">{action}</LinkButton>
       </div>
-      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-sunken">
-        <div className="h-full rounded-full bg-ink transition-all" style={{ width: `${pct}%` }} />
-      </div>
-      {note && <p className="mt-1 text-[11px] text-muted">{note}</p>}
-    </div>
+    </Card>
   );
 }
 
@@ -52,126 +84,114 @@ export default async function HomePage() {
   const user = await currentUser();
   if (!user) redirect("/login?from=/");
 
-  const showAmounts = can(user.role, "amounts:view");
-
   // مدير المشتريات لا يرى المال — تُعرض له وجهته مباشرةً
-  if (!showAmounts) redirect("/upload");
+  if (!can(user.role, "amounts:view")) redirect("/upload");
 
-  const [health, attentionFacts, prov] = await Promise.all([
-    gatherHealthFacts().then(buildDataHealth),
-    gatherAttentionFacts(),
-    gatherHomeProvenance(),
+  const [attention, balances, overdue] = await Promise.all([
+    attentionItems(),
+    loadBalanceTotals(),
+    loadOverdueBalances(),
   ]);
 
-  const attention = buildAttention(attentionFacts);
   const counts = countBySeverity(attention);
+  const { totals } = balances;
+  const oldestDays = overdue.reduce((m, r) => Math.max(m, r.oldestDays), 0);
 
-  const changes = buildChanges(
-    await gatherChangeFacts(
-      attentionFacts.priceRises.length,
-      attentionFacts.priceRiseAnnualMinor,
-    ),
+  const facts = await gatherChangeFacts(0, 0);
+  /*
+    «المشتريات» و«المستحقّ عليك» بندان في `buildChanges` — وهما الرقمان
+    المعروضان أعلى الشاشة بترندهما. فيُطرحان هنا: التكرار لا يُضيف خبراً.
+  */
+  const changes = notable(buildChanges(facts)).filter(
+    (c) => c.id !== "outstanding" && c.id !== "purchases",
   );
 
-  const invoiceRows = await db
-    .select({
-      periodMonth: invoices.periodMonth,
-      invoiceDate: invoices.invoiceDate,
-      totalMinor: invoices.totalMinor,
-      supplierName: suppliers.nameAr,
-      allocated: sql<number>`coalesce((
-        select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = invoices.id
-      ), 0)`,
-    })
-    .from(invoices)
-    .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id));
+  /* «قد يُسترد» ريالٌ خرج ويمكن ردُّه — وهو أقوى ما يحرّك صاحب المقهى. */
+  const recoverableMinor = impactByKind(attention).RECOVERABLE?.amountMinor ?? 0;
+  const recoverable =
+    recoverableMinor > 0 ? ` ومنها ${formatRiyalsDisplay(recoverableMinor)} ريالاً قد تُسترد.` : "";
 
-  const monthly = spendByMonth(invoiceRows);
-  /*
-    الشهر الجاري يُقارَن بمثله من السابق لا بشهرٍ تامّ — وإلّا قيل في
-    السادس من كل شهر «▼ ٩٨٪» والنقص يومٌ لا سلوك.
-  */
-  const trendResult = spendTrend(invoiceRows, new Date());
-  const trend = trendResult.pct;
-
-  const bySupplier = new Map<string, number>();
-  for (const r of invoiceRows) {
-    const name = r.supplierName ?? "غير محدَّد";
-    bySupplier.set(name, (bySupplier.get(name) ?? 0) + r.totalMinor);
-  }
-  const topSuppliers = [...bySupplier.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const maxSupplier = topSuppliers[0]?.[1] ?? 0;
-  const maxMonth = Math.max(...monthly.map((m) => m.totalMinor), 1);
+  const pct = facts.purchasesPrevMonth > 0
+    ? Math.round(((facts.purchasesThisMonth - facts.purchasesPrevMonth) / facts.purchasesPrevMonth) * 100)
+    : null;
 
   return (
     <PageShell
       user={user}
       width="wide"
-     
       title="حال المقهى"
       intro="ما تحتاج معرفته أو فعله اليوم."
-      actions={<LinkButton href="/upload" variant="primary" size="sm">+ ارفع فاتورة</LinkButton>}
     >
-      {/* ── الأرقام ── */}
-      <StatGrid>
-        {/* سؤال أحمد الأوّل «كم أدين؟» أوّلاً — والخانة الأبرز لم تعد لغياب */}
-        <Figure
-          label="المستحقّ للمورّدين"
-          provenance={prov.outstanding}
-          href="/purchases/insights"
-          tone={prov.outstanding.valueMinor > 0 ? "warn" : "ok"}
-          note="للمورّدين الآن"
+      {/* ── السؤال الأوّل: كم عليّ ولمن ── */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Headline
+          label="عليك للمورّدين"
+          minor={totals.owedMinor}
+          tone={totals.owedMinor > 0 ? "warn" : undefined}
+          sub={
+            totals.owedMinor === 0
+              ? "لا مستحقّ على المقهى الآن."
+              : `${countNoun(totals.owedSuppliers, SUPPLIER)} · أقدم دَينٍ منذ ${countNoun(oldestDays, DAY)}` +
+                (totals.offsetMinor > 0
+                  ? ` · بعد خصم ${formatRiyalsDisplay(totals.offsetMinor)} دفعتَها ولم تُخصم من فاتورة`
+                  : "")
+          }
+          aside={
+            /*
+              نصفُ الجواب ليس جواباً: مالٌ دفعتَه ولم يُخصم من فاتورةٍ
+              بعينها يجلس عند المورّد، وإن لم يُذكر هنا ظنّ صاحبُ المقهى
+              أنّ حسابه معهم هو هذا الرقم وحده.
+            */
+            totals.creditLeftMinor > 0 ? (
+              <p className="mt-2.5 border-t border-line pt-2.5 text-xs leading-relaxed">
+                <span className="text-muted">ولك عند </span>
+                <span className="font-medium">{countNoun(totals.creditSuppliers, SUPPLIER)}</span>
+                <span className="nums font-bold"> <Money minor={totals.creditLeftMinor} /></span>
+                <span className="text-muted"> — مالٌ دفعتَه ولم تصلك فاتورته.</span>
+              </p>
+            ) : undefined
+          }
+          href="/suppliers"
+          action="افتح حسابات المورّدين"
         />
-        <Figure
-          label={`مشتريات ${prov.month ? formatMonth(prov.month) : "الشهر"}`}
-          provenance={prov.purchases}
-          href="/purchases"
-          tone={trend !== null && trend > 0.15 ? "warn" : undefined}
-          note={
-            trend === null
-              ? undefined
-              : `${trend > 0 ? "▲" : "▼"} ${Math.abs(Math.round(trend * 100))}٪ عن ${
-                  trendResult.basisDays === null
-                    ? trendResult.prevMonth
-                    : `أوّل ${countNoun(trendResult.basisDays, DAY)} من ${trendResult.prevMonth}`
+
+        <Headline
+          label={`مشتريات ${formatMonth(facts.thisMonthLabel)}`}
+          minor={facts.purchasesThisMonth}
+          sub={
+            pct === null
+              ? `أوّل مشتريات في ${formatMonth(facts.thisMonthLabel)}`
+              : `${pct > 0 ? "▲" : "▼"} ${Math.abs(pct)}٪ عن ${
+                  facts.daysElapsedInMonth === null
+                    ? formatMonth(facts.prevMonthLabel)
+                    : `أوّل ${countNoun(facts.daysElapsedInMonth, DAY)} من ${formatMonth(facts.prevMonthLabel)}`
                 }`
           }
+          aside={
+            <p className="mt-2.5 border-t border-line pt-2.5 text-xs leading-relaxed text-muted">
+              محسوبةٌ من الفواتير المسجّلة — لا من كشف البنك.
+            </p>
+          }
+          href="/purchases/invoices"
+          action="افتح الفواتير"
         />
+      </div>
 
-
-        <Figure
-          label="ضريبة مدخلات مؤكَّدة"
-          provenance={prov.vat}
-          href="/purchases/invoices?tax=VALID"
-          note="من فواتير مستوفية الأركان وحدها"
-        />
-        {/*
-          المبيعات وهامش الربح يحتاجان مصدر مبيعات لم يُوصَل بعد.
-          صفرٌ هنا يوحي بأنّ المقهى لم يبع شيئاً — والفراغ الصادق خير منه.
-        */}
-        <Figure label="مبيعات اليوم" value="غير موصولة" tone="muted" note="لا مصدر مبيعات بعد" />
-
-      </StatGrid>
-
-      {/* ── ما الذي تغيّر ── */}
+      {/* ── السؤال الثاني: ما ينتظرني ── */}
       <Section
-        title="ما الذي تغيّر"
-        hint="ما تحرّك منذ آخر مرّة."
-      >
-        <Changes changes={changes} />
-      </Section>
-
-      {/* ── ما يحتاج انتباهك ── */}
-      <Section
-        title={
+        title={attention.length === 0 ? "لا شيء يحتاج قرارك" : `يحتاج قرارك (${attention.length})`}
+        hint={
           attention.length === 0
-            ? "لا شيء يحتاج انتباهك"
-            : `يحتاج انتباهك (${attention.length})`
+            ? undefined
+            : `${counts.CRITICAL} حرج · ${counts.HIGH} عالٍ · ${counts.MEDIUM} متوسّط.` + recoverable
         }
         action={
-          attention.length > 0 ? (
-            <Link href="/attention" className="text-xs font-medium underline underline-offset-4 hover:text-ink">
-              {counts.CRITICAL} حرج · {counts.HIGH} عالٍ ←
+          attention.length > 3 ? (
+            <Link
+              href="/attention"
+              className="text-xs font-medium underline underline-offset-4 hover:text-ink"
+            >
+              افتح الكلّ ({attention.length}) ←
             </Link>
           ) : undefined
         }
@@ -179,70 +199,12 @@ export default async function HomePage() {
         <AttentionList items={attention} limit={3} />
       </Section>
 
-      {/* ── الاتجاه ── */}
-      <div className="mt-8 grid gap-6 sm:mt-10 lg:grid-cols-2">
-        <section>
-          <h2 className="mb-3 font-display text-lg font-bold leading-tight">المصروف الشهري</h2>
-          <Card>
-            <div className="space-y-3.5">
-            {monthly.length === 0 ? (
-              <p className="text-xs text-muted">لا بيانات بعد.</p>
-            ) : (
-              monthly.map((m) => (
-                <Bar key={m.month} label={m.month} value={m.totalMinor} max={maxMonth} note={`${countNoun(m.invoiceCount, INVOICE)}`} />
-              ))
-            )}
-            </div>
-          </Card>
-        </section>
-
-        <section>
-          <h2 className="mb-3 font-display text-lg font-bold leading-tight">أعلى المورّدين</h2>
-          <Card>
-            <div className="space-y-3.5">
-            {topSuppliers.length === 0 ? (
-              <p className="text-xs text-muted">لا بيانات بعد.</p>
-            ) : (
-              topSuppliers.map(([name, total]) => (
-                <Bar key={name} label={name} value={total} max={maxSupplier} />
-              ))
-            )}
-            </div>
-          </Card>
-        </section>
-      </div>
-
-      {/* ── صحّة البيانات ── */}
-      <Section
-        title="صحّة البيانات"
-        hint="الرقم بلا بيان تغطيته يخدع. هذه نسبة ما بُنيت عليه أرقام الصفحة — وما لم يُوصَل يُقال عنه «غير موصول» ولا يُملأ بصفر."
-        action={
-          <span className="nums text-sm font-bold">
-            اكتمال البيانات {Math.round(health.confidence * 100)}٪
-          </span>
-        }
-      >
-        <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
-          {health.metrics.map((m) => (
-            <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">{m.label}</span>
-                <span className="block truncate text-[11px] text-muted">{m.detail}</span>
-              </span>
-              <span
-                className={`nums shrink-0 text-sm font-bold ${
-                  m.state === "GOOD" ? "text-ok"
-                  : m.state === "NOT_CONNECTED" ? "text-muted"
-                  : m.state === "MISSING" ? "text-danger" : "text-warn"
-                }`}
-              >
-                {m.coverage === null ? "غير موصول" : `${Math.round(m.coverage * 100)}٪`}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Section>
-
+      {/* ── السؤال الثالث: ما تحرّك ── */}
+      {changes.length > 0 && (
+        <Section title="ما الذي تغيّر" hint="منذ الأسبوع الماضي — وما فوقه ليس مكرَّراً هنا.">
+          <Changes changes={changes} />
+        </Section>
+      )}
     </PageShell>
   );
 }

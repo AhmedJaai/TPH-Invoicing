@@ -26,7 +26,7 @@ export default async function StatementsPage({
   if (!user) redirect("/login?from=/statements");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} width="wide" title="كشوف المورّدين">
+      <PageShell user={user} width="wide" title="الكشوف">
         <NoAccess />
       </PageShell>
     );
@@ -74,7 +74,7 @@ export default async function StatementsPage({
     <PageShell
       user={user}
      
-      title="كشوف المورّدين"
+      title="الكشوف"
       intro="مقابلة كشف المورّد بفواتيرك. وهذه وحدها تكشف الفاتورة التي حمّلها عليك ولم تصلك — فاتورة ناقصة لا يكشفها تفتيش أرشيفك، لأنّها ليست فيه."
     >
       {missing && (

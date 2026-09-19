@@ -66,12 +66,15 @@ export function Card({
  * يستطيع أن يفعل، ولا ينزل ليبحث.
  */
 export function Section({
+  id,
   title,
   hint,
   action,
   children,
   className = "",
 }: {
+  /** مرساةٌ يهبط إليها رابطٌ من تنبيه — فالعدد يفتح سجلّه لا رأس الصفحة. */
+  id?: string;
   title: string;
   hint?: string;
   action?: React.ReactNode;
@@ -79,7 +82,7 @@ export function Section({
   className?: string;
 }) {
   return (
-    <section className={`mt-8 sm:mt-10 ${className}`}>
+    <section id={id} className={`mt-8 sm:mt-10 ${className}`}>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="font-display text-lg font-bold leading-tight">{title}</h2>
         {action && <div className="shrink-0">{action}</div>}

@@ -6,6 +6,7 @@ import {
 const pay = (o: Partial<UnbackedPayment> & { paymentId: string }): UnbackedPayment => ({
   supplierId: "g", supplierName: "غاناش", supplierSlug: "Ganache",
   paidOn: "2026-08-03", amountMinor: 9_535_80, unbackedMinor: 8_505_40, bankTransactionId: null,
+  issuesInvoices: true,
   ...o,
 });
 
