@@ -152,7 +152,7 @@ export async function gatherHomeProvenance(): Promise<HomeProvenance> {
       count: 0,
       amountMinor: -totals.offsetMinor,
       included: true,
-      href: "/purchases/insights",
+      href: "/suppliers",
     });
   }
   if (totals.creditLeftMinor > 0) {
@@ -164,7 +164,7 @@ export async function gatherHomeProvenance(): Promise<HomeProvenance> {
       amountMinor: totals.creditLeftMinor,
       included: false,
       reason: "لا يُخصم من دَين مورّدٍ آخر — اطلب فواتيره أو استرداده",
-      href: "/purchases/insights",
+      href: "/suppliers",
     });
   }
   if (Number(r?.disputed_count ?? 0) > 0) {

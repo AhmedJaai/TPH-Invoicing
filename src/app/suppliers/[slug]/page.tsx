@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -6,12 +7,11 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Card, DataTable, EmptyState, LinkButton, Section, Stat, StatGrid, TONE_TEXT, type Tone } from "@/components/ui";
+import { Card, DataTable, EmptyState, LinkButton, Section, Stat, TONE_TEXT, type Tone } from "@/components/ui";
 import {
   DIMENSION_LABEL,
   GRADE_LABEL,
   buildSupplierHealth,
-  overallGrade,
   type Grade,
 } from "@/lib/supplier-health";
 import { buildSupplierAccount, describeAccount } from "@/lib/supplier-account";
@@ -21,6 +21,7 @@ import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { splitSupplierCredit } from "@/lib/supplier-requests";
+import { SupplierPolicy } from "@/components/supplier-policy";
 import { formatDay, formatRange } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,25 @@ export const dynamic = "force-dynamic";
  * صفحةٌ تجمع ماله ووثائقه وضريبته وكشوفه وسعره في مكان واحد.
  */
 
+/** طريقةُ السداد بالعربية — والسدادُ من حساب المالك لا يظهر في كشف المقهى أبداً. */
+const METHOD_LABEL: Record<string, string> = {
+  BANK_TRANSFER: "حوالة بنكية",
+  CASH: "نقداً",
+  EMPLOYEE_ADVANCE: "عهدة موظّف",
+  OWNER_ACCOUNT: "من حساب المالك",
+};
+
+/** حالُ الدفعة — والمردودةُ لا تُحسَب مدفوعة. */
+const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  UNAPPLIED: "لم تُخصَّص",
+  PARTIALLY_APPLIED: "خُصّصت جزئياً",
+  APPLIED: "خُصّصت",
+  OVERPAYMENT: "زائدة عن فواتيره",
+  ADVANCE: "مقدَّمة معلَنة",
+  REVERSED: "مردودة",
+  VOID: "ملغاة",
+};
+
 const GRADE_TONE: Record<Grade, Tone | undefined> = {
   GOOD: "ok",
   FAIR: "warn",
@@ -40,15 +60,28 @@ const GRADE_TONE: Record<Grade, Tone | undefined> = {
   UNRATED: "muted",
 };
 
+type Tab = "invoices" | "payments" | "statements" | "profile";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "invoices", label: "فواتيره" },
+  { id: "payments", label: "دفعاته" },
+  { id: "statements", label: "كشوفه" },
+  { id: "profile", label: "بياناته" },
+];
+
 export default async function SupplierPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const user = await currentUser();
   if (!user) redirect("/login?from=/suppliers");
 
   const { slug } = await params;
+  const wantedTab = (await searchParams).tab;
+  const tab: Tab = TABS.some((t) => t.id === wantedTab) ? (wantedTab as Tab) : "invoices";
   const showAmounts = can(user.role, "amounts:view");
 
   const [s] = await db.select().from(suppliers).where(eq(suppliers.slug, slug));
@@ -212,7 +245,6 @@ export default async function SupplierPage({
     activeMonths: n("active_months"),
     priceChangePct,
   });
-  const overall = overallGrade(health);
 
   const recent = await db
     .select({
@@ -233,7 +265,31 @@ export default async function SupplierPage({
     .from(statements)
     .where(eq(statements.supplierId, s.id))
     .orderBy(desc(statements.periodEnd))
-    .limit(6);
+    .limit(12);
+
+  /*
+    دفعاته — وكانت الصفحة لا تعرض منها واحدة.
+
+    فالمورّد الذي يقول النظام إنّ عليه ١٬٧٩٦ لا يُرى في صفحته **ما دُفع
+    له**، ولا كيف بلغ الرقم ما بلغ. والسؤال الذي تُفتَح له هذه الصفحة
+    قبل التفاوض هو «لِمَ عليّ هذا؟» — ولا يُجاب إلّا بالطرفين.
+  */
+  const paymentRows = showAmounts
+    ? (await db.execute<{
+        id: string; d: string; amount: string; fee: string; method: string;
+        status: string; allocated: string; tx: string | null;
+      }>(sql`
+        select p.id, p.paid_at::date::text as d, p.amount_minor as amount, p.fee_minor as fee,
+               p.method::text as method, p.status::text as status,
+               coalesce((select sum(a.amount_minor)::int from payment_allocations a
+                          where a.payment_id = p.id), 0) as allocated,
+               (select bt.id from bank_transactions bt where bt.matched_payment_id = p.id limit 1) as tx
+          from payments p
+         where p.supplier_id = ${s.id}
+         order by p.paid_at desc
+         limit 40
+      `)).rows
+    : [];
 
   return (
     <PageShell
@@ -249,92 +305,113 @@ export default async function SupplierPage({
         </>
       }
     >
-      {showAmounts && (
-        <StatGrid>
-          <Stat label="المفوتر" minor={billed} sub={`${countNoun(n("active_months"), MONTH)} من التعامل`} />
-          <Stat
-            label="المستحقّ له"
-            minor={balance}
-            tone={balance > 0 ? "warn" : "ok"}
-            href={creditSplit.unbackedMinor > 0 ? `/suppliers?unbacked=1#unbacked-${s.slug}` : undefined}
-            sub={
-              creditLeft > 0
-                ? [
-                    creditSplit.unbackedMinor > 0 ? `دفعتَ له بلا فاتورة: ${formatRiyalsDisplay(creditSplit.unbackedMinor)}` : null,
-                    creditSplit.advanceMinor > 0 ? `لك عنده مقدَّمةً: ${formatRiyalsDisplay(creditSplit.advanceMinor)}` : null,
-                  ].filter(Boolean).join(" · ")
-                : balance > 0
-                  ? "بعد خصم ما دفعتَه له"
-                  : "لا رصيد"
-            }
-          />
-          <Stat
-            label="حال العلاقة"
-            value={GRADE_LABEL[overall]}
-            tone={GRADE_TONE[overall]}
-            sub="أسوأ الأبعاد هو الحاكم"
-          />
-          <Stat
-            label="تغيّر السعر"
-            value={priceChangePct === null ? "غير مقيس" : `${priceChangePct > 0 ? "+" : ""}${Math.round(priceChangePct)}٪`}
-            tone={priceChangePct === null ? "muted" : priceChangePct > 5 ? "warn" : "ok"}
-            sub={priceChangePct === null ? "لا تكفي بنوده" : "أوّل شهر مقابل آخره"}
-          />
-        </StatGrid>
-      )}
+      {/*
+        ── رقمٌ واحد يُتتبَّع ──
 
+        كانت أربعَ بطاقاتٍ متساوية: «المفوتر» و«المستحقّ له» و«حال
+        العلاقة» و«تغيّر السعر». ثلاثٌ منها لا تُسأل عند فتح الصفحة،
+        والرابعة — وهي المقصودة — تُعرَض رقماً بلا بيان: «المستحقّ له
+        ٠٫٠٠» ثمّ في سطر تحته «دفعتَ له بلا فاتورة ٢٦٬٧٦٧٫٤٠». فيقرأ
+        صاحبُ المقهى صفراً ولا يعرف أنّ عنده عند المورّد ستّةً وعشرين
+        ألفاً.
+
+        والسؤالُ الذي تُفتَح له هذه الصفحة واحد: **لِمَ يقول النظام إنّ
+        عليّ هذا؟** فيُعرَض الرقم كبيراً، وتحته معادلتُه بأطرافها — ما
+        فُوتر، وما دُفع، وما بقي — وكلُّ طرفٍ يفتح سجلّاته.
+      */}
       {showAmounts && (
-        <Section
-          title="حسابه"
-          hint="ما نعرفه من فواتيرنا، مقابل ما يقوله آخرُ كشفٍ وصل منه. والفرق ليس اتّهاماً — قد يكون فاتورةً حمّلها علينا ولم تصلنا، أو سداداً لم يصل كشفُه بعد."
-        >
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Stat
-              label="ما نعرفه"
-              value={
-                account.knownBalanceMinor === null
-                  ? "غير معروف"
-                  : <Money minor={account.knownBalanceMinor} />
-              }
-              tone={account.knownBalanceMinor === null ? "muted" : undefined}
-              sub={
-                account.knownBalanceMinor === null
-                  ? "لا فاتورة منه عندنا — وذلك ليس صفراً"
-                  : reportedAt
-                    ? `حتى ${reportedAt} — تاريخ كشفه${paidAfterStatement > 0 ? ` · ودفعتَ بعده ${formatRiyalsDisplay(paidAfterStatement)}` : ""}`
-                    : "المفوتر ناقص كلِّ ما دفعتَه له"
-              }
-            />
-            <Stat
-              label="ما يقوله كشفه"
-              value={
-                account.reportedBalanceMinor === null
-                  ? "لم يصل"
-                  : <Money minor={account.reportedBalanceMinor} />
-              }
-              tone={account.reportedBalanceMinor === null ? "muted" : undefined}
-              sub={account.reportedBalanceMinor === null ? "أو وصل ولم يُقرأ رصيدُه" : `آخر رصيدٍ ختاميّ · ${reportedAt}`}
-            />
-            <Stat
-              label="الفرق"
-              value={
-                account.differenceMinor === null
-                  ? "لا مقارنة"
-                  : <Money minor={Math.abs(account.differenceMinor)} />
-              }
-              tone={
-                account.status === "DIFFERS" ? "warn"
-                : account.status === "AGREED" ? "ok" : "muted"
-              }
-              sub={
-                describeAccount(account)
-                + (account.allocatedAfterStatementMinor
-                  ? ` · وخُصّص بعد كشفه على فواتير سبقته ${formatRiyalsDisplay(account.allocatedAfterStatementMinor)}`
-                  : "")
-              }
-            />
-          </div>
-        </Section>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start">
+          <Card tone={balance > 0 ? "warn" : creditLeft > 0 ? undefined : "ok"}>
+            <p className="text-xs font-medium text-muted">
+              {balance > 0 ? "عليك له" : creditLeft > 0 ? "رصيدٌ لك عنده" : "الحساب متّزن"}
+            </p>
+            <p className={`nums mt-2 font-display text-[2.4rem] font-black leading-none ${balance > 0 ? "text-warn" : ""}`}>
+              <Money minor={balance > 0 ? balance : creditLeft} />
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-muted">
+              {balance > 0
+                ? `على ${countNoun(bal?.openCount ?? 0, INVOICE)} مفتوحة، بعد خصم ما دفعتَه له.`
+                : creditLeft > 0
+                  ? "مالٌ دفعتَه له ولم تصلك فاتورتُه — يُخصَم من فواتيره القادمة."
+                  : "لا فاتورة مفتوحة ولا رصيدَ لك عنده."}
+            </p>
+
+            {/* ── ممّ تكوّن: كلُّ طرفٍ يفتح سجلّاته ── */}
+            <dl className="mt-4 divide-y divide-line border-t border-line pt-1 text-xs">
+              <Trace label="فُوتِرَ عليك" minor={billed} href={`/purchases/invoices?supplier=${s.slug}`} />
+              <Trace label="دفعتَ له" minor={paidNet} href={`/suppliers/${s.slug}?tab=payments`} />
+              <Trace
+                label="بقي مفتوحاً على فواتيره"
+                minor={bal?.openMinor ?? 0}
+                href={`/purchases/invoices?supplier=${s.slug}&paid=OPEN`}
+              />
+              {creditSplit.unbackedMinor > 0 && (
+                <Trace
+                  label="دفعتَ بلا فاتورة"
+                  minor={creditSplit.unbackedMinor}
+                  href={`/suppliers?unbacked=1#unbacked-${s.slug}`}
+                />
+              )}
+              {creditSplit.advanceMinor > 0 && (
+                <Trace label="مقدَّمةٌ معلَنة" minor={creditSplit.advanceMinor} />
+              )}
+            </dl>
+          </Card>
+
+          {/* ── حسابه مقابل كشفه — الاستثناء الذي يستحقّ النظر ── */}
+          <Section
+            className="mt-0"
+            title="ما نعرفه مقابل ما يقوله كشفه"
+            hint="والفرق ليس اتّهاماً — قد يكون فاتورةً حمّلها علينا ولم تصلنا، أو سداداً لم يصل كشفُه بعد."
+          >
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Stat
+                label="ما نعرفه"
+                value={
+                  account.knownBalanceMinor === null
+                    ? "غير معروف"
+                    : <Money minor={account.knownBalanceMinor} />
+                }
+                tone={account.knownBalanceMinor === null ? "muted" : undefined}
+                sub={
+                  account.knownBalanceMinor === null
+                    ? "لا فاتورة منه عندنا — وذلك ليس صفراً"
+                    : reportedAt
+                      ? `حتى ${reportedAt} — تاريخ كشفه${paidAfterStatement > 0 ? ` · ودفعتَ بعده ${formatRiyalsDisplay(paidAfterStatement)}` : ""}`
+                      : "المفوتر ناقص كلِّ ما دفعتَه له"
+                }
+              />
+              <Stat
+                label="ما يقوله كشفه"
+                value={
+                  account.reportedBalanceMinor === null
+                    ? "لم يصل"
+                    : <Money minor={account.reportedBalanceMinor} />
+                }
+                tone={account.reportedBalanceMinor === null ? "muted" : undefined}
+                sub={account.reportedBalanceMinor === null ? "أو وصل ولم يُقرأ رصيدُه" : `آخر رصيدٍ ختاميّ · ${reportedAt}`}
+              />
+              <Stat
+                label="الفرق"
+                value={
+                  account.differenceMinor === null
+                    ? "لا مقارنة"
+                    : <Money minor={Math.abs(account.differenceMinor)} />
+                }
+                tone={
+                  account.status === "DIFFERS" ? "warn"
+                  : account.status === "AGREED" ? "ok" : "muted"
+                }
+                sub={
+                  describeAccount(account)
+                  + (account.allocatedAfterStatementMinor
+                    ? ` · وخُصّص بعد كشفه على فواتير سبقته ${formatRiyalsDisplay(account.allocatedAfterStatementMinor)}`
+                    : "")
+                }
+              />
+            </div>
+          </Section>
+        </div>
       )}
 
       {showAmounts && canAnalyze && (
@@ -351,108 +428,234 @@ export default async function SupplierPage({
         </Section>
       )}
 
+      {/* ── التفصيل خلف ألسنة — لا سبعةُ أقسامٍ متتالية ── */}
       <Section
-        title="تعاملك معه"
-        hint="ليست درجةً واحدة من مئة — رقمٌ كهذا يُخفي سببه فلا يُفيد عند التفاوض. وما لا تكفي بياناته يبقى غير مقيَّم، ولا يُعطى صفراً."
+        title="تفصيل حسابه"
+        hint="الفواتير والدفعات والكشوف — كلٌّ في لسانه، فلا تُقرأ سبعةُ جداول لتُوجَد واحد."
+        className="mt-8"
       >
-        <div className="grid gap-3 sm:grid-cols-2">
-          {health.map((d) => (
-            <Card key={d.dimension} tone={GRADE_TONE[d.grade]}>
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="text-sm font-bold">{DIMENSION_LABEL[d.dimension]}</p>
-                <span className={`shrink-0 text-[11px] font-bold ${d.grade === "UNRATED" ? "text-muted" : TONE_TEXT[GRADE_TONE[d.grade] ?? "muted"]}`}>
-                  {GRADE_LABEL[d.grade]}
-                </span>
-              </div>
-              <p className="mt-2 text-xs leading-relaxed text-ink-soft">{d.reason}</p>
-            </Card>
+        <nav className="scroll-x mb-4 flex items-center gap-5 overflow-x-auto border-b border-line" aria-label="تفصيل حسابه">
+          {TABS.map((t) => (
+            <Link
+              key={t.id}
+              href={`/suppliers/${s.slug}?tab=${t.id}`}
+              aria-current={tab === t.id ? "page" : undefined}
+              className={`flex min-h-11 shrink-0 items-center border-b-2 text-xs transition-colors sm:min-h-0 sm:pb-2.5 sm:pt-1 ${
+                tab === t.id ? "border-ink font-bold text-ink" : "border-transparent text-muted hover:text-ink-soft"
+              }`}
+            >
+              {t.label}
+              {t.id === "invoices" && n("invoice_count") > 0 && <span className="nums ms-1.5 text-muted">{n("invoice_count")}</span>}
+              {t.id === "payments" && paymentRows.length > 0 && <span className="nums ms-1.5 text-muted">{paymentRows.length}</span>}
+              {t.id === "statements" && statementRows.length > 0 && <span className="nums ms-1.5 text-muted">{statementRows.length}</span>}
+            </Link>
           ))}
-        </div>
-      </Section>
+        </nav>
 
-      <Section title="بياناته">
-        <Card>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-            <Fact label="الرقم الضريبي" value={s.vatNumber} missing="ناقص" ltr />
-            <Fact label="السجل التجاري" value={s.crNumber} missing="ناقص" ltr />
-            <Fact label="شروط السداد" value={s.paymentTerms} missing="غير محدّدة" />
-            <Fact
-              label="عقد التوريد"
-              value={s.contractOnFile ? "موجود" : null}
-              missing={s.issuesInvoices ? "غير مطلوب" : "ناقص"}
+        {tab === "invoices" && (
+          <>
+            <DataTable
+              rows={recent}
+              keyOf={(r) => r.id}
+              empty={<EmptyState title="لا فواتير منه بعد." hint="ترفع فاتورةً منه فتظهر هنا." />}
+              columns={[
+                {
+                  key: "number",
+                  header: "رقم الفاتورة",
+                  primary: true,
+                  cell: (r) => <span className="nums" dir="ltr">{r.number ?? "—"}</span>,
+                },
+                { key: "date", header: "التاريخ", cell: (r) => <span>{formatDay(r.date)}</span> },
+                { key: "month", header: "الشهر", secondary: true, cell: (r) => <span className="nums">{r.month}</span> },
+                {
+                  key: "tax",
+                  header: "الضريبة",
+                  cell: (r) => (
+                    <span className={r.taxStatus === "VALID" ? "text-ok" : r.taxStatus === "INVALID" ? "text-danger" : "text-muted"}>
+                      {r.taxStatus === "VALID" ? "مستوفية" : r.taxStatus === "INVALID" ? "ناقصة" : r.taxStatus === "UNKNOWN" ? "لم تُقرأ" : "لا تُقيَّد"}
+                    </span>
+                  ),
+                },
+                ...(showAmounts
+                  ? [{
+                      key: "total",
+                      header: "الإجمالي",
+                      numeric: true as const,
+                      cell: (r: (typeof recent)[number]) => <Money minor={r.total} />,
+                    }]
+                  : []),
+              ]}
             />
-            <Fact label="الاسم في الدرايف" value={s.driveFolderName} ltr />
-            <Fact label="المعرّف" value={s.slug} ltr />
-            <Fact label="أسماء بديلة" value={String(n("alias_count"))} />
-            <Fact label="يصدر فواتير ضريبية" value={s.issuesInvoices ? "نعم" : "لا"} />
-          </dl>
-        </Card>
-      </Section>
+            {n("invoice_count") > recent.length && (
+              <p className="mt-2 text-xs text-muted">
+                تُعرض آخرُ {recent.length} من {countNoun(n("invoice_count"), INVOICE)} —{" "}
+                <Link href={`/purchases/invoices?supplier=${s.slug}`} className="underline underline-offset-4">كلُّها</Link>.
+              </p>
+            )}
+          </>
+        )}
 
-      <Section
-        title="آخر فواتيره"
-        action={<LinkButton href={`/purchases/invoices?supplier=${s.slug}`} size="sm">كلّها</LinkButton>}
-      >
-        <DataTable
-          rows={recent}
-          keyOf={(r) => r.id}
-          empty={<EmptyState title="لا فواتير منه بعد." hint="ترفع فاتورةً منه فتظهر هنا." />}
-          columns={[
-            {
-              key: "number",
-              header: "رقم الفاتورة",
-              primary: true,
-              cell: (r) => <span className="nums" dir="ltr">{r.number ?? "—"}</span>,
-            },
-            {
-              key: "date",
-              header: "التاريخ",
-              cell: (r) => <span>{formatDay(r.date)}</span>,
-            },
-            { key: "month", header: "الشهر", secondary: true, cell: (r) => <span className="nums">{r.month}</span> },
-            {
-              key: "tax",
-              header: "الضريبة",
-              cell: (r) => (
-                <span className={r.taxStatus === "VALID" ? "text-ok" : r.taxStatus === "INVALID" ? "text-danger" : "text-muted"}>
-                  {r.taxStatus === "VALID" ? "مستوفية" : r.taxStatus === "INVALID" ? "ناقصة" : r.taxStatus === "UNKNOWN" ? "لم تُقرأ" : "لا تُقيَّد"}
-                </span>
-              ),
-            },
-            ...(showAmounts
-              ? [{
-                  key: "total",
-                  header: "الإجمالي",
-                  numeric: true as const,
-                  cell: (r: (typeof recent)[number]) => <Money minor={r.total} />,
-                }]
-              : []),
-          ]}
-        />
-      </Section>
-
-      <Section
-        title="كشوفه"
-        hint="الكشف هو ما يكشف الفاتورة التي لم تصلك — والمورّد بلا كشوف حسابه غير مُتحقَّق منه."
-        action={<LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} size="sm">طابقها</LinkButton>}
-      >
-        {statementRows.length === 0 ? (
-          <EmptyState
-            title="لا كشف حساب واحد منه."
-            hint={`تعاملتَ معه ${countNoun(n("active_months"), MONTH)} بلا كشف. اطلب كشفاً وطابقه — فهو ما يكشف ما لم يصلك.`}
-            action={<LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} variant="primary">ارفع كشفاً</LinkButton>}
+        {tab === "payments" && (
+          <DataTable
+            rows={paymentRows}
+            keyOf={(r) => r.id}
+            empty={
+              <EmptyState
+                title="لا دفعة مسجّلة له."
+                hint="تُقيَّد الدفعة من حركة البنك أو من إيصال سداد مؤرشف."
+              />
+            }
+            columns={[
+              { key: "date", header: "التاريخ", primary: true, cell: (r) => <span>{formatDay(r.d)}</span> },
+              { key: "amount", header: "المبلغ", numeric: true, cell: (r) => <span className="font-medium"><Money minor={Number(r.amount)} /></span> },
+              {
+                key: "allocated", header: "خُصّص على فواتيره", numeric: true,
+                cell: (r) => <Money minor={Number(r.allocated)} />,
+              },
+              {
+                key: "left", header: "بلا فاتورة", numeric: true,
+                cell: (r) => {
+                  const left = Number(r.amount) - Number(r.fee) - Number(r.allocated);
+                  return left > 100
+                    ? <span className="font-bold text-warn"><Money minor={left} /></span>
+                    : <span className="text-muted">—</span>;
+                },
+              },
+              {
+                key: "method", header: "طريقته", secondary: true,
+                cell: (r) => <span className="text-xs text-ink-soft">{METHOD_LABEL[r.method] ?? r.method}</span>,
+              },
+              {
+                key: "state", header: "حالها",
+                cell: (r) =>
+                  r.status === "REVERSED" || r.status === "VOID" ? (
+                    <span className="text-danger">{PAYMENT_STATUS_LABEL[r.status] ?? r.status}</span>
+                  ) : (
+                    <span className="text-muted">{PAYMENT_STATUS_LABEL[r.status] ?? r.status}</span>
+                  ),
+              },
+              {
+                key: "tx", header: "حركتها", secondary: true,
+                cell: (r) =>
+                  r.tx ? (
+                    <Link href={`/bank?tx=${r.tx}`} className="text-xs underline underline-offset-4">في الكشف</Link>
+                  ) : (
+                    <span className="text-xs text-muted">لا حركة</span>
+                  ),
+              },
+            ]}
           />
-        ) : (
-          <ul className="flex flex-wrap gap-2">
-            {statementRows.map((st) => (
-              <li key={st.id} className="rounded-xl border border-line bg-raised px-3 py-1.5 text-xs shadow-raised">
-                {formatRange(st.periodStart, st.periodEnd)}
-              </li>
-            ))}
-          </ul>
+        )}
+
+        {tab === "statements" && (
+          statementRows.length === 0 ? (
+            <EmptyState
+              title="لا كشف حساب واحد منه."
+              hint={`تعاملتَ معه ${countNoun(n("active_months"), MONTH)} بلا كشف. والكشف هو ما يكشف الفاتورة التي حُمّلت عليك ولم تصلك — فاتورةٌ ناقصة لا يكشفها تفتيشُ أرشيفك، لأنّها ليست فيه.`}
+              action={<LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} variant="primary">ارفع كشفاً</LinkButton>}
+            />
+          ) : (
+            <>
+              <ul className="flex flex-wrap gap-2">
+                {statementRows.map((st) => (
+                  <li key={st.id} className="rounded-xl border border-line bg-raised px-3 py-1.5 text-xs shadow-raised">
+                    {formatRange(st.periodStart, st.periodEnd)}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3">
+                <LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} size="sm">طابقها بفواتيرك</LinkButton>
+              </div>
+            </>
+          )
+        )}
+
+        {tab === "profile" && (
+          <div className="space-y-4">
+            {/*
+              السياسةُ أوّلاً: هي الشيء الوحيد في هذا اللسان الذي
+              **يُغيَّر**، وما تحتها عرضٌ وتقييم.
+            */}
+            <SupplierPolicy
+              supplierId={s.id}
+              canEdit={canAnalyze}
+              initial={{
+                issuesInvoices: s.issuesInvoices,
+                paperInvoices: s.paperInvoices,
+                contractRequired: s.contractRequired,
+                contractOnFile: s.contractOnFile,
+              }}
+            />
+
+            <Card>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+                <Fact label="الرقم الضريبي" value={s.vatNumber} missing="ناقص" ltr />
+                <Fact label="السجل التجاري" value={s.crNumber} missing="ناقص" ltr />
+                <Fact label="شروط السداد" value={s.paymentTerms} missing="غير محدّدة" />
+                <Fact
+                  label="عقد التوريد"
+                  value={s.contractOnFile ? "موجود" : null}
+                  missing={s.contractRequired && !s.issuesInvoices ? "ناقص" : "غير مطلوب"}
+                />
+                <Fact label="الاسم في الدرايف" value={s.driveFolderName} ltr />
+                <Fact label="المعرّف" value={s.slug} ltr />
+                <Fact label="أسماء بديلة" value={String(n("alias_count"))} />
+                <Fact
+                  label="فواتيره"
+                  value={
+                    !s.issuesInvoices ? "لا يصدر فواتير"
+                    : s.paperInvoices ? "ضريبية — ورقيّة باليد"
+                    : "ضريبية"
+                  }
+                />
+              </dl>
+            </Card>
+
+            {/*
+              «تعاملك معه» تقييمٌ لا فعلَ له — فمكانُه خلف لسانٍ يُفتَح عند
+              التفاوض، لا قسمٌ في منتصف الصفحة بين المال وفواتيره.
+            */}
+            <div>
+              <h3 className="mb-2 text-xs font-bold text-muted">
+                تعاملك معه — وما لا تكفي بياناته يبقى غير مقيَّم، ولا يُعطى صفراً
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {health.map((d) => (
+                  <Card key={d.dimension} tone={GRADE_TONE[d.grade]}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-sm font-bold">{DIMENSION_LABEL[d.dimension]}</p>
+                      <span className={`shrink-0 text-[11px] font-bold ${d.grade === "UNRATED" ? "text-muted" : TONE_TEXT[GRADE_TONE[d.grade] ?? "muted"]}`}>
+                        {GRADE_LABEL[d.grade]}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-ink-soft">{d.reason}</p>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       </Section>
     </PageShell>
+  );
+}
+
+/** طرفٌ من معادلة الحساب — ومعه بابُ سجلّاته. */
+function Trace({ label, minor, href }: { label: string; minor: number; href?: string }) {
+  const body = (
+    <>
+      <dt className="min-w-0 text-muted">{label}</dt>
+      <dd className="nums shrink-0 font-bold"><Money minor={minor} /></dd>
+    </>
+  );
+  if (!href) return <div className="flex items-baseline justify-between gap-3 py-1.5">{body}</div>;
+  return (
+    <Link
+      href={href}
+      className="flex items-baseline justify-between gap-3 py-1.5 transition-colors hover:text-ink"
+    >
+      {body}
+    </Link>
   );
 }
 

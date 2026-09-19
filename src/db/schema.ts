@@ -92,6 +92,17 @@ export const suppliers = pgTable("suppliers", {
   issuesInvoices: boolean("issues_invoices").notNull().default(true),
   /** وُقّع معه عقد توريد — يمنع تكرار التنبيه كل مرة */
   contractOnFile: boolean("contract_on_file").notNull().default(false),
+  /*
+    أيُطلَب منه عقدُ توريد؟ — يكتبه الإنسان ولا يُشتقّ من غياب
+    المستندات. فمورّدٌ يُشترى منه مرّةً في السنة لا يُتصوَّر معه عقد،
+    والتنبيهُ عليه يُعلّم تجاهلَ التنبيهات. انظر `035`.
+  */
+  contractRequired: boolean("contract_required").notNull().default(true),
+  /*
+    فواتيرُه ورقيّةٌ تُسلَّم باليد — موجودةٌ حقّاً وإن لم تُرفَع. وقولُ
+    «لا يصدر فواتير» عنه خبرٌ كاذب يجرّ إلى مطالبته بعقدٍ لا يحتاجه.
+  */
+  paperInvoices: boolean("paper_invoices").notNull().default(false),
   contractDriveFileId: text("contract_drive_file_id"),
 
   /** حد الرصيد الذي يفتح تنبيهاً، بالهللات. فارغ = بلا حد */

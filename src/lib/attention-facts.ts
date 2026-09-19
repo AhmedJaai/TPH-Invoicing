@@ -94,7 +94,17 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
                 from payments p
                where p.supplier_id = s.id and p.status not in ('REVERSED','VOID')) as unbacked
       from suppliers s
-      where s.is_active and not s.issues_invoices and not s.contract_on_file
+      /*
+        من أُعلن أنّه لا يُطلَب منه عقد يخرج، ومن فواتيرُه ورقيّةٌ يخرج
+        كذلك: الأولى قرارُ صاحب العمل، والثانية تقول إنّ الفاتورة
+        موجودةٌ ولم تُرفَع — فمطلبُها رفعُ الورقة لا عقدُ توريد.
+        انظر الهجرة 035.
+      */
+      where s.is_active
+        and not s.issues_invoices
+        and not s.contract_on_file
+        and s.contract_required
+        and not s.paper_invoices
       order by unbacked desc
     `)
   ).rows;

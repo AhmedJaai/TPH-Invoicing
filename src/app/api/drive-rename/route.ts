@@ -26,6 +26,7 @@ import { DriveAuthExpiredError, driveForUser, isDriveAuthError, renameFile } fro
 import { canonicalName, type NamedDocument } from "@/lib/canonical-name";
 import { recordAudit } from "@/lib/audit";
 import { refreshTokenFor } from "@/services/drive.service";
+import { DRIVE_READONLY_MESSAGE, driveWritesAllowed } from "@/lib/drive-readonly";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -53,6 +54,8 @@ async function load(): Promise<NamedDocument[]> {
       invoiceNumber: invoices.invoiceNumber,
       statementEnd: statements.periodEnd,
       statementTotal: statements.closingBalanceMinor,
+      invoiceId: invoices.id,
+      documentId: documents.id,
     })
     .from(documents)
     .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
@@ -83,6 +86,8 @@ async function load(): Promise<NamedDocument[]> {
       date: (r.invoiceDate ?? r.statementEnd)?.toISOString().slice(0, 10) ?? null,
       totalMinor: r.invoiceTotal ?? r.statementTotal ?? null,
       invoiceNumber: r.invoiceNumber ?? null,
+      invoiceId: r.invoiceId ?? null,
+      documentId: r.documentId ?? null,
     }));
 }
 
@@ -108,12 +113,38 @@ export async function POST(request: Request) {
     p.verdict.status === "RENAME"
       ? [{ doc: p.doc, proposed: p.verdict.proposed, reason: p.verdict.reason }]
       : []);
+  /*
+    ── «لا يُبنى له اسم» كان طريقاً مسدوداً ──
+
+    كانت القائمةُ تقول «لا رقم فاتورة مقيَّد له» وتقف. وهي **ليست
+    عطباً في التسمية** — هي نقصٌ في بيانات الفاتورة نفسها، وموضعُ
+    إصلاحه شاشةُ الفواتير. فصار لكلّ سطرٍ بابُه: من ضغطه وصل إلى
+    الحقل الناقص وكتبه، ثمّ عاد فبُني الاسم.
+  */
   const blocked = proposals.flatMap((p) =>
     p.verdict.status === "CANNOT"
-      ? [{ current: p.doc.fileName, reason: p.verdict.reason }]
+      ? [{
+          current: p.doc.fileName,
+          reason: p.verdict.reason,
+          /* المسار الذي يُصلَح فيه النقص — وما لا مسار له يُقال أنّه بلا مسار */
+          fixHref: p.doc.invoiceId
+            ? `/purchases/invoices?fix=${encodeURIComponent(p.doc.invoiceId)}#fix`
+            : p.doc.documentId
+              ? `/documents?q=${encodeURIComponent(p.doc.fileName)}`
+              : null,
+        }]
       : []);
 
   /* ── معاينة ── */
+  /*
+    المعاينةُ تعمل في كلّ بيئة؛ والتنفيذ لا يقع إلّا في الإنتاج. فالدرايف
+    لا يتفرّع كما تتفرّع القاعدة، وتسميةٌ من معاينةٍ تقع على الملفّ الذي
+    يراه أحمد.
+  */
+  if (body.apply === true && !driveWritesAllowed(process.env)) {
+    return NextResponse.json({ ok: false, error: DRIVE_READONLY_MESSAGE }, { status: 403 });
+  }
+
   if (body.apply !== true) {
     return NextResponse.json({
       ok: true,

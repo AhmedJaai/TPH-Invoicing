@@ -1,9 +1,20 @@
 /**
- * نموذج التنقّل: المساحات وأقسامها.
+ * نموذج التنقّل: خمسُ مساحات، وألسنةٌ داخلها.
  *
- * الصفحة ليست وجهةً بذاتها، بل قسمٌ داخل مساحة يفتحها صاحب المقهى لسؤال
- * في رأسه. فـ«كشوف المورّدين» ليست بنداً في قائمة، بل طريقة مراجعة حساب
- * مورّد — ومكانها تحت «المشتريات».
+ * كانت ستَّ مساحاتٍ وسبعةَ عشر رابطاً في شريطٍ علويٍّ من صفّين — أي
+ * «عشرون رابطاً قبل المحتوى» بنصّ التعليق الذي كان في `page-shell.tsx`.
+ * وكان فيها ما ليس وجهةً أصلاً: «الإعدادات» تُضبط مرّةً في العمر
+ * وتحتلّ سُدس شريط التنقّل، و«الرفع» فعلٌ لا مكان.
+ *
+ * فصارت المساحة سؤالاً يفتحه صاحب المقهى:
+ *
+ *   الرئيسية    — ما حال المقهى اليوم؟
+ *   يحتاج قرارك — ما الذي ينتظرني؟
+ *   المورّدون   — لمن أدين وكم؟
+ *   المال       — أين ذهب المال؟
+ *   المستندات   — ما الذي وصلني؟
+ *
+ * والإعدادات في قائمة المستخدم، والرفع زرٌّ دائم فوق المساحات.
  *
  * ولمّا كانت هذه الروابط تُبنى على الخادم وتُعرض على الجوّال وتُختبر،
  * فُصلت عن مكوّن العرض: البنية هنا، والرسم في `components/nav.tsx`.
@@ -21,14 +32,14 @@ export interface NavArea extends NavLink {
   short: string;
   /** المسارات التي تنتمي إلى هذه المساحة وإن لم تظهر في القائمة. */
   owns: readonly string[];
+  /** ألسنةُ المساحة — لا مساحاتٌ فرعيّة. */
   children: readonly NavLink[];
 }
 
 /**
- * المساحات الستّ. الترتيب مقصود: يبدأ بما يُفتح كل صباح، وينتهي بما
- * يُفتح مرّة في العمر.
+ * الخمس. والترتيب مقصود: يبدأ بما يُفتح كلّ صباح.
  *
- * واسم القسم هو عنوان الصفحة التي يفتحها — حرفاً بحرف. وكان «كشف
+ * واسم اللسان هو عنوان الصفحة التي يفتحها — حرفاً بحرف. وكان «كشف
  * الحساب» يفتح «التدفّق النقدي وقائمة الدخل»، والعبارة في البنوك
  * السعوديّة تعني كشف البنك: فيضغطها صاحب العمل يطلب حركاته فيجد قائمة
  * دخل. وهذا نصّ شكواه: «تودّي على أماكن غلط».
@@ -43,34 +54,33 @@ export const AREAS: readonly NavArea[] = [
   },
   {
     href: "/attention",
-    label: "يحتاج انتباهك",
-    short: "انتباهك",
+    label: "يحتاج قرارك",
+    short: "قرارك",
     needs: "reports:view",
-    owns: ["/audit"],
+    /*
+      `/review` كان مساحةَ عملٍ ثانية وهو فارغٌ بحكم تعريفه، فابتُلع هنا:
+      ورشةُ قرار البنك صارت لوحَ تفصيلٍ داخل هذه المساحة.
+    */
+    owns: ["/review", "/audit"],
     children: [],
   },
   {
-    href: "/purchases",
-    label: "المشتريات",
-    short: "المشتريات",
+    href: "/suppliers",
+    label: "المورّدون",
+    short: "المورّدون",
     needs: "amounts:view",
-    owns: ["/suppliers", "/statements", "/analysis", "/performance"],
+    owns: ["/purchases"],
     /*
-      «كم أدين ولمن؟» سؤال أحمد الأوّل، فهو أوّل الأقسام وباسمه لا باسم
-      الأداة التي تحسبه. وكان تحت «تحليل الذكاء»، وبجانبه «المستحقّ عليك»
-      يفتح قائمة فواتير لا يُخصم منها ما دُفع ولم يُخصَّص — فيظنّ من فتحه
-      أنّه مدين لمورّدٍ دفع له مقدَّماً. والمرشِّح `?paid=OPEN` بقي داخل
-      صفحة الفواتير، ولا يُرفع إلى التنقّل: القسم وجهةٌ لا ترشيح.
+      كانت «المشتريات» و«المورّدون» مساحتين لشيءٍ واحد: الفاتورة تأتي من
+      مورّد، والكشف كشفُ مورّد، والصنف صنفُه. وكانت `/purchases` سبعَ
+      بطاقاتٍ كلُّها روابط — فهرسٌ في ثوب صفحة — و`/purchases/insights`
+      تعدّ ١٢ مورّداً بينما `/suppliers` تعدّ ٢٢.
     */
     children: [
-      { href: "/purchases/insights", label: "عليك لكلّ مورّد" },
-      { href: "/purchases", label: "النظرة العامة" },
+      { href: "/suppliers", label: "الحسابات", needs: "supplier:view" },
       { href: "/purchases/invoices", label: "الفواتير" },
-      { href: "/suppliers", label: "المورّدون", needs: "supplier:view" },
-      { href: "/purchases/products", label: "الأصناف" },
-      { href: "/performance", label: "الأسعار" },
-      { href: "/analysis", label: "الإنفاق على الأصناف", needs: "reports:view" },
-      { href: "/statements", label: "كشوف المورّدين", needs: "supplier:view" },
+      { href: "/statements", label: "الكشوف", needs: "supplier:view" },
+      { href: "/analysis", label: "الأصناف والأسعار", needs: "reports:view" },
     ],
   },
   {
@@ -78,14 +88,12 @@ export const AREAS: readonly NavArea[] = [
     label: "المال",
     short: "المال",
     needs: "bank:view",
-    owns: ["/bank", "/review", "/payments", "/close"],
+    owns: ["/bank", "/payments", "/close"],
     children: [
-      { href: "/money", label: "النظرة العامة" },
-      { href: "/payments", label: "دفعة الشهر", needs: "payment:approve" },
+      { href: "/money", label: "أين ذهب" },
+      { href: "/bank", label: "حركة البنك" },
       { href: "/money/expenses", label: "المصروفات" },
-      { href: "/bank", label: "البنك" },
-      { href: "/review", label: "طابور المراجعة", needs: "bank:view" },
-      { href: "/money/statement", label: "التدفّق وقائمة الدخل" },
+      { href: "/payments", label: "دفعة الشهر", needs: "payment:approve" },
       { href: "/close", label: "إقفال الشهر", needs: "month:close" },
     ],
   },
@@ -94,22 +102,19 @@ export const AREAS: readonly NavArea[] = [
     label: "المستندات",
     short: "المستندات",
     owns: ["/upload"],
-    children: [
-      { href: "/documents", label: "المستندات" },
-      { href: "/upload", label: "ارفع مستنداً", needs: "document:upload" },
-    ],
+    children: [],
   },
-  {
-    href: "/settings",
-    label: "الإعدادات",
-    short: "الإعدادات",
-    needs: "supplier:view",
-    owns: [],
-    children: [
-      { href: "/settings", label: "عام" },
-      { href: "/settings/audit", label: "سجلّ التدقيق", needs: "audit:view" },
-    ],
-  },
+];
+
+/**
+ * ما يُضبط مرّةً في العمر لا يُعطى سُدسَ شريط التنقّل.
+ *
+ * وفيه ما لا يخصّ صاحب المقهى أصلاً: رقمُ الهجرات واسمُ النموذج القارئ.
+ * فمكانُه قائمةُ المستخدم.
+ */
+export const ACCOUNT_LINKS: readonly NavLink[] = [
+  { href: "/settings", label: "الإعدادات", needs: "supplier:view" },
+  { href: "/settings/audit", label: "سجلّ التدقيق", needs: "audit:view" },
 ];
 
 /** عدد المساحات الظاهرة في شريط الجوّال السفليّ قبل «المزيد». */
@@ -125,14 +130,18 @@ export function visibleAreas(role: Role): NavArea[] {
 
 export function visibleChildren(role: Role, area: NavArea): NavLink[] {
   const kids = area.children.filter((c) => allowed(role, c));
-  // قسمٌ واحد ليس تفريعاً — فلا يُعرض شريط أقسام لمساحة بلا اختيار.
+  // لسانٌ واحد ليس تفريعاً — فلا يُعرض شريط ألسنةٍ لمساحة بلا اختيار.
   return kids.length > 1 ? kids : [];
+}
+
+export function visibleAccountLinks(role: Role): NavLink[] {
+  return ACCOUNT_LINKS.filter((l) => allowed(role, l));
 }
 
 /**
  * المساحة التي ينتمي إليها المسار.
  *
- * تُطابَق أطول بادئة، كي يذهب `/purchases/products` إلى «المشتريات» لا
+ * تُطابَق أطول بادئة، كي يذهب `/purchases/invoices` إلى «المورّدون» لا
  * إلى الرئيسية. و`/` وحدها لا تُطابَق بالبادئة وإلّا ابتلعت كل مسار.
  */
 export function activeArea(pathname: string): NavArea | undefined {
@@ -143,7 +152,7 @@ export function activeArea(pathname: string): NavArea | undefined {
   let bestLength = 0;
 
   for (const area of AREAS) {
-    for (const base of [area.href, ...area.owns]) {
+    for (const base of [area.href, ...area.owns, ...area.children.map((c) => c.href)]) {
       if (base === "/") continue;
       if (path === base || path.startsWith(`${base}/`)) {
         if (base.length > bestLength) {
@@ -156,7 +165,7 @@ export function activeArea(pathname: string): NavArea | undefined {
   return best;
 }
 
-/** القسم الظاهر داخل المساحة — أطول بادئة أيضاً. */
+/** اللسان الظاهر داخل المساحة — أطول بادئة أيضاً. */
 export function activeChild(pathname: string, area: NavArea): NavLink | undefined {
   const path = normalize(pathname);
   let best: NavLink | undefined;

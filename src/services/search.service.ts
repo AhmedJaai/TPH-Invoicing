@@ -182,7 +182,7 @@ async function findProducts(like: string): Promise<SearchHit[]> {
     id: r.id,
     title: r.name,
     subtitle: `${r.supplier ?? "بلا مورّد"}${r.canonical ? ` · ${r.canonical}` : " · غير مربوط"}`,
-    href: "/purchases/products",
+    href: "/analysis",
   }));
 }
 

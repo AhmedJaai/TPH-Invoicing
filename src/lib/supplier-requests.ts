@@ -20,6 +20,11 @@ export interface UnbackedPayment {
   unbackedMinor: number;
   /** حركة البنك التي قُيّدت منها — إن وُجدت. */
   bankTransactionId: string | null;
+  /**
+   * أيصدر هذا المورّد فواتير؟ — تتبعه **صياغةُ الطلب** لا العدّ.
+   * ومن لا يصدر يُطلَب منه عقدُ توريد، ويبقى مالُه معدوداً.
+   */
+  issuesInvoices: boolean;
 }
 
 export interface UnbackedSupplier {

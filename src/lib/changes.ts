@@ -137,7 +137,8 @@ export function buildChanges(f: ChangeFacts): Change[] {
     const dir = direction(f.outstandingNow, f.outstandingThen);
     out.push({
       id: "outstanding",
-      label: "المستحقّ عليك",
+      /* «عليك للمورّدين» هو الاسم الوحيد لهذا المفهوم في التطبيق كلّه */
+      label: "عليك للمورّدين",
       baseline: "عن قبل ثلاثين يوماً (تقديرٌ من تواريخ الفواتير والدفعات)",
       direction: dir,
       pct: pctChange(f.outstandingNow, f.outstandingThen),

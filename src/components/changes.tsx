@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Money } from "./money";
+import { Money, Prose } from "./money";
 import { notable, type Change } from "@/lib/changes";
 
 /**
@@ -62,7 +62,7 @@ export function Changes({ changes }: { changes: readonly Change[] }) {
             </p>
 
             <p className="mt-2 text-xs leading-relaxed text-muted">
-              {c.detail} · {c.baseline}
+              <Prose text={c.detail} /> · <Prose text={c.baseline} />
             </p>
           </>
         );

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Money } from "@/components/money";
+import { Money, Prose } from "@/components/money";
 import { ITEM, countNoun } from "@/lib/arabic";
 import {
   AREA_LABEL, IMPACT_LABEL, SEVERITY_LABEL, prioritize,
@@ -37,11 +37,11 @@ export function AttentionCard({ item }: { item: AttentionItem }) {
 
       <div className="ps-2">
         <Impact item={item} />
-        <p className="mt-2 text-xs leading-relaxed text-ink-soft">{item.detail}</p>
+        <p className="mt-2 text-xs leading-relaxed text-ink-soft"><Prose text={item.detail} /></p>
       </div>
       <p className="mt-2.5 ps-2 text-xs leading-relaxed">
         <span className="font-bold">الخطوة التالية: </span>
-        {item.action}
+        <Prose text={item.action} />
       </p>
 
       {item.evidence.length > 0 && (
@@ -54,7 +54,7 @@ export function AttentionCard({ item }: { item: AttentionItem }) {
               <li key={i} className="flex items-start justify-between gap-3 px-3 py-1.5">
                 <span className="min-w-0">
                   <span className="block truncate text-[11px] font-medium">{e.label}</span>
-                  {e.sub && <span className="block truncate text-[11px] text-muted">{e.sub}</span>}
+                  {e.sub && <span className="block truncate text-[11px] text-muted"><Prose text={e.sub} /></span>}
                 </span>
                 {e.amountMinor !== undefined && (
                   <span className="shrink-0 text-[11px] font-bold">

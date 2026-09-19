@@ -1,67 +1,94 @@
-import { looksLikeGoodsPurchase } from "@/lib/expenses";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, Money, PageShell } from "@/components/page-shell";
-import { HubGrid, type HubTile } from "@/components/hub";
 import { Figure } from "@/components/figure";
 import { gatherHomeProvenance } from "@/lib/provenance-facts";
-import { loadBalanceTotals } from "@/services/supplier-balance.service";
-
+import { buildCashFlow, type CashMovement } from "@/lib/cashflow";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
-import { NoAccess } from "@/components/ui";
-import { IMPORT, INVOICE, PAYMENT_RECORD, TRANSACTION, countNoun } from "@/lib/arabic";
+import { DataTable, NoAccess, Section, Stat } from "@/components/ui";
+import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
+import { formatMonth } from "@/lib/riyadh-time";
+import { looksLikeGoodsPurchase } from "@/lib/expenses";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * المال: أين ذهب — لا فهرسٌ لصفحاتٍ عن المال.
+ *
+ * كانت الصفحة ستَّ بطاقاتٍ، **أربعٌ منها روابط إلى صفحاتٍ أخرى** — وقد
+ * صارت تلك الصفحاتُ ألسنةً في شريط المساحة فوق العنوان، فالبطاقة التي
+ * كلُّ محتواها «اذهب إلى هنا» لم يبقَ لها معنى.
+ *
+ * وبطاقةُ «المستحقّ للمورّدين» كانت تعرض ١٠٬٥٠٢٫٤٩ — وهو الرقم نفسه
+ * المعروض في الرئيسية وفي حسابات المورّدين. ثلاثُ شاشاتٍ لرقمٍ واحد،
+ * وثلاثةُ أسماءٍ له. فخرج من هنا: هذه صفحةُ **ما خرج من الحساب**،
+ * والمستحقُّ سؤالُ المورّدين.
+ *
+ * وانتقل إليها **التدفّق النقديّ** من `/money/statement` — وكانت تلك
+ * تعرض جدول «المصروف حسب الباب» نفسه المعروض هنا بالأرقام نفسها. أمّا
+ * قائمةُ الدخل فخمسةٌ من سبعة بنودٍ فيها «غير متاح» حتى يُوصَل مصدر
+ * المبيعات، وهيكلٌ ينتظر مصدراً ليس صفحةً تُفتَح كلّ شهر.
+ */
 export default async function MoneyPage() {
   const user = await currentUser();
   if (!user) redirect("/login?from=/money");
   if (!can(user.role, "bank:view")) {
     return (
-      <PageShell user={user} title="المال">
+      <PageShell user={user} title="أين ذهب المال">
         <NoAccess />
       </PageShell>
     );
   }
 
-  const prov = await gatherHomeProvenance();
-
-  /* «عليك» بالمورّد: فواتيره المفتوحة ناقصَ رصيدِنا عنده — مصدرٌ واحد */
-  const { totals: balanceTotals } = await loadBalanceTotals();
-  const owedMinor = balanceTotals.owedMinor;
-
-  const [f] = (
-    await db.execute<Record<string, number>>(sql`
+  const [prov, counts, movements, debitRows] = await Promise.all([
+    gatherHomeProvenance(),
+    db.execute<Record<string, number>>(sql`
       select
         (select count(*)::int from bank_transactions)                            as tx,
         (select count(*)::int from bank_transactions where category='UNKNOWN')   as unclassified,
-        (select count(*)::int from bank_imports)                                 as imports,
         (select coalesce(sum(vat_minor),0)::bigint from invoices
            where input_vat_status='ELIGIBLE')                                    as recoverable,
         (select coalesce(sum(vat_minor),0)::bigint from invoices
            where input_vat_status='NOT_ELIGIBLE' and vat_minor > 0)              as at_risk,
-        (select count(*)::int from invoices where input_vat_status='UNKNOWN')    as vat_unknown,
-        (select count(*)::int from payments)                                     as payments
-    `)
-  ).rows;
-
-  // المصروف حسب تصنيفه — من كشف البنك، وهو الموجود فعلاً
-  /*
-    «شراء بضاعة» يُستبعَد بالدالّة نفسها التي تستبعده في قائمة الدخل.
-    كان يُحسب هنا راتباً ويُستبعَد هناك، فللرواتب رقمان في شاشتين.
-  */
-  const debitRows = (
-    await db.execute<{ category: string; amount_minor: string; description: string | null; beneficiary_raw: string | null }>(sql`
+        (select count(*)::int from invoices where input_vat_status='UNKNOWN')    as vat_unknown
+    `),
+    db.execute<{ month: string; direction: string; category: string; amount: string }>(sql`
+      select to_char(value_date, 'YYYY-MM') as month,
+             direction::text as direction,
+             category::text as category,
+             sum(amount_minor)::bigint as amount
+        from bank_transactions
+       group by 1, 2, 3
+    `),
+    /*
+      «شراء بضاعة» يُستبعَد بالدالّة نفسها التي تستبعده في المصروفات.
+      كان يُحسب هنا راتباً ويُستبعَد هناك، فللرواتب رقمان في شاشتين.
+    */
+    db.execute<{ category: string; amount_minor: string; description: string | null; beneficiary_raw: string | null }>(sql`
       select category::text as category, amount_minor, description, beneficiary_raw
-      from bank_transactions
-      where direction = 'DEBIT' and category not in ('INTERNAL','UNKNOWN','SUPPLIER','PERSONAL','POS_SETTLEMENT')
-    `)
-  ).rows;
+        from bank_transactions
+       where direction = 'DEBIT'
+         and category not in ('INTERNAL','UNKNOWN','SUPPLIER','PERSONAL','POS_SETTLEMENT')
+    `),
+  ]);
+
+  const f = counts.rows[0] ?? {};
+  const n = (k: string) => Number(f[k] ?? 0);
+
+  const cash = buildCashFlow(
+    movements.rows.map<CashMovement>((r) => ({
+      month: r.month,
+      direction: r.direction as "DEBIT" | "CREDIT",
+      category: r.category as TxCategory,
+      amountMinor: Number(r.amount),
+    })),
+  );
+
   const categoryTotals = new Map<string, { category: string; n: number; s: number }>();
-  for (const r of debitRows) {
+  for (const r of debitRows.rows) {
     if (looksLikeGoodsPurchase(r.description ?? "", r.beneficiary_raw)) continue;
     const e = categoryTotals.get(r.category) ?? { category: r.category, n: 0, s: 0 };
     e.n++;
@@ -69,115 +96,152 @@ export default async function MoneyPage() {
     categoryTotals.set(r.category, e);
   }
   const byCategory = [...categoryTotals.values()].sort((a, b) => b.s - a.s);
-
-  const tiles: HubTile[] = [
-    {
-      href: "/bank",
-      title: "حركات كشف البنك",
-      value: String(f?.tx ?? 0),
-      detail:
-        Number(f?.unclassified ?? 0) > 0
-          ? `${countNoun(f?.unclassified, TRANSACTION)} لم تُصنَّف — صنّفها مرّة وتسري القاعدة بعدها`
-          : `${countNoun(Number(f?.imports ?? 0), IMPORT)} · كلّها مصنَّفة`,
-      tone: Number(f?.unclassified ?? 0) > 0 ? "warn" : "ok",
-    },
-    {
-      /*
-        الوجهةُ تعرض العدد الذي في البطاقة.
-
-        كانت تفتح «دفعة أوّل الشهر» — وهي تعرض ما جاز تحويلُه من الشهر
-        المنقضي وحده (٩٥٦ ريالاً)، لا المستحقّ كلّه (١٨٬١٩٤). فيضغط
-        صاحب العمل رقماً ويرى غيرَه ولا يجد تفصيله.
-
-        ثمّ كانت تفتح قائمة الفواتير، وهي بالفاتورة لا بالمورّد: فمن دفع
-        لمورّدٍ مقدَّماً يرى فواتيره «مستحقّة» وقد سدّدها. **والرقمُ الذي
-        لا تفتح وجهتُه تفصيلَه يُفقد الثقة به.**
-      */
-      href: "/purchases/insights",
-      title: "المستحقّ للمورّدين",
-      amountMinor: owedMinor,
-      detail: `على فواتير لم تُسدَّد · ${countNoun(Number(f?.payments ?? 0), PAYMENT_RECORD)} مسجّلة`,
-      tone: owedMinor > 0 ? "warn" : "ok",
-    },
-    {
-      href: "/purchases/invoices?tax=VALID",
-      title: "ضريبة قابلة للاسترداد",
-      amountMinor: Number(f?.recoverable ?? 0),
-      detail: "من فواتير ضريبية كاملة",
-      tone: "ok",
-    },
-    {
-      href: "/attention",
-      title: "ضريبة معرّضة للضياع",
-      amountMinor: Number(f?.at_risk ?? 0),
-      detail:
-        Number(f?.vat_unknown ?? 0) > 0
-          ? `و${countNoun(f?.vat_unknown, INVOICE)} لم يُقرأ تفصيلها بعد`
-          : "من فواتير لا تصلح للخصم",
-      tone: Number(f?.at_risk ?? 0) > 0 ? "danger" : "ok",
-    },
-    {
-      href: "/close",
-      title: "إقفال الشهر",
-      actionLabel: "افتح القائمة",
-      detail: "قائمة تحقّق تُقرأ قبل أن يُقفل الشهر",
-    },
-    {
-      href: "/money/statement",
-      title: "التدفّق النقدي وقائمة الدخل",
-      actionLabel: "اعرضها",
-      detail: "من كشف بنكك وفواتيرك — وما يحتاج مبيعات معروضٌ بسببه لا بصفر",
-    },
-  ];
+  const expenseTotal = byCategory.reduce((s, c) => s + c.s, 0);
 
   return (
     <PageShell
       user={user}
-     
-      title="المال"
-      intro="أين ذهب المال وما بقي عليك — من كشف بنكك وفواتيرك، لا من تقدير."
+      width="wide"
+      title="أين ذهب المال"
+      intro="من كشف بنكك وفواتيرك، لا من تقدير. وما لم يُصنَّف معلَنٌ بمبلغه."
     >
       {/*
         الصادر من الحساب، والمجهول منه معلَنٌ بمبلغه.
         «مصروفاتك ٤٢٬٠٠٠» تُقرأ كاملةً وفيها ثمانية آلاف لم يُعرف وجهها.
       */}
-      <div className="mb-6 max-w-md">
+      {/*
+        ── ارتفاعاتٌ متساوية ──
+
+        كانت البطاقةُ الأولى بيانَ مصدرٍ فيه زرٌّ يُفتَح، وبجانبها أربعُ
+        بطاقاتٍ قصيرة في صفٍّ واحد — فتبدو الصفحةُ مكسورةً من أوّلها،
+        ويقفز ما تحتها حين يُفتَح البيان. فصارت الأولى تملأ ارتفاع
+        صفّها، والأربعُ في مربّعين × مربّعين إلى جانبها.
+      */}
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:items-stretch">
         <Figure
           label="الصادر من الحساب"
           provenance={prov.bankOutflow}
           unit="حركة"
           href="/bank"
           note="اضغط «من أين جاء؟» لترى ما لم يُصنَّف بعد"
+          className="flex flex-col"
         />
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+          <Stat
+            label="الوارد إلى الحساب"
+            minor={cash.totalInMinor}
+            tone="ok"
+            sub="يشمل إيداعات نقاط البيع — وهي ليست «مبيعات»، فالمبيعات تحتاج مصدرها"
+          />
+          <Stat
+            label="ضريبة قابلة للاسترداد"
+            minor={n("recoverable")}
+            tone="ok"
+            sub="من فواتير ضريبية كاملة"
+            href="/purchases/invoices?tax=VALID"
+          />
+          <Stat
+            label="ضريبة معرَّضة للضياع"
+            minor={n("at_risk")}
+            tone={n("at_risk") > 0 ? "danger" : "ok"}
+            sub={
+              n("vat_unknown") > 0
+                ? `و${countNoun(n("vat_unknown"), INVOICE)} لم يُقرأ تفصيلها بعد`
+                : "من فواتير لا تصلح للخصم"
+            }
+            href="/purchases/invoices?tax=INVALID"
+          />
+          <Stat
+            label="حركات كشف البنك"
+            value={String(n("tx"))}
+            tone={n("unclassified") > 0 ? "warn" : "ok"}
+            sub={
+              n("unclassified") > 0
+                ? `${countNoun(n("unclassified"), TRANSACTION)} لم تُصنَّف`
+                : "كلّها مصنَّفة"
+            }
+            href="/bank"
+          />
+        </div>
       </div>
 
-      <HubGrid tiles={tiles} />
-
-      <section className="mt-10">
-        <h2 className="mb-1 text-base font-bold">المصروف حسب نوعه</h2>
-        <p className="mb-3 text-xs leading-relaxed text-muted">
-          من كشف البنك، بحسب ما صنّفتَه بنفسك. وسداد المورّدين والتحويل الشخصيّ مستثنيان — الأوّل له صفحته، والثاني سحبُ مالكٍ لا مصروف.
-        </p>
+      <Section
+        title="المصروف حسب بابه"
+        hint={`من كشف البنك، بحسب ما صنّفتَه بنفسك — ${
+          expenseTotal > 0 ? "" : ""
+        }وسدادُ المورّدين والتحويلُ الشخصيّ مستثنيان: الأوّل محسوبٌ في المشتريات، والثاني سحبُ مالكٍ لا مصروف.`}
+      >
         {byCategory.length === 0 ? (
-          <Empty message="لا حركات مصنَّفة بعد. صنّف حركاتك من صفحة كشف البنك." />
+          <Empty message="لا حركات مصنَّفة بعد. صنّف حركاتك من صفحة حركة البنك." />
         ) : (
+          /*
+            صفٌّ عرضُه ألفُ بكسل بين اسمٍ في طرفٍ ورقمٍ في طرف يُقرأ
+            واحداً واحداً، ولا يقول أيُّ بابٍ أثقل. والشريطُ يقوله في
+            لمحة — ونسبتُه من أكبر بابٍ لا من المجموع، فالفرقُ بين
+            البابين هو المقصود.
+          */
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {byCategory.map((c) => (
-              <li key={c.category} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium">
-                    {CATEGORY_LABEL[c.category as TxCategory] ?? c.category}
+              <li key={c.category} className="px-4 py-2.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">
+                      {CATEGORY_LABEL[c.category as TxCategory] ?? c.category}
+                    </span>
+                    <span className="block text-[11px] text-muted">{countNoun(c.n, TRANSACTION)}</span>
                   </span>
-                  <span className="block text-[11px] text-muted">{countNoun(c.n, TRANSACTION)}</span>
-                </span>
-                <span className="shrink-0 text-sm font-bold">
-                  <Money minor={Number(c.s)} />
-                </span>
+                  <span className="shrink-0 text-end">
+                    <span className="nums block text-sm font-bold">
+                      <Money minor={Number(c.s)} />
+                    </span>
+                    <span className="nums block text-[11px] text-muted">
+                      {expenseTotal > 0 ? `${Math.round((c.s / expenseTotal) * 100)}٪` : ""}
+                    </span>
+                  </span>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunken" aria-hidden>
+                  <div
+                    className="h-full rounded-full bg-ink-soft"
+                    style={{ width: `${Math.max(1, Math.round((c.s / byCategory[0].s) * 100))}%` }}
+                  />
+                </div>
               </li>
             ))}
           </ul>
         )}
-      </section>
+      </Section>
+
+      {/* ── التدفّق الشهريّ — كان صفحةً مستقلّة تعرض الجدول أعلاه كذلك ── */}
+      {cash.months.length > 0 && (
+        <Section
+          title="التدفّق النقديّ شهراً بشهر"
+          hint="من حركات البنك مباشرةً. والوارد يشمل إيداعات نقاط البيع."
+        >
+          {cash.unclassifiedCount > 0 && (
+            <p className="mb-3 rounded-lg bg-warn-bg px-3 py-2 text-xs leading-relaxed text-warn">
+              ⚠ {countNoun(cash.unclassifiedCount, TRANSACTION)} بقيمة{" "}
+              <Money minor={cash.unclassifiedMinor} /> لم تُصنَّف بعد، فتوزيعُ المصروف أعلاه ناقصٌ بقدرها.
+            </p>
+          )}
+          <DataTable
+            rows={cash.months}
+            keyOf={(m) => m.month}
+            columns={[
+              { key: "month", header: "الشهر", primary: true, cell: (m) => formatMonth(m.month) },
+              { key: "in", header: "وارد", numeric: true, cell: (m) => <span className="text-ok"><Money minor={m.inMinor} /></span> },
+              { key: "out", header: "صادر", numeric: true, cell: (m) => <span className="text-warn"><Money minor={m.outMinor} /></span> },
+              {
+                key: "net", header: "الصافي", numeric: true,
+                cell: (m) => (
+                  <span className={`font-bold ${m.netMinor >= 0 ? "text-ok" : "text-danger"}`}>
+                    <Money minor={m.netMinor} />
+                  </span>
+                ),
+              },
+            ]}
+          />
+        </Section>
+      )}
     </PageShell>
   );
 }

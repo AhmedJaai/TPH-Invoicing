@@ -1,77 +1,11 @@
-import { redirect } from "next/navigation";
-import { currentUser } from "@/lib/session";
-import { can } from "@/lib/permissions";
-import { Empty, PageShell } from "@/components/page-shell";
-import { NoAccess } from "@/components/ui";
-import { ProductMapping } from "@/components/product-mapping";
-import { listProducts, listSupplierProducts, mappingCoverage } from "@/services/product.service";
-import { suggestMerges, type SupplierItem } from "@/lib/products";
+import { permanentRedirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function ProductsPage() {
-  const user = await currentUser();
-  if (!user) redirect("/login?from=/purchases/products");
-  if (!can(user.role, "supplier:edit")) {
-    return (
-      <PageShell user={user} width="wide" title="الأصناف">
-        <NoAccess what="تعديل الأصناف" />
-      </PageShell>
-    );
-  }
-
-  const [rows, products, coverage] = await Promise.all([
-    listSupplierProducts(),
-    listProducts(),
-    mappingCoverage(),
-  ]);
-
-  const items: SupplierItem[] = rows.map((r) => ({
-    supplierId: r.supplierId,
-    supplierName: r.supplierName,
-    normalized: r.normalized,
-    displayName: r.displayName,
-    lastUnitPriceMinor: r.lastUnitPriceMinor,
-    orderCount: r.orderCount,
-  }));
-
-  const suggestions = suggestMerges(items);
-
-  if (rows.length === 0) {
-    return (
-      <PageShell user={user} width="wide" title="الأصناف">
-        <Empty message="لا أصناف بعد. تُبنى من بنود الفواتير — اقرأ محتوى فواتيرك أوّلاً." />
-      </PageShell>
-    );
-  }
-
-  return (
-    <PageShell
-      user={user}
-     
-      title="الأصناف"
-      intro="اربط اسم الصنف عند كل مورّد بصنفٍ واحد عندك — فتعرف كم يكلّفك البنّ من كل مورّد، لا كم يكلّفك «العنب» عند اثنين."
-    >
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
-          <p className="text-xs text-muted">أصناف مورّدين</p>
-          <p className="nums mt-1 text-xl font-bold">{coverage.total}</p>
-        </div>
-        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
-          <p className="text-xs text-muted">مربوطة بصنف معياري</p>
-          <p className={`nums mt-1 text-xl font-bold ${coverage.mapped > 0 ? "text-ok" : ""}`}>
-            {coverage.mapped}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
-          <p className="text-xs text-muted">أصناف معيارية</p>
-          <p className="nums mt-1 text-xl font-bold">{products.length}</p>
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <ProductMapping rows={rows} products={products} suggestions={suggestions} />
-      </div>
-    </PageShell>
-  );
+/**
+ * تحويلٌ دائم إلى «الأصناف والأسعار».
+ *
+ * ربطُ اسم الصنف عند المورّد بصنفٍ معياريّ **عملٌ على الأصناف**، لا
+ * صفحةٌ ثالثة عنها بجانب صفحتين تعرضانها. فصار قسماً في مكانه.
+ */
+export default function LegacyProducts(): never {
+  permanentRedirect("/analysis");
 }

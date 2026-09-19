@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Money } from "./money";
+import { Money, Prose } from "./money";
 import { ScrollX } from "./scroll-x";
 
 /**
@@ -66,12 +66,15 @@ export function Card({
  * يستطيع أن يفعل، ولا ينزل ليبحث.
  */
 export function Section({
+  id,
   title,
   hint,
   action,
   children,
   className = "",
 }: {
+  /** مرساةٌ يهبط إليها رابطٌ من تنبيه — فالعدد يفتح سجلّه لا رأس الصفحة. */
+  id?: string;
   title: string;
   hint?: string;
   action?: React.ReactNode;
@@ -79,12 +82,16 @@ export function Section({
   className?: string;
 }) {
   return (
-    <section className={`mt-8 sm:mt-10 ${className}`}>
+    <section id={id} className={`mt-8 sm:mt-10 ${className}`}>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="font-display text-lg font-bold leading-tight">{title}</h2>
         {action && <div className="shrink-0">{action}</div>}
       </div>
-      {hint && <p className="mb-3 max-w-2xl text-xs leading-relaxed text-muted">{hint}</p>}
+      {hint && (
+        <p className="mb-3 max-w-2xl text-xs leading-relaxed text-muted">
+          <Prose text={hint} />
+        </p>
+      )}
       {children}
     </section>
   );
@@ -183,7 +190,11 @@ export function Stat({
         <p className={`${isNumeric(value) ? "nums " : ""}mt-2 font-display text-2xl font-bold leading-none sm:text-[1.75rem] ${tone ? TONE_TEXT[tone] : ""}`}>
           {minor !== undefined ? <Money minor={minor} /> : value}
         </p>
-        {sub && <p className="mt-2 text-xs leading-relaxed text-muted">{sub}</p>}
+        {sub && (
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            {typeof sub === "string" ? <Prose text={sub} /> : sub}
+          </p>
+        )}
       </div>
     </Card>
   );
@@ -353,26 +364,43 @@ export function DataTable<T>({
         </table>
       </ScrollX>
 
-      {/* الجوّال: بطاقات */}
+      {/*
+        ── الجوّال: بطاقات، ورابطُ البطاقة طبقةٌ لا غلاف ──
+
+        كانت البطاقة كلُّها `<Link>` يلفّ خلاياها. فأيُّ خليّةٍ فيها
+        رابطٌ تُنتج `<a>` داخل `<a>` — وهو ترميزٌ باطل يرفضه المتصفّح
+        فيعيد بناء الشجرة، **ويسقط الترطيب فيتوقّف تفاعلُ الصفحة
+        كلّها**. وقد وقع حين صارت شارةُ الضريبة تفتح سببَها.
+
+        والعلاج أنّ الرابط طبقةٌ مطلقة تحت المحتوى لا غلافٌ حوله:
+        الضغطُ على الفراغ يبلغها، والضغطُ على رابطٍ داخليّ يبلغه هو —
+        لأنّ المحتوى يُرسَم بعدها فيعلوها. ولا `<a>` داخل `<a>`.
+      */}
       <ul className="space-y-2.5 sm:hidden">
         {rows.map((row) => {
           const href = hrefOf?.(row);
-          const body = (
-            <>
-              <p className="text-sm font-bold leading-snug">{primary.cell(row)}</p>
-              <dl className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
-                {rest.map((c) => (
-                  <div key={c.key} className="min-w-0">
-                    <dt className="text-[11px] text-muted">{c.header}</dt>
-                    <dd className="truncate text-xs">{c.cell(row)}</dd>
-                  </div>
-                ))}
-              </dl>
-            </>
-          );
           return (
             <li key={keyOf(row)}>
-              <Card href={href}>{body}</Card>
+              <Card className={href ? "relative card-rows" : ""}>
+                {href && (
+                  <Link
+                    href={href}
+                    aria-label="افتح التفصيل"
+                    className="absolute inset-0 rounded-2xl"
+                  />
+                )}
+                <div>
+                  <p className="text-sm font-bold leading-snug">{primary.cell(row)}</p>
+                  <dl className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                    {rest.map((c) => (
+                      <div key={c.key} className="min-w-0">
+                        <dt className="text-[11px] text-muted">{c.header}</dt>
+                        <dd className="truncate text-xs">{c.cell(row)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </Card>
             </li>
           );
         })}

@@ -14,19 +14,31 @@ import type { UnbackedPayment } from "@/lib/supplier-requests";
 export const UNBACKED_FLOOR_MINOR = 100;
 
 /**
- * دفعاتٌ لا فاتورةَ تفسّرها.
+ * دفعاتٌ لا فاتورةَ تفسّرها — **تعريفٌ واحد لكلّ شاشة**.
  *
  * والمقدَّمةُ المعلَنة تخرج (صاحبُها قال ما هي)، والمردودةُ والملغاةُ لم
- * يخرج مالُها. ومورّدٌ أُعلن أنّه لا يصدر فواتير يخرج كذلك: سؤاله «عقد
- * التوريد» لا «اطلب الفاتورة» (SCN-104).
+ * يخرج مالُها.
+ *
+ * ── ومن لا يصدر فواتير لا يخرج ──
+ *
+ * كان يُستثنى (SCN-104) بحجّة أنّ سؤاله «عقد التوريد» لا «اطلب
+ * الفاتورة». وذلك صحيحٌ في **صياغة الطلب**، غلطٌ في **العدّ**: فصفحة
+ * البنك لا تستثنيه فتقول «١٣ دفعة · ٣٥٬٦٤٤٫٩٠»، والتنبيه يستثنيه
+ * فيقول «١٠ دفعات · ٣٢٬٦٨٨٫١٥» — رقمان لعبارةٍ واحدة في شاشتين، وثلاثةُ
+ * آلافِ ريالٍ تختفي من إحداهما بلا أن يُقال لِمَ.
+ *
+ * ومالٌ خرج بلا فاتورة هو مالٌ خرج بلا فاتورة، أصدر المورّدُ فواتير أو
+ * لم يصدر. فيدخل الكلّ، ويُحمَل `issuesInvoices` مع الصفّ كي تتبعه
+ * **صياغةُ الطلب** وحدها.
  */
 export async function loadUnbackedPayments(): Promise<UnbackedPayment[]> {
   const rows = (
     await db.execute<{
       id: string; supplier_id: string | null; name_ar: string | null; slug: string | null;
-      d: string; amount_minor: number; unbacked: number; tx: string | null;
+      d: string; amount_minor: number; unbacked: number; tx: string | null; issues: boolean | null;
     }>(sql`
       select p.id, p.supplier_id, s.name_ar, s.slug, p.paid_at::date::text as d, p.amount_minor,
+             coalesce(s.issues_invoices, true) as issues,
              p.amount_minor - p.fee_minor
                - coalesce((select sum(a.amount_minor)::int from payment_allocations a
                             where a.payment_id = p.id), 0) as unbacked,
@@ -35,7 +47,6 @@ export async function loadUnbackedPayments(): Promise<UnbackedPayment[]> {
         from payments p
         left join suppliers s on s.id = p.supplier_id
        where p.status not in ('REVERSED','VOID','ADVANCE')
-         and coalesce(s.issues_invoices, true)
          and p.amount_minor - p.fee_minor
              - coalesce((select sum(a.amount_minor)::int from payment_allocations a
                           where a.payment_id = p.id), 0) > ${UNBACKED_FLOOR_MINOR}
@@ -52,6 +63,7 @@ export async function loadUnbackedPayments(): Promise<UnbackedPayment[]> {
     amountMinor: Number(r.amount_minor),
     unbackedMinor: Number(r.unbacked),
     bankTransactionId: r.tx,
+    issuesInvoices: r.issues ?? true,
   }));
 }
 

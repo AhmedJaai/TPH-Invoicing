@@ -8,6 +8,7 @@ import {
   activeArea,
   activeChild,
   mobileTabs,
+  visibleAccountLinks,
   visibleAreas,
   visibleChildren,
   type NavArea,
@@ -16,11 +17,19 @@ import {
 /**
  * التنقّل حول عمل صاحب المقهى لا حول جداول القاعدة.
  *
- * والموضع يُشتقّ من المسار نفسه لا من خاصيّة تمرّرها كل صفحة: كانت
- * `/الموردون` تُعلِّم «الإعدادات» و`/التدقيق` تُعلِّم «الأداء»، لأنّ
- * الخاصيّة تُكتب باليد فتُنسى. المسار لا يُنسى.
+ * ── لماذا شريطٌ جانبيّ على الحاسوب ──
  *
- * وعلى الجوّال شريط سفليّ ثابت: الإبهام يبلغ أسفل الشاشة، ولا يبلغ
+ * كان التنقّل شريطاً علويّاً من صفّين: مساحاتٌ في صفّ وأقسامُها في صفّ
+ * تحته. فيأكل نحو مئةٍ وعشرين بكسلاً رأسيّاً من كلّ صفحة — وهي أثمن ما
+ * في شاشةٍ ارتفاعها تسعمئة — ويُحرّك الصفّ الثاني ظهوراً واختفاءً بحسب
+ * المساحة، فيقفز المحتوى. والأسوأ أنّ موضع المستخدم من التطبيق يختفي
+ * متى نزل قليلاً.
+ *
+ * والشريط الجانبيّ ثابتٌ لا يقفز، ويأخذ من العرض ما لا تحتاجه القراءة
+ * (على ١٤٤٠ بكسلاً كان الوسطُ ١٢٨٠ والحافّتان فارغتين)، ويترك الارتفاع
+ * كلَّه للجداول. وهو ما تفعله أدواتُ التشغيل الماليّة.
+ *
+ * وعلى الجوّال يبقى الشريط السفليّ: الإبهام يبلغ أسفل الشاشة، ولا يبلغ
  * أعلاها. البنية في `lib/nav.ts` مختبَرةً، وهذا رسمها.
  */
 
@@ -40,12 +49,10 @@ function Icon({ href, className }: { href: string; className?: string }) {
       return <svg {...common}><path d="M3 10.5 12 3l9 7.5" /><path d="M5.5 9.5V21h13V9.5" /></svg>;
     case "/attention":
       return <svg {...common}><path d="M12 4 2.5 20h19L12 4Z" /><path d="M12 10v4" /><path d="M12 17.2v.1" /></svg>;
-    case "/purchases":
+    case "/suppliers":
       return <svg {...common}><path d="M4 7h16l-1.2 12.5a1.5 1.5 0 0 1-1.5 1.5H6.7a1.5 1.5 0 0 1-1.5-1.5Z" /><path d="M8.5 7V5.5a3.5 3.5 0 0 1 7 0V7" /></svg>;
     case "/money":
       return <svg {...common}><rect x="2.5" y="5.5" width="19" height="13" rx="2" /><path d="M2.5 10h19" /></svg>;
-    case "/performance":
-      return <svg {...common}><path d="M4 20V10" /><path d="M10 20V4" /><path d="M16 20v-7" /><path d="M22 20H2" /></svg>;
     case "/documents":
       return <svg {...common}><path d="M6 2.5h8L19 7.5V21H6Z" /><path d="M13.5 2.5V8H19" /></svg>;
     case "/settings":
@@ -63,71 +70,140 @@ function MoreIcon({ className }: { className?: string }) {
   );
 }
 
-export function Nav({ role, pending = 0 }: { role: Role; pending?: number }) {
+/**
+ * الشريط الجانبيّ — الحاسوب وحده.
+ *
+ * والعدد الظاهر بجانب «يحتاج قرارك» هو عددُ بنود تلك الصفحة نفسها،
+ * يُحسب مرّةً في القشرة ويُمرَّر. وكان العدّاد `countPendingWork()` —
+ * وهو يقول صفراً على بيانات أحمد بينما تسعةُ بنودٍ تنتظره فعلاً،
+ * لأنّه يعدّ حركاتِ البنك وحدها. **والعدد الذي يقول صفراً والعملُ
+ * قائم أسوأ من لا عدّاد.**
+ */
+export function Sidebar({
+  role,
+  pending = 0,
+  documents = 0,
+}: {
+  role: Role;
+  pending?: number;
+  documents?: number;
+}) {
   const pathname = usePathname() ?? "/";
   const areas = visibleAreas(role);
   const area = activeArea(pathname);
-  const children = area ? visibleChildren(role, area) : [];
-  const child = area ? activeChild(pathname, area) : undefined;
+
+  const badgeOf = (href: string) =>
+    href === "/attention" ? pending : href === "/documents" ? documents : 0;
+
+  /*
+    النصُّ يختفي حين ينطوي الشريط وتبقى الأيقونة — و`group-hover/rail`
+    يقرأ حالَ الحاوية في القشرة. والعرضُ ثابتٌ عند ٢٤٠ بكسلاً داخلَها
+    كي لا يتراقص النصُّ أثناء الحركة، وإنّما تُقصّ الحاوية عليه.
+  */
+  const label = "min-w-0 flex-1 truncate opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100";
 
   return (
-    <>
-      {/* ── الحاسوب: المساحات ثمّ أقسام المساحة المفتوحة ── */}
-      <nav className="hidden items-center gap-1 sm:flex" aria-label="المساحات">
-        {areas.map((a) => (
-          <Link
-            key={a.href}
-            href={a.href}
-            aria-current={area?.href === a.href ? "page" : undefined}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-              area?.href === a.href
-                ? "bg-inverse-surface text-inverse-ink"
-                : "text-ink-soft hover:bg-sunken"
-            }`}
-          >
-            {a.label}
-          </Link>
-        ))}
+    <nav className="flex h-full flex-col gap-1 overflow-hidden p-3" aria-label="المساحات">
+      <Link
+        href="/"
+        className={`mb-1 block truncate rounded-lg px-3 py-2 font-display text-base font-bold leading-tight tracking-tight ${label}`}
+      >
+        ذا بوبليك هاوس
+      </Link>
 
-        {/* الرفع فعلٌ لا مساحة — فيبقى ظاهراً وممتازاً عن بقيّة الروابط */}
-        <UploadButton role={role} pathname={pathname} className="ms-auto" />
-      </nav>
+      <UploadButton role={role} pathname={pathname} className="mb-2 w-full" collapsible />
 
-      {children.length > 0 && (
-        <nav
-          className="scroll-x mt-2 flex items-center gap-4 overflow-x-auto border-t border-line pt-2"
-          aria-label={area?.label}
-        >
-          {children.map((c) => (
-            <Link
-              key={c.href}
-              href={c.href}
-              aria-current={child?.href === c.href ? "page" : undefined}
-              className={`flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 pb-1 text-xs transition-colors sm:min-h-0 ${
-                child?.href === c.href
-                  ? "border-ink font-bold text-ink"
-                  : "border-transparent text-muted hover:text-ink-soft"
-              }`}
-            >
-              {c.label}
-              {/*
-                العدد الواحد للعمل الباقي — يُقرأ من مصدرٍ واحد ولا يتغيّر
-                بتغيّر الصفحة. وكان لكلّ شاشةٍ عددُها فيتناقضن.
-              */}
-              {c.href === "/review" && pending > 0 && (
-                <span className="nums rounded-full bg-warn-bg px-1.5 py-0.5 text-[11px] font-bold text-warn" title={`حركات بنك تنتظر قراراً: ${pending} — والسداد المزدوج والدفعات بلا فاتورة في «ما يحتاج انتباهك»`} aria-label={`حركات بنك تنتظر قراراً: ${pending}`}>
-                  {pending}
-                </span>
-              )}
-            </Link>
+      <ul className="space-y-0.5">
+        {areas.map((a) => {
+          const current = area?.href === a.href;
+          const n = badgeOf(a.href);
+          return (
+            <li key={a.href}>
+              <Link
+                href={a.href}
+                aria-current={current ? "page" : undefined}
+                className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  current
+                    ? "bg-inverse-surface font-bold text-inverse-ink"
+                    : "text-ink-soft hover:bg-sunken"
+                }`}
+              >
+                <Icon href={a.href} className="h-[1.15rem] w-[1.15rem] shrink-0" />
+                <span className={label}>{a.label}</span>
+                {/* الشارةُ تبقى وهو منطوٍ: العددُ هو ما يُنظَر إليه من طرف العين */}
+                {n > 0 && (
+                  <span
+                    className={`nums absolute end-1.5 top-1 rounded-full px-1.5 text-[10px] font-bold group-hover/rail:static group-hover/rail:end-auto group-hover/rail:top-auto group-hover/rail:py-0.5 group-hover/rail:text-[11px] group-focus-within/rail:static ${
+                      current ? "bg-inverse-ink/20 text-inverse-ink" : "bg-warn text-white"
+                    }`}
+                  >
+                    {n}
+                  </span>
+                )}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="mt-auto border-t border-line pt-2">
+        <ul className="space-y-0.5">
+          {visibleAccountLinks(role).map((l) => (
+            <li key={l.href}>
+              <Link
+                href={l.href}
+                aria-current={pathname.startsWith(l.href) ? "page" : undefined}
+                className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs transition-colors ${
+                  pathname === l.href ? "font-bold text-ink" : "text-muted hover:bg-sunken hover:text-ink-soft"
+                }`}
+              >
+                <Icon href="/settings" className="h-4 w-4 shrink-0 opacity-70" />
+                <span className={label}>{l.label}</span>
+              </Link>
+            </li>
           ))}
-        </nav>
-      )}
-
-    </>
+        </ul>
+      </div>
+    </nav>
   );
 }
 
+/**
+ * ألسنةُ المساحة — فوق محتواها لا في القشرة.
+ *
+ * موضعُها داخل الصفحة يجعلها تُقرأ تابعةً للعنوان الذي تحتها، لا صفّاً
+ * ثانياً من تنقّلٍ عامّ.
+ */
+export function AreaTabs({ role }: { role: Role }) {
+  const pathname = usePathname() ?? "/";
+  const area = activeArea(pathname);
+  if (!area) return null;
+  const children = visibleChildren(role, area);
+  if (children.length === 0) return null;
+  const child = activeChild(pathname, area);
+
+  return (
+    <nav
+      className="scroll-x -mb-px flex items-center gap-5 overflow-x-auto border-b border-line"
+      aria-label={area.label}
+    >
+      {children.map((c) => (
+        <Link
+          key={c.href}
+          href={c.href}
+          aria-current={child?.href === c.href ? "page" : undefined}
+          className={`flex min-h-11 shrink-0 items-center border-b-2 text-xs transition-colors sm:min-h-0 sm:pb-2.5 sm:pt-1 ${
+            child?.href === c.href
+              ? "border-ink font-bold text-ink"
+              : "border-transparent text-muted hover:text-ink-soft"
+          }`}
+        >
+          {c.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
 
 /**
  * شريط الجوّال السفليّ.
@@ -136,7 +212,15 @@ export function Nav({ role, pending = 0 }: { role: Role; pending?: number }) {
  * والمرشِّح يُنشئ إطاراً حاويًا يحبس `fixed` داخله — فكان الشريط يظهر
  * أعلى الشاشة لا أسفلها. لا يُدخل هذا المكوّن ترويسةً أبداً.
  */
-export function MobileTabBar({ role }: { role: Role }) {
+export function MobileTabBar({
+  role,
+  pending = 0,
+  documents = 0,
+}: {
+  role: Role;
+  pending?: number;
+  documents?: number;
+}) {
   const pathname = usePathname() ?? "/";
   const [moreOpen, setMoreOpen] = useState(false);
   /* الدرج يُغلق بـEscape — من فتحه بلوحة المفاتيح لا يُحبَس فيه */
@@ -148,13 +232,15 @@ export function MobileTabBar({ role }: { role: Role }) {
   }, [moreOpen]);
   const area = activeArea(pathname);
   const { tabs, more } = mobileTabs(role, pathname);
+  const badgeOf = (href: string) =>
+    href === "/attention" ? pending : href === "/documents" ? documents : 0;
 
   return (
     <>
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md sm:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
         <nav className="flex items-stretch" aria-label="المساحات">
           {tabs.map((a) => (
-            <Tab key={a.href} area={a} current={area?.href === a.href} />
+            <Tab key={a.href} area={a} current={area?.href === a.href} badge={badgeOf(a.href)} />
           ))}
           {more.length > 0 && (
             <button
@@ -172,18 +258,18 @@ export function MobileTabBar({ role }: { role: Role }) {
         </nav>
       </div>
 
-      {moreOpen && more.length > 0 && (
+      {moreOpen && (
         <>
           <button
             type="button"
             aria-label="إغلاق"
             onClick={() => setMoreOpen(false)}
-            className="fixed inset-0 z-30 bg-black/25 sm:hidden"
+            className="fixed inset-0 z-30 bg-black/25 lg:hidden"
           />
-          <div role="dialog" aria-modal="true" aria-label="المزيد" className="fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border-t border-line bg-surface pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 sm:hidden">
+          <div role="dialog" aria-modal="true" aria-label="المزيد" className="fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border-t border-line bg-surface pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 lg:hidden">
             <div className="mx-auto mb-2 h-1 w-9 rounded-full bg-line" />
             <ul className="divide-y divide-line">
-              {more.map((a) => (
+              {[...more, ...visibleAccountLinks(role)].map((a) => (
                 <li key={a.href}>
                   <Link
                     href={a.href}
@@ -203,16 +289,23 @@ export function MobileTabBar({ role }: { role: Role }) {
   );
 }
 
-function Tab({ area, current }: { area: NavArea; current: boolean }) {
+function Tab({ area, current, badge }: { area: NavArea; current: boolean; badge: number }) {
   return (
     <Link
       href={area.href}
       aria-current={current ? "page" : undefined}
-      className={`flex min-h-11 flex-1 flex-col items-center gap-1 py-2 text-[11px] transition-colors ${
+      className={`relative flex min-h-11 flex-1 flex-col items-center gap-1 py-2 text-[11px] transition-colors ${
         current ? "font-bold text-ink" : "text-muted"
       }`}
     >
-      <Icon href={area.href} className="h-5 w-5" />
+      <span className="relative">
+        <Icon href={area.href} className="h-5 w-5" />
+        {badge > 0 && (
+          <span className="nums absolute -end-2 -top-1.5 rounded-full bg-warn px-1 text-[9px] font-bold text-white">
+            {badge}
+          </span>
+        )}
+      </span>
       {area.short}
     </Link>
   );
@@ -222,10 +315,13 @@ export function UploadButton({
   role,
   pathname,
   className = "",
+  collapsible = false,
 }: {
   role: Role;
   pathname: string;
   className?: string;
+  /** في الشريط المنطوي: تبقى «+» ويختفي النصّ. */
+  collapsible?: boolean;
 }) {
   if (!can(role, "document:upload")) return null;
 
@@ -233,11 +329,21 @@ export function UploadButton({
   return (
     <Link
       href="/upload"
-      className={`inline-flex min-h-11 shrink-0 items-center rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors sm:min-h-0 ${
+      className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors sm:min-h-0 sm:py-2 ${
         active ? "border-ink bg-inverse-surface text-inverse-ink" : "border-line hover:border-ink-soft"
       } ${className}`}
+      title="ارفع مستنداً"
     >
-      + رفع
+      <span aria-hidden>+</span>
+      <span
+        className={
+          collapsible
+            ? "truncate opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100"
+            : ""
+        }
+      >
+        ارفع مستنداً
+      </span>
     </Link>
   );
 }

@@ -25,7 +25,7 @@ interface Proposal {
 interface Preview {
   summary: { archived: number; onStandard: number; toRename: number; cannot: number };
   proposals: Proposal[];
-  cannot: { current: string; reason: string }[];
+  cannot: { current: string; reason: string; fixHref: string | null }[];
 }
 
 export function DriveRename() {
@@ -127,7 +127,7 @@ export function DriveRename() {
               ["مؤرشَفة", data.summary.archived, ""],
               ["على الصيغة", data.summary.onStandard, "text-ok"],
               ["تحتاج تسمية", data.summary.toRename, data.summary.toRename ? "text-warn" : ""],
-              ["لا يُبنى لها اسم", data.summary.cannot, ""],
+              ["ينقصها بيانات", data.summary.cannot, ""],
             ].map(([label, value, cls]) => (
               <div key={String(label)} className="rounded-lg border border-line bg-raised px-3 py-2">
                 <p className="text-[11px] text-muted">{label}</p>
@@ -182,12 +182,25 @@ export function DriveRename() {
           {data.cannot.length > 0 && (
             <details className="mt-3">
               <summary className="cursor-pointer text-[11px] text-muted">
-                لا يُبنى لها اسم ({data.cannot.length}) — تُعرَض ولا تُمَسّ
+                ينقصها ما يُبنى به الاسم ({data.cannot.length}) — أكمِل الناقص ثمّ أعد الفحص
               </summary>
+              {/*
+                كانت قائمةً ميّتة: تقول «لا رقم فاتورة مقيَّد له» وتقف.
+                والنقصُ ليس في التسمية بل في بيانات الفاتورة، وموضعُ
+                إصلاحه شاشةٌ أخرى — فصار لكلّ سطرٍ بابُه.
+              */}
               <ul className="mt-1.5 space-y-1">
                 {data.cannot.map((c, i) => (
                   <li key={i} className="text-[11px] leading-relaxed text-muted">
                     <span dir="ltr">{c.current}</span> — {c.reason}
+                    {c.fixHref && (
+                      <>
+                        {" "}
+                        <a href={c.fixHref} className="font-bold text-ink underline underline-offset-4">
+                          أكمِل الناقص ←
+                        </a>
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>
