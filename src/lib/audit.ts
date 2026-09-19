@@ -30,6 +30,8 @@ export type AuditAction =
   | "DRIVE_SYNCED"
   | "BANK_IMPORTED"
   | "INVOICES_MARKED_PAID"
+  /* تصحيحُ حقلٍ قرأه النموذج خطأً — بقيمته قبلَه وبعدَه */
+  | "INVOICE_FIELDS_CORRECTED"
   | "SUPPLIER_ALIAS_LEARNED"
   | "STATEMENT_RECONCILED"
   | "PRODUCT_LINKED"

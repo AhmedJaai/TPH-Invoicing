@@ -29,6 +29,13 @@ export interface NamedDocument {
   invoiceNumber: string | null;
   /** نوعُ المحتوى المقيَّد — منه يُعرَف الامتداد حين لا يحمله الاسم. */
   mimeType?: string | null;
+  /*
+    معرّفا الفاتورة والمستند — لا يدخلان في بناء الاسم، وإنّما يدلّان
+    على **موضع إصلاح** ما نقص منه. فالملفّ الذي لا يُبنى له اسم نقصُه
+    في بياناته لا في تسميته.
+  */
+  invoiceId?: string | null;
+  documentId?: string | null;
 }
 
 export type NameVerdict =

@@ -18,6 +18,11 @@ import { INVOICE, countNoun } from "@/lib/arabic";
 import { ScrollX } from "@/components/scroll-x";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { formatDay } from "@/lib/riyadh-time";
+import { documents } from "@/db/schema";
+import { invoiceReasons } from "@/lib/invoice-findings";
+import { InvoiceFix } from "@/components/invoice-fix";
+import { companyConfig } from "@/config/drive";
+import { Section } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +51,10 @@ export default async function InvoicesPage({
     );
   }
 
-  const f = parseFilters(await searchParams);
+  const params = await searchParams;
+  const f = parseFilters(params);
+  /* الفاتورةُ المفتوحة للمعالجة — تُختار من الجدول ويُعرَض سببُها فوقه */
+  const fixId = params.fix?.trim() || null;
 
   /*
     `${invoices}.id` لا `${invoices.id}`: الثاني يُصيَّر عموداً مجرّداً في
@@ -76,8 +84,9 @@ export default async function InvoicesPage({
     clauses.push(sql`${invoices.invoiceDate} < now() - interval '${sql.raw(String(OVERDUE_DAYS))} days'`);
   }
   const where = clauses.length ? and(...clauses) : undefined;
+  const canEditInvoices = can(user.role, "document:upload");
 
-  const [rows, totals, months, supplierList] = await Promise.all([
+  const [rows, totals, months, supplierList, fixRow] = await Promise.all([
     db
       .select({
         id: invoices.id,
@@ -119,10 +128,74 @@ export default async function InvoicesPage({
       .from(suppliers)
       .where(eq(suppliers.isActive, true))
       .orderBy(asc(suppliers.nameAr)),
+
+    /*
+      حقولُ الفاتورة المفتوحة كاملةً — تُقرأ عند الطلب وحده. والسببُ
+      يُشتقّ منها بـ`invoiceReasons`، ولا يُخزَّن: لو خُزّن لبقي السببُ
+      القديم معروضاً بعد تصحيح الحقل.
+    */
+    fixId
+      ? db
+          .select({
+            id: invoices.id,
+            kind: documents.kind,
+            invoiceNumber: invoices.invoiceNumber,
+            sellerVat: invoices.sellerVat,
+            buyerVat: invoices.buyerVat,
+            subtotalMinor: invoices.subtotalMinor,
+            vatMinor: invoices.vatMinor,
+            totalMinor: invoices.totalMinor,
+            supplierName: suppliers.nameAr,
+            issuesInvoices: suppliers.issuesInvoices,
+            contractOnFile: suppliers.contractOnFile,
+            lineCount: sql<number>`(
+              select count(*)::int from invoice_lines l where l.invoice_id = invoices.id
+            )`,
+          })
+          .from(invoices)
+          .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
+          .leftJoin(documents, eq(documents.id, invoices.documentId))
+          .where(eq(invoices.id, fixId))
+          .limit(1)
+      : Promise.resolve([]),
   ]);
 
   const t = totals[0];
   const pages = Math.max(1, Math.ceil(Number(t.n) / PAGE_SIZE));
+
+  /*
+    رابطُ المعالجة يحافظ على الترشيح القائم ويضيف `fix` — فمن فتح فاتورةً
+    من قائمةٍ مرشَّحة يعود إليها بإغلاقها، ولا يُلقى في القائمة كاملةً.
+  */
+  const fixLink = (id: string) => {
+    const base = linkTo(f, {});
+    const sep = base.includes("?") ? "&" : "?";
+    return `${base}${sep}fix=${encodeURIComponent(id)}#fix`;
+  };
+
+  const fix = fixRow[0] ?? null;
+  /*
+    السببُ يُشتقّ من الحقول وحالِ المورّد ورقمِ المنشأة — بالدالّة نفسها
+    التي يحكم بها مسارُ الأرشفة. فما تقرؤه الشاشةُ هو ما يحكم به الخادم.
+  */
+  const fixReasons = fix
+    ? invoiceReasons(
+        {
+          kind: fix.kind,
+          invoiceNumber: fix.invoiceNumber,
+          sellerVat: fix.sellerVat,
+          buyerVat: fix.buyerVat,
+          subtotalMinor: fix.subtotalMinor,
+          vatMinor: fix.vatMinor,
+          totalMinor: fix.totalMinor,
+          lineCount: Number(fix.lineCount),
+        },
+        fix.issuesInvoices === null
+          ? null
+          : { issuesInvoices: fix.issuesInvoices, contractOnFile: fix.contractOnFile ?? false },
+        companyConfig.vatNumber,
+      )
+    : [];
 
   return (
     <PageShell
@@ -188,6 +261,46 @@ export default async function InvoicesPage({
         </Row>
       </div>
 
+      {/*
+        ── لوحُ المعالجة ──
+
+        كانت الشاشة تقول «ينقصها ركن» ولا تقول أيّ ركن، ولا تعطي موضعاً
+        يُصحَّح فيه ما أخطأت القراءةُ فيه. فيقف صاحب المقهى أمام فاتورةٍ
+        يعرف رقمها ولا يستطيع كتابته.
+      */}
+      {fix && (
+        <Section
+          id="fix"
+          className="mt-6 scroll-mt-24"
+          title={`معالجة فاتورة ${fix.invoiceNumber}`}
+          hint={`${fix.supplierName ?? "بلا مورّد"} — ما ينقصها، وما يُصلحه.`}
+          action={
+            <Link href={linkTo(f, {})} className="text-xs underline underline-offset-4">
+              أغلق ←
+            </Link>
+          }
+        >
+          <InvoiceFix
+            invoiceId={fix.id}
+            canEdit={canEditInvoices}
+            reasons={fixReasons}
+            initial={{
+              invoiceNumber: fix.invoiceNumber ?? "",
+              sellerVat: fix.sellerVat ?? "",
+              buyerVat: fix.buyerVat ?? "",
+              /*
+                حقلٌ يُكتب فيه لا نصٌّ يُقرأ — فبلا فواصل آلاف:
+                `formatRiyals` لا `formatRiyalsDisplay`. والفاصلةُ في
+                حقلٍ يُعاد إرسالُه تدخل التحليل وتكذب.
+              */
+              subtotal: fix.subtotalMinor === null ? "" : formatRiyals(fix.subtotalMinor),
+              vat: fix.vatMinor === null ? "" : formatRiyals(fix.vatMinor),
+              total: fix.totalMinor === null ? "" : formatRiyals(fix.totalMinor),
+            }}
+          />
+        </Section>
+      )}
+
       <div className="mt-6">
         <DataTable
           rows={rows}
@@ -228,11 +341,28 @@ export default async function InvoicesPage({
             {
               key: "tax",
               header: "الضريبة",
-              cell: (r) => (
-                <Badge tone={r.taxStatus === "VALID" ? "ok" : r.taxStatus === "INVALID" ? "danger" : "muted"}>
-                  {TAX_LABEL[r.taxStatus as keyof typeof TAX_LABEL] ?? r.taxStatus}
-                </Badge>
-              ),
+              /*
+                الشارةُ كانت تقول الحكمَ ولا تفتح سببَه. وصارت باباً:
+                من ضغطها رأى أيّ ركنٍ ينقص وصحّحه.
+              */
+              cell: (r) => {
+                const badge = (
+                  <Badge tone={r.taxStatus === "VALID" ? "ok" : r.taxStatus === "INVALID" ? "danger" : "muted"}>
+                    {TAX_LABEL[r.taxStatus as keyof typeof TAX_LABEL] ?? r.taxStatus}
+                  </Badge>
+                );
+                if (r.taxStatus === "VALID" && Number(r.lineCount) > 0) return badge;
+                return (
+                  <Link
+                    href={fixLink(r.id)}
+                    className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
+                    title="لماذا؟ وكيف تُصلَح"
+                  >
+                    {badge}
+                    <span className="text-[10px] text-muted">لماذا؟</span>
+                  </Link>
+                );
+              },
             },
             {
               key: "lines",

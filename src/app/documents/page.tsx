@@ -11,6 +11,8 @@ import { ScrollX } from "@/components/scroll-x";
 import { RejectDocument } from "@/components/reject-document";
 import { ConfirmDocument } from "@/components/confirm-document";
 import { DataTable, EmptyState, LinkButton, buttonClass } from "@/components/ui";
+import { invoiceReasons } from "@/lib/invoice-findings";
+import { companyConfig } from "@/config/drive";
 
 export const dynamic = "force-dynamic";
 
@@ -159,6 +161,17 @@ export default async function DocumentsPage({
         invoiceNumber: invoices.invoiceNumber,
         totalMinor: invoices.totalMinor,
         taxStatus: invoices.taxStatus,
+        /* ما يُبنى عليه «ما الذي يحتاج مراجعة؟» — يُشتقّ ولا يُخزَّن */
+        invoiceId: invoices.id,
+        sellerVat: invoices.sellerVat,
+        buyerVat: invoices.buyerVat,
+        subtotalMinor: invoices.subtotalMinor,
+        vatMinor: invoices.vatMinor,
+        issuesInvoices: suppliers.issuesInvoices,
+        contractOnFile: suppliers.contractOnFile,
+        lineCount: sql<number>`(
+          select count(*)::int from invoice_lines l where l.invoice_id = invoices.id
+        )`,
       })
       .from(documents)
       .leftJoin(suppliers, eq(documents.supplierId, suppliers.id))
@@ -214,6 +227,30 @@ export default async function DocumentsPage({
   const pages = Math.ceil(Number(total) / PAGE_SIZE);
   const hasFilter = Boolean(p.month || p.supplier || p.kind || p.q || p.status);
   const inboxEmpty = chosenStatus === INBOX_STATUS && Number(total) === 0;
+
+  /*
+    سببُ «يحتاج مراجعة» — يُشتقّ من الصفّ نفسه، ولا يُستعلَم له ثانية.
+    وما لا فاتورة له لا سبب ضريبيّ له: كشفٌ أو إيصالٌ يُراجَع بعينه.
+  */
+  const reasonOf = (r: (typeof rows)[number]) =>
+    r.invoiceId
+      ? invoiceReasons(
+          {
+            kind: r.kind,
+            invoiceNumber: r.invoiceNumber,
+            sellerVat: r.sellerVat,
+            buyerVat: r.buyerVat,
+            subtotalMinor: r.subtotalMinor,
+            vatMinor: r.vatMinor,
+            totalMinor: r.totalMinor,
+            lineCount: Number(r.lineCount),
+          },
+          r.issuesInvoices === null
+            ? null
+            : { issuesInvoices: r.issuesInvoices, contractOnFile: r.contractOnFile ?? false },
+          companyConfig.vatNumber,
+        )
+      : [];
 
   return (
     <PageShell
@@ -367,6 +404,45 @@ export default async function DocumentsPage({
                   return (
                     <span className="block">
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>{st.text}</span>
+                      {/*
+                        ── «يحتاج مراجعة» كان لا يقول ماذا ──
+
+                        فيقف صاحب المقهى أمام زرّين — «اعتمد» و«ارفض» —
+                        ولا يعرف ما الذي يُراجَع. والاعتمادُ على غير
+                        علمٍ أسوأ من الرفض.
+
+                        والسببُ مشتقٌّ من حقول الفاتورة بالدالّة نفسها
+                        التي يحكم بها مسارُ الأرشفة، فيُعرَض أوّلُه هنا
+                        وتفصيلُه خلف الرابط ومعه موضعُ التصحيح.
+                      */}
+                      {["PENDING", "EXTRACTED", "NEEDS_REVIEW"].includes(r.status) && (
+                        reasonOf(r).length > 0 ? (
+                          <span className="mt-1 block text-[11px] leading-relaxed text-warn">
+                            {reasonOf(r)[0].what}
+                            {reasonOf(r).length > 1 && ` (و${reasonOf(r).length - 1} غيره)`}
+                            {r.invoiceId && (
+                              <>
+                                {" · "}
+                                <Link
+                                  href={`/purchases/invoices?fix=${encodeURIComponent(r.invoiceId)}#fix`}
+                                  className="font-bold text-ink underline underline-offset-4"
+                                >
+                                  صحّحه
+                                </Link>
+                              </>
+                            )}
+                          </span>
+                        ) : (
+                          /*
+                            لا نقصَ فيها — فالمراجعةُ مراجعةُ قراءةٍ لا
+                            مراجعةُ عطب. وقولُ ذلك يُنهي حَيرةَ «ما الذي
+                            يُراجَع؟»: افتح الملفّ وقارن الأرقام، ثمّ اعتمد.
+                          */
+                          <span className="mt-1 block text-[11px] leading-relaxed text-muted">
+                            لا ينقصها ركن — قرأها النموذجُ ولم يؤكّدها إنسانٌ بعد. افتح الملفّ وقارن ثمّ اعتمد.
+                          </span>
+                        )
+                      )}
                       {/* ما ينتظر قراراً له فعلٌ في موضعه — لا «راجعه» بلا زرّ */}
                       {canDecide && ["PENDING", "EXTRACTED", "NEEDS_REVIEW"].includes(r.status) && (
                         <span className="mt-1 flex flex-wrap gap-1.5">
