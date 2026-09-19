@@ -8,7 +8,7 @@ import { Figure } from "@/components/figure";
 import { gatherHomeProvenance } from "@/lib/provenance-facts";
 import { buildCashFlow, type CashMovement } from "@/lib/cashflow";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
-import { DataTable, NoAccess, Section, Stat, StatGrid } from "@/components/ui";
+import { DataTable, NoAccess, Section, Stat } from "@/components/ui";
 import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { formatMonth } from "@/lib/riyadh-time";
 import { looksLikeGoodsPurchase } from "@/lib/expenses";
@@ -109,15 +109,24 @@ export default async function MoneyPage() {
         الصادر من الحساب، والمجهول منه معلَنٌ بمبلغه.
         «مصروفاتك ٤٢٬٠٠٠» تُقرأ كاملةً وفيها ثمانية آلاف لم يُعرف وجهها.
       */}
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start">
+      {/*
+        ── ارتفاعاتٌ متساوية ──
+
+        كانت البطاقةُ الأولى بيانَ مصدرٍ فيه زرٌّ يُفتَح، وبجانبها أربعُ
+        بطاقاتٍ قصيرة في صفٍّ واحد — فتبدو الصفحةُ مكسورةً من أوّلها،
+        ويقفز ما تحتها حين يُفتَح البيان. فصارت الأولى تملأ ارتفاع
+        صفّها، والأربعُ في مربّعين × مربّعين إلى جانبها.
+      */}
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:items-stretch">
         <Figure
           label="الصادر من الحساب"
           provenance={prov.bankOutflow}
           unit="حركة"
           href="/bank"
           note="اضغط «من أين جاء؟» لترى ما لم يُصنَّف بعد"
+          className="flex flex-col"
         />
-        <StatGrid>
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
           <Stat
             label="الوارد إلى الحساب"
             minor={cash.totalInMinor}
@@ -153,7 +162,7 @@ export default async function MoneyPage() {
             }
             href="/bank"
           />
-        </StatGrid>
+        </div>
       </div>
 
       <Section
@@ -165,18 +174,37 @@ export default async function MoneyPage() {
         {byCategory.length === 0 ? (
           <Empty message="لا حركات مصنَّفة بعد. صنّف حركاتك من صفحة حركة البنك." />
         ) : (
+          /*
+            صفٌّ عرضُه ألفُ بكسل بين اسمٍ في طرفٍ ورقمٍ في طرف يُقرأ
+            واحداً واحداً، ولا يقول أيُّ بابٍ أثقل. والشريطُ يقوله في
+            لمحة — ونسبتُه من أكبر بابٍ لا من المجموع، فالفرقُ بين
+            البابين هو المقصود.
+          */
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {byCategory.map((c) => (
-              <li key={c.category} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium">
-                    {CATEGORY_LABEL[c.category as TxCategory] ?? c.category}
+              <li key={c.category} className="px-4 py-2.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">
+                      {CATEGORY_LABEL[c.category as TxCategory] ?? c.category}
+                    </span>
+                    <span className="block text-[11px] text-muted">{countNoun(c.n, TRANSACTION)}</span>
                   </span>
-                  <span className="block text-[11px] text-muted">{countNoun(c.n, TRANSACTION)}</span>
-                </span>
-                <span className="nums shrink-0 text-sm font-bold">
-                  <Money minor={Number(c.s)} />
-                </span>
+                  <span className="shrink-0 text-end">
+                    <span className="nums block text-sm font-bold">
+                      <Money minor={Number(c.s)} />
+                    </span>
+                    <span className="nums block text-[11px] text-muted">
+                      {expenseTotal > 0 ? `${Math.round((c.s / expenseTotal) * 100)}٪` : ""}
+                    </span>
+                  </span>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunken" aria-hidden>
+                  <div
+                    className="h-full rounded-full bg-ink-soft"
+                    style={{ width: `${Math.max(1, Math.round((c.s / byCategory[0].s) * 100))}%` }}
+                  />
+                </div>
               </li>
             ))}
           </ul>

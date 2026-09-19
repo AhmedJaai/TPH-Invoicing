@@ -21,6 +21,7 @@ export function Figure({
   href,
   tone,
   note,
+  className = "",
 }: {
   label: string;
   /** غياب البيان يعني رقماً لا مصدر له يُعرض — كحالة «غير موصول». */
@@ -31,6 +32,8 @@ export function Figure({
   href?: string;
   tone?: Tone;
   note?: React.ReactNode;
+  /** كي تتساوى ارتفاعاتُ البطاقات حين تقف في صفٍّ واحد. */
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -40,7 +43,7 @@ export function Figure({
   const big = `${value === undefined || isNumeric(value) ? "nums " : ""}font-display text-2xl font-bold leading-none sm:text-[1.75rem] ${cls}`;
 
   return (
-    <div className="rounded-2xl border border-line bg-raised px-4 py-3.5 shadow-raised sm:px-5 sm:py-4">
+    <div className={`rounded-2xl border border-line bg-raised px-4 py-3.5 shadow-raised sm:px-5 sm:py-4 ${className}`}>
       <p className="text-xs font-medium text-muted">{label}</p>
 
       {href ? (

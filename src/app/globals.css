@@ -49,8 +49,21 @@
   --ring: color-mix(in oklab, var(--ink) 55%, transparent);
 }
 
+/*
+ * الظلام: اختيارُ النظام، ثمّ اختيارُ صاحب المقهى فوقه.
+ *
+ * كان الوضعُ يتبع النظامَ وحده (`prefers-color-scheme`)، فمن أراد
+ * الفاتحَ نهاراً على جهازٍ مضبوطٍ على الداكن لا يملك سبيلاً. فصارت
+ * ثلاثُ حالات: `data-theme="dark"` و`data-theme="light"` يكتبهما الزرّ،
+ * ولا شيء يعني «اتبع النظام».
+ *
+ * والقيمُ مكرّرةٌ في كتلتين — ولا مفرّ: لا يجوز ضمّ استعلامِ وسطٍ إلى
+ * محدِّدٍ في قائمةٍ واحدة. والتكرارُ هنا أصدق من متغيّرٍ وسيط يُخفي
+ * اللون الحقيقيّ عمّن يقرأ.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --surface: #000000;
     --raised: #0a0a0b;
     --sunken: #131316;
@@ -77,6 +90,39 @@
     --shadow-lifted: 0 4px 16px rgb(0 0 0 / 0.5);
     --ring: color-mix(in oklab, var(--ink) 50%, transparent);
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+    --surface: #000000;
+    --raised: #0a0a0b;
+    --sunken: #131316;
+    --ink: #ffffff;
+    --ink-soft: #a1a1aa;
+    /* يجتاز الحدّ على الأسود وعلى أرضيّات الحالات الداكنة جميعاً */
+    --muted: #95959f;
+    --line: #26262b;
+    /* ‎#26262b‎ على ‎#0a0a0b‎ هو ‎1.31:1‎ — وهذا نحو ‎3.9:1‎ */
+    --line-input: #6b6b74;
+    --line-strong: #ffffff;
+    --inverse-surface: #ffffff;
+    --inverse-ink: #000000;
+
+    --ok: #4ade80;
+    --ok-bg: #052e1a;
+    --warn: #fbbf24;
+    --warn-bg: #2e1f05;
+    --danger: #f87171;
+    --danger-bg: #2e0f0d;
+
+    /* في الظلام لا يُرى الظلّ — فالطبقة تُصنع بالحدّ والأرضية */
+    --shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.02);
+    --shadow-lifted: 0 4px 16px rgb(0 0 0 / 0.5);
+    --ring: color-mix(in oklab, var(--ink) 50%, transparent);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 @theme inline {
@@ -276,4 +322,42 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
+}
+
+
+/*
+ * ── إخفاء الأرقام ──
+ *
+ * زرٌّ كالذي في تطبيقات البنوك: يفتح صاحبُ المقهى الشاشةَ ليُري أحداً
+ * كيف يعمل النظام، فلا يُري معها ما عليه لمورّديه ولا رواتبَ موظّفيه.
+ *
+ * والتنفيذ بالتنقيط لا بالطمس: `blur` يترك شكلَ الرقم وطولَه، وطولُ
+ * الرقم وحده يقول «هذا بالآلاف» — فيُستبدَل النصّ كلُّه بنقاطٍ متساويةٍ
+ * لا تقول شيئاً. ويُحفَظ الأصلُ في `aria-hidden` كي لا يقرأه قارئ
+ * الشاشة، ويُعلَن للقارئ أنّ الرقم مخفيّ.
+ *
+ * و`.nums` هو الصنف الذي لا يُوضَع إلّا على أرقامٍ صرفة — فهو الموضع
+ * الصحيح لهذا، ولا يمسّ نصّاً عربياً.
+ */
+html[data-amounts="hidden"] .nums {
+  position: relative;
+  color: transparent !important;
+  user-select: none;
+}
+
+html[data-amounts="hidden"] .nums::after {
+  content: "••••";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  letter-spacing: 0.15em;
+  font-size: 0.85em;
+}
+
+/* العمود الرقميّ يُحاذى يساراً، فالنقاط تتبعه */
+html[data-amounts="hidden"] .nums-col .nums::after {
+  justify-content: flex-end;
 }

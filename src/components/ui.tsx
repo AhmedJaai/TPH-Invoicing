@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Money } from "./money";
+import { Money, Prose } from "./money";
 import { ScrollX } from "./scroll-x";
 
 /**
@@ -87,7 +87,11 @@ export function Section({
         <h2 className="font-display text-lg font-bold leading-tight">{title}</h2>
         {action && <div className="shrink-0">{action}</div>}
       </div>
-      {hint && <p className="mb-3 max-w-2xl text-xs leading-relaxed text-muted">{hint}</p>}
+      {hint && (
+        <p className="mb-3 max-w-2xl text-xs leading-relaxed text-muted">
+          <Prose text={hint} />
+        </p>
+      )}
       {children}
     </section>
   );
@@ -186,7 +190,11 @@ export function Stat({
         <p className={`${isNumeric(value) ? "nums " : ""}mt-2 font-display text-2xl font-bold leading-none sm:text-[1.75rem] ${tone ? TONE_TEXT[tone] : ""}`}>
           {minor !== undefined ? <Money minor={minor} /> : value}
         </p>
-        {sub && <p className="mt-2 text-xs leading-relaxed text-muted">{sub}</p>}
+        {sub && (
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            {typeof sub === "string" ? <Prose text={sub} /> : sub}
+          </p>
+        )}
       </div>
     </Card>
   );

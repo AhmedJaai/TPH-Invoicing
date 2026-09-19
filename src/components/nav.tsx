@@ -95,16 +95,23 @@ export function Sidebar({
   const badgeOf = (href: string) =>
     href === "/attention" ? pending : href === "/documents" ? documents : 0;
 
+  /*
+    النصُّ يختفي حين ينطوي الشريط وتبقى الأيقونة — و`group-hover/rail`
+    يقرأ حالَ الحاوية في القشرة. والعرضُ ثابتٌ عند ٢٤٠ بكسلاً داخلَها
+    كي لا يتراقص النصُّ أثناء الحركة، وإنّما تُقصّ الحاوية عليه.
+  */
+  const label = "min-w-0 flex-1 truncate opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100";
+
   return (
-    <nav className="flex h-full flex-col gap-1 p-3" aria-label="المساحات">
+    <nav className="flex h-full flex-col gap-1 overflow-hidden p-3" aria-label="المساحات">
       <Link
         href="/"
-        className="mb-1 block truncate rounded-lg px-3 py-2 font-display text-base font-bold leading-tight tracking-tight"
+        className={`mb-1 block truncate rounded-lg px-3 py-2 font-display text-base font-bold leading-tight tracking-tight ${label}`}
       >
         ذا بوبليك هاوس
       </Link>
 
-      <UploadButton role={role} pathname={pathname} className="mb-2 w-full" />
+      <UploadButton role={role} pathname={pathname} className="mb-2 w-full" collapsible />
 
       <ul className="space-y-0.5">
         {areas.map((a) => {
@@ -115,18 +122,19 @@ export function Sidebar({
               <Link
                 href={a.href}
                 aria-current={current ? "page" : undefined}
-                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+                className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
                   current
                     ? "bg-inverse-surface font-bold text-inverse-ink"
                     : "text-ink-soft hover:bg-sunken"
                 }`}
               >
                 <Icon href={a.href} className="h-[1.15rem] w-[1.15rem] shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{a.label}</span>
+                <span className={label}>{a.label}</span>
+                {/* الشارةُ تبقى وهو منطوٍ: العددُ هو ما يُنظَر إليه من طرف العين */}
                 {n > 0 && (
                   <span
-                    className={`nums shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-bold ${
-                      current ? "bg-inverse-ink/15 text-inverse-ink" : "bg-warn-bg text-warn"
+                    className={`nums absolute end-1.5 top-1 rounded-full px-1.5 text-[10px] font-bold group-hover/rail:static group-hover/rail:end-auto group-hover/rail:top-auto group-hover/rail:py-0.5 group-hover/rail:text-[11px] group-focus-within/rail:static ${
+                      current ? "bg-inverse-ink/20 text-inverse-ink" : "bg-warn text-white"
                     }`}
                   >
                     {n}
@@ -150,7 +158,7 @@ export function Sidebar({
                 }`}
               >
                 <Icon href="/settings" className="h-4 w-4 shrink-0 opacity-70" />
-                <span className="truncate">{l.label}</span>
+                <span className={label}>{l.label}</span>
               </Link>
             </li>
           ))}
@@ -307,10 +315,13 @@ export function UploadButton({
   role,
   pathname,
   className = "",
+  collapsible = false,
 }: {
   role: Role;
   pathname: string;
   className?: string;
+  /** في الشريط المنطوي: تبقى «+» ويختفي النصّ. */
+  collapsible?: boolean;
 }) {
   if (!can(role, "document:upload")) return null;
 
@@ -318,11 +329,21 @@ export function UploadButton({
   return (
     <Link
       href="/upload"
-      className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors sm:min-h-0 sm:py-2 ${
+      className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors sm:min-h-0 sm:py-2 ${
         active ? "border-ink bg-inverse-surface text-inverse-ink" : "border-line hover:border-ink-soft"
       } ${className}`}
+      title="ارفع مستنداً"
     >
-      + ارفع مستنداً
+      <span aria-hidden>+</span>
+      <span
+        className={
+          collapsible
+            ? "truncate opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100"
+            : ""
+        }
+      >
+        ارفع مستنداً
+      </span>
     </Link>
   );
 }

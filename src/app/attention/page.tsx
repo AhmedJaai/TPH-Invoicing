@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
-import { Money } from "@/components/money";
+import { Money, Prose } from "@/components/money";
 import { Card, EmptyState, LinkButton, NoAccess, buttonClass } from "@/components/ui";
 import {
   AREA_LABEL, IMPACT_LABEL, SEVERITY_LABEL, impactByKind, prioritize,
@@ -115,10 +115,10 @@ function Detail({
           <p className="mt-3 text-xs font-bold opacity-70">{IMPACT_LABEL[kind]}</p>
         )}
 
-        <p className="mt-3 text-sm leading-relaxed text-ink-soft">{item.detail}</p>
+        <p className="mt-3 text-sm leading-relaxed text-ink-soft"><Prose text={item.detail} /></p>
         <p className="mt-2.5 text-sm leading-relaxed">
           <span className="font-bold">الخطوة التالية: </span>
-          {item.action}
+          <Prose text={item.action} />
         </p>
 
         {/*
@@ -145,7 +145,7 @@ function Detail({
               <li key={i} className="flex items-start justify-between gap-3 px-3.5 py-2">
                 <span className="min-w-0">
                   <span className="block truncate text-xs font-medium">{e.label}</span>
-                  {e.sub && <span className="block truncate text-[11px] text-muted">{e.sub}</span>}
+                  {e.sub && <span className="block truncate text-[11px] text-muted"><Prose text={e.sub} /></span>}
                 </span>
                 {e.amountMinor !== undefined && (
                   <span className="nums shrink-0 text-xs font-bold">

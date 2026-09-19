@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { thmanyahDisplay, thmanyahSans } from "./fonts";
 import "./globals.css";
+import { ThemePrimer } from "@/components/view-controls";
 
 export const metadata: Metadata = {
   title: "فواتير ذا بوبليك هاوس",
@@ -21,7 +22,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
+      <head>
+        {/* يكتب الوضعَ وإخفاءَ الأرقام قبل أوّل رسم — فلا ومضةَ أبيضَ ولا مبلغٌ يظهر لحظةً */}
+        <ThemePrimer />
+      </head>
       <body className={`${thmanyahSans.variable} ${thmanyahDisplay.variable} font-sans antialiased`}>
         {children}
       </body>

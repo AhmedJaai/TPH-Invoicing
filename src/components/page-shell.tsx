@@ -2,6 +2,7 @@ import { AreaTabs, MobileTabBar, Sidebar, UploadButton } from "./nav";
 import { SearchBox } from "./search-box";
 import { TrialBanner } from "./trial-banner";
 import { UserMenu } from "./user-menu";
+import { ViewControls } from "./view-controls";
 import { can, type Role } from "@/lib/permissions";
 import { inboxCount, workCount } from "@/lib/work";
 
@@ -61,9 +62,27 @@ export async function PageShell({
         تخطَّ إلى المحتوى
       </a>
 
-      {/* ── الحاسوب: شريطٌ جانبيّ ثابت ── */}
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-s border-line bg-sunken/40 lg:block">
-        <Sidebar role={user.role} pending={pending} documents={inbox} />
+      {/*
+        ── الشريط الجانبيّ ينطوي ──
+
+        كان ثابتاً بعرض ٢٤٠ بكسلاً يأخذها من الجدول دائماً. وأكثرُ
+        الوقت لا يُنظَر إليه: صاحب المقهى يفتح شاشةً ويعمل فيها. فصار
+        شريطاً ضيّقاً بالأيقونات، يتّسع بمرور الفأرة عليه أو بتركيز
+        لوحة المفاتيح، وينطوي حين تبتعد.
+
+        والاتّساع بالتراكب لا بالدفع: لو دفع المحتوى لانتقل الجدولُ
+        تحت الفأرة كلّما مرّت، وهو أسوأ من ضيق الشاشة.
+
+        و`group` على الحاوية كي يتبعها المحتوى في `Sidebar` بلا حالةٍ
+        في JavaScript — فينطوي ويتّسع بلا إعادة رسم.
+      */}
+      <aside
+        className="group/rail sticky top-0 z-30 hidden h-screen w-14 shrink-0 overflow-hidden border-s border-line bg-sunken/40 transition-[width] duration-200 hover:w-60 focus-within:w-60 lg:block"
+        aria-label="التنقّل"
+      >
+        <div className="h-full w-60">
+          <Sidebar role={user.role} pending={pending} documents={inbox} />
+        </div>
       </aside>
 
       <div className="min-w-0 flex-1">
@@ -77,6 +96,7 @@ export async function PageShell({
             </span>
             <SearchBox />
             <div className="flex shrink-0 items-center gap-2">
+              <ViewControls />
               <span className="lg:hidden">
                 <UploadButton role={user.role} pathname="" />
               </span>

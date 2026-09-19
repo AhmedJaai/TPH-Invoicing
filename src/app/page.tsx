@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
-import { Money } from "@/components/money";
+import { Money, Prose } from "@/components/money";
 import { Card, LinkButton, Section } from "@/components/ui";
 import { AttentionList } from "@/components/attention-list";
 import { countBySeverity, impactByKind } from "@/lib/attention";
@@ -71,7 +71,7 @@ function Headline({
       >
         <Money minor={minor} />
       </p>
-      <p className="mt-2.5 text-xs leading-relaxed text-muted">{sub}</p>
+      <p className="mt-2.5 text-xs leading-relaxed text-muted"><Prose text={sub} /></p>
       {aside}
       <div className="mt-4 pt-1">
         <LinkButton href={href} size="sm">{action}</LinkButton>
