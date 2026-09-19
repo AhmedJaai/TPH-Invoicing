@@ -339,7 +339,7 @@ export default async function SupplierPage({
 
       {showAmounts && canAnalyze && (
         <Section
-          title="تحليل الذكاء"
+          title="اقتراحات تنتظر قرارك"
           hint="يقرأ فواتيره ودفعاته وكشوفه وحوالات البنك، ويقترح ما يصحّح حسابه. لا يُكتب شيءٌ حتى تُقرّه."
           action={<RunAnalysis suppliers={[{ id: s.id, name: s.nameAr }]} label="حلّل حسابه" />}
         >

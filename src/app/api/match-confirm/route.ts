@@ -121,7 +121,7 @@ async function handle(request: Request) {
       return NextResponse.json({ ok: true, message: "قُيّدت من قبل — لم يُكتب شيءٌ ثانيةً" });
     }
     return NextResponse.json(
-      { error: "هذه الحركة مقيَّدة بدفعة من قبل — افتحها في صفحة البنك لترى دفعتها" },
+      { error: "هذه الحركة سُجّلت سداداً من قبل — افتحها في صفحة البنك لترى دفعتها" },
       { status: 409 },
     );
   }
@@ -262,7 +262,7 @@ async function handle(request: Request) {
     const already = group.filter((g) => g.matchedPaymentId !== null);
     if (already.length > 0) {
       return NextResponse.json(
-        { error: `${already.length} من هذه الحركات مقيَّدة بدفعة بالفعل` },
+        { error: `${already.length} من هذه الحركات سُجّلت سداداً بالفعل` },
         { status: 409 },
       );
     }
