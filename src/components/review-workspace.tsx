@@ -14,6 +14,7 @@ import {
   type ReviewBucket, type ReviewItem,
 } from "@/lib/bank/review-queue";
 import { ACT, recordBatch } from "@/lib/ui-terms";
+import { formatDay } from "@/lib/riyadh-time";
 
 /**
  * طابور المراجعة الموحَّد.
@@ -469,7 +470,7 @@ function Row({
 
       {/* الوصف عربيّ أو لاتينيّ بحسب البنك — `auto` لا `ltr`، والتاريخ معزول */}
       <p className="mt-0.5 text-xs text-muted" dir="auto">
-        <bdi className="nums">{i.valueDate}</bdi> · {i.description.slice(0, 80)}
+        <bdi>{formatDay(i.valueDate)}</bdi> · {i.description.slice(0, 80)}
       </p>
 
       {i.reasons.length > 0 && (

@@ -31,3 +31,44 @@ export function currentMonthRiyadh(at: Date = new Date()): string {
 export function dayOfMonthRiyadh(at: Date = new Date()): number {
   return Number(parts(at).day);
 }
+
+/*
+ * التاريخ كما يُقرأ، لا كما يُخزَّن.
+ *
+ * كان `toISOString().slice(0, 10)` في اثنتي عشرة صفحة: صيغةٌ أبطأ قراءةً
+ * على الجوّال، **وبتوقيت UTC**. فإقفالٌ يقع الواحدة والنصف فجراً بتوقيت
+ * الرياض يُكتب بتاريخ اليوم السابق — في سجلٍّ مرجعُه الزمن.
+ *
+ * وتبقى قيم ISO في `value` و`href` كما هي: الترتيب والترشيح يُقرآن آلةً،
+ * وهذه للعين وحدها.
+ */
+const DAY_FORMAT = new Intl.DateTimeFormat("ar-SA-u-nu-latn-ca-gregory", {
+  timeZone: RIYADH, day: "numeric", month: "short", year: "numeric",
+});
+
+const MONTH_NAME = new Intl.DateTimeFormat("ar-SA-u-nu-latn-ca-gregory", {
+  timeZone: RIYADH, month: "long", year: "numeric",
+});
+
+function asDate(value: Date | string): Date {
+  /* سلسلةُ يومٍ بلا وقت تُقرأ UTC، وهو ما كُتبت به — فلا تُزاح يوماً */
+  return value instanceof Date ? value : new Date(`${value}T12:00:00Z`);
+}
+
+/** «14 سبتمبر 2026» بتوقيت الرياض. */
+export function formatDay(value: Date | string | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const d = asDate(value);
+  return Number.isNaN(d.getTime()) ? String(value) : DAY_FORMAT.format(d);
+}
+
+/** «أغسطس 2026» من `YYYY-MM`. */
+export function formatMonth(month: string): string {
+  if (!/^\d{4}-\d{2}$/.test(month)) return month;
+  return MONTH_NAME.format(new Date(`${month}-15T12:00:00Z`));
+}
+
+/** «من … إلى …» — لا سهمان متعاكسان في صفحتين. */
+export function formatRange(from: Date | string, to: Date | string): string {
+  return `من ${formatDay(from)} إلى ${formatDay(to)}`;
+}

@@ -20,6 +20,7 @@ import { Changes } from "@/components/changes";
 import { buildChanges } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
 import { DAY, INVOICE, countNoun } from "@/lib/arabic";
+import { formatMonth } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -122,7 +123,7 @@ export default async function HomePage() {
           note="للمورّدين الآن"
         />
         <Figure
-          label={`مشتريات ${prov.month ?? "الشهر"}`}
+          label={`مشتريات ${prov.month ? formatMonth(prov.month) : "الشهر"}`}
           provenance={prov.purchases}
           href="/purchases"
           tone={trend !== null && trend > 0.15 ? "warn" : undefined}

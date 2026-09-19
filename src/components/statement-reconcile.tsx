@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { request } from "@/lib/http-client";
 import { LINE, countNoun } from "@/lib/arabic";
+import { formatRange } from "@/lib/riyadh-time";
 
 export interface ArchivedStatement {
   id: string;
@@ -110,8 +111,8 @@ export function StatementReconcile({
               <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{a.supplierName}</span>
-                  <span className="nums block text-[11px] text-muted" dir="ltr">
-                    {a.periodStart} → {a.periodEnd}
+                  <span className="block text-[11px] text-muted" dir="auto">
+                    {formatRange(a.periodStart, a.periodEnd)}
                     {a.lineCount > 0
                       ? ` · ${countNoun(a.lineCount, LINE)} مطابَقة`
                       : " · بلا أسطر — طابِقه لتُقرأ"}

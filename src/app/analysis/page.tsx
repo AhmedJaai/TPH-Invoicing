@@ -8,6 +8,7 @@ import { Empty, Money, PageShell } from "@/components/page-shell";
 import { findSameNameCandidates, summarizeItems, type LineRow } from "@/lib/analytics";
 import { NoAccess, DataTable } from "@/components/ui";
 import { PRODUCT, countNoun, DAY } from "@/lib/arabic";
+import { formatDay } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -220,7 +221,7 @@ export default async function AnalysisPage() {
             },
             {
               key: "last", header: "آخر طلب", secondary: true,
-              cell: (i) => <span className="nums text-xs text-ink-soft" dir="ltr">{i.lastOrderedAt ? i.lastOrderedAt.toISOString().slice(0, 10) : "—"}</span>,
+              cell: (i) => <span className="text-xs text-ink-soft">{formatDay(i.lastOrderedAt)}</span>,
             },
           ]}
         />

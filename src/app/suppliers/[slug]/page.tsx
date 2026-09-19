@@ -21,6 +21,7 @@ import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { splitSupplierCredit } from "@/lib/supplier-requests";
+import { formatDay, formatRange } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -406,7 +407,7 @@ export default async function SupplierPage({
             {
               key: "date",
               header: "التاريخ",
-              cell: (r) => <span className="nums">{r.date.toISOString().slice(0, 10)}</span>,
+              cell: (r) => <span>{formatDay(r.date)}</span>,
             },
             { key: "month", header: "الشهر", secondary: true, cell: (r) => <span className="nums">{r.month}</span> },
             {
@@ -444,8 +445,8 @@ export default async function SupplierPage({
         ) : (
           <ul className="flex flex-wrap gap-2">
             {statementRows.map((st) => (
-              <li key={st.id} className="nums rounded-xl border border-line bg-raised px-3 py-1.5 text-xs shadow-raised">
-                {st.periodStart.toISOString().slice(0, 10)} ← {st.periodEnd.toISOString().slice(0, 10)}
+              <li key={st.id} className="rounded-xl border border-line bg-raised px-3 py-1.5 text-xs shadow-raised">
+                {formatRange(st.periodStart, st.periodEnd)}
               </li>
             ))}
           </ul>

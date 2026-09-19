@@ -23,6 +23,7 @@ import { DoublePaidActions } from "@/components/double-paid-actions";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { formatDay } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -378,7 +379,7 @@ export default async function BankPage({
                   }).beneficiary ?? focused.description?.slice(0, 60) ?? "حركة"}
                 </span>
                 <span className="mt-0.5 block text-[11px] text-muted" dir="auto">
-                  <bdi className="nums">{focused.valueDate.toISOString().slice(0, 10)}</bdi> ·{" "}
+                  <bdi>{formatDay(focused.valueDate)}</bdi> ·{" "}
                   {focused.direction === "DEBIT" ? "صادر" : "وارد"} ·{" "}
                   {CATEGORY_LABEL[focused.category] ?? focused.category}
                 </span>
@@ -510,7 +511,7 @@ export default async function BankPage({
                           {t.description?.slice(0, 60) ?? "حركة"}
                         </span>
                         <span className="nums block truncate text-[11px] text-muted">
-                          {t.valueDate.toISOString().slice(0, 10)} ·{" "}
+                          {formatDay(t.valueDate)} ·{" "}
                           {t.direction === "DEBIT" ? "صادر" : "وارد"} ·{" "}
                           {CATEGORY_LABEL[t.category] ?? t.category}
                         </span>

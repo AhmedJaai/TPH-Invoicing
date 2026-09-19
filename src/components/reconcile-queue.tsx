@@ -7,6 +7,7 @@ import { Badge, buttonClass, Card, EmptyState } from "./ui";
 import { countNoun, GROUP, TRANSACTION } from "@/lib/arabic";
 import { postJson } from "@/lib/http-client";
 import { ACT } from "@/lib/ui-terms";
+import { formatDay } from "@/lib/riyadh-time";
 
 /**
  * حلّ المعلّقات — **مجموعةً مجموعة** لا حركةً حركة.
@@ -249,7 +250,7 @@ export function ReconcileQueue({
         <ul className="mt-2 space-y-1 border-s-2 border-line ps-2.5">
           {shown.map((i) => (
             <li key={i.id} className="flex items-baseline justify-between gap-3">
-              <span className="nums shrink-0 text-[11px] text-muted">{i.date}</span>
+              <span className="shrink-0 text-[11px] text-muted">{formatDay(i.date)}</span>
               <span className="clamp-1 min-w-0 flex-1 text-[11px] text-muted" dir="auto">
                 {i.description || "بلا وصف"}
               </span>

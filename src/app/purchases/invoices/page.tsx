@@ -17,6 +17,7 @@ import {
 import { INVOICE, countNoun } from "@/lib/arabic";
 import { ScrollX } from "@/components/scroll-x";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
+import { formatDay } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -222,7 +223,7 @@ export default async function InvoicesPage({
             {
               key: "date",
               header: "التاريخ",
-              cell: (r) => <span className="nums">{r.date.toISOString().slice(0, 10)}</span>,
+              cell: (r) => <span>{formatDay(r.date)}</span>,
             },
             {
               key: "tax",
