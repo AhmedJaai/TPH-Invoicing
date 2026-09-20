@@ -17,6 +17,7 @@ import { loadBalanceTotals, loadOverdueBalances } from "@/services/supplier-bala
 import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
 import { formatDay } from "@/lib/riyadh-time";
+import { needsContract, needsPaperUpload } from "@/lib/supplier-policy-rules";
 
 
 export const dynamic = "force-dynamic";
@@ -90,7 +91,7 @@ export default async function SuppliersPage({
 
   if (meta.length === 0) {
     return (
-      <PageShell user={user} width="wide" title="المورّدون">
+      <PageShell user={user} width="wide" title="حسابات المورّدين">
         <EmptyState
           title="لا مورّدين بعد."
           hint="يُنشَأ المورّد حين تُقرأ أوّل فاتورة منه — أو تختاره «مورّداً جديداً» في شاشة الرفع."
@@ -126,16 +127,10 @@ export default async function SuppliersPage({
       a.nameAr.localeCompare(b.nameAr, "ar"),
     );
 
-  /*
-    من أُعلن أنّه لا يُطلَب منه عقد يخرج، ومن فواتيرُه ورقيّةٌ يخرج كذلك:
-    الأولى قرارُ صاحب العمل، والثانية تقول إنّ الفاتورة موجودةٌ ولم
-    تُرفَع — فمطلبُها رفعُ الورقة لا عقدُ توريد. (الهجرة 035)
-  */
-  const needContract = meta.filter(
-    (r) => !r.issuesInvoices && !r.contractOnFile && r.contractRequired && !r.paperInvoices,
-  );
+  /* القاعدة في `supplier-policy-rules.ts` — موضعٌ واحد لها. */
+  const needContract = meta.filter(needsContract);
   /* ومن فواتيرُه ورقيّة يُذكَر بمطلبه هو: ارفع الورقة. */
-  const paperOnly = meta.filter((r) => r.paperInvoices);
+  const paperOnly = meta.filter(needsPaperUpload);
 
   const findings: FindingView[] = open.map((f) => ({
     id: f.id, supplierId: f.supplierId, supplierName: f.supplierName, supplierSlug: f.supplierSlug,

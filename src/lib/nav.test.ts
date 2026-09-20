@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   AREAS,
@@ -229,4 +231,43 @@ describe("سلامة البنية", () => {
   it("كل رابط حساب له صلاحيته", () => {
     for (const link of ACCOUNT_LINKS) expect(link.needs).toBeDefined();
   });
+});
+
+/*
+  اسمُ الهيكل هو اسمُ صفحته.
+
+  كان `/attention` يعرض «ما يحتاج انتباهك» ريثما تُبنى، ثمّ «يحتاج
+  قرارك» حين تُبنى — وكذلك `/statements` («كشوف المورّدين» ثمّ
+  «الكشوف») و`/money` («المال» ثمّ «أين ذهب المال») وستٌّ غيرها.
+  فيقرأ صاحب المقهى عنواناً ثمّ يراه يتبدّل أمامه، فيشكّ أنّه انتقل.
+*/
+describe("الهيكل يحمل اسم صفحته", () => {
+  const titleOf = (file: string): string | null => {
+    if (!existsSync(file)) return null;
+    return readFileSync(file, "utf8").match(/title="([^"]+)"/)?.[1] ?? null;
+  };
+
+  const loadings: string[] = [];
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const f = join(dir, e.name);
+      if (e.isDirectory()) walk(f);
+      else if (e.name === "loading.tsx") loadings.push(f);
+    }
+  };
+  walk("src/app");
+
+  it("ثمّة هياكل تُفحَص أصلاً", () => {
+    expect(loadings.length).toBeGreaterThan(10);
+  });
+
+  for (const l of loadings) {
+    const page = l.replace(/loading\.tsx$/, "page.tsx");
+    const pageTitle = titleOf(page);
+    /* صفحةٌ بلا عنوانٍ حرفيّ (تحويلٌ أو عنوانٌ محسوب) لا تُقارَن */
+    if (!pageTitle) continue;
+    it(`${l} يطابق عنوان صفحته`, () => {
+      expect(titleOf(l)).toBe(pageTitle);
+    });
+  }
 });

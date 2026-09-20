@@ -4,6 +4,7 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { bankTransactions, suppliers } from "@/db/schema";
 import { formatRiyalsDisplay } from "./money";
 import type { AttentionEvidence, AttentionFacts } from "./attention";
 import { previousMonth } from "./filing";
@@ -13,6 +14,8 @@ import { checkBalance } from "./bank/balance-equation";
 import { findDuplicateExpenses, type Expense } from "./expenses";
 import { findDoublePaid, partitionDoublePaid, recoverableMinor, type DoublePaidGroup, type DoublePaidTx } from "./bank/double-paid";
 import { detectAnomalies } from "./bank/lifecycle";
+import { pendingDecision } from "./bank/pending";
+import { needsContractSql } from "./supplier-policy-rules";
 import { loadOverdueBalances } from "@/services/supplier-balance.service";
 import { DAY, TIME, countNoun } from "./arabic";
 import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
@@ -33,9 +36,19 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         (select coalesce(sum(vat_minor),0)::bigint from invoices
            where input_vat_status='NOT_ELIGIBLE' and vat_minor > 0)                        as vat_at_risk,
         (select count(*)::int from invoices where tax_status='UNKNOWN')                    as unknown_tax,
-        (select count(*)::int from bank_transactions where category='UNKNOWN')             as unclassified,
-        (select coalesce(sum(amount_minor),0)::bigint from bank_transactions
-           where category='UNKNOWN')                                                       as unclassified_amount,
+        /*
+          ── عددُ البند هو عددُ الطابور نفسِه ──
+
+          كان يعدّ ‎category='UNKNOWN'‎ بينما اللوحُ الذي يفتحه البند
+          (‎ReviewSection‎) يقرأ ‎pendingDecision()‎. فالعدّان لشيءٍ واحد
+          بشرطين مختلفين — وتقاطعُهما قد يكون صفراً: حركةٌ تنتظر قراراً
+          ولا بندَ يدلّ عليها، أو بندٌ يُفتَح على لوحٍ فارغ.
+
+          فصار الشرط واحداً، يُستدعى ولا يُنسَخ.
+        */
+        (select count(*)::int from ${bankTransactions} where ${pendingDecision()})          as unclassified,
+        (select coalesce(sum(amount_minor),0)::bigint from ${bankTransactions}
+           where ${pendingDecision()})                                                      as unclassified_amount,
         (select count(*)::int from invoices i
            where not exists (select 1 from invoice_lines l where l.invoice_id=i.id))       as no_lines
     `)
@@ -87,24 +100,19 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
   const noContractRows = (
     await db.execute<Row>(sql`
-      select s.name_ar,
+      select suppliers.name_ar,
              (select coalesce(sum(greatest(0, p.amount_minor - p.fee_minor
                 - coalesce((select sum(a.amount_minor)::int from payment_allocations a
                              where a.payment_id = p.id), 0))), 0)::bigint
                 from payments p
-               where p.supplier_id = s.id and p.status not in ('REVERSED','VOID')) as unbacked
-      from suppliers s
+               where p.supplier_id = suppliers.id and p.status not in ('REVERSED','VOID')) as unbacked
       /*
-        من أُعلن أنّه لا يُطلَب منه عقد يخرج، ومن فواتيرُه ورقيّةٌ يخرج
-        كذلك: الأولى قرارُ صاحب العمل، والثانية تقول إنّ الفاتورة
-        موجودةٌ ولم تُرفَع — فمطلبُها رفعُ الورقة لا عقدُ توريد.
-        انظر الهجرة 035.
+        القاعدةُ في supplier-policy-rules — تُحقَن ولا تُعاد كتابتها.
+        وبلا لقبٍ للجدول عمداً: القاعدةُ تسمّي أعمدتها باسم الجدول،
+        فلقبٌ هنا يجعلها تشير إلى ما ليس في FROM.
       */
-      where s.is_active
-        and not s.issues_invoices
-        and not s.contract_on_file
-        and s.contract_required
-        and not s.paper_invoices
+      from ${suppliers}
+      where suppliers.is_active and ${needsContractSql()}
       order by unbacked desc
     `)
   ).rows;

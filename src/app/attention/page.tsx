@@ -13,6 +13,9 @@ import { attentionItems } from "@/lib/work";
 import { ITEM, countNoun } from "@/lib/arabic";
 import { DoublePaidWorkspace } from "@/components/double-paid-section";
 import { ReviewSection } from "@/components/review-section";
+import {
+  ContractPolicyWorkspace, InboxWorkspace, StatementRequestWorkspace, UnbackedWorkspace,
+} from "@/components/attention-workspaces";
 
 export const dynamic = "force-dynamic";
 
@@ -135,7 +138,15 @@ function Detail({
         )}
       </Card>
 
-      {item.evidence.length > 0 && (
+      {/*
+        الدليلُ يُعرَض حين لا لوحَ فعلٍ تحته.
+
+        فاللوحُ يعرض الشيءَ نفسه ومعه زرُّه — فلمّا وُضع تحت قائمةِ
+        أدلّةٍ صارت الأسماءُ مكتوبةً مرّتين في شاشةٍ واحدة: ثمانيةً بلا
+        فعل، ثمّ ثلاثةَ عشر بفعلها. ومن يقرأ قائمتين متشابهتين يحسبهما
+        شيئين.
+      */}
+      {item.evidence.length > 0 && !workspace && (
         <section>
           <h3 className="mb-2 text-xs font-bold text-muted">
             ما بُني عليه هذا البند ({item.evidence.length})
@@ -221,11 +232,27 @@ export default async function AttentionPage({
     البندان اللذان يُحسمان في مكانهما. وما عداهما يفتح سجلّاته — ولكلٍّ
     منها `href` مرشَّح في `attention.ts`، لا صفحةً عامّة.
   */
+  const canUpload = can(user.role, "document:upload");
+  const canEditSupplier = can(user.role, "supplier:edit");
+
+  /*
+    ستّةُ بنودٍ من ثمانية كان زرُّها يخرج من الطابور لعملٍ صغير — رسالةٌ
+    تُرسَل، ومستندٌ يُعتمَد، وسياسةٌ تُعلَن. فصار العملُ هنا، ولا يُخرَج
+    إلّا لما لا يقع إلّا هناك.
+  */
   const workspace =
     selected.id === "duplicate-payments" || selected.id === "duplicate-payments-claimed" ? (
       <DoublePaidWorkspace canEdit={canEdit} />
     ) : selected.id === "unclassified-bank" ? (
       <ReviewSection canApprove={canApprove} canEdit={canEdit} />
+    ) : selected.id === "unbacked-payments" ? (
+      <UnbackedWorkspace />
+    ) : selected.id === "pending-documents" || selected.id === "open-blockers" ? (
+      <InboxWorkspace canUpload={canUpload} />
+    ) : selected.id === "no-contract" ? (
+      <ContractPolicyWorkspace canEdit={canEditSupplier} />
+    ) : selected.id === "missing-statements" ? (
+      <StatementRequestWorkspace />
     ) : undefined;
 
   return (

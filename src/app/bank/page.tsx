@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -7,7 +6,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Card, LinkButton, Section, Stat, StatGrid, NoAccess } from "@/components/ui";
+import { Card, DataTable, LinkButton, Section, Stat, StatGrid, NoAccess } from "@/components/ui";
 import { BankImport } from "@/components/bank-import";
 import { MatchExplain, type MatchExplanation } from "@/components/match-explain";
 import { ReconcileQueue, type QueueGroup, type QueueItem } from "@/components/reconcile-queue";
@@ -114,6 +113,8 @@ export default async function BankPage({
       matchScore: bankTransactions.matchScore,
       matchOutcome: bankTransactions.matchOutcome,
       matchEvidence: bankTransactions.matchEvidence,
+      matchStatus: bankTransactions.matchStatus,
+      lifecycle: bankTransactions.lifecycle,
       transactionType: bankTransactions.transactionType,
     })
       .from(bankTransactions)
@@ -208,6 +209,8 @@ export default async function BankPage({
           matchScore: bankTransactions.matchScore,
           matchOutcome: bankTransactions.matchOutcome,
           matchEvidence: bankTransactions.matchEvidence,
+          matchStatus: bankTransactions.matchStatus,
+          lifecycle: bankTransactions.lifecycle,
         })
           .from(bankTransactions)
           .where(eq(bankTransactions.id, params.tx))
@@ -403,7 +406,8 @@ export default async function BankPage({
                 outcome: focused.matchOutcome,
                 amountMinor: focused.amountMinor,
                 matched: focused.matchedPaymentId !== null,
-                direction: focused.direction as "DEBIT" | "CREDIT",
+                status: focused.matchStatus,
+                lifecycle: focused.lifecycle,
                 evidence: focused.matchEvidence as MatchExplanation["evidence"],
               }}
               canUndo={canApprove}
@@ -448,26 +452,6 @@ export default async function BankPage({
         والأزرار نفسها الموجودة في «يحتاج قرارك». فبقي في موضعٍ واحد،
         وهذه إحالةٌ إليه لا نسخةٌ منه.
       */}
-      {doublePaidCount > 0 && (
-        <div id="double-paid" className="mt-8 scroll-mt-28">
-          <Card tone="danger">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="min-w-0 text-xs leading-relaxed">
-                <span className="font-bold text-danger">
-                  مالٌ خرج مرّتين في يومٍ واحد — {countNoun(doublePaidCount, ITEM)}
-                </span>
-                <span className="block text-muted">
-                  يُطالَب به الجهةُ ويُسترَدّ، ولا يُصلَح في قيدنا. ومكانُ حسمه واحد.
-                </span>
-              </p>
-              <LinkButton href="/attention?item=duplicate-payments" variant="primary" size="sm">
-                افتحه في «يحتاج قرارك»
-              </LinkButton>
-            </div>
-          </Card>
-        </div>
-      )}
-
       {groups.length > 0 && (
         <Section
           title="حلّ المعلّقات"
@@ -488,84 +472,112 @@ export default async function BankPage({
           يقرؤه «يحتاج قرارك». فإن كان فيه شيء قيل وفُتح موضعُه، وإلّا
           فهذا سجلُّ ما وقع لا طابورُ ما ينتظر.
       */}
+      {/*
+        ── شاشةُ تشغيل لا دفترَ حركات ──
+
+        كان هذا خمسةً وعشرين بطاقةً، في كلٍّ منها نصُّ البنك الخام سطراً
+        أوّل، والمبلغُ في طرف، والحالُ تحتهما. فالعينُ تقرأ البطاقةَ
+        بطاقةً ولا تمسح عموداً: لا يُعرَف في لمحةٍ لمن خرج المال، ولا
+        أيُّ حركةٍ حالُها غير حال أختها.
+
+        فصار جدولاً بأعمدةٍ تُمسَح: **الجهة** ثمّ التاريخ ثمّ البابُ ثمّ
+        **المبلغ** مصفوفاً على خاناته، ثمّ **الحالُ وفعلُه** في عمودٍ
+        واحد — الشارةُ تقول أين وقفت، و«لماذا؟» تفتح الأدلّة في موضعها،
+        والتراجعُ بجانبها. ونصُّ البنك باقٍ تحت اسم الجهة: دليلٌ يُقابَل
+        بالكشف، لا عنوانٌ يُقرأ.
+      */}
+      {doublePaidCount > 0 && (
+        <div id="double-paid" className="mt-8 scroll-mt-28">
+          <Card tone="danger">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="min-w-0 text-xs leading-relaxed">
+                <span className="font-bold text-danger">
+                  مالٌ خرج مرّتين في يومٍ واحد — {countNoun(doublePaidCount, ITEM)}
+                </span>
+                <span className="block text-muted">
+                  يُطالَب به الجهةُ ويُسترَدّ، ولا يُصلَح في قيدنا. ومكانُ حسمه واحد.
+                </span>
+              </p>
+              <LinkButton href="/attention?item=duplicate-payments" variant="primary" size="sm">
+                افتحه في «يحتاج قرارك»
+              </LinkButton>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {recent.length > 0 && (
         <Section
-          title="آخر ما طابقه النظام"
-          hint={
-            n("pending") > 0
-              ? `سجلُّ آخر ما رُبط بفواتيره. وهذا ترجيح، فراجِع ما يبدو غريباً — و${countNoun(n("pending"), ITEM)} تنتظر قرارك.`
-              : "سجلُّ آخر ما رُبط بفواتيره. وهذا ترجيح، فراجِع ما يبدو غريباً."
-          }
-          action={
-            n("pending") > 0 ? (
-              <Link
-                href="/attention"
-                className="text-xs font-medium underline underline-offset-4 hover:text-ink"
-              >
-                افتح ما ينتظر قرارك ←
-              </Link>
-            ) : undefined
-          }
+          title="آخر الحركات وحالها"
+          hint="لمن خرج المال، وأين وقفت كلُّ حركة. والحالُ يُشتقّ من الحركة نفسها لا من ترجيحٍ قديم."
         >
-          <ul className="space-y-2.5">
-            {recent.map((t) => {
-              const explanation: MatchExplanation = {
-                transactionId: t.id,
-                disposition: t.matchDisposition,
-                score: t.matchScore,
-                outcome: t.matchOutcome,
-                amountMinor: t.amountMinor,
-                matched: t.matchedPaymentId !== null,
-                direction: t.direction as "DEBIT" | "CREDIT",
-                evidence: t.matchEvidence as MatchExplanation["evidence"],
-              };
-              return (
-                <li key={t.id} id={`tx-${t.id}`} className="scroll-mt-28">
-                  <Card>
-                    <div className="flex items-start justify-between gap-3">
-                      {/*
-                        ── الاسم قبل نصّ البنك الخام ──
-
-                        كان السطر الأوّل `description` مقتطعاً عند ستّين
-                        حرفاً: «حوالات تحت الطلب20260825S ANCBKNCBK6B8241…».
-                        خمسةٌ وعشرون صفّاً كذلك — سجلُّ نظامٍ لا شاشةُ
-                        صاحب عمل، ولا يُعرَف منه لمن خرج المال.
-
-                        و`toCanonical` تستخرج المستفيد من الوصف كما يفعل
-                        لوحُ الحركة المختارة فوقه بالضبط؛ فاختلافُ
-                        الشاشتين في الشيء نفسه كان سهواً لا قراراً.
-                        والنصُّ الخام يبقى تحته لمن يقابله بكشفه.
-                      */}
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-bold" dir="auto">
-                          {toCanonical({
-                            valueDate: t.valueDate,
-                            description: t.description,
-                            beneficiaryRaw: t.beneficiaryRaw,
-                            transactionType: t.transactionType,
-                            amountMinor: t.amountMinor,
-                            direction: t.direction as "DEBIT" | "CREDIT",
-                          }).beneficiary ?? t.description?.slice(0, 60) ?? "حركة"}
-                        </span>
-                        <span className="block truncate text-[11px] text-muted">
-                          <bdi className="nums">{formatDay(t.valueDate)}</bdi> ·{" "}
-                          {t.direction === "DEBIT" ? "صادر" : "وارد"} ·{" "}
-                          {CATEGORY_LABEL[t.category] ?? t.category}
-                        </span>
-                        <span className="mt-0.5 block truncate text-[11px] text-muted/80" dir="auto">
-                          {t.description}
-                        </span>
-                      </span>
-                      <span className="nums shrink-0 text-sm font-bold">
-                        <Money minor={t.amountMinor} />
-                      </span>
-                    </div>
-                    <MatchExplain match={explanation} canUndo={canApprove} />
-                  </Card>
-                </li>
-              );
-            })}
-          </ul>
+          <DataTable
+            rows={recent}
+            keyOf={(t) => t.id}
+            columns={[
+              {
+                key: "who", header: "الجهة", primary: true,
+                cell: (t) => (
+                  <span className="block min-w-0">
+                    <span className="block truncate font-bold" dir="auto">
+                      {toCanonical({
+                        valueDate: t.valueDate,
+                        description: t.description,
+                        beneficiaryRaw: t.beneficiaryRaw,
+                        transactionType: t.transactionType,
+                        amountMinor: t.amountMinor,
+                        direction: t.direction as "DEBIT" | "CREDIT",
+                      }).beneficiary ?? t.description?.slice(0, 60) ?? "حركة"}
+                    </span>
+                    <span
+                      className="mt-0.5 block max-w-[28rem] truncate text-[11px] text-muted"
+                      dir="auto"
+                      title={t.description ?? undefined}
+                    >
+                      {t.description}
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                key: "date", header: "التاريخ", secondary: true,
+                cell: (t) => <bdi className="nums">{formatDay(t.valueDate)}</bdi>,
+              },
+              {
+                key: "kind", header: "الباب", secondary: true,
+                cell: (t) => (
+                  <span className="whitespace-nowrap text-muted">
+                    {t.direction === "DEBIT" ? "صادر" : "وارد"} · {CATEGORY_LABEL[t.category] ?? t.category}
+                  </span>
+                ),
+              },
+              {
+                key: "amount", header: "المبلغ", numeric: true,
+                cell: (t) => <span className="font-bold"><Money minor={t.amountMinor} /></span>,
+              },
+              {
+                key: "state", header: "الحال",
+                cell: (t) => (
+                  <span id={`tx-${t.id}`} className="block scroll-mt-28">
+                    <MatchExplain
+                      match={{
+                        transactionId: t.id,
+                        disposition: t.matchDisposition,
+                        score: t.matchScore,
+                        outcome: t.matchOutcome,
+                        amountMinor: t.amountMinor,
+                        matched: t.matchedPaymentId !== null,
+                        status: t.matchStatus,
+                        lifecycle: t.lifecycle,
+                        evidence: t.matchEvidence as MatchExplanation["evidence"],
+                      }}
+                      canUndo={canApprove}
+                    />
+                  </span>
+                ),
+              },
+            ]}
+          />
         </Section>
       )}
 

@@ -1,5 +1,5 @@
 import { PageSkeleton } from "@/components/page-skeleton";
 
 export default function Loading() {
-  return <PageSkeleton title="البنك" stats={0} />;
+  return <PageSkeleton title="حركة البنك" stats={0} />;
 }
