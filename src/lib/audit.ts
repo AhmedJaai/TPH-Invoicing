@@ -60,7 +60,20 @@ export type AuditAction =
   | "DOCUMENT_STATUS_CHANGED"
   /* أُعيدت قراءةُ مستندٍ مؤرشف — بما قُرئ وبعدد ما كُتب من بنود */
   | "DOCUMENT_REREAD"
-  | "ALERT_RESOLVED";
+  | "ALERT_RESOLVED"
+  /* ── الجرد وتسوية المخزون ── */
+  | "SALES_IMPORTED"
+  | "POS_PRODUCT_MAPPED"
+  | "POS_PRODUCT_UNMAPPED"
+  | "RECIPE_CREATED"
+  | "RECIPE_VERSION_SAVED"
+  | "RECIPE_VERSION_ACTIVATED"
+  | "INVENTORY_COUNT_STARTED"
+  | "INVENTORY_COUNT_LINE_EDITED"
+  | "INVENTORY_COUNT_FINALISED"
+  | "INVENTORY_COUNT_REOPENED"
+  | "INVENTORY_MOVEMENT_RECORDED"
+  | "WASTE_RECORDED";
 
 export async function recordAudit(entry: {
   actorId?: string | null;

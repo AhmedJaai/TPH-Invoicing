@@ -93,14 +93,96 @@ async function main() {
   const tx = await one<{ id: string }>(`select id from bank_transactions order by amount_minor desc limit 1`);
 
   /*
+    ── قيودُ الجرد تُنشئ بياناتها بنفسها ──
+
+    قيودُ المال تُختبَر على فاتورةٍ وحركةٍ قائمتين لأنّها تقيس حدوداً
+    نسبيّة (ما بقي على الفاتورة). وقيودُ الجرد مطلقة، فتُنشأ صفوفُها
+    داخل المعاملة نفسِها — فتُفحَص على قاعدةٍ فارغة كما تُفحَص على
+    قاعدةِ الإنتاج، ولا تصير «لم تُفحَص» لأنّ المقهى لم يجرد بعد.
+  */
+  const inventory = [
+    await mustFail("كتابةُ عدٍّ في جردٍ مقفَل",
+      `insert into products (id, name_ar) values ('t-inv-p1', 'صنف اختبار');
+       insert into inventory_counts (id, period_start, period_end)
+         values ('t-inv-c1', '2099-01-01', '2099-01-07');
+       insert into inventory_count_lines (id, count_id, product_id, base_unit)
+         values ('t-inv-l1', 't-inv-c1', 't-inv-p1', 'KG');
+       update inventory_counts set status = 'FINALISED', finalised_at = now() where id = 't-inv-c1';
+       update inventory_count_lines set actual_milli = 1 where id = 't-inv-l1'`,
+      { code: "23514", message: /مقفَل/ }),
+
+    await mustFail("حذفُ لقطةِ جردٍ مقفَل",
+      `insert into inventory_counts (id, period_start, period_end, status, finalised_at)
+         values ('t-inv-c2', '2099-01-08', '2099-01-14', 'FINALISED', now());
+       insert into inventory_count_snapshots (count_id, engine_version, payload, provenance, checksum)
+         values ('t-inv-c2', 'x', '{}'::jsonb, '{}'::jsonb, 'x');
+       delete from inventory_count_snapshots where count_id = 't-inv-c2'`,
+      { code: "23514", message: /لا تُعدَّل/ }),
+
+    await mustFail("نسختا وصفةٍ ساريتان تتداخلان",
+      `insert into products (id, name_ar) values ('t-inv-p2', 'صنف مباع');
+       insert into recipes (id, product_id) values ('t-inv-r1', 't-inv-p2');
+       insert into recipe_versions (id, recipe_id, version, status, effective_from, effective_to)
+         values ('t-inv-v1', 't-inv-r1', 1, 'ACTIVE', '2099-01-01', '2099-01-31');
+       insert into recipe_versions (id, recipe_id, version, status, effective_from)
+         values ('t-inv-v2', 't-inv-r1', 2, 'ACTIVE', '2099-01-15')`,
+      { code: "23514", message: /تتداخل/ }),
+
+    await mustPass("ونسختان متتاليتان بلا تداخلٍ مقبولتان — القيدُ الذي يرفض كلَّ شيء يمنع الواقع",
+      `insert into products (id, name_ar) values ('t-inv-p3', 'صنف مباع');
+       insert into recipes (id, product_id) values ('t-inv-r2', 't-inv-p3');
+       insert into recipe_versions (id, recipe_id, version, status, effective_from, effective_to)
+         values ('t-inv-v3', 't-inv-r2', 1, 'ACTIVE', '2099-01-01', '2099-01-14');
+       insert into recipe_versions (id, recipe_id, version, status, effective_from)
+         values ('t-inv-v4', 't-inv-r2', 2, 'ACTIVE', '2099-01-15')`),
+
+    await mustFail("ملفُّ مبيعاتٍ ببصمةٍ مكرَّرة",
+      `insert into sales_sources (id, name) values ('t-inv-s1', 'مصدر اختبار');
+       insert into sales_imports (id, source_id, file_name, file_sha256, adapter)
+         values ('t-inv-i1', 't-inv-s1', 'a.xlsx', 't-inv-sha', 'X');
+       insert into sales_imports (id, source_id, file_name, file_sha256, adapter)
+         values ('t-inv-i2', 't-inv-s1', 'b.xlsx', 't-inv-sha', 'X')`,
+      { code: "23505" }),
+
+    await mustFail("جردان لفترةٍ واحدة في فرعٍ واحد",
+      `insert into inventory_counts (id, period_start, period_end)
+         values ('t-inv-c3', '2099-02-01', '2099-02-07');
+       insert into inventory_counts (id, period_start, period_end)
+         values ('t-inv-c4', '2099-02-01', '2099-02-07')`,
+      { code: "23505" }),
+
+    await mustPass("والفترةُ نفسُها في فرعٍ آخر جردٌ آخر",
+      `insert into branches (id, name_ar, code) values ('t-inv-b1', 'فرع اختبار', 't-inv-b1');
+       insert into inventory_counts (id, period_start, period_end)
+         values ('t-inv-c5', '2099-03-01', '2099-03-07');
+       insert into inventory_counts (id, branch_id, period_start, period_end)
+         values ('t-inv-c6', 't-inv-b1', '2099-03-01', '2099-03-07')`),
+
+    await mustFail("مكوّنُ وصفةٍ بكمّيّةٍ صفر",
+      `insert into products (id, name_ar) values ('t-inv-p4', 'صنف مباع');
+       insert into products (id, name_ar) values ('t-inv-p5', 'مكوّن');
+       insert into recipes (id, product_id) values ('t-inv-r3', 't-inv-p4');
+       insert into recipe_versions (id, recipe_id, version, effective_from)
+         values ('t-inv-v5', 't-inv-r3', 1, '2099-01-01');
+       insert into recipe_ingredients (id, recipe_version_id, product_id, quantity_milli, unit)
+         values ('t-inv-g1', 't-inv-v5', 't-inv-p5', 0, 'G')`,
+      { code: "23514", constraint: "recipe_ingredients_qty_positive" }),
+  ];
+
+  /*
     بلا بياناتٍ لا يُفحَص قيد — و«لم يُفحَص» ليس نجاحاً. فعلى الجهاز يُقال
     ويخرج بسلام، وفي CI (`--require-data`) يُعدّ فشلاً كي لا يخضرّ فحصُ صفرٍ من القيود.
   */
   if (!inv || !tx) {
     const strict = process.argv.includes("--require-data");
-    console.log(`لا بيانات كافية للفحص${!inv ? " (لا فاتورة)" : " (لا حركة بنك)"}${strict ? " — ولم يُفحَص شيء." : "."}`);
+    const ok = inventory.filter(Boolean).length;
+    console.log(
+      `\n${ok} من ${inventory.length} من قيود الجرد يعمل.`
+      + `\nولا بيانات كافية لقيود المال${!inv ? " (لا فاتورة)" : " (لا حركة بنك)"}${strict ? " — ولم تُفحَص." : "."}`,
+    );
     await pool.end();
-    process.exit(strict ? 1 : 0);
+    /* و«لم يُفحَص» ليس نجاحاً: في CI يُعدّ فشلاً كما كان */
+    process.exit(strict || ok !== inventory.length ? 1 : 0);
   }
 
   const total = Number(inv.total);
@@ -211,9 +293,10 @@ async function main() {
       { code: "23505" })] : []),
   ];
 
-  const passed = results.filter(Boolean).length;
-  console.log(`\n${passed} من ${results.length} قيداً يعمل.`);
+  const all = [...results, ...inventory];
+  const passed = all.filter(Boolean).length;
+  console.log(`\n${passed} من ${all.length} قيداً يعمل.`);
   await pool.end();
-  process.exit(passed === results.length ? 0 : 1);
+  process.exit(passed === all.length ? 0 : 1);
 }
 main().catch(async (e) => { console.error(e); await pool.end(); process.exit(1); });

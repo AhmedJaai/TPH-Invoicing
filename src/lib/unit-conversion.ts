@@ -143,3 +143,37 @@ export function canCompare(a: Comparable, b: Comparable): ComparisonVerdict {
   }
   return { comparable: true, reason: "الوحدتان من عائلةٍ واحدة" };
 }
+
+/* ───────────────────── الوحدة كما تُخزَّن في القاعدة ───────────────────── */
+
+/**
+ * ما يقبله عمود `base_unit` في القاعدة.
+ *
+ * ويختلف اسمُه عن `BaseUnit` في حرفين: `G` و`L` هنا، و`GRAM` و`LITER`
+ * هناك. والاختلافُ قديم — `005` كتبت الأولى وهذا الملفّ كتب الثانية —
+ * **ولا يُصلَح بتغيير أحدهما**: تغييرُ نوعٍ في القاعدة يحتاج هجرةً
+ * وقراءةً مزدوجة على نشرتين، وتغييرُ النوع هنا يكسر اختبارات قائمة.
+ *
+ * فالجسرُ يُعلَن هنا، في موضعٍ واحد، بدل أن يُكتب `u === "G" ? "GRAM"`
+ * في كلّ ملفٍّ يقرأ عموداً — وتلك هي الصيغة التي تُنسى مرّةً فتُقارَن
+ * الجراماتُ بالكيلوات.
+ *
+ * ولا تُصدَّر دالّةُ تحويلٍ بين النوعين ما دام لا مستدعٍ لها: الصادرُ
+ * الميّت يُحذَف ولا يُسرَد — ويحرسه `npm run lint:dead`.
+ */
+export type StoredUnit = "KG" | "G" | "L" | "ML" | "PIECE" | "PACK";
+
+export const STORED_UNITS: readonly StoredUnit[] = ["KG", "G", "L", "ML", "PIECE", "PACK"];
+
+const STORED_TO_BASE: Record<StoredUnit, BaseUnit> = {
+  KG: "KG", G: "GRAM", L: "LITER", ML: "ML", PIECE: "PIECE", PACK: "PACK",
+};
+
+export function isStoredUnit(value: unknown): value is StoredUnit {
+  return typeof value === "string" && (STORED_UNITS as readonly string[]).includes(value);
+}
+
+/** اسمُ الوحدة المخزَّنة للعرض — بالمعجم نفسه، فلا تسميتان لشيءٍ واحد. */
+export function storedUnitLabel(unit: StoredUnit): string {
+  return UNIT_LABEL[STORED_TO_BASE[unit]];
+}

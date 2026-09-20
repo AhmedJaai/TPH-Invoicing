@@ -1,0 +1,89 @@
+import { describe, expect, it } from "vitest";
+import { formatBp, stockVariance, theoreticalClosing, type StockTerms } from "./equation";
+import { canonicalToQuantity, toCanonical } from "./units";
+
+/** كيلوغراماتٌ بالوحدة المعياريّة (مِلّي‑جرام). */
+const kg = (n: number) => toCanonical(n * 1000, "KG");
+
+function terms(over: Partial<StockTerms> = {}): StockTerms {
+  return {
+    openingMilli: kg(5),
+    purchasesMilli: kg(20),
+    adjustmentsInMilli: 0,
+    adjustmentsOutMilli: 0,
+    theoreticalConsumptionMilli: kg(12),
+    recordedWasteMilli: 0,
+    ...over,
+  };
+}
+
+describe("المعادلة", () => {
+  it("افتتاحيّ ٥ + مشتريات ٢٠ − استهلاك ١٢ = ١٣ متوقَّعاً", () => {
+    const closing = theoreticalClosing(terms());
+    expect(canonicalToQuantity(closing!, "KG")).toBe(13);
+  });
+
+  it("والفعليّ ١٠٫٥ يعطي فرقاً ‑٢٫٥ كجم و‑١٩٫٢٪", () => {
+    const r = stockVariance(terms(), kg(10.5));
+    expect(canonicalToQuantity(r.varianceMilli!, "KG")).toBe(-2.5);
+    /* ‏٢٫٥ ÷ ١٣ = ١٩٫٢٣٪ */
+    expect(r.varianceBp).toBe(-1923);
+    expect(formatBp(r.varianceBp)).toBe("−19.2٪");
+  });
+
+  it("والمتوقَّع ٦ مع فعليٍّ ٥٫٢ = ‑٠٫٨ كجم", () => {
+    const r = stockVariance(
+      terms({ openingMilli: kg(6), purchasesMilli: 0, theoreticalConsumptionMilli: 0 }),
+      kg(5.2),
+    );
+    expect(canonicalToQuantity(r.varianceMilli!, "KG")).toBe(-0.8);
+  });
+
+  it("والهدرُ المسجَّل والتسوياتُ تدخل المعادلة", () => {
+    const closing = theoreticalClosing(terms({
+      recordedWasteMilli: kg(1),
+      adjustmentsInMilli: kg(2),
+      adjustmentsOutMilli: kg(0.5),
+    }));
+    /* ٥ + ٢٠ + ٢ − ٠٫٥ − ١٢ − ١ = ١٣٫٥ */
+    expect(canonicalToQuantity(closing!, "KG")).toBe(13.5);
+  });
+
+  it("ولا يُقصّ المتوقَّع عند الصفر — السالبُ خبر", () => {
+    const closing = theoreticalClosing(terms({ theoreticalConsumptionMilli: kg(40) }));
+    expect(canonicalToQuantity(closing!, "KG")).toBe(-15);
+  });
+});
+
+describe("المجهولُ ينتشر ولا يُبتلَع", () => {
+  it("افتتاحيٌّ مجهول ⇒ المتوقَّعُ مجهول — لا ٢٠", () => {
+    const r = stockVariance(terms({ openingMilli: null }), kg(10.5));
+    expect(r.theoreticalClosingMilli).toBeNull();
+    expect(r.varianceMilli).toBeNull();
+    expect(r.varianceBp).toBeNull();
+  });
+
+  it("ومشترياتٌ فيها بندٌ لم تُعرَف كمّيّتُه ⇒ مجهول", () => {
+    expect(theoreticalClosing(terms({ purchasesMilli: null }))).toBeNull();
+  });
+
+  it("واستهلاكٌ لا وصفةَ له ⇒ مجهول", () => {
+    expect(theoreticalClosing(terms({ theoreticalConsumptionMilli: null }))).toBeNull();
+  });
+
+  it("وصنفٌ لم يُعَدّ ⇒ لا فرق — والمتوقَّعُ يبقى محسوباً", () => {
+    const r = stockVariance(terms(), null);
+    expect(canonicalToQuantity(r.theoreticalClosingMilli!, "KG")).toBe(13);
+    expect(r.varianceMilli).toBeNull();
+  });
+
+  it("والقسمةُ على صفرٍ لا تُصلَح بمئةٍ ولا بصفر — النسبةُ غير معرَّفة", () => {
+    const r = stockVariance(
+      terms({ openingMilli: 0, purchasesMilli: kg(12), theoreticalConsumptionMilli: kg(12) }),
+      kg(-1),
+    );
+    expect(r.theoreticalClosingMilli).toBe(0);
+    expect(r.varianceBp).toBeNull();
+    expect(formatBp(null)).toBe("غير معروف");
+  });
+});

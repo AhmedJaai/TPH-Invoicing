@@ -23,6 +23,19 @@ const OTHER_VALUE_LABEL: Record<string, string> = {
   PURCHASING: "مدير المشتريات",
   DEBIT: "صادر",
   CREDIT: "وارد",
+  /* أبوابُ الهدر وحركاتُ المخزون — قوائمُ مغلقة في `036` */
+  EXPIRED: "منتهي الصلاحية",
+  SPILLED: "مسكوب",
+  FAILED_PREP: "تحضيرٌ فاشل",
+  CALIBRATION: "معايرة",
+  STAFF_DRINK: "مشروب موظَّف",
+  DAMAGED: "تالف",
+  OTHER: "سببٌ آخر",
+  OPENING: "رصيدٌ افتتاحيّ",
+  ADJUST_IN: "تسويةٌ بالزيادة",
+  ADJUST_OUT: "تسويةٌ بالنقص",
+  TRANSFER_IN: "نقلٌ وارد",
+  TRANSFER_OUT: "نقلٌ صادر",
 };
 
 export const VALUE_LABEL: Record<string, string> = {
