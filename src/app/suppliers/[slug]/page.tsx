@@ -297,12 +297,23 @@ export default async function SupplierPage({
       width="wide"
       title={s.nameAr}
       intro={`${countNoun(n("invoice_count"), INVOICE)} · ${countNoun(n("active_months"), MONTH)} من التعامل · ${countNoun(n("product_count"), PRODUCT)}`}
+      /*
+        ── ضابطان لا ثلاثة بالاسم نفسه ──
+
+        كان هنا زرّان: «كشوفه» و«فواتيره». وتحتهما في الصفحة نفسها
+        ألسنةٌ أسماؤها «فواتيره · دفعاته · كشوفه · بياناته». فـ«كشوفه»
+        اسمٌ واحدٌ لضابطين ووجهتين في شاشةٍ واحدة، و«فواتيره» كذلك —
+        ومن ضغط أحدهما لا يعرف قبل الضغط أيّهما ضغط.
+
+        و«فواتيره» سقط: لسانُه تحته يعرضها كلَّها، فالزرّ يخرج بالقارئ
+        من الصفحة ليريَه ما فيها. وبقي الآخر باسم **فعله** لا باسم
+        موضوعه: المطابقةُ هي ما لا يقع هنا، وهي وحدها تكشف فاتورةً
+        حمّلها علينا ولم تصلنا.
+      */
       actions={
-        <>
-          {/* كان يفتح كشوف كلّ المورّدين — فيُبحث عنه من جديد (BTN-032) */}
-          <LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} size="sm">كشوفه</LinkButton>
-          <LinkButton href={`/purchases/invoices?supplier=${s.slug}`} size="sm">فواتيره</LinkButton>
-        </>
+        <LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} size="sm">
+          طابِق كشوفه
+        </LinkButton>
       }
     >
       {/*

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -14,15 +15,13 @@ import { pendingDecision } from "@/lib/bank/pending";
 import { toCanonical } from "@/lib/bank/canonical";
 import { groupByIdentity } from "@/lib/bank/pattern";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
-import { countNoun, ITEM, PAYMENT_RECORD, TRANSACTION } from "@/lib/arabic";
+import { countNoun, ITEM, TRANSACTION } from "@/lib/arabic";
 import {
   findDoublePaid, partitionDoublePaid,
   type DoublePaidTx,
 } from "@/lib/bank/double-paid";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
-import { loadUnbackedPayments } from "@/services/supplier-followups.service";
-import { formatRiyalsDisplay } from "@/lib/money";
 import { formatDay } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
@@ -115,6 +114,7 @@ export default async function BankPage({
       matchScore: bankTransactions.matchScore,
       matchOutcome: bankTransactions.matchOutcome,
       matchEvidence: bankTransactions.matchEvidence,
+      transactionType: bankTransactions.transactionType,
     })
       .from(bankTransactions)
       .where(sql`${bankTransactions.matchDisposition} is not null`)
@@ -240,12 +240,9 @@ export default async function BankPage({
   const doublePaidCount = doublePaidSplit.open.length + doublePaidSplit.claimed.length;
 
   /*
-    «دفعات لم تُنسب» من المصدر الواحد — هو نفسه الذي يقرؤه التنبيه
-    وصفحةُ حسابات المورّدين. وكان هنا استعلامٌ ثالثٌ مستقلّ بشرطٍ ثالث.
+    ولا يُستعلَم هنا عن «دفعات لم تُنسب»: خرجت بطاقتُها إلى موضعها
+    الواحد في «يحتاج قرارك» — فلا استعلامَ لرقمٍ لا يُعرَض.
   */
-  const unbacked = await loadUnbackedPayments();
-  const unbackedCount = unbacked.length;
-  const unbackedTotalMinor = unbacked.reduce((sum, p) => sum + p.unbackedMinor, 0);
   const focused = focus[0] ?? null;
   const canApprove = can(user.role, "payment:approve");
   const canEdit = can(user.role, "bank:edit");
@@ -406,6 +403,7 @@ export default async function BankPage({
                 outcome: focused.matchOutcome,
                 amountMinor: focused.amountMinor,
                 matched: focused.matchedPaymentId !== null,
+                direction: focused.direction as "DEBIT" | "CREDIT",
                 evidence: focused.matchEvidence as MatchExplanation["evidence"],
               }}
               canUndo={canApprove}
@@ -421,27 +419,19 @@ export default async function BankPage({
 
       <StatGrid>
         {/*
-          «طابور المراجعة» كان بطاقةً هنا تفتح صفحةً فارغة، وعددُها عدٌّ
-          ثانٍ للعمل الباقي بجانب عدّ «يحتاج قرارك». فعدٌّ واحد وموضعٌ واحد.
+          ── بطاقتان خرجتا من هنا ──
 
-          و«سداد بلا فاتورة» كان يعدّ ١٣ دفعة بينما التنبيه يعدّ ١٠ —
-          الفرقُ أنّ أحدهما يستثني من لا يصدر فواتير. فصار التعريف واحداً
-          في `loadUnbackedPayments`، والعددُ يفتح تلك الدفعات بعينها.
+          «دفعات لم تُنسب إلى فاتورة» كانت بطاقةً في **أربع** شاشات:
+          الرئيسية، و«يحتاج قرارك»، و«المورّدون»، وهذه. والعملُ الواحد
+          معروضاً أربع مرّاتٍ يُقرأ أربعةَ أعمال. وهو **عملٌ باقٍ** لا
+          حالُ بنك، فموضعُه الطابور حيث له فعلُه.
+
+          و«فواتير مفتوحة ٢١» حالُ فواتير لا حالُ حساب — موضعُها صفحة
+          الفواتير، وهي تعرضها مع ما بقي عليها.
+
+          وبقيت «إيداعات مدى» لأنّها وحدها خبرٌ عن هذا الحساب: من أين
+          يدخل المال.
         */}
-        <Stat
-          label="دفعات لم تُنسب إلى فاتورة"
-          minor={unbackedTotalMinor}
-          tone={unbackedCount > 0 ? "warn" : "ok"}
-          sub={`${countNoun(unbackedCount, PAYMENT_RECORD)} بلا مستند`
-            + (n("advance") > 0 ? ` · ودفعة مقدَّمة ${formatRiyalsDisplay(n("advance_sum"))}` : "")}
-          href="/suppliers?unbacked=1#unbacked"
-        />
-        <Stat
-          label="فواتير مفتوحة"
-          value={String(n("open"))}
-          href="/purchases/invoices?paid=OPEN"
-          sub="ما زال عليها رصيد"
-        />
         <Stat
           label="إيداعات مدى (نقاط البيع)"
           minor={n("settled")}
@@ -487,10 +477,35 @@ export default async function BankPage({
         </Section>
       )}
 
+      {/*
+          ── تلميحٌ كان ينفي صفوفَه ──
+
+          كان يقول «... ولا بنودَ تنتظر تأكيدك» لأنّه يعدّ `SUGGEST`
+          وحدها، وفي القائمة تحته صفٌّ بشارة «تنتظر مراجعتك» (`REVIEW`).
+          فالقسمُ ينفي في عنوانه ما يعرضه في متنه.
+
+          والعددُ الواحد للعمل الباقي هو `pending` — الشرطُ نفسه الذي
+          يقرؤه «يحتاج قرارك». فإن كان فيه شيء قيل وفُتح موضعُه، وإلّا
+          فهذا سجلُّ ما وقع لا طابورُ ما ينتظر.
+      */}
       {recent.length > 0 && (
         <Section
           title="آخر ما طابقه النظام"
-          hint={`${countNoun(n("auto"), ITEM)} طُوبقت تلقائياً · ${countNoun(n("suggest"), ITEM)} تنتظر تأكيدك. وهذا ترجيح، فراجِع ما يبدو غريباً.`}
+          hint={
+            n("pending") > 0
+              ? `سجلُّ آخر ما رُبط بفواتيره. وهذا ترجيح، فراجِع ما يبدو غريباً — و${countNoun(n("pending"), ITEM)} تنتظر قرارك.`
+              : "سجلُّ آخر ما رُبط بفواتيره. وهذا ترجيح، فراجِع ما يبدو غريباً."
+          }
+          action={
+            n("pending") > 0 ? (
+              <Link
+                href="/attention"
+                className="text-xs font-medium underline underline-offset-4 hover:text-ink"
+              >
+                افتح ما ينتظر قرارك ←
+              </Link>
+            ) : undefined
+          }
         >
           <ul className="space-y-2.5">
             {recent.map((t) => {
@@ -501,20 +516,44 @@ export default async function BankPage({
                 outcome: t.matchOutcome,
                 amountMinor: t.amountMinor,
                 matched: t.matchedPaymentId !== null,
+                direction: t.direction as "DEBIT" | "CREDIT",
                 evidence: t.matchEvidence as MatchExplanation["evidence"],
               };
               return (
                 <li key={t.id} id={`tx-${t.id}`} className="scroll-mt-28">
                   <Card>
                     <div className="flex items-start justify-between gap-3">
+                      {/*
+                        ── الاسم قبل نصّ البنك الخام ──
+
+                        كان السطر الأوّل `description` مقتطعاً عند ستّين
+                        حرفاً: «حوالات تحت الطلب20260825S ANCBKNCBK6B8241…».
+                        خمسةٌ وعشرون صفّاً كذلك — سجلُّ نظامٍ لا شاشةُ
+                        صاحب عمل، ولا يُعرَف منه لمن خرج المال.
+
+                        و`toCanonical` تستخرج المستفيد من الوصف كما يفعل
+                        لوحُ الحركة المختارة فوقه بالضبط؛ فاختلافُ
+                        الشاشتين في الشيء نفسه كان سهواً لا قراراً.
+                        والنصُّ الخام يبقى تحته لمن يقابله بكشفه.
+                      */}
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-bold" dir="auto">
-                          {t.description?.slice(0, 60) ?? "حركة"}
+                          {toCanonical({
+                            valueDate: t.valueDate,
+                            description: t.description,
+                            beneficiaryRaw: t.beneficiaryRaw,
+                            transactionType: t.transactionType,
+                            amountMinor: t.amountMinor,
+                            direction: t.direction as "DEBIT" | "CREDIT",
+                          }).beneficiary ?? t.description?.slice(0, 60) ?? "حركة"}
                         </span>
-                        <span className="nums block truncate text-[11px] text-muted">
-                          {formatDay(t.valueDate)} ·{" "}
+                        <span className="block truncate text-[11px] text-muted">
+                          <bdi className="nums">{formatDay(t.valueDate)}</bdi> ·{" "}
                           {t.direction === "DEBIT" ? "صادر" : "وارد"} ·{" "}
                           {CATEGORY_LABEL[t.category] ?? t.category}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[11px] text-muted/80" dir="auto">
+                          {t.description}
                         </span>
                       </span>
                       <span className="nums shrink-0 text-sm font-bold">

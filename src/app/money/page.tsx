@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -167,9 +168,20 @@ export default async function MoneyPage() {
 
       <Section
         title="المصروف حسب بابه"
-        hint={`من كشف البنك، بحسب ما صنّفتَه بنفسك — ${
-          expenseTotal > 0 ? "" : ""
-        }وسدادُ المورّدين والتحويلُ الشخصيّ مستثنيان: الأوّل محسوبٌ في المشتريات، والثاني سحبُ مالكٍ لا مصروف.`}
+        hint="من كشف البنك، بحسب ما صنّفتَه بنفسك — وسدادُ المورّدين والتحويلُ الشخصيّ مستثنيان: الأوّل محسوبٌ في المشتريات، والثاني سحبُ مالكٍ لا مصروف."
+        /*
+          مدخلُ «المصروفات» — خرجت من ألسنة المساحة لأنّ جوابها بلا
+          مصروفاتٍ متكرّرةٍ مسجّلة «لا يمكن الحساب»، وموضعُها الطبيعيّ
+          هنا: من قرأ بابَ المصروف هو من يريد تفصيله ومقارنته بالمتوقَّع.
+        */
+        action={
+          <Link
+            href="/money/expenses"
+            className="text-xs font-medium underline underline-offset-4 hover:text-ink"
+          >
+            المتوقَّع مقابل الفعليّ ←
+          </Link>
+        }
       >
         {byCategory.length === 0 ? (
           <Empty message="لا حركات مصنَّفة بعد. صنّف حركاتك من صفحة حركة البنك." />

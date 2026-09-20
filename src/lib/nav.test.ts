@@ -28,7 +28,8 @@ describe("activeArea", () => {
     expect(activeArea("/analysis")?.href).toBe("/suppliers");
     expect(activeArea("/purchases")?.href).toBe("/suppliers");
     expect(activeArea("/bank")?.href).toBe("/money");
-    expect(activeArea("/payments")?.href).toBe("/money");
+    // «دفعة الشهر» جوابُ «لمن أدين» — فمساحتُها المورّدون لا المال
+    expect(activeArea("/payments")?.href).toBe("/suppliers");
     expect(activeArea("/close")?.href).toBe("/money");
     expect(activeArea("/audit")?.href).toBe("/attention");
     expect(activeArea("/review")?.href).toBe("/attention");
@@ -212,7 +213,7 @@ describe("سلامة البنية", () => {
     expect(labels.get("/payments")).toBe("دفعة الشهر");
     expect(labels.get("/statements")).toBe("الكشوف");
     expect(labels.get("/bank")).toBe("حركة البنك");
-    expect(labels.get("/analysis")).toBe("الأصناف والأسعار");
+    expect(labels.get("/close")).toBe("إقفال الشهر");
     // ولا لسان يحمل اسم «التدفّق وقائمة الدخل» — صار التدفّق في «المال»
     expect([...labels.values()]).not.toContain("التدفّق وقائمة الدخل");
   });

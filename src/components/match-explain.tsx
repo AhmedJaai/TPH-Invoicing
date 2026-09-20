@@ -26,6 +26,8 @@ export interface MatchExplanation {
   outcome: string | null;
   amountMinor: number;
   matched: boolean;
+  /** اتّجاه الحركة — يلزم كي لا يُوعَد بمراجعةٍ لا طابورَ لها. انظر أدناه. */
+  direction?: "DEBIT" | "CREDIT";
   evidence: {
     تصنيف?: string;
     مستفيد?: string[];
@@ -84,19 +86,43 @@ export function MatchExplain({
     «ليست سداداً» كان الخادم يردّها (match-undo) ولا زرّ لها — فمن أعلنها
     خطأً يرى الحركة خارج الطابور ولا يملك إعادتها (BTN-106).
   */
+  /*
+    ── شارةٌ كانت تَعِد بطابورٍ لا يوجد ──
+
+    حركةٌ **واردة** بـ١٬١٠٠ ريالاً (٤ يوليو) مصنَّفةٌ «سداد مورّد»
+    وقرارُها `REVIEW`. فكانت تحمل شارة «تنتظر مراجعتك» بالأحمر — ولا
+    طابورَ يعرضها: شرطُ `pendingDecision()` يشترط `DEBIT` في باب
+    المورّد، لأنّ **المال الداخل ليس سداداً** (وإلّا أُقفلت فاتورةٌ لم
+    تُدفَع من مالٍ دخل). فالشرطُ صحيح، والشارةُ فوقه تَعِد بعملٍ لا
+    مكانَ له — **وهي أسوأ من غياب الشارة**: تُري صاحبَ المقهى واجباً
+    ثمّ لا تدلّه عليه.
+
+    فتُقال الحقيقة: وارٌد صُنّف خطأً. وتصحيحُه تصنيفُ الحركة لا مطابقةُ
+    فاتورة. ولم يُمَسّ الشرط ولا محرّك المطابقة.
+  */
+  const incomingAsPayment =
+    !match.matched && match.direction === "CREDIT" && match.disposition === "REVIEW";
+
   const notAPayment = !match.matched && match.outcome === "NOT_A_PAYMENT";
   const d = notAPayment
     ? { label: "أُعلنت ليست سداداً", tone: "muted" as const }
-    : match.matched && match.disposition !== "AUTO"
-      ? { label: "سُجّلت سداداً", tone: "ok" as const }
-      : match.disposition ? DISPOSITION[match.disposition] : null;
+    : incomingAsPayment
+      ? { label: "مالٌ وارد صُنّف سداد مورّد", tone: "warn" as const }
+      : match.matched && match.disposition !== "AUTO"
+        ? { label: "سُجّلت سداداً", tone: "ok" as const }
+        : match.disposition ? DISPOSITION[match.disposition] : null;
 
   return (
     <div className="mt-2">
       <div className="flex flex-wrap items-center gap-2">
         {d && <Badge tone={d.tone}>{d.label}</Badge>}
-        {match.score !== null && (
+        {match.score !== null && !incomingAsPayment && (
           <span className="text-[11px] text-muted">{strength(match.score)}</span>
+        )}
+        {incomingAsPayment && (
+          <span className="text-[11px] text-muted">
+            لا تُخصَّص على فاتورة — صحّح بابَها من «حلّ المعلّقات»
+          </span>
         )}
         <button
           type="button"

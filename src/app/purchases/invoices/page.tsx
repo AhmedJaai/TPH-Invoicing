@@ -214,10 +214,32 @@ export default async function InvoicesPage({
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
         <Box label="المعروض" value={countNoun(Number(t.n), INVOICE)} />
         <Box label="قيمتها" minor={Number(t.billed)} />
+        {/*
+          ── ليست «عليك» ──
+
+          كان اسمُها «ما بقي عليك» وهي مجموعُ ما بقي على **الفواتير
+          المعروضة**. و«عليك للمورّدين» في صفحة المورّدين محسوبةٌ
+          بالمورّد: يُخصَم رصيدُه عندنا من دَينه. فكان الرقمان
+          ١١٬٩١١٫٢٤ و١٠٬٥٠٢٫٤٩ يحملان الكلمة نفسها ويفترقان بـ١٬٤٠٨٫٧٥
+          — ومن قرأهما لا يملك ما يرجّح به، **فيفقد الثقة في الاثنين**.
+
+          فصار لكلٍّ اسمُه: هنا «بقي على هذه الفواتير»، وهناك وحدها
+          «عليك للمورّدين». والمصدر الواحد للسؤال الثاني
+          `supplier-balances.ts` كما هو.
+        */}
         <Box
-          label="ما بقي عليك"
+          label="بقي على هذه الفواتير"
           minor={Number(t.outstanding)}
           tone={Number(t.outstanding) > 0 ? "warn" : "ok"}
+          sub={
+            <>
+              وحسابُ المورّدين بعد خصم رصيدك عندهم في{" "}
+              <Link href="/suppliers" className="underline underline-offset-4 hover:text-ink">
+                حسابات المورّدين
+              </Link>
+              .
+            </>
+          }
         />
       </div>
 
@@ -446,12 +468,13 @@ export default async function InvoicesPage({
 }
 
 function Box({
-  label, value, minor, tone,
+  label, value, minor, tone, sub,
 }: {
   label: string;
   value?: string;
   minor?: number;
   tone?: "warn" | "ok";
+  sub?: React.ReactNode;
 }) {
   const cls = tone === "warn" ? "text-warn" : tone === "ok" ? "text-ok" : "";
   return (
@@ -460,6 +483,7 @@ function Box({
       <p className={`nums mt-1.5 font-display text-lg font-bold leading-none sm:text-xl ${cls}`}>
         {minor !== undefined ? <Money minor={minor} /> : value}
       </p>
+      {sub && <p className="mt-1.5 text-[11px] leading-relaxed text-muted">{sub}</p>}
     </div>
   );
 }
