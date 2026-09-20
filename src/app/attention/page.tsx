@@ -6,13 +6,16 @@ import { PageShell } from "@/components/page-shell";
 import { Money, Prose } from "@/components/money";
 import { Card, EmptyState, LinkButton, NoAccess, buttonClass } from "@/components/ui";
 import {
-  AREA_LABEL, IMPACT_LABEL, SEVERITY_LABEL, impactByKind, prioritize,
+  AREA_LABEL, IMPACT_LABEL, SEVERITY_LABEL, prioritize,
   type AttentionItem, type AttentionSeverity,
 } from "@/lib/attention";
 import { attentionItems } from "@/lib/work";
 import { ITEM, countNoun } from "@/lib/arabic";
 import { DoublePaidWorkspace } from "@/components/double-paid-section";
 import { ReviewSection } from "@/components/review-section";
+import {
+  ContractPolicyWorkspace, InboxWorkspace, StatementRequestWorkspace, UnbackedWorkspace,
+} from "@/components/attention-workspaces";
 
 export const dynamic = "force-dynamic";
 
@@ -135,7 +138,15 @@ function Detail({
         )}
       </Card>
 
-      {item.evidence.length > 0 && (
+      {/*
+        الدليلُ يُعرَض حين لا لوحَ فعلٍ تحته.
+
+        فاللوحُ يعرض الشيءَ نفسه ومعه زرُّه — فلمّا وُضع تحت قائمةِ
+        أدلّةٍ صارت الأسماءُ مكتوبةً مرّتين في شاشةٍ واحدة: ثمانيةً بلا
+        فعل، ثمّ ثلاثةَ عشر بفعلها. ومن يقرأ قائمتين متشابهتين يحسبهما
+        شيئين.
+      */}
+      {item.evidence.length > 0 && !workspace && (
         <section>
           <h3 className="mb-2 text-xs font-bold text-muted">
             ما بُني عليه هذا البند ({item.evidence.length})
@@ -197,11 +208,6 @@ export default async function AttentionPage({
   */
   const picked = Boolean(wanted) && ordered.some((i) => i.id === wanted);
 
-  const impact = impactByKind(items);
-  const money = (["RECOVERABLE", "AT_RISK", "OWED", "UNATTRIBUTED"] as const)
-    .map((kind) => ({ kind, ...(impact[kind] ?? { amountMinor: 0, count: 0 }) }))
-    .filter((x) => x.amountMinor > 0);
-
   if (items.length === 0) {
     return (
       <PageShell
@@ -226,49 +232,59 @@ export default async function AttentionPage({
     البندان اللذان يُحسمان في مكانهما. وما عداهما يفتح سجلّاته — ولكلٍّ
     منها `href` مرشَّح في `attention.ts`، لا صفحةً عامّة.
   */
+  const canUpload = can(user.role, "document:upload");
+  const canEditSupplier = can(user.role, "supplier:edit");
+
+  /*
+    ستّةُ بنودٍ من ثمانية كان زرُّها يخرج من الطابور لعملٍ صغير — رسالةٌ
+    تُرسَل، ومستندٌ يُعتمَد، وسياسةٌ تُعلَن. فصار العملُ هنا، ولا يُخرَج
+    إلّا لما لا يقع إلّا هناك.
+  */
   const workspace =
     selected.id === "duplicate-payments" || selected.id === "duplicate-payments-claimed" ? (
       <DoublePaidWorkspace canEdit={canEdit} />
     ) : selected.id === "unclassified-bank" ? (
       <ReviewSection canApprove={canApprove} canEdit={canEdit} />
+    ) : selected.id === "unbacked-payments" ? (
+      <UnbackedWorkspace />
+    ) : selected.id === "pending-documents" || selected.id === "open-blockers" ? (
+      <InboxWorkspace canUpload={canUpload} />
+    ) : selected.id === "no-contract" ? (
+      <ContractPolicyWorkspace canEdit={canEditSupplier} />
+    ) : selected.id === "missing-statements" ? (
+      <StatementRequestWorkspace />
     ) : undefined;
 
   return (
     <PageShell
       user={user}
       width="wide"
-      title="يحتاج قرارك"
-      intro="كلُّ ما ينتظر قراراً في مكانٍ واحد — ولكلٍّ منه سببُه وفعلُه."
+      title={`${countNoun(items.length, ITEM)} تنتظر قرارك`}
+      intro="الأهمّ أوّلاً. اختر بنداً ترَ سببَه ودليلَه وفعلَه."
     >
-      {money.length > 0 && (
-        <div className="mb-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-          {money.map((m) => (
-            <div key={m.kind} className="rounded-xl border border-line bg-raised px-3.5 py-2.5 shadow-raised">
-              <p className="text-[11px] text-muted">{IMPACT_LABEL[m.kind]}</p>
-              <p className="nums mt-1 font-display text-lg font-bold leading-none">
-                <Money minor={m.amountMinor} />
-              </p>
-              <p className="mt-1 text-[11px] text-muted">{countNoun(m.count, ITEM)}</p>
-            </div>
-          ))}
-        </div>
-      )}
-      <p className="mb-5 max-w-3xl text-xs leading-relaxed text-muted">
-        والمبالغ أعلاه لا تُجمع بعضها إلى بعض: ريالٌ قد يُسترد ليس كريالٍ معرَّض للرفض وليس
-        كريالٍ مستحقّ عليك.
-      </p>
+      {/*
+        ── لا لوحةَ فوق الطابور ──
+
+        كانت هنا أربعُ بطاقاتِ أرقامٍ مجمَّعةٍ بالأثر، وتحتها سطرٌ يحذّر
+        من جمعها: «ريالٌ قد يُسترد ليس كريالٍ معرَّض للرفض». وهو تحذيرٌ
+        صحيح من سوء فهمٍ **أحدثَه العرضُ نفسه** — أربعةُ مبالغَ في صفٍّ
+        واحد تُقرأ مجموعاً.
+
+        وثمنُها مقيس: ١٦٥ بكسلاً تدفع الطابور إلى ٣٨٣، فلا يظهر من
+        ثمانية بنودٍ على شاشة ٧٦٨ إلّا خمسة. وبرفعها يبدأ الطابور عند
+        ٢١٨ فتظهر الثمانيةُ كلُّها.
+
+        ومبلغُ كلّ بندٍ معروضٌ في صفّه وفي تفصيله — فلم يضع رقم.
+      */}
 
       {/* ── القائمة والتفصيل ── */}
-      <div className="grid gap-5 lg:grid-cols-[19rem_minmax(0,1fr)] lg:items-start">
+      <div className="mt-6 grid gap-5 lg:grid-cols-[19rem_minmax(0,1fr)] lg:items-start">
         <nav
           aria-label="البنود"
           className={`space-y-2 lg:sticky lg:top-20 lg:block lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pe-1 ${
             picked ? "hidden" : ""
           }`}
         >
-          <p className="px-1 text-[11px] font-bold text-muted">
-            {countNoun(items.length, ITEM)} — الأهمّ أوّلاً
-          </p>
           {ordered.map((i) => (
             <Row key={i.id} item={i} active={i.id === selected.id} />
           ))}

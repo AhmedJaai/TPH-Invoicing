@@ -145,32 +145,61 @@ export default async function ExpensesPage({
         ))}
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        <Box label="المتوقَّع شهرياً" minor={expectedTotal}
-             note={recurring.length === 0 ? "لم تُسجَّل مصروفات متكرّرة بعد" : countNoun(recurring.length, ITEM)} />
-        <Box
-          label={`الفعليّ في ${month}`}
-          minor={actualTotal}
-          tone={pending.count > 0 ? "warn" : undefined}
-          note={
-            pending.count > 0
-              ? `${countNoun(actual.length, ITEM)} · وناقصٌ منه ما لم يُقيَّد من الكشف`
-              : countNoun(actual.length, ITEM)
-          }
-        />
-        <Box
-          label="الفرق"
-          minor={expectedTotal === 0 ? null : actualTotal - expectedTotal}
-          tone={expectedTotal === 0 ? "muted" : actualTotal > expectedTotal ? "warn" : "ok"}
-          note={
-            expectedTotal === 0
-              ? "سجّل مصروفاتك المتكرّرة في الإعدادات ليُقارَن بها الفعليّ"
-              : actualTotal > expectedTotal
-                ? "صُرف أكثر ممّا تُوقّع"
-                : "صُرف أقلّ ممّا تُوقّع"
-          }
-        />
-      </div>
+      {/*
+        ── بطاقةٌ واحدة حين لا متوقَّع ──
+
+        كانت ثلاثاً دائماً: «المتوقَّع ٠٫٠٠ — لم تُسجَّل مصروفات متكرّرة
+        بعد»، و«الفعليّ»، و«الفرق: لا يمكن الحساب». اثنتان من ثلاثٍ
+        تقولان «لا أعرف»، وهما ثُلثا أوّلِ ما يُقرأ في الصفحة.
+
+        و**الصفرُ يُقرأ جواباً**: «المتوقَّع ٠٫٠٠» تقول إنّ المقهى لا
+        يتوقّع أن يصرف شيئاً، وذلك غير «لم يُسجَّل بعد». فإن لم يُسجَّل
+        متوقَّعٌ عُرض الفعليُّ وحده، ومعه سطرٌ واحدٌ يقول كيف تُفتَح
+        المقارنة — لا بطاقتا فراغ.
+      */}
+      {expectedTotal === 0 ? (
+        <>
+          <div className="mt-6 sm:max-w-sm">
+            <Box
+              label={`الفعليّ في ${month}`}
+              minor={actualTotal}
+              tone={pending.count > 0 ? "warn" : undefined}
+              note={
+                pending.count > 0
+                  ? `${countNoun(actual.length, ITEM)} · وناقصٌ منه ما لم يُقيَّد من الكشف`
+                  : countNoun(actual.length, ITEM)
+              }
+            />
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-muted">
+            ولا مقارنةَ بالمتوقَّع بعد — سجّل الإيجار والرواتب وما يتكرّر شهرياً في{" "}
+            <Link href="/settings" className="font-medium underline underline-offset-4 hover:text-ink">
+              الإعدادات
+            </Link>{" "}
+            ليُقابَل بها الفعليّ.
+          </p>
+        </>
+      ) : (
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <Box label="المتوقَّع شهرياً" minor={expectedTotal} note={countNoun(recurring.length, ITEM)} />
+          <Box
+            label={`الفعليّ في ${month}`}
+            minor={actualTotal}
+            tone={pending.count > 0 ? "warn" : undefined}
+            note={
+              pending.count > 0
+                ? `${countNoun(actual.length, ITEM)} · وناقصٌ منه ما لم يُقيَّد من الكشف`
+                : countNoun(actual.length, ITEM)
+            }
+          />
+          <Box
+            label="الفرق"
+            minor={actualTotal - expectedTotal}
+            tone={actualTotal > expectedTotal ? "warn" : "ok"}
+            note={actualTotal > expectedTotal ? "صُرف أكثر ممّا تُوقّع" : "صُرف أقلّ ممّا تُوقّع"}
+          />
+        </div>
+      )}
 
       <UnrecordedNotice pending={pending} month={month} />
       {duplicates.length > 0 && (
@@ -262,6 +291,12 @@ export default async function ExpensesPage({
         </section>
       )}
 
+      {/*
+        وجدولُ «المتوقَّع مقابل الفعلي» بلا متوقَّعٍ عمودان من أربعةٍ
+        يقولان «لم يُتوقَّع»، وعمودُ الفرق يساوي عمودَ الفعليّ. فلا
+        يُعرَض — والقيودُ تحته تحمل التفصيل نفسه بلا ادّعاء مقارنة.
+      */}
+      {expectedTotal > 0 && (
       <section className="mt-8">
         <h2 className="mb-3 text-base font-bold">المتوقَّع مقابل الفعلي</h2>
         {variance.length === 0 ? (
@@ -291,6 +326,7 @@ export default async function ExpensesPage({
           />
         )}
       </section>
+      )}
 
       <section className="mt-8">
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
@@ -306,12 +342,35 @@ export default async function ExpensesPage({
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {actual.map((e) => (
               <li key={e.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                {/*
+                  ── البابُ أوّلاً، ونصُّ البنك تحته ──
+
+                  كان السطرُ الأوّل `label` وهو منقولٌ عن وصف الحركة:
+                  «REFERENCE : 81140155 VV26 0831 000000». أربعةَ عشر
+                  صفّاً كذلك بمبالغ ٠٫٣٩ و٠٫٥٧ ريالاً — لا يقرأ منها
+                  صاحبُ المقهى شيئاً، ولا يفرّق صفّاً عن أخيه.
+
+                  وبابُ المصروف («رسوم شبكة») هو ما يعنيه، وهو محسوبٌ
+                  عندنا. فصُدِّر إلى الأعلى وبقي نصُّ البنك تحته: من
+                  يقابل الصفَّ بكشفه يجده، ومن يقرأ ليعرف أين ذهب المال
+                  يقرأ الباب.
+
+                  ولم يُمَسّ ما في القاعدة: `label` كما هو، والتغيير في
+                  العرض وحده.
+                */}
                 <span className="min-w-0">
-                  <span className="block truncate text-sm">{e.label}</span>
-                  <span className="nums block truncate text-[11px] text-muted">
-                    {e.occurredOn} · {SOURCE_LABEL[e.source]}
+                  <span className="block truncate text-sm">
+                    {CATEGORY_LABEL[e.category] ?? e.label}
+                  </span>
+                  <span className="block truncate text-[11px] text-muted">
+                    <bdi className="nums">{e.occurredOn}</bdi> · {SOURCE_LABEL[e.source]}
                     {e.recurringExpenseId && " · مربوط بمتوقَّع"}
                   </span>
+                  {e.label && e.label !== CATEGORY_LABEL[e.category] && (
+                    <span className="block truncate text-[11px] text-muted/80" dir="auto">
+                      {e.label}
+                    </span>
+                  )}
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <span className="text-sm font-bold"><Money minor={e.amountMinor} /></span>

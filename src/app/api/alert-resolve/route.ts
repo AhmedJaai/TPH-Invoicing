@@ -126,6 +126,6 @@ export async function POST(request: Request) {
       ? "أُعيد فتح التنبيه"
       : decision === "CLAIMED"
         ? "حُفظ: طُولبت الجهة — يبقى التنبيه بحالٍ أهدأ حتى يعود المال"
-        : `حُفظ: ${DOUBLE_PAID_DECISION_LABEL[decision as DoublePaidDecision]} — خرج التنبيه من «ما يحتاج انتباهك»`,
+        : `حُفظ: ${DOUBLE_PAID_DECISION_LABEL[decision as DoublePaidDecision]} — خرج التنبيه من «يحتاج قرارك»`,
   });
 }

@@ -6,7 +6,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Card, LinkButton, Section, Stat, StatGrid, NoAccess } from "@/components/ui";
+import { Card, DataTable, LinkButton, Section, Stat, StatGrid, NoAccess } from "@/components/ui";
 import { BankImport } from "@/components/bank-import";
 import { MatchExplain, type MatchExplanation } from "@/components/match-explain";
 import { ReconcileQueue, type QueueGroup, type QueueItem } from "@/components/reconcile-queue";
@@ -14,15 +14,13 @@ import { pendingDecision } from "@/lib/bank/pending";
 import { toCanonical } from "@/lib/bank/canonical";
 import { groupByIdentity } from "@/lib/bank/pattern";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
-import { countNoun, ITEM, PAYMENT_RECORD, TRANSACTION } from "@/lib/arabic";
+import { countNoun, ITEM, TRANSACTION } from "@/lib/arabic";
 import {
   findDoublePaid, partitionDoublePaid,
   type DoublePaidTx,
 } from "@/lib/bank/double-paid";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
-import { loadUnbackedPayments } from "@/services/supplier-followups.service";
-import { formatRiyalsDisplay } from "@/lib/money";
 import { formatDay } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
@@ -115,6 +113,9 @@ export default async function BankPage({
       matchScore: bankTransactions.matchScore,
       matchOutcome: bankTransactions.matchOutcome,
       matchEvidence: bankTransactions.matchEvidence,
+      matchStatus: bankTransactions.matchStatus,
+      lifecycle: bankTransactions.lifecycle,
+      transactionType: bankTransactions.transactionType,
     })
       .from(bankTransactions)
       .where(sql`${bankTransactions.matchDisposition} is not null`)
@@ -208,6 +209,8 @@ export default async function BankPage({
           matchScore: bankTransactions.matchScore,
           matchOutcome: bankTransactions.matchOutcome,
           matchEvidence: bankTransactions.matchEvidence,
+          matchStatus: bankTransactions.matchStatus,
+          lifecycle: bankTransactions.lifecycle,
         })
           .from(bankTransactions)
           .where(eq(bankTransactions.id, params.tx))
@@ -240,12 +243,9 @@ export default async function BankPage({
   const doublePaidCount = doublePaidSplit.open.length + doublePaidSplit.claimed.length;
 
   /*
-    «دفعات لم تُنسب» من المصدر الواحد — هو نفسه الذي يقرؤه التنبيه
-    وصفحةُ حسابات المورّدين. وكان هنا استعلامٌ ثالثٌ مستقلّ بشرطٍ ثالث.
+    ولا يُستعلَم هنا عن «دفعات لم تُنسب»: خرجت بطاقتُها إلى موضعها
+    الواحد في «يحتاج قرارك» — فلا استعلامَ لرقمٍ لا يُعرَض.
   */
-  const unbacked = await loadUnbackedPayments();
-  const unbackedCount = unbacked.length;
-  const unbackedTotalMinor = unbacked.reduce((sum, p) => sum + p.unbackedMinor, 0);
   const focused = focus[0] ?? null;
   const canApprove = can(user.role, "payment:approve");
   const canEdit = can(user.role, "bank:edit");
@@ -406,6 +406,8 @@ export default async function BankPage({
                 outcome: focused.matchOutcome,
                 amountMinor: focused.amountMinor,
                 matched: focused.matchedPaymentId !== null,
+                status: focused.matchStatus,
+                lifecycle: focused.lifecycle,
                 evidence: focused.matchEvidence as MatchExplanation["evidence"],
               }}
               canUndo={canApprove}
@@ -421,27 +423,19 @@ export default async function BankPage({
 
       <StatGrid>
         {/*
-          «طابور المراجعة» كان بطاقةً هنا تفتح صفحةً فارغة، وعددُها عدٌّ
-          ثانٍ للعمل الباقي بجانب عدّ «يحتاج قرارك». فعدٌّ واحد وموضعٌ واحد.
+          ── بطاقتان خرجتا من هنا ──
 
-          و«سداد بلا فاتورة» كان يعدّ ١٣ دفعة بينما التنبيه يعدّ ١٠ —
-          الفرقُ أنّ أحدهما يستثني من لا يصدر فواتير. فصار التعريف واحداً
-          في `loadUnbackedPayments`، والعددُ يفتح تلك الدفعات بعينها.
+          «دفعات لم تُنسب إلى فاتورة» كانت بطاقةً في **أربع** شاشات:
+          الرئيسية، و«يحتاج قرارك»، و«المورّدون»، وهذه. والعملُ الواحد
+          معروضاً أربع مرّاتٍ يُقرأ أربعةَ أعمال. وهو **عملٌ باقٍ** لا
+          حالُ بنك، فموضعُه الطابور حيث له فعلُه.
+
+          و«فواتير مفتوحة ٢١» حالُ فواتير لا حالُ حساب — موضعُها صفحة
+          الفواتير، وهي تعرضها مع ما بقي عليها.
+
+          وبقيت «إيداعات مدى» لأنّها وحدها خبرٌ عن هذا الحساب: من أين
+          يدخل المال.
         */}
-        <Stat
-          label="دفعات لم تُنسب إلى فاتورة"
-          minor={unbackedTotalMinor}
-          tone={unbackedCount > 0 ? "warn" : "ok"}
-          sub={`${countNoun(unbackedCount, PAYMENT_RECORD)} بلا مستند`
-            + (n("advance") > 0 ? ` · ودفعة مقدَّمة ${formatRiyalsDisplay(n("advance_sum"))}` : "")}
-          href="/suppliers?unbacked=1#unbacked"
-        />
-        <Stat
-          label="فواتير مفتوحة"
-          value={String(n("open"))}
-          href="/purchases/invoices?paid=OPEN"
-          sub="ما زال عليها رصيد"
-        />
         <Stat
           label="إيداعات مدى (نقاط البيع)"
           minor={n("settled")}
@@ -457,6 +451,40 @@ export default async function BankPage({
         «سُدّد مرّتين» كان معروضاً هنا كاملاً — البند نفسه والمبالغ نفسها
         والأزرار نفسها الموجودة في «يحتاج قرارك». فبقي في موضعٍ واحد،
         وهذه إحالةٌ إليه لا نسخةٌ منه.
+      */}
+      {groups.length > 0 && (
+        <Section
+          title="حلّ المعلّقات"
+          hint="سؤالٌ واحد عن كلّ ما يتشابه، ثمّ ننتقل. وما تؤكّده يصير ذاكرة: يُطبَّق الآن على ما اخترتَه، ويُعرَف به ما يشبهه في الكشوف القادمة بلا سؤال."
+        >
+          <ReconcileQueue groups={groups} suppliers={supplierRows} canApprove={canApprove} canEdit={canEdit} />
+        </Section>
+      )}
+
+      {/*
+          ── تلميحٌ كان ينفي صفوفَه ──
+
+          كان يقول «... ولا بنودَ تنتظر تأكيدك» لأنّه يعدّ `SUGGEST`
+          وحدها، وفي القائمة تحته صفٌّ بشارة «تنتظر مراجعتك» (`REVIEW`).
+          فالقسمُ ينفي في عنوانه ما يعرضه في متنه.
+
+          والعددُ الواحد للعمل الباقي هو `pending` — الشرطُ نفسه الذي
+          يقرؤه «يحتاج قرارك». فإن كان فيه شيء قيل وفُتح موضعُه، وإلّا
+          فهذا سجلُّ ما وقع لا طابورُ ما ينتظر.
+      */}
+      {/*
+        ── شاشةُ تشغيل لا دفترَ حركات ──
+
+        كان هذا خمسةً وعشرين بطاقةً، في كلٍّ منها نصُّ البنك الخام سطراً
+        أوّل، والمبلغُ في طرف، والحالُ تحتهما. فالعينُ تقرأ البطاقةَ
+        بطاقةً ولا تمسح عموداً: لا يُعرَف في لمحةٍ لمن خرج المال، ولا
+        أيُّ حركةٍ حالُها غير حال أختها.
+
+        فصار جدولاً بأعمدةٍ تُمسَح: **الجهة** ثمّ التاريخ ثمّ البابُ ثمّ
+        **المبلغ** مصفوفاً على خاناته، ثمّ **الحالُ وفعلُه** في عمودٍ
+        واحد — الشارةُ تقول أين وقفت، و«لماذا؟» تفتح الأدلّة في موضعها،
+        والتراجعُ بجانبها. ونصُّ البنك باقٍ تحت اسم الجهة: دليلٌ يُقابَل
+        بالكشف، لا عنوانٌ يُقرأ.
       */}
       {doublePaidCount > 0 && (
         <div id="double-paid" className="mt-8 scroll-mt-28">
@@ -478,55 +506,78 @@ export default async function BankPage({
         </div>
       )}
 
-      {groups.length > 0 && (
-        <Section
-          title="حلّ المعلّقات"
-          hint="سؤالٌ واحد عن كلّ ما يتشابه، ثمّ ننتقل. وما تؤكّده يصير ذاكرة: يُطبَّق الآن على ما اخترتَه، ويُعرَف به ما يشبهه في الكشوف القادمة بلا سؤال."
-        >
-          <ReconcileQueue groups={groups} suppliers={supplierRows} canApprove={canApprove} canEdit={canEdit} />
-        </Section>
-      )}
-
       {recent.length > 0 && (
         <Section
-          title="آخر ما طابقه النظام"
-          hint={`${countNoun(n("auto"), ITEM)} طُوبقت تلقائياً · ${countNoun(n("suggest"), ITEM)} تنتظر تأكيدك. وهذا ترجيح، فراجِع ما يبدو غريباً.`}
+          title="آخر الحركات وحالها"
+          hint="لمن خرج المال، وأين وقفت كلُّ حركة. والحالُ يُشتقّ من الحركة نفسها لا من ترجيحٍ قديم."
         >
-          <ul className="space-y-2.5">
-            {recent.map((t) => {
-              const explanation: MatchExplanation = {
-                transactionId: t.id,
-                disposition: t.matchDisposition,
-                score: t.matchScore,
-                outcome: t.matchOutcome,
-                amountMinor: t.amountMinor,
-                matched: t.matchedPaymentId !== null,
-                evidence: t.matchEvidence as MatchExplanation["evidence"],
-              };
-              return (
-                <li key={t.id} id={`tx-${t.id}`} className="scroll-mt-28">
-                  <Card>
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-bold" dir="auto">
-                          {t.description?.slice(0, 60) ?? "حركة"}
-                        </span>
-                        <span className="nums block truncate text-[11px] text-muted">
-                          {formatDay(t.valueDate)} ·{" "}
-                          {t.direction === "DEBIT" ? "صادر" : "وارد"} ·{" "}
-                          {CATEGORY_LABEL[t.category] ?? t.category}
-                        </span>
-                      </span>
-                      <span className="nums shrink-0 text-sm font-bold">
-                        <Money minor={t.amountMinor} />
-                      </span>
-                    </div>
-                    <MatchExplain match={explanation} canUndo={canApprove} />
-                  </Card>
-                </li>
-              );
-            })}
-          </ul>
+          <DataTable
+            rows={recent}
+            keyOf={(t) => t.id}
+            columns={[
+              {
+                key: "who", header: "الجهة", primary: true,
+                cell: (t) => (
+                  <span className="block min-w-0">
+                    <span className="block truncate font-bold" dir="auto">
+                      {toCanonical({
+                        valueDate: t.valueDate,
+                        description: t.description,
+                        beneficiaryRaw: t.beneficiaryRaw,
+                        transactionType: t.transactionType,
+                        amountMinor: t.amountMinor,
+                        direction: t.direction as "DEBIT" | "CREDIT",
+                      }).beneficiary ?? t.description?.slice(0, 60) ?? "حركة"}
+                    </span>
+                    <span
+                      className="mt-0.5 block max-w-[28rem] truncate text-[11px] text-muted"
+                      dir="auto"
+                      title={t.description ?? undefined}
+                    >
+                      {t.description}
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                key: "date", header: "التاريخ", secondary: true,
+                cell: (t) => <bdi className="nums">{formatDay(t.valueDate)}</bdi>,
+              },
+              {
+                key: "kind", header: "الباب", secondary: true,
+                cell: (t) => (
+                  <span className="whitespace-nowrap text-muted">
+                    {t.direction === "DEBIT" ? "صادر" : "وارد"} · {CATEGORY_LABEL[t.category] ?? t.category}
+                  </span>
+                ),
+              },
+              {
+                key: "amount", header: "المبلغ", numeric: true,
+                cell: (t) => <span className="font-bold"><Money minor={t.amountMinor} /></span>,
+              },
+              {
+                key: "state", header: "الحال",
+                cell: (t) => (
+                  <span id={`tx-${t.id}`} className="block scroll-mt-28">
+                    <MatchExplain
+                      match={{
+                        transactionId: t.id,
+                        disposition: t.matchDisposition,
+                        score: t.matchScore,
+                        outcome: t.matchOutcome,
+                        amountMinor: t.amountMinor,
+                        matched: t.matchedPaymentId !== null,
+                        status: t.matchStatus,
+                        lifecycle: t.lifecycle,
+                        evidence: t.matchEvidence as MatchExplanation["evidence"],
+                      }}
+                      canUndo={canApprove}
+                    />
+                  </span>
+                ),
+              },
+            ]}
+          />
         </Section>
       )}
 

@@ -26,6 +26,10 @@ export interface MatchExplanation {
   outcome: string | null;
   amountMinor: number;
   matched: boolean;
+  /** حالُ الحركة الفعليّ — و«متجاهَلة» قرارٌ تامّ. انظر أدناه. */
+  status?: "UNMATCHED" | "MATCHED" | "IGNORED" | "PARTIAL" | "DISPUTED" | null;
+  /** أين تقف من الطبقات — وما بلغ الحسمَ لا يُسأل عنه. */
+  lifecycle?: "RAW" | "INFERRED" | "SUGGESTED" | "CONFIRMED" | "POSTED" | null;
   evidence: {
     تصنيف?: string;
     مستفيد?: string[];
@@ -84,12 +88,44 @@ export function MatchExplain({
     «ليست سداداً» كان الخادم يردّها (match-undo) ولا زرّ لها — فمن أعلنها
     خطأً يرى الحركة خارج الطابور ولا يملك إعادتها (BTN-106).
   */
-  const notAPayment = !match.matched && match.outcome === "NOT_A_PAYMENT";
+  /*
+    ── الشارةُ تُشتقّ من الحال، لا من عمودٍ قديم ──
+
+    كانت تُقرأ من `match_disposition` وحده متى لم تكن الحركة مقيَّدةً
+    بدفعة. و`match_disposition` عمودٌ عن **آخر ما رجّحه المحرّك**، لا عن
+    حال الحركة اليوم: يبقى فيه «مراجعة» بعد أن يبتّ الإنسانُ الأمر،
+    لأنّ الذي يتغيّر حينها عمودٌ آخر.
+
+    فوقع في قاعدة أحمد: حوالةٌ **واردة** بـ١٬١٠٠ ريالاً (٤ يوليو ٢٠٢٦)
+    حالُها `IGNORED` — أي **أُعلن أنّها ليست سداداً وانتهى أمرُها** —
+    وكانت تُعرَض بشارةٍ حمراء «تنتظر مراجعتك». ولم تُمسَك بالحارس
+    القديم لأنّه كان يسأل عن `match_outcome = 'NOT_A_PAYMENT'`،
+    ونتيجتُها `UNKNOWN_ENTITY`. فالحارسُ كان يمسك **سبباً** واحداً من
+    أسباب التجاهل لا **الحالَ** نفسه.
+
+    وشارةٌ تقول «ينتظرك عمل» عن عملٍ مقضيّ أسوأ من غياب الشارة: تُري
+    صاحبَ المقهى واجباً ثمّ لا يجده في أيّ طابور، فيشكّ في الطوابير كلّها.
+
+    فصارت تُشتقّ بالترتيب الذي تصير به الحركةُ إلى حالها:
+    متجاهَلةٌ ← مقيَّدةٌ بدفعة ← حُسمت بلا مال ← ترجيحٌ ينتظر. ولم يُمَسّ
+    شيءٌ من محرّك المطابقة: التغييرُ في قراءة الحال لا في تقريره.
+  */
+  const decided = match.lifecycle === "CONFIRMED" || match.lifecycle === "POSTED";
+  /*
+    «متجاهَلة» حالٌ لا سبب — و`NOT_A_PAYMENT` سببٌ واحدٌ من أسبابها.
+    ويُبقى السببُ في الشرط كي لا يسقط صفٌّ قديمٌ لم يُكتب حالُه.
+  */
+  const notAPayment = !match.matched && (match.status === "IGNORED" || match.outcome === "NOT_A_PAYMENT");
+
   const d = notAPayment
     ? { label: "أُعلنت ليست سداداً", tone: "muted" as const }
-    : match.matched && match.disposition !== "AUTO"
-      ? { label: "سُجّلت سداداً", tone: "ok" as const }
-      : match.disposition ? DISPOSITION[match.disposition] : null;
+    : match.matched
+      ? match.disposition === "AUTO"
+        ? { label: "طُوبقت تلقائياً", tone: "ok" as const }
+        : { label: "سُجّلت سداداً", tone: "ok" as const }
+      : decided
+        ? { label: "حُسمت بلا قيد", tone: "ok" as const }
+        : match.disposition ? DISPOSITION[match.disposition] : null;
 
   return (
     <div className="mt-2">

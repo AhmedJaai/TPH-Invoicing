@@ -17,7 +17,8 @@ import { loadBalanceTotals, loadOverdueBalances } from "@/services/supplier-bala
 import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
 import { formatDay } from "@/lib/riyadh-time";
-import { formatRiyalsDisplay } from "@/lib/money";
+import { needsContract, needsPaperUpload } from "@/lib/supplier-policy-rules";
+
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +91,7 @@ export default async function SuppliersPage({
 
   if (meta.length === 0) {
     return (
-      <PageShell user={user} width="wide" title="المورّدون">
+      <PageShell user={user} width="wide" title="حسابات المورّدين">
         <EmptyState
           title="لا مورّدين بعد."
           hint="يُنشَأ المورّد حين تُقرأ أوّل فاتورة منه — أو تختاره «مورّداً جديداً» في شاشة الرفع."
@@ -126,16 +127,10 @@ export default async function SuppliersPage({
       a.nameAr.localeCompare(b.nameAr, "ar"),
     );
 
-  /*
-    من أُعلن أنّه لا يُطلَب منه عقد يخرج، ومن فواتيرُه ورقيّةٌ يخرج كذلك:
-    الأولى قرارُ صاحب العمل، والثانية تقول إنّ الفاتورة موجودةٌ ولم
-    تُرفَع — فمطلبُها رفعُ الورقة لا عقدُ توريد. (الهجرة 035)
-  */
-  const needContract = meta.filter(
-    (r) => !r.issuesInvoices && !r.contractOnFile && r.contractRequired && !r.paperInvoices,
-  );
+  /* القاعدة في `supplier-policy-rules.ts` — موضعٌ واحد لها. */
+  const needContract = meta.filter(needsContract);
   /* ومن فواتيرُه ورقيّة يُذكَر بمطلبه هو: ارفع الورقة. */
-  const paperOnly = meta.filter((r) => r.paperInvoices);
+  const paperOnly = meta.filter(needsPaperUpload);
 
   const findings: FindingView[] = open.map((f) => ({
     id: f.id, supplierId: f.supplierId, supplierName: f.supplierName, supplierSlug: f.supplierSlug,
@@ -157,7 +152,29 @@ export default async function SuppliersPage({
       width="wide"
       title="حسابات المورّدين"
       intro="كم على المقهى لكلّ مورّد بعد خصم ما دُفع له، وكم بقي له عندهم."
+      /*
+        مدخلُ «الأصناف والأسعار» — خرجت من ألسنة المساحة لأنّها سؤالٌ
+        يُسأل مرّاتٍ في السنة، ولا يأخذ رُبعَ شريطٍ يُقرأ كلّ يوم. وموضعُه
+        هنا: من فتح حسابات المورّدين هو من يسأل «أرتفع سعرُ البنّ؟».
+      */
+      actions={
+        <LinkButton href="/analysis" size="sm">
+          الأصناف والأسعار
+        </LinkButton>
+      }
     >
+      {/*
+        ── بطاقتان لا ثلاث ──
+
+        كانت ثالثتُها «دفعات لم تُنسب إلى فاتورة»، وتحتها فقرةٌ تشرح لِمَ
+        تختلف عن «رصيدٌ لك»: الأولى بالمورّد (يُخصَم رصيدُه من دَينه)،
+        والثانية بالدفعة. والفقرة كانت صحيحة، **ووجودُها هو العطب**:
+        رقمان لا يُفهمان إلّا بفقرةٍ بينهما لا يُعرضان معاً.
+
+        و«لم تُنسب» عملٌ باقٍ لا حالُ حساب، فموضعُه «يحتاج قرارك» — وهو
+        معروضٌ هناك بندَاً له فعلُه. ويبقى هنا سطرُ إحالةٍ إلى الجدول
+        نفسِه أسفل الصفحة، فلا يضيع المدخل.
+      */}
       {showAmounts && (
         <StatGrid>
           <Stat
@@ -171,30 +188,19 @@ export default async function SuppliersPage({
             minor={totals.creditLeftMinor}
             sub={`${countNoun(totals.creditSuppliers, SUPPLIER)} · مالٌ دفعتَه ولم تصلك فاتورته`}
           />
-          <Stat
-            label="دفعات لم تُنسب إلى فاتورة"
-            minor={unbackedTotal}
-            /*
-              العدد يفتح ما يعدّه بعينه — لا صفحة البنك ولا الجدول العامّ.
-              وهو التعريف نفسه الذي يقرؤه التنبيه وصفحةُ البنك بعد التوحيد.
-            */
-            href="/suppliers?unbacked=1#unbacked"
-            sub={`${countNoun(unbackedPayments.length, PAYMENT_RECORD)} · افتحها واطلب مستنداتها`}
-          />
         </StatGrid>
       )}
 
-      {/*
-        رقمان متقاربان في شاشةٍ واحدة يُقرآن الشيءَ نفسه ما لم يُقَل
-        الفرق. و«رصيدٌ لك» محسوبٌ بالمورّد — فمن عليك له يُخصَم رصيدُه من
-        دَينه ولا يظهر هنا؛ و«لم تُنسب» محسوبٌ بالدفعة، فتُعَدّ كلُّ دفعةٍ
-        بلا مستندٍ ولو كان صاحبُها مديناً لك. والفرق بينهما ليس خطأً.
-      */}
-      {showAmounts && unbackedTotal > 0 && totals.creditLeftMinor > 0 && unbackedTotal !== totals.creditLeftMinor && (
+      {showAmounts && unbackedTotal > 0 && (
         <p className="mt-2.5 text-xs leading-relaxed text-muted">
-          ولِمَ يختلف الرقمان؟ «رصيدٌ لك» بالمورّد — فمن عليك له خُصم رصيدُه من دَينه أوّلاً؛
-          و«لم تُنسب» بالدفعة، تُعَدّ فيها كلُّ دفعةٍ بلا مستند. والفرق بينهما ما خُصم:{" "}
-          <span className="nums font-bold">{formatRiyalsDisplay(totals.offsetMinor)}</span> ريالاً.
+          و
+          <Link
+            href="/suppliers?unbacked=1#unbacked"
+            className="font-medium underline underline-offset-4 hover:text-ink"
+          >
+            {countNoun(unbackedPayments.length, PAYMENT_RECORD)}
+          </Link>{" "}
+          دفعتَها ولم يصل مستندُها — اطلب فواتيرها.
         </p>
       )}
 
