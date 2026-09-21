@@ -30,6 +30,9 @@ import { db } from "@/db";
 import { posProducts, products } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { normaliseHeader } from "@/lib/sales/columns";
+import { READY_MADE } from "@/lib/inventory/ready-made";
+import { MILLI } from "@/lib/inventory/units";
+import type { StoredUnit } from "@/lib/unit-conversion";
 import {
   CATALOG_LABEL, parseCatalogFile,
   type CatalogIssue, type CatalogKind, type MenuProductRow, type ParsedCatalog,
@@ -136,7 +139,7 @@ export async function importFoodicsCatalog(
   const run = async (tx: Conn) => {
     const itemIdBySku = await upsertStockItems(items, input, out, tx);
     const menuIdBySku = await upsertMenuProducts(menu, input, out, tx);
-    await writeRecipes(lines, itemIdBySku, menuIdBySku, input, out, tx);
+    await writeRecipes(lines, itemIdBySku, await readyMadeUnits(items, tx), menuIdBySku, input, out, tx);
     if (input.dryRun) throw new DryRun();
   };
 
@@ -332,22 +335,78 @@ async function upsertMenuProducts(
 
 /* ────────────────────────── الوصفات ────────────────────────── */
 
+/**
+ * وحدةُ صرفِ كلّ صنفٍ جاهز — من المرفوع أوّلاً، ثمّ من القاعدة.
+ *
+ * فمن رفع ملفّ الوصفات وحدَه (وأصنافُه مقيَّدةٌ من رفعةٍ سابقة) يجد
+ * وحداتِها كما هي. والوحدةُ تُقرأ ولا تُكتب في جدول الاقتران: مصدرٌ
+ * واحد لها، وهو الكتالوج.
+ */
+async function readyMadeUnits(
+  uploaded: readonly StockItemRow[],
+  tx: Conn,
+): Promise<Map<string, StoredUnit>> {
+  const out = new Map<string, StoredUnit>(
+    uploaded.map((i) => [i.itemSku, i.baseUnit] as const),
+  );
+
+  const missing = READY_MADE.map((r) => r.itemSku).filter((sku) => !out.has(sku));
+  if (missing.length === 0) return out;
+
+  const rows = await tx
+    .select({ sku: products.foodicsItemSku, baseUnit: products.baseUnit })
+    .from(products)
+    .where(inArray(products.foodicsItemSku, missing));
+  for (const r of rows) {
+    if (r.sku !== null) out.set(r.sku, r.baseUnit);
+  }
+  return out;
+}
+
 async function writeRecipes(
   lines: readonly RecipeLineRow[],
   itemIdBySku: ReadonlyMap<string, string>,
+  itemUnitBySku: ReadonlyMap<string, StoredUnit>,
   menuIdBySku: ReadonlyMap<string, string>,
   input: CatalogImportInput,
   out: CatalogImportResult,
   tx: Conn,
 ): Promise<void> {
-  if (lines.length === 0) return;
-
   const byProduct = new Map<string, RecipeLineRow[]>();
   for (const l of lines) {
     const list = byProduct.get(l.productSku);
     if (list) list.push(l);
     else byProduct.set(l.productSku, [l]);
   }
+
+  /*
+    ── والجاهزُ يُضاف إلى وصفته ولو خلا منه الملفّ ──
+
+    كتالوج فودكس يحمل لهذه الأصناف تغليفَها وحدَه، أو لا يحمل لها
+    شيئاً. فيُضاف صنفُها نفسُه — قطعةً واحدة — إلى ما جاء في الملفّ،
+    **ولا يُستبدَل به**: الشوكةُ والعلبةُ تُستهلكان أيضاً.
+
+    ولا يُضاف إن كان مذكوراً أصلاً: من صحّح وصفتَه في فودكس لا
+    يُضاعَف عليه مكوّنُه.
+  */
+  if (menuIdBySku.size > 0 || lines.length > 0) {
+    for (const ready of READY_MADE) {
+      const existing = byProduct.get(ready.productSku) ?? [];
+      if (existing.some((l) => l.itemSku === ready.itemSku)) continue;
+      byProduct.set(ready.productSku, [...existing, {
+        productSku: ready.productSku,
+        productName: existing[0]?.productName ?? "",
+        itemSku: ready.itemSku,
+        itemName: ready.itemName,
+        /* الكمّيّةُ بوحدة صرف الصنف، وتُقرأ منه لا من هذا الجدول */
+        quantityMilli: ready.quantity * MILLI,
+        unit: itemUnitBySku.get(ready.itemSku) ?? "PIECE",
+        statedCostMinor: null,
+      }]);
+    }
+  }
+
+  if (byProduct.size === 0) return;
 
   /* أيُّ الوصفات كتبها إنسان — لا يُكتَب فوقها */
   const human = await humanWrittenRecipes(tx);
