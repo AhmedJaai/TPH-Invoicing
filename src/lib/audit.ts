@@ -70,6 +70,10 @@ export type AuditAction =
   | "RECIPE_CREATED"
   | "RECIPE_VERSION_SAVED"
   | "RECIPE_VERSION_ACTIVATED"
+  /* تصحيحٌ في مكانه — يسري على ما مضى، ولا يقع على ما قُفل عليه جرد */
+  | "RECIPE_VERSION_CORRECTED"
+  | "RECIPE_DELETED"
+  | "STOCK_ITEM_RETIRED"
   | "INVENTORY_COUNT_STARTED"
   | "INVENTORY_COUNT_LINE_EDITED"
   | "INVENTORY_COUNT_FINALISED"

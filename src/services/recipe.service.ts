@@ -16,8 +16,10 @@ import { db } from "@/db";
 import { products, recipeIngredients, recipeVersions, recipes } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { isStoredUnit, type StoredUnit } from "@/lib/unit-conversion";
-import type { RecipeVersionInput } from "@/lib/inventory/recipe";
+import { RECIPE_EPOCH, type RecipeVersionInput } from "@/lib/inventory/recipe";
 import { recipeCost, type CostedIngredient, type RecipeCost } from "@/lib/inventory/recipe-cost";
+import { milliToDecimal } from "@/lib/inventory/units";
+import { milliMinorToMinor } from "@/lib/money";
 import type { Conn } from "./types";
 
 export interface IngredientDraft {
@@ -59,6 +61,24 @@ export interface SaveVersionResult {
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** فحصُ المسوّدة — واحدٌ للحفظ والتصحيح، فلا يفترق الشرطان. */
+function validateDraft(ingredients: readonly IngredientDraft[]): void {
+  if (ingredients.length === 0) throw new Error("وصفةٌ بلا مكوّنات لا تُحسَب — أضِف مكوّناً واحداً على الأقلّ");
+  for (const ing of ingredients) {
+    if (!isStoredUnit(ing.unit)) throw new Error("وحدةُ مكوّنٍ غير معروفة");
+    if (!Number.isInteger(ing.quantityMilli) || ing.quantityMilli <= 0) {
+      throw new Error("كمّيّةُ المكوّن تكون أكبر من صفر");
+    }
+  }
+  /* المكوّنُ يتكرّر بخيارين مختلفين — ولا يتكرّر بالخيار نفسه */
+  const seen = new Set<string>();
+  for (const ing of ingredients) {
+    const key = `${ing.productId}|${ing.modifierExternalId ?? ""}`;
+    if (seen.has(key)) throw new Error("المكوّن مذكورٌ مرّتين بالخيار نفسه — اجمعه في سطرٍ واحد");
+    seen.add(key);
+  }
+}
+
 /** اليومُ السابق — نصّاً، بلا `Date` محلّيّة تجرّ منطقةَ الجلسة. */
 export function previousDay(date: string): string {
   const [y, m, d] = date.split("-").map(Number);
@@ -74,20 +94,7 @@ export function previousDay(date: string): string {
  */
 export async function saveRecipeVersion(input: SaveVersionInput, conn: Conn = db): Promise<SaveVersionResult> {
   if (!DATE.test(input.effectiveFrom)) throw new Error("تاريخُ بدء السريان يُكتب YYYY-MM-DD");
-  if (input.ingredients.length === 0) throw new Error("وصفةٌ بلا مكوّنات لا تُحسَب — أضِف مكوّناً واحداً على الأقلّ");
-  for (const ing of input.ingredients) {
-    if (!isStoredUnit(ing.unit)) throw new Error("وحدةُ مكوّنٍ غير معروفة");
-    if (!Number.isInteger(ing.quantityMilli) || ing.quantityMilli <= 0) {
-      throw new Error("كمّيّةُ المكوّن تكون أكبر من صفر");
-    }
-  }
-  /* المكوّنُ يتكرّر بخيارين مختلفين — ولا يتكرّر بالخيار نفسه */
-  const seen = new Set<string>();
-  for (const ing of input.ingredients) {
-    const key = `${ing.productId}|${ing.modifierExternalId ?? ""}`;
-    if (seen.has(key)) throw new Error("المكوّن مذكورٌ مرّتين بالخيار نفسه — اجمعه في سطرٍ واحد");
-    seen.add(key);
-  }
+  validateDraft(input.ingredients);
 
   return conn.transaction(async (tx) => {
     const [menu] = await tx
@@ -122,6 +129,22 @@ export async function saveRecipeVersion(input: SaveVersionInput, conn: Conn = db
       .where(eq(recipeVersions.recipeId, recipe.id));
 
     /*
+      ── أوّلُ نسخةٍ سارية منذ البداية ──
+
+      تصف **كيف كان يُصنَع المشروب دائماً**، لا كيف سيُصنَع من الغد.
+      فلو بدأت يومَ كتابتها لخرج كلُّ بيعٍ قبلها «بلا نسخةٍ سارية».
+
+      وقد وقع ذلك: رُفع الكتالوج بتاريخ سريانٍ في المستقبل، فقالت
+      شاشةُ الجرد «لم يدخل الحسابَ سطرُ بيعٍ واحد» — ١٧٠٦ من ١٧١٧،
+      والوصفاتُ كلُّها صحيحة.
+
+      **والتغييرُ اللاحق وحده يُؤرَّخ**، فيبقى تقريرُ ما مضى محسوباً
+      بما كان.
+    */
+    const first = Number(next) === 1;
+    const effectiveFrom = first ? RECIPE_EPOCH : input.effectiveFrom;
+
+    /*
       ── تُغلَق السابقةُ قبل أن تُكتَب اللاحقة ──
 
       ومؤثِّرُ القاعدة يرفض التداخل، فلو عُكس الترتيب سقطت الكتابةُ
@@ -138,14 +161,14 @@ export async function saveRecipeVersion(input: SaveVersionInput, conn: Conn = db
         .limit(1);
 
       if (current) {
-        if (current.effectiveFrom >= input.effectiveFrom) {
+        if (current.effectiveFrom >= effectiveFrom) {
           throw new Error(
             `النسخة السارية تبدأ في ${current.effectiveFrom} — فلا تبدأ الجديدة قبلها أو معها. اختر تاريخاً بعده.`,
           );
         }
         await tx
           .update(recipeVersions)
-          .set({ effectiveTo: previousDay(input.effectiveFrom) })
+          .set({ effectiveTo: previousDay(effectiveFrom) })
           .where(eq(recipeVersions.id, current.id));
         closedPrevious = current.id;
       }
@@ -157,7 +180,7 @@ export async function saveRecipeVersion(input: SaveVersionInput, conn: Conn = db
         recipeId: recipe.id,
         version: Number(next),
         status: input.activate ? "ACTIVE" : "DRAFT",
-        effectiveFrom: input.effectiveFrom,
+        effectiveFrom,
         effectiveTo: null,
         yieldQuantityMilli: input.yieldQuantityMilli ?? null,
         yieldUnit: input.yieldUnit ?? null,
@@ -198,9 +221,9 @@ export async function saveRecipeVersion(input: SaveVersionInput, conn: Conn = db
       after: {
         الصنف: menu.nameAr,
         النسخة: version.version,
-        تسري_من: input.effectiveFrom,
+        تسري_من: first ? "منذ البداية" : effectiveFrom,
         المكوّنات: input.ingredients.length,
-        ...(closedPrevious ? { أُغلقت_السابقة_في: previousDay(input.effectiveFrom) } : {}),
+        ...(closedPrevious ? { أُغلقت_السابقة_في: previousDay(effectiveFrom) } : {}),
       },
     }, tx);
 
@@ -339,6 +362,30 @@ export interface RecipeRow {
   priceMinor: number | null;
   /** والكلفةُ التي يعلنها المصدر — تُقارَن ولا تحلّ محلّ الحساب. */
   declaredCostMinor: number | null;
+  /** يومُ بدء السريان، و`RECIPE_EPOCH` تعني «منذ البداية». */
+  activeFromLabel: string;
+  /**
+   * أيجوز تصحيحُها في مكانها؟
+   *
+   * يجوز ما دام **لا جردَ مقفَلٌ تتقاطع فترتُه مع سريانها**. فالتصحيح
+   * يقول «كانت دائماً كذا وأخطأنا في كتابتها»، وذلك يسري على ما مضى.
+   * أمّا إن قُفل عليها جردٌ فالتصحيحُ يجعل أصلَ تقريرٍ مجمَّدٍ يكذب —
+   * فيُطلَب حينئذٍ **تغييرٌ مؤرَّخ** لا تصحيح.
+   */
+  correctable: boolean;
+  /** مكوّناتُ النسخة القائمة، بكلفة كلٍّ — يُفتَح بها اللوحُ بلا طلبٍ ثانٍ. */
+  ingredients: RecipeIngredientView[];
+}
+
+/** مكوّنٌ كما يُعرَض ويُعدَّل. */
+export interface RecipeIngredientView {
+  productId: string;
+  name: string;
+  /** الكمّيّة نصّاً بوحدتها: «0.18» — تُكتب في الحقل كما هي. */
+  quantity: string;
+  unit: StoredUnit;
+  baseUnit: StoredUnit;
+  costMinor: number | null;
 }
 
 /**
@@ -392,6 +439,25 @@ export async function listRecipes(conn: Conn = db): Promise<RecipeRow[]> {
       join products p on p.id = i.product_id
   `);
 
+  /*
+    ── أيُّ النسخ يجوز تصحيحُها ──
+
+    التصحيحُ يسري على ما مضى، فلا يقع على نسخةٍ قُفل عليها جرد:
+    أرقامُ المقفَل مجمَّدةٌ ولن تتغيّر، لكنّ **أصلَها سيكذب**. ويُقرأ
+    الجوابُ لكلّ الوصفات في استعلامٍ واحد لا استعلامٍ لكلّ صفّ.
+  */
+  const locked = new Set(
+    (await conn.execute<{ recipe_id: string }>(sql`
+      select distinct v.recipe_id
+        from recipe_versions v
+        join inventory_counts c
+          on c.status = 'FINALISED'
+         and c.period_end >= v.effective_from
+         and (v.effective_to is null or c.period_start <= v.effective_to)
+       where v.status = 'ACTIVE' and v.effective_to is null
+    `)).rows.map((r) => String(r.recipe_id)),
+  );
+
   const byRecipe = new Map<string, CostedIngredient[]>();
   for (const r of ings.rows) {
     const unit = r.unit;
@@ -412,7 +478,9 @@ export async function listRecipes(conn: Conn = db): Promise<RecipeRow[]> {
   }
 
   return rows.rows.map((r) => {
-    const cost = recipeCost(byRecipe.get(String(r.recipe_id)) ?? []);
+    const mine = byRecipe.get(String(r.recipe_id)) ?? [];
+    const cost = recipeCost(mine);
+    const costByProduct = new Map(cost.lines.map((l) => [l.productId, l.costMilliMinor] as const));
     return {
       recipeId: String(r.recipe_id),
       menuProductId: String(r.product_id),
@@ -425,7 +493,241 @@ export async function listRecipes(conn: Conn = db): Promise<RecipeRow[]> {
       unknownCost: cost.unknown,
       priceMinor: r.price_minor === null ? null : Number(r.price_minor),
       declaredCostMinor: r.declared_cost === null ? null : Number(r.declared_cost),
+      activeFromLabel: r.active_from === null ? "" : String(r.active_from),
+      correctable: !locked.has(String(r.recipe_id)),
+      ingredients: mine.map((i) => ({
+        productId: i.productId,
+        name: i.name,
+        /* تُعرَض بوحدتها كما كُتبت — لا تُحوَّل إلى وحدة الصنف فتُقرأ «١٨٠ مليلتر» لمن كتب «٠٫١٨ لتر» */
+        quantity: milliToDecimalTrimmed(i.quantityMilli),
+        unit: i.unit,
+        baseUnit: i.baseUnit,
+        costMinor: (() => {
+          const m = costByProduct.get(i.productId);
+          return m === null || m === undefined ? null : milliMinorToMinor(m);
+        })(),
+      })),
     };
   });
 }
 
+/** «0.180» ← «0.18»، و«18.000» ← «18» — للعرض في حقلٍ يُكتب فيه. */
+function milliToDecimalTrimmed(milliValue: number): string {
+  return milliToDecimal(milliValue).replace(/\.?0+$/, "");
+}
+
+
+/* ───────────────────── التصحيحُ والحذف ───────────────────── */
+
+/**
+ * يُصحِّح مكوّناتِ النسخة القائمة **في مكانها**.
+ *
+ * ── ومتى يجوز ──
+ *
+ * «لا تُعدَّل نسخةٌ في مكانها» قاعدةٌ وُضعت لحماية **تقريرٍ مجمَّد**:
+ * لو عُدِّلت وصفةٌ حُسب بها جردٌ مقفَل لصار أصلُ ذلك التقرير يكذب.
+ *
+ * فالحدُّ هو ذاك بعينه، لا أكثر: ما لم يُقفَل جردٌ تتقاطع فترتُه مع
+ * سريان النسخة، فالتصحيح **يسري على ما مضى** — وهو الصواب: من كتب
+ * «١٨ جراماً» وهي عشرون لم يُغيّر وصفتَه، بل أخطأ في كتابتها.
+ *
+ * وما عداه **تغييرٌ مؤرَّخ**: نسخةٌ ثانية تقول «من هنا صار كذا».
+ */
+export async function correctRecipeVersion(
+  input: { menuProductId: string; ingredients: IngredientDraft[]; actorId: string },
+  conn: Conn = db,
+): Promise<{ versionId: string; version: number; ingredients: number }> {
+  validateDraft(input.ingredients);
+
+  return conn.transaction(async (tx) => {
+    const [current] = (await tx.execute<{ version_id: string; version: number; recipe_id: string; name_ar: string }>(sql`
+      select v.id as version_id, v.version, r.id as recipe_id, p.name_ar
+        from recipes r
+        join products p on p.id = r.product_id
+        join recipe_versions v on v.recipe_id = r.id
+       where r.product_id = ${input.menuProductId}
+         and v.status = 'ACTIVE' and v.effective_to is null
+       limit 1
+    `)).rows;
+    if (!current) throw new Error("لا نسخةَ سارية لهذا الصنف — احفظ وصفةً أوّلاً");
+
+    const [locked] = (await tx.execute<{ period_start: string; period_end: string }>(sql`
+      select c.period_start, c.period_end
+        from recipe_versions v
+        join inventory_counts c
+          on c.status = 'FINALISED'
+         and c.period_end >= v.effective_from
+         and (v.effective_to is null or c.period_start <= v.effective_to)
+       where v.id = ${String(current.version_id)}
+       limit 1
+    `)).rows;
+    if (locked) {
+      throw new RecipeLockedError(String(locked.period_start), String(locked.period_end));
+    }
+
+    await tx.delete(recipeIngredients).where(eq(recipeIngredients.recipeVersionId, String(current.version_id)));
+    await tx.insert(recipeIngredients).values(
+      input.ingredients.map((ing) => ({
+        recipeVersionId: String(current.version_id),
+        productId: ing.productId,
+        quantityMilli: ing.quantityMilli,
+        unit: ing.unit,
+        prepLossBp: ing.prepLossBp ?? null,
+        modifierExternalId: ing.modifierExternalId ?? null,
+        note: ing.note ?? null,
+      })),
+    );
+
+    await recordAudit({
+      actorId: input.actorId,
+      action: "RECIPE_VERSION_CORRECTED",
+      entityType: "recipe_version",
+      entityId: String(current.version_id),
+      after: {
+        الصنف: String(current.name_ar),
+        النسخة: Number(current.version),
+        المكوّنات: input.ingredients.length,
+        ملاحظة: "تصحيحٌ في مكانه — يسري على ما مضى، ولا جردَ مقفَلٌ عليه",
+      },
+    }, tx);
+
+    return {
+      versionId: String(current.version_id),
+      version: Number(current.version),
+      ingredients: input.ingredients.length,
+    };
+  });
+}
+
+/** نسخةٌ حُسب بها جردٌ مقفَل — تُغيَّر بنسخةٍ مؤرَّخة لا بتصحيح. */
+export class RecipeLockedError extends Error {
+  constructor(readonly periodStart: string, readonly periodEnd: string) {
+    super(
+      `حُسب بهذه الوصفة جردٌ مقفَل (${periodStart} → ${periodEnd})،`
+      + ` فتصحيحُها يجعل أصلَ ذلك التقرير يكذب.`
+      + ` احفظ **تغييراً بتاريخ** يبدأ بعد الجرد المقفل.`,
+    );
+    this.name = "RecipeLockedError";
+  }
+}
+
+/**
+ * يحذف وصفةً بنسخها كلِّها.
+ *
+ * ولا يقع على ما حُسب به جردٌ مقفَل — للسبب نفسه: التقريرُ المجمَّد
+ * يحفظ **بم حُسب**، وحذفُ أصله يجعل ذلك الحفظ إشارةً إلى لا شيء.
+ */
+export async function deleteRecipe(
+  menuProductId: string,
+  actorId: string,
+  conn: Conn = db,
+): Promise<{ deletedVersions: number; name: string }> {
+  return conn.transaction(async (tx) => {
+    const [row] = (await tx.execute<{ recipe_id: string; name_ar: string; versions: number }>(sql`
+      select r.id as recipe_id, p.name_ar,
+             (select count(*)::int from recipe_versions v where v.recipe_id = r.id) as versions
+        from recipes r
+        join products p on p.id = r.product_id
+       where r.product_id = ${menuProductId}
+       limit 1
+    `)).rows;
+    if (!row) throw new Error("لا وصفةَ لهذا الصنف");
+
+    const [locked] = (await tx.execute<{ period_start: string; period_end: string }>(sql`
+      select c.period_start, c.period_end
+        from recipe_versions v
+        join inventory_counts c
+          on c.status = 'FINALISED'
+         and c.period_end >= v.effective_from
+         and (v.effective_to is null or c.period_start <= v.effective_to)
+       where v.recipe_id = ${String(row.recipe_id)}
+       limit 1
+    `)).rows;
+    if (locked) {
+      throw new RecipeLockedError(String(locked.period_start), String(locked.period_end));
+    }
+
+    await tx.delete(recipes).where(eq(recipes.id, String(row.recipe_id)));
+
+    await recordAudit({
+      actorId,
+      action: "RECIPE_DELETED",
+      entityType: "recipe",
+      entityId: String(row.recipe_id),
+      before: { الصنف: String(row.name_ar), النسخ: Number(row.versions) },
+    }, tx);
+
+    return { deletedVersions: Number(row.versions), name: String(row.name_ar) };
+  });
+}
+
+/**
+ * صنفُ مخزونٍ لا يخرج من القائمة لأنّه مذكورٌ في وصفةٍ سارية.
+ *
+ * فإخراجُه يترك وصفاتٍ تشير إلى صنفٍ لا يُعَدّ — فتُحسَب لها كلفةٌ
+ * ولا يُقابلها عدٌّ على الرفّ، ويظهر فرقُها الأسبوعيّ بحجم ما اشتُري
+ * منه. والوصفةُ تُصحَّح أوّلاً، ثمّ يخرج الصنف.
+ */
+export class ItemInUseError extends Error {
+  constructor(public readonly recipes: readonly string[]) {
+    super(
+      `هذا الصنف مكوّنٌ في ${recipes.length} وصفةً سارية (${recipes.slice(0, 5).join("، ")}`
+      + `${recipes.length > 5 ? "…" : ""}). احذفه من وصفاتها أوّلاً، ثمّ أخرِجه.`,
+    );
+    this.name = "ItemInUseError";
+  }
+}
+
+/**
+ * يُخرج صنفَ مخزونٍ من القائمة — **ولا يحذف تاريخه**.
+ *
+ * ── ولماذا إخراجٌ لا حذف ──
+ *
+ * الصنفُ مذكورٌ في بنود فواتير، وحركات مخزون، وأسطر جردٍ مقفَل. فحذفُه
+ * يجعل تلك الأسطر تشير إلى لا شيء — وأسطرُ الجرد المقفَل مجمَّدةٌ
+ * عمداً كي يبقى التقريرُ التاريخيّ صادقاً. والقاعدةُ نفسُها في
+ * المورّدين منذ اليوم الأوّل: **يُدمَج ويُعطَّل، ولا يُحذف**.
+ *
+ * فالذي يقع هو `is_active = false`: يختفي من الجرد ومن قوائم اختيار
+ * المكوّنات، ويبقى ما مضى كما حُسب.
+ */
+export async function retireStockItem(
+  productId: string,
+  actorId: string,
+  conn: Conn = db,
+): Promise<{ name: string }> {
+  return conn.transaction(async (tx) => {
+    const [row] = (await tx.execute<{ name_ar: string }>(sql`
+      select p.name_ar from products p
+       where p.id = ${productId} and p.is_stock_item and p.is_active
+       limit 1
+    `)).rows;
+    if (!row) throw new Error("لا صنفَ مخزونٍ قائمٌ بهذا المعرّف");
+
+    /* الوصفاتُ السارية وحدها تمنع — والمؤرشفةُ ذكرى، لا استعمال */
+    const used = (await tx.execute<{ name_ar: string }>(sql`
+      select distinct mp.name_ar
+        from recipe_ingredients ri
+        join recipe_versions v on v.id = ri.recipe_version_id
+        join recipes r on r.id = v.recipe_id
+        join products mp on mp.id = r.product_id
+       where ri.product_id = ${productId}
+         and v.status = 'ACTIVE' and v.effective_to is null
+       order by mp.name_ar
+    `)).rows;
+    if (used.length > 0) throw new ItemInUseError(used.map((u) => String(u.name_ar)));
+
+    await tx.execute(sql`update products set is_active = false where id = ${productId}`);
+
+    await recordAudit({
+      actorId,
+      action: "STOCK_ITEM_RETIRED",
+      entityType: "product",
+      entityId: productId,
+      before: { الصنف: String(row.name_ar), قائم: true },
+      after: { قائم: false },
+    }, tx);
+
+    return { name: String(row.name_ar) };
+  });
+}

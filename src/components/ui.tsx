@@ -282,6 +282,15 @@ export interface Column<T> {
   secondary?: boolean;
   /** عنوان البطاقة على الجوّال — يُعرَض بارزاً بلا تسمية. */
   primary?: boolean;
+  /**
+   * خليّةٌ لا تُقصّ على الجوّال.
+   *
+   * القصُّ (`truncate`) يضع `overflow: hidden` على الخليّة — وذلك
+   * صحيحٌ لنصٍّ طويل، ويبتلع **لوحَ إقرارٍ يُفتَح داخلها**: فيضغط
+   * صاحبُه «احذف» فلا يرى ما يؤكّد به. فما كانت خليّتُه فعلاً لا نصّاً
+   * تُعلَن هنا.
+   */
+  wrap?: boolean;
 }
 
 /**
@@ -395,7 +404,7 @@ export function DataTable<T>({
                     {rest.map((c) => (
                       <div key={c.key} className="min-w-0">
                         <dt className="text-[11px] text-muted">{c.header}</dt>
-                        <dd className="truncate text-xs">{c.cell(row)}</dd>
+                        <dd className={c.wrap ? "text-xs" : "truncate text-xs"}>{c.cell(row)}</dd>
                       </div>
                     ))}
                   </dl>
