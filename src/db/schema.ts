@@ -6,8 +6,9 @@
  *  ٢. كل شهر محاسبي نصٌّ بصيغة YYYY-MM مشتقٌّ من تاريخ الفاتورة لا تاريخ الرفع.
  */
 import {
-  pgTable, pgEnum, text, integer, boolean, timestamp, jsonb,
+  pgTable, pgEnum, text, integer, bigint, boolean, timestamp, jsonb,
   doublePrecision, numeric, uniqueIndex, index, primaryKey,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { createId } from "@/lib/id";
@@ -261,6 +262,14 @@ export const invoices = pgTable("invoices", {
 
   /** إن رُحّلت من شهر سابق، الشهر الأصلي هنا ليبقى الأثر مرئياً */
   carriedForwardFrom: text("carried_forward_from"),
+  /**
+   * تاريخُ دخول البضاعة فعلاً — وهو غير تاريخ الفاتورة.
+   *
+   * المورّد يسلّم في السابع ويصدر فاتورتَه في العاشر، وجردُ ١–٧ يشمل ما
+   * وصل. وفارغٌ يعني «غير معروف»: يُستعمَل تاريخُ الفاتورة نائباً
+   * **مُعلَناً**، وما وقع في نافذة الالتباس يُعرَض ولا يُضمّ بلا قرار.
+   */
+  receivedOn: text("received_on"),
 
   createdAt: now(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -693,6 +702,22 @@ export const products = pgTable("products", {
   category: productCategoryEnum("category").notNull().default("OTHER"),
   /** الوحدة التي يُقاس بها الصنف مهما اختلفت عبوات مورّديه */
   baseUnit: baseUnitEnum("base_unit").notNull().default("PIECE"),
+  /**
+   * أيُعَدّ في الجرد؟
+   *
+   * الافتراضُ نعم، لأنّ كلّ ما في الجدول اليوم مبنيٌّ من بنود الفواتير
+   * — أي مشترىً يُخزَّن.
+   */
+  isStockItem: boolean("is_stock_item").notNull().default(true),
+  /**
+   * أيُباع في نقاط البيع؟
+   *
+   * صنفُ القائمة («سبانيش لاتيه») صفٌّ هنا أيضاً لا في جدولٍ ثانٍ:
+   * ‏`pos_products.product_id` كان يشير إلى هذا الجدول منذ `005`،
+   * وصنفٌ واحد قد يكون الاثنين معاً (قارورةُ ماءٍ تُشترى وتُعَدّ
+   * وتُباع كما هي).
+   */
+  isMenuItem: boolean("is_menu_item").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: now(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -949,6 +974,8 @@ export const salesSources = pgTable("sales_sources", {
   createdAt: now(),
 });
 
+export const posProductKindEnum = pgEnum("pos_product_kind", ["PRODUCT", "MODIFIER"]);
+
 export const posProducts = pgTable("pos_products", {
   id: id(),
   sourceId: text("source_id").notNull().references(() => salesSources.id, { onDelete: "cascade" }),
@@ -957,9 +984,20 @@ export const posProducts = pgTable("pos_products", {
   name: text("name").notNull(),
   category: text("category"),
   priceMinor: integer("price_minor"),
+  /**
+   * خيارُ الإضافة ليس صنفاً يُباع.
+   *
+   * ولو دخل طابورَ «منتجات تحتاج ربطاً» لطُلب من صاحب المقهى أن يربط
+   * «Double shots» بصنفٍ يُباع — وهو ليس كذلك، ولا وصفةَ له.
+   */
+  kind: posProductKindEnum("kind").notNull().default("PRODUCT"),
+  parentExternalId: text("parent_external_id"),
   productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
   createdAt: now(),
-}, (t) => [uniqueIndex("pos_products_uniq").on(t.sourceId, t.externalId)]);
+}, (t) => [
+  uniqueIndex("pos_products_uniq").on(t.sourceId, t.externalId),
+  index("pos_products_kind_idx").on(t.kind),
+]);
 
 export const sales = pgTable("sales", {
   id: id(),
@@ -982,10 +1020,15 @@ export const sales = pgTable("sales", {
   vatMinor: integer("vat_minor").notNull().default(0),
   netMinor: integer("net_minor").notNull(),
   orderCount: integer("order_count").notNull().default(1),
+  /** الاستيراد الذي أدخلها — أثرٌ يُقرأ، لا هويّةٌ يُمنَع بها التكرار. */
+  importId: text("import_id").references((): AnyPgColumn => salesImports.id, { onDelete: "set null" }),
+  /** بيعةٌ ملغاة — تُستبعَد كلّها من الاستهلاك: لم تُصنَع. */
+  isVoid: boolean("is_void").notNull().default(false),
   createdAt: now(),
 }, (t) => [
   uniqueIndex("sales_uniq").on(t.sourceId, t.externalId),
   index("sales_date_idx").on(t.businessDate),
+  index("sales_import_idx").on(t.importId),
 ]);
 
 export const saleLines = pgTable("sale_lines", {
@@ -1004,9 +1047,358 @@ export const saleLines = pgTable("sale_lines", {
   quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull().default("1"),
   unitPriceMinor: integer("unit_price_minor").notNull(),
   lineTotalMinor: integer("line_total_minor").notNull(),
+  /**
+   * المرتجَع والملغى والمجانيّ ثلاثةٌ لا واحد.
+   *
+   * المرتجَع يُنقص الاستهلاك (رُدَّ بعد أن صُنع)، والملغى يُستبعَد
+   * كلّه (لم يُصنَع أصلاً)، والمجانيّ يُستهلَك فعلاً ويُعرَض على حدة.
+   * ومن جمعها في رقمٍ واحد أخطأ في ثلاثة.
+   */
+  isRefund: boolean("is_refund").notNull().default(false),
+  isVoid: boolean("is_void").notNull().default(false),
+  isComplimentary: boolean("is_complimentary").notNull().default(false),
+  /**
+   * حالُ البند كما قالها المصدر — خاماً.
+   *
+   * وفودكس يقولها `Done`/`Returned`/`Void` **بكمّيّةٍ موجبة دائماً**؛
+   * والأعلامُ أعلاه مشتقّةٌ منها. وتُحفَظ الحالُ نفسُها كي يُقرأ بعد
+   * سنةٍ بم حُكم على السطر، ولأنّ مصدراً آخر قد يحمل حالاتٍ أخرى.
+   */
+  sourceStatus: text("source_status"),
+  /**
+   * خيارُ إضافةٍ لا منتج.
+   *
+   * في تصدير فودكس يأتي المُعدِّل صفّاً مستقلّاً مرتبطاً بأصله، كمّيّتُه
+   * كمّيّةُ أصله دائماً، **وسعرُ الأصل يشمله**. فلو عُدّ بنداً مستقلّاً
+   * لتضاعف الإيراد وانتفخت الوحداتُ المباعة.
+   */
+  isModifier: boolean("is_modifier").notNull().default(false),
+  parentExternalId: text("parent_external_id"),
+  /** المُعدِّلات كما وردت — تُحفَظ على الأصل، وما لا يُربَط منها يُعلَن في التغطية. */
+  modifiers: jsonb("modifiers"),
+  /**
+   * بصمةُ الحقول المؤثِّرة — بها يُفرَّق المُراجَع من المكرَّر.
+   *
+   * والتصديرُ لا يحمل رقمَ نسخةٍ ولا طابعَ إنشاء، فلا سبيل إلى «أهذا
+   * أحدث؟» إلّا بمقارنة ما يقوله عن السطر نفسِه.
+   */
+  contentHash: text("content_hash"),
 }, (t) => [
   index("sale_lines_sale_idx").on(t.saleId),
   uniqueIndex("sale_lines_external_uniq").on(t.saleId, t.externalId),
+]);
+
+
+/* ───────────────────────── الجرد وتسوية المخزون ───────────────────────── */
+
+/**
+ * الكمّيّة عددٌ صحيح بالمِلّي — كما أنّ المال عددٌ صحيح بالهللات.
+ *
+ * مِلّي‑جرام للوزن، ومِلّي‑مليلتر للحجم، ومِلّي‑حبّة للعدّ. فـ١٨ جراماً
+ * ‏١٨٬٠٠٠، و٢٠ كيلو ‏٢٠٬٠٠٠٬٠٠٠. والحسابُ يتكرّر ألفَ مرّة في الجرد
+ * الواحد، فكسرُ الفاصلة العائمة يتراكم حتّى يصير جراماتٍ ثمّ كيلوات.
+ *
+ * واللاحقة `_milli` في اسم العمود مقصودة: من يقرؤه لا يظنّه وحدةَ أساس.
+ */
+const milli = (name: string) => bigint(name, { mode: "number" });
+
+export const recipeStatusEnum = pgEnum("recipe_status", ["DRAFT", "ACTIVE", "ARCHIVED"]);
+
+/**
+ * وصفةُ صنفٍ يُباع — هويّةٌ ثابتة تعلو نسخَها.
+ *
+ * صنفٌ واحد ← وصفةٌ واحدة، ولها تاريخ. والحسابُ يأخذ النسخةَ السارية
+ * في تاريخ **كلّ بيعة**، لا الأحدثَ.
+ */
+export const recipes = pgTable("recipes", {
+  id: id(),
+  productId: text("product_id").notNull().unique().references(() => products.id, { onDelete: "cascade" }),
+  note: text("note"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * النسخةُ بفترة سريانها — وهذا هو الفرق بين تقريرٍ تاريخيّ وتقريرٍ يكذب.
+ *
+ * بِيع في ١ سبتمبر بجرعة ٢٠ جراماً، وفي ٩ منه بجرعة ١٨. فحسابُ سبتمبر
+ * بالوصفة الأحدث يقول إنّ المقهى استهلك أقلّ ممّا استهلك، فيظهر فرقٌ
+ * لم يقع — أو يختفي فرقٌ وقع.
+ *
+ * **ولا تتداخل نسختان ساريتان** — يمنعه مؤثِّرٌ في القاعدة لا اتّفاقٌ
+ * برمجيّ: الكتابةُ تأتي من مسارين لا يعرف أحدهما الآخر.
+ */
+export const recipeVersions = pgTable("recipe_versions", {
+  id: id(),
+  recipeId: text("recipe_id").notNull().references(() => recipes.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  status: recipeStatusEnum("status").notNull().default("DRAFT"),
+  /** YYYY-MM-DD — يوم بدء السريان، شاملاً. */
+  effectiveFrom: text("effective_from").notNull(),
+  /** فارغٌ يعني «سارية إلى الآن»؛ وحين يُكتب فهو شاملٌ أيضاً. */
+  effectiveTo: text("effective_to"),
+  /** ناتجُ الوصفة إن كانت تُحضَّر دفعةً — و`null` لا تُقرأ واحداً. */
+  yieldQuantityMilli: milli("yield_quantity_milli"),
+  yieldUnit: baseUnitEnum("yield_unit"),
+  note: text("note"),
+  createdById: text("created_by_id").references(() => users.id),
+  activatedById: text("activated_by_id").references(() => users.id),
+  activatedAt: timestamp("activated_at", { withTimezone: true }),
+  createdAt: now(),
+}, (t) => [
+  uniqueIndex("recipe_versions_number_uniq").on(t.recipeId, t.version),
+  index("recipe_versions_effective_idx").on(t.recipeId, t.effectiveFrom),
+]);
+
+/** مكوّنٌ وكمّيّةٌ ووحدة — و`prepLossBp` يرفع الاستهلاك حين يُعرَف. */
+export const recipeIngredients = pgTable("recipe_ingredients", {
+  id: id(),
+  recipeVersionId: text("recipe_version_id").notNull()
+    .references(() => recipeVersions.id, { onDelete: "cascade" }),
+  productId: text("product_id").notNull().references(() => products.id),
+  /** بالمِلّي من `unit` المذكورة: ١٨ جراماً ← `unit=G` و`18000`. */
+  quantityMilli: milli("quantity_milli").notNull(),
+  unit: baseUnitEnum("unit").notNull(),
+  /** فاقدُ التجهيز بنقاط الأساس (١٠٠ = ١٪). و`null` تعني «لم يُقَس» لا «صفر». */
+  prepLossBp: integer("prep_loss_bp"),
+  /**
+   * مكوّنٌ لا يُحسَب إلّا مع هذا الخيار.
+   *
+   * و«دبل شوت» في هذا المقهى **خيارٌ داخل الوصفة لا إضافةُ بنّ** — قالها
+   * صاحبُه، ويؤيّدها الملفّ: سعرُه صفرٌ في ١٥٨ مرّة. فالعمودُ يبقى
+   * فارغاً حتّى يقول إنسانٌ إنّ خياراً بعينه يزيد مكوّناً.
+   */
+  modifierExternalId: text("modifier_external_id"),
+  note: text("note"),
+}, (t) => [
+  index("recipe_ingredients_modifier_idx").on(t.modifierExternalId),
+  index("recipe_ingredients_product_idx").on(t.productId),
+]);
+
+export const salesImportStatusEnum = pgEnum("sales_import_status", [
+  "PENDING", "IMPORTED", "PARTIAL", "FAILED", "DUPLICATE",
+]);
+
+export const salesImportRowStatusEnum = pgEnum("sales_import_row_status", [
+  "PARSED", "SKIPPED", "ERROR", "DUPLICATE",
+  /**
+   * مقيَّدٌ من قبل، وقد تغيّر ما يقوله المصدر عنه.
+   *
+   * طلبٌ أُلغي بعد تصدير الأمس يصل اليوم بحال `Void`. فردُّ الملفّ
+   * «مكرَّراً» يُبقي في قيدنا مبيعاً لم يقع.
+   */
+  "REVISED",
+]);
+
+/**
+ * هويّةُ ملفّ المبيعات المرفوع.
+ *
+ * وبصمتُه فريدة: الملفّ عينُه مرّتين يُردّ بإعلانٍ لا بصمت — الدرسُ
+ * نفسه الذي كلّف كشفاً بنكياً استُورد ثلاث مرّات فصارت ١٤٢٨ حركة
+ * ‏٤٢٨٤.
+ *
+ * **والبصمةُ ليست وحدها المانع**: فوقها المفتاحُ الطبيعيّ للبيعة
+ * (`sales_uniq`) — فملفٌّ آخر يغطّي اليوم نفسه لا يضاعفه.
+ */
+export const salesImports = pgTable("sales_imports", {
+  id: id(),
+  sourceId: text("source_id").notNull().references(() => salesSources.id, { onDelete: "cascade" }),
+  branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+  fileName: text("file_name").notNull(),
+  fileSha256: text("file_sha256").notNull(),
+  byteSize: integer("byte_size"),
+  /** أيُّ محوِّلٍ قرأه — والمحوِّلُ خلف واجهة، فصيغُ فودكس تتعدّد. */
+  adapter: text("adapter").notNull(),
+  /** FOODICS_ORDERS · FOODICS_PRODUCT_MIX */
+  shape: text("shape"),
+  periodStart: text("period_start"),
+  periodEnd: text("period_end"),
+  status: salesImportStatusEnum("status").notNull().default("PENDING"),
+  totalRows: integer("total_rows").notNull().default(0),
+  importedRows: integer("imported_rows").notNull().default(0),
+  skippedRows: integer("skipped_rows").notNull().default(0),
+  errorRows: integer("error_rows").notNull().default(0),
+  duplicateRows: integer("duplicate_rows").notNull().default(0),
+  revisedRows: integer("revised_rows").notNull().default(0),
+  /** ما لم يُقرأ ولماذا — يُعرَض للمستخدم لا يُدفَن في سجلّ خادم. */
+  messages: jsonb("messages"),
+  importedById: text("imported_by_id").references(() => users.id),
+  createdAt: now(),
+}, (t) => [
+  uniqueIndex("sales_imports_sha_uniq").on(t.fileSha256),
+  index("sales_imports_period_idx").on(t.periodStart, t.periodEnd),
+]);
+
+/**
+ * الصفُّ الخام كما ورد، قبل أيّ تحويل.
+ *
+ * **ولا صفَّ يُرمى صامتاً.** صفٌّ لم يُقرأ يُحفَظ بحاله وسببه ويُعرَض
+ * مجموعاً — فالقصُّ الصامت يجعل الاستيراد يبدو تامّاً وهو ناقص، ثمّ
+ * يختلّ الجرد بلا سببٍ ظاهر.
+ */
+export const salesImportRows = pgTable("sales_import_rows", {
+  id: id(),
+  importId: text("import_id").notNull().references(() => salesImports.id, { onDelete: "cascade" }),
+  rowNumber: integer("row_number").notNull(),
+  raw: jsonb("raw").notNull(),
+  status: salesImportRowStatusEnum("status").notNull(),
+  reason: text("reason"),
+  saleId: text("sale_id").references(() => sales.id, { onDelete: "set null" }),
+  createdAt: now(),
+}, (t) => [
+  uniqueIndex("sales_import_rows_uniq").on(t.importId, t.rowNumber),
+  index("sales_import_rows_status_idx").on(t.importId, t.status),
+]);
+
+export const inventoryCountStatusEnum = pgEnum("inventory_count_status", ["DRAFT", "FINALISED"]);
+
+export const valuationBasisEnum = pgEnum("valuation_basis", [
+  "PERIOD_WEIGHTED_AVERAGE", "LATEST_KNOWN", "UNKNOWN",
+]);
+
+export const inventoryReadinessEnum = pgEnum("inventory_readiness", ["READY", "PARTIAL", "BLOCKED"]);
+
+/**
+ * جلسةُ الجرد — فترةٌ وفرعٌ وحال.
+ *
+ * والجاهزيّةُ تُحسَب ولا تُدَّعى: «جزئيّ» حكمٌ يُعلَن مع ما يُستثنى وكم
+ * يمثّل من المبيعات. **ولا يُحسَب على بياناتٍ ناقصةٍ صامتاً.**
+ */
+export const inventoryCounts = pgTable("inventory_counts", {
+  id: id(),
+  branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+  periodStart: text("period_start").notNull(),
+  periodEnd: text("period_end").notNull(),
+  status: inventoryCountStatusEnum("status").notNull().default("DRAFT"),
+  readiness: inventoryReadinessEnum("readiness"),
+  coverage: jsonb("coverage"),
+  note: text("note"),
+  startedById: text("started_by_id").references(() => users.id),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finalisedById: text("finalised_by_id").references(() => users.id),
+  finalisedAt: timestamp("finalised_at", { withTimezone: true }),
+  reopenedById: text("reopened_by_id").references(() => users.id),
+  reopenedAt: timestamp("reopened_at", { withTimezone: true }),
+  reopenReason: text("reopen_reason"),
+  reopenCount: integer("reopen_count").notNull().default(0),
+}, (t) => [
+  index("inventory_counts_status_idx").on(t.status, t.periodEnd),
+]);
+
+/**
+ * سطرُ الصنف — وكلُّ حدٍّ في المعادلة عمودٌ يقبل الفراغ.
+ *
+ * و`null` هنا «غير معروف» لا «صفر». صفرٌ كاذب في الافتتاحيّ يقول إنّ
+ * الرفّ كان فارغاً، فيصير كلُّ ما اشتُري «فرقاً».
+ */
+export const inventoryCountLines = pgTable("inventory_count_lines", {
+  id: id(),
+  countId: text("count_id").notNull().references(() => inventoryCounts.id, { onDelete: "cascade" }),
+  productId: text("product_id").notNull().references(() => products.id),
+  /** مجمَّدةٌ هنا: لو غُيّرت وحدةُ الصنف لاحقاً بقي التقرير مقروءاً كما كُتب. */
+  baseUnit: baseUnitEnum("base_unit").notNull(),
+
+  openingMilli: milli("opening_milli"),
+  purchasesMilli: milli("purchases_milli"),
+  adjustmentsInMilli: milli("adjustments_in_milli").notNull().default(0),
+  adjustmentsOutMilli: milli("adjustments_out_milli").notNull().default(0),
+  theoreticalConsumptionMilli: milli("theoretical_consumption_milli"),
+  recordedWasteMilli: milli("recorded_waste_milli").notNull().default(0),
+  theoreticalClosingMilli: milli("theoretical_closing_milli"),
+  actualMilli: milli("actual_milli"),
+  varianceMilli: milli("variance_milli"),
+  /**
+   * **النسبةُ الأساسيّة**: الفرق ÷ الاستهلاك المتوقَّع، بنقاط الأساس.
+   *
+   * وهي جوابُ «كم ضاع ممّا كان ينبغي أن يُصرَف؟». ومقامُ المخزون
+   * الختاميّ يتضخّم كلّما قلّ ما بقي على الرفّ، فيُنذر أشدَّ ما يكون
+   * آخرَ الأسبوع حين يكون الرفّ فارغاً بحقّ.
+   */
+  varianceConsumptionBp: integer("variance_consumption_bp"),
+  /** ونسبةٌ ثانويّة إلى المخزون الختاميّ المتوقَّع — تُعرَض بجانبها. */
+  varianceBp: integer("variance_bp"),
+  unitCostMinor: integer("unit_cost_minor"),
+  /** بم قُوِّم الفرق — يُحفَظ مع الرقم ويُعرَض، فلا يتغيّر المنهجُ صامتاً. */
+  valuationBasis: valuationBasisEnum("valuation_basis").notNull().default("UNKNOWN"),
+  varianceCostMinor: integer("variance_cost_minor"),
+  /** لماذا جُهل ما جُهل — أسبابٌ تُعرَض للقارئ لا تُدفَن. */
+  flags: jsonb("flags"),
+  note: text("note"),
+  countedById: text("counted_by_id").references(() => users.id),
+  countedAt: timestamp("counted_at", { withTimezone: true }),
+  createdAt: now(),
+}, (t) => [
+  uniqueIndex("inventory_count_lines_uniq").on(t.countId, t.productId),
+  index("inventory_count_lines_product_idx").on(t.productId),
+]);
+
+/**
+ * اللقطة: أصولُ كلّ رقم.
+ *
+ * الأرقامُ مجمَّدةٌ في الأسطر، وهذه تحفظ **بم حُسبت** — نسخُ الوصفات
+ * ومعرّفاتُ الاستيرادات ونطاقُ أسطر الشراء ونسخةُ المحرّك. فيُعاد
+ * إنتاجُ التقرير عند الحاجة إلى إثبات، ولا يُصدَّق الجدولُ وحده.
+ */
+export const inventoryCountSnapshots = pgTable("inventory_count_snapshots", {
+  countId: text("count_id").primaryKey().references(() => inventoryCounts.id, { onDelete: "cascade" }),
+  engineVersion: text("engine_version").notNull(),
+  payload: jsonb("payload").notNull(),
+  provenance: jsonb("provenance").notNull(),
+  checksum: text("checksum").notNull(),
+  computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const inventoryMovementKindEnum = pgEnum("inventory_movement_kind", [
+  "OPENING", "ADJUST_IN", "ADJUST_OUT", "TRANSFER_IN", "TRANSFER_OUT",
+]);
+
+/** الرصيدُ الافتتاحيّ الصريح والتسويةُ والنقل — ما لا يعرفه الشراءُ ولا البيع. */
+export const inventoryMovements = pgTable("inventory_movements", {
+  id: id(),
+  productId: text("product_id").notNull().references(() => products.id),
+  branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+  kind: inventoryMovementKindEnum("kind").notNull(),
+  quantityMilli: milli("quantity_milli").notNull(),
+  unit: baseUnitEnum("unit").notNull(),
+  occurredOn: text("occurred_on").notNull(),
+  note: text("note"),
+  countId: text("count_id").references(() => inventoryCounts.id, { onDelete: "set null" }),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+}, (t) => [
+  index("inventory_movements_product_idx").on(t.productId, t.occurredOn),
+  index("inventory_movements_count_idx").on(t.countId),
+]);
+
+export const wasteReasonEnum = pgEnum("waste_reason", [
+  "EXPIRED", "SPILLED", "FAILED_PREP", "CALIBRATION", "STAFF_DRINK", "DAMAGED", "OTHER",
+]);
+
+/**
+ * الهدرُ المسجَّل.
+ *
+ * يُبنى الجدولُ الآن ويُملأ متى شاء صاحبه. ومتى امتلأ انفصل ما يُعرَض
+ * اليوم «فرقاً غير مفسَّر» إلى قسمين: **هدرٌ مسجَّل** و**فرقٌ باقٍ**.
+ * ولا يُسمّى الفرقُ هدراً قبل أن يُكتب هنا.
+ */
+export const wasteRecords = pgTable("waste_records", {
+  id: id(),
+  productId: text("product_id").notNull().references(() => products.id),
+  branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+  quantityMilli: milli("quantity_milli").notNull(),
+  unit: baseUnitEnum("unit").notNull(),
+  occurredOn: text("occurred_on").notNull(),
+  reason: wasteReasonEnum("reason").notNull(),
+  note: text("note"),
+  evidenceUrl: text("evidence_url"),
+  countId: text("count_id").references(() => inventoryCounts.id, { onDelete: "set null" }),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+}, (t) => [
+  index("waste_records_product_idx").on(t.productId, t.occurredOn),
+  index("waste_records_count_idx").on(t.countId),
 ]);
 
 /* ───────────────────────── سجل التدقيق ───────────────────────── */

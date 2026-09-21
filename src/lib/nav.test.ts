@@ -36,6 +36,10 @@ describe("activeArea", () => {
     expect(activeArea("/audit")?.href).toBe("/attention");
     expect(activeArea("/review")?.href).toBe("/attention");
     expect(activeArea("/upload")?.href).toBe("/documents");
+    expect(activeArea("/inventory")?.href).toBe("/inventory");
+    expect(activeArea("/inventory/counts/abc")?.href).toBe("/inventory");
+    expect(activeArea("/inventory/items/abc")?.href).toBe("/inventory");
+    expect(activeArea("/inventory/trend")?.href).toBe("/inventory");
   });
 
   it("لا تخلط مساراً يشارك البادئة حرفياً دون أن يكون تحتها", () => {
@@ -68,9 +72,9 @@ describe("activeChild", () => {
 });
 
 describe("visibleAreas", () => {
-  it("المالك يرى الخمس كلّها", () => {
+  it("المالك يرى الستّ كلّها", () => {
     expect(visibleAreas("OWNER")).toHaveLength(AREAS.length);
-    expect(AREAS).toHaveLength(5);
+    expect(AREAS).toHaveLength(6);
   });
 
   it("مدير المشتريات لا يرى المال ولا ما يحتاج قراراً", () => {
@@ -78,6 +82,8 @@ describe("visibleAreas", () => {
     expect(hrefs).not.toContain("/money");
     expect(hrefs).not.toContain("/attention");
     expect(hrefs).toContain("/documents");
+    /* ويعدّ الرفّ — فالميزانُ عملُه، وإن لم يرَ كلفةَ الفرق */
+    expect(hrefs).toContain("/inventory");
   });
 
   it("المحاسب يرى المال وما يحتاج قراراً", () => {
@@ -108,9 +114,18 @@ describe("visibleAreas", () => {
     expect(visibleAccountLinks("PURCHASING").map((l) => l.href)).toEqual(["/settings"]);
   });
 
-  it("عددُ روابط التنقّل الظاهرة خمسة — كان سبعةَ عشر", () => {
+  /*
+    ── ولماذا ستّ لا خمس ──
+
+    الجردُ عملٌ أسبوعيٌّ متكرّر بدورةٍ خاصّة: يُبدَأ ويُراجَع ويُعَدّ
+    ويُقفَل. ولو دُسّ تحت «المورّدين» أو «المال» لما فُتح أبداً —
+    فصاحبُ المقهى لا يصل إليه من سؤالٍ عن مورّدٍ ولا عن ريال.
+
+    والعددُ يبقى محروساً: **سادسةٌ بحجّة، لا سابعةٌ بلا حجّة.**
+  */
+  it("عددُ روابط التنقّل الظاهرة ستّة — كان سبعةَ عشر", () => {
     const owner = visibleAreas("OWNER");
-    expect(owner).toHaveLength(5);
+    expect(owner).toHaveLength(6);
   });
 });
 
@@ -216,6 +231,8 @@ describe("سلامة البنية", () => {
     expect(labels.get("/statements")).toBe("الكشوف");
     expect(labels.get("/bank")).toBe("حركة البنك");
     expect(labels.get("/close")).toBe("إقفال الشهر");
+    expect(labels.get("/inventory")).toBe("الجرد الحالي");
+    expect(labels.get("/inventory/history")).toBe("سجلّ الجرد");
     // ولا لسان يحمل اسم «التدفّق وقائمة الدخل» — صار التدفّق في «المال»
     expect([...labels.values()]).not.toContain("التدفّق وقائمة الدخل");
   });

@@ -58,6 +58,20 @@ export function stripPrototypeKeys<T>(value: T): T {
 export interface SafeSheet {
   name: string;
   grid: string[][];
+  /**
+   * القيمُ الخام قبل التصيير — تُطلَب بـ`includeRaw` ولا تُحسَب بغيرها.
+   *
+   * ── ولماذا لزمت ──
+   *
+   * التصييرُ يتبع تنسيقَ الخليّة: تاريخُ فودكس المخزَّن عدداً تسلسليّاً
+   * (‏٤٦٢٨٤) يخرج نصّاً «9/19/26» — بسنةٍ من خانتين وترتيبٍ يتبع تنسيق
+   * الملفّ لا لغةَ قارئه. فمن قرأ المصيَّر قرأ **تفسيرَ إكسل** للقيمة،
+   * وذلك التفسير يختلف بين ملفٍّ وآخر ولو كان الرقمُ واحداً.
+   *
+   * والعددُ التسلسليُّ نفسُه لا لبسَ فيه. فالخامُ يُتاح لمن يحتاجه،
+   * ويبقى `grid` كما هو لمن بُني عليه — فلا يُبطَل مسارٌ قائم.
+   */
+  raw?: string[][];
   /** ما قُصّ، ويُعلَن — القصّ الصامت يجعل الكشف يبدو تامّاً وهو ناقص. */
   truncated: { rows: boolean; cols: boolean };
 }
@@ -73,7 +87,12 @@ export interface SafeWorkbook {
  * والإعلان شرط: لو قُصّ الكشفُ صامتاً لظهر تامّاً وهو ناقص، ثمّ اختلّت
  * معادلتُه بلا سببٍ ظاهر.
  */
-export function readWorkbookSafely(buffer: Buffer): SafeWorkbook {
+export interface ReadOptions {
+  /** يُرفق القيمَ الخام مع المصيَّرة — للتواريخ التي يُفسدها التصيير. */
+  includeRaw?: boolean;
+}
+
+export function readWorkbookSafely(buffer: Buffer, options: ReadOptions = {}): SafeWorkbook {
   const warnings: string[] = [];
 
   const wb = XLSX.read(buffer, {
@@ -130,9 +149,24 @@ export function readWorkbookSafely(buffer: Buffer): SafeWorkbook {
       warnings.push(`الورقة «${name}» أعرض من ${MAX_COLS} عموداً — قُرئ أوّلُها فقط.`);
     }
 
+    let rawGrid: string[][] | undefined;
+    if (options.includeRaw) {
+      const rawRows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], {
+        header: 1, raw: true, defval: "",
+      });
+      rawGrid = stripPrototypeKeys(
+        rawRows.slice(0, MAX_ROWS).map((row) =>
+          (Array.isArray(row) ? row : [])
+            .slice(0, MAX_COLS)
+            .map((c) => (c === null || c === undefined ? "" : String(c)).slice(0, MAX_CELL_CHARS)),
+        ),
+      );
+    }
+
     return {
       name,
       grid: stripPrototypeKeys(grid),
+      raw: rawGrid,
       truncated: { rows: rowsTruncated, cols: colsTruncated },
     };
   });

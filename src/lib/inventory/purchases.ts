@@ -1,0 +1,225 @@
+/**
+ * كمّيّةُ الشراء وكلفةُ الوحدة — من الفواتير القائمة، لا من نموذجٍ ثانٍ.
+ *
+ * ── لماذا لا يُحسَب الفرقُ بالمبيعات وحدها ──
+ *
+ * افتتاحيٌّ ٥ كجم، ومشترياتٌ ٢٠، واستهلاكٌ متوقَّع ١٢ ← المتوقَّع ١٣.
+ * ولو أُسقطت المشترياتُ لصار المتوقَّع «سالب ٧» والجردُ الفعليّ ١٠٫٥،
+ * فيُعلَن «فائضٌ ١٧٫٥ كجم» — رقمٌ بلا معنى، وأسوأُ من لا رقم.
+ *
+ * ── والكمّيّة لا تُخمَّن من الريال ──
+ *
+ * «دفعتُ ٤٥٠ ريالاً لمحمصة» لا يقول كم كيلو. وقسمةُ المبلغ على آخر
+ * سعرٍ معروف تُنتج كمّيّةً تبدو دقيقة وهي مخترَعة — ثمّ يُبنى عليها
+ * فرقُ جردٍ يُحاسَب عليه أحد. **فما لم تُعرَف عبوتُه يُعلَن ويُستبعَد،
+ * ويُعرَض عددُه ومبلغُه كي يُعرَف حجمُ ما خرج من الحساب.**
+ */
+import type { StoredUnit } from "@/lib/unit-conversion";
+import { decimalToMilli, sameUnitFamily, toCanonical, MILLI } from "./units";
+
+/** سطرُ فاتورةٍ بمواصفة عبوة صنفِ مورّده. */
+export interface PurchaseLineInput {
+  lineId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  supplierName: string;
+  /**
+   * تاريخُ دخول البضاعة المعتمَد — الحقيقيّ إن وُجد، وإلّا تاريخُ
+   * الفاتورة **نائباً مُعلَناً**.
+   */
+  invoiceDate: string;
+  /** أهو تاريخُ استلامٍ حقيقيّ أم نائبٌ عنه؟ */
+  receiptKnown?: boolean;
+  description: string;
+  productId: string | null;
+  /** عددُ العبوات في السطر — نصٌّ عشريّ كما في `invoice_lines.qty`. */
+  qty: string | null;
+  lineTotalMinor: number;
+  /** مواصفةُ العبوة من `supplier_products` — وثلاثتُها أو لا شيء. */
+  packSize: string | null;
+  contentUnit: StoredUnit | null;
+  contentQuantity: string | null;
+}
+
+export type PurchaseGapReason =
+  | "UNLINKED_PRODUCT"
+  | "NO_PACK_SPEC"
+  | "MISSING_QUANTITY"
+  | "UNIT_FAMILY_MISMATCH";
+
+export const PURCHASE_GAP_LABEL: Record<PurchaseGapReason, string> = {
+  UNLINKED_PRODUCT: "بندٌ غير مربوطٍ بصنفٍ معياريّ",
+  NO_PACK_SPEC: "مواصفةُ عبوة المورّد غير معروفة — فلا تُعرَف الكمّيّة",
+  MISSING_QUANTITY: "الكمّيّة غير مقروءةٍ في الفاتورة",
+  UNIT_FAMILY_MISMATCH: "وحدةُ العبوة لا تُحوَّل إلى وحدة الصنف — وزنٌ وحجم",
+};
+
+export type PurchaseQuantity =
+  | { known: true; canonicalMilli: number }
+  | { known: false; reason: PurchaseGapReason };
+
+/**
+ * كمّيّةُ السطر بالوحدة المعياريّة.
+ *
+ * ```
+ *   عددُ العبوات × حجمُ العبوة × كمّيّةُ ما في الواحدة  →  وحدةُ المحتوى
+ * ```
+ *
+ * «سطرٌ فيه كرتونان، والكرتون ١٢ × ١ لتر» = ‏٢٤ لتراً. ثمّ يُحوَّل
+ * إلى عائلة وحدةِ الصنف، وما لم يصحّ تحويلُه يُعلَن — ولا يُمرَّر
+ * كما هو، فذاك بالضبط ما يُنتج «٢٤ كيلو» من أربعةٍ وعشرين لتراً.
+ */
+export function purchaseQuantity(
+  line: PurchaseLineInput,
+  productBaseUnit: StoredUnit,
+): PurchaseQuantity {
+  if (!line.productId) return { known: false, reason: "UNLINKED_PRODUCT" };
+
+  const qtyMilli = decimalToMilli(line.qty);
+  if (qtyMilli === null) return { known: false, reason: "MISSING_QUANTITY" };
+
+  const packMilli = decimalToMilli(line.packSize);
+  const contentMilli = decimalToMilli(line.contentQuantity);
+
+  /* المجهول لا يُحوَّل ولا يُفترَض واحداً — نصّ `unit-conversion.ts` */
+  if (packMilli === null || contentMilli === null || line.contentUnit === null) {
+    return { known: false, reason: "NO_PACK_SPEC" };
+  }
+  if (packMilli <= 0 || contentMilli <= 0) return { known: false, reason: "NO_PACK_SPEC" };
+
+  if (!sameUnitFamily(line.contentUnit, productBaseUnit)) {
+    return { known: false, reason: "UNIT_FAMILY_MISMATCH" };
+  }
+
+  /* ثلاثةُ أعدادٍ بالمِلّي مضروبةٌ ببعضها = مِلّي³، فيُقسَم على ‏١٠٦ */
+  const inContentUnitMilli = (qtyMilli * packMilli * contentMilli) / (MILLI * MILLI);
+  return { known: true, canonicalMilli: Math.round(toCanonical(inContentUnitMilli, line.contentUnit)) };
+}
+
+export interface PurchaseGap {
+  lineId: string;
+  invoiceNumber: string;
+  supplierName: string;
+  description: string;
+  productId: string | null;
+  lineTotalMinor: number;
+  reason: PurchaseGapReason;
+}
+
+export interface ProductPurchases {
+  productId: string;
+  canonicalMilli: number;
+  /** ما دُفع في الأسطر التي عُرفت كمّيّتُها — وحدها تصلح أساساً للكلفة. */
+  knownCostMinor: number;
+  lines: number;
+  invoiceLineIds: string[];
+}
+
+export interface PurchaseSummary {
+  byProduct: Map<string, ProductPurchases>;
+  gaps: PurchaseGap[];
+  /** ما خرج من الحساب — عدداً ومبلغاً، فيُعرَف حجمُه لا وجودُه فقط. */
+  gapTotals: { lines: number; totalMinor: number };
+  totalLines: number;
+}
+
+/** يجمع مشترياتِ الفترة لكلّ صنف، ويفصل ما تعذّرت معرفةُ كمّيّته. */
+export function summarisePurchases(
+  lines: readonly PurchaseLineInput[],
+  baseUnitOf: (productId: string) => StoredUnit | null,
+): PurchaseSummary {
+  const byProduct = new Map<string, ProductPurchases>();
+  const gaps: PurchaseGap[] = [];
+
+  const gap = (line: PurchaseLineInput, reason: PurchaseGapReason) => {
+    gaps.push({
+      lineId: line.lineId,
+      invoiceNumber: line.invoiceNumber,
+      supplierName: line.supplierName,
+      description: line.description,
+      productId: line.productId,
+      lineTotalMinor: line.lineTotalMinor,
+      reason,
+    });
+  };
+
+  for (const line of lines) {
+    if (!line.productId) {
+      gap(line, "UNLINKED_PRODUCT");
+      continue;
+    }
+    const base = baseUnitOf(line.productId);
+    if (!base) {
+      gap(line, "UNLINKED_PRODUCT");
+      continue;
+    }
+
+    const q = purchaseQuantity(line, base);
+    if (!q.known) {
+      gap(line, q.reason);
+      continue;
+    }
+
+    let acc = byProduct.get(line.productId);
+    if (!acc) {
+      acc = { productId: line.productId, canonicalMilli: 0, knownCostMinor: 0, lines: 0, invoiceLineIds: [] };
+      byProduct.set(line.productId, acc);
+    }
+    acc.canonicalMilli += q.canonicalMilli;
+    acc.knownCostMinor += line.lineTotalMinor;
+    acc.lines++;
+    acc.invoiceLineIds.push(line.lineId);
+  }
+
+  return {
+    byProduct,
+    gaps,
+    gapTotals: {
+      lines: gaps.length,
+      totalMinor: gaps.reduce((s, g) => s + g.lineTotalMinor, 0),
+    },
+    totalLines: lines.length,
+  };
+}
+
+/**
+ * كلفةُ وحدةِ الأساس بالهللات — متوسّطٌ مرجَّح لمشتريات الفترة.
+ *
+ * وترجع `null` حين لا مشترياتٍ صالحة — **لا صفراً**. فصفرُ الكلفة
+ * يجعل كلفةَ الفرق صفراً، فيُقرأ «فرقٌ بلا أثرٍ ماليّ» وهو فرقٌ لا
+ * نعرف كلفتَه.
+ */
+export function unitCostMinor(
+  purchases: ProductPurchases | undefined,
+  baseUnit: StoredUnit,
+  fallbackMinor: number | null,
+): number | null {
+  if (!purchases || purchases.canonicalMilli <= 0 || purchases.knownCostMinor <= 0) {
+    return fallbackMinor;
+  }
+  /* الكمّيّة المعياريّة مِلّي‑صغرى؛ وكلفةُ وحدةِ الأساس تحتاج قسمتها على وحدةِ الأساس */
+  const baseUnits = quantityInBaseUnits(purchases.canonicalMilli, baseUnit);
+  if (baseUnits <= 0) return fallbackMinor;
+  return Math.round(purchases.knownCostMinor / baseUnits);
+}
+
+/** الكمّيّة المعياريّة معبَّرٌ عنها بعددِ وحداتِ الأساس — للقسمة والضرب بالكلفة. */
+export function quantityInBaseUnits(canonicalMilli: number, baseUnit: StoredUnit): number {
+  const perBaseUnit = toCanonical(MILLI, baseUnit);
+  return canonicalMilli / perBaseUnit;
+}
+
+/**
+ * كلفةُ الفرق بالهللات — عددٌ صحيح دائماً.
+ *
+ * وترجع `null` حين تُجهَل الكلفة أو الفرق، فلا يُعرَض صفرٌ باسم
+ * التكلفة.
+ */
+export function varianceCostMinor(
+  varianceCanonicalMilli: number | null,
+  unitCost: number | null,
+  baseUnit: StoredUnit,
+): number | null {
+  if (varianceCanonicalMilli === null || unitCost === null) return null;
+  return Math.round(quantityInBaseUnits(varianceCanonicalMilli, baseUnit) * unitCost);
+}

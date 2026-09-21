@@ -48,6 +48,19 @@ const ACTION_LABEL: Record<string, string> = {
   EXPENSE_RECLASSIFIED: "مصروفٌ تبع تصنيف حركته",
   RECONCILIATION_BALANCES_SET: "رصيدا الشهر في التسوية",
   DOCUMENT_STATUS_CHANGED: "تغيير حال مستند",
+  /* الجرد وتسوية المخزون */
+  SALES_IMPORTED: "استيراد ملفّ مبيعات",
+  POS_PRODUCT_MAPPED: "ربط صنف فودكس",
+  POS_PRODUCT_UNMAPPED: "فكّ ربط صنف فودكس",
+  RECIPE_CREATED: "إنشاء وصفة",
+  RECIPE_VERSION_SAVED: "حفظ نسخة وصفة",
+  RECIPE_VERSION_ACTIVATED: "تفعيل نسخة وصفة",
+  INVENTORY_COUNT_STARTED: "بدء جرد",
+  INVENTORY_COUNT_LINE_EDITED: "تعديل عدٍّ فعليّ",
+  INVENTORY_COUNT_FINALISED: "إقفال جرد",
+  INVENTORY_COUNT_REOPENED: "إعادة فتح جرد",
+  INVENTORY_MOVEMENT_RECORDED: "قيد حركة مخزون",
+  WASTE_RECORDED: "تسجيل هدر",
   /* قيودٌ قديمة كُتبت قبل أن يكون لها اسم */
   DELETE_DUPLICATE_TRANSACTION: "حذف حركة مكرَّرة",
   BANK_MATCH_UNDONE: "تراجع عن مطابقة",
@@ -70,6 +83,14 @@ const ENTITY_LABEL: Record<string, string> = {
   payment_run: "دفعة الشهر",
   product: "صنف",
   ai_finding: "اقتراح ذكاء",
+  sales_import: "استيراد مبيعات",
+  pos_product: "صنف فودكس",
+  recipe: "وصفة",
+  recipe_version: "نسخة وصفة",
+  inventory_count: "جرد",
+  inventory_count_line: "سطر جرد",
+  inventory_movement: "حركة مخزون",
+  waste_record: "هدر مسجَّل",
 };
 
 /**

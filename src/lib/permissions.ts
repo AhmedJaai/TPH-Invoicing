@@ -29,22 +29,42 @@ export type Capability =
   | "month:close"
   | "month:reopen"
   | "users:manage"
-  | "audit:view";
+  | "audit:view"
+  /*
+    الجرد: القراءةُ غير الكتابة، والوصفةُ غير العدّ.
+
+    ومديرُ المشتريات يعدّ الرفّ ولا يرى كلفةَ الفرق — فهو يقف عند
+    الميزان لا عند الدفتر. و«الأرقام المالية» تبقى محروسةً
+    بـ`amounts:view` كما هي.
+  */
+  | "inventory:view"
+  | "inventory:count"
+  /**
+   * إعادةُ فتح جردٍ مقفَل — فعلٌ مستقلّ لا يُعار من إقفال الشهر.
+   *
+   * إقفالُ الشهر المحاسبيّ وإقفالُ الجرد فعلان على بياناتٍ مختلفة،
+   * ومن ملك أحدَهما لا يلزم أن يملك الآخر. والصلاحيّةُ المشتركة
+   * تُوسّع الأذن بلا قصد.
+   */
+  | "inventory:reopen"
+  | "recipe:edit";
 
 const MATRIX: Record<Role, readonly Capability[]> = {
   OWNER: [
     "document:upload", "document:view", "supplier:view", "supplier:edit",
     "amounts:view", "reports:view", "bank:view", "bank:edit", "payroll:view",
     "expense:edit", "payment:approve", "month:close", "month:reopen", "users:manage", "audit:view",
+    "inventory:view", "inventory:count", "inventory:reopen", "recipe:edit",
   ],
   // المحاسب يرى كل المالية ولا يدير المستخدمين
   ACCOUNTANT: [
     "document:upload", "document:view", "supplier:view", "supplier:edit",
     "amounts:view", "reports:view", "bank:view", "bank:edit",
     "expense:edit", "month:close", "audit:view",
+    "inventory:view", "inventory:count", "recipe:edit",
   ],
   // مدير المشتريات يرفع ويتابع الناقص فقط — لا أرقام مالية ولا بنك ولا رواتب
-  PURCHASING: ["document:upload", "document:view", "supplier:view"],
+  PURCHASING: ["document:upload", "document:view", "supplier:view", "inventory:view", "inventory:count"],
 };
 
 export function can(role: Role | undefined | null, capability: Capability): boolean {
@@ -73,6 +93,10 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "month:reopen": "إعادة فتح الشهر",
   "users:manage": "إدارة المستخدمين",
   "audit:view": "عرض سجلّ التدقيق",
+  "inventory:view": "عرض الجرد",
+  "inventory:count": "إدخال الجرد وإقفاله",
+  "inventory:reopen": "إعادة فتح جردٍ مقفَل",
+  "recipe:edit": "تعديل الوصفات",
 };
 
 /** يُرمى داخل الواجهات البرمجية ليُترجم إلى 403. */
