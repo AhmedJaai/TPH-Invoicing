@@ -69,6 +69,28 @@ describe("تصحيحُ الوصفة", () => {
       expect(row.ingredients.find((i) => i.productId === coffee)!.quantity).toBe("18");
     }));
 
+  it("والمصحَّحُ يصير مكتوباً بيد إنسان — فلا يكتب فوقه استيرادٌ قادم", () =>
+    withRollback(async (tx) => {
+      const { actorId, coffee, latte } = await setup(tx);
+
+      await tx.execute(sql`
+        update recipe_versions set source = 'FOODICS_CATALOG'
+         where recipe_id = (select id from recipes where product_id = ${latte})
+      `);
+
+      await correctRecipeVersion({
+        menuProductId: latte, actorId,
+        ingredients: [{ productId: coffee, quantityMilli: 18_000, unit: "G" }],
+      }, tx);
+
+      const [row] = (await tx.execute<{ source: string }>(sql`
+        select v.source from recipe_versions v
+          join recipes r on r.id = v.recipe_id
+         where r.product_id = ${latte} and v.effective_to is null
+      `)).rows;
+      expect(row.source).toBe("HUMAN");
+    }));
+
   it("ومكوّنٌ يُحذَف من الوصفة بالتصحيح", () =>
     withRollback(async (tx) => {
       const { actorId, coffee, latte } = await setup(tx);

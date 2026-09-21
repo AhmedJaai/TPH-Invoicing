@@ -565,6 +565,16 @@ export async function correctRecipeVersion(
       throw new RecipeLockedError(String(locked.period_start), String(locked.period_end));
     }
 
+    /*
+      ── والمصحَّحُ صار مكتوباً بيد إنسان ──
+
+      النسخةُ المستورَدة مصدرُها `FOODICS_CATALOG`، والاستيرادُ يكتب
+      فوقها بحقّ. فلو بقي مصدرُها كما هو بعد التصحيح لعاد أوّلُ استيرادٍ
+      فكتب فوق ما صحّحه صاحبُ المقهى — **وهو بالضبط ما تمنعه القاعدة
+      القائمة**: ما كتبه إنسانٌ لا يُكتَب فوقه، ويُعلَن أنّه تُخطّي.
+    */
+    await tx.execute(sql`update recipe_versions set source = 'HUMAN' where id = ${String(current.version_id)}`);
+
     await tx.delete(recipeIngredients).where(eq(recipeIngredients.recipeVersionId, String(current.version_id)));
     await tx.insert(recipeIngredients).values(
       input.ingredients.map((ing) => ({
