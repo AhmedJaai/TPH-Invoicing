@@ -262,6 +262,14 @@ export const invoices = pgTable("invoices", {
 
   /** إن رُحّلت من شهر سابق، الشهر الأصلي هنا ليبقى الأثر مرئياً */
   carriedForwardFrom: text("carried_forward_from"),
+  /**
+   * تاريخُ دخول البضاعة فعلاً — وهو غير تاريخ الفاتورة.
+   *
+   * المورّد يسلّم في السابع ويصدر فاتورتَه في العاشر، وجردُ ١–٧ يشمل ما
+   * وصل. وفارغٌ يعني «غير معروف»: يُستعمَل تاريخُ الفاتورة نائباً
+   * **مُعلَناً**، وما وقع في نافذة الالتباس يُعرَض ولا يُضمّ بلا قرار.
+   */
+  receivedOn: text("received_on"),
 
   createdAt: now(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -966,6 +974,8 @@ export const salesSources = pgTable("sales_sources", {
   createdAt: now(),
 });
 
+export const posProductKindEnum = pgEnum("pos_product_kind", ["PRODUCT", "MODIFIER"]);
+
 export const posProducts = pgTable("pos_products", {
   id: id(),
   sourceId: text("source_id").notNull().references(() => salesSources.id, { onDelete: "cascade" }),
@@ -974,9 +984,20 @@ export const posProducts = pgTable("pos_products", {
   name: text("name").notNull(),
   category: text("category"),
   priceMinor: integer("price_minor"),
+  /**
+   * خيارُ الإضافة ليس صنفاً يُباع.
+   *
+   * ولو دخل طابورَ «منتجات تحتاج ربطاً» لطُلب من صاحب المقهى أن يربط
+   * «Double shots» بصنفٍ يُباع — وهو ليس كذلك، ولا وصفةَ له.
+   */
+  kind: posProductKindEnum("kind").notNull().default("PRODUCT"),
+  parentExternalId: text("parent_external_id"),
   productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
   createdAt: now(),
-}, (t) => [uniqueIndex("pos_products_uniq").on(t.sourceId, t.externalId)]);
+}, (t) => [
+  uniqueIndex("pos_products_uniq").on(t.sourceId, t.externalId),
+  index("pos_products_kind_idx").on(t.kind),
+]);
 
 export const sales = pgTable("sales", {
   id: id(),
@@ -1036,8 +1057,32 @@ export const saleLines = pgTable("sale_lines", {
   isRefund: boolean("is_refund").notNull().default(false),
   isVoid: boolean("is_void").notNull().default(false),
   isComplimentary: boolean("is_complimentary").notNull().default(false),
-  /** المُعدِّلات كما وردت — تُحفَظ خاماً، وما لا يُربَط منها يُعلَن في التغطية. */
+  /**
+   * حالُ البند كما قالها المصدر — خاماً.
+   *
+   * وفودكس يقولها `Done`/`Returned`/`Void` **بكمّيّةٍ موجبة دائماً**؛
+   * والأعلامُ أعلاه مشتقّةٌ منها. وتُحفَظ الحالُ نفسُها كي يُقرأ بعد
+   * سنةٍ بم حُكم على السطر، ولأنّ مصدراً آخر قد يحمل حالاتٍ أخرى.
+   */
+  sourceStatus: text("source_status"),
+  /**
+   * خيارُ إضافةٍ لا منتج.
+   *
+   * في تصدير فودكس يأتي المُعدِّل صفّاً مستقلّاً مرتبطاً بأصله، كمّيّتُه
+   * كمّيّةُ أصله دائماً، **وسعرُ الأصل يشمله**. فلو عُدّ بنداً مستقلّاً
+   * لتضاعف الإيراد وانتفخت الوحداتُ المباعة.
+   */
+  isModifier: boolean("is_modifier").notNull().default(false),
+  parentExternalId: text("parent_external_id"),
+  /** المُعدِّلات كما وردت — تُحفَظ على الأصل، وما لا يُربَط منها يُعلَن في التغطية. */
   modifiers: jsonb("modifiers"),
+  /**
+   * بصمةُ الحقول المؤثِّرة — بها يُفرَّق المُراجَع من المكرَّر.
+   *
+   * والتصديرُ لا يحمل رقمَ نسخةٍ ولا طابعَ إنشاء، فلا سبيل إلى «أهذا
+   * أحدث؟» إلّا بمقارنة ما يقوله عن السطر نفسِه.
+   */
+  contentHash: text("content_hash"),
 }, (t) => [
   index("sale_lines_sale_idx").on(t.saleId),
   uniqueIndex("sale_lines_external_uniq").on(t.saleId, t.externalId),
@@ -1118,9 +1163,17 @@ export const recipeIngredients = pgTable("recipe_ingredients", {
   unit: baseUnitEnum("unit").notNull(),
   /** فاقدُ التجهيز بنقاط الأساس (١٠٠ = ١٪). و`null` تعني «لم يُقَس» لا «صفر». */
   prepLossBp: integer("prep_loss_bp"),
+  /**
+   * مكوّنٌ لا يُحسَب إلّا مع هذا الخيار.
+   *
+   * و«دبل شوت» في هذا المقهى **خيارٌ داخل الوصفة لا إضافةُ بنّ** — قالها
+   * صاحبُه، ويؤيّدها الملفّ: سعرُه صفرٌ في ١٥٨ مرّة. فالعمودُ يبقى
+   * فارغاً حتّى يقول إنسانٌ إنّ خياراً بعينه يزيد مكوّناً.
+   */
+  modifierExternalId: text("modifier_external_id"),
   note: text("note"),
 }, (t) => [
-  uniqueIndex("recipe_ingredients_uniq").on(t.recipeVersionId, t.productId),
+  index("recipe_ingredients_modifier_idx").on(t.modifierExternalId),
   index("recipe_ingredients_product_idx").on(t.productId),
 ]);
 
@@ -1130,6 +1183,13 @@ export const salesImportStatusEnum = pgEnum("sales_import_status", [
 
 export const salesImportRowStatusEnum = pgEnum("sales_import_row_status", [
   "PARSED", "SKIPPED", "ERROR", "DUPLICATE",
+  /**
+   * مقيَّدٌ من قبل، وقد تغيّر ما يقوله المصدر عنه.
+   *
+   * طلبٌ أُلغي بعد تصدير الأمس يصل اليوم بحال `Void`. فردُّ الملفّ
+   * «مكرَّراً» يُبقي في قيدنا مبيعاً لم يقع.
+   */
+  "REVISED",
 ]);
 
 /**
@@ -1161,6 +1221,7 @@ export const salesImports = pgTable("sales_imports", {
   skippedRows: integer("skipped_rows").notNull().default(0),
   errorRows: integer("error_rows").notNull().default(0),
   duplicateRows: integer("duplicate_rows").notNull().default(0),
+  revisedRows: integer("revised_rows").notNull().default(0),
   /** ما لم يُقرأ ولماذا — يُعرَض للمستخدم لا يُدفَن في سجلّ خادم. */
   messages: jsonb("messages"),
   importedById: text("imported_by_id").references(() => users.id),
@@ -1192,6 +1253,10 @@ export const salesImportRows = pgTable("sales_import_rows", {
 ]);
 
 export const inventoryCountStatusEnum = pgEnum("inventory_count_status", ["DRAFT", "FINALISED"]);
+
+export const valuationBasisEnum = pgEnum("valuation_basis", [
+  "PERIOD_WEIGHTED_AVERAGE", "LATEST_KNOWN", "UNKNOWN",
+]);
 
 export const inventoryReadinessEnum = pgEnum("inventory_readiness", ["READY", "PARTIAL", "BLOCKED"]);
 
@@ -1244,9 +1309,19 @@ export const inventoryCountLines = pgTable("inventory_count_lines", {
   theoreticalClosingMilli: milli("theoretical_closing_milli"),
   actualMilli: milli("actual_milli"),
   varianceMilli: milli("variance_milli"),
-  /** بنقاط الأساس (١٠٠ = ١٪) — ولا تُحسَب حين يكون المتوقَّع صفراً أو مجهولاً. */
+  /**
+   * **النسبةُ الأساسيّة**: الفرق ÷ الاستهلاك المتوقَّع، بنقاط الأساس.
+   *
+   * وهي جوابُ «كم ضاع ممّا كان ينبغي أن يُصرَف؟». ومقامُ المخزون
+   * الختاميّ يتضخّم كلّما قلّ ما بقي على الرفّ، فيُنذر أشدَّ ما يكون
+   * آخرَ الأسبوع حين يكون الرفّ فارغاً بحقّ.
+   */
+  varianceConsumptionBp: integer("variance_consumption_bp"),
+  /** ونسبةٌ ثانويّة إلى المخزون الختاميّ المتوقَّع — تُعرَض بجانبها. */
   varianceBp: integer("variance_bp"),
   unitCostMinor: integer("unit_cost_minor"),
+  /** بم قُوِّم الفرق — يُحفَظ مع الرقم ويُعرَض، فلا يتغيّر المنهجُ صامتاً. */
+  valuationBasis: valuationBasisEnum("valuation_basis").notNull().default("UNKNOWN"),
   varianceCostMinor: integer("variance_cost_minor"),
   /** لماذا جُهل ما جُهل — أسبابٌ تُعرَض للقارئ لا تُدفَن. */
   flags: jsonb("flags"),

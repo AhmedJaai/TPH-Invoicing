@@ -52,10 +52,27 @@ describe("فصل صلاحيات الكتابة عن القراءة", () => {
     }
   });
 
-  it("وإعادةُ فتح جردٍ مقفَل للمالك وحده — كإعادة فتح الشهر", () => {
-    expect(can("OWNER", "month:reopen")).toBe(true);
-    expect(can("ACCOUNTANT", "month:reopen")).toBe(false);
-    expect(can("PURCHASING", "month:reopen")).toBe(false);
+  /*
+    إعادةُ فتح الجرد صلاحيّةٌ مستقلّة عن إقفال الشهر.
+
+    فعلان على بياناتٍ مختلفة: أحدُهما يفتح شهراً محاسبيّاً، والآخر
+    يُعيد حسابَ جردٍ مقفَل. ومن ملك أحدَهما لا يلزم أن يملك الآخر —
+    والصلاحيّةُ المشتركة تُوسّع الأذن بلا قصد.
+  */
+  it("وإعادةُ فتح جردٍ مقفَل صلاحيّةٌ مستقلّة، للمالك وحده", () => {
+    expect(can("OWNER", "inventory:reopen")).toBe(true);
+    expect(can("ACCOUNTANT", "inventory:reopen")).toBe(false);
+    expect(can("PURCHASING", "inventory:reopen")).toBe(false);
+  });
+
+  it("ولا تُعار من إقفال الشهر", () => {
+    const roles = ["OWNER", "ACCOUNTANT", "PURCHASING"] as const;
+    const reopenMonth = roles.filter((r) => can(r, "month:reopen"));
+    const reopenCount = roles.filter((r) => can(r, "inventory:reopen"));
+    /* تتصادفان اليوم على المالك، وهما مستقلّتان في التعريف */
+    expect(reopenMonth).not.toBe(reopenCount);
+    expect(can("ACCOUNTANT", "month:close")).toBe(true);
+    expect(can("ACCOUNTANT", "inventory:reopen")).toBe(false);
   });
 
   it("صلاحية الكتابة مستقلّة عن صلاحية القراءة في التعريف", () => {

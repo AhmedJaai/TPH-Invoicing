@@ -23,8 +23,13 @@ export interface PurchaseLineInput {
   invoiceId: string;
   invoiceNumber: string;
   supplierName: string;
-  /** YYYY-MM-DD */
+  /**
+   * تاريخُ دخول البضاعة المعتمَد — الحقيقيّ إن وُجد، وإلّا تاريخُ
+   * الفاتورة **نائباً مُعلَناً**.
+   */
   invoiceDate: string;
+  /** أهو تاريخُ استلامٍ حقيقيّ أم نائبٌ عنه؟ */
+  receiptKnown?: boolean;
   description: string;
   productId: string | null;
   /** عددُ العبوات في السطر — نصٌّ عشريّ كما في `invoice_lines.qty`. */

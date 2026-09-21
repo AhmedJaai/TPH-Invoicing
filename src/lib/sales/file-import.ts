@@ -8,7 +8,7 @@
  */
 import type { SalesTransaction } from "./connector";
 
-export type ParsedRowStatus = "PARSED" | "SKIPPED" | "ERROR" | "DUPLICATE";
+export type ParsedRowStatus = "PARSED" | "SKIPPED" | "ERROR" | "DUPLICATE" | "REVISED";
 
 export interface ParsedSaleLine {
   /** فريدٌ داخل البيعة — عليه يقوم منعُ التكرار عند إعادة الاستيراد. */
@@ -20,16 +20,37 @@ export interface ParsedSaleLine {
   quantityMilli: number;
   unitPriceMinor: number;
   lineTotalMinor: number;
+  /**
+   * حالُ البند كما قالها المصدر — ومنها تُشتقّ الأعلام.
+   *
+   * وفودكس يقولها `Done`/`Returned`/`Void` **بكمّيّةٍ موجبة دائماً**؛
+   * فالمرتجَعُ ليس سالباً، والملغى ليس غائباً.
+   */
+  sourceStatus: string | null;
   isRefund: boolean;
   isVoid: boolean;
+  /** لا دليلَ عليه في تصدير فودكس — يبقى `false` ولا يُخترَع. */
   isComplimentary: boolean;
+  /**
+   * خيارُ إضافةٍ لا منتج: كمّيّتُه كمّيّةُ أصله، وسعرُه مشمولٌ في الأصل.
+   * يُحفَظ بتمامه ولا يُستهلَك وحده ولا يُجمَع إيرادُه.
+   */
+  isModifier: boolean;
+  parentExternalId: string | null;
+  /** أسماءُ خيارات هذا البند — تُحفَظ على الأصل للعرض. */
   modifiers: string[] | null;
+  /** كلفةُ المصدر — تُحفَظ للمقارنة ولا يُقوَّم بها فرقٌ (تكون دائريّة). */
+  sourceUnitCostMinor: number | null;
+  /** بصمةُ المحتوى — بها يُفرَّق المُراجَع من المكرَّر. */
+  contentHash: string;
   /** أرقامُ الصفوف التي كوّنته — أثرٌ يُعاد منه إلى الملفّ. */
   rowNumbers: number[];
 }
 
 export interface ParsedSale {
   externalId: string;
+  /** حالُ الطلب — تُحفَظ، ولا تغلب حالَ البند. */
+  orderStatus: string | null;
   businessDate: string;
   soldAt: Date;
   branchLabel: string | null;
@@ -68,6 +89,12 @@ export interface ParsedSalesFile {
   blocked?: string;
 }
 
+/** الشبكةُ الخام بجانب المصيَّرة — للتواريخ التي يُفسدها التصيير. */
+export interface ParseGrids {
+  grid: readonly string[][];
+  raw?: readonly string[][];
+}
+
 export interface ParseOptions {
   /**
    * يومُ العمل حين لا يذكره الملفّ.
@@ -85,7 +112,7 @@ export interface SalesFileAdapter {
   readonly name: string;
   /** أيعرف هذا الملفّ؟ — بالترويسات لا باسم الملفّ. */
   detect(grid: readonly string[][]): boolean;
-  parse(grid: readonly string[][], options: ParseOptions): ParsedSalesFile;
+  parse(grids: ParseGrids, options: ParseOptions): ParsedSalesFile;
 }
 
 /** جسرٌ إلى نوع الموصل — يثبت أنّ الطريقين يلتقيان عند نوعٍ واحد. */
@@ -99,7 +126,8 @@ export function toSalesTransactions(file: ParsedSalesFile): SalesTransaction[] {
     refundMinor: s.refundMinor,
     vatMinor: s.vatMinor,
     netMinor: s.netMinor,
-    lines: s.lines.map((l) => ({
+    /* المُعدِّلاتُ ليست بنوداً تُباع — فلا تدخل النوعَ المحايد */
+    lines: s.lines.filter((l) => !l.isModifier).map((l) => ({
       externalProductId: l.productExternalId,
       name: l.name,
       category: l.category ?? undefined,

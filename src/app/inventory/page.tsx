@@ -56,7 +56,7 @@ export default async function InventoryPage() {
             header={header}
             report={report}
             canCount={can(user.role, "inventory:count")}
-            canReopen={can(user.role, "month:reopen")}
+            canReopen={can(user.role, "inventory:reopen")}
             showAmounts={can(user.role, "amounts:view")}
           />
         </PageShell>

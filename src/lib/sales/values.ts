@@ -30,29 +30,49 @@ export function parseMoneyMinor(raw: string | undefined): number | null {
   return parseRiyals(text);
 }
 
-const TRUE_WORDS = new Set(["true", "yes", "y", "1", "نعم", "صح", "مرتجع", "ملغي", "ملغاة", "ملغى", "مجاني", "مجانية"]);
-const FALSE_WORDS = new Set(["false", "no", "n", "0", "", "-", "لا", "خطأ"]);
-
 /**
- * عَلَمٌ منطقيّ.
+ * كلفةُ المصدر — **إعلاميّةٌ لا يُقوَّم بها فرق**.
  *
- * ويُرجع `null` لما لم يُفهَم — فيُقرأ «غير معروف» ولا يُقرأ «لا».
- * وقراءةُ المجهول «لا» في عمود «ملغاة» تُدخل بيعةً لم تقع.
+ * ── ولماذا قارئٌ مستقلّ ──
+ *
+ * فودكس يكتب الكلفة بخمس منازل (`2.92246`)، و`parseRiyals` يردّ ما
+ * جاوز منزلتين عن قصد: مبلغٌ لا يُمثَّل بالهللات حسمُه تخمين. وذلك
+ * الحارسُ صحيحٌ في **مال الفواتير**، ولا يُضعَّف من أجل رقمٍ إعلاميّ.
+ *
+ * فالكلفةُ تُقرَّب هنا وتُحفَظ للمقارنة وحدها. **ولا يُبنى عليها تقييمُ
+ * فرقٍ يُعرَض**: الغايةُ من النظام فحصُ حساب فودكس استقلالاً، فلو
+ * قُوِّم الفرقُ بكلفته لصار الفحصُ دائريّاً.
  */
-export function parseFlag(raw: string | undefined): boolean | null {
+export function parseSourceCostMinor(raw: string | undefined): number | null {
   if (raw === undefined) return null;
-  const text = raw.trim().toLowerCase();
-  if (TRUE_WORDS.has(text)) return true;
-  if (FALSE_WORDS.has(text)) return false;
-  return null;
+  const text = normaliseNumeric(raw);
+  if (text === "" || !/^-?\d+(\.\d+)?$/.test(text)) return null;
+  const value = Math.round(Number(text) * 100);
+  return Number.isSafeInteger(value) ? value : null;
 }
+
+/*
+  ── ولا قارئَ لعَلَمٍ منطقيّ ──
+
+  كان هنا `parseFlag` يقرأ «نعم/لا» لأعمدةِ «ملغاة» و«مرتجَعة». وفحصُ
+  التصدير الحقيقيّ أسقطه: فودكس لا يحمل أعلاماً منطقيّة أصلاً — يحمل
+  **حالاً نصّيّة** في عمود `status` (`Done` · `Returned` · `Void`).
+  فحُذف بدل أن يبقى صادراً لا يستدعيه شيء.
+*/
 
 /* ───────────────────────── التواريخ ───────────────────────── */
 
 export type DateOrder = "ISO" | "DMY" | "MDY" | "AMBIGUOUS";
 
 const ISO = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/;
-const SLASH = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/;
+/**
+ * صيغةُ الشرطة المائلة — والسنةُ خانتان أو أربع.
+ *
+ * تصديرُ فودكس الحقيقيّ يُصيَّر «9/19/26»: سنةٌ من خانتين. ومحلِّلٌ
+ * يطلب أربعاً يردّ **كلّ صفٍّ في الملفّ** — وذلك يُقرأ «الملفّ غير
+ * مفهوم» بينما هو مفهومٌ تماماً.
+ */
+const SLASH = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2}|\d{4})/;
 /** يومُ إكسل الصفر: ٣٠ ديسمبر ١٨٩٩ — ونظامُ ١٩٠٠ فيه يومُ كبيسٍ وهميّ. */
 const EXCEL_EPOCH = Date.UTC(1899, 11, 30);
 
@@ -118,7 +138,12 @@ export function parseBusinessDate(raw: string | undefined, order: DateOrder = "I
   if (slash) {
     const a = Number(slash[1]);
     const b = Number(slash[2]);
-    const y = Number(slash[3]);
+    /*
+      سنةٌ من خانتين تُردّ إلى قرنها: ٦٩ فما دون ← ٢٠xx، وما فوقها ←
+      ١٩xx. وهو اصطلاحُ إكسل نفسِه، فلا يُخترَع هنا اصطلاحٌ ثانٍ.
+    */
+    const rawYear = Number(slash[3]);
+    const y = slash[3].length === 2 ? (rawYear <= 69 ? 2000 + rawYear : 1900 + rawYear) : rawYear;
     /* ما قطع به الملفّ يغلب الافتراض؛ وما جاوز ١٢ يقطع بنفسه */
     const dayFirst = a > 12 ? true : b > 12 ? false : order !== "MDY";
     const d = dayFirst ? a : b;

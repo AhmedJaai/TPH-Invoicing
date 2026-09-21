@@ -1,225 +1,281 @@
 import { describe, expect, it } from "vitest";
-import { adapterFor, findHeader, foodicsExcelAdapter } from "./foodics-excel";
+import { readFileSync } from "node:fs";
+import * as XLSX from "xlsx";
+import { adapterFor, contentFingerprint, findHeader, foodicsExcelAdapter } from "./foodics-excel";
 import { mapColumns, normaliseHeader } from "./columns";
-import { detectDateOrder, parseBusinessDate, parseFlag, parseQuantityMilli } from "./values";
-import { toSalesTransactions } from "./file-import";
+import { detectDateOrder, parseBusinessDate, parseSourceCostMinor, parseQuantityMilli } from "./values";
+import { toSalesTransactions, type ParsedSalesFile } from "./file-import";
+import { readWorkbookSafely } from "@/lib/bank/parsers/safe-xlsx";
 
-const ORDERS_HEADER = [
-  "Order Number", "Business Date", "Branch", "SKU", "Product", "Category",
-  "Quantity", "Unit Price", "Net Sales", "Is Refund", "Voided", "Modifiers",
-];
+/**
+ * المحوِّل يُختبَر على **التصدير الحقيقيّ** لا على ملفٍّ مصنوع.
+ *
+ * والنسخةُ في `src/test/fixtures` هي الملفُّ نفسُه، فُرّغت منه ثلاثةُ
+ * أعمدةٍ شخصيّة (اسمُ العميل ومفتاحُه ورقمُ جوّاله) لا شأن للجرد بها.
+ * وما عداها كما ورد حرفاً بحرف: الطلباتُ والأصنافُ والحالاتُ
+ * والمُعدِّلاتُ والتواريخُ والمبالغ.
+ */
+const FIXTURE = "src/test/fixtures/foodics-order-items.xlsx";
 
-function ordersGrid(rows: string[][]): string[][] {
-  return [
-    ["تقرير الطلبات — مؤسسة ذا بوبليك هاوس"],
-    [],
-    ORDERS_HEADER,
-    ...rows,
-  ];
+function parseReal(): ParsedSalesFile {
+  const wb = readWorkbookSafely(readFileSync(FIXTURE), { includeRaw: true });
+  return foodicsExcelAdapter.parse({ grid: wb.sheets[0].grid, raw: wb.sheets[0].raw }, {});
 }
 
-const PMIX_HEADER = ["التاريخ", "الصنف", "الكمية", "صافي المبيعات"];
+/** ملفٌّ مصنوع بترويسة فودكس نفسِها — لحالاتٍ لا توجد في الملفّ الحقيقيّ. */
+const HEADER = [
+  "order_reference", "order_status", "type", "parent_item_sku", "status",
+  "sku", "name", "unit_price", "unit_cost", "quantity", "total_price", "business_date",
+  "branch_name", "branch_reference",
+];
 
-describe("فهمُ الترويسة بالاسم لا بالموضع", () => {
+function sheet(rows: (string | number)[][]) {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([HEADER, ...rows]), "S");
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  const safe = readWorkbookSafely(buf, { includeRaw: true });
+  return { grid: safe.sheets[0].grid, raw: safe.sheets[0].raw };
+}
+
+const line = (over: Partial<Record<string, string | number>> = {}) => {
+  const base: Record<string, string | number> = {
+    order_reference: 1, order_status: "Done", type: "المنتج", parent_item_sku: "",
+    status: "Done", sku: "sk-0001", name: "Latte", unit_price: 20, unit_cost: 3.876,
+    quantity: 1, total_price: 20, business_date: "2026-09-13",
+    branch_name: "Branch 1", branch_reference: "B01",
+  };
+  return HEADER.map((h) => ({ ...base, ...over })[h] ?? "");
+};
+
+/* ═══════════ التصدير الحقيقيّ ═══════════ */
+
+describe("التصديرُ الحقيقيّ يُقرأ كما هو", () => {
+  const parsed = parseReal();
+
+  it("يُعرَف بترويسته، وصيغتُه بنودُ طلبات", () => {
+    expect(parsed.shape).toBe("FOODICS_ORDER_ITEMS");
+    expect(parsed.blocked).toBeUndefined();
+  });
+
+  it("‏١٬٠٩٠ طلباً و٢٬٠٨١ سطراً — كلُّها مقروءة", () => {
+    expect(parsed.sales).toHaveLength(1090);
+    expect(parsed.rows).toHaveLength(2081);
+    expect(parsed.rows.every((r) => r.status === "PARSED")).toBe(true);
+  });
+
+  it("والفترةُ سبعةُ أيّامٍ متّصلة — من عددٍ تسلسليّ لا من نصٍّ مصيَّر", () => {
+    expect(parsed.periodStart).toBe("2026-09-13");
+    expect(parsed.periodEnd).toBe("2026-09-19");
+    const days = new Set(parsed.sales.map((s) => s.businessDate));
+    expect(days.size).toBe(7);
+  });
+
+  it("‏١٬٧١٧ منتجاً و٣٦٤ خيارَ إضافة — والفضاءان لا يتقاطعان", () => {
+    const lines = parsed.sales.flatMap((s) => s.lines);
+    expect(lines.filter((l) => !l.isModifier)).toHaveLength(1717);
+    expect(lines.filter((l) => l.isModifier)).toHaveLength(364);
+
+    const productSkus = new Set(lines.filter((l) => !l.isModifier).map((l) => l.productExternalId));
+    const modSkus = new Set(lines.filter((l) => l.isModifier).map((l) => l.productExternalId));
+    expect([...modSkus].filter((s) => productSkus.has(s))).toEqual([]);
+  });
+
+  it("والوحداتُ: إجمالي ٢٬٠٦١ · تامّ ٢٬٠٣٣ · مرتجَع ٢١ · ملغى ٧", () => {
+    const p = parsed.sales.flatMap((s) => s.lines).filter((l) => !l.isModifier);
+    const units = (f: (l: typeof p[number]) => boolean) =>
+      p.filter(f).reduce((s, l) => s + l.quantityMilli / 1000, 0);
+
+    expect(units(() => true)).toBe(2061);
+    expect(units((l) => !l.isRefund && !l.isVoid)).toBe(2033);
+    expect(units((l) => l.isRefund)).toBe(21);
+    expect(units((l) => l.isVoid)).toBe(7);
+  });
+
+  it("**والمرتجَعُ كمّيّتُه موجبة** — لا سالبَ في الملفّ إطلاقاً", () => {
+    const lines = parsed.sales.flatMap((s) => s.lines);
+    expect(lines.every((l) => l.quantityMilli > 0)).toBe(true);
+    const returned = lines.filter((l) => l.isRefund);
+    expect(returned.length).toBeGreaterThan(0);
+    expect(returned.every((l) => l.sourceStatus === "Returned")).toBe(true);
+  });
+
+  it("وحالُ البند تغلب حالَ الطلب — طلبٌ فيه ملغىً وتامّ معاً", () => {
+    const mixed = parsed.sales.find((s) => {
+      const p = s.lines.filter((l) => !l.isModifier);
+      return p.some((l) => l.isVoid) && p.some((l) => !l.isVoid);
+    });
+    expect(mixed).toBeDefined();
+    /* ولا يُعَدّ الطلبُ كلُّه ملغىً ما دام فيه بندٌ صُنع */
+    expect(mixed!.isVoid).toBe(false);
+  });
+
+  it("و«دبل شوت» خيارٌ بسعر صفرٍ لا إضافةُ مكوّن", () => {
+    const doubles = parsed.sales.flatMap((s) => s.lines)
+      .filter((l) => l.isModifier && l.name === "Double shots");
+    expect(doubles).toHaveLength(158);
+    expect(doubles.every((l) => l.unitPriceMinor === 0)).toBe(true);
+    expect(doubles.every((l) => l.parentExternalId !== null)).toBe(true);
+  });
+
+  it("وكمّيّةُ الخيار = كمّيّةُ أصله دائماً", () => {
+    for (const sale of parsed.sales) {
+      for (const m of sale.lines.filter((l) => l.isModifier)) {
+        const parent = sale.lines.find((l) => !l.isModifier && l.productExternalId === m.parentExternalId);
+        if (parent) expect(m.quantityMilli).toBe(parent.quantityMilli);
+      }
+    }
+  });
+
+  it("**وسعرُ الأصل يشمل خياراته** — فلا يُجمَع إيرادُ الخيار معه", () => {
+    /* ماتشا ٢٥×٢ مع Coconut ٤×٢ ← إجمالي ٥٨ لا ٥٠ */
+    const matcha = parsed.sales
+      .flatMap((s) => s.lines)
+      .find((l) => l.name === "Matcha" && (l.modifiers?.includes("Coconut") ?? false) && l.quantityMilli === 2000);
+    expect(matcha).toBeDefined();
+    expect(matcha!.unitPriceMinor).toBe(2500);
+    expect(matcha!.lineTotalMinor).toBe(5800);
+
+    /* والإيرادُ المجمَّع لا يعدّ صفوف الخيارات */
+    const revenue = parsed.sales.reduce((s, x) => s + x.netMinor + x.refundMinor, 0);
+    const productSum = parsed.sales.flatMap((s) => s.lines)
+      .filter((l) => !l.isModifier && !l.isVoid)
+      .reduce((s, l) => s + l.lineTotalMinor, 0);
+    expect(revenue).toBe(productSum);
+  });
+
+  it("ولا يُدَّعى «مجانيّ» — لا عمودَ يدلّ عليه في هذا المصدر", () => {
+    expect(parsed.sales.flatMap((s) => s.lines).every((l) => l.isComplimentary === false)).toBe(true);
+  });
+
+  it("والطلبُ لا يمتدّ على يومين", () => {
+    expect(new Set(parsed.sales.map((s) => s.externalId)).size).toBe(parsed.sales.length);
+  });
+
+  it("ومخرَجُه هو نوعُ الموصل نفسُه — بلا خيارات", () => {
+    const tx = toSalesTransactions(parsed);
+    expect(tx).toHaveLength(1090);
+    expect(tx.flatMap((t) => t.lines)).toHaveLength(1717);
+  });
+
+  it("والأعمدةُ التي لم تُقرأ تُعلَن بأسمائها", () => {
+    expect(parsed.recognisedColumns.length).toBeGreaterThan(10);
+    expect(parsed.unrecognisedColumns).not.toContain("quantity");
+  });
+});
+
+/* ═══════════ الترويسة والقيم ═══════════ */
+
+describe("فهمُ الترويسة", () => {
   it("يوحّد الفراغَ والشرطةَ والهمزةَ والتاء المربوطة", () => {
     expect(normaliseHeader("Net Sales")).toBe("netsales");
-    expect(normaliseHeader("net_sales")).toBe("netsales");
-    expect(normaliseHeader(" صافي  المبيعات ")).toBe("صافيالمبيعات");
+    expect(normaliseHeader("business_date")).toBe("businessdate");
     expect(normaliseHeader("الكمّيّة")).toBe("الكميه");
   });
 
-  it("يربط الإنجليزيّة والعربيّة بالحقول نفسها", () => {
-    const en = mapColumns(ORDERS_HEADER);
-    expect(en.index.orderId).toBe(0);
-    expect(en.index.businessDate).toBe(1);
-    expect(en.index.productName).toBe(4);
-    expect(en.index.quantity).toBe(6);
-
-    const ar = mapColumns(PMIX_HEADER);
-    expect(ar.index.businessDate).toBe(0);
-    expect(ar.index.productName).toBe(1);
-    expect(ar.index.quantity).toBe(2);
-    expect(ar.index.lineTotal).toBe(3);
+  it("**`name` يسبق `name_localized`** — والثاني فارغٌ في التصدير الحقيقيّ", () => {
+    const m = mapColumns(["sku", "name", "name_localized", "quantity"]);
+    expect(m.index.productName).toBe(1);
+    expect(m.index.productNameLocalized).toBe(2);
   });
 
-  it("وما لم يُفهَم يُعلَن بأسمائه — لا يُتجاهَل صامتاً", () => {
-    const m = mapColumns(["Product", "Quantity", "Loyalty Points", "Cashier"]);
-    expect(m.unrecognised).toEqual(["Loyalty Points", "Cashier"]);
-    expect(m.recognised.length).toBe(2);
+  it("ويربط أعمدةَ فودكس بحقولها", () => {
+    const m = mapColumns(HEADER);
+    expect(m.index.orderId).toBe(0);
+    expect(m.index.lineType).toBe(2);
+    expect(m.index.parentSku).toBe(3);
+    expect(m.index.lineStatus).toBe(4);
+    expect(m.index.productExternalId).toBe(5);
+    expect(m.index.businessDate).toBe(11);
   });
 
-  it("والترويسةُ تُطلَب بعد أسطرِ العنوان — لا تُفترَض أوّلَ صفّ", () => {
-    expect(findHeader(ordersGrid([]))?.rowIndex).toBe(2);
+  it("والترويسةُ تُطلَب بعد أسطر العنوان", () => {
+    expect(findHeader([["تقرير"], [], HEADER])?.rowIndex).toBe(2);
     expect(findHeader([["عنوان"], ["فترة"]])).toBeNull();
   });
 });
 
-describe("التواريخ", () => {
-  it("‏`YYYY-MM-DD` لا لبسَ فيه", () => {
-    expect(parseBusinessDate("2026-09-03")).toBe("2026-09-03");
-    expect(parseBusinessDate("2026-09-03 14:32:11")).toBe("2026-09-03");
+describe("التواريخ والقيم", () => {
+  it("العددُ التسلسليّ لا لبسَ فيه", () => {
+    expect(parseBusinessDate("46284", "ISO")).toBe("2026-09-19");
+    expect(parseBusinessDate("46278", "ISO")).toBe("2026-09-13");
   });
 
-  it("وترتيبُ اليوم والشهر يُستنتَج من الملفّ كلِّه — صفٌّ فيه ١٣ يقطع", () => {
-    expect(detectDateOrder(["03/09/2026", "13/09/2026"])).toBe("DMY");
-    expect(detectDateOrder(["09/13/2026", "09/03/2026"])).toBe("MDY");
-    expect(detectDateOrder(["03/09/2026", "04/09/2026"])).toBe("AMBIGUOUS");
-    expect(detectDateOrder(["2026-09-03"])).toBe("ISO");
+  it("**والسنةُ من خانتين تُقرأ** — «9/19/26» يُصيَّرها إكسل", () => {
+    expect(parseBusinessDate("9/19/26", "MDY")).toBe("2026-09-19");
+    expect(parseBusinessDate("19/9/26", "DMY")).toBe("2026-09-19");
+    expect(detectDateOrder(["9/19/26", "9/13/26"])).toBe("MDY");
   });
 
-  it("والمُلتبِسُ يُقرأ اليومَ أوّلاً — والافتراضُ يُعلَن في التحذيرات", () => {
-    expect(parseBusinessDate("03/09/2026", "AMBIGUOUS")).toBe("2026-09-03");
-    /* و«09/03» في ترتيب الشهرِ أوّلاً هو الثالث من سبتمبر */
-    expect(parseBusinessDate("09/03/2026", "MDY")).toBe("2026-09-03");
-    expect(parseBusinessDate("03/09/2026", "MDY")).toBe("2026-03-09");
-    const parsed = foodicsExcelAdapter.parse(
-      [PMIX_HEADER, ["03/09/2026", "لاتيه", "2", "36.00"]],
-      {},
-    );
-    expect(parsed.warnings.some((w) => w.includes("ترتيب اليوم والشهر"))).toBe(true);
+  it("وكلفةُ المصدر تُقرأ بمنازلها الخمس — إعلاميّةً لا للتقييم", () => {
+    expect(parseSourceCostMinor("2.92246")).toBe(292);
+    expect(parseSourceCostMinor("3.876")).toBe(388);
+    expect(parseSourceCostMinor("-")).toBeNull();
   });
 
-  it("وما ليس تاريخاً يُرجع `null` — لا يُقرأ اليوم", () => {
-    expect(parseBusinessDate("—")).toBeNull();
-    expect(parseBusinessDate("2026-13-40")).toBeNull();
-  });
-});
-
-describe("القيم", () => {
-  it("الأرقامُ العربيّة وفواصلُ الآلاف تُقرأ", () => {
-    expect(parseQuantityMilli("١٢٣")).toBe(123_000);
+  it("والكمّيّةُ تُقرأ عربيّةً ولاتينيّة", () => {
+    expect(parseQuantityMilli("٣")).toBe(3000);
     expect(parseQuantityMilli("1,234.5")).toBe(1_234_500);
     expect(parseQuantityMilli("")).toBeNull();
   });
-
-  it("والعَلَمُ المجهولُ `null` لا «لا» — وقراءتُه «لا» في «ملغاة» تُدخل بيعةً لم تقع", () => {
-    expect(parseFlag("true")).toBe(true);
-    expect(parseFlag("نعم")).toBe(true);
-    expect(parseFlag("0")).toBe(false);
-    expect(parseFlag("ربّما")).toBeNull();
-  });
 });
 
-describe("تصديرُ الطلبات", () => {
-  const grid = ordersGrid([
-    ["ORD-1", "2026-09-03", "النسيم", "SKU-1", "Spanish Latte", "Hot", "2", "18.00", "36.00", "", "", "Extra Shot"],
-    ["ORD-1", "2026-09-03", "النسيم", "SKU-2", "Croissant", "Bakery", "1", "12.00", "12.00", "", "", ""],
-    ["ORD-2", "2026-09-04", "النسيم", "SKU-1", "Spanish Latte", "Hot", "1", "18.00", "18.00", "", "", ""],
-  ]);
+/* ═══════════ حالاتٌ لا توجد في الملفّ الحقيقيّ ═══════════ */
 
-  it("يُعرَف بترويسته، ويصير بيعةً لكلّ طلب", () => {
-    expect(adapterFor(grid)).toBe(foodicsExcelAdapter);
-    const parsed = foodicsExcelAdapter.parse(grid, {});
-
-    expect(parsed.shape).toBe("FOODICS_ORDERS");
-    expect(parsed.sales).toHaveLength(2);
-    expect(parsed.sales[0].externalId).toBe("FDX:ORD-1");
-    expect(parsed.sales[0].lines).toHaveLength(2);
-    expect(parsed.sales[0].netMinor).toBe(48_00);
-    expect(parsed.periodStart).toBe("2026-09-03");
-    expect(parsed.periodEnd).toBe("2026-09-04");
+describe("حالاتٌ تُصنَع لأنّها لم ترد", () => {
+  it("الصنفُ المكرَّر في الطلب الواحد يبقى سطرين — الترتيبُ يفرّقهما", () => {
+    const p = foodicsExcelAdapter.parse(sheet([
+      line({ order_reference: 7, sku: "sk-0014", name: "Water" }),
+      line({ order_reference: 7, sku: "sk-0014", name: "Water" }),
+    ]), {});
+    expect(p.sales[0].lines).toHaveLength(2);
+    expect(new Set(p.sales[0].lines.map((l) => l.externalId)).size).toBe(2);
   });
 
-  it("والمُعدِّلاتُ تُحفَظ خاماً", () => {
-    const parsed = foodicsExcelAdapter.parse(grid, {});
-    expect(parsed.sales[0].lines[0].modifiers).toEqual(["Extra Shot"]);
-    expect(parsed.sales[0].lines[1].modifiers).toBeNull();
+  it("وخيارٌ بلا أصلٍ يُعلَن ولا يُطرَح", () => {
+    const p = foodicsExcelAdapter.parse(sheet([
+      line({ order_reference: 8, type: "خيار الإضافة", parent_item_sku: "sk-9999", sku: "sk-0039", name: "Double shots", unit_price: 0, total_price: 0 }),
+    ]), {});
+    expect(p.warnings.some((w) => w.includes("لا أصلَ له"))).toBe(true);
+    expect(p.sales[0].lines[0].isModifier).toBe(true);
   });
 
-  it("والكمّيّةُ السالبة مرتجَعٌ ضمنيّ — تُقلَب وتُوسَم", () => {
-    const parsed = foodicsExcelAdapter.parse(
-      ordersGrid([["ORD-9", "2026-09-03", "النسيم", "SKU-1", "Latte", "Hot", "-1", "18.00", "-18.00", "", "", ""]]),
-      {},
-    );
-    const line = parsed.sales[0].lines[0];
-    expect(line.isRefund).toBe(true);
-    expect(line.quantityMilli).toBe(1000);
-    expect(parsed.sales[0].refundMinor).toBe(18_00);
-    expect(parsed.sales[0].netMinor).toBe(0);
+  it("وصفٌّ بلا كمّيّة يُتخطّى بسببه لا يُعَدّ خطأً", () => {
+    const p = foodicsExcelAdapter.parse(sheet([
+      line({ order_reference: 9 }),
+      line({ order_reference: 0, sku: "", name: "الإجمالي", quantity: "" }),
+    ]), {});
+    expect(p.rows[1].status).toBe("SKIPPED");
+    expect(p.rows[1].reason).toContain("مجموع");
   });
 
-  it("والملغاةُ تُوسَم ولا تدخل الإجماليّ", () => {
-    const parsed = foodicsExcelAdapter.parse(
-      ordersGrid([["ORD-8", "2026-09-03", "النسيم", "SKU-1", "Latte", "Hot", "1", "18.00", "18.00", "", "true", ""]]),
-      {},
-    );
-    expect(parsed.sales[0].lines[0].isVoid).toBe(true);
-    expect(parsed.sales[0].netMinor).toBe(0);
+  it("وكمّيّةٌ مكتوبةٌ لا تُقرأ خطأٌ يُعلَن", () => {
+    const p = foodicsExcelAdapter.parse(sheet([line({ order_reference: 10, quantity: "غير مقروء" })]), {});
+    expect(p.rows[0].status).toBe("ERROR");
+    expect(p.rows[0].reason).toContain("الكمّيّة");
+    expect(p.rows[0].raw["name"]).toBe("Latte");
   });
 
-  it("وصنفان متطابقان في الطلب الواحد يبقيان سطرين — الترتيبُ آخرُ ما يدخل المفتاح", () => {
-    const parsed = foodicsExcelAdapter.parse(
-      ordersGrid([
-        ["ORD-7", "2026-09-03", "النسيم", "SKU-1", "Latte", "Hot", "1", "18.00", "18.00", "", "", "بلا سكّر"],
-        ["ORD-7", "2026-09-03", "النسيم", "SKU-1", "Latte", "Hot", "1", "18.00", "18.00", "", "", "مزدوج"],
-      ]),
-      {},
-    );
-    expect(parsed.sales[0].lines).toHaveLength(2);
-    expect(new Set(parsed.sales[0].lines.map((l) => l.externalId)).size).toBe(2);
+  it("وبصمةُ المحتوى تتغيّر بتغيّر الحال — وبها يُعرَف المُراجَع", () => {
+    const a = foodicsExcelAdapter.parse(sheet([line({ order_reference: 11 })]), {});
+    const b = foodicsExcelAdapter.parse(sheet([line({ order_reference: 11, status: "Void", order_status: "Void" })]), {});
+    expect(a.sales[0].lines[0].externalId).toBe(b.sales[0].lines[0].externalId);
+    expect(a.sales[0].lines[0].contentHash).not.toBe(b.sales[0].lines[0].contentHash);
   });
 
-  it("ومخرَجُه هو نوعُ الموصل نفسُه — فالواجهةُ حين تأتي تُغذّي المسار ذاته", () => {
-    const tx = toSalesTransactions(foodicsExcelAdapter.parse(grid, {}));
-    expect(tx[0].externalId).toBe("FDX:ORD-1");
-    expect(tx[0].lines[0].quantity).toBe(2);
-    expect(tx[0].businessDate).toBe("2026-09-03");
-  });
-});
-
-describe("تصديرُ مزيج الأصناف", () => {
-  it("بيعةٌ مصطنَعة لكلّ يومٍ وفرع — فملفّان عن يومٍ واحد لا يضاعفانه", () => {
-    const parsed = foodicsExcelAdapter.parse(
-      [PMIX_HEADER, ["2026-09-03", "لاتيه", "100", "1800.00"], ["2026-09-03", "كرواسون", "20", "240.00"]],
-      {},
-    );
-    expect(parsed.shape).toBe("FOODICS_PRODUCT_MIX");
-    expect(parsed.sales).toHaveLength(1);
-    expect(parsed.sales[0].externalId).toBe("PMIX:الفرع:2026-09-03");
-    expect(parsed.sales[0].lines).toHaveLength(2);
+  it("والبصمةُ ثابتةٌ لما لم يتغيّر", () => {
+    expect(contentFingerprint([1, "Done", 20, "2026-09-13", "B01"]))
+      .toBe(contentFingerprint([1, "Done", 20, "2026-09-13", "B01"]));
+    expect(contentFingerprint([1, "Done", 20, "2026-09-13", "B01"]))
+      .not.toBe(contentFingerprint([2, "Done", 20, "2026-09-13", "B01"]));
   });
 
-  it("والصنفُ المذكور مرّتين في اليوم تُجمَع كمّيّتُه — اليومُ واحد والصنفُ واحد", () => {
-    const parsed = foodicsExcelAdapter.parse(
-      [PMIX_HEADER, ["2026-09-03", "لاتيه", "60", "1080.00"], ["2026-09-03", "لاتيه", "40", "720.00"]],
-      {},
-    );
-    expect(parsed.sales[0].lines).toHaveLength(1);
-    expect(parsed.sales[0].lines[0].quantityMilli).toBe(100_000);
-    expect(parsed.sales[0].lines[0].lineTotalMinor).toBe(1800_00);
-  });
-});
-
-describe("لا صفَّ يُرمى صامتاً", () => {
-  it("كلُّ صفٍّ يُحفَظ بحاله وسببه", () => {
-    const parsed = foodicsExcelAdapter.parse(
-      ordersGrid([
-        ["ORD-1", "2026-09-03", "النسيم", "SKU-1", "Latte", "Hot", "2", "18.00", "36.00", "", "", ""],
-        [],
-        ["", "", "", "", "الإجمالي", "", "", "", "36.00", "", "", ""],
-        ["ORD-2", "2026-09-03", "النسيم", "SKU-2", "Tea", "Hot", "غير مقروء", "9.00", "9.00", "", "", ""],
-        ["ORD-3", "بلا تاريخ", "النسيم", "SKU-2", "Tea", "Hot", "1", "9.00", "9.00", "", "", ""],
-      ]),
-      {},
-    );
-
-    expect(parsed.rows).toHaveLength(5);
-    const byStatus = parsed.rows.map((r) => r.status);
-    expect(byStatus).toEqual(["PARSED", "SKIPPED", "SKIPPED", "ERROR", "ERROR"]);
-    expect(parsed.rows.every((r) => r.status === "PARSED" || r.reason !== null)).toBe(true);
-    /* والصفُّ الخام محفوظٌ بنصّه */
-    expect(parsed.rows[3].raw["Product"]).toBe("Tea");
+  it("وما لم يُفهَم يُعلَن سببُه لقارئه", () => {
+    const p = foodicsExcelAdapter.parse({ grid: [["اسم"], ["قيمة"]] }, {});
+    expect(p.blocked).toContain("اسم الصنف");
   });
 
-  it("وصفٌّ بلا يومِ عملٍ يُردّ — لا يُنسَب إلى يومٍ بالحدس", () => {
-    const parsed = foodicsExcelAdapter.parse([PMIX_HEADER, ["", "لاتيه", "5", "90.00"]], {});
-    expect(parsed.rows[0].status).toBe("ERROR");
-    expect(parsed.rows[0].reason).toContain("يومُ عمل");
-  });
-
-  it("وما لم يُفهَم أصلاً يُعلَن سببُه لقارئه — لا خطأٌ تقنيّ", () => {
-    const parsed = foodicsExcelAdapter.parse([["اسم"], ["قيمة"]], {});
-    expect(parsed.blocked).toContain("اسم الصنف");
-    expect(parsed.sales).toEqual([]);
+  it("والمحوِّلُ يُعرَف بالترويسة لا باسم الملفّ", () => {
+    expect(adapterFor([HEADER])).toBe(foodicsExcelAdapter);
+    expect(adapterFor([["a", "b"]])).toBeNull();
   });
 });

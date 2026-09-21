@@ -40,6 +40,12 @@ export interface SoldLineInput {
   isRefund: boolean;
   isVoid: boolean;
   isComplimentary: boolean;
+  /**
+   * رموزُ الخيارات على هذا البند كما وردت من المصدر.
+   *
+   * تُحفَظ دائماً، **ولا تزيد مكوّناً** إلّا إذا رُبط بها مكوّنٌ صراحةً.
+   */
+  modifierExternalIds?: readonly string[];
 }
 
 /** سببُ خروج سطرٍ من الحساب — يُعرَض، ولا يُدفَن. */
@@ -208,7 +214,18 @@ export function computeConsumption(
     includedUnits += sign * line.quantityMilli;
     includedTotal += sign * line.lineTotalMinor;
 
+    const present = new Set(line.modifierExternalIds ?? []);
+
     for (const ing of version.ingredients) {
+      /*
+        ── المكوّنُ المرتبطُ بخيارٍ لا يُحسَب إلّا بحضوره ──
+
+        وأكثرُ الخيارات لا تزيد شيئاً: «دبل شوت» خيارٌ داخل الوصفة.
+        فالحقلُ فارغٌ في الغالب، ومتى مُلئ بقرار إنسان («إكسترا شوت
+        يزيد ١٨ جراماً») حُسب على البنود التي تحمله وحدها.
+      */
+      if (ing.modifierExternalId && !present.has(ing.modifierExternalId)) continue;
+
       const amount = ingredientForSale(
         line.quantityMilli,
         ing.quantityMilli,

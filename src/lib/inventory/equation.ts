@@ -45,6 +45,13 @@ export interface StockTerms {
 export interface StockResult {
   theoreticalClosingMilli: number | null;
   varianceMilli: number | null;
+  /**
+   * **النسبةُ الأساسيّة**: الفرق ÷ الاستهلاك المتوقَّع.
+   *
+   * وهي جوابُ «كم ضاع ممّا كان ينبغي أن يُصرَف؟».
+   */
+  varianceConsumptionBp: number | null;
+  /** ونسبةٌ ثانويّة إلى المخزون الختاميّ المتوقَّع. */
   varianceBp: number | null;
 }
 
@@ -71,22 +78,44 @@ export function theoreticalClosing(terms: StockTerms): number | null {
 }
 
 /**
- * الفرق ونسبتُه.
+ * الفرق ونسبتاه.
  *
- * والنسبةُ تُنسَب إلى **المتوقَّع** لا إلى الفعليّ: السؤال «كم ضاع
- * ممّا كان ينبغي أن يكون» لا «كم يزيد ما وُجد». وحين يكون المتوقَّع
- * صفراً فالنسبةُ **غير معرَّفة** ولا تُكتب: القسمةُ على صفرٍ لا تُصلَح
- * بمئةٍ ولا بصفر.
+ * ── ولماذا المقامُ الأساسيّ هو الاستهلاك ──
+ *
+ * السؤال التشغيليّ: **«كم ضاع ممّا كان ينبغي أن يُصرَف؟»** — لا «كم
+ * ينقص ممّا كان ينبغي أن يبقى». والفرقُ بينهما ليس أكاديميّاً:
+ *
+ *   مقهىً صرف ٣٠ كجم بنّاً وبقي في المتوقَّع ١٠، فوُجد ٩. الفرقُ كيلو.
+ *   بمقام **المخزون الختاميّ** يُقرأ «١٠٪‑» فيبدو فادحاً؛ وبمقام
+ *   **الاستهلاك** يُقرأ «٣٫٣٪‑» وهو حجمُه الحقيقيّ من العمل الذي جرى.
+ *
+ * ومقامُ المخزون يتضخّم كلّما قلّ ما تبقّى على الرفّ — فيُنذر أشدَّ ما
+ * يكون آخرَ الأسبوع حين يكون الرفّ فارغاً بحقّ. فالنسبتان تُحسبان،
+ * والأساسيّةُ هي نسبةُ الاستهلاك.
+ *
+ * **والمقامُ الصفر أو المجهول لا يُنتج نسبة**: صنفٌ لم يُستهلَك منه شيء
+ * نسبتُه «غير معروفة» لا «∞٪» ولا «١٠٠٪».
  */
 export function stockVariance(terms: StockTerms, actualMilli: number | null): StockResult {
   const closing = theoreticalClosing(terms);
   if (closing === null || actualMilli === null) {
-    return { theoreticalClosingMilli: closing, varianceMilli: null, varianceBp: null };
+    return {
+      theoreticalClosingMilli: closing,
+      varianceMilli: null, varianceConsumptionBp: null, varianceBp: null,
+    };
   }
 
   const variance = actualMilli - closing;
-  const bp = closing === 0 ? null : Math.round((variance * BP) / Math.abs(closing));
-  return { theoreticalClosingMilli: closing, varianceMilli: variance, varianceBp: bp };
+  const consumption = terms.theoreticalConsumptionMilli;
+  return {
+    theoreticalClosingMilli: closing,
+    varianceMilli: variance,
+    varianceConsumptionBp:
+      consumption === null || consumption === 0
+        ? null
+        : Math.round((variance * BP) / Math.abs(consumption)),
+    varianceBp: closing === 0 ? null : Math.round((variance * BP) / Math.abs(closing)),
+  };
 }
 
 /** نقاطُ الأساس نسبةً مئويّةً للعرض — «‏١٩٫٢‑٪». */

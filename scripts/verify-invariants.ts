@@ -144,12 +144,13 @@ async function main() {
          values ('t-inv-i2', 't-inv-s1', 'b.xlsx', 't-inv-sha', 'X')`,
       { code: "23505" }),
 
+    /* والفترةُ المتطابقة حالةٌ خاصّة من التداخل — يمسكها المؤثِّر أوّلاً */
     await mustFail("جردان لفترةٍ واحدة في فرعٍ واحد",
       `insert into inventory_counts (id, period_start, period_end)
          values ('t-inv-c3', '2099-02-01', '2099-02-07');
        insert into inventory_counts (id, period_start, period_end)
          values ('t-inv-c4', '2099-02-01', '2099-02-07')`,
-      { code: "23505" }),
+      { code: "23514", message: /تتداخل/ }),
 
     await mustPass("والفترةُ نفسُها في فرعٍ آخر جردٌ آخر",
       `insert into branches (id, name_ar, code) values ('t-inv-b1', 'فرع اختبار', 't-inv-b1');
@@ -157,6 +158,19 @@ async function main() {
          values ('t-inv-c5', '2099-03-01', '2099-03-07');
        insert into inventory_counts (id, branch_id, period_start, period_end)
          values ('t-inv-c6', 't-inv-b1', '2099-03-01', '2099-03-07')`),
+
+    await mustFail("فترتا جردٍ تتداخلان في الفرع نفسه",
+      `insert into inventory_counts (id, period_start, period_end)
+         values ('t-inv-ov1', '2099-04-01', '2099-04-07');
+       insert into inventory_counts (id, period_start, period_end)
+         values ('t-inv-ov2', '2099-04-05', '2099-04-11')`,
+      { code: "23514", message: /تتداخل/ }),
+
+    await mustPass("والفترةُ الملاصقة مقبولة — ٨ يبدأ بعد ٧",
+      `insert into inventory_counts (id, period_start, period_end)
+         values ('t-inv-ov3', '2099-05-01', '2099-05-07');
+       insert into inventory_counts (id, period_start, period_end)
+         values ('t-inv-ov4', '2099-05-08', '2099-05-14')`),
 
     await mustFail("مكوّنُ وصفةٍ بكمّيّةٍ صفر",
       `insert into products (id, name_ar) values ('t-inv-p4', 'صنف مباع');

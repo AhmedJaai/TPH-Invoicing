@@ -1,42 +1,73 @@
 /**
- * محوِّلُ ملفّ فودكس — الطريقُ الأوّل إلى مجال المبيعات.
+ * محوِّلُ تصدير فودكس — **مبنيٌّ على ملفٍّ حقيقيّ فُحص، لا على عاداتِ
+ * نقاط البيع.**
  *
- * ── صيغتان لا واحدة ──
+ * ── ما أثبته الملفّ (٢٬٠٨١ صفّاً · ١٬٠٩٠ طلباً · سبعةُ أيّام) ──
  *
- *   **تصديرُ الطلبات** — لكلّ صفٍّ رقمُ طلبه، فالبيعةُ بيعةٌ حقيقيّة
- *   وهويّتُها رقمُ الطلب عند فودكس.
+ *   • صيغتُه **بنودُ طلبات**: صفٌّ لكلّ بندٍ في كلّ طلب.
+ *   • `order_reference` هويّةُ الطلب، **ولا معرّفَ للبند**.
+ *   • `status` (على البند) يقول `Done` · `Returned` · `Void`
+ *     — **والكمّيّةُ موجبةٌ في الثلاث**. فلا سالبَ يدلّ على مرتجَع.
+ *   • حالُ البند **تغلب** حالَ الطلب: طلبٌ واحد فيه أربعةُ بنودٍ ملغاة
+ *     وبندٌ تامّ.
+ *   • المُعدِّل صفٌّ مستقلّ (`type = خيار الإضافة`) مرتبطٌ بأصله
+ *     بـ`parent_item_sku`، **كمّيّتُه كمّيّةُ أصله دائماً** (٣٦٤ من ٣٦٤)،
+ *     **وسعرُ الأصل يشمله** (٤٠ صفّاً فيها `سعر×كمّيّة ≠ الإجمالي`،
+ *     والفرقُ بالضبط مجموعُ أسعار مُعدِّلاته).
+ *   • `business_date` **عددٌ تسلسليّ**، ويُصيَّر «9/19/26» بسنةٍ من
+ *     خانتين وترتيبٍ يتبع تنسيقَ الملفّ. فيُقرأ من القيمة الخام.
+ *   • لا وقتَ بيعٍ إطلاقاً، ولا عَلَمَ ضيافة، ولا رقمَ نسخةٍ للتصدير.
  *
- *   **تصديرُ مزيج الأصناف** — لا رقمَ طلبٍ فيه، بل «كم بِيع من كلّ
- *   صنفٍ في اليوم». فتُصطنَع بيعةٌ واحدة لليوم والفرع، هويّتُها
- *   `PMIX:{الفرع}:{التاريخ}` — **ومعنى ذلك أنّ ملفّاً ثانياً يغطّي
- *   اليوم نفسه يُعيد بيانَه ولا يضيفه**، وهو الصواب: التقريران عن
- *   اليوم الواحد ليسا بيعتين.
+ * ── وما بُني على ذلك ──
  *
- * ── والهويّة من البيانات لا من الملفّ ──
- *
- * بصمةُ الملفّ تمنع رفعَ الملفّ عينِه مرّتين، ولا تمنع أن يغطّي ملفّان
- * مختلفان اليومَ نفسه. فالمنعُ الحقيقيّ على المفتاح الذي تعطيه
- * البيانات — الدرسُ نفسه الذي كلّف كشفاً بنكياً ١٤١٣ حركةً مكرّرة
- * حين تغيّرت دالّةُ بصمته.
+ * المُعدِّلُ يُحفَظ سطراً موسوماً لا يُستهلَك ولا يُجمَع إيرادُه —
+ * فيبقى الأثرُ تامّاً ولا يتضاعف رقم. و«دبل شوت» **خيارٌ داخل الوصفة**
+ * كما قال صاحبُ المقهى، ويؤيّده الملفّ: سعرُه صفرٌ في ١٥٨ مرّة.
  */
+import { mapColumns, FIELD_LABEL, type ColumnMap } from "./columns";
 import {
-  mapColumns, FIELD_LABEL,
-  type ColumnMap, type SalesColumn,
-} from "./columns";
-import {
-  detectDateOrder, parseBusinessDate, parseFlag, parseMoneyMinor,
-  parseQuantityMilli, parseSoldAt, type DateOrder,
+  detectDateOrder, parseBusinessDate, parseMoneyMinor, parseQuantityMilli,
+  parseSoldAt, parseSourceCostMinor, type DateOrder,
 } from "./values";
-import type {
-  ParsedRow, ParsedSale, ParsedSaleLine, SalesFileAdapter,
-} from "./file-import";
+import type { ParsedRow, ParsedSale, ParsedSaleLine, SalesFileAdapter } from "./file-import";
 
 export const FOODICS_ADAPTER = "FOODICS_XLSX";
-export const SHAPE_ORDERS = "FOODICS_ORDERS";
+/** بنودُ طلبات — الصيغةُ التي أثبتها الملفّ الحقيقيّ. */
+export const SHAPE_ORDER_ITEMS = "FOODICS_ORDER_ITEMS";
+/** ملخّصُ يومٍ بلا أرقام طلبات — صيغةٌ أخرى يقبلها المحوِّل. */
 export const SHAPE_PRODUCT_MIX = "FOODICS_PRODUCT_MIX";
 
-/** أقصى عددِ صفوفٍ تُقرأ قبل الترويسة بحثاً عنها. */
 const HEADER_SCAN = 15;
+
+/** قيمُ `type` كما وردت — والعربيّةُ في البيانات لا في الترويسة. */
+const MODIFIER_TYPES = new Set(["خيار الاضافه", "خيارالاضافه", "modifier", "option", "addon"]);
+
+/** قيمُ `status` كما وردت. */
+const RETURNED = new Set(["returned", "return", "refunded", "مرتجع", "مرتجعه"]);
+const VOIDED = new Set(["void", "voided", "cancelled", "canceled", "ملغي", "ملغاه", "ملغى"]);
+
+function fold(text: string): string {
+  return text.trim().toLowerCase()
+    .replace(/[ً-ْـ]/g, "")
+    .replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه")
+    .replace(/\s+/g, "");
+}
+
+/**
+ * بصمةُ محتوى السطر — دالّةٌ نقيّة بلا حزمة.
+ *
+ * ‏FNV‑1a: تكفي للتفريق بين «هو هو» و«تغيّر»، وليست حرزاً أمنيّاً —
+ * فلا يُحتاج هنا إلى مقاومة تصادمٍ مقصود.
+ */
+export function contentFingerprint(parts: readonly (string | number)[]): string {
+  let h = 0x811c9dc5;
+  const text = parts.join("\u0001");
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
 
 interface HeaderFound {
   rowIndex: number;
@@ -46,10 +77,8 @@ interface HeaderFound {
 /**
  * يجد صفَّ الترويسة.
  *
- * تقاريرُ فودكس تبدأ بأسطرِ عنوانٍ وفترةٍ واسمِ منشأة قبل الجدول. فلا
- * يُفترَض أنّ الصفّ الأوّل ترويسة: يُبحَث عن أوّل صفٍّ يُفهَم منه
- * **اسمُ الصنف والكمّيّة** معاً — وهما أقلُّ ما لا يقوم الاستيراد
- * بدونه.
+ * ولا يُفترَض أنّه الأوّل: تقاريرُ فودكس قد تبدأ بأسطرِ عنوان. ويُطلَب
+ * أقلُّ ما لا يقوم الاستيراد بدونه — اسمُ الصنف والكمّيّة.
  */
 export function findHeader(grid: readonly string[][]): HeaderFound | null {
   for (let i = 0; i < Math.min(grid.length, HEADER_SCAN); i++) {
@@ -61,8 +90,8 @@ export function findHeader(grid: readonly string[][]): HeaderFound | null {
   return null;
 }
 
-function cell(row: readonly string[], at: number | undefined): string | undefined {
-  if (at === undefined) return undefined;
+function cell(row: readonly string[] | undefined, at: number | undefined): string | undefined {
+  if (at === undefined || row === undefined) return undefined;
   const value = row[at];
   return value === undefined ? undefined : String(value);
 }
@@ -88,43 +117,47 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
     return findHeader(grid) !== null;
   },
 
-  parse(grid, options) {
+  parse(grids, options) {
+    const grid = grids.grid;
     const warnings: string[] = [];
     const header = findHeader(grid);
 
     if (!header) {
       return {
-        adapter: FOODICS_ADAPTER,
-        shape: "UNKNOWN",
-        sales: [], rows: [],
-        periodStart: null, periodEnd: null,
-        warnings,
+        adapter: FOODICS_ADAPTER, shape: "UNKNOWN",
+        sales: [], rows: [], periodStart: null, periodEnd: null, warnings,
         recognisedColumns: [], unrecognisedColumns: [],
         blocked:
           "لم يُفهَم هذا الملفّ: لم يُعثَر على عمودَي «اسم الصنف» و«الكمّيّة». " +
-          "صدِّر من فودكس تقريرَ الأصناف أو تقريرَ الطلبات بترويسةٍ واحدة.",
+          "صدِّر من فودكس تقريرَ بنود الطلبات أو تقريرَ الأصناف بترويسةٍ واحدة.",
       };
     }
 
     const { index } = header.columns;
     const headerRow = grid[header.rowIndex] ?? [];
     const body = grid.slice(header.rowIndex + 1);
-    const shape = index.orderId !== undefined ? SHAPE_ORDERS : SHAPE_PRODUCT_MIX;
+    /* الخامُ يقابل المصيَّر صفّاً بصفّ — والترويسةُ في الموضع نفسه */
+    const rawBody = grids.raw ? grids.raw.slice(header.rowIndex + 1) : undefined;
 
-    /* ترتيبُ اليوم والشهر يُستنتَج من الملفّ كلّه قبل قراءة صفٍّ واحد */
-    const dateColumn: SalesColumn | null =
-      index.businessDate !== undefined ? "businessDate" : index.soldAt !== undefined ? "soldAt" : null;
-    const samples = dateColumn
-      ? body.map((r) => cell(r, index[dateColumn]) ?? "").filter((s) => s !== "").slice(0, 200)
-      : [];
+    const shape = index.orderId !== undefined ? SHAPE_ORDER_ITEMS : SHAPE_PRODUCT_MIX;
+
+    /*
+      ── التاريخُ من الخام حين يوجد ──
+
+      `business_date` عددٌ تسلسليّ يُصيَّر «9/19/26»: سنةٌ من خانتين
+      وترتيبٌ يتبع تنسيقَ الملفّ لا لغةَ قارئه. والعددُ لا لبسَ فيه.
+    */
+    const dateCol = index.businessDate !== undefined ? index.businessDate : index.soldAt;
+    const usingRawDates = rawBody !== undefined && dateCol !== undefined;
+    const samples = dateCol === undefined ? [] : body.map((r) => cell(r, dateCol) ?? "").filter((x) => x !== "").slice(0, 200);
     const order: DateOrder = detectDateOrder(samples);
-    if (order === "AMBIGUOUS" && samples.length > 0) {
+    if (!usingRawDates && order === "AMBIGUOUS" && samples.length > 0) {
       warnings.push(
-        "لم يقطع الملفّ بترتيب اليوم والشهر في تواريخه — قُرئت **اليومُ أوّلاً** (٠٣/٠٩ = ٣ سبتمبر). " +
+        "لم يقطع الملفّ بترتيب اليوم والشهر في تواريخه — قُرئت **اليومُ أوّلاً**. " +
         "راجِع الفترة المعروضة أدناه قبل الاعتماد.",
       );
     }
-    if (!dateColumn) {
+    if (dateCol === undefined) {
       warnings.push(
         options.fallbackBusinessDate
           ? `لا عمودَ تاريخٍ في الملفّ — نُسبت الصفوفُ كلُّها إلى ${options.fallbackBusinessDate} كما اخترتَ.`
@@ -134,83 +167,65 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
 
     const rows: ParsedRow[] = [];
     const sales = new Map<string, ParsedSale>();
-    const lineSeen = new Map<string, ParsedSaleLine>();
     const occurrence = new Map<string, number>();
+    /** مُعدِّلاتٌ تنتظر أصلَها: مفتاحُ الطلب+الأصل ← الأسطر. */
+    const pendingModifiers: { saleKey: string; parentSku: string; line: ParsedSaleLine }[] = [];
 
     body.forEach((row, i) => {
-      const rowNumber = header.rowIndex + i + 2; // رقمُ الصفّ في الملفّ، ١‑مبنيّ ومعه الترويسة
+      const rowNumber = header.rowIndex + i + 2;
       const raw = rawOf(headerRow, row);
-
       const reject = (status: ParsedRow["status"], reason: string) => {
         rows.push({ rowNumber, raw, status, reason, saleExternalId: null });
       };
 
-      /* صفٌّ فارغٌ تماماً ليس خطأً — تقاريرُ فودكس تفصل أقسامَها بفراغ */
-      if (Object.keys(raw).length === 0) {
-        reject("SKIPPED", "صفٌّ فارغ");
-        return;
-      }
+      if (Object.keys(raw).length === 0) { reject("SKIPPED", "صفٌّ فارغ"); return; }
 
-      const name = (cell(row, index.productName) ?? "").trim();
-      if (name === "") {
-        reject("SKIPPED", "لا اسمَ صنفٍ في الصفّ — غالباً سطرُ مجموعٍ أو فاصل");
-        return;
-      }
+      /* المعرَّبُ يُفضَّل حين يكون مملوءاً — وهو فارغٌ في تصدير فودكس المفحوص */
+      const name = ((cell(row, index.productNameLocalized) ?? "").trim())
+        || (cell(row, index.productName) ?? "").trim();
+      if (name === "") { reject("SKIPPED", "لا اسمَ صنفٍ في الصفّ — غالباً سطرُ مجموعٍ أو فاصل"); return; }
 
-      /*
-        ── الخانةُ الفارغة ليست الخانةَ المعطوبة ──
-
-        تقاريرُ فودكس تحمل سطرَ مجموعٍ في ذيل كلّ قسم: خانةُ الصنف فيه
-        «الإجمالي» وخانةُ الكمّيّة فارغة. ولو عُدّ ذلك **خطأً** لخرج من
-        كلّ استيرادٍ خطآن أو ثلاثة لا شيءَ فيها — ومن يرى خطأً كلَّ مرّة
-        يتعلّم ألّا ينظر، فيمرّ الخطأُ الحقيقيّ معها.
-
-        فالفارغُ يُتخطّى بسببه، والمكتوبُ الذي لا يُقرأ خطأٌ يُعلَن.
-      */
       const quantityCell = (cell(row, index.quantity) ?? "").trim();
-      if (quantityCell === "") {
-        reject("SKIPPED", "لا كمّيّة في الصفّ — غالباً سطرُ مجموعٍ أو فاصل");
-        return;
-      }
+      if (quantityCell === "") { reject("SKIPPED", "لا كمّيّة في الصفّ — غالباً سطرُ مجموعٍ أو فاصل"); return; }
       const quantityMilli = parseQuantityMilli(quantityCell);
       if (quantityMilli === null) {
         reject("ERROR", `تعذّرت قراءة ${FIELD_LABEL.quantity}: «${quantityCell}»`);
         return;
       }
 
-      const businessDate = dateColumn
-        ? parseBusinessDate(cell(row, index[dateColumn]), order)
-        : (options.fallbackBusinessDate ?? null);
+      /* يومُ العمل: الخامُ أوّلاً، ثمّ المصيَّر، ثمّ ما اختاره المستخدم */
+      const rawDate = usingRawDates ? cell(rawBody?.[i], dateCol) : undefined;
+      const businessDate =
+        (rawDate ? parseBusinessDate(rawDate, "ISO") : null)
+        ?? (dateCol !== undefined ? parseBusinessDate(cell(row, dateCol), order) : null)
+        ?? options.fallbackBusinessDate
+        ?? null;
       if (!businessDate) {
         reject("ERROR", "لا يُعرَف يومُ عمل هذا الصفّ — وبيعةٌ في اليوم الخطأ تُحسَب بوصفةٍ أخرى");
         return;
       }
 
-      const branchLabel = (cell(row, index.branch) ?? options.branchLabel ?? "").trim() || null;
+      const branchLabel =
+        (cell(row, index.branch) ?? cell(row, index.branchName) ?? options.branchLabel ?? "").trim() || null;
       const productExternalId = (cell(row, index.productExternalId) ?? "").trim() || `NAME:${slug(name)}`;
+
+      /* ── نوعُ السطر وحالُه: من المصدر لا من إشارة الكمّيّة ── */
+      const typeText = fold(cell(row, index.lineType) ?? "");
+      const parentSku = (cell(row, index.parentSku) ?? "").trim();
+      const isModifier = MODIFIER_TYPES.has(typeText) || (typeText !== "" && parentSku !== "");
+
+      const statusText = fold(cell(row, index.lineStatus) ?? cell(row, index.orderStatus) ?? "");
+      const isRefund = RETURNED.has(statusText);
+      const isVoid = VOIDED.has(statusText);
+      const sourceStatus = (cell(row, index.lineStatus) ?? cell(row, index.orderStatus) ?? "").trim() || null;
 
       const lineTotalMinor = parseMoneyMinor(cell(row, index.lineTotal)) ?? 0;
       const unitPriceMinor = parseMoneyMinor(cell(row, index.unitPrice))
         ?? (quantityMilli !== 0 ? Math.round((lineTotalMinor * 1000) / quantityMilli) : 0);
-
-      /*
-        الكمّيّة السالبة مرتجَعٌ ضمنيّ — كثيرٌ من التصديرات تكتفي بها
-        ولا تضع عموداً. وتُقلَب موجبةً ويُوسَم السطرُ مرتجَعاً، فيبقى
-        حساب الاستهلاك واحداً مهما اختلفت صيغةُ الملفّ.
-      */
-      const explicitRefund = parseFlag(cell(row, index.isRefund)) === true;
-      const isRefund = explicitRefund || quantityMilli < 0;
-      const isVoid = parseFlag(cell(row, index.isVoid)) === true;
-      const isComplimentary = parseFlag(cell(row, index.isComplimentary)) === true
-        || (lineTotalMinor === 0 && !isVoid && !isRefund && quantityMilli > 0 && index.lineTotal !== undefined);
-
-      const modifiersRaw = (cell(row, index.modifiers) ?? "").trim();
-      const modifiers = modifiersRaw === ""
-        ? null
-        : modifiersRaw.split(/[,،;|+]/).map((m) => m.trim()).filter((m) => m !== "");
+      const sourceUnitCostMinor = parseSourceCostMinor(cell(row, index.unitCost));
 
       const orderId = (cell(row, index.orderId) ?? "").trim();
-      const saleExternalId = shape === SHAPE_ORDERS && orderId !== ""
+      const saleExternalId = shape === SHAPE_ORDER_ITEMS && orderId !== ""
         ? `FDX:${orderId}`
         : `PMIX:${slug(branchLabel ?? "الفرع")}:${businessDate}`;
 
@@ -218,11 +233,12 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
       if (!sale) {
         sale = {
           externalId: saleExternalId,
+          orderStatus: (cell(row, index.orderStatus) ?? "").trim() || null,
           businessDate,
           soldAt: parseSoldAt(cell(row, index.soldAt), businessDate),
           branchLabel,
           grossMinor: 0, discountMinor: 0, refundMinor: 0, vatMinor: 0, netMinor: 0,
-          orderCount: shape === SHAPE_ORDERS ? 1 : 0,
+          orderCount: shape === SHAPE_ORDER_ITEMS ? 1 : 0,
           isVoid: false,
           lines: [],
         };
@@ -230,63 +246,53 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
       }
 
       /*
-        مفتاحُ السطر داخل بيعته: الصنفُ وحالُه وترتيبُ تكراره.
-        و`occurrence` آخرُ ما يدخل المفتاح لا أوّلُه — فاتنان من
-        الصنف نفسه في الطلب الواحد حقيقةٌ تقع، ولا يُفرَّق بينهما
-        إلّا به.
+        ── الترتيبُ آخرُ ما يدخل الهويّة، ولا بدّ منه ──
+
+        لا معرّفَ للبند في التصدير، ويتكرّر (طلب · رمز · نوع) في ثمانيةَ
+        عشر موضعاً — حتّى أربعِ مرّاتٍ في طلبٍ واحد. فبلا ترتيبٍ تبتلع
+        النسخةُ الأولى الثلاثَ الباقيات.
       */
-      const stateKey = `${saleExternalId}|${productExternalId}|${isRefund ? "R" : ""}${isVoid ? "V" : ""}${isComplimentary ? "C" : ""}`;
-      const mix = shape === SHAPE_PRODUCT_MIX;
+      const stateKey = `${saleExternalId}|${productExternalId}|${isModifier ? "M" : "P"}|${parentSku}`;
+      const n = (occurrence.get(stateKey) ?? 0) + 1;
+      occurrence.set(stateKey, n);
+
+      const line: ParsedSaleLine = {
+        externalId: `${productExternalId}#${isModifier ? "M" : "P"}${parentSku ? `:${parentSku}` : ""}#${n}`,
+        productExternalId,
+        name,
+        category: (cell(row, index.category) ?? "").trim() || null,
+        quantityMilli: Math.abs(quantityMilli),
+        unitPriceMinor: Math.abs(unitPriceMinor),
+        lineTotalMinor: Math.abs(lineTotalMinor),
+        sourceStatus,
+        isRefund,
+        isVoid,
+        /* لا عَلَمَ ضيافةٍ في هذا المصدر — ولا يُخترَع */
+        isComplimentary: false,
+        isModifier,
+        parentExternalId: parentSku || null,
+        modifiers: null,
+        sourceUnitCostMinor,
+        contentHash: contentFingerprint([
+          quantityMilli, sourceStatus ?? "", lineTotalMinor, businessDate, branchLabel ?? "",
+        ]),
+        rowNumbers: [rowNumber],
+      };
+
+      sale.lines.push(line);
+      if (isModifier && parentSku) pendingModifiers.push({ saleKey: saleExternalId, parentSku, line });
 
       /*
-        ── ولماذا لا يدخل الترتيبُ مفتاحَ سطرِ «مزيج الأصناف» ──
+        ── الإيرادُ من صفوف المنتج وحدها ──
 
-        في تصدير الطلبات، صنفان متطابقان في الطلب الواحد **واقعتان**:
-        كوبان بِيعا معاً، ولا يفرّق بينهما إلّا الترتيب. وفي تصدير مزيج
-        الأصناف الصفُّ **ملخّصٌ ليومٍ كامل**، فذكرُ الصنف مرّتين (قسمان
-        في التقرير) شيءٌ واحد يُجمَع.
-
-        فلو أُدخل الترتيبُ في الحالين لخرج من اليوم الواحد سطران
-        لصنفٍ واحد، ولصار إعادةُ الاستيراد تكتب سطرين جديدين بمفتاحين
-        جديدين. والترتيبُ آخرُ ما يدخل الهويّة ولا يدخلها إلّا بحاجة.
+        سعرُ الأصل يشمل مُعدِّلاته (أثبته الملفّ في أربعين صفّاً). فجمعُ
+        صفوف المُعدِّلات معها يضاعف ما لم يُقبَض.
       */
-      const n = mix ? 1 : (occurrence.get(stateKey) ?? 0) + 1;
-      if (!mix) occurrence.set(stateKey, n);
-      const lineExternalId = `${productExternalId}#${isRefund ? "R" : "S"}#${n}`;
-
-      const mergeKey = `${saleExternalId}|${lineExternalId}`;
-      const existing = mix ? lineSeen.get(mergeKey) : undefined;
-
-      const absQuantity = Math.abs(quantityMilli);
-      const absTotal = Math.abs(lineTotalMinor);
-
-      if (existing) {
-        existing.quantityMilli += absQuantity;
-        existing.lineTotalMinor += absTotal;
-        existing.rowNumbers.push(rowNumber);
-      } else {
-        const line: ParsedSaleLine = {
-          externalId: lineExternalId,
-          productExternalId,
-          name,
-          category: (cell(row, index.category) ?? "").trim() || null,
-          quantityMilli: absQuantity,
-          unitPriceMinor: Math.abs(unitPriceMinor),
-          lineTotalMinor: absTotal,
-          isRefund, isVoid, isComplimentary,
-          modifiers,
-          rowNumbers: [rowNumber],
-        };
-        sale.lines.push(line);
-        lineSeen.set(mergeKey, line);
-      }
-
-      /* المرتجَعُ يُجمَع في خانته لا في الإجمالي — فيبقى الصافي صافياً */
-      if (!isVoid) {
-        if (isRefund) sale.refundMinor += absTotal;
+      if (!isModifier && !isVoid) {
+        if (isRefund) sale.refundMinor += Math.abs(lineTotalMinor);
         else {
-          sale.grossMinor += parseMoneyMinor(cell(row, index.gross)) ?? absTotal;
-          sale.netMinor += absTotal;
+          sale.grossMinor += parseMoneyMinor(cell(row, index.gross)) ?? Math.abs(lineTotalMinor);
+          sale.netMinor += Math.abs(lineTotalMinor);
         }
         sale.discountMinor += parseMoneyMinor(cell(row, index.discount)) ?? 0;
         sale.vatMinor += parseMoneyMinor(cell(row, index.vat)) ?? 0;
@@ -294,6 +300,23 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
 
       rows.push({ rowNumber, raw, status: "PARSED", reason: null, saleExternalId });
     });
+
+    /* ── وصلُ المُعدِّل بأصله: يُعرَض على الأصل، ويُعلَن اليتيم ── */
+    let orphans = 0;
+    for (const { saleKey, parentSku, line } of pendingModifiers) {
+      const sale = sales.get(saleKey);
+      const parent = sale?.lines.find((l) => !l.isModifier && l.productExternalId === parentSku);
+      if (!parent) { orphans++; continue; }
+      parent.modifiers = [...(parent.modifiers ?? []), line.name];
+    }
+    if (orphans > 0) {
+      warnings.push(`${orphans} خيارَ إضافةٍ لا أصلَ له في طلبه — حُفظ ولم يُنسَب.`);
+    }
+
+    /* حالُ الطلب تُحفَظ، ولا تُسقِط بنداً صُنع: الملغى يُعرَف ببنده */
+    for (const sale of sales.values()) {
+      sale.isVoid = sale.lines.length > 0 && sale.lines.every((l) => l.isVoid);
+    }
 
     const dates = [...sales.values()].map((s) => s.businessDate).sort();
 

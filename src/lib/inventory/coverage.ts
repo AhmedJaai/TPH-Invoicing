@@ -25,11 +25,19 @@ export const READINESS_LABEL: Record<Readiness, string> = {
 
 export interface CoverageGap {
   kind: "SALES" | "PURCHASES" | "ITEMS";
-  reason: ExclusionReason | PurchaseGapReason | "UNIT_CONFLICT" | "NO_UNIT";
+  reason: ExclusionReason | PurchaseGapReason | "UNIT_CONFLICT" | "NO_UNIT" | "RECEIPT_AMBIGUOUS";
   label: string;
   count: number;
   /** ما يمثّله من المال — الريالُ يقول حجمَ الفجوة أصدقَ من العدد. */
   totalMinor: number;
+  /**
+   * وحصّتُه من **الوحدات المباعة**، بنقاط الأساس.
+   *
+   * «٣ منتجات بلا وصفة» لا تقول شيئاً: قد تكون أندرَ ما يُباع وقد تكون
+   * أكثرَه. و«تمثّل ٤٫٢٪ من الوحدات المباعة» تقول للقارئ **أيصلح
+   * التقرير للعمل به أم لا**.
+   */
+  unitsShareBp: number | null;
   /** أمثلةٌ بأسمائها — «٣ منتجات» لا تُصلَح، و«سبانيش لاتيه» تُصلَح. */
   examples: string[];
 }
@@ -48,6 +56,10 @@ export interface CoverageReport {
     excludedTotalMinor: number;
     /** نسبةُ ما دخل الحساب من **مال** المبيعات، بنقاط الأساس. */
     coveredBp: number | null;
+    /** ونسبةُ ما دخل منه من **الوحدات المباعة** — وهي أدلُّ على الاستهلاك. */
+    unitsCoveredBp: number | null;
+    includedUnitsMilli: number;
+    excludedUnitsMilli: number;
   };
   purchases: {
     lines: number;
@@ -91,6 +103,8 @@ export interface CoverageInput {
   /** أصنافٌ تضاربت وحداتُها بين وصفتين، أو لا وحدةَ لها. */
   unitConflicts: readonly string[];
   unitlessItems: readonly string[];
+  /** فواتيرُ التباسِ الاستلام — تُعرَض ولا تُضمّ. */
+  ambiguousReceipts?: readonly { invoiceNumber: string; supplierName: string; lineTotalMinor: number }[];
 }
 
 /**
@@ -111,6 +125,20 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
   const salesLines = c.included.lines + c.excludedTotals.lines;
   const salesCoveredBp = salesTotal === 0 ? null : Math.round((c.included.totalMinor * 10_000) / salesTotal);
 
+  /*
+    ── الوحداتُ أدلُّ من الريال على الاستهلاك ──
+
+    صنفٌ رخيصٌ كثيرُ البيع يأكل من المخزون أكثرَ ممّا يقوله سعرُه.
+    فحصّةُ الفجوة تُقاس بالوحدات أيضاً، وهي التي تُعرَض للقارئ.
+  */
+  const includedUnits = Math.abs(c.included.unitsMilli);
+  const excludedUnits = c.excluded
+    .filter((e) => e.reason !== "VOID")
+    .reduce((s, e) => s + Math.abs(e.quantityMilli), 0);
+  const unitsTotal = includedUnits + excludedUnits;
+  const unitsCoveredBp = unitsTotal === 0 ? null : Math.round((includedUnits * 10_000) / unitsTotal);
+  const shareOf = (units: number) => (unitsTotal === 0 ? null : Math.round((units * 10_000) / unitsTotal));
+
   const p = input.purchases;
   const includedPurchaseLines = p.totalLines - p.gaps.length;
   const purchaseTotal = [...p.byProduct.values()].reduce((s, x) => s + x.knownCostMinor, 0) + p.gapTotals.totalMinor;
@@ -120,12 +148,13 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
   const gaps: CoverageGap[] = [];
 
   /* فجواتُ المبيعات مجموعةً بسببها، ومع كلٍّ أمثلةٌ بأسمائها */
-  const byReason = new Map<ExclusionReason, { count: number; total: number; names: Set<string> }>();
+  const byReason = new Map<ExclusionReason, { count: number; total: number; units: number; names: Set<string> }>();
   for (const e of c.excluded) {
     let acc = byReason.get(e.reason);
-    if (!acc) { acc = { count: 0, total: 0, names: new Set() }; byReason.set(e.reason, acc); }
+    if (!acc) { acc = { count: 0, total: 0, units: 0, names: new Set() }; byReason.set(e.reason, acc); }
     acc.count++;
     acc.total += e.lineTotalMinor;
+    acc.units += Math.abs(e.quantityMilli);
     if (acc.names.size < MAX_EXAMPLES) acc.names.add(e.posProductName);
   }
   for (const [reason, acc] of byReason) {
@@ -141,6 +170,7 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
       label: EXCLUSION_LABEL[reason],
       count: acc.count,
       totalMinor: acc.total,
+      unitsShareBp: shareOf(acc.units),
       examples: [...acc.names],
     });
   }
@@ -160,6 +190,7 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
       label: PURCHASE_GAP_LABEL[reason],
       count: acc.count,
       totalMinor: acc.total,
+      unitsShareBp: null,
       examples: [...acc.names],
     });
   }
@@ -171,9 +202,30 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
       label: "صنفٌ ذُكر بوحدتين من عائلتين مختلفتين — ولا جسرَ بين وزنٍ وحجم",
       count: input.unitConflicts.length,
       totalMinor: 0,
+      unitsShareBp: null,
       examples: input.unitConflicts.slice(0, MAX_EXAMPLES),
     });
   }
+  /*
+    ── التباسُ الاستلام يُعرَض ولا يُحسَب ──
+
+    تاريخُ الفاتورة نائبٌ عن تاريخ الاستلام (لا عمودَ استلامٍ في
+    المخطّط). ففاتورةٌ تلي نهايةَ الفترة بيومٍ قد تكون بضاعتَها.
+    وضمُّها بالحدس يُنقص الفرق، وإسقاطُها يزيده — فتُعرَض ليقرّر إنسان.
+  */
+  const ambiguous = input.ambiguousReceipts ?? [];
+  if (ambiguous.length > 0) {
+    gaps.push({
+      kind: "PURCHASES",
+      reason: "RECEIPT_AMBIGUOUS",
+      label: "فاتورةُ شراءٍ تلي نهايةَ الفترة بأيّامٍ قليلة — أوصلت بضاعةً داخلها؟",
+      count: ambiguous.length,
+      totalMinor: ambiguous.reduce((s, a) => s + a.lineTotalMinor, 0),
+      unitsShareBp: null,
+      examples: [...new Set(ambiguous.map((a) => `${a.supplierName} · ${a.invoiceNumber}`))].slice(0, MAX_EXAMPLES),
+    });
+  }
+
   if (input.unitlessItems.length > 0) {
     gaps.push({
       kind: "ITEMS",
@@ -181,6 +233,7 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
       label: "صنفٌ وحدةُ قياسه غير معروفة",
       count: input.unitlessItems.length,
       totalMinor: 0,
+      unitsShareBp: null,
       examples: input.unitlessItems.slice(0, MAX_EXAMPLES),
     });
   }
@@ -200,6 +253,9 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
       excludedLines: c.excludedTotals.lines,
       excludedTotalMinor: c.excludedTotals.totalMinor,
       coveredBp: salesCoveredBp,
+      unitsCoveredBp,
+      includedUnitsMilli: includedUnits,
+      excludedUnitsMilli: excludedUnits,
     },
     purchases: {
       lines: p.totalLines,
@@ -229,8 +285,8 @@ export function describeCoverage(c: CoverageReport): string {
   }
 
   const bits: string[] = [];
-  if (c.sales.coveredBp !== null) {
-    bits.push(`دخل الحسابَ ${Math.round(c.sales.coveredBp / 100)}٪ من مبيعات الفترة`);
+  if (c.sales.unitsCoveredBp !== null) {
+    bits.push(`دخل الحسابَ ${Math.round(c.sales.unitsCoveredBp / 100)}٪ من الوحدات المباعة`);
   }
   if (c.sales.missingDays.length > 0) {
     bits.push(`و${c.sales.missingDays.length} يوماً بلا مبيعاتٍ مستوردة`);

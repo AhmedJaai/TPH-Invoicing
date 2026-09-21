@@ -23,12 +23,41 @@ describe("المعادلة", () => {
     expect(canonicalToQuantity(closing!, "KG")).toBe(13);
   });
 
-  it("والفعليّ ١٠٫٥ يعطي فرقاً ‑٢٫٥ كجم و‑١٩٫٢٪", () => {
+  it("والفعليّ ١٠٫٥ يعطي فرقاً ‑٢٫٥ كجم", () => {
     const r = stockVariance(terms(), kg(10.5));
     expect(canonicalToQuantity(r.varianceMilli!, "KG")).toBe(-2.5);
-    /* ‏٢٫٥ ÷ ١٣ = ١٩٫٢٣٪ */
+    /* الثانويّة: ٢٫٥ ÷ ١٣ = ١٩٫٢٣٪ من المخزون الختاميّ */
     expect(r.varianceBp).toBe(-1923);
     expect(formatBp(r.varianceBp)).toBe("−19.2٪");
+    /* والأساسيّة: ٢٫٥ ÷ ١٢ = ٢٠٫٨٣٪ من الاستهلاك */
+    expect(r.varianceConsumptionBp).toBe(-2083);
+  });
+
+  /*
+    ── المقامُ الأساسيّ هو الاستهلاك ──
+
+    ومقامُ المخزون الختاميّ يتضخّم كلّما قلّ ما بقي على الرفّ، فيُنذر
+    أشدَّ ما يكون آخرَ الأسبوع حين يكون الرفّ فارغاً بحقّ.
+  */
+  it("استهلاكٌ ٣٠ وفرقٌ ‑١ ← الأساسيّة ‑٣٫٣٣٪ لا ‑١٠٪", () => {
+    const r = stockVariance(
+      terms({ openingMilli: kg(40), purchasesMilli: 0, theoreticalConsumptionMilli: kg(30) }),
+      kg(9),
+    );
+    expect(canonicalToQuantity(r.varianceMilli!, "KG")).toBe(-1);
+    expect(r.varianceConsumptionBp).toBe(-333);
+    expect(formatBp(r.varianceConsumptionBp)).toBe("−3.3٪");
+    /* والثانويّةُ تقول ١٠٪ — وهي التي كانت تُعرَض وحدها فتُخيف بلا وجه */
+    expect(r.varianceBp).toBe(-1000);
+  });
+
+  it("واستهلاكٌ صفرٌ لا يُنتج نسبةً أساسيّة — ولا «∞٪» ولا «١٠٠٪»", () => {
+    const r = stockVariance(
+      terms({ openingMilli: kg(10), purchasesMilli: 0, theoreticalConsumptionMilli: 0 }),
+      kg(9),
+    );
+    expect(r.varianceMilli).not.toBeNull();
+    expect(r.varianceConsumptionBp).toBeNull();
   });
 
   it("والمتوقَّع ٦ مع فعليٍّ ٥٫٢ = ‑٠٫٨ كجم", () => {
@@ -61,6 +90,7 @@ describe("المجهولُ ينتشر ولا يُبتلَع", () => {
     expect(r.theoreticalClosingMilli).toBeNull();
     expect(r.varianceMilli).toBeNull();
     expect(r.varianceBp).toBeNull();
+    expect(r.varianceConsumptionBp).toBeNull();
   });
 
   it("ومشترياتٌ فيها بندٌ لم تُعرَف كمّيّتُه ⇒ مجهول", () => {

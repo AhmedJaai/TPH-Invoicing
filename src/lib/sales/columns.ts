@@ -20,10 +20,11 @@
 
 /** الحقولُ التي يعرفها النظام. */
 export type SalesColumn =
-  | "orderId" | "businessDate" | "soldAt" | "branch"
-  | "productExternalId" | "productName" | "category"
-  | "quantity" | "unitPrice" | "lineTotal" | "gross" | "discount" | "refund" | "vat"
-  | "isVoid" | "isRefund" | "isComplimentary" | "modifiers";
+  | "orderId" | "checkNumber" | "orderStatus" | "lineStatus" | "lineType" | "parentSku"
+  | "businessDate" | "soldAt" | "branch" | "branchName"
+  | "productExternalId" | "productName" | "productNameLocalized" | "category"
+  | "quantity" | "unitPrice" | "lineTotal" | "unitCost" | "lineCost"
+  | "gross" | "discount" | "vat" | "modifiers";
 
 /**
  * المرادفات.
@@ -33,23 +34,45 @@ export type SalesColumn =
  * عموداً ليس له.
  */
 const RAW_SYNONYMS: Record<SalesColumn, readonly string[]> = {
-  orderId: ["ordernumber", "orderid", "orderreference", "orderno", "receiptnumber", "invoicenumber", "رقمالطلب", "رقمالفاتورة", "رقمالإيصال", "الطلب"],
+  /*
+    ── الأسماءُ الحقيقيّة أوّلاً ──
+
+    فُحص تصديرٌ حقيقيّ من فودكس، فجاءت ترويسته بأسماءٍ برمجيّة
+    (`order_reference` · `business_date` · `parent_item_sku`). وهي
+    المقدَّمة هنا، ثمّ ما يشبهها من صيغٍ أخرى — فالأخصُّ قبل الأعمّ،
+    وإلّا التقط العامُّ عموداً ليس له.
+  */
+  orderId: ["orderreference", "ordernumber", "orderid", "orderno", "receiptnumber", "رقمالطلب", "رقمالفاتورة", "الطلب"],
+  checkNumber: ["checknumber", "رقمالشيك"],
+  orderStatus: ["orderstatus", "حالةالطلب"],
+  lineStatus: ["status", "itemstatus", "linestatus", "حالةالبند", "الحالة"],
+  lineType: ["type", "itemtype", "النوع"],
+  parentSku: ["parentitemsku", "parentsku", "parentproductsku", "رمزالصنفالاصل"],
   businessDate: ["businessdate", "businessday", "تاريخالعمل", "يومالعمل", "التاريخ", "date"],
-  soldAt: ["datetime", "createdat", "orderdate", "closedat", "time", "التاريخوالوقت", "الوقت"],
-  branch: ["branchname", "branch", "store", "location", "الفرع", "اسمالفرع", "المتجر"],
-  productExternalId: ["productid", "productsku", "sku", "itemid", "itemcode", "barcode", "رمزالصنف", "رقمالصنف", "الرمز"],
-  productName: ["productname", "itemname", "product", "item", "name", "اسمالصنف", "اسمالمنتج", "الصنف", "المنتج"],
+  soldAt: ["datetime", "createdat", "orderdate", "closedat", "dueat", "التاريخوالوقت", "الوقت"],
+  branch: ["branchreference", "branchname", "branch", "store", "location", "الفرع", "اسمالفرع", "المتجر"],
+  branchName: ["branchname", "اسمالفرع"],
+  productExternalId: ["sku", "productid", "productsku", "itemid", "itemcode", "barcode", "رمزالصنف", "رقمالصنف", "الرمز"],
+  /*
+    ── الاسمُ المعروض قبل المعرَّب ──
+
+    في التصدير الحقيقيّ عمودان: `name` مملوء و`name_localized` **فارغٌ
+    في ٢٬٠٨١ صفّاً**. ولمّا قُدّم المعرَّبُ في المرادفات خرج كلُّ صفّ
+    «بلا اسم صنف» فتُخطّي الملفُّ كلُّه — عطبٌ يقول «الملفّ غير مفهوم»
+    وهو مفهومٌ تماماً. فالمعروضُ أوّلاً، والمعرَّبُ حقلٌ مستقلّ يُفضَّل
+    عند العرض **إن كان مملوءاً**.
+  */
+  productName: ["productname", "itemname", "name", "product", "item", "اسمالصنف", "اسمالمنتج", "الصنف", "المنتج"],
+  productNameLocalized: ["namelocalized", "localizedname", "الاسمالمعرب"],
   category: ["categoryname", "category", "productcategory", "group", "التصنيف", "القسم", "المجموعة"],
   quantity: ["quantity", "qty", "soldquantity", "quantitysold", "count", "الكمية", "الكميةالمباعة", "العدد"],
   unitPrice: ["unitprice", "priceperunit", "price", "سعرالوحدة", "السعر"],
-  lineTotal: ["netsales", "nettotal", "netamount", "linetotal", "totalsales", "subtotal", "total", "amount", "net", "صافيالمبيعات", "الإجمالي", "المجموع", "صافي"],
-  gross: ["grosssales", "grossamount", "grosstotal", "gross", "إجماليالمبيعات", "الإجماليقبلالخصم"],
+  lineTotal: ["totalprice", "netsales", "nettotal", "netamount", "linetotal", "totalsales", "subtotal", "total", "amount", "net", "صافيالمبيعات", "الإجمالي", "المجموع", "صافي"],
+  unitCost: ["unitcost", "كلفةالوحدة"],
+  lineCost: ["totalcost", "الكلفة"],
+  gross: ["grosssales", "grossamount", "grosstotal", "gross", "إجماليالمبيعات"],
   discount: ["discountamount", "discounts", "discount", "الخصم", "الخصومات"],
-  refund: ["refundamount", "refunds", "refunded", "returns", "returnamount", "المرتجعات", "المرتجع", "المردودات"],
-  vat: ["taxamount", "vatamount", "tax", "vat", "الضريبة", "ضريبةالقيمةالمضافة"],
-  isVoid: ["isvoid", "voided", "void", "cancelled", "canceled", "ملغاة", "ملغي", "ملغى"],
-  isRefund: ["isrefund", "isreturn", "refundflag", "isrefunded", "مرتجع", "مرتجعة", "مردود"],
-  isComplimentary: ["iscomplimentary", "complimentary", "comp", "isfree", "freeitem", "مجاني", "مجانية", "ضيافة"],
+  vat: ["totaltaxes", "taxamount", "vatamount", "tax", "vat", "الضريبة", "ضريبةالقيمةالمضافة"],
   modifiers: ["modifiers", "modifier", "options", "extras", "addons", "الإضافات", "الخيارات", "المعدلات"],
 };
 
@@ -142,21 +165,26 @@ export function mapColumns(header: readonly string[]): ColumnMap {
 
 export const FIELD_LABEL: Record<SalesColumn, string> = {
   orderId: "رقم الطلب",
+  checkNumber: "رقم الشيك",
+  orderStatus: "حال الطلب",
+  lineStatus: "حال البند",
+  lineType: "نوع السطر",
+  parentSku: "رمز الصنف الأصل",
   businessDate: "تاريخ العمل",
   soldAt: "وقت البيع",
   branch: "الفرع",
+  branchName: "اسم الفرع",
   productExternalId: "رمز الصنف",
   productName: "اسم الصنف",
+  productNameLocalized: "الاسم المعرَّب",
   category: "التصنيف",
   quantity: "الكمّيّة",
   unitPrice: "سعر الوحدة",
   lineTotal: "إجمالي السطر",
+  unitCost: "كلفة الوحدة عند المصدر",
+  lineCost: "كلفة السطر عند المصدر",
   gross: "الإجمالي قبل الخصم",
   discount: "الخصم",
-  refund: "المرتجَع",
   vat: "الضريبة",
-  isVoid: "ملغاة",
-  isRefund: "مرتجَعة",
-  isComplimentary: "مجانيّة",
   modifiers: "الإضافات",
 };

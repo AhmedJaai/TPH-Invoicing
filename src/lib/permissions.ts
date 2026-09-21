@@ -39,6 +39,14 @@ export type Capability =
   */
   | "inventory:view"
   | "inventory:count"
+  /**
+   * إعادةُ فتح جردٍ مقفَل — فعلٌ مستقلّ لا يُعار من إقفال الشهر.
+   *
+   * إقفالُ الشهر المحاسبيّ وإقفالُ الجرد فعلان على بياناتٍ مختلفة،
+   * ومن ملك أحدَهما لا يلزم أن يملك الآخر. والصلاحيّةُ المشتركة
+   * تُوسّع الأذن بلا قصد.
+   */
+  | "inventory:reopen"
   | "recipe:edit";
 
 const MATRIX: Record<Role, readonly Capability[]> = {
@@ -46,7 +54,7 @@ const MATRIX: Record<Role, readonly Capability[]> = {
     "document:upload", "document:view", "supplier:view", "supplier:edit",
     "amounts:view", "reports:view", "bank:view", "bank:edit", "payroll:view",
     "expense:edit", "payment:approve", "month:close", "month:reopen", "users:manage", "audit:view",
-    "inventory:view", "inventory:count", "recipe:edit",
+    "inventory:view", "inventory:count", "inventory:reopen", "recipe:edit",
   ],
   // المحاسب يرى كل المالية ولا يدير المستخدمين
   ACCOUNTANT: [
@@ -87,6 +95,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "audit:view": "عرض سجلّ التدقيق",
   "inventory:view": "عرض الجرد",
   "inventory:count": "إدخال الجرد وإقفاله",
+  "inventory:reopen": "إعادة فتح جردٍ مقفَل",
   "recipe:edit": "تعديل الوصفات",
 };
 

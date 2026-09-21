@@ -161,6 +161,51 @@ describe("الملغى والمرتجَع والمجانيّ — ثلاثةٌ ل
   });
 });
 
+/*
+  ── الخيارُ لا يزيد مكوّناً إلّا بقرار ──
+
+  «دبل شوت» في هذا المقهى خيارٌ داخل الوصفة لا إضافةُ بنّ — قالها
+  صاحبُه، ويؤيّدها التصدير الحقيقيّ: سعرُه صفرٌ في ١٥٨ مرّة. فالافتراضُ
+  ألّا يزيد شيئاً، والبنيةُ تقبل الزيادةَ متى قيلت صراحةً.
+*/
+describe("المكوّنُ المرتبطُ بخيار", () => {
+  it("لا يُحسَب حين يغيب الخيار", () => {
+    const versions = indexRecipeVersions([version({
+      ingredients: [
+        { productId: COFFEE, quantityMilli: 18_000, unit: "G", prepLossBp: null },
+        { productId: COFFEE, quantityMilli: 18_000, unit: "G", prepLossBp: null, modifierExternalId: "sk-0036" },
+      ],
+    })]);
+    const r = computeConsumption([sold({ quantityMilli: 10 * 1000 })], versions);
+    expect(canonicalToQuantity(r.byIngredient.get(COFFEE)!.canonicalMilli, "G")).toBe(180);
+  });
+
+  it("ويُحسَب حين يحضر — «إكسترا شوت» يزيد ١٨ جراماً", () => {
+    const versions = indexRecipeVersions([version({
+      ingredients: [
+        { productId: COFFEE, quantityMilli: 18_000, unit: "G", prepLossBp: null },
+        { productId: COFFEE, quantityMilli: 18_000, unit: "G", prepLossBp: null, modifierExternalId: "sk-0036" },
+      ],
+    })]);
+    const r = computeConsumption(
+      [sold({ quantityMilli: 10 * 1000, modifierExternalIds: ["sk-0036"] })],
+      versions,
+    );
+    /* ١٠ مشروباتٍ × (١٨ + ١٨) = ٣٦٠ جراماً */
+    expect(canonicalToQuantity(r.byIngredient.get(COFFEE)!.canonicalMilli, "G")).toBe(360);
+  });
+
+  it("و«دبل شوت» بلا مكوّنٍ مرتبطٍ لا يزيد شيئاً وإن حضر", () => {
+    const versions = indexRecipeVersions([version()]);
+    const withOption = computeConsumption(
+      [sold({ quantityMilli: 10 * 1000, modifierExternalIds: ["sk-0039"] })], versions,
+    );
+    const without = computeConsumption([sold({ quantityMilli: 10 * 1000 })], versions);
+    expect(withOption.byIngredient.get(COFFEE)!.canonicalMilli)
+      .toBe(without.byIngredient.get(COFFEE)!.canonicalMilli);
+  });
+});
+
 describe("ما لا يُحسَب يُعلَن — ولا يُبتلَع", () => {
   const versions = indexRecipeVersions([version()]);
 

@@ -24,6 +24,8 @@ export interface IngredientDraft {
   quantityMilli: number;
   unit: StoredUnit;
   prepLossBp?: number | null;
+  /** يُملأ حين يزيد خيارٌ بعينه هذا المكوّن — ولا يقع بلا قرار إنسان. */
+  modifierExternalId?: string | null;
   note?: string | null;
 }
 
@@ -70,10 +72,12 @@ export async function saveRecipeVersion(input: SaveVersionInput, conn: Conn = db
       throw new Error("كمّيّةُ المكوّن تكون أكبر من صفر");
     }
   }
+  /* المكوّنُ يتكرّر بخيارين مختلفين — ولا يتكرّر بالخيار نفسه */
   const seen = new Set<string>();
   for (const ing of input.ingredients) {
-    if (seen.has(ing.productId)) throw new Error("المكوّن مذكورٌ مرّتين — اجمعه في سطرٍ واحد");
-    seen.add(ing.productId);
+    const key = `${ing.productId}|${ing.modifierExternalId ?? ""}`;
+    if (seen.has(key)) throw new Error("المكوّن مذكورٌ مرّتين بالخيار نفسه — اجمعه في سطرٍ واحد");
+    seen.add(key);
   }
 
   return conn.transaction(async (tx) => {
@@ -162,6 +166,7 @@ export async function saveRecipeVersion(input: SaveVersionInput, conn: Conn = db
         quantityMilli: ing.quantityMilli,
         unit: ing.unit,
         prepLossBp: ing.prepLossBp ?? null,
+        modifierExternalId: ing.modifierExternalId ?? null,
         note: ing.note ?? null,
       })),
     );
@@ -276,6 +281,7 @@ export async function loadRecipeVersions(conn: Conn = db): Promise<RecipeVersion
       quantityMilli: recipeIngredients.quantityMilli,
       unit: recipeIngredients.unit,
       prepLossBp: recipeIngredients.prepLossBp,
+      modifierExternalId: recipeIngredients.modifierExternalId,
     })
     .from(recipeIngredients);
 
@@ -287,6 +293,7 @@ export async function loadRecipeVersions(conn: Conn = db): Promise<RecipeVersion
       quantityMilli: Number(ing.quantityMilli),
       unit: ing.unit,
       prepLossBp: ing.prepLossBp,
+      modifierExternalId: ing.modifierExternalId,
     };
     if (list) list.push(value);
     else byVersion.set(ing.recipeVersionId, [value]);

@@ -34,6 +34,31 @@ import { loadRecipeVersions } from "./recipe.service";
 /** كم يوماً يُنظَر إلى الوراء بحثاً عن آخر كلفةٍ معروفة حين لا شراءَ في الفترة. */
 const COST_LOOKBACK_DAYS = 180;
 
+/**
+ * نافذةُ التباس الاستلام — أيّامٌ بعد نهاية الفترة.
+ *
+ * ── لماذا وُجدت ──
+ *
+ * المورّد يسلّم في السابع ويصدر فاتورتَه في العاشر. وفُحص المخطّط: لا
+ * عمودَ استلامٍ كان فيه. فالقاعدةُ معلَنة — **تاريخُ الفاتورة نائبٌ عن
+ * تاريخ الاستلام** — ولها حدٌّ: فاتورةٌ تلي نهايةَ الفترة بأيّامٍ قليلة
+ * قد تكون بضاعةَ الفترة.
+ *
+ * فما وقع في النافذة **يُعرَض بندَ التباسٍ ولا يُضمّ ولا يُسقَط**. ومتى
+ * كُتب `received_on` حقيقيٌّ قُدّم عليه وسقط الالتباس.
+ */
+const RECEIPT_AMBIGUITY_DAYS = 3;
+
+/**
+ * فترةٌ تتقاطع مع جردٍ قائم — وتُسمّى فترتُه كي يُعرَف أين الاصطدام.
+ */
+export class OverlappingPeriodError extends Error {
+  constructor(readonly periodStart: string, readonly periodEnd: string) {
+    super(`هذه الفترة تتقاطع مع جردٍ آخر (${periodStart} → ${periodEnd}) — اختر فترةً تبدأ بعده.`);
+    this.name = "OverlappingPeriodError";
+  }
+}
+
 export class CountLockedError extends Error {
   constructor() {
     super("هذا الجرد مقفَل — أعِد فتحَه أوّلاً إن أردت تعديله.");
@@ -107,12 +132,23 @@ export async function loadSoldLines(
            sl.line_total_minor,
            sl.is_refund,
            (sl.is_void or s.is_void) as is_void,
-           sl.is_complimentary
+           sl.is_complimentary,
+           coalesce((
+             select array_agg(m.pp_external)
+               from (
+                 select pp2.external_id as pp_external
+                   from sale_lines ml
+                   left join pos_products pp2 on pp2.id = ml.pos_product_id
+                  where ml.sale_id = s.id and ml.is_modifier
+                    and ml.parent_external_id = pp.external_id
+               ) m
+           ), '{}') as modifier_ids
       from sale_lines sl
       join sales s on s.id = sl.sale_id
       left join pos_products pp on pp.id = sl.pos_product_id
      where s.business_date >= ${periodStart}
        and s.business_date <= ${periodEnd}
+       and not sl.is_modifier
        ${branchId ? sql`and (s.branch_id = ${branchId} or s.branch_id is null)` : sql``}
      order by s.business_date, sl.id
   `);
@@ -130,6 +166,9 @@ export async function loadSoldLines(
     isRefund: Boolean(r.is_refund),
     isVoid: Boolean(r.is_void),
     isComplimentary: Boolean(r.is_complimentary),
+    modifierExternalIds: Array.isArray(r.modifier_ids)
+      ? (r.modifier_ids as unknown[]).filter((x): x is string => typeof x === "string")
+      : [],
   }));
 }
 
@@ -145,15 +184,31 @@ export async function loadPurchaseLines(
   periodStart: string,
   periodEnd: string,
   conn: Conn = db,
-): Promise<{ inPeriod: PurchaseLineInput[]; lookback: PurchaseLineInput[] }> {
+): Promise<{
+  inPeriod: PurchaseLineInput[];
+  lookback: PurchaseLineInput[];
+  /** فواتيرُ تلي نهايةَ الفترة بأيّامٍ قليلة — التباسُ استلامٍ يُعرَض. */
+  ambiguous: PurchaseLineInput[];
+}> {
   const from = shiftDays(periodStart, -COST_LOOKBACK_DAYS);
+  const until = shiftDays(periodEnd, RECEIPT_AMBIGUITY_DAYS);
 
+  /*
+    ── تاريخُ الدخول: الحقيقيّ إن وُجد، وإلّا تاريخُ الفاتورة نائباً ──
+
+    و`received_on` أُضيف فارغاً في `037`. فما دام فارغاً يعمل النائب
+    **مُعلَناً**، ومتى مُلئ قُدّم بلا إعادة كتابةِ استعلام.
+  */
   const rows = await conn.execute<Record<string, unknown>>(sql`
     select il.id            as line_id,
            il.invoice_id,
            i.invoice_number,
            su.name_ar       as supplier_name,
-           to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as invoice_date,
+           coalesce(
+             i.received_on,
+             to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD')
+           )                as effective_date,
+           i.received_on is not null as receipt_known,
            il.description,
            sp.product_id,
            il.qty,
@@ -165,9 +220,9 @@ export async function loadPurchaseLines(
       join invoices i on i.id = il.invoice_id
       join suppliers su on su.id = i.supplier_id
       left join supplier_products sp on sp.id = il.supplier_product_id
-     where i.invoice_date >= ${from}::date
-       and i.invoice_date < (${periodEnd}::date + 1)
-     order by i.invoice_date
+     where coalesce(i.received_on, to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD')) >= ${from}
+       and coalesce(i.received_on, to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD')) <= ${until}
+     order by effective_date
   `);
 
   const all = rows.rows.map((r) => ({
@@ -175,7 +230,8 @@ export async function loadPurchaseLines(
     invoiceId: String(r.invoice_id),
     invoiceNumber: String(r.invoice_number),
     supplierName: String(r.supplier_name),
-    invoiceDate: String(r.invoice_date),
+    invoiceDate: String(r.effective_date),
+    receiptKnown: Boolean(r.receipt_known),
     description: String(r.description),
     productId: r.product_id === null ? null : String(r.product_id),
     qty: r.qty === null ? null : String(r.qty),
@@ -188,6 +244,8 @@ export async function loadPurchaseLines(
   return {
     inPeriod: all.filter((l) => l.invoiceDate >= periodStart && l.invoiceDate <= periodEnd),
     lookback: all.filter((l) => l.invoiceDate < periodStart),
+    /* تاريخُ استلامٍ حقيقيٌّ يقطع الالتباس — فلا يُعرَض إلّا النائب */
+    ambiguous: all.filter((l) => !l.receiptKnown && l.invoiceDate > periodEnd),
   };
 }
 
@@ -359,6 +417,7 @@ export async function buildEngineInput(
     soldLines,
     recipeVersions,
     purchaseLines: purchases.inPeriod,
+    ambiguousReceipts: purchases.ambiguous,
     openingByProduct: opening,
     adjustmentsInByProduct: movements.inByProduct,
     adjustmentsOutByProduct: movements.outByProduct,
@@ -418,18 +477,33 @@ export interface StartCountInput {
  * وجردٌ واحد للفترة الواحدة في الفرع الواحد: يحرسه فهرسٌ فريد في
  * القاعدة. فضغطتان على «ابدأ جرداً» لا تُنشئان جردين نصفُ العدّ في
  * كلٍّ منهما.
+ *
+ * **ولا تتداخل فترتان** — والتداخلُ أخطرُ من التطابق: يوماً واحداً
+ * مشتركاً يعني أنّ شراءَ ذلك اليوم واستهلاكَه يُحسَبان في جردين،
+ * وفعليُّ الأوّل افتتاحيُّ الثاني وقد مضى عليه يومٌ لم يُحسَب. فالمنعُ
+ * في القاعدة بمؤثِّر (`037`)، ويُقال هنا **قبل أن يصل الطلبُ إليها**
+ * بلغةٍ تُقرأ ومعها الفترةُ المتعارضة — فرسالةُ Postgres ليست جواباً
+ * لصاحب المقهى.
  */
 export async function startCount(input: StartCountInput, conn: Conn = db): Promise<{ countId: string; created: boolean }> {
   if (input.periodEnd < input.periodStart) throw new Error("نهايةُ الفترة قبل بدايتها");
 
-  const existing = await conn.execute<{ id: string }>(sql`
-    select id from inventory_counts
-     where period_start = ${input.periodStart}
-       and period_end = ${input.periodEnd}
-       and coalesce(branch_id, '~') = coalesce(${input.branchId}::text, '~')
+  const clash = await conn.execute<{ id: string; period_start: string; period_end: string }>(sql`
+    select id, period_start, period_end from inventory_counts
+     where coalesce(branch_id, '~') = coalesce(${input.branchId}::text, '~')
+       and period_start <= ${input.periodEnd}
+       and period_end   >= ${input.periodStart}
+     order by period_start
      limit 1
   `);
-  if (existing.rows[0]) return { countId: String(existing.rows[0].id), created: false };
+  const found = clash.rows[0];
+  if (found) {
+    /* المتطابقةُ هي الجردُ نفسُه — تُفتَح ولا تُنشَأ ثانيةً */
+    if (String(found.period_start) === input.periodStart && String(found.period_end) === input.periodEnd) {
+      return { countId: String(found.id), created: false };
+    }
+    throw new OverlappingPeriodError(String(found.period_start), String(found.period_end));
+  }
 
   const [row] = await conn
     .insert(inventoryCounts)
@@ -496,8 +570,10 @@ async function persistLines(countId: string, report: EngineReport, conn: Conn): 
       theoreticalClosingMilli: l.theoreticalClosingMilli,
       actualMilli: l.actualMilli,
       varianceMilli: l.varianceMilli,
+      varianceConsumptionBp: l.varianceConsumptionBp,
       varianceBp: l.varianceBp,
       unitCostMinor: l.unitCostMinor,
+      valuationBasis: l.valuationBasis,
       varianceCostMinor: l.varianceCostMinor,
       flags: l.flags as never,
     }));
@@ -518,8 +594,10 @@ async function persistLines(countId: string, report: EngineReport, conn: Conn): 
             recordedWasteMilli: sql`excluded.recorded_waste_milli`,
             theoreticalClosingMilli: sql`excluded.theoretical_closing_milli`,
             varianceMilli: sql`excluded.variance_milli`,
+            varianceConsumptionBp: sql`excluded.variance_consumption_bp`,
             varianceBp: sql`excluded.variance_bp`,
             unitCostMinor: sql`excluded.unit_cost_minor`,
+            valuationBasis: sql`excluded.valuation_basis`,
             varianceCostMinor: sql`excluded.variance_cost_minor`,
             flags: sql`excluded.flags`,
             /* والعدُّ الفعليّ لا يُمَسّ — كتبه إنسان، ولا يُدهَس بإعادة حساب */
@@ -753,8 +831,10 @@ export async function readFrozenReport(header: CountHeader, conn: Conn = db): Pr
     theoreticalClosingMilli: num(r.theoretical_closing_milli),
     actualMilli: num(r.actual_milli),
     varianceMilli: num(r.variance_milli),
+    varianceConsumptionBp: num(r.variance_consumption_bp),
     varianceBp: num(r.variance_bp),
     unitCostMinor: num(r.unit_cost_minor),
+    valuationBasis: (r.valuation_basis ?? "UNKNOWN") as EngineReport["lines"][number]["valuationBasis"],
     varianceCostMinor: num(r.variance_cost_minor),
     flags: (Array.isArray(r.flags) ? r.flags : []) as EngineReport["lines"][number]["flags"],
     recipeVersionIds: [],
@@ -794,7 +874,8 @@ function emptyCoverage(header: CountHeader): EngineReport["coverage"] {
     readiness: header.readiness ?? "PARTIAL",
     sales: {
       lines: 0, daysWithSales: 0, periodDays: 0, missingDays: [],
-      includedLines: 0, includedTotalMinor: 0, excludedLines: 0, excludedTotalMinor: 0, coveredBp: null,
+      includedLines: 0, includedTotalMinor: 0, excludedLines: 0, excludedTotalMinor: 0,
+      coveredBp: null, unitsCoveredBp: null, includedUnitsMilli: 0, excludedUnitsMilli: 0,
     },
     purchases: { lines: 0, includedLines: 0, excludedLines: 0, excludedTotalMinor: 0, coveredBp: null },
     items: { counted: 0, withKnownOpening: 0, withKnownCost: 0 },
@@ -885,6 +966,7 @@ export async function itemHistory(productId: string, limit = 12, conn: Conn = db
       theoreticalClosingMilli: inventoryCountLines.theoreticalClosingMilli,
       actualMilli: inventoryCountLines.actualMilli,
       varianceMilli: inventoryCountLines.varianceMilli,
+      varianceConsumptionBp: inventoryCountLines.varianceConsumptionBp,
       varianceBp: inventoryCountLines.varianceBp,
       varianceCostMinor: inventoryCountLines.varianceCostMinor,
     })
@@ -962,6 +1044,8 @@ export async function unmappedPosProducts(conn: Conn = db): Promise<{
       from pos_products pp
       left join sale_lines sl on sl.pos_product_id = pp.id
      where pp.product_id is null
+       /* خيارُ الإضافة ليس صنفاً يُباع — فلا يُطلَب ربطُه ولا وصفتُه */
+       and pp.kind = 'PRODUCT'
      group by pp.id
      order by sold_minor desc
      limit 200

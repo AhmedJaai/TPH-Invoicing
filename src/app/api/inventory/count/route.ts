@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import {
-  CountLockedError, finaliseCount, recomputeCount, reopenCount,
+  CountLockedError, OverlappingPeriodError, finaliseCount, recomputeCount, reopenCount,
   saveActualCounts, startCount, type ActualInput,
 } from "@/services/inventory.service";
 import { decimalToMilli, toCanonical } from "@/lib/inventory/units";
@@ -131,9 +131,13 @@ export async function POST(request: Request) {
 
       case "reopen": {
         if (!body.countId) return NextResponse.json({ error: "لم يُحدَّد الجرد" }, { status: 400 });
-        /* إعادةُ الفتح تُعيد كتابةَ تقريرٍ مقفَل — فللمالك وحده */
+        /*
+          إعادةُ الفتح تُعيد كتابةَ تقريرٍ مقفَل — فللمالك وحده،
+          **وبصلاحيّتها هي** لا بصلاحيّة إقفال الشهر: فعلان على
+          بياناتٍ مختلفة، والمشتركةُ تُوسّع الأذن بلا قصد.
+        */
         try {
-          await guard("inventory-reopen", "month:reopen");
+          await guard("inventory-reopen", "inventory:reopen");
         } catch (e) {
           const mapped = respondTo(e);
           if (mapped) return mapped;
@@ -147,7 +151,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "فعلٌ غير معروف" }, { status: 400 });
     }
   } catch (e) {
-    if (e instanceof CountLockedError) {
+    if (e instanceof CountLockedError || e instanceof OverlappingPeriodError) {
       return NextResponse.json({ error: e.message }, { status: 409 });
     }
     const mapped = respondTo(e);

@@ -15,6 +15,14 @@ import type { StoredUnit } from "@/lib/unit-conversion";
 
 export interface RecipeIngredientInput {
   productId: string;
+  /**
+   * مكوّنٌ لا يُحسَب إلّا مع هذا الخيار.
+   *
+   * فارغٌ = يخصّ الوصفة كلَّها. و**«دبل شوت» في هذا المقهى خيارٌ داخل
+   * الوصفة لا إضافةُ بنّ** — قالها صاحبُه، ويؤيّدها الملفّ: سعرُه صفرٌ
+   * في ١٥٨ مرّة. فلا يُملأ هذا الحقلُ إلّا بقرار إنسان.
+   */
+  modifierExternalId?: string | null;
   /** بالمِلّي من `unit`. */
   quantityMilli: number;
   unit: StoredUnit;

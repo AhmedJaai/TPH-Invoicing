@@ -25,6 +25,20 @@ import {
 import { sameUnitFamily } from "./units";
 
 /**
+ * بم قُوِّمت كلفةُ الفرق.
+ *
+ * **ولا تُقرأ تكلفةَ مبيعات**: هي تقديرُ أثرٍ ماليّ لفرقٍ لم يُفسَّر
+ * بعد، ولا تدخل قائمةَ دخلٍ ولا قيداً محاسبيّاً.
+ */
+export type ValuationBasis = "PERIOD_WEIGHTED_AVERAGE" | "LATEST_KNOWN" | "UNKNOWN";
+
+export const VALUATION_LABEL: Record<ValuationBasis, string> = {
+  PERIOD_WEIGHTED_AVERAGE: "قُوِّم بمتوسّط شراء الفترة",
+  LATEST_KNOWN: "قُوِّم بآخر كلفةٍ معروفة — لا شراءَ في الفترة",
+  UNKNOWN: "لا كلفةَ معروفة — لم يُقوَّم",
+};
+
+/**
  * نسخةُ المحرّك.
  *
  * تُرفَع كلّما تغيّر **معنى** رقمٍ يُحسَب هنا — لا كلّما عُدّل سطر.
@@ -67,6 +81,13 @@ export interface EngineInput {
   soldLines: readonly SoldLineInput[];
   recipeVersions: readonly RecipeVersionInput[];
   purchaseLines: readonly PurchaseLineInput[];
+  /**
+   * فواتيرُ تلي نهايةَ الفترة بأيّامٍ قليلة بلا تاريخ استلامٍ حقيقيّ.
+   *
+   * لا تُضمّ ولا تُسقَط — تُعرَض بندَ التباسٍ في التغطية، ويقرّر فيها
+   * إنسان. وضمُّها بالحدس يُنقص الفرق، وإسقاطُها يزيده.
+   */
+  ambiguousReceipts?: readonly PurchaseLineInput[];
   /** الافتتاحيّ بالوحدة المعياريّة، و`null` «غير معروف». */
   openingByProduct: ReadonlyMap<string, number | null>;
   adjustmentsInByProduct: ReadonlyMap<string, number>;
@@ -93,8 +114,13 @@ export interface ReportLine {
   theoreticalClosingMilli: number | null;
   actualMilli: number | null;
   varianceMilli: number | null;
+  /** **الأساسيّة**: الفرق ÷ الاستهلاك المتوقَّع. */
+  varianceConsumptionBp: number | null;
+  /** وثانويّةٌ إلى المخزون الختاميّ المتوقَّع. */
   varianceBp: number | null;
   unitCostMinor: number | null;
+  /** بم قُوِّم — يُعرَض مع الرقم، فلا يتغيّر المنهجُ صامتاً. */
+  valuationBasis: ValuationBasis;
   varianceCostMinor: number | null;
 
   flags: LineFlag[];
@@ -208,7 +234,11 @@ export function reconcile(input: EngineInput): EngineReport {
     const result = stockVariance(terms, actualMilli);
     if (result.varianceMilli !== null) linesWithVariance++;
 
-    const cost = unitCostMinor(bought, product.baseUnit, input.fallbackCostByProduct.get(product.id) ?? null);
+    const fallback = input.fallbackCostByProduct.get(product.id) ?? null;
+    const periodCost = unitCostMinor(bought, product.baseUnit, null);
+    const cost = periodCost ?? fallback;
+    const valuationBasis: ValuationBasis =
+      periodCost !== null ? "PERIOD_WEIGHTED_AVERAGE" : cost !== null ? "LATEST_KNOWN" : "UNKNOWN";
     if (cost === null) flags.push("COST_UNKNOWN");
 
     const varianceCost = varianceCostMinor(result.varianceMilli, cost, product.baseUnit);
@@ -231,8 +261,10 @@ export function reconcile(input: EngineInput): EngineReport {
       theoreticalClosingMilli: result.theoreticalClosingMilli,
       actualMilli,
       varianceMilli: result.varianceMilli,
+      varianceConsumptionBp: result.varianceConsumptionBp,
       varianceBp: result.varianceBp,
       unitCostMinor: cost,
+      valuationBasis,
       varianceCostMinor: varianceCost,
       flags,
       recipeVersionIds: used?.recipeVersionIds ?? [],
@@ -241,6 +273,7 @@ export function reconcile(input: EngineInput): EngineReport {
   }
 
   const coverage = computeCoverage({
+    ambiguousReceipts: input.ambiguousReceipts ?? [],
     periodStart: input.periodStart,
     periodEnd: input.periodEnd,
     salesBusinessDates: input.soldLines.map((l) => l.businessDate),

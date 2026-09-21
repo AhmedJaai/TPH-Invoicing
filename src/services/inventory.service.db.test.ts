@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { eq, sql } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
@@ -10,8 +11,8 @@ import { importSalesFile } from "./sales-import.service";
 import { mapPosProducts } from "./pos-mapping.service";
 import { saveRecipeVersion } from "./recipe.service";
 import {
-  CountLockedError, finaliseCount, itemHistory, loadCountHeader, readFrozenReport,
-  recomputeCount, reopenCount, saveActualCounts, startCount,
+  CountLockedError, OverlappingPeriodError, finaliseCount, itemHistory, loadCountHeader,
+  readFrozenReport, recomputeCount, reopenCount, saveActualCounts, startCount, unmappedPosProducts,
 } from "./inventory.service";
 import { recordWaste } from "./inventory-movement.service";
 import { canonicalToQuantity } from "@/lib/inventory/units";
@@ -27,22 +28,37 @@ import type { Tx } from "./types";
 
 /* ─────────────────── تجهيزٌ مشترك ─────────────────── */
 
+/** ترويسةُ فودكس الحقيقيّة — كما فُحصت في التصدير المرفق. */
 const ORDERS_HEADER = [
-  "Order Number", "Business Date", "SKU", "Product", "Quantity", "Unit Price", "Net Sales",
+  "order_reference", "order_status", "type", "parent_item_sku", "status",
+  "sku", "name", "unit_price", "quantity", "total_price", "business_date", "branch_name",
 ];
 
-function workbook(rows: string[][]): Buffer {
+function workbook(rows: (string | number)[][]): Buffer {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([ORDERS_HEADER, ...rows]), "Sheet1");
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
 }
 
-/** ملفُّ مبيعاتٍ فيه `count` مشروباً من صنفٍ واحد. */
-function salesFile(count: number, date = "2026-09-03", orderPrefix = "ORD"): Buffer {
+interface RowOver {
+  order?: string | number; status?: string; type?: string; parent?: string;
+  sku?: string; name?: string; price?: number; qty?: number; total?: number;
+  date?: string; branch?: string;
+}
+
+function foodicsRow(o: RowOver = {}): (string | number)[] {
+  return [
+    o.order ?? 1, o.status ?? "Done", o.type ?? "المنتج", o.parent ?? "",
+    o.status ?? "Done", o.sku ?? "SKU-LATTE", o.name ?? "Spanish Latte",
+    o.price ?? 18, o.qty ?? 1, o.total ?? 18, o.date ?? "2026-09-03", o.branch ?? "Branch 1",
+  ];
+}
+
+/** ملفُّ مبيعاتٍ فيه `count` مشروباً من صنفٍ واحد، طلبٌ لكلٍّ. */
+function salesFile(count: number, date = "2026-09-03", orderPrefix = "ORD", branch?: string): Buffer {
   return workbook(
-    Array.from({ length: count }, (_, i) => [
-      `${orderPrefix}-${i + 1}`, date, "SKU-LATTE", "Spanish Latte", "1", "18.00", "18.00",
-    ]),
+    Array.from({ length: count }, (_, i) =>
+      foodicsRow({ order: `${orderPrefix}-${i + 1}`, date, branch })),
   );
 }
 
@@ -77,12 +93,12 @@ describe("استيرادُ المبيعات لا يُضاعِف", () => {
       expect(first.status).toBe("IMPORTED");
       expect(first.totals.salesWritten).toBe(3);
 
-      const before = await countSales(tx);
+      const before = await countSales(tx, "FDX:ORD-");
       const second = await importSalesFile({ buffer, fileName: "a.xlsx", actorId }, tx);
 
       expect(second.status).toBe("DUPLICATE");
       expect(second.importId).toBe(first.importId);
-      expect(await countSales(tx)).toBe(before);
+      expect(await countSales(tx, "FDX:ORD-")).toBe(before);
     }));
 
   it("وملفٌّ آخر يحمل الطلباتِ نفسَها لا يضاعفها — المنعُ على المفتاح الطبيعيّ لا على البصمة", () =>
@@ -92,26 +108,93 @@ describe("استيرادُ المبيعات لا يُضاعِف", () => {
       await importSalesFile({ buffer: salesFile(3), fileName: "a.xlsx", actorId }, tx);
       const before = await countSales(tx);
 
-      /* ملفٌّ ببصمةٍ مختلفة (صفٌّ زائد) يحمل الطلبات الثلاثة نفسها */
+      /* ملفٌّ ببصمةٍ مختلفة (صفٌّ زائد) يحمل الطلبات الثلاثة نفسها بلا تغيير */
       const wider = workbook([
-        ...Array.from({ length: 3 }, (_, i) => [`ORD-${i + 1}`, "2026-09-03", "SKU-LATTE", "Spanish Latte", "1", "18.00", "18.00"]),
-        ["ORD-4", "2026-09-03", "SKU-LATTE", "Spanish Latte", "1", "18.00", "18.00"],
+        ...Array.from({ length: 3 }, (_, i) => foodicsRow({ order: `ORD-${i + 1}` })),
+        foodicsRow({ order: "ORD-4" }),
       ]);
       const second = await importSalesFile({ buffer: wider, fileName: "b.xlsx", actorId }, tx);
 
       expect(second.status).toBe("IMPORTED");
-      /* واحدةٌ جديدة فقط، وثلاثٌ رُدّت بوصفها مقيَّدة */
+      /* واحدةٌ جديدة، وثلاثةُ أسطرٍ مقيَّدةٌ بلا تغيير */
       expect(second.totals.salesWritten).toBe(1);
       expect(second.totals.duplicates).toBe(3);
-      expect(await countSales(tx)).toBe(before + 1);
+      expect(second.totals.revised).toBe(0);
+      expect(await countSales(tx, "FDX:ORD-")).toBe(before + 1);
+    }));
+
+  /*
+    ── التصحيحُ ليس تكراراً ──
+
+    تصديرُ فودكس لا يحمل رقمَ نسخةٍ ولا طابعَ إنشاء. فطلبٌ أُلغي بعد
+    تصدير الأمس يصل اليوم بحال `Void`؛ ولو رُدّ الملفُّ «مكرَّراً» لبقي
+    في قيدنا مبيعاً لم يقع، وحُسب استهلاكُه في الجرد.
+  */
+  it("تصديرٌ مصحَّح يُقرأ مراجعةً لا تكراراً — ويُحدَّث السطر", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+
+      const first = await importSalesFile(
+        { buffer: workbook([foodicsRow({ order: "REV-1" })]), fileName: "day1.xlsx", actorId }, tx,
+      );
+      expect(first.totals.salesWritten).toBe(1);
+
+      /* التصديرُ التالي يقول إنّ الطلب أُلغي */
+      const corrected = workbook([foodicsRow({ order: "REV-1", status: "Void" })]);
+      const second = await importSalesFile({ buffer: corrected, fileName: "day2.xlsx", actorId }, tx);
+
+      expect(second.status).toBe("IMPORTED");
+      expect(second.totals.revised).toBe(1);
+      expect(second.totals.duplicates).toBe(0);
+      expect(second.revisions[0].was).toContain("Done");
+      expect(second.revisions[0].now).toContain("Void");
+
+      /* ولا بيعةَ ثانية — الطلبُ واحد، وحالُه هي التي تغيّرت */
+      expect(await countSales(tx, "FDX:REV-")).toBe(1);
+      const line = await tx.execute<{ source_status: string; is_void: boolean }>(sql`
+        select sl.source_status, sl.is_void from sale_lines sl
+          join sales s on s.id = sl.sale_id where s.external_id = 'FDX:REV-1'
+      `);
+      expect(line.rows[0].source_status).toBe("Void");
+      expect(line.rows[0].is_void).toBe(true);
+
+      /* والصفُّ الخام يقول ماذا تغيّر بالضبط */
+      const raw = await tx.execute<{ status: string; reason: string }>(sql`
+        select status, reason from sales_import_rows where import_id = ${second.importId}
+      `);
+      expect(raw.rows[0].status).toBe("REVISED");
+      expect(raw.rows[0].reason).toContain("تغيّر ما يقوله المصدر");
+    }));
+
+  it("وخيارُ الإضافة يُقيَّد ولا يدخل طابور الربط", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      await importSalesFile({
+        buffer: workbook([
+          foodicsRow({ order: "MOD-1", sku: "sk-0002", name: "Latte" }),
+          foodicsRow({ order: "MOD-1", type: "خيار الإضافة", parent: "sk-0002", sku: "sk-0039", name: "Double shots", price: 0, total: 0 }),
+        ]),
+        fileName: "mods.xlsx", actorId,
+      }, tx);
+
+      const kinds = await tx.execute<{ external_id: string; kind: string }>(sql`
+        select external_id, kind from pos_products where external_id in ('sk-0002','sk-0039')
+      `);
+      expect(kinds.rows.find((r) => r.external_id === "sk-0039")?.kind).toBe("MODIFIER");
+      expect(kinds.rows.find((r) => r.external_id === "sk-0002")?.kind).toBe("PRODUCT");
+
+      /* ولا يُطلَب ربطُ «دبل شوت» — ليس صنفاً يُباع */
+      const queue = await unmappedPosProducts(tx);
+      expect(queue.map((q) => q.externalId)).toContain("sk-0002");
+      expect(queue.map((q) => q.externalId)).not.toContain("sk-0039");
     }));
 
   it("ولا صفَّ يُرمى صامتاً — الخامُ محفوظٌ بحاله وسببه", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const buffer = workbook([
-        ["ORD-1", "2026-09-03", "SKU-1", "Latte", "2", "18.00", "36.00"],
-        ["ORD-2", "2026-09-03", "SKU-2", "Tea", "غير مقروء", "9.00", "9.00"],
+        foodicsRow({ order: "ORD-1", sku: "SKU-1", name: "Latte", qty: 2, total: 36 }),
+        foodicsRow({ order: "ORD-2", sku: "SKU-2", name: "Tea", qty: "غير مقروء" as never, total: 9 }),
       ]);
 
       const r = await importSalesFile({ buffer, fileName: "c.xlsx", actorId }, tx);
@@ -124,7 +207,7 @@ describe("استيرادُ المبيعات لا يُضاعِف", () => {
       expect(rows.rows).toHaveLength(2);
       expect(rows.rows[1].status).toBe("ERROR");
       expect(rows.rows[1].reason).toContain("الكمّيّة");
-      expect((rows.rows[1].raw as Record<string, string>)["Product"]).toBe("Tea");
+      expect((rows.rows[1].raw as Record<string, string>)["name"]).toBe("Tea");
     }));
 });
 
@@ -256,6 +339,53 @@ describe("الجرد من طرفه إلى طرفه", () => {
       const second = await startCount(input, tx);
       expect(second.countId).toBe(first.countId);
       expect(second.created).toBe(false);
+    }));
+
+  /*
+    ── والتداخلُ أخطرُ من التطابق ──
+
+    فترتان تشتركان في يومٍ واحد تعنيان أنّ شراءَ ذلك اليوم واستهلاكَه
+    محسوبان مرّتين، وأنّ فعليَّ الأوّل ليس افتتاحيَّ الثاني. والمنعُ في
+    القاعدة بمؤثِّر (`037`) **ويُقال في الخدمة بلغةٍ تُقرأ** — فرسالةُ
+    Postgres ليست جواباً لصاحب المقهى.
+  */
+  it("وفترةٌ تتقاطع مع جردٍ قائم تُردّ — ومعها فترتُه", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      const branchId = (await makeBranch(tx)).id;
+
+      await startCount({ periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId, actorId }, tx);
+      const e = await caught(startCount(
+        { periodStart: "2026-09-05", periodEnd: "2026-09-11", branchId, actorId }, tx,
+      ));
+
+      expect(e).toBeInstanceOf(OverlappingPeriodError);
+      expect((e as Error).message).toContain("2026-09-07");
+    }));
+
+  it("والملاصقةُ مقبولة — الثامنُ يبدأ بعد السابع", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      const branchId = (await makeBranch(tx)).id;
+
+      const first = await startCount({ periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId, actorId }, tx);
+      const second = await startCount({ periodStart: "2026-09-08", periodEnd: "2026-09-14", branchId, actorId }, tx);
+
+      expect(second.created).toBe(true);
+      expect(second.countId).not.toBe(first.countId);
+    }));
+
+  it("والفترةُ نفسُها في فرعٍ آخر جردٌ آخر — لا تداخل", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      const mine = (await makeBranch(tx)).id;
+      const other = (await makeBranch(tx)).id;
+      const period = { periodStart: "2026-09-01", periodEnd: "2026-09-07", actorId };
+
+      const a = await startCount({ ...period, branchId: mine }, tx);
+      const b = await startCount({ ...period, branchId: other }, tx);
+      expect(b.created).toBe(true);
+      expect(b.countId).not.toBe(a.countId);
     }));
 });
 
@@ -495,10 +625,131 @@ describe("الافتتاحيُّ من آخر جردٍ مقفَل", () => {
     }));
 });
 
+/* ─────────────────── الملفُّ الحقيقيّ ─────────────────── */
+
+/*
+  ── والاختباراتُ النقيّة لا تُثبت أنّ النظام يعمل ──
+
+  المحوِّل مفحوصٌ على هذا الملفّ في `foodics-excel.test.ts`، وذاك يُثبت
+  أنّه **يقرأ** الملفّ. وهذا يُثبت أنّ المقروء **يصل القاعدةَ ويخرج
+  استهلاكاً**: ألفٌ وتسعون طلباً تمرّ بالخدمة نفسِها التي تمرّ بها
+  الشاشة، على المخطّط نفسِه، بقيوده ومؤثِّراته.
+
+  والأرقامُ أدناه مأخوذةٌ من الملفّ لا من توقُّع: فإن تغيّر المحوِّل
+  فتغيّرت، لم يكن التغيّرُ صامتاً.
+*/
+const REAL_FILE = "src/test/fixtures/foodics-order-items.xlsx";
+/** أوّلُ الأسبوع وآخرُه في التصدير المرفق. */
+const REAL_FROM = "2026-09-13";
+const REAL_TO = "2026-09-19";
+/**
+ * أكثرُ الأصناف مبيعاً فيه — و٢١١ صفّاً تقول ٢٩٣ كوباً بالجملة:
+ * ‏٢٨٤ منجزاً، و٨ مرتجعة، وواحدٌ ملغى.
+ */
+const TOP_SKU = "sk-0058";
+
+describe("التصديرُ الحقيقيّ يدخل القاعدة", () => {
+  it("‏١٬٠٩٠ طلباً و٢٬٠٨١ سطراً منها ٣٦٤ خيارَ إضافة — ثمّ الملفُّ عينُه تكرار", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      const branch = await makeBranch(tx);
+      const buffer = readFileSync(REAL_FILE);
+
+      const first = await importSalesFile(
+        { buffer, fileName: "foodics-real.xlsx", actorId, branchLabel: branch.nameAr }, tx,
+      );
+
+      expect(first.status).toBe("IMPORTED");
+      expect(first.totals.salesWritten).toBe(1090);
+      expect(first.totals.lineCount).toBe(2081);
+      expect(first.totals.errors).toBe(0);
+
+      const mods = await tx.execute<{ n: number }>(sql`
+        select count(*)::int as n from sale_lines sl
+          join sales s on s.id = sl.sale_id
+         where s.import_id = ${first.importId} and sl.is_modifier
+      `);
+      expect(Number(mods.rows[0].n)).toBe(364);
+
+      /* والملفُّ عينُه ثانيةً: تكرارٌ يُردّ عند البصمة، ولا صفَّ يُكتب */
+      const again = await importSalesFile(
+        { buffer, fileName: "foodics-real.xlsx", actorId, branchLabel: branch.nameAr }, tx,
+      );
+      expect(again.status).toBe("DUPLICATE");
+      expect(again.importId).toBe(first.importId);
+    }));
+
+  /*
+    ── والملغى والمرتجَع والمجانيّ ثلاثةٌ لا واحد ──
+
+    الجملةُ ٢٩٣ كوباً، والمصنوعُ فعلاً ٢٧٦: يخرج الملغى كلُّه (لم
+    يُصنَع)، ويُنقص المرتجَعُ ثمانيةً. ولو جُمعت الثلاثةُ رقماً واحداً
+    لخرج استهلاكٌ أعلى من الواقع بـ٣٤٠ جراماً — ثمّ يُعلَن «فائضٌ» في
+    الرفّ سببُه حسابُنا لا مخزونُنا.
+
+    وهذا هو موضعُ الفحص: البياناتُ الحقيقيّة فيها الحالاتُ الثلاث،
+    والملفُّ المصنوع لا يضمنها.
+  */
+  it("وأكثرُها مبيعاً ٢٧٦ كوباً مصنوعاً من ٢٩٣ — ‏٢٠ جراماً لكلٍّ = ‏٥٫٥٢ كجم", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      const branch = await makeBranch(tx);
+      const coffee = await makeStockProduct(tx, "بنّ إثيوبيا", "KG", "COFFEE");
+      const drink = await makeMenuProduct(tx, "V60 إثيوبيا مثلّج");
+      await isolateProducts(tx, [coffee, drink]);
+
+      await importSalesFile(
+        { buffer: readFileSync(REAL_FILE), fileName: "foodics-real.xlsx", actorId, branchLabel: branch.nameAr },
+        tx,
+      );
+
+      /* يُربَط صنفٌ واحد — والباقي يبقى في الطابور، وتلك تغطيةٌ جزئيّة تُعلَن */
+      const pos = await tx.execute<{ id: string }>(sql`
+        select id from pos_products where external_id = ${TOP_SKU} and product_id is null
+      `);
+      expect(pos.rows).toHaveLength(1);
+      await mapPosProducts({ posProductIds: [String(pos.rows[0].id)], productId: drink, actorId }, tx);
+
+      await saveRecipeVersion({
+        menuProductId: drink, effectiveFrom: REAL_FROM, activate: true, actorId,
+        ingredients: [{ productId: coffee, quantityMilli: 20_000, unit: "G" }],
+      }, tx);
+
+      const { countId } = await startCount(
+        { periodStart: REAL_FROM, periodEnd: REAL_TO, branchId: branch.id, actorId }, tx,
+      );
+      const report = await recomputeCount(countId, tx);
+
+      const line = report.lines.find((l) => l.productId === coffee)!;
+      /* ٢٧٦ × ٢٠ جراماً = ‏٥٬٥٢٠ جراماً — لا ٥٬٨٦٠ */
+      expect(canonicalToQuantity(line.theoreticalConsumptionMilli!, "KG")).toBe(5.52);
+
+      /*
+        والتغطيةُ تُعلَن بلغة العمل: ما بقي من أصناف فودكس بلا ربط، ونصيبُها
+        من الوحدات المباعة محسوبٌ لا مقدَّر — فـ«٩٦٪ من الوصفات مكتملة»
+        لا تقول إنّ الباقيَ أكثرُ الأصناف مبيعاً.
+      */
+      expect(report.coverage.readiness).toBe("PARTIAL");
+      const gap = report.coverage.gaps.find((g) => g.reason === "UNMAPPED_POS_PRODUCT")!;
+      expect(gap.unitsShareBp).not.toBeNull();
+      expect(gap.unitsShareBp!).toBeGreaterThan(0);
+    }));
+});
+
 /* ─────────────────── أدوات ─────────────────── */
 
-async function countSales(tx: Tx): Promise<number> {
-  const rows = await tx.select({ n: sql<number>`count(*)::int` }).from(sales);
+/**
+ * يعدّ البيعات **التي أنشأها هذا الاختبار** لا ما في القاعدة كلِّها.
+ *
+ * قاعدةُ الاختبار مشتركةٌ بين الملفّات وقد تحمل بقايا من مشيٍ سابق.
+ * وعددٌ مطلقٌ يمرّ اليوم ويسقط غداً ليس اختباراً — يقيس البيئةَ لا
+ * الشيفرة.
+ */
+async function countSales(tx: Tx, prefix = "FDX:"): Promise<number> {
+  const rows = await tx
+    .select({ n: sql<number>`count(*)::int` })
+    .from(sales)
+    .where(sql`${sales.externalId} like ${prefix + "%"}`);
   return Number(rows[0]?.n ?? 0);
 }
 

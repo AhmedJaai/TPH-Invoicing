@@ -9,7 +9,7 @@ import { storedUnitLabel } from "@/lib/unit-conversion";
 import { canonicalToQuantity, formatSignedQuantity } from "@/lib/inventory/units";
 import { formatBp } from "@/lib/inventory/equation";
 import { describeCoverage, READINESS_LABEL } from "@/lib/inventory/coverage";
-import { FLAG_LABEL, topVariances, type EngineReport } from "@/lib/inventory/engine";
+import { FLAG_LABEL, VALUATION_LABEL, topVariances, type EngineReport } from "@/lib/inventory/engine";
 import type { CountHeader } from "@/services/inventory.service";
 
 /**
@@ -56,7 +56,8 @@ export function InventoryWorkspace({
       : trim(canonicalToQuantity(l.theoreticalClosingMilli, l.baseUnit)),
     actual: l.actualMilli === null ? "" : trim(canonicalToQuantity(l.actualMilli, l.baseUnit)),
     varianceText: l.varianceMilli === null ? null : formatSignedQuantity(l.varianceMilli, l.baseUnit),
-    varianceBpText: l.varianceBp === null ? "نسبةٌ غير محسوبة" : formatBp(l.varianceBp),
+    /* النسبةُ المعروضة هي نسبةُ الاستهلاك — جوابُ «كم ضاع ممّا صُرف» */
+    varianceBpText: l.varianceConsumptionBp === null ? "نسبةٌ غير محسوبة" : formatBp(l.varianceConsumptionBp),
     varianceCostMinor: showAmounts ? l.varianceCostMinor : null,
     flags: l.flags.map((f) => FLAG_LABEL[f]),
     negative: (l.varianceMilli ?? 0) < 0,
@@ -109,6 +110,10 @@ export function InventoryWorkspace({
               <li key={i} className="rounded-lg border border-line bg-raised/70 px-3 py-2 text-[11px] leading-relaxed">
                 <span className="font-bold">{g.label}</span>
                 <span className="nums text-muted"> — {g.count}</span>
+                {/* «٣ منتجات» لا تقول شيئاً؛ وحصّتُها من المبيع تقول أيصلح التقرير */}
+                {g.unitsShareBp !== null && g.unitsShareBp > 0 && (
+                  <span className="nums font-bold"> · تمثّل {(g.unitsShareBp / 100).toFixed(1)}٪ من الوحدات المباعة</span>
+                )}
                 {showAmounts && g.totalMinor > 0 && <> بقيمة <Money minor={g.totalMinor} /></>}
                 {g.examples.length > 0 && <span className="text-muted"> · {g.examples.join(" · ")}</span>}
               </li>
@@ -168,7 +173,7 @@ export function InventoryWorkspace({
                 <span className={`nums text-xs font-bold ${(l.varianceMilli ?? 0) < 0 ? "text-danger" : "text-ok"}`}>
                   {formatSignedQuantity(l.varianceMilli, l.baseUnit)}
                 </span>
-                <span className="nums w-16 text-xs text-muted">{formatBp(l.varianceBp)}</span>
+                <span className="nums w-16 text-xs text-muted">{formatBp(l.varianceConsumptionBp)}</span>
                 {showAmounts && (
                   <span className="nums w-24 text-end text-xs">
                     {l.varianceCostMinor === null ? "كلفةٌ غير معروفة" : <Money minor={l.varianceCostMinor} />}
@@ -185,6 +190,11 @@ export function InventoryWorkspace({
             جرعةً زائدة، أو ميزاناً غير معاير، أو شراءً لم يُقيَّد، أو
             نقلاً لم يُسجَّل. وتسميتُه «فاقداً» دعوى سببٍ بلا دليل.
           */}
+          <p className="mt-2 text-[11px] text-muted">
+            النسبةُ محسوبةٌ على <strong>الاستهلاك المتوقَّع</strong> — أي «كم ضاع ممّا كان
+            ينبغي أن يُصرَف». {valuationNote(report)}
+          </p>
+
           <p className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5 text-[11px] leading-relaxed text-ink-soft">
             هذا <strong>فرقُ جرد</strong> لا فاقد: الفرقُ الواحد قد يكون جرعةً أكبر ممّا في
             الوصفة، أو ميزاناً غير معاير، أو فاتورةَ شراءٍ لم تصل بعد، أو نقلاً لم يُسجَّل،
@@ -275,6 +285,19 @@ function Fact({ label, value }: { label: string; value: string }) {
       <dd className="nums text-sm font-bold">{value}</dd>
     </div>
   );
+}
+
+/**
+ * أساسُ التقييم يُقال مع الرقم.
+ *
+ * والمنهجُ الذي يتغيّر بين تقريرين بلا إعلانٍ يُفسد المقارنة: أسبوعٌ
+ * قُوِّم بمتوسّط شرائه وأسبوعٌ بآخر كلفةٍ معروفة ليسا على مقياسٍ واحد.
+ */
+function valuationNote(report: EngineReport): string {
+  const bases = new Set(report.lines.filter((l) => l.varianceCostMinor !== null).map((l) => l.valuationBasis));
+  if (bases.size === 0) return "";
+  if (bases.size === 1) return VALUATION_LABEL[[...bases][0]] + ".";
+  return "قُوِّم بعضُه بمتوسّط شراء الفترة وبعضُه بآخر كلفةٍ معروفة.";
 }
 
 /** رقمٌ بلا أصفارٍ زائدة — «٢» لا «٢٫٠٠٠». */
