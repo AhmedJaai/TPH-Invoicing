@@ -17,7 +17,7 @@ import { products, recipeIngredients, recipeVersions, recipes } from "@/db/schem
 import { recordAudit } from "@/lib/audit";
 import { isStoredUnit, type StoredUnit } from "@/lib/unit-conversion";
 import type { RecipeVersionInput } from "@/lib/inventory/recipe";
-import { recipeCost, type CostedIngredient } from "@/lib/inventory/recipe-cost";
+import { recipeCost, type CostedIngredient, type RecipeCost } from "@/lib/inventory/recipe-cost";
 import type { Conn } from "./types";
 
 export interface IngredientDraft {
@@ -333,8 +333,8 @@ export interface RecipeRow {
   ingredientCount: number;
   /** كلفةُ مكوّناتها بالهللات، و`null` إن جُهل مكوّنٌ واحد. */
   costMinor: number | null;
-  /** وما جُهلت كلفتُه بأسمائه — «لماذا لا رقمَ هنا». */
-  unknownCost: string[];
+  /** وما جُهلت كلفتُه بأسمائه وأسبابه — «لماذا لا رقمَ هنا». */
+  unknownCost: RecipeCost["unknown"];
   /** سعرُ بيعه عند نقاط البيع. */
   priceMinor: number | null;
   /** والكلفةُ التي يعلنها المصدر — تُقارَن ولا تحلّ محلّ الحساب. */

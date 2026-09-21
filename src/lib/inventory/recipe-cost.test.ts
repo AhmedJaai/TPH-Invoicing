@@ -60,7 +60,7 @@ describe("كلفةُ الوصفة من عبوات مكوّناتها", () => {
     const cost = recipeCost(ings);
 
     expect(cost.costMinor).toBeNull();
-    expect(cost.unknown).toEqual([ings[1].name]);
+    expect(cost.unknown).toEqual([{ name: ings[1].name, reason: "NO_COST" }]);
     /* وما عُرف يبقى معروضاً في سطره — فيُعرَف موضعُ النقص */
     expect(cost.lines.filter((l) => l.costMilliMinor !== null)).toHaveLength(3);
     expect(cost.lines.find((l) => l.reason === "NO_COST")!.name).toBe(ings[1].name);

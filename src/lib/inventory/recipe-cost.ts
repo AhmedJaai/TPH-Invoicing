@@ -46,8 +46,8 @@ export interface RecipeCost {
   costMilliMinor: number | null;
   costMinor: number | null;
   lines: CostedLine[];
-  /** أسماءُ ما جُهلت كلفتُه — «لماذا لا رقمَ هنا». */
-  unknown: string[];
+  /** ما جُهلت كلفتُه بأسمائه وأسبابه — «لماذا لا رقمَ هنا». */
+  unknown: { name: string; reason: NonNullable<CostedLine["reason"]> }[];
 }
 
 export const COST_REASON_LABEL: Record<NonNullable<CostedLine["reason"]>, string> = {
@@ -91,7 +91,9 @@ export function recipeCost(ingredients: readonly CostedIngredient[]): RecipeCost
     costMilliMinor: known ? total : null,
     costMinor: known ? milliMinorToMinor(total) : null,
     lines,
-    unknown: lines.filter((l) => l.reason !== null).map((l) => l.name),
+    unknown: lines
+      .filter((l) => l.reason !== null)
+      .map((l) => ({ name: l.name, reason: l.reason! })),
   };
 }
 

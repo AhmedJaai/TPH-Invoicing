@@ -11,7 +11,7 @@ import { RecipeEditor } from "@/components/recipe-editor";
 import { listRecipes, type RecipeRow } from "@/services/recipe.service";
 import { storedUnitLabel } from "@/lib/unit-conversion";
 import { Money } from "@/components/money";
-import { declaredCostDisagrees } from "@/lib/inventory/recipe-cost";
+import { COST_REASON_LABEL, declaredCostDisagrees } from "@/lib/inventory/recipe-cost";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
@@ -77,7 +77,14 @@ export default async function RecipesPage() {
       key: "cost", header: "كلفةُ المكوّنات", numeric: true,
       cell: (r) => (
         r.costMinor === null
-          ? <span className="text-[11px] text-muted" title={r.unknownCost.join("، ")}>غير معروفة</span>
+          ? (
+            <span
+              className="text-[11px] text-muted"
+              title={r.unknownCost.map((u) => `${u.name}: ${COST_REASON_LABEL[u.reason]}`).join(" · ")}
+            >
+              غير معروفة — {r.unknownCost.map((u) => u.name).join("، ")}
+            </span>
+          )
           : <Money minor={r.costMinor} />
       ),
     },
