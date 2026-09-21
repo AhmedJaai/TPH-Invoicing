@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import {
-  CountLockedError, OverlappingPeriodError, finaliseCount, recomputeCount, reopenCount,
+  CountLockedError, NotAWeekError, OverlappingPeriodError, finaliseCount, recomputeCount, reopenCount,
   saveActualCounts, startCount, type ActualInput,
 } from "@/services/inventory.service";
 import { decimalToMilli, toCanonical } from "@/lib/inventory/units";
@@ -151,7 +151,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "فعلٌ غير معروف" }, { status: 400 });
     }
   } catch (e) {
-    if (e instanceof CountLockedError || e instanceof OverlappingPeriodError) {
+    if (e instanceof CountLockedError || e instanceof OverlappingPeriodError || e instanceof NotAWeekError) {
       return NextResponse.json({ error: e.message }, { status: 409 });
     }
     const mapped = respondTo(e);

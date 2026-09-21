@@ -719,9 +719,39 @@ export const products = pgTable("products", {
    */
   isMenuItem: boolean("is_menu_item").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
+
+  /*
+    ── رمزُ فودكس نطاقان لا نطاق ──
+
+    `sk-0002` في كتالوج المنتجات «Espresso»، وفي كتالوج المخزون
+    «Colombia margo» — و٣٩ رمزاً من ٦٠ تحمل معنيين. فعمودٌ واحد
+    يجعل البنَّ هو الإسبريسو، بوصفةٍ تستهلك نفسَها.
+  */
+  foodicsItemSku: text("foodics_item_sku"),
+  foodicsProductSku: text("foodics_product_sku"),
+
+  /** وحدةُ التخزين كما كتبها المصدر: «كرتون»، «قالب» — تُعرَض ولا تُترجَم. */
+  catalogPackUnit: text("catalog_pack_unit"),
+  /** كم وحدةَ صرفٍ فيها، بالمِلّي: كرتونُ ٥٠٠ كاسٍ = ‏٥٠٠٬٠٠٠. */
+  catalogPackMilli: bigint("catalog_pack_milli", { mode: "number" }),
+  /**
+   * كلفةُ **وحدة التخزين** بالهللات — ولا يُحفَظ خارجُ القسمة.
+   *
+   * كرتونُ المصّاصات ٨٥ ريالاً لأربعة آلاف = ‏٢٫١٢٥ هللة للمصّاصة.
+   * فمن حفظ هللتين أسقط ٦٪، ومن حفظ ثلاثاً زاد ٤١٪.
+   */
+  catalogPackCostMinor: integer("catalog_pack_cost_minor"),
+  /** كلفةُ الصنف المباع كما يعلنها المصدر — تُقارَن بمجموع وصفته ولا تحلّ محلّه. */
+  catalogDeclaredCostMinor: integer("catalog_declared_cost_minor"),
+  catalogSyncedAt: timestamp("catalog_synced_at", { withTimezone: true }),
+
   createdAt: now(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("products_category_idx").on(t.category)]);
+}, (t) => [
+  index("products_category_idx").on(t.category),
+  uniqueIndex("products_foodics_item_sku_uniq").on(t.foodicsItemSku),
+  uniqueIndex("products_foodics_product_sku_uniq").on(t.foodicsProductSku),
+]);
 
 /**
  * صنف المورّد وربطه بالمعياري.
@@ -1143,6 +1173,8 @@ export const recipeVersions = pgTable("recipe_versions", {
   yieldQuantityMilli: milli("yield_quantity_milli"),
   yieldUnit: baseUnitEnum("yield_unit"),
   note: text("note"),
+  /** من أين جاءت: `HUMAN` لمن كتبها بيده، `FOODICS_CATALOG` لما استُورد. وما كتبه إنسانٌ لا يُكتَب فوقه. */
+  source: text("source"),
   createdById: text("created_by_id").references(() => users.id),
   activatedById: text("activated_by_id").references(() => users.id),
   activatedAt: timestamp("activated_at", { withTimezone: true }),
@@ -1255,7 +1287,10 @@ export const salesImportRows = pgTable("sales_import_rows", {
 export const inventoryCountStatusEnum = pgEnum("inventory_count_status", ["DRAFT", "FINALISED"]);
 
 export const valuationBasisEnum = pgEnum("valuation_basis", [
-  "PERIOD_WEIGHTED_AVERAGE", "LATEST_KNOWN", "UNKNOWN",
+  "PERIOD_WEIGHTED_AVERAGE", "LATEST_KNOWN",
+  /** كلفةُ كتالوج فودكس — معياريّةٌ يكتبها المقهى، لا ثمنٌ دُفع. وتأتي بعد الفاتورة. */
+  "CATALOG",
+  "UNKNOWN",
 ]);
 
 export const inventoryReadinessEnum = pgEnum("inventory_readiness", ["READY", "PARTIAL", "BLOCKED"]);
@@ -1319,7 +1354,10 @@ export const inventoryCountLines = pgTable("inventory_count_lines", {
   varianceConsumptionBp: integer("variance_consumption_bp"),
   /** ونسبةٌ ثانويّة إلى المخزون الختاميّ المتوقَّع — تُعرَض بجانبها. */
   varianceBp: integer("variance_bp"),
+  /** المعدَّلُ مقرَّباً — للعرض السريع. و٨٫٨ هللة للجرام تُعرَض «٩». */
   unitCostMinor: integer("unit_cost_minor"),
+  /** والمعدَّلُ بدقّته: مِلّي‑هللةٍ لوحدة الأساس. وعليه تُحسَب كلفةُ الفرق. */
+  unitCostMilliMinor: bigint("unit_cost_milli_minor", { mode: "number" }),
   /** بم قُوِّم الفرق — يُحفَظ مع الرقم ويُعرَض، فلا يتغيّر المنهجُ صامتاً. */
   valuationBasis: valuationBasisEnum("valuation_basis").notNull().default("UNKNOWN"),
   varianceCostMinor: integer("variance_cost_minor"),

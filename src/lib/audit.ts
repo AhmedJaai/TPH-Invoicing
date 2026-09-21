@@ -63,6 +63,8 @@ export type AuditAction =
   | "ALERT_RESOLVED"
   /* ── الجرد وتسوية المخزون ── */
   | "SALES_IMPORTED"
+  /* كتالوجُ فودكس: الأصنافُ والعبواتُ والوصفات */
+  | "CATALOG_IMPORTED"
   | "POS_PRODUCT_MAPPED"
   | "POS_PRODUCT_UNMAPPED"
   | "RECIPE_CREATED"

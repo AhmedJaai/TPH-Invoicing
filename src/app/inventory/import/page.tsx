@@ -8,6 +8,8 @@ import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Badge, EmptyState, NoAccess, Section, buttonClass } from "@/components/ui";
 import { InventoryImport } from "@/components/inventory-import";
+import { CatalogImport } from "@/components/catalog-import";
+import { lastCompleteWeek, nextWeek } from "@/lib/inventory/week";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +66,16 @@ export default async function SalesImportPage() {
       actions={<Link href="/inventory/mapping" className={buttonClass("secondary", "sm")}>منتجات تحتاج ربطاً</Link>}
     >
       <InventoryImport canImport={can(user.role, "inventory:count")} />
+
+      <Section
+        title="الكتالوج: الأصناف والعبوات والوصفات"
+        hint="ما يُباع، وما يُخزَّن، وكم يدخل كلَّ مشروب — وبه تُحسَب كلفةُ الفرق."
+      >
+        <CatalogImport
+          canEdit={can(user.role, "recipe:edit")}
+          defaultFrom={nextWeek(lastCompleteWeek()).start}
+        />
+      </Section>
 
       <Section title="ما استُورد من قبل">
         {rows.length === 0 ? (

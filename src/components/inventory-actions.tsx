@@ -5,8 +5,18 @@ import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
 import { ConfirmAction } from "./ui-client";
+import { shiftDays, weekOf, type Week } from "@/lib/inventory/week";
 
-/** يبدأ جرداً لفترةٍ يختارها صاحبُ العمل. */
+/**
+ * يبدأ جردَ أسبوع.
+ *
+ * ── ولا يُختار تاريخان حرّان ──
+ *
+ * الجردُ أسبوعٌ من الأحد إلى السبت، فالشاشةُ تُظهر أسبوعاً وتتنقّل
+ * بينه وبين جيرانه. وحقلا تاريخٍ حرّان يسمحان بفترةٍ تترك يومين خارج
+ * كلّ جرد — ثمّ يردّها الخادمُ بعد الضغط. **والمنعُ قبل الفعل خيرٌ من
+ * رسالة خطأ بعده.**
+ */
 export function StartCount({
   defaultStart,
   defaultEnd,
@@ -17,19 +27,21 @@ export function StartCount({
   branches: { id: string; name: string }[];
 }) {
   const router = useRouter();
-  const [start, setStart] = useState(defaultStart);
-  const [end, setEnd] = useState(defaultEnd);
+  const [week, setWeek] = useState<Week>({ start: defaultStart, end: defaultEnd });
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /* لا يُقترَح أسبوعٌ لم ينتهِ — فالفرقُ فيه أيّامٌ لم تمضِ لا فاقد */
+  const atLatest = week.start >= defaultStart;
 
   async function begin() {
     setBusy(true);
     setError(null);
     const r = await postJson<{ countId: string }>("/api/inventory/count", {
       action: "start",
-      periodStart: start,
-      periodEnd: end,
+      periodStart: week.start,
+      periodEnd: week.end,
       branchId: branchId || null,
     });
     setBusy(false);
@@ -43,26 +55,38 @@ export function StartCount({
 
   return (
     <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
-      <h3 className="font-display text-base font-bold">ابدأ جرداً جديداً</h3>
+      <h3 className="font-display text-base font-bold">ابدأ جردَ أسبوع</h3>
       <p className="mt-1 text-xs leading-relaxed text-muted">
-        اختر الفترة، ويُهيَّأ لك ما بِيع فيها وما اشتُريت. ثمّ تُدخل العدّ الفعليّ وحده.
+        الأسبوعُ من الأحد إلى تقفيلة السبت. يُهيَّأ لك ما بِيع فيه وما اشتُري، ثمّ
+        تُدخل العدّ الفعليّ وحده.
       </p>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <label className="block">
-          <span className="block text-[11px] text-muted">من</span>
-          <input
-            type="date" value={start} onChange={(e) => setStart(e.target.value)}
-            className="nums mt-1 min-h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm"
-          />
-        </label>
-        <label className="block">
-          <span className="block text-[11px] text-muted">إلى</span>
-          <input
-            type="date" value={end} onChange={(e) => setEnd(e.target.value)}
-            className="nums mt-1 min-h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm"
-          />
-        </label>
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <div className="min-w-0 flex-1">
+          <span className="block text-[11px] text-muted">الأسبوع</span>
+          <div className="mt-1 flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="الأسبوع السابق"
+              onClick={() => setWeek(weekOf(shiftDays(week.start, -7)))}
+              className={buttonClass("secondary", "sm")}
+            >
+              ‹ السابق
+            </button>
+            <span className="nums-col min-w-0 flex-1 truncate rounded-xl border border-line bg-canvas px-3 py-2.5 text-center text-sm font-bold">
+              {week.start} → {week.end}
+            </span>
+            <button
+              type="button"
+              aria-label="الأسبوع التالي"
+              disabled={atLatest}
+              onClick={() => setWeek(weekOf(shiftDays(week.start, 7)))}
+              className={buttonClass("secondary", "sm")}
+            >
+              التالي ›
+            </button>
+          </div>
+        </div>
         {branches.length > 0 && (
           <label className="block">
             <span className="block text-[11px] text-muted">الفرع</span>
@@ -77,9 +101,12 @@ export function StartCount({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button type="button" onClick={begin} disabled={busy || !start || !end} className={buttonClass("primary")}>
-          {busy ? "يُهيَّأ…" : "ابدأ جرداً جديداً"}
+        <button type="button" onClick={begin} disabled={busy} className={buttonClass("primary")}>
+          {busy ? "يُهيَّأ…" : "ابدأ جردَ هذا الأسبوع"}
         </button>
+        {atLatest && (
+          <span className="text-[11px] text-muted">هذا آخرُ أسبوعٍ اكتمل.</span>
+        )}
         {error && <span className="text-xs text-danger">{error}</span>}
       </div>
     </div>

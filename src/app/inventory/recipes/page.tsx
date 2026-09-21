@@ -10,6 +10,8 @@ import { Badge, Card, DataTable, EmptyState, NoAccess, Section, buttonClass, typ
 import { RecipeEditor } from "@/components/recipe-editor";
 import { listRecipes, type RecipeRow } from "@/services/recipe.service";
 import { storedUnitLabel } from "@/lib/unit-conversion";
+import { Money } from "@/components/money";
+import { declaredCostDisagrees } from "@/lib/inventory/recipe-cost";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
@@ -71,8 +73,39 @@ export default async function RecipesPage() {
       ),
     },
     { key: "ingredients", header: "مكوّنات", numeric: true, cell: (r) => <span className="nums">{r.ingredientCount}</span> },
+    {
+      key: "cost", header: "كلفةُ المكوّنات", numeric: true,
+      cell: (r) => (
+        r.costMinor === null
+          ? <span className="text-[11px] text-muted" title={r.unknownCost.join("، ")}>غير معروفة</span>
+          : <Money minor={r.costMinor} />
+      ),
+    },
+    {
+      key: "price", header: "سعرُ البيع", numeric: true, secondary: true,
+      cell: (r) => (r.priceMinor === null ? <span className="text-muted">—</span> : <Money minor={r.priceMinor} />),
+    },
+    {
+      key: "margin", header: "الفرق", numeric: true,
+      cell: (r) => (
+        r.costMinor === null || r.priceMinor === null
+          ? <span className="text-muted">—</span>
+          : <Money minor={r.priceMinor - r.costMinor} />
+      ),
+    },
     { key: "versions", header: "عددُ النسخ", numeric: true, secondary: true, cell: (r) => <span className="nums">{r.versions}</span> },
   ];
+
+  /*
+    ── وصفةٌ فيها التغليفُ وحدَه ──
+
+    الكلفةُ المعلَنة عند المصدر تخالف مجموعَ الوصفة مخالفةً كبيرة.
+    وذلك يقع حين يسقط **جوهرُ الصنف** من وصفته: «تشيز مدريد» وصفتُه
+    شوكةٌ وعلبةٌ بـ٠٫٧٦ ريالاً والمعلَنة ٩٫١٧ — والكعكةُ ليست فيها.
+    فكلُّ قطعةٍ تُباع لا تُخصَم من المخزون، ويظهر ما اشتُري منها
+    كلُّه «فرقاً» في آخر الأسبوع.
+  */
+  const suspicious = rows.filter((r) => declaredCostDisagrees(r.costMinor, r.declaredCostMinor));
 
   return (
     <PageShell
@@ -92,6 +125,28 @@ export default async function RecipesPage() {
           <p className="mt-2 text-xs">
             {missing.rows.map((r) => String(r.name_ar)).join(" · ")}
           </p>
+        </Card>
+      )}
+
+      {suspicious.length > 0 && (
+        <Card tone="warn" className="mt-4">
+          <p className="text-sm font-bold">
+            {suspicious.length} وصفةً كلفتُها أبعدُ من الكلفة المعلَنة عند فودكس
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            وأكثرُ ما يسبّبه أنّ جوهرَ الصنف ليس في وصفته — تُحسَب العلبةُ والشوكة ولا
+            تُحسَب الكعكة. فلا يُخصَم المبيعُ من المخزون، ويظهر ما اشتُري كلُّه «فرقاً».
+          </p>
+          <ul className="mt-2 space-y-1 text-xs">
+            {suspicious.map((r) => (
+              <li key={r.recipeId} className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-bold">{r.menuProductName}</span>
+                <span className="text-muted">
+                  وصفتُه <Money minor={r.costMinor!} /> والمعلَنة <Money minor={r.declaredCostMinor!} />
+                </span>
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
 

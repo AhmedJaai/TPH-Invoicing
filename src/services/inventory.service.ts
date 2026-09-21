@@ -21,15 +21,17 @@ import {
   inventoryMovements, products, wasteRecords,
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
+import { MILLI_MINOR } from "@/lib/money";
 import { createHash } from "node:crypto";
 import { isStoredUnit, type StoredUnit } from "@/lib/unit-conversion";
-import { toCanonical } from "@/lib/inventory/units";
+import { MILLI, toCanonical } from "@/lib/inventory/units";
 import { ENGINE_VERSION, reconcile, type CountedProduct, type EngineInput, type EngineReport } from "@/lib/inventory/engine";
 import type { Conn } from "./types";
 import type { SoldLineInput } from "@/lib/inventory/consumption";
 import type { PurchaseLineInput } from "@/lib/inventory/purchases";
 import { purchaseQuantity } from "@/lib/inventory/purchases";
 import { loadRecipeVersions } from "./recipe.service";
+import { isInventoryWeek, weekLabel, weekOf } from "@/lib/inventory/week";
 
 /** كم يوماً يُنظَر إلى الوراء بحثاً عن آخر كلفةٍ معروفة حين لا شراءَ في الفترة. */
 const COST_LOOKBACK_DAYS = 180;
@@ -52,6 +54,22 @@ const RECEIPT_AMBIGUITY_DAYS = 3;
 /**
  * فترةٌ تتقاطع مع جردٍ قائم — وتُسمّى فترتُه كي يُعرَف أين الاصطدام.
  */
+/**
+ * فترةٌ ليست أسبوعَ جرد — والسلسلةُ تنقطع بها.
+ *
+ * وتُقترَح الفترةُ الصحيحة في الرسالة: من رفضتَ عليه فعلاً قُل له ما
+ * الصواب، وإلّا صار الرفضُ حاجزاً بلا مخرج.
+ */
+export class NotAWeekError extends Error {
+  constructor(readonly suggestion: { start: string; end: string }) {
+    super(
+      `الجردُ أسبوعٌ من الأحد إلى السبت — وهذه الفترة ليست كذلك.`
+      + ` أقربُ أسبوعٍ يحويها: ${weekLabel(suggestion)}.`,
+    );
+    this.name = "NotAWeekError";
+  }
+}
+
 export class OverlappingPeriodError extends Error {
   constructor(readonly periodStart: string, readonly periodEnd: string) {
     super(`هذه الفترة تتقاطع مع جردٍ آخر (${periodStart} → ${periodEnd}) — اختر فترةً تبدأ بعده.`);
@@ -360,7 +378,7 @@ async function loadWaste(
   return out;
 }
 
-/** كلفةُ الوحدة من آخر شراءٍ معروفِ الكمّيّة قبل الفترة. */
+/** معدَّلُ كلفةِ الوحدة من آخر شراءٍ معروفِ الكمّيّة قبل الفترة — بمِلّي‑الهللة. */
 function fallbackCosts(
   lookback: readonly PurchaseLineInput[],
   baseUnitOf: ReadonlyMap<string, StoredUnit>,
@@ -374,7 +392,42 @@ function fallbackCosts(
     const q = purchaseQuantity(line, base);
     if (!q.known || q.canonicalMilli <= 0 || line.lineTotalMinor <= 0) continue;
     const perBaseUnit = toCanonical(1000, base);
-    out.set(line.productId, Math.round(line.lineTotalMinor / (q.canonicalMilli / perBaseUnit)));
+    /* بمِلّي‑الهللة: المعدَّلُ قد يكون كسراً، ولا يُقرَّب قبل أن يُضرَب في الكمّيّة */
+    out.set(line.productId, Math.round((line.lineTotalMinor * MILLI_MINOR) / (q.canonicalMilli / perBaseUnit)));
+  }
+  return out;
+}
+
+/**
+ * كلفةُ الكتالوج المعياريّة — بمِلّي‑الهللة لوحدة الأساس.
+ *
+ * وهي العبوةُ وكلفتُها كما كتبهما المقهى في نقاط البيع: كرتونٌ فيه
+ * ‏٥٠٠ كاسٍ بـ٢١٥ ريالاً. والقسمةُ تقع هنا لا عند الحفظ، فتُحفَظ
+ * الثلاثةُ كما هي ولا يُحفَظ خارجُ قسمتها.
+ *
+ * ولا تُستعمَل إلّا حين لا فاتورةَ: **الفاتورةُ واقعةٌ والكتالوجُ
+ * تقدير.**
+ */
+async function catalogCosts(
+  baseUnitOf: ReadonlyMap<string, StoredUnit>,
+  conn: Conn,
+): Promise<Map<string, number | null>> {
+  const rows = await conn
+    .select({
+      id: products.id,
+      packMilli: products.catalogPackMilli,
+      packCostMinor: products.catalogPackCostMinor,
+    })
+    .from(products)
+    .where(sql`${products.catalogPackMilli} is not null and ${products.catalogPackCostMinor} is not null`);
+
+  const out = new Map<string, number | null>();
+  for (const r of rows) {
+    const packMilli = Number(r.packMilli);
+    const cost = Number(r.packCostMinor);
+    if (!baseUnitOf.has(r.id) || packMilli <= 0 || cost <= 0) continue;
+    /* المعامِلُ بوحدة الصرف نفسِها، وهي وحدةُ الأساس — فلا تحويلَ بينهما */
+    out.set(r.id, Math.round((MILLI * cost * MILLI_MINOR) / packMilli));
   }
   return out;
 }
@@ -409,6 +462,7 @@ export async function buildEngineInput(
   const opening = await loadOpening(periodStart, branchId, productIds, conn);
   const movements = await loadMovements(periodStart, periodEnd, branchId, conn);
   const waste = await loadWaste(periodStart, periodEnd, branchId, conn);
+  const catalog = await catalogCosts(baseUnitOf, conn);
 
   return {
     periodStart,
@@ -424,6 +478,7 @@ export async function buildEngineInput(
     wasteByProduct: waste,
     actualByProduct: actuals,
     fallbackCostByProduct: fallbackCosts(purchases.lookback, baseUnitOf),
+    catalogCostByProduct: catalog,
   };
 }
 
@@ -487,6 +542,16 @@ export interface StartCountInput {
  */
 export async function startCount(input: StartCountInput, conn: Conn = db): Promise<{ countId: string; created: boolean }> {
   if (input.periodEnd < input.periodStart) throw new Error("نهايةُ الفترة قبل بدايتها");
+  /*
+    ── الأسبوعُ من الأحد إلى السبت، ويُفرَض هنا ──
+
+    لأنّ فعليَّ الأسبوع هو افتتاحيُّ الذي يليه: فترةٌ تبدأ الأربعاء
+    تترك يومين خارج كلّ جرد، أو تُدخلهما في جردين. والمؤثِّرُ في
+    القاعدة يمنع التداخل، وهذا يمنع الفجوة.
+  */
+  if (!isInventoryWeek(input.periodStart, input.periodEnd)) {
+    throw new NotAWeekError(weekOf(input.periodStart));
+  }
 
   const clash = await conn.execute<{ id: string; period_start: string; period_end: string }>(sql`
     select id, period_start, period_end from inventory_counts
@@ -573,6 +638,7 @@ async function persistLines(countId: string, report: EngineReport, conn: Conn): 
       varianceConsumptionBp: l.varianceConsumptionBp,
       varianceBp: l.varianceBp,
       unitCostMinor: l.unitCostMinor,
+      unitCostMilliMinor: l.unitCostMilliMinor,
       valuationBasis: l.valuationBasis,
       varianceCostMinor: l.varianceCostMinor,
       flags: l.flags as never,
@@ -597,6 +663,7 @@ async function persistLines(countId: string, report: EngineReport, conn: Conn): 
             varianceConsumptionBp: sql`excluded.variance_consumption_bp`,
             varianceBp: sql`excluded.variance_bp`,
             unitCostMinor: sql`excluded.unit_cost_minor`,
+            unitCostMilliMinor: sql`excluded.unit_cost_milli_minor`,
             valuationBasis: sql`excluded.valuation_basis`,
             varianceCostMinor: sql`excluded.variance_cost_minor`,
             flags: sql`excluded.flags`,
@@ -834,6 +901,7 @@ export async function readFrozenReport(header: CountHeader, conn: Conn = db): Pr
     varianceConsumptionBp: num(r.variance_consumption_bp),
     varianceBp: num(r.variance_bp),
     unitCostMinor: num(r.unit_cost_minor),
+    unitCostMilliMinor: num(r.unit_cost_milli_minor),
     valuationBasis: (r.valuation_basis ?? "UNKNOWN") as EngineReport["lines"][number]["valuationBasis"],
     varianceCostMinor: num(r.variance_cost_minor),
     flags: (Array.isArray(r.flags) ? r.flags : []) as EngineReport["lines"][number]["flags"],

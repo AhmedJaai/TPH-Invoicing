@@ -11,7 +11,7 @@ import { importSalesFile } from "./sales-import.service";
 import { mapPosProducts } from "./pos-mapping.service";
 import { saveRecipeVersion } from "./recipe.service";
 import {
-  CountLockedError, OverlappingPeriodError, finaliseCount, itemHistory, loadCountHeader,
+  CountLockedError, NotAWeekError, finaliseCount, itemHistory, loadCountHeader,
   readFrozenReport, recomputeCount, reopenCount, saveActualCounts, startCount, unmappedPosProducts,
 } from "./inventory.service";
 import { recordWaste } from "./inventory-movement.service";
@@ -234,14 +234,14 @@ describe("الجرد من طرفه إلى طرفه", () => {
       /* رصيدٌ افتتاحيّ صريح ٥ كجم */
       await tx.execute(sql`
         insert into inventory_movements (id, product_id, branch_id, kind, quantity_milli, unit, occurred_on, created_by_id)
-        values (${`mv-${Math.random()}`}, ${coffee}, ${branchId}, 'OPENING', ${5000}, 'KG', '2026-09-01', ${actorId})
+        values (${`mv-${Math.random()}`}, ${coffee}, ${branchId}, 'OPENING', ${5000}, 'KG', '2026-08-30', ${actorId})
       `);
 
       /* شراءُ ٢٠ كجم بـ‏١٬٥٠٠ ريالاً */
       await makePurchase(tx, coffee, "2026-09-02", 1500_00, { packSize: "1", contentUnit: "KG", contentQuantity: "20", qty: "1" });
 
       const { countId } = await startCount({
-        periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId, actorId,
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId, actorId,
       }, tx);
 
       const report = await saveActualCounts(countId, [{ productId: coffee, actualMilli: kg(20.5) }], actorId, tx);
@@ -273,11 +273,11 @@ describe("الجرد من طرفه إلى طرفه", () => {
       await importAndMap(tx, salesFile(100), actorId, latte, branch.nameAr);
       await tx.execute(sql`
         insert into inventory_movements (id, product_id, branch_id, kind, quantity_milli, unit, occurred_on, created_by_id)
-        values (${`mv-${Math.random()}`}, ${coffee}, ${branchId}, 'OPENING', ${5000}, 'KG', '2026-09-01', ${actorId})
+        values (${`mv-${Math.random()}`}, ${coffee}, ${branchId}, 'OPENING', ${5000}, 'KG', '2026-08-30', ${actorId})
       `);
 
       const { countId } = await startCount({
-        periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId, actorId,
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId, actorId,
       }, tx);
 
       const before = await saveActualCounts(countId, [{ productId: coffee, actualMilli: kg(2.5) }], actorId, tx);
@@ -321,7 +321,7 @@ describe("الجرد من طرفه إلى طرفه", () => {
       await importAndMap(tx, salesFile(50, "2026-09-03", "OTHER"), actorId, latte, other.nameAr);
 
       const { countId } = await startCount({
-        periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId: mine.id, actorId,
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: mine.id, actorId,
       }, tx);
       const report = await recomputeCount(countId, tx);
 
@@ -333,7 +333,7 @@ describe("الجرد من طرفه إلى طرفه", () => {
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branchId = (await makeBranch(tx)).id;
-      const input = { periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId, actorId };
+      const input = { periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId, actorId };
 
       const first = await startCount(input, tx);
       const second = await startCount(input, tx);
@@ -349,27 +349,40 @@ describe("الجرد من طرفه إلى طرفه", () => {
     القاعدة بمؤثِّر (`037`) **ويُقال في الخدمة بلغةٍ تُقرأ** — فرسالةُ
     Postgres ليست جواباً لصاحب المقهى.
   */
-  it("وفترةٌ تتقاطع مع جردٍ قائم تُردّ — ومعها فترتُه", () =>
+  /*
+    ── والأسبوعُ يمنع التداخلَ من أصله ──
+
+    أسابيعُ الأحد‑إلى‑السبت إمّا أن تتطابق وإمّا أن تنفصل — فلا
+    تتقاطعان في يومٍ واحد أبداً. فالحارسُ عند الباب هو **شكلُ
+    الفترة**، وهو أقوى: يردّ ٥ → ١١ سبتمبر قبل أن يسأل عن جردٍ آخر،
+    ومعه الأسبوعُ الصحيح كي لا يكون الرفضُ حاجزاً بلا مخرج.
+
+    ومؤثِّرُ `037` يبقى خلفه لمن كتب في القاعدة مباشرةً — يُثبته
+    `db:verify`.
+  */
+  it("وفترةٌ ليست أسبوعاً تُردّ، ومعها الأسبوعُ الصحيح", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branchId = (await makeBranch(tx)).id;
 
-      await startCount({ periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId, actorId }, tx);
+      await startCount({ periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId, actorId }, tx);
       const e = await caught(startCount(
         { periodStart: "2026-09-05", periodEnd: "2026-09-11", branchId, actorId }, tx,
       ));
 
-      expect(e).toBeInstanceOf(OverlappingPeriodError);
-      expect((e as Error).message).toContain("2026-09-07");
+      expect(e).toBeInstanceOf(NotAWeekError);
+      /* ويُقترَح الأسبوعُ الذي يحوي بدايتَها: ٣٠ أغسطس → ٥ سبتمبر */
+      expect((e as Error).message).toContain("2026-08-30");
+      expect((e as Error).message).toContain("2026-09-05");
     }));
 
-  it("والملاصقةُ مقبولة — الثامنُ يبدأ بعد السابع", () =>
+  it("والأسبوعُ التالي يُقبَل — السادسُ يبدأ بعد الخامس", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branchId = (await makeBranch(tx)).id;
 
-      const first = await startCount({ periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId, actorId }, tx);
-      const second = await startCount({ periodStart: "2026-09-08", periodEnd: "2026-09-14", branchId, actorId }, tx);
+      const first = await startCount({ periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId, actorId }, tx);
+      const second = await startCount({ periodStart: "2026-09-06", periodEnd: "2026-09-12", branchId, actorId }, tx);
 
       expect(second.created).toBe(true);
       expect(second.countId).not.toBe(first.countId);
@@ -380,7 +393,7 @@ describe("الجرد من طرفه إلى طرفه", () => {
       const actorId = await makeActor(tx);
       const mine = (await makeBranch(tx)).id;
       const other = (await makeBranch(tx)).id;
-      const period = { periodStart: "2026-09-01", periodEnd: "2026-09-07", actorId };
+      const period = { periodStart: "2026-08-30", periodEnd: "2026-09-05", actorId };
 
       const a = await startCount({ ...period, branchId: mine }, tx);
       const b = await startCount({ ...period, branchId: other }, tx);
@@ -408,11 +421,11 @@ describe("التقريرُ المقفَل لا يتغيّر", () => {
       await importAndMap(tx, salesFile(100), actorId, latte, branch.nameAr);
       await tx.execute(sql`
         insert into inventory_movements (id, product_id, branch_id, kind, quantity_milli, unit, occurred_on, created_by_id)
-        values (${`mv-${Math.random()}`}, ${coffee}, ${branchId}, 'OPENING', ${5000}, 'KG', '2026-09-01', ${actorId})
+        values (${`mv-${Math.random()}`}, ${coffee}, ${branchId}, 'OPENING', ${5000}, 'KG', '2026-08-30', ${actorId})
       `);
 
       const { countId } = await startCount({
-        periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId, actorId,
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId, actorId,
       }, tx);
       await saveActualCounts(countId, [{ productId: coffee, actualMilli: kg(2.5) }], actorId, tx);
 
@@ -439,7 +452,7 @@ describe("التقريرُ المقفَل لا يتغيّر", () => {
       await isolateProducts(tx, [coffee]);
 
       const { countId } = await startCount({
-        periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId: null, actorId,
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: null, actorId,
       }, tx);
       await recomputeCount(countId, tx);
       await finaliseCount(countId, actorId, tx);
@@ -459,7 +472,7 @@ describe("التقريرُ المقفَل لا يتغيّر", () => {
       await isolateProducts(tx, [coffee]);
 
       const { countId } = await startCount({
-        periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId: null, actorId,
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: null, actorId,
       }, tx);
       await recomputeCount(countId, tx);
       await finaliseCount(countId, actorId, tx);
@@ -475,7 +488,7 @@ describe("التقريرُ المقفَل لا يتغيّر", () => {
       await isolateProducts(tx, [coffee]);
 
       const { countId } = await startCount({
-        periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId: null, actorId,
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: null, actorId,
       }, tx);
       await recomputeCount(countId, tx);
       await finaliseCount(countId, actorId, tx);
@@ -493,7 +506,7 @@ describe("التقريرُ المقفَل لا يتغيّر", () => {
       await isolateProducts(tx, [coffee]);
 
       const { countId } = await startCount({
-        periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId: null, actorId,
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: null, actorId,
       }, tx);
       await recomputeCount(countId, tx);
       await finaliseCount(countId, actorId, tx);
@@ -587,7 +600,7 @@ describe("الافتتاحيُّ من آخر جردٍ مقفَل", () => {
       await isolateProducts(tx, [coffee]);
 
       const first = await startCount({
-        periodStart: "2026-09-01", periodEnd: "2026-09-07", branchId, actorId,
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId, actorId,
       }, tx);
       const firstReport = await recomputeCount(first.countId, tx);
       /* لا جردَ سابقٌ ولا رصيدٌ مكتوب ⇒ الافتتاحيُّ **غير معروف** لا صفر */
@@ -598,7 +611,7 @@ describe("الافتتاحيُّ من آخر جردٍ مقفَل", () => {
       await finaliseCount(first.countId, actorId, tx);
 
       const second = await startCount({
-        periodStart: "2026-09-08", periodEnd: "2026-09-14", branchId, actorId,
+        periodStart: "2026-09-06", periodEnd: "2026-09-12", branchId, actorId,
       }, tx);
       const secondReport = await recomputeCount(second.countId, tx);
       expect(canonicalToQuantity(secondReport.lines[0].openingMilli!, "KG")).toBe(8);
@@ -612,7 +625,7 @@ describe("الافتتاحيُّ من آخر جردٍ مقفَل", () => {
       const coffee = await makeStockProduct(tx, "بنّ", "KG", "COFFEE");
       await isolateProducts(tx, [coffee]);
 
-      for (const [from, to] of [["2026-09-01", "2026-09-07"], ["2026-09-08", "2026-09-14"]]) {
+      for (const [from, to] of [["2026-08-30", "2026-09-05"], ["2026-09-06", "2026-09-12"]]) {
         const c = await startCount({ periodStart: from, periodEnd: to, branchId, actorId }, tx);
         await saveActualCounts(c.countId, [{ productId: coffee, actualMilli: kg(8) }], actorId, tx);
         await finaliseCount(c.countId, actorId, tx);
@@ -620,7 +633,7 @@ describe("الافتتاحيُّ من آخر جردٍ مقفَل", () => {
 
       const history = await itemHistory(coffee, 12, tx);
       expect(history).toHaveLength(2);
-      expect(history[0].periodEnd).toBe("2026-09-14");
+      expect(history[0].periodEnd).toBe("2026-09-12");
       expect(history[0].baseUnit).toBe("KG");
     }));
 });

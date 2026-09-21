@@ -1,0 +1,143 @@
+﻿product_sku,product_name,product_name_localized,inventory_item_sku,inventory_item_name,inventory_item_name_localized,quantity,unit,ingredient_cost
+sk-0059,"Iced V60 Colombia",,sk-0002,"Colombia margo",,20,جرام,1.925
+sk-0062,"Hot V60 Colombia",,sk-0002,"Colombia margo",,15,جرام,1.44375
+sk-0058,"Iced V60 Ethiopia",,sk-0003,"Ethiopia guji",,20,جرام,1.76
+sk-0061,"Hot V60 Ethiopia",,sk-0003,"Ethiopia guji",,15,جرام,1.32
+sk-0060,"Iced V60 Indonesia",,sk-0005,"Indonesia sumatra",,20,جرام,1.8
+sk-0063,"Hot V60 Indonesia",,sk-0005,"Indonesia sumatra",,15,جرام,1.35
+sk-0012,Karkade,,sk-0006,Karkade,,8.5,جرام,0.2125
+sk-0009,"Iced latte",,sk-0007,مصاصات,,1,حبه,0.02125
+sk-0010,"Iced Americano",,sk-0007,مصاصات,,1,حبه,0.02125
+sk-0011,Kombucha,,sk-0007,مصاصات,,1,حبه,0.02125
+sk-0012,Karkade,,sk-0007,مصاصات,,1,حبه,0.02125
+sk-0051,"Iced Spanish latte",,sk-0007,مصاصات,,1,حبه,0.02125
+sk-0067,"Iced tea",,sk-0007,مصاصات,,1,حبه,0.02125
+sk-0081,Infusion,,sk-0007,مصاصات,,1,حبه,0.02125
+sk-0003,Piclo,,sk-0008,"حليب نادك",,0.1,لتر,0.62857142857143
+sk-0004,Cortado,,sk-0008,"حليب نادك",,0.12,لتر,0.75428571428571
+sk-0005,"Flat white",,sk-0008,"حليب نادك",,0.14,لتر,0.88
+sk-0006,Cappuccino,,sk-0008,"حليب نادك",,0.18,لتر,1.1314285714286
+sk-0007,Latte,,sk-0008,"حليب نادك",,0.28,لتر,1.76
+sk-0009,"Iced latte",,sk-0008,"حليب نادك",,0.18,لتر,1.1314285714286
+sk-0013,Matcha,,sk-0008,"حليب نادك",,0.12,لتر,0.75428571428571
+sk-0051,"Iced Spanish latte",,sk-0008,"حليب نادك",,0.14,لتر,0.88
+sk-0055,Macchiato,,sk-0008,"حليب نادك",,0.04,لتر,0.25142857142857
+sk-0056,"Hot Spanish latte",,sk-0008,"حليب نادك",,0.22,لتر,1.3828571428571
+sk-0022,"Crunchy cake",,sk-0009,شوك,,2,حبه,0.16
+sk-0023,"Madrid Cheesecake",,sk-0009,شوك,,2,حبه,0.16
+sk-0024,Dolce,,sk-0009,شوك,,2,حبه,0.16
+sk-0025,"Truffle mango",,sk-0009,شوك,,2,حبه,0.16
+sk-0066,Tiramisu,,sk-0009,شوك,,2,حبه,0.16
+sk-0007,Latte,,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0008,Americano,,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0010,"Iced Americano",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0011,Kombucha,,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0012,Karkade,,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0013,Matcha,,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0026,"Iced Coffee Of The Day",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0056,"Hot Spanish latte",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0058,"Iced V60 Ethiopia",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0059,"Iced V60 Colombia",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0060,"Iced V60 Indonesia",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0061,"Hot V60 Ethiopia",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0062,"Hot V60 Colombia",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0063,"Hot V60 Indonesia",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0070,"Iced V60 Colombia grapes",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0081,Infusion,,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0083,"Iced V60 Brazil chocolate",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0085,"Iced V60 Colombia coconut",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0087,"Iced V60 Colombia decaf",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0088,"Hot V60 Colombia decaf",,sk-0018,"كاسات ١٢ اونص",,1,حبة,0.43
+sk-0006,Cappuccino,,sk-0019,"كاسات ١٠ اونص",,1,حبة,0.42
+sk-0040,Alfredo,,sk-0019,"كاسات ١٠ اونص",,1,حبة,0.42
+sk-0069,"Hot Coffee of The Day",,sk-0019,"كاسات ١٠ اونص",,1,حبة,0.42
+sk-0071,"Hot V60 Colombia grapes",,sk-0019,"كاسات ١٠ اونص",,1,حبة,0.42
+sk-0084,"Hot V60 Brazil chocolate",,sk-0019,"كاسات ١٠ اونص",,1,حبة,0.42
+sk-0086,"Hot V60 Colombia coconut",,sk-0019,"كاسات ١٠ اونص",,1,حبة,0.42
+sk-0088,"Hot V60 Colombia decaf",,sk-0019,"كاسات ١٠ اونص",,1,حبة,0.42
+sk-0051,"Iced Spanish latte",,sk-0020,نستله,,30,جرام,0.66324324324324
+sk-0056,"Hot Spanish latte",,sk-0020,نستله,,50,جرام,1.1054054054054
+sk-0013,Matcha,,sk-0023,"سيرب فانيلا",,0.015,لتر,0.72
+sk-0051,"Iced Spanish latte",,sk-0023,"سيرب فانيلا",,0.01,لتر,0.48
+sk-0056,"Hot Spanish latte",,sk-0023,"سيرب فانيلا",,0.01,لتر,0.48
+sk-0058,"Iced V60 Ethiopia",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0059,"Iced V60 Colombia",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0060,"Iced V60 Indonesia",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0061,"Hot V60 Ethiopia",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0062,"Hot V60 Colombia",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0063,"Hot V60 Indonesia",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0070,"Iced V60 Colombia grapes",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0071,"Hot V60 Colombia grapes",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0083,"Iced V60 Brazil chocolate",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0084,"Hot V60 Brazil chocolate",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0085,"Iced V60 Colombia coconut",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0086,"Hot V60 Colombia coconut",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0087,"Iced V60 Colombia decaf",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0088,"Hot V60 Colombia decaf",,sk-0024,"فلتر  قهوة مقطرة",,1,حبة,0.19
+sk-0013,Matcha,,sk-0025,"ماتشا خام",,4,جرام,2.60868
+sk-0012,Karkade,,sk-0027,سكر,,0.02,كيلو,0.1
+sk-0081,Infusion,,sk-0027,سكر,,0.01,كيلو,0.05
+sk-0006,Cappuccino,,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0007,Latte,,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0008,Americano,,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0010,"Iced Americano",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0012,Karkade,,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0013,Matcha,,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0026,"Iced Coffee Of The Day",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0040,Alfredo,,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0056,"Hot Spanish latte",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0058,"Iced V60 Ethiopia",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0059,"Iced V60 Colombia",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0060,"Iced V60 Indonesia",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0061,"Hot V60 Ethiopia",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0062,"Hot V60 Colombia",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0063,"Hot V60 Indonesia",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0069,"Hot Coffee of The Day",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0070,"Iced V60 Colombia grapes",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0071,"Hot V60 Colombia grapes",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0081,Infusion,,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0083,"Iced V60 Brazil chocolate",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0084,"Hot V60 Brazil chocolate",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0085,"Iced V60 Colombia coconut",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0086,"Hot V60 Colombia coconut",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0087,"Iced V60 Colombia decaf",,sk-0028,"اغطية ١٢ اونص",,1,حبه,0.156
+sk-0022,"Crunchy cake",,sk-0032,"علب تيكاوي",,1,حبة,0.6
+sk-0023,"Madrid Cheesecake",,sk-0032,"علب تيكاوي",,1,حبة,0.6
+sk-0009,"Iced latte",,sk-0034,"كاسات بلاستيك ١٢ اونص",,1,حبة,0.15
+sk-0051,"Iced Spanish latte",,sk-0034,"كاسات بلاستيك ١٢ اونص",,1,حبة,0.15
+sk-0067,"Iced tea",,sk-0034,"كاسات بلاستيك ١٢ اونص",,1,حبة,0.15
+sk-0067,"Iced tea",,sk-0035,"سيرب خوخ",,0.04,لتر,1.92
+sk-0081,Infusion,,sk-0035,"سيرب خوخ",,0.02,لتر,0.96
+sk-0067,"Iced tea",,sk-0036,"شاي كابوس فرط",,2.2,جرام,0.11120879120879
+sk-0081,Infusion,,sk-0036,"شاي كابوس فرط",,1.1,جرام,0.055604395604396
+sk-0002,Espresso,,sk-0039,"كاسات ورق ٧ اونص",,1,حبة,0.085
+sk-0003,Piclo,,sk-0039,"كاسات ورق ٧ اونص",,1,حبة,0.085
+sk-0004,Cortado,,sk-0039,"كاسات ورق ٧ اونص",,1,حبة,0.085
+sk-0005,"Flat white",,sk-0039,"كاسات ورق ٧ اونص",,1,حبة,0.085
+sk-0055,Macchiato,,sk-0039,"كاسات ورق ٧ اونص",,1,حبة,0.085
+sk-0070,"Iced V60 Colombia grapes",,sk-0040,"Colombia grabes",,20,جرام,3.1
+sk-0071,"Hot V60 Colombia grapes",,sk-0040,"Colombia grabes",,20,جرام,3.1
+sk-0079,"Quarter Colombia grapes",,sk-0040,"Colombia grabes",,250,جرام,38.75
+sk-0002,Espresso,,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0003,Piclo,,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0004,Cortado,,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0005,"Flat white",,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0006,Cappuccino,,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0007,Latte,,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0008,Americano,,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0009,"Iced latte",,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0010,"Iced Americano",,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0040,Alfredo,,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0051,"Iced Spanish latte",,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0055,Macchiato,,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0056,"Hot Spanish latte",,sk-0043,"Blend fusion",,18,جرام,1.386
+sk-0067,"Iced tea",,sk-0046,"سيرب موهيتو",,0.015,لتر,0.72
+sk-0081,Infusion,,sk-0046,"سيرب موهيتو",,0.01,لتر,0.48
+sk-0083,"Iced V60 Brazil chocolate",,sk-0052,"Brazil choco",,20,جرام,2.9
+sk-0084,"Hot V60 Brazil chocolate",,sk-0052,"Brazil choco",,15,جرام,2.175
+sk-0085,"Iced V60 Colombia coconut",,sk-0053,"Colombia coconut",,20,جرام,3.6
+sk-0086,"Hot V60 Colombia coconut",,sk-0053,"Colombia coconut",,15,جرام,2.7
+sk-0087,"Iced V60 Colombia decaf",,sk-0054,"Colombia decaf",,20,جرام,2
+sk-0088,"Hot V60 Colombia decaf",,sk-0054,"Colombia decaf",,15,جرام,1.5
+sk-0026,"Iced Coffee Of The Day",,sk-0057,Uganda,,11,جرام,0.968
+sk-0069,"Hot Coffee of The Day",,sk-0057,Uganda,,20,جرام,1.76
