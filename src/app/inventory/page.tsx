@@ -11,7 +11,7 @@ import { Money } from "@/components/money";
 import { StartCount } from "@/components/inventory-actions";
 import { InventoryWorkspace } from "@/components/inventory-workspace";
 import { listCounts, loadCountHeader, recomputeCount } from "@/services/inventory.service";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { lastCompleteWeek } from "@/lib/inventory/week";
 import { formatBp } from "@/lib/inventory/equation";
 
 export const dynamic = "force-dynamic";
@@ -72,8 +72,8 @@ export default async function InventoryPage() {
     .orderBy(asc(branches.nameAr));
 
   const recent = (await listCounts(3)).filter((c) => c.status === "FINALISED");
-  const today = todayInRiyadh();
-  const weekAgo = new Date(Date.parse(`${today}T00:00:00Z`) - 6 * 86_400_000).toISOString().slice(0, 10);
+  /* آخرُ أسبوعٍ اكتمل — لا الجاري: الجردُ يقع بعد تقفيلة السبت */
+  const week = lastCompleteWeek();
 
   const hasSales = (await db.execute<{ n: number }>(sql`select count(*)::int as n from sales`)).rows[0]?.n ?? 0;
 
@@ -100,8 +100,8 @@ export default async function InventoryPage() {
       <div className="mt-6">
         {can(user.role, "inventory:count") ? (
           <StartCount
-            defaultStart={weekAgo}
-            defaultEnd={today}
+            defaultStart={week.start}
+            defaultEnd={week.end}
             branches={branchRows.map((b) => ({ id: b.id, name: b.nameAr }))}
           />
         ) : (

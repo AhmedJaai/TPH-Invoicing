@@ -19,10 +19,11 @@ import { computeCoverage, type CoverageReport } from "./coverage";
 import { stockVariance, type StockTerms } from "./equation";
 import { indexRecipeVersions, type RecipeVersionInput } from "./recipe";
 import {
-  summarisePurchases, unitCostMinor, varianceCostMinor,
+  summarisePurchases, unitCostMilliMinor, varianceCostMinor,
   type PurchaseLineInput, type PurchaseSummary,
 } from "./purchases";
 import { sameUnitFamily } from "./units";
+import { milliMinorToMinor } from "@/lib/money";
 
 /**
  * بم قُوِّمت كلفةُ الفرق.
@@ -30,11 +31,12 @@ import { sameUnitFamily } from "./units";
  * **ولا تُقرأ تكلفةَ مبيعات**: هي تقديرُ أثرٍ ماليّ لفرقٍ لم يُفسَّر
  * بعد، ولا تدخل قائمةَ دخلٍ ولا قيداً محاسبيّاً.
  */
-export type ValuationBasis = "PERIOD_WEIGHTED_AVERAGE" | "LATEST_KNOWN" | "UNKNOWN";
+export type ValuationBasis = "PERIOD_WEIGHTED_AVERAGE" | "LATEST_KNOWN" | "CATALOG" | "UNKNOWN";
 
 export const VALUATION_LABEL: Record<ValuationBasis, string> = {
   PERIOD_WEIGHTED_AVERAGE: "قُوِّم بمتوسّط شراء الفترة",
   LATEST_KNOWN: "قُوِّم بآخر كلفةٍ معروفة — لا شراءَ في الفترة",
+  CATALOG: "قُوِّم بكلفة الكتالوج المعياريّة — لا فاتورةَ لهذا الصنف",
   UNKNOWN: "لا كلفةَ معروفة — لم يُقوَّم",
 };
 
@@ -95,8 +97,21 @@ export interface EngineInput {
   wasteByProduct: ReadonlyMap<string, number>;
   /** العدُّ الفعليّ كما أدخله الإنسان، و`null` «لم يُعَدّ بعد». */
   actualByProduct: ReadonlyMap<string, number | null>;
-  /** آخرُ كلفةٍ معروفة خارج الفترة — تُستعمَل حين لا مشترياتٍ فيها. */
+  /**
+   * آخرُ كلفةٍ معروفة خارج الفترة — **بمِلّي‑الهللة لوحدة الأساس**.
+   *
+   * تُستعمَل حين لا مشترياتٍ في الفترة. والمقياسُ مِلّي لأنّ معدَّل
+   * الكلفة قد يكون كسراً: ‏٢٫١٢٥ هللة للمصّاصة.
+   */
   fallbackCostByProduct: ReadonlyMap<string, number | null>;
+  /**
+   * كلفةُ الكتالوج المعياريّة — بمِلّي‑الهللة كذلك.
+   *
+   * وتأتي **بعد** الفاتورة لا قبلها: الفاتورةُ واقعةٌ والكتالوجُ
+   * تقدير. وخيرٌ منها «لا كلفة»: صنفٌ لم تصل فاتورتُه هذا الشهر
+   * يُقوَّم بتقديرٍ مُعلَن، لا يُترَك بلا رقم.
+   */
+  catalogCostByProduct?: ReadonlyMap<string, number | null>;
 }
 
 export interface ReportLine {
@@ -118,7 +133,15 @@ export interface ReportLine {
   varianceConsumptionBp: number | null;
   /** وثانويّةٌ إلى المخزون الختاميّ المتوقَّع. */
   varianceBp: number | null;
+  /** المعدَّلُ مقرَّباً — للعرض السريع وحده. */
   unitCostMinor: number | null;
+  /**
+   * والمعدَّلُ بدقّته: مِلّي‑هللةٍ لوحدة الأساس.
+   *
+   * ‏٨٨ ريالاً لكيلو البنّ = ‏٨٫٨ هللة للجرام. فالمقرَّبُ يقول «٩»
+   * — زيادةُ ٢٫٣٪ في عمودٍ اسمُه الكلفة. وعلى هذا يقع الحساب والعرض.
+   */
+  unitCostMilliMinor: number | null;
   /** بم قُوِّم — يُعرَض مع الرقم، فلا يتغيّر المنهجُ صامتاً. */
   valuationBasis: ValuationBasis;
   varianceCostMinor: number | null;
@@ -234,14 +257,24 @@ export function reconcile(input: EngineInput): EngineReport {
     const result = stockVariance(terms, actualMilli);
     if (result.varianceMilli !== null) linesWithVariance++;
 
-    const fallback = input.fallbackCostByProduct.get(product.id) ?? null;
-    const periodCost = unitCostMinor(bought, product.baseUnit, null);
-    const cost = periodCost ?? fallback;
-    const valuationBasis: ValuationBasis =
-      periodCost !== null ? "PERIOD_WEIGHTED_AVERAGE" : cost !== null ? "LATEST_KNOWN" : "UNKNOWN";
-    if (cost === null) flags.push("COST_UNKNOWN");
+    /*
+      ── ترتيبُ التقييم: الواقعُ قبل التقدير ──
 
-    const varianceCost = varianceCostMinor(result.varianceMilli, cost, product.baseUnit);
+      متوسّطُ شراء الفترة، ثمّ آخرُ كلفةٍ من فاتورةٍ سابقة، ثمّ كلفةُ
+      الكتالوج. والأخيرةُ معياريّةٌ يكتبها المقهى في نقاط البيع لا
+      ثمنٌ دُفع — فلا تُقدَّم على فاتورة، ولا تُكتَم حين لا فاتورة.
+    */
+    const fallback = input.fallbackCostByProduct.get(product.id) ?? null;
+    const catalog = input.catalogCostByProduct?.get(product.id) ?? null;
+    const periodRate = unitCostMilliMinor(bought, product.baseUnit, null);
+    const rate = periodRate ?? fallback ?? catalog;
+    const valuationBasis: ValuationBasis =
+      periodRate !== null ? "PERIOD_WEIGHTED_AVERAGE"
+        : fallback !== null ? "LATEST_KNOWN"
+          : catalog !== null ? "CATALOG" : "UNKNOWN";
+    if (rate === null) flags.push("COST_UNKNOWN");
+
+    const varianceCost = varianceCostMinor(result.varianceMilli, rate, product.baseUnit);
     if (varianceCost !== null) {
       varianceCostTotal += varianceCost;
       linesWithKnownCost++;
@@ -263,7 +296,9 @@ export function reconcile(input: EngineInput): EngineReport {
       varianceMilli: result.varianceMilli,
       varianceConsumptionBp: result.varianceConsumptionBp,
       varianceBp: result.varianceBp,
-      unitCostMinor: cost,
+      /* ويُعرَض المعدَّلُ مقرَّباً — والحسابُ أعلاه جرى بالمِلّي */
+      unitCostMinor: rate === null ? null : milliMinorToMinor(rate),
+      unitCostMilliMinor: rate,
       valuationBasis,
       varianceCostMinor: varianceCost,
       flags,

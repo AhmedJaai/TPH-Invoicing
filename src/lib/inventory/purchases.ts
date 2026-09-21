@@ -16,6 +16,7 @@
  */
 import type { StoredUnit } from "@/lib/unit-conversion";
 import { decimalToMilli, sameUnitFamily, toCanonical, MILLI } from "./units";
+import { MILLI_MINOR } from "@/lib/money";
 
 /** سطرُ فاتورةٍ بمواصفة عبوة صنفِ مورّده. */
 export interface PurchaseLineInput {
@@ -183,24 +184,35 @@ export function summarisePurchases(
 }
 
 /**
- * كلفةُ وحدةِ الأساس بالهللات — متوسّطٌ مرجَّح لمشتريات الفترة.
+ * معدَّلُ كلفةِ وحدةِ الأساس — **بمِلّي‑الهللة**، متوسّطاً مرجَّحاً
+ * لمشتريات الفترة.
+ *
+ * ── ولماذا لا تُقرَّب هنا ──
+ *
+ * كان يُقرَّب إلى هللةٍ صحيحة ثمّ يُضرَب في الكمّيّة. وذلك يصحّ في
+ * الكيلو (‏٩٦٫٢٥ ريالاً = ‏٩٦٢٥ هللة بالضبط) ويكسر في العدّ: كرتونُ
+ * المصّاصات ٨٥ ريالاً لأربعة آلاف = ‏٢٫١٢٥ هللة للمصّاصة، فيُقرَّب
+ * إلى هللتين — **وتضيع ستّةٌ في المئة من كلفة كلّ مصّاصة**، خمسةَ
+ * ريالاتٍ في الكرتون الواحد.
+ *
+ * فالمعدَّلُ يبقى بمِلّي‑الهللة، والتقريبُ عند آخر ضربٍ وحده.
  *
  * وترجع `null` حين لا مشترياتٍ صالحة — **لا صفراً**. فصفرُ الكلفة
  * يجعل كلفةَ الفرق صفراً، فيُقرأ «فرقٌ بلا أثرٍ ماليّ» وهو فرقٌ لا
  * نعرف كلفتَه.
  */
-export function unitCostMinor(
+export function unitCostMilliMinor(
   purchases: ProductPurchases | undefined,
   baseUnit: StoredUnit,
-  fallbackMinor: number | null,
+  fallbackMilliMinor: number | null,
 ): number | null {
   if (!purchases || purchases.canonicalMilli <= 0 || purchases.knownCostMinor <= 0) {
-    return fallbackMinor;
+    return fallbackMilliMinor;
   }
-  /* الكمّيّة المعياريّة مِلّي‑صغرى؛ وكلفةُ وحدةِ الأساس تحتاج قسمتها على وحدةِ الأساس */
+  /* الكمّيّة المعياريّة مِلّي‑صغرى؛ والمعدَّل يحتاج قسمتها على وحدةِ الأساس */
   const baseUnits = quantityInBaseUnits(purchases.canonicalMilli, baseUnit);
-  if (baseUnits <= 0) return fallbackMinor;
-  return Math.round(purchases.knownCostMinor / baseUnits);
+  if (baseUnits <= 0) return fallbackMilliMinor;
+  return Math.round((purchases.knownCostMinor * MILLI_MINOR) / baseUnits);
 }
 
 /** الكمّيّة المعياريّة معبَّرٌ عنها بعددِ وحداتِ الأساس — للقسمة والضرب بالكلفة. */
@@ -210,16 +222,17 @@ export function quantityInBaseUnits(canonicalMilli: number, baseUnit: StoredUnit
 }
 
 /**
- * كلفةُ الفرق بالهللات — عددٌ صحيح دائماً.
+ * كلفةُ الفرق بالهللات — عددٌ صحيح، بتقريبٍ **واحد** في آخر الطريق.
  *
  * وترجع `null` حين تُجهَل الكلفة أو الفرق، فلا يُعرَض صفرٌ باسم
  * التكلفة.
  */
 export function varianceCostMinor(
   varianceCanonicalMilli: number | null,
-  unitCost: number | null,
+  unitRateMilliMinor: number | null,
   baseUnit: StoredUnit,
 ): number | null {
-  if (varianceCanonicalMilli === null || unitCost === null) return null;
-  return Math.round(quantityInBaseUnits(varianceCanonicalMilli, baseUnit) * unitCost);
+  if (varianceCanonicalMilli === null || unitRateMilliMinor === null) return null;
+  const baseUnits = quantityInBaseUnits(varianceCanonicalMilli, baseUnit);
+  return Math.round((baseUnits * unitRateMilliMinor) / MILLI_MINOR);
 }

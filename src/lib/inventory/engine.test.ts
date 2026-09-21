@@ -59,7 +59,8 @@ function input(over: Partial<EngineInput> = {}): EngineInput {
     adjustmentsOutByProduct: new Map(),
     wasteByProduct: new Map(),
     actualByProduct: new Map([[COFFEE, kg(10.5)], [MILK, L(25.4)]]),
-    fallbackCostByProduct: new Map([[MILK, 12_00]]),
+    /* بمِلّي‑الهللة: ١٢ ريالاً للتر */
+    fallbackCostByProduct: new Map([[MILK, 12_00 * 1000]]),
     ...over,
   };
 }

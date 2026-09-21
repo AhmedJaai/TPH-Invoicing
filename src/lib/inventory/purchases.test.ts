@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   purchaseQuantity, quantityInBaseUnits, summarisePurchases,
-  unitCostMinor, varianceCostMinor, type PurchaseLineInput,
+  unitCostMilliMinor, varianceCostMinor, type PurchaseLineInput,
 } from "./purchases";
 import { canonicalToQuantity } from "./units";
 
@@ -109,20 +109,36 @@ describe("الكلفة", () => {
       ],
       () => "KG",
     );
-    /* ‏١٢٠٠ ريالاً على ٢٠ كجم = ٦٠ للكيلو */
-    expect(unitCostMinor(s.byProduct.get("p-coffee"), "KG", null)).toBe(60_00);
+    /* ‏١٢٠٠ ريالاً على ٢٠ كجم = ٦٠ للكيلو — بمِلّي‑الهللة */
+    expect(unitCostMilliMinor(s.byProduct.get("p-coffee"), "KG", null)).toBe(60_00 * 1000);
   });
 
   it("وبلا مشترياتٍ صالحةٍ تُؤخَذ الكلفةُ السابقة — وإلّا `null` لا صفر", () => {
-    expect(unitCostMinor(undefined, "KG", 75_00)).toBe(75_00);
-    expect(unitCostMinor(undefined, "KG", null)).toBeNull();
+    expect(unitCostMilliMinor(undefined, "KG", 75_00 * 1000)).toBe(75_00 * 1000);
+    expect(unitCostMilliMinor(undefined, "KG", null)).toBeNull();
   });
 
   it("وكلفةُ الفرق عددٌ صحيح بالهللات، و`null` حين تُجهَل الكلفة", () => {
     /* ‑٢٫٥ كجم × ٧٥ ريالاً = ‑١٨٧٫٥٠ */
-    expect(varianceCostMinor(-2_500_000, 75_00, "KG")).toBe(-187_50);
+    expect(varianceCostMinor(-2_500_000, 75_00 * 1000, "KG")).toBe(-187_50);
     expect(varianceCostMinor(-2_500_000, null, "KG")).toBeNull();
-    expect(varianceCostMinor(null, 75_00, "KG")).toBeNull();
+    expect(varianceCostMinor(null, 75_00 * 1000, "KG")).toBeNull();
+  });
+
+  /*
+    ── المعدَّلُ الكسريّ لا يُقرَّب قبل الضرب ──
+
+    كرتونُ مصّاصاتٍ بـ٨٥ ريالاً لأربعة آلاف: المصّاصةُ ‏٢٫١٢٥ هللة.
+    فلو قُرِّب المعدَّلُ إلى هللتين لخرجت كلفةُ الكرتون ٨٠ ريالاً —
+    **خمسةُ ريالاتٍ تضيع في كلّ كرتون، ٦٪**. وبالمِلّي تعود ٨٥
+    بالضبط.
+  */
+  it("ومعدَّلٌ كسريّ — ٢٫١٢٥ هللة للمصّاصة — يعود تامّاً على الكرتون", () => {
+    const rate = Math.round((85_00 * 1000) / 4000);
+    expect(rate).toBe(2_125);
+    expect(varianceCostMinor(4000 * 1000, rate, "PIECE")).toBe(85_00);
+    /* ولو قُرِّب المعدَّلُ أوّلاً لخرج هذا */
+    expect(varianceCostMinor(4000 * 1000, Math.round(rate / 1000) * 1000, "PIECE")).toBe(80_00);
   });
 
   it("وعددُ وحدات الأساس يُحسَب من المعياريّ", () => {

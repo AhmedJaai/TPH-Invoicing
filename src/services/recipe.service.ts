@@ -17,6 +17,7 @@ import { products, recipeIngredients, recipeVersions, recipes } from "@/db/schem
 import { recordAudit } from "@/lib/audit";
 import { isStoredUnit, type StoredUnit } from "@/lib/unit-conversion";
 import type { RecipeVersionInput } from "@/lib/inventory/recipe";
+import { recipeCost, type CostedIngredient, type RecipeCost } from "@/lib/inventory/recipe-cost";
 import type { Conn } from "./types";
 
 export interface IngredientDraft {
@@ -38,6 +39,14 @@ export interface SaveVersionInput {
   ingredients: IngredientDraft[];
   activate: boolean;
   actorId: string;
+  /**
+   * من أين جاءت هذه النسخة.
+   *
+   * و`FOODICS_CATALOG` تعني أنّ استيراداً كتبها، فيجوز لاستيرادٍ لاحق
+   * أن يُحدّثها. أمّا ما كتبه إنسانٌ (فارغٌ أو `HUMAN`) **فلا يُكتَب
+   * فوقه**: من عدّل جرعةً بيده لا يُلغى عملُه لأنّ ملفّاً رُفع.
+   */
+  source?: string | null;
 }
 
 export interface SaveVersionResult {
@@ -153,6 +162,7 @@ export async function saveRecipeVersion(input: SaveVersionInput, conn: Conn = db
         yieldQuantityMilli: input.yieldQuantityMilli ?? null,
         yieldUnit: input.yieldUnit ?? null,
         note: input.note ?? null,
+        source: input.source ?? "HUMAN",
         createdById: input.actorId,
         activatedById: input.activate ? input.actorId : null,
         activatedAt: input.activate ? new Date() : null,
@@ -321,14 +331,32 @@ export interface RecipeRow {
   activeVersion: number | null;
   activeFrom: string | null;
   ingredientCount: number;
+  /** كلفةُ مكوّناتها بالهللات، و`null` إن جُهل مكوّنٌ واحد. */
+  costMinor: number | null;
+  /** وما جُهلت كلفتُه بأسمائه وأسبابه — «لماذا لا رقمَ هنا». */
+  unknownCost: RecipeCost["unknown"];
+  /** سعرُ بيعه عند نقاط البيع. */
+  priceMinor: number | null;
+  /** والكلفةُ التي يعلنها المصدر — تُقارَن ولا تحلّ محلّ الحساب. */
+  declaredCostMinor: number | null;
 }
 
-/** قائمةُ الوصفات كما تُعرَض — ومعها ما بِيع بلا وصفة يُحسَب في مكانٍ آخر. */
+/**
+ * قائمةُ الوصفات كما تُعرَض — ومعها كلفتُها محسوبةً من عبوات مكوّناتها.
+ *
+ * والكلفةُ تُحسَب هنا ولا تُقرأ من عمود: الوصفةُ تتغيّر، والعبوةُ
+ * يُعاد استيرادُها، ورقمٌ محفوظٌ بينهما يفترق عن مصدريه. والمجهولُ
+ * يُنشر: مكوّنٌ بلا كلفةٍ يجعل مجموعَ وصفته `null` لا ناقصاً.
+ */
 export async function listRecipes(conn: Conn = db): Promise<RecipeRow[]> {
   const rows = await conn.execute<Record<string, unknown>>(sql`
     select r.id as recipe_id,
            r.product_id,
            p.name_ar as product_name,
+           p.catalog_declared_cost_minor as declared_cost,
+           (select pp.price_minor from pos_products pp
+             where pp.product_id = p.id and pp.kind = 'PRODUCT'
+             order by pp.created_at limit 1) as price_minor,
            count(v.id)::int as versions,
            max(v.version) filter (where v.status = 'ACTIVE') as active_version,
            max(v.effective_from) filter (where v.status = 'ACTIVE') as active_from,
@@ -343,17 +371,61 @@ export async function listRecipes(conn: Conn = db): Promise<RecipeRow[]> {
       from recipes r
       join products p on p.id = r.product_id
       left join recipe_versions v on v.recipe_id = r.id
-     group by r.id, p.name_ar
+     group by r.id, p.name_ar, p.catalog_declared_cost_minor, p.id
      order by p.name_ar
   `);
 
-  return rows.rows.map((r) => ({
-    recipeId: String(r.recipe_id),
-    menuProductId: String(r.product_id),
-    menuProductName: String(r.product_name),
-    versions: Number(r.versions),
-    activeVersion: r.active_version === null ? null : Number(r.active_version),
-    activeFrom: r.active_from === null ? null : String(r.active_from),
-    ingredientCount: Number(r.ingredient_count),
-  }));
+  /*
+    مكوّناتُ النسخة السارية لكلّ وصفةٍ في استعلامٍ واحد — لا استعلامٌ
+    لكلّ صفّ. وصفحةٌ فيها ستّون وصفةً تعني ستّين رحلةً إلى القاعدة،
+    وهي على فيرسل في المجمَّع طابورٌ على اتّصالٍ واحد.
+  */
+  const ings = await conn.execute<Record<string, unknown>>(sql`
+    select r.id as recipe_id, i.product_id, p.name_ar, i.quantity_milli, i.unit,
+           p.base_unit, p.catalog_pack_milli, p.catalog_pack_cost_minor
+      from recipes r
+      join recipe_versions v on v.recipe_id = r.id
+       and v.id = (select v2.id from recipe_versions v2
+                    where v2.recipe_id = r.id and v2.status = 'ACTIVE'
+                    order by v2.effective_from desc limit 1)
+      join recipe_ingredients i on i.recipe_version_id = v.id
+      join products p on p.id = i.product_id
+  `);
+
+  const byRecipe = new Map<string, CostedIngredient[]>();
+  for (const r of ings.rows) {
+    const unit = r.unit;
+    const base = r.base_unit;
+    if (!isStoredUnit(unit) || !isStoredUnit(base)) continue;
+    const key = String(r.recipe_id);
+    const list = byRecipe.get(key) ?? [];
+    list.push({
+      productId: String(r.product_id),
+      name: String(r.name_ar),
+      quantityMilli: Number(r.quantity_milli),
+      unit,
+      baseUnit: base,
+      packMilli: r.catalog_pack_milli === null ? null : Number(r.catalog_pack_milli),
+      packCostMinor: r.catalog_pack_cost_minor === null ? null : Number(r.catalog_pack_cost_minor),
+    });
+    byRecipe.set(key, list);
+  }
+
+  return rows.rows.map((r) => {
+    const cost = recipeCost(byRecipe.get(String(r.recipe_id)) ?? []);
+    return {
+      recipeId: String(r.recipe_id),
+      menuProductId: String(r.product_id),
+      menuProductName: String(r.product_name),
+      versions: Number(r.versions),
+      activeVersion: r.active_version === null ? null : Number(r.active_version),
+      activeFrom: r.active_from === null ? null : String(r.active_from),
+      ingredientCount: Number(r.ingredient_count),
+      costMinor: cost.costMinor,
+      unknownCost: cost.unknown,
+      priceMinor: r.price_minor === null ? null : Number(r.price_minor),
+      declaredCostMinor: r.declared_cost === null ? null : Number(r.declared_cost),
+    };
+  });
 }
+
