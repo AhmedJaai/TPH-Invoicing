@@ -233,6 +233,8 @@ describe("سلامة البنية", () => {
     expect(labels.get("/close")).toBe("إقفال الشهر");
     expect(labels.get("/inventory")).toBe("الجرد الحالي");
     expect(labels.get("/inventory/history")).toBe("سجلّ الجرد");
+    /* والصفحةُ تحمل المبيعاتِ والكتالوجَ معاً، فاسمُها اسمُ الفعل لا أحدِ مفعوليه */
+    expect(labels.get("/inventory/import")).toBe("الاستيراد");
     // ولا لسان يحمل اسم «التدفّق وقائمة الدخل» — صار التدفّق في «المال»
     expect([...labels.values()]).not.toContain("التدفّق وقائمة الدخل");
   });

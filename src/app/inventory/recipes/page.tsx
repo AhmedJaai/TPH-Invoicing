@@ -175,8 +175,16 @@ export default async function RecipesPage() {
           empty={
             <EmptyState
               title="لا وصفةَ مسجَّلة بعد."
-              hint="بلا وصفاتٍ لا يُحسَب استهلاكٌ متوقَّع، فلا يُحسَب فرقُ جرد. ابدأ بأكثر ما يُباع."
-              action={<Link href="/inventory/mapping" className={buttonClass("secondary", "sm")}>اربط منتجات فودكس أوّلاً</Link>}
+              hint={
+                "بلا وصفاتٍ لا يُحسَب استهلاكٌ متوقَّع، فلا يُحسَب فرقُ جرد. "
+                + "وكتالوج فودكس يُنشئها كلَّها دفعةً واحدة — أصنافَ المخزون، والأصنافَ المباعة، "
+                + "والوصفاتِ وربطَها بنقاط البيع — فلا تُكتب واحدةً واحدة."
+              }
+              action={
+                <Link href="/inventory/import" className={buttonClass("primary", "sm")}>
+                  ارفع كتالوج فودكس
+                </Link>
+              }
             />
           }
         />

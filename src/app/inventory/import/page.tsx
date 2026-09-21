@@ -35,7 +35,7 @@ export default async function SalesImportPage() {
   if (!user) redirect("/login?from=/inventory/import");
   if (!can(user.role, "inventory:view")) {
     return (
-      <PageShell user={user} width="page" title="استيراد المبيعات">
+      <PageShell user={user} width="page" title="الاستيراد">
         <NoAccess what="الجرد" />
       </PageShell>
     );
@@ -61,8 +61,8 @@ export default async function SalesImportPage() {
     <PageShell
       user={user}
       width="page"
-      title="استيراد المبيعات"
-      intro="ملفُّ فودكس يدخل مجالَ المبيعات نفسَه الذي ستدخله الواجهةُ البرمجيّة لاحقاً — فلا يُعاد بناءُ شيء حين تصل."
+      title="الاستيراد"
+      intro="ملفّان يدخلان من هنا: كتالوجُ المقهى مرّةً وعند تغيّره، ومبيعاتُ الأسبوع كلَّ أحد."
       actions={<Link href="/inventory/mapping" className={buttonClass("secondary", "sm")}>منتجات تحتاج ربطاً</Link>}
     >
       <InventoryImport canImport={can(user.role, "inventory:count")} />
