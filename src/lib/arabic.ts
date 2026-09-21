@@ -162,14 +162,6 @@ export const DAY: NounForms = {
   zero: "لا أيّام",
 };
 
-export const IMPORT: NounForms = {
-  one: "عملية استيراد واحدة",
-  two: "عمليّتا استيراد",
-  few: "عمليات استيراد",
-  many: "عملية استيراد",
-  zero: "لا عمليات استيراد",
-};
-
 export const ALIAS: NounForms = {
   one: "اسم بديل واحد",
   two: "اسمان بديلان",
