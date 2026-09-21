@@ -39,7 +39,7 @@ async function importAll(tx: Tx, actorId: string, over: Partial<{ effectiveFrom:
 }
 
 describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
-  it("‏٦٠ صنفَ مخزون و٥٨ صنفاً يُباع و٥٧ وصفة — من ثلاثة ملفّاتٍ في طلبٍ واحد", () =>
+  it("‏٦٠ صنفَ مخزون و٥٨ صنفاً يُباع و٤٩ وصفة — من ثلاثة ملفّاتٍ في طلبٍ واحد", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const r = await importAll(tx, actorId);
@@ -49,8 +49,13 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
 
       expect(r.stockItems.created).toBe(60);
       expect(r.menuProducts.created).toBe(58);
-      /* ‏١٤٢ سطراً تنتظم في ٤٠ وصفة — والباقي أصنافٌ بلا وصفة */
-      expect(r.recipes.written).toBe(40);
+      /*
+        ‏١٤٢ سطراً تنتظم في ٤٠ وصفة، ويُضاف إليها **تسعُ وصفاتٍ للجاهز**
+        لم يحمل لها الملفُّ شيئاً (ماءٌ وبراوني وكوكيز وكيكُ باشن…).
+        والستُّ الباقيات من الجاهز كان لها تغليفٌ في الملفّ، فأُكمِلت
+        ولم تُستحدَث.
+      */
+      expect(r.recipes.written).toBe(49);
       expect(r.recipes.blocked).toBe(0);
     }));
 
@@ -135,7 +140,7 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
       expect(again.stockItems.created).toBe(0);
       expect(again.stockItems.updated).toBe(60);
       expect(again.recipes.written).toBe(0);
-      expect(again.recipes.unchanged).toBe(40);
+      expect(again.recipes.unchanged).toBe(49);
     }));
 
   /*
@@ -199,7 +204,7 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
       );
 
       expect(r.recipes.written).toBe(0);
-      expect(r.recipes.blocked).toBe(40);
+      expect(r.recipes.blocked).toBe(49);
       expect(r.blocked[0].reason).toContain("الأصناف المباعة");
     }));
 
@@ -210,6 +215,103 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
         { files: ALL(), effectiveFrom: "19-09-2026", actorId }, tx,
       ));
       expect((e as Error).message).toContain("YYYY-MM-DD");
+    }));
+});
+
+describe("الجاهزُ يُشترى ويُباع كما هو", () => {
+  /*
+    ── والتغليفُ يبقى، والصنفُ يُضاف إليه ──
+
+    «تشيز مدريد» في الملفّ شوكةٌ وعلبةٌ — والكعكةُ ليست فيه. فتُضاف
+    الكعكةُ **إلى** ما جاء، لا بدلاً منه: الشوكةُ تُستهلَك أيضاً.
+  */
+  it("«تشيز مدريد» صارت ثلاثةَ مكوّنات — والكعكةُ فيها", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      await importAll(tx, actorId);
+
+      const rows = await tx.execute<{ name_ar: string; quantity_milli: string; unit: string }>(sql`
+        select p.name_ar, i.quantity_milli, i.unit
+          from products mp
+          join recipes r on r.product_id = mp.id
+          join recipe_versions v on v.recipe_id = r.id and v.effective_to is null
+          join recipe_ingredients i on i.recipe_version_id = v.id
+          join products p on p.id = i.product_id
+         where mp.foodics_product_sku = 'sk-0023'
+         order by p.name_ar
+      `);
+
+      expect(rows.rows.map((r) => r.name_ar)).toEqual(["تشيز مدريد", "شوك", "علب تيكاوي"]);
+      const cake = rows.rows.find((r) => r.name_ar === "تشيز مدريد")!;
+      expect(Number(cake.quantity_milli)).toBe(1_000);
+      expect(cake.unit).toBe("PIECE");
+    }));
+
+  it("و«الماء» بلا وصفةٍ في الملفّ صارت قارورةً واحدة", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      await importAll(tx, actorId);
+
+      const rows = await tx.execute<{ name_ar: string; quantity_milli: string }>(sql`
+        select p.name_ar, i.quantity_milli
+          from products mp
+          join recipes r on r.product_id = mp.id
+          join recipe_versions v on v.recipe_id = r.id and v.effective_to is null
+          join recipe_ingredients i on i.recipe_version_id = v.id
+          join products p on p.id = i.product_id
+         where mp.foodics_product_sku = 'sk-0014'
+      `);
+      expect(rows.rows).toHaveLength(1);
+      expect(rows.rows[0].name_ar).toBe("مياه معدنية");
+      expect(Number(rows.rows[0].quantity_milli)).toBe(1_000);
+    }));
+
+  /*
+    والكمبوتشا علبةٌ كاملة — ٣٣٠ مليلتراً، وهي محتوى العلبة في
+    الكتالوج. فتُقرأ بوحدة صرف صنفها لا بوحدةٍ تُكتب في جدول الاقتران.
+  */
+  it("والكمبوتشا ٣٣٠ مليلتراً بوحدة صنفها", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      await importAll(tx, actorId);
+
+      const [row] = (await tx.execute<{ quantity_milli: string; unit: string }>(sql`
+        select i.quantity_milli, i.unit
+          from products mp
+          join recipes r on r.product_id = mp.id
+          join recipe_versions v on v.recipe_id = r.id and v.effective_to is null
+          join recipe_ingredients i on i.recipe_version_id = v.id
+          join products p on p.id = i.product_id
+         where mp.foodics_product_sku = 'sk-0011' and p.foodics_item_sku = 'sk-0042'
+      `)).rows;
+      expect(Number(row.quantity_milli)).toBe(330_000);
+      expect(row.unit).toBe("ML");
+    }));
+
+  it("ومبيعُ الحلى صار يُخصَم من المخزون — ٩٧ قطعةَ تشيز مدريد", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      const branch = await makeBranch(tx);
+      await importAll(tx, actorId);
+
+      const [cake] = (await tx.execute<{ id: string }>(sql`
+        select id from products where foodics_item_sku = 'sk-0011'
+      `)).rows;
+      await isolateProducts(tx, [String(cake.id)]);
+
+      await importSalesFile(
+        { buffer: readFileSync(SALES), fileName: "sales.xlsx", actorId, branchLabel: branch.nameAr },
+        tx,
+      );
+
+      const { countId } = await startCount(
+        { periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx,
+      );
+      const report = await recomputeCount(countId, tx);
+      const line = report.lines.find((l) => l.productId === String(cake.id))!;
+
+      /* وكانت صفراً قبل هذا: الوصفةُ فيها الشوكةُ والعلبةُ لا الكعكة */
+      expect(canonicalToQuantity(line.theoreticalConsumptionMilli!, "PIECE")).toBe(97);
     }));
 });
 

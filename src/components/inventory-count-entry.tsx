@@ -20,6 +20,17 @@ import { Money } from "./money";
  * يُحفَظ **ما تغيّر وحده** عند الضغط. والمسوّدةُ تبقى مسوّدة: يخرج
  * ويعود فيجد ما أدخله. والإقفالُ فعلٌ آخر في مكانٍ آخر.
  *
+ * ── ويُعَدّ بالوحدة التي يُوزَن بها ──
+ *
+ * وحدةُ الصنف في الكتالوج هي وحدةُ **صرفه** — البنُّ بالجرام لأنّ
+ * الوصفة تقول «٢٠ جراماً». وصاحبُ المقهى يزن الكيسَ فيقرأ «٥٫٢ كجم»،
+ * فلو لزمته الوحدةُ الصغرى لكتب «٥٢٠٠» وأخطأ في صفرٍ لا يُرى أثرُه
+ * إلّا في فرقٍ بعشرة أضعاف.
+ *
+ * فتُعرَض له وحدتا عائلته، ويختار. **والتحويلُ في الخادم** لا هنا:
+ * يصل الرقمُ ووحدتُه، ويُحوَّل هناك — فلا يُصدَّق المتصفّح في رقمٍ
+ * يُبنى عليه قرار.
+ *
  * ── ولا يُحسَب فرقٌ في المتصفّح يُعتمَد عليه ──
  *
  * الفرقُ المعروض أثناء الكتابة **مؤشِّرٌ فوريّ** لا رقمٌ يُحفَظ. والرقمُ
@@ -33,6 +44,10 @@ export interface CountRow {
   category: string;
   categoryLabel: string;
   unitLabel: string;
+  /** وحدةُ الصنف كما تُخزَّن — يُرسَل ما يختاره ويُحوَّل في الخادم. */
+  baseUnit: string;
+  /** وحدتا عائلته بأسمائهما — واحدةٌ فقط لما لا أكبرَ له. */
+  unitChoices: { value: string; label: string }[];
   /** المتوقَّع بوحدة الصنف — نصّاً كما يُعرَض، أو `null` «غير معروف». */
   expected: string | null;
   /** ما أُدخل سابقاً بوحدة الصنف، نصّاً. */
@@ -61,6 +76,10 @@ export function InventoryCountEntry({
   const router = useRouter();
   const [values, setValues] = useState<Record<string, string>>(
     () => Object.fromEntries(rows.map((r) => [r.productId, r.actual])),
+  );
+  /* الوحدةُ المختارة لكلّ صنف — وأوّلُها وحدتُه في الكتالوج */
+  const [units, setUnits] = useState<Record<string, string>>(
+    () => Object.fromEntries(rows.map((r) => [r.productId, r.baseUnit])),
   );
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
@@ -100,6 +119,8 @@ export function InventoryCountEntry({
       entries: dirty.map((row) => ({
         productId: row.productId,
         actual: (values[row.productId] ?? "").trim() === "" ? null : values[row.productId].trim(),
+        /* الوحدةُ تُرسَل مع الرقم، والتحويلُ في الخادم */
+        unit: units[row.productId] ?? row.baseUnit,
       })),
     });
 
@@ -201,7 +222,21 @@ export function InventoryCountEntry({
                       changed ? "border-ok bg-ok-bg" : "border-line bg-canvas"
                     }`}
                   />
-                  <span className="w-12 text-[11px] text-muted">{row.unitLabel}</span>
+                  {row.unitChoices.length > 1 ? (
+                    <select
+                      aria-label={`وحدةُ عدّ ${row.productName}`}
+                      disabled={!canEdit || locked || busy}
+                      value={units[row.productId] ?? row.baseUnit}
+                      onChange={(e) => setUnits((u) => ({ ...u, [row.productId]: e.target.value }))}
+                      className="min-h-11 w-16 rounded-xl border border-line bg-canvas px-1 text-[11px]"
+                    >
+                      {row.unitChoices.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="w-12 text-[11px] text-muted">{row.unitLabel}</span>
+                  )}
                 </label>
 
                 <div className="w-28 shrink-0 text-end">

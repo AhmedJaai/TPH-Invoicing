@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  canonicalToQuantity, convertMilli, decimalToMilli, formatQuantity,
-  formatSignedQuantity, fromCanonical, milliToDecimal, sameUnitFamily,
-  toCanonical, unitFamily,
-} from "./units";
+import { canonicalToQuantity, convertMilli, decimalToMilli, formatQuantity, formatSignedQuantity, fromCanonical, milliToDecimal, sameUnitFamily, toCanonical, unitChoices, unitFamily } from "./units";
 
 /**
  * الوحدةُ الداخليّة: مِلّي من أصغر وحدةٍ في العائلة.
@@ -107,5 +103,32 @@ describe("العرض", () => {
     expect(formatSignedQuantity(-2_500_000, "KG")).toBe("−2.5 كيلو");
     expect(formatSignedQuantity(2_500_000, "KG")).toBe("+2.5 كيلو");
     expect(formatSignedQuantity(0, "KG")).toBe("0 كيلو");
+  });
+});
+
+describe("يُعَدّ بالوحدة التي يُوزَن بها", () => {
+  /*
+    وحدةُ الصنف في الكتالوج وحدةُ صرفه — البنُّ بالجرام لأنّ الوصفة
+    تقول «٢٠ جراماً». والميزانُ يقول «٥٫٢ كجم». فلو لزمت الصغرى لكُتب
+    «٥٢٠٠»، وخطأُ صفرٍ واحد فرقٌ بعشرة أضعاف لا يُرى إلّا في التقرير.
+  */
+  it("الوزنُ جرامٌ وكيلو، والحجمُ مليلترٌ ولتر", () => {
+    expect(unitChoices("G")).toEqual(["G", "KG"]);
+    expect(unitChoices("KG")).toEqual(["G", "KG"]);
+    expect(unitChoices("ML")).toEqual(["ML", "L"]);
+    expect(unitChoices("L")).toEqual(["ML", "L"]);
+  });
+
+  /* ولا معامِلَ بين حبّةٍ وعبوة، فلا خيارَ فيهما */
+  it("وما لا ثانيَ له تبقى وحدتُه وحدها", () => {
+    expect(unitChoices("PIECE")).toEqual(["PIECE"]);
+    expect(unitChoices("PACK")).toEqual(["PACK"]);
+  });
+
+  it("والرقمُ المكتوب بالكيلو يصير مِلّي‑جرامٍ في الخادم", () => {
+    /* ‏٥٫٢ كجم */
+    expect(toCanonical(decimalToMilli("5.2")!, "KG")).toBe(5_200_000);
+    /* وهو عينُ ٥٢٠٠ جراماً */
+    expect(toCanonical(decimalToMilli("5200")!, "G")).toBe(5_200_000);
   });
 });

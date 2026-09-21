@@ -97,6 +97,24 @@ export function convertMilli(
   return toCanonical(quantityMilli, from) / IN_SMALLEST[to];
 }
 
+/**
+ * وحدتا عائلةِ الصنف — يُعَدّ بأيّهما شاء.
+ *
+ * وحدةُ الصنف في الكتالوج وحدةُ **صرفه**: البنُّ بالجرام لأنّ الوصفة
+ * تقول «٢٠ جراماً». وصاحبُ المقهى يزن الكيسَ فيقرأ «٥٫٢ كجم» — فلو
+ * لزمته الصغرى لكتب «٥٢٠٠»، وخطأُ صفرٍ واحد فرقٌ بعشرة أضعاف لا
+ * يُرى إلّا في التقرير.
+ *
+ * فتُعرَض العائلةُ كلُّها ويختار، **والتحويل في الخادم**. وما لا
+ * ثانيَ له (حبّة، عبوة) تبقى وحدتُه وحدها: لا معامِلَ بين حبّةٍ وعبوة.
+ */
+export function unitChoices(baseUnit: StoredUnit): StoredUnit[] {
+  const family = unitFamily(baseUnit);
+  if (family === "MASS") return ["G", "KG"];
+  if (family === "VOLUME") return ["ML", "L"];
+  return [baseUnit];
+}
+
 /* ───────────────────── قراءةُ العدد العشريّ ───────────────────── */
 
 const DECIMAL = /^\s*([+-]?)(\d*)(?:[.,](\d*))?\s*$/;

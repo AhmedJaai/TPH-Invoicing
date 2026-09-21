@@ -6,7 +6,7 @@ import { InventoryCountEntry, type CountRow } from "./inventory-count-entry";
 import { InventoryWaste } from "./inventory-waste";
 import { CATEGORY_LABEL, type ProductCategory } from "@/lib/products";
 import { storedUnitLabel } from "@/lib/unit-conversion";
-import { canonicalToQuantity, formatSignedQuantity } from "@/lib/inventory/units";
+import { canonicalToQuantity, formatSignedQuantity, unitChoices } from "@/lib/inventory/units";
 import { formatBp } from "@/lib/inventory/equation";
 import { describeCoverage, READINESS_LABEL } from "@/lib/inventory/coverage";
 import { FLAG_LABEL, VALUATION_LABEL, topVariances, type EngineReport } from "@/lib/inventory/engine";
@@ -51,6 +51,8 @@ export function InventoryWorkspace({
     category: l.category,
     categoryLabel: CATEGORY_LABEL[l.category as ProductCategory] ?? l.category,
     unitLabel: storedUnitLabel(l.baseUnit),
+    baseUnit: l.baseUnit,
+    unitChoices: unitChoices(l.baseUnit).map((u) => ({ value: u, label: storedUnitLabel(u) })),
     expected: l.theoreticalClosingMilli === null
       ? null
       : trim(canonicalToQuantity(l.theoreticalClosingMilli, l.baseUnit)),
