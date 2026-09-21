@@ -1363,12 +1363,22 @@ export const inventoryCountLines = pgTable("inventory_count_lines", {
   varianceCostMinor: integer("variance_cost_minor"),
   /** لماذا جُهل ما جُهل — أسبابٌ تُعرَض للقارئ لا تُدفَن. */
   flags: jsonb("flags"),
+  /**
+   * أيدخل هذا الصنفُ حسابَ هذا الجرد؟
+   *
+   * الخارجُ تُحسَب وقائعُه (افتتاحيُّه ومشترياتُه واستهلاكُه المتوقَّع)
+   * ولا يُحسَب له فرق، ولا يدخل المجاميع — **ولا يُعَدّ صفراً على
+   * الرفّ**. ويُعلَن عددُه في رأس الشاشة، فما يُخفى في رقمٍ هو الذي
+   * يُخدَع به.
+   */
+  inScope: boolean("in_scope").notNull().default(true),
   note: text("note"),
   countedById: text("counted_by_id").references(() => users.id),
   countedAt: timestamp("counted_at", { withTimezone: true }),
   createdAt: now(),
 }, (t) => [
   uniqueIndex("inventory_count_lines_uniq").on(t.countId, t.productId),
+  index("inventory_count_lines_scope_idx").on(t.countId, t.inScope),
   index("inventory_count_lines_product_idx").on(t.productId),
 ]);
 

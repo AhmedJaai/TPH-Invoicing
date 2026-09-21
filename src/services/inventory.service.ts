@@ -14,7 +14,7 @@
  * عداه يُشتقّ هنا: الدرسُ نفسه من `confirm.ts` و«الإقرار الجماعيّ
  * يُعيد الحساب».
  */
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   inventoryCountLines, inventoryCountSnapshots, inventoryCounts,
@@ -445,6 +445,8 @@ export async function buildEngineInput(
   branchId: string | null,
   actuals: ReadonlyMap<string, number | null>,
   conn: Conn = db,
+  /** أصنافُ هذا الجرد — وغيابُها «الكلُّ داخل». */
+  inScope?: ReadonlySet<string>,
 ): Promise<EngineInput> {
   const countedProducts = await loadCountedProducts(conn);
   const productIds = countedProducts.map((p) => p.id);
@@ -479,7 +481,112 @@ export async function buildEngineInput(
     actualByProduct: actuals,
     fallbackCostByProduct: fallbackCosts(purchases.lookback, baseUnitOf),
     catalogCostByProduct: catalog,
+    inScopeByProduct: inScope,
   };
+}
+
+/* ─────────────────────────── نطاقُ الجرد ─────────────────────────── */
+
+/**
+ * أصنافُ هذا الجرد — ومن ليس فيها فخارجَه.
+ *
+ * ── والاختيارُ يُتوارَث ──
+ *
+ * من استبعد المصّاصاتِ والأكوابَ هذا الأسبوع يستبعدها الأسبوعَ القادم
+ * غالباً — وهي ستّون صنفاً يُسأل عنها كلَّ أحد. فما لم يُقَل فيه شيءٌ
+ * في هذا الجرد يُقرأ من **الجرد السابق في الفرع نفسه**، ويُقال في
+ * الشاشة إنّه موروث. وإلّا صار «اختيارُ الأصناف» عملاً أسبوعيّاً من
+ * ستّين قراراً، فيُضغَط «الكلّ» هرباً منه — وذاك إلغاءُ الميزة لا
+ * استعمالُها.
+ *
+ * ولا يُتوارَث من جردٍ في فرعٍ آخر: لكلّ فرعٍ رفُّه.
+ */
+export async function loadScope(
+  countId: string,
+  conn: Conn = db,
+): Promise<{ excluded: Set<string>; inherited: boolean }> {
+  const mine = await conn.execute<{ product_id: string }>(sql`
+    select product_id from inventory_count_lines
+     where count_id = ${countId} and in_scope = false
+  `);
+  if (mine.rows.length > 0) {
+    return { excluded: new Set(mine.rows.map((r) => String(r.product_id))), inherited: false };
+  }
+
+  /*
+    ── ولا يُتوارَث إلّا ما لم يُقَل فيه شيء ──
+
+    الأسطرُ تُكتب في أوّل حساب، فوجودُها لا يعني أنّ إنساناً اختار.
+    والعلامةُ استبعادٌ واحد في هذا الجرد: عندها يكون النطاق قراراً
+    قائماً لا يُداخَل فيه. وحين لا استبعادَ فيه يُقرأ **أحدثُ جردٍ
+    سابق** في الفرع نفسه — أحدثُه وحده، لا كلُّ ما استُبعد يوماً.
+  */
+  const inherited = await conn.execute<{ product_id: string }>(sql`
+    select l.product_id
+      from inventory_count_lines l
+     where l.in_scope = false
+       and l.count_id = (
+         select prev.id from inventory_counts prev
+          where prev.id <> ${countId}
+            and coalesce(prev.branch_id, '~') = (
+              select coalesce(cur.branch_id, '~') from inventory_counts cur where cur.id = ${countId}
+            )
+            and prev.period_end < (select cur.period_start from inventory_counts cur where cur.id = ${countId})
+          order by prev.period_end desc
+          limit 1
+       )
+  `);
+
+  return {
+    excluded: new Set(inherited.rows.map((r) => String(r.product_id))),
+    inherited: inherited.rows.length > 0,
+  };
+}
+
+/**
+ * يكتب نطاقَ الجرد — أصنافاً بأعيانها، داخلةً أو خارجة.
+ *
+ * ولا يُمَسّ العدُّ المكتوب: من استبعد صنفاً عدّه ثمّ أعاده وجد عدَّه.
+ * والمقفَلُ يُرَدّ هنا وفي القاعدة معاً — هذا ليقرأ المستخدمُ سبباً،
+ * وذاك كي لا يُكتَب في تقريرٍ مجمَّد من أيّ باب.
+ */
+export async function setCountScope(
+  countId: string,
+  productIds: readonly string[],
+  inScope: boolean,
+  actorId: string,
+  conn: Conn = db,
+): Promise<{ changed: number }> {
+  const header = await loadCountHeader(countId, conn);
+  if (!header) throw new Error("الجرد غير موجود");
+  if (header.status === "FINALISED") throw new CountLockedError();
+  if (productIds.length === 0) return { changed: 0 };
+
+  /* والأسطرُ تُهيَّأ قبل أن يُكتَب فيها — الدرسُ نفسه من `saveActualCounts` */
+  await recomputeCount(countId, conn);
+
+  const written = await conn.transaction(async (tx) => {
+    const rows = await tx
+      .update(inventoryCountLines)
+      .set({ inScope })
+      .where(and(
+        eq(inventoryCountLines.countId, countId),
+        inArray(inventoryCountLines.productId, [...productIds]),
+      ))
+      .returning({ id: inventoryCountLines.id });
+
+    await recordAudit({
+      actorId,
+      action: "INVENTORY_COUNT_SCOPE_SET",
+      entityType: "inventory_count",
+      entityId: countId,
+      after: { أصناف: rows.length, داخلة: inScope },
+    }, tx);
+
+    return rows.length;
+  });
+
+  return { changed: written };
 }
 
 /* ─────────────────────────── دورةُ الجرد ─────────────────────────── */
@@ -606,7 +713,14 @@ export async function recomputeCount(countId: string, conn: Conn = db): Promise<
   if (header.status === "FINALISED") return readFrozenReport(header, conn);
 
   const actuals = await loadActuals(countId, conn);
-  const input = await buildEngineInput(header.periodStart, header.periodEnd, header.branchId, actuals, conn);
+  /* النطاقُ يُقرأ قبل الحساب — فالخارجُ لا يُحسَب له فرقٌ ولا يدخل مجموعاً */
+  const scope = await loadScope(countId, conn);
+  const products = await loadCountedProducts(conn);
+  const inScope = new Set(products.map((p) => p.id).filter((id) => !scope.excluded.has(id)));
+
+  const input = await buildEngineInput(
+    header.periodStart, header.periodEnd, header.branchId, actuals, conn, inScope,
+  );
   const report = reconcile(input);
 
   await persistLines(countId, report, conn);
@@ -625,6 +739,12 @@ async function persistLines(countId: string, report: EngineReport, conn: Conn): 
     const values = report.lines.map((l) => ({
       countId,
       productId: l.productId,
+      /*
+        ويُكتَب النطاقُ عند الإنشاء وحده — لا في `onConflictDoUpdate`
+        أدناه. فالسطرُ القائم يحمل اختيارَ إنسان، وإعادةُ الحساب لا
+        تدهسه؛ والجديدُ يرث ما ورّثه الجردُ السابق.
+      */
+      inScope: l.inScope,
       baseUnit: l.baseUnit,
       openingMilli: l.openingMilli,
       purchasesMilli: l.purchasesMilli,
@@ -904,6 +1024,8 @@ export async function readFrozenReport(header: CountHeader, conn: Conn = db): Pr
     unitCostMilliMinor: num(r.unit_cost_milli_minor),
     valuationBasis: (r.valuation_basis ?? "UNKNOWN") as EngineReport["lines"][number]["valuationBasis"],
     varianceCostMinor: num(r.variance_cost_minor),
+    /* والمقفَلُ يحفظ نطاقَه كما كان — لا كما صار اليوم */
+    inScope: r.in_scope !== false,
     flags: (Array.isArray(r.flags) ? r.flags : []) as EngineReport["lines"][number]["flags"],
     recipeVersionIds: [],
     invoiceLineIds: [],
@@ -916,10 +1038,10 @@ export async function readFrozenReport(header: CountHeader, conn: Conn = db): Pr
     lines,
     coverage: (stored?.coverage ?? emptyCoverage(header)) as EngineReport["coverage"],
     totals: (stored?.totals ?? {
-      varianceCostMinor: lines.reduce((s, l) => s + (l.varianceCostMinor ?? 0), 0),
-      linesWithKnownCost: lines.filter((l) => l.varianceCostMinor !== null).length,
-      linesCounted: lines.filter((l) => l.actualMilli !== null).length,
-      linesWithVariance: lines.filter((l) => l.varianceMilli !== null).length,
+      varianceCostMinor: lines.reduce((s, l) => s + (l.inScope ? l.varianceCostMinor ?? 0 : 0), 0),
+      linesWithKnownCost: lines.filter((l) => l.inScope && l.varianceCostMinor !== null).length,
+      linesCounted: lines.filter((l) => l.inScope && l.actualMilli !== null).length,
+      linesWithVariance: lines.filter((l) => l.inScope && l.varianceMilli !== null).length,
       salesTotalMinor: 0,
       purchasesTotalMinor: 0,
     }) as EngineReport["totals"],
@@ -947,6 +1069,7 @@ function emptyCoverage(header: CountHeader): EngineReport["coverage"] {
     },
     purchases: { lines: 0, includedLines: 0, excludedLines: 0, excludedTotalMinor: 0, coveredBp: null },
     items: { counted: 0, withKnownOpening: 0, withKnownCost: 0 },
+    scope: { included: 0, excluded: 0, excludedNames: [] },
     gaps: [],
   };
 }

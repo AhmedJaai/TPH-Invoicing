@@ -10,7 +10,7 @@ import { Card, NoAccess, Section, buttonClass } from "@/components/ui";
 import { Money } from "@/components/money";
 import { StartCount } from "@/components/inventory-actions";
 import { InventoryWorkspace } from "@/components/inventory-workspace";
-import { listCounts, loadCountHeader, recomputeCount } from "@/services/inventory.service";
+import { listCounts, loadCountHeader, loadScope, recomputeCount } from "@/services/inventory.service";
 import { lastCompleteWeek } from "@/lib/inventory/week";
 import { formatBp } from "@/lib/inventory/equation";
 
@@ -44,6 +44,7 @@ export default async function InventoryPage() {
     const header = await loadCountHeader(open.id);
     if (header) {
       const report = await recomputeCount(open.id);
+      const scope = await loadScope(open.id);
       return (
         <PageShell
           user={user}
@@ -58,6 +59,7 @@ export default async function InventoryPage() {
             canCount={can(user.role, "inventory:count")}
             canReopen={can(user.role, "inventory:reopen")}
             showAmounts={can(user.role, "amounts:view")}
+            scopeInherited={scope.inherited}
           />
         </PageShell>
       );

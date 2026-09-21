@@ -63,7 +63,8 @@ export type LineFlag =
   | "COST_UNKNOWN"
   | "NOT_COUNTED"
   | "UNIT_CONFLICT"
-  | "RECIPE_UNIT_MISMATCH";
+  | "RECIPE_UNIT_MISMATCH"
+  | "OUT_OF_SCOPE";
 
 export const FLAG_LABEL: Record<LineFlag, string> = {
   OPENING_UNKNOWN: "الرصيد الافتتاحيّ غير معروف — لا جردَ سابقٌ ولا رصيدٌ مكتوب",
@@ -73,6 +74,7 @@ export const FLAG_LABEL: Record<LineFlag, string> = {
   NOT_COUNTED: "لم يُدخَل عدٌّ فعليّ بعد",
   UNIT_CONFLICT: "ذُكر في الوصفات بوحدتين من عائلتين مختلفتين",
   RECIPE_UNIT_MISMATCH: "وحدةُ الوصفة لا تُحوَّل إلى وحدة الصنف",
+  OUT_OF_SCOPE: "خارج هذا الجرد باختيارك — وقائعُه محسوبة ولا فرقَ له",
 };
 
 export interface EngineInput {
@@ -112,6 +114,21 @@ export interface EngineInput {
    * يُقوَّم بتقديرٍ مُعلَن، لا يُترَك بلا رقم.
    */
   catalogCostByProduct?: ReadonlyMap<string, number | null>;
+  /**
+   * أصنافُ هذا الجرد — ومن ليس فيها فخارجَه باختيار إنسان.
+   *
+   * ── ويُحسَب ولا يُحذَف ──
+   *
+   * الخارجُ تُحسَب وقائعُه كما هي: افتتاحيُّه ومشترياتُه واستهلاكُه
+   * المتوقَّع. والذي يسقط عنه **الفرقُ وحده** — لأنّ الفرق يقتضي عدّاً
+   * على الرفّ، ولا عدّ. فلا يدخل المجاميع ولا «أكبر الفروق».
+   *
+   * ولو حُذف سطرُه بالكلّيّة لما عُرف حجمُ ما خرج من الحساب — وذاك
+   * أوّلُ ما يُسأل عنه: «كم استبعدتُ، وكم يمثّل؟».
+   *
+   * وغيابُها يعني «الكلُّ داخل» — وهو سلوكُ النظام قبل أن يُخيَّر.
+   */
+  inScopeByProduct?: ReadonlySet<string>;
 }
 
 export interface ReportLine {
@@ -145,6 +162,14 @@ export interface ReportLine {
   /** بم قُوِّم — يُعرَض مع الرقم، فلا يتغيّر المنهجُ صامتاً. */
   valuationBasis: ValuationBasis;
   varianceCostMinor: number | null;
+
+  /**
+   * أهو داخلُ هذا الجرد؟
+   *
+   * والخارجُ سطرٌ كامل بوقائعه، بلا فرقٍ ولا كلفةِ فرق — يُعرَض
+   * معلَناً أنّه خارج، لا يُحذَف فيُظنّ أنّه عُدّ.
+   */
+  inScope: boolean;
 
   flags: LineFlag[];
   /** أصلُ الاستهلاك: أيّ نسخِ وصفاتٍ أسهمت فيه. */
@@ -250,8 +275,20 @@ export function reconcile(input: EngineInput): EngineReport {
       recordedWasteMilli: input.wasteByProduct.get(product.id) ?? 0,
     };
 
-    const actualMilli = input.actualByProduct.get(product.id) ?? null;
-    if (actualMilli === null) flags.push("NOT_COUNTED");
+    /*
+      ── الخارجُ عن الجرد لا يُحسَب له فرق ──
+
+      والفرقُ يقتضي عدّاً على الرفّ. فصنفٌ لم يُعَدّ عمداً لا يُقال
+      عنه «فرقُه صفر» ولا «فرقُه كذا»: يُقال إنّه خارج هذا الجرد.
+      ولذلك يُمرَّر إليه `null` مكانَ العدّ ولو كان مكتوباً — **وما
+      كُتب يبقى في القاعدة** فيعود متى أُعيد الصنف إلى الجرد.
+    */
+    const inScope = input.inScopeByProduct?.has(product.id) ?? true;
+    const storedActual = input.actualByProduct.get(product.id) ?? null;
+    const actualMilli = inScope ? storedActual : null;
+
+    if (!inScope) flags.push("OUT_OF_SCOPE");
+    else if (actualMilli === null) flags.push("NOT_COUNTED");
     else linesCounted++;
 
     const result = stockVariance(terms, actualMilli);
@@ -301,6 +338,7 @@ export function reconcile(input: EngineInput): EngineReport {
       unitCostMilliMinor: rate,
       valuationBasis,
       varianceCostMinor: varianceCost,
+      inScope,
       flags,
       recipeVersionIds: used?.recipeVersionIds ?? [],
       invoiceLineIds: bought?.invoiceLineIds ?? [],
@@ -319,6 +357,10 @@ export function reconcile(input: EngineInput): EngineReport {
     itemsWithKnownCost: lines.filter((l) => l.unitCostMinor !== null).length,
     unitConflicts,
     unitlessItems: [],
+    scope: {
+      included: lines.filter((l) => l.inScope).length,
+      excluded: lines.filter((l) => !l.inScope).map((l) => l.productName),
+    },
   });
 
   return {
@@ -348,7 +390,7 @@ export function reconcile(input: EngineInput): EngineReport {
  */
 export function topVariances(report: EngineReport, limit = 5): ReportLine[] {
   return report.lines
-    .filter((l) => l.varianceMilli !== null && l.varianceMilli !== 0)
+    .filter((l) => l.inScope && l.varianceMilli !== null && l.varianceMilli !== 0)
     .sort((a, b) => {
       const ac = a.varianceCostMinor === null ? -1 : Math.abs(a.varianceCostMinor);
       const bc = b.varianceCostMinor === null ? -1 : Math.abs(b.varianceCostMinor);

@@ -216,3 +216,78 @@ describe("تغيُّرُ الوصفة لا يُعاد به حسابُ ما مض�
     expect(later.recipeVersionIds).toEqual(["v-18"]);
   });
 });
+
+/**
+ * نطاقُ الجرد — ما يُعَدّ وما لا يُعَدّ.
+ *
+ * والسؤالُ الذي تجيبه هذه الاختبارات: **ماذا يسقط بالاستبعاد؟**
+ * الجوابُ: الفرقُ وحده. أمّا الوقائع — افتتاحيٌّ ومشترياتٌ واستهلاكٌ
+ * متوقَّع — فتُحسَب وتُعرَض، وإلّا لم يُعرَف حجمُ ما خرج من الحساب.
+ */
+describe("نطاقُ الجرد", () => {
+  it("الخارجُ تُحسَب وقائعُه ولا يُحسَب فرقُه", () => {
+    const r = reconcile(input({ inScopeByProduct: new Set([MILK]) }));
+    const coffee = r.lines.find((l) => l.productId === COFFEE)!;
+
+    expect(coffee.inScope).toBe(false);
+    /* الوقائعُ كما هي */
+    expect(canonicalToQuantity(coffee.openingMilli!, "KG")).toBe(5);
+    expect(canonicalToQuantity(coffee.purchasesMilli!, "KG")).toBe(20);
+    expect(canonicalToQuantity(coffee.theoreticalConsumptionMilli!, "KG")).toBe(1.8);
+    expect(canonicalToQuantity(coffee.theoreticalClosingMilli!, "KG")).toBe(23.2);
+    /* والفرقُ وحده يسقط */
+    expect(coffee.varianceMilli).toBeNull();
+    expect(coffee.varianceCostMinor).toBeNull();
+    expect(coffee.flags).toContain("OUT_OF_SCOPE");
+  });
+
+  it("ولا يدخل المجاميع ولا «أكبر الفروق»", () => {
+    const all = reconcile(input());
+    const some = reconcile(input({ inScopeByProduct: new Set([MILK]) }));
+
+    /* كلفةُ فرق البنّ ٩٥٢٫٥٠ — تخرج بخروجه، ولا يبقى إلّا فرقُ الحليب */
+    expect(all.totals.varianceCostMinor).not.toBe(some.totals.varianceCostMinor);
+    expect(some.totals.linesCounted).toBe(1);
+    expect(some.totals.linesWithVariance).toBe(1);
+    expect(topVariances(some).map((l) => l.productId)).toEqual([MILK]);
+  });
+
+  it("والعدُّ المكتوب يبقى في مدخل المحرّك — الاستبعادُ لا يمحوه", () => {
+    /*
+      يُمرَّر العدُّ كاملاً ويُستبعَد الصنف. فلو كان الاستبعادُ محواً
+      لما عاد الفرقُ بعودة الصنف — ويعود، وهذا ما يُثبته الشوطان.
+    */
+    const out = reconcile(input({ inScopeByProduct: new Set([MILK]) }));
+    const back = reconcile(input({ inScopeByProduct: new Set([MILK, COFFEE]) }));
+
+    expect(out.lines.find((l) => l.productId === COFFEE)!.varianceMilli).toBeNull();
+    expect(canonicalToQuantity(
+      back.lines.find((l) => l.productId === COFFEE)!.varianceMilli!, "KG",
+    )).toBe(-12.7);
+  });
+
+  it("والنطاقُ يُعلَن في التغطية بعدده وأسمائه — ولا يُنقص الحكم", () => {
+    const some = reconcile(input({ inScopeByProduct: new Set([MILK]) }));
+
+    expect(some.coverage.scope.included).toBe(1);
+    expect(some.coverage.scope.excluded).toBe(1);
+    expect(some.coverage.scope.excludedNames).toEqual(["حبوب قهوة"]);
+
+    /*
+      ── وليس فجوةَ تغطية ──
+
+      الاستبعادُ اختيارُ إنسان معلَن، لا نقصٌ في البيانات. ولو عُدّ
+      فجوةً لما بلغ جردٌ فيه استبعادٌ واحد `READY` أبداً — فيتعلّم
+      صاحبُه أنّ الشارة لا تعني شيئاً.
+    */
+    const all = reconcile(input());
+    expect(some.coverage.gaps.length).toBe(all.coverage.gaps.length);
+    expect(some.coverage.readiness).toBe(all.coverage.readiness);
+  });
+
+  it("وغيابُ النطاق يعني «الكلُّ داخل» — فلا يتغيّر ما كان", () => {
+    const r = reconcile(input());
+    expect(r.lines.every((l) => l.inScope)).toBe(true);
+    expect(r.coverage.scope.excluded).toBe(0);
+  });
+});
