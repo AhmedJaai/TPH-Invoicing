@@ -7,7 +7,10 @@
  */
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
-import { activateRecipeVersion, saveRecipeVersion, type IngredientDraft } from "@/services/recipe.service";
+import {
+  RecipeLockedError, activateRecipeVersion, correctRecipeVersion, deleteRecipe,
+  saveRecipeVersion, type IngredientDraft,
+} from "@/services/recipe.service";
 import { decimalToMilli } from "@/lib/inventory/units";
 import { isStoredUnit } from "@/lib/unit-conversion";
 
@@ -24,7 +27,7 @@ interface IngredientBody {
 }
 
 interface Body {
-  action?: "save" | "activate";
+  action?: "save" | "activate" | "correct" | "delete";
   versionId?: string;
   menuProductId?: string;
   effectiveFrom?: string;
@@ -60,6 +63,14 @@ export async function POST(request: Request) {
     }
 
     if (!body.menuProductId) return NextResponse.json({ error: "لم يُحدَّد الصنف المباع" }, { status: 400 });
+
+    if (body.action === "delete") {
+      const gone = await deleteRecipe(body.menuProductId, user.id);
+      return NextResponse.json({
+        ok: true,
+        message: `حُذفت وصفةُ «${gone.name}» بنسخها (${gone.deletedVersions}).`,
+      });
+    }
 
     const ingredients: IngredientDraft[] = [];
     for (const raw of body.ingredients ?? []) {
@@ -97,6 +108,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "ناتجُ الوصفة يُذكَر بكمّيّته ووحدته معاً" }, { status: 400 });
     }
 
+    /*
+      ── التصحيحُ غيرُ التغيير ──
+
+      التصحيحُ يقول «كانت دائماً كذا وأخطأنا في كتابتها»، فيسري على ما
+      مضى ولا يُنشئ نسخة. والتغييرُ يقول «من هنا صار كذا»، فيُؤرَّخ.
+    */
+    if (body.action === "correct") {
+      const fixed = await correctRecipeVersion({
+        menuProductId: body.menuProductId, ingredients, actorId: user.id,
+      });
+      return NextResponse.json({
+        ok: true, ...fixed,
+        message: `صُحِّحت النسخة ${fixed.version} — والتصحيحُ يسري على الأسابيع كلِّها.`,
+      });
+    }
+
     const result = await saveRecipeVersion({
       menuProductId: body.menuProductId,
       effectiveFrom: body.effectiveFrom ?? "",
@@ -115,6 +142,10 @@ export async function POST(request: Request) {
         : `حُفظت النسخة ${result.version} مسوّدةً — لا تدخل الحساب حتى تُفعَّل.`,
     });
   } catch (e) {
+    /* «حُسب بها جردٌ مقفَل» خبرٌ عن الحال لا عطبٌ في الطلب */
+    if (e instanceof RecipeLockedError) {
+      return NextResponse.json({ error: e.message }, { status: 409 });
+    }
     const mapped = respondTo(e);
     if (mapped) return mapped;
     return NextResponse.json({ error: (e as Error).message }, { status: 400 });

@@ -10,6 +10,7 @@ import { Money } from "@/components/money";
 import { isStoredUnit, storedUnitLabel } from "@/lib/unit-conversion";
 import { CATEGORY_LABEL, type ProductCategory } from "@/lib/products";
 import { formatBp } from "@/lib/inventory/equation";
+import { RetireItem } from "@/components/retire-item";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +83,7 @@ export default async function InventoryItemsPage() {
   /* من لا يرى المبالغ لا يُعرَض له عمودُ الكلفة — و`inventory:view` ليست `amounts:view` */
   const showAmounts = can(user.role, "amounts:view");
 
-  const columns: readonly Column<ItemRow>[] = [
+  let columns: readonly Column<ItemRow>[] = [
     {
       key: "name", header: "الصنف", primary: true,
       cell: (r) => <Link href={`/inventory/items/${r.id}`} className="font-bold hover:underline">{r.name}</Link>,
@@ -117,6 +118,19 @@ export default async function InventoryItemsPage() {
     },
     { key: "times", header: "مرّاتُ العدّ", numeric: true, secondary: true, cell: (r) => <span className="nums">{r.countedTimes}</span> },
   ];
+
+  /*
+    ── ولِمَ الفعلُ هنا لا في صفحة الصنف ──
+
+    من يراجع كتالوجاً مستورَداً يخرج منه عشرةَ أصنافٍ لا يشتريها —
+    وذلك عشرُ صفحاتٍ تُفتَح وتُغلَق لو كان الفعلُ في صفحة الصنف.
+  */
+  if (can(user.role, "recipe:edit")) {
+    columns = [...columns, {
+      key: "retire", header: "", wrap: true,
+      cell: (r) => <RetireItem productId={r.id} name={r.name} />,
+    }];
+  }
 
   return (
     <PageShell

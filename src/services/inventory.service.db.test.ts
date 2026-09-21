@@ -16,6 +16,7 @@ import {
 } from "./inventory.service";
 import { recordWaste } from "./inventory-movement.service";
 import { canonicalToQuantity } from "@/lib/inventory/units";
+import { RECIPE_EPOCH } from "@/lib/inventory/recipe";
 import type { Tx } from "./types";
 
 /**
@@ -552,20 +553,57 @@ describe("نسخُ الوصفة لا تتداخل", () => {
       expect(rows[1].to).toBeNull();
     }));
 
-  it("ونسخةٌ تبدأ قبل السارية تُرَدّ — ولا فجوةَ ولا تداخل", () =>
+  /*
+    ── أوّلُ نسخةٍ سارية منذ البداية ──
+
+    تصف كيف كان يُصنَع المشروب دائماً، لا كيف سيُصنَع من الغد. ولمّا
+    بدأت أوّلُ النسخ يومَ رفعها خرج **١٧٠٦ سطرَ بيعٍ من ١٧١٧** من
+    الحساب — ٩٩٫٨٪ من الوحدات — والوصفاتُ كلُّها صحيحة.
+  */
+  it("أوّلُ نسخةٍ تسري منذ البداية، فتغطّي ما بِيع قبل كتابتها", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      const coffee = await makeStockProduct(tx, "بنّ", "KG", "COFFEE");
+      const latte = await makeMenuProduct(tx, "لاتيه");
+
+      /* يُطلَب تاريخٌ في المستقبل، ويُكتَب من البداية */
+      await saveRecipeVersion({
+        menuProductId: latte, effectiveFrom: "2026-09-20", activate: true, actorId,
+        ingredients: [{ productId: coffee, quantityMilli: 20_000, unit: "G" }],
+      }, tx);
+
+      const [v] = (await tx.execute<{ effective_from: string; version: number }>(sql`
+        select v.effective_from, v.version
+          from recipe_versions v
+          join recipes r on r.id = v.recipe_id
+         where r.product_id = ${latte}
+      `)).rows;
+      expect(Number(v.version)).toBe(1);
+      expect(String(v.effective_from)).toBe(RECIPE_EPOCH);
+    }));
+
+  it("والتغييرُ اللاحق وحده يُؤرَّخ — ونسخةٌ تبدأ قبل السارية تُرَدّ", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const coffee = await makeStockProduct(tx, "بنّ", "KG", "COFFEE");
       const latte = await makeMenuProduct(tx, "لاتيه");
 
       await saveRecipeVersion({
-        menuProductId: latte, effectiveFrom: "2026-09-08", activate: true, actorId,
+        menuProductId: latte, effectiveFrom: "2026-09-01", activate: true, actorId,
         ingredients: [{ productId: coffee, quantityMilli: 20_000, unit: "G" }],
       }, tx);
 
+      /* الثانيةُ تُؤرَّخ كما طُلبت، وتُغلق الأولى قبلها بيوم */
+      const second = await saveRecipeVersion({
+        menuProductId: latte, effectiveFrom: "2026-09-08", activate: true, actorId,
+        ingredients: [{ productId: coffee, quantityMilli: 18_000, unit: "G" }],
+      }, tx);
+      expect(second.version).toBe(2);
+      expect(second.closedPrevious).not.toBeNull();
+
       await expect(saveRecipeVersion({
         menuProductId: latte, effectiveFrom: "2026-09-01", activate: true, actorId,
-        ingredients: [{ productId: coffee, quantityMilli: 18_000, unit: "G" }],
+        ingredients: [{ productId: coffee, quantityMilli: 19_000, unit: "G" }],
       }, tx)).rejects.toThrow(/تبدأ في 2026-09-08/);
     }));
 

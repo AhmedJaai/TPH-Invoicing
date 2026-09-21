@@ -323,11 +323,18 @@ describe("الكتالوجُ يُقوِّم الفرق حين لا فاتورة"
     صنفٌ لم تصل فاتورتُه هذا الأسبوع يُقوَّم فرقُه بتقديرٍ **مُعلَنٍ
     أنّه تقدير** لا يُترَك بلا رقم.
   */
-  it("بنُّ إثيوبيا: ‏٥٫٧١٥ كجم استهلاكاً، وكلفتُه من الكتالوج لا من فاتورة", () =>
+  /*
+    ── ويُرفَع الكتالوجُ بتاريخِ سريانٍ **بعد** الأسبوع المعدود ──
+
+    وهو ما وقع فعلاً: رُفع في ٢١ سبتمبر بسريانٍ من ٢٠، والجردُ على
+    ‏١٣–١٩. فخرج ١٧٠٦ سطرَ بيعٍ من ١٧١٧ من الحساب. وأوّلُ نسخةٍ تسري
+    منذ البداية، فتغطّيه.
+  */
+  it("بنُّ إثيوبيا: ‏٥٫٧١٥ كجم — ولو رُفع الكتالوجُ بسريانٍ بعد الأسبوع", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
-      await importAll(tx, actorId);
+      await importAll(tx, actorId, { effectiveFrom: "2026-09-27" });
 
       const [coffee] = (await tx.execute<{ id: string }>(sql`
         select id from products where foodics_item_sku = 'sk-0003'

@@ -6,12 +6,13 @@ import { products } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
-import { Badge, Card, DataTable, EmptyState, NoAccess, Section, buttonClass, type Column } from "@/components/ui";
+import { Card, EmptyState, NoAccess, Section, buttonClass } from "@/components/ui";
 import { RecipeEditor } from "@/components/recipe-editor";
-import { listRecipes, type RecipeRow } from "@/services/recipe.service";
+import { RecipeRows } from "@/components/recipe-rows";
+import { listRecipes } from "@/services/recipe.service";
 import { storedUnitLabel } from "@/lib/unit-conversion";
 import { Money } from "@/components/money";
-import { COST_REASON_LABEL, declaredCostDisagrees } from "@/lib/inventory/recipe-cost";
+import { declaredCostDisagrees } from "@/lib/inventory/recipe-cost";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
@@ -61,47 +62,6 @@ export default async function RecipesPage() {
      order by sold_minor desc
      limit 20
   `);
-
-  const columns: readonly Column<RecipeRow>[] = [
-    { key: "name", header: "الصنف المباع", primary: true, cell: (r) => r.menuProductName },
-    {
-      key: "active", header: "النسخة السارية",
-      cell: (r) => (
-        r.activeVersion === null
-          ? <Badge tone="warn">مسوّدة — لا تدخل الحساب</Badge>
-          : <span className="nums">نسخة {r.activeVersion} من {r.activeFrom}</span>
-      ),
-    },
-    { key: "ingredients", header: "مكوّنات", numeric: true, cell: (r) => <span className="nums">{r.ingredientCount}</span> },
-    {
-      key: "cost", header: "كلفةُ المكوّنات", numeric: true,
-      cell: (r) => (
-        r.costMinor === null
-          ? (
-            <span
-              className="text-[11px] text-muted"
-              title={r.unknownCost.map((u) => `${u.name}: ${COST_REASON_LABEL[u.reason]}`).join(" · ")}
-            >
-              غير معروفة — {r.unknownCost.map((u) => u.name).join("، ")}
-            </span>
-          )
-          : <Money minor={r.costMinor} />
-      ),
-    },
-    {
-      key: "price", header: "سعرُ البيع", numeric: true, secondary: true,
-      cell: (r) => (r.priceMinor === null ? <span className="text-muted">—</span> : <Money minor={r.priceMinor} />),
-    },
-    {
-      key: "margin", header: "الفرق", numeric: true,
-      cell: (r) => (
-        r.costMinor === null || r.priceMinor === null
-          ? <span className="text-muted">—</span>
-          : <Money minor={r.priceMinor - r.costMinor} />
-      ),
-    },
-    { key: "versions", header: "عددُ النسخ", numeric: true, secondary: true, cell: (r) => <span className="nums">{r.versions}</span> },
-  ];
 
   /*
     ── وصفةٌ فيها التغليفُ وحدَه ──
@@ -168,26 +128,31 @@ export default async function RecipesPage() {
       </div>
 
       <Section title="الوصفات المسجَّلة">
-        <DataTable
-          columns={columns}
-          rows={rows}
-          keyOf={(r) => r.recipeId}
-          empty={
-            <EmptyState
-              title="لا وصفةَ مسجَّلة بعد."
-              hint={
-                "بلا وصفاتٍ لا يُحسَب استهلاكٌ متوقَّع، فلا يُحسَب فرقُ جرد. "
-                + "وكتالوج فودكس يُنشئها كلَّها دفعةً واحدة — أصنافَ المخزون، والأصنافَ المباعة، "
-                + "والوصفاتِ وربطَها بنقاط البيع — فلا تُكتب واحدةً واحدة."
-              }
-              action={
-                <Link href="/inventory/import" className={buttonClass("primary", "sm")}>
-                  ارفع كتالوج فودكس
-                </Link>
-              }
-            />
-          }
-        />
+        {/*
+          الصفُّ يتمدّد في مكانه — فمراجعةُ ستّين وصفةً لا تكون ستّين
+          ذهاباً وإياباً بين صفحتين، ولا يفقد المراجعُ موضعَه من القائمة.
+        */}
+        {rows.length === 0 ? (
+          <EmptyState
+            title="لا وصفةَ مسجَّلة بعد."
+            hint={
+              "بلا وصفاتٍ لا يُحسَب استهلاكٌ متوقَّع، فلا يُحسَب فرقُ جرد. "
+              + "وكتالوج فودكس يُنشئها كلَّها دفعةً واحدة — أصنافَ المخزون، والأصنافَ المباعة، "
+              + "والوصفاتِ وربطَها بنقاط البيع — فلا تُكتب واحدةً واحدة."
+            }
+            action={
+              <Link href="/inventory/import" className={buttonClass("primary", "sm")}>
+                ارفع كتالوج فودكس
+              </Link>
+            }
+          />
+        ) : (
+          <RecipeRows
+            rows={rows}
+            choices={ingredients.map((p) => ({ id: p.id, name: p.nameAr, baseUnit: p.baseUnit }))}
+            defaultChangeFrom={todayInRiyadh()}
+          />
+        )}
       </Section>
     </PageShell>
   );
