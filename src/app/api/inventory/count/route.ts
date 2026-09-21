@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import {
   CountLockedError, NotAWeekError, OverlappingPeriodError, finaliseCount, recomputeCount, reopenCount,
-  saveActualCounts, startCount, type ActualInput,
+  saveActualCounts, setCountScope, startCount, type ActualInput,
 } from "@/services/inventory.service";
 import { decimalToMilli, toCanonical } from "@/lib/inventory/units";
 import { isStoredUnit } from "@/lib/unit-conversion";
@@ -26,7 +26,7 @@ interface Entry {
 }
 
 interface Body {
-  action?: "start" | "save" | "finalise" | "reopen" | "recompute";
+  action?: "start" | "save" | "scope" | "finalise" | "reopen" | "recompute";
   countId?: string;
   periodStart?: string;
   periodEnd?: string;
@@ -34,6 +34,9 @@ interface Body {
   note?: string | null;
   reason?: string;
   entries?: Entry[];
+  /** أصنافٌ بأعيانها يُغيَّر نطاقُها — مع `inScope`. */
+  productIds?: string[];
+  inScope?: boolean;
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -72,6 +75,29 @@ export async function POST(request: Request) {
         return NextResponse.json({
           ok: true, countId, created,
           message: created ? "بدأ الجرد — راجِع الجاهزيّة ثمّ أدخِل العدّ." : "هذه الفترة لها جردٌ مفتوحٌ أصلاً — فُتح.",
+        });
+      }
+
+      /*
+        ── النطاق: أيُّ الأصناف يُحسَب في هذا الجرد ──
+
+        ولا يُؤخَذ من المتصفّح إلّا معرّفاتُ الأصناف وأينها من الجرد.
+        والاستبعادُ لا يمحو عدّاً مكتوباً، ولا يُقرأ صفراً على الرفّ.
+      */
+      case "scope": {
+        if (!body.countId) return NextResponse.json({ error: "لم يُحدَّد الجرد" }, { status: 400 });
+        if (typeof body.inScope !== "boolean") {
+          return NextResponse.json({ error: "لم يُحدَّد أداخلٌ هو أم خارج" }, { status: 400 });
+        }
+        const ids = (body.productIds ?? []).filter((x) => typeof x === "string" && x.length > 0);
+        if (ids.length === 0) return NextResponse.json({ error: "لم يُحدَّد صنف" }, { status: 400 });
+
+        const { changed } = await setCountScope(body.countId, ids, body.inScope, user.id);
+        return NextResponse.json({
+          ok: true,
+          message: body.inScope
+            ? `أُدخل ${countNoun(changed, ITEM)} في الجرد.`
+            : `أُخرج ${countNoun(changed, ITEM)} من الجرد — وقائعُه محسوبة ولا فرقَ له.`,
         });
       }
 

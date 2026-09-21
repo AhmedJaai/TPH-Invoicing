@@ -73,6 +73,20 @@ export interface CoverageReport {
     withKnownOpening: number;
     withKnownCost: number;
   };
+  /**
+   * نطاقُ الجرد — كم صنفاً فيه وكم استُبعد.
+   *
+   * ── ولماذا ليس «فجوةَ تغطية» ──
+   *
+   * الفجوةُ نقصٌ في البيانات يُنقص الثقة بالرقم؛ وهذا **اختيارُ
+   * إنسان** معلَن: «لا أعدّ المصّاصات هذا الأسبوع». فلو عُدّ فجوةً
+   * لما بلغ جردٌ فيه استبعادٌ واحد حالَ `READY` أبداً — فيتعلّم
+   * صاحبُه أنّ الشارة لا تعني شيئاً، ويتجاهل نقصاً حقيقيّاً حين يقع.
+   *
+   * فيُعلَن عددُه في رأس الشاشة ولا يُنقص الحكم. والأسماءُ محفوظة
+   * كي يُقرأ **ما** استُبعد لا كم استُبعد.
+   */
+  scope: { included: number; excluded: number; excludedNames: string[] };
   gaps: CoverageGap[];
 }
 
@@ -105,6 +119,8 @@ export interface CoverageInput {
   unitlessItems: readonly string[];
   /** فواتيرُ التباسِ الاستلام — تُعرَض ولا تُضمّ. */
   ambiguousReceipts?: readonly { invoiceNumber: string; supplierName: string; lineTotalMinor: number }[];
+  /** نطاقُ الجرد: ما دخله وما استُبعد منه باختيار إنسان. */
+  scope?: { included: number; excluded: readonly string[] };
 }
 
 /**
@@ -268,6 +284,11 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
       counted: input.itemsCounted,
       withKnownOpening: input.itemsWithKnownOpening,
       withKnownCost: input.itemsWithKnownCost,
+    },
+    scope: {
+      included: input.scope?.included ?? 0,
+      excluded: input.scope?.excluded.length ?? 0,
+      excludedNames: [...(input.scope?.excluded ?? [])].slice(0, MAX_EXAMPLES),
     },
     gaps,
   };

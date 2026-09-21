@@ -11,8 +11,9 @@ import { importSalesFile } from "./sales-import.service";
 import { mapPosProducts } from "./pos-mapping.service";
 import { saveRecipeVersion } from "./recipe.service";
 import {
-  CountLockedError, NotAWeekError, finaliseCount, itemHistory, loadCountHeader,
-  readFrozenReport, recomputeCount, reopenCount, saveActualCounts, startCount, unmappedPosProducts,
+  CountLockedError, NotAWeekError, finaliseCount, itemHistory, loadCountHeader, loadScope,
+  readFrozenReport, recomputeCount, reopenCount, saveActualCounts, setCountScope, startCount,
+  unmappedPosProducts,
 } from "./inventory.service";
 import { recordWaste } from "./inventory-movement.service";
 import { canonicalToQuantity } from "@/lib/inventory/units";
@@ -828,3 +829,116 @@ async function makePurchase(
             ${totalMinor}, ${totalMinor}, ${day(isoDate)}, ${supplierId}, ${spId})
   `);
 }
+
+/**
+ * نطاقُ الجرد على القاعدة — ما يُعَدّ وما لا يُعَدّ.
+ *
+ * والسؤالان اللذان لا يجيبهما اختبارٌ نقيّ: أيبقى العدُّ المكتوب بعد
+ * الاستبعاد؟ وأيتوارَث الاختيارُ إلى جرد الأسبوع القادم؟
+ */
+describe("نطاقُ الجرد", () => {
+  async function twoItems(tx: Tx) {
+    const actorId = await makeActor(tx);
+    const branch = await makeBranch(tx);
+    const coffee = await makeStockProduct(tx, "حبوب قهوة", "KG", "COFFEE");
+    const straws = await makeStockProduct(tx, "مصّاصات", "PIECE");
+    const latte = await makeMenuProduct(tx, "لاتيه");
+    await isolateProducts(tx, [coffee, straws, latte]);
+
+    await saveRecipeVersion({
+      menuProductId: latte, effectiveFrom: "2026-09-01", activate: true, actorId,
+      ingredients: [{ productId: coffee, quantityMilli: 20_000, unit: "G" }],
+    }, tx);
+    await importAndMap(tx, salesFile(100), actorId, latte, branch.nameAr);
+
+    /* افتتاحيٌّ وشراءٌ — بلا حدَّي المعادلة يخرج الفرقُ مجهولاً لا محسوباً */
+    await tx.execute(sql`
+      insert into inventory_movements (id, product_id, branch_id, kind, quantity_milli, unit, occurred_on, created_by_id)
+      values (${`mv-${Math.random()}`}, ${coffee}, ${branch.id}, 'OPENING', ${5000}, 'KG', '2026-08-30', ${actorId})
+    `);
+    await makePurchase(tx, coffee, "2026-09-02", 1500_00, {
+      packSize: "1", contentUnit: "KG", contentQuantity: "20", qty: "1",
+    });
+
+    return { actorId, branch, coffee, straws };
+  }
+
+  it("المستبعَدُ تُحسَب وقائعُه ولا فرقَ له — ولا يدخل المجاميع", () =>
+    withRollback(async (tx) => {
+      const { actorId, branch, coffee, straws } = await twoItems(tx);
+      const { countId } = await startCount({
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: branch.id, actorId,
+      }, tx);
+
+      await saveActualCounts(countId, [{ productId: coffee, actualMilli: kg(20.5) }], actorId, tx);
+      await setCountScope(countId, [straws], false, actorId, tx);
+
+      const report = await recomputeCount(countId, tx);
+      const line = report.lines.find((l) => l.productId === straws)!;
+
+      expect(line.inScope).toBe(false);
+      expect(line.varianceMilli).toBeNull();
+      expect(report.coverage.scope.excluded).toBe(1);
+      expect(report.coverage.scope.included).toBe(1);
+    }));
+
+  it("والعدُّ المكتوب يبقى في القاعدة — يُستبعَد الصنفُ ثمّ يعود فيعود فرقُه", () =>
+    withRollback(async (tx) => {
+      const { actorId, branch, coffee } = await twoItems(tx);
+      const { countId } = await startCount({
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: branch.id, actorId,
+      }, tx);
+
+      await saveActualCounts(countId, [{ productId: coffee, actualMilli: kg(20.5) }], actorId, tx);
+      await setCountScope(countId, [coffee], false, actorId, tx);
+
+      /* الرقمُ محفوظٌ في السطر وإن لم يُحسَب به */
+      const [row] = (await tx.execute<{ actual_milli: string | null }>(sql`
+        select actual_milli from inventory_count_lines
+         where count_id = ${countId} and product_id = ${coffee}
+      `)).rows;
+      expect(row.actual_milli).not.toBeNull();
+
+      await setCountScope(countId, [coffee], true, actorId, tx);
+      const back = await recomputeCount(countId, tx);
+      expect(canonicalToQuantity(
+        back.lines.find((l) => l.productId === coffee)!.varianceMilli!, "KG",
+      )).toBe(-2.5);
+    }));
+
+  it("والاختيارُ يُتوارَث إلى جرد الأسبوع التالي — ولا يُسأل عنه كلَّ أحد", () =>
+    withRollback(async (tx) => {
+      const { actorId, branch, coffee, straws } = await twoItems(tx);
+
+      const first = await startCount({
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: branch.id, actorId,
+      }, tx);
+      await setCountScope(first.countId, [straws], false, actorId, tx);
+      await saveActualCounts(first.countId, [{ productId: coffee, actualMilli: kg(20.5) }], actorId, tx);
+      await finaliseCount(first.countId, actorId, tx);
+
+      const second = await startCount({
+        periodStart: "2026-09-06", periodEnd: "2026-09-12", branchId: branch.id, actorId,
+      }, tx);
+      const scope = await loadScope(second.countId, tx);
+      expect(scope.inherited).toBe(true);
+      expect(scope.excluded.has(straws)).toBe(true);
+
+      const report = await recomputeCount(second.countId, tx);
+      expect(report.lines.find((l) => l.productId === straws)!.inScope).toBe(false);
+      expect(report.lines.find((l) => l.productId === coffee)!.inScope).toBe(true);
+    }));
+
+  it("ولا يُكتَب نطاقٌ في جردٍ مقفَل", () =>
+    withRollback(async (tx) => {
+      const { actorId, branch, coffee, straws } = await twoItems(tx);
+      const { countId } = await startCount({
+        periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: branch.id, actorId,
+      }, tx);
+      await saveActualCounts(countId, [{ productId: coffee, actualMilli: kg(20.5) }], actorId, tx);
+      await finaliseCount(countId, actorId, tx);
+
+      expect(await caught(setCountScope(countId, [straws], false, actorId, tx)))
+        .toBeInstanceOf(CountLockedError);
+    }));
+});

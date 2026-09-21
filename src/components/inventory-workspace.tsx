@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Badge, Card, EmptyState, Section, Stat, StatGrid, buttonClass } from "./ui";
 import { Money, Prose } from "./money";
 import { FinaliseCount, RecomputeCount, ReopenCount } from "./inventory-actions";
-import { InventoryCountEntry, type CountRow } from "./inventory-count-entry";
+import { InventoryCountSteps, type StepRow } from "./inventory-count-steps";
 import { InventoryWaste } from "./inventory-waste";
 import { CATEGORY_LABEL, type ProductCategory } from "@/lib/products";
 import { storedUnitLabel } from "@/lib/unit-conversion";
@@ -28,11 +28,14 @@ export function InventoryWorkspace({
   canCount,
   canReopen,
   showAmounts,
+  scopeInherited,
 }: {
   header: CountHeader;
   report: EngineReport;
   canCount: boolean;
   canReopen: boolean;
+  /** أمورَّثٌ نطاقُ هذا الجرد من سابقه؟ — يُقال للمستخدم. */
+  scopeInherited: boolean;
   /**
    * أيرى هذا الدورُ المبالغ؟
    *
@@ -45,7 +48,7 @@ export function InventoryWorkspace({
   const locked = header.status === "FINALISED";
   const coverage = report.coverage;
 
-  const rows: CountRow[] = report.lines.map((l) => ({
+  const rows: StepRow[] = report.lines.map((l) => ({
     productId: l.productId,
     productName: l.productName,
     category: l.category,
@@ -63,7 +66,18 @@ export function InventoryWorkspace({
     varianceCostMinor: showAmounts ? l.varianceCostMinor : null,
     flags: l.flags.map((f) => FLAG_LABEL[f]),
     negative: (l.varianceMilli ?? 0) < 0,
+    inScope: l.inScope,
+    /* حدودُ المعادلة نصّاً — و`null` تبقى «غير معروف» لا صفراً */
+    openingText: q(l.openingMilli, l.baseUnit),
+    purchasesText: q(l.purchasesMilli, l.baseUnit),
+    adjustmentsText: l.adjustmentsInMilli === 0 && l.adjustmentsOutMilli === 0
+      ? null
+      : q(l.adjustmentsInMilli - l.adjustmentsOutMilli, l.baseUnit),
+    consumptionText: q(l.theoreticalConsumptionMilli, l.baseUnit),
+    wasteText: l.recordedWasteMilli === 0 ? null : q(l.recordedWasteMilli, l.baseUnit),
   }));
+
+  const inScopeCount = report.lines.filter((l) => l.inScope).length;
 
   const categories = [...new Set(report.lines.map((l) => l.category))].map((key) => ({
     key,
@@ -103,8 +117,26 @@ export function InventoryWorkspace({
           <Fact label="أسطرُ بيع" value={`${coverage.sales.includedLines} من ${coverage.sales.lines}`} />
           <Fact label="أيّامٌ فيها مبيعات" value={`${coverage.sales.daysWithSales} من ${coverage.sales.periodDays}`} />
           <Fact label="أسطرُ شراء" value={`${coverage.purchases.includedLines} من ${coverage.purchases.lines}`} />
-          <Fact label="أصنافٌ عُدّت" value={`${report.totals.linesCounted} من ${report.lines.length}`} />
+          <Fact label="أصنافٌ عُدّت" value={`${report.totals.linesCounted} من ${inScopeCount}`} />
         </dl>
+
+        {/*
+          ── النطاقُ يُقال ولا يُخفى ──
+
+          «عُدّ ٢٤ من ٢٤» تقرأ اكتمالاً، وقد تكون ستّةٌ وثلاثون صنفاً
+          خارج الجرد. فما خرج يُقال عدده وأمثلتُه هنا، فوق كلّ رقم.
+          وليس فجوةَ تغطية: هو اختيارُ إنسان معلَن، ولو أنقص الحكمَ
+          لما بلغ جردٌ فيه استبعادٌ واحد `READY` أبداً.
+        */}
+        {coverage.scope.excluded > 0 && (
+          <p className="mt-2.5 text-[11px] leading-relaxed text-ink-soft">
+            و<span className="nums font-bold">{coverage.scope.excluded}</span> صنفاً خارج هذا الجرد
+            باختيارك — وقائعُها محسوبة ولا فرقَ لها ولا تدخل المجاميع
+            {coverage.scope.excludedNames.length > 0 && (
+              <span className="text-muted">: {coverage.scope.excludedNames.join(" · ")}</span>
+            )}.
+          </p>
+        )}
 
         {coverage.gaps.length > 0 && (
           <ul className="mt-3 space-y-1.5">
@@ -209,10 +241,10 @@ export function InventoryWorkspace({
       {/* ── العدّ ── */}
       <Section
         id="count"
-        title={locked ? "الأصناف كما أُقفلت" : "أدخِل العدّ الفعليّ"}
+        title={locked ? "الأصناف كما أُقفلت" : "الجرد"}
         hint={locked
           ? "هذه الأرقام مجمَّدة — لا تتغيّر بتعديل وصفةٍ ولا بوصول فاتورة."
-          : "اكتب ما وجدتَه على الرفّ، والباقي محسوب. وEnter ينقلك إلى الصنف التالي."}
+          : "اختر ما يُعَدّ، ثمّ اقرأ ما تقوله المبيعات، ثمّ اكتب ما وجدتَه. وEnter ينقلك إلى الصنف التالي."}
       >
         {report.lines.length === 0 ? (
           <EmptyState
@@ -220,12 +252,13 @@ export function InventoryWorkspace({
             hint="تُبنى الأصناف من بنود فواتير المورّدين — ارفع فاتورةً أو اربط أصنافَ مورّديك."
           />
         ) : (
-          <InventoryCountEntry
+          <InventoryCountSteps
             countId={header.id}
             rows={rows}
             categories={categories}
             canEdit={canCount}
             locked={locked}
+            scopeInherited={scopeInherited}
           />
         )}
       </Section>
@@ -237,7 +270,7 @@ export function InventoryWorkspace({
             countId={header.id}
             branchId={header.branchId}
             defaultDate={header.periodEnd}
-            items={report.lines.map((l) => ({
+            items={report.lines.filter((l) => l.inScope).map((l) => ({
               id: l.productId,
               name: l.productName,
               baseUnit: l.baseUnit,
@@ -272,7 +305,7 @@ export function InventoryWorkspace({
             countId={header.id}
             readiness={coverage.readiness}
             countedItems={report.totals.linesCounted}
-            totalItems={report.lines.length}
+            totalItems={inScopeCount}
           />
         ) : null}
       </Section>
@@ -305,4 +338,9 @@ function valuationNote(report: EngineReport): string {
 /** رقمٌ بلا أصفارٍ زائدة — «٢» لا «٢٫٠٠٠». */
 function trim(value: number): string {
   return String(Math.round(value * 1000) / 1000);
+}
+
+/** حدٌّ في المعادلة نصّاً — و`null` تبقى `null` فتُكتب «غير معروف». */
+function q(milli: number | null, unit: StepRow["baseUnit"]): string | null {
+  return milli === null ? null : trim(canonicalToQuantity(milli, unit as never));
 }

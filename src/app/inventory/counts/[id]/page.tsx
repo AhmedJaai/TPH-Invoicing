@@ -4,7 +4,7 @@ import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { NoAccess } from "@/components/ui";
 import { InventoryWorkspace } from "@/components/inventory-workspace";
-import { loadCountHeader, readFrozenReport, recomputeCount } from "@/services/inventory.service";
+import { loadCountHeader, loadScope, readFrozenReport, recomputeCount } from "@/services/inventory.service";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +37,7 @@ export default async function CountReportPage({
   const report = header.status === "FINALISED"
     ? await readFrozenReport(header)
     : await recomputeCount(header.id);
+  const scope = await loadScope(header.id);
 
   return (
     <PageShell
@@ -51,6 +52,7 @@ export default async function CountReportPage({
         canCount={can(user.role, "inventory:count")}
         canReopen={can(user.role, "inventory:reopen")}
         showAmounts={can(user.role, "amounts:view")}
+        scopeInherited={scope.inherited}
       />
     </PageShell>
   );
