@@ -75,7 +75,25 @@ export default async function InventoryPage() {
   /* آخرُ أسبوعٍ اكتمل — لا الجاري: الجردُ يقع بعد تقفيلة السبت */
   const week = lastCompleteWeek();
 
-  const hasSales = (await db.execute<{ n: number }>(sql`select count(*)::int as n from sales`)).rows[0]?.n ?? 0;
+  /*
+    ── ثلاثُ خطواتٍ مرتَّبة، لا حالةٌ واحدة ──
+
+    كانت الشاشة تسأل عن المبيعات وحدها، فمن استورد مبيعاته ولا كتالوجَ
+    عنده يرى شاشةً هادئةً لا تقول شيئاً — **والجردُ يخرج فارغاً بلا
+    سببٍ ظاهر**: لا أصنافَ تُعَدّ، ولا وصفاتٍ تُحسَب بها.
+
+    فتُقرأ الثلاثةُ وتُعرَض بترتيبها: كتالوجٌ يُنشئ الأصناف والوصفات،
+    ثمّ مبيعاتٌ تقول ما بِيع، ثمّ جردٌ يُقابلهما.
+  */
+  const [readiness] = (await db.execute<{ items: number; recipes: number; sales: number }>(sql`
+    select (select count(*)::int from products where is_stock_item and is_active) as items,
+           (select count(*)::int from recipes) as recipes,
+           (select count(*)::int from sales) as sales
+  `)).rows;
+
+  const stockItems = Number(readiness?.items ?? 0);
+  const recipeCount = Number(readiness?.recipes ?? 0);
+  const hasSales = Number(readiness?.sales ?? 0);
 
   return (
     <PageShell
@@ -84,15 +102,38 @@ export default async function InventoryPage() {
       title="الجرد الحالي"
       intro="ما كان ينبغي أن يبقى على الرفّ، مقابلَ ما وُجد فعلاً."
     >
-      {Number(hasSales) === 0 && (
+      {(recipeCount === 0 || hasSales === 0) && (
         <Card tone="warn">
-          <p className="text-sm font-bold">لا مبيعاتٍ مستوردة بعد.</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">
-            الجردُ يُقابل ما وُجد بما كان ينبغي أن يُستهلَك — وذلك يُحسَب من المبيعات
-            ووصفاتها. فابدأ باستيراد ملفّ فودكس.
+          <p className="text-sm font-bold">
+            {recipeCount === 0
+              ? "لا كتالوجَ بعد — ولا وصفةَ واحدة."
+              : "الكتالوجُ عندك، ولم تصل المبيعات بعد."}
           </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            الجردُ يُقابل ما وُجد على الرفّ بما كان ينبغي أن يُستهلَك. وذاك يحتاج
+            ثلاثةً بترتيبها:
+          </p>
+
+          <ol className="mt-3 space-y-2">
+            <Step
+              done={recipeCount > 0}
+              title="ارفع كتالوج فودكس"
+              detail={
+                recipeCount > 0
+                  ? `${stockItems} صنفَ مخزون · ${recipeCount} وصفة`
+                  : "ثلاثةُ ملفّات: أصنافُ المخزون، والأصنافُ المباعة، والوصفات — تُنشئ الأصناف والوصفات والربط دفعةً واحدة"
+              }
+            />
+            <Step
+              done={hasSales > 0}
+              title="ارفع ملفّ المبيعات"
+              detail={hasSales > 0 ? `${hasSales} بيعةً مقيَّدة` : "تصديرُ الطلبات من فودكس — وبه يُحسَب ما كان ينبغي أن يُصرَف"}
+            />
+            <Step done={false} title="ابدأ جردَ الأسبوع" detail="تُدخل العدّ الفعليّ وحده، والباقي محسوب" />
+          </ol>
+
           <Link href="/inventory/import" className={`${buttonClass("primary", "sm")} mt-3`}>
-            استورِد مبيعات فودكس
+            {recipeCount === 0 ? "ارفع الكتالوج" : "ارفع المبيعات"}
           </Link>
         </Card>
       )}
@@ -129,5 +170,20 @@ export default async function InventoryPage() {
         </Section>
       )}
     </PageShell>
+  );
+}
+
+/** خطوةٌ في التهيئة — تقول أتمّت أم لا، وبم تمّت. */
+function Step({ done, title, detail }: { done: boolean; title: string; detail: string }) {
+  return (
+    <li className="flex gap-2">
+      <span aria-hidden className={`mt-0.5 text-xs ${done ? "text-ok" : "text-muted"}`}>
+        {done ? "✓" : "○"}
+      </span>
+      <span className="min-w-0">
+        <span className={`text-xs font-bold ${done ? "text-muted line-through" : ""}`}>{title}</span>
+        <span className="block text-[11px] leading-relaxed text-muted">{detail}</span>
+      </span>
+    </li>
   );
 }
