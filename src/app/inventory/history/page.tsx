@@ -58,21 +58,44 @@ export default async function InventoryHistoryPage() {
       key: "sales", header: "مبيعاتُ الفترة", numeric: true,
       cell: (r) => (r.salesMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={r.salesMinor} />),
     },
+    /*
+      ── النقصُ والزيادةُ عمودان لا عمودٌ صافٍ ──
+
+      نقصٌ بألفٍ وزيادةٌ بألفٍ صافيهما صفر — «لا مشكلة» في أسبوعٍ فيه
+      مشكلتان. فالنقصُ أوّلاً، والزيادةُ بجانبه، والصافي ثانويّ.
+    */
     {
-      key: "variance", header: "كلفةُ فرق الجرد", numeric: true,
+      key: "shortage", header: "النقص", numeric: true,
       cell: (r) => (
-        r.varianceCostMinor === null
-          ? <span className="text-muted">غير معروف</span>
-          : <Money minor={r.varianceCostMinor} tone={r.varianceCostMinor < 0 ? "danger" : undefined} />
+        r.summary.shortageCostMinor === 0 && r.summary.linesShort === 0
+          ? <span className="text-muted">—</span>
+          : <Money minor={r.summary.shortageCostMinor} tone="danger" />
       ),
     },
     {
-      key: "pct", header: "من المبيعات", numeric: true,
-      cell: (r) => <span className="nums">{formatBp(r.varianceBp)}</span>,
+      key: "overage", header: "الزيادة", numeric: true,
+      cell: (r) => (
+        r.summary.overageCostMinor === 0 && r.summary.linesOver === 0
+          ? <span className="text-muted">—</span>
+          : <Money minor={r.summary.overageCostMinor} />
+      ),
+    },
+    {
+      key: "rate", header: "النقصُ من الاستهلاك", numeric: true,
+      cell: (r) => (
+        <span className="nums">
+          {r.summary.shortageRateBp === null ? "غير محسوبة" : formatBp(-r.summary.shortageRateBp)}
+          {!r.summary.consumptionCostComplete && <span className="text-muted"> *</span>}
+        </span>
+      ),
+    },
+    {
+      key: "net", header: "الصافي", numeric: true, secondary: true,
+      cell: (r) => <Money minor={r.summary.netCostMinor} />,
     },
     {
       key: "items", header: "أصنافٌ عُدّت", numeric: true, secondary: true,
-      cell: (r) => <span className="nums">{r.itemsCounted}</span>,
+      cell: (r) => <span className="nums">{r.itemsCounted} من {r.itemsInScope}</span>,
     },
   ];
 
@@ -97,6 +120,11 @@ export default async function InventoryHistoryPage() {
           />
         }
       />
+      {rows.some((r) => !r.summary.consumptionCostComplete) && (
+        <p className="mt-3 text-[11px] leading-relaxed text-muted">
+          * مقامُ النسبة ناقص: بعضُ الاستهلاك في ذلك الأسبوع لا تُعرَف كلفتُه، فالنسبةُ على ما عُرف وحده.
+        </p>
+      )}
     </PageShell>
   );
 }

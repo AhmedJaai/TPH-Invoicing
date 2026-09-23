@@ -1,0 +1,66 @@
+import { describe, expect, it } from "vitest";
+import { combineSummaries, summariseVariance, type SummaryLine } from "./variance-summary";
+
+/* ١٠٠ ريالٍ للكيلو = ١٠ هللات للجرام = ١٠٬٠٠٠ مِلّي‑هللة */
+const RATE = 10_000;
+const g = (n: number) => n * 1000; // جرامٌ بالمِلّي المعياريّ
+
+function line(over: Partial<SummaryLine>): SummaryLine {
+  return {
+    inScope: true, varianceMilli: null, varianceCostMinor: null,
+    theoreticalConsumptionMilli: null, unitCostMilliMinor: RATE, baseUnit: "G",
+    ...over,
+  };
+}
+
+describe("النقصُ والزيادةُ لا يتقاصّان", () => {
+  it("نقصٌ بألفٍ وزيادةٌ بألف في أسبوعٍ واحد — الصافي صفر، والنقصُ ألفٌ والحجمُ ألفان", () => {
+    const s = summariseVariance([
+      line({ varianceMilli: -g(10_000), varianceCostMinor: -1000_00 }),
+      line({ varianceMilli: g(10_000), varianceCostMinor: 1000_00 }),
+    ]);
+    expect(s.netCostMinor).toBe(0);
+    expect(s.shortageCostMinor).toBe(1000_00);
+    expect(s.overageCostMinor).toBe(1000_00);
+    expect(s.absoluteCostMinor).toBe(2000_00);
+    expect(s.linesShort).toBe(1);
+    expect(s.linesOver).toBe(1);
+  });
+
+  it("وعبر أسبوعين كذلك — نقصُ الأوّل لا تُطفئه زيادةُ الثاني", () => {
+    const w1 = summariseVariance([line({ varianceMilli: -g(10_000), varianceCostMinor: -1000_00 })]);
+    const w2 = summariseVariance([line({ varianceMilli: g(10_000), varianceCostMinor: 1000_00 })]);
+    const both = combineSummaries([w1, w2]);
+    expect(both.netCostMinor).toBe(0);
+    expect(both.shortageCostMinor).toBe(1000_00);
+    expect(both.absoluteCostMinor).toBe(2000_00);
+  });
+
+  it("ونسبةُ النقص مقامُها كلفةُ الاستهلاك المتوقَّع", () => {
+    /* استُهلك ٢٠ كجم بكلفة ٢٬٠٠٠ ريال، ونقص ما قيمتُه ١٠٠ ← ٥٪ */
+    const s = summariseVariance([
+      line({ theoreticalConsumptionMilli: g(20_000), varianceMilli: -g(1000), varianceCostMinor: -100_00 }),
+    ]);
+    expect(s.consumptionCostMinor).toBe(2000_00);
+    expect(s.shortageRateBp).toBe(500);
+    expect(s.consumptionCostComplete).toBe(true);
+  });
+
+  it("والخارجُ عن الجرد لا يدخل شيئاً", () => {
+    const s = summariseVariance([
+      line({ inScope: false, varianceMilli: -g(1000), varianceCostMinor: -100_00, theoreticalConsumptionMilli: g(5000) }),
+    ]);
+    expect(s.shortageCostMinor).toBe(0);
+    expect(s.consumptionCostMinor).toBe(0);
+    expect(s.shortageRateBp).toBeNull();
+  });
+
+  it("وفرقٌ بلا كلفة يُعَدّ ولا يُجمَع — ومقامٌ بلا كلفة يُعلَن ناقصاً", () => {
+    const s = summariseVariance([
+      line({ varianceMilli: -g(500), varianceCostMinor: null, unitCostMilliMinor: null, theoreticalConsumptionMilli: g(3000) }),
+    ]);
+    expect(s.linesWithoutCost).toBe(1);
+    expect(s.shortageCostMinor).toBe(0);
+    expect(s.consumptionCostComplete).toBe(false);
+  });
+});

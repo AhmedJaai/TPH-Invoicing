@@ -25,7 +25,9 @@ export const READINESS_LABEL: Record<Readiness, string> = {
 
 export interface CoverageGap {
   kind: "SALES" | "PURCHASES" | "ITEMS";
-  reason: ExclusionReason | PurchaseGapReason | "UNIT_CONFLICT" | "NO_UNIT" | "RECEIPT_AMBIGUOUS";
+  reason:
+    | ExclusionReason | PurchaseGapReason
+    | "UNIT_CONFLICT" | "NO_UNIT" | "RECEIPT_AMBIGUOUS" | "RECEIPT_POSSIBLE_DUPLICATE";
   label: string;
   count: number;
   /** ما يمثّله من المال — الريالُ يقول حجمَ الفجوة أصدقَ من العدد. */
@@ -121,6 +123,8 @@ export interface CoverageInput {
   ambiguousReceipts?: readonly { invoiceNumber: string; supplierName: string; lineTotalMinor: number }[];
   /** نطاقُ الجرد: ما دخله وما استُبعد منه باختيار إنسان. */
   scope?: { included: number; excluded: readonly string[] };
+  /** استلاماتٌ يدويّة قد تكون هي نفسَ بندِ فاتورة — لم يُحسَم أمرُها. */
+  receiptDuplicates?: readonly { productName: string; invoiceNumber: string; supplierName: string }[];
 }
 
 /**
@@ -239,6 +243,25 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
       totalMinor: ambiguous.reduce((s, a) => s + a.lineTotalMinor, 0),
       unitsShareBp: null,
       examples: [...new Set(ambiguous.map((a) => `${a.supplierName} · ${a.invoiceNumber}`))].slice(0, MAX_EXAMPLES),
+    });
+  }
+
+  /*
+    ── استلامٌ يدويٌّ قد يكون هو الفاتورة ──
+
+    فجوةُ بياناتٍ لا اختيار: لا نعرف أهما شحنةٌ واحدة أم اثنتان، فمشترياتُ
+    الصنف مجهولة حتى يقول صاحبُها. ولذلك تُنقص الجاهزيّة — بخلاف النطاق.
+  */
+  const dup = input.receiptDuplicates ?? [];
+  if (dup.length > 0) {
+    gaps.push({
+      kind: "PURCHASES",
+      reason: "RECEIPT_POSSIBLE_DUPLICATE",
+      label: "كمّيّةٌ أدخلتَها يدوياً قد تكون هي نفسَ بندِ فاتورةٍ وصلت — اربطهما أو أكّد أنّهما شحنتان",
+      count: dup.length,
+      totalMinor: 0,
+      unitsShareBp: null,
+      examples: [...new Set(dup.map((d) => `${d.productName} ↔ ${d.supplierName} · ${d.invoiceNumber}`))].slice(0, MAX_EXAMPLES),
     });
   }
 

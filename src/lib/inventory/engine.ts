@@ -13,6 +13,8 @@
  * تُحفَظ في اللقطة مع كلّ جردٍ مقفَل. فمن قرأ تقريراً بعد سنةٍ عرف
  * بأيّ منطقٍ حُسب — ولو تغيّر المنطقُ بعده لم يتغيّر التقرير.
  */
+import { summariseVariance, type VarianceSummary } from "./variance-summary";
+import type { DuplicateCandidate } from "./receipts";
 import type { StoredUnit } from "@/lib/unit-conversion";
 import { computeConsumption, type ConsumptionResult, type SoldLineInput } from "./consumption";
 import { computeCoverage, type CoverageReport } from "./coverage";
@@ -64,7 +66,8 @@ export type LineFlag =
   | "NOT_COUNTED"
   | "UNIT_CONFLICT"
   | "RECIPE_UNIT_MISMATCH"
-  | "OUT_OF_SCOPE";
+  | "OUT_OF_SCOPE"
+  | "RECEIPT_POSSIBLE_DUPLICATE";
 
 export const FLAG_LABEL: Record<LineFlag, string> = {
   OPENING_UNKNOWN: "الرصيد الافتتاحيّ غير معروف — لا جردَ سابقٌ ولا رصيدٌ مكتوب",
@@ -75,6 +78,17 @@ export const FLAG_LABEL: Record<LineFlag, string> = {
   UNIT_CONFLICT: "ذُكر في الوصفات بوحدتين من عائلتين مختلفتين",
   RECIPE_UNIT_MISMATCH: "وحدةُ الوصفة لا تُحوَّل إلى وحدة الصنف",
   OUT_OF_SCOPE: "خارج هذا الجرد باختيارك — وقائعُه محسوبة ولا فرقَ له",
+  RECEIPT_POSSIBLE_DUPLICATE: "كمّيّةٌ مستلَمة قد تكون هي نفسَ بندِ فاتورة — فالمشتريات غير معروفة حتى تُحسَم",
+};
+
+/** مصدرُ الرصيد الافتتاحيّ — بترتيبٍ ثابت لا تتنافس فيه المصادر. */
+export type OpeningSource = "MANUAL" | "PREVIOUS_COUNT" | "MOVEMENT" | "UNKNOWN";
+
+export const OPENING_SOURCE_LABEL: Record<OpeningSource, string> = {
+  MANUAL: "أُدخل يدوياً",
+  PREVIOUS_COUNT: "من جرد الأسبوع السابق",
+  MOVEMENT: "من رصيدٍ افتتاحيٍّ مسجَّل",
+  UNKNOWN: "غير معروف",
 };
 
 export interface EngineInput {
@@ -129,6 +143,19 @@ export interface EngineInput {
    * وغيابُها يعني «الكلُّ داخل» — وهو سلوكُ النظام قبل أن يُخيَّر.
    */
   inScopeByProduct?: ReadonlySet<string>;
+  /**
+   * مصدرُ الافتتاحيّ لكلّ صنف ومرجعُه — يحسمه الخادم بترتيبٍ ثابت،
+   * ويمرّ هنا ليُحفَظ مع الرقم. **المحرّكُ يتسلّم القيمةَ المحسومة**
+   * ولا يختار بين مصادر.
+   */
+  openingSourceByProduct?: ReadonlyMap<string, { source: OpeningSource; ref: string | null }>;
+  /**
+   * استلاماتٌ يدويّة قد تكون هي نفسَ بندِ فاتورة — لم يُحسَم أمرُها.
+   *
+   * ولا تُدمَج ولا تُحذَف ولا تُحسَب مرّتين بصمت: **تصير مشترياتُ
+   * الصنف غيرَ معروفة**، ويُعرَض بندٌ في التغطية بفعلَيه.
+   */
+  receiptDuplicates?: readonly DuplicateCandidate[];
 }
 
 export interface ReportLine {
@@ -170,12 +197,19 @@ export interface ReportLine {
    * معلَناً أنّه خارج، لا يُحذَف فيُظنّ أنّه عُدّ.
    */
   inScope: boolean;
+  /** من أين جاء الافتتاحيّ — يُعرَض مع الرقم. */
+  openingSource: OpeningSource;
+  openingRef: string | null;
+  /** ما دخل من المشتريات بإدخالٍ يدويّ — والباقي من الفواتير. */
+  manualReceiptsMilli: number;
 
   flags: LineFlag[];
   /** أصلُ الاستهلاك: أيّ نسخِ وصفاتٍ أسهمت فيه. */
   recipeVersionIds: string[];
   /** وأيّ أسطرِ فواتيرَ بُنيت عليها المشتريات. */
   invoiceLineIds: string[];
+  /** وأيّ استلاماتٍ يدويّة. */
+  receiptIds: string[];
 }
 
 export interface EngineReport {
@@ -197,6 +231,8 @@ export interface EngineReport {
     linesWithVariance: number;
     salesTotalMinor: number;
     purchasesTotalMinor: number;
+    /** النقصُ والزيادةُ وحجمُهما — لا يتقاصّان (`variance-summary.ts`). */
+    summary: VarianceSummary;
   };
   consumption: ConsumptionResult;
   purchases: PurchaseSummary;
@@ -218,6 +254,16 @@ export function reconcile(input: EngineInput): EngineReport {
 
   const unitConflicts: string[] = [];
   const lines: ReportLine[] = [];
+  const duplicateProducts = new Set((input.receiptDuplicates ?? []).map((d) => d.productId));
+  const hasSales = input.soldLines.length > 0;
+  /* مكوّناتُ كلّ نسخةٍ ساريةٍ تتقاطع مع الفترة — وبها يُعرَف أنّ الصفرَ صفر */
+  const inActiveRecipe = new Set(
+    input.recipeVersions
+      .filter((v) => v.status === "ACTIVE"
+        && v.effectiveFrom <= input.periodEnd
+        && (v.effectiveTo === null || v.effectiveTo >= input.periodStart))
+      .flatMap((v) => v.ingredients.map((i) => i.productId)),
+  );
 
   let varianceCostTotal = 0;
   let linesWithKnownCost = 0;
@@ -246,11 +292,27 @@ export function reconcile(input: EngineInput): EngineReport {
       } else {
         consumptionMilli = used.canonicalMilli;
       }
+    } else if (hasSales && inActiveRecipe.has(product.id)) {
+      /*
+        ── لم يُبَع ما يستهلكه — صفرٌ بدليل ──
+
+        الصنفُ مكوّنٌ في وصفةٍ سارية، ومبيعاتُ الفترة مستورَدة، ولم يُبَع
+        شيءٌ يصل إليه. فاستهلاكُه **صفرٌ حقيقيّ** كما أنّ مشترياتِ صنفٍ لم
+        يُشترَ صفرٌ حقيقيّ. وكان يُقرأ «غير معروف» — فلا يُحسَب لأبطأ
+        الأصناف دوراناً فرقٌ أبداً، وهي أحوجُها إلى العدّ.
+
+        والدليلُ شرطان معاً: وصفةٌ تصل إليه (وإلّا فالمجهولُ صادق: لا
+        نعرف ما يستهلكه)، ومبيعاتٌ في الفترة (وإلّا فالصفرُ غيابُ ملفّ لا
+        غيابُ بيع). وما بِيع ولم يُربَط يُعلَن في التغطية كما كان.
+      */
+      consumptionMilli = 0;
     }
     if (consumptionMilli === null) flags.push("CONSUMPTION_UNKNOWN");
 
     const openingMilli = input.openingByProduct.get(product.id) ?? null;
     if (openingMilli === null) flags.push("OPENING_UNKNOWN");
+    const openingFrom = input.openingSourceByProduct?.get(product.id);
+    const openingSource: OpeningSource = openingMilli === null ? "UNKNOWN" : openingFrom?.source ?? "MOVEMENT";
 
     /*
       مشترياتُ صنفٍ لم يُشترَ في الفترة **صفرٌ حقيقيّ** لا مجهول: قرأنا
@@ -263,6 +325,16 @@ export function reconcile(input: EngineInput): EngineReport {
     if (hasUnknownPurchase) {
       purchasesMilli = null;
       flags.push("PURCHASES_UNKNOWN");
+    }
+    /*
+      ── استلامٌ لم يُحسَم أهو فاتورةٌ أم شحنةٌ أخرى ──
+
+      فالمشترياتُ عشرون أو أربعون — ولا نعرف أيّهما. وقولُ أحدهما دعوى:
+      الأربعون تُخفي نقصاً، والعشرون قد تُسقط شحنةً وصلت فعلاً.
+    */
+    if (duplicateProducts.has(product.id)) {
+      purchasesMilli = null;
+      flags.push("RECEIPT_POSSIBLE_DUPLICATE");
     }
     purchasesTotalMinor += bought?.knownCostMinor ?? 0;
 
@@ -339,9 +411,13 @@ export function reconcile(input: EngineInput): EngineReport {
       valuationBasis,
       varianceCostMinor: varianceCost,
       inScope,
+      openingSource,
+      openingRef: openingMilli === null ? null : openingFrom?.ref ?? null,
+      manualReceiptsMilli: bought?.manualMilli ?? 0,
       flags,
       recipeVersionIds: used?.recipeVersionIds ?? [],
       invoiceLineIds: bought?.invoiceLineIds ?? [],
+      receiptIds: bought?.receiptIds ?? [],
     });
   }
 
@@ -361,6 +437,11 @@ export function reconcile(input: EngineInput): EngineReport {
       included: lines.filter((l) => l.inScope).length,
       excluded: lines.filter((l) => !l.inScope).map((l) => l.productName),
     },
+    receiptDuplicates: (input.receiptDuplicates ?? []).map((d) => ({
+      productName: input.products.find((p) => p.id === d.productId)?.nameAr ?? d.productId,
+      invoiceNumber: d.invoiceNumber,
+      supplierName: d.supplierName,
+    })),
   });
 
   return {
@@ -376,6 +457,7 @@ export function reconcile(input: EngineInput): EngineReport {
       linesWithVariance,
       salesTotalMinor: consumption.included.totalMinor + consumption.excludedTotals.totalMinor,
       purchasesTotalMinor,
+      summary: summariseVariance(lines),
     },
     consumption,
     purchases,

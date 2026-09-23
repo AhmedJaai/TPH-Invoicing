@@ -12,7 +12,7 @@ import { mapPosProducts } from "./pos-mapping.service";
 import { saveRecipeVersion } from "./recipe.service";
 import {
   CountLockedError, NotAWeekError, finaliseCount, itemHistory, loadCountHeader, loadScope,
-  readFrozenReport, recomputeCount, reopenCount, saveActualCounts, setCountScope, startCount,
+  readFrozenReport, recomputeCount, reopenCount, saveActualCounts, saveCountScope, startCount,
   unmappedPosProducts,
 } from "./inventory.service";
 import { recordWaste } from "./inventory-movement.service";
@@ -871,7 +871,7 @@ describe("نطاقُ الجرد", () => {
       }, tx);
 
       await saveActualCounts(countId, [{ productId: coffee, actualMilli: kg(20.5) }], actorId, tx);
-      await setCountScope(countId, [straws], false, actorId, tx);
+      await saveCountScope(countId, { included: [], excluded: [straws] }, actorId, tx);
 
       const report = await recomputeCount(countId, tx);
       const line = report.lines.find((l) => l.productId === straws)!;
@@ -890,7 +890,7 @@ describe("نطاقُ الجرد", () => {
       }, tx);
 
       await saveActualCounts(countId, [{ productId: coffee, actualMilli: kg(20.5) }], actorId, tx);
-      await setCountScope(countId, [coffee], false, actorId, tx);
+      await saveCountScope(countId, { included: [], excluded: [coffee] }, actorId, tx);
 
       /* الرقمُ محفوظٌ في السطر وإن لم يُحسَب به */
       const [row] = (await tx.execute<{ actual_milli: string | null }>(sql`
@@ -899,7 +899,7 @@ describe("نطاقُ الجرد", () => {
       `)).rows;
       expect(row.actual_milli).not.toBeNull();
 
-      await setCountScope(countId, [coffee], true, actorId, tx);
+      await saveCountScope(countId, { included: [coffee], excluded: [] }, actorId, tx);
       const back = await recomputeCount(countId, tx);
       expect(canonicalToQuantity(
         back.lines.find((l) => l.productId === coffee)!.varianceMilli!, "KG",
@@ -913,7 +913,7 @@ describe("نطاقُ الجرد", () => {
       const first = await startCount({
         periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: branch.id, actorId,
       }, tx);
-      await setCountScope(first.countId, [straws], false, actorId, tx);
+      await saveCountScope(first.countId, { included: [], excluded: [straws] }, actorId, tx);
       await saveActualCounts(first.countId, [{ productId: coffee, actualMilli: kg(20.5) }], actorId, tx);
       await finaliseCount(first.countId, actorId, tx);
 
@@ -938,7 +938,7 @@ describe("نطاقُ الجرد", () => {
       await saveActualCounts(countId, [{ productId: coffee, actualMilli: kg(20.5) }], actorId, tx);
       await finaliseCount(countId, actorId, tx);
 
-      expect(await caught(setCountScope(countId, [straws], false, actorId, tx)))
+      expect(await caught(saveCountScope(countId, { included: [], excluded: [straws] }, actorId, tx)))
         .toBeInstanceOf(CountLockedError);
     }));
 });

@@ -14,18 +14,22 @@
  * عداه يُشتقّ هنا: الدرسُ نفسه من `confirm.ts` و«الإقرار الجماعيّ
  * يُعيد الحساب».
  */
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  inventoryCountLines, inventoryCountSnapshots, inventoryCounts,
+  inventoryCountLines, inventoryCountOpenings, inventoryCountSnapshots, inventoryCounts,
   inventoryMovements, products, wasteRecords,
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { MILLI_MINOR } from "@/lib/money";
 import { createHash } from "node:crypto";
 import { isStoredUnit, type StoredUnit } from "@/lib/unit-conversion";
-import { MILLI, toCanonical } from "@/lib/inventory/units";
-import { ENGINE_VERSION, reconcile, type CountedProduct, type EngineInput, type EngineReport } from "@/lib/inventory/engine";
+import { MILLI, sameUnitFamily, toCanonical } from "@/lib/inventory/units";
+import {
+  ENGINE_VERSION, reconcile, type CountedProduct, type EngineInput, type EngineReport, type OpeningSource,
+} from "@/lib/inventory/engine";
+import { duplicateCandidates, RECEIPT_MATCH_WINDOW_DAYS, type DuplicateCandidate } from "@/lib/inventory/receipts";
+import { summariseVariance, type SummaryLine, type VarianceSummary } from "@/lib/inventory/variance-summary";
 import type { Conn } from "./types";
 import type { SoldLineInput } from "@/lib/inventory/consumption";
 import type { PurchaseLineInput } from "@/lib/inventory/purchases";
@@ -96,6 +100,8 @@ export interface CountHeader {
   finalisedAt: Date | null;
   reopenCount: number;
   note: string | null;
+  /** نطاقُ الجرد موروثٌ أم صريح (`041`). */
+  scopeSource: "INHERITED" | "EXPLICIT";
 }
 
 function shiftDays(date: string, days: number): string {
@@ -202,6 +208,7 @@ export async function loadPurchaseLines(
   periodStart: string,
   periodEnd: string,
   conn: Conn = db,
+  branchId: string | null = null,
 ): Promise<{
   inPeriod: PurchaseLineInput[];
   lookback: PurchaseLineInput[];
@@ -240,7 +247,42 @@ export async function loadPurchaseLines(
       left join supplier_products sp on sp.id = il.supplier_product_id
      where coalesce(i.received_on, to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD')) >= ${from}
        and coalesce(i.received_on, to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD')) <= ${until}
+       /*
+         ── البندُ الذي يمثّله استلامٌ يدويّ يخرج من الحساب ──
+
+         قال صاحبُ المقهى إنّ هذا الاستلامَ هو الوجهُ الفعليّ لهذا البند:
+         فالكمّيّةُ كمّيّتُه وتاريخُه تاريخُه. ويخرج البندُ **حيثما وقع
+         تاريخُه** — فاتورةٌ بتاريخ ٢٠ لشحنةٍ وصلت ١٨ لا تُحسَب في أسبوع
+         ٢٠ ثانيةً.
+       */
+       and not exists (
+         select 1 from inventory_receipts r
+          where r.invoice_line_id = il.id and r.voided_at is null
+       )
      order by effective_date
+  `);
+
+  /*
+    ── والكمّيّةُ المستلَمة يدوياً سطرٌ من الأسطر نفسِها ──
+
+    لا معادلةٌ ثانية: تمرّ بـ`summarisePurchases` كما يمرّ بندُ الفاتورة،
+    وكمّيّتُها مكتوبةٌ لا مشتقّة. وتاريخُها تاريخُ الاستلام الفعليّ.
+    وكلفتُها ما كُتب لها، وإلّا كلفةُ البند المرتبط — وإلّا مجهولة فلا
+    تدخل مقامَ المتوسّط.
+  */
+  const receipts = await conn.execute<Record<string, unknown>>(sql`
+    select r.id, r.product_id, r.received_on, r.entered_milli, r.entered_unit,
+           r.cost_minor, r.document_ref, r.invoice_line_id,
+           il.line_total_minor as linked_total,
+           su.name_ar as supplier_name
+      from inventory_receipts r
+      left join invoice_lines il on il.id = r.invoice_line_id
+      left join suppliers su on su.id = r.supplier_id
+     where r.voided_at is null
+       and r.received_on >= ${from}
+       and r.received_on <= ${periodEnd}
+       and ${branchId ? sql`(r.branch_id = ${branchId} or r.branch_id is null)` : sql`true`}
+     order by r.received_on, r.created_at
   `);
 
   const all = rows.rows.map((r) => ({
@@ -259,36 +301,90 @@ export async function loadPurchaseLines(
     contentQuantity: r.content_quantity === null ? null : String(r.content_quantity),
   } satisfies PurchaseLineInput));
 
+  const manual: PurchaseLineInput[] = receipts.rows.flatMap((r) => {
+    const unit = r.entered_unit;
+    if (!isStoredUnit(unit)) return [];
+    const cost = r.cost_minor !== null ? Number(r.cost_minor)
+      : r.linked_total !== null ? Number(r.linked_total) : null;
+    return [{
+      lineId: String(r.id),
+      invoiceId: r.invoice_line_id === null ? "" : String(r.invoice_line_id),
+      invoiceNumber: r.document_ref === null ? "" : String(r.document_ref),
+      supplierName: r.supplier_name === null ? "" : String(r.supplier_name),
+      invoiceDate: String(r.received_on),
+      receiptKnown: true,
+      description: "كمّيّةٌ مستلَمة",
+      productId: String(r.product_id),
+      qty: null,
+      lineTotalMinor: cost ?? 0,
+      packSize: null,
+      contentUnit: null,
+      contentQuantity: null,
+      source: "MANUAL_RECEIPT" as const,
+      receivedMilli: Number(r.entered_milli),
+      receivedUnit: unit,
+      costKnown: cost !== null,
+    } satisfies PurchaseLineInput];
+  });
+
+  const merged = [...all, ...manual].sort((a, b) => (a.invoiceDate < b.invoiceDate ? -1 : a.invoiceDate > b.invoiceDate ? 1 : 0));
+
   return {
-    inPeriod: all.filter((l) => l.invoiceDate >= periodStart && l.invoiceDate <= periodEnd),
-    lookback: all.filter((l) => l.invoiceDate < periodStart),
+    inPeriod: merged.filter((l) => l.invoiceDate >= periodStart && l.invoiceDate <= periodEnd),
+    lookback: merged.filter((l) => l.invoiceDate < periodStart),
     /* تاريخُ استلامٍ حقيقيٌّ يقطع الالتباس — فلا يُعرَض إلّا النائب */
     ambiguous: all.filter((l) => !l.receiptKnown && l.invoiceDate > periodEnd),
   };
 }
 
 /**
- * الرصيدُ الافتتاحيّ.
+ * الرصيدُ الافتتاحيّ ومصدرُه.
  *
- * ثلاثةُ مصادرَ بترتيبٍ لا يُخلَط: **آخرُ جردٍ مقفَل** (فعليُّه هو
- * افتتاحيُّ ما بعده)، ثمّ **رصيدٌ افتتاحيٌّ مكتوب بيد إنسان**، ثمّ
- * **غير معروف**.
+ * أربعةُ مصادر **بترتيبٍ ثابتٍ لا تتنافس فيه**:
  *
- * ولا رابعَ لها. وقراءةُ المجهول صفراً هنا تجعل كلَّ ما اشتُري في
- * الفترة يظهر «فرقاً».
+ *   ١. `MANUAL` — أدخله إنسانٌ لهذا الجرد. يغلب ما دونه **صراحةً**:
+ *      كتبه عارفاً أنّ الجردَ السابق يقول غيرَه، ويُحفَظ مصدرُه.
+ *   ٢. `PREVIOUS_COUNT` — فعليُّ آخر جردٍ مقفَل في الفرع نفسه.
+ *   ٣. `MOVEMENT` — رصيدٌ افتتاحيٌّ تاريخيّ مسجَّل حركةً.
+ *   ٤. `UNKNOWN` — ويبقى `null`. **وقراءتُه صفراً تجعل كلَّ ما اشتُري
+ *      في الفترة يظهر «فرقاً».**
+ *
+ * والمحرّكُ يتسلّم القيمةَ المحسومة ومصدرَها معاً، فيقول التقرير «٥٫٢
+ * كجم — أُدخل يدوياً» لا «٥٫٢» وحدها.
  */
-export async function loadOpening(
+export async function resolveOpenings(
+  countId: string | null,
   periodStart: string,
   branchId: string | null,
   productIds: readonly string[],
   conn: Conn = db,
-): Promise<Map<string, number | null>> {
-  const out = new Map<string, number | null>(productIds.map((id) => [id, null]));
-  if (productIds.length === 0) return out;
+): Promise<{
+  values: Map<string, number | null>;
+  sources: Map<string, { source: OpeningSource; ref: string | null }>;
+}> {
+  const values = new Map<string, number | null>(productIds.map((id) => [id, null]));
+  const sources = new Map<string, { source: OpeningSource; ref: string | null }>();
+  if (productIds.length === 0) return { values, sources };
 
+  const settle = (id: string, milli: number, source: OpeningSource, ref: string | null) => {
+    if (!values.has(id) || values.get(id) !== null) return;
+    values.set(id, milli);
+    sources.set(id, { source, ref });
+  };
+
+  /* ١ · اليدويّ لهذا الجرد */
+  if (countId) {
+    const manual = await conn.execute<{ id: string; product_id: string; canonical_milli: string }>(sql`
+      select id, product_id, canonical_milli from inventory_count_openings
+       where count_id = ${countId} and superseded_at is null
+    `);
+    for (const r of manual.rows) settle(String(r.product_id), Number(r.canonical_milli), "MANUAL", String(r.id));
+  }
+
+  /* ٢ · فعليُّ آخر جردٍ مقفَل في الفرع نفسه — لا من فرعٍ آخر */
   const previous = await conn.execute<Record<string, unknown>>(sql`
     select distinct on (l.product_id)
-           l.product_id, l.actual_milli
+           l.product_id, l.actual_milli, c.id as count_id
       from inventory_count_lines l
       join inventory_counts c on c.id = l.count_id
      where c.status = 'FINALISED'
@@ -297,12 +393,14 @@ export async function loadOpening(
        and l.actual_milli is not null
      order by l.product_id, c.period_end desc
   `);
-  for (const r of previous.rows) out.set(String(r.product_id), Number(r.actual_milli));
+  for (const r of previous.rows) {
+    settle(String(r.product_id), Number(r.actual_milli), "PREVIOUS_COUNT", String(r.count_id));
+  }
 
-  /* الرصيدُ المكتوب بيد إنسان يغلب حين يكون أحدثَ من آخر جرد */
+  /* ٣ · رصيدٌ افتتاحيٌّ مسجَّل حركةً — آخرُه قبل بدء الفترة */
   const written = await conn.execute<Record<string, unknown>>(sql`
     select distinct on (m.product_id)
-           m.product_id, m.quantity_milli, m.unit, m.occurred_on
+           m.id, m.product_id, m.quantity_milli, m.unit, m.occurred_on
       from inventory_movements m
      where m.kind = 'OPENING'
        and m.occurred_on <= ${periodStart}
@@ -312,12 +410,100 @@ export async function loadOpening(
   for (const r of written.rows) {
     const unit = r.unit;
     if (!isStoredUnit(unit)) continue;
-    const id = String(r.product_id);
-    if (!out.has(id)) continue;
-    if (out.get(id) === null) out.set(id, toCanonical(Number(r.quantity_milli), unit));
+    settle(String(r.product_id), toCanonical(Number(r.quantity_milli), unit), "MOVEMENT", String(r.id));
   }
 
-  return out;
+  return { values, sources };
+}
+
+/**
+ * استلاماتٌ يدويّة قد تكون هي نفسَ بندِ فاتورة — لم يُحسَم أمرُها.
+ *
+ * المرشَّحُ: استلامٌ سارٍ في الفترة، **غيرُ مرتبطٍ ولا مؤكَّدٍ انفصالُه**،
+ * يشبهه بندٌ في نافذة سبعة أيّام (`receipts.ts`). والبنودُ تُقرأ حول
+ * تاريخ الاستلام لا حول الفترة: فاتورةٌ بتاريخ ٢٠ قد تكون شحنةَ ١٨.
+ */
+export async function loadReceiptDuplicates(
+  periodStart: string,
+  periodEnd: string,
+  branchId: string | null,
+  baseUnitOf: ReadonlyMap<string, StoredUnit>,
+  conn: Conn = db,
+): Promise<DuplicateCandidate[]> {
+  const open = await conn.execute<Record<string, unknown>>(sql`
+    select r.id, r.product_id, r.received_on, r.canonical_milli
+      from inventory_receipts r
+     where r.voided_at is null
+       and r.invoice_line_id is null
+       and not r.confirmed_separate
+       and r.received_on between ${periodStart} and ${periodEnd}
+       and ${branchId ? sql`(r.branch_id = ${branchId} or r.branch_id is null)` : sql`true`}
+  `);
+  if (open.rows.length === 0) return [];
+
+  const productIds = [...new Set(open.rows.map((r) => String(r.product_id)))];
+  const from = shiftDays(periodStart, -RECEIPT_MATCH_WINDOW_DAYS);
+  const until = shiftDays(periodEnd, RECEIPT_MATCH_WINDOW_DAYS);
+  const lines = await invoiceLinesForMatch(productIds, from, until, baseUnitOf, conn);
+  const linked = await linkedInvoiceLineIds(conn);
+
+  return open.rows.flatMap((r) => duplicateCandidates({
+    id: String(r.id),
+    productId: String(r.product_id),
+    receivedOn: String(r.received_on),
+    canonicalMilli: Number(r.canonical_milli),
+  }, lines, linked));
+}
+
+/** بنودُ الفواتير لأصنافٍ بأعيانها في نافذة — بكمّيّتها المعياريّة أو `null`. */
+export async function invoiceLinesForMatch(
+  productIds: readonly string[],
+  from: string,
+  until: string,
+  baseUnitOf: ReadonlyMap<string, StoredUnit>,
+  conn: Conn = db,
+) {
+  if (productIds.length === 0) return [];
+  const rows = await conn.execute<Record<string, unknown>>(sql`
+    select il.id as line_id, il.invoice_id, i.invoice_number, su.name_ar as supplier_name,
+           coalesce(i.received_on, to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD')) as effective_date,
+           il.description, sp.product_id, il.qty, il.line_total_minor,
+           sp.pack_size, sp.content_unit, sp.content_quantity
+      from invoice_lines il
+      join invoices i on i.id = il.invoice_id
+      join suppliers su on su.id = i.supplier_id
+      join supplier_products sp on sp.id = il.supplier_product_id
+     where sp.product_id in (${sql.join(productIds.map((id) => sql`${id}`), sql`, `)})
+       and coalesce(i.received_on, to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD')) between ${from} and ${until}
+  `);
+  return rows.rows.map((r) => {
+    const productId = String(r.product_id);
+    const base = baseUnitOf.get(productId);
+    const line: PurchaseLineInput = {
+      lineId: String(r.line_id), invoiceId: String(r.invoice_id), invoiceNumber: String(r.invoice_number),
+      supplierName: String(r.supplier_name), invoiceDate: String(r.effective_date),
+      description: String(r.description), productId,
+      qty: r.qty === null ? null : String(r.qty), lineTotalMinor: Number(r.line_total_minor),
+      packSize: r.pack_size === null ? null : String(r.pack_size),
+      contentUnit: isStoredUnit(r.content_unit) ? r.content_unit : null,
+      contentQuantity: r.content_quantity === null ? null : String(r.content_quantity),
+    };
+    const q = base ? purchaseQuantity(line, base) : { known: false as const };
+    return {
+      lineId: line.lineId, invoiceId: line.invoiceId, invoiceNumber: line.invoiceNumber,
+      supplierName: line.supplierName, productId, effectiveDate: line.invoiceDate,
+      canonicalMilli: q.known ? q.canonicalMilli : null, lineTotalMinor: line.lineTotalMinor,
+    };
+  });
+}
+
+/** بنودٌ يمثّلها استلامٌ سارٍ — لا تُرشَّح ثانيةً. */
+export async function linkedInvoiceLineIds(conn: Conn = db): Promise<Set<string>> {
+  const rows = await conn.execute<{ invoice_line_id: string }>(sql`
+    select invoice_line_id from inventory_receipts
+     where invoice_line_id is not null and voided_at is null
+  `);
+  return new Set(rows.rows.map((r) => String(r.invoice_line_id)));
 }
 
 async function loadMovements(
@@ -447,6 +633,8 @@ export async function buildEngineInput(
   conn: Conn = db,
   /** أصنافُ هذا الجرد — وغيابُها «الكلُّ داخل». */
   inScope?: ReadonlySet<string>,
+  /** الجردُ الذي يُحسَب — ومنه الافتتاحيُّ اليدويّ. */
+  countId: string | null = null,
 ): Promise<EngineInput> {
   const countedProducts = await loadCountedProducts(conn);
   const productIds = countedProducts.map((p) => p.id);
@@ -459,9 +647,10 @@ export async function buildEngineInput(
     تتزاحم. والفرقُ في الزمن لا يُذكَر أمام عطبٍ يقع في الاختبار وحده.
   */
   const soldLines = await loadSoldLines(periodStart, periodEnd, branchId, conn);
-  const purchases = await loadPurchaseLines(periodStart, periodEnd, conn);
+  const purchases = await loadPurchaseLines(periodStart, periodEnd, conn, branchId);
   const recipeVersions = await loadRecipeVersions(conn);
-  const opening = await loadOpening(periodStart, branchId, productIds, conn);
+  const opening = await resolveOpenings(countId, periodStart, branchId, productIds, conn);
+  const duplicates = await loadReceiptDuplicates(periodStart, periodEnd, branchId, baseUnitOf, conn);
   const movements = await loadMovements(periodStart, periodEnd, branchId, conn);
   const waste = await loadWaste(periodStart, periodEnd, branchId, conn);
   const catalog = await catalogCosts(baseUnitOf, conn);
@@ -474,7 +663,9 @@ export async function buildEngineInput(
     recipeVersions,
     purchaseLines: purchases.inPeriod,
     ambiguousReceipts: purchases.ambiguous,
-    openingByProduct: opening,
+    openingByProduct: opening.values,
+    openingSourceByProduct: opening.sources,
+    receiptDuplicates: duplicates,
     adjustmentsInByProduct: movements.inByProduct,
     adjustmentsOutByProduct: movements.outByProduct,
     wasteByProduct: waste,
@@ -490,103 +681,255 @@ export async function buildEngineInput(
 /**
  * أصنافُ هذا الجرد — ومن ليس فيها فخارجَه.
  *
- * ── والاختيارُ يُتوارَث ──
+ * ── النطاقُ حالٌ محفوظة لا استنتاج ──
  *
- * من استبعد المصّاصاتِ والأكوابَ هذا الأسبوع يستبعدها الأسبوعَ القادم
- * غالباً — وهي ستّون صنفاً يُسأل عنها كلَّ أحد. فما لم يُقَل فيه شيءٌ
- * في هذا الجرد يُقرأ من **الجرد السابق في الفرع نفسه**، ويُقال في
- * الشاشة إنّه موروث. وإلّا صار «اختيارُ الأصناف» عملاً أسبوعيّاً من
- * ستّين قراراً، فيُضغَط «الكلّ» هرباً منه — وذاك إلغاءُ الميزة لا
- * استعمالُها.
+ * كان يُستنتَج «أاختار الإنسانُ؟» من وجود صفٍّ مستبعَد. فمن ورث ‏٢٤
+ * صنفاً من ٦٠ ثمّ اختار الستّين كلَّها لم يبقَ صفٌّ مستبعَد — فيُقرأ
+ * الجردُ «لم يُختَر له» ويُورَّث ثانيةً، **ويضيع اختيارُه بتحديث
+ * الصفحة**. فصار للجرد `scope_source` (`041`):
  *
- * ولا يُتوارَث من جردٍ في فرعٍ آخر: لكلّ فرعٍ رفُّه.
+ *   `EXPLICIT` — حفظه إنسان: يُقرأ من أسطره كما هي، ولا يمسّه التوريث.
+ *   `INHERITED` — يُقرأ من **أحدث جردٍ سابق في الفرع نفسه**، بنطاقه
+ *   النهائيّ أيّاً كان مصدرُه. وإن لم يوجد سابقٌ فالكلُّ داخل.
+ *
+ * ولا يُتوارَث من فرعٍ آخر: لكلّ فرعٍ رفُّه.
  */
 export async function loadScope(
   countId: string,
   conn: Conn = db,
-): Promise<{ excluded: Set<string>; inherited: boolean }> {
-  const mine = await conn.execute<{ product_id: string }>(sql`
-    select product_id from inventory_count_lines
-     where count_id = ${countId} and in_scope = false
-  `);
-  if (mine.rows.length > 0) {
-    return { excluded: new Set(mine.rows.map((r) => String(r.product_id))), inherited: false };
+): Promise<{ excluded: Set<string>; inherited: boolean; explicit: boolean }> {
+  const [count] = (await conn.execute<{ scope_source: string }>(sql`
+    select scope_source from inventory_counts where id = ${countId}
+  `)).rows;
+
+  if (count?.scope_source === "EXPLICIT") {
+    const mine = await conn.execute<{ product_id: string }>(sql`
+      select product_id from inventory_count_lines
+       where count_id = ${countId} and in_scope = false
+    `);
+    return { excluded: new Set(mine.rows.map((r) => String(r.product_id))), inherited: false, explicit: true };
   }
 
-  /*
-    ── ولا يُتوارَث إلّا ما لم يُقَل فيه شيء ──
-
-    الأسطرُ تُكتب في أوّل حساب، فوجودُها لا يعني أنّ إنساناً اختار.
-    والعلامةُ استبعادٌ واحد في هذا الجرد: عندها يكون النطاق قراراً
-    قائماً لا يُداخَل فيه. وحين لا استبعادَ فيه يُقرأ **أحدثُ جردٍ
-    سابق** في الفرع نفسه — أحدثُه وحده، لا كلُّ ما استُبعد يوماً.
-  */
-  const inherited = await conn.execute<{ product_id: string }>(sql`
-    select l.product_id
-      from inventory_count_lines l
-     where l.in_scope = false
-       and l.count_id = (
-         select prev.id from inventory_counts prev
-          where prev.id <> ${countId}
-            and coalesce(prev.branch_id, '~') = (
-              select coalesce(cur.branch_id, '~') from inventory_counts cur where cur.id = ${countId}
-            )
-            and prev.period_end < (select cur.period_start from inventory_counts cur where cur.id = ${countId})
-          order by prev.period_end desc
-          limit 1
-       )
+  const previous = await conn.execute<{ id: string }>(sql`
+    select prev.id
+      from inventory_counts prev
+      join inventory_counts cur on cur.id = ${countId}
+     where prev.id <> cur.id
+       and coalesce(prev.branch_id, '~') = coalesce(cur.branch_id, '~')
+       and prev.period_end < cur.period_start
+     order by prev.period_end desc
+     limit 1
   `);
+  const prevId = previous.rows[0]?.id;
+  if (!prevId) return { excluded: new Set(), inherited: false, explicit: false };
 
+  const excluded = await conn.execute<{ product_id: string }>(sql`
+    select product_id from inventory_count_lines
+     where count_id = ${String(prevId)} and in_scope = false
+  `);
   return {
-    excluded: new Set(inherited.rows.map((r) => String(r.product_id))),
-    inherited: inherited.rows.length > 0,
+    excluded: new Set(excluded.rows.map((r) => String(r.product_id))),
+    /* «موروث» يُقال حين يوجد ما يُورَث — ولو كان «الكلَّ داخل» */
+    inherited: true,
+    explicit: false,
   };
 }
 
+/** معرّفٌ ليس صنفاً في هذا الجرد — يُلغي العمليّةَ كلَّها. */
+export class ScopeItemNotInCountError extends Error {
+  constructor(readonly productIds: readonly string[]) {
+    super(`${productIds.length} صنفاً ليس في هذا الجرد — لم يُحفَظ شيءٌ من النطاق. حدّث الصفحة.`);
+    this.name = "ScopeItemNotInCountError";
+  }
+}
+
 /**
- * يكتب نطاقَ الجرد — أصنافاً بأعيانها، داخلةً أو خارجة.
+ * يحفظ نطاقَ الجرد — **عمليّةٌ واحدة**.
+ *
+ * كانت الشاشة ترسل طلبين (الداخل ثمّ الخارج)، فإن سقط الثاني بقي
+ * النطاقُ نصفَ مكتوب ولا يعرف أحدٌ أين وقف. فصار:
+ *
+ *   تحقُّقٌ من كلّ معرّف ← كتابةُ الأسطر ← وسمُ الجرد `EXPLICIT` ← أثر
+ *
+ * في معاملةٍ واحدة. ومعرّفٌ واحدٌ غريب يُلغي الكلَّ.
  *
  * ولا يُمَسّ العدُّ المكتوب: من استبعد صنفاً عدّه ثمّ أعاده وجد عدَّه.
- * والمقفَلُ يُرَدّ هنا وفي القاعدة معاً — هذا ليقرأ المستخدمُ سبباً،
- * وذاك كي لا يُكتَب في تقريرٍ مجمَّد من أيّ باب.
+ * والمقفَلُ يُرَدّ هنا وفي القاعدة معاً.
  */
-export async function setCountScope(
+export async function saveCountScope(
   countId: string,
-  productIds: readonly string[],
-  inScope: boolean,
+  change: { included: readonly string[]; excluded: readonly string[] },
   actorId: string,
   conn: Conn = db,
-): Promise<{ changed: number }> {
+): Promise<{ included: number; excluded: number }> {
   const header = await loadCountHeader(countId, conn);
   if (!header) throw new Error("الجرد غير موجود");
   if (header.status === "FINALISED") throw new CountLockedError();
-  if (productIds.length === 0) return { changed: 0 };
 
-  /* والأسطرُ تُهيَّأ قبل أن يُكتَب فيها — الدرسُ نفسه من `saveActualCounts` */
-  await recomputeCount(countId, conn);
+  const both = new Set([...change.included, ...change.excluded]);
+  if (both.size !== change.included.length + change.excluded.length) {
+    throw new Error("صنفٌ واحدٌ ذُكر داخلاً وخارجاً معاً — لم يُحفَظ شيء.");
+  }
 
-  const written = await conn.transaction(async (tx) => {
-    const rows = await tx
-      .update(inventoryCountLines)
-      .set({ inScope })
-      .where(and(
-        eq(inventoryCountLines.countId, countId),
-        inArray(inventoryCountLines.productId, [...productIds]),
-      ))
-      .returning({ id: inventoryCountLines.id });
+  return conn.transaction(async (tx) => {
+    /* الأسطرُ تُهيَّأ داخل المعاملة نفسِها — فلا يُكتَب نطاقٌ على غير موجود */
+    await recomputeCount(countId, tx);
+
+    const present = await tx.execute<{ product_id: string }>(sql`
+      select product_id from inventory_count_lines where count_id = ${countId}
+    `);
+    const known = new Set(present.rows.map((r) => String(r.product_id)));
+    const strangers = [...both].filter((id) => !known.has(id));
+    if (strangers.length > 0) throw new ScopeItemNotInCountError(strangers);
+
+    for (const [ids, inScope] of [[change.included, true], [change.excluded, false]] as const) {
+      if (ids.length === 0) continue;
+      await tx
+        .update(inventoryCountLines)
+        .set({ inScope })
+        .where(and(eq(inventoryCountLines.countId, countId), inArray(inventoryCountLines.productId, [...ids])));
+    }
+
+    /* والصريحُ صريحٌ ولو اختار الكلّ — الأثرُ في الجرد لا في وجود مستبعَد */
+    await tx.update(inventoryCounts).set({ scopeSource: "EXPLICIT" }).where(eq(inventoryCounts.id, countId));
 
     await recordAudit({
       actorId,
       action: "INVENTORY_COUNT_SCOPE_SET",
       entityType: "inventory_count",
       entityId: countId,
-      after: { أصناف: rows.length, داخلة: inScope },
+      before: { المصدر: header.scopeSource },
+      after: { المصدر: "EXPLICIT", داخلة: change.included.length, خارجة: change.excluded.length },
     }, tx);
 
-    return rows.length;
+    return { included: change.included.length, excluded: change.excluded.length };
   });
+}
 
-  return { changed: written };
+/* ─────────────────────── الرصيدُ الافتتاحيّ اليدويّ ─────────────────────── */
+
+/** الرصيدُ اليدويّ الساري لكلّ صنفٍ في جرد — بوحدته كما كُتب، لمحرّر التعديل. */
+export async function loadManualOpenings(
+  countId: string,
+  conn: Conn = db,
+): Promise<Map<string, { enteredMilli: number; unit: StoredUnit }>> {
+  const rows = await conn
+    .select({
+      productId: inventoryCountOpenings.productId,
+      enteredMilli: inventoryCountOpenings.enteredMilli,
+      unit: inventoryCountOpenings.enteredUnit,
+    })
+    .from(inventoryCountOpenings)
+    .where(and(eq(inventoryCountOpenings.countId, countId), sql`${inventoryCountOpenings.supersededAt} is null`));
+  return new Map(rows.map((r) => [r.productId, { enteredMilli: Number(r.enteredMilli), unit: r.unit }]));
+}
+
+
+export interface OpeningEntry {
+  productId: string;
+  /** بالمِلّي من `unit` كما أُدخل، و`null` = «أفرِغه» فيعود غير معروف. */
+  enteredMilli: number | null;
+  unit: StoredUnit;
+  note?: string | null;
+}
+
+/**
+ * يكتب الرصيدَ الافتتاحيّ يدوياً — أصنافاً بأعيانها في جردٍ بعينه.
+ *
+ * **والتعديلُ لا يكتب فوق السابق**: يُغلقه (`superseded_at`) ويُضيف
+ * جديداً، فيبقى التاريخُ كلُّه. والإفراغُ يُغلقه بلا بديل — فيعود
+ * الافتتاحيُّ إلى ما دونه في الترتيب، أو «غير معروف»، **لا صفراً**.
+ *
+ * والتحويلُ هنا لا في المتصفّح: «٥٫٢ كجم» تصل نصّاً ووحدة، وتُحوَّل
+ * إلى المِلّي المعياريّ بقراءةٍ عشريّة لا تمرّ بفاصلةٍ عائمة.
+ */
+export async function setOpenings(
+  countId: string,
+  entries: readonly OpeningEntry[],
+  actorId: string,
+  conn: Conn = db,
+): Promise<{ set: number; cleared: number }> {
+  const header = await loadCountHeader(countId, conn);
+  if (!header) throw new Error("الجرد غير موجود");
+  if (header.status === "FINALISED") throw new CountLockedError();
+  if (entries.length === 0) return { set: 0, cleared: 0 };
+
+  return conn.transaction(async (tx) => {
+    const ids = [...new Set(entries.map((e) => e.productId))];
+    const known = await tx
+      .select({ id: products.id, baseUnit: products.baseUnit, name: products.nameAr })
+      .from(products)
+      .where(and(inArray(products.id, ids), eq(products.isStockItem, true)));
+    const byId = new Map(known.map((p) => [p.id, p]));
+
+    let set = 0;
+    let cleared = 0;
+    for (const e of entries) {
+      const product = byId.get(e.productId);
+      if (!product) throw new Error("صنفٌ ليس من أصناف المخزون — لم يُحفَظ شيء.");
+      if (e.enteredMilli !== null && (!Number.isInteger(e.enteredMilli) || e.enteredMilli < 0)) {
+        throw new Error(`رصيدٌ غير مقروء لـ«${product.name}»`);
+      }
+      if (e.enteredMilli !== null && !sameUnitFamily(e.unit, product.baseUnit)) {
+        throw new Error(`وحدةُ «${product.name}» لا تُحوَّل إلى وحدته — وزنٌ لا يصير حجماً`);
+      }
+
+      const [previous] = await tx
+        .update(inventoryCountOpenings)
+        .set({ supersededAt: new Date(), supersededById: actorId })
+        .where(and(
+          eq(inventoryCountOpenings.countId, countId),
+          eq(inventoryCountOpenings.productId, e.productId),
+          sql`${inventoryCountOpenings.supersededAt} is null`,
+        ))
+        .returning({ enteredMilli: inventoryCountOpenings.enteredMilli, enteredUnit: inventoryCountOpenings.enteredUnit });
+
+      if (e.enteredMilli === null) {
+        if (!previous) continue;
+        cleared++;
+        await recordAudit({
+          actorId,
+          action: "INVENTORY_OPENING_CLEARED",
+          entityType: "inventory_count",
+          entityId: countId,
+          before: { الصنف: product.name, الرصيد: Number(previous.enteredMilli), الوحدة: previous.enteredUnit },
+        }, tx);
+        continue;
+      }
+
+      await tx.insert(inventoryCountOpenings).values({
+        countId,
+        productId: e.productId,
+        enteredMilli: e.enteredMilli,
+        enteredUnit: e.unit,
+        canonicalMilli: toCanonical(e.enteredMilli, e.unit),
+        note: e.note ?? null,
+        createdById: actorId,
+      });
+      set++;
+
+      await recordAudit({
+        actorId,
+        action: "INVENTORY_OPENING_SET",
+        entityType: "inventory_count",
+        entityId: countId,
+        before: previous
+          ? { الصنف: product.name, الرصيد: Number(previous.enteredMilli), الوحدة: previous.enteredUnit }
+          : null,
+        after: {
+          الصنف: product.name,
+          الرصيد: e.enteredMilli,
+          الوحدة: e.unit,
+          الفترة: `${header.periodStart} → ${header.periodEnd}`,
+          الفرع: header.branchName ?? "—",
+          المصدر: "MANUAL",
+        },
+      }, tx);
+    }
+
+    await recomputeCount(countId, tx);
+    return { set, cleared };
+  });
 }
 
 /* ─────────────────────────── دورةُ الجرد ─────────────────────────── */
@@ -613,6 +956,7 @@ export async function loadCountHeader(countId: string, conn: Conn = db): Promise
     finalisedAt: r.finalised_at === null ? null : new Date(String(r.finalised_at)),
     reopenCount: Number(r.reopen_count),
     note: r.note === null ? null : String(r.note),
+    scopeSource: r.scope_source === "EXPLICIT" ? "EXPLICIT" : "INHERITED",
   };
 }
 
@@ -719,11 +1063,15 @@ export async function recomputeCount(countId: string, conn: Conn = db): Promise<
   const inScope = new Set(products.map((p) => p.id).filter((id) => !scope.excluded.has(id)));
 
   const input = await buildEngineInput(
-    header.periodStart, header.periodEnd, header.branchId, actuals, conn, inScope,
+    header.periodStart, header.periodEnd, header.branchId, actuals, conn, inScope, countId,
   );
   const report = reconcile(input);
 
-  await persistLines(countId, report, conn);
+  /*
+    والموروثُ يتبع مصدرَه ما دام موروثاً — فتُكتَب أسطرُه بما وُرث.
+    والصريحُ **لا تمسّه إعادةُ الحساب**: حفظه إنسان.
+  */
+  await persistLines(countId, report, conn, !scope.explicit);
   await conn
     .update(inventoryCounts)
     .set({ readiness: report.coverage.readiness, coverage: report.coverage as never })
@@ -732,7 +1080,13 @@ export async function recomputeCount(countId: string, conn: Conn = db): Promise<
   return report;
 }
 
-async function persistLines(countId: string, report: EngineReport, conn: Conn): Promise<void> {
+async function persistLines(
+  countId: string,
+  report: EngineReport,
+  conn: Conn,
+  /** أيُكتَب النطاقُ فوق القائم؟ — للموروث وحده، والصريحُ لا يُمَسّ. */
+  mirrorScope = false,
+): Promise<void> {
   if (report.lines.length === 0) return;
 
   await conn.transaction(async (tx) => {
@@ -745,6 +1099,9 @@ async function persistLines(countId: string, report: EngineReport, conn: Conn): 
         تدهسه؛ والجديدُ يرث ما ورّثه الجردُ السابق.
       */
       inScope: l.inScope,
+      openingSource: l.openingSource,
+      openingRef: l.openingRef,
+      manualReceiptsMilli: l.manualReceiptsMilli,
       baseUnit: l.baseUnit,
       openingMilli: l.openingMilli,
       purchasesMilli: l.purchasesMilli,
@@ -787,10 +1144,43 @@ async function persistLines(countId: string, report: EngineReport, conn: Conn): 
             valuationBasis: sql`excluded.valuation_basis`,
             varianceCostMinor: sql`excluded.variance_cost_minor`,
             flags: sql`excluded.flags`,
+            openingSource: sql`excluded.opening_source`,
+            openingRef: sql`excluded.opening_ref`,
+            manualReceiptsMilli: sql`excluded.manual_receipts_milli`,
+            ...(mirrorScope ? { inScope: sql`excluded.in_scope` } : {}),
             /* والعدُّ الفعليّ لا يُمَسّ — كتبه إنسان، ولا يُدهَس بإعادة حساب */
           },
         });
     }
+  });
+}
+
+/**
+ * عدٌّ بوحدته كما كتبها الإنسان ← مِلّي معياريّ، **في الخادم**.
+ *
+ * وتُفحَص العائلة: «٥ لتر» لصنفٍ يُوزَن بالكيلو كانت تُحوَّل إلى مِلّي
+ * المليلتر ثمّ تُقرأ مِلّي‑جرام — رقمٌ صحيحُ الشكل خاطئُ المعنى.
+ */
+export async function canonicalCounts(
+  entries: readonly { productId: string; milli: number | null; unit: StoredUnit }[],
+  conn: Conn = db,
+): Promise<ActualInput[]> {
+  if (entries.length === 0) return [];
+  const ids = [...new Set(entries.map((e) => e.productId))];
+  const rows = await conn
+    .select({ id: products.id, baseUnit: products.baseUnit, name: products.nameAr })
+    .from(products)
+    .where(inArray(products.id, ids));
+  const byId = new Map(rows.map((r) => [r.id, r]));
+
+  return entries.map((e) => {
+    const p = byId.get(e.productId);
+    if (!p) throw new Error("صنفٌ غير معروف — حدّث الصفحة");
+    if (e.milli === null) return { productId: e.productId, actualMilli: null };
+    if (!sameUnitFamily(e.unit, p.baseUnit)) {
+      throw new Error(`وحدةُ «${p.name}» لا تُحوَّل إلى وحدته — وزنٌ لا يصير حجماً`);
+    }
+    return { productId: e.productId, actualMilli: toCanonical(e.milli, e.unit) };
   });
 }
 
@@ -874,6 +1264,16 @@ export async function finaliseCount(countId: string, actorId: string, conn: Conn
     engineVersion: ENGINE_VERSION,
     recipeVersionIds: [...new Set(report.lines.flatMap((l) => l.recipeVersionIds))].sort(),
     invoiceLineIds: [...new Set(report.lines.flatMap((l) => l.invoiceLineIds))].sort(),
+    /* وما أدخله إنسان: الاستلاماتُ ومصادرُ الافتتاحيّ ونطاقُ الجرد */
+    receiptIds: [...new Set(report.lines.flatMap((l) => l.receiptIds))].sort(),
+    openings: report.lines
+      .filter((l) => l.openingSource !== "UNKNOWN")
+      .map((l) => ({ productId: l.productId, source: l.openingSource, ref: l.openingRef }))
+      .sort((a, b) => a.productId.localeCompare(b.productId)),
+    scope: {
+      source: header.scopeSource,
+      excluded: report.lines.filter((l) => !l.inScope).map((l) => l.productId).sort(),
+    },
     salesLineIds: report.consumption.included.lines,
     salesImportIds: await importIdsFor(header.periodStart, header.periodEnd, conn),
     computedAt: new Date().toISOString(),
@@ -1026,10 +1426,22 @@ export async function readFrozenReport(header: CountHeader, conn: Conn = db): Pr
     varianceCostMinor: num(r.variance_cost_minor),
     /* والمقفَلُ يحفظ نطاقَه كما كان — لا كما صار اليوم */
     inScope: r.in_scope !== false,
+    openingSource: (r.opening_source ?? "UNKNOWN") as OpeningSource,
+    openingRef: r.opening_ref === null || r.opening_ref === undefined ? null : String(r.opening_ref),
+    manualReceiptsMilli: Number(r.manual_receipts_milli ?? 0),
+    receiptIds: [],
     flags: (Array.isArray(r.flags) ? r.flags : []) as EngineReport["lines"][number]["flags"],
     recipeVersionIds: [],
     invoiceLineIds: [],
   }));
+
+  /*
+    والنقصُ والزيادةُ يُحسَبان من الأسطر المجمَّدة نفسِها — وهي لا تتغيّر،
+    فالحسابُ عليها قراءةٌ لا إعادةُ حساب. ولجرداتٍ أُقفلت قبل أن يُحفَظ
+    الملخّصُ في لقطتها يُشتقّ هنا.
+  */
+  const storedTotals = (stored?.totals ?? null) as Partial<EngineReport["totals"]> | null;
+  const summary = storedTotals?.summary ?? summariseVariance(lines);
 
   return {
     engineVersion: ENGINE_VERSION,
@@ -1037,13 +1449,14 @@ export async function readFrozenReport(header: CountHeader, conn: Conn = db): Pr
     periodEnd: header.periodEnd,
     lines,
     coverage: (stored?.coverage ?? emptyCoverage(header)) as EngineReport["coverage"],
-    totals: (stored?.totals ?? {
+    totals: (storedTotals ? { ...storedTotals, summary } : {
       varianceCostMinor: lines.reduce((s, l) => s + (l.inScope ? l.varianceCostMinor ?? 0 : 0), 0),
       linesWithKnownCost: lines.filter((l) => l.inScope && l.varianceCostMinor !== null).length,
       linesCounted: lines.filter((l) => l.inScope && l.actualMilli !== null).length,
       linesWithVariance: lines.filter((l) => l.inScope && l.varianceMilli !== null).length,
       salesTotalMinor: 0,
       purchasesTotalMinor: 0,
+      summary,
     }) as EngineReport["totals"],
     consumption: {
       byIngredient: new Map(),
@@ -1084,43 +1497,77 @@ export interface CountSummary {
   status: "DRAFT" | "FINALISED";
   readiness: "READY" | "PARTIAL" | "BLOCKED" | null;
   salesMinor: number | null;
+  /**
+   * النقصُ والزيادةُ وحجمُهما ونسبةُ النقص — من الأسطر نفسِها
+   * (`variance-summary.ts`). والصافي فيها ثانويّ: نقصٌ بألفٍ وزيادةٌ
+   * بألف صافيهما صفر، **وليس ذلك «لا مشكلة»**.
+   */
+  summary: VarianceSummary;
+  /** الصافي — يبقى للمقارنة الثانويّة، ولا يقود. */
   varianceCostMinor: number | null;
-  varianceBp: number | null;
   itemsCounted: number;
+  itemsInScope: number;
   finalisedAt: Date | null;
 }
 
-/** سجلُّ الجرد — كلُّ أسبوعٍ بسطر. */
 export async function listCounts(limit = 52, conn: Conn = db): Promise<CountSummary[]> {
   const rows = await conn.execute<Record<string, unknown>>(sql`
     select c.id, c.period_start, c.period_end, c.status, c.readiness, c.finalised_at,
            b.name_ar as branch_name,
-           (c.coverage -> 'sales' ->> 'includedTotalMinor')::bigint as sales_minor,
-           coalesce(sum(l.variance_cost_minor), 0)::bigint as variance_cost,
-           count(l.id) filter (where l.actual_milli is not null)::int as items_counted
+           (c.coverage -> 'sales' ->> 'includedTotalMinor')::bigint as sales_minor
       from inventory_counts c
       left join branches b on b.id = c.branch_id
-      left join inventory_count_lines l on l.count_id = c.id
-     group by c.id, b.name_ar
      order by c.period_end desc, c.started_at desc
      limit ${limit}
   `);
+  if (rows.rows.length === 0) return [];
+
+  /*
+    الأسطرُ تُقرأ وتُجمَع في دالّةٍ واحدة (`summariseVariance`) — لا
+    مجموعٌ في SQL وآخرُ في الشاشة. تعريفٌ واحدٌ للنقص في النظام كلِّه.
+  */
+  const ids = rows.rows.map((r) => String(r.id));
+  const lineRows = await conn.execute<Record<string, unknown>>(sql`
+    select count_id, in_scope, variance_milli, variance_cost_minor,
+           theoretical_consumption_milli, unit_cost_milli_minor, base_unit, actual_milli
+      from inventory_count_lines
+     where count_id in (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
+  `);
+  const byCount = new Map<string, SummaryLine[]>();
+  const counted = new Map<string, number>();
+  const inScope = new Map<string, number>();
+  for (const l of lineRows.rows) {
+    const id = String(l.count_id);
+    const scoped = l.in_scope !== false;
+    const list = byCount.get(id) ?? [];
+    list.push({
+      inScope: scoped,
+      varianceMilli: num(l.variance_milli),
+      varianceCostMinor: num(l.variance_cost_minor),
+      theoreticalConsumptionMilli: num(l.theoretical_consumption_milli),
+      unitCostMilliMinor: num(l.unit_cost_milli_minor),
+      baseUnit: (isStoredUnit(l.base_unit) ? l.base_unit : "PIECE") as StoredUnit,
+    });
+    byCount.set(id, list);
+    if (scoped) inScope.set(id, (inScope.get(id) ?? 0) + 1);
+    if (scoped && l.actual_milli !== null) counted.set(id, (counted.get(id) ?? 0) + 1);
+  }
 
   return rows.rows.map((r) => {
-    const sales = r.sales_minor === null ? null : Number(r.sales_minor);
-    const variance = Number(r.variance_cost ?? 0);
+    const id = String(r.id);
+    const summary = summariseVariance(byCount.get(id) ?? []);
     return {
-      id: String(r.id),
+      id,
       periodStart: String(r.period_start),
       periodEnd: String(r.period_end),
       branchName: r.branch_name === null ? null : String(r.branch_name),
       status: r.status as "DRAFT" | "FINALISED",
       readiness: (r.readiness ?? null) as CountSummary["readiness"],
-      salesMinor: sales,
-      varianceCostMinor: variance,
-      /* النسبةُ من المبيعات — و`null` حين لا مبيعاتٍ محسوبة، لا صفر */
-      varianceBp: sales && sales > 0 ? Math.round((variance * 10_000) / sales) : null,
-      itemsCounted: Number(r.items_counted),
+      salesMinor: r.sales_minor === null ? null : Number(r.sales_minor),
+      summary,
+      varianceCostMinor: summary.netCostMinor,
+      itemsCounted: counted.get(id) ?? 0,
+      itemsInScope: inScope.get(id) ?? 0,
       finalisedAt: r.finalised_at === null ? null : new Date(String(r.finalised_at)),
     };
   });
@@ -1132,46 +1579,62 @@ export interface ItemHistoryRow {
   periodEnd: string;
   status: "DRAFT" | "FINALISED";
   baseUnit: StoredUnit;
+  inScope: boolean;
+  openingMilli: number | null;
+  openingSource: OpeningSource;
+  purchasesMilli: number | null;
+  manualReceiptsMilli: number;
+  theoreticalConsumptionMilli: number | null;
+  recordedWasteMilli: number;
   theoreticalClosingMilli: number | null;
   actualMilli: number | null;
   varianceMilli: number | null;
+  /** الأساسيّة: الفرق ÷ الاستهلاك المتوقَّع. */
+  varianceConsumptionBp: number | null;
   varianceBp: number | null;
   varianceCostMinor: number | null;
 }
 
 /**
- * تاريخُ صنفٍ بعينه عبر الجردات.
+ * سجلُّ الصنف — أسبوعاً أسبوعاً، بكلّ حدٍّ في معادلته ومصدرِه.
  *
- * وهذا ما يكشف المشكلة المتكرّرة: صنفٌ ينقص كلَّ أسبوعٍ بالقدر نفسه
- * وصفتُه خاطئة غالباً، وصنفٌ نقص مرّةً واحدةً بقدرٍ كبير حادثةٌ.
- * والفرقُ بينهما لا يُرى في تقرير أسبوعٍ واحد.
+ * والغايةُ أن يُرى **المتكرّر**: نقصٌ في كلّ أسبوعٍ بنسبةٍ متقاربة
+ * يُشير إلى وصفةٍ أو جرعة؛ ونقصٌ مرّةً وزيادةٌ مرّة يُشير إلى عدٍّ أو
+ * توقيتِ استلام. ولا يُفهَم ذلك من الفرق وحده.
  */
 export async function itemHistory(productId: string, limit = 12, conn: Conn = db): Promise<ItemHistoryRow[]> {
-  const rows = await conn
-    .select({
-      countId: inventoryCounts.id,
-      periodStart: inventoryCounts.periodStart,
-      periodEnd: inventoryCounts.periodEnd,
-      status: inventoryCounts.status,
-      baseUnit: inventoryCountLines.baseUnit,
-      theoreticalClosingMilli: inventoryCountLines.theoreticalClosingMilli,
-      actualMilli: inventoryCountLines.actualMilli,
-      varianceMilli: inventoryCountLines.varianceMilli,
-      varianceConsumptionBp: inventoryCountLines.varianceConsumptionBp,
-      varianceBp: inventoryCountLines.varianceBp,
-      varianceCostMinor: inventoryCountLines.varianceCostMinor,
-    })
-    .from(inventoryCountLines)
-    .innerJoin(inventoryCounts, eq(inventoryCounts.id, inventoryCountLines.countId))
-    .where(eq(inventoryCountLines.productId, productId))
-    .orderBy(desc(inventoryCounts.periodEnd))
-    .limit(limit);
+  const rows = await conn.execute<Record<string, unknown>>(sql`
+    select c.id as count_id, c.period_start, c.period_end, c.status,
+           l.base_unit, l.in_scope, l.opening_milli, l.opening_source, l.purchases_milli,
+           l.manual_receipts_milli, l.theoretical_consumption_milli, l.recorded_waste_milli,
+           l.theoretical_closing_milli, l.actual_milli, l.variance_milli,
+           l.variance_consumption_bp, l.variance_bp, l.variance_cost_minor
+      from inventory_count_lines l
+      join inventory_counts c on c.id = l.count_id
+     where l.product_id = ${productId}
+     order by c.period_end desc
+     limit ${limit}
+  `);
 
-  return rows.map((r) => ({
-    ...r,
-    theoreticalClosingMilli: r.theoreticalClosingMilli === null ? null : Number(r.theoreticalClosingMilli),
-    actualMilli: r.actualMilli === null ? null : Number(r.actualMilli),
-    varianceMilli: r.varianceMilli === null ? null : Number(r.varianceMilli),
+  return rows.rows.map((r) => ({
+    countId: String(r.count_id),
+    periodStart: String(r.period_start),
+    periodEnd: String(r.period_end),
+    status: r.status as "DRAFT" | "FINALISED",
+    baseUnit: (isStoredUnit(r.base_unit) ? r.base_unit : "PIECE") as StoredUnit,
+    inScope: r.in_scope !== false,
+    openingMilli: num(r.opening_milli),
+    openingSource: (r.opening_source ?? "UNKNOWN") as OpeningSource,
+    purchasesMilli: num(r.purchases_milli),
+    manualReceiptsMilli: Number(r.manual_receipts_milli ?? 0),
+    theoreticalConsumptionMilli: num(r.theoretical_consumption_milli),
+    recordedWasteMilli: Number(r.recorded_waste_milli ?? 0),
+    theoreticalClosingMilli: num(r.theoretical_closing_milli),
+    actualMilli: num(r.actual_milli),
+    varianceMilli: num(r.variance_milli),
+    varianceConsumptionBp: num(r.variance_consumption_bp),
+    varianceBp: num(r.variance_bp),
+    varianceCostMinor: num(r.variance_cost_minor),
   }));
 }
 
@@ -1182,32 +1645,41 @@ export interface RecurringItem {
   category: string;
   periods: number;
   negativePeriods: number;
-  totalVarianceCostMinor: number;
+  /** مقدارُ النقص في المدّة — لا تُطفئه زيادةُ أسبوعٍ آخر. */
+  shortageCostMinor: number;
+  overageCostMinor: number;
+  /** ومقدارُ النقص بالكمّيّة — يُجمَع لأنّه صنفٌ واحدٌ بوحدةٍ واحدة. */
+  shortageMilli: number;
+  overageMilli: number;
   worstBp: number | null;
 }
 
 /**
- * الأصنافُ التي يتكرّر فيها الفرق.
+ * أصنافٌ يتكرّر فيها الفرق — مرتَّبةً بعدد أسابيع النقص ثمّ بمقداره.
  *
- * والترتيبُ بعدد المرّات ثمّ بالكلفة: المتكرّرُ الصغير مشكلةٌ في
- * الطريقة، والكبيرُ مرّةً حادثة. والأوّلُ هو ما يُصلَح.
+ * **والجمعُ على المقادير لا على الصافي**: صنفٌ نقص ألفاً في أسبوعٍ وزاد
+ * ألفاً في آخر ليس «صنفاً سليماً»، هو صنفٌ فيه مشكلتان.
  */
 export async function recurringVariances(sinceDate: string, limit = 10, conn: Conn = db): Promise<RecurringItem[]> {
   const rows = await conn.execute<Record<string, unknown>>(sql`
-    select l.product_id, p.name_ar as product_name, p.base_unit, p.category,
+    select l.product_id, p.name_ar as product_name, l.base_unit, p.category,
            count(*)::int as periods,
            count(*) filter (where l.variance_milli < 0)::int as negative_periods,
-           coalesce(sum(l.variance_cost_minor), 0)::bigint as total_cost,
-           min(l.variance_bp) as worst_bp
+           coalesce(sum(-l.variance_cost_minor) filter (where l.variance_cost_minor < 0), 0)::bigint as shortage_cost,
+           coalesce(sum(l.variance_cost_minor) filter (where l.variance_cost_minor > 0), 0)::bigint as overage_cost,
+           coalesce(sum(-l.variance_milli) filter (where l.variance_milli < 0), 0)::bigint as shortage_milli,
+           coalesce(sum(l.variance_milli) filter (where l.variance_milli > 0), 0)::bigint as overage_milli,
+           min(l.variance_consumption_bp) as worst_bp
       from inventory_count_lines l
       join inventory_counts c on c.id = l.count_id
       join products p on p.id = l.product_id
      where c.status = 'FINALISED'
        and c.period_end >= ${sinceDate}
+       and l.in_scope
        and l.variance_milli is not null
        and l.variance_milli <> 0
-     group by l.product_id, p.name_ar, p.base_unit, p.category
-     order by negative_periods desc, abs(coalesce(sum(l.variance_cost_minor), 0)) desc
+     group by l.product_id, p.name_ar, l.base_unit, p.category
+     order by negative_periods desc, shortage_cost desc
      limit ${limit}
   `);
 
@@ -1218,12 +1690,14 @@ export async function recurringVariances(sinceDate: string, limit = 10, conn: Co
     category: String(r.category),
     periods: Number(r.periods),
     negativePeriods: Number(r.negative_periods),
-    totalVarianceCostMinor: Number(r.total_cost),
+    shortageCostMinor: Number(r.shortage_cost),
+    overageCostMinor: Number(r.overage_cost),
+    shortageMilli: Number(r.shortage_milli),
+    overageMilli: Number(r.overage_milli),
     worstBp: r.worst_bp === null ? null : Number(r.worst_bp),
   }));
 }
 
-/** أصنافٌ لم يدخلها الحساب ومعها معرّفاتُها — لعرض «تحتاج ربطاً». */
 export async function unmappedPosProducts(conn: Conn = db): Promise<{
   id: string; externalId: string; name: string; category: string | null;
   soldUnits: number; soldMinor: number;

@@ -1,3 +1,4 @@
+import { formatRiyalsDisplay } from "@/lib/money";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
@@ -9,6 +10,7 @@ import { PageShell } from "@/components/page-shell";
 import { Badge, Card, EmptyState, NoAccess, Section, Stat, StatGrid } from "@/components/ui";
 import { Money } from "@/components/money";
 import { itemHistory } from "@/services/inventory.service";
+import { OPENING_SOURCE_LABEL } from "@/lib/inventory/engine";
 import { formatQuantity, formatSignedQuantity } from "@/lib/inventory/units";
 import { formatBp } from "@/lib/inventory/equation";
 import { storedUnitLabel } from "@/lib/unit-conversion";
@@ -51,7 +53,9 @@ export default async function ItemHistoryPage({
   const finalised = history.filter((h) => h.status === "FINALISED" && h.varianceMilli !== null);
 
   const negatives = finalised.filter((h) => (h.varianceMilli ?? 0) < 0).length;
-  const totalCost = finalised.reduce((s, h) => s + (h.varianceCostMinor ?? 0), 0);
+  /* النقصُ والزيادةُ لا يتقاصّان — لا في الجرد ولا في سجلّ الصنف */
+  const shortageCost = finalised.reduce((s, h) => s + Math.max(0, -(h.varianceCostMinor ?? 0)), 0);
+  const overageCost = finalised.reduce((s, h) => s + Math.max(0, h.varianceCostMinor ?? 0), 0);
 
   return (
     <PageShell
@@ -70,7 +74,12 @@ export default async function ItemHistoryPage({
             ? "نقصٌ في كلّ مرّة — راجِع جرعة الوصفة والميزان قبل أن تبحث عن فاقد"
             : undefined}
         />
-        <Stat label="مجموعُ كلفة الفروق" minor={totalCost} tone={totalCost < 0 ? "danger" : undefined} />
+        <Stat
+          label="النقص"
+          minor={shortageCost}
+          tone={shortageCost > 0 ? "danger" : undefined}
+          sub={overageCost > 0 ? `والزيادة ${formatRiyalsDisplay(overageCost)} — لا تُطرح منه` : undefined}
+        />
         <Stat
           label="آخرُ فرق"
           value={finalised[0] ? formatSignedQuantity(finalised[0].varianceMilli, finalised[0].baseUnit) : "—"}
@@ -86,24 +95,37 @@ export default async function ItemHistoryPage({
         ) : (
           <ul className="divide-y divide-line rounded-2xl border border-line bg-raised">
             {history.map((h) => (
-              <li key={h.countId} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
-                <Link href={`/inventory/counts/${h.countId}`} className="nums w-44 shrink-0 text-xs font-bold hover:underline">
-                  {h.periodStart} → {h.periodEnd}
-                </Link>
-                {h.status === "DRAFT" && <Badge tone="warn">مسوّدة</Badge>}
-                <span className="nums text-[11px] text-muted">
-                  المتوقَّع {formatQuantity(h.theoreticalClosingMilli, h.baseUnit)}
-                  {" · "}
-                  الفعليّ {formatQuantity(h.actualMilli, h.baseUnit)}
-                </span>
-                <span className="grow" />
-                <span className={`nums text-xs font-bold ${(h.varianceMilli ?? 0) < 0 ? "text-danger" : "text-ok"}`}>
-                  {formatSignedQuantity(h.varianceMilli, h.baseUnit)}
-                </span>
-                <span className="nums w-16 text-end text-xs text-muted">{formatBp(h.varianceBp)}</span>
-                <span className="nums w-24 text-end text-xs">
-                  {h.varianceCostMinor === null ? "—" : <Money minor={h.varianceCostMinor} />}
-                </span>
+              <li key={h.countId} className="px-3 py-2.5">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <Link href={`/inventory/counts/${h.countId}`} className="nums w-44 shrink-0 text-xs font-bold hover:underline">
+                    {h.periodStart} → {h.periodEnd}
+                  </Link>
+                  {h.status === "DRAFT" && <Badge tone="warn">مسوّدة</Badge>}
+                  {!h.inScope && <Badge>خارج الجرد</Badge>}
+                  <span className="grow" />
+                  <span className={`nums text-xs font-bold ${(h.varianceMilli ?? 0) < 0 ? "text-danger" : "text-ok"}`}>
+                    {formatSignedQuantity(h.varianceMilli, h.baseUnit)}
+                  </span>
+                  <span className="nums w-16 text-end text-xs text-muted">{formatBp(h.varianceConsumptionBp)}</span>
+                  <span className="nums w-24 text-end text-xs">
+                    {h.varianceCostMinor === null ? "—" : <Money minor={h.varianceCostMinor} />}
+                  </span>
+                </div>
+                {/*
+                  المعادلةُ كلُّها بمصادرها — فيُقرأ **المتكرّر**: نقصٌ بنسبةٍ
+                  متقاربة كلَّ أسبوع يشير إلى وصفةٍ أو جرعة، ونقصٌ مرّةً وزيادةٌ
+                  مرّة يشير إلى عدٍّ أو توقيتِ استلام.
+                */}
+                <p className="nums mt-1 text-[11px] leading-relaxed text-muted">
+                  افتتاحيّ {formatQuantity(h.openingMilli, h.baseUnit)}
+                  {h.openingMilli !== null && ` (${OPENING_SOURCE_LABEL[h.openingSource]})`}
+                  {" + "}مشتريات {formatQuantity(h.purchasesMilli, h.baseUnit)}
+                  {h.manualReceiptsMilli > 0 && ` (منها ${formatQuantity(h.manualReceiptsMilli, h.baseUnit)} يدوياً)`}
+                  {" − "}استهلاك {formatQuantity(h.theoreticalConsumptionMilli, h.baseUnit)}
+                  {h.recordedWasteMilli > 0 && <>{" − "}هدر {formatQuantity(h.recordedWasteMilli, h.baseUnit)}</>}
+                  {" = "}متوقَّع {formatQuantity(h.theoreticalClosingMilli, h.baseUnit)}
+                  {" · "}الفعليّ {formatQuantity(h.actualMilli, h.baseUnit)}
+                </p>
               </li>
             ))}
           </ul>
