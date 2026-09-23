@@ -40,6 +40,23 @@ export interface PurchaseLineInput {
   packSize: string | null;
   contentUnit: StoredUnit | null;
   contentQuantity: string | null;
+  /**
+   * مصدرُ السطر: بندُ فاتورة، أو **كمّيّةٌ مستلَمة أدخلها إنسان**.
+   *
+   * والاثنان يمرّان بهذا الملفّ نفسِه — لا معادلةٌ ثانية للاستلام
+   * اليدويّ. والفرقُ الوحيد من أين تُعرَف الكمّيّة: من مواصفة العبوة
+   * في الفاتورة، ومن الرقم الذي كتبه صاحبُ المقهى في الاستلام.
+   */
+  source?: "INVOICE" | "MANUAL_RECEIPT";
+  /** للاستلام اليدويّ: الكمّيّةُ بالمِلّي من `receivedUnit` كما أُدخلت. */
+  receivedMilli?: number | null;
+  receivedUnit?: StoredUnit | null;
+  /**
+   * أتُعرَف كلفةُ هذا السطر؟ — والافتراضُ نعم (بندُ فاتورةٍ مبلغُه
+   * مدفوع). والاستلامُ بلا كلفة لا يدخل **مقامَ** متوسّط الكلفة، وإلّا
+   * خفّض كلفةَ الوحدة بكمّيّةٍ لم يُدفَع عنها شيءٌ معروف.
+   */
+  costKnown?: boolean;
 }
 
 export type PurchaseGapReason =
@@ -75,6 +92,23 @@ export function purchaseQuantity(
   productBaseUnit: StoredUnit,
 ): PurchaseQuantity {
   if (!line.productId) return { known: false, reason: "UNLINKED_PRODUCT" };
+
+  /*
+    ── الاستلامُ اليدويّ: الكمّيّةُ مكتوبةٌ لا مشتقّة ──
+
+    كتبها صاحبُ المقهى بوحدته، وتحقّق الخادمُ عند الحفظ من عائلتها.
+    ويُعاد الفحصُ هنا لأنّ وحدةَ الصنف قد تتغيّر بعد الحفظ — ووزنٌ
+    لا يصير حجماً بمرور الوقت.
+  */
+  if (line.source === "MANUAL_RECEIPT") {
+    if (line.receivedMilli == null || line.receivedUnit == null || line.receivedMilli <= 0) {
+      return { known: false, reason: "MISSING_QUANTITY" };
+    }
+    if (!sameUnitFamily(line.receivedUnit, productBaseUnit)) {
+      return { known: false, reason: "UNIT_FAMILY_MISMATCH" };
+    }
+    return { known: true, canonicalMilli: toCanonical(line.receivedMilli, line.receivedUnit) };
+  }
 
   const qtyMilli = decimalToMilli(line.qty);
   if (qtyMilli === null) return { known: false, reason: "MISSING_QUANTITY" };
@@ -112,8 +146,19 @@ export interface ProductPurchases {
   canonicalMilli: number;
   /** ما دُفع في الأسطر التي عُرفت كمّيّتُها — وحدها تصلح أساساً للكلفة. */
   knownCostMinor: number;
+  /**
+   * الكمّيّةُ التي عُرفت كلفتُها — **مقامُ** المتوسّط.
+   *
+   * استلامٌ يدويٌّ بلا كلفة يزيد الكمّيّة ولا يزيد المبلغ؛ فلو دخل
+   * المقامَ لقال المتوسّطُ إنّ الكيلو أرخصُ ممّا دُفع فيه.
+   */
+  costedMilli: number;
+  /** وما دخل منها بإدخالٍ يدويّ — يُعرَض مصدرُ الكمّيّة لا الكمّيّةُ وحدها. */
+  manualMilli: number;
   lines: number;
   invoiceLineIds: string[];
+  /** معرّفاتُ الاستلامات اليدويّة — تُحفَظ في لقطة الجرد المقفَل. */
+  receiptIds: string[];
 }
 
 export interface PurchaseSummary {
@@ -163,13 +208,24 @@ export function summarisePurchases(
 
     let acc = byProduct.get(line.productId);
     if (!acc) {
-      acc = { productId: line.productId, canonicalMilli: 0, knownCostMinor: 0, lines: 0, invoiceLineIds: [] };
+      acc = {
+        productId: line.productId, canonicalMilli: 0, knownCostMinor: 0, costedMilli: 0,
+        manualMilli: 0, lines: 0, invoiceLineIds: [], receiptIds: [],
+      };
       byProduct.set(line.productId, acc);
     }
     acc.canonicalMilli += q.canonicalMilli;
-    acc.knownCostMinor += line.lineTotalMinor;
+    if (line.costKnown !== false) {
+      acc.knownCostMinor += line.lineTotalMinor;
+      acc.costedMilli += q.canonicalMilli;
+    }
     acc.lines++;
-    acc.invoiceLineIds.push(line.lineId);
+    if (line.source === "MANUAL_RECEIPT") {
+      acc.manualMilli += q.canonicalMilli;
+      acc.receiptIds.push(line.lineId);
+    } else {
+      acc.invoiceLineIds.push(line.lineId);
+    }
   }
 
   return {
@@ -206,11 +262,11 @@ export function unitCostMilliMinor(
   baseUnit: StoredUnit,
   fallbackMilliMinor: number | null,
 ): number | null {
-  if (!purchases || purchases.canonicalMilli <= 0 || purchases.knownCostMinor <= 0) {
+  if (!purchases || purchases.costedMilli <= 0 || purchases.knownCostMinor <= 0) {
     return fallbackMilliMinor;
   }
   /* الكمّيّة المعياريّة مِلّي‑صغرى؛ والمعدَّل يحتاج قسمتها على وحدةِ الأساس */
-  const baseUnits = quantityInBaseUnits(purchases.canonicalMilli, baseUnit);
+  const baseUnits = quantityInBaseUnits(purchases.costedMilli, baseUnit);
   if (baseUnits <= 0) return fallbackMilliMinor;
   return Math.round((purchases.knownCostMinor * MILLI_MINOR) / baseUnits);
 }

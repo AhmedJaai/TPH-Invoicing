@@ -1,3 +1,4 @@
+import { formatRiyalsDisplay } from "@/lib/money";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { currentUser } from "@/lib/session";
@@ -7,6 +8,8 @@ import { Card, EmptyState, NoAccess, Section, Stat, StatGrid, buttonClass } from
 import { Money } from "@/components/money";
 import { listCounts, recurringVariances } from "@/services/inventory.service";
 import { formatBp } from "@/lib/inventory/equation";
+import { combineSummaries } from "@/lib/inventory/variance-summary";
+import { formatSignedQuantity } from "@/lib/inventory/units";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
@@ -50,10 +53,16 @@ export default async function InventoryTrendPage({
   const inWindow = all.filter((c) => c.status === "FINALISED" && c.periodEnd >= since);
   const recurring = await recurringVariances(since);
 
-  const totalVariance = inWindow.reduce((s, c) => s + (c.varianceCostMinor ?? 0), 0);
-  const totalSales = inWindow.reduce((s, c) => s + (c.salesMinor ?? 0), 0);
+  /*
+    ── المقاديرُ تُجمَع، لا الصافي ──
+
+    نقصُ أسبوعٍ لا تُطفئه زيادةُ أسبوعٍ آخر. فالمؤشّرُ الأوّل هو النقص،
+    ويليه حجمُ الفروق، والصافي يُذكَر ثانويّاً ولا يقود.
+  */
+  const total = combineSummaries(inWindow.map((c) => c.summary));
   const counted = inWindow.length;
   const coveredWeeks = inWindow.filter((c) => c.readiness === "READY").length;
+  const worstRate = Math.max(1, ...inWindow.map((c) => c.summary.shortageRateBp ?? 0));
 
   return (
     <PageShell
@@ -86,15 +95,21 @@ export default async function InventoryTrendPage({
         <>
           <div className="mt-6">
             <StatGrid>
-              <Stat label="جرداتٌ مقفَلة" value={String(counted)} />
               <Stat
-                label="كلفةُ الفروق"
-                minor={totalVariance}
-                tone={totalVariance < 0 ? "danger" : undefined}
+                label="النقص"
+                minor={total.shortageCostMinor}
+                tone={total.shortageCostMinor > 0 ? "danger" : undefined}
+                sub={`في ${total.linesShort} سطراً — ولا تُطفئه زيادةٌ في غيره`}
               />
               <Stat
-                label="من المبيعات"
-                value={totalSales > 0 ? formatBp(Math.round((totalVariance * 10_000) / totalSales)) : "غير معروف"}
+                label="النقصُ من كلفة الاستهلاك"
+                value={total.shortageRateBp === null ? "غير محسوبة" : formatBp(-total.shortageRateBp)}
+                sub={total.consumptionCostComplete ? "كم ضاع ممّا كان ينبغي أن يُصرَف" : "على ما عُرفت كلفتُه — المقامُ ناقص"}
+              />
+              <Stat
+                label="حجمُ الفروق"
+                minor={total.absoluteCostMinor}
+                sub={`نقصٌ وزيادة معاً · الصافي ${formatRiyalsDisplay(total.netCostMinor)}`}
               />
               <Stat
                 label="أسابيعُ تغطيتُها تامّة"
@@ -107,23 +122,25 @@ export default async function InventoryTrendPage({
           <Section title="أسبوعاً أسبوعاً">
             <ul className="divide-y divide-line rounded-2xl border border-line bg-raised">
               {inWindow.map((c) => {
-                const magnitude = Math.min(100, Math.abs(c.varianceBp ?? 0) / 50);
+                /* طولُ الشريط من نسبة النقص — فالأسابيعُ تُقارَن لا الريالات */
+                const magnitude = Math.min(100, ((c.summary.shortageRateBp ?? 0) * 100) / worstRate);
                 return (
                   <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
                     <Link href={`/inventory/counts/${c.id}`} className="nums w-44 shrink-0 text-xs font-bold hover:underline">
                       {c.periodStart} → {c.periodEnd}
                     </Link>
-                    {/* شريطٌ نسبيّ — طولُه من النسبة لا من الريال، فالأسابيع تُقارَن */}
                     <span className="hidden h-2 min-w-0 flex-1 rounded-full bg-sunken sm:block" aria-hidden>
-                      <span
-                        className={`block h-2 rounded-full ${(c.varianceCostMinor ?? 0) < 0 ? "bg-danger" : "bg-ok"}`}
-                        style={{ width: `${magnitude}%` }}
-                      />
+                      <span className="block h-2 rounded-full bg-danger" style={{ width: `${magnitude}%` }} />
                     </span>
-                    <span className="nums w-24 text-end text-xs">
-                      {c.varianceCostMinor === null ? "—" : <Money minor={c.varianceCostMinor} />}
+                    <span className="nums w-28 text-end text-xs">
+                      نقص <Money minor={c.summary.shortageCostMinor} tone={c.summary.shortageCostMinor > 0 ? "danger" : undefined} />
                     </span>
-                    <span className="nums w-16 text-end text-xs text-muted">{formatBp(c.varianceBp)}</span>
+                    <span className="nums w-28 text-end text-xs text-muted">
+                      زيادة <Money minor={c.summary.overageCostMinor} />
+                    </span>
+                    <span className="nums w-16 text-end text-xs text-muted">
+                      {c.summary.shortageRateBp === null ? "—" : formatBp(-c.summary.shortageRateBp)}
+                    </span>
                   </li>
                 );
               })}
@@ -148,10 +165,18 @@ export default async function InventoryTrendPage({
                     <span className="nums text-[11px] text-muted">
                       نقص في {r.negativePeriods} من {r.periods}
                     </span>
+                    <span className="nums text-[11px] text-muted">
+                      {formatSignedQuantity(-r.shortageMilli, r.baseUnit)}
+                    </span>
                     <span className="nums w-16 text-end text-xs text-muted">{formatBp(r.worstBp)}</span>
                     <span className="nums w-24 text-end text-xs">
-                      <Money minor={r.totalVarianceCostMinor} tone={r.totalVarianceCostMinor < 0 ? "danger" : undefined} />
+                      <Money minor={r.shortageCostMinor} tone={r.shortageCostMinor > 0 ? "danger" : undefined} />
                     </span>
+                    {r.overageCostMinor > 0 && (
+                      <span className="nums w-24 text-end text-[11px] text-muted">
+                        وزيادة <Money minor={r.overageCostMinor} />
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

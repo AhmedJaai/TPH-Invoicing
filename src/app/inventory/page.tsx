@@ -11,8 +11,9 @@ import { Money } from "@/components/money";
 import { StartCount } from "@/components/inventory-actions";
 import { InventoryWorkspace } from "@/components/inventory-workspace";
 import { listCounts, loadCountHeader, loadScope, recomputeCount } from "@/services/inventory.service";
+import { loadWorkspaceInputs } from "@/services/inventory-workspace.service";
+import { todayInRiyadh } from "@/lib/riyadh-time";
 import { lastCompleteWeek } from "@/lib/inventory/week";
-import { formatBp } from "@/lib/inventory/equation";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export default async function InventoryPage() {
     if (header) {
       const report = await recomputeCount(open.id);
       const scope = await loadScope(open.id);
+      const inputs = await loadWorkspaceInputs(header);
       return (
         <PageShell
           user={user}
@@ -60,6 +62,8 @@ export default async function InventoryPage() {
             canReopen={can(user.role, "inventory:reopen")}
             showAmounts={can(user.role, "amounts:view")}
             scopeInherited={scope.inherited}
+            {...inputs}
+            today={todayInRiyadh()}
           />
         </PageShell>
       );
@@ -162,10 +166,13 @@ export default async function InventoryPage() {
                 <Link href={`/inventory/counts/${c.id}`} className="nums min-w-0 flex-1 text-xs font-bold hover:underline">
                   {c.periodStart} → {c.periodEnd}
                 </Link>
+                {/* النقصُ والزيادةُ لا يتقاصّان — يُعرضان جنباً إلى جنب */}
                 <span className="nums text-xs">
-                  {c.varianceCostMinor === null ? "—" : <Money minor={c.varianceCostMinor} />}
+                  نقص <Money minor={c.summary.shortageCostMinor} tone={c.summary.shortageCostMinor > 0 ? "danger" : undefined} />
                 </span>
-                <span className="nums w-16 text-end text-xs text-muted">{formatBp(c.varianceBp)}</span>
+                <span className="nums text-xs text-muted">
+                  زيادة <Money minor={c.summary.overageCostMinor} />
+                </span>
               </li>
             ))}
           </ul>

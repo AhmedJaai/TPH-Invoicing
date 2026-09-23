@@ -1,45 +1,24 @@
 /**
- * دورةُ الجرد: يبدأ · يُدخَل فيه العدّ · يُقفَل · يُعاد فتحُه.
+ * دورةُ الجرد: يبدأ · يُختار نطاقُه · يُدخَل افتتاحيُّه وعدُّه · يُقفَل ·
+ * يُعاد فتحُه.
  *
- * **ولا يُؤخَذ من المتصفّح إلّا العدُّ الفعليّ ومعرّفُ الصنف.** كلُّ ما
- * عداه يُشتقّ في الخادم: الافتتاحيُّ والمشترياتُ والاستهلاكُ والكلفة.
- * والدرسُ من `confirm.ts`: لا يُصدَّق المتصفّح في رقمٍ يُبنى عليه قرار.
+ * **ولا يُؤخَذ من المتصفّح إلّا ما لا يعرفه غيرُ الإنسان**: العدُّ
+ * الفعليّ، والافتتاحيُّ حين لا مصدرَ له، ونطاقُ الجرد. وكلُّ ما عداه
+ * يُشتقّ هنا. والطلبُ يُفحَص وقتَ التشغيل (`count-request.ts`) قبل أن
+ * يبلغ الخدمة — لا بـ`as Body`.
  */
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import {
-  CountLockedError, NotAWeekError, OverlappingPeriodError, finaliseCount, recomputeCount, reopenCount,
-  saveActualCounts, setCountScope, startCount, type ActualInput,
+  CountLockedError, NotAWeekError, OverlappingPeriodError, ScopeItemNotInCountError,
+  canonicalCounts, finaliseCount, recomputeCount, reopenCount, saveActualCounts, saveCountScope,
+  setOpenings, startCount,
 } from "@/services/inventory.service";
-import { decimalToMilli, toCanonical } from "@/lib/inventory/units";
-import { isStoredUnit } from "@/lib/unit-conversion";
+import { parseCountRequest } from "@/lib/inventory/count-request";
 import { ITEM, countNoun } from "@/lib/arabic";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-interface Entry {
-  productId?: string;
-  /** الكمّيّة كما كتبها الإنسان، بوحدة الصنف — «10.5». والفراغُ يعني «لم يُعَدّ». */
-  actual?: string | number | null;
-  unit?: string;
-}
-
-interface Body {
-  action?: "start" | "save" | "scope" | "finalise" | "reopen" | "recompute";
-  countId?: string;
-  periodStart?: string;
-  periodEnd?: string;
-  branchId?: string | null;
-  note?: string | null;
-  reason?: string;
-  entries?: Entry[];
-  /** أصنافٌ بأعيانها يُغيَّر نطاقُها — مع `inScope`. */
-  productIds?: string[];
-  inScope?: boolean;
-}
-
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function POST(request: Request) {
   let user;
@@ -51,22 +30,23 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
+  let raw: unknown;
   try {
-    body = (await request.json()) as Body;
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
   }
 
+  const parsed = parseCountRequest(raw);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+  const body = parsed.request;
+
   try {
     switch (body.action) {
       case "start": {
-        if (!DATE.test(body.periodStart ?? "") || !DATE.test(body.periodEnd ?? "")) {
-          return NextResponse.json({ error: "حدِّد فترةً بصيغة YYYY-MM-DD" }, { status: 400 });
-        }
         const { countId, created } = await startCount({
-          periodStart: body.periodStart!,
-          periodEnd: body.periodEnd!,
+          periodStart: body.periodStart,
+          periodEnd: body.periodEnd,
           branchId: body.branchId ?? null,
           note: body.note ?? null,
           actorId: user.id,
@@ -74,80 +54,58 @@ export async function POST(request: Request) {
         await recomputeCount(countId);
         return NextResponse.json({
           ok: true, countId, created,
-          message: created ? "بدأ الجرد — راجِع الجاهزيّة ثمّ أدخِل العدّ." : "هذه الفترة لها جردٌ مفتوحٌ أصلاً — فُتح.",
+          message: created ? "بدأ الجرد — اختر ما يُعَدّ ثمّ راجِع ما دخل وما خرج." : "هذه الفترة لها جردٌ مفتوحٌ أصلاً — فُتح.",
         });
       }
 
       /*
-        ── النطاق: أيُّ الأصناف يُحسَب في هذا الجرد ──
+        ── النطاق: طلبٌ واحد، ومعاملةٌ واحدة ──
 
-        ولا يُؤخَذ من المتصفّح إلّا معرّفاتُ الأصناف وأينها من الجرد.
-        والاستبعادُ لا يمحو عدّاً مكتوباً، ولا يُقرأ صفراً على الرفّ.
+        المجموعتان تصلان معاً، ويُكتبان معاً أو لا يُكتب شيء. وبعده
+        يصير النطاقُ صريحاً ولا يمسّه التوريث.
       */
       case "scope": {
-        if (!body.countId) return NextResponse.json({ error: "لم يُحدَّد الجرد" }, { status: 400 });
-        if (typeof body.inScope !== "boolean") {
-          return NextResponse.json({ error: "لم يُحدَّد أداخلٌ هو أم خارج" }, { status: 400 });
-        }
-        const ids = (body.productIds ?? []).filter((x) => typeof x === "string" && x.length > 0);
-        if (ids.length === 0) return NextResponse.json({ error: "لم يُحدَّد صنف" }, { status: 400 });
-
-        const { changed } = await setCountScope(body.countId, ids, body.inScope, user.id);
+        const r = await saveCountScope(body.countId, { included: body.included, excluded: body.excluded }, user.id);
         return NextResponse.json({
           ok: true,
-          message: body.inScope
-            ? `أُدخل ${countNoun(changed, ITEM)} في الجرد.`
-            : `أُخرج ${countNoun(changed, ITEM)} من الجرد — وقائعُه محسوبة ولا فرقَ له.`,
+          message: `حُفظ النطاق — يُعَدّ ما اخترتَه${r.excluded > 0 ? `، و${countNoun(r.excluded, ITEM)} خارجه` : ""}.`,
         });
       }
 
       case "save": {
-        if (!body.countId) return NextResponse.json({ error: "لم يُحدَّد الجرد" }, { status: 400 });
-        const entries: ActualInput[] = [];
-        for (const e of body.entries ?? []) {
-          if (!e.productId) continue;
-          const raw = e.actual;
-          if (raw === null || raw === undefined || String(raw).trim() === "") {
-            entries.push({ productId: e.productId, actualMilli: null });
-            continue;
-          }
-          const milli = decimalToMilli(typeof raw === "number" ? raw : String(raw).trim());
-          if (milli === null || milli < 0) {
-            return NextResponse.json(
-              { error: `كمّيّةٌ غير مقروءة: «${String(raw)}» — اكتب رقماً موجباً` },
-              { status: 400 },
-            );
-          }
-          /*
-            الوحدةُ تأتي من الشاشة لأنّ الإنسان قد يعدّ بالجرام وصنفُه
-            بالكيلو. وتُفحَص هنا، والتحويلُ إلى المعياريّ في الخادم —
-            فلا يصل رقمٌ محوَّلٌ في المتصفّح.
-          */
-          const unit = e.unit;
-          if (unit !== undefined && !isStoredUnit(unit)) {
-            return NextResponse.json({ error: "وحدةٌ غير معروفة" }, { status: 400 });
-          }
-          entries.push({
-            productId: e.productId,
-            actualMilli: unit ? toCanonical(milli, unit) : milli,
-          });
-        }
-
+        /* الوحدةُ من الشاشة، والتحويلُ وفحصُ العائلة في الخادم */
+        const entries = await canonicalCounts(
+          body.entries.map((e) => ({ productId: e.productId, milli: e.actual, unit: e.unit })),
+        );
         await saveActualCounts(body.countId, entries, user.id);
-        return NextResponse.json({
-          ok: true,
-          message: `حُفظ عدُّ ${countNoun(entries.length, ITEM)}`,
-        });
+        return NextResponse.json({ ok: true, message: `حُفظ عدُّ ${countNoun(entries.length, ITEM)}` });
+      }
+
+      /*
+        ── الرصيدُ الافتتاحيّ يدوياً ──
+
+        يغلب الجردَ السابق صراحةً ويُحفَظ مصدرُه. والفراغُ يُفرغه فيعود
+        إلى ما دونه أو «غير معروف» — لا صفراً.
+      */
+      case "opening": {
+        const r = await setOpenings(
+          body.countId,
+          body.entries.map((e) => ({ productId: e.productId, enteredMilli: e.quantity, unit: e.unit, note: e.note ?? null })),
+          user.id,
+        );
+        const parts = [
+          r.set > 0 ? `كُتب الرصيدُ الافتتاحيّ لـ${countNoun(r.set, ITEM)}` : null,
+          r.cleared > 0 ? `وأُفرغ لـ${countNoun(r.cleared, ITEM)} فعاد غيرَ معروف` : null,
+        ].filter(Boolean);
+        return NextResponse.json({ ok: true, message: parts.length > 0 ? `${parts.join(" ")}.` : "لا تغيير." });
       }
 
       case "recompute": {
-        if (!body.countId) return NextResponse.json({ error: "لم يُحدَّد الجرد" }, { status: 400 });
         await recomputeCount(body.countId);
         return NextResponse.json({ ok: true, message: "أُعيد حسابُ الجرد على أحدث البيانات." });
       }
 
       case "finalise": {
-        if (!body.countId) return NextResponse.json({ error: "لم يُحدَّد الجرد" }, { status: 400 });
         const report = await finaliseCount(body.countId, user.id);
         return NextResponse.json({
           ok: true,
@@ -156,7 +114,6 @@ export async function POST(request: Request) {
       }
 
       case "reopen": {
-        if (!body.countId) return NextResponse.json({ error: "لم يُحدَّد الجرد" }, { status: 400 });
         /*
           إعادةُ الفتح تُعيد كتابةَ تقريرٍ مقفَل — فللمالك وحده،
           **وبصلاحيّتها هي** لا بصلاحيّة إقفال الشهر: فعلان على
@@ -169,15 +126,15 @@ export async function POST(request: Request) {
           if (mapped) return mapped;
           throw e;
         }
-        await reopenCount(body.countId, body.reason ?? "", user.id);
+        await reopenCount(body.countId, body.reason, user.id);
         return NextResponse.json({ ok: true, message: "أُعيد فتحُ الجرد — والسببُ في سجلّ التدقيق." });
       }
-
-      default:
-        return NextResponse.json({ error: "فعلٌ غير معروف" }, { status: 400 });
     }
   } catch (e) {
-    if (e instanceof CountLockedError || e instanceof OverlappingPeriodError || e instanceof NotAWeekError) {
+    if (
+      e instanceof CountLockedError || e instanceof OverlappingPeriodError
+      || e instanceof NotAWeekError || e instanceof ScopeItemNotInCountError
+    ) {
       return NextResponse.json({ error: e.message }, { status: 409 });
     }
     const mapped = respondTo(e);

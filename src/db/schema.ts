@@ -1296,6 +1296,14 @@ export const valuationBasisEnum = pgEnum("valuation_basis", [
 export const inventoryReadinessEnum = pgEnum("inventory_readiness", ["READY", "PARTIAL", "BLOCKED"]);
 
 /**
+ * نطاقُ الجرد موروثٌ أم صريح (`041`).
+ *
+ * كان يُستنتَج من وجود صفٍّ مستبعَد — فمن اختار الأصنافَ كلَّها لم يبقَ
+ * لاختياره أثر، فيُورَّث ثانيةً ويضيع بتحديث الصفحة.
+ */
+export const inventoryScopeSourceEnum = pgEnum("inventory_scope_source", ["INHERITED", "EXPLICIT"]);
+
+/**
  * جلسةُ الجرد — فترةٌ وفرعٌ وحال.
  *
  * والجاهزيّةُ تُحسَب ولا تُدَّعى: «جزئيّ» حكمٌ يُعلَن مع ما يُستثنى وكم
@@ -1318,6 +1326,7 @@ export const inventoryCounts = pgTable("inventory_counts", {
   reopenedAt: timestamp("reopened_at", { withTimezone: true }),
   reopenReason: text("reopen_reason"),
   reopenCount: integer("reopen_count").notNull().default(0),
+  scopeSource: inventoryScopeSourceEnum("scope_source").notNull().default("INHERITED"),
 }, (t) => [
   index("inventory_counts_status_idx").on(t.status, t.periodEnd),
 ]);
@@ -1372,6 +1381,12 @@ export const inventoryCountLines = pgTable("inventory_count_lines", {
    * يُخدَع به.
    */
   inScope: boolean("in_scope").notNull().default(true),
+  /** مصدرُ الافتتاحيّ: `MANUAL` · `PREVIOUS_COUNT` · `MOVEMENT` · `UNKNOWN` — بترتيبٍ ثابت. */
+  openingSource: text("opening_source").notNull().default("UNKNOWN"),
+  /** ومرجعُه: صفُّ الإدخال، أو الجردُ السابق، أو الحركة. */
+  openingRef: text("opening_ref"),
+  /** ما دخل من المشتريات بإدخالٍ يدويّ — والباقي من الفواتير. */
+  manualReceiptsMilli: milli("manual_receipts_milli").notNull().default(0),
   note: text("note"),
   countedById: text("counted_by_id").references(() => users.id),
   countedAt: timestamp("counted_at", { withTimezone: true }),
@@ -1418,6 +1433,62 @@ export const inventoryMovements = pgTable("inventory_movements", {
 }, (t) => [
   index("inventory_movements_product_idx").on(t.productId, t.occurredOn),
   index("inventory_movements_count_idx").on(t.countId),
+]);
+
+/**
+ * الرصيدُ الافتتاحيّ اليدويّ لجردٍ بعينه (`041`).
+ *
+ * يغلب الجردَ السابق **صراحةً** لا صمتاً. والتعديلُ يُغلق السابقَ
+ * (`supersededAt`) ولا يمحوه، والإفراغُ يُغلقه بلا بديل فيعود «غير
+ * معروف». ومؤثِّرٌ يرفض الكتابةَ فيه متى أُقفل الجرد.
+ */
+export const inventoryCountOpenings = pgTable("inventory_count_openings", {
+  id: id(),
+  countId: text("count_id").notNull().references(() => inventoryCounts.id, { onDelete: "cascade" }),
+  productId: text("product_id").notNull().references(() => products.id),
+  enteredMilli: milli("entered_milli").notNull(),
+  enteredUnit: baseUnitEnum("entered_unit").notNull(),
+  canonicalMilli: milli("canonical_milli").notNull(),
+  note: text("note"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  supersededAt: timestamp("superseded_at", { withTimezone: true }),
+  supersededById: text("superseded_by_id").references(() => users.id),
+}, (t) => [
+  index("inventory_count_openings_count_idx").on(t.countId),
+]);
+
+/**
+ * كمّيّةٌ دخلت الرفّ بإدخال إنسان (`041`) — **ليست فاتورةً ولا ديناً**.
+ *
+ * الكمّيّةُ هي الواقعة، والكلفةُ معلومةٌ اختياريّة لا تُشتقّ منها كمّيّة.
+ * وتدخل المحرّكَ في مسار أسطر الشراء نفسِه. وعلاقتُها ببند الفاتورة
+ * محفوظة: مرتبطٌ (يخرج البندُ من الحساب) · منفصلٌ مؤكَّد · لم يُراجَع.
+ * ولا تُحذَف: تُلغى بسببها.
+ */
+export const inventoryReceipts = pgTable("inventory_receipts", {
+  id: id(),
+  productId: text("product_id").notNull().references(() => products.id),
+  branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+  receivedOn: text("received_on").notNull(),
+  enteredMilli: milli("entered_milli").notNull(),
+  enteredUnit: baseUnitEnum("entered_unit").notNull(),
+  canonicalMilli: milli("canonical_milli").notNull(),
+  supplierId: text("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
+  documentRef: text("document_ref"),
+  costMinor: bigint("cost_minor", { mode: "number" }),
+  note: text("note"),
+  invoiceLineId: text("invoice_line_id").references(() => invoiceLines.id, { onDelete: "set null" }),
+  confirmedSeparate: boolean("confirmed_separate").notNull().default(false),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  updatedById: text("updated_by_id").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+  voidedById: text("voided_by_id").references(() => users.id),
+  voidReason: text("void_reason"),
+}, (t) => [
+  index("inventory_receipts_product_idx").on(t.productId, t.receivedOn),
 ]);
 
 export const wasteReasonEnum = pgEnum("waste_reason", [

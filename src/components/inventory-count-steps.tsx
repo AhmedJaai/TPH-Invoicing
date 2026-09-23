@@ -1,15 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
 import { InventoryCountEntry, type CountRow } from "./inventory-count-entry";
+import { FlowStep, type DuplicateRow, type ReceiptRow } from "./inventory-flow-step";
 
 /**
- * الجردُ ثلاثُ خطوات، بترتيبِ ما يجري على الرفّ.
+ * الجردُ خمسُ خطوات، بترتيبِ ما يجري على الرفّ.
  *
- *   ‏١ · ما الذي يُعَدّ؟   ‏٢ · كم تقول المبيعاتُ إنّه استُهلك؟   ‏٣ · كم وجدتَ؟
+ *   ‏١ · ما الذي نعدّه؟
+ *   ‏٢ · ما الذي دخل وما الذي خرج؟ — ومعه فعلُ كلّ مجهول
+ *   ‏٣ · كم وجدنا؟
+ *   ‏٤ · ماذا اختلف؟ — النقصُ والزيادةُ لا يتقاصّان
+ *   ‏٥ · أقفل الجرد
  *
  * ── ولماذا هذا الترتيب بعينه ──
  *
@@ -19,49 +24,87 @@ import { InventoryCountEntry, type CountRow } from "./inventory-count-entry";
  * في خانة الفعليّ أسوأ من فراغ**: الفراغُ يقول «لم يُعَدّ»، والتخمينُ
  * يقول «هذا ما على الرفّ» فيُحسَب عليه فرقٌ ويُبنى عليه قرار.
  *
- * فصار يختار أوّلاً، ثمّ يقرأ المعادلة التي ستُحاسِبه، ثمّ يعدّ.
  * ومن قرأ الخطوة الثانية عرف أنّ الفرق **فرقٌ بين رقمين محسوبين**
- * لا حكماً ينزل عليه.
+ * لا حكماً ينزل عليه — ووجد بجانب كلّ مجهولٍ ما يُدخله به.
  */
 export interface StepRow extends CountRow {
   inScope: boolean;
-  /** حدودُ المعادلة نصّاً بوحدة الصنف — و«غير معروف» تبقى نصّاً لا صفراً. */
+  /** حدودُ المعادلة نصّاً بوحدة الصنف — و`null` تبقى «غير معروف» لا صفراً. */
   openingText: string | null;
+  /** ومن أين جاء: «أُدخل يدوياً» · «من جرد الأسبوع السابق» … */
+  openingSourceLabel: string;
+  openingManual: boolean;
+  /** ما أُدخل يدوياً بوحدته كما كُتب — يُملأ به المحرّرُ عند التعديل. */
+  openingEntered: string | null;
+  openingEnteredUnit: string | null;
   purchasesText: string | null;
+  /** صفرٌ بدليل: «لا مشتريات» — غيرُ «كمّيّة المشتريات غير معروفة». */
+  purchasesZero: boolean;
+  manualReceiptsText: string | null;
   adjustmentsText: string | null;
   consumptionText: string | null;
   wasteText: string | null;
 }
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 export function InventoryCountSteps({
   countId,
+  branchId,
+  periodStart,
+  periodEnd,
+  defaultReceiptDate,
   rows,
   categories,
+  receipts,
+  duplicates,
+  suppliers,
   canEdit,
   locked,
   scopeInherited,
+  scopeExplicit,
+  review,
+  finalise,
 }: {
   countId: string;
+  branchId: string | null;
+  periodStart: string;
+  periodEnd: string;
+  defaultReceiptDate: string;
   rows: StepRow[];
   categories: { key: string; label: string }[];
+  receipts: ReceiptRow[];
+  duplicates: DuplicateRow[];
+  suppliers: { id: string; name: string }[];
   canEdit: boolean;
   locked: boolean;
   /** أمورَّثٌ هذا النطاق من الجرد السابق؟ — يُقال، فلا يُظنّ أنّه اختيارُ اليوم. */
   scopeInherited: boolean;
+  /** أحفظه إنسانٌ هنا؟ — فلا يمسّه التوريث بعدها. */
+  scopeExplicit: boolean;
+  /** ‏٤ · ماذا اختلف — يُرسَم في الخادم ويُمرَّر. */
+  review: ReactNode;
+  /** ‏٥ · الإقفال. */
+  finalise: ReactNode;
 }) {
   const counted = rows.filter((r) => r.inScope && r.actual.trim() !== "").length;
-  const [step, setStep] = useState<Step>(() => (counted > 0 || locked ? 3 : 1));
+  const [step, setStep] = useState<Step>(() => (locked ? 4 : counted > 0 ? 3 : scopeExplicit ? 2 : 1));
 
   const inScope = rows.filter((r) => r.inScope);
+  const unknownInputs = inScope.filter((r) => r.openingText === null || r.purchasesText === null).length;
 
   return (
     <div>
       <nav className="mb-4 flex flex-wrap gap-2" aria-label="خطوات الجرد">
-        <StepTab n={1} now={step} go={setStep} label="ما الذي يُعَدّ؟" count={`${inScope.length} من ${rows.length}`} />
-        <StepTab n={2} now={step} go={setStep} label="ما تقوله المبيعات" count={`${inScope.filter((r) => r.consumptionText !== null).length} محسوب`} />
-        <StepTab n={3} now={step} go={setStep} label="كم وجدتَ؟" count={`${counted} من ${inScope.length}`} />
+        <StepTab n={1} now={step} go={setStep} label="ما الذي نعدّه؟" count={`${inScope.length} من ${rows.length}`} />
+        <StepTab
+          n={2} now={step} go={setStep} label="ما الذي دخل وما الذي خرج؟"
+          count={unknownInputs > 0 ? `${unknownInputs} ينقصه شيء` : "المعادلةُ معروفة"}
+          warn={unknownInputs > 0}
+        />
+        <StepTab n={3} now={step} go={setStep} label="كم وجدنا؟" count={`${counted} من ${inScope.length}`} />
+        <StepTab n={4} now={step} go={setStep} label="ماذا اختلف؟" count="النقصُ والزيادة" />
+        <StepTab n={5} now={step} go={setStep} label={locked ? "حالُ الجرد" : "أقفل الجرد"} count={locked ? "مقفَل" : "بعد المراجعة"} />
       </nav>
 
       {step === 1 && (
@@ -71,29 +114,67 @@ export function InventoryCountSteps({
           categories={categories}
           canEdit={canEdit && !locked}
           inherited={scopeInherited}
+          explicit={scopeExplicit}
           onDone={() => setStep(2)}
         />
       )}
 
-      {step === 2 && <EquationView rows={inScope} onDone={() => setStep(3)} />}
-
-      {step === 3 && (
-        <InventoryCountEntry
+      {step === 2 && (
+        <FlowStep
           countId={countId}
+          branchId={branchId}
+          periodStart={periodStart}
+          periodEnd={periodEnd}
+          defaultReceiptDate={defaultReceiptDate}
           rows={inScope}
           categories={categories}
-          canEdit={canEdit}
-          locked={locked}
+          receipts={receipts}
+          duplicates={duplicates}
+          suppliers={suppliers}
+          canEdit={canEdit && !locked}
+          onDone={() => setStep(3)}
         />
       )}
+
+      {step === 3 && (
+        <div>
+          <InventoryCountEntry
+            countId={countId}
+            rows={inScope}
+            categories={categories}
+            canEdit={canEdit}
+            locked={locked}
+          />
+          <div className="mt-4">
+            <button type="button" onClick={() => setStep(4)} className={buttonClass("secondary")}>
+              تابِع — ماذا اختلف؟
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div>
+          {review}
+          {!locked && (
+            <div className="mt-4">
+              <button type="button" onClick={() => setStep(5)} className={buttonClass("secondary")}>
+                تابِع — أقفل الجرد
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {step === 5 && finalise}
     </div>
   );
 }
 
 function StepTab({
-  n, now, go, label, count,
+  n, now, go, label, count, warn,
 }: {
-  n: Step; now: Step; go: (s: Step) => void; label: string; count: string;
+  n: Step; now: Step; go: (s: Step) => void; label: string; count: string; warn?: boolean;
 }) {
   const active = now === n;
   return (
@@ -106,7 +187,7 @@ function StepTab({
       }`}
     >
       <span className="nums font-bold">{n}</span> · <span className="font-bold">{label}</span>
-      <span className={`nums block text-[11px] ${active ? "opacity-80" : "text-muted"}`}>{count}</span>
+      <span className={`nums block text-[11px] ${active ? "opacity-80" : warn ? "text-warn" : "text-muted"}`}>{count}</span>
     </button>
   );
 }
@@ -114,13 +195,14 @@ function StepTab({
 /* ─────────────────────── ١ · ما الذي يُعَدّ؟ ─────────────────────── */
 
 function ScopePicker({
-  countId, rows, categories, canEdit, inherited, onDone,
+  countId, rows, categories, canEdit, inherited, explicit, onDone,
 }: {
   countId: string;
   rows: StepRow[];
   categories: { key: string; label: string }[];
   canEdit: boolean;
   inherited: boolean;
+  explicit: boolean;
   onDone: () => void;
 }) {
   const router = useRouter();
@@ -145,23 +227,29 @@ function ScopePicker({
   const changed = rows.filter((r) => picked[r.productId] !== r.inScope);
   const chosen = rows.filter((r) => picked[r.productId]).length;
 
+  /*
+    ── طلبٌ واحد بالمجموعتين ──
+
+    كان طلبين (الداخل ثمّ الخارج)؛ فإن سقط الثاني بقي النطاقُ نصفَ
+    مكتوب. والخادمُ يكتبهما في معاملةٍ واحدة أو لا يكتب شيئاً، ويصير
+    النطاقُ بعدها صريحاً لا يمسّه التوريث — ولو لم يتغيّر فيه شيء:
+    «أبقِه كما ورثتُه» اختيارٌ كذلك.
+  */
   async function save() {
-    if (changed.length === 0) { onDone(); return; }
+    if (changed.length === 0 && explicit) { onDone(); return; }
     setBusy(true);
     setError(null);
     setSaved(null);
 
-    /* مجموعتان لا صنفٌ صنف — فلا يبقى نصفُ الاختيار مكتوباً إن سقط الطلب */
-    for (const inScope of [true, false]) {
-      const ids = changed.filter((r) => picked[r.productId] === inScope).map((r) => r.productId);
-      if (ids.length === 0) continue;
-      const res = await postJson("/api/inventory/count", {
-        action: "scope", countId, productIds: ids, inScope,
-      });
-      if (!res.ok) { setBusy(false); setError(res.error); return; }
-    }
+    const res = await postJson("/api/inventory/count", {
+      action: "scope",
+      countId,
+      included: rows.filter((r) => picked[r.productId]).map((r) => r.productId),
+      excluded: rows.filter((r) => !picked[r.productId]).map((r) => r.productId),
+    });
 
     setBusy(false);
+    if (!res.ok) { setError(res.error); return; }
     setSaved(`حُفظ النطاق — يُعَدّ ${chosen} صنفاً.`);
     router.refresh();
     onDone();
@@ -181,9 +269,10 @@ function ScopePicker({
         اختر ما ستعدّه على الرفّ. <strong>والخارجُ ليس صفراً</strong>: تُحسَب مشترياتُه
         واستهلاكُه المتوقَّع ويُعرضان، ولا يُحسَب له فرقٌ ولا يدخل مجاميعَ التقرير — لأنّ
         الفرق يقتضي عدّاً، ولا عدّ. ويبقى ما أدخلتَه من عدٍّ محفوظاً إن أعدتَه.
-        {inherited && (
-          <> <strong className="text-warn">وهذا الاختيار موروثٌ من جردك السابق</strong> — غيِّره متى شئت.</>
+        {!explicit && inherited && (
+          <> <strong className="text-warn">وهذا الاختيار موروثٌ من جردك السابق ولم تحفظه بعد</strong> — احفظه كما هو أو غيِّره.</>
         )}
+        {explicit && <> <strong>وهذا نطاقٌ حفظتَه لهذا الجرد</strong> — لا يتغيّر بتغيّر الجرد السابق.</>}
       </p>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -252,7 +341,9 @@ function ScopePicker({
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {canEdit ? (
           <button type="button" onClick={save} disabled={busy} className={buttonClass("primary")}>
-            {busy ? "يُحفظ…" : changed.length === 0 ? "تابِع" : `احفظ النطاق (${changed.length} تغييراً)`}
+            {busy ? "يُحفظ…"
+              : changed.length > 0 ? `احفظ النطاق (${changed.length} تغييراً)`
+                : explicit ? "تابِع" : "احفظه كما هو وتابِع"}
           </button>
         ) : (
           <button type="button" onClick={onDone} className={buttonClass("primary")}>تابِع</button>
@@ -262,109 +353,4 @@ function ScopePicker({
       </div>
     </div>
   );
-}
-
-/* ──────────────── ٢ · ما تقوله المبيعات: المعادلة ──────────────── */
-
-/**
- * المعادلةُ تُقرأ قبل أن يُعَدّ الرفّ.
- *
- * وهذه هي التي تُحاسِب: **افتتاحيّ + مشتريات + إضافات − استهلاك
- * متوقَّع − هدر = المتوقَّع على الرفّ**. والاستهلاكُ المتوقَّع محسوبٌ
- * من المبيعات بوصفاتها — لا مقدَّرٌ ولا مأخوذٌ من نقاط البيع.
- *
- * و**المجهولُ يُنشَر ولا يُبتَلع**: حدٌّ واحدٌ غيرُ معروف يجعل
- * المتوقَّعَ غيرَ معروف. ولو جُمع ما عداه لخرج رقمٌ يبدو دقيقاً وهو
- * أقلُّ من الحقّ، ثمّ حُوسب عليه صاحبُ المقهى.
- */
-function EquationView({ rows, onDone }: { rows: StepRow[]; onDone: () => void }) {
-  const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-  const visible = q === "" ? rows : rows.filter((r) => r.productName.toLowerCase().includes(q));
-
-  const computed = rows.filter((r) => r.consumptionText !== null).length;
-  const blind = rows.filter((r) => r.expected === null).length;
-
-  return (
-    <div>
-      <p className="mb-3 rounded-xl border border-line bg-sunken px-3 py-2.5 text-[11px] leading-relaxed text-ink-soft">
-        هذه هي المعادلة التي يُحسَب بها فرقُك:{" "}
-        <strong>افتتاحيّ + مشتريات + إضافات − استهلاك متوقَّع − هدر = المتوقَّع على الرفّ</strong>.
-        والاستهلاكُ المتوقَّع محسوبٌ من مبيعات الفترة بوصفاتها — نسخةِ الوصفة السارية{" "}
-        <strong>في تاريخ كلّ بيعة</strong>، لا الأحدث.
-        {" "}حُسب لـ<span className="nums">{computed}</span> من <span className="nums">{rows.length}</span> صنفاً
-        {blind > 0 && (
-          <>، و<span className="nums">{blind}</span> منها متوقَّعُه غيرُ معروف لأنّ حدّاً في معادلته غيرُ معروف —
-          وتلك تُعَدّ ويُعرَض عدُّها بلا فرق.</>
-        )}
-      </p>
-
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="ابحث عن صنف…"
-        aria-label="ابحث عن صنف"
-        className="mb-3 min-h-11 w-full rounded-xl border border-line bg-raised px-3 text-sm"
-      />
-
-      <ul className="divide-y divide-line rounded-2xl border border-line bg-raised">
-        {visible.map((row) => (
-          <li key={row.productId} className="px-3 py-2.5">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-              <p className="min-w-0 flex-1 truncate text-xs font-bold">{row.productName}</p>
-              <p className="text-[11px] text-muted">بـ{row.unitLabel}</p>
-            </div>
-
-            <dl className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[11px]">
-              <Term label="افتتاحيّ" value={row.openingText} />
-              <Op>+</Op>
-              <Term label="مشتريات" value={row.purchasesText} />
-              {row.adjustmentsText !== null && (
-                <>
-                  <Op>±</Op>
-                  <Term label="إضافات" value={row.adjustmentsText} />
-                </>
-              )}
-              <Op>−</Op>
-              <Term label="استهلاكٌ متوقَّع" value={row.consumptionText} strong />
-              {row.wasteText !== null && (
-                <>
-                  <Op>−</Op>
-                  <Term label="هدرٌ مسجَّل" value={row.wasteText} />
-                </>
-              )}
-              <Op>=</Op>
-              <Term label="يُتوقَّع على الرفّ" value={row.expected} strong />
-            </dl>
-
-            {row.flags.length > 0 && (
-              <p className="mt-1 text-[11px] text-warn">{row.flags[0]}</p>
-            )}
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-4">
-        <button type="button" onClick={onDone} className={buttonClass("primary")}>
-          فهمتُ — أدخِل ما وجدتَه
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Term({ label, value, strong }: { label: string; value: string | null; strong?: boolean }) {
-  return (
-    <span className="inline-flex items-baseline gap-1">
-      <dt className="text-muted">{label}</dt>
-      <dd className={value === null ? "text-warn" : `nums ${strong ? "font-bold" : ""}`}>
-        {value ?? "غير معروف"}
-      </dd>
-    </span>
-  );
-}
-
-function Op({ children }: { children: string }) {
-  return <span aria-hidden className="text-muted">{children}</span>;
 }

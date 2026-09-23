@@ -75,3 +75,69 @@ export async function makeActor(tx: Tx): Promise<string> {
   });
   return id;
 }
+
+/* ───────────── مبيعاتٌ وفواتيرُ للتجهيز — بالخدمات لا بالإدراج ───────────── */
+
+import * as XLSX from "xlsx";
+import { sql } from "drizzle-orm";
+import { importSalesFile } from "@/services/sales-import.service";
+import { mapPosProducts } from "@/services/pos-mapping.service";
+import { makeInvoice, makeSupplier, day } from "@/test/db";
+
+const ORDERS_HEADER = [
+  "order_reference", "order_status", "type", "parent_item_sku", "status",
+  "sku", "name", "unit_price", "quantity", "total_price", "business_date", "branch_name",
+];
+
+/** ملفُّ فودكس بترويسته الحقيقيّة — `count` لاتيه، طلبٌ لكلٍّ، في يومٍ واحد. */
+export function latteSalesFile(count: number, date: string, orderPrefix = "ORD", branch = "Branch 1"): Buffer {
+  const rows = Array.from({ length: count }, (_, i) => [
+    `${orderPrefix}-${i + 1}`, "Done", "المنتج", "", "Done", "SKU-LATTE", "Spanish Latte",
+    18, 1, 18, date, branch,
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([ORDERS_HEADER, ...rows]), "Sheet1");
+  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+}
+
+/** يستورد الملفّ بخدمته، ثمّ يربط منتجَ فودكس بصنف القائمة. */
+export async function importLatteSales(
+  tx: Tx, buffer: Buffer, actorId: string, menuProductId: string, branchLabel?: string,
+): Promise<void> {
+  await importSalesFile({ buffer, fileName: `foodics-${Math.random()}.xlsx`, actorId, branchLabel }, tx);
+  const unmapped = await tx.execute<{ id: string }>(sql`
+    select id from pos_products where product_id is null and external_id = 'SKU-LATTE'
+  `);
+  if (unmapped.rows[0]) {
+    await mapPosProducts({ posProductIds: [String(unmapped.rows[0].id)], productId: menuProductId, actorId }, tx);
+  }
+}
+
+/**
+ * بندُ فاتورةٍ لصنف — بمواصفة عبوة أو بلا مواصفة (`pack: null` = كمّيّةٌ
+ * لا تُعرَف). ويُرجع معرّفَ البند.
+ */
+export async function makeInvoicePurchase(
+  tx: Tx,
+  productId: string,
+  isoDate: string,
+  totalMinor: number,
+  pack: { packSize: string; contentUnit: string; contentQuantity: string; qty: string } | null,
+): Promise<string> {
+  const supplierId = await makeSupplier(tx);
+  const invoiceId = await makeInvoice(tx, supplierId, totalMinor, isoDate);
+  const spId = `sp-${Math.random().toString(36).slice(2, 12)}`;
+  await tx.execute(sql`
+    insert into supplier_products (id, supplier_id, normalized_description, display_name, product_id, pack_size, content_unit, content_quantity)
+    values (${spId}, ${supplierId}, ${`item-${spId}`}, 'صنف اختبار', ${productId},
+            ${pack?.packSize ?? null}, ${pack?.contentUnit ?? null}::base_unit, ${pack?.contentQuantity ?? null})
+  `);
+  const lineId = `il-${spId}`;
+  await tx.execute(sql`
+    insert into invoice_lines (id, invoice_id, description, normalized_description, qty,
+                               unit_price_minor, line_total_minor, invoice_date, supplier_id, supplier_product_id)
+    values (${lineId}, ${invoiceId}, 'صنف اختبار', ${`item-${spId}`}, ${pack?.qty ?? "1"},
+            ${totalMinor}, ${totalMinor}, ${day(isoDate)}, ${supplierId}, ${spId})
+  `);
+  return lineId;
+}

@@ -291,3 +291,34 @@ describe("نطاقُ الجرد", () => {
     expect(r.coverage.scope.excluded).toBe(0);
   });
 });
+
+describe("الاستهلاكُ الصفرُ بدليل", () => {
+  it("مكوّنٌ في وصفةٍ سارية لم يُبَع ما يستهلكه في أسبوعٍ فيه مبيعات — صفرٌ لا مجهول", () => {
+    const OTHER = "p-other";
+    const r = reconcile(input({
+      products: [...PRODUCTS, { id: OTHER, nameAr: "شراب", category: "OTHER", baseUnit: "ML" as const }],
+      recipeVersions: [RECIPE, {
+        ...RECIPE, id: "v2", recipeId: "r2", menuProductId: "m-other",
+        ingredients: [{ productId: OTHER, quantityMilli: 30_000, unit: "ML", prepLossBp: null }],
+      }],
+    }));
+    const other = r.lines.find((l) => l.productId === OTHER)!;
+    expect(other.theoreticalConsumptionMilli).toBe(0);
+    expect(other.flags).not.toContain("CONSUMPTION_UNKNOWN");
+  });
+
+  it("وبلا مبيعاتٍ في الفترة — مجهولٌ لا صفر: الغيابُ غيابُ ملفّ لا غيابُ بيع", () => {
+    const r = reconcile(input({ soldLines: [] }));
+    expect(r.lines.every((l) => l.theoreticalConsumptionMilli === null)).toBe(true);
+  });
+
+  it("وصنفٌ لا تصل إليه وصفة — مجهولٌ صادق", () => {
+    const LOOSE = "p-loose";
+    const r = reconcile(input({
+      products: [...PRODUCTS, { id: LOOSE, nameAr: "منظّف", category: "OTHER", baseUnit: "L" as const }],
+    }));
+    const loose = r.lines.find((l) => l.productId === LOOSE)!;
+    expect(loose.theoreticalConsumptionMilli).toBeNull();
+    expect(loose.flags).toContain("CONSUMPTION_UNKNOWN");
+  });
+});
