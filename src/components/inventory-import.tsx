@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { request } from "@/lib/http-client";
 import { buttonClass } from "./ui";
@@ -27,7 +28,7 @@ interface ImportResponse {
   messages: string[];
   recognisedColumns: string[];
   unrecognisedColumns: string[];
-  newPosProducts: number;
+  unmappedProducts: number;
 }
 
 const SHAPE_LABEL: Record<string, string> = {
@@ -138,11 +139,18 @@ export function InventoryImport({ canImport }: { canImport: boolean }) {
             <Fact label="أُعيد بيانُها" value={result.totals.salesRestated} />
             <Fact label="أسطرُ بيع" value={result.totals.lineCount} />
             <Fact
-              label="أصنافٌ جديدة تحتاج ربطاً"
-              value={result.newPosProducts}
-              tone={result.newPosProducts > 0 ? "text-warn" : undefined}
+              label="أصنافٌ مباعة تحتاج ربطاً"
+              value={result.unmappedProducts}
+              tone={result.unmappedProducts > 0 ? "text-warn" : undefined}
             />
           </dl>
+
+          {/* العددُ الذي يُنذر يحمل فعلَه — لا يُترَك صاحبُه يبحث عن موضعه */}
+          {result.unmappedProducts > 0 && (
+            <Link href="/inventory/mapping" className={`mt-3 ${buttonClass("secondary", "sm")}`}>
+              اربطها ←
+            </Link>
+          )}
 
           {result.messages.length > 0 && (
             <ul className="mt-3 space-y-1.5">

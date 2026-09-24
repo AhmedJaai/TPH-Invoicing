@@ -120,7 +120,7 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
       const branch = await makeBranch(tx);
       await importAll(tx, actorId);
 
-      await importSalesFile(
+      const imported = await importSalesFile(
         { buffer: readFileSync(SALES), fileName: "sales.xlsx", actorId, branchLabel: branch.nameAr },
         tx,
       );
@@ -129,6 +129,12 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
         select count(*)::int as n from pos_products where product_id is null and kind = 'PRODUCT'
       `);
       expect(Number(unmapped.rows[0].n)).toBe(0);
+      /*
+        وما يقوله الاستيرادُ لصاحبه هو ما تقوله صفحةُ الربط. كان يعدّ كلَّ
+        جديدٍ ومنه أحدَ عشر خياراً لا تُربَط، فيقول «١١ تحتاج ربطاً» وصفحةُ
+        الربط فارغة.
+      */
+      expect(imported.unmappedProducts).toBe(0);
     }));
 
   it("ورفعُه مرّتين لا يُنشئ نسخةَ وصفةٍ ثانية", () =>
