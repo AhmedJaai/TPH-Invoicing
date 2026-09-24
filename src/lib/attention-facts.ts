@@ -8,7 +8,8 @@ import { bankTransactions, suppliers } from "@/db/schema";
 import { formatRiyalsDisplay } from "./money";
 import type { AttentionEvidence, AttentionFacts } from "./attention";
 import { previousMonth } from "./filing";
-import { currentMonthRiyadh } from "./riyadh-time";
+import { currentMonthRiyadh, formatDay } from "./riyadh-time";
+import { findReversals } from "./bank/reversal";
 import { analyzeCoverage } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
 import { findDuplicateExpenses, type Expense } from "./expenses";
@@ -325,7 +326,48 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     }).map((a) => ({ r, a })),
   );
 
+  /*
+    ── سدادُ مورّدٍ رُدّ ──
+
+    الصادرُ لمورّدٍ (مصنَّفاً أو مقيَّداً دفعةً) والواردُ بالمبلغ نفسه بعده
+    في أربعة عشر يوماً. ويُقصَر على ما فوق الريال: بغير هذا القيد التقط
+    على البيانات الحقيقيّة هللةَ ضريبةٍ في نقاط البيع ولا شيء غيرها.
+  */
+  const bounceRows = (
+    await db.execute<{
+      id: string; value_date: string; amount_minor: number; direction: "DEBIT" | "CREDIT";
+      party: string | null; supplier: string | null;
+    }>(sql`
+      select bt.id, to_char(bt.value_date, 'YYYY-MM-DD') as value_date, bt.amount_minor, bt.direction,
+             coalesce(bt.beneficiary_raw, bt.description) as party, s.name_ar as supplier
+        from bank_transactions bt
+        left join payments p on p.id = bt.matched_payment_id
+        left join suppliers s on s.id = coalesce(p.supplier_id, bt.supplier_id)
+       where bt.amount_minor > 100
+         and ((bt.direction = 'DEBIT' and (bt.matched_payment_id is not null or bt.category = 'SUPPLIER'))
+           or (bt.direction = 'CREDIT' and bt.category <> 'INTERNAL'))
+    `)
+  ).rows;
+  const bounced = findReversals(bounceRows.map((r) => ({
+    id: r.id,
+    valueDate: new Date(`${r.value_date}T12:00:00Z`),
+    amountMinor: Number(r.amount_minor),
+    direction: r.direction,
+    party: r.party,
+  })));
+  const supplierOfTx = new Map(bounceRows.map((r) => [r.id, r.supplier]));
+
   return {
+    bouncedPayments: bounced.map((b) => ({
+      label: supplierOfTx.get(b.outgoing.id) ?? (b.outgoing.party ?? "حوالة").slice(0, 45),
+      sub: `خرجت ${formatDay(b.outgoing.valueDate)} · عادت بعد ${countNoun(b.daysApart, DAY)}${
+        b.samePartyEvidence ? " من الطرف نفسه" : " — والطرف لم يتطابق"
+      }`,
+      amountMinor: b.outgoing.amountMinor,
+      href: `/bank?tx=${b.outgoing.id}`,
+    })),
+    bouncedPaymentMinor: bounced.reduce((s, b) => s + b.outgoing.amountMinor, 0),
+    firstBouncedTransactionId: bounced[0]?.outgoing.id ?? null,
     lifecycleAnomalies: anomalies.map(({ r, a }) => ({
       label: (r.description ?? "حركة").slice(0, 45),
       sub: `${r.value_date} · ${a.detail}`,

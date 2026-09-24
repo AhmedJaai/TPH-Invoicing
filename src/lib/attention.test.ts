@@ -427,3 +427,23 @@ describe("مالٌ خرج مرّتين — الجملةُ تتبع الدليل"
   });
 });
 
+
+describe("حوالةٌ لمورّد خرجت ثمّ عادت — findReversals موصولةً", () => {
+  it("لا بند حين لا ردّ", () => {
+    expect(buildAttention(quiet).some((i) => i.id === "bounced-payments")).toBe(false);
+  });
+
+  it("بندٌ عالٍ يفتح الحركة الأولى، ومبلغه مستحقّ عليك", () => {
+    const items = buildAttention({
+      ...quiet,
+      bouncedPayments: [{ label: "غاناش", sub: "خرجت …", amountMinor: 4_250_00, href: "/bank?tx=t1" }],
+      bouncedPaymentMinor: 4_250_00,
+      firstBouncedTransactionId: "t1",
+    });
+    const b = items.find((i) => i.id === "bounced-payments");
+    expect(b?.severity).toBe("HIGH");
+    expect(b?.href).toBe("/bank?tx=t1");
+    expect(b?.impact).toEqual({ kind: "OWED", amountMinor: 4_250_00 });
+    expect(b?.title).toContain("خرجت ثمّ عادت");
+  });
+});

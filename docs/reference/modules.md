@@ -29,7 +29,7 @@
 | `src/services/payment.service.ts` | `createPayment` يسأل التوأم ويرمي ما لم يُقَرّ · `recordBankPayment` يتبنّى المقيَّد بلا حركة · `claimBankTransaction` يربط بشرط ألّا تكون مربوطة ويرمي |
 | `src/lib/unit-conversion.ts` | لا جسر بين وزنٍ وحجم، والمجهول لا يُحوَّل · و`StoredUnit` جسرُ عمود القاعدة (`G`/`L`) إلى `BaseUnit` (`GRAM`/`LITER`) — في موضعٍ واحد |
 | `src/lib/bank/fees.ts` | الرسم البنكيّ داخل الدفعة — والنقص سدادٌ جزئيّ لا رسم |
-| `src/lib/bank/reversal.ts` | ما خرج ثمّ عاد — لا إيراد ولا تحويل داخليّ · **لا تصل إليها شاشة** |
+| `src/lib/bank/reversal.ts` | ما خرج ثمّ عاد — لا إيراد ولا تحويل داخليّ · موصولةٌ ببند «حوالةٌ لمورّد خرجت ثمّ عادت» في `attention-facts.ts` (سداد مورّد فوق الريال وحده) |
 | `src/lib/credit-notes.ts` | الإشعار الدائن يخفض المستحقّ ولا يُعدّ سداداً · **موصولةٌ نصفَ وصل** — لا يُمرَّر لها إشعار |
 | `src/services/adjudicator.service.ts` | استدعاء الحَكَم — وحكمه اقتراحٌ لا مطابقة |
 | `src/lib/bank/adjudicate.ts` | متى يُستدعى الذكاء: عند العجز وحده، وعلى مرشّحين مولَّدين لا بيانات خام |
@@ -139,7 +139,6 @@
 | الوحدة | ماذا يضيع بغيابها |
 |---|---|
 | `src/lib/credit-notes.ts` | موصولةٌ نصفَ وصل: `supplier-account.ts` تستدعيها ولا يُمرَّر لها إشعارٌ واحد — لا إشعارات في البيانات اليوم |
-| `src/lib/bank/reversal.ts` | الردّ لا يُكشَف آلياً — حالةٌ واحدة محتملة في البيانات |
 | `src/lib/extraction/benchmark.ts` | لا يُقاس أيّ نموذجٍ أدقّ |
 | `branches` | مخطَّطٌ بلا شيفرة: `branchId` لا يرد في استعلامٍ واحد. (أمّا `bank_accounts` فممتلئٌ في كلّ حركة، و`reconciliation_periods` يكتبه الاستيراد ونموذج الإقفال.) |
 

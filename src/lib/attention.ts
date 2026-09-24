@@ -154,6 +154,14 @@ export interface AttentionFacts {
   lifecycleAnomalies?: AttentionEvidence[];
   lifecycleAnomalyMinor?: number;
   firstAnomalyTransactionId?: string | null;
+  /**
+   * سدادُ مورّدٍ خرج ثمّ عاد (`findReversals`): والفاتورةُ تبدو مسدَّدةً
+   * والمالُ في حساب المقهى. كانت الدالّةُ مبنيّةً ومختبَرة ولا تصل إليها
+   * شاشة.
+   */
+  bouncedPayments?: AttentionEvidence[];
+  bouncedPaymentMinor?: number;
+  firstBouncedTransactionId?: string | null;
   /** مورّدون لا يصدرون فواتير وبلا عقد */
   suppliersWithoutContract: string[];
   /** والمال الذي دُفع لهم بلا مستند — دليلُ البند لا أسماءٌ وحدها. */
@@ -484,6 +492,24 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       amountMinor: f.lifecycleAnomalyMinor ?? undefined,
       impact: { kind: "UNATTRIBUTED", amountMinor: f.lifecycleAnomalyMinor ?? null },
       evidence: f.lifecycleAnomalies!.slice(0, 6),
+    });
+  }
+
+  if ((f.bouncedPayments?.length ?? 0) > 0) {
+    const n = f.bouncedPayments!.length;
+    out.push({
+      id: "bounced-payments",
+      area: "BANK",
+      severity: "HIGH",
+      title: n === 1 ? "حوالةٌ لمورّد خرجت ثمّ عادت" : `${countNoun(n, TRANSACTION)} لمورّدين خرجت ثمّ عادت`,
+      detail: "المبلغ نفسه رجع إلى الحساب بعد أيّام — فالفاتورة التي قُيّدت عليها تبدو مسدَّدةً ولم تُسدَّد.",
+      action: "افتح الحركة: إن كانت ردّاً فتراجع عن مطابقتها لتعود الفاتورة مستحقّة، ثمّ أعد التحويل.",
+      actionLabel: "افتح الحركة",
+      href: f.firstBouncedTransactionId ? `/bank?tx=${f.firstBouncedTransactionId}` : "/bank",
+      count: n,
+      amountMinor: f.bouncedPaymentMinor ?? undefined,
+      impact: { kind: "OWED", amountMinor: f.bouncedPaymentMinor ?? null },
+      evidence: f.bouncedPayments!.slice(0, 6),
     });
   }
 

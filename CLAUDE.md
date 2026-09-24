@@ -109,7 +109,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 
 ## مبنيٌّ ولا يصل إليه أحد
 
-`credit-notes.ts` (نصفُ وصل) · `bank/reversal.ts` · `extraction/benchmark.ts` · جدول `branches`.
+`credit-notes.ts` (نصفُ وصل) · `extraction/benchmark.ts` · جدول `branches`.
 بُنيت واختُبرت ولم تُوصَل بشاشة، فـ**تُظنّ عاملة**. التفصيل في `docs/reference/modules.md`.
 **قبل أن تُضيف وحدةً جديدة: أوصِل واحدةً من هذه.**
 
