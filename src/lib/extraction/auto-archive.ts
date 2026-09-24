@@ -3,19 +3,19 @@
  *
  * كان كلُّ ما قرأه النموذج من ملفٍّ لا يُفهم اسمُه «ينتظر المراجعة» — لأنّ
  * القراءة قد تُخطئ في رقمٍ وتبقى متّسقةً حسابياً. فسأل أحمد (٢٤ سبتمبر
- * ٢٠٢٦): «ليش ما دخلها أوتوماتيك؟»، ووافق على أن يدخل وحده ما اجتمعت فيه
- * أربعةُ شروط، **كلُّ واحدٍ منها يسدّ باباً للخطأ لا يسدّه غيره**:
+ * ٢٠٢٦): «ليش ما دخلها أوتوماتيك؟». ثمّ سحب شرطَ الرقم الضريبيّ، وطلب ألّا
+ * يبقى للمراجعة إلّا «حالةٌ مستعصية» بسببٍ مقنعٍ فعليّ. فالشروط:
  *
- *   ١. **قُرئ من نصٍّ مكتوب في الملفّ** — الرقمُ فيه منقولٌ لا مقروءٌ ظنّاً.
- *      والصورةُ الممسوحة تُقرأ بالعين الآليّة، وهناك يقع الخطأ الواثق.
- *   ٢. **الرقمُ الضريبيّ للبائع يطابق المورّد المسجَّل** — فالفاتورةُ من
- *      المورّد الذي نظنّ، لا من اسمٍ يشبهه.
- *   ٣. **الحسابُ مستقيم**: قبل الضريبة + الضريبة = الإجمالي (بتسامح ريالٍ
+ *   ١. **مورّدٌ معروفٌ عندنا.**
+ *   ٢. **فاتورةٌ مقيَّدة**: رقمٌ وتاريخٌ وإجماليّ — وإلّا فلا شيء يُعتمَد.
+ *   ٣. **حسابٌ مستقيم**: قبل الضريبة + الضريبة = الإجمالي (بتسامح ريال
  *      كما في القاعدة). والمجهولُ هنا ليس استقامة.
- *   ٤. **المورّدُ معروفٌ عندنا.**
+ *   ٤. **قراءةٌ موثوقة**: نصٌّ مكتوبٌ في الملفّ (منقولٌ لا مقروءٌ ظنّاً)،
+ *      أو — إن قُرئ من صورة — **شاهدٌ مستقلّ** يصدّقها: ضريبتُه ١٥٪ من
+ *      صافيه (رقمان قُرئا منفصلَين يتّفقان بالنسبة لا بالجمع وحده)، أو
+ *      رقمُ فاتورته مكتوبٌ في اسم الملفّ (كتبه غيرُ النموذج).
  *
- * وما لم يجتمع فيه الأربعة يبقى للإنسان، **ويُقال له أيُّها لم يتحقّق** —
- * فالمراجعةُ تُوجَّه إلى موضع الشكّ لا إلى المستند كلِّه.
+ * وما لم يجتمع فيه ذلك يبقى للإنسان، **ويُقال له ما نقص بعينه**.
  *
  * دالّةٌ خالصة: تُستدعى في المزامنة لتقرّر، وفي لوح المراجعة لتشرح —
  * فلا يفترق القرارُ عن تفسيره.
@@ -30,62 +30,49 @@ export interface AutoArchiveFacts {
   invoiceRecorded: boolean;
   textSource: string | null;
   supplierKnown: boolean;
-  sellerVat: string | null;
-  supplierVat: string | null;
   subtotalMinor: number | null;
   vatMinor: number | null;
   totalMinor: number | null;
-  /** عُرف المورّدُ من مجلّده في الدرايف — اسمٌ كتبه إنسان، لا تخمينٌ من النموذج. */
-  supplierByFolder?: boolean;
-  /** الرقمُ الضريبيّ المقروء مسجَّلٌ لمورّدٍ آخر؟ */
-  vatTakenByOther?: boolean;
+  invoiceNumber?: string | null;
+  fileName?: string | null;
 }
 
 export type AutoArchiveGap =
   | "NOT_INVOICE"
   | "NOT_RECORDED"
-  | "NOT_TEXT"
   | "SUPPLIER_UNKNOWN"
-  | "VAT_MISMATCH"
-  | "VAT_UNKNOWN"
-  | "ARITHMETIC";
+  | "ARITHMETIC"
+  | "UNVERIFIED_IMAGE";
 
 export interface AutoArchiveVerdict {
   auto: boolean;
   gaps: AutoArchiveGap[];
-  /**
-   * رقمٌ ضريبيّ يُسجَّل للمورّد لأوّل مرّة — حين لا رقمَ له عندنا.
-   *
-   * «كلّها فيها المعلومات» (أحمد، ٢٤ سبتمبر): وأكثرُ المورّدين لا رقمَ
-   * ضريبيّاً مسجَّلاً لهم، فكان الشرطُ الثاني يُسقط فواتيرهم كلَّها ولو
-   * طُبع الرقمُ عليها. فيُتعلَّم الرقمُ مرّةً بثلاثة أدلّة معاً: قُرئ من
-   * نصٍّ مكتوب لا من صورة، وصيغتُه صيغةُ الهيئة (١٥ رقماً تبدأ بـ٣ وتنتهي
-   * بـ٣)، والمورّدُ عُرف من مجلّده لا من تخمين النموذج — ولا يحمله مورّدٌ
-   * آخر. ثمّ تُقابَل به فواتيرُه كلُّها بعدها.
-   */
-  learnVat: string | null;
 }
 
-/** ما يُقال لصاحب المقهى عن كلّ شرطٍ لم يتحقّق — ومعه ما يقارنه بالورقة. */
+/** ما يُقال لصاحب المقهى عن كلّ شرطٍ لم يتحقّق. */
 export const GAP_TEXT: Record<AutoArchiveGap, string> = {
   NOT_INVOICE: "ليس فاتورة — الإيصالاتُ والكشوفُ تُعتمَد بيد",
-  NOT_RECORDED: "لم تكفِ القراءةُ لقيد فاتورة — مورّدٌ أو مبلغٌ أو تاريخٌ لم يُعرَف",
-  NOT_TEXT: "قُرئ من صورةٍ ممسوحة — قارن الأرقامَ بالورقة",
-  SUPPLIER_UNKNOWN: "المورّدُ لم يُعرَف — تحقّق من اسمه",
-  VAT_MISMATCH: "الرقمُ الضريبيّ لا يطابق المورّد المسجَّل — تحقّق من المورّد",
-  VAT_UNKNOWN: "لا رقمَ ضريبيّاً يُقارَن — مقروءاً أو مسجَّلاً عند المورّد",
-  ARITHMETIC: "الحسابُ لا يستقيم أو ينقصه رقم — قارن الإجمالي والضريبة بالورقة",
+  NOT_RECORDED: "لم تُقيَّد له فاتورة — ينقصه مورّدٌ أو رقمٌ أو تاريخٌ أو إجماليّ مقروء",
+  SUPPLIER_UNKNOWN: "المورّدُ لم يُعرَف — ليس في قائمة المورّدين ولا في مجلّده",
+  ARITHMETIC: "الحسابُ لا يستقيم أو ينقصه رقم — قبل الضريبة + الضريبة لا يساوي الإجمالي",
+  UNVERIFIED_IMAGE: "قُرئ من صورةٍ ممسوحة ولا شاهدَ يصدّقه — ضريبتُه ليست ١٥٪ من صافيه، ورقمُه ليس في اسم الملفّ",
 };
 
 /** الضريبيّةُ والمبسّطة — والمبسّطةُ مستحقّةٌ الدفعَ وإن لم يُخصم مدخلُها. */
 const INVOICE_KINDS = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE"]);
 
-/** صيغةُ الرقم الضريبيّ عند الهيئة: خمسةَ عشر رقماً، أوّلُها ٣ وآخرُها ٣. */
-const ZATCA_VAT = /^3\d{13}3$/;
+/** ضريبةُ القيمة المضافة ١٥٪ من الصافي — بتسامح ريالٍ كتقريب المورّد. */
+function vatIsStandardRate(subtotal: number, vat: number): boolean {
+  return subtotal > 0 && Math.abs(vat * 100 - subtotal * 15) <= TOTAL_ROUNDING_TOLERANCE_MINOR * 100;
+}
 
-/** يُسقط الفراغ وما ليس رقماً — «3100 0797 16» و«310007971600003» رقمٌ واحد. */
-function digits(value: string | null): string {
-  return (value ?? "").replace(/\D/g, "");
+/** أرقامُ الفاتورة (ثلاثةٌ فأكثر) مكتوبةٌ في اسم الملفّ كتلةً واحدة، أو ضمن كتلةٍ لستّةٍ فأكثر؟ */
+function numberInFileName(invoiceNumber: string | null | undefined, fileName: string | null | undefined): boolean {
+  const digits = (invoiceNumber ?? "").replace(/\D/g, "");
+  if (digits.length < 3 || !fileName) return false;
+  const blocks = fileName.replace(/\D+/g, " ").trim().split(" ");
+  if (blocks.includes(digits)) return true;
+  return digits.length >= 6 && blocks.some((b) => b.includes(digits));
 }
 
 export function autoArchive(f: AutoArchiveFacts): AutoArchiveVerdict {
@@ -94,24 +81,19 @@ export function autoArchive(f: AutoArchiveFacts): AutoArchiveVerdict {
   if (!INVOICE_KINDS.has(f.kind ?? "")) gaps.push("NOT_INVOICE");
   else if (!f.invoiceRecorded) gaps.push("NOT_RECORDED");
 
-  if (f.textSource !== "TEXT") gaps.push("NOT_TEXT");
   if (!f.supplierKnown) gaps.push("SUPPLIER_UNKNOWN");
 
-  const seller = digits(f.sellerVat);
-  const registered = digits(f.supplierVat);
-  let learnVat: string | null = null;
-  if (f.vatTakenByOther && seller && seller !== registered) gaps.push("VAT_MISMATCH");
-  else if (!registered && seller && f.textSource === "TEXT" && f.supplierByFolder && ZATCA_VAT.test(seller)) {
-    learnVat = seller;
-  } else if (!seller || !registered) gaps.push("VAT_UNKNOWN");
-  else if (seller !== registered) gaps.push("VAT_MISMATCH");
+  const arithmeticOk =
+    f.subtotalMinor !== null && f.vatMinor !== null && f.totalMinor !== null
+    && Math.abs(f.subtotalMinor + f.vatMinor - f.totalMinor) <= TOTAL_ROUNDING_TOLERANCE_MINOR;
+  if (!arithmeticOk) gaps.push("ARITHMETIC");
 
-  if (
-    f.subtotalMinor === null || f.vatMinor === null || f.totalMinor === null
-    || Math.abs(f.subtotalMinor + f.vatMinor - f.totalMinor) > TOTAL_ROUNDING_TOLERANCE_MINOR
-  ) {
-    gaps.push("ARITHMETIC");
+  if (f.textSource !== "TEXT") {
+    const corroborated =
+      (arithmeticOk && vatIsStandardRate(f.subtotalMinor!, f.vatMinor!))
+      || numberInFileName(f.invoiceNumber, f.fileName);
+    if (!corroborated) gaps.push("UNVERIFIED_IMAGE");
   }
 
-  return { auto: gaps.length === 0, gaps, learnVat: gaps.length === 0 ? learnVat : null };
+  return { auto: gaps.length === 0, gaps };
 }

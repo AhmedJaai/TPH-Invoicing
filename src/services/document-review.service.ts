@@ -5,10 +5,19 @@
  * فلا يعدّ اللوحُ «٧ تجتمع فيها» ثمّ يعتمد الفعلُ خمسة.
  */
 
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, suppliers } from "@/db/schema";
+import type { drive_v3 } from "googleapis";
 import { autoArchive, type AutoArchiveVerdict } from "@/lib/extraction/auto-archive";
+import { recordAudit } from "@/lib/audit";
+import { applySupplierCredit } from "@/services/supplier-credit.service";
+import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
+import { driveWritesAllowed } from "@/lib/drive-readonly";
+import { renameArchived } from "@/services/drive-rename.service";
+import { missingFromReading, recordFromStoredReadings } from "@/services/document-backlog.service";
+import { normalizeDocumentDate } from "@/lib/document-date";
+import { parseRiyals } from "@/lib/money";
 
 export async function loadPendingReview(limit = 200) {
   const rows = await db
@@ -30,6 +39,7 @@ export async function loadPendingReview(limit = 200) {
       supplierId: suppliers.id,
       supplierVat: suppliers.vatNumber,
       supplierName: suppliers.nameAr,
+      reading: documents.extractionJson,
     })
     .from(documents)
     .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
@@ -38,18 +48,99 @@ export async function loadPendingReview(limit = 200) {
     .orderBy(asc(documents.periodMonth))
     .limit(limit);
 
-  return rows.map((d) => ({
+  return rows.map(({ reading, ...d }) => ({
     ...d,
+    /* ما نقص بعينه حين لم تُقيَّد فاتورة — من القراءة المحفوظة */
+    missing: d.invoiceId === null ? missingFor(reading, d.supplierId !== null) : [],
+    /* لا فاتورةَ له وقراءتُه كاملة — تُقيَّد عند الاستدراك (تاريخٌ كان يُرمى) */
+    recordable: d.invoiceId === null
+      && ["TAX_INVOICE", "SIMPLIFIED_INVOICE"].includes((reading as { documentKind?: string } | null)?.documentKind ?? "")
+      && missingFor(reading, d.supplierId !== null).length === 0,
     verdict: autoArchive({
       kind: d.kind,
       invoiceRecorded: d.invoiceId !== null,
       textSource: d.textSource,
       supplierKnown: d.supplierId !== null,
-      sellerVat: d.sellerVat,
-      supplierVat: d.supplierVat,
       subtotalMinor: d.subtotalMinor,
       vatMinor: d.vatMinor,
       totalMinor: d.totalMinor,
+      invoiceNumber: d.invoiceNumber,
+      fileName: d.fileName,
     }) as AutoArchiveVerdict,
   }));
+}
+
+function missingFor(reading: unknown, supplierKnown: boolean): string[] {
+  const x = (reading ?? {}) as { invoiceNumber?: string; invoiceDate?: string; totalAmount?: string };
+  return missingFromReading({
+    supplierKnown,
+    invoiceNumber: x.invoiceNumber?.trim() || null,
+    invoiceDate: normalizeDocumentDate(x.invoiceDate),
+    totalMinor: parseRiyals(x.totalAmount ?? ""),
+    rawDate: x.invoiceDate?.trim() || null,
+  });
+}
+
+/**
+ * يعتمد كلَّ ما ينتظر وتجتمع فيه الشروط — كالاعتماد اليدويّ تماماً:
+ * خصمُ رصيد المورّد، وأثرٌ في السجلّ بسببه. والحكمُ من القيد الآن.
+ */
+export async function approveEligible(actorId: string, limit = 80): Promise<{
+  approved: number; driveFileIds: string[]; failed: string[]; remaining: number;
+}> {
+  const eligible = (await loadPendingReview(500)).filter((d) => d.status === "NEEDS_REVIEW" && d.verdict.auto);
+  const driveFileIds: string[] = [];
+  const failed: string[] = [];
+  let approved = 0;
+  for (const d of eligible.slice(0, limit)) {
+    try {
+      const ok = await db.transaction(async (t) => {
+        const rows = await t.update(documents).set({ status: "ARCHIVED" })
+          .where(and(eq(documents.id, d.id), eq(documents.status, "NEEDS_REVIEW")))
+          .returning({ id: documents.id });
+        if (rows.length === 0) return false;
+        await recordAudit({
+          actorId,
+          action: "DOCUMENT_STATUS_CHANGED",
+          entityType: "document",
+          entityId: d.id,
+          before: { الحال: "ينتظر المراجعة" },
+          after: { الملف: d.fileName, الحال: "مؤرشف", السبب: "اجتمعت فيه شروطُ الأرشفة الآليّة" },
+        }, t);
+        if (d.supplierId) await applySupplierCredit(t, d.supplierId, { forwardDays: SETTLEMENT_FORWARD_DAYS });
+        return true;
+      });
+      if (ok) {
+        approved++;
+        if (d.driveFileId) driveFileIds.push(d.driveFileId);
+      }
+    } catch (e) {
+      failed.push(`${d.fileName}: ${(e as Error).message.slice(0, 80)}`);
+    }
+  }
+  return { approved, driveFileIds, failed, remaining: Math.max(0, eligible.length - limit) };
+}
+
+/**
+ * استدراكُ ما تراكم — ثلاثُ خطواتٍ بترتيبها:
+ *   ١. تُقيَّد فواتيرُ ما رُمي تاريخُه، من قراءته المحفوظة.
+ *   ٢. يُعتمَد ما تجتمع فيه الشروط (ومنه ما قُيِّد للتوّ).
+ *   ٣. يُسمّى كلُّ ما أُرشِف ويخالف اسمُه الصيغة — لا ما أُرشِف اليوم وحده.
+ * والثالثةُ في الإنتاج وحده وبتفويض الدرايف؛ وإلّا تُترَك وتُقترَح.
+ */
+export async function processDocumentBacklog(
+  actorId: string,
+  drive: drive_v3.Drive | null,
+): Promise<{ recorded: number; approved: number; renamed: { from: string; to: string }[]; notes: string[] }> {
+  const notes: string[] = [];
+  const { recorded } = await recordFromStoredReadings(actorId);
+  const approval = await approveEligible(actorId);
+  notes.push(...approval.failed);
+  let renamed: { from: string; to: string }[] = [];
+  if (drive && driveWritesAllowed(process.env)) {
+    const outcome = await renameArchived(drive, null, actorId, "الاستدراك");
+    renamed = outcome.done;
+    notes.push(...outcome.failed.map((f) => `${f.from}: ${f.error}`));
+  }
+  return { recorded, approved: approval.approved, renamed, notes };
 }

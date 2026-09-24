@@ -7,6 +7,7 @@
  *
  * ولا يُستدعى إلا بعد تأكيد بشري صريح في شاشة المعاينة.
  */
+import { normalizeDocumentDate } from "@/lib/document-date";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { isAuthBypassed } from "@/lib/session";
@@ -206,7 +207,10 @@ export async function POST(request: Request) {
       من تاريخ الفاتورة لا تاريخ الرفع». والقاعدة التي لا يفرضها الكود
       وصيّةٌ لا قاعدة.
     */
-    const invoiceDate = body.invoiceDate ? new Date(`${body.invoiceDate}T00:00:00Z`) : null;
+    /* ما كُتب «13/09/2026» يُوحَّد ولا يُرمى — كما في المراجعة */
+    const isoDate = normalizeDocumentDate(body.invoiceDate);
+    if (isoDate) body.invoiceDate = isoDate;
+    const invoiceDate = isoDate ? new Date(`${isoDate}T00:00:00Z`) : null;
 
     const derivedMonth =
       invoiceDate !== null && !Number.isNaN(invoiceDate.getTime())

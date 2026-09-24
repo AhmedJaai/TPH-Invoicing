@@ -16,7 +16,7 @@
  */
 
 import type { drive_v3 } from "googleapis";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, statements, suppliers } from "@/db/schema";
 import { isDriveAuthError, renameFile } from "@/lib/drive";
@@ -90,11 +90,12 @@ const MAX_AUTO = 25;
  */
 export async function renameArchived(
   drive: drive_v3.Drive,
-  driveFileIds: readonly string[],
+  /** `null`: كلُّ ما أُرشِف — لاستدراك ما سبق التسميةَ الآليّة. */
+  driveFileIds: readonly string[] | null,
   actorId: string,
   via: string,
 ): Promise<RenameOutcome & { cannot: { current: string; reason: string }[] }> {
-  if (driveFileIds.length === 0) return { done: [], failed: [], authExpired: false, cannot: [] };
+  if (driveFileIds !== null && driveFileIds.length === 0) return { done: [], failed: [], authExpired: false, cannot: [] };
 
   const rows = await db
     .select({
@@ -113,7 +114,9 @@ export async function renameArchived(
     .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
     .leftJoin(invoices, eq(invoices.documentId, documents.id))
     .leftJoin(statements, eq(statements.documentId, documents.id))
-    .where(and(inArray(documents.driveFileId, [...driveFileIds]), eq(documents.status, "ARCHIVED")));
+    .where(driveFileIds === null
+      ? and(isNotNull(documents.driveFileId), eq(documents.status, "ARCHIVED"))
+      : and(inArray(documents.driveFileId, [...driveFileIds]), eq(documents.status, "ARCHIVED")));
 
   const targets: RenameTarget[] = [];
   const cannot: { current: string; reason: string }[] = [];

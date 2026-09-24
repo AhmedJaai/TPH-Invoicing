@@ -12,7 +12,7 @@
 import { refreshTokenFor } from "@/services/drive.service";
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   documents, invoices, payments, statements,
@@ -39,6 +39,7 @@ import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { canonicalName } from "@/lib/canonical-name";
 import { autoArchive, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
 import { renameArchived } from "@/services/drive-rename.service";
+import { processDocumentBacklog } from "@/services/document-review.service";
 import { driveWritesAllowed } from "@/lib/drive-readonly";
 import { FILE, MONTH, countNoun } from "@/lib/arabic";
 import { withDeadline } from "@/lib/ai/deadline";
@@ -136,6 +137,19 @@ async function handle(request: Request) {
   }
 
   const drive = driveForUser(token);
+
+  /*
+    ── الاستدراكُ قبل الجديد ──
+
+    ما تراكم قبل أن تستقيم القراءة (تاريخٌ رُمي، مستندٌ ينتظر وتجتمع فيه
+    الشروط، ملفٌّ مؤرشَفٌ باسمٍ خارج الصيغة) يُعالَج في كلّ مزامنة — فلا
+    يبقى عملٌ قديم ينتظر زرّاً لا يعرف صاحبُه أنّه موجود.
+  */
+  /* مرّةً في المزامنة — في طلبها الأوّل، لا في كلّ دفعةٍ تستأنف القراءة */
+  const firstCall = !body.fileIds?.length && !body.onlyMonths?.length;
+  const backlog = apply && firstCall
+    ? await processDocumentBacklog(user.id, drive)
+    : { recorded: 0, approved: 0, renamed: [] as { from: string; to: string }[], notes: [] as string[] };
 
   const known = new Set(
     (await db.select({ id: documents.driveFileId }).from(documents))
@@ -492,25 +506,20 @@ async function handle(request: Request) {
       /*
         ── أيدخل وحده؟ ── (`auto-archive.ts`، بإذن أحمد في ٢٤ سبتمبر ٢٠٢٦)
 
-        أربعةُ شروطٍ معاً: نصٌّ مكتوب لا صورة، ورقمٌ ضريبيّ يطابق المورّد،
-        وحسابٌ مستقيم، ومورّدٌ معروف. وما لم تجتمع فيه ينتظر إنساناً،
-        ولوحُ المراجعة يقول له أيُّها لم يتحقّق.
+        مورّدٌ معروف، وفاتورةٌ مقيَّدة، وحسابٌ مستقيم، وقراءةٌ موثوقة (نصٌّ
+        مكتوب، أو صورةٌ يصدّقها شاهدٌ مستقلّ). وما لم تجتمع فيه ينتظر
+        إنساناً، ولوحُ المراجعة يقول له ما نقص بعينه.
       */
-      const sellerDigits = (x.sellerVatNumber ?? "").replace(/\D/g, "");
       const verdict = autoArchive({
         kind: x.documentKind,
         invoiceRecorded: review.canCreateInvoice && Boolean(supplier) && parseRiyals(x.totalAmount) !== null,
         textSource: extraction.textSource ?? null,
         supplierKnown: Boolean(supplier),
-        sellerVat: x.sellerVatNumber ?? null,
-        supplierVat: supplier?.vatNumber ?? null,
         subtotalMinor: parseRiyals(x.subtotalAmount),
         vatMinor: parseRiyals(x.vatAmount),
         totalMinor: parseRiyals(x.totalAmount),
-        supplierByFolder: Boolean(folderSupplier) && supplier === folderSupplier,
-        vatTakenByOther: sellerDigits !== "" && supplierList.some(
-          (s) => s.id !== supplier?.id && (s.vatNumber ?? "").replace(/\D/g, "") === sellerDigits,
-        ),
+        invoiceNumber: x.invoiceNumber,
+        fileName: entry.file.name,
       });
 
       /*
@@ -545,8 +554,8 @@ async function handle(request: Request) {
           /*
             ما قرأه النموذج ينتظر إنساناً إلّا إن اجتمعت الشروطُ الأربعة:
             كان يُقيَّد «مؤرشفاً» بلا شرط فيدخل ملفّ التحويلات وما رآه أحد —
-            وفاتورةٌ منفوخة حسابُها مستقيم تمرّ كلَّ فحص. والشرطان اللذان
-            يسدّان ذلك: نصٌّ منقول لا صورةٌ مقروءة، ورقمٌ ضريبيّ يطابق المورّد.
+            وفاتورةٌ منفوخة حسابُها مستقيم تمرّ كلَّ فحص. والذي يسدّ ذلك:
+            نصٌّ منقول، أو صورةٌ يصدّقها شاهدٌ مستقلّ عن جمع أرقامها.
           */
           status: verdict.auto ? "ARCHIVED" : "NEEDS_REVIEW",
           periodMonth: entry.month,
@@ -560,13 +569,6 @@ async function handle(request: Request) {
 
         if (!doc) return;
         recorded = true;
-
-        /* رقمٌ ضريبيّ تُعُلِّم لمورّدٍ لا رقمَ له — يُكتَب إن بقي فارغاً */
-        if (verdict.learnVat && supplier) {
-          await tx.update(suppliers)
-            .set({ vatNumber: verdict.learnVat })
-            .where(and(eq(suppliers.id, supplier.id), isNull(suppliers.vatNumber)));
-        }
 
         if (!review.canCreateInvoice || !supplier) return;
 
@@ -612,8 +614,6 @@ async function handle(request: Request) {
         created++; read++; recordedFileIds.add(entry.file.id);
         if (verdict.auto) autoArchived++;
         else for (const g of verdict.gaps) reviewGaps.set(g, (reviewGaps.get(g) ?? 0) + 1);
-        /* فواتيرُ المورّد التالية في هذا النداء تُقابَل بالرقم الذي تُعُلِّم */
-        if (verdict.learnVat && supplier && !supplier.vatNumber) supplier.vatNumber = verdict.learnVat;
       }
       if (invoiceCreated) invoicesCreated++;
       } catch (e) {
@@ -728,7 +728,8 @@ async function handle(request: Request) {
     },
     /* لماذا لم يدخل ما لم يدخل — مجموعاً بالسبب، فيُعرَف أيُّ شرطٍ يُسقط أكثر */
     reviewReasons: [...reviewGaps.entries()].map(([gap, count]) => ({ gap, count })),
-    renamed,
+    renamed: [...backlog.renamed, ...renamed],
+    backlog: { recorded: backlog.recorded, approved: backlog.approved, notes: backlog.notes.slice(0, 10) },
     renameFailures,
     notes: notes.slice(0, 20),
     readFailures,

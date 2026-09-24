@@ -51,6 +51,8 @@ interface Result {
   renamed?: { from: string; to: string }[];
   /** لماذا لم يدخل ما لم يدخل — مجموعاً بالسبب. */
   reviewReasons?: { gap: AutoArchiveGap; count: number }[];
+  /** استدراكُ ما تراكم — في الطلب الأوّل من المزامنة. */
+  backlog?: { recorded: number; approved: number; notes: string[] };
 }
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" }) {
@@ -165,6 +167,7 @@ export function DriveSync() {
           for (const g of r.reviewReasons ?? []) reasons.set(g.gap, (reasons.get(g.gap) ?? 0) + g.count);
         };
         absorb(json);
+        const backlog = json.backlog;
 
         while (guard < 12 && json.summary?.truncated
           && (json.summary.pendingMonths?.length ?? 0) > 0) {
@@ -222,6 +225,7 @@ export function DriveSync() {
 
         json.renameSuggestions = suggestions;
         json.renamed = renamedAll;
+        json.backlog = backlog;
         json.reviewReasons = [...reasons.entries()].map(([gap, count]) => ({ gap, count }));
         json.summary = { ...json.summary, autoArchived: tally.auto, needsReview: tally.review };
 
@@ -318,6 +322,14 @@ export function DriveSync() {
             «كلّها فيها المعلومات، لكنّه ما يستخرجها أو ما يعتمدها» — فيُقال
             بعد كلّ مزامنة كم دخل وحده، وكم ينتظر، وأيُّ شرطٍ أسقط ما ينتظر.
           */}
+          {result?.backlog && (result.backlog.recorded > 0 || result.backlog.approved > 0) && (
+            <p className="mt-2 rounded-lg bg-ok-bg px-3 py-2 text-[11px] font-bold text-ok">
+              استُدرك ما تراكم:
+              {result.backlog.recorded > 0 && ` قُيِّدت ${countNoun(result.backlog.recorded, INVOICE)} من قراءتها المحفوظة`}
+              {result.backlog.recorded > 0 && result.backlog.approved > 0 && " ·"}
+              {result.backlog.approved > 0 && ` اعتُمد ${countNoun(result.backlog.approved, FILE)} تجتمع فيه الشروط`}
+            </p>
+          )}
           {result?.applied && ((s.autoArchived ?? 0) > 0 || (s.needsReview ?? 0) > 0) && (
             <div className="mt-2 rounded-lg border border-line bg-sunken px-3 py-2 text-[11px] leading-relaxed">
               <p>

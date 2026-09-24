@@ -15,13 +15,14 @@ import { assertMonthsOpen } from "@/services/month-guard";
 import { recordAudit } from "@/lib/audit";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { renameArchived } from "@/services/drive-rename.service";
-import { loadPendingReview } from "@/services/document-review.service";
+import { processDocumentBacklog } from "@/services/document-review.service";
 import { refreshTokenFor } from "@/services/drive.service";
 import { driveForUser } from "@/lib/drive";
 import { driveWritesAllowed } from "@/lib/drive-readonly";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { can } from "@/lib/permissions";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { DOCUMENT, FILE, INVOICE, countNoun } from "@/lib/arabic";
 
 export const runtime = "nodejs";
 
@@ -61,49 +62,20 @@ export async function POST(request: Request) {
     if (!can(user.role, "amounts:view")) {
       return NextResponse.json({ error: "الاعتماد يحتاج صلاحية عرض المبالغ" }, { status: 403 });
     }
-    const eligible = (await loadPendingReview()).filter((d) => d.status === "NEEDS_REVIEW" && d.verdict.auto);
-    const done: string[] = [];
-    const skipped: string[] = [];
-    for (const d of eligible.slice(0, 50)) {
-      try {
-        const ok = await db.transaction(async (t) => {
-          const rows = await t.update(documents).set({ status: "ARCHIVED" })
-            .where(and(eq(documents.id, d.id), eq(documents.status, "NEEDS_REVIEW")))
-            .returning({ id: documents.id });
-          if (rows.length === 0) return false;
-          await recordAudit({
-            actorId: user.id,
-            action: "DOCUMENT_STATUS_CHANGED",
-            entityType: "document",
-            entityId: d.id,
-            before: { الحال: "ينتظر المراجعة" },
-            after: { الملف: d.fileName, الحال: "مؤرشف", السبب: "اجتمعت فيه شروطُ الأرشفة الآليّة الأربعة" },
-          }, t);
-          if (d.supplierId) await applySupplierCredit(t, d.supplierId, { forwardDays: SETTLEMENT_FORWARD_DAYS });
-          return true;
-        });
-        if (ok && d.driveFileId) done.push(d.driveFileId);
-        else if (ok) done.push(d.id);
-      } catch (e) {
-        skipped.push(`${d.fileName}: ${(e as Error).message.slice(0, 80)}`);
-      }
+    let drive = null;
+    if (driveWritesAllowed(process.env)) {
+      const token = await refreshTokenFor(user.id).catch(() => null);
+      if (token) drive = driveForUser(token);
     }
-    let renamed = 0;
-    if (done.length > 0 && driveWritesAllowed(process.env)) {
-      try {
-        const token = await refreshTokenFor(user.id);
-        if (token) renamed = (await renameArchived(driveForUser(token), done, user.id, "الاعتماد الجماعيّ")).done.length;
-      } catch (e) {
-        console.warn("[document-status] تعذّرت التسمية بعد الاعتماد الجماعيّ:", (e as Error).message);
-      }
-    }
-    const message = done.length === 0
-      ? "لا مستندَ تجتمع فيه الشروطُ الآن"
-      : `اعتُمد ${done.length}`
-        + (renamed > 0 ? ` · وسُمّي ${renamed}` : "")
-        + (skipped.length > 0 ? ` · وتعذّر ${skipped.length}: ${skipped[0]}` : "")
-        + (eligible.length > 50 ? ` · بقي ${eligible.length - 50} — اضغط ثانيةً` : "");
-    return NextResponse.json({ ok: true, message, confirmed: done.length, skipped });
+    const r = await processDocumentBacklog(user.id, drive);
+    const parts = [
+      r.recorded > 0 ? `قُيِّد من القراءة المحفوظة: ${countNoun(r.recorded, INVOICE)}` : null,
+      r.approved > 0 ? `اعتُمد ${countNoun(r.approved, DOCUMENT)}` : null,
+      r.renamed.length > 0 ? `وسُمّي ${countNoun(r.renamed.length, FILE)}` : null,
+      r.notes.length > 0 ? `وتعذّر ${r.notes.length}: ${r.notes[0]}` : null,
+    ].filter(Boolean);
+    const message = parts.length === 0 ? "لا مستندَ تجتمع فيه الشروطُ الآن" : parts.join(" · ");
+    return NextResponse.json({ ok: true, message, ...r });
   }
 
   if (typeof body.documentId !== "string" || !body.documentId) {

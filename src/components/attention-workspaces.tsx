@@ -137,7 +137,8 @@ export async function UnbackedWorkspace() {
 /** «مستنداتٌ لم يُبتّ فيها» — تُعتمَد أو تُرفَض من هنا. */
 export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boolean; canConfirm: boolean }) {
   const all = await loadPendingReview();
-  const eligible = all.filter((d) => d.verdict.auto);
+  /* ما يُعتمَد الآن، وما تُقيَّد فاتورتُه أوّلاً ثمّ يُحكَم عليه — كلاهما بضغطةٍ واحدة */
+  const eligible = all.filter((d) => d.verdict.auto || d.recordable);
   const rows = all.slice(0, 40);
 
   if (rows.length === 0) {
@@ -162,18 +163,19 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
       {eligible.length > 0 && canConfirm && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/40 bg-ok-bg px-3 py-2.5">
           <p className="min-w-0 flex-1 text-xs leading-relaxed">
-            <strong>{countNoun(eligible.length, DOCUMENT)} تجتمع فيها الشروطُ الأربعة</strong> — كانت تنتظر قبل أن
-            يدخل مثلُها وحده. اعتمادُها يُدخل فواتيرَها دفعةَ الشهر ويسمّي ملفّاتها.
+            <strong>{countNoun(eligible.length, DOCUMENT)} يُحسَم الآن بلا مراجعة</strong> — تجتمع فيها الشروط، أو
+            قراءتُها كاملة وفاتورتُها لم تُقيَّد لأنّ تاريخها كان يُرمى. الضغطُ يقيّد الفواتير ويعتمدها ويسمّي ملفّاتها،
+            ويبقى ما لا يستقيم بعد القيد بسببه.
           </p>
           <ConfirmEligible count={eligible.length} />
         </div>
       )}
       <p className="rounded-xl border border-line bg-sunken px-3 py-2.5 text-[11px] leading-relaxed text-ink-soft">
-        يدخل المستندُ وحده إذا اجتمعت فيه أربعة: قُرئ من <strong>نصٍّ مكتوب</strong> لا من صورة،
-        و<strong>رقمُه الضريبيّ</strong> يطابق المورّد، و<strong>حسابُه مستقيم</strong>، و<strong>مورّدُه معروف</strong>.
-        وما لم تجتمع فيه يُكتَب تحته ما نقصه. <strong>المطلوب:</strong> افتح المستند وقارن الأرقام
-        بالورقة؛ إن طابقت فاعتمده — فتدخل فاتورتُه دفعةَ الشهر، ويُخصم منها ما دفعتَه للمورّد مقدَّماً،
-        ويُسمّى ملفُّه على الصيغة. وإن اختلف شيءٌ فارفضه وارفعه من صفحة الرفع لتصحّح الحقل.
+        يدخل المستندُ وحده إذا عُرف <strong>مورّدُه</strong>، وقُيّدت له <strong>فاتورة</strong> (رقمٌ وتاريخٌ وإجماليّ)،
+        و<strong>استقام حسابُه</strong>، وكانت <strong>قراءتُه موثوقة</strong> (نصٌّ مكتوب، أو صورةٌ ضريبتُها ١٥٪ من صافيها
+        أو رقمُها في اسم الملفّ). وما لم يجتمع فيه ذلك يُكتَب تحته ما نقص بعينه.{" "}
+        <strong>المطلوب:</strong> أصلح الناقص أو قارن بالورقة ثمّ اعتمد — فتدخل الفاتورةُ دفعةَ الشهر، ويُخصم منها
+        ما دفعتَه للمورّد مقدَّماً، ويُسمّى ملفُّها. وإن كان المستندُ خطأً فارفضه.
       </p>
       <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
         {rows.map((d) => {
@@ -207,11 +209,19 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                   {canUpload && <RejectDocument documentId={d.id} />}
                 </span>
               </div>
-              {d.invoiceNumber === null ? (
-                <p className="mt-2 text-[11px] leading-relaxed text-warn">
-                  لم تُقيَّد له فاتورة — القراءةُ لم تكفِ لقيدها (مورّدٌ أو مبلغٌ أو تاريخٌ لم يُعرَف).
-                  ارفضه وارفعه من صفحة الرفع لتكمل ما نقص.
+              {d.invoiceNumber === null && d.recordable ? (
+                <p className="mt-2 text-[11px] leading-relaxed text-ok">
+                  قراءتُه كاملة (مورّدٌ ورقمٌ وتاريخٌ وإجماليّ) — لم تُقيَّد فاتورتُه لأنّ تاريخه كُتب بصيغةٍ كانت تُرمى.
+                  تُقيَّد في المزامنة القادمة، أو بالضغط أعلاه.
                 </p>
+              ) : d.invoiceNumber === null ? (
+                <div className="mt-2 text-[11px] leading-relaxed text-warn">
+                  <p>لم تُقيَّد له فاتورة — ينقصه:</p>
+                  <ul className="list-inside list-disc">
+                    {(d.missing.length > 0 ? d.missing : ["لم يُقرأ منه ما يُقيَّد — أو ليس فاتورة"]).map((m) => <li key={m}>{m}</li>)}
+                  </ul>
+                  <p className="text-muted">ارفضه وارفعه من صفحة الرفع لتكتب الناقص بيدك.</p>
+                </div>
               ) : (
                 <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-5">
                   <ReadField label="رقم الفاتورة" value={<bdi className="nums">{d.invoiceNumber}</bdi>} />
@@ -221,10 +231,10 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                   <ReadField label="الإجمالي" value={d.totalMinor === null ? "غير معروف" : <Money minor={d.totalMinor} />} />
                 </dl>
               )}
-              {gaps.length === 0 && (
+              {d.invoiceId !== null && gaps.length === 0 && (
                 <p className="mt-2 text-[11px] text-ok">تجتمع فيه الشروطُ الأربعة — يُعتمَد مع ما فوقه بضغطةٍ واحدة.</p>
               )}
-              {gaps.length > 0 && (
+              {d.invoiceId !== null && gaps.length > 0 && (
                 <ul className="mt-2 space-y-0.5 text-[11px] text-warn">
                   {gaps.filter((g) => g !== "NOT_RECORDED").map((g) => (
                     <li key={g}>لم يدخل وحده: {GAP_TEXT[g]}</li>
