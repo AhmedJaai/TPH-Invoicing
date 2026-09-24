@@ -79,16 +79,23 @@ export function InvoiceFix({
 
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
-  if (reasons.length === 0 && !open) {
+  if (reasons.every((r) => r.severity === "INFO") && !open) {
     return (
-      <p className="text-xs text-ok">
-        مستوفيةُ الأركان — لا شيء ينقصها.
-        {canEdit && (
-          <button type="button" onClick={() => setOpen(true)} className="ms-2 underline underline-offset-4">
-            صحّح حقلاً على أيّ حال
-          </button>
-        )}
-      </p>
+      <div className="space-y-1.5">
+        <p className="text-xs text-ok">
+          مستوفيةُ الأركان — لا شيء ينقصها.
+          {canEdit && (
+            <button type="button" onClick={() => setOpen(true)} className="ms-2 underline underline-offset-4">
+              صحّح حقلاً على أيّ حال
+            </button>
+          )}
+        </p>
+        {reasons.map((r) => (
+          <p key={r.code} className="text-[11px] leading-relaxed text-muted">
+            للعلم: {r.what} — {r.fix}
+          </p>
+        ))}
+      </div>
     );
   }
 
@@ -100,11 +107,14 @@ export function InvoiceFix({
             <li
               key={r.code}
               className={`rounded-lg border px-3 py-2 ${
-                r.severity === "BLOCKER" ? "border-danger/40 bg-danger-bg" : "border-warn/40 bg-warn-bg"
+                r.severity === "BLOCKER"
+                  ? "border-danger/40 bg-danger-bg"
+                  : r.severity === "WARN" ? "border-warn/40 bg-warn-bg" : "border-line bg-sunken"
               }`}
             >
               <p className="text-xs font-bold">
-                {r.severity === "BLOCKER" ? "يمنع القيد: " : "يحتاج معالجة: "}
+                {/* ما هو للعلم لا يُكتب «يحتاج معالجة» — وإلّا صار كلُّ تقريبٍ عطباً */}
+                {r.severity === "BLOCKER" ? "يمنع القيد: " : r.severity === "WARN" ? "يحتاج معالجة: " : "للعلم: "}
                 {r.what}
               </p>
               <p className="mt-0.5 text-[11px] leading-relaxed text-ink-soft">{r.fix}</p>

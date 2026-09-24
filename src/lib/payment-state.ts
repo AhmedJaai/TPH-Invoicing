@@ -93,14 +93,29 @@ export function availableMinor(f: PaymentFacts): number {
   return Math.max(0, f.amountMinor - f.feeMinor - f.allocatedMinor);
 }
 
+/** حالُ الدفعة بالعربيّة — والمردودةُ لا تُحسَب مدفوعة. */
 export const STATUS_LABEL: Record<PaymentStatus, string> = {
-  UNAPPLIED: "بلا تخصيص",
-  PARTIALLY_APPLIED: "خُصّص بعضها",
-  APPLIED: "مستقرّة",
-  OVERPAYMENT: "فائضة",
-  ADVANCE: "دفعة مقدّمة",
+  UNAPPLIED: "لم تُخصَّص",
+  PARTIALLY_APPLIED: "خُصّصت جزئياً",
+  APPLIED: "خُصّصت",
+  OVERPAYMENT: "زائدة عن فواتيره",
+  ADVANCE: "مقدَّمة معلَنة",
   REVERSED: "مردودة",
   VOID: "ملغاة",
+};
+
+/** حالٌ مقروءٌ من القاعدة نصّاً — وما لا اسم له يُعرَض كما هو. */
+export function paymentStatusLabel(status: string): string {
+  const labels: Readonly<Record<string, string>> = STATUS_LABEL;
+  return labels[status] ?? status;
+}
+
+/** طريقةُ السداد بالعربيّة — والسدادُ من حساب المالك لا يظهر في كشف المقهى أبداً. */
+export const METHOD_LABEL: Record<string, string> = {
+  BANK_TRANSFER: "حوالة بنكية",
+  CASH: "نقداً",
+  EMPLOYEE_ADVANCE: "عهدة موظّف",
+  OWNER_ACCOUNT: "من حساب المالك",
 };
 
 /** انتقالاتٌ مسموحة — وما عداها يُرفَض ولا يُكتَب. */

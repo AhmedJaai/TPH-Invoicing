@@ -18,6 +18,7 @@ import { pendingDecision } from "./bank/pending";
 import { needsContractSql } from "./supplier-policy-rules";
 import { loadOverdueBalances } from "@/services/supplier-balance.service";
 import { DAY, TIME, countNoun } from "./arabic";
+import { invoiceHref } from "./invoice-profile";
 import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
 
 interface Row {
@@ -70,12 +71,12 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
       لكلّ فاتورةٍ في موضعها: رقمُنا الضريبيّ يُكتب إن صُحّحت الفاتورة، أو
       الضريبةُ صفرٌ إن لم يكن المورّدُ مسجَّلاً — والخادمُ يعيد اشتقاق الحال.
     */
-    href: `/purchases/invoices?fix=${encodeURIComponent(String(r.id))}#fix`,
+    href: invoiceHref(String(r.id), "tax"),
   }));
 
   const unknownEvidence = (
     await db.execute<Row>(sql`
-      select i.invoice_number, s.name_ar, i.total_minor
+      select i.id, i.invoice_number, s.name_ar, i.total_minor
       from invoices i left join suppliers s on s.id = i.supplier_id
       where i.tax_status='UNKNOWN' order by i.total_minor desc limit 10
     `)
@@ -83,6 +84,8 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     label: String(r.invoice_number),
     sub: String(r.name_ar ?? "—"),
     amountMinor: Number(r.total_minor),
+    /* كلُّ دليلٍ يفتح فاتورتَه — وفيها «أعد قراءة المستند» */
+    href: invoiceHref(String(r.id), "tax"),
   }));
 
   /*

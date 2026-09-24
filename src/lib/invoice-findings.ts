@@ -98,6 +98,18 @@ const FIX: Record<string, { what: string; fix: string }> = {
   },
 };
 
+/** صورُ العطب التي يحملها رمزٌ واحد — والمفتاح `رمز:صورة`. */
+const VARIANT_FIX: Record<string, { what: string; fix: string }> = {
+  [`${ISSUE.VAT_MATH_MISMATCH}:ROUNDING`]: {
+    what: "المورّد قرّب الإجماليّ بأقلّ من ريال",
+    fix: "لا شيء يُفعَل: المطبوعُ على الفاتورة هو الملزِم، والفرقُ تقريب.",
+  },
+  [`${ISSUE.VAT_MATH_MISMATCH}:RATE`]: {
+    what: "الضريبة أقلّ أو أكثر من ١٥٪ من الصافي — والجمعُ يستقيم",
+    fix: "غالباً في الفاتورة بنودٌ معفاة أو صفريّة. قارن بالورقة، ولا تُطالِب المورّد إلّا إن كانت البنود كلّها خاضعة.",
+  },
+};
+
 /** بندٌ خاصّ: فاتورةٌ بلا بنود — ليس ركناً ضريبياً، وهو عطبٌ مع ذلك. */
 export const NO_LINES: InvoiceReason = {
   code: "NO_LINES",
@@ -139,7 +151,7 @@ export function invoiceReasons(
   );
 
   const out: InvoiceReason[] = result.findings.map((f) => {
-    const copy = FIX[f.code];
+    const copy = (f.variant && VARIANT_FIX[`${f.code}:${f.variant}`]) || FIX[f.code];
     return {
       code: f.code,
       severity: f.severity,

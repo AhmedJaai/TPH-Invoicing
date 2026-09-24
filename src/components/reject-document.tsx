@@ -6,10 +6,15 @@ import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
 
 /** رفضٌ بخطوتين: الضغطة الأولى تسأل، والثانية ترفض — ولا يُحذف الملفّ. */
-export function RejectDocument({ documentId, cancel = false }: {
+export function RejectDocument({ documentId, cancel = false, redirectTo }: {
   documentId: string;
   /** مستندٌ معتمَد يُلغى — فاتورةٌ ألغاها المورّد. ويُكتَب السبب. */
   cancel?: boolean;
+  /**
+   * وجهةٌ بعد النجاح. الإلغاءُ من ملفّ الفاتورة يُسقط الفاتورة نفسها،
+   * فالتحديثُ في موضعه يفتح «لم نجد هذه الصفحة» — طريقٌ مسدود بعد فعلٍ نجح.
+   */
+  redirectTo?: string;
 }) {
   const router = useRouter();
   const [asking, setAsking] = useState(false);
@@ -45,7 +50,8 @@ export function RejectDocument({ documentId, cancel = false }: {
           const r = await postJson("/api/document-status", { documentId, reason: reason.trim() || undefined });
           setBusy(false);
           if (!r.ok) { setError(r.error); return; }
-          router.refresh();
+          if (redirectTo) router.push(redirectTo);
+          else router.refresh();
         }}
       >
         {busy ? "يرفض…" : cancel ? "نعم، ألغِها" : "نعم، ارفضه"}

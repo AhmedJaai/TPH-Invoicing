@@ -84,7 +84,7 @@ describe("المردودة والملغاة", () => {
 
   it("لكل حالٍ اسمٌ عربيّ", () => {
     expect(Object.keys(STATUS_LABEL)).toHaveLength(7);
-    expect(STATUS_LABEL.OVERPAYMENT).toBe("فائضة");
+    expect(STATUS_LABEL.OVERPAYMENT).toBe("زائدة عن فواتيره");
   });
 });
 

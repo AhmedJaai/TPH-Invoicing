@@ -13,6 +13,15 @@ export interface Finding {
   code: IssueCode;
   severity: Severity;
   message: string;
+  /**
+   * صورةٌ من العطب حين يحمل الرمزُ الواحد أكثرَ من معنى.
+   *
+   * `VAT_MATH_MISMATCH` كان ثلاثة أشياء: إجماليٌّ لا يستقيم (خطأ قراءة)،
+   * وإجماليٌّ قرّبه المورّد (لا عطب)، وضريبةٌ دون ١٥٪ من الصافي (بنودٌ
+   * معفاة غالباً). وكانت الشاشة تقول للثلاثة «الصافي + الضريبة لا يساوي
+   * الإجمالي» — فتُتَّهم فاتورةٌ يستقيم جمعُها بالهللة.
+   */
+  variant?: "ROUNDING" | "RATE";
 }
 
 export interface InvoiceCandidate {
@@ -140,6 +149,7 @@ export function validateInvoice(
        */
       findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
         severity: "INFO",
+        variant: "ROUNDING",
         message: `المورّد قرّب الإجمالي: ${(subtotalMinor + vatMinor) / 100} صار ${totalMinor / 100}`,
       }));
     } else if (subtotalMinor + vatMinor !== totalMinor) {
@@ -152,6 +162,7 @@ export function validateInvoice(
       if (Math.abs(expected - vatMinor) > 1) {
         findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
           severity: "INFO",
+          variant: "RATE",
           message: `الضريبة ${vatMinor / 100} تخالف ١٥٪ من الصافي (${expected / 100}) — تحقّق من وجود بنود معفاة`,
         }));
       }

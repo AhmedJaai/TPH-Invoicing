@@ -3,6 +3,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { postJson, request } from "@/lib/http-client";
@@ -575,14 +576,14 @@ export function BankImport({
           ما دُفع نقداً أو من حسابك الشخصيّ يُسجَّل لكلّ فاتورةٍ وحدها من قائمة الفواتير:
           «سجّل أنّها سُدّدت»، ويُسأل فيه من أين دُفعت.
         </p>
-        <a
+        <Link
           href="/purchases/invoices?paid=OPEN"
           className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-line px-3 text-xs font-medium hover:border-ink-soft"
         >
           {openInvoiceCount > 0
             ? `${countNoun(openInvoiceCount, INVOICE)} مفتوحة — افتحها ←`
             : "افتح قائمة الفواتير ←"}
-        </a>
+        </Link>
       </section>
     </div>
   );

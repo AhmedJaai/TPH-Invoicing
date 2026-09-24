@@ -63,5 +63,7 @@ describe("describe", () => {
     expect(describeFilters(parseFilters({ tax: "INVALID", month: "2026-08" })))
       .toBe("ينقصها ركن · في 2026-08");
     expect(describeFilters(parseFilters({ overdue: "1" }))).toContain("60");
+    expect(describeFilters(parseFilters({ supplier: "Loreva" }), "لوريفا كيك")).toBe("من لوريفا كيك");
+    expect(describeFilters(parseFilters({ supplier: "Loreva" }))).toBe("من Loreva");
   });
 });

@@ -234,3 +234,12 @@ export const QUOTATION: NounForms = {
   many: "عرض سعر",
   zero: "لا عروض أسعار",
 };
+
+/** سببُ نقصٍ في فاتورة — «وسببان غيره». */
+export const REASON: NounForms = {
+  one: "سببٌ واحد",
+  two: "سببان",
+  few: "أسباب",
+  many: "سبباً",
+  zero: "لا أسباب",
+};

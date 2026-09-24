@@ -59,3 +59,31 @@ describe("لماذا ناقصةُ ركن", () => {
     expect(invoiceReasons(ok, supplier, COMPANY_VAT).map((x) => x.code)).not.toContain("NO_LINES");
   });
 });
+
+describe("VAT_MATH_MISMATCH بصوره الثلاث — لا تُتَّهم فاتورةٌ يستقيم جمعُها", () => {
+  const supplier = { issuesInvoices: true, contractOnFile: false };
+  const base = {
+    kind: "TAX_INVOICE", invoiceNumber: "2823",
+    sellerVat: "312343850700003", buyerVat: "310007971600003", lineCount: 3,
+  };
+
+  it("ضريبةٌ دون ١٥٪ والجمعُ يستقيم ← للعلم، وبنصّ البنود المعفاة", () => {
+    const r = invoiceReasons({ ...base, subtotalMinor: 120_600, vatMinor: 16_290, totalMinor: 136_890 }, supplier, "310007971600003");
+    const m = r.find((x) => x.code === "VAT_MATH_MISMATCH");
+    expect(m?.severity).toBe("INFO");
+    expect(m?.what).not.toContain("لا يساوي");
+    expect(m?.what).toContain("١٥٪");
+  });
+
+  it("تقريبُ المورّد ← للعلم", () => {
+    const r = invoiceReasons({ ...base, subtotalMinor: 100_000, vatMinor: 15_000, totalMinor: 114_950 }, supplier, "310007971600003");
+    expect(r.find((x) => x.code === "VAT_MATH_MISMATCH")?.what).toContain("قرّب");
+  });
+
+  it("إجماليٌّ لا يستقيم فعلاً ← يحتاج معالجة بنصّه القديم", () => {
+    const r = invoiceReasons({ ...base, subtotalMinor: 100_000, vatMinor: 15_000, totalMinor: 125_000 }, supplier, "310007971600003");
+    const m = r.find((x) => x.code === "VAT_MATH_MISMATCH");
+    expect(m?.severity).toBe("WARN");
+    expect(m?.what).toContain("لا يساوي");
+  });
+});

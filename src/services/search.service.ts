@@ -16,6 +16,7 @@ import {
   amountRange, parseSearch, rankHits,
   type SearchHit, type SearchIntent,
 } from "@/lib/search";
+import { invoiceHref } from "@/lib/invoice-profile";
 
 /** أقصى ما يُرجَع من كل نوع — الشاشة لا تسع أكثر، والقاعدة لا تُتعب. */
 export const PER_KIND = 6;
@@ -125,7 +126,7 @@ async function findInvoices(intent: SearchIntent, like: string): Promise<SearchH
       r.taxStatus === "INVALID" ? " · ضريبتها ناقصة" : ""
     }`,
     amountMinor: r.total,
-    href: r.supplierSlug ? `/suppliers/${r.supplierSlug}` : `/purchases?month=${r.month}`,
+    href: invoiceHref(r.id),
   }));
 }
 

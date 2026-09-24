@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { invoiceHref } from "@/lib/invoice-profile";
 import { redirect } from "next/navigation";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -164,7 +166,10 @@ export default async function PaymentsPage({
                   {s.invoices.map((i) => (
                     <li key={i.invoiceId} className="flex items-center justify-between gap-3 py-1.5 text-xs">
                       <span className="text-ink-soft" dir="auto">
-                        <bdi className="font-mono">{i.invoiceNumber}</bdi> · {formatDay(i.invoiceDate)}
+                        <Link href={invoiceHref(i.invoiceId)} className="underline-offset-4 hover:underline">
+                          <bdi className="font-mono">{i.invoiceNumber}</bdi>
+                        </Link>{" "}
+                        · {formatDay(i.invoiceDate)}
                       </span>
                       <span className="nums-col shrink-0">
                         <Money minor={i.totalMinor - i.allocatedMinor} />
@@ -237,7 +242,9 @@ export default async function PaymentsPage({
                       <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
                         {list.map((h) => (
                           <li key={h.invoice.invoiceId} className="font-mono text-xs text-ink-soft" dir="ltr">
-                            {h.invoice.invoiceNumber}
+                            <Link href={invoiceHref(h.invoice.invoiceId, "tax")} className="underline-offset-4 hover:underline">
+                              {h.invoice.invoiceNumber}
+                            </Link>
                           </li>
                         ))}
                       </ul>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { invoiceHref } from "@/lib/invoice-profile";
 import { redirect } from "next/navigation";
 import { and, asc, count, desc, eq, ilike, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
@@ -417,7 +418,9 @@ export default async function DocumentsPage({
                   <span title={r.fileName}>
                     <span className="block truncate font-medium">{r.supplierName ?? KIND_LABEL[r.kind] ?? "مستند"}</span>
                     <span className="block text-[11px] font-normal text-muted">
-                      {r.invoiceNumber ? <span className="nums" style={{ unicodeBidi: "isolate" }}>{r.invoiceNumber}</span> : "بلا رقم"}
+                      {r.invoiceNumber && r.invoiceId
+                        ? <Link href={invoiceHref(r.invoiceId)} className="nums underline-offset-4 hover:underline" style={{ unicodeBidi: "isolate" }}>{r.invoiceNumber}</Link>
+                        : "بلا رقم"}
                       {r.taxStatus === "INVALID" && <span className="text-danger"> · لا يصلح لخصم الضريبة</span>}
                       {r.taxStatus === "UNKNOWN" && <span className="text-warn"> · لم تُقرأ ضريبته</span>}
                     </span>

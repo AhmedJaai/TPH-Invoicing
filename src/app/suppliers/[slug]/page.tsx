@@ -23,6 +23,8 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { splitSupplierCredit } from "@/lib/supplier-requests";
 import { SupplierPolicy } from "@/components/supplier-policy";
 import { formatDay, formatRange } from "@/lib/riyadh-time";
+import { METHOD_LABEL, paymentStatusLabel } from "@/lib/payment-state";
+import { invoiceHref } from "@/lib/invoice-profile";
 
 export const dynamic = "force-dynamic";
 
@@ -33,25 +35,6 @@ export const dynamic = "force-dynamic";
  * تجيب «كيف حالي معه» — وهذا هو السؤال قبل التفاوض. فصار لكل مورّد
  * صفحةٌ تجمع ماله ووثائقه وضريبته وكشوفه وسعره في مكان واحد.
  */
-
-/** طريقةُ السداد بالعربية — والسدادُ من حساب المالك لا يظهر في كشف المقهى أبداً. */
-const METHOD_LABEL: Record<string, string> = {
-  BANK_TRANSFER: "حوالة بنكية",
-  CASH: "نقداً",
-  EMPLOYEE_ADVANCE: "عهدة موظّف",
-  OWNER_ACCOUNT: "من حساب المالك",
-};
-
-/** حالُ الدفعة — والمردودةُ لا تُحسَب مدفوعة. */
-const PAYMENT_STATUS_LABEL: Record<string, string> = {
-  UNAPPLIED: "لم تُخصَّص",
-  PARTIALLY_APPLIED: "خُصّصت جزئياً",
-  APPLIED: "خُصّصت",
-  OVERPAYMENT: "زائدة عن فواتيره",
-  ADVANCE: "مقدَّمة معلَنة",
-  REVERSED: "مردودة",
-  VOID: "ملغاة",
-};
 
 const GRADE_TONE: Record<Grade, Tone | undefined> = {
   GOOD: "ok",
@@ -465,13 +448,18 @@ export default async function SupplierPage({
             <DataTable
               rows={recent}
               keyOf={(r) => r.id}
+              hrefOf={(r) => invoiceHref(r.id)}
               empty={<EmptyState title="لا فواتير منه بعد." hint="ترفع فاتورةً منه فتظهر هنا." />}
               columns={[
                 {
                   key: "number",
                   header: "رقم الفاتورة",
                   primary: true,
-                  cell: (r) => <span className="nums" dir="ltr">{r.number ?? "—"}</span>,
+                  cell: (r) => (
+                    <Link href={invoiceHref(r.id)} className="nums relative underline-offset-4 hover:underline" dir="ltr">
+                      {r.number ?? "—"}
+                    </Link>
+                  ),
                 },
                 { key: "date", header: "التاريخ", cell: (r) => <span>{formatDay(r.date)}</span> },
                 { key: "month", header: "الشهر", secondary: true, cell: (r) => <span className="nums">{r.month}</span> },
@@ -537,9 +525,9 @@ export default async function SupplierPage({
                 key: "state", header: "حالها",
                 cell: (r) =>
                   r.status === "REVERSED" || r.status === "VOID" ? (
-                    <span className="text-danger">{PAYMENT_STATUS_LABEL[r.status] ?? r.status}</span>
+                    <span className="text-danger">{paymentStatusLabel(r.status)}</span>
                   ) : (
-                    <span className="text-muted">{PAYMENT_STATUS_LABEL[r.status] ?? r.status}</span>
+                    <span className="text-muted">{paymentStatusLabel(r.status)}</span>
                   ),
               },
               {

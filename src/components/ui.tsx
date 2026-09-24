@@ -356,20 +356,37 @@ export function DataTable<T>({
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {rows.map((row) => (
-              <tr key={keyOf(row)} className="transition-colors hover:bg-sunken/60">
-                {columns.map((c) => (
-                  <td
-                    key={c.key}
-                    className={`px-3 py-2.5 align-top ${
-                      c.numeric ? "nums-col" : c.align === "end" ? "text-end" : "text-start"
-                    } ${c.secondary ? "hidden lg:table-cell" : ""}`}
-                  >
-                    {c.cell(row)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {rows.map((row) => {
+              const href = hrefOf?.(row);
+              return (
+                /*
+                  الصفُّ كلُّه يفتح سجلَّه على الحاسوب كما تفتحه البطاقةُ على
+                  الجوّال. كان الرابطُ في البطاقة وحدها، فمن ضغط صفّاً في جدول
+                  الفواتير لم يحدث شيء — والصفُّ يتلوّن تحت الفأرة كأنّه يُضغط.
+                  والرابطُ طبقةٌ تحت المحتوى (`card-rows`) لا غلاف، فما في
+                  الخلايا من روابط وأزرار يبقى فوقها ويُضغط وحده. وهو خارجُ
+                  ترتيب المفاتيح: لوحةُ المفاتيح تبلغ السجلَّ برابط الخليّة.
+                */
+                <tr
+                  key={keyOf(row)}
+                  className={`transition-colors hover:bg-sunken/60 ${href ? "card-rows relative cursor-pointer" : ""}`}
+                >
+                  {columns.map((c, i) => (
+                    <td
+                      key={c.key}
+                      className={`px-3 py-2.5 align-top ${
+                        c.numeric ? "nums-col" : c.align === "end" ? "text-end" : "text-start"
+                      } ${c.secondary ? "hidden lg:table-cell" : ""}`}
+                    >
+                      {i === 0 && href && (
+                        <Link href={href} aria-label="افتح التفصيل" tabIndex={-1} className="absolute inset-0" />
+                      )}
+                      {c.cell(row)}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </ScrollX>

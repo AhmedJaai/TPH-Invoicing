@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { invoiceHref } from "@/lib/invoice-profile";
 import { redirect } from "next/navigation";
 import { desc } from "drizzle-orm";
 import { db } from "@/db";
@@ -7,91 +9,9 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Empty, PageShell } from "@/components/page-shell";
 import { NoAccess } from "@/components/ui";
-import { labelValue } from "@/lib/audit-labels";
+import { ENTITY_LABEL, actionLabel, labelValue } from "@/lib/audit-labels";
 
 export const dynamic = "force-dynamic";
-
-const ACTION_LABEL: Record<string, string> = {
-  DOCUMENT_UPLOADED: "رفع مستند",
-  DOCUMENT_ARCHIVED: "أرشفة مستند",
-  DOCUMENT_REJECTED: "رفض مستند",
-  FIELD_CORRECTED: "تصحيح حقل",
-  SUPPLIER_CREATED: "إنشاء مورّد",
-  SUPPLIER_UPDATED: "تعديل مورّد",
-  ISSUE_WAIVED: "تجاوز تنبيه",
-  MONTH_CLOSED: "إقفال شهر",
-  USER_ROLE_CHANGED: "تغيير دور",
-  DRIVE_SYNCED: "مزامنة الدرايف",
-  BANK_IMPORTED: "استيراد كشف بنك",
-  INVOICES_MARKED_PAID: "وسم فواتير مسدَّدة",
-  SUPPLIER_ALIAS_LEARNED: "تعلّم اسم بنكي",
-  STATEMENT_RECONCILED: "مطابقة كشف مورّد",
-  PRODUCT_LINKED: "ربط صنف معياري",
-  PRODUCT_UNLINKED: "فكّ ربط صنف",
-  EXPENSE_ADDED: "إضافة مصروف",
-  EXPENSE_REMOVED: "حذف مصروف أو تعطيله",
-  EXPENSE_REACTIVATED: "إعادة تفعيل مصروف متكرّر",
-  INVOICE_PAID_BY_OWNER: "سداد فاتورة من حساب المالك",
-  SUPPLIER_CREDIT_APPLIED: "خصم رصيد المورّد من فاتورة",
-  AI_ANALYSIS_RUN: "تحليل الذكاء لحساب مورّد",
-  AI_FINDING_DECIDED: "قرارٌ في اقتراح الذكاء",
-  COUNTERPARTY_CONFIRMED: "تعريف جهة",
-  BANK_RULE_LEARNED: "قاعدة تصنيف بنكية",
-  MONTH_REOPENED: "إعادة فتح شهر",
-  MATCH_CONFIRMED: "تقييد حوالة على فواتير",
-  MATCH_UNDONE: "تراجع عن مطابقة",
-  MATCH_REJECTED: "إعلان «ليست سداداً»",
-  PAYMENT_RECORDED: "قيد دفعة",
-  DRIVE_FILE_RENAMED: "إعادة تسمية في الدرايف",
-  PAYMENT_RUN_EXPORTED: "تنزيل ملف التحويلات",
-  EXPENSES_DERIVED: "اشتقاق المصروفات من البنك",
-  EXPENSE_RECLASSIFIED: "مصروفٌ تبع تصنيف حركته",
-  RECONCILIATION_BALANCES_SET: "رصيدا الشهر في التسوية",
-  DOCUMENT_STATUS_CHANGED: "تغيير حال مستند",
-  /* الجرد وتسوية المخزون */
-  SALES_IMPORTED: "استيراد ملفّ مبيعات",
-  POS_PRODUCT_MAPPED: "ربط صنف فودكس",
-  POS_PRODUCT_UNMAPPED: "فكّ ربط صنف فودكس",
-  RECIPE_CREATED: "إنشاء وصفة",
-  RECIPE_VERSION_SAVED: "حفظ نسخة وصفة",
-  RECIPE_VERSION_ACTIVATED: "تفعيل نسخة وصفة",
-  INVENTORY_COUNT_STARTED: "بدء جرد",
-  INVENTORY_COUNT_LINE_EDITED: "تعديل عدٍّ فعليّ",
-  INVENTORY_COUNT_FINALISED: "إقفال جرد",
-  INVENTORY_COUNT_REOPENED: "إعادة فتح جرد",
-  INVENTORY_MOVEMENT_RECORDED: "قيد حركة مخزون",
-  WASTE_RECORDED: "تسجيل هدر",
-  /* قيودٌ قديمة كُتبت قبل أن يكون لها اسم */
-  DELETE_DUPLICATE_TRANSACTION: "حذف حركة مكرَّرة",
-  BANK_MATCH_UNDONE: "تراجع عن مطابقة",
-};
-
-/** نوعُ ما وقع عليه الفعل — بالعربية لا باسم الجدول. */
-const ENTITY_LABEL: Record<string, string> = {
-  bank_transaction: "حركة بنك",
-  bank_import: "استيراد كشف",
-  bank_rule: "قاعدة بنك",
-  document: "مستند",
-  invoice: "فاتورة",
-  supplier: "مورّد",
-  counterparty: "جهة",
-  statement: "كشف مورّد",
-  month_close: "إقفال شهر",
-  expense: "مصروف",
-  drive: "الدرايف",
-  drive_sync: "مزامنة الدرايف",
-  payment_run: "دفعة الشهر",
-  product: "صنف",
-  ai_finding: "اقتراح ذكاء",
-  sales_import: "استيراد مبيعات",
-  pos_product: "صنف فودكس",
-  recipe: "وصفة",
-  recipe_version: "نسخة وصفة",
-  inventory_count: "جرد",
-  inventory_count_line: "سطر جرد",
-  inventory_movement: "حركة مخزون",
-  waste_record: "هدر مسجَّل",
-};
 
 /**
  * الوقت بتوقيت الرياض — كان يُعرض UTC بلا إشارة، فالعاشرة صباحاً «07:00».
@@ -182,14 +102,22 @@ export default async function AuditTrailPage({
             <li key={r.id} className="px-4 py-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="text-sm font-bold">
-                  {ACTION_LABEL[r.action] ?? r.action}
+                  {actionLabel(r.action)}
                 </span>
                 <span className="nums text-[11px] text-muted">
                   <bdi>{WHEN.format(r.at)}</bdi>
                 </span>
               </div>
               <p className="mt-0.5 text-[11px] text-muted">
-                {r.actorName ?? r.actorEmail ?? "النظام"} · {ENTITY_LABEL[r.entityType] ?? "سجلّ"}
+                {r.actorName ?? r.actorEmail ?? "النظام"} ·{" "}
+                {/* ما له صفحةٌ يُفتَح منها — السجلُّ مرجعٌ عند الخلاف، والخلافُ على سجلٍّ بعينه */}
+                {r.entityType === "invoice" ? (
+                  <Link href={invoiceHref(r.entityId)} className="underline underline-offset-4">فاتورة</Link>
+                ) : r.entityType === "bank_transaction" ? (
+                  <Link href={`/bank?tx=${encodeURIComponent(r.entityId)}`} className="underline underline-offset-4">حركة بنك</Link>
+                ) : (
+                  ENTITY_LABEL[r.entityType] ?? "سجلّ"
+                )}
               </p>
               <Detail value={r.after} />
             </li>

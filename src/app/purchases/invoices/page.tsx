@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { RejectDocument } from "@/components/reject-document";
 import { redirect } from "next/navigation";
 import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
@@ -19,12 +18,7 @@ import { INVOICE, countNoun } from "@/lib/arabic";
 import { ScrollX } from "@/components/scroll-x";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { formatDay } from "@/lib/riyadh-time";
-import { documents } from "@/db/schema";
-import { invoiceReasons } from "@/lib/invoice-findings";
-import { InvoiceFix } from "@/components/invoice-fix";
-import { DocumentReread } from "@/components/document-reread";
-import { companyConfig } from "@/config/drive";
-import { Section } from "@/components/ui";
+import { invoiceHref } from "@/lib/invoice-profile";
 
 export const dynamic = "force-dynamic";
 
@@ -55,8 +49,12 @@ export default async function InvoicesPage({
 
   const params = await searchParams;
   const f = parseFilters(params);
-  /* الفاتورةُ المفتوحة للمعالجة — تُختار من الجدول ويُعرَض سببُها فوقه */
-  const fixId = params.fix?.trim() || null;
+  /*
+    `?fix=` كان يفتح لوحَ المعالجة فوق القائمة. وصار للفاتورة ملفُّها،
+    والرابطُ القديم (تنبيهٌ محفوظ أو علامةُ متصفّح) يُوجَّه إليه.
+  */
+  const fixId = params.fix?.trim();
+  if (fixId) redirect(invoiceHref(fixId, "tax"));
 
   /*
     `${invoices}.id` لا `${invoices.id}`: الثاني يُصيَّر عموداً مجرّداً في
@@ -86,9 +84,8 @@ export default async function InvoicesPage({
     clauses.push(sql`${invoices.invoiceDate} < now() - interval '${sql.raw(String(OVERDUE_DAYS))} days'`);
   }
   const where = clauses.length ? and(...clauses) : undefined;
-  const canEditInvoices = can(user.role, "document:upload");
 
-  const [rows, totals, months, supplierList, fixRow] = await Promise.all([
+  const [rows, totals, months, supplierList] = await Promise.all([
     db
       .select({
         id: invoices.id,
@@ -130,82 +127,17 @@ export default async function InvoicesPage({
       .from(suppliers)
       .where(eq(suppliers.isActive, true))
       .orderBy(asc(suppliers.nameAr)),
-
-    /*
-      حقولُ الفاتورة المفتوحة كاملةً — تُقرأ عند الطلب وحده. والسببُ
-      يُشتقّ منها بـ`invoiceReasons`، ولا يُخزَّن: لو خُزّن لبقي السببُ
-      القديم معروضاً بعد تصحيح الحقل.
-    */
-    fixId
-      ? db
-          .select({
-            id: invoices.id,
-            documentId: invoices.documentId,
-            kind: documents.kind,
-            invoiceNumber: invoices.invoiceNumber,
-            sellerVat: invoices.sellerVat,
-            buyerVat: invoices.buyerVat,
-            subtotalMinor: invoices.subtotalMinor,
-            vatMinor: invoices.vatMinor,
-            totalMinor: invoices.totalMinor,
-            supplierName: suppliers.nameAr,
-            issuesInvoices: suppliers.issuesInvoices,
-            contractOnFile: suppliers.contractOnFile,
-            lineCount: sql<number>`(
-              select count(*)::int from invoice_lines l where l.invoice_id = invoices.id
-            )`,
-          })
-          .from(invoices)
-          .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
-          .leftJoin(documents, eq(documents.id, invoices.documentId))
-          .where(eq(invoices.id, fixId))
-          .limit(1)
-      : Promise.resolve([]),
   ]);
 
   const t = totals[0];
   const pages = Math.max(1, Math.ceil(Number(t.n) / PAGE_SIZE));
-
-  /*
-    رابطُ المعالجة يحافظ على الترشيح القائم ويضيف `fix` — فمن فتح فاتورةً
-    من قائمةٍ مرشَّحة يعود إليها بإغلاقها، ولا يُلقى في القائمة كاملةً.
-  */
-  const fixLink = (id: string) => {
-    const base = linkTo(f, {});
-    const sep = base.includes("?") ? "&" : "?";
-    return `${base}${sep}fix=${encodeURIComponent(id)}#fix`;
-  };
-
-  const fix = fixRow[0] ?? null;
-  /*
-    السببُ يُشتقّ من الحقول وحالِ المورّد ورقمِ المنشأة — بالدالّة نفسها
-    التي يحكم بها مسارُ الأرشفة. فما تقرؤه الشاشةُ هو ما يحكم به الخادم.
-  */
-  const fixReasons = fix
-    ? invoiceReasons(
-        {
-          kind: fix.kind,
-          invoiceNumber: fix.invoiceNumber,
-          sellerVat: fix.sellerVat,
-          buyerVat: fix.buyerVat,
-          subtotalMinor: fix.subtotalMinor,
-          vatMinor: fix.vatMinor,
-          totalMinor: fix.totalMinor,
-          lineCount: Number(fix.lineCount),
-        },
-        fix.issuesInvoices === null
-          ? null
-          : { issuesInvoices: fix.issuesInvoices, contractOnFile: fix.contractOnFile ?? false },
-        companyConfig.vatNumber,
-      )
-    : [];
 
   return (
     <PageShell
       user={user}
       width="wide"
       title="الفواتير"
-      intro={describeFilters(f)}
+      intro={describeFilters(f, supplierList.find((x) => x.slug === f.supplier)?.nameAr)}
       /*
         «ارفع مستنداً» كان هنا زرّاً ثانياً مطابقاً لزرّ الشريط في الشاشة
         نفسها — والرفعُ دائمٌ في القشرة على كلّ مقاس.
@@ -290,62 +222,11 @@ export default async function InvoicesPage({
         </Row>
       </div>
 
-      {/*
-        ── لوحُ المعالجة ──
-
-        كانت الشاشة تقول «ينقصها ركن» ولا تقول أيّ ركن، ولا تعطي موضعاً
-        يُصحَّح فيه ما أخطأت القراءةُ فيه. فيقف صاحب المقهى أمام فاتورةٍ
-        يعرف رقمها ولا يستطيع كتابته.
-      */}
-      {fix && (
-        <Section
-          id="fix"
-          className="mt-6 scroll-mt-24"
-          title={`معالجة فاتورة ${fix.invoiceNumber}`}
-          hint={`${fix.supplierName ?? "بلا مورّد"} — ما ينقصها، وما يُصلحه.`}
-          action={
-            <Link href={linkTo(f, {})} className="text-xs underline underline-offset-4">
-              أغلق ←
-            </Link>
-          }
-        >
-          {/*
-            بابان لعطبٍ واحد: ما أخطأت القراءةُ فيه يُصحَّح بيد الإنسان،
-            وما لم تقرأه أصلاً (البنود · التفصيل الضريبيّ) يُعاد قراءتُه.
-            وكان أحدهما غائباً والآخر غائباً معه.
-          */}
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-            <DocumentReread documentId={fix.documentId} canEdit={canEditInvoices} />
-            {/* فاتورةٌ ألغاها المورّد لا تُعالَج — تُلغى، ويبقى ملفُّها في الدرايف */}
-            {canEditInvoices && fix.documentId && <RejectDocument documentId={fix.documentId} cancel />}
-          </div>
-
-          <InvoiceFix
-            invoiceId={fix.id}
-            canEdit={canEditInvoices}
-            reasons={fixReasons}
-            initial={{
-              invoiceNumber: fix.invoiceNumber ?? "",
-              sellerVat: fix.sellerVat ?? "",
-              buyerVat: fix.buyerVat ?? "",
-              /*
-                حقلٌ يُكتب فيه لا نصٌّ يُقرأ — فبلا فواصل آلاف:
-                `formatRiyals` لا `formatRiyalsDisplay`. والفاصلةُ في
-                حقلٍ يُعاد إرسالُه تدخل التحليل وتكذب.
-              */
-              subtotal: fix.subtotalMinor === null ? "" : formatRiyals(fix.subtotalMinor),
-              vat: fix.vatMinor === null ? "" : formatRiyals(fix.vatMinor),
-              total: fix.totalMinor === null ? "" : formatRiyals(fix.totalMinor),
-            }}
-          />
-        </Section>
-      )}
-
       <div className="mt-6">
         <DataTable
           rows={rows}
           keyOf={(r) => r.id}
-          hrefOf={(r) => (r.supplierSlug ? `/suppliers/${r.supplierSlug}` : undefined)}
+          hrefOf={(r) => invoiceHref(r.id)}
           empty={
             <EmptyState
               title="لا فاتورة تطابق هذا الترشيح."
@@ -367,9 +248,13 @@ export default async function InvoicesPage({
                     و`isolate` يعزل ترتيبه الداخليّ ويُبقي الكتلة في اتّجاه
                     الصفحة، فيقع تحت الاسم محاذياً له.
                   */}
-                  <span className="nums block text-[11px] text-muted" style={{ unicodeBidi: "isolate" }}>
+                  <Link
+                    href={invoiceHref(r.id)}
+                    className="nums block text-[11px] text-muted underline-offset-4 hover:text-ink hover:underline"
+                    style={{ unicodeBidi: "isolate" }}
+                  >
                     {r.number ?? "بلا رقم"}
-                  </span>
+                  </Link>
                 </span>
               ),
             },
@@ -394,7 +279,7 @@ export default async function InvoicesPage({
                 if (r.taxStatus === "VALID" && Number(r.lineCount) > 0) return badge;
                 return (
                   <Link
-                    href={fixLink(r.id)}
+                    href={invoiceHref(r.id, "tax")}
                     className="inline-flex items-center gap-1 underline-offset-4 hover:underline"
                     title="لماذا؟ وكيف تُصلَح"
                   >

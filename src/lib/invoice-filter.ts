@@ -97,8 +97,10 @@ export const PAID_LABEL: Record<PaidFilter, string> = {
  *
  * العنوان «الفواتير» فوق قائمةٍ مُرشَّحة يخدع — فيقال ما الذي يُعرض.
  */
-export function describe(f: InvoiceFilters): string {
+export function describe(f: InvoiceFilters, supplierName?: string | null): string {
   const parts: string[] = [];
+  /* قائمةٌ مرشَّحةٌ بمورّد كانت تقول «كل الفواتير» فوق فواتير مورّدٍ واحد */
+  if (f.supplier) parts.push(`من ${supplierName ?? f.supplier}`);
   if (f.tax) parts.push(TAX_LABEL[f.tax]);
   if (f.paid) parts.push(PAID_LABEL[f.paid]);
   if (f.overdue) parts.push(`مضى على استحقاقها ${countNoun(OVERDUE_DAYS, DAY)}`);
