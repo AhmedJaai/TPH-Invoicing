@@ -42,7 +42,7 @@ interface Body {
 }
 
 /** يجمع ما يُبنى به الاسم من الجداول التي تحمله. */
-async function load(): Promise<NamedDocument[]> {
+async function load(): Promise<(NamedDocument & { pending: boolean })[]> {
   const rows = await db
     .select({
       driveFileId: documents.driveFileId,
@@ -57,6 +57,7 @@ async function load(): Promise<NamedDocument[]> {
       statementTotal: statements.closingBalanceMinor,
       invoiceId: invoices.id,
       documentId: documents.id,
+      status: documents.status,
     })
     .from(documents)
     .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
@@ -89,6 +90,7 @@ async function load(): Promise<NamedDocument[]> {
       invoiceNumber: r.invoiceNumber ?? null,
       invoiceId: r.invoiceId ?? null,
       documentId: r.documentId ?? null,
+      pending: r.status !== "ARCHIVED",
     }));
 }
 
@@ -161,6 +163,8 @@ export async function POST(request: Request) {
         current: p.doc.fileName,
         proposed: p.proposed,
         reason: p.reason,
+        /* ينتظر المراجعة: اسمُه من قراءةٍ لم تُحسَم — يُسمّى آلياً حين يُعتمَد */
+        pending: p.doc.pending,
       })),
       cannot: blocked.slice(0, 40),
     });
