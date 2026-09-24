@@ -1,16 +1,19 @@
 import Link from "next/link";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { documents, invoices, suppliers } from "@/db/schema";
+import { suppliers } from "@/db/schema";
 import { Money } from "@/components/money";
 import { Card, LinkButton, buttonClass } from "./ui";
 import { ConfirmDocument } from "./confirm-document";
+import { ConfirmEligible } from "./confirm-eligible";
 import { RejectDocument } from "./reject-document";
 import { SupplierPolicy } from "./supplier-policy";
 import { buildInvoiceRequest, buildStatementRequest, groupUnbackedBySupplier } from "@/lib/supplier-requests";
 import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
-import { PAYMENT_RECORD, countNoun } from "@/lib/arabic";
+import { DOCUMENT, PAYMENT_RECORD, countNoun } from "@/lib/arabic";
 import { needsContract } from "@/lib/supplier-policy-rules";
+import { GAP_TEXT } from "@/lib/extraction/auto-archive";
+import { loadPendingReview } from "@/services/document-review.service";
 import { previousMonth } from "@/lib/filing";
 import { currentMonthRiyadh, formatDay } from "@/lib/riyadh-time";
 
@@ -132,29 +135,10 @@ export async function UnbackedWorkspace() {
 }
 
 /** «مستنداتٌ لم يُبتّ فيها» — تُعتمَد أو تُرفَض من هنا. */
-export async function InboxWorkspace({ canUpload }: { canUpload: boolean }) {
-  const rows = await db
-    .select({
-      id: documents.id,
-      fileName: documents.fileName,
-      driveFileId: documents.driveFileId,
-      periodMonth: documents.periodMonth,
-      totalMinor: invoices.totalMinor,
-      subtotalMinor: invoices.subtotalMinor,
-      vatMinor: invoices.vatMinor,
-      invoiceDate: invoices.invoiceDate,
-      invoiceNumber: invoices.invoiceNumber,
-      sellerVat: invoices.sellerVat,
-      supplierVat: suppliers.vatNumber,
-      textSource: documents.textSource,
-      supplierName: suppliers.nameAr,
-    })
-    .from(documents)
-    .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
-    .leftJoin(invoices, eq(invoices.documentId, documents.id))
-    .where(inArray(documents.status, ["PENDING", "NEEDS_REVIEW"]))
-    .orderBy(asc(documents.periodMonth))
-    .limit(40);
+export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boolean; canConfirm: boolean }) {
+  const all = await loadPendingReview();
+  const eligible = all.filter((d) => d.verdict.auto);
+  const rows = all.slice(0, 40);
 
   if (rows.length === 0) {
     return <p className="text-xs text-ok">لا مستند ينتظر — كلُّ ما وصل اعتُمد أو رُفض.</p>;
@@ -171,17 +155,30 @@ export async function InboxWorkspace({ canUpload }: { canUpload: boolean }) {
   */
   return (
     <div className="space-y-3">
+      {/*
+        ما انتظر قبل أن توجد قاعدةُ الأرشفة الآليّة وتجتمع فيه شروطُها —
+        يُعتمَد دفعةً بضغطة، والخادمُ يعيد الحكمَ على كلٍّ منها.
+      */}
+      {eligible.length > 0 && canConfirm && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/40 bg-ok-bg px-3 py-2.5">
+          <p className="min-w-0 flex-1 text-xs leading-relaxed">
+            <strong>{countNoun(eligible.length, DOCUMENT)} تجتمع فيها الشروطُ الأربعة</strong> — كانت تنتظر قبل أن
+            يدخل مثلُها وحده. اعتمادُها يُدخل فواتيرَها دفعةَ الشهر ويسمّي ملفّاتها.
+          </p>
+          <ConfirmEligible count={eligible.length} />
+        </div>
+      )}
       <p className="rounded-xl border border-line bg-sunken px-3 py-2.5 text-[11px] leading-relaxed text-ink-soft">
-        قرأ النموذجُ هذه المستندات — إمّا لأنّ <strong>اسمَ الملفّ لم يُكتب على الصيغة</strong> فلم يُقرأ
-        منه شيء، وإمّا لأنّ من رفعها لا يرى المبالغ. والقراءةُ قد تُخطئ في رقمٍ أو تاريخ وتبقى
-        متّسقةً حسابياً، فلا يدخل مالٌ إلى ملفّ التحويلات على قراءةٍ لم يرها إنسان.{" "}
-        <strong>المطلوب:</strong> افتح المستند وقارن الأرقام أدناه بالورقة. إن طابقت فاعتمده —
-        فتدخل فاتورتُه دفعةَ الشهر ويُخصم منها ما دفعتَه للمورّد مقدَّماً. وإن اختلف شيءٌ فارفضه
-        وارفعه من صفحة الرفع لتصحّح الحقل قبل الحفظ.
+        يدخل المستندُ وحده إذا اجتمعت فيه أربعة: قُرئ من <strong>نصٍّ مكتوب</strong> لا من صورة،
+        و<strong>رقمُه الضريبيّ</strong> يطابق المورّد، و<strong>حسابُه مستقيم</strong>، و<strong>مورّدُه معروف</strong>.
+        وما لم تجتمع فيه يُكتَب تحته ما نقصه. <strong>المطلوب:</strong> افتح المستند وقارن الأرقام
+        بالورقة؛ إن طابقت فاعتمده — فتدخل فاتورتُه دفعةَ الشهر، ويُخصم منها ما دفعتَه للمورّد مقدَّماً،
+        ويُسمّى ملفُّه على الصيغة. وإن اختلف شيءٌ فارفضه وارفعه من صفحة الرفع لتصحّح الحقل.
       </p>
       <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
         {rows.map((d) => {
-          const vatMatches = d.sellerVat && d.supplierVat ? d.sellerVat.trim() === d.supplierVat.trim() : null;
+          /* الشرحُ من الدالّة التي قرّرت — فلا يفترق القرارُ عن تفسيره */
+          const { gaps } = d.verdict;
           return (
             <li key={d.id} className="px-3.5 py-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -224,15 +221,16 @@ export async function InboxWorkspace({ canUpload }: { canUpload: boolean }) {
                   <ReadField label="الإجمالي" value={d.totalMinor === null ? "غير معروف" : <Money minor={d.totalMinor} />} />
                 </dl>
               )}
-              <p className="mt-1.5 text-[11px] text-muted">
-                {d.textSource === "TEXT"
-                  ? "قُرئ من نصٍّ مكتوب في الملفّ — الأرقامُ منقولة، والخطأ نادر."
-                  : d.textSource
-                    ? "قُرئ من صورةٍ ممسوحة — الأرقامُ مقروءةٌ ظنّاً، فقارِنها بعناية."
-                    : null}
-                {vatMatches === true && " · الرقمُ الضريبيّ يطابق المورّد المسجَّل."}
-                {vatMatches === false && <span className="text-warn"> · الرقمُ الضريبيّ لا يطابق المورّد المسجَّل — تحقّق من المورّد.</span>}
-              </p>
+              {gaps.length === 0 && (
+                <p className="mt-2 text-[11px] text-ok">تجتمع فيه الشروطُ الأربعة — يُعتمَد مع ما فوقه بضغطةٍ واحدة.</p>
+              )}
+              {gaps.length > 0 && (
+                <ul className="mt-2 space-y-0.5 text-[11px] text-warn">
+                  {gaps.filter((g) => g !== "NOT_RECORDED").map((g) => (
+                    <li key={g}>لم يدخل وحده: {GAP_TEXT[g]}</li>
+                  ))}
+                </ul>
+              )}
             </li>
           );
         })}

@@ -12,7 +12,7 @@
 import { refreshTokenFor } from "@/services/drive.service";
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
   documents, invoices, payments, statements,
@@ -37,6 +37,9 @@ import { MonthClosedError } from "@/services/validation.service";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { canonicalName } from "@/lib/canonical-name";
+import { autoArchive, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
+import { renameArchived } from "@/services/drive-rename.service";
+import { driveWritesAllowed } from "@/lib/drive-readonly";
 import { FILE, MONTH, countNoun } from "@/lib/arabic";
 import { withDeadline } from "@/lib/ai/deadline";
 import { consume } from "@/services/rate-limit.service";
@@ -383,6 +386,8 @@ async function handle(request: Request) {
 
   // ── الملفات التي لا يُفهم اسمها: تُقرأ بمحتواها ──
   let read = 0;
+  let autoArchived = 0;
+  const reviewGaps = new Map<AutoArchiveGap, number>();
   const readFailures: string[] = [];
   /** التسعيرات: تُعرَض ولا تُقيَّد. */
   const quotations: string[] = [];
@@ -485,7 +490,31 @@ async function handle(request: Request) {
       );
 
       /*
-        ── المزامنة لا تسمّي شيئاً ──
+        ── أيدخل وحده؟ ── (`auto-archive.ts`، بإذن أحمد في ٢٤ سبتمبر ٢٠٢٦)
+
+        أربعةُ شروطٍ معاً: نصٌّ مكتوب لا صورة، ورقمٌ ضريبيّ يطابق المورّد،
+        وحسابٌ مستقيم، ومورّدٌ معروف. وما لم تجتمع فيه ينتظر إنساناً،
+        ولوحُ المراجعة يقول له أيُّها لم يتحقّق.
+      */
+      const sellerDigits = (x.sellerVatNumber ?? "").replace(/\D/g, "");
+      const verdict = autoArchive({
+        kind: x.documentKind,
+        invoiceRecorded: review.canCreateInvoice && Boolean(supplier) && parseRiyals(x.totalAmount) !== null,
+        textSource: extraction.textSource ?? null,
+        supplierKnown: Boolean(supplier),
+        sellerVat: x.sellerVatNumber ?? null,
+        supplierVat: supplier?.vatNumber ?? null,
+        subtotalMinor: parseRiyals(x.subtotalAmount),
+        vatMinor: parseRiyals(x.vatAmount),
+        totalMinor: parseRiyals(x.totalAmount),
+        supplierByFolder: Boolean(folderSupplier) && supplier === folderSupplier,
+        vatTakenByOther: sellerDigits !== "" && supplierList.some(
+          (s) => s.id !== supplier?.id && (s.vatNumber ?? "").replace(/\D/g, "") === sellerDigits,
+        ),
+      });
+
+      /*
+        ── المزامنة لا تسمّي شيئاً قبل التقييد ──
 
         كانت تعيد تسمية الملفّ في الدرايف قبل تقييده، بلا اختيارٍ لكلّ
         ملفّ ولا أثرٍ في سجلّ التدقيق، والاسم الأصليّ لا يُحفَظ في موضع —
@@ -493,9 +522,9 @@ async function handle(request: Request) {
         خاطئة (غاناش). وهذا خرقٌ للقيد الأوّل نصّاً: «لا شيء بلا اختيار
         الإنسان ملفّاً ملفّاً وأثرٍ في سجلّ التدقيق».
 
-        فيُقيَّد الملفّ باسمه كما هو، ثمّ يُقترَح اسمُه القياسيّ في
-        الردّ (`renameSuggestions`) ليختار صاحبُ العمل ما يُسمّى، والفعلُ
-        في `/api/drive-rename` وحده بالاسمين في السجلّ.
+        فيُقيَّد الملفّ باسمه كما هو، ثمّ — بعد التقييد — يُسمّى آلياً ما
+        أُرشِف (`drive-rename.service.ts`، بالاسمين في السجلّ)، ويُقترَح
+        ما سواه في الردّ (`renameSuggestions`).
       */
       const finalName = entry.file.name;
 
@@ -514,12 +543,12 @@ async function handle(request: Request) {
           driveMd5: entry.file.md5Checksum ?? createHash("md5").update(data).digest("hex"),
           kind: x.documentKind as never,
           /*
-            ما قرأه النموذج من ملفٍّ لا يُفهم اسمُه ينتظر إنساناً: كان يُقيَّد
-            «مؤرشفاً» فيدخل ملفّ التحويلات للبنك وما رآه أحد — وفاتورةٌ
-            منفوخة حسابُها مستقيم تمرّ كلَّ فحص. والاسمُ الذي كتبه إنسانٌ
-            (المسار السابق) يبقى مؤرشفاً.
+            ما قرأه النموذج ينتظر إنساناً إلّا إن اجتمعت الشروطُ الأربعة:
+            كان يُقيَّد «مؤرشفاً» بلا شرط فيدخل ملفّ التحويلات وما رآه أحد —
+            وفاتورةٌ منفوخة حسابُها مستقيم تمرّ كلَّ فحص. والشرطان اللذان
+            يسدّان ذلك: نصٌّ منقول لا صورةٌ مقروءة، ورقمٌ ضريبيّ يطابق المورّد.
           */
-          status: "NEEDS_REVIEW",
+          status: verdict.auto ? "ARCHIVED" : "NEEDS_REVIEW",
           periodMonth: entry.month,
           supplierId: supplier?.id ?? null,
           extractionJson: x as never,
@@ -531,6 +560,13 @@ async function handle(request: Request) {
 
         if (!doc) return;
         recorded = true;
+
+        /* رقمٌ ضريبيّ تُعُلِّم لمورّدٍ لا رقمَ له — يُكتَب إن بقي فارغاً */
+        if (verdict.learnVat && supplier) {
+          await tx.update(suppliers)
+            .set({ vatNumber: verdict.learnVat })
+            .where(and(eq(suppliers.id, supplier.id), isNull(suppliers.vatNumber)));
+        }
 
         if (!review.canCreateInvoice || !supplier) return;
 
@@ -572,7 +608,13 @@ async function handle(request: Request) {
         /* مالٌ دُفع لهذا المورّد قبل وصول فاتورته يُخصم منها — كما في الرفع */
         await applySupplierCredit(tx, supplier.id, { forwardDays: SETTLEMENT_FORWARD_DAYS });
       });
-      if (recorded) { created++; read++; recordedFileIds.add(entry.file.id); }
+      if (recorded) {
+        created++; read++; recordedFileIds.add(entry.file.id);
+        if (verdict.auto) autoArchived++;
+        else for (const g of verdict.gaps) reviewGaps.set(g, (reviewGaps.get(g) ?? 0) + 1);
+        /* فواتيرُ المورّد التالية في هذا النداء تُقابَل بالرقم الذي تُعُلِّم */
+        if (verdict.learnVat && supplier && !supplier.vatNumber) supplier.vatNumber = verdict.learnVat;
+      }
       if (invoiceCreated) invoicesCreated++;
       } catch (e) {
         /* أُقفل الشهر بين السؤال عند الباب والكتابة — يُتخطّى برسالة */
@@ -618,6 +660,23 @@ async function handle(request: Request) {
     باختيارٍ ملفّاً ملفّاً.
   */
   const justRecorded = [...recordedFileIds];
+
+  /*
+    ── التسميةُ الآليّة ── (إذن أحمد في ٢٤ سبتمبر ٢٠٢٦)
+
+    ما أُرشِف للتوّ ويخالف اسمُه الصيغة يُسمّى الآن، بأثرٍ في السجلّ
+    بالاسمين. وما ينتظر المراجعة لا يُسمّى — اسمُه يُبنى من قيدٍ لم يُحسَم —
+    ويُسمّى حين يُعتمَد. وما لا يُبنى له اسمٌ يبقى اقتراحاً أو سبباً.
+    والكتابةُ على الدرايف في الإنتاج وحده، وفي غيره تبقى اقتراحاً.
+  */
+  let renamed: { from: string; to: string }[] = [];
+  const renameFailures: string[] = [];
+  if (justRecorded.length > 0 && driveWritesAllowed(process.env)) {
+    const outcome = await renameArchived(drive, justRecorded, user.id, "المزامنة");
+    renamed = outcome.done;
+    renameFailures.push(...outcome.failed.map((f) => `${f.from} — ${f.error}`));
+  }
+  const renamedFrom = new Set(renamed.map((r) => r.from));
   const renameSuggestions: { fileId: string; current: string; proposed: string }[] = [];
 
   if (justRecorded.length > 0) {
@@ -641,7 +700,7 @@ async function handle(request: Request) {
       .where(inArray(documents.driveFileId, justRecorded));
 
     for (const r of rows) {
-      if (!r.driveFileId) continue;
+      if (!r.driveFileId || renamedFrom.has(r.fileName)) continue;
       const verdict = canonicalName({
         driveFileId: r.driveFileId,
         fileName: r.fileName,
@@ -663,7 +722,14 @@ async function handle(request: Request) {
   return NextResponse.json({
     ok: true,
     applied: true,
-    summary: { ...scanned, created, invoicesCreated, paymentsAdopted, closedMonthSkipped, contentRead: read, remainingUnnamed: remaining },
+    summary: {
+      ...scanned, created, invoicesCreated, paymentsAdopted, closedMonthSkipped, contentRead: read, remainingUnnamed: remaining,
+      autoArchived, needsReview: read - autoArchived, renamed: renamed.length,
+    },
+    /* لماذا لم يدخل ما لم يدخل — مجموعاً بالسبب، فيُعرَف أيُّ شرطٍ يُسقط أكثر */
+    reviewReasons: [...reviewGaps.entries()].map(([gap, count]) => ({ gap, count })),
+    renamed,
+    renameFailures,
     notes: notes.slice(0, 20),
     readFailures,
     quotations,

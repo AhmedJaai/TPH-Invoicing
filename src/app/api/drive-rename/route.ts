@@ -22,7 +22,8 @@ import { eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, statements, suppliers } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { DriveAuthExpiredError, driveForUser, isDriveAuthError, renameFile } from "@/lib/drive";
+import { DriveAuthExpiredError, driveForUser } from "@/lib/drive";
+import { applyRenames } from "@/services/drive-rename.service";
 import { canonicalName, type NamedDocument } from "@/lib/canonical-name";
 import { recordAudit } from "@/lib/audit";
 import { refreshTokenFor } from "@/services/drive.service";
@@ -194,40 +195,10 @@ export async function POST(request: Request) {
   const mine = renameable.filter((p) => chosen.has(p.doc.driveFileId));
   const targets = mine.slice(0, MAX_PER_CALL);
 
-  const done: { from: string; to: string }[] = [];
-  const failed: { from: string; error: string }[] = [];
-  let authExpired = false;
-
-  for (const t of targets) {
-    let renamedInDrive = false;
-    try {
-      await renameFile(drive, t.doc.driveFileId, t.proposed);
-      renamedInDrive = true;
-      await db
-        .update(documents)
-        .set({ fileName: t.proposed })
-        .where(eq(documents.driveFileId, t.doc.driveFileId));
-      done.push({ from: t.doc.fileName, to: t.proposed });
-    } catch (e) {
-      /*
-        فشلُ ملفٍّ لا يوقف البقيّة — ويُعلَن ولا يُبتلَع. وإن سُمّي في
-        الدرايف وتعذّر قيدُه عندنا فهو **تسميةٌ وقعت**: تُسجَّل في الأثر
-        بالاسمين، وإلّا بقي في الأرشيف تغييرٌ لا يعرف أحدٌ مصدره.
-      */
-      /* التفويض المنتهي يوقف البقيّة — كلُّها ستُردّ بالسبب نفسه */
-      if (!renamedInDrive && isDriveAuthError(e)) {
-        authExpired = true;
-        break;
-      }
-      if (renamedInDrive) done.push({ from: t.doc.fileName, to: t.proposed });
-      failed.push({
-        from: t.doc.fileName,
-        error: renamedInDrive
-          ? `سُمّي في الدرايف وتعذّر تحديث القيد: ${(e as Error).message}`
-          : (e as Error).message,
-      });
-    }
-  }
+  const { done, failed, authExpired } = await applyRenames(
+    drive,
+    targets.map((t) => ({ driveFileId: t.doc.driveFileId, fileName: t.doc.fileName, proposed: t.proposed })),
+  );
 
   if (done.length > 0) {
     await recordAudit({
