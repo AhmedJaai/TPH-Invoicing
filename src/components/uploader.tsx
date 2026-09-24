@@ -46,7 +46,8 @@ interface AnalysisResponse {
 
 type Item =
   | { id: string; fileName: string; state: "reading" }
-  | { id: string; fileName: string; state: "failed"; error: string }
+  /** `file` لما يُعاد: فشلٌ عابر لا يُطلب له البحثُ عن الملفّ ثانيةً */
+  | { id: string; fileName: string; state: "failed"; error: string; file?: File }
   | {
       id: string;
       fileName: string;
@@ -377,7 +378,7 @@ export function Uploader({
       if (!r.ok) {
         setItems((prev) =>
           prev.map((it) =>
-            it.id === id ? { id, fileName: file.name, state: "failed", error: r.error } : it,
+            it.id === id ? { id, fileName: file.name, state: "failed", error: r.error, file } : it,
           ),
         );
         return;
@@ -408,7 +409,7 @@ export function Uploader({
     } catch (e) {
       setItems((prev) =>
         prev.map((it) =>
-          it.id === id ? { id, fileName: file.name, state: "failed", error: (e as Error).message } : it,
+          it.id === id ? { id, fileName: file.name, state: "failed", error: (e as Error).message, file } : it,
         ),
       );
     }
@@ -649,6 +650,19 @@ export function Uploader({
                     {item.fileName}
                   </p>
                   <p className="mt-2 text-sm text-danger">{item.error}</p>
+                  {item.file && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const file = item.file!;
+                        setItems((prev) => prev.filter((it) => it.id !== item.id));
+                        void analyze(file);
+                      }}
+                      className={`mt-3 ${buttonClass("secondary", "sm")}`}
+                    >
+                      أعد القراءة
+                    </button>
+                  )}
                 </article>
               );
             }

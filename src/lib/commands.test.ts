@@ -75,4 +75,11 @@ describe("matchCommands", () => {
   it("ما لا يطابق شيئاً يُرجع فراغاً — لا أقرب ما يكون", () => {
     expect(matchCommands("زززز", all)).toEqual([]);
   });
+
+  it("المجموعتان لا تتناوبان — الأفعالُ كلُّها ثمّ الصفحات", () => {
+    const groups = matchCommands("جرد", all).map((c) => c.group);
+    const firstPage = groups.indexOf("PAGE");
+    expect(firstPage).toBeGreaterThan(0);
+    expect(groups.slice(firstPage).every((g) => g === "PAGE")).toBe(true);
+  });
 });

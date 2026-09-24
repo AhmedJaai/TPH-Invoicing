@@ -223,5 +223,13 @@ export function matchCommands(query: string, commands: readonly Command[]): Comm
     scored.push({ c, score, i });
   });
 
-  return scored.sort((a, b) => b.score - a.score || a.i - b.i).map((s) => s.c);
+  /*
+    الأفعالُ ثمّ الصفحات، والأقوى داخل كلٍّ أوّلاً. وكان الترتيبُ بالقوّة
+    وحدها فتتناوب المجموعتان — «افعل · انتقل إلى · افعل · انتقل إلى» —
+    وعنوانُ المجموعة يتكرّر فلا يعود يعني شيئاً.
+  */
+  const rank = (g: CommandGroup) => (g === "ACTION" ? 0 : 1);
+  return scored
+    .sort((a, b) => rank(a.c.group) - rank(b.c.group) || b.score - a.score || a.i - b.i)
+    .map((s) => s.c);
 }
