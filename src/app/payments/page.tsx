@@ -11,6 +11,7 @@ import { MarkSupplierPaid } from "@/components/payment-run-actions";
 import { countNoun, INVOICE, SUPPLIER } from "@/lib/arabic";
 import { NoAccess } from "@/components/ui";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
+import { loadPayeeAccounts } from "@/services/payee-account.service";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +81,8 @@ export default async function PaymentsPage({
     /* «أدرجها في دفعة أوّل الشهر» كانت خطوةً لا تُنفَّذ: ما فات شهرُه لا يدخل الدفعة أبداً */
     { creditBySupplier, includeOlderUnpaid: true },
   );
+  /* الحسابُ الذي سيحمله الملفّ — يُرى قبل التنزيل لا بعد فتحه في إكسل */
+  const accounts = await loadPayeeAccounts(run.ready.map((r) => r.supplierId));
 
   const heldBySupplier = new Map<string, typeof run.held>();
   for (const h of run.held) {
@@ -144,6 +147,16 @@ export default async function PaymentsPage({
                   <h3 className="text-sm font-bold">{s.supplierName}</h3>
                   <span className="text-base font-bold"><Money minor={s.totalMinor} /></span>
                 </div>
+                {(() => {
+                  const acc = accounts.get(s.supplierId);
+                  return acc?.account ? (
+                    <p className="mt-0.5 text-[11px] text-muted">
+                      إلى <bdi className="font-mono" dir="ltr">{acc.account}</bdi> — من كشوف البنك
+                    </p>
+                  ) : (
+                    <p className="mt-0.5 text-[11px] text-warn">{acc?.note ?? "الحسابُ غير معروف — أدخله في البنك"}</p>
+                  );
+                })()}
                 <ul className="mt-2 divide-y divide-line">
                   {s.invoices.map((i) => (
                     <li key={i.invoiceId} className="flex items-center justify-between gap-3 py-1.5 text-xs">

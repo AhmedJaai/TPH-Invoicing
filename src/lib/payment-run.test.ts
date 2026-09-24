@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPaymentRun, buildSupplierMessage, toBankTransferCsv, type PayableInvoice } from "./payment-run";
+import { buildPaymentRun, buildSupplierMessage, resolvePayeeAccount, toBankTransferCsv, type PayableInvoice } from "./payment-run";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
@@ -104,6 +104,18 @@ describe("ملف التحويلات", () => {
     expect(csv).toContain("SAR");
   });
 
+  it("يحمل حسابَ المستفيد من أدلّة الكشف — والبنكُ لا يحوّل إلى اسم", () => {
+    const sid = run.ready[0].supplierId;
+    const accounts = new Map([[sid, resolvePayeeAccount([{ kind: "IBAN", normalized: "SA0380000000608010167519" }])]]);
+    const line = toBankTransferCsv(run, accounts).split("\r\n")[1];
+    expect(line).toContain("SA0380000000608010167519");
+  });
+
+  it("ولا حسابَ يُخمَّن: المجهولُ فارغٌ ومعه تنبيه", () => {
+    const line = toBankTransferCsv(run).split("\r\n")[1];
+    expect(line).toContain("الحسابُ غير معروف");
+  });
+
   it("يبدأ بعلامة ترميز ليقرأه إكسل العربي", () => {
     expect(toBankTransferCsv(run).charCodeAt(0)).toBe(0xfeff);
   });
@@ -199,6 +211,31 @@ describe("ما قرأه النموذج ولم يُؤكَّد لا يدخل مل�
     expect(run.ready).toHaveLength(0);
     expect(run.held[0]?.reason).toBe("NEEDS_REVIEW");
     expect(run.heldTotalMinor).toBe(50_000);
+  });
+});
+
+describe("حسابُ المستفيد", () => {
+  it("آيبانٌ واحد يُكتَب — ويسبق رقمَ الحساب", () => {
+    expect(resolvePayeeAccount([
+      { kind: "ACCOUNT", normalized: "608010167519" },
+      { kind: "IBAN", normalized: "SA0380000000608010167519" },
+    ])).toEqual({ account: "SA0380000000608010167519", note: null });
+  });
+
+  it("آيبانان مختلفان سؤالٌ لا يُحسَم بالحدس", () => {
+    const r = resolvePayeeAccount([
+      { kind: "IBAN", normalized: "SA0380000000608010167519" },
+      { kind: "IBAN", normalized: "SA4420000001234567891234" },
+    ]);
+    expect(r.account).toBeNull();
+    expect(r.note).toContain("حسابات");
+  });
+
+  it("والمكرَّرُ نفسُه ليس حسابين", () => {
+    expect(resolvePayeeAccount([
+      { kind: "IBAN", normalized: "SA0380000000608010167519" },
+      { kind: "IBAN", normalized: "SA0380000000608010167519" },
+    ]).account).toBe("SA0380000000608010167519");
   });
 });
 
