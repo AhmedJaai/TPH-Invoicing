@@ -1,5 +1,6 @@
 import { AreaTabs, MobileTabBar, Sidebar, UploadButton } from "./nav";
 import { CommandPalette, CommandTrigger } from "./command-palette";
+import { AutoProcess } from "./auto-process";
 import { TrialBanner } from "./trial-banner";
 import { UserMenu } from "./user-menu";
 import { ViewControls } from "./view-controls";
@@ -143,6 +144,7 @@ export async function PageShell({
       <MobileTabBar role={user.role} pending={pending} documents={inbox} footer={<UserMenu name={user.name} role={user.role} />} />
 
       <CommandPalette role={user.role} canSearch={can(user.role, "document:view")} />
+      {can(user.role, "document:upload") && can(user.role, "amounts:view") && <AutoProcess />}
     </div>
   );
 }

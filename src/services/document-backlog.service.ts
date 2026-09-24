@@ -14,13 +14,15 @@
 
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { documents, invoices, supplierAliases, suppliers } from "@/db/schema";
+import { documents, invoices, statements, supplierAliases, suppliers } from "@/db/schema";
 import { reviewConfirmed } from "@/lib/confirm";
 import { normalizeDocumentDate } from "@/lib/document-date";
 import { parseRiyals } from "@/lib/money";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import { companyConfig } from "@/config/drive";
-import { createInvoice, replaceLines } from "@/services/invoice.service";
+import { createInvoice, createStatement, replaceLines } from "@/services/invoice.service";
+import { parseStatementExtras } from "@/lib/extraction/statement-extras";
+import { factsFromFileName } from "@/lib/extraction/filename-facts";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { recordAudit } from "@/lib/audit";
@@ -58,6 +60,20 @@ async function loadSuppliers(): Promise<SupplierRecord[]> {
   }));
 }
 
+function supplierByVatInName(list: readonly SupplierRecord[], fileName: string): SupplierRecord | undefined {
+  const vat = fileName.match(/(?:^|\D)(3\d{13}3)(?:\D|$)/)?.[1];
+  if (!vat) return undefined;
+  return list.find((s) => (s.vatNumber ?? "").replace(/\D/g, "") === vat);
+}
+
+/** آخرُ يومٍ من «YYYY-MM» — بالتقويم لا بالحدس. */
+function lastDayOf(month: string): string | null {
+  const m = month.match(/^(\d{4})-(\d{2})$/);
+  if (!m) return null;
+  const d = new Date(Date.UTC(+m[1], +m[2], 0));
+  return d.toISOString().slice(0, 10);
+}
+
 /** ما نقص بعينه — الجملةُ التي تُقال تحت المستند. */
 export function missingFromReading(r: {
   supplierKnown: boolean; invoiceNumber: string | null; invoiceDate: string | null; totalMinor: number | null;
@@ -91,10 +107,12 @@ export async function recordFromStoredReadings(actorId: string, limit = 60): Pro
     })
     .from(documents)
     .leftJoin(invoices, eq(invoices.documentId, documents.id))
+    .leftJoin(statements, eq(statements.documentId, documents.id))
     .where(and(
       inArray(documents.status, ["PENDING", "NEEDS_REVIEW"]),
       isNotNull(documents.extractionJson),
       isNull(invoices.id),
+      isNull(statements.id),
     ))
     .limit(limit);
 
@@ -108,7 +126,9 @@ export async function recordFromStoredReadings(actorId: string, limit = 60): Pro
   for (const doc of pending) {
     const x = (doc.reading ?? {}) as StoredReading;
     const kind = x.documentKind ?? "";
-    if (!INVOICE_KINDS.has(kind)) continue;
+    if (!INVOICE_KINDS.has(kind) && kind !== "STATEMENT") continue;
+    /* ما سكت عنه النموذجُ ونطق به اسمُ الملفّ — سدٌّ لفراغ لا تصحيحٌ لقراءة */
+    const fromName = factsFromFileName(doc.fileName);
 
     const supplier = (doc.supplierId ? byId.get(doc.supplierId) : undefined)
       ?? matchSupplier(supplierList, {
@@ -116,10 +136,57 @@ export async function recordFromStoredReadings(actorId: string, limit = 60): Pro
         supplierNameAr: x.supplierNameAr,
         supplierNameEn: x.supplierNameEn,
       }).supplier
+      /* رقمٌ ضريبيّ في أوّل اسم الملفّ — «310660311700003_…» — لمورّدٍ مسجَّلٍ به */
+      ?? supplierByVatInName(supplierList, doc.fileName)
       ?? undefined;
-    const date = normalizeDocumentDate(x.invoiceDate);
-    const number = x.invoiceNumber?.trim() || null;
-    const totalMinor = parseRiyals(x.totalAmount ?? "");
+    const date = normalizeDocumentDate(x.invoiceDate) ?? fromName.date;
+    const number = x.invoiceNumber?.trim() || fromName.invoiceNumber;
+    const totalMinor = parseRiyals(x.totalAmount ?? "") ?? fromName.totalMinor;
+
+    /*
+      ── الكشف ── هويّتُه مورّدُه وفترتُه، لا رقمٌ ولا إجماليّ. وتاريخُه إن
+      لم يُقرأ فآخرُ يومٍ من شهر مجلّده (كتبه إنسان) — فالكشفُ لا يُحجَز
+      بسؤالٍ لا يعنيه.
+    */
+    if (kind === "STATEMENT") {
+      if (!supplier) {
+        missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["المورّد: لم يُعرَف من الاسم المقروء"] });
+        continue;
+      }
+      const end = date ?? (doc.periodMonth ? lastDayOf(doc.periodMonth) : null);
+      if (!end) {
+        missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["التاريخ: لم يُقرأ، ولا شهرَ للمجلّد"] });
+        continue;
+      }
+      try {
+        await db.transaction(async (tx) => {
+          const parsed = parseStatementExtras(doc.reading);
+          await createStatement(tx, {
+            documentId: doc.id,
+            supplierId: supplier.id,
+            periodEnd: new Date(`${end}T00:00:00Z`),
+            openingBalanceMinor: parsed.openingBalanceMinor,
+            closingBalanceMinor: totalMinor ?? parsed.closingBalanceMinor,
+            lines: parsed.lines,
+          });
+          if (!doc.supplierId) {
+            await tx.update(documents).set({ supplierId: supplier.id }).where(eq(documents.id, doc.id));
+          }
+          await recordAudit({
+            actorId,
+            action: "DOCUMENT_REREAD",
+            entityType: "document",
+            entityId: doc.id,
+            after: { الملف: doc.fileName, السبب: "قُيِّد كشفاً من القراءة المحفوظة", نهاية_الفترة: end },
+          }, tx);
+          recorded++;
+        });
+      } catch (e) {
+        if (!(e instanceof MonthClosedError)) throw e;
+        missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: [e.message] });
+      }
+      continue;
+    }
 
     const review = reviewConfirmed(
       {

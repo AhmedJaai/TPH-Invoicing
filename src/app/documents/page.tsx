@@ -10,6 +10,7 @@ import { DOCUMENT, countNoun } from "@/lib/arabic";
 import { ScrollX } from "@/components/scroll-x";
 import { RejectDocument } from "@/components/reject-document";
 import { ConfirmDocument } from "@/components/confirm-document";
+import { RestoreDocument } from "@/components/restore-document";
 import { DataTable, EmptyState, LinkButton, buttonClass } from "@/components/ui";
 import { invoiceReasons } from "@/lib/invoice-findings";
 import { loadPendingReview } from "@/services/document-review.service";
@@ -241,6 +242,25 @@ export default async function DocumentsPage({
   const pendingVerdicts = new Map(
     (await loadPendingReview(500)).map((d) => [d.id, d] as const),
   );
+  /*
+    ── لماذا رُفض؟ ──
+
+    «في فاتورة مرفوضة مدري ليش» (أحمد). الرفضُ فعلُ إنسانٍ وحده، وسببُه
+    ومن رفعه في سجلّ التدقيق — لا في الصفحة. فيُعرَض بجانب الشارة، ومعه
+    «أعِده للمراجعة»: القراءةُ محفوظة، فيُقيَّد ويُحكَم عليه من جديد.
+  */
+  const rejectedIds = rows.filter((r) => r.status === "REJECTED").map((r) => r.id);
+  const rejections = new Map<string, { at: Date; by: string | null; reason: string | null }>();
+  if (rejectedIds.length > 0) {
+    const found = await db.execute<{ entity_id: string; at: Date; by: string | null; reason: string | null }>(sql`
+      select distinct on (a.entity_id) a.entity_id, a.at, u.name as by, a.after->>'السبب' as reason
+      from audit_logs a left join users u on u.id = a.actor_id
+      where a.action = 'DOCUMENT_REJECTED' and a.entity_id in (${sql.join(rejectedIds.map((id) => sql`${id}`), sql`, `)})
+      order by a.entity_id, a.at desc
+    `);
+    for (const f of found.rows) rejections.set(f.entity_id, { at: new Date(f.at), by: f.by, reason: f.reason });
+  }
+
   const reasonOf = (r: (typeof rows)[number]) =>
     r.invoiceId
       ? invoiceReasons(
@@ -419,6 +439,18 @@ export default async function DocumentsPage({
                   return (
                     <span className="block">
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>{st.text}</span>
+                      {r.status === "REJECTED" && (
+                        <span className="mt-1 block text-[11px] leading-relaxed text-muted">
+                          {(() => {
+                            const j = rejections.get(r.id);
+                            if (!j) return "رُفض — ولا أثرَ لسببه في السجلّ.";
+                            return `رُفض ${j.at.toISOString().slice(0, 10)}${j.by ? ` بيد ${j.by}` : ""} — ${j.reason ?? "بلا سبب مكتوب"}`;
+                          })()}
+                          {canDecide && showAmounts && (
+                            <span className="mt-1 block"><RestoreDocument documentId={r.id} /></span>
+                          )}
+                        </span>
+                      )}
                       {/*
                         ── «يحتاج مراجعة» كان لا يقول ماذا ──
 
@@ -457,7 +489,7 @@ export default async function DocumentsPage({
                             {(() => {
                               const v = pendingVerdicts.get(r.id);
                               if (!v) return "قرأها النموذج — افتح الملفّ وقارن ثمّ اعتمد.";
-                              if (v.verdict.auto) return "تجتمع فيها شروطُ الأرشفة الآليّة — تُعتمَد في المزامنة القادمة، أو اعتمدها الآن.";
+                              if (v.verdict.auto || v.recordable) return "تجتمع فيها الشروط — تُحسَم تلقائياً الآن.";
                               const texts = v.missing.length > 0
                                 ? v.missing
                                 : v.verdict.gaps.map((g) => GAP_TEXT[g]);

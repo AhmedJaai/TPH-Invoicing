@@ -27,17 +27,19 @@ import { planImport } from "@/lib/archive-import";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import { extractDocument } from "@/lib/extraction";
 import { reviewConfirmed } from "@/lib/confirm";
-import { parseRiyals } from "@/lib/money";
+import { formatRiyals, parseRiyals } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
 import { recordAudit } from "@/lib/audit";
 import { createPayment, PaymentTwinError } from "@/services/payment.service";
-import { createInvoice, replaceLines } from "@/services/invoice.service";
+import { createInvoice, createStatement, replaceLines } from "@/services/invoice.service";
 import { firstClosedMonth } from "@/services/month-guard";
 import { MonthClosedError } from "@/services/validation.service";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { canonicalName } from "@/lib/canonical-name";
-import { autoArchive, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
+import { autoArchive, sumLineTotals, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
+import { factsFromFileName } from "@/lib/extraction/filename-facts";
+import { parseStatementExtras } from "@/lib/extraction/statement-extras";
 import { renameArchived } from "@/services/drive-rename.service";
 import { processDocumentBacklog } from "@/services/document-review.service";
 import { driveWritesAllowed } from "@/lib/drive-readonly";
@@ -462,6 +464,18 @@ async function handle(request: Request) {
       const x = extraction.value;
 
       /*
+        ما سكت عنه النموذجُ ونطق به اسمُ الملفّ — «فاتورة - 260391 -» —
+        يُؤخَذ من الاسم: كتبه نظامُ المورّد لا نموذجُنا. سدٌّ لفراغ لا
+        تصحيحٌ لقراءة.
+      */
+      {
+        const fromName = factsFromFileName(entry.file.name);
+        if (!x.invoiceNumber?.trim() && fromName.invoiceNumber) x.invoiceNumber = fromName.invoiceNumber;
+        if (!x.invoiceDate && fromName.date) x.invoiceDate = fromName.date;
+        if (!x.totalAmount?.trim() && fromName.totalMinor !== null) x.totalAmount = formatRiyals(fromName.totalMinor);
+      }
+
+      /*
         ── التسعيرة تُحذَّر ولا تُسجَّل ──
 
         عرضُ السعر ليس واقعةً ماليّة: لا مالَ خرج ولا التزامَ نشأ، وقد
@@ -520,6 +534,9 @@ async function handle(request: Request) {
         totalMinor: parseRiyals(x.totalAmount),
         invoiceNumber: x.invoiceNumber,
         fileName: entry.file.name,
+        linesTotalMinor: sumLineTotals(x.lines as { lineTotal?: string }[], (v) => parseRiyals(v)),
+        /* الكشفُ يُقيَّد أدناه متى عُرف مورّدُه — وتاريخُه من القراءة أو من شهر المجلّد */
+        statementRecorded: x.documentKind === "STATEMENT" && Boolean(supplier),
       });
 
       /*
@@ -569,6 +586,23 @@ async function handle(request: Request) {
 
         if (!doc) return;
         recorded = true;
+
+        /* الكشف: هويّتُه مورّدُه وفترتُه — لا رقمٌ ولا إجماليّ */
+        if (x.documentKind === "STATEMENT" && supplier) {
+          /* بلا تاريخٍ مقروء: آخرُ يومٍ من شهر المجلّد — كتبه إنسان */
+          const [y, m] = entry.month.split("-").map(Number);
+          const end = x.invoiceDate || new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+          const parsed = parseStatementExtras(x);
+          await createStatement(tx, {
+            documentId: doc.id,
+            supplierId: supplier.id,
+            periodEnd: new Date(`${end}T00:00:00Z`),
+            openingBalanceMinor: parsed.openingBalanceMinor,
+            closingBalanceMinor: parseRiyals(x.totalAmount) ?? parsed.closingBalanceMinor,
+            lines: parsed.lines,
+          });
+          return;
+        }
 
         if (!review.canCreateInvoice || !supplier) return;
 
