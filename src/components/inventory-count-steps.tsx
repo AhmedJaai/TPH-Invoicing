@@ -155,7 +155,8 @@ export function InventoryCountSteps({
 
       {step === 4 && (
         <div>
-          {review}
+          {/* عنصرٌ بناه الخادم لا يقف أخاً لغيره في مصفوفة أبناء — وإلّا طلب React مفتاحاً له */}
+          <div>{review}</div>
           {!locked && (
             <div className="mt-4">
               <button type="button" onClick={() => setStep(5)} className={buttonClass("secondary")}>
