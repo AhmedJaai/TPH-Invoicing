@@ -11,6 +11,7 @@
  * فصار المسار على مرحلتين: **يُصنَّف المستند أوّلاً**، ثمّ يُطلَب مخطّط
  * نوعه وحده. والتصنيف رخيص لأنّه سؤالٌ واحد.
  */
+import { normalizeDocumentDate } from "@/lib/document-date";
 import { z } from "zod";
 import { DOCUMENT_KINDS, confidenceScore, invoiceLineSchema, statementLineSchema, moneyString } from "./schema";
 
@@ -189,7 +190,12 @@ export function widen(
     buyerVatNumber: str("buyerVatNumber"),
     invoiceNumber: str("invoiceNumber") || str("referenceNumber"),
     /* الإيصال يسمّي تاريخه `transferDate`، والكشف `statementDate` */
-    invoiceDate: str("invoiceDate") || str("transferDate") || str("statementDate"),
+    /*
+      والتاريخُ يُوحَّد هنا مرّةً لكلّ مستهلك: النموذجُ يعيد ما على الورقة
+      («13/09/2026»)، والقيدُ يطلب `YYYY-MM-DD` — فكان التاريخُ المقروء
+      يُرمى ولا تُقيَّد الفاتورة. وما لا يُفهَم يبقى فارغاً: مجهولٌ لا مخمَّن.
+    */
+    invoiceDate: normalizeDocumentDate(str("invoiceDate") || str("transferDate") || str("statementDate")) ?? "",
     subtotalAmount: str("subtotalAmount"),
     vatAmount: str("vatAmount"),
     totalAmount: str("totalAmount"),

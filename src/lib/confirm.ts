@@ -10,6 +10,7 @@
  * والمنطق مطابق لما في pipeline.ts عمداً، حتى لا تختلف شاشة المعاينة عن
  * القرار الفعلي فيرى المستخدم شيئاً ويحدث غيره.
  */
+import { normalizeDocumentDate } from "@/lib/document-date";
 import { ISSUE, ISSUE_TEXT } from "./issue-codes";
 import {
   validateInvoice,
@@ -54,8 +55,6 @@ export interface ConfirmReview {
   canCreateInvoice: boolean;
 }
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 export function reviewConfirmed(
   fields: ConfirmedFields,
   context: ConfirmContext,
@@ -66,7 +65,8 @@ export function reviewConfirmed(
   const isPaymentDoc = PAYMENT_KINDS.has(kind);
   const isStatement = kind === "STATEMENT";
   const invoiceNumber = fields.invoiceNumber?.trim() || undefined;
-  const invoiceDate = DATE_RE.test(fields.invoiceDate ?? "") ? fields.invoiceDate! : undefined;
+  /* ما كُتب «13/09/2026» تاريخٌ مقروء لا غائب — يُوحَّد ولا يُرمى */
+  const invoiceDate = normalizeDocumentDate(fields.invoiceDate) ?? undefined;
 
   const validation = validateInvoice(
     {

@@ -12,6 +12,8 @@ import { RejectDocument } from "@/components/reject-document";
 import { ConfirmDocument } from "@/components/confirm-document";
 import { DataTable, EmptyState, LinkButton, buttonClass } from "@/components/ui";
 import { invoiceReasons } from "@/lib/invoice-findings";
+import { loadPendingReview } from "@/services/document-review.service";
+import { GAP_TEXT } from "@/lib/extraction/auto-archive";
 import { companyConfig } from "@/config/drive";
 
 export const dynamic = "force-dynamic";
@@ -232,6 +234,13 @@ export default async function DocumentsPage({
     سببُ «يحتاج مراجعة» — يُشتقّ من الصفّ نفسه، ولا يُستعلَم له ثانية.
     وما لا فاتورة له لا سبب ضريبيّ له: كشفٌ أو إيصالٌ يُراجَع بعينه.
   */
+  /*
+    حكمُ الأرشفة الآليّة على ما ينتظر — ليُقال لماذا لم يدخل وحده بعينه،
+    لا «لا ينقصها ركن» عن مستندٍ ينتظر بلا سببٍ ظاهر.
+  */
+  const pendingVerdicts = new Map(
+    (await loadPendingReview(500)).map((d) => [d.id, d] as const),
+  );
   const reasonOf = (r: (typeof rows)[number]) =>
     r.invoiceId
       ? invoiceReasons(
@@ -445,7 +454,15 @@ export default async function DocumentsPage({
                             يُراجَع؟»: افتح الملفّ وقارن الأرقام، ثمّ اعتمد.
                           */
                           <span className="mt-1 block text-[11px] leading-relaxed text-muted">
-                            لا ينقصها ركن — قرأها النموذجُ ولم يؤكّدها إنسانٌ بعد. افتح الملفّ وقارن ثمّ اعتمد.
+                            {(() => {
+                              const v = pendingVerdicts.get(r.id);
+                              if (!v) return "قرأها النموذج — افتح الملفّ وقارن ثمّ اعتمد.";
+                              if (v.verdict.auto) return "تجتمع فيها شروطُ الأرشفة الآليّة — تُعتمَد في المزامنة القادمة، أو اعتمدها الآن.";
+                              const texts = v.missing.length > 0
+                                ? v.missing
+                                : v.verdict.gaps.map((g) => GAP_TEXT[g]);
+                              return `لم تدخل وحدها: ${texts.join(" · ")}`;
+                            })()}
                           </span>
                         )
                       )}

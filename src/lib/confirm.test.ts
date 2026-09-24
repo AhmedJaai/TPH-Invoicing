@@ -61,8 +61,14 @@ describe("reviewConfirmed", () => {
   });
 
   it("يمنع الأرشفة بلا تاريخ صالح", () => {
-    const r = reviewConfirmed({ ...validInvoice, invoiceDate: "12/08/2026" }, { companyVat: COMPANY_VAT });
+    const r = reviewConfirmed({ ...validInvoice, invoiceDate: "سبتمبر" }, { companyVat: COMPANY_VAT });
     expect(r.blockers.some((b) => b.message.includes("تاريخ"))).toBe(true);
+  });
+
+  it("والتاريخُ المطبوع «12/08/2026» مقروءٌ لا غائب — يُوحَّد ولا يُرمى", () => {
+    const r = reviewConfirmed({ ...validInvoice, invoiceDate: "12/08/2026" }, { companyVat: COMPANY_VAT });
+    expect(r.blockers.some((b) => b.message.includes("تاريخ"))).toBe(false);
+    expect(r.canCreateInvoice).toBe(true);
   });
 
   it("يمنع الأرشفة بلا مبلغ إجمالي", () => {

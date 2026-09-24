@@ -6,35 +6,37 @@ const clean: AutoArchiveFacts = {
   invoiceRecorded: true,
   textSource: "TEXT",
   supplierKnown: true,
-  sellerVat: "300123456700003",
-  supplierVat: "300123456700003",
   subtotalMinor: 40_000,
   vatMinor: 6_000,
   totalMinor: 46_000,
+  invoiceNumber: "260387",
+  fileName: "invoice.pdf",
 };
 
-describe("الأرشفةُ الآليّة — أربعةُ شروطٍ معاً", () => {
-  it("اجتمعت الأربعة فيدخل وحده", () => {
-    expect(autoArchive(clean)).toEqual({ auto: true, gaps: [], learnVat: null });
+describe("الأرشفةُ الآليّة", () => {
+  it("نصٌّ مكتوب وحسابٌ مستقيم ومورّدٌ معروف — يدخل وحده", () => {
+    expect(autoArchive(clean)).toEqual({ auto: true, gaps: [] });
   });
 
-  it("الصورةُ الممسوحة لا تدخل وحدها — ولو استقام كلُّ ما عداها", () => {
-    const v = autoArchive({ ...clean, textSource: "PDF_EMBEDDED" });
-    expect(v.auto).toBe(false);
-    expect(v.gaps).toEqual(["NOT_TEXT"]);
+  it("الصورةُ تدخل إن صدّقها شاهد: ضريبةٌ ١٥٪ من الصافي", () => {
+    expect(autoArchive({ ...clean, textSource: "PDF_EMBEDDED" }).auto).toBe(true);
+    expect(autoArchive({ ...clean, textSource: null }).auto).toBe(true);
   });
 
-  it("رقمٌ ضريبيّ يخالف المسجَّل — فاتورةٌ من غير من نظنّ", () => {
-    expect(autoArchive({ ...clean, sellerVat: "399999999900003" }).gaps).toEqual(["VAT_MISMATCH"]);
+  it("أو رقمُ الفاتورة في اسم الملفّ", () => {
+    const zeroRated = { ...clean, textSource: "DIRECT", subtotalMinor: 46_000, vatMinor: 0 };
+    expect(autoArchive({ ...zeroRated, fileName: "فاتورة - 260387 - مؤسسة ذا بوبليك هاوس.pdf" }).auto).toBe(true);
+    expect(autoArchive({ ...zeroRated, invoiceNumber: "285558808", fileName: "print_invoice_13_09_2026_15_13_22_فاتورة285558808.pdf" }).auto).toBe(true);
   });
 
-  it("والرقمُ الغائب ليس مطابقة — من أيّ الطرفين غاب", () => {
-    expect(autoArchive({ ...clean, sellerVat: null }).gaps).toEqual(["VAT_UNKNOWN"]);
-    expect(autoArchive({ ...clean, supplierVat: "" }).gaps).toEqual(["VAT_UNKNOWN"]);
+  it("وبلا شاهدٍ تبقى الصورةُ للإنسان — بسببها", () => {
+    const v = autoArchive({ ...clean, textSource: "DIRECT", subtotalMinor: 46_000, vatMinor: 0 });
+    expect(v.gaps).toEqual(["UNVERIFIED_IMAGE"]);
   });
 
-  it("والفراغُ داخل الرقم لا يُفرّق", () => {
-    expect(autoArchive({ ...clean, sellerVat: "3001 2345 6700 003" }).auto).toBe(true);
+  it("رقمٌ قصير لا يُعدّ شاهداً — «12» يقع في كلّ اسم", () => {
+    const v = autoArchive({ ...clean, textSource: "DIRECT", subtotalMinor: 46_000, vatMinor: 0, invoiceNumber: "12", fileName: "2026-12-01.pdf" });
+    expect(v.gaps).toEqual(["UNVERIFIED_IMAGE"]);
   });
 
   it("الحسابُ يُتسامَح فيه بريال — كما في القاعدة", () => {
@@ -47,8 +49,7 @@ describe("الأرشفةُ الآليّة — أربعةُ شروطٍ معاً",
   });
 
   it("المورّدُ المجهول لا يدخل", () => {
-    expect(autoArchive({ ...clean, supplierKnown: false, supplierVat: null }).gaps)
-      .toEqual(["SUPPLIER_UNKNOWN", "VAT_UNKNOWN"]);
+    expect(autoArchive({ ...clean, supplierKnown: false }).gaps).toEqual(["SUPPLIER_UNKNOWN"]);
   });
 
   it("والآليُّ للفواتير المقيَّدة وحدها", () => {
@@ -58,25 +59,6 @@ describe("الأرشفةُ الآليّة — أربعةُ شروطٍ معاً",
 
   it("والمبسّطةُ فاتورةٌ تُدفَع — تدخل كالضريبيّة", () => {
     expect(autoArchive({ ...clean, kind: "SIMPLIFIED_INVOICE" }).auto).toBe(true);
-  });
-
-  it("مورّدٌ بلا رقمٍ مسجَّل: يُتعلَّم الرقمُ بأدلّته الثلاثة", () => {
-    const v = autoArchive({ ...clean, supplierVat: null, supplierByFolder: true });
-    expect(v).toEqual({ auto: true, gaps: [], learnVat: "300123456700003" });
-  });
-
-  it("ولا يُتعلَّم من صورة، ولا بلا مجلّد، ولا بصيغةٍ غير صيغة الهيئة", () => {
-    expect(autoArchive({ ...clean, supplierVat: null, supplierByFolder: true, textSource: "PDF_EMBEDDED" }).gaps)
-      .toEqual(["NOT_TEXT", "VAT_UNKNOWN"]);
-    expect(autoArchive({ ...clean, supplierVat: null, supplierByFolder: false }).gaps).toEqual(["VAT_UNKNOWN"]);
-    expect(autoArchive({ ...clean, supplierVat: null, supplierByFolder: true, sellerVat: "12345" }).gaps)
-      .toEqual(["VAT_UNKNOWN"]);
-  });
-
-  it("ورقمٌ يحمله مورّدٌ آخر ليس لهذا — ولا يُتعلَّم", () => {
-    const v = autoArchive({ ...clean, supplierVat: null, supplierByFolder: true, vatTakenByOther: true });
-    expect(v.gaps).toEqual(["VAT_MISMATCH"]);
-    expect(v.learnVat).toBeNull();
   });
 
   it("ولكلّ شرطٍ جملةٌ تُقال", () => {
