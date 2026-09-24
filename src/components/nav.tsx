@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { Suspense, use, useState, useEffect } from "react";
 import { can, type Role } from "@/lib/permissions";
 import {
   activeArea,
@@ -96,14 +96,13 @@ function MoreIcon({ className }: { className?: string }) {
  */
 export function Sidebar({
   role,
-  pending = 0,
-  documents = 0,
+  counts,
   search,
   footer,
 }: {
   role: Role;
-  pending?: number;
-  documents?: number;
+  /** عدّادا القشرة — وعدٌ يُقرأ في الشارة وحدها، فلا ينتظره رسمُ الصفحة. */
+  counts?: Promise<ShellCounts>;
   /** زرُّ لوحة الأوامر — يُمرَّر كي تبقى اللوحةُ واحدةً في القشرة. */
   search?: React.ReactNode;
   /** ضوابطُ العرض والمستخدم — مكوّناتُ خادمٍ تُمرَّر ولا تُستورَد هنا. */
@@ -113,9 +112,6 @@ export function Sidebar({
   const areas = visibleAreas(role);
   const area = activeArea(pathname);
   const child = area ? activeChild(pathname, area) : undefined;
-
-  const badgeOf = (href: string) =>
-    href === "/attention" ? pending : href === "/documents" ? documents : 0;
 
   return (
     <nav className="flex h-full flex-col" aria-label="المساحات">
@@ -140,7 +136,6 @@ export function Sidebar({
         <ul className="space-y-0.5">
           {areas.map((a) => {
             const current = area?.href === a.href;
-            const n = badgeOf(a.href);
             const kids = current ? visibleChildren(role, a) : [];
             return (
               <li key={a.href}>
@@ -153,14 +148,7 @@ export function Sidebar({
                 >
                   <Icon href={a.href} className="h-[1.1rem] w-[1.1rem] shrink-0" />
                   <span className="min-w-0 flex-1 truncate">{a.label}</span>
-                  {n > 0 && (
-                    <span
-                      className="nums rounded-full bg-warn px-1.5 py-px text-[11px] font-bold text-surface"
-                      aria-label={`${n} بانتظارك`}
-                    >
-                      {n}
-                    </span>
-                  )}
+                  <CountBadge counts={counts} href={a.href} className="rounded-full bg-warn px-1.5 py-px text-[11px] font-bold text-surface" />
                 </Link>
                 {kids.length > 0 && (
                   <ul className="mb-1 ms-[1.3rem] mt-0.5 space-y-px border-s border-line ps-2">
@@ -260,13 +248,11 @@ export function AreaTabs({ role }: { role: Role }) {
  */
 export function MobileTabBar({
   role,
-  pending = 0,
-  documents = 0,
+  counts,
   footer,
 }: {
   role: Role;
-  pending?: number;
-  documents?: number;
+  counts?: Promise<ShellCounts>;
   /** المستخدمُ والخروج — كانا في الترويسة، وصار موضعُهما «المزيد». */
   footer?: React.ReactNode;
 }) {
@@ -281,15 +267,13 @@ export function MobileTabBar({
   }, [moreOpen]);
   const area = activeArea(pathname);
   const { tabs, more } = mobileTabs(role, pathname);
-  const badgeOf = (href: string) =>
-    href === "/attention" ? pending : href === "/documents" ? documents : 0;
 
   return (
     <>
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
         <nav className="flex items-stretch" aria-label="المساحات">
           {tabs.map((a) => (
-            <Tab key={a.href} area={a} current={area?.href === a.href} badge={badgeOf(a.href)} />
+            <Tab key={a.href} area={a} current={area?.href === a.href} counts={counts} />
           ))}
           {(more.length > 0 || footer || visibleAccountLinks(role).length > 0) && (
             <button
@@ -339,7 +323,38 @@ export function MobileTabBar({
   );
 }
 
-function Tab({ area, current, badge }: { area: NavArea; current: boolean; badge: number }) {
+/**
+ * عدّادا القشرة: ما ينتظر قرارك، وما لم يُبَتّ من المستندات.
+ * `null` حين تعذّر العدّ — فيُكتب «؟» لا صفرٌ يقول «لا شيء ينتظرك».
+ */
+export type ShellCounts = { pending: number | null; documents: number | null };
+
+/**
+ * الشارةُ تنتظر عددها وحدها. كان التخطيطُ ينتظر الطابور كلَّه (ستّة عشر
+ * استعلاماً، ~٣ ثوانٍ) قبل أن يرسم شيئاً، فتتأخّر كلُّ صفحةٍ وكلُّ
+ * `router.refresh()` بعد فعلٍ بزمنه. صار العددُ يصل بعد الصفحة.
+ */
+function CountBadge({ counts, href, className }: { counts?: Promise<ShellCounts>; href: string; className: string }) {
+  if (!counts || (href !== "/attention" && href !== "/documents")) return null;
+  return (
+    <Suspense fallback={null}>
+      <CountBadgeValue counts={counts} href={href} className={className} />
+    </Suspense>
+  );
+}
+
+function CountBadgeValue({ counts, href, className }: { counts: Promise<ShellCounts>; href: string; className: string }) {
+  const c = use(counts);
+  const n = href === "/attention" ? c.pending : c.documents;
+  if (n === 0) return null;
+  return (
+    <span className={`nums ${className}`} aria-label={n === null ? "تعذّر العدّ" : `${n} بانتظارك`}>
+      {n === null ? "؟" : n}
+    </span>
+  );
+}
+
+function Tab({ area, current, counts }: { area: NavArea; current: boolean; counts?: Promise<ShellCounts> }) {
   return (
     <Link
       href={area.href}
@@ -350,11 +365,7 @@ function Tab({ area, current, badge }: { area: NavArea; current: boolean; badge:
     >
       <span className="relative">
         <Icon href={area.href} className="h-5 w-5" />
-        {badge > 0 && (
-          <span className="nums absolute -end-2 -top-1.5 rounded-full bg-warn px-1 text-[9px] font-bold text-surface">
-            {badge}
-          </span>
-        )}
+        <CountBadge counts={counts} href={area.href} className="absolute -end-2 -top-1.5 rounded-full bg-warn px-1 text-[9px] font-bold text-surface" />
       </span>
       {area.short}
     </Link>

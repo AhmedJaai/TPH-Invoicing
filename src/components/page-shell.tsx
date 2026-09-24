@@ -1,4 +1,4 @@
-import { AreaTabs, MobileTabBar, Sidebar, UploadButton } from "./nav";
+import { AreaTabs, MobileTabBar, Sidebar, UploadButton, type ShellCounts } from "./nav";
 import { CommandPalette, CommandTrigger } from "./command-palette";
 import { AutoProcess } from "./auto-process";
 import { TrialBanner } from "./trial-banner";
@@ -44,7 +44,7 @@ const WIDTH: Record<ShellWidth, string> = {
  * وحده. والعدّادان يتجدّدان مع كلّ فعلٍ (`router.refresh()` يعيد رسم
  * التخطيط) لا مع كلّ ضغطة رابط.
  */
-export async function AppShell({
+export function AppShell({
   user,
   children,
 }: {
@@ -53,12 +53,13 @@ export async function AppShell({
 }) {
   /*
     عددان اثنان لا أكثر، وكلاهما يفتح ما يعدّه بعينه. ومن لا يرى
-    التقارير لا يُحسَب له عددُ العمل.
+    التقارير لا يُحسَب له عددُ العمل. ولا يُنتظَران هنا: يُمرَّران وعداً
+    تقرؤه الشارة، فتُرسَم القشرةُ والصفحةُ قبلهما.
   */
-  const [pending, inbox] = await Promise.all([
-    can(user.role, "reports:view") ? workCount() : Promise.resolve(0),
-    inboxCount(),
-  ]);
+  const counts: Promise<ShellCounts> = Promise.all([
+    can(user.role, "reports:view") ? workCount().catch(() => null) : Promise.resolve(0),
+    inboxCount().catch(() => null),
+  ]).then(([pending, documents]) => ({ pending, documents }));
 
   const userControls = (
     <div className="flex items-center gap-2">
@@ -86,8 +87,7 @@ export async function AppShell({
       >
         <Sidebar
           role={user.role}
-          pending={pending}
-          documents={inbox}
+          counts={counts}
           search={<CommandTrigger />}
           footer={userControls}
         />
@@ -112,7 +112,7 @@ export async function AppShell({
       </div>
 
       {/* خارج الترويسة عمداً: `backdrop-blur` عليها يحبس `fixed` داخلها */}
-      <MobileTabBar role={user.role} pending={pending} documents={inbox} footer={<UserMenu name={user.name} role={user.role} />} />
+      <MobileTabBar role={user.role} counts={counts} footer={<UserMenu name={user.name} role={user.role} />} />
 
       <CommandPalette role={user.role} canSearch={can(user.role, "document:view")} />
       {can(user.role, "document:upload") && can(user.role, "amounts:view") && <AutoProcess />}
