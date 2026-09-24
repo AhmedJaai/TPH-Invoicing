@@ -203,7 +203,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
           return (
             <li key={r.type === "hit" ? `h-${r.hit.kind}-${r.hit.id}` : `c-${r.command.id}`} role="presentation">
               {first && (
-                <p className="px-4 pb-1 pt-2.5 text-[11px] font-bold text-muted" role="presentation">
+                <p className="px-4 pb-1 pt-2.5 text-[11px] font-bold text-muted" aria-hidden>
                   {GROUP_LABEL[g]}
                 </p>
               )}
