@@ -1514,9 +1514,11 @@ export async function listCounts(limit = 52, conn: Conn = db): Promise<CountSumm
   const rows = await conn.execute<Record<string, unknown>>(sql`
     select c.id, c.period_start, c.period_end, c.status, c.readiness, c.finalised_at,
            b.name_ar as branch_name,
-           (c.coverage -> 'sales' ->> 'includedTotalMinor')::bigint as sales_minor
+           (c.coverage -> 'sales' ->> 'includedTotalMinor')::bigint as sales_minor,
+           s.payload -> 'totals' -> 'summary' as stored_summary
       from inventory_counts c
       left join branches b on b.id = c.branch_id
+      left join inventory_count_snapshots s on s.count_id = c.id
      order by c.period_end desc, c.started_at desc
      limit ${limit}
   `);
@@ -1555,7 +1557,11 @@ export async function listCounts(limit = 52, conn: Conn = db): Promise<CountSumm
 
   return rows.rows.map((r) => {
     const id = String(r.id);
-    const summary = summariseVariance(byCount.get(id) ?? []);
+    /*
+      المقفَلُ يُقرأ بملخّصه المحفوظ كما تقرؤه صفحتُه — لا يُعاد حسابُه
+      بتعريفٍ أحدث فيفترق السجلُّ عن التقرير الذي يفتحه.
+    */
+    const summary = (r.stored_summary as VarianceSummary | null) ?? summariseVariance(byCount.get(id) ?? []);
     return {
       id,
       periodStart: String(r.period_start),

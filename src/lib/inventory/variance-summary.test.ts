@@ -88,3 +88,18 @@ describe("ما لم يُقَس غيرُ معروف — لا صفر", () => {
     expect(s.linesMeasured).toBe(0);
   });
 });
+
+describe("نسبةُ النقص على ما عُدّ — لا على الجرد كلِّه", () => {
+  it("صنفٌ عُدّ نقص منه ٥٫٦٪ وتسعةٌ لم تُعَدّ: النسبةُ ٥٫٦٪ لا ٠٫٦٪", () => {
+    /* براوني: استُهلك ٣٦ بـ٦٫٦٠ = ٢٣٧٫٦٠، ونقص ٢ = ١٣٫٢٠ */
+    const counted = line({
+      baseUnit: "PIECE", unitCostMilliMinor: 660_000,
+      theoreticalConsumptionMilli: 36_000, varianceMilli: -2_000, varianceCostMinor: -13_20,
+    });
+    const notCounted = line({ theoreticalConsumptionMilli: g(20_000) }); // ٢٬٠٠٠ ريال، لم يُعَدّ
+    const s = summariseVariance([counted, ...Array.from({ length: 9 }, () => notCounted)]);
+    expect(s.consumptionCostMinor).toBe(237_60);
+    expect(s.shortageRateBp).toBe(556);
+  });
+});
+

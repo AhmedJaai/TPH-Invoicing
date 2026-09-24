@@ -54,7 +54,7 @@ export interface VarianceSummary {
   linesMeasured: number;
   /** أصنافٌ لها فرقٌ بلا كلفةٍ معروفة — خارج المجاميع أعلاه، ويُقال عددُها. */
   linesWithoutCost: number;
-  /** كلفةُ الاستهلاك المتوقَّع لما عُرفت كلفتُه — مقامُ النسبة. */
+  /** كلفةُ الاستهلاك المتوقَّع **لما حُسب فرقُه** وعُرفت كلفتُه — مقامُ النسبة. */
   consumptionCostMinor: number;
   /** أكلُّ استهلاكٍ داخلٍ في الجرد معروفُ الكلفة؟ وإلّا فالمقامُ ناقص. */
   consumptionCostComplete: boolean;
@@ -85,7 +85,16 @@ export function summariseVariance(lines: readonly SummaryLine[]): VarianceSummar
       else overage += l.varianceCostMinor;
     }
 
-    if (l.theoreticalConsumptionMilli !== null && l.theoreticalConsumptionMilli > 0) {
+    /*
+      ── والمقامُ من المقيس وحده ──
+
+      كان كلُّ استهلاكٍ داخلٍ في الجرد يدخل المقام، عُدّ صنفُه أو لم يُعَدّ.
+      فجردٌ عُدّ فيه صنفٌ واحد نقص منه ٥٫٦٪ يُقال عنه «النقص ٠٫٢٪ من كلفة
+      الاستهلاك» — لأنّ المقام استهلاكُ ستّين صنفاً والبسطَ فرقُ واحد. والجردُ
+      الجزئيّ هو الغالب، فالنسبةُ كانت تُصغِّر الضياعَ بقدر ما لم يُعَدّ.
+      فالسؤال «كم ضاع ممّا كان ينبغي أن يُصرَف **فيما عددناه**؟».
+    */
+    if (l.varianceMilli !== null && l.theoreticalConsumptionMilli !== null && l.theoreticalConsumptionMilli > 0) {
       const cost = varianceCostMinor(l.theoreticalConsumptionMilli, l.unitCostMilliMinor, l.baseUnit);
       if (cost === null) complete = false;
       else consumptionCost += cost;

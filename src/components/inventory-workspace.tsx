@@ -151,7 +151,7 @@ export function InventoryWorkspace({
             value={measured ? undefined : "غير معروف"}
             minor={measured ? summary.absoluteCostMinor : undefined}
             sub={measured
-              ? `الصافي ${formatRiyalsDisplay(summary.netCostMinor)}${summary.linesWithoutCost > 0 ? ` · ولا تشمل ${summary.linesWithoutCost} صنفاً كلفتُه غير معروفة` : ""}`
+              ? `الصافي \u2066${formatRiyalsDisplay(summary.netCostMinor)}\u2069${summary.linesWithoutCost > 0 ? ` · ولا تشمل ${summary.linesWithoutCost} صنفاً كلفتُه غير معروفة` : ""}`
               : `${summary.linesMeasured} من ${inScopeCount} صنفاً حُسب فرقُه`}
           />
         ) : (

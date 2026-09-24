@@ -123,5 +123,9 @@ export function formatBp(bp: number | null): string {
   if (bp === null) return "غير معروف";
   const pct = Math.round(Math.abs(bp) / 10) / 10;
   const sign = bp > 0 ? "+" : bp < 0 ? "−" : "";
-  return `${sign}${pct}٪`;
+  /*
+    عزلٌ من اليسار إلى اليمين (LRI…PDI) لا يُرى: «٪» حرفٌ عربيّ فيضمّ
+    الرقمَ إلى سطرٍ من اليمين، فتقع الإشارةُ في الطرف الآخر — «5.6٪−».
+  */
+  return `\u2066${sign}${pct}٪\u2069`;
 }
