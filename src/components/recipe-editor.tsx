@@ -93,7 +93,7 @@ export function RecipeEditor({
 
   return (
     <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
-      <h3 className="font-display text-base font-bold">وصفةٌ جديدة أو نسخةٌ جديدة</h3>
+      <h2 className="font-display text-base font-bold">وصفةٌ جديدة أو نسخةٌ جديدة</h2>
       <p className="mt-1 text-xs leading-relaxed text-muted">
         غيّرتَ الجرعة؟ اكتب نسخةً جديدة بتاريخ التغيير. وتُغلَق السابقةُ في اليوم الذي
         قبله — فتبقى تقاريرُ ما مضى محسوبةً بما كان عاملاً فيها.

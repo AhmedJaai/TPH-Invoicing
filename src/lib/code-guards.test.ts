@@ -311,3 +311,25 @@ describe("لا زرَّ أقصر من إبهام", () => {
     expect(shortButtons('<button className={buttonClass("primary", "sm")}>أ</button>')).toEqual([]);
   });
 });
+
+/*
+  ── النصُّ الثانويّ لا يُبهَّت ──
+
+  `--muted` مضبوطٌ ليجتاز ‎4.5:1‎ بالكاد (`globals.css`)، فأيُّ شفافيّةٍ فوقه
+  تُسقطه: `text-muted/80` كانت ‎3.47:1‎ في «المصروفات» — وكشفها فحصُ axe لا
+  العين. والتدرّجُ يُصنع بالحجم والوزن، لا بتبهيت اللون الذي يحمل المعنى.
+*/
+const FADED_TEXT = /\btext-(muted|ink-soft)\/\d+/;
+
+describe("لا نصَّ ثانويّاً مبهَّتاً دون حدّ التباين", () => {
+  it("لا text-muted/NN ولا text-ink-soft/NN في الواجهة", () => {
+    const hits = SRC.filter((f) => f.endsWith(".tsx"))
+      .filter((f) => FADED_TEXT.test(readFileSync(f, "utf8")));
+    expect(hits).toEqual([]);
+  });
+
+  it("والحارس يُمسك الشكل الخاطئ", () => {
+    expect(FADED_TEXT.test('className="text-muted/80"')).toBe(true);
+    expect(FADED_TEXT.test('className="text-muted"')).toBe(false);
+  });
+});

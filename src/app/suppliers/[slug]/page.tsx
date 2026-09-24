@@ -650,20 +650,20 @@ export default async function SupplierPage({
 
 /** طرفٌ من معادلة الحساب — ومعه بابُ سجلّاته. */
 function Trace({ label, minor, href }: { label: string; minor: number; href?: string }) {
-  const body = (
-    <>
-      <dt className="min-w-0 text-muted">{label}</dt>
-      <dd className="nums shrink-0 font-bold"><Money minor={minor} /></dd>
-    </>
-  );
-  if (!href) return <div className="flex items-baseline justify-between gap-3 py-1.5">{body}</div>;
+  /*
+    الصفُّ كلُّه يُضغَط، و`<dl>` لا يقبل رابطاً بين يديه وبين `<dt>`: كان
+    `<a>` يلفّ الزوج فيفقد قارئُ الشاشة أنّهما اسمٌ وقيمته. فالرابطُ داخل
+    الاسم، ويمتدّ غطاؤه على الصفّ.
+  */
   return (
-    <Link
-      href={href}
-      className="flex items-baseline justify-between gap-3 py-1.5 transition-colors hover:text-ink"
-    >
-      {body}
-    </Link>
+    <div className="relative flex items-baseline justify-between gap-3 py-1.5 transition-colors hover:text-ink">
+      <dt className="min-w-0 text-muted">
+        {href ? (
+          <Link href={href} className="after:absolute after:inset-0">{label}</Link>
+        ) : label}
+      </dt>
+      <dd className="nums shrink-0 font-bold"><Money minor={minor} /></dd>
+    </div>
   );
 }
 

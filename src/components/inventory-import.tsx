@@ -75,7 +75,7 @@ export function InventoryImport({ canImport }: { canImport: boolean }) {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
-        <h3 className="font-display text-base font-bold">ارفع ملفّ مبيعات فودكس</h3>
+        <h2 className="font-display text-base font-bold">ارفع ملفّ مبيعات فودكس</h2>
         <p className="mt-1 text-xs leading-relaxed text-muted">
           صدِّر من فودكس تقريرَ الأصناف أو تقريرَ الطلبات (Excel)، وارفعه هنا. والملفُّ
           نفسُه مرّتين لا يُضاعف شيئاً.
