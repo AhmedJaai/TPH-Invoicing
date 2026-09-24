@@ -98,7 +98,12 @@ export default async function HomePage() {
   const { totals } = balances;
   const oldestDays = overdue.reduce((m, r) => Math.max(m, r.oldestDays), 0);
 
-  const facts = await gatherChangeFacts(0, 0);
+  /*
+    ارتفاعُ الأسعار من بند الطابور نفسه — كان هنا «(0, 0)» مكتوبين بيد،
+    فلا يظهر «أصناف ارتفع سعرها» في «ما الذي تغيّر» أبداً مهما ارتفع.
+  */
+  const rises = attention.find((i) => i.id === "price-rises");
+  const facts = await gatherChangeFacts(rises?.count ?? 0, rises?.impact.amountMinor ?? 0);
   /*
     «المشتريات» و«المستحقّ عليك» بندان في `buildChanges` — وهما الرقمان
     المعروضان في شريط الحال. فيُطرحان هنا: التكرار لا يُضيف خبراً.

@@ -461,7 +461,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "SUPPLIERS",
       severity: f.priceRiseAnnualMinor > 100_000 ? "HIGH" : "MEDIUM",
       title: "ارتفاع أسعار المورّدين",
-      detail: `${countNoun(f.priceRises.length, PRODUCT)} ارتفع سعره عند مورّده.`,
+      detail: `${countNoun(f.priceRises.length, PRODUCT)} ارتفع سعره عند مورّده — والأثرُ بكمّيّة ما اشتريتَه منه في آخر سنة.`,
       action: "فاوض على الثلاثة الأعلى أثراً، واطلب عرضاً من مورّد بديل لتفاوض بورقة في يدك.",
       actionLabel: "قارن الأسعار",
       /*

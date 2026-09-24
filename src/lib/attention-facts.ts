@@ -142,9 +142,10 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
                                   order by l.invoice_date desc) as rn
         from invoice_lines l left join suppliers s on s.id = l.supplier_id
         where l.invoice_date is not null and l.supplier_id is not null
+          and l.normalized_description <> ''
       ),
       pairs as (
-        select a.name_ar, a.description,
+        select a.supplier_id, a.normalized_description, a.name_ar, a.description,
                a.unit_price_minor as now_price,
                b.unit_price_minor as then_price
         from ranked a join ranked b
@@ -153,10 +154,21 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
          and a.rn = 1 and b.rn = 2
         where a.unit_price_minor > b.unit_price_minor
       )
-      select name_ar, description, now_price, then_price
-      from pairs
-      where then_price > 0 and (now_price - then_price)::float / then_price >= 0.05
-      order by (now_price - then_price) desc limit 10
+      /*
+        الأثرُ السنويّ = الزيادةُ في سعر الوحدة × ما اشتُري منه فعلاً في
+        آخر سنة، بحساب القاعدة العشريّ لا بعددٍ عائم. وكان «× ٢٠»: عشرون
+        شراءً في السنة لكلّ صنف مفترَضةً بيد — رقمٌ مخترَع يُعرَض مالاً.
+      */
+      select p.name_ar, p.description, p.now_price, p.then_price,
+             round((p.now_price - p.then_price) * coalesce((
+               select sum(l.qty) from invoice_lines l
+                where l.supplier_id = p.supplier_id
+                  and l.normalized_description = p.normalized_description
+                  and l.invoice_date >= now() - interval '365 days'
+             ), 0))::bigint as annual_minor
+      from pairs p
+      where p.then_price > 0 and (p.now_price - p.then_price) * 100 >= 5 * p.then_price
+      order by annual_minor desc, (p.now_price - p.then_price) desc limit 10
     `)
   ).rows;
 
@@ -165,6 +177,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     sub: `${r.name_ar ?? "—"} · ${formatRiyalsDisplay(Number(r.then_price))} ← ${formatRiyalsDisplay(Number(r.now_price))}`,
     amountMinor: Number(r.now_price) - Number(r.then_price),
   }));
+  const priceRiseAnnualMinor = rises.reduce((sum, r) => sum + Number(r.annual_minor), 0);
 
   /*
     فجوات التغطية — تُحسب من فترات الاستيرادات نفسها.
@@ -427,7 +440,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     })),
     priceRises,
     // الأثر السنوي يحتاج دورة الطلب؛ يُقدَّر هنا بفارق السعر × عشرين طلباً
-    priceRiseAnnualMinor: priceRises.reduce((s, r) => s + (r.amountMinor ?? 0) * 20, 0),
+    priceRiseAnnualMinor,
   };
 }
 
