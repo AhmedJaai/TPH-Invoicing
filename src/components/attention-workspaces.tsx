@@ -1,16 +1,19 @@
 import Link from "next/link";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { documents, invoices, suppliers } from "@/db/schema";
+import { suppliers } from "@/db/schema";
 import { Money } from "@/components/money";
 import { Card, LinkButton, buttonClass } from "./ui";
 import { ConfirmDocument } from "./confirm-document";
+import { ConfirmEligible } from "./confirm-eligible";
 import { RejectDocument } from "./reject-document";
 import { SupplierPolicy } from "./supplier-policy";
 import { buildInvoiceRequest, buildStatementRequest, groupUnbackedBySupplier } from "@/lib/supplier-requests";
 import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
-import { PAYMENT_RECORD, countNoun } from "@/lib/arabic";
+import { DOCUMENT, PAYMENT_RECORD, countNoun } from "@/lib/arabic";
 import { needsContract } from "@/lib/supplier-policy-rules";
+import { GAP_TEXT } from "@/lib/extraction/auto-archive";
+import { loadPendingReview } from "@/services/document-review.service";
 import { previousMonth } from "@/lib/filing";
 import { currentMonthRiyadh, formatDay } from "@/lib/riyadh-time";
 
@@ -132,63 +135,116 @@ export async function UnbackedWorkspace() {
 }
 
 /** «مستنداتٌ لم يُبتّ فيها» — تُعتمَد أو تُرفَض من هنا. */
-export async function InboxWorkspace({ canUpload }: { canUpload: boolean }) {
-  const rows = await db
-    .select({
-      id: documents.id,
-      fileName: documents.fileName,
-      driveFileId: documents.driveFileId,
-      periodMonth: documents.periodMonth,
-      totalMinor: invoices.totalMinor,
-      invoiceNumber: invoices.invoiceNumber,
-      supplierName: suppliers.nameAr,
-    })
-    .from(documents)
-    .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
-    .leftJoin(invoices, eq(invoices.documentId, documents.id))
-    .where(inArray(documents.status, ["PENDING", "NEEDS_REVIEW"]))
-    .orderBy(asc(documents.periodMonth))
-    .limit(40);
+export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boolean; canConfirm: boolean }) {
+  const all = await loadPendingReview();
+  const eligible = all.filter((d) => d.verdict.auto);
+  const rows = all.slice(0, 40);
 
   if (rows.length === 0) {
     return <p className="text-xs text-ok">لا مستند ينتظر — كلُّ ما وصل اعتُمد أو رُفض.</p>;
   }
 
+  /*
+    ── ما المطلوب، ولماذا، وماذا يتغيّر ──
+
+    كانت القائمةُ اسماً ومبلغاً وزرَّين، فيسأل صاحبُ المقهى: لماذا لم
+    يدخل وحده؟ وماذا أراجع؟ وما الذي يتغيّر إن أكّدت؟ والجوابُ كان في
+    تعليقات الشيفرة لا على الشاشة. فيُعرَض ما قرأه النموذج حقلاً حقلاً
+    ليُقارَن بالورقة، ويُقال من أين قُرئ (نصٌّ مكتوب أم صورة)، وأيطابق
+    الرقمُ الضريبيّ المورّدَ المسجَّل — ثمّ ما يقع بعد التأكيد.
+  */
   return (
-    <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
-      {rows.map((d) => (
-        <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5">
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-xs font-bold">
-              {d.supplierName ? `${d.supplierName} — ` : ""}
-              {d.invoiceNumber ?? d.fileName}
-            </span>
-            <span className="block truncate text-[11px] text-muted">
-              <bdi className="nums">{d.periodMonth}</bdi>
-              {d.totalMinor !== null && <> · <Money minor={d.totalMinor} /></>}
-            </span>
-          </span>
-          <span className="flex shrink-0 flex-wrap items-center gap-1.5">
-            {/*
-              «افتحه» قبل «اعتمده» عمداً: الاعتمادُ شهادةٌ بأنّ ما قرأه
-              النموذج يطابق الورقة، ولا تُعطى شهادةٌ بلا نظر.
-            */}
-            {d.driveFileId && (
-              <a
-                href={`https://drive.google.com/file/d/${d.driveFileId}/view`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonClass("quiet", "sm")}
-              >
-                افتح المستند
-              </a>
-            )}
-            {canUpload && <ConfirmDocument documentId={d.id} />}
-            {canUpload && <RejectDocument documentId={d.id} />}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-3">
+      {/*
+        ما انتظر قبل أن توجد قاعدةُ الأرشفة الآليّة وتجتمع فيه شروطُها —
+        يُعتمَد دفعةً بضغطة، والخادمُ يعيد الحكمَ على كلٍّ منها.
+      */}
+      {eligible.length > 0 && canConfirm && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/40 bg-ok-bg px-3 py-2.5">
+          <p className="min-w-0 flex-1 text-xs leading-relaxed">
+            <strong>{countNoun(eligible.length, DOCUMENT)} تجتمع فيها الشروطُ الأربعة</strong> — كانت تنتظر قبل أن
+            يدخل مثلُها وحده. اعتمادُها يُدخل فواتيرَها دفعةَ الشهر ويسمّي ملفّاتها.
+          </p>
+          <ConfirmEligible count={eligible.length} />
+        </div>
+      )}
+      <p className="rounded-xl border border-line bg-sunken px-3 py-2.5 text-[11px] leading-relaxed text-ink-soft">
+        يدخل المستندُ وحده إذا اجتمعت فيه أربعة: قُرئ من <strong>نصٍّ مكتوب</strong> لا من صورة،
+        و<strong>رقمُه الضريبيّ</strong> يطابق المورّد، و<strong>حسابُه مستقيم</strong>، و<strong>مورّدُه معروف</strong>.
+        وما لم تجتمع فيه يُكتَب تحته ما نقصه. <strong>المطلوب:</strong> افتح المستند وقارن الأرقام
+        بالورقة؛ إن طابقت فاعتمده — فتدخل فاتورتُه دفعةَ الشهر، ويُخصم منها ما دفعتَه للمورّد مقدَّماً،
+        ويُسمّى ملفُّه على الصيغة. وإن اختلف شيءٌ فارفضه وارفعه من صفحة الرفع لتصحّح الحقل.
+      </p>
+      <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+        {rows.map((d) => {
+          /* الشرحُ من الدالّة التي قرّرت — فلا يفترق القرارُ عن تفسيره */
+          const { gaps } = d.verdict;
+          return (
+            <li key={d.id} className="px-3.5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-bold">
+                    {d.supplierName ?? "مورّدٌ لم يُعرَف"}
+                  </span>
+                  <span className="block truncate text-[11px] text-muted" dir="ltr">{d.fileName}</span>
+                </span>
+                <span className="flex shrink-0 flex-wrap items-center gap-1.5">
+                  {/*
+                    «افتحه» قبل «أكّده» عمداً: التأكيدُ شهادةٌ بأنّ ما قرأه
+                    النموذج يطابق الورقة، ولا تُعطى شهادةٌ بلا نظر.
+                  */}
+                  {d.driveFileId && (
+                    <a
+                      href={`https://drive.google.com/file/d/${d.driveFileId}/view`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={buttonClass("quiet", "sm")}
+                    >
+                      افتح المستند
+                    </a>
+                  )}
+                  {canUpload && <ConfirmDocument documentId={d.id} />}
+                  {canUpload && <RejectDocument documentId={d.id} />}
+                </span>
+              </div>
+              {d.invoiceNumber === null ? (
+                <p className="mt-2 text-[11px] leading-relaxed text-warn">
+                  لم تُقيَّد له فاتورة — القراءةُ لم تكفِ لقيدها (مورّدٌ أو مبلغٌ أو تاريخٌ لم يُعرَف).
+                  ارفضه وارفعه من صفحة الرفع لتكمل ما نقص.
+                </p>
+              ) : (
+                <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-5">
+                  <ReadField label="رقم الفاتورة" value={<bdi className="nums">{d.invoiceNumber}</bdi>} />
+                  <ReadField label="التاريخ" value={d.invoiceDate ? <bdi className="nums">{formatDay(d.invoiceDate)}</bdi> : "غير معروف"} />
+                  <ReadField label="قبل الضريبة" value={d.subtotalMinor === null ? "غير معروف" : <Money minor={d.subtotalMinor} />} />
+                  <ReadField label="الضريبة" value={d.vatMinor === null ? "غير معروف" : <Money minor={d.vatMinor} />} />
+                  <ReadField label="الإجمالي" value={d.totalMinor === null ? "غير معروف" : <Money minor={d.totalMinor} />} />
+                </dl>
+              )}
+              {gaps.length === 0 && (
+                <p className="mt-2 text-[11px] text-ok">تجتمع فيه الشروطُ الأربعة — يُعتمَد مع ما فوقه بضغطةٍ واحدة.</p>
+              )}
+              {gaps.length > 0 && (
+                <ul className="mt-2 space-y-0.5 text-[11px] text-warn">
+                  {gaps.filter((g) => g !== "NOT_RECORDED").map((g) => (
+                    <li key={g}>لم يدخل وحده: {GAP_TEXT[g]}</li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function ReadField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] text-muted">{label}</dt>
+      <dd className="truncate text-xs font-bold">{value}</dd>
+    </div>
   );
 }
 

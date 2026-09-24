@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { INVOICE, QUOTATION, countNoun, FILE } from "@/lib/arabic";
 import { buttonClass } from "./ui";
+import { GAP_TEXT, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
 
 interface Summary {
   scope: string;
@@ -18,6 +19,9 @@ interface Summary {
   /** أشهرٌ أوقفتها المهلة — يستأنفها الطلب التالي. */
   pendingMonths?: string[];
   truncated?: boolean;
+  autoArchived?: number;
+  needsReview?: number;
+  renamed?: number;
 }
 
 interface RenameSuggestion {
@@ -43,6 +47,10 @@ interface Result {
   files?: ScannedFile[];
   notes?: string[];
   readFailures?: string[];
+  /** ما سُمّي آلياً بعد أرشفته — بالاسمين. */
+  renamed?: { from: string; to: string }[];
+  /** لماذا لم يدخل ما لم يدخل — مجموعاً بالسبب. */
+  reviewReasons?: { gap: AutoArchiveGap; count: number }[];
 }
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" }) {
@@ -146,6 +154,17 @@ export function DriveSync() {
         */
         let guard = 0;
         const suggestions = [...(json.renameSuggestions ?? [])];
+        /* ما دخل وحده، وما سُمّي، وأسبابُ ما ينتظر — تُجمَع عبر الدفعات */
+        const tally = { auto: 0, review: 0 };
+        const renamedAll: { from: string; to: string }[] = [];
+        const reasons = new Map<AutoArchiveGap, number>();
+        const absorb = (r: Result) => {
+          tally.auto += r.summary.autoArchived ?? 0;
+          tally.review += r.summary.needsReview ?? 0;
+          renamedAll.push(...(r.renamed ?? []));
+          for (const g of r.reviewReasons ?? []) reasons.set(g.gap, (reasons.get(g.gap) ?? 0) + g.count);
+        };
+        absorb(json);
 
         while (guard < 12 && json.summary?.truncated
           && (json.summary.pendingMonths?.length ?? 0) > 0) {
@@ -154,6 +173,7 @@ export function DriveSync() {
             apply, readContent: apply, onlyMonths: json.summary.pendingMonths,
           });
           suggestions.push(...(next.renameSuggestions ?? []));
+          absorb(next);
           json = {
             ...next,
             summary: {
@@ -181,6 +201,7 @@ export function DriveSync() {
             const chunk = queue.splice(0, 2);
             const next = await post({ apply: true, readContent: true, fileIds: chunk });
             suggestions.push(...(next.renameSuggestions ?? []));
+            absorb(next);
             json = {
               ...json,
               summary: {
@@ -200,6 +221,9 @@ export function DriveSync() {
         }
 
         json.renameSuggestions = suggestions;
+        json.renamed = renamedAll;
+        json.reviewReasons = [...reasons.entries()].map(([gap, count]) => ({ gap, count }));
+        json.summary = { ...json.summary, autoArchived: tally.auto, needsReview: tally.review };
 
         setResult(json);
 
@@ -286,6 +310,47 @@ export function DriveSync() {
               {s.contentRead ? ` · قُرئ محتوى ${s.contentRead}` : ""}
               {s.remainingUnnamed ? ` · بقي ${countNoun(s.remainingUnnamed, FILE)} يحتاج قراءة` : ""}
             </p>
+          )}
+
+          {/*
+            ── ما دخل وحده، وما ينتظرك ولماذا ──
+
+            «كلّها فيها المعلومات، لكنّه ما يستخرجها أو ما يعتمدها» — فيُقال
+            بعد كلّ مزامنة كم دخل وحده، وكم ينتظر، وأيُّ شرطٍ أسقط ما ينتظر.
+          */}
+          {result?.applied && ((s.autoArchived ?? 0) > 0 || (s.needsReview ?? 0) > 0) && (
+            <div className="mt-2 rounded-lg border border-line bg-sunken px-3 py-2 text-[11px] leading-relaxed">
+              <p>
+                <strong className="text-ok">دخل وحده {countNoun(s.autoArchived ?? 0, FILE)}</strong>
+                {(s.needsReview ?? 0) > 0 && (
+                  <> · <strong className="text-warn">ينتظر مراجعتك {countNoun(s.needsReview ?? 0, FILE)}</strong>
+                    {" "}— في <a href="/attention?item=pending-documents" className="underline underline-offset-4">يحتاج قرارك</a></>
+                )}
+              </p>
+              {result.reviewReasons && result.reviewReasons.length > 0 && (
+                <ul className="mt-1 space-y-0.5 text-muted">
+                  {result.reviewReasons
+                    .slice()
+                    .sort((a, b) => b.count - a.count)
+                    .map((r) => (
+                      <li key={r.gap}><bdi className="nums">{r.count}</bdi> · {GAP_TEXT[r.gap]}</li>
+                    ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {result?.renamed && result.renamed.length > 0 && (
+            <details className="mt-2 rounded-lg border border-line bg-raised px-3 py-2 text-[11px]">
+              <summary className="cursor-pointer font-bold text-ok">
+                أُعيدت تسمية {countNoun(result.renamed.length, FILE)} في الدرايف آلياً
+              </summary>
+              <ul className="mt-1.5 space-y-0.5 text-muted">
+                {result.renamed.map((r) => (
+                  <li key={r.to} className="truncate" dir="ltr">{r.from} → {r.to}</li>
+                ))}
+              </ul>
+            </details>
           )}
 
           {/*

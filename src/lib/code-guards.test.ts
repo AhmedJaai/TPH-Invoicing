@@ -138,16 +138,17 @@ describe("لا وصولَ إلى db داخل معاملة", () => {
 /* ── ٢. تسمية ملفّات الدرايف في موضعٍ واحد ── */
 
 /**
- * القيد الأوّل: لا تسمية بلا اختيار الإنسان ملفّاً ملفّاً وأثرٍ في السجلّ.
+ * القيد الأوّل: لا تسمية بلا أثرٍ في السجلّ بالاسمين، ولا لما لم يُحسَم.
  * وكانت المزامنة تسمّي وحدها قبل التقييد، بلا أثر. فلا يُستدعى
- * `renameFile` إلّا من المسار الذي يأخذ الاختيار ويكتب الاسمين.
+ * `renameFile` إلّا من خدمة التسمية — وهي التي تكتب الأثر، ولا تسمّي
+ * آلياً إلّا ما أُرشِف (إذن أحمد في ٢٤ سبتمبر ٢٠٢٦).
  */
 const RENAME_ALLOWED = new Set([
   path.join("src", "lib", "drive.ts"),
-  path.join("src", "app", "api", "drive-rename", "route.ts"),
+  path.join("src", "services", "drive-rename.service.ts"),
 ]);
 
-describe("renameFile لا يُستدعى إلّا من /api/drive-rename", () => {
+describe("renameFile لا يُستدعى إلّا من خدمة التسمية", () => {
   it("لا مستدعٍ آخر", () => {
     const offenders = SRC.filter(
       (f) => !RENAME_ALLOWED.has(f) && /\brenameFile\s*\(/.test(readFileSync(f, "utf8")),

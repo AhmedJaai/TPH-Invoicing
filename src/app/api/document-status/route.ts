@@ -13,6 +13,13 @@ import { documents, invoices, statements } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { assertMonthsOpen } from "@/services/month-guard";
 import { recordAudit } from "@/lib/audit";
+import { applySupplierCredit } from "@/services/supplier-credit.service";
+import { renameArchived } from "@/services/drive-rename.service";
+import { loadPendingReview } from "@/services/document-review.service";
+import { refreshTokenFor } from "@/services/drive.service";
+import { driveForUser } from "@/lib/drive";
+import { driveWritesAllowed } from "@/lib/drive-readonly";
+import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { can } from "@/lib/permissions";
 import { formatRiyalsDisplay } from "@/lib/money";
 
@@ -22,7 +29,7 @@ interface Body {
   documentId?: string;
   reason?: string;
   /** «confirm»: ما قرأه النموذج صحيح فيُؤرشَف — والافتراضيّ الرفض */
-  action?: "reject" | "confirm";
+  action?: "reject" | "confirm" | "confirm-eligible";
 }
 
 const UNDECIDED = ["PENDING", "EXTRACTED", "NEEDS_REVIEW"] as const;
@@ -43,6 +50,62 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
   }
+  /*
+    ── اعتمادُ ما اجتمعت فيه الشروط الأربعة ── (إذن أحمد في ٢٤ سبتمبر ٢٠٢٦)
+
+    ما انتظر قبل أن توجد القاعدة: يُعاد الحكمُ عليه هنا من القيد —
+    لا تُؤخَذ من المتصفّح قائمة — ثمّ يُعتمَد كلٌّ في معاملته كالاعتماد
+    اليدويّ تماماً (خصمُ رصيد المورّد، والأثر)، ويُسمّى ما اعتُمد.
+  */
+  if (body.action === "confirm-eligible") {
+    if (!can(user.role, "amounts:view")) {
+      return NextResponse.json({ error: "الاعتماد يحتاج صلاحية عرض المبالغ" }, { status: 403 });
+    }
+    const eligible = (await loadPendingReview()).filter((d) => d.status === "NEEDS_REVIEW" && d.verdict.auto);
+    const done: string[] = [];
+    const skipped: string[] = [];
+    for (const d of eligible.slice(0, 50)) {
+      try {
+        const ok = await db.transaction(async (t) => {
+          const rows = await t.update(documents).set({ status: "ARCHIVED" })
+            .where(and(eq(documents.id, d.id), eq(documents.status, "NEEDS_REVIEW")))
+            .returning({ id: documents.id });
+          if (rows.length === 0) return false;
+          await recordAudit({
+            actorId: user.id,
+            action: "DOCUMENT_STATUS_CHANGED",
+            entityType: "document",
+            entityId: d.id,
+            before: { الحال: "ينتظر المراجعة" },
+            after: { الملف: d.fileName, الحال: "مؤرشف", السبب: "اجتمعت فيه شروطُ الأرشفة الآليّة الأربعة" },
+          }, t);
+          if (d.supplierId) await applySupplierCredit(t, d.supplierId, { forwardDays: SETTLEMENT_FORWARD_DAYS });
+          return true;
+        });
+        if (ok && d.driveFileId) done.push(d.driveFileId);
+        else if (ok) done.push(d.id);
+      } catch (e) {
+        skipped.push(`${d.fileName}: ${(e as Error).message.slice(0, 80)}`);
+      }
+    }
+    let renamed = 0;
+    if (done.length > 0 && driveWritesAllowed(process.env)) {
+      try {
+        const token = await refreshTokenFor(user.id);
+        if (token) renamed = (await renameArchived(driveForUser(token), done, user.id, "الاعتماد الجماعيّ")).done.length;
+      } catch (e) {
+        console.warn("[document-status] تعذّرت التسمية بعد الاعتماد الجماعيّ:", (e as Error).message);
+      }
+    }
+    const message = done.length === 0
+      ? "لا مستندَ تجتمع فيه الشروطُ الآن"
+      : `اعتُمد ${done.length}`
+        + (renamed > 0 ? ` · وسُمّي ${renamed}` : "")
+        + (skipped.length > 0 ? ` · وتعذّر ${skipped.length}: ${skipped[0]}` : "")
+        + (eligible.length > 50 ? ` · بقي ${eligible.length - 50} — اضغط ثانيةً` : "");
+    return NextResponse.json({ ok: true, message, confirmed: done.length, skipped });
+  }
+
   if (typeof body.documentId !== "string" || !body.documentId) {
     return NextResponse.json({ error: "حدّد المستند" }, { status: 400 });
   }
@@ -81,18 +144,54 @@ export async function POST(request: Request) {
         before: { الحال: "ينتظر المراجعة" },
         after: { الملف: rows[0].fileName, الحال: "مؤرشف", السبب: "أكّد ما قرأه النموذج" },
       }, t);
+      /*
+        الرفعُ ممّن لا يرى المبالغ يُقيَّد «ينتظر المراجعة» ولا يُخصم عليه
+        رصيدُ المورّد — بانتظار هذا التأكيد بعينه. فكان التأكيدُ يحوّل
+        الحال وحدها، وتبقى الفاتورةُ مستحقّةً كاملةً ومالٌ دُفع للمورّد
+        قبلها لا يُخصم منها: فتدخل دفعةَ الشهر ويُدفَع الريالُ مرّتين.
+        والخصمُ لا يتكرّر — ما خُصم في المزامنة لا يُخصم ثانيةً.
+      */
+      const [inv] = await t
+        .select({ supplierId: invoices.supplierId })
+        .from(invoices)
+        .where(eq(invoices.documentId, rows[0].id))
+        .limit(1);
+      if (inv?.supplierId) {
+        await applySupplierCredit(t, inv.supplierId, { forwardDays: SETTLEMENT_FORWARD_DAYS });
+      }
       return { ...rows[0], invoices: linked?.invoices ?? 0, statements: linked?.statements ?? 0 };
     });
     if (!confirmed) {
       return NextResponse.json({ error: "المستند ليس بانتظار مراجعة — ربما حُسم من نافذةٍ أخرى" }, { status: 409 });
     }
+    /*
+      ── وما اعتُمد يُسمّى ── (إذن أحمد في ٢٤ سبتمبر ٢٠٢٦)
+
+      اسمُه يُبنى الآن من قيدٍ أقرّه إنسان. والتسميةُ لا توقف الاعتماد:
+      إن تعذّرت (لا تفويض، أو بيئةُ معاينة) بقي الملفّ باسمه واقتُرح في
+      شاشة التسمية.
+    */
+    let renamedTo: string | null = null;
+    if (driveWritesAllowed(process.env)) {
+      try {
+        const [doc] = await db.select({ driveFileId: documents.driveFileId })
+          .from(documents).where(eq(documents.id, confirmed.id)).limit(1);
+        const token = doc?.driveFileId ? await refreshTokenFor(user.id) : null;
+        if (doc?.driveFileId && token) {
+          const outcome = await renameArchived(driveForUser(token), [doc.driveFileId], user.id, "الاعتماد");
+          renamedTo = outcome.done[0]?.to ?? null;
+        }
+      } catch (e) {
+        console.warn("[document-status] تعذّرت التسمية بعد الاعتماد:", (e as Error).message);
+      }
+    }
     /* الرسالة تقول ما وقع: لا «دخلت فاتورتُه الدفعة» لمستندٍ لا فاتورة له */
     const message = confirmed.invoices > 0
-      ? "أُكِّد المستند — وتدخل فاتورتُه دفعةَ الشهر"
+      ? "اعتُمد المستند — وتدخل فاتورتُه دفعةَ الشهر، ويُخصم منها ما دُفع للمورّد مقدَّماً"
       : confirmed.statements > 0
-        ? "أُكِّد الكشف"
-        : "أُكِّد المستند — ولا فاتورةَ مقيَّدة له بعد: ارفعه من صفحة الرفع ليُقرأ ويُقيَّد";
-    return NextResponse.json({ ok: true, message });
+        ? "اعتُمد الكشف"
+        : "اعتُمد المستند — ولا فاتورةَ مقيَّدة له بعد: ارفعه من صفحة الرفع ليُقرأ ويُقيَّد";
+    return NextResponse.json({ ok: true, message: renamedTo ? `${message} · وسُمّي ${renamedTo}` : message });
   }
 
   const reason = body.reason?.trim().slice(0, 500) || "رُفض من صفحة المستندات";
