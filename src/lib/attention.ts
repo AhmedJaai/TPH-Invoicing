@@ -2,6 +2,10 @@ import {
   BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, countNoun,
 } from "./arabic";
 import { OVERDUE_DAYS } from "./invoice-filter";
+import { formatDay } from "./riyadh-time";
+
+/** بعد كم يوماً من آخر كشفٍ يصير وقوفُه بنداً — الكشفُ يُستورَد أسبوعيّاً. */
+export const BANK_STALE_DAYS = 7;
 /**
  * ما يحتاج انتباهك.
  *
@@ -205,6 +209,13 @@ export interface AttentionFacts {
   bankGapRanges: AttentionEvidence[];
   /** فرقٌ بين ما يقوله البنك وما تقتضيه الحركات المقروءة. */
   bankBalanceDifferenceMinor: number | null;
+  /**
+   * آخرُ يومٍ في آخر كشفٍ مستورَد، وكم مضى عليه. الفجوةُ تُحسب **بين**
+   * الكشوف وحدها، فالكشفُ الذي وقف قبل ثلاثة أسابيع لا يراه عدّاد —
+   * وكلُّ رقمٍ بعدها (ما دفعتَه، وما طابقتَه، ورصيدُ المورّد) يقف معه.
+   */
+  bankLastDay?: string | null;
+  bankStaleDays?: number | null;
 
   /** أصناف ارتفع سعرها عند مورّدها */
   priceRises: AttentionEvidence[];
@@ -245,6 +256,26 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: f.bankGapDays,
       impact: { kind: "BLOCKED", amountMinor: null },
       evidence: f.bankGapRanges,
+    });
+  }
+
+  /*
+    الكشفُ الواقف: ما بعد آخر يومٍ فيه غائبٌ كالفجوة، لكنّه في آخر
+    الخطّ فلا يقع بين كشفين. وأسبوعٌ مهلة: الكشفُ يُستورَد أسبوعيّاً.
+  */
+  if (f.bankLastDay && f.bankStaleDays != null && f.bankStaleDays > BANK_STALE_DAYS) {
+    out.push({
+      id: "bank-stale",
+      area: "BANK",
+      severity: "HIGH",
+      title: `كشف البنك يقف عند ${formatDay(f.bankLastDay)}`,
+      detail: `مضى ${countNoun(f.bankStaleDays, DAY)} لا يعرف النظام ما دخل فيها وما خرج — فما دفعتَه لمورّديك ورصيدُ كلٍّ منهم على ما قبلها.`,
+      action: "استورد الكشف من اليوم التالي له إلى اليوم.",
+      actionLabel: "استورد كشفاً",
+      href: "/bank#import",
+      count: f.bankStaleDays,
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: [],
     });
   }
 

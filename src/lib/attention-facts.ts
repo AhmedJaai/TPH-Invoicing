@@ -8,7 +8,7 @@ import { bankTransactions, suppliers } from "@/db/schema";
 import { formatRiyalsDisplay } from "./money";
 import type { AttentionEvidence, AttentionFacts } from "./attention";
 import { previousMonth } from "./filing";
-import { currentMonthRiyadh, formatDay } from "./riyadh-time";
+import { currentMonthRiyadh, daysSinceRiyadh, formatDay } from "./riyadh-time";
 import { findReversals } from "./bank/reversal";
 import { analyzeCoverage } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
@@ -197,6 +197,8 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     .filter((r): r is { start: string; end: string } => r.start !== null && r.end !== null);
 
   const coverage = periods.length > 0 ? analyzeCoverage(periods) : null;
+  const bankLastDay = coverage?.to ?? null;
+  const bankStaleDays = bankLastDay ? daysSinceRiyadh(bankLastDay) : null;
   const gaps = coverage?.gaps ?? [];
 
   const bankGapRanges = gaps.slice(0, 8).map<AttentionEvidence>((g) => ({
@@ -398,6 +400,8 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     bankGapDays: gaps.reduce((sum, g) => sum + g.days, 0),
     bankGapRanges,
     bankBalanceDifferenceMinor: balance.differenceMinor,
+    bankLastDay,
+    bankStaleDays,
     openBlockers: Number(counts?.open_blockers ?? 0),
     pendingDocuments: Number(counts?.pending_docs ?? 0),
     /*
@@ -439,7 +443,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
       amountMinor: r.unbackedMinor,
     })),
     priceRises,
-    // الأثر السنوي يحتاج دورة الطلب؛ يُقدَّر هنا بفارق السعر × عشرين طلباً
+    // الزيادة × ما اشتُري فعلاً في آخر سنة — الحسابُ في الاستعلام أعلاه
     priceRiseAnnualMinor,
   };
 }

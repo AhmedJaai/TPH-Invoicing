@@ -22,6 +22,12 @@ export function todayInRiyadh(at: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+/** كم يوماً مضى على يومٍ (`YYYY-MM-DD`) حتى اليوم بتوقيت الرياض. */
+export function daysSinceRiyadh(day: string, at: Date = new Date()): number {
+  const t = (d: string) => Date.parse(`${d}T00:00:00Z`);
+  return Math.round((t(todayInRiyadh(at)) - t(day)) / 86_400_000);
+}
+
 /** YYYY-MM بتوقيت الرياض. */
 export function currentMonthRiyadh(at: Date = new Date()): string {
   return todayInRiyadh(at).slice(0, 7);

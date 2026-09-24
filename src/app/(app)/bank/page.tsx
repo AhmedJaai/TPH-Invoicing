@@ -14,14 +14,15 @@ import { pendingDecision } from "@/lib/bank/pending";
 import { toCanonical } from "@/lib/bank/canonical";
 import { groupByIdentity } from "@/lib/bank/pattern";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
-import { countNoun, ITEM, TRANSACTION } from "@/lib/arabic";
+import { countNoun, DAY, ITEM, TRANSACTION } from "@/lib/arabic";
 import {
   findDoublePaid, partitionDoublePaid,
   type DoublePaidTx,
 } from "@/lib/bank/double-paid";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
-import { formatDay } from "@/lib/riyadh-time";
+import { daysSinceRiyadh, formatDay } from "@/lib/riyadh-time";
+import { BANK_STALE_DAYS } from "@/lib/attention";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,8 @@ export default async function BankPage({
     db.execute<Record<string, number>>(sql`
       select
         (select count(*)::int from bank_transactions)                                as tx,
+        (select to_char(min(value_date), 'YYYY-MM-DD') from bank_transactions)       as first_day,
+        (select to_char(max(value_date), 'YYYY-MM-DD') from bank_transactions)       as last_day,
         (select count(*)::int from bank_transactions
           where match_disposition = 'AUTO')                                         as auto,
         (select count(*)::int from bank_transactions
@@ -364,6 +367,10 @@ export default async function BankPage({
 
   const f = counts.rows[0] ?? {};
   const n = (k: string) => Number(f[k] ?? 0);
+  const firstDay = f.first_day ? String(f.first_day) : null;
+  const lastDay = f.last_day ? String(f.last_day) : null;
+  const staleDays = lastDay ? daysSinceRiyadh(lastDay) : null;
+  const stale = staleDays !== null && staleDays > BANK_STALE_DAYS;
 
   return (
     <PageShell
@@ -372,6 +379,8 @@ export default async function BankPage({
       /* اسمُ الصفحة هو اسمُ لسانها حرفاً بحرف — «فعلٌ واحد باسمٍ واحد» */
       title="حركة البنك"
       intro="أين تحرّكت الأموال. وكلّ مطابقةٍ هنا تقول لماذا طُوبقت، ويمكن التراجع عنها."
+      /* الاستيرادُ أوّلُ أفعال الصفحة وكان في آخرها، تحت ألف حركة */
+      actions={canEdit ? <LinkButton href="#import" variant={stale ? "primary" : "secondary"}>استورد كشفاً</LinkButton> : undefined}
     >
       {/* ── الحركة التي فُتحت عليها الصفحة ── */}
       {focused && (
@@ -441,16 +450,28 @@ export default async function BankPage({
           وبقيت «إيداعات مدى» لأنّها وحدها خبرٌ عن هذا الحساب: من أين
           يدخل المال.
         */}
+        {/*
+          ما يغطّيه الكشفُ أوّلُ ما يُقرأ: كلُّ رقمٍ في الصفحة على ما قبل
+          آخر يومٍ فيه. وكان يُقال «١٤٤٠ حركة مخزّنة بعد إزالة المكرَّر»
+          ولا يُقال إنّ آخرها قبل ثلاثة أسابيع.
+        */}
+        <Stat
+          label="الكشف المستورَد"
+          value={lastDay ? `حتى ${formatDay(lastDay)}` : "غير معروف"}
+          tone={stale ? "warn" : undefined}
+          sub={
+            stale
+              ? `وقف منذ ${countNoun(staleDays, DAY)} — ما بعده لا يعرفه النظام.`
+              : `من ${formatDay(firstDay)} · ${countNoun(n("tx"), TRANSACTION)}`
+          }
+        />
         <Stat
           label="إيداعات مدى (نقاط البيع)"
           minor={n("settled")}
           tone="ok"
-          sub="إيراد البطاقات يصل حسابك"
+          sub={firstDay && lastDay ? `إيراد البطاقات من ${formatDay(firstDay)} إلى ${formatDay(lastDay)}` : "إيراد البطاقات يصل حسابك"}
         />
       </StatGrid>
-      <p className="mt-2 text-[11px] text-muted">
-        {countNoun(n("tx"), TRANSACTION)} مخزّنة بعد إزالة المكرَّر.
-      </p>
       </>)}
 
       {/*

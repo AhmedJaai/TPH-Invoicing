@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  currentMonthRiyadh, dayOfMonthRiyadh, formatDay, formatMonth, formatRange, todayInRiyadh,
+  currentMonthRiyadh, dayOfMonthRiyadh, daysSinceRiyadh, formatDay, formatMonth, formatRange, todayInRiyadh,
 } from "./riyadh-time";
 
 describe("الشهر بتوقيت الرياض", () => {
@@ -54,5 +54,13 @@ describe("التاريخ كما يُقرأ", () => {
     expect(r).toContain(" إلى ");
     expect(r).not.toContain("←");
     expect(r).not.toContain("→");
+  });
+});
+
+describe("daysSinceRiyadh", () => {
+  it("يعدّ بيوم الرياض لا بيوم غرينتش", () => {
+    // ٢٣:٣٠ بغرينتش في ٢٣ سبتمبر = ٠٢:٣٠ في ٢٤ سبتمبر بالرياض
+    expect(daysSinceRiyadh("2026-09-03", new Date("2026-09-23T23:30:00Z"))).toBe(21);
+    expect(daysSinceRiyadh("2026-09-24", new Date("2026-09-24T09:00:00Z"))).toBe(0);
   });
 });

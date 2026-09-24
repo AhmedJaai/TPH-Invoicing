@@ -1,6 +1,8 @@
 import { AreaTabs, MobileTabBar, Sidebar, UploadButton, type ShellCounts } from "./nav";
 import { CommandPalette, CommandTrigger } from "./command-palette";
+import { Suspense } from "react";
 import { AutoProcess } from "./auto-process";
+import { HashScroll } from "./hash-scroll";
 import { TrialBanner } from "./trial-banner";
 import { UserMenu } from "./user-menu";
 import { ViewControls } from "./view-controls";
@@ -116,6 +118,9 @@ export function AppShell({
 
       <CommandPalette role={user.role} canSearch={can(user.role, "document:view")} />
       {can(user.role, "document:upload") && can(user.role, "amounts:view") && <AutoProcess />}
+      <Suspense fallback={null}>
+        <HashScroll />
+      </Suspense>
     </div>
   );
 }

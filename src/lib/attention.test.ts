@@ -24,6 +24,21 @@ const quiet: AttentionFacts = {
 
 const ids = (f: Partial<AttentionFacts>) => buildAttention({ ...quiet, ...f }).map((i) => i.id);
 
+describe("الكشفُ الواقف", () => {
+  it("أسبوعٌ مهلة، وما بعده بندٌ يقول آخر يومٍ ويفتح الاستيراد", () => {
+    expect(ids({ bankLastDay: "2026-09-17", bankStaleDays: 7 })).not.toContain("bank-stale");
+    const [item] = buildAttention({ ...quiet, bankLastDay: "2026-09-03", bankStaleDays: 21 });
+    expect(item.id).toBe("bank-stale");
+    expect(item.title).toContain("3 سبتمبر 2026");
+    expect(item.href).toBe("/bank#import");
+    expect(item.impact).toEqual({ kind: "BLOCKED", amountMinor: null });
+  });
+
+  it("بلا كشفٍ أصلاً لا يُقال «واقف» — ذاك سؤالُ «ابدأ من هنا»", () => {
+    expect(ids({ bankLastDay: null, bankStaleDays: null })).not.toContain("bank-stale");
+  });
+});
+
 describe("buildAttention", () => {
   it("البيانات النظيفة لا تُنتج بنوداً", () => {
     expect(buildAttention(quiet)).toHaveLength(0);
