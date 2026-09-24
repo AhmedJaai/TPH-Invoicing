@@ -27,6 +27,8 @@ interface Body {
   paperInvoices?: boolean;
   contractRequired?: boolean;
   contractOnFile?: boolean;
+  /** أيصدر كشفَ حساب؟ (044) */
+  issuesStatements?: boolean;
 }
 
 export async function POST(request: Request) {
@@ -56,6 +58,7 @@ export async function POST(request: Request) {
       paperInvoices: suppliers.paperInvoices,
       contractRequired: suppliers.contractRequired,
       contractOnFile: suppliers.contractOnFile,
+      issuesStatements: suppliers.issuesStatements,
     })
     .from(suppliers)
     .where(eq(suppliers.id, id))
@@ -68,6 +71,7 @@ export async function POST(request: Request) {
     paperInvoices: body.paperInvoices ?? before.paperInvoices,
     contractRequired: body.contractRequired ?? before.contractRequired,
     contractOnFile: body.contractOnFile ?? before.contractOnFile,
+    issuesStatements: body.issuesStatements ?? before.issuesStatements,
   };
 
   /*

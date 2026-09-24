@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RejectDocument } from "@/components/reject-document";
 import { redirect } from "next/navigation";
 import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
@@ -313,8 +314,10 @@ export default async function InvoicesPage({
             وما لم تقرأه أصلاً (البنود · التفصيل الضريبيّ) يُعاد قراءتُه.
             وكان أحدهما غائباً والآخر غائباً معه.
           */}
-          <div className="mb-3">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
             <DocumentReread documentId={fix.documentId} canEdit={canEditInvoices} />
+            {/* فاتورةٌ ألغاها المورّد لا تُعالَج — تُلغى، ويبقى ملفُّها في الدرايف */}
+            {canEditInvoices && fix.documentId && <RejectDocument documentId={fix.documentId} cancel />}
           </div>
 
           <InvoiceFix

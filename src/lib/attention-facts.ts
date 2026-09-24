@@ -56,7 +56,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
   const vatEvidence = (
     await db.execute<Row>(sql`
-      select i.invoice_number, s.name_ar, i.vat_minor, i.invoice_date::date
+      select i.id, i.invoice_number, s.name_ar, i.vat_minor, i.invoice_date::date
       from invoices i left join suppliers s on s.id = i.supplier_id
       where i.input_vat_status='NOT_ELIGIBLE' and i.vat_minor > 0
       order by i.vat_minor desc limit 10
@@ -65,6 +65,12 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     label: String(r.invoice_number),
     sub: `${r.name_ar ?? "—"} · ${new Date(r.invoice_date as string).toISOString().slice(0, 10)}`,
     amountMinor: Number(r.vat_minor),
+    /*
+      «بعضهم ما عندهم ضريبة، أو ما سجّلوا ضريبتي وتعدّلت» (أحمد) — فالإصلاحُ
+      لكلّ فاتورةٍ في موضعها: رقمُنا الضريبيّ يُكتب إن صُحّحت الفاتورة، أو
+      الضريبةُ صفرٌ إن لم يكن المورّدُ مسجَّلاً — والخادمُ يعيد اشتقاق الحال.
+    */
+    href: `/purchases/invoices?fix=${encodeURIComponent(String(r.id))}#fix`,
   }));
 
   const unknownEvidence = (

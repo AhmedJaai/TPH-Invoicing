@@ -28,6 +28,8 @@ interface Preview {
   linesWritten?: number;
   taxStatus?: string;
   note?: string;
+  /** القراءةُ لا تستقيم — تُقال بأرقامها، ولا تُكتَب مبالغُها. */
+  problem?: string | null;
 }
 
 /**
@@ -73,7 +75,8 @@ export function DocumentReread({
       setPreview(null);
       setDone(
         `كُتبت القراءة — ${r.data.linesWritten ?? 0} بنداً.`
-        + (r.data.taxStatus === "VALID" ? " وصارت الفاتورة مستوفيةَ الأركان." : ""),
+        + (r.data.taxStatus === "VALID" ? " وصارت الفاتورة مستوفيةَ الأركان." : "")
+        + (r.data.problem ? ` ${r.data.problem}` : ""),
       );
       router.refresh();
       return;
@@ -105,6 +108,11 @@ export function DocumentReread({
         <div className="rounded-xl border border-line bg-sunken/50 p-3">
           <p className="text-xs font-bold">ما قرأه النموذج الآن — لم يُكتَب بعد</p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{preview.note}</p>
+          {preview.problem && (
+            <p className="mt-2 rounded-lg bg-warn-bg px-2.5 py-1.5 text-[11px] leading-relaxed text-warn" role="status">
+              {preview.problem}
+            </p>
+          )}
 
           <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] sm:grid-cols-3">
             <Pair label="الصافي" value={money(preview.read.subtotalMinor)} />

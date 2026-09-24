@@ -40,6 +40,8 @@ export interface AttentionEvidence {
   label: string;
   sub?: string;
   amountMinor?: number;
+  /** موضعُ إصلاح هذا السطر بعينه — لا الصفحةُ الجامعة. */
+  href?: string;
 }
 
 /**

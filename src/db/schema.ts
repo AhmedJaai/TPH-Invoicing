@@ -104,6 +104,8 @@ export const suppliers = pgTable("suppliers", {
     «لا يصدر فواتير» عنه خبرٌ كاذب يجرّ إلى مطالبته بعقدٍ لا يحتاجه.
   */
   paperInvoices: boolean("paper_invoices").notNull().default(false),
+  /** أيصدر كشفَ حساب؟ — يكتبه الإنسان (044)، ومن لا يصدره لا يُطلَب منه. */
+  issuesStatements: boolean("issues_statements").notNull().default(true),
   contractDriveFileId: text("contract_drive_file_id"),
 
   /** حد الرصيد الذي يفتح تنبيهاً، بالهللات. فارغ = بلا حد */

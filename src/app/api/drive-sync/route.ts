@@ -151,7 +151,7 @@ async function handle(request: Request) {
   const firstCall = !body.fileIds?.length && !body.onlyMonths?.length;
   const backlog = apply && firstCall
     ? await processDocumentBacklog(user.id, drive)
-    : { recorded: 0, approved: 0, renamed: [] as { from: string; to: string }[], notes: [] as string[] };
+    : { recorded: 0, approved: 0, renamed: [] as { from: string; to: string }[], reread: 0, notes: [] as string[] };
 
   const known = new Set(
     (await db.select({ id: documents.driveFileId }).from(documents))

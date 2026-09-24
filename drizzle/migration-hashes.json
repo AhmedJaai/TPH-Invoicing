@@ -41,5 +41,6 @@
   "040_count_scope.sql": "3d2e7ce524f117ec2e6f4ee81c8b7ad44af81ba76da3615371fe2b4195157f32",
   "041_inventory_manual_inputs.sql": "a160a7c49f5c6fa22b58bcf2e460d6306a73dc84d8d7fd8888899d8b67bf96bc",
   "042_posted_supplier_category.sql": "c121d5c489f8bc94c5e79ec38402a45ad121d8717f87017c5bf984de89a3a02b",
-  "043_human_confirmed_source.sql": "37d7f1926cc89d92a21617fe877602a0a8473266ff139fa0bae622d22a53ffe1"
+  "043_human_confirmed_source.sql": "37d7f1926cc89d92a21617fe877602a0a8473266ff139fa0bae622d22a53ffe1",
+  "044_supplier_issues_statements.sql": "a6c2491e2c20b40e0d636496950508905cfd79cad1d949461ed11fb31d804fc7"
 }
