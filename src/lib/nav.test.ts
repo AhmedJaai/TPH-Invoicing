@@ -261,9 +261,15 @@ describe("سلامة البنية", () => {
   فيقرأ صاحب المقهى عنواناً ثمّ يراه يتبدّل أمامه، فيشكّ أنّه انتقل.
 */
 describe("الهيكل يحمل اسم صفحته", () => {
+  /*
+    عنوانُ الصفحة هو خاصّيّةُ `PageShell` أو `PageSkeleton` — لا أوّلُ
+    `title="` في الملفّ: كان يلتقط عنوانَ قسمٍ («ما نعرفه مقابل ما يقوله
+    كشفه») في ملفّ المورّد وعنوانُ الصفحة فيه محسوبٌ من اسمه.
+  */
   const titleOf = (file: string): string | null => {
     if (!existsSync(file)) return null;
-    return readFileSync(file, "utf8").match(/title="([^"]+)"/)?.[1] ?? null;
+    const m = readFileSync(file, "utf8").match(/<(?:PageShell|PageSkeleton)\b[\s\S]*?\btitle=(?:"([^"]+)"|\{)/);
+    return m?.[1] ?? null;
   };
 
   const loadings: string[] = [];
