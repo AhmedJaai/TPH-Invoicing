@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeCoverage, describeCoverage, type Period } from "./coverage";
+import { analyzeCoverage, describeCoverage, monthGapDays, type Period } from "./coverage";
 
 const p = (start: string, end: string, label?: string): Period => ({ start, end, label });
 
@@ -87,5 +87,31 @@ describe("describeCoverage", () => {
 
   it("لا شيء بعد", () => {
     expect(describeCoverage(analyzeCoverage([]))).toContain("لم يُستورَد");
+  });
+});
+
+describe("monthGapDays — الرأسُ يُعدّ كما يُعدّ الذيل", () => {
+  it("كشفٌ من ٢ إلى ٣٠ أغسطس يترك يومين: الأوّل والحادي والثلاثين", () => {
+    expect(monthGapDays([{ start: "2026-08-02", end: "2026-08-30" }], "2026-08-01", "2026-08-31")).toBe(2);
+  });
+
+  it("كشفٌ يبدأ في العاشر يترك تسعة أيّامٍ في رأسه لا ثمانية", () => {
+    expect(monthGapDays([{ start: "2026-08-10", end: "2026-08-31" }], "2026-08-01", "2026-08-31")).toBe(9);
+  });
+
+  it("الشهرُ المغطّى كلُّه صفر — والفترةُ الأوسع منه تُقصّ عليه", () => {
+    expect(monthGapDays([{ start: "2026-07-20", end: "2026-09-05" }], "2026-08-01", "2026-08-31")).toBe(0);
+  });
+
+  it("الفجوةُ بين كشفين تُعدّ مع الرأس والذيل", () => {
+    expect(monthGapDays(
+      [{ start: "2026-08-01", end: "2026-08-10" }, { start: "2026-08-15", end: "2026-08-31" }],
+      "2026-08-01", "2026-08-31",
+    )).toBe(4);
+  });
+
+  it("بلا كشفٍ في الشهر لا يُقال «ثلاثون يوماً» — يُقال لا كشف", () => {
+    expect(monthGapDays([{ start: "2026-06-01", end: "2026-06-30" }], "2026-08-01", "2026-08-31")).toBeNull();
+    expect(monthGapDays([], "2026-08-01", "2026-08-31")).toBeNull();
   });
 });

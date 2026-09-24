@@ -192,13 +192,18 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
 
   items.push({
     id: "bank",
-    label: "كشف البنك مستورد ويغطّي الشهر",
+    /*
+      «ويغطّي الشهر» كان ادّعاءً فوق ما يُفحَص هنا: الشرطُ حركةٌ واحدة في
+      الشهر. فينجح بجانب «لا أيّام بلا كشف» الساقط، وتناقض القائمةُ نفسها.
+      والتغطيةُ يفحصها البندُ الذي يليه.
+    */
+    label: "كشف البنك مستورد لهذا الشهر",
     /*
       غيابُ الكشف مانع لا تنبيه: أيّام الشهر كلّها فجوة، والفجوة يقين.
       وكان «تنبيهاً» فيُقفَل شهرٌ لم يُقرأ منه ريالٌ بنكيّ.
     */
     state: facts.bankImportCoversMonth ? "PASS" : "BLOCK",
-    detail: facts.bankImportCoversMonth ? "السداد مثبت بحركات بنكية" : "لم يُستورد كشف بنك يغطّي الشهر — أيّامه كلّها فجوة",
+    detail: facts.bankImportCoversMonth ? "في الشهر حركاتٌ من كشف البنك" : "لم يُستورد كشف بنك لهذا الشهر — أيّامه كلّها فجوة",
     action: facts.bankImportCoversMonth ? undefined : "استورد كشف الحساب من صفحة البنك",
   });
 

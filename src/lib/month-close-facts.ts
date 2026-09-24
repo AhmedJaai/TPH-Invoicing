@@ -9,7 +9,7 @@ import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bankTransactions, documents, invoices, issues } from "@/db/schema";
 import { nextMonth } from "./filing";
-import { analyzeCoverage } from "./bank/coverage";
+import { monthGapDays } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
 import type { MonthFacts } from "./month-close";
 import { SETTLED_TOLERANCE_MINOR } from "./supplier-balances";
@@ -110,30 +110,10 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
       group by bank_import_id
     `)
   ).rows
-    .filter((r): r is { start: string; end: string } => r.start !== null && r.end !== null)
-    .map((r) => ({
-      start: r.start < monthStartIso ? monthStartIso : r.start,
-      end: r.end > monthEndIso ? monthEndIso : r.end,
-    }))
-    .filter((r) => r.start <= r.end);
+    .filter((r): r is { start: string; end: string } => r.start !== null && r.end !== null);
 
-  const gapDays = importPeriods.length === 0
-    ? 0
-    : (() => {
-        const cov = analyzeCoverage([...importPeriods, { start: monthStartIso, end: monthStartIso }]);
-        const days = cov.gaps
-          .filter((g) => g.start <= monthEndIso && g.end >= monthStartIso)
-          .reduce((sum, g) => sum + g.days, 0);
-        /* والذيل الناقص فجوةٌ أيضاً: كشفٌ ينتهي في ٢٠ والشهر ثلاثون */
-        const covered = cov.to;
-        const tail = covered !== null && covered < monthEndIso
-          ? Math.round(
-              (new Date(`${monthEndIso}T00:00:00Z`).getTime()
-                - new Date(`${covered}T00:00:00Z`).getTime()) / 86_400_000,
-            )
-          : 0;
-        return days + tail;
-      })();
+  /* الرأسُ والوسطُ والذيل — `monthGapDays` تشرح لِمَ لا فترةَ حارسة */
+  const gapDays = monthGapDays(importPeriods, monthStartIso, monthEndIso) ?? 0;
 
   /*
     الأرصدة تُقرأ من فترة التسوية إن سُجّلت. وما لم يُسجَّل يبقى `null`
