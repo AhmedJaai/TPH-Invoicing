@@ -421,6 +421,11 @@ export default async function BankPage({
         </p>
       )}
 
+      {/*
+        بلا كشفٍ مستورَد لا يُعرض «إيداعات مدى ٠٫٠٠» بالأخضر — صفرٌ عن غير
+        علم. ويبقى قسمُ الاستيراد أدناه، وهو الفعلُ الوحيد هنا.
+      */}
+      {n("tx") > 0 && (<>
       <StatGrid>
         {/*
           ── بطاقتان خرجتا من هنا ──
@@ -446,6 +451,7 @@ export default async function BankPage({
       <p className="mt-2 text-[11px] text-muted">
         {countNoun(n("tx"), TRANSACTION)} مخزّنة بعد إزالة المكرَّر.
       </p>
+      </>)}
 
       {/*
         «سُدّد مرّتين» كان معروضاً هنا كاملاً — البند نفسه والمبالغ نفسها

@@ -98,6 +98,8 @@ export default async function PaymentsPage({
       title={`دفعة الشهر — ${formatMonth(month)}`}
       intro="مستحقّات الشهر المنقضي وما تأخّر قبله، مورّداً مورّداً. ما ليس فاتورة ضريبية كاملة يُحجز — السداد قبل الحصول عليها يفقدك ورقة التفاوض الوحيدة."
     >
+      {/* أربعةُ أصفارٍ فوق «لا مستحقّات» تكرارٌ لا خبر — والجملةُ تحتها تقول ما يُعرَف */}
+      {(run.ready.length > 0 || run.held.length > 0 || run.coveredByCredit.length > 0) && (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">جاهز للتحويل</p>
@@ -130,6 +132,7 @@ export default async function PaymentsPage({
           )}
         </div>
       </div>
+      )}
 
       {run.ready.length === 0 && run.held.length === 0 ? (
         <div className="mt-8">

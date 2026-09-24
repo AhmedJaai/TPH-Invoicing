@@ -9,7 +9,7 @@ import { Figure } from "@/components/figure";
 import { gatherHomeProvenance } from "@/lib/provenance-facts";
 import { buildCashFlow, type CashMovement } from "@/lib/cashflow";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
-import { DataTable, NoAccess, Section, Stat } from "@/components/ui";
+import { DataTable, EmptyState, LinkButton, NoAccess, Section, Stat } from "@/components/ui";
 import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { formatMonth } from "@/lib/riyadh-time";
 import { looksLikeGoodsPurchase } from "@/lib/expenses";
@@ -100,6 +100,25 @@ export default async function MoneyPage() {
   }
   const byCategory = [...categoryTotals.values()].sort((a, b) => b.s - a.s);
   const expenseTotal = byCategory.reduce((s, c) => s + c.s, 0);
+
+  /*
+    ── بلا كشفٍ لا جوابَ هنا ──
+
+    كانت الصفحةُ على قاعدةٍ بلا كشف تقول «الصادر ٠٫٠٠ · كلُّ الصادر معروفُ
+    الوجه» و«حركاتُ كشف البنك ٠ — كلُّها مصنّفة» بالأخضر. أصفارٌ عن غير
+    علم، وطمأنينةٌ عن كشفٍ لم يُرفَع. فيُقال ما ينقص، ومعه فعلُه.
+  */
+  if (n("tx") === 0) {
+    return (
+      <PageShell user={user} width="wide" title="أين ذهب المال" intro="من كشف بنكك وفواتيرك، لا من تقدير.">
+        <EmptyState
+          title="لم يُستورَد كشفُ بنكٍ بعد."
+          hint="بلا كشفٍ لا يُعرَف ما خرج من الحساب ولا أين — فلا يُعرَض هنا رقمٌ يُقرأ صفراً."
+          action={<LinkButton href="/bank#import" variant="primary">استورد كشف البنك</LinkButton>}
+        />
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell

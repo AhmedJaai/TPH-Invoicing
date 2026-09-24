@@ -4,7 +4,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Section } from "@/components/ui";
+import { Section, buttonClass } from "@/components/ui";
 import { TaskList } from "@/components/task-list";
 import { prioritize } from "@/lib/attention";
 import { attentionItems } from "@/lib/work";
@@ -13,6 +13,8 @@ import { buildChanges, notable } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
 import { DAY, ITEM, SUPPLIER, countNoun } from "@/lib/arabic";
 import { formatMonth } from "@/lib/riyadh-time";
+import type { StartStep } from "@/lib/start";
+import { loadStartState } from "@/services/start.service";
 import { loadBalanceTotals, loadOverdueBalances } from "@/services/supplier-balance.service";
 
 export const dynamic = "force-dynamic";
@@ -86,10 +88,11 @@ export default async function HomePage() {
   // مدير المشتريات لا يرى المال — تُعرض له وجهته مباشرةً
   if (!can(user.role, "amounts:view")) redirect("/upload");
 
-  const [attention, balances, overdue] = await Promise.all([
+  const [attention, balances, overdue, start] = await Promise.all([
     attentionItems(),
     loadBalanceTotals(),
     loadOverdueBalances(),
+    loadStartState(),
   ]);
 
   const { totals } = balances;
@@ -117,6 +120,14 @@ export default async function HomePage() {
       title="حال المقهى"
       intro="ما تحتاج معرفته أو فعله اليوم."
     >
+      {/* ── أوّلُ يوم: ما ينقص النظامَ ليعرف ── */}
+      {start.incomplete && <StartSteps steps={start.steps} knowsNothing={start.knowsNothing} />}
+
+      {/*
+        شريطُ الحال لا يُعرض عن غير علم: «عليك ٠٫٠٠» بلا فاتورةٍ واحدة
+        في النظام يقول «لا دَين» — والنظامُ لم يقرأ شيئاً بعد.
+      */}
+      {!start.knowsNothing && (<>
       {/* ── شريطُ الحال: خبرٌ في سطر، لا لوحةُ مؤشّرات ── */}
       <div className="flex flex-col divide-y divide-line rounded-2xl border border-line bg-raised p-1 shadow-raised sm:flex-row sm:divide-x sm:divide-x-reverse sm:divide-y-0">
         <Fact
@@ -158,12 +169,13 @@ export default async function HomePage() {
           }
         />
       </div>
+      </>)}
 
       {/* ── ما ينتظرك ── */}
       <Section
-        title={attention.length === 0 ? "لا شيء ينتظر قرارك" : "ما ينتظر قرارك"}
+        title={attention.length === 0 ? (start.knowsNothing ? "ما ينتظر قرارك" : "لا شيء ينتظر قرارك") : "ما ينتظر قرارك"}
         hint={
-          attention.length === 0
+          attention.length === 0 && !start.knowsNothing
             ? "لا مالٌ خرج مرّتين، ولا دفعةٌ بلا مستند، ولا مستندٌ ينتظر."
             : undefined
         }
@@ -195,14 +207,21 @@ export default async function HomePage() {
             )}
           </>
         ) : (
-          <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ok">
-            كلُّ ما يعرفه النظام سليم.
-          </p>
+          start.knowsNothing ? (
+            /* «كلُّ ما يعرفه سليم» عن نظامٍ لا يعرف شيئاً طمأنينةٌ بلا سند */
+            <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
+              يظهر هنا ما يحتاج قرارك حين يقرأ النظام مستنداتك وكشفك.
+            </p>
+          ) : (
+            <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ok">
+              كلُّ ما يعرفه النظام سليم.
+            </p>
+          )
         )}
       </Section>
 
-      {/* ── ما تحرّك ── */}
-      <Section title="ما الذي تغيّر" hint="منذ الأسبوع الماضي — وما في شريط الحال ليس مكرَّراً هنا.">
+      {/* ── ما تحرّك ── (ولا شيء يتحرّك في نظامٍ لم يقرأ شيئاً) */}
+      {!start.knowsNothing && <Section title="ما الذي تغيّر" hint="منذ الأسبوع الماضي — وما في شريط الحال ليس مكرَّراً هنا.">
         {changes.length > 0 ? (
           <Changes changes={changes} />
         ) : (
@@ -214,8 +233,45 @@ export default async function HomePage() {
             لا تغيّر يستحقّ الذكر منذ الأسبوع الماضي.
           </p>
         )}
-      </Section>
+      </Section>}
 
     </PageShell>
   );
 }
+
+/** «ابدأ من هنا» — الخطواتُ بترتيبها، وما تمّ منها يُقال إنّه تمّ. */
+function StartSteps({ steps, knowsNothing }: { steps: StartStep[]; knowsNothing: boolean }) {
+  const next = steps.find((s) => !s.done);
+  return (
+    <section aria-labelledby="start-title" className="mb-8 rounded-2xl border border-line bg-raised p-5 shadow-raised">
+      <h2 id="start-title" className="font-display text-lg font-bold">
+        {knowsNothing ? "ابدأ من هنا" : "بقي ما يُكمل الصورة"}
+      </h2>
+      <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+        {knowsNothing
+          ? "النظامُ لا يعرف شيئاً بعد — فلا يقول لك «عليك صفر». خطوتان تكفيان ليعرف لمن تدين وأين ذهب المال."
+          : "ما لم يُستورَد مجهولٌ لا صفر — والأرقامُ أدناه على ما قُرئ وحده."}
+      </p>
+      <ol className="mt-4 space-y-2">
+        {steps.map((s, i) => (
+          <li key={s.id} className={`flex flex-wrap items-center gap-3 rounded-xl border px-3.5 py-3 ${s.done ? "border-line" : s === next ? "border-ink-soft" : "border-line"}`}>
+            <span aria-hidden className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold ${s.done ? "bg-ok-bg text-ok" : "bg-sunken text-ink-soft"}`}>
+              {s.done ? "✓" : i + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className={`text-sm font-bold ${s.done ? "text-muted line-through decoration-1" : ""}`}>{s.title}</p>
+              {!s.done && <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.detail}</p>}
+            </div>
+            {!s.done && (
+              <Link href={s.href} className={buttonClass(s === next ? "primary" : "secondary", "sm")}>
+                {s.action}
+              </Link>
+            )}
+            {s.done && <span className="sr-only">تمّت</span>}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+

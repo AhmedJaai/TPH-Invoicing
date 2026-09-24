@@ -146,27 +146,34 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     });
   }
 
-  items.push({
-    id: "tax-valid",
-    label: "كل الفواتير ضريبية كاملة",
-    state: facts.notTaxValidCount === 0 ? "PASS" : "WARN",
-    detail:
-      facts.notTaxValidCount === 0
-        ? "كلّها تصلح لخصم المدخلات"
-        : `${countNoun(facts.notTaxValidCount, INVOICE)} لا تصلح لخصم المدخلات`,
-    action: facts.notTaxValidCount === 0 ? undefined : "اطلب البديل من المورّد قبل السداد",
-  });
+  /*
+    وما يُفحَص على الفواتير لا يُعلَن ناجحاً على صفرٍ منها: «كل الفواتير
+    ضريبية كاملة ✓ — كلّها تصلح لخصم المدخلات» عن شهرٍ بلا فاتورة واحدة
+    صدقٌ منطقيّ وكذبٌ عمليّ. والمانعُ «فواتير الشهر مرفوعة» يقول ما ينقص.
+  */
+  if (facts.invoiceCount > 0) {
+    items.push({
+      id: "tax-valid",
+      label: "كل الفواتير ضريبية كاملة",
+      state: facts.notTaxValidCount === 0 ? "PASS" : "WARN",
+      detail:
+        facts.notTaxValidCount === 0
+          ? "كلّها تصلح لخصم المدخلات"
+          : `${countNoun(facts.notTaxValidCount, INVOICE)} لا تصلح لخصم المدخلات`,
+      action: facts.notTaxValidCount === 0 ? undefined : "اطلب البديل من المورّد قبل السداد",
+    });
 
-  items.push({
-    id: "paid",
-    label: "مستحقّات الشهر مسدَّدة",
-    state: facts.unpaidCount === 0 ? "PASS" : "WARN",
-    detail:
-      facts.unpaidCount === 0
-        ? "لا رصيد مستحق"
-        : `${countNoun(facts.unpaidCount, INVOICE)} بقيمة ${riyals(facts.unpaidTotalMinor)} ريال`,
-    action: facts.unpaidCount === 0 ? undefined : "أدرجها في دفعة أوّل الشهر أو اعتمدها مسدَّدة",
-  });
+    items.push({
+      id: "paid",
+      label: "مستحقّات الشهر مسدَّدة",
+      state: facts.unpaidCount === 0 ? "PASS" : "WARN",
+      detail:
+        facts.unpaidCount === 0
+          ? "لا رصيد مستحق"
+          : `${countNoun(facts.unpaidCount, INVOICE)} بقيمة ${riyals(facts.unpaidTotalMinor)} ريال`,
+      action: facts.unpaidCount === 0 ? undefined : "أدرجها في دفعة أوّل الشهر أو اعتمدها مسدَّدة",
+    });
+  }
 
   /*
     «كل الفواتير مقيَّدة محاسبياً» كان بنداً لا يمرّ أبداً: التصدير
@@ -175,20 +182,22 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     يعود حين يُبنى مسار القيد.
   */
 
-  const missingStatements = Math.max(0, facts.suppliersWithInvoices - facts.suppliersWithStatement);
-  items.push({
-    id: "statements",
-    label: "كشوف المورّدين وصلت وتطابقت",
-    state: missingStatements === 0 ? "PASS" : "WARN",
-    detail:
-      missingStatements === 0
-        ? `كشوف ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} كاملة`
-        : `${missingStatements} من ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} لم يصل كشفه`,
-    action:
-      missingStatements === 0
-        ? undefined
-        : "اطلب الكشف — هو وحده يكشف فاتورة حُمّلت عليك ولم تصلك",
-  });
+  if (facts.invoiceCount > 0) {
+    const missingStatements = Math.max(0, facts.suppliersWithInvoices - facts.suppliersWithStatement);
+    items.push({
+      id: "statements",
+      label: "كشوف المورّدين وصلت وتطابقت",
+      state: missingStatements === 0 ? "PASS" : "WARN",
+      detail:
+        missingStatements === 0
+          ? `كشوف ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} كاملة`
+          : `${missingStatements} من ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} لم يصل كشفه`,
+      action:
+        missingStatements === 0
+          ? undefined
+          : "اطلب الكشف — هو وحده يكشف فاتورة حُمّلت عليك ولم تصلك",
+    });
+  }
 
   items.push({
     id: "bank",

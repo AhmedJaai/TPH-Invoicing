@@ -10,6 +10,7 @@ import {
   type AttentionItem, type AttentionSeverity,
 } from "@/lib/attention";
 import { attentionItems } from "@/lib/work";
+import { loadStartState } from "@/services/start.service";
 import { ITEM, countNoun } from "@/lib/arabic";
 import { DoublePaidWorkspace } from "@/components/double-paid-section";
 import { ReviewSection } from "@/components/review-section";
@@ -209,6 +210,22 @@ export default async function AttentionPage({
   const picked = Boolean(wanted) && ordered.some((i) => i.id === wanted);
 
   if (items.length === 0) {
+    /*
+      «كلُّ ما يعرفه النظام سليم» عن نظامٍ لا يعرف شيئاً طمأنينةٌ بلا سند.
+      فحين لا مستندَ ولا كشف يُقال ذلك، ويُدَلّ على البداية.
+    */
+    const start = await loadStartState();
+    if (start.knowsNothing) {
+      return (
+        <PageShell user={user} width="wide" title="يحتاج قرارك" intro="كلُّ ما ينتظر قراراً في مكانٍ واحد — ولكلٍّ منه سببُه وفعلُه.">
+          <EmptyState
+            title="لا يعرف النظامُ شيئاً بعد."
+            hint="يظهر هنا ما يحتاج قرارك حين يقرأ مستنداتِك وكشفَ بنكك — والفراغُ الآن لا يعني أنّ كلَّ شيءٍ سليم."
+            action={<LinkButton href="/" variant="primary">ابدأ من الرئيسية</LinkButton>}
+          />
+        </PageShell>
+      );
+    }
     return (
       <PageShell
         user={user}
