@@ -64,3 +64,27 @@ describe("النقصُ والزيادةُ لا يتقاصّان", () => {
     expect(s.consumptionCostComplete).toBe(false);
   });
 });
+
+describe("ما لم يُقَس غيرُ معروف — لا صفر", () => {
+  const unmeasured: SummaryLine = {
+    inScope: true, varianceMilli: null, varianceCostMinor: null,
+    theoreticalConsumptionMilli: 36_000, unitCostMilliMinor: 5_000_000, baseUnit: "PIECE",
+  };
+
+  it("جردٌ لم يُحسَب فيه فرقُ صنفٍ واحد: لا نسبةَ نقصٍ تُقال صفراً", () => {
+    const s = summariseVariance([unmeasured, { ...unmeasured }]);
+    expect(s.linesMeasured).toBe(0);
+    expect(s.shortageRateBp).toBeNull();
+  });
+
+  it("الفرقُ الصفرُ المحسوب قياسٌ — نسبتُه صفرٌ بحقّ", () => {
+    const s = summariseVariance([{ ...unmeasured, varianceMilli: 0, varianceCostMinor: 0 }]);
+    expect(s.linesMeasured).toBe(1);
+    expect(s.shortageRateBp).toBe(0);
+  });
+
+  it("والخارجُ عن النطاق لا يُعدّ مقيساً", () => {
+    const s = summariseVariance([{ ...unmeasured, inScope: false, varianceMilli: 0, varianceCostMinor: 0 }]);
+    expect(s.linesMeasured).toBe(0);
+  });
+});

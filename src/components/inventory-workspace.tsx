@@ -111,6 +111,8 @@ export function InventoryWorkspace({
   /* الاستلامُ يُقترَح في يومه إن وقع في الأسبوع، وإلّا آخرَ يومٍ فيه */
   const defaultReceiptDate = today >= header.periodStart && today <= header.periodEnd ? today : header.periodEnd;
 
+  const measured = summary.linesMeasured > 0;
+
   /* ─────────── ‏٤ · ماذا اختلف؟ ─────────── */
   const review = (
     <div>
@@ -120,19 +122,23 @@ export function InventoryWorkspace({
         نقصٌ بألفٍ وزيادةٌ بألف صافيهما صفر — وليس ذلك «لا مشكلة». فالنقصُ
         أوّلاً، والزيادةُ بجانبه، والصافي ثانويٌّ في آخر السطر.
       */}
+      {/*
+        بلا صنفٍ واحدٍ حُسب فرقُه فالمجاميعُ «غير معروفة» لا صفر: «النقص
+        ٠٫٠٠» فوق «لا فرقَ محسوبٌ بعد» يقول «لم يضع شيء» عن أسبوعٍ لم يُقَس.
+      */}
       <StatGrid>
         <Stat
           label="النقص"
-          value={showAmounts ? undefined : `${summary.linesShort} صنفاً`}
-          minor={showAmounts ? summary.shortageCostMinor : undefined}
+          value={!measured ? "غير معروف" : showAmounts ? undefined : `${summary.linesShort} صنفاً`}
+          minor={measured && showAmounts ? summary.shortageCostMinor : undefined}
           tone={summary.shortageCostMinor > 0 ? "danger" : undefined}
-          sub={`${summary.linesShort} صنفاً وُجد منه أقلُّ من المتوقَّع`}
+          sub={measured ? `${summary.linesShort} صنفاً وُجد منه أقلُّ من المتوقَّع` : "لم يُحسَب فرقُ صنفٍ بعد"}
         />
         <Stat
           label="الزيادة"
-          value={showAmounts ? undefined : `${summary.linesOver} صنفاً`}
-          minor={showAmounts ? summary.overageCostMinor : undefined}
-          sub={`${summary.linesOver} صنفاً وُجد منه أكثر — شراءٌ لم يُقيَّد أو عدٌّ يُراجَع`}
+          value={!measured ? "غير معروف" : showAmounts ? undefined : `${summary.linesOver} صنفاً`}
+          minor={measured && showAmounts ? summary.overageCostMinor : undefined}
+          sub={measured ? `${summary.linesOver} صنفاً وُجد منه أكثر — شراءٌ لم يُقيَّد أو عدٌّ يُراجَع` : "لم يُحسَب فرقُ صنفٍ بعد"}
         />
         <Stat
           label="النقصُ من كلفة الاستهلاك"
@@ -142,8 +148,11 @@ export function InventoryWorkspace({
         {showAmounts ? (
           <Stat
             label="حجمُ الفروق"
-            minor={summary.absoluteCostMinor}
-            sub={`الصافي ${formatRiyalsDisplay(summary.netCostMinor)}${summary.linesWithoutCost > 0 ? ` · ولا تشمل ${summary.linesWithoutCost} صنفاً كلفتُه غير معروفة` : ""}`}
+            value={measured ? undefined : "غير معروف"}
+            minor={measured ? summary.absoluteCostMinor : undefined}
+            sub={measured
+              ? `الصافي ${formatRiyalsDisplay(summary.netCostMinor)}${summary.linesWithoutCost > 0 ? ` · ولا تشمل ${summary.linesWithoutCost} صنفاً كلفتُه غير معروفة` : ""}`
+              : `${summary.linesMeasured} من ${inScopeCount} صنفاً حُسب فرقُه`}
           />
         ) : (
           <Stat label="أصنافٌ عُدّت" value={`${report.totals.linesCounted} من ${inScopeCount}`} />

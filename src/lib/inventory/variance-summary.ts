@@ -44,6 +44,14 @@ export interface VarianceSummary {
   absoluteCostMinor: number;
   linesShort: number;
   linesOver: number;
+  /**
+   * كم صنفاً داخلاً في الجرد حُسب فرقُه أصلاً — صفراً كان أو غيره.
+   *
+   * وبلا واحدٍ منها فالمجاميعُ أعلاه **غير معروفة** لا صفر: «النقص ٠٫٠٠»
+   * في جردٍ لم يُحسَب فيه فرقٌ واحد يقول «لم يضع شيء» — وهو لم يُقَس.
+   * والنسبةُ حينها `null`.
+   */
+  linesMeasured: number;
   /** أصنافٌ لها فرقٌ بلا كلفةٍ معروفة — خارج المجاميع أعلاه، ويُقال عددُها. */
   linesWithoutCost: number;
   /** كلفةُ الاستهلاك المتوقَّع لما عُرفت كلفتُه — مقامُ النسبة. */
@@ -60,12 +68,14 @@ export function summariseVariance(lines: readonly SummaryLine[]): VarianceSummar
   let overage = 0;
   let linesShort = 0;
   let linesOver = 0;
+  let linesMeasured = 0;
   let linesWithoutCost = 0;
   let consumptionCost = 0;
   let complete = true;
 
   for (const l of lines) {
     if (!l.inScope) continue;
+    if (l.varianceMilli !== null) linesMeasured++;
 
     if (l.varianceMilli !== null && l.varianceMilli !== 0) {
       if (l.varianceMilli < 0) linesShort++;
@@ -89,10 +99,13 @@ export function summariseVariance(lines: readonly SummaryLine[]): VarianceSummar
     absoluteCostMinor: shortage + overage,
     linesShort,
     linesOver,
+    linesMeasured,
     linesWithoutCost,
     consumptionCostMinor: consumptionCost,
     consumptionCostComplete: complete,
-    shortageRateBp: consumptionCost > 0 ? Math.round((shortage * 10_000) / consumptionCost) : null,
+    shortageRateBp: consumptionCost > 0 && linesMeasured > 0
+      ? Math.round((shortage * 10_000) / consumptionCost)
+      : null,
   };
 }
 
@@ -113,6 +126,8 @@ export function combineSummaries(weeks: readonly VarianceSummary[]): VarianceSum
     absoluteCostMinor: shortage + overage,
     linesShort: weeks.reduce((s, w) => s + w.linesShort, 0),
     linesOver: weeks.reduce((s, w) => s + w.linesOver, 0),
+    /* جردٌ مقفَلٌ قبل هذا الحقل لم يُحفَظ له — ويُعدّ مقيساً إن كان فيه فرق */
+    linesMeasured: weeks.reduce((s, w) => s + (w.linesMeasured ?? (w.linesShort + w.linesOver)), 0),
     linesWithoutCost: weeks.reduce((s, w) => s + w.linesWithoutCost, 0),
     consumptionCostMinor: consumption,
     consumptionCostComplete: weeks.every((w) => w.consumptionCostComplete),
