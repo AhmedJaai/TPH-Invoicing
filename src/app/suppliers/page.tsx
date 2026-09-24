@@ -151,17 +151,19 @@ export default async function SuppliersPage({
       user={user}
       width="wide"
       title="حسابات المورّدين"
-      intro="كم على المقهى لكلّ مورّد بعد خصم ما دُفع له، وكم بقي له عندهم."
+      intro={showAmounts
+        ? "كم على المقهى لكلّ مورّد بعد خصم ما دُفع له، وكم بقي له عندهم."
+        : "المورّدون وفواتيرُهم المفتوحة وآخرُ تعاملٍ معهم — والمبالغُ خارج صلاحيتك."}
       /*
         مدخلُ «الأصناف والأسعار» — خرجت من ألسنة المساحة لأنّها سؤالٌ
         يُسأل مرّاتٍ في السنة، ولا يأخذ رُبعَ شريطٍ يُقرأ كلّ يوم. وموضعُه
         هنا: من فتح حسابات المورّدين هو من يسأل «أرتفع سعرُ البنّ؟».
       */
-      actions={
+      actions={showAmounts ? (
         <LinkButton href="/analysis" size="sm">
           الأصناف والأسعار
         </LinkButton>
-      }
+      ) : undefined}
     >
       {/*
         ── بطاقتان لا ثلاث ──
@@ -330,13 +332,17 @@ export default async function SuppliersPage({
                 </Link>
               ),
             },
+            /*
+              عمودا المال لا يُعرضان لمن لا يرى المال: شَرطتان في كلّ صفّ
+              تُقرآن «لا دَين» — وهي «لا تُعرَض لك».
+            */
+            ...(showAmounts ? [
             {
               key: "owed",
               header: "عليك",
               numeric: true,
-              cell: (r) =>
-                !showAmounts ? "—"
-                : r.owedMinor > 0 ? (
+              cell: (r: (typeof rows)[number]) =>
+                r.owedMinor > 0 ? (
                   <span className="font-bold text-warn"><Money minor={r.owedMinor} /></span>
                 ) : (
                   <span className="text-muted">—</span>
@@ -346,14 +352,14 @@ export default async function SuppliersPage({
               key: "credit",
               header: "رصيدٌ لك",
               numeric: true,
-              cell: (r) =>
-                !showAmounts ? "—"
-                : r.creditLeftMinor > 0 ? (
+              cell: (r: (typeof rows)[number]) =>
+                r.creditLeftMinor > 0 ? (
                   <span className="font-bold"><Money minor={r.creditLeftMinor} /></span>
                 ) : (
                   <span className="text-muted">—</span>
                 ),
             },
+            ] : []),
             {
               key: "open",
               header: "فواتير مفتوحة",
