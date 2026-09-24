@@ -205,10 +205,14 @@ export default async function InvoicesPage({
       width="wide"
       title="الفواتير"
       intro={describeFilters(f)}
+      /*
+        «ارفع مستنداً» كان هنا زرّاً ثانياً مطابقاً لزرّ الشريط في الشاشة
+        نفسها — والرفعُ دائمٌ في القشرة على كلّ مقاس.
+      */
       actions={
         hasFilters(f)
           ? <LinkButton href="/purchases/invoices" size="sm">امسح الترشيح</LinkButton>
-          : <LinkButton href="/upload" variant="primary" size="sm">ارفع مستنداً</LinkButton>
+          : undefined
       }
     >
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
