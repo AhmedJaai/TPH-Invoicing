@@ -1,35 +1,51 @@
 import Link from "next/link";
+import { Inbox, type LucideIcon } from "lucide-react";
 import { Money, Prose } from "./money";
 import { ScrollX } from "./scroll-x";
+import { TableFilter } from "./ui-client";
 
 /**
- * عناصر الواجهة المشتركة.
+ * عناصر الواجهة المشتركة — نظامُ التصميم الثاني.
  *
- * كانت كل صفحة تكتب بطاقتها وجدولها وحالتها الفارغة بنفسها، فاختلفت
- * المسافات والحدود ومقاسات الخطّ بين صفحة وأخرى — وهو ما يجعل التطبيق
- * يبدو أداةً داخلية لا منتجاً. هذه الملفّ يوحّدها.
+ * كلُّ ما يتكرّر في الشاشات يُرسَم هنا: البطاقة والقسم والزرّ والشارة
+ * والرقم والجدول والحالات الفارغة والخطّ الزمنيّ والخطوات. فتغييرُ
+ * عنصرٍ هنا يغيّر التطبيق كلَّه، ولا تكتب صفحةٌ جدولها بنفسها.
  *
- * كلّها عناصر عرض بلا حالة، فتصلح للخادم. وما يحتاج تفاعلاً في
- * `ui-client.tsx`.
+ * كلّها بلا حالة فتصلح للخادم. وما يحتاج تفاعلاً في `ui-client.tsx`.
  */
 
-/* ─────────────────────────── الطبقات ─────────────────────────── */
+/* ─────────────────────────── النبرات ─────────────────────────── */
 
-export type Tone = "warn" | "danger" | "ok" | "muted";
+export type Tone = "warn" | "danger" | "ok" | "muted" | "info" | "accent";
 
 export const TONE_TEXT: Record<Tone, string> = {
   warn: "text-warn",
   danger: "text-danger",
   ok: "text-ok",
   muted: "text-muted",
+  info: "text-info",
+  accent: "text-accent",
 };
 
 const TONE_SURFACE: Record<Tone, string> = {
-  warn: "border-warn/40 bg-warn-bg",
-  danger: "border-danger/40 bg-danger-bg",
-  ok: "border-ok/40 bg-ok-bg",
+  warn: "border-warn/25 bg-warn-bg",
+  danger: "border-danger/25 bg-danger-bg",
+  ok: "border-ok/25 bg-ok-bg",
   muted: "border-line bg-sunken",
+  info: "border-info/25 bg-info-bg",
+  accent: "border-accent-line bg-accent-soft",
 };
+
+const TONE_DOT: Record<Tone, string> = {
+  warn: "bg-warn",
+  danger: "bg-danger",
+  ok: "bg-ok",
+  muted: "bg-muted",
+  info: "bg-info",
+  accent: "bg-accent",
+};
+
+/* ─────────────────────────── الطبقات ─────────────────────────── */
 
 export function Card({
   children,
@@ -44,7 +60,7 @@ export function Card({
   className?: string;
   padded?: boolean;
 }) {
-  const base = `rounded-2xl border shadow-raised ${padded ? "p-4 sm:p-5" : ""} ${
+  const base = `rounded-xl border shadow-raised ${padded ? "p-4 sm:p-5" : ""} ${
     tone ? TONE_SURFACE[tone] : "border-line bg-raised"
   } ${className}`;
 
@@ -52,7 +68,7 @@ export function Card({
   return (
     <Link
       href={href}
-      className={`${base} block transition-all hover:border-ink-soft hover:shadow-lifted`}
+      className={`${base} block transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-accent-line hover:shadow-lifted`}
     >
       {children}
     </Link>
@@ -60,16 +76,15 @@ export function Card({
 }
 
 /**
- * عنوان قسم مع فعله.
- *
- * الفعل بجانب العنوان لا في ذيل القسم: من يقرأ العنوان يعرف فوراً ماذا
- * يستطيع أن يفعل، ولا ينزل ليبحث.
+ * عنوان قسم مع فعله — الفعل بجانب العنوان لا في ذيل القسم.
  */
 export function Section({
   id,
   title,
   hint,
   action,
+  icon: Icon,
+  count,
   children,
   className = "",
 }: {
@@ -78,17 +93,26 @@ export function Section({
   title: string;
   hint?: string;
   action?: React.ReactNode;
+  icon?: LucideIcon;
+  /** عددُ ما في القسم — يُكتب بجانب العنوان. */
+  count?: number;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <section id={id} className={`mt-8 sm:mt-10 ${className}`}>
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="font-display text-lg font-bold leading-tight">{title}</h2>
-        {action && <div className="shrink-0">{action}</div>}
+    <section id={id} className={`mt-10 scroll-mt-24 first:mt-0 ${className}`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h2 className="flex items-center gap-2 text-[15px] font-bold leading-tight sm:text-base">
+          {Icon && <Icon className="h-[18px] w-[18px] text-muted" strokeWidth={1.75} aria-hidden />}
+          {title}
+          {count !== undefined && (
+            <span className="nums rounded-full bg-sunken px-2 py-0.5 text-[11px] font-bold text-ink-soft">{count}</span>
+          )}
+        </h2>
+        {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
       </div>
       {hint && (
-        <p className="mb-3 max-w-2xl text-xs leading-relaxed text-muted">
+        <p className="-mt-1 mb-3 max-w-3xl text-xs leading-relaxed text-muted">
           <Prose text={hint} />
         </p>
       )}
@@ -99,70 +123,68 @@ export function Section({
 
 /* ─────────────────────────── الأفعال ─────────────────────────── */
 
-export type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
-
-export const BUTTON_CLASS: Record<ButtonVariant, string> = {
-  primary: "bg-inverse-surface text-inverse-ink hover:opacity-90",
-  secondary: "border border-line hover:border-ink-soft",
-  quiet: "text-ink-soft hover:bg-sunken",
-  danger: "border border-danger/50 text-danger hover:bg-danger-bg",
-};
-
-export function buttonClass(variant: ButtonVariant = "secondary", size: "sm" | "md" = "md") {
-  /*
-    ارتفاعُ اللمس ٤٤ بكسل على الجوّال — كان زرّ «sm» ٢٨ بكسلاً في كلّ أزرار
-    الطابور، وأحمد يضغطها بإبهامه عند الكاشير. وعلى الحاسوب يبقى مضغوطاً.
-  */
-  const pad = size === "sm"
-    ? "min-h-11 px-3 py-1.5 text-[11px] sm:min-h-0"
-    : "min-h-11 px-4 py-2.5 text-sm";
-  return `inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl font-bold transition-all disabled:opacity-50 ${pad} ${BUTTON_CLASS[variant]}`;
-}
+export { BUTTON_CLASS, buttonClass, type ButtonVariant } from "./ui-tokens";
+import { buttonClass, type ButtonVariant } from "./ui-tokens";
 
 export function LinkButton({
   href,
   variant = "secondary",
   size = "md",
+  icon: Icon,
   children,
   className = "",
+  prefetch,
 }: {
   href: string;
   variant?: ButtonVariant;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
+  icon?: LucideIcon;
   children: React.ReactNode;
   className?: string;
+  prefetch?: boolean;
 }) {
   return (
-    <Link href={href} className={`${buttonClass(variant, size)} ${className}`}>
+    <Link href={href} prefetch={prefetch} className={`${buttonClass(variant, size)} ${className}`}>
+      {Icon && <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />}
       {children}
     </Link>
   );
 }
 
+/** شارةُ حال: نقطةٌ وكلمة — اللونُ لا يأتي وحده. */
 export function Badge({
   tone,
+  dot = false,
   children,
 }: {
   tone?: Tone;
+  dot?: boolean;
   children: React.ReactNode;
 }) {
   const cls = tone
     ? `${TONE_SURFACE[tone]} ${TONE_TEXT[tone]}`
     : "border-line bg-sunken text-ink-soft";
   return (
-    <span className={`inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-bold ${cls}`}>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-bold leading-5 ${cls}`}>
+      {dot && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${tone ? TONE_DOT[tone] : "bg-muted"}`} />}
       {children}
     </span>
+  );
+}
+
+export function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd dir="ltr" className="inline-flex min-w-5 items-center justify-center rounded-md border border-line border-b-2 bg-raised px-1 font-sans text-[11px] font-medium leading-4 text-ink-soft">
+      {children}
+    </kbd>
   );
 }
 
 /* ─────────────────────────── الأرقام ─────────────────────────── */
 
 /**
- * رقمٌ في بطاقة.
- *
- * الرقم أوّلاً وأكبر، والوصف تحته أصغر: العين تقرأ الحجم قبل الترتيب.
- * وحين يكون له وجهة يصير كلّه قابلاً للنقر، لا كلمةً صغيرة في ذيله.
+ * رقمٌ في بطاقة: الرقمُ أوّلاً وأكبر، والوصفُ تحته. وحين يكون له وجهة
+ * يصير كلُّه قابلاً للنقر.
  */
 export function Stat({
   label,
@@ -171,6 +193,7 @@ export function Stat({
   sub,
   tone,
   href,
+  icon: Icon,
 }: {
   label: string;
   value?: React.ReactNode;
@@ -178,20 +201,21 @@ export function Stat({
   sub?: React.ReactNode;
   tone?: Tone;
   href?: string;
+  icon?: LucideIcon;
 }) {
   return (
-    <Card href={href} padded={false}>
-      <div className="px-4 py-3.5 sm:px-5 sm:py-4">
-        <p className="text-xs font-medium text-muted">{label}</p>
-        {/*
-          `.nums` يخطّ بخطّ النظام — فيوضع على الرقم وحده. كان على الحاوية،
-          فكُتبت «غير معروف» و«لم يصل» بخطٍّ غير خطّ الواجهة.
-        */}
-        <p className={`${isNumeric(value) ? "nums " : ""}mt-2 font-display text-2xl font-bold leading-none sm:text-[1.75rem] ${tone ? TONE_TEXT[tone] : ""}`}>
+    <Card href={href} padded={false} className="h-full">
+      <div className="flex h-full flex-col px-4 py-4 sm:px-5">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-muted">
+          {Icon && <Icon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />}
+          {label}
+        </p>
+        {/* `.nums` على الرقم وحده — «غير معروف» تُكتب بخطّ الواجهة */}
+        <p className={`${isNumeric(value) || minor !== undefined ? "nums " : ""}mt-2.5 text-[1.6rem] font-bold leading-none tracking-tight sm:text-[1.75rem] ${tone ? TONE_TEXT[tone] : ""}`}>
           {minor !== undefined ? <Money minor={minor} /> : value}
         </p>
         {sub && (
-          <p className="mt-2 text-xs leading-relaxed text-muted">
+          <p className="mt-auto pt-2.5 text-xs leading-relaxed text-muted">
             {typeof sub === "string" ? <Prose text={sub} /> : sub}
           </p>
         )}
@@ -206,41 +230,215 @@ export function isNumeric(value: React.ReactNode): boolean {
 }
 
 export function StatGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">{children}</div>;
+  return <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{children}</div>;
 }
 
-/* ─────────────────────────── الحالات ─────────────────────────── */
-
 /**
- * الفراغ يقول ما الذي يملؤه.
- *
- * «لا بيانات» تترك القارئ واقفاً؛ الفراغ النافع يقول لماذا هو فارغ وما
- * الخطوة التي تملؤه.
+ * اتّجاهُ التغيّر: سهمٌ ونسبة، واللونُ لمن يُعرف أهو في صالحه.
+ * ارتفاعُ المشتريات لا لون له — قد يكون نموّاً وقد يكون تسرّباً.
  */
-export function EmptyState({
-  title,
-  hint,
-  action,
-}: {
-  title: string;
-  hint?: string;
-  action?: React.ReactNode;
-}) {
+export function Delta({ pct, favourable }: { pct: number | null; favourable?: boolean | null }) {
+  if (pct === null) return <span className="text-[11px] text-muted">بلا مقارنة</span>;
+  const up = pct > 0;
+  const tone = favourable === true ? "text-ok bg-ok-bg" : favourable === false ? "text-warn bg-warn-bg" : "text-ink-soft bg-sunken";
   return (
-    <div className="rounded-2xl border border-dashed border-line px-5 py-12 text-center">
-      <p className="text-sm font-bold">{title}</p>
-      {hint && <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-muted">{hint}</p>}
-      {action && <div className="mt-4 flex justify-center">{action}</div>}
+    <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[11px] font-bold ${tone}`}>
+      <span aria-hidden>{up ? "▲" : pct < 0 ? "▼" : "•"}</span>
+      <span className="nums">{Math.abs(Math.round(pct))}</span>٪
+    </span>
+  );
+}
+
+/** شريطُ تقدّمٍ حقيقيّ — لا يُرسَم إلّا لنسبةٍ معروفةٍ مقامُها. */
+export function Meter({
+  value,
+  max,
+  tone = "accent",
+  label,
+}: {
+  value: number;
+  max: number;
+  tone?: Tone;
+  label: string;
+}) {
+  const pct = max > 0 ? Math.min(100, Math.max(0, (value / max) * 100)) : 0;
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      className="h-1.5 w-full overflow-hidden rounded-full bg-sunken"
+    >
+      <div className={`h-full rounded-full ${TONE_DOT[tone]} transition-[width] duration-500`} style={{ width: `${pct}%` }} />
     </div>
   );
 }
 
 /**
- * صفحةٌ خارج الصلاحية.
- *
- * كانت أربع عشرة صياغةً لمعنىً واحد — «محجوبة عن دورك» و«دورك لا يشمل
- * الأرقام المالية» و«للمالك وحده» — ولا واحدةٌ منها تقول **لمن يُطلَب
- * الإذن**. فالقارئ يعرف أنّه ممنوع ولا يعرف كيف يُسمَح له.
+ * منحنى صغير — من قيمٍ حقيقيّة وحدها. قيمةٌ مجهولة (`null`) تقطع الخطّ
+ * ولا تُرسَم صفراً.
+ */
+export function Sparkline({
+  values,
+  className = "h-8 w-24",
+  tone = "accent",
+  label,
+}: {
+  values: readonly (number | null)[];
+  className?: string;
+  tone?: Tone;
+  label: string;
+}) {
+  const known = values.filter((v): v is number => v !== null);
+  if (known.length < 2) return null;
+  const min = Math.min(...known);
+  const max = Math.max(...known);
+  const span = max - min || 1;
+  const w = 100;
+  const h = 32;
+  const step = values.length > 1 ? w / (values.length - 1) : w;
+  let d = "";
+  let pen = false;
+  values.forEach((v, i) => {
+    if (v === null) { pen = false; return; }
+    const x = i * step;
+    const y = h - 3 - ((v - min) / span) * (h - 6);
+    d += `${pen ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)} `;
+    pen = true;
+  });
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className={`${className} ${TONE_TEXT[tone]}`} role="img" aria-label={label}>
+      <path d={d} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+/**
+ * قائمةُ أشرطة: كلُّ صفٍّ اسمٌ ومبلغٌ وشريطٌ نسبتُه من الأكبر.
+ */
+export function BarList({
+  items,
+  tone = "accent",
+}: {
+  items: readonly { key: string; label: React.ReactNode; minor: number; href?: string; sub?: string }[];
+  tone?: Tone;
+}) {
+  const max = Math.max(1, ...items.map((i) => i.minor));
+  return (
+    <ul className="space-y-1">
+      {items.map((i) => {
+        const pct = Math.max(2, (i.minor / max) * 100);
+        const inner = (
+          <>
+            <span className="relative z-10 min-w-0 flex-1 truncate text-[13px]">
+              {i.label}
+              {i.sub && <span className="ms-2 text-[11px] text-muted">{i.sub}</span>}
+            </span>
+            <span className="relative z-10 shrink-0 text-[13px] font-bold"><Money minor={i.minor} /></span>
+            <span aria-hidden className={`absolute inset-y-1 start-0 rounded-md opacity-[0.14] ${TONE_DOT[tone]}`} style={{ width: `${pct}%` }} />
+          </>
+        );
+        const cls = "relative flex min-h-10 items-center gap-3 overflow-hidden rounded-lg px-2.5";
+        return (
+          <li key={i.key}>
+            {i.href ? (
+              <Link href={i.href} className={`${cls} transition-colors hover:bg-hover`}>{inner}</Link>
+            ) : (
+              <div className={cls}>{inner}</div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/* ─────────────────────────── الهويّة ─────────────────────────── */
+
+const MONO_HUES = [
+  "bg-accent-soft text-accent",
+  "bg-info-bg text-info",
+  "bg-plum-bg text-plum",
+  "bg-sand-bg text-sand",
+  "bg-sunken text-ink-soft",
+];
+
+/** حرفُ الاسم في دائرة — يميّز المورّد بالعين في قائمةٍ طويلة. */
+export function Monogram({ name, className = "h-8 w-8 text-[13px]" }: { name: string; className?: string }) {
+  const clean = name.replace(/^(ال|شركة|مؤسسة)\s*/u, "").trim() || name;
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return (
+    <span aria-hidden className={`grid shrink-0 place-items-center rounded-full font-bold ${MONO_HUES[h % MONO_HUES.length]} ${className}`}>
+      {clean.charAt(0)}
+    </span>
+  );
+}
+
+/* ─────────────────────────── الحالات ─────────────────────────── */
+
+/**
+ * الفراغ يقول ما الذي يملؤه — لماذا هو فارغ وما الخطوة التي تملؤه.
+ */
+export function EmptyState({
+  title,
+  hint,
+  action,
+  icon: Icon = Inbox,
+  compact = false,
+}: {
+  title: string;
+  hint?: string;
+  action?: React.ReactNode;
+  icon?: LucideIcon;
+  compact?: boolean;
+}) {
+  return (
+    <div className={`rounded-xl border border-dashed border-line bg-raised/60 px-5 text-center ${compact ? "py-7" : "py-12"}`}>
+      <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-accent-soft text-accent">
+        <Icon className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+      </span>
+      <p className="mt-3 text-sm font-bold">{title}</p>
+      {hint && <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-muted"><Prose text={hint} /></p>}
+      {action && <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div>}
+    </div>
+  );
+}
+
+/**
+ * تنبيهٌ داخل الصفحة: نبرةٌ ورمزٌ وجملةٌ وفعلٌ بجانبه — لا فقرةٌ ملوّنة بلا مخرج.
+ */
+export function Callout({
+  tone = "info",
+  icon: Icon,
+  title,
+  children,
+  action,
+  className = "",
+}: {
+  tone?: Tone;
+  icon?: LucideIcon;
+  title?: string;
+  children?: React.ReactNode;
+  action?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div role={tone === "danger" ? "alert" : undefined} className={`flex flex-wrap items-start gap-3 rounded-xl border px-4 py-3 ${TONE_SURFACE[tone]} ${className}`}>
+      {Icon && <Icon className={`mt-0.5 h-[18px] w-[18px] shrink-0 ${TONE_TEXT[tone]}`} strokeWidth={2} aria-hidden />}
+      <div className="min-w-0 flex-1 text-xs leading-relaxed text-ink-soft">
+        {title && <p className={`text-[13px] font-bold ${TONE_TEXT[tone]}`}>{title}</p>}
+        {children && <div className={title ? "mt-0.5" : ""}>{children}</div>}
+      </div>
+      {action && <div className="flex shrink-0 flex-wrap gap-2">{action}</div>}
+    </div>
+  );
+}
+
+/**
+ * صفحةٌ خارج الصلاحية — ولمن يُطلَب الإذن.
  */
 export function NoAccess({ what }: { what?: string }) {
   return (
@@ -254,12 +452,151 @@ export function NoAccess({ what }: { what?: string }) {
 /** هيكل الانتظار: يدلّ على أين سيقع المحتوى، بلا نسبة مخترَعة. */
 export function Skeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="space-y-2" aria-busy="true" aria-live="polite">
+    <div className="overflow-hidden rounded-xl border border-line bg-raised" aria-busy="true" aria-live="polite">
+      <div className="skeleton h-10 rounded-none opacity-60" />
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="skeleton h-12" />
+        <div key={i} className="flex items-center gap-4 border-t border-line-soft px-4 py-3.5">
+          <div className="skeleton h-3.5 w-1/3" />
+          <div className="skeleton h-3.5 w-1/5" />
+          <div className="skeleton ms-auto h-3.5 w-20" />
+        </div>
       ))}
       <span className="sr-only">يُحمّل…</span>
     </div>
+  );
+}
+
+/* ─────────────────────────── القوائم ─────────────────────────── */
+
+/** أزواجُ اسمٍ وقيمة — لملفّ مورّدٍ أو فاتورة. */
+export function KeyValue({
+  items,
+  columns = 2,
+}: {
+  items: readonly { label: string; value: React.ReactNode; hint?: string }[];
+  columns?: 2 | 3 | 4;
+}) {
+  const cols = columns === 4 ? "sm:grid-cols-4" : columns === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2";
+  return (
+    <dl className={`grid grid-cols-2 gap-x-6 gap-y-4 ${cols}`}>
+      {items.map((i) => (
+        <div key={i.label} className="min-w-0">
+          <dt className="text-[11px] font-medium text-muted">{i.label}</dt>
+          <dd className="mt-1 text-sm font-medium leading-snug">{i.value}</dd>
+          {i.hint && <dd className="mt-0.5 text-[11px] text-muted">{i.hint}</dd>}
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+export type TimelineItem = {
+  id: string;
+  title: React.ReactNode;
+  meta?: React.ReactNode;
+  body?: React.ReactNode;
+  tone?: Tone;
+  icon?: LucideIcon;
+  href?: string;
+};
+
+/** خطٌّ زمنيّ: ما حدث، ومتى، ومَن — بترتيبه. */
+export function Timeline({ items }: { items: readonly TimelineItem[] }) {
+  return (
+    <ol className="relative space-y-0">
+      {items.map((i, idx) => {
+        const Icon = i.icon;
+        return (
+          <li key={i.id} className="relative flex gap-3 pb-5 last:pb-0">
+            {idx < items.length - 1 && <span aria-hidden className="absolute start-[13px] top-7 bottom-0 w-px bg-line" />}
+            <span className={`relative z-10 mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-line bg-raised ${i.tone ? TONE_TEXT[i.tone] : "text-muted"}`}>
+              {Icon ? <Icon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : <span className={`h-2 w-2 rounded-full ${i.tone ? TONE_DOT[i.tone] : "bg-muted"}`} />}
+            </span>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <p className="text-[13px] font-bold leading-snug">
+                  {i.href ? <Link href={i.href} className="hover:text-accent hover:underline hover:underline-offset-4">{i.title}</Link> : i.title}
+                </p>
+                {i.meta && <p className="shrink-0 text-[11px] text-muted">{i.meta}</p>}
+              </div>
+              {i.body && <div className="mt-1 text-xs leading-relaxed text-ink-soft">{i.body}</div>}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+export type StepState = "done" | "current" | "todo" | "blocked";
+
+/** خطواتٌ بترتيبها: ما تمّ، وما الآن، وما يمنع. */
+export function Stepper({
+  steps,
+}: {
+  steps: readonly { id: string; title: string; detail?: React.ReactNode; state: StepState; action?: React.ReactNode }[];
+}) {
+  const DOT: Record<StepState, string> = {
+    done: "border-ok bg-ok text-raised",
+    current: "border-accent bg-accent-soft text-accent",
+    todo: "border-line bg-raised text-muted",
+    blocked: "border-danger/50 bg-danger-bg text-danger",
+  };
+  return (
+    <ol className="space-y-2">
+      {steps.map((s, i) => (
+        <li
+          key={s.id}
+          className={`flex flex-wrap items-start gap-3 rounded-xl border px-4 py-3.5 ${
+            s.state === "current" ? "border-accent-line bg-raised shadow-lifted" : "border-line bg-raised"
+          }`}
+        >
+          <span aria-hidden className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 text-xs font-bold ${DOT[s.state]}`}>
+            {s.state === "done" ? "✓" : s.state === "blocked" ? "!" : <span className="nums">{i + 1}</span>}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className={`text-sm font-bold ${s.state === "done" ? "text-muted" : ""}`}>
+              {s.title}
+              <span className="sr-only">
+                {s.state === "done" ? " — تمّت" : s.state === "blocked" ? " — متوقّفة" : s.state === "current" ? " — الخطوة الحاليّة" : ""}
+              </span>
+            </p>
+            {s.detail && <div className="mt-0.5 text-xs leading-relaxed text-muted">{s.detail}</div>}
+          </div>
+          {s.action && <div className="shrink-0">{s.action}</div>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** ألسنةٌ داخل الصفحة بروابط — التصفيةُ في العنوان فتُحفَظ وتُشارَك. */
+export function LinkTabs({
+  items,
+  label,
+}: {
+  items: readonly { href: string; label: string; count?: number | null; active: boolean }[];
+  label: string;
+}) {
+  return (
+    <nav aria-label={label} className="scroll-x -mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
+      {items.map((t) => (
+        <Link
+          key={t.href}
+          href={t.href}
+          scroll={false}
+          aria-current={t.active ? "page" : undefined}
+          className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-bold transition-colors sm:min-h-8 ${
+            t.active ? "bg-inverse-surface text-inverse-ink" : "text-ink-soft hover:bg-hover hover:text-ink"
+          }`}
+        >
+          {t.label}
+          {t.count !== undefined && t.count !== null && (
+            <span className={`nums rounded-full px-1.5 text-[10px] ${t.active ? "bg-white/15" : "bg-sunken"}`}>{t.count}</span>
+          )}
+        </Link>
+      ))}
+    </nav>
   );
 }
 
@@ -272,10 +609,8 @@ export interface Column<T> {
   cell: (row: T) => React.ReactNode;
   align?: "start" | "end";
   /**
-   * عمود مال أو عدد — تصطفّ فواصله على خطٍّ واحد.
-   *
-   * يسبق `align`: المال يُصفّ على آخر خانةٍ منه لا على جهةٍ من الجدول،
-   * فلا يصحّ فيه `start` ولا `end` وإنّما اليمين الفيزيائيّ.
+   * عمود مال أو عدد — تصطفّ فواصله على خطٍّ واحد. يسبق `align`: المال
+   * يُصفّ على آخر خانةٍ منه، أي اليمين الفيزيائيّ.
    */
   numeric?: boolean;
   /** عمودٌ ثانويّ يُخفى على الشاشات الضيّقة داخل الجدول. */
@@ -283,22 +618,22 @@ export interface Column<T> {
   /** عنوان البطاقة على الجوّال — يُعرَض بارزاً بلا تسمية. */
   primary?: boolean;
   /**
-   * خليّةٌ لا تُقصّ على الجوّال.
-   *
-   * القصُّ (`truncate`) يضع `overflow: hidden` على الخليّة — وذلك
-   * صحيحٌ لنصٍّ طويل، ويبتلع **لوحَ إقرارٍ يُفتَح داخلها**: فيضغط
-   * صاحبُه «احذف» فلا يرى ما يؤكّد به. فما كانت خليّتُه فعلاً لا نصّاً
-   * تُعلَن هنا.
+   * خليّةٌ لا تُقصّ على الجوّال — ما كانت خليّتُه فعلاً لا نصّاً
+   * (لوحُ إقرارٍ يُفتح داخلها) لا يُبتلَع بـ`overflow: hidden`.
    */
   wrap?: boolean;
 }
 
+/** فوق كم صفّاً يثبت رأسُ الجدول ويُبحَث فيه. */
+const LONG_TABLE = 15;
+
 /**
- * جدول يصير بطاقات على الجوّال.
+ * جدولٌ يصير بطاقاتٍ على الجوّال.
  *
- * جدولٌ بعشرة أعمدة يُسحب عرضاً على شاشة الجوّال ليس جدولاً بل عقوبة.
- * وعلى الشاشة الضيّقة يصير كلّ صفٍّ بطاقةً: العنوان بارزاً، وكلّ حقلٍ
- * باسمه وقيمته. البيانات نفسها، والعرض يتبع الشاشة.
+ * - رأسٌ ثابت وبحثٌ داخل الجدول حين تطول الصفوف (`searchOf`).
+ * - عمودُ المال يصطفّ على آخر خانة.
+ * - الصفُّ كلُّه يفتح سجلَّه، والرابطُ طبقةٌ تحت المحتوى لا غلاف.
+ * - `j`/`k` تتنقّل بين الصفوف و`Enter` تفتح (`data-nav-item`).
  */
 export function DataTable<T>({
   columns,
@@ -306,19 +641,19 @@ export function DataTable<T>({
   keyOf,
   empty,
   hrefOf,
+  searchOf,
+  searchLabel = "ابحث في هذا الجدول",
 }: {
   columns: readonly Column<T>[];
   rows: readonly T[];
   keyOf: (row: T) => string;
   empty?: React.ReactNode;
   hrefOf?: (row: T) => string | undefined;
+  /** نصُّ الصفّ للبحث داخل الجدول — يظهر الحقل حين تطول الصفوف. */
+  searchOf?: (row: T) => string;
+  searchLabel?: string;
 }) {
   if (rows.length === 0) {
-    /*
-      الفراغ الافتراضيّ يقول ما يملؤه — وهو الذي يظهر حيث لم تُكتب حالةٌ
-      خاصّة، أي في المواضع التي لم يُفكَّر فيها. و«لا شيء هنا بعد» وحدها
-      تترك القارئ واقفاً لا يدري أهو عطبٌ أم ترتيبٌ صحيح.
-    */
     return (
       <>
         {empty ?? (
@@ -333,48 +668,48 @@ export function DataTable<T>({
 
   const primary = columns.find((c) => c.primary) ?? columns[0];
   const rest = columns.filter((c) => c !== primary);
+  const long = rows.length > LONG_TABLE;
+  const searchable = !!searchOf && rows.length > 8;
 
   return (
-    <>
+    <div data-filter-root="">
+      {searchable && <TableFilter label={searchLabel} total={rows.length} />}
+
       {/* الحاسوب: جدول */}
-      <ScrollX className="hidden rounded-2xl border border-line shadow-raised sm:block">
-        <table className="w-full text-xs">
-          <thead className="bg-sunken text-muted">
+      <ScrollX
+        className={`hidden rounded-xl border border-line bg-raised shadow-raised sm:block ${long ? "max-h-[min(72vh,60rem)] overflow-y-auto" : ""}`}
+      >
+        <table className="w-full border-separate border-spacing-0 text-[13px]">
+          <thead className={long ? "sticky top-0 z-10" : ""}>
             <tr>
               {columns.map((c) => (
                 <th
                   key={c.key}
-                  className={`whitespace-nowrap px-3 py-2.5 font-medium ${
-                    /* رأسُ عمود المال على جهة آخر خانةٍ منه — وهي في العربية جهة البدء */
+                  scope="col"
+                  className={`whitespace-nowrap border-b border-line bg-sunken/80 px-3.5 py-2.5 text-[11px] font-bold text-muted backdrop-blur first:rounded-ss-xl last:rounded-se-xl ${
                     c.numeric ? "text-start" : c.align === "end" ? "text-end" : "text-start"
                   } ${c.secondary ? "hidden lg:table-cell" : ""}`}
                 >
-                  {/* عمودُ الأفعال بلا عنوانٍ مرئيّ — ولقارئ الشاشة اسمُه، لا رأسٌ صامت */}
                   {c.header || <span className="sr-only">الفعل</span>}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-line">
+          <tbody>
             {rows.map((row) => {
               const href = hrefOf?.(row);
               return (
-                /*
-                  الصفُّ كلُّه يفتح سجلَّه على الحاسوب كما تفتحه البطاقةُ على
-                  الجوّال. كان الرابطُ في البطاقة وحدها، فمن ضغط صفّاً في جدول
-                  الفواتير لم يحدث شيء — والصفُّ يتلوّن تحت الفأرة كأنّه يُضغط.
-                  والرابطُ طبقةٌ تحت المحتوى (`card-rows`) لا غلاف، فما في
-                  الخلايا من روابط وأزرار يبقى فوقها ويُضغط وحده. وهو خارجُ
-                  ترتيب المفاتيح: لوحةُ المفاتيح تبلغ السجلَّ برابط الخليّة.
-                */
                 <tr
                   key={keyOf(row)}
-                  className={`transition-colors hover:bg-sunken/60 ${href ? "card-rows relative cursor-pointer" : ""}`}
+                  data-filter={searchOf ? searchOf(row) : undefined}
+                  data-nav-item={href ? "" : undefined}
+                  data-href={href}
+                  className={`group transition-colors hover:bg-hover ${href ? "card-rows relative cursor-pointer" : ""}`}
                 >
                   {columns.map((c, i) => (
                     <td
                       key={c.key}
-                      className={`px-3 py-2.5 align-top ${
+                      className={`border-b border-line-soft px-3.5 py-3 align-middle group-last:border-b-0 ${
                         c.numeric ? "nums-col" : c.align === "end" ? "text-end" : "text-start"
                       } ${c.secondary ? "hidden lg:table-cell" : ""}`}
                     >
@@ -391,34 +726,19 @@ export function DataTable<T>({
         </table>
       </ScrollX>
 
-      {/*
-        ── الجوّال: بطاقات، ورابطُ البطاقة طبقةٌ لا غلاف ──
-
-        كانت البطاقة كلُّها `<Link>` يلفّ خلاياها. فأيُّ خليّةٍ فيها
-        رابطٌ تُنتج `<a>` داخل `<a>` — وهو ترميزٌ باطل يرفضه المتصفّح
-        فيعيد بناء الشجرة، **ويسقط الترطيب فيتوقّف تفاعلُ الصفحة
-        كلّها**. وقد وقع حين صارت شارةُ الضريبة تفتح سببَها.
-
-        والعلاج أنّ الرابط طبقةٌ مطلقة تحت المحتوى لا غلافٌ حوله:
-        الضغطُ على الفراغ يبلغها، والضغطُ على رابطٍ داخليّ يبلغه هو —
-        لأنّ المحتوى يُرسَم بعدها فيعلوها. ولا `<a>` داخل `<a>`.
-      */}
-      <ul className="space-y-2.5 sm:hidden">
+      {/* الجوّال: بطاقات، ورابطُ البطاقة طبقةٌ لا غلاف — لا `<a>` داخل `<a>` */}
+      <ul className="space-y-2 sm:hidden">
         {rows.map((row) => {
           const href = hrefOf?.(row);
           return (
-            <li key={keyOf(row)}>
-              <Card className={href ? "relative card-rows" : ""}>
+            <li key={keyOf(row)} data-filter={searchOf ? searchOf(row) : undefined}>
+              <div className={`rounded-xl border border-line bg-raised p-4 shadow-raised ${href ? "card-rows relative active:bg-hover" : ""}`}>
                 {href && (
-                  <Link
-                    href={href}
-                    aria-label="افتح التفصيل"
-                    className="absolute inset-0 rounded-2xl"
-                  />
+                  <Link href={href} aria-label="افتح التفصيل" className="absolute inset-0 rounded-xl" />
                 )}
                 <div>
                   <p className="text-sm font-bold leading-snug">{primary.cell(row)}</p>
-                  <dl className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                  <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
                     {rest.map((c) => (
                       <div key={c.key} className="min-w-0">
                         <dt className="text-[11px] text-muted">{c.header}</dt>
@@ -427,11 +747,11 @@ export function DataTable<T>({
                     ))}
                   </dl>
                 </div>
-              </Card>
+              </div>
             </li>
           );
         })}
       </ul>
-    </>
+    </div>
   );
 }

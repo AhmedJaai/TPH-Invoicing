@@ -33,6 +33,8 @@ export const users = pgTable("users", {
   role: roleEnum("role").notNull().default("PURCHASING"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: now(),
+  /** حدُّ ما قرأه من الإشعارات — ما وقع بعده «جديد» (045). والفراغ: لم يفتحها قطّ. */
+  notificationsSeenAt: timestamp("notifications_seen_at", { withTimezone: true }),
 });
 
 /** جدول Auth.js — يحمل أيضاً refresh_token الخاص بجوجل للرفع للدرايف بصلاحية المستخدم */

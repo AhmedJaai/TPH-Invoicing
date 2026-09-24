@@ -23,6 +23,35 @@ const AMOUNTS_KEY = "tph.amounts";
 
 type Theme = "light" | "dark" | "system";
 
+export function toggleTheme() {
+  const root = document.documentElement;
+  const chosen = root.getAttribute("data-theme");
+  const darkNow =
+    chosen === "dark"
+    || (chosen !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  /* الدورة ثنائيّة: من ضغط الزرّ يريد الضدّ، لا «اتبع النظام». */
+  const next: Theme = darkNow ? "light" : "dark";
+  root.setAttribute("data-theme", next);
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch {
+    /* متصفّحٌ يمنع التخزين — يبقى الاختيار لهذه الجلسة وحدها */
+  }
+}
+
+export function toggleAmounts() {
+  const root = document.documentElement;
+  const next = root.getAttribute("data-amounts") !== "hidden";
+  if (next) root.setAttribute("data-amounts", "hidden");
+  else root.removeAttribute("data-amounts");
+  try {
+    localStorage.setItem(AMOUNTS_KEY, next ? "hidden" : "shown");
+  } catch {
+    /* كما سبق */
+  }
+}
+
+
 export function ViewControls() {
   /*
     ── لا حالةَ في الترميز ──
@@ -36,39 +65,11 @@ export function ViewControls() {
     لا الحال («بدّل الوضع») فلا يختلف بين الخادم والمتصفّح. والقارئُ
     يعرف الحالَ من الصفحة نفسها لا من نصّ الزرّ.
   */
-  function toggleTheme() {
-    const root = document.documentElement;
-    const chosen = root.getAttribute("data-theme");
-    const darkNow =
-      chosen === "dark"
-      || (chosen !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    /* الدورة ثنائيّة: من ضغط الزرّ يريد الضدّ، لا «اتبع النظام». */
-    const next: Theme = darkNow ? "light" : "dark";
-    root.setAttribute("data-theme", next);
-    try {
-      localStorage.setItem(THEME_KEY, next);
-    } catch {
-      /* متصفّحٌ يمنع التخزين — يبقى الاختيار لهذه الجلسة وحدها */
-    }
-  }
-
-  function toggleAmounts() {
-    const root = document.documentElement;
-    const next = root.getAttribute("data-amounts") !== "hidden";
-    if (next) root.setAttribute("data-amounts", "hidden");
-    else root.removeAttribute("data-amounts");
-    try {
-      localStorage.setItem(AMOUNTS_KEY, next ? "hidden" : "shown");
-    } catch {
-      /* كما سبق */
-    }
-  }
-
   const btn =
-    "inline-flex min-h-11 w-9 items-center justify-center rounded-lg border border-line text-ink-soft transition-colors hover:border-ink-soft hover:text-ink sm:min-h-0 sm:h-8";
+    "inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-soft transition-colors hover:bg-hover hover:text-ink lg:h-9 lg:w-9";
 
   return (
-    <div className="flex shrink-0 items-center gap-1.5">
+    <div className="flex shrink-0 items-center gap-1">
       <button
         type="button"
         onClick={toggleAmounts}
@@ -76,8 +77,8 @@ export function ViewControls() {
         title="أخفِ المبالغ أو أظهرها — للعرض على غيرك"
         aria-label="بدّل إخفاء المبالغ"
       >
-        <Eye className="icon-shown h-4 w-4" />
-        <EyeOff className="icon-hidden h-4 w-4" />
+        <Eye className="icon-shown h-[18px] w-[18px]" />
+        <EyeOff className="icon-hidden h-[18px] w-[18px]" />
       </button>
 
       <button
@@ -87,8 +88,8 @@ export function ViewControls() {
         title="بدّل بين الوضع الفاتح والداكن"
         aria-label="بدّل الوضع الفاتح والداكن"
       >
-        <Sun className="icon-dark h-4 w-4" />
-        <Moon className="icon-light h-4 w-4" />
+        <Sun className="icon-dark h-[18px] w-[18px]" />
+        <Moon className="icon-light h-[18px] w-[18px]" />
       </button>
     </div>
   );

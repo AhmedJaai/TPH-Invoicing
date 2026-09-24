@@ -1,17 +1,16 @@
-import { Skeleton } from "./ui";
 import { mainClass, type ShellWidth } from "./page-shell";
 
 /**
- * ما يُعرَض ريثما تُبنى الصفحة على الخادم.
+ * ما يُعرَض ريثما تُبنى الصفحة على الخادم — داخل القشرة الثابتة، في موضع
+ * المحتوى نفسه وبمقاس عنوانه، فلا يقفز شيءٌ حين تصل.
  *
- * كانت الصفحة تبقى فارغةً حتى يكتمل الاستعلام، فيظنّ من ينتظر أنّ
- * التطبيق تعطّل. والهيكل يقول: شيءٌ قادم، وهذا موضعه. بلا نسبة مئوية
- * مخترَعة — فالنسبة الكاذبة أسوأ من غيابها.
+ * العنوانُ الحقيقيّ يُكتب (فيعرف المنتظر أين هو)، وما تحته أشكالٌ بلا
+ * أرقام — والنسبةُ الكاذبة أسوأ من غيابها.
  */
 export function PageSkeleton({
   title,
   stats = 4,
-  rows = 5,
+  rows = 6,
   width = "wide",
 }: {
   title: string;
@@ -19,28 +18,37 @@ export function PageSkeleton({
   rows?: number;
   width?: ShellWidth;
 }) {
-  /*
-    يقع داخل القشرة الدائمة، في موضع المحتوى نفسه وبمقاس عنوانه — فلا
-    يقفز العنوانُ ولا يختفي الشريطُ حين تصل الصفحة.
-  */
   return (
     <main id="main" className={mainClass(width)} aria-busy="true">
-      <h1 className="font-display text-[1.6rem] font-black leading-[1.15] tracking-tight sm:text-[2rem]">
-        {title}
-      </h1>
-      <p className="mt-2 text-sm text-muted">يُحمّل…</p>
+      <h1 className="text-[1.65rem] font-extrabold leading-[1.2] tracking-tight sm:text-[1.9rem]">{title}</h1>
+      <div className="skeleton mt-3 h-4 w-72 max-w-full" />
 
       {stats > 0 && (
-        <div className="mt-7 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+        <div className="mt-8 grid grid-cols-2 gap-3 xl:grid-cols-4">
           {Array.from({ length: stats }).map((_, i) => (
-            <div key={i} className="skeleton h-24 rounded-2xl" />
+            <div key={i} className="rounded-2xl border border-line bg-raised p-5">
+              <div className="skeleton h-3.5 w-24" />
+              <div className="skeleton mt-5 h-8 w-32" />
+              <div className="skeleton mt-4 h-3 w-40 max-w-full" />
+            </div>
           ))}
         </div>
       )}
 
-      <div className="mt-8">
-        <Skeleton rows={rows} />
+      <div className="mt-10 overflow-hidden rounded-xl border border-line bg-raised">
+        <div className="skeleton h-10 rounded-none opacity-60" />
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 border-t border-line-soft px-5 py-4">
+            <div className="skeleton h-9 w-9 shrink-0 rounded-lg" />
+            <div className="flex-1 space-y-2">
+              <div className="skeleton h-3.5 w-2/5" />
+              <div className="skeleton h-3 w-3/5" />
+            </div>
+            <div className="skeleton h-4 w-20" />
+          </div>
+        ))}
       </div>
+      <span className="sr-only">يُحمّل…</span>
     </main>
   );
 }

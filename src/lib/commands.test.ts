@@ -40,8 +40,19 @@ describe("commandsFor", () => {
 
   it("المالك يرى كلّ فعل", () => {
     expect(ids(commandsFor("OWNER"))).toEqual(
-      expect.arrayContaining(["upload", "bank-import", "pay-run", "close-month", "count", "sales-import"]),
+      expect.arrayContaining(["upload", "bank-import", "pay-run", "close-month", "count", "sales-import", "cash", "accountant-pack"]),
     );
+  });
+
+  it("أفعالُ الواجهة لا تنتقل — تحمل حدثها ووجهةً موجودة", () => {
+    const view = commandsFor("OWNER").filter((c) => c.event);
+    expect(view.map((c) => c.event).sort()).toEqual(["amounts", "shortcuts", "theme"]);
+    for (const c of view) expect(c.href).toBe("/");
+  });
+
+  it("النقدُ القادم لمن يرى البنك وحده", () => {
+    expect(ids(commandsFor("ACCOUNTANT"))).toContain("cash");
+    expect(ids(commandsFor("PURCHASING"))).not.toContain("cash");
   });
 });
 

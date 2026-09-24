@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { CloudOff, RotateCw } from "lucide-react";
+import { buttonClass } from "@/components/ui-tokens";
 
 /**
- * حدُّ الخطأ — بالعربية.
+ * حدُّ الخطأ — بالعربية، داخل القشرة.
  *
- * كان انقطاعُ Neon في أيّ صفحة يعرض صفحة Next الافتراضيّة بالإنجليزيّة،
+ * انقطاعٌ في الاتصال بالقاعدة كان يعرض صفحة Next الافتراضيّة بالإنجليزيّة،
  * وصاحبُ العمل لا يعرف أهو عطبٌ عابر أم فُقد شيء. وعرضُ الصفحة قراءةٌ لا
- * كتابة، فيُقال ذلك صراحةً.
+ * كتابة، فيُقال ذلك صراحةً — ومعه طريقان: أعد المحاولة، أو ارجع إلى اليوم.
  */
 export default function ErrorPage({
   error,
@@ -22,9 +24,13 @@ export default function ErrorPage({
   }, [error]);
 
   return (
-    <main className="mx-auto max-w-lg px-4 py-16">
-      <div className="rounded-2xl border border-danger/40 bg-danger-bg px-5 py-8 text-center">
-        <h1 className="text-lg font-bold text-danger">تعذّر عرض هذه الصفحة</h1>
+    <main id="main" className="mx-auto max-w-lg px-4 py-16 sm:py-24">
+      <title>تعذّر عرض الصفحة · ذا بوبليك هاوس</title>
+      <div className="rounded-2xl border border-line bg-raised px-6 py-10 text-center shadow-lifted">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-danger-bg text-danger">
+          <CloudOff className="h-6 w-6" strokeWidth={1.75} aria-hidden />
+        </span>
+        <h1 className="mt-4 text-lg font-bold">تعذّر عرض هذه الصفحة</h1>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-soft">
           عرضُ الصفحة لا يكتب شيئاً، فلم يضِع قيد. وغالباً هو انقطاعٌ عابر في الاتصال بالقاعدة —
           أعد المحاولة بعد لحظة.
@@ -34,19 +40,13 @@ export default function ErrorPage({
             إن تكرّر فانقل هذا الرمز لمن يصلحه: <span className="nums" dir="ltr">{error.digest}</span>
           </p>
         )}
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <button
-            type="button"
-            onClick={() => retry()}
-            className="inline-flex min-h-11 items-center rounded-lg bg-inverse-surface px-4 text-sm font-bold text-inverse-ink sm:min-h-9"
-          >
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <button type="button" onClick={() => retry()} className={buttonClass("primary")}>
+            <RotateCw className="h-4 w-4" strokeWidth={2} aria-hidden />
             أعد المحاولة
           </button>
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 text-sm sm:min-h-9"
-          >
-            الرئيسية
+          <Link href="/" className={buttonClass("secondary")}>
+            إلى اليوم
           </Link>
         </div>
       </div>

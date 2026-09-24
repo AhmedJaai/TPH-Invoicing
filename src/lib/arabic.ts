@@ -243,3 +243,45 @@ export const REASON: NounForms = {
   many: "سبباً",
   zero: "لا أسباب",
 };
+
+/* ── الزمنُ النسبيّ في الإشعارات: «قبل ٥ دقائق» لا «قبل 5 د» ── */
+
+export const MINUTE: NounForms = {
+  one: "دقيقة",
+  two: "دقيقتين",
+  few: "دقائق",
+  many: "دقيقة",
+  zero: "لحظات",
+};
+
+export const HOUR: NounForms = {
+  one: "ساعة",
+  two: "ساعتين",
+  few: "ساعات",
+  many: "ساعة",
+  zero: "لحظات",
+};
+
+export const DAY_AGO: NounForms = {
+  one: "يوم",
+  two: "يومين",
+  few: "أيّام",
+  many: "يوماً",
+  zero: "لحظات",
+};
+
+/**
+ * «منذ متى» بالعربية: الآن · قبل دقيقة · قبل ٣ ساعات · أمس · قبل ٥ أيّام.
+ * والمجرورُ بعد «قبل» يأخذ صيغة المثنّى المجرور («قبل ساعتين»).
+ */
+export function timeAgo(iso: string | Date, at: Date = new Date()): string {
+  const diff = at.getTime() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "الآن";
+  if (m < 60) return `قبل ${countNoun(m, MINUTE)}`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `قبل ${countNoun(h, HOUR)}`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return "أمس";
+  return `قبل ${countNoun(d, DAY_AGO)}`;
+}

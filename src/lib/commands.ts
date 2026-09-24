@@ -38,6 +38,11 @@ export interface Command {
   needs?: Capability;
   /** كلماتٌ يكتبها الناس ولا تقع في الاسم — «سداد» لـ«دفعة الشهر». */
   keywords?: readonly string[];
+  /**
+   * فعلٌ في الواجهة لا صفحة — يفتح قائمةَ الاختصارات أو يبدّل الوضع.
+   * و`href` معه `/` كي يبقى كلُّ أمرٍ ذا وجهةٍ موجودة.
+   */
+  event?: "shortcuts" | "theme" | "amounts";
 }
 
 /**
@@ -120,6 +125,24 @@ const ACTIONS: readonly Command[] = [
     keywords: ["فودكس", "مبيعات", "كتالوج", "foodics", "sales", "اكسل"],
   },
   {
+    id: "cash",
+    label: "انظر النقد القادم",
+    hint: "ما يخرج ومتى، مقابل رصيد البنك",
+    group: "ACTION",
+    href: "/cash",
+    needs: "bank:view",
+    keywords: ["نقد", "سيوله", "توقع", "تدفق", "cash", "outlook", "رصيد"],
+  },
+  {
+    id: "accountant-pack",
+    label: "صدّر حزمة المحاسب",
+    hint: "فواتير الشهر ودفعاته ومصروفه وضريبته — ملفّ Excel",
+    group: "ACTION",
+    href: "/close#export",
+    needs: "month:close",
+    keywords: ["محاسب", "تصدير", "اكسل", "حزمه", "export", "accountant", "ضريبه"],
+  },
+  {
     id: "statements",
     label: "طابِق كشف مورّد",
     hint: "الكشوف",
@@ -130,13 +153,20 @@ const ACTIONS: readonly Command[] = [
   },
 ];
 
+/** أفعالُ الواجهة — لا صفحة لها. */
+const VIEW: readonly Command[] = [
+  { id: "shortcuts", label: "اختصارات لوحة المفاتيح", hint: "?", group: "ACTION", href: "/", event: "shortcuts", keywords: ["اختصار", "مفاتيح", "shortcuts", "keyboard"] },
+  { id: "theme", label: "بدّل الوضع الفاتح والداكن", group: "ACTION", href: "/", event: "theme", keywords: ["داكن", "ليلي", "فاتح", "dark", "theme"] },
+  { id: "amounts", label: "أخفِ المبالغ أو أظهرها", hint: "للعرض على غيرك", group: "ACTION", href: "/", event: "amounts", keywords: ["اخف", "اخفاء", "مبالغ", "hide", "privacy"] },
+];
+
 /**
  * صفحاتٌ تُفتَح من موضعها لا من الألسنة — فلا يجدها من لا يعرف موضعها
  * إلّا هنا. وكلٌّ منها يُحرَس بما تحرسه به صفحتُه.
  */
 const SECONDARY: readonly Command[] = [
   { id: "p:analysis", label: "الأصناف والأسعار", hint: "المورّدون", group: "PAGE", href: "/analysis", needs: "amounts:view", keywords: ["سعر", "اسعار", "صنف", "prices"] },
-  { id: "p:expenses", label: "المصروفات", hint: "المال", group: "PAGE", href: "/money/expenses", needs: "bank:view", keywords: ["مصروف", "ايجار", "رواتب", "expenses"] },
+  { id: "p:expenses", label: "المصروفات", hint: "البنك", group: "PAGE", href: "/money/expenses", needs: "bank:view", keywords: ["مصروف", "ايجار", "رواتب", "expenses"] },
   { id: "p:trend", label: "اتّجاه الجرد", hint: "الجرد", group: "PAGE", href: "/inventory/trend", needs: "amounts:view", keywords: ["فرق", "اتجاه", "trend"] },
   { id: "p:mapping", label: "منتجات تحتاج ربطاً", hint: "الجرد", group: "PAGE", href: "/inventory/mapping", needs: "inventory:view", keywords: ["ربط", "منتج", "mapping"] },
 ];
@@ -180,7 +210,7 @@ function pageCommands(): Command[] {
 export function commandsFor(role: Role): Command[] {
   const pages = pageCommands();
   const areaNeeds = new Map(AREAS.flatMap((a) => a.children.map((c) => [c.href, a.needs] as const)));
-  return [...ACTIONS, ...pages].filter((c) => {
+  return [...ACTIONS, ...pages, ...VIEW].filter((c) => {
     if (c.needs && !can(role, c.needs)) return false;
     // فعلٌ يقع في لسانٍ من مساحةٍ مغلقة لا يُعرض وإن ملك الفعلَ نفسه
     const area = areaNeeds.get(c.href.split("#")[0]);

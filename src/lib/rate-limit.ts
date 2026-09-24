@@ -80,6 +80,8 @@ export const RULES: Record<string, RateLimitRule> = {
   /* قراءةُ المحتوى تكلّف نداءات نموذج — المشي بلا حدّ، والقراءة بحدّ */
   "drive-sync-content": { limit: 120, windowSeconds: 3600 },
   "bank-import": { limit: 12, windowSeconds: 3600 },
+  /* الجرسُ يسأل كلَّ ثلاث دقائق ومع كلّ فتح — قراءةٌ رخيصة بلا نموذج */
+  notifications: { limit: 600, windowSeconds: 3600 },
   /*
     كان عشرة في الساعة، وزرُّه في كلّ صفّ من قائمة الفواتير: فالحادية
     عشرة تُردّ وأحمد يرتّب دفاتره القديمة. والوسم الجماعيّ الذي كان

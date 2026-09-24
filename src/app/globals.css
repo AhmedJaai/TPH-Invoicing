@@ -1,124 +1,196 @@
 @import "tailwindcss";
 
 /*
- * نظام لوني عالي التباين: أبيض وأسود خالصان.
- * الرمادي للنص الثانوي والحدود فقط، واللون محجوز للحالات وحدها
- * حتى يبقى التنبيه ملحوظاً لأنه الملوّن الوحيد في الشاشة.
+ * ── نظام التصميم، الإصدار الثاني (سبتمبر ٢٠٢٦) ──
+ *
+ * مكتبٌ ماليٌّ لمقهى قهوةٍ مختصّة: دافئ، هادئ، واثق، دقيق.
+ *
+ * - أرضيّةٌ ورقيّةٌ دافئة، وبطاقاتٌ بيضاء فوقها، وحبرٌ قريبٌ من الأسود.
+ * - لونُ علامةٍ واحد: «الهيل» — أخضرُ مزرقّ عميق. للفعل الرئيسيّ والموضع
+ *   الحاليّ والتركيز، لا للزينة.
+ * - ألوانُ الحال (سليم · تنبيه · خطر · معلومة) لا تأتي وحدها أبداً:
+ *   معها أيقونةٌ أو كلمة، فلا يُحمَّل اللونُ معنىً لا يراه كلُّ أحد.
+ * - إطارُ التطبيق (الشريط الجانبيّ) داكنٌ بلون العلامة في الوضعين.
+ *
+ * كلُّ لونٍ هنا رمزٌ يُقرأ في كلّ الشاشات؛ تغييرُ رمزٍ يغيّر التطبيق كلَّه.
+ * والتباين مقيسٌ لا مقدَّر: النصّ ≥ ‎4.5:1‎ على كلّ أرضيّةٍ يقع عليها،
+ * وحدودُ الحقول ≥ ‎3:1‎ (WCAG AA).
+ *
+ * والدروسُ الباقية من الإصدار الأوّل محفوظةٌ أدناه بأسبابها: عمودُ المال
+ * يصطفّ على آخر خانة، والأرقامُ بخطٍّ يملك أرقاماً جدوليّة، وإخفاءُ
+ * المبالغ بالتنقيط، ورابطُ الصفّ طبقةٌ لا غلاف.
  */
 :root {
-  --surface: #ffffff;
-  --raised: #ffffff;
-  --sunken: #f4f4f5;
-  --ink: #000000;
-  --ink-soft: #52525b;
-  /*
-   * الرمادي الثانوي يجتاز حدّ التباين (‎4.5:1‎) على الأبيض.
-   * كان `#8b8b93` وهو ‎3.38:1‎ — وعليه تسميةُ كل بطاقة رقم، ورأسُ كل
-   * عمود، وتسميةُ كل لسانٍ في شريط الجوّال. أي أنّ أضعف نصٍّ في الشاشة
-   * كان يحمل أكثر ما يُقرأ فيها.
-   */
-  --muted: #6b6b74;
-  --line: #e4e4e7;
-  /*
-   * حدّ الحقل غير الحدّ الفاصل.
-   *
-   * `--line` على الأبيض ‎1.27:1‎ وعلى `--sunken` ‎1.15:1‎ — وهو الحدّ
-   * الوحيد لأربعة وثلاثين حقلاً. ومع ضوء النافذة عند الكاشير يختفي، فلا
-   * يُعرف أين يُكتب. وWCAG يطلب ‎3:1‎ لغير النصّ، وهذا نحو ‎3.4:1‎.
-   */
-  --line-input: #8c8c96;
-  --line-strong: #000000;
-  --inverse-surface: #000000;
-  --inverse-ink: #ffffff;
+  /* الأرضيّات — من الأعمق إلى الأعلى */
+  --surface: #f6f4ef;          /* أرضيّة التطبيق: ورقٌ دافئ */
+  --raised: #ffffff;           /* البطاقة واللوح */
+  --overlay: #ffffff;          /* ما يطفو: القوائم والحوارات */
+  --sunken: #eeebe4;           /* البئر: رأسُ الجدول والحقل المعطَّل */
+  --hover: #f1eee8;            /* تحت الفأرة */
 
-  --ok: #067647;
-  --ok-bg: #ecfdf3;
-  --warn: #b54708;
-  --warn-bg: #fffaeb;
-  --danger: #b42318;
-  --danger-bg: #fef3f2;
+  --ink: #1b1a17;
+  --ink-soft: #57534b;
+  --muted: #6d685e;            /* ‎5.04:1‎ على الأرضيّة و‎4.65:1‎ على البئر */
+  --line: #e6e1d7;
+  --line-soft: #efebe3;
+  --line-input: #8d877b;       /* ‎3.57:1‎ على الأبيض — حدُّ الحقل يُرى */
+  --line-strong: #1b1a17;
 
-  /*
-   * الارتفاع بالظلّ لا باللون.
-   * البطاقة على أرضية بيضاء لا يفصلها عنها إلّا حدّ رمادي باهت، فتبدو
-   * الشاشة مسطّحةً كجدول. وظلٌّ خفيف يُنشئ الطبقة دون أن يكسر التقشّف.
-   */
-  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.06);
-  --shadow-lifted: 0 2px 4px rgb(0 0 0 / 0.05), 0 4px 12px rgb(0 0 0 / 0.08);
-  /* حلقة التركيز ٣:١ على الأقلّ — كانت ‎1.69:1‎ فاتحاً، فلا يُرى أين التركيز بلا فأرة */
-  --ring: color-mix(in oklab, var(--ink) 55%, transparent);
+  --accent: #0f6b58;           /* الهيل — ‎6.43:1‎ على الأبيض */
+  --accent-strong: #0b5747;
+  --accent-ink: #ffffff;
+  --accent-soft: #e4f2ed;
+  --accent-line: #b7dccf;
+
+  --inverse-surface: #1b1a17;
+  --inverse-ink: #f6f4ef;
+
+  --ok: #1f7a3d;
+  --ok-bg: #e6f4ea;
+  --warn: #9a4d00;
+  --warn-bg: #fcf0dc;
+  --danger: #b8261b;
+  --danger-bg: #fdeceb;
+  --info: #2d5bc4;
+  --info-bg: #e8eefc;
+  /* لونان للتمييز لا للحال — حروفُ المورّدين */
+  --plum: #8a2f74;
+  --plum-bg: #f6e8f3;
+  --sand: #7a5a1e;
+  --sand-bg: #f4ecda;
+
+  /* الإطار: شريطٌ جانبيّ بلون العلامة */
+  --frame: #10231e;
+  --frame-raised: #183029;
+  --frame-ink: #eef5f2;
+  --frame-muted: #9fb8b0;      /* ‎7.2:1‎ على الإطار */
+  --frame-line: #23413a;
+  --frame-accent: #6fdcbc;
+
+  /* الارتفاع: ظلٌّ دافئ لا رماديّ */
+  --shadow-xs: 0 1px 0 rgb(40 30 10 / 0.04);
+  --shadow-raised: 0 1px 2px rgb(40 30 10 / 0.05), 0 1px 1px rgb(40 30 10 / 0.03);
+  --shadow-lifted: 0 4px 10px -2px rgb(40 30 10 / 0.08), 0 2px 4px -2px rgb(40 30 10 / 0.06);
+  --shadow-overlay: 0 16px 40px -8px rgb(40 30 10 / 0.22), 0 4px 12px -4px rgb(40 30 10 / 0.12);
+
+  --ring: color-mix(in oklab, var(--accent) 70%, transparent);
+
+  /* الحركة */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 150ms;
+  --dur: 220ms;
 }
 
 /*
  * الظلام: اختيارُ النظام، ثمّ اختيارُ صاحب المقهى فوقه.
- *
- * كان الوضعُ يتبع النظامَ وحده (`prefers-color-scheme`)، فمن أراد
- * الفاتحَ نهاراً على جهازٍ مضبوطٍ على الداكن لا يملك سبيلاً. فصارت
  * ثلاثُ حالات: `data-theme="dark"` و`data-theme="light"` يكتبهما الزرّ،
- * ولا شيء يعني «اتبع النظام».
- *
- * والقيمُ مكرّرةٌ في كتلتين — ولا مفرّ: لا يجوز ضمّ استعلامِ وسطٍ إلى
- * محدِّدٍ في قائمةٍ واحدة. والتكرارُ هنا أصدق من متغيّرٍ وسيط يُخفي
- * اللون الحقيقيّ عمّن يقرأ.
+ * ولا شيء يعني «اتبع النظام». والقيمُ مكرّرةٌ في كتلتين لأنّه لا يجوز
+ * ضمُّ استعلامِ وسطٍ إلى محدِّدٍ في قائمةٍ واحدة.
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --surface: #000000;
-    --raised: #0a0a0b;
-    --sunken: #131316;
-    --ink: #ffffff;
-    --ink-soft: #a1a1aa;
-    /* يجتاز الحدّ على الأسود وعلى أرضيّات الحالات الداكنة جميعاً */
-    --muted: #95959f;
-    --line: #26262b;
-    /* ‎#26262b‎ على ‎#0a0a0b‎ هو ‎1.31:1‎ — وهذا نحو ‎3.9:1‎ */
-    --line-input: #6b6b74;
-    --line-strong: #ffffff;
-    --inverse-surface: #ffffff;
-    --inverse-ink: #000000;
+    --surface: #0e0d0b;
+    --raised: #1a1815;
+    --overlay: #221f1b;
+    --sunken: #141310;
+    --hover: #23211d;
 
-    --ok: #4ade80;
-    --ok-bg: #052e1a;
-    --warn: #fbbf24;
-    --warn-bg: #2e1f05;
-    --danger: #f87171;
-    --danger-bg: #2e0f0d;
+    --ink: #efeae0;
+    --ink-soft: #cdc6b8;
+    --muted: #a8a194;
+    --line: #2b2823;
+    --line-soft: #221f1b;
+    --line-input: #6b655a;
+    --line-strong: #efeae0;
 
-    /* في الظلام لا يُرى الظلّ — فالطبقة تُصنع بالحدّ والأرضية */
-    --shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.02);
-    --shadow-lifted: 0 4px 16px rgb(0 0 0 / 0.5);
-    --ring: color-mix(in oklab, var(--ink) 50%, transparent);
+    --accent: #4fc9a8;
+    --accent-strong: #6fdcbc;
+    --accent-ink: #062a21;
+    --accent-soft: #0f2a23;
+    --accent-line: #1f5446;
+
+    --inverse-surface: #efeae0;
+    --inverse-ink: #0e0d0b;
+
+    --ok: #5fd38a;
+    --ok-bg: #10261a;
+    --warn: #f3b54a;
+    --warn-bg: #2a1e08;
+    --danger: #ff8a7a;
+    --danger-bg: #2d1210;
+    --info: #8fb0ff;
+    --info-bg: #121c33;
+    --plum: #f0a6dc;
+    --plum-bg: #2b1227;
+    --sand: #e3c27e;
+    --sand-bg: #2a2212;
+
+    --frame: #0a0908;
+    --frame-raised: #171512;
+    --frame-ink: #efeae0;
+    --frame-muted: #a8a194;
+    --frame-line: #221f1b;
+    --frame-accent: #4fc9a8;
+
+    --shadow-xs: 0 0 0 1px rgb(255 255 255 / 0.02);
+    --shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.03);
+    --shadow-lifted: 0 6px 18px -4px rgb(0 0 0 / 0.6);
+    --shadow-overlay: 0 20px 50px -10px rgb(0 0 0 / 0.75), 0 0 0 1px rgb(255 255 255 / 0.05);
+    --ring: color-mix(in oklab, var(--accent) 75%, transparent);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-    --surface: #000000;
-    --raised: #0a0a0b;
-    --sunken: #131316;
-    --ink: #ffffff;
-    --ink-soft: #a1a1aa;
-    /* يجتاز الحدّ على الأسود وعلى أرضيّات الحالات الداكنة جميعاً */
-    --muted: #95959f;
-    --line: #26262b;
-    /* ‎#26262b‎ على ‎#0a0a0b‎ هو ‎1.31:1‎ — وهذا نحو ‎3.9:1‎ */
-    --line-input: #6b6b74;
-    --line-strong: #ffffff;
-    --inverse-surface: #ffffff;
-    --inverse-ink: #000000;
+  --surface: #0e0d0b;
+  --raised: #1a1815;
+  --overlay: #221f1b;
+  --sunken: #141310;
+  --hover: #23211d;
 
-    --ok: #4ade80;
-    --ok-bg: #052e1a;
-    --warn: #fbbf24;
-    --warn-bg: #2e1f05;
-    --danger: #f87171;
-    --danger-bg: #2e0f0d;
+  --ink: #efeae0;
+  --ink-soft: #cdc6b8;
+  --muted: #a8a194;
+  --line: #2b2823;
+  --line-soft: #221f1b;
+  --line-input: #6b655a;
+  --line-strong: #efeae0;
 
-    /* في الظلام لا يُرى الظلّ — فالطبقة تُصنع بالحدّ والأرضية */
-    --shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.02);
-    --shadow-lifted: 0 4px 16px rgb(0 0 0 / 0.5);
-    --ring: color-mix(in oklab, var(--ink) 50%, transparent);
+  --accent: #4fc9a8;
+  --accent-strong: #6fdcbc;
+  --accent-ink: #062a21;
+  --accent-soft: #0f2a23;
+  --accent-line: #1f5446;
+
+  --inverse-surface: #efeae0;
+  --inverse-ink: #0e0d0b;
+
+  --ok: #5fd38a;
+  --ok-bg: #10261a;
+  --warn: #f3b54a;
+  --warn-bg: #2a1e08;
+  --danger: #ff8a7a;
+  --danger-bg: #2d1210;
+  --info: #8fb0ff;
+  --info-bg: #121c33;
+  --plum: #f0a6dc;
+  --plum-bg: #2b1227;
+  --sand: #e3c27e;
+  --sand-bg: #2a2212;
+
+  --frame: #0a0908;
+  --frame-raised: #171512;
+  --frame-ink: #efeae0;
+  --frame-muted: #a8a194;
+  --frame-line: #221f1b;
+  --frame-accent: #4fc9a8;
+
+  --shadow-xs: 0 0 0 1px rgb(255 255 255 / 0.02);
+  --shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.03);
+  --shadow-lifted: 0 6px 18px -4px rgb(0 0 0 / 0.6);
+  --shadow-overlay: 0 20px 50px -10px rgb(0 0 0 / 0.75), 0 0 0 1px rgb(255 255 255 / 0.05);
+  --ring: color-mix(in oklab, var(--accent) 75%, transparent);
 }
 
 :root[data-theme="light"] {
@@ -131,15 +203,24 @@
 
   --color-surface: var(--surface);
   --color-raised: var(--raised);
+  --color-overlay: var(--overlay);
   --color-sunken: var(--sunken);
+  --color-hover: var(--hover);
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
   --color-muted: var(--muted);
   --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
   --color-line-input: var(--line-input);
   --color-line-strong: var(--line-strong);
   --color-inverse-surface: var(--inverse-surface);
   --color-inverse-ink: var(--inverse-ink);
+
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
 
   --color-ok: var(--ok);
   --color-ok-bg: var(--ok-bg);
@@ -147,13 +228,44 @@
   --color-warn-bg: var(--warn-bg);
   --color-danger: var(--danger);
   --color-danger-bg: var(--danger-bg);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-plum: var(--plum);
+  --color-plum-bg: var(--plum-bg);
+  --color-sand: var(--sand);
+  --color-sand-bg: var(--sand-bg);
 
+  --color-frame: var(--frame);
+  --color-frame-raised: var(--frame-raised);
+  --color-frame-ink: var(--frame-ink);
+  --color-frame-muted: var(--frame-muted);
+  --color-frame-line: var(--frame-line);
+  --color-frame-accent: var(--frame-accent);
+
+  --shadow-xs: var(--shadow-xs);
   --shadow-raised: var(--shadow-raised);
   --shadow-lifted: var(--shadow-lifted);
+  --shadow-overlay: var(--shadow-overlay);
+
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+  --radius-panel: 1rem;
+
+  --ease-out: var(--ease-out);
+  --animate-rise: rise var(--dur) var(--ease-out);
+  --animate-fade: fade var(--dur) var(--ease-out);
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes fade {
+  from { opacity: 0; }
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
 }
 
 body {
@@ -163,11 +275,13 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+::selection {
+  background: color-mix(in oklab, var(--accent) 24%, transparent);
+}
+
 /*
- * النصّ المؤقّت يُقرأ.
- *
- * Tailwind v4 يجعله نصفَ لون النصّ، أي ‎3.98:1‎ على الأبيض — وهو في حقولٍ
- * كانت تسميتُها هو وحده قبل UX-103. فيُضبط على `--muted` بلا شفافيّة: ‎5.28:1‎.
+ * النصّ المؤقّت يُقرأ: Tailwind v4 يجعله نصفَ لون النصّ (‎3.98:1‎)، فيُضبط
+ * على `--muted` بلا شفافيّة.
  */
 ::placeholder {
   color: var(--muted);
@@ -175,45 +289,43 @@ body {
 }
 
 /*
- * الأرقام في الجداول المالية بعرض ثابت حتى تصطفّ الخانات.
+ * ── الأرقام ──
  *
- * و`tabular-nums` وحدها لا تكفي: خطّ ثمانية سانس لا يحمل مجموعة الأرقام
- * الجدوليّة أصلاً، فالخاصيّة تُحسَب ولا أثر لها — قيس عليه فكان «11»
- * بعرض ‎9.08px‎ و«88» بعرض ‎15.31px‎. فيُطلَب للأرقام خطّ الواجهة النظاميّ،
- * وهو يحملها على أنظمة التشغيل الثلاثة، وعرضُ رقمه ‎15.12px‎ — أي بمقاس
- * أرقام ثمانية نفسها، فلا يبين الفرق.
- *
- * ولا يُخشى على النصّ العربيّ: هذا الصنف لا يوضَع إلّا على أرقامٍ صرفة.
+ * خطّ ثمانية سانس لا يحمل الأرقام الجدوليّة أصلاً — «11» بعرض ‎9.08px‎
+ * و«88» بعرض ‎15.31px‎ — فلا تصطفّ الخانات مهما طُلب `tnum`. فيُطلب للأرقام
+ * خطّ الواجهة النظاميّ وهو يحملها على أنظمة التشغيل الثلاثة. ولا يوضَع
+ * هذا الصنف إلّا على أرقامٍ صرفة، فلا يُمسّ النصّ العربيّ.
  */
 .nums {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
+  letter-spacing: -0.01em;
+}
+
+/* الكسرُ أخفت من الصحيح — العين تقرأ الريالات وتمرّ على الهللات */
+.nums-frac {
+  opacity: 0.55;
 }
 
 /*
  * عمود مالٍ تصطفّ فواصله.
  *
- * `text-align: end` في العربية هو **اليسار** — فكانت الأرقام تلتصق
- * بحافّتها اليسرى فتتراقص فواصلها العشرية. والمال يُصفّ على آخر خانةٍ
- * منه: `direction: ltr` مع `text-align: right` يجعل كل الفواصل على خطٍّ
- * واحد، فيُمسَح العمود بالعين ولا يُقرأ رقماً رقماً.
+ * `text-align: end` في العربية هو **اليسار**، فتتراقص الفواصل. والمال
+ * يُصفّ على آخر خانةٍ منه: `direction: ltr` مع `text-align: right`.
+ * و`unicode-bidi: plaintext` كي تُقرأ الخليّةُ التي فيها كلمةٌ عربيّة
+ * («٤ من ٦٠») من اليمين ولا تنقلب.
  */
 .nums-col {
   direction: ltr;
   text-align: right;
-  /*
-    الرقمُ وحده يبقى من اليسار — وخليّةٌ فيها كلمةٌ عربيّة («٤ من ٦٠»،
-    «فاتورتان») تُقرأ من اليمين. كان `direction: ltr` وحده يقلبها
-    «من 60 4»، وكلُّ خليّةٍ تُصلَح بيدها تُنسى أختُها.
-  */
   unicode-bidi: plaintext;
 }
 
 /* منطقة الإفلات حين يُسحب ملف فوقها */
 .dropping {
-  border-color: var(--ink);
-  background: var(--sunken);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 /* شريط تقدّم متحرّك — يدلّ على أنّ العمل جارٍ دون ادّعاء نسبة لا نعرفها */
@@ -226,44 +338,31 @@ body {
   animation: upload-slide 1.4s ease-in-out infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .upload-bar {
-    animation: none;
-    width: 100%;
-    opacity: 0.4;
-  }
-}
-
-
 /*
- * حلقة التركيز ظاهرة دائماً لمن يتنقّل بلوحة المفاتيح.
- * `outline: none` بلا بديل يجعل التطبيق غير قابل للاستعمال بلا فأرة.
+ * حلقة التركيز ظاهرة دائماً لمن يتنقّل بلوحة المفاتيح — بلون العلامة.
  */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-control);
+}
+
+/* الحقل يُعلن تركيزه بحدّه كذلك — الحلقةُ خارجه والحدُّ داخله */
+:where(input, select, textarea):focus-visible {
+  border-color: var(--accent);
 }
 
 /*
- * الجدول الذي يفيض عرضاً يُمرَّر داخل إطاره، ولا يُمرَّر الصفحةَ كلَّها.
- * وحافّة متدرّجة تدلّ على أنّ وراءه مزيداً — وإلّا ظنّه القارئ منتهياً.
+ * الجدول الذي يفيض عرضاً يُمرَّر داخل إطاره. والحافّة المتدرّجة على الجهة
+ * التي وراءها مزيدٌ **فعلاً** — يكتبها `ScrollX` في `data-overflow` بعد قياس الفيض.
  */
 .scroll-x {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
-/*
- * الحافّة المتدرّجة كانت موصوفةً في تعليق `.scroll-x` وغير مكتوبة — وهي
- * أشدّ ما يُحتاج إليه في صفّ المرشِّحات على الجوّال: ‎1109px‎ من المورّدين
- * داخل ‎290px‎، أي ثلاثة أرباعهم خلف الحافّة بلا ما يدلّ عليهم.
- *
- * والتدرّج يُوضَع على الجهة التي وراءها مزيدٌ **فعلاً**، لا دائماً:
- * حافّةٌ تَعِد بما ليس وراءه أسوأ من ألّا تكون. و`data-overflow` يكتبه
- * `ScrollX` بعد قياس الفيض.
- */
 [data-overflow="start"] {
   mask-image: linear-gradient(to left, transparent 0, #000 2rem);
   -webkit-mask-image: linear-gradient(to left, transparent 0, #000 2rem);
@@ -279,23 +378,19 @@ body {
   -webkit-mask-image: linear-gradient(to left, transparent 0, #000 2rem, #000 calc(100% - 2rem), transparent 100%);
 }
 
-/*
- * رابط التخطّي: القشرة تضع الشعار والبحث وسبع مساحاتٍ وسبعة أقسام قبل
- * المحتوى، فمن يتنقّل بلوحة المفاتيح يمرّ على اثنين وعشرين رابطاً في كل
- * صفحة. وهذا يقفز فوقها، ولا يظهر إلّا لمن يحتاجه.
- */
+/* رابط التخطّي: يقفز فوق القشرة، ولا يظهر إلّا لمن يحتاجه */
 .skip-link {
   position: absolute;
   inset-inline-start: 0.75rem;
   top: -4rem;
-  z-index: 50;
-  border-radius: 0.5rem;
-  background: var(--inverse-surface);
-  color: var(--inverse-ink);
+  z-index: 60;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--accent-ink);
   padding: 0.6rem 1rem;
   font-size: 0.8125rem;
   font-weight: 700;
-  transition: top 0.15s ease;
+  transition: top var(--dur-fast) var(--ease-out);
 }
 
 .skip-link:focus {
@@ -311,44 +406,41 @@ body {
 }
 
 /*
- * هيكل الانتظار: يدلّ على أنّ شيئاً قادم وأين سيقع، بلا نسبة مئوية
- * مخترَعة. والنسبة الكاذبة أسوأ من غيابها.
+ * هيكل الانتظار: بريقٌ يعبر الشكل — يدلّ على أنّ شيئاً قادم وأين سيقع،
+ * بلا نسبة مئوية مخترَعة.
  */
 @keyframes shimmer {
-  0% { opacity: 0.55; }
-  50% { opacity: 0.95; }
-  100% { opacity: 0.55; }
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
 }
 
 .skeleton {
-  background: var(--sunken);
-  border-radius: 0.5rem;
-  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: var(--radius-control);
+  background: linear-gradient(
+    90deg,
+    var(--sunken) 0%,
+    color-mix(in oklab, var(--sunken) 55%, var(--raised)) 45%,
+    var(--sunken) 90%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s var(--ease-out) infinite;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; }
-}
-
 
 /*
  * ── إخفاء الأرقام ──
  *
- * زرٌّ كالذي في تطبيقات البنوك: يفتح صاحبُ المقهى الشاشةَ ليُري أحداً
- * كيف يعمل النظام، فلا يُري معها ما عليه لمورّديه ولا رواتبَ موظّفيه.
- *
- * والتنفيذ بالتنقيط لا بالطمس: `blur` يترك شكلَ الرقم وطولَه، وطولُ
- * الرقم وحده يقول «هذا بالآلاف» — فيُستبدَل النصّ كلُّه بنقاطٍ متساويةٍ
- * لا تقول شيئاً. ويُحفَظ الأصلُ في `aria-hidden` كي لا يقرأه قارئ
- * الشاشة، ويُعلَن للقارئ أنّ الرقم مخفيّ.
- *
- * و`.nums` هو الصنف الذي لا يُوضَع إلّا على أرقامٍ صرفة — فهو الموضع
- * الصحيح لهذا، ولا يمسّ نصّاً عربياً.
+ * زرٌّ كالذي في تطبيقات البنوك: يُري صاحبُ المقهى الشاشةَ أحداً بلا
+ * مبالغ. بالتنقيط لا بالطمس — `blur` يترك طولَ الرقم، وطولُه وحده يقول
+ * «هذا بالآلاف». و`.nums` لا يوضَع إلّا على أرقامٍ صرفة.
  */
 html[data-amounts="hidden"] .nums {
   position: relative;
   color: transparent !important;
   user-select: none;
+}
+
+html[data-amounts="hidden"] .nums * {
+  color: transparent !important;
 }
 
 html[data-amounts="hidden"] .nums::after {
@@ -363,22 +455,14 @@ html[data-amounts="hidden"] .nums::after {
   font-size: 0.85em;
 }
 
-/* العمود الرقميّ يُحاذى يساراً، فالنقاط تتبعه */
 html[data-amounts="hidden"] .nums-col .nums::after {
   justify-content: flex-end;
 }
 
-
 /*
  * ── أيقونتا زرّي العرض: يقرّرهما CSS لا JavaScript ──
- *
- * الحالةُ مكتوبةٌ على `<html>` بنصٍّ يسبق الرسم، والخادمُ لا يعرفها.
- * فلو رُسمت الأيقونةُ من حالةٍ في React لاختلف ما رسمه الخادمُ عمّا
- * يرسمه المتصفّح — وهو خطأُ ترطيبٍ يُبطل تفاعلَ الشجرة كلّها، لا
- * تحذيرٌ في السجلّ وحده.
- *
- * فيُرسَم الرمزان معاً ويُظهر CSS أحدَهما. ولا حالةَ في الترميز أصلاً،
- * فلا شيء يختلف بين الخادم والمتصفّح.
+ * الحالةُ مكتوبةٌ على `<html>` بنصٍّ يسبق الرسم، والخادمُ لا يعرفها؛ فلو
+ * رُسمت من حالةٍ في React لاختلف الترطيب. فيُرسَم الرمزان ويُظهر CSS أحدَهما.
  */
 .icon-dark { display: none; }
 .icon-light { display: block; }
@@ -398,36 +482,92 @@ html[data-amounts="hidden"] .nums-col .nums::after {
 html[data-amounts="hidden"] .icon-shown { display: none; }
 html[data-amounts="hidden"] .icon-hidden { display: block; }
 
-
 /*
- * ── بطاقةُ الصفّ على الجوّال: رابطُها طبقةٌ لا غلاف ──
+ * ── رابطُ الصفّ طبقةٌ لا غلاف ──
  *
- * كان الصفُّ كلُّه `<Link>` يلفّ خلاياه، فأيُّ خليّةٍ فيها رابطٌ تُنتج
- * `<a>` داخل `<a>` — ترميزٌ باطل يرفضه المتصفّح فيعيد بناء الشجرة،
- * **ويسقط الترطيب فيتوقّف تفاعلُ الصفحة كلّها**.
- *
- * فصار الرابطُ طبقةً مطلقةً تملأ البطاقة، والمحتوى فوقها غيرُ مموضَع —
- * فتبقى الطبقةُ هي ما يُضغَط في الفراغ. وما كان تفاعليّاً داخل المحتوى
- * (رابطٌ أو زرٌّ أو حقل) يُرفَع فوقها بـ`position: relative` فيبلغه
- * الضغطُ هو. فلا يضيع اتّساعُ هدف اللمس، ولا يُحجَب فعلٌ داخليّ.
+ * الصفُّ كلُّه `<Link>` يلفّ خلاياه يُنتج `<a>` داخل `<a>` حين تحمل خليّةٌ
+ * رابطاً — ترميزٌ باطل يُسقط الترطيب فيتوقّف تفاعلُ الصفحة كلّها. فالرابطُ
+ * طبقةٌ مطلقة، وما كان تفاعليّاً داخل المحتوى يُرفَع فوقها.
  */
 .card-rows :where(a, button, input, select, label, summary):not([aria-label="افتح التفصيل"]) {
   position: relative;
 }
 
-/*
- * حقلُ لوحة الأوامر هو اللوحةُ نفسها: التركيزُ فيه دائماً ما دامت مفتوحة،
- * فالحلقةُ حوله لا تدلّ على شيء — والشريطُ الذي يحمله هو الإطار.
- */
+/* ── لوحة الأوامر والحوارات: دخولٌ قصير ── */
 .palette-input:focus-visible {
   outline: none;
 }
-.palette[open] {
-  animation: palette-in 120ms ease-out;
+.palette[open],
+.sheet[open] {
+  animation: palette-in var(--dur) var(--ease-out);
+}
+.palette::backdrop,
+.sheet::backdrop {
+  background: rgb(14 13 11 / 0.45);
+  backdrop-filter: blur(2px);
+  animation: fade var(--dur) var(--ease-out);
 }
 @keyframes palette-in {
-  from { opacity: 0; transform: translateY(-4px) scale(0.99); }
+  from { opacity: 0; transform: translateY(-6px) scale(0.985); }
 }
+
+/* الورقةُ على الجوّال تصعد من الأسفل */
+@media (max-width: 639px) {
+  .sheet[open] {
+    animation: sheet-up var(--dur) var(--ease-out);
+  }
+}
+@keyframes sheet-up {
+  from { transform: translateY(24px); opacity: 0; }
+}
+
+/* ── الانتقال بين الصفحات: تلاشٍ قصير للمحتوى وحده، والقشرةُ ثابتة ── */
+::view-transition-old(page),
+::view-transition-new(page) {
+  animation-duration: 180ms;
+  animation-timing-function: var(--ease-out);
+}
+
+/* الصفُّ المختار بلوحة المفاتيح (j/k) */
+[data-nav-item][data-nav-active="true"] {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-card);
+}
+
+/* شريطُ التمرير الرفيع في الإطار الداكن */
+.frame-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--frame-line) transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .palette[open] { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .upload-bar {
+    width: 100%;
+    opacity: 0.4;
+  }
+  .skeleton {
+    background: var(--sunken);
+  }
+}
+
+/* ── الطباعة: كشفُ المورّد وحزمةُ المحاسب تُطبَع أو تُحفَظ PDF ── */
+@media print {
+  :root {
+    --surface: #ffffff;
+    --raised: #ffffff;
+    --sunken: #f4f4f4;
+    --ink: #000000;
+    --muted: #444444;
+    --line: #cccccc;
+  }
+  .no-print { display: none !important; }
+  body { background: #fff; padding: 0; }
+  main { padding: 0 !important; max-width: none !important; }
 }

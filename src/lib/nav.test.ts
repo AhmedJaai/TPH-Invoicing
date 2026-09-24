@@ -7,6 +7,9 @@ import {
   MOBILE_TABS,
   activeArea,
   activeChild,
+  chordsFor,
+  entryHref,
+  groupedAreas,
   mobileTabs,
   visibleAccountLinks,
   visibleAreas,
@@ -16,23 +19,30 @@ import {
 describe("activeArea", () => {
   it("تطابق الجذر وحده ولا تبتلع سواه", () => {
     expect(activeArea("/")?.href).toBe("/");
-    expect(activeArea("/money")?.href).toBe("/money");
+    expect(activeArea("/bank")?.href).toBe("/bank");
   });
 
   it("تنسب الصفحة الفرعية إلى مساحتها", () => {
     expect(activeArea("/purchases/invoices")?.href).toBe("/suppliers");
-    expect(activeArea("/money/expenses")?.href).toBe("/money");
+    expect(activeArea("/money/expenses")?.href).toBe("/bank");
     expect(activeArea("/suppliers/Ganache")?.href).toBe("/suppliers");
   });
 
-  it("تنسب الصفحات إلى مساحاتها بعد دمج «المشتريات» في «المورّدون»", () => {
+  /*
+    ── الإصدار الثاني: كلُّ عملٍ يوميٍّ مدخلٌ باسمه ──
+
+    كانت «المال» تجمع البنكَ والإقفالَ في بابٍ واحد، و«دفعة الشهر» لساناً
+    تحت المورّدين — فيقرأ صاحبُ المقهى «عليك» ثمّ يبحث عن موضع الدفع.
+    صار: المورّدون (لمن أدين) · الدفعات (ماذا أدفع ومتى) · البنك · الإقفال.
+  */
+  it("تنسب الصفحات إلى مساحاتها في نموذج الأعمال", () => {
     expect(activeArea("/statements")?.href).toBe("/suppliers");
     expect(activeArea("/analysis")?.href).toBe("/suppliers");
     expect(activeArea("/purchases")?.href).toBe("/suppliers");
-    expect(activeArea("/bank")?.href).toBe("/money");
-    // «دفعة الشهر» جوابُ «لمن أدين» — فمساحتُها المورّدون لا المال
-    expect(activeArea("/payments")?.href).toBe("/suppliers");
-    expect(activeArea("/close")?.href).toBe("/money");
+    expect(activeArea("/payments")?.href).toBe("/payments");
+    expect(activeArea("/cash")?.href).toBe("/payments");
+    expect(activeArea("/money")?.href).toBe("/bank");
+    expect(activeArea("/close")?.href).toBe("/close");
     expect(activeArea("/audit")?.href).toBe("/attention");
     expect(activeArea("/review")?.href).toBe("/attention");
     expect(activeArea("/upload")?.href).toBe("/documents");
@@ -43,12 +53,12 @@ describe("activeArea", () => {
   });
 
   it("لا تخلط مساراً يشارك البادئة حرفياً دون أن يكون تحتها", () => {
-    // `/moneybox` ليست تحت `/money` وإن بدأت بحروفها
-    expect(activeArea("/moneybox")).toBeUndefined();
+    // `/bankrupt` ليست تحت `/bank` وإن بدأت بحروفها
+    expect(activeArea("/bankrupt")).toBeUndefined();
   });
 
   it("تتجاهل الشرطة الأخيرة", () => {
-    expect(activeArea("/money/")?.href).toBe("/money");
+    expect(activeArea("/bank/")?.href).toBe("/bank");
   });
 
   it("ترجع غير معرَّف لمسار لا يخصّ أحداً", () => {
@@ -72,33 +82,29 @@ describe("activeChild", () => {
 });
 
 describe("visibleAreas", () => {
-  it("المالك يرى الستّ كلّها", () => {
+  it("المالك يرى المساحات الثماني كلّها", () => {
     expect(visibleAreas("OWNER")).toHaveLength(AREAS.length);
-    expect(AREAS).toHaveLength(6);
+    expect(AREAS).toHaveLength(8);
   });
 
   it("مدير المشتريات لا يرى المال ولا ما يحتاج قراراً", () => {
     const hrefs = visibleAreas("PURCHASING").map((a) => a.href);
-    expect(hrefs).not.toContain("/money");
+    expect(hrefs).not.toContain("/");
+    expect(hrefs).not.toContain("/bank");
+    expect(hrefs).not.toContain("/payments");
     expect(hrefs).not.toContain("/attention");
     expect(hrefs).toContain("/documents");
     /* ويعدّ الرفّ — فالميزانُ عملُه، وإن لم يرَ كلفةَ الفرق */
     expect(hrefs).toContain("/inventory");
   });
 
-  it("المحاسب يرى المال وما يحتاج قراراً", () => {
+  it("المحاسب يرى البنك وما يحتاج قراراً والإقفال", () => {
     const hrefs = visibleAreas("ACCOUNTANT").map((a) => a.href);
-    expect(hrefs).toContain("/money");
+    expect(hrefs).toContain("/bank");
     expect(hrefs).toContain("/attention");
+    expect(hrefs).toContain("/close");
   });
 
-  /*
-    ── ما خرج من التنقّل عمداً ──
-
-    كانت ستَّ مساحاتٍ وسبعةَ عشر رابطاً في شريطٍ من صفّين. وثلاثٌ من
-    تلك الوجهات لم تكن وجهاتٍ أصلاً: «الإعدادات» تُضبَط مرّةً في العمر،
-    و«الأداء» و«المشتريات» تكرّران ما في غيرهما.
-  */
   it("لا مساحةَ لما يُضبط مرّةً في العمر ولا لصفحةٍ حُذفت", () => {
     const hrefs = AREAS.map((a) => a.href);
     expect(hrefs).not.toContain("/settings");
@@ -110,75 +116,69 @@ describe("visibleAreas", () => {
   it("الإعدادات وسجلّ التدقيق في روابط الحساب لا في المساحات", () => {
     const hrefs = visibleAccountLinks("OWNER").map((l) => l.href);
     expect(hrefs).toEqual(["/settings", "/settings/audit"]);
-    // ومدير المشتريات لا يرى سجلّ التدقيق
     expect(visibleAccountLinks("PURCHASING").map((l) => l.href)).toEqual(["/settings"]);
   });
 
   /*
-    ── ولماذا ستّ لا خمس ──
-
-    الجردُ عملٌ أسبوعيٌّ متكرّر بدورةٍ خاصّة: يُبدَأ ويُراجَع ويُعَدّ
-    ويُقفَل. ولو دُسّ تحت «المورّدين» أو «المال» لما فُتح أبداً —
-    فصاحبُ المقهى لا يصل إليه من سؤالٍ عن مورّدٍ ولا عن ريال.
-
-    والعددُ يبقى محروساً: **سادسةٌ بحجّة، لا سابعةٌ بلا حجّة.**
+    ثماني مساحاتٍ في ثلاث مجموعات — والعددُ محروس: كلُّ مدخلٍ عملٌ
+    يوميٌّ أو أسبوعيّ باسمه، لا جدولٌ في القاعدة.
   */
-  it("عددُ روابط التنقّل الظاهرة ستّة — كان سبعةَ عشر", () => {
-    const owner = visibleAreas("OWNER");
-    expect(owner).toHaveLength(6);
+  it("المجموعات ثلاث بترتيبها، ولا مجموعةَ فارغة", () => {
+    expect(groupedAreas("OWNER").map((g) => g.group)).toEqual(["today", "money", "ops"]);
+    expect(groupedAreas("PURCHASING").map((g) => g.group)).toEqual(["today", "ops"]);
+  });
+
+  it("لكلّ مساحةٍ حرفُ اختصارٍ لا يتكرّر", () => {
+    const chords = AREAS.map((a) => a.chord);
+    expect(new Set(chords).size).toBe(chords.length);
+    expect(chordsFor("OWNER")).toHaveLength(AREAS.length);
   });
 });
 
-describe("visibleChildren", () => {
+describe("visibleChildren و entryHref", () => {
   it("تحجب اللسان الذي لا يملك الدور صلاحيته", () => {
-    const money = AREAS.find((a) => a.href === "/money")!;
-    const forAccountant = visibleChildren("ACCOUNTANT", money).map((c) => c.href);
-    // المحاسب لا يعتمد الدفعات
-    expect(forAccountant).not.toContain("/payments");
-    // لكنّه يقفل الشهر
-    expect(forAccountant).toContain("/close");
+    const payments = AREAS.find((a) => a.href === "/payments")!;
+    // المحاسب لا يعتمد الدفعات — فلا يرى إلّا النقد القادم، ولسانٌ واحد ليس تفريعاً
+    expect(visibleChildren("ACCOUNTANT", payments)).toEqual([]);
+    // ومدخلُه إلى المساحة النقدُ القادم لا صفحةٌ تردّه
+    expect(entryHref("ACCOUNTANT", payments)).toBe("/cash");
+    expect(entryHref("OWNER", payments)).toBe("/payments");
   });
 
-  it("لا تعرض شريط ألسنة لمساحة بلسانٍ واحد أو بلا ألسنة", () => {
-    const home = AREAS.find((a) => a.href === "/")!;
-    expect(visibleChildren("OWNER", home)).toEqual([]);
-
-    // «المستندات» صارت وجهةً واحدة — والرفع فعلٌ لا لسان
-    const documents = AREAS.find((a) => a.href === "/documents")!;
-    expect(visibleChildren("OWNER", documents)).toEqual([]);
-
-    // و«يحتاج قرارك» مكانٌ واحد للعمل كلّه
-    const attention = AREAS.find((a) => a.href === "/attention")!;
-    expect(visibleChildren("OWNER", attention)).toEqual([]);
+  it("لا تعرض شريط ألسنة لمساحة بلا ألسنة", () => {
+    for (const href of ["/", "/documents", "/attention", "/close"]) {
+      const area = AREAS.find((a) => a.href === href)!;
+      expect(visibleChildren("OWNER", area)).toEqual([]);
+    }
   });
 });
 
 describe("mobileTabs", () => {
-  it("أربع مساحات ثمّ الباقي في المزيد", () => {
+  it("ثلاث مساحات ثمّ الباقي في المزيد", () => {
     const { tabs, more } = mobileTabs("OWNER", "/");
     expect(tabs).toHaveLength(MOBILE_TABS);
     expect(tabs.length + more.length).toBe(AREAS.length);
   });
 
   it("لا تكرّر مساحةً بين الشريط والمزيد", () => {
-    const { tabs, more } = mobileTabs("OWNER", "/documents");
+    const { tabs, more } = mobileTabs("OWNER", "/bank");
     const all = [...tabs, ...more].map((a) => a.href);
     expect(new Set(all).size).toBe(all.length);
   });
 
   it("ترفع المساحة المفتوحة إلى الشريط كي لا يفقد المستخدم موضعه", () => {
-    const { tabs } = mobileTabs("OWNER", "/documents");
-    expect(tabs.map((a) => a.href)).toContain("/documents");
+    const { tabs } = mobileTabs("OWNER", "/bank");
+    expect(tabs.map((a) => a.href)).toContain("/bank");
     expect(tabs).toHaveLength(MOBILE_TABS);
   });
 
-  it("تبقي الرئيسية في الشريط حتى حين تُرفع مساحة بعيدة", () => {
-    const { tabs } = mobileTabs("OWNER", "/documents");
+  it("تبقي «اليوم» في الشريط حتى حين تُرفع مساحة بعيدة", () => {
+    const { tabs } = mobileTabs("OWNER", "/inventory");
     expect(tabs[0].href).toBe("/");
   });
 
   it("لا ترفع شيئاً حين تكون المساحة المفتوحة في الشريط أصلاً", () => {
-    const { tabs, more } = mobileTabs("OWNER", "/money");
+    const { tabs, more } = mobileTabs("OWNER", "/attention");
     expect(tabs).toEqual(visibleAreas("OWNER").slice(0, MOBILE_TABS));
     expect(more).toEqual(visibleAreas("OWNER").slice(MOBILE_TABS));
   });
@@ -228,9 +228,11 @@ describe("سلامة البنية", () => {
     // ما طلب — «كشف الحساب» أخطرُها: في البنوك السعوديّة تعني حركاته.
     const labels = new Map(AREAS.flatMap((a) => a.children.map((c) => [c.href, c.label] as const)));
     expect(labels.get("/payments")).toBe("دفعة الشهر");
+    expect(labels.get("/cash")).toBe("النقد القادم");
     expect(labels.get("/statements")).toBe("الكشوف");
     expect(labels.get("/bank")).toBe("حركة البنك");
-    expect(labels.get("/close")).toBe("إقفال الشهر");
+    // الإقفالُ مساحةٌ بلا ألسنة — واسمُها عنوانُ صفحتها
+    expect(AREAS.find((a) => a.href === "/close")?.label).toBe("إقفال الشهر");
     expect(labels.get("/inventory")).toBe("الجرد الحالي");
     expect(labels.get("/inventory/history")).toBe("سجلّ الجرد");
     /* والصفحةُ تحمل المبيعاتِ والكتالوجَ معاً، فاسمُها اسمُ الفعل لا أحدِ مفعوليه */

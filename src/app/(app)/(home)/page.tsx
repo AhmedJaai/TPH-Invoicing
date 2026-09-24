@@ -1,86 +1,46 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import {
+  ArrowLeft, CalendarCheck, CircleCheck, Inbox, Landmark, ShoppingBasket, Sparkles, Store, Wallet,
+} from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Section, buttonClass } from "@/components/ui";
+import { Badge, Delta, EmptyState, LinkButton, Meter, Section, Stepper, buttonClass } from "@/components/ui";
 import { TaskList } from "@/components/task-list";
+import { Changes } from "@/components/changes";
 import { prioritize } from "@/lib/attention";
 import { attentionItems } from "@/lib/work";
-import { Changes } from "@/components/changes";
 import { buildChanges, notable } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
-import { DAY, ITEM, SUPPLIER, countNoun } from "@/lib/arabic";
-import { formatMonth } from "@/lib/riyadh-time";
-import type { StartStep } from "@/lib/start";
+import { DAY, INVOICE, ITEM, SUPPLIER, countNoun } from "@/lib/arabic";
+import { previousMonth } from "@/lib/filing";
+import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadStartState } from "@/services/start.service";
 import { loadBalanceTotals, loadOverdueBalances } from "@/services/supplier-balance.service";
+import { loadPaymentRun } from "@/services/payment-run.service";
+import { greeting, loadCashPosition, loadCloseProgress, longDate } from "@/services/briefing.service";
 
 export const dynamic = "force-dynamic";
 
-/** كم مهمّةً تُعرَض قبل «افتح الطابور». خمسٌ تملأ شاشة ٧٦٨ ولا تتجاوزها. */
+/** كم مهمّةً تُعرَض قبل «افتح الطابور». */
 const SHOWN = 5;
 
 /**
- * الرئيسية: سطحُ قرار.
+ * اليوم — إحاطةُ الصباح.
  *
- * ── ما كُشف بالقياس ──
+ * شاشةٌ واحدة هادئة تجيب «ماذا أحتاج أن أعرف أو أفعل اليوم؟»:
  *
- * كانت الصفحة: بطاقتا رقمٍ كبيرتان (٢١٨→٤٥١)، ثمّ «يحتاج قرارك» عند
- * ٤٩١، وكلُّ بندٍ فيها ٢٤٩ بكسلاً. وعلى **١٣٦٦×٧٦٨** — وهو أشيعُ مقاسِ
- * حاسوبٍ محمول — يقع زرُّ المهمّة الأولى عند ٧٣٣ ملاصقاً للحافّة،
- * والثانية عند ٩٦٧ والثالثة عند ١٢٠١ تحت الطيّ.
+ *   ١. جملةٌ تقول الحال، وفعلٌ واحدٌ بارز: أهمُّ ما ينتظر.
+ *   ٢. أربعةُ أرقامٍ لها جواب: كم عليك · كم تدفع هذا الشهر · كم في البنك ·
+ *      كم اشتريت — وكلٌّ يفتح موضعه. والمجهولُ «غير معروف» لا صفر.
+ *   ٣. ما ينتظر قرارك — العددُ نفسُه في القشرة والطابور.
+ *   ٤. بجانبه: تقدّمُ إقفال الشهر، وما تغيّر منذ الأسبوع الماضي.
  *
- * أي أنّ صاحب المقهى يفتح نظامه صباحاً ليسأل «ما الذي ينتظرني؟» فيجيبه
- * النظام بمهمّةٍ واحدةٍ من ثماني، وبرقمين كبيرين فوقها لا فعلَ لهما.
- * **والعملُ الذي لا يُرى لا يُنجَز** — وهو درسٌ تكرّر في هذا النظام.
- *
- * ── الترتيب الجديد، وسببُه ──
- *
- *   ١. **شريطُ الحال** — سطرٌ واحد لا بطاقتان: كم عليك، وكم لك، وكم
- *      اشتريتَ هذا الشهر. ~٩٠ بكسلاً بدل ٢٣٣. وهو أوّل شيءٍ لأنّ
- *      «كم عليّ؟» أوّلُ أسئلة صاحب العمل — لكنّه **سطرُ خبرٍ لا لوحة**:
- *      من أراد التفصيل ضغط.
- *   ٢. **ما ينتظرك** — خمسُ مهمّاتٍ مختصرة، لكلٍّ فعلُها.
- *   ٣. **ما تغيّر** — ويُعلَن حين لا شيء، فالقسمُ الذي يختفي يُقرأ
- *      «لم يُفحَص» لا «لا جديد».
- *
- * وما خرج من هنا لم يُحذَف: هو في موضعه حيث يُفعَل به شيء.
+ * والأقسامُ البطيئة (الإقفال) تصل بعد الصفحة في `Suspense` — فلا ينتظرها ما فوقها.
  */
-
-/** خبرٌ في شريط الحال — رقمٌ وتسميةٌ وسطرُ سياق، يفتح موضعه. */
-function Fact({
-  label,
-  minor,
-  sub,
-  href,
-  tone,
-}: {
-  label: string;
-  minor: number;
-  sub: string;
-  href: string;
-  tone?: "warn";
-}) {
-  return (
-    <Link
-      href={href}
-      className="group block min-w-0 flex-1 rounded-xl px-3.5 py-3 transition-colors hover:bg-sunken/60"
-    >
-      <span className="block text-[11px] font-medium text-muted">{label}</span>
-      <span
-        className={`nums mt-1 block font-display text-2xl font-black leading-none group-hover:underline group-hover:underline-offset-4 ${
-          tone === "warn" ? "text-warn" : ""
-        }`}
-      >
-        <Money minor={minor} />
-      </span>
-      <span className="mt-1.5 block truncate text-[11px] leading-relaxed text-muted">{sub}</span>
-    </Link>
-  );
-}
-
 export default async function HomePage() {
   const user = await currentUser();
   if (!user) redirect("/login?from=/");
@@ -88,195 +48,293 @@ export default async function HomePage() {
   // مدير المشتريات لا يرى المال — تُعرض له وجهته مباشرةً
   if (!can(user.role, "amounts:view")) redirect("/upload");
 
-  const [attention, balances, overdue, start] = await Promise.all([
+  const runMonth = previousMonth(currentMonthRiyadh());
+  const canPay = can(user.role, "payment:approve");
+
+  const [attention, balances, overdue, start, run, cash] = await Promise.all([
     attentionItems(),
     loadBalanceTotals(),
     loadOverdueBalances(),
     loadStartState(),
+    canPay ? loadPaymentRun(runMonth) : Promise.resolve(null),
+    can(user.role, "bank:view") ? loadCashPosition() : Promise.resolve(null),
   ]);
 
   const { totals } = balances;
   const oldestDays = overdue.reduce((m, r) => Math.max(m, r.oldestDays), 0);
 
-  /*
-    ارتفاعُ الأسعار من بند الطابور نفسه — كان هنا «(0, 0)» مكتوبين بيد،
-    فلا يظهر «أصناف ارتفع سعرها» في «ما الذي تغيّر» أبداً مهما ارتفع.
-  */
   const rises = attention.find((i) => i.id === "price-rises");
   const facts = await gatherChangeFacts(rises?.count ?? 0, rises?.impact.amountMinor ?? 0);
-  /*
-    «المشتريات» و«المستحقّ عليك» بندان في `buildChanges` — وهما الرقمان
-    المعروضان في شريط الحال. فيُطرحان هنا: التكرار لا يُضيف خبراً.
-  */
-  const changes = notable(buildChanges(facts)).filter(
-    (c) => c.id !== "outstanding" && c.id !== "purchases",
-  );
+  const changes = notable(buildChanges(facts)).filter((c) => c.id !== "outstanding" && c.id !== "purchases");
 
   const { top } = prioritize(attention, SHOWN);
+  const first = top[0];
 
   const pct = facts.purchasesPrevMonth > 0
-    ? Math.round(((facts.purchasesThisMonth - facts.purchasesPrevMonth) / facts.purchasesPrevMonth) * 100)
+    ? ((facts.purchasesThisMonth - facts.purchasesPrevMonth) / facts.purchasesPrevMonth) * 100
     : null;
+
+  const name = user.name && user.name !== "وضع التجربة" ? user.name.split(" ")[0] : null;
+  const title = name ? `${greeting()}، ${name}` : greeting();
+
+  /* جملةُ الحال — تُبنى من الأرقام نفسها التي تحتها، لا من نموذج */
+  const summary: string[] = [];
+  if (start.knowsNothing) {
+    summary.push("النظامُ لا يعرف شيئاً بعد — خطوتان تكفيان ليعرف لمن تدين وأين ذهب المال.");
+  } else {
+    summary.push(attention.length === 0 ? "لا شيء ينتظر قرارك اليوم." : `ينتظر قرارك ${countNoun(attention.length, ITEM)}.`);
+    if (run && run.readyTotalMinor > 0) summary.push(`ودفعةُ ${formatMonth(runMonth)} جاهزةٌ للتحويل (${countNoun(run.ready.length, SUPPLIER)}).`);
+  }
 
   return (
     <PageShell
       user={user}
       width="wide"
-      title="حال المقهى"
-      intro="ما تحتاج معرفته أو فعله اليوم."
+      eyebrow={longDate()}
+      title={title}
+      display
+      intro={summary.join(" ")}
+      actions={
+        first ? (
+          <LinkButton href={first.href} variant="primary" size="lg" icon={ArrowLeft}>
+            {`ابدأ بالأهمّ: ${first.actionLabel ?? "افتح"}`}
+          </LinkButton>
+        ) : undefined
+      }
     >
-      {/* ── أوّلُ يوم: ما ينقص النظامَ ليعرف ── */}
-      {start.incomplete && <StartSteps steps={start.steps} knowsNothing={start.knowsNothing} />}
-
-      {/*
-        شريطُ الحال لا يُعرض عن غير علم: «عليك ٠٫٠٠» بلا فاتورةٍ واحدة
-        في النظام يقول «لا دَين» — والنظامُ لم يقرأ شيئاً بعد.
-      */}
-      {!start.knowsNothing && (<>
-      {/* ── شريطُ الحال: خبرٌ في سطر، لا لوحةُ مؤشّرات ── */}
-      <div className="flex flex-col divide-y divide-line rounded-2xl border border-line bg-raised p-1 shadow-raised sm:flex-row sm:divide-x sm:divide-x-reverse sm:divide-y-0">
-        <Fact
-          label="عليك للمورّدين"
-          minor={totals.owedMinor}
-          tone={totals.owedMinor > 0 ? "warn" : undefined}
-          href="/suppliers"
-          sub={
-            totals.owedMinor === 0
-              ? "لا مستحقّ على المقهى الآن."
-              : `${countNoun(totals.owedSuppliers, SUPPLIER)} · أقدم دَينٍ منذ ${countNoun(oldestDays, DAY)}`
-          }
-        />
-        {/*
-          نصفُ الجواب ليس جواباً: مالٌ دفعتَه ولم يُخصم من فاتورةٍ بعينها
-          يجلس عند المورّد. وكان سطراً داخل البطاقة الأولى فيُقرأ تتمّةً
-          لها؛ وهو رقمٌ آخر لجهةٍ أخرى من الحساب، فصار خبراً بنفسه.
-        */}
-        {totals.creditLeftMinor > 0 && (
-          <Fact
-            label="ولك عند المورّدين"
-            minor={totals.creditLeftMinor}
-            href="/suppliers"
-            sub={`${countNoun(totals.creditSuppliers, SUPPLIER)} · دفعتَه ولم تصلك فاتورته`}
-          />
-        )}
-        <Fact
-          label={`مشتريات ${formatMonth(facts.thisMonthLabel)}`}
-          minor={facts.purchasesThisMonth}
-          href="/purchases/invoices"
-          sub={
-            pct === null
-              ? "من الفواتير المسجّلة، لا من كشف البنك"
-              : `${pct > 0 ? "▲" : "▼"} ${Math.abs(pct)}٪ عن ${
-                  facts.daysElapsedInMonth === null
-                    ? formatMonth(facts.prevMonthLabel)
-                    : `أوّل ${countNoun(facts.daysElapsedInMonth, DAY)} من ${formatMonth(facts.prevMonthLabel)}`
-                }`
-          }
-        />
-      </div>
-      </>)}
-
-      {/* ── ما ينتظرك ── */}
-      <Section
-        title={attention.length === 0 ? (start.knowsNothing ? "ما ينتظر قرارك" : "لا شيء ينتظر قرارك") : "ما ينتظر قرارك"}
-        hint={
-          attention.length === 0 && !start.knowsNothing
-            ? "لا مالٌ خرج مرّتين، ولا دفعةٌ بلا مستند، ولا مستندٌ ينتظر."
-            : undefined
-        }
-        action={
-          attention.length > SHOWN ? (
-            <Link
-              href="/attention"
-              className="text-xs font-medium underline underline-offset-4 hover:text-ink"
-            >
-              افتح الطابور ({attention.length}) ←
-            </Link>
-          ) : undefined
-        }
-      >
-        {attention.length > 0 ? (
-          <>
-            <TaskList items={top} />
-            {/*
-              ما لم يُعرض يُقال بعدده تحت القائمة نفسها — كان زرّاً بعد
-              قسم «ما الذي تغيّر»، فيُقرأ تابعاً لقسمٍ لا علاقة له به.
-            */}
-            {attention.length > SHOWN && (
-              <Link
-                href="/attention"
-                className="mt-2 flex min-h-11 items-center justify-center rounded-xl border border-dashed border-line text-xs font-medium text-ink-soft hover:border-ink-soft hover:text-ink"
-              >
-                افتح الطابور كاملاً — بقي {countNoun(attention.length - SHOWN, ITEM)} ←
-              </Link>
-            )}
-          </>
-        ) : (
-          start.knowsNothing ? (
-            /* «كلُّ ما يعرفه سليم» عن نظامٍ لا يعرف شيئاً طمأنينةٌ بلا سند */
-            <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
-              يظهر هنا ما يحتاج قرارك حين يقرأ النظام مستنداتك وكشفك.
-            </p>
-          ) : (
-            <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ok">
-              كلُّ ما يعرفه النظام سليم.
-            </p>
-          )
-        )}
-      </Section>
-
-      {/* ── ما تحرّك ── (ولا شيء يتحرّك في نظامٍ لم يقرأ شيئاً) */}
-      {!start.knowsNothing && <Section title="ما الذي تغيّر" hint="منذ الأسبوع الماضي — وما في شريط الحال ليس مكرَّراً هنا.">
-        {changes.length > 0 ? (
-          <Changes changes={changes} />
-        ) : (
-          /*
-            القسمُ الذي يختفي حين لا جديد يُقرأ «لم يُفحَص». والفرق بين
-            «لا جديد» و«لم نفحص» هو الفرق بين الطمأنينة والجهل.
-          */
-          <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs text-muted">
-            لا تغيّر يستحقّ الذكر منذ الأسبوع الماضي.
+      {start.incomplete && (
+        <section aria-labelledby="start-title" className="mb-8 rounded-2xl border border-accent-line bg-accent-soft/60 p-5 sm:p-6">
+          <h2 id="start-title" className="flex items-center gap-2 text-base font-bold">
+            <Sparkles className="h-[18px] w-[18px] text-accent" strokeWidth={2} aria-hidden />
+            {start.knowsNothing ? "ابدأ من هنا" : "بقي ما يُكمل الصورة"}
+          </h2>
+          <p className="mb-4 mt-1 text-xs leading-relaxed text-ink-soft">
+            {start.knowsNothing
+              ? "لا يقول لك النظامُ «عليك صفر» وهو لم يقرأ شيئاً. أكمل الخطوات بترتيبها."
+              : "ما لم يُستورَد مجهولٌ لا صفر — والأرقامُ أدناه على ما قُرئ وحده."}
           </p>
-        )}
-      </Section>}
+          <Stepper
+            steps={start.steps.map((s) => ({
+              id: s.id,
+              title: s.title,
+              detail: s.done ? undefined : s.detail,
+              state: s.done ? "done" : s === start.steps.find((x) => !x.done) ? "current" : "todo",
+              action: s.done ? undefined : (
+                <Link href={s.href} className={buttonClass(s === start.steps.find((x) => !x.done) ? "primary" : "secondary", "sm")}>
+                  {s.action}
+                </Link>
+              ),
+            }))}
+          />
+        </section>
+      )}
 
+      {/* ── الأرقامُ الأربعة: كلٌّ جوابُ سؤال، وكلٌّ يفتح موضعه ── */}
+      {!start.knowsNothing && (
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <HeroFigure
+            icon={Store}
+            label="عليك للمورّدين"
+            href="/suppliers"
+            value={<Money minor={totals.owedMinor} />}
+            tone={totals.owedMinor > 0 ? "warn" : undefined}
+            sub={
+              totals.owedMinor === 0
+                ? "لا مستحقّ على المقهى الآن."
+                : `${countNoun(totals.owedSuppliers, SUPPLIER)}${oldestDays > 0 ? ` · أقدمُ دَينٍ منذ ${countNoun(oldestDays, DAY)}` : ""}`
+            }
+            extra={totals.creditLeftMinor > 0 ? <>ولك عندهم <Money minor={totals.creditLeftMinor} /></> : undefined}
+          />
+          {run && (
+            <HeroFigure
+              icon={Wallet}
+              label={`دفعة ${formatMonth(runMonth)}`}
+              href="/payments"
+              value={<Money minor={run.readyTotalMinor} />}
+              sub={
+                run.ready.length === 0 && run.held.length === 0
+                  ? "لا مستحقّات جاهزة للتحويل."
+                  : `جاهزةٌ لـ${run.ready.length === 1 ? "مورّدٍ واحد" : run.ready.length === 2 ? "مورّدَين" : countNoun(run.ready.length, SUPPLIER)}${run.held.length > 0 ? ` · ومحجوزٌ ${countNoun(run.held.length, INVOICE)}` : ""}`
+              }
+            />
+          )}
+          {cash && (
+            <HeroFigure
+              icon={Landmark}
+              label="في البنك"
+              href="/cash"
+              value={cash.balanceMinor === null ? <span className="text-[1.35rem] text-muted">غير معروف</span> : <Money minor={cash.balanceMinor} />}
+              sub={cash.balanceMinor === null ? "لا كشفَ يحمل الرصيد — استورد كشفاً فيه عمودُ الرصيد." : `آخرُ رصيدٍ معروف · ${formatDay(cash.asOf)}`}
+            />
+          )}
+          <HeroFigure
+            icon={ShoppingBasket}
+            label={`مشتريات ${formatMonth(facts.thisMonthLabel)}`}
+            href="/purchases/invoices"
+            value={<Money minor={facts.purchasesThisMonth} />}
+            sub={
+              pct === null
+                ? "من الفواتير المسجّلة، لا من كشف البنك."
+                : facts.daysElapsedInMonth === null
+                  ? `عن ${formatMonth(facts.prevMonthLabel)}`
+                  : `عن أوّل ${countNoun(facts.daysElapsedInMonth, DAY)} من ${formatMonth(facts.prevMonthLabel)}`
+            }
+            delta={pct}
+          />
+        </div>
+      )}
+
+      <div className="mt-10 grid gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+        {/* ── ما ينتظر قرارك ── */}
+        <Section
+          title="ما ينتظر قرارك"
+          icon={Inbox}
+          count={attention.length > 0 ? attention.length : undefined}
+          className="mt-0!"
+          action={
+            attention.length > 0 ? (
+              <Link href="/attention" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
+                افتح الطابور كاملاً <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+              </Link>
+            ) : undefined
+          }
+        >
+          {attention.length > 0 ? (
+            <>
+              <TaskList items={top} />
+              {attention.length > SHOWN && (
+                <Link
+                  href="/attention"
+                  className="mt-2 flex min-h-11 items-center justify-center gap-1 rounded-xl border border-dashed border-line text-xs font-medium text-ink-soft transition-colors hover:border-accent-line hover:text-accent"
+                >
+                  وبقي {countNoun(attention.length - SHOWN, ITEM)} في الطابور
+                  <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                </Link>
+              )}
+              <p className="mt-3 hidden text-[11px] text-muted lg:block">
+                تنقّل بين البنود بـ<kbd className="rounded border border-line px-1">J</kbd> و<kbd className="rounded border border-line px-1">K</kbd>، وافتح بـ<kbd className="rounded border border-line px-1">Enter</kbd>.
+              </p>
+            </>
+          ) : start.knowsNothing ? (
+            <EmptyState
+              compact
+              title="يظهر هنا ما يحتاج قرارك"
+              hint="حين يقرأ النظامُ مستنداتك وكشفَ بنكك — لا قبل ذلك، ولا يقول «سليم» عن غير علم."
+            />
+          ) : (
+            <div className="flex items-center gap-3 rounded-xl border border-ok/25 bg-ok-bg px-5 py-6">
+              <CircleCheck className="h-6 w-6 shrink-0 text-ok" strokeWidth={2} aria-hidden />
+              <div>
+                <p className="text-sm font-bold text-ok">لا شيء ينتظر قرارك.</p>
+                <p className="mt-0.5 text-xs text-ink-soft">لا مالٌ خرج مرّتين، ولا دفعةٌ بلا مستند، ولا مستندٌ ينتظر.</p>
+              </div>
+            </div>
+          )}
+        </Section>
+
+        <div className="space-y-10">
+          {can(user.role, "month:close") && !start.knowsNothing && (
+            <Suspense fallback={<CloseCardSkeleton />}>
+              <CloseCard month={runMonth} />
+            </Suspense>
+          )}
+
+          {!start.knowsNothing && (
+            <Section title="ما الذي تغيّر" icon={Sparkles} hint="منذ الأسبوع الماضي." className="mt-0!">
+              <Changes changes={changes} />
+            </Section>
+          )}
+        </div>
+      </div>
     </PageShell>
   );
 }
 
-/** «ابدأ من هنا» — الخطواتُ بترتيبها، وما تمّ منها يُقال إنّه تمّ. */
-function StartSteps({ steps, knowsNothing }: { steps: StartStep[]; knowsNothing: boolean }) {
-  const next = steps.find((s) => !s.done);
+function HeroFigure({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  href,
+  tone,
+  delta,
+  extra,
+}: {
+  icon: typeof Store;
+  label: string;
+  value: React.ReactNode;
+  sub: string;
+  href: string;
+  tone?: "warn";
+  delta?: number | null;
+  extra?: React.ReactNode;
+}) {
   return (
-    <section aria-labelledby="start-title" className="mb-8 rounded-2xl border border-line bg-raised p-5 shadow-raised">
-      <h2 id="start-title" className="font-display text-lg font-bold">
-        {knowsNothing ? "ابدأ من هنا" : "بقي ما يُكمل الصورة"}
-      </h2>
-      <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-        {knowsNothing
-          ? "النظامُ لا يعرف شيئاً بعد — فلا يقول لك «عليك صفر». خطوتان تكفيان ليعرف لمن تدين وأين ذهب المال."
-          : "ما لم يُستورَد مجهولٌ لا صفر — والأرقامُ أدناه على ما قُرئ وحده."}
-      </p>
-      <ol className="mt-4 space-y-2">
-        {steps.map((s, i) => (
-          <li key={s.id} className={`flex flex-wrap items-center gap-3 rounded-xl border px-3.5 py-3 ${s.done ? "border-line" : s === next ? "border-ink-soft" : "border-line"}`}>
-            <span aria-hidden className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold ${s.done ? "bg-ok-bg text-ok" : "bg-sunken text-ink-soft"}`}>
-              {s.done ? "✓" : i + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className={`text-sm font-bold ${s.done ? "text-muted line-through decoration-1" : ""}`}>{s.title}</p>
-              {!s.done && <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.detail}</p>}
-            </div>
-            {!s.done && (
-              <Link href={s.href} className={buttonClass(s === next ? "primary" : "secondary", "sm")}>
-                {s.action}
-              </Link>
-            )}
-            {s.done && <span className="sr-only">تمّت</span>}
-          </li>
-        ))}
-      </ol>
-    </section>
+    <Link
+      href={href}
+      className="group flex min-h-[9.5rem] flex-col rounded-2xl border border-line bg-raised p-4 shadow-raised transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-accent-line hover:shadow-lifted sm:p-5"
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-xs font-bold text-muted">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-sunken text-ink-soft transition-colors group-hover:bg-accent-soft group-hover:text-accent">
+            <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </span>
+          {label}
+        </span>
+        {delta !== undefined && <Delta pct={delta} />}
+      </span>
+      <span className={`mt-4 block text-[1.75rem] font-bold leading-none tracking-tight sm:text-[2.1rem] ${tone === "warn" ? "text-warn" : ""}`}>
+        {value}
+      </span>
+      <span className="mt-auto pt-3 text-xs leading-relaxed text-muted">
+        {sub}
+        {extra && <span className="mt-0.5 block text-ink-soft">{extra}</span>}
+      </span>
+    </Link>
   );
 }
 
+async function CloseCard({ month }: { month: string }) {
+  const p = await loadCloseProgress(month);
+  const blockers = p.report.blockers.length;
+  const next = p.report.blockers[0] ?? p.report.warnings[0];
+  return (
+    <Section title={`إقفال ${formatMonth(month)}`} icon={CalendarCheck} className="mt-0!">
+      <Link
+        href="/close"
+        className="block rounded-xl border border-line bg-raised p-4 shadow-raised transition-[border-color,box-shadow] hover:border-accent-line hover:shadow-lifted sm:p-5"
+      >
+        <span className="flex items-center justify-between gap-3">
+          <span className="text-[13px] font-bold">
+            {p.closed ? "مُقفَل" : <><span className="nums">{p.passed}</span> من <span className="nums">{p.total}</span> فحوصٍ سليمة</>}
+          </span>
+          {p.closed ? (
+            <Badge tone="ok" dot>مُقفَل</Badge>
+          ) : blockers > 0 ? (
+            <Badge tone="danger" dot>{blockers === 1 ? "مانعٌ واحد" : blockers === 2 ? "مانعان" : `${blockers} موانع`}</Badge>
+          ) : (
+            <Badge tone="accent" dot>جاهزٌ للإقفال</Badge>
+          )}
+        </span>
+        <span className="mt-3 block">
+          <Meter value={p.closed ? p.total : p.passed} max={p.total} tone={p.closed || blockers === 0 ? "ok" : "accent"} label="تقدّم الإقفال" />
+        </span>
+        {!p.closed && next && (
+          <span className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-ink-soft">
+            <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${next.state === "BLOCK" ? "bg-danger" : "bg-warn"}`} aria-hidden />
+            <span><span className="font-bold text-ink">{next.label}:</span> {next.detail}</span>
+          </span>
+        )}
+      </Link>
+    </Section>
+  );
+}
+
+function CloseCardSkeleton() {
+  return (
+    <div aria-busy="true">
+      <div className="skeleton mb-3 h-5 w-40" />
+      <div className="skeleton h-32 rounded-xl" />
+    </div>
+  );
+}

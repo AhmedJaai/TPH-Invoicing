@@ -6,15 +6,37 @@
  * من ذلك، فيصلحان للطرفين.
  */
 
-export function Money({ minor, tone }: { minor: number; tone?: "warn" | "danger" | "ok" }) {
+/**
+ * المبلغ بالهللات يُكتب ريالاتٍ — والكسرُ أخفت من الصحيح: العين تقرأ
+ * الريالات وتمرّ على الهللات، وعرضُ الخانات لا يتغيّر فيبقى العمود مصطفّاً.
+ * و`currency` تُلحق «ر.س» للرقم البارز وحده؛ في الجدول تكفي ترويسةُ العمود.
+ */
+export function Money({
+  minor,
+  tone,
+  currency = false,
+}: {
+  minor: number;
+  tone?: "warn" | "danger" | "ok";
+  currency?: boolean;
+}) {
   const cls = tone === "warn" ? "text-warn" : tone === "danger" ? "text-danger" : tone === "ok" ? "text-ok" : "";
   const whole = Math.floor(Math.abs(minor) / 100);
   const frac = String(Math.abs(minor) % 100).padStart(2, "0");
   const digits = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return (
-    <span className={`nums ${cls}`} dir="ltr">
+  const figure = (
+    <span className={`nums whitespace-nowrap ${cls}`} dir="ltr">
       {minor < 0 ? "-" : ""}
-      {digits}.{frac}
+      {digits}
+      <span className="nums-frac">.{frac}</span>
+    </span>
+  );
+  if (!currency) return figure;
+  /* في سطرٍ من اليمين: الرقمُ أوّلاً ثمّ «ر.س» عن يساره، كما يُكتب المبلغ عربياً */
+  return (
+    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
+      {figure}
+      <span className="text-[0.42em] font-bold tracking-normal text-muted">ر.س</span>
     </span>
   );
 }

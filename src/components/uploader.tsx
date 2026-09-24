@@ -6,6 +6,7 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { NETWORK_ERROR, postJson, readResponse, request } from "@/lib/http-client";
 import { FIELD, countNoun } from "@/lib/arabic";
 import { buttonClass } from "./ui";
+import { onCaptured, takeCaptured } from "@/lib/capture-queue";
 
 interface Finding {
   code: string;
@@ -531,6 +532,18 @@ export function Uploader({
     [analyze],
   );
 
+  /*
+    ما التقطه زرُّ الكاميرا أو أُفلِت في صفحةٍ أخرى يصل هنا — يُقرأ حين
+    تُركَّب الصفحة، وما يصل بعدها يُقرأ حين يصل.
+  */
+  useEffect(() => {
+    const take = () => {
+      for (const f of takeCaptured()) void analyze(f);
+    };
+    take();
+    return onCaptured(take);
+  }, [analyze]);
+
   const justArchived = archived.length > 0 && Date.now() - archived[0].at < 8000;
 
   return (
@@ -551,6 +564,7 @@ export function Uploader({
         يُركَّز عليه أصلاً: من لا يستعمل الفأرة لا يرفع فاتورة.
       */}
       <label
+        data-dropzone=""
         onDragOver={(e) => {
           e.preventDefault();
           setDragging(true);

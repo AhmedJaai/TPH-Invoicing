@@ -1,87 +1,67 @@
 import Link from "next/link";
+import { ArrowLeft, CircleAlert, Lightbulb, TriangleAlert, Info } from "lucide-react";
 import { Money } from "@/components/money";
 import { buttonClass } from "./ui";
-import { SEVERITY_LABEL, type AttentionItem, type AttentionSeverity } from "@/lib/attention";
+import { IMPACT_LABEL, SEVERITY_LABEL, type AttentionItem, type AttentionSeverity } from "@/lib/attention";
 
 /**
- * صفُّ مهمّة — لا بطاقةُ تنبيه.
+ * صفُّ مهمّة — سطران وفعلٌ واحد، لا بطاقةُ تنبيه.
  *
- * ── لماذا وُلد هذا المكوّن ──
- *
- * كانت الرئيسية تعرض `AttentionCard`: عنوانٌ، وشدّةٌ وبابٌ، ومبلغٌ
- * بثلاثة أسطر، وشرحٌ، و«الخطوة التالية»، وتفصيلٌ يُفتَح، وزرّ. مقاسُها
- * **٢٤٩ بكسلاً**. فعلى شاشة ١٣٦٦×٧٦٨ — وهي أكثر ما يُفتَح به هذا
- * النظام — كان زرُّ البند الأوّل عند ٧٣٣، والثاني عند ٩٦٧ تحت الطيّ.
- * أي أنّ صاحب المقهى يفتح نظامه صباحاً فيرى **مهمّةً واحدةً من ثماني**.
- *
- * والبطاقةُ صحيحةٌ في موضعها — في `/attention` حيث يُقرأ البند كلُّه
- * ويُحسَم. أمّا الرئيسية فسؤالُها أقصر: **ما الذي ينتظرني، وبأيّ
- * ترتيب؟** فيكفيه سطران وزرّ.
- *
- * ── ما بقي وما سقط ──
- *
- * بقي: العنوان (ما هو)، والمبلغ (كم يساوي)، وسطرُ «لماذا يهمّ»، وفعلٌ
- * واحدٌ باسم أثره. وسقط: شارةُ الباب — وهي اسمُ وحدةٍ في النظام لا خبرٌ
- * عن المهمّة — وقائمةُ الأدلّة، فموضعُها التفصيل.
- *
- * والارتفاع صار ~٨٠ بكسلاً، فخمسُ مهمّاتٍ حيث كانت واحدة.
+ * الرئيسيةُ تسأل «ما الذي ينتظرني، وبأيّ ترتيب؟» فيكفيها: رمزُ الشدّة،
+ * وما هو، ولماذا يهمّ، وكم يساوي، وفعلٌ باسم أثره. والتفصيلُ كلُّه في
+ * `/attention` حيث يُحسم البند. والصفوفُ تُتنقَّل بـJ/K.
  */
 
-const RAIL: Record<AttentionSeverity, string> = {
-  CRITICAL: "bg-danger",
-  HIGH: "bg-warn",
-  MEDIUM: "bg-line-strong",
-  OPPORTUNITY: "bg-ok",
-};
-
-const TEXT: Record<AttentionSeverity, string> = {
-  CRITICAL: "text-danger",
-  HIGH: "text-warn",
-  MEDIUM: "text-muted",
-  OPPORTUNITY: "text-ok",
+const SEVERITY: Record<AttentionSeverity, { icon: typeof CircleAlert; chip: string; text: string }> = {
+  CRITICAL: { icon: CircleAlert, chip: "bg-danger-bg text-danger", text: "text-danger" },
+  HIGH: { icon: TriangleAlert, chip: "bg-warn-bg text-warn", text: "text-warn" },
+  MEDIUM: { icon: Info, chip: "bg-info-bg text-info", text: "text-info" },
+  OPPORTUNITY: { icon: Lightbulb, chip: "bg-ok-bg text-ok", text: "text-ok" },
 };
 
 export function TaskRow({ item }: { item: AttentionItem }) {
-  const { amountMinor } = item.impact;
+  const { amountMinor, kind } = item.impact;
+  const s = SEVERITY[item.severity];
+  const Icon = s.icon;
+  const detailHref = `/attention?item=${encodeURIComponent(item.id)}`;
 
   return (
-    <li className="relative flex items-center gap-4 overflow-hidden rounded-xl border border-line bg-raised px-4 py-3 shadow-raised">
-      <span className={`absolute inset-y-0 start-0 w-1 ${RAIL[item.severity]}`} aria-hidden />
+    <li
+      data-nav-item=""
+      data-href={`/attention?item=${encodeURIComponent(item.id)}`}
+      className="card-rows group relative flex items-center gap-3.5 px-4 py-3.5 transition-colors hover:bg-hover sm:px-5"
+    >
+      <Link href={detailHref} aria-label="افتح التفصيل" tabIndex={-1} className="absolute inset-0" />
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${s.chip}`} title={SEVERITY_LABEL[item.severity]}>
+        <Icon className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+        <span className="sr-only">{SEVERITY_LABEL[item.severity]}</span>
+      </span>
 
-      {/* ما هو، ولماذا يهمّ */}
-      <span className="min-w-0 flex-1 ps-1.5">
-        <Link
-          href={`/attention?item=${encodeURIComponent(item.id)}`}
-          className="block truncate text-sm font-bold leading-snug hover:underline hover:underline-offset-4"
-        >
+      <span className="min-w-0 flex-1">
+        <Link href={detailHref} className="block truncate text-[14px] font-bold leading-snug hover:text-accent">
           {item.title}
         </Link>
-        <span className="mt-0.5 flex items-baseline gap-2">
-          <span className={`shrink-0 text-[11px] font-bold ${TEXT[item.severity]}`}>
-            {SEVERITY_LABEL[item.severity]}
-          </span>
-          <span className="min-w-0 truncate text-[11px] leading-relaxed text-muted">
-            {item.detail}
-          </span>
+        <span className="mt-0.5 block truncate text-xs leading-relaxed text-muted">{item.detail}</span>
+      </span>
+
+      {amountMinor !== null && amountMinor > 0 && (
+        <span className="hidden w-32 shrink-0 text-end sm:block">
+          <span className="nums-col block text-[14px] font-bold"><Money minor={amountMinor} /></span>
+          <span className="block text-[11px] text-muted">{IMPACT_LABEL[kind]}</span>
         </span>
-      </span>
+      )}
 
-      {/* كم يساوي — وعمودٌ بعرضٍ ثابت كي تلتقي الفواصل بين الصفوف */}
-      <span className="nums-col hidden w-28 shrink-0 text-sm font-bold sm:block">
-        {amountMinor !== null && amountMinor > 0 ? <Money minor={amountMinor} /> : ""}
-      </span>
-
-      {/* فعلٌ واحد، باسم أثره */}
-      <Link href={item.href} className={`${buttonClass("secondary", "sm")} shrink-0`}>
+      <Link href={item.href} className={`${buttonClass("secondary", "sm")} hidden sm:inline-flex`}>
         {item.actionLabel ?? "افتح السجلّات"}
       </Link>
+      <ArrowLeft className="h-4 w-4 shrink-0 text-muted sm:hidden" strokeWidth={2} aria-hidden />
     </li>
   );
 }
 
 export function TaskList({ items }: { items: readonly AttentionItem[] }) {
   return (
-    <ul className="space-y-2">
+    <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
       {items.map((i) => (
         <TaskRow key={i.id} item={i} />
       ))}

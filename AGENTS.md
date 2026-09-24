@@ -77,10 +77,17 @@ clear loading / error / success states.
 unexplained controls, silent actions, or forms without recovery. If a feature
 isn't available, remove it or build it.
 
-Visual quality means hierarchy, typography, spacing, density, and consistency —
-restrained and useful. Avoid AI-dashboard clichés: meaningless KPI cards,
-decorative charts, big gradients, glass, nested rounded boxes, gratuitous
-animation, wasted space. Don't copy SaaS features because others have them.
+Visual quality means hierarchy, typography, spacing, density, and consistency.
+**The design system is v2 (Sep 2026)** — a premium specialty-café finance desk:
+warm paper canvas, white cards, one confident accent («الهيل», teal-green),
+a dark brand frame (sidebar), semantic colours always paired with an icon or
+word, Thmanyah Sans for UI and Serif Display for the Home greeting, lucide
+icons, 150–250 ms ease-out motion that respects `prefers-reduced-motion`.
+Tokens live in `globals.css`, primitives in `ui.tsx` / `ui-client.tsx`; a
+page never re-styles what a primitive owns. **"Restrained" must not become
+"plain"** — go bold on hierarchy, layout and interaction; stay honest on data
+(no decorative charts, no KPI without an answer and a destination).
+Rationale and lessons: `docs/decisions/ui-ux.md`.
 
 ## 6. Financial correctness
 
