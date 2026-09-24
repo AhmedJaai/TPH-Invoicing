@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  BUCKET_LABEL, bucketOf, bulkConfirmable, describeQueue, groupForReview,
+  BUCKET_LABEL, bucketOf, bulkConfirmable, describeQueue, groupForReview, settleable,
   type ReviewItem,
 } from "./review-queue";
 
@@ -94,3 +94,30 @@ describe("ما يصلح للإقرار الجماعيّ", () => {
     expect(bulkConfirmable([item({ transactionId: "a", disposition: "AUTO" })])).toEqual([]);
   });
 });
+
+/*
+  حوالةٌ عرف المحرّكُ مورّدَها ولم يجد فاتورةً تطابقها: بابُها لم يُكتَب
+  (`UNKNOWN`) ومورّدُها معروف. كانت تذهب إلى «يُحسَم» وفعلُها «عرِّف
+  هذه الجهة» — وقد عُرفت. وفعلُها الحقّ قيدُها على حسابه.
+*/
+describe("المورّدُ معروف والبابُ لم يُكتَب", () => {
+  const known = item({
+    transactionId: "k", category: "UNKNOWN", disposition: "REVIEW", supplierId: "s-olive",
+  });
+
+  it("يُراجَع ويُقيَّد على حسابه — لا يُطلَب تعريفُ جهةٍ معروفة", () => {
+    expect(bucketOf(known)).toBe("REVIEW");
+    expect(settleable(known)).toBe(true);
+  });
+
+  it("الواردُ لا يُقيَّد سداداً وإن عُرفت جهته", () => {
+    const incoming = { ...known, direction: "CREDIT" as const };
+    expect(bucketOf(incoming)).toBe("RESOLVE");
+    expect(settleable(incoming)).toBe(false);
+  });
+
+  it("اسمٌ بلا معرّف مورّد ليس مورّداً معروفاً", () => {
+    expect(bucketOf({ ...known, supplierId: null })).toBe("RESOLVE");
+  });
+});
+

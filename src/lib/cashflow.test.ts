@@ -146,3 +146,15 @@ describe("compareExpenses", () => {
     expect(c[0].category).toBe("RENT");
   });
 });
+
+describe("buildCashFlow — عددُ ما لم يُصنَّف", () => {
+  it("يعدّ الحركات لا الصفوف المجمَّعة — خمسٌ في صفٍّ واحد خمس", () => {
+    const c = buildCashFlow([
+      { month: "2026-08", direction: "DEBIT", category: "UNKNOWN", amountMinor: 235_000, count: 5 },
+      { month: "2026-08", direction: "DEBIT", category: "RENT", amountMinor: 1_500_000, count: 1 },
+    ]);
+    expect(c.unclassifiedCount).toBe(5);
+    expect(c.unclassifiedMinor).toBe(235_000);
+  });
+});
+

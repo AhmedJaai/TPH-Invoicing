@@ -15,6 +15,12 @@ export interface CashMovement {
   direction: "DEBIT" | "CREDIT";
   category: TxCategory;
   amountMinor: number;
+  /**
+   * كم حركةً في هذا الصفّ. المستدعي يجمع بالشهر والباب في SQL، فالصفّ
+   * الواحد قد يكون خمسَ حركات — وكان العدّ بالصفوف فيقول «حركة واحدة
+   * بقيمة ٢٬٣٥٠» عن خمس. والغائبُ واحدةٌ: صفٌّ لحركةٍ بعينها.
+   */
+  count?: number;
 }
 
 export interface CashFlowMonth {
@@ -50,7 +56,7 @@ export function buildCashFlow(movements: readonly CashMovement[]): CashFlow {
 
     if (m.category === "UNKNOWN") {
       unclassifiedMinor += m.amountMinor;
-      unclassifiedCount++;
+      unclassifiedCount += m.count ?? 1;
     }
 
     const cat = entry.byCategory.find((c) => c.category === m.category);

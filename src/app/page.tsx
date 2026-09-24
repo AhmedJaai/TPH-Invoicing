@@ -4,14 +4,14 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { LinkButton, Section } from "@/components/ui";
+import { Section } from "@/components/ui";
 import { TaskList } from "@/components/task-list";
 import { prioritize } from "@/lib/attention";
 import { attentionItems } from "@/lib/work";
 import { Changes } from "@/components/changes";
 import { buildChanges, notable } from "@/lib/changes";
 import { gatherChangeFacts } from "@/lib/changes-facts";
-import { DAY, SUPPLIER, countNoun } from "@/lib/arabic";
+import { DAY, ITEM, SUPPLIER, countNoun } from "@/lib/arabic";
 import { formatMonth } from "@/lib/riyadh-time";
 import { loadBalanceTotals, loadOverdueBalances } from "@/services/supplier-balance.service";
 
@@ -179,7 +179,21 @@ export default async function HomePage() {
         }
       >
         {attention.length > 0 ? (
-          <TaskList items={top} />
+          <>
+            <TaskList items={top} />
+            {/*
+              ما لم يُعرض يُقال بعدده تحت القائمة نفسها — كان زرّاً بعد
+              قسم «ما الذي تغيّر»، فيُقرأ تابعاً لقسمٍ لا علاقة له به.
+            */}
+            {attention.length > SHOWN && (
+              <Link
+                href="/attention"
+                className="mt-2 flex min-h-11 items-center justify-center rounded-xl border border-dashed border-line text-xs font-medium text-ink-soft hover:border-ink-soft hover:text-ink"
+              >
+                افتح الطابور كاملاً — بقي {countNoun(attention.length - SHOWN, ITEM)} ←
+              </Link>
+            )}
+          </>
         ) : (
           <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-ok">
             كلُّ ما يعرفه النظام سليم.
@@ -202,13 +216,6 @@ export default async function HomePage() {
         )}
       </Section>
 
-      {attention.length > SHOWN && (
-        <p className="text-center text-xs text-muted">
-          <LinkButton href="/attention" size="sm">
-            افتح الطابور كاملاً ({attention.length})
-          </LinkButton>
-        </p>
-      )}
     </PageShell>
   );
 }

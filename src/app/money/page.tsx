@@ -56,11 +56,12 @@ export default async function MoneyPage() {
            where input_vat_status='NOT_ELIGIBLE' and vat_minor > 0)              as at_risk,
         (select count(*)::int from invoices where input_vat_status='UNKNOWN')    as vat_unknown
     `),
-    db.execute<{ month: string; direction: string; category: string; amount: string }>(sql`
+    db.execute<{ month: string; direction: string; category: string; amount: string; n: number }>(sql`
       select to_char(value_date, 'YYYY-MM') as month,
              direction::text as direction,
              category::text as category,
-             sum(amount_minor)::bigint as amount
+             sum(amount_minor)::bigint as amount,
+             count(*)::int as n
         from bank_transactions
        group by 1, 2, 3
     `),
@@ -85,6 +86,7 @@ export default async function MoneyPage() {
       direction: r.direction as "DEBIT" | "CREDIT",
       category: r.category as TxCategory,
       amountMinor: Number(r.amount),
+      count: Number(r.n),
     })),
   );
 
@@ -124,7 +126,22 @@ export default async function MoneyPage() {
           provenance={prov.bankOutflow}
           unit="حركة"
           href="/bank"
-          note="اضغط «من أين جاء؟» لترى ما لم يُصنَّف بعد"
+          /*
+            الرقمُ يستثني ما لم يُعرف وجهه — والاستثناءُ يُقال بعدده ومبلغه
+            تحته، لا خلف زرّ. كان التنبيه «اضغط من أين جاء؟» بينما جدولُ
+            التدفّق أسفلَ الصفحة يقول صادراً أكبر، فيظهر للشهر رقمان.
+          */
+          note={
+            prov.bankOutflow.excludedCount > 0 ? (
+              <>
+                وخارجه {countNoun(prov.bankOutflow.excludedCount, TRANSACTION)} بـ
+                <Money minor={prov.bankOutflow.excludedKnownMinor} /> لم يُعرف وجهها —{" "}
+                <Link href="/attention" className="underline underline-offset-4">عرّفها</Link>
+              </>
+            ) : (
+              "كلُّ الصادر معروفُ الوجه"
+            )
+          }
           className="flex flex-col"
         />
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3">

@@ -343,6 +343,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
       من الفراغ**، لأنّه يُقرأ جواباً.
     */
     duplicatePayments: doublePaid.length,
+    duplicatePaymentsDistinct: doublePaid.filter((g) => g.distinctOperations).length,
     duplicatePaymentAmountMinor: recoverableMinor(doublePaid),
     duplicatePaymentEvidence: doublePaid.slice(0, 6).map(doublePaidEvidence),
     duplicatePaymentsClaimed: doublePaidSplit.claimed.length,
