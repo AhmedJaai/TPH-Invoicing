@@ -298,10 +298,15 @@ export default async function DocumentsPage({
           </Chip>
           {STATUS_BUCKETS.map((b) => {
             const n = statusCount.get(b.id) ?? 0;
-            if (n === 0 && p.status !== b.id) return null;
+            /*
+              الوجهُ المفتوح يبقى ظاهراً ولو فرغ. كان يُخفى صندوقُ الوارد
+              حين يفرغ — وهو الافتراضيّ — فلا تُضاء شارةٌ واحدة، ولا يُعرَف
+              أيّ الوجوه هذا.
+            */
+            if (n === 0 && chosenStatus !== b.id) return null;
             return (
               <Chip key={b.id} href={link({ status: b.id })} active={chosenStatus === b.id}>
-                <span className={p.status === b.id ? "" : b.tone === "warn" ? "text-warn" : b.tone === "ok" ? "text-ok" : ""}>
+                <span className={chosenStatus === b.id ? "" : b.tone === "warn" ? "text-warn" : b.tone === "ok" ? "text-ok" : ""}>
                   {b.label} ({n})
                 </span>
               </Chip>
@@ -334,10 +339,11 @@ export default async function DocumentsPage({
         </ScrollX>
       </div>
 
-      <p className="mt-4 text-xs text-muted">
+      {/* العدُّ فوق الفراغ يكرّر ما يقوله الفراغ نفسه */}
+      {rows.length > 0 && <p className="mt-4 text-xs text-muted">
         {countNoun(Number(total), DOCUMENT)}{hasFilter ? " ضمن الترشيح" : ""}
         {pages > 1 && ` · صفحة ${page} من ${pages}`}
-      </p>
+      </p>}
 
       {rows.length === 0 ? (
         <div className="mt-3">
