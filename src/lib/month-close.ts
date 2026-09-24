@@ -13,6 +13,7 @@
 
 import type { BalanceStatus } from "@/lib/bank/balance-equation";
 import { DAY, DOCUMENT, INVOICE, SUPPLIER, TRANSACTION, WARNING, countNoun } from "./arabic";
+import { formatMonth } from "./riyadh-time";
 
 export type CheckState = "PASS" | "WARN" | "BLOCK";
 
@@ -104,7 +105,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     state: facts.invoiceCount > 0 ? "PASS" : "BLOCK",
     detail:
       facts.invoiceCount > 0
-        ? `${countNoun(facts.invoiceCount, INVOICE)} في ${facts.month}`
+        ? `${countNoun(facts.invoiceCount, INVOICE)} في ${formatMonth(facts.month)}`
         : "لا فاتورة واحدة في هذا الشهر",
     action: facts.invoiceCount > 0 ? undefined : "ارفع فواتير الشهر أو زامن الدرايف قبل الإقفال",
   });

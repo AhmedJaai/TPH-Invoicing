@@ -1,12 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  ArrowLeft, CircleAlert, CircleCheck, Download, FileSpreadsheet, Landmark, Lock, Receipt, RotateCw, ShieldCheck,
+  TriangleAlert, Unlock, Wallet, type LucideIcon,
+} from "lucide-react";
 import type { CheckItem, MonthCloseReport } from "@/lib/month-close";
-import { ConfirmAction } from "./ui-client";
+import { ConfirmAction, toast } from "./ui-client";
 import { countNoun, BLOCKER, CHECK, WARNING } from "@/lib/arabic";
+import { formatMonth } from "@/lib/riyadh-time";
 import { postJson } from "@/lib/http-client";
-import { buttonClass } from "./ui";
+import { buttonClass } from "./ui-tokens";
 
 interface Response {
   report: MonthCloseReport;
@@ -15,61 +21,37 @@ interface Response {
   error?: string;
 }
 
-function ChecksSummary({
-  items,
-  canClose,
-  month,
-}: {
-  items: readonly { state: "PASS" | "WARN" | "BLOCK" }[];
-  canClose: boolean;
-  month: string;
-}) {
-  const passed = items.filter((i) => i.state === "PASS").length;
-  const blocks = items.filter((i) => i.state === "BLOCK").length;
-  const warns = items.filter((i) => i.state === "WARN").length;
+/**
+ * الإقفالُ قائمةٌ موجَّهة لا قائمةُ بنود.
+ *
+ * الفحوصُ نفسُها (`lib/month-close.ts`) مجموعةً في أربع خطوات بترتيب ما
+ * يعتمد عليه ما بعدها: المستندات ← الضريبة ← السداد والكشوف ← البنك، ثمّ
+ * الإقفال، ثمّ حزمةُ المحاسب. ولكلّ خطوةٍ حالُها (أسوأُ ما فيها)، ولكلّ
+ * بندٍ لم يجتز موضعُ إصلاحه. والقائمةُ تُرسَم ممّا حسبه الخادم، وتغييرُ
+ * الشهر وحده يستدعيه.
+ */
 
-  return (
-    <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
-      <p className="text-xs text-muted">إقفال {month}</p>
-      <p className="mt-1.5 font-display text-2xl font-bold leading-none">
-        {canClose ? "جاهز للإقفال" : "لا يمكن الإقفال بعد"}
-      </p>
-      <p className="mt-2.5 text-sm font-bold">
-        اجتاز <span className="nums">{passed}</span> من {countNoun(items.length, CHECK)}
-      </p>
+type State = CheckItem["state"];
 
-      <div className="mt-3 flex gap-1" aria-hidden>
-        {items.map((i, n) => (
-          <span
-            key={n}
-            className={`h-1.5 flex-1 rounded-full ${
-              i.state === "PASS" ? "bg-ok" : i.state === "WARN" ? "bg-warn" : "bg-danger"
-            }`}
-          />
-        ))}
-      </div>
+const STEPS: { id: string; title: string; icon: LucideIcon; ids: readonly string[] }[] = [
+  { id: "documents", title: "المستندات", icon: Receipt, ids: ["has-invoices", "no-pending-review", "no-blockers"] },
+  { id: "tax", title: "الضريبة", icon: ShieldCheck, ids: ["tax-unknown", "tax-valid", "fixed-assets"] },
+  { id: "payables", title: "السداد والكشوف", icon: Wallet, ids: ["paid", "statements"] },
+  { id: "bank", title: "البنك", icon: Landmark, ids: ["bank", "bank-coverage", "bank-balance", "bank-unexplained"] },
+];
 
-      <p className="mt-2.5 text-xs leading-relaxed text-muted">
-        {blocks > 0
-          ? `${countNoun(blocks, BLOCKER)} يجب حلّه، و${countNoun(warns, WARNING)} لا يمنع.`
-          : warns > 0
-            ? `لا مانع. و${countNoun(warns, WARNING)} ستُقَرّ بها عند الإقفال.`
-            : "لا مانع ولا تنبيه."}
-      </p>
-    </div>
-  );
-}
+const RANK: Record<State, number> = { PASS: 0, WARN: 1, BLOCK: 2 };
 
-const STATE_STYLE: Record<CheckItem["state"], { icon: string; box: string; text: string }> = {
-  PASS: { icon: "✓", box: "border-line bg-raised", text: "text-ok" },
-  WARN: { icon: "!", box: "border-warn/40 bg-warn-bg", text: "text-warn" },
-  BLOCK: { icon: "✕", box: "border-danger/40 bg-danger-bg", text: "text-danger" },
+const STATE_UI: Record<State, { icon: LucideIcon; text: string; chip: string; label: string }> = {
+  PASS: { icon: CircleCheck, text: "text-ok", chip: "bg-ok-bg text-ok", label: "سليم" },
+  WARN: { icon: TriangleAlert, text: "text-warn", chip: "bg-warn-bg text-warn", label: "تنبيه لا يمنع" },
+  BLOCK: { icon: CircleAlert, text: "text-danger", chip: "bg-danger-bg text-danger", label: "يمنع الإقفال" },
 };
 
-/**
- * القائمة تُرسم من بيانات حسبها الخادم، فلا شاشة فارغة تنتظر طلباً.
- * وتغيير الشهر وحده هو ما يستدعي الخادم.
- */
+function worst(items: readonly CheckItem[]): State {
+  return items.reduce<State>((w, i) => (RANK[i.state] > RANK[w] ? i.state : w), "PASS");
+}
+
 export function MonthClose({
   months,
   initialMonth,
@@ -104,6 +86,9 @@ export function MonthClose({
           return false;
         }
         setData(r.data);
+        if (action === "close") toast({ tone: "ok", title: `أُقفل ${formatMonth(forMonth)}`, body: "والحزمةُ جاهزةٌ للمحاسب أدناه." });
+        if (action === "reopen") toast({ tone: "warn", title: `فُتح ${formatMonth(forMonth)} من جديد`, body: "سُجّل الفتح في سجلّ التدقيق باسمك." });
+        if (action === "balances") toast({ tone: "ok", title: "حُفظ الرصيدان وأُعيد الفحص" });
         if (action !== "check") router.refresh();
         return true;
       } finally {
@@ -115,217 +100,284 @@ export function MonthClose({
 
   const report = data?.report;
   const isClosed = data?.status === "CLOSED";
+  const passed = report?.items.filter((i) => i.state === "PASS").length ?? 0;
+  const total = report?.items.length ?? 0;
+  const byId = new Map(report?.items.map((i) => [i.id, i]) ?? []);
+  const grouped = STEPS.map((s) => ({ ...s, items: s.ids.map((id) => byId.get(id)).filter((i): i is CheckItem => !!i) }))
+    .filter((s) => s.items.length > 0);
+  const known = new Set(STEPS.flatMap((s) => s.ids));
+  const other = report?.items.filter((i) => !known.has(i.id)) ?? [];
+  if (other.length > 0) grouped.push({ id: "other", title: "أخرى", icon: CircleAlert, ids: [], items: other });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* ── الشهر ── */}
       <div className="flex flex-wrap items-center gap-2">
-        <select
-          aria-label="الشهر"
-          value={month}
-          onChange={(e) => {
-            setMonth(e.target.value);
-            void call("check", e.target.value);
-          }}
-          className="nums rounded-lg border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
-          dir="ltr"
-        >
-          {months.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
-        </select>
-        <button
-          onClick={() => void call("check", month)}
-          disabled={busy !== null}
-          className={buttonClass("secondary", "sm")}
-        >
+        <label className="flex items-center gap-2 text-xs text-muted">
+          الشهر
+          <select
+            value={month}
+            onChange={(e) => {
+              setMonth(e.target.value);
+              void call("check", e.target.value);
+            }}
+            className="min-h-11 rounded-lg border border-line-input bg-raised px-3 text-sm font-bold text-ink sm:min-h-9"
+          >
+            {months.map((m) => (
+              <option key={m} value={m}>{formatMonth(m)}</option>
+            ))}
+          </select>
+        </label>
+        <button onClick={() => void call("check", month)} disabled={busy !== null} className={buttonClass("secondary", "sm")}>
+          <RotateCw className={`h-3.5 w-3.5 ${busy === "checking" ? "animate-spin" : ""}`} strokeWidth={2} aria-hidden />
           {busy === "checking" ? "يفحص…" : "أعد الفحص"}
         </button>
-        {isClosed && (
-          <span className="rounded-full bg-ok-bg px-3 py-1 text-[11px] font-bold text-ok">مقفل</span>
-        )}
       </div>
 
-      {error && <p className="rounded-lg bg-danger-bg px-3 py-2 text-xs text-danger">{error}</p>}
-      {data?.message && !error && (
-        <p className="rounded-lg bg-ok-bg px-3 py-2 text-xs font-bold text-ok">✓ {data.message}</p>
+      {error && (
+        <p role="alert" className="flex items-center gap-2 rounded-xl border border-danger/25 bg-danger-bg px-4 py-3 text-xs font-bold text-danger">
+          <CircleAlert className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden /> {error}
+        </p>
       )}
-
-      {busy === "checking" && <p className="text-xs text-muted">يفحص الشهر…</p>}
 
       {report && (
         <>
-          {/*
-            رأسٌ يجيب السؤال قبل القائمة.
-            قائمةٌ من ثمانية بنود لا تقول «هل أقفل أم لا» إلّا بعد قراءتها
-            كلّها. والعدد يقولها في سطر، ثمّ تُقرأ التفاصيل عند الحاجة.
-          */}
-          <ChecksSummary items={report.items} canClose={report.canClose} month={month} />
+          {/* ── الجواب قبل القائمة ── */}
+          <section
+            aria-live="polite"
+            className={`overflow-hidden rounded-2xl border shadow-raised ${
+              isClosed ? "border-ok/25 bg-ok-bg" : report.canClose ? "border-accent-line bg-accent-soft" : "border-line bg-raised"
+            }`}
+          >
+            <div className="flex flex-wrap items-center gap-5 p-5 sm:p-6">
+              <span
+                className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${
+                  isClosed ? "bg-ok text-raised" : report.canClose ? "bg-accent text-accent-ink" : "bg-danger-bg text-danger"
+                }`}
+              >
+                {isClosed ? <Lock className="h-7 w-7" strokeWidth={1.75} aria-hidden /> : report.canClose ? <CircleCheck className="h-7 w-7" strokeWidth={1.75} aria-hidden /> : <CircleAlert className="h-7 w-7" strokeWidth={1.75} aria-hidden />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-muted">إقفال {formatMonth(month)}</p>
+                <p className="mt-1 text-2xl font-extrabold tracking-tight">
+                  {isClosed ? "الشهرُ مُقفَل" : report.canClose ? "جاهزٌ للإقفال" : "لا يُقفَل بعد"}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+                  اجتاز <span className="nums font-bold">{passed}</span> من {countNoun(total, CHECK)}
+                  {report.blockers.length > 0 && <> · {countNoun(report.blockers.length, BLOCKER)} يجب حلّه</>}
+                  {report.warnings.length > 0 && <> · {countNoun(report.warnings.length, WARNING)} لا يمنع</>}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-1 px-5 pb-5 sm:px-6" aria-hidden>
+              {report.items.map((i) => (
+                <span key={i.id} className={`h-1.5 flex-1 rounded-full ${i.state === "PASS" ? "bg-ok" : i.state === "WARN" ? "bg-warn" : "bg-danger"}`} />
+              ))}
+            </div>
+          </section>
 
-          <ul className="space-y-2">
-            {report.items.map((i) => {
-              const st = STATE_STYLE[i.state];
+          {/* ── الخطوات ── */}
+          <ol className="space-y-3">
+            {grouped.map((s, n) => {
+              const st = worst(s.items);
+              const ui = STATE_UI[st];
               return (
-                <li key={i.id} className={`rounded-2xl border p-3.5 shadow-raised sm:p-4 ${st.box}`}>
-                  <div className="flex items-start gap-2.5">
-                    <span className={`shrink-0 text-sm font-bold ${st.text}`}>{st.icon}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold leading-snug">{i.label}</p>
-                      <p className="mt-0.5 text-xs text-ink-soft">{i.detail}</p>
-                      {i.action && (
-                        <p className="mt-1.5 text-xs leading-relaxed">
-                          <span className="font-bold">الخطوة التالية: </span>
-                          {i.action}
-                        </p>
-                      )}
-                      {i.href && i.state !== "PASS" && (
-                        <a
-                          href={i.href}
-                          className="mt-1 inline-flex min-h-11 items-center text-xs font-bold underline underline-offset-4 sm:min-h-0"
-                        >
-                          أصلِح ←
-                        </a>
-                      )}
-                    </div>
+                <li key={s.id} className="overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
+                  <div className="flex items-center gap-3 border-b border-line-soft px-4 py-3.5 sm:px-5">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-sunken text-ink-soft">
+                      <s.icon className="h-4 w-4" strokeWidth={2} aria-hidden />
+                    </span>
+                    <h3 className="min-w-0 flex-1 text-[15px] font-bold">
+                      <span className="nums text-muted">{n + 1}.</span> {s.title}
+                    </h3>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${ui.chip}`}>
+                      <ui.icon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                      {ui.label}
+                    </span>
                   </div>
+                  <ul className="divide-y divide-line-soft">
+                    {s.items.map((i) => {
+                      const iu = STATE_UI[i.state];
+                      return (
+                        <li key={i.id} className="flex items-start gap-3 px-4 py-3 sm:px-5">
+                          <iu.icon className={`mt-0.5 h-[18px] w-[18px] shrink-0 ${iu.text}`} strokeWidth={2} aria-label={iu.label} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-bold leading-snug">{i.label}</p>
+                            <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">{i.detail}</p>
+                            {i.action && i.state !== "PASS" && (
+                              <p className="mt-1 text-xs leading-relaxed text-muted">
+                                <span className="font-bold text-ink-soft">الخطوة التالية: </span>{i.action}
+                              </p>
+                            )}
+                          </div>
+                          {i.href && i.state !== "PASS" && (
+                            <Link href={i.href} className={buttonClass(i.state === "BLOCK" ? "primary" : "secondary", "sm")}>
+                              أصلِح <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                            </Link>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </li>
               );
             })}
-          </ul>
+          </ol>
 
+          {/* ── رصيدا الشهر: بهما وحدهما تُفحَص المعادلة ── */}
           {!isClosed && report.items.some((i) => i.id === "bank-balance" && i.state !== "PASS") && (
             <form
               id="balances"
-              className="scroll-mt-28 rounded-2xl border border-line bg-raised p-4 shadow-raised"
+              className="scroll-mt-28 rounded-xl border border-line bg-raised p-5 shadow-raised"
               onSubmit={(e) => {
                 e.preventDefault();
                 void call("balances", month, { openingBalance: opening, closingBalance: closing });
               }}
             >
-              <p className="text-sm font-bold">رصيدا الحساب في {month}</p>
+              <h3 className="text-[15px] font-bold">رصيدا الحساب في {formatMonth(month)}</h3>
               <p className="mt-1 text-xs leading-relaxed text-ink-soft">
                 كما في كشف البنك: الرصيد قبل أوّل حركةٍ في الشهر، والرصيد بعد آخرها. بهما تُفحَص
                 المعادلة: الافتتاحيّ + الوارد − الصادر = الختاميّ.
               </p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <label className="block text-xs">
-                  <span className="text-muted">الرصيد الافتتاحيّ</span>
+                  <span className="font-bold text-ink-soft">الرصيد الافتتاحيّ</span>
                   <input
                     value={opening}
                     onChange={(e) => setOpening(e.target.value)}
                     inputMode="decimal"
                     dir="ltr"
                     required
-                    className="nums mt-1 w-full rounded-lg border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+                    placeholder="0.00"
+                    className="nums mt-1.5 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm"
                   />
                 </label>
                 <label className="block text-xs">
-                  <span className="text-muted">الرصيد الختاميّ</span>
+                  <span className="font-bold text-ink-soft">الرصيد الختاميّ</span>
                   <input
                     value={closing}
                     onChange={(e) => setClosing(e.target.value)}
                     inputMode="decimal"
                     dir="ltr"
                     required
-                    className="nums mt-1 w-full rounded-lg border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+                    placeholder="0.00"
+                    className="nums mt-1.5 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm"
                   />
                 </label>
               </div>
               <button
                 type="submit"
                 disabled={busy !== null || !opening.trim() || !closing.trim()}
-                className="mt-3 min-h-11 rounded-lg bg-inverse-surface px-4 text-xs font-bold text-inverse-ink disabled:opacity-40"
+                className={`${buttonClass("primary", "sm")} mt-4`}
               >
                 {busy === "balancing" ? "يحفظ…" : "احفظ الرصيدين وأعد الفحص"}
               </button>
             </form>
           )}
 
-          {!isClosed && (
-            <div className="rounded-2xl border border-line bg-raised shadow-raised p-4">
+          {/* ── الإقفال ── */}
+          {!isClosed ? (
+            <section className="rounded-xl border border-line bg-raised p-5 shadow-raised">
+              <h3 className="flex items-center gap-2 text-[15px] font-bold">
+                <Lock className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
+                <span className="nums text-muted">{grouped.length + 1}.</span> الإقفال
+              </h3>
               {report.canClose ? (
                 <>
-                  <p className="text-sm font-bold">
+                  <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
                     {report.warnings.length === 0
-                      ? "لا شيء يمنع الإقفال ولا شيء ينبّه."
-                      : `لا مانع من الإقفال، وفيه ${countNoun(report.warnings.length, WARNING)} ستُقَرّ بها.`}
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                    بعد الإقفال ترفض الأرشفة إضافة أي مستند إلى هذا الشهر. ويمكنك إعادة فتحه
-                    متى وجدت فاتورة متأخّرة.
+                      ? "لا شيء يمنع الإقفال ولا شيء ينبّه. "
+                      : `لا مانع، وفيه ${countNoun(report.warnings.length, WARNING)} ستُقَرّ بها. `}
+                    بعد الإقفال ترفض الأرشفةُ إضافة أيّ مستندٍ إلى هذا الشهر، وتستطيع إعادة فتحه متى وصلت فاتورةٌ متأخّرة.
                   </p>
                   {report.warnings.length > 0 && (
-                    /* النصّ المؤقّت ليس اسماً: يختفي عند أوّل حرفٍ يُكتب، فيبقى
-                       أخطرُ حقلٍ في الشهر بلا ما يقول ما هو */
                     <label className="mt-3 block text-xs">
-                      <span className="text-muted">سبب الإقفال مع التنبيهات</span>
+                      <span className="font-bold text-ink-soft">سبب الإقفال مع التنبيهات</span>
                       <input
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
                         placeholder="يُحفظ في سجلّ التدقيق"
                         dir="auto"
-                        className="mt-1 w-full rounded-lg border border-line-input bg-surface px-3 py-2 text-xs outline-none focus:border-ink"
+                        className="mt-1.5 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm"
                       />
                     </label>
                   )}
-                  {/*
-                    كان أخطرُ فعلٍ شهريّ يقع في نافذة المتصفّح الأصليّة،
-                    وأزرارها «OK» و«Cancel» بلغة النظام لا بلغة الفعل.
-                    وهذا اللوح يسمّي ما سيقع ويطلب إقراراً به.
-                  */}
-                  <div className="mt-3">
+                  <div className="mt-4">
                     <ConfirmAction
-                      label={busy === "closing" ? "يُقفل…" : `أقفل ${month}`}
+                      label={busy === "closing" ? "يُقفل…" : `أقفل ${formatMonth(month)}`}
                       variant="primary"
                       tone="warn"
                       size="md"
                       block
                       disabled={busy !== null}
-                      title={`إقفال ${month}`}
+                      title={`إقفال ${formatMonth(month)}`}
                       consequence={
                         report.warnings.length > 0
                           ? `بعد الإقفال ترفض الأرشفة أيّ مستند لهذا الشهر، وتُقَرّ ${countNoun(report.warnings.length, WARNING)} على حالها. وتستطيع إعادة فتحه متى وصلتك فاتورة متأخّرة.`
                           : "بعد الإقفال ترفض الأرشفة أيّ مستند لهذا الشهر. وتستطيع إعادة فتحه متى وصلتك فاتورة متأخّرة."
                       }
-                      acknowledgement={`أُقرّ بأنّ فواتير ${month} كلّها وصلت، وأنّ ما بقي من تنبيهات مقصودٌ لا مفوت.`}
-                      confirmLabel={`أقفل ${month}`}
+                      acknowledgement={`أُقرّ بأنّ فواتير ${formatMonth(month)} كلّها وصلت، وأنّ ما بقي من تنبيهات مقصودٌ لا مفوت.`}
+                      confirmLabel={`أقفل ${formatMonth(month)}`}
                       onConfirm={() => call("close", month)}
                     />
                   </div>
                 </>
               ) : (
-                <>
-                  <p className="text-sm font-bold text-danger">
-                    {countNoun(report.blockers.length, BLOCKER)} يجب معالجته قبل الإقفال
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                    هذه أخطاء في البيانات نفسها، لا وقائع تُقرّ بها. عالجها ثم أعد الفحص.
-                  </p>
-                </>
+                <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
+                  <span className="font-bold text-danger">{countNoun(report.blockers.length, BLOCKER)} يجب معالجته قبل الإقفال.</span>{" "}
+                  هذه أخطاءٌ في البيانات نفسها لا وقائع تُقرّ بها — أصلحها من أزرار «أصلِح» أعلاه ثمّ أعد الفحص.
+                </p>
               )}
-            </div>
-          )}
-
-          {isClosed && (
-            <div className="rounded-2xl border border-line bg-raised shadow-raised p-4">
-              <p className="text-sm font-bold">هذا الشهر مقفل.</p>
-              <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                الأرشفة ترفض إضافة مستند إليه. إن وصلتك فاتورة متأخّرة تخصّه، أعد فتحه —
-                ويُسجَّل ذلك في سجل التدقيق باسمك.
+            </section>
+          ) : (
+            <section className="rounded-xl border border-line bg-raised p-5 shadow-raised">
+              <h3 className="flex items-center gap-2 text-[15px] font-bold">
+                <Lock className="h-4 w-4 text-ok" strokeWidth={2} aria-hidden /> هذا الشهر مقفل
+              </h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
+                الأرشفةُ ترفض إضافة مستندٍ إليه. إن وصلتك فاتورةٌ متأخّرة تخصّه، أعد فتحه — ويُسجَّل ذلك باسمك.
               </p>
-              <div className="mt-3">
+              <div className="mt-4">
                 <ConfirmAction
                   label={busy === "reopening" ? "يفتح…" : "أعد فتح الشهر"}
                   variant="secondary"
                   tone="warn"
                   disabled={busy !== null}
-                  title={`إعادة فتح ${month}`}
+                  title={`إعادة فتح ${formatMonth(month)}`}
                   consequence="تُقبَل إضافة المستندات إليه من جديد، ويُسجَّل الفتح في سجلّ التدقيق باسمك. وتقارير الشهر تتغيّر بما يُضاف بعده."
                   acknowledgement="أُقرّ بأنّ لديّ ما يخصّ هذا الشهر ولم يُدرَج فيه."
-                  confirmLabel={`افتح ${month}`}
+                  confirmLabel={`افتح ${formatMonth(month)}`}
                   onConfirm={() => call("reopen", month)}
                 />
               </div>
+            </section>
+          )}
+
+          {/* ── حزمة المحاسب ── */}
+          <section id="export" className="scroll-mt-28 overflow-hidden rounded-xl border border-accent-line bg-raised shadow-raised">
+            <div className="flex flex-wrap items-center gap-4 p-5">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
+                <FileSpreadsheet className="h-6 w-6" strokeWidth={1.75} aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-[15px] font-bold">حزمة المحاسب — {formatMonth(month)}</h3>
+                <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
+                  ملفّ Excel بستّ أوراق: الملخّص · الفواتير · الضريبة · الدفعات · المصروفات · حركات البنك.
+                  {isClosed ? " الشهرُ مقفل، فأرقامُه ثابتة." : " الشهرُ مفتوح — قد تتغيّر أرقامُه بعد التنزيل، ويُكتب ذلك في الملفّ."}
+                </p>
+              </div>
+              <a href={`/api/export/accountant?month=${month}`} download className={buttonClass(isClosed ? "primary" : "secondary")}>
+                <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
+                نزّل الحزمة
+              </a>
             </div>
+          </section>
+
+          {isClosed && (
+            <p className="flex items-center gap-1.5 text-[11px] text-muted">
+              <Unlock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+              إعادةُ الفتح والإقفال كلاهما في سجلّ التدقيق بالاسم والوقت.
+            </p>
           )}
         </>
       )}

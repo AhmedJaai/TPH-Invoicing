@@ -54,6 +54,8 @@ export type AuditAction =
   | "PAYMENT_VOIDED"
   | "DRIVE_FILE_RENAMED"
   | "PAYMENT_RUN_EXPORTED"
+  /* حزمةُ المحاسب — شهرٌ كاملٌ في ملفّ يخرج من النظام، فتنزيلُه أثرٌ يُقيَّد */
+  | "ACCOUNTANT_PACK_EXPORTED"
   | "EXPENSES_DERIVED"
   | "EXPENSE_RECLASSIFIED"
   | "RECONCILIATION_BALANCES_SET"

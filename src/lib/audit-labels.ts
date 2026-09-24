@@ -98,6 +98,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   PAYMENT_RECORDED: "قيد دفعة",
   DRIVE_FILE_RENAMED: "إعادة تسمية في الدرايف",
   PAYMENT_RUN_EXPORTED: "تنزيل ملف التحويلات",
+  ACCOUNTANT_PACK_EXPORTED: "تنزيل حزمة المحاسب",
   EXPENSES_DERIVED: "اشتقاق المصروفات من البنك",
   EXPENSE_RECLASSIFIED: "مصروفٌ تبع تصنيف حركته",
   RECONCILIATION_BALANCES_SET: "رصيدا الشهر في التسوية",

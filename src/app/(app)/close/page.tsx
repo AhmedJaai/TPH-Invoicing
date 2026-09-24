@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import { desc, sql } from "drizzle-orm";
+import { CalendarCheck, Lock } from "lucide-react";
 import { db } from "@/db";
 import { invoices, monthCloses } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
-import { Empty, PageShell } from "@/components/page-shell";
-import { NoAccess } from "@/components/ui";
+import { PageShell } from "@/components/page-shell";
+import { EmptyState, LinkButton, NoAccess, Section } from "@/components/ui";
 import { MonthClose } from "@/components/month-close";
 import { previousMonth } from "@/lib/filing";
 import { buildMonthClose } from "@/lib/month-close";
@@ -14,6 +15,12 @@ import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * إقفالُ الشهر — قائمةٌ موجَّهة ثمّ حزمةُ المحاسب.
+ *
+ * يُفتح على الشهر المنقضي؛ والفحوصُ بخطواتها في `MonthClose`، والإقفالُ
+ * بإقرار، والحزمةُ تُنزَّل للشهر المختار مقفلاً كان أو مفتوحاً (ويُقال ذلك).
+ */
 export default async function ClosePage() {
   const user = await currentUser();
   if (!user) redirect("/login?from=/close");
@@ -41,10 +48,15 @@ export default async function ClosePage() {
     .where(sql`${monthCloses.status} = 'CLOSED'`)
     .orderBy(desc(monthCloses.month));
 
-  if (months.length === 0) {
+  if (rows.length === 0) {
     return (
       <PageShell user={user} title="إقفال الشهر">
-        <Empty message="لا بيانات بعد. ارفع فواتيرك أوّلاً." />
+        <EmptyState
+          icon={CalendarCheck}
+          title="لا شهرَ يُقفَل بعد"
+          hint="الإقفالُ إعلانٌ بأنّ فواتير الشهر كلّها وصلت — ولا فاتورة في النظام بعد. ارفع فواتيرك أو زامن الدرايف أوّلاً."
+          action={<LinkButton href="/upload" variant="primary">ارفع مستنداً</LinkButton>}
+        />
       </PageShell>
     );
   }
@@ -56,32 +68,35 @@ export default async function ClosePage() {
   return (
     <PageShell
       user={user}
-     
       title="إقفال الشهر"
-      intro="إعلانٌ بأنّ الشهر تمّ: كل فاتورة وصلت، وكل خلل عُولج أو أُقرَّ به عمداً. اقرأ القائمة أوّلاً."
+      eyebrow={`الشهر المنقضي: ${formatMonth(previous)}`}
+      intro="إعلانٌ بأنّ الشهر تمّ: كلُّ فاتورةٍ وصلت، وكلُّ خللٍ عُولج أو أُقرّ به عمداً — ثمّ حزمةٌ واحدة للمحاسب."
     >
-      <MonthClose
-        months={months}
-        initialMonth={selected}
-        initialReport={report}
-        initialStatus={status}
-      />
+      <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <MonthClose months={months} initialMonth={selected} initialReport={report} initialStatus={status} />
 
-      {closed.length > 0 && (
-        <section className="mt-10">
-          <h2 className="mb-3 text-sm font-bold">أشهر مقفلة</h2>
-          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
-            {closed.map((c) => (
-              <li key={c.month} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span className="font-medium">{formatMonth(c.month)}</span>
-                <span className="text-[11px] text-muted">
-                  {formatDay(c.closedAt)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+        <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
+          <Section title="أشهرٌ مقفلة" icon={Lock} className="mt-0!">
+            {closed.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs leading-relaxed text-muted">
+                لم يُقفَل شهرٌ بعد. أوّلُ إقفالٍ يثبّت أرقام شهره ويُحفَظ هنا.
+              </p>
+            ) : (
+              <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
+                {closed.map((c) => (
+                  <li key={c.month} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                    <span className="flex items-center gap-2 font-bold">
+                      <Lock className="h-3.5 w-3.5 text-ok" strokeWidth={2} aria-hidden />
+                      {formatMonth(c.month)}
+                    </span>
+                    <span className="text-[11px] text-muted">{formatDay(c.closedAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+        </aside>
+      </div>
     </PageShell>
   );
 }
