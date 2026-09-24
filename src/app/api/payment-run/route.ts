@@ -1,13 +1,10 @@
 /** يصدّر دفعة الشهر ملفَّ تحويلات جماعية للبنك. */
 import { NextResponse } from "next/server";
-import { eq, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { documents, invoices, paymentAllocations, suppliers } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { buildPaymentRun, toBankTransferCsv, type PayableInvoice } from "@/lib/payment-run";
+import { toBankTransferCsv } from "@/lib/payment-run";
 import { loadPayeeAccounts } from "@/services/payee-account.service";
 import { recordAudit } from "@/lib/audit";
-import { loadSupplierBalances } from "@/services/supplier-balance.service";
+import { loadPaymentRun } from "@/services/payment-run.service";
 
 export const runtime = "nodejs";
 
@@ -26,54 +23,24 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "شهر غير صالح" }, { status: 400 });
   }
 
-  const rows = await db
-    .select({
-      invoiceId: invoices.id,
-      supplierId: invoices.supplierId,
-      supplierName: suppliers.nameAr,
-      invoiceNumber: invoices.invoiceNumber,
-      invoiceDate: invoices.invoiceDate,
-      periodMonth: invoices.periodMonth,
-      totalMinor: invoices.totalMinor,
-      vatMinor: invoices.vatMinor,
-      taxStatus: invoices.taxStatus,
-      inputVatStatus: invoices.inputVatStatus,
-      allocatedMinor: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}), 0)::bigint`,
-      /* ما لم يُؤرشَف لم يُقَرّ — ينتظر مراجعةً أو رُفض — فلا يدخل ملفّ التحويلات */
-      needsReview: sql<boolean>`coalesce(bool_or(${documents.status} <> 'ARCHIVED'), false)`,
-    })
-    .from(invoices)
-    .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
-    .leftJoin(documents, eq(documents.id, invoices.documentId))
-    .leftJoin(paymentAllocations, eq(paymentAllocations.invoiceId, invoices.id))
-    .groupBy(invoices.id, suppliers.nameAr);
+  /*
+    الملفّ يطابق الصفحة: البناءُ نفسُه من `payment-run.service` — رصيدٌ لنا
+    عند المورّد يُخصم، والمتأخّر يُدرج. كان الاستعلامُ منسوخاً هنا فافترق.
+  */
+  const full = await loadPaymentRun(month);
 
   /*
-    الملفّ يطابق الصفحة: رصيدٌ لنا عند المورّد يُخصم، والمتأخّر يُدرج.
-    كان الملفّ يُبنى بلا خصم الرصيد والصفحةُ تخصمه — فيُحوَّل ما قالت
-    الصفحة إنّه مغطّى.
+    ما اختاره صاحبُ الدفعة وحده — مورّدون بأعيانهم من الجاهزين. والخادمُ لا
+    يأخذ من المتصفّح إلّا المعرّفات: المبالغُ من البناء نفسه، وما ليس في
+    «الجاهز» يُتجاهَل فلا يُحوَّل لمحجوزٍ أو مغطّى.
   */
-  const balances = await loadSupplierBalances();
-  const creditBySupplier = new Map(balances.map((b) => [b.supplierId, b.creditMinor]));
-
-  const run = buildPaymentRun(
-    rows.map<PayableInvoice>((r) => ({
-      invoiceId: r.invoiceId,
-      supplierId: r.supplierId,
-      supplierName: r.supplierName ?? "غير محدَّد",
-      invoiceNumber: r.invoiceNumber,
-      invoiceDate: r.invoiceDate,
-      periodMonth: r.periodMonth,
-      totalMinor: r.totalMinor,
-      allocatedMinor: Number(r.allocatedMinor),
-      taxStatus: r.taxStatus,
-      inputVatStatus: r.inputVatStatus,
-      vatMinor: r.vatMinor,
-      needsReview: Boolean(r.needsReview),
-    })),
-    month,
-    { creditBySupplier, includeOlderUnpaid: true },
-  );
+  const picked = new URL(request.url).searchParams.get("suppliers");
+  const only = picked ? new Set(picked.split(",").filter((x) => /^[A-Za-z0-9_-]{1,64}$/.test(x))) : null;
+  const ready = only ? full.ready.filter((r) => only.has(r.supplierId)) : full.ready;
+  if (ready.length === 0) {
+    return NextResponse.json({ error: "لا مورّد جاهزاً في ما اخترته — حدّث الصفحة." }, { status: 400 });
+  }
+  const run = { ...full, ready, readyTotalMinor: ready.reduce((s, r) => s + r.totalMinor, 0) };
 
   const accounts = await loadPayeeAccounts(run.ready.map((r) => r.supplierId));
 
@@ -83,7 +50,13 @@ export async function GET(request: Request) {
     action: "PAYMENT_RUN_EXPORTED",
     entityType: "payment_run",
     entityId: month,
-    after: { الشهر: month, "جاهز بالهللات": run.readyTotalMinor, "محجوز بالهللات": run.heldTotalMinor, مورّدون: run.ready.length },
+    after: {
+      الشهر: month,
+      "جاهز بالهللات": run.readyTotalMinor,
+      "محجوز بالهللات": run.heldTotalMinor,
+      مورّدون: run.ready.length,
+      ...(only ? { "اختيارٌ من الجاهزين": `${run.ready.length} من ${full.ready.length}` } : {}),
+    },
   });
 
   return new NextResponse(toBankTransferCsv(run, accounts), {

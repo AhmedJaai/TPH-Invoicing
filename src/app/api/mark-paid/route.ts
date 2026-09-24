@@ -173,6 +173,8 @@ async function handle(request: Request) {
   const paidAt = new Date(`${paidOn}T00:00:00Z`);
 
   let totalMinor = 0;
+  /* معرّفاتُ الدفعات المكتوبة — يُعاد بها التراجعُ من الإشعار ما دام قريباً */
+  const paymentIds: string[] = [];
 
   try {
   await db.transaction(async (tx) => {
@@ -197,6 +199,7 @@ async function handle(request: Request) {
         وسياسةٌ تتغيّر في الخدمة تبلغ هذا الباب بلا أن يُنسَخ إليه شيء.
       */
       await allocate(tx, payId, remaining, [{ invoiceId: inv.id, amountMinor: remaining }]);
+      paymentIds.push(payId);
 
       totalMinor += remaining;
     }
@@ -228,6 +231,7 @@ async function handle(request: Request) {
     ok: true,
     marked: pending.length,
     totalMinor,
+    paymentIds,
     message: `سُجّل سداد ${countNoun(pending.length, INVOICE)} بقيمة ${formatRiyalsDisplay(totalMinor)} ريال`,
   });
 }

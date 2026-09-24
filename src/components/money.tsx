@@ -36,7 +36,7 @@ export function Money({
   return (
     <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
       {figure}
-      <span className="text-[0.42em] font-bold tracking-normal text-muted">ر.س</span>
+      <span className="text-[max(0.5em,11px)] font-bold tracking-normal text-muted">ر.س</span>
     </span>
   );
 }

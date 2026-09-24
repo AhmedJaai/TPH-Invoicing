@@ -1,23 +1,34 @@
 import Link from "next/link";
-import { invoiceHref } from "@/lib/invoice-profile";
 import { redirect } from "next/navigation";
-import { eq, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { documents, invoices, paymentAllocations, suppliers } from "@/db/schema";
+import { CircleCheck, PauseCircle, ShieldCheck } from "lucide-react";
+import { invoiceHref } from "@/lib/invoice-profile";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
-import { Empty, Money, PageShell } from "@/components/page-shell";
-import { buildPaymentRun, buildSupplierMessage, type PayableInvoice } from "@/lib/payment-run";
+import { PageShell } from "@/components/page-shell";
+import { Money } from "@/components/money";
+import { Callout, EmptyState, LinkTabs, NoAccess, Section, Stat, StatGrid } from "@/components/ui";
+import { PayRunPlanner, WhatsAppLink, type PlannerSupplier } from "@/components/pay-run-planner";
+import { buildSupplierMessage } from "@/lib/payment-run";
 import { previousMonth } from "@/lib/filing";
-import { MarkSupplierPaid } from "@/components/payment-run-actions";
-import { countNoun, INVOICE, SUPPLIER } from "@/lib/arabic";
-import { NoAccess } from "@/components/ui";
+import { INVOICE, SUPPLIER, countNoun } from "@/lib/arabic";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
 import { loadPayeeAccounts } from "@/services/payee-account.service";
+import { loadPaymentRun } from "@/services/payment-run.service";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
+import { db } from "@/db";
+import { suppliers as suppliersTable } from "@/db/schema";
+import { inArray } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * دفعةُ الشهر — مخطِّطُ ما يُحوَّل.
+ *
+ * مستحقّاتُ الشهر المنقضي وما تأخّر قبله، مورّداً مورّداً: تختار من تدفع
+ * له فيتغيّر المجموعُ والملفّ، وترى ما يبقى عليك لكلٍّ بعد التحويل، وتسجّل
+ * السدادَ بتراجعٍ من الإشعار. وما ليس فاتورةً ضريبيةً كاملة يُحجز —
+ * السدادُ قبل الحصول عليها يفقدك ورقة التفاوض الوحيدة.
+ */
 export default async function PaymentsPage({
   searchParams,
 }: {
@@ -34,57 +45,40 @@ export default async function PaymentsPage({
   }
 
   const { month: raw } = await searchParams;
-  const month = /^\d{4}-\d{2}$/.test(raw ?? "")
-    ? raw!
-    : previousMonth(currentMonthRiyadh());
+  const current = currentMonthRiyadh();
+  const defaultMonth = previousMonth(current);
+  const month = /^\d{4}-\d{2}$/.test(raw ?? "") ? raw! : defaultMonth;
 
-  const rows = await db
-    .select({
-      invoiceId: invoices.id,
-      supplierId: invoices.supplierId,
-      supplierName: suppliers.nameAr,
-      invoiceNumber: invoices.invoiceNumber,
-      invoiceDate: invoices.invoiceDate,
-      periodMonth: invoices.periodMonth,
-      totalMinor: invoices.totalMinor,
-      vatMinor: invoices.vatMinor,
-      taxStatus: invoices.taxStatus,
-      inputVatStatus: invoices.inputVatStatus,
-      allocatedMinor: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}), 0)::bigint`,
-      /* ما لم يُؤرشَف لم يُقَرّ — ينتظر مراجعةً أو رُفض — فلا يدخل ملفّ التحويلات */
-      needsReview: sql<boolean>`coalesce(bool_or(${documents.status} <> 'ARCHIVED'), false)`,
-    })
-    .from(invoices)
-    .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
-    .leftJoin(documents, eq(documents.id, invoices.documentId))
-    .leftJoin(paymentAllocations, eq(paymentAllocations.invoiceId, invoices.id))
-    .groupBy(invoices.id, suppliers.nameAr);
+  const [run, balances] = await Promise.all([loadPaymentRun(month), loadSupplierBalances()]);
+  const [accounts, slugs] = await Promise.all([
+    loadPayeeAccounts(run.ready.map((r) => r.supplierId)),
+    run.ready.length > 0
+      ? db.select({ id: suppliersTable.id, slug: suppliersTable.slug }).from(suppliersTable).where(inArray(suppliersTable.id, run.ready.map((r) => r.supplierId)))
+      : Promise.resolve([]),
+  ]);
+  const owedBy = new Map(balances.map((b) => [b.supplierId, b.owedMinor]));
+  const slugBy = new Map(slugs.map((s) => [s.id, s.slug]));
 
-  /* رصيدٌ لنا عند كلّ مورّد — يُخصم من دفعته فلا يُحوَّل الريال مرّتين */
-  const balances = await loadSupplierBalances();
-  const creditBySupplier = new Map(balances.map((b) => [b.supplierId, b.creditMinor]));
-
-  const run = buildPaymentRun(
-    rows.map<PayableInvoice>((r) => ({
-      invoiceId: r.invoiceId,
-      supplierId: r.supplierId,
-      supplierName: r.supplierName ?? "غير محدَّد",
-      invoiceNumber: r.invoiceNumber,
-      invoiceDate: r.invoiceDate,
-      periodMonth: r.periodMonth,
-      totalMinor: r.totalMinor,
-      allocatedMinor: Number(r.allocatedMinor),
-      taxStatus: r.taxStatus,
-      inputVatStatus: r.inputVatStatus,
-      vatMinor: r.vatMinor,
-      needsReview: Boolean(r.needsReview),
-    })),
-    month,
-    /* «أدرجها في دفعة أوّل الشهر» كانت خطوةً لا تُنفَّذ: ما فات شهرُه لا يدخل الدفعة أبداً */
-    { creditBySupplier, includeOlderUnpaid: true },
-  );
-  /* الحسابُ الذي سيحمله الملفّ — يُرى قبل التنزيل لا بعد فتحه في إكسل */
-  const accounts = await loadPayeeAccounts(run.ready.map((r) => r.supplierId));
+  const planner: PlannerSupplier[] = run.ready.map((s) => {
+    const acc = accounts.get(s.supplierId);
+    return {
+      supplierId: s.supplierId,
+      name: s.supplierName,
+      slug: slugBy.get(s.supplierId) ?? null,
+      totalMinor: s.totalMinor,
+      creditAppliedMinor: s.creditAppliedMinor,
+      owedMinor: owedBy.get(s.supplierId) ?? null,
+      account: acc?.account ?? null,
+      accountNote: acc?.note ?? null,
+      invoices: s.invoices.map((i) => ({
+        id: i.invoiceId,
+        number: i.invoiceNumber,
+        date: formatDay(i.invoiceDate),
+        openMinor: i.totalMinor - i.allocatedMinor,
+        href: invoiceHref(i.invoiceId),
+      })),
+    };
+  });
 
   const heldBySupplier = new Map<string, typeof run.held>();
   for (const h of run.held) {
@@ -93,192 +87,126 @@ export default async function PaymentsPage({
     heldBySupplier.set(h.invoice.supplierName, list);
   }
 
+  const months = [previousMonth(defaultMonth), defaultMonth, current];
+  const empty = run.ready.length === 0 && run.held.length === 0 && run.coveredByCredit.length === 0;
+
   return (
     <PageShell
       user={user}
-     
-      title={`دفعة الشهر — ${formatMonth(month)}`}
-      intro="مستحقّات الشهر المنقضي وما تأخّر قبله، مورّداً مورّداً. ما ليس فاتورة ضريبية كاملة يُحجز — السداد قبل الحصول عليها يفقدك ورقة التفاوض الوحيدة."
+      width="wide"
+      title="دفعة الشهر"
+      eyebrow={`مستحقّات ${formatMonth(month)} وما تأخّر قبلها`}
+      intro="اختر من تحوِّل له هذه المرّة، وانظر ما يبقى عليك لكلٍّ بعدها، ثمّ نزّل ملفّ التحويلات أو سجّل السداد."
     >
-      {/* أربعةُ أصفارٍ فوق «لا مستحقّات» تكرارٌ لا خبر — والجملةُ تحتها تقول ما يُعرَف */}
-      {(run.ready.length > 0 || run.held.length > 0 || run.coveredByCredit.length > 0) && (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
-          <p className="text-xs text-muted">جاهز للتحويل</p>
-          <p className="mt-1 text-xl font-bold text-ok"><Money minor={run.readyTotalMinor} /></p>
-          <p className="mt-1 text-xs text-muted">{countNoun(run.ready.length, SUPPLIER)}</p>
-        </div>
-        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
-          <p className="text-xs text-muted">محجوز</p>
-          <p className={`mt-1 text-xl font-bold ${run.held.length ? "text-warn" : ""}`}>
-            <Money minor={run.heldTotalMinor} />
-          </p>
-          <p className="mt-1 text-xs text-muted">{countNoun(run.held.length, INVOICE)}</p>
-        </div>
-        <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
-          <p className="text-xs text-muted">ضريبة معرّضة</p>
-          {run.vatAtRiskUnknown > 0 && run.vatAtRiskMinor === 0 ? (
-            <p className="mt-1 text-xl font-bold text-muted">غير معروف</p>
-          ) : (
-            <p className={`mt-1 text-xl font-bold ${run.vatAtRiskMinor ? "text-danger" : ""}`}>
-              <Money minor={run.vatAtRiskMinor} />
-            </p>
-          )}
-          {run.vatAtRiskUnknown > 0 && (
-            <p className="mt-1 text-xs text-muted">
-              {run.vatAtRiskMinor > 0 ? "وأكثر: " : ""}
-              {countNoun(run.vatAtRiskUnknown, INVOICE)} بلا ضريبةٍ مقروءة
-            </p>
-          )}
-        </div>
-        <div className="flex items-center rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
-          {run.ready.length > 0 ? (
-            <a
-              href={`/api/payment-run?month=${month}`}
-              className="w-full rounded-lg bg-inverse-surface px-3 py-2 text-center text-xs font-bold text-inverse-ink"
-            >
-              نزّل ملف التحويلات
-            </a>
-          ) : (
-            <span className="text-xs text-muted">لا شيء للتصدير</span>
-          )}
-        </div>
+      <div className="mb-6">
+        <LinkTabs
+          label="الشهر"
+          items={months.map((m) => ({
+            href: m === defaultMonth ? "/payments" : `/payments?month=${m}`,
+            label: m === current ? `${formatMonth(m)} (حتى اليوم)` : formatMonth(m),
+            active: m === month,
+          }))}
+        />
       </div>
+
+      {!empty && (
+        <StatGrid>
+          <Stat label="جاهزٌ للتحويل" icon={CircleCheck} minor={run.readyTotalMinor} tone="ok" sub={countNoun(run.ready.length, SUPPLIER)} />
+          <Stat
+            label="محجوزٌ حتى تُعالَج"
+            icon={PauseCircle}
+            minor={run.heldTotalMinor}
+            tone={run.held.length ? "warn" : undefined}
+            sub={run.held.length ? countNoun(run.held.length, INVOICE) : "لا شيء محجوز"}
+          />
+          <Stat
+            label="ضريبةٌ معرّضة"
+            icon={ShieldCheck}
+            value={run.vatAtRiskUnknown > 0 && run.vatAtRiskMinor === 0 ? "غير معروف" : undefined}
+            minor={run.vatAtRiskUnknown > 0 && run.vatAtRiskMinor === 0 ? undefined : run.vatAtRiskMinor}
+            tone={run.vatAtRiskMinor ? "danger" : undefined}
+            sub={run.vatAtRiskUnknown > 0 ? `${run.vatAtRiskMinor > 0 ? "وأكثر: " : ""}${countNoun(run.vatAtRiskUnknown, INVOICE)} بلا ضريبةٍ مقروءة` : "لا ضريبة مدخلاتٍ تضيع بهذه الدفعة"}
+          />
+          <Stat
+            label="يغطّيه رصيدُك عندهم"
+            minor={run.coveredByCredit.reduce((s, c) => s + c.creditAppliedMinor, 0)}
+            sub={run.coveredByCredit.length ? countNoun(run.coveredByCredit.length, SUPPLIER) : "لا مورّد مغطّى كلّه"}
+          />
+        </StatGrid>
       )}
 
-      {run.ready.length === 0 && run.held.length === 0 ? (
-        <div className="mt-8">
-          <Empty message={`لا مستحقّات في ${month} — إمّا سُدّد كل شيء أو لم تُرفع فواتير الشهر بعد.`} />
-        </div>
-      ) : null}
+      {empty ? (
+        <EmptyState
+          title={`لا مستحقّات في ${formatMonth(month)}`}
+          hint="إمّا سُدّد كلُّ شيء، أو لم تُرفع فواتيرُ الشهر بعد. انظر النقد القادم لما يستحقّ بعده."
+          action={<Link href="/cash" className="text-sm font-bold text-accent hover:underline">النقد القادم</Link>}
+        />
+      ) : (
+        <>
+          {run.ready.length > 0 && (
+            <div className="mt-10">
+              <PayRunPlanner month={month} suppliers={planner} />
+            </div>
+          )}
 
-      {run.ready.length > 0 && (
-        <section className="mt-10">
-          <h2 className="mb-3 text-base font-bold">جاهز للتحويل</h2>
-          <div className="space-y-3">
-            {run.ready.map((s) => (
-              <article key={s.supplierId} className="rounded-2xl border border-line bg-raised shadow-raised p-4">
-                <div className="flex items-baseline justify-between gap-3">
-                  <h3 className="text-sm font-bold">{s.supplierName}</h3>
-                  <span className="text-base font-bold"><Money minor={s.totalMinor} /></span>
-                </div>
-                {(() => {
-                  const acc = accounts.get(s.supplierId);
-                  return acc?.account ? (
-                    <p className="mt-0.5 text-[11px] text-muted">
-                      إلى <bdi className="font-mono" dir="ltr">{acc.account}</bdi> — من كشوف البنك
-                    </p>
-                  ) : (
-                    <p className="mt-0.5 text-[11px] text-warn">{acc?.note ?? "الحسابُ غير معروف — أدخله في البنك"}</p>
-                  );
-                })()}
-                <ul className="mt-2 divide-y divide-line">
-                  {s.invoices.map((i) => (
-                    <li key={i.invoiceId} className="flex items-center justify-between gap-3 py-1.5 text-xs">
-                      <span className="text-ink-soft" dir="auto">
-                        <Link href={invoiceHref(i.invoiceId)} className="underline-offset-4 hover:underline">
-                          <bdi className="font-mono">{i.invoiceNumber}</bdi>
-                        </Link>{" "}
-                        · {formatDay(i.invoiceDate)}
-                      </span>
-                      <span className="nums-col shrink-0">
-                        <Money minor={i.totalMinor - i.allocatedMinor} />
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                {s.creditAppliedMinor > 0 ? (
-                  <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-                    خُصم <Money minor={s.creditAppliedMinor} /> رصيداً لك عنده دفعتَه ولم يُخصم من فاتورة —
-                    فحوِّل الباقي وحده، ثمّ اخصم الرصيد من «تحليل الذكاء».
-                  </p>
-                ) : (
-                  <MarkSupplierPaid
-                    supplierName={s.supplierName}
-                    invoiceIds={s.invoices.map((i) => i.invoiceId)}
-                    totalMinor={s.totalMinor}
-                  />
-                )}
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
+          {run.coveredByCredit.length > 0 && (
+            <Section title="يغطّيها رصيدُك عندهم" hint="دفعتَ لهؤلاء مالاً لم يُخصم بعد، ويكفي لفواتير الشهر كلّها — فلا تحوِّل لهم شيئاً.">
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {run.coveredByCredit.map((s) => (
+                  <li key={s.supplierId} className="flex items-center justify-between gap-3 rounded-xl border border-ok/25 bg-ok-bg px-4 py-3 text-sm">
+                    <span className="font-bold">{s.supplierName}</span>
+                    <span className="text-xs text-ink-soft">رصيدُك يغطّي <Money minor={s.creditAppliedMinor} /></span>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
-      {run.coveredByCredit.length > 0 && (
-        <section className="mt-10">
-          <h2 className="mb-1 text-base font-bold">يغطّيها رصيدُك عندهم</h2>
-          <p className="mb-3 text-xs text-muted">
-            دفعتَ لهؤلاء مالاً لم يُخصم بعد، ويكفي لفواتير الشهر كلّها — فلا تحوِّل لهم شيئاً.
-          </p>
-          <ul className="space-y-2">
-            {run.coveredByCredit.map((s) => (
-              <li key={s.supplierId} className="flex items-baseline justify-between gap-3 rounded-2xl border border-ok/40 bg-ok-bg px-4 py-3 text-sm">
-                <span className="font-bold">{s.supplierName}</span>
-                <span className="text-xs text-ink-soft">
-                  رصيدك يغطّي <Money minor={s.creditAppliedMinor} />
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {run.held.length > 0 && (
-        <section className="mt-10">
-          <h2 className="mb-1 text-base font-bold">محجوز حتى تُعالَج</h2>
-          <p className="mb-3 text-xs text-muted">
-            لا تُدرَج في ملف التحويلات. اطلب الفاتورة الصحيحة قبل السداد.
-          </p>
-          <div className="space-y-3">
-            {[...heldBySupplier].map(([name, list]) => (
-              <article key={name} className="rounded-xl border border-warn/40 bg-warn-bg p-4">
-                <div className="flex items-baseline justify-between gap-3">
-                  <h3 className="text-sm font-bold text-warn">{name}</h3>
-                  <span className="text-sm font-bold text-warn">
-                    <Money minor={list.reduce((s, h) => s + h.invoice.totalMinor - h.invoice.allocatedMinor, 0)} />
-                  </span>
-                </div>
-                {/*
-                  السبب يُقال مرّةً للمجموعة، لا في ذيل كل سطر.
-                  كانت الجملة نفسها تتكرّر ثلاث عشرة مرّة تحت مورّدٍ واحد —
-                  خمسمئة حرفٍ لا تضيف شيئاً بعد أوّل قراءة، وتُخفي أرقام
-                  الفواتير وهي المطلوبة لطلب البديل.
-                */}
-                {(() => {
+          {run.held.length > 0 && (
+            <Section title="محجوزٌ حتى تُعالَج" count={run.held.length} hint="لا يدخل ملفّ التحويلات. اطلب الفاتورة الصحيحة قبل السداد — والرسالةُ جاهزة.">
+              <div className="grid gap-3 lg:grid-cols-2">
+                {[...heldBySupplier].map(([name, list]) => {
                   const reasons = [...new Set(list.map((h) => h.message))];
                   return (
-                    <>
-                      <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                    <article key={name} className="rounded-xl border border-warn/25 bg-raised p-4 shadow-raised">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <h3 className="text-sm font-bold">{name}</h3>
+                        <span className="text-sm font-bold text-warn">
+                          <Money minor={list.reduce((s, h) => s + h.invoice.totalMinor - h.invoice.allocatedMinor, 0)} />
+                        </span>
+                      </div>
+                      <ul className="mt-2 flex flex-wrap gap-1.5">
                         {list.map((h) => (
-                          <li key={h.invoice.invoiceId} className="font-mono text-xs text-ink-soft" dir="ltr">
-                            <Link href={invoiceHref(h.invoice.invoiceId, "tax")} className="underline-offset-4 hover:underline">
+                          <li key={h.invoice.invoiceId}>
+                            <Link
+                              href={invoiceHref(h.invoice.invoiceId, "tax")}
+                              className="inline-flex min-h-8 items-center rounded-md bg-sunken px-2 font-mono text-[11px] text-ink-soft hover:text-accent"
+                              dir="ltr"
+                            >
                               {h.invoice.invoiceNumber}
                             </Link>
                           </li>
                         ))}
                       </ul>
                       <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-                        {reasons.length === 1
-                          ? reasons[0]
-                          : reasons.map((r) => `• ${r}`).join(" ")}
+                        {reasons.length === 1 ? reasons[0] : reasons.map((r) => `• ${r}`).join(" ")}
                       </p>
-                    </>
+                      <div className="mt-3">
+                        <WhatsAppLink href={`https://wa.me/?text=${encodeURIComponent(buildSupplierMessage(name, list))}`} />
+                      </div>
+                    </article>
                   );
-                })()}
-                <a
-                  href={`https://wa.me/?text=${encodeURIComponent(buildSupplierMessage(name, list))}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-3 inline-block rounded-lg border border-warn/50 px-3 py-1.5 text-xs font-bold text-warn"
-                >
-                  رسالة واتساب جاهزة
-                </a>
-              </article>
-            ))}
-          </div>
-        </section>
+                })}
+              </div>
+            </Section>
+          )}
+        </>
       )}
+
+      <Callout tone="muted" className="mt-10">
+        الملفُّ يُبنى في الخادم ممّا اخترته ويُسجَّل تنزيلُه في سجلّ التدقيق. والإقرارُ بالسداد يُكتب باسمك — وحين يصل كشفُ البنك يطابق ما بقي.
+        لما يستحقّ بعد هذه الدفعة انظر <Link href="/cash" className="font-bold text-accent hover:underline">النقد القادم</Link>.
+      </Callout>
     </PageShell>
   );
 }
