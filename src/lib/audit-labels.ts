@@ -139,6 +139,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
 /** نوعُ ما وقع عليه الفعل — بالعربية لا باسم الجدول. */
 export const ENTITY_LABEL: Record<string, string> = {
   bank_transaction: "حركة بنك",
+  payment: "دفعة",
   bank_import: "استيراد كشف",
   bank_rule: "قاعدة بنك",
   document: "مستند",

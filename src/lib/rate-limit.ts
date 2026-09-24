@@ -86,6 +86,8 @@ export const RULES: Record<string, RateLimitRule> = {
     الحدّ يحرسه أُزيل.
   */
   "mark-paid": { limit: 200, windowSeconds: 3600 },
+  /* دفعةٌ بلا مورّد تُحسَم واحدةً واحدة — وقلّما تكون أكثر من عشر */
+  "payment-orphan": { limit: 60, windowSeconds: 3600 },
   "match-undo": { limit: 60, windowSeconds: 3600 },
   counterparty: { limit: 300, windowSeconds: 3600 },
   "match-confirm": { limit: 200, windowSeconds: 3600 },

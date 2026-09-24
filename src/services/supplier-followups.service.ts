@@ -36,6 +36,7 @@ export async function loadUnbackedPayments(): Promise<UnbackedPayment[]> {
     await db.execute<{
       id: string; supplier_id: string | null; name_ar: string | null; slug: string | null;
       d: string; amount_minor: number; unbacked: number; tx: string | null; issues: boolean | null;
+      drive_file_id: string | null;
     }>(sql`
       select p.id, p.supplier_id, s.name_ar, s.slug, p.paid_at::date::text as d, p.amount_minor,
              coalesce(s.issues_invoices, true) as issues,
@@ -43,9 +44,11 @@ export async function loadUnbackedPayments(): Promise<UnbackedPayment[]> {
                - coalesce((select sum(a.amount_minor)::int from payment_allocations a
                             where a.payment_id = p.id), 0) as unbacked,
              (select bt.id from bank_transactions bt
-               where bt.matched_payment_id = p.id limit 1) as tx
+               where bt.matched_payment_id = p.id limit 1) as tx,
+             d.drive_file_id
         from payments p
         left join suppliers s on s.id = p.supplier_id
+        left join documents d on d.id = p.document_id
        where p.status not in ('REVERSED','VOID','ADVANCE')
          /*
            مورّدٌ أعلن صاحبُ المقهى أنّه لا يصدر فواتير، وعقدُه عندنا أو لا
@@ -71,6 +74,7 @@ export async function loadUnbackedPayments(): Promise<UnbackedPayment[]> {
     unbackedMinor: Number(r.unbacked),
     bankTransactionId: r.tx,
     issuesInvoices: r.issues ?? true,
+    receiptDriveFileId: r.drive_file_id,
   }));
 }
 

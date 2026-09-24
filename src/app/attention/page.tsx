@@ -269,7 +269,7 @@ export default async function AttentionPage({
     ) : selected.id === "unclassified-bank" ? (
       <ReviewSection canApprove={canApprove} canEdit={canEdit} />
     ) : selected.id === "unbacked-payments" ? (
-      <UnbackedWorkspace />
+      <UnbackedWorkspace canApprove={canApprove} />
     ) : selected.id === "pending-documents" || selected.id === "open-blockers" ? (
       <InboxWorkspace canUpload={canUpload} canConfirm={canUpload && can(user.role, "amounts:view")} />
     ) : selected.id === "no-contract" ? (

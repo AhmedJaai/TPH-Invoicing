@@ -1,0 +1,115 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { postJson } from "@/lib/http-client";
+import { buttonClass } from "./ui";
+
+/**
+ * دفعةٌ بلا مورّد ولا حركة بنك — تُحسَم في بندها.
+ *
+ * كان البند يقول «راجِعها في سجلّ التدقيق» ولا فعلَ له، فتبقى في الطابور
+ * أبداً. والجوابُ في الإيصال نفسه: لمن حُوّلت؟ فيُفتح الإيصال، ثمّ تُنسَب
+ * إلى مورّد، أو يُقال إنّها ليست لمورّدٍ ويُكتب ما هي.
+ */
+export function OrphanPayment({
+  paymentId,
+  suppliers,
+  receiptUrl,
+}: {
+  paymentId: string;
+  suppliers: { id: string; nameAr: string }[];
+  receiptUrl: string | null;
+}) {
+  const router = useRouter();
+  const [mode, setMode] = useState<"idle" | "assign" | "void">("idle");
+  const [supplierId, setSupplierId] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    const body = mode === "assign"
+      ? { action: "assign", paymentId, supplierId }
+      : { action: "void", paymentId, reason };
+    const r = await postJson<{ message: string }>("/api/payment-orphan", body);
+    setBusy(false);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
+    setDone(r.data.message);
+    router.refresh();
+  }
+
+  if (done) return <p className="text-xs text-ok" role="status">{done}</p>;
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        {receiptUrl && (
+          <a href={receiptUrl} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm")}>
+            افتح الإيصال ↗
+          </a>
+        )}
+        <button
+          type="button"
+          onClick={() => { setMode("assign"); setError(null); }}
+          className={buttonClass(mode === "assign" ? "primary" : "secondary", "sm")}
+        >
+          انسبها إلى مورّد
+        </button>
+        <button
+          type="button"
+          onClick={() => { setMode("void"); setError(null); }}
+          className={buttonClass(mode === "void" ? "primary" : "quiet", "sm")}
+        >
+          ليست لمورّد
+        </button>
+      </div>
+
+      {mode === "assign" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="المورّد"
+            value={supplierId}
+            onChange={(e) => setSupplierId(e.target.value)}
+            className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-surface px-2 text-xs lg:min-h-9"
+          >
+            <option value="">اختر المورّد…</option>
+            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.nameAr}</option>)}
+          </select>
+          <button type="button" disabled={busy || !supplierId} onClick={submit} className={buttonClass("primary", "sm")}>
+            {busy ? "يحفظ…" : "انسبها"}
+          </button>
+        </div>
+      )}
+
+      {mode === "void" && (
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              aria-label="ما هذه الدفعة"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="ما هي؟ أجرة · تحويل شخصيّ · مصروف…"
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-surface px-2 text-xs lg:min-h-9"
+            />
+            <button type="button" disabled={busy || reason.trim().length < 3} onClick={submit} className={buttonClass("danger", "sm")}>
+              {busy ? "يُلغي…" : "ألغِ قيدَها"}
+            </button>
+          </div>
+          <p className="text-[11px] leading-relaxed text-muted">
+            يُلغى قيدُها سداداً ولا يُحذَف: تبقى بحالها وسببها في السجلّ، والإيصالُ في الأرشيف.
+          </p>
+        </div>
+      )}
+
+      {error && <p className="text-[11px] text-danger" role="alert">{error}</p>}
+    </div>
+  );
+}

@@ -20,6 +20,8 @@ export interface UnbackedPayment {
   unbackedMinor: number;
   /** حركة البنك التي قُيّدت منها — إن وُجدت. */
   bankTransactionId: string | null;
+  /** إيصالُها في الدرايف — منه يُعرَف لمن حُوّلت حين لا مورّد ولا حركة. */
+  receiptDriveFileId?: string | null;
   /**
    * أيصدر هذا المورّد فواتير؟ — تتبعه **صياغةُ الطلب** لا العدّ.
    * ومن لا يصدر يُطلَب منه عقدُ توريد، ويبقى مالُه معدوداً.

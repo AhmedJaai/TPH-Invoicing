@@ -9,6 +9,7 @@ import { ConfirmEligible } from "./confirm-eligible";
 import { NoStatementsButton } from "./no-statements-button";
 import { RejectDocument } from "./reject-document";
 import { SupplierPolicy } from "./supplier-policy";
+import { OrphanPayment } from "./orphan-payment";
 import { buildInvoiceRequest, buildStatementRequest, groupUnbackedBySupplier } from "@/lib/supplier-requests";
 import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
 import { DOCUMENT, PAYMENT_RECORD, countNoun } from "@/lib/arabic";
@@ -48,8 +49,17 @@ import { currentMonthRiyadh, formatDay } from "@/lib/riyadh-time";
  */
 
 /** «دفعاتٌ لم تُنسب إلى فاتورة» — تُطلَب فواتيرُها من هنا. */
-export async function UnbackedWorkspace() {
+export async function UnbackedWorkspace({ canApprove }: { canApprove: boolean }) {
   const groups = groupUnbackedBySupplier(await loadUnbackedPayments());
+  /* قائمةُ المورّدين لا تُقرأ إلّا حين توجد دفعةٌ بلا جهة تُنسَب إلى أحدهم */
+  const hasOrphans = groups.some((g) => !g.supplierId && g.payments.some((p) => !p.bankTransactionId));
+  const supplierOptions = hasOrphans && canApprove
+    ? await db
+        .select({ id: suppliers.id, nameAr: suppliers.nameAr })
+        .from(suppliers)
+        .where(eq(suppliers.isActive, true))
+        .orderBy(asc(suppliers.nameAr))
+    : [];
   if (groups.length === 0) {
     return <p className="text-xs text-ok">لا دفعة بلا مستند — كلّ ما دُفع له مستندُه.</p>;
   }
@@ -73,7 +83,11 @@ export async function UnbackedWorkspace() {
                 )}
                 <span className="block text-[11px] text-muted">
                   {countNoun(g.payments.length, PAYMENT_RECORD)}
-                  {g.supplierId ? " بلا مستند" : " لم تُعرَف جهتها — افتح حركتها وحدّد مورّدها"}
+                  {g.supplierId
+                    ? " بلا مستند"
+                    : g.payments.some((p) => p.bankTransactionId)
+                      ? " لم تُعرَف جهتها — افتح حركتها وحدّد مورّدها"
+                      : " لم تُعرَف جهتها"}
                 </span>
               </span>
               <span className="nums-col shrink-0 text-sm font-bold text-warn">
@@ -116,16 +130,29 @@ export async function UnbackedWorkspace() {
                         عرّف جهة حركة <bdi className="nums">{p.paidOn}</bdi>
                       </LinkButton>
                     ))
-                ) : (
-                  <p className="text-[11px] leading-relaxed text-muted">
-                    لا حركةَ بنكٍ لهذه الدفعة ولا مورّد — قُيّدت بيد، أو بقيت من دمجٍ قديم.
-                    راجِعها في{" "}
-                    <Link href="/settings/audit" className="underline underline-offset-4 hover:text-ink">
-                      سجلّ التدقيق
-                    </Link>{" "}
-                    لتعرف من قيّدها ومتى.
-                  </p>
-                )}
+                ) : null}
+                {/*
+                  ولا حركةَ لها ولا مورّد: قُيّدت من إيصالٍ لم يُقرأ مستفيدُه.
+                  كان النصّ يقول «راجِعها في سجلّ التدقيق» ولا فعلَ له —
+                  فتبقى في الطابور أبداً. والجوابُ في الإيصال نفسه.
+                */}
+                {g.payments.filter((p) => !p.bankTransactionId).map((p) => (
+                  <div key={p.paymentId} className="w-full rounded-lg border border-line bg-sunken/50 p-2.5">
+                    <p className="mb-2 text-[11px] leading-relaxed text-muted">
+                      <Money minor={p.unbackedMinor} /> في {formatDay(p.paidOn)} — لا حركةَ بنكٍ لها ولا مورّد.
+                      {p.receiptDriveFileId ? " افتح إيصالها لترى لمن حُوّلت." : ""}
+                    </p>
+                    {canApprove ? (
+                      <OrphanPayment
+                        paymentId={p.paymentId}
+                        suppliers={supplierOptions}
+                        receiptUrl={p.receiptDriveFileId ? `https://drive.google.com/file/d/${p.receiptDriveFileId}/view` : null}
+                      />
+                    ) : (
+                      <p className="text-[11px] text-muted">حسمُها لمن يعتمد السداد.</p>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </Card>
