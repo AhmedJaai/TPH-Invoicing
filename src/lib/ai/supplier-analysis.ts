@@ -33,6 +33,7 @@ import {
   type FindingKind,
   type FindingRef,
   type Severity,
+  humanizeRefs,
 } from "./finding-labels";
 
 export {
@@ -338,8 +339,9 @@ export function validateAnalysis(raw: unknown, f: SupplierFacts, s: Signals): An
       .filter((r): r is FindingRef => Boolean(r));
 
     const severity: Severity = item.severity === "HIGH" || item.severity === "LOW" ? item.severity : "MEDIUM";
-    const title = clean(item.title, 120);
-    const explanation = clean(item.explanation, 700);
+    /* رموزُ المراجع (F10 · P1) تُسمّى بأسمائها قبل أن تُحفَظ — من الفهرس كلِّه لا من مراجع البند وحدها */
+    const title = humanizeRefs(clean(item.title, 120), [...index.values()]);
+    const explanation = humanizeRefs(clean(item.explanation, 700), [...index.values()]);
     if (!title) { dropped.push({ kind, reason: "بلا عنوان" }); continue; }
 
     let amountMinor: number | null = null;

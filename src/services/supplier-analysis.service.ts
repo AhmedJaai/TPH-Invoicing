@@ -29,6 +29,7 @@ import {
   type SupplierFacts,
   type ValidFinding,
 } from "@/lib/ai/supplier-analysis";
+import { humanizeRefs } from "@/lib/ai/finding-labels";
 import {
   applySupplierCredit,
   CreditError,
@@ -330,11 +331,17 @@ export async function listOpenFindings(supplierId?: string): Promise<(StoredFind
 
   const rank: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
   return rows
-    .map((r) => ({
-      ...r,
-      action: (r.action ?? null) as FindingAction | null,
-      refs: (r.refs ?? []) as FindingRef[],
-    }))
+    .map((r) => {
+      const refs = (r.refs ?? []) as FindingRef[];
+      /* ما حُفظ قبل تسمية الرموز يُسمّى عند العرض — بمراجعه المحفوظة معه */
+      return {
+        ...r,
+        title: humanizeRefs(r.title, refs),
+        explanation: humanizeRefs(r.explanation, refs),
+        action: (r.action ?? null) as FindingAction | null,
+        refs,
+      };
+    })
     .sort((a, b) => (rank[a.severity] ?? 3) - (rank[b.severity] ?? 3));
 }
 

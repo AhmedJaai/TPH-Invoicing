@@ -46,3 +46,28 @@ export interface FindingRef {
   id: string;
   label: string;
 }
+
+/**
+ * رموزُ المراجع في نصّ النموذج تصير أسماءً يقرؤها صاحبُ المقهى.
+ *
+ * النموذجُ يُعطى الفواتير والدفعات برموزٍ قصيرة (F1 · P2) كي يشير إليها
+ * بلا أن ينسخ أرقاماً، ثمّ يكتبها في الشرح نفسه: «فواتير F10 وF11 وF12
+ * مفتوحة… من دفعة P1». فيقرأ أحمد رموزاً لا يعرفها. والاسمُ من المرجع
+ * المحسوب لا من النموذج: الفاتورةُ برقمها، والدفعةُ والحوالةُ بتاريخها،
+ * والكشفُ بنهايته. وما لا مرجعَ له يبقى كما كُتب — إخفاؤه يغيّر المعنى.
+ */
+export function humanizeRefs(text: string, refs: readonly Pick<FindingRef, "ref" | "type" | "label">[]): string {
+  if (!text || refs.length === 0) return text;
+  const name = new Map(refs.map((r) => [r.ref, shortName(r)]));
+  const keys = [...name.keys()].filter(Boolean).sort((a, b) => b.length - a.length)
+    .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (keys.length === 0) return text;
+  const re = new RegExp(`(?<![A-Za-z0-9])(${keys.join("|")})(?![A-Za-z0-9])`, "g");
+  return text.replace(re, (m) => name.get(m) ?? m);
+}
+
+function shortName(r: Pick<FindingRef, "type" | "label">): string {
+  const stripped = r.label.replace(/^(فاتورة|دفعة|كشف|حوالة)\s+/, "");
+  /* الفاتورةُ برقمها وحده — تاريخُها في قائمة المراجع تحت الشرح */
+  return r.type === "invoice" ? stripped.split(" · ")[0] : stripped;
+}

@@ -17,6 +17,7 @@ import {
 import { buildSupplierAccount, describeAccount } from "@/lib/supplier-account";
 import { countNoun, INVOICE, MONTH, PRODUCT } from "@/lib/arabic";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
+import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -237,6 +238,10 @@ export default async function SupplierPage({
       month: invoices.periodMonth,
       total: invoices.totalMinor,
       taxStatus: invoices.taxStatus,
+      /* `${invoices}.id` لا `${invoices.id}` — الثاني يصمت في الاستعلام الفرعيّ */
+      allocated: sql<number>`coalesce((
+        select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = ${invoices}.id
+      ), 0)`,
     })
     .from(invoices)
     .where(eq(invoices.supplierId, s.id))
@@ -478,6 +483,21 @@ export default async function SupplierPage({
                       header: "الإجمالي",
                       numeric: true as const,
                       cell: (r: (typeof recent)[number]) => <Money minor={r.total} />,
+                    },
+                    {
+                      /*
+                        «ما بقي» — سؤالُ من فتح ملفّ المورّد ليدفع له. كان الجدول
+                        يعرض الإجماليّ وحده، فيُفتح «الفواتير» في صفحةٍ أخرى ليُعرَف.
+                      */
+                      key: "remaining",
+                      header: "ما بقي",
+                      numeric: true as const,
+                      cell: (r: (typeof recent)[number]) => {
+                        const rem = r.total - Number(r.allocated);
+                        return rem <= SETTLED_TOLERANCE_MINOR
+                          ? <span className="text-[11px] text-ok">مسدَّدة</span>
+                          : <span className="font-bold"><Money minor={rem} tone="warn" /></span>;
+                      },
                     }]
                   : []),
               ]}
