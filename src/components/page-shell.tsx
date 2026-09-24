@@ -1,5 +1,5 @@
 import { AreaTabs, MobileTabBar, Sidebar, UploadButton } from "./nav";
-import { SearchBox } from "./search-box";
+import { CommandPalette, CommandTrigger } from "./command-palette";
 import { TrialBanner } from "./trial-banner";
 import { UserMenu } from "./user-menu";
 import { ViewControls } from "./view-controls";
@@ -56,6 +56,13 @@ export async function PageShell({
     inboxCount(),
   ]);
 
+  const userControls = (
+    <div className="flex items-center gap-2">
+      <UserMenu name={user.name} role={user.role} />
+      <ViewControls />
+    </div>
+  );
+
   return (
     <div className="min-h-screen lg:flex">
       <a href="#main" className="skip-link">
@@ -63,53 +70,46 @@ export async function PageShell({
       </a>
 
       {/*
-        ── الشريط الجانبيّ ينطوي ──
+        ── الشريط الجانبيّ: ثابتٌ بأسمائه ──
 
-        كان ثابتاً بعرض ٢٤٠ بكسلاً يأخذها من الجدول دائماً. وأكثرُ
-        الوقت لا يُنظَر إليه: صاحب المقهى يفتح شاشةً ويعمل فيها. فصار
-        شريطاً ضيّقاً بالأيقونات، يتّسع بمرور الفأرة عليه أو بتركيز
-        لوحة المفاتيح، وينطوي حين تبتعد.
-
-        والاتّساع بالتراكب لا بالدفع: لو دفع المحتوى لانتقل الجدولُ
-        تحت الفأرة كلّما مرّت، وهو أسوأ من ضيق الشاشة.
-
-        و`group` على الحاوية كي يتبعها المحتوى في `Sidebar` بلا حالةٍ
-        في JavaScript — فينطوي ويتّسع بلا إعادة رسم.
+        كان ينطوي إلى أيقوناتٍ بلا أسماء ويتّسع بالفأرة (انظر `Sidebar`).
+        وصار يحمل ما كانت الترويسةُ تحمله على الحاسوب — البحثَ والرفعَ
+        والمستخدمَ وضوابطَ العرض — فلا ترويسةَ فوق المحتوى تأكل ستّين
+        بكسلاً من كلّ صفحة، والعنوانُ أوّلُ ما يُقرأ.
       */}
       <aside
-        className="group/rail sticky top-0 z-30 hidden h-screen w-14 shrink-0 overflow-hidden border-s border-line bg-sunken/40 transition-[width] duration-200 hover:w-60 focus-within:w-60 lg:block"
+        className="sticky top-0 z-30 hidden h-screen w-60 shrink-0 border-e border-line bg-sunken/50 lg:block"
         aria-label="التنقّل"
       >
-        <div className="h-full w-60">
-          <Sidebar role={user.role} pending={pending} documents={inbox} />
-        </div>
+        <Sidebar
+          role={user.role}
+          pending={pending}
+          documents={inbox}
+          search={<CommandTrigger />}
+          footer={userControls}
+        />
       </aside>
 
       <div className="min-w-0 flex-1">
         <TrialBanner />
 
-        {/* ── الجوّال: ترويسةٌ تحمل الشعار والبحث ── */}
-        <header className="sticky top-0 z-20 border-b border-line bg-surface/85 backdrop-blur-md">
-          <div className="flex items-center gap-3 px-4 py-2.5 sm:px-6">
-            <span className="shrink-0 truncate font-display text-base font-bold leading-tight tracking-tight lg:hidden">
+        {/* ── الجوّال: ترويسةٌ تحمل الاسمَ والبحثَ والرفع ── */}
+        <header className="sticky top-0 z-20 border-b border-line bg-surface/85 backdrop-blur-md lg:hidden">
+          <div className="flex items-center gap-2 px-4 py-2">
+            <span className="min-w-0 flex-1 truncate font-display text-base font-bold leading-tight tracking-tight">
               ذا بوبليك هاوس
             </span>
-            <SearchBox />
-            <div className="flex shrink-0 items-center gap-2">
-              <ViewControls />
-              <span className="lg:hidden">
-                <UploadButton role={user.role} pathname="" />
-              </span>
-              <UserMenu name={user.name} role={user.role} />
-            </div>
+            <CommandTrigger compact />
+            <ViewControls />
+            <UploadButton role={user.role} pathname="" />
           </div>
         </header>
 
         {/* الحشو السفليّ يُخلي مكان الشريط السفليّ على الجوّال */}
-        <main id="main" className={`mx-auto ${WIDTH[width]} px-4 pb-28 pt-6 sm:px-6 lg:pb-16 lg:pt-9`}>
+        <main id="main" className={`mx-auto ${WIDTH[width]} px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-16 lg:pt-10`}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="font-display text-[1.65rem] font-black leading-[1.15] tracking-tight sm:text-[2.1rem]">
+              <h1 className="font-display text-[1.6rem] font-black leading-[1.15] tracking-tight sm:text-[2rem]">
                 {title}
               </h1>
               {intro && (
@@ -119,17 +119,23 @@ export async function PageShell({
             {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
           </div>
 
-          {/* ألسنةُ المساحة تحت عنوانها — فتُقرأ تابعةً له */}
-          <div className="mt-5">
+          {/*
+            ألسنةُ المساحة تحت عنوانها على الجوّال وحده. وعلى الحاسوب هي في
+            الشريط تحت مساحتها — وضابطان لشيءٍ واحد في شاشةٍ واحدة يُقرآن
+            شيئين.
+          */}
+          <div className="mt-5 lg:hidden">
             <AreaTabs role={user.role} />
           </div>
 
-          <div className="mt-6">{children}</div>
+          <div className="mt-6 lg:mt-8">{children}</div>
         </main>
       </div>
 
       {/* خارج الترويسة عمداً: `backdrop-blur` عليها يحبس `fixed` داخلها */}
-      <MobileTabBar role={user.role} pending={pending} documents={inbox} />
+      <MobileTabBar role={user.role} pending={pending} documents={inbox} footer={<UserMenu name={user.name} role={user.role} />} />
+
+      <CommandPalette role={user.role} canSearch={can(user.role, "document:view")} />
     </div>
   );
 }

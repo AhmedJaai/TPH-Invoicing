@@ -4,8 +4,8 @@ import { ROLE_LABEL, type Role } from "@/lib/permissions";
 
 export function UserMenu({ name, role }: { name?: string | null; role: Role }) {
   return (
-    <div className="flex shrink-0 items-center gap-2">
-      <div className="text-start">
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="min-w-0 flex-1 text-start">
         <p className="max-w-[9rem] truncate text-xs font-medium">{name ?? "مستخدم"}</p>
         <p className="text-[11px] text-muted">{ROLE_LABEL[role]}</p>
       </div>
