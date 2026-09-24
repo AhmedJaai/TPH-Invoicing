@@ -20,6 +20,7 @@ interface Proposal {
   current: string;
   proposed: string;
   reason: string;
+  pending?: boolean;
 }
 
 interface Preview {
@@ -147,10 +148,10 @@ export function DriveRename() {
             والصفرُ صحيح، لكنّه صفرٌ في نطاقٍ لم يُذكَر. **والعدد الذي
             لا يُقال نطاقُه يُقرأ نفياً.**
           */}
-          <p className="mt-3 text-xs text-muted">
-            يفحص المسجَّل وحده ({data.summary.archived} مستنداً). والملفّات التي
-            تجدها المزامنة ولا تُسجَّل بعدُ لا تدخل هذا الفحص — تُسجَّل أوّلاً
-            بزرّ «سجّل الجديد»، وتُقترَح تسميتها هناك.
+          <p className="mt-3 text-xs leading-relaxed text-muted">
+            <strong className="text-ink">التسميةُ تقع آلياً في كلّ مزامنة</strong> لكلّ مستندٍ معتمَد اسمُه خارج
+            الصيغة (خمسةٌ وعشرون في كلّ مرّة). وهذه القائمة لما تريد تسميتَه الآن بيدك. وما ينتظر المراجعة
+            يُسمّى حين يُعتمَد — اسمُه مبنيٌّ من قراءةٍ لم تُحسَم بعد. يفحص المسجَّل وحده ({data.summary.archived} مستنداً).
           </p>
 
           {data.proposals.length > 0 && (
@@ -171,7 +172,10 @@ export function DriveRename() {
                       <span className="block truncate text-[11px] font-bold" dir="ltr">
                         {p.proposed}
                       </span>
-                      <span className="block text-[11px] text-muted">{p.reason}</span>
+                      <span className="block text-[11px] text-muted">
+                        {p.reason}
+                        {p.pending && <span className="text-warn"> · ينتظر المراجعة — يُسمّى حين يُعتمَد</span>}
+                      </span>
                     </span>
                   </label>
                 </li>
@@ -216,6 +220,16 @@ export function DriveRename() {
             >
               {busy ? "يعيد التسمية…" : `أعد تسمية المختار (${chosen.size})`}
             </button>
+            {data.proposals.some((p) => !p.pending) && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setChosen(new Set(data.proposals.filter((p) => !p.pending).map((p) => p.fileId)))}
+                className={buttonClass("secondary", "sm")}
+              >
+                اختر كلَّ المعتمَد ({data.proposals.filter((p) => !p.pending).length})
+              </button>
+            )}
             <button
               type="button"
               disabled={busy}
