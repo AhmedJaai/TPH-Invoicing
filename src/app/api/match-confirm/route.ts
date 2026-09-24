@@ -161,6 +161,8 @@ async function handle(request: Request) {
 
         await claimBankTransaction(t, tx.id, {
           category: "SUPPLIER",
+          /* بابٌ أقرّه إنسانٌ بضغطته — ولا يبقى مصدرُه «مجهولاً» بجانبه */
+          classificationSource: "HUMAN",
           matchedPaymentId: id,
           matchStatus: "MATCHED",
           matchDisposition: "AUTO",
@@ -358,6 +360,8 @@ async function settleAccounts(
         matchedPaymentId: paymentId,
         supplierId,
         category: "SUPPLIER",
+        /* بابٌ أقرّه إنسانٌ بضغطته — ولا يبقى مصدرُه «مجهولاً» بجانبه */
+        classificationSource: "HUMAN",
         matchStatus: "MATCHED",
         matchDisposition: null,
         matchOutcome: plan.remainingMinor > 0 ? "SUPPLIER_ON_ACCOUNT" : "SUPPLIER_SETTLED",

@@ -133,3 +133,36 @@ export function describeCoverage(c: Coverage): string {
   }
   return `${parts.join("، ")}.`;
 }
+
+/**
+ * كم يوماً من الشهر لا يغطّيه كشف — الرأسُ والوسطُ والذيل.
+ *
+ * كان الرأسُ يُقاس بفترةٍ حارسة `{أوّل الشهر، أوّل الشهر}` تُضاف إلى
+ * الفترات — والحارسةُ **نفسُها تُحسَب تغطيةً** ليومها. فكشفٌ يبدأ في
+ * الثاني يندمج بها ولا يُقال إنّ اليوم الأوّل غائب، وكشفٌ يبدأ في العاشر
+ * يُعدّ غيابُه ثمانيةً لا تسعة. فيقول الإقفالُ «يومٌ واحد بلا كشف» والغائبُ
+ * يومان. والرأسُ الآن يُقاس كما يُقاس الذيل: من حدّ الشهر إلى أوّل ما غُطّي.
+ *
+ * والفترةُ خارج الشهر تُقصّ عليه. وبلا فترةٍ واحدة يُرجع `null`: الشهرُ
+ * الذي لم يُستورَد له كشفٌ ليس «ثلاثين يوماً من الفجوة» بل «لا كشف» —
+ * والمستدعي يقول ذلك بجملته.
+ */
+export function monthGapDays(
+  periods: readonly Period[],
+  monthStart: string,
+  monthEnd: string,
+): number | null {
+  const clipped = periods
+    .map((p) => ({
+      start: p.start < monthStart ? monthStart : p.start,
+      end: p.end > monthEnd ? monthEnd : p.end,
+    }))
+    .filter((p) => p.start <= p.end);
+  if (clipped.length === 0) return null;
+
+  const cov = analyzeCoverage(clipped);
+  const inner = cov.gaps.reduce((sum, g) => sum + g.days, 0);
+  const head = cov.from !== null && cov.from > monthStart ? daysBetween(monthStart, cov.from) - 1 : 0;
+  const tail = cov.to !== null && cov.to < monthEnd ? daysBetween(cov.to, monthEnd) - 1 : 0;
+  return head + inner + tail;
+}

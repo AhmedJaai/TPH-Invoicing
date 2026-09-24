@@ -28,7 +28,7 @@ describe("المعادلة", () => {
     expect(canonicalToQuantity(r.varianceMilli!, "KG")).toBe(-2.5);
     /* الثانويّة: ٢٫٥ ÷ ١٣ = ١٩٫٢٣٪ من المخزون الختاميّ */
     expect(r.varianceBp).toBe(-1923);
-    expect(formatBp(r.varianceBp)).toBe("−19.2٪");
+    expect(formatBp(r.varianceBp)).toBe("\u2066−19.2٪\u2069");
     /* والأساسيّة: ٢٫٥ ÷ ١٢ = ٢٠٫٨٣٪ من الاستهلاك */
     expect(r.varianceConsumptionBp).toBe(-2083);
   });
@@ -46,7 +46,7 @@ describe("المعادلة", () => {
     );
     expect(canonicalToQuantity(r.varianceMilli!, "KG")).toBe(-1);
     expect(r.varianceConsumptionBp).toBe(-333);
-    expect(formatBp(r.varianceConsumptionBp)).toBe("−3.3٪");
+    expect(formatBp(r.varianceConsumptionBp)).toBe("\u2066−3.3٪\u2069");
     /* والثانويّةُ تقول ١٠٪ — وهي التي كانت تُعرَض وحدها فتُخيف بلا وجه */
     expect(r.varianceBp).toBe(-1000);
   });

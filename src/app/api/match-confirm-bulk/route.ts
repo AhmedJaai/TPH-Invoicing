@@ -268,6 +268,8 @@ export async function POST(request: Request) {
           lifecycle: "POSTED",
           supplierId: plan.supplierId,
           category: "SUPPLIER",
+          /* بابٌ أقرّه إنسانٌ بضغطته — ولا يبقى مصدرُه «مجهولاً» بجانبه */
+          classificationSource: "HUMAN",
         });
 
         await t.insert(decisionHistory).values({

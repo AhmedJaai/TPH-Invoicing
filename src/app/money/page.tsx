@@ -9,7 +9,7 @@ import { Figure } from "@/components/figure";
 import { gatherHomeProvenance } from "@/lib/provenance-facts";
 import { buildCashFlow, type CashMovement } from "@/lib/cashflow";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
-import { DataTable, NoAccess, Section, Stat } from "@/components/ui";
+import { DataTable, EmptyState, LinkButton, NoAccess, Section, Stat } from "@/components/ui";
 import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { formatMonth } from "@/lib/riyadh-time";
 import { looksLikeGoodsPurchase } from "@/lib/expenses";
@@ -56,11 +56,12 @@ export default async function MoneyPage() {
            where input_vat_status='NOT_ELIGIBLE' and vat_minor > 0)              as at_risk,
         (select count(*)::int from invoices where input_vat_status='UNKNOWN')    as vat_unknown
     `),
-    db.execute<{ month: string; direction: string; category: string; amount: string }>(sql`
+    db.execute<{ month: string; direction: string; category: string; amount: string; n: number }>(sql`
       select to_char(value_date, 'YYYY-MM') as month,
              direction::text as direction,
              category::text as category,
-             sum(amount_minor)::bigint as amount
+             sum(amount_minor)::bigint as amount,
+             count(*)::int as n
         from bank_transactions
        group by 1, 2, 3
     `),
@@ -85,6 +86,7 @@ export default async function MoneyPage() {
       direction: r.direction as "DEBIT" | "CREDIT",
       category: r.category as TxCategory,
       amountMinor: Number(r.amount),
+      count: Number(r.n),
     })),
   );
 
@@ -98,6 +100,25 @@ export default async function MoneyPage() {
   }
   const byCategory = [...categoryTotals.values()].sort((a, b) => b.s - a.s);
   const expenseTotal = byCategory.reduce((s, c) => s + c.s, 0);
+
+  /*
+    ── بلا كشفٍ لا جوابَ هنا ──
+
+    كانت الصفحةُ على قاعدةٍ بلا كشف تقول «الصادر ٠٫٠٠ · كلُّ الصادر معروفُ
+    الوجه» و«حركاتُ كشف البنك ٠ — كلُّها مصنّفة» بالأخضر. أصفارٌ عن غير
+    علم، وطمأنينةٌ عن كشفٍ لم يُرفَع. فيُقال ما ينقص، ومعه فعلُه.
+  */
+  if (n("tx") === 0) {
+    return (
+      <PageShell user={user} width="wide" title="أين ذهب المال" intro="من كشف بنكك وفواتيرك، لا من تقدير.">
+        <EmptyState
+          title="لم يُستورَد كشفُ بنكٍ بعد."
+          hint="بلا كشفٍ لا يُعرَف ما خرج من الحساب ولا أين — فلا يُعرَض هنا رقمٌ يُقرأ صفراً."
+          action={<LinkButton href="/bank#import" variant="primary">استورد كشف البنك</LinkButton>}
+        />
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell
@@ -124,7 +145,22 @@ export default async function MoneyPage() {
           provenance={prov.bankOutflow}
           unit="حركة"
           href="/bank"
-          note="اضغط «من أين جاء؟» لترى ما لم يُصنَّف بعد"
+          /*
+            الرقمُ يستثني ما لم يُعرف وجهه — والاستثناءُ يُقال بعدده ومبلغه
+            تحته، لا خلف زرّ. كان التنبيه «اضغط من أين جاء؟» بينما جدولُ
+            التدفّق أسفلَ الصفحة يقول صادراً أكبر، فيظهر للشهر رقمان.
+          */
+          note={
+            prov.bankOutflow.excludedCount > 0 ? (
+              <>
+                وخارجه {countNoun(prov.bankOutflow.excludedCount, TRANSACTION)} بـ
+                <Money minor={prov.bankOutflow.excludedKnownMinor} /> لم يُعرف وجهها —{" "}
+                <Link href="/attention" className="underline underline-offset-4">عرّفها</Link>
+              </>
+            ) : (
+              "كلُّ الصادر معروفُ الوجه"
+            )
+          }
           className="flex flex-col"
         />
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3">

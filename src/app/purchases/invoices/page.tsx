@@ -205,13 +205,17 @@ export default async function InvoicesPage({
       width="wide"
       title="الفواتير"
       intro={describeFilters(f)}
+      /*
+        «ارفع مستنداً» كان هنا زرّاً ثانياً مطابقاً لزرّ الشريط في الشاشة
+        نفسها — والرفعُ دائمٌ في القشرة على كلّ مقاس.
+      */
       actions={
         hasFilters(f)
           ? <LinkButton href="/purchases/invoices" size="sm">امسح الترشيح</LinkButton>
-          : <LinkButton href="/upload" variant="primary" size="sm">ارفع مستنداً</LinkButton>
+          : undefined
       }
     >
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <Box label="المعروض" value={countNoun(Number(t.n), INVOICE)} />
         <Box label="قيمتها" minor={Number(t.billed)} />
         {/*
@@ -480,10 +484,10 @@ function Box({
   return (
     <div className="rounded-2xl border border-line bg-raised px-3 py-3 shadow-raised sm:px-4">
       <p className="text-[11px] text-muted">{label}</p>
-      <p className={`nums mt-1.5 font-display text-lg font-bold leading-none sm:text-xl ${cls}`}>
+      <p className={`nums mt-1.5 font-display text-sm font-bold leading-none sm:text-xl ${cls}`}>
         {minor !== undefined ? <Money minor={minor} /> : value}
       </p>
-      {sub && <p className="mt-1.5 text-[11px] leading-relaxed text-muted">{sub}</p>}
+      {sub && <p className="mt-1.5 hidden text-[11px] leading-relaxed text-muted sm:block">{sub}</p>}
     </div>
   );
 }

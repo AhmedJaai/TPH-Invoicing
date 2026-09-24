@@ -349,7 +349,8 @@ export function DataTable<T>({
                     c.numeric ? "text-start" : c.align === "end" ? "text-end" : "text-start"
                   } ${c.secondary ? "hidden lg:table-cell" : ""}`}
                 >
-                  {c.header}
+                  {/* عمودُ الأفعال بلا عنوانٍ مرئيّ — ولقارئ الشاشة اسمُه، لا رأسٌ صامت */}
+                  {c.header || <span className="sr-only">الفعل</span>}
                 </th>
               ))}
             </tr>

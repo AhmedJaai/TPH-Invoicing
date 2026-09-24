@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { desc } from "drizzle-orm";
+import { count, desc } from "drizzle-orm";
 import { db } from "@/db";
-import { salesImports } from "@/db/schema";
+import { recipes, salesImports } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -41,7 +41,7 @@ export default async function SalesImportPage() {
     );
   }
 
-  const rows = await db
+  const [rows, [catalog]] = await Promise.all([db
     .select({
       id: salesImports.id,
       fileName: salesImports.fileName,
@@ -55,7 +55,32 @@ export default async function SalesImportPage() {
     })
     .from(salesImports)
     .orderBy(desc(salesImports.createdAt))
-    .limit(30);
+    .limit(30),
+    db.select({ n: count() }).from(recipes),
+  ]);
+
+  /*
+    ── الترتيبُ يتبع الخطوة التالية ──
+
+    المبيعاتُ فعلُ كلِّ أحد فتأتي أوّلاً — متى كان الكتالوجُ قائماً. وقبله
+    يُحسَب البيعُ بلا وصفة فيخرج الاستهلاكُ مجهولاً كلُّه، والرئيسيةُ تقول
+    «كتالوج ← مبيعات ← جرد». فكانت الصفحةُ تعرض المبيعاتِ أوّلاً لمن لم
+    يرفع كتالوجاً بعد: الخطوةُ الثانية فوق الأولى.
+  */
+  const hasCatalog = Number(catalog?.n ?? 0) > 0;
+  const catalogSection = (
+    <Section
+      title={hasCatalog ? "الكتالوج: الأصناف والعبوات والوصفات" : "ابدأ بالكتالوج: الأصناف والعبوات والوصفات"}
+      hint={hasCatalog
+        ? "ما يُباع، وما يُخزَّن، وكم يدخل كلَّ مشروب — وبه تُحسَب كلفةُ الفرق."
+        : "بلا وصفاتٍ لا يُعرَف ما استهلكته المبيعات — فهو الخطوةُ الأولى، ثمّ ملفُّ المبيعات."}
+    >
+      <CatalogImport
+        canEdit={can(user.role, "recipe:edit")}
+        defaultFrom={nextWeek(lastCompleteWeek()).start}
+      />
+    </Section>
+  );
 
   return (
     <PageShell
@@ -65,22 +90,22 @@ export default async function SalesImportPage() {
       intro="ملفّان يدخلان من هنا: كتالوجُ المقهى مرّةً وعند تغيّره، ومبيعاتُ الأسبوع كلَّ أحد."
       actions={<Link href="/inventory/mapping" className={buttonClass("secondary", "sm")}>منتجات تحتاج ربطاً</Link>}
     >
-      <InventoryImport canImport={can(user.role, "inventory:count")} />
+      {/*
+        الترتيبُ بـ`order` لا بموضعين في الشجرة: لو انتقل المكوّنُ من موضعٍ
+        إلى آخر حين يُكتَب أوّلُ كتالوج لأعاد React تركيبَه، فتضيع نتيجةُ
+        الاستيراد التي يعرضها — ويُكتَب الكتالوجُ ولا يُقال شيء.
+      */}
+      <div className="flex flex-col">
+        <div className={hasCatalog ? "" : "mt-8 sm:mt-10"}>
+          <InventoryImport canImport={can(user.role, "inventory:count")} />
+        </div>
+        <div className={hasCatalog ? "" : "order-first [&>section]:mt-0"}>{catalogSection}</div>
+      </div>
 
-      <Section
-        title="الكتالوج: الأصناف والعبوات والوصفات"
-        hint="ما يُباع، وما يُخزَّن، وكم يدخل كلَّ مشروب — وبه تُحسَب كلفةُ الفرق."
-      >
-        <CatalogImport
-          canEdit={can(user.role, "recipe:edit")}
-          defaultFrom={nextWeek(lastCompleteWeek()).start}
-        />
-      </Section>
-
-      <Section title="ما استُورد من قبل">
+      <Section title="ملفّاتُ المبيعات المستورَدة">
         {rows.length === 0 ? (
           <EmptyState
-            title="لم يُستورَد ملفٌّ بعد."
+            title="لم يُستورَد ملفُّ مبيعاتٍ بعد."
             hint="ارفع أوّل تصديرٍ من فودكس ليُحسَب أوّلُ جرد."
           />
         ) : (

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 /**
  * حُرّاسُ النشر: أن يقع ما تقوله الوثيقة.
@@ -70,4 +71,30 @@ describe("المستودع والقاعدة يتحرّكان معاً", () => {
       expect(cmd).not.toContain("drizzle-kit push");
     }
   });
+});
+
+/*
+  ── الهجرةُ المطبَّقة لا تُعدَّل ──
+
+  أُضيف إلى 042 تحديثٌ ثانٍ بعد أن طبّقها نشرُ معاينة على قاعدته. والمشغّلُ
+  يرفض — بحقّ — هجرةً مطبَّقة تغيّر ملفّها، فسقط كلُّ نشرٍ بعدها عند
+  `migrate` قبل أن يبدأ البناء، ووصلت رسائلُ الفشل صاحبَ المشروع.
+
+  ولا يعرف الاختبارُ أيّ القواعد طبّقت ماذا — فيحفظ `migration-hashes.json`
+  بصمةَ كلّ هجرةٍ كما دخلت المستودع. هجرةٌ جديدة تُضاف إليه، وتعديلُ قائمةٍ
+  يُسقط CI **قبل** أن يُسقط النشر. والتعديلُ المقصود (نادر، ويحتاج
+  `--reapply` على كلّ قاعدة) يُعدِّل البصمةَ بيده عالماً بما يفعل.
+*/
+describe("الهجرةُ المطبَّقة لا تُعدَّل — الإضافةُ هجرةٌ جديدة", () => {
+  const manifest = JSON.parse(readFileSync("drizzle/migration-hashes.json", "utf8")) as Record<string, string>;
+  const files = readdirSync("drizzle/sql").filter((f) => f.endsWith(".sql")).sort();
+
+  for (const name of files) {
+    it(name, () => {
+      /* بالطريقة نفسِها التي يبصم بها `scripts/migrate.ts` */
+      const sha = createHash("sha256").update(readFileSync(`drizzle/sql/${name}`, "utf8")).digest("hex");
+      expect(manifest[name], `${name} ليست في drizzle/migration-hashes.json — أضِفها`).toBeDefined();
+      expect(sha, `${name} تغيّرت بعد إدخالها — اكتب هجرةً جديدة بدل تعديلها`).toBe(manifest[name]);
+    });
+  }
 });

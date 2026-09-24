@@ -34,6 +34,9 @@ export default async function InventoryPage() {
     );
   }
 
+  /* سجلُّ الجرد والمبالغُ لمن يرى المبالغ — ومن لا يراها لا يُعطى رابطاً يردّه */
+  const showAmounts = can(user.role, "amounts:view");
+
   const [open] = await db
     .select({ id: inventoryCounts.id })
     .from(inventoryCounts)
@@ -53,14 +56,14 @@ export default async function InventoryPage() {
           width="wide"
           title="الجرد الحالي"
           intro="ما كان ينبغي أن يبقى على الرفّ، مقابلَ ما وُجد فعلاً."
-          actions={<Link href="/inventory/history" className={buttonClass("secondary", "sm")}>سجلّ الجرد</Link>}
+          actions={showAmounts ? <Link href="/inventory/history" className={buttonClass("secondary", "sm")}>سجلّ الجرد</Link> : undefined}
         >
           <InventoryWorkspace
             header={header}
             report={report}
             canCount={can(user.role, "inventory:count")}
             canReopen={can(user.role, "inventory:reopen")}
-            showAmounts={can(user.role, "amounts:view")}
+            showAmounts={showAmounts}
             scopeInherited={scope.inherited}
             {...inputs}
             today={todayInRiyadh()}
@@ -158,8 +161,21 @@ export default async function InventoryPage() {
         )}
       </div>
 
+      {/*
+        ── المبالغُ لمن يرى المبالغ ──
+
+        كان «آخرُ ما أُقفل» يعرض «نقص ١٣٫٢٠ · زيادة ٠٫٠٠» بالريال لكلّ من
+        يفتح الجرد — ومديرُ المشتريات يعدّ الرفَّ ولا يرى كلفةَ الفرق. وكان
+        «السجلّ كلّه» يقوده إلى صفحةٍ تشترط المبالغ فتردّه. فلمن لا يراها
+        يُعرَض عددُ ما نقص وما زاد، ويبقى الرابطُ إلى تقرير الجرد نفسه.
+      */}
       {recent.length > 0 && (
-        <Section title="آخرُ ما أُقفل" action={<Link href="/inventory/history" className={buttonClass("quiet", "sm")}>السجلّ كلّه</Link>}>
+        <Section
+          title="آخرُ ما أُقفل"
+          action={showAmounts
+            ? <Link href="/inventory/history" className={buttonClass("quiet", "sm")}>السجلّ كلّه</Link>
+            : undefined}
+        >
           <ul className="divide-y divide-line rounded-2xl border border-line bg-raised">
             {recent.map((c) => (
               <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
@@ -167,12 +183,20 @@ export default async function InventoryPage() {
                   {c.periodStart} → {c.periodEnd}
                 </Link>
                 {/* النقصُ والزيادةُ لا يتقاصّان — يُعرضان جنباً إلى جنب */}
-                <span className="nums text-xs">
-                  نقص <Money minor={c.summary.shortageCostMinor} tone={c.summary.shortageCostMinor > 0 ? "danger" : undefined} />
-                </span>
-                <span className="nums text-xs text-muted">
-                  زيادة <Money minor={c.summary.overageCostMinor} />
-                </span>
+                {showAmounts ? (
+                  <>
+                    <span className="nums text-xs">
+                      نقص <Money minor={c.summary.shortageCostMinor} tone={c.summary.shortageCostMinor > 0 ? "danger" : undefined} />
+                    </span>
+                    <span className="nums text-xs text-muted">
+                      زيادة <Money minor={c.summary.overageCostMinor} />
+                    </span>
+                  </>
+                ) : (
+                  <span className="nums text-xs text-muted">
+                    أصنافٌ نقصت: {c.summary.linesShort} · زادت: {c.summary.linesOver}
+                  </span>
+                )}
               </li>
             ))}
           </ul>

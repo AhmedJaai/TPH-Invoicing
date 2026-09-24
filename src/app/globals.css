@@ -202,6 +202,12 @@ body {
 .nums-col {
   direction: ltr;
   text-align: right;
+  /*
+    الرقمُ وحده يبقى من اليسار — وخليّةٌ فيها كلمةٌ عربيّة («٤ من ٦٠»،
+    «فاتورتان») تُقرأ من اليمين. كان `direction: ltr` وحده يقلبها
+    «من 60 4»، وكلُّ خليّةٍ تُصلَح بيدها تُنسى أختُها.
+  */
+  unicode-bidi: plaintext;
 }
 
 /* منطقة الإفلات حين يُسحب ملف فوقها */
@@ -407,4 +413,21 @@ html[data-amounts="hidden"] .icon-hidden { display: block; }
  */
 .card-rows :where(a, button, input, select, label, summary):not([aria-label="افتح التفصيل"]) {
   position: relative;
+}
+
+/*
+ * حقلُ لوحة الأوامر هو اللوحةُ نفسها: التركيزُ فيه دائماً ما دامت مفتوحة،
+ * فالحلقةُ حوله لا تدلّ على شيء — والشريطُ الذي يحمله هو الإطار.
+ */
+.palette-input:focus-visible {
+  outline: none;
+}
+.palette[open] {
+  animation: palette-in 120ms ease-out;
+}
+@keyframes palette-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.99); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .palette[open] { animation: none; }
 }

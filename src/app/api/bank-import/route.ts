@@ -819,12 +819,31 @@ async function handle(request: Request) {
         فتُعرَض في طابور المراجعة تطلب تأكيداً لا يقبله الخادم —
         لأنّها مطابَقةٌ أصلاً. خمسُ حركاتٍ في قاعدة أحمد كذلك.
       */
+      /*
+        ── والبابُ يتقدّم معها ──
+
+        كان القيدُ الآليّ يكتب الدفعةَ والطبقةَ ويترك الباب `UNKNOWN`،
+        بينما يكتب التأكيدُ اليدويّ (`match-confirm`) `SUPPLIER`. فحوالةٌ
+        سدّدت فواتير بيكوف تُعرَض «صادر · غير مصنّفة» بجانب شارة «طُوبقت
+        تلقائياً»، وتدخل «أين ذهب المال» مالاً لا يُعرف أين ذهب — وهي
+        محسوبةٌ في المشتريات. والمصدرُ `STRUCTURE`: عرفها الحسابُ على
+        الفواتير لا كلمةٌ في الوصف. ولا يُكتب فوق بابٍ عرفه المصنِّف.
+      */
+      const classifiedElsewhere = (decided?.category ?? "UNKNOWN") !== "UNKNOWN";
       await tx
         .update(bankTransactions)
         .set({
           matchedPaymentId: paymentId,
           matchStatus: "MATCHED",
           lifecycle: "POSTED",
+          ...(classifiedElsewhere
+            ? {}
+            : {
+                category: "SUPPLIER" as const,
+                supplierId: plan.supplierId,
+                classificationSource: "STRUCTURE" as const,
+                classificationReason: `طُوبقت مع ${countNoun(plan.allocations.length, INVOICE)} للمورّد`,
+              }),
         })
         .where(eq(bankTransactions.id, inserted.id));
 

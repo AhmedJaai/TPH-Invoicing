@@ -75,8 +75,16 @@ export interface ImportResult {
   messages: string[];
   recognisedColumns: string[];
   unrecognisedColumns: string[];
-  /** أصنافُ فودكس التي لم تكن معروفة قبل هذا الملفّ — تحتاج ربطاً. */
-  newPosProducts: number;
+  /**
+   * أصنافٌ **مباعة** في هذا الملفّ لا صنفَ لها عندنا — تحتاج ربطاً.
+   *
+   * كان العددُ «ما لم يكن معروفاً قبل الملفّ» بلا تمييز، فدخلته الخياراتُ
+   * (دبل شوت، حليب الشوفان) وهي لا تُربَط ولا وصفةَ لها بقرارٍ مكتوب —
+   * فيقول الاستيرادُ «١١ تحتاج ربطاً» وصفحةُ الربط تقول «كلُّ ما بِيع
+   * مربوط». وكان يعدّ الجديدَ وحده، فصنفٌ غيرُ مربوطٍ من ملفٍّ سابق لا
+   * يُذكَر ثانيةً وهو ما زال ينتظر.
+   */
+  unmappedProducts: number;
   blocked?: string;
 }
 
@@ -173,7 +181,7 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
       messages: [`هذا الملفّ مستورَدٌ من قبل باسم «${seen.fileName}» — ولم يُكتب شيءٌ ثانيةً.`],
       recognisedColumns: [],
       unrecognisedColumns: [],
-      newPosProducts: 0,
+      unmappedProducts: 0,
     };
   }
 
@@ -212,7 +220,7 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
       messages: [...workbook.warnings, blocked],
       recognisedColumns: parsed?.recognisedColumns ?? [],
       unrecognisedColumns: parsed?.unrecognisedColumns ?? [],
-      newPosProducts: 0,
+      unmappedProducts: 0,
       blocked,
     };
   }
@@ -302,7 +310,6 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
       }
     }
 
-    let newPosProducts = 0;
     const externalIds = [...products.keys()];
     if (externalIds.length > 0) {
       const values = externalIds.map((externalId) => {
@@ -314,15 +321,25 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
         };
       });
       for (let i = 0; i < values.length; i += 300) {
-        const inserted = await tx
+        await tx
           .insert(posProducts)
           .values(values.slice(i, i + 300))
           /* القائمُ لا يُمَسّ: قد يكون مربوطاً بصنفٍ عندنا، والربطُ عملُ إنسانٍ لا يُداس */
-          .onConflictDoNothing()
-          .returning({ id: posProducts.id });
-        newPosProducts += inserted.length;
+          .onConflictDoNothing();
       }
     }
+
+    const [{ unmappedProducts }] = externalIds.length === 0
+      ? [{ unmappedProducts: 0 }]
+      : await tx
+          .select({ unmappedProducts: sql<number>`count(*)::int` })
+          .from(posProducts)
+          .where(and(
+            eq(posProducts.sourceId, sourceId),
+            inArray(posProducts.externalId, externalIds),
+            eq(posProducts.kind, "PRODUCT"),
+            sql`${posProducts.productId} is null`,
+          ));
 
     const posByExternal = new Map(
       (await tx
@@ -495,7 +512,7 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
       messages,
       recognisedColumns: file.recognisedColumns,
       unrecognisedColumns: file.unrecognisedColumns,
-      newPosProducts,
+      unmappedProducts: Number(unmappedProducts),
     };
   });
 }

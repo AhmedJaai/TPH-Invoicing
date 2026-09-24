@@ -367,7 +367,7 @@ export default async function ExpensesPage({
                     {e.recurringExpenseId && " · مربوط بمتوقَّع"}
                   </span>
                   {e.label && e.label !== CATEGORY_LABEL[e.category] && (
-                    <span className="block truncate text-[11px] text-muted/80" dir="auto">
+                    <span className="block truncate text-[11px] text-muted" dir="auto">
                       {e.label}
                     </span>
                   )}

@@ -195,3 +195,14 @@ describe("لكلّ بندٍ غير ناجحٍ موضعُ إصلاحه", () => {
   });
 });
 
+
+describe("ما يُفحَص على الفواتير لا يُعلَن ناجحاً على صفرٍ منها", () => {
+  it("شهرٌ بلا فاتورة: لا «كلّها ضريبية كاملة ✓» ولا «مسدَّدة ✓» ولا «الكشوف كاملة ✓»", () => {
+    const r = buildMonthClose({ ...clean, invoiceCount: 0, suppliersWithInvoices: 0, suppliersWithStatement: 0 });
+    const ids = r.items.map((i) => i.id);
+    expect(ids).not.toContain("tax-valid");
+    expect(ids).not.toContain("paid");
+    expect(ids).not.toContain("statements");
+    expect(r.items.find((i) => i.id === "has-invoices")!.state).toBe("BLOCK");
+  });
+});

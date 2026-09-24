@@ -55,7 +55,7 @@ export function StartCount({
 
   return (
     <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
-      <h3 className="font-display text-base font-bold">ابدأ جردَ أسبوع</h3>
+      <h2 className="font-display text-base font-bold">ابدأ جردَ أسبوع</h2>
       <p className="mt-1 text-xs leading-relaxed text-muted">
         الأسبوعُ من الأحد إلى تقفيلة السبت. يُهيَّأ لك ما بِيع فيه وما اشتُري، ثمّ
         تُدخل العدّ الفعليّ وحده.

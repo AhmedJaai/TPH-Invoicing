@@ -89,13 +89,16 @@ export default async function Home() {
         فبقي في صفحة الرفع ما يخصّ الرفع: منطقةُ الملفّ، ومزامنةُ
         الدرايف، ومدخلٌ إلى المورّدين لمن أراد أن يراجعهم.
       */}
-      <p className="mt-6 text-xs leading-relaxed text-muted">
-        ولمراجعة المورّدين وما عليك لكلٍّ منهم:{" "}
-        <Link href="/suppliers" className="font-medium underline underline-offset-4 hover:text-ink">
-          حسابات المورّدين
-        </Link>
-        .
-      </p>
+      {/* مدخلٌ إلى ما يُفتَح لقارئه وحده — مديرُ المشتريات لا يرى حسابات المورّدين */}
+      {showAmounts && (
+        <p className="mt-6 text-xs leading-relaxed text-muted">
+          ولمراجعة المورّدين وما عليك لكلٍّ منهم:{" "}
+          <Link href="/suppliers" className="font-medium underline underline-offset-4 hover:text-ink">
+            حسابات المورّدين
+          </Link>
+          .
+        </p>
+      )}
 
       {!showAmounts && (
         <footer className="mt-12 border-t border-line pt-5 text-xs leading-relaxed text-muted">

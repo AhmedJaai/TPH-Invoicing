@@ -147,20 +147,57 @@ export function buildPaymentRun(
 }
 
 /** ملف تحويلات جماعية بصيغة CSV، بترميز يقرأه إكسل العربي. */
-export function toBankTransferCsv(run: PaymentRun): string {
+/**
+ * حسابُ المستفيد — من أدلّة الكشف لا من ذاكرةِ أحد.
+ *
+ * كان ملفُّ التحويلات اسماً ومبلغاً بلا حساب، والبنكُ لا يحوّل إلى اسم —
+ * فيُعاد كتابةُ كلّ آيبان باليد، وهو أخطرُ ما في التحويل خطأً. والنظامُ
+ * يعرف حسابَ كلّ مستفيدٍ أكّده إنسانٌ من كشف البنك (`counterparty_evidence`،
+ * دليلٌ قاطع). فيُؤخَذ من هناك: آيبانٌ واحد يُكتَب، وآيبانان مختلفان سؤالٌ
+ * لا يُحسَم بالحدس — يبقى الحقلُ فارغاً ويُقال لِمَ. ورقمُ الحساب يأتي بعد
+ * الآيبان لأنّ البنوك تطلب الآيبان للتحويل المحلّيّ.
+ */
+export interface PayeeAccount {
+  account: string | null;
+  note: string | null;
+}
+
+export function resolvePayeeAccount(
+  evidence: readonly { kind: string; normalized: string }[],
+): PayeeAccount {
+  const distinct = (kind: string) => [...new Set(evidence.filter((e) => e.kind === kind).map((e) => e.normalized))];
+  for (const kind of ["IBAN", "ACCOUNT"] as const) {
+    const values = distinct(kind);
+    if (values.length === 1) return { account: values[0], note: null };
+    if (values.length > 1) {
+      return { account: null, note: `له ${values.length} حسابات في الكشوف — اختر الصحيح في البنك` };
+    }
+  }
+  return { account: null, note: "الحسابُ غير معروف — أدخله في البنك" };
+}
+
+export function toBankTransferCsv(
+  run: PaymentRun,
+  accounts: ReadonlyMap<string, PayeeAccount> = new Map(),
+): string {
   const rows = [
-    ["اسم المستفيد", "المبلغ", "العملة", "عدد الفواتير", "أرقام الفواتير", "البيان"],
-    ...run.ready.map((s) => [
-      s.supplierName,
-      (s.totalMinor / 100).toFixed(2),
-      "SAR",
-      String(s.invoiceCount),
-      s.invoices.map((i) => i.invoiceNumber).join(" | "),
-      `سداد فواتير ${run.month}`,
-    ]),
+    ["اسم المستفيد", "حساب المستفيد", "المبلغ", "العملة", "عدد الفواتير", "أرقام الفواتير", "البيان", "تنبيه"],
+    ...run.ready.map((s) => {
+      const acc = accounts.get(s.supplierId) ?? resolvePayeeAccount([]);
+      return [
+        s.supplierName,
+        acc.account ?? "",
+        (s.totalMinor / 100).toFixed(2),
+        "SAR",
+        String(s.invoiceCount),
+        s.invoices.map((i) => i.invoiceNumber).join(" | "),
+        `سداد فواتير ${run.month}`,
+        acc.note ?? "",
+      ];
+    }),
   ];
   const escape = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-  return "﻿" + rows.map((r) => r.map(escape).join(",")).join("\r\n");
+  return "\ufeff" + rows.map((r) => r.map(escape).join(",")).join("\r\n");
 }
 
 /** رسالة واتساب جاهزة للمورّد بأرقام فواتيره المحجوزة. */

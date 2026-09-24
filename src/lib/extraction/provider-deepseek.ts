@@ -105,10 +105,15 @@ function taskFor(input: DocumentInput): "TEXT" | "VISION" {
 
 async function extractWithDeepseek(request: ExtractionRequest): Promise<ExtractionOutcome> {
   if (!isDeepseekConfigured()) {
+    /*
+      الرسالةُ لمن رفع الملفّ لا لمن بنى النظام: اسمُ المتغيّر لا يفعل به
+      صاحبُ المقهى شيئاً. فيُقال له ما وقع وما يفعله، والاسمُ في السجلّ.
+    */
+    console.error("[extraction] DEEPSEEK_API_KEY غير مضبوط — لا قراءة للمستندات");
     return {
       ok: false,
       provider: "deepseek",
-      reason: "مفتاح DEEPSEEK_API_KEY غير مضبوط",
+      reason: "قراءةُ المستندات متوقّفة: القارئ غير مهيّأ في الخادم. لم يُحفَظ شيء — أبلِغ مالك الحساب ثمّ أعد المحاولة.",
     };
   }
 

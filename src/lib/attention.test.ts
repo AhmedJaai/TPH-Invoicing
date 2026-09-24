@@ -409,3 +409,21 @@ describe("التنبيه يُغلَق بقرار (SCN-104)", () => {
     expect(item?.evidence[0].amountMinor).toBe(2_560_00);
   });
 });
+
+describe("مالٌ خرج مرّتين — الجملةُ تتبع الدليل", () => {
+  const item = (f: Partial<AttentionFacts>) =>
+    buildAttention({ ...quiet, duplicatePayments: 1, duplicatePaymentAmountMinor: 1_180_40, ...f })
+      .find((i) => i.id === "duplicate-payments")!;
+
+  it("بمرجعين مختلفين يُقال إنّهما عمليّتان", () => {
+    expect(item({ duplicatePaymentsDistinct: 1 }).detail).toContain("مرجعُ سدادٍ مستقلّ");
+  });
+
+  it("بلا مرجعين لا يُدَّعى مرجعٌ مستقلّ — والفعلُ تحقّقٌ قبل المطالبة", () => {
+    const i = item({ duplicatePaymentsDistinct: 0 });
+    expect(i.detail).not.toContain("مستقلّ");
+    expect(i.detail).toContain("لم يُقطَع");
+    expect(i.action).toContain("إن ظهر");
+  });
+});
+

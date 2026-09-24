@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { documents, invoices, paymentAllocations, suppliers } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { buildPaymentRun, toBankTransferCsv, type PayableInvoice } from "@/lib/payment-run";
+import { loadPayeeAccounts } from "@/services/payee-account.service";
 import { recordAudit } from "@/lib/audit";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
 
@@ -74,6 +75,8 @@ export async function GET(request: Request) {
     { creditBySupplier, includeOlderUnpaid: true },
   );
 
+  const accounts = await loadPayeeAccounts(run.ready.map((r) => r.supplierId));
+
   /* ملفٌّ يُرفع إلى البنك فيُحوَّل به مال — تنزيلُه أثرٌ لا يُترك بلا قيد */
   await recordAudit({
     actorId: user.id,
@@ -83,7 +86,7 @@ export async function GET(request: Request) {
     after: { الشهر: month, "جاهز بالهللات": run.readyTotalMinor, "محجوز بالهللات": run.heldTotalMinor, مورّدون: run.ready.length },
   });
 
-  return new NextResponse(toBankTransferCsv(run), {
+  return new NextResponse(toBankTransferCsv(run, accounts), {
     headers: {
       "content-type": "text/csv; charset=utf-8",
       "content-disposition": `attachment; filename="payment-run-${month}.csv"`,

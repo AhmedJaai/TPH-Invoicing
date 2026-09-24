@@ -116,9 +116,10 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
                 type="button"
                 onClick={() => void send(true)}
                 disabled={busy !== null || files.length === 0}
-                className={buttonClass("primary")}
+                /* بعد المعاينة الفعلُ التالي هو التنفيذ — فلا زرّان رئيسيّان متجاوران */
+                className={buttonClass(result?.dryRun ? "secondary" : "primary")}
               >
-                {busy === "preview" ? "يُحسَب…" : "اعرض ما سيقع"}
+                {busy === "preview" ? "يُحسَب…" : result?.dryRun ? "أعد المعاينة" : "اعرض ما سيقع"}
               </button>
               {result?.dryRun && (
                 <button

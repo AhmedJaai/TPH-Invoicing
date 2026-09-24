@@ -55,8 +55,12 @@ function Icon({ href, className }: { href: string; className?: string }) {
       return <svg {...common}><rect x="2.5" y="5.5" width="19" height="13" rx="2" /><path d="M2.5 10h19" /></svg>;
     case "/documents":
       return <svg {...common}><path d="M6 2.5h8L19 7.5V21H6Z" /><path d="M13.5 2.5V8H19" /></svg>;
+    case "/inventory":
+      return <svg {...common}><path d="M3.5 8 12 3.5 20.5 8v8L12 20.5 3.5 16Z" /><path d="M3.5 8 12 12.5 20.5 8" /><path d="M12 12.5v8" /></svg>;
+    case "/settings/audit":
+      return <svg {...common}><path d="M12 3 4.5 6v5.5c0 4.4 3.1 8.2 7.5 9.5 4.4-1.3 7.5-5.1 7.5-9.5V6Z" /><path d="m9 12 2 2 4-4" /></svg>;
     case "/settings":
-      return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1" /></svg>;
+      return <svg {...common}><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>;
     default:
       return <svg {...common}><circle cx="12" cy="12" r="8.5" /></svg>;
   }
@@ -73,96 +77,138 @@ function MoreIcon({ className }: { className?: string }) {
 /**
  * الشريط الجانبيّ — الحاسوب وحده.
  *
+ * ── لماذا صار بأسمائه لا بأيقوناته ──
+ *
+ * كان شريطاً منطوياً بعرض ٥٦ بكسلاً، يتّسع بمرور الفأرة. فكانت المساحاتُ
+ * أيقوناتٍ بلا اسم — والجرد دائرةٌ فارغة لأنّه لا أيقونة له، والإعداداتُ
+ * وسجلُّ التدقيق شمسان متطابقتان — **وأيقونةٌ لا يُعرف معناها إلّا بمرور
+ * الفأرة ليست تنقّلاً بل لغز**. وكان اسمُ المنشأة (المخفيُّ وهو منطوٍ) يرث
+ * `flex-1` من صنفٍ كُتب للصفوف، فيتمدّد في العمود ٥٢٥ بكسلاً ويدفع
+ * المساحاتِ كلَّها إلى منتصف الشاشة. عطبان صامتان لا يراهما اختبار.
+ *
+ * وعلى ١٤٤٠ بكسلاً عرضُ المحتوى محدودٌ أصلاً بسقفه، فالمئتا بكسلٍ التي
+ * وفّرها الانطواء لم تكن تُعطى لجدول. فصار الشريطُ ثابتاً بأسمائه، وتحت
+ * المساحة المفتوحة ألسنتُها — فيُرى الموضعُ من التطبيق كلُّه في نظرة.
+ *
  * والعدد الظاهر بجانب «يحتاج قرارك» هو عددُ بنود تلك الصفحة نفسها،
- * يُحسب مرّةً في القشرة ويُمرَّر. وكان العدّاد حركاتِ البنك وحدَها —
- * وهو يقول صفراً على بيانات أحمد بينما تسعةُ بنودٍ تنتظره فعلاً،
- * لأنّه يعدّ حركاتِ البنك وحدها. **والعدد الذي يقول صفراً والعملُ
+ * يُحسب مرّةً في القشرة ويُمرَّر. **والعدد الذي يقول صفراً والعملُ
  * قائم أسوأ من لا عدّاد.**
  */
 export function Sidebar({
   role,
   pending = 0,
   documents = 0,
+  search,
+  footer,
 }: {
   role: Role;
   pending?: number;
   documents?: number;
+  /** زرُّ لوحة الأوامر — يُمرَّر كي تبقى اللوحةُ واحدةً في القشرة. */
+  search?: React.ReactNode;
+  /** ضوابطُ العرض والمستخدم — مكوّناتُ خادمٍ تُمرَّر ولا تُستورَد هنا. */
+  footer?: React.ReactNode;
 }) {
   const pathname = usePathname() ?? "/";
   const areas = visibleAreas(role);
   const area = activeArea(pathname);
+  const child = area ? activeChild(pathname, area) : undefined;
 
   const badgeOf = (href: string) =>
     href === "/attention" ? pending : href === "/documents" ? documents : 0;
 
-  /*
-    النصُّ يختفي حين ينطوي الشريط وتبقى الأيقونة — و`group-hover/rail`
-    يقرأ حالَ الحاوية في القشرة. والعرضُ ثابتٌ عند ٢٤٠ بكسلاً داخلَها
-    كي لا يتراقص النصُّ أثناء الحركة، وإنّما تُقصّ الحاوية عليه.
-  */
-  const label = "min-w-0 flex-1 truncate opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100";
-
   return (
-    <nav className="flex h-full flex-col gap-1 overflow-hidden p-3" aria-label="المساحات">
-      <Link
-        href="/"
-        className={`mb-1 block truncate rounded-lg px-3 py-2 font-display text-base font-bold leading-tight tracking-tight ${label}`}
-      >
-        ذا بوبليك هاوس
-      </Link>
+    <nav className="flex h-full flex-col" aria-label="المساحات">
+      <div className="px-3 pb-2 pt-4">
+        <Link href="/" className="flex items-center gap-2.5 rounded-lg px-1.5 py-1">
+          <span aria-hidden className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-inverse-surface font-display text-[13px] font-black text-inverse-ink">
+            ذ
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-display text-[0.95rem] font-bold leading-tight tracking-tight">ذا بوبليك هاوس</span>
+            <span className="block truncate text-[11px] text-muted">المال والتشغيل</span>
+          </span>
+        </Link>
+      </div>
 
-      <UploadButton role={role} pathname={pathname} className="mb-2 w-full" collapsible />
+      <div className="space-y-2 px-3 pb-3">
+        {search}
+        <UploadButton role={role} pathname={pathname} className="w-full" />
+      </div>
 
-      <ul className="space-y-0.5">
-        {areas.map((a) => {
-          const current = area?.href === a.href;
-          const n = badgeOf(a.href);
-          return (
-            <li key={a.href}>
-              <Link
-                href={a.href}
-                aria-current={current ? "page" : undefined}
-                className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  current
-                    ? "bg-inverse-surface font-bold text-inverse-ink"
-                    : "text-ink-soft hover:bg-sunken"
-                }`}
-              >
-                <Icon href={a.href} className="h-[1.15rem] w-[1.15rem] shrink-0" />
-                <span className={label}>{a.label}</span>
-                {/* الشارةُ تبقى وهو منطوٍ: العددُ هو ما يُنظَر إليه من طرف العين */}
-                {n > 0 && (
-                  <span
-                    className={`nums absolute end-1.5 top-1 rounded-full px-1.5 text-[10px] font-bold group-hover/rail:static group-hover/rail:end-auto group-hover/rail:top-auto group-hover/rail:py-0.5 group-hover/rail:text-[11px] group-focus-within/rail:static ${
-                      current ? "bg-inverse-ink/20 text-inverse-ink" : "bg-warn text-white"
-                    }`}
-                  >
-                    {n}
-                  </span>
-                )}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-
-      <div className="mt-auto border-t border-line pt-2">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         <ul className="space-y-0.5">
-          {visibleAccountLinks(role).map((l) => (
-            <li key={l.href}>
-              <Link
-                href={l.href}
-                aria-current={pathname.startsWith(l.href) ? "page" : undefined}
-                className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs transition-colors ${
-                  pathname === l.href ? "font-bold text-ink" : "text-muted hover:bg-sunken hover:text-ink-soft"
-                }`}
-              >
-                <Icon href="/settings" className="h-4 w-4 shrink-0 opacity-70" />
-                <span className={label}>{l.label}</span>
-              </Link>
-            </li>
-          ))}
+          {areas.map((a) => {
+            const current = area?.href === a.href;
+            const n = badgeOf(a.href);
+            const kids = current ? visibleChildren(role, a) : [];
+            return (
+              <li key={a.href}>
+                <Link
+                  href={a.href}
+                  aria-current={current && kids.length === 0 ? "page" : undefined}
+                  className={`flex items-center gap-2.5 rounded-lg px-2.5 py-[0.45rem] text-sm transition-colors ${
+                    current ? "bg-sunken font-bold text-ink" : "text-ink-soft hover:bg-sunken hover:text-ink"
+                  }`}
+                >
+                  <Icon href={a.href} className="h-[1.1rem] w-[1.1rem] shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">{a.label}</span>
+                  {n > 0 && (
+                    <span
+                      className="nums rounded-full bg-warn px-1.5 py-px text-[11px] font-bold text-surface"
+                      aria-label={`${n} بانتظارك`}
+                    >
+                      {n}
+                    </span>
+                  )}
+                </Link>
+                {kids.length > 0 && (
+                  <ul className="mb-1 ms-[1.3rem] mt-0.5 space-y-px border-s border-line ps-2">
+                    {kids.map((c) => {
+                      const on = child?.href === c.href;
+                      return (
+                        <li key={c.href}>
+                          <Link
+                            href={c.href}
+                            aria-current={on ? "page" : undefined}
+                            className={`block truncate rounded-md px-2 py-1.5 text-[13px] transition-colors ${
+                              on ? "bg-inverse-surface font-bold text-inverse-ink" : "text-ink-soft hover:bg-sunken hover:text-ink"
+                            }`}
+                          >
+                            {c.label}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
         </ul>
+      </div>
+
+      <div className="border-t border-line px-3 py-2">
+        <ul className="space-y-px">
+          {visibleAccountLinks(role).map((l) => {
+            const on = pathname === l.href;
+            return (
+              <li key={l.href}>
+                <Link
+                  href={l.href}
+                  aria-current={on ? "page" : undefined}
+                  className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+                    on ? "bg-sunken font-bold text-ink" : "text-muted hover:bg-sunken hover:text-ink-soft"
+                  }`}
+                >
+                  <Icon href={l.href} className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{l.label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+        {footer && <div className="mt-2 border-t border-line pt-2.5">{footer}</div>}
       </div>
     </nav>
   );
@@ -216,10 +262,13 @@ export function MobileTabBar({
   role,
   pending = 0,
   documents = 0,
+  footer,
 }: {
   role: Role;
   pending?: number;
   documents?: number;
+  /** المستخدمُ والخروج — كانا في الترويسة، وصار موضعُهما «المزيد». */
+  footer?: React.ReactNode;
 }) {
   const pathname = usePathname() ?? "/";
   const [moreOpen, setMoreOpen] = useState(false);
@@ -242,7 +291,7 @@ export function MobileTabBar({
           {tabs.map((a) => (
             <Tab key={a.href} area={a} current={area?.href === a.href} badge={badgeOf(a.href)} />
           ))}
-          {more.length > 0 && (
+          {(more.length > 0 || footer || visibleAccountLinks(role).length > 0) && (
             <button
               type="button"
               onClick={() => setMoreOpen((v) => !v)}
@@ -282,6 +331,7 @@ export function MobileTabBar({
                 </li>
               ))}
             </ul>
+            {footer && <div className="border-t border-line px-5 pt-3">{footer}</div>}
           </div>
         </>
       )}
@@ -301,7 +351,7 @@ function Tab({ area, current, badge }: { area: NavArea; current: boolean; badge:
       <span className="relative">
         <Icon href={area.href} className="h-5 w-5" />
         {badge > 0 && (
-          <span className="nums absolute -end-2 -top-1.5 rounded-full bg-warn px-1 text-[9px] font-bold text-white">
+          <span className="nums absolute -end-2 -top-1.5 rounded-full bg-warn px-1 text-[9px] font-bold text-surface">
             {badge}
           </span>
         )}
@@ -315,35 +365,29 @@ export function UploadButton({
   role,
   pathname,
   className = "",
-  collapsible = false,
 }: {
   role: Role;
   pathname: string;
   className?: string;
-  /** في الشريط المنطوي: تبقى «+» ويختفي النصّ. */
-  collapsible?: boolean;
 }) {
   if (!can(role, "document:upload")) return null;
 
+  /*
+    الفعلُ الأكثرُ تكراراً في النظام — فهو الزرُّ الوحيد المملوء في الشريط.
+    وفي صفحة الرفع نفسها يبقى ظاهراً ولا يتلوّن: الضغطُ عليه لا يفعل شيئاً
+    جديداً، فيُعلَن أنّه الموضعُ الحاليّ.
+  */
   const active = pathname === "/upload";
   return (
     <Link
       href="/upload"
-      className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors sm:min-h-0 sm:py-2 ${
-        active ? "border-ink bg-inverse-surface text-inverse-ink" : "border-line hover:border-ink-soft"
+      aria-current={active ? "page" : undefined}
+      className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-opacity lg:min-h-9 ${
+        active ? "border border-line text-muted" : "bg-inverse-surface text-inverse-ink hover:opacity-90"
       } ${className}`}
-      title="ارفع مستنداً"
     >
-      <span aria-hidden>+</span>
-      <span
-        className={
-          collapsible
-            ? "truncate opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100"
-            : ""
-        }
-      >
-        ارفع مستنداً
-      </span>
+      <span aria-hidden className="text-sm leading-none">+</span>
+      ارفع مستنداً
     </Link>
   );
 }

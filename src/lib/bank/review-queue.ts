@@ -70,9 +70,28 @@ export interface Bucketed {
  * حركةً لا يُعرف عمّاذا تُسأل. ولا معنى لعرض مرشّحين لمن لا نعرف من هو.
  */
 export function bucketOf(item: ReviewItem): ReviewBucket {
-  if (item.supplierName === null || item.category === "UNKNOWN") return "RESOLVE";
-  if (item.disposition === "REVIEW") return "REVIEW";
+  if (item.supplierName === null) return "RESOLVE";
+  /*
+    ── البابُ المجهول لا يعني الجهةَ المجهولة ──
+
+    كان كلُّ `UNKNOWN` يذهب إلى «يُحسَم» وفعلُه «عرِّف هذه الجهة» —
+    ومنه حوالاتٌ **عرف المحرّكُ مورّدَها** ولم يجد فاتورةً تطابقها:
+    تقول الشاشةُ «المورّد معروف ولا فاتورة مفتوحة تطابق هذه الدفعة»
+    ثمّ تطلب تعريفَه. وفعلُها الحقّ قيدُها على حسابه (سداد مورّدٍ لا
+    فاتورةٍ بعينها)، وهو ما يقبله الخادمُ أصلاً: يقرأ المورّدَ من
+    الحركة لا من بابها. فيبقى «يُحسَم» لما لا تُعرَف جهتُه، أو ما دخل.
+  */
+  if (item.category === "UNKNOWN" && !knownSupplierPayment(item)) return "RESOLVE";
+  if (item.disposition === "REVIEW" || item.category === "UNKNOWN") return "REVIEW";
   return "CONFIRM";
+}
+
+/** صادرٌ عُرف مورّدُه — ببابه المكتوب أو بترجيح المحرّك قبل أن يُكتَب الباب. */
+function knownSupplierPayment(i: ReviewItem): boolean {
+  return i.direction === "DEBIT"
+    && i.supplierName !== null
+    && Boolean(i.supplierId)
+    && (i.category === "SUPPLIER" || i.category === "UNKNOWN");
 }
 
 export function groupForReview(items: readonly ReviewItem[]): Bucketed[] {
@@ -118,10 +137,7 @@ export function describeQueue(groups: readonly Bucketed[]): string {
  * في شاشة البنك وحدها، وهذه هي الشاشة التي تُسمّى طابور المراجعة.
  */
 export function settleable(i: ReviewItem): boolean {
-  return i.direction === "DEBIT"
-    && i.category === "SUPPLIER"
-    && i.supplierName !== null
-    && i.disposition !== "SUGGEST";
+  return knownSupplierPayment(i) && i.disposition !== "SUGGEST";
 }
 
 /** ما يصلح للتأكيد الجماعيّ — وهو مجموعة «يُؤكَّد» وحدها. */
