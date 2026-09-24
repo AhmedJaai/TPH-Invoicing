@@ -11,28 +11,45 @@ import { GATE_ORDER } from "@/lib/ops/production-gate";
  * آلياً يُفحَص هنا.
  */
 const claude = readFileSync("CLAUDE.md", "utf8");
+/*
+  نُقل التفصيل من `CLAUDE.md` إلى `docs/` (٢٤ سبتمبر ٢٠٢٦) كي لا يُحمَّل في
+  كلّ جلسة — فالحارس يتبع المحتوى إلى موضعه ولا يسقط بسقوطه من هنا.
+*/
+const schemaDoc = readFileSync("docs/data-model/migrations.md", "utf8");
+const modulesDoc = readFileSync("docs/reference/modules.md", "utf8");
+const opsDoc = readFileSync("docs/decisions/engineering-ops.md", "utf8");
+const decisionDocs = readdirSync("docs/decisions")
+  .filter((f) => f.endsWith(".md"))
+  .map((f) => readFileSync(`docs/decisions/${f}`, "utf8"));
+const allDocs = [claude, schemaDoc, modulesDoc, ...decisionDocs].join("\n");
 const scripts = Object.keys(
   (JSON.parse(readFileSync("package.json", "utf8")) as { scripts: Record<string, string> }).scripts,
 );
 
-describe("CLAUDE.md يطابق المستودع", () => {
+describe("CLAUDE.md ووثائق docs/ تطابق المستودع", () => {
   it("جدول الهجرات هو عينُ مجلّد drizzle/sql", () => {
-    const listed = [...claude.matchAll(/^\| `(\d{3}_[\w-]+\.sql)` \|/gm)].map((m) => m[1]).sort();
+    const listed = [...schemaDoc.matchAll(/^\| `(\d{3}_[\w-]+\.sql)` \|/gm)].map((m) => m[1]).sort();
     const onDisk = readdirSync("drizzle/sql").filter((f) => f.endsWith(".sql")).sort();
     expect(listed).toEqual(onDisk);
   });
 
   it("كلّ أمرٍ مذكور موجودٌ في package.json", () => {
     const named = new Set(
-      [...claude.matchAll(/`(?:npm run )?((?:db|drive|ops|bench|try):[\w-]+)`/g)].map((m) => m[1]),
+      [...allDocs.matchAll(/`(?:npm run )?((?:db|drive|ops|bench|try):[\w-]+)`/g)].map((m) => m[1]),
     );
     expect([...named].filter((n) => !scripts.includes(n))).toEqual([]);
   });
 
   it("كلّ ملفٍّ في جدول المكتبات موجود", () => {
-    const files = [...claude.matchAll(/^\| `((?:src|scripts)\/[^`]+\.tsx?)` \|/gm)].map((m) => m[1]);
+    const files = [...modulesDoc.matchAll(/^\| `((?:src|scripts)\/[^`]+\.tsx?)` \|/gm)].map((m) => m[1]);
     expect(files.length).toBeGreaterThan(40);
     expect(files.filter((f) => !existsSync(f))).toEqual([]);
+  });
+
+  it("كلّ مسارٍ يذكره CLAUDE.md موجود — الخريطة التي تدلّ على غائبٍ أسوأ من غيابها", () => {
+    const paths = [...claude.matchAll(/`((?:src|docs|scripts|drizzle)\/[^`*\s]+)`/g)].map((m) => m[1]);
+    expect(paths.length).toBeGreaterThan(20);
+    expect(paths.filter((f) => !existsSync(f))).toEqual([]);
   });
 
   it("لا أمرَ يطبّق المخطّط بلا هجرة", () => {
@@ -61,13 +78,13 @@ export function arabicCount(text: string): number {
   throw new Error(`عددٌ لا يُفهَم في الوثيقة: «${text}»`);
 }
 
-function claimed(re: RegExp): number {
-  const m = re.exec(claude);
-  if (!m) throw new Error(`لم يُعثَر على العدد في CLAUDE.md: ${re}`);
+function claimed(re: RegExp, doc: string): number {
+  const m = re.exec(doc);
+  if (!m) throw new Error(`لم يُعثَر على العدد في الوثيقة: ${re}`);
   return arabicCount(m[1]);
 }
 
-describe("أعدادُ CLAUDE.md تطابق مصادرها", () => {
+describe("أعدادُ الوثائق تطابق مصادرها", () => {
   it("يُفهَم العدد رقماً أو كلمة", () => {
     expect(arabicCount("٤١")).toBe(41);
     expect(arabicCount("أحدَ عشر")).toBe(11);
@@ -78,9 +95,9 @@ describe("أعدادُ CLAUDE.md تطابق مصادرها", () => {
   it("الجداول = عدد pgTable في schema.ts، وأسماؤها المسرودة هي أسماؤها", () => {
     const schema = readFileSync("src/db/schema.ts", "utf8");
     const names = [...schema.matchAll(/pgTable\(\s*"([a-z_]+)"/g)].map((m) => m[1]).sort();
-    expect(claimed(/^## القاعدة — ([٠-٩0-9]+) جدولاً/m)).toBe(names.length);
+    expect(claimed(/^## الجداول — ([٠-٩0-9]+)$/m, schemaDoc)).toBe(names.length);
 
-    const section = claude.slice(claude.indexOf("## القاعدة —"), claude.indexOf("التعريف في `src/db/schema.ts`"));
+    const section = schemaDoc.slice(schemaDoc.indexOf("## الجداول —"), schemaDoc.indexOf("التعريف في `src/db/schema.ts`"));
     const listed = [...section.matchAll(/`([a-z_]+)`/g)].map((m) => m[1]).sort();
     expect(listed).toEqual(names);
   });
@@ -88,7 +105,7 @@ describe("أعدادُ CLAUDE.md تطابق مصادرها", () => {
   it("سيناريوهات الشهادة = ما في certify-flow.ts", () => {
     const flow = readFileSync("scripts/certify-flow.ts", "utf8");
     const ordinals = new Set([...flow.matchAll(/"([٠-٩]+) · /g)].map((m) => m[1]));
-    expect(claimed(/\| `npm run ops:certify` \| (\S+(?: عشر)?) سيناريو/)).toBe(ordinals.size);
+    expect(claimed(/\| `npm run ops:certify` \| (\S+(?: عشر)?) سيناريو/, opsDoc)).toBe(ordinals.size);
   });
 
   /*
@@ -96,6 +113,6 @@ describe("أعدادُ CLAUDE.md تطابق مصادرها", () => {
     صُحّحت الوثيقة، فصار الفحص حارساً: من يضيف بنداً إلى البوّابة يصحّح عددها.
   */
   it("بنود البوّابة = GATE_ORDER.length", () => {
-    expect(claimed(/\| `npm run ops:gate` \| (\S+(?: عشر)?) بنداً/)).toBe(GATE_ORDER.length);
+    expect(claimed(/\| `npm run ops:gate` \| (\S+(?: عشر)?) بنداً/, opsDoc)).toBe(GATE_ORDER.length);
   });
 });

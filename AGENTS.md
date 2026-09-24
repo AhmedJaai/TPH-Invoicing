@@ -42,7 +42,9 @@ Investigate only until you can act, then act.
 - Do not stay in analysis once you have enough to make a change.
 - Do not write audits, plans, or review documents unless explicitly asked.
 - Documentation follows code, and is short. A decision gets one or two lines in
-  `CLAUDE.md`, not an essay. Never document intent that isn't implemented.
+  the matching `docs/decisions/*.md` file, not an essay — and never in
+  `CLAUDE.md` unless nearly every task needs it. Never document intent that
+  isn't implemented.
 
 ## 3. No checklist theater
 
