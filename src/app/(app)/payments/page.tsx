@@ -117,9 +117,19 @@ export default async function PaymentsPage({
         </div>
         <div className="rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           <p className="text-xs text-muted">ضريبة معرّضة</p>
-          <p className={`mt-1 text-xl font-bold ${run.vatAtRiskMinor ? "text-danger" : ""}`}>
-            <Money minor={run.vatAtRiskMinor} />
-          </p>
+          {run.vatAtRiskUnknown > 0 && run.vatAtRiskMinor === 0 ? (
+            <p className="mt-1 text-xl font-bold text-muted">غير معروف</p>
+          ) : (
+            <p className={`mt-1 text-xl font-bold ${run.vatAtRiskMinor ? "text-danger" : ""}`}>
+              <Money minor={run.vatAtRiskMinor} />
+            </p>
+          )}
+          {run.vatAtRiskUnknown > 0 && (
+            <p className="mt-1 text-xs text-muted">
+              {run.vatAtRiskMinor > 0 ? "وأكثر: " : ""}
+              {countNoun(run.vatAtRiskUnknown, INVOICE)} بلا ضريبةٍ مقروءة
+            </p>
+          )}
         </div>
         <div className="flex items-center rounded-2xl border border-line bg-raised shadow-raised px-4 py-3">
           {run.ready.length > 0 ? (

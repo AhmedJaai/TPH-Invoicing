@@ -59,8 +59,12 @@ export interface PaymentRun {
   /** محجوز حتى تُعالَج المشكلة */
   held: HeldInvoice[];
   heldTotalMinor: number;
-  /** ضريبة مدخلات معرّضة داخل المحجوز */
+  /**
+   * ضريبة مدخلات معرّضة داخل المحجوز: ما حُجز لأنّ خصمه لا يجوز. وما ليست
+   * ضريبتُه مقروءة يُعَدّ في `vatAtRiskUnknown` ولا يُجمَع صفراً.
+   */
   vatAtRiskMinor: number;
+  vatAtRiskUnknown: number;
 }
 
 const HOLD_TEXT: Record<HoldReason, string> = {
@@ -132,6 +136,8 @@ export function buildPaymentRun(
   }
 
   const all = [...bySupplier.values()];
+  // ما لم يُقرأ أو لم يُؤكَّد لا يُعرَف أنّ ضريبته ضائعة — المعرّض ما لا يُخصم يقيناً
+  const atRisk = held.filter((h) => h.reason === "NOT_TAX_VALID" || h.reason === "NO_VAT_DEDUCTION");
   const ready = all.filter((s) => s.totalMinor > 0).sort((a, b) => b.totalMinor - a.totalMinor);
   const coveredByCredit = all.filter((s) => s.totalMinor === 0);
 
@@ -142,7 +148,8 @@ export function buildPaymentRun(
     readyTotalMinor: ready.reduce((s, r) => s + r.totalMinor, 0),
     held,
     heldTotalMinor: held.reduce((s, h) => s + (h.invoice.totalMinor - h.invoice.allocatedMinor), 0),
-    vatAtRiskMinor: held.reduce((s, h) => s + (h.invoice.vatMinor ?? 0), 0),
+    vatAtRiskMinor: atRisk.reduce((s, h) => s + (h.invoice.vatMinor ?? 0), 0),
+    vatAtRiskUnknown: atRisk.filter((h) => h.invoice.vatMinor === null).length,
   };
 }
 

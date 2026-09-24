@@ -173,10 +173,16 @@ describe("المجهول لا يُسدَّد ولا يُطالَب صاحبه", 
 
   it("الضريبة المجهولة لا تُجمع في «المعرّض» كصفر", () => {
     const run = buildPaymentRun(
-      [{ ...base, taxStatus: "UNKNOWN", inputVatStatus: "UNKNOWN" }],
+      [
+        { ...base, invoiceId: "u", taxStatus: "UNKNOWN", inputVatStatus: "UNKNOWN" },
+        { ...base, invoiceId: "b", taxStatus: "INVALID", inputVatStatus: "NOT_ELIGIBLE" },
+        { ...base, invoiceId: "k", taxStatus: "INVALID", inputVatStatus: "NOT_ELIGIBLE", vatMinor: 2_000 },
+      ],
       "2026-08",
     );
-    expect(run.vatAtRiskMinor).toBe(0);
+    // المجهولة الحال لا يُعرَف أنّ ضريبتها ضائعة؛ والناقصة بلا ضريبة مقروءة تُعَدّ ولا تُجمَع
+    expect(run.vatAtRiskMinor).toBe(2_000);
+    expect(run.vatAtRiskUnknown).toBe(1);
   });
 });
 
