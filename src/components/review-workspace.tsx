@@ -241,17 +241,24 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
   return (
     <div className="space-y-6">
       {/* الخلاصة تُقرأ في ثانية: «يُؤكَّد ٣٠١ · يُراجَع ١٧ · يُحسَم ٩». */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      {/*
+        ثلاثٌ في صفٍّ واحد على كلّ مقاس. كانت على الجوّال بطاقاتٍ متراصّة
+        تأكل أربعمئة بكسلٍ قبل أوّل بند — ومنها بطاقةٌ خضراء لمجموعةٍ فارغة.
+        فالشرحُ يظهر حيث يتّسع له المكان، والفارغةُ تهدأ.
+      */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {groups.map((g) => {
           const left = g.items.filter((i) => !done.has(i.transactionId)).length;
           return (
             <div
               key={g.bucket}
-              className={`rounded-2xl border px-4 py-3 shadow-raised ${BUCKET_TONE[g.bucket]}`}
+              className={`rounded-2xl border px-3 py-2.5 shadow-raised sm:px-4 sm:py-3 ${
+                left === 0 ? "border-line bg-raised text-muted" : BUCKET_TONE[g.bucket]
+              }`}
             >
               <p className="text-xs font-bold">{BUCKET_LABEL[g.bucket]}</p>
-              <p className="nums mt-1 font-display text-3xl font-bold leading-none">{left}</p>
-              <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">{BUCKET_HINT[g.bucket]}</p>
+              <p className="nums mt-1 font-display text-2xl font-bold leading-none sm:text-3xl">{left}</p>
+              <p className="mt-1.5 hidden text-xs leading-relaxed text-ink-soft sm:block">{BUCKET_HINT[g.bucket]}</p>
               {g.amountMinor > 0 && (
                 /* المبلغ كان بأضعف رمادٍ في البطاقة — وهو المال نفسه */
                 <p className="mt-1 text-xs text-ink-soft">
