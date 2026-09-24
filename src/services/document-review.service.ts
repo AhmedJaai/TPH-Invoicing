@@ -53,5 +53,3 @@ export async function loadPendingReview(limit = 200) {
     }) as AutoArchiveVerdict,
   }));
 }
-
-export type PendingReviewRow = Awaited<ReturnType<typeof loadPendingReview>>[number];
