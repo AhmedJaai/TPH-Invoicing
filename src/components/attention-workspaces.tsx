@@ -209,19 +209,20 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                   {canUpload && <RejectDocument documentId={d.id} />}
                 </span>
               </div>
-              {d.invoiceNumber === null && d.recordable ? (
+              {d.recordable ? (
                 <p className="mt-2 text-[11px] leading-relaxed text-ok">
-                  قراءتُه كاملة (مورّدٌ ورقمٌ وتاريخٌ وإجماليّ) — لم تُقيَّد فاتورتُه لأنّ تاريخه كُتب بصيغةٍ كانت تُرمى.
-                  تُقيَّد في المزامنة القادمة، أو بالضغط أعلاه.
+                  قراءتُه كاملة — يُقيَّد ويُحسَم تلقائياً الآن، أو بالضغط أعلاه.
                 </p>
-              ) : d.invoiceNumber === null ? (
+              ) : d.invoiceId === null && d.statementId === null ? (
                 <div className="mt-2 text-[11px] leading-relaxed text-warn">
-                  <p>لم تُقيَّد له فاتورة — ينقصه:</p>
+                  <p>لم يُقيَّد — ينقصه:</p>
                   <ul className="list-inside list-disc">
-                    {(d.missing.length > 0 ? d.missing : ["لم يُقرأ منه ما يُقيَّد — أو ليس فاتورة"]).map((m) => <li key={m}>{m}</li>)}
+                    {(d.missing.length > 0 ? d.missing : ["ليس فاتورةً ولا كشفاً — إيصالٌ أو نوعٌ يُحسَم بيد"]).map((m) => <li key={m}>{m}</li>)}
                   </ul>
                   <p className="text-muted">ارفضه وارفعه من صفحة الرفع لتكتب الناقص بيدك.</p>
                 </div>
+              ) : d.statementId !== null ? (
+                <p className="mt-2 text-[11px] text-muted">كشفُ حسابٍ مقيَّد — لا يُسأل عن رقم فاتورة.</p>
               ) : (
                 <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-5">
                   <ReadField label="رقم الفاتورة" value={<bdi className="nums">{d.invoiceNumber}</bdi>} />
@@ -231,10 +232,10 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                   <ReadField label="الإجمالي" value={d.totalMinor === null ? "غير معروف" : <Money minor={d.totalMinor} />} />
                 </dl>
               )}
-              {d.invoiceId !== null && gaps.length === 0 && (
-                <p className="mt-2 text-[11px] text-ok">تجتمع فيه الشروطُ الأربعة — يُعتمَد مع ما فوقه بضغطةٍ واحدة.</p>
+              {(d.invoiceId !== null || d.statementId !== null) && gaps.length === 0 && (
+                <p className="mt-2 text-[11px] text-ok">تجتمع فيه الشروط — يُعتمَد تلقائياً.</p>
               )}
-              {d.invoiceId !== null && gaps.length > 0 && (
+              {(d.invoiceId !== null || d.statementId !== null) && gaps.length > 0 && (
                 <ul className="mt-2 space-y-0.5 text-[11px] text-warn">
                   {gaps.filter((g) => g !== "NOT_RECORDED").map((g) => (
                     <li key={g}>لم يدخل وحده: {GAP_TEXT[g]}</li>

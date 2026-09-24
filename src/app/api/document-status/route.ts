@@ -30,7 +30,7 @@ interface Body {
   documentId?: string;
   reason?: string;
   /** «confirm»: ما قرأه النموذج صحيح فيُؤرشَف — والافتراضيّ الرفض */
-  action?: "reject" | "confirm" | "confirm-eligible";
+  action?: "reject" | "confirm" | "confirm-eligible" | "restore";
 }
 
 const UNDECIDED = ["PENDING", "EXTRACTED", "NEEDS_REVIEW"] as const;
@@ -90,6 +90,37 @@ export async function POST(request: Request) {
     التحويلات حتى يُؤكَّد. والتأكيد إقرارٌ بمبلغٍ مستحقّ، فيحتاج من يرى
     المبالغ — لا مَن يرفع المستندات وحده.
   */
+  /*
+    ── إعادةُ المرفوض إلى المراجعة ──
+
+    الرفضُ يُسقط الفاتورةَ ويُبقي الملفّ وقراءتَه. فالإعادةُ تحوّل الحال
+    وحدها، والاستدراكُ يقيّده ويحكم عليه كأيّ مستندٍ ينتظر.
+  */
+  if (body.action === "restore") {
+    if (!can(user.role, "amounts:view")) {
+      return NextResponse.json({ error: "الإعادة تحتاج صلاحية عرض المبالغ" }, { status: 403 });
+    }
+    const restored = await db.transaction(async (t) => {
+      const rows = await t.update(documents).set({ status: "NEEDS_REVIEW" })
+        .where(and(eq(documents.id, documentId), eq(documents.status, "REJECTED")))
+        .returning({ id: documents.id, fileName: documents.fileName });
+      if (rows.length === 0) return null;
+      await recordAudit({
+        actorId: user.id,
+        action: "DOCUMENT_STATUS_CHANGED",
+        entityType: "document",
+        entityId: rows[0].id,
+        before: { الحال: "مرفوض" },
+        after: { الملف: rows[0].fileName, الحال: "ينتظر المراجعة", السبب: "أُعيد من الرفض" },
+      }, t);
+      return rows[0];
+    });
+    if (!restored) {
+      return NextResponse.json({ error: "المستند ليس مرفوضاً — ربما أُعيد من نافذةٍ أخرى" }, { status: 409 });
+    }
+    return NextResponse.json({ ok: true, message: "أُعيد للمراجعة — يُقيَّد ويُحسَم تلقائياً إن اجتمعت شروطه" });
+  }
+
   if (body.action === "confirm") {
     if (!can(user.role, "amounts:view")) {
       return NextResponse.json({ error: "تأكيد المستند يحتاج صلاحية عرض المبالغ" }, { status: 403 });

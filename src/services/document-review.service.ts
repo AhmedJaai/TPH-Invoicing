@@ -7,9 +7,10 @@
 
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { documents, invoices, suppliers } from "@/db/schema";
+import { documents, invoices, statements, suppliers } from "@/db/schema";
 import type { drive_v3 } from "googleapis";
-import { autoArchive, type AutoArchiveVerdict } from "@/lib/extraction/auto-archive";
+import { autoArchive, sumLineTotals, type AutoArchiveVerdict } from "@/lib/extraction/auto-archive";
+import { factsFromFileName } from "@/lib/extraction/filename-facts";
 import { recordAudit } from "@/lib/audit";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
@@ -40,43 +41,56 @@ export async function loadPendingReview(limit = 200) {
       supplierVat: suppliers.vatNumber,
       supplierName: suppliers.nameAr,
       reading: documents.extractionJson,
+      statementId: statements.id,
     })
     .from(documents)
     .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
     .leftJoin(invoices, eq(invoices.documentId, documents.id))
+    .leftJoin(statements, eq(statements.documentId, documents.id))
     .where(inArray(documents.status, ["PENDING", "NEEDS_REVIEW"]))
     .orderBy(asc(documents.periodMonth))
     .limit(limit);
 
-  return rows.map(({ reading, ...d }) => ({
-    ...d,
-    /* ما نقص بعينه حين لم تُقيَّد فاتورة — من القراءة المحفوظة */
-    missing: d.invoiceId === null ? missingFor(reading, d.supplierId !== null) : [],
-    /* لا فاتورةَ له وقراءتُه كاملة — تُقيَّد عند الاستدراك (تاريخٌ كان يُرمى) */
-    recordable: d.invoiceId === null
-      && ["TAX_INVOICE", "SIMPLIFIED_INVOICE"].includes((reading as { documentKind?: string } | null)?.documentKind ?? "")
-      && missingFor(reading, d.supplierId !== null).length === 0,
-    verdict: autoArchive({
-      kind: d.kind,
-      invoiceRecorded: d.invoiceId !== null,
-      textSource: d.textSource,
-      supplierKnown: d.supplierId !== null,
-      subtotalMinor: d.subtotalMinor,
-      vatMinor: d.vatMinor,
-      totalMinor: d.totalMinor,
-      invoiceNumber: d.invoiceNumber,
-      fileName: d.fileName,
-    }) as AutoArchiveVerdict,
-  }));
+  return rows.map(({ reading, ...d }) => {
+    const x = (reading ?? {}) as { documentKind?: string; lines?: { lineTotal?: string }[] };
+    const readKind = x.documentKind ?? d.kind;
+    const isStatement = readKind === "STATEMENT" || d.kind === "STATEMENT";
+    const recorded = d.invoiceId !== null || d.statementId !== null;
+    const missing = recorded ? [] : missingFor(reading, d.supplierId !== null, d.fileName, isStatement);
+    return {
+      ...d,
+      /* ما نقص بعينه حين لم يُقيَّد شيء — من القراءة المحفوظة واسم الملفّ */
+      missing,
+      /* لا قيدَ له وقراءتُه كاملة — يُقيَّد عند الاستدراك */
+      recordable: !recorded
+        && (isStatement || ["TAX_INVOICE", "SIMPLIFIED_INVOICE"].includes(readKind ?? ""))
+        && missing.length === 0,
+      verdict: autoArchive({
+        kind: isStatement ? "STATEMENT" : d.kind,
+        invoiceRecorded: d.invoiceId !== null,
+        statementRecorded: d.statementId !== null,
+        textSource: d.textSource,
+        supplierKnown: d.supplierId !== null,
+        subtotalMinor: d.subtotalMinor,
+        vatMinor: d.vatMinor,
+        totalMinor: d.totalMinor,
+        invoiceNumber: d.invoiceNumber,
+        fileName: d.fileName,
+        linesTotalMinor: sumLineTotals(x.lines, (v) => parseRiyals(v)),
+      }) as AutoArchiveVerdict,
+    };
+  });
 }
 
-function missingFor(reading: unknown, supplierKnown: boolean): string[] {
+function missingFor(reading: unknown, supplierKnown: boolean, fileName: string, isStatement: boolean): string[] {
+  if (isStatement) return supplierKnown ? [] : ["المورّد: لم يُعرَف من الاسم المقروء"];
   const x = (reading ?? {}) as { invoiceNumber?: string; invoiceDate?: string; totalAmount?: string };
+  const fromName = factsFromFileName(fileName);
   return missingFromReading({
     supplierKnown,
-    invoiceNumber: x.invoiceNumber?.trim() || null,
-    invoiceDate: normalizeDocumentDate(x.invoiceDate),
-    totalMinor: parseRiyals(x.totalAmount ?? ""),
+    invoiceNumber: x.invoiceNumber?.trim() || fromName.invoiceNumber,
+    invoiceDate: normalizeDocumentDate(x.invoiceDate) ?? fromName.date,
+    totalMinor: parseRiyals(x.totalAmount ?? "") ?? fromName.totalMinor,
     rawDate: x.invoiceDate?.trim() || null,
   });
 }

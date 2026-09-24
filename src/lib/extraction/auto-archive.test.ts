@@ -61,6 +61,23 @@ describe("الأرشفةُ الآليّة", () => {
     expect(autoArchive({ ...clean, kind: "SIMPLIFIED_INVOICE" }).auto).toBe(true);
   });
 
+  it("فاتورةٌ بلا سطر ضريبة: البنودُ تساوي الإجماليّ — أوراق الزيتون", () => {
+    const olive = { ...clean, textSource: null, subtotalMinor: null, vatMinor: null, totalMinor: 26_000, linesTotalMinor: 26_000 };
+    expect(autoArchive(olive).auto).toBe(true);
+    expect(autoArchive({ ...olive, linesTotalMinor: 25_000 }).gaps).toEqual(["ARITHMETIC", "UNVERIFIED_IMAGE"]);
+  });
+
+  it("والبنودُ قبل الضريبة + الضريبة = الإجمالي", () => {
+    expect(autoArchive({ ...clean, subtotalMinor: null, linesTotalMinor: 40_000 }).auto).toBe(true);
+  });
+
+  it("الكشفُ لا يُسأل عن رقم فاتورة ولا حساب — مورّدُه وقيدُه يكفيان", () => {
+    const st = { ...clean, kind: "STATEMENT", invoiceNumber: null, subtotalMinor: null, vatMinor: null, totalMinor: null };
+    expect(autoArchive({ ...st, statementRecorded: true }).auto).toBe(true);
+    expect(autoArchive({ ...st, statementRecorded: false }).gaps).toEqual(["NOT_RECORDED"]);
+    expect(autoArchive({ ...st, supplierKnown: false }).gaps).toEqual(["SUPPLIER_UNKNOWN"]);
+  });
+
   it("ولكلّ شرطٍ جملةٌ تُقال", () => {
     for (const text of Object.values(GAP_TEXT)) expect(text.length).toBeGreaterThan(10);
   });
