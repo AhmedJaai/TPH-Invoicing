@@ -13,6 +13,8 @@ import { documents, invoices, statements } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { assertMonthsOpen } from "@/services/month-guard";
 import { recordAudit } from "@/lib/audit";
+import { applySupplierCredit } from "@/services/supplier-credit.service";
+import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { can } from "@/lib/permissions";
 import { formatRiyalsDisplay } from "@/lib/money";
 
@@ -81,6 +83,21 @@ export async function POST(request: Request) {
         before: { الحال: "ينتظر المراجعة" },
         after: { الملف: rows[0].fileName, الحال: "مؤرشف", السبب: "أكّد ما قرأه النموذج" },
       }, t);
+      /*
+        الرفعُ ممّن لا يرى المبالغ يُقيَّد «ينتظر المراجعة» ولا يُخصم عليه
+        رصيدُ المورّد — بانتظار هذا التأكيد بعينه. فكان التأكيدُ يحوّل
+        الحال وحدها، وتبقى الفاتورةُ مستحقّةً كاملةً ومالٌ دُفع للمورّد
+        قبلها لا يُخصم منها: فتدخل دفعةَ الشهر ويُدفَع الريالُ مرّتين.
+        والخصمُ لا يتكرّر — ما خُصم في المزامنة لا يُخصم ثانيةً.
+      */
+      const [inv] = await t
+        .select({ supplierId: invoices.supplierId })
+        .from(invoices)
+        .where(eq(invoices.documentId, rows[0].id))
+        .limit(1);
+      if (inv?.supplierId) {
+        await applySupplierCredit(t, inv.supplierId, { forwardDays: SETTLEMENT_FORWARD_DAYS });
+      }
       return { ...rows[0], invoices: linked?.invoices ?? 0, statements: linked?.statements ?? 0 };
     });
     if (!confirmed) {
@@ -88,10 +105,10 @@ export async function POST(request: Request) {
     }
     /* الرسالة تقول ما وقع: لا «دخلت فاتورتُه الدفعة» لمستندٍ لا فاتورة له */
     const message = confirmed.invoices > 0
-      ? "أُكِّد المستند — وتدخل فاتورتُه دفعةَ الشهر"
+      ? "اعتُمد المستند — وتدخل فاتورتُه دفعةَ الشهر، ويُخصم منها ما دُفع للمورّد مقدَّماً"
       : confirmed.statements > 0
-        ? "أُكِّد الكشف"
-        : "أُكِّد المستند — ولا فاتورةَ مقيَّدة له بعد: ارفعه من صفحة الرفع ليُقرأ ويُقيَّد";
+        ? "اعتُمد الكشف"
+        : "اعتُمد المستند — ولا فاتورةَ مقيَّدة له بعد: ارفعه من صفحة الرفع ليُقرأ ويُقيَّد";
     return NextResponse.json({ ok: true, message });
   }
 

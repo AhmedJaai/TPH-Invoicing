@@ -140,7 +140,13 @@ export async function InboxWorkspace({ canUpload }: { canUpload: boolean }) {
       driveFileId: documents.driveFileId,
       periodMonth: documents.periodMonth,
       totalMinor: invoices.totalMinor,
+      subtotalMinor: invoices.subtotalMinor,
+      vatMinor: invoices.vatMinor,
+      invoiceDate: invoices.invoiceDate,
       invoiceNumber: invoices.invoiceNumber,
+      sellerVat: invoices.sellerVat,
+      supplierVat: suppliers.vatNumber,
+      textSource: documents.textSource,
       supplierName: suppliers.nameAr,
     })
     .from(documents)
@@ -154,41 +160,93 @@ export async function InboxWorkspace({ canUpload }: { canUpload: boolean }) {
     return <p className="text-xs text-ok">لا مستند ينتظر — كلُّ ما وصل اعتُمد أو رُفض.</p>;
   }
 
+  /*
+    ── ما المطلوب، ولماذا، وماذا يتغيّر ──
+
+    كانت القائمةُ اسماً ومبلغاً وزرَّين، فيسأل صاحبُ المقهى: لماذا لم
+    يدخل وحده؟ وماذا أراجع؟ وما الذي يتغيّر إن أكّدت؟ والجوابُ كان في
+    تعليقات الشيفرة لا على الشاشة. فيُعرَض ما قرأه النموذج حقلاً حقلاً
+    ليُقارَن بالورقة، ويُقال من أين قُرئ (نصٌّ مكتوب أم صورة)، وأيطابق
+    الرقمُ الضريبيّ المورّدَ المسجَّل — ثمّ ما يقع بعد التأكيد.
+  */
   return (
-    <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
-      {rows.map((d) => (
-        <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5">
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-xs font-bold">
-              {d.supplierName ? `${d.supplierName} — ` : ""}
-              {d.invoiceNumber ?? d.fileName}
-            </span>
-            <span className="block truncate text-[11px] text-muted">
-              <bdi className="nums">{d.periodMonth}</bdi>
-              {d.totalMinor !== null && <> · <Money minor={d.totalMinor} /></>}
-            </span>
-          </span>
-          <span className="flex shrink-0 flex-wrap items-center gap-1.5">
-            {/*
-              «افتحه» قبل «اعتمده» عمداً: الاعتمادُ شهادةٌ بأنّ ما قرأه
-              النموذج يطابق الورقة، ولا تُعطى شهادةٌ بلا نظر.
-            */}
-            {d.driveFileId && (
-              <a
-                href={`https://drive.google.com/file/d/${d.driveFileId}/view`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonClass("quiet", "sm")}
-              >
-                افتح المستند
-              </a>
-            )}
-            {canUpload && <ConfirmDocument documentId={d.id} />}
-            {canUpload && <RejectDocument documentId={d.id} />}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-3">
+      <p className="rounded-xl border border-line bg-sunken px-3 py-2.5 text-[11px] leading-relaxed text-ink-soft">
+        قرأ النموذجُ هذه المستندات — إمّا لأنّ <strong>اسمَ الملفّ لم يُكتب على الصيغة</strong> فلم يُقرأ
+        منه شيء، وإمّا لأنّ من رفعها لا يرى المبالغ. والقراءةُ قد تُخطئ في رقمٍ أو تاريخ وتبقى
+        متّسقةً حسابياً، فلا يدخل مالٌ إلى ملفّ التحويلات على قراءةٍ لم يرها إنسان.{" "}
+        <strong>المطلوب:</strong> افتح المستند وقارن الأرقام أدناه بالورقة. إن طابقت فاعتمده —
+        فتدخل فاتورتُه دفعةَ الشهر ويُخصم منها ما دفعتَه للمورّد مقدَّماً. وإن اختلف شيءٌ فارفضه
+        وارفعه من صفحة الرفع لتصحّح الحقل قبل الحفظ.
+      </p>
+      <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+        {rows.map((d) => {
+          const vatMatches = d.sellerVat && d.supplierVat ? d.sellerVat.trim() === d.supplierVat.trim() : null;
+          return (
+            <li key={d.id} className="px-3.5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-bold">
+                    {d.supplierName ?? "مورّدٌ لم يُعرَف"}
+                  </span>
+                  <span className="block truncate text-[11px] text-muted" dir="ltr">{d.fileName}</span>
+                </span>
+                <span className="flex shrink-0 flex-wrap items-center gap-1.5">
+                  {/*
+                    «افتحه» قبل «أكّده» عمداً: التأكيدُ شهادةٌ بأنّ ما قرأه
+                    النموذج يطابق الورقة، ولا تُعطى شهادةٌ بلا نظر.
+                  */}
+                  {d.driveFileId && (
+                    <a
+                      href={`https://drive.google.com/file/d/${d.driveFileId}/view`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={buttonClass("quiet", "sm")}
+                    >
+                      افتح المستند
+                    </a>
+                  )}
+                  {canUpload && <ConfirmDocument documentId={d.id} />}
+                  {canUpload && <RejectDocument documentId={d.id} />}
+                </span>
+              </div>
+              {d.invoiceNumber === null ? (
+                <p className="mt-2 text-[11px] leading-relaxed text-warn">
+                  لم تُقيَّد له فاتورة — القراءةُ لم تكفِ لقيدها (مورّدٌ أو مبلغٌ أو تاريخٌ لم يُعرَف).
+                  ارفضه وارفعه من صفحة الرفع لتكمل ما نقص.
+                </p>
+              ) : (
+                <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-5">
+                  <ReadField label="رقم الفاتورة" value={<bdi className="nums">{d.invoiceNumber}</bdi>} />
+                  <ReadField label="التاريخ" value={d.invoiceDate ? <bdi className="nums">{formatDay(d.invoiceDate)}</bdi> : "غير معروف"} />
+                  <ReadField label="قبل الضريبة" value={d.subtotalMinor === null ? "غير معروف" : <Money minor={d.subtotalMinor} />} />
+                  <ReadField label="الضريبة" value={d.vatMinor === null ? "غير معروف" : <Money minor={d.vatMinor} />} />
+                  <ReadField label="الإجمالي" value={d.totalMinor === null ? "غير معروف" : <Money minor={d.totalMinor} />} />
+                </dl>
+              )}
+              <p className="mt-1.5 text-[11px] text-muted">
+                {d.textSource === "TEXT"
+                  ? "قُرئ من نصٍّ مكتوب في الملفّ — الأرقامُ منقولة، والخطأ نادر."
+                  : d.textSource
+                    ? "قُرئ من صورةٍ ممسوحة — الأرقامُ مقروءةٌ ظنّاً، فقارِنها بعناية."
+                    : null}
+                {vatMatches === true && " · الرقمُ الضريبيّ يطابق المورّد المسجَّل."}
+                {vatMatches === false && <span className="text-warn"> · الرقمُ الضريبيّ لا يطابق المورّد المسجَّل — تحقّق من المورّد.</span>}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function ReadField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] text-muted">{label}</dt>
+      <dd className="truncate text-xs font-bold">{value}</dd>
+    </div>
   );
 }
 
