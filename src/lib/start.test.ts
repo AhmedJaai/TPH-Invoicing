@@ -25,7 +25,7 @@ describe("أوّلُ يوم", () => {
   it("كلُّ خطوةٍ تفتح صفحةً موجودة", () => {
     for (const step of startState({ documents: 0, bankTransactions: 0, recipes: 0 }).steps) {
       const path = step.href.split("#")[0];
-      expect(existsSync(`src/app${path}/page.tsx`), step.href).toBe(true);
+      expect(existsSync(`src/app/(app)${path}/page.tsx`), step.href).toBe(true);
     }
   });
 });

@@ -32,20 +32,23 @@ const WIDTH: Record<ShellWidth, string> = {
   wide: "max-w-[1400px]",
 };
 
-export async function PageShell({
+/**
+ * القشرةُ الدائمة — في تخطيط `(app)` لا في كلّ صفحة.
+ *
+ * كانت تُرسَم داخل كلّ صفحة، فيقع هيكلُ التحميل (`loading.tsx`) **مكانها**:
+ * يضغط صاحبُ المقهى «حركة البنك» فيختفي الشريطُ الجانبيّ كلُّه ثانيتين
+ * ويبقى عنوانٌ وأشرطةٌ رماديّة على سواد — كأنّه خرج من التطبيق. وكان
+ * عدّادُ «يحتاج قرارك» يُعاد حسابُه (ستّة عشر استعلاماً) في كلّ تنقّل.
+ *
+ * والتخطيطُ يبقى بين الصفحات: الشريطُ ثابت، والهيكلُ يقع في موضع المحتوى
+ * وحده. والعدّادان يتجدّدان مع كلّ فعلٍ (`router.refresh()` يعيد رسم
+ * التخطيط) لا مع كلّ ضغطة رابط.
+ */
+export async function AppShell({
   user,
-  title,
-  intro,
-  actions,
-  width = "page",
   children,
 }: {
   user: { name?: string | null; role: Role };
-  title: string;
-  intro?: string;
-  /** أفعال الصفحة، تظهر بمحاذاة العنوان على الشاشات الواسعة. */
-  actions?: React.ReactNode;
-  width?: ShellWidth;
   children: React.ReactNode;
 }) {
   /*
@@ -66,13 +69,6 @@ export async function PageShell({
 
   return (
     <div className="min-h-screen lg:flex">
-      {/*
-        عنوانُ اللسان عنوانُ الصفحة. كانت الألسنةُ كلُّها «فواتير ذا بوبليك
-        هاوس» فلا يُفرَّق بينها في المتصفّح ولا في سجلّه — ومن فتح المورّدَ
-        والبنكَ والجردَ جنباً إلى جنب لا يعرف أيّها أيّها. وReact يرفع
-        `<title>` إلى الترويسة أينما رُسم، فلا تحتاج كلُّ صفحةٍ metadata.
-      */}
-      <title>{`${title} · ذا بوبليك هاوس`}</title>
       <a href="#main" className="skip-link">
         تخطَّ إلى المحتوى
       </a>
@@ -80,8 +76,7 @@ export async function PageShell({
       {/*
         ── الشريط الجانبيّ: ثابتٌ بأسمائه ──
 
-        كان ينطوي إلى أيقوناتٍ بلا أسماء ويتّسع بالفأرة (انظر `Sidebar`).
-        وصار يحمل ما كانت الترويسةُ تحمله على الحاسوب — البحثَ والرفعَ
+        يحمل ما كانت الترويسةُ تحمله على الحاسوب — البحثَ والرفعَ
         والمستخدمَ وضوابطَ العرض — فلا ترويسةَ فوق المحتوى تأكل ستّين
         بكسلاً من كلّ صفحة، والعنوانُ أوّلُ ما يُقرأ.
       */}
@@ -113,31 +108,7 @@ export async function PageShell({
           </div>
         </header>
 
-        {/* الحشو السفليّ يُخلي مكان الشريط السفليّ على الجوّال */}
-        <main id="main" className={`mx-auto ${WIDTH[width]} px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-16 lg:pt-10`}>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="font-display text-[1.6rem] font-black leading-[1.15] tracking-tight sm:text-[2rem]">
-                {title}
-              </h1>
-              {intro && (
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">{intro}</p>
-              )}
-            </div>
-            {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
-          </div>
-
-          {/*
-            ألسنةُ المساحة تحت عنوانها على الجوّال وحده. وعلى الحاسوب هي في
-            الشريط تحت مساحتها — وضابطان لشيءٍ واحد في شاشةٍ واحدة يُقرآن
-            شيئين.
-          */}
-          <div className="mt-5 lg:hidden">
-            <AreaTabs role={user.role} />
-          </div>
-
-          <div className="mt-6 lg:mt-8">{children}</div>
-        </main>
+        {children}
       </div>
 
       {/* خارج الترويسة عمداً: `backdrop-blur` عليها يحبس `fixed` داخلها */}
@@ -146,6 +117,64 @@ export async function PageShell({
       <CommandPalette role={user.role} canSearch={can(user.role, "document:view")} />
       {can(user.role, "document:upload") && can(user.role, "amounts:view") && <AutoProcess />}
     </div>
+  );
+}
+
+/** موضعُ المحتوى بعرضه — تقرؤه الصفحةُ وهيكلُ تحميلها معاً، فلا يقفز المحتوى حين يصل. */
+export function mainClass(width: ShellWidth = "page"): string {
+  return `mx-auto ${WIDTH[width]} px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-16 lg:pt-10`;
+}
+
+/**
+ * رأسُ الصفحة ومحتواها — والقشرةُ حولها في التخطيط.
+ *
+ * `user` باقٍ في التوقيع لألسنة المساحة على الجوّال (تتبع الدور).
+ */
+export function PageShell({
+  user,
+  title,
+  intro,
+  actions,
+  width = "page",
+  children,
+}: {
+  user: { name?: string | null; role: Role };
+  title: string;
+  intro?: string;
+  /** أفعال الصفحة، تظهر بمحاذاة العنوان على الشاشات الواسعة. */
+  actions?: React.ReactNode;
+  width?: ShellWidth;
+  children: React.ReactNode;
+}) {
+  return (
+    <main id="main" className={mainClass(width)}>
+      {/*
+        عنوانُ اللسان عنوانُ الصفحة — وReact يرفع `<title>` إلى الترويسة
+        أينما رُسم، فلا تحتاج كلُّ صفحةٍ metadata.
+      */}
+      <title>{`${title} · ذا بوبليك هاوس`}</title>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-[1.6rem] font-black leading-[1.15] tracking-tight sm:text-[2rem]">
+            {title}
+          </h1>
+          {intro && (
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">{intro}</p>
+          )}
+        </div>
+        {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
+      </div>
+
+      {/*
+        ألسنةُ المساحة تحت عنوانها على الجوّال وحده. وعلى الحاسوب هي في
+        الشريط تحت مساحتها.
+      */}
+      <div className="mt-5 lg:hidden">
+        <AreaTabs role={user.role} />
+      </div>
+
+      <div className="mt-6 lg:mt-8">{children}</div>
+    </main>
   );
 }
 

@@ -1,4 +1,5 @@
 import { Skeleton } from "./ui";
+import { mainClass, type ShellWidth } from "./page-shell";
 
 /**
  * ما يُعرَض ريثما تُبنى الصفحة على الخادم.
@@ -11,17 +12,23 @@ export function PageSkeleton({
   title,
   stats = 4,
   rows = 5,
+  width = "wide",
 }: {
   title: string;
   stats?: number;
   rows?: number;
+  width?: ShellWidth;
 }) {
+  /*
+    يقع داخل القشرة الدائمة، في موضع المحتوى نفسه وبمقاس عنوانه — فلا
+    يقفز العنوانُ ولا يختفي الشريطُ حين تصل الصفحة.
+  */
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-28 pt-7 sm:px-6 sm:pt-10">
-      <h1 className="font-display text-[1.65rem] font-black leading-[1.15] tracking-tight sm:text-4xl">
+    <main id="main" className={mainClass(width)} aria-busy="true">
+      <h1 className="font-display text-[1.6rem] font-black leading-[1.15] tracking-tight sm:text-[2rem]">
         {title}
       </h1>
-      <p className="mt-2.5 text-sm text-muted">يُحمّل…</p>
+      <p className="mt-2 text-sm text-muted">يُحمّل…</p>
 
       {stats > 0 && (
         <div className="mt-7 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
@@ -34,6 +41,6 @@ export function PageSkeleton({
       <div className="mt-8">
         <Skeleton rows={rows} />
       </div>
-    </div>
+    </main>
   );
 }

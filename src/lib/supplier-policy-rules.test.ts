@@ -40,8 +40,8 @@ describe("من يحتاج عقد توريد", () => {
 */
 describe("لا نسخةَ ثانية من الشرط", () => {
   const FILES = [
-    "src/app/suppliers/page.tsx",
-    "src/app/upload/page.tsx",
+    "src/app/(app)/suppliers/page.tsx",
+    "src/app/(app)/upload/page.tsx",
     "src/components/attention-workspaces.tsx",
     "src/lib/attention-facts.ts",
   ];

@@ -1,3 +1,4 @@
+import { cache } from "react";
 /** مساعدات الجلسة للواجهات البرمجية وصفحات الخادم. */
 import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
@@ -66,7 +67,11 @@ async function trialUser(): Promise<CurrentUser> {
   return TRIAL_USER;
 }
 
-export async function currentUser(): Promise<CurrentUser | null> {
+/*
+  مرّةً في الطلب: التخطيطُ يقرؤه للقشرة والصفحةُ لمحتواها — وكلٌّ منهما
+  جلسةٌ واستعلامٌ عن حال المستخدم. و`cache` من React تجعلهما واحداً.
+*/
+export const currentUser = cache(async (): Promise<CurrentUser | null> => {
   if (isAuthBypassed()) return await trialUser();
 
   const session = await auth();
@@ -92,7 +97,7 @@ export async function currentUser(): Promise<CurrentUser | null> {
     name: session.user.name,
     role: session.user.role,
   };
-}
+});
 
 /** يرمي عند غياب الجلسة أو الصلاحية — تُترجم في الواجهة إلى 401 أو 403. */
 export class UnauthenticatedError extends Error {
