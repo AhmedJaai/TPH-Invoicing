@@ -56,14 +56,19 @@ export async function search(
   const like = `%${intent.term}%`;
   const jobs: Promise<SearchHit[]>[] = [];
 
-  if (intent.targets.includes("invoices")) jobs.push(findInvoices(intent, like));
+  if (intent.targets.includes("invoices")) jobs.push(findInvoices(intent, like, access.amounts));
   if (intent.targets.includes("suppliers")) jobs.push(findSuppliers(intent, like));
   if (intent.targets.includes("products")) jobs.push(findProducts(like));
   if (access.bank && intent.targets.includes("bankTransactions")) jobs.push(findBankTx(intent, like));
   if (intent.targets.includes("documents")) jobs.push(findDocuments(intent, like));
 
   const hits = (await Promise.all(jobs)).flat()
-    .map((h) => (access.amounts ? h : { ...h, amountMinor: undefined, title: stripAmount(h.title), subtitle: h.subtitle && stripAmount(h.subtitle) }));
+    .map((h) => (access.amounts ? h : {
+      ...h,
+      amountMinor: undefined,
+      title: stripAmount(h.title),
+      subtitle: h.subtitle && stripAmount(h.subtitle),
+    }));
   return { intent, hits: rankHits(hits, intent.kind) };
 }
 
@@ -87,7 +92,7 @@ function likeNormalized(col: AnyColumn, like: string) {
   return sql`translate(${col}, 'إأآٱىة', 'اااايه') ilike ${like}`;
 }
 
-async function findInvoices(intent: SearchIntent, like: string): Promise<SearchHit[]> {
+async function findInvoices(intent: SearchIntent, like: string, amounts: boolean): Promise<SearchHit[]> {
   const clauses = [];
 
   if (intent.kind === "NUMBER") clauses.push(ilike(invoices.invoiceNumber, like));
@@ -126,7 +131,11 @@ async function findInvoices(intent: SearchIntent, like: string): Promise<SearchH
       r.taxStatus === "INVALID" ? " · ضريبتها ناقصة" : ""
     }`,
     amountMinor: r.total,
-    href: invoiceHref(r.id),
+    /*
+      ملفُّ الفاتورة كلُّه مال — ومن لا يرى المبالغ يُفتح له ملفُّ مورّدها
+      (فواتيرُه بلا مبالغ) لا صفحةٌ تقول «خارج صلاحيتك».
+    */
+    href: amounts || !r.supplierSlug ? invoiceHref(r.id) : `/suppliers/${r.supplierSlug}`,
   }));
 }
 

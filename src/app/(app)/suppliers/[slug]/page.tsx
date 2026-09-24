@@ -453,17 +453,20 @@ export default async function SupplierPage({
             <DataTable
               rows={recent}
               keyOf={(r) => r.id}
-              hrefOf={(r) => invoiceHref(r.id)}
+              /* ملفُّ الفاتورة كلُّه مال — لا يُفتح لمن لا يرى المبالغ */
+              hrefOf={(r) => (showAmounts ? invoiceHref(r.id) : undefined)}
               empty={<EmptyState title="لا فواتير منه بعد." hint="ترفع فاتورةً منه فتظهر هنا." />}
               columns={[
                 {
                   key: "number",
                   header: "رقم الفاتورة",
                   primary: true,
-                  cell: (r) => (
+                  cell: (r) => showAmounts ? (
                     <Link href={invoiceHref(r.id)} className="nums relative underline-offset-4 hover:underline" dir="ltr">
                       {r.number ?? "—"}
                     </Link>
+                  ) : (
+                    <span className="nums" dir="ltr">{r.number ?? "—"}</span>
                   ),
                 },
                 { key: "date", header: "التاريخ", cell: (r) => <span>{formatDay(r.date)}</span> },
