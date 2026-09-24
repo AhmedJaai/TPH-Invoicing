@@ -6,6 +6,7 @@ import { Money } from "@/components/money";
 import { Card, LinkButton, buttonClass } from "./ui";
 import { ConfirmDocument } from "./confirm-document";
 import { ConfirmEligible } from "./confirm-eligible";
+import { NoStatementsButton } from "./no-statements-button";
 import { RejectDocument } from "./reject-document";
 import { SupplierPolicy } from "./supplier-policy";
 import { buildInvoiceRequest, buildStatementRequest, groupUnbackedBySupplier } from "@/lib/supplier-requests";
@@ -324,7 +325,7 @@ export async function ContractPolicyWorkspace({ canEdit }: { canEdit: boolean })
 }
 
 /** «مورّدون لم يصل كشفهم» — يُطلَب الكشف من هنا. */
-export async function StatementRequestWorkspace() {
+export async function StatementRequestWorkspace({ canEdit = false }: { canEdit?: boolean }) {
   const month = previousMonth(currentMonthRiyadh());
   const rows = await loadMissingStatementSuppliers(month);
 
@@ -358,6 +359,8 @@ export async function StatementRequestWorkspace() {
           >
             اطلب الكشف (واتساب)
           </a>
+          {/* «كشوف الحساب مو كلّهم يصدرونها» — يُعلَن فيخرج من القائمة */}
+          {canEdit && <NoStatementsButton supplierId={m.id} />}
         </li>
       ))}
     </ul>

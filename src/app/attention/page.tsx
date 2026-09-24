@@ -156,7 +156,13 @@ function Detail({
             {item.evidence.map((e, i) => (
               <li key={i} className="flex items-start justify-between gap-3 px-3.5 py-2">
                 <span className="min-w-0">
-                  <span className="block truncate text-xs font-medium">{e.label}</span>
+                  {e.href ? (
+                    <Link href={e.href} className="block truncate text-xs font-medium underline underline-offset-4 hover:text-ink">
+                      {e.label} — صحّحها
+                    </Link>
+                  ) : (
+                    <span className="block truncate text-xs font-medium">{e.label}</span>
+                  )}
                   {e.sub && <span className="block truncate text-[11px] text-muted"><Prose text={e.sub} /></span>}
                 </span>
                 {e.amountMinor !== undefined && (
@@ -269,7 +275,7 @@ export default async function AttentionPage({
     ) : selected.id === "no-contract" ? (
       <ContractPolicyWorkspace canEdit={canEditSupplier} />
     ) : selected.id === "missing-statements" ? (
-      <StatementRequestWorkspace />
+      <StatementRequestWorkspace canEdit={canEditSupplier} />
     ) : undefined;
 
   return (

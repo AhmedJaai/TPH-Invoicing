@@ -5,7 +5,7 @@
  * فلا يعدّ اللوحُ «٧ تجتمع فيها» ثمّ يعتمد الفعلُ خمسة.
  */
 
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, statements, suppliers } from "@/db/schema";
 import type { drive_v3 } from "googleapis";
@@ -16,6 +16,7 @@ import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { driveWritesAllowed } from "@/lib/drive-readonly";
 import { renameArchived } from "@/services/drive-rename.service";
+import { autoRereadGaps } from "@/services/document-reread.service";
 import { missingFromReading, recordFromStoredReadings } from "@/services/document-backlog.service";
 import { normalizeDocumentDate } from "@/lib/document-date";
 import { parseRiyals } from "@/lib/money";
@@ -145,16 +146,46 @@ export async function approveEligible(actorId: string, limit = 80): Promise<{
 export async function processDocumentBacklog(
   actorId: string,
   drive: drive_v3.Drive | null,
-): Promise<{ recorded: number; approved: number; renamed: { from: string; to: string }[]; notes: string[] }> {
+): Promise<{ recorded: number; approved: number; renamed: { from: string; to: string }[]; reread: number; notes: string[] }> {
   const notes: string[] = [];
   const { recorded } = await recordFromStoredReadings(actorId);
   const approval = await approveEligible(actorId);
   notes.push(...approval.failed);
+
+  /*
+    دفعةٌ سبقت فاتورتَها تُخصم منها حين تصل — والفاتورةُ قد تصل من طريقٍ لا
+    يمرّ بالخصم (قيدٌ قديم، أو اعتمادٌ جماعيّ سبق). فيمرّ الخصمُ على كلّ
+    مورّدٍ له مالٌ غيرُ مخصَّص، بالسياسة نفسها (الأقدمُ أوّلاً، وسبعةُ أيّام).
+    أحمد: «كوهي وأطلس فواتيرهم موجودة على الغالب».
+  */
+  const withCredit = await db.execute<{ supplier_id: string }>(sql`
+    select distinct p.supplier_id from payments p
+     where p.supplier_id is not null and p.status not in ('REVERSED','VOID','ADVANCE')
+       and p.amount_minor - p.fee_minor
+           - coalesce((select sum(a.amount_minor) from payment_allocations a where a.payment_id = p.id), 0) > 0
+  `);
+  let creditApplied = 0;
+  for (const { supplier_id } of withCredit.rows) {
+    try {
+      const out = await db.transaction((t) => applySupplierCredit(t, supplier_id, { forwardDays: SETTLEMENT_FORWARD_DAYS }));
+      creditApplied += out.allocations.length;
+    } catch (e) {
+      notes.push(`خصمُ الرصيد: ${(e as Error).message.slice(0, 80)}`);
+    }
+  }
+  if (creditApplied > 0) notes.push(`نُسبت ${creditApplied} دفعةً إلى فواتيرها`);
   let renamed: { from: string; to: string }[] = [];
+  let reread = 0;
+  if (drive) {
+    /* ما نقص تفصيلُه الضريبيّ أو بنودُه يُقرأ من جديد — واحدٌ في كلّ مرّة (نداءٌ مدفوع) */
+    const r = await autoRereadGaps(actorId, drive, 1).catch((e: Error) => ({ reread: 0, notes: [e.message] }));
+    reread = r.reread;
+    notes.push(...r.notes);
+  }
   if (drive && driveWritesAllowed(process.env)) {
     const outcome = await renameArchived(drive, null, actorId, "الاستدراك");
     renamed = outcome.done;
     notes.push(...outcome.failed.map((f) => `${f.from}: ${f.error}`));
   }
-  return { recorded, approved: approval.approved, renamed, notes };
+  return { recorded, approved: approval.approved, renamed, reread, notes };
 }

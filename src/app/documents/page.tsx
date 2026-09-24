@@ -499,6 +499,10 @@ export default async function DocumentsPage({
                         )
                       )}
                       {/* ما ينتظر قراراً له فعلٌ في موضعه — لا «راجعه» بلا زرّ */}
+                      {/* فاتورةٌ ألغاها المورّد تُلغى هنا — ويبقى ملفُّها في الدرايف */}
+                      {canDecide && showAmounts && r.status === "ARCHIVED" && r.totalMinor !== null && (
+                        <span className="mt-1 flex flex-wrap gap-1.5"><RejectDocument documentId={r.id} cancel /></span>
+                      )}
                       {canDecide && ["PENDING", "EXTRACTED", "NEEDS_REVIEW"].includes(r.status) && (
                         <span className="mt-1 flex flex-wrap gap-1.5">
                           {r.status === "NEEDS_REVIEW" && showAmounts && <ConfirmDocument documentId={r.id} />}
