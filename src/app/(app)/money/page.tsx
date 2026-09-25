@@ -1,39 +1,38 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { sql } from "drizzle-orm";
-import { db } from "@/db";
+import {
+  ArrowDownLeft, ArrowLeft, ArrowUpRight, ChartColumn, CircleAlert, Info, Landmark, PieChart, Receipt, Scale, Upload,
+} from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
-import { Empty, Money, PageShell } from "@/components/page-shell";
+import { PageShell } from "@/components/page-shell";
+import { Money } from "@/components/money";
 import { Figure } from "@/components/figure";
-import { gatherHomeProvenance } from "@/lib/provenance-facts";
-import { buildCashFlow, type CashMovement } from "@/lib/cashflow";
-import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
-import { DataTable, EmptyState, LinkButton, NoAccess, Section, Stat } from "@/components/ui";
-import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
-import { formatMonth } from "@/lib/riyadh-time";
-import { looksLikeGoodsPurchase } from "@/lib/expenses";
+import { CashFlowChart } from "@/components/cash-flow-chart";
+import { BarList, Callout, EmptyState, LinkButton, LinkTabs, NoAccess, Section } from "@/components/ui";
+import { DAY, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
+import { daysSinceRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
+import { BANK_STALE_DAYS } from "@/lib/attention";
+import { loadMoneyView } from "@/services/money-view.service";
 
 export const dynamic = "force-dynamic";
 
 /**
- * المال: أين ذهب — لا فهرسٌ لصفحاتٍ عن المال.
+ * أين ذهب المال — من كلّ ريالٍ خرج من الحساب، أين ذهب؟
  *
- * كانت الصفحة ستَّ بطاقاتٍ، **أربعٌ منها روابط إلى صفحاتٍ أخرى** — وقد
- * صارت تلك الصفحاتُ ألسنةً في شريط المساحة فوق العنوان، فالبطاقة التي
- * كلُّ محتواها «اذهب إلى هنا» لم يبقَ لها معنى.
+ *   ١. ثلاثةُ أرقام للفترة: الصادر (ببيان مصدره)، والوارد، والصافي.
+ *   ٢. الصادرُ مقسوماً على أبوابه حتى يُجمَع إليه — وما لم يُصنَّف معلَنٌ
+ *      بمبلغه ومعه فعلُ تصنيفه، لا مطمورٌ في غيره.
+ *   ٣. الوارد والصادر شهراً بشهر، والشهرُ الجزئيّ معلَن.
  *
- * وبطاقةُ «المستحقّ للمورّدين» كانت تعرض ١٠٬٥٠٢٫٤٩ — وهو الرقم نفسه
- * المعروض في الرئيسية وفي حسابات المورّدين. ثلاثُ شاشاتٍ لرقمٍ واحد،
- * وثلاثةُ أسماءٍ له. فخرج من هنا: هذه صفحةُ **ما خرج من الحساب**،
- * والمستحقُّ سؤالُ المورّدين.
- *
- * وانتقل إليها **التدفّق النقديّ** من `/money/statement` — وكانت تلك
- * تعرض جدول «المصروف حسب الباب» نفسه المعروض هنا بالأرقام نفسها. أمّا
- * قائمةُ الدخل فخمسةٌ من سبعة بنودٍ فيها «غير متاح» حتى يُوصَل مصدر
- * المبيعات، وهيكلٌ ينتظر مصدراً ليس صفحةً تُفتَح كلّ شهر.
+ * والإيرادُ لا يُعرَض هنا: المبيعات لا تصل إلى هذه الصفحة، والواردُ إيداعاتُ
+ * الشبكة والتحويلات. فيُقال ذلك ولا يُكتب «الإيراد ٠٫٠٠».
  */
-export default async function MoneyPage() {
+export default async function MoneyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
   const user = await currentUser();
   if (!user) redirect("/login?from=/money");
   if (!can(user.role, "bank:view")) {
@@ -44,252 +43,222 @@ export default async function MoneyPage() {
     );
   }
 
-  const [prov, counts, movements, debitRows] = await Promise.all([
-    gatherHomeProvenance(),
-    db.execute<Record<string, number>>(sql`
-      select
-        (select count(*)::int from bank_transactions)                            as tx,
-        (select count(*)::int from bank_transactions where category='UNKNOWN')   as unclassified,
-        (select coalesce(sum(vat_minor),0)::bigint from invoices
-           where input_vat_status='ELIGIBLE')                                    as recoverable,
-        (select coalesce(sum(vat_minor),0)::bigint from invoices
-           where input_vat_status='NOT_ELIGIBLE' and vat_minor > 0)              as at_risk,
-        (select count(*)::int from invoices where input_vat_status='UNKNOWN')    as vat_unknown
-    `),
-    db.execute<{ month: string; direction: string; category: string; amount: string; n: number }>(sql`
-      select to_char(value_date, 'YYYY-MM') as month,
-             direction::text as direction,
-             category::text as category,
-             sum(amount_minor)::bigint as amount,
-             count(*)::int as n
-        from bank_transactions
-       group by 1, 2, 3
-    `),
-    /*
-      «شراء بضاعة» يُستبعَد بالدالّة نفسها التي تستبعده في المصروفات.
-      كان يُحسب هنا راتباً ويُستبعَد هناك، فللرواتب رقمان في شاشتين.
-    */
-    db.execute<{ category: string; amount_minor: string; description: string | null; beneficiary_raw: string | null }>(sql`
-      select category::text as category, amount_minor, description, beneficiary_raw
-        from bank_transactions
-       where direction = 'DEBIT'
-         and category not in ('INTERNAL','UNKNOWN','SUPPLIER','PERSONAL','POS_SETTLEMENT')
-    `),
-  ]);
-
-  const f = counts.rows[0] ?? {};
-  const n = (k: string) => Number(f[k] ?? 0);
-
-  const cash = buildCashFlow(
-    movements.rows.map<CashMovement>((r) => ({
-      month: r.month,
-      direction: r.direction as "DEBIT" | "CREDIT",
-      category: r.category as TxCategory,
-      amountMinor: Number(r.amount),
-      count: Number(r.n),
-    })),
-  );
-
-  const categoryTotals = new Map<string, { category: string; n: number; s: number }>();
-  for (const r of debitRows.rows) {
-    if (looksLikeGoodsPurchase(r.description ?? "", r.beneficiary_raw)) continue;
-    const e = categoryTotals.get(r.category) ?? { category: r.category, n: 0, s: 0 };
-    e.n++;
-    e.s += Number(r.amount_minor);
-    categoryTotals.set(r.category, e);
-  }
-  const byCategory = [...categoryTotals.values()].sort((a, b) => b.s - a.s);
-  const expenseTotal = byCategory.reduce((s, c) => s + c.s, 0);
+  const p = await searchParams;
+  const asked = p.month && /^\d{4}-\d{2}$/.test(p.month) ? p.month : null;
+  const v = await loadMoneyView(asked);
+  const month = asked && v.months.includes(asked) ? asked : null;
 
   /*
     ── بلا كشفٍ لا جوابَ هنا ──
 
     كانت الصفحةُ على قاعدةٍ بلا كشف تقول «الصادر ٠٫٠٠ · كلُّ الصادر معروفُ
-    الوجه» و«حركاتُ كشف البنك ٠ — كلُّها مصنّفة» بالأخضر. أصفارٌ عن غير
-    علم، وطمأنينةٌ عن كشفٍ لم يُرفَع. فيُقال ما ينقص، ومعه فعلُه.
+    الوجه» بالأخضر. أصفارٌ عن غير علم. فيُقال ما ينقص، ومعه فعلُه.
   */
-  if (n("tx") === 0) {
+  if (v.txCount === 0) {
     return (
-      <PageShell user={user} width="wide" title="أين ذهب المال" intro="من كشف بنكك وفواتيرك، لا من تقدير.">
+      <PageShell user={user} width="wide" title="أين ذهب المال" intro="من كشف بنكك، لا من تقدير.">
         <EmptyState
+          icon={Landmark}
           title="لم يُستورَد كشفُ بنكٍ بعد."
-          hint="بلا كشفٍ لا يُعرَف ما خرج من الحساب ولا أين — فلا يُعرَض هنا رقمٌ يُقرأ صفراً."
-          action={<LinkButton href="/bank#import" variant="primary">استورد كشف البنك</LinkButton>}
+          hint="بلا كشفٍ لا يُعرَف ما خرج من الحساب ولا أين — فلا يُعرَض هنا رقمٌ يُقرأ صفراً. استورد كشف الحساب، فتظهر هنا أبوابُ الصادر وحركةُ كلّ شهر."
+          action={<LinkButton href="/bank#import" variant="primary" icon={Upload}>استورد كشف البنك</LinkButton>}
         />
       </PageShell>
     );
   }
+
+  const staleDays = v.lastDay ? daysSinceRiyadh(v.lastDay) : null;
+  const stale = staleDays !== null && staleDays > BANK_STALE_DAYS;
+  const netMinor = v.inMinor - v.outMinor;
+  const periodLabel = month ? formatMonth(month) : "الفترة كلّها";
+
+  /* الشهرُ الذي لم يغطّه الكشفُ كلَّه — أوّلُ الكشف وآخرُه */
+  const partial = new Map<string, string>();
+  if (v.firstDay && !v.firstDay.endsWith("-01")) partial.set(v.firstDay.slice(0, 7), `من ${formatDay(v.firstDay)}`);
+  if (v.lastDay && !isMonthEnd(v.lastDay)) partial.set(v.lastDay.slice(0, 7), `حتى ${formatDay(v.lastDay)}`);
+
+  const monthHref = (m: string | null) => (m ? `/money?month=${m}` : "/money");
+  const expenseTotal = v.buckets.filter((b) => b.kind === "expense" || b.kind === "fees").reduce((s, b) => s + b.minor, 0);
 
   return (
     <PageShell
       user={user}
       width="wide"
       title="أين ذهب المال"
-      intro="من كشف بنكك وفواتيرك، لا من تقدير. وما لم يُصنَّف معلَنٌ بمبلغه."
+      eyebrow={
+        <span className={stale ? "font-bold text-warn" : ""}>
+          {stale && <CircleAlert className="me-1 inline-block h-3.5 w-3.5 align-[-2px]" strokeWidth={2} aria-hidden />}
+          من كشف البنك: <bdi>{formatDay(v.firstDay)}</bdi> إلى <bdi>{formatDay(v.lastDay)}</bdi>
+          {stale && <> — وقف منذ {countNoun(staleDays, DAY)}</>}
+        </span>
+      }
+      intro="كلُّ ريالٍ خرج من حسابك وإلى أين ذهب، وما دخل إليه — من الكشف نفسه لا من تقدير. وما لم يُصنَّف معلَنٌ بمبلغه."
+      actions={stale ? <LinkButton href="/bank#import" icon={Upload} variant="primary">استورد الأحدث</LinkButton> : undefined}
     >
-      {/*
-        الصادر من الحساب، والمجهول منه معلَنٌ بمبلغه.
-        «مصروفاتك ٤٢٬٠٠٠» تُقرأ كاملةً وفيها ثمانية آلاف لم يُعرف وجهها.
-      */}
-      {/*
-        ── ارتفاعاتٌ متساوية ──
-
-        كانت البطاقةُ الأولى بيانَ مصدرٍ فيه زرٌّ يُفتَح، وبجانبها أربعُ
-        بطاقاتٍ قصيرة في صفٍّ واحد — فتبدو الصفحةُ مكسورةً من أوّلها،
-        ويقفز ما تحتها حين يُفتَح البيان. فصارت الأولى تملأ ارتفاع
-        صفّها، والأربعُ في مربّعين × مربّعين إلى جانبها.
-      */}
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:items-stretch">
-        <Figure
-          label="الصادر من الحساب"
-          provenance={prov.bankOutflow}
-          unit="حركة"
-          href="/bank"
-          /*
-            الرقمُ يستثني ما لم يُعرف وجهه — والاستثناءُ يُقال بعدده ومبلغه
-            تحته، لا خلف زرّ. كان التنبيه «اضغط من أين جاء؟» بينما جدولُ
-            التدفّق أسفلَ الصفحة يقول صادراً أكبر، فيظهر للشهر رقمان.
-          */
-          note={
-            prov.bankOutflow.excludedCount > 0 ? (
-              <>
-                وخارجه {countNoun(prov.bankOutflow.excludedCount, TRANSACTION)} بـ
-                <Money minor={prov.bankOutflow.excludedKnownMinor} /> لم يُعرف وجهها —{" "}
-                <Link href="/attention" className="underline underline-offset-4">عرّفها</Link>
-              </>
-            ) : (
-              "كلُّ الصادر معروفُ الوجه"
-            )
-          }
-          className="flex flex-col"
-        />
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-          <Stat
-            label="الوارد إلى الحساب"
-            minor={cash.totalInMinor}
-            tone="ok"
-            sub="يشمل إيداعات نقاط البيع — وهي ليست «مبيعات»، فالمبيعات تحتاج مصدرها"
-          />
-          <Stat
-            label="ضريبة قابلة للاسترداد"
-            minor={n("recoverable")}
-            tone="ok"
-            sub="من فواتير ضريبية كاملة"
-            href="/purchases/invoices?tax=VALID"
-          />
-          <Stat
-            label="ضريبة معرَّضة للضياع"
-            minor={n("at_risk")}
-            tone={n("at_risk") > 0 ? "danger" : "ok"}
-            sub={
-              n("vat_unknown") > 0
-                ? `و${countNoun(n("vat_unknown"), INVOICE)} لم يُقرأ تفصيلها بعد`
-                : "من فواتير لا تصلح للخصم"
-            }
-            href="/purchases/invoices?tax=INVALID"
-          />
-          <Stat
-            label="حركات كشف البنك"
-            value={String(n("tx"))}
-            tone={n("unclassified") > 0 ? "warn" : "ok"}
-            sub={
-              n("unclassified") > 0
-                ? `${countNoun(n("unclassified"), TRANSACTION)} لم تُصنَّف`
-                : "كلّها مصنَّفة"
-            }
-            href="/bank"
-          />
-        </div>
-      </div>
-
-      <Section
-        title="المصروف حسب بابه"
-        hint="من كشف البنك، بحسب ما صنّفتَه بنفسك — وسدادُ المورّدين والتحويلُ الشخصيّ مستثنيان: الأوّل محسوبٌ في المشتريات، والثاني سحبُ مالكٍ لا مصروف."
-        /*
-          مدخلُ «المصروفات» — خرجت من ألسنة المساحة لأنّ جوابها بلا
-          مصروفاتٍ متكرّرةٍ مسجّلة «لا يمكن الحساب»، وموضعُها الطبيعيّ
-          هنا: من قرأ بابَ المصروف هو من يريد تفصيله ومقارنته بالمتوقَّع.
-        */
-        action={
-          <Link
-            href="/money/expenses"
-            className="text-xs font-medium underline underline-offset-4 hover:text-ink"
-          >
-            المتوقَّع مقابل الفعليّ ←
-          </Link>
-        }
-      >
-        {byCategory.length === 0 ? (
-          <Empty message="لا حركات مصنَّفة بعد. صنّف حركاتك من صفحة حركة البنك." />
-        ) : (
-          /*
-            صفٌّ عرضُه ألفُ بكسل بين اسمٍ في طرفٍ ورقمٍ في طرف يُقرأ
-            واحداً واحداً، ولا يقول أيُّ بابٍ أثقل. والشريطُ يقوله في
-            لمحة — ونسبتُه من أكبر بابٍ لا من المجموع، فالفرقُ بين
-            البابين هو المقصود.
-          */
-          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
-            {byCategory.map((c) => (
-              <li key={c.category} className="px-4 py-2.5">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">
-                      {CATEGORY_LABEL[c.category as TxCategory] ?? c.category}
-                    </span>
-                    <span className="block text-[11px] text-muted">{countNoun(c.n, TRANSACTION)}</span>
-                  </span>
-                  <span className="shrink-0 text-end">
-                    <span className="nums block text-sm font-bold">
-                      <Money minor={Number(c.s)} />
-                    </span>
-                    <span className="nums block text-[11px] text-muted">
-                      {expenseTotal > 0 ? `${Math.round((c.s / expenseTotal) * 100)}٪` : ""}
-                    </span>
-                  </span>
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunken" aria-hidden>
-                  <div
-                    className="h-full rounded-full bg-ink-soft"
-                    style={{ width: `${Math.max(1, Math.round((c.s / byCategory[0].s) * 100))}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
-      {/* ── التدفّق الشهريّ — كان صفحةً مستقلّة تعرض الجدول أعلاه كذلك ── */}
-      {cash.months.length > 0 && (
-        <Section
-          title="التدفّق النقديّ شهراً بشهر"
-          hint="من حركات البنك مباشرةً. والوارد يشمل إيداعات نقاط البيع."
-        >
-          {cash.unclassifiedCount > 0 && (
-            <p className="mb-3 rounded-lg bg-warn-bg px-3 py-2 text-xs leading-relaxed text-warn">
-              ⚠ {countNoun(cash.unclassifiedCount, TRANSACTION)} بقيمة{" "}
-              <Money minor={cash.unclassifiedMinor} /> لم تُصنَّف بعد، فتوزيعُ المصروف أعلاه ناقصٌ بقدرها.
-            </p>
-          )}
-          <DataTable
-            rows={cash.months}
-            keyOf={(m) => m.month}
-            columns={[
-              { key: "month", header: "الشهر", primary: true, cell: (m) => formatMonth(m.month) },
-              { key: "in", header: "وارد", numeric: true, cell: (m) => <span className="text-ok"><Money minor={m.inMinor} /></span> },
-              { key: "out", header: "صادر", numeric: true, cell: (m) => <span className="text-warn"><Money minor={m.outMinor} /></span> },
-              {
-                key: "net", header: "الصافي", numeric: true,
-                cell: (m) => (
-                  <span className={`font-bold ${m.netMinor >= 0 ? "text-ok" : "text-danger"}`}>
-                    <Money minor={m.netMinor} />
-                  </span>
-                ),
-              },
+      {v.months.length > 1 && (
+        <div className="mb-5">
+          <LinkTabs
+            label="الفترة"
+            items={[
+              { href: monthHref(null), label: "الفترة كلّها", active: month === null },
+              ...v.months.map((m) => ({
+                href: monthHref(m),
+                label: partial.has(m) ? `${formatMonth(m)} (جزئيّ)` : formatMonth(m),
+                active: m === month,
+              })),
             ]}
           />
-        </Section>
+        </div>
       )}
+
+      {/* ── الأرقامُ الثلاثة للفترة ── */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Figure
+          icon={<ArrowUpRight strokeWidth={2} aria-hidden />}
+          label={`الصادر · ${periodLabel}`}
+          provenance={v.outflow}
+          unit="حركة"
+          href={month ? `/bank?month=${month}#transactions` : "/bank#transactions"}
+          /*
+            الرقمُ يستثني ما لم يُعرف وجهه — والاستثناءُ يُقال بعدده ومبلغه
+            تحته، لا خلف زرّ.
+          */
+          note={
+            v.unknown.count > 0 ? (
+              <span className="text-warn">
+                وخارجه {countNoun(v.unknown.count, TRANSACTION)} بـ<Money minor={v.unknown.minor} /> لم يُعرف وجهها.
+              </span>
+            ) : (
+              "كلُّ الصادر في هذه الفترة معروفُ الوجه."
+            )
+          }
+        />
+        <Figure
+          icon={<ArrowDownLeft strokeWidth={2} aria-hidden />}
+          label={`الوارد · ${periodLabel}`}
+          value={<Money minor={v.inMinor} />}
+          href={month ? `/bank?show=in&month=${month}#transactions` : "/bank?show=in#transactions"}
+          note="إيداعاتُ الشبكة والتحويلات إلى الحساب — لا «مبيعات»."
+        />
+        <Figure
+          icon={<Scale strokeWidth={2} aria-hidden />}
+          label="الصافي"
+          value={<Money minor={netMinor} />}
+          tone={netMinor < 0 ? "danger" : undefined}
+          note={
+            month && partial.has(month)
+              ? `شهرٌ جزئيّ (${partial.get(month)}) — لا يُقارَن بشهرٍ كامل.`
+              : "الوارد ناقصاً كلَّ ما خرج، ومنه ما لم يُصنَّف."
+          }
+        />
+      </div>
+
+      <Callout tone="info" icon={Info} className="mt-4">
+        <strong className="text-ink">الإيراد غير معروف هنا.</strong> مبيعاتُ فودكس لا تصل إلى هذه الصفحة، فلا يُحسب ربحٌ ولا هامش —
+        والصافي أعلاه حركةُ الحساب لا ربحُ المقهى.
+      </Callout>
+
+      <div className="mt-10 grid gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        {/* ── أين ذهب الصادر ── */}
+        <Section
+          title="أين ذهب"
+          icon={PieChart}
+          className="mt-0!"
+          hint={`الصادرُ في ${periodLabel} مقسوماً على أبوابه — والمجموعُ هو الصادرُ كلُّه. سدادُ المورّدين محسوبٌ في المشتريات، وسحبُ المالك ليس مصروفاً.`}
+          action={
+            <Link href={month ? `/money/expenses?month=${month}` : "/money/expenses"} className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline sm:min-h-0">
+              المصروفات بالتفصيل <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+            </Link>
+          }
+        >
+          <div className="rounded-2xl border border-line bg-raised p-3 shadow-raised sm:p-4">
+            {v.buckets.length === 0 ? (
+              <p className="px-2 py-6 text-center text-xs text-muted">لا صادرَ في {periodLabel}.</p>
+            ) : (
+              <BarList
+                items={v.buckets.map((b) => ({
+                  key: b.key,
+                  label: b.label,
+                  minor: b.minor,
+                  href: b.href,
+                  sub: `${countNoun(b.count, TRANSACTION)} · ${share(b.minor, v.outMinor)}`,
+                }))}
+              />
+            )}
+
+            {/* ما لم يُصنَّف يُعلَن بمبلغه ومعه فعلُه — لا شريطاً بين الأشرطة */}
+            {v.unknown.count > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-3 rounded-xl border border-warn/25 bg-warn-bg px-3 py-2.5">
+                <CircleAlert className="h-4 w-4 shrink-0 text-warn" strokeWidth={2} aria-hidden />
+                <p className="min-w-0 flex-1 text-xs text-ink-soft">
+                  <span className="font-bold text-warn">لم يُصنَّف بعد: <Money minor={v.unknown.minor} /></span>
+                  {" "}— {countNoun(v.unknown.count, TRANSACTION)}، فتوزيعُ ما فوقه ناقصٌ بقدرها.
+                </p>
+                <LinkButton href="/bank?show=unknown#transactions" size="sm" variant="primary">صنّفها</LinkButton>
+              </div>
+            )}
+
+            <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-line-soft px-2 pt-3 text-xs">
+              <div>
+                <dt className="text-muted">الصادرُ كلُّه</dt>
+                <dd className="mt-0.5 text-sm font-bold"><Money minor={v.outMinor} /></dd>
+              </div>
+              <div>
+                <dt className="text-muted">منه مصروفٌ تشغيليّ ورسوم</dt>
+                <dd className="mt-0.5 text-sm font-bold"><Money minor={expenseTotal} /></dd>
+              </div>
+            </dl>
+          </div>
+        </Section>
+
+        {/* ── شهراً بشهر ── */}
+        <Section
+          title="شهراً بشهر"
+          icon={ChartColumn}
+          className="mt-0!"
+          hint="الوارد والصادر في كلّ شهر من الكشف. اضغط شهراً لتقرأ أبوابه."
+        >
+          <CashFlowChart months={v.flow.months} partial={partial} hrefOf={(m) => monthHref(m)} active={month} />
+        </Section>
+      </div>
+
+      {/* ── الضريبة في الفواتير — ليست حركة بنك، لكنّها مالٌ يعود أو يضيع ── */}
+      <Section title="ضريبةُ المشتريات" icon={Receipt} hint="من الفواتير المسجّلة، لا من الكشف.">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Link href="/purchases/invoices?tax=VALID" className="flex items-center justify-between gap-3 rounded-xl border border-line bg-raised px-4 py-3.5 shadow-raised transition-colors hover:border-accent-line">
+            <span>
+              <span className="block text-xs font-bold text-muted">قابلةٌ للاسترداد</span>
+              <span className="mt-0.5 block text-[11px] text-muted">من فواتير ضريبيّة كاملة</span>
+            </span>
+            <span className="text-lg font-bold text-ok"><Money minor={v.vat.recoverableMinor} /></span>
+          </Link>
+          <Link href="/purchases/invoices?tax=INVALID" className="flex items-center justify-between gap-3 rounded-xl border border-line bg-raised px-4 py-3.5 shadow-raised transition-colors hover:border-accent-line">
+            <span>
+              <span className="block text-xs font-bold text-muted">معرَّضةٌ للضياع</span>
+              <span className="mt-0.5 block text-[11px] text-muted">
+                {v.vat.unknownInvoices > 0
+                  ? `ولم يُقرأ تفصيلُ ${countNoun(v.vat.unknownInvoices, INVOICE)} بعد`
+                  : "من فواتير لا تصلح للخصم"}
+              </span>
+            </span>
+            <span className={`text-lg font-bold ${v.vat.atRiskMinor > 0 ? "text-danger" : ""}`}><Money minor={v.vat.atRiskMinor} /></span>
+          </Link>
+        </div>
+      </Section>
     </PageShell>
   );
+}
+
+function isMonthEnd(day: string): boolean {
+  const d = new Date(`${day}T12:00:00Z`);
+  const next = new Date(d);
+  next.setUTCDate(d.getUTCDate() + 1);
+  return next.getUTCMonth() !== d.getUTCMonth();
+}
+
+/** النسبة من الصادر كلّه — تقريبٌ إلى عددٍ صحيح، وما دون الواحد «أقلّ من ١٪». */
+function share(minor: number, total: number): string {
+  if (total <= 0) return "";
+  const pct = (minor / total) * 100;
+  return pct < 1 ? "أقلّ من 1٪" : `${Math.round(pct)}٪`;
 }

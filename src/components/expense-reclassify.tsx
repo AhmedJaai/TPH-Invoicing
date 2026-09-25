@@ -1,28 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, Check } from "lucide-react";
 import { Money } from "./money";
 import { buttonClass } from "./ui";
+import { toast } from "./ui-client";
+import { postJson } from "@/lib/http-client";
 
 /**
  * تصحيحُ التصنيف في موضع التنبيه.
  *
- * ── لماذا لا يكفي الرابط ──
- *
- * كان التنبيه يسمّي البنود ثمّ يفتح صفحة البنك. وهي **تنقل ولا تُصلح**:
- * يصل صاحبُ العمل إلى شاشةٍ فيها مئات الحركات، ويبحث عن البند، ثمّ
- * يفعل هناك ما كان يمكن أن يقع هنا بضغطة.
- *
- * والنظام يعرف الجواب أصلاً: هذه الحركة تحمل اسم مورّدٍ مسجَّل عندنا،
- * وقد صُنّفت راتباً أو أجراً. فالاقتراح معلوم — «سدادُ مورّد» — ولا
- * ينقص إلّا تأكيدُ إنسان.
- *
- * ── وما يقع بالضغطة ──
- *
- * تُصنَّف الحركة سداد مورّد، **ويصير ذلك ذاكرةً** تسري على أمثالها في
- * الكشوف السابقة والقادمة — وهو المسار نفسه الذي يمرّ به تعريفُ الجهة
- * في طابور المراجعة، لا مسارٌ ثانٍ يفعل الشيء نفسه بطريقةٍ أخرى.
+ * كان التنبيه يسمّي البنود ثمّ يفتح صفحة البنك — **ينقل ولا يُصلح**. والنظام
+ * يعرف الجواب أصلاً: الحركة تحمل اسم مورّدٍ مسجَّل وقد صُنّفت راتباً أو
+ * أجراً. فالاقتراح «سدادُ مورّد» معلوم، ولا ينقص إلّا تأكيدُ إنسان — ويصير
+ * ذاكرةً بالمسار نفسه الذي يمرّ به تعريفُ الجهة في الطابور، لا بمسارٍ ثانٍ.
  *
  * ولا يُكتَب شيء بلا ضغطة: الاقتراح يُعرَض، والإنسان يقرّر.
  */
@@ -47,96 +40,71 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
     if (!s.bankTransactionId || !s.supplierId) return;
     setBusy(s.id);
     setError(null);
-
-    let res: Response;
     try {
-      res = await fetch("/api/counterparty", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          transactionId: s.bankTransactionId,
-          kind: "SUPPLIER",
-          supplierId: s.supplierId,
-          displayName: s.supplier,
-        }),
+      /*
+        ومعرّفُ المورّد يُرسَل لا اسمُه وحده — النظام يعرفه (به طابق البند)،
+        فطلبُه من صاحب العمل سؤالٌ عمّا يُطرَح جوابُه.
+      */
+      const r = await postJson<{ message?: string }>("/api/counterparty", {
+        transactionId: s.bankTransactionId,
+        kind: "SUPPLIER",
+        supplierId: s.supplierId,
+        displayName: s.supplier,
       });
-    } catch {
-      /* لم يصل الطلب أصلاً — وهذا وحده عطبُ شبكة */
-      setError({ id: s.id, message: "تعذّر الاتصال بالخادم — لم يصل الطلب." });
+      if (!r.ok) {
+        setError({ id: s.id, message: r.error });
+        return;
+      }
+      const message = r.data.message ?? "صُنّفت سداد مورّد";
+      setDone((d) => new Map(d).set(s.id, message));
+      toast({ tone: "ok", title: message, body: "ويسري على أمثالها في الكشوف القادمة." });
+      router.refresh();
+    } finally {
       setBusy(null);
-      return;
     }
-
-    /* يُقرأ نصّاً قبل ادّعاء أنّه JSON — صفحةُ الخطأ ليست JSON */
-    const text = await res.text().catch(() => "");
-    let data: { message?: string; error?: string } = {};
-    try {
-      data = text ? (JSON.parse(text) as typeof data) : {};
-    } catch {
-      /* ليس JSON */
-    }
-
-    if (!res.ok) {
-      setError({
-        id: s.id,
-        message: data.error ?? `تعذّر الحفظ — ردّ الخادم بالرمز ${res.status}`,
-      });
-      setBusy(null);
-      return;
-    }
-
-    setDone((d) => new Map(d).set(s.id, data.message ?? "صُنّفت سداد مورّد"));
-    setBusy(null);
-    router.refresh();
   }
 
   return (
-    <ul className="mt-3 divide-y divide-line/60 rounded-lg border border-line/60 bg-surface/60">
+    <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised">
       {suspects.map((s) => {
         const finished = done.get(s.id);
         return (
-          <li key={s.id} className="px-3 py-2.5">
-            <div className="flex items-center justify-between gap-3">
+          <li key={s.id} className={`px-4 py-3 ${finished ? "bg-ok-bg" : ""}`}>
+            <div className="flex items-start justify-between gap-3">
               <span className="min-w-0">
-                <span className="block truncate text-xs font-medium">{s.label}</span>
-                <span className="block truncate text-[11px] text-muted">
-                  مصنَّفة {s.categoryLabel} · تطابق المورّد «{s.supplier}»
+                <span className="block truncate text-[13px] font-bold" dir="auto">{s.label}</span>
+                <span className="mt-0.5 block text-[11px] text-muted">
+                  مصنَّفة «{s.categoryLabel}» · تحمل اسم المورّد «{s.supplier}»
                 </span>
               </span>
-              <span className="shrink-0 text-xs font-bold">
-                <Money minor={s.amountMinor} />
-              </span>
+              <span className="shrink-0 text-[13px] font-bold"><Money minor={s.amountMinor} /></span>
             </div>
 
             {finished ? (
-              <p className="mt-1.5 text-[11px] font-bold text-ok">✓ {finished}</p>
+              <p className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-ok">
+                <Check className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden /> {finished}
+              </p>
             ) : (
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                {/*
-                  الاقتراح يُقال قبل الضغط — والسياسة المخفيّة تُنتج
-                  ثقةً بلا فهم.
-                */}
-                <span className="text-[11px] text-muted">
-                  المقترَح: سدادُ مورّد لـ«{s.supplier}» — ويسري على أمثاله
-                </span>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   disabled={busy === s.id || !s.bankTransactionId || !s.supplierId}
                   onClick={() => fix(s)}
                   className={buttonClass("primary", "sm")}
                 >
-                  {busy === s.id ? "يحفظ…" : "صنّفها سداد مورّد"}
+                  {busy === s.id ? "يحفظ…" : `صنّفها سداداً لـ«${s.supplier}»`}
                 </button>
                 {s.bankTransactionId && (
-                  <a href={`/bank?tx=${s.bankTransactionId}`} className="inline-flex min-h-11 items-center text-[11px] underline sm:min-h-0">
-                    أو افتحها في البنك ←
-                  </a>
+                  <Link href={`/bank?tx=${s.bankTransactionId}`} className="inline-flex min-h-11 items-center gap-1 text-[11px] font-bold text-ink-soft hover:text-accent sm:min-h-0">
+                    افتح حركتها <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                  </Link>
                 )}
+                {!s.supplierId && <span className="text-[11px] text-muted">المورّد غير مسجَّل بمعرّفه — صنّفها من البنك.</span>}
               </div>
             )}
 
             {error?.id === s.id && (
-              <p className="mt-1.5 text-[11px] font-bold text-danger">{error.message}</p>
+              <p role="alert" className="mt-1.5 text-[11px] font-bold text-danger">{error.message}</p>
             )}
           </li>
         );

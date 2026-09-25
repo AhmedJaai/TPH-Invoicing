@@ -1,14 +1,19 @@
 "use client";
 
-
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { formatRiyalsDisplay } from "@/lib/money";
+import {
+  ArrowLeft, CalendarRange, Check, CircleAlert, CircleCheck, FileSpreadsheet, Info, Loader2, RotateCcw,
+  TriangleAlert, Upload, X,
+} from "lucide-react";
 import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { postJson, request } from "@/lib/http-client";
 import { DAY, INVOICE, TRANSACTION, countNoun, GROUP } from "@/lib/arabic";
-import { buttonClass } from "./ui";
+import { formatDay } from "@/lib/riyadh-time";
+import { Money } from "./money";
+import { Badge, buttonClass } from "./ui";
+import { toast } from "./ui-client";
 
 interface Coverage {
   from: string | null;
@@ -76,22 +81,12 @@ export interface SupplierOption {
   nameAr: string;
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" | "danger" }) {
-  const cls = tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : tone === "danger" ? "text-danger" : "";
-  return (
-    <div className="rounded-2xl border border-line bg-raised shadow-raised px-3 py-2.5">
-      <p className="text-[11px] text-muted">{label}</p>
-      <p className={`nums mt-0.5 text-lg font-bold ${cls}`}>{value}</p>
-    </div>
-  );
-}
+const field = "min-h-11 rounded-lg border border-line-input bg-raised px-2.5 text-xs sm:min-h-9";
 
 /**
- * صفّ لحركة بنكية لم تُعرف.
- *
- * كشف الحساب ليس كلّه مورّدين: فيه رواتب وإيجار وزكاة وكهرباء وتحويلات
- * شخصية. وعرضها كلّها «مدفوعات مجهولة» يغرق النافع في الضجيج. فيصنّفها
- * المالك مرّة، وتصير قاعدةً تسري على ما يشبهها في كل كشف بعده.
+ * صفّ لحركة بنكية لم تُعرف — يصنّفها المالك مرّة، فتصير قاعدةً تسري على
+ * ما يشبهها في كل كشف بعده. وكشفُ الحساب ليس كلّه مورّدين: فيه رواتب
+ * وإيجار وزكاة وكهرباء وتحويلات شخصية.
  */
 function UnknownRow({
   tx,
@@ -127,26 +122,26 @@ function UnknownRow({
   };
 
   return (
-    <li className={`px-3 py-2.5 ${state === "saved" ? "bg-ok-bg" : ""}`}>
-      <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 truncate text-xs text-ink-soft" dir="ltr" title={tx.description}>
+    <li className={`px-4 py-3 ${state === "saved" ? "bg-ok-bg" : ""}`}>
+      <div className="flex items-baseline gap-3">
+        <bdi className="w-20 shrink-0 text-[11px] text-muted">{formatDay(tx.date)}</bdi>
+        <p className="min-w-0 flex-1 truncate text-xs text-ink-soft" dir="auto" title={tx.description}>
           {tx.description}
         </p>
-        <span className="nums shrink-0 text-xs font-bold" dir="ltr">
-          {formatRiyalsDisplay(tx.amountMinor)}
-        </span>
-        <span className="nums shrink-0 text-[11px] text-muted" dir="ltr">{tx.date}</span>
+        <span className="shrink-0 text-xs font-bold"><Money minor={tx.amountMinor} /></span>
       </div>
 
       {state === "saved" ? (
-        <p className="mt-1.5 text-[11px] font-bold text-ok">✓ {message}</p>
+        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-bold text-ok">
+          <Check className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden /> {message}
+        </p>
       ) : (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <select
             aria-label="باب الحركة"
             value={category}
             onChange={(e) => setCategory(e.target.value as TxCategory)}
-            className="min-w-[8rem] rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+            className={`min-w-[8rem] ${field}`}
           >
             {CATEGORY_OPTIONS.map((c) => (
               <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>
@@ -158,7 +153,7 @@ function UnknownRow({
               aria-label="المورّد"
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="min-w-[9rem] flex-1 rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+              className={`min-w-[9rem] flex-1 ${field}`}
             >
               <option value="">اختر المورّد…</option>
               {suppliers.map((s) => (
@@ -173,19 +168,15 @@ function UnknownRow({
             onChange={(e) => setPattern(e.target.value)}
             placeholder="النصّ المميِّز في وصف الحركة"
             dir="auto"
-            className="min-w-[9rem] flex-1 rounded-lg border border-line-input bg-surface px-2 py-1.5 text-xs outline-none focus:border-ink"
+            className={`min-w-[9rem] flex-1 ${field}`}
           />
 
-          <button
-            onClick={save}
-            disabled={!ready || state === "saving"}
-            className={buttonClass("primary", "sm")}
-          >
+          <button onClick={save} disabled={!ready || state === "saving"} className={buttonClass("primary", "sm")}>
             {state === "saving" ? "يحفظ…" : "صنّفها"}
           </button>
 
           {state === "error" && message && (
-            <p className="w-full text-[11px] text-danger">{message}</p>
+            <p role="alert" className="w-full text-[11px] font-bold text-danger">{message}</p>
           )}
         </div>
       )}
@@ -193,38 +184,42 @@ function UnknownRow({
   );
 }
 
+/* ─────────────────────────── الخطوات ─────────────────────────── */
 
 /**
- * خطوات الاستيراد، ظاهرةً.
- *
- * كان كل شيء في شاشة واحدة: الرفع والمعاينة والتصنيف والقواعد والتطبيق
- * والوسم اليدويّ. فلا يعرف المستخدم أين هو ولا كم بقي. والخطوة تُشتقّ
- * من الحال لا تُخزَّن — فحالٌ ثانية قد تخالف الأولى.
+ * خطوات الاستيراد، ظاهرةً — والخطوةُ تُشتقّ من الحال لا تُخزَّن: حالٌ
+ * ثانية تُخزَّن هي حالٌ ثانية قد تخالف الأولى.
  */
-const STEPS = ["ارفع الكشف", "يُقرأ", "راجع ما يحتاجك", "طبّق", "تمّ"] as const;
+const STEPS = ["اختر الملفّ", "راجع المعاينة", "قيِّد الجديد", "النتيجة"] as const;
 
-function Steps({ current }: { current: number }) {
+function FlowSteps({ current, failed }: { current: number; failed: boolean }) {
   return (
-    <ol className="flex items-center gap-1.5" aria-label="خطوات الاستيراد">
-      {STEPS.map((label, i) => (
-        <li key={label} className="flex min-w-0 flex-1 flex-col gap-1">
-          <span
-            className={`h-1 rounded-full ${
-              i < current ? "bg-ink" : i === current ? "bg-ink/50" : "bg-sunken"
-            }`}
-          />
-          <span
-            className={`truncate text-[11px] ${
-              i === current ? "font-bold text-ink" : "text-muted"
-            }`}
-          >
-            {label}
-          </span>
-        </li>
-      ))}
+    <ol className="grid grid-cols-4 gap-2" aria-label="خطوات الاستيراد">
+      {STEPS.map((label, i) => {
+        const state = i < current ? "done" : i === current ? (failed ? "failed" : "current") : "todo";
+        return (
+          <li key={label} className="min-w-0" aria-current={state === "current" ? "step" : undefined}>
+            <span
+              aria-hidden
+              className={`block h-1 rounded-full ${
+                state === "done" ? "bg-ok" : state === "current" ? "bg-accent" : state === "failed" ? "bg-danger" : "bg-sunken"
+              }`}
+            />
+            <span className={`mt-1.5 flex items-center gap-1 text-[11px] ${state === "current" || state === "failed" ? "font-bold text-ink" : "text-muted"}`}>
+              {state === "done" && <Check className="h-3 w-3 shrink-0 text-ok" strokeWidth={2.5} aria-hidden />}
+              <span className="truncate">{label}</span>
+              <span className="sr-only">
+                {state === "done" ? " — تمّت" : state === "current" ? " — الخطوة الحاليّة" : state === "failed" ? " — تعثّرت" : ""}
+              </span>
+            </span>
+          </li>
+        );
+      })}
     </ol>
   );
 }
+
+/* ─────────────────────────── الاستيراد ─────────────────────────── */
 
 export function BankImport({
   openInvoiceCount,
@@ -236,10 +231,12 @@ export function BankImport({
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<File | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [busy, setBusy] = useState<"reading" | "applying" | null>(null);
   const [data, setData] = useState<Preview | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; during: "reading" | "applying" } | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   /** كم اسماً بنكياً تعلّمه النظام في هذه الجلسة — يفتح زرّ إعادة المطابقة */
   const [learned, setLearned] = useState(0);
 
@@ -251,16 +248,17 @@ export function BankImport({
       body.append("file", file);
       if (apply) body.append("apply", "true");
       const r = await request<Preview & { message?: string }>("/api/bank-import", { method: "POST", body });
-      if (!r.ok) { setError(r.error); return; }
+      if (!r.ok) { setError({ message: r.error, during: apply ? "applying" : "reading" }); return; }
       if (apply) {
         /*
           رسالةُ الخادم تُعرض كما قالها — وكانت الشاشة تكتب نصّها هي:
-          «طوبقت ٠ فاتورة من ٠ تحويلاً» عن كشفٍ مقيَّدٍ كلُّه من قبل،
-          والخادم يقول «هذا الكشف مقيَّد عندك من قبل».
+          «طوبقت ٠ فاتورة من ٠ تحويلاً» عن كشفٍ مقيَّدٍ كلُّه من قبل.
         */
-        setDone(r.data.message ?? "اكتمل الاستيراد");
+        const message = r.data.message ?? "اكتمل الاستيراد";
+        setDone(message);
         setData(null);
         setLearned(0);
+        toast({ tone: "ok", title: "استُورد الكشف", body: message });
         router.refresh();
       } else {
         setData(r.data);
@@ -270,321 +268,379 @@ export function BankImport({
     }
   }, [router]);
 
+  function choose(f: File | undefined) {
+    if (!f) return;
+    fileRef.current = f;
+    setFileName(f.name);
+    setDone(null);
+    setData(null);
+    void send(f, false);
+  }
 
-  /*
-    الخطوة الحالية تُشتقّ من الحال لا تُخزَّن.
-    حالٌ ثانية تُخزَّن هي حالٌ ثانية قد تخالف الأولى.
-  */
-  const step = done ? 4 : data ? (data.summary.unknown > 0 ? 2 : 3) : busy === "reading" ? 1 : 0;
+  function reset() {
+    fileRef.current = null;
+    setFileName(null);
+    setData(null);
+    setError(null);
+    setDone(null);
+    setLearned(0);
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  const step = done ? 3 : busy === "applying" || error?.during === "applying" ? 2 : data ? 1 : 0;
 
   return (
-    <div className="space-y-8">
-      {/* ── الخيار الأول: كشف البنك ── */}
-      <section>
-        <h2 className="font-display text-lg font-bold leading-tight">اقرأ كشف البنك</h2>
-        <p className="mb-4 mt-1 max-w-2xl text-xs leading-relaxed text-ink-soft">
-          الأدقّ: كل سداد مثبت بحركة بنكية بتاريخها ومبلغها. ولا يُحفظ شيء قبل أن
-          تراه.
-        </p>
+    <div className="overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
+      <div className="border-b border-line-soft px-4 py-4 sm:px-5">
+        <FlowSteps current={step} failed={error !== null} />
+      </div>
 
-        <Steps current={step} />
-
-        <label
-          className="mt-3 block cursor-pointer rounded-xl border-2 border-dashed border-line px-5 py-8 text-center focus-within:border-ink hover:border-ink-soft"
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv,.pdf"
-            className="sr-only"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) { fileRef.current = f; void send(f, false); }
-            }}
-          />
-          <p className="text-sm font-bold">
-            {busy === "reading" ? "يقرأ الكشف…" : "اختر ملف كشف الحساب"}
-          </p>
-          <p className="mt-1 text-xs text-muted">Excel أو PDF نصّيّ من بنكك — لا يُحفظ شيء قبل مراجعتك</p>
-        </label>
-
-        {error && <p className="mt-3 rounded-lg bg-danger-bg px-3 py-2 text-xs text-danger">{error}</p>}
-        {done && <p className="mt-3 rounded-lg bg-ok-bg px-3 py-2 text-xs font-bold text-ok">✓ {done}</p>}
-
-        {data && (
-          <div className="mt-4 rounded-2xl border border-line bg-raised shadow-raised p-4">
-            <p className="text-xs text-muted">
-              {data.summary.bank} · حساب {data.summary.accountNumber ?? "—"} ·{" "}
-              {data.summary.periodStart} إلى {data.summary.periodEnd}
-            </p>
-
-            {/*
-              الفجوة تُعرَض قبل كل شيء: التكرار يُرفَض من نفسه، أمّا
-              الأسبوع الذي لم يُستورَد فلا يشكو منه أحد — الغائب لا يُرى.
-            */}
-            {data.summary.coverage && data.summary.coverage.gaps.length > 0 && (
-              <div className="mt-3 rounded-xl border border-warn/40 bg-warn-bg px-3 py-2.5">
-                <p className="text-xs font-bold text-warn">
-                  فجوة في التغطية — أيامٌ لم يُستورَد كشفها
-                </p>
-                <ul className="mt-1.5 space-y-0.5">
-                  {data.summary.coverage.gaps.slice(0, 4).map((g, i) => (
-                    <li key={i} className="nums text-[11px] leading-relaxed">
-                      <bdi>{g.start}</bdi> إلى <bdi>{g.end}</bdi> ({countNoun(g.days, DAY)})
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">
-                  حركات هذه الأيام غائبة عن النظام، ولن تظهر ناقصةً في أي تقرير — لأنّ
-                  الغائب لا يُرى. ارفع كشفها لتكتمل.
-                </p>
-              </div>
-            )}
-
-            {/*
-              حدود القراءة تُعرَض قبل الأرقام.
-
-              محوِّلُ بنكٍ لم يُجرَّب على كشفٍ حقيقيّ، أو كشفٌ قُرئ بصرياً
-              من صورة — كلاهما حدٌّ معلوم سلفاً لا خطأٌ وقع. وإخفاؤه حتى
-              يقع الخطأ يجعل من يقع فيه يظنّ أنّ النظام أخطأ، وإنّما هو
-              يعمل ضمن حدّه المعلَن.
-            */}
-            {(data.summary.notices ?? []).length > 0 && (
-              <div className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5">
-                <p className="text-xs font-bold">حدود هذه القراءة</p>
-                <ul className="mt-1.5 space-y-1">
-                  {(data.summary.notices ?? []).map((n, i) => (
-                    <li key={i} className="text-[11px] leading-relaxed text-ink-soft">
-                      — {n}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/*
-              الحلّ التقريبيّ يُعلَن.
-
-              حين تنفد ميزانيّة العقد يرجع المحسِّن إلى الجشع، فيُنتج
-              توزيعاً جيّداً لا أفضل. وكان هذا يُحسَب ولا يُعرَض — فتقول
-              الشاشة عن حلٍّ تقريبيّ ما تقوله عن حلٍّ مثبت. والقرار نفسه
-              يحتاط فيصير التلقائيّ اقتراحاً، لكنّ من يرى الاقتراحات
-              كثُرت فجأةً يستحقّ أن يعرف لماذا.
-            */}
-            {data.summary.exact === false && (
-              <div className="mt-3 rounded-xl border border-warn/40 bg-warn-bg px-3 py-2.5">
-                <p className="text-xs font-bold text-warn">
-                  التوزيع تقريبيّ — لا مثبت
-                </p>
-                <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">
-                  الاحتمالات في هذا الكشف أكثر من أن تُستقصى كلّها، فتوقّف البحث عند
-                  أفضل ما بلغه. والتوزيع المعروض صحيحٌ ومتّسق، لكن قد يوجد توزيعٌ أنسب
-                  لم يُبلَغ — ولذلك لم تُطابَق حركةٌ تلقائياً هنا: صارت كلّها اقتراحاً
-                  ينتظر تأكيدك. راجعها بعينك.
-                </p>
-              </div>
-            )}
-
-            {/*
-              الرقم الأوّل هو ما يحتاج المستخدم، لا مجموع ما في الملف.
-              من يرى «٢٤٣ حركة» يظنّ أنّ عليه مراجعة مئتين وأربعين، وإنّما
-              عليه اثنتا عشرة.
-            */}
-            {/*
-              المزامنة تُقال أوّلاً.
-
-              لأنّ صاحب العمل لا يريد أن يُدخِل ملفّاً، يريد أن يعرف ما
-              الجديد فيه. وكان يُقال «أُضيفت ٣٢٧ حركة» عن ملفٍّ لم يُضِف
-              واحدة — فيراجع ثلاثمئة سطرٍ حسم أمرها من شهر.
-            */}
-            {data.sync && (
-              <div className="mt-3 rounded-xl border border-line bg-sunken px-3 py-3">
-                <p className="font-display text-2xl font-bold leading-none">
-                  {data.sync.added === 0
-                    ? "لا جديد في هذا الكشف"
-                    : `${countNoun(data.sync.added, TRANSACTION)} جديدة`}
-                </p>
-                {(data.sync.closedMonthRows ?? 0) > 0 && (
-                  <p className="mt-2 rounded-lg border border-warn/40 bg-warn-bg px-2.5 py-1.5 text-xs leading-relaxed" role="status">
-                    {countNoun(data.sync.closedMonthRows ?? 0, TRANSACTION)} في شهرٍ مقفل ({(data.sync.closedMonths ?? []).join("، ")}) — لا تُقيَّد.
-                    إن كانت مقصودة فأعد فتح الشهر من «إقفال الشهر» ثمّ استورد الكشف ثانيةً.
-                  </p>
-                )}
-                <p className="nums mt-1.5 text-xs text-muted">
-                  {data.sync.inFile} في الملفّ · {data.sync.alreadyKnown} مسجّلة عندك
-                  {data.sync.byReference > 0 && ` (${countNoun(data.sync.byReference, TRANSACTION)} عرفناها برقم العمليّة)`}
-                  {data.sync.ambiguous > 0 && ` · ${countNoun(data.sync.ambiguous, TRANSACTION)} قد تكون مكرَّرة`}
-                </p>
-                {data.sync.ambiguous > 0 && (
-                  <div className="mt-2 border-t border-line pt-2">
-                    <p className="text-[11px] font-bold text-warn">للمراجعة — لن تُضاف ولن تُحذف</p>
-                    <ul className="mt-1 space-y-1">
-                      {(data.sync.ambiguousRows ?? []).map((a, i) => (
-                        <li key={i} className="text-[11px] leading-relaxed text-muted">
-                          <span className="nums">{a.date}</span> ·{" "}
-                          <span className="nums font-bold">{formatRiyalsDisplay(a.amountMinor)}</span> ·{" "}
-                          {a.description} — {a.reason}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <p className="mt-3 font-display text-2xl font-bold leading-none">
-              {data.summary.unknown === 0
-                ? "لا شيء يحتاجك"
-                : `${countNoun(data.summary.unknown, TRANSACTION)} تحتاجك`}
-            </p>
-            <p className="mt-1.5 text-xs text-muted">
-              من <span className="nums">{data.sync?.added ?? data.summary.totalRows}</span> حركة جديدة —
-              الباقي صُنّف بقواعدك أو بطبيعته.
-            </p>
-
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Stat label="حركات الكشف" value={String(data.summary.totalRows)} />
-              <Stat label="مدفوعات محتملة" value={String(data.summary.payments)} />
-              <Stat label="ستُطابق فواتير" value={String(data.summary.matchedInvoices)} tone="ok" />
-              <Stat label="تحتاجك" value={String(data.summary.unknown)} tone={data.summary.unknown ? "warn" : undefined} />
-            </div>
-
-            {data.summary.byCategory.filter((c) => c.category !== "UNKNOWN" && c.category !== "SUPPLIER").length > 0 && (
-              <div className="mt-3">
-                <p className="text-[11px] font-bold">حركات صنّفتَها سابقاً</p>
-                <ul className="mt-1 flex flex-wrap gap-1.5">
-                  {data.summary.byCategory
-                    .filter((c) => c.category !== "UNKNOWN" && c.category !== "SUPPLIER")
-                    .map((c) => (
-                      <li key={c.category} className="rounded-lg border border-line px-2 py-1 text-[11px]">
-                        {c.label}: {c.count} ·{" "}
-                        <span className="nums" dir="ltr">{formatRiyalsDisplay(c.amountMinor)}</span>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            )}
-
-            {data.summary.duplicateGroups > 0 && (
-              <p className="mt-3 rounded-lg bg-danger-bg px-3 py-2 text-xs text-danger">
-                ⚠ {countNoun(data.summary.duplicateGroups, GROUP)} يُشتبه بتكرار دفعها — راجعها بعد الاستيراد
-              </p>
-            )}
-
-            {data.preview.length > 0 && (
-              <>
-                <p className="mt-4 text-xs font-bold">عيّنة ممّا سيُطابق</p>
-                <ul className="mt-1.5 divide-y divide-line">
-                  {data.preview.slice(0, 8).map((p, i) => (
-                    <li key={i} className="flex items-center justify-between gap-3 py-1.5 text-xs">
-                      <span className="min-w-0 truncate">
-                        <span className="nums text-muted" dir="ltr">{p.date}</span>{" "}
-                        {p.supplierName} — {countNoun(p.invoiceNumbers.length, INVOICE)}
-                      </span>
-                      <span className="nums shrink-0 font-medium" dir="ltr">
-                        {formatRiyalsDisplay(p.amountMinor)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-
-            {data.unknown.length > 0 && (
-              <>
-                <p className="mt-5 text-xs font-bold text-warn">
-                  {countNoun(data.unknown.length, TRANSACTION)} لم يُعرف مستفيدها
-                </p>
-                <p className="text-[11px] leading-relaxed text-muted">
-                  ليست كلّها مورّدين: فيها رواتب وإيجار وزكاة وكهرباء وتحويلاتك الشخصية.
-                  صنّف كلّ حركة مرّة واحدة — يُحفظ التصنيف قاعدةً تسري على ما يشبهها في كل
-                  كشف بعده، فتُخرَج من حساب مستحقّات المورّدين.
-                  {learned > 0 && ` — صُنّف منها ${countNoun(learned, TRANSACTION)} حتى الآن.`}
-                </p>
-
-                <ul className="mt-2 max-h-[26rem] divide-y divide-line overflow-y-auto rounded-lg border border-line">
-                  {data.unknown.map((u) => (
-                    <UnknownRow
-                      key={u.id}
-                      tx={u}
-                      suppliers={suppliers}
-                      onLearned={() => setLearned((n) => n + 1)}
-                    />
-                  ))}
-                </ul>
-
-                {learned > 0 && (
-                  <button
-                    onClick={() => fileRef.current && send(fileRef.current, false)}
-                    disabled={busy !== null}
-                    className={`mt-2 w-full ${buttonClass("secondary", "sm")}`}
-                  >
-                    {busy === "reading" ? "يعيد المطابقة…" : "أعد المطابقة بالأسماء الجديدة"}
-                  </button>
-                )}
-              </>
-            )}
-
-            {data.supplierOnlyList.length > 0 && (
-              <>
-                <p className="mt-5 text-xs font-bold">عُرف المورّد ولم تُطابَق فاتورة</p>
-                <p className="text-[11px] text-muted">
-                  تحويل إلى مورّد معروف لا تفسّره فاتورة مفتوحة — إمّا سُدّدت سلفاً أو لم تُرفع فاتورتها.
-                </p>
-                <ul className="mt-1.5 divide-y divide-line">
-                  {data.supplierOnlyList.slice(0, 8).map((u, i) => (
-                    <li key={i} className="flex items-center justify-between gap-3 py-1.5 text-xs">
-                      <span className="min-w-0 truncate">{u.supplierName}</span>
-                      <span className="nums shrink-0 text-muted" dir="ltr">{u.date}</span>
-                      <span className="nums shrink-0 font-medium" dir="ltr">
-                        {formatRiyalsDisplay(u.amountMinor)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-
-            {/* «لا جديد» ثمّ «أكّد وطابِق» كان يكتب استيراداً عن لا شيء */}
-            {data.sync && data.sync.added === 0 ? (
-              <p className="mt-4 text-center text-sm text-muted">لا شيء يُقيَّد من هذا الملفّ.</p>
+      <div className="px-4 py-5 sm:px-5">
+        {/* ── ١ · اختيار الملفّ ── */}
+        {!data && !done && (
+          <label
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => { e.preventDefault(); setDragging(false); choose(e.dataTransfer.files?.[0]); }}
+            className={`flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed px-5 py-9 text-center transition-colors focus-within:border-accent hover:border-accent-line ${
+              dragging ? "border-accent bg-accent-soft/60" : "border-line-input bg-sunken/40"
+            } ${busy ? "pointer-events-none" : ""}`}
+          >
+            {/* `sr-only` لا `hidden` — ما لا يُركَّز عليه لا يرفعه من لا يستعمل الفأرة */}
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv,.pdf"
+              className="sr-only"
+              disabled={busy !== null}
+              onChange={(e) => choose(e.target.files?.[0])}
+            />
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-accent-soft text-accent">
+              {busy === "reading"
+                ? <Loader2 className="h-5 w-5 animate-spin" strokeWidth={2} aria-hidden />
+                : <Upload className="h-5 w-5" strokeWidth={2} aria-hidden />}
+            </span>
+            {busy === "reading" ? (
+              <span role="status">
+                <span className="block text-sm font-bold">يقرأ «{fileName}»…</span>
+                <span className="mt-1 block text-xs text-muted">يعرف الجديد من المقيَّد ثمّ يرجّح المطابقات — قد يستغرق دقيقة. لا يُحفظ شيء بعد.</span>
+              </span>
             ) : (
-              <button
-                onClick={() => fileRef.current && send(fileRef.current, true)}
-                disabled={busy !== null}
-                className={`mt-4 w-full ${buttonClass("primary")}`}
-              >
-                {busy === "applying" ? "يطبّق…" : "أكّد وطابِق"}
-              </button>
+              <span>
+                <span className="block text-sm font-bold">اختر ملفّ كشف الحساب أو أفلته هنا</span>
+                <span className="mt-1 block text-xs text-muted">Excel أو CSV أو PDF نصّيّ من بنكك — تُعرَض عليك معاينةٌ ولا يُحفظ شيء قبل أن تقيّده.</span>
+              </span>
             )}
+            {!busy && <span className={buttonClass("secondary", "sm")}>تصفّح الملفّات</span>}
+          </label>
+        )}
+
+        {/* ── التعثّر: يُقال ما وقع، ومعه طريقُ الرجوع ── */}
+        {error && (
+          <div role="alert" className="mt-4 flex flex-wrap items-start gap-3 rounded-xl border border-danger/25 bg-danger-bg px-4 py-3">
+            <CircleAlert className="mt-0.5 h-[18px] w-[18px] shrink-0 text-danger" strokeWidth={2} aria-hidden />
+            <div className="min-w-0 flex-1 text-xs leading-relaxed text-ink-soft">
+              <p className="text-[13px] font-bold text-danger">
+                {error.during === "applying" ? "لم يُقيَّد الكشف" : "تعذّرت قراءة الملفّ"}
+              </p>
+              <p className="mt-0.5">{error.message}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {fileName && (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current && send(fileRef.current, error.during === "applying")}
+                  disabled={busy !== null}
+                  className={buttonClass("secondary", "sm")}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                  أعد المحاولة
+                </button>
+              )}
+              <button type="button" onClick={reset} disabled={busy !== null} className={buttonClass("quiet", "sm")}>
+                اختر ملفّاً آخر
+              </button>
+            </div>
           </div>
         )}
-      </section>
+
+        {/* ── ٤ · النتيجة ── */}
+        {done && (
+          <div role="status" className="flex flex-wrap items-start gap-3 rounded-xl border border-ok/25 bg-ok-bg px-4 py-4">
+            <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-ok" strokeWidth={2} aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-ok">اكتمل الاستيراد</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">{done}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a href="#queue" className={buttonClass("primary", "sm")}>
+                انظر ما ينتظر قرارك
+                <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+              </a>
+              <button type="button" onClick={reset} className={buttonClass("secondary", "sm")}>استورد كشفاً آخر</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── ٢ · المعاينة ── */}
+        {data && <PreviewPanel
+          data={data}
+          fileName={fileName}
+          suppliers={suppliers}
+          learned={learned}
+          busy={busy}
+          onLearned={() => setLearned((n) => n + 1)}
+          onRematch={() => fileRef.current && send(fileRef.current, false)}
+          onApply={() => fileRef.current && send(fileRef.current, true)}
+          onCancel={reset}
+        />}
+      </div>
 
       {/*
         ── طريقة سداد أخرى ──
 
-        كان هنا زرٌّ واحد «أعلن سدادها يدوياً» يسِم **كلّ** المفتوح حتى
-        الشهر الجاري مسدَّداً بتحويلٍ بنكيّ، بتاريخ الفاتورة، ولا ردّ له:
-        ستّ عشرة فاتورة بـ١٨٬٤٤٧٫٦٥ تختفي بضغطتين، ثمّ تصل الحوالة
-        الحقيقيّة فلا تجد فاتورةً مفتوحة فتُقيَّد دفعةً ثانية. فأُزيل،
-        والسداد اليدويّ صار فاتورةً فاتورة حيث تُرى — ويُسأل فيه من أين دُفعت.
+        كان هنا زرٌّ يسِم **كلّ** المفتوح مسدَّداً بتحويلٍ بنكيّ ولا ردّ له —
+        ثمّ تصل الحوالة الحقيقيّة فتُقيَّد دفعةً ثانية. فأُزيل، والسداد اليدويّ
+        صار فاتورةً فاتورة حيث تُرى — ويُسأل فيه من أين دُفعت.
       */}
-      <section className="border-t border-line pt-8">
-        <h2 className="font-display text-lg font-bold leading-tight">طريقة سداد أخرى</h2>
-        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-ink-soft">
-          ما دُفع نقداً أو من حسابك الشخصيّ يُسجَّل لكلّ فاتورةٍ وحدها من قائمة الفواتير:
-          «سجّل أنّها سُدّدت»، ويُسأل فيه من أين دُفعت.
-        </p>
-        <Link
-          href="/purchases/invoices?paid=OPEN"
-          className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-line px-3 text-xs font-medium hover:border-ink-soft"
-        >
-          {openInvoiceCount > 0
-            ? `${countNoun(openInvoiceCount, INVOICE)} مفتوحة — افتحها ←`
-            : "افتح قائمة الفواتير ←"}
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line-soft bg-sunken/40 px-4 py-3 text-xs text-muted sm:px-5">
+        <Info className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+        دفعتَ نقداً أو من حسابك الشخصيّ؟ يُسجَّل لكلّ فاتورةٍ وحدها من قائمة الفواتير.
+        <Link href="/purchases/invoices?paid=OPEN" className="inline-flex min-h-11 items-center font-bold text-accent hover:underline sm:min-h-0">
+          {openInvoiceCount > 0 ? `${countNoun(openInvoiceCount, INVOICE)} مفتوحة` : "قائمة الفواتير"}
+          <ArrowLeft className="ms-0.5 h-3.5 w-3.5" strokeWidth={2} aria-hidden />
         </Link>
-      </section>
+      </p>
+    </div>
+  );
+}
+
+function PreviewPanel({
+  data, fileName, suppliers, learned, busy, onLearned, onRematch, onApply, onCancel,
+}: {
+  data: Preview;
+  fileName: string | null;
+  suppliers: SupplierOption[];
+  learned: number;
+  busy: "reading" | "applying" | null;
+  onLearned: () => void;
+  onRematch: () => void;
+  onApply: () => void;
+  onCancel: () => void;
+}) {
+  const s = data.summary;
+  const added = data.sync?.added ?? s.totalRows;
+  const nothingNew = data.sync !== undefined && data.sync.added === 0;
+  const learnedCats = s.byCategory.filter((c) => c.category !== "UNKNOWN" && c.category !== "SUPPLIER");
+
+  return (
+    <div className="space-y-4">
+      {/* ── هويّة الملفّ ── */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl bg-sunken px-4 py-3">
+        <FileSpreadsheet className="h-5 w-5 shrink-0 text-ink-soft" strokeWidth={1.75} aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-bold" dir="auto">{fileName ?? "كشف الحساب"}</p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted">
+            <span>{s.bank}</span>
+            {s.accountNumber && <span>· حساب <bdi dir="ltr" className="font-mono">{s.accountNumber}</bdi></span>}
+            {s.periodStart && s.periodEnd && (
+              <span className="inline-flex items-center gap-1">
+                · <CalendarRange className="h-3 w-3" strokeWidth={2} aria-hidden />
+                <bdi>{formatDay(s.periodStart)}</bdi> إلى <bdi>{formatDay(s.periodEnd)}</bdi>
+              </span>
+            )}
+          </p>
+        </div>
+        <button type="button" onClick={onCancel} disabled={busy !== null} className={buttonClass("quiet", "sm")}>
+          <X className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+          ألغِ
+        </button>
+      </div>
+
+      {/*
+        المزامنة تُقال أوّلاً: صاحب العمل يريد أن يعرف ما الجديد، لا أن
+        يُدخِل ملفّاً. وكان يُقال «أُضيفت ٣٢٧ حركة» عن ملفٍّ لم يُضِف واحدة.
+      */}
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <div>
+          <p className="text-[1.6rem] font-bold leading-tight tracking-tight">
+            {nothingNew ? "لا جديد في هذا الكشف" : `${countNoun(added, TRANSACTION)} جديدة`}
+          </p>
+          {data.sync && (
+            <p className="mt-1 text-xs text-muted">
+              <span className="nums">{data.sync.inFile}</span> في الملفّ · <span className="nums">{data.sync.alreadyKnown}</span> مسجّلة عندك
+              {data.sync.byReference > 0 && ` (${countNoun(data.sync.byReference, TRANSACTION)} عرفناها برقم العمليّة)`}
+            </p>
+          )}
+        </div>
+        {!nothingNew && (
+          <dl className="grid grid-cols-3 gap-2 text-center">
+            <Mini label="ستُطابَق فواتير" value={s.matchedInvoices} tone="ok" />
+            <Mini label="عُرف مورّدها بلا فاتورة" value={s.supplierOnly} />
+            <Mini label="تحتاجك" value={s.unknown} tone={s.unknown > 0 ? "warn" : undefined} />
+          </dl>
+        )}
+      </div>
+
+      {/* ── ما يجب أن يُعرف قبل التقييد — الغائبُ لا يُرى ── */}
+      {s.coverage && s.coverage.gaps.length > 0 && (
+        <Warn title="فجوةٌ في التغطية — أيّامٌ لم يُستورَد كشفُها">
+          <ul className="mt-1 space-y-0.5">
+            {s.coverage.gaps.slice(0, 4).map((g, i) => (
+              <li key={i}><bdi>{formatDay(g.start)}</bdi> إلى <bdi>{formatDay(g.end)}</bdi> ({countNoun(g.days, DAY)})</li>
+            ))}
+          </ul>
+          <p className="mt-1">حركاتُ هذه الأيّام غائبة، ولن تظهر ناقصةً في أيّ تقرير — ارفع كشفها لتكتمل.</p>
+        </Warn>
+      )}
+      {(data.sync?.closedMonthRows ?? 0) > 0 && (
+        <Warn title={`${countNoun(data.sync?.closedMonthRows ?? 0, TRANSACTION)} في شهرٍ مقفل — لا تُقيَّد`}>
+          ({(data.sync?.closedMonths ?? []).join("، ")}). إن كانت مقصودة فأعد فتح الشهر من «إقفال الشهر» ثمّ استورد الكشف ثانيةً.
+        </Warn>
+      )}
+      {s.exact === false && (
+        <Warn title="التوزيعُ تقريبيّ — لا مثبت">
+          الاحتمالاتُ أكثر من أن تُستقصى كلُّها، فتوقّف البحث عند أفضل ما بلغه. ولذلك لا يُطابَق شيءٌ تلقائياً هنا: كلُّه اقتراحٌ ينتظر تأكيدك.
+        </Warn>
+      )}
+      {s.duplicateGroups > 0 && (
+        <Warn tone="danger" title={`${countNoun(s.duplicateGroups, GROUP)} يُشتبه بتكرار دفعها`}>
+          راجعها بعد الاستيراد في «يحتاج قرارك».
+        </Warn>
+      )}
+      {data.sync && data.sync.ambiguous > 0 && (
+        <Warn title={`${countNoun(data.sync.ambiguous, TRANSACTION)} قد تكون مكرَّرة — لن تُضاف ولن تُحذف`}>
+          <ul className="mt-1 space-y-1">
+            {(data.sync.ambiguousRows ?? []).map((a, i) => (
+              <li key={i}>
+                <bdi>{formatDay(a.date)}</bdi> · <span className="font-bold"><Money minor={a.amountMinor} /></span> · <span dir="auto">{a.description}</span> — {a.reason}
+              </li>
+            ))}
+          </ul>
+        </Warn>
+      )}
+      {/* حدودُ القراءة المعلومة سلفاً — تُعرَض دائماً، لا حين يقع الخطأ */}
+      {(s.notices ?? []).length > 0 && (
+        <div className="rounded-xl border border-line bg-sunken/60 px-4 py-3 text-xs leading-relaxed text-ink-soft">
+          <p className="flex items-center gap-1.5 font-bold text-ink"><Info className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> حدود هذه القراءة</p>
+          <ul className="mt-1 space-y-0.5">
+            {(s.notices ?? []).map((n, i) => <li key={i}>— {n}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {learnedCats.length > 0 && (
+        <div>
+          <p className="text-[11px] font-bold text-muted">صُنّف بقواعدك</p>
+          <ul className="mt-1.5 flex flex-wrap gap-1.5">
+            {learnedCats.map((c) => (
+              <li key={c.category}>
+                <Badge>{c.label}: <span className="nums">{c.count}</span> · <Money minor={c.amountMinor} /></Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {data.preview.length > 0 && (
+        <Block title="عيّنةٌ ممّا سيُطابَق">
+          {data.preview.slice(0, 8).map((p, i) => (
+            <li key={i} className="flex items-center gap-3 px-4 py-2 text-xs">
+              <bdi className="w-20 shrink-0 text-muted">{formatDay(p.date)}</bdi>
+              <span className="min-w-0 flex-1 truncate">{p.supplierName} — {countNoun(p.invoiceNumbers.length, INVOICE)}</span>
+              <span className="nums-col shrink-0 font-bold"><Money minor={p.amountMinor} /></span>
+            </li>
+          ))}
+        </Block>
+      )}
+
+      {data.unknown.length > 0 && (
+        <div>
+          <p className="flex items-center gap-2 text-[13px] font-bold">
+            <TriangleAlert className="h-4 w-4 text-warn" strokeWidth={2} aria-hidden />
+            {countNoun(data.unknown.length, TRANSACTION)} لم يُعرف مستفيدها
+          </p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
+            صنّف كلّ حركةٍ مرّة — يُحفظ التصنيف قاعدةً تسري على ما يشبهها في كلّ كشفٍ بعده، ويخرج من مستحقّات المورّدين ما ليس لهم.
+            {learned > 0 && ` صُنّف منها ${countNoun(learned, TRANSACTION)} حتى الآن.`}
+          </p>
+          <ul className="mt-2 max-h-[26rem] divide-y divide-line-soft overflow-y-auto rounded-xl border border-line">
+            {data.unknown.map((u) => (
+              <UnknownRow key={u.id} tx={u} suppliers={suppliers} onLearned={onLearned} />
+            ))}
+          </ul>
+          {learned > 0 && (
+            <button type="button" onClick={onRematch} disabled={busy !== null} className={`mt-2 w-full ${buttonClass("secondary", "sm")}`}>
+              <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+              {busy === "reading" ? "يعيد المطابقة…" : "أعد المعاينة بالأسماء الجديدة"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {data.supplierOnlyList.length > 0 && (
+        <Block title="عُرف المورّد ولم تُطابَق فاتورة" hint="إمّا سُدّدت سلفاً أو لم تُرفع فاتورتُها — تظهر في الطابور بعد التقييد.">
+          {data.supplierOnlyList.slice(0, 8).map((u, i) => (
+            <li key={i} className="flex items-center gap-3 px-4 py-2 text-xs">
+              <bdi className="w-20 shrink-0 text-muted">{formatDay(u.date)}</bdi>
+              <span className="min-w-0 flex-1 truncate">{u.supplierName}</span>
+              <span className="nums-col shrink-0 font-bold"><Money minor={u.amountMinor} /></span>
+            </li>
+          ))}
+        </Block>
+      )}
+
+      {/* ── ٣ · التقييد: «لا جديد» ثمّ «قيِّد» كان يكتب استيراداً عن لا شيء ── */}
+      <div className="flex flex-wrap items-center gap-2 border-t border-line-soft pt-4">
+        {nothingNew ? (
+          <>
+            <p className="flex-1 text-sm text-muted">لا شيء يُقيَّد من هذا الملفّ — كلُّ حركاته عندك.</p>
+            <button type="button" onClick={onCancel} className={buttonClass("secondary")}>اختر ملفّاً آخر</button>
+          </>
+        ) : (
+          <>
+            <button type="button" onClick={onApply} disabled={busy !== null} className={buttonClass("primary")}>
+              {busy === "applying"
+                ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden /> يقيّد…</>
+                : <><Check className="h-4 w-4" strokeWidth={2.25} aria-hidden /> قيِّد {countNoun(added, TRANSACTION)} وطابِق</>}
+            </button>
+            <button type="button" onClick={onCancel} disabled={busy !== null} className={buttonClass("quiet")}>ألغِ — لا يُحفظ شيء</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Mini({ label, value, tone }: { label: string; value: number; tone?: "ok" | "warn" }) {
+  return (
+    <div className="rounded-lg bg-sunken px-3 py-2">
+      <dt className="text-[10px] font-bold leading-tight text-muted">{label}</dt>
+      <dd className={`nums mt-1 text-lg font-bold leading-none ${tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : ""}`}>{value}</dd>
+    </div>
+  );
+}
+
+function Warn({ title, tone = "warn", children }: { title: string; tone?: "warn" | "danger"; children: React.ReactNode }) {
+  const skin = tone === "danger" ? "border-danger/25 bg-danger-bg text-danger" : "border-warn/25 bg-warn-bg text-warn";
+  const Icon = tone === "danger" ? CircleAlert : TriangleAlert;
+  return (
+    <div className={`flex gap-3 rounded-xl border px-4 py-3 ${skin}`}>
+      <Icon className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+      <div className="min-w-0 text-xs leading-relaxed text-ink-soft">
+        <p className={`text-[13px] font-bold ${tone === "danger" ? "text-danger" : "text-warn"}`}>{title}</p>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Block({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[13px] font-bold">{title}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-muted">{hint}</p>}
+      <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-xl border border-line">{children}</ul>
     </div>
   );
 }

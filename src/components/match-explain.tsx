@@ -2,8 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  CircleAlert, CircleCheck, CircleDashed, CircleMinus, Clock3, Info, Sparkles, type LucideIcon,
+} from "lucide-react";
 import { Money } from "./money";
-import { Badge, buttonClass } from "./ui";
+import { Badge, type Tone } from "./ui";
+import { ConfirmAction, Sheet, toast } from "./ui-client";
 import { postJson } from "@/lib/http-client";
 import { strength } from "@/lib/bank/strength";
 import { ACT } from "@/lib/ui-terms";
@@ -11,12 +15,13 @@ import { ACT } from "@/lib/ui-terms";
 /**
  * لماذا طُوبقت هذه الحركة؟ وكيف أتراجع؟
  *
- * كان النظام يعرض «٩٨٪» — وهي تسميةٌ ثابتة متنكّرة في زيّ رقم، تُقرأ
- * يقيناً وليست كذلك. فصار يُعرَض **وصفُ الترجيح** وتحته **الأدلّة
- * بنصّها**: من هو المستفيد ولماذا، وما الذي طابق المبلغ والتاريخ، وهل
- * كان هناك مرشّح آخر قريب.
+ * كان النظام يعرض «٩٨٪» — تسميةٌ ثابتة متنكّرة في زيّ رقم، تُقرأ يقيناً
+ * وليست كذلك. فيُعرَض **وصفُ الترجيح** وتحته **الأدلّة بنصّها**: من هو
+ * المستفيد ولماذا، وما الذي طابق المبلغ والتاريخ.
  *
- * والتراجع بجانبها: من وافق على مطابقة خاطئة لا يبقى أسيرها.
+ * والتراجعُ بجانبها: من وافق على مطابقةٍ خاطئة لا يبقى أسيرها. وفي
+ * السجلّ تُفتح الأدلّةُ في ورقةٍ لا داخل خليّة جدول — الخليّةُ الضيّقة
+ * تقصّ الدليل وتدفع الصفوف، والورقةُ تعطيه موضعه.
  */
 
 export interface MatchExplanation {
@@ -26,7 +31,7 @@ export interface MatchExplanation {
   outcome: string | null;
   amountMinor: number;
   matched: boolean;
-  /** حالُ الحركة الفعليّ — و«متجاهَلة» قرارٌ تامّ. انظر أدناه. */
+  /** حالُ الحركة الفعليّ — و«متجاهَلة» قرارٌ تامّ. */
   status?: "UNMATCHED" | "MATCHED" | "IGNORED" | "PARTIAL" | "DISPUTED" | null;
   /** أين تقف من الطبقات — وما بلغ الحسمَ لا يُسأل عنه. */
   lifecycle?: "RAW" | "INFERRED" | "SUGGESTED" | "CONFIRMED" | "POSTED" | null;
@@ -38,206 +43,222 @@ export interface MatchExplanation {
   } | null;
 }
 
-const DISPOSITION: Record<string, { label: string; tone: "ok" | "warn" | "danger" }> = {
-  AUTO: { label: "طُوبقت تلقائياً", tone: "ok" },
-  SUGGEST: { label: "اقتراح ينتظر تأكيدك", tone: "warn" },
-  REVIEW: { label: "تنتظر مراجعتك", tone: "danger" },
+interface StateLook {
+  label: string;
+  tone: Tone;
+  icon: LucideIcon;
+}
+
+const DISPOSITION: Record<string, StateLook> = {
+  AUTO: { label: "طُوبقت تلقائياً", tone: "ok", icon: Sparkles },
+  SUGGEST: { label: "اقتراح ينتظر تأكيدك", tone: "warn", icon: Clock3 },
+  REVIEW: { label: "تنتظر مراجعتك", tone: "danger", icon: CircleAlert },
 };
+
+/**
+ * الشارةُ تُشتقّ من الحال، لا من عمودٍ قديم.
+ *
+ * `match_disposition` عمودٌ عن **آخر ما رجّحه المحرّك**، لا عن حال الحركة
+ * اليوم — فحوالةٌ واردة أُعلن أنّها ليست سداداً كانت تُعرَض «تنتظر
+ * مراجعتك» بالأحمر. فالترتيبُ هو ترتيبُ ما تصير به الحركة إلى حالها:
+ * متجاهَلةٌ ← مقيَّدةٌ بدفعة ← حُسمت بلا مال ← ترجيحٌ ينتظر. ولم يُمَسّ
+ * محرّكُ المطابقة: التغييرُ في قراءة الحال لا في تقريره.
+ */
+export function stateOf(match: MatchExplanation): StateLook | null {
+  const decided = match.lifecycle === "CONFIRMED" || match.lifecycle === "POSTED";
+  if (isNotAPayment(match)) return { label: "أُعلنت ليست سداداً", tone: "muted", icon: CircleMinus };
+  if (match.matched) {
+    return match.disposition === "AUTO"
+      ? DISPOSITION.AUTO
+      : { label: "سُجّلت سداداً", tone: "ok", icon: CircleCheck };
+  }
+  if (decided) return { label: "حُسمت بلا قيد", tone: "ok", icon: CircleDashed };
+  return match.disposition ? DISPOSITION[match.disposition] : null;
+}
+
+/**
+ * «متجاهَلة» حالٌ لا سبب — و`NOT_A_PAYMENT` سببٌ واحدٌ من أسبابها. ويُبقى
+ * السببُ في الشرط كي لا يسقط صفٌّ قديمٌ لم يُكتب حالُه.
+ */
+function isNotAPayment(match: MatchExplanation): boolean {
+  return !match.matched && (match.status === "IGNORED" || match.outcome === "NOT_A_PAYMENT");
+}
 
 export function MatchExplain({
   match,
   canUndo = true,
+  inline = false,
+  title,
 }: {
   match: MatchExplanation;
   /** الردّ بصلاحية «اعتماد السداد» — ومن لا يملكها لا يُعرَض له زرٌّ يردّه الخادم. */
   canUndo?: boolean;
+  /** الأدلّة ظاهرةٌ في موضعها (بطاقة الحركة المطلوبة) لا في ورقة. */
+  inline?: boolean;
+  /** اسمُ الجهة — عنوانُ الورقة. */
+  title?: string;
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [undoing, setUndoing] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+  const d = stateOf(match);
 
-  async function undo() {
-    setUndoing(true);
-    setFailed(false);
-    try {
-      const r = await postJson<{ message?: string }>("/api/match-undo", {
-        transactionId: match.transactionId,
-        reason: "تراجع من الشاشة",
-      });
-      if (!r.ok) {
-        setFailed(true);
-        setMessage(r.error);
-      } else {
-        setMessage(r.data.message ?? "فُكّت المطابقة");
-        router.refresh();
-      }
-    } finally {
-      setUndoing(false);
-      setConfirming(false);
-    }
+  if (inline) {
+    return (
+      <div className="space-y-3">
+        <StateLine look={d} score={match.score} />
+        <Evidence match={match} />
+        <UndoAction match={match} canUndo={canUndo} />
+      </div>
+    );
   }
 
-  /*
-    ما قُيّد بدفعةٍ انتهى أمره — وكان قرارُ المطابقة القديم يبقى «تنتظر
-    مراجعتك» بالأحمر على حركاتٍ مقيَّدة، والطابور فارغ.
-  */
-  /*
-    «ليست سداداً» كان الخادم يردّها (match-undo) ولا زرّ لها — فمن أعلنها
-    خطأً يرى الحركة خارج الطابور ولا يملك إعادتها (BTN-106).
-  */
-  /*
-    ── الشارةُ تُشتقّ من الحال، لا من عمودٍ قديم ──
-
-    كانت تُقرأ من `match_disposition` وحده متى لم تكن الحركة مقيَّدةً
-    بدفعة. و`match_disposition` عمودٌ عن **آخر ما رجّحه المحرّك**، لا عن
-    حال الحركة اليوم: يبقى فيه «مراجعة» بعد أن يبتّ الإنسانُ الأمر،
-    لأنّ الذي يتغيّر حينها عمودٌ آخر.
-
-    فوقع في قاعدة أحمد: حوالةٌ **واردة** بـ١٬١٠٠ ريالاً (٤ يوليو ٢٠٢٦)
-    حالُها `IGNORED` — أي **أُعلن أنّها ليست سداداً وانتهى أمرُها** —
-    وكانت تُعرَض بشارةٍ حمراء «تنتظر مراجعتك». ولم تُمسَك بالحارس
-    القديم لأنّه كان يسأل عن `match_outcome = 'NOT_A_PAYMENT'`،
-    ونتيجتُها `UNKNOWN_ENTITY`. فالحارسُ كان يمسك **سبباً** واحداً من
-    أسباب التجاهل لا **الحالَ** نفسه.
-
-    وشارةٌ تقول «ينتظرك عمل» عن عملٍ مقضيّ أسوأ من غياب الشارة: تُري
-    صاحبَ المقهى واجباً ثمّ لا يجده في أيّ طابور، فيشكّ في الطوابير كلّها.
-
-    فصارت تُشتقّ بالترتيب الذي تصير به الحركةُ إلى حالها:
-    متجاهَلةٌ ← مقيَّدةٌ بدفعة ← حُسمت بلا مال ← ترجيحٌ ينتظر. ولم يُمَسّ
-    شيءٌ من محرّك المطابقة: التغييرُ في قراءة الحال لا في تقريره.
-  */
-  const decided = match.lifecycle === "CONFIRMED" || match.lifecycle === "POSTED";
-  /*
-    «متجاهَلة» حالٌ لا سبب — و`NOT_A_PAYMENT` سببٌ واحدٌ من أسبابها.
-    ويُبقى السببُ في الشرط كي لا يسقط صفٌّ قديمٌ لم يُكتب حالُه.
-  */
-  const notAPayment = !match.matched && (match.status === "IGNORED" || match.outcome === "NOT_A_PAYMENT");
-
-  const d = notAPayment
-    ? { label: "أُعلنت ليست سداداً", tone: "muted" as const }
-    : match.matched
-      ? match.disposition === "AUTO"
-        ? { label: "طُوبقت تلقائياً", tone: "ok" as const }
-        : { label: "سُجّلت سداداً", tone: "ok" as const }
-      : decided
-        ? { label: "حُسمت بلا قيد", tone: "ok" as const }
-        : match.disposition ? DISPOSITION[match.disposition] : null;
-
   return (
-    <div className="mt-2">
-      <div className="flex flex-wrap items-center gap-2">
-        {d && <Badge tone={d.tone}>{d.label}</Badge>}
-        {match.score !== null && (
-          <span className="text-[11px] text-muted">{strength(match.score)}</span>
+    <>
+      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+        {d && (
+          <Badge tone={d.tone}>
+            <d.icon className="h-3 w-3" strokeWidth={2.25} aria-hidden />
+            {d.label}
+          </Badge>
         )}
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="inline-flex min-h-11 items-center px-2 text-[11px] text-muted underline decoration-dotted underline-offset-4 hover:text-ink-soft sm:min-h-0 sm:px-0"
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          className="relative z-10 inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 text-[11px] font-bold text-muted transition-colors hover:bg-hover hover:text-ink sm:min-h-7"
         >
-          {open ? "أخفِ السبب" : "لماذا؟"}
+          <Info className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+          لماذا؟
         </button>
-      </div>
+      </span>
 
-      {open && (
-        <div className="mt-2.5 rounded-xl border border-line bg-sunken px-3 py-2.5">
-          {match.evidence?.تصنيف && (
-            <Row label="ما هي" value={match.evidence.تصنيف} />
-          )}
-
-          {match.evidence?.مستفيد && match.evidence.مستفيد.length > 0 && (
-            <Row
-              label="المستفيد"
-              value={match.evidence.مستفيد.join(" · ")}
-              note={
-                match.evidence.درجةالمستفيد !== undefined
-                  ? `ترجيح ${match.evidence.درجةالمستفيد} من مئة`
-                  : undefined
-              }
-            />
-          )}
-
-          {match.evidence?.مطابقة && match.evidence.مطابقة.length > 0 && (
-            <div className="mt-2">
-              <p className="text-[11px] text-muted">لماذا هذه الفاتورة</p>
-              <ul className="mt-1 space-y-1">
-                {match.evidence.مطابقة.map((r, i) => (
-                  <li key={i} className="text-[11px] leading-relaxed">— {r}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {!match.evidence && (
-            <p className="text-[11px] text-muted">
-              لم تُحفَظ أدلّة لهذه الحركة — استُوردت قبل أن يبدأ حفظها.
-            </p>
-          )}
-
-          <p className="mt-2.5 border-t border-line pt-2 text-[11px] leading-relaxed text-muted">
-            المبلغ <Money minor={match.amountMinor} /> ريالاً. وهذا ترجيح، فراجِع ما
-            يبدو غريباً.
-          </p>
-
-          {canUndo && (match.matched || notAPayment) && (
-            <div className="mt-2.5">
-              {!confirming ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirming(true)}
-                  className={buttonClass("danger", "sm")}
-                >
-                  {notAPayment ? "تراجع عن «ليست سداداً»" : "تراجع عن المطابقة"}
-                </button>
-              ) : (
-                <div className="rounded-lg border border-danger/40 bg-danger-bg p-2.5">
-                  <p className="text-[11px] leading-relaxed">
-                    {notAPayment
-                      ? "يعود باب الحركة إلى ما كان قبل الإعلان، وتعود إلى طابور المراجعة تنتظر قراراً: من الجهة، وأيّ فاتورة. لا يُكتب مالٌ الآن، ويُكتب الردّ في سجلّ التدقيق باسمك."
-                      : "ستُفكّ التخصيصات، وتُردّ الدفعة وتبقى في السجلّ مردودةً بسببها، وتعود الفاتورة مستحقّة. ويُكتب ذلك في سجلّ التدقيق باسمك."}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={undoing}
-                      onClick={undo}
-                      className={buttonClass("danger", "sm")}
-                    >
-                      {undoing ? "يُردّ…" : notAPayment ? ACT.restoreToQueue : ACT.undoMatch}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={undoing}
-                      onClick={() => setConfirming(false)}
-                      className={buttonClass("quiet", "sm")}
-                    >
-                      إلغاء
-                    </button>
-                  </div>
-                </div>
-              )}
-              {message && (
-                <p className={`mt-2 text-[11px] ${failed ? "text-danger" : "text-ok"}`}>{message}</p>
-              )}
-            </div>
-          )}
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={title ? `لماذا: ${title}` : "لماذا هذا الحال؟"}
+        description="الأدلّةُ كما حُفظت مع القرار — ترجيحٌ لا يقين، فراجِع ما يبدو غريباً."
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-sunken px-4 py-3">
+            <StateLine look={d} score={match.score} />
+            <span className="text-lg font-bold"><Money minor={match.amountMinor} currency /></span>
+          </div>
+          <Evidence match={match} />
+          <UndoAction match={match} canUndo={canUndo} onDone={() => setOpen(false)} />
         </div>
+      </Sheet>
+    </>
+  );
+}
+
+function StateLine({ look, score }: { look: StateLook | null; score: number | null }) {
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {look ? (
+        <Badge tone={look.tone}>
+          <look.icon className="h-3 w-3" strokeWidth={2.25} aria-hidden />
+          {look.label}
+        </Badge>
+      ) : (
+        <Badge>لا ترجيحَ محفوظ</Badge>
       )}
+      {score !== null && <span className="text-xs text-muted">{strength(score)}</span>}
+    </span>
+  );
+}
+
+function Evidence({ match }: { match: MatchExplanation }) {
+  const ev = match.evidence;
+  const has = ev && (ev.تصنيف || (ev.مستفيد?.length ?? 0) > 0 || (ev.مطابقة?.length ?? 0) > 0);
+  if (!has) {
+    return (
+      <p className="rounded-xl border border-dashed border-line px-4 py-3 text-xs leading-relaxed text-muted">
+        لم تُحفَظ أدلّةٌ لهذه الحركة — استُوردت قبل أن يبدأ حفظُها، أو صُنّفت بقاعدةٍ لا بترجيح.
+      </p>
+    );
+  }
+  return (
+    <dl className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised">
+      {ev.تصنيف && <EvidenceRow label="ما هي" items={[ev.تصنيف]} />}
+      {ev.مستفيد && ev.مستفيد.length > 0 && (
+        <EvidenceRow
+          label="المستفيد"
+          items={ev.مستفيد}
+          note={ev.درجةالمستفيد !== undefined ? `ترجيح ${ev.درجةالمستفيد} من مئة` : undefined}
+        />
+      )}
+      {ev.مطابقة && ev.مطابقة.length > 0 && <EvidenceRow label="لماذا هذه الفاتورة" items={ev.مطابقة} />}
+    </dl>
+  );
+}
+
+function EvidenceRow({ label, items, note }: { label: string; items: readonly string[]; note?: string }) {
+  return (
+    <div className="grid gap-1 px-4 py-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-4">
+      <dt className="text-[11px] font-bold text-muted">{label}</dt>
+      <dd className="min-w-0">
+        <ul className="space-y-1">
+          {items.map((r, i) => (
+            <li key={i} className="flex gap-2 text-xs leading-relaxed" dir="auto">
+              <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-muted" />
+              <span className="min-w-0">{r}</span>
+            </li>
+          ))}
+        </ul>
+        {note && <p className="mt-1 text-[11px] text-muted">{note}</p>}
+      </dd>
     </div>
   );
 }
 
-function Row({ label, value, note }: { label: string; value: string; note?: string }) {
+/**
+ * التراجع — بإقرارٍ لا بنقرتين، وينتظر ردَّ الخادم قبل أن يقول شيئاً.
+ * ولا يُعرَض إلّا لما يُردّ فعلاً: مطابقةٌ مقيَّدة، أو إعلانُ «ليست سداداً».
+ */
+function UndoAction({ match, canUndo, onDone }: { match: MatchExplanation; canUndo: boolean; onDone?: () => void }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const notAPayment = isNotAPayment(match);
+  if (!canUndo || !(match.matched || notAPayment)) return null;
+
   return (
-    <div className="mt-2 first:mt-0">
-      <p className="text-[11px] text-muted">{label}</p>
-      <p className="text-[11px] leading-relaxed">{value}</p>
-      {note && <p className="text-[11px] text-muted">{note}</p>}
+    <div>
+      <ConfirmAction
+        label={notAPayment ? "تراجع عن «ليست سداداً»" : "تراجع عن المطابقة"}
+        title={notAPayment ? "أعِد الحركة إلى الطابور؟" : "فُكَّ هذه المطابقة؟"}
+        consequence={
+          notAPayment
+            ? "يعود بابُ الحركة إلى ما كان قبل الإعلان، وتعود إلى الطابور تنتظر قراراً: من الجهة، وأيّ فاتورة. لا يُكتب مالٌ الآن، ويُكتب الردّ في سجلّ التدقيق باسمك."
+            : "ستُفكّ التخصيصات، وتُردّ الدفعة وتبقى في السجلّ مردودةً بسببها، وتعود الفاتورة مستحقّة. ويُكتب ذلك في سجلّ التدقيق باسمك."
+        }
+        acknowledgement={
+          notAPayment
+            ? "فهمتُ أنّ الحركة تعود إلى الطابور بلا بابٍ محسوم"
+            : "فهمتُ أنّ الفاتورة تعود مستحقّةً حتى تُطابَق من جديد"
+        }
+        confirmLabel={notAPayment ? ACT.restoreToQueue : ACT.undoMatch}
+        onConfirm={async () => {
+          setError(null);
+          const r = await postJson<{ message?: string }>("/api/match-undo", {
+            transactionId: match.transactionId,
+            reason: "تراجع من الشاشة",
+          });
+          if (!r.ok) {
+            setError(r.error);
+            return false;
+          }
+          toast({ tone: "ok", title: r.data.message ?? "فُكّت المطابقة" });
+          onDone?.();
+          router.refresh();
+          return true;
+        }}
+      />
+      {error && (
+        <p role="alert" className="mt-2 flex items-start gap-1.5 text-xs font-bold text-danger">
+          <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+          {error}
+        </p>
+      )}
     </div>
   );
 }

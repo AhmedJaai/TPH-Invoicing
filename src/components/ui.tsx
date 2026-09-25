@@ -738,12 +738,14 @@ export function DataTable<T>({
   const searchable = !!searchOf && rows.length > 8;
 
   return (
-    <div data-filter-root="">
+    /* `relative` هنا وعلى الإطار: نصُّ `sr-only` داخل خليّةٍ مطلقُ الموضع، وبلا
+       أبٍ موضوعٍ يفلت إلى الصفحة فيطيلها بطول الجدول كلّه (٨٤٥٢ بكسلاً في /bank). */
+    <div data-filter-root="" className="relative">
       {searchable && <TableFilter label={searchLabel} total={rows.length} />}
 
       {/* الحاسوب: جدول */}
       <ScrollX
-        className={`hidden rounded-xl border border-line bg-raised shadow-raised sm:block ${long ? "max-h-[min(72vh,60rem)] overflow-y-auto" : ""}`}
+        className={`relative hidden rounded-xl border border-line bg-raised shadow-raised sm:block ${long ? "max-h-[min(72vh,60rem)] overflow-y-auto" : ""}`}
       >
         <table className="w-full border-separate border-spacing-0 text-[13px]">
           <thead className={long ? "sticky top-0 z-10" : ""}>
