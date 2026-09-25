@@ -3,10 +3,13 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
+import { Equal, TriangleAlert } from "lucide-react";
 import { buttonClass } from "./ui";
 import { ReceiptForm } from "./inventory-receipt-form";
 import { OpeningGrid } from "./inventory-opening-grid";
 import type { StepRow } from "./inventory-count-steps";
+import { Toolbar } from "./inventory-toolbar";
+import { PRODUCT, countNoun } from "@/lib/arabic";
 
 /**
  * ‏٢ · ما الذي دخل وما الذي خرج؟
@@ -64,7 +67,6 @@ export function FlowStep({
   duplicates,
   suppliers,
   canEdit,
-  onDone,
 }: {
   countId: string;
   branchId: string | null;
@@ -77,7 +79,6 @@ export function FlowStep({
   duplicates: DuplicateRow[];
   suppliers: { id: string; name: string }[];
   canEdit: boolean;
-  onDone: () => void;
 }) {
   const [editor, setEditor] = useState<Editor>(null);
   const [query, setQuery] = useState("");
@@ -101,26 +102,28 @@ export function FlowStep({
 
   return (
     <div>
-      <p className="mb-3 rounded-xl border border-line bg-sunken px-3 py-2.5 text-[11px] leading-relaxed text-ink-soft">
-        هذه المعادلة التي يُحسَب بها فرقُك:{" "}
-        <strong>افتتاحيّ + مشتريات ± إضافات − استهلاكٌ متوقَّع − هدر = المتوقَّع على الرفّ</strong>.
-        والاستهلاكُ من مبيعات الأسبوع بوصفاتها — بنسخة الوصفة السارية <strong>في تاريخ كلّ بيعة</strong>.
-        وما لا يُعرَف يبقى «غير معروف» ولا يُحسَب صفراً — <strong>ولك أن تُدخله</strong> من سطره.
-      </p>
+      <div className="mb-4 max-w-3xl">
+        <h2 className="text-base font-bold">المعادلةُ التي يُحسَب بها فرقُك</h2>
+        <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+          لكلّ صنف: ما كان على الرفّ، وما دخل، وما صُرف من المبيعات بنسخة الوصفة السارية <strong>في تاريخ كلّ بيعة</strong> —
+          فيخرج ما يُتوقَّع أن تجده. وما لا يُعرَف يبقى «غير معروف» ولا يُحسَب صفراً، <strong>ولك أن تُدخله</strong> من موضعه.
+        </p>
+      </div>
 
       {(missingOpening > 0 || missingPurchases > 0) && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-warn/40 bg-warn-bg px-3 py-2.5 text-[11px]">
-          <span className="min-w-0 flex-1 leading-relaxed">
-            {missingOpening > 0 && <><span className="nums font-bold">{missingOpening}</span> صنفاً رصيدُه الافتتاحيّ غير معروف. </>}
-            {missingPurchases > 0 && <><span className="nums font-bold">{missingPurchases}</span> صنفاً كمّيّةُ مشترياته غير معروفة. </>}
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-warn/25 bg-warn-bg px-4 py-3">
+          <TriangleAlert className="h-[18px] w-[18px] shrink-0 text-warn" strokeWidth={2} aria-hidden />
+          <p className="min-w-0 flex-1 text-xs leading-relaxed text-ink-soft">
+            {missingOpening > 0 && <><span className="font-bold text-ink">{countNoun(missingOpening, PRODUCT)}</span> رصيدُه الافتتاحيّ غير معروف. </>}
+            {missingPurchases > 0 && <><span className="font-bold text-ink">{countNoun(missingPurchases, PRODUCT)}</span> كمّيّةُ مشترياته غير معروفة. </>}
             وبلا هذه لا يُحسَب لها فرق.
-          </span>
+          </p>
           <button type="button" onClick={() => setOnlyMissing((v) => !v)} className={buttonClass("secondary", "sm")}>
             {onlyMissing ? "اعرض الكلّ" : "اعرض ما ينقصه شيء"}
           </button>
           {canEdit && missingOpening > 0 && (
-            <button type="button" onClick={() => setGrid((v) => !v)} className={buttonClass("secondary", "sm")}>
-              {grid ? "أغلِق" : "أدخل الأرصدة دفعةً واحدة"}
+            <button type="button" onClick={() => setGrid((v) => !v)} className={buttonClass(grid ? "quiet" : "primary", "sm")}>
+              {grid ? "أغلِق الجدول" : "أدخل الأرصدة دفعةً واحدة"}
             </button>
           )}
         </div>
@@ -130,146 +133,142 @@ export function FlowStep({
         <OpeningGrid countId={countId} rows={rows} categories={categories} onDone={() => setGrid(false)} />
       )}
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <input
-          type="search" value={query} onChange={(e) => setQuery(e.target.value)}
-          placeholder="ابحث عن صنف…" aria-label="ابحث عن صنف"
-          className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-raised px-3 text-sm"
-        />
-        <select
-          value={category} onChange={(e) => setCategory(e.target.value)} aria-label="رشِّح بالباب"
-          className="min-h-11 rounded-xl border border-line bg-raised px-3 text-xs"
-        >
-          <option value="">كلّ الأبواب</option>
-          {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-        </select>
-      </div>
+      <Toolbar query={query} setQuery={setQuery} category={category} setCategory={setCategory} categories={categories} />
 
-      <ul className="divide-y divide-line rounded-2xl border border-line bg-raised">
-        {visible.map((row) => (
-          <li key={row.productId} className="px-3 py-2.5">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-              <p className="min-w-0 flex-1 truncate text-xs font-bold">{row.productName}</p>
-              <p className="text-[11px] text-muted">بـ{row.unitLabel}</p>
-            </div>
-
-            <dl className="mt-1.5 grid grid-cols-1 gap-1 text-[11px] sm:grid-cols-[auto_1fr]">
-              <dt className="text-muted">الرصيد الافتتاحيّ</dt>
-              <dd className="flex flex-wrap items-center gap-2">
-                {row.openingText === null ? (
-                  <span className="text-warn">غير معروف</span>
-                ) : (
-                  <>
-                    <span className="nums font-bold">{row.openingText}</span>
-                    <span className="text-muted">— {row.openingSourceLabel}</span>
-                  </>
-                )}
-                {canEdit && editor?.kind !== "opening" && (
-                  <button
-                    type="button"
-                    onClick={() => setEditor({ productId: row.productId, kind: "opening" })}
-                    className={buttonClass(row.openingText === null ? "primary" : "quiet", "sm")}
-                  >
-                    {row.openingText === null ? "أدخل الرصيد" : row.openingManual ? "عدِّله" : "استبدِله يدوياً"}
-                  </button>
-                )}
-              </dd>
-
-              <dt className="text-muted">+ المشتريات</dt>
-              <dd className="flex flex-wrap items-center gap-2">
-                {row.purchasesText === null ? (
-                  <span className="text-warn">كمّيّة المشتريات غير معروفة</span>
-                ) : row.purchasesZero ? (
-                  <span>لا مشتريات</span>
-                ) : (
-                  <>
-                    <span className="nums font-bold">{row.purchasesText}</span>
-                    {row.manualReceiptsText !== null && (
-                      <span className="text-muted">منها <span className="nums">{row.manualReceiptsText}</span> أُدخلت يدوياً</span>
-                    )}
-                  </>
-                )}
-                {canEdit && (
-                  <button
-                    type="button"
-                    onClick={() => setEditor({ productId: row.productId, kind: "receipt" })}
-                    className={buttonClass(row.purchasesText === null ? "primary" : "quiet", "sm")}
-                  >
-                    أدخل الكمّيّة المستلَمة
-                  </button>
-                )}
-              </dd>
-
-              {row.adjustmentsText !== null && (
-                <>
-                  <dt className="text-muted">± إضافات</dt>
-                  <dd className="nums">{row.adjustmentsText}</dd>
-                </>
-              )}
-
-              <dt className="text-muted">− الاستهلاك المتوقَّع</dt>
-              <dd>
-                {row.consumptionText === null
-                  ? <span className="text-warn">غير معروف — لا وصفةَ تصل إليه</span>
-                  : <span className="nums font-bold">{row.consumptionText}</span>}
-                <span className="text-muted"> من المبيعات</span>
-              </dd>
-
-              {row.wasteText !== null && (
-                <>
-                  <dt className="text-muted">− هدرٌ مسجَّل</dt>
-                  <dd className="nums">{row.wasteText}</dd>
-                </>
-              )}
-
-              <dt className="font-bold">= يُتوقَّع على الرفّ</dt>
-              <dd>
-                {row.expected === null
-                  ? <span className="text-warn">غير معروف — حدٌّ في المعادلة مجهول</span>
-                  : <span className="nums font-bold">{row.expected}</span>}
-              </dd>
-            </dl>
-
-            {(receiptsBy.get(row.productId) ?? []).length > 0 && (
-              <ReceiptList receipts={receiptsBy.get(row.productId)!} canEdit={canEdit} />
-            )}
-
-            {(duplicatesBy.get(row.productId) ?? []).length > 0 && (
-              <DuplicateQuestion duplicates={duplicatesBy.get(row.productId)!} canEdit={canEdit} />
-            )}
-
-            {editor?.productId === row.productId && editor.kind === "opening" && (
-              <OpeningEditor countId={countId} row={row} onDone={() => setEditor(null)} />
-            )}
-            {editor?.productId === row.productId && editor.kind === "receipt" && (
-              <ReceiptForm
-                productId={row.productId}
-                productName={row.productName}
-                branchId={branchId}
-                unitChoices={row.unitChoices}
-                defaultUnit={row.unitChoices[row.unitChoices.length - 1]?.value ?? row.baseUnit}
-                defaultDate={defaultReceiptDate}
-                periodStart={periodStart}
-                periodEnd={periodEnd}
-                suppliers={suppliers}
-                onDone={() => setEditor(null)}
-              />
-            )}
-          </li>
-        ))}
-      </ul>
-
-      {visible.length === 0 && (
-        <p className="rounded-2xl border border-dashed border-line px-5 py-10 text-center text-sm text-muted">
+      {visible.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-line px-5 py-10 text-center text-sm text-muted">
           {onlyMissing ? "لا صنفَ ينقصه شيء — المعادلةُ معروفةُ الحدود كلُّها." : "لا صنفَ يطابق هذا الترشيح."}
         </p>
-      )}
+      ) : (
+        <ul className="space-y-3">
+          {visible.map((row) => (
+            <li key={row.productId} className="rounded-xl border border-line bg-raised p-4 shadow-raised">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <p className="min-w-0 flex-1 truncate text-[14px] font-bold">
+                  {row.productName}
+                  <span className="ms-2 text-[11px] font-medium text-muted">{row.categoryLabel} · بـ{row.unitLabel}</span>
+                </p>
+                <p className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold ${row.expected === null ? "bg-warn-bg text-warn" : "bg-accent-soft text-accent"}`}>
+                  <Equal className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
+                  يُتوقَّع على الرفّ:
+                  <span className={row.expected === null ? "" : "nums"}>{row.expected ?? "غير معروف"}</span>
+                </p>
+              </div>
 
-      <div className="mt-4">
-        <button type="button" onClick={onDone} className={buttonClass("primary")}>
-          تابِع — أدخِل ما وجدتَه
-        </button>
-      </div>
+              {/* ── حدودُ المعادلة: كلُّ حدٍّ بقيمته ومصدرِه، والمجهولُ بفعله ── */}
+              <dl className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                <Term
+                  op={null}
+                  label="الرصيد الافتتاحيّ"
+                  value={row.openingText}
+                  source={row.openingText === null ? "لا جردَ سابقٌ ولا رصيدٌ مكتوب" : row.openingSourceLabel}
+                  action={canEdit ? (
+                    <button
+                      type="button"
+                      onClick={() => setEditor({ productId: row.productId, kind: "opening" })}
+                      className={buttonClass(row.openingText === null ? "primary" : "quiet", "sm")}
+                    >
+                      {row.openingText === null ? "أدخل الرصيد" : row.openingManual ? "عدِّله" : "استبدِله يدوياً"}
+                    </button>
+                  ) : undefined}
+                />
+                <Term
+                  op="+"
+                  label="المشتريات"
+                  value={row.purchasesText === null ? null : row.purchasesZero ? "لا مشتريات" : row.purchasesText}
+                  plain={row.purchasesZero}
+                  source={row.purchasesText === null
+                    ? "بندٌ لم تُعرَف كمّيّتُه أو استلامٌ لم يُحسَم"
+                    : row.manualReceiptsText !== null ? `منها ${row.manualReceiptsText} أُدخلت يدوياً` : "من الفواتير"}
+                  action={canEdit ? (
+                    <button
+                      type="button"
+                      onClick={() => setEditor({ productId: row.productId, kind: "receipt" })}
+                      className={buttonClass(row.purchasesText === null ? "primary" : "quiet", "sm")}
+                    >
+                      أدخل كمّيّةً مستلَمة
+                    </button>
+                  ) : undefined}
+                  extra={row.adjustmentsText !== null ? <>± إضافات <span className="nums">{row.adjustmentsText}</span></> : undefined}
+                />
+                <Term
+                  op="−"
+                  label="الاستهلاك المتوقَّع"
+                  value={row.consumptionText}
+                  source={row.consumptionText === null ? "لا وصفةَ تصل إليه" : "من المبيعات بوصفاتها"}
+                  extra={row.wasteText !== null ? <>− هدرٌ مسجَّل <span className="nums">{row.wasteText}</span></> : undefined}
+                />
+                <Term
+                  op="="
+                  label="المتوقَّع"
+                  value={row.expected}
+                  strong
+                  source={row.expected === null ? "حدٌّ في المعادلة مجهول" : "يُقابَل بما تعدّه"}
+                />
+              </dl>
+
+              {(receiptsBy.get(row.productId) ?? []).length > 0 && (
+                <ReceiptList receipts={receiptsBy.get(row.productId)!} canEdit={canEdit} />
+              )}
+
+              {(duplicatesBy.get(row.productId) ?? []).length > 0 && (
+                <DuplicateQuestion duplicates={duplicatesBy.get(row.productId)!} canEdit={canEdit} />
+              )}
+
+              {editor?.productId === row.productId && editor.kind === "opening" && (
+                <OpeningEditor countId={countId} row={row} onDone={() => setEditor(null)} />
+              )}
+              {editor?.productId === row.productId && editor.kind === "receipt" && (
+                <ReceiptForm
+                  productId={row.productId}
+                  productName={row.productName}
+                  branchId={branchId}
+                  unitChoices={row.unitChoices}
+                  defaultUnit={row.unitChoices[row.unitChoices.length - 1]?.value ?? row.baseUnit}
+                  defaultDate={defaultReceiptDate}
+                  periodStart={periodStart}
+                  periodEnd={periodEnd}
+                  suppliers={suppliers}
+                  onDone={() => setEditor(null)}
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** حدٌّ في المعادلة — قيمتُه أو «غير معروف»، ومصدرُه، وفعلُه إن جُهل. */
+function Term({
+  op, label, value, source, action, extra, strong = false, plain = false,
+}: {
+  op: "+" | "−" | "=" | null;
+  label: string;
+  value: string | null;
+  source: string;
+  action?: React.ReactNode;
+  extra?: React.ReactNode;
+  strong?: boolean;
+  /** قيمةٌ جملةٌ لا رقم — «لا مشتريات». */
+  plain?: boolean;
+}) {
+  const unknown = value === null;
+  return (
+    <div className={`flex min-w-0 flex-col rounded-lg border px-3 py-2.5 ${
+      unknown ? "border-warn/30 bg-warn-bg" : strong ? "border-accent-line bg-accent-soft/50" : "border-line-soft bg-sunken/60"
+    }`}>
+      <dt className="flex items-center gap-1 text-[11px] font-medium text-muted">
+        {op && <span aria-hidden className="text-[13px] font-bold text-ink-soft">{op}</span>}
+        {label}
+      </dt>
+      <dd className={`mt-1 text-[15px] font-bold leading-tight ${unknown ? "text-warn" : ""}`}>
+        {unknown ? "غير معروف" : <span className={plain ? "text-[13px]" : "nums"}>{value}</span>}
+      </dd>
+      <dd className="mt-0.5 text-[11px] leading-relaxed text-muted">{source}</dd>
+      {extra && <dd className="mt-0.5 text-[11px] text-ink-soft">{extra}</dd>}
+      {action && <dd className="mt-auto pt-2">{action}</dd>}
     </div>
   );
 }
@@ -298,8 +297,8 @@ function OpeningEditor({ countId, row, onDone }: { countId: string; row: StepRow
   }
 
   return (
-    <div className="mt-2 rounded-xl border border-line bg-canvas p-3">
-      <p className="text-[11px] font-bold">ما كان على الرفّ أوّلَ الأسبوع — {row.productName}</p>
+    <div className="mt-3 animate-rise rounded-xl border border-accent-line bg-accent-soft/40 p-4">
+      <p className="text-[13px] font-bold">ما كان على الرفّ أوّلَ الأسبوع — {row.productName}</p>
       {row.openingText !== null && !row.openingManual && (
         <p className="mt-1 text-[11px] text-muted">
           الحاليّ {row.openingText} {row.openingSourceLabel} — وما تُدخله يغلبه صراحةً ويُكتَب مصدرُه «يدويّ».
@@ -311,14 +310,14 @@ function OpeningEditor({ countId, row, onDone }: { countId: string; row: StepRow
           <input
             type="text" inputMode="decimal" dir="ltr" autoFocus value={value}
             onChange={(e) => setValue(e.target.value)} disabled={busy} placeholder="5.2"
-            className="nums mt-1 block min-h-11 w-24 rounded-xl border border-line bg-raised px-2 text-center text-sm"
+            className="nums mt-1 block min-h-11 w-24 rounded-lg border border-line-input bg-raised px-2 text-center text-base"
           />
         </label>
         <label className="text-[11px] text-muted">
           الوحدة
           <select
             value={unit} onChange={(e) => setUnit(e.target.value)} disabled={busy || row.unitChoices.length < 2}
-            className="mt-1 block min-h-11 rounded-xl border border-line bg-raised px-2 text-xs"
+            className="mt-1 block min-h-11 rounded-lg border border-line-input bg-raised px-2 text-sm"
           >
             {row.unitChoices.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
           </select>
@@ -333,7 +332,7 @@ function OpeningEditor({ countId, row, onDone }: { countId: string; row: StepRow
         )}
         <button type="button" disabled={busy} onClick={onDone} className={buttonClass("quiet", "sm")}>تراجع</button>
       </div>
-      {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
     </div>
   );
 }
@@ -359,7 +358,7 @@ function ReceiptList({ receipts, canEdit }: { receipts: ReceiptRow[]; canEdit: b
   }
 
   return (
-    <ul className="mt-2 space-y-1 rounded-lg bg-sunken px-3 py-2 text-[11px]">
+    <ul className="mt-3 space-y-1.5 rounded-lg border border-line-soft bg-sunken/60 px-3 py-2.5 text-xs">
       {receipts.map((r) => (
         <li key={r.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="nums">{r.receivedOn}</span>
@@ -379,7 +378,7 @@ function ReceiptList({ receipts, canEdit }: { receipts: ReceiptRow[]; canEdit: b
               <input
                 type="text" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus
                 placeholder="سببُ الإلغاء" aria-label="سببُ الإلغاء"
-                className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-raised px-2 text-sm"
+                className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-sm"
               />
               <button
                 type="button" disabled={busy || reason.trim().length < 3}
@@ -414,7 +413,7 @@ function DuplicateQuestion({ duplicates, canEdit }: { duplicates: DuplicateRow[]
   }
 
   return (
-    <div className="mt-2 rounded-lg border border-warn/40 bg-warn-bg p-3 text-[11px]">
+    <div className="mt-3 rounded-xl border border-warn/25 bg-warn-bg p-3.5 text-xs">
       <p className="font-bold text-warn">
         كمّيّةٌ أدخلتَها يدوياً قد تكون هي نفسَ بندِ فاتورةٍ وصلت — فالمشترياتُ غير معروفة حتى تختار.
       </p>

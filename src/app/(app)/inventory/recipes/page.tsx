@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { products } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
-import { Card, EmptyState, NoAccess, Section, buttonClass } from "@/components/ui";
+import { BookOpen, Scale, TriangleAlert, Upload } from "lucide-react";
+import { Callout, LinkButton, NoAccess, Section } from "@/components/ui";
+import { RECIPE } from "@/components/inventory-ui";
+import { PRODUCT, countNoun } from "@/lib/arabic";
 import { RecipeEditor } from "@/components/recipe-editor";
 import { RecipeRows } from "@/components/recipe-rows";
 import { listRecipes } from "@/services/recipe.service";
@@ -74,50 +76,15 @@ export default async function RecipesPage() {
   */
   const suspicious = rows.filter((r) => declaredCostDisagrees(r.costMinor, r.declaredCostMinor));
 
+  const canWriteManually = menuProducts.length > 0 && ingredients.length > 0;
+
   return (
     <PageShell
       user={user}
       width="wide"
       title="الوصفات"
       intro="كم يخرج من الرفّ لكلّ ما يُباع. وكلُّ تغييرٍ نسخةٌ بتاريخها، فتبقى تقاريرُ ما مضى كما حُسبت."
-    >
-      {missing.rows.length > 0 && (
-        <Card tone="warn">
-          <p className="text-sm font-bold">
-            {missing.rows.length} صنفاً بِيع ولا وصفةَ له
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">
-            لا يدخل استهلاكُها الحساب، ويُعلَن ذلك في كلّ تقرير. وهذه أكثرُها مبيعاً:
-          </p>
-          <p className="mt-2 text-xs">
-            {missing.rows.map((r) => String(r.name_ar)).join(" · ")}
-          </p>
-        </Card>
-      )}
-
-      {suspicious.length > 0 && (
-        <Card tone="warn" className="mt-4">
-          <p className="text-sm font-bold">
-            {suspicious.length} وصفةً كلفتُها أبعدُ من الكلفة المعلَنة عند فودكس
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">
-            وأكثرُ ما يسبّبه أنّ جوهرَ الصنف ليس في وصفته — تُحسَب العلبةُ والشوكة ولا
-            تُحسَب الكعكة. فلا يُخصَم المبيعُ من المخزون، ويظهر ما اشتُري كلُّه «فرقاً».
-          </p>
-          <ul className="mt-2 space-y-1 text-xs">
-            {suspicious.map((r) => (
-              <li key={r.recipeId} className="flex flex-wrap items-baseline gap-x-2">
-                <span className="font-bold">{r.menuProductName}</span>
-                <span className="text-muted">
-                  وصفتُه <Money minor={r.costMinor!} /> والمعلَنة <Money minor={r.declaredCostMinor!} />
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      <div className="mt-6">
+      actions={canWriteManually && rows.length > 0 ? (
         <RecipeEditor
           menuProducts={menuProducts.map((p) => ({ id: p.id, name: p.nameAr }))}
           ingredients={ingredients.map((p) => ({
@@ -125,35 +92,99 @@ export default async function RecipesPage() {
           }))}
           defaultFrom={todayInRiyadh()}
         />
-      </div>
+      ) : undefined}
+    >
+      {rows.length === 0 ? (
+        /*
+          ── الفراغُ يقول ما يملؤه ──
 
-      <Section title="الوصفات المسجَّلة">
-        {/*
-          الصفُّ يتمدّد في مكانه — فمراجعةُ ستّين وصفةً لا تكون ستّين
-          ذهاباً وإياباً بين صفحتين، ولا يفقد المراجعُ موضعَه من القائمة.
-        */}
-        {rows.length === 0 ? (
-          <EmptyState
-            title="لا وصفةَ مسجَّلة بعد."
-            hint={
-              "بلا وصفاتٍ لا يُحسَب استهلاكٌ متوقَّع، فلا يُحسَب فرقُ جرد. "
-              + "وكتالوج فودكس يُنشئها كلَّها دفعةً واحدة — أصنافَ المخزون، والأصنافَ المباعة، "
-              + "والوصفاتِ وربطَها بنقاط البيع — فلا تُكتب واحدةً واحدة."
-            }
-            action={
-              <Link href="/inventory/import" className={buttonClass("primary", "sm")}>
-                ارفع كتالوج فودكس
-              </Link>
-            }
-          />
-        ) : (
-          <RecipeRows
-            rows={rows}
-            choices={ingredients.map((p) => ({ id: p.id, name: p.nameAr, baseUnit: p.baseUnit }))}
-            defaultChangeFrom={todayInRiyadh()}
-          />
-        )}
-      </Section>
+          بلا وصفاتٍ لا يُحسَب استهلاكٌ متوقَّع، فلا يُحسَب فرقُ جرد. والكتالوجُ
+          يُنشئها كلَّها دفعةً واحدة — فلا تُكتب واحدةً واحدة، وكتابتُها يدوياً
+          طريقٌ ثانٍ لا أوّل.
+        */
+        <section className="rounded-2xl border border-accent-line bg-accent-soft/50 px-5 py-10 text-center sm:px-10">
+          <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-accent text-accent-ink">
+            <BookOpen className="h-6 w-6" strokeWidth={1.75} aria-hidden />
+          </span>
+          <h2 className="mt-4 text-lg font-bold">لا وصفةَ مسجَّلة بعد</h2>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-ink-soft">
+            بلا وصفاتٍ لا يُعرَف ما صرفته المبيعات، فلا يُحسَب فرقُ جرد. وكتالوجُ فودكس يُنشئها كلَّها دفعةً واحدة —
+            أصنافَ المخزون، والأصنافَ المباعة، والوصفاتِ وربطَها بنقاط البيع.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <LinkButton href="/inventory/import#catalog" variant="primary" icon={Upload}>ارفع كتالوج فودكس</LinkButton>
+            {canWriteManually && (
+              <RecipeEditor
+                variant="secondary"
+                menuProducts={menuProducts.map((p) => ({ id: p.id, name: p.nameAr }))}
+                ingredients={ingredients.map((p) => ({
+                  id: p.id, name: p.nameAr, baseUnit: p.baseUnit, unitLabel: storedUnitLabel(p.baseUnit),
+                }))}
+                defaultFrom={todayInRiyadh()}
+              />
+            )}
+          </div>
+          {!canWriteManually && (
+            <p className="mx-auto mt-4 max-w-md text-[11px] leading-relaxed text-muted">
+              {menuProducts.length === 0
+                ? "ولا صنفَ مباعاً مسجَّلٌ بعد تُكتب له وصفةٌ يدوياً — يُنشئ الكتالوجُ ما يُباع."
+                : "ولا صنفَ مخزونٍ يكون مكوّناً بعد."}
+            </p>
+          )}
+        </section>
+      ) : (
+        <>
+          {(missing.rows.length > 0 || suspicious.length > 0) && (
+            <div className="mb-8 grid gap-3 lg:grid-cols-2">
+              {missing.rows.length > 0 && (
+                <Callout tone="warn" icon={TriangleAlert} title={`${countNoun(missing.rows.length, PRODUCT)} بِيع ولا وصفةَ له`}>
+                  <p>لا يدخل استهلاكُها الحساب، ويُعلَن ذلك في كلّ تقرير. أكثرُها مبيعاً:</p>
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {missing.rows.map((r) => (
+                      <li key={String(r.id)} className="rounded-md bg-raised/80 px-2 py-0.5 font-medium text-ink">{String(r.name_ar)}</li>
+                    ))}
+                  </ul>
+                </Callout>
+              )}
+
+              {/*
+                ── وصفةٌ فيها التغليفُ وحدَه ──
+
+                الكلفةُ المعلَنة عند المصدر تخالف مجموعَ الوصفة مخالفةً كبيرة.
+                وذلك يقع حين يسقط **جوهرُ الصنف** من وصفته: «تشيز مدريد» وصفتُه
+                شوكةٌ وعلبةٌ بـ٠٫٧٦ ريالاً والمعلَنة ٩٫١٧ — والكعكةُ ليست فيها.
+              */}
+              {suspicious.length > 0 && (
+                <Callout tone="warn" icon={Scale} title={`${countNoun(suspicious.length, RECIPE)} كلفتُها أبعدُ من المعلَنة عند فودكس`}>
+                  <p>وأكثرُ ما يسبّبه أنّ جوهرَ الصنف ليس في وصفته — تُحسَب العلبةُ والشوكة ولا تُحسَب الكعكة.</p>
+                  <ul className="mt-2 space-y-1">
+                    {suspicious.map((r) => (
+                      <li key={r.recipeId} className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="font-bold text-ink">{r.menuProductName}</span>
+                        <span>وصفتُه <Money minor={r.costMinor!} /> والمعلَنة <Money minor={r.declaredCostMinor!} /></span>
+                      </li>
+                    ))}
+                  </ul>
+                </Callout>
+              )}
+            </div>
+          )}
+
+          <Section
+            title="الوصفات المسجَّلة"
+            icon={BookOpen}
+            count={rows.length}
+            className="mt-0!"
+            hint="افتح وصفةً لتصحّحها في مكانها أو تغيّرها بتاريخ — الصفُّ يتمدّد، فلا تفقد موضعك من القائمة."
+          >
+            <RecipeRows
+              rows={rows}
+              choices={ingredients.map((p) => ({ id: p.id, name: p.nameAr, baseUnit: p.baseUnit }))}
+              defaultChangeFrom={todayInRiyadh()}
+            />
+          </Section>
+        </>
+      )}
     </PageShell>
   );
 }

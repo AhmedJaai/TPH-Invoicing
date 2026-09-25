@@ -2,7 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
-import { NoAccess } from "@/components/ui";
+import { History } from "lucide-react";
+import { LinkButton, NoAccess } from "@/components/ui";
+import { formatWeek, isStepId } from "@/components/inventory-ui";
 import { InventoryWorkspace } from "@/components/inventory-workspace";
 import { loadWorkspaceInputs } from "@/services/inventory-workspace.service";
 import { todayInRiyadh } from "@/lib/riyadh-time";
@@ -19,10 +21,13 @@ export const dynamic = "force-dynamic";
  */
 export default async function CountReportPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ step?: string }>;
 }) {
   const { id } = await params;
+  const { step } = await searchParams;
   const user = await currentUser();
   if (!user) redirect(`/login?from=/inventory/counts/${id}`);
   if (!can(user.role, "inventory:view")) {
@@ -39,15 +44,19 @@ export default async function CountReportPage({
   const report = header.status === "FINALISED"
     ? await readFrozenReport(header)
     : await recomputeCount(header.id);
-  const scope = await loadScope(header.id);
-  const inputs = await loadWorkspaceInputs(header);
+  const [scope, inputs] = await Promise.all([loadScope(header.id), loadWorkspaceInputs(header)]);
+  const locked = header.status === "FINALISED";
 
   return (
     <PageShell
       user={user}
       width="wide"
       title="تقرير الجرد"
-      intro={`${header.periodStart} → ${header.periodEnd}`}
+      eyebrow={`${locked ? "جردٌ مقفَل" : "جردٌ مفتوح"}${header.branchName ? ` · ${header.branchName}` : ""}`}
+      intro={`أسبوع ${formatWeek(header.periodStart, header.periodEnd)}`}
+      actions={can(user.role, "amounts:view")
+        ? <LinkButton href="/inventory/history" size="sm" icon={History}>سجلّ الجرد</LinkButton>
+        : undefined}
     >
       <InventoryWorkspace
         header={header}
@@ -58,6 +67,7 @@ export default async function CountReportPage({
         scopeInherited={scope.inherited}
         {...inputs}
         today={todayInRiyadh()}
+        initialStep={isStepId(step) ? step : null}
       />
     </PageShell>
   );

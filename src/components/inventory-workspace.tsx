@@ -1,19 +1,26 @@
-import { formatRiyalsDisplay } from "@/lib/money";
 import Link from "next/link";
-import { Badge, Card, EmptyState, Section, Stat, StatGrid, buttonClass } from "./ui";
+import {
+  ArrowLeft, CircleCheck, FileSpreadsheet, Link2, Lock, OctagonAlert, Package, ShieldCheck, TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
+import { formatRiyalsDisplay } from "@/lib/money";
+import { Badge, Callout, EmptyState, LinkButton, Meter, Section, type Tone } from "./ui";
 import { Money, Prose } from "./money";
 import { FinaliseCount, RecomputeCount, ReopenCount } from "./inventory-actions";
 import { InventoryCountSteps, type StepRow } from "./inventory-count-steps";
 import type { DuplicateRow, ReceiptRow } from "./inventory-flow-step";
 import { InventoryWaste } from "./inventory-waste";
+import { DIRECTION, DirectionTag, MagnitudeBar, VarianceSplit, directionOf, formatWeek, type StepId } from "./inventory-ui";
 import { CATEGORY_LABEL, type ProductCategory } from "@/lib/products";
 import { storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
 import { canonicalToQuantity, formatSignedQuantity, milliToDecimal, unitChoices } from "@/lib/inventory/units";
 import { formatBp } from "@/lib/inventory/equation";
-import { describeCoverage, READINESS_LABEL } from "@/lib/inventory/coverage";
+import { describeCoverage, READINESS_LABEL, type CoverageGap, type Readiness } from "@/lib/inventory/coverage";
 import {
   FLAG_LABEL, OPENING_SOURCE_LABEL, VALUATION_LABEL, topVariances, type EngineReport,
 } from "@/lib/inventory/engine";
+import { LINE, PRODUCT, countNoun } from "@/lib/arabic";
+import { formatDay } from "@/lib/riyadh-time";
 import type { CountHeader } from "@/services/inventory.service";
 
 /**
@@ -38,6 +45,7 @@ export function InventoryWorkspace({
   suppliers,
   manualOpenings,
   today,
+  initialStep,
 }: {
   header: CountHeader;
   report: EngineReport;
@@ -58,6 +66,8 @@ export function InventoryWorkspace({
   suppliers: { id: string; name: string }[];
   manualOpenings: ReadonlyMap<string, { enteredMilli: number; unit: StoredUnit }>;
   today: string;
+  /** خطوةٌ مطلوبة في العنوان (`?step=count`) — فالرابطُ يفتح موضعَه. */
+  initialStep?: StepId | null;
 }) {
   const locked = header.status === "FINALISED";
   const coverage = report.coverage;
@@ -81,6 +91,7 @@ export function InventoryWorkspace({
       varianceCostMinor: showAmounts ? l.varianceCostMinor : null,
       flags: l.flags.map((f) => FLAG_LABEL[f]),
       negative: (l.varianceMilli ?? 0) < 0,
+      direction: directionOf(l.varianceMilli),
       inScope: l.inScope,
       /* حدودُ المعادلة نصّاً — و`null` تبقى «غير معروف» لا صفراً */
       openingText: q(l.openingMilli, l.baseUnit),
@@ -107,96 +118,108 @@ export function InventoryWorkspace({
 
   /* والترتيبُ بالكلفة يبقى صحيحاً وإن لم تُعرَض — من يعدّ يرى الأثقل أوّلاً */
   const top = topVariances(report, 8);
+  const measured = summary.linesMeasured > 0;
 
   /* الاستلامُ يُقترَح في يومه إن وقع في الأسبوع، وإلّا آخرَ يومٍ فيه */
   const defaultReceiptDate = today >= header.periodStart && today <= header.periodEnd ? today : header.periodEnd;
 
-  const measured = summary.linesMeasured > 0;
-
   /* ─────────── ‏٤ · ماذا اختلف؟ ─────────── */
+  const maxWeight = Math.max(
+    1,
+    ...top.map((l) => (l.varianceCostMinor !== null ? Math.abs(l.varianceCostMinor) : 0)),
+  );
+  const maxBp = Math.max(1, ...top.map((l) => Math.abs(l.varianceConsumptionBp ?? 0)));
+  const anyCost = top.some((l) => l.varianceCostMinor !== null);
+
   const review = (
-    <div>
+    <div className="space-y-8">
       {/*
         ── النقصُ والزيادةُ لا يتقاصّان ──
 
-        نقصٌ بألفٍ وزيادةٌ بألف صافيهما صفر — وليس ذلك «لا مشكلة». فالنقصُ
-        أوّلاً، والزيادةُ بجانبه، والصافي ثانويٌّ في آخر السطر.
+        نقصٌ بألفٍ وزيادةٌ بألف صافيهما صفر — وليس ذلك «لا مشكلة». فهما
+        لوحان متجاوران، والصافي سطرٌ ثانويٌّ تحتهما. وبلا صنفٍ واحدٍ حُسب
+        فرقُه فالمجموعان «غير معروفين» لا صفر.
       */}
-      {/*
-        بلا صنفٍ واحدٍ حُسب فرقُه فالمجاميعُ «غير معروفة» لا صفر: «النقص
-        ٠٫٠٠» فوق «لا فرقَ محسوبٌ بعد» يقول «لم يضع شيء» عن أسبوعٍ لم يُقَس.
-      */}
-      <StatGrid>
-        <Stat
-          label="النقص"
-          value={!measured ? "غير معروف" : showAmounts ? undefined : `${summary.linesShort} صنفاً`}
-          minor={measured && showAmounts ? summary.shortageCostMinor : undefined}
-          tone={summary.shortageCostMinor > 0 ? "danger" : undefined}
-          sub={measured ? `${summary.linesShort} صنفاً وُجد منه أقلُّ من المتوقَّع` : "لم يُحسَب فرقُ صنفٍ بعد"}
-        />
-        <Stat
-          label="الزيادة"
-          value={!measured ? "غير معروف" : showAmounts ? undefined : `${summary.linesOver} صنفاً`}
-          minor={measured && showAmounts ? summary.overageCostMinor : undefined}
-          sub={measured ? `${summary.linesOver} صنفاً وُجد منه أكثر — شراءٌ لم يُقيَّد أو عدٌّ يُراجَع` : "لم يُحسَب فرقُ صنفٍ بعد"}
-        />
-        <Stat
-          label="النقصُ من كلفة الاستهلاك"
-          value={summary.shortageRateBp === null ? "غير محسوبة" : formatBp(-summary.shortageRateBp)}
-          sub={summary.consumptionCostComplete ? "كم ضاع ممّا كان ينبغي أن يُصرَف" : "على ما عُرفت كلفتُه — المقامُ ناقص"}
-        />
-        {showAmounts ? (
-          <Stat
-            label="حجمُ الفروق"
-            value={measured ? undefined : "غير معروف"}
-            minor={measured ? summary.absoluteCostMinor : undefined}
-            sub={measured
-              ? `الصافي \u2066${formatRiyalsDisplay(summary.netCostMinor)}\u2069${summary.linesWithoutCost > 0 ? ` · ولا تشمل ${summary.linesWithoutCost} صنفاً كلفتُه غير معروفة` : ""}`
-              : `${summary.linesMeasured} من ${inScopeCount} صنفاً حُسب فرقُه`}
+      <VarianceSplit
+        shortage={summary.shortageCostMinor}
+        overage={summary.overageCostMinor}
+        linesShort={summary.linesShort}
+        linesOver={summary.linesOver}
+        showAmounts={showAmounts}
+        measured={measured}
+        foot={measured ? (
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <Mini
+              label="النقصُ من كلفة الاستهلاك"
+              value={summary.shortageRateBp === null ? "غير محسوبة" : formatBp(-summary.shortageRateBp)}
+              hint={summary.consumptionCostComplete ? "كم ضاع ممّا كان ينبغي أن يُصرَف" : "على ما عُرفت كلفتُه — المقامُ ناقص"}
+            />
+            {showAmounts && (
+              <Mini
+                label="حجمُ الفروق"
+                value={<Money minor={summary.absoluteCostMinor} />}
+                hint={`نقصٌ وزيادةٌ معاً · والصافي ⁦${formatRiyalsDisplay(summary.netCostMinor)}⁩`}
+              />
+            )}
+            <Mini
+              label="أصنافٌ حُسب فرقُها"
+              value={<span className="nums">{summary.linesMeasured} من {inScopeCount}</span>}
+              hint={summary.linesWithoutCost > 0 ? `منها ${countNoun(summary.linesWithoutCost, PRODUCT)} كلفتُه غير معروفة` : "كلُّها معروفةُ الكلفة"}
+            />
+          </dl>
+        ) : undefined}
+      />
+
+      <Section
+        title="أكبرُ الفروق"
+        className="mt-0!"
+        hint={anyCost ? "مرتَّبةٌ بالكلفة لا بالكمّيّة — كيلو بنٍّ أثقل من لترِ حليبٍ بأضعاف، والعين لا تقرأ ذلك من الكمّيّتين." : undefined}
+      >
+        {top.length === 0 ? (
+          <EmptyState
+            compact
+            icon={Package}
+            title={measured ? "لا فرقَ في ما عُدّ — كلُّه مطابق." : "لم يُحسَب فرقٌ بعد."}
+            hint={measured
+              ? "كلُّ صنفٍ عُدّ وُجد منه ما كان متوقَّعاً."
+              : "يُحسَب لكلّ صنفٍ عُدّ وعُرفت حدودُ معادلته — أدخِل ما وجدتَه في الخطوة الثالثة."}
           />
         ) : (
-          <Stat label="أصنافٌ عُدّت" value={`${report.totals.linesCounted} من ${inScopeCount}`} />
-        )}
-      </StatGrid>
-
-      {top.length === 0 ? (
-        <Card className="mt-4">
-          <p className="text-xs text-muted">
-            لا فرقَ محسوبٌ بعد — يُحسَب لكلّ صنفٍ عُدّ وعُرفت حدودُ معادلته.
-          </p>
-        </Card>
-      ) : (
-        <Section
-          title="أكبرُ الفروق"
-          hint="مرتَّبةٌ بالكلفة لا بالكمّيّة — كيلو بنٍّ أثقل من لترِ حليبٍ بأضعاف، والعين لا تقرأ ذلك من الكمّيّتين."
-        >
-          <ul className="divide-y divide-line rounded-2xl border border-line bg-raised">
-            {top.map((l) => (
-              <li key={l.productId} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
-                <Link href={`/inventory/items/${l.productId}`} className="min-w-0 flex-1 text-xs font-bold hover:underline">
-                  {l.productName}
-                </Link>
-                <Badge tone={(l.varianceMilli ?? 0) < 0 ? "danger" : "ok"}>
-                  {(l.varianceMilli ?? 0) < 0 ? "نقص" : "زيادة"}
-                </Badge>
-                <span className={`nums text-xs font-bold ${(l.varianceMilli ?? 0) < 0 ? "text-danger" : "text-ok"}`}>
-                  {formatSignedQuantity(l.varianceMilli, l.baseUnit)}
-                </span>
-                <span className="nums w-16 text-xs text-muted">{formatBp(l.varianceConsumptionBp)}</span>
-                {showAmounts && (
-                  <span className="nums w-24 text-end text-xs">
-                    {l.varianceCostMinor === null ? "كلفةٌ غير معروفة" : <Money minor={l.varianceCostMinor} />}
-                  </span>
-                )}
-              </li>
-            ))}
+          <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
+            {top.map((l) => {
+              const d = directionOf(l.varianceMilli) ?? "even";
+              const weight = anyCost && l.varianceCostMinor !== null ? Math.abs(l.varianceCostMinor) : Math.abs(l.varianceConsumptionBp ?? 0);
+              return (
+                <li key={l.productId} className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                    <Link href={`/inventory/items/${l.productId}`} className="min-w-0 flex-1 truncate text-[13px] font-bold hover:text-accent hover:underline hover:underline-offset-4">
+                      {l.productName}
+                    </Link>
+                    <DirectionTag milli={l.varianceMilli} />
+                    <span className={`nums text-[13px] font-bold ${DIRECTION[d].text}`}>
+                      {formatSignedQuantity(l.varianceMilli, l.baseUnit)}
+                    </span>
+                    <span className="nums w-16 text-end text-xs text-muted">{formatBp(l.varianceConsumptionBp)}</span>
+                    {showAmounts && (
+                      <span className="w-24 text-end text-[13px]">
+                        {l.varianceCostMinor === null ? <span className="text-[11px] text-muted">كلفةٌ غير معروفة</span> : <Money minor={Math.abs(l.varianceCostMinor)} />}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2">
+                    <MagnitudeBar value={weight} max={anyCost ? maxWeight : maxBp} direction={d} />
+                  </div>
+                </li>
+              );
+            })}
           </ul>
-          <p className="mt-2 text-[11px] text-muted">
-            النسبةُ محسوبةٌ على <strong>الاستهلاك المتوقَّع</strong> — أي «كم ضاع ممّا كان
-            ينبغي أن يُصرَف». {valuationNote(report)}
+        )}
+        {top.length > 0 && (
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            النسبةُ على <strong>الاستهلاك المتوقَّع</strong> — «كم ضاع ممّا كان ينبغي أن يُصرَف». {valuationNote(report)}
           </p>
-        </Section>
-      )}
+        )}
+      </Section>
 
       {/*
         ── ولماذا لا يُسمّى هذا «هدراً» ──
@@ -205,140 +228,117 @@ export function InventoryWorkspace({
         أو شراءً لم يُقيَّد، أو نقلاً لم يُسجَّل. وتسميتُه هدراً دعوى سببٍ
         بلا دليل.
       */}
-      <p className="mt-4 rounded-xl border border-line bg-sunken px-3 py-2.5 text-[11px] leading-relaxed text-ink-soft">
-        هذا <strong>فرقُ جرد</strong> لا هدر: الفرقُ الواحد قد يكون جرعةً أكبر ممّا في الوصفة،
-        أو ميزاناً غير معاير، أو كمّيّةً دخلت ولم تُقيَّد، أو نقلاً لم يُسجَّل، أو عدّاً
-        مستعجلاً. راجِعها قبل أن تعدّه فاقداً — وما تعرف سببَه سجِّله هدراً فيخرج من هذا الرقم.
-      </p>
+      <Callout tone="muted" icon={ShieldCheck} title="هذا فرقُ جرد، لا هدر">
+        الفرقُ الواحد قد يكون جرعةً أكبر ممّا في الوصفة، أو ميزاناً غير معاير، أو كمّيّةً دخلت ولم تُقيَّد،
+        أو نقلاً لم يُسجَّل، أو عدّاً مستعجلاً. راجِعه قبل أن تعدّه فاقداً — وما تعرف سببَه سجِّله هدراً
+        أدناه فيخرج من «الفرق غير المفسَّر».
+      </Callout>
 
-      {!locked && inScopeCount > 0 && (
-        <Section title="الهدر المسجَّل" hint="ما تعرف سببَه يخرج من «الفرق غير المفسَّر».">
-          <InventoryWaste
-            countId={header.id}
-            branchId={header.branchId}
-            defaultDate={header.periodEnd}
-            items={report.lines.filter((l) => l.inScope).map((l) => ({
-              id: l.productId,
-              name: l.productName,
-              baseUnit: l.baseUnit,
-              unitLabel: storedUnitLabel(l.baseUnit),
-            }))}
-            canEdit={canCount}
-          />
-        </Section>
+      {!locked && inScopeCount > 0 && canCount && (
+        <InventoryWaste
+          countId={header.id}
+          branchId={header.branchId}
+          defaultDate={header.periodEnd}
+          items={report.lines.filter((l) => l.inScope).map((l) => ({
+            id: l.productId,
+            name: l.productName,
+            baseUnit: l.baseUnit,
+            unitLabel: storedUnitLabel(l.baseUnit),
+          }))}
+          canEdit={canCount}
+        />
       )}
     </div>
   );
 
   /* ─────────── ‏٥ · الإقفال ─────────── */
+  const uncounted = inScopeCount - report.totals.linesCounted;
+  const checks: { ok: boolean; warn?: boolean; text: string }[] = [
+    {
+      ok: coverage.readiness === "READY",
+      warn: coverage.readiness === "PARTIAL",
+      text: coverage.readiness === "READY"
+        ? "كلُّ ما بِيع مربوطٌ وله وصفةٌ سارية."
+        : coverage.readiness === "PARTIAL" ? "التقريرُ جزئيّ — وما نقص مكتوبٌ فيه." : "لا مبيعاتَ داخلةٌ في الحساب — لا يُقفَل.",
+    },
+    {
+      ok: uncounted === 0 && inScopeCount > 0,
+      warn: uncounted > 0,
+      text: uncounted === 0
+        ? `عُدّت الأصنافُ كلُّها (${countNoun(inScopeCount, PRODUCT)}).`
+        : `${countNoun(uncounted, PRODUCT)} بلا عدّ — يُقفَل بلا فرقٍ محسوب.`,
+    },
+    {
+      ok: duplicates.length === 0,
+      warn: duplicates.length > 0,
+      text: duplicates.length === 0
+        ? "لا استلامَ يدويّاً يشبه بندَ فاتورة."
+        : `${countNoun(duplicates.length, LINE)} استلامٍ قد يكون مكرَّراً — المشترياتُ غير معروفة حتى تُحسَم.`,
+    },
+  ];
+
   const finalise = locked ? (
-    <div className="space-y-3">
-      <Card tone="ok">
-        <p className="text-xs leading-relaxed">
-          أُقفل هذا الجرد{header.finalisedAt ? ` في ${header.finalisedAt.toISOString().slice(0, 10)}` : ""}.
-          أرقامُه مجمَّدة، وأصولُها محفوظة — نسخُ الوصفات، وأسطرُ الفواتير، والكمّيّاتُ المستلَمة
-          يدوياً، ومصادرُ الأرصدة الافتتاحيّة، ونطاقُ الجرد.
-        </p>
-      </Card>
+    <div className="space-y-4">
+      <Callout tone="ok" icon={Lock} title={`أُقفل هذا الجرد${header.finalisedAt ? ` في ${formatDay(header.finalisedAt)}` : ""}`}>
+        أرقامُه مجمَّدة، وأصولُها محفوظة — نسخُ الوصفات، وأسطرُ الفواتير، والكمّيّاتُ المستلَمة يدوياً،
+        ومصادرُ الأرصدة الافتتاحيّة، ونطاقُ الجرد. ولا تغيّره وصفةٌ تُعدَّل بعده ولا فاتورةٌ تصل.
+      </Callout>
       {canReopen && <ReopenCount countId={header.id} />}
     </div>
-  ) : coverage.readiness === "BLOCKED" ? (
-    <Card tone="warn">
-      <p className="text-xs leading-relaxed">
-        لا يُقفَل جردٌ لا يُحسَب: استورِد مبيعات الفترة واربط أصنافها أوّلاً.
-      </p>
-    </Card>
-  ) : canCount ? (
-    <FinaliseCount
-      countId={header.id}
-      readiness={coverage.readiness}
-      countedItems={report.totals.linesCounted}
-      totalItems={inScopeCount}
-    />
-  ) : null;
+  ) : (
+    <div className="space-y-4">
+      <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
+        {checks.map((c) => (
+          <li key={c.text} className="flex items-start gap-3 px-4 py-3 text-[13px] leading-relaxed">
+            {c.ok
+              ? <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-ok" strokeWidth={2} aria-label="سليم" />
+              : c.warn
+                ? <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" strokeWidth={2} aria-label="تنبيه" />
+                : <OctagonAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" strokeWidth={2} aria-label="مانع" />}
+            <span>{c.text}</span>
+          </li>
+        ))}
+      </ul>
+      {coverage.readiness === "BLOCKED" ? (
+        <Callout
+          tone="warn"
+          icon={TriangleAlert}
+          title="لا يُقفَل جردٌ لا يُحسَب"
+          action={<LinkButton href="/inventory/import#sales" variant="primary" size="sm" icon={FileSpreadsheet}>استورِد المبيعات</LinkButton>}
+        >
+          استورِد مبيعاتِ الفترة واربط أصنافَها أوّلاً — ثمّ أعِد الحساب.
+        </Callout>
+      ) : canCount ? (
+        <FinaliseCount
+          countId={header.id}
+          readiness={coverage.readiness}
+          countedItems={report.totals.linesCounted}
+          totalItems={inScopeCount}
+        />
+      ) : (
+        <p className="text-xs text-muted">الإقفالُ خارج صلاحيتك.</p>
+      )}
+    </div>
+  );
 
   return (
     <>
-      {/* ── الجاهزيّة: تُقرأ قبل أيّ رقم ── */}
-      <div className={`rounded-2xl border p-4 sm:p-5 ${
-        coverage.readiness === "READY" ? "border-ok/40 bg-ok-bg"
-          : coverage.readiness === "BLOCKED" ? "border-danger/40 bg-danger-bg"
-            : "border-warn/40 bg-warn-bg"
-      }`}>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tone={coverage.readiness === "READY" ? "ok" : coverage.readiness === "BLOCKED" ? "danger" : "warn"}>
-            {READINESS_LABEL[coverage.readiness]}
-          </Badge>
-          <span className="nums text-xs text-muted">
-            {header.periodStart} → {header.periodEnd}
-          </span>
-          {header.branchName && <span className="text-xs text-muted">· {header.branchName}</span>}
-          {locked && <Badge>مقفَل</Badge>}
-          {header.reopenCount > 0 && <Badge tone="warn">أُعيد فتحُه {header.reopenCount} مرّة</Badge>}
-        </div>
+      <CoverageBanner
+        header={header}
+        report={report}
+        inScopeCount={inScopeCount}
+        showAmounts={showAmounts}
+        canCount={canCount}
+        locked={locked}
+      />
 
-        <p className="mt-2.5 text-sm leading-relaxed">
-          <Prose text={describeCoverage(coverage)} />
-        </p>
-
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-4">
-          <Fact label="أسطرُ بيع" value={`${coverage.sales.includedLines} من ${coverage.sales.lines}`} />
-          <Fact label="أيّامٌ فيها مبيعات" value={`${coverage.sales.daysWithSales} من ${coverage.sales.periodDays}`} />
-          <Fact label="أسطرُ شراء" value={`${coverage.purchases.includedLines} من ${coverage.purchases.lines}`} />
-          <Fact label="أصنافٌ عُدّت" value={`${report.totals.linesCounted} من ${inScopeCount}`} />
-        </dl>
-
-        {/*
-          ── النطاقُ يُقال ولا يُخفى ──
-
-          «عُدّ ٢٤ من ٢٤» تقرأ اكتمالاً، وقد تكون ستّةٌ وثلاثون صنفاً
-          خارج الجرد. وليس فجوةَ تغطية: هو اختيارُ إنسان معلَن، ولو أنقص
-          الحكمَ لما بلغ جردٌ فيه استبعادٌ واحد `READY` أبداً.
-        */}
-        {coverage.scope.excluded > 0 && (
-          <p className="mt-2.5 text-[11px] leading-relaxed text-ink-soft">
-            و<span className="nums font-bold">{coverage.scope.excluded}</span> صنفاً خارج هذا الجرد
-            باختيارك — وقائعُها محسوبة ولا فرقَ لها ولا تدخل المجاميع
-            {coverage.scope.excludedNames.length > 0 && (
-              <span className="text-muted">: {coverage.scope.excludedNames.join(" · ")}</span>
-            )}.
-          </p>
-        )}
-
-        {coverage.gaps.length > 0 && (
-          <ul className="mt-3 space-y-1.5">
-            {coverage.gaps.map((g, i) => (
-              <li key={i} className="rounded-lg border border-line bg-raised/70 px-3 py-2 text-[11px] leading-relaxed">
-                <span className="font-bold">{g.label}</span>
-                <span className="nums text-muted"> — {g.count}</span>
-                {/* «٣ منتجات» لا تقول شيئاً؛ وحصّتُها من المبيع تقول أيصلح التقرير */}
-                {g.unitsShareBp !== null && g.unitsShareBp > 0 && (
-                  <span className="nums font-bold"> · تمثّل {(g.unitsShareBp / 100).toFixed(1)}٪ من الوحدات المباعة</span>
-                )}
-                {showAmounts && g.totalMinor > 0 && <> بقيمة <Money minor={g.totalMinor} /></>}
-                {g.examples.length > 0 && <span className="text-muted"> · {g.examples.join(" · ")}</span>}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          {!locked && canCount && <RecomputeCount countId={header.id} />}
-          <Link href="/inventory/import" className={buttonClass("secondary", "sm")}>
-            استورِد مبيعات فودكس
-          </Link>
-          <Link href="/inventory/mapping" className={buttonClass("secondary", "sm")}>
-            اربط منتجات فودكس
-          </Link>
-        </div>
-      </div>
-
-      <Section id="count" title={locked ? "الجرد كما أُقفل" : "الجرد"}>
+      <div className="mt-8">
         {report.lines.length === 0 ? (
           <EmptyState
+            icon={Package}
             title="لا صنفَ مخزونٍ مسجَّل بعد."
-            hint="تُبنى الأصناف من كتالوج فودكس أو من بنود فواتير المورّدين."
-            action={<Link href="/inventory/import" className={buttonClass("primary", "sm")}>ارفع كتالوج فودكس</Link>}
+            hint="تُبنى الأصناف من كتالوج فودكس أو من بنود فواتير المورّدين — وبعدها يُعَدّ هنا."
+            action={<LinkButton href="/inventory/import#catalog" variant="primary" size="sm">ارفع كتالوج فودكس</LinkButton>}
           />
         ) : (
           <InventoryCountSteps
@@ -356,20 +356,179 @@ export function InventoryWorkspace({
             locked={locked}
             scopeInherited={scopeInherited}
             scopeExplicit={header.scopeSource === "EXPLICIT"}
+            measured={measured}
+            initialStep={initialStep ?? null}
             review={review}
             finalise={finalise}
           />
         )}
-      </Section>
+      </div>
     </>
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+/* ─────────────────────── رأسُ الجرد: الجاهزيّة ─────────────────────── */
+
+const READINESS_SKIN: Record<Readiness, { tone: Tone; icon: LucideIcon; stripe: string }> = {
+  READY: { tone: "ok", icon: CircleCheck, stripe: "bg-ok" },
+  PARTIAL: { tone: "warn", icon: TriangleAlert, stripe: "bg-warn" },
+  BLOCKED: { tone: "danger", icon: OctagonAlert, stripe: "bg-danger" },
+};
+
+/**
+ * الجاهزيّةُ تُقرأ قبل أيّ رقم — حكمٌ، وجملةٌ، وأربعةُ مقاييس، وفجواتٌ بأفعالها.
+ */
+function CoverageBanner({
+  header, report, inScopeCount, showAmounts, canCount, locked,
+}: {
+  header: CountHeader;
+  report: EngineReport;
+  inScopeCount: number;
+  showAmounts: boolean;
+  canCount: boolean;
+  locked: boolean;
+}) {
+  const coverage = report.coverage;
+  const skin = READINESS_SKIN[coverage.readiness];
+  const noSales = coverage.sales.lines === 0;
+
+  const meters: { label: string; value: number; max: number; empty?: string }[] = [
+    { label: "أسطرُ بيعٍ دخلت الحساب", value: coverage.sales.includedLines, max: coverage.sales.lines, empty: "لا مبيعاتٍ مستورَدة" },
+    { label: "أيّامٌ فيها مبيعات", value: coverage.sales.daysWithSales, max: coverage.sales.periodDays },
+    { label: "أسطرُ شراءٍ عُرفت كمّيّتُها", value: coverage.purchases.includedLines, max: coverage.purchases.lines, empty: "لا فواتيرَ في الفترة" },
+    { label: "أصنافٌ عُدّت", value: report.totals.linesCounted, max: inScopeCount },
+  ];
+
   return (
-    <div>
-      <dt className="text-[11px] text-muted">{label}</dt>
-      <dd className="nums text-sm font-bold">{value}</dd>
+    <section aria-labelledby="coverage-title" className="relative overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
+      <span aria-hidden className={`absolute inset-y-0 start-0 w-1 ${skin.stripe}`} />
+      <div className="p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 id="coverage-title" className="sr-only">جاهزيّةُ الحساب</h2>
+          <Badge tone={skin.tone} dot>{`الحساب ${READINESS_LABEL[coverage.readiness]}`}</Badge>
+          {locked ? <Badge dot>مقفَل</Badge> : <Badge tone="accent" dot>مسوّدة</Badge>}
+          {header.reopenCount > 0 && <Badge tone="warn">أُعيد فتحُه {header.reopenCount === 1 ? "مرّة" : `${header.reopenCount} مرّات`}</Badge>}
+          <span className="text-xs text-muted">أسبوع {formatWeek(header.periodStart, header.periodEnd)}{header.branchName ? ` · ${header.branchName}` : ""}</span>
+        </div>
+
+        <p className="mt-3 flex items-start gap-2 text-[15px] font-bold leading-relaxed">
+          <skin.icon className={`mt-1 h-[18px] w-[18px] shrink-0 ${skin.tone === "ok" ? "text-ok" : skin.tone === "warn" ? "text-warn" : "text-danger"}`} strokeWidth={2} aria-hidden />
+          <span><Prose text={describeCoverage(coverage)} /></span>
+        </p>
+
+        <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-4 lg:grid-cols-4">
+          {meters.map((m) => (
+            <div key={m.label} className="min-w-0">
+              <dt className="truncate text-[11px] font-medium text-muted">{m.label}</dt>
+              <dd className="mt-1">
+                {m.max === 0 ? (
+                  <span className="text-[13px] font-bold text-muted">{m.empty ?? "لا شيء بعد"}</span>
+                ) : (
+                  <>
+                    <span className="text-[13px] font-bold"><span className="nums">{m.value}</span> <span className="text-muted">من</span> <span className="nums">{m.max}</span></span>
+                    <span className="mt-1.5 block">
+                      <Meter value={m.value} max={m.max} tone={m.value === m.max ? "ok" : "accent"} label={m.label} />
+                    </span>
+                  </>
+                )}
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        {/*
+          ── النطاقُ يُقال ولا يُخفى ──
+
+          «عُدّ ٢٤ من ٢٤» تقرأ اكتمالاً، وقد تكون ستّةٌ وثلاثون صنفاً
+          خارج الجرد. وليس فجوةَ تغطية: هو اختيارُ إنسان معلَن.
+        */}
+        {coverage.scope.excluded > 0 && (
+          <p className="mt-4 text-xs leading-relaxed text-ink-soft">
+            و<span className="font-bold">{countNoun(coverage.scope.excluded, PRODUCT)}</span> خارج هذا الجرد باختيارك — وقائعُها
+            محسوبة ولا فرقَ لها ولا تدخل المجاميع
+            {coverage.scope.excludedNames.length > 0 && <span className="text-muted">: {coverage.scope.excludedNames.join(" · ")}</span>}.
+          </p>
+        )}
+      </div>
+
+      {coverage.gaps.length > 0 && (
+        <ul className="divide-y divide-line-soft border-t border-line bg-sunken/40">
+          {coverage.gaps.map((g, i) => {
+            const fix = gapAction(g);
+            return (
+              <li key={i} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
+                <div className="min-w-0 flex-1 text-xs leading-relaxed">
+                  <p className="font-bold text-ink">
+                    {g.label} <span className="nums text-muted">· {g.count}</span>
+                    {/* «٣ منتجات» لا تقول شيئاً؛ وحصّتُها من المبيع تقول أيصلح التقرير */}
+                    {g.unitsShareBp !== null && g.unitsShareBp > 0 && (
+                      <span className="text-warn"> · تمثّل <span className="nums">{(g.unitsShareBp / 100).toFixed(1)}٪</span> من الوحدات المباعة</span>
+                    )}
+                    {showAmounts && g.totalMinor > 0 && <span className="font-medium text-muted"> · بقيمة <Money minor={g.totalMinor} /></span>}
+                  </p>
+                  {g.examples.length > 0 && <p className="mt-0.5 truncate text-muted">{g.examples.join(" · ")}</p>}
+                </div>
+                {fix && (
+                  <Link href={fix.href} className="inline-flex min-h-11 shrink-0 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
+                    {fix.label} <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {!locked && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3 sm:px-5">
+          {noSales ? (
+            <LinkButton href="/inventory/import#sales" variant="primary" size="sm" icon={FileSpreadsheet}>استورِد مبيعات الأسبوع</LinkButton>
+          ) : (
+            <LinkButton href="/inventory/import#sales" size="sm" icon={FileSpreadsheet}>استورِد مبيعاتٍ أحدث</LinkButton>
+          )}
+          {coverage.gaps.some((g) => g.reason === "UNMAPPED_POS_PRODUCT") && (
+            <LinkButton href="/inventory/mapping" size="sm" icon={Link2}>اربط منتجات فودكس</LinkButton>
+          )}
+          {canCount && <RecomputeCount countId={header.id} />}
+          <span className="text-[11px] text-muted">بعد استيرادٍ أو تصحيحِ وصفة، أعِد الحساب.</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** فعلُ كلّ فجوة — العددُ الذي يُنذر يحمل ما يُصلحه. */
+function gapAction(g: CoverageGap): { href: string; label: string } | null {
+  switch (g.reason) {
+    case "UNMAPPED_POS_PRODUCT":
+      return { href: "/inventory/mapping", label: "اربطها" };
+    case "NO_RECIPE":
+    case "NO_EFFECTIVE_VERSION":
+    case "EMPTY_RECIPE":
+    case "UNSUPPORTED_YIELD_UNIT":
+    case "UNIT_CONFLICT":
+    case "NO_UNIT":
+      return { href: "/inventory/recipes", label: "الوصفات" };
+    case "UNLINKED_PRODUCT":
+    case "NO_PACK_SPEC":
+    case "UNIT_FAMILY_MISMATCH":
+      return { href: "/purchases/products", label: "الأصنافُ والعبوات" };
+    case "MISSING_QUANTITY":
+      return { href: "/purchases/invoices", label: "الفواتير" };
+    case "RECEIPT_AMBIGUOUS":
+    case "RECEIPT_POSSIBLE_DUPLICATE":
+      return { href: "?step=flow", label: "احسمها في الخطوة الثانية" };
+    default:
+      return null;
+  }
+}
+
+function Mini({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
+  return (
+    <div className="rounded-xl border border-line bg-raised px-4 py-3">
+      <dt className="text-[11px] font-medium text-muted">{label}</dt>
+      <dd className="mt-1 text-base font-bold">{value}</dd>
+      {hint && <dd className="mt-0.5 text-[11px] leading-relaxed text-muted"><Prose text={hint} /></dd>}
     </div>
   );
 }

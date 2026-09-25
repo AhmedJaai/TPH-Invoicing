@@ -74,8 +74,8 @@ export function OpeningGrid({
   }
 
   return (
-    <div className="mb-4 rounded-2xl border border-line bg-raised p-3">
-      <p className="text-xs font-bold">الأرصدة الافتتاحيّة — ما كان على الرفّ أوّلَ الأسبوع</p>
+    <div className="mb-5 animate-rise rounded-2xl border border-accent-line bg-raised p-4 shadow-lifted sm:p-5">
+      <p className="text-[14px] font-bold">الأرصدة الافتتاحيّة — ما كان على الرفّ أوّلَ الأسبوع</p>
       <p className="mt-1 text-[11px] leading-relaxed text-muted">
         اكتب ما تعرفه، واترك ما لا تعرفه فارغاً — يبقى «غير معروف» ولا يُحسَب صفراً.
       </p>
@@ -84,25 +84,25 @@ export function OpeningGrid({
         <input
           type="search" value={query} onChange={(e) => setQuery(e.target.value)}
           placeholder="ابحث…" aria-label="ابحث عن صنف"
-          className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-canvas px-3 text-sm"
+          className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-sm"
         />
         <select
           value={category} onChange={(e) => setCategory(e.target.value)} aria-label="رشِّح بالباب"
-          className="min-h-11 rounded-xl border border-line bg-canvas px-3 text-xs"
+          className="min-h-11 rounded-lg border border-line-input bg-raised px-3 text-xs"
         >
           <option value="">كلّ الأبواب</option>
           {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
-        <label className="flex min-h-11 items-center gap-2 rounded-xl border border-line px-3 text-xs">
-          <input type="checkbox" checked={onlyUnknown} onChange={(e) => setOnlyUnknown(e.target.checked)} className="h-4 w-4 accent-[var(--ink)]" />
+        <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line-input bg-raised px-3 text-xs sm:min-h-9">
+          <input type="checkbox" checked={onlyUnknown} onChange={(e) => setOnlyUnknown(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
           غيرُ المعروف وحده
         </label>
       </div>
 
-      <ul className="mt-2 divide-y divide-line">
+      <ul className="mt-3 divide-y divide-line-soft">
         {visible.map((row, at) => (
-          <li key={row.productId} className="flex flex-wrap items-center gap-2 py-2">
-            <span className="min-w-0 flex-1 truncate text-xs">
+          <li key={row.productId} className="flex flex-wrap items-center gap-2 py-2.5">
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
               {row.productName}
               {row.openingText !== null && (
                 <span className="text-muted"> — الحاليّ {row.openingText} {row.openingSourceLabel}</span>
@@ -114,14 +114,14 @@ export function OpeningGrid({
               aria-label={`الرصيد الافتتاحيّ لـ${row.productName}`}
               onChange={(e) => setValues((v) => ({ ...v, [row.productId]: e.target.value }))}
               onKeyDown={(e) => onKey(e, at)}
-              className="nums min-h-11 w-24 rounded-xl border border-line bg-canvas px-2 text-center text-sm"
+              className="nums h-12 w-28 rounded-lg border border-line-input bg-raised px-2 text-center text-base font-bold"
             />
             {row.unitChoices.length > 1 ? (
               <select
                 value={units[row.productId]} disabled={busy}
                 aria-label={`وحدةُ ${row.productName}`}
                 onChange={(e) => setUnits((u) => ({ ...u, [row.productId]: e.target.value }))}
-                className="min-h-11 w-16 rounded-xl border border-line bg-canvas px-1 text-[11px]"
+                className="h-12 w-20 rounded-lg border border-line-input bg-raised px-1 text-sm"
               >
                 {row.unitChoices.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
               </select>
@@ -133,11 +133,11 @@ export function OpeningGrid({
       </ul>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" disabled={busy || filled.length === 0} onClick={() => void save()} className={buttonClass("primary", "sm")}>
+        <button type="button" disabled={busy || filled.length === 0} onClick={() => void save()} className={buttonClass("primary")}>
           {busy ? "يُحفظ…" : filled.length === 0 ? "لا رصيدَ مكتوب" : `احفظ ${filled.length} رصيداً`}
         </button>
         <button type="button" disabled={busy} onClick={onDone} className={buttonClass("quiet", "sm")}>أغلِق</button>
-        {error && <span className="text-[11px] text-danger">{error}</span>}
+        {error && <span role="alert" className="text-xs text-danger">{error}</span>}
       </div>
     </div>
   );

@@ -102,7 +102,7 @@ export function ReceiptForm({
   const outside = date !== "" && (date < periodStart || date > periodEnd);
 
   return (
-    <div className="mt-2 rounded-xl border border-line bg-canvas p-3">
+    <div className="mt-3 animate-rise rounded-xl border border-accent-line bg-accent-soft/40 p-4">
       <p className="text-[11px] font-bold">كمّيّةٌ دخلت الرفّ — {productName}</p>
 
       <div className="mt-2 flex flex-wrap items-end gap-2">
@@ -112,14 +112,14 @@ export function ReceiptForm({
             type="text" inputMode="decimal" dir="ltr" autoFocus
             value={quantity} onChange={(e) => setQuantity(e.target.value)} disabled={busy}
             placeholder="20"
-            className="nums mt-1 block min-h-11 w-24 rounded-xl border border-line bg-raised px-2 text-center text-sm"
+            className="nums mt-1 block min-h-11 w-24 rounded-lg border border-line-input bg-raised px-2 text-center text-sm"
           />
         </label>
         <label className="text-[11px] text-muted">
           الوحدة
           <select
             value={unit} onChange={(e) => setUnit(e.target.value)} disabled={busy || unitChoices.length < 2}
-            className="mt-1 block min-h-11 rounded-xl border border-line bg-raised px-2 text-xs"
+            className="mt-1 block min-h-11 rounded-lg border border-line-input bg-raised px-2 text-xs"
           >
             {unitChoices.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
           </select>
@@ -128,7 +128,7 @@ export function ReceiptForm({
           تاريخ الاستلام
           <input
             type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={busy}
-            className="nums mt-1 block min-h-11 rounded-xl border border-line bg-raised px-2 text-sm"
+            className="nums mt-1 block min-h-11 rounded-lg border border-line-input bg-raised px-2 text-sm"
           />
         </label>
         <button type="button" onClick={() => setMore((m) => !m)} className={buttonClass("quiet", "sm")}>
@@ -148,7 +148,7 @@ export function ReceiptForm({
             المورّد
             <select
               value={supplierId} onChange={(e) => setSupplierId(e.target.value)} disabled={busy}
-              className="mt-1 block min-h-11 max-w-56 rounded-xl border border-line bg-raised px-2 text-xs"
+              className="mt-1 block min-h-11 max-w-56 rounded-lg border border-line-input bg-raised px-2 text-xs"
             >
               <option value="">—</option>
               {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -158,7 +158,7 @@ export function ReceiptForm({
             رقم المستند
             <input
               type="text" value={documentRef} onChange={(e) => setDocumentRef(e.target.value)} disabled={busy}
-              className="mt-1 block min-h-11 w-32 rounded-xl border border-line bg-raised px-2 text-sm"
+              className="mt-1 block min-h-11 w-32 rounded-lg border border-line-input bg-raised px-2 text-sm"
             />
           </label>
           <label className="text-[11px] text-muted">
@@ -166,14 +166,14 @@ export function ReceiptForm({
             <input
               type="text" inputMode="decimal" dir="ltr" value={cost} onChange={(e) => setCost(e.target.value)} disabled={busy}
               placeholder="—"
-              className="nums mt-1 block min-h-11 w-28 rounded-xl border border-line bg-raised px-2 text-center text-sm"
+              className="nums mt-1 block min-h-11 w-28 rounded-lg border border-line-input bg-raised px-2 text-center text-sm"
             />
           </label>
           <label className="min-w-40 flex-1 text-[11px] text-muted">
             ملاحظة
             <input
               type="text" value={note} onChange={(e) => setNote(e.target.value)} disabled={busy}
-              className="mt-1 block min-h-11 w-full rounded-xl border border-line bg-raised px-2 text-sm"
+              className="mt-1 block min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-sm"
             />
           </label>
         </div>

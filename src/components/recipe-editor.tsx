@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
+import { Plus, Trash2 } from "lucide-react";
 import { buttonClass } from "./ui";
+import { Sheet, toast } from "./ui-client";
 
 /**
  * محرّرُ الوصفة — ولا تُعدَّل نسخةٌ في مكانها أبداً.
@@ -40,12 +42,15 @@ export function RecipeEditor({
   menuProducts,
   ingredients,
   defaultFrom,
+  variant = "primary",
 }: {
   menuProducts: { id: string; name: string }[];
   ingredients: IngredientOption[];
   defaultFrom: string;
+  variant?: "primary" | "secondary";
 }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const [menuProductId, setMenuProductId] = useState(menuProducts[0]?.id ?? "");
   const [effectiveFrom, setEffectiveFrom] = useState(defaultFrom);
   const [lines, setLines] = useState<Line[]>([{ productId: "", quantity: "", unit: "G", prepLossPercent: "" }]);
@@ -86,116 +91,129 @@ export function RecipeEditor({
       setMessage(r.error);
       return;
     }
-    setMessage(String(r.data.message ?? "حُفظت."));
+    setMessage(null);
     setLines([{ productId: "", quantity: "", unit: "G", prepLossPercent: "" }]);
+    setOpen(false);
+    toast({ tone: "ok", title: String(r.data.message ?? "حُفظت الوصفة وفُعِّلت.") });
     router.refresh();
   }
 
   return (
-    <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
-      <h2 className="font-display text-base font-bold">وصفةٌ جديدة أو نسخةٌ جديدة</h2>
-      <p className="mt-1 text-xs leading-relaxed text-muted">
-        غيّرتَ الجرعة؟ اكتب نسخةً جديدة بتاريخ التغيير. وتُغلَق السابقةُ في اليوم الذي
-        قبله — فتبقى تقاريرُ ما مضى محسوبةً بما كان عاملاً فيها.
-      </p>
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={buttonClass(variant, "sm")}>
+        <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+        وصفةٌ جديدة
+      </button>
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        size="lg"
+        title="وصفةٌ جديدة أو نسخةٌ جديدة"
+        description="غيّرتَ الجرعة؟ اكتب نسخةً بتاريخ التغيير — وتُغلَق السابقةُ في اليوم الذي قبله، فتبقى تقاريرُ ما مضى محسوبةً بما كان عاملاً فيها."
+        footer={
+          <>
+            {message && <p role={failed ? "alert" : "status"} className={`me-auto self-center text-xs ${failed ? "text-danger" : "text-ok"}`}>{message}</p>}
+            <button type="button" onClick={() => setOpen(false)} className={buttonClass("quiet")}>أغلِق</button>
+            <button type="button" onClick={save} disabled={busy || !ready} className={buttonClass("primary")}>
+              {busy ? "يُحفظ…" : "احفظ النسخة وفعِّلها"}
+            </button>
+          </>
+        }
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="block text-[11px] font-medium text-muted">الصنف المباع</span>
+            <select
+              value={menuProductId}
+              onChange={(e) => setMenuProductId(e.target.value)}
+              className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm"
+            >
+              <option value="">اختر صنفاً…</option>
+              {menuProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="block text-[11px] font-medium text-muted">تسري من</span>
+            <input
+              type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)}
+              className="nums mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm"
+            />
+          </label>
+        </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="block text-[11px] text-muted">الصنف المباع</span>
-          <select
-            value={menuProductId}
-            onChange={(e) => setMenuProductId(e.target.value)}
-            className="mt-1 min-h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm"
-          >
-            <option value="">اختر صنفاً…</option>
-            {menuProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </label>
-        <label className="block">
-          <span className="block text-[11px] text-muted">تسري من</span>
-          <input
-            type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)}
-            className="nums mt-1 min-h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm"
-          />
-        </label>
-      </div>
-
-      <div className="mt-4 space-y-2">
-        {lines.map((line, at) => (
-          <div key={at} className="flex flex-wrap items-end gap-2">
-            <label className="min-w-0 flex-1">
-              <span className="block text-[11px] text-muted">المكوّن</span>
-              <select
-                value={line.productId}
-                onChange={(e) => setLine(at, { productId: e.target.value })}
-                className="mt-1 min-h-11 w-full rounded-xl border border-line bg-canvas px-2 text-xs"
-              >
-                <option value="">اختر…</option>
-                {ingredients.map((i) => (
-                  <option key={i.id} value={i.id}>{i.name} ({i.unitLabel})</option>
-                ))}
-              </select>
-            </label>
-            <label className="w-24">
-              <span className="block text-[11px] text-muted">الكمّيّة</span>
-              <input
-                type="text" inputMode="decimal" dir="ltr"
-                value={line.quantity}
-                onChange={(e) => setLine(at, { quantity: e.target.value })}
-                className="nums mt-1 min-h-11 w-full rounded-xl border border-line bg-canvas px-2 text-center text-sm"
-              />
-            </label>
-            <label className="w-24">
-              <span className="block text-[11px] text-muted">الوحدة</span>
-              <select
-                value={line.unit}
-                onChange={(e) => setLine(at, { unit: e.target.value })}
-                className="mt-1 min-h-11 w-full rounded-xl border border-line bg-canvas px-2 text-xs"
-              >
-                {UNITS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
-              </select>
-            </label>
-            <label className="w-24">
-              <span className="block text-[11px] text-muted">فاقدُ التجهيز ٪</span>
-              <input
-                type="text" inputMode="decimal" dir="ltr"
-                value={line.prepLossPercent}
-                onChange={(e) => setLine(at, { prepLossPercent: e.target.value })}
-                placeholder="—"
-                className="nums mt-1 min-h-11 w-full rounded-xl border border-line bg-canvas px-2 text-center text-sm"
-              />
-            </label>
-            {lines.length > 1 && (
-              <button
-                type="button"
-                onClick={() => setLines((ls) => ls.filter((_, i) => i !== at))}
-                className={buttonClass("quiet", "sm")}
-              >
-                احذف
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <p className="mt-5 text-[13px] font-bold">المكوّنات</p>
+        <ul className="mt-2 space-y-2">
+          {lines.map((line, at) => (
+            <li key={at} className="grid grid-cols-2 items-end gap-2 rounded-xl border border-line-soft bg-sunken/50 p-3 sm:grid-cols-[minmax(0,1fr)_6rem_6rem_6rem_auto]">
+              <label className="col-span-2 min-w-0 sm:col-span-1">
+                <span className="block text-[11px] font-medium text-muted">المكوّن</span>
+                <select
+                  value={line.productId}
+                  onChange={(e) => setLine(at, { productId: e.target.value })}
+                  className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-sm"
+                >
+                  <option value="">اختر…</option>
+                  {ingredients.map((i) => (
+                    <option key={i.id} value={i.id}>{i.name} ({i.unitLabel})</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="block text-[11px] font-medium text-muted">الكمّيّة</span>
+                <input
+                  type="text" inputMode="decimal" dir="ltr"
+                  value={line.quantity}
+                  onChange={(e) => setLine(at, { quantity: e.target.value })}
+                  className="nums mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-center text-base"
+                />
+              </label>
+              <label>
+                <span className="block text-[11px] font-medium text-muted">الوحدة</span>
+                <select
+                  value={line.unit}
+                  onChange={(e) => setLine(at, { unit: e.target.value })}
+                  className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-sm"
+                >
+                  {UNITS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                </select>
+              </label>
+              <label>
+                <span className="block text-[11px] font-medium text-muted">فاقدُ التجهيز ٪</span>
+                <input
+                  type="text" inputMode="decimal" dir="ltr"
+                  value={line.prepLossPercent}
+                  onChange={(e) => setLine(at, { prepLossPercent: e.target.value })}
+                  placeholder="—"
+                  className="nums mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-center text-base"
+                />
+              </label>
+              {lines.length > 1 ? (
+                <button
+                  type="button"
+                  aria-label="احذف هذا المكوّن"
+                  onClick={() => setLines((ls) => ls.filter((_, i) => i !== at))}
+                  className={`${buttonClass("quiet", "sm")} justify-self-end`}
+                >
+                  <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
+                </button>
+              ) : <span className="hidden sm:block" />}
+            </li>
+          ))}
+        </ul>
         <button
           type="button"
           onClick={() => setLines((ls) => [...ls, { productId: "", quantity: "", unit: "G", prepLossPercent: "" }])}
-          className={buttonClass("secondary", "sm")}
+          className={`${buttonClass("subtle", "sm")} mt-3`}
         >
+          <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
           أضِف مكوّناً
         </button>
-        <button type="button" onClick={save} disabled={busy || !ready} className={buttonClass("primary", "sm")}>
-          {busy ? "يُحفظ…" : "احفظ النسخة وفعِّلها"}
-        </button>
-        {message && <span className={`text-xs ${failed ? "text-danger" : "text-ok"}`}>{message}</span>}
-      </div>
 
-      <p className="mt-3 text-[11px] leading-relaxed text-muted">
-        «فاقدُ التجهيز» نسبةُ ما يُصرَف من الرفّ ولا يصل الكوب — يُترَك فارغاً إن لم
-        يُقَس، ولا يُفترَض صفراً في الحساب إلّا بمعنى «لم يُقَس».
-      </p>
-    </div>
+        <p className="mt-4 text-[11px] leading-relaxed text-muted">
+          «فاقدُ التجهيز» نسبةُ ما يُصرَف من الرفّ ولا يصل الكوب — يُترَك فارغاً إن لم يُقَس، ولا يُفترَض صفراً
+          في الحساب إلّا بمعنى «لم يُقَس».
+        </p>
+      </Sheet>
+    </>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
+import { toast } from "./ui-client";
 import { Money } from "./money";
 
 /**
@@ -52,37 +53,32 @@ export function PosProductMapping({
       setError(r.error);
       return;
     }
+    toast({ tone: "ok", title: `رُبط «${row.name}»`, body: "ويُعرَف بمعرّفه في كلّ استيرادٍ بعده." });
     router.refresh();
   }
 
-  if (rows.length === 0) {
-    return (
-      <p className="rounded-2xl border border-dashed border-line px-5 py-10 text-center text-sm text-muted">
-        كلُّ ما بِيع مربوطٌ بصنفٍ عندنا.
-      </p>
-    );
-  }
+  if (rows.length === 0) return null;
 
   return (
     <div>
-      <ul className="divide-y divide-line rounded-2xl border border-line bg-raised">
+      <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
         {rows.map((row) => (
-          <li key={row.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3">
+          <li key={row.id} className="flex flex-wrap items-center gap-x-4 gap-y-2.5 px-4 py-3.5">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-bold">{row.name}</p>
-              <p className="nums text-[11px] text-muted">
-                {row.soldUnits} وحدة · <Money minor={row.soldMinor} />
-                {row.category && <span className="font-sans"> · {row.category}</span>}
+              <p className="truncate text-[13px] font-bold" dir="auto">{row.name}</p>
+              <p className="mt-0.5 text-[11px] text-muted">
+                <span className="nums">{row.soldUnits}</span> وحدة بِيعت · <Money minor={row.soldMinor} />
+                {row.category && <> · {row.category}</>}
               </p>
             </div>
 
-            {canEdit && (
-              <>
+            {canEdit ? (
+              <div className="flex w-full items-center gap-2 sm:w-auto">
                 <select
                   value={selected[row.id] ?? ""}
                   onChange={(e) => setSelected((s) => ({ ...s, [row.id]: e.target.value }))}
                   aria-label={`اربط «${row.name}» بصنف`}
-                  className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-canvas px-2 text-xs sm:max-w-64"
+                  className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-2 text-sm sm:min-h-9 sm:w-64 sm:flex-none"
                 >
                   <option value="">أنشئ صنفاً باسمه</option>
                   {menuProducts.map((p) => (
@@ -92,17 +88,17 @@ export function PosProductMapping({
                 <button
                   type="button"
                   onClick={() => map(row)}
-                  disabled={busyId === row.id}
-                  className={buttonClass("secondary", "sm")}
+                  disabled={busyId !== null}
+                  className={buttonClass("primary", "sm")}
                 >
-                  {busyId === row.id ? "…" : "اربطه"}
+                  {busyId === row.id ? "يُربَط…" : "اربطه"}
                 </button>
-              </>
-            )}
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>
-      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
+import { Trash2 } from "lucide-react";
 import { buttonClass } from "./ui";
 
 /**
@@ -85,7 +86,10 @@ export function InventoryWaste({
 
   return (
     <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
-      <h3 className="text-sm font-bold">سجِّل هدراً تعرفه</h3>
+      <h3 className="flex items-center gap-2 text-sm font-bold">
+        <Trash2 className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
+        سجِّل هدراً تعرفه
+      </h3>
       <p className="mt-1 text-xs leading-relaxed text-muted">
         ما تُسجّله هنا يخرج من «الفرق غير المفسَّر» ويُعرَض باسمه. وما لا تعرف سببه
         يبقى سؤالاً مفتوحاً — ولا يُسمّى هدراً.
@@ -96,7 +100,7 @@ export function InventoryWaste({
           <span className="block text-[11px] text-muted">الصنف</span>
           <select
             value={productId} onChange={(e) => setProductId(e.target.value)}
-            className="mt-1 min-h-11 w-full rounded-xl border border-line bg-canvas px-2 text-xs"
+            className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-xs"
           >
             <option value="">اختر…</option>
             {items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
@@ -107,14 +111,14 @@ export function InventoryWaste({
           <input
             type="text" inputMode="decimal" dir="ltr"
             value={quantity} onChange={(e) => setQuantity(e.target.value)}
-            className="nums mt-1 min-h-11 w-full rounded-xl border border-line bg-canvas px-2 text-center text-sm"
+            className="nums mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-center text-sm"
           />
         </label>
         <label className="w-40">
           <span className="block text-[11px] text-muted">السبب</span>
           <select
             value={reason} onChange={(e) => setReason(e.target.value)}
-            className="mt-1 min-h-11 w-full rounded-xl border border-line bg-canvas px-2 text-xs"
+            className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-xs"
           >
             {REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
@@ -123,25 +127,25 @@ export function InventoryWaste({
           <span className="block text-[11px] text-muted">التاريخ</span>
           <input
             type="date" value={occurredOn} onChange={(e) => setOccurredOn(e.target.value)}
-            className="nums mt-1 min-h-11 w-full rounded-xl border border-line bg-canvas px-2 text-sm"
+            className="nums mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-sm"
           />
         </label>
         <input
           type="text" value={note} onChange={(e) => setNote(e.target.value)}
           aria-label="ملاحظة على هذا الهدر"
           placeholder="ملاحظة (اختياريّة)"
-          className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-canvas px-3 text-xs"
+          className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-xs"
         />
         <button
           type="button" onClick={submit}
           disabled={busy || !productId || quantity.trim() === ""}
-          className={buttonClass("secondary", "sm")}
+          className={buttonClass("primary")}
         >
-          {busy ? "…" : "سجِّل الهدر"}
+          {busy ? "يُسجَّل…" : "سجِّل الهدر"}
         </button>
       </div>
 
-      {message && <p className={`mt-2 text-xs ${failed ? "text-danger" : "text-ok"}`}>{message}</p>}
+      {message && <p role={failed ? "alert" : "status"} className={`mt-2 text-xs ${failed ? "text-danger" : "text-ok"}`}>{message}</p>}
     </div>
   );
 }
