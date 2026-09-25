@@ -76,6 +76,8 @@ const WALK_BUDGET_MS = 20_000;
 const CONTENT_BUDGET_MS = 28_000;
 
 interface Body {
+  /** مزامنةٌ خلفيّة من القشرة — التفويضُ الغائب يُردّ ردّاً سليماً بـ`needsAuth`. */
+  background?: boolean;
   /** عدد الأشهر الأخيرة التي تُفحص. الافتراضي ثلاثة. */
   months?: number;
   /** أشهرٌ بعينها — بها يستأنف الطلبُ التالي ما أوقفته المهلة. */
@@ -128,14 +130,22 @@ async function handle(request: Request) {
   const body = ((await request.json().catch(() => ({}))) ?? {}) as Body;
   const apply = body.apply === true;
 
+  /*
+    التفويضُ الغائب أو المنتهي خبرٌ لصاحبه لا عطبُ خادم. والزرُّ يأخذه ٤٢٨
+    فيقول ما يُصلحه؛ أمّا المزامنةُ الخلفيّة (`background: true`) فتأخذه
+    ردّاً سليماً بـ`needsAuth` فتقوله في إشعارٍ مرّةً — لا خطأً أحمر في
+    طرفيّة كلّ صفحة، ولا صمتاً.
+  */
+  const needsAuth = (error: string) =>
+    body.background === true
+      ? NextResponse.json({ needsAuth: true, error })
+      : NextResponse.json({ error }, { status: 428 });
+
   /* من الحارس وحده: وضعُ التجربة لا يستعير تفويض المالك (drive.service.ts) */
   const token = await refreshTokenFor(user.id);
 
   if (!token) {
-    return NextResponse.json(
-      { error: "لا يوجد تفويض درايف لحسابك. سجّل الخروج ثم الدخول ووافق على صلاحية الدرايف." },
-      { status: 428 },
-    );
+    return needsAuth("لا يوجد تفويض درايف لحسابك. سجّل الخروج ثم الدخول ووافق على صلاحية الدرايف.");
   }
 
   const drive = driveForUser(token);
@@ -203,7 +213,7 @@ async function handle(request: Request) {
     }
     } catch (e) {
       if (e instanceof DriveAuthExpiredError) {
-        return NextResponse.json({ error: e.message }, { status: 428 });
+        return needsAuth(e.message);
       }
       throw e;
     }
@@ -217,7 +227,7 @@ async function handle(request: Request) {
     } catch (e) {
       /* التفويض المنتهي خبرٌ يُصلحه صاحبه — لا «لا جديد» ولا عطبٌ مبهم */
       if (e instanceof DriveAuthExpiredError) {
-        return NextResponse.json({ error: e.message }, { status: 428 });
+        return needsAuth(e.message);
       }
       return NextResponse.json(
         { error: `تعذّرت قراءة الدرايف: ${(e as Error).message}` },
@@ -443,7 +453,7 @@ async function handle(request: Request) {
         ({ data, mimeType } = await downloadFile(drive, entry.file.id));
       } catch (e) {
         if (isDriveAuthError(e)) {
-          return NextResponse.json({ error: new DriveAuthExpiredError().message }, { status: 428 });
+          return needsAuth(new DriveAuthExpiredError().message);
         }
         readFailures.push(`${entry.file.name} — تعذّر التنزيل`);
         continue;
