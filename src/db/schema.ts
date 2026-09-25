@@ -35,6 +35,11 @@ export const users = pgTable("users", {
   createdAt: now(),
   /** حدُّ ما قرأه من الإشعارات — ما وقع بعده «جديد» (045). والفراغ: لم يفتحها قطّ. */
   notificationsSeenAt: timestamp("notifications_seen_at", { withTimezone: true }),
+  /** آخرُ فحصٍ للدرايف نجح بتفويضه (046) — به يُعرف أنّ المزامنة الآليّة تعمل وإن لم تجد جديداً. */
+  driveCheckedAt: timestamp("drive_checked_at", { withTimezone: true }),
+  /** آخرُ فحصٍ تعثّر وسببُه — تفويضٌ غائب أو منتهٍ، أو الدرايف لم يُجب. */
+  driveFailedAt: timestamp("drive_failed_at", { withTimezone: true }),
+  driveFailedReason: text("drive_failed_reason"),
 });
 
 /** جدول Auth.js — يحمل أيضاً refresh_token الخاص بجوجل للرفع للدرايف بصلاحية المستخدم */

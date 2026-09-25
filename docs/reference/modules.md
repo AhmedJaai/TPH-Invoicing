@@ -91,6 +91,8 @@
 | `src/services/document-reread.service.ts` | **إعادةُ القراءة للزرّ وللاستدراك**: ما يستقيم يُكتَب، وما لا يستقيم يُقال بأرقامه ولا يُكتَب |
 | `src/components/auto-process.tsx` | **الاستدراكُ والمزامنةُ يقعان وحدهما** — لا زرٌّ يُنتظَر |
 | `src/services/drive-rename.service.ts` | **التسمية في موضعٍ واحد** — يدويّةً وآليّة، والآليّةُ لما أُرشِف وحده، وبالاسمين في السجلّ |
+| `src/services/drive-status.service.ts` | حالُ الدرايف لصفحة `/documents/drive` وشارة «المستندات» والإشعارات: `loadDriveHeartbeat` · `loadDriveStatus` · `markDriveChecked/Failed` (046) · و`loadNamedDocuments` مصدرُ معاينة التسمية |
+| `src/lib/drive-state.ts` | `driveState` — الحالُ بكلمة (تجربة · غير موصول · متوقّف · لم يُفحص · يعمل)، ولا «يعمل» بلا فحصٍ نجح |
 | `src/services/document-review.service.ts` | ما ينتظر المراجعة وحكمُ الشروط عليه — مصدرُ اللوح وصفحة المستندات · و`processDocumentBacklog` الاستدراكُ في كلّ مزامنة |
 | `src/lib/work.ts` | **عددٌ واحد للعمل الباقي** — هو عددُ بنود `/attention` نفسِها، بـ`cache()` فلا تُستعلَم القاعدة مرّتين في الطلب |
 | `src/lib/invoice-findings.ts` | **لماذا ناقصةُ ركن** — يُشتقّ ولا يُخزَّن، ولكلّ سببٍ فعلُه ومن يُطالَب به |

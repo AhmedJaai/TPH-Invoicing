@@ -39,17 +39,24 @@ function tellOnce(message: string) {
     if (sessionStorage.getItem(AUTH_TOLD_KEY)) return;
     sessionStorage.setItem(AUTH_TOLD_KEY, "1");
   } catch { /* بلا تخزين: يُقال في كلّ مزامنة — أي كلَّ ثلاث ساعات */ }
-  toast({ tone: "warn", title: "مزامنةُ الدرايف متوقّفة", body: message, duration: 10_000 });
+  toast({
+    tone: "warn",
+    title: "مزامنةُ الدرايف متوقّفة",
+    body: message,
+    link: { label: "حالُ الدرايف", href: "/documents/drive" },
+    duration: 10_000,
+  });
 }
 
-export function AutoProcess() {
+export function AutoProcess({ drive = true }: { drive?: boolean }) {
   const router = useRouter();
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       let changed = false;
-      if (due("tph:auto-sync", SYNC_EVERY_MS)) {
+      /* وضعُ التجربة لا يحمل تفويض درايف عمداً — فلا يُسأل الدرايف ولا يُنذَر بتوقّفٍ مقصود */
+      if (drive && due("tph:auto-sync", SYNC_EVERY_MS)) {
         const r = await postJson<{ summary?: { created?: number }; needsAuth?: boolean; error?: string }>(
           "/api/drive-sync",
           { apply: true, readContent: true, months: 2, background: true },
@@ -67,7 +74,7 @@ export function AutoProcess() {
       if (changed && !cancelled) router.refresh();
     })();
     return () => { cancelled = true; };
-  }, [router]);
+  }, [router, drive]);
 
   return null;
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, asc, count, desc, eq, ilike, inArray, sql, type SQL } from "drizzle-orm";
 import {
-  Archive, ArrowLeft, ArrowRight, CircleCheck, ExternalLink, FileSearch, Search, Upload,
+  Archive, ArrowLeft, ArrowRight, CircleCheck, ExternalLink, FileSearch, FolderSync, Search, Upload,
 } from "lucide-react";
 import { db } from "@/db";
 import { documents, invoices, suppliers } from "@/db/schema";
@@ -10,7 +10,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { DOCUMENT, countNoun } from "@/lib/arabic";
+import { DOCUMENT, countNoun, timeAgo } from "@/lib/arabic";
 import { ConfirmEligible } from "@/components/confirm-eligible";
 import { RestoreDocument } from "@/components/restore-document";
 import { FilterSelect } from "@/components/filter-select";
@@ -24,6 +24,7 @@ import { loadPendingReview } from "@/services/document-review.service";
 import { GAP_TEXT } from "@/lib/extraction/auto-archive";
 import { companyConfig } from "@/config/drive";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
+import { loadDriveHeartbeat, type DriveHeartbeat } from "@/services/drive-status.service";
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +131,7 @@ export default async function DocumentsPage({
   const whereBase = base.length ? and(...base) : undefined;
 
   /* استعلاماتٌ متوازية لا متسلسلة — لا يعتمد أيّها على الآخر */
-  const [totalRows, rows, monthRows, supplierRows, statusRows, kindRows, anyDoc, pending] = await Promise.all([
+  const [totalRows, rows, monthRows, supplierRows, statusRows, kindRows, anyDoc, pending, beat] = await Promise.all([
     db.select({ total: count() }).from(documents).where(where),
 
     db
@@ -199,6 +200,9 @@ export default async function DocumentsPage({
       لا «لا ينقصها ركن» عن مستندٍ ينتظر بلا سببٍ ظاهر.
     */
     loadPendingReview(500),
+
+    /* نبضُ الدرايف في الرأس — «هل تعمل المزامنة وحدها؟» جوابُه هنا لا في صفحةٍ أخرى */
+    canDecide ? loadDriveHeartbeat(user.id).catch(() => null) : Promise.resolve(null),
   ]);
 
   const total = Number(totalRows[0].total);
@@ -311,6 +315,7 @@ export default async function DocumentsPage({
       width="wide"
       title="المستندات"
       intro="ما وصل من فواتير وكشوف وإيصالات — ما ينتظر قرارك أوّلاً، وكلُّ مستندٍ موصولٌ بملفّه في الدرايف."
+      actions={beat ? <DrivePulse beat={beat} /> : undefined}
     >
       {freshDb ? (
         /* قاعدةٌ بلا مستند: لا ألسنة ولا أصفار — الخطوةُ الأولى وحدها */
@@ -318,7 +323,12 @@ export default async function DocumentsPage({
           icon={Upload}
           title="لم يصل مستندٌ بعد."
           hint="ارفع أوّل فاتورة — صوّرها بجوّالك أو اختر ملفّها — أو زامن الدرايف ليُقرأ ما فيه. وكلُّ ما يصل يظهر هنا."
-          action={<LinkButton href="/upload" variant="primary" icon={Upload}>ارفع مستنداً</LinkButton>}
+          action={
+            <div className="flex flex-wrap justify-center gap-2">
+              <LinkButton href="/upload" variant="primary" icon={Upload}>ارفع مستنداً</LinkButton>
+              {canDecide && <LinkButton href="/documents/drive" variant="secondary" icon={FolderSync}>زامن الدرايف</LinkButton>}
+            </div>
+          }
         />
       ) : (
         <>
@@ -584,5 +594,24 @@ export default async function DocumentsPage({
         </>
       )}
     </PageShell>
+  );
+}
+
+/**
+ * نبضُ الدرايف في رأس «المستندات»: آخرُ فحصٍ وحاله بلونٍ وكلمة، ويفتح لسان
+ * «الدرايف». التعثّرُ أحمرُ بكلمته، والجهلُ «لم يُفحص بعد» — لا «يعمل» عن غير علم.
+ */
+function DrivePulse({ beat }: { beat: DriveHeartbeat }) {
+  const state =
+    beat.state === "preview" ? { dot: "bg-muted", text: "الدرايف: غير موصول في التجربة" }
+    : beat.state === "disconnected" ? { dot: "bg-danger", text: "الدرايف: غير موصول بحسابك" }
+    : beat.state === "failing" && beat.failure ? { dot: "bg-danger", text: `الدرايف: تعثّر ${timeAgo(beat.failure.at)}` }
+    : beat.state === "ok" && beat.checkedAt ? { dot: "bg-ok", text: `الدرايف: فُحص ${timeAgo(beat.checkedAt)}` }
+    : { dot: "bg-warn", text: "الدرايف: لم يُفحص بعد" };
+  return (
+    <Link href="/documents/drive" className={buttonClass("secondary", "sm")}>
+      <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${state.dot}`} />
+      {state.text}
+    </Link>
   );
 }

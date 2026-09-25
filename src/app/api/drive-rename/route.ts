@@ -18,13 +18,11 @@
  */
 import { can } from "@/lib/permissions";
 import { NextResponse } from "next/server";
-import { eq, ne } from "drizzle-orm";
-import { db } from "@/db";
-import { documents, invoices, statements, suppliers } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { DriveAuthExpiredError, driveForUser } from "@/lib/drive";
 import { applyRenames } from "@/services/drive-rename.service";
-import { canonicalName, type NamedDocument } from "@/lib/canonical-name";
+import { canonicalName } from "@/lib/canonical-name";
+import { loadNamedDocuments } from "@/services/drive-status.service";
 import { recordAudit } from "@/lib/audit";
 import { refreshTokenFor } from "@/services/drive.service";
 import { DRIVE_READONLY_MESSAGE, driveWritesAllowed } from "@/lib/drive-readonly";
@@ -42,58 +40,6 @@ interface Body {
 }
 
 /** يجمع ما يُبنى به الاسم من الجداول التي تحمله. */
-async function load(): Promise<(NamedDocument & { pending: boolean })[]> {
-  const rows = await db
-    .select({
-      driveFileId: documents.driveFileId,
-      fileName: documents.fileName,
-      mimeType: documents.mimeType,
-      kind: documents.kind,
-      slug: suppliers.slug,
-      invoiceDate: invoices.invoiceDate,
-      invoiceTotal: invoices.totalMinor,
-      invoiceNumber: invoices.invoiceNumber,
-      statementEnd: statements.periodEnd,
-      statementTotal: statements.closingBalanceMinor,
-      invoiceId: invoices.id,
-      documentId: documents.id,
-      status: documents.status,
-    })
-    .from(documents)
-    .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
-    .leftJoin(invoices, eq(invoices.documentId, documents.id))
-    .leftJoin(statements, eq(statements.documentId, documents.id))
-    /*
-      كلُّ ما له سجلٌّ عندنا — لا المؤرشَف وحده.
-
-      كان الشرط `status = ARCHIVED`، والملفّ الذي تسجّله المزامنة للتوّ
-      يكون `PENDING` أو `NEEDS_REVIEW`. فتقترح المزامنة تسميته، ثمّ
-      تطلبها، فلا يجده هذا المسار في قائمته فيردّ «أُعيدت تسمية ٠
-      ملفّاً» — طلبٌ نُفِّذ وأثرُه صفر، ولا يُقال السبب.
-
-      والضمان المعلَن «ما له سجلٌّ عندنا وحده» لا يشترط الأرشفة؛ يشترط
-      أن نعرف الملفّ. والمرفوض يُستثنى: قررنا ألّا نقيّده، فلا نكتب في
-      اسمه.
-    */
-    .where(ne(documents.status, "REJECTED"));
-
-  return rows
-    .filter((r): r is typeof r & { driveFileId: string } => Boolean(r.driveFileId))
-    .map((r) => ({
-      driveFileId: r.driveFileId,
-      fileName: r.fileName,
-      mimeType: r.mimeType,
-      kind: r.kind,
-      slug: r.slug,
-      date: (r.invoiceDate ?? r.statementEnd)?.toISOString().slice(0, 10) ?? null,
-      totalMinor: r.invoiceTotal ?? r.statementTotal ?? null,
-      invoiceNumber: r.invoiceNumber ?? null,
-      invoiceId: r.invoiceId ?? null,
-      documentId: r.documentId ?? null,
-      pending: r.status !== "ARCHIVED",
-    }));
-}
-
 export async function POST(request: Request) {
   let user;
   try {
@@ -106,7 +52,7 @@ export async function POST(request: Request) {
   }
 
   const body = ((await request.json().catch(() => ({}))) ?? {}) as Body;
-  const docs = await load();
+  const docs = await loadNamedDocuments();
 
   const proposals = docs
     .map((d) => ({ doc: d, verdict: canonicalName(d) }))

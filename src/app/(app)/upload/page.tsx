@@ -6,9 +6,7 @@ import { db } from "@/db";
 import { suppliers } from "@/db/schema";
 import { Uploader } from "@/components/uploader";
 import { PageShell } from "@/components/page-shell";
-import { DriveSync } from "@/components/drive-sync";
-import { DriveRename } from "@/components/drive-rename";
-import { Callout, LinkButton, Section } from "@/components/ui";
+import { Callout, LinkButton } from "@/components/ui";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { inboxCount } from "@/lib/work";
@@ -23,16 +21,16 @@ export const dynamic = "force-dynamic";
  * وعلى الحاسوب منطقةُ إفلات. ثمّ ما رُفع في الجلسة بمراحله (يُقرأ ←
  * يُراجَع ← يُؤرشَف)، وبطاقةُ المراجعة بجانب الورقة.
  *
- * والدرايف طريقٌ ثانٍ إلى الشيء نفسه — يلتقط ما وصله من غير هذه الصفحة،
- * ويجري وحده كلَّ ثلاث ساعات — فموضعُه تحت الرفع قسماً ثانوياً، ظاهراً
- * لا مطويّاً: **الفعل الذي لا يُرى غيرُ موجود** (ظنّ صاحبُ العمل مرّةً
- * أنّ زرّ المزامنة حُذف لأنّه طُوي).
+ * والدرايف طريقٌ ثانٍ إلى الشيء نفسه — يلتقط ما وصله من غير هذه الصفحة
+ * ويجري وحده. كان قسماً أسفل هذه الصفحة فلم يُرَ مرّتين («ظنّ الزرّ حُذف»
+ * ثمّ «ما أشوفها»)، فصار لساناً باسمه (`/documents/drive`) وهنا إشارةٌ إليه.
  */
 export default async function UploadPage() {
   const user = await currentUser();
   if (!user) redirect("/login?from=/upload");
 
   const showAmounts = can(user.role, "amounts:view");
+  const canDecide = can(user.role, "document:upload");
 
   const [rows, waiting] = await Promise.all([
     db
@@ -75,25 +73,25 @@ export default async function UploadPage() {
         </p>
       )}
 
-      {/* ── الدرايف: الطريقُ الثاني ── */}
-      <Section
-        id="drive"
-        icon={FolderSync}
-        title="من الدرايف"
-        hint="المزامنةُ تجري وحدها كلَّ ثلاث ساعات. افحص الآن إن وضعتَ ملفّاً في الدرايف بيدك ولا تريد الانتظار."
-        className="mt-12"
-      >
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
-          <DriveSync />
-          <DriveRename />
-        </div>
-        {showAmounts && (
-          <p className="mt-4 text-xs text-muted">
-            ولمراجعة المورّدين وما عليك لكلٍّ منهم:{" "}
-            <Link href="/suppliers" className="font-bold text-accent hover:underline">حسابات المورّدين</Link>
-          </p>
-        )}
-      </Section>
+      {/* ── الدرايف: الطريقُ الثاني — حالُه وتحكّمُه في لسانه ── */}
+      {canDecide && (
+        <Callout
+          tone="muted"
+          icon={FolderSync}
+          className="mt-12"
+          title="وما يصل إلى الدرايف يُقرأ وحده"
+          action={<LinkButton href="/documents/drive" size="sm" variant="secondary">حالُ الدرايف</LinkButton>}
+        >
+          يُفحص الدرايف كلَّ ثلاث ساعات ويُسمّى المؤرشَفُ على الصيغة — بلا زرّ. وإن وضعتَ ملفّاً فيه بيدك ولا تريد
+          الانتظار، افحصه الآن من لسان «الدرايف».
+        </Callout>
+      )}
+      {showAmounts && (
+        <p className="mt-4 text-xs text-muted">
+          ولمراجعة المورّدين وما عليك لكلٍّ منهم:{" "}
+          <Link href="/suppliers" className="font-bold text-accent hover:underline">حسابات المورّدين</Link>
+        </p>
+      )}
     </PageShell>
   );
 }

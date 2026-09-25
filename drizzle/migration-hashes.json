@@ -43,5 +43,6 @@
   "042_posted_supplier_category.sql": "c121d5c489f8bc94c5e79ec38402a45ad121d8717f87017c5bf984de89a3a02b",
   "043_human_confirmed_source.sql": "37d7f1926cc89d92a21617fe877602a0a8473266ff139fa0bae622d22a53ffe1",
   "044_supplier_issues_statements.sql": "a6c2491e2c20b40e0d636496950508905cfd79cad1d949461ed11fb31d804fc7",
-  "045_notifications_seen.sql": "bb5c12e2f80e9cc44327dad6427709fa077dcb504df204a495fb59ffdaa0675f"
+  "045_notifications_seen.sql": "bb5c12e2f80e9cc44327dad6427709fa077dcb504df204a495fb59ffdaa0675f",
+  "046_drive_checked.sql": "91d682cbdeb001675d16f561d799aef09b492e934a3ca3bb5eede37c2793c018"
 }

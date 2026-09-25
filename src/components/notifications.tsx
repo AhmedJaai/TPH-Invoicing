@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, CheckCheck, CircleAlert, CircleCheck, FileText, Info, RefreshCw, TriangleAlert } from "lucide-react";
+import { Bell, CheckCheck, CircleAlert, CircleCheck, CloudOff, FileText, Info, RefreshCw, TriangleAlert } from "lucide-react";
 import { request, postJson } from "@/lib/http-client";
 import { timeAgo } from "@/lib/arabic";
 import type { NoticeFeed, Notice } from "@/services/notifications.service";
@@ -28,6 +28,7 @@ const ICON = {
   REVIEW: TriangleAlert,
   STALLED: CircleAlert,
   OVERDUE: TriangleAlert,
+  DRIVE: CloudOff,
   ACTIVITY: CircleCheck,
 } as const;
 

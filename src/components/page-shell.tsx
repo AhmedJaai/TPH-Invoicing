@@ -11,6 +11,7 @@ import { Topbar, DropAnywhere } from "./topbar";
 import { Toaster } from "./ui-client";
 import { can, type Role } from "@/lib/permissions";
 import { inboxCount, workCount } from "@/lib/work";
+import { isAuthBypassed } from "@/lib/session";
 
 /**
  * القشرة — الإصدار الثاني.
@@ -81,7 +82,7 @@ export function AppShell({
       <KeyboardShortcuts role={user.role} />
       <DropAnywhere role={user.role} />
       <Toaster />
-      {can(user.role, "document:upload") && can(user.role, "amounts:view") && <AutoProcess />}
+      {can(user.role, "document:upload") && can(user.role, "amounts:view") && <AutoProcess drive={!isAuthBypassed()} />}
       <Suspense fallback={null}>
         <HashScroll />
       </Suspense>

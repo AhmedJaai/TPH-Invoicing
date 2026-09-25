@@ -16,6 +16,7 @@ import { DAY, DOCUMENT, SUPPLIER, countNoun } from "@/lib/arabic";
 import { can, type Role } from "@/lib/permissions";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { loadOverdueBalances } from "./supplier-balance.service";
+import { loadDriveHeartbeat } from "./drive-status.service";
 
 export type NoticeTone = "ok" | "warn" | "danger" | "info";
 
@@ -28,7 +29,7 @@ export interface Notice {
   body?: string;
   href: string;
   tone: NoticeTone;
-  kind: "DOCUMENTS" | "REVIEW" | "STALLED" | "OVERDUE" | "ACTIVITY";
+  kind: "DOCUMENTS" | "REVIEW" | "STALLED" | "OVERDUE" | "DRIVE" | "ACTIVITY";
 }
 
 export interface Digest {
@@ -60,7 +61,7 @@ const DECISION_ACTIONS = [
 const WINDOW_DAYS = 14;
 
 function actionLabel(action: string): string {
-  return (ACTION_LABEL as Record<string, string>)[action] ?? action;
+  return Object.hasOwn(ACTION_LABEL, action) ? String(Reflect.get(ACTION_LABEL, action)) : action;
 }
 
 export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<NoticeFeed> {
@@ -74,7 +75,7 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
     .limit(1);
   const seenAt = seenRow?.seenAt ?? null;
 
-  const [arrivals, pending, activity, digestRow, overdue] = await Promise.all([
+  const [arrivals, pending, activity, digestRow, overdue, drive] = await Promise.all([
     db.execute<{ day: string; arrived: number; archived: number; last_at: string }>(sql`
       select to_char(created_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as day,
              count(*)::int as arrived,
@@ -113,6 +114,8 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
             and action in (${sql.join(DECISION_ACTIONS.map((a) => sql`${a}`), sql`, `)})) as decisions
     `),
     money ? loadOverdueBalances() : Promise.resolve([]),
+    /* المزامنةُ المتوقّفة تُقال لمن يملك إصلاحها — مرّةً بحالها لا في كلّ فحص */
+    can(user.role, "document:upload") ? loadDriveHeartbeat(user.id).catch(() => null) : Promise.resolve(null),
   ]);
 
   const notices: Notice[] = [];
@@ -166,6 +169,29 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
       title: `${countNoun(overdue.length, SUPPLIER)} تأخّر سدادُهم أكثر من ${countNoun(60, DAY)}`,
       body: `أقدمُ دَينٍ منذ ${countNoun(oldest, DAY)}.`,
       href: "/payments",
+    });
+  }
+
+  if (drive?.state === "failing" && drive.failure) {
+    notices.push({
+      id: `drive:${drive.failure.at.toISOString()}`,
+      at: drive.failure.at.toISOString(),
+      kind: "DRIVE",
+      tone: "danger",
+      title: "مزامنةُ الدرايف متوقّفة",
+      body: drive.failure.reason,
+      href: "/documents/drive",
+    });
+  } else if (drive?.state === "disconnected") {
+    notices.push({
+      id: `drive:disconnected:${todayInRiyadh()}`,
+      /* حالٌ قائمة لا حدث — تُؤرَّخ بأوّل اليوم */
+      at: new Date(`${todayInRiyadh()}T00:00:00+03:00`).toISOString(),
+      kind: "DRIVE",
+      tone: "danger",
+      title: "الدرايف غير موصول بحسابك",
+      body: "لا مزامنةَ ولا تسمية حتى تعيد الربط.",
+      href: "/documents/drive",
     });
   }
 

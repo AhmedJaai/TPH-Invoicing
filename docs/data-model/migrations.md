@@ -87,6 +87,7 @@
 | `043_human_confirmed_source.sql` | ما أقرّه إنسانٌ مصدرُه `HUMAN` لا `UNKNOWN` — كان في 042 أُضيف بعد تطبيقها، فسقط كلُّ نشرٍ عند `migrate` |
 | `044_supplier_issues_statements.sql` | `suppliers.issues_statements` — «كشوف الحساب مو كلّهم يصدرونها»: يكتبه الإنسان، ومن لا يصدره لا يُطلَب منه كشف |
 | `045_notifications_seen.sql` | `users.notifications_seen_at` — حدُّ ما قرأه المستخدم من مركز الإشعارات. الإشعاراتُ تُشتقّ ولا تُخزَّن؛ الحدُّ وحده لا يُشتقّ |
+| `046_drive_checked.sql` | `users.drive_checked_at` · `drive_failed_at` · `drive_failed_reason` — آخرُ فحصٍ للدرايف نجح وآخرُ فحصٍ تعثّر وسببُه. كان الأثرُ يُكتب إن وُجد جديدٌ وحده، فلا يُعرف أتعمل المزامنةُ الآليّة أم توقّفت |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

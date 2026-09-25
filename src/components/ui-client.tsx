@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CircleAlert, CircleCheck, Info, Search, TriangleAlert, Undo2, X } from "lucide-react";
 import { buttonClass, type ButtonVariant } from "./ui-tokens";
@@ -194,6 +195,8 @@ export interface ToastInput {
    * يُرجع `false` إن فشل التراجع.
    */
   undo?: { label?: string; run: () => Promise<boolean | void> | boolean | void };
+  /** موضعُ الإصلاح — إشعارٌ يقول «توقّف كذا» يفتح حيث يُصلَح، لا يقف عند الخبر. */
+  link?: { label: string; href: string };
   /** بالمللي ثانية — والإشعارُ بتراجعٍ يبقى أطول كي يُلحَق. */
   duration?: number;
 }
@@ -274,6 +277,11 @@ export function Toaster() {
                 <Undo2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                 {t.state === "undoing" ? "يتراجع…" : t.undo.label ?? "تراجع"}
               </button>
+            )}
+            {t.link && t.state === "idle" && (
+              <Link href={t.link.href} onClick={() => dismiss(t.id)} className={`${buttonClass("subtle", "sm")} -my-1`}>
+                {t.link.label}
+              </Link>
             )}
             <button
               type="button"

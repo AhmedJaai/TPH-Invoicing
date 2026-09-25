@@ -46,6 +46,7 @@ describe("activeArea", () => {
     expect(activeArea("/audit")?.href).toBe("/attention");
     expect(activeArea("/review")?.href).toBe("/attention");
     expect(activeArea("/upload")?.href).toBe("/documents");
+    expect(activeArea("/documents/drive")?.href).toBe("/documents");
     expect(activeArea("/inventory")?.href).toBe("/inventory");
     expect(activeArea("/inventory/counts/abc")?.href).toBe("/inventory");
     expect(activeArea("/inventory/items/abc")?.href).toBe("/inventory");
@@ -146,10 +147,22 @@ describe("visibleChildren و entryHref", () => {
   });
 
   it("لا تعرض شريط ألسنة لمساحة بلا ألسنة", () => {
-    for (const href of ["/", "/documents", "/attention", "/close"]) {
+    for (const href of ["/", "/attention", "/close"]) {
       const area = AREAS.find((a) => a.href === href)!;
       expect(visibleChildren("OWNER", area)).toEqual([]);
     }
+  });
+
+  /*
+    الدرايف لسانٌ في «المستندات» لا قسمٌ أسفل «ارفع»: سأل صاحبُ المقهى «ما
+    أشوفها، هل صارت تلقائيّة؟» والمزامنةُ تعمل وحدها بلا أثرٍ يُرى.
+  */
+  it("المستندات تُظهر الرفعَ والدرايفَ لساناً لمن يرفع", () => {
+    const docs = AREAS.find((a) => a.href === "/documents")!;
+    expect(visibleChildren("OWNER", docs).map((c) => c.href)).toEqual(["/documents", "/upload", "/documents/drive"]);
+    expect(activeChild("/documents/drive", docs)?.href).toBe("/documents/drive");
+    expect(activeChild("/documents", docs)?.href).toBe("/documents");
+    expect(entryHref("OWNER", docs)).toBe("/documents");
   });
 });
 
@@ -237,6 +250,9 @@ describe("سلامة البنية", () => {
     expect(labels.get("/inventory/history")).toBe("سجلّ الجرد");
     /* والصفحةُ تحمل المبيعاتِ والكتالوجَ معاً، فاسمُها اسمُ الفعل لا أحدِ مفعوليه */
     expect(labels.get("/inventory/import")).toBe("الاستيراد");
+    // الدرايف لسانٌ يُرى — لا قسمٌ أسفل «ارفع» يُظنّ غائباً
+    expect(labels.get("/documents/drive")).toBe("الدرايف");
+    expect(labels.get("/upload")).toBe("ارفع مستنداً");
     // ولا لسان يحمل اسم «التدفّق وقائمة الدخل» — صار التدفّق في «المال»
     expect([...labels.values()]).not.toContain("التدفّق وقائمة الدخل");
   });

@@ -42,6 +42,8 @@ import { factsFromFileName } from "@/lib/extraction/filename-facts";
 import { parseStatementExtras } from "@/lib/extraction/statement-extras";
 import { renameArchived } from "@/services/drive-rename.service";
 import { processDocumentBacklog } from "@/services/document-review.service";
+import { markDriveChecked, markDriveFailed } from "@/services/drive-status.service";
+import { previewAllowed } from "@/lib/preview-mode";
 import { driveWritesAllowed } from "@/lib/drive-readonly";
 import { FILE, MONTH, countNoun } from "@/lib/arabic";
 import { withDeadline } from "@/lib/ai/deadline";
@@ -136,10 +138,13 @@ async function handle(request: Request) {
     ردّاً سليماً بـ`needsAuth` فتقوله في إشعارٍ مرّةً — لا خطأً أحمر في
     طرفيّة كلّ صفحة، ولا صمتاً.
   */
-  const needsAuth = (error: string) =>
-    body.background === true
+  const needsAuth = async (error: string) => {
+    /* التعثّرُ يُحفظ بسببه لتقوله صفحةُ الدرايف — ووضعُ التجربة بلا تفويضٍ عمداً فلا يُحفظ له */
+    if (!previewAllowed(process.env)) await markDriveFailed(user.id, error);
+    return body.background === true
       ? NextResponse.json({ needsAuth: true, error })
       : NextResponse.json({ error }, { status: 428 });
+  };
 
   /* من الحارس وحده: وضعُ التجربة لا يستعير تفويض المالك (drive.service.ts) */
   const token = await refreshTokenFor(user.id);
@@ -229,12 +234,13 @@ async function handle(request: Request) {
       if (e instanceof DriveAuthExpiredError) {
         return needsAuth(e.message);
       }
-      return NextResponse.json(
-        { error: `تعذّرت قراءة الدرايف: ${(e as Error).message}` },
-        { status: 502 },
-      );
+      const error = `تعذّرت قراءة الدرايف: ${(e as Error).message}`;
+      await markDriveFailed(user.id, error);
+      return NextResponse.json({ error }, { status: 502 });
     }
   }
+  /* قرأ الدرايف بتفويضه — فحصٌ نجح وإن لم يجد جديداً */
+  await markDriveChecked(user.id);
 
   /** ما سُجّل في هذا الطلب — به يُسأل عن تسميته بعد قراءته. */
   const recordedFileIds = new Set<string>();

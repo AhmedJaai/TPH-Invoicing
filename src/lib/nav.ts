@@ -84,8 +84,16 @@ export const AREAS: readonly NavArea[] = [
     group: "today",
     question: "ما وصلك من فواتير وكشوف وإيصالات",
     chord: "d",
-    owns: ["/upload"],
-    children: [],
+    owns: [],
+    /*
+      الدرايف لسانٌ باسمه لا قسمٌ أسفل «ارفع»: سأل صاحبُ المقهى «ما أشوفها،
+      هل صارت تلقائيّة؟» والمزامنةُ تعمل وحدها بلا أثرٍ يُرى (٢٥ سبتمبر ٢٠٢٦).
+    */
+    children: [
+      { href: "/documents", label: "المستندات" },
+      { href: "/upload", label: "ارفع مستنداً", needs: "document:upload" },
+      { href: "/documents/drive", label: "الدرايف", needs: "document:upload" },
+    ],
   },
   {
     href: "/suppliers",
