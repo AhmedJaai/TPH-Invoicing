@@ -4,16 +4,16 @@ import "./globals.css";
 import { ThemePrimer } from "@/components/view-controls";
 
 export const metadata: Metadata = {
-  title: "فواتير ذا بوبليك هاوس",
-  description: "نظام إدارة دورة الفواتير — من وصول الفاتورة حتى قيدها وسدادها",
-  appleWebApp: { capable: true, title: "الفواتير", statusBarStyle: "black-translucent" },
+  title: "ذا بوبليك هاوس — المال والتشغيل",
+  description: "ماذا تحتاج أن تعرف أو تفعل اليوم — من وصول الفاتورة حتى قيدها وسدادها وإقفال الشهر",
+  appleWebApp: { capable: true, title: "ذا بوبليك هاوس", statusBarStyle: "black-translucent" },
   manifest: "/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: "#f6f4ef" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e0d0b" },
   ],
   width: "device-width",
   initialScale: 1,

@@ -1,11 +1,25 @@
 {
-  "name": "فواتير ذا بوبليك هاوس",
-  "short_name": "الفواتير",
-  "description": "نظام إدارة دورة الفواتير",
+  "name": "ذا بوبليك هاوس — المال والتشغيل",
+  "short_name": "ذا بوبليك هاوس",
+  "description": "ماذا تحتاج أن تعرف أو تفعل اليوم — الفواتير والمورّدون والبنك والإقفال.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "dir": "rtl",
   "lang": "ar",
-  "background_color": "#ffffff",
-  "theme_color": "#000000"
+  "background_color": "#f6f4ef",
+  "theme_color": "#10231e",
+  "categories": ["finance", "business", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "صوّر فاتورة أو ارفعها", "short_name": "ارفع", "url": "/upload", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "يحتاج قرارك", "short_name": "قرارك", "url": "/attention", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "دفعة الشهر", "short_name": "الدفعات", "url": "/payments", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
 }
