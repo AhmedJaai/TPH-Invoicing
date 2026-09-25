@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Check, CircleAlert, MessageCircle, RotateCcw } from "lucide-react";
 import { buttonClass } from "./ui";
-import { ConfirmAction } from "./ui-client";
+import { ConfirmAction, toast } from "./ui-client";
 import { postJson } from "@/lib/http-client";
 
 /**
@@ -12,8 +13,10 @@ import { postJson } from "@/lib/http-client";
  * كان القسم يقول «يُطالَب به الجهة» ولا يعطي رسالةً ولا زرّاً، والتنبيه
  * يبقى حرجاً في رأس القائمة مهما فعل. فالرسالة بالمرجعين والمبلغ تُرسَل
  * كما هي، والقرار ثلاثة: «طالبتُ» يُبقيه أهدأ، و«استُردّ» و«ليس
- * ازدواجاً» يُغلقانه — وكلّها تُردّ بـ«أعد فتحه».
+ * ازدواجاً» يُغلقانه — وكلّها تُردّ بـ«أعد فتحه» أو بـ«تراجع» في الإشعار.
  */
+type Decision = "CLAIMED" | "RECOVERED" | "NOT_DUPLICATE";
+
 export function DoublePaidActions({
   transactionIds,
   decision,
@@ -21,27 +24,45 @@ export function DoublePaidActions({
   canEdit,
 }: {
   transactionIds: string[];
-  decision: "CLAIMED" | "RECOVERED" | "NOT_DUPLICATE" | null;
+  decision: Decision | null;
   claimText: string;
   canEdit: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function decide(next: "CLAIMED" | "RECOVERED" | "NOT_DUPLICATE" | "OPEN"): Promise<boolean> {
+  /*
+    القرارُ يُكتب ثمّ يُعلَن — لا يُعرَض متفائلاً. وكلُّ قرارٍ هنا يُردّ:
+    فالإشعارُ يحمل «تراجع» يعيد القرارَ السابق كما كان (أو يفتحه إن لم
+    يكن)، والخادمُ يُعيد فحصَ المجموعة في الحالين.
+  */
+  async function send(next: Decision | "OPEN") {
+    return postJson<{ message?: string }>("/api/alert-resolve", { transactionIds, decision: next });
+  }
+
+  async function decide(next: Decision | "OPEN"): Promise<boolean> {
     setBusy(true);
-    setFailed(false);
-    setMessage(null);
+    setError(null);
     try {
-      const r = await postJson<{ message?: string }>("/api/alert-resolve", { transactionIds, decision: next });
+      const r = await send(next);
       if (!r.ok) {
-        setFailed(true);
-        setMessage(r.error);
+        setError(r.error);
         return false;
       }
-      setMessage(r.data.message ?? "حُفظ");
+      const previous: Decision | "OPEN" = decision ?? "OPEN";
+      toast({
+        tone: next === "OPEN" ? "info" : "ok",
+        title: r.data.message ?? "حُفظ",
+        body: "كُتب القرارُ في سجلّ التدقيق باسمك.",
+        undo: {
+          run: async () => {
+            const u = await send(previous);
+            if (u.ok) router.refresh();
+            return u.ok;
+          },
+        },
+      });
       router.refresh();
       return true;
     } finally {
@@ -52,7 +73,7 @@ export function DoublePaidActions({
   const closed = decision === "RECOVERED" || decision === "NOT_DUPLICATE";
 
   return (
-    <div className="mt-2.5">
+    <div className="mt-3">
       <div className="flex flex-wrap items-center gap-2">
         {!closed && (
           <a
@@ -61,6 +82,7 @@ export function DoublePaidActions({
             rel="noopener noreferrer"
             className={buttonClass(decision === null ? "primary" : "secondary", "sm")}
           >
+            <MessageCircle className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
             رسالة مطالبة (واتساب)
           </a>
         )}
@@ -71,6 +93,7 @@ export function DoublePaidActions({
         )}
         {canEdit && !closed && (
           <button type="button" disabled={busy} onClick={() => void decide("RECOVERED")} className={buttonClass("secondary", "sm")}>
+            <Check className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
             {busy ? "يحفظ…" : "استُردّ المال"}
           </button>
         )}
@@ -89,12 +112,16 @@ export function DoublePaidActions({
         )}
         {canEdit && decision !== null && (
           <button type="button" disabled={busy} onClick={() => void decide("OPEN")} className={buttonClass("quiet", "sm")}>
+            <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
             {busy ? "يحفظ…" : "أعد فتحه"}
           </button>
         )}
       </div>
-      {message && (
-        <p role="status" className={`mt-2 text-[11px] font-bold ${failed ? "text-danger" : "text-ok"}`}>{message}</p>
+      {error && (
+        <p role="alert" className="mt-2 flex items-start gap-1.5 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2 text-[11px] font-bold text-danger">
+          <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+          {error}
+        </p>
       )}
     </div>
   );

@@ -3,7 +3,8 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { suppliers } from "@/db/schema";
 import { Money } from "@/components/money";
-import { Card, LinkButton, buttonClass } from "./ui";
+import { ChevronDown, CircleCheck, CircleHelp, ExternalLink, FileText, MessageCircle, TriangleAlert } from "lucide-react";
+import { LinkButton, Monogram, buttonClass } from "./ui";
 import { ConfirmDocument } from "./confirm-document";
 import { ConfirmEligible } from "./confirm-eligible";
 import { NoStatementsButton } from "./no-statements-button";
@@ -48,6 +49,9 @@ import { currentMonthRiyadh, formatDay } from "@/lib/riyadh-time";
  * استعلامَ ثانٍ ولا عددٌ ثانٍ.
  */
 
+/** صفوفُ لوحٍ واحد — بطاقةٌ مرفوعة بفواصل، كما في مخطِّط الدفعة. */
+const LIST = "divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised";
+
 /** «دفعاتٌ لم تُنسب إلى فاتورة» — تُطلَب فواتيرُها من هنا. */
 export async function UnbackedWorkspace({ canApprove }: { canApprove: boolean }) {
   const groups = groupUnbackedBySupplier(await loadUnbackedPayments());
@@ -61,104 +65,109 @@ export async function UnbackedWorkspace({ canApprove }: { canApprove: boolean })
         .orderBy(asc(suppliers.nameAr))
     : [];
   if (groups.length === 0) {
-    return <p className="text-xs text-ok">لا دفعة بلا مستند — كلّ ما دُفع له مستندُه.</p>;
+    return <Done>لا دفعة بلا مستند — كلّ ما دُفع له مستندُه.</Done>;
   }
 
   return (
-    <ul className="grid gap-2.5 xl:grid-cols-2">
+    <ul className={LIST}>
       {groups.map((g) => (
-        <li key={g.supplierId ?? "none"}>
-          <Card>
-            <div className="flex items-start justify-between gap-3">
-              <span className="min-w-0">
-                {g.supplierSlug ? (
-                  <Link
-                    href={`/suppliers/${g.supplierSlug}`}
-                    className="block text-sm font-bold underline-offset-4 hover:underline"
-                  >
-                    {g.supplierName}
-                  </Link>
-                ) : (
-                  <span className="block text-sm font-bold">{g.supplierName}</span>
-                )}
-                <span className="block text-[11px] text-muted">
-                  {countNoun(g.payments.length, PAYMENT_RECORD)}
-                  {g.supplierId
-                    ? " بلا مستند"
-                    : g.payments.some((p) => p.bankTransactionId)
-                      ? " لم تُعرَف جهتها — افتح حركتها وحدّد مورّدها"
-                      : " لم تُعرَف جهتها"}
-                </span>
-              </span>
-              <span className="nums-col shrink-0 text-sm font-bold text-warn">
-                <Money minor={g.totalMinor} />
-              </span>
-            </div>
-
-            {g.supplierId ? (
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                {/*
-                  الرسالةُ تُبنى من الوقائع — تواريخُ الدفعات ومبالغُها —
-                  ومن لا يصدر فواتير يُطلَب منه عقدُ توريد لا فاتورة.
-                */}
-                <a
-                  href={`https://wa.me/?text=${encodeURIComponent(buildInvoiceRequest(g))}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={buttonClass("primary", "sm")}
+        <li key={g.supplierId ?? "none"} className="px-4 py-3.5 sm:px-5">
+          <div className="flex items-center gap-3">
+            <Monogram name={g.supplierName} />
+            <span className="min-w-0 flex-1">
+              {g.supplierSlug ? (
+                <Link
+                  href={`/suppliers/${g.supplierSlug}`}
+                  className="block truncate text-[14px] font-bold hover:text-accent"
                 >
-                  {g.payments.every((p) => !p.issuesInvoices)
-                    ? "اطلب عقد التوريد (واتساب)"
-                    : "اطلب الفاتورة (واتساب)"}
-                </a>
-                {g.supplierSlug && <LinkButton href={`/suppliers/${g.supplierSlug}`} size="sm">ملفّه</LinkButton>}
-              </div>
-            ) : (
-              /*
-                دفعةٌ لا جهةَ لها: إن كانت لها حركةُ بنك فُتحت لتُعرَّف
-                جهتُها؛ وإن لم تكن فهي دفعةٌ بلا أصل — تُعرَض ولا تُطوى
-                (طيُّها يُعيد الفاتورة مستحقّةً بلا سببٍ ظاهر فتُدفَع
-                مرّتين)، ويُقال لصاحبها ما يفعل بدل أن يُترَك بلا زرّ.
-              */
-              <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                {g.payments.some((p) => p.bankTransactionId) ? (
-                  g.payments
-                    .filter((p) => p.bankTransactionId)
-                    .slice(0, 3)
-                    .map((p) => (
-                      <LinkButton key={p.paymentId} href={`/bank?tx=${p.bankTransactionId}`} size="sm">
-                        عرّف جهة حركة <bdi className="nums">{p.paidOn}</bdi>
-                      </LinkButton>
-                    ))
-                ) : null}
-                {/*
-                  ولا حركةَ لها ولا مورّد: قُيّدت من إيصالٍ لم يُقرأ مستفيدُه.
-                  كان النصّ يقول «راجِعها في سجلّ التدقيق» ولا فعلَ له —
-                  فتبقى في الطابور أبداً. والجوابُ في الإيصال نفسه.
-                */}
-                {g.payments.filter((p) => !p.bankTransactionId).map((p) => (
-                  <div key={p.paymentId} className="w-full rounded-lg border border-line bg-sunken/50 p-2.5">
-                    <p className="mb-2 text-[11px] leading-relaxed text-muted">
-                      <Money minor={p.unbackedMinor} /> في {formatDay(p.paidOn)} — لا حركةَ بنكٍ لها ولا مورّد.
-                      {p.receiptDriveFileId ? " افتح إيصالها لترى لمن حُوّلت." : ""}
-                    </p>
-                    {canApprove ? (
-                      <OrphanPayment
-                        paymentId={p.paymentId}
-                        suppliers={supplierOptions}
-                        receiptUrl={p.receiptDriveFileId ? `https://drive.google.com/file/d/${p.receiptDriveFileId}/view` : null}
-                      />
-                    ) : (
-                      <p className="text-[11px] text-muted">حسمُها لمن يعتمد السداد.</p>
-                    )}
-                  </div>
+                  {g.supplierName}
+                </Link>
+              ) : (
+                <span className="block truncate text-[14px] font-bold">{g.supplierName}</span>
+              )}
+              <span className="block text-[11px] text-muted">
+                {countNoun(g.payments.length, PAYMENT_RECORD)}
+                {g.supplierId
+                  ? " بلا مستند"
+                  : g.payments.some((p) => p.bankTransactionId)
+                    ? " لم تُعرَف جهتها — افتح حركتها وحدّد مورّدها"
+                    : " لم تُعرَف جهتها"}
+              </span>
+            </span>
+            <span className="shrink-0 text-[14px] font-bold"><Money minor={g.totalMinor} /></span>
+          </div>
+
+          {g.supplierId ? (
+            <div className="mt-3 flex flex-wrap gap-2 sm:ps-11">
+              {/*
+                الرسالةُ تُبنى من الوقائع — تواريخُ الدفعات ومبالغُها —
+                ومن لا يصدر فواتير يُطلَب منه عقدُ توريد لا فاتورة.
+              */}
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(buildInvoiceRequest(g))}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonClass("primary", "sm")}
+              >
+                <MessageCircle className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                {g.payments.every((p) => !p.issuesInvoices)
+                  ? "اطلب عقد التوريد (واتساب)"
+                  : "اطلب الفاتورة (واتساب)"}
+              </a>
+              {g.supplierSlug && <LinkButton href={`/suppliers/${g.supplierSlug}`} size="sm" variant="quiet">ملفّه</LinkButton>}
+            </div>
+          ) : (
+            /*
+              دفعةٌ لا جهةَ لها: إن كانت لها حركةُ بنك فُتحت لتُعرَّف
+              جهتُها؛ وإن لم تكن فهي دفعةٌ بلا أصل — تُعرَض ولا تُطوى
+              (طيُّها يُعيد الفاتورة مستحقّةً بلا سببٍ ظاهر فتُدفَع
+              مرّتين)، ويُقال لصاحبها ما يفعل بدل أن يُترَك بلا زرّ.
+            */
+            <div className="mt-3 flex flex-wrap items-center gap-2 sm:ps-11">
+              {g.payments
+                .filter((p) => p.bankTransactionId)
+                .slice(0, 3)
+                .map((p) => (
+                  <LinkButton key={p.paymentId} href={`/bank?tx=${p.bankTransactionId}`} size="sm">
+                    عرّف جهة حركة <bdi className="nums">{p.paidOn}</bdi>
+                  </LinkButton>
                 ))}
-              </div>
-            )}
-          </Card>
+              {/*
+                ولا حركةَ لها ولا مورّد: قُيّدت من إيصالٍ لم يُقرأ مستفيدُه.
+                والجوابُ في الإيصال نفسه.
+              */}
+              {g.payments.filter((p) => !p.bankTransactionId).map((p) => (
+                <div key={p.paymentId} className="w-full rounded-lg border border-line-soft bg-sunken/60 p-3">
+                  <p className="mb-2 text-[11px] leading-relaxed text-ink-soft">
+                    <Money minor={p.unbackedMinor} /> في {formatDay(p.paidOn)} — لا حركةَ بنكٍ لها ولا مورّد.
+                    {p.receiptDriveFileId ? " افتح إيصالها لترى لمن حُوّلت." : ""}
+                  </p>
+                  {canApprove ? (
+                    <OrphanPayment
+                      paymentId={p.paymentId}
+                      suppliers={supplierOptions}
+                      receiptUrl={p.receiptDriveFileId ? `https://drive.google.com/file/d/${p.receiptDriveFileId}/view` : null}
+                    />
+                  ) : (
+                    <p className="text-[11px] text-muted">حسمُها لمن يعتمد السداد.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </li>
       ))}
     </ul>
+  );
+}
+
+/** لوحٌ فرغ — حُسم ما فيه والصفحةُ لم تُحدَّث بعد. */
+function Done({ children }: { children: React.ReactNode }) {
+  return (
+    <p role="status" className="flex items-center gap-2 rounded-xl border border-ok/25 bg-ok-bg px-4 py-3 text-xs font-bold text-ok">
+      <CircleCheck className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+      {children}
+    </p>
   );
 }
 
@@ -170,17 +179,16 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
   const rows = all.slice(0, 40);
 
   if (rows.length === 0) {
-    return <p className="text-xs text-ok">لا مستند ينتظر — كلُّ ما وصل اعتُمد أو رُفض.</p>;
+    return <Done>لا مستند ينتظر — كلُّ ما وصل اعتُمد أو رُفض.</Done>;
   }
 
   /*
     ── ما المطلوب، ولماذا، وماذا يتغيّر ──
 
     كانت القائمةُ اسماً ومبلغاً وزرَّين، فيسأل صاحبُ المقهى: لماذا لم
-    يدخل وحده؟ وماذا أراجع؟ وما الذي يتغيّر إن أكّدت؟ والجوابُ كان في
-    تعليقات الشيفرة لا على الشاشة. فيُعرَض ما قرأه النموذج حقلاً حقلاً
-    ليُقارَن بالورقة، ويُقال من أين قُرئ (نصٌّ مكتوب أم صورة)، وأيطابق
-    الرقمُ الضريبيّ المورّدَ المسجَّل — ثمّ ما يقع بعد التأكيد.
+    يدخل وحده؟ وماذا أراجع؟ وما الذي يتغيّر إن أكّدت؟ فيُعرَض ما قرأه
+    النموذج حقلاً حقلاً ليُقارَن بالورقة، وما نقص بعينه تحته. والقاعدةُ
+    العامّة خلف «متى يدخل المستند وحده؟» — تُقرأ مرّةً لا في كلّ زيارة.
   */
   return (
     <div className="space-y-3">
@@ -189,34 +197,49 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
         يُعتمَد دفعةً بضغطة، والخادمُ يعيد الحكمَ على كلٍّ منها.
       */}
       {eligible.length > 0 && canConfirm && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/40 bg-ok-bg px-3 py-2.5">
-          <p className="min-w-0 flex-1 text-xs leading-relaxed">
-            <strong>{countNoun(eligible.length, DOCUMENT)} يُحسَم الآن بلا مراجعة</strong> — تجتمع فيها الشروط، أو
-            قراءتُها كاملة وفاتورتُها لم تُقيَّد لأنّ تاريخها كان يُرمى. الضغطُ يقيّد الفواتير ويعتمدها ويسمّي ملفّاتها،
-            ويبقى ما لا يستقيم بعد القيد بسببه.
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/25 bg-ok-bg px-4 py-3">
+          <p className="flex min-w-0 flex-1 items-start gap-2 text-xs leading-relaxed">
+            <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-ok" strokeWidth={2} aria-hidden />
+            <span>
+              <strong>{countNoun(eligible.length, DOCUMENT)} يُحسَم الآن بلا مراجعة</strong> — تجتمع فيها الشروط، أو
+              قراءتُها كاملة وفاتورتُها لم تُقيَّد. الضغطُ يقيّد الفواتير ويعتمدها ويسمّي ملفّاتها، ويبقى ما لا
+              يستقيم بعد القيد بسببه.
+            </span>
           </p>
           <ConfirmEligible count={eligible.length} />
         </div>
       )}
-      <p className="rounded-xl border border-line bg-sunken px-3 py-2.5 text-[11px] leading-relaxed text-ink-soft">
-        يدخل المستندُ وحده إذا عُرف <strong>مورّدُه</strong>، وقُيّدت له <strong>فاتورة</strong> (رقمٌ وتاريخٌ وإجماليّ)،
-        و<strong>استقام حسابُه</strong>، وكانت <strong>قراءتُه موثوقة</strong> (نصٌّ مكتوب، أو صورةٌ ضريبتُها ١٥٪ من صافيها
-        أو رقمُها في اسم الملفّ). وما لم يجتمع فيه ذلك يُكتَب تحته ما نقص بعينه.{" "}
-        <strong>المطلوب:</strong> أصلح الناقص أو قارن بالورقة ثمّ اعتمد — فتدخل الفاتورةُ دفعةَ الشهر، ويُخصم منها
-        ما دفعتَه للمورّد مقدَّماً، ويُسمّى ملفُّها. وإن كان المستندُ خطأً فارفضه.
-      </p>
-      <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">
+      <details className="group rounded-xl border border-line-soft bg-sunken/60">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 text-xs font-bold text-ink-soft [&::-webkit-details-marker]:hidden">
+          <CircleHelp className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
+          متى يدخل المستندُ وحده، وماذا يتغيّر إن اعتمدته؟
+          <ChevronDown className="ms-auto h-3.5 w-3.5 transition-transform group-open:rotate-180" strokeWidth={2} aria-hidden />
+        </summary>
+        <p className="px-4 pb-3 text-[11px] leading-relaxed text-ink-soft">
+          يدخل المستندُ وحده إذا عُرف <strong>مورّدُه</strong>، وقُيّدت له <strong>فاتورة</strong> (رقمٌ وتاريخٌ وإجماليّ)،
+          و<strong>استقام حسابُه</strong>، وكانت <strong>قراءتُه موثوقة</strong> (نصٌّ مكتوب، أو صورةٌ ضريبتُها ١٥٪ من صافيها
+          أو رقمُها في اسم الملفّ). وما لم يجتمع فيه ذلك يُكتَب تحته ما نقص بعينه.{" "}
+          <strong>المطلوب:</strong> أصلح الناقص أو قارن بالورقة ثمّ اعتمد — فتدخل الفاتورةُ دفعةَ الشهر، ويُخصم منها
+          ما دفعتَه للمورّد مقدَّماً، ويُسمّى ملفُّها. وإن كان المستندُ خطأً فارفضه.
+        </p>
+      </details>
+      <ul className={LIST}>
         {rows.map((d) => {
           /* الشرحُ من الدالّة التي قرّرت — فلا يفترق القرارُ عن تفسيره */
           const { gaps } = d.verdict;
           return (
-            <li key={d.id} className="px-3.5 py-3">
+            <li key={d.id} className="px-4 py-3.5 sm:px-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-bold">
-                    {d.supplierName ?? "مورّدٌ لم يُعرَف"}
+                <span className="flex min-w-0 flex-1 items-center gap-3">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-sunken text-ink-soft">
+                    <FileText className="h-4 w-4" strokeWidth={2} aria-hidden />
                   </span>
-                  <span className="block truncate text-[11px] text-muted" dir="ltr">{d.fileName}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13px] font-bold">
+                      {d.supplierName ?? "مورّدٌ لم يُعرَف"}
+                    </span>
+                    <span className="block truncate text-[11px] text-muted" dir="ltr">{d.fileName}</span>
+                  </span>
                 </span>
                 <span className="flex shrink-0 flex-wrap items-center gap-1.5">
                   {/*
@@ -230,6 +253,7 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                       rel="noopener noreferrer"
                       className={buttonClass("quiet", "sm")}
                     >
+                      <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                       افتح المستند
                     </a>
                   )}
@@ -237,44 +261,61 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                   {canUpload && <RejectDocument documentId={d.id} />}
                 </span>
               </div>
-              {d.recordable ? (
-                <p className="mt-2 text-[11px] leading-relaxed text-ok">
-                  قراءتُه كاملة — يُقيَّد ويُحسَم تلقائياً الآن، أو بالضغط أعلاه.
-                </p>
-              ) : d.invoiceId === null && d.statementId === null ? (
-                <div className="mt-2 text-[11px] leading-relaxed text-warn">
-                  <p>لم يُقيَّد — ينقصه:</p>
-                  <ul className="list-inside list-disc">
-                    {(d.missing.length > 0 ? d.missing : ["ليس فاتورةً ولا كشفاً — إيصالٌ أو نوعٌ يُحسَم بيد"]).map((m) => <li key={m}>{m}</li>)}
+              <div className="sm:ps-11">
+                {d.recordable ? (
+                  <Note tone="ok">قراءتُه كاملة — يُقيَّد ويُحسَم تلقائياً الآن، أو بالضغط أعلاه.</Note>
+                ) : d.invoiceId === null && d.statementId === null ? (
+                  <div className="mt-2 rounded-lg border border-warn/25 bg-warn-bg px-3 py-2 text-[11px] leading-relaxed text-warn">
+                    <p className="font-bold">لم يُقيَّد — ينقصه:</p>
+                    <ul className="list-inside list-disc">
+                      {(d.missing.length > 0 ? d.missing : ["ليس فاتورةً ولا كشفاً — إيصالٌ أو نوعٌ يُحسَم بيد"]).map((m) => <li key={m}>{m}</li>)}
+                    </ul>
+                    <p className="text-ink-soft">ارفضه وارفعه من صفحة الرفع لتكتب الناقص بيدك.</p>
+                  </div>
+                ) : d.statementId !== null ? (
+                  <Note>كشفُ حسابٍ مقيَّد — لا يُسأل عن رقم فاتورة.</Note>
+                ) : (
+                  <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg bg-sunken/60 px-3 py-2.5 sm:grid-cols-5">
+                    <ReadField label="رقم الفاتورة" value={<bdi className="nums">{d.invoiceNumber}</bdi>} />
+                    <ReadField label="التاريخ" value={d.invoiceDate ? <bdi className="nums">{formatDay(d.invoiceDate)}</bdi> : "غير معروف"} />
+                    <ReadField label="قبل الضريبة" value={d.subtotalMinor === null ? "غير معروف" : <Money minor={d.subtotalMinor} />} />
+                    <ReadField label="الضريبة" value={d.vatMinor === null ? "غير معروف" : <Money minor={d.vatMinor} />} />
+                    <ReadField label="الإجمالي" value={d.totalMinor === null ? "غير معروف" : <Money minor={d.totalMinor} />} />
+                  </dl>
+                )}
+                {(d.invoiceId !== null || d.statementId !== null) && gaps.length === 0 && (
+                  <Note tone="ok">تجتمع فيه الشروط — يُعتمَد تلقائياً.</Note>
+                )}
+                {(d.invoiceId !== null || d.statementId !== null) && gaps.length > 0 && (
+                  <ul className="mt-2 space-y-0.5 text-[11px] leading-relaxed text-warn">
+                    {gaps.filter((g) => g !== "NOT_RECORDED").map((g) => (
+                      <li key={g} className="flex items-start gap-1.5">
+                        <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={2.25} aria-hidden />
+                        لم يدخل وحده: {GAP_TEXT[g]}
+                      </li>
+                    ))}
                   </ul>
-                  <p className="text-muted">ارفضه وارفعه من صفحة الرفع لتكتب الناقص بيدك.</p>
-                </div>
-              ) : d.statementId !== null ? (
-                <p className="mt-2 text-[11px] text-muted">كشفُ حسابٍ مقيَّد — لا يُسأل عن رقم فاتورة.</p>
-              ) : (
-                <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-5">
-                  <ReadField label="رقم الفاتورة" value={<bdi className="nums">{d.invoiceNumber}</bdi>} />
-                  <ReadField label="التاريخ" value={d.invoiceDate ? <bdi className="nums">{formatDay(d.invoiceDate)}</bdi> : "غير معروف"} />
-                  <ReadField label="قبل الضريبة" value={d.subtotalMinor === null ? "غير معروف" : <Money minor={d.subtotalMinor} />} />
-                  <ReadField label="الضريبة" value={d.vatMinor === null ? "غير معروف" : <Money minor={d.vatMinor} />} />
-                  <ReadField label="الإجمالي" value={d.totalMinor === null ? "غير معروف" : <Money minor={d.totalMinor} />} />
-                </dl>
-              )}
-              {(d.invoiceId !== null || d.statementId !== null) && gaps.length === 0 && (
-                <p className="mt-2 text-[11px] text-ok">تجتمع فيه الشروط — يُعتمَد تلقائياً.</p>
-              )}
-              {(d.invoiceId !== null || d.statementId !== null) && gaps.length > 0 && (
-                <ul className="mt-2 space-y-0.5 text-[11px] text-warn">
-                  {gaps.filter((g) => g !== "NOT_RECORDED").map((g) => (
-                    <li key={g}>لم يدخل وحده: {GAP_TEXT[g]}</li>
-                  ))}
-                </ul>
-              )}
+                )}
+              </div>
             </li>
           );
         })}
       </ul>
+      {all.length > rows.length && (
+        <p className="text-[11px] text-muted">
+          يُعرض أوّلُ {rows.length} — وبقي <span className="nums">{all.length - rows.length}</span> يظهر حين يُحسم ما هنا.
+        </p>
+      )}
     </div>
+  );
+}
+
+function Note({ tone, children }: { tone?: "ok"; children: React.ReactNode }) {
+  return (
+    <p className={`mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed ${tone === "ok" ? "text-ok" : "text-muted"}`}>
+      {tone === "ok" && <CircleCheck className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={2.25} aria-hidden />}
+      {children}
+    </p>
   );
 }
 
@@ -305,46 +346,44 @@ export async function ContractPolicyWorkspace({ canEdit }: { canEdit: boolean })
 
   const need = rows.filter(needsContract);
   if (need.length === 0) {
-    return <p className="text-xs text-ok">لا مورّد بلا مستندٍ مطلوب — كلٌّ أُعلنت سياستُه.</p>;
+    return <Done>لا مورّد بلا مستندٍ مطلوب — كلٌّ أُعلنت سياستُه.</Done>;
   }
 
   return (
-    <ul className="space-y-2.5">
+    <ul className={LIST}>
       {need.map((r) => (
-        <li key={r.id}>
-          <Card>
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <Link
-                href={`/suppliers/${r.slug}`}
-                className="text-sm font-bold underline-offset-4 hover:underline"
-              >
+        <li key={r.id} className="px-4 py-3.5 sm:px-5">
+          <div className="flex items-center gap-3">
+            <Monogram name={r.nameAr} />
+            <span className="min-w-0 flex-1">
+              <Link href={`/suppliers/${r.slug}`} className="block truncate text-[14px] font-bold hover:text-accent">
                 {r.nameAr}
               </Link>
-              <span className="text-[11px] text-muted">لا يصدر فواتير ضريبية، ولا عقدَ عندنا</span>
-            </div>
-            {/*
-              ثلاثةُ أجوبةٍ صحيحة لا جوابٌ واحد: وقّع عقداً، أو أعلِن
-              أنّه لا يُطلَب منه عقد، أو أنّ فواتيره ورقيّةٌ تُرفَع.
-              والتنبيهُ الذي لا يُسكَت ولا يُفعَل فيه شيء يُعلّم صاحبَه
-              تجاهلَ ما عداه — فالإعلانُ هنا بيد الإنسان لا يُشتقّ.
-            */}
-            <div className="mt-3">
-              {canEdit ? (
-                <SupplierPolicy
-                  supplierId={r.id}
-                  canEdit={canEdit}
-                  initial={{
-                    issuesInvoices: r.issuesInvoices,
-                    paperInvoices: r.paperInvoices,
-                    contractRequired: r.contractRequired,
-                    contractOnFile: r.contractOnFile,
-                  }}
-                />
-              ) : (
-                <p className="text-[11px] text-muted">تعديل سياسة المورّد خارج صلاحيتك.</p>
-              )}
-            </div>
-          </Card>
+              <span className="block text-[11px] text-muted">لا يصدر فواتير ضريبية، ولا عقدَ عندنا</span>
+            </span>
+          </div>
+          {/*
+            ثلاثةُ أجوبةٍ صحيحة لا جوابٌ واحد: وقّع عقداً، أو أعلِن
+            أنّه لا يُطلَب منه عقد، أو أنّ فواتيره ورقيّةٌ تُرفَع.
+            والتنبيهُ الذي لا يُسكَت ولا يُفعَل فيه شيء يُعلّم صاحبَه
+            تجاهلَ ما عداه — فالإعلانُ هنا بيد الإنسان لا يُشتقّ.
+          */}
+          <div className="mt-3 sm:ps-11">
+            {canEdit ? (
+              <SupplierPolicy
+                supplierId={r.id}
+                canEdit={canEdit}
+                initial={{
+                  issuesInvoices: r.issuesInvoices,
+                  paperInvoices: r.paperInvoices,
+                  contractRequired: r.contractRequired,
+                  contractOnFile: r.contractOnFile,
+                }}
+              />
+            ) : (
+              <p className="text-[11px] text-muted">تعديل سياسة المورّد خارج صلاحيتك.</p>
+            )}
+          </div>
         </li>
       ))}
     </ul>
@@ -357,37 +396,36 @@ export async function StatementRequestWorkspace({ canEdit = false }: { canEdit?:
   const rows = await loadMissingStatementSuppliers(month);
 
   if (rows.length === 0) {
-    return <p className="text-xs text-ok">وصل كشفُ كلّ مورّدٍ له تعامل.</p>;
+    return <Done>وصل كشفُ كلّ مورّدٍ له تعامل.</Done>;
   }
 
   return (
-    <ul className="grid gap-2 sm:grid-cols-2">
+    <ul className={LIST}>
       {rows.map((m) => (
-        <li
-          key={m.id}
-          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-raised px-3.5 py-2.5"
-        >
-          <span className="min-w-0">
-            <Link
-              href={`/suppliers/${m.slug}`}
-              className="block truncate text-xs font-bold underline-offset-4 hover:underline"
-            >
+        <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 sm:px-5">
+          <Monogram name={m.nameAr} />
+          <span className="min-w-0 flex-1">
+            <Link href={`/suppliers/${m.slug}`} className="block truncate text-[13px] font-bold hover:text-accent">
               {m.nameAr}
             </Link>
             <span className="block text-[11px] text-muted">
-              آخر فاتورة <bdi className="nums">{m.lastInvoiceDate ? formatDay(m.lastInvoiceDate) : "—"}</bdi>
+              آخر فاتورة{" "}
+              {m.lastInvoiceDate ? <bdi className="nums">{formatDay(m.lastInvoiceDate)}</bdi> : "غير معروف"}
             </span>
           </span>
-          <a
-            href={`https://wa.me/?text=${encodeURIComponent(buildStatementRequest(m.nameAr, month))}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonClass("primary", "sm")}
-          >
-            اطلب الكشف (واتساب)
-          </a>
-          {/* «كشوف الحساب مو كلّهم يصدرونها» — يُعلَن فيخرج من القائمة */}
-          {canEdit && <NoStatementsButton supplierId={m.id} />}
+          <span className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(buildStatementRequest(m.nameAr, month))}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClass("secondary", "sm")}
+            >
+              <MessageCircle className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+              اطلب الكشف (واتساب)
+            </a>
+            {/* «كشوف الحساب مو كلّهم يصدرونها» — يُعلَن فيخرج من القائمة */}
+            {canEdit && <NoStatementsButton supplierId={m.id} />}
+          </span>
         </li>
       ))}
     </ul>

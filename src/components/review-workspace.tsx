@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Money } from "./money";
 import { Badge, buttonClass, Card, EmptyState } from "./ui";
+import { toast } from "./ui-client";
 import { countNoun, SUGGESTION, TRANSACTION } from "@/lib/arabic";
 import { postJson } from "@/lib/http-client";
 import { strength } from "@/lib/bank/strength";
@@ -42,10 +43,11 @@ export interface ReviewWorkspaceProps {
   suppliers?: readonly { id: string; nameAr: string }[];
 }
 
-const BUCKET_TONE: Record<ReviewBucket, string> = {
-  CONFIRM: "border-ok/40 bg-ok-bg",
-  REVIEW: "border-warn/40 bg-warn-bg",
-  RESOLVE: "border-line bg-raised",
+/* لونُ الباب نقطةٌ بجانب اسمه — الاسمُ يحمل المعنى واللونُ يعين العين */
+const BUCKET_DOT: Record<ReviewBucket, string> = {
+  CONFIRM: "bg-ok",
+  REVIEW: "bg-warn",
+  RESOLVE: "bg-info",
 };
 
 /** أبواب الحركة — هي نفسها المعروضة في «حلّ المعلّقات» بصفحة البنك. */
@@ -133,7 +135,8 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
     return seen;
   }, [items]);
 
-  async function post(url: string, body: unknown, id: string, doneLabel: string) {
+  async function post(url: string, body: unknown, id: string, doneLabel: string, undoable = false) {
+    if (rowBusy.has(id)) return;
     busyOn(id, true);
     errorOn(id, null);
 
@@ -171,6 +174,33 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
     setDone((d) => new Map(d).set(id, data.message ?? doneLabel));
     setOpenOn(null);
     busyOn(id, false);
+    /*
+      الإشعارُ بعد ردّ الخادم لا قبله. و«تراجع» يمرّ بمسار الردّ نفسه في
+      صفحة البنك (`match-undo`): تُفكّ الدفعة وتُعلَن مردودةً ولا تُحذف،
+      أو يُردّ إعلانُ «ليست سداداً» — فتعود الحركة إلى الطابور.
+    */
+    toast({
+      tone: "ok",
+      title: data.message ?? doneLabel,
+      undo: undoable
+        ? {
+            run: async () => {
+              const u = await postJson<{ message?: string }>("/api/match-undo", {
+                transactionId: id,
+                reason: "تراجعٌ من إشعار «يحتاج قرارك»",
+              });
+              if (!u.ok) return false;
+              setDone((d) => {
+                const next = new Map(d);
+                next.delete(id);
+                return next;
+              });
+              router.refresh();
+              return true;
+            },
+          }
+        : undefined,
+    });
     router.refresh();
   }
 
@@ -180,10 +210,10 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
     المتصفّح لصدَّق الخادمُ اقتراحاً حُسب لحظة الاستيراد وقد سُدّدت فاتورته.
   */
   const confirmOne = (id: string) =>
-    post("/api/match-confirm-bulk", { transactionIds: [id] }, id, "أُكِّدت");
+    post("/api/match-confirm-bulk", { transactionIds: [id] }, id, "أُكِّدت", true);
 
   const rejectOne = (id: string, kind: string) =>
-    post("/api/match-confirm", { transactionId: id, notAPayment: kind }, id, "حُفظت");
+    post("/api/match-confirm", { transactionId: id, notAPayment: kind }, id, "حُفظت", true);
 
   /*
     السدادُ على حساب المورّد — والسياسة تُقال قبل الضغط لا بعده.
@@ -192,7 +222,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
     جهاتِها بيده، فخرجت من الطابور بلا أن يُقيَّد ريالٌ منها.
   */
   const settleOne = (id: string) =>
-    post("/api/match-confirm", { transactionId: id, settleSupplier: true }, id, "قُيِّدت على حسابه");
+    post("/api/match-confirm", { transactionId: id, settleSupplier: true }, id, "قُيِّدت على حسابه", true);
 
   const defineOne = (id: string, kind: string, displayName: string, supplierId: string | null) =>
     post("/api/counterparty", { transactionId: id, kind, displayName, supplierId }, id, "عُرِّفت");
@@ -239,29 +269,27 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* الخلاصة تُقرأ في ثانية: «يُؤكَّد ٣٠١ · يُراجَع ١٧ · يُحسَم ٩». */}
       {/*
         ثلاثٌ في صفٍّ واحد على كلّ مقاس. كانت على الجوّال بطاقاتٍ متراصّة
         تأكل أربعمئة بكسلٍ قبل أوّل بند — ومنها بطاقةٌ خضراء لمجموعةٍ فارغة.
         فالشرحُ يظهر حيث يتّسع له المكان، والفارغةُ تهدأ.
       */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      <div className="grid grid-cols-3 divide-x divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
         {groups.map((g) => {
           const left = g.items.filter((i) => !done.has(i.transactionId)).length;
           return (
-            <div
-              key={g.bucket}
-              className={`rounded-2xl border px-3 py-2.5 shadow-raised sm:px-4 sm:py-3 ${
-                left === 0 ? "border-line bg-raised text-muted" : BUCKET_TONE[g.bucket]
-              }`}
-            >
-              <p className="text-xs font-bold">{BUCKET_LABEL[g.bucket]}</p>
-              <p className="nums mt-1 font-display text-2xl font-bold leading-none sm:text-3xl">{left}</p>
-              <p className="mt-1.5 hidden text-xs leading-relaxed text-ink-soft sm:block">{BUCKET_HINT[g.bucket]}</p>
+            <div key={g.bucket} className={`px-3 py-3 sm:px-4 ${left === 0 ? "text-muted" : ""}`}>
+              <p className="flex items-center gap-1.5 text-xs font-bold">
+                <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${left === 0 ? "bg-line" : BUCKET_DOT[g.bucket]}`} />
+                {BUCKET_LABEL[g.bucket]}
+              </p>
+              <p className="nums mt-1.5 text-2xl font-bold leading-none">{left}</p>
+              <p className="mt-1.5 hidden text-[11px] leading-relaxed text-muted sm:block">{BUCKET_HINT[g.bucket]}</p>
               {g.amountMinor > 0 && (
                 /* المبلغ كان بأضعف رمادٍ في البطاقة — وهو المال نفسه */
-                <p className="mt-1 text-xs text-ink-soft">
+                <p className="mt-1 text-xs font-bold text-ink-soft">
                   <Money minor={g.amountMinor} />
                 </p>
               )}
@@ -392,7 +420,7 @@ function Bucket({
       <h2 className="mb-2 text-sm font-bold">
         {BUCKET_LABEL[bucket]} <span className="nums text-muted">({left})</span>
       </h2>
-      <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
+      <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
         {visible.map((i) => (
           <Row
             key={i.transactionId}
