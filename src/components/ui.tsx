@@ -224,6 +224,72 @@ export function Stat({
   );
 }
 
+/**
+ * رقمُ الرأس — أيقونةٌ وتسمية، والرقمُ كبيراً، وجملةٌ تقول معناه، ويفتح موضعه.
+ *
+ * كانت ثلاثُ صفحاتٍ (اليوم · النقد القادم · المورّدون) تكتب هذه البطاقة
+ * بنفسها بمقاساتٍ متقاربة لا متطابقة. و`children` لما تحت الرقم ممّا له
+ * روابطُه (شريطُ أعمار) — فلا يُلفّ رابطٌ داخل رابط.
+ */
+export function KeyFigure({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  href,
+  tone,
+  delta,
+  children,
+  className = "",
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
+  href?: string;
+  tone?: "warn" | "danger" | "ok";
+  /** نسبةُ التغيّر بجانب التسمية — `null` «بلا مقارنة». */
+  delta?: number | null;
+  children?: React.ReactNode;
+  className?: string;
+}) {
+  const chip =
+    tone === "danger" ? "bg-danger-bg text-danger"
+    : tone === "warn" ? "bg-warn-bg text-warn"
+    : tone === "ok" ? "bg-ok-bg text-ok"
+    : "bg-sunken text-ink-soft group-hover:bg-accent-soft group-hover:text-accent";
+  const ink = tone ? TONE_TEXT[tone] : "";
+  const body = (
+    <>
+      <span className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-xs font-bold text-muted">
+          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors ${chip}`}>
+            <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </span>
+          {label}
+        </span>
+        {delta !== undefined && <Delta pct={delta} />}
+      </span>
+      <span className={`mt-4 block text-[1.6rem] font-bold leading-none tracking-tight sm:text-[2rem] ${ink}`}>{value}</span>
+      {sub && <span className="mt-3 block text-xs leading-relaxed text-muted">{sub}</span>}
+    </>
+  );
+  const frame = `group flex min-h-[9.5rem] flex-col rounded-2xl border border-line bg-raised p-4 shadow-raised transition-[border-color,box-shadow,transform] duration-150 sm:p-5 ${className}`;
+  if (href && !children) {
+    return (
+      <Link href={href} className={`${frame} hover:-translate-y-px hover:border-accent-line hover:shadow-lifted`}>
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <div className={`${frame} ${href ? "has-[a:hover]:border-accent-line has-[a:hover]:shadow-lifted" : ""}`}>
+      {href ? <Link href={href} className="-m-1 block rounded-xl p-1">{body}</Link> : body}
+      {children && <div className="mt-auto pt-4">{children}</div>}
+    </div>
+  );
+}
+
 /** قيمةٌ نصّها أرقامٌ صرفة — وحدها تستحقّ خطّ الأرقام. */
 export function isNumeric(value: React.ReactNode): boolean {
   return typeof value === "number" || (typeof value === "string" && /^[\d\s.,٫٬%٪+\-/]+$/.test(value));

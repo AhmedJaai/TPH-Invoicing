@@ -1,5 +1,3 @@
-import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
 import { Money } from "./money";
 import { AGE_BUCKETS } from "@/lib/supplier-intel";
 
@@ -59,58 +57,5 @@ export function AgeingBar({
   );
 }
 
-/**
- * رقمُ الرأس: أيقونةٌ وتسمية، والرقمُ كبيراً، وجملةٌ تقول معناه — وكلُّه
- * يفتح موضعه حين يكون له موضع.
- */
-export function Figure({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  href,
-  tone,
-  children,
-  className = "",
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: React.ReactNode;
-  sub?: React.ReactNode;
-  href?: string;
-  tone?: "warn" | "danger" | "ok";
-  children?: React.ReactNode;
-  className?: string;
-}) {
-  const chip =
-    tone === "danger" ? "bg-danger-bg text-danger"
-    : tone === "warn" ? "bg-warn-bg text-warn"
-    : tone === "ok" ? "bg-ok-bg text-ok"
-    : "bg-sunken text-ink-soft";
-  const ink = tone === "danger" ? "text-danger" : tone === "warn" ? "text-warn" : "";
-  const body = (
-    <>
-      <span className="flex items-center gap-2 text-xs font-bold text-muted">
-        <span className={`grid h-7 w-7 place-items-center rounded-lg ${chip}`}>
-          <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
-        </span>
-        {label}
-      </span>
-      <span className={`mt-4 block text-[1.45rem] font-bold leading-none tracking-tight sm:text-[2rem] ${ink}`}>{value}</span>
-      {sub && <span className="mt-3 block text-xs leading-relaxed text-muted">{sub}</span>}
-    </>
-  );
-  const cls = `flex flex-col rounded-2xl border border-line bg-raised p-4 shadow-raised transition-[border-color,box-shadow] sm:p-5 ${href ? "has-[a:hover]:border-accent-line has-[a:hover]:shadow-lifted" : ""} ${className}`;
-  return (
-    <div className={cls}>
-      {href ? (
-        <Link href={href} className="group -m-1 block rounded-xl p-1 transition-colors hover:text-inherit focus-visible:outline-2">
-          {body}
-        </Link>
-      ) : (
-        body
-      )}
-      {children && <div className="mt-auto pt-4">{children}</div>}
-    </div>
-  );
-}
+/** رقمُ الرأس صار عنصراً مشتركاً — يُعاد تصديره باسمه القديم لمستورديه. */
+export { KeyFigure as Figure } from "./ui";

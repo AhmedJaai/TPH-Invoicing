@@ -5,7 +5,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Callout, EmptyState, LinkButton, NoAccess } from "@/components/ui";
+import { Callout, EmptyState, KeyFigure, LinkButton, NoAccess } from "@/components/ui";
 import { SUPPLIER, countNoun } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
 import { loadCashOutlook } from "@/services/cash-outlook.service";
@@ -50,14 +50,14 @@ export default async function CashPage() {
     >
       {/* ── الأرقام الثلاثة ── */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <Figure
+        <KeyFigure
           icon={Landmark}
           label="آخرُ رصيدٍ معروف"
           value={balanceKnown ? <Money minor={o.balanceMinor as number} /> : <span className="text-xl text-muted">غير معروف</span>}
           sub={balanceKnown ? `في ${formatDay(o.balanceAsOf)} — وما دخل وخرج بعده لم يُحسب` : "لا كشفَ يحمل الرصيد. استورد كشفاً فيه عمودُ الرصيد، أو أدخله عند الإقفال."}
           href={balanceKnown ? "/bank" : "/bank#import"}
         />
-        <Figure
+        <KeyFigure
           icon={TriangleAlert}
           tone={overdue ? "danger" : undefined}
           label="متأخّرٌ الآن"
@@ -65,7 +65,7 @@ export default async function CashPage() {
           sub={overdue ? `${countNoun(overdue.lines.length, SUPPLIER)} من دفعة الشهر الماضي لم يُحوَّل لهم` : "لا شيء متأخّر من دفعة الشهر الماضي."}
           href="/payments"
         />
-        <Figure
+        <KeyFigure
           icon={CalendarClock}
           label="يخرج حتى آخر الشهر القادم"
           value={<Money minor={o.totalMinor} />}
@@ -123,41 +123,6 @@ export default async function CashPage() {
         </p>
       )}
     </PageShell>
-  );
-}
-
-function Figure({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  href,
-  tone,
-}: {
-  icon: typeof Landmark;
-  label: string;
-  value: React.ReactNode;
-  sub: string;
-  href?: string;
-  tone?: "danger";
-}) {
-  const body = (
-    <>
-      <span className="flex items-center gap-2 text-xs font-bold text-muted">
-        <span className={`grid h-7 w-7 place-items-center rounded-lg ${tone === "danger" ? "bg-danger-bg text-danger" : "bg-sunken text-ink-soft"}`}>
-          <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
-        </span>
-        {label}
-      </span>
-      <span className={`mt-4 block text-[1.75rem] font-bold leading-none tracking-tight ${tone === "danger" ? "text-danger" : ""}`}>{value}</span>
-      <span className="mt-3 block text-xs leading-relaxed text-muted">{sub}</span>
-    </>
-  );
-  const cls = "block rounded-2xl border border-line bg-raised p-5 shadow-raised";
-  return href ? (
-    <Link href={href} className={`${cls} transition-[border-color,box-shadow] hover:border-accent-line hover:shadow-lifted`}>{body}</Link>
-  ) : (
-    <div className={cls}>{body}</div>
   );
 }
 

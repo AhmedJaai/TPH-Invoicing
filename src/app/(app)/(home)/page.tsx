@@ -8,7 +8,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Badge, Delta, EmptyState, LinkButton, Meter, Section, Stepper, buttonClass } from "@/components/ui";
+import { Badge, EmptyState, KeyFigure, LinkButton, Meter, Section, Stepper, buttonClass } from "@/components/ui";
 import { TaskList } from "@/components/task-list";
 import { Changes } from "@/components/changes";
 import { prioritize } from "@/lib/attention";
@@ -132,7 +132,7 @@ export default async function HomePage() {
       {/* ── الأرقامُ الأربعة: كلٌّ جوابُ سؤال، وكلٌّ يفتح موضعه ── */}
       {!start.knowsNothing && (
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <HeroFigure
+          <KeyFigure
             icon={Store}
             label="عليك للمورّدين"
             href="/suppliers"
@@ -143,10 +143,13 @@ export default async function HomePage() {
                 ? "لا مستحقّ على المقهى الآن."
                 : `${countNoun(totals.owedSuppliers, SUPPLIER)}${oldestDays > 0 ? ` · أقدمُ دَينٍ منذ ${countNoun(oldestDays, DAY)}` : ""}`
             }
-            extra={totals.creditLeftMinor > 0 ? <>ولك عندهم <Money minor={totals.creditLeftMinor} /></> : undefined}
-          />
+          >
+            {totals.creditLeftMinor > 0 && (
+              <p className="text-xs text-ink-soft">ولك عندهم <Money minor={totals.creditLeftMinor} /></p>
+            )}
+          </KeyFigure>
           {run && (
-            <HeroFigure
+            <KeyFigure
               icon={Wallet}
               label={`دفعة ${formatMonth(runMonth)}`}
               href="/payments"
@@ -159,7 +162,7 @@ export default async function HomePage() {
             />
           )}
           {cash && (
-            <HeroFigure
+            <KeyFigure
               icon={Landmark}
               label="في البنك"
               href="/cash"
@@ -167,7 +170,7 @@ export default async function HomePage() {
               sub={cash.balanceMinor === null ? "لا كشفَ يحمل الرصيد — استورد كشفاً فيه عمودُ الرصيد." : `آخرُ رصيدٍ معروف · ${formatDay(cash.asOf)}`}
             />
           )}
-          <HeroFigure
+          <KeyFigure
             icon={ShoppingBasket}
             label={`مشتريات ${formatMonth(facts.thisMonthLabel)}`}
             href="/purchases/invoices"
@@ -247,50 +250,6 @@ export default async function HomePage() {
         </div>
       </div>
     </PageShell>
-  );
-}
-
-function HeroFigure({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  href,
-  tone,
-  delta,
-  extra,
-}: {
-  icon: typeof Store;
-  label: string;
-  value: React.ReactNode;
-  sub: string;
-  href: string;
-  tone?: "warn";
-  delta?: number | null;
-  extra?: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex min-h-[9.5rem] flex-col rounded-2xl border border-line bg-raised p-4 shadow-raised transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-accent-line hover:shadow-lifted sm:p-5"
-    >
-      <span className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-xs font-bold text-muted">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-sunken text-ink-soft transition-colors group-hover:bg-accent-soft group-hover:text-accent">
-            <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
-          </span>
-          {label}
-        </span>
-        {delta !== undefined && <Delta pct={delta} />}
-      </span>
-      <span className={`mt-4 block text-[1.75rem] font-bold leading-none tracking-tight sm:text-[2.1rem] ${tone === "warn" ? "text-warn" : ""}`}>
-        {value}
-      </span>
-      <span className="mt-auto pt-3 text-xs leading-relaxed text-muted">
-        {sub}
-        {extra && <span className="mt-0.5 block text-ink-soft">{extra}</span>}
-      </span>
-    </Link>
   );
 }
 
