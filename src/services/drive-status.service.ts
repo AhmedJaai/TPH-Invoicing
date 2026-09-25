@@ -170,29 +170,22 @@ export interface DriveHeartbeat {
 
 export async function loadDriveHeartbeat(userId: string): Promise<DriveHeartbeat> {
   const previewMode = previewAllowed(process.env);
-  const [[row], token] = await Promise.all([
+  const [[checked], [failed], token] = await Promise.all([
+    db.select({ at: sql<Date | null>`max(${users.driveCheckedAt})` }).from(users),
+    /* آخرُ تعثّرٍ بسببه في صفٍّ واحد — لا مطابقةَ لاحقة بالوقت */
     db
-      .select({
-        checkedAt: sql<Date | null>`max(${users.driveCheckedAt})`,
-        failedAt: sql<Date | null>`max(${users.driveFailedAt})`,
-      })
-      .from(users),
+      .select({ at: users.driveFailedAt, reason: users.driveFailedReason })
+      .from(users)
+      .where(isNotNull(users.driveFailedAt))
+      .orderBy(desc(users.driveFailedAt))
+      .limit(1),
     previewMode ? Promise.resolve(null) : refreshTokenFor(userId),
   ]);
-  const checkedAt = row?.checkedAt ? new Date(row.checkedAt) : null;
-  const failedAt = row?.failedAt ? new Date(row.failedAt) : null;
+  const checkedAt = checked?.at ? new Date(checked.at) : null;
+  const failedAt = failed?.at ?? null;
   const connected = previewMode ? null : token !== null;
   const state = driveState({ previewMode, connected, checkedAt, failedAt });
-
-  let failure: DriveHeartbeat["failure"] = null;
-  if (state === "failing" && failedAt) {
-    const [f] = await db
-      .select({ reason: users.driveFailedReason })
-      .from(users)
-      .where(eq(users.driveFailedAt, failedAt))
-      .limit(1);
-    failure = { at: failedAt, reason: f?.reason ?? "تعذّر الفحص." };
-  }
+  const failure = state === "failing" && failedAt ? { at: failedAt, reason: failed?.reason ?? "تعذّر الفحص." } : null;
   return { state, previewMode, connected, checkedAt, failure };
 }
 
