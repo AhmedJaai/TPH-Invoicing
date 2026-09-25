@@ -494,7 +494,8 @@ export function Callout({
   return (
     <div role={tone === "danger" ? "alert" : undefined} className={`flex flex-wrap items-start gap-3 rounded-xl border px-4 py-3 ${TONE_SURFACE[tone]} ${className}`}>
       {Icon && <Icon className={`mt-0.5 h-[18px] w-[18px] shrink-0 ${TONE_TEXT[tone]}`} strokeWidth={2} aria-hidden />}
-      <div className="min-w-0 flex-1 text-xs leading-relaxed text-ink-soft">
+      {/* `basis-56`: على الجوّال ينزل الفعلُ تحت النصّ بدل أن يعصره عموداً من كلمتين */}
+      <div className="min-w-0 flex-1 basis-56 text-xs leading-relaxed text-ink-soft">
         {title && <p className={`text-[13px] font-bold ${TONE_TEXT[tone]}`}>{title}</p>}
         {children && <div className={title ? "mt-0.5" : ""}>{children}</div>}
       </div>
@@ -620,7 +621,7 @@ export function Stepper({
           <span aria-hidden className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 text-xs font-bold ${DOT[s.state]}`}>
             {s.state === "done" ? "✓" : s.state === "blocked" ? "!" : <span className="nums">{i + 1}</span>}
           </span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-48">
             <p className={`text-sm font-bold ${s.state === "done" ? "text-muted" : ""}`}>
               {s.title}
               <span className="sr-only">
