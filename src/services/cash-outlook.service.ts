@@ -6,7 +6,9 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { recurringExpenses } from "@/db/schema";
-import { buildCashOutlook, type Cadence, type CashOutlook, type SupplierDue } from "@/lib/cash-outlook";
+import {
+  buildCashOutlook, dueThisWeek, type Cadence, type CashOutlook, type RecurringInput, type SupplierDue, type WeekDue,
+} from "@/lib/cash-outlook";
 import { previousMonth } from "@/lib/filing";
 import type { PaymentRun } from "@/lib/payment-run";
 import { currentMonthRiyadh, todayInRiyadh } from "@/lib/riyadh-time";
@@ -22,13 +24,34 @@ function asCadence(v: string): Cadence {
   return v === "QUARTERLY" || v === "ANNUAL" ? v : "MONTHLY";
 }
 
+/** المصروفاتُ المتكرّرة الفاعلة بصيغة الإسقاط — للنقد القادم ولـ«هذا الأسبوع» في الإحاطة. */
+export async function loadRecurringInputs(): Promise<RecurringInput[]> {
+  const rows = await db.select().from(recurringExpenses).where(eq(recurringExpenses.isActive, true));
+  return rows.map((r) => ({
+    id: r.id,
+    label: r.label,
+    amountMinor: r.amountMinor,
+    cadence: asCadence(r.cadence),
+    startsOn: r.startsOn,
+    endsOn: r.endsOn,
+  }));
+}
+
+/**
+ * ما يخرج في الأيّام السبعة القادمة — من دفعة الشهر المنقضي (محسوبةً
+ * سلفاً بيد المتّصل، فالإحاطةُ تحملها) والمتكرّرِ الفاعل.
+ */
+export async function loadWeekDue(run: PaymentRun): Promise<WeekDue> {
+  return dueThisWeek({ today: todayInRiyadh(), overdueRun: dues(run), recurring: await loadRecurringInputs() });
+}
+
 export async function loadCashOutlook(): Promise<CashOutlook & { runMonth: string; thisMonth: string }> {
   const thisMonth = currentMonthRiyadh();
   const runMonth = previousMonth(thisMonth);
 
   const [balances, recurring, cash] = await Promise.all([
     loadSupplierBalances(),
-    db.select().from(recurringExpenses).where(eq(recurringExpenses.isActive, true)),
+    loadRecurringInputs(),
     loadCashPosition(),
   ]);
   const credit = new Map(balances.map((b) => [b.supplierId, b.creditMinor]));
@@ -46,14 +69,7 @@ export async function loadCashOutlook(): Promise<CashOutlook & { runMonth: strin
     overdueRun: dues(overdue),
     heldMinor: overdue.heldTotalMinor,
     nextRun: dues(next),
-    recurring: recurring.map((r) => ({
-      id: r.id,
-      label: r.label,
-      amountMinor: r.amountMinor,
-      cadence: asCadence(r.cadence),
-      startsOn: r.startsOn,
-      endsOn: r.endsOn,
-    })),
+    recurring,
     balanceMinor: cash.balanceMinor,
     balanceAsOf: cash.asOf,
   });

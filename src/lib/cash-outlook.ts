@@ -198,3 +198,82 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
     recurringCount: input.recurring.length,
   };
 }
+
+/* ─────────────────────────── هذا الأسبوع ─────────────────────────── */
+
+export interface WeekLine extends OutflowLine {
+  /** YYYY-MM-DD — و`null` للمتأخّر: موعدُه مضى فهو مستحقٌّ الآن. */
+  date: string | null;
+}
+
+export interface WeekDue {
+  /** أوّلُ الأيّام السبعة وآخرُها — اليومُ والستّةُ بعده. */
+  from: string;
+  to: string;
+  lines: WeekLine[];
+  totalMinor: number;
+  /** متكرّرٌ يقع هذا الشهر بلا يومٍ محدَّد — لا يُحسب في الأسبوع ولا يُنسى. */
+  undated: number;
+}
+
+function shiftDay(day: string, n: number): string {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+function monthLength(month: string): number {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+/**
+ * ما يخرج في الأيّام السبعة القادمة — جوابُ «ماذا أدفع هذا الأسبوع؟» في
+ * إحاطة الصباح. من المصادر نفسها التي يبني منها `buildCashOutlook`:
+ * المتأخّرُ من دفعة الشهر المنقضي (مستحقٌّ الآن)، والمتكرّرُ الذي يقع يومُه
+ * في النافذة. واليومُ الذي يتجاوز طولَ الشهر (٣١ في شهرٍ من ثلاثين) يقع
+ * في آخره. وما لا يومَ له يُعَدّ ولا يُوضَع في يومٍ مخترَع.
+ */
+export function dueThisWeek(
+  input: Pick<OutlookInput, "today" | "overdueRun" | "recurring">,
+  days = 7,
+): WeekDue {
+  const to = shiftDay(input.today, days - 1);
+  const months = [...new Set([input.today.slice(0, 7), to.slice(0, 7)])];
+
+  const lines: WeekLine[] = input.overdueRun
+    .filter((s) => s.amountMinor > 0)
+    .sort((a, b) => b.amountMinor - a.amountMinor)
+    .map((s) => ({
+      id: `run:${s.supplierId}`,
+      label: s.supplierName,
+      amountMinor: s.amountMinor,
+      kind: "SUPPLIER" as const,
+      href: "/payments",
+      date: null,
+    }));
+
+  let undated = 0;
+  for (const r of input.recurring) {
+    for (const month of months) {
+      const o = occursIn(r, month);
+      if (!o.occurs) continue;
+      if (o.day === null) {
+        if (month === input.today.slice(0, 7)) undated++;
+        continue;
+      }
+      const date = `${month}-${String(Math.min(o.day, monthLength(month))).padStart(2, "0")}`;
+      if (date < input.today || date > to) continue;
+      lines.push({
+        id: `rec:${r.id}:${date}`,
+        label: r.label,
+        amountMinor: r.amountMinor,
+        kind: "RECURRING",
+        href: "/settings#recurring",
+        date,
+      });
+    }
+  }
+
+  lines.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "") || b.amountMinor - a.amountMinor);
+  return { from: input.today, to, lines, totalMinor: lines.reduce((s, l) => s + l.amountMinor, 0), undated };
+}

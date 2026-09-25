@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, buildCashOutlook, occursIn, type OutlookInput, type RecurringInput } from "./cash-outlook";
+import { addMonths, buildCashOutlook, dueThisWeek, occursIn, type OutlookInput, type RecurringInput } from "./cash-outlook";
 
 const base: OutlookInput = {
   today: "2026-09-24",
@@ -91,5 +91,47 @@ describe("addMonths", () => {
   it("يعبر السنة", () => {
     expect(addMonths("2026-12", 1)).toBe("2027-01");
     expect(addMonths("2026-01", -1)).toBe("2025-12");
+  });
+});
+
+describe("dueThisWeek — ما يخرج في الأيّام السبعة القادمة", () => {
+  const week = { today: "2026-09-26", overdueRun: [], recurring: [] };
+
+  it("المتأخّرُ مستحقٌّ الآن ويأتي أوّلاً", () => {
+    const w = dueThisWeek({
+      ...week,
+      overdueRun: [{ supplierId: "s1", supplierName: "أوراق الزيتون", amountMinor: 245_000 }],
+      recurring: [{ ...rent, startsOn: "2026-01-28" }],
+    });
+    expect(w.lines.map((l) => [l.label, l.date])).toEqual([["أوراق الزيتون", null], ["الإيجار", "2026-09-28"]]);
+    expect(w.totalMinor).toBe(245_000 + 1_500_000);
+    expect(w.to).toBe("2026-10-02");
+  });
+
+  it("النافذةُ تعبر إلى الشهر التالي", () => {
+    const w = dueThisWeek({ ...week, recurring: [{ ...rent, startsOn: "2026-01-01" }] });
+    expect(w.lines.map((l) => l.date)).toEqual(["2026-10-01"]);
+  });
+
+  it("ما مضى يومُه هذا الشهر لا يُحسب — وما بعد النافذة لا يُحسب", () => {
+    expect(dueThisWeek({ ...week, recurring: [{ ...rent, startsOn: "2026-01-20" }] }).lines).toEqual([]);
+    expect(dueThisWeek({ ...week, recurring: [{ ...rent, startsOn: "2026-01-15" }] }).lines).toEqual([]);
+  });
+
+  it("اليومُ ٣١ في شهرٍ من ثلاثين يقع في آخره", () => {
+    const w = dueThisWeek({ ...week, recurring: [{ ...rent, startsOn: "2026-01-31" }] });
+    expect(w.lines.map((l) => l.date)).toEqual(["2026-09-30"]);
+  });
+
+  it("ما لا يومَ له يُعَدّ ولا يوضَع في يومٍ مخترَع", () => {
+    const w = dueThisWeek({ ...week, recurring: [rent] });
+    expect(w.lines).toEqual([]);
+    expect(w.totalMinor).toBe(0);
+    expect(w.undated).toBe(1);
+  });
+
+  it("الدفعةُ الصفريّة لا تُعرض سطراً", () => {
+    const w = dueThisWeek({ ...week, overdueRun: [{ supplierId: "s1", supplierName: "س", amountMinor: 0 }] });
+    expect(w.lines).toEqual([]);
   });
 });

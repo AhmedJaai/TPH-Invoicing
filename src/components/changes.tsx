@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight, Minus, Sparkles } from "lucide-react";
 import { Money, Prose } from "./money";
 import { notable, type Change } from "@/lib/changes";
+import { Delta } from "./ui";
 
 /**
  * ما الذي تغيّر — خبرٌ في سطر لكلّ مقياس.
@@ -43,8 +44,9 @@ export function Changes({ changes }: { changes: readonly Change[] }) {
               </span>
               <span className="mt-0.5 flex items-baseline justify-between gap-3 text-[11px] leading-relaxed text-muted">
                 <span className="min-w-0 truncate"><Prose text={`${c.detail} · ${c.baseline}`} /></span>
-                <span className={`shrink-0 font-bold ${c.favourable === true ? "text-ok" : c.favourable === false ? "text-warn" : ""}`}>
-                  {c.direction === "NEW" ? "جديد" : c.pct === null ? "بلا مقارنة" : <><span className="nums">{Math.abs(Math.round(c.pct))}</span>٪</>}
+                {/* الاتّجاهُ بسهمه لا بسهم الأيقونة وحده — «100٪» بلا علامةٍ تُقرأ ارتفاعاً وهي هبوط */}
+                <span className="shrink-0">
+                  {c.direction === "NEW" ? <span className="font-bold">جديد</span> : <Delta pct={c.pct} favourable={c.favourable} />}
                 </span>
               </span>
             </span>

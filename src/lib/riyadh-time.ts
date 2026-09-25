@@ -68,6 +68,15 @@ export function formatDay(value: Date | string | null | undefined): string {
   return Number.isNaN(d.getTime()) ? String(value) : DAY_FORMAT.format(d);
 }
 
+const WEEKDAY = new Intl.DateTimeFormat("ar-SA-u-nu-latn-ca-gregory", { timeZone: RIYADH, weekday: "long" });
+const DAY_NUM = new Intl.DateTimeFormat("ar-SA-u-nu-latn-ca-gregory", { timeZone: RIYADH, day: "numeric" });
+
+/** «الأحد 28» — لموعدٍ في الأيّام القريبة، حيث الشهرُ معلومٌ من السياق. */
+export function formatWeekday(value: Date | string): string {
+  const d = asDate(value);
+  return Number.isNaN(d.getTime()) ? String(value) : `${WEEKDAY.format(d)} ${DAY_NUM.format(d)}`;
+}
+
 /** «أغسطس 2026» من `YYYY-MM`. */
 export function formatMonth(month: string): string {
   if (!/^\d{4}-\d{2}$/.test(month)) return month;

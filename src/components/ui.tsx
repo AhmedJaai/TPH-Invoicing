@@ -310,6 +310,7 @@ export function Delta({ pct, favourable }: { pct: number | null; favourable?: bo
   return (
     <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[11px] font-bold ${tone}`}>
       <span aria-hidden>{up ? "▲" : pct < 0 ? "▼" : "•"}</span>
+      <span className="sr-only">{up ? "ارتفاع" : pct < 0 ? "انخفاض" : "ثبات"}</span>
       <span className="nums">{Math.abs(Math.round(pct))}</span>٪
     </span>
   );
