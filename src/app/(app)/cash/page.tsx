@@ -43,7 +43,7 @@ export default async function CashPage() {
       title="النقد القادم"
       intro="ما يخرج من الحساب في الأسابيع القادمة ممّا هو معلوم وحده — دفعاتُ المورّدين والمصروفاتُ المتكرّرة — مقابل آخر رصيدٍ معروف."
       actions={
-        <LinkButton href="/money/expenses" icon={Plus} variant="secondary">
+        <LinkButton href="/settings#recurring" icon={Plus} variant="secondary">
           مصروفٌ متكرّر
         </LinkButton>
       }
@@ -93,7 +93,7 @@ export default async function CashPage() {
             icon={CalendarClock}
             title="لا خروجَ معروفاً في الأسابيع القادمة."
             hint="لا دفعة مورّدين مفتوحة، ولا مصروفات متكرّرة مسجّلة. سجّل الإيجار والرواتب متكرّرةً ليظهر خروجُها هنا في يومه."
-            action={<LinkButton href="/money/expenses" variant="primary" icon={Plus}>سجّل مصروفاً متكرّراً</LinkButton>}
+            action={<LinkButton href="/settings#recurring" variant="primary" icon={Plus}>سجّل مصروفاً متكرّراً</LinkButton>}
           />
         ) : (
           <ol className="relative space-y-4">
@@ -110,7 +110,7 @@ export default async function CashPage() {
           icon={Repeat}
           className="mt-6"
           title="الإيجار والرواتب لا يظهران بعد"
-          action={<LinkButton href="/money/expenses" variant="primary" size="sm" icon={Plus}>سجّلها</LinkButton>}
+          action={<LinkButton href="/settings#recurring" variant="primary" size="sm" icon={Plus}>سجّلها</LinkButton>}
         >
           لا مصروف متكرّراً مسجّلاً — فالجدولُ أعلاه دفعاتُ المورّدين وحدها. سجّل ما يتكرّر كلَّ شهرٍ بيومه فيدخل الإسقاط.
         </Callout>

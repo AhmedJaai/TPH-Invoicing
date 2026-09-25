@@ -184,7 +184,7 @@ export default async function HomePage() {
         </div>
       )}
 
-      <div className="mt-10 grid gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+      <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
         {/* ── ما ينتظر قرارك ── */}
         <Section
           title="ما ينتظر قرارك"

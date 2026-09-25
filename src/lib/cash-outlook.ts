@@ -141,7 +141,7 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
         sub: o.day ? `يوم ${o.day}` : "يومٌ غير محدَّد",
         amountMinor: r.amountMinor,
         kind: "RECURRING" as const,
-        href: "/money/expenses",
+        href: "/settings#recurring",
       }));
 
   const raw: Omit<OutlookBucket, "totalMinor" | "afterMinor">[] = [

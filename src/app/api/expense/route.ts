@@ -30,6 +30,12 @@ interface Body {
   amount?: string;
   cadence?: (typeof CADENCES)[number];
   note?: string;
+  /**
+   * أوّلُ استحقاقٍ (YYYY-MM-DD) — اختياريّ. منه يُعرف يومُ الشهريّ وشهرُ
+   * الربعيّ والسنويّ، فيقع في «النقد القادم» في موضعه. وبدونه يُقال
+   * «يومٌ غير محدَّد» ولا يُخترَع له يوم.
+   */
+  startsOn?: string;
 }
 
 export async function POST(request: Request) {
@@ -101,6 +107,15 @@ export async function POST(request: Request) {
 
   const cadence = body.cadence && CADENCES.includes(body.cadence) ? body.cadence : "MONTHLY";
 
+  let startsOn: string | null = null;
+  if (body.startsOn) {
+    const d = new Date(`${body.startsOn}T12:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.startsOn) || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== body.startsOn) {
+      return NextResponse.json({ error: "تاريخ أوّل استحقاقٍ غير صالح" }, { status: 400 });
+    }
+    startsOn = body.startsOn;
+  }
+
   const [row] = await db
     .insert(recurringExpenses)
     .values({
@@ -108,6 +123,7 @@ export async function POST(request: Request) {
       category: body.category,
       amountMinor,
       cadence,
+      startsOn,
       note: body.note?.trim() || null,
       createdById: user.id,
     })
@@ -118,7 +134,7 @@ export async function POST(request: Request) {
     action: "EXPENSE_ADDED",
     entityType: "recurring_expense",
     entityId: row.id,
-    after: { البند: label, المبلغ_بالهللة: amountMinor, الدورة: cadence, التصنيف: body.category },
+    after: { البند: label, المبلغ_بالهللة: amountMinor, الدورة: cadence, التصنيف: body.category, أوّل_استحقاق: startsOn },
   });
 
   return NextResponse.json({ ok: true, id: row.id, message: `أُضيف «${label}»` });
