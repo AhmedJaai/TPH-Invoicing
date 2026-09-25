@@ -31,7 +31,7 @@ export interface HubTile {
 
 export function HubGrid({ tiles }: { tiles: readonly HubTile[] }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {tiles.map((t) => {
         const cls = t.tone ? TONE_TEXT[t.tone] : "";
 

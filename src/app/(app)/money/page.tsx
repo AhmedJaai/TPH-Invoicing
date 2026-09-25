@@ -112,7 +112,7 @@ export default async function MoneyPage({
       )}
 
       {/* ── الأرقامُ الثلاثة للفترة ── */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
         <Figure
           icon={<ArrowUpRight strokeWidth={2} aria-hidden />}
           label={`الصادر · ${periodLabel}`}
@@ -158,7 +158,7 @@ export default async function MoneyPage({
         والصافي أعلاه حركةُ الحساب لا ربحُ المقهى.
       </Callout>
 
-      <div className="mt-10 grid gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         {/* ── أين ذهب الصادر ── */}
         <Section
           title="أين ذهب"
@@ -224,7 +224,7 @@ export default async function MoneyPage({
 
       {/* ── الضريبة في الفواتير — ليست حركة بنك، لكنّها مالٌ يعود أو يضيع ── */}
       <Section title="ضريبةُ المشتريات" icon={Receipt} hint="من الفواتير المسجّلة، لا من الكشف.">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
           <Link href="/purchases/invoices?tax=VALID" className="flex items-center justify-between gap-3 rounded-xl border border-line bg-raised px-4 py-3.5 shadow-raised transition-colors hover:border-accent-line">
             <span>
               <span className="block text-xs font-bold text-muted">قابلةٌ للاسترداد</span>

@@ -135,7 +135,7 @@ export default async function RecipesPage() {
       ) : (
         <>
           {(missing.rows.length > 0 || suspicious.length > 0) && (
-            <div className="mb-8 grid gap-3 lg:grid-cols-2">
+            <div className="mb-8 grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
               {missing.rows.length > 0 && (
                 <Callout tone="warn" icon={TriangleAlert} title={`${countNoun(missing.rows.length, PRODUCT)} بِيع ولا وصفةَ له`}>
                   <p>لا يدخل استهلاكُها الحساب، ويُعلَن ذلك في كلّ تقرير. أكثرُها مبيعاً:</p>

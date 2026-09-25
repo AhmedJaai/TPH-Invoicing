@@ -104,7 +104,7 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
 
   return (
     <Sheet open={help} onClose={() => setHelp(false)} title="اختصارات لوحة المفاتيح" description="تعمل من أيّ صفحة ما دام المؤشّر خارج حقلٍ يُكتب فيه." size="md">
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 sm:grid-cols-2">
         <ShortcutGroup
           title="عامّ"
           rows={[

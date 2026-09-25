@@ -461,7 +461,7 @@ function PreviewPanel({
         المزامنة تُقال أوّلاً: صاحب العمل يريد أن يعرف ما الجديد، لا أن
         يُدخِل ملفّاً. وكان يُقال «أُضيفت ٣٢٧ حركة» عن ملفٍّ لم يُضِف واحدة.
       */}
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <div>
           <p className="text-[1.6rem] font-bold leading-tight tracking-tight">
             {nothingNew ? "لا جديد في هذا الكشف" : `${countNoun(added, TRANSACTION)} جديدة`}

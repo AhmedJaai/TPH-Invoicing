@@ -151,7 +151,7 @@ export default async function StatementsPage({
       {/* بندُ الطابور يفتح `?missing=1`: الغائبون أوّلاً، لا في ذيل العمود الجانبيّ */}
       {focusMissing && !params.supplier && <div className="mb-8 max-w-2xl">{missingPanel}</div>}
 
-      <div className="grid gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <StatementReconcile
           archived={rows.rows.map((r) => ({
             id: r.id,

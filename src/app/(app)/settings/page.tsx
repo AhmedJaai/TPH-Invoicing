@@ -182,7 +182,7 @@ export default async function SettingsPage() {
           </Section>
 
           <Section id="system" title="النظام" icon={Cpu}>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
               <Link href="/suppliers" className="rounded-xl border border-line bg-raised p-4 shadow-raised transition-colors hover:border-accent-line">
                 <Store className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
                 <p className="mt-2 text-sm font-bold">المورّدون <span className="nums text-muted">{Number(f?.suppliers ?? 0)}</span></p>

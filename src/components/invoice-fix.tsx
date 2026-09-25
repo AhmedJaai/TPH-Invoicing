@@ -150,7 +150,7 @@ export function InvoiceFix({
           <p className="mb-2.5 text-[11px] leading-relaxed text-muted">
             اكتب ما على الورقة. والنظامُ يعيد الحكمَ على الفاتورة بعد الحفظ — لا تُكتَب الحالُ من هنا.
           </p>
-          <div className="grid gap-2.5 sm:grid-cols-2">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 sm:grid-cols-2">
             <Field label="رقم الفاتورة" value={form.invoiceNumber} onChange={(v) => set({ invoiceNumber: v })} ltr />
             <Field label="الرقم الضريبيّ للبائع" value={form.sellerVat} onChange={(v) => set({ sellerVat: v })} ltr />
             <Field label="الرقم الضريبيّ للمشتري" value={form.buyerVat} onChange={(v) => set({ buyerVat: v })} ltr />

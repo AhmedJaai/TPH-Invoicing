@@ -321,7 +321,7 @@ export default async function SupplierPage({
       }
     >
       {showAmounts && (
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-stretch">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-stretch">
           {/* ── الرقم الواحد: كم عليك له، ومنذ متى، وممّ تكوّن ── */}
           <Card className="flex flex-col">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -483,7 +483,7 @@ export default async function SupplierPage({
       )}
 
       {/* ── التفصيل خلف ألسنة، وبجانبه آخرُ ما جرى ── */}
-      <div className="mt-10 grid gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section id="detail" className="min-w-0 scroll-mt-24" aria-label="تفصيل حسابه">
           <div className="mb-4">
             <LinkTabs
@@ -779,7 +779,7 @@ export default async function SupplierPage({
                 <h3 className="mb-2 text-xs font-bold text-muted">
                   تعاملك معه — وما لا تكفي بياناته يبقى غير مقيَّم، ولا يُعطى صفراً
                 </h3>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
                   {health.map((d) => (
                     <Card key={d.dimension}>
                       <div className="flex items-baseline justify-between gap-3">

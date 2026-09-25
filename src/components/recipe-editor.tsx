@@ -120,7 +120,7 @@ export function RecipeEditor({
           </>
         }
       >
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="block text-[11px] font-medium text-muted">الصنف المباع</span>
             <select

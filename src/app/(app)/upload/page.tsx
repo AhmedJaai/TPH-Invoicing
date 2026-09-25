@@ -83,7 +83,7 @@ export default async function UploadPage() {
         hint="المزامنةُ تجري وحدها كلَّ ثلاث ساعات. افحص الآن إن وضعتَ ملفّاً في الدرايف بيدك ولا تريد الانتظار."
         className="mt-12"
       >
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
           <DriveSync />
           <DriveRename />
         </div>

@@ -428,7 +428,7 @@ function ScopePicker({
       {visible.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line px-5 py-10 text-center text-sm text-muted">لا صنفَ يطابق هذا الترشيح.</p>
       ) : (
-        <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {visible.map((row) => {
             const on = picked[row.productId] ?? true;
             return (

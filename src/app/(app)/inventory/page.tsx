@@ -120,7 +120,7 @@ export default async function InventoryPage({
       {!progress.complete && (
         <section
           aria-labelledby="setup-title"
-          className="mb-8 grid gap-6 rounded-2xl border border-accent-line bg-accent-soft/60 p-5 sm:p-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]"
+          className="mb-8 grid grid-cols-[minmax(0,1fr)] gap-6 rounded-2xl border border-accent-line bg-accent-soft/60 p-5 sm:p-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]"
         >
           <div className="min-w-0">
             <h2 id="setup-title" className="flex items-center gap-2 text-base font-bold">
@@ -142,7 +142,7 @@ export default async function InventoryPage({
         </section>
       )}
 
-      <div className="grid gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         {/* ── ابدأ جرد الأسبوع ── */}
         <div id="start" className="min-w-0 scroll-mt-24">
           {canCount ? (
@@ -224,7 +224,7 @@ export default async function InventoryPage({
             </Link>
           ) : undefined}
         >
-          <ul className="grid gap-3 md:grid-cols-3">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-3">
             {recent.map((c) => (
               <li key={c.id}>
                 <Link

@@ -176,7 +176,7 @@ export default async function ExpensesPage({
           بلا متوقَّعٍ مسجَّل تُعرَض بطاقةُ الفعليّ وحدها — «المتوقَّع ٠٫٠٠»
           تقول إنّ المقهى لا يتوقّع أن يصرف شيئاً، وذلك غير «لم يُسجَّل بعد».
         */
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-stretch">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-stretch">
           <Hero
             label={`الفعليّ في ${formatMonth(month)}`}
             minor={actualTotal}
@@ -194,7 +194,7 @@ export default async function ExpensesPage({
           </Notice>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
           <Hero label="المتوقَّع شهرياً" minor={expectedTotal} note={countNoun(recurring.length, ITEM)} />
           <Hero
             label={`الفعليّ في ${formatMonth(month)}`}
@@ -310,7 +310,7 @@ export default async function ExpensesPage({
         </div>
       )}
 
-      <div className="mt-10 grid gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+      <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
         {/* ── أين ذهب مصروفُ الشهر ── */}
         <Section title="الأبواب" icon={PieChart} className="mt-0!" hint={`مصروفُ ${formatMonth(month)} بأبوابه — من القيود أدناه.`}>
           {categories.length === 0 ? (

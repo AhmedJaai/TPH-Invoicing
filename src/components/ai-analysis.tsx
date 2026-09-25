@@ -169,7 +169,7 @@ export function FindingsList({
   const hidden = sorted.length - limit;
   return (
     <>
-      <ul className="grid gap-3 xl:grid-cols-2">
+      <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 xl:grid-cols-2">
         {sorted.slice(0, limit).map((f) => (
           <li key={f.id} className="min-w-0">
             <FindingCard finding={f} canApprove={canApprove} showSupplier={showSupplier} />

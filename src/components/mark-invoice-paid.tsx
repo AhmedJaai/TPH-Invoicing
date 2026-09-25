@@ -189,7 +189,7 @@ export function MarkInvoicePaid({
         panel ? (
           <fieldset className="space-y-2">
             <legend className="mb-2 text-xs font-bold text-ink-soft">من أين دُفعت؟</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
               <Choice
                 icon={Wallet}
                 title="من حسابي أو نقداً"

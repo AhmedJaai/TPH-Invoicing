@@ -442,7 +442,7 @@ function UnbackedSection({ groups, count }: { groups: ReturnType<typeof groupUnb
         {groups.length === 0 ? (
           <EmptyState compact title="لا دفعة بلا فاتورة." hint="كلّ ما دُفع له مستندُه." />
         ) : (
-          <ul className="grid gap-3 xl:grid-cols-2">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 xl:grid-cols-2">
             {groups.map((g) => (
               <li key={g.supplierId ?? "none"} id={g.supplierSlug ? `unbacked-${g.supplierSlug}` : undefined} className="scroll-mt-28">
                 <Card>

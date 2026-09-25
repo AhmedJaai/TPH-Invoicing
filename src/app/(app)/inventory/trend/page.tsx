@@ -141,7 +141,7 @@ export default async function InventoryTrendPage({
             <ul className="overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
               {chrono.map((c) => (
                 <li key={c.id} className="border-b border-line-soft last:border-b-0">
-                  <Link href={`/inventory/counts/${c.id}`} className="grid gap-x-5 gap-y-2 px-4 py-3 transition-colors hover:bg-hover sm:grid-cols-[11rem_minmax(0,1fr)_5rem]">
+                  <Link href={`/inventory/counts/${c.id}`} className="grid grid-cols-[minmax(0,1fr)] gap-x-5 gap-y-2 px-4 py-3 transition-colors hover:bg-hover sm:grid-cols-[11rem_minmax(0,1fr)_5rem]">
                     <span className="min-w-0">
                       <span className="block text-[13px] font-bold">{formatWeek(c.periodStart, c.periodEnd)}</span>
                       {c.readiness && c.readiness !== "READY" && (

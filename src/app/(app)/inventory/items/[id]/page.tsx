@@ -102,7 +102,7 @@ export default async function ItemHistoryPage({
         </Callout>
       )}
 
-      <div className="grid gap-x-8 gap-y-10 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-10">
           {/* ── الفرقُ عبر الجرودات: جهتان لا صافٍ ── */}
           <Section title="الفرقُ في الجرودات المقفَلة" className="mt-0!" hint={finalised.length > 0 ? `في آخر ${finalised.length === 1 ? "جردٍ واحد" : finalised.length === 2 ? "جردين" : `${finalised.length} جرودات`} حُسب فيها فرقُه.` : undefined}>

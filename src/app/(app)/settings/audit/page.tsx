@@ -64,7 +64,7 @@ function Detail({ value, label }: { value: unknown; label: string }) {
   return (
     <div>
       <p className="mb-1 text-[11px] font-bold text-muted">{label}</p>
-      <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-[auto_1fr]">
+      <dl className="grid grid-cols-[minmax(0,1fr)] gap-x-4 gap-y-1 sm:grid-cols-[auto_1fr]">
         {entries.map(([k, v]) => (
           <div key={k} className="contents text-[11px]">
             <dt className="text-muted">{k.replace(/_/g, " ")}</dt>
@@ -207,7 +207,7 @@ export default async function AuditTrailPage({
                               <summary className="inline-flex min-h-11 cursor-pointer items-center text-[11px] font-bold text-ink-soft hover:text-accent sm:min-h-6">
                                 التفاصيل
                               </summary>
-                              <div className="mt-2 grid gap-3 rounded-lg bg-sunken/60 p-3 sm:grid-cols-2">
+                              <div className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-3 rounded-lg bg-sunken/60 p-3 sm:grid-cols-2">
                                 <Detail value={r.before} label="قبل" />
                                 <Detail value={r.after} label={r.before ? "بعد" : "ما كُتب"} />
                               </div>

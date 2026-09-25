@@ -72,7 +72,7 @@ export default async function ClosePage() {
       eyebrow={`الشهر المنقضي: ${formatMonth(previous)}`}
       intro="إعلانٌ بأنّ الشهر تمّ: كلُّ فاتورةٍ وصلت، وكلُّ خللٍ عُولج أو أُقرّ به عمداً — ثمّ حزمةٌ واحدة للمحاسب."
     >
-      <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <MonthClose months={months} initialMonth={selected} initialReport={report} initialStatus={status} />
 
         <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">

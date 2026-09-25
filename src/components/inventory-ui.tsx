@@ -169,7 +169,7 @@ export function VarianceSplit({
 
   return (
     <div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
         {side("short", shortage, linesShort, "وُجد منه أقلّ من المتوقَّع.")}
         {side("over", overage, linesOver, "وُجد منه أكثر — شراءٌ لم يُقيَّد أو عدٌّ يُراجَع.")}
       </div>

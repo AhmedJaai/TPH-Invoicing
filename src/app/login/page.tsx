@@ -39,7 +39,7 @@ export default async function LoginPage({
   const { error, from } = await searchParams;
 
   return (
-    <main className="grid min-h-screen lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+    <main className="grid grid-cols-[minmax(0,1fr)] min-h-screen lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <title>الدخول · ذا بوبليك هاوس</title>
       {/* ── العلامة: إطارٌ داكن يقول ما هذا النظام قبل أن يُطلب الدخول ── */}
       <section className="relative hidden overflow-hidden bg-frame p-12 text-frame-ink lg:flex lg:flex-col">

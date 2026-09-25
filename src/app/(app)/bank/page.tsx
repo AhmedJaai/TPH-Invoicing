@@ -341,7 +341,7 @@ function FocusCard({ tx, canUndo }: { tx: NonNullable<Awaited<ReturnType<typeof 
           <X className="h-4 w-4" strokeWidth={2} aria-hidden />
         </Link>
       </header>
-      <div className="grid gap-5 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <div className="space-y-4">
           <KeyValue
             items={[

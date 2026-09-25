@@ -275,7 +275,7 @@ export default async function ItemsAndPricesPage({
             {dueSoon.length === 0 ? (
               <EmptyState compact icon={CalendarClock} title="لا صنفَ بلغ دورته." hint="تُحسب الدورة لما اشتُري في يومين مختلفين فأكثر." />
             ) : (
-              <ul className="grid gap-2 md:grid-cols-2">
+              <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
                 {dueSoon.map((x) => (
                   <li key={x.item.key} className="flex items-center gap-3 rounded-xl border border-line bg-raised px-4 py-3 shadow-raised">
                     <span className="min-w-0 flex-1">

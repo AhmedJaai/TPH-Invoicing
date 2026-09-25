@@ -49,7 +49,7 @@ export default async function CashPage() {
       }
     >
       {/* ── الأرقام الثلاثة ── */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
         <KeyFigure
           icon={Landmark}
           label="آخرُ رصيدٍ معروف"

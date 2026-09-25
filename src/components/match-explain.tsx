@@ -194,7 +194,7 @@ function Evidence({ match }: { match: MatchExplanation }) {
 
 function EvidenceRow({ label, items, note }: { label: string; items: readonly string[]; note?: string }) {
   return (
-    <div className="grid gap-1 px-4 py-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-4">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-1 px-4 py-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-4">
       <dt className="text-[11px] font-bold text-muted">{label}</dt>
       <dd className="min-w-0">
         <ul className="space-y-1">

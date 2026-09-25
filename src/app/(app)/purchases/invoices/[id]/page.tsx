@@ -178,7 +178,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       {/* ── الحالُ والخطوةُ التالية ── */}
       <section
         aria-label="ما بقي عليها"
-        className="grid overflow-hidden rounded-2xl border border-line bg-raised shadow-raised lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]"
+        className="grid grid-cols-[minmax(0,1fr)] overflow-hidden rounded-2xl border border-line bg-raised shadow-raised lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]"
       >
         <div className="p-5 sm:p-6">
           <div className="flex flex-wrap items-center gap-2">

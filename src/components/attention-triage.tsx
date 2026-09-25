@@ -419,7 +419,7 @@ export function ItemDetail({
             </p>
           </div>
 
-          <div className="mt-5 grid gap-x-6 gap-y-4 md:grid-cols-2">
+          <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 md:grid-cols-2">
             <div>
               <h3 className="flex items-center gap-1.5 text-[11px] font-bold text-muted">
                 <ScanSearch className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />

@@ -151,7 +151,7 @@ export default async function PaymentsPage({
 
           {run.coveredByCredit.length > 0 && (
             <Section title="يغطّيها رصيدُك عندهم" hint="دفعتَ لهؤلاء مالاً لم يُخصم بعد، ويكفي لفواتير الشهر كلّها — فلا تحوِّل لهم شيئاً.">
-              <ul className="grid gap-2 sm:grid-cols-2">
+              <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
                 {run.coveredByCredit.map((s) => (
                   <li key={s.supplierId} className="flex items-center justify-between gap-3 rounded-xl border border-ok/25 bg-ok-bg px-4 py-3 text-sm">
                     <span className="font-bold">{s.supplierName}</span>
@@ -164,7 +164,7 @@ export default async function PaymentsPage({
 
           {run.held.length > 0 && (
             <Section title="محجوزٌ حتى تُعالَج" count={run.held.length} hint="لا يدخل ملفّ التحويلات. اطلب الفاتورة الصحيحة قبل السداد — والرسالةُ جاهزة.">
-              <div className="grid gap-3 lg:grid-cols-2">
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
                 {[...heldBySupplier].map(([name, list]) => {
                   const reasons = [...new Set(list.map((h) => h.message))];
                   return (

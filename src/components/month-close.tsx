@@ -239,7 +239,7 @@ export function MonthClose({
                 كما في كشف البنك: الرصيد قبل أوّل حركةٍ في الشهر، والرصيد بعد آخرها. بهما تُفحَص
                 المعادلة: الافتتاحيّ + الوارد − الصادر = الختاميّ.
               </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
                 <label className="block text-xs">
                   <span className="font-bold text-ink-soft">الرصيد الافتتاحيّ</span>
                   <input

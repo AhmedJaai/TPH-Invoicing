@@ -164,7 +164,7 @@ export function RecurringExpenses({
           onSubmit={(e) => { e.preventDefault(); void create(); }}
         >
           <p className="mb-3 text-[13px] font-bold">أضِف مصروفاً متكرّراً</p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <label className="block text-xs lg:col-span-2">
               <span className="font-bold text-ink-soft">الاسم</span>
               <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="إيجار المحل" dir="auto" className={`${field} mt-1.5`} />
