@@ -510,10 +510,13 @@ export function Callout({
  */
 export function NoAccess({ what }: { what?: string }) {
   return (
-    <EmptyState
-      title={what ? `${what} خارج صلاحيتك.` : "هذه الصفحة خارج صلاحيتك."}
-      hint="اطلب من مالك الحساب توسيع صلاحيتك، ثمّ حدّث الصفحة."
-    />
+    /* `data-no-access`: الزاحفُ بدورٍ غير المالك يعدّ كلَّ صفحةٍ كهذه وصلها رابطٌ ظاهرٌ له طريقاً مسدوداً */
+    <div data-no-access="">
+      <EmptyState
+        title={what ? `${what} خارج صلاحيتك.` : "هذه الصفحة خارج صلاحيتك."}
+        hint="اطلب من مالك الحساب توسيع صلاحيتك، ثمّ حدّث الصفحة."
+      />
+    </div>
   );
 }
 

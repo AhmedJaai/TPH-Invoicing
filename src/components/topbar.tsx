@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronLeft, Keyboard, Search, UploadCloud } from "lucide-react";
-import { ACCOUNT_LINKS, activeArea, activeChild, entryHref } from "@/lib/nav";
+import { ACCOUNT_LINKS, activeArea, activeChild, canSeeArea, entryHref, homeHref } from "@/lib/nav";
 import { can, type Role } from "@/lib/permissions";
 import { queueCapture } from "@/lib/capture-queue";
 import { BrandMark } from "./icons";
@@ -34,7 +34,7 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
     <header className="no-print sticky top-0 z-20 border-b border-line bg-surface/85 backdrop-blur-md">
       <div className="flex h-14 items-center gap-2 px-4 sm:px-6 lg:h-[60px] lg:px-8">
         {/* الجوّال: العلامة واسمُ المساحة */}
-        <Link href="/" className="flex min-w-0 items-center gap-2 lg:hidden" aria-label="اليوم">
+        <Link href={homeHref(role)} className="flex min-w-0 items-center gap-2 lg:hidden" aria-label="البداية">
           <BrandMark className="h-8 w-8" />
         </Link>
         <p className="min-w-0 flex-1 truncate text-[15px] font-bold lg:hidden">{area?.label ?? account?.label ?? "ذا بوبليك هاوس"}</p>
@@ -43,9 +43,14 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
         <nav aria-label="موضعك" className="hidden min-w-0 items-center gap-1.5 text-[13px] lg:flex lg:w-64 xl:w-72">
           {area ? (
             <>
-              <Link href={entryHref(role, area)} className={`truncate ${showChild ? "text-muted hover:text-ink" : "font-bold"}`}>
-                {area.label}
-              </Link>
+              {canSeeArea(role, area) ? (
+                <Link href={entryHref(role, area)} className={`truncate ${showChild ? "text-muted hover:text-ink" : "font-bold"}`}>
+                  {area.label}
+                </Link>
+              ) : (
+                /* مساحةٌ خارج الصلاحية تُسمّى ولا تُفتح — وصلها بابٌ آخر */
+                <span className={`truncate ${showChild ? "text-muted" : "font-bold"}`}>{area.label}</span>
+              )}
               {showChild && (
                 <>
                   <ChevronLeft className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} aria-hidden />

@@ -35,6 +35,11 @@ export const CATEGORY_LABEL: Record<TxCategory, string> = {
   BANK_VAT: "ضريبة رسوم البنك",
 };
 
+/** نصُّ الباب من القاعدة — يُفحص ولا يُفرَض بـ`as`؛ وما ليس باباً معروفاً «غير مصنَّفة». */
+export function isTxCategory(v: string): v is TxCategory {
+  return Object.hasOwn(CATEGORY_LABEL, v);
+}
+
 export interface BankRule {
   id: string;
   /** النمط بعد التطبيع */

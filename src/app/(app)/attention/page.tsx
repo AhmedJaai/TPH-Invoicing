@@ -91,7 +91,7 @@ export default async function AttentionPage({
       فحين لا مستندَ ولا كشف يُقال ذلك، ويُدَلّ على البداية.
     */
     const start = await loadStartState();
-    return shell(start.knowsNothing ? <KnowsNothing start={start} /> : <AllClear start={start} />);
+    return shell(start.knowsNothing ? <KnowsNothing start={start} /> : <AllClear start={start} canPay={can(user.role, "payment:approve")} />);
   }
 
   const canEdit = can(user.role, "bank:edit");

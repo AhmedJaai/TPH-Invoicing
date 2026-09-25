@@ -32,6 +32,10 @@ export default async function CashPage() {
   }
 
   const o = await loadCashOutlook();
+  /* المحاسبُ لا يعتمد الدفعة — فسطرُ المورّد يفتح حساباته لا صفحةً تقول «خارج صلاحيتك» */
+  const canPay = can(user.role, "payment:approve");
+  const payHref = canPay ? "/payments" : "/suppliers";
+  const buckets = o.buckets.map((b) => ({ ...b, lines: b.lines.map((l) => (l.kind === "SUPPLIER" ? { ...l, href: payHref } : l)) }));
   const overdue = o.buckets.find((b) => b.id === "overdue");
   const nextRun = o.buckets.find((b) => b.id === "next-run");
   const balanceKnown = o.balanceMinor !== null;
@@ -63,7 +67,7 @@ export default async function CashPage() {
           label="متأخّرٌ الآن"
           value={<Money minor={overdue?.totalMinor ?? 0} />}
           sub={overdue ? `${countNoun(overdue.lines.length, SUPPLIER)} من دفعة الشهر الماضي لم يُحوَّل لهم` : "لا شيء متأخّر من دفعة الشهر الماضي."}
-          href="/payments"
+          href={payHref}
         />
         <KeyFigure
           icon={CalendarClock}
@@ -97,8 +101,8 @@ export default async function CashPage() {
           />
         ) : (
           <ol className="relative space-y-4">
-            {o.buckets.map((b, i) => (
-              <BucketCard key={b.id} bucket={b} last={i === o.buckets.length - 1} shortfall={o.shortfallAt === b.id} />
+            {buckets.map((b, i) => (
+              <BucketCard key={b.id} bucket={b} last={i === buckets.length - 1} shortfall={o.shortfallAt === b.id} />
             ))}
           </ol>
         )}
@@ -118,8 +122,15 @@ export default async function CashPage() {
 
       {nextRun && (
         <p className="mt-6 text-xs leading-relaxed text-muted">
-          دفعةُ الشهر القادم تُبنى من الفواتير المسجّلة حتى اليوم وتكبر مع كلّ فاتورةٍ تصل — ودفعةُ الشهر الماضي تُعتمَد من{" "}
-          <Link href="/payments" className="font-bold text-accent hover:underline">دفعة الشهر</Link>.
+          دفعةُ الشهر القادم تُبنى من الفواتير المسجّلة حتى اليوم وتكبر مع كلّ فاتورةٍ تصل
+          {canPay ? (
+            <>
+              {" "}— ودفعةُ الشهر الماضي تُعتمَد من{" "}
+              <Link href="/payments" className="font-bold text-accent hover:underline">دفعة الشهر</Link>.
+            </>
+          ) : (
+            " — ويعتمدها المالك."
+          )}
         </p>
       )}
     </PageShell>

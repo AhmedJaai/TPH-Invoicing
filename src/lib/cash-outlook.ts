@@ -19,6 +19,11 @@ import { formatMonth } from "./riyadh-time";
 
 export type Cadence = "MONTHLY" | "QUARTERLY" | "ANNUAL";
 
+/** دورةُ المصروف من نصّ القاعدة — وما ليس ربعيّاً ولا سنويّاً شهريّ، كما يكتبه النموذج. */
+export function asCadence(v: string): Cadence {
+  return v === "QUARTERLY" || v === "ANNUAL" ? v : "MONTHLY";
+}
+
 export interface RecurringInput {
   id: string;
   label: string;

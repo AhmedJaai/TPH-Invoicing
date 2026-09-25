@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
 import { Activity, Cpu, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound } from "lucide-react";
 import { BankRules, type BankRuleRow } from "@/components/bank-rules";
-import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
+import { CATEGORY_LABEL, isTxCategory } from "@/lib/bank/rules";
+import { asCadence } from "@/lib/cash-outlook";
 import { db } from "@/db";
 import { currentUser, isAuthBypassed } from "@/lib/session";
 import { can, ROLE_LABEL } from "@/lib/permissions";
@@ -68,7 +69,7 @@ export default async function SettingsPage() {
   const rules: BankRuleRow[] = rulesRows.map((r) => ({
     id: r.id,
     pattern: r.pattern,
-    categoryLabel: CATEGORY_LABEL[r.category as TxCategory] ?? r.category,
+    categoryLabel: isTxCategory(r.category) ? CATEGORY_LABEL[r.category] : r.category,
     supplier: r.supplier,
     note: r.note,
   }));
@@ -77,9 +78,9 @@ export default async function SettingsPage() {
     const row = {
       id: r.id,
       label: r.label,
-      category: r.category as TxCategory,
+      category: isTxCategory(r.category) ? r.category : "OTHER",
       amountMinor: Number(r.amount_minor),
-      cadence: r.cadence as ExpenseRow["cadence"],
+      cadence: asCadence(r.cadence),
     };
     return { ...row, monthlyMinor: monthlyShare(row), isActive: r.is_active, startsOn: r.starts_on };
   });
@@ -88,16 +89,23 @@ export default async function SettingsPage() {
     cadence: r.cadence, monthlyMinor: r.monthlyMinor, startsOn: r.startsOn,
   });
 
+  /*
+    الإيجارُ والرواتبُ مبالغ — ومديرُ المشتريات لا يرى المبالغ. وكان القسمُ
+    يُعرض لكلّ من يرى المورّدين، فيقرأ رواتبَ زملائه. وقواعدُ التصنيف نصوصُ
+    حركات البنك، فلمن يرى البنك وحده.
+  */
+  const showMoney = can(user.role, "amounts:view");
+  const showRules = can(user.role, "bank:view");
   const toc = [
     { id: "account", label: "الحساب", icon: UserRound },
-    { id: "recurring", label: "المصروفات المتكرّرة", icon: Repeat },
-    { id: "rules", label: "قواعد التصنيف", icon: SlidersHorizontal },
+    ...(showMoney ? [{ id: "recurring", label: "المصروفات المتكرّرة", icon: Repeat }] : []),
+    ...(showRules ? [{ id: "rules", label: "قواعد التصنيف", icon: SlidersHorizontal }] : []),
     { id: "health", label: "صحّة البيانات", icon: Activity },
     { id: "system", label: "النظام", icon: Cpu },
   ];
 
   return (
-    <PageShell user={user} width="wide" title="الإعدادات" intro="ما يُضبط مرّة: المصروفاتُ المتكرّرة، وقواعدُ التصنيف، وحالُ الربط.">
+    <PageShell user={user} width="wide" title="الإعدادات" intro={`ما يُضبط مرّة: ${[showMoney ? "المصروفاتُ المتكرّرة" : null, showRules ? "قواعدُ التصنيف" : null, "حالُ الربط"].filter(Boolean).join("، و")}.`}>
       {/* `minmax(0,1fr)` على الجوّال أيضاً — عمودٌ ضمنيّ بعرض محتواه يمدّه صفُّ الفهرس فتفيض الصفحة كلُّها عرضاً */}
       <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[13rem_minmax(0,1fr)]">
         <nav aria-label="أقسام الإعدادات" className="min-w-0 lg:sticky lg:top-24 lg:self-start">
@@ -126,25 +134,29 @@ export default async function SettingsPage() {
               />
               {isAuthBypassed() && (
                 <Callout tone="danger" icon={ShieldAlert} className="mt-4" title="وضع التجربة مفعَّل — الدخول معطَّل">
-                  كلُّ من يعرف الرابط يدخل بصلاحية المالك. لا يعمل في الإنتاج مهما فُعِّل.
+                  كلُّ من يعرف الرابط يدخل بدور «{ROLE_LABEL[user.role]}». لا يعمل في الإنتاج مهما فُعِّل.
                 </Callout>
               )}
             </div>
           </Section>
 
-          <Section
-            id="recurring"
-            title="المصروفات المتكرّرة"
-            icon={Repeat}
-            hint="ما يتكرّر بلا فاتورةٍ تصلك: الإيجار والرواتب والاشتراكات. منها يُعرف «النقد القادم»، ويُقابَل المتوقَّعُ بالفعليّ."
-            action={<Link href="/cash" className="text-xs font-bold text-accent hover:underline">النقد القادم</Link>}
-          >
-            <RecurringExpenses rows={all.filter((r) => r.isActive).map(toRow)} inactive={all.filter((r) => !r.isActive).map(toRow)} canEdit={can(user.role, "expense:edit")} />
-          </Section>
+          {showMoney && (
+            <Section
+              id="recurring"
+              title="المصروفات المتكرّرة"
+              icon={Repeat}
+              hint="ما يتكرّر بلا فاتورةٍ تصلك: الإيجار والرواتب والاشتراكات. منها يُعرف «النقد القادم»، ويُقابَل المتوقَّعُ بالفعليّ."
+              action={can(user.role, "bank:view") ? <Link href="/cash" className="text-xs font-bold text-accent hover:underline">النقد القادم</Link> : undefined}
+            >
+              <RecurringExpenses rows={all.filter((r) => r.isActive).map(toRow)} inactive={all.filter((r) => !r.isActive).map(toRow)} canEdit={can(user.role, "expense:edit")} />
+            </Section>
+          )}
 
-          <Section id="rules" title="قواعد تصنيف الحركات" icon={SlidersHorizontal} count={rules.length} hint="ما قرّرتَه مرّةً عند استيراد كشف: حركةٌ فيها هذا النصّ تُصنَّف هكذا في كلّ كشفٍ بعده.">
-            <BankRules rows={rules} canEdit={can(user.role, "bank:edit")} />
-          </Section>
+          {showRules && (
+            <Section id="rules" title="قواعد تصنيف الحركات" icon={SlidersHorizontal} count={rules.length} hint="ما قرّرتَه مرّةً عند استيراد كشف: حركةٌ فيها هذا النصّ تُصنَّف هكذا في كلّ كشفٍ بعده.">
+              <BankRules rows={rules} canEdit={can(user.role, "bank:edit")} />
+            </Section>
+          )}
 
           <Section
             id="health"
@@ -190,11 +202,13 @@ export default async function SettingsPage() {
                   {countNoun(Number(f?.aliases ?? 0), ALIAS)}{Number(f?.inactive ?? 0) > 0 ? ` · ${f?.inactive} معطَّلة بعد الدمج` : ""}
                 </p>
               </Link>
-              <Link href="/settings/audit" className="rounded-xl border border-line bg-raised p-4 shadow-raised transition-colors hover:border-accent-line">
-                <ScrollText className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-                <p className="mt-2 text-sm font-bold">سجلّ التدقيق <span className="nums text-muted">{Number(f?.audit ?? 0)}</span></p>
-                <p className="mt-0.5 text-[11px] text-muted">ما فُعل ومن فعله ومتى — لا يُعدَّل ولا يُحذف</p>
-              </Link>
+              {can(user.role, "audit:view") && (
+                <Link href="/settings/audit" className="rounded-xl border border-line bg-raised p-4 shadow-raised transition-colors hover:border-accent-line">
+                  <ScrollText className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
+                  <p className="mt-2 text-sm font-bold">سجلّ التدقيق <span className="nums text-muted">{Number(f?.audit ?? 0)}</span></p>
+                  <p className="mt-0.5 text-[11px] text-muted">ما فُعل ومن فعله ومتى — لا يُعدَّل ولا يُحذف</p>
+                </Link>
+              )}
               <div className="rounded-xl border border-line bg-raised p-4 shadow-raised">
                 <Cpu className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
                 <p className="mt-2 text-sm font-bold">قارئ المستندات</p>

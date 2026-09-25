@@ -595,7 +595,7 @@ export function WorkspaceSkeleton() {
  * لا شيء ينتظر — طمأنينةٌ بسندها: ما فُحص فخلا. وإن بقي أساسٌ لم يُستورَد
  * قيل إنّ الفراغ على ما قُرئ وحده، ودُلّ على ما يكمله.
  */
-export function AllClear({ start }: { start: StartState }) {
+export function AllClear({ start, canPay = false }: { start: StartState; canPay?: boolean }) {
   const next = start.steps.find((s) => !s.done);
   return (
     <div className="space-y-5">
@@ -617,7 +617,7 @@ export function AllClear({ start }: { start: StartState }) {
         </ul>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <LinkButton href="/suppliers" variant="secondary">افتح حسابات المورّدين</LinkButton>
-          <LinkButton href="/payments" variant="quiet">دفعة الشهر</LinkButton>
+          {canPay && <LinkButton href="/payments" variant="quiet">دفعة الشهر</LinkButton>}
         </div>
       </section>
       {start.incomplete && next && (

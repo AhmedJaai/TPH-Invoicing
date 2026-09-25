@@ -258,4 +258,5 @@ https://tph-invoicing.vercel.app/api/health
 
 `AUTH_BYPASS=true` يتخطّى تسجيل الدخول ويعطي صلاحية المالك. للتجربة وحدها:
 متى كان مفعّلاً فكل من يعرف الرابط يدخل، ويظهر شريط أصفر في كل صفحة ينبّه على
-ذلك. أطفئه بـ `AUTH_BYPASS=false` ثم أعد النشر.
+ذلك. أطفئه بـ `AUTH_BYPASS=false` ثم أعد النشر. ولتجربة دورٍ غير المالك:
+`AUTH_BYPASS_ROLE=ACCOUNTANT` أو `PURCHASING` — لا أثر له خارج وضع التجربة.

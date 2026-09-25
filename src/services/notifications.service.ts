@@ -168,7 +168,8 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
       tone: "warn",
       title: `${countNoun(overdue.length, SUPPLIER)} تأخّر سدادُهم أكثر من ${countNoun(60, DAY)}`,
       body: `أقدمُ دَينٍ منذ ${countNoun(oldest, DAY)}.`,
-      href: "/payments",
+      /* من لا يعتمد الدفعة يفتح الحسابات — لا صفحةً تقول «خارج صلاحيتك» */
+      href: can(user.role, "payment:approve") ? "/payments" : "/suppliers",
     });
   }
 

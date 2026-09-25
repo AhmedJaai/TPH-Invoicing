@@ -106,10 +106,11 @@ export const AREAS: readonly NavArea[] = [
     needs: "amounts:view",
     owns: ["/purchases", "/analysis"],
     children: [
+      /* حاجةُ اللسان حاجةُ صفحته — لسانٌ يفتح «خارج صلاحيتك» طريقٌ مسدود */
       { href: "/suppliers", label: "الحسابات", needs: "supplier:view" },
-      { href: "/purchases/invoices", label: "الفواتير" },
-      { href: "/statements", label: "الكشوف", needs: "supplier:view" },
-      { href: "/analysis", label: "الأصناف والأسعار" },
+      { href: "/purchases/invoices", label: "الفواتير", needs: "amounts:view" },
+      { href: "/statements", label: "الكشوف", needs: "amounts:view" },
+      { href: "/analysis", label: "الأصناف والأسعار", needs: "amounts:view" },
     ],
   },
   {
@@ -215,6 +216,20 @@ export function visibleChildren(role: Role, area: NavArea): NavLink[] {
 export function entryHref(role: Role, area: NavArea): string {
   if (area.children.length === 0) return area.href;
   return visibleChildrenAll(role, area)[0]?.href ?? area.href;
+}
+
+/**
+ * بيتُ الدور: مدخلُ أوّل مساحةٍ يراها. العلامةُ تفتحه — و«اليوم» لمن لا يرى
+ * المبالغ يُحوِّل إلى الرفع، فالعلامةُ التي تشير إليه تُحوِّل ولا تصل.
+ */
+export function homeHref(role: Role): string {
+  const first = visibleAreas(role)[0];
+  return first ? entryHref(role, first) : "/";
+}
+
+/** أيرى الدورُ هذه المساحة؟ — فتاتُ الموضع لا يُرسل إلى مساحةٍ خارج الصلاحية. */
+export function canSeeArea(role: Role, area: NavArea): boolean {
+  return visibleAreas(role).some((a) => a.href === area.href);
 }
 
 export function visibleAccountLinks(role: Role): (NavLink & { icon: NavIcon })[] {

@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { recurringExpenses } from "@/db/schema";
 import {
-  buildCashOutlook, dueThisWeek, type Cadence, type CashOutlook, type RecurringInput, type SupplierDue, type WeekDue,
+  asCadence, buildCashOutlook, dueThisWeek, type CashOutlook, type RecurringInput, type SupplierDue, type WeekDue,
 } from "@/lib/cash-outlook";
 import { previousMonth } from "@/lib/filing";
 import type { PaymentRun } from "@/lib/payment-run";
@@ -18,10 +18,6 @@ import { loadSupplierBalances } from "./supplier-balance.service";
 
 function dues(run: PaymentRun): SupplierDue[] {
   return run.ready.map((s) => ({ supplierId: s.supplierId, supplierName: s.supplierName, amountMinor: s.totalMinor }));
-}
-
-function asCadence(v: string): Cadence {
-  return v === "QUARTERLY" || v === "ANNUAL" ? v : "MONTHLY";
 }
 
 /** المصروفاتُ المتكرّرة الفاعلة بصيغة الإسقاط — للنقد القادم ولـ«هذا الأسبوع» في الإحاطة. */

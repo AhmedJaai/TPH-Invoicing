@@ -58,3 +58,15 @@ export function refusalReason(env: PreviewEnv): string | null {
   if (!env.VERCEL_ENV && env.NODE_ENV === "production") return "وضع المعاينة مرفوض: البناء إنتاجيّ.";
   return null;
 }
+
+/**
+ * دورُ وضع التجربة — المالكُ افتراضاً، و`AUTH_BYPASS_ROLE` يجرّب غيرَه.
+ *
+ * كانت التجربةُ مالكاً دائماً، فلم يُرَ قطّ ما يراه المحاسبُ ومديرُ المشتريات:
+ * زرٌّ يظهر لمن لا يملكه، أو صفحةٌ تُفتح على «لا صلاحية» — لا يكشفه إلّا
+ * دورٌ آخر. والمتغيّرُ لا أثر له خارج وضع التجربة (`previewAllowed`)، وما
+ * ليس دوراً معروفاً يُرَدّ إلى المالك ولا يُخترَع له دور.
+ */
+export function previewRole(requested: string | undefined): "OWNER" | "ACCOUNTANT" | "PURCHASING" {
+  return requested === "ACCOUNTANT" || requested === "PURCHASING" ? requested : "OWNER";
+}

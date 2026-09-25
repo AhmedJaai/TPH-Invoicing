@@ -7,9 +7,11 @@ import {
   MOBILE_TABS,
   activeArea,
   activeChild,
+  canSeeArea,
   chordsFor,
   entryHref,
   groupedAreas,
+  homeHref,
   mobileTabs,
   visibleAccountLinks,
   visibleAreas,
@@ -313,4 +315,29 @@ describe("الهيكل يحمل اسم صفحته", () => {
       expect(titleOf(l)).toBe(pageTitle);
     });
   }
+});
+
+/*
+  لا رابطَ ظاهرٌ لدورٍ يفتح عليه «خارج صلاحيتك» — وجده الزاحفُ بدور مدير
+  المشتريات: العلامةُ إلى «اليوم» (يُحوِّل)، وألسنةُ المورّدين إلى صفحاتٍ مالُها
+  خارج صلاحيته.
+*/
+describe("روابطُ الدور تصل ولا تُردّ", () => {
+  it("العلامةُ تفتح أوّلَ ما يراه الدور", () => {
+    expect(homeHref("OWNER")).toBe("/");
+    expect(homeHref("PURCHASING")).toBe("/documents");
+  });
+
+  it("فتاتُ الموضع لا يفتح مساحةً خارج الصلاحية", () => {
+    const payments = AREAS.find((a) => a.href === "/payments")!;
+    expect(canSeeArea("OWNER", payments)).toBe(true);
+    expect(canSeeArea("PURCHASING", payments)).toBe(false);
+  });
+
+  it("ألسنةُ المورّدين التي صفحاتُها مالٌ تحتاج رؤيةَ المال", () => {
+    const suppliers = AREAS.find((a) => a.href === "/suppliers")!;
+    for (const href of ["/purchases/invoices", "/statements", "/analysis"]) {
+      expect(suppliers.children.find((c) => c.href === href)?.needs).toBe("amounts:view");
+    }
+  });
 });

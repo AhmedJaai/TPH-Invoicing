@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { can, ForbiddenError, type Capability, type Role } from "./permissions";
-import { previewAllowed } from "./preview-mode";
+import { previewAllowed, previewRole } from "./preview-mode";
 
 export interface CurrentUser {
   id: string;
@@ -51,7 +51,8 @@ const TRIAL_USER: CurrentUser = {
 let cachedTrialId: string | null = null;
 
 async function trialUser(): Promise<CurrentUser> {
-  if (cachedTrialId) return { ...TRIAL_USER, id: cachedTrialId };
+  const role = previewRole(process.env.AUTH_BYPASS_ROLE);
+  if (cachedTrialId) return { ...TRIAL_USER, id: cachedTrialId, role };
 
   try {
     const { db } = await import("@/db");
@@ -59,12 +60,12 @@ async function trialUser(): Promise<CurrentUser> {
     const [row] = await db.select({ id: users.id }).from(users).limit(1);
     if (row?.id) {
       cachedTrialId = row.id;
-      return { ...TRIAL_USER, id: row.id };
+      return { ...TRIAL_USER, id: row.id, role };
     }
   } catch {
     /* لا قاعدة في متناول اليد — يبقى المعرّف المخترَع، والقراءة تعمل */
   }
-  return TRIAL_USER;
+  return { ...TRIAL_USER, role };
 }
 
 /*

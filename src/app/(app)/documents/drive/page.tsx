@@ -119,7 +119,7 @@ export default async function DrivePage() {
           title="آخرُ ما فعله"
           icon={History}
           className="mt-0!"
-          action={<LinkButton href="/settings/audit?kind=documents" size="sm" variant="quiet">سجلُّ التدقيق</LinkButton>}
+          action={can(user.role, "audit:view") ? <LinkButton href="/settings/audit?kind=documents" size="sm" variant="quiet">سجلُّ التدقيق</LinkButton> : undefined}
         >
           {s.recent.length > 0 ? (
             <Timeline items={s.recent.map(activityItem)} />

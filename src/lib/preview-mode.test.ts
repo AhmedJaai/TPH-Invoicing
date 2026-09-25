@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isProductionEnv, previewAllowed, refusalReason } from "./preview-mode";
+import { isProductionEnv, previewAllowed, previewRole, refusalReason } from "./preview-mode";
 
 describe("previewAllowed", () => {
   it("مغلق ما لم يُطلب صراحةً", () => {
@@ -67,5 +67,18 @@ describe("refusalReason", () => {
 
   it("تسكت حين يُطلب ويُسمح", () => {
     expect(refusalReason({ AUTH_BYPASS: "true", NODE_ENV: "development" })).toBeNull();
+  });
+});
+
+describe("previewRole", () => {
+  it("المالكُ افتراضاً، والدورُ المعروف يُجرَّب", () => {
+    expect(previewRole(undefined)).toBe("OWNER");
+    expect(previewRole("ACCOUNTANT")).toBe("ACCOUNTANT");
+    expect(previewRole("PURCHASING")).toBe("PURCHASING");
+  });
+
+  it("ما ليس دوراً معروفاً يُرَدّ إلى المالك ولا يُخترَع", () => {
+    expect(previewRole("ADMIN")).toBe("OWNER");
+    expect(previewRole("accountant")).toBe("OWNER");
   });
 });

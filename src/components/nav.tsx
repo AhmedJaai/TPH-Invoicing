@@ -10,6 +10,7 @@ import {
   activeChild,
   entryHref,
   groupedAreas,
+  homeHref,
   mobileTabs,
   visibleAccountLinks,
   visibleChildren,
@@ -51,7 +52,7 @@ export function Sidebar({
   return (
     <nav className="flex h-full flex-col" aria-label="التنقّل الرئيسيّ">
       <div className="flex items-center gap-2.5 px-4 pb-4 pt-5">
-        <Link href="/" className="flex min-w-0 items-center gap-2.5 rounded-lg">
+        <Link href={homeHref(role)} className="flex min-w-0 items-center gap-2.5 rounded-lg">
           <BrandMark className="h-9 w-9" />
           <span className="min-w-0">
             <span className="block truncate text-[15px] font-bold leading-tight tracking-tight text-frame-ink">ذا بوبليك هاوس</span>

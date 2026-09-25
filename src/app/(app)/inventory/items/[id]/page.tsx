@@ -270,7 +270,8 @@ function movementItem(m: ItemMovement, showAmounts: boolean): TimelineItem {
     id: m.id,
     icon: skin.icon,
     tone: m.voided ? "muted" : skin.tone,
-    href: m.href ?? undefined,
+    /* الفاتورةُ مالٌ — ومن لا يرى المبالغ يقرأ السطرَ ولا يُرسَل إلى «خارج صلاحيتك» */
+    href: m.kind === "INVOICE" && !showAmounts ? undefined : m.href ?? undefined,
     title: <span className={m.voided ? "line-through decoration-muted" : ""}>{m.title}</span>,
     meta: formatDay(m.day),
     body: (

@@ -4,6 +4,7 @@
  *   npm run ui:crawl                      (خادمُ التطوير على :3000، وضعُ التجربة)
  *   BASE=http://localhost:3100 npm run ui:crawl
  *   npm run ui:crawl -- --quick           (الحاسوبُ الفاتح وحده)
+ *   CRAWL_ROLE=ACCOUNTANT npm run ui:crawl  (خادمٌ بـ`AUTH_BYPASS_ROLE` نفسه)
  *
  * يبدأ من كلّ مسارٍ في نموذج التنقّل ولوحة الأوامر، ثمّ يتبع كلَّ رابطٍ
  * داخليٍّ يجده في الصفحات (بعرضٍ واحد)، ثمّ يزور كلَّ ما وجده بأربعة
@@ -13,18 +14,22 @@
  *   - ليست فارغة: عنوانٌ `h1` ونصٌّ يُقرأ.
  *   - لا `href="#"` ولا رابطٌ بلا وجهة، ولا زرٌّ أو حقلٌ بلا اسمٍ يُقرأ.
  *   - لا فيضَ عرضاً على الجوّال (الصفحةُ لا تُسحب جانبياً).
+ *   - وبدورٍ غير المالك (`CRAWL_ROLE`): يبدأ ممّا يراه الدورُ وحده، فكلُّ صفحةٍ
+ *     تقول «خارج صلاحيتك» أو تُحوِّل إلى غيرها وصلها رابطٌ ظاهرٌ له — طريقٌ مسدود.
  *
  * ولا يضغط زرّاً ولا يرسل نموذجاً — يقرأ فقط، فيصلح لقاعدة المعاينة وحدها.
  * ويخرج بـ١ إن وجد شيئاً، ويكتب التقرير في `.scratch/crawl-report.json`.
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { chromium, type Page } from "playwright-core";
-import { AREAS, ACCOUNT_LINKS } from "@/lib/nav";
+import { entryHref, visibleAccountLinks, visibleAreas, visibleChildren } from "@/lib/nav";
 import { commandsFor } from "@/lib/commands";
+import type { Role } from "@/lib/permissions";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const QUICK = process.argv.includes("--quick");
 const MAX_PAGES = Number(process.env.CRAWL_MAX ?? 120);
+const ROLE: Role = process.env.CRAWL_ROLE === "ACCOUNTANT" || process.env.CRAWL_ROLE === "PURCHASING" ? process.env.CRAWL_ROLE : "OWNER";
 
 /** مساراتٌ لا يُزحَف إليها: التنزيلاتُ والواجهاتُ والخروج. */
 const SKIP = [/^\/api\//, /^\/login/, /\.(csv|xlsx|pdf|png|jpg|svg|ico|webmanifest)$/i];
@@ -41,6 +46,8 @@ interface Finding {
   route: string;
   variant: string;
   problem: string;
+  /** أوّلُ صفحةٍ دلّت عليه — موضعُ الإصلاح حين يكون الرابطُ نفسُه هو العطب. */
+  from?: string;
 }
 
 /** مسارٌ له صفحة — `owns` بادئاتٌ قد لا تكون صفحاتٍ (`/inventory/counts` لـ`/inventory/counts/[id]`). */
@@ -49,21 +56,27 @@ function isPage(path: string): boolean {
   return existsSync(file);
 }
 
+/** ما يراه الدورُ وحده: مساحاتُه وألسنتُها وروابطُ حسابه وأوامرُ لوحته. */
 function seeds(): string[] {
-  const out = new Set<string>(["/"]);
-  for (const a of AREAS) {
-    out.add(a.href);
-    for (const c of a.children) out.add(c.href);
-    for (const o of a.owns) out.add(o);
+  const out = new Set<string>(ROLE === "OWNER" ? ["/"] : []);
+  for (const a of visibleAreas(ROLE)) {
+    out.add(entryHref(ROLE, a));
+    for (const c of visibleChildren(ROLE, a)) out.add(c.href);
+    if (ROLE === "OWNER") for (const o of a.owns) out.add(o);
   }
-  for (const l of ACCOUNT_LINKS) out.add(l.href);
-  for (const c of commandsFor("OWNER")) out.add(c.href.split("#")[0]);
+  for (const l of visibleAccountLinks(ROLE)) out.add(l.href);
+  /* أوامرُ العرض (`event`) تُطلق فعلاً في الصفحة ولا تنتقل — ليست وجهات */
+  for (const c of commandsFor(ROLE)) if (!c.event) out.add(c.href.split("#")[0]);
   return [...out].filter(isPage);
 }
 
-function normalize(href: string): string | null {
+/**
+ * الرابطُ يُقرأ نسبةً إلى الصفحة التي هو فيها لا إلى الجذر: «#manual» في
+ * صفحة الدرايف كان يُقرأ «/» فيُعَدّ رابطاً إلى «اليوم».
+ */
+function normalize(href: string, from: string): string | null {
   try {
-    const u = new URL(href, BASE);
+    const u = new URL(href, BASE + from);
     if (u.origin !== new URL(BASE).origin) return null;
     if (SKIP.some((re) => re.test(u.pathname))) return null;
     return u.pathname + u.search;
@@ -80,6 +93,7 @@ interface Facts {
   unnamedFields: string[];
   overflow: number;
   links: string[];
+  noAccess: boolean;
 }
 
 const FACTS_SCRIPT = `(() => {
@@ -106,7 +120,9 @@ const FACTS_SCRIPT = `(() => {
     .map(function (f) { return f.outerHTML.slice(0, 80); });
   const overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
   const links = Array.from(document.querySelectorAll("a[href]")).map(function (a) { return a.getAttribute("href") || ""; });
-  return { textLength: text.length, h1: h1, deadLinks: deadLinks, unnamedButtons: unnamedButtons, unnamedFields: unnamedFields, overflow: overflow, links: links };
+  /* الصفحةُ كلُّها خارج الصلاحية (\`NoAccess\`) — لا جملةٌ تقول إنّ جزءاً منها كذلك */
+  const noAccess = document.querySelector("main [data-no-access]") !== null;
+  return { textLength: text.length, h1: h1, deadLinks: deadLinks, unnamedButtons: unnamedButtons, unnamedFields: unnamedFields, overflow: overflow, links: links, noAccess: noAccess };
 })()`;
 
 async function inspect(page: Page, route: string, variant: Variant, collectLinks: boolean): Promise<{ findings: Finding[]; links: string[] }> {
@@ -128,6 +144,10 @@ async function inspect(page: Page, route: string, variant: Variant, collectLinks
     const status = res?.status() ?? 0;
     if (status >= 400 || status === 0) add(`HTTP ${status}`);
     await page.waitForTimeout(250);
+    /* رابطٌ يُحوِّل إلى غير وجهته — لدورٍ لا يملكها، أو وجهةٌ لم تعد موجودة */
+    /* (والمالكُ يُزار بمساراتٍ قديمةٍ تُحوِّل عمداً — `owns` — فيُفحص التحويلُ لغيره) */
+    const landed = new URL(page.url()).pathname;
+    if (ROLE !== "OWNER" && landed !== route.split("?")[0] && !landed.startsWith("/login")) add(`يُحوِّل إلى ${landed}`);
 
     /*
       نصٌّ لا دالّة: مُشغّلُ TypeScript يُلحق بالدوالّ المسمّاة مساعداً (`__name`)
@@ -135,6 +155,7 @@ async function inspect(page: Page, route: string, variant: Variant, collectLinks
     */
     const facts = (await page.evaluate(FACTS_SCRIPT)) as Facts;
 
+    if (facts.noAccess) add(`«خارج صلاحيتك» لدور ${ROLE} — وصلها رابطٌ ظاهرٌ له`);
     if (!facts.h1) add("لا عنوان h1 في المحتوى");
     if (facts.textLength < 40) add(`صفحةٌ شبه فارغة (${facts.textLength} حرفاً)`);
     for (const d of facts.deadLinks) add(`رابطٌ بلا وجهة: ${d}`);
@@ -145,7 +166,7 @@ async function inspect(page: Page, route: string, variant: Variant, collectLinks
     for (const f of failed) add(`طلبٌ فاشل: ${f}`);
 
     const links = collectLinks
-      ? facts.links.map(normalize).filter((x): x is string => x !== null)
+      ? facts.links.map((l) => normalize(l, route)).filter((x): x is string => x !== null)
       : [];
     return { findings, links };
   } catch (e) {
@@ -170,6 +191,7 @@ async function main() {
   const seen = new Set<string>();
   /* مسارٌ بمعاملاتٍ مختلفة صفحةٌ واحدة في الغالب — يُزار أوّلُ ثلاثة لكلّ مسار */
   const perPath = new Map<string, number>();
+  const cameFrom = new Map<string, string>();
   while (queue.length > 0 && seen.size < MAX_PAGES) {
     const route = queue.shift()!;
     if (seen.has(route)) continue;
@@ -179,8 +201,12 @@ async function main() {
     perPath.set(path, n + 1);
     seen.add(route);
     const r = await inspect(page, route, first, true);
-    findings.push(...r.findings);
-    for (const l of r.links) if (!seen.has(l)) queue.push(l);
+    findings.push(...r.findings.map((f) => ({ ...f, from: cameFrom.get(route) ?? "(بذرة)" })));
+    for (const l of r.links) {
+      if (seen.has(l)) continue;
+      if (!cameFrom.has(l)) cameFrom.set(l, route);
+      queue.push(l);
+    }
     process.stdout.write(`${r.findings.length ? "✕" : "✓"} ${first.name} ${route}\n`);
   }
   await ctx.close();
@@ -207,11 +233,11 @@ async function main() {
   await browser.close();
 
   mkdirSync(".scratch", { recursive: true });
-  writeFileSync(".scratch/crawl-report.json", JSON.stringify({ base: BASE, pages: [...seen], findings }, null, 2));
+  writeFileSync(ROLE === "OWNER" ? ".scratch/crawl-report.json" : `.scratch/crawl-report-${ROLE}.json`, JSON.stringify({ base: BASE, pages: [...seen], findings }, null, 2));
 
   console.log(`\nزُحف إلى ${seen.size} صفحة${QUICK ? "" : ` × ${VARIANTS.length} أوجه`}. ما وُجد: ${findings.length}.`);
   const grouped = new Map<string, string[]>();
-  for (const f of findings) grouped.set(f.problem, [...(grouped.get(f.problem) ?? []), `${f.route} (${f.variant})`]);
+  for (const f of findings) grouped.set(f.problem, [...(grouped.get(f.problem) ?? []), `${f.route} (${f.variant})${f.from ? ` ← ${f.from}` : ""}`]);
   for (const [problem, where] of grouped) console.log(`\n✕ ${problem}\n   ${where.slice(0, 6).join("\n   ")}${where.length > 6 ? `\n   … و${where.length - 6} غيرها` : ""}`);
   process.exit(findings.length ? 1 : 0);
 }
