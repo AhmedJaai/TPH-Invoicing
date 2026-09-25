@@ -14,6 +14,7 @@ import {
   type BalanceTotals,
   type SupplierBalance,
 } from "@/lib/supplier-balances";
+import type { AgeBucketIndex, OpenInvoiceAge } from "@/lib/supplier-intel";
 import type { Tx } from "./types";
 
 type Executor = typeof db | Tx;
@@ -170,4 +171,52 @@ export async function loadBalanceTotals(executor: Executor = db): Promise<{
 }> {
   const rows = await loadSupplierBalances(executor);
   return { rows, totals: totalBalances(rows) };
+}
+
+/**
+ * الفواتيرُ المفتوحة بأعمارها — «المفتوح» نفسُه الذي يُجمَع في
+ * `loadSupplierBalances` (ما بقي فوق هللة التقريب)، فاتورةً فاتورة، وبحدود
+ * العمر التي يعدّ بها `loadOverdueBalances` «المتأخّر». عليها يوزّع
+ * `ageOwed` رقمَ «عليك» على أعماره في القائمة وملفّ المورّد.
+ */
+export async function loadOpenInvoiceAges(supplierId?: string): Promise<Map<string, OpenInvoiceAge[]>> {
+  const rows = (
+    await db.execute<{
+      id: string; supplier_id: string; invoice_number: string; d: string;
+      open_minor: string | number; age: number; bucket: number;
+    }>(sql`
+      with alloc as (
+        select invoice_id, sum(amount_minor)::bigint as s from payment_allocations group by invoice_id
+      )
+      select i.id, i.supplier_id, i.invoice_number,
+             (i.invoice_date at time zone 'Asia/Riyadh')::date::text as d,
+             (i.total_minor - coalesce(a.s, 0))::bigint as open_minor,
+             greatest(0, extract(day from now() - i.invoice_date))::int as age,
+             case
+               when i.invoice_date < now() - make_interval(days => 90) then 3
+               when i.invoice_date < now() - make_interval(days => 60) then 2
+               when i.invoice_date < now() - make_interval(days => 30) then 1
+               else 0
+             end as bucket
+        from invoices i
+        left join alloc a on a.invoice_id = i.id
+       where i.total_minor - coalesce(a.s, 0) > ${SETTLED_TOLERANCE_MINOR}
+         ${supplierId ? sql`and i.supplier_id = ${supplierId}` : sql``}
+    `)
+  ).rows;
+
+  const map = new Map<string, OpenInvoiceAge[]>();
+  for (const r of rows) {
+    const list = map.get(r.supplier_id) ?? [];
+    list.push({
+      id: r.id,
+      number: r.invoice_number,
+      date: r.d,
+      openMinor: Number(r.open_minor),
+      ageDays: Number(r.age),
+      bucket: Number(r.bucket) as AgeBucketIndex,
+    });
+    map.set(r.supplier_id, list);
+  }
+  return map;
 }

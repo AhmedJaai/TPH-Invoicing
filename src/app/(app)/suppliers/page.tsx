@@ -1,98 +1,81 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { asc, eq, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { suppliers } from "@/db/schema";
+import { Clock, FileWarning, Hourglass, PiggyBank, Receipt, Sparkles, Store, Wallet } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import {
-  Card, DataTable, EmptyState, LinkButton, Section, Stat, StatGrid, buttonClass,
+  Badge, Callout, Card, DataTable, EmptyState, LinkButton, LinkTabs, Monogram, Section, buttonClass, type Column,
 } from "@/components/ui";
+import { AgeingBar, Figure } from "@/components/supplier-intel";
 import { SUPPLIER, countNoun, INVOICE, PAYMENT_RECORD, DAY } from "@/lib/arabic";
 import { buildInvoiceRequest, groupUnbackedBySupplier } from "@/lib/supplier-requests";
 import { loadUnbackedPayments } from "@/services/supplier-followups.service";
-import { loadBalanceTotals, loadOverdueBalances } from "@/services/supplier-balance.service";
+import { loadBalanceTotals, loadOpenInvoiceAges, loadOverdueBalances } from "@/services/supplier-balance.service";
+import { loadSupplierDirectory } from "@/services/supplier-intel.service";
 import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
 import { formatDay } from "@/lib/riyadh-time";
 import { needsContract, needsPaperUpload } from "@/lib/supplier-policy-rules";
-
+import { ageOwed, ageTone, type OwedAgeing } from "@/lib/supplier-intel";
 
 export const dynamic = "force-dynamic";
 
 /**
- * حسابات المورّدين — «كم عليّ ولمن؟» في مكانٍ واحد.
+ * حسابات المورّدين — «لمن أدين، وكم، ومنذ متى؟» في مكانٍ واحد.
  *
- * ── لماذا صفحةٌ واحدة بدل ثلاث ──
+ * ── ثلاثةُ أرقامٍ ثمّ قائمة ──
  *
- * كان السؤال الواحد موزّعاً على ثلاث شاشات لا تتّفق:
+ * رأسُ الصفحة ثلاثةُ أجوبة: كم عليك، وكم منه تأخّر، وكم لك عندهم. وتحت
+ * الأوّل شريطُ الأعمار — «منذ متى؟» — لأنّ «عليك ١٢ ألفاً» لا يقول أيّه
+ * يستحقّ الاتّصال اليوم. والقائمةُ تُصفّى في العنوان (عليك · متأخّر · لك
+ * رصيد · بلا تعامل) ويُبحث فيها بالاسم البديل واسم المستفيد في البنك.
  *
- *   `/purchases`          سبعُ بطاقاتٍ كلُّها روابط — فهرسٌ لا صفحة.
- *   `/purchases/insights` جدولُ الحسابات، يعدّ **١٢** مورّداً.
- *   `/suppliers`          جدولٌ بثمانية أعمدة، يعدّ **٢٢**.
+ * ── المصدرُ واحد ──
  *
- * والعدّان صحيحان — الأوّل من له حساب، والثاني كلُّ مسجَّل — لكنّ من
- * يقرأ لا يعرف ذلك، فيرى رقمين لعنوانٍ واحد.
+ * «عليك» و«لك» من `loadBalanceTotals()` — التي تحسب الرقم في الرئيسية
+ * وفي التنبيهات. والمتأخّرُ من `loadOverdueBalances()` — التي يعدّ بها
+ * الطابور. والأعمارُ توزيعٌ لذلك الرقم نفسِه على الفواتير (`ageOwed`)، لا
+ * حسابٌ ثانٍ له.
  *
- * وجدولُ الثانية كان يفتتح بـ«التصنيف» و«الرقم الضريبي» و«٥ أسماء
- * بديلة» قبل أن يقول كم على المورّد — أي أنّ أوّلَ ما يُقرأ في صفحة
- * المورّدين بياناتٌ إداريّة لا يُفتَح لها التطبيق. وعمودُ «الصافي» يحمل
- * تارةً رقماً وتارةً جملةً كاملة («دفعتَ له بلا فاتورة: ٢٦٬٧٦٧٫٤٠»)،
- * فلا يُمسَح بالعين ولا يُفرَز.
+ * ── لماذا صفحةٌ واحدة بدل ثلاث ── (باقٍ من الإصدار الأوّل)
  *
- * فصارت أربعةَ أعمدة: المورّد · عليك · رصيدٌ لك · آخر تعامل. والإداريُّ
- * في ملفّ المورّد حيث يُطلَب، لا في الجدول حيث يُزاحم.
- *
- * والمصدر واحد: `loadBalanceTotals()` — هي التي تحسب الرقم في الرئيسية
- * وفي التنبيهات، فلا يختلف الجدول عن رأسه ولا عن الصفحة التي قبله.
+ * كان السؤال موزّعاً على `/purchases` و`/purchases/insights` و`/suppliers`
+ * بعدَّين مختلفين لعنوانٍ واحد. والإداريُّ (الرقم الضريبيّ، دورة الفوترة،
+ * الأسماء البديلة) في ملفّ المورّد حيث يُطلَب، لا في الجدول حيث يُزاحم.
  */
+
+type View = "all" | "owed" | "overdue" | "credit" | "idle";
+const VIEWS: readonly View[] = ["all", "owed", "overdue", "credit", "idle"];
+
 export default async function SuppliersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ unbacked?: string }>;
+  searchParams: Promise<{ unbacked?: string; view?: string }>;
 }) {
   const user = await currentUser();
   if (!user) redirect("/login?from=/suppliers");
 
   const showAmounts = can(user.role, "amounts:view");
-  const unbackedView = (await searchParams).unbacked === "1";
+  const params = await searchParams;
+  const unbackedView = params.unbacked === "1";
+  const wanted = VIEWS.find((v) => v === params.view) ?? "all";
 
-  const [{ rows: balances, totals }, overdue, unbackedPayments, open, meta] = await Promise.all([
+  const [{ rows: balances, totals }, overdue, ages, unbackedPayments, open, directory] = await Promise.all([
     loadBalanceTotals(),
-    loadOverdueBalances(),
+    showAmounts ? loadOverdueBalances() : Promise.resolve([]),
+    loadOpenInvoiceAges(),
     showAmounts ? loadUnbackedPayments() : Promise.resolve([]),
     showAmounts ? listOpenFindings() : Promise.resolve([]),
-    db
-      .select({
-        id: suppliers.id,
-        slug: suppliers.slug,
-        nameAr: suppliers.nameAr,
-        issuesInvoices: suppliers.issuesInvoices,
-        contractOnFile: suppliers.contractOnFile,
-        contractRequired: suppliers.contractRequired,
-        paperInvoices: suppliers.paperInvoices,
-        invoiceCount: sql<number>`(
-          select count(*)::int from invoices i where i.supplier_id = suppliers.id
-        )`,
-        lastActivity: sql<string | null>`(
-          select to_char(max(d), 'YYYY-MM-DD') from (
-            select max(i.invoice_date) d from invoices i where i.supplier_id = suppliers.id
-            union all
-            select max(p.paid_at) d from payments p where p.supplier_id = suppliers.id
-          ) x
-        )`,
-      })
-      .from(suppliers)
-      .where(eq(suppliers.isActive, true))
-      .orderBy(asc(suppliers.nameAr)),
+    loadSupplierDirectory(),
   ]);
 
-  if (meta.length === 0) {
+  if (directory.length === 0) {
     return (
       <PageShell user={user} width="wide" title="حسابات المورّدين">
         <EmptyState
+          icon={Store}
           title="لا مورّدين بعد."
           hint="يُنشَأ المورّد حين تُقرأ أوّل فاتورة منه — أو تختاره «مورّداً جديداً» في شاشة الرفع."
           action={<LinkButton href="/upload" variant="primary">ارفع مستنداً</LinkButton>}
@@ -102,35 +85,60 @@ export default async function SuppliersPage({
   }
 
   const balanceOf = new Map(balances.map((b) => [b.supplierId, b]));
-  const overdueOf = new Map(overdue.map((o) => [o.supplierId, o]));
   const unbackedGroups = groupUnbackedBySupplier(unbackedPayments);
   const unbackedTotal = unbackedPayments.reduce((s, p) => s + p.unbackedMinor, 0);
 
-  /*
-    الترتيب يتبع العمل: من عليك له أوّلاً وبالأكبر، ثمّ من لك عنده، ثمّ
-    الساكنون. وكان أبجديّاً — فيتصدّر الجدولَ من لا شيء بينك وبينه.
-  */
-  const rows = meta
+  const rows = directory
     .map((m) => {
       const b = balanceOf.get(m.id);
+      const owedMinor = b?.owedMinor ?? 0;
+      const ageing: OwedAgeing = ageOwed(ages.get(m.id) ?? [], owedMinor);
       return {
         ...m,
-        owedMinor: b?.owedMinor ?? 0,
+        owedMinor,
         creditLeftMinor: b?.creditLeftMinor ?? 0,
         openCount: b?.openCount ?? 0,
-        oldestDays: overdueOf.get(m.id)?.oldestDays ?? null,
+        ageing,
+        idle: m.invoiceCount === 0 && m.paymentCount === 0,
+        contract: needsContract(m),
+        paper: needsPaperUpload(m),
       };
     })
+    /*
+      الترتيب يتبع العمل: من عليك له أوّلاً وبالأكبر، ثمّ من لك عنده، ثمّ
+      من تعاملتَ معه أخيراً، والساكنون آخراً.
+    */
     .sort((a, b) =>
       b.owedMinor - a.owedMinor ||
       b.creditLeftMinor - a.creditLeftMinor ||
+      Number(a.idle) - Number(b.idle) ||
+      (b.lastActivity ?? "").localeCompare(a.lastActivity ?? "") ||
       a.nameAr.localeCompare(b.nameAr, "ar"),
     );
 
-  /* القاعدة في `supplier-policy-rules.ts` — موضعٌ واحد لها. */
-  const needContract = meta.filter(needsContract);
-  /* ومن فواتيرُه ورقيّة يُذكَر بمطلبه هو: ارفع الورقة. */
-  const paperOnly = meta.filter(needsPaperUpload);
+  type Row = (typeof rows)[number];
+  const inView: Record<View, (r: Row) => boolean> = {
+    all: () => true,
+    owed: (r) => r.owedMinor > 0,
+    overdue: (r) => r.ageing.overdueMinor > 0,
+    credit: (r) => r.creditLeftMinor > 0,
+    idle: (r) => r.idle,
+  };
+  /* من لا يرى المال لا تُعرَض له ألسنةُ المال — ولا يُفتح أحدُها من العنوان */
+  const view: View = showAmounts || wanted === "all" || wanted === "idle" ? wanted : "all";
+  const shown = rows.filter(inView[view]);
+
+  /* رأسُ الصفحة: هل يعرف النظام شيئاً؟ مورّدون بلا فاتورةٍ ولا دفعة ليسوا «عليك صفر» */
+  const knows = balances.length > 0;
+  const allBuckets = rows.reduce<[number, number, number, number]>(
+    (acc, r) => [acc[0] + r.ageing.buckets[0], acc[1] + r.ageing.buckets[1], acc[2] + r.ageing.buckets[2], acc[3] + r.ageing.buckets[3]],
+    [0, 0, 0, 0],
+  );
+  const overdueMinor = overdue.reduce((s, o) => s + o.owedMinor, 0);
+  const oldestOverdue = overdue.reduce((m, o) => Math.max(m, o.oldestDays), 0);
+
+  const needContract = rows.filter((r) => r.contract);
+  const paperOnly = rows.filter((r) => r.paper);
 
   const findings: FindingView[] = open.map((f) => ({
     id: f.id, supplierId: f.supplierId, supplierName: f.supplierName, supplierSlug: f.supplierSlug,
@@ -139,12 +147,103 @@ export default async function SuppliersPage({
     refs: f.refs.map((r) => ({ label: r.label, type: r.type })),
     createdAt: f.createdAt.toISOString(),
   }));
+  const worth = rows.filter((r) => r.owedMinor > 0 || r.creditLeftMinor > 0);
 
-  const nameOf = new Map(meta.map((m) => [m.id, m.nameAr]));
+  const tabs = [
+    { id: "all" as const, label: "الكلّ", count: rows.length },
+    ...(showAmounts
+      ? [
+          { id: "owed" as const, label: "عليك", count: rows.filter(inView.owed).length },
+          { id: "overdue" as const, label: "متأخّر", count: rows.filter(inView.overdue).length },
+          { id: "credit" as const, label: "لك رصيد", count: rows.filter(inView.credit).length },
+        ]
+      : []),
+    { id: "idle" as const, label: "بلا تعامل", count: rows.filter(inView.idle).length },
+  ];
 
-  const worth = balances
-    .filter((r) => r.owedMinor > 0 || r.creditMinor > 0)
-    .sort((a, b) => (b.owedMinor + b.creditMinor) - (a.owedMinor + a.creditMinor));
+  const columns: Column<Row>[] = [
+    {
+      key: "name",
+      header: "المورّد",
+      primary: true,
+      cell: (r) => (
+        <span className="flex min-w-0 items-center gap-3">
+          <Monogram name={r.nameAr} className="h-9 w-9 text-sm" />
+          <span className="min-w-0">
+            <Link href={`/suppliers/${r.slug}`} className="relative block truncate font-bold hover:text-accent">
+              {r.nameAr}
+            </Link>
+            <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-normal text-muted">
+              {r.idle
+                ? "لا فاتورة ولا دفعة بعد"
+                : r.openCount > 0
+                  ? `${countNoun(r.openCount, INVOICE)} مفتوحة`
+                  : r.invoiceCount > 0 ? "فواتيره مسدَّدة" : "دفعاتٌ بلا فواتير"}
+              {r.contract && <Badge tone="warn">يحتاج عقداً</Badge>}
+              {r.paper && <Badge>فواتيرُه ورقيّة</Badge>}
+            </span>
+          </span>
+        </span>
+      ),
+    },
+    /*
+      أعمدةُ المال لا تُعرض لمن لا يرى المال: شَرطتان في كلّ صفّ تُقرآن
+      «لا دَين» — وهي «لا تُعرَض لك».
+    */
+    ...(showAmounts
+      ? ([
+          {
+            /*
+              عمودٌ واحد للحساب بجهته — «عليك» أو «لك» كلمةً بجانب الرقم. كانا
+              عمودين نصفُ خاناتهما شَرطة، فتطول البطاقةُ على الجوّال بلا خبر.
+            */
+            key: "balance",
+            header: "الحساب",
+            numeric: true,
+            cell: (r) =>
+              r.owedMinor > 0 ? (
+                <span className="inline-flex items-baseline gap-1.5 font-bold">
+                  <Money minor={r.owedMinor} tone="warn" />
+                  <span className="text-[10px] text-warn">عليك</span>
+                </span>
+              ) : r.creditLeftMinor > 0 ? (
+                <span className="inline-flex items-baseline gap-1.5 font-bold">
+                  <Money minor={r.creditLeftMinor} />
+                  <span className="text-[10px] text-ok">لك</span>
+                </span>
+              ) : (
+                <span className="text-[11px] text-muted">{r.idle ? "—" : "متّزن"}</span>
+              ),
+          },
+          {
+            key: "age",
+            header: "أقدم دَين",
+            cell: (r) =>
+              r.ageing.oldestOwedDays === null ? (
+                <span className="text-muted">—</span>
+              ) : (
+                <Badge tone={ageTone(r.ageing.oldestOwedDays) === "muted" ? undefined : ageTone(r.ageing.oldestOwedDays)} dot>
+                  منذ {countNoun(r.ageing.oldestOwedDays, DAY)}
+                </Badge>
+              ),
+          },
+        ] satisfies Column<Row>[])
+      : []),
+    {
+      key: "last",
+      header: "آخر تعامل",
+      secondary: true,
+      cell: (r) =>
+        r.lastActivity ? (
+          <span className="whitespace-nowrap text-ink-soft">
+            {formatDay(r.lastActivity)}
+            <span className="ms-1.5 text-[11px] text-muted">{r.lastActivityKind === "INVOICE" ? "فاتورة" : "دفعة"}</span>
+          </span>
+        ) : (
+          <span className="text-muted">لا تعامل بعد</span>
+        ),
+    },
+  ];
 
   return (
     <PageShell
@@ -152,257 +251,256 @@ export default async function SuppliersPage({
       width="wide"
       title="حسابات المورّدين"
       intro={showAmounts
-        ? "كم على المقهى لكلّ مورّد بعد خصم ما دُفع له، وكم بقي له عندهم."
+        ? "لمن تدين، وكم، ومنذ متى — بعد خصم ما دفعتَه لكلٍّ منهم، وما بقي لك عندهم."
         : "المورّدون وفواتيرُهم المفتوحة وآخرُ تعاملٍ معهم — والمبالغُ خارج صلاحيتك."}
-      /*
-        مدخلُ «الأصناف والأسعار» — خرجت من ألسنة المساحة لأنّها سؤالٌ
-        يُسأل مرّاتٍ في السنة، ولا يأخذ رُبعَ شريطٍ يُقرأ كلّ يوم. وموضعُه
-        هنا: من فتح حسابات المورّدين هو من يسأل «أرتفع سعرُ البنّ؟».
-      */
-      actions={showAmounts ? (
-        <LinkButton href="/analysis" size="sm">
-          الأصناف والأسعار
-        </LinkButton>
-      ) : undefined}
+      actions={
+        showAmounts && can(user.role, "payment:approve") && totals.owedMinor > 0 ? (
+          <LinkButton href="/payments" variant="primary" icon={Wallet}>خطّط الدفعة</LinkButton>
+        ) : undefined
+      }
     >
-      {/*
-        ── بطاقتان لا ثلاث ──
-
-        كانت ثالثتُها «دفعات لم تُنسب إلى فاتورة»، وتحتها فقرةٌ تشرح لِمَ
-        تختلف عن «رصيدٌ لك»: الأولى بالمورّد (يُخصَم رصيدُه من دَينه)،
-        والثانية بالدفعة. والفقرة كانت صحيحة، **ووجودُها هو العطب**:
-        رقمان لا يُفهمان إلّا بفقرةٍ بينهما لا يُعرضان معاً.
-
-        و«لم تُنسب» عملٌ باقٍ لا حالُ حساب، فموضعُه «يحتاج قرارك» — وهو
-        معروضٌ هناك بندَاً له فعلُه. ويبقى هنا سطرُ إحالةٍ إلى الجدول
-        نفسِه أسفل الصفحة، فلا يضيع المدخل.
-      */}
+      {/* ── الأجوبة الثلاثة ── */}
       {showAmounts && (
-        <StatGrid>
-          <Stat
-            label="عليك للمورّدين"
-            minor={totals.owedMinor}
-            tone={totals.owedMinor > 0 ? "warn" : "ok"}
-            sub={`${countNoun(totals.owedSuppliers, SUPPLIER)} · على ${countNoun(totals.openInvoiceCount, INVOICE)} مفتوحة`}
-          />
-          <Stat
-            label="رصيدٌ لك عند المورّدين"
-            minor={totals.creditLeftMinor}
-            sub={`${countNoun(totals.creditSuppliers, SUPPLIER)} · مالٌ دفعتَه ولم تصلك فاتورته`}
-          />
-        </StatGrid>
-      )}
-
-      {showAmounts && unbackedTotal > 0 && (
-        <p className="mt-2.5 text-xs leading-relaxed text-muted">
-          و
-          <Link
-            href="/suppliers?unbacked=1#unbacked"
-            className="font-medium underline underline-offset-4 hover:text-ink"
+        knows ? (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]">
+            <Figure
+              className="col-span-2 lg:col-span-1"
+              icon={Receipt}
+              label="عليك للمورّدين"
+              href="/suppliers?view=owed"
+              tone={totals.owedMinor > 0 ? "warn" : undefined}
+              value={<Money minor={totals.owedMinor} currency />}
+              sub={totals.owedMinor > 0
+                ? `${countNoun(totals.owedSuppliers, SUPPLIER)} · على ${countNoun(totals.openInvoiceCount, INVOICE)} مفتوحة، بعد خصم ما دفعتَه لهم`
+                : "لا فاتورة مفتوحة إلّا وقد غطّاها ما دفعتَه."}
+            >
+              <AgeingBar buckets={allBuckets} />
+            </Figure>
+            <Figure
+              icon={Hourglass}
+              label="متأخّرٌ أكثر من 60 يوماً"
+              href="/suppliers?view=overdue"
+              tone={overdueMinor > 0 ? "danger" : "ok"}
+              value={<Money minor={overdueMinor} />}
+              sub={overdueMinor > 0
+                ? `عند ${countNoun(overdue.length, SUPPLIER)} · أقدمُه منذ ${countNoun(oldestOverdue, DAY)}`
+                : "لا دَين تجاوز ستّين يوماً بعد خصم أرصدتك."}
+            />
+            <Figure
+              icon={PiggyBank}
+              label="رصيدٌ لك عندهم"
+              href="/suppliers?view=credit"
+              value={<Money minor={totals.creditLeftMinor} />}
+              sub={totals.creditLeftMinor > 0
+                ? `${countNoun(totals.creditSuppliers, SUPPLIER)} · مالٌ دفعتَه ولم تصلك فاتورتُه — يُخصَم من فواتيرهم القادمة`
+                : "لا مال دفعتَه إلّا وفاتورتُه عندك."}
+            />
+          </div>
+        ) : (
+          /* مورّدون مسجَّلون ولا فاتورةَ ولا دفعة: «عليك صفر» كذبٌ عن غير علم */
+          <Callout
+            tone="accent"
+            icon={Sparkles}
+            title="لا يعرف النظام بعدُ لمن تدين"
+            action={<LinkButton href="/upload" variant="primary" size="sm">ارفع مستنداً</LinkButton>}
           >
-            {countNoun(unbackedPayments.length, PAYMENT_RECORD)}
-          </Link>{" "}
-          دفعتَها ولم يصل مستندُها — اطلب فواتيرها.
-        </p>
+            لا فاتورةَ ولا دفعةَ مقيّدة لأيّ مورّد. ارفع فواتيرهم واستورد كشف البنك، فيظهر هنا ما عليك وما لك ومنذ متى.
+          </Callout>
+        )
       )}
 
-      {unbackedView && showAmounts && (
-        <div id="unbacked" className="scroll-mt-28">
-          <Section
-            title="دفعاتٌ لم تُنسب إلى فاتورة"
-            hint={`${countNoun(unbackedPayments.length, PAYMENT_RECORD)} عند ${countNoun(
-              unbackedGroups.filter((g) => g.supplierId).length, SUPPLIER,
-            )}. بلا فاتورةٍ ضريبية لا يُخصَم مدخلُها. ومن لا يصدر فواتير يُطلَب منه عقدُ توريد بدلها — وهو معدودٌ هنا كغيره، فالمال خرج.`}
-            action={<LinkButton href="/suppliers" size="sm" variant="quiet">كلّ الحسابات</LinkButton>}
-          >
-            {unbackedGroups.length === 0 && (
-              <p className="text-xs text-ok">لا دفعة بلا فاتورة — كلّ ما دُفع له مستندُه.</p>
-            )}
-            <ul className="grid gap-2.5 xl:grid-cols-2">
-              {unbackedGroups.map((g) => (
-                <li
-                  key={g.supplierId ?? "none"}
-                  id={g.supplierSlug ? `unbacked-${g.supplierSlug}` : undefined}
-                  className="scroll-mt-28"
-                >
-                  <Card>
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="min-w-0">
-                        {g.supplierSlug ? (
-                          <Link href={`/suppliers/${g.supplierSlug}`} className="block text-sm font-bold underline-offset-4 hover:underline">
-                            {g.supplierName}
-                          </Link>
-                        ) : (
-                          <span className="block text-sm font-bold">{g.supplierName}</span>
-                        )}
-                        <span className="block text-[11px] text-muted">
-                          {countNoun(g.payments.length, PAYMENT_RECORD)}
-                          {g.supplierId ? " بلا فاتورة" : " لم تُعرَف جهتها — افتح حركتها وحدّد مورّدها"}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-end">
-                        <span className="block text-[11px] text-muted">بلا مستند</span>
-                        <span className="nums block text-sm font-bold text-warn"><Money minor={g.totalMinor} /></span>
-                      </span>
-                    </div>
-                    <ul className="mt-2 space-y-1 border-s-2 border-line ps-2.5">
-                      {g.payments.map((p) => (
-                        <li key={p.paymentId} className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                          <span className="min-w-0 text-muted">
-                            <bdi className="nums">{p.paidOn}</bdi> · من أصل <Money minor={p.amountMinor} />
-                            {p.bankTransactionId && (
-                              <>
-                                {" · "}
-                                <Link href={`/bank?tx=${p.bankTransactionId}`} className="inline-flex min-h-11 items-center underline underline-offset-4 sm:min-h-0">
-                                  حركتها
-                                </Link>
-                              </>
-                            )}
-                          </span>
-                          <span className="nums font-bold"><Money minor={p.unbackedMinor} /></span>
-                        </li>
-                      ))}
-                    </ul>
-                    {g.supplierId && (
-                      <div className="mt-2.5 flex flex-wrap gap-2">
-                        <a
-                          href={`https://wa.me/?text=${encodeURIComponent(buildInvoiceRequest(g))}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={buttonClass("primary", "sm")}
-                        >
-                          {g.payments.every((p) => !p.issuesInvoices)
-                            ? "اطلب عقد التوريد (واتساب)"
-                            : "اطلب الفاتورة (واتساب)"}
-                        </a>
-                        {g.supplierSlug && <LinkButton href={`/suppliers/${g.supplierSlug}`} size="sm">ملفّه</LinkButton>}
-                      </div>
-                    )}
-                  </Card>
-                </li>
-              ))}
-            </ul>
-          </Section>
-        </div>
+      {showAmounts && unbackedTotal > 0 && !unbackedView && (
+        <Callout
+          tone="info"
+          icon={FileWarning}
+          className="mt-4"
+          action={<LinkButton href="/suppliers?unbacked=1#unbacked" size="sm">اعرضها واطلب فواتيرها</LinkButton>}
+        >
+          <strong className="text-ink">{countNoun(unbackedPayments.length, PAYMENT_RECORD)} دفعتَها ولم يصل مستندُها</strong>{" "}
+          — <Money minor={unbackedTotal} />. بلا فاتورةٍ ضريبية لا يُخصَم مدخلُها.
+        </Callout>
       )}
 
+      {unbackedView && showAmounts && <UnbackedSection groups={unbackedGroups} count={unbackedPayments.length} />}
+
+      {/* ── القائمة ── */}
       <Section
-        title="كلّ مورّد"
-        hint="من عليك له أوّلاً وبالأكبر. والبيانات الضريبية ودورةُ الفوترة والأسماء البديلة في ملفّ المورّد."
+        title="المورّدون"
+        icon={Store}
+        count={rows.length}
+        hint={showAmounts ? "من عليك له أوّلاً وبالأكبر. ابحث بالاسم، أو بالاسم الذي يظهر به في كشف البنك." : undefined}
       >
-        {needContract.length > 0 && (
-          <div id="no-contract" className="mb-3 scroll-mt-24 rounded-xl border border-warn/40 bg-warn-bg px-4 py-3">
-            <p className="text-xs leading-relaxed">
-              <span className="font-bold text-warn">
-                {countNoun(needContract.length, SUPPLIER)} يحتاج عقد توريد:
-              </span>{" "}
-              {needContract.map((r) => r.nameAr).join(" · ")} — لا يصدرون فواتير ضريبية، وبلا عقدٍ
-              مكتوب لا خصم ضريبة ولا إثبات مصروف.{" "}
-              <span className="text-muted">
-                ومن لا يحتاج عقداً تُطفئه من ملفّه: «ما يُطلَب من هذا المورّد».
-              </span>
-            </p>
-          </div>
-        )}
+        <div className="mb-3">
+          <LinkTabs
+            label="تصفية المورّدين"
+            items={tabs.map((t) => ({
+              href: t.id === "all" ? "/suppliers" : `/suppliers?view=${t.id}`,
+              label: t.label,
+              count: t.count,
+              active: view === t.id,
+            }))}
+          />
+        </div>
 
-        {paperOnly.length > 0 && (
-          <div className="mb-3 rounded-xl border border-line bg-sunken px-4 py-3">
-            <p className="text-xs leading-relaxed">
-              <span className="font-bold">
-                {countNoun(paperOnly.length, SUPPLIER)} فواتيرُه ورقيّة:
-              </span>{" "}
-              {paperOnly.map((r) => r.nameAr).join(" · ")} — فاتورتُه موجودةٌ باليد ولم تُرفَع،
-              فالمطلوبُ تصويرُها ورفعُها لا طلبُ عقدٍ منه.
-            </p>
-          </div>
+        {(needContract.length > 0 || paperOnly.length > 0) && view === "all" && (
+          <Callout tone="warn" icon={Clock} className="mb-3" title="ما يُطلَب من مورّدين">
+            {needContract.length > 0 && (
+              <p id="no-contract" className="scroll-mt-24">
+                <span className="font-bold text-ink">{countNoun(needContract.length, SUPPLIER)} يحتاج عقد توريد</span> — لا يصدرون فواتير ضريبية،
+                وبلا عقدٍ مكتوب لا خصمَ ضريبة ولا إثباتَ مصروف:{" "}
+                {needContract.map((r, i) => (
+                  <span key={r.id}>
+                    {i > 0 && " · "}
+                    <Link href={`/suppliers/${r.slug}?tab=profile`} className="font-medium underline underline-offset-4 hover:text-ink">{r.nameAr}</Link>
+                  </span>
+                ))}
+                . ومن لا يحتاج عقداً تُطفئه من ملفّه.
+              </p>
+            )}
+            {paperOnly.length > 0 && (
+              <p className={needContract.length > 0 ? "mt-1" : ""}>
+                <span className="font-bold text-ink">{countNoun(paperOnly.length, SUPPLIER)} فواتيرُه ورقيّة</span> — فاتورتُه موجودةٌ باليد، والمطلوبُ
+                تصويرُها ورفعُها: {paperOnly.map((r) => r.nameAr).join(" · ")}.
+              </p>
+            )}
+          </Callout>
         )}
 
         <DataTable
-          rows={rows}
+          rows={shown}
           keyOf={(r) => r.id}
           hrefOf={(r) => `/suppliers/${r.slug}`}
-          columns={[
-            {
-              key: "name",
-              header: "المورّد",
-              primary: true,
-              cell: (r) => (
-                <Link href={`/suppliers/${r.slug}`} className="font-bold underline-offset-4 hover:underline">
-                  {r.nameAr}
-                </Link>
-              ),
-            },
-            /*
-              عمودا المال لا يُعرضان لمن لا يرى المال: شَرطتان في كلّ صفّ
-              تُقرآن «لا دَين» — وهي «لا تُعرَض لك».
-            */
-            ...(showAmounts ? [
-            {
-              key: "owed",
-              header: "عليك",
-              numeric: true,
-              cell: (r: (typeof rows)[number]) =>
-                r.owedMinor > 0 ? (
-                  <span className="font-bold text-warn"><Money minor={r.owedMinor} /></span>
-                ) : (
-                  <span className="text-muted">—</span>
-                ),
-            },
-            {
-              key: "credit",
-              header: "رصيدٌ لك",
-              numeric: true,
-              cell: (r: (typeof rows)[number]) =>
-                r.creditLeftMinor > 0 ? (
-                  <span className="font-bold"><Money minor={r.creditLeftMinor} /></span>
-                ) : (
-                  <span className="text-muted">—</span>
-                ),
-            },
-            ] : []),
-            {
-              key: "open",
-              header: "فواتير مفتوحة",
-              numeric: true,
-              secondary: true,
-              cell: (r) =>
-                r.openCount > 0 ? <span className="nums">{r.openCount}</span> : <span className="text-muted">—</span>,
-            },
-            {
-              key: "last",
-              header: "آخر تعامل",
-              cell: (r) => (
-                <span className="whitespace-nowrap text-muted">
-                  {r.lastActivity ? formatDay(r.lastActivity) : "لا تعامل بعد"}
-                  {r.oldestDays !== null && r.oldestDays >= 60 && (
-                    <span className="ms-1.5 font-bold text-warn">
-                      ⚠ أقدم دَينٍ {countNoun(r.oldestDays, DAY)}
-                    </span>
-                  )}
-                </span>
-              ),
-            },
-          ]}
+          searchOf={(r) => [r.nameAr, r.nameEn, r.slug, r.vatNumber, r.aliases].filter(Boolean).join(" ")}
+          searchLabel="ابحث باسم المورّد أو اسمه في البنك"
+          columns={columns}
+          empty={
+            <EmptyState
+              compact
+              icon={Store}
+              title={
+                view === "owed" ? "لا مورّد عليك له شيء."
+                : view === "overdue" ? "لا دَين تجاوز ستّين يوماً."
+                : view === "credit" ? "لا رصيد لك عند أحد."
+                : view === "idle" ? "كلُّ مورّدٍ مسجَّل تعاملتَ معه."
+                : "لا مورّدين في هذه القائمة."
+              }
+              hint={view === "owed" || view === "overdue" ? "كلُّ فاتورةٍ مفتوحة غطّاها ما دفعتَه — بحسب ما قُيّد من فواتير ودفعات." : undefined}
+              action={<LinkButton href="/suppliers" size="sm">كلُّ المورّدين</LinkButton>}
+            />
+          }
         />
       </Section>
 
-      {showAmounts && (
+      {/* ── اقتراحات التحليل: تُكشَف بقدر، وتُحلَّل بضغطة ── */}
+      {showAmounts && (findings.length > 0 || can(user.role, "supplier:edit")) && (
         <Section
-          title="اقتراحات تنتظر قرارك"
-          hint="يقرأ التحليل فواتير المورّد ودفعاته وكشوفه، ويقترح ما يصحّح حسابه. والأرقام يحسبها الخادم، ولا يُكتب شيء حتى تُقرّه."
+          title="اقتراحات التحليل"
+          icon={Sparkles}
+          count={findings.length > 0 ? findings.length : undefined}
+          hint="يقرأ التحليلُ فواتير المورّد ودفعاته وكشوفه ويقترح ما يصحّح حسابه. الأرقامُ يحسبها الخادم، ولا يُكتب شيءٌ حتى تُقرّه."
           action={
-            can(user.role, "supplier:edit") ? (
-              <RunAnalysis suppliers={worth.map((w) => ({ id: w.supplierId, name: nameOf.get(w.supplierId) ?? "" }))} label={`حلّل ${worth.length} مورّداً`} />
+            can(user.role, "supplier:edit") && worth.length > 0 ? (
+              <RunAnalysis
+                suppliers={worth.map((w) => ({ id: w.id, name: w.nameAr }))}
+                label={`حلّل حسابات ${countNoun(worth.length, SUPPLIER)}`}
+              />
             ) : undefined
           }
         >
-          <FindingsList
-            findings={findings}
-            canApprove={can(user.role, "payment:approve")}
-            showSupplier
-          />
+          {findings.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Sparkles}
+              title="لا اقتراح ينتظر قرارك."
+              hint="شغّل التحليل على من بينك وبينه رصيد — يقارن فواتيره بدفعاته وكشفه، ويقترح ولا يكتب."
+            />
+          ) : (
+            <FindingsList findings={findings} canApprove={can(user.role, "payment:approve")} showSupplier collapseAfter={3} />
+          )}
         </Section>
       )}
     </PageShell>
+  );
+}
+
+/* ───────────────────── دفعاتٌ لم تُنسب ───────────────────── */
+
+/**
+ * «لمن دفعنا بلا فاتورة؟» — يفتحها بندُ الطابور (`?unbacked=1#unbacked`).
+ * مورّداً مورّداً، ومع كلٍّ رسالةُ طلبه جاهزة.
+ */
+function UnbackedSection({ groups, count }: { groups: ReturnType<typeof groupUnbackedBySupplier>; count: number }) {
+  return (
+    <div id="unbacked" className="scroll-mt-28">
+      <Section
+        title="دفعاتٌ لم تُنسب إلى فاتورة"
+        icon={FileWarning}
+        count={count}
+        hint={`عند ${countNoun(groups.filter((g) => g.supplierId).length, SUPPLIER)}. بلا فاتورةٍ ضريبية لا يُخصَم مدخلُها. ومن لا يصدر فواتير يُطلَب منه عقدُ توريد بدلها — وهو معدودٌ هنا كغيره، فالمال خرج.`}
+        action={<LinkButton href="/suppliers" size="sm" variant="quiet">كلّ الحسابات</LinkButton>}
+      >
+        {groups.length === 0 ? (
+          <EmptyState compact title="لا دفعة بلا فاتورة." hint="كلّ ما دُفع له مستندُه." />
+        ) : (
+          <ul className="grid gap-3 xl:grid-cols-2">
+            {groups.map((g) => (
+              <li key={g.supplierId ?? "none"} id={g.supplierSlug ? `unbacked-${g.supplierSlug}` : undefined} className="scroll-mt-28">
+                <Card>
+                  <div className="flex items-start gap-3">
+                    <Monogram name={g.supplierName} className="h-9 w-9 text-sm" />
+                    <span className="min-w-0 flex-1">
+                      {g.supplierSlug ? (
+                        <Link href={`/suppliers/${g.supplierSlug}`} className="block truncate text-sm font-bold hover:text-accent">{g.supplierName}</Link>
+                      ) : (
+                        <span className="block text-sm font-bold">{g.supplierName}</span>
+                      )}
+                      <span className="block text-[11px] text-muted">
+                        {countNoun(g.payments.length, PAYMENT_RECORD)}
+                        {g.supplierId ? " بلا فاتورة" : " لم تُعرَف جهتها — افتح حركتها وحدّد مورّدها"}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-end">
+                      <span className="block text-[11px] text-muted">بلا مستند</span>
+                      <span className="block text-[15px] font-bold"><Money minor={g.totalMinor} tone="warn" /></span>
+                    </span>
+                  </div>
+                  <ul className="mt-3 divide-y divide-line-soft rounded-lg border border-line-soft bg-sunken/40">
+                    {g.payments.map((p) => (
+                      <li key={p.paymentId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-[11px]">
+                        <span className="min-w-0 text-muted">
+                          {formatDay(p.paidOn)} · من أصل <Money minor={p.amountMinor} />
+                          {p.bankTransactionId && (
+                            <>
+                              {" · "}
+                              <Link href={`/bank?tx=${p.bankTransactionId}`} className="inline-flex min-h-11 items-center font-medium text-accent hover:underline sm:min-h-0">
+                                حركتها
+                              </Link>
+                            </>
+                          )}
+                        </span>
+                        <span className="font-bold"><Money minor={p.unbackedMinor} /></span>
+                      </li>
+                    ))}
+                  </ul>
+                  {g.supplierId && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        href={`https://wa.me/?text=${encodeURIComponent(buildInvoiceRequest(g))}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={buttonClass("primary", "sm")}
+                      >
+                        {g.payments.every((p) => !p.issuesInvoices) ? "اطلب عقد التوريد (واتساب)" : "اطلب الفاتورة (واتساب)"}
+                      </a>
+                      {g.supplierSlug && <LinkButton href={`/suppliers/${g.supplierSlug}`} size="sm">ملفّه</LinkButton>}
+                    </div>
+                  )}
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+    </div>
   );
 }

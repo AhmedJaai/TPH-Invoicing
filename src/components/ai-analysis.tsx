@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ChevronDown, Sparkles } from "lucide-react";
+import { Money } from "./money";
+import { Badge, type Tone } from "./ui";
+import { buttonClass } from "./ui-tokens";
 import { useRouter } from "next/navigation";
 import { formatRiyalsDisplay } from "@/lib/money";
 import {
@@ -67,10 +71,17 @@ const errorOf = (r: Awaited<ReturnType<typeof postJson>>) =>
     ? "تعذّر الاتصال بالخادم — لم يصل الطلب."
     : String(r.data.error ?? (r.status === 504 ? "تأخّر الخادم — أعد المحاولة" : `ردّ الخادم بالرمز ${r.status}`));
 
-const SEVERITY_SKIN: Record<string, string> = {
-  HIGH: "border-danger/40 bg-danger-bg text-danger",
-  MEDIUM: "border-warn/40 bg-warn-bg text-warn",
-  LOW: "border-line bg-sunken text-ink-soft",
+const SEVERITY_TONE: Record<string, Tone | undefined> = {
+  HIGH: "danger",
+  MEDIUM: "warn",
+  LOW: undefined,
+};
+
+/* شريطُ الحدّة على حافّة البطاقة — ومعه كلمتُها في الشارة، فاللونُ لا يأتي وحده */
+const SEVERITY_EDGE: Record<string, string> = {
+  HIGH: "before:bg-danger",
+  MEDIUM: "before:bg-warn",
+  LOW: "before:bg-line",
 };
 
 /* ───────────────────── زرّ التحليل ───────────────────── */
@@ -115,8 +126,9 @@ export function RunAnalysis({
         type="button"
         onClick={run}
         disabled={busy || suppliers.length === 0}
-        className="inline-flex min-h-11 items-center justify-center rounded-xl bg-inverse-surface px-4 py-2.5 text-sm font-bold text-inverse-ink disabled:opacity-50"
+        className={buttonClass("secondary", "sm")}
       >
+        <Sparkles className={`h-4 w-4 text-accent ${busy ? "animate-pulse" : ""}`} strokeWidth={2} aria-hidden />
         {busy ? "يحلّل…" : label}
       </button>
       {progress && <p className="text-xs text-muted" aria-live="polite">{progress}</p>}
@@ -140,20 +152,41 @@ export function FindingsList({
   findings,
   canApprove,
   showSupplier,
+  collapseAfter,
 }: {
   findings: FindingView[];
   canApprove: boolean;
   showSupplier: boolean;
+  /** كم اقتراحاً يُعرض قبل «اعرض الباقي» — الأشدُّ أوّلاً. */
+  collapseAfter?: number;
 }) {
+  const [all, setAll] = useState(false);
   if (findings.length === 0) return null;
+  /* الأشدُّ أوّلاً، ثمّ الأكبرُ مالاً: ما يُطوى هو الأخفّ */
+  const rank = (f: FindingView) => (f.severity === "HIGH" ? 0 : f.severity === "MEDIUM" ? 1 : 2);
+  const sorted = [...findings].sort((a, b) => rank(a) - rank(b) || (b.amountMinor ?? 0) - (a.amountMinor ?? 0));
+  const limit = collapseAfter !== undefined && !all ? collapseAfter : sorted.length;
+  const hidden = sorted.length - limit;
   return (
-    <ul className="space-y-3">
-      {findings.map((f) => (
-        <li key={f.id}>
-          <FindingCard finding={f} canApprove={canApprove} showSupplier={showSupplier} />
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="grid gap-3 xl:grid-cols-2">
+        {sorted.slice(0, limit).map((f) => (
+          <li key={f.id} className="min-w-0">
+            <FindingCard finding={f} canApprove={canApprove} showSupplier={showSupplier} />
+          </li>
+        ))}
+      </ul>
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setAll(true)}
+          className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-line text-xs font-medium text-ink-soft transition-colors hover:border-accent-line hover:text-accent"
+        >
+          اعرض {countNoun(hidden, SUGGESTION)} {hidden === 1 ? "آخر" : "أخرى"}
+          <ChevronDown className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+        </button>
+      )}
+    </>
   );
 }
 
@@ -195,26 +228,24 @@ function FindingCard({
     router.refresh();
   }
 
-  const btn = "inline-flex min-h-10 items-center justify-center rounded-xl px-3 py-2 text-xs font-bold disabled:opacity-50";
-
   return (
-    <article className="rounded-2xl border border-line bg-raised p-4 shadow-raised">
+    <article
+      className={`relative flex h-full flex-col overflow-hidden rounded-xl border border-line bg-raised p-4 shadow-raised before:absolute before:inset-y-0 before:start-0 before:w-1 sm:p-5 ${SEVERITY_EDGE[f.severity] ?? SEVERITY_EDGE.LOW}`}
+    >
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${SEVERITY_SKIN[f.severity] ?? SEVERITY_SKIN.LOW}`}>
-          {severityLabel}
-        </span>
+        <Badge tone={SEVERITY_TONE[f.severity]} dot>{severityLabel}</Badge>
         <span className="text-[11px] font-medium text-muted">{kindLabel}</span>
         {showSupplier && (
-          <Link href={`/suppliers/${f.supplierSlug}`} className="text-[11px] font-bold underline underline-offset-2">
+          <Link href={`/suppliers/${f.supplierSlug}`} className="text-[11px] font-bold text-ink-soft hover:text-accent hover:underline hover:underline-offset-2">
             {f.supplierName}
           </Link>
         )}
       </div>
 
-      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3 className="text-sm font-bold leading-relaxed">{f.title}</h3>
+      <div className="mt-2.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h3 className="min-w-0 text-sm font-bold leading-relaxed">{f.title}</h3>
         {f.amountMinor !== null && (
-          <span className="nums shrink-0 text-base font-bold" dir="ltr">{formatRiyalsDisplay(f.amountMinor)}</span>
+          <span className="shrink-0 text-base font-bold"><Money minor={f.amountMinor} /></span>
         )}
       </div>
       {f.explanation && <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">{f.explanation}</p>}
@@ -222,7 +253,7 @@ function FindingCard({
       {f.refs.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1.5">
           {f.refs.map((r, k) => (
-            <li key={k} className="nums rounded-lg border border-line bg-sunken px-2 py-0.5 text-[11px] text-ink-soft">
+            <li key={k} className="rounded-md border border-line-soft bg-sunken px-2 py-0.5 text-[11px] text-ink-soft" dir="auto">
               {r.label}
             </li>
           ))}
@@ -230,7 +261,7 @@ function FindingCard({
       )}
 
       {state === "preview" && preview && (
-        <p className="mt-3 rounded-xl border border-warn/40 bg-warn-bg p-3 text-xs leading-relaxed">
+        <p className="mt-3 rounded-lg border border-warn/25 bg-warn-bg p-3 text-xs leading-relaxed">
           تُقيَّد فاتورة {preview.invoiceNumber} مسدَّدةً من حسابك بـ{formatRiyalsDisplay(preview.ownerPaymentMinor)}
           {preview.freed.length > 0 && (
             <>
@@ -251,25 +282,25 @@ function FindingCard({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             maxLength={500}
-            className="mt-1 block min-h-11 w-full rounded-xl border border-line-input bg-surface px-3 text-sm"
+            className="mt-1 block min-h-11 w-full rounded-lg border border-line-input bg-surface px-3 text-sm"
             placeholder="مثلاً: سدّدتُها بحوالةٍ من حسابٍ آخر"
           />
         </label>
       )}
 
       {state !== "done" && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-auto flex flex-wrap gap-2 pt-4">
           {state === "dismissing" ? (
             <>
-              <button type="button" className={`${btn} border border-line`} onClick={() => decide("dismiss")}>
+              <button type="button" className={buttonClass("secondary", "sm")} onClick={() => decide("dismiss")}>
                 احفظ الرفض
               </button>
-              <button type="button" className={`${btn} text-ink-soft`} onClick={() => setState("idle")}>تراجع</button>
+              <button type="button" className={buttonClass("quiet", "sm")} onClick={() => setState("idle")}>تراجع</button>
             </>
           ) : moneyAction ? (
             <>
               {f.action?.type === "OWNER_PAID" && state !== "preview" && (
-                <button type="button" disabled={state === "busy"} className={`${btn} border border-line`} onClick={() => decide("preview")}>
+                <button type="button" disabled={state === "busy"} className={buttonClass("secondary", "sm")} onClick={() => decide("preview")}>
                   {state === "busy" ? "يحسب…" : "عاين ما سيتغيّر"}
                 </button>
               )}
@@ -277,23 +308,23 @@ function FindingCard({
                 <button
                   type="button"
                   disabled={state === "busy" || !canApprove}
-                  className={`${btn} bg-inverse-surface text-inverse-ink`}
+                  className={buttonClass("primary", "sm")}
                   onClick={() => decide("accept")}
                   title={canApprove ? undefined : "إقرار ما يكتب سداداً لمن يعتمد السداد"}
                 >
                   {state === "busy" ? "يحفظ…" : f.action?.type === "OWNER_PAID" ? ACT.paidFromOwner : f.action?.type === "VOID_DUPLICATE" ? "هي دفعةٌ واحدة — ألغِ المكرّرة" : "اخصم الرصيد من فواتيره"}
                 </button>
               )}
-              <button type="button" disabled={state === "busy"} className={`${btn} text-ink-soft`} onClick={() => setState("dismissing")}>
+              <button type="button" disabled={state === "busy"} className={buttonClass("quiet", "sm")} onClick={() => setState("dismissing")}>
                 ليس صحيحاً
               </button>
             </>
           ) : (
             <>
-              <button type="button" disabled={state === "busy"} className={`${btn} border border-line`} onClick={() => decide("accept")}>
+              <button type="button" disabled={state === "busy"} className={buttonClass("secondary", "sm")} onClick={() => decide("accept")}>
                 صحيح — عُلم
               </button>
-              <button type="button" disabled={state === "busy"} className={`${btn} text-ink-soft`} onClick={() => setState("dismissing")}>
+              <button type="button" disabled={state === "busy"} className={buttonClass("quiet", "sm")} onClick={() => setState("dismissing")}>
                 ليس صحيحاً
               </button>
             </>
