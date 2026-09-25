@@ -42,6 +42,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
   const [tab, setTab] = useState<"new" | "digest">("new");
   const [marking, setMarking] = useState(false);
   const loading = useRef(false);
+  const hasFeed = useRef(false);
 
   const load = useCallback(async () => {
     if (loading.current) return;
@@ -50,8 +51,10 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
       const r = await request<NoticeFeed>("/api/notifications");
       if (r.ok) {
         setFeed(r.data);
+        hasFeed.current = true;
         setError(null);
-      } else {
+      } else if (r.status !== 429 || !hasFeed.current) {
+        /* الحدُّ المؤقّت في سؤالٍ دوريّ لا يُعرَض عطباً ما دام ما عُرض قبله باقياً */
         setError(r.error);
       }
     } finally {
