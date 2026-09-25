@@ -2,8 +2,10 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CircleAlert, CircleCheck, FolderSync, X } from "lucide-react";
 import { INVOICE, QUOTATION, countNoun, FILE } from "@/lib/arabic";
-import { buttonClass } from "./ui";
+import { buttonClass } from "./ui-tokens";
+import { toast } from "./ui-client";
 import { GAP_TEXT, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
 
 interface Summary {
@@ -58,7 +60,7 @@ interface Result {
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" }) {
   const cls = tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : "";
   return (
-    <div className="rounded-lg border border-line bg-raised px-3 py-2">
+    <div className="rounded-lg bg-sunken px-3 py-2">
       <p className="text-[11px] text-muted">{label}</p>
       <p className={`nums mt-0.5 text-base font-bold ${cls}`}>{value}</p>
     </div>
@@ -241,7 +243,14 @@ export function DriveSync() {
         */
         setChosen(new Set());
 
-        if (apply) router.refresh();
+        if (apply) {
+          toast({
+            tone: "ok",
+            title: "سُجّل الجديد من الدرايف",
+            body: `دخل وحده ${countNoun(tally.auto, FILE)}${tally.review > 0 ? ` · ينتظر مراجعتك ${countNoun(tally.review, FILE)}` : ""}`,
+          });
+          router.refresh();
+        }
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -253,46 +262,75 @@ export function DriveSync() {
 
   if (!open) {
     return (
-      <button
-        onClick={() => { setOpen(true); void call(false); }}
-        className={buttonClass("secondary", "sm")}
-      >
-        افحص الدرايف عن ملفات جديدة
-      </button>
+      <div className="flex flex-col rounded-xl border border-line bg-raised p-4 shadow-raised">
+        <div className="flex items-start gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+            <FolderSync className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-bold">ملفّاتٌ جديدة في الدرايف</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted">
+              يقارن الدرايف بالمسجَّل ويعرض ما لا سجلّ له — ولا يُسجَّل شيءٌ حتى تضغط «سجّل الجديد».
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setOpen(true); void call(false); }}
+          className={`mt-4 self-start ${buttonClass("secondary", "sm")}`}
+        >
+          افحص الآن
+        </button>
+      </div>
     );
   }
 
   const s = result?.summary;
 
   return (
-    <section className="rounded-2xl border border-line bg-raised shadow-raised p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-bold">مزامنة الدرايف</h2>
-        <button onClick={() => setOpen(false)} className="text-[11px] text-muted hover:text-ink">
-          إغلاق
+    <section className="rounded-xl border border-accent-line bg-raised p-4 shadow-lifted lg:col-span-2 sm:p-5" aria-label="مزامنة الدرايف">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+            <FolderSync className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold">مزامنة الدرايف</h3>
+            <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
+              يقارن ملفات الدرايف بما هو مسجّل عندنا، ويضيف ما لا سجلّ له — كملفٍّ وضعتَه بيدك.
+              لا يعيد قراءة ما قُرئ، ولا حذف ولا نقل.
+            </p>
+          </div>
+        </div>
+        <button type="button" onClick={() => setOpen(false)} aria-label="أغلق المزامنة" className="-me-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-hover hover:text-ink">
+          <X className="h-4 w-4" strokeWidth={2} aria-hidden />
         </button>
       </div>
-      <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-        يقارن ملفات الدرايف بما هو مسجّل عندنا، ويضيف ما لا سجلّ له وحده — كملف رفعتَه
-        بيدك. لا يعيد قراءة ما قُرئ، ولا يمسّ الدرايف إلا قراءةً.
-      </p>
 
-      <label className="mt-3 flex items-center gap-2 text-xs">
+      <label className="mt-3 flex min-h-11 items-center gap-2 text-xs sm:min-h-0">
         <input
           type="checkbox"
           checked={full}
           onChange={(e) => setFull(e.target.checked)}
-          className="accent-black dark:accent-white"
+          className="h-4 w-4 accent-[var(--accent)]"
         />
         افحص الأرشيف كله بدل آخر ثلاثة أشهر (أبطأ)
       </label>
 
-      {error && <p className="mt-3 rounded-lg bg-danger-bg px-3 py-2 text-xs text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2 text-xs text-danger">
+          <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+          {error}
+        </p>
+      )}
 
       {busy && (
-        <p className="mt-3 text-xs text-muted">
-          {busy === "scanning" ? "يفحص الدرايف…" : "يسجّل الجديد ويقرؤه…"}
-        </p>
+        <div className="mt-3" aria-live="polite">
+          <p className="text-xs text-ink-soft">{busy === "scanning" ? "يفحص الدرايف…" : "يسجّل الجديد ويقرؤه…"}</p>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sunken">
+            <div className="upload-bar h-full w-1/3 rounded-full bg-accent" />
+          </div>
+        </div>
       )}
 
       {s && !busy && (
@@ -309,8 +347,9 @@ export function DriveSync() {
           </div>
 
           {result?.applied && (
-            <p className="mt-3 rounded-lg bg-ok-bg px-3 py-2 text-xs font-bold text-ok">
-              ✓ سُجّل {s.created ?? 0} مستنداً، منها {countNoun(s.invoicesCreated ?? 0, INVOICE)}
+            <p className="mt-3 flex items-start gap-2 rounded-lg border border-ok/25 bg-ok-bg px-3 py-2 text-xs font-bold text-ok">
+              <CircleCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+              سُجّل {s.created ?? 0} مستنداً، منها {countNoun(s.invoicesCreated ?? 0, INVOICE)}
               {s.contentRead ? ` · قُرئ محتوى ${s.contentRead}` : ""}
               {s.remainingUnnamed ? ` · بقي ${countNoun(s.remainingUnnamed, FILE)} يحتاج قراءة` : ""}
             </p>
@@ -336,7 +375,7 @@ export function DriveSync() {
                 <strong className="text-ok">دخل وحده {countNoun(s.autoArchived ?? 0, FILE)}</strong>
                 {(s.needsReview ?? 0) > 0 && (
                   <> · <strong className="text-warn">ينتظر مراجعتك {countNoun(s.needsReview ?? 0, FILE)}</strong>
-                    {" "}— في <a href="/attention?item=pending-documents" className="underline underline-offset-4">يحتاج قرارك</a></>
+                    {" "}— في <a href="/documents?status=NEEDS_REVIEW" className="font-bold text-accent underline underline-offset-4">المستندات</a></>
                 )}
               </p>
               {result.reviewReasons && result.reviewReasons.length > 0 && (
@@ -431,7 +470,7 @@ export function DriveSync() {
                   type="button"
                   disabled={renaming || chosen.size === 0}
                   onClick={() => applyRenames([...chosen])}
-                  className="min-h-11 rounded-lg border border-line px-3 text-[11px] font-medium hover:border-ink-soft disabled:opacity-50"
+                  className={buttonClass("secondary", "sm")}
                 >
                   {renaming ? "يسمّي…" : `سمِّ المختار (${chosen.size})`}
                 </button>
@@ -479,8 +518,9 @@ export function DriveSync() {
             </ul>
           )}
 
-          <div className="mt-3 flex gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <button
+              type="button"
               onClick={() => void call(false)}
               className={buttonClass("secondary", "sm")}
             >
@@ -488,6 +528,7 @@ export function DriveSync() {
             </button>
             {s.newFiles > 0 && (
               <button
+                type="button"
                 onClick={() => void call(true)}
                 className={buttonClass("primary", "sm")}
               >

@@ -2,8 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ScanText } from "lucide-react";
 import { postJson } from "@/lib/http-client";
-import { buttonClass } from "./ui";
+import { ITEM, countNoun } from "@/lib/arabic";
+import { buttonClass } from "./ui-tokens";
+import { toast } from "./ui-client";
+import { Money } from "./money";
 
 interface ReadLine {
   description: string;
@@ -73,11 +77,12 @@ export function DocumentReread({
     }
     if (apply) {
       setPreview(null);
-      setDone(
-        `كُتبت القراءة — ${r.data.linesWritten ?? 0} بنداً.`
+      const text =
+        `كُتبت القراءة — ${countNoun(r.data.linesWritten ?? 0, ITEM)}.`
         + (r.data.taxStatus === "VALID" ? " وصارت الفاتورة مستوفيةَ الأركان." : "")
-        + (r.data.problem ? ` ${r.data.problem}` : ""),
-      );
+        + (r.data.problem ? ` ${r.data.problem}` : "");
+      setDone(text);
+      toast({ tone: r.data.problem ? "warn" : "ok", title: "أُقرّت القراءة الجديدة", body: text });
       router.refresh();
       return;
     }
@@ -93,7 +98,8 @@ export function DocumentReread({
           disabled={busy}
           className={buttonClass("secondary", "sm")}
         >
-          {busy ? "يقرأ المستند…" : "أعد قراءة المستند"}
+          <ScanText className={`h-3.5 w-3.5 ${busy ? "animate-pulse" : ""}`} strokeWidth={2} aria-hidden />
+          {busy ? "يقرأ المستند… (حتى دقيقة)" : "أعد قراءة المستند"}
         </button>
       )}
 
@@ -102,10 +108,10 @@ export function DocumentReread({
           {error}
         </p>
       )}
-      {done && <p className="text-xs text-ok">{done}</p>}
+      {done && <p role="status" className="text-xs font-bold text-ok">{done}</p>}
 
       {preview?.read && (
-        <div className="rounded-xl border border-line bg-sunken/50 p-3">
+        <div className="w-full rounded-xl border border-accent-line bg-raised p-3.5 shadow-raised">
           <p className="text-xs font-bold">ما قرأه النموذج الآن — لم يُكتَب بعد</p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{preview.note}</p>
           {preview.problem && (
@@ -120,7 +126,7 @@ export function DocumentReread({
             <Pair label="الإجماليّ" value={money(preview.read.totalMinor)} />
             <Pair label="ضريبيّ البائع" value={preview.read.sellerVat ?? "لم يُقرأ"} />
             <Pair label="ضريبيّ المشتري" value={preview.read.buyerVat ?? "لم يُقرأ"} />
-            <Pair label="البنود" value={String(preview.read.lineCount)} />
+            <Pair label="البنود" value={<span className="nums">{preview.read.lineCount}</span>} />
           </dl>
 
           {preview.read.lines.length > 0 ? (
@@ -169,7 +175,7 @@ export function DocumentReread({
   );
 }
 
-function Pair({ label, value }: { label: string; value: string }) {
+function Pair({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-muted">{label}</dt>
@@ -179,9 +185,7 @@ function Pair({ label, value }: { label: string; value: string }) {
 }
 
 /** المجهول يبقى مجهولاً — ولا يُكتَب صفراً. */
-function money(minor: number | null): string {
-  if (minor === null) return "لم يُقرأ";
-  const whole = Math.floor(Math.abs(minor) / 100);
-  const frac = String(Math.abs(minor) % 100).padStart(2, "0");
-  return `${minor < 0 ? "-" : ""}${whole.toLocaleString("en-US")}.${frac}`;
+function money(minor: number | null): React.ReactNode {
+  if (minor === null) return <span className="font-normal text-muted">لم يُقرأ</span>;
+  return <Money minor={minor} />;
 }

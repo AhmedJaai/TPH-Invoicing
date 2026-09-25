@@ -1,22 +1,29 @@
 import Link from "next/link";
-import { invoiceHref } from "@/lib/invoice-profile";
 import { redirect } from "next/navigation";
-import { and, asc, count, desc, eq, ilike, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, sql, type SQL } from "drizzle-orm";
+import {
+  Archive, ArrowLeft, ArrowRight, CircleCheck, ExternalLink, FileSearch, Search, Upload,
+} from "lucide-react";
 import { db } from "@/db";
 import { documents, invoices, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
-import { Empty, Money, PageShell } from "@/components/page-shell";
+import { PageShell } from "@/components/page-shell";
+import { Money } from "@/components/money";
 import { DOCUMENT, countNoun } from "@/lib/arabic";
-import { ScrollX } from "@/components/scroll-x";
-import { RejectDocument } from "@/components/reject-document";
-import { ConfirmDocument } from "@/components/confirm-document";
+import { ConfirmEligible } from "@/components/confirm-eligible";
 import { RestoreDocument } from "@/components/restore-document";
-import { DataTable, EmptyState, LinkButton, buttonClass } from "@/components/ui";
+import { FilterSelect } from "@/components/filter-select";
+import { WaitingCard } from "@/components/document-waiting-card";
+import {
+  Badge, Callout, DataTable, EmptyState, LinkButton, LinkTabs, Monogram, buttonClass, type Tone,
+} from "@/components/ui";
 import { invoiceReasons } from "@/lib/invoice-findings";
+import { invoiceHref } from "@/lib/invoice-profile";
 import { loadPendingReview } from "@/services/document-review.service";
 import { GAP_TEXT } from "@/lib/extraction/auto-archive";
 import { companyConfig } from "@/config/drive";
+import { formatDay, formatMonth } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -36,16 +43,20 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 /*
-  اسمٌ واحد لكلّ حال — في الشارة وفي الترشيح. كانت «قيد القراءة» في
+  اسمٌ واحد لكلّ حال — في الشارة وفي اللسان. كانت «قيد القراءة» في
   الترشيح «مقروءاً» في الصفّ (عكس المعنى)، و«محجور» هناك «مرفوضاً» هنا.
 */
-const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
-  ARCHIVED: { text: "مؤرشف", cls: "bg-ok-bg text-ok" },
-  PENDING: { text: "جديد", cls: "bg-warn-bg text-warn" },
-  EXTRACTED: { text: "مقروء ولم يُعتمد", cls: "bg-sunken text-ink-soft" },
-  NEEDS_REVIEW: { text: "يحتاج مراجعة", cls: "bg-warn-bg text-warn" },
-  REJECTED: { text: "مرفوض", cls: "bg-danger-bg text-danger" },
+const STATUS_BADGE: Record<string, { text: string; tone: Tone }> = {
+  ARCHIVED: { text: "أُرشف", tone: "ok" },
+  PENDING: { text: "ينتظر المراجعة", tone: "warn" },
+  EXTRACTED: { text: "ينتظر المراجعة", tone: "warn" },
+  NEEDS_REVIEW: { text: "ينتظر المراجعة", tone: "warn" },
+  REJECTED: { text: "رُفض", tone: "danger" },
 };
+
+/** ما لم يُبتّ فيه — «ينتظر المراجعة» بأحواله الثلاث، كعدّاد الشريط. */
+const WAITING = ["PENDING", "EXTRACTED", "NEEDS_REVIEW"] as const;
+const isWaiting = (s: string) => (WAITING as readonly string[]).includes(s);
 
 /** رابط الملف في الدرايف — المعرّف محفوظ لكل مستند منذ الأرشفة. */
 const driveUrl = (id: string) => `https://drive.google.com/file/d/${id}/view`;
@@ -62,50 +73,14 @@ interface Params {
 /**
  * صندوق الوارد — لا متصفّح ملفات.
  *
- * الأرشيف وحده متصفّح ملفات؛ وصاحب العمل لا يحتاج تصفّح مئةٍ وثلاثةٍ
- * وثمانين ملفاً، بل يحتاج معرفة أيّها ينتظره.
- *
- * وكانت الصفحة تُفتَح على «الكل (١٨٣)»: مئةٌ وسبعةٌ وستّون منها مؤرشفةٌ
- * فُرغ منها، وخمسةَ عشرَ تنتظر. فيقع العملُ الباقي وسط ما انتهى، ويُقرأ
- * الصفُّ الأوّل بلا فرقٍ بين ما يحتاجه وما لا يحتاجه.
- *
- * فصارت تُفتَح على **ما ينتظر** — وصندوقُ الوارد الفارغ خبرٌ سارّ لا
- * صفحةٌ فارغة. و«الكل» بضغطةٍ واحدة، وتُطلَب صراحةً بـ`?status=ALL`
+ * صاحب العمل لا يحتاج تصفّح مئةٍ وثلاثةٍ وثمانين ملفاً، بل معرفةَ أيّها
+ * ينتظره. فتُفتَح الصفحة على **ما ينتظر المراجعة** — وصندوقُ الوارد
+ * الفارغ خبرٌ سارّ لا صفحةٌ فارغة. و«الكلّ» اختيارٌ صريح بـ`?status=ALL`
  * كي يبقى الفرق بين «لم يختر» و«اختار الكلّ» ظاهراً في المسار.
+ *
+ * و«ينتظر المراجعة» بطاقاتٌ لا صفوف: لكلّ مستندٍ سببُ انتظاره وما قرأه
+ * النموذج وفعلُه في موضعه. وما فُرغ منه جدولٌ يُبحث فيه.
  */
-const ALL_STATUSES = "ALL";
-
-/** الحال الافتراضيّة: ما ينتظر قراراً. */
-const INBOX_STATUS = "NEEDS_REVIEW";
-const STATUS_BUCKETS: { id: string; label: string; tone?: "warn" | "ok" }[] = [
-  { id: "PENDING", label: STATUS_LABEL.PENDING.text, tone: "warn" },
-  { id: "EXTRACTED", label: STATUS_LABEL.EXTRACTED.text },
-  { id: "NEEDS_REVIEW", label: STATUS_LABEL.NEEDS_REVIEW.text, tone: "warn" },
-  { id: "ARCHIVED", label: STATUS_LABEL.ARCHIVED.text, tone: "ok" },
-  { id: "REJECTED", label: STATUS_LABEL.REJECTED.text },
-];
-
-function Chip({
-  href,
-  active,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors sm:min-h-0 ${
-        active ? "bg-inverse-surface text-inverse-ink" : "border border-line text-ink-soft hover:border-ink-soft"
-      }`}
-    >
-      {children}
-    </Link>
-  );
-}
-
 export default async function DocumentsPage({
   searchParams,
 }: {
@@ -118,38 +93,44 @@ export default async function DocumentsPage({
   const showAmounts = can(user.role, "amounts:view");
   const canDecide = can(user.role, "document:upload");
   const page = Math.max(1, Number(p.page ?? "1") || 1);
+  const q = p.q?.trim() || undefined;
 
   /*
-    الترشيحات بلا الحالة أوّلاً، ثمّ الحالة فوقها — لأنّ «الكل» يعني كلَّ
-    الحالات تحت الترشيحات الأخرى. كان يُحسَب بالحالة المختارة فيقول
-    «الكل (٠)» تحت «يحتاج مراجعة» والمؤرشف ١٦٥.
+    ── أيّ الأحوال؟ ──
+
+    بلا اختيارٍ فالوجهةُ صندوقُ الوارد. إلّا حين يصل بحثٌ بلا حال — من
+    البحث العامّ أو من «أكمِل الناقص» في التسمية — فالمطلوبُ ملفٌّ بعينه
+    أينما كان: كان يُفتَح على «ينتظر» فلا يجد المؤرشَف ويقول «لا شيء».
   */
-  const baseFilters: SQL[] = [];
-  if (p.month) baseFilters.push(eq(documents.periodMonth, p.month));
-  if (p.supplier) baseFilters.push(eq(documents.supplierId, p.supplier));
-  if (p.kind) baseFilters.push(sql`${documents.kind}::text = ${p.kind}`);
+  const tab: "WAITING" | "ARCHIVED" | "REJECTED" | "ALL" =
+    p.status === "ALL" || (!p.status && q) ? "ALL"
+    : p.status === "ARCHIVED" ? "ARCHIVED"
+    : p.status === "REJECTED" ? "REJECTED"
+    : "WAITING";
+  /* `PENDING` و`EXTRACTED` روابطُ قديمة — تُحترَم بعينها تحت لسان «ينتظر» */
+  const exact = p.status === "PENDING" || p.status === "EXTRACTED" ? p.status : null;
+  const statusFilter: SQL | undefined =
+    tab === "ALL" ? undefined
+    : exact ? sql`${documents.status}::text = ${exact}`
+    : tab === "WAITING" ? inArray(documents.status, [...WAITING])
+    : eq(documents.status, tab);
+
+  /*
+    الترشيحات بلا الحالة أوّلاً، ثمّ الحالة فوقها — فعددُ كلّ لسانٍ يُحسب
+    تحت الترشيحات الأخرى. كان يُحسَب بالحالة المختارة فيقول «الكل (٠)»
+    تحت «يحتاج مراجعة» والمؤرشف ١٦٥.
+  */
+  const base: SQL[] = [];
+  if (p.month) base.push(eq(documents.periodMonth, p.month));
+  if (p.supplier) base.push(eq(documents.supplierId, p.supplier));
+  if (p.kind) base.push(sql`${documents.kind}::text = ${p.kind}`);
   // البحث في اسم الملف كما هو في الدرايف — وهو ما يتذكّره المستخدم عادةً
-  if (p.q?.trim()) baseFilters.push(ilike(documents.fileName, `%${p.q.trim()}%`));
-  /*
-    ما لم يُختَر شيء فالوجهةُ صندوقُ الوارد. و«الكل» اختيارٌ صريح، فلا
-    يلتبس «لم يختر» بـ«اختار الكلّ».
-  */
-  const chosenStatus =
-    p.status === ALL_STATUSES ? undefined : (p.status ?? INBOX_STATUS);
-  const filters: SQL[] = chosenStatus
-    ? [...baseFilters, sql`${documents.status}::text = ${chosenStatus}`]
-    : baseFilters;
-  const where = filters.length ? and(...filters) : undefined;
-  const whereAllStatuses = baseFilters.length ? and(...baseFilters) : undefined;
+  if (q) base.push(ilike(documents.fileName, `%${q}%`));
+  const where = and(...base, ...(statusFilter ? [statusFilter] : []));
+  const whereBase = base.length ? and(...base) : undefined;
 
-  /*
-    ستّة استعلامات متوازية لا متسلسلة.
-
-    كانت تُنتظر واحداً بعد واحد، وكلٌّ رحلةُ شبكة إلى Neon — فيُجمع
-    تأخيرها كلّه قبل أوّل رسم. ولا يعتمد أيّها على الآخر، فلا سبب
-    لتسلسلها.
-  */
-  const [totalRows, rows, monthRows, supplierRows, statusRows, kindRows, allStatusRows] = await Promise.all([
+  /* استعلاماتٌ متوازية لا متسلسلة — لا يعتمد أيّها على الآخر */
+  const [totalRows, rows, monthRows, supplierRows, statusRows, kindRows, anyDoc, pending] = await Promise.all([
     db.select({ total: count() }).from(documents).where(where),
 
     db
@@ -161,8 +142,10 @@ export default async function DocumentsPage({
         status: documents.status,
         periodMonth: documents.periodMonth,
         uploadedAt: documents.uploadedAt,
+        textSource: documents.textSource,
         supplierName: suppliers.nameAr,
         invoiceNumber: invoices.invoiceNumber,
+        invoiceDate: invoices.invoiceDate,
         totalMinor: invoices.totalMinor,
         taxStatus: invoices.taxStatus,
         /* ما يُبنى عليه «ما الذي يحتاج مراجعة؟» — يُشتقّ ولا يُخزَّن */
@@ -174,7 +157,7 @@ export default async function DocumentsPage({
         issuesInvoices: suppliers.issuesInvoices,
         contractOnFile: suppliers.contractOnFile,
         lineCount: sql<number>`(
-          select count(*)::int from invoice_lines l where l.invoice_id = invoices.id
+          select count(*)::int from invoice_lines l where l.invoice_id = ${invoices}.id
         )`,
       })
       .from(documents)
@@ -200,6 +183,7 @@ export default async function DocumentsPage({
     db
       .select({ status: documents.status, n: sql<number>`count(*)::int` })
       .from(documents)
+      .where(whereBase)
       .groupBy(documents.status),
 
     db
@@ -208,41 +192,25 @@ export default async function DocumentsPage({
       .groupBy(documents.kind)
       .orderBy(desc(sql`count(*)`)),
 
-    db.select({ total: count() }).from(documents).where(whereAllStatuses),
+    db.select({ id: documents.id }).from(documents).limit(1),
+
+    /*
+      حكمُ الأرشفة الآليّة على ما ينتظر — ليُقال لماذا لم يدخل وحده بعينه،
+      لا «لا ينقصها ركن» عن مستندٍ ينتظر بلا سببٍ ظاهر.
+    */
+    loadPendingReview(500),
   ]);
 
-  const total = totalRows[0].total;
-  const statusCount = new Map(statusRows.map((r) => [r.status as string, Number(r.n)]));
+  const total = Number(totalRows[0].total);
+  const byStatus = new Map(statusRows.map((r) => [r.status as string, Number(r.n)]));
+  const nWaiting = WAITING.reduce((s, st) => s + (byStatus.get(st) ?? 0), 0);
+  const nArchived = byStatus.get("ARCHIVED") ?? 0;
+  const nRejected = byStatus.get("REJECTED") ?? 0;
+  const nAll = [...byStatus.values()].reduce((s, n) => s + n, 0);
+  const verdicts = new Map(pending.map((d) => [d.id, d] as const));
+  const eligible = pending.filter((d) => d.verdict.auto || d.recordable).length;
+  const freshDb = anyDoc.length === 0;
 
-  const link = (patch: Partial<Params>) => {
-    const next = new URLSearchParams();
-    const merged = { ...p, ...patch, page: undefined };
-    for (const [k, v] of Object.entries(merged)) if (v) next.set(k, String(v));
-    const qs = next.toString();
-    return qs ? `/documents?${qs}` : "/documents";
-  };
-
-  const pageLink = (n: number) => {
-    const next = new URLSearchParams();
-    for (const [k, v] of Object.entries({ ...p, page: String(n) })) if (v) next.set(k, String(v));
-    return `/documents?${next.toString()}`;
-  };
-
-  const pages = Math.ceil(Number(total) / PAGE_SIZE);
-  const hasFilter = Boolean(p.month || p.supplier || p.kind || p.q || p.status);
-  const inboxEmpty = chosenStatus === INBOX_STATUS && Number(total) === 0;
-
-  /*
-    سببُ «يحتاج مراجعة» — يُشتقّ من الصفّ نفسه، ولا يُستعلَم له ثانية.
-    وما لا فاتورة له لا سبب ضريبيّ له: كشفٌ أو إيصالٌ يُراجَع بعينه.
-  */
-  /*
-    حكمُ الأرشفة الآليّة على ما ينتظر — ليُقال لماذا لم يدخل وحده بعينه،
-    لا «لا ينقصها ركن» عن مستندٍ ينتظر بلا سببٍ ظاهر.
-  */
-  const pendingVerdicts = new Map(
-    (await loadPendingReview(500)).map((d) => [d.id, d] as const),
-  );
   /*
     ── لماذا رُفض؟ ──
 
@@ -262,7 +230,13 @@ export default async function DocumentsPage({
     for (const f of found.rows) rejections.set(f.entity_id, { at: new Date(f.at), by: f.by, reason: f.reason });
   }
 
-  const reasonOf = (r: (typeof rows)[number]) =>
+  type Row = (typeof rows)[number];
+
+  /*
+    سببُ الانتظار — يُشتقّ من الصفّ نفسه بالدالّة التي يحكم بها مسارُ
+    الأرشفة، ولا يُستعلَم له ثانية. وما لا فاتورة له لا سبب ضريبيّ له.
+  */
+  const reasonsOf = (r: Row) =>
     r.invoiceId
       ? invoiceReasons(
           {
@@ -279,271 +253,297 @@ export default async function DocumentsPage({
             ? null
             : { issuesInvoices: r.issuesInvoices, contractOnFile: r.contractOnFile ?? false },
           companyConfig.vatNumber,
-        )
+        ).filter((x) => x.severity !== "INFO")
       : [];
+
+  /** لماذا ينتظر — بالعبارة التي قرّرت، لا «راجعه» بلا سبب. */
+  const whyWaiting = (r: Row): { tone: "warn" | "ok" | "muted"; lines: string[] } => {
+    const reasons = reasonsOf(r);
+    if (reasons.length > 0) return { tone: "warn", lines: reasons.map((x) => x.what) };
+    const v = verdicts.get(r.id);
+    if (!v) return { tone: "muted", lines: ["قرأه النموذج — افتح الملفّ وقارن ثمّ اعتمد."] };
+    if (v.verdict.auto || v.recordable) return { tone: "ok", lines: ["تجتمع فيه الشروط — يُحسَم تلقائياً، أو بـ«اعتمدها كلَّها» أعلاه."] };
+    const texts = v.missing.length > 0 ? v.missing : v.verdict.gaps.map((g) => GAP_TEXT[g]);
+    return { tone: "warn", lines: texts.length > 0 ? texts : ["قرأه النموذج — افتح الملفّ وقارن ثمّ اعتمد."] };
+  };
+
+  /* ── الروابط: الترشيحُ في العنوان ── */
+  const statusParam = tab === "WAITING" ? undefined : tab;
+  const link = (patch: Partial<Params>) => {
+    const next = new URLSearchParams();
+    const merged: Params = { ...p, status: exact ?? statusParam, ...patch, page: undefined };
+    for (const [k, v] of Object.entries(merged)) if (v) next.set(k, String(v));
+    const qs = next.toString();
+    return qs ? `/documents?${qs}` : "/documents";
+  };
+  const pageLink = (n: number) => {
+    const next = new URLSearchParams();
+    for (const [k, v] of Object.entries({ ...p, page: String(n) })) if (v) next.set(k, String(v));
+    return `/documents?${next.toString()}`;
+  };
+
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const filtered = Boolean(p.month || p.supplier || p.kind || q);
+
+  const tabs = [
+    { id: "WAITING", label: "ينتظر المراجعة", count: nWaiting, href: link({ status: "NEEDS_REVIEW" }) },
+    { id: "ARCHIVED", label: "أُرشف", count: nArchived, href: link({ status: "ARCHIVED" }) },
+    { id: "REJECTED", label: "رُفض", count: nRejected, href: link({ status: "REJECTED" }) },
+    { id: "ALL", label: "الكلّ", count: nAll, href: link({ status: "ALL" }) },
+  ] as const;
 
   return (
     <PageShell
       user={user}
       width="wide"
-     
       title="المستندات"
-      intro="صندوق وارد: ما ينتظر قرارك أوّلاً. وكلُّ مستندٍ موصولٌ بملفّه في الدرايف."
+      intro="ما وصل من فواتير وكشوف وإيصالات — ما ينتظر قرارك أوّلاً، وكلُّ مستندٍ موصولٌ بملفّه في الدرايف."
     >
-      {/* ── البحث والترشيح ── */}
-      <form action="/documents" className="flex flex-wrap items-center gap-2">
-        <input
-          name="q"
-          defaultValue={p.q ?? ""}
-          placeholder="ابحث في اسم الملف…"
-          aria-label="ابحث في اسم الملف"
-          dir="auto"
-          className="min-w-[12rem] flex-1 rounded-lg border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+      {freshDb ? (
+        /* قاعدةٌ بلا مستند: لا ألسنة ولا أصفار — الخطوةُ الأولى وحدها */
+        <EmptyState
+          icon={Upload}
+          title="لم يصل مستندٌ بعد."
+          hint="ارفع أوّل فاتورة — صوّرها بجوّالك أو اختر ملفّها — أو زامن الدرايف ليُقرأ ما فيه. وكلُّ ما يصل يظهر هنا."
+          action={<LinkButton href="/upload" variant="primary" icon={Upload}>ارفع مستنداً</LinkButton>}
         />
-        {p.month && <input type="hidden" name="month" value={p.month} />}
-        {p.supplier && <input type="hidden" name="supplier" value={p.supplier} />}
-        {p.kind && <input type="hidden" name="kind" value={p.kind} />}
-        {p.status && <input type="hidden" name="status" value={p.status} />}
-        <button
-          type="submit"
-          className={buttonClass("primary", "sm")}
-        >
-          ابحث
-        </button>
-        {hasFilter && (
-          <Link
-            href="/documents"
-            className={buttonClass("secondary", "sm")}
-          >
-            امسح الترشيح
-          </Link>
-        )}
-      </form>
-
-      <div className="mt-3 space-y-2">
-        {/* الحالة أوّلاً: ما ينتظرك قبل ما مضى */}
-        <ScrollX className="flex gap-1.5 pb-1">
-          <Chip href={link({ status: ALL_STATUSES })} active={p.status === ALL_STATUSES}>
-            الكل ({Number(allStatusRows[0].total)})
-          </Chip>
-          {STATUS_BUCKETS.map((b) => {
-            const n = statusCount.get(b.id) ?? 0;
-            /*
-              الوجهُ المفتوح يبقى ظاهراً ولو فرغ. كان يُخفى صندوقُ الوارد
-              حين يفرغ — وهو الافتراضيّ — فلا تُضاء شارةٌ واحدة، ولا يُعرَف
-              أيّ الوجوه هذا.
-            */
-            if (n === 0 && chosenStatus !== b.id) return null;
-            return (
-              <Chip key={b.id} href={link({ status: b.id })} active={chosenStatus === b.id}>
-                <span className={chosenStatus === b.id ? "" : b.tone === "warn" ? "text-warn" : b.tone === "ok" ? "text-ok" : ""}>
-                  {b.label} ({n})
-                </span>
-              </Chip>
-            );
-          })}
-        </ScrollX>
-        <ScrollX className="flex gap-1.5 pb-1">
-          <Chip href={link({ month: undefined })} active={!p.month}>كل الأشهر</Chip>
-          {monthRows.map((m) => (
-            <Chip key={m.month} href={link({ month: m.month ?? undefined })} active={p.month === m.month}>
-              <span dir="ltr">{m.month}</span>
-            </Chip>
-          ))}
-        </ScrollX>
-        <ScrollX className="flex gap-1.5 pb-1">
-          <Chip href={link({ kind: undefined })} active={!p.kind}>كل الأنواع</Chip>
-          {kindRows.map((k) => (
-            <Chip key={k.kind} href={link({ kind: k.kind })} active={p.kind === k.kind}>
-              {KIND_LABEL[k.kind] ?? k.kind} ({k.n})
-            </Chip>
-          ))}
-        </ScrollX>
-        <ScrollX className="flex gap-1.5 pb-1">
-          <Chip href={link({ supplier: undefined })} active={!p.supplier}>كل المورّدين</Chip>
-          {supplierRows.map((s) => (
-            <Chip key={s.id} href={link({ supplier: s.id })} active={p.supplier === s.id}>
-              {s.nameAr}
-            </Chip>
-          ))}
-        </ScrollX>
-      </div>
-
-      {/* العدُّ فوق الفراغ يكرّر ما يقوله الفراغ نفسه */}
-      {rows.length > 0 && <p className="mt-4 text-xs text-muted">
-        {countNoun(Number(total), DOCUMENT)}{hasFilter ? " ضمن الترشيح" : ""}
-        {pages > 1 && ` · صفحة ${page} من ${pages}`}
-      </p>}
-
-      {rows.length === 0 ? (
-        <div className="mt-3">
-          {/*
-            صندوقُ الوارد الفارغ خبرٌ سارّ لا صفحةٌ فارغة — فيُقال ذلك،
-            ويُعرَض بابُ الأرشيف لمن جاء يبحث فيه.
-          */}
-          {inboxEmpty ? (
-            <EmptyState
-              title="لا مستند ينتظر قرارك."
-              hint="كلُّ ما وصل قد اعتُمد أو رُفض. وما مضى في الأرشيف."
-              action={
-                <LinkButton href={link({ status: ALL_STATUSES })}>
-                  افتح الأرشيف ({Number(allStatusRows[0].total)})
-                </LinkButton>
-              }
-            />
-          ) : (
-            <Empty
-              message={
-                hasFilter
-                  ? "لا مستندات تطابق الترشيح. جرّب توسيعه."
-                  : "لا مستندات بعد. ارفع فواتيرك أو زامن الدرايف من صفحة الرفع."
-              }
-            />
-          )}
-        </div>
       ) : (
-        <div className="mt-3">
-          {/*
-            جدولٌ يصير بطاقات على الجوّال — كان عرضه ٤٦ ريم فيُسحب أفقيّاً.
-            والعمود الأبرز المورّدُ والرقم لا اسمُ ملفّ الدرايف: الاسم
-            يبقى في رابط «افتحه».
-          */}
-          <DataTable
-            rows={rows}
-            keyOf={(r) => r.id}
-            columns={[
-              {
-                key: "doc", header: "المستند", primary: true,
-                cell: (r) => (
-                  <span title={r.fileName}>
-                    <span className="block truncate font-medium">{r.supplierName ?? KIND_LABEL[r.kind] ?? "مستند"}</span>
-                    <span className="block text-[11px] font-normal text-muted">
-                      {r.invoiceNumber && r.invoiceId && showAmounts
-                        ? <Link href={invoiceHref(r.invoiceId)} className="nums underline-offset-4 hover:underline" style={{ unicodeBidi: "isolate" }}>{r.invoiceNumber}</Link>
-                        : r.invoiceNumber
-                          ? <span className="nums" style={{ unicodeBidi: "isolate" }}>{r.invoiceNumber}</span>
-                          : "بلا رقم"}
-                      {r.taxStatus === "INVALID" && <span className="text-danger"> · لا يصلح لخصم الضريبة</span>}
-                      {r.taxStatus === "UNKNOWN" && <span className="text-warn"> · لم تُقرأ ضريبته</span>}
-                    </span>
-                  </span>
-                ),
-              },
-              { key: "kind", header: "النوع", secondary: true, cell: (r) => <span className="text-ink-soft">{KIND_LABEL[r.kind] ?? r.kind}</span> },
-              { key: "month", header: "الشهر", cell: (r) => <span className="nums text-muted" dir="ltr">{r.periodMonth ?? "—"}</span> },
-              ...(showAmounts
-                ? [{
-                    key: "amount", header: "المبلغ", numeric: true,
-                    cell: (r: (typeof rows)[number]) => r.totalMinor !== null ? <Money minor={r.totalMinor} /> : <span className="text-muted">—</span>,
-                  }]
-                : []),
-              {
-                key: "status", header: "الحالة",
-                cell: (r) => {
-                  const st = STATUS_LABEL[r.status] ?? { text: r.status, cls: "bg-sunken text-ink-soft" };
-                  return (
-                    <span className="block">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>{st.text}</span>
-                      {r.status === "REJECTED" && (
-                        <span className="mt-1 block text-[11px] leading-relaxed text-muted">
-                          {(() => {
-                            const j = rejections.get(r.id);
-                            if (!j) return "رُفض — ولا أثرَ لسببه في السجلّ.";
-                            return `رُفض ${j.at.toISOString().slice(0, 10)}${j.by ? ` بيد ${j.by}` : ""} — ${j.reason ?? "بلا سبب مكتوب"}`;
-                          })()}
-                          {canDecide && showAmounts && (
-                            <span className="mt-1 block"><RestoreDocument documentId={r.id} /></span>
+        <>
+          {/* ── الحال أوّلاً، ثمّ البحث والترشيح في سطرٍ واحد ── */}
+          <div className="space-y-3 border-b border-line pb-3">
+            <LinkTabs
+              label="حال المستندات"
+              items={tabs.map((t) => ({ href: t.href, label: t.label, count: t.count, active: tab === t.id }))}
+            />
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <form action="/documents" className="relative col-span-2 flex min-w-0 items-center sm:w-72" role="search">
+                <Search className="pointer-events-none absolute start-3 h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
+                <input
+                  name="q"
+                  type="search"
+                  defaultValue={q ?? ""}
+                  placeholder="ابحث باسم الملف…"
+                  aria-label="ابحث باسم الملف"
+                  dir="auto"
+                  className="min-h-11 w-full rounded-lg border border-line-input bg-raised ps-9 pe-3 text-sm sm:min-h-9"
+                />
+                {p.month && <input type="hidden" name="month" value={p.month} />}
+                {p.supplier && <input type="hidden" name="supplier" value={p.supplier} />}
+                {p.kind && <input type="hidden" name="kind" value={p.kind} />}
+                {/* البحثُ داخل اللسان المفتوح — و«الكلّ» لسانٌ لمن أراده */}
+                <input type="hidden" name="status" value={exact ?? statusParam ?? "NEEDS_REVIEW"} />
+              </form>
+              <FilterSelect
+                label="الشهر"
+                value={p.month ?? ""}
+                options={[
+                  { value: "", label: "كلّ الأشهر", href: link({ month: undefined }) },
+                  ...monthRows.filter((m) => m.month).map((m) => ({
+                    value: m.month as string,
+                    label: formatMonth(m.month as string),
+                    href: link({ month: m.month as string }),
+                  })),
+                ]}
+              />
+              <FilterSelect
+                label="النوع"
+                value={p.kind ?? ""}
+                options={[
+                  { value: "", label: "كلّ الأنواع", href: link({ kind: undefined }) },
+                  ...kindRows.map((k) => ({
+                    value: k.kind,
+                    label: `${KIND_LABEL[k.kind] ?? k.kind} (${k.n})`,
+                    href: link({ kind: k.kind }),
+                  })),
+                ]}
+              />
+              <FilterSelect
+                label="المورّد"
+                value={p.supplier ?? ""}
+                options={[
+                  { value: "", label: "كلّ المورّدين", href: link({ supplier: undefined }) },
+                  ...supplierRows.map((s) => ({ value: s.id, label: s.nameAr, href: link({ supplier: s.id }) })),
+                ]}
+              />
+              {filtered && (
+                <Link href={link({ month: undefined, supplier: undefined, kind: undefined, q: undefined })} className={buttonClass("quiet", "sm")}>
+                  امسح الترشيح
+                </Link>
+              )}
+            </div>
+          </div>
+
+          {/* العدُّ فوق الفراغ يكرّر ما يقوله الفراغ نفسه */}
+          {rows.length > 0 && (
+            <p className="mt-4 text-xs text-muted">
+              {countNoun(total, DOCUMENT)}
+              {filtered ? " ضمن الترشيح" : ""}
+              {q ? <> — بحثاً عن «<bdi>{q}</bdi>»</> : null}
+              {pages > 1 && <> · صفحة <span className="nums">{page}</span> من <span className="nums">{pages}</span></>}
+            </p>
+          )}
+
+          <div className="mt-3">
+            {rows.length === 0 ? (
+              tab === "WAITING" && !filtered ? (
+                /* صندوقُ الوارد الفارغ خبرٌ سارّ — ويُعرَض بابُ الأرشيف لمن جاء يبحث فيه */
+                <EmptyState
+                  icon={CircleCheck}
+                  title="لا مستند ينتظر قرارك."
+                  hint="كلُّ ما وصل اعتُمد أو رُفض. وما يصل من الرفع أو الدرايف ويحتاج نظرك يظهر هنا."
+                  action={
+                    <>
+                      <LinkButton href={link({ status: "ARCHIVED" })} icon={Archive}>
+                        افتح المؤرشَف ({nArchived})
+                      </LinkButton>
+                      <LinkButton href="/upload" variant="primary" icon={Upload}>ارفع مستنداً</LinkButton>
+                    </>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  icon={FileSearch}
+                  title={q ? `لا مستند باسمٍ فيه «${q}» هنا.` : "لا مستند يطابق هذا الترشيح."}
+                  hint={tab !== "ALL" ? "جرّب «الكلّ» — قد يكون في حالٍ أخرى — أو امسح الترشيح." : "جرّب توسيع الترشيح أو امسحه."}
+                  action={
+                    <>
+                      {tab !== "ALL" && <LinkButton href={link({ status: "ALL" })}>ابحث في الكلّ</LinkButton>}
+                      <LinkButton href={link({ month: undefined, supplier: undefined, kind: undefined, q: undefined })} variant="primary">
+                        امسح الترشيح
+                      </LinkButton>
+                    </>
+                  }
+                />
+              )
+            ) : tab === "WAITING" ? (
+              <>
+                {eligible > 0 && canDecide && showAmounts && (
+                  <Callout
+                    tone="ok"
+                    icon={CircleCheck}
+                    className="mb-4"
+                    title={`${countNoun(eligible, DOCUMENT)} يُحسَم الآن بلا مراجعة`}
+                    action={<ConfirmEligible count={eligible} />}
+                  >
+                    تجتمع فيها الشروط، أو قراءتُها كاملة وفاتورتُها لم تُقيَّد بعد. الضغطُ يقيّدها ويعتمدها، ويبقى ما لا يستقيم بسببه.
+                  </Callout>
+                )}
+                <ul className="space-y-3" aria-label="مستنداتٌ تنتظر المراجعة">
+                  {rows.map((r) => (
+                    <WaitingCard
+                      key={r.id}
+                      row={r}
+                      kindLabel={KIND_LABEL[r.kind] ?? r.kind}
+                      why={whyWaiting(r)}
+                      showAmounts={showAmounts}
+                      canDecide={canDecide}
+                    />
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <DataTable
+                rows={rows}
+                keyOf={(r) => r.id}
+                hrefOf={(r) => (r.invoiceId && showAmounts ? invoiceHref(r.invoiceId) : undefined)}
+                columns={[
+                  {
+                    key: "doc",
+                    header: "المستند",
+                    primary: true,
+                    cell: (r) => (
+                      <span className="flex min-w-0 items-center gap-3" title={r.fileName}>
+                        <Monogram name={r.supplierName ?? KIND_LABEL[r.kind] ?? "م"} />
+                        <span className="min-w-0">
+                          <span className="block truncate font-bold">{r.supplierName ?? "مورّدٌ لم يُعرَف"}</span>
+                          <span className="block truncate text-[11px] font-normal text-muted">
+                            {r.invoiceNumber
+                              ? <bdi className="nums">{r.invoiceNumber}</bdi>
+                              : <span dir="ltr">{r.fileName}</span>}
+                          </span>
+                        </span>
+                      </span>
+                    ),
+                  },
+                  { key: "kind", header: "النوع", secondary: true, cell: (r) => <span className="text-ink-soft">{KIND_LABEL[r.kind] ?? r.kind}</span> },
+                  { key: "month", header: "الشهر", cell: (r) => <span className="text-ink-soft">{r.periodMonth ? formatMonth(r.periodMonth) : "غير معروف"}</span> },
+                  ...(showAmounts
+                    ? [{
+                        key: "amount", header: "المبلغ", numeric: true,
+                        /* بلا فاتورةٍ لا مبلغ مقيَّد — «—» لا «0.00» */
+                        cell: (r: Row) => r.totalMinor !== null ? <Money minor={r.totalMinor} /> : <span className="text-muted">—</span>,
+                      }]
+                    : []),
+                  {
+                    key: "status",
+                    header: "الحال",
+                    wrap: true,
+                    cell: (r) => {
+                      const st = STATUS_BADGE[r.status] ?? { text: r.status, tone: "muted" as Tone };
+                      const j = rejections.get(r.id);
+                      return (
+                        <span className="block space-y-1.5">
+                          <Badge tone={st.tone} dot>{st.text}</Badge>
+                          {r.status === "ARCHIVED" && r.taxStatus === "INVALID" && (
+                            <span className="block text-[11px] text-danger">لا يصلح لخصم الضريبة</span>
+                          )}
+                          {r.status === "REJECTED" && (
+                            <span className="block text-[11px] leading-relaxed text-muted">
+                              {j
+                                ? <>رُفض {formatDay(j.at)}{j.by ? <> بيد <bdi>{j.by}</bdi></> : null} — {j.reason ?? "بلا سبب مكتوب"}</>
+                                : "رُفض — ولا أثرَ لسببه في السجلّ."}
+                            </span>
+                          )}
+                          {r.status === "REJECTED" && canDecide && showAmounts && <RestoreDocument documentId={r.id} />}
+                          {isWaiting(r.status) && (
+                            <Link href={link({ status: "NEEDS_REVIEW", q: r.fileName })} className="relative block text-[11px] font-bold text-accent hover:underline">
+                              راجعه ←
+                            </Link>
                           )}
                         </span>
-                      )}
-                      {/*
-                        ── «يحتاج مراجعة» كان لا يقول ماذا ──
+                      );
+                    },
+                  },
+                  {
+                    key: "drive",
+                    header: "الملف",
+                    cell: (r) =>
+                      r.driveFileId ? (
+                        <a
+                          href={driveUrl(r.driveFileId)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex min-h-8 items-center gap-1 text-xs font-bold text-ink-soft hover:text-accent"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                          الدرايف
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted">لا ملفّ</span>
+                      ),
+                  },
+                ]}
+              />
+            )}
+          </div>
 
-                        فيقف صاحب المقهى أمام زرّين — «اعتمد» و«ارفض» —
-                        ولا يعرف ما الذي يُراجَع. والاعتمادُ على غير
-                        علمٍ أسوأ من الرفض.
-
-                        والسببُ مشتقٌّ من حقول الفاتورة بالدالّة نفسها
-                        التي يحكم بها مسارُ الأرشفة، فيُعرَض أوّلُه هنا
-                        وتفصيلُه خلف الرابط ومعه موضعُ التصحيح.
-                      */}
-                      {["PENDING", "EXTRACTED", "NEEDS_REVIEW"].includes(r.status) && (
-                        reasonOf(r).length > 0 ? (
-                          <span className="mt-1 block text-[11px] leading-relaxed text-warn">
-                            {reasonOf(r)[0].what}
-                            {reasonOf(r).length > 1 && ` (و${reasonOf(r).length - 1} غيره)`}
-                            {r.invoiceId && (
-                              <>
-                                {" · "}
-                                <Link
-                                  href={`/purchases/invoices?fix=${encodeURIComponent(r.invoiceId)}#fix`}
-                                  className="font-bold text-ink underline underline-offset-4"
-                                >
-                                  صحّحه
-                                </Link>
-                              </>
-                            )}
-                          </span>
-                        ) : (
-                          /*
-                            لا نقصَ فيها — فالمراجعةُ مراجعةُ قراءةٍ لا
-                            مراجعةُ عطب. وقولُ ذلك يُنهي حَيرةَ «ما الذي
-                            يُراجَع؟»: افتح الملفّ وقارن الأرقام، ثمّ اعتمد.
-                          */
-                          <span className="mt-1 block text-[11px] leading-relaxed text-muted">
-                            {(() => {
-                              const v = pendingVerdicts.get(r.id);
-                              if (!v) return "قرأها النموذج — افتح الملفّ وقارن ثمّ اعتمد.";
-                              if (v.verdict.auto || v.recordable) return "تجتمع فيها الشروط — تُحسَم تلقائياً الآن.";
-                              const texts = v.missing.length > 0
-                                ? v.missing
-                                : v.verdict.gaps.map((g) => GAP_TEXT[g]);
-                              return `لم تدخل وحدها: ${texts.join(" · ")}`;
-                            })()}
-                          </span>
-                        )
-                      )}
-                      {/* ما ينتظر قراراً له فعلٌ في موضعه — لا «راجعه» بلا زرّ */}
-                      {/* فاتورةٌ ألغاها المورّد تُلغى هنا — ويبقى ملفُّها في الدرايف */}
-                      {canDecide && showAmounts && r.status === "ARCHIVED" && r.totalMinor !== null && (
-                        <span className="mt-1 flex flex-wrap gap-1.5"><RejectDocument documentId={r.id} cancel /></span>
-                      )}
-                      {canDecide && ["PENDING", "EXTRACTED", "NEEDS_REVIEW"].includes(r.status) && (
-                        <span className="mt-1 flex flex-wrap gap-1.5">
-                          {r.status === "NEEDS_REVIEW" && showAmounts && <ConfirmDocument documentId={r.id} />}
-                          {(showAmounts || r.totalMinor === null) && <RejectDocument documentId={r.id} />}
-                        </span>
-                      )}
-                    </span>
-                  );
-                },
-              },
-              {
-                key: "drive", header: "الدرايف",
-                cell: (r) => r.driveFileId ? (
-                  <a href={driveUrl(r.driveFileId)} target="_blank" rel="noreferrer" className="underline underline-offset-4 hover:text-ink">
-                    افتحه
-                  </a>
-                ) : <span className="text-muted">—</span>,
-              },
-            ]}
-          />
-        </div>
-      )}
-
-      {pages > 1 && (
-        <div className="mt-4 flex items-center justify-between gap-3">
-          {page > 1 ? (
-            <Link href={pageLink(page - 1)} className="rounded-lg border border-line px-3 py-2 text-xs font-medium hover:border-ink-soft">
-              الأحدث
-            </Link>
-          ) : <span />}
-          {page < pages ? (
-            <Link href={pageLink(page + 1)} className="rounded-lg border border-line px-3 py-2 text-xs font-medium hover:border-ink-soft">
-              الأقدم
-            </Link>
-          ) : <span />}
-        </div>
+          {pages > 1 && (
+            <nav className="mt-5 flex items-center justify-between gap-3" aria-label="الصفحات">
+              {page > 1 ? (
+                <LinkButton href={pageLink(page - 1)} size="sm" icon={ArrowRight}>الأحدث</LinkButton>
+              ) : <span />}
+              <span className="text-xs text-muted">
+                صفحة <span className="nums">{page}</span> من <span className="nums">{pages}</span>
+              </span>
+              {page < pages ? (
+                <Link href={pageLink(page + 1)} className={buttonClass("secondary", "sm")}>
+                  الأقدم
+                  <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
+                </Link>
+              ) : <span />}
+            </nav>
+          )}
+        </>
       )}
     </PageShell>
   );

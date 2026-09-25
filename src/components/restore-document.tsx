@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { RotateCcw } from "lucide-react";
 import { postJson } from "@/lib/http-client";
-import { buttonClass } from "./ui";
+import { buttonClass } from "./ui-tokens";
+import { toast } from "./ui-client";
 
 /** «أعِده للمراجعة» — المرفوضُ يُقرأ من جديد ويُحكَم عليه كأيّ مستندٍ ينتظر. */
 export function RestoreDocument({ documentId }: { documentId: string }) {
@@ -11,7 +13,7 @@ export function RestoreDocument({ documentId }: { documentId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
-    <span className="flex flex-wrap items-center gap-1.5">
+    <span className="inline-flex flex-wrap items-center gap-1.5">
       <button
         type="button"
         disabled={busy}
@@ -20,15 +22,22 @@ export function RestoreDocument({ documentId }: { documentId: string }) {
           setBusy(true);
           setError(null);
           const r = await postJson("/api/document-status", { documentId, action: "restore" });
-          if (r.ok) await postJson("/api/document-status", { action: "confirm-eligible" });
+          /* ثمّ يُحكَم عليه كأيّ مستندٍ ينتظر — فإن اجتمعت فيه الشروط دخل وحده */
+          const then = r.ok ? await postJson<{ message?: string }>("/api/document-status", { action: "confirm-eligible" }) : null;
           setBusy(false);
           if (!r.ok) { setError(r.error); return; }
+          toast({
+            tone: "ok",
+            title: "أُعيد المستند إلى المراجعة",
+            body: then?.ok && then.data.message ? then.data.message : "تجده تحت «ينتظر المراجعة».",
+          });
           router.refresh();
         }}
       >
+        <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
         {busy ? "يعيده…" : "أعِده للمراجعة"}
       </button>
-      {error && <span className="text-[11px] text-danger" role="alert">{error}</span>}
+      {error && <span className="text-[11px] font-bold text-danger" role="alert">{error}</span>}
     </span>
   );
 }

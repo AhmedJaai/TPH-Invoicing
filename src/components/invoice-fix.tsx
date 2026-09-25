@@ -2,8 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CircleAlert, CircleCheck, Info, PenLine, TriangleAlert } from "lucide-react";
 import { postJson } from "@/lib/http-client";
-import { buttonClass } from "./ui";
+import { buttonClass } from "./ui-tokens";
+import { toast } from "./ui-client";
 import type { InvoiceReason } from "@/lib/invoice-findings";
 
 /**
@@ -69,11 +71,13 @@ export function InvoiceFix({
       setMessage(r.error);
       return;
     }
-    setMessage(
-      r.data.taxStatus === "VALID"
-        ? "حُفظ — وصارت الفاتورة مستوفيةَ الأركان."
-        : "حُفظ. وما زال فيها ما يُراجَع — انظر الأسباب أعلاه بعد التحديث.",
-    );
+    const valid = r.data.taxStatus === "VALID";
+    toast({
+      tone: valid ? "ok" : "warn",
+      title: "حُفظ التصحيح",
+      body: valid ? "وأعاد الخادمُ الحكمَ عليها: صارت مستوفيةَ الأركان." : "وما زال فيها ما يُراجَع — الأسبابُ أعلاه.",
+    });
+    setOpen(false);
     router.refresh();
   }
 
@@ -82,10 +86,14 @@ export function InvoiceFix({
   if (reasons.every((r) => r.severity === "INFO") && !open) {
     return (
       <div className="space-y-1.5">
-        <p className="text-xs text-ok">
-          مستوفيةُ الأركان — لا شيء ينقصها.
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <span className="inline-flex items-center gap-1.5 font-bold text-ok">
+            <CircleCheck className="h-4 w-4" strokeWidth={2} aria-hidden />
+            مستوفيةُ الأركان — لا شيء ينقصها.
+          </span>
           {canEdit && (
-            <button type="button" onClick={() => setOpen(true)} className="ms-2 underline underline-offset-4">
+            <button type="button" onClick={() => setOpen(true)} className={buttonClass("quiet", "sm")}>
+              <PenLine className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
               صحّح حقلاً على أيّ حال
             </button>
           )}
@@ -106,18 +114,25 @@ export function InvoiceFix({
           {reasons.map((r) => (
             <li
               key={r.code}
-              className={`rounded-lg border px-3 py-2 ${
+              className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 ${
                 r.severity === "BLOCKER"
-                  ? "border-danger/40 bg-danger-bg"
-                  : r.severity === "WARN" ? "border-warn/40 bg-warn-bg" : "border-line bg-sunken"
+                  ? "border-danger/25 bg-danger-bg"
+                  : r.severity === "WARN" ? "border-warn/25 bg-warn-bg" : "border-line bg-sunken"
               }`}
             >
-              <p className="text-xs font-bold">
-                {/* ما هو للعلم لا يُكتب «يحتاج معالجة» — وإلّا صار كلُّ تقريبٍ عطباً */}
-                {r.severity === "BLOCKER" ? "يمنع القيد: " : r.severity === "WARN" ? "يحتاج معالجة: " : "للعلم: "}
-                {r.what}
-              </p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-ink-soft">{r.fix}</p>
+              {r.severity === "BLOCKER"
+                ? <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" strokeWidth={2} aria-hidden />
+                : r.severity === "WARN"
+                  ? <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" strokeWidth={2} aria-hidden />
+                  : <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted" strokeWidth={2} aria-hidden />}
+              <div className="min-w-0">
+                <p className="text-xs font-bold">
+                  {/* ما هو للعلم لا يُكتب «يحتاج معالجة» — وإلّا صار كلُّ تقريبٍ عطباً */}
+                  {r.severity === "BLOCKER" ? "يمنع القيد: " : r.severity === "WARN" ? "يحتاج معالجة: " : "للعلم: "}
+                  {r.what}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-ink-soft">{r.fix}</p>
+              </div>
             </li>
           ))}
         </ul>
@@ -125,12 +140,13 @@ export function InvoiceFix({
 
       {canEdit && !open && (
         <button type="button" onClick={() => setOpen(true)} className={buttonClass("secondary", "sm")}>
+          <PenLine className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
           صحّح الحقول بيدك
         </button>
       )}
 
       {canEdit && open && (
-        <div className="rounded-xl border border-line bg-sunken/50 p-3">
+        <div className="rounded-xl border border-line bg-raised p-3.5 shadow-raised">
           <p className="mb-2.5 text-[11px] leading-relaxed text-muted">
             اكتب ما على الورقة. والنظامُ يعيد الحكمَ على الفاتورة بعد الحفظ — لا تُكتَب الحالُ من هنا.
           </p>
@@ -159,7 +175,7 @@ export function InvoiceFix({
             >
               إلغاء
             </button>
-            {message && <span className={`text-xs ${failed ? "text-danger" : "text-ok"}`}>{message}</span>}
+            {message && <span role={failed ? "alert" : "status"} className={`text-xs font-bold ${failed ? "text-danger" : "text-ok"}`}>{message}</span>}
           </div>
         </div>
       )}
@@ -190,7 +206,7 @@ function Field({
           وأحمد يكتبها بإبهامه عند الكاشير.
         */
         inputMode={/الضريب|الصافي|الإجمال/.test(label) ? "decimal" : undefined}
-        className={`w-full rounded-lg border border-line-input bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-ink ${ltr ? "nums" : ""}`}
+        className={`min-h-11 w-full rounded-lg border border-line-input bg-raised px-2.5 text-sm sm:min-h-9 ${ltr ? "nums" : ""}`}
       />
     </label>
   );

@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCheck } from "lucide-react";
 import { postJson } from "@/lib/http-client";
-import { buttonClass } from "./ui";
+import { buttonClass } from "./ui-tokens";
+import { toast } from "./ui-client";
 
 /**
  * «اعتمد ما اجتمعت فيه الشروط» — لما انتظر قبل أن توجد القاعدة.
@@ -15,29 +17,28 @@ import { buttonClass } from "./ui";
 export function ConfirmEligible({ count }: { count: number }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   return (
-    <span className="flex flex-wrap items-center gap-2">
+    <span className="inline-flex flex-wrap items-center gap-2">
       <button
         type="button"
         disabled={busy}
         className={buttonClass("primary", "sm")}
         onClick={async () => {
           setBusy(true);
-          setMessage(null);
+          setError(null);
           const r = await postJson<{ message?: string }>("/api/document-status", { action: "confirm-eligible" });
           setBusy(false);
-          if (!r.ok) { setMessage({ ok: false, text: r.error }); return; }
-          setMessage({ ok: true, text: r.data.message ?? "اعتُمدت" });
+          if (!r.ok) { setError(r.error); return; }
+          toast({ tone: "ok", title: "حُسم ما اجتمعت فيه الشروط", body: r.data.message ?? "اعتُمدت" });
           router.refresh();
         }}
       >
+        <CheckCheck className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
         {busy ? "يعتمد…" : count === 1 ? "اعتمده" : "اعتمدها كلَّها"}
       </button>
-      {message && (
-        <span role="status" className={`text-[11px] ${message.ok ? "text-ok" : "text-danger"}`}>{message.text}</span>
-      )}
+      {error && <span role="alert" className="text-[11px] font-bold text-danger">{error}</span>}
     </span>
   );
 }
