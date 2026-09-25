@@ -21,7 +21,7 @@ export async function gatherChangeFacts(
   risingItems: number,
   risingAnnualMinor: number,
 ): Promise<ChangeFacts> {
-  const [{ totals }, rows] = await Promise.all([
+  const [{ totals }, rows, spend] = await Promise.all([
     loadBalanceTotals(),
     db.execute<Row>(sql`
       with months as (
@@ -103,6 +103,22 @@ export async function gatherChangeFacts(
             left join pay using (supplier_id))                                     as outstanding_then,
         (select count(*)::int from bank_transactions where category = 'UNKNOWN')  as new_unclassified
     `),
+    /*
+      مشترياتُ كلّ مورّدٍ بتاريخ فاتورته: آخرُ ثلاثين يوماً، والتسعون قبلها،
+      وفي كم شهرٍ منها اشترينا منه. نوافذُ متدحرجة لا أشهرٌ تقويميّة — فلا
+      يُقارَن أوّلُ الشهر بشهرٍ تامّ.
+    */
+    db.execute<{ slug: string; name: string; last30: number; prev90: number; months: number }>(sql`
+      select s.slug, s.name_ar as name,
+             coalesce(sum(i.total_minor) filter (where i.invoice_date >= now() - interval '30 days'), 0)::bigint as last30,
+             coalesce(sum(i.total_minor) filter (where i.invoice_date < now() - interval '30 days'), 0)::bigint as prev90,
+             count(distinct to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM'))
+               filter (where i.invoice_date < now() - interval '30 days')::int as months
+        from invoices i
+        join suppliers s on s.id = i.supplier_id
+       where i.invoice_date >= now() - interval '120 days'
+       group by s.slug, s.name_ar
+    `),
   ]);
   const [r] = rows.rows;
 
@@ -120,5 +136,12 @@ export async function gatherChangeFacts(
     risingItems,
     risingAnnualMinor,
     newUnclassified: Number(r?.new_unclassified ?? 0),
+    spend: spend.rows.map((x) => ({
+      slug: x.slug,
+      name: x.name,
+      last30Minor: Number(x.last30),
+      prev90Minor: Number(x.prev90),
+      activeMonths: Number(x.months),
+    })),
   };
 }

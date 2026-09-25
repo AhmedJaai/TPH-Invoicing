@@ -81,6 +81,53 @@ export interface ChangeFacts {
 
   /** حركات بنكية جديدة لم تُصنَّف. */
   newUnclassified: number;
+
+  /** مشترياتُ كلّ مورّدٍ في آخر ثلاثين يوماً وفي التسعين قبلها — لكشف الإنفاق غير المعتاد. */
+  spend?: readonly SupplierSpend[];
+}
+
+export interface SupplierSpend {
+  slug: string;
+  name: string;
+  /** مجموعُ فواتيره بتاريخها في آخر ثلاثين يوماً. */
+  last30Minor: number;
+  /** مجموعُها في التسعين يوماً التي قبلها. */
+  prev90Minor: number;
+  /** في كم شهرٍ من تلك التسعين اشترينا منه — الأساسُ الذي لا يتكرّر ليس أساساً. */
+  activeMonths: number;
+}
+
+/** ما دونه ليس «غير معتاد» ولو تضاعف: ألفُ ريالٍ فوق المعتاد. */
+export const SPIKE_MIN_DELTA_MINOR = 100_000;
+
+/**
+ * إنفاقٌ غير معتاد عند مورّد — آخرُ ثلاثين يوماً مقابل متوسّطه الشهريّ في
+ * التسعين قبلها. يُعَدّ غيرَ معتاد إن بلغ مرّةً ونصفاً من متوسّطه **و**زاد
+ * ألفَ ريالٍ فأكثر، وله أساسٌ يُقاس عليه (شهران من ثلاثةٍ على الأقلّ) —
+ * فالمورّدُ الذي يُشترى منه كلَّ فصلٍ مرّةً لا يُنذَر به كلَّ فصل.
+ *
+ * ولا يُحكم عليه (`favourable: null`): قد يكون موسماً أو فرعاً أو خطأً،
+ * والخبرُ أن يُنظر فيه. والمقارنةُ بأعدادٍ صحيحة: `٢ × الأخير ≥ ٣ × المتوسّط`.
+ */
+export function spendSpikes(rows: readonly SupplierSpend[], limit = 2): Change[] {
+  return rows
+    .map((r) => ({ r, avg: Math.round(r.prev90Minor / 3) }))
+    .filter(({ r, avg }) => r.activeMonths >= 2 && avg > 0
+      && r.last30Minor * 2 >= avg * 3 && r.last30Minor - avg >= SPIKE_MIN_DELTA_MINOR)
+    .sort((a, b) => (b.r.last30Minor - b.avg) - (a.r.last30Minor - a.avg))
+    .slice(0, limit)
+    .map(({ r, avg }) => ({
+      id: `spend:${r.slug}`,
+      label: `${r.name} — إنفاقٌ فوق المعتاد`,
+      baseline: "آخرُ ثلاثين يوماً مقابل متوسّط الأشهر الثلاثة قبلها",
+      direction: "UP" as const,
+      pct: pctChange(r.last30Minor, avg),
+      currentMinor: r.last30Minor,
+      previousMinor: avg,
+      favourable: null,
+      detail: "تحقّق أنّه طلبٌ لا خطأٌ ولا فاتورةٌ مكرّرة",
+      href: `/suppliers/${encodeURIComponent(r.slug)}`,
+    }));
 }
 
 export function buildChanges(f: ChangeFacts): Change[] {
@@ -172,6 +219,9 @@ export function buildChanges(f: ChangeFacts): Change[] {
       href: "/analysis",
     });
   }
+
+  /* ── إنفاقٌ غير معتاد عند مورّد ── */
+  out.push(...spendSpikes(f.spend ?? []));
 
   /* ── حركات لم تُصنَّف ── */
   if (f.newUnclassified > 0) {

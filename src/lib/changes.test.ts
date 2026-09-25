@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NOISE_PCT, buildChanges, direction, notable, pctChange, type ChangeFacts } from "./changes";
+import { NOISE_PCT, buildChanges, direction, notable, pctChange, spendSpikes, type ChangeFacts } from "./changes";
 
 const quiet: ChangeFacts = {
   purchasesThisMonth: 100_00, purchasesPrevMonth: 100_00,
@@ -112,5 +112,42 @@ describe("الشهر الجاري يُقارَن بمثله", () => {
   it("الشهر التامّ يُقارَن بالشهر كلّه", () => {
     const c = buildChanges(f({ daysElapsedInMonth: null })).find((x) => x.id === "purchases");
     expect(c?.baseline).toBe("عن 2026-08");
+  });
+});
+
+describe("spendSpikes — إنفاقٌ فوق المعتاد عند مورّد", () => {
+  const s = (o: Partial<import("./changes").SupplierSpend> = {}) => ({
+    slug: "OliveLeaves", name: "أوراق الزيتون", last30Minor: 0, prev90Minor: 0, activeMonths: 3, ...o,
+  });
+
+  it("مرّةٌ ونصفٌ من المتوسّط وألفُ ريالٍ فوقه — خبر", () => {
+    const [c] = spendSpikes([s({ last30Minor: 450_000, prev90Minor: 600_000 })]);
+    expect(c.id).toBe("spend:OliveLeaves");
+    expect(c.previousMinor).toBe(200_000);
+    expect(c.pct).toBe(125);
+    expect(c.favourable).toBeNull();
+    expect(c.href).toBe("/suppliers/OliveLeaves");
+  });
+
+  it("الضعفُ على مبلغٍ صغير ليس خبراً", () => {
+    expect(spendSpikes([s({ last30Minor: 60_000, prev90Minor: 60_000 })])).toEqual([]);
+  });
+
+  it("ما دون مرّةٍ ونصف ليس خبراً ولو كبر المبلغ", () => {
+    expect(spendSpikes([s({ last30Minor: 2_900_000, prev90Minor: 6_000_000 })])).toEqual([]);
+  });
+
+  it("بلا أساسٍ متكرّر لا يُنذَر — المورّدُ الفصليّ والجديد", () => {
+    expect(spendSpikes([s({ last30Minor: 900_000, prev90Minor: 300_000, activeMonths: 1 })])).toEqual([]);
+    expect(spendSpikes([s({ last30Minor: 900_000, prev90Minor: 0, activeMonths: 0 })])).toEqual([]);
+  });
+
+  it("الأكبرُ فرقاً أوّلاً، واثنان على الأكثر", () => {
+    const out = spendSpikes([
+      s({ slug: "A", last30Minor: 500_000, prev90Minor: 600_000 }),
+      s({ slug: "B", last30Minor: 900_000, prev90Minor: 600_000 }),
+      s({ slug: "C", last30Minor: 700_000, prev90Minor: 600_000 }),
+    ]);
+    expect(out.map((c) => c.id)).toEqual(["spend:B", "spend:C"]);
   });
 });
