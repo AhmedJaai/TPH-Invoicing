@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAccountantPack, summarize, type PackInput } from "./accountant-pack";
+import { buildAccountantPack, expensesByCategory, invoiceOpenMinor, outflowByCategory, summarize, vatByStatus, type PackInput } from "./accountant-pack";
 
 const base: PackInput = {
   month: "2026-08",
@@ -60,5 +60,72 @@ describe("حزمة المحاسب", () => {
     const s = summarize({ ...base, invoices: [inv({ paidMinor: 20_000 })] });
     expect(s.paidMinor).toBe(11_500);
     expect(s.openMinor).toBe(0);
+  });
+});
+
+describe("ضريبةُ المدخلات بحالها — مصدرُ الورقة والحزمة المطبوعة", () => {
+  it("يجمع المقروء ويعدّ المجهول ولا يجمعه صفراً", () => {
+    const p = {
+      ...base,
+      invoices: [
+        inv(),
+        inv({ number: "B", vatMinor: 900 }),
+        inv({ number: "C", vatMinor: null, inputVatStatus: "UNKNOWN" }),
+        inv({ number: "D", inputVatStatus: "NOT_ELIGIBLE", vatMinor: 300 }),
+      ],
+    };
+    expect(vatByStatus(p)).toEqual([
+      { status: "ELIGIBLE", count: 2, vatKnownMinor: 2_400, unknownVat: 0 },
+      { status: "NOT_ELIGIBLE", count: 1, vatKnownMinor: 300, unknownVat: 0 },
+      { status: "UNKNOWN", count: 1, vatKnownMinor: 0, unknownVat: 1 },
+    ]);
+  });
+
+  it("الباقي على الفاتورة لا يقلّ عن صفر — الزائدُ رصيدٌ لا دينٌ سالب", () => {
+    expect(invoiceOpenMinor(inv({ paidMinor: 4_000 }))).toBe(7_500);
+    expect(invoiceOpenMinor(inv({ paidMinor: 20_000 }))).toBe(0);
+  });
+});
+
+describe("صادرُ البنك في الحزمة", () => {
+  const row = (over: Partial<PackInput["bank"][number]>): PackInput["bank"][number] => ({
+    date: "2026-08-05", description: "—", direction: "DEBIT", amountMinor: 1_000, category: "POS_FEE", matched: false, ...over,
+  });
+
+  it("رسومُ الشبكة والرواتبُ مفسَّرةٌ ببابها — لا «لم يُطابَق»", () => {
+    const p = {
+      ...base,
+      bank: [
+        row({}),
+        row({ category: "SALARY" }),
+        row({ category: "UNKNOWN" }),
+        row({ category: "SUPPLIER" }),
+        row({ category: "SUPPLIER", matched: true }),
+        row({ direction: "CREDIT", category: "UNKNOWN" }),
+      ],
+    };
+    expect(summarize(p).bankUnexplainedCount).toBe(2);
+  });
+
+  it("الصادرُ بأبوابه، الأكبرُ أوّلاً، والواردُ لا يدخله", () => {
+    const p = {
+      ...base,
+      bank: [row({ amountMinor: 100 }), row({ amountMinor: 200 }), row({ category: "RENT", amountMinor: 4_750_000 }), row({ direction: "CREDIT", amountMinor: 9 })],
+    };
+    expect(outflowByCategory(p)).toEqual([
+      { category: "RENT", count: 1, totalMinor: 4_750_000 },
+      { category: "POS_FEE", count: 2, totalMinor: 300 },
+    ]);
+  });
+});
+
+describe("المصروفاتُ بأبوابها", () => {
+  it("تُجمع بالباب، الأكبرُ أوّلاً", () => {
+    const e = (category: string, amountMinor: number) => ({ date: "2026-08-01", category, label: "—", amountMinor, source: "BANK" });
+    const p = { ...base, expenses: [e("POS_FEE", 40), e("POS_FEE", 60), e("RENT", 4_750_000)] };
+    expect(expensesByCategory(p)).toEqual([
+      { category: "RENT", count: 1, totalMinor: 4_750_000 },
+      { category: "POS_FEE", count: 2, totalMinor: 100 },
+    ]);
   });
 });

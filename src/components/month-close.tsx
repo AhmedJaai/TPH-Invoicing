@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, CircleAlert, CircleCheck, Download, FileSpreadsheet, Landmark, Lock, Receipt, RotateCw, ShieldCheck,
+  ArrowLeft, CircleAlert, CircleCheck, Download, Printer, FileSpreadsheet, Landmark, Lock, Receipt, RotateCw, ShieldCheck,
   TriangleAlert, Unlock, Wallet, type LucideIcon,
 } from "lucide-react";
 import type { CheckItem, MonthCloseReport } from "@/lib/month-close";
@@ -362,14 +362,20 @@ export function MonthClose({
               <div className="min-w-0 flex-1">
                 <h3 className="text-[15px] font-bold">حزمة المحاسب — {formatMonth(month)}</h3>
                 <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
-                  ملفّ Excel بستّ أوراق: الملخّص · الفواتير · الضريبة · الدفعات · المصروفات · حركات البنك.
+                  ملفّ Excel بستّ أوراق (الملخّص · الفواتير · الضريبة · الدفعات · المصروفات · حركات البنك)، أو ورقةٌ تُطبَع وتُحفَظ PDF بالأرقام نفسها.
                   {isClosed ? " الشهرُ مقفل، فأرقامُه ثابتة." : " الشهرُ مفتوح — قد تتغيّر أرقامُه بعد التنزيل، ويُكتب ذلك في الملفّ."}
                 </p>
               </div>
-              <a href={`/api/export/accountant?month=${month}`} download className={buttonClass(isClosed ? "primary" : "secondary")}>
-                <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
-                نزّل الحزمة
-              </a>
+              <div className="flex flex-wrap gap-2">
+                <a href={`/api/export/accountant?month=${month}`} download className={buttonClass(isClosed ? "primary" : "secondary")}>
+                  <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
+                  نزّل Excel
+                </a>
+                <Link href={`/close/pack?month=${month}`} className={buttonClass("secondary")}>
+                  <Printer className="h-4 w-4" strokeWidth={2} aria-hidden />
+                  اعرضها للطباعة
+                </Link>
+              </div>
             </div>
           </section>
 

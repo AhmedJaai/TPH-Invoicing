@@ -81,14 +81,14 @@ const UNKNOWN = "غير معروف";
 const riyals = (minor: number): Cell => ({ riyals: formatRiyals(minor) });
 const maybe = (minor: number | null): Cell => (minor === null ? UNKNOWN : riyals(minor));
 
-const SOURCE_LABEL: Record<string, string> = { BANK: "كشف البنك", INVOICE: "فاتورة", MANUAL: "إدخالٌ يدويّ" };
+export const SOURCE_LABEL: Record<string, string> = { BANK: "كشف البنك", INVOICE: "فاتورة", MANUAL: "إدخالٌ يدويّ" };
 
-function categoryLabel(c: string): string {
+export function categoryLabel(c: string): string {
   const labels: Readonly<Record<string, string>> = CATEGORY_LABEL satisfies Record<TxCategory, string>;
   return labels[c] ?? c;
 }
 
-const INPUT_VAT_LABEL: Record<InputVatStatus, string> = {
+export const INPUT_VAT_LABEL: Record<InputVatStatus, string> = {
   ELIGIBLE: "تُخصم",
   NOT_ELIGIBLE: "لا تُخصم",
   UNKNOWN,
@@ -106,7 +106,79 @@ export interface PackSummary {
   expensesMinor: number;
   bankInMinor: number;
   bankOutMinor: number;
-  bankUnmatchedCount: number;
+  /** صادرٌ بلا تفسير: غيرُ مصنَّف، أو لمورّدٍ بلا دفعةٍ قُيّدت له. */
+  bankUnexplainedCount: number;
+}
+
+/**
+ * صادرٌ يسأل عنه المحاسب: غيرُ مصنَّف، أو خرج لمورّدٍ ولا دفعةَ مقيَّدةً تقابله.
+ *
+ * كان العدُّ «صادرٌ لم يُطابَق» — والمطابقةُ للدفعات وحدها، فعدّ رسومَ الشبكة
+ * والرواتبَ والإيجار (٣٨٨ في أغسطس ٢٠٢٦ وكلُّها مفسَّرةٌ ببابها) فبدا الشهرُ
+ * فوضى وهو مستقيم.
+ */
+export function unexplained(b: PackBankRow): boolean {
+  return b.direction === "DEBIT" && (b.category === "UNKNOWN" || (b.category === "SUPPLIER" && !b.matched));
+}
+
+export interface OutflowByCategory {
+  category: string;
+  count: number;
+  totalMinor: number;
+}
+
+/** صادرُ البنك بأبوابه، الأكبرُ أوّلاً — ما يسأل عنه المحاسب قبل الحركات. */
+export function outflowByCategory(p: PackInput): OutflowByCategory[] {
+  const by = new Map<string, OutflowByCategory>();
+  for (const b of p.bank) {
+    if (b.direction !== "DEBIT") continue;
+    const row = by.get(b.category) ?? { category: b.category, count: 0, totalMinor: 0 };
+    row.count++;
+    row.totalMinor += b.amountMinor;
+    by.set(b.category, row);
+  }
+  return [...by.values()].sort((a, b) => b.totalMinor - a.totalMinor);
+}
+
+/** رسومٌ صغيرةٌ متكرّرة (مئاتٌ في الشهر) — تُجمَل ببابها في الورق ولا تُسرَد. */
+export const SMALL_FEE_CATEGORIES: ReadonlySet<string> = new Set(["POS_FEE", "POS_VAT", "BANK_FEE", "BANK_VAT"]);
+
+/** المصروفاتُ بأبوابها، الأكبرُ أوّلاً. */
+export function expensesByCategory(p: PackInput): OutflowByCategory[] {
+  const by = new Map<string, OutflowByCategory>();
+  for (const e of p.expenses) {
+    const row = by.get(e.category) ?? { category: e.category, count: 0, totalMinor: 0 };
+    row.count++;
+    row.totalMinor += e.amountMinor;
+    by.set(e.category, row);
+  }
+  return [...by.values()].sort((a, b) => b.totalMinor - a.totalMinor);
+}
+
+/** ما بقي على الفاتورة — لا يقلّ عن صفر، فالسدادُ الزائد رصيدٌ للمورّد لا دينٌ سالب. */
+export function invoiceOpenMinor(i: PackInvoice): number {
+  return Math.max(0, i.totalMinor - i.paidMinor);
+}
+
+export interface VatRow {
+  status: InputVatStatus;
+  count: number;
+  /** مجموعُ المقروء وحده — والمجهولُ يُعَدّ في `unknownVat` ولا يُجمع صفراً. */
+  vatKnownMinor: number;
+  unknownVat: number;
+}
+
+/** ضريبةُ المدخلات بحالها — لورقة Excel وللحزمة المطبوعة من مصدرٍ واحد. */
+export function vatByStatus(p: PackInput): VatRow[] {
+  return (["ELIGIBLE", "NOT_ELIGIBLE", "UNKNOWN"] as const).map((status) => {
+    const list = p.invoices.filter((i) => i.inputVatStatus === status);
+    return {
+      status,
+      count: list.length,
+      vatKnownMinor: list.reduce((s, i) => s + (i.vatMinor ?? 0), 0),
+      unknownVat: list.filter((i) => i.vatMinor === null).length,
+    };
+  });
 }
 
 export function summarize(p: PackInput): PackSummary {
@@ -120,12 +192,12 @@ export function summarize(p: PackInput): PackSummary {
       .filter((i) => i.inputVatStatus === "ELIGIBLE" && i.vatMinor !== null)
       .reduce((s, i) => s + (i.vatMinor ?? 0), 0),
     paidMinor: p.invoices.reduce((s, i) => s + Math.min(i.paidMinor, i.totalMinor), 0),
-    openMinor: p.invoices.reduce((s, i) => s + Math.max(0, i.totalMinor - i.paidMinor), 0),
+    openMinor: p.invoices.reduce((s, i) => s + invoiceOpenMinor(i), 0),
     paymentsMinor: live.reduce((s, x) => s + x.amountMinor, 0),
     expensesMinor: p.expenses.reduce((s, e) => s + e.amountMinor, 0),
     bankInMinor: p.bank.filter((b) => b.direction === "CREDIT").reduce((s, b) => s + b.amountMinor, 0),
     bankOutMinor: p.bank.filter((b) => b.direction === "DEBIT").reduce((s, b) => s + b.amountMinor, 0),
-    bankUnmatchedCount: p.bank.filter((b) => b.direction === "DEBIT" && !b.matched).length,
+    bankUnexplainedCount: p.bank.filter(unexplained).length,
   };
 }
 
@@ -152,7 +224,7 @@ export function buildAccountantPack(p: PackInput): Sheet[] {
     ["المصروفات", riyals(s.expensesMinor)],
     ["وارد البنك", riyals(s.bankInMinor)],
     ["صادر البنك", riyals(s.bankOutMinor)],
-    ["صادرٌ لم يُطابَق", { count: s.bankUnmatchedCount }],
+    ["صادرٌ بلا تفسير (غير مصنَّف أو لمورّدٍ بلا دفعة)", { count: s.bankUnexplainedCount }],
     [],
     ["ملاحظة", "المبيعات غير موصولة بالنظام — الإيراد ليس في هذه الحزمة. والمجهولُ مكتوبٌ «غير معروف» لا صفراً."],
   ];
@@ -170,20 +242,16 @@ export function buildAccountantPack(p: PackInput): Sheet[] {
       TAX_STATUS_LABEL[i.taxStatus],
       INPUT_VAT_LABEL[i.inputVatStatus],
       riyals(Math.min(i.paidMinor, i.totalMinor)),
-      riyals(Math.max(0, i.totalMinor - i.paidMinor)),
+      riyals(invoiceOpenMinor(i)),
     ]),
   ];
 
-  const vatRows = (["ELIGIBLE", "NOT_ELIGIBLE", "UNKNOWN"] as const).map((st) => {
-    const list = p.invoices.filter((i) => i.inputVatStatus === st);
-    const unknownVat = list.filter((i) => i.vatMinor === null).length;
-    return [
-      INPUT_VAT_LABEL[st],
-      { count: list.length },
-      riyals(list.reduce((s2, i) => s2 + (i.vatMinor ?? 0), 0)),
-      unknownVat > 0 ? `منها ${unknownVat} ضريبتُها غير مقروءة` : "",
-    ] as Cell[];
-  });
+  const vatRows = vatByStatus(p).map((v): Cell[] => [
+    INPUT_VAT_LABEL[v.status],
+    { count: v.count },
+    riyals(v.vatKnownMinor),
+    v.unknownVat > 0 ? `منها ${v.unknownVat} ضريبتُها غير مقروءة` : "",
+  ]);
   const vat: Cell[][] = [["ضريبة المدخلات", "عدد الفواتير", "الضريبة المقروءة", "ملاحظة"], ...vatRows];
 
   const payments: Cell[][] = [
