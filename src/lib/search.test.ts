@@ -37,6 +37,14 @@ describe("parseSearch", () => {
     expect(r.amountMinor).toBe(260_342_00);
   });
 
+  it("الصفرُ في أوّله رقمُ مستندٍ لا مبلغ — «00073» فاتورةٌ لا ٧٣ ريالاً", () => {
+    const r = parseSearch("00073")!;
+    expect(r.kind).toBe("NUMBER");
+    expect(r.term).toBe("00073");
+    expect(parseSearch("05")!.kind).toBe("NUMBER");
+    expect(parseSearch("0.50")!.kind).toBe("AMOUNT");
+  });
+
   it("الكسر يجعله مبلغاً مهما طال", () => {
     const r = parseSearch("1234567.89")!;
     expect(r.kind).toBe("AMOUNT");

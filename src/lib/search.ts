@@ -83,8 +83,13 @@ export function parseSearch(raw: string): SearchIntent | null {
 
   const bare = digits.replace(/,/g, "");
   if (AMOUNT_RE.test(digits)) {
+    /*
+      والصفرُ في أوّله رقمُ مستند لا مبلغ: لا يُكتب مبلغٌ «00073»، وتُكتب
+      فاتورة «00073». كان يُقرأ ٧٣ ريالاً فتظهر رسومُ الشبكة ولا تظهر الفاتورة.
+    */
+    const leadingZero = /^0\d/.test(bare) && !digits.includes(".");
     const isLongInteger = !digits.includes(".") && !digits.includes(",")
-      && bare.length >= DOCUMENT_NUMBER_MIN_DIGITS;
+      && (bare.length >= DOCUMENT_NUMBER_MIN_DIGITS || leadingZero);
 
     if (isLongInteger) {
       return {
