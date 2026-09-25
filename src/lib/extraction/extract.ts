@@ -77,7 +77,8 @@ async function extractWithClaude(input: ExtractionRequest): Promise<ExtractionOu
     */
     const classified = await client.messages.parse({
       model: EXTRACTION_MODEL,
-      max_tokens: 512,
+      // التفكير يعمل افتراضياً على هذا النموذج ويُحسَب من السقف — فسقفٌ ضيّق يقطع التصنيف بصمت
+      max_tokens: 4096,
       messages: [{
         role: "user",
         content: [
@@ -85,7 +86,7 @@ async function extractWithClaude(input: ExtractionRequest): Promise<ExtractionOu
           { type: "text", text: "ما نوع هذا المستند؟ صنّفه ولا تستخرج حقوله." },
         ],
       }],
-      output_config: { format: zodOutputFormat(classifierSchema) },
+      output_config: { effort: "low", format: zodOutputFormat(classifierSchema) },
     });
 
     const kind = classified.parsed_output?.documentKind ?? null;
@@ -121,6 +122,8 @@ async function extractWithClaude(input: ExtractionRequest): Promise<ExtractionOu
         },
       ],
       output_config: {
+        // القراءة نقلٌ لا استدلال (انظر `thinkingFor` في ai/deepseek.ts) — فالجهد أدناه
+        effort: "low",
         format: zodOutputFormat(kind ? schemaFor(kind) : extractionSchema),
       },
     });

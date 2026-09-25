@@ -42,7 +42,7 @@ Vitest 4.1.11 · zod 4.5.4 · googleapis 178 (الدرايف وحده) · `@anth
 
 **القاعدة:** نقطة Neon **المجمَّعة** (`...-pooler.c-2.us-east-2.aws.neon.tech`) — غيرها تنفد اتصالاتها تحت Vercel. وللمعاينة فرعٌ خاصّ (`ux-redesign`)؛ لا يكتب نشرٌ تجريبيّ في مالٍ حقيقيّ.
 
-**النشر:** Vercel `tph4/tph-invoicing` · GitHub `AhmedJaai/TPH-Invoicing` · `main`. المستودع **غير** مربوطٍ بـVercel ربطَ Git: النشر بـ`vercel --prod --yes` بعد الدفع.
+**النشر:** Vercel `tph4/tph-invoicing` · GitHub `AhmedJaai/TPH-Invoicing` · `main`. المستودع مربوطٌ بـVercel ربطَ Git: الدفعُ إلى `main` ينشر وحده، و`vercel --prod` بعده يُنتج نشرين. ويُتحقَّق بـ`gh api repos/AhmedJaai/TPH-Invoicing/deployments?per_page=1` (الـsha يطابق `main`).
 
 ## الثوابت المالية — تتكرّر في كلّ مهمّةٍ تمسّ المال
 
