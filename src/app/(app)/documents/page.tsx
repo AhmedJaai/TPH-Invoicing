@@ -285,6 +285,19 @@ export default async function DocumentsPage({
   const pages = Math.ceil(total / PAGE_SIZE);
   const filtered = Boolean(p.month || p.supplier || p.kind || q);
 
+  /*
+    صندوقُ الوارد الفارغ خبرٌ سارّ — ويبقى نافعاً: ما وصل مؤخّراً تحته،
+    فمن فتح الصفحة يسأل «هل قُرئت فاتورةُ اليوم؟» يجد جوابه بلا لسانٍ آخر.
+  */
+  const recent = tab === "WAITING" && !filtered && rows.length === 0
+    ? await db
+        .select({ id: documents.id, fileName: documents.fileName, status: documents.status, at: documents.uploadedAt, supplier: suppliers.nameAr })
+        .from(documents)
+        .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
+        .orderBy(desc(documents.uploadedAt))
+        .limit(6)
+    : [];
+
   const tabs = [
     { id: "WAITING", label: "ينتظر المراجعة", count: nWaiting, href: link({ status: "NEEDS_REVIEW" }) },
     { id: "ARCHIVED", label: "أُرشف", count: nArchived, href: link({ status: "ARCHIVED" }) },
@@ -387,7 +400,9 @@ export default async function DocumentsPage({
             {rows.length === 0 ? (
               tab === "WAITING" && !filtered ? (
                 /* صندوقُ الوارد الفارغ خبرٌ سارّ — ويُعرَض بابُ الأرشيف لمن جاء يبحث فيه */
+                <>
                 <EmptyState
+                  compact
                   icon={CircleCheck}
                   title="لا مستند ينتظر قرارك."
                   hint="كلُّ ما وصل اعتُمد أو رُفض. وما يصل من الرفع أو الدرايف ويحتاج نظرك يظهر هنا."
@@ -400,6 +415,29 @@ export default async function DocumentsPage({
                     </>
                   }
                 />
+                {recent.length > 0 && (
+                  <section aria-labelledby="recent-docs" className="mt-8">
+                    <h2 id="recent-docs" className="mb-3 text-[15px] font-bold">وصل مؤخّراً</h2>
+                    <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
+                      {recent.map((d) => (
+                        <li key={d.id}>
+                          <Link
+                            href={link({ status: "ALL", q: d.fileName })}
+                            className="flex min-h-12 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-hover"
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[13px] font-bold" dir="auto">{d.supplier ?? d.fileName}</span>
+                              <span className="block truncate text-[11px] text-muted" dir="auto">{d.fileName}</span>
+                            </span>
+                            <Badge tone={STATUS_BADGE[d.status]?.tone} dot>{STATUS_BADGE[d.status]?.text ?? d.status}</Badge>
+                            <span className="hidden shrink-0 text-[11px] text-muted sm:block">{formatDay(d.at)}</span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                </>
               ) : (
                 <EmptyState
                   icon={FileSearch}
