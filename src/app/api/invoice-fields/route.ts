@@ -26,6 +26,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, suppliers } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
+import { can } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { reviewConfirmed } from "@/lib/confirm";
 import { companyConfig } from "@/config/drive";
@@ -83,6 +84,16 @@ export async function POST(request: Request) {
 
   const id = body.invoiceId?.trim();
   if (!id) return NextResponse.json({ error: "لم تُذكر الفاتورة" }, { status: 400 });
+
+  /*
+    المبلغُ لا يكتبه من لا يراه. الصلاحيةُ صلاحيةُ رفع (مديرُ المشتريات يصحّح
+    الرقمَ والتاريخ)، والشاشةُ تُخفي المبالغ عنه — لكنّ الخادم كان يقبلها من
+    أيّ طلب، فيغيّر إجماليَّ فاتورةٍ لا يراه. والشاشةُ ليست حارساً.
+  */
+  const touchesMoney = body.subtotal !== undefined || body.vat !== undefined || body.total !== undefined;
+  if (touchesMoney && !can(user.role, "amounts:view")) {
+    return NextResponse.json({ error: "تعديل مبالغ الفاتورة يحتاج صلاحية عرض المبالغ — اطلبه من مالك الحساب." }, { status: 403 });
+  }
 
   const [row] = await db
     .select({
