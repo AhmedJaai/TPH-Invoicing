@@ -28,41 +28,174 @@ interface Row {
 
 export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   const lastMonth = previousMonth(currentMonthRiyadh());
+  /*
+    الوقائعُ مستقلّةٌ بعضُها عن بعض — تُطلَب معاً لا واحدةً بعد أخرى.
+    كانت ستَّ عشرةَ رحلةً متتابعة إلى القاعدة في كلّ صفحة (عدّادُ القشرة
+    يقرؤها)؛ ومعاً تنتهي بزمن أبطئها. وعلى الخادم باتّصالٍ واحد يصطفّ
+    الطلبُ في المجمَّع بلا انتظارٍ بين طلبٍ وآخر.
+  */
+  const [q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15] = await Promise.all([
+    db.execute<Row>(sql`
+        select
+          (select count(*)::int from issues where status='OPEN' and severity='BLOCKER')      as open_blockers,
+          (select count(*)::int from documents where status in ('PENDING','NEEDS_REVIEW'))   as pending_docs,
+          (select count(*)::int from invoices where tax_status='INVALID')                    as not_valid,
+          (select coalesce(sum(vat_minor),0)::bigint from invoices
+             where input_vat_status='NOT_ELIGIBLE' and vat_minor > 0)                        as vat_at_risk,
+          (select count(*)::int from invoices where tax_status='UNKNOWN')                    as unknown_tax,
+          /*
+            ── عددُ البند هو عددُ الطابور نفسِه ──
+
+            كان يعدّ ‎category='UNKNOWN'‎ بينما اللوحُ الذي يفتحه البند
+            (‎ReviewSection‎) يقرأ ‎pendingDecision()‎. فالعدّان لشيءٍ واحد
+            بشرطين مختلفين — وتقاطعُهما قد يكون صفراً: حركةٌ تنتظر قراراً
+            ولا بندَ يدلّ عليها، أو بندٌ يُفتَح على لوحٍ فارغ.
+
+            فصار الشرط واحداً، يُستدعى ولا يُنسَخ.
+          */
+          (select count(*)::int from ${bankTransactions} where ${pendingDecision()})          as unclassified,
+          (select coalesce(sum(amount_minor),0)::bigint from ${bankTransactions}
+             where ${pendingDecision()})                                                      as unclassified_amount,
+          (select count(*)::int from invoices i
+             where not exists (select 1 from invoice_lines l where l.invoice_id=i.id))       as no_lines
+      `),
+    db.execute<Row>(sql`
+        select i.id, i.invoice_number, s.name_ar, i.vat_minor, i.invoice_date::date
+        from invoices i left join suppliers s on s.id = i.supplier_id
+        where i.input_vat_status='NOT_ELIGIBLE' and i.vat_minor > 0
+        order by i.vat_minor desc limit 10
+      `),
+    db.execute<Row>(sql`
+        select i.id, i.invoice_number, s.name_ar, i.total_minor
+        from invoices i left join suppliers s on s.id = i.supplier_id
+        where i.tax_status='UNKNOWN' order by i.total_minor desc limit 10
+      `),
+    loadOverdueBalances(db, 60),
+    loadMissingStatementSuppliers(lastMonth),
+    db.execute<Row>(sql`
+        select suppliers.name_ar,
+               (select coalesce(sum(greatest(0, p.amount_minor - p.fee_minor
+                  - coalesce((select sum(a.amount_minor)::int from payment_allocations a
+                               where a.payment_id = p.id), 0))), 0)::bigint
+                  from payments p
+                 where p.supplier_id = suppliers.id and p.status not in ('REVERSED','VOID')) as unbacked
+        /*
+          القاعدةُ في supplier-policy-rules — تُحقَن ولا تُعاد كتابتها.
+          وبلا لقبٍ للجدول عمداً: القاعدةُ تسمّي أعمدتها باسم الجدول،
+          فلقبٌ هنا يجعلها تشير إلى ما ليس في FROM.
+        */
+        from ${suppliers}
+        where suppliers.is_active and ${needsContractSql()}
+        order by unbacked desc
+      `),
+    db.execute<Row>(sql`
+        with ranked as (
+          select l.normalized_description, l.supplier_id, s.name_ar, l.description,
+                 l.unit_price_minor, l.invoice_date,
+                 row_number() over (partition by l.supplier_id, l.normalized_description
+                                    order by l.invoice_date desc) as rn
+          from invoice_lines l left join suppliers s on s.id = l.supplier_id
+          where l.invoice_date is not null and l.supplier_id is not null
+            and l.normalized_description <> ''
+        ),
+        pairs as (
+          select a.supplier_id, a.normalized_description, a.name_ar, a.description,
+                 a.unit_price_minor as now_price,
+                 b.unit_price_minor as then_price
+          from ranked a join ranked b
+            on a.supplier_id = b.supplier_id
+           and a.normalized_description = b.normalized_description
+           and a.rn = 1 and b.rn = 2
+          where a.unit_price_minor > b.unit_price_minor
+        )
+        /*
+          الأثرُ السنويّ = الزيادةُ في سعر الوحدة × ما اشتُري منه فعلاً في
+          آخر سنة، بحساب القاعدة العشريّ لا بعددٍ عائم. وكان «× ٢٠»: عشرون
+          شراءً في السنة لكلّ صنف مفترَضةً بيد — رقمٌ مخترَع يُعرَض مالاً.
+        */
+        select p.name_ar, p.description, p.now_price, p.then_price,
+               round((p.now_price - p.then_price) * coalesce((
+                 select sum(l.qty) from invoice_lines l
+                  where l.supplier_id = p.supplier_id
+                    and l.normalized_description = p.normalized_description
+                    and l.invoice_date >= now() - interval '365 days'
+               ), 0))::bigint as annual_minor
+        from pairs p
+        where p.then_price > 0 and (p.now_price - p.then_price) * 100 >= 5 * p.then_price
+        order by annual_minor desc, (p.now_price - p.then_price) desc limit 10
+      `),
+    db.execute<{ start: string | null; end: string | null }>(sql`
+        select to_char(min(value_date), 'YYYY-MM-DD') as start,
+               to_char(max(value_date), 'YYYY-MM-DD') as end
+        from bank_transactions
+        group by bank_import_id
+      `),
+    db.execute<{ credits: number | null; debits: number | null }>(sql`
+        select coalesce(sum(amount_minor) filter (where direction = 'CREDIT'), 0)::bigint as credits,
+               coalesce(sum(amount_minor) filter (where direction = 'DEBIT'), 0)::bigint  as debits
+        from bank_transactions
+      `),
+    db.execute<{ opening: number | null; closing: number | null }>(sql`
+        select sum(opening_balance_minor)::bigint as opening,
+               sum(closing_balance_minor)::bigint as closing
+        from reconciliation_periods
+      `),
+    db.execute<{
+        id: string; value_date: Date; amount_minor: number; direction: string;
+        description: string | null; beneficiary_raw: string | null;
+        category: string; operation_ref: string | null;
+      }>(sql`
+        select id, value_date, amount_minor, direction::text as direction,
+               description, beneficiary_raw, category::text as category, operation_ref
+        from bank_transactions
+        where direction = 'DEBIT'
+      `),
+    loadUnbackedPayments(),
+    db.execute<{ key: string; decision: string }>(sql`
+        select key, decision from alert_resolutions where key like 'double:%'
+      `),
+    db.execute<Record<string, unknown>>(sql`
+        select id, period_month, occurred_on, category, label,
+               amount_minor, source, bank_transaction_id
+          from expenses
+         where occurred_on >= to_char(now() - interval '120 days', 'YYYY-MM-DD')
+      `),
+    db.execute<{
+        id: string; amount_minor: number; lifecycle: string; match_status: string;
+        matched_payment_id: string | null; description: string | null; value_date: string;
+      }>(sql`
+        select id, amount_minor, lifecycle::text as lifecycle, match_status::text as match_status,
+               matched_payment_id, description, to_char(value_date, 'YYYY-MM-DD') as value_date
+          from bank_transactions
+         where (matched_payment_id is not null
+                 and (match_status = 'IGNORED' or lifecycle not in ('CONFIRMED','POSTED')))
+            or (lifecycle in ('CONFIRMED','POSTED') and matched_payment_id is null
+                 and match_status <> 'IGNORED' and category = 'SUPPLIER' and direction = 'DEBIT')
+         order by amount_minor desc
+         limit 50
+      `),
+    db.execute<{
+        id: string; value_date: string; amount_minor: number; direction: "DEBIT" | "CREDIT";
+        party: string | null; supplier: string | null;
+      }>(sql`
+        select bt.id, to_char(bt.value_date, 'YYYY-MM-DD') as value_date, bt.amount_minor, bt.direction,
+               coalesce(bt.beneficiary_raw, bt.description) as party, s.name_ar as supplier
+          from bank_transactions bt
+          left join payments p on p.id = bt.matched_payment_id
+          left join suppliers s on s.id = coalesce(p.supplier_id, bt.supplier_id)
+         where bt.amount_minor > 100
+           and ((bt.direction = 'DEBIT' and (bt.matched_payment_id is not null or bt.category = 'SUPPLIER'))
+             or (bt.direction = 'CREDIT' and bt.category <> 'INTERNAL'))
+      `),
+  ]);
+
 
   const [counts] = (
-    await db.execute<Row>(sql`
-      select
-        (select count(*)::int from issues where status='OPEN' and severity='BLOCKER')      as open_blockers,
-        (select count(*)::int from documents where status in ('PENDING','NEEDS_REVIEW'))   as pending_docs,
-        (select count(*)::int from invoices where tax_status='INVALID')                    as not_valid,
-        (select coalesce(sum(vat_minor),0)::bigint from invoices
-           where input_vat_status='NOT_ELIGIBLE' and vat_minor > 0)                        as vat_at_risk,
-        (select count(*)::int from invoices where tax_status='UNKNOWN')                    as unknown_tax,
-        /*
-          ── عددُ البند هو عددُ الطابور نفسِه ──
-
-          كان يعدّ ‎category='UNKNOWN'‎ بينما اللوحُ الذي يفتحه البند
-          (‎ReviewSection‎) يقرأ ‎pendingDecision()‎. فالعدّان لشيءٍ واحد
-          بشرطين مختلفين — وتقاطعُهما قد يكون صفراً: حركةٌ تنتظر قراراً
-          ولا بندَ يدلّ عليها، أو بندٌ يُفتَح على لوحٍ فارغ.
-
-          فصار الشرط واحداً، يُستدعى ولا يُنسَخ.
-        */
-        (select count(*)::int from ${bankTransactions} where ${pendingDecision()})          as unclassified,
-        (select coalesce(sum(amount_minor),0)::bigint from ${bankTransactions}
-           where ${pendingDecision()})                                                      as unclassified_amount,
-        (select count(*)::int from invoices i
-           where not exists (select 1 from invoice_lines l where l.invoice_id=i.id))       as no_lines
-    `)
+    q0
   ).rows;
 
   const vatEvidence = (
-    await db.execute<Row>(sql`
-      select i.id, i.invoice_number, s.name_ar, i.vat_minor, i.invoice_date::date
-      from invoices i left join suppliers s on s.id = i.supplier_id
-      where i.input_vat_status='NOT_ELIGIBLE' and i.vat_minor > 0
-      order by i.vat_minor desc limit 10
-    `)
+    q1
   ).rows.map<AttentionEvidence>((r) => ({
     label: String(r.invoice_number),
     sub: `${r.name_ar ?? "—"} · ${new Date(r.invoice_date as string).toISOString().slice(0, 10)}`,
@@ -76,11 +209,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   }));
 
   const unknownEvidence = (
-    await db.execute<Row>(sql`
-      select i.id, i.invoice_number, s.name_ar, i.total_minor
-      from invoices i left join suppliers s on s.id = i.supplier_id
-      where i.tax_status='UNKNOWN' order by i.total_minor desc limit 10
-    `)
+    q2
   ).rows.map<AttentionEvidence>((r) => ({
     label: String(r.invoice_number),
     sub: String(r.name_ar ?? "—"),
@@ -94,7 +223,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     كان يُجمع ما بقي على الفواتير القديمة بلا خصم رصيدنا عند المورّد ولا
     عتبة الهللة، فيقول «مستحقّ عليك» عن مالٍ دفعناه.
   */
-  const overdue = await loadOverdueBalances(db, 60);
+  const overdue = q3;
   const overdueMinor = overdue.reduce((s, r) => s + r.owedMinor, 0);
   const overdueSuppliers = overdue.slice(0, 10).map<AttentionEvidence>((r) => ({
     label: r.nameAr,
@@ -105,26 +234,11 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   }));
 
   // مورّدون لهم فواتير ولم يصل كشفهم عن الشهر المنقضي — المصدر نفسه الذي تقرؤه /statements?missing=1
-  const missingStatementRows = await loadMissingStatementSuppliers(lastMonth);
+  const missingStatementRows = q4;
   const missingStatements = missingStatementRows.slice(0, 8).map((r) => r.nameAr);
 
   const noContractRows = (
-    await db.execute<Row>(sql`
-      select suppliers.name_ar,
-             (select coalesce(sum(greatest(0, p.amount_minor - p.fee_minor
-                - coalesce((select sum(a.amount_minor)::int from payment_allocations a
-                             where a.payment_id = p.id), 0))), 0)::bigint
-                from payments p
-               where p.supplier_id = suppliers.id and p.status not in ('REVERSED','VOID')) as unbacked
-      /*
-        القاعدةُ في supplier-policy-rules — تُحقَن ولا تُعاد كتابتها.
-        وبلا لقبٍ للجدول عمداً: القاعدةُ تسمّي أعمدتها باسم الجدول،
-        فلقبٌ هنا يجعلها تشير إلى ما ليس في FROM.
-      */
-      from ${suppliers}
-      where suppliers.is_active and ${needsContractSql()}
-      order by unbacked desc
-    `)
+    q5
   ).rows;
   const noContract = noContractRows.map((r) => String(r.name_ar));
 
@@ -134,42 +248,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
    * ليس «انخفاض سعر».
    */
   const rises = (
-    await db.execute<Row>(sql`
-      with ranked as (
-        select l.normalized_description, l.supplier_id, s.name_ar, l.description,
-               l.unit_price_minor, l.invoice_date,
-               row_number() over (partition by l.supplier_id, l.normalized_description
-                                  order by l.invoice_date desc) as rn
-        from invoice_lines l left join suppliers s on s.id = l.supplier_id
-        where l.invoice_date is not null and l.supplier_id is not null
-          and l.normalized_description <> ''
-      ),
-      pairs as (
-        select a.supplier_id, a.normalized_description, a.name_ar, a.description,
-               a.unit_price_minor as now_price,
-               b.unit_price_minor as then_price
-        from ranked a join ranked b
-          on a.supplier_id = b.supplier_id
-         and a.normalized_description = b.normalized_description
-         and a.rn = 1 and b.rn = 2
-        where a.unit_price_minor > b.unit_price_minor
-      )
-      /*
-        الأثرُ السنويّ = الزيادةُ في سعر الوحدة × ما اشتُري منه فعلاً في
-        آخر سنة، بحساب القاعدة العشريّ لا بعددٍ عائم. وكان «× ٢٠»: عشرون
-        شراءً في السنة لكلّ صنف مفترَضةً بيد — رقمٌ مخترَع يُعرَض مالاً.
-      */
-      select p.name_ar, p.description, p.now_price, p.then_price,
-             round((p.now_price - p.then_price) * coalesce((
-               select sum(l.qty) from invoice_lines l
-                where l.supplier_id = p.supplier_id
-                  and l.normalized_description = p.normalized_description
-                  and l.invoice_date >= now() - interval '365 days'
-             ), 0))::bigint as annual_minor
-      from pairs p
-      where p.then_price > 0 and (p.now_price - p.then_price) * 100 >= 5 * p.then_price
-      order by annual_minor desc, (p.now_price - p.then_price) desc limit 10
-    `)
+    q6
   ).rows;
 
   const priceRises = rises.map<AttentionEvidence>((r) => ({
@@ -187,12 +266,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     شيءٌ في سبتمبر.
   */
   const periods = (
-    await db.execute<{ start: string | null; end: string | null }>(sql`
-      select to_char(min(value_date), 'YYYY-MM-DD') as start,
-             to_char(max(value_date), 'YYYY-MM-DD') as end
-      from bank_transactions
-      group by bank_import_id
-    `)
+    q7
   ).rows
     .filter((r): r is { start: string; end: string } => r.start !== null && r.end !== null);
 
@@ -212,19 +286,11 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     وهو لا يُعلم.
   */
   const [totals] = (
-    await db.execute<{ credits: number | null; debits: number | null }>(sql`
-      select coalesce(sum(amount_minor) filter (where direction = 'CREDIT'), 0)::bigint as credits,
-             coalesce(sum(amount_minor) filter (where direction = 'DEBIT'), 0)::bigint  as debits
-      from bank_transactions
-    `)
+    q8
   ).rows;
 
   const [balances] = (
-    await db.execute<{ opening: number | null; closing: number | null }>(sql`
-      select sum(opening_balance_minor)::bigint as opening,
-             sum(closing_balance_minor)::bigint as closing
-      from reconciliation_periods
-    `)
+    q9
   ).rows;
 
   const balance = checkBalance({
@@ -242,16 +308,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     شهر لا يجد له أثراً — وقد خرج المال.
   */
   const outgoing = (
-    await db.execute<{
-      id: string; value_date: Date; amount_minor: number; direction: string;
-      description: string | null; beneficiary_raw: string | null;
-      category: string; operation_ref: string | null;
-    }>(sql`
-      select id, value_date, amount_minor, direction::text as direction,
-             description, beneficiary_raw, category::text as category, operation_ref
-      from bank_transactions
-      where direction = 'DEBIT'
-    `)
+    q10
   ).rows;
 
   /*
@@ -259,7 +316,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     والاستعلام في `supplier-followups.service` يقرؤه التنبيه والصفحة التي
     يفتحها (/suppliers?unbacked=1)، فلا يفترق العدّان (BTN-110).
   */
-  const unbacked = await loadUnbackedPayments();
+  const unbacked = q11;
 
   const doublePaidAll = findDoublePaid(outgoing.map((r): DoublePaidTx => ({
     id: r.id,
@@ -278,9 +335,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     أهدأ — فالمال لم يعد بعد، ونسيانُه بعد المطالبة ضياعٌ ثانٍ.
   */
   const resolutions = (
-    await db.execute<{ key: string; decision: string }>(sql`
-      select key, decision from alert_resolutions where key like 'double:%'
-    `)
+    q12
   ).rows;
   const doublePaidSplit = partitionDoublePaid(
     doublePaidAll,
@@ -295,12 +350,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     أثرُه: حركتان بنكيّتان مختلفتان حدثان لا حدث.
   */
   const expenseRows = (
-    await db.execute<Record<string, unknown>>(sql`
-      select id, period_month, occurred_on, category, label,
-             amount_minor, source, bank_transaction_id
-        from expenses
-       where occurred_on >= to_char(now() - interval '120 days', 'YYYY-MM-DD')
-    `)
+    q13
   ).rows.map<Expense>((r) => ({
     id: String(r.id),
     periodMonth: String(r.period_month),
@@ -316,20 +366,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
   /* ── حركاتٌ يتناقض قرارُها ومالُها — `detectAnomalies` موصولةً أخيراً ── */
   const anomalyRows = (
-    await db.execute<{
-      id: string; amount_minor: number; lifecycle: string; match_status: string;
-      matched_payment_id: string | null; description: string | null; value_date: string;
-    }>(sql`
-      select id, amount_minor, lifecycle::text as lifecycle, match_status::text as match_status,
-             matched_payment_id, description, to_char(value_date, 'YYYY-MM-DD') as value_date
-        from bank_transactions
-       where (matched_payment_id is not null
-               and (match_status = 'IGNORED' or lifecycle not in ('CONFIRMED','POSTED')))
-          or (lifecycle in ('CONFIRMED','POSTED') and matched_payment_id is null
-               and match_status <> 'IGNORED' and category = 'SUPPLIER' and direction = 'DEBIT')
-       order by amount_minor desc
-       limit 50
-    `)
+    q14
   ).rows;
   const anomalies = anomalyRows.flatMap((r) =>
     detectAnomalies({
@@ -349,19 +386,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     على البيانات الحقيقيّة هللةَ ضريبةٍ في نقاط البيع ولا شيء غيرها.
   */
   const bounceRows = (
-    await db.execute<{
-      id: string; value_date: string; amount_minor: number; direction: "DEBIT" | "CREDIT";
-      party: string | null; supplier: string | null;
-    }>(sql`
-      select bt.id, to_char(bt.value_date, 'YYYY-MM-DD') as value_date, bt.amount_minor, bt.direction,
-             coalesce(bt.beneficiary_raw, bt.description) as party, s.name_ar as supplier
-        from bank_transactions bt
-        left join payments p on p.id = bt.matched_payment_id
-        left join suppliers s on s.id = coalesce(p.supplier_id, bt.supplier_id)
-       where bt.amount_minor > 100
-         and ((bt.direction = 'DEBIT' and (bt.matched_payment_id is not null or bt.category = 'SUPPLIER'))
-           or (bt.direction = 'CREDIT' and bt.category <> 'INTERNAL'))
-    `)
+    q15
   ).rows;
   const bounced = findReversals(bounceRows.map((r) => ({
     id: r.id,
