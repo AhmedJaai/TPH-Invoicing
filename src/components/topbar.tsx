@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronLeft, Keyboard, Search, UploadCloud } from "lucide-react";
-import { activeArea, activeChild, entryHref } from "@/lib/nav";
+import { ACCOUNT_LINKS, activeArea, activeChild, entryHref } from "@/lib/nav";
 import { can, type Role } from "@/lib/permissions";
 import { queueCapture } from "@/lib/capture-queue";
 import { BrandMark } from "./icons";
@@ -26,6 +26,9 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
   const area = activeArea(pathname);
   const child = area ? activeChild(pathname, area) : undefined;
   const showChild = child && child.label !== area?.label && child.href !== area?.href;
+  /* الإعداداتُ وسجلُّ التدقيق خارج المساحات — وموضعُهما يُقال كذلك */
+  const account = area ? undefined : [...ACCOUNT_LINKS].sort((a, b) => b.href.length - a.href.length)
+    .find((l) => pathname === l.href || pathname.startsWith(`${l.href}/`));
 
   return (
     <header className="no-print sticky top-0 z-20 border-b border-line bg-surface/85 backdrop-blur-md">
@@ -34,7 +37,7 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
         <Link href="/" className="flex min-w-0 items-center gap-2 lg:hidden" aria-label="اليوم">
           <BrandMark className="h-8 w-8" />
         </Link>
-        <p className="min-w-0 flex-1 truncate text-[15px] font-bold lg:hidden">{area?.label ?? "ذا بوبليك هاوس"}</p>
+        <p className="min-w-0 flex-1 truncate text-[15px] font-bold lg:hidden">{area?.label ?? account?.label ?? "ذا بوبليك هاوس"}</p>
 
         {/* الحاسوب: فتاتُ الموضع */}
         <nav aria-label="موضعك" className="hidden min-w-0 items-center gap-1.5 text-[13px] lg:flex lg:w-64 xl:w-72">
@@ -47,6 +50,16 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
                 <>
                   <ChevronLeft className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} aria-hidden />
                   <span className="truncate font-bold">{child.label}</span>
+                </>
+              )}
+            </>
+          ) : account ? (
+            <>
+              <Link href="/settings" className={`truncate ${account.href !== "/settings" ? "text-muted hover:text-ink" : "font-bold"}`}>الإعدادات</Link>
+              {account.href !== "/settings" && (
+                <>
+                  <ChevronLeft className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} aria-hidden />
+                  <span className="truncate font-bold">{account.label}</span>
                 </>
               )}
             </>
