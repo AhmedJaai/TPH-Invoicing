@@ -34,11 +34,12 @@ export async function loadRecurringInputs(): Promise<RecurringInput[]> {
 }
 
 /**
- * ما يخرج في الأيّام السبعة القادمة — من دفعة الشهر المنقضي (محسوبةً
- * سلفاً بيد المتّصل، فالإحاطةُ تحملها) والمتكرّرِ الفاعل.
+ * ما يخرج في الأيّام السبعة القادمة — من دفعة الشهر المنقضي والمتكرّرِ
+ * الفاعل، وكلاهما يطلبه المتّصلُ مع غيره معاً (الإحاطةُ تحمل الدفعةَ سلفاً)،
+ * فلا يُنتظَر استعلامٌ بعد استعلام.
  */
-export async function loadWeekDue(run: PaymentRun): Promise<WeekDue> {
-  return dueThisWeek({ today: todayInRiyadh(), overdueRun: dues(run), recurring: await loadRecurringInputs() });
+export function weekDue(run: PaymentRun, recurring: readonly RecurringInput[]): WeekDue {
+  return dueThisWeek({ today: todayInRiyadh(), overdueRun: dues(run), recurring: [...recurring] });
 }
 
 export async function loadCashOutlook(): Promise<CashOutlook & { runMonth: string; thisMonth: string }> {

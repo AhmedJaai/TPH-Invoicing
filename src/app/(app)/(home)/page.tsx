@@ -21,7 +21,7 @@ import { currentMonthRiyadh, formatDay, formatMonth, formatWeekday } from "@/lib
 import { loadStartState } from "@/services/start.service";
 import { loadBalanceTotals, loadOverdueBalances } from "@/services/supplier-balance.service";
 import { loadPaymentRun } from "@/services/payment-run.service";
-import { loadWeekDue } from "@/services/cash-outlook.service";
+import { loadRecurringInputs, weekDue } from "@/services/cash-outlook.service";
 import type { WeekDue } from "@/lib/cash-outlook";
 import { greeting, loadCashPosition, loadCloseProgress, longDate } from "@/services/briefing.service";
 
@@ -54,22 +54,28 @@ export default async function HomePage() {
   const canPay = can(user.role, "payment:approve");
   const canBank = can(user.role, "bank:view");
 
-  const [attention, balances, overdue, start, run, cash] = await Promise.all([
-    attentionItems(),
+  const attentionP = attentionItems();
+  /* «ما الذي تغيّر» يجري مع الطابور لا بعده — يأخذ منه ارتفاعَ الأسعار وعداً */
+  const factsP = gatherChangeFacts(attentionP.then((a) => {
+    const rises = a.find((i) => i.id === "price-rises");
+    return { count: rises?.count ?? 0, amountMinor: rises?.impact.amountMinor ?? 0 };
+  }));
+  const [attention, balances, overdue, start, run, cash, recurring, facts] = await Promise.all([
+    attentionP,
     loadBalanceTotals(),
     loadOverdueBalances(),
     loadStartState(),
     canPay || canBank ? loadPaymentRun(runMonth) : Promise.resolve(null),
     canBank ? loadCashPosition() : Promise.resolve(null),
+    canPay || canBank ? loadRecurringInputs() : Promise.resolve([]),
+    factsP,
   ]);
   /* «ماذا أدفع هذا الأسبوع؟» — من الدفعة نفسها والمتكرّر، كما في «النقد القادم» */
-  const week = run ? await loadWeekDue(run) : null;
+  const week = run ? weekDue(run, recurring) : null;
 
   const { totals } = balances;
   const oldestDays = overdue.reduce((m, r) => Math.max(m, r.oldestDays), 0);
 
-  const rises = attention.find((i) => i.id === "price-rises");
-  const facts = await gatherChangeFacts(rises?.count ?? 0, rises?.impact.amountMinor ?? 0);
   const changes = notable(buildChanges(facts)).filter((c) => c.id !== "outstanding" && c.id !== "purchases");
 
   const { top } = prioritize(attention, SHOWN);

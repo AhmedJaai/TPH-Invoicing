@@ -17,11 +17,14 @@ interface Row extends Record<string, unknown> {
   days_elapsed: number | null;
 }
 
+/**
+ * `rising` يأتي من الطابور — وقد يُمرَّر وعداً فتجري الاستعلاماتُ هنا معه
+ * لا بعده: الإحاطةُ كانت تنتظر الطابورَ كلَّه ثمّ تبدأ هذه.
+ */
 export async function gatherChangeFacts(
-  risingItems: number,
-  risingAnnualMinor: number,
+  rising: { count: number; amountMinor: number } | Promise<{ count: number; amountMinor: number }>,
 ): Promise<ChangeFacts> {
-  const [{ totals }, rows, spend] = await Promise.all([
+  const [{ totals }, rows, spend, rises] = await Promise.all([
     loadBalanceTotals(),
     db.execute<Row>(sql`
       with months as (
@@ -119,6 +122,7 @@ export async function gatherChangeFacts(
        where i.invoice_date >= now() - interval '120 days'
        group by s.slug, s.name_ar
     `),
+    rising,
   ]);
   const [r] = rows.rows;
 
@@ -133,8 +137,8 @@ export async function gatherChangeFacts(
     /* «عليك» الآن من المصدر الواحد — الرقم نفسه الذي في بطاقة الصفحة الأولى */
     outstandingNow: totals.owedMinor,
     outstandingThen: Number(r?.outstanding_then ?? 0),
-    risingItems,
-    risingAnnualMinor,
+    risingItems: rises.count,
+    risingAnnualMinor: rises.amountMinor,
     newUnclassified: Number(r?.new_unclassified ?? 0),
     spend: spend.rows.map((x) => ({
       slug: x.slug,
