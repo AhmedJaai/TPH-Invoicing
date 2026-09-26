@@ -99,7 +99,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
       >
         <Bell className="h-[18px] w-[18px]" strokeWidth={1.9} aria-hidden />
         {unread > 0 && (
-          <span dir="ltr" className="nums absolute end-1 top-1 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-white">
+          <span dir="ltr" className="nums absolute end-1 top-1 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-raised">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -139,7 +139,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
               className={`min-h-9 rounded-md px-3 text-xs font-bold transition-colors ${tab === k ? "bg-raised text-ink shadow-raised" : "text-muted hover:text-ink"}`}
             >
               {label}
-              {k === "new" && unread > 0 && <span className="nums ms-1.5 rounded-full bg-danger px-1.5 text-[10px] text-white">{unread}</span>}
+              {k === "new" && unread > 0 && <span className="nums ms-1.5 rounded-full bg-danger px-1.5 text-[10px] text-raised">{unread}</span>}
             </button>
           ))}
         </div>

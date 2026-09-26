@@ -4,7 +4,7 @@ import { Inbox, type LucideIcon } from "lucide-react";
 import { Money, Prose } from "./money";
 import { LiveMoney } from "./live-money";
 import { ScrollX } from "./scroll-x";
-import { TableFilter } from "./ui-client";
+import { LinkPending, TableFilter } from "./ui-client";
 
 /**
  * عناصر الواجهة المشتركة — نظامُ التصميم الثاني.
@@ -149,6 +149,7 @@ export function LinkButton({
     <Link href={href} prefetch={prefetch} className={`${buttonClass(variant, size)} ${className}`}>
       {Icon && <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />}
       {children}
+      <LinkPending />
     </Link>
   );
 }
@@ -662,8 +663,9 @@ export function LinkTabs({
           )}
           <span className="relative">{t.label}</span>
           {t.count !== undefined && t.count !== null && (
-            <span className={`nums relative rounded-full px-1.5 text-[10px] ${t.active ? "bg-white/15" : "bg-sunken"}`}>{t.count}</span>
+            <span className={`nums relative rounded-full px-1.5 text-[10px] ${t.active ? "bg-inverse-ink/15" : "bg-sunken"}`}>{t.count}</span>
           )}
+          <LinkPending />
         </Link>
       ))}
     </nav>

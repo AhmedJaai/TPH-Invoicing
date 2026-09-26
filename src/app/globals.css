@@ -739,6 +739,26 @@ details[open]::details-content {
   to { transform: rotate(360deg); }
 }
 
+/* انتظارُ الرابط: دوّارةٌ تظهر بعد مهلةٍ قصيرة — الانتقالُ السريع لا يومض */
+.link-pending {
+  display: inline-block;
+  width: 0;
+  height: 0.7rem;
+  border-radius: 999px;
+  border: 0 solid currentColor;
+  border-inline-end-color: transparent;
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease-standard);
+}
+.link-pending[data-on="true"] {
+  width: 0.7rem;
+  margin-inline-start: 0.1rem;
+  border-width: 1.5px;
+  opacity: 0.8;
+  transition-delay: 120ms;
+  animation: spin 0.7s linear infinite;
+}
+
 /* الإشعارُ يخرج كما دخل */
 .toast {
   transition:

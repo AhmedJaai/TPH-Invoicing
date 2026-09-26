@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { CircleAlert, CircleCheck, Info, Search, TriangleAlert, Undo2, X } from "lucide-react";
 import { buttonClass, type ButtonVariant } from "./ui-tokens";
@@ -255,6 +255,20 @@ export function ActionButton({
       <span className="sr-only" aria-live="polite">{busy ? "يُنفَّذ" : done ? "تمّ" : ""}</span>
     </>
   );
+}
+
+/* ─────────────────────────── انتظارُ الرابط ─────────────────────────── */
+
+/**
+ * دوّارةٌ صغيرة داخل رابطٍ ينتظر الخادم — لسانٌ أو زرُّ انتقال.
+ *
+ * الانتقالُ إلى صفحةٍ ديناميكيّة يستغرق ثانيةً أو أكثر، والرابطُ لا يقول إنّ
+ * الضغطة وصلت. وتظهر بعد ١٢٠ مللي ثانية لا فوراً (`globals.css`): الانتقالُ
+ * السريع لا يومض فيه شيء. توضع داخل `<Link>` وحده (`useLinkStatus`).
+ */
+export function LinkPending() {
+  const { pending } = useLinkStatus();
+  return <span aria-hidden className="link-pending" data-on={pending} />;
 }
 
 /* ─────────────────────────── القائمةُ المنبثقة ─────────────────────────── */

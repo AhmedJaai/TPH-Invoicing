@@ -19,7 +19,7 @@ import {
 import { queueCapture } from "@/lib/capture-queue";
 import { BrandMark, NavGlyph } from "./icons";
 import { openCommandPalette } from "@/lib/ui-events";
-import { Sheet, toast } from "./ui-client";
+import { LinkPending, Sheet, toast } from "./ui-client";
 import { useShellPath } from "./use-shell-path";
 
 /**
@@ -95,9 +95,15 @@ export function Sidebar({
                           : "text-frame-muted hover:bg-frame-raised/60 hover:text-frame-ink"
                       }`}
                     >
-                      {current && <span aria-hidden className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-frame-accent" />}
+                      {/* العلامةُ تنزلق من المساحة القديمة إلى الجديدة — والشريطُ نفسُه ثابت */}
+                      {current && (
+                        <ViewTransition name="sidebar-current" share="tab-slide" default="none">
+                          <span aria-hidden className="absolute inset-y-2 start-0 w-[3px] rounded-full bg-frame-accent" />
+                        </ViewTransition>
+                      )}
                       <NavGlyph icon={a.icon} className={`h-[18px] w-[18px] shrink-0 ${current ? "text-frame-accent" : ""}`} />
                       <span className="min-w-0 flex-1 truncate">{a.label}</span>
+                      <LinkPending />
                       <CountBadge counts={counts} href={a.href} className="rounded-full bg-frame-accent px-1.5 text-[11px] font-bold leading-5 text-frame" />
                       <kbd dir="ltr" aria-hidden className="hidden shrink-0 rounded border border-frame-line px-1 text-[10px] leading-4 text-frame-muted group-hover:inline-block">
                         G {a.chord.toUpperCase()}
@@ -126,6 +132,7 @@ export function Sidebar({
                 >
                   <NavGlyph icon={l.icon} className="h-4 w-4 shrink-0" />
                   <span className="truncate">{l.label}</span>
+                  <LinkPending />
                 </Link>
               </li>
             );
@@ -166,6 +173,7 @@ export function AreaTabs({ role }: { role: Role }) {
             }`}
           >
             {c.label}
+            <LinkPending />
             {/* الخطُّ ينزلق من اللسان القديم إلى الجديد — عنصرٌ واحدٌ يتحرّك لا خطّان يومضان */}
             {on && (
               <ViewTransition name="area-tab" share="tab-slide" default="none">
