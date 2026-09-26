@@ -551,7 +551,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "missing-statements",
       area: "SUPPLIERS",
       severity: "MEDIUM",
-      title: `${countNoun(missingCount, SUPPLIER)} لم يصل كشفه`,
+      /* الضميرُ يتبع العدد: «كشفُه» لواحد، و«كشفُهما» لاثنين، و«كشوفُهم» لما فوقهما */
+      title: `${countNoun(missingCount, SUPPLIER)} ${missingCount === 1 ? "لم يصل كشفُه" : missingCount === 2 ? "لم يصل كشفُهما" : "لم تصل كشوفُهم"}`,
       detail: "الكشف وحده يكشف فاتورة حُمّلت عليك ولم تصلك — ولا يظهر ذلك في أرشيفك مهما فتّشته.",
       action: "اطلب الكشف الشهري منهم، ثمّ طابقه.",
       actionLabel: "اطلب الكشوف",

@@ -332,7 +332,7 @@ function weekSummary(week: WeekDue, runMonth: string): string {
   const suppliers = week.lines.filter((l) => l.kind === "SUPPLIER");
   const recurring = week.lines.filter((l) => l.kind === "RECURRING");
   const parts: string[] = [];
-  if (suppliers.length > 0) parts.push(`دفعةُ ${formatMonth(runMonth)} متأخّرةٌ لـ${suppliers.length === 1 ? "مورّدٍ واحد" : suppliers.length === 2 ? "مورّدَين" : countNoun(suppliers.length, SUPPLIER)}`);
+  if (suppliers.length > 0) parts.push(`دفعةُ ${formatMonth(runMonth)} متأخّرةٌ ${suppliers.length === 1 ? "لمورّدٍ واحد" : suppliers.length === 2 ? "لمورّدَين" : `لـ${countNoun(suppliers.length, SUPPLIER)}`}`);
   if (recurring.length > 0 && recurring[0].date) {
     parts.push(`${recurring[0].label} ${formatWeekday(recurring[0].date)}${recurring.length > 1 ? ` و${countNoun(recurring.length - 1, ITEM)} غيره` : ""}`);
   }
