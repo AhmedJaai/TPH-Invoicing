@@ -97,7 +97,7 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
             type="button"
             onClick={openShortcuts}
             aria-label="اختصارات لوحة المفاتيح"
-            title="اختصارات لوحة المفاتيح (?)"
+            data-tip="اختصارات لوحة المفاتيح (?)"
             className="hidden h-9 w-9 place-items-center rounded-lg text-ink-soft hover:bg-hover hover:text-ink lg:grid"
           >
             <Keyboard className="h-[18px] w-[18px]" strokeWidth={1.9} aria-hidden />

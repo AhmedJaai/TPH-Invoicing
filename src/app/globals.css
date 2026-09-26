@@ -94,7 +94,10 @@
   --dur-3: 220ms;
   --dur-4: 320ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  /* «ease-out قويّ» — يبدأ سريعاً فيُحَسّ فوريّاً، ويستقرّ ببطء (Emil Kowalski، Linear) */
+  --ease-emphasized: cubic-bezier(0.23, 1, 0.32, 1);
+  /* منحنى الدرج في iOS — للّوح الذي يدخل من الحافّة */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
   --ease-spring: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017 20.8%, 1.035 23.8%, 1.032 27.2%, 1.01 34.6%, 0.998 42.4%, 1);
   /* الأسماءُ القديمة تُقرأ من الجديدة — لا قيمةَ ثانية */
@@ -590,6 +593,15 @@ html[data-amounts="hidden"] .icon-hidden { display: block; }
   .sheet[open]::backdrop { background: rgb(14 13 11 / 0); backdrop-filter: blur(0); }
 }
 
+/*
+ * ما يُفتح بلوحة المفاتيح لا يتحرّك: من ضغط ⌘K مئة مرّةٍ في اليوم يريد
+ * اللوحةَ الآن لا بعد ٢٢٠ مللي ثانية. والحركةُ لما يُفتح بالفأرة واللمس.
+ */
+.palette[data-keyboard],
+.palette[data-keyboard]::backdrop {
+  transition: none !important;
+}
+
 /* الورقةُ على الجوّال تصعد من الأسفل وتُسحب إليه لتُغلق */
 @media (max-width: 639px) {
   .sheet { transform: translateY(calc(100% * var(--travel))); }
@@ -623,6 +635,8 @@ html[data-amounts="hidden"] .icon-hidden { display: block; }
   position: fixed;
   inset: auto;
   margin: 0;
+  /* ينمو من الزرّ الذي فتحه لا من وسطه — يكتب `Popover` الجهة */
+  transform-origin: var(--pop-origin, top center);
 }
 
 /*
@@ -695,7 +709,7 @@ details[open]::details-content {
     opacity var(--dur-2) var(--ease-standard);
 }
 .btn:active:not(:disabled):not([aria-busy="true"]) {
-  transform: scale(0.98);
+  transform: scale(0.97);
   filter: brightness(0.96);
 }
 .btn[aria-busy="true"],
@@ -759,6 +773,14 @@ details[open]::details-content {
   animation: spin 0.7s linear infinite;
 }
 
+/* التلميح: يدخل في ١٢٥ مللي ثانية بتلاشٍ وإزاحةٍ صغيرة */
+.tip {
+  animation: tip-in 125ms var(--ease-emphasized) both;
+}
+@keyframes tip-in {
+  from { opacity: 0; transform: translateY(calc(2px * var(--travel))) scale(calc(1 - 0.03 * var(--travel))); }
+}
+
 /* الإشعارُ يخرج كما دخل */
 .toast {
   transition:
@@ -798,6 +820,9 @@ details[open]::details-content {
 .inspector[data-state="open"] {
   transform: translateX(0);
   opacity: 1;
+  transition:
+    transform var(--dur-4) var(--ease-drawer),
+    opacity var(--dur-2) var(--ease-standard);
 }
 .inspector[data-state="closing"] {
   transition:
@@ -895,14 +920,15 @@ details[open]::details-content {
   to { opacity: 0; transform: scale(calc(1 - 0.03 * var(--travel))); }
 }
 
+/* تلاشٍ بطمسٍ خفيف (٢ بكسل) يسدّ الفجوة بين القديم والجديد فلا تُرى صورتان */
 @keyframes vt-fade-out {
-  to { opacity: 0; }
+  to { opacity: 0; filter: blur(2px); }
 }
 @keyframes vt-fade-in {
   from { opacity: 0; }
 }
 @keyframes vt-rise-in {
-  from { opacity: 0; transform: translateY(calc(8px * var(--travel))); }
+  from { opacity: 0; transform: translateY(calc(8px * var(--travel))); filter: blur(calc(2px * var(--travel))); }
 }
 
 /* الصفُّ المختار بلوحة المفاتيح (j/k) */

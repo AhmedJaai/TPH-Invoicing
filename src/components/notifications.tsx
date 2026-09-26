@@ -95,6 +95,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
         onClick={() => { setOpen(true); void load(); }}
         aria-label={unread > 0 ? `الإشعارات — ${unread} جديد` : "الإشعارات"}
         aria-haspopup="dialog"
+        data-tip="الإشعارات"
         className={`relative grid shrink-0 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-hover hover:text-ink ${compact ? "h-11 w-11" : "h-9 w-9"}`}
       >
         <Bell className="h-[18px] w-[18px]" strokeWidth={1.9} aria-hidden />

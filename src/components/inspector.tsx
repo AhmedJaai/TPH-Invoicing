@@ -228,7 +228,7 @@ export function InspectorPanel({
               href={fullHref}
               data-full-page=""
               aria-label="افتح الصفحة كاملة"
-              title="افتح الصفحة كاملة"
+              data-tip="افتح الصفحة كاملة"
               className="grid h-11 w-11 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-ink sm:h-9 sm:w-9"
             >
               <Maximize2 className="h-4 w-4" strokeWidth={2} aria-hidden />
@@ -237,7 +237,7 @@ export function InspectorPanel({
               type="button"
               onClick={close}
               aria-label="أغلق اللوح"
-              title="أغلق (Esc)"
+              data-tip="أغلق (Esc)"
               className="grid h-11 w-11 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-ink sm:h-9 sm:w-9"
             >
               <X className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />

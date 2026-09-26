@@ -86,10 +86,13 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
 
   const commands = useMemo(() => commandsFor(role), [role]);
 
-  const open = useCallback(() => {
+  const open = useCallback((viaKeyboard = false) => {
     const d = dialogRef.current;
     if (!d || d.open) return;
     setRecent(readRecent());
+    /* المفتوحُ بالمفاتيح يظهر فوراً بلا حركة (`globals.css`) */
+    if (viaKeyboard) d.setAttribute("data-keyboard", "");
+    else d.removeAttribute("data-keyboard");
     d.showModal();
     inputRef.current?.select();
   }, []);
@@ -103,17 +106,18 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         if (dialogRef.current?.open) close();
-        else open();
+        else open(true);
       } else if (e.key === "/" && !typing && !document.querySelector("dialog[open]")) {
         e.preventDefault();
-        open();
+        open(true);
       }
     }
     window.addEventListener("keydown", onKey);
-    window.addEventListener(PALETTE_EVENT, open);
+    const openByPointer = () => open(false);
+    window.addEventListener(PALETTE_EVENT, openByPointer);
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener(PALETTE_EVENT, open);
+      window.removeEventListener(PALETTE_EVENT, openByPointer);
     };
   }, [open, close]);
 

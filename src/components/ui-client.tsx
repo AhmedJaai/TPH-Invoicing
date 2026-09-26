@@ -314,7 +314,11 @@ export function Popover({
     let left = rtl ? r.right - pw : r.left;
     left = Math.max(margin, Math.min(left, window.innerWidth - pw - margin));
     const below = window.innerHeight - r.bottom;
-    const top = below >= ph + gap + margin || below > r.top ? r.bottom + gap : r.top - ph - gap;
+    const down = below >= ph + gap + margin || below > r.top;
+    const top = down ? r.bottom + gap : r.top - ph - gap;
+    /* ينمو من حافّته القريبة من الزرّ */
+    const originX = Math.min(pw, Math.max(0, r.left + r.width / 2 - left));
+    p.style.setProperty("--pop-origin", `${Math.round(originX)}px ${down ? "0" : "100%"}`);
     p.style.left = `${Math.round(left)}px`;
     p.style.top = `${Math.round(Math.max(margin, top))}px`;
   }, []);

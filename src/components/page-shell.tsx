@@ -10,6 +10,7 @@ import { KeyboardShortcuts } from "./keyboard";
 import { Topbar, DropAnywhere } from "./topbar";
 import { Toaster } from "./ui-client";
 import { InspectorLauncher } from "./inspector";
+import { Tooltips } from "./tooltips";
 import { can, type Role } from "@/lib/permissions";
 import { inboxCount, workCount } from "@/lib/work";
 import { isAuthBypassed } from "@/lib/session";
@@ -73,6 +74,7 @@ export function AppShell({
       </div>
 
       <InspectorLauncher />
+      <Tooltips />
       {drawer}
 
       <MobileTabBar
