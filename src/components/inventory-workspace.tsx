@@ -6,7 +6,7 @@ import {
 import { formatRiyalsDisplay } from "@/lib/money";
 import { Badge, Callout, EmptyState, LinkButton, Meter, Section, type Tone } from "./ui";
 import { Money, Prose } from "./money";
-import { FinaliseCount, RecomputeCount, ReopenCount } from "./inventory-actions";
+import { DiscardCount, FinaliseCount, RecomputeCount, ReopenCount } from "./inventory-actions";
 import { InventoryCountSteps, type StepRow } from "./inventory-count-steps";
 import type { DuplicateRow, ReceiptRow } from "./inventory-flow-step";
 import { InventoryWaste } from "./inventory-waste";
@@ -317,6 +317,17 @@ export function InventoryWorkspace({
         />
       ) : (
         <p className="text-xs text-muted">الإقفالُ خارج صلاحيتك.</p>
+      )}
+      {/* بُدئ خطأً أو تُرك ناقصاً — يُلغى ويُبدأ أسبوعُه من جديد، والمقفَلُ يُعاد فتحُه لا يُلغى */}
+      {canCount && (
+        <div className="flex flex-wrap items-center gap-3 border-t border-line-soft pt-4">
+          <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-muted">لا تريد إكمالَه؟ ألغِه وابدأ أسبوعَه من جديد، أو ابدأ غيرَه.</p>
+          <DiscardCount
+            countId={header.id}
+            week={{ start: header.periodStart, end: header.periodEnd }}
+            countedItems={report.totals.linesCounted}
+          />
+        </div>
       )}
     </div>
   );

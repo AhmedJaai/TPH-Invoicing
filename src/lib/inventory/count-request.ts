@@ -96,6 +96,7 @@ export const countRequest = z.discriminatedUnion("action", [
     reason: z.string().trim().min(5, "اكتب سببَ إعادة الفتح — خمسةُ أحرفٍ على الأقلّ").max(500),
   }).strict(),
   z.object({ action: z.literal("recompute"), countId: id }).strict(),
+  z.object({ action: z.literal("discard"), countId: id }).strict(),
 ]);
 
 export type CountRequest = z.infer<typeof countRequest>;

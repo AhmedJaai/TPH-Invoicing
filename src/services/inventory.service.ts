@@ -14,7 +14,7 @@
  * عداه يُشتقّ هنا: الدرسُ نفسه من `confirm.ts` و«الإقرار الجماعيّ
  * يُعيد الحساب».
  */
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   inventoryCountLines, inventoryCountOpenings, inventoryCountSnapshots, inventoryCounts,
@@ -1042,6 +1042,57 @@ export async function startCount(input: StartCountInput, conn: Conn = db): Promi
   }, conn);
 
   return { countId: row.id, created: true };
+}
+
+/**
+ * يُلغي جرداً لم يُقفَل — ليُبدأ أسبوعُه من جديد، أو يُترك.
+ *
+ * طلبه أحمد (٢٧ سبتمبر ٢٠٢٦) مع «ابدأ جرداً جديداً»: مسوّدةٌ بُدئت خطأً أو
+ * تُركت ناقصة لا تبقى عالقة. **والمقفَلُ لا يُلغى** — يُعاد فتحُه بسببٍ مكتوب؛
+ * ومؤثِّراتُ ٠٣٦ و٠٤١ تمنع مسَّ أسطره أصلاً.
+ *
+ * وما أدخله إنسانٌ — العدُّ الفعليّ والأرصدةُ الافتتاحيّة — يُحفَظ بنصّه في
+ * سجلّ التدقيق قبل الحذف، فلا يضيع عملُ يدٍ بلا أثر. والهدرُ والحركاتُ
+ * المسجَّلةُ فيه وقائعُ مستقلّة تبقى (`count_id` يصير فارغاً).
+ */
+export async function discardCount(
+  countId: string,
+  actorId: string,
+  conn: Conn = db,
+): Promise<{ periodStart: string; periodEnd: string; counted: number }> {
+  const header = await loadCountHeader(countId, conn);
+  if (!header) throw new Error("الجرد غير موجود — ربما أُلغي من نافذةٍ أخرى");
+  if (header.status === "FINALISED") throw new CountLockedError();
+
+  const counted = await conn
+    .select({ productId: inventoryCountLines.productId, actualMilli: inventoryCountLines.actualMilli, unit: inventoryCountLines.baseUnit })
+    .from(inventoryCountLines)
+    .where(and(eq(inventoryCountLines.countId, countId), isNotNull(inventoryCountLines.actualMilli)));
+  const openings = await conn
+    .select({ productId: inventoryCountOpenings.productId, milli: inventoryCountOpenings.enteredMilli, unit: inventoryCountOpenings.enteredUnit })
+    .from(inventoryCountOpenings)
+    .where(and(eq(inventoryCountOpenings.countId, countId), isNull(inventoryCountOpenings.supersededAt)));
+
+  await recordAudit({
+    actorId,
+    action: "INVENTORY_COUNT_DISCARDED",
+    entityType: "inventory_count",
+    entityId: countId,
+    before: {
+      الفترة: `${header.periodStart} → ${header.periodEnd}`,
+      العدّ_الفعليّ: counted.map((c) => ({ الصنف: c.productId, بالمِلّي: Number(c.actualMilli), الوحدة: c.unit })),
+      الأرصدة_الافتتاحيّة: openings.map((o) => ({ الصنف: o.productId, بالمِلّي: Number(o.milli), الوحدة: o.unit })),
+    },
+    after: { السبب: "أُلغي الجردُ قبل إقفاله" },
+  }, conn);
+
+  /* الأسطرُ واللقطةُ والأرصدةُ تتبعه (cascade) — والمؤثِّرُ يأذن لأنّه مسوّدة */
+  const removed = await conn.delete(inventoryCounts)
+    .where(and(eq(inventoryCounts.id, countId), eq(inventoryCounts.status, "DRAFT")))
+    .returning({ id: inventoryCounts.id });
+  if (removed.length === 0) throw new CountLockedError();
+
+  return { periodStart: header.periodStart, periodEnd: header.periodEnd, counted: counted.length };
 }
 
 /**

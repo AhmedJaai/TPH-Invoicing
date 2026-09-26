@@ -8,10 +8,11 @@
  * يبلغ الخدمة — لا بـ`as Body`.
  */
 import { NextResponse } from "next/server";
+import { db } from "@/db";
 import { guard, respondTo } from "@/services/guard";
 import {
   CountLockedError, NotAWeekError, OverlappingPeriodError, ScopeItemNotInCountError,
-  canonicalCounts, finaliseCount, recomputeCount, reopenCount, saveActualCounts, saveCountScope,
+  canonicalCounts, discardCount, finaliseCount, recomputeCount, reopenCount, saveActualCounts, saveCountScope,
   setOpenings, startCount,
 } from "@/services/inventory.service";
 import { parseCountRequest } from "@/lib/inventory/count-request";
@@ -98,6 +99,22 @@ export async function POST(request: Request) {
           r.cleared > 0 ? `وأُفرغ لـ${countNoun(r.cleared, ITEM)} فعاد غيرَ معروف` : null,
         ].filter(Boolean);
         return NextResponse.json({ ok: true, message: parts.length > 0 ? `${parts.join(" ")}.` : "لا تغيير." });
+      }
+
+      /*
+        ── إلغاءُ جردٍ لم يُقفَل ──
+
+        بصلاحيّة العدّ نفسها التي بدأته: مسوّدةٌ لا تقريرَ مجمَّداً فيها. والمقفَلُ
+        يُردّ (`CountLockedError`)، وما عُدّ فيه يُحفَظ في سجلّ التدقيق قبل الحذف.
+      */
+      case "discard": {
+        /* الأثرُ والحذفُ في معاملةٍ واحدة — لا أثرَ بلا حذفٍ ولا حذفَ بلا أثر */
+        const r = await db.transaction((t) => discardCount(body.countId, user.id, t));
+        return NextResponse.json({
+          ok: true,
+          message: `أُلغي جردُ ${r.periodStart} → ${r.periodEnd}`
+            + (r.counted > 0 ? ` — وعدُّ ${countNoun(r.counted, ITEM)} محفوظٌ في سجلّ التدقيق` : ""),
+        });
       }
 
       case "recompute": {

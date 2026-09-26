@@ -87,6 +87,8 @@ export default async function InventoryPage({
                   defaultEnd={newestWeek.end}
                   branches={branchList.map((b) => ({ id: b.id, name: b.nameAr }))}
                   openWeek={{ start: header.periodStart, end: header.periodEnd }}
+                  openCountId={header.id}
+                  openBranchId={header.branchId}
                 />
               )}
               {showAmounts && <LinkButton href="/inventory/history" size="sm" icon={History}>سجلّ الجرد</LinkButton>}

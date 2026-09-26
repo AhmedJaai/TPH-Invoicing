@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
-import { ConfirmAction, Sheet } from "./ui-client";
+import { ConfirmAction, Sheet, toast } from "./ui-client";
 import { CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, CircleAlert, RefreshCw, Store, TriangleAlert } from "lucide-react";
 import { shiftDays, weekOf, type Week } from "@/lib/inventory/week";
-import { countNoun } from "@/lib/arabic";
+import { ITEM, countNoun } from "@/lib/arabic";
 import { WEEK, formatWeek } from "./inventory-ui";
 
 /**
@@ -27,6 +27,7 @@ export function StartCount({
   prerequisite = null,
   openWeekStart = null,
   onSameWeek,
+  onRestart,
 }: {
   defaultStart: string;
   defaultEnd: string;
@@ -34,6 +35,8 @@ export function StartCount({
   /** أسبوعُ جردٍ مفتوح — اختيارُه ثانيةً عودةٌ إليه لا جردٌ جديد. */
   openWeekStart?: string | null;
   onSameWeek?: () => void;
+  /** يُلغى المفتوحُ ويُبدأ أسبوعُه من جديد — بإقرارٍ في الورقة. */
+  onRestart?: () => Promise<boolean>;
   /**
    * ما ينقص قبل أن يُحسَب فرق — يُقال بجانب الزرّ ولا يمنعه.
    *
@@ -145,9 +148,23 @@ export function StartCount({
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         {sameAsOpen ? (
-          <button type="button" onClick={onSameWeek} className={`${buttonClass("primary", "lg")} w-full sm:w-auto`}>
-            عُد إلى الجرد المفتوح
-          </button>
+          <>
+            <button type="button" onClick={onSameWeek} className={`${buttonClass("primary", "lg")} w-full sm:w-auto`}>
+              عُد إلى الجرد المفتوح
+            </button>
+            {onRestart && (
+              <ConfirmAction
+                label="ألغِه وابدأه من جديد"
+                title="جردٌ جديد للأسبوع نفسه"
+                consequence="يُحذف الجردُ المفتوح لهذا الأسبوع ويُبدأ غيرُه فارغاً. وما عددتَه فيه لا يُنقَل — يبقى نصُّه في سجلّ التدقيق وحده."
+                acknowledgement="أفهم أنّ عدَّ الجرد المفتوح لا يعود إلّا بإدخاله ثانيةً."
+                confirmLabel="ألغِه وابدأ"
+                variant="quiet"
+                size="md"
+                onConfirm={onRestart}
+              />
+            )}
+          </>
         ) : (
           <button
             type="button"
@@ -320,14 +337,43 @@ export function NewCount({
   defaultEnd,
   branches,
   openWeek,
+  openCountId,
+  openBranchId,
 }: {
   defaultStart: string;
   defaultEnd: string;
   branches: { id: string; name: string }[];
   /** أسبوعُ الجرد المفتوح — يُذكَر كي لا يُظنّ أنّه يُحذَف. */
   openWeek: { start: string; end: string };
+  openCountId: string;
+  /** فرعُ المفتوح — الجديدُ لأسبوعه يُبدأ للفرع نفسه. */
+  openBranchId: string | null;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  /* يُلغى المفتوحُ ثمّ يُبدأ أسبوعُه — طلبان، والثاني لا يقع إن فشل الأوّل */
+  async function restart(): Promise<boolean> {
+    const d = await postJson("/api/inventory/count", { action: "discard", countId: openCountId });
+    if (!d.ok) {
+      toast({ tone: "danger", title: "تعذّر إلغاءُ الجرد", body: d.error });
+      return false;
+    }
+    const r = await postJson<{ countId: string }>("/api/inventory/count", {
+      action: "start", periodStart: openWeek.start, periodEnd: openWeek.end, branchId: openBranchId,
+    });
+    if (!r.ok) {
+      toast({ tone: "danger", title: "أُلغي الجرد ولم يُبدأ الجديد", body: `${r.error} — ابدأه من «ابدأ جرداً جديداً».` });
+      router.push("/inventory");
+      router.refresh();
+      return false;
+    }
+    toast({ tone: "ok", title: "بدأ الجردُ من جديد", body: `أسبوع ${formatWeek(openWeek.start, openWeek.end)} — فارغاً.` });
+    setOpen(false);
+    router.push(`/inventory/counts/${r.data.countId}`);
+    router.refresh();
+    return true;
+  }
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={buttonClass("secondary", "sm")}>
@@ -347,8 +393,57 @@ export function NewCount({
           branches={branches}
           openWeekStart={openWeek.start}
           onSameWeek={() => setOpen(false)}
+          onRestart={restart}
         />
       </Sheet>
     </>
+  );
+}
+
+/**
+ * إلغاءُ جردٍ لم يُقفَل — ليُبدأ من جديد أو يُترك.
+ * ما عُدّ فيه يُحفَظ في سجلّ التدقيق، والمقفَلُ لا يُلغى (يُعاد فتحُه).
+ */
+export function DiscardCount({
+  countId,
+  week,
+  countedItems,
+}: {
+  countId: string;
+  week: { start: string; end: string };
+  countedItems: number;
+}) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div>
+      <ConfirmAction
+        label="ألغِ هذا الجرد"
+        title={`إلغاءُ جرد أسبوع ${formatWeek(week.start, week.end)}`}
+        consequence={
+          "يُحذف هذا الجردُ ولا يُقفَل — ويعود أسبوعُه بلا جرد، فتبدؤه من جديد متى شئت."
+          + (countedItems > 0
+            ? ` وما عددتَه فيه (${countNoun(countedItems, ITEM)}) لا يُنقَل إلى الجديد — يبقى نصُّه في سجلّ التدقيق وحده.`
+            : " ولم يُعَدّ فيه صنفٌ بعد.")
+          + " والهدرُ المسجَّل في الأسبوع يبقى كما هو."
+        }
+        acknowledgement="أفهم أنّ هذا الجرد يُحذف، وأنّ عدَّه لا يعود إلّا بإدخاله ثانيةً."
+        confirmLabel="ألغِه"
+        variant="quiet"
+        onConfirm={async () => {
+          setError(null);
+          const r = await postJson<{ message?: string }>("/api/inventory/count", { action: "discard", countId });
+          if (!r.ok) {
+            setError(r.error);
+            return false;
+          }
+          toast({ tone: "ok", title: "أُلغي الجرد", body: r.data.message ?? "" });
+          router.push("/inventory");
+          router.refresh();
+          return true;
+        }}
+      />
+      {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
+    </div>
   );
 }

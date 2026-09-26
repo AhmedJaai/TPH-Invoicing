@@ -135,6 +135,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   INVENTORY_COUNT_LINE_EDITED: "تعديل عدٍّ فعليّ",
   INVENTORY_COUNT_FINALISED: "إقفال جرد",
   INVENTORY_COUNT_REOPENED: "إعادة فتح جرد",
+  INVENTORY_COUNT_DISCARDED: "إلغاء جردٍ لم يُقفَل",
   INVENTORY_MOVEMENT_RECORDED: "قيد حركة مخزون",
   WASTE_RECORDED: "تسجيل هدر",
   /* قيودٌ قديمة كُتبت قبل أن يكون لها اسم */

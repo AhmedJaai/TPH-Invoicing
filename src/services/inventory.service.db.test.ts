@@ -11,7 +11,7 @@ import { importSalesFile } from "./sales-import.service";
 import { mapPosProducts } from "./pos-mapping.service";
 import { saveRecipeVersion } from "./recipe.service";
 import {
-  CountLockedError, NotAWeekError, finaliseCount, itemHistory, loadCountHeader, loadScope,
+  CountLockedError, NotAWeekError, discardCount, finaliseCount, itemHistory, loadCountHeader, loadScope,
   readFrozenReport, recomputeCount, reopenCount, saveActualCounts, saveCountScope, startCount,
   unmappedPosProducts,
 } from "./inventory.service";
@@ -940,5 +940,42 @@ describe("نطاقُ الجرد", () => {
 
       expect(await caught(saveCountScope(countId, { included: [], excluded: [straws] }, actorId, tx)))
         .toBeInstanceOf(CountLockedError);
+    }));
+});
+
+describe("إلغاءُ جردٍ لم يُقفَل — «ابدأه من جديد»", () => {
+  it("يُحذف المسوّدةُ وأسطرُها، ويُحفَظ عدُّها في السجلّ، ويُبدأ أسبوعُه ثانيةً", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      const branch = await makeBranch(tx);
+      const coffee = await makeStockProduct(tx, "حبوب قهوة", "KG", "COFFEE");
+      await isolateProducts(tx, [coffee]);
+      const input = { periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: branch.id, actorId };
+      const { countId } = await startCount(input, tx);
+      await saveActualCounts(countId, [{ productId: coffee, actualMilli: kg(3) }], actorId, tx);
+
+      const out = await discardCount(countId, actorId, tx);
+      expect(out.counted).toBe(1);
+      expect(await loadCountHeader(countId, tx)).toBeNull();
+      const log = await tx.execute<{ before: { العدّ_الفعليّ: unknown[] } }>(sql`
+        select before from audit_logs where entity_id = ${countId} and action = 'INVENTORY_COUNT_DISCARDED'
+      `);
+      expect(log.rows[0].before["العدّ_الفعليّ"]).toHaveLength(1);
+
+      const again = await startCount(input, tx);
+      expect(again.created).toBe(true);
+      expect(again.countId).not.toBe(countId);
+    }));
+
+  it("المقفَلُ لا يُلغى — يُعاد فتحُه بسببٍ مكتوب", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      const branch = await makeBranch(tx);
+      const coffee = await makeStockProduct(tx, "حبوب قهوة", "KG", "COFFEE");
+      await isolateProducts(tx, [coffee]);
+      const { countId } = await startCount({ periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: branch.id, actorId }, tx);
+      await saveActualCounts(countId, [{ productId: coffee, actualMilli: kg(3) }], actorId, tx);
+      await tx.execute(sql`update inventory_counts set status = 'FINALISED' where id = ${countId}`);
+      expect(await caught(discardCount(countId, actorId, tx))).toBeInstanceOf(CountLockedError);
     }));
 });
