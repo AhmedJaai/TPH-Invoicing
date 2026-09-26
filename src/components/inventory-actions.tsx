@@ -244,11 +244,12 @@ export function ReopenCount({ countId }: { countId: string }) {
           className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-sm sm:min-h-9"
         />
         <button
+          aria-busy={busy}
           type="button" onClick={reopen}
           disabled={busy || reason.trim().length < 4}
           className={buttonClass("secondary", "sm")}
         >
-          {busy ? "يُعاد فتحُه…" : "أعِد فتحه"}
+          أعِد فتحه
         </button>
       </div>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
@@ -265,6 +266,7 @@ export function RecomputeCount({ countId }: { countId: string }) {
   return (
     <>
       <button
+        aria-busy={busy}
         type="button"
         className={buttonClass("secondary", "sm")}
         disabled={busy}
@@ -278,7 +280,7 @@ export function RecomputeCount({ countId }: { countId: string }) {
         }}
       >
         <RefreshCw className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} strokeWidth={2} aria-hidden />
-        {busy ? "يُحسب…" : "أعِد الحساب"}
+        أعِد الحساب
       </button>
       {error && <span role="alert" className="ms-2 text-xs text-danger">{error}</span>}
     </>

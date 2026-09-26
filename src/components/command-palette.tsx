@@ -39,6 +39,7 @@ type Recent = { label: string; hint?: string; href: string; kind: "page" | Searc
 
 type Row =
   | { type: "hit"; hit: SearchHit }
+  | { type: "verb"; hit: SearchHit; verb: { label: string; href: string } }
   | { type: "command"; command: Command }
   | { type: "recent"; recent: Recent };
 
@@ -167,7 +168,11 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
   */
   const numeric = intent !== null && intent.kind !== "TEXT";
   const commandRows: Row[] = matched.map((command) => ({ type: "command", command }));
-  const hitRows: Row[] = hits.map((hit) => ({ type: "hit", hit }));
+  /* تحت كلّ سجلٍّ أفعالُه — «سجّل سدادها» لا «افتحها ثمّ ابحث عن الزرّ» */
+  const hitRows: Row[] = hits.flatMap((hit): Row[] => [
+    { type: "hit", hit },
+    ...(hit.verbs ?? []).map((verb): Row => ({ type: "verb", hit, verb })),
+  ]);
   const recentRows: Row[] = q.trim() === "" ? recent.map((r) => ({ type: "recent", recent: r })) : [];
   const rows: Row[] = numeric ? [...hitRows, ...commandRows] : [...recentRows, ...commandRows, ...hitRows];
   const current = Math.min(active, Math.max(rows.length - 1, 0));
@@ -185,13 +190,15 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
       }
       if (row.type === "hit") {
         pushRecent({ label: row.hit.title, hint: KIND_LABEL[row.hit.kind], href: row.hit.href, kind: row.hit.kind });
-        router.push(row.hit.href);
+        router.push(row.hit.href, { scroll: false });
+      } else if (row.type === "verb") {
+        router.push(row.verb.href, { scroll: false });
       } else if (row.type === "command") {
         pushRecent({ label: row.command.label, hint: row.command.hint, href: row.command.href, kind: "page" });
         router.push(row.command.href);
       } else {
         pushRecent(row.recent);
-        router.push(row.recent.href);
+        router.push(row.recent.href, { scroll: false });
       }
     },
     [close, router],
@@ -208,7 +215,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
     if (e.key === "Enter") { e.preventDefault(); go(rows[current]); }
   }
 
-  const groupOf = (r: Row) => (r.type === "hit" ? "RECORDS" : r.type === "recent" ? "RECENT" : r.command.group);
+  const groupOf = (r: Row) => (r.type === "hit" || r.type === "verb" ? "RECORDS" : r.type === "recent" ? "RECENT" : r.command.group);
   const GROUP_LABEL: Record<string, string> = { ...COMMAND_GROUP_LABEL, RECORDS: "في سجلّاتك", RECENT: "فتحتَها مؤخّراً" };
 
   const intentLine =
@@ -266,7 +273,9 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
           const g = groupOf(r);
           const first = i === 0 || groupOf(rows[i - 1]) !== g;
           const selected = i === current;
-          const key = r.type === "hit" ? `h-${r.hit.kind}-${r.hit.id}` : r.type === "recent" ? `r-${r.recent.href}` : `c-${r.command.id}`;
+          const key = r.type === "hit" ? `h-${r.hit.kind}-${r.hit.id}`
+            : r.type === "verb" ? `v-${r.hit.kind}-${r.hit.id}-${r.verb.href}`
+            : r.type === "recent" ? `r-${r.recent.href}` : `c-${r.command.id}`;
           return (
             <li key={key} role="presentation">
               {first && (
@@ -315,6 +324,9 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
 
 function RowIcon({ row, selected }: { row: Row; selected: boolean }) {
   const box = `grid h-8 w-8 shrink-0 place-items-center rounded-lg ${selected ? "bg-raised text-accent" : "bg-sunken text-ink-soft"}`;
+  if (row.type === "verb") {
+    return <span className={`${box} ms-6 h-7 w-7`}><Zap className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /></span>;
+  }
   if (row.type === "hit") {
     const Icon = HIT_ICON[row.hit.kind];
     return <span className={box}><Icon className="h-4 w-4" strokeWidth={2} aria-hidden /></span>;
@@ -325,7 +337,7 @@ function RowIcon({ row, selected }: { row: Row; selected: boolean }) {
   if (row.command.group === "ACTION") {
     return <span className={box}><Zap className="h-4 w-4" strokeWidth={2} aria-hidden /></span>;
   }
-  const area = activeArea(row.command.href.split("#")[0]);
+  const area = activeArea(row.command.href.split(/[?#]/)[0]);
   return (
     <span className={box}>
       {area ? <NavGlyph icon={area.icon} className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />}
@@ -334,6 +346,14 @@ function RowIcon({ row, selected }: { row: Row; selected: boolean }) {
 }
 
 function RowBody({ row }: { row: Row }) {
+  if (row.type === "verb") {
+    return (
+      <span className="flex min-w-0 flex-1 items-baseline justify-between gap-3">
+        <span className="min-w-0 truncate text-[13px] font-medium">{row.verb.label}</span>
+        <span className="shrink-0 truncate text-[11px] text-muted">{row.hit.title}</span>
+      </span>
+    );
+  }
   if (row.type === "command") {
     return (
       <span className="flex min-w-0 flex-1 items-baseline justify-between gap-3">

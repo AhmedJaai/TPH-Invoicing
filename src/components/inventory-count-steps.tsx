@@ -470,11 +470,9 @@ function ScopePicker({
           </p>
           {error && <p role="alert" className="w-full text-xs text-danger sm:order-last">{error}</p>}
           {canEdit ? (
-            <button type="button" onClick={save} disabled={busy || chosen === 0} className={buttonClass("primary")}>
-              {busy ? "يُحفظ…"
-                : changed.length > 0 ? "احفظ النطاق وتابِع"
-                  : explicit ? "تابِع" : "احفظه كما هو وتابِع"}
-              {!busy && <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />}
+            <button type="button" onClick={save} aria-busy={busy} disabled={busy || chosen === 0} className={buttonClass("primary")}>
+              {changed.length > 0 ? "احفظ النطاق وتابِع" : explicit ? "تابِع" : "احفظه كما هو وتابِع"}
+              <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
             </button>
           ) : (
             <button type="button" onClick={onDone} className={buttonClass("primary")}>

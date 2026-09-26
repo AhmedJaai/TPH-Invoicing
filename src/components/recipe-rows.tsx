@@ -307,12 +307,13 @@ function RecipePanel({
       <div className="mt-4 flex flex-wrap items-end gap-3">
         {row.correctable ? (
           <button
+            aria-busy={busy === "correct"}
             type="button"
             onClick={() => void submit("correct")}
             disabled={!dirty || empty || busy !== null}
             className={buttonClass("primary", "sm")}
           >
-            {busy === "correct" ? "يُصحَّح…" : "صحِّحها — تسري على الأسابيع كلِّها"}
+            صحِّحها — تسري على الأسابيع كلِّها
           </button>
         ) : (
           <p className="text-[11px] leading-relaxed text-warn">
@@ -332,12 +333,13 @@ function RecipePanel({
             />
           </span>
           <button
+            aria-busy={busy === "save"}
             type="button"
             onClick={() => void submit("save")}
             disabled={!dirty || empty || busy !== null || changeFrom === ""}
             className={buttonClass("secondary", "sm")}
           >
-            {busy === "save" ? "يُحفَظ…" : "احفظ تغييراً"}
+            احفظ تغييراً
           </button>
         </label>
 

@@ -220,11 +220,12 @@ export function ReceiptForm({
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
+            aria-busy={busy}
             type="button" disabled={busy || quantity.trim() === "" || date === ""}
             onClick={() => void send(null)}
             className={buttonClass("primary", "sm")}
           >
-            {busy ? "يُحفظ…" : "احفظ الكمّيّة"}
+            احفظ الكمّيّة
           </button>
           <button type="button" disabled={busy} onClick={onDone} className={buttonClass("quiet", "sm")}>تراجع</button>
         </div>

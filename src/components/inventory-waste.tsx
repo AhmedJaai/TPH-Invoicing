@@ -137,11 +137,12 @@ export function InventoryWaste({
           className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-xs"
         />
         <button
+          aria-busy={busy}
           type="button" onClick={submit}
           disabled={busy || !productId || quantity.trim() === ""}
           className={buttonClass("primary")}
         >
-          {busy ? "يُسجَّل…" : "سجِّل الهدر"}
+          سجِّل الهدر
         </button>
       </div>
 

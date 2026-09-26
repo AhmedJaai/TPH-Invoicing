@@ -32,6 +32,7 @@ import {
 import { ExpenseReclassify } from "@/components/expense-reclassify";
 import { ExpenseDelete } from "@/components/expense-delete";
 import type { LucideIcon } from "lucide-react";
+import { txHref } from "@/lib/inspector";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,7 @@ export const dynamic = "force-dynamic";
 export default async function ExpensesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; add?: string }>;
 }) {
   const user = await currentUser();
   if (!user) redirect("/login?from=/money/expenses");
@@ -74,7 +75,8 @@ export default async function ExpensesPage({
   const actions = canEdit ? (
     <>
       <DeriveExpenses month={month} />
-      <ManualExpense />
+      {/* «سجّل مصروفاً» من لوحة الأوامر يفتح الورقةَ نفسها هنا */}
+      <ManualExpense startOpen={p.add === "1"} />
     </>
   ) : undefined;
 
@@ -249,7 +251,7 @@ export default async function ExpensesPage({
                             <SourceBadge source={e.source} />
                             <span className="font-bold text-ink"><Money minor={e.amountMinor} /></span>
                             {e.bankTransactionId && (
-                              <Link href={`/bank?tx=${e.bankTransactionId}`} className="inline-flex min-h-11 items-center font-bold text-accent hover:underline sm:min-h-0">حركتُه</Link>
+                              <Link href={txHref(e.bankTransactionId)} className="inline-flex min-h-11 items-center font-bold text-accent hover:underline sm:min-h-0">حركتُه</Link>
                             )}
                           </span>
                           {canEdit && deletableExpense(e)

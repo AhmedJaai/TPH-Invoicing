@@ -19,6 +19,7 @@ import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-ana
 import { formatDay } from "@/lib/riyadh-time";
 import { needsContract, needsPaperUpload } from "@/lib/supplier-policy-rules";
 import { ageOwed, ageTone, type OwedAgeing } from "@/lib/supplier-intel";
+import { txHref } from "@/lib/inspector";
 
 export const dynamic = "force-dynamic";
 
@@ -472,7 +473,7 @@ function UnbackedSection({ groups, count }: { groups: ReturnType<typeof groupUnb
                           {p.bankTransactionId && (
                             <>
                               {" · "}
-                              <Link href={`/bank?tx=${p.bankTransactionId}`} className="inline-flex min-h-11 items-center font-medium text-accent hover:underline sm:min-h-0">
+                              <Link href={txHref(p.bankTransactionId)} className="inline-flex min-h-11 items-center font-medium text-accent hover:underline sm:min-h-0">
                                 حركتها
                               </Link>
                             </>

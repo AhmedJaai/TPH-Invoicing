@@ -15,6 +15,7 @@ import { buttonClass } from "@/components/ui-tokens";
 import { ENTITY_LABEL, actionLabel, labelValue } from "@/lib/audit-labels";
 import { AUDIT_KIND_LABEL, KIND_PATTERN, LEARNED_ACTIONS, auditKind, isAuditKind, type AuditKind } from "@/lib/audit-kinds";
 import { todayInRiyadh } from "@/lib/riyadh-time";
+import { txHref } from "@/lib/inspector";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +79,7 @@ function Detail({ value, label }: { value: unknown; label: string }) {
 
 function entityLink(entityType: string, entityId: string): React.ReactNode {
   if (entityType === "invoice") return <Link href={invoiceHref(entityId)} className="font-bold text-accent hover:underline">فاتورة</Link>;
-  if (entityType === "bank_transaction") return <Link href={`/bank?tx=${encodeURIComponent(entityId)}`} className="font-bold text-accent hover:underline">حركة بنك</Link>;
+  if (entityType === "bank_transaction") return <Link href={txHref(encodeURIComponent(entityId))} className="font-bold text-accent hover:underline">حركة بنك</Link>;
   if (entityType === "month") return <Link href="/close" className="font-bold text-accent hover:underline">الإقفال</Link>;
   return ENTITY_LABEL[entityType] ?? "سجلّ";
 }

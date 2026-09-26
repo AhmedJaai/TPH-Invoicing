@@ -1,6 +1,6 @@
 import { MobileTabBar, Sidebar, AreaTabs, type ShellCounts } from "./nav";
 import { CommandPalette } from "./command-palette";
-import { Suspense } from "react";
+import { Suspense, ViewTransition } from "react";
 import { AutoProcess } from "./auto-process";
 import { HashScroll } from "./hash-scroll";
 import { TrialBanner } from "./trial-banner";
@@ -9,6 +9,7 @@ import { ViewControls } from "./view-controls";
 import { KeyboardShortcuts } from "./keyboard";
 import { Topbar, DropAnywhere } from "./topbar";
 import { Toaster } from "./ui-client";
+import { InspectorLauncher } from "./inspector";
 import { can, type Role } from "@/lib/permissions";
 import { inboxCount, workCount } from "@/lib/work";
 import { isAuthBypassed } from "@/lib/session";
@@ -35,9 +36,12 @@ const WIDTH: Record<ShellWidth, string> = {
 export function AppShell({
   user,
   children,
+  drawer,
 }: {
   user: { name?: string | null; role: Role };
   children: React.ReactNode;
+  /** لوحُ الفحص — مسارٌ معترِض يُفتح فوق الصفحة (`(app)/@drawer`). */
+  drawer?: React.ReactNode;
 }) {
   const counts: Promise<ShellCounts> = Promise.all([
     can(user.role, "reports:view") ? workCount().catch(() => null) : Promise.resolve(0),
@@ -61,11 +65,15 @@ export function AppShell({
         />
       </aside>
 
-      <div className="min-w-0">
+      {/* `app-content`: لوحُ الفحص على الجوّال يُخمِله ريثما يُفتح فوقه */}
+      <div id="app-content" className="min-w-0">
         <TrialBanner />
         <Topbar role={user.role} controls={<ViewControls />} />
         {children}
       </div>
+
+      <InspectorLauncher />
+      {drawer}
 
       <MobileTabBar
         role={user.role}
@@ -122,10 +130,16 @@ export function PageShell({
   children: React.ReactNode;
 }) {
   return (
+    /*
+      المحتوى وحده يتحرّك بين الصفحات (`page-in` · `page-out` في `globals.css`)،
+      والقشرةُ ثابتة. في الصفحة لا في التخطيط: التخطيطُ يبقى فلا يدخل ولا يخرج.
+      و`default="none"`: تحديثُ الصفحة نفسها (فعلٌ ثمّ `refresh`) لا يحرّكها.
+    */
+    <ViewTransition enter="page-in" exit="page-out" default="none">
     <main id="main" className={mainClass(width)}>
       {/* React 19 يرفع `<title>` إلى الترويسة أينما رُسم */}
       <title>{`${title} · ذا بوبليك هاوس`}</title>
-      <header className="animate-rise">
+      <header>
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
           <div className="min-w-0">
             {eyebrow && <p className="mb-1.5 text-xs font-medium text-muted">{eyebrow}</p>}
@@ -149,8 +163,10 @@ export function PageShell({
         </div>
       </header>
 
-      <div className="mt-6 lg:mt-8">{children}</div>
+      {/* `@container`: المتنُ يُصمَّم بمقاس وعائه — يصحّ صفحةً ولوحاً */}
+      <div className="@container mt-6 lg:mt-8">{children}</div>
     </main>
+    </ViewTransition>
   );
 }
 

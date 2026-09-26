@@ -337,13 +337,13 @@ export function ReconcileQueue({
                 </dl>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" disabled={busy !== null} onClick={settleAccount} className={buttonClass("primary", "sm")}>
+                <button aria-busy={busy === "settle"} type="button" disabled={busy !== null} onClick={settleAccount} className={buttonClass("primary", "sm")}>
                   <Wallet className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                  {busy === "settle" ? "يقيّد…" : ACT.settleOnAccount}
+                  {ACT.settleOnAccount}
                 </button>
                 {single && (
-                  <button type="button" disabled={busy !== null} onClick={markAdvance} className={buttonClass("secondary", "sm")}>
-                    {busy === "advance" ? "يقيّد…" : "دفعة مقدَّمة — قبل فاتورتها"}
+                  <button aria-busy={busy === "advance"} type="button" disabled={busy !== null} onClick={markAdvance} className={buttonClass("secondary", "sm")}>
+                    دفعة مقدَّمة — قبل فاتورتها
                   </button>
                 )}
               </div>
@@ -396,10 +396,8 @@ export function ReconcileQueue({
               )}
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button type="button" disabled={!ready || busy !== null} onClick={identify} className={buttonClass(group.supplierId ? "secondary" : "primary", "sm")}>
-                  {busy === "identify"
-                    ? "يحفظ…"
-                    : group.items.length > 1
+                <button type="button" aria-busy={busy === "identify"} disabled={!ready || busy !== null} onClick={identify} className={buttonClass(group.supplierId ? "secondary" : "primary", "sm")}>
+                  {group.items.length > 1
                       ? `${ACT.defineGroup} — وطبّقها على ${countNoun(group.items.length, TRANSACTION)}`
                       : ACT.saveIdentityAndNext}
                 </button>

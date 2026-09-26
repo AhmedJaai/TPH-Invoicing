@@ -313,12 +313,13 @@ export function InventoryCountEntry({
             </p>
             {error && <p role="alert" className="w-full text-xs text-danger sm:order-last">{error}</p>}
             <button
+              aria-busy={busy}
               type="button"
               onClick={save}
               disabled={busy || dirty.length === 0 || invalid.length > 0}
               className={`${buttonClass("primary", "lg")} w-full sm:w-auto`}
             >
-              {busy ? "يُحفظ…" : dirty.length === 0 ? "لا تغييرَ يُحفظ" : `احفظ العدّ (${dirty.length})`}
+              {dirty.length === 0 ? "لا تغييرَ يُحفظ" : `احفظ العدّ (${dirty.length})`}
             </button>
           </div>
         </div>

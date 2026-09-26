@@ -87,14 +87,14 @@ export function DoublePaidActions({
           </a>
         )}
         {canEdit && decision === null && (
-          <button type="button" disabled={busy} onClick={() => void decide("CLAIMED")} className={buttonClass("secondary", "sm")}>
-            {busy ? "يحفظ…" : "طالبتُ الجهة"}
+          <button aria-busy={busy} type="button" disabled={busy} onClick={() => void decide("CLAIMED")} className={buttonClass("secondary", "sm")}>
+            طالبتُ الجهة
           </button>
         )}
         {canEdit && !closed && (
-          <button type="button" disabled={busy} onClick={() => void decide("RECOVERED")} className={buttonClass("secondary", "sm")}>
+          <button aria-busy={busy} type="button" disabled={busy} onClick={() => void decide("RECOVERED")} className={buttonClass("secondary", "sm")}>
             <Check className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-            {busy ? "يحفظ…" : "استُردّ المال"}
+            استُردّ المال
           </button>
         )}
         {canEdit && !closed && (
@@ -111,9 +111,9 @@ export function DoublePaidActions({
           />
         )}
         {canEdit && decision !== null && (
-          <button type="button" disabled={busy} onClick={() => void decide("OPEN")} className={buttonClass("quiet", "sm")}>
+          <button aria-busy={busy} type="button" disabled={busy} onClick={() => void decide("OPEN")} className={buttonClass("quiet", "sm")}>
             <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            {busy ? "يحفظ…" : "أعد فتحه"}
+            أعد فتحه
           </button>
         )}
       </div>

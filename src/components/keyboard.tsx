@@ -9,6 +9,7 @@ import { Kbd } from "./ui";
 import { Sheet } from "./ui-client";
 import { triggerCapture } from "./nav";
 import { SHORTCUTS_EVENT } from "@/lib/ui-events";
+import { isInspectorPath, pathOf } from "@/lib/inspector";
 
 /**
  * لوحةُ المفاتيح — لمن يعمل بها كلَّ يوم.
@@ -52,12 +53,18 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
     function move(delta: number) {
       const list = items();
       if (list.length === 0) return;
-      const at = list.findIndex((el) => el.dataset.navActive === "true");
+      /* واللوحُ مفتوح: يبدأ العدُّ من الصفّ المفتوح فيه، لا من آخر ما اختير بالمفاتيح */
+      const open = document.documentElement.dataset.inspector;
+      const inspected = open ? list.findIndex((el) => pathOf(el.dataset.href ?? "") === open) : -1;
+      const at = inspected !== -1 ? inspected : list.findIndex((el) => el.dataset.navActive === "true");
       const next = at === -1 ? (delta > 0 ? 0 : list.length - 1) : Math.min(list.length - 1, Math.max(0, at + delta));
       list.forEach((el) => delete el.dataset.navActive);
       const el = list[next];
       el.dataset.navActive = "true";
-      el.scrollIntoView({ block: "nearest" });
+      el.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      /* لوحُ الفحص مفتوح: ينتقل إلى ملفّ الصفّ التالي في مكانه — مراجعةُ قائمةٍ بلا ذهابٍ وإياب */
+      const href = el.dataset.href;
+      if (open && href && isInspectorPath(href)) router.replace(href, { scroll: false });
     }
 
     function openActive(): boolean {
@@ -65,7 +72,7 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
       if (!el) return false;
       const href = el.dataset.href ?? el.querySelector<HTMLAnchorElement>("a[href]")?.getAttribute("href");
       if (!href) return false;
-      router.push(href);
+      router.push(href, { scroll: false });
       return true;
     }
 
@@ -121,6 +128,8 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
             { keys: ["J"], label: "الصفّ التالي" },
             { keys: ["K"], label: "الصفّ السابق" },
             { keys: ["Enter"], label: "افتح الصفّ المختار" },
+            { keys: ["J", "K"], label: "واللوحُ مفتوح: الملفُّ التالي في مكانه" },
+            { keys: ["Esc"], label: "أغلق اللوح" },
           ]}
         />
         <ShortcutGroup

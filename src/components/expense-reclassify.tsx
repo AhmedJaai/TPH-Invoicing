@@ -8,6 +8,7 @@ import { Money } from "./money";
 import { buttonClass } from "./ui";
 import { toast } from "./ui-client";
 import { postJson } from "@/lib/http-client";
+import { txHref } from "@/lib/inspector";
 
 /**
  * تصحيحُ التصنيف في موضع التنبيه.
@@ -87,15 +88,16 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
             ) : (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
+                  aria-busy={busy === s.id}
                   type="button"
                   disabled={busy === s.id || !s.bankTransactionId || !s.supplierId}
                   onClick={() => fix(s)}
                   className={buttonClass("primary", "sm")}
                 >
-                  {busy === s.id ? "يحفظ…" : `صنّفها سداداً لـ«${s.supplier}»`}
+                  {`صنّفها سداداً لـ«${s.supplier}»`}
                 </button>
                 {s.bankTransactionId && (
-                  <Link href={`/bank?tx=${s.bankTransactionId}`} className="inline-flex min-h-11 items-center gap-1 text-[11px] font-bold text-ink-soft hover:text-accent sm:min-h-0">
+                  <Link href={txHref(s.bankTransactionId)} className="inline-flex min-h-11 items-center gap-1 text-[11px] font-bold text-ink-soft hover:text-accent sm:min-h-0">
                     افتح حركتها <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                   </Link>
                 )}

@@ -171,8 +171,8 @@ function UnknownRow({
             className={`min-w-[9rem] flex-1 ${field}`}
           />
 
-          <button onClick={save} disabled={!ready || state === "saving"} className={buttonClass("primary", "sm")}>
-            {state === "saving" ? "يحفظ…" : "صنّفها"}
+          <button aria-busy={state === "saving"} onClick={save} disabled={!ready || state === "saving"} className={buttonClass("primary", "sm")}>
+            صنّفها
           </button>
 
           {state === "error" && message && (

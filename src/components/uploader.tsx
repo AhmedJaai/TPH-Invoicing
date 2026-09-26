@@ -370,12 +370,13 @@ function SupplierPicker({
             className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-sm sm:min-h-9"
           />
           <button
+            aria-busy={busy}
             type="button"
             onClick={() => void create()}
             disabled={busy || name.trim().length < 2}
             className={buttonClass("primary", "sm")}
           >
-            {busy ? "يُنشئ…" : "أنشئه"}
+            أنشئه
           </button>
           <button type="button" onClick={() => { setCreating(false); setError(null); }} className={buttonClass("quiet", "sm")}>
             إلغاء

@@ -148,6 +148,12 @@ export interface SearchHit {
   subtitle: string;
   amountMinor?: number;
   href: string;
+  /**
+   * أفعالٌ على السجلّ نفسه — «سجّل سدادها» و«كشف حسابه» — تُعرض في لوحة
+   * الأوامر تحت نتيجتها. والخادمُ يقرّر أيّها يصحّ (فاتورةٌ مسدَّدة لا
+   * يُعرض لها سداد)، والفعلُ نفسُه يقع في ملفّ السجلّ لا في اللوحة.
+   */
+  verbs?: readonly { label: string; href: string }[];
 }
 
 export const KIND_LABEL: Record<SearchHit["kind"], string> = {

@@ -24,10 +24,10 @@ const CATEGORIES: TxCategory[] = ["RENT", "SALARY", "UTILITY", "GOVERNMENT", "ZA
  * وضغطتان على «قيّده» كانتا مصروفين: الخادمُ يردّ الثانيةَ (٤٠٩) ويسأل،
  * وهنا يُعرَض سؤالُه بزرٍّ صريح «هو مصروفٌ ثانٍ» لا بإعادة المحاولة.
  */
-export function ManualExpense({ variant = "primary" }: { variant?: ButtonVariant }) {
+export function ManualExpense({ variant = "primary", startOpen = false }: { variant?: ButtonVariant; startOpen?: boolean }) {
   const router = useRouter();
   const ids = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
   const [occurredOn, setOccurredOn] = useState(todayInRiyadh());
@@ -99,15 +99,15 @@ export function ManualExpense({ variant = "primary" }: { variant?: ButtonVariant
           duplicate ? (
             <>
               <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={() => setDuplicate(null)}>لا — لا تقيّده</button>
-              <button type="button" className={buttonClass("primary")} disabled={busy} onClick={() => save(true)}>
-                {busy ? "يقيّد…" : "نعم — مصروفٌ ثانٍ، قيّده"}
+              <button aria-busy={busy} type="button" className={buttonClass("primary")} disabled={busy} onClick={() => save(true)}>
+                نعم — مصروفٌ ثانٍ، قيّده
               </button>
             </>
           ) : (
             <>
               <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={close}>إلغاء</button>
-              <button type="button" className={buttonClass("primary")} disabled={busy} onClick={() => save(false)}>
-                {busy ? "يقيّد…" : "قيّده"}
+              <button aria-busy={busy} type="button" className={buttonClass("primary")} disabled={busy} onClick={() => save(false)}>
+                قيّده
               </button>
             </>
           )

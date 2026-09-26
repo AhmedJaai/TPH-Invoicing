@@ -1,24 +1,26 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  ArrowDownLeft, ArrowLeft, ArrowUpRight, CalendarRange, CircleAlert, CircleCheck, Clock3, Inbox, Landmark,
-  ListFilter, Upload, X,
+  ArrowLeft, CalendarRange, CircleAlert, CircleCheck, Clock3, Inbox, Landmark,
+  ListFilter, Upload,
 } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Badge, DataTable, EmptyState, KeyValue, LinkButton, LinkTabs, NoAccess, Section, buttonClass } from "@/components/ui";
+import { Badge, DataTable, EmptyState, LinkButton, LinkTabs, NoAccess, Section, buttonClass } from "@/components/ui";
+import { CategoryBadge, DirectionIcon } from "@/components/bank-bits";
+import { txHref } from "@/lib/inspector";
 import { BankImport } from "@/components/bank-import";
 import { MatchExplain } from "@/components/match-explain";
 import { ReconcileQueue } from "@/components/reconcile-queue";
-import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
+import { CATEGORY_LABEL } from "@/lib/bank/rules";
 import { countNoun, DAY, GROUP, ITEM, TRANSACTION } from "@/lib/arabic";
 import { daysSinceRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { BANK_STALE_DAYS } from "@/lib/attention";
 import { formatRiyalsDisplay } from "@/lib/money";
 import {
-  TX_VIEWS, txLimit, countOpenDoublePaid, loadBankCoverage, loadBankQueue, loadFocusedTx, loadLedger,
+  TX_VIEWS, txLimit, countOpenDoublePaid, loadBankCoverage, loadBankQueue, loadLedger,
   type LedgerRow, type TxView,
 } from "@/services/bank-view.service";
 
@@ -65,12 +67,14 @@ export default async function BankPage({
     : "out";
   const month = params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : null;
 
-  const [coverage, queue, ledger, doublePaid, focused] = await Promise.all([
+  /* الرابطُ القديم `/bank?tx=` يفتح ملفَّ الحركة — تبقى الإشاراتُ المحفوظة تعمل */
+  if (params.tx) redirect(txHref(params.tx));
+
+  const [coverage, queue, ledger, doublePaid] = await Promise.all([
     loadBankCoverage(),
     loadBankQueue(),
     loadLedger(view, month),
     countOpenDoublePaid(),
-    params.tx ? loadFocusedTx(params.tx) : Promise.resolve(null),
   ]);
 
   const canApprove = can(user.role, "payment:approve");
@@ -103,16 +107,6 @@ export default async function BankPage({
         </LinkButton>
       ) : undefined}
     >
-      {/* ── الحركة التي فُتحت عليها الصفحة — من الطابور أو البحث ── */}
-      {focused && <FocusCard tx={focused} canUndo={canApprove} />}
-      {params.tx && !focused && (
-        <div role="status" className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-warn/25 bg-warn-bg px-4 py-3 text-xs text-ink-soft">
-          <CircleAlert className="h-4 w-4 shrink-0 text-warn" strokeWidth={2} aria-hidden />
-          <span className="flex-1">لا توجد الحركة المطلوبة — ربما دُمجت بنسختها عند تنظيف المكرَّر.</span>
-          <Link href="/bank" className="font-bold text-accent hover:underline">اعرض الصفحة كاملة</Link>
-        </div>
-      )}
-
       {empty ? (
         /*
           بلا كشفٍ لا يُعرض «إيداعات مدى ٠٫٠٠» بالأخضر ولا «كلُّها مصنّفة» —
@@ -211,6 +205,7 @@ export default async function BankPage({
             <DataTable
               rows={ledger.rows}
               keyOf={(t) => t.id}
+              hrefOf={(t) => txHref(t.id)}
               searchOf={(t) => [t.who, t.description, CATEGORY_LABEL[t.category], formatDay(t.valueDate), formatRiyalsDisplay(t.amountMinor)].filter(Boolean).join(" ")}
               searchLabel="ابحث بالجهة أو المبلغ أو نصّ البنك"
               empty={
@@ -323,45 +318,6 @@ function CoverageBand({
   );
 }
 
-/** الحركة المطلوبة — بطاقةٌ فوق الصفحة بأدلّتها كاملةً وبابِ التراجع. */
-function FocusCard({ tx, canUndo }: { tx: NonNullable<Awaited<ReturnType<typeof loadFocusedTx>>>; canUndo: boolean }) {
-  return (
-    <section aria-labelledby="focus-title" className="mb-8 overflow-hidden rounded-2xl border border-accent-line bg-raised shadow-lifted">
-      <header className="flex flex-wrap items-start gap-3 border-b border-line-soft px-4 py-4 sm:px-5">
-        <DirectionIcon direction={tx.direction} large />
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-bold text-accent">الحركة المطلوبة</p>
-          <h2 id="focus-title" className="mt-0.5 text-base font-bold" dir="auto">{tx.who || tx.description?.trim().slice(0, 60) || "حركة بلا وصف"}</h2>
-        </div>
-        <p className={`text-[1.6rem] font-bold leading-none ${tx.direction === "CREDIT" ? "text-ok" : ""}`}>
-          <span dir="ltr" className="inline-flex">{tx.direction === "CREDIT" ? "+" : "−"}<Money minor={tx.amountMinor} /></span>{" "}
-          <span className="text-xs font-bold text-muted">ر.س</span>
-        </p>
-        <Link href="/bank" aria-label="أغلق الحركة المطلوبة" className="grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-hover hover:text-ink sm:h-9 sm:w-9">
-          <X className="h-4 w-4" strokeWidth={2} aria-hidden />
-        </Link>
-      </header>
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-        <div className="space-y-4">
-          <KeyValue
-            items={[
-              { label: "التاريخ", value: <bdi>{formatDay(tx.valueDate)}</bdi> },
-              { label: "الاتّجاه", value: tx.direction === "DEBIT" ? "صادر من الحساب" : "وارد إلى الحساب" },
-              { label: "الباب", value: <CategoryBadge category={tx.category} /> },
-              { label: "نوع العمليّة", value: tx.transactionType ?? "غير معروف" },
-            ]}
-          />
-          <div>
-            <p className="text-[11px] font-medium text-muted">نصُّ البنك</p>
-            <p className="mt-1 rounded-lg bg-sunken px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-soft" dir="auto">{tx.description ?? "—"}</p>
-          </div>
-        </div>
-        <MatchExplain match={tx.match} canUndo={canUndo} inline />
-      </div>
-    </section>
-  );
-}
-
 /** حالُ الحركة في السجلّ — والفعلُ بجانبه حيث يوجد. */
 function StateCell({ tx, queued, canUndo }: { tx: LedgerRow; queued: boolean; canUndo: boolean }) {
   const m = tx.match;
@@ -380,40 +336,4 @@ function StateCell({ tx, queued, canUndo }: { tx: LedgerRow; queued: boolean; ca
     );
   }
   return <span className="text-[11px] text-muted">لا تحتاج مطابقة</span>;
-}
-
-const CATEGORY_TONE: Partial<Record<TxCategory, "warn" | "info" | "accent" | "muted" | "ok">> = {
-  UNKNOWN: "warn",
-  SUPPLIER: "accent",
-  POS_SETTLEMENT: "ok",
-  POS_FEE: "muted",
-  POS_VAT: "muted",
-  BANK_FEE: "muted",
-  BANK_VAT: "muted",
-  PERSONAL: "info",
-};
-
-function CategoryBadge({ category }: { category: TxCategory }) {
-  return <Badge tone={CATEGORY_TONE[category]}>{CATEGORY_LABEL[category] ?? category}</Badge>;
-}
-
-/**
- * السهمُ مع كلمةٍ مخفيّة للقارئ — اللونُ لا يأتي وحده.
- *
- * و`relative` على الوعاء شرط: `sr-only` موضعُه مطلق، وبلا سلفٍ مموضَع يفلت
- * من وعاء الجدول المُمرَّر فيطيل الصفحةَ كلَّها بطول الجدول (قيس: ٨٤٥٢ بكسلاً
- * لصفحةٍ محتواها ألفان).
- */
-function DirectionIcon({ direction, large = false }: { direction: "DEBIT" | "CREDIT"; large?: boolean }) {
-  const out = direction === "DEBIT";
-  const Icon = out ? ArrowUpRight : ArrowDownLeft;
-  return (
-    <span
-      title={out ? "صادر" : "وارد"}
-      className={`relative grid shrink-0 place-items-center rounded-full ${large ? "h-10 w-10" : "mt-0.5 h-7 w-7"} ${out ? "bg-sunken text-ink-soft" : "bg-ok-bg text-ok"}`}
-    >
-      <Icon className={large ? "h-5 w-5" : "h-3.5 w-3.5"} strokeWidth={2.25} aria-hidden />
-      <span className="sr-only">{out ? "صادر" : "وارد"}</span>
-    </span>
-  );
 }

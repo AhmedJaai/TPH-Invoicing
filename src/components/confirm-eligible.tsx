@@ -22,6 +22,7 @@ export function ConfirmEligible({ count }: { count: number }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
       <button
+        aria-busy={busy}
         type="button"
         disabled={busy}
         className={buttonClass("primary", "sm")}
@@ -36,7 +37,7 @@ export function ConfirmEligible({ count }: { count: number }) {
         }}
       >
         <CheckCheck className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-        {busy ? "يعتمد…" : count === 1 ? "اعتمده" : "اعتمدها كلَّها"}
+        {count === 1 ? "اعتمده" : "اعتمدها كلَّها"}
       </button>
       {error && <span role="alert" className="text-[11px] font-bold text-danger">{error}</span>}
     </span>

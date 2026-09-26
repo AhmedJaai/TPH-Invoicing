@@ -3,6 +3,7 @@ import {
 } from "./arabic";
 import { OVERDUE_DAYS } from "./invoice-filter";
 import { formatDay } from "./riyadh-time";
+import { txHref } from "@/lib/inspector";
 
 /** بعد كم يوماً من آخر كشفٍ يصير وقوفُه بنداً — الكشفُ يُستورَد أسبوعيّاً. */
 export const BANK_STALE_DAYS = 7;
@@ -518,7 +519,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       detail: "حُسمت ولم تُقيَّد بدفعة، أو قُيّدت وأُعلن أنّها ليست سداداً — عطبٌ يُعرَض ولا يُصحَّح آلياً، فقد يكون فشلَ كتابة أو حذفاً بيد.",
       action: "افتح الحركة وقرّر أيّ الطرفين الصحيح.",
       actionLabel: "احسم الحركة",
-      href: f.firstAnomalyTransactionId ? `/bank?tx=${f.firstAnomalyTransactionId}` : "/bank",
+      href: f.firstAnomalyTransactionId ? txHref(f.firstAnomalyTransactionId) : "/bank",
       count: n,
       amountMinor: f.lifecycleAnomalyMinor ?? undefined,
       impact: { kind: "UNATTRIBUTED", amountMinor: f.lifecycleAnomalyMinor ?? null },
@@ -536,7 +537,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       detail: "المبلغ نفسه رجع إلى الحساب بعد أيّام — فالفاتورة التي قُيّدت عليها تبدو مسدَّدةً ولم تُسدَّد.",
       action: "افتح الحركة: إن كانت ردّاً فتراجع عن مطابقتها لتعود الفاتورة مستحقّة، ثمّ أعد التحويل.",
       actionLabel: "افتح الحركة",
-      href: f.firstBouncedTransactionId ? `/bank?tx=${f.firstBouncedTransactionId}` : "/bank",
+      href: f.firstBouncedTransactionId ? txHref(f.firstBouncedTransactionId) : "/bank",
       count: n,
       amountMinor: f.bouncedPaymentMinor ?? undefined,
       impact: { kind: "OWED", amountMinor: f.bouncedPaymentMinor ?? null },

@@ -128,9 +128,9 @@ export function MonthClose({
             ))}
           </select>
         </label>
-        <button onClick={() => void call("check", month)} disabled={busy !== null} className={buttonClass("secondary", "sm")}>
+        <button aria-busy={busy === "checking"} onClick={() => void call("check", month)} disabled={busy !== null} className={buttonClass("secondary", "sm")}>
           <RotateCw className={`h-3.5 w-3.5 ${busy === "checking" ? "animate-spin" : ""}`} strokeWidth={2} aria-hidden />
-          {busy === "checking" ? "يفحص…" : "أعد الفحص"}
+          أعد الفحص
         </button>
       </div>
 
@@ -266,11 +266,12 @@ export function MonthClose({
                 </label>
               </div>
               <button
+                aria-busy={busy === "balancing"}
                 type="submit"
                 disabled={busy !== null || !opening.trim() || !closing.trim()}
                 className={`${buttonClass("primary", "sm")} mt-4`}
               >
-                {busy === "balancing" ? "يحفظ…" : "احفظ الرصيدين وأعد الفحص"}
+                احفظ الرصيدين وأعد الفحص
               </button>
             </form>
           )}
@@ -304,7 +305,7 @@ export function MonthClose({
                   )}
                   <div className="mt-4">
                     <ConfirmAction
-                      label={busy === "closing" ? "يُقفل…" : `أقفل ${formatMonth(month)}`}
+                      label={`أقفل ${formatMonth(month)}`}
                       variant="primary"
                       tone="warn"
                       size="md"
@@ -339,7 +340,7 @@ export function MonthClose({
               </p>
               <div className="mt-4">
                 <ConfirmAction
-                  label={busy === "reopening" ? "يفتح…" : "أعد فتح الشهر"}
+                  label="أعد فتح الشهر"
                   variant="secondary"
                   tone="warn"
                   disabled={busy !== null}

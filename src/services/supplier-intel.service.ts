@@ -22,6 +22,7 @@ import {
   type ProductPriceHistory,
 } from "@/lib/supplier-intel";
 import { invoiceHref } from "@/lib/invoice-profile";
+import { txHref } from "@/lib/inspector";
 
 const RIYADH_DAY = (col: SQL) => sql`(${col} at time zone 'Asia/Riyadh')::date::text`;
 
@@ -237,7 +238,7 @@ export async function loadSupplierIntel(
         meta: r.meta,
         href:
           kind === "INVOICE" ? invoiceHref(r.id)
-          : kind === "PAYMENT" && r.ref_id ? `/bank?tx=${r.ref_id}`
+          : kind === "PAYMENT" && r.ref_id ? txHref(r.ref_id)
           : undefined,
         cancelled: r.cancelled ?? undefined,
       };
@@ -303,7 +304,7 @@ export async function loadStatementLedger(
       kind: r.kind === "INVOICE" ? "INVOICE" : "PAYMENT",
       reference: r.ref,
       amountMinor: Number(r.amount),
-      href: r.kind === "INVOICE" ? invoiceHref(r.id) : r.tx ? `/bank?tx=${r.tx}` : undefined,
+      href: r.kind === "INVOICE" ? invoiceHref(r.id) : r.tx ? txHref(r.tx) : undefined,
     })),
   );
   return ledger;

@@ -153,12 +153,13 @@ export function DocumentReread({
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
+              aria-busy={busy}
               type="button"
               onClick={() => run(true)}
               disabled={busy}
               className={buttonClass("primary", "sm")}
             >
-              {busy ? "يكتب…" : "أقرّ هذه القراءة"}
+              أقرّ هذه القراءة
             </button>
             <button
               type="button"

@@ -9,7 +9,7 @@ const ids = (cs: { id: string }[]) => cs.map((c) => c.id);
 describe("commandsFor", () => {
   it("كلُّ أمرٍ يشير إلى صفحةٍ موجودة — لا أمرَ إلى مسارٍ حُذف", () => {
     for (const c of commandsFor("OWNER")) {
-      const path = c.href.split("#")[0];
+      const path = c.href.split(/[?#]/)[0];
       const file = path === "/" ? "src/app/(app)/(home)/page.tsx" : `src/app/(app)${path}/page.tsx`;
       expect(existsSync(join(process.cwd(), file)), `${c.id} → ${file}`).toBe(true);
     }

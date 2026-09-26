@@ -133,8 +133,8 @@ export function OpeningGrid({
       </ul>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" disabled={busy || filled.length === 0} onClick={() => void save()} className={buttonClass("primary")}>
-          {busy ? "يُحفظ…" : filled.length === 0 ? "لا رصيدَ مكتوب" : `احفظ ${filled.length} رصيداً`}
+        <button aria-busy={busy} type="button" disabled={busy || filled.length === 0} onClick={() => void save()} className={buttonClass("primary")}>
+          {filled.length === 0 ? "لا رصيدَ مكتوب" : `احفظ ${filled.length} رصيداً`}
         </button>
         <button type="button" disabled={busy} onClick={onDone} className={buttonClass("quiet", "sm")}>أغلِق</button>
         {error && <span role="alert" className="text-xs text-danger">{error}</span>}

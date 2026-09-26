@@ -84,15 +84,18 @@ export function MarkInvoicePaid({
   invoiceId,
   label,
   layout = "inline",
+  startOpen = false,
 }: {
   invoiceId: string;
   /** المتبقّي نصّاً مقروءاً — من الخادم، لا يُحسَب هنا. */
   label: string;
   /** `inline` في صفّ جدول، و`panel` في ملفّ الفاتورة: الخياران بطاقتان. */
   layout?: "inline" | "panel";
+  /** يُفتح والسؤالُ مطروح — حين جاء صاحبُه ليسجّل السداد نفسَه. */
+  startOpen?: boolean;
 }) {
   const router = useRouter();
-  const [state, setState] = useState<State>("idle");
+  const [state, setState] = useState<State>(startOpen ? "choose" : "idle");
   const [message, setMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const panel = layout === "panel";
@@ -210,8 +213,8 @@ export function MarkInvoicePaid({
         ) : (
           <>
             <span className="text-[11px] text-muted">من أين دُفعت؟</span>
-            <button type="button" disabled={state === "previewing"} onClick={loadOwnerPreview} className={buttonClass("secondary", "sm")}>
-              {state === "previewing" ? "يحسب…" : "من حسابي أو نقداً"}
+            <button aria-busy={state === "previewing"} type="button" disabled={state === "previewing"} onClick={loadOwnerPreview} className={buttonClass("secondary", "sm")}>
+              من حسابي أو نقداً
             </button>
             <button type="button" disabled={state === "previewing"} onClick={() => setState("confirm-bank")} className={buttonClass("secondary", "sm")}>
               حوالة من حساب المقهى
@@ -227,8 +230,8 @@ export function MarkInvoicePaid({
             {describePreview(preview).map((line) => <li key={line}>{line}</li>)}
           </ul>
           <div className={panel ? "mt-3 flex flex-wrap gap-2" : "flex flex-wrap gap-1.5"}>
-            <button type="button" disabled={state === "busy"} onClick={() => run("OWNER")} className={buttonClass("primary", "sm")}>
-              {state === "busy" ? "يحفظ…" : ACT.paidFromOwner}
+            <button aria-busy={state === "busy"} type="button" disabled={state === "busy"} onClick={() => run("OWNER")} className={buttonClass("primary", "sm")}>
+              {ACT.paidFromOwner}
             </button>
             <button type="button" onClick={back("choose")} className={buttonClass("quiet", "sm")}>تراجع</button>
           </div>
@@ -241,8 +244,8 @@ export function MarkInvoicePaid({
             تُنشأ دفعةٌ بـ<bdi className="nums font-bold text-ink">{label}</bdi> وتُخصَّص عليها — ويمكنك التراجع من الإشعار.
           </p>
           <div className={panel ? "mt-3 flex flex-wrap gap-2" : "flex flex-wrap gap-1.5"}>
-            <button type="button" disabled={state === "busy"} onClick={() => run("BANK")} className={buttonClass("primary", "sm")}>
-              {state === "busy" ? "يحفظ…" : ACT.recordBankTransfer}
+            <button aria-busy={state === "busy"} type="button" disabled={state === "busy"} onClick={() => run("BANK")} className={buttonClass("primary", "sm")}>
+              {ACT.recordBankTransfer}
             </button>
             <button type="button" onClick={back("choose")} className={buttonClass("quiet", "sm")}>تراجع</button>
           </div>

@@ -1,14 +1,20 @@
 /**
- * صنفُ المخزون — إخراجُه من القائمة.
+ * صنفُ المخزون — إخراجُه من القائمة، وإعادتُه (تراجعُ الإخراج من الإشعار).
  *
  * ولا حذفَ هنا: الصنفُ مذكورٌ في فواتيرَ وحركاتٍ وأسطرِ جردٍ مقفَل،
  * فيُعطَّل ويبقى تاريخُه. والقاعدةُ نفسُها في المورّدين.
  */
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { guard, respondTo } from "@/services/guard";
-import { ItemInUseError, retireStockItem } from "@/services/recipe.service";
+import { ItemInUseError, restoreStockItem, retireStockItem } from "@/services/recipe.service";
 
 export const runtime = "nodejs";
+
+const Body = z.object({
+  action: z.enum(["retire", "restore"]).default("retire"),
+  productId: z.string().min(1, "لم يُحدَّد الصنف"),
+});
 
 export async function POST(request: Request) {
   let user;
@@ -20,17 +26,24 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: { action?: "retire"; productId?: string };
+  let raw: unknown;
   try {
-    body = (await request.json()) as typeof body;
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
   }
-
-  if (!body.productId) return NextResponse.json({ error: "لم يُحدَّد الصنف" }, { status: 400 });
+  const parsed = Body.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلبٌ غير مفهوم" }, { status: 400 });
+  }
+  const { action, productId } = parsed.data;
 
   try {
-    const gone = await retireStockItem(body.productId, user.id);
+    if (action === "restore") {
+      const back = await restoreStockItem(productId, user.id);
+      return NextResponse.json({ ok: true, message: `عاد «${back.name}» إلى الجرد.` });
+    }
+    const gone = await retireStockItem(productId, user.id);
     return NextResponse.json({
       ok: true,
       message: `أُخرج «${gone.name}» من الجرد — وبقي ما مضى كما حُسب.`,

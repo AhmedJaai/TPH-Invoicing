@@ -728,12 +728,13 @@ export function DataTable<T>({
   return (
     /* `relative` هنا وعلى الإطار: نصُّ `sr-only` داخل خليّةٍ مطلقُ الموضع، وبلا
        أبٍ موضوعٍ يفلت إلى الصفحة فيطيلها بطول الجدول كلّه (٨٤٥٢ بكسلاً في /bank). */
-    <div data-filter-root="" className="relative">
+    /* `@container`: جدولٌ أو بطاقاتٌ بمقاس الوعاء لا الشاشة — يصحّ في الصفحة وفي لوح الفحص */
+    <div data-filter-root="" className="@container relative">
       {searchable && <TableFilter label={searchLabel} total={rows.length} />}
 
       {/* الحاسوب: جدول */}
       <ScrollX
-        className={`relative hidden rounded-xl border border-line bg-raised shadow-raised sm:block ${long ? "max-h-[min(72vh,60rem)] overflow-y-auto" : ""}`}
+        className={`relative hidden rounded-xl border border-line bg-raised shadow-raised @xl:block ${long ? "max-h-[min(72vh,60rem)] overflow-y-auto" : ""}`}
       >
         <table className="w-full border-separate border-spacing-0 text-[13px]">
           <thead className={long ? "sticky top-0 z-10" : ""}>
@@ -744,7 +745,7 @@ export function DataTable<T>({
                   scope="col"
                   className={`whitespace-nowrap border-b border-line bg-sunken/80 px-3.5 py-2.5 text-[11px] font-bold text-muted backdrop-blur first:rounded-ss-xl last:rounded-se-xl ${
                     c.numeric ? "text-start" : c.align === "end" ? "text-end" : "text-start"
-                  } ${c.secondary ? "hidden lg:table-cell" : ""}`}
+                  } ${c.secondary ? "hidden @4xl:table-cell" : ""}`}
                 >
                   {c.header || <span className="sr-only">الفعل</span>}
                 </th>
@@ -760,17 +761,17 @@ export function DataTable<T>({
                   data-filter={searchOf ? searchOf(row) : undefined}
                   data-nav-item={href ? "" : undefined}
                   data-href={href}
-                  className={`group transition-colors hover:bg-hover ${href ? "card-rows relative cursor-pointer" : ""}`}
+                  className={`group transition-colors duration-(--dur-1) hover:bg-hover ${href ? "card-rows relative cursor-pointer" : ""}`}
                 >
                   {columns.map((c, i) => (
                     <td
                       key={c.key}
                       className={`border-b border-line-soft px-3.5 py-3 align-middle group-last:border-b-0 ${
                         c.numeric ? "nums-col" : c.align === "end" ? "text-end" : "text-start"
-                      } ${c.secondary ? "hidden lg:table-cell" : ""}`}
+                      } ${c.secondary ? "hidden @4xl:table-cell" : ""}`}
                     >
                       {i === 0 && href && (
-                        <Link href={href} aria-label="افتح التفصيل" tabIndex={-1} className="absolute inset-0" />
+                        <Link href={href} scroll={false} aria-label="افتح التفصيل" tabIndex={-1} className="absolute inset-0" />
                       )}
                       {c.cell(row)}
                     </td>
@@ -783,14 +784,17 @@ export function DataTable<T>({
       </ScrollX>
 
       {/* الجوّال: بطاقات، ورابطُ البطاقة طبقةٌ لا غلاف — لا `<a>` داخل `<a>` */}
-      <ul className="space-y-2 sm:hidden">
+      <ul className="space-y-2 @xl:hidden">
         {rows.map((row) => {
           const href = hrefOf?.(row);
           return (
             <li key={keyOf(row)} data-filter={searchOf ? searchOf(row) : undefined}>
-              <div className={`rounded-xl border border-line bg-raised p-4 shadow-raised ${href ? "card-rows relative active:bg-hover" : ""}`}>
+              <div
+                data-href={href}
+                className={`rounded-xl border border-line bg-raised p-4 shadow-raised transition-[background-color,transform] ${href ? "card-rows relative active:scale-[0.99] active:bg-hover" : ""}`}
+              >
                 {href && (
-                  <Link href={href} aria-label="افتح التفصيل" className="absolute inset-0 rounded-xl" />
+                  <Link href={href} scroll={false} aria-label="افتح التفصيل" className="absolute inset-0 rounded-xl" />
                 )}
                 <div>
                   <p className="text-sm font-bold leading-snug">{primary.cell(row)}</p>

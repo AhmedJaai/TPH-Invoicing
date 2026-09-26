@@ -21,6 +21,7 @@ import { loadOverdueBalances } from "@/services/supplier-balance.service";
 import { DAY, TIME, countNoun } from "./arabic";
 import { invoiceHref } from "./invoice-profile";
 import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
+import { txHref } from "@/lib/inspector";
 
 interface Row {
   [key: string]: unknown;
@@ -404,7 +405,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         b.samePartyEvidence ? " من الطرف نفسه" : " — والطرف لم يتطابق"
       }`,
       amountMinor: b.outgoing.amountMinor,
-      href: `/bank?tx=${b.outgoing.id}`,
+      href: txHref(b.outgoing.id),
     })),
     bouncedPaymentMinor: bounced.reduce((s, b) => s + b.outgoing.amountMinor, 0),
     firstBouncedTransactionId: bounced[0]?.outgoing.id ?? null,

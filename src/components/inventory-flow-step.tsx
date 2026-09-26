@@ -322,8 +322,8 @@ function OpeningEditor({ countId, row, onDone }: { countId: string; row: StepRow
             {row.unitChoices.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
           </select>
         </label>
-        <button type="button" disabled={busy || value.trim() === ""} onClick={() => void save(value.trim())} className={buttonClass("primary", "sm")}>
-          {busy ? "يُحفظ…" : "احفظ الرصيد"}
+        <button aria-busy={busy} type="button" disabled={busy || value.trim() === ""} onClick={() => void save(value.trim())} className={buttonClass("primary", "sm")}>
+          احفظ الرصيد
         </button>
         {row.openingManual && (
           <button type="button" disabled={busy} onClick={() => void save(null)} className={buttonClass("secondary", "sm")}>

@@ -19,6 +19,7 @@ import { GAP_TEXT } from "@/lib/extraction/auto-archive";
 import { loadPendingReview } from "@/services/document-review.service";
 import { previousMonth } from "@/lib/filing";
 import { currentMonthRiyadh, formatDay } from "@/lib/riyadh-time";
+import { txHref } from "@/lib/inspector";
 
 /**
  * ألواحُ الفعل داخل «يحتاج قرارك».
@@ -125,10 +126,10 @@ export async function UnbackedWorkspace({ canApprove }: { canApprove: boolean })
             */
             <div className="mt-3 flex flex-wrap items-center gap-2 sm:ps-11">
               {g.payments
-                .filter((p) => p.bankTransactionId)
+                .flatMap((p) => (p.bankTransactionId ? [{ ...p, tx: p.bankTransactionId }] : []))
                 .slice(0, 3)
                 .map((p) => (
-                  <LinkButton key={p.paymentId} href={`/bank?tx=${p.bankTransactionId}`} size="sm">
+                  <LinkButton key={p.paymentId} href={txHref(p.tx)} size="sm">
                     عرّف جهة حركة <bdi className="nums">{p.paidOn}</bdi>
                   </LinkButton>
                 ))}

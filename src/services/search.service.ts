@@ -9,6 +9,7 @@
  */
 import { and, eq, gte, ilike, lte, or, sql, type AnyColumn } from "drizzle-orm";
 import { db } from "@/db";
+import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import {
   bankTransactions, documents, invoices, products, supplierProducts, suppliers,
 } from "@/db/schema";
@@ -17,6 +18,7 @@ import {
   type SearchHit, type SearchIntent,
 } from "@/lib/search";
 import { invoiceHref } from "@/lib/invoice-profile";
+import { txHref } from "@/lib/inspector";
 
 /** أقصى ما يُرجَع من كل نوع — الشاشة لا تسع أكثر، والقاعدة لا تُتعب. */
 export const PER_KIND = 6;
@@ -57,7 +59,7 @@ export async function search(
   const jobs: Promise<SearchHit[]>[] = [];
 
   if (intent.targets.includes("invoices")) jobs.push(findInvoices(intent, like, access.amounts));
-  if (intent.targets.includes("suppliers")) jobs.push(findSuppliers(intent, like));
+  if (intent.targets.includes("suppliers")) jobs.push(findSuppliers(intent, like, access.amounts));
   if (intent.targets.includes("products")) jobs.push(findProducts(like));
   if (access.bank && intent.targets.includes("bankTransactions")) jobs.push(findBankTx(intent, like));
   if (intent.targets.includes("documents")) jobs.push(findDocuments(intent, like));
@@ -117,6 +119,8 @@ async function findInvoices(intent: SearchIntent, like: string, amounts: boolean
       taxStatus: invoices.taxStatus,
       supplier: suppliers.nameAr,
       supplierSlug: suppliers.slug,
+      /* `${invoices}.id` لا `${invoices.id}` — الثاني يصيّر العمودَ مجرّداً فيُرجع صفراً */
+      paid: sql<number>`(select coalesce(sum(pa.amount_minor), 0)::int from payment_allocations pa where pa.invoice_id = ${invoices}.id)`,
     })
     .from(invoices)
     .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
@@ -136,10 +140,14 @@ async function findInvoices(intent: SearchIntent, like: string, amounts: boolean
       (فواتيرُه بلا مبالغ) لا صفحةٌ تقول «خارج صلاحيتك».
     */
     href: amounts || !r.supplierSlug ? invoiceHref(r.id) : `/suppliers/${r.supplierSlug}`,
+    /* «سجّل سدادها» لما بقي عليه أكثرُ من ريال — والتسجيلُ نفسُه في ملفّها، بخطوته وتراجعه */
+    verbs: amounts && r.total - Number(r.paid ?? 0) > TOTAL_ROUNDING_TOLERANCE_MINOR
+      ? [{ label: "سجّل سدادها", href: `/purchases/invoices/${encodeURIComponent(r.id)}?act=pay` }]
+      : undefined,
   }));
 }
 
-async function findSuppliers(intent: SearchIntent, like: string): Promise<SearchHit[]> {
+async function findSuppliers(intent: SearchIntent, like: string, amounts: boolean): Promise<SearchHit[]> {
   const clauses = [];
   if (intent.kind === "VAT") clauses.push(eq(suppliers.vatNumber, intent.term));
   if (intent.kind === "TEXT") {
@@ -167,6 +175,12 @@ async function findSuppliers(intent: SearchIntent, like: string): Promise<Search
     title: r.nameAr,
     subtitle: `${r.slug}${r.vatNumber ? "" : " · بلا رقم ضريبي"}${r.isActive ? "" : " · معطَّل"}`,
     href: `/suppliers/${r.slug}`,
+    verbs: amounts
+      ? [
+          { label: "كشف حسابه", href: `/suppliers/${r.slug}/statement` },
+          { label: "دفعاته", href: `/suppliers/${r.slug}?tab=payments` },
+        ]
+      : undefined,
   }));
 }
 
@@ -237,7 +251,7 @@ async function findBankTx(intent: SearchIntent, like: string): Promise<SearchHit
       r.direction === "DEBIT" ? "صادر" : "وارد"
     }${r.category === "UNKNOWN" ? " · غير مصنَّفة" : ""}`,
     amountMinor: r.amount,
-    href: `/bank?tx=${r.id}`,
+    href: txHref(r.id),
   }));
 }
 

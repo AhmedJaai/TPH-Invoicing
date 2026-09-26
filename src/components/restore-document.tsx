@@ -15,6 +15,7 @@ export function RestoreDocument({ documentId }: { documentId: string }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <button
+        aria-busy={busy}
         type="button"
         disabled={busy}
         className={buttonClass("secondary", "sm")}
@@ -35,7 +36,7 @@ export function RestoreDocument({ documentId }: { documentId: string }) {
         }}
       >
         <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        {busy ? "يعيده…" : "أعِده للمراجعة"}
+        أعِده للمراجعة
       </button>
       {error && <span className="text-[11px] font-bold text-danger" role="alert">{error}</span>}
     </span>

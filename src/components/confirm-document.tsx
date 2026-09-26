@@ -29,6 +29,7 @@ export function ConfirmDocument({
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <button
+        aria-busy={busy}
         type="button"
         disabled={busy}
         className={buttonClass(variant, "sm")}
@@ -47,7 +48,7 @@ export function ConfirmDocument({
         }}
       >
         <Check className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-        {busy ? "يعتمد…" : ACT.approveDocument}
+        {ACT.approveDocument}
       </button>
       {error && <span className="text-[11px] font-bold text-danger" role="alert">{error}</span>}
     </span>

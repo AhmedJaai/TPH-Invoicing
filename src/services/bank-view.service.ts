@@ -374,6 +374,8 @@ export interface FocusedTx {
   amountMinor: number;
   direction: "DEBIT" | "CREDIT";
   category: TxCategory;
+  /** الدفعةُ التي قُيّدت بها — وما خُصم منها لكلّ فاتورة في `loadTxAllocations`. */
+  paymentId: string | null;
   match: MatchExplanation;
 }
 
@@ -408,6 +410,7 @@ export async function loadFocusedTx(id: string): Promise<FocusedTx | null> {
     amountMinor: t.amountMinor,
     direction: t.direction,
     category: t.category,
+    paymentId: t.matchedPaymentId,
     match: {
       transactionId: t.id,
       disposition: t.matchDisposition,
@@ -438,4 +441,42 @@ function canonicalOf(t: {
     amountMinor: t.amountMinor,
     direction: t.direction,
   });
+}
+
+/**
+ * ما سدّدته الحركة — كلُّ فاتورةٍ خُصم لها من دفعتها، بمبلغها ومورّدها.
+ * يجيب «ماذا دفعتُ بهذه الحوالة؟» في ملفّ الحركة دون الذهاب إلى المورّد.
+ */
+export async function loadTxAllocations(paymentId: string): Promise<{
+  invoiceId: string;
+  invoiceNumber: string;
+  invoiceDate: Date;
+  supplierName: string;
+  supplierSlug: string;
+  amountMinor: number;
+}[]> {
+  const rows = await db.execute<{
+    invoice_id: string;
+    invoice_number: string;
+    invoice_date: Date;
+    supplier_name: string;
+    supplier_slug: string;
+    amount_minor: number;
+  }>(sql`
+    select i.id as invoice_id, i.invoice_number, i.invoice_date, s.name_ar as supplier_name, s.slug as supplier_slug,
+           pa.amount_minor::int as amount_minor
+      from payment_allocations pa
+      join invoices i on i.id = pa.invoice_id
+      join suppliers s on s.id = i.supplier_id
+     where pa.payment_id = ${paymentId}
+     order by i.invoice_date asc
+  `);
+  return rows.rows.map((r) => ({
+    invoiceId: r.invoice_id,
+    invoiceNumber: r.invoice_number,
+    invoiceDate: new Date(r.invoice_date),
+    supplierName: r.supplier_name,
+    supplierSlug: r.supplier_slug,
+    amountMinor: Number(r.amount_minor),
+  }));
 }

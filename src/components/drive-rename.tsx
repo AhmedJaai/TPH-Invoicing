@@ -228,7 +228,7 @@ export function DriveRename() {
                     <span dir="ltr">{c.current}</span> — {c.reason}
                     {c.fixHref && (
                       <>
-                        {" "}
+                         
                         <a href={c.fixHref} className="font-bold text-ink underline underline-offset-4">
                           أكمِل الناقص ←
                         </a>
@@ -242,12 +242,13 @@ export function DriveRename() {
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button
+              aria-busy={busy}
               type="button"
               disabled={busy || chosen.size === 0}
               onClick={apply}
               className={buttonClass("primary", "sm")}
             >
-              {busy ? "يعيد التسمية…" : `أعد تسمية المختار (${chosen.size})`}
+              {`أعد تسمية المختار (${chosen.size})`}
             </button>
             {data.proposals.some((p) => !p.pending) && (
               <button

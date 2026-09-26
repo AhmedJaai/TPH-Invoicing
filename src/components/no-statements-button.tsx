@@ -18,6 +18,7 @@ export function NoStatementsButton({ supplierId }: { supplierId: string }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <button
+        aria-busy={busy}
         type="button"
         disabled={busy}
         className={buttonClass("quiet", "sm")}
@@ -32,7 +33,7 @@ export function NoStatementsButton({ supplierId }: { supplierId: string }) {
         }}
       >
         <FileX className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        {busy ? "يحفظ…" : "لا يصدر كشوفاً"}
+        لا يصدر كشوفاً
       </button>
       {error && <span className="text-[11px] font-bold text-danger" role="alert">{error}</span>}
     </span>

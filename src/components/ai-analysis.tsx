@@ -300,19 +300,20 @@ function FindingCard({
           ) : moneyAction ? (
             <>
               {f.action?.type === "OWNER_PAID" && state !== "preview" && (
-                <button type="button" disabled={state === "busy"} className={buttonClass("secondary", "sm")} onClick={() => decide("preview")}>
-                  {state === "busy" ? "يحسب…" : "عاين ما سيتغيّر"}
+                <button aria-busy={state === "busy"} type="button" disabled={state === "busy"} className={buttonClass("secondary", "sm")} onClick={() => decide("preview")}>
+                  عاين ما سيتغيّر
                 </button>
               )}
               {(f.action?.type !== "OWNER_PAID" || state === "preview") && (
                 <button
+                  aria-busy={state === "busy"}
                   type="button"
                   disabled={state === "busy" || !canApprove}
                   className={buttonClass("primary", "sm")}
                   onClick={() => decide("accept")}
                   title={canApprove ? undefined : "إقرار ما يكتب سداداً لمن يعتمد السداد"}
                 >
-                  {state === "busy" ? "يحفظ…" : f.action?.type === "OWNER_PAID" ? ACT.paidFromOwner : f.action?.type === "VOID_DUPLICATE" ? "هي دفعةٌ واحدة — ألغِ المكرّرة" : "اخصم الرصيد من فواتيره"}
+                  {f.action?.type === "OWNER_PAID" ? ACT.paidFromOwner : f.action?.type === "VOID_DUPLICATE" ? "هي دفعةٌ واحدة — ألغِ المكرّرة" : "اخصم الرصيد من فواتيره"}
                 </button>
               )}
               <button type="button" disabled={state === "busy"} className={buttonClass("quiet", "sm")} onClick={() => setState("dismissing")}>

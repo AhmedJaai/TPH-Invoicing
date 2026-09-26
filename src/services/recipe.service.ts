@@ -741,3 +741,37 @@ export async function retireStockItem(
     return { name: String(row.name_ar) };
   });
 }
+
+/**
+ * إعادةُ صنفٍ أُخرج — تراجعُ «أخرِجه» من الإشعار.
+ *
+ * الإخراجُ تعطيلٌ لا حذف، فعكسُه تامّ: يعود إلى شاشة العدّ وقوائم المكوّنات،
+ * وتاريخُه لم يُمسّ أصلاً. ويُكتب في السجلّ كما كُتب الإخراج.
+ */
+export async function restoreStockItem(
+  productId: string,
+  actorId: string,
+  conn: Conn = db,
+): Promise<{ name: string }> {
+  return conn.transaction(async (tx) => {
+    const [row] = (await tx.execute<{ name_ar: string }>(sql`
+      select p.name_ar from products p
+       where p.id = ${productId} and p.is_stock_item and not p.is_active
+       limit 1
+    `)).rows;
+    if (!row) throw new Error("لا صنفَ مُخرَجاً بهذا المعرّف — ربما أُعيد من قبل");
+
+    await tx.execute(sql`update products set is_active = true where id = ${productId}`);
+
+    await recordAudit({
+      actorId,
+      action: "STOCK_ITEM_RESTORED",
+      entityType: "product",
+      entityId: productId,
+      before: { الصنف: String(row.name_ar), قائم: false },
+      after: { قائم: true },
+    }, tx);
+
+    return { name: String(row.name_ar) };
+  });
+}

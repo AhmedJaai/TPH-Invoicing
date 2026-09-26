@@ -95,8 +95,8 @@ export function OrphanPayment({
             <option value="">اختر المورّد…</option>
             {suppliers.map((s) => <option key={s.id} value={s.id}>{s.nameAr}</option>)}
           </select>
-          <button type="button" disabled={busy || !supplierId} onClick={submit} className={buttonClass("primary", "sm")}>
-            {busy ? "يحفظ…" : "انسبها"}
+          <button aria-busy={busy} type="button" disabled={busy || !supplierId} onClick={submit} className={buttonClass("primary", "sm")}>
+            انسبها
           </button>
         </div>
       )}
@@ -112,8 +112,8 @@ export function OrphanPayment({
               placeholder="ما هي؟ أجرة · تحويل شخصيّ · مصروف…"
               className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-surface px-2 text-xs lg:min-h-9"
             />
-            <button type="button" disabled={busy || reason.trim().length < 3} onClick={submit} className={buttonClass("danger", "sm")}>
-              {busy ? "يُلغي…" : "ألغِ قيدَها"}
+            <button aria-busy={busy} type="button" disabled={busy || reason.trim().length < 3} onClick={submit} className={buttonClass("danger", "sm")}>
+              ألغِ قيدَها
             </button>
           </div>
           <p className="text-[11px] leading-relaxed text-muted">

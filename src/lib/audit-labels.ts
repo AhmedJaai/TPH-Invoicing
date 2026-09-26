@@ -112,6 +112,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   RECIPE_VERSION_CORRECTED: "تصحيح نسخة وصفة",
   RECIPE_DELETED: "حذف وصفة",
   STOCK_ITEM_RETIRED: "إيقاف صنف مخزون",
+  STOCK_ITEM_RESTORED: "إعادة صنف مخزون",
   INVENTORY_COUNT_SCOPE_SET: "تحديد نطاق الجرد",
   INVENTORY_OPENING_SET: "رصيد افتتاحي للمخزون",
   INVENTORY_OPENING_CLEARED: "مسح رصيد افتتاحي",

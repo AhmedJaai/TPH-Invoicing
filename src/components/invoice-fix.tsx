@@ -160,12 +160,13 @@ export function InvoiceFix({
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <button
+              aria-busy={busy}
               type="button"
               onClick={save}
               disabled={busy || !dirty}
               className={buttonClass("primary", "sm")}
             >
-              {busy ? "يُحفظ…" : "احفظ التصحيح"}
+              احفظ التصحيح
             </button>
             <button
               type="button"

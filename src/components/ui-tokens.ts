@@ -21,5 +21,10 @@ export function buttonClass(variant: ButtonVariant = "secondary", size: "sm" | "
     size === "sm" ? "min-h-11 px-3 text-xs sm:min-h-8"
     : size === "lg" ? "min-h-12 px-5 text-[15px]"
     : "min-h-11 px-4 text-sm sm:min-h-10";
-  return `inline-flex shrink-0 select-none items-center justify-center gap-1.5 rounded-lg font-bold transition-[background-color,border-color,color,box-shadow,filter] duration-150 active:translate-y-px disabled:pointer-events-none disabled:opacity-50 ${pad} ${BUTTON_CLASS[variant]}`;
+  /*
+    `btn` يملك الحركة كلَّها (`globals.css`): الضغطُ، والانتظارُ في مكانه
+    (`aria-busy`)، وعلامةُ النجاح (`data-done`). والمعطَّلُ يبقى تحت الفأرة
+    كي يُقرأ سببُه في `title` — كان `pointer-events: none` يُسكته.
+  */
+  return `btn inline-flex shrink-0 select-none items-center justify-center gap-1.5 rounded-lg font-bold disabled:cursor-not-allowed disabled:opacity-50 ${pad} ${BUTTON_CLASS[variant]}`;
 }

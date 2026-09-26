@@ -195,9 +195,9 @@ export function RecurringExpenses({
             </label>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button type="submit" disabled={busy || label.trim().length < 2 || !amount.trim()} className={buttonClass("primary", "sm")}>
+            <button aria-busy={busy} type="submit" disabled={busy || label.trim().length < 2 || !amount.trim()} className={buttonClass("primary", "sm")}>
               <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-              {busy ? "يحفظ…" : "أضِف"}
+              أضِف
             </button>
             {error && <p role="alert" className="text-xs font-bold text-danger">{error}</p>}
           </div>

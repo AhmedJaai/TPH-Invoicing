@@ -51,6 +51,7 @@ export function RejectDocument({ documentId, cancel = false, redirectTo }: {
         className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-2.5 text-xs sm:min-h-8 sm:w-44 sm:flex-none"
       />
       <button
+        aria-busy={busy}
         type="button"
         disabled={busy}
         className={buttonClass("danger", "sm")}
@@ -71,7 +72,7 @@ export function RejectDocument({ documentId, cancel = false, redirectTo }: {
           else router.refresh();
         }}
       >
-        {busy ? (cancel ? "يُلغي…" : "يرفض…") : cancel ? "نعم، ألغِها" : "نعم، ارفضه"}
+        {cancel ? "نعم، ألغِها" : "نعم، ارفضه"}
       </button>
       <button type="button" className={buttonClass("quiet", "sm")} onClick={() => { setAsking(false); setError(null); }}>
         تراجع

@@ -86,12 +86,13 @@ export function PosProductMapping({
                   ))}
                 </select>
                 <button
+                  aria-busy={busyId === row.id}
                   type="button"
                   onClick={() => map(row)}
                   disabled={busyId !== null}
                   className={buttonClass("primary", "sm")}
                 >
-                  {busyId === row.id ? "يُربَط…" : "اربطه"}
+                  اربطه
                 </button>
               </div>
             ) : null}

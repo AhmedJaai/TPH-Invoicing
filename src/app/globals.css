@@ -76,10 +76,31 @@
 
   --ring: color-mix(in oklab, var(--accent) 70%, transparent);
 
-  /* الحركة */
-  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --dur-fast: 150ms;
-  --dur: 220ms;
+  /*
+   * ── الحركة: جسديّةٌ، سريعةٌ، هادئة ──
+   *
+   * أربعُ مددٍ لا غير، وثلاثةُ منحنيات. كلُّ حركةٍ في التطبيق تُكتب بها —
+   * فلا يتحرّك شيءٌ بإيقاعٍ يخالف جاره.
+   *
+   *   ١٠٠  ضغطُ زرّ، تبديلُ لون           ٢٢٠  لوحٌ، قائمة، إشعار، ورقة
+   *   ١٥٠  ظهورُ تلميح، تمرير الفأرة       ٣٢٠  لوحُ الفحص، انتقالُ الصفحة
+   *
+   * `standard` لما يتغيّر في مكانه، و`emphasized` لما يدخل الشاشة (يبدأ
+   * سريعاً ويستقرّ)، و`exit` لما يغادرها (يتسارع ويختفي)، و`spring` نابضٌ
+   * خفيف بلا ارتداد ظاهر — يتجاوز هدفه ١٪ ثمّ يستقرّ.
+   */
+  --dur-1: 100ms;
+  --dur-2: 150ms;
+  --dur-3: 220ms;
+  --dur-4: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --ease-spring: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017 20.8%, 1.035 23.8%, 1.032 27.2%, 1.01 34.6%, 0.998 42.4%, 1);
+  /* الأسماءُ القديمة تُقرأ من الجديدة — لا قيمةَ ثانية */
+  --ease-out: var(--ease-emphasized);
+  --dur-fast: var(--dur-2);
+  --dur: var(--dur-3);
 }
 
 /*
@@ -252,9 +273,12 @@
   --radius-card: 0.75rem;
   --radius-panel: 1rem;
 
-  --ease-out: var(--ease-out);
-  --animate-rise: rise var(--dur) var(--ease-out);
-  --animate-fade: fade var(--dur) var(--ease-out);
+  /* كلُّ `transition-*` في Tailwind يرث الرمزين — لا مدّةَ ارتجاليّة */
+  --default-transition-duration: var(--dur-2);
+  --default-transition-timing-function: var(--ease-standard);
+  --animate-rise: rise var(--dur-3) var(--ease-emphasized) both;
+  --animate-fade: fade var(--dur-3) var(--ease-standard) both;
+  --animate-pop: pop var(--dur-3) var(--ease-spring) both;
 }
 
 @keyframes rise {
@@ -262,6 +286,9 @@
 }
 @keyframes fade {
   from { opacity: 0; }
+}
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.96); }
 }
 
 html {
@@ -494,39 +521,312 @@ html[data-amounts="hidden"] .icon-hidden { display: block; }
   position: relative;
 }
 
-/* ── لوحة الأوامر والحوارات: دخولٌ قصير ── */
+/*
+ * ── ما يطفو: يدخل ويخرج بحركة ──
+ *
+ * الحوارُ (`<dialog>`) والقائمةُ المنبثقة (`[popover]`) يُعرَضان في الطبقة
+ * العليا، وكانا يدخلان بحركةٍ ويختفيان في إطارٍ واحد. فصارت الحالُ كلُّها
+ * انتقالاً: `@starting-style` نقطةُ البدء عند الفتح، و`allow-discrete` يُبقي
+ * العنصرَ مرسوماً حتى تنتهي حركةُ خروجه. والمتصفّحُ الذي لا يعرفهما يفتح
+ * ويغلق بلا حركة — لا يضيع شيء.
+ *
+ * `--travel` مسافةُ الحركة: ١ عادةً، وصفرٌ لمن طلب تقليل الحركة — فيبقى
+ * التلاشي القصير وتسقط الإزاحة.
+ */
+:root { --travel: 1; }
+
 .palette-input:focus-visible {
   outline: none;
 }
-.palette[open],
-.sheet[open] {
-  animation: palette-in var(--dur) var(--ease-out);
+
+.palette,
+.sheet,
+.pop {
+  opacity: 0;
+  transition:
+    opacity var(--dur-2) var(--ease-exit),
+    transform var(--dur-2) var(--ease-exit),
+    overlay var(--dur-2) var(--ease-exit) allow-discrete,
+    display var(--dur-2) var(--ease-exit) allow-discrete;
 }
+.palette { transform: translateY(calc(-8px * var(--travel))) scale(calc(1 - 0.015 * var(--travel))); }
+.sheet { transform: translateY(calc(10px * var(--travel))) scale(calc(1 - 0.01 * var(--travel))); }
+.pop { transform: translateY(calc(-4px * var(--travel))) scale(calc(1 - 0.02 * var(--travel))); }
+
+.palette[open],
+.sheet[open],
+.pop:popover-open {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--dur-3) var(--ease-emphasized),
+    transform var(--dur-3) var(--ease-spring),
+    overlay var(--dur-3) allow-discrete,
+    display var(--dur-3) allow-discrete;
+}
+@starting-style {
+  .palette[open] { opacity: 0; transform: translateY(calc(-8px * var(--travel))) scale(calc(1 - 0.015 * var(--travel))); }
+  .sheet[open] { opacity: 0; transform: translateY(calc(10px * var(--travel))) scale(calc(1 - 0.01 * var(--travel))); }
+  .pop:popover-open { opacity: 0; transform: translateY(calc(-4px * var(--travel))) scale(calc(1 - 0.02 * var(--travel))); }
+}
+
 .palette::backdrop,
 .sheet::backdrop {
-  background: rgb(14 13 11 / 0.45);
-  backdrop-filter: blur(2px);
-  animation: fade var(--dur) var(--ease-out);
+  background: rgb(14 13 11 / 0);
+  backdrop-filter: blur(0);
+  transition:
+    background-color var(--dur-3) var(--ease-standard),
+    backdrop-filter var(--dur-3) var(--ease-standard),
+    overlay var(--dur-3) allow-discrete,
+    display var(--dur-3) allow-discrete;
 }
-@keyframes palette-in {
-  from { opacity: 0; transform: translateY(-6px) scale(0.985); }
+.palette[open]::backdrop,
+.sheet[open]::backdrop {
+  background: rgb(14 13 11 / 0.42);
+  backdrop-filter: blur(2px);
+}
+@starting-style {
+  .palette[open]::backdrop,
+  .sheet[open]::backdrop { background: rgb(14 13 11 / 0); backdrop-filter: blur(0); }
 }
 
-/* الورقةُ على الجوّال تصعد من الأسفل */
+/* الورقةُ على الجوّال تصعد من الأسفل وتُسحب إليه لتُغلق */
 @media (max-width: 639px) {
-  .sheet[open] {
-    animation: sheet-up var(--dur) var(--ease-out);
+  .sheet { transform: translateY(calc(100% * var(--travel))); }
+  .sheet[open] { transform: translateY(var(--drag, 0px)); }
+  .sheet[open][data-dragging] { transition: none; }
+  @starting-style {
+    .sheet[open] { transform: translateY(calc(100% * var(--travel))); }
   }
 }
-@keyframes sheet-up {
-  from { transform: translateY(24px); opacity: 0; }
+
+/* مقبضُ السحب — يُرى على الجوّال وحده */
+.grabber {
+  touch-action: none;
+}
+.grabber::before {
+  content: "";
+  display: block;
+  width: 2.25rem;
+  height: 0.3rem;
+  margin: 0.5rem auto 0;
+  border-radius: 999px;
+  background: var(--line-input);
+  opacity: 0.55;
+}
+@media (min-width: 640px) {
+  .grabber { display: none; }
 }
 
-/* ── الانتقال بين الصفحات: تلاشٍ قصير للمحتوى وحده، والقشرةُ ثابتة ── */
-::view-transition-old(page),
-::view-transition-new(page) {
-  animation-duration: 180ms;
-  animation-timing-function: var(--ease-out);
+/* القائمةُ المنبثقة: تُرسَم في موضعها الذي يحسبه `Popover` */
+.pop {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+}
+
+/*
+ * ── الكشفُ في مكانه: الارتفاعُ يتحرّك لا يقفز ──
+ * `grid-template-rows` من ‎0fr‎ إلى ‎1fr‎ — يعرف الارتفاعَ الحقيقيّ بلا قياس.
+ */
+.reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--dur-3) var(--ease-standard),
+    opacity var(--dur-2) var(--ease-standard);
+}
+.reveal[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.reveal > * {
+  min-height: 0;
+  overflow: hidden;
+}
+.reveal[data-open="true"][data-settled="true"] > * {
+  overflow: visible;
+}
+
+/*
+ * ── الأزرار: تُضغط، وتنتظر في مكانها، وتقول «تمّ» ──
+ *
+ * `aria-busy` يُخفي نصَّ الزرّ ويُبقي عرضَه، ويرسم دوّارةً في وسطه — كان
+ * النصُّ يتبدّل إلى «يحفظ…» فيقفز الزرُّ وما بجانبه. و`data-done` علامةُ
+ * نجاحٍ قصيرة ثمّ يستقرّ.
+ */
+.btn {
+  position: relative;
+  transition:
+    background-color var(--dur-1) var(--ease-standard),
+    border-color var(--dur-1) var(--ease-standard),
+    color var(--dur-1) var(--ease-standard),
+    box-shadow var(--dur-2) var(--ease-standard),
+    filter var(--dur-1) var(--ease-standard),
+    transform var(--dur-1) var(--ease-standard),
+    opacity var(--dur-2) var(--ease-standard);
+}
+.btn:active:not(:disabled):not([aria-busy="true"]) {
+  transform: scale(0.98);
+  filter: brightness(0.96);
+}
+.btn[aria-busy="true"],
+.btn[data-done="true"] {
+  -webkit-text-fill-color: transparent;
+  pointer-events: none;
+}
+/* المنتظرُ معطَّلٌ كي لا يُضغط ثانيةً — لكنّه ليس «غيرَ متاح»، فلا يبهت */
+.btn[aria-busy="true"]:disabled {
+  opacity: 1;
+}
+.btn[aria-busy="true"] > *,
+.btn[data-done="true"] > * {
+  opacity: 0;
+}
+.btn[aria-busy="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  animation: spin 0.7s linear infinite;
+}
+.btn[data-done="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 1.1rem;
+  height: 1.1rem;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+  animation: pop var(--dur-3) var(--ease-spring) both;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* الإشعارُ يخرج كما دخل */
+.toast {
+  transition:
+    opacity var(--dur-2) var(--ease-exit),
+    transform var(--dur-2) var(--ease-exit);
+}
+.toast[data-leaving="true"] {
+  opacity: 0;
+  transform: translateY(calc(8px * var(--travel))) scale(calc(1 - 0.02 * var(--travel)));
+}
+
+/* الرقمُ الذي تغيّر يومض بلونه لحظة — العينُ تجد ما تغيّر */
+@keyframes changed {
+  from { background-color: color-mix(in oklab, var(--accent) 16%, transparent); }
+}
+.just-changed {
+  animation: changed 900ms var(--ease-standard);
+  border-radius: 4px;
+}
+
+/*
+ * ── لوحُ الفحص ──
+ *
+ * يُفتح فوق القائمة من الحافّة المقابلة للشريط الجانبيّ (اليسار في
+ * العربية)، فتبقى القائمةُ بتمريرها وتصفيتها واختيارها. وعلى الجوّال ورقةٌ
+ * من الأسفل تُسحب لتُغلق. والدخولُ والخروجُ حركتان لا ومضتان.
+ */
+.inspector {
+  --from-x: calc(-100% * var(--travel));
+  transform: translateX(var(--from-x));
+  opacity: 0;
+  transition:
+    transform var(--dur-4) var(--ease-emphasized),
+    opacity var(--dur-3) var(--ease-standard);
+}
+:dir(ltr) .inspector { --from-x: calc(100% * var(--travel)); }
+.inspector[data-state="open"] {
+  transform: translateX(0);
+  opacity: 1;
+}
+.inspector[data-state="closing"] {
+  transition:
+    transform var(--dur-3) var(--ease-exit),
+    opacity var(--dur-3) var(--ease-exit);
+}
+.inspector[data-instant="true"] {
+  transition: opacity var(--dur-2) var(--ease-standard);
+  transform: none;
+}
+@media (max-width: 1023px) {
+  .inspector {
+    --from-x: 0;
+    transform: translateY(calc(100% * var(--travel)));
+  }
+  .inspector[data-state="open"] {
+    transform: translateY(var(--drag, 0px));
+  }
+  .inspector[data-dragging] {
+    transition: none;
+  }
+}
+.inspector-scrim {
+  opacity: 0;
+  transition: opacity var(--dur-3) var(--ease-standard);
+}
+.inspector-scrim[data-state="open"] {
+  opacity: 1;
+}
+
+/* الصفُّ الذي فُتح في لوح الفحص — يبقى معلَّماً في القائمة */
+[data-href][data-inspected="true"] {
+  background: var(--accent-soft);
+}
+[data-href][data-inspected="true"] > td:first-child {
+  box-shadow: inset -3px 0 0 var(--accent);
+}
+
+/*
+ * ── الانتقالُ بين الصفحات: المحتوى وحده، والقشرةُ ثابتة ──
+ *
+ * `root` لا يُلتقَط: الشريطُ الجانبيّ والعلويّ لا يتلاشيان مع كلّ رابط.
+ * ويتحرّك المحتوى (`PageShell` يلفّه بـ`<ViewTransition>`): القديمُ يخفت
+ * سريعاً، والجديدُ يصعد قليلاً ويستقرّ. والطبقةُ لا تحجز النقر — ضغطةٌ في
+ * منتصف الحركة تصل إلى الصفحة.
+ */
+:root {
+  view-transition-name: none;
+}
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(.page-out) {
+  animation: vt-fade-out var(--dur-2) var(--ease-exit) both;
+}
+::view-transition-new(.page-in) {
+  animation: vt-rise-in var(--dur-4) var(--ease-emphasized) both;
+}
+::view-transition-group(.page-in),
+::view-transition-group(.page-out) {
+  animation-duration: var(--dur-4);
+}
+::view-transition-old(.swap) {
+  animation: vt-fade-out var(--dur-2) var(--ease-exit) both;
+}
+::view-transition-new(.swap) {
+  animation: vt-fade-in var(--dur-3) var(--ease-standard) both;
+}
+@keyframes vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+}
+@keyframes vt-rise-in {
+  from { opacity: 0; transform: translateY(calc(8px * var(--travel))); }
 }
 
 /* الصفُّ المختار بلوحة المفاتيح (j/k) */
@@ -542,20 +842,32 @@ html[data-amounts="hidden"] .icon-hidden { display: block; }
   scrollbar-color: var(--frame-line) transparent;
 }
 
+/*
+ * تقليلُ الحركة لا يعني «لا شيء يتغيّر»: تسقط الإزاحةُ والتكبير (`--travel`
+ * صفر)، ويبقى تلاشٍ قصير يقول إنّ شيئاً تبدّل. والحركةُ الدائمة (البريق،
+ * شريطُ التقدّم) تقف.
+ */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  :root {
+    --travel: 0;
+    --dur-3: 120ms;
+    --dur-4: 140ms;
+    --ease-spring: var(--ease-standard);
   }
+  @keyframes rise { from { opacity: 0; } }
+  @keyframes pop { from { opacity: 0; } }
+  @keyframes vt-rise-in { from { opacity: 0; } }
+  .btn:active:not(:disabled) { transform: none; }
   .upload-bar {
+    animation: none;
     width: 100%;
     opacity: 0.4;
   }
   .skeleton {
+    animation: none;
     background: var(--sunken);
   }
+  html { scroll-behavior: auto !important; }
 }
 
 /* ── الطباعة: كشفُ المورّد وحزمةُ المحاسب تُطبَع أو تُحفَظ PDF ── */

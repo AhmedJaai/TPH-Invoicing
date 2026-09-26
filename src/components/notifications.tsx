@@ -116,13 +116,14 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
               <RefreshCw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> حدّث
             </button>
             <button
+              aria-busy={marking}
               type="button"
               disabled={marking || unread === 0}
               onClick={markSeen}
               className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-accent-ink disabled:opacity-50 sm:min-h-8"
             >
               <CheckCheck className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              {marking ? "يحفظ…" : "علّم الكلّ مقروءاً"}
+              علّم الكلّ مقروءاً
             </button>
           </>
         }

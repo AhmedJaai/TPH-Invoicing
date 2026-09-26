@@ -16,6 +16,7 @@ import {
 } from "@/lib/bank/review-queue";
 import { ACT, recordBatch } from "@/lib/ui-terms";
 import { formatDay } from "@/lib/riyadh-time";
+import { txHref } from "@/lib/inspector";
 
 /**
  * طابور المراجعة الموحَّد.
@@ -323,12 +324,13 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
               )}
             </div>
             <button
+              aria-busy={busy}
               type="button"
               className={buttonClass("primary")}
               disabled={busy}
               onClick={confirmAll}
             >
-              {busy ? "يُعاد الحساب…" : recordBatch(Math.min(50, confirmable.length))}
+              {recordBatch(Math.min(50, confirmable.length))}
             </button>
           </div>
 
@@ -537,22 +539,24 @@ function Row({
             */}
             {settleable(i) ? (
               <button
+                aria-busy={busy}
                 type="button"
                 className={buttonClass("primary", "sm")}
                 disabled={busy}
                 onClick={() => onSettle(i.transactionId)}
                 title="تُسجَّل سداداً لهذا المورّد وتُخصم من أقدم فواتيره، وما بقي يبقى بلا فاتورة"
               >
-                {busy ? "يُقيَّد…" : ACT.settleOnAccount}
+                {ACT.settleOnAccount}
               </button>
             ) : (
             <button
+              aria-busy={busy}
               type="button"
               className={buttonClass("primary", "sm")}
               disabled={busy}
               onClick={() => onConfirm(i.transactionId)}
             >
-              {busy ? "يُعاد الحساب…" : ACT.recordAgainstInvoice}
+              {ACT.recordAgainstInvoice}
             </button>
             )}
             <button
@@ -579,7 +583,7 @@ function Row({
           </button>
         )}
 
-        <Link href={`/bank?tx=${i.transactionId}`} className={buttonClass("quiet", "sm")}>
+        <Link href={txHref(i.transactionId)} className={buttonClass("quiet", "sm")}>
           افتحها في البنك ←
         </Link>
       </div>
@@ -650,6 +654,7 @@ function Row({
           )}
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <button
+              aria-busy={busy}
               type="button"
               className={buttonClass("primary", "sm")}
               disabled={busy || !kind || (kind === "SUPPLIER" && !supplierId)}
@@ -664,7 +669,7 @@ function Row({
                 )
               }
             >
-              {busy ? "يُحفظ…" : ACT.saveIdentity}
+              {ACT.saveIdentity}
             </button>
             <span className="text-xs leading-relaxed text-muted">
               ما تؤكّده يصير ذاكرة: يُطبَّق الآن على ما اخترتَه، ويُعرَف به ما يشبهه في الكشوف القادمة بلا سؤال.

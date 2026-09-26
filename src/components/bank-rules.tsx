@@ -94,8 +94,8 @@ export function BankRules({ rows, canEdit }: { rows: BankRuleRow[]; canEdit: boo
               </span>
               {canEdit && (asking === r.id ? (
                 <span className="flex flex-wrap gap-1.5">
-                  <button type="button" disabled={busy} className={buttonClass("danger", "sm")} onClick={() => void remove(r)}>
-                    {busy ? "يحذف…" : "نعم، احذفها"}
+                  <button aria-busy={busy} type="button" disabled={busy} className={buttonClass("danger", "sm")} onClick={() => void remove(r)}>
+                    نعم، احذفها
                   </button>
                   <button type="button" className={buttonClass("quiet", "sm")} onClick={() => setAsking(null)}>إلغاء</button>
                 </span>

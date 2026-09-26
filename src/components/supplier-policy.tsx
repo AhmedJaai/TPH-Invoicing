@@ -119,12 +119,13 @@ export function SupplierPolicy({
       {canEdit && (
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
+            aria-busy={busy}
             type="button"
             onClick={save}
             disabled={busy || !dirty || conflict}
             className={buttonClass("primary", "sm")}
           >
-            {busy ? "يُحفظ…" : "احفظ السياسة"}
+            احفظ السياسة
           </button>
           {message && (
             <span className={`text-xs ${failed ? "text-danger" : "text-ok"}`}>{message}</span>

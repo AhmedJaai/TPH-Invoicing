@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CircleAlert, CircleCheck, FolderSync, X } from "lucide-react";
@@ -375,7 +376,7 @@ export function DriveSync() {
                 <strong className="text-ok">دخل وحده {countNoun(s.autoArchived ?? 0, FILE)}</strong>
                 {(s.needsReview ?? 0) > 0 && (
                   <> · <strong className="text-warn">ينتظر مراجعتك {countNoun(s.needsReview ?? 0, FILE)}</strong>
-                    {" "}— في <a href="/documents?status=NEEDS_REVIEW" className="font-bold text-accent underline underline-offset-4">المستندات</a></>
+                    {" "}— في <Link href="/documents?status=NEEDS_REVIEW" className="font-bold text-accent underline underline-offset-4">المستندات</Link></>
                 )}
               </p>
               {result.reviewReasons && result.reviewReasons.length > 0 && (
@@ -467,12 +468,13 @@ export function DriveSync() {
               </ul>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
+                  aria-busy={renaming}
                   type="button"
                   disabled={renaming || chosen.size === 0}
                   onClick={() => applyRenames([...chosen])}
                   className={buttonClass("secondary", "sm")}
                 >
-                  {renaming ? "يسمّي…" : `سمِّ المختار (${chosen.size})`}
+                  {`سمِّ المختار (${chosen.size})`}
                 </button>
                 {renamed && (
                   <span className={`text-[11px] ${renamed.ok ? "text-ok" : "text-danger"}`} role="status">

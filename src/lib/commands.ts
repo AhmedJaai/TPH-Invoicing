@@ -143,6 +143,15 @@ const ACTIONS: readonly Command[] = [
     keywords: ["محاسب", "تصدير", "اكسل", "حزمه", "export", "accountant", "ضريبه"],
   },
   {
+    id: "add-expense",
+    label: "سجّل مصروفاً دُفع نقداً",
+    hint: "إيجار، راتب، فاتورة خدمة — خارج كشف البنك",
+    group: "ACTION",
+    href: "/money/expenses?add=1",
+    needs: "expense:edit",
+    keywords: ["مصروف", "نقد", "كاش", "ايجار", "راتب", "expense", "cash"],
+  },
+  {
     id: "statements",
     label: "طابِق كشف مورّد",
     hint: "الكشوف",
@@ -213,7 +222,7 @@ export function commandsFor(role: Role): Command[] {
   return [...ACTIONS, ...pages, ...VIEW].filter((c) => {
     if (c.needs && !can(role, c.needs)) return false;
     // فعلٌ يقع في لسانٍ من مساحةٍ مغلقة لا يُعرض وإن ملك الفعلَ نفسه
-    const area = areaNeeds.get(c.href.split("#")[0]);
+    const area = areaNeeds.get(c.href.split(/[?#]/)[0]);
     return !area || can(role, area);
   });
 }

@@ -148,11 +148,12 @@ function LinkRow({
           )}
 
           <button
+            aria-busy={busy}
             onClick={() => void save()}
             disabled={busy || (creating && newName.trim().length < 2)}
             className={buttonClass("primary", "sm")}
           >
-            {busy ? "يحفظ…" : items.length > 1 ? `اربط ${items.length} معاً` : "اربط"}
+            {items.length > 1 ? `اربط ${items.length} معاً` : "اربط"}
           </button>
         </div>
       )}
@@ -286,8 +287,8 @@ function Triage({
 
       <div className="mt-4 flex flex-wrap gap-2">
         {candidate && (
-          <button type="button" onClick={accept} disabled={busy} className={buttonClass("primary", "sm")}>
-            {busy ? "يحفظ…" : `نعم، هو «${candidate.nameAr}»`}
+          <button aria-busy={busy} type="button" onClick={accept} disabled={busy} className={buttonClass("primary", "sm")}>
+            {`نعم، هو «${candidate.nameAr}»`}
           </button>
         )}
         <button type="button" onClick={createOwn} disabled={busy} className={buttonClass(candidate ? "secondary" : "primary", "sm")}>
@@ -448,6 +449,7 @@ function UnlinkButton({ id }: { id: string }) {
   return (
     <span className="flex flex-col items-end">
       <button
+        aria-busy={busy}
         type="button"
         disabled={busy}
         onClick={async () => {
@@ -463,7 +465,7 @@ function UnlinkButton({ id }: { id: string }) {
         }}
         className={buttonClass("quiet", "sm")}
       >
-        {busy ? "يفكّ…" : "فُكّ الربط"}
+        فُكّ الربط
       </button>
       {error && <span role="alert" className="text-[11px] font-bold text-danger">{error}</span>}
     </span>
