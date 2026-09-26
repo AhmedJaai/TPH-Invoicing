@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { suppliers } from "@/db/schema";
 import { Money } from "@/components/money";
 import { ChevronDown, CircleCheck, CircleHelp, ExternalLink, FileText, MessageCircle, TriangleAlert } from "lucide-react";
-import { LinkButton, Monogram, buttonClass } from "./ui";
+import { LinkButton, Monogram, buttonClass, FlowItem } from "./ui";
 import { ConfirmDocument } from "./confirm-document";
 import { ConfirmEligible } from "./confirm-eligible";
 import { NoStatementsButton } from "./no-statements-button";
@@ -72,7 +72,8 @@ export async function UnbackedWorkspace({ canApprove }: { canApprove: boolean })
   return (
     <ul className={LIST}>
       {groups.map((g) => (
-        <li key={g.supplierId ?? "none"} className="px-4 py-3.5 sm:px-5">
+        <FlowItem key={g.supplierId ?? "none"} scope="unbacked" id={g.supplierId ?? "none"}>
+          <li className="px-4 py-3.5 sm:px-5">
           <div className="flex items-center gap-3">
             <Monogram name={g.supplierName} />
             <span className="min-w-0 flex-1">
@@ -157,6 +158,7 @@ export async function UnbackedWorkspace({ canApprove }: { canApprove: boolean })
             </div>
           )}
         </li>
+        </FlowItem>
       ))}
     </ul>
   );
@@ -229,7 +231,8 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
           /* الشرحُ من الدالّة التي قرّرت — فلا يفترق القرارُ عن تفسيره */
           const { gaps } = d.verdict;
           return (
-            <li key={d.id} className="px-4 py-3.5 sm:px-5">
+            <FlowItem key={d.id} scope="inbox" id={d.id}>
+              <li className="px-4 py-3.5 sm:px-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="flex min-w-0 flex-1 items-center gap-3">
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-sunken text-ink-soft">
@@ -299,6 +302,7 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                 )}
               </div>
             </li>
+            </FlowItem>
           );
         })}
       </ul>
@@ -353,7 +357,8 @@ export async function ContractPolicyWorkspace({ canEdit }: { canEdit: boolean })
   return (
     <ul className={LIST}>
       {need.map((r) => (
-        <li key={r.id} className="px-4 py-3.5 sm:px-5">
+        <FlowItem key={r.id} scope="policy" id={r.id}>
+          <li className="px-4 py-3.5 sm:px-5">
           <div className="flex items-center gap-3">
             <Monogram name={r.nameAr} />
             <span className="min-w-0 flex-1">
@@ -386,6 +391,7 @@ export async function ContractPolicyWorkspace({ canEdit }: { canEdit: boolean })
             )}
           </div>
         </li>
+        </FlowItem>
       ))}
     </ul>
   );
@@ -403,7 +409,8 @@ export async function StatementRequestWorkspace({ canEdit = false }: { canEdit?:
   return (
     <ul className={LIST}>
       {rows.map((m) => (
-        <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 sm:px-5">
+        <FlowItem key={m.id} scope="stmt" id={m.id}>
+          <li className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 sm:px-5">
           <Monogram name={m.nameAr} />
           <span className="min-w-0 flex-1">
             <Link href={`/suppliers/${m.slug}`} className="block truncate text-[13px] font-bold hover:text-accent">
@@ -428,6 +435,7 @@ export async function StatementRequestWorkspace({ canEdit = false }: { canEdit?:
             {canEdit && <NoStatementsButton supplierId={m.id} />}
           </span>
         </li>
+        </FlowItem>
       ))}
     </ul>
   );

@@ -344,7 +344,11 @@ export function Meter({
       aria-valuenow={value}
       className="h-1.5 w-full overflow-hidden rounded-full bg-sunken"
     >
-      <div className={`h-full rounded-full ${TONE_DOT[tone]} transition-[width] duration-500`} style={{ width: `${pct}%` }} />
+      {/* يتحرّك بالتحويل لا بالعرض — لا يُعاد تخطيطُ الصفحة مع كلّ إطار */}
+      <div
+        className={`h-full w-full rounded-full ${TONE_DOT[tone]} origin-right transition-transform duration-(--dur-4) ease-(--ease-standard) ltr:origin-left`}
+        style={{ transform: `scaleX(${pct / 100})` }}
+      />
     </div>
   );
 }
@@ -663,6 +667,29 @@ export function LinkTabs({
         </Link>
       ))}
     </nav>
+  );
+}
+
+/* ─────────────────────────── القوائمُ التي تُحسم ─────────────────────────── */
+
+/**
+ * بندٌ في قائمةٍ تُحسم بنوداً — يخرج بحركةٍ حين يُحسم، وما تحته ينزلق إلى
+ * مكانه ولا يقفز. (`<ViewTransition>`: الحذفُ بعد `router.refresh()` انتقالٌ
+ * فتتحرّك فيه البنودُ المسمّاة.) و`scope` يميّز القائمة: المعرّفُ نفسُه قد
+ * يقع في قائمتين في صفحةٍ واحدة، والاسمُ المكرَّر يُسقط الحركة كلَّها.
+ */
+export function FlowItem({ scope, id, children }: { scope: string; id: string; children: React.ReactNode }) {
+  return (
+    <ViewTransition
+      name={`${scope}-${id.replace(/[^A-Za-z0-9_-]/g, "_")}`}
+      enter="flow-in"
+      exit="flow-out"
+      update="flow-move"
+      share="flow-move"
+      default="none"
+    >
+      {children}
+    </ViewTransition>
   );
 }
 

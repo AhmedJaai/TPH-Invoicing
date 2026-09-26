@@ -256,7 +256,8 @@ export function ReconcileQueue({
         </button>
       </div>
 
-      <article className="overflow-hidden rounded-2xl border border-line bg-raised shadow-lifted">
+      {/* المجموعةُ التالية تدخل بحركة — تُرى أنّ ما قبلها حُسم لا أنّ الصفحةَ تبدّلت */}
+      <article key={group.key} className="animate-rise overflow-hidden rounded-2xl border border-line bg-raised shadow-lifted">
         {/* ── الرأس: من، وكم، ولماذا تُسأل ── */}
         <header className="flex flex-wrap items-start gap-3 border-b border-line-soft px-4 py-4 sm:px-5">
           <Monogram name={group.title} className="h-10 w-10 text-base" />

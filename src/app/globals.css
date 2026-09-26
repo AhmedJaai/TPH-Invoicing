@@ -860,6 +860,21 @@ details[open]::details-content {
   display: none;
 }
 
+/* بندٌ حُسم يخرج، وما تحته ينزلق إلى مكانه */
+::view-transition-group(.flow-move) {
+  animation-duration: var(--dur-3);
+  animation-timing-function: var(--ease-standard);
+}
+::view-transition-old(.flow-out) {
+  animation: vt-collapse-out var(--dur-2) var(--ease-exit) both;
+}
+::view-transition-new(.flow-in) {
+  animation: vt-rise-in var(--dur-3) var(--ease-emphasized) both;
+}
+@keyframes vt-collapse-out {
+  to { opacity: 0; transform: scale(calc(1 - 0.03 * var(--travel))); }
+}
+
 @keyframes vt-fade-out {
   to { opacity: 0; }
 }

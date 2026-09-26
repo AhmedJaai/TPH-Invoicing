@@ -6,7 +6,7 @@ import {
   ScanSearch, ShieldAlert, Sparkles, TrendingUp, TriangleAlert, Undo2, Unlink, Zap,
 } from "lucide-react";
 import { Money, Prose } from "./money";
-import { Badge, LinkButton, LinkTabs, Stepper, buttonClass, type Tone } from "./ui";
+import { Badge, FlowItem, LinkButton, LinkTabs, Stepper, buttonClass, type Tone } from "./ui";
 import {
   AREA_LABEL, IMPACT_LABEL, SEVERITY_LABEL, countBySeverity,
   type AttentionEvidence, type AttentionItem, type AttentionSeverity, type ImpactKind,
@@ -234,7 +234,9 @@ export function TriageList({
             </h2>
             <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
               {g.items.map((i) => (
-                <TriageRow key={i.id} item={i} lens={lens} active={i.id === selectedId} then={neighbours(items, i.id).next?.id} />
+                <FlowItem key={i.id} scope="triage" id={i.id}>
+                  <TriageRow item={i} lens={lens} active={i.id === selectedId} then={neighbours(items, i.id).next?.id} />
+                </FlowItem>
               ))}
             </ul>
           </section>
