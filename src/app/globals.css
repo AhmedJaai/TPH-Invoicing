@@ -824,6 +824,24 @@ details[open]::details-content {
   }
 }
 
+/*
+ * فعلُ الصفّ يظهر للصفّ الذي تحت الفأرة أو فيه التركيز — وما فُتح منه
+ * (لوحُ «من أين دُفعت؟») يبقى ظاهراً. وللّمس ظاهرٌ دائماً.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .row-reveal > * {
+    opacity: 0;
+    transition: opacity var(--dur-2) var(--ease-standard);
+  }
+  tr:hover > .row-reveal > *,
+  tr:focus-within > .row-reveal > *,
+  tr[data-inspected="true"] > .row-reveal > *,
+  .row-reveal > [data-active],
+  .row-reveal > *:has(button[aria-expanded="true"], fieldset, [role="alert"]) {
+    opacity: 1;
+  }
+}
+
 /* الإشعارُ يخرج كما دخل */
 .toast {
   transition:

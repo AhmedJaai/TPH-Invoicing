@@ -175,6 +175,8 @@ export function MarkInvoicePaid({
   return (
     <div
       onClick={stop}
+      /* ما دام السؤالُ مفتوحاً يبقى ظاهراً ولو غادرت الفأرةُ الصفّ (`.row-reveal`) */
+      data-active={state !== "idle" || undefined}
       className={panel ? "space-y-3" : "flex max-w-full flex-wrap items-center justify-end gap-1.5"}
     >
       {state === "idle" && (

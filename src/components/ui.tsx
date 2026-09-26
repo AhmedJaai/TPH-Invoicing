@@ -733,6 +733,12 @@ export interface Column<T> {
    * (لوحُ إقرارٍ يُفتح داخلها) لا يُبتلَع بـ`overflow: hidden`.
    */
   wrap?: boolean;
+  /**
+   * فعلٌ يتكرّر في كلّ صفّ — يظهر للصفّ الذي تحت الفأرة أو فيه التركيز وحده
+   * على الحاسوب (Linear)، فلا يصير الجدولُ عموداً من أزرارٍ متطابقة. وعلى
+   * الجوّال وما لا فأرةَ له ظاهرٌ دائماً — لا شيء يُخبَّأ عن اللمس.
+   */
+  reveal?: boolean;
 }
 
 /** فوق كم صفّاً يثبت رأسُ الجدول ويُبحَث فيه. */
@@ -825,7 +831,7 @@ export function DataTable<T>({
                       key={c.key}
                       className={`border-b border-line-soft px-3.5 py-3 align-middle group-last:border-b-0 ${
                         c.numeric ? "nums-col" : c.align === "end" ? "text-end" : "text-start"
-                      } ${c.secondary ? "hidden @4xl:table-cell" : ""}`}
+                      } ${c.secondary ? "hidden @4xl:table-cell" : ""} ${c.reveal ? "row-reveal" : ""}`}
                     >
                       {i === 0 && href && (
                         <Link href={href} scroll={false} aria-label="افتح التفصيل" tabIndex={-1} className="absolute inset-0" />

@@ -370,6 +370,7 @@ export default async function InvoicesPage({
                   key: "pay",
                   header: "",
                   wrap: true,
+                  reveal: true,
                   cell: (r) => {
                     const rem = r.total - Number(r.allocated);
                     if (rem <= SETTLED_TOLERANCE_MINOR) return null;
