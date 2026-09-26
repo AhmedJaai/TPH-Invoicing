@@ -439,12 +439,21 @@ export async function allocate(
 
   let count = 0;
   for (const a of plan.allocations) {
-    const inserted = await tx
+    /*
+      الدفعةُ نفسُها على الفاتورة نفسها مرّةً ثانية **تُضاف إلى تخصيصها** — لا تُسقَط.
+      كان `onConflictDoNothing` يرمي الزيادة صامتاً ويُعيدها «خُصّصت»: رونة ٤٦٢ خُصّص
+      منها ٤٣٧ على فاتورتها، فلمّا صُحّح إجماليُّها إلى ٤٦٢ لم يُضَف الـ٢٥ وبقي
+      «متّزناً على الورق». والسقفُ في القاعدة (مؤثِّر ٠٠٧) يحرس التحديث كالإدراج.
+    */
+    const written = await tx
       .insert(paymentAllocations)
       .values({ paymentId, invoiceId: a.invoiceId, amountMinor: a.amountMinor })
-      .onConflictDoNothing()
+      .onConflictDoUpdate({
+        target: [paymentAllocations.paymentId, paymentAllocations.invoiceId],
+        set: { amountMinor: sql`${paymentAllocations.amountMinor} + excluded.amount_minor` },
+      })
       .returning({ id: paymentAllocations.id });
-    if (inserted.length > 0) count++;
+    if (written.length > 0) count++;
   }
 
   await refreshPaymentStatus(tx, paymentId);

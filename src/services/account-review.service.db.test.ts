@@ -189,3 +189,16 @@ describe("سدادٌ بيدٍ خرج من حوالةٍ جامعة لم تُنس�
       expect(await caught(mergeIntoCredit(tx, hand, await someone(tx)))).toBeInstanceOf(EchoMergeRefused);
     }));
 });
+
+describe("التخصيصُ الثاني للدفعة نفسها على الفاتورة نفسها يُضاف — رونة", () => {
+  it("٤٣٧ ثمّ ٢٥ على الفاتورة نفسها = ٤٦٢، لا ٤٣٧ مع «خُصّصت» كاذبة", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const inv = await makeInvoice(tx, s, 462_00, "2026-09-06");
+      const pay = await createPayment(tx, { supplierId: s, paidAt: day("2026-09-06"), amountMinor: 462_00, method: "BANK_TRANSFER", acknowledgeTwin: true });
+      await allocate(tx, pay, 462_00, [{ invoiceId: inv, amountMinor: 437_00 }]);
+      const out = await allocate(tx, pay, 462_00, [{ invoiceId: inv, amountMinor: 25_00 }]);
+      expect(out.allocatedMinor).toBe(25_00);
+      expect(await allocationsOf(tx, pay)).toEqual([{ invoiceId: inv, amountMinor: 462_00 }]);
+    }));
+});
