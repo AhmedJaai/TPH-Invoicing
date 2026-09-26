@@ -6,7 +6,7 @@ import {
   ScanSearch, ShieldAlert, Sparkles, TrendingUp, TriangleAlert, Undo2, Unlink, Zap,
 } from "lucide-react";
 import { Money, Prose } from "./money";
-import { Badge, FlowItem, LinkButton, LinkTabs, Stepper, buttonClass, type Tone } from "./ui";
+import { Badge, DoneMark, FlowItem, LinkButton, LinkTabs, Stepper, buttonClass, type Tone } from "./ui";
 import {
   AREA_LABEL, IMPACT_LABEL, SEVERITY_LABEL, countBySeverity,
   type AttentionEvidence, type AttentionItem, type AttentionSeverity, type ImpactKind,
@@ -610,8 +610,8 @@ export function AllClear({ start, canPay = false }: { start: StartState; canPay?
   return (
     <div className="space-y-5">
       <section className="animate-rise rounded-2xl border border-ok/25 bg-ok-bg px-6 py-10 text-center sm:py-14">
-        <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-raised text-ok shadow-raised">
-          <CircleCheck className="h-7 w-7" strokeWidth={1.9} aria-hidden />
+        <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-raised text-ok shadow-raised">
+          <DoneMark className="h-10 w-10" />
         </span>
         <h2 className="mt-4 text-lg font-bold">لا شيء ينتظر قرارك.</h2>
         <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-ink-soft">

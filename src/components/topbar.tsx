@@ -32,7 +32,7 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
     .find((l) => pathname === l.href || pathname.startsWith(`${l.href}/`));
 
   return (
-    <header className="no-print sticky top-0 z-20 border-b border-line bg-surface/85 backdrop-blur-md">
+    <header className="topbar no-print sticky top-0 z-20 border-b border-line bg-surface/90 backdrop-blur-md">
       <div className="flex h-14 items-center gap-2 px-4 sm:px-6 lg:h-[60px] lg:px-8">
         {/* الجوّال: العلامة واسمُ المساحة */}
         <Link href={homeHref(role)} className="flex min-w-0 items-center gap-2 lg:hidden" aria-label="البداية">

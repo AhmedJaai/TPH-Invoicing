@@ -119,7 +119,8 @@ export default async function InventoryItemsPage({
       key: "recipes", header: "في الوصفات",
       cell: (r) => (
         r.inRecipes === 0
-          ? <Badge tone="warn" dot>لا وصفةَ تصل إليه</Badge>
+          /* الشارةُ بابٌ إلى علاجها — الوصفات، لا خبرٌ يقف */
+          ? <Link href="/inventory/recipes" className="relative z-10 inline-flex"><Badge tone="warn" dot>لا وصفةَ تصل إليه — اكتبها</Badge></Link>
           : <span className="text-ink-soft">{countNoun(r.inRecipes, RECIPE)}</span>
       ),
     },

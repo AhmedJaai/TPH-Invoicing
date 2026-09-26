@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
@@ -196,6 +197,12 @@ export function FlowStep({
                   label="الاستهلاك المتوقَّع"
                   value={row.consumptionText}
                   source={row.consumptionText === null ? "لا وصفةَ تصل إليه" : "من المبيعات بوصفاتها"}
+                  action={row.consumptionText === null ? (
+                    /* المجهولُ هنا وصفةٌ غائبة — وموضعُ كتابتها الوصفات، بلا بحثٍ عنه */
+                    <Link href="/inventory/recipes" className={buttonClass("secondary", "sm")}>
+                      اكتب وصفةً تستعمله
+                    </Link>
+                  ) : undefined}
                   extra={row.wasteText !== null ? <>− هدرٌ مسجَّل <span className="nums">{row.wasteText}</span></> : undefined}
                 />
                 <Term
@@ -203,7 +210,9 @@ export function FlowStep({
                   label="المتوقَّع"
                   value={row.expected}
                   strong
-                  source={row.expected === null ? "حدٌّ في المعادلة مجهول" : "يُقابَل بما تعدّه"}
+                  source={row.expected === null
+                    ? `مجهولٌ لأنّ ${[row.openingText === null && "الرصيد", row.purchasesText === null && "المشتريات", row.consumptionText === null && "الاستهلاك"].filter(Boolean).join(" و") || "حدّاً فيه"} غير معروف — أكمِله في مربّعه`
+                    : "يُقابَل بما تعدّه"}
                 />
               </dl>
 

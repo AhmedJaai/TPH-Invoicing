@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ChevronDown, CircleAlert, CircleCheck, Lightbulb, SkipForward, Store, Wallet } from "lucide-react";
+import { ChevronDown, CircleAlert, Lightbulb, SkipForward, Store, Wallet } from "lucide-react";
 import { Money } from "./money";
-import { Badge, Meter, Monogram, buttonClass, type Tone } from "./ui";
+import { Badge, DoneMark, Meter, Monogram, buttonClass, type Tone } from "./ui";
 import { toast } from "./ui-client";
 import { countNoun, TRANSACTION } from "@/lib/arabic";
 import { postJson } from "@/lib/http-client";
@@ -143,7 +143,7 @@ export function ReconcileQueue({
   if (!group) {
     return (
       <div className="flex items-center gap-3 rounded-xl border border-ok/25 bg-ok-bg px-5 py-5">
-        <CircleCheck className="h-6 w-6 shrink-0 text-ok" strokeWidth={2} aria-hidden />
+        <DoneMark className="h-8 w-8 shrink-0 text-ok" />
         <div>
           <p className="text-sm font-bold text-ok">انتهت المجموعات.</p>
           <p className="mt-0.5 text-xs text-ink-soft">

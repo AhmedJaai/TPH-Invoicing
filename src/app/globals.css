@@ -781,6 +781,49 @@ details[open]::details-content {
   from { opacity: 0; transform: translateY(calc(2px * var(--travel))) scale(calc(1 - 0.03 * var(--travel))); }
 }
 
+/* علامةُ «انتهى»: الدائرةُ ثمّ الصحّ، رسماً لا ظهوراً */
+.done-mark-ring {
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  animation: draw 420ms var(--ease-emphasized) 80ms forwards;
+}
+.done-mark-tick {
+  stroke-dasharray: 36;
+  stroke-dashoffset: 36;
+  animation: draw 280ms var(--ease-emphasized) 380ms forwards;
+}
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/*
+ * ── عنوانُ الصفحة يتراجع مع التمرير ──
+ * كالعنوان الكبير في iOS: يصغر ويخفت حين تنزل، والشريطُ العلويّ (وفيه موضعُك)
+ * يكتسب خطّاً وظلاً — فيُعرف أنّ المحتوى تحته. بالتمرير نفسه لا بسكربت، ولمن
+ * لا يدعمه يبقى كما كان.
+ */
+@supports (animation-timeline: scroll()) {
+  .page-title {
+    transform-origin: right top;
+    animation: title-recede linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 140px;
+  }
+  :dir(ltr) .page-title { transform-origin: left top; }
+  @keyframes title-recede {
+    to { opacity: 0.35; transform: translateY(calc(6px * var(--travel))) scale(calc(1 - 0.06 * var(--travel))); }
+  }
+  .topbar {
+    animation: topbar-lift linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 64px;
+  }
+  @keyframes topbar-lift {
+    from { box-shadow: 0 0 0 transparent; border-bottom-color: transparent; }
+    to { box-shadow: 0 10px 24px -20px rgb(40 30 10 / 0.35); border-bottom-color: var(--line); }
+  }
+}
+
 /* الإشعارُ يخرج كما دخل */
 .toast {
   transition:
@@ -970,6 +1013,7 @@ details[open]::details-content {
     animation: none;
     background: var(--sunken);
   }
+  .done-mark-ring, .done-mark-tick { animation: none; stroke-dashoffset: 0; }
   html { scroll-behavior: auto !important; }
 }
 

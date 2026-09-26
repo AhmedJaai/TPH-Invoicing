@@ -143,7 +143,7 @@ export function PageShell({
       <title>{`${title} · ذا بوبليك هاوس`}</title>
       <header>
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
-          <div className="min-w-0">
+          <div className="page-title min-w-0">
             {eyebrow && <p className="mb-1.5 text-xs font-medium text-muted">{eyebrow}</p>}
             <h1
               dir="auto"

@@ -313,7 +313,12 @@ export async function SupplierView({
         <span className="flex flex-wrap items-center gap-2">
           <Monogram name={s.nameAr} className="h-6 w-6 text-[11px]" />
           <span>ملفّ المورّد</span>
-          {!s.issuesInvoices && <Badge tone="warn">لا يصدر فواتير</Badge>}
+          {/* الشارةُ تفتح سياستَه — هناك تُغيَّر إن تغيّر حالُه */}
+          {!s.issuesInvoices && (
+            <Link href={`/suppliers/${s.slug}?tab=profile`} scroll={false} className="rounded-full hover:opacity-80">
+              <Badge tone="warn">لا يصدر فواتير</Badge>
+            </Link>
+          )}
           {s.paperInvoices && <Badge>فواتيرُه ورقيّة</Badge>}
           {!s.isActive && <Badge tone="danger">معطَّل</Badge>}
         </span>
@@ -337,9 +342,18 @@ export async function SupplierView({
                 {balance > 0 ? "عليك له" : creditLeft > 0 ? "رصيدٌ لك عنده" : "الحساب متّزن"}
               </p>
               {ageing.oldestOwedDays !== null && (
-                <Badge tone={ageTone(ageing.oldestOwedDays) === "muted" ? undefined : ageTone(ageing.oldestOwedDays)} dot>
-                  أقدمُ دَينٍ منذ {countNoun(ageing.oldestOwedDays, DAY)}
-                </Badge>
+                /* الدَّينُ القديم يُسدَّد من دفعة الشهر — والشارةُ بابُها لمن يعتمد السداد وحده */
+                can(user.role, "payment:approve") ? (
+                  <Link href="/payments" className="rounded-full hover:opacity-80">
+                    <Badge tone={ageTone(ageing.oldestOwedDays) === "muted" ? undefined : ageTone(ageing.oldestOwedDays)} dot>
+                      أقدمُ دَينٍ منذ {countNoun(ageing.oldestOwedDays, DAY)} — جهّز سدادَه
+                    </Badge>
+                  </Link>
+                ) : (
+                  <Badge tone={ageTone(ageing.oldestOwedDays) === "muted" ? undefined : ageTone(ageing.oldestOwedDays)} dot>
+                    أقدمُ دَينٍ منذ {countNoun(ageing.oldestOwedDays, DAY)}
+                  </Badge>
+                )
               )}
             </div>
             <p className={`mt-4 text-[2.25rem] font-bold leading-none tracking-tight sm:text-[2.6rem] ${balance > 0 ? "text-warn" : ""}`}>

@@ -458,6 +458,21 @@ export function Monogram({ name, className = "h-8 w-8 text-[13px]" }: { name: st
 /* ─────────────────────────── الحالات ─────────────────────────── */
 
 /**
+ * علامةُ «انتهى» تُرسَم رسماً — دائرةٌ ثمّ صحّ، في ٥٠٠ مللي ثانية.
+ *
+ * لحظةُ فراغ الطابور أو إقفال الشهر إنجاز، وتستحقّ أن تُرى — بلا ألعابٍ
+ * نارية ولا ارتداد. وتُرسم مرّةً عند الظهور، ولمن طلب تقليل الحركة تظهر كاملة.
+ */
+export function DoneMark({ className = "h-14 w-14" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 52 52" className={`done-mark ${className}`} role="img" aria-label="تمّ">
+      <circle cx="26" cy="26" r="24" fill="none" stroke="currentColor" strokeWidth="2.5" className="done-mark-ring" />
+      <path d="M15 27 l7.5 7.5 L37 19" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="done-mark-tick" />
+    </svg>
+  );
+}
+
+/**
  * الفراغ يقول ما الذي يملؤه — لماذا هو فارغ وما الخطوة التي تملؤه.
  */
 export function EmptyState({
