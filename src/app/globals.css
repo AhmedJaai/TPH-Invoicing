@@ -6,11 +6,12 @@
  * مكتبٌ ماليٌّ لمقهى قهوةٍ مختصّة: دافئ، هادئ، واثق، دقيق.
  *
  * - أرضيّةٌ ورقيّةٌ دافئة، وبطاقاتٌ بيضاء فوقها، وحبرٌ قريبٌ من الأسود.
- * - لونُ علامةٍ واحد: «الهيل» — أخضرُ مزرقّ عميق. للفعل الرئيسيّ والموضع
- *   الحاليّ والتركيز، لا للزينة.
+ * - لونُ علامةٍ واحد: «الزيتون» — زيتيٌّ عسكريٌّ داكن `#5A5444`، لونُ المقهى
+ *   (أحمد، ٢٦ سبتمبر ٢٠٢٦). للفعل الرئيسيّ والموضع الحاليّ والتركيز، لا للزينة.
  * - ألوانُ الحال (سليم · تنبيه · خطر · معلومة) لا تأتي وحدها أبداً:
  *   معها أيقونةٌ أو كلمة، فلا يُحمَّل اللونُ معنىً لا يراه كلُّ أحد.
- * - إطارُ التطبيق (الشريط الجانبيّ) داكنٌ بلون العلامة في الوضعين.
+ * - إطارُ التطبيق (الشريط الجانبيّ) بلون العلامة نفسِه، وإبرازُه كريميّ؛
+ *   وفي الداكن زيتونيٌّ أعمق وإبرازُه كاكيّ.
  *
  * كلُّ لونٍ هنا رمزٌ يُقرأ في كلّ الشاشات؛ تغييرُ رمزٍ يغيّر التطبيق كلَّه.
  * والتباين مقيسٌ لا مقدَّر: النصّ ≥ ‎4.5:1‎ على كلّ أرضيّةٍ يقع عليها،
@@ -36,11 +37,11 @@
   --line-input: #8d877b;       /* ‎3.57:1‎ على الأبيض — حدُّ الحقل يُرى */
   --line-strong: #1b1a17;
 
-  --accent: #0f6b58;           /* الهيل — ‎6.43:1‎ على الأبيض */
-  --accent-strong: #0b5747;
+  --accent: #5a5444;           /* الزيتون — ‎7.54:1‎ على الأبيض و‎6.86:1‎ على الأرضيّة */
+  --accent-strong: #48432f;
   --accent-ink: #ffffff;
-  --accent-soft: #e4f2ed;
-  --accent-line: #b7dccf;
+  --accent-soft: #ebe8dd;
+  --accent-line: #cdc7b3;
 
   --inverse-surface: #1b1a17;
   --inverse-ink: #f6f4ef;
@@ -60,12 +61,12 @@
   --sand-bg: #f4ecda;
 
   /* الإطار: شريطٌ جانبيّ بلون العلامة */
-  --frame: #10231e;
-  --frame-raised: #183029;
-  --frame-ink: #eef5f2;
-  --frame-muted: #9fb8b0;      /* ‎7.2:1‎ على الإطار */
-  --frame-line: #23413a;
-  --frame-accent: #6fdcbc;
+  --frame: #5a5444;            /* الإطارُ بلون العلامة */
+  --frame-raised: #4b4637;
+  --frame-ink: #fbf9f3;        /* ‎7.16:1‎ على الإطار */
+  --frame-muted: #ddd7c6;      /* ‎5.24:1‎ على الإطار */
+  --frame-line: #6e6856;
+  --frame-accent: #efe8d1;     /* كريميّ — ونصُّ الإطار عليه ‎6.15:1‎ */
 
   /* الارتفاع: ظلٌّ دافئ لا رماديّ */
   --shadow-xs: 0 1px 0 rgb(40 30 10 / 0.04);
@@ -104,11 +105,11 @@
     --line-input: #6b655a;
     --line-strong: #efeae0;
 
-    --accent: #4fc9a8;
-    --accent-strong: #6fdcbc;
-    --accent-ink: #062a21;
-    --accent-soft: #0f2a23;
-    --accent-line: #1f5446;
+    --accent: #cbc09a;
+    --accent-strong: #dcd2ad;
+    --accent-ink: #211e17;
+    --accent-soft: #29261d;
+    --accent-line: #4d4834;
 
     --inverse-surface: #efeae0;
     --inverse-ink: #0e0d0b;
@@ -126,12 +127,12 @@
     --sand: #e3c27e;
     --sand-bg: #2a2212;
 
-    --frame: #0a0908;
-    --frame-raised: #171512;
+    --frame: #1f1d17;
+    --frame-raised: #2c2921;
     --frame-ink: #efeae0;
-    --frame-muted: #a8a194;
-    --frame-line: #221f1b;
-    --frame-accent: #4fc9a8;
+    --frame-muted: #b3ac99;
+    --frame-line: #39352b;
+    --frame-accent: #d4c9a3;
 
     --shadow-xs: 0 0 0 1px rgb(255 255 255 / 0.02);
     --shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.03);
@@ -157,11 +158,11 @@
   --line-input: #6b655a;
   --line-strong: #efeae0;
 
-  --accent: #4fc9a8;
-  --accent-strong: #6fdcbc;
-  --accent-ink: #062a21;
-  --accent-soft: #0f2a23;
-  --accent-line: #1f5446;
+  --accent: #cbc09a;
+  --accent-strong: #dcd2ad;
+  --accent-ink: #211e17;
+  --accent-soft: #29261d;
+  --accent-line: #4d4834;
 
   --inverse-surface: #efeae0;
   --inverse-ink: #0e0d0b;
@@ -179,12 +180,12 @@
   --sand: #e3c27e;
   --sand-bg: #2a2212;
 
-  --frame: #0a0908;
-  --frame-raised: #171512;
+  --frame: #1f1d17;
+  --frame-raised: #2c2921;
   --frame-ink: #efeae0;
-  --frame-muted: #a8a194;
-  --frame-line: #221f1b;
-  --frame-accent: #4fc9a8;
+  --frame-muted: #b3ac99;
+  --frame-line: #39352b;
+  --frame-accent: #d4c9a3;
 
   --shadow-xs: 0 0 0 1px rgb(255 255 255 / 0.02);
   --shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.03);

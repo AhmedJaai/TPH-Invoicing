@@ -44,7 +44,7 @@ export default async function LoginPage({
       {/* ── العلامة: إطارٌ داكن يقول ما هذا النظام قبل أن يُطلب الدخول ── */}
       <section className="relative hidden overflow-hidden bg-frame p-12 text-frame-ink lg:flex lg:flex-col">
         <div className="flex items-center gap-3">
-          <BrandMark className="h-11 w-11" />
+          <BrandMark className="h-10 w-auto text-frame-accent" />
           <div>
             <p className="text-lg font-bold leading-tight">ذا بوبليك هاوس</p>
             <p className="text-xs text-frame-muted">المال والتشغيل</p>
@@ -73,7 +73,7 @@ export default async function LoginPage({
       <section className="flex flex-col justify-center px-6 py-16 sm:px-12">
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <BrandMark className="h-10 w-10" />
+            <BrandMark className="h-9 w-auto text-accent" />
             <p className="text-base font-bold">ذا بوبليك هاوس</p>
           </div>
           <h1 className="text-[1.9rem] font-extrabold leading-tight tracking-tight">أهلاً بعودتك</h1>

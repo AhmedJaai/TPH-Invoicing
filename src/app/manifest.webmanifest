@@ -10,7 +10,7 @@
   "dir": "rtl",
   "lang": "ar",
   "background_color": "#f6f4ef",
-  "theme_color": "#10231e",
+  "theme_color": "#5a5444",
   "categories": ["finance", "business", "productivity"],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

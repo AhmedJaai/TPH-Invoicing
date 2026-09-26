@@ -79,8 +79,9 @@ isn't available, remove it or build it.
 
 Visual quality means hierarchy, typography, spacing, density, and consistency.
 **The design system is v2 (Sep 2026)** — a premium specialty-café finance desk:
-warm paper canvas, white cards, one confident accent («الهيل», teal-green),
-a dark brand frame (sidebar), semantic colours always paired with an icon or
+warm paper canvas, white cards, one confident accent — the café's army dark olive «الزيتون» `#5A5444`,
+a brand frame (sidebar) in that olive with cream highlights and the café's
+own logomark (`BrandMark`), semantic colours always paired with an icon or
 word, Thmanyah Sans for UI and Serif Display for the Home greeting, lucide
 icons, 150–250 ms ease-out motion that respects `prefers-reduced-motion`.
 Tokens live in `globals.css`, primitives in `ui.tsx` / `ui-client.tsx`; a

@@ -35,7 +35,7 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
       <div className="flex h-14 items-center gap-2 px-4 sm:px-6 lg:h-[60px] lg:px-8">
         {/* الجوّال: العلامة واسمُ المساحة */}
         <Link href={homeHref(role)} className="flex min-w-0 items-center gap-2 lg:hidden" aria-label="البداية">
-          <BrandMark className="h-8 w-8" />
+          <BrandMark className="h-7 w-auto text-accent" />
         </Link>
         <p className="min-w-0 flex-1 truncate text-[15px] font-bold lg:hidden">{area?.label ?? account?.label ?? "ذا بوبليك هاوس"}</p>
 

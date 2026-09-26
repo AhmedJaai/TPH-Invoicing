@@ -23,7 +23,7 @@ export default function GlobalError({
           <button
             type="button"
             onClick={() => retry()}
-            style={{ marginTop: "1rem", padding: "0.6rem 1.2rem", borderRadius: "0.5rem", border: 0, background: "#0f6b58", color: "#fff", fontWeight: 700 }}
+            style={{ marginTop: "1rem", padding: "0.6rem 1.2rem", borderRadius: "0.5rem", border: 0, background: "#5a5444", color: "#fff", fontWeight: 700 }}
           >
             أعد المحاولة
           </button>
