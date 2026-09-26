@@ -33,6 +33,7 @@ export function InvoiceFix({
   reasons,
   initial,
   canEdit,
+  startOpen = false,
 }: {
   invoiceId: string;
   reasons: InvoiceReason[];
@@ -45,9 +46,11 @@ export function InvoiceFix({
     total: string;
   };
   canEdit: boolean;
+  /** يُفتح من رابطٍ جاء لتصحيحه (`?act=fix`) — لا يُطلب ضغطةٌ ثانية. */
+  startOpen?: boolean;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen && canEdit);
   const [form, setForm] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);

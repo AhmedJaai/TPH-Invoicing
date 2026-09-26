@@ -15,6 +15,7 @@ export const maxDuration = 60;
 const Body = z.object({
   preview: z.boolean().default(true),
   echoKeys: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}:[A-Za-z0-9_-]{1,64}$/)).max(100).default([]),
+  linkKeys: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}:[A-Za-z0-9_-]{1,64}$/)).max(100).default([]),
 });
 
 export async function POST(request: Request) {
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
     if (parsed.data.preview) {
       return NextResponse.json({ ok: true, preview: await previewAccountReview(user.id) });
     }
-    return NextResponse.json({ ok: true, result: await runAccountReview(user.id, parsed.data.echoKeys) });
+    return NextResponse.json({ ok: true, result: await runAccountReview(user.id, parsed.data.echoKeys, parsed.data.linkKeys) });
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { bankImports, bankTransactions, paymentAllocations, payments, users } from "@/db/schema";
 import { allocate, createPayment } from "./payment.service";
-import { EchoMergeRefused, loadPaymentEchoes, mergePaymentEcho } from "./account-review.service";
+import { EchoMergeRefused, HandLinkRefused, linkHandPayment, loadHandPaymentLinks, loadPaymentEchoes, mergePaymentEcho } from "./account-review.service";
 import { drawBankCredit, undrawBankCredit } from "./supplier-credit.service";
 import { caught, day, makeInvoice, makeSupplier, withRollback } from "@/test/db";
 import type { Tx } from "./types";
@@ -104,5 +104,61 @@ describe("«سجّل أنّها سُدّدت» يأخذ حوالةَ الكشف 
       expect(out).toEqual({ drawn: [], restMinor: 100_00 });
       const n = await tx.execute<{ n: number }>(sql`select count(*)::int as n from payment_allocations where invoice_id = ${inv}`);
       expect(Number(n.rows[0].n)).toBe(0);
+    }));
+});
+
+/** حوالةٌ في الطابور: عُرف مورّدُها ولم تُربط بدفعة. */
+async function waitingTransfer(tx: Tx, supplierId: string, amountMinor: number, iso: string): Promise<string> {
+  const [imp] = await tx.insert(bankImports).values({ fileName: `dbtest-${Math.random()}.xlsx` }).returning({ id: bankImports.id });
+  const [t] = await tx.insert(bankTransactions).values({
+    bankImportId: imp.id, valueDate: day(iso), amountMinor, direction: "DEBIT",
+    matchStatus: "UNMATCHED", category: "SUPPLIER", supplierId,
+  }).returning({ id: bankTransactions.id });
+  return t.id;
+}
+
+describe("حوالةُ الطابور وسدادُها المقيَّد بيد — مختبرات القهوة ورونة", () => {
+  it("المبلغُ نفسه: تُربط الحوالةُ بالدفعة ولا تُنشأ ثانية، والفاتورةُ تبقى مسدَّدة", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const inv = await makeInvoice(tx, s, 638_00, "2026-09-08");
+      const hand = await manualPaid(tx, s, inv, 638_00, "2026-09-08");
+      const t = await waitingTransfer(tx, s, 638_00, "2026-09-08");
+
+      const [l] = (await loadHandPaymentLinks(tx)).filter((x) => x.supplierId === s);
+      expect(l).toMatchObject({ transferId: t, paymentId: hand, exact: true, extraMinor: 0 });
+
+      await linkHandPayment(tx, l, await someone(tx));
+      const [bt] = await tx.select({ p: bankTransactions.matchedPaymentId, st: bankTransactions.matchStatus })
+        .from(bankTransactions).where(eq(bankTransactions.id, t));
+      expect(bt).toEqual({ p: hand, st: "MATCHED" });
+      const n = await tx.execute<{ n: number }>(sql`select count(*)::int as n from payments where supplier_id = ${s}`);
+      expect(Number(n.rows[0].n)).toBe(1);
+      expect(await allocationsOf(tx, hand)).toEqual([{ invoiceId: inv, amountMinor: 638_00 }]);
+    }));
+
+  it("الحوالةُ أكبر: تأخذ الدفعةُ مبلغَها، والزائدُ رصيدٌ لا يُخصَّص على الفاتورة نفسها", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const inv = await makeInvoice(tx, s, 437_00, "2026-09-06");
+      const hand = await manualPaid(tx, s, inv, 437_00, "2026-09-06");
+      const t = await waitingTransfer(tx, s, 462_00, "2026-09-06");
+      const [l] = (await loadHandPaymentLinks(tx)).filter((x) => x.supplierId === s);
+      expect(l).toMatchObject({ exact: false, extraMinor: 25_00 });
+
+      await linkHandPayment(tx, { transferId: t, paymentId: hand }, await someone(tx));
+      const [p] = await tx.select({ a: payments.amountMinor }).from(payments).where(eq(payments.id, hand));
+      expect(p.a).toBe(462_00);
+      expect(await allocationsOf(tx, hand)).toEqual([{ invoiceId: inv, amountMinor: 437_00 }]);
+    }));
+
+  it("لا يُربط ما ليس زوجاً — الحوالةُ أقلّ من الدفعة", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const inv = await makeInvoice(tx, s, 500_00, "2026-09-06");
+      const hand = await manualPaid(tx, s, inv, 500_00, "2026-09-06");
+      const t = await waitingTransfer(tx, s, 400_00, "2026-09-06");
+      const e = await caught(linkHandPayment(tx, { transferId: t, paymentId: hand }, await someone(tx)));
+      expect(e).toBeInstanceOf(HandLinkRefused);
     }));
 });

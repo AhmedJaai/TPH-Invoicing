@@ -111,6 +111,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   PAYMENT_VOIDED: "إلغاء دفعة",
   PAYMENT_ECHO_MERGED: "دمج دفعةٍ قُيِّدت مرّتين",
   BANK_CREDIT_UNDRAWN: "فكّ حوالةٍ عن فاتورة",
+  HAND_PAYMENT_LINKED: "ربط حوالةٍ بسدادٍ مقيَّدٍ بيد",
   CATALOG_IMPORTED: "استيراد كتالوج فودكس",
   RECIPE_VERSION_CORRECTED: "تصحيح نسخة وصفة",
   RECIPE_DELETED: "حذف وصفة",

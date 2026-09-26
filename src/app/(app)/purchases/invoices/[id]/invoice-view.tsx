@@ -420,10 +420,11 @@ export async function InvoiceView({
               {inv.carriedForwardFrom && <Row label="رُحِّلت من">{formatMonth(inv.carriedForwardFrom)}</Row>}
             </dl>
 
-            <div className="mt-3">
+            <div id="fix" className="mt-3 scroll-mt-24">
               <InvoiceFix
                 invoiceId={inv.id}
                 canEdit={canEdit}
+                startOpen={act === "fix"}
                 reasons={reasons}
                 initial={{
                   invoiceNumber: inv.number,

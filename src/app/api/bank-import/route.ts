@@ -26,6 +26,7 @@ import { loadSupplierProfiles } from "@/services/supplier-profile.service";
 import { analyzeCoverage, describeCoverage } from "@/lib/bank/coverage";
 import type { SupplierIdentity } from "@/lib/bank/entities";
 import { monthBalancesFromStatement } from "@/lib/bank/statement-balances";
+import { linkExactHandPayments } from "@/services/account-review.service";
 import { withDeadline } from "@/lib/ai/deadline";
 
 export const runtime = "nodejs";
@@ -907,6 +908,17 @@ async function handle(request: Request) {
     },
   });
 
+  /*
+    ── الحوالةُ وسدادُها المقيَّد بيد ──
+
+    فاتورةٌ رُفعت وقيل «سُدّدت» فقُيِّدت دفعةٌ بلا حركة وأُغلقت — فلا يجد المطابقُ
+    لحوالتها فاتورةً مفتوحة، وتقف في الطابور (مختبرات القهوة ٦٣٨). فبعد الكتابة
+    تُربط كلُّ حوالةٍ بدفعتها المقيَّدة بيد إن طابق المبلغُ والمورّدُ في نافذة أيّام.
+    وما زادت فيه الحوالةُ يُقترح في «راجِع الحسابات» ولا يُربط وحده.
+  */
+  const linkNotes: string[] = [];
+  const handLinked = newRows > 0 ? await linkExactHandPayments(user.id, linkNotes) : 0;
+
   /* الصفّ المحفوظ يقول ما دخل فعلاً — لا ما أجازه الفحص ثمّ ردّه القيد */
   if (rejectedByConstraint > 0 && importId) {
     await db.update(bankImports).set({ newRowCount: newRows - rejectedByConstraint }).where(eq(bankImports.id, importId));
@@ -948,7 +960,11 @@ async function handle(request: Request) {
             sync.ambiguous.length > 0 ? ` · ${sync.ambiguous.length} للمراجعة` : ""
           }${
             sync.conflict.length > 0 ? ` · ${sync.conflict.length} تضارب هويّة — لم تُقيَّد` : ""
-          }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} ردّها قيد القاعدة` : ""}.`,
+          }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} ردّها قيد القاعدة` : ""}${
+            handLinked > 0 ? ` · ${handLinked} رُبطت بسدادٍ قيّدتَه بيدك` : ""
+          }.`,
+    handLinked,
+    linkNotes,
   });
 }
 

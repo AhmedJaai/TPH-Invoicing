@@ -17,10 +17,10 @@
 import { NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bankTransactions, decisionHistory } from "@/db/schema";
+import { bankTransactions, decisionHistory, payments } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { recordAudit } from "@/lib/audit";
-import { reversePayment } from "@/services/payment.service";
+import { refreshPaymentStatus, reversePayment } from "@/services/payment.service";
 
 export const runtime = "nodejs";
 
@@ -153,7 +153,41 @@ export async function POST(request: Request) {
       `)
     ).rows;
 
-    if (Number(others) === 0) {
+    /*
+      ── الدفعةُ التي سبقت حوالتَها لا تُردّ بردّ الربط ──
+
+      «سجّل أنّها سُدّدت» أو إيصالٌ قُيِّد قبل أن يصل الكشف، ثمّ رُبطت به الحوالة
+      (`recordBankPayment` · «راجِع الحسابات»). فالتراجعُ عن الربط يفكّ الحوالةَ
+      وحدها — وكان يردّ الدفعةَ كلَّها، فيمحو إقرارَ صاحب العمل وتعود فاتورتُه
+      مستحقّةً كأنّها لم تُسدَّد. ويُعاد مبلغُها الذي كان إن غيّره الربط.
+    */
+    const [origin] = (await t.execute<{ adopted: boolean }>(sql`
+      select p.created_at < bi.created_at as adopted
+        from payments p, bank_transactions bt
+        join bank_imports bi on bi.id = bt.bank_import_id
+       where p.id = ${paymentId} and bt.id = ${tx.id}
+    `)).rows;
+    const adoptedPayment = Boolean(origin?.adopted);
+    if (adoptedPayment) {
+      const [linked] = (await t.execute<{ was: string | number | null }>(sql`
+        select payload->>'كانت بالهللات' as was from decision_history
+         where bank_transaction_id = ${tx.id} and event = 'MATCH_CONFIRMED' and payload ? 'كانت بالهللات'
+         order by created_at desc limit 1
+      `)).rows;
+      const was = linked?.was === null || linked?.was === undefined ? null : Number(linked.was);
+      if (was !== null && Number.isInteger(was) && was > 0) {
+        const [{ allocated }] = (await t.execute<{ allocated: number }>(sql`
+          select coalesce(sum(amount_minor), 0)::int as allocated from payment_allocations where payment_id = ${paymentId}
+        `)).rows;
+        /* لا يُعاد مبلغٌ أصغرُ ممّا خُصّص منها — يبقى كما هو ويُقال */
+        if (Number(allocated) <= was) {
+          await t.update(payments).set({ amountMinor: was }).where(eq(payments.id, paymentId));
+          await refreshPaymentStatus(t, paymentId);
+        }
+      }
+    }
+
+    if (Number(others) === 0 && !adoptedPayment) {
       const outcome = await reversePayment(t, {
         paymentId,
         kind: "REVERSED",

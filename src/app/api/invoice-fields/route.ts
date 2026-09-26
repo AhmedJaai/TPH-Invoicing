@@ -22,6 +22,8 @@
  *   • **كلُّ تغييرٍ في سجلّ التدقيق** بقيمته قبلَه وبعدَه.
  */
 import { NextResponse } from "next/server";
+import { applySupplierCredit } from "@/services/supplier-credit.service";
+import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, suppliers } from "@/db/schema";
@@ -209,6 +211,15 @@ export async function POST(request: Request) {
           inputVatStatus: review.inputVatStatus,
         })
         .where(eq(invoices.id, id));
+
+      /*
+        إجماليٌّ صُحّح بالزيادة يترك على الفاتورة باقياً — ولعلّ للمورّد عندنا مالاً
+        يقابله (رونة: رسمُ توصيلٍ ٢٥ لم يُقرأ، وزاد به التحويلُ على ما قُيِّد). فيُخصم
+        رصيدُه بالسياسة نفسها، ولا يبقى «متّزناً على الورق».
+      */
+      if (row.supplierId && next.totalMinor !== null && next.totalMinor > (row.totalMinor ?? 0)) {
+        await applySupplierCredit(t, row.supplierId, { forwardDays: SETTLEMENT_FORWARD_DAYS });
+      }
     });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 409 });

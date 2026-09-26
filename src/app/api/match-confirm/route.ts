@@ -15,6 +15,7 @@ import { bankTransactions, decisionHistory, invoices } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { allocate, claimBankTransaction, recordBankPayment } from "@/services/payment.service";
 import { recordAudit } from "@/lib/audit";
+import { HandLinkRefused, linkHandPayment, loadHandPaymentLinks } from "@/services/account-review.service";
 import { resyncBankExpenses } from "@/services/expense.service";
 import { settleSupplierAccount } from "@/lib/allocation";
 import { INVOICE, countNoun } from "@/lib/arabic";
@@ -124,6 +125,34 @@ async function handle(request: Request) {
       { error: "هذه الحركة سُجّلت سداداً من قبل — افتحها في صفحة البنك لترى دفعتها" },
       { status: 409 },
     );
+  }
+
+  /*
+    ── سدادٌ مقيَّدٌ بيدٍ قبل الحوالة ──
+
+    فاتورةٌ وُسمت «سُدّدت» فأُغلقت، ثمّ جاءت حوالتُها. فإقرارُها سداداً (لفاتورة
+    أو لحساب المورّد) كان يُنشئ دفعةً ثانية بجانب الأولى — ورونة يصير مدفوعاً له
+    ٨٩٩ عن ٤٦٢. فتُربط الحوالةُ بتلك الدفعة، ولا يُكتب غيرُ ذلك.
+  */
+  if (!body.notAPayment) {
+    const link = (await loadHandPaymentLinks()).find((l) => l.transferId === tx.id);
+    /* فاتورةٌ أخرى اختارها صاحبُ العمل بعينها لا يُتجاوز اختيارُه */
+    const picked = [...(body.invoiceIds ?? []), ...(body.split ?? []).map((x) => x.invoiceId)];
+    const samePick = link !== undefined
+      && (body.settleSupplier === true || picked.length === 0 || picked.every((id) => link.invoices.some((i) => i.id === id)));
+    if (link && samePick) {
+      try {
+        await db.transaction((t) => linkHandPayment(t, link, user.id));
+      } catch (e) {
+        if (e instanceof HandLinkRefused) return NextResponse.json({ error: e.message }, { status: 409 });
+        throw e;
+      }
+      return NextResponse.json({
+        ok: true,
+        message: `رُبطت بسدادٍ قيّدتَه بيدك (${formatRiyalsDisplay(link.paymentMinor)}${link.invoices[0] ? ` · ${link.invoices[0].number}` : ""}) — لم تُنشأ دفعةٌ ثانية`
+          + (link.extraMinor > 0 ? ` · وزادت ${formatRiyalsDisplay(link.extraMinor)} رصيداً للمورّد` : ""),
+      });
+    }
   }
 
   /* ── ليست سداد فاتورة ── */

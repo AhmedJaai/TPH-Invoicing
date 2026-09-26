@@ -8,6 +8,8 @@ import { Money } from "@/components/money";
 import { EmptyState, KeyValue, LinkButton, Monogram, NoAccess, Section } from "@/components/ui";
 import { CategoryBadge, DirectionIcon } from "@/components/bank-bits";
 import { MatchExplain } from "@/components/match-explain";
+import { AccountReview } from "@/components/account-review";
+import { loadHandPaymentLinks } from "@/services/account-review.service";
 import { loadFocusedTx, loadTxAllocations } from "@/services/bank-view.service";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { txHref } from "@/lib/inspector";
@@ -50,6 +52,10 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
   const allocations = tx.paymentId && can(user.role, "amounts:view") ? await loadTxAllocations(tx.paymentId) : [];
   const allocated = allocations.reduce((s, a) => s + a.amountMinor, 0);
   const canUndo = can(user.role, "payment:approve");
+  /* حوالةٌ لم تُربط وسدادُها مقيَّدٌ بيد — «لا فاتورة مفتوحة» صحيحٌ حرفاً، فيُقال لماذا */
+  const handLink = !tx.paymentId && canUndo
+    ? (await loadHandPaymentLinks()).find((l) => l.transferId === id) ?? null
+    : null;
   const title = tx.who || tx.description?.trim().slice(0, 60) || "حركة بلا وصف";
 
   return (
@@ -95,6 +101,23 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
         <div>
           <p className="mb-2 text-[11px] font-bold text-muted">لماذا طُوبقت — وكيف تتراجع</p>
           <MatchExplain match={tx.match} canUndo={canUndo} inline />
+          {handLink && (
+            <div className="mt-3 rounded-xl border border-accent-line bg-accent-soft/50 p-3 text-xs leading-relaxed">
+              <p className="font-bold">سدادُها مقيَّدٌ بيدك من قبل</p>
+              <p className="mt-1 text-ink-soft">
+                في {formatDay(handLink.paymentDay)} قيّدتَ سداداً لـ{handLink.supplierName} بـ<Money minor={handLink.paymentMinor} />
+                {handLink.invoices.length > 0 && <> عن {handLink.invoices.map((i) => i.number).join("، ")}</>}، فأُغلقت فاتورتُه
+                — ولذلك لم يجد المطابقُ فاتورةً مفتوحة. هذه الحوالةُ هي ذلك السداد
+                {handLink.exact ? "." : <>، وزادت عليه <Money minor={handLink.extraMinor} /> (توصيلٌ في الفاتورة؟ صحّح إجماليَّها).</>}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <AccountReview size="sm" variant="primary" />
+                {!handLink.exact && handLink.invoices[0] && (
+                  <LinkButton href={`/purchases/invoices/${handLink.invoices[0].id}?act=fix#fix`} size="sm">صحّح إجماليَّ {handLink.invoices[0].number}</LinkButton>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

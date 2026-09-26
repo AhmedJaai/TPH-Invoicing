@@ -14,6 +14,8 @@ import { txHref } from "@/lib/inspector";
 import { BankImport } from "@/components/bank-import";
 import { MatchExplain } from "@/components/match-explain";
 import { ReconcileQueue } from "@/components/reconcile-queue";
+import { AccountReview } from "@/components/account-review";
+import { loadHandPaymentLinks } from "@/services/account-review.service";
 import { CATEGORY_LABEL } from "@/lib/bank/rules";
 import { countNoun, DAY, GROUP, ITEM, TRANSACTION } from "@/lib/arabic";
 import { daysSinceRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
@@ -70,11 +72,12 @@ export default async function BankPage({
   /* الرابطُ القديم `/bank?tx=` يفتح ملفَّ الحركة — تبقى الإشاراتُ المحفوظة تعمل */
   if (params.tx) redirect(txHref(params.tx));
 
-  const [coverage, queue, ledger, doublePaid] = await Promise.all([
+  const [coverage, queue, ledger, doublePaid, handLinks] = await Promise.all([
     loadBankCoverage(),
     loadBankQueue(),
     loadLedger(view, month),
     countOpenDoublePaid(),
+    can(user.role, "payment:approve") ? loadHandPaymentLinks() : Promise.resolve([]),
   ]);
 
   const canApprove = can(user.role, "payment:approve");
@@ -151,6 +154,20 @@ export default async function BankPage({
               ? `${countNoun(queue.groups.length, GROUP)} تضمّ ${countNoun(queuedTx, TRANSACTION)} — سؤالٌ واحد عن كلّ ما يتشابه، وما تؤكّده يصير ذاكرة.`
               : undefined}
           >
+            {/*
+              حوالةٌ في الطابور سدادُها مقيَّدٌ بيد — «لا فاتورة مفتوحة» صحيحٌ حرفاً
+              وخطأٌ معنىً: فاتورتُها أُغلقت بتلك الدفعة. فيُقال ذلك فوق الطابور، وبابُه بجانبه.
+            */}
+            {handLinks.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-accent-line bg-accent-soft/50 px-4 py-3">
+                <p className="min-w-0 flex-1 text-xs leading-relaxed">
+                  <span className="font-bold">{countNoun(handLinks.length, TRANSACTION)} هنا سدادُها مقيَّدٌ بيدك من قبل</span>
+                  {" — "}{handLinks.map((l) => `${l.supplierName} ${formatRiyalsDisplay(l.transferMinor)}`).join("، ")}.
+                  {" "}فاتورتُها أُغلقت بتلك الدفعة، فلم يجد المطابقُ فاتورةً مفتوحة. اربطها ولا تُقيِّدها مرّةً ثانية.
+                </p>
+                <AccountReview size="sm" variant="primary" />
+              </div>
+            )}
             {queue.groups.length > 0 ? (
               <ReconcileQueue groups={queue.groups} suppliers={queue.suppliers} canApprove={canApprove} canEdit={canEdit} />
             ) : (

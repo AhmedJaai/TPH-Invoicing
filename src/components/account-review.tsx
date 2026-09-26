@@ -3,11 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Copy, FileCheck2, FileQuestion, ScanSearch } from "lucide-react";
+import { ArrowLeft, Copy, FileCheck2, FileQuestion, Link2, ScanSearch } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { documentHref } from "@/lib/document-labels";
 import { formatDay } from "@/lib/riyadh-time";
-import { INVOICE, PAYMENT, countNoun } from "@/lib/arabic";
+import { INVOICE, PAYMENT, TRANSACTION, countNoun } from "@/lib/arabic";
 import type { AccountReviewPreview, AccountReviewResult } from "@/services/account-review.service";
 import { Money } from "./money";
 import { buttonClass, type ButtonVariant } from "./ui-tokens";
@@ -29,6 +29,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [chosenLinks, setChosenLinks] = useState<Set<string>>(new Set());
 
   async function start() {
     setOpen(true);
@@ -43,6 +44,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
     }
     setPreview(r.data.preview);
     setChosen(new Set(r.data.preview.echoes.map((e) => e.key)));
+    setChosenLinks(new Set(r.data.preview.links.filter((l) => !l.exact).map((l) => l.key)));
   }
 
   async function run() {
@@ -51,6 +53,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
     const r = await postJson<{ result: AccountReviewResult }>("/api/account-review", {
       preview: false,
       echoKeys: [...chosen],
+      linkKeys: [...chosenLinks],
     });
     setBusy(false);
     if (!r.ok) {
@@ -62,6 +65,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
     const parts = [
       res.invoices.recorded > 0 ? `قُيِّدت ${countNoun(res.invoices.recorded, INVOICE)}` : null,
       res.merged.length > 0 ? `دُمجت ${countNoun(res.merged.length, PAYMENT)} قُيِّدت مرّتين` : null,
+      res.linked.length > 0 ? `رُبطت ${countNoun(res.linked.length, TRANSACTION)} بسدادٍ قيّدتَه بيدك` : null,
       res.creditApplied > 0 ? `نُسب ${countNoun(res.creditApplied, PAYMENT)} إلى فواتيرها` : null,
     ].filter(Boolean);
     toast({
@@ -70,6 +74,15 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
       body: parts.length > 0 ? parts.join(" · ") : "لم يجد ما يُقيَّد أو يُدمج آلياً.",
     });
     router.refresh();
+  }
+
+  function toggleLink(key: string) {
+    setChosenLinks((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }
 
   function toggle(key: string) {
@@ -82,7 +95,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
   }
 
   const p = preview;
-  const nothing = p && p.invoices.items.length === 0 && p.echoes.length === 0;
+  const nothing = p && p.invoices.items.length === 0 && p.echoes.length === 0 && p.links.length === 0;
 
   return (
     <>
@@ -201,6 +214,53 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
               </section>
             )}
 
+            {p.links.length > 0 && (
+              <section aria-labelledby="ar-links">
+                <h3 id="ar-links" className="flex items-center gap-2 text-sm font-bold">
+                  <Link2 className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />
+                  {`حوالاتٌ في الطابور سدادُها مقيَّدٌ بيدك — ${countNoun(p.links.length, TRANSACTION)}`}
+                </h3>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                  رُفعت الفاتورةُ وقيل «سُدّدت» فأُغلقت، ثمّ جاء الكشفُ بحوالتها فلم يجد فاتورةً مفتوحة. الربطُ يجعل الحوالةَ دليلَ ذلك السداد — ولا يُنشئ دفعةً ثانية.
+                </p>
+                <ul className="mt-2 space-y-2">
+                  {p.links.map((l) => (
+                    <li key={l.key}>
+                      <label className={`flex gap-3 rounded-lg border border-line-soft p-3 text-xs ${l.exact ? "" : "cursor-pointer has-[:checked]:border-accent has-[:checked]:bg-accent-soft/40"}`}>
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
+                          checked={l.exact || chosenLinks.has(l.key)}
+                          disabled={l.exact}
+                          onChange={() => toggleLink(l.key)}
+                          aria-describedby={`${l.key}-why`}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-baseline justify-between gap-2">
+                            <span className="font-bold">{l.supplierName}</span>
+                            <Money minor={l.transferMinor} />
+                          </span>
+                          <span id={`${l.key}-why`} className="mt-1 block leading-relaxed text-muted">
+                            حوالةُ {formatDay(l.transferDay)} · وسدادٌ بيدك {formatDay(l.paymentDay)} بـ<Money minor={l.paymentMinor} />
+                            {l.invoices.length > 0 && <> لـ{l.invoices.map((i) => i.number).join("، ")}</>}
+                            {l.exact
+                              ? " — المبلغُ نفسه، يُربط وحده."
+                              : <> — زادت الحوالةُ <Money minor={l.extraMinor} />: يبقى رصيداً للمورّد. فإن كان في الفاتورة (توصيلٌ مثلاً) فصحّح إجماليَّها ويُخصم منه.</>}
+                          </span>
+                        </span>
+                      </label>
+                      {!l.exact && l.invoices[0] && (
+                        <Link href={`/purchases/invoices/${l.invoices[0].id}?act=fix#fix`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-accent hover:underline">
+                          صحّح إجماليَّ {l.invoices[0].number}
+                          <ArrowLeft className="h-3 w-3" aria-hidden />
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
             {p.invoices.missing.length > 0 && <LeftForYou missing={p.invoices.missing} />}
 
             {nothing && p.invoices.missing.length === 0 && (
@@ -244,11 +304,12 @@ function ReviewResult({ result }: { result: AccountReviewResult }) {
   const rows = [
     { label: "فواتيرُ قُيِّدت", value: result.invoices.recorded },
     { label: "دفعاتٌ دُمجت", value: result.merged.length },
+    { label: "حوالاتٌ رُبطت", value: result.linked.length },
     { label: "دفعاتٌ نُسبت إلى فواتيرها", value: result.creditApplied },
   ];
   return (
     <div className="space-y-5">
-      <dl className="grid grid-cols-3 gap-2">
+      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {rows.map((r) => (
           <div key={r.label} className="rounded-lg bg-sunken px-3 py-2.5">
             <dt className="text-[11px] text-muted">{r.label}</dt>
