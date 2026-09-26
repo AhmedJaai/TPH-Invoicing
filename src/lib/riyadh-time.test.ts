@@ -1,3 +1,4 @@
+import { timeAgo } from "./arabic";
 import { describe, expect, it } from "vitest";
 import {
   currentMonthRiyadh, dayOfMonthRiyadh, daysSinceRiyadh, formatDay, formatMoment, formatMonth, formatRange, formatWeekday, todayInRiyadh,
@@ -83,5 +84,21 @@ describe("formatMoment", () => {
   it("منتصفُ الليل بتوقيت الرياض يفصل اليوم عن أمس — لا توقيتُ غرينتش", () => {
     // 21:30 غرينتش يوم ٢٥ = 00:30 الرياض يوم ٢٦
     expect(formatMoment(new Date("2026-09-25T21:30:00Z"), now)).toBe("اليوم 12:30 ص");
+  });
+});
+
+describe("timeAgo — «أمس» يومُ التقويم بتوقيت الرياض", () => {
+  const now = new Date("2026-09-26T00:52:00Z"); // السبت 3:52 ص بتوقيت الرياض
+  it("ما قبل يومين تقويميّين لا يُقال «أمس» ولو كان دون ٤٨ ساعة", () => {
+    expect(timeAgo(new Date("2026-09-24T03:25:00Z"), now)).toBe("قبل يومين");
+  });
+  it("أمسُ التقويم «أمس»", () => {
+    expect(timeAgo(new Date("2026-09-25T08:00:00Z"), now)).toBe("أمس");
+  });
+  it("ساعاتٌ قليلة عبر منتصف الليل تبقى بساعاتها", () => {
+    expect(timeAgo(new Date("2026-09-25T20:52:00Z"), now)).toBe("قبل 4 ساعات");
+  });
+  it("الدقائقُ دقائق", () => {
+    expect(timeAgo(new Date("2026-09-26T00:40:00Z"), now)).toBe("قبل 12 دقيقة");
   });
 });

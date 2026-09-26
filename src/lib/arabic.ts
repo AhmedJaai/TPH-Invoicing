@@ -5,6 +5,7 @@
  * والقاعدة: الواحد والاثنان لهما صيغتاهما، ومن ثلاثة إلى عشرة جمعٌ،
  * ومن أحد عشر فصاعداً مفردٌ منصوب — ثمّ تعود الدورة عند المئة.
  */
+import { daysSinceRiyadh, todayInRiyadh } from "./riyadh-time";
 
 export interface NounForms {
   /** بند */
@@ -273,15 +274,19 @@ export const DAY_AGO: NounForms = {
 /**
  * «منذ متى» بالعربية: الآن · قبل دقيقة · قبل ٣ ساعات · أمس · قبل ٥ أيّام.
  * والمجرورُ بعد «قبل» يأخذ صيغة المثنّى المجرور («قبل ساعتين»).
+ *
+ * و«أمس» يومُ التقويم بتوقيت الرياض لا «بين ٢٤ و٤٨ ساعة»: كانت تسميةُ الخميس
+ * فجراً تُقرأ «أمس» صباحَ السبت، وبجانبها «الخميس، 24 سبتمبر» — فتناقضا.
+ * وما وقع قبل ساعاتٍ قليلة يبقى بساعاته وإن عبر منتصفَ الليل.
  */
 export function timeAgo(iso: string | Date, at: Date = new Date()): string {
-  const diff = at.getTime() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
+  const when = new Date(iso);
+  const m = Math.floor((at.getTime() - when.getTime()) / 60000);
   if (m < 1) return "الآن";
   if (m < 60) return `قبل ${countNoun(m, MINUTE)}`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `قبل ${countNoun(h, HOUR)}`;
-  const d = Math.floor(h / 24);
-  if (d === 1) return "أمس";
-  return `قبل ${countNoun(d, DAY_AGO)}`;
+  const days = daysSinceRiyadh(todayInRiyadh(when), at);
+  if (days === 0 || h < 6) return `قبل ${countNoun(h, HOUR)}`;
+  if (days === 1) return "أمس";
+  return `قبل ${countNoun(days, DAY_AGO)}`;
 }
