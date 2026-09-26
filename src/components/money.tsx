@@ -79,11 +79,3 @@ export function Prose({ text }: { text: string }) {
     </>
   );
 }
-
-export function Empty({ message }: { message: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-line px-5 py-10 text-center">
-      <p className="text-sm text-muted">{message}</p>
-    </div>
-  );
-}

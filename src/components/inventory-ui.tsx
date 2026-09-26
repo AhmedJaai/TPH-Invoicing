@@ -22,7 +22,6 @@ import { formatDay } from "@/lib/riyadh-time";
 export const RECIPE: NounForms = { one: "وصفة واحدة", two: "وصفتان", few: "وصفات", many: "وصفة", zero: "لا وصفات" };
 export const COUNT: NounForms = { one: "جرد واحد", two: "جردان", few: "جردات", many: "جرداً", zero: "لا جرد" };
 export const WEEK: NounForms = { one: "أسبوع واحد", two: "أسبوعان", few: "أسابيع", many: "أسبوعاً", zero: "لا أسابيع" };
-export const UNIT_SOLD: NounForms = { one: "وحدة واحدة", two: "وحدتان", few: "وحدات", many: "وحدة", zero: "لا وحدات" };
 
 /* ─────────────────────────── خطواتُ الجرد ─────────────────────────── */
 

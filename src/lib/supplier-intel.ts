@@ -25,9 +25,6 @@ export const AGE_BUCKETS = [
 
 export type AgeBucketIndex = 0 | 1 | 2 | 3;
 
-/** العتبةُ التي يُعدّ بعدها الدَّين متأخّراً — هي نفسُها في «يحتاج قرارك». */
-export const OVERDUE_BUCKET: AgeBucketIndex = 2;
-
 export interface OpenInvoiceAge {
   id: string;
   number: string;

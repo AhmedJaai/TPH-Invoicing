@@ -154,5 +154,5 @@ export function PageShell({
   );
 }
 
-// يُعاد تصديرهما للمستوردين القدامى؛ تعريفهما في `money.tsx`
-export { Money, Empty } from "./money";
+// يُعاد تصديره للمستوردين القدامى؛ تعريفه في `money.tsx`
+export { Money } from "./money";
