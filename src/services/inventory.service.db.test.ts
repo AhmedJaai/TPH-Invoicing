@@ -975,7 +975,7 @@ describe("إلغاءُ جردٍ لم يُقفَل — «ابدأه من جديد
       await isolateProducts(tx, [coffee]);
       const { countId } = await startCount({ periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: branch.id, actorId }, tx);
       await saveActualCounts(countId, [{ productId: coffee, actualMilli: kg(3) }], actorId, tx);
-      await tx.execute(sql`update inventory_counts set status = 'FINALISED' where id = ${countId}`);
+      await tx.execute(sql`update inventory_counts set status = 'FINALISED', finalised_at = now() where id = ${countId}`);
       expect(await caught(discardCount(countId, actorId, tx))).toBeInstanceOf(CountLockedError);
     }));
 });
