@@ -18,12 +18,14 @@
  * ── ولا يجري تشغيلان معاً ──
  *
  * قفلٌ استشاريّ على الجلسة: نشرٌ وجهازٌ يشغّلانه في اللحظة نفسها كان
- * يقرأ كلاهما «غير مطبَّقة» فيطبّقانها مرّتين.
+ * يقرأ كلاهما «غير مطبَّقة» فيطبّقانها مرّتين. والجلسةُ على الاتّصال
+ * المباشر لا المجمَّع، والقفلُ يُفرَج عنه بيدٍ في كلّ مخرج.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { Client } from "pg";
+import { directDatabaseUrl } from "../src/lib/ops/direct-url";
 
 const DIR = join(process.cwd(), "drizzle", "sql");
 
@@ -54,8 +56,21 @@ async function main() {
     process.exit(1);
   }
 
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  /*
+    ── على الاتّصال المباشر، والقفلُ يُفرَج عنه بيد ──
+
+    القفلُ الاستشاريّ للجلسة، والمجمِّعُ (نقطةُ `-pooler`) لا يعطي الجلسةَ
+    اتّصالاً بعينه: كان القفلُ يبقى على اتّصالٍ حيٍّ في المجمِّع بعد انتهاء
+    التشغيل، فيسقط كلُّ نشرٍ بعده «القفل مأخوذ» حتى يُعاد تدويرُ ذلك الاتّصال
+    (٢٦ سبتمبر ٢٠٢٦، على الإنتاج والمعاينة معاً). انظر `direct-url.ts`.
+  */
+  const client = new Client({ connectionString: directDatabaseUrl(process.env.DATABASE_URL) });
   await client.connect();
+  const finish = async (code: number): Promise<never> => {
+    await client.query("select pg_advisory_unlock(hashtext('tph-migrate'))").catch(() => undefined);
+    await client.end();
+    process.exit(code);
+  };
 
   /*
     ── القفل يُنتظَر ولا يُفشَل عنده فوراً ──
@@ -82,7 +97,8 @@ async function main() {
     }
   }
   if (!locked) {
-    console.error("✕ تشغيلٌ آخر للهجرات لم يُفرِج عن القفل بعد عشرين ثانية — افحصه.");
+    console.error("✕ تشغيلٌ آخر للهجرات لم يُفرِج عن القفل بعد عشرين ثانية — افحصه:");
+    console.error("  select pid, state, backend_start from pg_locks join pg_stat_activity using (pid) where locktype = 'advisory';");
     await client.end();
     process.exit(1);
   }
@@ -115,8 +131,7 @@ async function main() {
     console.error("✕ هجراتٌ مطبَّقة تغيّر ملفّها — القاعدة والملفّ افترقا:");
     for (const d of drifted) console.error(`    ${d}`);
     console.error("  لا يُعاد تطبيقها بصمت. إن كان التغيير مقصوداً:  npm run db:migrate -- --reapply <الاسم>");
-    await client.end();
-    process.exit(1);
+    await finish(1);
   }
 
   for (const name of files) {
@@ -146,14 +161,12 @@ async function main() {
       await client.query("rollback");
       console.log(`\r  ✕ ${name} — فشلت`);
       console.error((e as Error).message);
-      await client.end();
-      process.exit(1);
+      await finish(1);
     }
   }
 
   console.log(`\n${ran === 0 ? "القاعدة محدَّثة." : `طُبّقت ${ran} هجرة.`}\n`);
-  await client.end();
-  process.exit(0);
+  await finish(0);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
