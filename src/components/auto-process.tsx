@@ -65,11 +65,11 @@ export function AutoProcess({ drive = true }: { drive?: boolean }) {
         else if (r.ok && (r.data.summary?.created ?? 0) > 0) changed = true;
       }
       if (due("tph:auto-backlog", BACKLOG_EVERY_MS)) {
-        const r = await postJson<{ recorded?: number; approved?: number; renamed?: unknown[]; reread?: number }>(
+        const r = await postJson<{ recorded?: number; approved?: number; renamed?: unknown[]; reread?: number; handLinked?: number }>(
           "/api/document-status",
           { action: "confirm-eligible" },
         );
-        if (r.ok && ((r.data.recorded ?? 0) + (r.data.approved ?? 0) + (r.data.renamed?.length ?? 0) + (r.data.reread ?? 0)) > 0) changed = true;
+        if (r.ok && ((r.data.recorded ?? 0) + (r.data.approved ?? 0) + (r.data.renamed?.length ?? 0) + (r.data.reread ?? 0) + (r.data.handLinked ?? 0)) > 0) changed = true;
       }
       if (changed && !cancelled) router.refresh();
     })();

@@ -22,7 +22,8 @@ import { driveWritesAllowed } from "@/lib/drive-readonly";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { can } from "@/lib/permissions";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { DOCUMENT, FILE, INVOICE, countNoun } from "@/lib/arabic";
+import { DOCUMENT, FILE, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
+import { linkExactHandPayments } from "@/services/account-review.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -69,7 +70,14 @@ export async function POST(request: Request) {
       if (token) drive = driveForUser(token);
     }
     const r = await processDocumentBacklog(user.id, drive);
+    /*
+      حوالةٌ في طابور البنك وسدادُها قيّده صاحبُ العمل بيد بالمبلغ نفسه — تُربط
+      هنا أيضاً لا عند الاستيراد وحده: ما استُورد قبل وجود الربط (مختبرات القهوة
+      ٦٣٨) كان يبقى في «يحتاج قرارك» حتى يُضغط زرّ. والسياسةُ سياسةُ الاستيراد.
+    */
+    const handLinked = can(user.role, "bank:edit") ? await linkExactHandPayments(user.id, r.notes) : 0;
     const parts = [
+      handLinked > 0 ? `رُبطت ${countNoun(handLinked, TRANSACTION)} في البنك بسدادٍ قيّدتَه بيدك` : null,
       r.recorded > 0 ? `قُيِّد من القراءة المحفوظة: ${countNoun(r.recorded, INVOICE)}` : null,
       r.approved > 0 ? `اعتُمد ${countNoun(r.approved, DOCUMENT)}` : null,
       r.renamed.length > 0 ? `وسُمّي ${countNoun(r.renamed.length, FILE)}` : null,
@@ -77,7 +85,7 @@ export async function POST(request: Request) {
       r.notes.length > 0 ? `وتعذّر ${r.notes.length}: ${r.notes[0]}` : null,
     ].filter(Boolean);
     const message = parts.length === 0 ? "لا مستندَ تجتمع فيه الشروطُ الآن" : parts.join(" · ");
-    return NextResponse.json({ ok: true, message, ...r });
+    return NextResponse.json({ ok: true, message, ...r, handLinked });
   }
 
   if (typeof body.documentId !== "string" || !body.documentId) {
