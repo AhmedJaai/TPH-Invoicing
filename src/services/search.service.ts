@@ -19,6 +19,7 @@ import {
 } from "@/lib/search";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { txHref } from "@/lib/inspector";
+import { documentHref } from "@/lib/document-labels";
 
 /** أقصى ما يُرجَع من كل نوع — الشاشة لا تسع أكثر، والقاعدة لا تُتعب. */
 export const PER_KIND = 6;
@@ -279,6 +280,6 @@ async function findDocuments(intent: SearchIntent, like: string): Promise<Search
     id: r.id,
     title: r.fileName,
     subtitle: `${r.month ?? "بلا شهر"} · ${r.status}`,
-    href: `/documents?q=${encodeURIComponent(r.fileName)}`,
+    href: documentHref(r.id),
   }));
 }

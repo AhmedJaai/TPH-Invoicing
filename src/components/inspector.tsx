@@ -203,7 +203,7 @@ export function InspectorPanel({
         aria-busy={busy || undefined}
         data-state={data}
         data-instant={instant || undefined}
-        className="inspector no-print fixed inset-x-0 bottom-0 z-40 flex max-h-[92dvh] flex-col overflow-hidden rounded-t-2xl border border-line bg-surface text-ink shadow-overlay lg:inset-y-0 lg:end-0 lg:start-auto lg:max-h-none lg:w-[min(46rem,calc(100vw-256px-3rem))] lg:rounded-none lg:border-y-0 lg:border-e-0"
+        className="inspector no-print fixed inset-x-0 bottom-0 z-40 flex max-h-[92dvh] flex-col overflow-clip rounded-t-2xl border border-line bg-surface text-ink shadow-overlay lg:inset-y-0 lg:end-0 lg:start-auto lg:max-h-none lg:w-[min(46rem,calc(100vw-256px-3rem))] lg:rounded-none lg:border-y-0 lg:border-e-0"
       >
         <div className="grabber lg:hidden" aria-hidden {...handle} />
         <header
@@ -216,6 +216,7 @@ export function InspectorPanel({
               id={titleId}
               ref={headingRef}
               tabIndex={-1}
+              dir="auto"
               className="text-lg font-extrabold leading-snug tracking-tight outline-none sm:text-xl"
             >
               {title}
@@ -333,7 +334,7 @@ export function InspectorLauncher() {
     <section
       aria-hidden
       data-state={shown ? "open" : "entering"}
-      className="inspector no-print pointer-events-none fixed inset-x-0 bottom-0 z-40 flex h-[92dvh] flex-col overflow-hidden rounded-t-2xl border border-line bg-surface shadow-overlay lg:inset-y-0 lg:end-0 lg:start-auto lg:h-auto lg:w-[min(46rem,calc(100vw-256px-3rem))] lg:rounded-none lg:border-y-0 lg:border-e-0"
+      className="inspector no-print pointer-events-none fixed inset-x-0 bottom-0 z-40 flex h-[92dvh] flex-col overflow-clip rounded-t-2xl border border-line bg-surface shadow-overlay lg:inset-y-0 lg:end-0 lg:start-auto lg:h-auto lg:w-[min(46rem,calc(100vw-256px-3rem))] lg:rounded-none lg:border-y-0 lg:border-e-0"
     >
       <div className="grabber lg:hidden" />
       <div className="border-b border-line bg-raised px-4 pb-4 pt-2 sm:px-6 lg:pt-5">

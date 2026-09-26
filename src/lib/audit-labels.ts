@@ -105,6 +105,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   DOCUMENT_STATUS_CHANGED: "تغيير حال مستند",
   INVOICE_FIELDS_CORRECTED: "تصحيح حقول فاتورة",
   DOCUMENT_REREAD: "إعادة قراءة مستند",
+  DOCUMENT_RECORDED_BY_HAND: "قيدُ فاتورةٍ من مستندٍ بيد",
   ALERT_RESOLVED: "إغلاق تنبيه",
   BANK_RULE_DELETED: "حذف قاعدة تصنيف",
   PAYMENT_VOIDED: "إلغاء دفعة",

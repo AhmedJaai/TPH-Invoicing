@@ -18,6 +18,7 @@
  */
 import { can } from "@/lib/permissions";
 import { NextResponse } from "next/server";
+import { documentHref } from "@/lib/document-labels";
 import { guard, respondTo } from "@/services/guard";
 import { DriveAuthExpiredError, driveForUser } from "@/lib/drive";
 import { applyRenames } from "@/services/drive-rename.service";
@@ -76,11 +77,10 @@ export async function POST(request: Request) {
           current: p.doc.fileName,
           reason: p.verdict.reason,
           /* المسار الذي يُصلَح فيه النقص — وما لا مسار له يُقال أنّه بلا مسار */
-          fixHref: p.doc.invoiceId
-            ? `/purchases/invoices?fix=${encodeURIComponent(p.doc.invoiceId)}#fix`
-            : p.doc.documentId
-              ? `/documents?q=${encodeURIComponent(p.doc.fileName)}`
-              : null,
+          /* ملفُّ المستند: فيه ما نقص بعينه، والحقلُ يُكتب في مكانه، وشرحُ ما قرّره النظام */
+          fixHref: p.doc.documentId ? documentHref(p.doc.documentId, "fix") : null,
+          /* عرضُ السعر والعقدُ لا صيغةَ لهما عمداً — لا شيء ناقصٌ فيهما */
+          byDesign: !["TAX_INVOICE", "SIMPLIFIED_INVOICE", "STATEMENT"].includes(p.doc.kind),
         }]
       : []);
 

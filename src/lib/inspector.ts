@@ -12,6 +12,7 @@ const INSPECTOR_PATHS: readonly RegExp[] = [
   /^\/purchases\/invoices\/[^/]+$/,
   /^\/inventory\/items\/[^/]+$/,
   /^\/bank\/tx\/[^/]+$/,
+  /^\/documents\/file\/[^/]+$/,
 ];
 
 /** المسارُ وحده، بلا استعلامٍ ولا مرساة. */

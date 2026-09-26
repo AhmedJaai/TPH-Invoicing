@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CircleAlert, CircleCheck, PenLine, X } from "lucide-react";
+import { ArrowLeft, CircleAlert, CircleCheck, PenLine, X } from "lucide-react";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
 
@@ -28,7 +29,7 @@ interface Proposal {
 interface Preview {
   summary: { archived: number; onStandard: number; toRename: number; cannot: number };
   proposals: Proposal[];
-  cannot: { current: string; reason: string; fixHref: string | null }[];
+  cannot: { current: string; reason: string; fixHref: string | null; byDesign?: boolean }[];
 }
 
 export function DriveRename() {
@@ -157,7 +158,7 @@ export function DriveRename() {
               ["مؤرشَفة", data.summary.archived, ""],
               ["على الصيغة", data.summary.onStandard, "text-ok"],
               ["تحتاج تسمية", data.summary.toRename, data.summary.toRename ? "text-warn" : ""],
-              ["ينقصها بيانات", data.summary.cannot, ""],
+              ["ينقصها بيانات", data.cannot.filter((c) => !c.byDesign).length, data.cannot.some((c) => !c.byDesign) ? "text-warn" : ""],
             ].map(([label, value, cls]) => (
               <div key={String(label)} className="rounded-lg bg-sunken px-3 py-2">
                 <p className="text-[11px] text-muted">{label}</p>
@@ -212,27 +213,44 @@ export function DriveRename() {
             </ul>
           )}
 
-          {data.cannot.length > 0 && (
+          {/*
+            ما لا يُبنى له اسم قسمان: ناقصٌ يُكمَل (فاتورةٌ بلا تاريخ، مورّدٌ غير
+            مسجَّل) — ولكلٍّ ملفُّه وفيه الحقلُ يُكتب ويُقيَّد، وشرحُ ما قرّره
+            النظام؛ وما لا صيغةَ له عمداً (عرضُ سعر، عقد) — يُقال ولا يُطلب فيه شيء.
+          */}
+          {data.cannot.some((c) => !c.byDesign) && (
+            <div className="mt-3 rounded-xl border border-warn/25 bg-warn-bg/60 p-3">
+              <p className="text-xs font-bold text-warn">ينقصها ما يُبنى به الاسم ({data.cannot.filter((c) => !c.byDesign).length}) — أكمِله في ملفّه ويُسمّى وحده</p>
+              <ul className="mt-2 space-y-1.5">
+                {data.cannot.filter((c) => !c.byDesign).map((c, i) => (
+                  <li key={i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg bg-raised px-3 py-2 text-[11px]">
+                    <span className="min-w-0">
+                      <span className="block truncate font-bold" dir="ltr">{c.current}</span>
+                      <span className="text-muted">{c.reason}</span>
+                    </span>
+                    {c.fixHref && (
+                      <Link href={c.fixHref} scroll={false} className={buttonClass("primary", "sm")}>
+                        أكمِل الناقص <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {data.cannot.some((c) => c.byDesign) && (
             <details className="mt-3">
               <summary className="cursor-pointer text-[11px] text-muted">
-                ينقصها ما يُبنى به الاسم ({data.cannot.length}) — أكمِل الناقص ثمّ أعد الفحص
+                لا صيغةَ لها عمداً ({data.cannot.filter((c) => c.byDesign).length}) — عروضُ أسعارٍ وعقود، لا شيء عليك فيها
               </summary>
-              {/*
-                كانت قائمةً ميّتة: تقول «لا رقم فاتورة مقيَّد له» وتقف.
-                والنقصُ ليس في التسمية بل في بيانات الفاتورة، وموضعُ
-                إصلاحه شاشةٌ أخرى — فصار لكلّ سطرٍ بابُه.
-              */}
               <ul className="mt-1.5 space-y-1">
-                {data.cannot.map((c, i) => (
-                  <li key={i} className="text-[11px] leading-relaxed text-muted">
+                {data.cannot.filter((c) => c.byDesign).map((c, i) => (
+                  <li key={i} className="flex flex-wrap items-center gap-x-2 text-[11px] leading-relaxed text-muted">
                     <span dir="ltr">{c.current}</span> — {c.reason}
                     {c.fixHref && (
-                      <>
-                         
-                        <a href={c.fixHref} className="font-bold text-ink underline underline-offset-4">
-                          أكمِل الناقص ←
-                        </a>
-                      </>
+                      <Link href={c.fixHref} scroll={false} className="font-bold text-accent hover:underline">
+                        افتح ملفّه — إن كان فاتورةً أخطأ نوعَها
+                      </Link>
                     )}
                   </li>
                 ))}

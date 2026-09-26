@@ -144,6 +144,7 @@ export function PageShell({
           <div className="min-w-0">
             {eyebrow && <p className="mb-1.5 text-xs font-medium text-muted">{eyebrow}</p>}
             <h1
+              dir="auto"
               className={
                 display
                   ? "font-display text-[2rem] font-black leading-[1.15] tracking-tight sm:text-[2.6rem]"

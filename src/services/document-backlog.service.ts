@@ -28,7 +28,7 @@ import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { recordAudit } from "@/lib/audit";
 import { MonthClosedError } from "@/services/validation.service";
 
-interface StoredReading {
+export interface StoredReading {
   documentKind?: string;
   supplierNameAr?: string;
   supplierNameEn?: string;
@@ -44,7 +44,8 @@ interface StoredReading {
 
 const INVOICE_KINDS = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE"]);
 
-async function loadSuppliers(): Promise<SupplierRecord[]> {
+/** المورّدون القائمون بأسمائهم البديلة — للمطابقة بالقراءة. يقرؤه قيدُ المستند باليد أيضاً. */
+export async function loadSuppliers(): Promise<SupplierRecord[]> {
   const rows = await db.select({
     id: suppliers.id, slug: suppliers.slug, nameAr: suppliers.nameAr, nameEn: suppliers.nameEn,
     driveFolderName: suppliers.driveFolderName, vatNumber: suppliers.vatNumber,
@@ -60,7 +61,7 @@ async function loadSuppliers(): Promise<SupplierRecord[]> {
   }));
 }
 
-function supplierByVatInName(list: readonly SupplierRecord[], fileName: string): SupplierRecord | undefined {
+export function supplierByVatInName(list: readonly SupplierRecord[], fileName: string): SupplierRecord | undefined {
   const vat = fileName.match(/(?:^|\D)(3\d{13}3)(?:\D|$)/)?.[1];
   if (!vat) return undefined;
   return list.find((s) => (s.vatNumber ?? "").replace(/\D/g, "") === vat);

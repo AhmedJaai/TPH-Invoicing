@@ -689,7 +689,7 @@ export function Sheet({
       aria-labelledby={titleId}
       onClose={onClose}
       onClick={(e) => { if (e.target === ref.current) onClose(); }}
-      className={`sheet m-0 mt-auto max-h-[92dvh] w-full max-w-none overflow-hidden rounded-t-2xl border border-line bg-overlay p-0 text-ink shadow-overlay sm:m-auto sm:rounded-2xl ${width}`}
+      className={`sheet m-0 mt-auto max-h-[92dvh] w-full max-w-none overflow-clip rounded-t-2xl border border-line bg-overlay p-0 text-ink shadow-overlay sm:m-auto sm:rounded-2xl ${width}`}
     >
       <div className="flex max-h-[92dvh] flex-col">
         <div className="grabber" aria-hidden {...handle} />

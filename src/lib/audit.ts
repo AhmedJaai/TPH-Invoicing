@@ -62,6 +62,7 @@ export type AuditAction =
   | "DOCUMENT_STATUS_CHANGED"
   /* أُعيدت قراءةُ مستندٍ مؤرشف — بما قُرئ وبعدد ما كُتب من بنود */
   | "DOCUMENT_REREAD"
+  | "DOCUMENT_RECORDED_BY_HAND"
   | "ALERT_RESOLVED"
   /* ── الجرد وتسوية المخزون ── */
   | "SALES_IMPORTED"
