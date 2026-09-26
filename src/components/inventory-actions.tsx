@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
-import { ConfirmAction } from "./ui-client";
-import { CalendarRange, ChevronLeft, ChevronRight, CircleAlert, RefreshCw, Store, TriangleAlert } from "lucide-react";
+import { ConfirmAction, Sheet } from "./ui-client";
+import { CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, CircleAlert, RefreshCw, Store, TriangleAlert } from "lucide-react";
 import { shiftDays, weekOf, type Week } from "@/lib/inventory/week";
 import { countNoun } from "@/lib/arabic";
 import { WEEK, formatWeek } from "./inventory-ui";
@@ -25,10 +25,15 @@ export function StartCount({
   defaultEnd,
   branches,
   prerequisite = null,
+  openWeekStart = null,
+  onSameWeek,
 }: {
   defaultStart: string;
   defaultEnd: string;
   branches: { id: string; name: string }[];
+  /** أسبوعُ جردٍ مفتوح — اختيارُه ثانيةً عودةٌ إليه لا جردٌ جديد. */
+  openWeekStart?: string | null;
+  onSameWeek?: () => void;
   /**
    * ما ينقص قبل أن يُحسَب فرق — يُقال بجانب الزرّ ولا يمنعه.
    *
@@ -45,6 +50,7 @@ export function StartCount({
 
   /* لا يُقترَح أسبوعٌ لم ينتهِ — فالفرقُ فيه أيّامٌ لم تمضِ لا فاقد */
   const atLatest = week.start >= defaultStart;
+  const sameAsOpen = openWeekStart !== null && week.start === openWeekStart;
 
   async function begin() {
     setBusy(true);
@@ -130,15 +136,29 @@ export function StartCount({
         </p>
       )}
 
+      {sameAsOpen && (
+        <p className="mt-4 flex items-start gap-2 rounded-lg border border-accent-line bg-accent-soft/60 px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
+          <CalendarRange className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2} aria-hidden />
+          <span>هذا أسبوعُ الجرد المفتوح نفسُه — عُد إليه وأكمله، أو اختر أسبوعاً آخر بالسهمين.</span>
+        </p>
+      )}
+
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={begin}
-          disabled={busy}
-          className={`${buttonClass(prerequisite ? "secondary" : "primary", "lg")} w-full sm:w-auto`}
-        >
-          {busy ? "يُهيَّأ الجرد…" : "ابدأ جردَ هذا الأسبوع"}
-        </button>
+        {sameAsOpen ? (
+          <button type="button" onClick={onSameWeek} className={`${buttonClass("primary", "lg")} w-full sm:w-auto`}>
+            عُد إلى الجرد المفتوح
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={begin}
+            aria-busy={busy}
+            disabled={busy}
+            className={`${buttonClass(prerequisite ? "secondary" : "primary", "lg")} w-full sm:w-auto`}
+          >
+            ابدأ جردَ هذا الأسبوع
+          </button>
+        )}
         {error && (
           <p role="alert" className="flex items-start gap-1.5 text-xs leading-relaxed text-danger">
             <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
@@ -283,6 +303,52 @@ export function RecomputeCount({ countId }: { countId: string }) {
         أعِد الحساب
       </button>
       {error && <span role="alert" className="ms-2 text-xs text-danger">{error}</span>}
+    </>
+  );
+}
+
+/**
+ * «ابدأ جرداً جديداً» — والجردُ المفتوحُ لم يُقفَل بعد.
+ *
+ * كانت شاشةُ «الجرد الحالي» تعرض المفتوحَ وحده، فمن ترك جرداً ناقصاً لا
+ * يبدأ غيرَه إلّا أن يُقفله. والخدمةُ لم تمنع ذلك قطّ: تمنع **تداخلَ**
+ * الأسابيع وحده (`OverlappingPeriodError`). فيُبدأ الجديد لأسبوعٍ آخر،
+ * ويبقى السابقُ مسوّدةً كما هو يُعاد إليه من «جرودٌ مفتوحة».
+ */
+export function NewCount({
+  defaultStart,
+  defaultEnd,
+  branches,
+  openWeek,
+}: {
+  defaultStart: string;
+  defaultEnd: string;
+  branches: { id: string; name: string }[];
+  /** أسبوعُ الجرد المفتوح — يُذكَر كي لا يُظنّ أنّه يُحذَف. */
+  openWeek: { start: string; end: string };
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={buttonClass("secondary", "sm")}>
+        <CalendarPlus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
+        ابدأ جرداً جديداً
+      </button>
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title="جردٌ جديد"
+        description={`جردُ أسبوع ${formatWeek(openWeek.start, openWeek.end)} يبقى مفتوحاً كما هو — تعود إليه متى شئت وتُكمله أو تُقفله. والجديدُ لأسبوعٍ غيره.`}
+        size="md"
+      >
+        <StartCount
+          defaultStart={defaultStart}
+          defaultEnd={defaultEnd}
+          branches={branches}
+          openWeekStart={openWeek.start}
+          onSameWeek={() => setOpen(false)}
+        />
+      </Sheet>
     </>
   );
 }

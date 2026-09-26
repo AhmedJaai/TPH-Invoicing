@@ -1,15 +1,15 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { ArrowLeft, BookOpen, ClipboardCheck, FileSpreadsheet, History, Package, Sparkles } from "lucide-react";
 import { db } from "@/db";
-import { branches } from "@/db/schema";
+import { branches, inventoryCounts } from "@/db/schema";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Card, LinkButton, NoAccess, Section } from "@/components/ui";
 import { Money } from "@/components/money";
-import { StartCount } from "@/components/inventory-actions";
+import { NewCount, StartCount } from "@/components/inventory-actions";
 import { InventoryWorkspace } from "@/components/inventory-workspace";
 import {
   COUNT, DIRECTION, EquationExplainer, FactTile, RECIPE, SetupJourney, formatWeek, isStepId,
@@ -56,11 +56,22 @@ export default async function InventoryPage({
   if (setup.openCountId) {
     const header = await loadCountHeader(setup.openCountId);
     if (header) {
-      const [report, scope, inputs] = await Promise.all([
+      const [report, scope, inputs, otherDrafts, branchList] = await Promise.all([
         recomputeCount(header.id),
         loadScope(header.id),
         loadWorkspaceInputs(header),
+        /* جرودٌ مفتوحةٌ غيرُه — بُدئ جديدٌ قبل أن تُقفَل، فلا تضيع */
+        db.select({ id: inventoryCounts.id, start: inventoryCounts.periodStart, end: inventoryCounts.periodEnd })
+          .from(inventoryCounts)
+          .where(and(eq(inventoryCounts.status, "DRAFT"), ne(inventoryCounts.id, header.id)))
+          .orderBy(desc(inventoryCounts.periodEnd)),
+        db.select({ id: branches.id, nameAr: branches.nameAr })
+          .from(branches)
+          .where(eq(branches.isActive, true))
+          .orderBy(asc(branches.nameAr)),
       ]);
+      const canCountHere = can(user.role, "inventory:count");
+      const newestWeek = lastCompleteWeek();
       return (
         <PageShell
           user={user}
@@ -68,8 +79,34 @@ export default async function InventoryPage({
           eyebrow={`جردٌ مفتوح${header.branchName ? ` · ${header.branchName}` : ""}`}
           title="الجرد الحالي"
           intro={`أسبوع ${formatWeek(header.periodStart, header.periodEnd)} — ما كان ينبغي أن يبقى على الرفّ، مقابلَ ما وُجد فعلاً.`}
-          actions={showAmounts ? <LinkButton href="/inventory/history" size="sm" icon={History}>سجلّ الجرد</LinkButton> : undefined}
+          actions={
+            <>
+              {canCountHere && (
+                <NewCount
+                  defaultStart={newestWeek.start}
+                  defaultEnd={newestWeek.end}
+                  branches={branchList.map((b) => ({ id: b.id, name: b.nameAr }))}
+                  openWeek={{ start: header.periodStart, end: header.periodEnd }}
+                />
+              )}
+              {showAmounts && <LinkButton href="/inventory/history" size="sm" icon={History}>سجلّ الجرد</LinkButton>}
+            </>
+          }
         >
+          {otherDrafts.length > 0 && (
+            <nav aria-label="جرودٌ مفتوحةٌ أخرى" className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-sunken/50 px-4 py-3 text-xs">
+              <span className="font-bold text-muted">{otherDrafts.length === 1 ? "جردٌ آخرُ مفتوح:" : "جرودٌ أخرى مفتوحة:"}</span>
+              {otherDrafts.map((d) => (
+                <Link
+                  key={d.id}
+                  href={`/inventory/counts/${d.id}`}
+                  className="rounded-full border border-line bg-raised px-3 py-1.5 font-bold hover:border-accent-line hover:bg-hover"
+                >
+                  أسبوع {formatWeek(String(d.start), String(d.end))}
+                </Link>
+              ))}
+            </nav>
+          )}
           <InventoryWorkspace
             header={header}
             report={report}
