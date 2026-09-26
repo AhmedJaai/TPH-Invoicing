@@ -13,7 +13,7 @@
  * **والشرحُ من الدوالّ التي قرّرت** (`autoArchive` · `canonicalName` ·
  * `missingFromReading`) لا نصٌّ يُكتب ثانيةً — فلا يفترق القرارُ عن تفسيره.
  */
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, documents, invoices, statements, suppliers, users } from "@/db/schema";
 import { autoArchive, sumLineTotals, type AutoArchiveVerdict } from "@/lib/extraction/auto-archive";
@@ -235,13 +235,4 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
     name,
     history,
   };
-}
-
-/** المستنداتُ الأحدث — لتنقّلٍ بين ملفّ وملفّ بلا رجوعٍ إلى القائمة. */
-export async function documentNeighbours(id: string, uploadedAt: Date): Promise<{ newer: string | null; older: string | null }> {
-  const [newer] = await db.select({ id: documents.id }).from(documents)
-    .where(sql`${documents.uploadedAt} > ${uploadedAt}`).orderBy(asc(documents.uploadedAt)).limit(1);
-  const [older] = await db.select({ id: documents.id }).from(documents)
-    .where(sql`${documents.uploadedAt} < ${uploadedAt} and ${documents.id} <> ${id}`).orderBy(desc(documents.uploadedAt)).limit(1);
-  return { newer: newer?.id ?? null, older: older?.id ?? null };
 }

@@ -5,6 +5,9 @@ import { RecordRefused, recordDocumentByHand } from "./document-record.service";
 import { caught, makeDocument, makeInvoice, makeSupplier, withRollback } from "@/test/db";
 import type { Tx } from "./types";
 
+/* رقمُ المنشأة الضريبيّ — يحكم به `reviewConfirmed` على رقم المشتري، ولا يُضبط في بيئة CI */
+process.env.COMPANY_VAT_NUMBER ??= "310007971600003";
+
 async function someone(tx: Tx): Promise<string> {
   const [u] = await tx.insert(users).values({ email: `t-${Date.now()}-${Math.random()}@test.local` }).returning({ id: users.id });
   return u.id;
