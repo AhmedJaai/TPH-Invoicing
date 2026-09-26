@@ -77,6 +77,22 @@ export function formatWeekday(value: Date | string): string {
   return Number.isNaN(d.getTime()) ? String(value) : `${WEEKDAY.format(d)} ${DAY_NUM.format(d)}`;
 }
 
+const CLOCK = new Intl.DateTimeFormat("ar-SA-u-nu-latn-ca-gregory", { timeZone: RIYADH, hour: "numeric", minute: "2-digit" });
+const DAY_NAME = new Intl.DateTimeFormat("ar-SA-u-nu-latn-ca-gregory", { timeZone: RIYADH, weekday: "long", day: "numeric", month: "long" });
+
+/**
+ * لحظةٌ بساعتها بتوقيت الرياض: «اليوم 3:12 ص» · «أمس 4:05 م» · «السبت، 26 سبتمبر · 3:12 ص».
+ * لما يُسأل عنه «متى بالضبط؟» — آخرُ مزامنة، آخرُ تسمية — لا «قبل ساعة» وحدها.
+ */
+export function formatMoment(value: Date, at: Date = new Date()): string {
+  const day = todayInRiyadh(value);
+  const days = daysSinceRiyadh(day, at);
+  const clock = CLOCK.format(value);
+  if (days === 0) return `اليوم ${clock}`;
+  if (days === 1) return `أمس ${clock}`;
+  return `${DAY_NAME.format(value)} · ${clock}`;
+}
+
 /** «أغسطس 2026» من `YYYY-MM`. */
 export function formatMonth(month: string): string {
   if (!/^\d{4}-\d{2}$/.test(month)) return month;

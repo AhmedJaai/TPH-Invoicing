@@ -116,6 +116,10 @@ export interface DriveActivity {
 export interface DriveStatus extends DriveHeartbeat {
   /** الكتابةُ على الدرايف (التسمية) — في الإنتاج وحده. */
   writesAllowed: boolean;
+  /** آخرُ مزامنةٍ وجدت جديداً فسجّلته (`DRIVE_SYNCED`). */
+  lastFoundAt: Date | null;
+  /** آخرُ تسميةٍ وقعت في الدرايف (`DRIVE_FILE_RENAMED`). */
+  lastRenamedAt: Date | null;
   fromDrive: number;
   lastArrivalAt: Date | null;
   arrivedLast7Days: number;
@@ -192,7 +196,7 @@ export async function loadDriveHeartbeat(userId: string): Promise<DriveHeartbeat
 export async function loadDriveStatus(userId: string): Promise<DriveStatus> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000);
 
-  const [beat, arrivals, waiting, named, recentRows] = await Promise.all([
+  const [beat, arrivals, waiting, named, recentRows, lastActs] = await Promise.all([
     loadDriveHeartbeat(userId),
     db
       .select({
@@ -212,7 +216,16 @@ export async function loadDriveStatus(userId: string): Promise<DriveStatus> {
       .where(inArray(auditLogs.action, ["DRIVE_SYNCED", "DRIVE_FILE_RENAMED"]))
       .orderBy(desc(auditLogs.at))
       .limit(8),
+    db
+      .select({ action: auditLogs.action, at: sql<Date | null>`max(${auditLogs.at})` })
+      .from(auditLogs)
+      .where(inArray(auditLogs.action, ["DRIVE_SYNCED", "DRIVE_FILE_RENAMED"]))
+      .groupBy(auditLogs.action),
   ]);
+  const lastOf = (action: string) => {
+    const at = lastActs.find((r) => r.action === action)?.at;
+    return at ? new Date(at) : null;
+  };
 
   const naming = { known: named.length, onStandard: 0, toRenameArchived: 0, toRenamePending: 0, cannot: 0 };
   for (const d of named) {
@@ -227,6 +240,8 @@ export async function loadDriveStatus(userId: string): Promise<DriveStatus> {
   return {
     ...beat,
     writesAllowed: driveWritesAllowed(process.env),
+    lastFoundAt: lastOf("DRIVE_SYNCED"),
+    lastRenamedAt: lastOf("DRIVE_FILE_RENAMED"),
     fromDrive: a?.total ?? 0,
     lastArrivalAt: a?.last ? new Date(a.last) : null,
     arrivedLast7Days: a?.week ?? 0,

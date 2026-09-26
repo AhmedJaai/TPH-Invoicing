@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  currentMonthRiyadh, dayOfMonthRiyadh, daysSinceRiyadh, formatDay, formatMonth, formatRange, formatWeekday, todayInRiyadh,
+  currentMonthRiyadh, dayOfMonthRiyadh, daysSinceRiyadh, formatDay, formatMoment, formatMonth, formatRange, formatWeekday, todayInRiyadh,
 } from "./riyadh-time";
 
 describe("الشهر بتوقيت الرياض", () => {
@@ -68,5 +68,20 @@ describe("daysSinceRiyadh", () => {
 describe("formatWeekday", () => {
   it("اسمُ اليوم ورقمُه بتوقيت الرياض", () => {
     expect(formatWeekday("2026-09-27")).toBe("الأحد 27");
+  });
+});
+
+describe("formatMoment", () => {
+  const now = new Date("2026-09-26T09:00:00Z"); // 12:00 م بتوقيت الرياض
+  it("اليومُ وأمسُ باسمهما، والساعةُ بتوقيت الرياض", () => {
+    expect(formatMoment(new Date("2026-09-26T00:12:00Z"), now)).toBe("اليوم 3:12 ص");
+    expect(formatMoment(new Date("2026-09-25T13:05:00Z"), now)).toBe("أمس 4:05 م");
+  });
+  it("ما قبل أمس باسم يومه وتاريخه", () => {
+    expect(formatMoment(new Date("2026-09-23T06:30:00Z"), now)).toBe("الأربعاء، 23 سبتمبر · 9:30 ص");
+  });
+  it("منتصفُ الليل بتوقيت الرياض يفصل اليوم عن أمس — لا توقيتُ غرينتش", () => {
+    // 21:30 غرينتش يوم ٢٥ = 00:30 الرياض يوم ٢٦
+    expect(formatMoment(new Date("2026-09-25T21:30:00Z"), now)).toBe("اليوم 12:30 ص");
   });
 });

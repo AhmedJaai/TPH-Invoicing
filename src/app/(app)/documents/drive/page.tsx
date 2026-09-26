@@ -1,16 +1,17 @@
 import { redirect } from "next/navigation";
 import {
-  Archive, CircleCheck, Clock, CloudOff, FileSearch, FolderSync, History, Inbox, PenLine, ShieldCheck, TriangleAlert,
+  Archive, FileSearch, FolderSync, History, Inbox, PenLine, ShieldCheck,
 } from "lucide-react";
 import { signIn } from "@/auth";
 import { PageShell } from "@/components/page-shell";
 import { DriveSync } from "@/components/drive-sync";
 import { DriveRename } from "@/components/drive-rename";
-import { Callout, EmptyState, KeyFigure, LinkButton, Section, Timeline, buttonClass, type TimelineItem } from "@/components/ui";
+import { EmptyState, KeyFigure, LinkButton, Section, Timeline, type TimelineItem } from "@/components/ui";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { DOCUMENT, FILE, countNoun, timeAgo } from "@/lib/arabic";
-import { formatDay } from "@/lib/riyadh-time";
+import { formatDay, formatMoment } from "@/lib/riyadh-time";
+import { DriveSyncNow } from "@/components/drive-sync-now";
 import { loadDriveStatus, type DriveStatus } from "@/services/drive-status.service";
 
 export const dynamic = "force-dynamic";
@@ -48,26 +49,9 @@ export default async function DrivePage() {
       title="الدرايف"
       intro="أرشيفُ المقهى في جوجل درايف: يُقرأ الجديدُ منه وحده، ويُسمّى المؤرشَفُ على الصيغة وحده. هنا حالُه وما فعله — والتحكّمُ اليدويّ إن لم ترد الانتظار."
     >
-      <StatusBanner s={s} reconnect={reconnect} />
+      <DriveSyncNow {...statusCopy(s)} state={s.state} facts={syncFacts(s)} reconnect={reconnect} />
 
-      <div className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <KeyFigure
-          icon={Clock}
-          label="آخرُ فحص"
-          tone={s.failure ? "danger" : s.checkedAt ? "ok" : undefined}
-          value={
-            s.checkedAt
-              ? <span className="text-[1.35rem] sm:text-[1.6rem]">{timeAgo(s.checkedAt)}</span>
-              : <span className="text-[1.35rem] text-muted">لم يُفحص بعد</span>
-          }
-          sub={
-            s.failure
-              ? `وتعثّر فحصٌ بعده ${timeAgo(s.failure.at)}.`
-              : s.checkedAt
-                ? "ويُعاد كلَّ ثلاث ساعات والتطبيقُ مفتوح."
-                : "يُسجَّل هنا أوّلَ ما يُفحص الدرايف."
-          }
-        />
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
         <KeyFigure
           icon={Archive}
           label="في الأرشيف"
@@ -136,9 +120,9 @@ export default async function DrivePage() {
 
       <Section
         id="manual"
-        title="افعلها الآن"
+        title="أدواتٌ مفصّلة"
         icon={FileSearch}
-        hint="للمستعجل: وضعتَ ملفّاً في الدرايف بيدك ولا تريد انتظار الفحص القادم، أو تريد أن ترى ما سيُسمّى قبل أن يُسمّى."
+        hint="«زامن الآن» أعلاه يفعل كلَّ شيء. وهنا لمن يريد أن يرى قبل أن يُسجَّل شيء: ما الجديد في الدرايف، وما سيُسمّى — ويختار ملفّاً ملفّاً."
         className="mt-12"
       >
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
@@ -212,50 +196,56 @@ function activityItem(a: DriveStatus["recent"][number]): TimelineItem {
   };
 }
 
-/** الحالُ بجملةٍ واحدة، وفعلُها بجانبها. */
-function StatusBanner({ s, reconnect }: { s: DriveStatus; reconnect: () => Promise<void> }) {
-  const reconnectButton = (
-    <form action={reconnect}>
-      <button type="submit" className={buttonClass("primary", "sm")}>أعد ربط الدرايف</button>
-    </form>
-  );
+/** الحالُ بجملة، وسببُها — بالحكم الواحد (`driveState`). */
+function statusCopy(s: DriveStatus): { headline: string; detail: string } {
+  switch (s.state) {
+    case "preview":
+      return {
+        headline: "نسخةُ تجربة: الدرايف غير موصول هنا — عمداً",
+        detail: "تدخل هذه النسخةَ بلا تسجيل دخول، فلا تستعير تفويضَ درايف المالك كي لا يُكتب في الأرشيف الحقيقيّ. الأرقامُ أدناه من نسخة البيانات.",
+      };
+    case "disconnected":
+      return {
+        headline: "الدرايف غير موصول بحسابك",
+        detail: "لا تفويضَ درايف محفوظٌ لحسابك، فلا مزامنةَ ولا تسمية. أعد الربط ووافق على صلاحية الدرايف في صفحة جوجل.",
+      };
+    case "failing":
+      return {
+        headline: `توقّفت المزامنة ${s.failure ? timeAgo(s.failure.at) : ""}`.trim(),
+        detail: s.failure?.reason ?? "تعذّر الفحص.",
+      };
+    case "unchecked":
+      return {
+        headline: "لم تُسجَّل مزامنةٌ بعد",
+        detail: "تقع وحدها في الدقائق الأولى من فتح التطبيق ثمّ كلَّ ثلاث ساعات — أو اضغط «زامن الآن».",
+      };
+    case "ok":
+      return {
+        headline: "المزامنةُ تعمل وحدها",
+        detail: s.writesAllowed
+          ? "كلَّ ثلاث ساعات والتطبيقُ مفتوح، والتسميةُ كلَّ عشر دقائق. لا حاجةَ لزرّ — إلّا إن وضعتَ ملفّاً الآن ولا تريد الانتظار."
+          : "والتسميةُ موقوفةٌ في هذه البيئة — تقع من الإنتاج وحده، فالأرشيف واحدٌ لا نسخةَ له.",
+      };
+  }
+}
 
-  if (s.state === "preview") {
-    return (
-      <Callout tone="info" icon={CloudOff} title="نسخةُ تجربة: الدرايف غير موصول هنا — عمداً">
-        تدخل هذه النسخةَ بلا تسجيل دخول، فلا تستعير تفويضَ درايف المالك؛ كي لا يُكتب في الأرشيف الحقيقيّ من بيئة
-        تجربة. الأرقامُ أدناه من نسخة البيانات. وفي التطبيق الحقيقيّ — بعد الدخول بحساب جوجل — تجري المزامنةُ
-        والتسميةُ وحدهما، وتظهر حالُهما هنا.
-      </Callout>
-    );
-  }
-  if (s.state === "disconnected") {
-    return (
-      <Callout tone="danger" icon={CloudOff} title="الدرايف غير موصول بحسابك" action={reconnectButton}>
-        لا تفويضَ درايف محفوظٌ لحسابك، فلا مزامنةَ ولا تسمية. أعد الربط ووافق على صلاحية الدرايف في صفحة جوجل.
-      </Callout>
-    );
-  }
-  if (s.state === "failing" && s.failure) {
-    return (
-      <Callout tone="danger" icon={TriangleAlert} title={`توقّفت المزامنة ${timeAgo(s.failure.at)}`} action={reconnectButton}>
-        {s.failure.reason}
-        {s.checkedAt && <> · آخرُ فحصٍ نجح {timeAgo(s.checkedAt)}.</>}
-      </Callout>
-    );
-  }
-  if (s.state === "unchecked" || !s.checkedAt) {
-    return (
-      <Callout tone="info" icon={Clock} title="لم يُسجَّل فحصٌ للدرايف بعد">
-        يُفحص وحده في الدقائق الأولى من فتح التطبيق، ثمّ كلَّ ثلاث ساعات. أو افحص الآن من «افحص الآن» أسفل الصفحة.
-      </Callout>
-    );
-  }
-  return (
-    <Callout tone="ok" icon={CircleCheck} title={`المزامنةُ تعمل وحدها — آخرُ فحصٍ ${timeAgo(s.checkedAt)}`}>
-      {s.writesAllowed
-        ? "والتسميةُ الآليّة تعمل: ما يُؤرشَف باسمٍ خارج الصيغة يُسمّى في دقائق."
-        : "والتسميةُ موقوفةٌ في هذه البيئة — تقع من الإنتاج وحده، فالأرشيف واحدٌ لا نسخةَ له."}
-    </Callout>
-  );
+/** متى بالضبط — بتوقيت الرياض، و«منذ» تحته. */
+function syncFacts(s: DriveStatus): { label: string; value: string; hint?: string }[] {
+  return [
+    {
+      label: "آخرُ مزامنة",
+      value: s.checkedAt ? formatMoment(s.checkedAt) : "لم تُسجَّل بعد",
+      hint: s.checkedAt ? timeAgo(s.checkedAt) : "تُسجَّل أوّلَ ما يُفحص الدرايف",
+    },
+    {
+      label: "آخرُ مرّةٍ وجدت جديداً",
+      value: s.lastFoundAt ? formatMoment(s.lastFoundAt) : "لم تجد بعد",
+      hint: s.lastArrivalAt ? `آخرُ مستندٍ دخل الأرشيف ${formatDay(s.lastArrivalAt)}` : undefined,
+    },
+    {
+      label: "آخرُ تسمية",
+      value: s.lastRenamedAt ? formatMoment(s.lastRenamedAt) : "لم تقع بعد",
+      hint: s.writesAllowed ? "تعمل وحدها كلَّ عشر دقائق" : "من الإنتاج وحده",
+    },
+  ];
 }

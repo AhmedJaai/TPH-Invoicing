@@ -63,10 +63,10 @@ const ACTIONS: readonly Command[] = [
   },
   {
     id: "drive-sync",
-    label: "افحص الدرايف عن ملفات جديدة",
-    hint: "حالُ المزامنة والتسمية، والفحصُ الآن",
+    label: "زامن الدرايف الآن",
+    hint: "آخرُ مزامنة، والفحصُ والأرشفةُ والتسميةُ بضغطة",
     group: "ACTION",
-    href: "/documents/drive#manual",
+    href: "/documents/drive",
     needs: "document:upload",
     keywords: ["درايف", "مزامنه", "drive", "sync", "جوجل", "تسميه", "اسماء", "rename", "ارشيف"],
   },
