@@ -12,7 +12,7 @@
  * وما لم يُقيَّد بعدها يُقال ما نقصه **بعينه** — لا «ينقصه ركن».
  */
 
-import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, statements, supplierAliases, suppliers } from "@/db/schema";
 import { reviewConfirmed } from "@/lib/confirm";
@@ -121,7 +121,8 @@ export interface BacklogOutcome {
  * «المفترض يبحث في الأرشيف ويتأكّد إذا مكرّرة أو لا، وإذا لم يجد أيّ
  * مشكلة يقيّدها». فيُقيَّد بشروطٍ كلّها:
  *   - نوعُه فاتورة: ما صنّفه إنسانٌ يحكم، ثمّ ما قرأه النموذج؛
- *   - مورّدُه مسجَّلٌ ومعروفٌ بالمستند أو بالرقم الضريبيّ أو بالاسم؛
+ *   - مورّدُه مسجَّلٌ ومعروفٌ بالمستند أو بالرقم الضريبيّ أو بالاسم،
+ *     **وقُيِّدت له فاتورةٌ من قبل** — أوّلُ فاتورةٍ من اسمٍ جديد بيد إنسان؛
  *   - الرقمُ والتاريخُ والإجماليُّ مقروءة، و`reviewConfirmed` بلا مانع
  *     (ومنه: الرقمُ الضريبيّ للمشتري ليس رقمَنا — فليست فاتورتَنا)؛
  *   - **ولا توأمَ لها** بين المقيَّد: الرقمُ نفسه بأيّ صيغة، أو اليومُ
@@ -150,7 +151,8 @@ export async function recordFromStoredReadings(
     .leftJoin(statements, eq(statements.documentId, documents.id))
     .where(and(
       inArray(documents.status, ["PENDING", "NEEDS_REVIEW", "ARCHIVED"]),
-      isNotNull(documents.extractionJson),
+      /* بلا قراءةٍ محفوظة: ما صُنّف فاتورةً يُقال إنّه ينتظر قراءةً — لا يُتخطّى صامتاً */
+      or(isNotNull(documents.extractionJson), inArray(documents.kind, ["TAX_INVOICE", "SIMPLIFIED_INVOICE"])),
       isNull(invoices.id),
       isNull(statements.id),
     ))
@@ -180,6 +182,10 @@ export async function recordFromStoredReadings(
     /* ما صنّفه إنسانٌ (أو المزامنةُ من المجلّد) يحكم، ثمّ ما قرأه النموذج */
     const kind = doc.kind && doc.kind !== "UNKNOWN" ? doc.kind : x.documentKind ?? "";
     if (!INVOICE_KINDS.has(kind) && kind !== "STATEMENT") continue;
+    if (doc.reading === null) {
+      out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["لم تُحفظ له قراءة — أعِد قراءته من ملفّه"] });
+      continue;
+    }
     /* ما سكت عنه النموذجُ ونطق به اسمُ الملفّ — سدٌّ لفراغ لا تصحيحٌ لقراءة */
     const fromName = factsFromFileName(doc.fileName);
 
@@ -285,6 +291,19 @@ export async function recordFromStoredReadings(
     }
     if (review.blockers.length > 0) {
       out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: review.blockers.map((b) => b.message) });
+      continue;
+    }
+    /*
+      «المورّدُ المعروف» مَن قُيِّدت له فاتورةٌ من قبل. أوّلُ فاتورةٍ من اسمٍ
+      جديد تُقيَّد بيد — «سبعة جرة» عميلٌ سُجّل مورّداً، وكادت تُقيَّد عليه
+      فاتورةُ بيعٍ مشترياتٍ بـ١٬١٠٠ ريال.
+    */
+    if (!recordedInvoices.some((r) => r.supplierId === supplier.id)) {
+      out.missing.push({
+        documentId: doc.id,
+        fileName: doc.fileName,
+        reasons: [`${supplier.nameAr}: لم تُقيَّد له فاتورةٌ من قبل — أوّلُ فاتورةٍ من مورّدٍ جديد تُقيَّد بيدك`],
+      });
       continue;
     }
     const twin = findInvoiceTwin(recordedInvoices, { supplierId: supplier.id, invoiceNumber: number, invoiceDate: date, totalMinor });
