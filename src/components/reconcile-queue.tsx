@@ -380,7 +380,10 @@ export function ReconcileQueue({
                 <SupplierPicker chipsOnly text={suggestText} suppliers={suggested} value="" onChange={(id) => { setKind("SUPPLIER"); setSupplierId(id); }} disabled={busy !== null} />
               )}
               {kind === "SUPPLIER" && (
-                <SupplierPicker text={suggestText} suppliers={suppliers} value={supplierId} onChange={setSupplierId} disabled={busy !== null} />
+                <SupplierPicker
+                  text={suggestText} suppliers={suppliers} value={supplierId} onChange={setSupplierId} disabled={busy !== null}
+                  canCreate={canEdit} createName={group.items[0].beneficiaryRaw ?? ""}
+                />
               )}
 
               {kind !== null && kind !== "SUPPLIER" && (

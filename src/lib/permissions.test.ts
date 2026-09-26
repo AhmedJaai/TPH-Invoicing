@@ -62,3 +62,16 @@ describe("قائمة الدخول البيضاء", () => {
     expect(parseAllowlist("").size).toBe(0);
   });
 });
+
+describe("مَن يصنّف حركات البنك يُنشئ مورّداً", () => {
+  /*
+    «ليس في القائمة؟ مورّدٌ جديد» يظهر في شاشات البنك لمن يملك `bank:edit`
+    (استيرادُ الكشف، والطابور، ومراجعةُ الحركات) — فإن فقد دورٌ `supplier:edit`
+    صار الزرُّ ميّتاً يُردّ بـ403.
+  */
+  it("كلُّ دورٍ له bank:edit له supplier:edit", () => {
+    for (const role of ["OWNER", "ACCOUNTANT", "PURCHASING"] as const) {
+      if (can(role, "bank:edit")) expect(can(role, "supplier:edit")).toBe(true);
+    }
+  });
+});

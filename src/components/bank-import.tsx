@@ -14,6 +14,7 @@ import { formatDay } from "@/lib/riyadh-time";
 import { Money } from "./money";
 import { Badge, buttonClass } from "./ui";
 import { toast } from "./ui-client";
+import { SupplierPicker } from "./supplier-picker";
 
 interface Coverage {
   from: string | null;
@@ -46,6 +47,7 @@ interface UnknownTx {
   amountMinor: number;
   description: string;
   suggestedAlias: string;
+  beneficiary?: string | null;
   suggestedCategory: TxCategory;
 }
 
@@ -148,19 +150,6 @@ function UnknownRow({
             ))}
           </select>
 
-          {needsSupplier && (
-            <select
-              aria-label="المورّد"
-              value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
-              className={`min-w-[9rem] flex-1 ${field}`}
-            >
-              <option value="">اختر المورّد…</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>{s.nameAr}</option>
-              ))}
-            </select>
-          )}
 
           <input
             aria-label="النصّ المميِّز في وصف الحركة"
@@ -174,6 +163,21 @@ function UnknownRow({
           <button aria-busy={state === "saving"} onClick={save} disabled={!ready || state === "saving"} className={buttonClass("primary", "sm")}>
             صنّفها
           </button>
+
+          {needsSupplier && (
+            /* المستفيدُ الذي لا يُعرف مورّداً يُنشأ هنا — ما يُستورَد به الكشفُ لا ينحصر في المسجَّل */
+            <div className="w-full [&>div]:mt-0">
+              <SupplierPicker
+                text={[tx.beneficiary, tx.description].filter(Boolean).join(" ")}
+                suppliers={suppliers}
+                value={supplierId}
+                onChange={setSupplierId}
+                disabled={state === "saving"}
+                canCreate
+                createName={tx.beneficiary || tx.suggestedAlias}
+              />
+            </div>
+          )}
 
           {state === "error" && message && (
             <p role="alert" className="w-full text-[11px] font-bold text-danger">{message}</p>

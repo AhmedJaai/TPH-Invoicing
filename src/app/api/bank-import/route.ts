@@ -524,6 +524,8 @@ async function handle(request: Request) {
           amountMinor: tx.amountMinor,
           description: tx.description.slice(0, 140),
           suggestedAlias: suggestAlias(tx.beneficiaryRaw ?? tx.description),
+          /* اسمُ المستفيد كما كتبه البنك — منه يُقترح اسمُ المورّد الجديد، لا من النصّ الموحَّد للمطابقة */
+          beneficiary: tx.beneficiaryRaw?.trim() || null,
           // اقتراح يُعرض لا حكم يُنفَّذ — الكلمة قد تخدع
           suggestedCategory: suggestCategory(`${tx.description} ${tx.transactionType}`),
           why: r.classificationReason,
