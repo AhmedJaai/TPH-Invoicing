@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Copy, FileCheck2, FileQuestion, Link2, ScanSearch } from "lucide-react";
+import { ArrowLeft, CircleHelp, Copy, FileCheck2, FileQuestion, Link2, ScanSearch } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { documentHref } from "@/lib/document-labels";
 import { formatDay } from "@/lib/riyadh-time";
@@ -261,9 +261,43 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
               </section>
             )}
 
+            {p.unproven.length > 0 && (
+              <section aria-labelledby="ar-unproven">
+                <h3 id="ar-unproven" className="flex items-center gap-2 text-sm font-bold">
+                  <CircleHelp className="h-4 w-4 text-warn" strokeWidth={2} aria-hidden />
+                  {`قيّدتَها بيدك حوالةً ولا تظهر في الكشف — ${countNoun(p.unproven.length, PAYMENT)}`}
+                </h3>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                  يومُها داخلَ ما استُورد من كشف البنك ولا حوالةَ فيه تقابلها. فإمّا دُفعت من حسابٍ آخر — فسجّلها «من حساب المالك» من فاتورتها —
+                  وإمّا لم تُدفع بعد. لا يُغيَّر فيها شيءٌ هنا.
+                </p>
+                <ul className="mt-2 divide-y divide-line-soft rounded-lg border border-line-soft">
+                  {p.unproven.map((u) => (
+                    <li key={u.paymentId}>
+                      <Link
+                        href={u.invoices[0] ? `/purchases/invoices/${u.invoices[0].id}` : `/suppliers/${u.supplierSlug}?tab=payments#detail`}
+                        className="flex items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-sunken"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-bold">{u.supplierName}</span>
+                          <span className="block truncate text-muted" dir="auto">
+                            {formatDay(u.day)}{u.invoices.length > 0 ? ` · ${u.invoices.map((i) => i.number).join("، ")}` : " · لم تُخصَّص على فاتورة"}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <Money minor={u.amountMinor} />
+                          <ArrowLeft className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
             {p.invoices.missing.length > 0 && <LeftForYou missing={p.invoices.missing} />}
 
-            {nothing && p.invoices.missing.length === 0 && (
+            {nothing && p.invoices.missing.length === 0 && p.unproven.length === 0 && (
               <p className="text-xs leading-relaxed text-muted">
                 كلُّ فاتورةٍ في الأرشيف مقيَّدة، ولا دفعةَ قُيِّدت مرّتين. «انسب الأرصدة» يخصم ما دفعتَه ولم يُنسب من فواتير كلّ مورّد.
               </p>

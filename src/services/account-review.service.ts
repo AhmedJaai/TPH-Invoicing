@@ -328,10 +328,64 @@ export async function linkExactHandPayments(actorId: string, notes: string[]): P
   return linked;
 }
 
+/* ─────────────── سدادٌ بيدٍ «حوالةً» لا يظهر في الكشف ─────────────── */
+
+export interface UnprovenHandPayment {
+  paymentId: string;
+  supplierName: string;
+  supplierSlug: string;
+  day: string;
+  amountMinor: number;
+  invoices: { id: string; number: string }[];
+}
+
+/**
+ * «سُدّدت» حوالةً من حساب المقهى، ويومُها داخلَ ما استُورد من الكشف بأيّام،
+ * ولا حوالةَ في الكشف تقابلها ولا مرشّحةَ للربط. إقرارٌ بلا دليل: إمّا من حسابٍ
+ * آخر (فهي «من حساب المالك»)، وإمّا لم تُدفع بعد. يُعرض ولا يُمسّ.
+ */
+export async function loadUnprovenHandPayments(conn: Conn = db, linked: readonly HandPaymentLink[] = []): Promise<UnprovenHandPayment[]> {
+  const rows = (await conn.execute<{
+    id: string; supplier_name: string; slug: string; day: string; amount_minor: number;
+  }>(sql`
+    with coverage as (select min(value_date)::date as first, max(value_date)::date as last from bank_transactions)
+    select p.id, s.name_ar as supplier_name, s.slug, to_char(p.paid_at, 'YYYY-MM-DD') as day, p.amount_minor
+      from payments p
+      join suppliers s on s.id = p.supplier_id
+      cross join coverage c
+     where p.document_id is null
+       and p.method = 'BANK_TRANSFER'
+       and p.status not in ('REVERSED','VOID')
+       and not exists (select 1 from bank_transactions bt where bt.matched_payment_id = p.id)
+       and c.last is not null
+       and p.paid_at::date between c.first and c.last - 3
+     order by p.paid_at desc
+     limit 60
+  `)).rows;
+  const skip = new Set(linked.map((l) => l.paymentId));
+  const list = rows.filter((r) => !skip.has(r.id));
+  if (list.length === 0) return [];
+  const allocs = await conn
+    .select({ paymentId: paymentAllocations.paymentId, invoiceId: invoices.id, number: invoices.invoiceNumber })
+    .from(paymentAllocations)
+    .innerJoin(invoices, eq(invoices.id, paymentAllocations.invoiceId))
+    .where(inArray(paymentAllocations.paymentId, list.map((r) => r.id)));
+  return list.map((r) => ({
+    paymentId: r.id,
+    supplierName: r.supplier_name,
+    supplierSlug: r.slug,
+    day: r.day,
+    amountMinor: Number(r.amount_minor),
+    invoices: allocs.filter((a) => a.paymentId === r.id).map((a) => ({ id: a.invoiceId, number: a.number ?? "" })),
+  }));
+}
+
 export interface AccountReviewPreview {
   invoices: BacklogOutcome;
   echoes: EchoView[];
   links: HandLinkView[];
+  /** للعلم لا للتنفيذ — إقرارٌ بلا حوالةٍ في الكشف. */
+  unproven: UnprovenHandPayment[];
 }
 
 export async function previewAccountReview(actorId: string): Promise<AccountReviewPreview> {
@@ -340,7 +394,10 @@ export async function previewAccountReview(actorId: string): Promise<AccountRevi
     loadPaymentEchoes(),
     loadHandPaymentLinks(),
   ]);
-  return { invoices: invoicesOutcome, echoes, links };
+  /* الصدى والمرشّحُ للربط لهما بابُهما — فلا يُعادان هنا */
+  const unproven = (await loadUnprovenHandPayments(db, links))
+    .filter((u) => !echoes.some((e) => e.manualId === u.paymentId));
+  return { invoices: invoicesOutcome, echoes, links, unproven };
 }
 
 export interface AccountReviewResult {

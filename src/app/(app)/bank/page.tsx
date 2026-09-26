@@ -161,9 +161,11 @@ export default async function BankPage({
             {handLinks.length > 0 && (
               <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-accent-line bg-accent-soft/50 px-4 py-3">
                 <p className="min-w-0 flex-1 text-xs leading-relaxed">
-                  <span className="font-bold">{countNoun(handLinks.length, TRANSACTION)} هنا سدادُها مقيَّدٌ بيدك من قبل</span>
+                  <span className="font-bold">
+                    {handLinks.length === 1 ? "حركةٌ هنا سدادُها مقيَّدٌ بيدك من قبل" : `${countNoun(handLinks.length, TRANSACTION)} هنا لكلٍّ منها سدادٌ قيّدتَه بيدك من قبل`}
+                  </span>
                   {" — "}{handLinks.map((l) => `${l.supplierName} ${formatRiyalsDisplay(l.transferMinor)}`).join("، ")}.
-                  {" "}فاتورتُها أُغلقت بتلك الدفعة، فلم يجد المطابقُ فاتورةً مفتوحة. اربطها ولا تُقيِّدها مرّةً ثانية.
+                  {" "}أُغلقت الفاتورةُ بذلك السداد، فلم يجد المطابقُ فاتورةً مفتوحة. اربطها ولا تقيّدها مرّةً ثانية.
                 </p>
                 <AccountReview size="sm" variant="primary" />
               </div>
