@@ -79,9 +79,17 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
       ? { tone: "ok" as const, icon: CircleCheck, text: "قُيِّد كشفاً" }
       : p.status === "REJECTED"
         ? { tone: "danger" as const, icon: CircleX, text: "رُفض — لا يدخل الحساب" }
+        : p.twin && isInvoiceKind
+          ? { tone: "warn" as const, icon: TriangleAlert, text: `نسخةٌ من الفاتورة ${p.twin.number} المقيَّدة — ارفضه ولا تقيّده ثانيةً` }
+        : p.twin
+          /* عرضُ السعر برقم فاتورةٍ قُيِّدت: هو عرضُ الطلب نفسه، لا نسخة — لا شيء عليك */
+          ? { tone: "ok" as const, icon: CircleCheck, text: `${DOCUMENT_KIND_LABEL[p.kind] ?? p.kind} — قُيِّدت فاتورتُه برقمه ${p.twin.number}، لا شيء عليك` }
         : byDesign
           ? { tone: "muted" as const, icon: FileText, text: `${DOCUMENT_KIND_LABEL[p.kind] ?? p.kind} — لا يُقيَّد فاتورةً` }
-          : { tone: "danger" as const, icon: CircleAlert, text: "لم تُقيَّد له فاتورة — ينقصه ما يُقيَّد به" };
+          : p.missing.length > 0
+            ? { tone: "danger" as const, icon: CircleAlert, text: "لم تُقيَّد له فاتورة — ينقصه ما يُقيَّد به" }
+            /* كلُّ ما يلزم مقروءٌ ولم يُقيَّد (أُرشف قبل القيد) — فالخطوةُ «عاين وقيّد» لا «أكمِل» */
+            : { tone: "warn" as const, icon: TriangleAlert, text: "لم تُقيَّد له فاتورة — وكلُّ ما يلزم مقروء: عاينه وقيّده أدناه" };
 
   /* ── الشروطُ الأربعة كما حكمت `autoArchive` ── */
   const gaps = new Set<AutoArchiveGap>(p.verdict.gaps);
@@ -148,7 +156,7 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
     >
       {/* ── الحال ── */}
       <section aria-label="حالُه" className="rounded-2xl border border-line bg-raised p-5 shadow-raised">
-        <p className={`flex items-center gap-2 text-base font-bold ${headline.tone === "ok" ? "text-ok" : headline.tone === "danger" ? "text-danger" : "text-ink-soft"}`}>
+        <p className={`flex items-center gap-2 text-base font-bold ${headline.tone === "ok" ? "text-ok" : headline.tone === "danger" ? "text-danger" : headline.tone === "warn" ? "text-warn" : "text-ink-soft"}`}>
           <headline.icon className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
           {headline.text}
         </p>
@@ -177,7 +185,14 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
           </div>
         </dl>
 
-        {p.missing.length > 0 && (
+        {p.twin && showAmounts && (
+          <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
+            {isInvoiceKind ? "برقمها المقروء نفسه ولمورّدها نفسه — قارِن ثمّ ارفض هذه النسخة." : "الفاتورةُ التي تلته برقمه نفسه:"}
+            <LinkButton href={invoiceHref(p.twin.id)} size="sm" icon={Receipt}>افتح الفاتورة المقيَّدة</LinkButton>
+          </p>
+        )}
+
+        {p.missing.length > 0 && !p.twin && (
           <ul className="mt-4 space-y-1.5" aria-label="ما ينقصه">
             {p.missing.map((m) => (
               <li key={m} className="flex items-start gap-2 rounded-lg bg-danger-bg px-3 py-2 text-xs text-ink-soft">
@@ -217,8 +232,8 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
       </section>
 
       {/* ── أكمِل الناقص وقيّدها ── */}
-      {recordable && canEdit && showAmounts && (
-        <Section id="fix" icon={Wrench} title={byDesign ? "هو فاتورةٌ في الحقيقة؟ قيّدها" : "أكمِل الناقص وقيّدها"} className="mt-8 scroll-mt-24">
+      {recordable && !p.twin && canEdit && showAmounts && (
+        <Section id="fix" icon={Wrench} title={byDesign ? "هو فاتورةٌ في الحقيقة؟ قيّدها" : p.missing.length > 0 ? "أكمِل الناقص وقيّدها" : "عاينها وقيّدها"} className="mt-8 scroll-mt-24">
           {byDesign && (
             <Callout tone="info" className="mb-3" title={`قرأه النموذجُ «${DOCUMENT_KIND_LABEL[p.kind] ?? p.kind}»`}>
               وما كان كذلك لا يُقيَّد ولا يدخل المستحقّ — وهذا صحيح إن كان عرضاً فعلاً. فإن كانت الورقةُ فاتورةً

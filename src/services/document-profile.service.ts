@@ -68,6 +68,8 @@ export interface DocumentProfile {
     buyerVat: string;
     fromName: string[];
   };
+  /** فاتورةٌ مقيَّدةٌ لمورّده برقمه المقروء — فالمستندُ نسخةٌ منها يُرفض لا يُقيَّد. */
+  twin: { id: string; number: string } | null;
   /** ما يمنع القيد بعينه — `missingFromReading`، وفارغٌ لما قُيِّد. */
   missing: string[];
   verdict: AutoArchiveVerdict;
@@ -168,6 +170,12 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
     linesTotalMinor: sumLineTotals(x?.lines, (v) => parseRiyals(v)),
   });
 
+  const twinNumber = readNumber ?? fromName.invoiceNumber;
+  const [twinRow] = !recorded && supplierId && twinNumber
+    ? await db.select({ id: invoices.id, number: invoices.invoiceNumber }).from(invoices)
+        .where(and(eq(invoices.supplierId, supplierId), eq(invoices.invoiceNumber, twinNumber))).limit(1)
+    : [];
+
   /* الاسمُ من المصدر الواحد لشاشة التسمية — فلا يقول الملفُّ غيرَ ما تقوله */
   const named = row.driveFileId ? (await loadNamedDocuments()).find((d) => d.documentId === id) : undefined;
   const name = named ? canonicalName(named) : null;
@@ -230,6 +238,7 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
       buyerVat: x?.buyerVatNumber || "",
       fromName: fromNameUsed,
     },
+    twin: twinRow ? { id: twinRow.id, number: twinRow.number } : null,
     missing,
     verdict,
     name,

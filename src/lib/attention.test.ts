@@ -462,3 +462,34 @@ describe("حوالةٌ لمورّد خرجت ثمّ عادت — findReversals �
     expect(b?.title).toContain("خرجت ثمّ عادت");
   });
 });
+
+describe("فواتيرُ أُرشفت ولم تُقيَّد", () => {
+  it("لا بندَ حين لا شيء", () => {
+    expect(ids({})).not.toContain("unrecorded-invoices");
+  });
+
+  it("بندٌ عالٍ يفتح ملفَّ أوّلها، ومبلغُه مستحقٌّ حين تُعرف كلُّ المبالغ", () => {
+    const [item] = buildAttention({
+      ...quiet,
+      unrecordedInvoices: [
+        { label: "لوريفا كيك", sub: "…", amountMinor: 253_00, href: "/documents/file/d1#fix" },
+        { label: "لافا كمبوتشا", sub: "…", amountMinor: 135_00, href: "/documents/file/d2#fix" },
+      ],
+    });
+    expect(item.id).toBe("unrecorded-invoices");
+    expect(item.severity).toBe("HIGH");
+    expect(item.href).toBe("/documents/file/d1#fix");
+    expect(item.impact).toEqual({ kind: "OWED", amountMinor: 388_00 });
+  });
+
+  it("المبلغُ المجهولُ لا يُجمع صفراً — الأثرُ «غير معروف»", () => {
+    const [item] = buildAttention({
+      ...quiet,
+      unrecordedInvoices: [
+        { label: "أ", amountMinor: 100_00, href: "/documents/file/a" },
+        { label: "ب", href: "/documents/file/b" },
+      ],
+    });
+    expect(item.impact.amountMinor).toBeNull();
+  });
+});

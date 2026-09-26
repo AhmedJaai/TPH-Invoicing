@@ -176,6 +176,13 @@ export interface AttentionFacts {
   invoicesWithoutLines: number;
 
   /**
+   * مستنداتُ فواتيرَ أُرشفت ولم تُقيَّد لها فاتورة — مالٌ لا يدخل «كم أدين»
+   * ولا دفعةَ الشهر، ولا شاشةَ كانت تقوله. (ثمانيةٌ في الإنتاج يوم وُجد.)
+   * ولكلٍّ ملفُّه: يُقيَّد فيه، أو يُرفض إن كان نسخةً من فاتورةٍ مقيَّدة.
+   */
+  unrecordedInvoices?: AttentionEvidence[];
+
+  /**
    * مالٌ خرج إلى مورّد ولا فاتورةَ تفسّره.
    *
    * وهذا السؤال الذي كان أحمد يراجعه بيده كلّ أسبوع: «لمن دفعنا بلا
@@ -579,6 +586,27 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: f.unknownTaxCount,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: f.unknownTaxEvidence,
+    });
+  }
+
+  const unrecorded = f.unrecordedInvoices ?? [];
+  if (unrecorded.length > 0) {
+    const known = unrecorded.filter((e) => e.amountMinor !== undefined);
+    out.push({
+      id: "unrecorded-invoices",
+      area: "INVOICES",
+      severity: "HIGH",
+      title: `${countNoun(unrecorded.length, INVOICE)} أُرشفت ولم تُقيَّد`,
+      detail: "مستنداتُ فواتير في الأرشيف بلا صفّ فاتورة — لا تدخل «كم أدين» ولا دفعةَ الشهر، فالمستحقُّ أقلُّ من حقيقته بقدرها.",
+      action: "افتح كلّاً منها: قيّدها بضغطة إن كانت فاتورة، أو ارفضها إن كانت نسخةً من فاتورةٍ مقيَّدة.",
+      actionLabel: "قيّدها أو ارفضها",
+      href: unrecorded[0].href ?? "/documents",
+      count: unrecorded.length,
+      impact: {
+        kind: "OWED",
+        amountMinor: known.length === unrecorded.length ? known.reduce((n, e) => n + (e.amountMinor ?? 0), 0) : null,
+      },
+      evidence: unrecorded,
     });
   }
 

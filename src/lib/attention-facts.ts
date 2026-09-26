@@ -22,6 +22,8 @@ import { DAY, TIME, countNoun } from "./arabic";
 import { invoiceHref } from "./invoice-profile";
 import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
 import { txHref } from "@/lib/inspector";
+import { documentHref } from "@/lib/document-labels";
+import { parseRiyals } from "@/lib/money";
 
 interface Row {
   [key: string]: unknown;
@@ -398,7 +400,40 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   })));
   const supplierOfTx = new Map(bounceRows.map((r) => [r.id, r.supplier]));
 
+  /*
+    ── فواتيرُ أُرشفت ولم تُقيَّد ──
+    والنسخةُ تُعرف برقمها المقروء مقيَّداً لمورّدها نفسه — فيُقال «ارفضها» لا «قيّدها».
+  */
+  const unrecordedRows = (await db.execute<{
+    id: string; file_name: string; supplier: string | null; twin: string | null; total_text: string | null;
+  }>(sql`
+    select d.id, d.file_name, s.name_ar as supplier, d.extraction_json->>'totalAmount' as total_text,
+           (select i2.invoice_number from invoices i2
+             where i2.supplier_id = d.supplier_id
+               and i2.invoice_number = nullif(trim(d.extraction_json->>'invoiceNumber'), '')
+             limit 1) as twin
+      from documents d
+      left join invoices i on i.document_id = d.id
+      left join statements st on st.document_id = d.id
+      left join suppliers s on s.id = d.supplier_id
+     where d.status = 'ARCHIVED' and d.kind in ('TAX_INVOICE', 'SIMPLIFIED_INVOICE')
+       and i.id is null and st.id is null
+     order by d.created_at desc
+     limit 20
+  `)).rows;
+
   return {
+    unrecordedInvoices: unrecordedRows.map((r) => {
+      const minor = r.total_text ? parseRiyals(r.total_text) : null;
+      return {
+        label: (r.supplier ?? r.file_name).slice(0, 45),
+        sub: r.twin
+          ? `نسخةٌ من الفاتورة ${r.twin} المقيَّدة — ارفضها`
+          : `${r.file_name.slice(0, 40)} — قيّدها من ملفّها`,
+        amountMinor: minor ?? undefined,
+        href: documentHref(r.id, "fix"),
+      };
+    }),
     bouncedPayments: bounced.map((b) => ({
       label: supplierOfTx.get(b.outgoing.id) ?? (b.outgoing.party ?? "حوالة").slice(0, 45),
       sub: `خرجت ${formatDay(b.outgoing.valueDate)} · عادت بعد ${countNoun(b.daysApart, DAY)}${

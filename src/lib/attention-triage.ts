@@ -27,6 +27,7 @@ export const ATTENTION_IDS = [
   "missing-statements",
   "unknown-tax",
   "no-lines",
+  "unrecorded-invoices",
   "pending-documents",
   "no-contract",
 ] as const;

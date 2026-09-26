@@ -64,6 +64,7 @@
 | `src/components/review-workspace.tsx` | ثلاثة أبواب، ولكلّ بندٍ فعلُه: يُؤكَّد · ليس سداداً · تُعرَّف جهته |
 | `src/components/ui-client.tsx` | `ConfirmAction` (الإقرارُ لما لا رجعة فيه أو يمسّ المال وحده) · `ActionButton` (ينتظر بعرضه ويقول «تمّ»، ولا ضغطةَ ثانية) · `Reveal` (الكشفُ في المكان، CSS وحده) · `Popover` (قرارٌ صغير بجانب ما يخصّه) · `LinkPending` · `toast({ undo })` والعارضُ الواحد في القشرة، يقف عدُّه تحت الفأرة · `Sheet` (حوارٌ أصليّ، ورقةٌ على الجوّال تُسحب لتُغلق) · `TableFilter` |
 | `src/components/inspector.tsx` · `detail-frame.tsx` · `src/lib/inspector.ts` | **لوحُ الفحص**: ملفُّ المورّد والفاتورة والصنف وحركة البنك لوحاً فوق القائمة (`(app)/@drawer` مساراتٌ معترِضة)، وصفحةً كاملةً عند التحميل المباشر. الملفُّ واحد (`*-view.tsx`) بإطارين. `InspectorLauncher` يرسم الهيكلَ في إطار النقرة، و`useShellPath` مسارُ القائمة تحت اللوح للقشرة |
+| `src/services/document-profile.service.ts` · `document-record.service.ts` · `/documents/file/[id]` | **ملفُّ المستند**: ما ينقصه وكيف قرّر النظام، و«أكمِل الناقص وقيّدها» بمعاينةٍ ثمّ قيد (`/api/document-record`) بالمسار نفسه — ويُعرف النسخةُ من فاتورةٍ مقيَّدة |
 | `src/components/live-money.tsx` | المبلغُ الذي تغيّر بعد فعلٍ ينتقل إليه ويومض — لا في أوّل رسم |
 | `src/lib/supplier-suggest.ts` · `src/components/supplier-picker.tsx` | «لعلّه هذا المورّد» من نصّ البنك: اقتراحٌ لا قرار، ومنتقٍ واحد لطابور البنك ومراجعة الحركات |
 | `src/lib/preview-mode.ts` | وضع المعاينة — لا يعمل في الإنتاج مهما فُعِّل المتغيّر |
