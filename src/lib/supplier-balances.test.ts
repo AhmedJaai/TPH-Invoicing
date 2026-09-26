@@ -57,3 +57,29 @@ describe("overdueOwedMinor", () => {
     expect(overdueOwedMinor(179_600, credit)).toBeLessThanOrEqual(row("x", open, credit).owedMinor);
   });
 });
+
+describe("مورّدٌ لا يصدر فواتير — حوالتُه شراءٌ لا رصيد", () => {
+  it("مريم: دفعاتٌ بلا فواتير لا تُقال «لك عنده»", () => {
+    const b = supplierBalance({
+      supplierId: "mariah", billedMinor: 0, openMinor: 0, openCount: 0, paidNetMinor: 3_120_00, creditMinor: 3_120_00,
+      issuesInvoices: false,
+    });
+    expect(b.creditLeftMinor).toBe(0);
+    expect(b.owedMinor).toBe(0);
+  });
+
+  it("وما قُيِّد له من فاتورةٍ تسدّده حوالاتُه — لا يُقال «عليك» وقد دُفع", () => {
+    const b = supplierBalance({
+      supplierId: "lava", billedMinor: 405_00, openMinor: 405_00, openCount: 1, paidNetMinor: 1_377_00, creditMinor: 1_377_00,
+      issuesInvoices: false,
+    });
+    expect(b).toMatchObject({ owedMinor: 0, creditLeftMinor: 0 });
+  });
+
+  it("ومن يصدر فواتير يبقى رصيدُه «لك» كما كان", () => {
+    const b = supplierBalance({
+      supplierId: "kohi", billedMinor: 0, openMinor: 0, openCount: 0, paidNetMinor: 833_75, creditMinor: 833_75,
+    });
+    expect(b.creditLeftMinor).toBe(833_75);
+  });
+});

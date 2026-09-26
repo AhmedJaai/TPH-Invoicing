@@ -481,7 +481,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "unclassified-bank",
       area: "BANK",
       severity: "HIGH",
-      title: `${countNoun(f.unclassifiedBankTx, TRANSACTION)} بنكية تنتظر قرارك`,
+      title: `${countNoun(f.unclassifiedBankTx, TRANSACTION)} في البنك تنتظر قرارك`,
       detail: `بقيمة ${riyals(f.unclassifiedBankAmountMinor)} ريال — لم يُعرَف بابُها، أو عُرف أنّها سدادُ مورّد ولم تُقيَّد بعد.`,
       action: "احسمها مرّة — وما تعرّفه يسري على أمثاله في كلّ كشفٍ بعده.",
       actionLabel: "احسم الحركات",

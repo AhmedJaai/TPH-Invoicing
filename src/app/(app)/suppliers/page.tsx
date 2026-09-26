@@ -180,6 +180,7 @@ export default async function SuppliersPage({
                 ? "لا فاتورة ولا دفعة بعد"
                 : r.openCount > 0
                   ? `${countNoun(r.openCount, INVOICE)} مفتوحة`
+                  : !r.issuesInvoices ? "لا يصدر فواتير — يُسدَّد عند الدفع"
                   : r.invoiceCount > 0 ? "فواتيره مسدَّدة" : "دفعاتٌ بلا فواتير"}
               {r.contract && <Badge tone="warn">يحتاج عقداً</Badge>}
               {r.paper && <Badge>فواتيرُه ورقيّة</Badge>}

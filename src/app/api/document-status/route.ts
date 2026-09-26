@@ -22,8 +22,8 @@ import { driveWritesAllowed } from "@/lib/drive-readonly";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { can } from "@/lib/permissions";
 import { formatRiyalsDisplay } from "@/lib/money";
-import { DOCUMENT, FILE, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
-import { linkExactHandPayments } from "@/services/account-review.service";
+import { DOCUMENT, FILE, INVOICE, PAYMENT, TRANSACTION, countNoun } from "@/lib/arabic";
+import { linkExactHandPayments, mergeExactEchoes } from "@/services/account-review.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -76,7 +76,10 @@ export async function POST(request: Request) {
       ٦٣٨) كان يبقى في «يحتاج قرارك» حتى يُضغط زرّ. والسياسةُ سياسةُ الاستيراد.
     */
     const handLinked = can(user.role, "bank:edit") ? await linkExactHandPayments(user.id, r.notes) : 0;
+    /* والدفعةُ التي قُيِّدت مرّتين بالمبلغ نفسه — حوالةٌ وإقرارٌ عنها — تُدمج بالسياسة نفسها */
+    const echoesMerged = can(user.role, "payment:approve") ? await mergeExactEchoes(user.id, r.notes) : 0;
     const parts = [
+      echoesMerged > 0 ? `دُمجت ${countNoun(echoesMerged, PAYMENT)} قُيِّدت مرّتين` : null,
       handLinked > 0 ? `رُبطت ${countNoun(handLinked, TRANSACTION)} في البنك بسدادٍ قيّدتَه بيدك` : null,
       r.recorded > 0 ? `قُيِّد من القراءة المحفوظة: ${countNoun(r.recorded, INVOICE)}` : null,
       r.approved > 0 ? `اعتُمد ${countNoun(r.approved, DOCUMENT)}` : null,
@@ -85,7 +88,7 @@ export async function POST(request: Request) {
       r.notes.length > 0 ? `وتعذّر ${r.notes.length}: ${r.notes[0]}` : null,
     ].filter(Boolean);
     const message = parts.length === 0 ? "لا مستندَ تجتمع فيه الشروطُ الآن" : parts.join(" · ");
-    return NextResponse.json({ ok: true, message, ...r, handLinked });
+    return NextResponse.json({ ok: true, message, ...r, handLinked: handLinked + echoesMerged });
   }
 
   if (typeof body.documentId !== "string" || !body.documentId) {

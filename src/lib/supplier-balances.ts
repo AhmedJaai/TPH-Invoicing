@@ -32,6 +32,13 @@ export interface SupplierBalanceInput {
   paidNetMinor: number;
   /** ما دفعناه ولم يُخصم من فاتورة. */
   creditMinor: number;
+  /**
+   * أيصدر فواتير؟ — ومن لا يصدر فحوالتُه هي الشراءُ نفسه: تسدّد ما قُيِّد له
+   * من فواتير، وما زاد **لا يُقال «رصيدٌ لك عنده»** — فلا فاتورةَ تأتي لتُخصم منه.
+   * (أحمد، ٢٧ سبتمبر ٢٠٢٦: «كتبت أنّه ما يصدرون فواتير ومكتوب أنّ لي مبلغ».)
+   * والغائبُ يُعدّ «يصدر» — كما في القاعدة.
+   */
+  issuesInvoices?: boolean;
 }
 
 export interface SupplierBalance extends SupplierBalanceInput {
@@ -45,7 +52,7 @@ export function supplierBalance(input: SupplierBalanceInput): SupplierBalance {
   return {
     ...input,
     owedMinor: Math.max(0, open - credit),
-    creditLeftMinor: Math.max(0, credit - open),
+    creditLeftMinor: input.issuesInvoices === false ? 0 : Math.max(0, credit - open),
   };
 }
 

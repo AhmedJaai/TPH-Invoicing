@@ -26,6 +26,7 @@ interface Row {
   open_count: string | number;
   paid_net: string | number;
   credit: string | number;
+  issues: boolean;
   [key: string]: unknown;
 }
 
@@ -66,7 +67,8 @@ export async function loadSupplierBalances(
              coalesce(inv.open_minor, 0) as open_minor,
              coalesce(inv.open_count, 0) as open_count,
              coalesce(pay.paid_net, 0)   as paid_net,
-             coalesce(pay.credit, 0)     as credit
+             coalesce(pay.credit, 0)     as credit,
+             s.issues_invoices           as issues
         from suppliers s
         left join inv on inv.supplier_id = s.id
         left join pay on pay.supplier_id = s.id
@@ -83,6 +85,7 @@ export async function loadSupplierBalances(
       openCount: Number(r.open_count),
       paidNetMinor: Number(r.paid_net),
       creditMinor: Number(r.credit),
+      issuesInvoices: r.issues !== false,
     }),
   );
 }

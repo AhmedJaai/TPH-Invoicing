@@ -463,6 +463,27 @@ export async function loadUnprovenHandPayments(conn: Conn = db, linked: readonly
   }));
 }
 
+/**
+ * يدمج الصدى **بالمبلغ نفسه** وحده، آليّاً — يُستدعى من الاستدراك الدوريّ.
+ *
+ * هي سياسةُ الاستيراد نفسُها (`recordBankPayment` يتبنّى إقراراً بلا حركة
+ * بالمبلغ نفسه في نافذة أيّام) حين يقع الإقرارُ بعد الحوالة لا قبلها. وكان
+ * ينتظر زرّاً، فبقي كوهي «٨٣٣٫٧٥ لك» وأطلس «٥٧٥ لك» وهما خطأ.
+ * والصدى على رصيد (مبالغُ مختلفة) يبقى بإقرار.
+ */
+export async function mergeExactEchoes(actorId: string, notes: string[]): Promise<number> {
+  let merged = 0;
+  for (const e of await loadPaymentEchoes()) {
+    try {
+      await db.transaction((t) => mergePaymentEcho(t, e, actorId));
+      merged++;
+    } catch (err) {
+      notes.push(`${e.supplierName}: ${(err as Error).message.slice(0, 100)}`);
+    }
+  }
+  return merged;
+}
+
 export interface AccountReviewPreview {
   invoices: BacklogOutcome;
   echoes: EchoView[];
