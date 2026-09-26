@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { echoKey, findPaymentEchoes, type EchoPayment } from "./payment-echo";
+import { echoKey, findCreditEchoes, findPaymentEchoes, type EchoPayment } from "./payment-echo";
 
 const p = (over: Partial<EchoPayment> & Pick<EchoPayment, "id" | "day">): EchoPayment => ({
   supplierId: "kohi",
@@ -81,5 +81,34 @@ describe("findPaymentEchoes — الحوالةُ نفسها قُيِّدت مر�
       p({ id: "m", day: "2026-08-05", allocatedMinor: 83_375 }),
     ];
     expect(findPaymentEchoes(rows)).toEqual([]);
+  });
+});
+
+describe("findCreditEchoes — إقرارٌ بيد وللمورّد حوالاتٌ لم تُنسب تسعه", () => {
+  it("غاناش: فاتورتان بـ٤٥٥٫٤٠ وُسمتا بيد، وحوالةٌ جامعة غيرُ منسوبة قبلهما", () => {
+    const rows = [
+      p({ id: "lump", supplierId: "g", amountMinor: 5_225_60, day: "2026-07-03", hasBankRow: true }),
+      p({ id: "m1", supplierId: "g", amountMinor: 455_40, allocatedMinor: 455_40, day: "2026-08-14" }),
+      p({ id: "m2", supplierId: "g", amountMinor: 455_40, allocatedMinor: 455_40, day: "2026-08-17" }),
+    ];
+    const out = findCreditEchoes(rows);
+    expect(out.map((e) => e.manualId)).toEqual(["m1", "m2"]);
+    expect(out[0].sources).toEqual([{ bankId: "lump", day: "2026-07-03", amountMinor: 455_40 }]);
+  });
+
+  it("الرصيدُ يُستهلك مرّة: حوالةٌ تسع إقراراً واحداً لا اثنين", () => {
+    const rows = [
+      p({ id: "b", supplierId: "g", amountMinor: 500_00, day: "2026-08-01", hasBankRow: true }),
+      p({ id: "m1", supplierId: "g", amountMinor: 455_40, allocatedMinor: 455_40, day: "2026-08-14" }),
+      p({ id: "m2", supplierId: "g", amountMinor: 455_40, allocatedMinor: 455_40, day: "2026-08-17" }),
+    ];
+    expect(findCreditEchoes(rows).map((e) => e.manualId)).toEqual(["m1"]);
+  });
+
+  it("لا صدى: الحوالةُ أبعد من ستّين يوماً، أو بعد الإقرار بأكثر من ثلاثة، أو ما أُخذ في صدى المبلغ نفسه", () => {
+    const m = p({ id: "m", supplierId: "g", amountMinor: 100_00, allocatedMinor: 100_00, day: "2026-08-14" });
+    expect(findCreditEchoes([m, p({ id: "old", supplierId: "g", day: "2026-06-01", hasBankRow: true })])).toEqual([]);
+    expect(findCreditEchoes([m, p({ id: "late", supplierId: "g", day: "2026-08-20", hasBankRow: true })])).toEqual([]);
+    expect(findCreditEchoes([m, p({ id: "b", supplierId: "g", day: "2026-08-10", hasBankRow: true })], ["m"])).toEqual([]);
   });
 });

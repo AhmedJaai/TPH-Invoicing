@@ -43,7 +43,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
       return;
     }
     setPreview(r.data.preview);
-    setChosen(new Set(r.data.preview.echoes.map((e) => e.key)));
+    setChosen(new Set([...r.data.preview.echoes.map((e) => e.key), ...r.data.preview.creditEchoes.map((e) => e.key)]));
     setChosenLinks(new Set(r.data.preview.links.filter((l) => !l.exact).map((l) => l.key)));
   }
 
@@ -95,7 +95,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
   }
 
   const p = preview;
-  const nothing = p && p.invoices.items.length === 0 && p.echoes.length === 0 && p.links.length === 0;
+  const nothing = p && p.invoices.items.length === 0 && p.echoes.length === 0 && p.creditEchoes.length === 0 && p.links.length === 0;
 
   return (
     <>
@@ -208,6 +208,44 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
                           <ArrowLeft className="h-3 w-3" aria-hidden />
                         </Link>
                       )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {p.creditEchoes.length > 0 && (
+              <section aria-labelledby="ar-credit-echoes">
+                <h3 id="ar-credit-echoes" className="flex items-center gap-2 text-sm font-bold">
+                  <Copy className="h-4 w-4 text-warn" strokeWidth={2} aria-hidden />
+                  {`سدادٌ بيدك خرج من حوالةٍ لم تُنسب — ${countNoun(p.creditEchoes.length, PAYMENT)}`}
+                </h3>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                  وسمتَ الفاتورةَ «سُدّدت» حوالةً، وللمورّد نفسه حوالةٌ في الكشف قبلها لم تُنسب إلى فاتورة وتسعها — فالمالُ عُدَّ مرّتين:
+                  مرّةً سداداً ومرّةً «رصيداً لك». الدمجُ يُلغي الإقرار ويسدّد الفاتورةَ من تلك الحوالة، فينقص الرصيدُ بقدرها.
+                </p>
+                <ul className="mt-2 space-y-2">
+                  {p.creditEchoes.map((e) => (
+                    <li key={e.key}>
+                      <label className="flex cursor-pointer gap-3 rounded-lg border border-line-soft p-3 text-xs has-[:checked]:border-accent has-[:checked]:bg-accent-soft/40">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
+                          checked={chosen.has(e.key)}
+                          onChange={() => toggle(e.key)}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-baseline justify-between gap-2">
+                            <span className="font-bold">{e.supplierName}</span>
+                            <Money minor={e.amountMinor} />
+                          </span>
+                          <span className="mt-1 block leading-relaxed text-muted">
+                            إقرارٌ بيدك {formatDay(e.manualDay)}
+                            {e.invoices.length > 0 && <> لـ{e.invoices.map((i) => i.number).join("، ")}</>}
+                            {" · من حوالة "}{e.sources.map((x) => formatDay(x.day)).join(" و")}
+                          </span>
+                        </span>
+                      </label>
                     </li>
                   ))}
                 </ul>

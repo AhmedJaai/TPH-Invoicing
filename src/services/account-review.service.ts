@@ -24,7 +24,7 @@ import { bankTransactions, decisionHistory, invoices, paymentAllocations, paymen
 import { linkHandPayments, linkKey, type HandPaymentLink } from "@/lib/hand-payment-link";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
-import { echoKey, findPaymentEchoes, type EchoPayment, type PaymentEcho } from "@/lib/payment-echo";
+import { echoKey, findCreditEchoes, findPaymentEchoes, type CreditEcho, type EchoPayment, type PaymentEcho } from "@/lib/payment-echo";
 import { recordAudit } from "@/lib/audit";
 import { recordFromStoredReadings, type BacklogOutcome } from "@/services/document-backlog.service";
 import { applyCreditEverywhere } from "@/services/document-review.service";
@@ -165,6 +165,89 @@ export async function mergePaymentEcho(
     },
   }, tx);
   return { movedMinor: moved.allocatedMinor, invoiceIds: reversal.freedInvoiceIds };
+}
+
+/* ─────────────── الصدى على رصيد: حوالةٌ جامعة وإقراراتٌ بيد ─────────────── */
+
+export interface CreditEchoView extends CreditEcho {
+  key: string;
+  supplierName: string;
+  invoices: { id: string; number: string; amountMinor: number }[];
+}
+
+async function creditEchoesOf(conn: Conn, supplierId?: string): Promise<CreditEcho[]> {
+  const rows = await echoRows(conn, supplierId);
+  /* ما قابله صدى بالمبلغ نفسه بابُه هناك — لا يُعاد هنا */
+  const exact = findPaymentEchoes(rows);
+  return findCreditEchoes(rows, [...exact.map((e) => e.manualId), ...exact.map((e) => e.bankId)]);
+}
+
+export async function loadCreditEchoes(conn: Conn = db): Promise<CreditEchoView[]> {
+  const list = await creditEchoesOf(conn);
+  if (list.length === 0) return [];
+  const names = await conn.select({ id: suppliers.id, nameAr: suppliers.nameAr }).from(suppliers)
+    .where(inArray(suppliers.id, [...new Set(list.map((e) => e.supplierId))]));
+  const allocs = await conn
+    .select({ paymentId: paymentAllocations.paymentId, invoiceId: invoices.id, number: invoices.invoiceNumber, amountMinor: paymentAllocations.amountMinor })
+    .from(paymentAllocations)
+    .innerJoin(invoices, eq(invoices.id, paymentAllocations.invoiceId))
+    .where(inArray(paymentAllocations.paymentId, list.map((e) => e.manualId)));
+  return list.map((e) => ({
+    ...e,
+    key: `credit:${e.manualId}`,
+    supplierName: names.find((n) => n.id === e.supplierId)?.nameAr ?? "مورّد",
+    invoices: allocs.filter((a) => a.paymentId === e.manualId).map((a) => ({ id: a.invoiceId, number: a.number ?? "", amountMinor: a.amountMinor })),
+  }));
+}
+
+/**
+ * يُلغى الإقرارُ وتُسدَّد فواتيرُه من حوالات المورّد غير المنسوبة — بإقرار الإنسان.
+ * والخادمُ يعيد اشتقاق المصادر بقفل؛ فإن لم تسع الحوالاتُ ما فُكّ رُدّ كلُّه.
+ */
+export async function mergeIntoCredit(tx: Tx, manualId: string, actorId: string): Promise<{ movedMinor: number }> {
+  const [manual] = await tx
+    .select({ id: payments.id, supplierId: payments.supplierId, paidAt: payments.paidAt, appliesToMonth: payments.appliesToMonth })
+    .from(payments).where(eq(payments.id, manualId)).for("update");
+  if (!manual?.supplierId) throw new EchoMergeRefused("لم تُوجد الدفعة — حدّث المراجعة");
+  await tx.select({ id: payments.id }).from(payments).where(eq(payments.supplierId, manual.supplierId)).for("update");
+  const echo = (await creditEchoesOf(tx, manual.supplierId)).find((e) => e.manualId === manualId);
+  if (!echo) throw new EchoMergeRefused("تغيّرت الدفعاتُ منذ المعاينة — حدّث المراجعة");
+
+  await assertMonthsOpen(tx, [manual.appliesToMonth, manual.paidAt.toISOString().slice(0, 7)]);
+  const reversal = await reversePayment(tx, {
+    paymentId: manualId,
+    kind: "VOID",
+    reason: "صدى حوالةٍ جامعة في الكشف: السدادُ الذي قُيِّد بيدٍ خرج من حوالةٍ لم تُنسب — فانتقل إليها",
+    userId: actorId,
+  });
+
+  const amounts = new Map((await tx.select({ id: payments.id, a: payments.amountMinor }).from(payments)
+    .where(inArray(payments.id, echo.sources.map((x) => x.bankId)))).map((r) => [r.id, r.a]));
+  const left = new Map(echo.sources.map((x) => [x.bankId, x.amountMinor]));
+  let moved = 0;
+  for (const alloc of reversal.previousAllocations) {
+    let need = alloc.amountMinor;
+    for (const src of echo.sources) {
+      if (need <= 0) break;
+      const take = Math.min(left.get(src.bankId) ?? 0, need);
+      if (take <= 0) continue;
+      const out = await allocate(tx, src.bankId, amounts.get(src.bankId) ?? 0, [{ invoiceId: alloc.invoiceId, amountMinor: take }]);
+      left.set(src.bankId, (left.get(src.bankId) ?? 0) - out.allocatedMinor);
+      need -= out.allocatedMinor;
+      moved += out.allocatedMinor;
+    }
+  }
+  if (moved !== reversal.freedMinor) throw new EchoMergeRefused("الحوالاتُ لا تسع ما على الإقرار — لم يُدمج شيء");
+
+  await recordAudit({
+    actorId,
+    action: "PAYMENT_ECHO_MERGED",
+    entityType: "payment",
+    entityId: manualId,
+    before: { الإقرار: manualId, تخصيصاته: reversal.previousAllocations },
+    after: { الحوالات: echo.sources, "انتقل بالهللات": moved, السبب: reversal.reason },
+  }, tx);
+  return { movedMinor: moved };
 }
 
 /* ─────────────── حوالةُ الطابور وسدادُها المقيَّد بيد ─────────────── */
@@ -383,21 +466,23 @@ export async function loadUnprovenHandPayments(conn: Conn = db, linked: readonly
 export interface AccountReviewPreview {
   invoices: BacklogOutcome;
   echoes: EchoView[];
+  creditEchoes: CreditEchoView[];
   links: HandLinkView[];
   /** للعلم لا للتنفيذ — إقرارٌ بلا حوالةٍ في الكشف. */
   unproven: UnprovenHandPayment[];
 }
 
 export async function previewAccountReview(actorId: string): Promise<AccountReviewPreview> {
-  const [invoicesOutcome, echoes, links] = await Promise.all([
+  const [invoicesOutcome, echoes, creditEchoes, links] = await Promise.all([
     recordFromStoredReadings(actorId, { dryRun: true, limit: 200 }),
     loadPaymentEchoes(),
+    loadCreditEchoes(),
     loadHandPaymentLinks(),
   ]);
   /* الصدى والمرشّحُ للربط لهما بابُهما — فلا يُعادان هنا */
   const unproven = (await loadUnprovenHandPayments(db, links))
-    .filter((u) => !echoes.some((e) => e.manualId === u.paymentId));
-  return { invoices: invoicesOutcome, echoes, links, unproven };
+    .filter((u) => !echoes.some((e) => e.manualId === u.paymentId) && !creditEchoes.some((e) => e.manualId === u.paymentId));
+  return { invoices: invoicesOutcome, echoes, creditEchoes, links, unproven };
 }
 
 export interface AccountReviewResult {
@@ -427,6 +512,19 @@ export async function runAccountReview(
       } catch (err) {
         notes.push(`${e.supplierName}: ${(err as Error).message.slice(0, 100)}`);
       }
+    }
+  }
+
+  /* الصدى على رصيد — ما أقرّه صاحبُه وحده (`credit:<id>`) */
+  for (const key of echoKeys.filter((k) => k.startsWith("credit:"))) {
+    const manualId = key.slice("credit:".length);
+    const e = (await loadCreditEchoes()).find((x) => x.manualId === manualId);
+    if (!e) continue;
+    try {
+      const out = await db.transaction((t) => mergeIntoCredit(t, manualId, actorId));
+      merged.push({ key, supplierName: e.supplierName, movedMinor: out.movedMinor });
+    } catch (err) {
+      notes.push(`${e.supplierName}: ${(err as Error).message.slice(0, 100)}`);
     }
   }
 

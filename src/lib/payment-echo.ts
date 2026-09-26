@@ -99,3 +99,61 @@ export function findPaymentEchoes(rows: readonly EchoPayment[]): PaymentEcho[] {
 export function echoKey(e: Pick<PaymentEcho, "manualId" | "bankId">): string {
   return `${e.manualId}:${e.bankId}`;
 }
+
+/* ─────────────── الصدى على رصيد: الحوالةُ أكبرُ من الإقرار ─────────────── */
+
+/** كم يوماً قبل الإقرار تُعدّ حوالةُ الكشف غيرُ المنسوبة مصدرَه — كما في `drawBankCredit`. */
+export const CREDIT_ECHO_LOOKBACK_DAYS = 60;
+
+export interface CreditEcho {
+  supplierId: string;
+  manualId: string;
+  manualDay: string;
+  /** ما خصّصه الإقرارُ على فواتيره — ينتقل إلى الحوالات. */
+  amountMinor: number;
+  /** الحوالاتُ التي يُؤخذ منها، بأقربها يوماً. */
+  sources: { bankId: string; day: string; amountMinor: number }[];
+}
+
+/**
+ * الإقرارُ الذي لم يقابله صدى بالمبلغ نفسه، وللمورّد نفسه حوالاتٌ في الكشف
+ * لم تُنسب تسعه — من ٦٠ يوماً قبله إلى ثلاثةٍ بعده. غاناش: حوالاتٌ جامعة
+ * بـ٢٦ ألفاً «رصيداً لك»، وفاتورتان بـ٤٥٥٫٤٠ وُسمتا «سُدّدت» بيد.
+ * ويُستهلك رصيدُ كلّ حوالةٍ مرّةً واحدة بين الإقرارات، الأقدمُ إقراراً أوّلاً.
+ */
+export function findCreditEchoes(rows: readonly EchoPayment[], taken: readonly string[] = []): CreditEcho[] {
+  const skip = new Set(taken);
+  const manuals = rows
+    .filter((p) => LIVE(p.status) && !p.hasBankRow && !p.hasDocument && p.method === "BANK_TRANSFER"
+      && p.allocatedMinor > 0 && !skip.has(p.id))
+    .sort((a, b) => a.day.localeCompare(b.day));
+  const free = new Map(rows
+    .filter((p) => LIVE(p.status) && p.hasBankRow && !skip.has(p.id))
+    .map((p) => [p.id, p.amountMinor - p.feeMinor - p.allocatedMinor] as const)
+    .filter(([, v]) => v > 0));
+  const banks = rows.filter((p) => free.has(p.id));
+
+  const out: CreditEcho[] = [];
+  for (const m of manuals) {
+    const pool = banks
+      .filter((b) => b.supplierId === m.supplierId)
+      .map((b) => ({ b, gap: dayNumber(m.day) - dayNumber(b.day) }))
+      .filter(({ gap }) => gap <= CREDIT_ECHO_LOOKBACK_DAYS && gap >= -3)
+      .sort((x, y) => Math.abs(x.gap) - Math.abs(y.gap));
+    const available = pool.reduce((s, { b }) => s + (free.get(b.id) ?? 0), 0);
+    if (available < m.allocatedMinor) continue;
+
+    let need = m.allocatedMinor;
+    const sources: CreditEcho["sources"] = [];
+    for (const { b } of pool) {
+      if (need <= 0) break;
+      const take = Math.min(free.get(b.id) ?? 0, need);
+      if (take <= 0) continue;
+      free.set(b.id, (free.get(b.id) ?? 0) - take);
+      sources.push({ bankId: b.id, day: b.day, amountMinor: take });
+      need -= take;
+    }
+    out.push({ supplierId: m.supplierId, manualId: m.id, manualDay: m.day, amountMinor: m.allocatedMinor, sources });
+  }
+  return out;
+}

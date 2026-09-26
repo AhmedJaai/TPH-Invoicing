@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { bankImports, bankTransactions, paymentAllocations, payments, users } from "@/db/schema";
 import { allocate, createPayment } from "./payment.service";
-import { EchoMergeRefused, HandLinkRefused, linkHandPayment, loadHandPaymentLinks, loadPaymentEchoes, mergePaymentEcho } from "./account-review.service";
+import { EchoMergeRefused, HandLinkRefused, loadCreditEchoes, mergeIntoCredit, linkHandPayment, loadHandPaymentLinks, loadPaymentEchoes, mergePaymentEcho } from "./account-review.service";
 import { drawBankCredit, undrawBankCredit } from "./supplier-credit.service";
 import { caught, day, makeInvoice, makeSupplier, withRollback } from "@/test/db";
 import type { Tx } from "./types";
@@ -160,5 +160,32 @@ describe("حوالةُ الطابور وسدادُها المقيَّد بيد �
       const t = await waitingTransfer(tx, s, 400_00, "2026-09-06");
       const e = await caught(linkHandPayment(tx, { transferId: t, paymentId: hand }, await someone(tx)));
       expect(e).toBeInstanceOf(HandLinkRefused);
+    }));
+});
+
+describe("سدادٌ بيدٍ خرج من حوالةٍ جامعة لم تُنسب — غاناش", () => {
+  it("يُلغى الإقرارُ وتُسدَّد فاتورتُه من الحوالة، وينقص الرصيدُ بقدرها", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const inv = await makeInvoice(tx, s, 455_40, "2026-08-14");
+      const lump = await bankPayment(tx, s, 5_225_60, "2026-08-03");
+      const hand = await manualPaid(tx, s, inv, 455_40, "2026-08-14");
+
+      const [e] = (await loadCreditEchoes(tx)).filter((x) => x.supplierId === s);
+      expect(e).toMatchObject({ manualId: hand, amountMinor: 455_40, sources: [{ bankId: lump, amountMinor: 455_40 }] });
+
+      await mergeIntoCredit(tx, hand, await someone(tx));
+      const [m] = await tx.select({ status: payments.status }).from(payments).where(eq(payments.id, hand));
+      expect(m.status).toBe("VOID");
+      expect(await allocationsOf(tx, lump)).toEqual([{ invoiceId: inv, amountMinor: 455_40 }]);
+    }));
+
+  it("لا يُدمج إن لم تسع الحوالةُ الإقرار", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const inv = await makeInvoice(tx, s, 455_40, "2026-08-14");
+      await bankPayment(tx, s, 100_00, "2026-08-03");
+      const hand = await manualPaid(tx, s, inv, 455_40, "2026-08-14");
+      expect(await caught(mergeIntoCredit(tx, hand, await someone(tx)))).toBeInstanceOf(EchoMergeRefused);
     }));
 });

@@ -14,6 +14,7 @@ export const maxDuration = 60;
 
 const Body = z.object({
   preview: z.boolean().default(true),
+  /* «manual:bank» صدى بالمبلغ نفسه، و«credit:manual» صدى على رصيد */
   echoKeys: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}:[A-Za-z0-9_-]{1,64}$/)).max(100).default([]),
   linkKeys: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}:[A-Za-z0-9_-]{1,64}$/)).max(100).default([]),
 });
