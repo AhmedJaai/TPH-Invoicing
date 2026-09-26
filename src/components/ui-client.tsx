@@ -154,56 +154,21 @@ export function ConfirmAction({
  * ما يُكشف في مكانه (لوحُ إقرار، تفصيلُ صفّ، حقلُ تعديل) يتحرّك ارتفاعُه
  * ولا يقفز. `grid-template-rows` من ‎0fr‎ إلى ‎1fr‎ في `globals.css`.
  *
- * والمطويُّ يخرج من الشجرة بعد انتهاء حركته (إلّا مع `keepMounted`) ويُعلَن
- * `inert` أثناءها — فلا يصل إليه التركيز وهو يختفي.
+ * والمطويُّ باقٍ في الشجرة، مخفيٌّ بعد انتهاء حركته (`visibility`) و`inert`
+ * أثناءها — فلا يصل إليه التركيز ولا قارئُ الشاشة. كان يُزال بمؤقّتٍ يسابق
+ * الفتحَ فيُخفي ما فُتح للتوّ؛ فصار CSS وحده، بلا حالةٍ ولا مؤقّت.
  */
 export function Reveal({
   open,
   children,
-  keepMounted = false,
   className = "",
 }: {
   open: boolean;
   children: React.ReactNode;
-  keepMounted?: boolean;
   className?: string;
 }) {
-  const [prevOpen, setPrevOpen] = useState(open);
-  const [mounted, setMounted] = useState(open || keepMounted);
-  const [shown, setShown] = useState(open);
-  const [settled, setSettled] = useState(open);
-
-  /* تبدُّلُ `open` يُقرأ أثناء الرسم لا في أثرٍ بعده — فلا يُرسم إطارٌ بحالٍ قديمة */
-  if (open !== prevOpen) {
-    setPrevOpen(open);
-    setSettled(false);
-    if (open) setMounted(true);
-    else setShown(false);
-  }
-
-  useEffect(() => {
-    if (open) {
-      /* إطارٌ بين الرسم والفتح — وإلّا بدأ من ‎1fr‎ بلا حركة */
-      let inner = 0;
-      const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => setShown(true)); });
-      return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); };
-    }
-    if (keepMounted) return;
-    const t = window.setTimeout(() => setMounted(false), 260);
-    return () => window.clearTimeout(t);
-  }, [open, keepMounted]);
-
-  if (!mounted) return null;
   return (
-    <div
-      className={`reveal ${className}`}
-      data-open={shown}
-      data-settled={settled}
-      inert={!open}
-      onTransitionEnd={(e) => {
-        if (e.target === e.currentTarget && e.propertyName === "grid-template-rows" && open) setSettled(true);
-      }}
-    >
+    <div className={`reveal ${className}`} data-open={open} inert={!open}>
       <div>{children}</div>
     </div>
   );

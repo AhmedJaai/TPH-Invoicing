@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { Check, ChevronDown, Download, MessageCircle, ShieldAlert, Wallet } from "lucide-react";
 import { Money } from "./money";
 import { Monogram } from "./ui";
-import { Sheet, toast } from "./ui-client";
+import { Sheet, toast, Reveal } from "./ui-client";
 import { buttonClass } from "./ui-tokens";
 import { postJson } from "@/lib/http-client";
 import { INVOICE, SUPPLIER, countNoun } from "@/lib/arabic";
@@ -217,7 +217,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                   aria-label={expanded ? "أخفِ الفواتير" : "اعرض الفواتير"}
                   className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-hover hover:text-ink sm:h-9 sm:w-9"
                 >
-                  <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden />
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-(--dur-3) ${expanded ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden />
                 </button>
               </div>
               {s.creditAppliedMinor > 0 && (
@@ -226,7 +226,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                   ولا يُسجَّل سدادُه من هنا.
                 </p>
               )}
-              {expanded && (
+              <Reveal open={expanded}>
                 <ul className="divide-y divide-line-soft border-t border-line-soft bg-sunken/40">
                   {s.invoices.map((i) => (
                     <li key={i.id} className="flex items-center justify-between gap-3 px-4 py-2 text-xs sm:px-5">
@@ -237,7 +237,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                     </li>
                   ))}
                 </ul>
-              )}
+              </Reveal>
             </li>
           );
         })}

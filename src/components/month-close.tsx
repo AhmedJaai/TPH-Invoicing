@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, CircleAlert, CircleCheck, Download, Printer, FileSpreadsheet, Landmark, Lock, Receipt, RotateCw, ShieldCheck,
+  ArrowLeft, ChevronDown, CircleAlert, CircleCheck, Download, Printer, FileSpreadsheet, Landmark, Lock, Receipt, RotateCw, ShieldCheck,
   TriangleAlert, Unlock, Wallet, type LucideIcon,
 } from "lucide-react";
 import type { CheckItem, MonthCloseReport } from "@/lib/month-close";
@@ -106,6 +106,7 @@ export function MonthClose({
   const grouped = STEPS.map((s) => ({ ...s, items: s.ids.map((id) => byId.get(id)).filter((i): i is CheckItem => !!i) }))
     .filter((s) => s.items.length > 0);
   const known = new Set(STEPS.flatMap((s) => s.ids));
+  const firstBlocker = grouped.flatMap((g) => g.items).find((i) => i.state === "BLOCK");
   const other = report?.items.filter((i) => !known.has(i.id)) ?? [];
   if (other.length > 0) grouped.push({ id: "other", title: "أخرى", icon: CircleAlert, ids: [], items: other });
 
@@ -168,6 +169,12 @@ export function MonthClose({
                   {report.warnings.length > 0 && <> · {countNoun(report.warnings.length, WARNING)} لا يمنع</>}
                 </p>
               </div>
+              {/* الجوابُ ومعه الخطوةُ التالية: المانعُ الأوّل بضغطة، لا بالبحث عنه في القائمة */}
+              {!isClosed && firstBlocker && (
+                <a href={`#check-${firstBlocker.id}`} className={buttonClass("primary", "md")}>
+                  إلى ما يمنع <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
+                </a>
+              )}
             </div>
             <div className="flex gap-1 px-5 pb-5 sm:px-6" aria-hidden>
               {report.items.map((i) => (
@@ -181,9 +188,14 @@ export function MonthClose({
             {grouped.map((s, n) => {
               const st = worst(s.items);
               const ui = STATE_UI[st];
+              /*
+                ما اجتاز كلَّه سطرٌ مطويّ — القائمةُ لما بقي، والسليمُ يُفتح لمن
+                يريد التحقّق منه. والطيُّ يتحرّك ولا يقفز (`details` في `globals.css`).
+              */
               return (
                 <li key={s.id} className="overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
-                  <div className="flex items-center gap-3 border-b border-line-soft px-4 py-3.5 sm:px-5">
+                  <details open={st !== "PASS"} className="group/step">
+                  <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 transition-colors hover:bg-hover sm:px-5 group-open/step:border-b group-open/step:border-line-soft [&::-webkit-details-marker]:hidden">
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-sunken text-ink-soft">
                       <s.icon className="h-4 w-4" strokeWidth={2} aria-hidden />
                     </span>
@@ -194,12 +206,13 @@ export function MonthClose({
                       <ui.icon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                       {ui.label}
                     </span>
-                  </div>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted transition-transform duration-(--dur-3) group-open/step:rotate-180" strokeWidth={2} aria-hidden />
+                  </summary>
                   <ul className="divide-y divide-line-soft">
                     {s.items.map((i) => {
                       const iu = STATE_UI[i.state];
                       return (
-                        <li key={i.id} className="flex items-start gap-3 px-4 py-3 sm:px-5">
+                        <li key={i.id} id={`check-${i.id}`} className="flex scroll-mt-28 items-start gap-3 px-4 py-3 target:bg-accent-soft/60 sm:px-5">
                           <iu.icon className={`mt-0.5 h-[18px] w-[18px] shrink-0 ${iu.text}`} strokeWidth={2} aria-label={iu.label} />
                           <div className="min-w-0 flex-1">
                             <p className="text-[13px] font-bold leading-snug">{i.label}</p>
@@ -219,6 +232,7 @@ export function MonthClose({
                       );
                     })}
                   </ul>
+                  </details>
                 </li>
               );
             })}

@@ -644,9 +644,36 @@ html[data-amounts="hidden"] .icon-hidden { display: block; }
 .reveal > * {
   min-height: 0;
   overflow: hidden;
+  /* يختفي بعد أن ينتهي الطيّ — لا قبله فيُرى فراغاً يتقلّص */
+  visibility: hidden;
+  transition: visibility 0s linear var(--dur-3);
 }
-.reveal[data-open="true"][data-settled="true"] > * {
+.reveal[data-open="true"] > * {
+  visibility: visible;
+  /* المفتوحُ لا يقصّ حلقةَ التركيز ولا قائمةً منسدلة — بعد أن يبلغ طولَه */
   overflow: visible;
+  transition:
+    visibility 0s linear 0s,
+    overflow 0s linear var(--dur-3) allow-discrete;
+}
+
+/*
+ * ── الطيُّ الأصليّ (`<details>`) يتحرّك ولا يقفز ──
+ * `interpolate-size` يسمح بالانتقال إلى `auto`، و`::details-content` هو ما
+ * يُطوى. والمتصفّحُ الذي لا يعرفهما يطوي بلا حركة كما كان.
+ */
+:root {
+  interpolate-size: allow-keywords;
+}
+details::details-content {
+  block-size: 0;
+  overflow: clip;
+  transition:
+    block-size var(--dur-3) var(--ease-standard),
+    content-visibility var(--dur-3) var(--ease-standard) allow-discrete;
+}
+details[open]::details-content {
+  block-size: auto;
 }
 
 /*

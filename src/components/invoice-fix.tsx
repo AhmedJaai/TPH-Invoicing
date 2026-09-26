@@ -1,11 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { CircleAlert, CircleCheck, Info, PenLine, TriangleAlert } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
-import { toast } from "./ui-client";
+import { Reveal, toast } from "./ui-client";
+import { Money } from "./money";
+import { parseRiyals, TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
+import { isValidSaudiVat } from "@/lib/validation";
 import type { InvoiceReason } from "@/lib/invoice-findings";
 
 /**
@@ -51,6 +54,9 @@ export function InvoiceFix({
   const [failed, setFailed] = useState(false);
 
   const dirty = (Object.keys(initial) as (keyof typeof initial)[]).some((k) => form[k] !== initial[k]);
+  /* مبلغٌ لا يُقرأ لا يُرسَل ليُردّ — يُقال تحت حقله، والزرُّ يقول لماذا لا يعمل */
+  const unreadable = !form.total.trim()
+    || [form.subtotal, form.vat, form.total].some((v) => v.trim() !== "" && parseRiyals(v) === null);
 
   async function save() {
     setBusy(true);
@@ -145,25 +151,28 @@ export function InvoiceFix({
         </button>
       )}
 
-      {canEdit && open && (
+      {canEdit && (
+        <Reveal open={open}>
         <div className="rounded-xl border border-line bg-raised p-3.5 shadow-raised">
           <p className="mb-2.5 text-[11px] leading-relaxed text-muted">
             اكتب ما على الورقة. والنظامُ يعيد الحكمَ على الفاتورة بعد الحفظ — لا تُكتَب الحالُ من هنا.
           </p>
           <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 sm:grid-cols-2">
             <Field label="رقم الفاتورة" value={form.invoiceNumber} onChange={(v) => set({ invoiceNumber: v })} ltr />
-            <Field label="الرقم الضريبيّ للبائع" value={form.sellerVat} onChange={(v) => set({ sellerVat: v })} ltr />
-            <Field label="الرقم الضريبيّ للمشتري" value={form.buyerVat} onChange={(v) => set({ buyerVat: v })} ltr />
-            <Field label="الصافي قبل الضريبة" value={form.subtotal} onChange={(v) => set({ subtotal: v })} ltr />
-            <Field label="الضريبة" value={form.vat} onChange={(v) => set({ vat: v })} ltr />
-            <Field label="الإجماليّ" value={form.total} onChange={(v) => set({ total: v })} ltr />
+            <Field label="الرقم الضريبيّ للبائع" value={form.sellerVat} onChange={(v) => set({ sellerVat: v })} ltr hint={vatHint(form.sellerVat)} />
+            <Field label="الرقم الضريبيّ للمشتري" value={form.buyerVat} onChange={(v) => set({ buyerVat: v })} ltr hint={vatHint(form.buyerVat)} />
+            <Field label="الصافي قبل الضريبة" value={form.subtotal} onChange={(v) => set({ subtotal: v })} ltr hint={amountHint(form.subtotal)} />
+            <Field label="الضريبة" value={form.vat} onChange={(v) => set({ vat: v })} ltr hint={amountHint(form.vat)} />
+            <Field label="الإجماليّ" value={form.total} onChange={(v) => set({ total: v })} ltr hint={amountHint(form.total, true)} />
           </div>
+          <SumCheck subtotal={form.subtotal} vat={form.vat} total={form.total} />
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <button
               aria-busy={busy}
               type="button"
               onClick={save}
-              disabled={busy || !dirty}
+              disabled={busy || !dirty || unreadable}
+              title={unreadable ? "صحّح المبلغ الذي لا يُقرأ أوّلاً" : !dirty ? "لم يتغيّر حقل" : undefined}
               className={buttonClass("primary", "sm")}
             >
               احفظ التصحيح
@@ -179,8 +188,52 @@ export function InvoiceFix({
             {message && <span role={failed ? "alert" : "status"} className={`text-xs font-bold ${failed ? "text-danger" : "text-ok"}`}>{message}</span>}
           </div>
         </div>
+        </Reveal>
       )}
     </div>
+  );
+}
+
+/*
+ * ── التحقّقُ أثناء الكتابة ──
+ *
+ * ما يُقال هنا عونٌ لا حكم: الخادمُ يعيد القراءة والحكمَ بعد الحفظ
+ * (`reviewConfirmed`). والغرضُ أن يرى من يكتب خطأه قبل أن يرسله — رقمٌ
+ * ضريبيٌّ بأربع عشرة خانة، أو مجموعٌ لا يطابق — لا أن يعرفه من ردٍّ مرفوض.
+ */
+type Hint = { tone: "ok" | "warn" | "danger"; text: React.ReactNode } | null;
+
+function vatHint(v: string): Hint {
+  if (!v.trim()) return null;
+  return isValidSaudiVat(v)
+    ? { tone: "ok", text: "رقمٌ ضريبيٌّ سليمُ الشكل" }
+    : { tone: "warn", text: "15 خانة، يبدأ بـ3 وينتهي بـ3" };
+}
+
+function amountHint(v: string, required = false): Hint {
+  if (!v.trim()) return required ? { tone: "danger", text: "الإجماليّ مطلوب" } : { tone: "warn", text: "فارغ — يُحفظ «غير معروف»" };
+  const minor = parseRiyals(v);
+  if (minor === null) return { tone: "danger", text: "لا يُقرأ مبلغاً — مثل 1250.50" };
+  /* ما كُتب بأرقامٍ هنديّة أو بفواصل يُعرض كما سيُحفظ */
+  return /[٠-٩۰-۹٬٫,]/.test(v) ? { tone: "ok", text: <>يُحفظ <Money minor={minor} /></> } : null;
+}
+
+function SumCheck({ subtotal, vat, total }: { subtotal: string; vat: string; total: string }) {
+  const s = subtotal.trim() ? parseRiyals(subtotal) : null;
+  const v = vat.trim() ? parseRiyals(vat) : null;
+  const t = total.trim() ? parseRiyals(total) : null;
+  if (s === null || v === null || t === null) return null;
+  const gap = s + v - t;
+  const ok = Math.abs(gap) <= TOTAL_ROUNDING_TOLERANCE_MINOR;
+  return (
+    <p
+      aria-live="polite"
+      className={`mt-2.5 flex flex-wrap items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold ${ok ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn"}`}
+    >
+      {ok ? <CircleCheck className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden /> : <TriangleAlert className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />}
+      الصافي + الضريبة = <Money minor={s + v} />
+      {ok ? " — يطابق الإجماليّ" : <> — يخالف الإجماليّ بـ<Money minor={Math.abs(gap)} /></>}
+    </p>
   );
 }
 
@@ -189,26 +242,41 @@ function Field({
   value,
   onChange,
   ltr,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   ltr?: boolean;
+  hint?: Hint;
 }) {
+  const hintId = useId();
+  /* التلميحُ وصفٌ للحقل (`aria-describedby`) لا جزءٌ من اسمه — وإلّا قرأه قارئُ الشاشة اسماً */
   return (
-    <label className="block">
-      <span className="mb-1 block text-[11px] font-medium text-muted">{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        dir={ltr ? "ltr" : undefined}
-        /*
-          `inputMode` رقميّ على المبالغ يفتح لوحةَ الأرقام على الجوّال —
-          وأحمد يكتبها بإبهامه عند الكاشير.
-        */
-        inputMode={/الضريب|الصافي|الإجمال/.test(label) ? "decimal" : undefined}
-        className={`min-h-11 w-full rounded-lg border border-line-input bg-raised px-2.5 text-sm sm:min-h-9 ${ltr ? "nums" : ""}`}
-      />
-    </label>
+    <div>
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-medium text-muted">{label}</span>
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          dir={ltr ? "ltr" : undefined}
+          /*
+            `inputMode` رقميّ على المبالغ يفتح لوحةَ الأرقام على الجوّال —
+            وأحمد يكتبها بإبهامه عند الكاشير.
+          */
+          inputMode={/الضريب|الصافي|الإجمال/.test(label) ? "decimal" : undefined}
+          aria-invalid={hint?.tone === "danger" || undefined}
+          aria-describedby={hint ? hintId : undefined}
+          className={`min-h-11 w-full rounded-lg border bg-raised px-2.5 text-sm transition-colors sm:min-h-9 ${ltr ? "nums" : ""} ${
+            hint?.tone === "danger" ? "border-danger" : "border-line-input"
+          }`}
+        />
+      </label>
+      {hint && (
+        <span id={hintId} className={`mt-1 block text-[11px] ${hint.tone === "ok" ? "text-ok" : hint.tone === "warn" ? "text-warn" : "text-danger"}`}>
+          {hint.text}
+        </span>
+      )}
+    </div>
   );
 }
