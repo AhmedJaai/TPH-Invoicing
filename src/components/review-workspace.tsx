@@ -17,6 +17,7 @@ import {
 import { ACT, recordBatch } from "@/lib/ui-terms";
 import { formatDay } from "@/lib/riyadh-time";
 import { txHref } from "@/lib/inspector";
+import { SupplierPicker } from "./supplier-picker";
 
 /**
  * طابور المراجعة الموحَّد.
@@ -638,19 +639,13 @@ function Row({
             ))}
           </div>
           {kind === "SUPPLIER" && (
-            <label className="mt-2.5 block">
-              <span className="text-xs text-muted">أيّ مورّد؟</span>
-              <select
-                value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-line-input bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
-              >
-                <option value="">اختر…</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.nameAr}</option>
-                ))}
-              </select>
-            </label>
+            <SupplierPicker
+              text={[i.beneficiary, i.description].filter(Boolean).join(" ")}
+              suppliers={suppliers}
+              value={supplierId}
+              onChange={setSupplierId}
+              disabled={busy}
+            />
           )}
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <button

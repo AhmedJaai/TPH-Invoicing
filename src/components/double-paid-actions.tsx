@@ -29,7 +29,8 @@ export function DoublePaidActions({
   canEdit: boolean;
 }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  /* أيُّ القرارات يُرسَل — فتدور الدوّارةُ في زرّه وحده، والبقيّةُ معطَّلةٌ حتى يعود */
+  const [busy, setBusy] = useState<Decision | "OPEN" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   /*
@@ -42,7 +43,7 @@ export function DoublePaidActions({
   }
 
   async function decide(next: Decision | "OPEN"): Promise<boolean> {
-    setBusy(true);
+    setBusy(next);
     setError(null);
     try {
       const r = await send(next);
@@ -66,7 +67,7 @@ export function DoublePaidActions({
       router.refresh();
       return true;
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -87,12 +88,12 @@ export function DoublePaidActions({
           </a>
         )}
         {canEdit && decision === null && (
-          <button aria-busy={busy} type="button" disabled={busy} onClick={() => void decide("CLAIMED")} className={buttonClass("secondary", "sm")}>
+          <button aria-busy={busy === "CLAIMED"} type="button" disabled={busy !== null} onClick={() => void decide("CLAIMED")} className={buttonClass("secondary", "sm")}>
             طالبتُ الجهة
           </button>
         )}
         {canEdit && !closed && (
-          <button aria-busy={busy} type="button" disabled={busy} onClick={() => void decide("RECOVERED")} className={buttonClass("secondary", "sm")}>
+          <button aria-busy={busy === "RECOVERED"} type="button" disabled={busy !== null} onClick={() => void decide("RECOVERED")} className={buttonClass("secondary", "sm")}>
             <Check className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
             استُردّ المال
           </button>
@@ -106,12 +107,12 @@ export function DoublePaidActions({
             consequence="يخرج هذا التنبيه من «يحتاج قرارك» ولا يُطالَب بالمال. استعمله حين تكون العمليّتان مستحقّتين فعلاً — فاتورتان بالمبلغ نفسه مثلاً. ويُكتب قرارك في سجلّ التدقيق باسمك، ويمكن فتحه ثانيةً."
             acknowledgement="تحقّقتُ أنّ المال خرج مرّتين عن حقّ"
             confirmLabel="نعم، ليس ازدواجاً"
-            disabled={busy}
+            disabled={busy !== null}
             onConfirm={() => decide("NOT_DUPLICATE")}
           />
         )}
         {canEdit && decision !== null && (
-          <button aria-busy={busy} type="button" disabled={busy} onClick={() => void decide("OPEN")} className={buttonClass("quiet", "sm")}>
+          <button aria-busy={busy === "OPEN"} type="button" disabled={busy !== null} onClick={() => void decide("OPEN")} className={buttonClass("quiet", "sm")}>
             <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
             أعد فتحه
           </button>

@@ -61,7 +61,8 @@ export async function ReviewSection({
   }
 
   const supplierOptions = await db
-    .select({ id: suppliers.id, nameAr: suppliers.nameAr })
+    /* الرمزُ واسمُ المجلّد للاقتراح من نصّ البنك (`SupplierPicker`) */
+    .select({ id: suppliers.id, nameAr: suppliers.nameAr, slug: suppliers.slug, folder: suppliers.driveFolderName })
     .from(suppliers)
     .where(eq(suppliers.isActive, true))
     .orderBy(asc(suppliers.nameAr));

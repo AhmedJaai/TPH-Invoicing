@@ -8,6 +8,8 @@ import { Badge, Meter, Monogram, buttonClass, type Tone } from "./ui";
 import { toast } from "./ui-client";
 import { countNoun, TRANSACTION } from "@/lib/arabic";
 import { postJson } from "@/lib/http-client";
+import { suggestSuppliers } from "@/lib/supplier-suggest";
+import { SupplierPicker } from "./supplier-picker";
 import { ACT } from "@/lib/ui-terms";
 import { formatDay } from "@/lib/riyadh-time";
 
@@ -90,6 +92,9 @@ export interface QueueGroup {
 export interface SupplierOption {
   id: string;
   nameAr: string;
+  /** للاقتراح من نصّ البنك (`suggestSuppliers`) — اختياريّان. */
+  slug?: string | null;
+  folder?: string | null;
 }
 
 /*
@@ -230,6 +235,9 @@ export function ReconcileQueue({
     }, (message) => toast({ tone: "ok", title: message, body: "ويُعرَف به ما يشبهها في الكشوف القادمة." }));
 
   const ready = kind !== null && (kind !== "SUPPLIER" || supplierId !== "");
+  /* ما لم يُعرف مورّدُه يُقترح له من نصّ حوالته — ولا يُقترح لما عُرف */
+  const suggestText = [group.title, ...group.items.map((i) => i.beneficiaryRaw ?? "")].join(" ");
+  const suggested = group.supplierId ? [] : suggestSuppliers(suggestText, suppliers);
   const shown = expanded ? group.items : group.items.slice(0, 4);
   const reason = group.items[0].reason;
   const doneCount = groups.length - remaining.length;
@@ -367,20 +375,12 @@ export function ReconcileQueue({
                 ))}
               </div>
 
+              {kind === null && suggested.length > 0 && (
+                /* قبل اختيار الباب: المقترَحُ ظاهرٌ فيُختار البابُ والمورّدُ بضغطةٍ واحدة */
+                <SupplierPicker chipsOnly text={suggestText} suppliers={suggested} value="" onChange={(id) => { setKind("SUPPLIER"); setSupplierId(id); }} disabled={busy !== null} />
+              )}
               {kind === "SUPPLIER" && (
-                <label className="mt-3 block">
-                  <span className="text-[11px] font-bold text-muted">أيّ مورّد؟</span>
-                  <select
-                    value={supplierId}
-                    onChange={(e) => setSupplierId(e.target.value)}
-                    className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm sm:min-h-10"
-                  >
-                    <option value="">اختر…</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>{s.nameAr}</option>
-                    ))}
-                  </select>
-                </label>
+                <SupplierPicker text={suggestText} suppliers={suppliers} value={supplierId} onChange={setSupplierId} disabled={busy !== null} />
               )}
 
               {kind !== null && kind !== "SUPPLIER" && (

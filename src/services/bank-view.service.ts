@@ -77,12 +77,12 @@ export interface BankQueue {
   groups: QueueGroup[];
   /** معرّفاتُ ما في طابور هذه الصفحة — ليقول السجلُّ «في الطابور أعلاه». */
   queuedIds: Set<string>;
-  suppliers: { id: string; nameAr: string }[];
+  suppliers: { id: string; nameAr: string; slug: string; folder: string | null }[];
 }
 
 export async function loadBankQueue(): Promise<BankQueue> {
   const [supplierRows, balances, pending] = await Promise.all([
-    db.select({ id: suppliers.id, nameAr: suppliers.nameAr })
+    db.select({ id: suppliers.id, nameAr: suppliers.nameAr, slug: suppliers.slug, folder: suppliers.driveFolderName })
       .from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.nameAr)),
 
     /*
