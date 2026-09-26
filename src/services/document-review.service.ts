@@ -158,21 +158,7 @@ export async function processDocumentBacklog(
     مورّدٍ له مالٌ غيرُ مخصَّص، بالسياسة نفسها (الأقدمُ أوّلاً، وسبعةُ أيّام).
     أحمد: «كوهي وأطلس فواتيرهم موجودة على الغالب».
   */
-  const withCredit = await db.execute<{ supplier_id: string }>(sql`
-    select distinct p.supplier_id from payments p
-     where p.supplier_id is not null and p.status not in ('REVERSED','VOID','ADVANCE')
-       and p.amount_minor - p.fee_minor
-           - coalesce((select sum(a.amount_minor) from payment_allocations a where a.payment_id = p.id), 0) > 0
-  `);
-  let creditApplied = 0;
-  for (const { supplier_id } of withCredit.rows) {
-    try {
-      const out = await db.transaction((t) => applySupplierCredit(t, supplier_id, { forwardDays: SETTLEMENT_FORWARD_DAYS }));
-      creditApplied += out.allocations.length;
-    } catch (e) {
-      notes.push(`خصمُ الرصيد: ${(e as Error).message.slice(0, 80)}`);
-    }
-  }
+  const creditApplied = await applyCreditEverywhere(notes);
   if (creditApplied > 0) notes.push(`نُسبت ${creditApplied} دفعةً إلى فواتيرها`);
   let renamed: { from: string; to: string }[] = [];
   let reread = 0;
@@ -188,4 +174,27 @@ export async function processDocumentBacklog(
     notes.push(...outcome.failed.map((f) => `${f.from}: ${f.error}`));
   }
   return { recorded, approved: approval.approved, renamed, reread, notes };
+}
+
+/**
+ * خصمُ رصيد كلّ مورّدٍ له مالٌ غيرُ مخصَّص — بالسياسة نفسها (الأقدمُ أوّلاً،
+ * وسبعةُ أيّام). يُعيد عددَ ما نُسب، وما تعذّر يُقال في `notes`.
+ */
+export async function applyCreditEverywhere(notes: string[]): Promise<number> {
+  const withCredit = await db.execute<{ supplier_id: string }>(sql`
+    select distinct p.supplier_id from payments p
+     where p.supplier_id is not null and p.status not in ('REVERSED','VOID','ADVANCE')
+       and p.amount_minor - p.fee_minor
+           - coalesce((select sum(a.amount_minor) from payment_allocations a where a.payment_id = p.id), 0) > 0
+  `);
+  let creditApplied = 0;
+  for (const { supplier_id } of withCredit.rows) {
+    try {
+      const out = await db.transaction((t) => applySupplierCredit(t, supplier_id, { forwardDays: SETTLEMENT_FORWARD_DAYS }));
+      creditApplied += out.allocations.length;
+    } catch (e) {
+      notes.push(`خصمُ الرصيد: ${(e as Error).message.slice(0, 80)}`);
+    }
+  }
+  return creditApplied;
 }

@@ -302,3 +302,76 @@ export async function markPaidByOwner(tx: Tx, invoiceId: string): Promise<OwnerP
 
   return { ...plan, ownerPaymentId, appliedMinor: credit.appliedMinor };
 }
+
+/* ─────────────────── «سُدّدت» وحوالتُها في الكشف ─────────────────── */
+
+/** كم يوماً قبل يوم السداد تُعدّ حوالةُ الكشف غيرُ المنسوبة حوالةَ هذه الفاتورة. */
+export const DRAW_LOOKBACK_DAYS = 60;
+
+/**
+ * قبل أن يُنشئ «سجّل أنّها سُدّدت» دفعةً بلا حركة، يسأل: أللمورّد حوالةٌ
+ * في الكشف لم تُنسب إلى فاتورة؟ فهي — على الأرجح — هذا السداد نفسه.
+ *
+ * كان يُنشئ دفعةً ثانية، فبقيت الحوالةُ «رصيداً لك» والفاتورةُ الأحدث
+ * «مسدَّدة» على الورق (كوهي ٨٣٣٫٧٥ وأطلس ٥٧٥). والتوأمةُ عند الإنشاء
+ * تطابق اليوم، والإقرارُ لا يعرف يوم الخصم.
+ *
+ * ولو لم تكن هي: المجموعُ صحيحٌ في الحالين — مالٌ خرج للمورّد فنُسب، والحوالةُ
+ * الجديدة حين تصل الكشفَ تصير رصيداً يُخصم من القادم.
+ * يُعيد ما نُسب (للتراجع من الإشعار) وما بقي بلا حوالة.
+ */
+export async function drawBankCredit(
+  tx: Tx,
+  input: { supplierId: string; invoiceId: string; remainingMinor: number; paidOn: string },
+): Promise<{ drawn: { paymentId: string; invoiceId: string; amountMinor: number; paidOn: string }[]; restMinor: number }> {
+  const rows = (
+    await tx.execute<{ id: string; amount_minor: number; day: string; available: string | number }>(sql`
+      select p.id, p.amount_minor, to_char(p.paid_at, 'YYYY-MM-DD') as day,
+             (p.amount_minor - p.fee_minor - coalesce((
+               select sum(pa.amount_minor) from payment_allocations pa where pa.payment_id = p.id
+             ), 0))::bigint as available
+        from payments p
+       where p.supplier_id = ${input.supplierId}
+         and p.status not in ('REVERSED', 'VOID')
+         and exists (select 1 from bank_transactions bt where bt.matched_payment_id = p.id)
+         and p.paid_at::date between ${input.paidOn}::date - ${DRAW_LOOKBACK_DAYS} and ${input.paidOn}::date + 3
+       order by abs(p.paid_at::date - ${input.paidOn}::date), p.paid_at
+       for update of p
+    `)
+  ).rows;
+
+  let rest = input.remainingMinor;
+  const drawn: { paymentId: string; invoiceId: string; amountMinor: number; paidOn: string }[] = [];
+  for (const r of rows) {
+    if (rest <= SETTLED_TOLERANCE_MINOR) break;
+    const available = Number(r.available);
+    if (available <= 0) continue;
+    const take = Math.min(available, rest);
+    const out = await allocate(tx, r.id, Number(r.amount_minor), [{ invoiceId: input.invoiceId, amountMinor: take }]);
+    if (out.allocatedMinor <= 0) continue;
+    drawn.push({ paymentId: r.id, invoiceId: input.invoiceId, amountMinor: out.allocatedMinor, paidOn: r.day });
+    rest -= out.allocatedMinor;
+  }
+  return { drawn, restMinor: Math.max(0, rest) };
+}
+
+/** التراجعُ عمّا نسبه `drawBankCredit` — فكٌّ لا إلغاء: الحوالةُ حقيقيّةٌ وتبقى. */
+export async function undrawBankCredit(
+  tx: Tx,
+  pairs: readonly { paymentId: string; invoiceId: string }[],
+): Promise<number> {
+  let freed = 0;
+  for (const p of pairs) {
+    const removed = await tx
+      .delete(paymentAllocations)
+      .where(and(
+        eq(paymentAllocations.paymentId, p.paymentId),
+        eq(paymentAllocations.invoiceId, p.invoiceId),
+        sql`exists (select 1 from bank_transactions bt where bt.matched_payment_id = ${p.paymentId})`,
+      ))
+      .returning({ amountMinor: paymentAllocations.amountMinor });
+    for (const r of removed) freed += r.amountMinor;
+    if (removed.length > 0) await refreshPaymentStatus(tx, p.paymentId);
+  }
+  return freed;
+}

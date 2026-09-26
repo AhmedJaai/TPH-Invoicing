@@ -15,7 +15,7 @@
  *   (`applySupplierCredit`)؛ وما ينتظر المراجعة يُخصم منه حين يُعتمَد.
  * - ويُكتب في السجلّ بما كُتب بيدٍ وما جاء من القراءة.
  */
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, statements, suppliers } from "@/db/schema";
 import { reviewConfirmed, type ConfirmReview } from "@/lib/confirm";
@@ -28,6 +28,7 @@ import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { recordAudit } from "@/lib/audit";
 import type { StoredReading } from "@/services/document-backlog.service";
 import type { Conn } from "@/services/types";
+import { invoiceNumberKey } from "@/lib/invoice-twin";
 
 export interface RecordByHandInput {
   documentId: string;
@@ -105,10 +106,13 @@ export async function recordDocumentByHand(
   if (input.subtotal?.trim() && subtotalMinor === null) throw new RecordRefused("الصافي لا يُقرأ مبلغاً", 400);
   if (input.vat?.trim() && vatMinor === null) throw new RecordRefused("الضريبة لا تُقرأ مبلغاً", 400);
 
-  const [dupe] = number
-    ? await conn.select({ id: invoices.id }).from(invoices)
-        .where(and(eq(invoices.supplierId, supplier.id), eq(invoices.invoiceNumber, number))).limit(1)
-    : [];
+  /* الرقمُ نفسه بأيّ صيغة — «INV/2026/05297» هو «INV-2026-05297» */
+  const key = number ? invoiceNumberKey(number) : "";
+  const dupe = key
+    ? (await conn.select({ id: invoices.id, number: invoices.invoiceNumber }).from(invoices)
+        .where(eq(invoices.supplierId, supplier.id)))
+        .find((r) => invoiceNumberKey(r.number ?? "") === key)
+    : undefined;
 
   const review = reviewConfirmed(
     {

@@ -9,6 +9,7 @@ import { Monogram } from "./ui";
 import { Sheet, toast, Reveal } from "./ui-client";
 import { buttonClass } from "./ui-tokens";
 import { postJson } from "@/lib/http-client";
+import { readDrawn } from "@/lib/drawn-credit";
 import { INVOICE, SUPPLIER, countNoun } from "@/lib/arabic";
 
 /**
@@ -80,11 +81,12 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
     setBusy(true);
     setError(null);
     const paymentIds: string[] = [];
+    const drawn: { paymentId: string; invoiceId: string }[] = [];
     let marked = 0;
     const failures: string[] = [];
     /* مورّداً مورّداً — فيُكتب لكلٍّ قيدُه في السجلّ، ويُعرف أيُّها فشل */
     for (const s of markable) {
-      const r = await postJson<{ marked?: number; totalMinor?: number; paymentIds?: string[]; message?: string }>("/api/mark-paid", {
+      const r = await postJson<{ marked?: number; totalMinor?: number; paymentIds?: string[]; drawn?: unknown; message?: string }>("/api/mark-paid", {
         invoiceIds: s.invoices.map((i) => i.id),
         supplierId: s.supplierId,
         note: `دفعة ${month} — ${s.name}`,
@@ -95,6 +97,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
       }
       marked += r.data.marked ?? 0;
       paymentIds.push(...(r.data.paymentIds ?? []));
+      drawn.push(...readDrawn(r.data.drawn));
     }
     setBusy(false);
     setConfirming(false);
@@ -105,9 +108,9 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
         tone: "ok",
         title: `سُجّل سدادُ ${countNoun(marked, INVOICE)}`,
         body: "إقرارٌ منك لا مطابقةٌ بنكية — وحين يصل الكشف يطابق ما بقي.",
-        undo: paymentIds.length > 0 ? {
+        undo: paymentIds.length + drawn.length > 0 ? {
           run: async () => {
-            const u = await postJson<{ message: string }>("/api/mark-paid/undo", { paymentIds });
+            const u = await postJson<{ message: string }>("/api/mark-paid/undo", { paymentIds, drawn });
             if (u.ok) router.refresh();
             return u.ok;
           },

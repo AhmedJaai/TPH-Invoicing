@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Banknote, Landmark, Wallet } from "lucide-react";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { postJson } from "@/lib/http-client";
+import { readDrawn } from "@/lib/drawn-credit";
 import { ACT } from "@/lib/ui-terms";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
@@ -138,14 +139,15 @@ export function MarkInvoicePaid({
     const paymentIds = Array.isArray(r.data.paymentIds)
       ? r.data.paymentIds.filter((x): x is string => typeof x === "string")
       : [];
+    const drawn = readDrawn(r.data.drawn);
     toast({
       tone: "ok",
       title: "سُجّلت الفاتورة مسدَّدة",
       body: text,
-      undo: paymentIds.length > 0
+      undo: paymentIds.length + drawn.length > 0
         ? {
             run: async () => {
-              const u = await postJson<{ message?: string }>("/api/mark-paid/undo", { paymentIds });
+              const u = await postJson<{ message?: string }>("/api/mark-paid/undo", { paymentIds, drawn });
               if (!u.ok) {
                 toast({ tone: "danger", title: "تعذّر التراجع", body: u.error });
                 return false;
@@ -291,3 +293,4 @@ function Choice({
     </button>
   );
 }
+

@@ -73,17 +73,22 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
     : [];
 
   /* ── الجوابُ في سطر: ما حالُه وما يمنعه ── */
+  /* الرقمُ نفسه بأيّ صيغة نسخةٌ يقيناً؛ واليومُ والمبلغ نفسهما شبهٌ يُقارَن ولا يُحسَم */
+  const sureTwin = p.twin?.how === "same-number" ? p.twin : null;
+  const likeTwin = p.twin?.how === "same-day-and-total" && isInvoiceKind ? p.twin : null;
   const headline = p.invoice
     ? { tone: "ok" as const, icon: CircleCheck, text: "قُيِّدت له فاتورة" }
     : p.statementId
       ? { tone: "ok" as const, icon: CircleCheck, text: "قُيِّد كشفاً" }
       : p.status === "REJECTED"
         ? { tone: "danger" as const, icon: CircleX, text: "رُفض — لا يدخل الحساب" }
-        : p.twin && isInvoiceKind
-          ? { tone: "warn" as const, icon: TriangleAlert, text: `نسخةٌ من الفاتورة ${p.twin.number} المقيَّدة — ارفضه ولا تقيّده ثانيةً` }
-        : p.twin
+        : sureTwin && isInvoiceKind
+          ? { tone: "warn" as const, icon: TriangleAlert, text: `نسخةٌ من الفاتورة ${sureTwin.number} المقيَّدة — ارفضه ولا تقيّده ثانيةً` }
+        : sureTwin
           /* عرضُ السعر برقم فاتورةٍ قُيِّدت: هو عرضُ الطلب نفسه، لا نسخة — لا شيء عليك */
-          ? { tone: "ok" as const, icon: CircleCheck, text: `${DOCUMENT_KIND_LABEL[p.kind] ?? p.kind} — قُيِّدت فاتورتُه برقمه ${p.twin.number}، لا شيء عليك` }
+          ? { tone: "ok" as const, icon: CircleCheck, text: `${DOCUMENT_KIND_LABEL[p.kind] ?? p.kind} — قُيِّدت فاتورتُه برقمه ${sureTwin.number}، لا شيء عليك` }
+        : likeTwin
+          ? { tone: "warn" as const, icon: TriangleAlert, text: `يشبه الفاتورة ${likeTwin.number} المقيَّدة (اليومُ والمبلغ نفسهما) — قارِنهما: إن كانت هي فارفضه، وإلّا فقيّده` }
         : byDesign
           ? { tone: "muted" as const, icon: FileText, text: `${DOCUMENT_KIND_LABEL[p.kind] ?? p.kind} — لا يُقيَّد فاتورةً` }
           : p.missing.length > 0
@@ -185,14 +190,14 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
           </div>
         </dl>
 
-        {p.twin && showAmounts && (
+        {p.twin && (sureTwin || likeTwin) && showAmounts && (
           <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
-            {isInvoiceKind ? "برقمها المقروء نفسه ولمورّدها نفسه — قارِن ثمّ ارفض هذه النسخة." : "الفاتورةُ التي تلته برقمه نفسه:"}
+            {likeTwin ? "لمورّدها نفسه باليوم والمبلغ نفسيهما، ورقمُها غيرُ رقمها:" : isInvoiceKind ? "برقمها المقروء نفسه ولمورّدها نفسه — قارِن ثمّ ارفض هذه النسخة." : "الفاتورةُ التي تلته برقمه نفسه:"}
             <LinkButton href={invoiceHref(p.twin.id)} size="sm" icon={Receipt}>افتح الفاتورة المقيَّدة</LinkButton>
           </p>
         )}
 
-        {p.missing.length > 0 && !p.twin && (
+        {p.missing.length > 0 && !sureTwin && (
           <ul className="mt-4 space-y-1.5" aria-label="ما ينقصه">
             {p.missing.map((m) => (
               <li key={m} className="flex items-start gap-2 rounded-lg bg-danger-bg px-3 py-2 text-xs text-ink-soft">
@@ -232,7 +237,7 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
       </section>
 
       {/* ── أكمِل الناقص وقيّدها ── */}
-      {recordable && !p.twin && canEdit && showAmounts && (
+      {recordable && !sureTwin && canEdit && showAmounts && (
         <Section id="fix" icon={Wrench} title={byDesign ? "هو فاتورةٌ في الحقيقة؟ قيّدها" : p.missing.length > 0 ? "أكمِل الناقص وقيّدها" : "عاينها وقيّدها"} className="mt-8 scroll-mt-24">
           {byDesign && (
             <Callout tone="info" className="mb-3" title={`قرأه النموذجُ «${DOCUMENT_KIND_LABEL[p.kind] ?? p.kind}»`}>

@@ -110,6 +110,7 @@
 | `src/lib/supplier-balances.ts` | **«كم أدين؟» بالمورّد لا بالفاتورة**: المفتوح ناقص رصيدنا عنده، ولا يُخصم رصيدُ مورّدٍ من دين آخر · المصدر `supplier-balance.service.ts` لكلّ شاشة تقول «عليك» |
 | `src/services/invoice-profile.service.ts` · `src/lib/invoice-profile.ts` | **ملفّ الفاتورة** (`/purchases/invoices/[id]`): البنود مقابل آخر سعرٍ من المورّد نفسه (`priceMove`) · التخصيصات وحركتها · أسطر كشف المورّد · فاتورةٌ بالمبلغ نفسه في يوم · سجلّ التدقيق · والجارتان. و`invoiceHref` موضعُ الرابط الوحيد |
 | `src/services/orphan-payment.service.ts` · `src/lib/orphan-payment.ts` | **دفعةٌ بلا مورّد ولا حركة** تُنسَب أو يُلغى قيدُها بسببه، في معاملةٍ بقفل، والطلبُ بـzod بلا مبلغ |
+| `src/services/account-review.service.ts` · `src/lib/payment-echo.ts` · `src/lib/invoice-twin.ts` | **«راجِع الحسابات»** (`/api/account-review`، معاينةٌ ثمّ تنفيذ): يقيّد ما أُرشف بلا قيد، ويدمج الدفعةَ التي قُيِّدت مرّتين بإقرار، وينسب الأرصدة |
 | `src/services/supplier-credit.service.ts` | `applySupplierCredit` يخصم ما دُفع من فواتير وصلت بعده (٧ أيّام آلياً) · `markPaidByOwner` يقيّد السداد من حساب المالك **وينقل حوالات المقهى عن تلك الفاتورة** · ومعاينته قبله |
 | `src/lib/ai/supplier-analysis.ts` | تحليل حساب المورّد: الإشارات تُحسب قبل النموذج، والمراجع قصيرة من قوائم حُسبت، **والمبلغ يحسبه الخادم** · الأنواع قائمة مغلقة |
 | `src/services/supplier-analysis.service.ts` | الوقائع ← النداء (بمهلةٍ تحت عمر المسار) ← `ai_findings` · والإقرار يمرّ بالخدمات نفسها، والرفض يقرؤه التحليل القادم |

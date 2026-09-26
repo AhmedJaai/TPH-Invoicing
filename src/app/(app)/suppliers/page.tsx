@@ -4,6 +4,7 @@ import { Clock, FileWarning, Hourglass, PiggyBank, Receipt, Sparkles, Store, Wal
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
+import { AccountReview } from "@/components/account-review";
 import { Money } from "@/components/money";
 import {
   Badge, Callout, Card, DataTable, EmptyState, LinkButton, LinkTabs, Monogram, Section, buttonClass, type Column,
@@ -213,7 +214,12 @@ export default async function SuppliersPage({
                   <span className="text-[10px] text-ok">لك</span>
                 </span>
               ) : (
-                <span className="text-[11px] text-muted">{r.idle ? "—" : "متّزن"}</span>
+                r.openCount > 0 ? (
+                  /* فاتورةٌ مفتوحة يقابلها مالٌ لم يُنسب — ليس «متّزناً» يُترك */
+                  <span className="text-[11px] font-bold text-warn">متّزنٌ على الورق</span>
+                ) : (
+                  <span className="text-[11px] text-muted">{r.idle ? "—" : "متّزن"}</span>
+                )
               ),
           },
           {
@@ -255,8 +261,11 @@ export default async function SuppliersPage({
         ? "لمن تدين، وكم، ومنذ متى — بعد خصم ما دفعتَه لكلٍّ منهم، وما بقي لك عندهم."
         : "المورّدون وفواتيرُهم المفتوحة وآخرُ تعاملٍ معهم — والمبالغُ خارج صلاحيتك."}
       actions={
-        showAmounts && can(user.role, "payment:approve") && totals.owedMinor > 0 ? (
-          <LinkButton href="/payments" variant="primary" icon={Wallet}>خطّط الدفعة</LinkButton>
+        showAmounts && can(user.role, "payment:approve") ? (
+          <>
+            <AccountReview />
+            {totals.owedMinor > 0 && <LinkButton href="/payments" variant="primary" icon={Wallet}>خطّط الدفعة</LinkButton>}
+          </>
         ) : undefined
       }
     >

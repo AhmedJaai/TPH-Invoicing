@@ -27,6 +27,7 @@ import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { recordAudit } from "@/lib/audit";
 import { MonthClosedError } from "@/services/validation.service";
+import { findInvoiceTwin, twinReason, type RecordedInvoice } from "@/lib/invoice-twin";
 
 export interface StoredReading {
   documentKind?: string;
@@ -90,18 +91,56 @@ export function missingFromReading(r: {
   return out;
 }
 
-/**
- * يقيّد فاتورةً لكلّ مستندٍ ينتظر ولا فاتورةَ له، من قراءته المحفوظة.
- * يُعيد ما قُيِّد، وما بقي ومعه ما نقصه.
- */
-export async function recordFromStoredReadings(actorId: string, limit = 60): Promise<{
+
+/** ما يُقيَّد — أو ما سيُقيَّد في المعاينة — بما يكفي ليُقال بجملة. */
+export interface BacklogItem {
+  documentId: string;
+  fileName: string;
+  kind: "INVOICE" | "STATEMENT";
+  supplierName: string;
+  invoiceNumber: string | null;
+  invoiceDate: string;
+  totalMinor: number | null;
+  /** أُرشف من قبل بلا قيد — فخصمُ رصيد المورّد يقع الآن. */
+  wasArchived: boolean;
+}
+
+export interface BacklogOutcome {
   recorded: number;
+  /** ما قُيِّد، أو ما سيُقيَّد في المعاينة. */
+  items: BacklogItem[];
   missing: { documentId: string; fileName: string; reasons: string[] }[];
-}> {
+}
+
+/**
+ * يقيّد فاتورةً (أو كشفاً) لكلّ مستندٍ لا قيدَ له، من قراءته المحفوظة —
+ * ما ينتظر المراجعة **وما أُرشف** كذلك.
+ *
+ * وكان المؤرشَفُ خارجه: ثماني فواتير في الإنتاج أُرشفت ولم تُقيَّد، فلا
+ * تدخل «كم أدين» وتبقى دفعاتُها «رصيداً لك». قال أحمد (٢٦ سبتمبر ٢٠٢٦):
+ * «المفترض يبحث في الأرشيف ويتأكّد إذا مكرّرة أو لا، وإذا لم يجد أيّ
+ * مشكلة يقيّدها». فيُقيَّد بشروطٍ كلّها:
+ *   - نوعُه فاتورة: ما صنّفه إنسانٌ يحكم، ثمّ ما قرأه النموذج؛
+ *   - مورّدُه مسجَّلٌ ومعروفٌ بالمستند أو بالرقم الضريبيّ أو بالاسم؛
+ *   - الرقمُ والتاريخُ والإجماليُّ مقروءة، و`reviewConfirmed` بلا مانع
+ *     (ومنه: الرقمُ الضريبيّ للمشتري ليس رقمَنا — فليست فاتورتَنا)؛
+ *   - **ولا توأمَ لها** بين المقيَّد: الرقمُ نفسه بأيّ صيغة، أو اليومُ
+ *     والمبلغ نفسهما (`findInvoiceTwin`) — فتُترك للإنسان من ملفّها.
+ *
+ * و`dryRun` يقول ما سيقع ولا يكتب — لزرّ «راجِع الحسابات» قبل التنفيذ.
+ */
+export async function recordFromStoredReadings(
+  actorId: string,
+  options: { limit?: number; dryRun?: boolean } = {},
+): Promise<BacklogOutcome> {
+  const limit = options.limit ?? 60;
+  const dryRun = options.dryRun ?? false;
   const pending = await db
     .select({
       id: documents.id,
       fileName: documents.fileName,
+      status: documents.status,
+      kind: documents.kind,
       supplierId: documents.supplierId,
       periodMonth: documents.periodMonth,
       reading: documents.extractionJson,
@@ -110,23 +149,36 @@ export async function recordFromStoredReadings(actorId: string, limit = 60): Pro
     .leftJoin(invoices, eq(invoices.documentId, documents.id))
     .leftJoin(statements, eq(statements.documentId, documents.id))
     .where(and(
-      inArray(documents.status, ["PENDING", "NEEDS_REVIEW"]),
+      inArray(documents.status, ["PENDING", "NEEDS_REVIEW", "ARCHIVED"]),
       isNotNull(documents.extractionJson),
       isNull(invoices.id),
       isNull(statements.id),
     ))
+    .orderBy(documents.uploadedAt)
     .limit(limit);
 
-  if (pending.length === 0) return { recorded: 0, missing: [] };
+  const out: BacklogOutcome = { recorded: 0, items: [], missing: [] };
+  if (pending.length === 0) return out;
 
   const supplierList = await loadSuppliers();
   const byId = new Map(supplierList.map((s) => [s.id, s]));
-  let recorded = 0;
-  const missing: { documentId: string; fileName: string; reasons: string[] }[] = [];
+  /* المقيَّدُ كلُّه — ويُضاف إليه ما يُقيَّد في هذه الدورة، فلا تُقيَّد نسختان معاً */
+  const recordedInvoices: RecordedInvoice[] = (await db
+    .select({
+      id: invoices.id, supplierId: invoices.supplierId, invoiceNumber: invoices.invoiceNumber,
+      invoiceDate: invoices.invoiceDate, totalMinor: invoices.totalMinor,
+    })
+    .from(invoices))
+    .filter((r): r is typeof r & { supplierId: string } => r.supplierId !== null)
+    .map((r) => ({
+      id: r.id, supplierId: r.supplierId, invoiceNumber: r.invoiceNumber ?? "",
+      invoiceDate: r.invoiceDate ? r.invoiceDate.toISOString().slice(0, 10) : null, totalMinor: r.totalMinor,
+    }));
 
   for (const doc of pending) {
     const x = (doc.reading ?? {}) as StoredReading;
-    const kind = x.documentKind ?? "";
+    /* ما صنّفه إنسانٌ (أو المزامنةُ من المجلّد) يحكم، ثمّ ما قرأه النموذج */
+    const kind = doc.kind && doc.kind !== "UNKNOWN" ? doc.kind : x.documentKind ?? "";
     if (!INVOICE_KINDS.has(kind) && kind !== "STATEMENT") continue;
     /* ما سكت عنه النموذجُ ونطق به اسمُ الملفّ — سدٌّ لفراغ لا تصحيحٌ لقراءة */
     const fromName = factsFromFileName(doc.fileName);
@@ -143,6 +195,7 @@ export async function recordFromStoredReadings(actorId: string, limit = 60): Pro
     const date = normalizeDocumentDate(x.invoiceDate) ?? fromName.date;
     const number = x.invoiceNumber?.trim() || fromName.invoiceNumber;
     const totalMinor = parseRiyals(x.totalAmount ?? "") ?? fromName.totalMinor;
+    const wasArchived = doc.status === "ARCHIVED";
 
     /*
       ── الكشف ── هويّتُه مورّدُه وفترتُه، لا رقمٌ ولا إجماليّ. وتاريخُه إن
@@ -151,12 +204,20 @@ export async function recordFromStoredReadings(actorId: string, limit = 60): Pro
     */
     if (kind === "STATEMENT") {
       if (!supplier) {
-        missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["المورّد: لم يُعرَف من الاسم المقروء"] });
+        out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["المورّد: لم يُعرَف من الاسم المقروء"] });
         continue;
       }
       const end = date ?? (doc.periodMonth ? lastDayOf(doc.periodMonth) : null);
       if (!end) {
-        missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["التاريخ: لم يُقرأ، ولا شهرَ للمجلّد"] });
+        out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["التاريخ: لم يُقرأ، ولا شهرَ للمجلّد"] });
+        continue;
+      }
+      const item: BacklogItem = {
+        documentId: doc.id, fileName: doc.fileName, kind: "STATEMENT", supplierName: supplier.nameAr,
+        invoiceNumber: null, invoiceDate: end, totalMinor, wasArchived,
+      };
+      if (dryRun) {
+        out.items.push(item);
         continue;
       }
       try {
@@ -180,23 +241,26 @@ export async function recordFromStoredReadings(actorId: string, limit = 60): Pro
             entityId: doc.id,
             after: { الملف: doc.fileName, السبب: "قُيِّد كشفاً من القراءة المحفوظة", نهاية_الفترة: end },
           }, tx);
-          recorded++;
         });
+        out.recorded++;
+        out.items.push(item);
       } catch (e) {
         if (!(e instanceof MonthClosedError)) throw e;
-        missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: [e.message] });
+        out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: [e.message] });
       }
       continue;
     }
 
+    const subtotalMinor = parseRiyals(x.subtotalAmount ?? "");
+    const vatMinor = parseRiyals(x.vatAmount ?? "");
     const review = reviewConfirmed(
       {
         documentKind: kind,
         supplierId: supplier?.id,
         invoiceNumber: number,
         invoiceDate: date,
-        subtotalMinor: parseRiyals(x.subtotalAmount ?? ""),
-        vatMinor: parseRiyals(x.vatAmount ?? ""),
+        subtotalMinor,
+        vatMinor,
         totalMinor,
         sellerVat: x.sellerVatNumber,
         buyerVat: x.buyerVatNumber,
@@ -209,7 +273,7 @@ export async function recordFromStoredReadings(actorId: string, limit = 60): Pro
     );
 
     if (!review.canCreateInvoice || !supplier || !date || totalMinor === null || !number) {
-      missing.push({
+      out.missing.push({
         documentId: doc.id,
         fileName: doc.fileName,
         reasons: missingFromReading({
@@ -219,18 +283,38 @@ export async function recordFromStoredReadings(actorId: string, limit = 60): Pro
       });
       continue;
     }
+    if (review.blockers.length > 0) {
+      out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: review.blockers.map((b) => b.message) });
+      continue;
+    }
+    const twin = findInvoiceTwin(recordedInvoices, { supplierId: supplier.id, invoiceNumber: number, invoiceDate: date, totalMinor });
+    if (twin) {
+      out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: [twinReason(twin)] });
+      continue;
+    }
+
+    const invoiceKind: "TAX_INVOICE" | "SIMPLIFIED_INVOICE" = kind === "SIMPLIFIED_INVOICE" ? "SIMPLIFIED_INVOICE" : "TAX_INVOICE";
+    const item: BacklogItem = {
+      documentId: doc.id, fileName: doc.fileName, kind: "INVOICE", supplierName: supplier.nameAr,
+      invoiceNumber: number, invoiceDate: date, totalMinor, wasArchived,
+    };
+    if (dryRun) {
+      out.items.push(item);
+      recordedInvoices.push({ id: `planned:${doc.id}`, supplierId: supplier.id, invoiceNumber: number, invoiceDate: date, totalMinor });
+      continue;
+    }
 
     try {
-      await db.transaction(async (tx) => {
+      const invoiceId = await db.transaction(async (tx) => {
         const invoiceDate = new Date(`${date}T00:00:00Z`);
-        const invoiceId = await createInvoice(tx, {
+        const id = await createInvoice(tx, {
           documentId: doc.id,
           supplierId: supplier.id,
           invoiceNumber: number,
           invoiceDate,
           periodMonth: doc.periodMonth || date.slice(0, 7),
-          subtotalMinor: parseRiyals(x.subtotalAmount ?? ""),
-          vatMinor: parseRiyals(x.vatAmount ?? ""),
+          subtotalMinor,
+          vatMinor,
           totalMinor,
           sellerVat: x.sellerVatNumber || null,
           buyerVat: x.buyerVatNumber || null,
@@ -238,35 +322,45 @@ export async function recordFromStoredReadings(actorId: string, limit = 60): Pro
           inputVatStatus: review.inputVatStatus,
           isFixedAsset: review.isFixedAsset,
         });
-        if (!invoiceId) return;
+        if (!id) return null;
         await replaceLines(tx, {
-          invoiceId,
+          invoiceId: id,
           supplierId: supplier.id,
           invoiceDate,
-          subtotalMinor: parseRiyals(x.subtotalAmount ?? ""),
-          lines: (x.lines ?? []) as never,
+          subtotalMinor,
+          lines: x.lines ?? [],
         });
-        if (!doc.supplierId) {
-          await tx.update(documents).set({ supplierId: supplier.id }).where(eq(documents.id, doc.id));
-        }
+        await tx.update(documents)
+          .set({ supplierId: supplier.id, ...(doc.kind === "UNKNOWN" ? { kind: invoiceKind } : {}) })
+          .where(eq(documents.id, doc.id));
         await recordAudit({
           actorId,
           action: "DOCUMENT_REREAD",
           entityType: "invoice",
-          entityId: invoiceId,
+          entityId: id,
           after: {
             الملف: doc.fileName,
-            السبب: "قُيِّدت من القراءة المحفوظة بعد توحيد التاريخ — لم يُعَد النداء",
+            السبب: wasArchived
+              ? "أُرشف ولم يُقيَّد — قُيِّد آلياً من قراءته المحفوظة بعد التحقّق أنّه ليس نسخة"
+              : "قُيِّدت من القراءة المحفوظة — لم يُعَد النداء",
             التاريخ: date,
           },
         }, tx);
         await applySupplierCredit(tx, supplier.id, { forwardDays: SETTLEMENT_FORWARD_DAYS });
-        recorded++;
+        return id;
       });
+      /* قيدٌ سبقه قيدٌ من نافذةٍ أخرى — لا يُعدّ ولا يُسكَت عنه */
+      if (!invoiceId) {
+        out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: [`قُيِّدت فاتورةٌ برقم ${number} لهذا المورّد للتوّ`] });
+        continue;
+      }
+      out.recorded++;
+      out.items.push(item);
+      recordedInvoices.push({ id: invoiceId, supplierId: supplier.id, invoiceNumber: number, invoiceDate: date, totalMinor });
     } catch (e) {
       if (!(e instanceof MonthClosedError)) throw e;
-      missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: [e.message] });
+      out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: [e.message] });
     }
   }
-  return { recorded, missing };
+  return out;
 }

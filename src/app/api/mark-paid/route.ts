@@ -24,7 +24,7 @@ import { invoices } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { recordAudit } from "@/lib/audit";
 import { allocate, createPayment } from "@/services/payment.service";
-import { CreditError, markPaidByOwner, previewOwnerPaid } from "@/services/supplier-credit.service";
+import { CreditError, drawBankCredit, markPaidByOwner, previewOwnerPaid } from "@/services/supplier-credit.service";
 import { INVOICE, countNoun } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
@@ -175,11 +175,24 @@ async function handle(request: Request) {
   let totalMinor = 0;
   /* معرّفاتُ الدفعات المكتوبة — يُعاد بها التراجعُ من الإشعار ما دام قريباً */
   const paymentIds: string[] = [];
+  /* ما نُسب من حوالاتٍ في الكشف — ويُفكّ بالتراجع ولا تُلغى الحوالة */
+  const drawn: { paymentId: string; invoiceId: string; amountMinor: number; paidOn: string }[] = [];
 
   try {
   await db.transaction(async (tx) => {
     for (const inv of pending) {
-      const remaining = inv.totalMinor - Number(inv.allocated);
+      let remaining = inv.totalMinor - Number(inv.allocated);
+      totalMinor += remaining;
+      /*
+        الحوالةُ في الكشف أوّلاً: إن كان للمورّد حوالةٌ لم تُنسب فهي هذا السداد
+        — وإلّا قُيِّد مرّتين (كوهي وأطلس). وما بقي بعدها يُقيَّد إقراراً.
+      */
+      if (inv.supplierId) {
+        const d = await drawBankCredit(tx, { supplierId: inv.supplierId, invoiceId: inv.id, remainingMinor: remaining, paidOn });
+        drawn.push(...d.drawn);
+        remaining = d.restMinor;
+      }
+      if (remaining <= SETTLED_TOLERANCE_MINOR) continue;
       /*
         عبر `createPayment` لا إدراجاً باليد: فيُسأل التوأم (الواقعة الواحدة
         لا تُقيَّد دفعتين) ويُحرَس الشهر المقفل.
@@ -200,8 +213,6 @@ async function handle(request: Request) {
       */
       await allocate(tx, payId, remaining, [{ invoiceId: inv.id, amountMinor: remaining }]);
       paymentIds.push(payId);
-
-      totalMinor += remaining;
     }
   });
   } catch (e) {
@@ -224,14 +235,22 @@ async function handle(request: Request) {
       // لم يأتِ من كشف بنك — تمييزه مهم عند أي مراجعة لاحقة
       مصدر_السداد: "إقرار المالك لا مطابقة بنكية",
       يوم_السداد: paidOn,
+      نُسب_من_حوالات_الكشف: drawn.map((d) => ({ الحوالة: d.paymentId, يومها: d.paidOn, بالهللات: d.amountMinor })),
     },
   });
+
+  const drawnMinor = drawn.reduce((s, d) => s + d.amountMinor, 0);
+  const drawnDays = [...new Set(drawn.map((d) => d.paidOn))];
 
   return NextResponse.json({
     ok: true,
     marked: pending.length,
     totalMinor,
     paymentIds,
-    message: `سُجّل سداد ${countNoun(pending.length, INVOICE)} بقيمة ${formatRiyalsDisplay(totalMinor)} ريال`,
+    drawn: drawn.map((d) => ({ paymentId: d.paymentId, invoiceId: d.invoiceId })),
+    message: `سُجّل سداد ${countNoun(pending.length, INVOICE)} بقيمة ${formatRiyalsDisplay(totalMinor)} ريال`
+      + (drawnMinor > 0
+        ? ` · منها ${formatRiyalsDisplay(drawnMinor)} من حوالةٍ في الكشف لم تكن منسوبة (${drawnDays.join("، ")}) — فلم تُقيَّد مرّتين`
+        : ""),
   });
 }

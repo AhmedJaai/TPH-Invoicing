@@ -11,10 +11,11 @@
  * في شهرٍ مفتوح. فلا يصير الزرُّ باباً لإلغاء مالٍ تاريخيّ.
  */
 import { inArray, sql } from "drizzle-orm";
-import { payments } from "@/db/schema";
+import { invoices, payments } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { assertMonthsOpen } from "./month-guard";
 import { reversePayment } from "./payment.service";
+import { undrawBankCredit } from "./supplier-credit.service";
 import type { Tx } from "./types";
 
 export const UNDO_WINDOW_MINUTES = 30;
@@ -88,4 +89,32 @@ export async function undoMarkedPaid(
     );
   }
   return { voided: rows.length, freedMinor };
+}
+
+/**
+ * التراجعُ عمّا نسبه الإقرارُ من حوالاتٍ في الكشف (`drawBankCredit`): يُفكّ
+ * التخصيص فتعود الحوالةُ رصيداً والفاتورةُ مفتوحة. فكٌّ لا إلغاء، ولا يقع
+ * في شهرٍ مقفل.
+ */
+export async function undoDrawn(
+  t: Tx,
+  pairs: readonly { paymentId: string; invoiceId: string }[],
+  userId: string,
+): Promise<number> {
+  const months = await t
+    .select({ month: invoices.periodMonth })
+    .from(invoices)
+    .where(inArray(invoices.id, pairs.map((p) => p.invoiceId)));
+  await assertMonthsOpen(t, months.map((m) => m.month));
+  const freed = await undrawBankCredit(t, pairs);
+  if (freed > 0) {
+    await recordAudit({
+      actorId: userId,
+      action: "BANK_CREDIT_UNDRAWN",
+      entityType: "payment",
+      entityId: pairs[0].paymentId,
+      after: { السبب: "تراجعٌ عن إقرار سداد — فُكّت الحوالةُ عن الفاتورة وبقيت", "فُكّ بالهللات": freed, الأزواج: pairs },
+    }, t);
+  }
+  return freed;
 }

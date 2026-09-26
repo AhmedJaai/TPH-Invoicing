@@ -109,6 +109,8 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   ALERT_RESOLVED: "إغلاق تنبيه",
   BANK_RULE_DELETED: "حذف قاعدة تصنيف",
   PAYMENT_VOIDED: "إلغاء دفعة",
+  PAYMENT_ECHO_MERGED: "دمج دفعةٍ قُيِّدت مرّتين",
+  BANK_CREDIT_UNDRAWN: "فكّ حوالةٍ عن فاتورة",
   CATALOG_IMPORTED: "استيراد كتالوج فودكس",
   RECIPE_VERSION_CORRECTED: "تصحيح نسخة وصفة",
   RECIPE_DELETED: "حذف وصفة",

@@ -24,6 +24,7 @@ import { formatRiyals, parseRiyals } from "@/lib/money";
 import { matchSupplier } from "@/lib/supplier-match";
 import { loadSuppliers, missingFromReading, supplierByVatInName, type StoredReading } from "@/services/document-backlog.service";
 import { loadNamedDocuments } from "@/services/drive-status.service";
+import { findInvoiceTwin, type InvoiceTwin } from "@/lib/invoice-twin";
 
 export interface DocumentProfile {
   id: string;
@@ -69,7 +70,7 @@ export interface DocumentProfile {
     fromName: string[];
   };
   /** فاتورةٌ مقيَّدةٌ لمورّده برقمه المقروء — فالمستندُ نسخةٌ منها يُرفض لا يُقيَّد. */
-  twin: { id: string; number: string } | null;
+  twin: { id: string; number: string; how: InvoiceTwin["kind"] } | null;
   /** ما يمنع القيد بعينه — `missingFromReading`، وفارغٌ لما قُيِّد. */
   missing: string[];
   verdict: AutoArchiveVerdict;
@@ -170,11 +171,19 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
     linesTotalMinor: sumLineTotals(x?.lines, (v) => parseRiyals(v)),
   });
 
-  const twinNumber = readNumber ?? fromName.invoiceNumber;
-  const [twinRow] = !recorded && supplierId && twinNumber
-    ? await db.select({ id: invoices.id, number: invoices.invoiceNumber }).from(invoices)
-        .where(and(eq(invoices.supplierId, supplierId), eq(invoices.invoiceNumber, twinNumber))).limit(1)
-    : [];
+  /* التوأمُ بالقاعدة نفسها التي يسألها القيدُ الآليّ — الرقمُ بأيّ صيغة، أو اليومُ والمبلغ */
+  const twinFound = !recorded && supplierId
+    ? findInvoiceTwin(
+        (await db.select({ id: invoices.id, number: invoices.invoiceNumber, date: invoices.invoiceDate, total: invoices.totalMinor })
+          .from(invoices).where(eq(invoices.supplierId, supplierId)))
+          .map((r) => ({
+            id: r.id, supplierId, invoiceNumber: r.number ?? "",
+            invoiceDate: r.date ? r.date.toISOString().slice(0, 10) : null, totalMinor: r.total,
+          })),
+        { supplierId, invoiceNumber: readNumber ?? fromName.invoiceNumber, invoiceDate: readDate ?? fromName.date, totalMinor: totalForMissing },
+      )
+    : null;
+  const twinRow = twinFound ? { id: twinFound.invoice.id, number: twinFound.invoice.invoiceNumber, how: twinFound.kind } : null;
 
   /* الاسمُ من المصدر الواحد لشاشة التسمية — فلا يقول الملفُّ غيرَ ما تقوله */
   const named = row.driveFileId ? (await loadNamedDocuments()).find((d) => d.documentId === id) : undefined;
@@ -238,7 +247,7 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
       buyerVat: x?.buyerVatNumber || "",
       fromName: fromNameUsed,
     },
-    twin: twinRow ? { id: twinRow.id, number: twinRow.number } : null,
+    twin: twinRow,
     missing,
     verdict,
     name,

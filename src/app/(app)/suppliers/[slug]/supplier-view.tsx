@@ -31,6 +31,7 @@ import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
 import { splitSupplierCredit } from "@/lib/supplier-requests";
 import { SupplierPolicy } from "@/components/supplier-policy";
+import { AccountReview } from "@/components/account-review";
 import { formatDay, formatRange } from "@/lib/riyadh-time";
 import { METHOD_LABEL, paymentStatusLabel } from "@/lib/payment-state";
 import { invoiceHref } from "@/lib/invoice-profile";
@@ -144,6 +145,9 @@ export async function SupplierView({
   const intel = await loadSupplierIntel(s.id, bal?.openCount ?? 0);
   const balance = bal?.owedMinor ?? 0;
   const creditLeft = bal?.creditLeftMinor ?? 0;
+  /* مالٌ دُفع ولم يُنسب، وفاتورةٌ مفتوحة معاً — المجموعُ صفرٌ والحقيقةُ غيرُ معروفة */
+  const unapplied = bal?.creditMinor ?? 0;
+  const offsetting = balance === 0 && creditLeft === 0 && (bal?.openMinor ?? 0) > 0;
   const paidNet = bal?.paidNetMinor ?? n("paid");
   const creditSplit = splitSupplierCredit(creditLeft, n("advance"));
   const ageing = ageOwed(ages.get(s.id) ?? [], balance);
@@ -339,7 +343,7 @@ export async function SupplierView({
                 <span className={`grid h-7 w-7 place-items-center rounded-lg ${balance > 0 ? "bg-warn-bg text-warn" : "bg-sunken text-ink-soft"}`}>
                   <Scale className="h-4 w-4" strokeWidth={2} aria-hidden />
                 </span>
-                {balance > 0 ? "عليك له" : creditLeft > 0 ? "رصيدٌ لك عنده" : "الحساب متّزن"}
+                {balance > 0 ? "عليك له" : creditLeft > 0 ? "رصيدٌ لك عنده" : offsetting ? "متّزنٌ على الورق" : "الحساب متّزن"}
               </p>
               {ageing.oldestOwedDays !== null && (
                 /* الدَّينُ القديم يُسدَّد من دفعة الشهر — والشارةُ بابُها لمن يعتمد السداد وحده */
@@ -364,10 +368,21 @@ export async function SupplierView({
                 ? `على ${countNoun(bal?.openCount ?? 0, INVOICE)} مفتوحة، بعد خصم ما دفعتَه له.`
                 : creditLeft > 0
                   ? "مالٌ دفعتَه له ولم تصلك فاتورتُه — يُخصَم من فواتيره القادمة."
-                  : n("invoice_count") === 0 && paidNet === 0
-                    ? "لا فاتورة منه ولا دفعة له بعد — فلا حسابَ يُقال عنه شيء."
-                    : "لا فاتورة مفتوحة ولا رصيدَ لك عنده."}
+                  : offsetting
+                    ? "فاتورةٌ مفتوحة يقابلها مالٌ دفعتَه ولم يُنسب إلى فاتورة — فإمّا سدادٌ لم يُنسب، وإمّا دفعةٌ قُيِّدت مرّتين."
+                    : n("invoice_count") === 0 && paidNet === 0
+                      ? "لا فاتورة منه ولا دفعة له بعد — فلا حسابَ يُقال عنه شيء."
+                      : "لا فاتورة مفتوحة ولا رصيدَ لك عنده."}
             </p>
+            {/* ما يتقابل لا يُقال «متّزناً» وتُترك — بابُه بجانبه */}
+            {unapplied > 0 && (bal?.openMinor ?? 0) > 0 && can(user.role, "payment:approve") && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-warn-bg px-3 py-2 text-[11px] text-warn">
+                <span className="flex-1">
+                  <Money minor={Math.min(unapplied, bal?.openMinor ?? 0)} /> دفعتَها ولم تُنسب، وفاتورةٌ مفتوحة بمثلها.
+                </span>
+                <AccountReview size="sm" />
+              </div>
+            )}
 
             {balance > 0 && (
               <div className="mt-5">
