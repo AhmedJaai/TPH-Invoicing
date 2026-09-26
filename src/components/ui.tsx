@@ -214,7 +214,7 @@ export function Stat({
           {label}
         </p>
         {/* `.nums` على الرقم وحده — «غير معروف» تُكتب بخطّ الواجهة */}
-        <p className={`${isNumeric(value) || minor !== undefined ? "nums " : ""}mt-2.5 text-[1.6rem] font-bold leading-none tracking-tight sm:text-[1.75rem] ${tone ? TONE_TEXT[tone] : ""}`}>
+        <p className={`${isNumeric(value) || minor !== undefined ? "nums " : ""}mt-2.5 text-[1.6rem] font-semibold leading-none tracking-tight sm:text-[1.75rem] ${tone ? TONE_TEXT[tone] : ""}`}>
           {minor !== undefined ? <LiveMoney minor={minor} /> : value}
         </p>
         {sub && (
@@ -273,7 +273,8 @@ export function KeyFigure({
         </span>
         {delta !== undefined && <Delta pct={delta} />}
       </span>
-      <span className={`mt-4 block text-[1.6rem] font-bold leading-none tracking-tight sm:text-[2rem] ${ink}`}>{value}</span>
+      {/* الرقمُ الكبير نصفُ غامق — الثقةُ في الحجم لا في الوزن (Stripe) */}
+      <span className={`mt-4 block text-[1.6rem] font-semibold leading-none tracking-tight sm:text-[2rem] ${ink}`}>{value}</span>
       {sub && <span className="mt-3 block text-xs leading-relaxed text-muted">{sub}</span>}
     </>
   );

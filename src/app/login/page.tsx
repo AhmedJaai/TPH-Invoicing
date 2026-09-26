@@ -51,7 +51,7 @@ export default async function LoginPage({
           </div>
         </div>
         <div className="mt-auto max-w-md">
-          <p className="font-display text-[2.6rem] font-black leading-[1.15]">
+          <p className="font-display text-[2.6rem] font-bold leading-[1.15]">
             كلُّ صباح: ماذا تحتاج أن تعرف، وماذا تفعل.
           </p>
           <ul className="mt-8 space-y-3 text-sm text-frame-muted">

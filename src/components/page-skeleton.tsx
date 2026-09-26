@@ -20,7 +20,7 @@ export function PageSkeleton({
 }) {
   return (
     <main id="main" className={mainClass(width)} aria-busy="true">
-      <h1 className="text-[1.65rem] font-extrabold leading-[1.2] tracking-tight sm:text-[1.9rem]">{title}</h1>
+      <h1 className="font-display text-[1.8rem] font-bold leading-[1.2] tracking-tight sm:text-[2.2rem]">{title}</h1>
       <div className="skeleton mt-3 h-4 w-72 max-w-full" />
 
       {stats > 0 && (

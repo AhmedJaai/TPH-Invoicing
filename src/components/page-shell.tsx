@@ -149,8 +149,8 @@ export function PageShell({
               dir="auto"
               className={
                 display
-                  ? "font-display text-[2rem] font-black leading-[1.15] tracking-tight sm:text-[2.6rem]"
-                  : "text-[1.65rem] font-extrabold leading-[1.2] tracking-tight sm:text-[1.9rem]"
+                  ? "font-display text-[2.1rem] font-bold leading-[1.15] tracking-tight sm:text-[2.7rem]"
+                  : "font-display text-[1.8rem] font-bold leading-[1.2] tracking-tight sm:text-[2.2rem]"
               }
             >
               {title}

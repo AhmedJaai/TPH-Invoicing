@@ -18,18 +18,15 @@ export const thmanyahSans = localFont({
 });
 
 /**
- * ثمانية سيرف ديسبلاي — لتحيّة «اليوم» وشاشة الدخول وحدهما.
+ * ثمانية سيرف ديسبلاي — عنوانُ كلّ صفحة (سبتمبر ٢٠٢٦).
  *
- * لا يُحمَّل مسبقاً (`preload: false`): كان يُسبِق ١٦٠ ك.ب إلى كلّ صفحة
- * لعنوانٍ في صفحتين. يُطلَب حين يُرسَم، و`swap` يُظهر العنوانَ بخطّ الواجهة
- * لحظةً ثمّ يبدّله.
+ * العنوانُ بخطٍّ تحريريّ كما تفعل المنتجاتُ الماليّة التي تُقرأ كبيانٍ مرتَّب
+ * (Mercury)، والمتنُ والأرقامُ بخطّ الواجهة. وزنٌ واحد (٨٢ ك.ب) **يُحمَّل
+ * مسبقاً** لأنّه في كلّ صفحة: بلا ذلك يُرسم العنوانُ بخطّ الواجهة ثمّ يتبدّل
+ * فيقفز ما تحته. وكان يُحمَّل وزنان (١٦٠ ك.ب) لعنوانين في صفحتين.
  */
 export const thmanyahDisplay = localFont({
-  src: [
-    { path: "../fonts/thmanyahserifdisplay-Bold.woff2", weight: "700", style: "normal" },
-    { path: "../fonts/thmanyahserifdisplay-Black.woff2", weight: "900", style: "normal" },
-  ],
+  src: [{ path: "../fonts/thmanyahserifdisplay-Bold.woff2", weight: "700", style: "normal" }],
   variable: "--font-thmanyah-display",
   display: "swap",
-  preload: false,
 });
