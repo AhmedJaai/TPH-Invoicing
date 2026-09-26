@@ -334,7 +334,7 @@ export async function drawBankCredit(
        where p.supplier_id = ${input.supplierId}
          and p.status not in ('REVERSED', 'VOID')
          and exists (select 1 from bank_transactions bt where bt.matched_payment_id = p.id)
-         and p.paid_at::date between ${input.paidOn}::date - ${DRAW_LOOKBACK_DAYS} and ${input.paidOn}::date + 3
+         and p.paid_at::date between ${input.paidOn}::date - ${DRAW_LOOKBACK_DAYS}::int and ${input.paidOn}::date + 3
        order by abs(p.paid_at::date - ${input.paidOn}::date), p.paid_at
        for update of p
     `)
