@@ -109,31 +109,48 @@ export default async function PaymentsPage({
         />
       </div>
 
-      {!empty && (
-        <StatGrid>
-          <Stat label="جاهزٌ للتحويل" icon={CircleCheck} minor={run.readyTotalMinor} tone="ok" sub={countNoun(run.ready.length, SUPPLIER)} />
-          <Stat
-            label="محجوزٌ حتى تُعالَج"
-            icon={PauseCircle}
-            minor={run.heldTotalMinor}
-            tone={run.held.length ? "warn" : undefined}
-            sub={run.held.length ? countNoun(run.held.length, INVOICE) : "لا شيء محجوز"}
-          />
-          <Stat
-            label="ضريبةٌ معرّضة"
-            icon={ShieldCheck}
-            value={run.vatAtRiskUnknown > 0 && run.vatAtRiskMinor === 0 ? "غير معروف" : undefined}
-            minor={run.vatAtRiskUnknown > 0 && run.vatAtRiskMinor === 0 ? undefined : run.vatAtRiskMinor}
-            tone={run.vatAtRiskMinor ? "danger" : undefined}
-            sub={run.vatAtRiskUnknown > 0 ? `${run.vatAtRiskMinor > 0 ? "وأكثر: " : ""}${countNoun(run.vatAtRiskUnknown, INVOICE)} بلا ضريبةٍ مقروءة` : "لا ضريبة مدخلاتٍ تضيع بهذه الدفعة"}
-          />
-          <Stat
-            label="يغطّيه رصيدُك عندهم"
-            minor={run.coveredByCredit.reduce((s, c) => s + c.creditAppliedMinor, 0)}
-            sub={run.coveredByCredit.length ? countNoun(run.coveredByCredit.length, SUPPLIER) : "لا مورّد مغطّى كلّه"}
-          />
-        </StatGrid>
-      )}
+      {!empty && (() => {
+        /*
+          بطاقةٌ تقول «٠٫٠٠ — لا شيء» تأخذ مكانَ ما يستحقّ النظر. فما صفرُه
+          معلومٌ يُقال سطراً هادئاً تحت البطاقات، والبطاقةُ لما فيه جواب.
+          والمجهولُ ليس صفراً: ضريبةٌ لم تُقرأ تبقى بطاقةً «غير معروف».
+        */
+        const covered = run.coveredByCredit.reduce((s, c) => s + c.creditAppliedMinor, 0);
+        const vatUnknownOnly = run.vatAtRiskUnknown > 0 && run.vatAtRiskMinor === 0;
+        const calm: string[] = [];
+        if (run.held.length === 0) calm.push("لا شيء محجوز");
+        if (run.vatAtRiskMinor === 0 && run.vatAtRiskUnknown === 0) calm.push("لا ضريبة مدخلاتٍ تضيع بهذه الدفعة");
+        if (covered === 0) calm.push("لا مورّد يغطّيه رصيدُك كلَّه");
+        return (
+          <>
+            <StatGrid>
+              <Stat label="جاهزٌ للتحويل" icon={CircleCheck} minor={run.readyTotalMinor} tone="ok" sub={countNoun(run.ready.length, SUPPLIER)} />
+              {run.held.length > 0 && (
+                <Stat label="محجوزٌ حتى تُعالَج" icon={PauseCircle} minor={run.heldTotalMinor} tone="warn" sub={countNoun(run.held.length, INVOICE)} />
+              )}
+              {(run.vatAtRiskMinor > 0 || run.vatAtRiskUnknown > 0) && (
+                <Stat
+                  label="ضريبةٌ معرّضة"
+                  icon={ShieldCheck}
+                  value={vatUnknownOnly ? "غير معروف" : undefined}
+                  minor={vatUnknownOnly ? undefined : run.vatAtRiskMinor}
+                  tone={run.vatAtRiskMinor ? "danger" : undefined}
+                  sub={run.vatAtRiskUnknown > 0 ? `${run.vatAtRiskMinor > 0 ? "وأكثر: " : ""}${countNoun(run.vatAtRiskUnknown, INVOICE)} بلا ضريبةٍ مقروءة` : undefined}
+                />
+              )}
+              {covered > 0 && (
+                <Stat label="يغطّيه رصيدُك عندهم" minor={covered} sub={countNoun(run.coveredByCredit.length, SUPPLIER)} />
+              )}
+            </StatGrid>
+            {calm.length > 0 && (
+              <p className="mt-3 flex items-center gap-2 text-xs text-muted">
+                <CircleCheck className="h-3.5 w-3.5 shrink-0 text-ok" strokeWidth={2} aria-hidden />
+                {calm.join(" · ")}
+              </p>
+            )}
+          </>
+        );
+      })()}
 
       {empty ? (
         <EmptyState

@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { ViewTransition } from "react";
 import { Inbox, type LucideIcon } from "lucide-react";
 import { Money, Prose } from "./money";
+import { LiveMoney } from "./live-money";
 import { ScrollX } from "./scroll-x";
 import { TableFilter } from "./ui-client";
 
@@ -212,7 +214,7 @@ export function Stat({
         </p>
         {/* `.nums` على الرقم وحده — «غير معروف» تُكتب بخطّ الواجهة */}
         <p className={`${isNumeric(value) || minor !== undefined ? "nums " : ""}mt-2.5 text-[1.6rem] font-bold leading-none tracking-tight sm:text-[1.75rem] ${tone ? TONE_TEXT[tone] : ""}`}>
-          {minor !== undefined ? <Money minor={minor} /> : value}
+          {minor !== undefined ? <LiveMoney minor={minor} /> : value}
         </p>
         {sub && (
           <p className="mt-auto pt-2.5 text-xs leading-relaxed text-muted">
@@ -295,8 +297,12 @@ export function isNumeric(value: React.ReactNode): boolean {
   return typeof value === "number" || (typeof value === "string" && /^[\d\s.,٫٬%٪+\-/]+$/.test(value));
 }
 
+/**
+ * صفُّ الأرقام — يتّسع لما فيه: أربعٌ تقتسم السطر، وواحدةٌ لا تقبع في ربعه.
+ * بمقاس الوعاء لا الشاشة (`@container` في `PageShell` ولوح الفحص).
+ */
 export function StatGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{children}</div>;
+  return <div className="grid grid-cols-2 gap-3 @3xl:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]">{children}</div>;
 }
 
 /**
@@ -640,13 +646,19 @@ export function LinkTabs({
           href={t.href}
           scroll={false}
           aria-current={t.active ? "page" : undefined}
-          className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-bold transition-colors sm:min-h-8 ${
-            t.active ? "bg-inverse-surface text-inverse-ink" : "text-ink-soft hover:bg-hover hover:text-ink"
+          className={`relative inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-bold transition-colors sm:min-h-8 ${
+            t.active ? "text-inverse-ink" : "text-ink-soft hover:bg-hover hover:text-ink"
           }`}
         >
-          {t.label}
+          {/* الخلفيّةُ المختارة تنزلق بين الألسنة — بالاسم نفسه في الحالين فتُقرأ شيئاً واحداً */}
+          {t.active && (
+            <ViewTransition name={`tabs-${label.replace(/\s+/g, "-")}`} share="tab-slide" default="none">
+              <span aria-hidden className="absolute inset-0 rounded-lg bg-inverse-surface" />
+            </ViewTransition>
+          )}
+          <span className="relative">{t.label}</span>
           {t.count !== undefined && t.count !== null && (
-            <span className={`nums rounded-full px-1.5 text-[10px] ${t.active ? "bg-white/15" : "bg-sunken"}`}>{t.count}</span>
+            <span className={`nums relative rounded-full px-1.5 text-[10px] ${t.active ? "bg-white/15" : "bg-sunken"}`}>{t.count}</span>
           )}
         </Link>
       ))}

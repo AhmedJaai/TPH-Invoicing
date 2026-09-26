@@ -1,12 +1,13 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { CircleCheck } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { NoAccess } from "@/components/ui";
 import { prioritize } from "@/lib/attention";
 import { attentionItems } from "@/lib/work";
-import { inLens, parseLens } from "@/lib/attention-triage";
+import { inLens, landing, parseLens } from "@/lib/attention-triage";
 import { loadStartState } from "@/services/start.service";
 import { DoublePaidWorkspace } from "@/components/double-paid-section";
 import { ReviewSection } from "@/components/review-section";
@@ -40,7 +41,7 @@ export const dynamic = "force-dynamic";
 export default async function AttentionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ item?: string; in?: string }>;
+  searchParams: Promise<{ item?: string; in?: string; then?: string }>;
 }) {
   const user = await currentUser();
   if (!user) redirect("/login?from=/attention");
@@ -66,13 +67,14 @@ export default async function AttentionPage({
   let lens = parseLens(params.in);
   if (wantedItem && !inLens(wantedItem, lens)) lens = "all";
   const list = ordered.filter((i) => inLens(i, lens));
-  const selected = wantedItem ?? list[0] ?? null;
+  /* ما حُسم خرج — فالتالي كما كان حين فُتح، لا رأسُ القائمة */
+  const { selected, resolved } = landing(list, wanted, params.then);
 
   /*
     على الحاسوب تُعرَض القائمة والتفصيل معاً. وعلى الجوّال لا يتّسعان:
     فمن اختار بنداً يرى بندَه وحده، وفوقه بابُ الرجوع والتنقّل.
   */
-  const picked = Boolean(wantedItem);
+  const picked = Boolean(wantedItem) || resolved;
 
   const shell = (children: React.ReactNode) => (
     <PageShell
@@ -148,8 +150,15 @@ export default async function AttentionPage({
             <TriageList items={list} lens={lens} selectedId={selected.id} />
           </nav>
 
-          <div className={`min-w-0 lg:block ${picked ? "" : "hidden"}`}>
+          <div className={`min-w-0 lg:block ${picked || resolved ? "" : "hidden"}`}>
+            {resolved && (
+              <p role="status" className="mb-3 flex animate-rise items-center gap-2 rounded-xl border border-ok/25 bg-ok-bg px-4 py-2.5 text-xs font-bold text-ok">
+                <CircleCheck className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
+                حُسم البندُ الذي كنت فيه وخرج من الطابور — وهذا تاليه.
+              </p>
+            )}
             <ItemDetail
+              key={selected.id}
               item={selected}
               list={list}
               lens={lens}

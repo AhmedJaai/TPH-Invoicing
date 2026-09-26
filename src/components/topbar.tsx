@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronLeft, Keyboard, Search, UploadCloud } from "lucide-react";
 import { ACCOUNT_LINKS, activeArea, activeChild, canSeeArea, entryHref, homeHref } from "@/lib/nav";
@@ -13,6 +13,7 @@ import { openShortcuts } from "@/lib/ui-events";
 import { NotificationsBell } from "./notifications";
 import { CaptureButton } from "./nav";
 import { toast } from "./ui-client";
+import { useShellPath } from "./use-shell-path";
 
 /**
  * الشريطُ العلويّ — موضعُك، والبحث، والإشعارات، والرفع.
@@ -22,7 +23,7 @@ import { toast } from "./ui-client";
  * المساحة والبحثُ والجرس — والرفعُ في زرّ الوسط أسفلَ الشاشة.
  */
 export function Topbar({ role, controls }: { role: Role; controls?: React.ReactNode }) {
-  const pathname = usePathname() ?? "/";
+  const pathname = useShellPath();
   const area = activeArea(pathname);
   const child = area ? activeChild(pathname, area) : undefined;
   const showChild = child && child.label !== area?.label && child.href !== area?.href;

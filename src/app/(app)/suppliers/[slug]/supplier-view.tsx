@@ -10,6 +10,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { DetailFrame, type DetailMode } from "@/components/detail-frame";
 import { Money } from "@/components/money";
+import { LiveMoney } from "@/components/live-money";
 import {
   Badge, Card, DataTable, Delta, EmptyState, KeyValue, LinkButton, LinkTabs, Meter, Monogram, Section, Sparkline, TONE_TEXT,
   Timeline, type TimelineItem, type Tone,
@@ -342,7 +343,7 @@ export async function SupplierView({
               )}
             </div>
             <p className={`mt-4 text-[2.25rem] font-bold leading-none tracking-tight sm:text-[2.6rem] ${balance > 0 ? "text-warn" : ""}`}>
-              <Money minor={balance > 0 ? balance : creditLeft} currency />
+              <LiveMoney minor={balance > 0 ? balance : creditLeft} currency />
             </p>
             <p className="mt-2.5 text-xs leading-relaxed text-muted">
               {balance > 0

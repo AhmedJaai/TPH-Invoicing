@@ -8,6 +8,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { DetailFrame, type DetailMode } from "@/components/detail-frame";
 import { Money } from "@/components/money";
+import { LiveMoney } from "@/components/live-money";
 import {
   Badge, DataTable, EmptyState, LinkButton, Meter, Monogram, NoAccess, Section, Timeline, buttonClass,
   type TimelineItem, type Tone,
@@ -209,7 +210,7 @@ export async function InvoiceView({
                 <span className="text-[1.6rem] sm:text-[1.9rem]">مسدَّدة بالكامل</span>
               </span>
             ) : (
-              <Money minor={p.remainingMinor} currency />
+              <LiveMoney minor={p.remainingMinor} currency />
             )}
           </p>
           <div className="mt-5 max-w-md">

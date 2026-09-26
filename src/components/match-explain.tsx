@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Money } from "./money";
 import { Badge, type Tone } from "./ui";
-import { ConfirmAction, Sheet, toast } from "./ui-client";
+import { ConfirmAction, Popover, toast } from "./ui-client";
 import { postJson } from "@/lib/http-client";
 import { strength } from "@/lib/bank/strength";
 import { ACT } from "@/lib/ui-terms";
@@ -98,7 +98,6 @@ export function MatchExplain({
   /** اسمُ الجهة — عنوانُ الورقة. */
   title?: string;
 }) {
-  const [open, setOpen] = useState(false);
   const d = stateOf(match);
 
   if (inline) {
@@ -111,43 +110,44 @@ export function MatchExplain({
     );
   }
 
+  /*
+    الأدلّةُ بجانب الشارة لا في ورقةٍ تغطّي السجلّ: سؤالٌ صغير («لماذا؟»)
+    جوابُه قائمةٌ قصيرة وزرُّ تراجع. تُغلَق بالنقر خارجها أو بـEscape.
+  */
   return (
-    <>
-      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-        {d && (
-          <Badge tone={d.tone}>
-            <d.icon className="h-3 w-3" strokeWidth={2.25} aria-hidden />
-            {d.label}
-          </Badge>
-        )}
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-haspopup="dialog"
-          className="relative z-10 inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 text-[11px] font-bold text-muted transition-colors hover:bg-hover hover:text-ink sm:min-h-7"
-        >
-          <Info className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          لماذا؟
-        </button>
-      </span>
-
-      <Sheet
-        open={open}
-        onClose={() => setOpen(false)}
-        title={title ? `لماذا: ${title}` : "لماذا هذا الحال؟"}
-        description="الأدلّةُ كما حُفظت مع القرار — ترجيحٌ لا يقين، فراجِع ما يبدو غريباً."
-        size="md"
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+      {d && (
+        <Badge tone={d.tone}>
+          <d.icon className="h-3 w-3" strokeWidth={2.25} aria-hidden />
+          {d.label}
+        </Badge>
+      )}
+      <Popover
+        width="26rem"
+        buttonClassName="relative z-10 inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 text-[11px] font-bold text-muted transition-colors hover:bg-hover hover:text-ink sm:min-h-7"
+        button={
+          <>
+            <Info className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+            لماذا؟
+          </>
+        }
       >
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-sunken px-4 py-3">
-            <StateLine look={d} score={match.score} />
-            <span className="text-lg font-bold"><Money minor={match.amountMinor} currency /></span>
+        {(close) => (
+          <div className="space-y-3 text-start">
+            <div>
+              <p className="text-[13px] font-bold">{title ? `لماذا: ${title}` : "لماذا هذا الحال؟"}</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-muted">الأدلّةُ كما حُفظت مع القرار — ترجيحٌ لا يقين.</p>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-sunken px-3.5 py-2.5">
+              <StateLine look={d} score={match.score} />
+              <span className="text-base font-bold"><Money minor={match.amountMinor} currency /></span>
+            </div>
+            <Evidence match={match} />
+            <UndoAction match={match} canUndo={canUndo} onDone={close} />
           </div>
-          <Evidence match={match} />
-          <UndoAction match={match} canUndo={canUndo} onDone={() => setOpen(false)} />
-        </div>
-      </Sheet>
-    </>
+        )}
+      </Popover>
+    </span>
   );
 }
 

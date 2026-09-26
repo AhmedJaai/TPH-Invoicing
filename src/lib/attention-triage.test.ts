@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { AttentionItem } from "./attention";
 import {
+  landing,
   ATTENTION_IDS, groupBySeverity, inLens, itemHref, lensTabs, neighbours, parseLens, stakeByKind,
 } from "./attention-triage";
 
@@ -103,5 +104,24 @@ describe("المالُ المعلَّق بحسب نوعه", () => {
 
   it("لا نوعَ بلا بند", () => {
     expect(stakeByKind([])).toEqual([]);
+  });
+});
+
+describe("landing — بعد الحسم إلى التالي", () => {
+  const list = [{ id: "a" }, { id: "b" }, { id: "c" }];
+  it("يفتح المطلوبَ ما دام في الطابور", () => {
+    expect(landing(list, "b", "c")).toEqual({ selected: { id: "b" }, resolved: false });
+  });
+  it("المطلوبُ حُسم وخرج: تاليه كما كان حين فُتح، ويُقال ذلك", () => {
+    expect(landing([{ id: "a" }, { id: "c" }], "b", "c")).toEqual({ selected: { id: "c" }, resolved: true });
+  });
+  it("وتاليه حُسم أيضاً: أوّلُ القائمة", () => {
+    expect(landing([{ id: "a" }], "b", "c")).toEqual({ selected: { id: "a" }, resolved: true });
+  });
+  it("بلا طلب: أوّلُ القائمة ولا خبرَ حسم", () => {
+    expect(landing(list, undefined, undefined)).toEqual({ selected: { id: "a" }, resolved: false });
+  });
+  it("الطابورُ فرغ: لا شيء", () => {
+    expect(landing([], "b", "c")).toEqual({ selected: null, resolved: true });
   });
 });

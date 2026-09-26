@@ -234,7 +234,7 @@ export function TriageList({
             </h2>
             <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
               {g.items.map((i) => (
-                <TriageRow key={i.id} item={i} lens={lens} active={i.id === selectedId} />
+                <TriageRow key={i.id} item={i} lens={lens} active={i.id === selectedId} then={neighbours(items, i.id).next?.id} />
               ))}
             </ul>
           </section>
@@ -255,8 +255,8 @@ export function TriageList({
  * والرابطُ طبقةٌ تحت المحتوى لا غلاف — فزرُّ الفعل داخل الصفّ لا يصير
  * `<a>` داخل `<a>` فيسقط الترطيب (`.card-rows`).
  */
-function TriageRow({ item, lens, active }: { item: AttentionItem; lens: Lens; active: boolean }) {
-  const href = itemHref(item.id, lens);
+function TriageRow({ item, lens, active, then }: { item: AttentionItem; lens: Lens; active: boolean; then?: string }) {
+  const href = itemHref(item.id, lens, then);
   const s = SEVERITY[item.severity];
   const signal = isSignal(item);
   const inPlace = resolvesInPlace(item);
@@ -350,12 +350,20 @@ export function ItemDetail({
   const s = SEVERITY[item.severity];
   const { kind, amountMinor } = item.impact;
   const ImpactIcon = IMPACT[kind].icon;
-  const nav = neighbours(list, item.id);
+  const base = neighbours(list, item.id);
+  const nav = {
+    ...base,
+    /* تالي كلٍّ من الجارين — كي يبقى «إلى التالي بعد الحسم» صحيحاً من أيّ طريق */
+    after: {
+      prev: base.prev ? neighbours(list, base.prev.id).next?.id : undefined,
+      next: base.next ? neighbours(list, base.next.id).next?.id : undefined,
+    },
+  };
   /* رابطُ السجلّات الكاملة حين يكون العملُ هنا — إلّا إن كان الرابطُ هذه الصفحةَ نفسها */
   const outward = !item.href.startsWith("/attention");
 
   return (
-    <article aria-labelledby="item-title" className="space-y-5">
+    <article aria-labelledby="item-title" className="animate-rise space-y-5">
       <div className="flex items-center justify-between gap-3 lg:hidden">
         <Link
           href={lensHref(lens)}
@@ -488,7 +496,7 @@ function Pager({
   total,
   lens,
 }: {
-  nav: ReturnType<typeof neighbours>;
+  nav: ReturnType<typeof neighbours> & { after: { prev?: string; next?: string } };
   total: number;
   lens: Lens;
 }) {
@@ -497,7 +505,7 @@ function Pager({
   return (
     <nav aria-label="التنقّل بين البنود" className="flex items-center gap-1.5">
       {nav.prev ? (
-        <Link href={itemHref(nav.prev.id, lens)} aria-label={`البند السابق: ${nav.prev.title}`} className={`${cell} hover:bg-hover hover:text-ink`}>
+        <Link href={itemHref(nav.prev.id, lens, nav.after.prev)} aria-label={`البند السابق: ${nav.prev.title}`} className={`${cell} hover:bg-hover hover:text-ink`}>
           <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden />
         </Link>
       ) : (
@@ -507,7 +515,7 @@ function Pager({
         <span className="nums font-bold text-ink">{nav.index + 1}</span> من <span className="nums">{total}</span>
       </span>
       {nav.next ? (
-        <Link href={itemHref(nav.next.id, lens)} aria-label={`البند التالي: ${nav.next.title}`} className={`${cell} hover:bg-hover hover:text-ink`}>
+        <Link href={itemHref(nav.next.id, lens, nav.after.next)} aria-label={`البند التالي: ${nav.next.title}`} className={`${cell} hover:bg-hover hover:text-ink`}>
           <ChevronLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
         </Link>
       ) : (

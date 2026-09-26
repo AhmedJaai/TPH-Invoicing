@@ -99,11 +99,33 @@ export function inLens(item: AttentionItem, lens: Lens): boolean {
 }
 
 /** رابطُ بندٍ في عدسته — `?item=` وحده يبقى صالحاً لروابط الرئيسية والإشعارات. */
-export function itemHref(id: string, lens: Lens = "all"): string {
+/**
+ * رابطُ بند. و`then` البندُ الذي يليه في القائمة حين فُتح — فإن حُسم هذا
+ * وخرج من الطابور انتقلت الصفحةُ إلى تاليه لا إلى أوّل القائمة (`landing`).
+ */
+export function itemHref(id: string, lens: Lens = "all", then?: string | null): string {
   const q = new URLSearchParams();
   if (lens !== "all") q.set("in", lens);
   q.set("item", id);
+  if (then) q.set("then", then);
   return `/attention?${q.toString()}`;
+}
+
+/**
+ * أيُّ بندٍ يُفتح. المطلوبُ إن بقي؛ فإن حُسم وخرج فتاليه كما كان حين فُتح،
+ * ثمّ أوّلُ القائمة. و`resolved` يقول إنّ المطلوب خرج — فيُقال ذلك ولا
+ * يُفاجأ صاحبُ المقهى ببندٍ غير الذي كان فيه.
+ */
+export function landing<T extends { id: string }>(
+  list: readonly T[],
+  wanted: string | undefined,
+  then: string | undefined,
+): { selected: T | null; resolved: boolean } {
+  const hit = wanted ? list.find((i) => i.id === wanted) : undefined;
+  if (hit) return { selected: hit, resolved: false };
+  const resolved = Boolean(wanted);
+  const next = then ? list.find((i) => i.id === then) : undefined;
+  return { selected: next ?? list[0] ?? null, resolved };
 }
 
 export function lensHref(lens: Lens): string {

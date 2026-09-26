@@ -819,6 +819,20 @@ html[data-amounts="hidden"] .icon-hidden { display: block; }
 ::view-transition-new(.swap) {
   animation: vt-fade-in var(--dur-3) var(--ease-standard) both;
 }
+/* مؤشّرُ اللسان ينزلق من موضعه القديم إلى الجديد */
+::view-transition-group(.tab-slide) {
+  animation-duration: var(--dur-3);
+  animation-timing-function: var(--ease-spring);
+}
+::view-transition-old(.tab-slide),
+::view-transition-new(.tab-slide) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(.tab-slide) {
+  display: none;
+}
+
 @keyframes vt-fade-out {
   to { opacity: 0; }
 }
@@ -858,6 +872,7 @@ html[data-amounts="hidden"] .icon-hidden { display: block; }
   @keyframes pop { from { opacity: 0; } }
   @keyframes vt-rise-in { from { opacity: 0; } }
   .btn:active:not(:disabled) { transform: none; }
+  ::view-transition-group(.tab-slide) { animation: none; }
   .upload-bar {
     animation: none;
     width: 100%;

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Suspense, use, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Suspense, ViewTransition, use, useRef, useState } from "react";
 import { Camera, Ellipsis, Plus, Search, Upload } from "lucide-react";
 import { can, type Role } from "@/lib/permissions";
 import {
@@ -20,6 +20,7 @@ import { queueCapture } from "@/lib/capture-queue";
 import { BrandMark, NavGlyph } from "./icons";
 import { openCommandPalette } from "@/lib/ui-events";
 import { Sheet, toast } from "./ui-client";
+import { useShellPath } from "./use-shell-path";
 
 /**
  * التنقّل حول عمل صاحب المقهى لا حول جداول القاعدة.
@@ -45,7 +46,7 @@ export function Sidebar({
   /** المستخدمُ وضوابطُ العرض — مكوّناتُ خادمٍ تُمرَّر ولا تُستورَد هنا. */
   footer?: React.ReactNode;
 }) {
-  const pathname = usePathname() ?? "/";
+  const pathname = useShellPath();
   const groups = groupedAreas(role);
   const area = activeArea(pathname);
 
@@ -141,7 +142,7 @@ export function Sidebar({
  * الصفحة التي يفتحها.
  */
 export function AreaTabs({ role }: { role: Role }) {
-  const pathname = usePathname() ?? "/";
+  const pathname = useShellPath();
   const area = activeArea(pathname);
   if (!area) return null;
   const children = visibleChildren(role, area);
@@ -165,7 +166,12 @@ export function AreaTabs({ role }: { role: Role }) {
             }`}
           >
             {c.label}
-            {on && <span aria-hidden className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-accent" />}
+            {/* الخطُّ ينزلق من اللسان القديم إلى الجديد — عنصرٌ واحدٌ يتحرّك لا خطّان يومضان */}
+            {on && (
+              <ViewTransition name="area-tab" share="tab-slide" default="none">
+                <span aria-hidden className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-accent" />
+              </ViewTransition>
+            )}
           </Link>
         );
       })}
@@ -188,7 +194,7 @@ export function MobileTabBar({
   counts?: Promise<ShellCounts>;
   footer?: React.ReactNode;
 }) {
-  const pathname = usePathname() ?? "/";
+  const pathname = useShellPath();
   const [moreOpen, setMoreOpen] = useState(false);
   const area = activeArea(pathname);
   const { tabs, more } = mobileTabs(role, pathname);
