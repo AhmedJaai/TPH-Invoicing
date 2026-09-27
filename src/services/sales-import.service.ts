@@ -662,8 +662,32 @@ async function writeLines(
     }
   }
 
+  /*
+    ── ما غاب عن التصدير الأحدث يُلغى ولا يُحذف ──
+
+    البيعةُ في الملفّ كاملة (الطلبُ كلُّه، أو اليومُ كلُّه في مزيج المنتجات)؛ فسطرٌ
+    قُيِّد من تصديرٍ سابقٍ ولم يرد في هذا لم يعد في المصدر — طلبٌ صُحّح فنقص صنفاً،
+    أو تكرّر الصنفُ مرّةً أقلّ. وكان يبقى محسوباً في المبيعات والاستهلاك. فيُعلَّم
+    ملغًى ويُعلَن في «ما رُوجع»، ولا يُحذف: إعادةُ استيراد الملفّ الكامل تعيده.
+  */
+  const inFile = new Set(sale.lines.map((l) => l.externalId));
+  for (const [externalId, was] of prior) {
+    if (inFile.has(externalId) || was.sourceStatus === REMOVED_STATUS) continue;
+    await tx.update(saleLines)
+      .set({ isVoid: true, sourceStatus: REMOVED_STATUS, contentHash: `${REMOVED_STATUS}:${externalId}` })
+      .where(eq(saleLines.id, was.id));
+    out.revised.push({
+      lineExternalId: externalId,
+      was: `${was.sourceStatus ?? "—"} × ${was.quantity ?? "—"}`,
+      now: "غاب عن التصدير الأحدث — أُلغي",
+    });
+  }
+
   for (let i = 0; i < fresh.length; i += 500) {
     await tx.insert(saleLines).values(fresh.slice(i, i + 500)).onConflictDoNothing();
   }
   return out;
 }
+
+/** حالُ سطرٍ غاب عن تصديرٍ أحدث للبيعة نفسها — يُلغى ولا يُحذف. */
+const REMOVED_STATUS = "REMOVED_IN_LATER_EXPORT";
