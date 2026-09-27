@@ -145,6 +145,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
                 title="المال"
                 rows={[
                   ["دفعات الشهر (القائمة)", <Money key="p" minor={s.paymentsMinor} />],
+                  ...creditNoteRow(s.creditNotesMinor),
                   ["المصروفات", <Money key="e" minor={s.expensesMinor} />],
                   ["وارد البنك", <Money key="i" minor={s.bankInMinor} />],
                   ["صادر البنك", <Money key="o" minor={s.bankOutMinor} />],
@@ -269,6 +270,11 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
 
 function Maybe({ minor }: { minor: number | null }) {
   return minor === null ? <span className="text-muted">غير معروف</span> : <Money minor={minor} />;
+}
+
+/** سطرُ الإشعارات الدائنة — يُعرض حين يوجد، ويُقال إنّه لم يخرج له مال. */
+function creditNoteRow(minor: number): [string, React.ReactNode][] {
+  return minor > 0 ? [["إشعارات دائنة — لا مال خرج", <Money key="cn" minor={minor} />]] : [];
 }
 
 function SummaryBlock({ title, rows }: { title: string; rows: [string, React.ReactNode][] }) {

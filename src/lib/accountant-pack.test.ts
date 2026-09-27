@@ -56,6 +56,13 @@ describe("حزمة المحاسب", () => {
     expect(summarize({ ...base, payments: [pay("APPLIED"), pay("REVERSED"), pay("VOID")] }).paymentsMinor).toBe(1_000);
   });
 
+  it("الإشعارُ الدائن ليس دفعة — يُعدّ وحده ولا يدخل «دفعات الشهر»", () => {
+    const pay = (method: string) => ({ date: "2026-08-05", supplier: "م", amountMinor: 700, feeMinor: 0, method, status: "APPLIED", invoices: [], fromBank: false });
+    const s = summarize({ ...base, payments: [pay("BANK_TRANSFER"), pay("CREDIT_NOTE")] });
+    expect(s.paymentsMinor).toBe(700);
+    expect(s.creditNotesMinor).toBe(700);
+  });
+
   it("المسدَّد لا يتجاوز الإجماليّ والباقي لا يصير سالباً", () => {
     const s = summarize({ ...base, invoices: [inv({ paidMinor: 20_000 })] });
     expect(s.paidMinor).toBe(11_500);

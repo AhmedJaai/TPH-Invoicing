@@ -64,7 +64,7 @@ export async function gatherSupplierFacts(supplierId: string): Promise<SupplierF
              coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = i.id), 0) as allocated,
              coalesce((select sum(pa.amount_minor) from payment_allocations pa
                          join payments p on p.id = pa.payment_id
-                        where pa.invoice_id = i.id and p.method in ('OWNER_ACCOUNT', 'CASH')), 0) as outside
+                        where pa.invoice_id = i.id and p.method in ('OWNER_ACCOUNT', 'CASH', 'CREDIT_NOTE')), 0) as outside
         from invoices i where i.supplier_id = ${supplierId}
        order by i.invoice_date, i.id
     `)

@@ -381,7 +381,8 @@ export function validateAnalysis(raw: unknown, f: SupplierFacts, s: Signals): An
           الاقتراح ويبقى التوأم (لافا ٩٤٥ وأطلس ٥٧٥). فإن كانت إحداهما وحدها
           بلا أصل وللأخرى أصل، فالإقرار يلغي التي بلا أصل.
         */
-        const orphans = pays.filter((p) => p.hasBankRow === false && p.hasDocument === false);
+        /* الإشعارُ الدائن لا حوالةَ له بطبعه — ليس «بلا أصل» ولا يُقترح إلغاؤه */
+        const orphans = pays.filter((p) => p.hasBankRow === false && p.hasDocument === false && p.method !== "CREDIT_NOTE");
         if (orphans.length === 1 && pays.length - orphans.length >= 1) {
           action = { type: "VOID_DUPLICATE", paymentId: orphans[0].id };
         }

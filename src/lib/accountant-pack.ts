@@ -102,7 +102,10 @@ export interface PackSummary {
   deductibleVatMinor: number;
   paidMinor: number;
   openMinor: number;
+  /** ما خرج مالاً — بلا الإشعارات الدائنة */
   paymentsMinor: number;
+  /** إشعاراتٌ دائنة سوّت فواتيرَ الشهر ولم يخرج لها مال */
+  creditNotesMinor: number;
   expensesMinor: number;
   bankInMinor: number;
   bankOutMinor: number;
@@ -193,7 +196,8 @@ export function summarize(p: PackInput): PackSummary {
       .reduce((s, i) => s + (i.vatMinor ?? 0), 0),
     paidMinor: p.invoices.reduce((s, i) => s + Math.min(i.paidMinor, i.totalMinor), 0),
     openMinor: p.invoices.reduce((s, i) => s + invoiceOpenMinor(i), 0),
-    paymentsMinor: live.reduce((s, x) => s + x.amountMinor, 0),
+    paymentsMinor: live.filter((x) => x.method !== "CREDIT_NOTE").reduce((s, x) => s + x.amountMinor, 0),
+    creditNotesMinor: live.filter((x) => x.method === "CREDIT_NOTE").reduce((s, x) => s + x.amountMinor, 0),
     expensesMinor: p.expenses.reduce((s, e) => s + e.amountMinor, 0),
     bankInMinor: p.bank.filter((b) => b.direction === "CREDIT").reduce((s, b) => s + b.amountMinor, 0),
     bankOutMinor: p.bank.filter((b) => b.direction === "DEBIT").reduce((s, b) => s + b.amountMinor, 0),
@@ -221,6 +225,7 @@ export function buildAccountantPack(p: PackInput): Sheet[] {
     [],
     ["المال"],
     ["دفعات الشهر (القائمة)", riyals(s.paymentsMinor)],
+    ...(s.creditNotesMinor > 0 ? [["إشعارات دائنة (مرتجع أو خصم — لا مال خرج)", riyals(s.creditNotesMinor)]] : []),
     ["المصروفات", riyals(s.expensesMinor)],
     ["وارد البنك", riyals(s.bankInMinor)],
     ["صادر البنك", riyals(s.bankOutMinor)],
@@ -264,7 +269,7 @@ export function buildAccountantPack(p: PackInput): Sheet[] {
       METHOD_LABEL[x.method] ?? x.method,
       paymentStatusLabel(x.status),
       x.invoices.join(" | "),
-      x.fromBank ? "نعم" : "إقرار يدويّ",
+      x.method === "CREDIT_NOTE" ? "إشعار دائن" : x.fromBank ? "نعم" : "إقرار يدويّ",
     ]),
   ];
 

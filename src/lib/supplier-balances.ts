@@ -28,8 +28,10 @@ export interface SupplierBalanceInput {
   openMinor: number;
   /** عدد فواتيره التي بقي عليها أكثر من هللة. */
   openCount: number;
-  /** ما دفعناه له فعلاً: الدفعات القائمة ناقص رسومها. */
+  /** ما دفعناه له فعلاً: الدفعات القائمة ناقص رسومها — بلا الإشعارات الدائنة. */
   paidNetMinor: number;
+  /** إشعاراتٌ دائنة (مرتجعٌ أو خصم) سوّت فواتيرَه ولم يخرج لها مال. */
+  creditNotesMinor?: number;
   /** ما دفعناه ولم يُخصم من فاتورة. */
   creditMinor: number;
   /**

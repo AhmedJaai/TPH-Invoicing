@@ -25,6 +25,7 @@ interface Row {
   open_minor: string | number;
   open_count: string | number;
   paid_net: string | number;
+  credit_notes: string | number;
   credit: string | number;
   issues: boolean;
   [key: string]: unknown;
@@ -55,7 +56,9 @@ export async function loadSupplierBalances(
       ),
       pay as (
         select p.supplier_id,
-               sum(p.amount_minor - p.fee_minor)::bigint as paid_net,
+               /* ما خرج مالاً — والإشعارُ الدائن تسويةٌ لم يخرج لها مال، يُعدّ وحده */
+               coalesce(sum(p.amount_minor - p.fee_minor) filter (where p.method <> 'CREDIT_NOTE'), 0)::bigint as paid_net,
+               coalesce(sum(p.amount_minor) filter (where p.method = 'CREDIT_NOTE'), 0)::bigint as credit_notes,
                sum(greatest(0, p.amount_minor - p.fee_minor - coalesce(b.s, 0)))::bigint as credit
           from payments p
           left join alloc_by_payment b on b.payment_id = p.id
@@ -67,6 +70,7 @@ export async function loadSupplierBalances(
              coalesce(inv.open_minor, 0) as open_minor,
              coalesce(inv.open_count, 0) as open_count,
              coalesce(pay.paid_net, 0)   as paid_net,
+             coalesce(pay.credit_notes, 0) as credit_notes,
              coalesce(pay.credit, 0)     as credit,
              s.issues_invoices           as issues
         from suppliers s
@@ -84,6 +88,7 @@ export async function loadSupplierBalances(
       openMinor: Number(r.open_minor),
       openCount: Number(r.open_count),
       paidNetMinor: Number(r.paid_net),
+      creditNotesMinor: Number(r.credit_notes),
       creditMinor: Number(r.credit),
       issuesInvoices: r.issues !== false,
     }),

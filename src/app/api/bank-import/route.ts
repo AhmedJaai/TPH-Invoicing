@@ -715,7 +715,12 @@ async function handle(request: Request) {
           classificationReason: decided?.classificationReason ?? null,
           classificationVersion: decided?.classificationVersion ?? null,
           supplierId: decided?.supplierId ?? null,
-          matchDisposition: decided?.decision?.disposition ?? null,
+          /*
+            المحجوزُ لسدادٍ قيّده صاحبُه بيد ليس «محسوماً» قبل أن يُربط: إن لم يُربط
+            (أخذت حوالةٌ أقدم السدادَ، أو الشهرُ مقفل) بقي في الطابور للمراجعة — لا
+            «قُرِّر ولم يُقيَّد» فلا يُعاد تخطيطُه ويُعدّ شذوذاً.
+          */
+          matchDisposition: reservedForHand.has(key) ? "REVIEW" : decided?.decision?.disposition ?? null,
           matchScore: decided?.candidate ? Math.round(decided.candidate.score * 100) : null,
           matchOutcome: decided?.outcome ?? null,
           /*
@@ -749,7 +754,7 @@ async function handle(request: Request) {
           lifecycle: deriveLifecycle({
             classified: (decided?.category ?? "UNKNOWN") !== "UNKNOWN",
             hasCandidate: decided?.candidate != null,
-            decided: decided?.decision?.disposition === "AUTO",
+            decided: decided?.decision?.disposition === "AUTO" && !reservedForHand.has(key),
             posted: plan !== undefined,
             ignored: decided?.outcome === "NOT_A_PAYMENT",
           }),

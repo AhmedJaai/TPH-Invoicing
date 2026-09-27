@@ -401,6 +401,9 @@ export async function SupplierView({
             <dl className="mt-5 divide-y divide-line-soft rounded-lg border border-line-soft bg-sunken/50 px-3 text-xs">
               <Trace label="فُوتِرَ عليك" minor={billed} href={`/purchases/invoices?supplier=${s.slug}`} />
               <Trace label="دفعتَ له" minor={paidNet} href={`/suppliers/${s.slug}?tab=payments#detail`} />
+              {(bal?.creditNotesMinor ?? 0) > 0 && (
+                <Trace label="إشعاراتٌ دائنة (مرتجع أو خصم)" minor={bal?.creditNotesMinor ?? 0} href={`/suppliers/${s.slug}?tab=payments#detail`} />
+              )}
               <Trace label="بقي مفتوحاً على فواتيره" minor={bal?.openMinor ?? 0} href={`/purchases/invoices?supplier=${s.slug}&paid=OPEN`} />
               {creditSplit.unbackedMinor > 0 && (
                 <Trace label="دفعتَ بلا فاتورة" minor={creditSplit.unbackedMinor} href={`/suppliers?unbacked=1#unbacked-${s.slug}`} />
