@@ -13,6 +13,7 @@ import { parseRiyals } from "@/lib/money";
 import type { InputVatStatus, TaxStatus } from "@/lib/validation";
 import type { RawLine, Tx } from "./types";
 import { assertMonthsOpen } from "./month-guard";
+import { buildSupplierProducts } from "./product.service";
 
 export interface CreateInvoiceInput {
   documentId: string;
@@ -114,6 +115,9 @@ export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<nu
       supplierId: input.supplierId,
     });
   }
+
+  /* كلُّ بندٍ إلى صنف مورّده — فالربطُ المؤكَّد بصنف الجرد يصل الفاتورةَ الجديدة وحده */
+  if (lines.length > 0) await buildSupplierProducts(tx, input.invoiceId);
 
   return lines.length;
 }

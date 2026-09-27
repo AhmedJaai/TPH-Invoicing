@@ -146,7 +146,7 @@ function LinkRow({ row, options, canEdit, onSaved }: {
           <span className="text-muted"> · {row.supplierName}</span>
         </p>
         <p className="text-[11px] text-muted">
-          <span className="nums">{row.qtyText}</span> في {row.lines === 1 ? "بندٍ واحد" : <><span className="nums">{row.lines}</span> بنود</>}
+          الكمّيّة <span className="nums">{row.qtyText}</span> · {row.lines === 1 ? "بندٌ واحد" : <><span className="nums">{row.lines}</span> بنود</>}
           {row.invoiceNumbers.length > 0 && <> · <span dir="ltr" className="nums">{row.invoiceNumbers.join("، ")}</span></>}
         </p>
       </div>

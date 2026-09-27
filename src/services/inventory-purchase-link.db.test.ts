@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import { caught, withRollback } from "@/test/db";
+import { caught, makeInvoice, makeSupplier, withRollback } from "@/test/db";
+import { replaceLines } from "./invoice.service";
 import { isolateProducts, makeActor, makeBranch, makeInvoicePurchase, makeStockProduct } from "@/test/inventory";
 import { recomputeCount, startCount } from "./inventory.service";
 import {
@@ -102,5 +103,31 @@ describe("ربطُ بنود الفواتير من الجرد", () => {
         { supplierProductId: sp, productId: coffee, packSize: "0", contentQuantity: "1", contentUnit: "KG" }, actorId, tx,
       ));
       expect(e).toBeInstanceOf(PurchaseLinkRefused);
+    }));
+
+  it("كما في الإنتاج: فاتورةٌ تُحفَظ فيُبنى صنفُ مورّدها، ويُربَط مرّةً فتدخل التاليةُ مربوطةً وحدها", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      const coffee = await makeStockProduct(tx, "بنّ أوغندا", "G", "COFFEE");
+      await isolateProducts(tx, [coffee]);
+      const supplierId = await makeSupplier(tx);
+      const item = { description: "1 كيلو اوغندا اميولو مقطرة اكياس بيضاء", quantity: "5", unitPrice: "88", lineTotal: "440" };
+
+      /* بنودٌ كانت تُكتَب بلا صنف مورّد — فلا يراها لوحُ الربط أصلاً */
+      const first = await makeInvoice(tx, supplierId, 506_00, "2026-09-14");
+      await replaceLines(tx, { invoiceId: first, supplierId, invoiceDate: new Date("2026-09-14T09:00:00+03:00"), subtotalMinor: 440_00, lines: [item] });
+      const options = await loadStockItemOptions(tx);
+      const row = (await loadPurchaseLinks(WEEK.start, WEEK.end, options, tx)).find((r) => r.displayName.includes("اوغندا"))!;
+      expect(row.status).toBe("UNLINKED_PRODUCT");
+      expect(row.suggestedProductId).toBe(coffee);
+      expect(row.guessedPack).toEqual({ packSize: "1", contentQuantity: "1", contentUnit: "KG" });
+
+      await savePurchaseLink({ supplierProductId: row.supplierProductId, productId: coffee, packSize: "1", contentQuantity: "1", contentUnit: "KG" }, actorId, tx);
+
+      const second = await makeInvoice(tx, supplierId, 506_00, "2026-09-21");
+      await replaceLines(tx, { invoiceId: second, supplierId, invoiceDate: new Date("2026-09-21T09:00:00+03:00"), subtotalMinor: 440_00, lines: [item] });
+      const next = (await loadPurchaseLinks(NEXT.start, NEXT.end, options, tx)).find((r) => r.supplierProductId === row.supplierProductId)!;
+      expect(next.status).toBe("LINKED");
+      expect(next.countedText).not.toBeNull();
     }));
 });

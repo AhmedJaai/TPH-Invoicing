@@ -9,6 +9,7 @@ import { and, eq, sql, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { invoiceLines, products, supplierProducts } from "@/db/schema";
 import { suggestCategory, type ProductCategory } from "@/lib/products";
+import type { Conn } from "./types";
 
 
 export interface BuildResult {
@@ -20,9 +21,14 @@ export interface BuildResult {
 /**
  * يبني أصناف المورّدين من بنود الفواتير ويربط البنود بها.
  * قابل لإعادة التشغيل: يضيف الجديد ولا يكرّر ولا يفكّ ربطاً قائماً.
+ *
+ * و`invoiceId` يقصره على فاتورةٍ واحدة — فيُستدعى من `replaceLines` عند كلّ
+ * حفظ. كان يجري بالنصّ `db:products` وحده، فلا صنفَ مورّدٍ لفاتورةٍ دخلت بعد
+ * آخر تشغيل: بنودُها بلا ربطٍ يُعرض، والربطُ الذي أكّده صاحبُه لا يصلها.
  */
-export async function buildSupplierProducts(): Promise<BuildResult> {
-  const groups = await db
+export async function buildSupplierProducts(conn: Conn = db, invoiceId?: string): Promise<BuildResult> {
+  const scope = invoiceId ? sql` and ${invoiceLines.invoiceId} = ${invoiceId}` : sql``;
+  const groups = await conn
     .select({
       supplierId: invoiceLines.supplierId,
       normalized: invoiceLines.normalizedDescription,
@@ -30,7 +36,7 @@ export async function buildSupplierProducts(): Promise<BuildResult> {
       displayName: sql<string>`(array_agg(${invoiceLines.description} order by length(${invoiceLines.description}) desc))[1]`,
     })
     .from(invoiceLines)
-    .where(sql`${invoiceLines.supplierId} is not null and ${invoiceLines.normalizedDescription} <> ''`)
+    .where(sql`${invoiceLines.supplierId} is not null and ${invoiceLines.normalizedDescription} <> ''${scope}`)
     .groupBy(invoiceLines.supplierId, invoiceLines.normalizedDescription);
 
   let created = 0;
@@ -48,7 +54,7 @@ export async function buildSupplierProducts(): Promise<BuildResult> {
       displayName: g.displayName ?? g.normalized,
     }));
   for (let i = 0; i < rows.length; i += 500) {
-    const inserted = await db
+    const inserted = await conn
       .insert(supplierProducts)
       .values(rows.slice(i, i + 500))
       .onConflictDoNothing()
@@ -58,13 +64,14 @@ export async function buildSupplierProducts(): Promise<BuildResult> {
   existing = rows.length - created;
 
   // ربط البنود بأصنافها — بالمورّد والوصف المطبَّع معاً
-  const linked = await db.execute(sql`
+  const linked = await conn.execute(sql`
     update invoice_lines l
        set supplier_product_id = sp.id
       from supplier_products sp
      where sp.supplier_id = l.supplier_id
        and sp.normalized_description = l.normalized_description
        and l.supplier_product_id is distinct from sp.id
+       ${invoiceId ? sql`and l.invoice_id = ${invoiceId}` : sql``}
   `);
 
   return { created, existing, linkedLines: linked.rowCount ?? 0 };
