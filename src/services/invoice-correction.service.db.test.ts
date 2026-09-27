@@ -7,6 +7,9 @@ import { correctInvoice } from "./invoice-correction.service";
 import { replaceLines } from "./invoice.service";
 import type { Tx } from "./types";
 
+/* الحكمُ على الضريبة يقارن رقمَ المشتري برقمنا — كما في document-record */
+process.env.COMPANY_VAT_NUMBER ??= "310007971600003";
+
 async function someone(tx: Tx): Promise<string> {
   const [u] = await tx.insert(users).values({ email: `fix-${Date.now()}-${Math.random()}@test.local` }).returning({ id: users.id });
   return u.id;
