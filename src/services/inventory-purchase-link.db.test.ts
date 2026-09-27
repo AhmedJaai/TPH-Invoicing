@@ -4,6 +4,7 @@ import { caught, makeInvoice, makeSupplier, withRollback } from "@/test/db";
 import { replaceLines } from "./invoice.service";
 import { isolateProducts, makeActor, makeBranch, makeInvoicePurchase, makeStockProduct } from "@/test/inventory";
 import { recomputeCount, startCount } from "./inventory.service";
+import { createReceipt } from "./inventory-receipt.service";
 import {
   PurchaseLinkRefused, loadPurchaseLinks, loadStockItemOptions, savePurchaseLink,
 } from "./inventory-purchase-link.service";
@@ -129,5 +130,44 @@ describe("ربطُ بنود الفواتير من الجرد", () => {
       const next = (await loadPurchaseLinks(NEXT.start, NEXT.end, options, tx)).find((r) => r.supplierProductId === row.supplierProductId)!;
       expect(next.status).toBe("LINKED");
       expect(next.countedText).not.toBeNull();
+    }));
+
+  it("إعادةُ قراءة الفاتورة لا تفكّ الاستلامَ المربوط ببندها — فلا تُحسَب البضاعةُ مرّتين", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      const branch = await makeBranch(tx);
+      const coffee = await makeStockProduct(tx, "بنّ", "G", "COFFEE");
+      await isolateProducts(tx, [coffee]);
+      const supplierId = await makeSupplier(tx);
+      const invoiceId = await makeInvoice(tx, supplierId, 506_00, "2026-09-14");
+      const lines = [
+        { description: "بن اوغندا 1 كيلو", quantity: "5", unitPrice: "80", lineTotal: "400" },
+        { description: "توصيل", quantity: "1", unitPrice: "40", lineTotal: "40" },
+      ];
+      const at = new Date("2026-09-14T09:00:00+03:00");
+      await replaceLines(tx, { invoiceId, supplierId, invoiceDate: at, subtotalMinor: 440_00, lines });
+      const [coffeeLine] = (await tx.execute<{ id: string }>(sql`
+        select id from invoice_lines where invoice_id = ${invoiceId} and description like 'بن%'
+      `)).rows;
+      const receiptId = await createReceipt({
+        productId: coffee, branchId: branch.id, receivedOn: "2026-09-14", enteredMilli: 5_000, unit: "KG",
+        resolution: { kind: "LINK", invoiceLineId: coffeeLine.id },
+      }, actorId, tx);
+
+      /* إعادةُ القراءة: السعرُ صُحّح، والبندُ نفسُه */
+      await replaceLines(tx, { invoiceId, supplierId, invoiceDate: at, subtotalMinor: 440_00, lines: [
+        { ...lines[0], unitPrice: "80.00" }, lines[1],
+      ] });
+
+      const [after] = (await tx.execute<{ line: string | null; n: number }>(sql`
+        select r.invoice_line_id as line, (select count(*)::int from invoice_lines where invoice_id = ${invoiceId}) as n
+          from inventory_receipts r where r.id = ${receiptId}
+      `)).rows;
+      expect(after).toEqual({ line: coffeeLine.id, n: 2 });
+
+      /* وما اختفى من القراءة الجديدة يُحذَف، وما جدّ يُضاف */
+      await replaceLines(tx, { invoiceId, supplierId, invoiceDate: at, subtotalMinor: 400_00, lines: [lines[0]] });
+      const [only] = (await tx.execute<{ n: number }>(sql`select count(*)::int as n from invoice_lines where invoice_id = ${invoiceId}`)).rows;
+      expect(only.n).toBe(1);
     }));
 });

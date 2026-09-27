@@ -159,7 +159,7 @@ export async function loadSupplierIntel(
          and l.normalized_description <> ''
          and l.unit_price_minor > 0
          /* سطرٌ تعارض ضربُه ولم يُفسَّر لا يُبنى عليه سعر */
-         and coalesce(l.pricing_basis, '') <> 'INCONSISTENT'
+         and coalesce(l.pricing_basis, '') not in ('INCONSISTENT', 'QTY_UNREAD')
     `),
     db.execute<{
       id: string; at: string; kind: string; title: string; amount: string | number | null;

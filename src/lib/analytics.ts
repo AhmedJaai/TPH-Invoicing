@@ -105,7 +105,8 @@ export interface LineRow {
   supplierId: string | null;
   supplierName?: string | null;
   invoiceDate: Date | null;
-  quantity: number;
+  /** `null` = لم تُقرأ */
+  quantity: number | null;
   unitPriceMinor: number;
   lineTotalMinor: number;
 }
@@ -119,9 +120,11 @@ export interface ItemSummary {
   /** أوضح صيغة للاسم — الأطول عادةً أوفاها وصفاً */
   displayName: string;
   orderCount: number;
-  totalQuantity: number;
+  /** `null` إن جُهلت كمّيّةُ سطرٍ واحد */
+  totalQuantity: number | null;
   totalSpentMinor: number;
-  averageUnitPriceMinor: number;
+  /** من الأسطر المعروفة كمّيّتُها وحدها — `null` إن لم يُعرف منها شيء */
+  averageUnitPriceMinor: number | null;
   lastUnitPriceMinor: number;
   lastOrderedAt: Date | null;
   firstOrderedAt: Date | null;
@@ -143,6 +146,12 @@ export interface ItemSummary {
  * هذا الاتجاه يُفرّق ما هو واحد، وذلك أهون من أن يجمع ما ليس واحداً ثمّ
  * يبني عليه توصية بالمال.
  */
+function averageUnitPrice(list: readonly LineRow[]): number | null {
+  const known = list.filter((r) => r.quantity !== null && r.quantity > 0);
+  const qty = known.reduce((s, r) => s + (r.quantity ?? 0), 0);
+  return qty > 0 ? Math.round(known.reduce((s, r) => s + r.lineTotalMinor, 0) / qty) : null;
+}
+
 export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
   const groups = new Map<string, LineRow[]>();
   for (const row of rows) {
@@ -161,7 +170,8 @@ export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
       .filter((r) => r.invoiceDate)
       .sort((a, b) => a.invoiceDate!.getTime() - b.invoiceDate!.getTime());
 
-    const totalQuantity = list.reduce((s, r) => s + r.quantity, 0);
+    /* كمّيّةٌ واحدةٌ مجهولة تجعل المجموعَ مجهولاً — لا يُجمَع الفراغُ صفراً */
+    const totalQuantity = list.some((r) => r.quantity === null) ? null : list.reduce((s, r) => s + (r.quantity ?? 0), 0);
     const totalSpentMinor = list.reduce((s, r) => s + r.lineTotalMinor, 0);
 
     // الأطول اسماً أوفى وصفاً غالباً: «حليب طازج كامل الدسم ٢ لتر» خير من «حليب»
@@ -190,7 +200,7 @@ export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
       orderCount: list.length,
       totalQuantity,
       totalSpentMinor,
-      averageUnitPriceMinor: totalQuantity > 0 ? Math.round(totalSpentMinor / totalQuantity) : 0,
+      averageUnitPriceMinor: averageUnitPrice(list),
       lastUnitPriceMinor: latest.unitPriceMinor,
       lastOrderedAt: dated.length ? dated[dated.length - 1].invoiceDate : null,
       firstOrderedAt: dated.length ? dated[0].invoiceDate : null,

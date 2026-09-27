@@ -549,7 +549,8 @@ const STATEMENT_MATCH_LABEL: Record<string, string> = {
 };
 
 /** «١٫٠٠٠» كمّيّةٌ مخزَّنة بثلاث خانات — تُعرَض «١» كما كُتبت على الورقة. */
-function trimQty(qty: string): string {
+function trimQty(qty: string | null): string {
+  if (qty === null) return "غير مقروءة";
   return qty.includes(".") ? qty.replace(/\.?0+$/, "") : qty;
 }
 

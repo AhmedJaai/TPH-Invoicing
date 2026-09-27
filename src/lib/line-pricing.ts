@@ -26,7 +26,9 @@ export type PricingBasis =
   /** لم يُقرأ إلا أحدهما */
   | "DERIVED"
   /** تعارض لا يُفسَّر بخصم ولا بضريبة */
-  | "INCONSISTENT";
+  | "INCONSISTENT"
+  /** الكمّيّةُ لم تُقرأ — فلا سعرَ وحدةٍ يُبنى عليه، والكمّيّةُ «غير معروفة» لا ١ */
+  | "QTY_UNREAD";
 
 export interface LinePricingInput {
   quantity: number;
@@ -53,6 +55,30 @@ const REL = 0.01;
 function near(a: number, b: number, rel = REL): boolean {
   if (b === 0) return a === 0;
   return Math.abs(a - b) / Math.abs(b) <= rel;
+}
+
+/**
+ * كمّيّةُ السطر كما كُتبت — نصّاً عشريّاً بثلاث خاناتٍ على الأكثر، أو `null`.
+ *
+ * كانت `Number(x.replace(/[^\d.]/g, "")) || 1`: «٣» تُمحى فتصير ١، و«12 × 500»
+ * تصير 12500، و«0» تصير ١. والكمّيّةُ غيرُ المقروءة ليست واحداً — تُخزَّن
+ * «غير معروفة» فيقول الجردُ ذلك بدل أن يحسب كيساً واحداً.
+ */
+export function parseLineQuantity(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  let s = raw
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/٫/g, ".")
+    .replace(/٬/g, "");
+  /* «2,5» فاصلةٌ عشريّة، و«1,200» فاصلُ آلاف */
+  s = /^\s*\d+,\d{1,2}\s*$/.test(s) ? s.replace(",", ".") : s.replace(/(\d),(?=\d{3}\b)/g, "$1");
+  const numbers = s.match(/-?\d+(?:\.\d+)?/g) ?? [];
+  if (numbers.length !== 1) return null;
+  const n = Number(numbers[0]);
+  if (!Number.isFinite(n) || n <= 0 || n >= 10_000_000) return null;
+  const fixed = (Math.round(n * 1000) / 1000).toFixed(3);
+  return fixed.replace(/\.?0+$/, "") || null;
 }
 
 export function resolveLinePricing(input: LinePricingInput): LinePricing | null {

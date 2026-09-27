@@ -5,10 +5,10 @@
  * مسارات تُنشئ فواتير — الأرشفة والمزامنة وقراءة المحتوى — وافتراقها في
  * حساب السعر أنتج «ارتفاع أسعار ١٥٪» لم يقع.
  */
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { invoiceLines, invoices, statementLines, statements } from "@/db/schema";
 import { normalizeItem } from "@/lib/items";
-import { reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
+import { parseLineQuantity, reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { parseRiyals } from "@/lib/money";
 import type { InputVatStatus, TaxStatus } from "@/lib/validation";
 import type { RawLine, Tx } from "./types";
@@ -77,35 +77,56 @@ export interface ReplaceLinesInput {
  * وتُكتب البنود بديلاً عمّا قبلها، فإعادة التشغيل لا تُضاعفها.
  */
 export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<number> {
-  await tx.delete(invoiceLines).where(eq(invoiceLines.invoiceId, input.invoiceId));
+  /*
+    ── البندُ يُحدَّث في مكانه، لا يُحذَف ويُعاد ──
+
+    كان يُحذَف كلُّه ويُكتَب بمعرّفاتٍ جديدة، فالاستلامُ اليدويّ المربوط ببندٍ
+    (`inventory_receipts.invoice_line_id`، ‏SET NULL) ينفكّ صامتاً مع كلّ إعادة
+    قراءة — فيُحسَب البندُ الجديد والاستلامُ معاً: البضاعةُ نفسُها مرّتين. وفي
+    أسبوعٍ مقفَل يرفض القيدُ الفكَّ فتفشل إعادةُ القراءة بخطأٍ عن الجرد.
+    فالقديمُ يُطابَق بالجديد بوصفه المطبَّع، ويبقى معرّفُه وكلُّ ما يشير إليه.
+  */
+  const previous = await tx.select({ id: invoiceLines.id, normalized: invoiceLines.normalizedDescription })
+    .from(invoiceLines).where(eq(invoiceLines.invoiceId, input.invoiceId)).orderBy(invoiceLines.id);
 
   const resolved: (NonNullable<ReturnType<typeof resolveLinePricing>> & {
     description: string;
     quantity: number;
+    /** كما كُتبت — أو `null` إن لم تُقرأ */
+    qtyText: string | null;
   })[] = [];
 
   for (const l of input.lines) {
     const description = l.description?.trim();
     if (!description) continue;
-    const quantity = Number((l.quantity ?? "1").replace(/[^\d.]/g, "")) || 1;
+    const qtyText = parseLineQuantity(l.quantity);
+    const quantity = qtyText === null ? 1 : Number(qtyText);
     // السطر بلا سعر ولا مبلغ لا يُسجَّل — صفرٌ مخترع يفسد كل متوسط بعده
-    const pricing = resolveLinePricing({
+    const priced = resolveLinePricing({
       quantity,
       unitPriceMinor: parseRiyals(l.unitPrice ?? ""),
       lineTotalMinor: parseRiyals(l.lineTotal ?? ""),
     });
-    if (!pricing) continue;
-    resolved.push({ ...pricing, description, quantity });
+    if (!priced) continue;
+    /* بلا كمّيّةٍ لا يُعرف أيّ الرقمين سعرُ الوحدة — فلا يدخل تتبّعَ الأسعار */
+    const pricing = qtyText === null ? { ...priced, basis: "QTY_UNREAD" as const } : priced;
+    resolved.push({ ...pricing, description, quantity, qtyText });
   }
 
   const { lines } = reconcileInvoiceLines(resolved, input.subtotalMinor);
+  /* قراءةٌ لا بندَ مسعَّراً فيها لا تمحو بنوداً صالحة — «لم يُقرأ» ليس «لا بنود» */
+  if (lines.length === 0 && previous.length > 0) return 0;
+
+  const reusable = new Map<string, string[]>();
+  for (const p of previous) reusable.set(p.normalized, [...(reusable.get(p.normalized) ?? []), p.id]);
+  const kept = new Set<string>();
 
   for (const l of lines) {
-    await tx.insert(invoiceLines).values({
-      invoiceId: input.invoiceId,
+    const normalizedDescription = normalizeItem(l.description);
+    const values = {
       description: l.description,
-      normalizedDescription: normalizeItem(l.description),
-      qty: String(l.quantity),
+      normalizedDescription,
+      qty: l.qtyText,
       unitPriceMinor: l.effectiveUnitMinor,
       lineTotalMinor: l.netTotalMinor,
       listUnitPriceMinor: l.listUnitMinor,
@@ -113,8 +134,18 @@ export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<nu
       pricingBasis: l.basis,
       invoiceDate: input.invoiceDate,
       supplierId: input.supplierId,
-    });
+    };
+    const reuse = reusable.get(normalizedDescription)?.shift();
+    if (reuse) {
+      kept.add(reuse);
+      await tx.update(invoiceLines).set(values).where(eq(invoiceLines.id, reuse));
+    } else {
+      await tx.insert(invoiceLines).values({ invoiceId: input.invoiceId, ...values });
+    }
   }
+
+  const gone = previous.filter((p) => !kept.has(p.id)).map((p) => p.id);
+  if (gone.length > 0) await tx.delete(invoiceLines).where(inArray(invoiceLines.id, gone));
 
   /* كلُّ بندٍ إلى صنف مورّده — فالربطُ المؤكَّد بصنف الجرد يصل الفاتورةَ الجديدة وحده */
   if (lines.length > 0) await buildSupplierProducts(tx, input.invoiceId);

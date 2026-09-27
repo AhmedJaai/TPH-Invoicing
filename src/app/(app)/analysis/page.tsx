@@ -96,7 +96,7 @@ export default async function ItemsAndPricesPage({
       supplierId: r.supplierId,
       supplierName: r.supplierName,
       invoiceDate: r.invoiceDate,
-      quantity: Number(r.quantity),
+      quantity: r.quantity === null ? null : Number(r.quantity),
       unitPriceMinor: r.unitPriceMinor,
       lineTotalMinor: r.lineTotalMinor,
     })),
@@ -317,7 +317,7 @@ export default async function ItemsAndPricesPage({
                 ),
               },
               { key: "total", header: "الإجمالي", numeric: true, cell: (i) => <span className="font-bold"><Money minor={i.totalSpentMinor} /></span> },
-              { key: "unit", header: "متوسّط سعر الوحدة", numeric: true, cell: (i) => <Money minor={i.averageUnitPriceMinor} /> },
+              { key: "unit", header: "متوسّط سعر الوحدة", numeric: true, cell: (i) => (i.averageUnitPriceMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={i.averageUnitPriceMinor} />) },
               { key: "orders", header: "مرّات الطلب", numeric: true, cell: (i) => <span className="nums">{i.orderCount}</span> },
               {
                 key: "move", header: "آخر تغيّر", secondary: true,

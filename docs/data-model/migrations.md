@@ -88,6 +88,7 @@
 | `044_supplier_issues_statements.sql` | `suppliers.issues_statements` — «كشوف الحساب مو كلّهم يصدرونها»: يكتبه الإنسان، ومن لا يصدره لا يُطلَب منه كشف |
 | `045_notifications_seen.sql` | `users.notifications_seen_at` — حدُّ ما قرأه المستخدم من مركز الإشعارات. الإشعاراتُ تُشتقّ ولا تُخزَّن؛ الحدُّ وحده لا يُشتقّ |
 | `046_drive_checked.sql` | `users.drive_checked_at` · `drive_failed_at` · `drive_failed_reason` — آخرُ فحصٍ للدرايف نجح وآخرُ فحصٍ تعثّر وسببُه. كان الأثرُ يُكتب إن وُجد جديدٌ وحده، فلا يُعرف أتعمل المزامنةُ الآليّة أم توقّفت |
+| `047_invoice_line_qty_unknown.sql` | `invoice_lines.qty` يقبل الفراغ — الكمّيّةُ غيرُ المقروءة «غير معروفة» لا ١؛ وسطرُها `pricing_basis = QTY_UNREAD` لا يدخل تتبّعَ الأسعار |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

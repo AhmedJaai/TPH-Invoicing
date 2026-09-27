@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reconcileInvoiceLines, resolveLinePricing } from "./line-pricing";
+import { parseLineQuantity, reconcileInvoiceLines, resolveLinePricing } from "./line-pricing";
 
 const r = (quantity: number, unitPriceMinor: number | null, lineTotalMinor: number | null) =>
   resolveLinePricing({ quantity, unitPriceMinor, lineTotalMinor });
@@ -126,5 +126,23 @@ describe("reconcileInvoiceLines", () => {
 
   it("بلا بنود لا شيء يُسوّى", () => {
     expect(reconcileInvoiceLines([], 1_000).lines).toHaveLength(0);
+  });
+});
+
+describe("parseLineQuantity — الكمّيّةُ كما كُتبت، والمجهولُ ليس واحداً", () => {
+  it("الأرقامُ العربيّة والفاصلة العشريّة", () => {
+    expect(parseLineQuantity("٣")).toBe("3");
+    expect(parseLineQuantity("٢٫٥")).toBe("2.5");
+    expect(parseLineQuantity("2,5")).toBe("2.5");
+    expect(parseLineQuantity("1,200")).toBe("1200");
+    expect(parseLineQuantity("5 كيلو")).toBe("5");
+  });
+  it("ما لا يُقرأ رقماً واحداً يبقى مجهولاً", () => {
+    expect(parseLineQuantity(undefined)).toBeNull();
+    expect(parseLineQuantity("")).toBeNull();
+    expect(parseLineQuantity("0")).toBeNull();
+    expect(parseLineQuantity("-2")).toBeNull();
+    expect(parseLineQuantity("12 × 500")).toBeNull();
+    expect(parseLineQuantity("كرتون")).toBeNull();
   });
 });

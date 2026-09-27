@@ -296,7 +296,8 @@ export const invoiceLines = pgTable("invoice_lines", {
   description: text("description").notNull(),
   /** الوصف بعد التطبيع — عليه يقوم تجميع الأصناف وتتبّع الأسعار */
   normalizedDescription: text("normalized_description").notNull().default(""),
-  qty: numeric("qty", { precision: 12, scale: 3 }).notNull().default("1"),
+  /** `null` = لم تُقرأ (047) — لا ١ ولا صفر */
+  qty: numeric("qty", { precision: 12, scale: 3 }),
   /**
    * السعر الفعلي للوحدة — ما دُفع، لا ما في القائمة.
    * النموذج ينسخ سعر القائمة أحياناً والإجمالي بعد الخصم، فيصير الضرب

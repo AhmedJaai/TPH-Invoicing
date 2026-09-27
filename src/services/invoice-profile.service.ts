@@ -69,7 +69,8 @@ export interface InvoiceProfile {
   lines: {
     id: string;
     description: string;
-    qty: string;
+    /** `null` = لم تُقرأ */
+    qty: string | null;
     unitPriceMinor: number;
     lineTotalMinor: number;
     discountMinor: number;
@@ -148,7 +149,7 @@ export async function loadInvoiceProfile(id: string): Promise<InvoiceProfile | n
       الفاتورة. والمقارنة داخل المورّد لا عبره — كـ`priceKey`.
     */
     db.execute<{
-      id: string; description: string; qty: string; unit_price_minor: number;
+      id: string; description: string; qty: string | null; unit_price_minor: number;
       line_total_minor: number; discount_minor: number; pricing_basis: string | null;
       prev_price: number | null; prev_date: Date | string | null; prev_number: string | null; prev_id: string | null;
     }>(sql`
