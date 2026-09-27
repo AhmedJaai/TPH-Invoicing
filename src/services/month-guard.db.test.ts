@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { invoices, monthCloses } from "@/db/schema";
 import { createId } from "@/lib/id";
@@ -28,6 +29,24 @@ describe("الشهر المقفل لا يُكتب فيه", () => {
 
       const e = await caught(createInvoice(tx, invoiceInput(documentId, supplierId, "2026-07")));
       expect(e).toBeInstanceOf(MonthClosedError);
+    }));
+
+  it("والشهرُ من تاريخ الفاتورة لا من مجلّدها: فاتورةُ يوليو في مجلّد أغسطس تُرفَض ما دام يوليو مقفلاً", () =>
+    withRollback(async (tx) => {
+      const supplierId = await makeSupplier(tx);
+      await tx.insert(monthCloses).values({ month: "2026-07", status: "CLOSED" });
+      const documentId = await makeDocument(tx, supplierId, "2026-08-15");
+      const e = await caught(createInvoice(tx, { ...invoiceInput(documentId, supplierId, "2026-07"), periodMonth: "2026-08" }));
+      expect(e).toBeInstanceOf(MonthClosedError);
+    }));
+
+  it("وفاتورةُ أغسطس في مجلّد سبتمبر تُحسَب في أغسطس", () =>
+    withRollback(async (tx) => {
+      const supplierId = await makeSupplier(tx);
+      const documentId = await makeDocument(tx, supplierId, "2026-09-02");
+      const id = await createInvoice(tx, { ...invoiceInput(documentId, supplierId, "2026-08"), periodMonth: "2026-09" });
+      const [row] = (await tx.execute<{ m: string }>(sql`select period_month as m from invoices where id = ${id}`)).rows;
+      expect(row.m).toBe("2026-08");
     }));
 
   it("وفي شهرٍ مفتوح تُنشأ — الحارس لا يرفض كلّ شيء", () =>

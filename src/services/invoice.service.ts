@@ -13,6 +13,7 @@ import { parseRiyals } from "@/lib/money";
 import type { InputVatStatus, TaxStatus } from "@/lib/validation";
 import type { RawLine, Tx } from "./types";
 import { assertMonthsOpen } from "./month-guard";
+import { monthOf } from "@/lib/filing";
 import { buildSupplierProducts } from "./product.service";
 
 export interface CreateInvoiceInput {
@@ -32,8 +33,22 @@ export interface CreateInvoiceInput {
   isFixedAsset: boolean;
 }
 
+/**
+ * شهرُ الفاتورة المحاسبيّ: شهرُ تاريخها — لا مجلّدُ الدرايف ولا يومُ رفعها.
+ *
+ * كانت المزامنةُ والطابور وتسجيلُ المستند يأخذون شهرَ المجلّد: فاتورةُ أغسطس في
+ * مجلّد سبتمبر تُحسَب في سبتمبر، وأغسطس ناقصٌ بها وإقفالُه لا يراها. والرفعُ
+ * يشتقّه من التاريخ منذ البداية — فصار الحكمُ هنا لكلّ باب. والشهرُ المُمرَّر
+ * احتياطٌ لتاريخٍ لا يُقرأ. والمقفلُ يُرفَض كما كان: ترحيلُ دَينٍ إلى شهرٍ آخر
+ * قرارُ صاحبه لا الآلة.
+ */
+export function filingMonthFor(invoiceDate: Date, fallbackMonth: string): string {
+  return Number.isNaN(invoiceDate.getTime()) ? fallbackMonth : monthOf(invoiceDate);
+}
+
 export async function createInvoice(tx: Tx, input: CreateInvoiceInput): Promise<string | null> {
-  await assertMonthsOpen(tx, [input.periodMonth]);
+  const periodMonth = filingMonthFor(input.invoiceDate, input.periodMonth);
+  await assertMonthsOpen(tx, [periodMonth]);
 
   const [inv] = await tx
     .insert(invoices)
@@ -42,7 +57,7 @@ export async function createInvoice(tx: Tx, input: CreateInvoiceInput): Promise<
       supplierId: input.supplierId,
       invoiceNumber: input.invoiceNumber,
       invoiceDate: input.invoiceDate,
-      periodMonth: input.periodMonth,
+      periodMonth,
       subtotalMinor: input.subtotalMinor,
       vatMinor: input.vatMinor,
       totalMinor: input.totalMinor,
