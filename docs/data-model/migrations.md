@@ -2,11 +2,11 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٥٥
+## الجداول — ٥٦
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` · `payments` `payment_allocations`
-`bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes`
+`bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes` · `job_state`
 `products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products`
 `audit_logs` `rate_limits` `expenses`
 `counterparties` `counterparty_evidence` · `branches` `bank_accounts` `reconciliation_periods`
@@ -94,6 +94,7 @@
 | `050_inventory_inputs_locked.sql` | `waste_records` و`inventory_movements` لا تُكتب ولا تُعدَّل ولا تُحذف في أسبوعٍ جردُه مقفَل (كالاستلام في 041) |
 | `051_bank_held_rows.sql` | `bank_held_rows` — صفوفُ الكشف الملتبسة والمتضاربة تُحفظ بوقائعها والحركة التي تشبهها حتّى يقرّر إنسان («هي نفسها» · «أضِفها» · «تحقّقتُ»)؛ فريدةٌ على الوقائع فلا تُكرّرها إعادةُ الاستيراد |
 | `052_alert_resolution_bounce.sql` | قيدُ `alert_resolutions.decision` يقبل `BOUNCED` و`NOT_BOUNCE` (قرارُ الحوالة المرتدّة، مفتاح `bounce:`) — توسيعٌ بقيمتين مسمّاتين |
+| `053_job_state.sql` | `job_state` — بصمةُ آخر تشغيلٍ لعملٍ خلفيّ (الاستدراك): لا يُعاد ما لم يتغيّر ما يعمل عليه أو يمضِ حدُّه |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

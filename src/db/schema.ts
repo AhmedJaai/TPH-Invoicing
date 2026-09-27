@@ -1645,6 +1645,13 @@ export const bankHeldRows = pgTable("bank_held_rows", {
   createdAt: now(),
 });
 
+/** بصمةُ آخر تشغيلٍ لعملٍ خلفيّ — لا يُعاد ما لم يتغيّر ما يعمل عليه (053). */
+export const jobState = pgTable("job_state", {
+  name: text("name").primaryKey(),
+  fingerprint: text("fingerprint").notNull(),
+  ranAt: timestamp("ran_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const bankTransactionsRelations = relations(bankTransactions, ({ one }) => ({
   bankImport: one(bankImports, { fields: [bankTransactions.bankImportId], references: [bankImports.id] }),
   matchedPayment: one(payments, { fields: [bankTransactions.matchedPaymentId], references: [payments.id] }),

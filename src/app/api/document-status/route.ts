@@ -6,6 +6,7 @@
  * (فيها قراءة الحقول وتأكيدها)، أمّا الرفض فقرارٌ بسيط: هذا ليس مستنداً
  * يُقيَّد. ويُسجَّل بسببه ومن رفضه، ولا يُحذف الملفّ من الدرايف.
  */
+import { backlogFingerprint, isDue, markRan } from "@/services/job-state.service";
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
@@ -27,6 +28,9 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { DOCUMENT, FILE, INVOICE, PAYMENT, TRANSACTION, countNoun } from "@/lib/arabic";
 import { linkExactHandPayments, mergeExactEchoes } from "@/services/account-review.service";
 
+/** حدُّ ما يُترك الاستدراكُ الخلفيّ بلا تشغيلٍ وإن لم يتغيّر شيء — لسياسات الأيّام */
+const BACKLOG_MAX_AGE_MS = 6 * 60 * 60_000;
+
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -35,6 +39,8 @@ const Body = z.object({
   reason: z.string().max(500).optional(),
   /** «confirm»: ما قرأه النموذج صحيح فيُؤرشَف — والافتراضيّ الرفض */
   action: z.enum(["reject", "confirm", "confirm-eligible", "restore"]).optional(),
+  /** الاستدراكُ الخلفيّ عند فتح الصفحات — لا يُعاد ما لم يتغيّر شيء (الضغطُ بيدٍ يجري دائماً) */
+  background: z.boolean().optional(),
 });
 type Body = z.infer<typeof Body>;
 
@@ -69,6 +75,17 @@ export async function POST(request: Request) {
       const token = await refreshTokenFor(user.id).catch(() => null);
       if (token) drive = driveForUser(token);
     }
+    /*
+      الخلفيُّ لا يُعاد ما لم تتغيّر بصمةُ ما يعمل عليه أو تمضِ ستُّ ساعات — كان
+      يجري كلَّ عشر دقائق لكلّ جهاز ولو لم يتغيّر صفّ (`job-state.service.ts`).
+    */
+    const fingerprint = await backlogFingerprint();
+    if (body.background && !(await isDue("backlog", fingerprint, BACKLOG_MAX_AGE_MS))) {
+      return NextResponse.json({
+        ok: true, skipped: true, message: "لا جديد منذ آخر استدراك",
+        recorded: 0, approved: 0, renamed: [], reread: 0, notes: [], handLinked: 0,
+      });
+    }
     const r = await processDocumentBacklog(user.id, drive);
     /*
       حوالةٌ في طابور البنك وسدادُها قيّده صاحبُ العمل بيد بالمبلغ نفسه — تُربط
@@ -88,6 +105,7 @@ export async function POST(request: Request) {
       r.notes.length > 0 ? `وتعذّر ${r.notes.length}: ${r.notes[0]}` : null,
     ].filter(Boolean);
     const message = parts.length === 0 ? "لا مستندَ تجتمع فيه الشروطُ الآن" : parts.join(" · ");
+    await markRan("backlog", await backlogFingerprint());
     return NextResponse.json({ ok: true, message, ...r, handLinked: handLinked + echoesMerged });
   }
 
