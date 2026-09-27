@@ -5,7 +5,7 @@
  * مسارات تُنشئ فواتير — الأرشفة والمزامنة وقراءة المحتوى — وافتراقها في
  * حساب السعر أنتج «ارتفاع أسعار ١٥٪» لم يقع.
  */
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { invoiceLines, invoices, statementLines, statements } from "@/db/schema";
 import { normalizeItem } from "@/lib/items";
 import { parseLineQuantity, reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
@@ -110,7 +110,10 @@ export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<nu
     أسبوعٍ مقفَل يرفض القيدُ الفكَّ فتفشل إعادةُ القراءة بخطأٍ عن الجرد.
     فالقديمُ يُطابَق بالجديد بوصفه المطبَّع، ويبقى معرّفُه وكلُّ ما يشير إليه.
   */
-  const previous = await tx.select({ id: invoiceLines.id, normalized: invoiceLines.normalizedDescription })
+  const previous = await tx.select({
+    id: invoiceLines.id, normalized: invoiceLines.normalizedDescription,
+    qty: invoiceLines.qty, total: invoiceLines.lineTotalMinor,
+  })
     .from(invoiceLines).where(eq(invoiceLines.invoiceId, input.invoiceId)).orderBy(invoiceLines.id);
 
   const resolved: (NonNullable<ReturnType<typeof resolveLinePricing>> & {
@@ -141,10 +144,27 @@ export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<nu
   /* قراءةٌ لا بندَ مسعَّراً فيها لا تمحو بنوداً صالحة — «لم يُقرأ» ليس «لا بنود» */
   if (lines.length === 0 && previous.length > 0) return 0;
 
-  const reusable = new Map<string, string[]>();
-  for (const p of previous) reusable.set(p.normalized, [...(reusable.get(p.normalized) ?? []), p.id]);
+  /*
+    بندان بالوصف نفسه («حليب» ×١٠ و«حليب» ×٢) لا يُقرنان بالترتيب: يُقدَّم القديمُ
+    بالكمّيّة والإجماليّ نفسيهما، ثمّ بالكمّيّة، ثمّ ما بقي — وإلّا صار البندُ المربوط
+    باستلامِ عشرةٍ بندَ اثنين، وحُسب الآخرُ عشرةً فوقه.
+  */
+  const reusable = new Map<string, typeof previous>();
+  for (const p of previous) reusable.set(p.normalized, [...(reusable.get(p.normalized) ?? []), p]);
   const kept = new Set<string>();
+  const sameQty = (a: string | null, b: string | null) => a !== null && b !== null && Number(a) === Number(b);
+  const takeReusable = (normalized: string, qty: string | null, total: number): string | undefined => {
+    const list = reusable.get(normalized);
+    if (!list || list.length === 0) return undefined;
+    const i = [
+      list.findIndex((p) => sameQty(p.qty, qty) && p.total === total),
+      list.findIndex((p) => sameQty(p.qty, qty)),
+      0,
+    ].find((x) => x >= 0)!;
+    return list.splice(i, 1)[0].id;
+  };
 
+  const plan: { reuse: string | undefined; values: Omit<typeof invoiceLines.$inferInsert, "invoiceId"> }[] = [];
   for (const l of lines) {
     const normalizedDescription = normalizeItem(l.description);
     const values = {
@@ -159,16 +179,33 @@ export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<nu
       invoiceDate: input.invoiceDate,
       supplierId: input.supplierId,
     };
-    const reuse = reusable.get(normalizedDescription)?.shift();
-    if (reuse) {
-      kept.add(reuse);
-      await tx.update(invoiceLines).set(values).where(eq(invoiceLines.id, reuse));
-    } else {
-      await tx.insert(invoiceLines).values({ invoiceId: input.invoiceId, ...values });
-    }
+    const reuse = takeReusable(normalizedDescription, l.qtyText, l.netTotalMinor);
+    if (reuse) kept.add(reuse);
+    plan.push({ reuse, values });
   }
 
+  /* الخطّةُ أوّلاً ثمّ الفحص ثمّ الكتابة — ما يُردّ لا يكتب قبل أن يُردّ */
   const gone = previous.filter((p) => !kept.has(p.id)).map((p) => p.id);
+  if (gone.length > 0) {
+    /*
+      بندٌ ربطه صاحبُه باستلامٍ يدويّ ولم يرد في القراءة الجديدة لا يُحذف صامتاً:
+      كان الربطُ ينفكّ (SET NULL) فيُحسَب الاستلامُ ثانيةً، أو تفشل القراءةُ في
+      أسبوعٍ مقفَل بخطأٍ لا يُفهم. فيُردّ الاستبدالُ كلُّه ويُقال لماذا.
+    */
+    const [held] = (await tx.execute<{ description: string }>(sql`
+      select il.description from invoice_lines il
+       where il.id in (${sql.join(gone.map((g) => sql`${g}`), sql`, `)})
+         and exists (select 1 from inventory_receipts r where r.invoice_line_id = il.id and r.voided_at is null)
+       limit 1
+    `)).rows;
+    if (held) throw new InvoiceLinesRefused(
+      `البندُ «${held.description}» مربوطٌ بكمّيّةٍ استُلمت بيدك، ولم يرد في القراءة الجديدة — فُكَّ ربطَه من الجرد أوّلاً، أو صحّح البنود بيدك.`,
+    );
+  }
+  for (const { reuse, values } of plan) {
+    if (reuse) await tx.update(invoiceLines).set(values).where(eq(invoiceLines.id, reuse));
+    else await tx.insert(invoiceLines).values({ invoiceId: input.invoiceId, ...values });
+  }
   if (gone.length > 0) await tx.delete(invoiceLines).where(inArray(invoiceLines.id, gone));
 
   /* كلُّ بندٍ إلى صنف مورّده — فالربطُ المؤكَّد بصنف الجرد يصل الفاتورةَ الجديدة وحده */
@@ -245,5 +282,13 @@ export async function createStatement(tx: Tx, input: CreateStatementInput): Prom
       debitMinor: l.debitMinor,
       creditMinor: l.creditMinor,
     });
+  }
+}
+
+/** استبدالُ البنود يُردّ — يُقال نصُّه لصاحبه (بندٌ مربوطٌ باستلامٍ لم يرد في القراءة). */
+export class InvoiceLinesRefused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvoiceLinesRefused";
   }
 }

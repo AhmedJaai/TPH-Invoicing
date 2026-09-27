@@ -30,7 +30,7 @@ import { recordAudit } from "@/lib/audit";
 import { downloadFile, isDriveAuthError } from "@/lib/drive";
 import { extractDocument, isSupportedUpload } from "@/lib/extraction";
 import { companyConfig } from "@/config/drive";
-import { replaceLines } from "@/services/invoice.service";
+import { InvoiceLinesRefused, replaceLines } from "@/services/invoice.service";
 import { assertMonthsOpen } from "@/services/month-guard";
 import { reviewConfirmed } from "@/lib/confirm";
 import { TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay, parseRiyals } from "@/lib/money";
@@ -217,10 +217,14 @@ export async function rereadDocument(opts: {
     });
   } catch (e) {
     const msg = (e as Error).message;
+    /* ما ردّه منّا سببٌ مسمّى (بندٌ مربوطٌ باستلام · شهرٌ مقفل · أسبوعُ جردٍ مقفَل) يُقال بنصّه */
+    const cause = (e as { cause?: { message?: string } }).cause?.message ?? "";
     return {
       ok: false, status: 409,
-      error: /month|شهر/i.test(msg)
+      error: e instanceof InvoiceLinesRefused || /month|شهر/i.test(msg)
         ? msg
+        : /مقفَل/.test(cause)
+          ? cause
         : "لم تُكتَب القراءة: رفضتها قيودُ المال في القاعدة — غالباً لأنّ مبالغها لا تستقيم مع ما دُفع. صحّح الحقول بيدك.",
     };
   }

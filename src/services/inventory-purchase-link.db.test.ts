@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { caught, makeInvoice, makeSupplier, withRollback } from "@/test/db";
-import { replaceLines } from "./invoice.service";
+import { InvoiceLinesRefused, replaceLines } from "./invoice.service";
 import { isolateProducts, makeActor, makeBranch, makeInvoicePurchase, makeStockProduct } from "@/test/inventory";
 import { recomputeCount, startCount } from "./inventory.service";
 import { createReceipt } from "./inventory-receipt.service";
@@ -170,4 +170,37 @@ describe("ربطُ بنود الفواتير من الجرد", () => {
       const [only] = (await tx.execute<{ n: number }>(sql`select count(*)::int as n from invoice_lines where invoice_id = ${invoiceId}`)).rows;
       expect(only.n).toBe(1);
     }));
+
+  it("بندان بالوصف نفسه يُقرنان بالكمّيّة لا بالترتيب — والمربوطُ الغائب يُردّ لا يُحذف", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      const branch = await makeBranch(tx);
+      const milk = await makeStockProduct(tx, "حليب", "L", "DAIRY");
+      await isolateProducts(tx, [milk]);
+      const supplierId = await makeSupplier(tx);
+      const invoiceId = await makeInvoice(tx, supplierId, 138_00, "2026-09-14");
+      const at = new Date("2026-09-14T09:00:00+03:00");
+      const ten = { description: "حليب", quantity: "10", unitPrice: "10", lineTotal: "100" };
+      const two = { description: "حليب", quantity: "2", unitPrice: "10", lineTotal: "20" };
+      await replaceLines(tx, { invoiceId, supplierId, invoiceDate: at, subtotalMinor: 120_00, lines: [ten, two] });
+      const [tenLine] = (await tx.execute<{ id: string }>(sql`
+        select id from invoice_lines where invoice_id = ${invoiceId} and qty = 10
+      `)).rows;
+      await createReceipt({
+        productId: milk, branchId: branch.id, receivedOn: "2026-09-14", enteredMilli: 10_000, unit: "L",
+        resolution: { kind: "LINK", invoiceLineId: tenLine.id },
+      }, actorId, tx);
+
+      /* القراءةُ الجديدة بالترتيب المعكوس */
+      await replaceLines(tx, { invoiceId, supplierId, invoiceDate: at, subtotalMinor: 120_00, lines: [two, ten] });
+      const [still] = (await tx.execute<{ qty: string }>(sql`select qty::text from invoice_lines where id = ${tenLine.id}`)).rows;
+      expect(Number(still.qty)).toBe(10);
+
+      /* وقراءةٌ لا يرد فيها البندُ المربوط تُردّ ولا تمسّ شيئاً */
+      const e = await caught(replaceLines(tx, { invoiceId, supplierId, invoiceDate: at, subtotalMinor: 20_00, lines: [two] }));
+      expect(e).toBeInstanceOf(InvoiceLinesRefused);
+      const [n] = (await tx.execute<{ n: number }>(sql`select count(*)::int as n from invoice_lines where invoice_id = ${invoiceId}`)).rows;
+      expect(n.n).toBe(2);
+    }));
 });
+

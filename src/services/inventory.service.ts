@@ -412,7 +412,12 @@ export async function resolveOpenings(
            m.id, m.product_id, m.quantity_milli, m.unit, m.occurred_on
       from inventory_movements m
      where m.kind = 'OPENING'
-       and m.occurred_on <= ${periodStart}
+       /*
+         رصيدٌ مسجَّلٌ في يومٍ هو افتتاحيُّ الفترة التي تبدأ بعده — عشيّتُها أو
+         أوّلُها. والأقدمُ منه كالجرد الأقدم: يُسقط ما استُهلك بينهما، فالفجوةُ
+         «غير معروف» لا رقمُ يونيو في أسبوع سبتمبر.
+       */
+       and m.occurred_on between ${shiftDays(periodStart, -1)} and ${periodStart}
        and ${branchId ? sql`(m.branch_id = ${branchId} or m.branch_id is null)` : sql`true`}
      order by m.product_id, m.occurred_on desc, m.created_at desc
   `);

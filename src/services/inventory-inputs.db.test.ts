@@ -114,6 +114,19 @@ describe("الرصيدُ الافتتاحيّ اليدويّ", () => {
       expect(l.openingSource).toBe("UNKNOWN");
     }));
 
+  it("ورصيدٌ افتتاحيّ مسجَّلٌ حركةً قبل أشهر لا يسدّ فجوةً — «غير معروف» لا رقمُ يونيو", () =>
+    withRollback(async (tx) => {
+      const { actorId, branch, coffee } = await cafe(tx, 0);
+      await tx.execute(sql`
+        insert into inventory_movements (id, product_id, branch_id, kind, quantity_milli, unit, occurred_on, created_by_id)
+        values (${`mv-${Math.random()}`}, ${coffee}, ${branch.id}, 'OPENING', ${5000}, 'KG', '2026-06-01', ${actorId})
+      `);
+      const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
+      const l = await line(tx, countId, coffee);
+      expect(l.openingMilli).toBeNull();
+      expect(l.openingSource).toBe("UNKNOWN");
+    }));
+
   it("واليدويّ يغلب السابقَ صراحةً — ويبقى تاريخُه، والإفراغُ يُعيد السابقَ لا الصفر", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx, 0);
