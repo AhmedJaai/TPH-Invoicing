@@ -15,6 +15,7 @@ import type { RawLine, Tx } from "./types";
 import { assertMonthsOpen } from "./month-guard";
 import { monthOf } from "@/lib/filing";
 import { buildSupplierProducts } from "./product.service";
+import { matchLateInvoice } from "./statement-late-match.service";
 
 export interface CreateInvoiceInput {
   documentId: string;
@@ -69,6 +70,14 @@ export async function createInvoice(tx: Tx, input: CreateInvoiceInput): Promise<
     })
     .onConflictDoNothing()
     .returning({ id: invoices.id });
+
+  /* كشفٌ سبق الفاتورة وفيه سطرُها — يُطابَق الآن ولا ينتظر «أعِد المطابقة» */
+  if (inv) {
+    await matchLateInvoice(tx, {
+      id: inv.id, supplierId: input.supplierId, invoiceNumber: input.invoiceNumber,
+      invoiceDate: input.invoiceDate, totalMinor: input.totalMinor,
+    });
+  }
 
   return inv?.id ?? null;
 }
