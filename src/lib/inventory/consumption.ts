@@ -135,8 +135,14 @@ export function ingredientForSale(
   ingredientQuantityMilli: number,
   yieldMilli: number,
   prepLossBp: number | null,
+  /**
+   * يُضرب قبل التقريب — لا بعده. وصفةٌ بالكيلو و٠٫٤ جرام للبيعة كانت تُقرَّب
+   * في وحدتها (٠٫٤ مِلّي‑كيلو ← صفر) ثمّ تُحوَّل، فيضيع المكوّنُ من كلّ سطر.
+   * فيُمرَّر عاملُ الوحدة الأصغر (`toCanonical(1, unit)`) ويُقرَّب مرّةً واحدة.
+   */
+  scale = 1,
 ): number {
-  const base = (soldQuantityMilli * ingredientQuantityMilli) / yieldMilli;
+  const base = (soldQuantityMilli * ingredientQuantityMilli * scale) / yieldMilli;
   if (prepLossBp === null || prepLossBp <= 0) return Math.round(base);
   return Math.round((base * 10_000) / (10_000 - prepLossBp));
 }
@@ -226,13 +232,13 @@ export function computeConsumption(
       */
       if (ing.modifierExternalId && !present.has(ing.modifierExternalId)) continue;
 
-      const amount = ingredientForSale(
+      const canonical = ingredientForSale(
         line.quantityMilli,
         ing.quantityMilli,
         yieldMilli,
         ing.prepLossBp,
-      );
-      const canonical = toCanonical(amount, ing.unit) * sign;
+        toCanonical(1, ing.unit),
+      ) * sign;
 
       let acc = byIngredient.get(ing.productId);
       if (!acc) {

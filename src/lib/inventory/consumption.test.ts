@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeConsumption, ingredientForSale, type SoldLineInput } from "./consumption";
 import { indexRecipeVersions, effectiveVersion, type RecipeVersionInput } from "./recipe";
-import { canonicalToQuantity } from "./units";
+import { canonicalToQuantity, toCanonical } from "./units";
 
 /* ─────────────────── تجهيزٌ يُقرأ ─────────────────── */
 
@@ -260,5 +260,15 @@ describe("ما لا يُحسَب يُعلَن — ولا يُبتلَع", () => 
       clashing,
     );
     expect(r.byIngredient.get(COFFEE)!.unitConflict).toBe("ML");
+  });
+});
+
+describe("ingredientForSale — يُقرَّب بعد التحويل لا قبله", () => {
+  it("وصفةٌ بالكيلو لعشر حصص فيها جرامٌ واحد: عُشرُ جرامٍ لكلّ بيعة لا صفر", () => {
+    /* ١ مِلّي‑كيلو = جرام؛ والناتجُ ١٠ حصص — فالبيعةُ الواحدة ٠٫١ جرام */
+    const perSale = ingredientForSale(1000, 1, 10_000, null, toCanonical(1, "KG"));
+    /* جرامٌ = ١٠٠٠ مِلّي‑جرام، فعُشرُه ١٠٠ — وكان يُقرَّب قبل التحويل صفراً */
+    expect(perSale).toBe(toCanonical(1000, "G") / 10);
+    expect(perSale).toBeGreaterThan(0);
   });
 });

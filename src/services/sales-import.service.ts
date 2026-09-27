@@ -428,7 +428,8 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
         await tx
           .update(sales)
           .set({
-            branchId,
+            /* تصديرٌ بلا فرعٍ لا يمحو فرعاً عُرف — المجهولُ لا يغلب المعلوم */
+            branchId: sql`coalesce(${branchId}, ${sales.branchId})`,
             soldAt: sale.soldAt,
             businessDate: sale.businessDate,
             grossMinor: sale.grossMinor,
