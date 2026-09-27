@@ -21,6 +21,7 @@ export const ATTENTION_IDS = [
   "vat-at-risk",
   "overdue",
   "unclassified-bank",
+  "held-bank-rows",
   "price-rises",
   "lifecycle-anomalies",
   "bounced-payments",

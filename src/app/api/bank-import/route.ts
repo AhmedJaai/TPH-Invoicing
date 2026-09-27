@@ -1,4 +1,5 @@
 /** استيراد كشف البنك ومطابقة مدفوعاته بالفواتير. */
+import { holdRows } from "@/services/bank-held.service";
 import { deriveOpenMonths } from "@/services/expense.service";
 import { NextResponse } from "next/server";
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
@@ -939,6 +940,27 @@ async function handle(request: Request) {
   */
   const linkNotes: string[] = [];
   const handLinked = newRows > 0 ? await linkExactHandPayments(user.id, linkNotes) : 0;
+  /*
+    الملتبسُ والمتضاربُ يُحفظان لقرار إنسان — كانا يُعدّان هنا ثمّ يختفيان،
+    فحوالةٌ ثانيةٌ حقيقيّة تضيع ولا يُسأل عنها (`bank-held.service.ts`).
+  */
+  const held = await holdRows([
+    ...sync.ambiguous.map((a) => ({ kind: "AMBIGUOUS" as const, row: a.row, verdict: a.verdict })),
+    ...sync.conflict.map((c) => ({ kind: "CONFLICT" as const, row: c.row, verdict: c.verdict })),
+  ].map((h) => ({
+    kind: h.kind,
+    bankImportId: importId ?? null,
+    bankAccountId,
+    againstTransactionId: h.verdict.againstId,
+    reason: h.verdict.reason,
+    valueDate: h.row.raw.valueDate,
+    description: h.row.raw.description ?? null,
+    beneficiaryRaw: h.row.raw.beneficiaryRaw ?? null,
+    transactionType: h.row.raw.transactionType || null,
+    amountMinor: h.row.raw.amountMinor,
+    direction: h.row.raw.direction,
+    operationRef: operationRef(h.row.tx),
+  })));
   /* ومصروفُ ما صُنّف من الجديد يُقيَّد وحده — لا ينتظر زرّاً في صفحة المصروفات */
   const derived = newRows > 0
     ? await deriveOpenMonths(freshRows.map((f) => f.row.raw.valueDate.toISOString().slice(0, 7)), user.id)
@@ -988,7 +1010,9 @@ async function handle(request: Request) {
             sync.conflict.length > 0 ? ` · ${sync.conflict.length} تضارب هويّة — لم تُقيَّد` : ""
           }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} ردّها قيد القاعدة` : ""}${
             handLinked > 0 ? ` · ${handLinked} رُبطت بسدادٍ قيّدتَه بيدك` : ""
-          }${derived.created > 0 ? ` · ${derived.created} قُيّدت مصروفاً` : ""}.`,
+          }${derived.created > 0 ? ` · ${derived.created} قُيّدت مصروفاً` : ""}${
+            held > 0 ? ` · ${held} محفوظةٌ لقرارك في صفحة البنك` : ""
+          }.`,
     handLinked,
     linkNotes,
   });

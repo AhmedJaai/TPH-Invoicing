@@ -48,5 +48,6 @@
   "047_invoice_line_qty_unknown.sql": "5ed9e681241da8cbfede66dd1adde3d8936d22e9f8ba9451f783f92a0f5d9184",
   "048_payment_bounds.sql": "d3e14da0c7e23453d2de305cefe411a1dd26b3f621e37f15274dae03fbaa2dd6",
   "049_credit_note_method.sql": "9be49e8b3097f95402d86661055ed86fb8f4ba1e5a0b66ab824c45a3c4e7aff5",
-  "050_inventory_inputs_locked.sql": "bf9b2663f3bfe80084e4582d7be78d4d03c6a1f5a3987f655b68be1ff60b401f"
+  "050_inventory_inputs_locked.sql": "bf9b2663f3bfe80084e4582d7be78d4d03c6a1f5a3987f655b68be1ff60b401f",
+  "051_bank_held_rows.sql": "cc7bd8d041298574625fdc280bf4a10af82884fe9fc6f8813a0a27a39b38837a"
 }

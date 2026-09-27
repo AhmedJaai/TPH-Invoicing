@@ -59,6 +59,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
           (select count(*)::int from ${bankTransactions} where ${pendingDecision()})          as unclassified,
           (select coalesce(sum(amount_minor),0)::bigint from ${bankTransactions}
              where ${pendingDecision()})                                                      as unclassified_amount,
+          (select count(*)::int from bank_held_rows where resolved_at is null)                 as held_rows,
           (select count(*)::int from invoices i
              where not exists (select 1 from invoice_lines l where l.invoice_id=i.id))       as no_lines
       `),
@@ -501,6 +502,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     overdueMinor,
     overdueSuppliers,
     unclassifiedBankTx: Number(counts?.unclassified ?? 0),
+    heldBankRows: Number(counts?.held_rows ?? 0),
     unclassifiedBankAmountMinor: Number(counts?.unclassified_amount ?? 0),
     suppliersMissingStatement: missingStatements,
     suppliersMissingStatementCount: missingStatementRows.length,

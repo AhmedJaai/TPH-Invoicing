@@ -1,3 +1,5 @@
+import { BankHeldRows } from "@/components/bank-held-rows";
+import { loadOpenHeldRows } from "@/services/bank-held.service";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -72,12 +74,13 @@ export default async function BankPage({
   /* الرابطُ القديم `/bank?tx=` يفتح ملفَّ الحركة — تبقى الإشاراتُ المحفوظة تعمل */
   if (params.tx) redirect(txHref(params.tx));
 
-  const [coverage, queue, ledger, doublePaid, handLinks] = await Promise.all([
+  const [coverage, queue, ledger, doublePaid, handLinks, held] = await Promise.all([
     loadBankCoverage(),
     loadBankQueue(),
     loadLedger(view, month),
     countOpenDoublePaid(),
     can(user.role, "payment:approve") ? loadHandPaymentLinks() : Promise.resolve([]),
+    loadOpenHeldRows(),
   ]);
 
   const canApprove = can(user.role, "payment:approve");
@@ -149,7 +152,7 @@ export default async function BankPage({
             id="queue"
             title="ما ينتظر قرارك"
             icon={Inbox}
-            count={queue.groups.length > 0 ? queue.groups.length : undefined}
+            count={queue.groups.length + held.length > 0 ? queue.groups.length + held.length : undefined}
             hint={queue.groups.length > 0
               ? `${countNoun(queue.groups.length, GROUP)} تضمّ ${countNoun(queuedTx, TRANSACTION)} — سؤالٌ واحد عن كلّ ما يتشابه، وما تؤكّده يصير ذاكرة.`
               : undefined}
@@ -170,6 +173,7 @@ export default async function BankPage({
                 <AccountReview size="sm" variant="primary" />
               </div>
             )}
+            <BankHeldRows rows={held} canEdit={canEdit} />
             {queue.groups.length > 0 ? (
               <ReconcileQueue groups={queue.groups} suppliers={queue.suppliers} canApprove={canApprove} canEdit={canEdit} />
             ) : (

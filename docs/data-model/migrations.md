@@ -2,11 +2,11 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٥٤
+## الجداول — ٥٥
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` · `payments` `payment_allocations`
-`bank_imports` `bank_transactions` `bank_rules` · `statements` `statement_lines` · `month_closes`
+`bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes`
 `products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products`
 `audit_logs` `rate_limits` `expenses`
 `counterparties` `counterparty_evidence` · `branches` `bank_accounts` `reconciliation_periods`
@@ -92,6 +92,7 @@
 | `048_payment_bounds.sql` | التخصيصُ حدُّه **صافي** الدفعة (المبلغ − الرسم)؛ ومؤثِّران يرفضان خفضَ مبلغ الدفعة أو إجماليّ الفاتورة تحت ما خُصّص؛ وقفلُ الشهر على **حذف** الدفعة؛ و`bank_tx_matched_payment_uniq` (حركةُ بنكٍ واحدة لكلّ دفعة)؛ وفهرسا `sale_lines.pos_product_id` و`statement_lines.matched_invoice_id`. قيس على الإنتاج قبلها: صفرُ مخالفات |
 | `049_credit_note_method.sql` | `payment_method` += `CREDIT_NOTE` — الإشعارُ الدائن (مرتجع/خصم) تسويةٌ تُخصَّص على فاتورتها ولا تمرّ ببنك |
 | `050_inventory_inputs_locked.sql` | `waste_records` و`inventory_movements` لا تُكتب ولا تُعدَّل ولا تُحذف في أسبوعٍ جردُه مقفَل (كالاستلام في 041) |
+| `051_bank_held_rows.sql` | `bank_held_rows` — صفوفُ الكشف الملتبسة والمتضاربة تُحفظ بوقائعها والحركة التي تشبهها حتّى يقرّر إنسان («هي نفسها» · «أضِفها» · «تحقّقتُ»)؛ فريدةٌ على الوقائع فلا تُكرّرها إعادةُ الاستيراد |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

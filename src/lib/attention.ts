@@ -144,6 +144,8 @@ export interface AttentionFacts {
   /** حركات بنكية لم يُعرف مستفيدها ولم تُصنَّف */
   unclassifiedBankTx: number;
   unclassifiedBankAmountMinor: number;
+  /** صفوفُ كشفٍ ملتبسة أو متضاربة لم تُقيَّد — تنتظر «هي نفسها» أو «أضِفها» (051) */
+  heldBankRows: number;
 
   /** مورّدون لهم فواتير ولم يصل كشفهم */
   suppliersMissingStatement: string[];
@@ -490,6 +492,23 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: f.unclassifiedBankTx,
       amountMinor: f.unclassifiedBankAmountMinor,
       impact: { kind: "UNATTRIBUTED", amountMinor: f.unclassifiedBankAmountMinor },
+      evidence: [],
+    });
+  }
+
+  if (f.heldBankRows > 0) {
+    out.push({
+      id: "held-bank-rows",
+      area: "BANK",
+      severity: "HIGH",
+      title: `${countNoun(f.heldBankRows, TRANSACTION)} من الكشف لم تُقيَّد — الدليلُ لا يحسمها`,
+      detail: "صفٌّ يشبه حركةً مقيَّدة ولا يُعرف أهو هي أم ثانية، أو مرجعٌ مكرَّرٌ بمبلغٍ آخر. وبلا قرارٍ قد تضيع حوالةٌ حقيقيّة.",
+      action: "«هي نفسها» أو «حركةٌ أخرى — أضِفها»، والقرارُ يُذكَر فلا يعود بإعادة الاستيراد.",
+      actionLabel: "احسمها في صفحة البنك",
+      href: "/bank#queue",
+      count: f.heldBankRows,
+      /* الأثرُ معلومٌ (مالٌ قد لا يُنسب) وقدرُه لا — ولا يُفترض صفراً */
+      impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: [],
     });
   }

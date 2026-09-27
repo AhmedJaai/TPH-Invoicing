@@ -1619,6 +1619,32 @@ export const bankImportsRelations = relations(bankImports, ({ one, many }) => ({
   transactions: many(bankTransactions),
 }));
 
+/**
+ * صفوفُ كشفٍ لم تُقيَّد لأنّها ملتبسة أو متضاربة — تنتظر قرار إنسان (051).
+ * كانت تُعدّ في نتيجة الاستيراد ثمّ تختفي.
+ */
+export const bankHeldRows = pgTable("bank_held_rows", {
+  id: id(),
+  kind: text("kind").$type<"AMBIGUOUS" | "CONFLICT">().notNull(),
+  bankImportId: text("bank_import_id").references(() => bankImports.id, { onDelete: "set null" }),
+  bankAccountId: text("bank_account_id").references(() => bankAccounts.id, { onDelete: "set null" }),
+  againstTransactionId: text("against_transaction_id").references(() => bankTransactions.id, { onDelete: "set null" }),
+  reason: text("reason").notNull(),
+  valueDate: timestamp("value_date", { withTimezone: true }).notNull(),
+  description: text("description"),
+  beneficiaryRaw: text("beneficiary_raw"),
+  transactionType: text("transaction_type"),
+  amountMinor: integer("amount_minor").notNull(),
+  direction: txDirectionEnum("direction").notNull(),
+  operationRef: text("operation_ref"),
+  factKey: text("fact_key").notNull(),
+  resolution: text("resolution").$type<"SAME" | "ADDED" | "CHECKED">(),
+  resolvedTransactionId: text("resolved_transaction_id").references(() => bankTransactions.id, { onDelete: "set null" }),
+  resolvedById: text("resolved_by_id").references(() => users.id),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  createdAt: now(),
+});
+
 export const bankTransactionsRelations = relations(bankTransactions, ({ one }) => ({
   bankImport: one(bankImports, { fields: [bankTransactions.bankImportId], references: [bankImports.id] }),
   matchedPayment: one(payments, { fields: [bankTransactions.matchedPaymentId], references: [payments.id] }),

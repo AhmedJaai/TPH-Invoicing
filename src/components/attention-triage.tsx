@@ -59,6 +59,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "vat-at-risk": Percent,
   "overdue": Clock,
   "unclassified-bank": Landmark,
+  "held-bank-rows": CircleHelp,
   "price-rises": TrendingUp,
   "lifecycle-anomalies": Unlink,
   "bounced-payments": Undo2,

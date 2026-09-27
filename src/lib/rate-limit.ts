@@ -99,6 +99,8 @@ export const RULES: Record<string, RateLimitRule> = {
   "credit-note": { limit: 120, windowSeconds: 3600 },
   /* كلُّ نداءٍ قراءةُ نموذجٍ مدفوعة */
   "document-reread": { limit: 30, windowSeconds: 3600 },
+  /* قرارُ صفٍّ ملتبس في الكشف */
+  "bank-held": { limit: 200, windowSeconds: 3600 },
   "match-undo": { limit: 60, windowSeconds: 3600 },
   counterparty: { limit: 300, windowSeconds: 3600 },
   "match-confirm": { limit: 200, windowSeconds: 3600 },

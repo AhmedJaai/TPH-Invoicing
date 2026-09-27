@@ -13,7 +13,7 @@ const quiet: AttentionFacts = {
   notTaxValidCount: 0, vatAtRiskMinor: 0, vatAtRiskEvidence: [],
   unknownTaxCount: 0, unknownTaxEvidence: [],
   overdueMinor: 0, overdueSuppliers: [],
-  unclassifiedBankTx: 0, unclassifiedBankAmountMinor: 0,
+  unclassifiedBankTx: 0, unclassifiedBankAmountMinor: 0, heldBankRows: 0,
   suppliersMissingStatement: [], suppliersWithoutContract: [],
   invoicesWithoutLines: 0,
   unbackedPaymentCount: 0, unbackedPaymentMinor: 0, unbackedPaymentEvidence: [],
@@ -490,6 +490,15 @@ describe("فواتيرُ أُرشفت ولم تُقيَّد", () => {
         { label: "ب", href: "/documents/file/b" },
       ],
     });
+    expect(item.impact.amountMinor).toBeNull();
+  });
+});
+
+describe("صفوفُ الكشف المحفوظة لقرارك", () => {
+  it("بندٌ واحدٌ يفتح صفحة البنك، ولا قدرَ يُفترض صفراً", () => {
+    const item = buildAttention({ ...quiet, heldBankRows: 2 }).find((i) => i.id === "held-bank-rows")!;
+    expect(item.count).toBe(2);
+    expect(item.href).toBe("/bank#queue");
     expect(item.impact.amountMinor).toBeNull();
   });
 });
