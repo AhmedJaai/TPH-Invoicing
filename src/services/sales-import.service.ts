@@ -229,6 +229,51 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
   const sourceId = await ensureFoodicsSource(conn);
   const branchId = await resolveBranch(input.branchLabel ?? file.sales[0]?.branchLabel ?? null, conn);
 
+  /*
+    ── مفتاحُ مزيج المنتجات من الفرع المعروف لا من نصّه ──
+
+    كان `PMIX:{نصّ الفرع}:{اليوم}`: ملفٌّ فيه عمودُ الفرع وآخرُ بلا عمود، أو
+    الاسمُ بالعربيّة مرّةً وبالإنجليزيّة أخرى — مفتاحان لليوم نفسه، فيُحسَب
+    بيعُه مرّتين. والفرعُ يُحَلّ هنا إلى معرّفه.
+  */
+  for (const sale of file.sales) {
+    if (sale.externalId.startsWith("PMIX:")) sale.externalId = `PMIX:${branchId ?? "no-branch"}:${sale.businessDate}`;
+  }
+
+  /*
+    ── الطبقة الثانية: أهذه الأيّامُ مغطّاةٌ بصيغةٍ أخرى؟ ──
+
+    «أصنافُ الطلبات» مفتاحُها الطلب (`FDX:`)، و«مزيجُ المنتجات» مفتاحُها اليوم
+    (`PMIX:`) — فلا يرى أحدُهما الآخر، وتقريرا الأسبوع نفسه يُحسبان معاً:
+    يتضاعف الاستهلاكُ المتوقَّع ويظهر فرقٌ كبيرٌ كاذب. فيُرفض الملفُّ ويُقال أيُّ
+    الأيّام، ولا يُكتب شيء.
+  */
+  const kind = file.sales[0]?.externalId.startsWith("PMIX:") ? "PMIX" : "FDX";
+  const days = [...new Set(file.sales.map((x) => x.businessDate))];
+  if (days.length > 0) {
+    const clash = (await conn.execute<{ day: string }>(sql`
+      select distinct to_char(business_date::date, 'YYYY-MM-DD') as day
+        from sales
+       where source_id = ${sourceId}
+         and business_date::date = any(${`{${days.join(",")}}`}::date[])
+         and split_part(external_id, ':', 1) <> ${kind}
+         and (branch_id is null or ${branchId}::text is null or branch_id = ${branchId})
+       order by 1
+    `)).rows.map((r) => r.day);
+    if (clash.length > 0) {
+      const blocked = `أيّامُ هذا الملفّ مستورَدةٌ من قبل بتقريرٍ آخر من فودكس (${kind === "PMIX" ? "أصناف الطلبات" : "مزيج المنتجات"}): `
+        + `${clash.slice(0, 5).join("، ")}${clash.length > 5 ? ` و${clash.length - 5} غيرها` : ""}. `
+        + "ولو استُورد لحُسب بيعُها مرّتين. استورد تقريراً واحداً لكلّ أسبوع — وأصنافُ الطلبات أدقّ.";
+      return {
+        importId: "", status: "FAILED", adapter: adapterName, shape: file.shape,
+        periodStart: file.periodStart, periodEnd: file.periodEnd,
+        totals: { rows: file.rows.length, parsed: 0, skipped: 0, errors: 0, duplicates: 0, revised: 0, salesWritten: 0, salesRestated: 0, lineCount: 0, unitsMilli: 0 },
+        revisions: [], messages: [blocked], recognisedColumns: file.recognisedColumns, unrecognisedColumns: file.unrecognisedColumns,
+        unmappedProducts: 0, blocked,
+      };
+    }
+  }
+
   const messages: string[] = [...workbook.warnings, ...file.warnings];
   const written = await writeImport({
     file, sourceId, branchId, sha, input, messages, conn,
