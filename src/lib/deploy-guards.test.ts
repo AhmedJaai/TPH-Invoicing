@@ -65,6 +65,13 @@ describe("المستودع والقاعدة يتحرّكان معاً", () => {
     });
   });
 
+  it("وإعدادُ drizzle-kit يرفض push وgenerate ولو كُتبا بيد", () => {
+    /* push يُسقط ما لا يعرفه schema.ts من قيود الهجرات — فرادةُ الهويّة ومؤثِّراتُ المال */
+    const config = readFileSync("drizzle.config.ts", "utf8");
+    expect(config).toMatch(/a === "push" \|\| a === "generate"/);
+    expect(config).toContain("throw new Error");
+  });
+
   it("ولا أمرَ يدفع المخطّط بلا هجرة", () => {
     /* `drizzle-kit push` يطلب طرفيّةً تفاعلية ولا يترك أثراً يُراجَع */
     for (const cmd of Object.values(pkg.scripts)) {
