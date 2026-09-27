@@ -22,6 +22,8 @@ import {
 import { LINE, PRODUCT, countNoun } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
 import type { CountHeader } from "@/services/inventory.service";
+import type { PurchaseLinkRow, StockItemOption } from "@/services/inventory-purchase-link.service";
+import { PurchaseLinkPanel } from "./inventory-purchase-links";
 
 /**
  * ورشةُ الجرد — الشاشةُ التي يعمل فيها صاحبُ المقهى.
@@ -44,6 +46,8 @@ export function InventoryWorkspace({
   duplicates,
   suppliers,
   manualOpenings,
+  purchaseLinks,
+  stockOptions,
   today,
   initialStep,
 }: {
@@ -65,6 +69,8 @@ export function InventoryWorkspace({
   duplicates: DuplicateRow[];
   suppliers: { id: string; name: string }[];
   manualOpenings: ReadonlyMap<string, { enteredMilli: number; unit: StoredUnit }>;
+  purchaseLinks: PurchaseLinkRow[];
+  stockOptions: StockItemOption[];
   today: string;
   /** خطوةٌ مطلوبة في العنوان (`?step=count`) — فالرابطُ يفتح موضعَه. */
   initialStep?: StepId | null;
@@ -363,6 +369,9 @@ export function InventoryWorkspace({
             receipts={receipts}
             duplicates={duplicates}
             suppliers={suppliers}
+            purchaseLinks={locked ? null : (
+              <PurchaseLinkPanel rows={purchaseLinks} options={stockOptions} canEdit={canCount} />
+            )}
             canEdit={canCount}
             locked={locked}
             scopeInherited={scopeInherited}
@@ -465,7 +474,7 @@ function CoverageBanner({
       {coverage.gaps.length > 0 && (
         <ul className="divide-y divide-line-soft border-t border-line bg-sunken/40">
           {coverage.gaps.map((g, i) => {
-            const fix = gapAction(g);
+            const fix = gapAction(g, locked);
             return (
               <li key={i} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
                 <div className="min-w-0 flex-1 text-xs leading-relaxed">
@@ -509,7 +518,7 @@ function CoverageBanner({
 }
 
 /** فعلُ كلّ فجوة — العددُ الذي يُنذر يحمل ما يُصلحه. */
-function gapAction(g: CoverageGap): { href: string; label: string } | null {
+function gapAction(g: CoverageGap, locked: boolean): { href: string; label: string } | null {
   switch (g.reason) {
     case "UNMAPPED_POS_PRODUCT":
       return { href: "/inventory/mapping", label: "اربطها" };
@@ -523,7 +532,10 @@ function gapAction(g: CoverageGap): { href: string; label: string } | null {
     case "UNLINKED_PRODUCT":
     case "NO_PACK_SPEC":
     case "UNIT_FAMILY_MISMATCH":
-      return { href: "/purchases/products", label: "الأصنافُ والعبوات" };
+      /* المقفَلُ لا يُعاد حسابُه — فالربطُ له يخدم الجردَ القادم من صفحة الأصناف */
+      return locked
+        ? { href: "/purchases/products", label: "الأصنافُ والعبوات" }
+        : { href: "?step=flow", label: "اربطها في الخطوة الثانية" };
     case "MISSING_QUANTITY":
       return { href: "/purchases/invoices", label: "الفواتير" };
     case "RECEIPT_AMBIGUOUS":

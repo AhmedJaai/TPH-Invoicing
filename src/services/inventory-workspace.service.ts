@@ -14,6 +14,7 @@ import { milliToDecimal } from "@/lib/inventory/units";
 import type { DuplicateRow, ReceiptRow } from "@/components/inventory-flow-step";
 import { loadManualOpenings, loadReceiptDuplicates, type CountHeader } from "./inventory.service";
 import { listReceipts } from "./inventory-receipt.service";
+import { loadPurchaseLinks, loadStockItemOptions, type PurchaseLinkRow, type StockItemOption } from "./inventory-purchase-link.service";
 import type { Conn } from "./types";
 
 export async function loadWorkspaceInputs(header: CountHeader, conn: Conn = db): Promise<{
@@ -21,6 +22,9 @@ export async function loadWorkspaceInputs(header: CountHeader, conn: Conn = db):
   duplicates: DuplicateRow[];
   suppliers: { id: string; name: string }[];
   manualOpenings: Map<string, { enteredMilli: number; unit: StoredUnit }>;
+  /** بنودُ فواتير الأسبوع وربطُها بأصناف الجرد — للمفتوح وحده؛ المقفَلُ يُقرأ من أسطره. */
+  purchaseLinks: PurchaseLinkRow[];
+  stockOptions: StockItemOption[];
 }> {
   const receipts = await listReceipts(header.periodStart, header.periodEnd, header.branchId, conn);
 
@@ -29,6 +33,11 @@ export async function loadWorkspaceInputs(header: CountHeader, conn: Conn = db):
   const duplicates = await loadReceiptDuplicates(
     header.periodStart, header.periodEnd, header.branchId, new Map(units.map((u) => [u.id, u.baseUnit])), conn,
   );
+
+  const stockOptions = header.status === "FINALISED" ? [] : await loadStockItemOptions(conn);
+  const purchaseLinks = header.status === "FINALISED"
+    ? []
+    : await loadPurchaseLinks(header.periodStart, header.periodEnd, stockOptions, conn);
 
   const supplierRows = await conn.select({ id: suppliers.id, name: suppliers.nameAr })
     .from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.nameAr));
@@ -56,5 +65,7 @@ export async function loadWorkspaceInputs(header: CountHeader, conn: Conn = db):
     })),
     suppliers: supplierRows,
     manualOpenings: await loadManualOpenings(header.id, conn),
+    purchaseLinks,
+    stockOptions,
   };
 }

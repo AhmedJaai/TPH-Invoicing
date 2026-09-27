@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { Equal, TriangleAlert } from "lucide-react";
@@ -67,6 +67,7 @@ export function FlowStep({
   receipts,
   duplicates,
   suppliers,
+  purchaseLinks,
   canEdit,
 }: {
   countId: string;
@@ -79,6 +80,7 @@ export function FlowStep({
   receipts: ReceiptRow[];
   duplicates: DuplicateRow[];
   suppliers: { id: string; name: string }[];
+  purchaseLinks: ReactNode;
   canEdit: boolean;
 }) {
   const [editor, setEditor] = useState<Editor>(null);
@@ -129,6 +131,8 @@ export function FlowStep({
           )}
         </div>
       )}
+
+      {purchaseLinks}
 
       {grid && canEdit && (
         <OpeningGrid countId={countId} rows={rows} categories={categories} onDone={() => setGrid(false)} />

@@ -142,6 +142,7 @@
 | `src/lib/inventory/count-request.ts` | طلبُ الجرد يُفحَص بـzod وقتَ التشغيل — والكمّيّةُ نصٌّ يُقرأ مِلّياً لا عددٌ يمرّ بالعائمة |
 | `src/lib/inventory/receipt-request.ts` | طلبُ الاستلام كذلك — والكلفةُ ريالاتٌ نصّاً تصير هللات، ولا تُشتقّ منها كمّيّة |
 | `src/services/inventory-receipt.service.ts` | الكمّيّةُ المستلَمة: تُقيَّد · تُعدَّل · تُلغى ولا تُحذَف · يُحسَم تكرارُها — **وليست فاتورةً ولا ديناً** |
+| `src/services/inventory-purchase-link.service.ts` | بنودُ فواتير الأسبوع ← أصنافُ الجرد: حالُ كلّ صنفِ مورّد، والربطُ والعبوةُ معاً بعد فحص عائلة الوحدة (والاقتراحُ من `lib/inventory/purchase-link.ts`) |
 | `src/services/inventory-workspace.service.ts` | ما تحتاجه ورشةُ الجرد فوق التقرير — لصفحتيها معاً فلا تفترقان |
 | `src/lib/sales/columns.ts` | ترويسةُ ملفّ فودكس تُفهَم بالاسم لا بالموضع — وما لم يُفهَم يُعلَن |
 | `src/lib/sales/foodics-excel.ts` | محوِّلُ فودكس بصيغتيه، والهويّةُ من البيانات لا من الملفّ |

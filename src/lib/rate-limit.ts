@@ -93,6 +93,8 @@ export const RULES: Record<string, RateLimitRule> = {
   "payment-orphan": { limit: 60, windowSeconds: 3600 },
   /* «راجِع الحسابات» — معاينةٌ ثمّ تنفيذ، ولا نموذجَ فيه */
   "account-review": { limit: 60, windowSeconds: 3600 },
+  /* ربطُ بنود الفواتير بأصناف الجرد — صنفٌ صنفٌ في جلسة */
+  "inventory-purchase-link": { limit: 400, windowSeconds: 3600 },
   "match-undo": { limit: 60, windowSeconds: 3600 },
   counterparty: { limit: 300, windowSeconds: 3600 },
   "match-confirm": { limit: 200, windowSeconds: 3600 },

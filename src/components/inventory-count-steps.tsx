@@ -67,6 +67,7 @@ export function InventoryCountSteps({
   receipts,
   duplicates,
   suppliers,
+  purchaseLinks,
   canEdit,
   locked,
   scopeInherited,
@@ -86,6 +87,8 @@ export function InventoryCountSteps({
   receipts: ReceiptRow[];
   duplicates: DuplicateRow[];
   suppliers: { id: string; name: string }[];
+  /** ربطُ بنود فواتير الأسبوع بأصناف الجرد — يُرسَم في الخادم ويُمرَّر. */
+  purchaseLinks: ReactNode;
   canEdit: boolean;
   locked: boolean;
   /** أمورَّثٌ هذا النطاق من الجرد السابق؟ — يُقال، فلا يُظنّ أنّه اختيارُ اليوم. */
@@ -195,6 +198,7 @@ export function InventoryCountSteps({
             receipts={receipts}
             duplicates={duplicates}
             suppliers={suppliers}
+            purchaseLinks={purchaseLinks}
             canEdit={canEdit && !locked}
           />
         </div>
