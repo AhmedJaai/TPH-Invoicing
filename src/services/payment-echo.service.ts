@@ -64,3 +64,26 @@ export async function echoHeldPaymentIds(conn: Conn, supplierId: string): Promis
   const credit = findCreditEchoes(rows, [...exact.map((e) => e.manualId), ...exact.map((e) => e.bankId)]);
   return new Set([...exact.map((e) => e.bankId), ...credit.flatMap((e) => e.sources.map((x) => x.bankId))]);
 }
+
+/**
+ * أهذه الدفعةُ إقرارُ صاحب العمل لا حوالةُ الكشف؟ — سؤالُ التراجع عن الربط.
+ *
+ * التراجعُ يفكّ الحركة؛ فإن كانت الدفعةُ إقرارَه (قُيِّدت قبل الكشف، أو ورثت
+ * إقرارَه بدمج الصدى) بقيت على فواتيرها — وإلّا رُدّت. كان يُحكَم بتاريخ الإنشاء
+ * وحده، والحوالةُ التي ورثت الإقرارَ أحدثُ من الاستيراد فتُردّ: تعود الفاتورةُ
+ * مستحقّةً والإقرارُ ملغى.
+ */
+export async function isOwnersPayment(conn: Conn, paymentId: string, bankTransactionId: string): Promise<boolean> {
+  const [row] = (await conn.execute<{ adopted: boolean }>(sql`
+    select (p.created_at < bi.created_at or exists (
+             select 1 from audit_logs a
+              where a.action = 'PAYMENT_ECHO_MERGED'
+                and (a.after->>'الحوالة' = ${paymentId}
+                     or a.after->'الحوالات' @> jsonb_build_array(jsonb_build_object('bankId', ${paymentId}::text)))
+           )) as adopted
+      from payments p, bank_transactions bt
+      join bank_imports bi on bi.id = bt.bank_import_id
+     where p.id = ${paymentId} and bt.id = ${bankTransactionId}
+  `)).rows;
+  return Boolean(row?.adopted);
+}

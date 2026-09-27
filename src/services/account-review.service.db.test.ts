@@ -4,6 +4,7 @@ import { bankImports, bankTransactions, paymentAllocations, payments, users } fr
 import { allocate, createPayment, findManualTwin } from "./payment.service";
 import { EchoMergeRefused, HandLinkRefused, reserveForHandPayments, loadCreditEchoes, mergeIntoCredit, linkHandPayment, loadHandPaymentLinks, loadPaymentEchoes, mergePaymentEcho } from "./account-review.service";
 import { applySupplierCredit, drawBankCredit, undrawBankCredit } from "./supplier-credit.service";
+import { isOwnersPayment } from "./payment-echo.service";
 import { caught, day, makeInvoice, makeSupplier, withRollback } from "@/test/db";
 import type { Tx } from "./types";
 
@@ -296,5 +297,22 @@ describe("لا مالَ على فاتورةٍ لم يُقِرّها أحد", () 
 
       await tx.execute(sql`update documents set status = 'ARCHIVED' where id = (select document_id from invoices where id = ${inv})`);
       expect((await applySupplierCredit(tx, s, { forwardDays: 7 })).appliedMinor).toBe(700_00);
+    }));
+});
+
+describe("التراجعُ عن ربط حوالةٍ ورثت إقرارَ صاحب العمل", () => {
+  it("الحوالةُ التي انتقل إليها السدادُ اليدويّ بدمج الصدى إقرارُه — لا تُردّ بالتراجع", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const bankId = await bankPayment(tx, s, 900_00, "2026-09-02");
+      const [bt] = await tx.select({ id: bankTransactions.id }).from(bankTransactions).where(eq(bankTransactions.matchedPaymentId, bankId));
+      /* في المعاملة الواحدة يتساوى وقتُ الإنشاء — فلا يشهد التاريخُ، ويشهد الدمج */
+      expect(await isOwnersPayment(tx, bankId, bt.id)).toBe(false);
+
+      await tx.execute(sql`
+        insert into audit_logs (id, action, entity_type, entity_id, after)
+        values (${`t-merge-${bankId}`}, 'PAYMENT_ECHO_MERGED', 'payment', 'manual-x', ${JSON.stringify({ الحوالة: bankId })}::jsonb)
+      `);
+      expect(await isOwnersPayment(tx, bankId, bt.id)).toBe(true);
     }));
 });

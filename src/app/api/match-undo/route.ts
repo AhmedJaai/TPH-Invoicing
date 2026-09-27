@@ -14,6 +14,7 @@
  * `decision_history` — وهو يجيب عن سؤالٍ آخر غير «من فعل ماذا»:
  * **كيف تطوّر هذا القرار؟**
  */
+import { isOwnersPayment } from "@/services/payment-echo.service";
 import { NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -161,13 +162,13 @@ export async function POST(request: Request) {
       وحدها — وكان يردّ الدفعةَ كلَّها، فيمحو إقرارَ صاحب العمل وتعود فاتورتُه
       مستحقّةً كأنّها لم تُسدَّد. ويُعاد مبلغُها الذي كان إن غيّره الربط.
     */
-    const [origin] = (await t.execute<{ adopted: boolean }>(sql`
-      select p.created_at < bi.created_at as adopted
-        from payments p, bank_transactions bt
-        join bank_imports bi on bi.id = bt.bank_import_id
-       where p.id = ${paymentId} and bt.id = ${tx.id}
-    `)).rows;
-    const adoptedPayment = Boolean(origin?.adopted);
+    /*
+      وما ورث إقرارَ صاحب العمل بدمج الصدى (`mergePaymentEcho` · `mergeIntoCredit`)
+      هو إقرارُه كذلك: أُلغي السدادُ اليدويّ وانتقلت تخصيصاتُه إلى الحوالة. كان
+      يُحكَم بتاريخ الإنشاء وحده، فالحوالةُ أحدثُ من الاستيراد فتُردّ — وتعود
+      الفاتورةُ مستحقّةً والإقرارُ ملغى.
+    */
+    const adoptedPayment = await isOwnersPayment(t, paymentId, tx.id);
     if (adoptedPayment) {
       /* والربطُ الآليّ يُسجَّل `POSTED` بيد النظام (لا إقرارَ إنسان) — وفيه ما كان كذلك */
       const [linked] = (await t.execute<{ was: string | number | null; fee: string | number | null }>(sql`
