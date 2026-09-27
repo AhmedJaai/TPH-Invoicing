@@ -229,13 +229,39 @@ async function main() {
        values ('t-over', 't-p-over', '${inv.id}', ${Math.min(200, Math.max(101, room))})`,
       { code: "23514", message: /الدفعة/ }),
 
+    /* 048: الحدُّ صافي الدفعة بعد رسمها — لا مبلغُها كلُّه */
+    await mustFail("تخصيصٌ يتجاوز صافي الدفعة بعد الرسم",
+      `insert into payments (id, supplier_id, paid_at, amount_minor, fee_minor, method, status)
+         values ('t-p-fee', '${inv.supplier_id}', now(), 1000, 100, 'BANK_TRANSFER', 'UNAPPLIED');
+       insert into payment_allocations (id, payment_id, invoice_id, amount_minor)
+       values ('t-fee', 't-p-fee', '${inv.id}', 950)`,
+      { code: "23514", message: /صافي الدفعة/ }),
+    /* 048: والحدُّ يُسأل حين يتغيّر الأصل — لا التخصيصُ وحده */
+    await mustFail("خفضُ مبلغ دفعةٍ تحت ما خُصّص منها",
+      `update payments set amount_minor = 1, fee_minor = 0
+        where id = (select payment_id from payment_allocations order by amount_minor desc limit 1)`,
+      { code: "23514", message: /خُصّص منها/ }),
+    await mustFail("خفضُ إجماليّ فاتورةٍ تحت ما سُدّد منها",
+      `update invoices set total_minor = 1, subtotal_minor = null, vat_minor = null
+        where id = (select invoice_id from payment_allocations order by amount_minor desc limit 1)`,
+      { code: "23514", message: /سُدّد منها/ }),
+    await mustFail("حذفُ دفعةٍ في شهرٍ مقفل",
+      `insert into payments (id, supplier_id, paid_at, amount_minor, method, status, applies_to_month)
+         values ('t-p-del', '${inv.supplier_id}', now(), 100, 'BANK_TRANSFER', 'UNAPPLIED', '2099-04');
+       insert into month_closes (id, month, status) values ('t-mc-del', '2099-04', 'CLOSED');
+       delete from payments where id = 't-p-del'`,
+      { code: "P0001", message: /مقفل/ }),
+
     /* تعديلٌ على الفاتورة نفسها — لا إدراجٌ يردّه قيدُ فرادة المستند */
     await mustFail("فاتورة بإجمالي صفر",
-      `update invoices set total_minor = 0, subtotal_minor = null, vat_minor = null where id = '${inv.id}'`,
+      /* تخصيصاتُها تُفَكّ أوّلاً (والمعاملةُ تُلغى) — فيُسأل قيدُ الإجماليّ لا حدُّ السداد (048) */
+      `delete from payment_allocations where invoice_id = '${inv.id}';
+       update invoices set total_minor = 0, subtotal_minor = null, vat_minor = null where id = '${inv.id}'`,
       { code: "23514", constraint: "invoices_total_positive" }),
 
     await mustFail("فاتورة مجموعها يخالف إجماليها بأكثر من ريال",
-      `update invoices set subtotal_minor = 10000, vat_minor = 1500, total_minor = 20000 where id = '${inv.id}'`,
+      `delete from payment_allocations where invoice_id = '${inv.id}';
+       update invoices set subtotal_minor = 10000, vat_minor = 1500, total_minor = 20000 where id = '${inv.id}'`,
       { code: "23514", constraint: "invoices_parts_sum_to_total" }),
 
     await mustFail("مصروف بمبلغ سالب",
@@ -295,6 +321,13 @@ async function main() {
        select 't-ref-other', bank_import_id, value_date, description, amount_minor,
               direction, occurrence, 't-acct', operation_ref, 't-ref-other-identity'
        from bank_transactions where operation_ref is not null limit 1`)] : []),
+
+    ...(tx ? [await mustFail("حركتا بنكٍ لدفعةٍ واحدة",
+      `insert into payments (id, supplier_id, paid_at, amount_minor, method, status)
+         values ('t-p-two', '${inv.supplier_id}', now(), 100, 'BANK_TRANSFER', 'UNAPPLIED');
+       update bank_transactions set matched_payment_id = 't-p-two'
+        where id in (select id from bank_transactions where matched_payment_id is null limit 2)`,
+      { code: "23505", constraint: "bank_tx_matched_payment_uniq" })] : []),
 
     ...(tx ? [await mustFail("حركتان بهويّةٍ مخزَّنة واحدة",
       `insert into bank_transactions

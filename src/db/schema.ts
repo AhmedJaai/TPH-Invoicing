@@ -362,6 +362,7 @@ export const statementLines = pgTable("statement_lines", {
 }, (t) => [
   index("statement_lines_statement_idx").on(t.statementId),
   index("statement_lines_status_idx").on(t.matchStatus),
+  index("statement_lines_matched_invoice_idx").on(t.matchedInvoiceId),
 ]);
 
 /* ───────────────────────── المدفوعات ───────────────────────── */
@@ -617,6 +618,8 @@ export const bankTransactions = pgTable("bank_transactions", {
   index("bank_tx_type_idx").on(t.transactionType),
   index("bank_tx_account_idx").on(t.bankAccountId),
   index("bank_tx_lifecycle_idx").on(t.lifecycle),
+  /* 048 — حركةُ بنكٍ واحدة لكلّ دفعة */
+  uniqueIndex("bank_tx_matched_payment_uniq").on(t.matchedPaymentId).where(sql`matched_payment_id is not null`),
   /*
     الفرادة مقيَّدة بالحساب — والقيد الفعليّ تعبيريّ في
     `014_identity_scoping.sql` لأنّ الحساب المجهول يجب أن يظلّ نطاقاً
@@ -1125,6 +1128,7 @@ export const saleLines = pgTable("sale_lines", {
   contentHash: text("content_hash"),
 }, (t) => [
   index("sale_lines_sale_idx").on(t.saleId),
+  index("sale_lines_pos_product_idx").on(t.posProductId),
   uniqueIndex("sale_lines_external_uniq").on(t.saleId, t.externalId),
 ]);
 
