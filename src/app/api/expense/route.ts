@@ -5,6 +5,9 @@
  * المتوقَّع بالفعلي. والإيجار الذي يُدفع مرّة في السنة يظهر حصّته الشهرية،
  * فلا يبدو شهرٌ ضخماً وأحد عشر خفيفة.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
+import { txCategoryEnum } from "@/db/schema";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -21,22 +24,23 @@ const CATEGORIES: readonly TxCategory[] = [
 ];
 const CADENCES = ["MONTHLY", "QUARTERLY", "ANNUAL"] as const;
 
-interface Body {
-  action?: "create" | "delete" | "activate";
-  id?: string;
-  label?: string;
-  category?: TxCategory;
+const Body = z.object({
+  action: z.enum(["create", "delete", "activate"]).optional(),
+  id: z.string().trim().min(1).max(64).optional(),
+  label: z.string().max(200).optional(),
+  category: z.enum(txCategoryEnum.enumValues).optional(),
   /** المبلغ نصّاً بالريالات */
-  amount?: string;
-  cadence?: (typeof CADENCES)[number];
-  note?: string;
+  amount: z.string().max(30).optional(),
+  cadence: z.enum(CADENCES).optional(),
+  note: z.string().max(500).optional(),
   /**
    * أوّلُ استحقاقٍ (YYYY-MM-DD) — اختياريّ. منه يُعرف يومُ الشهريّ وشهرُ
    * الربعيّ والسنويّ، فيقع في «النقد القادم» في موضعه. وبدونه يُقال
    * «يومٌ غير محدَّد» ولا يُخترَع له يوم.
    */
-  startsOn?: string;
-}
+  startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "التاريخ بصيغة YYYY-MM-DD").optional(),
+});
+type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
   let user;
@@ -48,12 +52,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   if (body.action === "delete") {
     if (!body.id) return NextResponse.json({ error: "حدّد المصروف" }, { status: 400 });

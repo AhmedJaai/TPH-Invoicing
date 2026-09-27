@@ -5,6 +5,8 @@
  * صلاحية اعتماد السداد — كما يحتاجها العمل اليدويّ نفسه. ولا يأخذ الخادم
  * من المتصفّح إلّا معرّف الاقتراح: الفعلُ ومبلغه محفوظان عنده.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import { can } from "@/lib/permissions";
@@ -19,7 +21,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const DECISIONS = new Set(["preview", "accept", "dismiss"]);
 
 export async function POST(request: Request) {
   let user;
@@ -31,17 +32,16 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: { findingId?: unknown; decision?: unknown; note?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب" }, { status: 400 });
-  }
+  const read = await readJson(request, z.object({
+    findingId: z.string().trim().min(1).max(64),
+    decision: z.enum(["preview", "accept", "dismiss"]),
+    /* الشاشةُ ترسل `null` حين لا ملاحظة */
+    note: z.string().max(2000).nullish(),
+  }));
+  if (!read.ok) return read.response;
+  const body = read.body;
 
-  if (typeof body.findingId !== "string" || typeof body.decision !== "string" || !DECISIONS.has(body.decision)) {
-    return NextResponse.json({ error: "طلبٌ ناقص" }, { status: 400 });
-  }
-  const decision = body.decision as "preview" | "accept" | "dismiss";
+  const decision = body.decision;
 
   try {
     if (decision === "accept") {
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     const result = await decideFinding({
       findingId: body.findingId,
       decision,
-      note: typeof body.note === "string" ? body.note : null,
+      note: body.note ?? null,
       userId: user.id,
     });
     return NextResponse.json({ ok: true, ...result });

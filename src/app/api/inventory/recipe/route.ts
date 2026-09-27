@@ -5,6 +5,8 @@
  * جديد. فتقريرُ الأسبوع الماضي يبقى محسوباً بالوصفة التي كانت عاملةً
  * فيه — وهذا هو الشرطُ الذي بلا وفائه يصير كلُّ تقريرٍ تاريخيّ كاذباً.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import {
@@ -16,27 +18,30 @@ import { isStoredUnit } from "@/lib/unit-conversion";
 
 export const runtime = "nodejs";
 
-interface IngredientBody {
-  productId?: string;
-  /** الكمّيّة كما كتبها الإنسان: «18». */
-  quantity?: string | number;
-  unit?: string;
-  /** فاقدُ التجهيز نسبةً مئويّة: «2.5». */
-  prepLossPercent?: string | number | null;
-  note?: string | null;
-}
 
-interface Body {
-  action?: "save" | "activate" | "correct" | "delete";
-  versionId?: string;
-  menuProductId?: string;
-  effectiveFrom?: string;
-  yieldQuantity?: string | number | null;
-  yieldUnit?: string | null;
-  note?: string | null;
-  activate?: boolean;
-  ingredients?: IngredientBody[];
-}
+const IngredientBody = z.object({
+  productId: z.string().trim().min(1).max(64).optional(),
+  /** الكمّيّة كما كتبها الإنسان: «18». */
+  quantity: z.union([z.string().max(30), z.number()]).optional(),
+  unit: z.string().max(10).optional(),
+  /** فاقدُ التجهيز نسبةً مئويّة: «2.5». */
+  prepLossPercent: z.union([z.string().max(10), z.number()]).nullable().optional(),
+  note: z.string().max(500).nullable().optional(),
+});
+type IngredientBody = z.infer<typeof IngredientBody>;
+
+const Body = z.object({
+  action: z.enum(["save", "activate", "correct", "delete"]).optional(),
+  versionId: z.string().trim().min(1).max(64).optional(),
+  menuProductId: z.string().trim().min(1).max(64).optional(),
+  effectiveFrom: z.string().max(10).optional(),
+  yieldQuantity: z.union([z.string().max(30), z.number()]).nullable().optional(),
+  yieldUnit: z.string().max(10).nullable().optional(),
+  note: z.string().max(500).nullable().optional(),
+  activate: z.boolean().optional(),
+  ingredients: z.array(IngredientBody).max(200).optional(),
+});
+type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
   let user;
@@ -48,12 +53,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   try {
     if (body.action === "activate") {

@@ -4,6 +4,7 @@
  * كانت كل واجهة تكرّر ثماني أسطر من `try/catch` لترجمة الأخطاء إلى رموز
  * HTTP، وكان الحدّ غائباً أصلاً. فجُمع ذلك هنا: تكرارٌ أقلّ، ونسيانٌ أصعب.
  */
+import "@/lib/zod-ar";
 import { NextResponse } from "next/server";
 import { requireUser, UnauthenticatedError, type CurrentUser } from "@/lib/session";
 import { ForbiddenError, type Capability } from "@/lib/permissions";

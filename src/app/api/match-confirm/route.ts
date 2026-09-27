@@ -8,6 +8,8 @@
  * والقبول يمرّ بما يمرّ به الاستيراد: تُنشأ دفعة، وتُخصَّص بقدرها، ولا
  * تتجاوز قيمةَ الدفعة ولا قيمةَ الفاتورة — تحرسه قيود القاعدة نفسها.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -31,34 +33,28 @@ const NOT_PAYMENT_KINDS = {
   BANK_FEE: { category: "BANK_FEE", label: "رسم بنكيّ" },
 } as const;
 
-interface Body {
-  transactionId?: string;
+const Body = z.object({
+  transactionId: z.string().trim().min(1).max(64).optional(),
   /** أو مجموعةٌ تُسدَّد معاً — في معاملةٍ واحدة لا خمسَ عشرة. */
-  transactionIds?: string[];
+  transactionIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
   /** الفواتير التي تفسّر الحركة — تُقبَل كما هي. */
-  invoiceIds?: string[];
+  invoiceIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
   /**
-   * أو توزيعٌ يكتبه صاحب العمل بنفسه.
-   *
-   * لأنّ النظام لا يعرف دائماً كيف قُسّمت الحوالة: دفعةٌ بسبعة آلاف
-   * وخمسمئة قد تكون أربعة آلاف على فاتورة وثلاثة آلاف وخمسمئة على
-   * أخرى، ولا شيء في الكشف يقول ذلك. فيقوله هو.
+   * أو توزيعٌ يكتبه صاحب العمل بنفسه — والمبلغُ لا يُؤخَذ منه: الخادمُ يوزّع
+   * مبلغَ الحركة نفسه على الفواتير التي سمّاها.
    */
-  split?: { invoiceId: string; amountMinor: number }[];
+  split: z.array(z.object({ invoiceId: z.string().trim().min(1).max(64), amountMinor: z.number().int() })).max(100).optional(),
   /** أو: ليست سداد فاتورة، وهذا سببها. */
-  notAPayment?: keyof typeof NOT_PAYMENT_KINDS;
+  notAPayment: z.enum(["ADVANCE", "INTERNAL", "PERSONAL", "BANK_FEE"]).optional(),
   /** لمن دُفعت المقدَّمة، إن لم يُعرَف المورّد من الحركة. */
-  supplierId?: string;
+  supplierId: z.string().trim().min(1).max(64).optional(),
   /**
-   * أو: سدادٌ **لحساب المورّد** لا لفاتورةٍ بعينها.
-   *
-   * وهذه ليست حالةً استثنائية: بعض مورّدي أحمد لا يعطون فاتورةً أصلاً
-   * — يعطون كشف حساب أو ورقةً باليد. فالحوالة سدادٌ لحسابه، والفواتير
-   * تفصيلٌ داخله؛ تُوزَّع عليها بالأقدم أوّلاً، وما بقي يبقى غير
-   * مخصَّص — وهي حالٌ صحيحة لا نقص.
+   * أو: سدادٌ **لحساب المورّد** لا لفاتورةٍ بعينها — تُوزَّع على فواتيره بالأقدم
+   * أوّلاً، وما بقي يبقى غير مخصَّص — وهي حالٌ صحيحة لا نقص.
    */
-  settleSupplier?: boolean;
-}
+  settleSupplier: z.boolean().optional(),
+});
+type Body = z.infer<typeof Body>;
 
 /**
  * أخطاءُ المال المعروفة تُترجَم هنا مرّةً لكلّ المسارات: شهرٌ مقفل،
@@ -84,12 +80,9 @@ async function handle(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   if (!body.transactionId) {
     return NextResponse.json({ error: "حدّد الحركة" }, { status: 400 });

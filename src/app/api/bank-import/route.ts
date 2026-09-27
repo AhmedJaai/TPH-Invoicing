@@ -1,4 +1,5 @@
 /** استيراد كشف البنك ومطابقة مدفوعاته بالفواتير. */
+import { deriveOpenMonths } from "@/services/expense.service";
 import { NextResponse } from "next/server";
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -938,6 +939,11 @@ async function handle(request: Request) {
   */
   const linkNotes: string[] = [];
   const handLinked = newRows > 0 ? await linkExactHandPayments(user.id, linkNotes) : 0;
+  /* ومصروفُ ما صُنّف من الجديد يُقيَّد وحده — لا ينتظر زرّاً في صفحة المصروفات */
+  const derived = newRows > 0
+    ? await deriveOpenMonths(freshRows.map((f) => f.row.raw.valueDate.toISOString().slice(0, 7)), user.id)
+    : { created: 0, notes: [] };
+  linkNotes.push(...derived.notes);
 
   /* الصفّ المحفوظ يقول ما دخل فعلاً — لا ما أجازه الفحص ثمّ ردّه القيد */
   if (rejectedByConstraint > 0 && importId) {
@@ -982,7 +988,7 @@ async function handle(request: Request) {
             sync.conflict.length > 0 ? ` · ${sync.conflict.length} تضارب هويّة — لم تُقيَّد` : ""
           }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} ردّها قيد القاعدة` : ""}${
             handLinked > 0 ? ` · ${handLinked} رُبطت بسدادٍ قيّدتَه بيدك` : ""
-          }.`,
+          }${derived.created > 0 ? ` · ${derived.created} قُيّدت مصروفاً` : ""}.`,
     handLinked,
     linkNotes,
   });

@@ -16,6 +16,10 @@
  * هويّة كلٍّ منها ويرفض ما لا يجتمع. فمن أرسل معرّفاتٍ لا يجمعها شيء
  * لا يُصنِّف بها سبعين حركة بضغطة.
  */
+import { deriveOpenMonths } from "@/services/expense.service";
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
+import { txCategoryEnum } from "@/db/schema";
 import { NextResponse } from "next/server";
 import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -46,16 +50,17 @@ const KINDS: readonly TxCategory[] = [
   "PERSONAL", "INTERNAL", "OTHER", "BANK_FEE",
 ];
 
-interface Body {
+const Body = z.object({
   /** حركةٌ واحدة — الصيغة القديمة، تبقى مقبولة. */
-  transactionId?: string;
+  transactionId: z.string().trim().min(1).max(64).optional(),
   /** المجموعة: معرّفات وحدها، ولا شيء غيرها يُؤخَذ من المتصفّح. */
-  transactionIds?: string[];
-  counterpartyId?: string;
-  displayName?: string;
-  kind?: TxCategory;
-  supplierId?: string | null;
-}
+  transactionIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
+  counterpartyId: z.string().trim().min(1).max(64).optional(),
+  displayName: z.string().max(200).optional(),
+  kind: z.enum(txCategoryEnum.enumValues).optional(),
+  supplierId: z.string().trim().min(1).max(64).nullable().optional(),
+});
+type Body = z.infer<typeof Body>;
 
 type Row = typeof bankTransactions.$inferSelect;
 
@@ -80,12 +85,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   const ids = [...new Set([
     ...(Array.isArray(body.transactionIds) ? body.transactionIds : []),
@@ -311,8 +313,12 @@ export async function POST(request: Request) {
     .from(counterparties)
     .where(eq(counterparties.id, result.counterpartyId));
 
+  /* المصروفُ يتبع التصنيفَ الجديد في شهره — يُقيَّد أو يُصحَّح بابُه وحده */
+  const derived = await deriveOpenMonths(rows.map((r) => r.valueDate.toISOString().slice(0, 7)), user.id);
+
   const parts = [`حُفظت «${party?.name}»`];
   parts.push(`وطُبّقت على ${countNoun(rows.length, TRANSACTION)}`);
+  if (derived.created > 0) parts.push(`وقُيّد ${countNoun(derived.created, TRANSACTION)} مصروفاً`);
   if (result.conflicts.length > 0) {
     parts.push(`ودليلٌ أو أكثر (${result.conflicts.length}) يدلّ على جهةٍ أخرى — راجعها`);
   }

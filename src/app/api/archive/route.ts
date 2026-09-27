@@ -7,6 +7,8 @@
  *
  * ولا يُستدعى إلا بعد تأكيد بشري صريح في شاشة المعاينة.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { normalizeDocumentDate } from "@/lib/document-date";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
@@ -33,7 +35,6 @@ import { can, ForbiddenError } from "@/lib/permissions";
 import { eq } from "drizzle-orm";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
-import type { RawLine } from "@/services/types";
 
 export const runtime = "nodejs";
 
@@ -78,29 +79,38 @@ const ARCHIVABLE_TYPES: readonly string[] = [
 ];
 export const maxDuration = 60;
 
-interface ArchiveBody {
-  fileName: string;
-  folderName: string;
-  periodMonth: string;
-  mimeType: string;
-  fileBase64: string;
-  documentKind: string;
-  supplierId?: string;
-  invoiceNumber?: string;
-  invoiceDate?: string;
-  subtotal?: string;
-  vat?: string;
-  total?: string;
-  sellerVat?: string;
-  buyerVat?: string;
-  beneficiary?: string;
-  /** ما استخرجه النموذج قبل أي تعديل، للمقارنة والتدقيق */
-  rawExtraction?: Record<string, unknown>;
-  extractionModel?: string;
+const Text = (n: number) => z.string().max(n);
+/** ما يُرسله المتصفّح فارغاً (`null`) أو غائباً سواء — «غير معروف» */
+const Opt = (n: number) => z.string().max(n).nullish().transform((v) => v ?? undefined);
+/** بندٌ كما قرأه النموذج: قد يكون الرقمُ رقماً أو نصّاً أو فراغاً — يُحمل نصّاً */
+const Cell = z.union([z.string().max(500), z.number()]).nullish().transform((v) => (v == null ? undefined : String(v)));
+const ArchiveBody = z.object({
+  fileName: Text(300),
+  folderName: Text(300),
+  periodMonth: Text(7),
+  mimeType: Text(120),
+  /** الملفُّ نفسُه — سقفُه فوق حدّ طلب المنصّة، فلا يُردّ رفعٌ صحيح */
+  fileBase64: z.string().max(12_000_000),
+  documentKind: Text(40),
+  supplierId: Opt(64),
+  invoiceNumber: Opt(120),
+  invoiceDate: Opt(40),
+  subtotal: Opt(40),
+  vat: Opt(40),
+  total: Opt(40),
+  sellerVat: Opt(40),
+  buyerVat: Opt(40),
+  beneficiary: Opt(300),
+  /** ما استخرجه النموذج قبل أي تعديل، للمقارنة والتدقيق — يُحفظ ولا يُعمل به */
+  rawExtraction: z.record(z.string(), z.unknown()).nullish().transform((v) => v ?? undefined),
+  extractionModel: Opt(120),
   /** تُقرأ للاطّلاع ولا يُعمل بها — الخادم يعيد حساب المانع بنفسه */
-  findings?: { code: string; severity: string; message: string }[];
-  lines?: Partial<RawLine>[];
-}
+  findings: z.array(z.object({ code: Text(80), severity: Text(20), message: Text(500) })).max(100).nullish()
+    .transform((v) => v ?? undefined),
+  lines: z.array(z.object({ description: Cell, quantity: Cell, unitPrice: Cell, lineTotal: Cell })).max(500).nullish()
+    .transform((v) => v ?? undefined),
+});
+type ArchiveBody = z.infer<typeof ArchiveBody>;
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const PAYMENT_KINDS = new Set(["RECEIPT", "CASH_RECEIPT"]);
@@ -152,12 +162,9 @@ export async function POST(request: Request) {
       throw new InvalidInputError(`الملف أكبر من ${MAX_ARCHIVE_BYTES / (1024 * 1024)} ميجابايت — صغّره ثمّ أعد المحاولة`);
     }
 
-    let body: ArchiveBody;
-    try {
-      body = (await request.json()) as ArchiveBody;
-    } catch {
-      throw new InvalidInputError("تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب.");
-    }
+    const read = await readJson(request, ArchiveBody);
+    if (!read.ok) return read.response;
+    const body: ArchiveBody = read.body;
 
     if (!body.fileName || !body.folderName || !MONTH_RE.test(body.periodMonth ?? "")) {
       throw new InvalidInputError("الاسم أو المجلد أو الشهر ناقص");

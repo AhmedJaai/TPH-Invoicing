@@ -4,6 +4,8 @@
  * كان المورّد غير المعروف طريقاً مسدوداً: الخادم يرفض الأرشفة بلا مورّد،
  * والشاشة لا تتيح إنشاءه. فيقف المستخدم أمام فاتورة صحيحة لا يستطيع حفظها.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import { createSupplier } from "@/services/supplier.service";
@@ -11,13 +13,14 @@ import { recordAudit } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
-interface Body {
-  nameAr: string;
-  nameEn?: string;
+const Body = z.object({
+  nameAr: z.string().max(200).optional().default(""),
+  nameEn: z.string().max(200).optional(),
   /** اسم مجلد الدرايف — يُشتقّ من الاسم إن غاب */
-  driveFolderName?: string;
-  vatNumber?: string;
-}
+  driveFolderName: z.string().max(200).optional(),
+  vatNumber: z.string().max(30).optional(),
+});
+type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
   let user;
@@ -29,12 +32,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   const nameAr = body.nameAr?.trim();
   if (!nameAr || nameAr.length < 2) {

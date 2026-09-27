@@ -4,6 +4,9 @@
  * الاشتقاق قابل لإعادة التشغيل: الحركة المقيَّدة لا تُقيَّد ثانيةً،
  * يحرسه فهرس فريد في القاعدة لا الشيفرة وحدها.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
+import { txCategoryEnum } from "@/db/schema";
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { expenses } from "@/db/schema";
@@ -16,22 +19,22 @@ import {
   recordManualExpense,
 } from "@/services/expense.service";
 import { isExpenseCategory } from "@/lib/expenses";
-import type { TxCategory } from "@/lib/bank/rules";
 
 export const runtime = "nodejs";
 
-interface Body {
-  action?: "derive" | "record" | "delete";
-  month?: string;
-  id?: string;
-  occurredOn?: string;
-  category?: TxCategory;
-  label?: string;
-  amount?: string;
-  note?: string;
+const Body = z.object({
+  action: z.enum(["derive", "record", "delete"]).optional(),
+  month: z.string().regex(/^\d{4}-\d{2}$/, "الشهر بصيغة YYYY-MM").optional(),
+  id: z.string().trim().min(1).max(64).optional(),
+  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "التاريخ بصيغة YYYY-MM-DD").optional(),
+  category: z.enum(txCategoryEnum.enumValues).optional(),
+  label: z.string().max(200).optional(),
+  amount: z.string().max(30).optional(),
+  note: z.string().max(500).optional(),
   /** أقرّ صاحبه بأنّه مصروفٌ ثانٍ بالقيمة نفسها */
-  confirmDuplicate?: boolean;
-}
+  confirmDuplicate: z.boolean().optional(),
+});
+type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
   let user;
@@ -43,12 +46,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   if (body.action === "derive") {
     const month = body.month?.match(/^\d{4}-\d{2}$/) ? body.month : undefined;

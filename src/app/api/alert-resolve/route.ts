@@ -11,6 +11,8 @@
  *
  * و`OPEN` يُعيد فتح ما حُسم خطأً — والقرار كلّه في سجلّ التدقيق.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { inArray, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -27,11 +29,17 @@ import {
 
 export const runtime = "nodejs";
 
-interface Body {
-  transactionIds?: unknown;
-  decision?: unknown;
-  note?: unknown;
-}
+const Body = z.object({
+  /** معرّفاتُ الحركتين (أو أكثر) اللتين خرج فيهما المال — بلا تكرار */
+  transactionIds: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)).min(2, "حدّد الحركتين اللتين خرج فيهما المال مرّتين").max(20)
+    .refine((ids) => new Set(ids).size === ids.length, "حركةٌ مكرَّرة في الطلب"),
+  /** «OPEN» يعيد البندَ مفتوحاً */
+  decision: z.custom<DoublePaidDecision | "OPEN">(
+    (v) => v === "OPEN" || (typeof v === "string" && (DOUBLE_PAID_DECISIONS as readonly string[]).includes(v)),
+    "القرار غير معروف",
+  ),
+  note: z.string().max(2000).optional(),
+});
 
 export async function POST(request: Request) {
   let user;
@@ -43,26 +51,12 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
-  }
-
-  const ids = Array.isArray(body.transactionIds)
-    ? [...new Set(body.transactionIds.filter((x): x is string => typeof x === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(x)))]
-    : [];
-  if (ids.length < 2 || ids.length !== (body.transactionIds as unknown[]).length) {
-    return NextResponse.json({ error: "حدّد الحركتين اللتين خرج فيهما المال مرّتين" }, { status: 400 });
-  }
-
-  const reopen = body.decision === "OPEN";
-  if (!reopen && !DOUBLE_PAID_DECISIONS.includes(body.decision as DoublePaidDecision)) {
-    return NextResponse.json({ error: "القرار غير معروف" }, { status: 400 });
-  }
-  const decision = body.decision as DoublePaidDecision | "OPEN";
-  const note = typeof body.note === "string" ? body.note.trim().slice(0, 500) || null : null;
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const ids = read.body.transactionIds;
+  const decision: DoublePaidDecision | "OPEN" = read.body.decision;
+  const reopen = decision === "OPEN";
+  const note = read.body.note?.trim().slice(0, 500) || null;
 
   const rows = await db
     .select({

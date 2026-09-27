@@ -5,6 +5,9 @@
  * المالك. ولا يصحّح هذا إلا صاحب العمل. فيقرّره مرّة، ويسري على ما يشبهه
  * في كل كشف بعده.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
+import { txCategoryEnum } from "@/db/schema";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -22,17 +25,18 @@ const CATEGORIES: readonly TxCategory[] = [
   "GOVERNMENT", "PERSONAL", "INTERNAL", "OTHER",
 ];
 
-interface Body {
+const Body = z.object({
   /** «delete» يحذف قاعدةً بمعرّفها — والافتراضيّ الإنشاء */
-  action?: "delete";
-  id?: string;
+  action: z.literal("delete").optional(),
+  id: z.string().trim().min(1).max(64).optional(),
   /** النصّ المميِّز الذي تُعرف به هذه الحركة وأمثالها */
-  pattern: string;
-  category: TxCategory;
+  pattern: z.string().max(200).optional().default(""),
+  category: z.enum(txCategoryEnum.enumValues).optional(),
   /** يلزم حين يكون التصنيف SUPPLIER */
-  supplierId?: string;
-  note?: string;
-}
+  supplierId: z.string().trim().min(1).max(64).optional(),
+  note: z.string().max(500).optional(),
+});
+type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {  let user;
   try {
@@ -43,12 +47,9 @@ export async function POST(request: Request) {  let user;
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   /*
     ── حذف قاعدة ──
@@ -75,7 +76,8 @@ export async function POST(request: Request) {  let user;
 
   const pattern = body.pattern?.trim();
   if (!pattern) return NextResponse.json({ error: "اكتب النصّ المميِّز للحركة" }, { status: 400 });
-  if (!CATEGORIES.includes(body.category)) {
+  const category = body.category;
+  if (!category || !CATEGORIES.includes(category)) {
     return NextResponse.json({ error: "تصنيف غير معروف" }, { status: 400 });
   }
 
@@ -92,7 +94,7 @@ export async function POST(request: Request) {  let user;
   }
 
   let supplierName: string | null = null;
-  if (body.category === "SUPPLIER") {
+  if (category === "SUPPLIER") {
     if (!body.supplierId) {
       return NextResponse.json({ error: "اختر المورّد" }, { status: 400 });
     }
@@ -117,8 +119,8 @@ export async function POST(request: Request) {  let user;
     .values({
       pattern,
       normalized,
-      category: body.category,
-      supplierId: body.category === "SUPPLIER" ? body.supplierId! : null,
+      category: category,
+      supplierId: category === "SUPPLIER" ? body.supplierId! : null,
       note: body.note ?? null,
       source: "MANUAL",
       createdById: user.id,
@@ -126,8 +128,8 @@ export async function POST(request: Request) {  let user;
     .onConflictDoUpdate({
       target: bankRules.normalized,
       set: {
-        category: body.category,
-        supplierId: body.category === "SUPPLIER" ? body.supplierId! : null,
+        category: category,
+        supplierId: category === "SUPPLIER" ? body.supplierId! : null,
         pattern,
       },
     })
@@ -138,7 +140,7 @@ export async function POST(request: Request) {  let user;
     وعبر `learnAlias` لا بإدراجٍ هنا: كان هذا الموضع يكتب الاسم بلا حدّها
     الأدنى، فنمطٌ من حرفين يصير اسماً بديلاً يطابق كلّ مستفيد.
   */
-  if (body.category === "SUPPLIER" && body.supplierId) {
+  if (category === "SUPPLIER" && body.supplierId) {
     await learnAlias(db, body.supplierId, pattern);
   }
 
@@ -149,7 +151,7 @@ export async function POST(request: Request) {  let user;
     entityId: inserted[0].id,
     after: {
       النمط: pattern,
-      التصنيف: CATEGORY_LABEL[body.category],
+      التصنيف: CATEGORY_LABEL[category],
       ...(previous ? { "كان": CATEGORY_LABEL[previous.category as keyof typeof CATEGORY_LABEL] ?? previous.category } : {}),
       المورّد: supplierName,
     },
@@ -159,10 +161,10 @@ export async function POST(request: Request) {  let user;
     ok: true,
     id: inserted[0].id,
     message:
-      (body.category === "SUPPLIER"
+      (category === "SUPPLIER"
         ? `«${pattern}» صار اسماً بنكياً لـ${supplierName}`
-        : `«${pattern}» صُنّف ${CATEGORY_LABEL[body.category]}`)
-      + (previous && previous.category !== body.category
+        : `«${pattern}» صُنّف ${CATEGORY_LABEL[category]}`)
+      + (previous && previous.category !== category
         ? ` — واستُبدلت قاعدةٌ كانت تصنّفه ${CATEGORY_LABEL[previous.category as keyof typeof CATEGORY_LABEL] ?? previous.category}`
         : ""),
   });

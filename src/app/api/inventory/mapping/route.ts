@@ -5,21 +5,24 @@
  * القائمة، والربطُ عليه يسقط في تلك اللحظة فيُسأل صاحبُ المقهى عن
  * الشيء نفسه كلَّ أسبوع.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
+import { productCategoryEnum } from "@/db/schema";
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import { mapPosProducts, unmapPosProducts } from "@/services/pos-mapping.service";
-import type { ProductCategory } from "@/lib/products";
 import { PRODUCT, countNoun } from "@/lib/arabic";
 
 export const runtime = "nodejs";
 
-interface Body {
-  action?: "map" | "unmap";
-  posProductIds?: string[];
-  productId?: string;
-  newProductName?: string;
-  category?: ProductCategory;
-}
+const Body = z.object({
+  action: z.enum(["map", "unmap"]).optional(),
+  posProductIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
+  productId: z.string().trim().min(1).max(64).optional(),
+  newProductName: z.string().max(200).optional(),
+  category: z.enum(productCategoryEnum.enumValues).optional(),
+});
+type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
   let user;
@@ -31,12 +34,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   const ids = body.posProductIds ?? [];
   if (ids.length === 0) return NextResponse.json({ error: "لم تُحدَّد أصناف" }, { status: 400 });

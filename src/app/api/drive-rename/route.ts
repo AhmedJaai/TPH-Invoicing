@@ -16,6 +16,8 @@
  *      يُعيد تسمية إلّا ما أرسل المتصفّح معرّفَه، ثمّ **يُعيد اشتقاق
  *      الاسم بنفسه** ولا يأخذه من المتصفّح.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { can } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 import { documentHref } from "@/lib/document-labels";
@@ -34,11 +36,12 @@ export const maxDuration = 60;
 /** حدُّ ما يُعاد تسميته في الطلب الواحد — والباقي في الذي يليه. */
 const MAX_PER_CALL = 25;
 
-interface Body {
-  apply?: boolean;
+const Body = z.object({
+  apply: z.boolean().optional(),
   /** معرّفات ملفّات الدرايف المختارة — ولا شيء غيرها يُؤخَذ. */
-  fileIds?: string[];
-}
+  fileIds: z.array(z.string().max(200)).max(500).optional(),
+});
+type Body = z.infer<typeof Body>;
 
 /** يجمع ما يُبنى به الاسم من الجداول التي تحمله. */
 export async function POST(request: Request) {
@@ -52,7 +55,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  const body = ((await request.json().catch(() => ({}))) ?? {}) as Body;
+  const read = await readJson(request, Body, { emptyOk: true });
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
   const docs = await loadNamedDocuments();
 
   const proposals = docs

@@ -9,6 +9,8 @@
  * والملف الذي لا يُفهم اسمه — وهو حال ما يُرفع يدوياً — يُقرأ محتواه.
  * وذلك أبطأ، فيُعالَج عدد محدود في كل طلب والباقي في الطلب التالي.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { autoRecordRefusal, findInvoiceTwin, twinReason } from "@/lib/invoice-twin";
 import { loadRecordedInvoices } from "@/services/document-backlog.service";
 import { refreshTokenFor } from "@/services/drive.service";
@@ -79,28 +81,25 @@ const MAX_CONTENT_PER_CALL = 2;
 const WALK_BUDGET_MS = 20_000;
 const CONTENT_BUDGET_MS = 28_000;
 
-interface Body {
+const Body = z.object({
   /** مزامنةٌ خلفيّة من القشرة — التفويضُ الغائب يُردّ ردّاً سليماً بـ`needsAuth`. */
-  background?: boolean;
+  background: z.boolean().optional(),
   /** عدد الأشهر الأخيرة التي تُفحص. الافتراضي ثلاثة. */
-  months?: number;
+  months: z.number().int().min(1).max(36).optional(),
   /** أشهرٌ بعينها — بها يستأنف الطلبُ التالي ما أوقفته المهلة. */
-  onlyMonths?: string[];
+  onlyMonths: z.array(z.string().regex(/^\d{4}-\d{2}$/, "الشهر بصيغة YYYY-MM")).max(36).optional(),
   /**
-   * ملفّاتٌ بعينها — تُقرأ بمعرّفاتها بلا مشيٍ على الأرشيف.
-   *
-   * لأنّ قراءة ملفّين لا تستحقّ إعادةَ المشي على السنوات والأشهر
-   * ومجلّدات المورّدين: عشرون ثانية تُهدَر قبل أن يُقرأ حرف، والدفعة
-   * التالية تُهدرها ثانيةً. فالمشي مرّةً واحدة في الفحص، ثمّ تُقرأ
-   * الملفّات بأسمائها من القائمة التي خرجت منه.
+   * ملفّاتٌ بعينها — تُقرأ بمعرّفاتها بلا مشيٍ على الأرشيف: المشي مرّةً واحدة
+   * في الفحص، ثمّ تُقرأ الملفّات بأسمائها من القائمة التي خرجت منه.
    */
-  fileIds?: string[];
+  fileIds: z.array(z.string().max(200)).max(500).optional(),
   /** فحص الأرشيف كله — أبطأ بكثير */
-  full?: boolean;
-  apply?: boolean;
+  full: z.boolean().optional(),
+  apply: z.boolean().optional(),
   /** قراءة محتوى الملفات التي لا يُفهم اسمها */
-  readContent?: boolean;
-}
+  readContent: z.boolean().optional(),
+});
+type Body = z.infer<typeof Body>;
 
 async function loadSuppliers(): Promise<SupplierRecord[]> {
   const rows = await db.select({
@@ -131,7 +130,9 @@ async function handle(request: Request) {
     throw e;
   }
 
-  const body = ((await request.json().catch(() => ({}))) ?? {}) as Body;
+  const parsedBody = await readJson(request, Body, { emptyOk: true });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body: Body = parsedBody.body;
   const apply = body.apply === true;
 
   /*

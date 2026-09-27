@@ -14,6 +14,8 @@
  * `decision_history` — وهو يجيب عن سؤالٍ آخر غير «من فعل ماذا»:
  * **كيف تطوّر هذا القرار؟**
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { isOwnersPayment } from "@/services/payment-echo.service";
 import { NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
@@ -25,11 +27,12 @@ import { refreshPaymentStatus, reversePayment } from "@/services/payment.service
 
 export const runtime = "nodejs";
 
-interface Body {
-  transactionId?: string;
+const Body = z.object({
+  transactionId: z.string().trim().min(1).max(64).optional(),
   /** سبب التراجع — يُحفَظ كي يُفهَم لاحقاً لِمَ فُكّت. */
-  reason?: string;
-}
+  reason: z.string().max(500).optional(),
+});
+type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
   let user;
@@ -42,12 +45,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   if (!body.transactionId) {
     return NextResponse.json({ error: "حدّد الحركة" }, { status: 400 });

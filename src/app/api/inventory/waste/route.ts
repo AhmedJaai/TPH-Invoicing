@@ -5,6 +5,8 @@
  * مسجَّل» — لا يزيد شيئاً ولا ينقصه من الرفّ. وهذا هو معنى الفصل
  * بينهما: الأوّلُ سؤالٌ مفتوح، والثاني جوابٌ مكتوب.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import {
@@ -18,18 +20,19 @@ import { isStoredUnit } from "@/lib/unit-conversion";
 
 export const runtime = "nodejs";
 
-interface Body {
-  action?: "waste" | "movement";
-  productId?: string;
-  quantity?: string | number;
-  unit?: string;
-  occurredOn?: string;
-  reason?: string;
-  kind?: string;
-  note?: string | null;
-  branchId?: string | null;
-  countId?: string | null;
-}
+const Body = z.object({
+  action: z.enum(["waste", "movement"]).optional(),
+  productId: z.string().trim().min(1).max(64).optional(),
+  quantity: z.union([z.string().max(30), z.number()]).optional(),
+  unit: z.string().max(10).optional(),
+  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "التاريخ بصيغة YYYY-MM-DD").optional(),
+  reason: z.string().max(40).optional(),
+  kind: z.string().max(40).optional(),
+  note: z.string().max(500).nullable().optional(),
+  branchId: z.string().trim().min(1).max(64).nullable().optional(),
+  countId: z.string().trim().min(1).max(64).nullable().optional(),
+});
+type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
   let user;
@@ -41,12 +44,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   if (!body.productId) return NextResponse.json({ error: "لم يُحدَّد الصنف" }, { status: 400 });
   if (!isStoredUnit(body.unit)) return NextResponse.json({ error: "وحدةٌ غير معروفة" }, { status: 400 });

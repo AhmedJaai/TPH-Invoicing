@@ -17,6 +17,8 @@
  *
  * وما لم يعد يصلح لا يُقرَّ ولا يُرَدّ صامتاً: يُعاد في القائمة بسببه.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -47,10 +49,11 @@ export const maxDuration = 60;
  */
 export const MAX_BULK = 50;
 
-interface Body {
+const Body = z.object({
   /** معرّفات الحركات وحدها — ولا شيء غيرها يُؤخَذ من المتصفّح. */
-  transactionIds?: string[];
-}
+  transactionIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
+});
+type Body = z.infer<typeof Body>;
 
 interface Outcome {
   transactionId: string;
@@ -70,12 +73,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   const ids = [...new Set(body.transactionIds ?? [])];
   if (ids.length === 0) {

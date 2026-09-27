@@ -6,6 +6,8 @@
  * (فيها قراءة الحقول وتأكيدها)، أمّا الرفض فقرارٌ بسيط: هذا ليس مستنداً
  * يُقيَّد. ويُسجَّل بسببه ومن رفضه، ولا يُحذف الملفّ من الدرايف.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -28,12 +30,13 @@ import { linkExactHandPayments, mergeExactEchoes } from "@/services/account-revi
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-interface Body {
-  documentId?: string;
-  reason?: string;
+const Body = z.object({
+  documentId: z.string().trim().min(1).max(64).optional(),
+  reason: z.string().max(500).optional(),
   /** «confirm»: ما قرأه النموذج صحيح فيُؤرشَف — والافتراضيّ الرفض */
-  action?: "reject" | "confirm" | "confirm-eligible" | "restore";
-}
+  action: z.enum(["reject", "confirm", "confirm-eligible", "restore"]).optional(),
+});
+type Body = z.infer<typeof Body>;
 
 const UNDECIDED = ["PENDING", "EXTRACTED", "NEEDS_REVIEW"] as const;
 
@@ -47,12 +50,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
   /*
     ── اعتمادُ ما اجتمعت فيه الشروط الأربعة ── (إذن أحمد في ٢٤ سبتمبر ٢٠٢٦)
 

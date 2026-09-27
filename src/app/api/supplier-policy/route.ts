@@ -12,6 +12,8 @@
  *
  * ولا شيء يُشتقّ: الافتراضُ يبقى على حاله حتى يقول الإنسانُ غيرَه.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -21,15 +23,16 @@ import { recordAudit } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
-interface Body {
-  supplierId?: string;
-  issuesInvoices?: boolean;
-  paperInvoices?: boolean;
-  contractRequired?: boolean;
-  contractOnFile?: boolean;
+const Body = z.object({
+  supplierId: z.string().trim().min(1).max(64).optional(),
+  issuesInvoices: z.boolean().optional(),
+  paperInvoices: z.boolean().optional(),
+  contractRequired: z.boolean().optional(),
+  contractOnFile: z.boolean().optional(),
   /** أيصدر كشفَ حساب؟ (044) */
-  issuesStatements?: boolean;
-}
+  issuesStatements: z.boolean().optional(),
+});
+type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
   let user;
@@ -41,12 +44,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   const id = body.supplierId?.trim();
   if (!id) return NextResponse.json({ error: "لم يُذكر المورّد" }, { status: 400 });

@@ -8,6 +8,8 @@
  * وبعد الإقفال يُقفَل الشهر فعلاً: كلُّ ما يكتب مالاً فيه يُرفض — في طبقة
  * الخدمات (`month-guard.ts`) وفي القاعدة (الهجرة ٠٢٨).
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -25,15 +27,16 @@ export const maxDuration = 60;
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
-interface Body {
-  month: string;
-  action?: "check" | "close" | "reopen" | "balances";
+const Body = z.object({
+  month: z.string().regex(/^\d{4}-\d{2}$/, "الشهر بصيغة YYYY-MM"),
+  action: z.enum(["check", "close", "reopen", "balances"]).optional(),
   /** رصيدا الشهر كما في كشف البنك — نصّاً يُقرأ في الخادم. */
-  openingBalance?: string;
-  closingBalance?: string;
+  openingBalance: z.string().max(30).optional(),
+  closingBalance: z.string().max(30).optional(),
   /** سبب مكتوب حين يُقفل الشهر وفيه تنبيهات */
-  note?: string;
-}
+  note: z.string().max(500).optional(),
+});
+type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
   let user;
@@ -45,12 +48,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   if (!MONTH_RE.test(body.month ?? "")) {
     return NextResponse.json({ error: "شهر غير صالح" }, { status: 400 });

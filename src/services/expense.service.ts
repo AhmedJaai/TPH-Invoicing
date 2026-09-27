@@ -11,7 +11,8 @@ import { bankTransactions, expenses, recurringExpenses } from "@/db/schema";
 import { createId } from "@/lib/id";
 import { expenseEventKey } from "@/lib/expenses";
 import { recordAudit } from "@/lib/audit";
-import type { Tx } from "./types";
+import type { Conn, Tx } from "./types";
+import { firstClosedMonth } from "./month-guard";
 import {
   deriveFromBank,
   isExpenseCategory,
@@ -48,8 +49,8 @@ export interface DeriveResult {
  * حركاتُ الكشف وما قُيّد منها — القراءةُ التي يبني عليها الاشتقاق وعدّادُ
  * ما لم يُقيَّد معاً، فلا يعدّ العدّادُ شيئاً لا يقيّده الزرّ.
  */
-async function loadBankForExpenses(month?: string): Promise<{ txs: BankTx[]; already: Set<string> }> {
-  const rows = await db
+async function loadBankForExpenses(month?: string, conn: Conn = db): Promise<{ txs: BankTx[]; already: Set<string> }> {
+  const rows = await conn
     .select({
       id: bankTransactions.id,
       valueDate: bankTransactions.valueDate,
@@ -66,7 +67,7 @@ async function loadBankForExpenses(month?: string): Promise<{ txs: BankTx[]; alr
         : sql`true`,
     );
 
-  const recorded = await db
+  const recorded = await conn
     .select({ id: expenses.bankTransactionId })
     .from(expenses)
     .where(sql`${expenses.bankTransactionId} is not null`);
@@ -94,10 +95,11 @@ export async function deriveExpensesFromBank(
   /** `null` حين يُشتقّ آلياً لا بطلب مستخدم. */
   userId: string | null,
   month?: string,
+  conn: Conn = db,
 ): Promise<DeriveResult> {
-  const { txs, already } = await loadBankForExpenses(month);
+  const { txs, already } = await loadBankForExpenses(month, conn);
   const { candidates, goodsPurchases } = deriveFromBank(txs, already);
-  const recurring = await activeRecurring();
+  const recurring = await activeRecurring(conn);
 
   /*
     إدخالٌ واحد لكل الصفوف داخل معاملة، لا صفٌّ صفّاً.
@@ -132,7 +134,7 @@ export async function deriveExpensesFromBank(
   let sync = { updated: 0, removed: 0 };
   // تُقسَّم دفعاتٍ كي لا يتجاوز الاستعلام حدّ المعاملات في بروتوكول pg
   const CHUNK = 500;
-  await db.transaction(async (tx) => {
+  await conn.transaction(async (tx) => {
     for (let i = 0; i < values.length; i += CHUNK) {
       await tx.insert(expenses).values(values.slice(i, i + CHUNK)).onConflictDoNothing();
     }
@@ -271,8 +273,8 @@ export async function resyncBankExpenses(
   return { updated: update.length, removed: remove.length, created };
 }
 
-export async function activeRecurring(): Promise<RecurringExpense[]> {
-  const rows = await db
+export async function activeRecurring(conn: Conn = db): Promise<RecurringExpense[]> {
+  const rows = await conn
     .select()
     .from(recurringExpenses)
     .where(eq(recurringExpenses.isActive, true));
@@ -364,4 +366,31 @@ export async function deleteExpense(userId: string, id: string): Promise<DeleteE
     }, t);
     return "DELETED";
   });
+}
+
+/**
+ * يُشتقّ المصروفُ وحده حين يتغيّر ما يُشتقّ منه — بعد استيراد كشفٍ، وبعد
+ * تصنيف حركة. كان زرّاً في صفحة المصروفات وحدها: ٢٨٩ حركةً من سبتمبر
+ * (٣٬٥٥٩ ريالاً) صنّفها صاحبها ولم تدخل المصروف، فتقريرُ الشهر ناقص.
+ *
+ * والاشتقاقُ حتميٌّ من تصنيفٍ أقرّه إنسان، وإعادتُه لا تُكرّر (`eventKey`)،
+ * ويتبع التصنيفَ إن تغيّر (`resyncBankExpenses`). والشهرُ المقفل لا يُمسّ،
+ * وتعثّرُه لا يُسقط ما قبله: يُقال ولا يُرمى.
+ */
+export async function deriveOpenMonths(
+  months: readonly string[],
+  userId: string | null,
+  conn: Conn = db,
+): Promise<{ created: number; notes: string[] }> {
+  let created = 0;
+  const notes: string[] = [];
+  for (const month of [...new Set(months)].filter((m) => /^\d{4}-\d{2}$/.test(m)).sort()) {
+    if (await firstClosedMonth(conn, [month])) continue;
+    try {
+      created += (await deriveExpensesFromBank(userId, month, conn)).created;
+    } catch (e) {
+      notes.push(`مصروفات ${month}: ${(e as Error).message.slice(0, 120)}`);
+    }
+  }
+  return { created, notes };
 }

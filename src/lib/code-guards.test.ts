@@ -177,6 +177,32 @@ describe("المكوّنات لا تقرأ الردّ JSON مباشرة", () => 
   });
 });
 
+/* ── ٣ب. جسمُ الطلب يُفحَص وقتَ التشغيل ── */
+
+/**
+ * `(await request.json()) as Body` وعدٌ للمترجم لا فحصٌ للطلب: رقمٌ حيث يُنتظر
+ * نصّ يصير ٥٠٠ بلا جملة. فالمساراتُ تقرأ بـ`readJson(request, Schema)`
+ * (`lib/request-body.ts`) أو بـ`safeParse`.
+ */
+const CAST_BODY = /request\.json\(\)[^;\n]*\)\s*as\s+\w+/;
+
+describe("المسارات لا تصبّ جسمَ الطلب بـ«as»", () => {
+  for (const file of SRC.filter((f) => f.includes(`${path.sep}app${path.sep}api${path.sep}`))) {
+    it(file, () => {
+      expect(CAST_BODY.test(readFileSync(file, "utf8"))).toBe(false);
+    });
+  }
+
+  it("والحارس يُمسك الشكل الخاطئ", () => {
+    expect(CAST_BODY.test("body = (await request.json()) as Body;")).toBe(true);
+    expect(CAST_BODY.test("const body = ((await request.json().catch(() => ({}))) ?? {}) as Body;")).toBe(true);
+  });
+
+  it("ولا يُمسك الصواب", () => {
+    expect(CAST_BODY.test("const read = await readJson(request, Body);")).toBe(false);
+  });
+});
+
 /* ── ٤. المال المعروض يمرّ بمنسّقٍ واحد ── */
 
 /**

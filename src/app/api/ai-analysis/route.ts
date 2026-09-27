@@ -5,6 +5,8 @@
  * في الشاشة يمرّ على المورّدين واحداً واحداً، فلا يُقتل طلبٌ طويل صامتاً.
  * والنتيجة اقتراحاتٌ تُحفَظ، ولا يُكتب في المال شيءٌ هنا.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import { analyzeSupplier } from "@/services/supplier-analysis.service";
@@ -24,17 +26,9 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: { supplierId?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب" }, { status: 400 });
-  }
-  if (typeof body.supplierId !== "string" || body.supplierId.length === 0 || body.supplierId.length > 64) {
-    return NextResponse.json({ error: "حدّد المورّد" }, { status: 400 });
-  }
-
-  const supplierId = body.supplierId;
+  const read = await readJson(request, z.object({ supplierId: z.string().trim().min(1, "حدّد المورّد").max(64) }));
+  if (!read.ok) return read.response;
+  const supplierId = read.body.supplierId;
   /* المسار يعلن عمره (تحت الستّين) وكلّ محاولةٍ تأخذ ما بقي منه — كما في analyze */
   const outcome = await withDeadline(55_000, () =>
     analyzeSupplier(supplierId, { persist: true, actorId: user.id, deadlineMs: 48_000 }),

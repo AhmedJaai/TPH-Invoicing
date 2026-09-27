@@ -16,6 +16,8 @@
  * و`preview: true` يعرض ما سينتقل قبل أن يقع — الفعلُ الذي ينقل مالاً
  * بين فواتير يُرى قبل الإقرار.
  */
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -32,18 +34,19 @@ import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-interface Body {
+const Body = z.object({
   /** يوم السداد (YYYY-MM-DD) — وإن غاب فاليوم بتوقيت الرياض، لا تاريخ الفاتورة */
-  paidOn?: string;
+  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "التاريخ بصيغة YYYY-MM-DD").optional(),
   /** فواتير بعينها، أو كل ما يسبق شهراً */
-  invoiceIds?: string[];
-  supplierId?: string;
-  note?: string;
+  invoiceIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
+  supplierId: z.string().trim().min(1).max(64).optional(),
+  note: z.string().max(500).optional(),
   /** من أين دُفعت: حوالة من حساب المقهى (الافتراضيّ) أو من حساب المالك. */
-  source?: "BANK" | "OWNER";
+  source: z.enum(["BANK", "OWNER"]).optional(),
   /** يُعرض ما سيقع ولا يُكتب شيء — للسداد من حساب المالك. */
-  preview?: boolean;
-}
+  preview: z.boolean().optional(),
+});
+type Body = z.infer<typeof Body>;
 
 export async function POST(request: Request) {
   try {
@@ -65,12 +68,9 @@ async function handle(request: Request) {
     throw e;
   }
 
-  let body: Body;
-  try {
-    body = (await request.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const body: Body = read.body;
 
   /* ── من حساب المالك: فاتورةٌ واحدة، بمعاينةٍ ثمّ إقرار ── */
   if (body.source === "OWNER") {
