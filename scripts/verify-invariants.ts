@@ -111,6 +111,19 @@ async function main() {
        update inventory_count_lines set actual_milli = 1 where id = 't-inv-l1'`,
       { code: "23514", message: /مقفَل/ }),
 
+    /* 050: الهدرُ والحركاتُ كالاستلام — لا تُكتب في أسبوعٍ جردُه مقفَل */
+    await mustFail("هدرٌ في أسبوعٍ جردُه مقفَل",
+      `insert into products (id, name_ar) values ('t-inv-pw', 'صنف اختبار');
+       insert into inventory_counts (id, period_start, period_end, status, finalised_at)
+         values ('t-inv-cw', '2099-02-01', '2099-02-07', 'FINALISED', now());
+       insert into waste_records (id, product_id, quantity_milli, unit, occurred_on, reason)
+         values ('t-inv-w', 't-inv-pw', 1000, 'KG', '2099-02-03', 'EXPIRED')`,
+      { code: "23514", message: /مقفَل/ }),
+    await mustPass("والهدرُ في أسبوعٍ لا جردَ مقفَلاً فيه مقبول",
+      `insert into products (id, name_ar) values ('t-inv-pw2', 'صنف اختبار');
+       insert into waste_records (id, product_id, quantity_milli, unit, occurred_on, reason)
+         values ('t-inv-w2', 't-inv-pw2', 1000, 'KG', '2099-02-20', 'EXPIRED')`),
+
     await mustFail("حذفُ لقطةِ جردٍ مقفَل",
       `insert into inventory_counts (id, period_start, period_end, status, finalised_at)
          values ('t-inv-c2', '2099-01-08', '2099-01-14', 'FINALISED', now());

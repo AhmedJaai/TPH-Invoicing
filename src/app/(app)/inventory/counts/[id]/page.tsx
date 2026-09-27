@@ -7,6 +7,7 @@ import { LinkButton, NoAccess } from "@/components/ui";
 import { formatWeek, isStepId } from "@/components/inventory-ui";
 import { InventoryWorkspace } from "@/components/inventory-workspace";
 import { loadWorkspaceInputs } from "@/services/inventory-workspace.service";
+import { changesSinceFinalise } from "@/services/inventory-staleness.service";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { loadCountHeader, loadScope, readFrozenReport, recomputeCount } from "@/services/inventory.service";
 
@@ -44,7 +45,7 @@ export default async function CountReportPage({
   const report = header.status === "FINALISED"
     ? await readFrozenReport(header)
     : await recomputeCount(header.id);
-  const [scope, inputs] = await Promise.all([loadScope(header.id), loadWorkspaceInputs(header)]);
+  const [scope, inputs, stale] = await Promise.all([loadScope(header.id), loadWorkspaceInputs(header), changesSinceFinalise(header)]);
   const locked = header.status === "FINALISED";
 
   return (
@@ -66,6 +67,7 @@ export default async function CountReportPage({
         showAmounts={can(user.role, "amounts:view")}
         scopeInherited={scope.inherited}
         {...inputs}
+        stale={stale}
         today={todayInRiyadh()}
         initialStep={isStepId(step) ? step : null}
       />

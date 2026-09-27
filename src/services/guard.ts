@@ -52,6 +52,15 @@ export function respondTo(e: unknown): NextResponse | null {
   if (code === "23505") {
     return NextResponse.json({ error: "سُجّل هذا من قبل — ربما من نافذةٍ أخرى. حدّث الصفحة" }, { status: 409 });
   }
+  /*
+    ومؤثِّراتُنا تقول سببها بالعربيّة («هذا يقع في أسبوعٍ جردُه مقفَل — أعِد فتح
+    الجرد أوّلاً» · «صافي الدفعة أقلّ ممّا خُصّص منها»). فيُقال نصُّها — لا جملةٌ
+    عامّة عن «قيدٍ ماليّ» لا تقول ما العمل. وقيدُ CHECK بلا نصّ يبقى على العامّة.
+  */
+  const own = ownDatabaseMessage(e);
+  if ((code === "23514" || code === "P0001") && own) {
+    return NextResponse.json({ error: own }, { status: 409 });
+  }
   if (code === "23514") {
     return NextResponse.json({ error: "رفضت القاعدة هذه القيمة لأنّها تخالف قيداً ماليّاً — لم يُكتب شيء. حدّث الصفحة" }, { status: 409 });
   }
@@ -69,4 +78,13 @@ export function pgErrorCode(e: unknown): string | undefined {
   const err = e as { code?: unknown; cause?: { code?: unknown } } | null;
   const code = err?.code ?? err?.cause?.code;
   return typeof code === "string" && /^[0-9A-Z]{5}$/.test(code) ? code : undefined;
+}
+
+/** نصُّ ما رفعه مؤثِّرٌ منّا — بالعربيّة وحدها؛ ورسالةُ Postgres الإنجليزيّة لا تُعرَض. */
+function ownDatabaseMessage(e: unknown): string | null {
+  const err = e as { message?: unknown; cause?: { message?: unknown } } | null;
+  for (const m of [err?.cause?.message, err?.message]) {
+    if (typeof m === "string" && !m.startsWith("Failed query") && /[\u0600-\u06FF]/.test(m)) return m.slice(0, 300);
+  }
+  return null;
 }

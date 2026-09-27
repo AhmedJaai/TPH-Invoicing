@@ -23,6 +23,7 @@ import { LINE, PRODUCT, countNoun } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
 import type { CountHeader } from "@/services/inventory.service";
 import type { PurchaseLinkRow, StockItemOption } from "@/services/inventory-purchase-link.service";
+import type { StaleReason } from "@/services/inventory-staleness.service";
 import { PurchaseLinkPanel } from "./inventory-purchase-links";
 
 /**
@@ -48,6 +49,7 @@ export function InventoryWorkspace({
   manualOpenings,
   purchaseLinks,
   stockOptions,
+  stale = [],
   today,
   initialStep,
 }: {
@@ -71,6 +73,8 @@ export function InventoryWorkspace({
   manualOpenings: ReadonlyMap<string, { enteredMilli: number; unit: StoredUnit }>;
   purchaseLinks: PurchaseLinkRow[];
   stockOptions: StockItemOption[];
+  /** ما تغيّر تحته بعد إقفاله — يُقال، والعلاجُ إعادةُ الفتح. */
+  stale?: StaleReason[];
   today: string;
   /** خطوةٌ مطلوبة في العنوان (`?step=count`) — فالرابطُ يفتح موضعَه. */
   initialStep?: StepId | null;
@@ -340,6 +344,22 @@ export function InventoryWorkspace({
 
   return (
     <>
+      {locked && stale.length > 0 && (
+        <Callout
+          tone="warn"
+          icon={TriangleAlert}
+          title="تغيّر ما تحت هذا الجرد بعد إقفاله"
+          className="mb-4"
+          action={canReopen
+            ? <Link href="?step=close" className="text-xs font-bold text-accent hover:underline">أعِد فتحه ليُعاد حسابُه</Link>
+            : undefined}
+        >
+          <ul className="mt-1 space-y-0.5">
+            {stale.map((r) => <li key={r.label}>{r.label} <span className="nums text-muted">· {r.count}</span></li>)}
+          </ul>
+          <p className="mt-1">الأرقامُ أدناه كما أُقفلت — ولا تشمل ما وصل بعدها.</p>
+        </Callout>
+      )}
       <CoverageBanner
         header={header}
         report={report}
