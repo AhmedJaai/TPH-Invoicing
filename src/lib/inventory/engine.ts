@@ -97,6 +97,11 @@ export interface EngineInput {
   /** الأصنافُ التي تُعَدّ — مرتَّبةٌ كما ستُعرَض. */
   products: readonly CountedProduct[];
   soldLines: readonly SoldLineInput[];
+  /**
+   * أيّامُ الفترة التي غطّاها ملفُّ مبيعاتٍ مستورَد — فيها بيعٌ أو لا. يومٌ في ملفٍّ
+   * بلا سطرٍ واحد يومٌ بلا بيعٍ بدليل (مقهىً يُغلق يوماً في الأسبوع)، لا يومٌ غاب ملفُّه.
+   */
+  salesCoveredDays?: readonly string[];
   recipeVersions: readonly RecipeVersionInput[];
   purchaseLines: readonly PurchaseLineInput[];
   /**
@@ -260,7 +265,7 @@ export function reconcile(input: EngineInput): EngineReport {
     مبيعات. كان يكفي سطرُ بيعٍ واحد — يومان من سبعة يُستوردان فيُعلَن
     الاستهلاكُ صفراً، وتصير المشترياتُ كلُّها «فرقاً».
   */
-  const soldDays = new Set(input.soldLines.map((l) => l.businessDate));
+  const soldDays = new Set([...input.soldLines.map((l) => l.businessDate), ...(input.salesCoveredDays ?? [])]);
   const hasSales = input.soldLines.length > 0 && everyDay(input.periodStart, input.periodEnd).every((d) => soldDays.has(d));
   /* مكوّناتُ كلّ نسخةٍ ساريةٍ تتقاطع مع الفترة — وبها يُعرَف أنّ الصفرَ صفر */
   const inActiveRecipe = new Set(

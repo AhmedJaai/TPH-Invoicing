@@ -106,7 +106,10 @@ export async function resolveHeldRow(
   if (decision === "SAME" && row.kind === "CONFLICT") decision = "CHECKED";
 
   let transactionId: string | null = null;
-  if (decision === "ADDED") {
+  if (decision === "ADDED" && !row.bankImportId) {
+    throw new HeldRowRefused("حُذف الاستيرادُ الذي جاء منه هذا الصفّ — استورد الكشفَ ثانيةً فيعود إن كان حركةً أخرى");
+  }
+  if (decision === "ADDED" && row.bankImportId) {
     /*
       الهويّةُ بالخوارزميّة الواحدة: الوقائعُ وترتيبُها بين ما يحمل الوقائعَ
       نفسها في الحساب — كما تحسبها المزامنة لو جاءت الحركةُ جديدة.
@@ -134,7 +137,7 @@ export async function resolveHeldRow(
       identityKey = identityKeyOf(row.bankAccountId, null, row.factKey, occurrence);
     }
     const [created] = await tx.insert(bankTransactions).values({
-      bankImportId: row.bankImportId!,
+      bankImportId: row.bankImportId,
       bankAccountId: row.bankAccountId,
       externalId: identityKey,
       identityKey,

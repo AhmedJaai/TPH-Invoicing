@@ -36,4 +36,22 @@ describe("المصروفُ يُشتقّ وحده — والشهرُ المقفل
       expect(out).toEqual({ created: 0, notes: [] });
       expect(await count(tx, "2099-07")).toBe(before);
     }));
+
+  it("مصروفٌ قُيِّد بيدٍ ثمّ جاءت حركتُه — يُتبنّى ولا يُكرَّر", () =>
+    withRollback(async (tx) => {
+      await tx.execute(sql`
+        insert into expenses (id, period_month, occurred_on, category, label, amount_minor, source)
+        values (${`t-man-${Math.random()}`}, '2099-10', '2099-10-03', 'RENT', 'إيجار أكتوبر', 800000, 'MANUAL')
+      `);
+      await rent(tx, "2099-10-05", 8000_00);
+      const before = await count(tx, "2099-10");
+      const out = await deriveOpenMonths(["2099-10"], null, tx);
+      expect(out.created).toBe(0);
+      expect(await count(tx, "2099-10")).toBe(before);
+      const [m] = (await tx.execute<{ linked: boolean }>(sql`
+        select bank_transaction_id is not null as linked from expenses where period_month = '2099-10' and source = 'MANUAL'
+      `)).rows;
+      expect(m.linked).toBe(true);
+    }));
 });
+

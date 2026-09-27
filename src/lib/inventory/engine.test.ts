@@ -327,6 +327,21 @@ describe("الاستهلاكُ الصفرُ بدليل", () => {
     expect(other.flags).toContain("CONSUMPTION_UNKNOWN");
   });
 
+  it("ومقهىً يُغلق يوماً: يومٌ غطّاه الملفّ بلا بيعٍ دليلٌ كيومٍ فيه بيع — صفرٌ لا مجهول", () => {
+    const OTHER = "p-other";
+    const sixDays = wholeWeek.filter((l) => l.businessDate !== "2026-09-05");
+    const r = reconcile(input({
+      soldLines: sixDays,
+      salesCoveredDays: ["2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05", "2026-09-06", "2026-09-07"],
+      products: [...PRODUCTS, { id: OTHER, nameAr: "شراب", category: "OTHER", baseUnit: "ML" as const }],
+      recipeVersions: [RECIPE, {
+        ...RECIPE, id: "v2", recipeId: "r2", menuProductId: "m-other",
+        ingredients: [{ productId: OTHER, quantityMilli: 30_000, unit: "ML", prepLossBp: null }],
+      }],
+    }));
+    expect(r.lines.find((l) => l.productId === OTHER)!.theoreticalConsumptionMilli).toBe(0);
+  });
+
   it("وبلا مبيعاتٍ في الفترة — مجهولٌ لا صفر: الغيابُ غيابُ ملفّ لا غيابُ بيع", () => {
     const r = reconcile(input({ soldLines: [] }));
     expect(r.lines.every((l) => l.theoreticalConsumptionMilli === null)).toBe(true);

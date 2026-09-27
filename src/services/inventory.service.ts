@@ -661,6 +661,7 @@ export async function buildEngineInput(
     تتزاحم. والفرقُ في الزمن لا يُذكَر أمام عطبٍ يقع في الاختبار وحده.
   */
   const soldLines = await loadSoldLines(periodStart, periodEnd, branchId, conn);
+  const salesCoveredDays = await loadSalesCoveredDays(periodStart, periodEnd, branchId, conn);
   const purchases = await loadPurchaseLines(periodStart, periodEnd, conn, branchId);
   const recipeVersions = await loadRecipeVersions(conn);
   const opening = await resolveOpenings(countId, periodStart, branchId, productIds, conn);
@@ -674,6 +675,7 @@ export async function buildEngineInput(
     periodEnd,
     products: countedProducts,
     soldLines,
+    salesCoveredDays,
     recipeVersions,
     purchaseLines: purchases.inPeriod,
     ambiguousReceipts: purchases.ambiguous,
@@ -688,6 +690,23 @@ export async function buildEngineInput(
     catalogCostByProduct: catalog,
     inScopeByProduct: inScope,
   };
+}
+
+/**
+ * أيّامُ الفترة التي غطّاها ملفُّ مبيعاتٍ مستورَدٌ لم يفشل — للفرع أو بلا فرع.
+ * بها يُعرف أنّ يوماً بلا سطرِ بيعٍ يومٌ بلا بيع، لا يومٌ لم يُستورَد ملفُّه.
+ */
+async function loadSalesCoveredDays(periodStart: string, periodEnd: string, branchId: string | null, conn: Conn): Promise<string[]> {
+  const rows = (await conn.execute<{ day: string }>(sql`
+    select distinct to_char(d, 'YYYY-MM-DD') as day
+      from sales_imports si,
+           generate_series(greatest(si.period_start::date, ${periodStart}::date),
+                           least(si.period_end::date, ${periodEnd}::date), interval '1 day') as d
+     where si.status in ('IMPORTED', 'PARTIAL') and si.period_start is not null and si.period_end is not null
+       and si.period_start <= ${periodEnd} and si.period_end >= ${periodStart}
+       and ${branchId ? sql`(si.branch_id = ${branchId} or si.branch_id is null)` : sql`true`}
+  `)).rows;
+  return rows.map((r) => r.day);
 }
 
 /* ─────────────────────────── نطاقُ الجرد ─────────────────────────── */

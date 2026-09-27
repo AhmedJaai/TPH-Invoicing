@@ -37,6 +37,8 @@ export interface DeriveResult {
   updated: number;
   /** ما لم يعد مصروفاً — حُذف صفُّه المشتقّ وحُفظ نصُّه في التدقيق. */
   removed: number;
+  /** مصروفٌ قُيِّد بيدٍ من قبل ووجدنا حركتَه — رُبط بها ولم يُكتب ثانية. */
+  adopted: number;
 }
 
 /**
@@ -108,8 +110,31 @@ export async function deriveExpensesFromBank(
     ويترك الفشل في المنتصف اشتقاقاً جزئياً لا يُعرف مداه. والمعاملة
     تجعله كلّه أو لا شيء منه، والدفعة تجعله رحلةً واحدة.
   */
+  /*
+    ── المصروفُ اليدويّ الذي سبق حركتَه يُتبنّى لا يُكرَّر ──
+
+    قيّد صاحبُ المقهى «إيجار ٨٬٠٠٠» بيده، ثمّ جاء الكشفُ بالحوالة. وبصمةُ الحدث
+    لا تجمعهما (وصفُه بيده غيرُ نصّ البنك)، فكان يُقيَّد مصروفان — وصار الاشتقاقُ
+    آلياً فيقع وحده. فالمبلغُ نفسُه في ثلاثة أيّام لمصروفٍ يدويٍّ بلا حركة: هو هو،
+    تُربط به الحركة («الريال يأتي من بابين» كما في الدفعات).
+  */
+  const manual = candidates.length === 0 ? [] : await conn
+    .select({ id: expenses.id, amountMinor: expenses.amountMinor, occurredOn: expenses.occurredOn })
+    .from(expenses)
+    .where(and(eq(expenses.source, "MANUAL"), sql`${expenses.bankTransactionId} is null`,
+      inArray(expenses.periodMonth, [...new Set(candidates.map((c) => c.periodMonth))])));
+  const dayNo = (d: string) => Math.round(Date.parse(`${d}T00:00:00Z`) / 86_400_000);
+  const adoptions: { expenseId: string; bankTransactionId: string }[] = [];
+  const toInsert = candidates.filter((c) => {
+    const i = manual.findIndex((m) => m.amountMinor === c.amountMinor && Math.abs(dayNo(m.occurredOn) - dayNo(c.occurredOn)) <= 3);
+    if (i < 0) return true;
+    adoptions.push({ expenseId: manual[i].id, bankTransactionId: c.bankTransactionId });
+    manual.splice(i, 1);
+    return false;
+  });
+
   let linked = 0;
-  const values = candidates.map((c) => {
+  const values = toInsert.map((c) => {
     const match = matchRecurring(c, recurring);
     if (match) linked++;
     return {
@@ -132,23 +157,33 @@ export async function deriveExpensesFromBank(
   });
 
   let sync = { updated: 0, removed: 0 };
+  let inserted = 0;
   // تُقسَّم دفعاتٍ كي لا يتجاوز الاستعلام حدّ المعاملات في بروتوكول pg
   const CHUNK = 500;
   await conn.transaction(async (tx) => {
     for (let i = 0; i < values.length; i += CHUNK) {
-      await tx.insert(expenses).values(values.slice(i, i + CHUNK)).onConflictDoNothing();
+      /* ما كُتب فعلاً — لا ما رُشّح: القيدُ الفريد يتخطّى ما قُيِّد في نافذةٍ أخرى */
+      inserted += (await tx.insert(expenses).values(values.slice(i, i + CHUNK)).onConflictDoNothing()
+        .returning({ id: expenses.id })).length;
+    }
+    for (const a of adoptions) {
+      await tx.update(expenses).set({ bankTransactionId: a.bankTransactionId })
+        .where(and(eq(expenses.id, a.expenseId), sql`${expenses.bankTransactionId} is null`));
     }
     /* وما قُيّد من قبل يتبع التصنيف الحاليّ — لا يبقى على ما كان */
     sync = await resyncBankExpenses(tx, userId, { month });
 
     /* ألفُ مصروفٍ قُيّد بلا أثر في التدقيق — صار له قيدٌ واحد بعدده */
-    if (values.length > 0 || sync.updated > 0 || sync.removed > 0) {
+    if (inserted > 0 || adoptions.length > 0 || sync.updated > 0 || sync.removed > 0) {
       await recordAudit({
         actorId: userId,
         action: "EXPENSES_DERIVED",
         entityType: "expense",
         entityId: month ?? "all",
-        after: { قُيّدت: values.length, "تغيّر بابها": sync.updated, "لم تعد مصروفاً": sync.removed },
+        after: {
+          قُيّدت: inserted, "رُبطت بمصروفٍ قُيِّد بيد": adoptions.length,
+          "تغيّر بابها": sync.updated, "لم تعد مصروفاً": sync.removed,
+        },
       }, tx);
     }
   });
@@ -157,7 +192,8 @@ export async function deriveExpensesFromBank(
   const alreadyCount = debits.filter((t) => already.has(t.id)).length;
   return {
     scanned: txs.length,
-    created: candidates.length,
+    created: inserted,
+    adopted: adoptions.length,
     skippedAlreadyRecorded: alreadyCount,
     skippedNotExpense:
       debits.length - candidates.length - alreadyCount - goodsPurchases.length,
