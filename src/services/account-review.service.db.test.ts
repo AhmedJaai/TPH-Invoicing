@@ -262,3 +262,24 @@ describe("الرصيدُ الوهميّ لا يُخصَم آلياً — حوا�
       expect(Number(n.rows[0].n)).toBe(0);
     }));
 });
+
+describe("رسمُ التحويل في الربط بالسداد اليدويّ", () => {
+  it("٣٬٠٠٥٫٧٥ على سدادٍ بـ٣٬٠٠٠: الزائدُ رسمٌ لا رصيدٌ للمورّد، والآليُّ بيد النظام", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const inv = await makeInvoice(tx, s, 3000_00, "2026-09-01");
+      const hand = await manualPaid(tx, s, inv, 3000_00, "2026-09-04");
+      const t = await waitingTransfer(tx, s, 3005_75, "2026-09-04");
+      await makeInvoice(tx, s, 500_00, "2026-09-06");
+
+      await linkHandPayment(tx, { transferId: t, paymentId: hand }, await someone(tx), "SYSTEM");
+      const [p] = await tx.select({ a: payments.amountMinor, f: payments.feeMinor }).from(payments).where(eq(payments.id, hand));
+      expect(p).toEqual({ a: 3005_75, f: 5_75 });
+      /* لا شيءَ خُصم من الفاتورة الثانية */
+      expect(await allocationsOf(tx, hand)).toEqual([{ invoiceId: inv, amountMinor: 3000_00 }]);
+      const [d] = (await tx.execute<{ event: string; actor: string }>(sql`
+        select event::text, actor from decision_history where bank_transaction_id = ${t}
+      `)).rows;
+      expect(d).toEqual({ event: "POSTED", actor: "SYSTEM" });
+    }));
+});

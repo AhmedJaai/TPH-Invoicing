@@ -169,19 +169,21 @@ export async function POST(request: Request) {
     `)).rows;
     const adoptedPayment = Boolean(origin?.adopted);
     if (adoptedPayment) {
-      const [linked] = (await t.execute<{ was: string | number | null }>(sql`
-        select payload->>'كانت بالهللات' as was from decision_history
-         where bank_transaction_id = ${tx.id} and event = 'MATCH_CONFIRMED' and payload ? 'كانت بالهللات'
+      /* والربطُ الآليّ يُسجَّل `POSTED` بيد النظام (لا إقرارَ إنسان) — وفيه ما كان كذلك */
+      const [linked] = (await t.execute<{ was: string | number | null; fee: string | number | null }>(sql`
+        select payload->>'كانت بالهللات' as was, payload->>'كان الرسم بالهللات' as fee from decision_history
+         where bank_transaction_id = ${tx.id} and event in ('MATCH_CONFIRMED', 'POSTED') and payload ? 'كانت بالهللات'
          order by created_at desc limit 1
       `)).rows;
       const was = linked?.was === null || linked?.was === undefined ? null : Number(linked.was);
+      const feeWas = linked?.fee === null || linked?.fee === undefined ? 0 : Number(linked.fee);
       if (was !== null && Number.isInteger(was) && was > 0) {
         const [{ allocated }] = (await t.execute<{ allocated: number }>(sql`
           select coalesce(sum(amount_minor), 0)::int as allocated from payment_allocations where payment_id = ${paymentId}
         `)).rows;
         /* لا يُعاد مبلغٌ أصغرُ ممّا خُصّص منها — يبقى كما هو ويُقال */
-        if (Number(allocated) <= was) {
-          await t.update(payments).set({ amountMinor: was }).where(eq(payments.id, paymentId));
+        if (Number.isInteger(feeWas) && Number(allocated) <= was - feeWas) {
+          await t.update(payments).set({ amountMinor: was, feeMinor: feeWas }).where(eq(payments.id, paymentId));
           await refreshPaymentStatus(t, paymentId);
         }
       }

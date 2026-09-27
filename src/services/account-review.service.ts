@@ -24,6 +24,7 @@ import { bankTransactions, decisionHistory, invoices, paymentAllocations, paymen
 import { linkHandPayments, linkKey, type HandPaymentLink } from "@/lib/hand-payment-link";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
+import { splitBankFee } from "@/lib/bank/fees";
 import { echoKey, findPaymentEchoes, type CreditEcho, type PaymentEcho } from "@/lib/payment-echo";
 import { creditEchoesOf, echoRows } from "@/services/payment-echo.service";
 import { recordAudit } from "@/lib/audit";
@@ -325,6 +326,8 @@ export async function linkHandPayment(
   tx: Tx,
   input: { transferId: string; paymentId: string },
   actorId: string,
+  /** «SYSTEM» حين يربط الاستيرادُ المطابقَ مبلغاً وحده — فلا يُسجَّل إقرارَ إنسانٍ لم يقع. */
+  by: "HUMAN" | "SYSTEM" = "HUMAN",
 ): Promise<HandPaymentLink> {
   await tx.select({ id: payments.id }).from(payments).where(eq(payments.id, input.paymentId)).for("update");
   await tx.select({ id: bankTransactions.id }).from(bankTransactions).where(eq(bankTransactions.id, input.transferId)).for("update");
@@ -332,15 +335,23 @@ export async function linkHandPayment(
   const [link] = linkHandPayments(transfers, hand);
   if (!link) throw new HandLinkRefused("تغيّرت الحوالةُ أو الدفعة منذ المعاينة — حدّث المراجعة");
 
-  const [p] = await tx.select({ paidAt: payments.paidAt, appliesToMonth: payments.appliesToMonth })
+  const [p] = await tx.select({ paidAt: payments.paidAt, appliesToMonth: payments.appliesToMonth, feeMinor: payments.feeMinor })
     .from(payments).where(eq(payments.id, link.paymentId));
   const [t] = await tx.select({
     valueDate: bankTransactions.valueDate, beneficiaryRaw: bankTransactions.beneficiaryRaw, description: bankTransactions.description,
   }).from(bankTransactions).where(eq(bankTransactions.id, link.transferId));
   await assertMonthsOpen(tx, [p.appliesToMonth, p.paidAt.toISOString().slice(0, 7), t.valueDate.toISOString().slice(0, 7)]);
 
+  /*
+    الزائدُ في حدّ رسم التحويل رسمٌ لا رصيد (`splitBankFee`) — ٣٬٠٠٥٫٧٥ على سدادٍ
+    بـ٣٬٠٠٠ ليس خمسةَ ريالاتٍ «لنا» عند المورّد تُخصَم من فاتورته التالية.
+  */
+  const fee = link.extraMinor > 0 ? splitBankFee(link.transferMinor, link.paymentMinor) : null;
+  const creditMinor = fee ? 0 : link.extraMinor;
+
   await tx.update(payments).set({
     amountMinor: link.transferMinor,
+    ...(fee ? { feeMinor: fee.feeMinor } : {}),
     paidAt: t.valueDate,
     beneficiaryNameRaw: sql`coalesce(${payments.beneficiaryNameRaw}, ${(t.beneficiaryRaw ?? t.description ?? "").slice(0, 200)})`,
   }).where(eq(payments.id, link.paymentId));
@@ -352,20 +363,28 @@ export async function linkHandPayment(
     category: "SUPPLIER",
     matchStatus: "MATCHED",
     matchDisposition: null,
-    matchOutcome: link.extraMinor > 0 ? "SUPPLIER_ON_ACCOUNT" : "SUPPLIER_SETTLED",
+    matchOutcome: creditMinor > 0 ? "SUPPLIER_ON_ACCOUNT" : "SUPPLIER_SETTLED",
     lifecycle: "POSTED",
   });
 
   const why = link.exact
     ? "الحوالةُ هي السدادُ الذي قُيِّد بيدٍ قبلها — المبلغُ نفسه والمورّدُ نفسه"
-    : `الحوالةُ هي السدادُ الذي قُيِّد بيدٍ قبلها، وزادت عليه — والزائدُ رصيدٌ للمورّد`;
+    : fee
+      ? `الحوالةُ هي السدادُ الذي قُيِّد بيدٍ قبلها، والزائدُ رسمُ تحويل — ${fee.reason}`
+      : `الحوالةُ هي السدادُ الذي قُيِّد بيدٍ قبلها، وزادت عليه — والزائدُ رصيدٌ للمورّد`;
   await tx.insert(decisionHistory).values({
     bankTransactionId: link.transferId,
-    event: "MATCH_CONFIRMED",
-    actor: "HUMAN",
-    actorId,
+    /* الربطُ الآليّ «قُيِّد» بيد النظام — لا «أقرّه» إنسانٌ لم يره */
+    event: by === "HUMAN" ? "MATCH_CONFIRMED" : "POSTED",
+    actor: by,
+    actorId: by === "HUMAN" ? actorId : null,
     detail: why,
-    payload: { الدفعة: link.paymentId, "كانت بالهللات": link.paymentMinor, "صارت بالهللات": link.transferMinor },
+    payload: {
+      الدفعة: link.paymentId,
+      "كانت بالهللات": link.paymentMinor,
+      "صارت بالهللات": link.transferMinor,
+      "كان الرسم بالهللات": p.feeMinor,
+    },
   });
   await recordAudit({
     actorId,
@@ -376,7 +395,7 @@ export async function linkHandPayment(
     after: { الحركة: link.transferId, المبلغ_بالهللات: link.transferMinor, السبب: why },
   }, tx);
 
-  if (link.extraMinor > 0) {
+  if (creditMinor > 0) {
     await applySupplierCredit(tx, link.supplierId, { forwardDays: SETTLEMENT_FORWARD_DAYS, paymentIds: [link.paymentId] });
   }
   return link;
@@ -387,7 +406,7 @@ export async function linkExactHandPayments(actorId: string, notes: string[]): P
   let linked = 0;
   for (const l of (await loadHandPaymentLinks()).filter((x) => x.exact)) {
     try {
-      await db.transaction((t) => linkHandPayment(t, l, actorId));
+      await db.transaction((t) => linkHandPayment(t, l, actorId, "SYSTEM"));
       linked++;
     } catch (e) {
       notes.push(`${l.supplierName}: ${(e as Error).message.slice(0, 100)}`);
@@ -540,7 +559,7 @@ export async function runAccountReview(
   for (const l of await loadHandPaymentLinks()) {
     if (!l.exact && !wantedLinks.has(l.key)) continue;
     try {
-      await db.transaction((t) => linkHandPayment(t, l, actorId));
+      await db.transaction((t) => linkHandPayment(t, l, actorId, wantedLinks.has(l.key) ? "HUMAN" : "SYSTEM"));
       linked.push({ key: l.key, supplierName: l.supplierName, extraMinor: l.extraMinor });
     } catch (err) {
       notes.push(`${l.supplierName}: ${(err as Error).message.slice(0, 100)}`);
