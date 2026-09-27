@@ -6,6 +6,7 @@
  * واحدة، لكنّها تعني أنّ النظام يخلق مالاً لم يُدفع. فالتخصيص يُحدّ بما
  * بقي، والفائض يُعلَن ولا يُبتلَع.
  */
+import { LINK_WINDOW_DAYS } from "@/lib/hand-payment-link";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { bankTransactions, invoices, paymentAllocations, payments } from "@/db/schema";
 import { assertMonthsOpen } from "./month-guard";
@@ -98,6 +99,13 @@ export async function findPaymentTwin(
 } | null> {
   if (!input.supplierId) return null;
 
+  /*
+    قفلُ المعاملة على المورّد والمبلغ: المزامنةُ (إيصالٌ) والاستيرادُ (كشفٌ) قد
+    يسألان في اللحظة نفسها فلا يرى أحدُهما الآخرَ ويكتبان دفعتين. فالثاني ينتظر
+    حتّى تُكتب الأولى أو تُلغى — ثمّ يجدها.
+  */
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`payment-twin:${input.supplierId}:${input.amountMinor}`}))`);
+
   const [row] = await tx
     .select({
       id: payments.id,
@@ -115,7 +123,7 @@ export async function findPaymentTwin(
       eq(payments.supplierId, input.supplierId),
       eq(payments.amountMinor, input.amountMinor),
       /* اليومُ نفسه — لا اللحظةُ نفسها: الإيصال يُؤرَّخ بيومه والكشف بوقته */
-      sql`${payments.paidAt}::date = ${input.paidAt.toISOString().slice(0, 10)}::date`,
+      sql`(${payments.paidAt} at time zone 'Asia/Riyadh')::date = (${input.paidAt}::timestamptz at time zone 'Asia/Riyadh')::date`,
       sql`${payments.status} not in ('REVERSED','VOID')`,
     ))
     /* ما لا حركةَ بنكٍ له أوّلاً: هو الذي يُتبنّى، وما له حركة واقعةٌ أخرى */
@@ -193,9 +201,15 @@ export async function findManualTwin(
       sql`${payments.documentId} is null`,
       sql`${payments.status} not in ('REVERSED','VOID')`,
       sql`not exists (select 1 from bank_transactions bt where bt.matched_payment_id = ${payments}.id)`,
-      sql`${payments.paidAt}::date between ${day}::date - 14 and ${day}::date + 3`,
+      /*
+        نافذةٌ متماثلة — نافذةُ الربط نفسُها (`LINK_WINDOW_DAYS`). كانت −14/+3،
+        والسدادُ اليدويّ يُؤرَّخ يومَ قيده لا يومَ الحوالة، فقيدٌ بعد الحوالة بأربعة
+        أيّام يفوت فتُكتب دفعةٌ ثانية. ويومُ الدفعة بتوقيت الرياض لا بتوقيت الجلسة.
+      */
+      sql`(${payments.paidAt} at time zone 'Asia/Riyadh')::date
+          between ${day}::date - ${LINK_WINDOW_DAYS}::int and ${day}::date + ${LINK_WINDOW_DAYS}::int`,
     ))
-    .orderBy(sql`abs(${payments.paidAt}::date - ${day}::date)`, payments.createdAt)
+    .orderBy(sql`abs((${payments.paidAt} at time zone 'Asia/Riyadh')::date - ${day}::date)`, payments.createdAt)
     .limit(1);
   return row ?? null;
 }

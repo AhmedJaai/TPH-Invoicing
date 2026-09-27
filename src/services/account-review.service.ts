@@ -261,8 +261,8 @@ export interface HandLinkView extends HandPaymentLink {
   invoices: { id: string; number: string }[];
 }
 
-async function handLinkInputs(conn: Conn, only?: { transferId: string; paymentId: string }) {
-  const transfers = (await conn
+async function handLinkInputs(conn: Conn, only?: { transferId: string; paymentId: string }, handOnly = false) {
+  const transfers = handOnly ? [] : (await conn
     .select({
       id: bankTransactions.id,
       supplierId: bankTransactions.supplierId,
@@ -275,7 +275,12 @@ async function handLinkInputs(conn: Conn, only?: { transferId: string; paymentId
       sql`${bankTransactions.matchedPaymentId} is null`,
       sql`${bankTransactions.supplierId} is not null`,
       sql`${bankTransactions.matchStatus} <> 'IGNORED'`,
-      eq(bankTransactions.category, "SUPPLIER"),
+      /*
+        المورّدُ معروفٌ من المستفيد والبابُ «غير معروف»: حوالةٌ عاديّة بلا كلمةٍ
+        دالّة. كان يُشترط `SUPPLIER` فتفوتها — ثمّ يُقِرّها صاحبُها فتُكتب دفعةً
+        ثانيةً فوق سداده المقيَّد بيده.
+      */
+      inArray(bankTransactions.category, ["SUPPLIER", "UNKNOWN"]),
       only ? eq(bankTransactions.id, only.transferId) : undefined,
     )))
     .filter((r): r is typeof r & { supplierId: string } => r.supplierId !== null);
@@ -299,6 +304,26 @@ async function handLinkInputs(conn: Conn, only?: { transferId: string; paymentId
     .filter((r): r is typeof r & { supplierId: string } => r.supplierId !== null);
 
   return { transfers, hand };
+}
+
+/**
+ * حوالاتُ ملفٍّ يُستورَد الآن، ولكلٍّ سدادٌ مقيَّدٌ بيدٍ بمبلغها نفسه — قبل أن
+ * تُكتب دفعةً.
+ *
+ * كان المطابقُ يعمل أوّلاً: الفاتورةُ الأولى أغلقها السدادُ اليدويّ، وفاتورةٌ
+ * ثانيةٌ للمورّد نفسه بالمبلغ نفسه مفتوحة — فتُطابَق الحوالةُ بها وتُكتب دفعةً
+ * جديدة، ويُعدّ المالُ مرّتين وتُغلق فاتورةٌ لم تُدفع. والربطُ بالسداد اليدويّ
+ * يجري بعد الكتابة فلا يجد الحوالة. فيُحجَز هنا ما يطابق مبلغاً بمبلغ في نافذة
+ * الربط، ويُترك للربط بعد الإدراج.
+ */
+export async function reserveForHandPayments(
+  rows: readonly { key: string; supplierId: string | null; day: string; amountMinor: number; direction: string }[],
+  conn: Conn = db,
+): Promise<Map<string, string>> {
+  const debits = rows.flatMap((r) => (r.direction === "DEBIT" && r.supplierId ? [{ id: r.key, supplierId: r.supplierId, day: r.day, amountMinor: r.amountMinor }] : []));
+  if (debits.length === 0) return new Map();
+  const { hand } = await handLinkInputs(conn, undefined, true);
+  return new Map(linkHandPayments(debits, hand).filter((l) => l.exact).map((l) => [l.transferId, l.paymentId]));
 }
 
 export async function loadHandPaymentLinks(conn: Conn = db): Promise<HandLinkView[]> {

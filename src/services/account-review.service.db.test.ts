@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { bankImports, bankTransactions, paymentAllocations, payments, users } from "@/db/schema";
-import { allocate, createPayment } from "./payment.service";
-import { EchoMergeRefused, HandLinkRefused, loadCreditEchoes, mergeIntoCredit, linkHandPayment, loadHandPaymentLinks, loadPaymentEchoes, mergePaymentEcho } from "./account-review.service";
+import { allocate, createPayment, findManualTwin } from "./payment.service";
+import { EchoMergeRefused, HandLinkRefused, reserveForHandPayments, loadCreditEchoes, mergeIntoCredit, linkHandPayment, loadHandPaymentLinks, loadPaymentEchoes, mergePaymentEcho } from "./account-review.service";
 import { drawBankCredit, undrawBankCredit } from "./supplier-credit.service";
 import { caught, day, makeInvoice, makeSupplier, withRollback } from "@/test/db";
 import type { Tx } from "./types";
@@ -108,11 +108,13 @@ describe("«سجّل أنّها سُدّدت» يأخذ حوالةَ الكشف 
 });
 
 /** حوالةٌ في الطابور: عُرف مورّدُها ولم تُربط بدفعة. */
-async function waitingTransfer(tx: Tx, supplierId: string, amountMinor: number, iso: string): Promise<string> {
+async function waitingTransfer(
+  tx: Tx, supplierId: string, amountMinor: number, iso: string, category: "SUPPLIER" | "UNKNOWN" = "SUPPLIER",
+): Promise<string> {
   const [imp] = await tx.insert(bankImports).values({ fileName: `dbtest-${Math.random()}.xlsx` }).returning({ id: bankImports.id });
   const [t] = await tx.insert(bankTransactions).values({
     bankImportId: imp.id, valueDate: day(iso), amountMinor, direction: "DEBIT",
-    matchStatus: "UNMATCHED", category: "SUPPLIER", supplierId,
+    matchStatus: "UNMATCHED", category, supplierId,
   }).returning({ id: bankTransactions.id });
   return t.id;
 }
@@ -202,3 +204,44 @@ describe("التخصيصُ الثاني للدفعة نفسها على الفا�
       expect(await allocationsOf(tx, pay)).toEqual([{ invoiceId: inv, amountMinor: 462_00 }]);
     }));
 });
+
+describe("كشفٌ يصل بعد «سُدّدت» — الحالةُ التي وصفها أحمد: ٣٬٠٠٠ ريال", () => {
+  it("حوالةٌ عُرف مورّدُها وبابُها «غير معروف» تُربط بالسداد اليدويّ ولا تنتظر إقراراً يكتب دفعةً ثانية", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const inv = await makeInvoice(tx, s, 3000_00, "2026-09-01");
+      const hand = await manualPaid(tx, s, inv, 3000_00, "2026-09-04");
+      const t = await waitingTransfer(tx, s, 3000_00, "2026-09-04", "UNKNOWN");
+      const [l] = (await loadHandPaymentLinks(tx)).filter((x) => x.supplierId === s);
+      expect(l).toMatchObject({ transferId: t, paymentId: hand, exact: true });
+    }));
+
+  it("فاتورةٌ ثانيةٌ مفتوحةٌ بالمبلغ نفسه لا تأخذ الحوالة — تُحجَز للسداد المقيَّد ولو قُيِّد بعدها بأيّام", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const first = await makeInvoice(tx, s, 3000_00, "2026-09-01");
+      await makeInvoice(tx, s, 3000_00, "2026-09-10");
+      /* الحوالةُ يومَ ٤، وقيدُها بيدٍ يومَ ٨ — «سُدّدت» يُؤرَّخ يومَ قيده */
+      const hand = await manualPaid(tx, s, first, 3000_00, "2026-09-08");
+
+      const reserved = await reserveForHandPayments([
+        { key: "row-1", supplierId: s, day: "2026-09-04", amountMinor: 3000_00, direction: "DEBIT" },
+        { key: "row-2", supplierId: s, day: "2026-09-04", amountMinor: 1200_00, direction: "DEBIT" },
+      ], tx);
+      expect([...reserved]).toEqual([["row-1", hand]]);
+
+      /* والتبنّي عند الكتابة يجده كذلك — نافذةٌ متماثلة لا ‎−14/+3 */
+      expect((await findManualTwin(tx, { supplierId: s, paidAt: day("2026-09-04"), amountMinor: 3000_00 }))?.id).toBe(hand);
+    }));
+
+  it("والسدادُ الذي له حركةُ بنكٍ لا يُحجَز له شيء — الحوالةُ الجديدة دفعةٌ أخرى حقّاً", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      await bankPayment(tx, s, 3000_00, "2026-09-04");
+      const reserved = await reserveForHandPayments([
+        { key: "row-1", supplierId: s, day: "2026-09-05", amountMinor: 3000_00, direction: "DEBIT" },
+      ], tx);
+      expect(reserved.size).toBe(0);
+    }));
+});
+

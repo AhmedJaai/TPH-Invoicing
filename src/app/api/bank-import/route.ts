@@ -26,7 +26,7 @@ import { loadSupplierProfiles } from "@/services/supplier-profile.service";
 import { analyzeCoverage, describeCoverage } from "@/lib/bank/coverage";
 import type { SupplierIdentity } from "@/lib/bank/entities";
 import { monthBalancesFromStatement } from "@/lib/bank/statement-balances";
-import { linkExactHandPayments } from "@/services/account-review.service";
+import { linkExactHandPayments, reserveForHandPayments } from "@/services/account-review.service";
 import { withDeadline } from "@/lib/ai/deadline";
 
 export const runtime = "nodejs";
@@ -645,6 +645,23 @@ async function handle(request: Request) {
   */
   const plannedByKey = new Map(engine.planned.map((p) => [p.transactionKey, p]));
 
+  /*
+    السدادُ المقيَّدُ بيدٍ يسبق المطابق: حوالةٌ بمبلغه لمورّده في نافذة الربط لا
+    تُكتب دفعةً جديدة ولو وجد المطابقُ لها فاتورةً مفتوحة بالمبلغ نفسه — تُترك
+    لـ`linkExactHandPayments` بعد الإدراج فتُربط بالسداد لا تُضاعفه.
+  */
+  const reservedForHand = await reserveForHandPayments(freshRows.flatMap((f) => {
+    const decided = engineByKey.get(f.row.key);
+    return plannedByKey.has(f.row.key) ? [{
+      key: f.row.key,
+      supplierId: decided?.supplierId ?? null,
+      day: f.row.raw.valueDate.toISOString().slice(0, 10),
+      amountMinor: f.row.raw.amountMinor,
+      direction: f.row.raw.direction,
+    }] : [];
+  }));
+  for (const key of reservedForHand.keys()) plannedByKey.delete(key);
+
   await db.transaction(async (tx) => {
     for (const row of fresh) {
       const t = row.row.tx;
@@ -709,6 +726,9 @@ async function handle(request: Request) {
                 مستفيد: decided.supplierEvidence,
                 مطابقة: decided.decision?.reasons ?? [],
                 درجةالمستفيد: Math.round(decided.supplierScore * 100),
+                ...(reservedForHand.has(key)
+                  ? { سدادمقيّدبيد: "بمبلغها نفسه للمورّد نفسه — تُربط به ولا تُكتب دفعةً ثانية" }
+                  : {}),
               }
             : null,
           /*
