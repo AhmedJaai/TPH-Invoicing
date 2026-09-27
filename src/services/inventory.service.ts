@@ -381,15 +381,24 @@ export async function resolveOpenings(
     for (const r of manual.rows) settle(String(r.product_id), Number(r.canonical_milli), "MANUAL", String(r.id));
   }
 
-  /* ٢ · فعليُّ آخر جردٍ مقفَل في الفرع نفسه — لا من فرعٍ آخر */
+  /*
+    ٢ · فعليُّ الجرد المقفَل **الذي ينتهي عشيّةَ هذا** في الفرع نفسه — وللصنف
+    الذي كان في نطاقه.
+
+    كان يُؤخَذ آخرُ جردٍ مقفَلٍ قبله أيّاً كان: أسبوعٌ لم يُجرَد بينهما فيصير
+    فعليُّ الأوّل افتتاحيَّ الثالث، ويسقط استهلاكُ الثاني كلُّه من الحساب؛ وصنفٌ
+    خارجَ نطاق الجرد السابق يبقى عليه عددٌ قديم فيُؤخَذ. فالفجوةُ «غير معروف»
+    يُدخله صاحبُه — لا رقمٌ من أسبوعٍ آخر.
+  */
   const previous = await conn.execute<Record<string, unknown>>(sql`
     select distinct on (l.product_id)
            l.product_id, l.actual_milli, c.id as count_id
       from inventory_count_lines l
       join inventory_counts c on c.id = l.count_id
      where c.status = 'FINALISED'
-       and c.period_end < ${periodStart}
+       and c.period_end = ${shiftDays(periodStart, -1)}
        and ${branchId ? sql`c.branch_id = ${branchId}` : sql`c.branch_id is null`}
+       and l.in_scope
        and l.actual_milli is not null
      order by l.product_id, c.period_end desc
   `);
@@ -1064,34 +1073,37 @@ export async function discardCount(
   if (!header) throw new Error("الجرد غير موجود — ربما أُلغي من نافذةٍ أخرى");
   if (header.status === "FINALISED") throw new CountLockedError();
 
-  const counted = await conn
-    .select({ productId: inventoryCountLines.productId, actualMilli: inventoryCountLines.actualMilli, unit: inventoryCountLines.baseUnit })
-    .from(inventoryCountLines)
-    .where(and(eq(inventoryCountLines.countId, countId), isNotNull(inventoryCountLines.actualMilli)));
-  const openings = await conn
-    .select({ productId: inventoryCountOpenings.productId, milli: inventoryCountOpenings.enteredMilli, unit: inventoryCountOpenings.enteredUnit })
-    .from(inventoryCountOpenings)
-    .where(and(eq(inventoryCountOpenings.countId, countId), isNull(inventoryCountOpenings.supersededAt)));
+  /* التدقيقُ والحذفُ معاً أو لا شيء — كان التدقيقُ يُكتب ثمّ يُردّ الحذفُ فيبقى سجلُّ إلغاءٍ لم يقع */
+  const counted = await conn.transaction(async (t) => {
+    const rows = await t
+      .select({ productId: inventoryCountLines.productId, actualMilli: inventoryCountLines.actualMilli, unit: inventoryCountLines.baseUnit })
+      .from(inventoryCountLines)
+      .where(and(eq(inventoryCountLines.countId, countId), isNotNull(inventoryCountLines.actualMilli)));
+    const openings = await t
+      .select({ productId: inventoryCountOpenings.productId, milli: inventoryCountOpenings.enteredMilli, unit: inventoryCountOpenings.enteredUnit })
+      .from(inventoryCountOpenings)
+      .where(and(eq(inventoryCountOpenings.countId, countId), isNull(inventoryCountOpenings.supersededAt)));
 
-  await recordAudit({
-    actorId,
-    action: "INVENTORY_COUNT_DISCARDED",
-    entityType: "inventory_count",
-    entityId: countId,
-    before: {
-      الفترة: `${header.periodStart} → ${header.periodEnd}`,
-      العدّ_الفعليّ: counted.map((c) => ({ الصنف: c.productId, بالمِلّي: Number(c.actualMilli), الوحدة: c.unit })),
-      الأرصدة_الافتتاحيّة: openings.map((o) => ({ الصنف: o.productId, بالمِلّي: Number(o.milli), الوحدة: o.unit })),
-    },
-    after: { السبب: "أُلغي الجردُ قبل إقفاله" },
-  }, conn);
+    await recordAudit({
+      actorId,
+      action: "INVENTORY_COUNT_DISCARDED",
+      entityType: "inventory_count",
+      entityId: countId,
+      before: {
+        الفترة: `${header.periodStart} → ${header.periodEnd}`,
+        العدّ_الفعليّ: rows.map((c) => ({ الصنف: c.productId, بالمِلّي: Number(c.actualMilli), الوحدة: c.unit })),
+        الأرصدة_الافتتاحيّة: openings.map((o) => ({ الصنف: o.productId, بالمِلّي: Number(o.milli), الوحدة: o.unit })),
+      },
+      after: { السبب: "أُلغي الجردُ قبل إقفاله" },
+    }, t);
 
-  /* الأسطرُ واللقطةُ والأرصدةُ تتبعه (cascade) — والمؤثِّرُ يأذن لأنّه مسوّدة */
-  const removed = await conn.delete(inventoryCounts)
-    .where(and(eq(inventoryCounts.id, countId), eq(inventoryCounts.status, "DRAFT")))
-    .returning({ id: inventoryCounts.id });
-  if (removed.length === 0) throw new CountLockedError();
-
+    /* الأسطرُ واللقطةُ والأرصدةُ تتبعه (cascade) — والمؤثِّرُ يأذن لأنّه مسوّدة */
+    const removed = await t.delete(inventoryCounts)
+      .where(and(eq(inventoryCounts.id, countId), eq(inventoryCounts.status, "DRAFT")))
+      .returning({ id: inventoryCounts.id });
+    if (removed.length === 0) throw new CountLockedError();
+    return rows;
+  });
   return { periodStart: header.periodStart, periodEnd: header.periodEnd, counted: counted.length };
 }
 
@@ -1305,41 +1317,46 @@ export async function saveActualCounts(
  * اتّفاقاً على ألّا نكتب، بل منعاً من أن نكتب.
  */
 export async function finaliseCount(countId: string, actorId: string, conn: Conn = db): Promise<EngineReport> {
-  const header = await loadCountHeader(countId, conn);
-  if (!header) throw new Error("الجرد غير موجود");
-  if (header.status === "FINALISED") throw new CountLockedError();
+  /*
+    الحسابُ والتجميدُ في معاملةٍ واحدة بقفلٍ على الجرد — كان الحسابُ خارجها:
+    عدٌّ يُحفَظ بينهما لا تحمله اللقطة، وضغطتا «أقفل» تكتبان لقطتين.
+  */
+  return conn.transaction(async (tx) => {
+    await tx.execute(sql`select 1 from inventory_counts where id = ${countId} for update`);
+    const header = await loadCountHeader(countId, tx);
+    if (!header) throw new Error("الجرد غير موجود");
+    if (header.status === "FINALISED") throw new CountLockedError();
 
-  const report = await recomputeCount(countId, conn);
+    const report = await recomputeCount(countId, tx);
 
-  const provenance = {
-    engineVersion: ENGINE_VERSION,
-    recipeVersionIds: [...new Set(report.lines.flatMap((l) => l.recipeVersionIds))].sort(),
-    invoiceLineIds: [...new Set(report.lines.flatMap((l) => l.invoiceLineIds))].sort(),
-    /* وما أدخله إنسان: الاستلاماتُ ومصادرُ الافتتاحيّ ونطاقُ الجرد */
-    receiptIds: [...new Set(report.lines.flatMap((l) => l.receiptIds))].sort(),
-    openings: report.lines
-      .filter((l) => l.openingSource !== "UNKNOWN")
-      .map((l) => ({ productId: l.productId, source: l.openingSource, ref: l.openingRef }))
-      .sort((a, b) => a.productId.localeCompare(b.productId)),
-    scope: {
-      source: header.scopeSource,
-      excluded: report.lines.filter((l) => !l.inScope).map((l) => l.productId).sort(),
-    },
-    salesLineIds: report.consumption.included.lines,
-    salesImportIds: await importIdsFor(header.periodStart, header.periodEnd, conn),
-    computedAt: new Date().toISOString(),
-  };
-  const payload = {
-    periodStart: header.periodStart,
-    periodEnd: header.periodEnd,
-    branchId: header.branchId,
-    coverage: report.coverage,
-    totals: report.totals,
-    lines: report.lines,
-  };
-  const checksum = createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+    const provenance = {
+      engineVersion: ENGINE_VERSION,
+      recipeVersionIds: [...new Set(report.lines.flatMap((l) => l.recipeVersionIds))].sort(),
+      invoiceLineIds: [...new Set(report.lines.flatMap((l) => l.invoiceLineIds))].sort(),
+      /* وما أدخله إنسان: الاستلاماتُ ومصادرُ الافتتاحيّ ونطاقُ الجرد */
+      receiptIds: [...new Set(report.lines.flatMap((l) => l.receiptIds))].sort(),
+      openings: report.lines
+        .filter((l) => l.openingSource !== "UNKNOWN")
+        .map((l) => ({ productId: l.productId, source: l.openingSource, ref: l.openingRef }))
+        .sort((a, b) => a.productId.localeCompare(b.productId)),
+      scope: {
+        source: header.scopeSource,
+        excluded: report.lines.filter((l) => !l.inScope).map((l) => l.productId).sort(),
+      },
+      salesLineIds: report.consumption.included.lines,
+      salesImportIds: await importIdsFor(header.periodStart, header.periodEnd, tx),
+      computedAt: new Date().toISOString(),
+    };
+    const payload = {
+      periodStart: header.periodStart,
+      periodEnd: header.periodEnd,
+      branchId: header.branchId,
+      coverage: report.coverage,
+      totals: report.totals,
+      lines: report.lines,
+    };
+    const checksum = createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 
-  await conn.transaction(async (tx) => {
     await tx
       .insert(inventoryCountSnapshots)
       .values({
@@ -1360,10 +1377,12 @@ export async function finaliseCount(countId: string, actorId: string, conn: Conn
         },
       });
 
-    await tx
+    const done = await tx
       .update(inventoryCounts)
       .set({ status: "FINALISED", finalisedById: actorId, finalisedAt: new Date() })
-      .where(eq(inventoryCounts.id, countId));
+      .where(and(eq(inventoryCounts.id, countId), eq(inventoryCounts.status, "DRAFT")))
+      .returning({ id: inventoryCounts.id });
+    if (done.length === 0) throw new CountLockedError();
 
     await recordAudit({
       actorId,
@@ -1378,9 +1397,9 @@ export async function finaliseCount(countId: string, actorId: string, conn: Conn
         بصمة_اللقطة: checksum.slice(0, 12),
       },
     }, tx);
-  });
 
-  return report;
+    return report;
+  });
 }
 
 async function importIdsFor(periodStart: string, periodEnd: string, conn: Conn): Promise<string[]> {

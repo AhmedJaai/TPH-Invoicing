@@ -20,7 +20,7 @@ export interface StaleReason {
 export async function changesSinceFinalise(header: CountHeader, conn: Conn = db): Promise<StaleReason[]> {
   if (header.status !== "FINALISED" || !header.finalisedAt) return [];
   const f = header.finalisedAt;
-  const [r] = (await conn.execute<{ sales: number; invoices: number; linked: number; recipes: number }>(sql`
+  const [r] = (await conn.execute<{ sales: number; invoices: number; linked: number; recipes: number; previous: number }>(sql`
     select
       (select count(*)::int from sales_imports si
         where si.created_at > ${f} and si.status <> 'FAILED'
@@ -39,12 +39,21 @@ export async function changesSinceFinalise(header: CountHeader, conn: Conn = db)
               between ${header.periodStart} and ${header.periodEnd}) as linked,
       (select count(*)::int from recipe_versions rv
         where coalesce(rv.activated_at, rv.created_at) > ${f} and rv.status = 'ACTIVE'
-          and rv.effective_from <= ${header.periodEnd}) as recipes
+          and rv.effective_from <= ${header.periodEnd}) as recipes,
+      /*
+        افتتاحيُّه فعليُّ الجرد الذي قبله — فإن أُعيد فتحُ ذاك (مسوّدةٌ الآن) أو
+        أُقفل ثانيةً بعد هذا، فقد تغيّر أوّلُ طرفٍ في معادلته.
+      */
+      (select count(*)::int from inventory_counts p
+        where p.period_end = to_char(${header.periodStart}::date - 1, 'YYYY-MM-DD')
+          and p.branch_id is not distinct from ${header.branchId}
+          and (p.status = 'DRAFT' or p.finalised_at > ${f})) as previous
   `)).rows;
   const out: StaleReason[] = [];
   if (r.sales > 0) out.push({ label: "ملفُّ مبيعاتٍ لأيّامه استُورد بعد الإقفال", count: r.sales });
   if (r.invoices > 0) out.push({ label: "فاتورةُ شراءٍ لأسبوعه قُيّدت بعد الإقفال", count: r.invoices });
   if (r.linked > 0) out.push({ label: "صنفُ مورّدٍ من فواتيره رُبط بصنف جردٍ بعد الإقفال", count: r.linked });
   if (r.recipes > 0) out.push({ label: "نسخةُ وصفةٍ تسري فيه فُعّلت بعد الإقفال", count: r.recipes });
+  if (r.previous > 0) out.push({ label: "جردُ الأسبوع الذي قبله أُعيد فتحُه بعد إقفال هذا — فرصيدُه الافتتاحيّ قد تغيّر", count: r.previous });
   return out;
 }

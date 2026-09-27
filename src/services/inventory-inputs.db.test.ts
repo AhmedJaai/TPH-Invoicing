@@ -101,6 +101,19 @@ describe("الرصيدُ الافتتاحيّ اليدويّ", () => {
       expect(l.openingRef).toBe(prev.countId);
     }));
 
+  it("وجردٌ قبل أسبوعين لا يصير افتتاحيّاً — الفجوةُ «غير معروف» لا رقمٌ يُسقط استهلاكَ أسبوعٍ كامل", () =>
+    withRollback(async (tx) => {
+      const { actorId, branch, coffee } = await cafe(tx, 0);
+      const old = await startCount({ periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: branch.id, actorId }, tx);
+      await saveActualCounts(old.countId, [{ productId: coffee, actualMilli: g(5200) }], actorId, tx);
+      await finaliseCount(old.countId, actorId, tx);
+
+      const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
+      const l = await line(tx, countId, coffee);
+      expect(l.openingMilli).toBeNull();
+      expect(l.openingSource).toBe("UNKNOWN");
+    }));
+
   it("واليدويّ يغلب السابقَ صراحةً — ويبقى تاريخُه، والإفراغُ يُعيد السابقَ لا الصفر", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx, 0);

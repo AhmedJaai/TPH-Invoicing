@@ -293,9 +293,14 @@ describe("نطاقُ الجرد", () => {
 });
 
 describe("الاستهلاكُ الصفرُ بدليل", () => {
+  /* مبيعاتٌ في كلّ يومٍ من الأسبوع — وهو شرطُ الدليل */
+  const wholeWeek = ["01", "02", "03", "04", "05", "06", "07"]
+    .flatMap((d, i) => soldLines(10, `2026-09-${d}`).map((l) => ({ ...l, lineId: `w${i}` })));
+
   it("مكوّنٌ في وصفةٍ سارية لم يُبَع ما يستهلكه في أسبوعٍ فيه مبيعات — صفرٌ لا مجهول", () => {
     const OTHER = "p-other";
     const r = reconcile(input({
+      soldLines: wholeWeek,
       products: [...PRODUCTS, { id: OTHER, nameAr: "شراب", category: "OTHER", baseUnit: "ML" as const }],
       recipeVersions: [RECIPE, {
         ...RECIPE, id: "v2", recipeId: "r2", menuProductId: "m-other",
@@ -305,6 +310,21 @@ describe("الاستهلاكُ الصفرُ بدليل", () => {
     const other = r.lines.find((l) => l.productId === OTHER)!;
     expect(other.theoreticalConsumptionMilli).toBe(0);
     expect(other.flags).not.toContain("CONSUMPTION_UNKNOWN");
+  });
+
+  it("ويومان من سبعة لا يكفيان — مجهولٌ لا صفر، فلا تصير المشترياتُ كلُّها فرقاً", () => {
+    const OTHER = "p-other";
+    const r = reconcile(input({
+      soldLines: wholeWeek.slice(0, 2),
+      products: [...PRODUCTS, { id: OTHER, nameAr: "شراب", category: "OTHER", baseUnit: "ML" as const }],
+      recipeVersions: [RECIPE, {
+        ...RECIPE, id: "v2", recipeId: "r2", menuProductId: "m-other",
+        ingredients: [{ productId: OTHER, quantityMilli: 30_000, unit: "ML", prepLossBp: null }],
+      }],
+    }));
+    const other = r.lines.find((l) => l.productId === OTHER)!;
+    expect(other.theoreticalConsumptionMilli).toBeNull();
+    expect(other.flags).toContain("CONSUMPTION_UNKNOWN");
   });
 
   it("وبلا مبيعاتٍ في الفترة — مجهولٌ لا صفر: الغيابُ غيابُ ملفّ لا غيابُ بيع", () => {

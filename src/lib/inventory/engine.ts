@@ -255,13 +255,30 @@ export function reconcile(input: EngineInput): EngineReport {
   const unitConflicts: string[] = [];
   const lines: ReportLine[] = [];
   const duplicateProducts = new Set((input.receiptDuplicates ?? []).map((d) => d.productId));
-  const hasSales = input.soldLines.length > 0;
+  /*
+    «لم يُبَع ما يستهلكه» يحتاج دليلاً على الفترة كلِّها: كلُّ يومٍ فيها له
+    مبيعات. كان يكفي سطرُ بيعٍ واحد — يومان من سبعة يُستوردان فيُعلَن
+    الاستهلاكُ صفراً، وتصير المشترياتُ كلُّها «فرقاً».
+  */
+  const soldDays = new Set(input.soldLines.map((l) => l.businessDate));
+  const hasSales = input.soldLines.length > 0 && everyDay(input.periodStart, input.periodEnd).every((d) => soldDays.has(d));
   /* مكوّناتُ كلّ نسخةٍ ساريةٍ تتقاطع مع الفترة — وبها يُعرَف أنّ الصفرَ صفر */
   const inActiveRecipe = new Set(
     input.recipeVersions
       .filter((v) => v.status === "ACTIVE"
         && v.effectiveFrom <= input.periodEnd
         && (v.effectiveTo === null || v.effectiveTo >= input.periodStart))
+      .flatMap((v) => v.ingredients.map((i) => i.productId)),
+  );
+
+  /*
+    وما بِيع واستُبعد من الحساب (بلا نسخةٍ ساريةٍ يومَ بيعه، أو وصفةٌ فارغة)
+    وفي نسخةٍ ما من وصفته هذا المكوّن — فقد يكون استُهلك ولم يُحسَب: لا صفرَ له.
+  */
+  const excludedMenu = new Set(consumption.excluded.flatMap((e) => (e.menuProductId ? [e.menuProductId] : [])));
+  const reachedByExcluded = new Set(
+    input.recipeVersions
+      .filter((v) => excludedMenu.has(v.menuProductId))
       .flatMap((v) => v.ingredients.map((i) => i.productId)),
   );
 
@@ -292,7 +309,7 @@ export function reconcile(input: EngineInput): EngineReport {
       } else {
         consumptionMilli = used.canonicalMilli;
       }
-    } else if (hasSales && inActiveRecipe.has(product.id)) {
+    } else if (hasSales && inActiveRecipe.has(product.id) && !reachedByExcluded.has(product.id)) {
       /*
         ── لم يُبَع ما يستهلكه — صفرٌ بدليل ──
 
@@ -480,4 +497,16 @@ export function topVariances(report: EngineReport, limit = 5): ReportLine[] {
       return Math.abs(b.varianceBp ?? 0) - Math.abs(a.varianceBp ?? 0);
     })
     .slice(0, limit);
+}
+
+/** أيّامُ الفترة شاملةً — YYYY-MM-DD. */
+function everyDay(start: string, end: string): string[] {
+  const out: string[] = [];
+  const [y, m, d] = start.split("-").map(Number);
+  for (let t = Date.UTC(y, m - 1, d); ; t += 86_400_000) {
+    const day = new Date(t).toISOString().slice(0, 10);
+    if (day > end || out.length > 400) break;
+    out.push(day);
+  }
+  return out;
 }
