@@ -78,6 +78,12 @@ async function loadCredits(executor: Executor, supplierId: string): Promise<Cred
 async function loadOpenInvoices(
   executor: Executor,
   supplierId: string,
+  /**
+   * للخصم الآليّ: فاتورةٌ مستندُها ينتظر المراجعة لا يُخصَّص عليها مال — قراءةُ
+   * النموذج لم يُقِرّها أحد، والتخصيصُ عليها كان يمنع رفضَها إن أخطأت («تراجع عن
+   * السداد أوّلاً» عن سدادٍ لم يقرّره أحد). والإقرارُ يخصم بعد الأرشفة.
+   */
+  archivedOnly = false,
 ): Promise<(OpenInvoice & { number: string })[]> {
   const rows = (
     await executor.execute<{ id: string; invoice_date: Date | string; invoice_number: string; remaining: string | number }>(sql`
@@ -87,6 +93,9 @@ async function loadOpenInvoices(
              ), 0))::bigint as remaining
         from invoices i
        where i.supplier_id = ${supplierId}
+         ${archivedOnly ? sql`and not exists (
+           select 1 from documents d where d.id = i.document_id and d.status <> 'ARCHIVED'
+         )` : sql``}
     `)
   ).rows;
   return rows
@@ -148,7 +157,7 @@ export async function applySupplierCredit(
   }
   if (credits.length === 0) return { allocations: [], appliedMinor: 0, creditLeftMinor: 0 };
 
-  const open = await loadOpenInvoices(tx, supplierId);
+  const open = await loadOpenInvoices(tx, supplierId, options.forwardDays !== null);
   const plan = planCreditApplication(credits, open, { forwardDays: options.forwardDays });
   if (plan.allocations.length === 0) {
     return { allocations: [], appliedMinor: 0, creditLeftMinor: plan.creditLeftMinor };

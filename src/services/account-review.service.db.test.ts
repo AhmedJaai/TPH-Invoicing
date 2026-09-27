@@ -283,3 +283,18 @@ describe("رسمُ التحويل في الربط بالسداد اليدويّ"
       expect(d).toEqual({ event: "POSTED", actor: "SYSTEM" });
     }));
 });
+
+describe("لا مالَ على فاتورةٍ لم يُقِرّها أحد", () => {
+  it("الخصمُ الآليّ يتخطّى فاتورةً مستندُها ينتظر المراجعة، ويخصم بعد الإقرار", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      await createPayment(tx, { supplierId: s, paidAt: day("2026-09-01"), amountMinor: 700_00, method: "BANK_TRANSFER", acknowledgeTwin: true });
+      const inv = await makeInvoice(tx, s, 700_00, "2026-09-03");
+      await tx.execute(sql`update documents set status = 'NEEDS_REVIEW' where id = (select document_id from invoices where id = ${inv})`);
+
+      expect((await applySupplierCredit(tx, s, { forwardDays: 7 })).appliedMinor).toBe(0);
+
+      await tx.execute(sql`update documents set status = 'ARCHIVED' where id = (select document_id from invoices where id = ${inv})`);
+      expect((await applySupplierCredit(tx, s, { forwardDays: 7 })).appliedMinor).toBe(700_00);
+    }));
+});
