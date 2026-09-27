@@ -1,3 +1,6 @@
+import { asc, eq, or } from "drizzle-orm";
+import { db } from "@/db";
+import { suppliers } from "@/db/schema";
 import { todayInRiyadh } from "@/lib/riyadh-time";
 import { CreditNoteForm } from "@/components/credit-note-form";
 import Link from "next/link";
@@ -96,6 +99,10 @@ export async function InvoiceView({
   const nav = await neighbours(supplier.id, inv.date, inv.id);
   const canEdit = can(user.role, "document:upload");
   const canPay = can(user.role, "payment:approve");
+  const supplierOptions = canEdit
+    ? (await db.select({ id: suppliers.id, name: suppliers.nameAr }).from(suppliers)
+      .where(or(eq(suppliers.isActive, true), eq(suppliers.id, supplier.id))).orderBy(asc(suppliers.nameAr)))
+    : [];
 
   const reasons = invoiceReasons(
     {
@@ -437,7 +444,11 @@ export async function InvoiceView({
                   subtotal: inv.subtotalMinor === null ? "" : formatRiyals(inv.subtotalMinor),
                   vat: inv.vatMinor === null ? "" : formatRiyals(inv.vatMinor),
                   total: formatRiyals(inv.totalMinor),
+                  invoiceDate: todayInRiyadh(inv.date),
+                  supplierId: supplier.id,
                 }}
+                suppliers={supplierOptions}
+                paidMinor={p.paidMinor}
               />
             </div>
           </Section>

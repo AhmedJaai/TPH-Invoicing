@@ -33,6 +33,8 @@ export function InvoiceFix({
   reasons,
   initial,
   canEdit,
+  suppliers,
+  paidMinor,
   startOpen = false,
 }: {
   invoiceId: string;
@@ -44,8 +46,15 @@ export function InvoiceFix({
     subtotal: string;
     vat: string;
     total: string;
+    /** YYYY-MM-DD */
+    invoiceDate: string;
+    supplierId: string;
   };
   canEdit: boolean;
+  /** للتصحيح حين قُرئ المورّدُ خطأً — تغييرُه يفكّ عنها سدادَ السابق. */
+  suppliers: { id: string; name: string }[];
+  /** ما خُصّص عليها — يُقال قبل تغيير المورّد إنّه سيُفكّ. */
+  paidMinor: number;
   /** يُفتح من رابطٍ جاء لتصحيحه (`?act=fix`) — لا يُطلب ضغطةٌ ثانية. */
   startOpen?: boolean;
 }) {
@@ -65,7 +74,7 @@ export function InvoiceFix({
     setBusy(true);
     setFailed(false);
     setMessage(null);
-    const r = await postJson<{ taxStatus: string }>("/api/invoice-fields", {
+    const r = await postJson<{ taxStatus: string; releasedMinor?: number }>("/api/invoice-fields", {
       invoiceId,
       invoiceNumber: form.invoiceNumber,
       sellerVat: form.sellerVat,
@@ -73,6 +82,9 @@ export function InvoiceFix({
       subtotal: form.subtotal,
       vat: form.vat,
       total: form.total,
+      /* ما لم يتغيّر لا يُرسَل — فلا يُسأل عن صلاحيةٍ لم يُطلب بها شيء */
+      ...(form.invoiceDate !== initial.invoiceDate ? { invoiceDate: form.invoiceDate } : {}),
+      ...(form.supplierId !== initial.supplierId ? { supplierId: form.supplierId } : {}),
     });
     setBusy(false);
     if (!r.ok) {
@@ -84,7 +96,9 @@ export function InvoiceFix({
     toast({
       tone: valid ? "ok" : "warn",
       title: "حُفظ التصحيح",
-      body: valid ? "وأعاد الخادمُ الحكمَ عليها: صارت مستوفيةَ الأركان." : "وما زال فيها ما يُراجَع — الأسبابُ أعلاه.",
+      body: (r.data.releasedMinor ?? 0) > 0
+        ? "وفُكّ عنها سدادُ المورّد السابق — عاد رصيداً له يُخصم من فواتيره."
+        : valid ? "وأعاد الخادمُ الحكمَ عليها: صارت مستوفيةَ الأركان." : "وما زال فيها ما يُراجَع — الأسبابُ أعلاه.",
     });
     setOpen(false);
     router.refresh();
@@ -167,6 +181,32 @@ export function InvoiceFix({
             <Field label="الصافي قبل الضريبة" value={form.subtotal} onChange={(v) => set({ subtotal: v })} ltr hint={amountHint(form.subtotal)} />
             <Field label="الضريبة" value={form.vat} onChange={(v) => set({ vat: v })} ltr hint={amountHint(form.vat)} />
             <Field label="الإجماليّ" value={form.total} onChange={(v) => set({ total: v })} ltr hint={amountHint(form.total, true)} />
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium text-muted">تاريخ الفاتورة</span>
+              <input
+                type="date" value={form.invoiceDate} onChange={(e) => set({ invoiceDate: e.target.value })}
+                className="nums min-h-11 w-full rounded-lg border border-line-input bg-raised px-2.5 text-sm sm:min-h-9"
+              />
+              {form.invoiceDate.slice(0, 7) !== initial.invoiceDate.slice(0, 7) && (
+                <span className="mt-1 block text-[11px] text-warn">تنتقل إلى شهر {form.invoiceDate.slice(0, 7)} — شهرُ الفاتورة من تاريخها</span>
+              )}
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium text-muted">المورّد</span>
+              <select
+                value={form.supplierId} onChange={(e) => set({ supplierId: e.target.value })}
+                className="min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-sm sm:min-h-9"
+              >
+                {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              {form.supplierId !== initial.supplierId && (
+                <span className="mt-1 block text-[11px] text-warn">
+                  {paidMinor > 0
+                    ? <>يُفكّ عنها ما خُصّص من سداد المورّد السابق (<Money minor={paidMinor} />) ويعود رصيداً له — ثمّ يُخصم رصيدُ الجديد.</>
+                    : "وتتبعها بنودُها وأصنافُها إلى المورّد الجديد."}
+                </span>
+              )}
+            </label>
           </div>
           <SumCheck subtotal={form.subtotal} vat={form.vat} total={form.total} />
           <div className="mt-3 flex flex-wrap items-center gap-3">
