@@ -46,5 +46,6 @@
   "045_notifications_seen.sql": "bb5c12e2f80e9cc44327dad6427709fa077dcb504df204a495fb59ffdaa0675f",
   "046_drive_checked.sql": "91d682cbdeb001675d16f561d799aef09b492e934a3ca3bb5eede37c2793c018",
   "047_invoice_line_qty_unknown.sql": "5ed9e681241da8cbfede66dd1adde3d8936d22e9f8ba9451f783f92a0f5d9184",
-  "048_payment_bounds.sql": "d3e14da0c7e23453d2de305cefe411a1dd26b3f621e37f15274dae03fbaa2dd6"
+  "048_payment_bounds.sql": "d3e14da0c7e23453d2de305cefe411a1dd26b3f621e37f15274dae03fbaa2dd6",
+  "049_credit_note_method.sql": "9be49e8b3097f95402d86661055ed86fb8f4ba1e5a0b66ab824c45a3c4e7aff5"
 }

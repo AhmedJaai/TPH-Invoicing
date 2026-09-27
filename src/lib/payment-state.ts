@@ -116,6 +116,7 @@ export const METHOD_LABEL: Record<string, string> = {
   CASH: "نقداً",
   EMPLOYEE_ADVANCE: "عهدة موظّف",
   OWNER_ACCOUNT: "من حساب المالك",
+  CREDIT_NOTE: "إشعار دائن",
 };
 
 /** انتقالاتٌ مسموحة — وما عداها يُرفَض ولا يُكتَب. */

@@ -24,7 +24,7 @@ export interface CreatePaymentInput {
   supplierId?: string | null;
   paidAt: Date;
   amountMinor: number;
-  method: "BANK_TRANSFER" | "CASH" | "EMPLOYEE_ADVANCE" | "OWNER_ACCOUNT";
+  method: "BANK_TRANSFER" | "CASH" | "EMPLOYEE_ADVANCE" | "OWNER_ACCOUNT" | "CREDIT_NOTE";
   beneficiaryNameRaw?: string | null;
   appliesToMonth?: string | null;
   /**
@@ -122,6 +122,8 @@ export async function findPaymentTwin(
     .where(and(
       eq(payments.supplierId, input.supplierId),
       eq(payments.amountMinor, input.amountMinor),
+      /* الإشعارُ الدائن ليس مالاً خرج — لا يتبنّاه كشفٌ ولا إيصالٌ بالمبلغ نفسه */
+      sql`${payments.method} <> 'CREDIT_NOTE'`,
       /* اليومُ نفسه — لا اللحظةُ نفسها: الإيصال يُؤرَّخ بيومه والكشف بوقته */
       sql`(${payments.paidAt} at time zone 'Asia/Riyadh')::date = (${input.paidAt}::timestamptz at time zone 'Asia/Riyadh')::date`,
       sql`${payments.status} not in ('REVERSED','VOID')`,
@@ -198,6 +200,8 @@ export async function findManualTwin(
     .where(and(
       eq(payments.supplierId, input.supplierId),
       eq(payments.amountMinor, input.amountMinor),
+      /* الإشعارُ الدائن ليس مالاً خرج — لا يتبنّاه كشفٌ ولا إيصالٌ بالمبلغ نفسه */
+      sql`${payments.method} <> 'CREDIT_NOTE'`,
       sql`${payments.documentId} is null`,
       sql`${payments.status} not in ('REVERSED','VOID')`,
       sql`not exists (select 1 from bank_transactions bt where bt.matched_payment_id = ${payments}.id)`,

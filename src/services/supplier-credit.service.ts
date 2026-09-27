@@ -38,7 +38,7 @@ import type { Tx } from "./types";
 type Executor = typeof db | Tx;
 
 /** طرقُ سدادٍ لا تمرّ بحساب المقهى — تخصيصُها يبقى عند الفكّ. */
-const OUTSIDE_BANK_METHODS = new Set(["OWNER_ACCOUNT", "CASH"]);
+const OUTSIDE_BANK_METHODS = new Set(["OWNER_ACCOUNT", "CASH", "CREDIT_NOTE"]);
 
 export class CreditError extends Error {
   readonly status: number;

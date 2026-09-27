@@ -1,3 +1,5 @@
+import { todayInRiyadh } from "@/lib/riyadh-time";
+import { CreditNoteForm } from "@/components/credit-note-form";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -239,6 +241,7 @@ export async function InvoiceView({
               <p className="mt-3 text-[11px] leading-relaxed text-muted">
                 إن كانت حوالةً من حساب المقهى وسيصل كشفُها، فانتظره — تُطابَق حينها وحدها.
               </p>
+              <CreditNoteForm invoiceId={inv.id} today={todayInRiyadh()} />
             </>
           ) : (
             <p className="text-sm leading-relaxed text-ink-soft">

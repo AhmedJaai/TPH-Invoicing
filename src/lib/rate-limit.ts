@@ -95,6 +95,8 @@ export const RULES: Record<string, RateLimitRule> = {
   "account-review": { limit: 60, windowSeconds: 3600 },
   /* ربطُ بنود الفواتير بأصناف الجرد — صنفٌ صنفٌ في جلسة */
   "inventory-purchase-link": { limit: 400, windowSeconds: 3600 },
+  /* الإشعارُ الدائن — إدخالٌ بيد، فاتورةً فاتورة */
+  "credit-note": { limit: 120, windowSeconds: 3600 },
   "match-undo": { limit: 60, windowSeconds: 3600 },
   counterparty: { limit: 300, windowSeconds: 3600 },
   "match-confirm": { limit: 200, windowSeconds: 3600 },

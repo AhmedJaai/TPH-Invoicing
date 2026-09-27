@@ -376,6 +376,8 @@ export const paymentMethodEnum = pgEnum("payment_method", [
     فلا يُنتظَر له توأمٌ من البنك. انظر `027`.
   */
   "OWNER_ACCOUNT",
+  /* إشعارٌ دائن من المورّد — تسويةٌ لا مالٌ خرج؛ لا تُطابَق بحوالة (049) */
+  "CREDIT_NOTE",
 ]);
 
 /**
