@@ -31,6 +31,7 @@ import {
 } from "@/lib/allocation";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { allocate, createPayment, refreshPaymentStatus } from "./payment.service";
+import { echoHeldPaymentIds } from "./payment-echo.service";
 import type { db } from "@/db";
 import type { Tx } from "./types";
 
@@ -139,6 +140,11 @@ export async function applySupplierCredit(
   if (options.paymentIds) {
     const only = new Set(options.paymentIds);
     credits = credits.filter((c) => only.has(c.paymentId));
+  }
+  /* الخصمُ الآليّ يتنحّى عن حوالةٍ هي صدى سدادٍ مقيَّد — وما يقرّره إنسانٌ (`null`) يمضي */
+  if (options.forwardDays !== null) {
+    const held = await echoHeldPaymentIds(tx, supplierId);
+    credits = credits.filter((c) => !held.has(c.paymentId));
   }
   if (credits.length === 0) return { allocations: [], appliedMinor: 0, creditLeftMinor: 0 };
 

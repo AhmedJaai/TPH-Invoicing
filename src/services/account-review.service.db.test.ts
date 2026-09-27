@@ -3,7 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { bankImports, bankTransactions, paymentAllocations, payments, users } from "@/db/schema";
 import { allocate, createPayment, findManualTwin } from "./payment.service";
 import { EchoMergeRefused, HandLinkRefused, reserveForHandPayments, loadCreditEchoes, mergeIntoCredit, linkHandPayment, loadHandPaymentLinks, loadPaymentEchoes, mergePaymentEcho } from "./account-review.service";
-import { drawBankCredit, undrawBankCredit } from "./supplier-credit.service";
+import { applySupplierCredit, drawBankCredit, undrawBankCredit } from "./supplier-credit.service";
 import { caught, day, makeInvoice, makeSupplier, withRollback } from "@/test/db";
 import type { Tx } from "./types";
 
@@ -245,3 +245,20 @@ describe("كشفٌ يصل بعد «سُدّدت» — الحالةُ التي و
     }));
 });
 
+
+describe("الرصيدُ الوهميّ لا يُخصَم آلياً — حوالةٌ هي صدى سدادٍ مقيَّد", () => {
+  it("فاتورةٌ جديدة لا تُغلَق بحوالةٍ هي سدادُ فاتورةٍ أخرى، والإنسانُ يقرّر", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const a = await makeInvoice(tx, s, 1000_00, "2026-09-01");
+      await manualPaid(tx, s, a, 1000_00, "2026-09-03");
+      /* الكشفُ كتب الحوالةَ دفعةً بلا تخصيص — رصيدٌ «لنا» في الظاهر */
+      await bankPayment(tx, s, 1000_00, "2026-09-02");
+      const b = await makeInvoice(tx, s, 1000_00, "2026-09-05");
+
+      const auto = await applySupplierCredit(tx, s, { forwardDays: 7 });
+      expect(auto.appliedMinor).toBe(0);
+      const n = await tx.execute<{ n: number }>(sql`select count(*)::int as n from payment_allocations where invoice_id = ${b}`);
+      expect(Number(n.rows[0].n)).toBe(0);
+    }));
+});

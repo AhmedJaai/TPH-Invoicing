@@ -24,7 +24,8 @@ import { bankTransactions, decisionHistory, invoices, paymentAllocations, paymen
 import { linkHandPayments, linkKey, type HandPaymentLink } from "@/lib/hand-payment-link";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
-import { echoKey, findCreditEchoes, findPaymentEchoes, type CreditEcho, type EchoPayment, type PaymentEcho } from "@/lib/payment-echo";
+import { echoKey, findPaymentEchoes, type CreditEcho, type PaymentEcho } from "@/lib/payment-echo";
+import { creditEchoesOf, echoRows } from "@/services/payment-echo.service";
 import { recordAudit } from "@/lib/audit";
 import { recordFromStoredReadings, type BacklogOutcome } from "@/services/document-backlog.service";
 import { applyCreditEverywhere } from "@/services/document-review.service";
@@ -38,40 +39,6 @@ export interface EchoView extends PaymentEcho {
   supplierSlug: string;
   /** الفواتيرُ التي سدّدها الإقرارُ على الورق — تنتقل إلى الحوالة. */
   invoices: { id: string; number: string; amountMinor: number }[];
-}
-
-async function echoRows(conn: Conn, supplierId?: string): Promise<EchoPayment[]> {
-  const rows = await conn
-    .select({
-      id: payments.id,
-      supplierId: payments.supplierId,
-      day: sql<string>`to_char(${payments.paidAt}, 'YYYY-MM-DD')`,
-      amountMinor: payments.amountMinor,
-      feeMinor: payments.feeMinor,
-      method: payments.method,
-      status: payments.status,
-      hasDocument: sql<boolean>`${payments.documentId} is not null`,
-      allocatedMinor: sql<number>`coalesce((
-        select sum(pa.amount_minor)::int from payment_allocations pa where pa.payment_id = ${payments}.id
-      ), 0)`,
-      hasBankRow: sql<boolean>`exists (
-        select 1 from bank_transactions bt where bt.matched_payment_id = ${payments}.id
-      )`,
-    })
-    .from(payments)
-    .where(and(
-      sql`${payments.supplierId} is not null`,
-      sql`${payments.status} not in ('REVERSED','VOID')`,
-      supplierId ? eq(payments.supplierId, supplierId) : undefined,
-    ));
-  return rows
-    .filter((r): r is typeof r & { supplierId: string } => r.supplierId !== null)
-    .map((r) => ({
-      ...r,
-      allocatedMinor: Number(r.allocatedMinor),
-      hasBankRow: Boolean(r.hasBankRow),
-      hasDocument: Boolean(r.hasDocument),
-    }));
 }
 
 /** كلُّ صدى قائم، بما يكفي ليُفهم قبل أن يُقَرّ. */
@@ -173,13 +140,6 @@ export interface CreditEchoView extends CreditEcho {
   key: string;
   supplierName: string;
   invoices: { id: string; number: string; amountMinor: number }[];
-}
-
-async function creditEchoesOf(conn: Conn, supplierId?: string): Promise<CreditEcho[]> {
-  const rows = await echoRows(conn, supplierId);
-  /* ما قابله صدى بالمبلغ نفسه بابُه هناك — لا يُعاد هنا */
-  const exact = findPaymentEchoes(rows);
-  return findCreditEchoes(rows, [...exact.map((e) => e.manualId), ...exact.map((e) => e.bankId)]);
 }
 
 export async function loadCreditEchoes(conn: Conn = db): Promise<CreditEchoView[]> {
