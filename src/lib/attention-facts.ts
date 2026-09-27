@@ -152,6 +152,16 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
                description, beneficiary_raw, category::text as category, operation_ref
         from bank_transactions
         where direction = 'DEBIT'
+          /*
+            الازدواجُ مبلغٌ واحدٌ في يومٍ واحد (يومُ UTC كما في findDoublePaid) — فما
+            لا يتكرّر يومُه ومبلغُه بين الصادر لا يكون ازدواجاً. كان يُجلَب الصادرُ
+            كلُّه في كلّ رسمٍ للقشرة لعددٍ واحدٍ في الشريط الجانبيّ؛ والنتيجةُ هي هي.
+          */
+          and (to_char(value_date at time zone 'UTC', 'YYYY-MM-DD'), amount_minor) in (
+            select to_char(value_date at time zone 'UTC', 'YYYY-MM-DD'), amount_minor
+              from bank_transactions where direction = 'DEBIT'
+             group by 1, 2 having count(*) > 1
+          )
       `),
     loadUnbackedPayments(),
     db.execute<{ key: string; decision: string }>(sql`
@@ -189,6 +199,11 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
          where bt.amount_minor > 100
            and ((bt.direction = 'DEBIT' and (bt.matched_payment_id is not null or bt.category = 'SUPPLIER'))
              or (bt.direction = 'CREDIT' and bt.category <> 'INTERNAL'))
+           /* الردُّ صادرٌ ووارد بالمبلغ نفسه — وما لا نظيرَ لمبلغه في الاتّجاه الآخر لا يكون ردّاً (findReversals) */
+           and bt.amount_minor in (
+             select amount_minor from bank_transactions where amount_minor > 100
+              group by amount_minor having count(distinct direction) = 2
+           )
       `),
   ]);
 

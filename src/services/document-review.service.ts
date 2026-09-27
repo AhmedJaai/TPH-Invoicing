@@ -41,7 +41,20 @@ export async function loadPendingReview(limit = 200) {
       supplierId: suppliers.id,
       supplierVat: suppliers.vatNumber,
       supplierName: suppliers.nameAr,
-      reading: documents.extractionJson,
+      /*
+        ما يُحتاج من القراءة وحده — لا عمودُها كلُّه. كان يُجلَب لخمسمئة مستندٍ
+        كلَّ عشر دقائق (الاستدراكُ الآليّ) وفي صفحة المستندات، والمستعمَلُ منه
+        خمسةُ مفاتيح. والفراغُ فراغ: المستندُ بلا قراءةٍ يبقى `null`.
+      */
+      reading: sql<unknown>`case when ${documents.extractionJson} is null then null else jsonb_build_object(
+        'documentKind', ${documents.extractionJson}->'documentKind',
+        'invoiceNumber', ${documents.extractionJson}->'invoiceNumber',
+        'invoiceDate', ${documents.extractionJson}->'invoiceDate',
+        'totalAmount', ${documents.extractionJson}->'totalAmount',
+        'lines', (select coalesce(jsonb_agg(jsonb_build_object('lineTotal', l->'lineTotal')), '[]'::jsonb)
+                    from jsonb_array_elements(case when jsonb_typeof(${documents.extractionJson}->'lines') = 'array'
+                                                   then ${documents.extractionJson}->'lines' else '[]'::jsonb end) l)
+      ) end`,
       statementId: statements.id,
     })
     .from(documents)

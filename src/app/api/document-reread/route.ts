@@ -28,15 +28,17 @@ import { driveForUser } from "@/lib/drive";
 import { refreshTokenFor } from "@/services/drive.service";
 import { withDeadline } from "@/lib/ai/deadline";
 import { rereadDocument } from "@/services/document-reread.service";
+import { z } from "zod";
+import { can } from "@/lib/permissions";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-interface Body {
-  documentId?: string;
-  /** بلا هذا: معاينةٌ لا تمسّ صفّاً. */
-  apply?: boolean;
-}
+/** بلا `apply`: معاينةٌ لا تمسّ صفّاً. */
+const Body = z.object({
+  documentId: z.string().trim().min(1).max(64),
+  apply: z.boolean().optional(),
+}).strict();
 
 export async function POST(request: Request) {
   let user;
@@ -48,15 +50,25 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let body: Body;
+  /*
+    إعادةُ القراءة قراءةٌ لمبالغ الفاتورة وكتابةٌ لها — فلا تُفتح لمن لا يراها.
+    كانت بصلاحية الرفع وحدها، فيرى مديرُ المشتريات الصافيَ والضريبةَ والإجماليّ
+    في المعاينة ويكتبها، وهو ما يمنعه «صحّح الحقول». والرقمُ والتاريخ يُصحَّحان هناك.
+  */
+  if (!can(user.role, "amounts:view")) {
+    return NextResponse.json({ error: "إعادةُ قراءة الفاتورة تحتاج صلاحية عرض المبالغ — وتصحيحُ الرقم والتاريخ من «صحّح الحقول»." }, { status: 403 });
+  }
+
+  let raw: unknown;
   try {
-    body = (await request.json()) as Body;
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
   }
-
-  const id = body.documentId?.trim();
-  if (!id) return NextResponse.json({ error: "لم يُذكر المستند" }, { status: 400 });
+  const parsed = Body.safeParse(raw);
+  if (!parsed.success) return NextResponse.json({ error: "لم يُذكر المستند" }, { status: 400 });
+  const body = parsed.data;
+  const id = body.documentId;
 
   /*
     وضعُ التجربة لا تفويضَ درايف له عمداً (`refreshTokenFor`) — فلا يرفع

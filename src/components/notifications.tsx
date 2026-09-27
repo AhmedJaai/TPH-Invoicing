@@ -17,11 +17,12 @@ import { Sheet } from "./ui-client";
  * بأعدادها). و«علّم الكلّ مقروءاً» يكتب حدّاً في القاعدة فيصحّ على كلّ
  * أجهزتك.
  *
- * ولا يُطلَب شيءٌ والنافذةُ في الخلفيّة: السؤالُ كلَّ ثلاث دقائق حين
- * تكون ظاهرة، ومع كلّ فتح.
+ * ولا يُطلَب شيءٌ والنافذةُ في الخلفيّة: السؤالُ كلَّ ربع ساعة حين تكون
+ * ظاهرة، ومع كلّ فتحٍ وكلّ عودةٍ إلى اللسان. وكان كلَّ ثلاث دقائق — والقاعدةُ
+ * لا تنام إلّا بعد خمسٍ بلا طلب، فكان لسانٌ مفتوحٌ يُبقيها مستيقظةً يومَه كلَّه.
  */
 
-const POLL_MS = 3 * 60 * 1000;
+const POLL_MS = 15 * 60 * 1000;
 
 const ICON = {
   DOCUMENTS: FileText,
@@ -68,7 +69,15 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
     const t = window.setInterval(() => {
       if (document.visibilityState === "visible") void load();
     }, POLL_MS);
-    return () => window.clearInterval(t);
+    /* العائدُ إلى اللسان يرى الجديد فوراً — فلا حاجةَ إلى سؤالٍ متقارب وهو غائب */
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [load]);
 
   /* الانتقالُ يغلق اللوح — يُضبط أثناء الرسم لا في أثر */
