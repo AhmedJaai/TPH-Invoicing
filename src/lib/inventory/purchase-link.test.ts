@@ -39,3 +39,14 @@ describe("suggestStockItem — أقربُ صنفٍ اسماً", () => {
     expect(suggestStockItem("كروسان زبدة", options)).toBeNull();
   });
 });
+
+describe("suggestStockItem — يتعلّم من الربط السابق", () => {
+  it("اسمُ المورّد الآخر يُقترح له ما رُبط به اسمٌ يشبهه", () => {
+    const options = [
+      { id: "eth", nameAr: "بن اثيوبي", aliases: ["[100791] Ethiopia Guji – Medium Roast 1 KG / إثيوبيا قوجي – وسط كجم"] },
+      { id: "col", nameAr: "بن كولومبي" },
+    ];
+    expect(suggestStockItem("Ethiopia Guji Coffee 1000g", options)?.id).toBe("eth");
+    expect(suggestStockItem("اثيوبيا قوجي كيلو", options)?.id).toBe("eth");
+  });
+});

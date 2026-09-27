@@ -26,6 +26,8 @@ export interface StockItemOption {
   nameAr: string;
   nameEn: string | null;
   baseUnit: StoredUnit;
+  /** أسماءُ أصناف المورّدين المربوطة به — للاقتراح وحده. */
+  aliases: string[];
 }
 
 export interface PurchaseLinkRow {
@@ -57,7 +59,11 @@ export async function loadStockItemOptions(conn: Conn = db): Promise<StockItemOp
     .from(products)
     .where(and(eq(products.isStockItem, true), eq(products.isActive, true)))
     .orderBy(products.nameAr);
-  return rows.flatMap((r) => (isStoredUnit(r.baseUnit) ? [{ ...r, baseUnit: r.baseUnit }] : []));
+  const linked = await conn.select({ productId: supplierProducts.productId, name: supplierProducts.displayName })
+    .from(supplierProducts).where(sql`${supplierProducts.productId} is not null`);
+  const aliases = new Map<string, string[]>();
+  for (const l of linked) if (l.productId) aliases.set(l.productId, [...(aliases.get(l.productId) ?? []), l.name]);
+  return rows.flatMap((r) => (isStoredUnit(r.baseUnit) ? [{ ...r, baseUnit: r.baseUnit, aliases: aliases.get(r.id) ?? [] }] : []));
 }
 
 /** كلُّ صنفِ مورّدٍ اشتُري في الفترة — بحاله وما يُحسَب منه. */

@@ -89,19 +89,25 @@ export interface StockOption {
   id: string;
   nameAr: string;
   nameEn?: string | null;
+  /** أسماءُ أصناف المورّدين التي رُبطت به قبلاً — ما تعلّمه النظامُ من تأكيد صاحبه. */
+  aliases?: readonly string[];
 }
 
 /**
  * أقربُ أصناف الجرد إلى نصّ البند — بالكلمات المشتركة، والأطولُ أثقل.
  * اقتراحٌ يُعرض أوّلاً في القائمة، لا ربطٌ يقع.
+ *
+ * ويُقارَن باسم الصنف **وبأسماء ما رُبط به من قبل**: «Ethiopia Guji 1 KG» عند
+ * مورّدٍ رُبط بـ«بن اثيوبي» فيُقترح «بن اثيوبي» لـ«إثيوبيا قوجي» عند مورّدٍ آخر.
  */
 export function suggestStockItem<T extends StockOption>(description: string, options: readonly T[]): T | null {
   const words = new Set(tokensOf(description));
   if (words.size === 0) return null;
   let best: { o: T; score: number } | null = null;
   for (const o of options) {
-    const own = tokensOf(`${o.nameAr} ${o.nameEn ?? ""}`);
-    const score = own.filter((w) => words.has(w)).reduce((s, w) => s + w.length, 0);
+    const score = [`${o.nameAr} ${o.nameEn ?? ""}`, ...(o.aliases ?? [])]
+      .map((name) => [...new Set(tokensOf(name))].filter((w) => words.has(w)).reduce((s, w) => s + w.length, 0))
+      .reduce((a, b) => Math.max(a, b), 0);
     if (score >= 3 && (!best || score > best.score)) best = { o, score };
   }
   return best?.o ?? null;
