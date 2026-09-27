@@ -42,6 +42,36 @@ export function findInvoiceTwin(
   return null;
 }
 
+/**
+ * أيُقيَّد هذا المستندُ فاتورةً **آلياً**؟ — بابٌ واحد لكلّ مسارٍ يقيّد بلا إنسان
+ * (طابورُ الأرشفة، مزامنةُ الدرايف). كانت المزامنةُ تسأل `canCreateInvoice` وحده:
+ * فاتورةُ بيعٍ أو فاتورةٌ لغيرنا صارت ديناً، ورقمٌ بصيغةٍ ثانية صار فاتورةً ثانية.
+ *
+ * يُرجع الأسباب — والفراغُ «يُقيَّد».
+ */
+export function autoRecordRefusal(input: {
+  blockers: readonly { message: string }[];
+  supplier: { id: string; nameAr: string };
+  recorded: readonly RecordedInvoice[];
+  invoiceNumber: string | null;
+  invoiceDate: string | null;
+  totalMinor: number | null;
+}): string[] {
+  if (input.blockers.length > 0) return input.blockers.map((b) => b.message);
+  /*
+    «المورّدُ المعروف» مَن قُيِّدت له فاتورةٌ من قبل. أوّلُ فاتورةٍ من اسمٍ
+    جديد تُقيَّد بيد — «سبعة جرة» عميلٌ سُجّل مورّداً، وكادت تُقيَّد عليه
+    فاتورةُ بيعٍ مشترياتٍ بـ١٬١٠٠ ريال.
+  */
+  if (!input.recorded.some((r) => r.supplierId === input.supplier.id)) {
+    return [`${input.supplier.nameAr}: لم تُقيَّد له فاتورةٌ من قبل — أوّلُ فاتورةٍ من مورّدٍ جديد تُقيَّد بيدك`];
+  }
+  const twin = findInvoiceTwin(input.recorded, {
+    supplierId: input.supplier.id, invoiceNumber: input.invoiceNumber, invoiceDate: input.invoiceDate, totalMinor: input.totalMinor,
+  });
+  return twin ? [twinReason(twin)] : [];
+}
+
 /** الجملةُ التي تُقال تحت المستند حين يُترك لأنّه يشبه مقيَّداً. */
 export function twinReason(t: InvoiceTwin): string {
   return t.kind === "same-number"

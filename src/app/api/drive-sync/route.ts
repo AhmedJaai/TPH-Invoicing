@@ -9,6 +9,8 @@
  * والملف الذي لا يُفهم اسمه — وهو حال ما يُرفع يدوياً — يُقرأ محتواه.
  * وذلك أبطأ، فيُعالَج عدد محدود في كل طلب والباقي في الطلب التالي.
  */
+import { autoRecordRefusal, findInvoiceTwin, twinReason } from "@/lib/invoice-twin";
+import { loadRecordedInvoices } from "@/services/document-backlog.service";
 import { refreshTokenFor } from "@/services/drive.service";
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -168,11 +170,10 @@ async function handle(request: Request) {
     ? await processDocumentBacklog(user.id, drive)
     : { recorded: 0, approved: 0, renamed: [] as { from: string; to: string }[], reread: 0, notes: [] as string[] };
 
-  const known = new Set(
-    (await db.select({ id: documents.driveFileId }).from(documents))
-      .map((d) => d.id)
-      .filter((v): v is string => Boolean(v)),
-  );
+  const knownRows = await db.select({ id: documents.driveFileId, md5: documents.driveMd5 }).from(documents);
+  const known = new Set(knownRows.map((d) => d.id).filter((v): v is string => Boolean(v)));
+  /* بصمةُ ما أُرشف — نسخةٌ من ملفٍّ مقيَّد (في مجلّدٍ آخر أو باسمٍ آخر) تُعرف قبل أن تُنزَّل أو تُقرأ */
+  const knownMd5 = new Set(knownRows.map((d) => d.md5).filter((v): v is string => Boolean(v)));
 
   const months = Array.isArray(body.onlyMonths) && body.onlyMonths.length > 0
     ? body.onlyMonths.slice(0, 36)
@@ -246,13 +247,21 @@ async function handle(request: Request) {
   const recordedFileIds = new Set<string>();
 
   const supplierList = await loadSuppliers();
+  /* المقيَّدُ للمقارنة بالتوأم — ويُضاف إليه ما يُقيَّد في هذا النداء */
+  const recordedInvoices = await loadRecordedInvoices();
   const bySlug = new Map(supplierList.map((s) => [s.slug, s]));
   const byFolder = new Map(supplierList.map((s) => [s.driveFolderName.trim(), s]));
 
   const named: { entry: ArchiveEntry; parsed: ReturnType<typeof parseFileName> }[] = [];
   const unnamed: ArchiveEntry[] = [];
 
+  /** نسخٌ من ملفّاتٍ مقيَّدة — تُذكَر ولا تُقرأ ولا تُقيَّد. */
+  const copies: string[] = [];
   for (const entry of fresh) {
+    if (entry.file.md5Checksum && knownMd5.has(entry.file.md5Checksum)) {
+      copies.push(entry.file.name);
+      continue;
+    }
     const parsed = parseFileName(entry.file.name, KNOWN_SLUGS);
     if (parsed.ok) named.push({ entry, parsed });
     else unnamed.push(entry);
@@ -294,6 +303,9 @@ async function handle(request: Request) {
   /** ملفّاتٌ شهرُها مقفل — تُعرَض ولا تُسجَّل حتى يُفتَح. */
   let closedMonthSkipped = 0;
   const notes: string[] = [];
+  if (copies.length > 0) {
+    notes.push(`${countNoun(copies.length, FILE)} نسخةٌ من ملفٍّ مؤرشَف (البصمةُ نفسُها) — لم تُقرأ ولم تُقيَّد: ${copies.slice(0, 3).join("، ")}`);
+  }
 
   for (const { entry, parsed } of named.slice(0, MAX_NAMED_PER_CALL)) {
     if (!parsed.ok) continue;
@@ -335,7 +347,18 @@ async function handle(request: Request) {
       if (!doc) return; // سُجّل بين الفحص والكتابة — لا نكرّره
       done = { ...done, doc: true };
 
-      if (plan.createsInvoice && supplier) {
+      /*
+        الاسمُ كتبه إنسان — فلا يُسأل عن أوّل فاتورة؛ لكنّ الرقمَ نفسه بصيغةٍ ثانية
+        («INV-05297» و«INV/05297»)، أو اليومَ والمبلغ نفسيهما، نسخةٌ لا فاتورة.
+      */
+      const twin = plan.createsInvoice && supplier
+        ? findInvoiceTwin(recordedInvoices, {
+          supplierId: supplier.id, invoiceNumber: p.invoiceNumber ?? null, invoiceDate: p.date, totalMinor: p.amountMinor ?? null,
+        })
+        : null;
+      if (twin) notes.push(`${entry.file.name} — ${twinReason(twin)}`);
+
+      if (plan.createsInvoice && supplier && !twin) {
         const invoiceId = await createInvoice(tx, {
           documentId: doc.id,
           supplierId: supplier.id,
@@ -351,7 +374,12 @@ async function handle(request: Request) {
           inputVatStatus: "UNKNOWN",
           isFixedAsset: false,
         });
-        if (invoiceId) done = { ...done, invoice: true };
+        if (invoiceId) {
+          done = { ...done, invoice: true };
+          recordedInvoices.push({
+            id: invoiceId, supplierId: supplier.id, invoiceNumber: p.invoiceNumber!, invoiceDate: p.date, totalMinor: p.amountMinor ?? null,
+          });
+        }
       }
 
       if (plan.createsStatement && supplier) {
@@ -433,25 +461,33 @@ async function handle(request: Request) {
       throw e;
     }
 
-    for (const entry of unnamed.slice(0, MAX_CONTENT_PER_CALL)) {
-      /*
-        الوقوف قبل بدء ملفٍّ لا في وسطه: الاستخراج يستغرق ما يستغرق،
-        وقطعُه في منتصفه يترك ملفّاً نُزّل ولم يُقيَّد. فيُسأل الوقتُ
-        عند الباب، ومن دخل أُتِمّ له.
-      */
-      if (Date.now() - startedAt >= CONTENT_BUDGET_MS) break;
+    /*
+      ── لا يعلق الطابورُ على الملفّين نفسيهما ──
 
-      /*
-        والشهرُ يُسأل عند الباب أيضاً — قبل التنزيل والقراءة. فالقراءةُ
-        نداءٌ مدفوع، وكتابتُها في شهرٍ مقفل تُرَدّ فيضيع ثمنُها ويُعاد في
-        كلّ مزامنة. والخدمة تسأل ثانيةً وقت الكتابة.
-      */
+      يُقرأ ملفّان في كلّ نداء. وكان ما لا يُكتب له صفٌّ — شهرٌ مقفل، عرضُ سعر،
+      قراءةٌ فشلت — يبقى «جديداً» فيعود أوّلَ الطابور في كلّ مزامنة: يُقرأ ثانيةً
+      (نداءٌ مدفوع) ولا يُقرأ ما بعده أبداً. فالمقفلُ يُعزل قبل الباب، وعرضُ السعر
+      والفاشلُ يُقيَّدان مستندَين (بلا فاتورة) فلا يعودان.
+    */
+    const readable: ArchiveEntry[] = [];
+    for (const entry of unnamed) {
+      if (readable.length >= MAX_CONTENT_PER_CALL) break;
       const closed = await firstClosedMonth(db, [entry.month]);
       if (closed) {
         notes.push(`${entry.file.name} — لم يُقرأ: ${new MonthClosedError(closed).message}`);
         closedMonthSkipped++;
         continue;
       }
+      readable.push(entry);
+    }
+
+    for (const entry of readable) {
+      /*
+        الوقوف قبل بدء ملفٍّ لا في وسطه: الاستخراج يستغرق ما يستغرق،
+        وقطعُه في منتصفه يترك ملفّاً نُزّل ولم يُقيَّد. فيُسأل الوقتُ
+        عند الباب، ومن دخل أُتِمّ له.
+      */
+      if (Date.now() - startedAt >= CONTENT_BUDGET_MS) break;
 
       let data: Buffer;
       let mimeType: string;
@@ -474,6 +510,8 @@ async function handle(request: Request) {
 
       if (!extraction.ok) {
         readFailures.push(`${entry.file.name} — ${extraction.reason}`);
+        /* يُقيَّد مستنداً «لم يُقرأ» فيظهر في المستندات بسببه — ولا يعود أوّلَ الطابور */
+        await recordUnread(entry, data, mimeType, user.id, "UNKNOWN");
         continue;
       }
 
@@ -502,7 +540,8 @@ async function handle(request: Request) {
         سُجّلت الفاتورة.
       */
       if (x.documentKind === "QUOTATION") {
-        quotations.push(`${entry.file.name} — عرض سعر، لم يُسجَّل`);
+        quotations.push(`${entry.file.name} — عرض سعر، حُفظ ولم يُقيَّد`);
+        await recordUnread(entry, data, mimeType, user.id, "QUOTATION", x);
         continue;
       }
 
@@ -540,9 +579,19 @@ async function handle(request: Request) {
         مكتوب، أو صورةٌ يصدّقها شاهدٌ مستقلّ). وما لم تجتمع فيه ينتظر
         إنساناً، ولوحُ المراجعة يقول له ما نقص بعينه.
       */
+      /* بابُ القيد الآليّ نفسُه الذي يمرّ به الطابور — لا `canCreateInvoice` وحده */
+      const refusal = review.canCreateInvoice && supplier
+        ? autoRecordRefusal({
+          blockers: review.blockers, supplier, recorded: recordedInvoices,
+          invoiceNumber: x.invoiceNumber?.trim() || null, invoiceDate: x.invoiceDate || null, totalMinor: parseRiyals(x.totalAmount),
+        })
+        : [];
+      for (const r of refusal) notes.push(`${entry.file.name} — ${r}`);
+      const mayRecord = review.canCreateInvoice && Boolean(supplier) && refusal.length === 0;
+
       const verdict = autoArchive({
         kind: x.documentKind,
-        invoiceRecorded: review.canCreateInvoice && Boolean(supplier) && parseRiyals(x.totalAmount) !== null,
+        invoiceRecorded: mayRecord && parseRiyals(x.totalAmount) !== null,
         textSource: extraction.textSource ?? null,
         supplierKnown: Boolean(supplier),
         subtotalMinor: parseRiyals(x.subtotalAmount),
@@ -620,7 +669,7 @@ async function handle(request: Request) {
           return;
         }
 
-        if (!review.canCreateInvoice || !supplier) return;
+        if (!mayRecord || !supplier) return;
 
         const totalMinor = parseRiyals(x.totalAmount)!;
         const invoiceDate = new Date(`${x.invoiceDate}T00:00:00Z`);
@@ -648,6 +697,9 @@ async function handle(request: Request) {
 
         if (!invoiceId) return;
         invoiceCreated = true;
+        recordedInvoices.push({
+          id: invoiceId, supplierId: supplier.id, invoiceNumber: x.invoiceNumber.trim(), invoiceDate: x.invoiceDate, totalMinor,
+        });
 
         await replaceLines(tx, {
           invoiceId,
@@ -791,4 +843,35 @@ async function handle(request: Request) {
 /* النداءات تحت عمر المسار — تقف بمهلةٍ معلَنة قبل أن تقتلها المنصّة */
 export async function POST(request: Request) {
   return withDeadline(55_000, () => handle(request));
+}
+
+/**
+ * ملفٌّ قُرئ ولن يُقيَّد فاتورةً — عرضُ سعر، أو قراءةٌ فشلت — يُحفظ مستنداً.
+ *
+ * بلا صفٍّ يبقى «جديداً» فيعود أوّلَ الطابور في كلّ مزامنة. والفاشلُ ينتظر
+ * إنساناً يُكمله من ملفّه («ينتظر» في المستندات)، وعرضُ السعر مؤرشفٌ بلا فاتورة.
+ * ونسخةٌ بالبصمة نفسها لما حُفظ (`documents_sha_uniq`) لا تُكرَّر.
+ */
+async function recordUnread(
+  entry: ArchiveEntry,
+  data: Buffer,
+  mimeType: string,
+  userId: string,
+  kind: "QUOTATION" | "UNKNOWN",
+  reading?: unknown,
+): Promise<void> {
+  await db.insert(documents).values({
+    driveFileId: entry.file.id,
+    driveFolderId: entry.file.parents?.[0] ?? null,
+    fileName: entry.file.name,
+    mimeType,
+    sizeBytes: data.length,
+    sha256: createHash("sha256").update(data).digest("hex"),
+    driveMd5: entry.file.md5Checksum ?? createHash("md5").update(data).digest("hex"),
+    kind,
+    status: kind === "QUOTATION" ? "ARCHIVED" : "NEEDS_REVIEW",
+    periodMonth: entry.month,
+    extractionJson: reading ?? null,
+    uploadedById: userId,
+  }).onConflictDoNothing();
 }

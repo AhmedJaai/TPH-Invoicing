@@ -12,7 +12,7 @@
  * وما لم يُقيَّد بعدها يُقال ما نقصه **بعينه** — لا «ينقصه ركن».
  */
 
-import { and, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, statements, supplierAliases, suppliers } from "@/db/schema";
 import { reviewConfirmed } from "@/lib/confirm";
@@ -27,7 +27,8 @@ import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { recordAudit } from "@/lib/audit";
 import { MonthClosedError } from "@/services/validation.service";
-import { findInvoiceTwin, twinReason, type RecordedInvoice } from "@/lib/invoice-twin";
+import type { Conn } from "./types";
+import { autoRecordRefusal, type RecordedInvoice } from "@/lib/invoice-twin";
 
 export interface StoredReading {
   documentKind?: string;
@@ -153,6 +154,16 @@ export async function recordFromStoredReadings(
       inArray(documents.status, ["PENDING", "NEEDS_REVIEW", "ARCHIVED"]),
       /* بلا قراءةٍ محفوظة: ما صُنّف فاتورةً يُقال إنّه ينتظر قراءةً — لا يُتخطّى صامتاً */
       or(isNotNull(documents.extractionJson), inArray(documents.kind, ["TAX_INVOICE", "SIMPLIFIED_INVOICE"])),
+      /*
+        ما يُقيَّد فاتورةً أو كشفاً وحده — في الاستعلام لا بعده. كانت الإيصالاتُ
+        وعروضُ الأسعار تُقرأ ستّين ستّين ثمّ تُتخطّى، فتملأ الدفعةَ كلَّها ولا يصل
+        الطابورُ إلى ما بعدها أبداً.
+      */
+      or(
+        inArray(documents.kind, ["TAX_INVOICE", "SIMPLIFIED_INVOICE", "STATEMENT"]),
+        and(eq(documents.kind, "UNKNOWN"),
+          sql`${documents.extractionJson}->>'documentKind' in ('TAX_INVOICE', 'SIMPLIFIED_INVOICE', 'STATEMENT')`),
+      ),
       isNull(invoices.id),
       isNull(statements.id),
     ))
@@ -165,17 +176,7 @@ export async function recordFromStoredReadings(
   const supplierList = await loadSuppliers();
   const byId = new Map(supplierList.map((s) => [s.id, s]));
   /* المقيَّدُ كلُّه — ويُضاف إليه ما يُقيَّد في هذه الدورة، فلا تُقيَّد نسختان معاً */
-  const recordedInvoices: RecordedInvoice[] = (await db
-    .select({
-      id: invoices.id, supplierId: invoices.supplierId, invoiceNumber: invoices.invoiceNumber,
-      invoiceDate: invoices.invoiceDate, totalMinor: invoices.totalMinor,
-    })
-    .from(invoices))
-    .filter((r): r is typeof r & { supplierId: string } => r.supplierId !== null)
-    .map((r) => ({
-      id: r.id, supplierId: r.supplierId, invoiceNumber: r.invoiceNumber ?? "",
-      invoiceDate: r.invoiceDate ? r.invoiceDate.toISOString().slice(0, 10) : null, totalMinor: r.totalMinor,
-    }));
+  const recordedInvoices = await loadRecordedInvoices();
 
   for (const doc of pending) {
     const x = (doc.reading ?? {}) as StoredReading;
@@ -289,26 +290,11 @@ export async function recordFromStoredReadings(
       });
       continue;
     }
-    if (review.blockers.length > 0) {
-      out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: review.blockers.map((b) => b.message) });
-      continue;
-    }
-    /*
-      «المورّدُ المعروف» مَن قُيِّدت له فاتورةٌ من قبل. أوّلُ فاتورةٍ من اسمٍ
-      جديد تُقيَّد بيد — «سبعة جرة» عميلٌ سُجّل مورّداً، وكادت تُقيَّد عليه
-      فاتورةُ بيعٍ مشترياتٍ بـ١٬١٠٠ ريال.
-    */
-    if (!recordedInvoices.some((r) => r.supplierId === supplier.id)) {
-      out.missing.push({
-        documentId: doc.id,
-        fileName: doc.fileName,
-        reasons: [`${supplier.nameAr}: لم تُقيَّد له فاتورةٌ من قبل — أوّلُ فاتورةٍ من مورّدٍ جديد تُقيَّد بيدك`],
-      });
-      continue;
-    }
-    const twin = findInvoiceTwin(recordedInvoices, { supplierId: supplier.id, invoiceNumber: number, invoiceDate: date, totalMinor });
-    if (twin) {
-      out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: [twinReason(twin)] });
+    const refusal = autoRecordRefusal({
+      blockers: review.blockers, supplier, recorded: recordedInvoices, invoiceNumber: number, invoiceDate: date, totalMinor,
+    });
+    if (refusal.length > 0) {
+      out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: refusal });
       continue;
     }
 
@@ -382,4 +368,19 @@ export async function recordFromStoredReadings(
     }
   }
   return out;
+}
+
+/** المقيَّدُ كلُّه للمقارنة بالتوأم — لكلّ مسارٍ يقيّد آلياً (الطابور، المزامنة). */
+export async function loadRecordedInvoices(conn: Conn = db): Promise<RecordedInvoice[]> {
+  return (await conn
+    .select({
+      id: invoices.id, supplierId: invoices.supplierId, invoiceNumber: invoices.invoiceNumber,
+      invoiceDate: invoices.invoiceDate, totalMinor: invoices.totalMinor,
+    })
+    .from(invoices))
+    .filter((r): r is typeof r & { supplierId: string } => r.supplierId !== null)
+    .map((r) => ({
+      id: r.id, supplierId: r.supplierId, invoiceNumber: r.invoiceNumber ?? "",
+      invoiceDate: r.invoiceDate ? r.invoiceDate.toISOString().slice(0, 10) : null, totalMinor: r.totalMinor,
+    }));
 }
