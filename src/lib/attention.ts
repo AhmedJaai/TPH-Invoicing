@@ -561,7 +561,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       severity: "HIGH",
       title: n === 1 ? "حوالةٌ لمورّد خرجت ثمّ عادت" : `${countNoun(n, TRANSACTION)} لمورّدين خرجت ثمّ عادت`,
       detail: "المبلغ نفسه رجع إلى الحساب بعد أيّام — فالفاتورة التي قُيّدت عليها تبدو مسدَّدةً ولم تُسدَّد.",
-      action: "افتح الحركة: إن كانت ردّاً فتراجع عن مطابقتها لتعود الفاتورة مستحقّة، ثمّ أعد التحويل.",
+      action: "افتح الحركة: «ارتدّت» تردّ الدفعة فتعود الفاتورة مستحقّة (ثمّ أعِد التحويل)، أو «ليست ردّاً» فيُغلق التنبيه.",
       actionLabel: "افتح الحركة",
       href: f.firstBouncedTransactionId ? txHref(f.firstBouncedTransactionId) : "/bank",
       count: n,

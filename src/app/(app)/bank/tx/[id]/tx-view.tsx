@@ -1,3 +1,6 @@
+import { BankBounce } from "@/components/bank-bounce";
+import { findBouncePartner } from "@/services/bank-bounce.service";
+import { db } from "@/db";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CircleAlert, Landmark, Receipt } from "lucide-react";
@@ -56,6 +59,7 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
   const handLink = !tx.paymentId && canUndo
     ? (await loadHandPaymentLinks()).find((l) => l.transferId === id) ?? null
     : null;
+  const bounce = canUndo ? await findBouncePartner(db, id) : null;
   const title = tx.who || tx.description?.trim().slice(0, 60) || "حركة بلا وصف";
 
   return (
@@ -101,6 +105,7 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
         <div>
           <p className="mb-2 text-[11px] font-bold text-muted">لماذا طُوبقت — وكيف تتراجع</p>
           <MatchExplain match={tx.match} canUndo={canUndo} inline />
+          {bounce && <BankBounce pair={bounce} currentId={id} />}
           {handLink && (
             <div className="mt-3 rounded-xl border border-accent-line bg-accent-soft/50 p-3 text-xs leading-relaxed">
               <p className="font-bold">سدادُها مقيَّدٌ بيدك من قبل</p>

@@ -99,3 +99,11 @@ export function describeReversal(r: Reversal): string {
     ? `${base} — ومن الطرف نفسه، فهو ردٌّ لا إيراد.`
     : `${base} — والطرف لم يتطابق، فهو ترجيحٌ يحتاج نظرك.`;
 }
+
+/**
+ * مفتاحُ قرار الإنسان في زوجِ خروجٍ وعودة — كـ`double:` للازدواج. به يخرج البندُ
+ * من «يحتاج قرارك» بعد الحسم؛ وكان الكشفُ حسابيّاً بحتاً فلا يُغلَق أبداً.
+ */
+export function reversalKey(outgoingId: string, incomingId: string): string {
+  return `bounce:${outgoingId}:${incomingId}`;
+}

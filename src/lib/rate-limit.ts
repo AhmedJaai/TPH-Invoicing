@@ -101,6 +101,7 @@ export const RULES: Record<string, RateLimitRule> = {
   "document-reread": { limit: 30, windowSeconds: 3600 },
   /* قرارُ صفٍّ ملتبس في الكشف */
   "bank-held": { limit: 200, windowSeconds: 3600 },
+  "bank-bounce": { limit: 100, windowSeconds: 3600 },
   "match-undo": { limit: 60, windowSeconds: 3600 },
   counterparty: { limit: 300, windowSeconds: 3600 },
   "match-confirm": { limit: 200, windowSeconds: 3600 },

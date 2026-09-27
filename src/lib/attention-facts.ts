@@ -9,7 +9,7 @@ import { formatRiyalsDisplay } from "./money";
 import type { AttentionEvidence, AttentionFacts } from "./attention";
 import { previousMonth } from "./filing";
 import { currentMonthRiyadh, daysSinceRiyadh, formatDay } from "./riyadh-time";
-import { findReversals } from "./bank/reversal";
+import { findReversals, reversalKey } from "./bank/reversal";
 import { analyzeCoverage } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
 import { findDuplicateExpenses, type Expense } from "./expenses";
@@ -166,7 +166,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
       `),
     loadUnbackedPayments(),
     db.execute<{ key: string; decision: string }>(sql`
-        select key, decision from alert_resolutions where key like 'double:%'
+        select key, decision from alert_resolutions where key like 'double:%' or key like 'bounce:%'
       `),
     db.execute<Record<string, unknown>>(sql`
         select id, period_month, occurred_on, category, label,
@@ -407,13 +407,15 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   const bounceRows = (
     q15
   ).rows;
+  /* ما حسمه إنسان («ارتدّت» · «ليست ردّاً») لا يعود بنداً */
+  const bounceDecided = new Set(resolutions.filter((r) => r.key.startsWith("bounce:")).map((r) => r.key));
   const bounced = findReversals(bounceRows.map((r) => ({
     id: r.id,
     valueDate: new Date(`${r.value_date}T12:00:00Z`),
     amountMinor: Number(r.amount_minor),
     direction: r.direction,
     party: r.party,
-  })));
+  }))).filter((b) => !bounceDecided.has(reversalKey(b.outgoing.id, b.incoming.id)));
   const supplierOfTx = new Map(bounceRows.map((r) => [r.id, r.supplier]));
 
   /*

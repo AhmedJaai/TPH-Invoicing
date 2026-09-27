@@ -6,8 +6,8 @@
  *
  * أربعة أعطال وجدها التدقيق في بيانات حقيقية:
  *
- *   ١. كشف البنك استُورد ثلاث مرّات، فصارت كل حركة ثلاثاً. وهذا يضاعف كل
- *      تقرير مبنيّ عليها. تُبقى أقدم عملية استيراد ويُحذف ما بعدها.
+ *   ١. (حُذفت) كشفٌ مستوردٌ ثلاث مرّات — يمنعه اليوم الاستيرادُ نفسه، والحذفُ
+ *      بالاسم كان يُسقط حركاتٍ حقيقيّة.
  *   ٢. مستندان بمحتوى واحد: الأصل ونسخة رُفعت أثناء الفحص. تُحجَر النسخة
  *      ولا تُحذف، وتُنقل فاتورتها إلى الأصل.
  *   ٣. تخصيص يتجاوز قيمة الدفعة — ولو بهللة. يُحدّ بما بقي من الدفعة.
@@ -48,30 +48,14 @@ async function main() {
   console.log(`\nوضع التشغيل: ${commit ? "إصلاح فعلي" : "معاينة فقط (أضف --commit)"}\n`);
   const steps: Step[] = [];
 
-  /* ── ١) كشوف بنكية مستوردة أكثر من مرّة ── */
-  const imports = await db.execute<{ id: string; file_name: string; n: number; created_at: Date }>(sql`
-    select bi.id, bi.file_name, bi.created_at,
-           (select count(*)::int from bank_transactions t where t.bank_import_id = bi.id) as n
-    from bank_imports bi order by bi.created_at
-  `);
-  const byFile = new Map<string, typeof imports.rows>();
-  for (const r of imports.rows) {
-    const list = byFile.get(r.file_name) ?? [];
-    list.push(r);
-    byFile.set(r.file_name, list);
-  }
-  const redundant = [...byFile.values()].flatMap((list) => list.slice(1));
-  steps.push({
-    name: "استيرادات بنكية مكرّرة",
-    found: redundant.length,
-    detail: redundant.map((r) => `  ${r.file_name} — ${r.n} حركة (يُحذف)`),
-    apply: async () => {
-      for (const r of redundant) {
-        await db.execute(sql`delete from bank_imports where id = ${r.id}`);
-      }
-    },
-  });
+  /*
+    ── ١) كان: كشوفٌ مستوردةٌ أكثر من مرّة — حُذفت الخطوة (٢٧ سبتمبر ٢٠٢٦) ──
 
+    كانت تحذف كلَّ استيرادٍ تكرّر **اسمُ ملفّه** — ومعه حركاتُه وقراراتُها
+    (cascade). والاسمُ ليس هويّة: كشفان مختلفان باسم «statement.xlsx» كانا
+    سيفقدان حركاتٍ حقيقيّة. والتكرارُ يمنعه اليوم بصمةُ الملفّ وهويّةُ الحركة
+    (`lib/bank/sync.ts`) قبل الكتابة. وكانت تقرأ عموداً غير موجود فتسقط أصلاً.
+  */
   /* ── ٢) مستندان بمحتوى واحد ── */
   const dupDocs = await db.execute<{ sha256: string; ids: string[]; names: string[] }>(sql`
     select sha256,
