@@ -254,8 +254,6 @@ export const invoices = pgTable("invoices", {
    */
   subtotalMinor: integer("subtotal_minor"),
   vatMinor: integer("vat_minor"),
-  /** خصم على مستوى الفاتورة — null = لم يُقرأ */
-  discountMinor: integer("discount_minor"),
   totalMinor: integer("total_minor").notNull(),
 
   sellerVat: text("seller_vat"),
