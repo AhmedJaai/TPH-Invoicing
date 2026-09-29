@@ -51,10 +51,9 @@ export const invoiceExtractionSchema = z.object({
   buyerVatNumber: z.string().describe("الرقم الضريبي للمشتري، ١٥ رقماً، أو فارغ"),
   invoiceNumber: z.string().describe("رقم الفاتورة كما ورد، أو فارغ"),
   invoiceDate: z.string().describe("تاريخ الفاتورة YYYY-MM-DD ميلادية، أو فارغ"),
-  subtotalAmount: moneyString.describe("صافي المبلغ الخاضع للضريبة بعد الخصم الذي يخفض الوعاء، كما هو مطبوع"),
-  vatAmount: moneyString.describe("مبلغ ضريبة القيمة المضافة كما هو مطبوع"),
-  discountAmount: moneyString.describe("الخصم على مستوى الفاتورة كما هو مطبوع، أو فارغ إذا لا يوجد"),
-  totalAmount: moneyString.describe("المبلغ النهائي المستحق أو المدفوع بعد الخصم، كما هو مطبوع"),
+  subtotalAmount: moneyString.describe("الإجمالي قبل الضريبة"),
+  vatAmount: moneyString.describe("مبلغ ضريبة القيمة المضافة"),
+  totalAmount: moneyString.describe("الإجمالي شامل الضريبة"),
   lines: z.array(invoiceLineSchema).describe("بنود الفاتورة، أو فارغة إن لم تُقرأ"),
   ...confidenceShape,
 });
@@ -142,7 +141,7 @@ export function absentFieldsFor(kind: DocumentKind): string[] {
   const all = [
     "supplierNameAr", "supplierNameEn", "sellerVatNumber", "sellerCrNumber",
     "buyerNameAr", "buyerVatNumber", "invoiceNumber", "invoiceDate",
-    "subtotalAmount", "vatAmount", "discountAmount", "totalAmount", "beneficiaryName",
+    "subtotalAmount", "vatAmount", "totalAmount", "beneficiaryName",
     "lines", "openingBalance", "closingBalance", "statementLines",
   ];
   return all.filter((f) => !asked.has(f));
@@ -199,7 +198,6 @@ export function widen(
     invoiceDate: normalizeDocumentDate(str("invoiceDate") || str("transferDate") || str("statementDate")) ?? "",
     subtotalAmount: str("subtotalAmount"),
     vatAmount: str("vatAmount"),
-    discountAmount: str("discountAmount"),
     totalAmount: str("totalAmount"),
     beneficiaryName: str("beneficiaryName"),
     lines: arr("lines"),
