@@ -21,7 +21,7 @@
  * فلا يفترق القرارُ عن تفسيره.
  */
 
-import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
+import { TOTAL_ROUNDING_TOLERANCE_MINOR, checkInvoiceTotals } from "@/lib/money";
 
 export interface AutoArchiveFacts {
   /** نوعُ المستند كما قرأه النموذج — والآليّ للفواتير وحدها. */
@@ -33,6 +33,8 @@ export interface AutoArchiveFacts {
   subtotalMinor: number | null;
   vatMinor: number | null;
   totalMinor: number | null;
+  /** خصمٌ بعد الضريبة — المقيَّدُ في الفاتورة، أو المقروءُ قبل القيد */
+  discountMinor?: number | null;
   invoiceNumber?: string | null;
   fileName?: string | null;
   /**
@@ -105,7 +107,7 @@ export function autoArchive(f: AutoArchiveFacts): AutoArchiveVerdict {
   const near = (a: number, b: number) => Math.abs(a - b) <= TOTAL_ROUNDING_TOLERANCE_MINOR;
   const byTax =
     f.subtotalMinor !== null && f.vatMinor !== null && f.totalMinor !== null
-    && near(f.subtotalMinor + f.vatMinor, f.totalMinor);
+    && checkInvoiceTotals(f.subtotalMinor, f.vatMinor, f.totalMinor, f.discountMinor ?? null).verdict !== "MISMATCH";
   /* البنودُ تساوي الإجماليّ — أو تساويه مع الضريبة */
   const byLines =
     f.linesTotalMinor != null && f.linesTotalMinor > 0 && f.totalMinor !== null

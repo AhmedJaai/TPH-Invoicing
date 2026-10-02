@@ -114,6 +114,8 @@ export async function recordDocumentByHand(
         .find((r) => invoiceNumberKey(r.number ?? "") === key)
     : undefined;
 
+  /* الخصمُ من القراءة المحفوظة لا من المتصفّح — ويُقبل إن سدّ فرقَ ما كُتب وحده */
+  const discountReadMinor = parseRiyals(((doc.reading ?? null) as StoredReading | null)?.discountAmount ?? "");
   const review = reviewConfirmed(
     {
       documentKind: input.kind,
@@ -123,6 +125,7 @@ export async function recordDocumentByHand(
       subtotalMinor,
       vatMinor,
       totalMinor,
+      discountMinor: discountReadMinor,
       sellerVat: input.sellerVat?.trim() || null,
       buyerVat: input.buyerVat?.trim() || null,
     },
@@ -151,6 +154,7 @@ export async function recordDocumentByHand(
       subtotalMinor,
       vatMinor,
       totalMinor,
+      discountReadMinor,
       sellerVat: input.sellerVat?.trim() || null,
       buyerVat: input.buyerVat?.trim() || null,
       taxStatus: review.taxStatus,

@@ -30,6 +30,8 @@ export interface ConfirmedFields {
   subtotalMinor?: number | null;
   vatMinor?: number | null;
   totalMinor?: number | null;
+  /** الخصمُ بعد الضريبة كما قُرئ أو كُتب — يُقبل إن سدّ الفرق */
+  discountMinor?: number | null;
   sellerVat?: string | null;
   buyerVat?: string | null;
 }
@@ -81,6 +83,7 @@ export function reviewConfirmed(
       subtotalMinor: fields.subtotalMinor ?? undefined,
       vatMinor: fields.vatMinor ?? undefined,
       totalMinor: fields.totalMinor ?? undefined,
+      discountMinor: fields.discountMinor ?? null,
     },
     {
       companyVat: context.companyVat,

@@ -9,7 +9,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { invoiceLines, invoices, statementLines, statements } from "@/db/schema";
 import { normalizeItem } from "@/lib/items";
 import { parseLineQuantity, reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
-import { parseRiyals } from "@/lib/money";
+import { checkInvoiceTotals, parseRiyals } from "@/lib/money";
 import type { InputVatStatus, TaxStatus } from "@/lib/validation";
 import type { RawLine, Tx } from "./types";
 import { assertMonthsOpen } from "./month-guard";
@@ -27,6 +27,11 @@ export interface CreateInvoiceInput {
   subtotalMinor: number | null;
   vatMinor: number | null;
   totalMinor: number;
+  /**
+   * الخصمُ كما قُرئ على الفاتورة — قبل الضريبة كان أو بعدها. والخادمُ يحكم
+   * (`checkInvoiceTotals`): يُكتب خصماً بعد الضريبة إن كان هو ما يفسّر الفرق وحده.
+   */
+  discountReadMinor?: number | null;
   sellerVat?: string | null;
   buyerVat?: string | null;
   taxStatus: TaxStatus;
@@ -62,6 +67,9 @@ export async function createInvoice(tx: Tx, input: CreateInvoiceInput): Promise<
       subtotalMinor: input.subtotalMinor,
       vatMinor: input.vatMinor,
       totalMinor: input.totalMinor,
+      discountMinor: input.subtotalMinor !== null && input.vatMinor !== null
+        ? checkInvoiceTotals(input.subtotalMinor, input.vatMinor, input.totalMinor, input.discountReadMinor ?? null).postVatDiscountMinor
+        : null,
       sellerVat: input.sellerVat ?? null,
       buyerVat: input.buyerVat ?? null,
       taxStatus: input.taxStatus,

@@ -76,9 +76,11 @@ export const extractionSchema = z.object({
     .string()
     .describe("تاريخ المستند بصيغة YYYY-MM-DD ميلادية. حوّل التاريخ الهجري إن كان هو الوحيد. فارغ إن لم يظهر."),
 
-  subtotalAmount: moneyString.describe("الإجمالي قبل الضريبة"),
-  vatAmount: moneyString.describe("مبلغ ضريبة القيمة المضافة"),
-  totalAmount: moneyString.describe("الإجمالي شامل الضريبة"),
+  subtotalAmount: moneyString.describe("صافي المبلغ الخاضع للضريبة بعد الخصم الذي يخفض الوعاء، كما هو مطبوع"),
+  vatAmount: moneyString.describe("مبلغ ضريبة القيمة المضافة كما هو مطبوع"),
+  /* غائبُه فراغ: قراءاتٌ محفوظةٌ قبله ومزوّدٌ لا يُرجعه — لا تُردّ القراءةُ كلُّها لحقلٍ جديد */
+  discountAmount: moneyString.describe("الخصم على مستوى الفاتورة كما هو مطبوع، أو فارغ إذا لا يوجد").default(""),
+  totalAmount: moneyString.describe("المبلغ النهائي المستحق أو المدفوع بعد الخصم، كما هو مطبوع"),
 
   /** اسم المستفيد في إيصال التحويل — يخالف اسم المورد غالباً */
   beneficiaryName: z.string().describe("اسم المستفيد في إيصال التحويل البنكي، أو فارغ"),

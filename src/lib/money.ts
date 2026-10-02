@@ -54,6 +54,34 @@ export function isSupplierRounding(
   return diff > 0 && diff <= TOTAL_ROUNDING_TOLERANCE_MINOR;
 }
 
+/**
+ * أيستقيم حسابُ الفاتورة؟ — والخصمُ بعد الضريبة جزءٌ منه.
+ *
+ * الخصمُ على الفاتورة نوعان (هيئة الزكاة): قبل الضريبة يُنقص الوعاء، فالصافي
+ * المطبوع بعده و«الصافي + الضريبة = الإجماليّ» يستقيم ولا يُطرح ثانية؛ وبعد
+ * الضريبة (نقديّ أو تقريبيّ) يُنقص المستحقَّ وحده: «الصافي + الضريبة − الخصم =
+ * المستحقّ» والضريبةُ كما طُبعت. وكانت القاعدةُ تعرف الأوّل وحده، ففاتورةُ الثاني
+ * تُردّ أو تُقيَّد بغير مستحقّها. والحكمُ هنا لا في قراءة النموذج: الخصمُ المقروء
+ * يُعدّ «بعد الضريبة» إن كان هو الذي يفسّر الفرق وحده.
+ */
+export type TotalsVerdict = "EXACT" | "ROUNDING" | "POST_VAT_DISCOUNT" | "MISMATCH";
+
+export function checkInvoiceTotals(
+  subtotalMinor: number,
+  vatMinor: number,
+  totalMinor: number,
+  discountReadMinor: number | null = null,
+): { verdict: TotalsVerdict; postVatDiscountMinor: number | null } {
+  const diff = subtotalMinor + vatMinor - totalMinor;
+  if (diff === 0) return { verdict: "EXACT", postVatDiscountMinor: null };
+  if (Math.abs(diff) <= TOTAL_ROUNDING_TOLERANCE_MINOR) return { verdict: "ROUNDING", postVatDiscountMinor: null };
+  if (discountReadMinor !== null && discountReadMinor > 0
+    && Math.abs(diff - discountReadMinor) <= TOTAL_ROUNDING_TOLERANCE_MINOR) {
+    return { verdict: "POST_VAT_DISCOUNT", postVatDiscountMinor: discountReadMinor };
+  }
+  return { verdict: "MISMATCH", postVatDiscountMinor: null };
+}
+
 /** يحوّل نصاً مثل "410.00" أو "410" أو "١٬٢٣٤٫٥٠" إلى هللات. */
 export function parseRiyals(input: string): number | null {
   const normalized = input

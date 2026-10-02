@@ -82,3 +82,14 @@ describe("الأرشفةُ الآليّة", () => {
     for (const text of Object.values(GAP_TEXT)) expect(text.length).toBeGreaterThan(10);
   });
 });
+
+describe("الأرشفةُ الآليّة والخصمُ بعد الضريبة", () => {
+  /* ٤٠٠ + ٦٠ − ١٠ = ٤٥٠ */
+  const discounted = { ...clean, totalMinor: 45_000 };
+  it("الحسابُ يستقيم بالخصم المقيَّد فيدخل", () => {
+    expect(autoArchive({ ...discounted, discountMinor: 1_000 }).auto).toBe(true);
+  });
+  it("وبلا خصمٍ يبقى «الحسابُ لا يستقيم»", () => {
+    expect(autoArchive(discounted).gaps).toContain("ARITHMETIC");
+  });
+});

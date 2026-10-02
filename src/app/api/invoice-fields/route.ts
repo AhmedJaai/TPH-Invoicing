@@ -45,6 +45,8 @@ const Body = z.object({
   subtotal: Text,
   vat: Text,
   total: Text,
+  /** الخصمُ بعد الضريبة إن كان على الورقة */
+  discount: Text,
   invoiceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "التاريخ بصيغة YYYY-MM-DD").optional(),
   supplierId: z.string().trim().min(1).max(64).optional(),
 }).strict();
@@ -73,7 +75,7 @@ export async function POST(request: Request) {
       المبلغُ لا يكتبه من لا يراه — ولا المورّدُ: تغييرُه يفكّ سداداً ويخصم رصيداً.
       الصلاحيةُ صلاحيةُ رفع (مديرُ المشتريات يصحّح الرقمَ والتاريخ)، والشاشةُ ليست حارساً.
     */
-    const touchesMoney = b.subtotal !== undefined || b.vat !== undefined || b.total !== undefined || b.supplierId !== undefined;
+    const touchesMoney = b.subtotal !== undefined || b.vat !== undefined || b.total !== undefined || b.discount !== undefined || b.supplierId !== undefined;
     if (touchesMoney && !can(user.role, "amounts:view")) {
       return NextResponse.json({ error: "تعديل المبالغ أو المورّد يحتاج صلاحية عرض المبالغ — اطلبه من مالك الحساب." }, { status: 403 });
     }
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
       subtotalMinor: amount(b.subtotal),
       vatMinor: amount(b.vat),
       totalMinor: amount(b.total),
+      discountMinor: amount(b.discount),
       invoiceDate: b.invoiceDate,
       supplierId: b.supplierId,
     }, user.id));

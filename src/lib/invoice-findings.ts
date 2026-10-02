@@ -34,6 +34,8 @@ export interface InvoiceForFindings {
   subtotalMinor: number | null;
   vatMinor: number | null;
   totalMinor: number | null;
+  /** الخصمُ بعد الضريبة المقيَّد — يسدّ فرقَ الحساب */
+  discountMinor?: number | null;
   /** عدد بنودها — صفرٌ عطبٌ بذاته، وهو خارج الفحص الضريبيّ */
   lineCount?: number;
 }
@@ -78,7 +80,7 @@ const FIX: Record<string, { what: string; fix: string }> = {
   },
   [ISSUE.VAT_MATH_MISMATCH]: {
     what: "الصافي + الضريبة لا يساوي الإجمالي",
-    fix: "صحّح المبلغ الذي أُخطئ في قراءته — والمطبوعُ على الورقة هو الملزِم.",
+    fix: "صحّح المبلغ الذي أُخطئ في قراءته — والمطبوعُ على الورقة هو الملزِم. وإن كان عليها خصمٌ بعد الضريبة فاكتبه في حقله.",
   },
   [ISSUE.NOT_A_TAX_INVOICE]: {
     what: "عرضُ سعرٍ أو فاتورةٌ مبدئيّة — لا تُقيَّد فاتورةً",
@@ -107,6 +109,10 @@ const VARIANT_FIX: Record<string, { what: string; fix: string }> = {
   [`${ISSUE.VAT_MATH_MISMATCH}:RATE`]: {
     what: "الضريبة أقلّ أو أكثر من ١٥٪ من الصافي — والجمعُ يستقيم",
     fix: "غالباً في الفاتورة بنودٌ معفاة أو صفريّة. قارن بالورقة، ولا تُطالِب المورّد إلّا إن كانت البنود كلّها خاضعة.",
+  },
+  [`${ISSUE.VAT_MATH_MISMATCH}:DISCOUNT`]: {
+    what: "عليها خصمٌ بعد الضريبة — والمستحقُّ أقلّ من الصافي والضريبة",
+    fix: "لا شيء يُفعَل: الخصمُ يسدّ الفرقَ كاملاً، والضريبةُ كما طُبعت. والمستحقُّ للمورّد هو الإجماليّ بعد الخصم.",
   },
 };
 
@@ -142,6 +148,7 @@ export function invoiceReasons(
       subtotalMinor: invoice.subtotalMinor ?? undefined,
       vatMinor: invoice.vatMinor ?? undefined,
       totalMinor: invoice.totalMinor ?? undefined,
+      discountMinor: invoice.discountMinor ?? null,
     },
     {
       companyVat,

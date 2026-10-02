@@ -6,7 +6,7 @@
  * والفاتورة المبسطة بلا رقم ضريبي للمشتري لا تصلح لخصم ضريبة المدخلات.
  */
 import { FIXED_ASSET_THRESHOLD_MINOR, VAT_RATE } from "@/config/drive";
-import { isSupplierRounding } from "./money";
+import { checkInvoiceTotals } from "./money";
 import { ISSUE, ISSUE_TEXT, type IssueCode, type Severity } from "./issue-codes";
 
 export interface Finding {
@@ -21,7 +21,7 @@ export interface Finding {
    * معفاة غالباً). وكانت الشاشة تقول للثلاثة «الصافي + الضريبة لا يساوي
    * الإجمالي» — فتُتَّهم فاتورةٌ يستقيم جمعُها بالهللة.
    */
-  variant?: "ROUNDING" | "RATE";
+  variant?: "ROUNDING" | "RATE" | "DISCOUNT";
 }
 
 export interface InvoiceCandidate {
@@ -32,6 +32,8 @@ export interface InvoiceCandidate {
   subtotalMinor?: number | null;
   vatMinor?: number | null;
   totalMinor?: number | null;
+  /** خصمٌ مطبوعٌ بعد الضريبة — يُقبل إن سدّ الفرقَ وحده (`checkInvoiceTotals`) */
+  discountMinor?: number | null;
   /** ثقة كل حقل بين ٠ و١، من مخرجات نموذج الاستخراج */
   fieldConfidence?: Record<string, number>;
 }
@@ -142,7 +144,8 @@ export function validateInvoice(
 
   // فحص حسابي يكشف أخطاء الاستخراج قبل أن تصل إلى القيد — على المعلوم وحده.
   if (subtotalKnown && totalKnown && subtotalMinor > 0 && totalMinor > 0) {
-    if (isSupplierRounding(subtotalMinor, vatMinor, totalMinor)) {
+    const totals = checkInvoiceTotals(subtotalMinor, vatMinor, totalMinor, candidate.discountMinor ?? null);
+    if (totals.verdict === "ROUNDING") {
       /*
        * المورّد يُسقط كسور الريال من الإجمالي، والمطبوع هو الملزِم.
        * فلا يُعدّ خطأً، لكنّه يُذكَر كي لا يُظنّ أنّ النظام لم يره.
@@ -152,7 +155,14 @@ export function validateInvoice(
         variant: "ROUNDING",
         message: `المورّد قرّب الإجمالي: ${(subtotalMinor + vatMinor) / 100} صار ${totalMinor / 100}`,
       }));
-    } else if (subtotalMinor + vatMinor !== totalMinor) {
+    } else if (totals.verdict === "POST_VAT_DISCOUNT") {
+      /* خصمٌ على الإجماليّ بعد الضريبة: المستحقّ أقلّ، والضريبةُ كما هي */
+      findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
+        severity: "INFO",
+        variant: "DISCOUNT",
+        message: `خصمٌ بعد الضريبة ${totals.postVatDiscountMinor! / 100}: الصافي والضريبة ${(subtotalMinor + vatMinor) / 100} والمستحقّ ${totalMinor / 100}`,
+      }));
+    } else if (totals.verdict === "MISMATCH") {
       findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
         message: `المجموع ${totalMinor / 100} لا يساوي الصافي ${subtotalMinor / 100} زائد الضريبة ${vatMinor / 100}`,
       }));

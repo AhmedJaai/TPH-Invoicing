@@ -16,6 +16,7 @@ function invoice(over: Partial<ExtractionResult> = {}): ExtractionResult {
     invoiceDate: "2026-08-14",
     subtotalAmount: "1000.00",
     vatAmount: "150.00",
+    discountAmount: "",
     totalAmount: "1150.00",
     beneficiaryName: "",
     lines: [],
@@ -39,6 +40,12 @@ describe("التحقّق من القراءة", () => {
   it("يكشف أنّ الإجمالي لا يساوي الصافي زائد الضريبة", () => {
     const c = findConflicts(invoice({ totalAmount: "1200.00" }));
     expect(c.map((x) => x.code)).toContain("TOTAL_NOT_SUM");
+  });
+
+  it("الخصمُ المطبوع بعد الضريبة يسدّ الفرق — لا تعارض", () => {
+    /* ١٠٠٠ + ١٥٠ − ٥٠ = ١١٠٠ */
+    expect(findConflicts(invoice({ totalAmount: "1100.00", discountAmount: "50.00" }))).toEqual([]);
+    expect(findConflicts(invoice({ totalAmount: "1100.00", discountAmount: "20.00" })).map((x) => x.code)).toContain("TOTAL_NOT_SUM");
   });
 
   it("يتسامح بريالٍ — المورّد يُسقط كسور الريال والمطبوع هو الملزِم", () => {

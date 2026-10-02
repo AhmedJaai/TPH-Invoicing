@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRiyals, formatRiyalsDisplay, parseRiyals } from "./money";
+import { checkInvoiceTotals, formatRiyals, formatRiyalsDisplay, parseRiyals } from "./money";
 
 describe("تحويل المبالغ", () => {
   it("يقرأ الأرقام اللاتينية", () => {
@@ -74,5 +74,21 @@ describe("parseRiyals — سقف عمود المال", () => {
   });
   it("يقبل أقصى ما يتّسع", () => {
     expect(parseRiyals("21474836.47")).toBe(2147483647);
+  });
+});
+
+describe("checkInvoiceTotals — الخصمُ قبل الضريبة وبعدها", () => {
+  it("الصافي + الضريبة = الإجماليّ: لا خصمَ يُطرح ولو قُرئ (كان قبل الضريبة)", () => {
+    expect(checkInvoiceTotals(1000_00, 150_00, 1150_00, 100_00)).toEqual({ verdict: "EXACT", postVatDiscountMinor: null });
+  });
+  it("الخصمُ بعد الضريبة يفسّر الفرق: يُطرح والضريبةُ كما هي", () => {
+    expect(checkInvoiceTotals(1000_00, 150_00, 1100_00, 50_00)).toEqual({ verdict: "POST_VAT_DISCOUNT", postVatDiscountMinor: 50_00 });
+  });
+  it("وتقريبُ المورّد بريالٍ تقريبٌ لا خصم", () => {
+    expect(checkInvoiceTotals(574_00, 86_10, 660_00, null).verdict).toBe("ROUNDING");
+  });
+  it("وما لا يفسّره خصمٌ مقروء — لا يستقيم", () => {
+    expect(checkInvoiceTotals(1000_00, 150_00, 1100_00, 20_00).verdict).toBe("MISMATCH");
+    expect(checkInvoiceTotals(1000_00, 150_00, 1100_00, null).verdict).toBe("MISMATCH");
   });
 });

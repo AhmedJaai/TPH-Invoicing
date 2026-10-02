@@ -37,6 +37,8 @@ export interface InvoiceProfile {
     subtotalMinor: number | null;
     vatMinor: number | null;
     totalMinor: number;
+    /** خصمٌ على الإجماليّ بعد الضريبة — `null` لا خصم */
+    discountMinor: number | null;
     sellerVat: string | null;
     buyerVat: string | null;
     taxStatus: string;
@@ -258,6 +260,7 @@ export async function loadInvoiceProfile(id: string): Promise<InvoiceProfile | n
       subtotalMinor: inv.subtotalMinor,
       vatMinor: inv.vatMinor,
       totalMinor: inv.totalMinor,
+      discountMinor: inv.discountMinor,
       sellerVat: inv.sellerVat,
       buyerVat: inv.buyerVat,
       taxStatus: inv.taxStatus,

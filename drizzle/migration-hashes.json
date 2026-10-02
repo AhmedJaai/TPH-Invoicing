@@ -51,5 +51,6 @@
   "050_inventory_inputs_locked.sql": "bf9b2663f3bfe80084e4582d7be78d4d03c6a1f5a3987f655b68be1ff60b401f",
   "051_bank_held_rows.sql": "cc7bd8d041298574625fdc280bf4a10af82884fe9fc6f8813a0a27a39b38837a",
   "052_alert_resolution_bounce.sql": "774c4440ba294c9f97ae6f3e4efd6cd3afcb1c9425f6373cb75f77d8df0eb3db",
-  "053_job_state.sql": "d76ba8a0f343b5df8a4d5cb844ac278e1bea0baf6a51d8d4a6569b2abe4ac561"
+  "053_job_state.sql": "d76ba8a0f343b5df8a4d5cb844ac278e1bea0baf6a51d8d4a6569b2abe4ac561",
+  "054_invoice_post_vat_discount.sql": "25582e87b883ce0bc127eb4ea75dac7ee0c672cfd480f3f2be7464a8e3c6f4af"
 }

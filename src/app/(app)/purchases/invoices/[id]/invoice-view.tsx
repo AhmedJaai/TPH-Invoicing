@@ -113,6 +113,7 @@ export async function InvoiceView({
       subtotalMinor: inv.subtotalMinor,
       vatMinor: inv.vatMinor,
       totalMinor: inv.totalMinor,
+      discountMinor: inv.discountMinor,
       lineCount: p.lines.length,
     },
     { issuesInvoices: supplier.issuesInvoices, contractOnFile: supplier.contractOnFile },
@@ -121,7 +122,7 @@ export async function InvoiceView({
   /* وما قاله `invoiceReasons` لا يُكرَّر بنصٍّ ثانٍ */
   const addsUp = reasons.some((r) => r.code === ISSUE.VAT_MATH_MISMATCH)
     ? null
-    : amountsAddUp(inv.subtotalMinor, inv.vatMinor, inv.totalMinor, TOTAL_ROUNDING_TOLERANCE_MINOR);
+    : amountsAddUp(inv.subtotalMinor, inv.vatMinor, inv.totalMinor, TOTAL_ROUNDING_TOLERANCE_MINOR, inv.discountMinor);
   const weak = weakFields(doc.fieldConfidence);
   const risen = p.lines.filter((l) => l.move?.direction === "up");
   /* ما هو للعلم (تقريبُ مورّد، بنودٌ معفاة) لا يُرفع إلى «ما يستحقّ الانتباه» */
@@ -415,7 +416,10 @@ export async function InvoiceView({
             <dl className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised text-xs shadow-raised">
               <Row label="الصافي قبل الضريبة">{inv.subtotalMinor === null ? <Unknown /> : <Money minor={inv.subtotalMinor} />}</Row>
               <Row label="الضريبة">{inv.vatMinor === null ? <Unknown /> : <Money minor={inv.vatMinor} />}</Row>
-              <Row label="الإجمالي"><span className="text-sm font-bold"><Money minor={inv.totalMinor} /></span></Row>
+              {inv.discountMinor !== null && (
+                <Row label="خصمٌ بعد الضريبة"><span className="text-ok">− <Money minor={inv.discountMinor} /></span></Row>
+              )}
+              <Row label={inv.discountMinor !== null ? "المستحقّ بعد الخصم" : "الإجمالي"}><span className="text-sm font-bold"><Money minor={inv.totalMinor} /></span></Row>
               <Row label="ضريبيّ البائع">{inv.sellerVat ? <bdi className="nums">{inv.sellerVat}</bdi> : <Unknown text="لا رقم" />}</Row>
               <Row label="ضريبيّ المشتري">{inv.buyerVat ? <bdi className="nums">{inv.buyerVat}</bdi> : <Unknown text="لا رقم" />}</Row>
               <Row label="حالُها الضريبيّ">
@@ -444,6 +448,7 @@ export async function InvoiceView({
                   subtotal: inv.subtotalMinor === null ? "" : formatRiyals(inv.subtotalMinor),
                   vat: inv.vatMinor === null ? "" : formatRiyals(inv.vatMinor),
                   total: formatRiyals(inv.totalMinor),
+                  discount: inv.discountMinor === null ? "" : formatRiyals(inv.discountMinor),
                   invoiceDate: todayInRiyadh(inv.date),
                   supplierId: supplier.id,
                 }}

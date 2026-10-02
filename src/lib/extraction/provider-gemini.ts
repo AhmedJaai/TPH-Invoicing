@@ -58,7 +58,8 @@ export const GEMINI_SCHEMA = {
     invoiceDate: { type: "STRING", description: "التاريخ بصيغة YYYY-MM-DD ميلادية أو فارغ" },
     subtotalAmount: { type: "STRING", description: "الإجمالي قبل الضريبة بمنزلتين عشريتين أو فارغ" },
     vatAmount: { type: "STRING", description: "مبلغ الضريبة بمنزلتين عشريتين أو فارغ" },
-    totalAmount: { type: "STRING", description: "الإجمالي شامل الضريبة بمنزلتين عشريتين أو فارغ" },
+    totalAmount: { type: "STRING", description: "المبلغ النهائي المستحق كما طُبع، بمنزلتين عشريتين أو فارغ" },
+    discountAmount: { type: "STRING", description: "الخصم على مستوى الفاتورة كما طُبع، بمنزلتين عشريتين أو فارغ" },
     beneficiaryName: { type: "STRING", description: "اسم المستفيد في إيصال التحويل أو فارغ" },
     lines: {
       type: "ARRAY",

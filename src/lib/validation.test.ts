@@ -229,3 +229,30 @@ describe("المجهول لا يصير صفراً", () => {
     expect(r.isFixedAsset).toBe(false);
   });
 });
+
+describe("الخصمُ بعد الضريبة", () => {
+  const paper = {
+    kind: "TAX_INVOICE" as const, invoiceNumber: "771",
+    sellerVat: "310111111100003", buyerVat: COMPANY_VAT,
+    /* ١٠٠٠ + ١٥٠ ضريبة − ٥٠ خصمٌ نقديّ = ١١٠٠ مستحقّ */
+    subtotalMinor: 1_000_00, vatMinor: 150_00, totalMinor: 1_100_00,
+  };
+
+  it("الخصمُ المطبوع يسدّ الفرق ← للعلم لا عطب، والضريبةُ صالحة", () => {
+    const r = validateInvoice({ ...paper, discountMinor: 50_00 }, ctx);
+    expect(r.taxStatus).toBe("VALID");
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]).toMatchObject({ code: ISSUE.VAT_MATH_MISMATCH, severity: "INFO", variant: "DISCOUNT" });
+  });
+
+  it("بلا خصمٍ مقروء الفرقُ نفسُه عطبٌ كما كان", () => {
+    const r = validateInvoice(paper, ctx);
+    expect(r.findings[0]).toMatchObject({ code: ISSUE.VAT_MATH_MISMATCH, severity: "WARN" });
+    expect(r.findings[0].variant).toBeUndefined();
+  });
+
+  it("خصمٌ لا يسدّ الفرق لا يُصدَّق", () => {
+    const r = validateInvoice({ ...paper, discountMinor: 30_00 }, ctx);
+    expect(r.findings[0].severity).not.toBe("INFO");
+  });
+});

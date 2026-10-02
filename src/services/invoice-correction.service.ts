@@ -18,7 +18,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { documents, invoiceLines, invoices, paymentAllocations, payments, suppliers } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
-import { formatRiyalsDisplay } from "@/lib/money";
+import { formatRiyalsDisplay, checkInvoiceTotals } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
 import { assertMonthsOpen } from "./month-guard";
 import { filingMonthFor } from "./invoice.service";
@@ -44,6 +44,8 @@ export interface InvoiceCorrection {
   subtotalMinor?: number | null;
   vatMinor?: number | null;
   totalMinor?: number | null;
+  /** خصمٌ على الإجماليّ بعد الضريبة — يُقبل إن سدّ فرقَ الحساب وحده */
+  discountMinor?: number | null;
   /** YYYY-MM-DD */
   invoiceDate?: string;
   supplierId?: string;
@@ -60,6 +62,7 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
       periodMonth: invoices.periodMonth, invoiceNumber: invoices.invoiceNumber,
       sellerVat: invoices.sellerVat, buyerVat: invoices.buyerVat,
       subtotalMinor: invoices.subtotalMinor, vatMinor: invoices.vatMinor, totalMinor: invoices.totalMinor,
+      discountMinor: invoices.discountMinor,
       invoiceDate: invoices.invoiceDate, supplierId: invoices.supplierId,
     })
     .from(invoices)
@@ -87,6 +90,24 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
   }
   if (next.totalMinor === null || next.totalMinor <= 0) {
     throw new InvoiceCorrectionRefused("الإجماليّ لا يكون فارغاً ولا صفراً — فاتورةٌ بلا مبلغٍ لا معنى لها.", 400);
+  }
+
+  /*
+    الخصمُ بعد الضريبة يُحكَم عليه بالحساب لا بما كُتب: يُحفظ إن كان هو ما يفسّر
+    الفرقَ وحده، ويُمحى إن استقام الحسابُ بدونه. ومن كتبه ولم يسدّ الفرقَ يُقال له.
+  */
+  const discountAsked = pick(input.discountMinor, row.discountMinor);
+  let discountMinor: number | null = null;
+  if (next.subtotalMinor !== null && next.vatMinor !== null) {
+    const totals = checkInvoiceTotals(next.subtotalMinor, next.vatMinor, next.totalMinor, discountAsked);
+    discountMinor = totals.postVatDiscountMinor;
+    if (totals.verdict === "MISMATCH" && input.discountMinor) {
+      throw new InvoiceCorrectionRefused(
+        `الصافي ${formatRiyalsDisplay(next.subtotalMinor)} + الضريبة ${formatRiyalsDisplay(next.vatMinor)} − الخصم ${formatRiyalsDisplay(input.discountMinor)} `
+        + `لا يساوي المستحقّ ${formatRiyalsDisplay(next.totalMinor)}. راجع الأرقام على الورقة.`, 400);
+    }
+  } else if (input.discountMinor) {
+    throw new InvoiceCorrectionRefused("الخصمُ بعد الضريبة يُقاس على الصافي والضريبة — اكتبهما معه.", 400);
   }
 
   const [supplier] = supplierId
@@ -137,6 +158,7 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
       subtotalMinor: next.subtotalMinor,
       vatMinor: next.vatMinor,
       totalMinor: next.totalMinor,
+      discountMinor,
       sellerVat: next.sellerVat,
       buyerVat: next.buyerVat,
     },
@@ -150,6 +172,7 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
   try {
     await tx.update(invoices).set({
       ...next,
+      discountMinor,
       invoiceNumber: next.invoiceNumber,
       totalMinor: next.totalMinor,
       invoiceDate: date,

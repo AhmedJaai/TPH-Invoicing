@@ -20,7 +20,7 @@
  * صفراً، والمحسوب عندنا ليس ما في المستند.** يُكشَف التعارض ويُعاد
  * السؤال؛ فإن بقي رُفع إلى إنسان.
  */
-import { parseRiyals, isSupplierRounding, TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
+import { parseRiyals, checkInvoiceTotals, TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
 import { VAT_RATE } from "@/config/drive";
 import type { ExtractionResult } from "./schema";
 
@@ -112,7 +112,8 @@ export function findConflicts(x: ExtractionResult): ExtractionConflict[] {
     تعارضاً كاذباً يُعيد السؤال بلا سبب.
   */
   if (!isStatement && !isPayment && subtotal !== null && vat !== null && total !== null) {
-    if (subtotal + vat !== total && !isSupplierRounding(subtotal, vat, total)) {
+    /* الخصمُ المطبوع بعد الضريبة يسدّ الفرق — إن سدّه وحده */
+    if (checkInvoiceTotals(subtotal, vat, total, money(x.discountAmount ?? "")).verdict === "MISMATCH") {
       conflicts.push({
         code: "TOTAL_NOT_SUM",
         fields: ["subtotalAmount", "vatAmount", "totalAmount"],

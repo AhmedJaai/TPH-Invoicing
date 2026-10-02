@@ -33,12 +33,14 @@ import { companyConfig } from "@/config/drive";
 import { InvoiceLinesRefused, replaceLines } from "@/services/invoice.service";
 import { assertMonthsOpen } from "@/services/month-guard";
 import { reviewConfirmed } from "@/lib/confirm";
-import { TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay, parseRiyals } from "@/lib/money";
+import { TOTAL_ROUNDING_TOLERANCE_MINOR, checkInvoiceTotals, formatRiyalsDisplay, parseRiyals } from "@/lib/money";
 
 export interface RereadRead {
   subtotalMinor: number | null;
   vatMinor: number | null;
   totalMinor: number | null;
+  /** خصمٌ مطبوعٌ بعد الضريبة — يُقبل إن سدّ الفرق وحده */
+  discountMinor: number | null;
   sellerVat: string | null;
   buyerVat: string | null;
   lineCount: number;
@@ -51,10 +53,10 @@ export type RereadOutcome =
   | { ok: true; applied: true; model: string; linesWritten: number; taxStatus: string; amountsWritten: boolean; problem: string | null };
 
 /** أيستقيم الثلاثيّ؟ — والجوابُ جملةٌ بأرقامها إن لم يستقم. */
-export function amountsProblem(subtotal: number | null, vat: number | null, total: number | null): string | null {
+export function amountsProblem(subtotal: number | null, vat: number | null, total: number | null, discount: number | null = null): string | null {
   if (subtotal === null || vat === null || total === null) return null;
   const diff = subtotal + vat - total;
-  if (Math.abs(diff) <= TOTAL_ROUNDING_TOLERANCE_MINOR) return null;
+  if (checkInvoiceTotals(subtotal, vat, total, discount).verdict !== "MISMATCH") return null;
   return `الصافي ${formatRiyalsDisplay(subtotal)} + الضريبة ${formatRiyalsDisplay(vat)} = `
     + `${formatRiyalsDisplay(subtotal + vat)}، والإجمالي ${formatRiyalsDisplay(total)} — `
     + `فرقُ ${formatRiyalsDisplay(Math.abs(diff))} لا يستقيم. لعلّ في الفاتورة رسماً أو خصماً لم يُقرأ؛ `
@@ -122,6 +124,7 @@ export async function rereadDocument(opts: {
     subtotalMinor: parseRiyals(x.subtotalAmount) ?? null,
     vatMinor: parseRiyals(x.vatAmount) ?? null,
     totalMinor: parseRiyals(x.totalAmount) ?? null,
+    discountMinor: parseRiyals(x.discountAmount) ?? null,
     sellerVat: x.sellerVatNumber?.trim() || null,
     buyerVat: x.buyerVatNumber?.trim() || null,
     lineCount: x.lines.length,
@@ -137,11 +140,15 @@ export async function rereadDocument(opts: {
   const total = doc.storedTotal ?? read.totalMinor;
   const totalConflict = doc.storedTotal !== null && read.totalMinor !== null
     && Math.abs(doc.storedTotal - read.totalMinor) > TOTAL_ROUNDING_TOLERANCE_MINOR;
-  const problem = amountsProblem(read.subtotalMinor, read.vatMinor, total)
+  const problem = amountsProblem(read.subtotalMinor, read.vatMinor, total, read.discountMinor)
     ?? (totalConflict
       ? `الإجماليُّ المقروء ${formatRiyalsDisplay(read.totalMinor!)} يخالف المقيَّد ${formatRiyalsDisplay(doc.storedTotal!)} — بقي المقيَّد.`
       : null);
-  const amountsOk = amountsProblem(read.subtotalMinor, read.vatMinor, total) === null;
+  const amountsOk = amountsProblem(read.subtotalMinor, read.vatMinor, total, read.discountMinor) === null;
+  /* الخصمُ يُكتب مع الصافي والضريبة أو لا يُكتب — والقيدُ 054 يزن الثلاثة معاً */
+  const discountToWrite = amountsOk && read.subtotalMinor !== null && read.vatMinor !== null && total !== null
+    ? { discountMinor: checkInvoiceTotals(read.subtotalMinor, read.vatMinor, total, read.discountMinor).postVatDiscountMinor }
+    : {};
 
   if (!opts.apply) {
     return {
@@ -163,6 +170,7 @@ export async function rereadDocument(opts: {
       subtotalMinor: amountsOk ? read.subtotalMinor : null,
       vatMinor: amountsOk ? read.vatMinor : null,
       totalMinor: total,
+      discountMinor: amountsOk ? read.discountMinor : null,
       sellerVat: read.sellerVat,
       buyerVat: read.buyerVat,
     },
@@ -184,6 +192,7 @@ export async function rereadDocument(opts: {
           ...(amountsOk ? {
             subtotalMinor: read.subtotalMinor ?? undefined,
             vatMinor: read.vatMinor ?? undefined,
+            ...discountToWrite,
             ...(doc.storedTotal === null && read.totalMinor !== null ? { totalMinor: read.totalMinor } : {}),
             taxStatus: review.taxStatus,
             inputVatStatus: review.inputVatStatus,
