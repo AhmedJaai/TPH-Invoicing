@@ -154,6 +154,23 @@ async function main() {
       });
     });
 
+    /* ── ٤ب. لافا كمبوتشا: دفعةٌ وهميّة نسخةُ حوالة ٧ أغسطس ── */
+    await step("لافا", async () => {
+      const PHANTOM = "15bd5c9f-eb81-4dc9-b4bb-72113b6e4db5";
+      const [p] = (await db.execute<{ status: string; supplier_id: string; bank: boolean }>(sql`
+        select status::text, supplier_id, exists(select 1 from bank_transactions bt where bt.matched_payment_id = ${PHANTOM}) bank from payments where id = ${PHANTOM}`)).rows;
+      say(`لافا ٩٤٥ (٧ أغسطس) بلا حركة بنك: ${!p ? "غير موجودة" : p.status === "VOID" ? "أُلغيت من قبل" : p.bank ? "لها حركة — لا تُمسّ" : "تُلغى"}`);
+      if (!WRITE || !p || p.status === "VOID" || p.bank) return;
+      await db.transaction(async (t) => {
+        const out = await reversePayment(t, { paymentId: PHANTOM, kind: "VOID", userId: AHMED,
+          reason: "نسخةٌ من حوالة ٧ أغسطس (٩٤٥): اليومُ والمبلغُ ونصُّ البنك واحد، والحوالةُ مطابَقةٌ بدفعةٍ أخرى، ولا حركة بنكٍ لهذه" });
+        await recordAudit({ actorId: AHMED, action: "PAYMENT_VOIDED", entityType: "payment", entityId: PHANTOM,
+          before: { التخصيص: out.previousAllocations }, after: { الحال: out.status, السبب: `${out.reason} — ${WHY}` } }, t);
+        const credit = await applySupplierCredit(t, p.supplier_id, { forwardDays: null });
+        say(`  وزّعت حوالاتُ لافا الحقيقيّة ${(credit.appliedMinor / 100).toFixed(2)} على ${credit.allocations.length} فواتير`);
+      });
+    });
+
     /* ── ٥. مختبرات القهوة V405791 ── */
     await step("V405791", async () => {
       const [v791] = await db.select({ id: documents.id, reading: documents.extractionJson, supplierId: documents.supplierId })
@@ -211,7 +228,8 @@ async function main() {
     /* ── ٧. إعادةُ القراءة ── */
     await step("إعادة القراءة", async () => {
       const rereads = (await db.execute<{ id: string; file_name: string }>(sql`
-        select id, file_name from documents where file_name like '%Rawnah_Invoice_4136%' or (file_name ~* '\\.hei[cf]$' and extraction_json is null)`)).rows;
+        select d.id, d.file_name from documents d where d.file_name like '%Rawnah_Invoice_4136%' or (d.file_name ~* '\\.hei[cf]$' and d.extraction_json is null)
+           or exists (select 1 from invoices i where i.document_id = d.id and (i.subtotal_minor is null or i.vat_minor is null) and i.period_month >= '2026-06')`)).rows;
       for (const r of rereads) {
         say(`إعادة قراءة ${r.file_name}`);
         if (!WRITE) continue;
