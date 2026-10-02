@@ -3,6 +3,7 @@ import {
 } from "./arabic";
 import { OVERDUE_DAYS } from "./invoice-filter";
 import { formatDay } from "./riyadh-time";
+import { formatRiyalsDisplay } from "./money";
 import { txHref } from "@/lib/inspector";
 
 /** بعد كم يوماً من آخر كشفٍ يصير وقوفُه بنداً — الكشفُ يُستورَد أسبوعيّاً. */
@@ -295,15 +296,17 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
   */
   if (f.bankBalanceDifferenceMinor !== null && Math.abs(f.bankBalanceDifferenceMinor) > 1) {
     const diff = Math.abs(f.bankBalanceDifferenceMinor);
+    /* فرقُ ريالٍ وسبعين هللة (سبتمبر ٢٠٢٦) كان «حرجاً» فوق ما يستحقّ القرار — الحِدّةُ بقدر المال */
+    const small = diff < 100 * 100;
     out.push({
       id: "bank-balance-difference",
       area: "BANK",
-      severity: "CRITICAL",
-      title: "رصيد البنك لا يطابق حركاته المقروءة",
+      severity: small ? "MEDIUM" : "CRITICAL",
+      title: small ? `فرقٌ صغير بين رصيد البنك وحركاته (${formatRiyalsDisplay(diff)})` : "رصيد البنك لا يطابق حركاته المقروءة",
       detail:
         f.bankBalanceDifferenceMinor > 0
-          ? "البنك يقول رصيداً أعلى — حركاتٌ واردة لم تُقرأ."
-          : "البنك يقول رصيداً أقلّ — حركاتٌ صادرة لم تُقرأ.",
+          ? `البنك يقول رصيداً أعلى بـ${formatRiyalsDisplay(diff)} — حركةٌ واردة لم تُقرأ، أو صادرةٌ قُرئت مرّتين.`
+          : `البنك يقول رصيداً أقلّ بـ${formatRiyalsDisplay(diff)} — حركةٌ صادرة لم تُقرأ، أو واردةٌ قُرئت مرّتين.`,
       action: "راجع الكشف: الفرق يعني حركاتٍ لم تصل، لا خطأ في المطابقة.",
       actionLabel: "اكتب رصيدَي الشهر",
       /*
@@ -453,7 +456,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       detail: `${countNoun(f.notTaxValidCount, INVOICE)} لا تحمل الأركان الأربعة، فلا يجوز خصم ضريبتها.`,
       action: "اطلب من هؤلاء المورّدين فاتورة ضريبية كاملة تحمل رقمنا الضريبي.",
       actionLabel: "اطلب فاتورة كاملة",
-      href: "/purchases/invoices?tax=INVALID",
+      href: "/purchases/invoices?tax=INVALID&withVat=1",
       count: f.notTaxValidCount,
       amountMinor: f.vatAtRiskMinor,
       impact: { kind: "AT_RISK", amountMinor: f.vatAtRiskMinor },

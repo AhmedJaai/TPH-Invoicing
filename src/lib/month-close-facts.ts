@@ -21,7 +21,8 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
   const [inv] = await db
     .select({
       invoiceCount: sql<number>`count(*)::int`,
-      notTaxValidCount: sql<number>`count(*) filter (where ${invoices.taxStatus} = 'INVALID')::int`,
+      /* «لا تصلح لخصم المدخلات» ما فيه ضريبةٌ تضيع — لا فاتورةُ مورّدٍ لا يفرض ضريبة */
+      notTaxValidCount: sql<number>`count(*) filter (where ${invoices.taxStatus} = 'INVALID' and ${invoices.vatMinor} > 0)::int`,
       unknownTaxCount: sql<number>`count(*) filter (where ${invoices.taxStatus} = 'UNKNOWN')::int`,
       unpostedCount: sql<number>`count(*) filter (where not ${invoices.postedToAccounting})::int`,
       fixedAssetCount: sql<number>`count(*) filter (where ${invoices.isFixedAsset})::int`,

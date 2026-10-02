@@ -316,6 +316,12 @@ describe("الغائب يُرى", () => {
     expect(item?.detail).toContain("صادرة لم تُقرأ");
   });
 
+  it("وفرقٌ صغيرٌ (١٫٧٣) يُقال بمبلغه ولا يُرفع حرجاً", () => {
+    const item = buildAttention({ ...quiet, bankBalanceDifferenceMinor: 173 }).find((i) => i.id === "bank-balance-difference");
+    expect(item?.severity).toBe("MEDIUM");
+    expect(item?.title).toContain("1.73");
+  });
+
   it("هللةٌ ليست فرقاً", () => {
     expect(ids({ bankBalanceDifferenceMinor: 1 })).not.toContain("bank-balance-difference");
   });

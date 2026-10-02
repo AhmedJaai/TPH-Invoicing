@@ -89,6 +89,7 @@ export default async function InvoicesPage({
   if (f.supplier) others.push(eq(suppliers.slug, f.supplier));
   if (f.tax) others.push(eq(invoices.taxStatus, f.tax));
   if (f.noLines) others.push(sql`${lineCount} = 0`);
+  if (f.withVat) others.push(sql`${invoices.vatMinor} > 0`);
   if (f.overdue) {
     others.push(sql`${remaining} > 0`);
     others.push(sql`${invoices.invoiceDate} < now() - interval '${sql.raw(String(OVERDUE_DAYS))} days'`);

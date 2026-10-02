@@ -27,6 +27,8 @@ export interface InvoiceFilters {
   noLines?: boolean;
   /** مضى على استحقاقها أكثر من الحدّ */
   overdue?: boolean;
+  /** فيها ضريبةٌ مقروءة — «معرّضة للضياع» ما فيه ضريبة وحده */
+  withVat?: boolean;
   page: number;
 }
 
@@ -46,6 +48,7 @@ export function parseFilters(raw: Record<string, string | undefined>): InvoiceFi
     paid: PAID_VALUES.includes(raw.paid ?? "") ? (raw.paid as PaidFilter) : undefined,
     noLines: raw.noLines === "1",
     overdue: raw.overdue === "1",
+    withVat: raw.withVat === "1",
     page: Number.isFinite(page) && page > 0 ? Math.floor(page) : 1,
   };
 }
@@ -65,6 +68,7 @@ export function linkTo(
   if (next.paid) params.set("paid", next.paid);
   if (next.noLines) params.set("noLines", "1");
   if (next.overdue) params.set("overdue", "1");
+  if (next.withVat) params.set("withVat", "1");
 
   const page = patch.page ?? 1;
   if (page > 1) params.set("page", String(page));
@@ -75,7 +79,7 @@ export function linkTo(
 
 /** هل من مُرشِّح فعّال؟ يُستعمل لعرض زرّ «امسح الترشيح». */
 export function hasFilters(f: InvoiceFilters): boolean {
-  return Boolean(f.month || f.supplier || f.tax || f.paid || f.noLines || f.overdue);
+  return Boolean(f.month || f.supplier || f.tax || f.paid || f.noLines || f.overdue || f.withVat);
 }
 
 export const TAX_LABEL: Record<TaxFilter, string> = {
@@ -105,6 +109,7 @@ export function describe(f: InvoiceFilters, supplierName?: string | null): strin
   if (f.paid) parts.push(PAID_LABEL[f.paid]);
   if (f.overdue) parts.push(`مضى على استحقاقها ${countNoun(OVERDUE_DAYS, DAY)}`);
   if (f.noLines) parts.push("بلا بنود مقروءة");
+  if (f.withVat) parts.push("فيها ضريبة");
   if (f.month) parts.push(`في ${f.month}`);
   return parts.length === 0 ? "كل الفواتير" : parts.join(" · ");
 }

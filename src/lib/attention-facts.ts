@@ -42,7 +42,8 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         select
           (select count(*)::int from issues where status='OPEN' and severity='BLOCKER')      as open_blockers,
           (select count(*)::int from documents where status in ('PENDING','NEEDS_REVIEW'))   as pending_docs,
-          (select count(*)::int from invoices where tax_status='INVALID')                    as not_valid,
+          /* ما لا ضريبةَ فيه لا يُخصم منه شيء — أوراق الزيتون ولافا (٦٦ فاتورة) بلا ضريبة أصلاً */
+          (select count(*)::int from invoices where tax_status='INVALID' and vat_minor > 0)  as not_valid,
           (select coalesce(sum(vat_minor),0)::bigint from invoices
              where input_vat_status='NOT_ELIGIBLE' and vat_minor > 0)                        as vat_at_risk,
           (select count(*)::int from invoices where tax_status='UNKNOWN')                    as unknown_tax,
