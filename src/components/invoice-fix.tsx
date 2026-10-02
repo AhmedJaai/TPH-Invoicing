@@ -48,6 +48,8 @@ export function InvoiceFix({
     total: string;
     /** خصمٌ بعد الضريبة — فراغُه «لا خصم» */
     discount: string;
+    /** رسومُ توصيلٍ أو شحنٍ بعد الضريبة — فراغُها «لا رسوم» */
+    charges: string;
     /** YYYY-MM-DD */
     invoiceDate: string;
     supplierId: string;
@@ -70,7 +72,7 @@ export function InvoiceFix({
   const dirty = (Object.keys(initial) as (keyof typeof initial)[]).some((k) => form[k] !== initial[k]);
   /* مبلغٌ لا يُقرأ لا يُرسَل ليُردّ — يُقال تحت حقله، والزرُّ يقول لماذا لا يعمل */
   const unreadable = !form.total.trim()
-    || [form.subtotal, form.vat, form.total, form.discount].some((v) => v.trim() !== "" && parseRiyals(v) === null);
+    || [form.subtotal, form.vat, form.total, form.discount, form.charges].some((v) => v.trim() !== "" && parseRiyals(v) === null);
 
   async function save() {
     setBusy(true);
@@ -85,6 +87,7 @@ export function InvoiceFix({
       vat: form.vat,
       total: form.total,
       ...(form.discount !== initial.discount ? { discount: form.discount } : {}),
+      ...(form.charges !== initial.charges ? { charges: form.charges } : {}),
       /* ما لم يتغيّر لا يُرسَل — فلا يُسأل عن صلاحيةٍ لم يُطلب بها شيء */
       ...(form.invoiceDate !== initial.invoiceDate ? { invoiceDate: form.invoiceDate } : {}),
       ...(form.supplierId !== initial.supplierId ? { supplierId: form.supplierId } : {}),
@@ -184,7 +187,8 @@ export function InvoiceFix({
             <Field label="الصافي قبل الضريبة" value={form.subtotal} onChange={(v) => set({ subtotal: v })} ltr hint={amountHint(form.subtotal)} />
             <Field label="الضريبة" value={form.vat} onChange={(v) => set({ vat: v })} ltr hint={amountHint(form.vat)} />
             <Field label="الإجماليّ (المستحقّ)" value={form.total} onChange={(v) => set({ total: v })} ltr hint={amountHint(form.total, true)} />
-            <Field label="خصمٌ بعد الضريبة — إن وُجد" value={form.discount} onChange={(v) => set({ discount: v })} ltr hint={amountHint(form.discount)} />
+            <Field label="خصمٌ بعد الضريبة — إن وُجد" value={form.discount} onChange={(v) => set({ discount: v })} ltr hint={optionalHint(form.discount)} />
+            <Field label="رسومُ توصيلٍ بعد الضريبة — إن وُجدت" value={form.charges} onChange={(v) => set({ charges: v })} ltr hint={optionalHint(form.charges)} />
             <label className="block">
               <span className="mb-1 block text-[11px] font-medium text-muted">تاريخ الفاتورة</span>
               <input
@@ -212,7 +216,7 @@ export function InvoiceFix({
               )}
             </label>
           </div>
-          <SumCheck subtotal={form.subtotal} vat={form.vat} total={form.total} discount={form.discount} />
+          <SumCheck subtotal={form.subtotal} vat={form.vat} total={form.total} discount={form.discount} charges={form.charges} />
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <button
               aria-busy={busy}
@@ -265,24 +269,31 @@ function amountHint(v: string, required = false): Hint {
   return /[٠-٩۰-۹٬٫,]/.test(v) ? { tone: "ok", text: <>يُحفظ <Money minor={minor} /></> } : null;
 }
 
-function SumCheck({ subtotal, vat, total, discount }: { subtotal: string; vat: string; total: string; discount: string }) {
+/* الخصمُ والرسومُ فراغُهما «لا شيء» لا «غير معروف» — فلا يُنذَر عنهما */
+function optionalHint(v: string): Hint {
+  return v.trim() ? amountHint(v) : null;
+}
+
+function SumCheck({ subtotal, vat, total, discount, charges }: { subtotal: string; vat: string; total: string; discount: string; charges: string }) {
   const s = subtotal.trim() ? parseRiyals(subtotal) : null;
   const v = vat.trim() ? parseRiyals(vat) : null;
   const t = total.trim() ? parseRiyals(total) : null;
-  const d = discount.trim() ? parseRiyals(discount) : null;
   if (s === null || v === null || t === null) return null;
   /* الحكمُ نفسُه الذي يحكم به الخادمُ والقاعدة — هنا عونٌ وهناك القرار */
-  const verdict = checkInvoiceTotals(s, v, t, d).verdict;
-  const ok = verdict !== "MISMATCH";
-  const gap = s + v - (verdict === "POST_VAT_DISCOUNT" ? d ?? 0 : 0) - t;
+  const check = checkInvoiceTotals(s, v, t, {
+    discountMinor: discount.trim() ? parseRiyals(discount) : null,
+    chargesMinor: charges.trim() ? parseRiyals(charges) : null,
+  });
+  const ok = check.verdict !== "MISMATCH";
+  const sum = s + v - (check.discountMinor ?? 0) + (check.chargesMinor ?? 0);
   return (
     <p
       aria-live="polite"
       className={`mt-2.5 flex flex-wrap items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold ${ok ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn"}`}
     >
       {ok ? <CircleCheck className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden /> : <TriangleAlert className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />}
-      الصافي + الضريبة{verdict === "POST_VAT_DISCOUNT" && d !== null && <> − الخصم</>} = <Money minor={s + v - (verdict === "POST_VAT_DISCOUNT" ? d ?? 0 : 0)} />
-      {ok ? " — يطابق الإجماليّ" : <> — يخالف الإجماليّ بـ<Money minor={Math.abs(gap)} /></>}
+      الصافي + الضريبة{check.discountMinor !== null && <> − الخصم</>}{check.chargesMinor !== null && <> + الرسوم</>} = <Money minor={sum} />
+      {ok ? " — يطابق الإجماليّ" : <> — يخالف الإجماليّ بـ<Money minor={Math.abs(sum - t)} /></>}
     </p>
   );
 }

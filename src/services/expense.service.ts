@@ -15,6 +15,7 @@ import type { Conn, Tx } from "./types";
 import { firstClosedMonth } from "./month-guard";
 import {
   deriveFromBank,
+  bankExpenseLabel,
   isExpenseCategory,
   looksLikeGoodsPurchase,
   matchRecurring,
@@ -252,7 +253,11 @@ export async function resyncBankExpenses(
     || !isExpenseCategory(r.category)
     || looksLikeGoodsPurchase(r.description, r.beneficiaryRaw));
   const removeIds = new Set(remove.map((r) => r.expenseId));
-  const update = rows.filter((r) => !removeIds.has(r.expenseId) && r.expenseCategory !== r.category);
+  /* البابُ والاسمُ يتبعان الحركة — والاسمُ لا يكتبه أحدٌ بيده للمصروف البنكيّ */
+  const update = rows
+    .filter((r) => !removeIds.has(r.expenseId))
+    .map((r) => ({ ...r, nextLabel: bankExpenseLabel({ beneficiaryRaw: r.beneficiaryRaw, description: r.description, category: r.category }) }))
+    .filter((r) => r.expenseCategory !== r.category || r.label !== r.nextLabel);
 
   if (remove.length > 0) {
     await tx.delete(expenses).where(inArray(expenses.id, remove.map((r) => r.expenseId)));
@@ -270,7 +275,7 @@ export async function resyncBankExpenses(
   }
 
   for (const r of update) {
-    await tx.update(expenses).set({ category: r.category }).where(eq(expenses.id, r.expenseId));
+    await tx.update(expenses).set({ category: r.category, label: r.nextLabel }).where(eq(expenses.id, r.expenseId));
   }
 
   let created = 0;

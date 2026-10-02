@@ -31,7 +31,7 @@ describe("لماذا ناقصةُ ركن", () => {
 
   it("المانعُ قبل التحذير — من يقرأ سطرين يقرأ ما يمنع القيد أوّلاً", () => {
     const r = invoiceReasons(
-      { ...ok, buyerVat: "999999999999999", invoiceNumber: null },
+      { ...ok, buyerVat: "300000000000003", invoiceNumber: null },
       supplier,
       COMPANY_VAT,
     );

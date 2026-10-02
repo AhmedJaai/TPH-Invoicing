@@ -6,12 +6,12 @@
  * حساب السعر أنتج «ارتفاع أسعار ١٥٪» لم يقع.
  */
 import { eq, inArray, sql } from "drizzle-orm";
-import { invoiceLines, invoices, statementLines, statements } from "@/db/schema";
+import { invoiceLines, invoices, statementLines, statements, supplierItemAliases } from "@/db/schema";
 import { normalizeItem } from "@/lib/items";
 import { parseLineQuantity, reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { checkInvoiceTotals, parseRiyals } from "@/lib/money";
 import type { InputVatStatus, TaxStatus } from "@/lib/validation";
-import type { RawLine, Tx } from "./types";
+import type { Conn, RawLine, Tx } from "./types";
 import { assertMonthsOpen } from "./month-guard";
 import { monthOf } from "@/lib/filing";
 import { buildSupplierProducts } from "./product.service";
@@ -32,6 +32,8 @@ export interface CreateInvoiceInput {
    * (`checkInvoiceTotals`): يُكتب خصماً بعد الضريبة إن كان هو ما يفسّر الفرق وحده.
    */
   discountReadMinor?: number | null;
+  /** الرسومُ بعد الضريبة كما قُرئت (توصيل · شحن) — بالحكم نفسه */
+  chargesReadMinor?: number | null;
   sellerVat?: string | null;
   buyerVat?: string | null;
   taxStatus: TaxStatus;
@@ -52,6 +54,15 @@ export function filingMonthFor(invoiceDate: Date, fallbackMonth: string): string
   return Number.isNaN(invoiceDate.getTime()) ? fallbackMonth : monthOf(invoiceDate);
 }
 
+/** ما يُحفظ من الخصم والرسوم بعد الضريبة — ما فسّر الفرقَ وحده، وإلّا فراغ. */
+function postVatOf(input: Pick<CreateInvoiceInput, "subtotalMinor" | "vatMinor" | "totalMinor" | "discountReadMinor" | "chargesReadMinor">) {
+  if (input.subtotalMinor === null || input.vatMinor === null) return { discountMinor: null, chargesMinor: null };
+  const t = checkInvoiceTotals(input.subtotalMinor, input.vatMinor, input.totalMinor, {
+    discountMinor: input.discountReadMinor, chargesMinor: input.chargesReadMinor,
+  });
+  return { discountMinor: t.discountMinor, chargesMinor: t.chargesMinor };
+}
+
 export async function createInvoice(tx: Tx, input: CreateInvoiceInput): Promise<string | null> {
   const periodMonth = filingMonthFor(input.invoiceDate, input.periodMonth);
   await assertMonthsOpen(tx, [periodMonth]);
@@ -67,9 +78,7 @@ export async function createInvoice(tx: Tx, input: CreateInvoiceInput): Promise<
       subtotalMinor: input.subtotalMinor,
       vatMinor: input.vatMinor,
       totalMinor: input.totalMinor,
-      discountMinor: input.subtotalMinor !== null && input.vatMinor !== null
-        ? checkInvoiceTotals(input.subtotalMinor, input.vatMinor, input.totalMinor, input.discountReadMinor ?? null).postVatDiscountMinor
-        : null,
+      ...postVatOf(input),
       sellerVat: input.sellerVat ?? null,
       buyerVat: input.buyerVat ?? null,
       taxStatus: input.taxStatus,
@@ -108,6 +117,16 @@ export interface ReplaceLinesInput {
  *
  * وتُكتب البنود بديلاً عمّا قبلها، فإعادة التشغيل لا تُضاعفها.
  */
+/** صيغُ أسماء أصناف المورّد المُقَرّة: الصيغة ← الأصل. */
+export async function itemAliases(conn: Conn | Tx, supplierId: string | null): Promise<Map<string, string>> {
+  if (!supplierId) return new Map();
+  const rows = await conn
+    .select({ alias: supplierItemAliases.aliasNormalized, canonical: supplierItemAliases.canonicalNormalized })
+    .from(supplierItemAliases)
+    .where(eq(supplierItemAliases.supplierId, supplierId));
+  return new Map(rows.map((r) => [r.alias, r.canonical]));
+}
+
 export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<number> {
   /*
     ── البندُ يُحدَّث في مكانه، لا يُحذَف ويُعاد ──
@@ -172,9 +191,12 @@ export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<nu
     return list.splice(i, 1)[0].id;
   };
 
+  /* صيغةٌ أقرّها إنسانٌ أنّها صنفٌ آخر لهذا المورّد تُكتب باسمه (056) */
+  const canonical = await itemAliases(tx, input.supplierId);
   const plan: { reuse: string | undefined; values: Omit<typeof invoiceLines.$inferInsert, "invoiceId"> }[] = [];
   for (const l of lines) {
-    const normalizedDescription = normalizeItem(l.description);
+    const read = normalizeItem(l.description);
+    const normalizedDescription = canonical.get(read) ?? read;
     const values = {
       description: l.description,
       normalizedDescription,

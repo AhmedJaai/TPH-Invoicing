@@ -11,10 +11,10 @@
  */
 import { refreshTokenFor } from "@/services/drive.service";
 import { NextResponse } from "next/server";
-import { and, eq, gte, inArray, lte } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  documents, invoices, issues, statementLines, statements,
+  documents, statements,
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
@@ -22,19 +22,17 @@ import { DriveAuthExpiredError, driveForUser, downloadFile, isDriveAuthError } f
 import { extractDocument, isSupportedUpload } from "@/lib/extraction";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import {
-  buildDiscrepancyMemo, reconcileStatement,
-  type OurInvoice, type StatementLineInput,
+  buildDiscrepancyMemo, type StatementLineInput,
 } from "@/lib/statement-match";
-import { parseRiyals } from "@/lib/money";
+import { parseStatementExtras } from "@/lib/extraction/statement-extras";
 import { companyConfig } from "@/config/drive";
-import { recordAudit } from "@/lib/audit";
+import { reconcileAndPersist } from "@/services/statement-reconcile.service";
 import { withDeadline } from "@/lib/ai/deadline";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MAX_BYTES = 4 * 1024 * 1024;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 async function loadSuppliers(): Promise<SupplierRecord[]> {
   const rows = await db.select({
@@ -176,26 +174,14 @@ async function handle(request: Request) {
 
   const supplier = supplierList.find((s) => s.id === supplierId);
 
-  // سطور الكشف كما قرأها النموذج — بلا حساب ولا تلفيق
-  const parsedLines: StatementLineInput[] = [];
-  /* ما لم يُقرأ مبلغُه أو تاريخُه يُعلَن — كان يصير صفراً فيُسقَط صامتاً */
-  const unreadLines: { date: string; description: string; amountText: string }[] = [];
-  for (const l of x.statementLines) {
-    const debitText = (l.debit ?? "").trim();
-    const creditText = (l.credit ?? "").trim();
-    const debitRead = debitText ? parseRiyals(debitText) : 0;
-    const creditRead = creditText ? parseRiyals(creditText) : 0;
-    const unread = () => unreadLines.push({
-      date: l.date ?? "", description: l.description ?? "", amountText: debitText || creditText,
-    });
-    if (debitRead === null || creditRead === null) { unread(); continue; }
-    const debit = debitRead;
-    const credit = creditRead;
-    if (debit === 0 && credit === 0) continue;
-    const date = DATE_RE.test(l.date) ? new Date(`${l.date}T00:00:00Z`) : null;
-    if (!date) { unread(); continue; }
-    parsedLines.push({ date, ref: l.ref || null, description: l.description || null, debitMinor: debit, creditMinor: credit });
-  }
+  /*
+    سطورُ الكشف كما قرأها النموذج — بالقاعدة نفسها التي يُقيَّد بها كشفُ المزامنة والرفع
+    (`parseStatementExtras`): ما لم يُقرأ مبلغُه أو تاريخُه يُعلَن، والرصيدُ الجاري المقروء
+    مديناً يُعاد إلى موضعه. كانت نسخةً ثانيةً هنا فلم يصلها الإصلاح.
+  */
+  const extras = parseStatementExtras(x);
+  const parsedLines: StatementLineInput[] = extras.lines;
+  const unreadLines = extras.unreadLines;
 
   if (parsedLines.length === 0) {
     return NextResponse.json(
@@ -212,65 +198,21 @@ async function handle(request: Request) {
    * سطوره كلّها بفواتير شهر واحد، فظهرت ست وثلاثون فاتورة «ناقصة» وهي عندنا.
    * والكشف يغطّي ما تغطّيه سطوره، لا ما يقوله اسم ملفه.
    */
-  const times = parsedLines.map((l) => l.date.getTime());
-  const start = new Date(Math.min(...times));
-  const end = new Date(Math.max(...times));
   void periodStart;
   void periodEnd;
 
-  /*
-   * نافذة الفواتير أوسع من مدى السطور بأسبوع من الطرفين.
-   *
-   * تاريخ المورّد للحركة ليس تاريخ فاتورتنا: رأينا سطراً بتاريخ ٢٣ أغسطس
-   * يخصّ فاتورة عندنا بتاريخ ٢٦. فحصر النافذة في مدى السطور يُخفي الفاتورة
-   * عن المطابقة، فتُعلَن «ناقصة» وهي عندنا — وإنذارٌ كاذب في هذا الموضع
-   * يُفقد الميزة كلّها قيمتها.
-   */
-  const PAD_MS = 7 * 86_400_000;
-  const windowStart = new Date(start.getTime() - PAD_MS);
-  const windowEnd = new Date(end.getTime() + PAD_MS);
-
-  const invRows = await db
-    .select({
-      invoiceId: invoices.id,
-      invoiceNumber: invoices.invoiceNumber,
-      invoiceDate: invoices.invoiceDate,
-      totalMinor: invoices.totalMinor,
-    })
-    .from(invoices)
-    .where(and(
-      eq(invoices.supplierId, supplierId),
-      gte(invoices.invoiceDate, windowStart),
-      lte(invoices.invoiceDate, windowEnd),
-    ));
-
-  const ours: OurInvoice[] = invRows;
-
-  /*
-    ══ المجهول ليس صفراً — ولا هو مجموعَ الكشف ══
-
-    كان الافتتاحيّ يُمرَّر `opening ?? 0`، والختاميّ يسقط إلى
-    `totalAmount` إن غاب. وكلاهما اختراع:
-
-      • رصيدٌ افتتاحيّ لم يُقرأ ليس صفراً — الصفر يقول «لم يكن على
-        المقهى شيء أوّل المدّة»، وهي دعوى لا يملكها من لم يقرأ السطر.
-      • ومجموعُ الكشف ليس رصيداً ختامياً إلّا أن يضمن ذلك عقدُ
-        المستند — والمجموع قد يكون مجموع المدين وحده.
-
-    وأثرُه أنّ المعادلة تُحسَب على رقمٍ مخترَع، فيُقال «حساب المورّد لا
-    يستقيم» ويُتَّهم المورّد بخطأٍ مصدره أنّنا لم نقرأ. و`reconcileStatement`
-    تُحسن التصرّف أصلاً: تُرجع `null` إن غاب أحدهما — أي «لم تُفحَص»
-    لا «فُحصت فنجحت». فالواجب ألّا نمنعها ذلك بصفرٍ نصنعه.
-  */
-  const opening = parseRiyals(x.openingBalance ?? "");
-  const closing = parseRiyals(x.closingBalance ?? "");
-
-  const result = reconcileStatement(parsedLines, ours, {
-    openingBalanceMinor: opening ?? undefined,
-    closingBalanceMinor: closing ?? undefined,
+  const { result, ours, start, end, periodLabel } = await reconcileAndPersist({
+    statementId: persist ? statementId : null,
+    supplierId,
+    supplierName: supplier?.nameAr ?? "المورّد",
+    documentId,
+    lines: parsedLines,
+    openingMinor: extras.openingBalanceMinor,
+    closingMinor: extras.closingBalanceMinor,
+    actorId: user.id,
+    persist,
   });
 
-  const periodLabel = `${start.toISOString().slice(0, 10)} إلى ${end.toISOString().slice(0, 10)}`;
   const memo = buildDiscrepancyMemo(supplier?.nameAr ?? "المورّد", periodLabel, result);
 
   const payload = {
@@ -315,76 +257,6 @@ async function handle(request: Request) {
   };
 
   if (!persist) return NextResponse.json(payload);
-
-  // ── الحفظ: سطور الكشف ونتيجته وتنبيهاته ──
-  await db.transaction(async (tx) => {
-    // تُعاد كتابة السطور كاملةً فتبقى إعادة المطابقة ممكنة بلا تكرار
-    await tx.delete(statementLines).where(eq(statementLines.statementId, statementId));
-
-    for (const l of result.lines) {
-      await tx.insert(statementLines).values({
-        statementId,
-        date: l.line.date,
-        ref: l.line.ref ?? null,
-        description: l.line.description ?? null,
-        debitMinor: l.line.debitMinor,
-        creditMinor: l.line.creditMinor,
-        matchedInvoiceId: l.invoice?.invoiceId ?? null,
-        matchStatus:
-          l.status === "MATCHED" ? "MATCHED"
-          : l.status === "AMOUNT_MISMATCH" ? "DISPUTED"
-          : l.status === "PAYMENT" ? "IGNORED"
-          : "UNMATCHED",
-      });
-    }
-
-    // الفترة المسجَّلة كانت مستنتَجة من اسم الملف؛ الآن نعرف ما تغطّيه سطوره
-    await tx.update(statements).set({
-      periodStart: start,
-      periodEnd: end,
-      /* العمودان يقبلان `null` منذ الهجرة ٠١٨ — فالمجهول يُحفَظ مجهولاً */
-      openingBalanceMinor: opening ?? null,
-      closingBalanceMinor: closing ?? null,
-    }).where(eq(statements.id, statementId));
-
-    /*
-      التنبيهات تُستبدَل كما تُستبدَل الأسطر: كان «أعِد المطابقة» يُدرجها
-      فوق السابقة، فتتضاعف في «يحتاج انتباهك» وفي موانع الإقفال مع كلّ ضغطة.
-      والمحسومُ بيد إنسان يبقى — لا يُمحى قرارُه بإعادة حساب.
-    */
-    await tx.delete(issues).where(and(
-      eq(issues.entityType, "statement"),
-      eq(issues.entityId, statementId),
-      eq(issues.status, "OPEN"),
-    ));
-
-    for (const f of result.findings) {
-      await tx.insert(issues).values({
-        code: f.code,
-        severity: f.severity,
-        entityType: "statement",
-        entityId: statementId,
-        message: f.message,
-      });
-    }
-  });
-
-  await recordAudit({
-    actorId: user.id,
-    action: "STATEMENT_RECONCILED",
-    entityType: "statement",
-    entityId: statementId,
-    after: {
-      المورّد: supplier?.nameAr,
-      الفترة: periodLabel,
-      سطور: parsedLines.length,
-      طوبقت: result.matchedCount,
-      ناقصة_من_الأرشيف: result.missingFromArchive.length,
-      فروق_مبالغ: result.amountMismatches.length,
-      المستند: documentId,
-    },
-  });
-
   return NextResponse.json({ ...payload, persisted: true });
 }
 

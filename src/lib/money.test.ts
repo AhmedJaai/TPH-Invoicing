@@ -77,18 +77,32 @@ describe("parseRiyals — سقف عمود المال", () => {
   });
 });
 
-describe("checkInvoiceTotals — الخصمُ قبل الضريبة وبعدها", () => {
+describe("checkInvoiceTotals — الخصمُ والرسومُ بعد الضريبة", () => {
   it("الصافي + الضريبة = الإجماليّ: لا خصمَ يُطرح ولو قُرئ (كان قبل الضريبة)", () => {
-    expect(checkInvoiceTotals(1000_00, 150_00, 1150_00, 100_00)).toEqual({ verdict: "EXACT", postVatDiscountMinor: null });
+    expect(checkInvoiceTotals(1000_00, 150_00, 1150_00, { discountMinor: 100_00 }))
+      .toEqual({ verdict: "EXACT", discountMinor: null, chargesMinor: null });
   });
   it("الخصمُ بعد الضريبة يفسّر الفرق: يُطرح والضريبةُ كما هي", () => {
-    expect(checkInvoiceTotals(1000_00, 150_00, 1100_00, 50_00)).toEqual({ verdict: "POST_VAT_DISCOUNT", postVatDiscountMinor: 50_00 });
+    expect(checkInvoiceTotals(1000_00, 150_00, 1100_00, { discountMinor: 50_00 }))
+      .toEqual({ verdict: "ADJUSTED", discountMinor: 50_00, chargesMinor: null });
+  });
+  it("رسومُ التوصيل بعد الضريبة تفسّر الزيادة — رونة ٩٢٥ + ١٣٨٫٧٥ + ٢٥", () => {
+    expect(checkInvoiceTotals(925_00, 138_75, 1088_75, { chargesMinor: 25_00 }))
+      .toEqual({ verdict: "ADJUSTED", discountMinor: null, chargesMinor: 25_00 });
+  });
+  it("وكلاهما معاً حين لا يفسّره أحدُهما وحده", () => {
+    expect(checkInvoiceTotals(1000_00, 150_00, 1125_00, { discountMinor: 50_00, chargesMinor: 25_00 }))
+      .toEqual({ verdict: "ADJUSTED", discountMinor: 50_00, chargesMinor: 25_00 });
+  });
+  it("ولا يُحفظ ما لم يلزم: الخصمُ وحده يكفي فالرسومُ المقروءة لا تُكتب", () => {
+    expect(checkInvoiceTotals(1000_00, 150_00, 1100_00, { discountMinor: 50_00, chargesMinor: 25_00 }).chargesMinor).toBeNull();
   });
   it("وتقريبُ المورّد بريالٍ تقريبٌ لا خصم", () => {
-    expect(checkInvoiceTotals(574_00, 86_10, 660_00, null).verdict).toBe("ROUNDING");
+    expect(checkInvoiceTotals(574_00, 86_10, 660_00).verdict).toBe("ROUNDING");
   });
-  it("وما لا يفسّره خصمٌ مقروء — لا يستقيم", () => {
-    expect(checkInvoiceTotals(1000_00, 150_00, 1100_00, 20_00).verdict).toBe("MISMATCH");
-    expect(checkInvoiceTotals(1000_00, 150_00, 1100_00, null).verdict).toBe("MISMATCH");
+  it("وما لا يفسّره المقروء — لا يستقيم", () => {
+    expect(checkInvoiceTotals(1000_00, 150_00, 1100_00, { discountMinor: 20_00 }).verdict).toBe("MISMATCH");
+    expect(checkInvoiceTotals(1000_00, 150_00, 1100_00).verdict).toBe("MISMATCH");
+    expect(checkInvoiceTotals(925_00, 138_75, 1088_75, { discountMinor: 25_00 }).verdict).toBe("MISMATCH");
   });
 });

@@ -43,7 +43,21 @@ export interface RecordByHandInput {
   total: string;
   sellerVat?: string;
   buyerVat?: string;
+  /**
+   * «قيّدها رغم ذلك» — سببٌ يكتبه الإنسان لتجاوز مانعٍ يحتمل الخطأ (`OVERRIDABLE`).
+   * والفاتورةُ تُقيَّد بحكمها كما هو: ركنٌ لم يثبت فلا تُخصم مدخلاتُها.
+   */
+  override?: string;
 }
+
+/*
+  ما يجوز تجاوزُه بإقرارٍ مكتوب: رقمُ المشتري يخالف رقمَنا — قد تُخطئ القراءةُ خانة،
+  أو يُخطئ المورّدُ الطباعة والفاتورةُ لنا. أمّا المكرَّرة وعرضُ السعر فلا: الأولى مالٌ
+  مرّتين، والثاني ليس ديناً.
+*/
+const OVERRIDABLE = new Set<string>(["BUYER_VAT_MISMATCH"]);
+/** سببٌ يُقرأ — لا حرفٌ يُكتب ليمرّ */
+const MIN_OVERRIDE_REASON = 8;
 
 export class RecordRefused extends Error {
   constructor(message: string, readonly status = 409) {
@@ -54,6 +68,8 @@ export class RecordRefused extends Error {
 
 export interface RecordOutcome {
   review: ConfirmReview;
+  /** المانعُ كلُّه ممّا يُتجاوز بسببٍ مكتوب */
+  overridable: boolean;
   month: string;
   /** للمعاينة: ما سيُكتب بالهللات، ليُعرض كما يُحفظ. */
   totalMinor: number;
@@ -115,7 +131,9 @@ export async function recordDocumentByHand(
     : undefined;
 
   /* الخصمُ من القراءة المحفوظة لا من المتصفّح — ويُقبل إن سدّ فرقَ ما كُتب وحده */
-  const discountReadMinor = parseRiyals(((doc.reading ?? null) as StoredReading | null)?.discountAmount ?? "");
+  const stored = (doc.reading ?? null) as StoredReading | null;
+  const discountReadMinor = parseRiyals(stored?.discountAmount ?? "");
+  const chargesReadMinor = parseRiyals(stored?.chargesAmount ?? "");
   const review = reviewConfirmed(
     {
       documentKind: input.kind,
@@ -126,6 +144,7 @@ export async function recordDocumentByHand(
       vatMinor,
       totalMinor,
       discountMinor: discountReadMinor,
+      chargesMinor: chargesReadMinor,
       sellerVat: input.sellerVat?.trim() || null,
       buyerVat: input.buyerVat?.trim() || null,
     },
@@ -138,8 +157,18 @@ export async function recordDocumentByHand(
   );
   const month = date ? date.slice(0, 7) : doc.periodMonth ?? "";
 
-  if (preview || !review.canCreateInvoice || review.blockers.length > 0 || !date) {
-    return { review, month, totalMinor, invoiceId: null };
+  const overridable = review.blockers.length > 0 && review.blockers.every((b) => OVERRIDABLE.has(b.code));
+  const reason = input.override?.trim() ?? "";
+  if (reason && !overridable) {
+    throw new RecordRefused("هذا المانعُ لا يُتجاوز: فاتورةٌ مكرَّرة أو ليست فاتورة. عالجه أو ارفض المستند.", 400);
+  }
+  if (reason && reason.length < MIN_OVERRIDE_REASON) {
+    throw new RecordRefused("اكتب سبباً يُفهم بعد شهر — لماذا تُقيَّد رغم المانع؟", 400);
+  }
+  const overriding = overridable && reason.length >= MIN_OVERRIDE_REASON;
+
+  if (preview || !review.canCreateInvoice || (review.blockers.length > 0 && !overriding) || !date) {
+    return { review, month, totalMinor, invoiceId: null, overridable };
   }
 
   const reading = (doc.reading ?? null) as StoredReading | null;
@@ -155,6 +184,7 @@ export async function recordDocumentByHand(
       vatMinor,
       totalMinor,
       discountReadMinor,
+      chargesReadMinor,
       sellerVat: input.sellerVat?.trim() || null,
       buyerVat: input.buyerVat?.trim() || null,
       taxStatus: review.taxStatus,
@@ -185,7 +215,9 @@ export async function recordDocumentByHand(
         التاريخ: date,
         الإجمالي: input.total,
         الحال_الضريبية: review.taxStatus,
-        السبب: "أكملَ الإنسانُ ما لم يُقرأ وقُيِّدت الفاتورة",
+        السبب: overriding
+          ? `قُيِّدت رغم المانع: ${review.blockers.map((b) => b.message).join("؛ ")} — لأنّ: ${reason}`
+          : "أكملَ الإنسانُ ما لم يُقرأ وقُيِّدت الفاتورة",
       },
     }, tx);
     /* المؤرشَفُ اعتُمد من قبل — فيُخصم رصيدُ المورّد كما في الاعتماد */
@@ -195,5 +227,5 @@ export async function recordDocumentByHand(
     return id;
   });
 
-  return { review, month, totalMinor, invoiceId };
+  return { review, month, totalMinor, invoiceId, overridable };
 }

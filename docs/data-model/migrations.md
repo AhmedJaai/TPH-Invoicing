@@ -2,10 +2,10 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٥٦
+## الجداول — ٥٧
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
-`suppliers` `supplier_aliases` `supplier_products` · `payments` `payment_allocations`
+`suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` · `payments` `payment_allocations`
 `bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes` · `job_state`
 `products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products`
 `audit_logs` `rate_limits` `expenses`
@@ -96,6 +96,8 @@
 | `052_alert_resolution_bounce.sql` | قيدُ `alert_resolutions.decision` يقبل `BOUNCED` و`NOT_BOUNCE` (قرارُ الحوالة المرتدّة، مفتاح `bounce:`) — توسيعٌ بقيمتين مسمّاتين |
 | `053_job_state.sql` | `job_state` — بصمةُ آخر تشغيلٍ لعملٍ خلفيّ (الاستدراك): لا يُعاد ما لم يتغيّر ما يعمل عليه أو يمضِ حدُّه |
 | `054_invoice_post_vat_discount.sql` | `invoices.discount_minor` — الخصمُ **بعد** الضريبة (يُنقص المستحقّ لا الوعاء)، يحكم به `checkInvoiceTotals`؛ و`invoices_parts_sum_to_total` صار «الصافي + الضريبة − الخصم ≈ الإجماليّ» بتسامح الريال |
+| `055_invoice_post_vat_charges.sql` | `invoices.charges_minor` — الرسومُ **بعد** الضريبة (توصيل · شحن · خدمة)، يحكم بها `checkInvoiceTotals`؛ والقيدُ صار «الصافي + الضريبة − الخصم + الرسوم ≈ الإجماليّ» |
+| `056_supplier_item_aliases.sql` | `supplier_item_aliases` — صيغةٌ أخرى لاسم صنف المورّد يُقرّها إنسان، فتُطبَّع إليها بنودُ كلّ فاتورةٍ بعدها (`replaceLines`) |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

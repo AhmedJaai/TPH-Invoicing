@@ -32,6 +32,8 @@ interface Verdict {
   taxStatus: string;
   inputVatStatus: string;
   blockers: string[];
+  /** المانعُ كلُّه ممّا يُتجاوز بسببٍ مكتوب */
+  overridable?: boolean;
   notes: string[];
 }
 
@@ -87,6 +89,7 @@ export function DocumentRecord({
     buyerVat: initial.buyerVat,
   });
   const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [overrideReason, setOverrideReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -103,10 +106,10 @@ export function DocumentRecord({
     && (f.subtotal.trim() === "" || sub !== null) && (f.vat.trim() === "" || vat !== null);
   const why = !supplierId ? "اختر المورّد" : !f.invoiceNumber.trim() ? "اكتب رقم الفاتورة" : !date ? "اكتب التاريخ" : total === null ? "اكتب الإجماليّ" : "مبلغٌ لا يُقرأ";
 
-  async function send(preview: boolean): Promise<boolean> {
+  async function send(preview: boolean, override?: string): Promise<boolean> {
     setError(null);
     const r = await postJson<Verdict>("/api/document-record", {
-      documentId, kind, supplierId, ...f, preview,
+      documentId, kind, supplierId, ...f, preview, ...(override ? { override } : {}),
     });
     if (!r.ok) { setError(r.error); return false; }
     setVerdict(r.data);
@@ -217,6 +220,9 @@ export function DocumentRecord({
           hint={total === null ? { tone: "danger", text: f.total.trim() ? "لا يُقرأ مبلغاً" : "مطلوب" } : { tone: "ok", text: <>يُحفظ <Money minor={total} /></> }} />
         <Field id={`${ids}-sv`} label="الرقم الضريبيّ للبائع" value={f.sellerVat} onChange={(v) => set({ sellerVat: v })} ltr
           hint={f.sellerVat.trim() ? (isValidSaudiVat(f.sellerVat) ? { tone: "ok", text: "سليمُ الشكل" } : { tone: "warn", text: "15 خانة، يبدأ بـ3 وينتهي بـ3" }) : null} />
+        {/* رقمُ المنشأة كما على الورقة — كان يُرسَل ولا يُرى، فمن رأى «لا يطابق» لم يجد أين يصحّحه */}
+        <Field id={`${ids}-bv`} label="الرقم الضريبيّ للمشتري (المنشأة)" value={f.buyerVat} onChange={(v) => set({ buyerVat: v })} ltr
+          hint={f.buyerVat.trim() ? (isValidSaudiVat(f.buyerVat) ? { tone: "ok", text: "سليمُ الشكل" } : { tone: "warn", text: "15 خانة — قارنه بالورقة" }) : { tone: "warn", text: "فارغ — لا تُخصم مدخلاتُها بلا رقم المنشأة" }} />
       </div>
 
       {sumOk !== null && (
@@ -239,6 +245,42 @@ export function DocumentRecord({
             {verdict.blockers.map((b) => <li key={b} className="font-bold text-danger">{b}</li>)}
             {verdict.notes.map((n) => <li key={n} className="text-warn">{n}</li>)}
           </ul>
+        </div>
+      )}
+
+      {/*
+        ── «قيّدها رغم ذلك» ──
+        لما يُتجاوز وحده (رقمُ المشتري لا يطابق): الفاتورةُ لنا والقراءةُ أو الطباعةُ أخطأت.
+        تُقيَّد بحكمها كما هو — لا تُخصم مدخلاتُها — والسببُ يُكتب في السجلّ باسمك.
+      */}
+      {verdict && !verdict.recorded && verdict.blockers.length > 0 && verdict.overridable && (
+        <div className="rounded-xl border border-warn/30 bg-warn-bg/50 p-3.5">
+          <label htmlFor={`${ids}-ov`} className="block text-xs font-bold text-warn">
+            الفاتورةُ لنا رغم ذلك؟ اكتب لماذا — يُحفظ في السجلّ باسمك
+          </label>
+          <textarea
+            id={`${ids}-ov`}
+            value={overrideReason}
+            onChange={(e) => setOverrideReason(e.target.value)}
+            rows={2}
+            placeholder="مثلاً: المورّدُ طبع رقمنا ناقصاً خانة، والفاتورةُ باسم المنشأة"
+            className="mt-1.5 w-full rounded-lg border border-line-input bg-raised px-2.5 py-2 text-sm"
+          />
+          <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
+            تدخل المستحقَّ ويُسدَّد عليها، ولا تُخصم ضريبتُها حتى يصحّح المورّدُ الرقم.
+          </p>
+          <div className="mt-2">
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              disabled={overrideReason.trim().length < 8}
+              reason="اكتب سبباً يُفهم بعد شهر"
+              onAction={() => send(false, overrideReason.trim())}
+            >
+              <FilePlus2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+              قيّدها رغم ذلك
+            </ActionButton>
+          </div>
         </div>
       )}
 

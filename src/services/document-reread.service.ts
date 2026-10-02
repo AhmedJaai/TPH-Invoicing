@@ -33,7 +33,7 @@ import { companyConfig } from "@/config/drive";
 import { InvoiceLinesRefused, replaceLines } from "@/services/invoice.service";
 import { assertMonthsOpen } from "@/services/month-guard";
 import { reviewConfirmed } from "@/lib/confirm";
-import { TOTAL_ROUNDING_TOLERANCE_MINOR, checkInvoiceTotals, formatRiyalsDisplay, parseRiyals } from "@/lib/money";
+import { TOTAL_ROUNDING_TOLERANCE_MINOR, checkInvoiceTotals, formatRiyalsDisplay, parseRiyals, type PostVatAdjustments } from "@/lib/money";
 
 export interface RereadRead {
   subtotalMinor: number | null;
@@ -41,6 +41,8 @@ export interface RereadRead {
   totalMinor: number | null;
   /** خصمٌ مطبوعٌ بعد الضريبة — يُقبل إن سدّ الفرق وحده */
   discountMinor: number | null;
+  /** رسومٌ مطبوعةٌ بعد الضريبة (توصيل · شحن) — كالخصم */
+  chargesMinor: number | null;
   sellerVat: string | null;
   buyerVat: string | null;
   lineCount: number;
@@ -53,13 +55,13 @@ export type RereadOutcome =
   | { ok: true; applied: true; model: string; linesWritten: number; taxStatus: string; amountsWritten: boolean; problem: string | null };
 
 /** أيستقيم الثلاثيّ؟ — والجوابُ جملةٌ بأرقامها إن لم يستقم. */
-export function amountsProblem(subtotal: number | null, vat: number | null, total: number | null, discount: number | null = null): string | null {
+export function amountsProblem(subtotal: number | null, vat: number | null, total: number | null, postVat: PostVatAdjustments = {}): string | null {
   if (subtotal === null || vat === null || total === null) return null;
   const diff = subtotal + vat - total;
-  if (checkInvoiceTotals(subtotal, vat, total, discount).verdict !== "MISMATCH") return null;
+  if (checkInvoiceTotals(subtotal, vat, total, postVat).verdict !== "MISMATCH") return null;
   return `الصافي ${formatRiyalsDisplay(subtotal)} + الضريبة ${formatRiyalsDisplay(vat)} = `
     + `${formatRiyalsDisplay(subtotal + vat)}، والإجمالي ${formatRiyalsDisplay(total)} — `
-    + `فرقُ ${formatRiyalsDisplay(Math.abs(diff))} لا يستقيم. لعلّ في الفاتورة رسماً أو خصماً لم يُقرأ؛ `
+    + `فرقُ ${formatRiyalsDisplay(Math.abs(diff))} لا يستقيم. لعلّ في الفاتورة رسمَ توصيلٍ أو خصماً لم يُقرأ؛ `
     + "فلم تُكتَب المبالغ — صحّحها بيدك إن أردت.";
 }
 
@@ -82,6 +84,12 @@ export async function rereadDocument(opts: {
       invoiceDate: invoices.invoiceDate,
       periodMonth: invoices.periodMonth,
       storedTotal: invoices.totalMinor,
+      storedSubtotal: invoices.subtotalMinor,
+      storedVat: invoices.vatMinor,
+      storedDiscount: invoices.discountMinor,
+      storedCharges: invoices.chargesMinor,
+      storedSellerVat: invoices.sellerVat,
+      storedBuyerVat: invoices.buyerVat,
       issuesInvoices: suppliers.issuesInvoices,
       contractOnFile: suppliers.contractOnFile,
     })
@@ -125,6 +133,7 @@ export async function rereadDocument(opts: {
     vatMinor: parseRiyals(x.vatAmount) ?? null,
     totalMinor: parseRiyals(x.totalAmount) ?? null,
     discountMinor: parseRiyals(x.discountAmount) ?? null,
+    chargesMinor: parseRiyals(x.chargesAmount) ?? null,
     sellerVat: x.sellerVatNumber?.trim() || null,
     buyerVat: x.buyerVatNumber?.trim() || null,
     lineCount: x.lines.length,
@@ -140,15 +149,16 @@ export async function rereadDocument(opts: {
   const total = doc.storedTotal ?? read.totalMinor;
   const totalConflict = doc.storedTotal !== null && read.totalMinor !== null
     && Math.abs(doc.storedTotal - read.totalMinor) > TOTAL_ROUNDING_TOLERANCE_MINOR;
-  const problem = amountsProblem(read.subtotalMinor, read.vatMinor, total, read.discountMinor)
+  const problem = amountsProblem(read.subtotalMinor, read.vatMinor, total, read)
     ?? (totalConflict
       ? `الإجماليُّ المقروء ${formatRiyalsDisplay(read.totalMinor!)} يخالف المقيَّد ${formatRiyalsDisplay(doc.storedTotal!)} — بقي المقيَّد.`
       : null);
-  const amountsOk = amountsProblem(read.subtotalMinor, read.vatMinor, total, read.discountMinor) === null;
-  /* الخصمُ يُكتب مع الصافي والضريبة أو لا يُكتب — والقيدُ 054 يزن الثلاثة معاً */
-  const discountToWrite = amountsOk && read.subtotalMinor !== null && read.vatMinor !== null && total !== null
-    ? { discountMinor: checkInvoiceTotals(read.subtotalMinor, read.vatMinor, total, read.discountMinor).postVatDiscountMinor }
-    : {};
+  const amountsOk = amountsProblem(read.subtotalMinor, read.vatMinor, total, read) === null;
+  /* الخصمُ والرسومُ يُكتبان مع الصافي والضريبة أو لا يُكتبان — والقيدُ 055 يزنها معاً */
+  const checked = amountsOk && read.subtotalMinor !== null && read.vatMinor !== null && total !== null
+    ? checkInvoiceTotals(read.subtotalMinor, read.vatMinor, total, read)
+    : null;
+  const postVatToWrite = checked ? { discountMinor: checked.discountMinor, chargesMinor: checked.chargesMinor } : {};
 
   if (!opts.apply) {
     return {
@@ -161,18 +171,33 @@ export async function rereadDocument(opts: {
     return { ok: false, status: 409, error: "لا فاتورةَ مقيَّدة لهذا المستند — لا موضعَ تُكتَب فيه القراءة." };
   }
 
+  /*
+    الحالُ الضريبيّة تُحسب على ما سيبقى في الصفّ بعد الكتابة — لا على القراءة وحدها.
+    ما لم يُقرأ لا يمحو المحفوظ (`?? undefined` أدناه)، فكان الحكمُ على قراءةٍ فاتها
+    رقمُ المشتري يكتب «ينقصها ركن» على فاتورةٍ أركانُها في صفّها: ستُّ فواتير في الإنتاج
+    (الغربية · أفال · مختبرات القهوة) «غير صالحة» وصفحتُها لا تجد ما ينقص.
+  */
+  const after = {
+    subtotalMinor: amountsOk ? read.subtotalMinor ?? doc.storedSubtotal : doc.storedSubtotal,
+    vatMinor: amountsOk ? read.vatMinor ?? doc.storedVat : doc.storedVat,
+    discountMinor: "discountMinor" in postVatToWrite ? postVatToWrite.discountMinor : doc.storedDiscount,
+    chargesMinor: "chargesMinor" in postVatToWrite ? postVatToWrite.chargesMinor : doc.storedCharges,
+    sellerVat: read.sellerVat ?? doc.storedSellerVat,
+    buyerVat: read.buyerVat ?? doc.storedBuyerVat,
+  };
   const review = reviewConfirmed(
     {
       documentKind: doc.kind,
       supplierId: doc.supplierId,
       invoiceNumber: doc.invoiceNumber,
       invoiceDate: doc.invoiceDate ? doc.invoiceDate.toISOString().slice(0, 10) : null,
-      subtotalMinor: amountsOk ? read.subtotalMinor : null,
-      vatMinor: amountsOk ? read.vatMinor : null,
+      subtotalMinor: after.subtotalMinor,
+      vatMinor: after.vatMinor,
       totalMinor: total,
-      discountMinor: amountsOk ? read.discountMinor : null,
-      sellerVat: read.sellerVat,
-      buyerVat: read.buyerVat,
+      discountMinor: after.discountMinor,
+      chargesMinor: after.chargesMinor,
+      sellerVat: after.sellerVat,
+      buyerVat: after.buyerVat,
     },
     {
       companyVat: companyConfig.vatNumber,
@@ -192,11 +217,12 @@ export async function rereadDocument(opts: {
           ...(amountsOk ? {
             subtotalMinor: read.subtotalMinor ?? undefined,
             vatMinor: read.vatMinor ?? undefined,
-            ...discountToWrite,
+            ...postVatToWrite,
             ...(doc.storedTotal === null && read.totalMinor !== null ? { totalMinor: read.totalMinor } : {}),
-            taxStatus: review.taxStatus,
-            inputVatStatus: review.inputVatStatus,
           } : {}),
+          /* والحكمُ على الصفّ كما سيبقى — فيُكتب ولو لم تُكتب المبالغ: رقمُ البائع قد تغيّر */
+          taxStatus: review.taxStatus,
+          inputVatStatus: review.inputVatStatus,
           sellerVat: read.sellerVat ?? undefined,
           buyerVat: read.buyerVat ?? undefined,
         })
@@ -220,7 +246,7 @@ export async function rereadDocument(opts: {
         before: { invoiceId: doc.invoiceId },
         after: {
           ...read, lines: undefined, linesWritten: written, model: outcome.model,
-          taxStatus: amountsOk ? review.taxStatus : "لم يُكتَب", problem, auto: opts.auto === true,
+          taxStatus: review.taxStatus, problem, auto: opts.auto === true,
         },
       }, t);
     });

@@ -21,6 +21,8 @@ const Body = z.object({
   total: z.string().min(1, "اكتب الإجماليّ").max(40),
   sellerVat: z.string().max(40).optional(),
   buyerVat: z.string().max(40).optional(),
+  /** «قيّدها رغم ذلك» — سببٌ مكتوب، والخادمُ يقرّر أيجوز التجاوز */
+  override: z.string().trim().max(500).optional(),
   preview: z.boolean().default(true),
 });
 
@@ -58,6 +60,7 @@ export async function POST(request: Request) {
       taxStatus: out.review.taxStatus,
       inputVatStatus: out.review.inputVatStatus,
       blockers: out.review.blockers.map((b) => b.message),
+      overridable: out.overridable,
       notes: out.review.findings.filter((f) => f.severity !== "BLOCKER").map((f) => f.message),
     });
   } catch (e) {

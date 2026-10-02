@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MATCH_TOLERANCE_PCT,
+  bankExpenseLabel,
   deriveFromBank,
   expectedVsActual,
   expenseEventKey,
@@ -506,5 +507,14 @@ describe("الزائد يُحذف بعينه (BTN-111)", () => {
     expect(deletableExpense({ source: "BANK" })).toBe(false);
     expect(deletableExpense({ source: "MANUAL" })).toBe(true);
     expect(deletableExpense({ source: "INVOICE" })).toBe(true);
+  });
+});
+
+describe("اسمُ المصروف من حركته", () => {
+  it("المستفيدُ كما في الكشف — لا اسمُ مورّدٍ يشبهه", () => {
+    /* «كيكي» ليس «لوريفا كيك»: الاسمُ من الكشف لا من سجلّ المورّدين */
+    expect(bankExpenseLabel({ beneficiaryRaw: " صالح نزار بن صالح كيكي ", description: "BV:رواتب شهرية", category: "SALARY" }))
+      .toBe("صالح نزار بن صالح كيكي");
+    expect(bankExpenseLabel({ beneficiaryRaw: null, description: "", category: "BANK_FEE" })).not.toBe("");
   });
 });

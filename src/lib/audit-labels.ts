@@ -81,6 +81,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   SUPPLIER_ALIAS_LEARNED: "تعلّم اسم بنكي",
   STATEMENT_RECONCILED: "مطابقة كشف مورّد",
   PRODUCT_LINKED: "ربط صنف معياري",
+  SUPPLIER_ITEM_MERGED: "دمج صيغة صنفٍ بأصله",
   PRODUCT_UNLINKED: "فكّ ربط صنف",
   EXPENSE_ADDED: "إضافة مصروف",
   EXPENSE_REMOVED: "حذف مصروف أو تعطيله",

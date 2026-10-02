@@ -114,3 +114,44 @@ export function detectPriceChange(history: readonly PricePoint[]): PriceChange |
 export function annualImpactMinor(change: PriceChange, quantityPerYear: number): number {
   return Math.round(change.deltaMinor * quantityPerYear);
 }
+
+/**
+ * أقربُ أصناف المورّد نفسه إلى صنفٍ — لتقديمها في «هو نفسه…» لا لدمجها.
+ *
+ * الاسمُ ليس هويّة: هذا ترتيبٌ يقدّم المحتمل، والدمجُ يُقرّه إنسان. «عنب» داخل
+ * «كولومبي عنب» كلمةً، و«كولومي» من «كولومبي» حرفاً — والأرقامُ إن اختلفت فصنفان
+ * («كيس ١ كيلو» و«كيس ٢ كيلو»)، فلا يُقترح.
+ */
+export function similarItems(target: string, others: readonly string[]): string[] {
+  const digits = (s: string) => (s.match(/\d+/g) ?? []).join(",");
+  /* الكلمةُ القصيرة («بن»، «مل») تجمع ما لا يجتمع — فلا يُعتدّ إلّا بما يميّز */
+  const words = (s: string) => s.split(" ").filter((w) => w.length >= 3);
+  const near = (a: string, b: string) => a.length >= 4 && b.length >= 4 && editDistance(a, b) <= Math.max(1, Math.floor(Math.min(a.length, b.length) / 6));
+  const score = (o: string): { s: number; shared: number } => {
+    if (o === target || digits(o) !== digits(target)) return { s: 0, shared: 0 };
+    const tw = words(target), ow = words(o);
+    let shared = 0;
+    for (const w of tw) if (ow.some((x) => x === w || near(x, w))) shared++;
+    /* على الأقصر: «عنب» كلُّه في «كولومبي عنب» */
+    return { s: tw.length === 0 || ow.length === 0 ? 0 : shared / Math.min(tw.length, ow.length), shared };
+  };
+  return others
+    .map((o) => ({ o, ...score(o) }))
+    .filter((x) => x.s >= 1)
+    .sort((a, b) => b.s - a.s || b.shared - a.shared)
+    .map((x) => x.o);
+}
+
+function editDistance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cur = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+  }
+  return row[b.length];
+}

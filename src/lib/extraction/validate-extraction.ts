@@ -112,8 +112,10 @@ export function findConflicts(x: ExtractionResult): ExtractionConflict[] {
     تعارضاً كاذباً يُعيد السؤال بلا سبب.
   */
   if (!isStatement && !isPayment && subtotal !== null && vat !== null && total !== null) {
-    /* الخصمُ المطبوع بعد الضريبة يسدّ الفرق — إن سدّه وحده */
-    if (checkInvoiceTotals(subtotal, vat, total, money(x.discountAmount ?? "")).verdict === "MISMATCH") {
+    /* الخصمُ والرسومُ المطبوعان بعد الضريبة يسدّان الفرق — إن سدّاه */
+    if (checkInvoiceTotals(subtotal, vat, total, {
+      discountMinor: money(x.discountAmount ?? ""), chargesMinor: money(x.chargesAmount ?? ""),
+    }).verdict === "MISMATCH") {
       conflicts.push({
         code: "TOTAL_NOT_SUM",
         fields: ["subtotalAmount", "vatAmount", "totalAmount"],

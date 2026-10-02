@@ -123,6 +123,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
       vatMinor,
       totalMinor,
       discountMinor: parseRiyals(x.discountAmount),
+      chargesMinor: parseRiyals(x.chargesAmount),
       fieldConfidence: {
         النوع: x.confidence.documentKind,
         المورد: x.confidence.supplierName,

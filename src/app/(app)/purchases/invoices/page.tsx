@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
 import { ArrowLeft, ArrowRight, CircleCheck, FileText, Receipt, Scale, Upload, Wallet } from "lucide-react";
 import { db } from "@/db";
-import { invoices, suppliers } from "@/db/schema";
+import { documents, invoices, suppliers } from "@/db/schema";
+import { evaluateInvoice, missingPillars } from "@/lib/invoice-findings";
+import { companyConfig } from "@/config/drive";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -108,9 +110,20 @@ export default async function InvoicesPage({
         supplierSlug: suppliers.slug,
         allocated,
         lineCount,
+        /* لتسمية الركن الناقص بجانب «غير صالحة» — بالحكم نفسه الذي في صفحة الفاتورة */
+        kind: documents.kind,
+        sellerVat: invoices.sellerVat,
+        buyerVat: invoices.buyerVat,
+        subtotalMinor: invoices.subtotalMinor,
+        vatMinor: invoices.vatMinor,
+        discountMinor: invoices.discountMinor,
+        chargesMinor: invoices.chargesMinor,
+        issuesInvoices: suppliers.issuesInvoices,
+        contractOnFile: suppliers.contractOnFile,
       })
       .from(invoices)
       .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
+      .leftJoin(documents, eq(documents.id, invoices.documentId))
       .where(where)
       .orderBy(desc(invoices.invoiceDate))
       .limit(PAGE_SIZE)
@@ -322,6 +335,12 @@ export default async function InvoicesPage({
                       </Badge>
                     );
                     if (r.taxStatus === "VALID" && Number(r.lineCount) > 0) return badge;
+                    const gaps = r.taxStatus === "VALID" ? [] : missingPillars(evaluateInvoice(
+                      { kind: r.kind, invoiceNumber: r.number, sellerVat: r.sellerVat, buyerVat: r.buyerVat,
+                        subtotalMinor: r.subtotalMinor, vatMinor: r.vatMinor, totalMinor: r.total, discountMinor: r.discountMinor, chargesMinor: r.chargesMinor },
+                      r.issuesInvoices === null ? null : { issuesInvoices: r.issuesInvoices, contractOnFile: r.contractOnFile ?? false },
+                      companyConfig.vatNumber,
+                    ).reasons);
                     return (
                       <Link
                         href={invoiceHref(r.id, "tax")}
@@ -329,7 +348,7 @@ export default async function InvoicesPage({
                         title="لماذا؟ وكيف تُصلَح"
                       >
                         {badge}
-                        <span className="text-[11px] text-muted">لماذا؟</span>
+                        <span className="text-[11px] text-muted">{gaps.length > 0 ? `ينقصها: ${gaps.join("، ")}` : "لماذا؟"}</span>
                       </Link>
                     );
                   },

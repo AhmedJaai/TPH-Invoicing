@@ -17,6 +17,7 @@ function invoice(over: Partial<ExtractionResult> = {}): ExtractionResult {
     subtotalAmount: "1000.00",
     vatAmount: "150.00",
     discountAmount: "",
+    chargesAmount: "",
     totalAmount: "1150.00",
     beneficiaryName: "",
     lines: [],

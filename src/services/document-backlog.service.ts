@@ -43,6 +43,8 @@ export interface StoredReading {
   totalAmount?: string;
   /** الخصمُ بعد الضريبة كما قُرئ — غائبٌ في القراءات الأقدم */
   discountAmount?: string;
+  /** الرسومُ بعد الضريبة كما قُرئت — غائبةٌ في القراءات الأقدم */
+  chargesAmount?: string;
   lines?: { description?: string; quantity?: string; unitPrice?: string; lineTotal?: string }[];
 }
 
@@ -263,6 +265,7 @@ export async function recordFromStoredReadings(
     const subtotalMinor = parseRiyals(x.subtotalAmount ?? "");
     const vatMinor = parseRiyals(x.vatAmount ?? "");
     const discountReadMinor = parseRiyals(x.discountAmount ?? "");
+    const chargesReadMinor = parseRiyals(x.chargesAmount ?? "");
     const review = reviewConfirmed(
       {
         documentKind: kind,
@@ -273,6 +276,7 @@ export async function recordFromStoredReadings(
         vatMinor,
         totalMinor,
         discountMinor: discountReadMinor,
+        chargesMinor: chargesReadMinor,
         sellerVat: x.sellerVatNumber,
         buyerVat: x.buyerVatNumber,
       },
@@ -326,6 +330,7 @@ export async function recordFromStoredReadings(
           vatMinor,
           totalMinor,
           discountReadMinor,
+          chargesReadMinor,
           sellerVat: x.sellerVatNumber || null,
           buyerVat: x.buyerVatNumber || null,
           taxStatus: review.taxStatus,

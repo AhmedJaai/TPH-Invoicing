@@ -35,6 +35,8 @@ export interface AutoArchiveFacts {
   totalMinor: number | null;
   /** خصمٌ بعد الضريبة — المقيَّدُ في الفاتورة، أو المقروءُ قبل القيد */
   discountMinor?: number | null;
+  /** رسومٌ بعد الضريبة — كالخصم */
+  chargesMinor?: number | null;
   invoiceNumber?: string | null;
   fileName?: string | null;
   /**
@@ -107,7 +109,7 @@ export function autoArchive(f: AutoArchiveFacts): AutoArchiveVerdict {
   const near = (a: number, b: number) => Math.abs(a - b) <= TOTAL_ROUNDING_TOLERANCE_MINOR;
   const byTax =
     f.subtotalMinor !== null && f.vatMinor !== null && f.totalMinor !== null
-    && checkInvoiceTotals(f.subtotalMinor, f.vatMinor, f.totalMinor, f.discountMinor ?? null).verdict !== "MISMATCH";
+    && checkInvoiceTotals(f.subtotalMinor, f.vatMinor, f.totalMinor, { discountMinor: f.discountMinor, chargesMinor: f.chargesMinor }).verdict !== "MISMATCH";
   /* البنودُ تساوي الإجماليّ — أو تساويه مع الضريبة */
   const byLines =
     f.linesTotalMinor != null && f.linesTotalMinor > 0 && f.totalMinor !== null

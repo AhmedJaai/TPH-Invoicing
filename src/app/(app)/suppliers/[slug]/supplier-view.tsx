@@ -25,6 +25,8 @@ import {
 import { buildSupplierAccount, describeAccount } from "@/lib/supplier-account";
 import { countNoun, DAY, INVOICE, LINE, MONTH, PRODUCT, TIME } from "@/lib/arabic";
 import { loadOpenInvoiceAges, loadSupplierBalances } from "@/services/supplier-balance.service";
+import { SupplierItemMerge } from "@/components/supplier-item-merge";
+import { similarItems } from "@/lib/items";
 import { loadSupplierIntel, type TimelineEvent } from "@/services/supplier-intel.service";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { listOpenFindings } from "@/services/supplier-analysis.service";
@@ -295,6 +297,18 @@ export async function SupplierView({
   const paymentCount = showAmounts ? paymentRows.length : 0;
 
   const rel = intel.reliability;
+  /* «هو نفسه…»: أصنافُ المورّد الأخرى، والأقربُ اسماً أوّلاً ومعلَّماً */
+  const mergeOptions = (key: string) => {
+    const others = intel.prices.filter((p) => p.normalized !== key);
+    const near = new Set(similarItems(key, others.map((p) => p.normalized)));
+    return [...others]
+      /* المقترَحُ أوّلاً، وبينها الأكثرُ شراءً ثمّ الأحدث — الدليلُ لا الإملاء */
+      .sort((a, b) => Number(near.has(b.normalized)) - Number(near.has(a.normalized))
+        || b.purchases - a.purchases
+        || String(b.lastDate).localeCompare(String(a.lastDate))
+        || a.displayName.localeCompare(b.displayName, "ar"))
+      .map((p) => ({ key: p.normalized, name: p.displayName, suggested: near.has(p.normalized) }));
+  };
   const rising = intel.prices.filter((p) => (p.lastMove?.pct ?? 0) > 0).length;
 
   const tabCount: Partial<Record<Tab, number>> = {
@@ -679,6 +693,14 @@ export async function SupplierView({
                         <span className="block text-[11px] font-normal text-muted">
                           اشتُري {countNoun(p.purchases, TIME)} · آخرها {formatDay(p.lastDate)}
                         </span>
+                        {canAnalyze && (
+                          <SupplierItemMerge
+                            supplierId={s.id}
+                            item={p.normalized}
+                            name={p.displayName}
+                            options={mergeOptions(p.normalized)}
+                          />
+                        )}
                       </span>
                     ),
                   },

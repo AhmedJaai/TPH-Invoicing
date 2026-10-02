@@ -92,4 +92,7 @@ describe("الأرشفةُ الآليّة والخصمُ بعد الضريبة",
   it("وبلا خصمٍ يبقى «الحسابُ لا يستقيم»", () => {
     expect(autoArchive(discounted).gaps).toContain("ARITHMETIC");
   });
+  it("ورسومُ التوصيل المقيَّدة تُقيم الحساب كذلك", () => {
+    expect(autoArchive({ ...clean, totalMinor: 48_500, chargesMinor: 2_500 }).auto).toBe(true);
+  });
 });

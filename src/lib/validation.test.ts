@@ -255,4 +255,33 @@ describe("الخصمُ بعد الضريبة", () => {
     const r = validateInvoice({ ...paper, discountMinor: 30_00 }, ctx);
     expect(r.findings[0].severity).not.toBe("INFO");
   });
+
+  it("رسومُ التوصيل بعد الضريبة تسدّ الزيادة ← للعلم، والضريبةُ صالحة", () => {
+    const r = validateInvoice({ ...paper, subtotalMinor: 925_00, vatMinor: 138_75, totalMinor: 1088_75, chargesMinor: 25_00 }, ctx);
+    expect(r.taxStatus).toBe("VALID");
+    expect(r.findings[0]).toMatchObject({ code: ISSUE.VAT_MATH_MISMATCH, severity: "INFO", variant: "CHARGES" });
+  });
+
+  it("ضريبةٌ صفرٌ مقروءة تُسمّى سبباً — لا «غير صالحة» بلا ركن", () => {
+    const r = validateInvoice({ ...paper, subtotalMinor: 1_000_00, vatMinor: 0, totalMinor: 1_000_00 }, ctx);
+    expect(r.taxStatus).toBe("INVALID");
+    expect(codes(r)).toContain(ISSUE.ZERO_VAT);
+  });
+});
+
+describe("رقمُ المنشأة المقروء ناقصاً", () => {
+  it("١٤ خانة ليست منشأةً أخرى — ركنٌ لم يُقرأ لا مانع (مختبرات القهوة)", () => {
+    const r = validateInvoice({
+      kind: "TAX_INVOICE", invoiceNumber: "V405791", sellerVat: "301283361800003", buyerVat: "31000797600003",
+      subtotalMinor: 198_26, vatMinor: 29_74, totalMinor: 228_00,
+    }, ctx);
+    expect(hasBlocker(r.findings)).toBe(false);
+    expect(r.findings.find((f) => f.code === ISSUE.MISSING_BUYER_VAT)?.variant).toBe("UNREADABLE");
+    expect(r.taxStatus).toBe("INVALID");
+  });
+  it("ورقمٌ سليمُ الشكل لمنشأةٍ أخرى يبقى مانعاً", () => {
+    const r = validateInvoice({ kind: "TAX_INVOICE", invoiceNumber: "1", sellerVat: "301283361800003", buyerVat: "300000000000003",
+      subtotalMinor: 100_00, vatMinor: 15_00, totalMinor: 115_00 }, ctx);
+    expect(hasBlocker(r.findings)).toBe(true);
+  });
 });

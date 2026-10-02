@@ -104,6 +104,17 @@ export interface ExpenseCandidate {
 }
 
 /**
+ * اسمُ المصروف من حركته — المستفيدُ كما في الكشف، أو وصفُها، أو بابُها.
+ *
+ * مشتقٌّ لا يُكتب بيد: وُجد في الإنتاج راتبُ «صالح نزار بن صالح كيكي» مقيَّداً
+ * باسم «لوريفا كيك» من اشتقاقٍ قديم، فبدا سدادَ مورّدٍ حُسب راتباً. فيُعاد
+ * من الحركة في كلّ مزامنة (`resyncBankExpenses`) ولا يبقى على ما كان.
+ */
+export function bankExpenseLabel(tx: Pick<BankTx, "beneficiaryRaw" | "description" | "category">): string {
+  return tx.beneficiaryRaw?.trim() || tx.description?.trim() || CATEGORY_LABEL[tx.category];
+}
+
+/**
  * ما يصلح أن يُقيَّد مصروفاً من حركات البنك.
  *
  * الخارج وحده، والمصنَّف وحده، وما ليس سداد مورّد. وما قُيّد من قبل
@@ -136,7 +147,7 @@ export function deriveFromBank(
       periodMonth: periodOf(tx.valueDate),
       occurredOn: tx.valueDate.toISOString().slice(0, 10),
       category: tx.category,
-      label: tx.beneficiaryRaw?.trim() || tx.description?.trim() || CATEGORY_LABEL[tx.category],
+      label: bankExpenseLabel(tx),
       amountMinor: Math.abs(tx.amountMinor),
     });
   }

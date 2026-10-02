@@ -97,6 +97,8 @@ export const RULES: Record<string, RateLimitRule> = {
   "inventory-purchase-link": { limit: 400, windowSeconds: 3600 },
   /* الإشعارُ الدائن — إدخالٌ بيد، فاتورةً فاتورة */
   "credit-note": { limit: 120, windowSeconds: 3600 },
+  /* دمجُ صيغة صنفٍ بأصله — صنفاً صنفاً من صفحة المورّد */
+  "supplier-item-merge": { limit: 200, windowSeconds: 3600 },
   /* كلُّ نداءٍ قراءةُ نموذجٍ مدفوعة */
   "document-reread": { limit: 30, windowSeconds: 3600 },
   /* قرارُ صفٍّ ملتبس في الكشف */

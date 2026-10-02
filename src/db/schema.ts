@@ -257,6 +257,8 @@ export const invoices = pgTable("invoices", {
   totalMinor: integer("total_minor").notNull(),
   /** خصمٌ بعد الضريبة يُنقص المستحقّ لا الوعاء — `null` لا خصم (054، `checkInvoiceTotals`) */
   discountMinor: integer("discount_minor"),
+  /** رسومٌ بعد الضريبة (توصيل · شحن · خدمة) تزيد المستحقّ — `null` لا رسوم (055) */
+  chargesMinor: integer("charges_minor"),
 
   sellerVat: text("seller_vat"),
   buyerVat: text("buyer_vat"),
@@ -801,6 +803,23 @@ export const supplierProducts = pgTable("supplier_products", {
 }, (t) => [
   uniqueIndex("supplier_products_uniq").on(t.supplierId, t.normalizedDescription),
   index("supplier_products_product_idx").on(t.productId),
+]);
+
+/**
+ * صيغةٌ أخرى لاسم صنف المورّد نفسه — يُقرّها إنسانٌ مرّة (056).
+ *
+ * النموذجُ يكتب «كولومبي عنب» مرّةً و«عنب» مرّة، فيتفرّق الصنفُ أصنافاً. والصيغةُ
+ * المُقَرّة تُطبَّع إلى أصلها في كلّ بندٍ يُكتب بعدها.
+ */
+export const supplierItemAliases = pgTable("supplier_item_aliases", {
+  id: id(),
+  supplierId: text("supplier_id").notNull().references(() => suppliers.id, { onDelete: "cascade" }),
+  aliasNormalized: text("alias_normalized").notNull(),
+  canonicalNormalized: text("canonical_normalized").notNull(),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+}, (t) => [
+  uniqueIndex("supplier_item_aliases_uniq").on(t.supplierId, t.aliasNormalized),
 ]);
 
 /* ───────────────────────── المصروفات المتكرّرة ───────────────────────── */

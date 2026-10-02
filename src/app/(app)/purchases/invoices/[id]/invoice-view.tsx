@@ -23,7 +23,9 @@ import { InvoiceFix } from "@/components/invoice-fix";
 import { DocumentReread } from "@/components/document-reread";
 import { RejectDocument } from "@/components/reject-document";
 import { loadInvoiceProfile, neighbours } from "@/services/invoice-profile.service";
-import { invoiceReasons } from "@/lib/invoice-findings";
+import { evaluateInvoice, missingPillars } from "@/lib/invoice-findings";
+import { InvoiceRejudge } from "@/components/invoice-rejudge";
+import { firstClosedMonth } from "@/services/month-guard";
 import { ISSUE } from "@/lib/issue-codes";
 import { FIELD_LABEL, LOW_CONFIDENCE, amountsAddUp, invoiceHref, weakFields } from "@/lib/invoice-profile";
 import { TAX_LABEL } from "@/lib/invoice-filter";
@@ -104,7 +106,7 @@ export async function InvoiceView({
       .where(or(eq(suppliers.isActive, true), eq(suppliers.id, supplier.id))).orderBy(asc(suppliers.nameAr)))
     : [];
 
-  const reasons = invoiceReasons(
+  const verdict = evaluateInvoice(
     {
       kind: doc.kind,
       invoiceNumber: inv.number,
@@ -114,15 +116,25 @@ export async function InvoiceView({
       vatMinor: inv.vatMinor,
       totalMinor: inv.totalMinor,
       discountMinor: inv.discountMinor,
+      chargesMinor: inv.chargesMinor,
       lineCount: p.lines.length,
     },
     { issuesInvoices: supplier.issuesInvoices, contractOnFile: supplier.contractOnFile },
     companyConfig.vatNumber,
   );
+  const reasons = verdict.reasons;
+  /* الركنُ الناقص باسمه — يُقال بجانب «غير صالحة» */
+  const gaps = verdict.taxStatus === "VALID" ? [] : missingPillars(reasons);
+  /*
+    الحالُ المحفوظة قديمة: حُسبت على قراءةٍ غيرِ ما في الصفّ اليوم. كانت الصفحةُ تقول
+    «غير صالحة» وقائمةُ ما ينقص فارغة — تناقضٌ لا يُفهم. فيُقال، ويُعاد الحكمُ بضغطة.
+  */
+  const stale = verdict.taxStatus !== inv.taxStatus;
+  const monthClosed = stale ? (await firstClosedMonth(db, [inv.month])) !== null : false;
   /* وما قاله `invoiceReasons` لا يُكرَّر بنصٍّ ثانٍ */
   const addsUp = reasons.some((r) => r.code === ISSUE.VAT_MATH_MISMATCH)
     ? null
-    : amountsAddUp(inv.subtotalMinor, inv.vatMinor, inv.totalMinor, TOTAL_ROUNDING_TOLERANCE_MINOR, inv.discountMinor);
+    : amountsAddUp(inv.subtotalMinor, inv.vatMinor, inv.totalMinor, TOTAL_ROUNDING_TOLERANCE_MINOR, inv.discountMinor, inv.chargesMinor);
   const weak = weakFields(doc.fieldConfidence);
   const risen = p.lines.filter((l) => l.move?.direction === "up");
   /* ما هو للعلم (تقريبُ مورّد، بنودٌ معفاة) لا يُرفع إلى «ما يستحقّ الانتباه» */
@@ -210,6 +222,9 @@ export async function InvoiceView({
             <Link href="#tax" className="rounded-full">
               <Badge tone={taxTone} dot>{TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus}</Badge>
             </Link>
+            {inv.taxStatus !== "VALID" && gaps.length > 0 && (
+              <span className="text-xs text-ink-soft">ينقصها: <b className="text-ink">{gaps.join("، ")}</b></span>
+            )}
             {inv.isFixedAsset && <Badge tone="info">أصلٌ ثابت</Badge>}
           </div>
           <p className="mt-5 text-xs font-bold text-muted">{p.settled ? "لا شيء عليها" : "بقي عليها"}</p>
@@ -265,7 +280,7 @@ export async function InvoiceView({
         كلُّ سطرٍ هنا مشتقٌّ لا مخزَّن، ومعه موضعُ علاجه. ولا يُعرَض القسم
         حين لا شيء: فراغُه هو الخبر.
       */}
-      {(p.twins.length > 0 || addsUp === false || weak.length > 0 || problems.length > 0 || risen.length > 0) && (
+      {(stale || p.twins.length > 0 || addsUp === false || weak.length > 0 || problems.length > 0 || risen.length > 0) && (
         <ul className="mt-4 space-y-2" aria-label="ما يستحقّ الانتباه">
           {p.twins.map((t) => (
             <Notice key={t.id} tone="warn" icon={Copy} href={invoiceHref(t.id)} cta="قارِنها">
@@ -274,6 +289,18 @@ export async function InvoiceView({
               قارِن بنودهما قبل أن تسدّد الاثنتين.
             </Notice>
           ))}
+          {stale && (
+            <li className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3 text-sm text-warn">
+              <TriangleAlert className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
+              <span className="min-w-0 flex-1 leading-relaxed">
+                الحالُ المحفوظة «{TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus}» قديمة —
+                حقولُها اليوم تقول «{TAX_LABEL[verdict.taxStatus as keyof typeof TAX_LABEL] ?? verdict.taxStatus}»
+                {gaps.length > 0 && <> (ينقصها: {gaps.join("، ")})</>}.
+                {monthClosed && <> وشهرُ {formatMonth(inv.month)} مقفل: أعِد فتحه لتُصحَّح، فهي تمسّ إقرارَه الضريبيّ.</>}
+              </span>
+              {canEdit && !monthClosed && <InvoiceRejudge invoiceId={inv.id} />}
+            </li>
+          )}
           {addsUp === false && (
             <Notice tone="danger" icon={CircleAlert} href="#tax" cta="صحّحها">
               الصافي + الضريبة لا يساوي الإجمالي بأكثر من ريال — أحدُ المبالغ قُرئ خطأً.
@@ -419,11 +446,17 @@ export async function InvoiceView({
               {inv.discountMinor !== null && (
                 <Row label="خصمٌ بعد الضريبة"><span className="text-ok">− <Money minor={inv.discountMinor} /></span></Row>
               )}
-              <Row label={inv.discountMinor !== null ? "المستحقّ بعد الخصم" : "الإجمالي"}><span className="text-sm font-bold"><Money minor={inv.totalMinor} /></span></Row>
+              {inv.chargesMinor !== null && (
+                <Row label="رسومٌ بعد الضريبة (توصيل)"><span>+ <Money minor={inv.chargesMinor} /></span></Row>
+              )}
+              <Row label={inv.discountMinor !== null || inv.chargesMinor !== null ? "المستحقّ" : "الإجمالي"}><span className="text-sm font-bold"><Money minor={inv.totalMinor} /></span></Row>
               <Row label="ضريبيّ البائع">{inv.sellerVat ? <bdi className="nums">{inv.sellerVat}</bdi> : <Unknown text="لا رقم" />}</Row>
               <Row label="ضريبيّ المشتري">{inv.buyerVat ? <bdi className="nums">{inv.buyerVat}</bdi> : <Unknown text="لا رقم" />}</Row>
               <Row label="حالُها الضريبيّ">
                 <Badge tone={taxTone} dot>{TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus}</Badge>
+                {inv.taxStatus !== "VALID" && gaps.length > 0 && (
+                  <span className="mt-1 block text-[11px] text-ink-soft">ينقصها: {gaps.join("، ")}</span>
+                )}
               </Row>
               <Row label="خصمُ ضريبة المدخلات">
                 <span className={`font-bold ${inv.inputVatStatus === "ELIGIBLE" ? "text-ok" : inv.inputVatStatus === "NOT_ELIGIBLE" ? "text-danger" : "text-muted"}`}>
@@ -449,6 +482,7 @@ export async function InvoiceView({
                   vat: inv.vatMinor === null ? "" : formatRiyals(inv.vatMinor),
                   total: formatRiyals(inv.totalMinor),
                   discount: inv.discountMinor === null ? "" : formatRiyals(inv.discountMinor),
+                  charges: inv.chargesMinor === null ? "" : formatRiyals(inv.chargesMinor),
                   invoiceDate: todayInRiyadh(inv.date),
                   supplierId: supplier.id,
                 }}

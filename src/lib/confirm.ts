@@ -32,6 +32,8 @@ export interface ConfirmedFields {
   totalMinor?: number | null;
   /** الخصمُ بعد الضريبة كما قُرئ أو كُتب — يُقبل إن سدّ الفرق */
   discountMinor?: number | null;
+  /** الرسومُ بعد الضريبة كما قُرئت أو كُتبت — تُقبل إن سدّت الفرق */
+  chargesMinor?: number | null;
   sellerVat?: string | null;
   buyerVat?: string | null;
 }
@@ -84,6 +86,7 @@ export function reviewConfirmed(
       vatMinor: fields.vatMinor ?? undefined,
       totalMinor: fields.totalMinor ?? undefined,
       discountMinor: fields.discountMinor ?? null,
+      chargesMinor: fields.chargesMinor ?? null,
     },
     {
       companyVat: context.companyVat,

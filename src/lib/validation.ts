@@ -21,7 +21,7 @@ export interface Finding {
    * معفاة غالباً). وكانت الشاشة تقول للثلاثة «الصافي + الضريبة لا يساوي
    * الإجمالي» — فتُتَّهم فاتورةٌ يستقيم جمعُها بالهللة.
    */
-  variant?: "ROUNDING" | "RATE" | "DISCOUNT";
+  variant?: "ROUNDING" | "RATE" | "DISCOUNT" | "CHARGES" | "UNREADABLE";
 }
 
 export interface InvoiceCandidate {
@@ -34,6 +34,8 @@ export interface InvoiceCandidate {
   totalMinor?: number | null;
   /** خصمٌ مطبوعٌ بعد الضريبة — يُقبل إن سدّ الفرقَ وحده (`checkInvoiceTotals`) */
   discountMinor?: number | null;
+  /** رسومٌ بعد الضريبة (توصيل · شحن) — بالحكم نفسه */
+  chargesMinor?: number | null;
   /** ثقة كل حقل بين ٠ و١، من مخرجات نموذج الاستخراج */
   fieldConfidence?: Record<string, number>;
 }
@@ -124,6 +126,18 @@ export function validateInvoice(
 
   if (!hasBuyerVat) {
     if (!isNotInvoice) findings.push(finding(ISSUE.MISSING_BUYER_VAT));
+  } else if (!buyerVatMatches && !isValidSaudiVat(buyerVat)) {
+    /*
+      رقمٌ ليس رقماً ضريبيّاً (ليس ١٥ خانة) لا يدلّ على منشأةٍ أخرى — قراءةٌ أسقطت خانة.
+      مختبرات القهوة: «31000797600003» عن «310007971600003»، فرُدّت فاتورتُها مانعاً
+      «ليست لنا» وأُرشفت بلا قيد، وضاع مستحقُّها. فهو ركنٌ لم يُقرأ لا مانع.
+    */
+    if (!isNotInvoice) {
+      findings.push(finding(ISSUE.MISSING_BUYER_VAT, {
+        variant: "UNREADABLE",
+        message: `رقم المنشأة على الفاتورة لم يُقرأ سليماً (${buyerVat}) — صحّحه من الورقة`,
+      }));
+    }
   } else if (!buyerVatMatches) {
     findings.push(finding(ISSUE.BUYER_VAT_MISMATCH));
   }
@@ -144,7 +158,9 @@ export function validateInvoice(
 
   // فحص حسابي يكشف أخطاء الاستخراج قبل أن تصل إلى القيد — على المعلوم وحده.
   if (subtotalKnown && totalKnown && subtotalMinor > 0 && totalMinor > 0) {
-    const totals = checkInvoiceTotals(subtotalMinor, vatMinor, totalMinor, candidate.discountMinor ?? null);
+    const totals = checkInvoiceTotals(subtotalMinor, vatMinor, totalMinor, {
+      discountMinor: candidate.discountMinor, chargesMinor: candidate.chargesMinor,
+    });
     if (totals.verdict === "ROUNDING") {
       /*
        * المورّد يُسقط كسور الريال من الإجمالي، والمطبوع هو الملزِم.
@@ -155,12 +171,16 @@ export function validateInvoice(
         variant: "ROUNDING",
         message: `المورّد قرّب الإجمالي: ${(subtotalMinor + vatMinor) / 100} صار ${totalMinor / 100}`,
       }));
-    } else if (totals.verdict === "POST_VAT_DISCOUNT") {
-      /* خصمٌ على الإجماليّ بعد الضريبة: المستحقّ أقلّ، والضريبةُ كما هي */
+    } else if (totals.verdict === "ADJUSTED") {
+      /* خصمٌ أو رسومٌ بعد الضريبة: المستحقّ غيرُ الصافي والضريبة، والضريبةُ كما هي */
+      const parts = [
+        totals.discountMinor !== null ? `خصمٌ ${totals.discountMinor / 100}` : null,
+        totals.chargesMinor !== null ? `رسومٌ ${totals.chargesMinor / 100}` : null,
+      ].filter(Boolean).join(" و");
       findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
         severity: "INFO",
-        variant: "DISCOUNT",
-        message: `خصمٌ بعد الضريبة ${totals.postVatDiscountMinor! / 100}: الصافي والضريبة ${(subtotalMinor + vatMinor) / 100} والمستحقّ ${totalMinor / 100}`,
+        variant: totals.chargesMinor !== null && totals.discountMinor === null ? "CHARGES" : "DISCOUNT",
+        message: `${parts} بعد الضريبة: الصافي والضريبة ${(subtotalMinor + vatMinor) / 100} والمستحقّ ${totalMinor / 100}`,
       }));
     } else if (totals.verdict === "MISMATCH") {
       findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
@@ -197,6 +217,8 @@ export function validateInvoice(
     taxStatus === "VALID" ? "ELIGIBLE" : taxStatus === "UNKNOWN" ? "UNKNOWN" : "NOT_ELIGIBLE";
 
   if (taxStatus === "UNKNOWN") findings.push(finding(ISSUE.TAX_STATUS_UNKNOWN));
+  /* «غير صالحة» بلا سببٍ مسمّى كانت تُعرض حكماً بلا ركن: الضريبةُ صفرٌ مقروء */
+  if (!isNotInvoice && !pillarsFailing && vatKnown && !hasVatBreakdown) findings.push(finding(ISSUE.ZERO_VAT));
 
   /*
    * أساس الرسملة: الضريبة تدخل التكلفة فقط حين لا تكون قابلة للخصم.

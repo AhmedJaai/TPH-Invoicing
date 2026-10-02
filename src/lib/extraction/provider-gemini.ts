@@ -60,6 +60,7 @@ export const GEMINI_SCHEMA = {
     vatAmount: { type: "STRING", description: "مبلغ الضريبة بمنزلتين عشريتين أو فارغ" },
     totalAmount: { type: "STRING", description: "المبلغ النهائي المستحق كما طُبع، بمنزلتين عشريتين أو فارغ" },
     discountAmount: { type: "STRING", description: "الخصم على مستوى الفاتورة كما طُبع، بمنزلتين عشريتين أو فارغ" },
+    chargesAmount: { type: "STRING", description: "رسوم بعد الضريبة غير داخلة في الصافي (توصيل أو شحن) كما طُبعت، أو فارغ" },
     beneficiaryName: { type: "STRING", description: "اسم المستفيد في إيصال التحويل أو فارغ" },
     lines: {
       type: "ARRAY",
@@ -88,6 +89,7 @@ export const GEMINI_SCHEMA = {
           description: { type: "STRING" },
           debit: { type: "STRING" },
           credit: { type: "STRING" },
+          balance: { type: "STRING", description: "الرصيد الجاري إن طُبع، لا في مدين أو دائن" },
         },
         required: ["date", "ref", "description", "debit", "credit"],
       },

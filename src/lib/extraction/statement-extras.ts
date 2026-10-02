@@ -25,6 +25,8 @@ export interface StatementExtras {
    * في كشفه» والمجهول صار نفياً.
    */
   unreadLines: { date: string; description: string; amountText: string }[];
+  /** عمودُ الرصيد الجاري قُرئ مديناً أو دائناً فأُعيد إلى موضعه (`repairRunningBalance`) */
+  columnsRepaired: boolean;
 }
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -49,7 +51,7 @@ function parseDay(v: unknown): Date | null {
 
 export function parseStatementExtras(raw: unknown): StatementExtras {
   const rec = asRecord(raw);
-  if (!rec) return { openingBalanceMinor: null, closingBalanceMinor: null, lines: [], unreadLines: [] };
+  if (!rec) return { openingBalanceMinor: null, closingBalanceMinor: null, lines: [], unreadLines: [], columnsRepaired: false };
 
   const rawLines = Array.isArray(rec.statementLines) ? rec.statementLines : [];
   const lines: RawStatementLine[] = [];
@@ -85,10 +87,54 @@ export function parseStatementExtras(raw: unknown): StatementExtras {
     });
   }
 
+  const openingBalanceMinor = parseRiyals(asText(rec.openingBalance));
+  const closingBalanceMinor = parseRiyals(asText(rec.closingBalance));
+  const repaired = repairRunningBalance(lines, openingBalanceMinor, closingBalanceMinor);
   return {
-    openingBalanceMinor: parseRiyals(asText(rec.openingBalance)),
-    closingBalanceMinor: parseRiyals(asText(rec.closingBalance)),
-    lines,
+    openingBalanceMinor,
+    closingBalanceMinor,
+    lines: repaired ?? lines,
     unreadLines,
+    columnsRepaired: repaired !== null,
   };
+}
+
+/**
+ * كشفٌ يطبع لكلّ سطرٍ مبلغَه ورصيدَه الجاري — فيأخذ النموذجُ الرصيدَ مديناً والمبلغَ دائناً.
+ *
+ * وُجد في الإنتاج: كشفُ أفال (٢٧ سبتمبر) «مدين ٥٠٦ · ١٬٦٥٧٫١٥ · ٢٬٦٥٣٫٣٤…» وهي أرصدة،
+ * و«دائن ٥٠٦ · ١٬١٥١٫١٥ · ٩٩٦٫١٩…» وهي الفواتير — فصارت خمسُ فواتير «متنازَعاً عليها»
+ * وقال الكشفُ إنّا سدّدنا ما حُمّل علينا. والحسابُ يكشفه بلا نموذج: فرقُ الرصيدين المتتاليين
+ * يساوي مبلغَ السطر في كلّ سطر. فإن صدق ذلك في الأسطر كلّها (وطابق آخرُ رصيدٍ الختاميَّ
+ * إن قُرئ) فالعمودُ رصيد: يُسقَط، والمبلغُ مدينٌ إن زاد به الرصيد ودائنٌ إن نقص.
+ * وما لم يصدق في سطرٍ واحد لا يُمسّ — التخمينُ أسوأ من قراءةٍ مُعلَنة.
+ */
+export function repairRunningBalance(
+  lines: readonly RawStatementLine[],
+  openingMinor: number | null,
+  closingMinor: number | null,
+): RawStatementLine[] | null {
+  if (lines.length < 2) return null;
+  const TOL = 1;
+  for (const balanceIs of ["debit", "credit"] as const) {
+    const bal = (l: RawStatementLine) => (balanceIs === "debit" ? l.debitMinor : l.creditMinor);
+    const amt = (l: RawStatementLine) => (balanceIs === "debit" ? l.creditMinor : l.debitMinor);
+    /* المبلغُ في كلّ سطر، والرصيدُ قد يكون صفراً (سدادٌ صفّى الحساب — أوراق الزيتون) */
+    if (lines.some((l) => amt(l) === 0) || lines.every((l) => bal(l) === 0)) continue;
+    /* قبل السطر الأوّل: الافتتاحيّ إن قُرئ، وإلّا صفرٌ لا يُفترض إلّا إن كان أوّلُ رصيدٍ هو أوّلَ مبلغ */
+    let prev = openingMinor ?? (Math.abs(bal(lines[0]) - amt(lines[0])) <= TOL ? 0 : null);
+    if (prev === null) continue;
+    const out: RawStatementLine[] = [];
+    let ok = true;
+    for (const l of lines) {
+      const step = bal(l) - prev;
+      if (Math.abs(Math.abs(step) - amt(l)) > TOL) { ok = false; break; }
+      out.push({ ...l, debitMinor: step > 0 ? amt(l) : 0, creditMinor: step > 0 ? 0 : amt(l) });
+      prev = bal(l);
+    }
+    if (!ok) continue;
+    if (closingMinor !== null && Math.abs(prev - closingMinor) > TOL) continue;
+    return out;
+  }
+  return null;
 }

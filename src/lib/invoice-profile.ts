@@ -76,11 +76,12 @@ export function amountsAddUp(
   vatMinor: number | null,
   totalMinor: number,
   toleranceMinor: number,
-  /** خصمٌ بعد الضريبة مقيَّد — جزءٌ من المعادلة، كما في قيد القاعدة (054) */
+  /** خصمٌ ورسومٌ بعد الضريبة مقيَّدان — جزءٌ من المعادلة، كما في قيد القاعدة (055) */
   discountMinor: number | null = null,
+  chargesMinor: number | null = null,
 ): boolean | null {
   if (subtotalMinor === null || vatMinor === null) return null;
-  return Math.abs(subtotalMinor + vatMinor - (discountMinor ?? 0) - totalMinor) <= toleranceMinor;
+  return Math.abs(subtotalMinor + vatMinor - (discountMinor ?? 0) + (chargesMinor ?? 0) - totalMinor) <= toleranceMinor;
 }
 
 /** رابطُ الفاتورة — موضعٌ واحد يُبنى منه في كلّ شاشةٍ وبحثٍ وتنبيه. */

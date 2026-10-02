@@ -135,6 +135,7 @@ export default async function DocumentsPage({
         buyerVat: invoices.buyerVat,
         subtotalMinor: invoices.subtotalMinor,
         discountMinor: invoices.discountMinor,
+        chargesMinor: invoices.chargesMinor,
         vatMinor: invoices.vatMinor,
         issuesInvoices: suppliers.issuesInvoices,
         contractOnFile: suppliers.contractOnFile,
@@ -233,6 +234,7 @@ export default async function DocumentsPage({
             vatMinor: r.vatMinor,
             totalMinor: r.totalMinor,
             discountMinor: r.discountMinor,
+            chargesMinor: r.chargesMinor,
             lineCount: Number(r.lineCount),
           },
           r.issuesInvoices === null

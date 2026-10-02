@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { annualImpactMinor, detectPriceChange, normalizeItem, priceKey } from "./items";
+import { annualImpactMinor, detectPriceChange, normalizeItem, priceKey, similarItems } from "./items";
 
 const at = (iso: string, price: number) => ({ date: new Date(`${iso}T00:00:00Z`), unitPriceMinor: price });
 
@@ -103,5 +103,20 @@ describe("الأثر السنوي", () => {
   it("الانخفاض يعطي أثراً سالباً أي توفيراً", () => {
     const c = detectPriceChange([at("2026-07-01", 1200), at("2026-08-01", 1000)])!;
     expect(annualImpactMinor(c, 100)).toBe(-20_000);
+  });
+});
+
+describe("أقربُ أصناف المورّد — للاقتراح لا للدمج", () => {
+  const n = (s: string) => normalizeItem(s);
+  it("صيغُ الغربية تتقدّم: «عنب» و«كولومي عنب» لـ«كولومبي عنب»", () => {
+    const out = similarItems(n("كولومبي عنب"), [n("بن سومطرة"), n("عنب"), n("كولومي عنب"), n("كولومبي بن")]);
+    expect(out[0]).toBe(n("كولومي عنب"));
+    expect(out).toContain(n("عنب"));
+    expect(out).not.toContain(n("بن سومطرة"));
+    /* «بن» وحدها لا تجمع صنفين */
+    expect(similarItems(n("بن سومطرة"), [n("كولومبي بن")])).toEqual([]);
+  });
+  it("والأرقامُ المختلفة صنفان لا يُقترح أحدُهما للآخر", () => {
+    expect(similarItems(n("كيس 1 كيلو"), [n("كيس 2 كيلو")])).toEqual([]);
   });
 });

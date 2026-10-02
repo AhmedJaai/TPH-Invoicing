@@ -35,6 +35,8 @@ export type AuditAction =
   | "SUPPLIER_ALIAS_LEARNED"
   | "STATEMENT_RECONCILED"
   | "PRODUCT_LINKED"
+  /* صيغةٌ أخرى لصنف المورّد نفسه — بنودُها نُقلت إليه (056) */
+  | "SUPPLIER_ITEM_MERGED"
   | "PRODUCT_UNLINKED"
   | "EXPENSE_ADDED"
   | "EXPENSE_REMOVED"

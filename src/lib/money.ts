@@ -55,31 +55,55 @@ export function isSupplierRounding(
 }
 
 /**
- * أيستقيم حسابُ الفاتورة؟ — والخصمُ بعد الضريبة جزءٌ منه.
+ * أيستقيم حسابُ الفاتورة؟ — وما بعد الضريبة جزءٌ منه.
  *
- * الخصمُ على الفاتورة نوعان (هيئة الزكاة): قبل الضريبة يُنقص الوعاء، فالصافي
- * المطبوع بعده و«الصافي + الضريبة = الإجماليّ» يستقيم ولا يُطرح ثانية؛ وبعد
- * الضريبة (نقديّ أو تقريبيّ) يُنقص المستحقَّ وحده: «الصافي + الضريبة − الخصم =
- * المستحقّ» والضريبةُ كما طُبعت. وكانت القاعدةُ تعرف الأوّل وحده، ففاتورةُ الثاني
- * تُردّ أو تُقيَّد بغير مستحقّها. والحكمُ هنا لا في قراءة النموذج: الخصمُ المقروء
- * يُعدّ «بعد الضريبة» إن كان هو الذي يفسّر الفرق وحده.
+ * «الصافي + الضريبة − الخصم + الرسوم = المستحقّ».
+ *
+ * - **الخصمُ** نوعان (هيئة الزكاة): قبل الضريبة يُنقص الوعاء فيُطبع الصافي بعده
+ *   ولا يُطرح ثانية؛ وبعدها (نقديّ أو تقريبيّ) يُنقص المستحقَّ وحده والضريبةُ كما طُبعت.
+ * - **الرسومُ بعد الضريبة** (توصيلٌ أو شحنٌ أو خدمة لم تدخل الصافي) تزيد المستحقّ.
+ *   وُجدت في الإنتاج: رونة ٩٢٥ + ١٣٨٫٧٥ ضريبة + ٢٥ توصيل = ١٬٠٨٨٫٧٥، فقُيّدت بلا
+ *   صافٍ ولا ضريبة («مجهولة») وضاعت ضريبتُها من الخصم.
+ *
+ * والحكمُ هنا لا في قراءة النموذج: المقروءُ يُعدّ بعد الضريبة إن كان هو الذي يفسّر
+ * الفرق — الأقلُّ أوّلاً: لا شيء، ثمّ الخصمُ وحده، ثمّ الرسومُ وحدها، ثمّ هما معاً.
  */
-export type TotalsVerdict = "EXACT" | "ROUNDING" | "POST_VAT_DISCOUNT" | "MISMATCH";
+export type TotalsVerdict = "EXACT" | "ROUNDING" | "ADJUSTED" | "MISMATCH";
+
+export interface PostVatAdjustments {
+  /** خصمٌ بعد الضريبة — `null` لا خصم */
+  discountMinor?: number | null;
+  /** رسومٌ بعد الضريبة (توصيل · شحن · خدمة) — `null` لا رسوم */
+  chargesMinor?: number | null;
+}
+
+export interface TotalsCheck {
+  verdict: TotalsVerdict;
+  /** ما يُحفظ على الفاتورة — ما فسّر الفرقَ وحده، وإلّا `null` */
+  discountMinor: number | null;
+  chargesMinor: number | null;
+}
 
 export function checkInvoiceTotals(
   subtotalMinor: number,
   vatMinor: number,
   totalMinor: number,
-  discountReadMinor: number | null = null,
-): { verdict: TotalsVerdict; postVatDiscountMinor: number | null } {
+  read: PostVatAdjustments = {},
+): TotalsCheck {
+  const none: TotalsCheck = { verdict: "MISMATCH", discountMinor: null, chargesMinor: null };
   const diff = subtotalMinor + vatMinor - totalMinor;
-  if (diff === 0) return { verdict: "EXACT", postVatDiscountMinor: null };
-  if (Math.abs(diff) <= TOTAL_ROUNDING_TOLERANCE_MINOR) return { verdict: "ROUNDING", postVatDiscountMinor: null };
-  if (discountReadMinor !== null && discountReadMinor > 0
-    && Math.abs(diff - discountReadMinor) <= TOTAL_ROUNDING_TOLERANCE_MINOR) {
-    return { verdict: "POST_VAT_DISCOUNT", postVatDiscountMinor: discountReadMinor };
+  if (diff === 0) return { ...none, verdict: "EXACT" };
+  if (Math.abs(diff) <= TOTAL_ROUNDING_TOLERANCE_MINOR) return { ...none, verdict: "ROUNDING" };
+  const d = read.discountMinor != null && read.discountMinor > 0 ? read.discountMinor : null;
+  const c = read.chargesMinor != null && read.chargesMinor > 0 ? read.chargesMinor : null;
+  const tries: [number | null, number | null][] = [[d, null], [null, c], [d, c]];
+  for (const [td, tc] of tries) {
+    if (td === null && tc === null) continue;
+    if (Math.abs(diff - (td ?? 0) + (tc ?? 0)) <= TOTAL_ROUNDING_TOLERANCE_MINOR) {
+      return { verdict: "ADJUSTED", discountMinor: td, chargesMinor: tc };
+    }
   }
-  return { verdict: "MISMATCH", postVatDiscountMinor: null };
+  return none;
 }
 
 /** يحوّل نصاً مثل "410.00" أو "410" أو "١٬٢٣٤٫٥٠" إلى هللات. */

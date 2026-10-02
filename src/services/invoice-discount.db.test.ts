@@ -67,4 +67,17 @@ describe("الخصمُ بعد الضريبة (054)", () => {
       await expect(correctInvoice(tx, { invoiceId: inv, ...paper, discountMinor: 20_00 }, await someone(tx)))
         .rejects.toBeInstanceOf(InvoiceCorrectionRefused);
     }));
+
+  it("رسومُ التوصيل بعد الضريبة تُقيَّد بالقاعدة نفسها (055)", () =>
+    withRollback(async (tx) => {
+      const s = await makeSupplier(tx);
+      const doc = await makeDocument(tx, s, "2026-09-10");
+      const id = await createInvoice(tx, {
+        documentId: doc, supplierId: s, invoiceNumber: "R-4136", invoiceDate: day("2026-09-10"), periodMonth: "2026-09",
+        subtotalMinor: 925_00, vatMinor: 138_75, totalMinor: 1_088_75, chargesReadMinor: 25_00,
+        taxStatus: "VALID", inputVatStatus: "ELIGIBLE", isFixedAsset: false,
+      });
+      const [r] = await tx.select({ c: invoices.chargesMinor, d: invoices.discountMinor }).from(invoices).where(eq(invoices.id, id!));
+      expect(r).toEqual({ c: 25_00, d: null });
+    }));
 });

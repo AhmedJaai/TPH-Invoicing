@@ -256,6 +256,7 @@ export async function POST(request: Request) {
     const totalMinor = parseRiyals(body.total ?? "");
     /* الخصمُ بعد الضريبة ممّا قرأه الخادم — يُقبل إن سدّ فرقَ ما أقرّه الإنسان وحده */
     const discountReadMinor = typeof serverRaw?.discountAmount === "string" ? parseRiyals(serverRaw.discountAmount) : null;
+    const chargesReadMinor = typeof serverRaw?.chargesAmount === "string" ? parseRiyals(serverRaw.chargesAmount) : null;
 
     const review = await reviewForArchive({
       documentKind: body.documentKind,
@@ -266,6 +267,7 @@ export async function POST(request: Request) {
       vatMinor,
       totalMinor,
       discountMinor: discountReadMinor,
+      chargesMinor: chargesReadMinor,
       sellerVat: body.sellerVat,
       buyerVat: body.buyerVat,
     });
@@ -321,6 +323,7 @@ export async function POST(request: Request) {
           vatMinor,
           totalMinor,
           discountReadMinor,
+          chargesReadMinor,
           sellerVat: body.sellerVat,
           buyerVat: body.buyerVat,
           taxStatus: review.taxStatus,
