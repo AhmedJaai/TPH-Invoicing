@@ -145,6 +145,7 @@ export async function applySupplierCredit(
   supplierId: string,
   options: { forwardDays: number | null; paymentIds?: readonly string[] },
 ): Promise<CreditOutcome> {
+  if (options.forwardDays !== null && !options.paymentIds) await reclaimForwardCredit(tx, supplierId);
   let credits = await loadCredits(tx, supplierId);
   if (options.paymentIds) {
     const only = new Set(options.paymentIds);
@@ -166,6 +167,53 @@ export async function applySupplierCredit(
   const amounts = new Map(credits.map((c) => [c.paymentId, c.amountMinor]));
   const applied = await writeCreditPlan(tx, plan.allocations, amounts);
   return { allocations: plan.allocations, appliedMinor: applied, creditLeftMinor: plan.creditLeftMinor };
+}
+
+/**
+ * الفاتورةُ الأقدم تصل متأخّرة — فتستردّ ما ذهب من حوالتها إلى فاتورةٍ أحدث.
+ *
+ * لوريفا (الإنتاج): حوالةُ ٢ سبتمبر (٤٬١٥١٫٥٠) هي فواتيرُ أغسطس بالضبط. وقُيّدت ثلاثٌ
+ * منها متأخّرةً (أسماءُ ملفّاتها بلا مبلغ، فقُرئت في ٢٦ سبتمبر)، وكان ما بقي من الحوالة
+ * قد خُصم آلياً من فواتير ٤ سبتمبر. فبدت فواتيرُ أغسطس غيرَ مسدَّدة فسُجّل سدادُها بيد
+ * (مالٌ لم يخرج)، وبدت فواتيرُ سبتمبر مسدَّدةً ولم تُسدَّد.
+ *
+ * والقاعدة «بالأقدم أوّلاً». وتخصيصُ حوالةٍ على فاتورةٍ **بعد تاريخها** لا يصنعه إلّا الخصمُ
+ * الآليّ (نافذةُ الأيّام القادمة) — فهو وحده يُستردّ هنا، ولا يُمسّ ما قبله ولا ما قرّره إنسانٌ
+ * على فاتورةٍ سابقة. يُستردّ حين توجد فاتورةٌ مفتوحة تاريخُها **حتّى** يوم الحوالة، والشهرانِ
+ * مفتوحان؛ ثمّ يوزّع `applySupplierCredit` بالأقدم أوّلاً فيعود الباقي إلى حيث كان.
+ */
+async function reclaimForwardCredit(tx: Tx, supplierId: string): Promise<number> {
+  const forward = (await tx.execute<{ payment_id: string; invoice_id: string; paid_at: Date | string }>(sql`
+    select pa.payment_id, pa.invoice_id, p.paid_at
+      from payment_allocations pa
+      join payments p on p.id = pa.payment_id
+      join invoices j on j.id = pa.invoice_id
+     where p.supplier_id = ${supplierId}
+       and p.status not in ('REVERSED', 'VOID')
+       and p.method::text not in ('OWNER_ACCOUNT', 'CASH', 'CREDIT_NOTE')
+       and j.invoice_date::date > p.paid_at::date
+       and not exists (select 1 from month_closes mc where mc.month = j.period_month and mc.status = 'CLOSED')
+       and exists (
+         select 1 from invoices i
+          where i.supplier_id = ${supplierId}
+            and i.invoice_date::date <= p.paid_at::date
+            and not exists (select 1 from month_closes mc where mc.month = i.period_month and mc.status = 'CLOSED')
+            and not exists (select 1 from documents d where d.id = i.document_id and d.status <> 'ARCHIVED')
+            and i.total_minor - coalesce((select sum(x.amount_minor) from payment_allocations x where x.invoice_id = i.id), 0) > ${SETTLED_TOLERANCE_MINOR}
+       )
+  `)).rows;
+  /* حوالةٌ هي صدى سدادٍ مقيَّد لا يوزّعها الآليّ — فلا يُفكّ منها ما لن يعود */
+  const held = forward.length > 0 ? await echoHeldPaymentIds(tx, supplierId) : new Set<string>();
+  const freeable = forward.filter((f) => !held.has(f.payment_id));
+  if (freeable.length === 0) return 0;
+  for (const f of freeable) {
+    await tx.delete(paymentAllocations).where(and(
+      eq(paymentAllocations.paymentId, f.payment_id),
+      eq(paymentAllocations.invoiceId, f.invoice_id),
+    ));
+  }
+  for (const id of new Set(freeable.map((f) => f.payment_id))) await refreshPaymentStatus(tx, id);
+  return freeable.length;
 }
 
 /* ─────────────────── السداد من حساب المالك ─────────────────── */

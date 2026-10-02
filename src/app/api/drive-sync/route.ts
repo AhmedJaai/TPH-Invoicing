@@ -171,7 +171,9 @@ async function handle(request: Request) {
     ? await processDocumentBacklog(user.id, drive)
     : { recorded: 0, approved: 0, renamed: [] as { from: string; to: string }[], reread: 0, notes: [] as string[] };
 
-  const knownRows = await db.select({ id: documents.driveFileId, md5: documents.driveMd5 }).from(documents);
+  const knownRows = await db.select({ id: documents.driveFileId, md5: documents.driveMd5, name: documents.fileName }).from(documents);
+  /* اسمُ الملفّ المعروف كما هو في الدرايف الآن — يُقارن بما عندنا بعد المشي */
+  const liveNames = new Map<string, string>();
   const known = new Set(knownRows.map((d) => d.id).filter((v): v is string => Boolean(v)));
   /* بصمةُ ما أُرشف — نسخةٌ من ملفٍّ مقيَّد (في مجلّدٍ آخر أو باسمٍ آخر) تُعرف قبل أن تُنزَّل أو تُقرأ */
   const knownMd5 = new Set(knownRows.map((d) => d.md5).filter((v): v is string => Boolean(v)));
@@ -227,7 +229,7 @@ async function handle(request: Request) {
     fresh = entries;
   } else {
     try {
-      const walked = await walkArchive(drive, { months, knownFileIds: known, deadline });
+      const walked = await walkArchive(drive, { months, knownFileIds: known, deadline, onKnown: (id, name) => liveNames.set(id, name) });
       fresh = walked.entries;
       pendingMonths = walked.pendingMonths;
       truncated = walked.truncated;
@@ -768,7 +770,17 @@ async function handle(request: Request) {
     ولا يُعاد تسميةُ شيء هنا: يُقترَح وحسب، والفعلُ في `/api/drive-rename`
     باختيارٍ ملفّاً ملفّاً.
   */
-  const justRecorded = [...recordedFileIds];
+  /*
+    ── الاسمُ في الدرايف هو الحقيقة ──
+    غُيّر اسمُ ملفٍّ هناك بيد («0044.pdf») وبقي عندنا قياسيّاً، فلم تره التسميةُ أبداً.
+    فيُحدَّث ما عندنا من الدرايف، ويدخل التسميةَ مع ما قُيِّد للتوّ.
+  */
+  const storedName = new Map(knownRows.filter((r) => r.id).map((r) => [r.id!, r.name]));
+  const drifted = [...liveNames].filter(([id, name]) => storedName.get(id) !== undefined && storedName.get(id) !== name);
+  for (const [id, name] of drifted) {
+    await db.update(documents).set({ fileName: name }).where(eq(documents.driveFileId, id));
+  }
+  const justRecorded = [...new Set([...recordedFileIds, ...drifted.map(([id]) => id)])];
 
   /*
     ── التسميةُ الآليّة ── (إذن أحمد في ٢٤ سبتمبر ٢٠٢٦)

@@ -113,6 +113,40 @@ const LOW = {
 const LOW_OTHER: Record<string, string> = { النوع: "نوع المستند", "الأرقام الضريبية": "الأرقام الضريبيّة" };
 
 const MAX_BYTES = 3 * 1024 * 1024;
+/** صورةٌ أكبر من هذا تُصغَّر في المتصفّح قبل الإرسال */
+const IMAGE_SHRINK_BYTES = 1.5 * 1024 * 1024;
+const IMAGE_MAX_SIDE = 2400;
+
+/**
+ * صورةُ الجوّال تُصغَّر هنا قبل أن تُرسَل — لا تُردّ.
+ *
+ * كانت كلُّ صورةٍ فوق ٣ ميجابايت تُردّ «صغّره»، وصورةُ كاميرا الهاتف ٣–٦ ميجابايت:
+ * فلا تُقرأ صورةٌ تقريباً. وHEIC (الآيفون) يرسلها كروم بنوعٍ فارغ فتُردّ «غير مدعوم».
+ * فتُرسم على لوحٍ بأطولِ ضلعٍ ٢٤٠٠ وتُحفظ JPEG — وهي ما يُؤرشَف (يُقرأ ويُطبع كالأصل).
+ * وما لا يفكّه المتصفّح (HEIC في كروم) يُرسَل كما هو ويحوّله الخادم.
+ */
+async function prepareForUpload(file: File): Promise<File> {
+  const ext = file.name.toLowerCase().split(".").pop() ?? "";
+  const heif = ext === "heic" || ext === "heif" || /image\/hei[cf]/.test(file.type);
+  const isImage = file.type.startsWith("image/") || heif;
+  if (!isImage) return file;
+  if (!heif && file.size <= IMAGE_SHRINK_BYTES) return file;
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, IMAGE_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.88));
+    if (!blob) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    /* لا يفكّه المتصفّح — يُرسَل كما هو بنوعٍ من امتداده، والخادمُ يحوّله */
+    return heif && !file.type ? new File([file], file.name, { type: ext === "heif" ? "image/heif" : "image/heic" }) : file;
+  }
+}
 
 /* ─────────────────────────── الأجزاء الصغيرة ─────────────────────────── */
 
@@ -443,14 +477,17 @@ export function Uploader({
     return () => { all.forEach((u) => URL.revokeObjectURL(u)); all.clear(); };
   }, []);
 
-  const analyze = useCallback(async (file: File) => {
-    const id = `${file.name}-${Date.now()}-${Math.random()}`;
+  const analyze = useCallback(async (picked: File) => {
+    const id = `${picked.name}-${Date.now()}-${Math.random()}`;
+    const file = await prepareForUpload(picked);
 
     /* الحدّ يُقال قبل الإرسال — لا ٤١٣ نصّيّ من المنصّة بعده */
     if (file.size > MAX_BYTES) {
       setItems((prev) => [{
         id, fileName: file.name, state: "failed", mime: file.type,
-        error: "الملف أكبر من ٣ ميجابايت — حدّ الأرشفة. صغّره (صوّره بدقّة أقلّ أو اضغط الـPDF) ثمّ أعد المحاولة.",
+        error: file.type.startsWith("image/")
+          ? "الصورة أكبر من ٣ ميجابايت ولم يستطع المتصفّح تصغيرها — صدّرها JPG من تطبيق الصور ثمّ أعد المحاولة."
+          : "الملف أكبر من ٣ ميجابايت — حدّ الأرشفة. اضغط الـPDF ثمّ أعد المحاولة.",
       }, ...prev]);
       return;
     }

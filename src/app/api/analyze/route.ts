@@ -10,7 +10,7 @@ import { and, eq, gt, inArray, ne, or } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, extractionCache, invoices, supplierAliases, suppliers } from "@/db/schema";
 import { withDeadline } from "@/lib/ai/deadline";
-import { extractDocument, isSupportedUpload } from "@/lib/extraction";
+import { extractDocument, isSupportedUpload, uploadMimeType } from "@/lib/extraction";
 import { runPipeline } from "@/lib/extraction/pipeline";
 import type { ExtractionOutcome, ExtractionSuccess } from "@/lib/extraction/provider";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
@@ -88,9 +88,11 @@ async function handle(request: Request) {
   if (file.size > MAX_BYTES) {
     return NextResponse.json({ error: "حجم الملف يتجاوز ٤ ميجابايت — صغّره (صوّره بدقّة أقلّ) ثمّ أعد المحاولة" }, { status: 400 });
   }
-  if (!isSupportedUpload(file.type)) {
+  /* كروم يرسل HEIC بنوعٍ فارغ — فيُعرف من الامتداد */
+  const mimeType = uploadMimeType(file.type, file.name);
+  if (!isSupportedUpload(mimeType)) {
     return NextResponse.json(
-      { error: `نوع غير مدعوم (${file.type || "مجهول"}) — المقبول PDF أو صورة` },
+      { error: `نوع غير مدعوم (${mimeType || "مجهول"}) — المقبول PDF أو صورة (JPG · PNG · HEIC)` },
       { status: 400 },
     );
   }
@@ -150,7 +152,7 @@ async function handle(request: Request) {
       }
     : await extractDocument({
         data: buffer,
-        mimeType: file.type,
+        mimeType,
         companyVat: companyConfig.vatNumber,
         companyName: companyConfig.nameAr,
         supplierNames: supplierList.map((s) => `${s.nameAr} (${s.slug})`),

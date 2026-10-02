@@ -167,16 +167,44 @@ export function layoutText(words: readonly PdfWord[]): string {
  * رفعٍ يواجه المستخدم، ورميُ استثناءٍ فيه يُنتج صفحةً بيضاء بدل رسالةٍ
  * تقول ما العمل.
  */
+const HEIF_TYPES = new Set(["image/heic", "image/heif"]);
+/** أطولُ ضلعٍ يُرسَل إلى النموذج — يكفي لقراءة فاتورة، ويُبقي الطلب صغيراً */
+const MAX_IMAGE_SIDE = 2000;
+
+/**
+ * صورةُ المستند كما يقرؤها النموذج: JPEG، معتدلة الحجم، مستقيمة.
+ *
+ * كانت تُرسَل كما وصلت ويُكتب نوعُها «image/jpeg» أيّاً كان — فالـPNG يُوسَم JPEG،
+ * وصورةُ الجوّال بأربعة ميجابايت تُرسَل كاملة، وHEIC (كاميرا الآيفون) لا تُفتح أصلاً.
+ * و`rotate()` يطبّق اتّجاه الكاميرا (EXIF): فاتورةٌ مصوَّرة بالطول لا تصل مستلقية.
+ */
+export async function normalizeImage(data: Buffer, mimeType: string): Promise<EmbeddedImage> {
+  const { default: sharp } = await import("sharp");
+  let source = data;
+  if (HEIF_TYPES.has(mimeType)) {
+    /* sharp المبنيّ سلفاً لا يفكّ HEVC — فيُفكّ بـlibheif المترجَم إلى WebAssembly */
+    const { default: convert } = await import("heic-convert");
+    source = Buffer.from(await convert({ buffer: data, format: "JPEG", quality: 0.92 }));
+  }
+  const { data: jpeg, info } = await sharp(source)
+    .rotate()
+    .resize({ width: MAX_IMAGE_SIDE, height: MAX_IMAGE_SIDE, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 85 })
+    .toBuffer({ resolveWithObject: true });
+  return { data: jpeg, mimeType: "image/jpeg", width: info.width, height: info.height };
+}
+
 export async function resolveDocumentInput(
   data: Buffer,
   mimeType: string,
 ): Promise<DocumentInput> {
-  if (isDeepseekImageType(mimeType)) {
-    return {
-      mode: "IMAGE",
-      source: "DIRECT",
-      images: [{ data, mimeType: "image/jpeg", width: 0, height: 0 }],
-    };
+  if (isDeepseekImageType(mimeType) || HEIF_TYPES.has(mimeType)) {
+    try {
+      const image = await normalizeImage(data, mimeType);
+      return { mode: "IMAGE", source: "DIRECT", images: [image] };
+    } catch (e) {
+      return { mode: "UNREADABLE", reason: `تعذّر فتح الصورة: ${(e as Error).message}` };
+    }
   }
 
   if (mimeType !== PDF_TYPE) {

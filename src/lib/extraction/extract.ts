@@ -30,8 +30,30 @@ import {
 export const EXTRACTION_MODEL = PINNED_MODELS.claude;
 
 /** أنواع الملفات التي يقبلها النموذج مباشرةً. */
-const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
+/*
+  صورُ الجوّال: HEIC هي صيغةُ كاميرا الآيفون، وكانت تُردّ «نوعٌ غير مدعوم» فبقيت فاتورتا
+  مود القهوة مقيَّدتين من اسمَي ملفّيهما بلا قراءة. وتُحوَّل كلُّها JPEG قبل النموذج
+  (`normalizeImage`).
+*/
+const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/heic", "image/heif"] as const;
+/** ما يقبله مزوّد كلود الخامل كما هو */
+type ClaudeImageType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 const PDF_TYPE = "application/pdf";
+
+const TYPE_BY_EXTENSION: Record<string, string> = {
+  pdf: PDF_TYPE, jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
+  gif: "image/gif", heic: "image/heic", heif: "image/heif",
+};
+
+/**
+ * نوعُ الملفّ المرفوع — والمتصفّحُ قد لا يعرفه: كروم يرسل HEIC بنوعٍ فارغ،
+ * فيُعرف من امتداد الاسم.
+ */
+export function uploadMimeType(type: string, fileName: string): string {
+  if (type && type !== "application/octet-stream") return type === "image/jpg" ? "image/jpeg" : type;
+  const ext = fileName.toLowerCase().split(".").pop() ?? "";
+  return TYPE_BY_EXTENSION[ext] ?? type;
+}
 
 export function isSupportedUpload(mimeType: string): boolean {
   return mimeType === PDF_TYPE || (SUPPORTED_IMAGE_TYPES as readonly string[]).includes(mimeType);
@@ -62,7 +84,7 @@ async function extractWithClaude(input: ExtractionRequest): Promise<ExtractionOu
           type: "image" as const,
           source: {
             type: "base64" as const,
-            media_type: input.mimeType as (typeof SUPPORTED_IMAGE_TYPES)[number],
+            media_type: input.mimeType as ClaudeImageType,
             data: base64,
           },
         });

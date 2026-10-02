@@ -14,8 +14,9 @@
  * من اسمٍ يبدو قياسيّاً ويحمل معلومةً مخترَعة.
  */
 import {
-  buildInvoiceFileName, buildStatementFileName, looksLikeExtension, parseFileName,
+  buildInvoiceFileName, buildStatementFileName, looksLikeExtension, parseFileName, type ParsedFileName,
 } from "./naming";
+import { invoiceNumberKey } from "./invoice-twin";
 
 export interface NamedDocument {
   driveFileId: string;
@@ -101,7 +102,7 @@ export function canonicalName(doc: NamedDocument): NameVerdict {
     لا أن يختلف المبنيّ.
   */
   const parsed = parseFileName(doc.fileName, []);
-  if (parsed.ok) return { status: "OK" };
+  if (parsed.ok) return contradiction(doc, parsed.value);
 
   if (!INVOICE_KINDS.has(doc.kind) && doc.kind !== "STATEMENT") {
     return { status: "CANNOT", reason: `نوعُه «${doc.kind}» — لا صيغة قياسية له هنا` };
@@ -126,4 +127,43 @@ export function canonicalName(doc: NamedDocument): NameVerdict {
   if (proposed === doc.fileName) return { status: "OK" };
 
   return { status: "RENAME", proposed, reason: "لا يُقرأ اسمُه — خارج الصيغة القياسية" };
+}
+
+/**
+ * اسمٌ يُقرأ ويخالف المقيَّد — الغلطُ الذي لا يراه شرطُ «لا يُقرأ».
+ *
+ * كان الاسمُ المقروء لا يُمسّ أبداً، فبقي في الأرشيف «‏…_SI-0034.pdf» بلا مبلغ،
+ * و«‏…_V405523_SAR678.10» والفاتورةُ ٦٧٨٫٠٠. والصيغةُ تُقرأ والمعلومةُ خاطئة —
+ * وهو أسوأ من اسمٍ لا يُقرأ، لأنّ من يبحث بالاسم يجده ويصدّقه.
+ *
+ * فللفواتير: المبلغُ الغائب أو المخالف، والتاريخُ المخالف، يُبنيان من القيد —
+ * **ويبقى ما كتبه إنسانٌ في الاسم** (اسمُ المورّد كما في الأرشيف، ورقمُ الفاتورة
+ * بصيغته، ورقمُ النسخة). ورقمُ فاتورةٍ يخالف المقيَّد في جوهره لا يُحسَم هنا: أيُّهما
+ * الصحيح لا يُعرف من الاسم، فيُعلَن ولا يُسمّى.
+ */
+function contradiction(doc: NamedDocument, p: ParsedFileName): NameVerdict {
+  if (!INVOICE_KINDS.has(doc.kind) || p.kind !== "INVOICE") return { status: "OK" };
+  if (!doc.date || doc.totalMinor === null || !doc.invoiceNumber) return { status: "OK" };
+
+  if (p.invoiceNumber && invoiceNumberKey(p.invoiceNumber) !== invoiceNumberKey(doc.invoiceNumber)) {
+    return { status: "CANNOT", reason: `رقمُ الفاتورة في الاسم «${p.invoiceNumber}» يخالف المقيَّد «${doc.invoiceNumber}» — راجع أيّهما الصحيح` };
+  }
+  const wrongAmount = p.amountMinor === undefined || p.amountMinor !== doc.totalMinor;
+  const wrongDate = p.date !== doc.date;
+  if (!wrongAmount && !wrongDate) return { status: "OK" };
+
+  const proposed = buildInvoiceFileName({
+    date: doc.date,
+    slug: p.slug ?? doc.slug ?? "",
+    invoiceNumber: p.invoiceNumber ?? doc.invoiceNumber,
+    amountMinor: doc.totalMinor,
+    extension: p.extension,
+    duplicateIndex: p.duplicateIndex,
+  });
+  if (!(p.slug ?? doc.slug) || proposed === doc.fileName) return { status: "OK" };
+  const why = [
+    wrongAmount ? (p.amountMinor === undefined ? "بلا مبلغ" : "المبلغ يخالف الفاتورة") : null,
+    wrongDate ? "التاريخ يخالف الفاتورة" : null,
+  ].filter(Boolean).join(" · ");
+  return { status: "RENAME", proposed, reason: `يُقرأ اسمُه ويخالف المقيَّد: ${why}` };
 }

@@ -24,6 +24,11 @@ export interface WalkOptions {
   /** ملفات معروفة سلفاً — تُتخطّى بلا قراءة */
   knownFileIds?: ReadonlySet<string>;
   /**
+   * اسمُ كلِّ ملفٍّ معروفٍ كما هو في الدرايف الآن — لا يُقرأ ثانيةً، لكنّ اسمه
+   * قد تغيّر بيدٍ هناك («0044.pdf» واسمُه عندنا قياسيّ)، والتسميةُ تحكم على ما عندنا.
+   */
+  onKnown?: (fileId: string, name: string) => void;
+  /**
    * مهلةٌ يقف عندها المشي (وقتٌ مطلق بالمللي ثانية).
    *
    * لأنّ الدالّة تعمل داخل طلبٍ له سقفٌ زمنيّ عند المزوّد. وبلا مهلة
@@ -104,14 +109,29 @@ export async function walkArchive(
         continue;
       }
 
-      const folders = (await listChildren(drive, month.id)).filter(isFolder);
+      const children = await listChildren(drive, month.id);
+      const folders = children.filter(isFolder);
+      /*
+        ملفٌّ وُضع في مجلد الشهر نفسه لا في مجلد مورّده — كان لا يُرى أبداً:
+        ثلاثُ فواتير وكشفٌ في سبتمبر ٢٠٢٦ («فاتورة ذابوبليك هاوس 27-09.pdf»).
+        فيُقرأ كغيره بلا مورّدٍ من المجلد، ويُعرف مورّدُه من محتواه.
+      */
+      for (const file of children) {
+        if (isFolder(file) || file.name === SUPPLIER_INFO_CARD || /\.(txt|md)$/i.test(file.name)) continue;
+        if (known?.has(file.id)) { options.onKnown?.(file.id, file.name); continue; }
+        out.push({ month: month.name, folderName: "", file });
+      }
       const perFolder = await inBatches(folders, FOLDER_CONCURRENCY, async (folder) => {
         const files = await listChildren(drive, folder.id);
         return files
           .filter((f) => !isFolder(f))
           .filter((f) => f.name !== SUPPLIER_INFO_CARD)
           .filter((f) => !/\.(txt|md)$/i.test(f.name))
-          .filter((f) => !known?.has(f.id))
+          .filter((f) => {
+            if (!known?.has(f.id)) return true;
+            options.onKnown?.(f.id, f.name);
+            return false;
+          })
           .map((file) => ({ month: month.name, folderName: folder.name, file }));
       });
       for (const group of perFolder) out.push(...group);

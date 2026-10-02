@@ -6,7 +6,7 @@ import { ollamaProvider } from "./provider-ollama";
 import { selectedProviderName, type ExtractionOutcome, type ExtractionRequest } from "./provider";
 import { deriveAmounts } from "./validate-extraction";
 
-export { isSupportedUpload } from "./extract";
+export { isSupportedUpload, uploadMimeType } from "./extract";
 export type { ExtractionOutcome, ExtractionRequest } from "./provider";
 
 const PROVIDERS = {
