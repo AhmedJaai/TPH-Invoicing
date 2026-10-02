@@ -117,4 +117,22 @@ describe("الرصيدُ الجاري المقروء مديناً — كشفُ �
       { date: "2026-08-26", ref: "2", description: "دفع", debit: "", credit: "150.00" },
     ] }).columnsRepaired).toBe(false);
   });
+
+  it("والرصيدُ وحده بلا مبلغ — يُشتقّ المبلغ من فرق الرصيدين إن طابق الختاميّ (أوراق الزيتون يوليو)", () => {
+    const out = parseStatementExtras({ closingBalance: "280.00", statementLines: [
+      { date: "2026-05-14", ref: "260137", description: "فاتورة", debit: "420.00", credit: "" },
+      { date: "2026-05-15", ref: "260138", description: "فاتورة", debit: "585.00", credit: "" },
+      { date: "2026-06-01", ref: "51", description: "تحويل", debit: "0.00", credit: "585.00" },
+      { date: "2026-06-02", ref: "260164", description: "فاتورة", debit: "280.00", credit: "" },
+    ] });
+    expect(out.columnsRepaired).toBe(true);
+    expect(out.lines.map((l) => [l.debitMinor, l.creditMinor])).toEqual([[420_00, 0], [165_00, 0], [0, 585_00], [280_00, 0]]);
+  });
+
+  it("ولا يُشتقّ بلا ختاميٍّ يشهد له", () => {
+    expect(parseStatementExtras({ statementLines: [
+      { date: "2026-05-14", ref: "1", description: "", debit: "420.00", credit: "" },
+      { date: "2026-05-15", ref: "2", description: "", debit: "585.00", credit: "" },
+    ] }).columnsRepaired).toBe(false);
+  });
 });

@@ -136,5 +136,41 @@ export function repairRunningBalance(
     if (closingMinor !== null && Math.abs(prev - closingMinor) > TOL) continue;
     return out;
   }
-  return null;
+  return balanceOnly(lines, openingMinor, closingMinor, TOL);
+}
+
+/**
+ * والصورةُ الثانية: الرصيدُ وحده في «مدين» والمبلغُ لم يُنقل — أوراق الزيتون (يوليو):
+ * «٤٢٠ · ٥٨٥ · ٨٦٥…» ثمّ سدادٌ دائنٌ ٤٬٢٨٣ والرصيدُ صفر. فالمبلغُ فرقُ الرصيدين المطبوعين.
+ * وشرطُه أشدّ: الختاميُّ مقروءٌ ويساوي آخرَ رصيد، وكلُّ سدادٍ يُنقص الرصيدَ بمبلغه بالضبط —
+ * فسطرٌ سقط من القراءة يكسر الحساب ولا يُدمج فاتورتين في سطرٍ صامتاً.
+ */
+function balanceOnly(
+  lines: readonly RawStatementLine[],
+  openingMinor: number | null,
+  closingMinor: number | null,
+  TOL: number,
+): RawStatementLine[] | null {
+  if (closingMinor === null) return null;
+  /* الافتتاحيُّ المقروء هو أوّلُ رصيد؟ فهو نسخةٌ منه لا رصيدٌ قبله */
+  let prev = openingMinor === null || openingMinor === lines[0].debitMinor ? 0 : openingMinor;
+  const out: RawStatementLine[] = [];
+  let charges = 0;
+  for (const l of lines) {
+    if (l.creditMinor === 0) {
+      const step = l.debitMinor - prev;
+      if (step <= 0) return null;
+      out.push({ ...l, debitMinor: step, creditMinor: 0 });
+      charges++;
+      prev = l.debitMinor;
+    } else {
+      /* سدادٌ: الرصيدُ بعده = ما قبله − المبلغ (وصفرٌ مكتوبٌ صفر) */
+      if (l.debitMinor !== 0 && Math.abs(prev - l.creditMinor - l.debitMinor) > TOL) return null;
+      if (l.debitMinor === 0 && Math.abs(prev - l.creditMinor) > TOL) return null;
+      out.push({ ...l, debitMinor: 0 });
+      prev -= l.creditMinor;
+    }
+  }
+  if (charges < 2 || Math.abs(prev - closingMinor) > TOL) return null;
+  return out;
 }

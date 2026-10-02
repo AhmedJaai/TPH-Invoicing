@@ -248,6 +248,7 @@ export async function POST(request: Request) {
     | { kind: "FORBIDDEN" }
     | { kind: "PAID"; number: string; allocatedMinor: number }
     | { kind: "MATCHED"; number: string }
+    | { kind: "NO_TWIN"; number: string }
     | { kind: "DONE"; fileName: string; removed: number };
 
   let outcome: Outcome;
@@ -287,6 +288,27 @@ export async function POST(request: Request) {
       if (paid) return { kind: "PAID", number: paid.number, allocatedMinor: Number(paid.allocatedMinor) };
       const matched = linked.find((l) => Number(l.matchedLines) > 0);
       if (matched) return { kind: "MATCHED", number: matched.number };
+
+      /*
+        «مكرّرة» دعوى تُفحص: لوريفا SI-0034 (٢٥٣) رُفضت «مكررة» ولا فاتورةَ أخرى بها ولا
+        ملفّ — وكانت من حوالة أغسطس، فبدت الحوالةُ أكبر من فواتيرها وذهب باقيها إلى سبتمبر.
+        فلا يُقبل السببُ إلّا وأصلُه قائم: الرقمُ نفسه بأيّ صيغة، أو اليومُ والمبلغ، أو البصمة.
+      */
+      if (/مكرر|مكرّر|duplicate/i.test(reason) && linked.length > 0) {
+        for (const l of linked) {
+          const key = l.number.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const [twin] = (await t.execute<{ id: string }>(sql`
+            select i.id from invoices i
+             where i.id <> ${l.id} and i.supplier_id is not distinct from ${l.supplierId}
+               and (regexp_replace(lower(i.invoice_number), '[^a-z0-9]', '', 'g') = ${key}
+                    or (i.invoice_date = ${l.invoiceDate} and i.total_minor = ${l.totalMinor}))
+            union all
+            select d2.id from documents d2 join documents d on d.id = ${doc.id}
+             where d2.id <> d.id and d.sha256 is not null and d2.sha256 = d.sha256
+            limit 1`)).rows;
+          if (!twin) return { kind: "NO_TWIN", number: l.number };
+        }
+      }
 
       await assertMonthsOpen(t, linked.map((l) => l.periodMonth));
 
@@ -337,6 +359,11 @@ export async function POST(request: Request) {
     case "PAID":
       return NextResponse.json({
         error: `على الفاتورة ${outcome.number} سدادٌ مقيَّد (${formatRiyalsDisplay(outcome.allocatedMinor)}) — تراجع عن السداد أوّلاً ثمّ ارفض المستند`,
+      }, { status: 409 });
+    case "NO_TWIN":
+      return NextResponse.json({
+        error: `لا فاتورةَ أخرى بالرقم ${outcome.number} لهذا المورّد، ولا بيومها ومبلغها، ولا ملفّ بالبصمة نفسها — فليست مكرّرة. `
+          + "إن رُفضت لسببٍ آخر فاكتبه، وإن كانت صحيحةً فاعتمدها: رفضُها يُسقط مبلغها من المستحقّ.",
       }, { status: 409 });
     case "MATCHED":
       return NextResponse.json({
