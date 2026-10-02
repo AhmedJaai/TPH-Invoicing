@@ -9,9 +9,9 @@
  * تُقرأ، وتُفحص، ولا يُبنى عليها قرار مالي بلا إعادة حساب.
  */
 import { sameInvoiceNumber } from "@/lib/invoice-number";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { invoices, monthCloses } from "@/db/schema";
+import { documents, invoices, monthCloses } from "@/db/schema";
 import { reviewConfirmed, type ConfirmedFields, type ConfirmReview } from "@/lib/confirm";
 import { companyConfig } from "@/config/drive";
 import { supplierContext, type SupplierContext } from "./supplier.service";
@@ -96,6 +96,8 @@ export async function reviewForArchive(fields: ConfirmedFields): Promise<ReviewR
       await db
         .select({ number: invoices.invoiceNumber })
         .from(invoices)
+        /* فاتورةٌ قُيِّدت من الكشف بلا ملفّ ليست أصلاً يُكرَّر — ملفُّها حين يصل يتبنّاها (057) */
+        .innerJoin(documents, and(eq(documents.id, invoices.documentId), isNull(documents.origin)))
         .where(eq(invoices.supplierId, fields.supplierId!))
     ).some((r) => sameInvoiceNumber(r.number, trimmedNumber));
 

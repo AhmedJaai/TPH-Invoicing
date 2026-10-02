@@ -280,7 +280,7 @@ export async function InvoiceView({
         كلُّ سطرٍ هنا مشتقٌّ لا مخزَّن، ومعه موضعُ علاجه. ولا يُعرَض القسم
         حين لا شيء: فراغُه هو الخبر.
       */}
-      {(stale || p.twins.length > 0 || addsUp === false || weak.length > 0 || problems.length > 0 || risen.length > 0) && (
+      {(stale || doc.origin === "STATEMENT_LINE" || p.twins.length > 0 || addsUp === false || weak.length > 0 || problems.length > 0 || risen.length > 0) && (
         <ul className="mt-4 space-y-2" aria-label="ما يستحقّ الانتباه">
           {p.twins.map((t) => (
             <Notice key={t.id} tone="warn" icon={Copy} href={invoiceHref(t.id)} cta="قارِنها">
@@ -289,6 +289,12 @@ export async function InvoiceView({
               قارِن بنودهما قبل أن تسدّد الاثنتين.
             </Notice>
           ))}
+          {doc.origin === "STATEMENT_LINE" && (
+            <Notice tone="warn" icon={ScanText} href="#tax" cta="اطلبها">
+              قُيِّدت من كشف المورّد ولا ملفَّ لها عندنا — تدخل المستحقّ، ولا تُخصم ضريبتُها حتى يصل ملفُّها.
+              اطلبها من {supplier.nameAr}؛ وحين تُرفع تتبنّى هذا القيدَ نفسَه ولا تتكرّر.
+            </Notice>
+          )}
           {stale && (
             <li className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3 text-sm text-warn">
               <TriangleAlert className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />

@@ -21,6 +21,11 @@ export async function matchLateInvoice(
   tx: Tx,
   invoice: { id: string; supplierId: string; invoiceNumber: string; invoiceDate: Date; totalMinor: number },
 ): Promise<number> {
+  /* الفاتورةُ سطرٌ واحد في كشوف مورّدها — فإن طوبقت بسطرٍ فلا تُطابَق بثانٍ (غاناش) */
+  const [already] = await tx.select({ id: statementLines.id }).from(statementLines)
+    .where(eq(statementLines.matchedInvoiceId, invoice.id)).limit(1);
+  if (already) return 0;
+
   const waiting = await tx
     .select({
       id: statementLines.id, statementId: statementLines.statementId, date: statementLines.date,

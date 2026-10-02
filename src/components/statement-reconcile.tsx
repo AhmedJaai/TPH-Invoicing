@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CircleAlert, CircleCheck, Copy, FileSearch, GitCompareArrows, MessageCircle, ScrollText, Upload } from "lucide-react";
-import { request } from "@/lib/http-client";
+import { postJson, request } from "@/lib/http-client";
 import { INVOICE, LINE, countNoun } from "@/lib/arabic";
 import { formatRange } from "@/lib/riyadh-time";
 import { Money } from "./money";
 import { Badge, Callout, DataTable, EmptyState, Monogram, Section } from "./ui";
-import { Sheet } from "./ui-client";
+import { Sheet, toast } from "./ui-client";
 import { buttonClass } from "./ui-tokens";
 
 export interface ArchivedStatement {
@@ -23,6 +23,9 @@ export interface ArchivedStatement {
   closingBalanceMinor: number | null;
   lineCount: number;
   matchedCount: number;
+  /** فواتيرُ يذكرها الكشفُ ولا ملفَّ لها عندنا — ومبلغُها */
+  missingCount: number;
+  missingMinor: number;
 }
 
 export interface SupplierOption {
@@ -208,6 +211,9 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
                   <button type="button" onClick={() => match(a.id)} disabled={busy !== null} className={`${buttonClass(a.lineCount === 0 ? "primary" : "quiet", "sm")} relative whitespace-nowrap`}>
                     {busy === a.id ? "يقرأ ويطابق…" : a.lineCount > 0 ? "أعد المطابقة" : "طابِق"}
                   </button>
+                  {a.missingCount > 0 && (
+                    <RecordMissing statementId={a.id} count={a.missingCount} minor={a.missingMinor} />
+                  )}
                   {error?.key === a.id && <span role="alert" className="max-w-56 text-[11px] text-danger">{error.text}</span>}
                 </span>
               ),
@@ -449,3 +455,33 @@ function ResultView({ result }: { result: Result }) {
   );
 }
 
+
+/**
+ * «قيّد الناقصة من الكشف» — فواتيرُ يذكرها كشفُ المورّد ولا ملفَّ لها: كانت خارج المستحقّ،
+ * فبدت حوالتُه سداداً زائداً (غاناش). تُقيَّد بإقرار، ولا تُخصم ضريبتُها حتى يصل ملفُّها.
+ */
+function RecordMissing({ statementId, count, minor }: { statementId: string; count: number; minor: number }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function run() {
+    setBusy(true);
+    setError(null);
+    const r = await postJson<{ message: string }>("/api/statement-invoices", { statementId });
+    setBusy(false);
+    if (!r.ok) { setError(r.error); return; }
+    toast({ tone: "ok", title: "قُيِّدت الناقصة من الكشف", body: r.data.message });
+    router.refresh();
+  }
+  return (
+    <span className="relative z-10 flex max-w-64 flex-col items-end gap-1 text-end">
+      <span className="text-[11px] text-warn">
+        {count === 1 ? "فاتورةٌ" : <><span className="nums">{count}</span> فواتير</>} في الكشف لا ملفَّ لها (<Money minor={minor} />)
+      </span>
+      <button type="button" onClick={run} disabled={busy} aria-busy={busy} className={`${buttonClass("secondary", "sm")} whitespace-nowrap`}>
+        {busy ? "يُقيِّد…" : "قيّدها من الكشف"}
+      </button>
+      {error && <span role="alert" className="text-[11px] text-danger">{error}</span>}
+    </span>
+  );
+}

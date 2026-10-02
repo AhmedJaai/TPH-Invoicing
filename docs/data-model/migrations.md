@@ -98,6 +98,7 @@
 | `054_invoice_post_vat_discount.sql` | `invoices.discount_minor` — الخصمُ **بعد** الضريبة (يُنقص المستحقّ لا الوعاء)، يحكم به `checkInvoiceTotals`؛ و`invoices_parts_sum_to_total` صار «الصافي + الضريبة − الخصم ≈ الإجماليّ» بتسامح الريال |
 | `055_invoice_post_vat_charges.sql` | `invoices.charges_minor` — الرسومُ **بعد** الضريبة (توصيل · شحن · خدمة)، يحكم بها `checkInvoiceTotals`؛ والقيدُ صار «الصافي + الضريبة − الخصم + الرسوم ≈ الإجماليّ» |
 | `056_supplier_item_aliases.sql` | `supplier_item_aliases` — صيغةٌ أخرى لاسم صنف المورّد يُقرّها إنسان، فتُطبَّع إليها بنودُ كلّ فاتورةٍ بعدها (`replaceLines`) |
+| `057_document_origin_statement.sql` | `documents.origin` و`origin_statement_id` — فاتورةٌ قُيِّدت من سطر كشف المورّد بلا ملفّ (`STATEMENT_LINE`، ولا `drive_file_id` لها)؛ ويتبنّاها ملفُّها حين يصل |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

@@ -39,6 +39,10 @@ export type AuditAction =
   | "SUPPLIER_ITEM_MERGED"
   /* حوالةٌ أُعيد توزيعُها بالأقدم أوّلاً — بتخصيصها قبلُ وبعد */
   | "PAYMENT_REALLOCATED"
+  /* فواتيرُ قُيِّدت من سطور كشف المورّد بلا ملفّ (057) */
+  | "STATEMENT_INVOICES_RECORDED"
+  /* رقمُ المورّد الضريبيّ تُعُلّم من فاتورتين تتّفقان عليه */
+  | "SUPPLIER_VAT_LEARNED"
   | "PRODUCT_UNLINKED"
   | "EXPENSE_ADDED"
   | "EXPENSE_REMOVED"

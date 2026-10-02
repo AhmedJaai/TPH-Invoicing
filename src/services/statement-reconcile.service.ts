@@ -6,10 +6,11 @@
  * فالمسارُ والإصلاحُ يمرّان هنا: الفترةُ من الأسطر، ونافذةُ الفواتير، والمطابقة،
  * ثمّ الحفظ (الأسطر والفترة والرصيدان والتنبيهات) والسجلّ.
  */
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { invoices, issues, statementLines, statements } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
+import { TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
 import { reconcileStatement, type OurInvoice, type StatementLineInput } from "@/lib/statement-match";
 
 export interface ReconcileInput {
@@ -73,6 +74,33 @@ export async function reconcileAndPersist(input: ReconcileInput) {
     closingBalanceMinor: input.closingMinor ?? undefined,
   });
   const periodLabel = `${start.toISOString().slice(0, 10)} إلى ${end.toISOString().slice(0, 10)}`;
+
+  /*
+    ── كشفُه مقابلَ دفترنا ──
+    الفحوصُ السابقة تقابل سطراً بسطر، ولا تقول إنّ ما يطالبنا به المورّدُ غيرُ ما ندين له به.
+    فغاناش: كشفُ أغسطس يقول ٥٬٤٣٢٫٦٠ ودفترُنا يقول «لنا عنده ٢٠٬٤٢٤» — ولم ينبّه شيء.
+    والمقارنةُ يومَ آخر سطر: فواتيرُه حتى يومها ناقصَ سدادِنا قبلها (سدادُ اليوم نفسه بعد
+    إصدار الكشف غالباً — أفال ٢٧ سبتمبر).
+  */
+  if (input.closingMinor !== null) {
+    const [ledger] = (await db.execute<{ owed: string | number }>(sql`
+      select (
+        (select coalesce(sum(i.total_minor), 0) from invoices i join documents d on d.id = i.document_id
+          where i.supplier_id = ${input.supplierId} and i.invoice_date::date <= ${end.toISOString().slice(0, 10)}::date and d.status <> 'REJECTED')
+        - (select coalesce(sum(p.amount_minor - p.fee_minor), 0) from payments p
+          where p.supplier_id = ${input.supplierId} and p.paid_at::date < ${end.toISOString().slice(0, 10)}::date and p.status not in ('VOID', 'REVERSED'))
+      )::bigint as owed`)).rows;
+    const owed = Number(ledger?.owed ?? 0);
+    const gap = owed - input.closingMinor;
+    if (Math.abs(gap) > TOTAL_ROUNDING_TOLERANCE_MINOR) {
+      result.findings.push({
+        code: "STATEMENT_AMOUNT_MISMATCH",
+        severity: "WARN",
+        message: `كشفُه يقول إنّا ندين له ${formatRiyalsDisplay(input.closingMinor)} يوم ${end.toISOString().slice(0, 10)}، ودفترُنا يقول ${owed >= 0 ? formatRiyalsDisplay(owed) : `لنا عنده ${formatRiyalsDisplay(-owed)}`} — `
+          + (gap < 0 ? `ينقصنا ${formatRiyalsDisplay(-gap)}: فواتيرُ في كشفه لم تُقيَّد، أو سدادٌ مقيَّدٌ لم يقع` : `يزيدنا ${formatRiyalsDisplay(gap)}: سدادٌ لم يُقيَّد، أو فاتورةٌ عندنا ليست في كشفه`),
+      });
+    }
+  }
 
   if (!input.persist || !input.statementId) return { result, ours, start, end, periodLabel };
   const statementId = input.statementId;

@@ -309,4 +309,26 @@ describe("النواة المشتركة — لا جشع في الكشوف أيض
     ];
     expect(reconcileStatement(...args)).toEqual(reconcileStatement(...args));
   });
+
+  it("رقمان مختلفان بالمبلغ نفسه ليسا فاتورةً واحدة، والفاتورةُ لا يأخذها سطران (غاناش)", () => {
+    const r = reconcileStatement(
+      [
+        line({ date: "2026-08-10", ref: "CIV-008578381", debitMinor: 45540 }),
+        line({ date: "2026-08-12", ref: "CIV-008585811", debitMinor: 45540 }),
+        line({ date: "2026-08-14", ref: "CIV-008593996", debitMinor: 45540 }),
+        line({ date: "2026-08-17", ref: "CIV-008606456", debitMinor: 45540 }),
+      ],
+      [inv("a", "CIV-008599396", 45540, "2026-08-14"), inv("b", "CIV-008606456", 45540, "2026-08-17")],
+    );
+    expect(r.lines.map((l) => l.invoice?.invoiceId ?? "-")).toEqual(["-", "-", "a", "b"]);
+    expect(r.missingFromArchive).toHaveLength(2);
+  });
+
+  it("ومرجعٌ هو ترقيمُ المورّد لا رقمُ فاتورتنا يُطابَق بالمبلغ والتاريخ (زاكوباك)", () => {
+    const r = reconcileStatement(
+      [line({ date: "2026-07-20", ref: "SO-0045123", debitMinor: 36540 })],
+      [inv("z", "2317", 36540, "2026-07-20")],
+    );
+    expect(r.lines[0].invoice?.invoiceId).toBe("z");
+  });
 });

@@ -63,6 +63,8 @@ export interface InvoiceProfile {
     kind: string;
     status: string;
     driveFileId: string | null;
+    /** `STATEMENT_LINE`: قُيِّدت من كشف المورّد ولا ملفَّ لها (057) */
+    origin: string | null;
     mimeType: string;
     textSource: string | null;
     extractionModel: string | null;
@@ -129,6 +131,7 @@ export async function loadInvoiceProfile(id: string): Promise<InvoiceProfile | n
         kind: documents.kind,
         status: documents.status,
         driveFileId: documents.driveFileId,
+        origin: documents.origin,
         mimeType: documents.mimeType,
         textSource: documents.textSource,
         extractionModel: documents.extractionModel,

@@ -387,7 +387,9 @@ export async function loadRecordedInvoices(conn: Conn = db): Promise<RecordedInv
       id: invoices.id, supplierId: invoices.supplierId, invoiceNumber: invoices.invoiceNumber,
       invoiceDate: invoices.invoiceDate, totalMinor: invoices.totalMinor,
     })
-    .from(invoices))
+    .from(invoices)
+    /* فاتورةٌ قُيِّدت من الكشف بلا ملفّ ليست أصلاً يُكرَّر — ملفُّها حين يصل يتبنّاها (057) */
+    .innerJoin(documents, and(eq(documents.id, invoices.documentId), isNull(documents.origin))))
     .filter((r): r is typeof r & { supplierId: string } => r.supplierId !== null)
     .map((r) => ({
       id: r.id, supplierId: r.supplierId, invoiceNumber: r.invoiceNumber ?? "",

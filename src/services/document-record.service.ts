@@ -15,7 +15,7 @@
  *   (`applySupplierCredit`)؛ وما ينتظر المراجعة يُخصم منه حين يُعتمَد.
  * - ويُكتب في السجلّ بما كُتب بيدٍ وما جاء من القراءة.
  */
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, statements, suppliers } from "@/db/schema";
 import { reviewConfirmed, type ConfirmReview } from "@/lib/confirm";
@@ -126,6 +126,8 @@ export async function recordDocumentByHand(
   const key = number ? invoiceNumberKey(number) : "";
   const dupe = key
     ? (await conn.select({ id: invoices.id, number: invoices.invoiceNumber }).from(invoices)
+        /* فاتورةٌ قُيِّدت من الكشف بلا ملفّ ليست أصلاً يُكرَّر — ملفُّها حين يصل يتبنّاها (057) */
+        .innerJoin(documents, and(eq(documents.id, invoices.documentId), isNull(documents.origin)))
         .where(eq(invoices.supplierId, supplier.id)))
         .find((r) => invoiceNumberKey(r.number ?? "") === key)
     : undefined;

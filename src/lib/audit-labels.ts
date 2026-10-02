@@ -83,6 +83,8 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   PRODUCT_LINKED: "ربط صنف معياري",
   SUPPLIER_ITEM_MERGED: "دمج صيغة صنفٍ بأصله",
   PAYMENT_REALLOCATED: "إعادة توزيع حوالة بالأقدم أوّلاً",
+  STATEMENT_INVOICES_RECORDED: "قيد فواتير من كشف المورّد",
+  SUPPLIER_VAT_LEARNED: "تعلُّم رقم المورّد الضريبيّ",
   PRODUCT_UNLINKED: "فكّ ربط صنف",
   EXPENSE_ADDED: "إضافة مصروف",
   EXPENSE_REMOVED: "حذف مصروف أو تعطيله",

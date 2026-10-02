@@ -5,8 +5,9 @@
  * مسارات تُنشئ فواتير — الأرشفة والمزامنة وقراءة المحتوى — وافتراقها في
  * حساب السعر أنتج «ارتفاع أسعار ١٥٪» لم يقع.
  */
-import { eq, inArray, sql } from "drizzle-orm";
-import { invoiceLines, invoices, statementLines, statements, supplierItemAliases } from "@/db/schema";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { documents, invoiceLines, invoices, statementLines, statements, supplierItemAliases } from "@/db/schema";
+import { invoiceNumberKey } from "@/lib/invoice-twin";
 import { normalizeItem } from "@/lib/items";
 import { parseLineQuantity, reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
 import { checkInvoiceTotals, parseRiyals } from "@/lib/money";
@@ -16,6 +17,7 @@ import { assertMonthsOpen } from "./month-guard";
 import { monthOf } from "@/lib/filing";
 import { buildSupplierProducts } from "./product.service";
 import { matchLateInvoice } from "./statement-late-match.service";
+import { learnSupplierVat } from "./supplier-vat.service";
 
 export interface CreateInvoiceInput {
   documentId: string;
@@ -63,9 +65,52 @@ function postVatOf(input: Pick<CreateInvoiceInput, "subtotalMinor" | "vatMinor" 
   return { discountMinor: t.discountMinor, chargesMinor: t.chargesMinor };
 }
 
+/** أصلُ المستند الذي لا ملفَّ له — فاتورةٌ من سطر كشف المورّد (057). */
+export const STATEMENT_LINE_ORIGIN = "STATEMENT_LINE";
+
+/**
+ * وصل ملفُّ فاتورةٍ كانت مقيَّدةً من الكشف: يُنقل القيدُ إلى المستند الجديد بحقوله المقروءة
+ * (الصافي والضريبة والأرقام الضريبيّة) ويُحذف المستندُ الذي لا ملفَّ له — فلا فاتورتان
+ * بالرقم نفسه، ولا يضيع ما خُصّص عليها من سداد.
+ */
+async function adoptStatementInvoice(tx: Tx, input: CreateInvoiceInput, periodMonth: string): Promise<string | null> {
+  const candidates = (await tx.execute<{ id: string; invoice_number: string; document_id: string; period_month: string }>(sql`
+    select i.id, i.invoice_number, i.document_id, i.period_month
+      from invoices i join documents d on d.id = i.document_id
+     where i.supplier_id = ${input.supplierId} and d.origin = ${STATEMENT_LINE_ORIGIN}
+       and i.document_id <> ${input.documentId}
+  `)).rows;
+  const key = invoiceNumberKey(input.invoiceNumber);
+  const twin = candidates.find((c) => invoiceNumberKey(c.invoice_number) === key);
+  if (!twin) return null;
+  await assertMonthsOpen(tx, [twin.period_month]);
+
+  await tx.update(invoices).set({
+    documentId: input.documentId,
+    invoiceNumber: input.invoiceNumber,
+    invoiceDate: input.invoiceDate,
+    periodMonth,
+    subtotalMinor: input.subtotalMinor,
+    vatMinor: input.vatMinor,
+    totalMinor: input.totalMinor,
+    ...postVatOf(input),
+    sellerVat: input.sellerVat ?? null,
+    buyerVat: input.buyerVat ?? null,
+    taxStatus: input.taxStatus,
+    inputVatStatus: input.inputVatStatus,
+    isFixedAsset: input.isFixedAsset,
+  }).where(eq(invoices.id, twin.id));
+  await tx.delete(documents).where(and(eq(documents.id, twin.document_id), eq(documents.origin, STATEMENT_LINE_ORIGIN)));
+  return twin.id;
+}
+
 export async function createInvoice(tx: Tx, input: CreateInvoiceInput): Promise<string | null> {
   const periodMonth = filingMonthFor(input.invoiceDate, input.periodMonth);
   await assertMonthsOpen(tx, [periodMonth]);
+
+  /* فاتورةٌ قُيِّدت من كشف المورّد بلا ملفّ — وهذا ملفُّها: يتبنّاها ولا يُكرّرها (057) */
+  const adopted = await adoptStatementInvoice(tx, input, periodMonth);
+  if (adopted) return adopted;
 
   const [inv] = await tx
     .insert(invoices)
@@ -89,6 +134,7 @@ export async function createInvoice(tx: Tx, input: CreateInvoiceInput): Promise<
     .returning({ id: invoices.id });
 
   /* كشفٌ سبق الفاتورة وفيه سطرُها — يُطابَق الآن ولا ينتظر «أعِد المطابقة» */
+  if (inv && input.sellerVat) await learnSupplierVat(tx, input.supplierId);
   if (inv) {
     await matchLateInvoice(tx, {
       id: inv.id, supplierId: input.supplierId, invoiceNumber: input.invoiceNumber,

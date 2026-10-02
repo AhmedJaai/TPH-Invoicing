@@ -110,6 +110,17 @@ function refMatches(theirs: string, ours: string): boolean {
 
 const DAY = 86_400_000;
 
+/**
+ * رقمان مختلفان قد يكونان رقماً واحداً أخطأت قراءتُه — خانةٌ أو خانتان بالطول نفسه
+ * («CIV-008593996» في كشف غاناش و«CIV-008599396» عندنا). وما زاد فرقمان.
+ */
+function nearRef(a: string, b: string): boolean {
+  if (a.length !== b.length || a.length < 6) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i] && ++diff > 2) return false;
+  return true;
+}
+
 export interface ReconcileOptions {
   /** تسامح فرق المبلغ بالهللات */
   toleranceMinor?: number;
@@ -142,6 +153,15 @@ export function reconcileStatement(
   */
   const debitLines = statementLines.filter((l) => l.debitMinor > 0);
   const claims: Claim[] = [];
+  /*
+    أمراجعُ هذا الكشف أرقامُ فواتيرنا؟ — يثبت ذلك سطرٌ واحد يطابق رقماً عندنا. فإن ثبت
+    فرقمٌ مختلف فاتورةٌ أخرى ولو تساوى المبلغ (غاناش). وإن لم يثبت فالمرجعُ ترقيمٌ آخر
+    عند المورّد (طلبٌ أو تسليم — زاكوباك، أفال أغسطس) والمبلغُ والتاريخُ هما الدليل.
+  */
+  const refsAreOurNumbers = debitLines.some((line) => {
+    const theirRef = normalizeRef(line.ref ?? line.description);
+    return theirRef.length > 0 && ourByRef.some((o) => refMatches(theirRef, o.ref));
+  });
 
   debitLines.forEach((line, lineIndex) => {
     const key = `line-${lineIndex}`;
@@ -154,6 +174,12 @@ export function reconcileStatement(
         Math.abs(o.invoice.invoiceDate.getTime() - line.date.getTime()) <= windowMs;
 
       if (!byRef && !(amountClose && dateClose)) continue;
+      /*
+        رقمان مقروءان مختلفان ليسا فاتورةً واحدة لأنّ المبلغ واحد: كلُّ فواتير غاناش ٤٥٥٫٤٠
+        أو ١٬٠٣٠٫٤٠، فطابق «CIV-008578381» فاتورتَنا «CIV-008599396» بالمبلغ وغاب أصلُه.
+      */
+      const looksNumbered = (r: string) => r.length >= 4 && /\d{3}/.test(r);
+      if (refsAreOurNumbers && !byRef && looksNumbered(theirRef) && looksNumbered(o.ref) && !nearRef(theirRef, o.ref)) continue;
 
       /*
         المرجع أوثق دليل: المورّد كتب رقم فاتورتنا بنفسه. والمبلغ
@@ -188,9 +214,23 @@ export function reconcileStatement(
   });
 
   const resolved = reconcile(claims);
-  const byLineKey = new Map(resolved.assigned.map((a) => [a.transactionId, a]));
+  /*
+    سطرُ الكشف فاتورةٌ واحدة، والفاتورةُ سطرٌ واحد — لا كالبنك حيث تُسدَّد الفاتورةُ بحوالتين.
+    كانت الفاتورةُ تُطابَق بسطرين (غاناش: «CIV-008417397» بسطرها وبسطر «CIV-008444320»)
+    فيبدو الكشفُ مكتملاً وفاتورتُه غائبة. فالأقوى دليلاً يأخذها والباقي «لا ملفَّ له».
+  */
+  const takenInvoice = new Set<string>();
+  const oneToOne = [...resolved.assigned]
+    .sort((a, b) => b.candidate.score - a.candidate.score || a.transactionId.localeCompare(b.transactionId))
+    .filter((a) => {
+      const id = a.candidate.invoiceIds[0];
+      if (takenInvoice.has(id)) return false;
+      takenInvoice.add(id);
+      return true;
+    });
+  const byLineKey = new Map(oneToOne.map((a) => [a.transactionId, a]));
   const invoiceById = new Map(ourInvoices.map((i) => [i.invoiceId, i]));
-  const claimedIds = new Set(resolved.assigned.flatMap((a) => a.candidate.invoiceIds));
+  const claimedIds = takenInvoice;
 
   const lines: LineMatch[] = [];
   let debitIndex = -1;

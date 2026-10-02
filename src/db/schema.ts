@@ -200,6 +200,12 @@ export const documents = pgTable("documents", {
   fieldConfidence: jsonb("field_confidence"),
 
   uploadedById: text("uploaded_by_id").references(() => users.id),
+  /**
+   * أصلُ المستند حين لا ملفَّ له (057): `STATEMENT_LINE` — فاتورةٌ يذكرها كشفُ المورّد
+   * ولم يصل ملفُّها، قُيِّدت بإقرار إنسان. ويتبنّاها الملفُّ حين يصل (`createInvoice`).
+   */
+  origin: text("origin"),
+  originStatementId: text("origin_statement_id"),
   uploadedAt: now(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

@@ -49,13 +49,16 @@ export default async function StatementsPage({
   const [rows, missing, supplierRows] = await Promise.all([
     db.execute<{
       id: string; supplier_name: string | null; supplier_slug: string | null; ps: string; pe: string;
-      closing: number | null; file_name: string | null; lines: number; matched: number;
+      closing: number | null; file_name: string | null; lines: number; matched: number; missing: number; missing_minor: number;
     }>(sql`
       select st.id, s.name_ar as supplier_name, s.slug as supplier_slug,
              to_char(st.period_start, 'YYYY-MM-DD') as ps, to_char(st.period_end, 'YYYY-MM-DD') as pe,
              st.closing_balance_minor as closing, d.file_name,
              (select count(*)::int from statement_lines sl where sl.statement_id = st.id) as lines,
-             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'MATCHED') as matched
+             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'MATCHED') as matched,
+             /* سطورٌ مدينة برقمٍ لم يُطابَق: فواتيرُ يذكرها الكشف ولا ملفَّ لها */
+             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null) as missing,
+             (select coalesce(sum(sl.debit_minor), 0)::bigint from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null) as missing_minor
         from statements st
         left join suppliers s on s.id = st.supplier_id
         left join documents d on d.id = st.document_id
@@ -163,6 +166,8 @@ export default async function StatementsPage({
             closingBalanceMinor: r.closing === null ? null : Number(r.closing),
             lineCount: Number(r.lines),
             matchedCount: Number(r.matched),
+            missingCount: Number(r.missing),
+            missingMinor: Number(r.missing_minor),
           }))}
         />
         <aside className="min-w-0 space-y-6">
