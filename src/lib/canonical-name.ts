@@ -150,11 +150,14 @@ function contradiction(doc: NamedDocument, p: ParsedFileName): NameVerdict {
   }
   const wrongAmount = p.amountMinor === undefined || p.amountMinor !== doc.totalMinor;
   const wrongDate = p.date !== doc.date;
-  if (!wrongAmount && !wrongDate) return { status: "OK" };
+  /* رمزٌ آليّ مكان المورّد («SUPSL2F0X») وللمورّد اسمٌ يُقرأ اليوم — يُكتب اسمُه */
+  const codedSlug = Boolean(p.slug && /^SUP[A-Z0-9]{5,6}$/.test(p.slug) && doc.slug && doc.slug !== p.slug);
+  const slashInName = /[\\/]/.test(doc.fileName);
+  if (!wrongAmount && !wrongDate && !codedSlug && !slashInName) return { status: "OK" };
 
   const proposed = buildInvoiceFileName({
     date: doc.date,
-    slug: p.slug ?? doc.slug ?? "",
+    slug: (codedSlug ? doc.slug : p.slug ?? doc.slug) ?? "",
     invoiceNumber: p.invoiceNumber ?? doc.invoiceNumber,
     amountMinor: doc.totalMinor,
     extension: p.extension,
@@ -164,6 +167,8 @@ function contradiction(doc: NamedDocument, p: ParsedFileName): NameVerdict {
   const why = [
     wrongAmount ? (p.amountMinor === undefined ? "بلا مبلغ" : "المبلغ يخالف الفاتورة") : null,
     wrongDate ? "التاريخ يخالف الفاتورة" : null,
+    codedSlug ? "رمزٌ مكان اسم المورّد" : null,
+    slashInName ? "«/» في الاسم" : null,
   ].filter(Boolean).join(" · ");
   return { status: "RENAME", proposed, reason: `يُقرأ اسمُه ويخالف المقيَّد: ${why}` };
 }

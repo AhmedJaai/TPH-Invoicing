@@ -15,7 +15,7 @@
  */
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, monthCloses } from "@/db/schema";
+import { accounts, monthCloses, suppliers } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { companyConfig } from "@/config/drive";
 import { driveForCli, downloadFile } from "@/lib/drive";
@@ -25,6 +25,8 @@ import type { RawStatementLine } from "@/services/invoice.service";
 import { reconcileAndPersist } from "@/services/statement-reconcile.service";
 import { recordStatementOnlyInvoices, StatementInvoicesRefused } from "@/services/statement-invoices.service";
 import { learnSupplierVat } from "@/services/supplier-vat.service";
+import { deriveSlug } from "@/services/supplier.service";
+import { renameArchived } from "@/services/drive-rename.service";
 import { writeAllowed } from "./lib/guard-write";
 
 const WRITE = writeAllowed();
@@ -49,6 +51,21 @@ async function main() {
     const learned: string[] = [];
     if (WRITE) for (const s of ids) { const v = await db.transaction((t) => learnSupplierVat(t, s.id)); if (v) learned.push(v); }
     console.log(`أرقامٌ ضريبيّة تُعُلّمت لمورّدين: ${WRITE ? learned.length : `(معاينة) ${ids.length} بلا رقم`}`);
+
+    /* المورّدُ برمزٍ آليّ («SUPSL2F0X») يُسمّى من الاسم الإنجليزيّ في فاتورته، أو بالحروف اللاتينيّة */
+    const coded = (await db.execute<{ id: string; name_ar: string; slug: string; en: string | null }>(sql`
+      select s.id, s.name_ar, s.slug, (select d.extraction_json->>'supplierNameEn' from documents d where d.supplier_id = s.id and coalesce(d.extraction_json->>'supplierNameEn','') <> '' limit 1) en
+        from suppliers s where s.slug ~ '^SUP[A-Z0-9]{5,6}$'`)).rows;
+    for (const c of coded) {
+      let slug = deriveSlug(c.en ?? undefined, c.name_ar);
+      const [taken] = (await db.execute<{ id: string }>(sql`select id from suppliers where slug = ${slug} and id <> ${c.id}`)).rows;
+      if (taken) slug = `${slug}2`;
+      console.log(`اسمُ المورّد في الأرشيف: ${c.name_ar} ${c.slug} ← ${slug}`);
+      if (WRITE) {
+        await db.update(suppliers).set({ slug }).where(eq(suppliers.id, c.id));
+        await recordAudit({ actorId: AHMED, action: "SUPPLIER_UPDATED", entityType: "supplier", entityId: c.id, before: { الاسم_في_الأرشيف: c.slug }, after: { الاسم_في_الأرشيف: slug, السبب: WHY } });
+      }
+    }
 
     const drive = await driveForCli(async () =>
       (await db.select({ t: accounts.refresh_token }).from(accounts).where(eq(accounts.provider, "google")).limit(1))[0]?.t ?? null);
@@ -94,6 +111,16 @@ async function main() {
         }
       }
       console.log(`${st.name_ar} · ${st.file_name}: طوبق ${r.result.matchedCount}/${lines.length} · فروق ${r.result.amountMismatches.length} · بلا ملفّ ${r.result.missingFromArchive.length}${recorded}`);
+    }
+
+    /* ما سُمّي اسمُه مورّدُه برمز أو فيه «/» — يُسمّى من القيد */
+    if (WRITE && process.env.DRIVE_ALLOW_WRITE === "true") {
+      for (let round = 0; round < 5; round++) {
+        const out = await renameArchived(drive, null, AHMED, `إصلاح ٣ أكتوبر — ${WHY}`);
+        if (out.done.length) console.log(`سُمّي ${out.done.length}: ${out.done.map((x) => `${x.from} ← ${x.to}`).join(" | ")}`);
+        if (out.failed.length) console.log(`فشل: ${out.failed.map((f) => `${f.from}: ${f.error}`).join(" | ")}`);
+        if (out.done.length === 0) break;
+      }
     }
 
     const bal = (await db.execute<{ name_ar: string; pe: string; theirs: number; ours: number }>(sql`

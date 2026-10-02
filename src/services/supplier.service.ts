@@ -35,6 +35,28 @@ export async function supplierContext(id: string | null | undefined): Promise<Su
 }
 
 /** رمز لاتيني قصير لاسم الملف؛ العربي يُشتقّ له رمز مميَّز. */
+const ARABIC_TO_LATIN: Record<string, string> = {
+  "ا": "a", "أ": "a", "إ": "i", "آ": "a", "ب": "b", "ت": "t", "ث": "th", "ج": "j", "ح": "h", "خ": "kh",
+  "د": "d", "ذ": "dh", "ر": "r", "ز": "z", "س": "s", "ش": "sh", "ص": "s", "ض": "d", "ط": "t", "ظ": "z",
+  "ع": "a", "غ": "gh", "ف": "f", "ق": "q", "ك": "k", "ل": "l", "م": "m", "ن": "n", "ه": "h", "ة": "a",
+  "و": "w", "ي": "y", "ى": "a", "ؤ": "w", "ئ": "y", "ء": "",
+};
+/** كلماتٌ لا تميّز مورّداً — «شركة» و«مؤسسة» في كلّ اسم */
+const GENERIC_WORDS = new Set(["شركة", "مؤسسة", "للتجارة", "التجارية", "المحدودة", "مصنع", "محل"]);
+
+/** «شركة جملة تقنية للتجارة» ← «JmlaTqnya» — كلمتان مميِّزتان بحروفٍ لاتينيّة */
+export function transliterateName(nameAr: string): string {
+  return nameAr
+    .replace(/[\u064B-\u0652\u0640]/g, "")
+    .split(/[\s—\-–()]+/)
+    .filter((w) => w && !GENERIC_WORDS.has(w))
+    .slice(0, 2)
+    .map((w) => [...w].map((c) => ARABIC_TO_LATIN[c] ?? (/[A-Za-z0-9]/.test(c) ? c : "")).join(""))
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join("");
+}
+
 export function deriveSlug(nameEn: string | undefined, nameAr: string): string {
   const latin = (nameEn ?? "")
     .normalize("NFKC")
@@ -46,6 +68,13 @@ export function deriveSlug(nameEn: string | undefined, nameAr: string): string {
     .join("");
 
   if (latin.length >= 2) return latin.slice(0, 32);
+
+  /*
+    بلا اسمٍ إنجليزيّ يُكتب العربيُّ بحروفٍ لاتينيّة — كان يصير رمزاً («SUPSL2F0X» لفودكس)
+    يدخل أسماءَ ملفّات الأرشيف فلا يُقرأ منها المورّد.
+  */
+  const roman = transliterateName(nameAr);
+  if (roman.length >= 3) return roman.slice(0, 32);
 
   const digest = [...normalizeName(nameAr)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
   return `SUP${digest.toString(36).toUpperCase().slice(0, 6)}`;

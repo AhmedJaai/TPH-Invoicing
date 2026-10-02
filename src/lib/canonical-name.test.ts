@@ -118,3 +118,18 @@ describe("الاسم القياسيّ يُشتقّ من المقيَّد لا م
     if (v.status === "RENAME") expect(v.proposed.endsWith(".xlsx")).toBe(true);
   });
 });
+
+describe("الاسمُ المقروء المخالف", () => {
+  const base = {
+    driveFileId: "f", kind: "TAX_INVOICE", slug: "FoodicsKsa", date: "2026-09-08", totalMinor: 425728, invoiceNumber: "INV-KSA-0270644",
+  };
+  it("رمزٌ آليّ مكان المورّد يُكتب اسمُه", () => {
+    const v = canonicalName({ ...base, fileName: "2026-09-08_SUPSL2F0X_Invoice_INV-KSA-0270644_SAR4257.28.pdf" });
+    expect(v).toMatchObject({ status: "RENAME", proposed: "2026-09-08_FoodicsKsa_Invoice_INV-KSA-0270644_SAR4257.28.pdf" });
+  });
+  it("و«/» في الرقم تصير «-»", () => {
+    const v = canonicalName({ ...base, slug: "JmlaTqnya", invoiceNumber: "B07/2026/17328", totalMinor: 38200, date: "2026-09-21",
+      fileName: "2026-09-21_SUPAKT3A2_Invoice_B07/2026/17328_SAR382.00.pdf" });
+    expect(v).toMatchObject({ status: "RENAME", proposed: "2026-09-21_JmlaTqnya_Invoice_B07-2026-17328_SAR382.00.pdf" });
+  });
+});

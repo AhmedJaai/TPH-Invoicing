@@ -270,7 +270,8 @@ function withSuffix(base: string, extension: string, duplicateIndex?: number): s
 export function buildInvoiceFileName(
   o: BuildOptions & { slug: string; invoiceNumber: string },
 ): string {
-  const base = `${o.date}_${o.slug}_Invoice_${o.invoiceNumber}_SAR${formatRiyals(o.amountMinor)}`;
+  /* «/» في اسم ملفٍّ يكسر تنزيلَه ونسخَه («B07/2026/17328») — يُكتب «-» */
+  const base = `${o.date}_${o.slug}_Invoice_${o.invoiceNumber.replace(/[\\/]/g, "-")}_SAR${formatRiyals(o.amountMinor)}`;
   return withSuffix(base, o.extension ?? "pdf", o.duplicateIndex);
 }
 
