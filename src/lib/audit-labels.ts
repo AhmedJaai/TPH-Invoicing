@@ -82,6 +82,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   STATEMENT_RECONCILED: "مطابقة كشف مورّد",
   PRODUCT_LINKED: "ربط صنف معياري",
   SUPPLIER_ITEM_MERGED: "دمج صيغة صنفٍ بأصله",
+  PAYMENT_REALLOCATED: "إعادة توزيع حوالة بالأقدم أوّلاً",
   PRODUCT_UNLINKED: "فكّ ربط صنف",
   EXPENSE_ADDED: "إضافة مصروف",
   EXPENSE_REMOVED: "حذف مصروف أو تعطيله",
