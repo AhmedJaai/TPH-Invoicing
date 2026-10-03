@@ -364,3 +364,19 @@ describe("لوريفا: كشفٌ بالمبلغ قبل الضريبة، ورقم
     expect(r.lines[2].status).toBe("AMOUNT_MISMATCH");
   });
 });
+
+describe("ما بعد آخر أيّام الكشف", () => {
+  it("فاتورتُنا بعد آخر يومٍ في الكشف لا تُعدّ «لم ترد فيه»", () => {
+    const dd = (x: string) => new Date(`${x}T00:00:00Z`);
+    const r = reconcileStatement(
+      [{ date: dd("2026-09-28"), ref: "SI-0086", description: null, debitMinor: 100_00, creditMinor: 0 }],
+      [
+        { invoiceId: "a", invoiceNumber: "SI-0086", invoiceDate: dd("2026-09-28"), totalMinor: 100_00 },
+        { invoiceId: "b", invoiceNumber: "SI-0090", invoiceDate: dd("2026-10-02"), totalMinor: 50_00 },
+        { invoiceId: "c", invoiceNumber: "SI-0080", invoiceDate: dd("2026-09-25"), totalMinor: 70_00 },
+      ],
+      { periodEnd: dd("2026-09-28") },
+    );
+    expect(r.notInStatement.map((i) => i.invoiceId)).toEqual(["c"]);
+  });
+});

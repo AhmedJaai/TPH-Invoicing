@@ -77,9 +77,16 @@ export async function reconcileAndPersist(input: ReconcileInput) {
     المجهولُ ليس صفراً — ولا هو مجموعَ الكشف: افتتاحيٌّ لم يُقرأ يُمرَّر غائباً،
     و`reconcileStatement` تُرجع «لم تُفحَص» لا «فُحصت فنجحت».
   */
+  const inOtherStatements = new Set((await conn.execute<{ id: string }>(sql`
+    select distinct sl.matched_invoice_id as id from statement_lines sl join statements st on st.id = sl.statement_id
+     where st.supplier_id = ${input.supplierId} and sl.matched_invoice_id is not null
+       ${input.statementId ? sql`and st.id <> ${input.statementId}` : sql``}`)).rows.map((r) => r.id));
   const result = reconcileStatement(input.lines, ours, {
+    inOtherStatements,
     openingBalanceMinor: input.openingMinor ?? undefined,
     closingBalanceMinor: input.closingMinor ?? undefined,
+    periodStart: start,
+    periodEnd: end,
   });
   const periodLabel = `${start.toISOString().slice(0, 10)} إلى ${end.toISOString().slice(0, 10)}`;
 

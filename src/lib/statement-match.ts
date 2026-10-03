@@ -152,6 +152,12 @@ export interface ReconcileOptions {
   dateWindowDays?: number;
   openingBalanceMinor?: number;
   closingBalanceMinor?: number;
+  /** مدّةُ الكشف — ما خارجها من فواتيرنا لا يُقال «لم يرد فيه»: قبلها في رصيده الافتتاحيّ
+   *  أو كشفٍ سبقه (لوريفا: فواتيرُ أغسطس وكشفُه من ١ سبتمبر)، وبعدها لم يصدر بعد */
+  periodStart?: Date;
+  periodEnd?: Date;
+  /** فواتيرُ طابقها كشفٌ آخر من المورّد — وردت هناك، فلا يُقال «لم ترد» (أسبوعُ ما قبل الكشف) */
+  inOtherStatements?: ReadonlySet<string>;
 }
 
 export function reconcileStatement(
@@ -321,7 +327,15 @@ export function reconcileStatement(
 
   const missingFromArchive = lines.filter((l) => l.status === "MISSING_FROM_ARCHIVE");
   const amountMismatches = lines.filter((l) => l.status === "AMOUNT_MISMATCH");
-  const notInStatement = ourInvoices.filter((i) => !claimedIds.has(i.invoiceId));
+  /*
+    وما بعد آخر أيّامه لا يُدّعى عليه: النافذةُ الموسَّعة أسبوعاً للمطابقة لا للدعوى —
+    كانت فواتيرُ الأسبوع بعد الكشف تُعدّ «لم ترد فيه» (لوريفا ثلاث، وأوراق الزيتون).
+  */
+  const firstDay = options.periodStart?.getTime() ?? -Infinity;
+  const lastDay = options.periodEnd?.getTime() ?? Infinity;
+  const notInStatement = ourInvoices.filter((i) =>
+    !claimedIds.has(i.invoiceId) && i.invoiceDate.getTime() >= firstDay && i.invoiceDate.getTime() <= lastDay
+    && !options.inOtherStatements?.has(i.invoiceId));
 
   const theirBilledMinor = statementLines.reduce((s, l) => s + Math.max(0, l.debitMinor), 0);
   const theirPaidMinor = statementLines.reduce((s, l) => s + Math.max(0, l.creditMinor), 0);
