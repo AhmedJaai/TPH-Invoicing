@@ -31,7 +31,7 @@ import { planImport } from "@/lib/archive-import";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import { extractDocument } from "@/lib/extraction";
 import { reviewConfirmed } from "@/lib/confirm";
-import { formatRiyals, parseRiyals } from "@/lib/money";
+import { parseRiyals } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
 import { recordAudit } from "@/lib/audit";
 import { createPayment, PaymentTwinError } from "@/services/payment.service";
@@ -42,7 +42,7 @@ import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { canonicalName } from "@/lib/canonical-name";
 import { autoArchive, sumLineTotals, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
-import { factsFromFileName } from "@/lib/extraction/filename-facts";
+import { fillFromFileName } from "@/lib/extraction/filename-facts";
 import { parseStatementExtras } from "@/lib/extraction/statement-extras";
 import { renameArchived } from "@/services/drive-rename.service";
 import { processDocumentBacklog } from "@/services/document-review.service";
@@ -525,12 +525,7 @@ async function handle(request: Request) {
         يُؤخَذ من الاسم: كتبه نظامُ المورّد لا نموذجُنا. سدٌّ لفراغ لا
         تصحيحٌ لقراءة.
       */
-      {
-        const fromName = factsFromFileName(entry.file.name);
-        if (!x.invoiceNumber?.trim() && fromName.invoiceNumber) x.invoiceNumber = fromName.invoiceNumber;
-        if (!x.invoiceDate && fromName.date) x.invoiceDate = fromName.date;
-        if (!x.totalAmount?.trim() && fromName.totalMinor !== null) x.totalAmount = formatRiyals(fromName.totalMinor);
-      }
+      fillFromFileName(x, entry.file.name);
 
       /*
         ── التسعيرة تُحذَّر ولا تُسجَّل ──

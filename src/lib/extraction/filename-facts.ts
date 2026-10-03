@@ -13,7 +13,7 @@
  */
 
 import { normalizeDocumentDate } from "@/lib/document-date";
-import { parseRiyals } from "@/lib/money";
+import { formatRiyals, parseRiyals } from "@/lib/money";
 
 export interface FileNameFacts {
   invoiceNumber: string | null;
@@ -39,4 +39,22 @@ export function factsFromFileName(fileName: string | null | undefined): FileName
   const totalMinor = amount ? parseRiyals(amount.replace(/,/g, "")) : null;
 
   return { invoiceNumber: number, date, totalMinor };
+}
+
+/**
+ * يسدّ ما سكت عنه النموذجُ ممّا ينطق به الاسم — **بابٌ واحد** للدرايف والرفع من البرنامج.
+ *
+ * كان في المزامنة وحدها: فاتورةُ أوراق الزيتون نفسُها تُقيَّد من الدرايف وتُقفل حين تُرفع من
+ * البرنامج («لم يُقرأ رقم الفاتورة» — والرقمُ في اسمها). يُعيد قائمةَ ما سُدّ.
+ */
+export function fillFromFileName(
+  x: { invoiceNumber?: string; invoiceDate?: string; totalAmount?: string },
+  fileName: string | null | undefined,
+): string[] {
+  const fn = factsFromFileName(fileName);
+  const filled: string[] = [];
+  if (!x.invoiceNumber?.trim() && fn.invoiceNumber) { x.invoiceNumber = fn.invoiceNumber; filled.push("رقم الفاتورة"); }
+  if (!x.invoiceDate && fn.date) { x.invoiceDate = fn.date; filled.push("التاريخ"); }
+  if (!x.totalAmount?.trim() && fn.totalMinor !== null) { x.totalAmount = formatRiyals(fn.totalMinor); filled.push("الإجمالي"); }
+  return filled;
 }

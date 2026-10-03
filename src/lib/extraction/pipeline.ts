@@ -277,6 +277,21 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     });
   }
 
+  /*
+    لا يُقفَل الزرُّ بلا سببٍ مكتوب: فاتورةٌ لم يُقرأ رقمُها لا يُبنى لها اسم، فكانت
+    `canArchive` كاذبةً ولا مانعَ معروض (أوراق الزيتون، ٣ أكتوبر ٢٠٢٦ — رقمٌ مطبوعٌ بلا عنوان
+    يتركه النموذج). فيُقال ما ينقص، والحقلُ يُكتب والحكمُ يُعاد.
+  */
+  if (!proposedFileName && invoiceDate && amountForName !== undefined && !findings.some((f) => f.severity === "BLOCKER")) {
+    findings.push({
+      code: ISSUE.LOW_CONFIDENCE_FIELD,
+      severity: "BLOCKER",
+      message: !invoiceNumber && !isPaymentDoc && !isStatement
+        ? "لم يُقرأ رقم الفاتورة — اكتبه من الورقة"
+        : "لا يُبنى له اسم في الأرشيف — اختر المورّد أو أكمِل الناقص",
+    });
+  }
+
   const proposedFolderPath =
     periodMonth && proposedFolderName ? drivePathFor(periodMonth, proposedFolderName) : undefined;
 

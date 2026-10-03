@@ -12,6 +12,7 @@ import { documents, extractionCache, invoices } from "@/db/schema";
 import { withDeadline } from "@/lib/ai/deadline";
 import { extractDocument, isSupportedUpload, uploadMimeType } from "@/lib/extraction";
 import { runPipeline } from "@/lib/extraction/pipeline";
+import { fillFromFileName } from "@/lib/extraction/filename-facts";
 import type { ExtractionOutcome, ExtractionSuccess } from "@/lib/extraction/provider";
 import { matchSupplier } from "@/lib/supplier-match";
 import { companyConfig } from "@/config/drive";
@@ -134,6 +135,13 @@ async function handle(request: Request) {
   if (!extraction.ok) {
     return NextResponse.json({ error: extraction.reason }, { status: 502 });
   }
+
+  /*
+    ما سكت عنه النموذجُ ونطق به اسمُ الملفّ — البابُ نفسُه الذي تمرّ به المزامنة. كانت
+    فاتورةُ أوراق الزيتون «فاتورة - 260340 - …» تُقيَّد من الدرايف وتُقفل حين تُرفع من هنا.
+    ويُسدّ قبل الحفظ: الأرشفةُ تقرأ القراءةَ المحفوظة نفسها.
+  */
+  fillFromFileName(extraction.value, file.name);
 
   /* ما قرأه النموذج يُحفظ هنا، وتقرؤه الأرشفة ببصمة الملفّ — لا من المتصفّح */
   await db.insert(extractionCache).values({

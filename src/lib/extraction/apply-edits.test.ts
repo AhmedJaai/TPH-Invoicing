@@ -58,3 +58,21 @@ describe("الكشفُ لا يُطلب له تاريخٌ ولا إجماليّ",
     expect(r.canArchive).toBe(true);
   });
 });
+
+describe("لا يُقفل الرفعُ بلا سبب", () => {
+  const invoice = {
+    ...statement, documentKind: "TAX_INVOICE", invoiceNumber: "", invoiceDate: "2026-09-01", totalAmount: "130.00", subtotalAmount: "130.00", vatAmount: "0",
+  } as unknown as ExtractionResult;
+
+  it("فاتورةٌ بلا رقمٍ مقروء تقول «اكتبه» — والرقمُ من اسم الملفّ يفتحها", async () => {
+    const r = judge(invoice);
+    expect(r.canArchive).toBe(false);
+    expect(r.findings.some((f) => f.severity === "BLOCKER" && f.message.includes("رقم الفاتورة"))).toBe(true);
+
+    const { fillFromFileName } = await import("./filename-facts");
+    const x = structuredClone(invoice);
+    expect(fillFromFileName(x, "فاتورة - 260340 - مؤسسة ذا بوبليك هاوس.pdf")).toEqual(["رقم الفاتورة"]);
+    expect(judge(x).invoiceNumber).toBe("260340");
+    expect(judge(x).findings.some((f) => f.message.includes("لم يُقرأ رقم الفاتورة"))).toBe(false);
+  });
+});
