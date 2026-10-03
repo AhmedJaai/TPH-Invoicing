@@ -40,6 +40,7 @@ import { invoiceHref } from "@/lib/invoice-profile";
 import { ACTION_LABEL } from "@/lib/audit-labels";
 import { MIN_SETTLED_SAMPLE, ageOwed, ageTone } from "@/lib/supplier-intel";
 import { txHref } from "@/lib/inspector";
+import { latestStatementDiscrepancies } from "@/services/statement-reconcile.service";
 
 
 /**
@@ -200,6 +201,9 @@ export async function SupplierView({
       `)).rows.map((r) => ({ invoiceNumber: r.invoice_number, totalMinor: Number(r.total_minor) }))
     : [];
   const paidAfterStatement = atStatement ? paidNet - Number(atStatement.paid) : 0;
+
+  /* ما يفسّر الفرق — سطراً سطراً من آخر كشف، لا رقماً واحداً */
+  const why = showAmounts ? await latestStatementDiscrepancies(s.id) : null;
 
   const account = buildSupplierAccount({
     billedMinor: atStatement ? Number(atStatement.billed) : billed,
@@ -458,6 +462,51 @@ export async function SupplierView({
                 {paidAfterStatement > 0 && <> · ودفعتَ بعد كشفه <Money minor={paidAfterStatement} /></>}
                 {account.allocatedAfterStatementMinor ? <> · وخُصّص بعده على فواتير سبقته <Money minor={account.allocatedAfterStatementMinor} /></> : null}
               </p>
+              {why && (why.missing.length + why.priceDiffs.length + why.notInStatement.length > 0) && (
+                <div className="mt-3 space-y-2.5 border-t border-line-soft pt-3 text-xs">
+                  <p className="font-bold">ما يفسّر الفرق — من كشفه حتى {formatDay(why.periodEnd)}</p>
+                  {why.missing.length > 0 && (
+                    <div>
+                      <p className="text-warn">في كشفه وليست عندنا — اطلبها منه:</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {why.missing.map((m, i) => (
+                          <li key={i} className="flex justify-between gap-3">
+                            <span><bdi className="nums">{m.ref ?? "بلا رقم"}</bdi> · {formatDay(m.day)}</span>
+                            <Money minor={m.amountMinor} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {why.priceDiffs.length > 0 && (
+                    <div>
+                      <p className="text-warn">المبلغُ في كشفه غيرُ فاتورتنا:</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {why.priceDiffs.map((d) => (
+                          <li key={d.invoiceId} className="flex flex-wrap justify-between gap-x-3">
+                            <Link href={invoiceHref(d.invoiceId)} className="font-bold text-accent hover:underline"><bdi className="nums">{d.invoiceNumber}</bdi></Link>
+                            <span>كشفُه <Money minor={d.theirsMinor} /> · فاتورتُنا <Money minor={d.oursMinor} /> · {d.oursMinor > d.theirsMinor ? "أكثرُ عندنا بـ" : "أقلُّ عندنا بـ"}<Money minor={Math.abs(d.oursMinor - d.theirsMinor)} /></span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {why.notInStatement.length > 0 && (
+                    <div>
+                      <p className="text-ink-soft">عندنا في مدّته ولم ترد في كشفه:</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {why.notInStatement.map((n) => (
+                          <li key={n.invoiceId} className="flex justify-between gap-3">
+                            <span><Link href={invoiceHref(n.invoiceId)} className="font-bold text-accent hover:underline"><bdi className="nums">{n.invoiceNumber}</bdi></Link> · {formatDay(n.day)}</span>
+                            <Money minor={n.amountMinor} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <Link href={`/statements?supplier=${encodeURIComponent(s.slug)}`} className="inline-block font-bold text-accent hover:underline">افتح الكشف ←</Link>
+                </div>
+              )}
             </Card>
 
             {/* ── كيف تسدّد له — من التخصيصات وحدها ── */}

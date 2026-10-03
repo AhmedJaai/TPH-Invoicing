@@ -5,8 +5,9 @@
  * مسارات تُنشئ فواتير — الأرشفة والمزامنة وقراءة المحتوى — وافتراقها في
  * حساب السعر أنتج «ارتفاع أسعار ١٥٪» لم يقع.
  */
+import { reconcileAndPersist } from "./statement-reconcile.service";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { documents, invoiceLines, invoices, statementLines, statements, supplierItemAliases } from "@/db/schema";
+import { documents, invoiceLines, invoices, statements, supplierItemAliases, suppliers } from "@/db/schema";
 import { invoiceNumberKey } from "@/lib/invoice-twin";
 import { normalizeItem } from "@/lib/items";
 import { parseLineQuantity, reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
@@ -347,18 +348,20 @@ export async function createStatement(tx: Tx, input: CreateStatementInput): Prom
     })
     .returning({ id: statements.id });
 
-  if (!row) return;
+  if (!row || lines.length === 0) return;
 
-  for (const l of lines) {
-    await tx.insert(statementLines).values({
-      statementId: row.id,
-      date: l.date,
-      ref: l.ref,
-      description: l.description,
-      debitMinor: l.debitMinor,
-      creditMinor: l.creditMinor,
-    });
-  }
+  /*
+    ويُطابَق بفواتيرنا حين يُقيَّد — لا حين يضغط أحدٌ «أعِد المطابقة».
+    كان كلُّ كشفٍ يُرفع أو يأتي من الدرايف يُحفظ بأسطره «غير مطابَقة» ولا تنبيه:
+    كشفُ أوراق الزيتون لسبتمبر (٣ أكتوبر ٢٠٢٦) قال صفحةُ مورّده «الفرق ٩٠» ولا شيء
+    يقول إنّها فاتورةٌ ناقصة (260410) وثلاثُ فواتير بسعرٍ غير سعره.
+  */
+  const [sup] = await tx.select({ nameAr: suppliers.nameAr }).from(suppliers).where(eq(suppliers.id, input.supplierId)).limit(1);
+  await reconcileAndPersist({
+    statementId: row.id, supplierId: input.supplierId, supplierName: sup?.nameAr ?? "", documentId: input.documentId,
+    lines: [...lines], openingMinor: input.openingBalanceMinor, closingMinor: input.closingBalanceMinor,
+    actorId: null, persist: true, tx,
+  });
 }
 
 /** استبدالُ البنود يُردّ — يُقال نصُّه لصاحبه (بندٌ مربوطٌ باستلامٍ لم يرد في القراءة). */

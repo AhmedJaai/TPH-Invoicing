@@ -30,9 +30,12 @@ export interface ReconcileInput {
   persist: boolean;
   /** سببٌ يُكتب في السجلّ مع النتيجة — للإصلاح */
   note?: string;
+  /** داخل معاملةٍ قائمة (قيدُ الكشف حين يُرفع) — وإلّا معاملةٌ خاصّة */
+  tx?: Tx;
 }
 
 export async function reconcileAndPersist(input: ReconcileInput) {
+  const conn: Conn = input.tx ?? db;
   /*
    * الفترة تُؤخذ من سطور الكشف نفسها لا من حقل مسجَّل.
    *
@@ -54,7 +57,7 @@ export async function reconcileAndPersist(input: ReconcileInput) {
    * يُفقد الميزة كلّها قيمتها.
    */
   const PAD_MS = 7 * 86_400_000;
-  const ours: OurInvoice[] = await db
+  const ours: OurInvoice[] = await conn
     .select({
       invoiceId: invoices.id,
       invoiceNumber: invoices.invoiceNumber,
@@ -88,7 +91,7 @@ export async function reconcileAndPersist(input: ReconcileInput) {
   if (input.closingMinor !== null) {
     const matched = result.lines.flatMap((l) => (l.status === "MATCHED" && l.invoice ? [{ invoiceId: l.invoice.invoiceId, debitMinor: l.line.debitMinor }] : []));
     const creditOnEnd = input.lines.some((l) => l.creditMinor > 0 && l.date.getTime() === end.getTime());
-    const gap = await ledgerGapFinding(db, input.supplierId, end, input.closingMinor, matched, creditOnEnd);
+    const gap = await ledgerGapFinding(conn, input.supplierId, end, input.closingMinor, matched, creditOnEnd);
     if (gap) result.findings.push(gap);
   }
 
@@ -96,7 +99,7 @@ export async function reconcileAndPersist(input: ReconcileInput) {
   const statementId = input.statementId;
 
   // ── الحفظ: سطور الكشف ونتيجته وتنبيهاته ──
-  await db.transaction(async (tx) => {
+  const persist = async (tx: Tx) => {
     // تُعاد كتابة السطور كاملةً فتبقى إعادة المطابقة ممكنة بلا تكرار
     await tx.delete(statementLines).where(eq(statementLines.statementId, statementId));
     if (result.lines.length > 0) {
@@ -161,7 +164,9 @@ export async function reconcileAndPersist(input: ReconcileInput) {
         ...(input.note ? { السبب: input.note } : {}),
       },
     }, tx);
-  });
+  };
+  if (input.tx) await persist(input.tx);
+  else await db.transaction(persist);
 
   return { result, ours, start, end, periodLabel };
 }
@@ -286,4 +291,84 @@ export async function latestStatementGaps(conn: Conn = db): Promise<SupplierLedg
     if (f) out.push({ supplierName: l.name_ar, slug: l.slug, day: end.toISOString().slice(0, 10), theirsMinor: Number(l.cb), oursMinor: f.owedMinor, gapMinor: f.gapMinor });
   }
   return out.sort((a, b) => Math.abs(b.gapMinor) - Math.abs(a.gapMinor));
+}
+
+export interface StatementDiscrepancies {
+  statementId: string;
+  periodEnd: string;
+  /** في كشفه وليست عندنا — اطلبها منه */
+  missing: { ref: string | null; day: string; amountMinor: number }[];
+  /** الرقمُ نفسُه والمبلغُ غيرُه — كشفُه مقابل فاتورتنا */
+  priceDiffs: { ref: string | null; day: string; theirsMinor: number; oursMinor: number; invoiceId: string; invoiceNumber: string }[];
+  /** عندنا في مدّته وليست في كشفه — فاتورةٌ لم يحسبها، أو ليست منه */
+  notInStatement: { invoiceId: string; invoiceNumber: string; day: string; amountMinor: number }[];
+}
+
+/**
+ * ما يفسّر الفرقَ بين آخر كشفٍ للمورّد ودفترنا — سطراً سطراً، لا رقماً واحداً.
+ *
+ * كانت صفحةُ المورّد تقول «الفرق ٩٠» وحده (أوراق الزيتون، سبتمبر ٢٠٢٦)، والجوابُ في
+ * الأسطر: فاتورةٌ في كشفه ليست عندنا (260410 · ١٤٠) وثلاثٌ بسعرٍ غير سعره (−٥٠).
+ *
+ * ويُحسب حيّاً بالنواة نفسها (`reconcileStatement`) على فواتير اليوم — فالفاتورةُ التي
+ * وصلت بعد الكشف تُرى، والكشفُ الذي لم يُطابَق حين قُيِّد لا يقول «كلُّه ناقص». وما
+ * طابقه إنسانٌ أو القيدُ من الكشف (الفاتورةُ الجامعة) يبقى كما حُفظ.
+ */
+export async function latestStatementDiscrepancies(supplierId: string, conn: Conn = db): Promise<StatementDiscrepancies | null> {
+  const [st] = (await conn.execute<{ id: string; ps: string; pe: string }>(sql`
+    select st.id, st.period_start::date::text as ps, st.period_end::date::text as pe
+      from statements st
+     where st.supplier_id = ${supplierId} and st.period_end is not null
+       and exists (select 1 from statement_lines sl where sl.statement_id = st.id)
+     order by st.period_end desc limit 1`)).rows;
+  if (!st) return null;
+
+  const stored = await conn.select({
+    date: statementLines.date, ref: statementLines.ref, description: statementLines.description,
+    debitMinor: statementLines.debitMinor, creditMinor: statementLines.creditMinor,
+    status: statementLines.matchStatus, invoiceId: statementLines.matchedInvoiceId,
+  }).from(statementLines).where(eq(statementLines.statementId, st.id));
+
+  const from = new Date(`${st.ps}T00:00:00Z`);
+  const to = new Date(`${st.pe}T00:00:00Z`);
+  const PAD_MS = 7 * 86_400_000;
+  const ours = (await conn.execute<{ id: string; num: string; d: string; total: number }>(sql`
+    select i.id, i.invoice_number as num, i.invoice_date::date::text as d, i.total_minor as total
+      from invoices i join documents d on d.id = i.document_id
+     where i.supplier_id = ${supplierId} and d.status <> 'REJECTED'
+       and i.invoice_date between ${new Date(from.getTime() - PAD_MS)} and ${new Date(to.getTime() + PAD_MS)}`)).rows
+    .map((o) => ({ invoiceId: o.id, invoiceNumber: o.num, invoiceDate: new Date(`${o.d}T00:00:00Z`), totalMinor: Number(o.total) }));
+
+  const kept = stored.filter((l) => l.status === "MATCHED" && l.invoiceId);
+  const keptIds = new Set(kept.map((l) => l.invoiceId!));
+  const live = reconcileStatement(
+    stored.filter((l) => !(l.status === "MATCHED" && l.invoiceId)).map((l) => ({ date: l.date, ref: l.ref, description: l.description, debitMinor: l.debitMinor, creditMinor: l.creditMinor })),
+    ours.filter((o) => !keptIds.has(o.invoiceId)),
+  );
+  const byId = new Map(ours.map((o) => [o.invoiceId, o]));
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+
+  /* الفاتورةُ الجامعة (هنقري مان) تطابق أسطراً — تُقابَل بمجموعها لا بكلّ سطر */
+  const pairs = [
+    ...kept.map((l) => ({ ref: l.ref, d: l.date, debit: l.debitMinor, inv: l.invoiceId! })),
+    ...live.lines.filter((l) => l.invoice && l.line.debitMinor > 0).map((l) => ({ ref: l.line.ref ?? null, d: l.line.date, debit: l.line.debitMinor, inv: l.invoice!.invoiceId })),
+  ];
+  const groups = pairs.reduce((m, p) => m.set(p.inv, [...(m.get(p.inv) ?? []), p]), new Map<string, typeof pairs>());
+  const claimed = new Set(groups.keys());
+
+  return {
+    statementId: st.id,
+    periodEnd: st.pe,
+    missing: live.missingFromArchive.map((l) => ({ ref: l.line.ref ?? null, day: day(l.line.date), amountMinor: l.line.debitMinor })),
+    priceDiffs: [...groups.entries()].flatMap(([inv, g]) => {
+      const o = byId.get(inv);
+      const theirs = g.reduce((sum, p) => sum + p.debit, 0);
+      if (!o || theirs === o.totalMinor) return [];
+      return [{ ref: g.map((p) => p.ref).filter(Boolean).join("، ") || null, day: day(g[0].d), theirsMinor: theirs, oursMinor: o.totalMinor, invoiceId: inv, invoiceNumber: o.invoiceNumber }];
+    }),
+    /* في مدّته وحدها — النافذةُ الموسَّعة للمطابقة لا للدعوى */
+    notInStatement: ours
+      .filter((o) => !claimed.has(o.invoiceId) && o.invoiceDate >= from && o.invoiceDate <= to)
+      .map((o) => ({ invoiceId: o.invoiceId, invoiceNumber: o.invoiceNumber, day: day(o.invoiceDate), amountMinor: o.totalMinor })),
+  };
 }
