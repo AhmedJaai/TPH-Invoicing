@@ -1652,7 +1652,7 @@ export const bankImportsRelations = relations(bankImports, ({ one, many }) => ({
  */
 export const bankHeldRows = pgTable("bank_held_rows", {
   id: id(),
-  kind: text("kind").$type<"AMBIGUOUS" | "CONFLICT">().notNull(),
+  kind: text("kind").$type<"AMBIGUOUS" | "CONFLICT" | "MISSING_FROM_FILE">().notNull(),
   bankImportId: text("bank_import_id").references(() => bankImports.id, { onDelete: "set null" }),
   bankAccountId: text("bank_account_id").references(() => bankAccounts.id, { onDelete: "set null" }),
   againstTransactionId: text("against_transaction_id").references(() => bankTransactions.id, { onDelete: "set null" }),
@@ -1665,7 +1665,7 @@ export const bankHeldRows = pgTable("bank_held_rows", {
   direction: txDirectionEnum("direction").notNull(),
   operationRef: text("operation_ref"),
   factKey: text("fact_key").notNull(),
-  resolution: text("resolution").$type<"SAME" | "ADDED" | "CHECKED">(),
+  resolution: text("resolution").$type<"SAME" | "ADDED" | "CHECKED" | "REMOVED">(),
   resolvedTransactionId: text("resolved_transaction_id").references(() => bankTransactions.id, { onDelete: "set null" }),
   resolvedById: text("resolved_by_id").references(() => users.id),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),

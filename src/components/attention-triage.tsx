@@ -64,6 +64,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "lifecycle-anomalies": Unlink,
   "bounced-payments": Undo2,
   "missing-statements": FileClock,
+  "statement-ledger-gap": Scale,
   "unknown-tax": FileSearch,
   "no-lines": FileWarning,
   "unrecorded-invoices": FileX,

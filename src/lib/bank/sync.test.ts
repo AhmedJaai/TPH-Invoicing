@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { toCanonical, type RawBankRow } from "./canonical";
 import { operationRef, operationRefs } from "./identity";
 import {
-  beneficiaryKey, factKey, identityText, looseKey, syncRows,
+  beneficiaryKey, factKey, identityText, looseKey, storedMissingFromFile, syncRows,
   type Incoming, type KnownRow,
 } from "./sync";
 
@@ -342,5 +342,29 @@ describe("ن · المستفيد مانعٌ لا صانع", () => {
     const before = [row("a", { ...generic, beneficiaryRaw: "مؤسسة  أوراق الزيتون" })];
     const after = [row("b", { ...generic, beneficiaryRaw: "مؤسسه أوراق الزيتون" })];
     expect(syncRows(incoming(after), store(before), ACC).known).toHaveLength(1);
+  });
+});
+
+describe("ي · ما عندنا وليس في الكشف", () => {
+  /* رسمُ ٢ سبتمبر قُيِّد مرّتين، والكشفُ يذكره مرّة — الثانية تُعلَن */
+  const fee = row("fee", { description: FEE, amountMinor: 100, valueDate: day("2026-09-02") });
+  const trf = row("trf", { description: TRF_OLD, valueDate: day("2026-09-02") });
+  const known = [...store([fee, trf]), { ...store([fee])[0], id: "db-fee-dup" }];
+  const at = (k: KnownRow, d = "2026-09-02", acc: string | null = ACC) => ({ id: k.id, valueDate: day(d), bankAccountId: acc });
+  const stored = known.map((k) => at(k));
+  const period = { start: day("2026-05-05"), end: day("2026-09-28") };
+
+  it("الرسمُ المكرَّر يُعلَن وحده", () => {
+    const r = syncRows(incoming([fee, trf]), known, ACC);
+    expect(r.fresh).toHaveLength(0);
+    expect(storedMissingFromFile(stored, r, period, ACC).map((s) => s.id)).toEqual(["db-fee-dup"]);
+  });
+
+  it("وما خارج مدّة الكشف، أو من حسابٍ آخر أو مجهول، أو بلا حسابٍ للكشف — لا يُحكم فيه", () => {
+    const r = syncRows(incoming([fee, trf]), known, ACC);
+    const outside = [at(known[2], "2026-09-29"), at(known[2], "2026-09-02", "acct-2"), at(known[2], "2026-09-02", null)];
+    expect(storedMissingFromFile(outside, r, period, ACC)).toEqual([]);
+    expect(storedMissingFromFile(stored, r, period, null)).toEqual([]);
+    expect(storedMissingFromFile(stored, r, { start: null, end: null }, ACC)).toEqual([]);
   });
 });

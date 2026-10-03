@@ -21,6 +21,7 @@ import { loadOverdueBalances } from "@/services/supplier-balance.service";
 import { DAY, TIME, countNoun } from "./arabic";
 import { invoiceHref } from "./invoice-profile";
 import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
+import { latestStatementGaps } from "@/services/statement-reconcile.service";
 import { txHref } from "@/lib/inspector";
 import { documentHref } from "@/lib/document-labels";
 import { parseRiyals } from "@/lib/money";
@@ -507,6 +508,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     unclassifiedBankTx: Number(counts?.unclassified ?? 0),
     heldBankRows: Number(counts?.held_rows ?? 0),
     unclassifiedBankAmountMinor: Number(counts?.unclassified_amount ?? 0),
+    statementGaps: await latestStatementGaps(),
     suppliersMissingStatement: missingStatements,
     suppliersMissingStatementCount: missingStatementRows.length,
     suppliersWithoutContract: noContract,

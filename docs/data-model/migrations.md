@@ -99,6 +99,7 @@
 | `055_invoice_post_vat_charges.sql` | `invoices.charges_minor` — الرسومُ **بعد** الضريبة (توصيل · شحن · خدمة)، يحكم بها `checkInvoiceTotals`؛ والقيدُ صار «الصافي + الضريبة − الخصم + الرسوم ≈ الإجماليّ» |
 | `056_supplier_item_aliases.sql` | `supplier_item_aliases` — صيغةٌ أخرى لاسم صنف المورّد يُقرّها إنسان، فتُطبَّع إليها بنودُ كلّ فاتورةٍ بعدها (`replaceLines`) |
 | `057_document_origin_statement.sql` | `documents.origin` و`origin_statement_id` — فاتورةٌ قُيِّدت من سطر كشف المورّد بلا ملفّ (`STATEMENT_LINE`، ولا `drive_file_id` لها)؛ ويتبنّاها ملفُّها حين يصل |
+| `058_bank_held_missing_from_file.sql` | `bank_held_rows`: نوعٌ ثالث `MISSING_FROM_FILE` (حركةٌ عندنا وليست في كشف البنك الذي يغطّي يومها) وقرارُ `REMOVED` — تُحذف هي ومصروفُها ما لم تُطابَق بدفعة |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

@@ -90,12 +90,59 @@ export function parseStatementExtras(raw: unknown): StatementExtras {
   const openingBalanceMinor = parseRiyals(asText(rec.openingBalance));
   const closingBalanceMinor = parseRiyals(asText(rec.closingBalance));
   const repaired = repairRunningBalance(lines, openingBalanceMinor, closingBalanceMinor);
+  const fixed = repaired ? null : repairStatementArithmetic(lines, openingBalanceMinor, closingBalanceMinor);
   return {
-    openingBalanceMinor,
+    openingBalanceMinor: fixed ? fixed.openingMinor : openingBalanceMinor,
     closingBalanceMinor,
-    lines: repaired ?? lines,
+    lines: repaired ?? fixed?.lines ?? lines,
     unreadLines,
-    columnsRepaired: repaired !== null,
+    columnsRepaired: repaired !== null || fixed !== null,
+  };
+}
+
+/**
+ * كشفٌ لا يستقيم حسابُه بقراءةٍ واحدةٍ خاطئة — يُصلَح حين يشهد الكشفُ نفسُه وحده.
+ *
+ * وُجد في الإنتاج نوعان، وكلاهما «حساب الكشف نفسه لا يستقيم» بلا علاج:
+ * - **الافتتاحيُّ هو أوّلُ سطر** (أوراق الزيتون، كشف يونيو): ٤٢٠ افتتاحياً وأوّلُ فاتورةٍ
+ *   ٤٢٠، فحُسبت مرّتين. فإن ساوى الافتتاحيُّ أوّلَ مدين، واستقام الحسابُ بافتتاحيٍّ صفر
+ *   ولم يستقم بالمقروء — فهو صفر.
+ * - **مبلغُ سطرٍ قُرئ رصيدَه** (هنقري مان، يونيو): «حوالة سداد شهر مايو» دائنُها ٢٤٠
+ *   ورصيدُها بعدها ٨٠، فقُرئ ٨٠. فالمبلغُ الذي يُقيم الحساب يُحسب لكلّ سطر، ولا يُقبل
+ *   إلّا إن ساوى المقروءُ الرصيدَ الجاريَ بعد السطر بذلك المبلغ — وفي سطرٍ واحدٍ فقط.
+ * وما سوى ذلك لا يُمسّ: التخمينُ أسوأ من قراءةٍ مُعلَنة.
+ */
+export function repairStatementArithmetic(
+  lines: readonly RawStatementLine[],
+  openingMinor: number | null,
+  closingMinor: number | null,
+): { lines: RawStatementLine[]; openingMinor: number } | null {
+  if (openingMinor === null || closingMinor === null || lines.length === 0) return null;
+  const net = lines.reduce((s, l) => s + l.debitMinor - l.creditMinor, 0);
+  if (openingMinor + net === closingMinor) return null;
+
+  if (openingMinor > 0 && lines[0].debitMinor === openingMinor && net === closingMinor) {
+    return { lines: [...lines], openingMinor: 0 };
+  }
+
+  const hits: { i: number; side: "debit" | "credit"; amount: number }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const side = l.creditMinor > 0 && l.debitMinor === 0 ? "credit" : l.debitMinor > 0 && l.creditMinor === 0 ? "debit" : null;
+    if (!side) continue;
+    const rest = net - (l.debitMinor - l.creditMinor);
+    const amount = side === "credit" ? openingMinor + rest - closingMinor : closingMinor - openingMinor - rest;
+    if (amount <= 0) continue;
+    const before = openingMinor + lines.slice(0, i).reduce((s, x) => s + x.debitMinor - x.creditMinor, 0);
+    const after = side === "credit" ? before - amount : before + amount;
+    const read = side === "credit" ? l.creditMinor : l.debitMinor;
+    if (read === after) hits.push({ i, side, amount });
+  }
+  if (hits.length !== 1) return null;
+  const [h] = hits;
+  return {
+    openingMinor,
+    lines: lines.map((l, i) => (i !== h.i ? l : h.side === "credit" ? { ...l, creditMinor: h.amount } : { ...l, debitMinor: h.amount })),
   };
 }
 

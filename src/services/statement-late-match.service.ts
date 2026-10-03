@@ -9,12 +9,10 @@
  * (`reconcileStatement`) — الرقمُ أو المبلغُ والتاريخ — ثمّ يُعاد عدُّ ما بقي
  * في الكشف: يُحدَّث التنبيهُ بعدده، أو يُحسَم إن لم يبق شيء.
  */
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
-import { issues, statementLines, statements } from "@/db/schema";
+import { and, eq, gt, isNull } from "drizzle-orm";
+import { statementLines, statements } from "@/db/schema";
 import { reconcileStatement, type StatementLineInput } from "@/lib/statement-match";
-import { ISSUE } from "@/lib/issue-codes";
-import { formatRiyalsDisplay } from "@/lib/money";
-import { INVOICE, countNoun } from "@/lib/arabic";
+import { refreshStatementFindings } from "./statement-reconcile.service";
 import type { Tx } from "./types";
 
 export async function matchLateInvoice(
@@ -54,25 +52,8 @@ export async function matchLateInvoice(
     .set({ matchedInvoiceId: invoice.id, matchStatus: "MATCHED" })
     .where(and(eq(statementLines.id, line.id), isNull(statementLines.matchedInvoiceId)));
 
-  /* التنبيهُ يقول ما بقي — أو يُحسَم */
-  const [left] = (await tx.execute<{ n: number; total: number }>(sql`
-    select count(*)::int as n, coalesce(sum(debit_minor), 0)::bigint as total
-      from statement_lines
-     where statement_id = ${line.statementId} and match_status = 'UNMATCHED' and debit_minor > 0
-  `)).rows;
-  const open = and(
-    eq(issues.entityType, "statement"),
-    eq(issues.entityId, line.statementId),
-    eq(issues.code, ISSUE.INVOICE_IN_STATEMENT_NOT_ARCHIVED),
-    eq(issues.status, "OPEN"),
-  );
-  if (Number(left.n) === 0) {
-    await tx.update(issues).set({ status: "RESOLVED", resolvedAt: new Date() }).where(open);
-  } else {
-    await tx.update(issues).set({
-      message: `${countNoun(Number(left.n), INVOICE)} في كشف المورّد بقيمة ${formatRiyalsDisplay(Number(left.total))} ريال ولا ملف لها عندنا — اطلبها منه`,
-    }).where(open);
-  }
+  /* التنبيهُ يقول ما بقي — أو يُحسَم؛ وما بين ختاميّه ودفترنا يُعاد حسابُه */
+  await refreshStatementFindings(tx, line.statementId);
   return 1;
 }
 

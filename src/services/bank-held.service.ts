@@ -9,17 +9,24 @@
  * والقرار: «هي نفسها» يُغلقه ويُذكَر (إعادةُ الاستيراد لا تعيده)؛ «حركةٌ أخرى»
  * تُضيفه حركةً بهويّتها من الخوارزميّة الواحدة (`identityKeyOf`) فيدخل الطابور؛
  * والمتضاربُ «تحقّقتُ» بعد النظر في الملفّ — لا يُضاف: مرجعُه لحركةٍ أخرى.
+ *
+ * والثالث عكسُهما (058): حركةٌ **عندنا** وليست في كشفٍ يغطّي يومها — «احذفها»
+ * تحذفها ومصروفَها (ما لم تُطابَق بدفعة، وشهرُها مفتوح)، أو «أبقِها».
  */
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bankHeldRows, bankTransactions } from "@/db/schema";
+import { bankHeldRows, bankTransactions, expenses } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { toCanonical } from "@/lib/bank/canonical";
 import { factKey, identityKeyOf } from "@/lib/bank/sync";
+import { assertMonthsOpen } from "./month-guard";
 import type { Conn, Tx } from "./types";
 
+export type HeldKind = "AMBIGUOUS" | "CONFLICT" | "MISSING_FROM_FILE";
+export type HeldDecision = "SAME" | "ADDED" | "CHECKED" | "REMOVED";
+
 export interface HeldRowInput {
-  kind: "AMBIGUOUS" | "CONFLICT";
+  kind: HeldKind;
   bankImportId: string | null;
   bankAccountId: string | null;
   againstTransactionId: string;
@@ -48,7 +55,7 @@ export async function holdRows(rows: readonly HeldRowInput[], conn: Conn = db): 
 
 export interface HeldRowView {
   id: string;
-  kind: "AMBIGUOUS" | "CONFLICT";
+  kind: HeldKind;
   reason: string;
   day: string;
   description: string | null;
@@ -59,7 +66,7 @@ export interface HeldRowView {
 
 export async function loadOpenHeldRows(conn: Conn = db): Promise<HeldRowView[]> {
   const rows = await conn.execute<{
-    id: string; kind: "AMBIGUOUS" | "CONFLICT"; reason: string; day: string; description: string | null;
+    id: string; kind: HeldKind; reason: string; day: string; description: string | null;
     amount_minor: number; direction: "DEBIT" | "CREDIT";
     against_id: string | null; against_day: string | null; against_amount: number | null;
     against_description: string | null; against_ref: string | null;
@@ -90,16 +97,18 @@ export class HeldRowRefused extends Error {
   }
 }
 
-/** «هي نفسها» · «حركةٌ أخرى» · «تحقّقتُ» — بقفلٍ، ومرّةً واحدة. */
+/** «هي نفسها» · «حركةٌ أخرى» · «تحقّقتُ» · «احذفها» — بقفلٍ، ومرّةً واحدة. */
 export async function resolveHeldRow(
   tx: Tx,
   id: string,
-  decision: "SAME" | "ADDED" | "CHECKED",
+  decision: HeldDecision,
   actorId: string,
-): Promise<{ transactionId: string | null }> {
+): Promise<{ transactionId: string | null; removed?: boolean }> {
   const [row] = await tx.select().from(bankHeldRows).where(eq(bankHeldRows.id, id)).for("update");
   if (!row) throw new HeldRowRefused("لم يُوجد الصفّ — حدّث الصفحة");
   if (row.resolvedAt) throw new HeldRowRefused("حُسم هذا الصفّ من قبل — حدّث الصفحة");
+  if (row.kind === "MISSING_FROM_FILE") return resolveMissing(tx, row, decision, actorId);
+  if (decision === "REMOVED") throw new HeldRowRefused("الحذفُ لحركةٍ عندنا ليست في الكشف — وهذا صفٌّ من الكشف");
   if (decision === "ADDED" && row.kind === "CONFLICT") {
     throw new HeldRowRefused("المتضاربُ لا يُضاف: مرجعُه لحركةٍ مقيَّدة بمبلغٍ آخر — انظر الملفّ ثمّ «تحقّقتُ»");
   }
@@ -170,4 +179,59 @@ export async function resolveHeldRow(
     },
   }, tx);
   return { transactionId };
+}
+
+
+/**
+ * حركةٌ عندنا ليست في الكشف الذي يغطّي يومها: «احذفها» أو «أبقِها».
+ *
+ * الحذفُ يقع على ما لا أثرَ له إلّا نفسه ومصروفه المشتقّ منه: المطابَقةُ بدفعةٍ
+ * تُفكّ أوّلاً (سدادٌ قائم على حركةٍ لم تقع خطأٌ آخر يُنظر فيه)، والشهرُ المقفل
+ * لا يُكتب فيه. والوقائعُ كاملةً في السجلّ — الحذفُ لا يمحو أثره.
+ */
+async function resolveMissing(
+  tx: Tx,
+  row: typeof bankHeldRows.$inferSelect,
+  decision: HeldDecision,
+  actorId: string,
+): Promise<{ transactionId: string | null; removed: boolean }> {
+  if (decision !== "REMOVED" && decision !== "CHECKED") {
+    throw new HeldRowRefused("هذه حركةٌ عندنا ليست في الكشف — «احذفها» أو «أبقِها»");
+  }
+  let removed = false;
+  let facts: Record<string, unknown> = {};
+  if (decision === "REMOVED" && row.againstTransactionId) {
+    const [t] = await tx.select().from(bankTransactions)
+      .where(eq(bankTransactions.id, row.againstTransactionId)).for("update");
+    if (t) {
+      if (t.matchedPaymentId || t.matchStatus === "MATCHED") {
+        throw new HeldRowRefused("الحركةُ مطابَقةٌ بدفعة — فكّ المطابقة من صفحتها أوّلاً، ثمّ احذفها");
+      }
+      const linked = await tx.select({ id: expenses.id, month: expenses.periodMonth, amountMinor: expenses.amountMinor, label: expenses.label })
+        .from(expenses).where(eq(expenses.bankTransactionId, t.id));
+      await assertMonthsOpen(tx, [t.valueDate.toISOString().slice(0, 7), ...linked.map((e) => e.month)]);
+      if (linked.length > 0) await tx.delete(expenses).where(inArray(expenses.id, linked.map((e) => e.id)));
+      await tx.delete(bankTransactions).where(eq(bankTransactions.id, t.id));
+      removed = true;
+      facts = {
+        الحركة: t.id, اليوم: t.valueDate.toISOString().slice(0, 10), المبلغ: t.amountMinor, الاتجاه: t.direction,
+        الوصف: t.description, الهويّة: t.identityKey, الاستيراد: t.bankImportId,
+        مصروفاتٌ_حُذفت: linked.map((e) => `${e.label} · ${e.amountMinor}`),
+      };
+    }
+  }
+
+  await tx.update(bankHeldRows).set({
+    resolution: decision, resolvedById: actorId, resolvedAt: new Date(),
+  }).where(and(eq(bankHeldRows.id, row.id), isNull(bankHeldRows.resolvedAt)));
+
+  await recordAudit({
+    actorId,
+    action: "BANK_HELD_ROW_RESOLVED",
+    entityType: "bank_held_row",
+    entityId: row.id,
+    before: { النوع: row.kind, السبب: row.reason, الحركة: row.againstTransactionId },
+    after: { القرار: removed ? "ليست في الكشف — حُذفت" : "أُبقيت", ...facts },
+  }, tx);
+  return { transactionId: null, removed };
 }

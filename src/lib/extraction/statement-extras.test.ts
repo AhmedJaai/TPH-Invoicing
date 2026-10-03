@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseStatementExtras, repairRunningBalance } from "./statement-extras";
+import { parseStatementExtras, repairRunningBalance, repairStatementArithmetic } from "./statement-extras";
 
 describe("parseStatementExtras", () => {
   it("يقرأ الأسطر والرصيدين من مخرَج النموذج", () => {
@@ -134,5 +134,29 @@ describe("الرصيدُ الجاري المقروء مديناً — كشفُ �
       { date: "2026-05-14", ref: "1", description: "", debit: "420.00", credit: "" },
       { date: "2026-05-15", ref: "2", description: "", debit: "585.00", credit: "" },
     ] }).columnsRepaired).toBe(false);
+  });
+});
+
+describe("كشفٌ لا يستقيم بقراءةٍ واحدةٍ خاطئة", () => {
+  const d = (s: string) => new Date(`${s}T00:00:00Z`);
+  const ln = (day: string, debitMinor: number, creditMinor = 0) => ({ date: d(day), ref: null, description: null, debitMinor, creditMinor });
+
+  it("هنقري مان: دائنُ «حوالة سداد شهر مايو» قُرئ رصيدَه (٨٠) — يُعاد ٢٤٠", () => {
+    const out = repairStatementArithmetic([ln("2026-06-04", 80_00), ln("2026-06-05", 0, 80_00)], 240_00, 80_00);
+    expect(out?.lines[1].creditMinor).toBe(240_00);
+    expect(out?.openingMinor).toBe(240_00);
+  });
+
+  it("أوراق الزيتون: الافتتاحيُّ أوّلُ فاتورة — يصير صفراً", () => {
+    const out = repairStatementArithmetic([ln("2026-05-14", 420_00), ln("2026-05-15", 165_00), ln("2026-06-01", 0, 100_00)], 420_00, 485_00);
+    expect(out?.openingMinor).toBe(0);
+    expect(out?.lines.map((l) => l.debitMinor)).toEqual([420_00, 165_00, 0]);
+  });
+
+  it("وما يستقيم، أو بلا رصيدين، أو بلا شاهدٍ من الرصيد الجاري — لا يُمسّ", () => {
+    expect(repairStatementArithmetic([ln("2026-06-04", 80_00)], 240_00, 320_00)).toBeNull();
+    expect(repairStatementArithmetic([ln("2026-06-04", 80_00)], null, 320_00)).toBeNull();
+    /* ينقص ١٠٠ ولا سطرَ مقروؤه رصيدُه — لا يُخمَّن أيُّها الخطأ */
+    expect(repairStatementArithmetic([ln("2026-06-04", 80_00), ln("2026-06-05", 50_00)], 240_00, 470_00)).toBeNull();
   });
 });

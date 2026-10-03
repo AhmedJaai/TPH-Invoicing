@@ -508,3 +508,17 @@ describe("صفوفُ الكشف المحفوظة لقرارك", () => {
     expect(item.impact.amountMinor).toBeNull();
   });
 });
+
+describe("كشفُ المورّد يخالف دفترَنا", () => {
+  it("غاناش: البندُ يقول الفرقَ ويفتح كشفَه", () => {
+    const [item] = buildAttention({ ...quiet, statementGaps: [{ supplierName: "غاناش", slug: "Ganache", day: "2026-08-31", theirsMinor: 5432_60, oursMinor: 4784_00, gapMinor: -648_60 }] });
+    expect(item.id).toBe("statement-ledger-gap");
+    expect(item.title).toContain("غاناش");
+    expect(item.amountMinor).toBe(648_60);
+    expect(item.href).toBe("/statements?supplier=Ganache");
+  });
+
+  it("وبلا فرقٍ لا بند", () => {
+    expect(ids({ statementGaps: [] })).not.toContain("statement-ledger-gap");
+  });
+});

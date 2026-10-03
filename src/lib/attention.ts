@@ -148,6 +148,9 @@ export interface AttentionFacts {
   /** صفوفُ كشفٍ ملتبسة أو متضاربة لم تُقيَّد — تنتظر «هي نفسها» أو «أضِفها» (051) */
   heldBankRows: number;
 
+  /** مورّدون يخالف آخرُ كشفٍ منهم دفترَنا (`latestStatementGaps`) — ما يطالبوننا به غيرُ ما ندين به */
+  statementGaps?: { supplierName: string; slug: string; day: string; theirsMinor: number; oursMinor: number; gapMinor: number }[];
+
   /** مورّدون لهم فواتير ولم يصل كشفهم */
   suppliersMissingStatement: string[];
   /**
@@ -504,9 +507,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "held-bank-rows",
       area: "BANK",
       severity: "HIGH",
-      title: `${countNoun(f.heldBankRows, TRANSACTION)} من الكشف لم تُقيَّد — الدليلُ لا يحسمها`,
-      detail: "صفٌّ يشبه حركةً مقيَّدة ولا يُعرف أهو هي أم ثانية، أو مرجعٌ مكرَّرٌ بمبلغٍ آخر. وبلا قرارٍ قد تضيع حوالةٌ حقيقيّة.",
-      action: "«هي نفسها» أو «حركةٌ أخرى — أضِفها»، والقرارُ يُذكَر فلا يعود بإعادة الاستيراد.",
+      title: `${countNoun(f.heldBankRows, TRANSACTION)} في البنك تنتظر قرارك — الدليلُ لا يحسمها`,
+      detail: "صفٌّ من الكشف يشبه حركةً مقيَّدة ولا يُعرف أهو هي أم ثانية، أو مرجعٌ مكرَّرٌ بمبلغٍ آخر، أو حركةٌ عندنا ليست في كشف البنك الذي يغطّي يومها. وبلا قرارٍ تضيع حوالةٌ حقيقيّة أو يبقى مكرَّرٌ يُفسد الرصيد.",
+      action: "احسم كلَّ واحدةٍ في صفحة البنك، والقرارُ يُذكَر فلا يعود بإعادة الاستيراد.",
       actionLabel: "احسمها في صفحة البنك",
       href: "/bank#queue",
       count: f.heldBankRows,
@@ -571,6 +574,36 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       amountMinor: f.bouncedPaymentMinor ?? undefined,
       impact: { kind: "OWED", amountMinor: f.bouncedPaymentMinor ?? null },
       evidence: f.bouncedPayments!.slice(0, 6),
+    });
+  }
+
+  /*
+    كشفُ المورّد يخالف دفترَنا: فاتورةٌ حُمّلت علينا ولم تُقيَّد (غاناش ٢٩–٣١ يوليو)، أو
+    سدادٌ مقيَّدٌ لم يصله. كان يُكتب تنبيهاً على الكشف وحده، فلا يبلغ هذه الصفحة.
+  */
+  const gaps = f.statementGaps ?? [];
+  if (gaps.length > 0) {
+    const total = gaps.reduce((s, g) => s + Math.abs(g.gapMinor), 0);
+    out.push({
+      id: "statement-ledger-gap",
+      area: "SUPPLIERS",
+      severity: "HIGH",
+      title: gaps.length === 1
+        ? `كشفُ ${gaps[0].supplierName} يخالف دفترَنا بـ${formatRiyalsDisplay(total)}`
+        : `${countNoun(gaps.length, SUPPLIER)} يخالف كشفُهم دفترَنا`,
+      detail: "ما يطالبك به المورّدُ في آخر كشفه غيرُ ما تدين له به في دفترك: فاتورةٌ في كشفه لم تصلك، أو سدادٌ قيّدتَه لم يصله.",
+      action: "افتح الكشف: «قيّدها من الكشف» لما لا ملفَّ له، أو اطلب من المورّد ما ينقص.",
+      actionLabel: "افتح الكشف",
+      href: gaps.length === 1 ? `/statements?supplier=${encodeURIComponent(gaps[0].slug)}` : "/statements",
+      count: gaps.length,
+      amountMinor: total,
+      impact: { kind: "UNATTRIBUTED", amountMinor: total },
+      evidence: gaps.map((g) => ({
+        label: g.supplierName,
+        sub: `كشفُه ${formatRiyalsDisplay(g.theirsMinor)} يوم ${formatDay(g.day)} · دفترُنا ${g.oursMinor >= 0 ? formatRiyalsDisplay(g.oursMinor) : `لنا عنده ${formatRiyalsDisplay(-g.oursMinor)}`}`,
+        amountMinor: Math.abs(g.gapMinor),
+        href: `/statements?supplier=${encodeURIComponent(g.slug)}`,
+      })),
     });
   }
 

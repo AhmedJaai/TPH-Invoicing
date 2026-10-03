@@ -68,6 +68,9 @@ interface SyncSummary {
   ambiguous: number;
   byReference: number;
   ambiguousRows?: { date: string; amountMinor: number; description: string; reason: string }[];
+  /** عندنا في مدّة الكشف وليست فيه */
+  missingFromFile?: number;
+  missingFromFileRows?: { date: string; amountMinor: number; direction: "DEBIT" | "CREDIT"; description: string }[];
 }
 
 interface Preview {
@@ -518,6 +521,18 @@ function PreviewPanel({
             {(data.sync.ambiguousRows ?? []).map((a, i) => (
               <li key={i}>
                 <bdi>{formatDay(a.date)}</bdi> · <span className="font-bold"><Money minor={a.amountMinor} /></span> · <span dir="auto">{a.description}</span> — {a.reason}
+              </li>
+            ))}
+          </ul>
+        </Warn>
+      )}
+      {data.sync && (data.sync.missingFromFile ?? 0) > 0 && (
+        <Warn tone="danger" title={`${countNoun(data.sync.missingFromFile ?? 0, TRANSACTION)} عندك في مدّة هذا الكشف وليست فيه`}>
+          مكرّرةٌ دخلت مرّتين، أو حركةٌ لم تقع — وهي تُفسد رصيد البنك. بعد الاستيراد تجدها في صفحة البنك: «احذفها» أو «أبقِها».
+          <ul className="mt-1 space-y-1">
+            {(data.sync.missingFromFileRows ?? []).map((m, i) => (
+              <li key={i}>
+                <bdi>{formatDay(m.date)}</bdi> · {m.direction === "DEBIT" ? "صادر" : "وارد"} <span className="font-bold"><Money minor={m.amountMinor} /></span> · <span dir="auto">{m.description}</span>
               </li>
             ))}
           </ul>

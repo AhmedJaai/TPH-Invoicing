@@ -23,7 +23,7 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
   const [error, setError] = useState<string | null>(null);
   if (rows.length === 0) return null;
 
-  async function decide(id: string, decision: "SAME" | "ADDED" | "CHECKED") {
+  async function decide(id: string, decision: "SAME" | "ADDED" | "CHECKED" | "REMOVED") {
     setBusy(id);
     setError(null);
     const r = await postJson<{ message?: string }>("/api/bank-held", { id, decision });
@@ -37,7 +37,7 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
     <div className="mb-3 rounded-xl border border-warn/25 bg-warn-bg px-4 py-3">
       <p className="flex items-center gap-2 text-[13px] font-bold">
         <CircleHelp className="h-[18px] w-[18px] shrink-0 text-warn" strokeWidth={2} aria-hidden />
-        {rows.length === 1 ? "صفٌّ من الكشف لم يُقيَّد — الدليلُ لا يحسمه" : `${rows.length} صفوفٍ من الكشف لم تُقيَّد — الدليلُ لا يحسمها`}
+        {rows.length === 1 ? "حركةٌ تنتظر قرارك — الدليلُ لا يحسمها" : `${rows.length} حركاتٍ تنتظر قرارك — الدليلُ لا يحسمها`}
       </p>
       <ul className="mt-2 divide-y divide-line-soft">
         {rows.map((r) => (
@@ -49,7 +49,13 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
             <p className="mt-0.5 text-ink-soft">
               {r.kind === "CONFLICT" && <TriangleAlert className="me-1 inline h-3.5 w-3.5 text-danger" aria-hidden />}
               {r.reason}
-              {r.against && (
+              {r.against && r.kind === "MISSING_FROM_FILE" && (
+                <>
+                  {" — "}
+                  <Link href={`/bank/tx/${r.against.id}`} className="font-bold text-accent hover:underline">افتح الحركة</Link>
+                </>
+              )}
+              {r.against && r.kind !== "MISSING_FROM_FILE" && (
                 <>
                   {" — تشبه "}
                   <Link href={`/bank/tx/${r.against.id}`} className="font-bold text-accent hover:underline">
@@ -61,7 +67,16 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
             </p>
             {canEdit && (
               <div className="mt-1.5 flex flex-wrap gap-2">
-                {r.kind === "AMBIGUOUS" ? (
+                {r.kind === "MISSING_FROM_FILE" ? (
+                  <>
+                    <button type="button" disabled={busy !== null} onClick={() => decide(r.id, "REMOVED")} className={buttonClass("danger", "sm")}>
+                      ليست في الكشف — احذفها
+                    </button>
+                    <button type="button" disabled={busy !== null} onClick={() => decide(r.id, "CHECKED")} className={buttonClass("secondary", "sm")}>
+                      أبقِها
+                    </button>
+                  </>
+                ) : r.kind === "AMBIGUOUS" ? (
                   <>
                     <button type="button" disabled={busy !== null} onClick={() => decide(r.id, "SAME")} className={buttonClass("secondary", "sm")}>
                       هي نفسها

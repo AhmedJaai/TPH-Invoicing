@@ -23,6 +23,7 @@ import { monthOf } from "@/lib/filing";
 import { createInvoice, STATEMENT_LINE_ORIGIN } from "./invoice.service";
 import { applySupplierCredit } from "./supplier-credit.service";
 import { firstClosedMonth } from "./month-guard";
+import { refreshStatementFindings } from "./statement-reconcile.service";
 import type { Tx } from "./types";
 
 export class StatementInvoicesRefused extends Error {
@@ -158,6 +159,9 @@ export async function recordStatementOnlyInvoices(
     known.add(key);
     out.created.push({ number, date: day, amountMinor: l.debitMinor });
   }
+
+  /* ما بقي بلا فاتورة، وما بين ختاميّه ودفترنا — بعد القيد لا قبله */
+  if (out.created.length > 0 || out.alreadyRecorded > 0) await refreshStatementFindings(tx, st.id);
 
   if (out.created.length > 0) {
     /* قرارُ إنسان: الرصيدُ يُوزَّع بالأقدم أوّلاً بلا نافذة */

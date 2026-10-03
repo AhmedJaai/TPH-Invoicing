@@ -1,5 +1,5 @@
 /** استيراد كشف البنك ومطابقة مدفوعاته بالفواتير. */
-import { holdRows } from "@/services/bank-held.service";
+import { holdRows, type HeldRowInput } from "@/services/bank-held.service";
 import { deriveOpenMonths } from "@/services/expense.service";
 import { NextResponse } from "next/server";
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
@@ -12,7 +12,7 @@ import {
   type BankTx, type OpenInvoice,
 } from "@/lib/bank/match";
 import { fileFingerprint, operationRef, operationRefs } from "@/lib/bank/identity";
-import { beneficiaryKey, factKey, looseKey, syncRows, type KnownRow } from "@/lib/bank/sync";
+import { beneficiaryKey, factKey, looseKey, storedMissingFromFile, syncRows, type KnownRow } from "@/lib/bank/sync";
 import { resolveBankAccount } from "@/services/bank-account.service";
 import { allocate, recordBankPayment } from "@/services/payment.service";
 import { CATEGORY_LABEL, suggestCategory, type BankRule, type TxCategory } from "@/lib/bank/rules";
@@ -204,6 +204,8 @@ async function handle(request: Request) {
     knownRows,
     bankAccountId,
   );
+  /* والعكس: ما عندنا في مدّة الكشف وليس فيه — مكرَّرٌ دخل، أو حركةٌ لم تقع */
+  const missingFromFile = storedMissingFromFile(priorRows, sync, { start: parsed.periodStart, end: parsed.periodEnd }, bankAccountId);
 
   /*
     ── الشهر المقفل لا يُكتب فيه من أيّ باب ──
@@ -478,6 +480,14 @@ async function handle(request: Request) {
           مختلف: الأوّل يُحسَم بنظرة، والثاني يُفحَص فيه الملفّ.
         */
         conflict: sync.conflict.length,
+        /* عندنا وليست في الكشف — تُحفظ بعد التطبيق ليقرّر فيها إنسان */
+        missingFromFile: missingFromFile.length,
+        missingFromFileRows: missingFromFile.slice(0, 10).map((m) => ({
+          date: m.valueDate.toISOString().slice(0, 10),
+          amountMinor: m.amountMinor,
+          direction: m.direction,
+          description: (m.description ?? "").slice(0, 90),
+        })),
         byReference: sync.known.filter((k) => k.verdict.basis === "REFERENCE").length,
         ambiguousRows: sync.ambiguous.slice(0, 10).map((a) => ({
           date: a.row.raw.valueDate.toISOString().slice(0, 10),
@@ -952,7 +962,7 @@ async function handle(request: Request) {
   const held = await holdRows([
     ...sync.ambiguous.map((a) => ({ kind: "AMBIGUOUS" as const, row: a.row, verdict: a.verdict })),
     ...sync.conflict.map((c) => ({ kind: "CONFLICT" as const, row: c.row, verdict: c.verdict })),
-  ].map((h) => ({
+  ].map((h): HeldRowInput => ({
     kind: h.kind,
     bankImportId: importId ?? null,
     bankAccountId,
@@ -965,7 +975,20 @@ async function handle(request: Request) {
     amountMinor: h.row.raw.amountMinor,
     direction: h.row.raw.direction,
     operationRef: operationRef(h.row.tx),
-  })));
+  })).concat(missingFromFile.map((m) => ({
+    kind: "MISSING_FROM_FILE" as const,
+    bankImportId: importId ?? null,
+    bankAccountId,
+    againstTransactionId: m.id,
+    reason: "عندنا وليست في كشف البنك الذي يغطّي يومها — مكرّرةٌ دخلت مرّتين، أو حركةٌ لم تقع",
+    valueDate: m.valueDate,
+    description: m.description,
+    beneficiaryRaw: m.beneficiaryRaw,
+    transactionType: m.transactionType,
+    amountMinor: m.amountMinor,
+    direction: m.direction as "DEBIT" | "CREDIT",
+    operationRef: m.operationRef,
+  }))));
   /* ومصروفُ ما صُنّف من الجديد يُقيَّد وحده — لا ينتظر زرّاً في صفحة المصروفات */
   const derived = newRows > 0
     ? await deriveOpenMonths(freshRows.map((f) => f.row.raw.valueDate.toISOString().slice(0, 7)), user.id)
@@ -993,6 +1016,7 @@ async function handle(request: Request) {
       added: newRows,
       ambiguous: sync.ambiguous.length,
       conflict: sync.conflict.length,
+      missingFromFile: missingFromFile.length,
       conflictRows: sync.conflict.slice(0, 10).map((c) => ({
         date: c.row.raw.valueDate.toISOString().slice(0, 10),
         amountMinor: c.row.raw.amountMinor,
@@ -1008,7 +1032,9 @@ async function handle(request: Request) {
     rejectedByConstraint,
     message:
       newRows === 0
-        ? `هذا الكشف مقيَّد عندك من قبل — ${countNoun(canonicalRows.length, TRANSACTION)} كلّها مسجَّلة، فلم تُضَف واحدة.`
+        ? `هذا الكشف مقيَّد عندك من قبل — ${countNoun(canonicalRows.length, TRANSACTION)} كلّها مسجَّلة، فلم تُضَف واحدة${
+            missingFromFile.length > 0 ? `. وعندك ${countNoun(missingFromFile.length, TRANSACTION)} في مدّته ليست فيه — لقرارك في صفحة البنك` : ""
+          }.`
         : `تمّت المزامنة: ${countNoun(canonicalRows.length, TRANSACTION)} في الملفّ · ${sync.known.length} موجودة · ${newRows} جديدة${
             sync.ambiguous.length > 0 ? ` · ${sync.ambiguous.length} للمراجعة` : ""
           }${

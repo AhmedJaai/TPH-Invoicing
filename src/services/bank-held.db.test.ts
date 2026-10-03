@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
-import { bankImports, bankTransactions, users } from "@/db/schema";
+import { bankImports, bankTransactions, expenses, users } from "@/db/schema";
 import { caught, day, withRollback } from "@/test/db";
 import { HeldRowRefused, holdRows, resolveHeldRow, type HeldRowInput } from "./bank-held.service";
 import type { Tx } from "./types";
@@ -57,5 +57,30 @@ describe("صفوفُ الكشف الملتبسة تُحفظ لقرار إنسا�
       const [{ id }] = (await tx.execute<{ id: string }>(sql`select id from bank_held_rows where amount_minor = 160000`)).rows;
       expect(await caught(resolveHeldRow(tx, id, "ADDED", actorId))).toBeInstanceOf(HeldRowRefused);
       await resolveHeldRow(tx, id, "CHECKED", actorId);
+    }));
+
+  it("حركةٌ عندنا ليست في الكشف: «احذفها» تحذفها ومصروفَها، والمطابَقةُ لا تُحذف، ولا «حركةٌ أخرى»", () =>
+    withRollback(async (tx) => {
+      const { actorId, known, row } = await setup(tx);
+      await tx.insert(expenses).values({ periodMonth: "2099-08", occurredOn: "2099-08-10", category: "BANK_FEE", label: "رسم", amountMinor: 1500_00, source: "BANK", bankTransactionId: known });
+      await holdRows([row("MISSING_FROM_FILE")], tx);
+      const [{ id }] = (await tx.execute<{ id: string }>(sql`select id from bank_held_rows where amount_minor = 150000`)).rows;
+      expect(await caught(resolveHeldRow(tx, id, "ADDED", actorId))).toBeInstanceOf(HeldRowRefused);
+      const out = await resolveHeldRow(tx, id, "REMOVED", actorId);
+      expect(out.removed).toBe(true);
+      expect(await tx.select().from(bankTransactions).where(eq(bankTransactions.id, known))).toHaveLength(0);
+      expect(await tx.select().from(expenses).where(eq(expenses.bankTransactionId, known))).toHaveLength(0);
+      expect(await openHeld(tx)).toBe(0);
+    }));
+
+  it("والمطابَقةُ بدفعة لا تُحذف — تُفكّ أوّلاً", () =>
+    withRollback(async (tx) => {
+      const { actorId, known, row } = await setup(tx);
+      await tx.update(bankTransactions).set({ matchStatus: "MATCHED" }).where(eq(bankTransactions.id, known));
+      await holdRows([row("MISSING_FROM_FILE")], tx);
+      const [{ id }] = (await tx.execute<{ id: string }>(sql`select id from bank_held_rows where amount_minor = 150000`)).rows;
+      expect(await caught(resolveHeldRow(tx, id, "REMOVED", actorId))).toBeInstanceOf(HeldRowRefused);
+      await resolveHeldRow(tx, id, "CHECKED", actorId);
+      expect(await tx.select().from(bankTransactions).where(eq(bankTransactions.id, known))).toHaveLength(1);
     }));
 });

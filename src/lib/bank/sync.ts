@@ -393,3 +393,36 @@ export function syncRows<T>(
 
   return result;
 }
+
+/**
+ * ما عندنا في مدّة الكشف ولم يقابله صفٌّ منه — والكشفُ يغطّي مدّته كلّها.
+ *
+ * المزامنةُ تسأل «أهذا الصفّ عندنا؟» ولا تسأل العكس. فدخلت رسومُ ٢ و٣ سبتمبر
+ * ٢٠٢٦ مرّتين أيّامَ إعادة بناء الهويّة، ولم يقل شيءٌ إلّا فرقاً بريالٍ وثلاث
+ * وسبعين هللة في المعادلة لا يُعرف مصدره. وكلُّ كشفٍ بعدها كان يقول الجواب:
+ * حركتان عندنا وليستا فيه.
+ *
+ * ولا يُحكم إلّا بيقين: حسابُ الكشف معروف، والحركةُ من حسابه نفسه (المجهولُ
+ * حسابُه قد يكون غيره)، ويومُها داخل مدّته — والنافذةُ الموسَّعة للمقابلة لا تدخل.
+ * وما شابهه صفٌّ ملتبسٌ أو متضارب ليس غائباً: له في الملفّ ما يشبهه.
+ */
+export function storedMissingFromFile<R extends { id: string; valueDate: Date; bankAccountId: string | null }>(
+  stored: readonly R[],
+  result: Pick<SyncResult<unknown>, "known" | "ambiguous" | "conflict">,
+  period: { start: Date | null | undefined; end: Date | null | undefined },
+  accountId: string | null,
+): R[] {
+  if (accountId === null || !period.start || !period.end) return [];
+  const seen = new Set<string>([
+    ...result.known.map((k) => k.verdict.matchedId),
+    ...result.ambiguous.map((a) => a.verdict.againstId),
+    ...result.conflict.map((c) => c.verdict.againstId),
+  ]);
+  const from = period.start.toISOString().slice(0, 10);
+  const to = period.end.toISOString().slice(0, 10);
+  return stored.filter((s) => {
+    if (seen.has(s.id) || s.bankAccountId !== accountId) return false;
+    const day = s.valueDate.toISOString().slice(0, 10);
+    return day >= from && day <= to;
+  });
+}
