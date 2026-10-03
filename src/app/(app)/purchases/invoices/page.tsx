@@ -88,7 +88,8 @@ export default async function InvoicesPage({
   if (f.month) others.push(eq(invoices.periodMonth, f.month));
   if (f.supplier) others.push(eq(suppliers.slug, f.supplier));
   if (f.tax) others.push(eq(invoices.taxStatus, f.tax));
-  if (f.noLines) others.push(sql`${lineCount} = 0`);
+  /* وفاتورةُ سطر الكشف (057) لا ملفَّ لها تُقرأ منه بنود — ليست «بلا بنود مقروءة» */
+  if (f.noLines) others.push(sql`${lineCount} = 0 and not exists (select 1 from ${documents} where ${documents}.id = ${invoices}.document_id and ${documents}.origin is not null)`);
   if (f.withVat) others.push(sql`${invoices.vatMinor} > 0`);
   if (f.overdue) {
     others.push(sql`${remaining} > 0`);

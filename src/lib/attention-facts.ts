@@ -62,8 +62,10 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
           (select coalesce(sum(amount_minor),0)::bigint from ${bankTransactions}
              where ${pendingDecision()})                                                      as unclassified_amount,
           (select count(*)::int from bank_held_rows where resolved_at is null)                 as held_rows,
-          (select count(*)::int from invoices i
-             where not exists (select 1 from invoice_lines l where l.invoice_id=i.id))       as no_lines
+          /* فاتورةُ سطر الكشف (057) لا ملفَّ لها يُقرأ منه بنود — كانت ٤٢ «بلا بنود» كلُّها منها */
+          (select count(*)::int from invoices i join documents d on d.id = i.document_id
+             where d.origin is null
+               and not exists (select 1 from invoice_lines l where l.invoice_id=i.id))       as no_lines
       `),
     db.execute<Row>(sql`
         select i.id, i.invoice_number, s.name_ar, i.vat_minor, i.invoice_date::date
