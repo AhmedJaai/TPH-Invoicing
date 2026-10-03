@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeCoverage, describeCoverage, monthGapDays, type Period } from "./coverage";
+import { analyzeCoverage, coverageStartFor, describeCoverage, monthGapDays, type Period } from "./coverage";
 
 const p = (start: string, end: string, label?: string): Period => ({ start, end, label });
 
@@ -113,5 +113,22 @@ describe("monthGapDays — الرأسُ يُعدّ كما يُعدّ الذيل"
   it("بلا كشفٍ في الشهر لا يُقال «ثلاثون يوماً» — يُقال لا كشف", () => {
     expect(monthGapDays([{ start: "2026-06-01", end: "2026-06-30" }], "2026-08-01", "2026-08-31")).toBeNull();
     expect(monthGapDays([], "2026-08-01", "2026-08-31")).toBeNull();
+  });
+});
+
+describe("الحسابُ فُتح في الشهر — ما قبل فتحه لا يُطلب له كشف", () => {
+  it("مايو ٢٠٢٦: فُتح ٨ مايو وأوّلُ كشفٍ منه — لا فجوة؛ والقاعدةُ باقيةٌ لما بعده", () => {
+    const periods = [p("2026-05-08", "2026-09-01")];
+    expect(monthGapDays(periods, "2026-05-01", "2026-05-31")).toBe(7);
+    const start = coverageStartFor("2026-05-01", "2026-05-31", "2026-05-08");
+    expect(start).toBe("2026-05-08");
+    expect(monthGapDays(periods, start!, "2026-05-31")).toBe(0);
+    /* وفي يونيو تبقى القاعدة كما هي */
+    expect(coverageStartFor("2026-06-01", "2026-06-30", "2026-05-08")).toBe("2026-06-01");
+  });
+
+  it("وبلا يومِ فتحٍ مكتوب تبقى من أوّل الشهر، وبعد الشهر كلّه لا يُطلب شيء", () => {
+    expect(coverageStartFor("2026-05-01", "2026-05-31", null)).toBe("2026-05-01");
+    expect(coverageStartFor("2026-04-01", "2026-04-30", "2026-05-08")).toBeNull();
   });
 });

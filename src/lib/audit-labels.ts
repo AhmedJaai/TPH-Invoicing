@@ -113,6 +113,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   DOCUMENT_RECORDED_BY_HAND: "قيدُ فاتورةٍ من مستندٍ بيد",
   ALERT_RESOLVED: "إغلاق تنبيه",
   BANK_HELD_ROW_RESOLVED: "قرارٌ في صفّ كشفٍ ملتبس",
+  BANK_ACCOUNT_UPDATED: "تعديل بيانات حسابٍ بنكيّ",
   BANK_RULE_DELETED: "حذف قاعدة تصنيف",
   PAYMENT_VOIDED: "إلغاء دفعة",
   PAYMENT_ECHO_MERGED: "دمج دفعةٍ قُيِّدت مرّتين",

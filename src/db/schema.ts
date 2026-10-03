@@ -935,6 +935,8 @@ export const bankAccounts = pgTable("bank_accounts", {
   iban: text("iban"),
   currency: text("currency").notNull().default("SAR"),
   openingBalanceMinor: integer("opening_balance_minor"),
+  /** يومُ فتح الحساب (YYYY-MM-DD) — ما قبله لا يُعدّ «بلا كشف» في إقفال شهره (059) */
+  openedOn: text("opened_on"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: now(),
 });

@@ -9,7 +9,7 @@ import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bankTransactions, documents, invoices, issues } from "@/db/schema";
 import { nextMonth } from "./filing";
-import { monthGapDays } from "./bank/coverage";
+import { coverageStartFor, monthGapDays } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
 import type { MonthFacts } from "./month-close";
 import { SETTLED_TOLERANCE_MINOR } from "./supplier-balances";
@@ -114,7 +114,14 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     .filter((r): r is { start: string; end: string } => r.start !== null && r.end !== null);
 
   /* الرأسُ والوسطُ والذيل — `monthGapDays` تشرح لِمَ لا فترةَ حارسة */
-  const gapDays = monthGapDays(importPeriods, monthStartIso, monthEndIso) ?? 0;
+  /*
+    والتغطيةُ تبدأ من يوم فتح الحساب إن كان في الشهر: الحسابُ فُتح في مايو ٢٠٢٦ فكان الإقفالُ
+    يُردّ بأيّامٍ قبل وجوده. والقاعدةُ نفسُها باقية — يومُ الفتح معلومةٌ تُكتب لا استثناء.
+  */
+  const [opened] = (await db.execute<{ d: string | null }>(sql`
+    select min(opened_on) as d from bank_accounts where is_active`)).rows;
+  const coverageStart = coverageStartFor(monthStartIso, monthEndIso, opened?.d);
+  const gapDays = coverageStart === null ? 0 : monthGapDays(importPeriods, coverageStart, monthEndIso) ?? 0;
 
   /*
     الأرصدة تُقرأ من فترة التسوية إن سُجّلت. وما لم يُسجَّل يبقى `null`

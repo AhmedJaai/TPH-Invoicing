@@ -166,3 +166,14 @@ export function monthGapDays(
   const tail = cov.to !== null && cov.to < monthEnd ? daysBetween(cov.to, monthEnd) - 1 : 0;
   return head + inner + tail;
 }
+
+
+/**
+ * من أيّ يومٍ يُطلب الكشف في الشهر — أوّلُه، أو يومُ فتح الحساب إن كان فيه.
+ * فتحُ الحساب في مايو ٢٠٢٦ جعل «٧ أيام بلا كشف» تمنع إقفالَه، وما قبل الفتح لا حسابَ فيه.
+ * و`null` إن فُتح بعد الشهر كلّه: لا يومَ يُطلب له كشف.
+ */
+export function coverageStartFor(monthStart: string, monthEnd: string, openedOn: string | null | undefined): string | null {
+  if (!openedOn || openedOn <= monthStart) return monthStart;
+  return openedOn > monthEnd ? null : openedOn;
+}
