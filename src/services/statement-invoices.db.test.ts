@@ -84,6 +84,8 @@ describe("قيدُ الناقصة من كشف المورّد (غاناش)", () =
       ]);
       const out = await recordStatementOnlyInvoices(tx, st, await someone(tx));
       expect(out.created.map((c) => c.number)).toEqual(["INVA/2026/02849"]);
+      const lines = await tx.select({ ref: statementLines.ref, m: statementLines.matchStatus }).from(statementLines).where(eq(statementLines.statementId, st));
+      expect(lines.every((l) => l.m === "MATCHED")).toBe(true);
     }));
 
   it("رقمُ السطر بلا وصف الفرع", () => {

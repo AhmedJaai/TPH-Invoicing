@@ -117,7 +117,13 @@ export async function recordStatementOnlyInvoices(
       كشفه «INVA/2026/02717»: لا يحتوي أحدُهما الآخرَ حرفاً، ويجمعهما المقطعُ «02717».
     */
     const tail = digitTail(number);
-    if (tail && ours.some((o) => digitGroups(o.n ?? "").includes(tail) && invoiceNumberKey(o.n ?? "") !== key)) { out.alreadyRecorded++; continue; }
+    const combined = tail ? ours.find((o) => digitGroups(o.n ?? "").includes(tail) && invoiceNumberKey(o.n ?? "") !== key) : undefined;
+    if (combined) {
+      /* السطرُ جزءٌ منها — يُطابَق بها فلا يبقى «لا ملفَّ له» وزرُّه يعود بلا شيء */
+      await tx.update(statementLines).set({ matchedInvoiceId: combined.id, matchStatus: "MATCHED" }).where(eq(statementLines.id, l.id));
+      out.alreadyRecorded++;
+      continue;
+    }
     /* فاتورةٌ عندنا باليوم والمبلغ نفسيهما لم يطابقها سطر — قد تكون هي برقمٍ آخر: لا يُخمَّن */
     const sameDayAmount = ours.some((o) => o.total === l.debitMinor && Math.abs(o.date.getTime() - l.date.getTime()) <= 3 * 86_400_000);
     if (sameDayAmount && !matchedByNumber) { out.alreadyRecorded++; continue; }
