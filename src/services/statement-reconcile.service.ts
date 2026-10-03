@@ -201,7 +201,22 @@ async function ledgerGapFinding(
 ) {
   const day = end.toISOString().slice(0, 10);
   const ids = [...new Set(matched.map((m) => m.invoiceId))];
-  const onLines = matched.reduce((s, m) => s + m.debitMinor, 0);
+  /*
+    والمطابَقةُ تُحسب بقيمتها عندنا ما دام سطرُها يساويها بأيّ صيغة — لوريفا يكتب المبلغ
+    قبل الضريبة، فكان «ينقصنا ٥٩٩٫١٢» عن كشفٍ يطابق دفترنا. والجامعةُ التي تطابق أسطراً
+    لا تساويها (هنقري مان) تُحسب بأسطرها في هذا الكشف.
+  */
+  const values = ids.length === 0 ? [] : (await conn.execute<{ id: string; total: number; sub: number | null; gross: number | null }>(sql`
+    select i.id, i.total_minor as total, i.subtotal_minor as sub,
+           (select sum(l.line_total_minor)::int from invoice_lines l where l.invoice_id = i.id) as gross
+      from invoices i where i.id in (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`)).rows;
+  const valueOf = new Map(values.map((v) => [v.id, v]));
+  const onLines = ids.reduce((s, id) => {
+    const lines = matched.filter((m) => m.invoiceId === id).reduce((x, m) => x + m.debitMinor, 0);
+    const v = valueOf.get(id);
+    const agrees = v && amountAgrees({ totalMinor: Number(v.total), subtotalMinor: v.sub === null ? null : Number(v.sub), grossMinor: v.gross === null ? null : Number(v.gross) }, lines);
+    return s + (agrees ? Number(v.total) : lines);
+  }, 0);
   const notMatched = ids.length > 0 ? sql`and i.id not in (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})` : sql``;
   const [ledger] = (await conn.execute<{ owed: string | number }>(sql`
     select (

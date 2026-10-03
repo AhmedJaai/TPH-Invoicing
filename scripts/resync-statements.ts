@@ -31,6 +31,11 @@ async function main() {
       select count(*)::int combined from statement_lines sl join documents d on d.origin_statement_id = sl.statement_id
        where sl.statement_id = ${st.id}`)).rows;
     if (Number(combined) > 0) { console.log(`${st.file}: فيه ما قُيِّد من الكشف — يُترك`); continue; }
+    /* فاتورةٌ جامعةٌ تطابق أسطراً (هنقري مان مايو) — ربطُها من القيد لا من النواة، فلا يُعاد */
+    const [{ shared }] = (await db.execute<{ shared: number }>(sql`
+      select count(*)::int shared from (select matched_invoice_id from statement_lines
+        where statement_id = ${st.id} and matched_invoice_id is not null group by 1 having count(*) > 1) x`)).rows;
+    if (Number(shared) > 0) { console.log(`${st.file}: فيه فاتورةٌ جامعة — يُترك`); continue; }
     const lines = await db.select({ date: statementLines.date, ref: statementLines.ref, description: statementLines.description, debitMinor: statementLines.debitMinor, creditMinor: statementLines.creditMinor })
       .from(statementLines).where(eq(statementLines.statementId, st.id)).orderBy(statementLines.date, statementLines.id);
     if (lines.length === 0) continue;
