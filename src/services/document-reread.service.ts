@@ -28,6 +28,9 @@ import { db } from "@/db";
 import { auditLogs, documents, invoiceLines, invoices, suppliers } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { downloadFile, isDriveAuthError } from "@/lib/drive";
+import { fillFromFileName } from "@/lib/extraction/filename-facts";
+import { matchSupplier } from "@/lib/supplier-match";
+import { loadSupplierRecords } from "./upload-review.service";
 import { extractDocument, isSupportedUpload } from "@/lib/extraction";
 import { companyConfig } from "@/config/drive";
 import { InvoiceLinesRefused, replaceLines } from "@/services/invoice.service";
@@ -52,7 +55,9 @@ export interface RereadRead {
 export type RereadOutcome =
   | { ok: false; status: number; error: string }
   | { ok: true; applied: false; model: string; fileName: string; read: RereadRead; note: string; problem: string | null }
-  | { ok: true; applied: true; model: string; linesWritten: number; taxStatus: string; amountsWritten: boolean; problem: string | null };
+  | { ok: true; applied: true; model: string; linesWritten: number; taxStatus: string; amountsWritten: boolean; problem: string | null;
+      /** حُفظت القراءةُ على مستندٍ بلا فاتورة — يُقيَّد بها من ملفّه */
+      savedForRecording?: boolean };
 
 /** أيستقيم الثلاثيّ؟ — والجوابُ جملةٌ بأرقامها إن لم يستقم. */
 export function amountsProblem(subtotal: number | null, vat: number | null, total: number | null, postVat: PostVatAdjustments = {}): string | null {
@@ -167,8 +172,34 @@ export async function rereadDocument(opts: {
     };
   }
 
-  if (!doc.invoiceId || !doc.supplierId) {
-    return { ok: false, status: 409, error: "لا فاتورةَ مقيَّدة لهذا المستند — لا موضعَ تُكتَب فيه القراءة." };
+  /*
+    ولا فاتورةَ له بعد: القراءةُ تُكتب على المستند نفسه — نوعُه وقراءتُه ومورّدُه — ثمّ يُقيَّد
+    من «عاينها وقيّدها» بها. كان يُقال «لا موضعَ تُكتب فيه» فيبقى ما لم يُقرأ لا يُقرأ أبداً
+    (زاكوباك 3068: أُرسم الـPDF فقُرئ كاملاً، ولا سبيلَ إلى حفظ قراءته).
+  */
+  if (!doc.invoiceId) {
+    fillFromFileName(x, doc.fileName);
+    const list = await loadSupplierRecords();
+    const matched = matchSupplier(list, { sellerVatNumber: x.sellerVatNumber, supplierNameAr: x.supplierNameAr, supplierNameEn: x.supplierNameEn });
+    const kind = (["TAX_INVOICE", "SIMPLIFIED_INVOICE", "STATEMENT", "QUOTATION", "PROFORMA", "RECEIPT", "CASH_RECEIPT"] as const)
+      .find((k) => k === x.documentKind) ?? "UNKNOWN";
+    await db.transaction(async (t) => {
+      await t.update(documents).set({
+        extractionJson: x as never, extractionModel: outcome.model, textSource: outcome.textSource ?? null, kind,
+        supplierId: doc.supplierId ?? matched.supplier?.id ?? null,
+        /* المؤرشفُ بلا قيدٍ يعود إلى المراجعة — لا يبقى مؤرشفاً بلا شيء */
+        status: "NEEDS_REVIEW",
+      }).where(eq(documents.id, doc.id));
+      await recordAudit({
+        actorId: opts.actorId, action: "DOCUMENT_REREAD", entityType: "document", entityId: doc.id,
+        after: { الملف: doc.fileName, النوع: kind, المورّد: matched.supplier?.nameAr ?? null, الإجمالي: x.totalAmount, المصدر: outcome.textSource ?? null,
+          السبب: "قُرئ من جديد ولا فاتورةَ له — حُفظت قراءتُه ليُقيَّد بها" },
+      }, t);
+    });
+    return { ok: true, applied: true, model: outcome.model, linesWritten: 0, taxStatus: "UNKNOWN", amountsWritten: false, problem, savedForRecording: true };
+  }
+  if (!doc.supplierId) {
+    return { ok: false, status: 409, error: "لا مورّدَ لهذا المستند — اختره ثمّ أعد القراءة." };
   }
 
   /*

@@ -156,6 +156,23 @@ export async function POST(request: Request) {
     if (!can(user.role, "amounts:view")) {
       return NextResponse.json({ error: "تأكيد المستند يحتاج صلاحية عرض المبالغ" }, { status: 403 });
     }
+    /*
+      «اعتمد» لا يُؤرشف ما لم يُقيَّد له شيء وهو ممّا يُقيَّد — فاتورةٌ أو كشفٌ أو مجهولُ
+      النوع. فاتورةُ زاكوباك 3068 لم تُقرأ (PDF مرسوم)، فاعتُمدت «أكّد ما قرأه النموذج» ولا
+      شيء مقروء: صارت مؤرشفةً بلا قيد وخرجت من كلّ قائمة تطلبها.
+    */
+    const [unrecorded] = (await db.execute<{ kind: string }>(sql`
+      select d.kind::text as kind from documents d
+       where d.id = ${documentId} and d.kind::text in ('TAX_INVOICE', 'SIMPLIFIED_INVOICE', 'STATEMENT', 'UNKNOWN')
+         and not exists (select 1 from invoices i where i.document_id = d.id)
+         and not exists (select 1 from statements s where s.document_id = d.id)`)).rows;
+    if (unrecorded) {
+      return NextResponse.json({
+        error: unrecorded.kind === "UNKNOWN"
+          ? "لم يُقرأ هذا المستند ولم يُقيَّد له شيء — أعِد قراءته، أو قيّده من ملفّه، أو ارفضه"
+          : "لم تُقيَّد له فاتورةٌ ولا كشف — قيّده من ملفّه («عاينها وقيّدها») ثمّ يُعتمد، أو ارفضه",
+      }, { status: 409 });
+    }
     const confirmed = await db.transaction(async (t) => {
       const rows = await t
         .update(documents)

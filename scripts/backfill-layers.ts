@@ -40,7 +40,7 @@ const statementPaths = process.argv.flatMap((a, i, all) => (all[i - 1] === "--st
 /** نسبة صفوف الكشف الموجودة في الاستيراد كي يُنسب إليه باسمه وحده. */
 const NAME_MATCH_MIN_SHARE = 0.9;
 
-type TextSource = "TEXT" | "PDF_EMBEDDED" | "DIRECT";
+type TextSource = "TEXT" | "PDF_EMBEDDED" | "PDF_RENDERED" | "DIRECT";
 
 async function importAccounts() {
   const rows = (await db.execute<{ id: string; file_name: string; accounts: string[] }>(sql`

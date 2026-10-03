@@ -37,7 +37,7 @@ export const MIN_INVOICE_WORDS = 60;
 
 export type DocumentInput =
   | { mode: "TEXT"; text: string; pageCount: number; wordCount: number }
-  | { mode: "IMAGE"; images: EmbeddedImage[]; source: "PDF_EMBEDDED" | "DIRECT" }
+  | { mode: "IMAGE"; images: EmbeddedImage[]; source: "PDF_EMBEDDED" | "PDF_RENDERED" | "DIRECT" }
   | { mode: "UNREADABLE"; reason: string };
 
 const ARABIC_RE = /[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]/;
@@ -194,6 +194,22 @@ export async function normalizeImage(data: Buffer, mimeType: string): Promise<Em
   return { data: jpeg, mimeType: "image/jpeg", width: info.width, height: info.height };
 }
 
+/** أقصى ما يُرسَم: صفحاتُ الفاتورة الأولى تكفي */
+const MAX_RENDERED_PAGES = 3;
+
+/** يرسم صفحاتِ الـPDF صوراً — حين لا نصَّ فيه ولا صورةَ موضوعة. */
+export async function renderPdfPages(data: Buffer): Promise<EmbeddedImage[]> {
+  const { getDocumentProxy, renderPageAsImage } = await import("unpdf");
+  const pdf = await getDocumentProxy(new Uint8Array(data));
+  const pages = Math.min(pdf.numPages, MAX_RENDERED_PAGES);
+  const out: EmbeddedImage[] = [];
+  for (let n = 1; n <= pages; n++) {
+    const png = await renderPageAsImage(pdf, n, { canvasImport: () => import("@napi-rs/canvas"), scale: 2 });
+    out.push(await normalizeImage(Buffer.from(png), "image/png"));
+  }
+  return out;
+}
+
 export async function resolveDocumentInput(
   data: Buffer,
   mimeType: string,
@@ -261,7 +277,19 @@ export async function resolveDocumentInput(
   }
 
   /*
-    لا نصّ يُقرأ ولا صورةَ تُنتزَع.
+    لا نصّ ولا صورةٌ موضوعة — فتُرسَم الصفحة.
+
+    فاتورةُ زاكوباك 3068 (٣ أكتوبر ٢٠٢٦) طُبعت بـ«Microsoft Print To PDF»: الصفحةُ أشكالٌ
+    مرسومة، لا نصَّ يُنتزَع ولا JPEG يُقصّ — فقيل «لم يُقرأ» عن فاتورةٍ واضحةٍ تماماً،
+    وأُرشفت بلا قيد. والرسمُ (`unpdf` على `@napi-rs/canvas`) يُخرج صورتَها كما تُرى.
+  */
+  const rendered = await renderPdfPages(data).catch(() => []);
+  if (rendered.length > 0) {
+    return { mode: "IMAGE", images: rendered, source: "PDF_RENDERED" };
+  }
+
+  /*
+    لا نصّ يُقرأ ولا صورةَ تُنتزَع ولا رسم.
 
     غالباً مسحٌ بضغط `CCITTFax` أو `JBIG2` — وهما خارج ما ينتزعه
     `pdf-images.ts`، وذلك حدٌّ معلَن هناك. والقول «لم يُقرأ» هنا أصدق

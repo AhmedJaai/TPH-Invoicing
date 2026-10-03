@@ -15,7 +15,8 @@ const nextConfig: NextConfig = {
     الفواتير، فتتحوّل كلّها إلى «لم تُقرأ». ولا يظهر محلّياً لأنّ
     `node_modules` حاضرة.
   */
-  serverExternalPackages: ["pdfjs-dist"],
+  /* وكذا لوحةُ رسم الصفحة (`@napi-rs/canvas`): ثنائيٌّ لكلّ منصّة — يُحمَّل ولا يُحزَم */
+  serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas"],
 
   /*
     ترويساتُ الأمان — لم يكن منها شيء.

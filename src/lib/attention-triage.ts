@@ -27,6 +27,7 @@ export const ATTENTION_IDS = [
   "bounced-payments",
   "missing-statements",
   "statement-ledger-gap",
+  "files-wrong-month",
   "unknown-tax",
   "no-lines",
   "unrecorded-invoices",

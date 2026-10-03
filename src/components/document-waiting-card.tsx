@@ -6,6 +6,10 @@ import { buttonClass } from "./ui-tokens";
 import { RejectDocument } from "./reject-document";
 import { ConfirmDocument } from "./confirm-document";
 import { invoiceHref } from "@/lib/invoice-profile";
+import { documentHref } from "@/lib/document-labels";
+
+/** ما يُقيَّد فاتورةً — لا يُعتمد قبل قيده (والكشفُ يحرسه الخادم: لا صفَّ كشفٍ هنا) */
+const RECORDABLE = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE", "UNKNOWN"]);
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
 
 /** رابط الملف في الدرايف — المعرّف محفوظ لكل مستند منذ الأرشفة. */
@@ -115,7 +119,11 @@ export function WaitingCard({
         )}
         <span className="flex-1" />
         {canDecide && (showAmounts || r.totalMinor === null) && <RejectDocument documentId={r.id} />}
-        {canDecide && showAmounts && r.status === "NEEDS_REVIEW" && <ConfirmDocument documentId={r.id} variant="primary" />}
+        {/* ما لم يُقيَّد له شيء لا يُعتمد — يُكمَل ويُقيَّد من ملفّه */}
+        {canDecide && showAmounts && r.status === "NEEDS_REVIEW" && (r.invoiceId || !RECORDABLE.has(r.kind)) && <ConfirmDocument documentId={r.id} variant="primary" />}
+        {canDecide && showAmounts && !r.invoiceId && RECORDABLE.has(r.kind) && (
+          <Link href={documentHref(r.id, "fix")} className={buttonClass("primary", "sm")}>أكمِله وقيّده</Link>
+        )}
         {!canDecide && <span className="text-[11px] text-muted">الحسمُ لمن يرفع المستندات ويعتمدها.</span>}
       </div>
     </li>

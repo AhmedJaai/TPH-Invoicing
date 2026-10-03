@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { drive_v3 } from "googleapis";
-import { walkArchive } from "./drive-sync";
+import { misplacedFiles, walkArchive } from "./drive-sync";
 import { DriveAuthExpiredError, isDriveAuthError, isDriveNotFound } from "./drive";
 
 /**
@@ -48,5 +48,18 @@ describe("مشي الأرشيف لا يبتلع التفويض المنتهي", 
     expect(isDriveAuthError({ response: { status: 401 } })).toBe(true);
     expect(isDriveAuthError({ code: 404 })).toBe(false);
     expect(isDriveNotFound({ code: 404 })).toBe(true);
+  });
+});
+
+describe("ملفٌّ في مجلد شهرٍ غير شهر فاتورته", () => {
+  it("فاتورتا زاكوباك لأغسطس في مجلد سبتمبر — تُذكران، وما في شهره لا", () => {
+    const seen = new Map([["f1", "2026-09"], ["f2", "2026-09"], ["f3", "2026-08"]]);
+    const out = misplacedFiles(seen, [
+      { driveFileId: "f1", month: "2026-08", fileName: "2026-08-08_Zacopack_Invoice_2823.pdf", documentId: "d1" },
+      { driveFileId: "f2", month: "2026-09", fileName: "3068.pdf", documentId: "d2" },
+      { driveFileId: "f3", month: "2026-08", fileName: "2894.pdf", documentId: "d3" },
+      { driveFileId: "f9", month: "2026-07", fileName: "غيرُ مرئيّ.pdf", documentId: "d9" },
+    ]);
+    expect(out).toEqual([{ documentId: "d1", fileName: "2026-08-08_Zacopack_Invoice_2823.pdf", folderMonth: "2026-09", month: "2026-08" }]);
   });
 });

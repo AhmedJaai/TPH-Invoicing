@@ -16,15 +16,16 @@ import { loadRecordedInvoices } from "@/services/document-backlog.service";
 import { refreshTokenFor } from "@/services/drive.service";
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  documents, invoices, payments, statements,
+  documents, invoices, issues, payments, statements,
   supplierAliases, suppliers,
 } from "@/db/schema";
+import { ISSUE } from "@/lib/issue-codes";
 import { guard, respondTo } from "@/services/guard";
 import { DriveAuthExpiredError, driveForUser, downloadFile, getFileMeta, isDriveAuthError } from "@/lib/drive";
-import { recentMonths, walkArchive, type ArchiveEntry } from "@/lib/drive-sync";
+import { misplacedFiles, recentMonths, walkArchive, type ArchiveEntry } from "@/lib/drive-sync";
 import { parseFileName } from "@/lib/naming";
 import { KNOWN_SLUGS } from "@/lib/suppliers-seed";
 import { planImport } from "@/lib/archive-import";
@@ -174,6 +175,8 @@ async function handle(request: Request) {
   const knownRows = await db.select({ id: documents.driveFileId, md5: documents.driveMd5, name: documents.fileName }).from(documents);
   /* اسمُ الملفّ المعروف كما هو في الدرايف الآن — يُقارن بما عندنا بعد المشي */
   const liveNames = new Map<string, string>();
+  /** مجلدُ الشهر الذي وُجد فيه كلُّ ملفٍّ معروف */
+  const liveMonths = new Map<string, string>();
   const known = new Set(knownRows.map((d) => d.id).filter((v): v is string => Boolean(v)));
   /* بصمةُ ما أُرشف — نسخةٌ من ملفٍّ مقيَّد (في مجلّدٍ آخر أو باسمٍ آخر) تُعرف قبل أن تُنزَّل أو تُقرأ */
   const knownMd5 = new Set(knownRows.map((d) => d.md5).filter((v): v is string => Boolean(v)));
@@ -229,7 +232,7 @@ async function handle(request: Request) {
     fresh = entries;
   } else {
     try {
-      const walked = await walkArchive(drive, { months, knownFileIds: known, deadline, onKnown: (id, name) => liveNames.set(id, name) });
+      const walked = await walkArchive(drive, { months, knownFileIds: known, deadline, onKnown: (id, name, month) => { liveNames.set(id, name); liveMonths.set(id, month); } });
       fresh = walked.entries;
       pendingMonths = walked.pendingMonths;
       truncated = walked.truncated;
@@ -776,6 +779,32 @@ async function handle(request: Request) {
     await db.update(documents).set({ fileName: name }).where(eq(documents.driveFileId, id));
   }
   const justRecorded = [...new Set([...recordedFileIds, ...drifted.map(([id]) => id)])];
+
+  /* ── ملفٌّ في مجلد شهرٍ غير شهر قيده: يُنبَّه ويُحسم حين يُنقل بيد صاحبه ── */
+  if (liveMonths.size > 0) {
+    const ids = [...liveMonths.keys()];
+    const recordedMonths = (await db.select({ driveFileId: documents.driveFileId, month: invoices.periodMonth, fileName: documents.fileName, documentId: documents.id })
+      .from(documents).innerJoin(invoices, eq(invoices.documentId, documents.id))
+      .where(inArray(documents.driveFileId, ids)))
+      .flatMap((r) => (r.driveFileId ? [{ ...r, driveFileId: r.driveFileId }] : []));
+    const wrong = misplacedFiles(liveMonths, recordedMonths);
+    const seenDocs = recordedMonths.map((r) => r.documentId);
+    await db.transaction(async (t) => {
+      await t.update(issues).set({ status: "RESOLVED", resolvedAt: new Date() }).where(and(
+        eq(issues.code, ISSUE.FILE_IN_WRONG_MONTH), eq(issues.status, "OPEN"), inArray(issues.entityId, seenDocs),
+        ...(wrong.length > 0 ? [notInArray(issues.entityId, wrong.map((w) => w.documentId))] : []),
+      ));
+      for (const w of wrong) {
+        const [open] = await t.select({ id: issues.id }).from(issues)
+          .where(and(eq(issues.code, ISSUE.FILE_IN_WRONG_MONTH), eq(issues.status, "OPEN"), eq(issues.entityId, w.documentId))).limit(1);
+        if (!open) {
+          await t.insert(issues).values({ code: ISSUE.FILE_IN_WRONG_MONTH, severity: "WARN", entityType: "document", entityId: w.documentId,
+            message: `«${w.fileName}» في مجلد ${w.folderMonth} وفاتورتُه لشهر ${w.month} — انقله إلى مجلد ${w.month}` });
+        }
+      }
+    });
+    for (const w of wrong) notes.push(`${w.fileName} — في مجلد ${w.folderMonth} وفاتورتُه لـ${w.month}`);
+  }
 
   /*
     ── التسميةُ الآليّة ── (إذن أحمد في ٢٤ سبتمبر ٢٠٢٦)

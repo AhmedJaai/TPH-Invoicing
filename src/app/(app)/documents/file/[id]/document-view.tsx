@@ -241,7 +241,8 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
             ) : (
               !p.invoice && <RejectDocument documentId={p.id} />
             )}
-            {p.driveFileId && (p.invoice || waiting) && <DocumentReread documentId={p.id} canEdit={canEdit} />}
+            {/* وما أُرشف بلا قيدٍ يُقرأ من جديد كذلك — زاكوباك 3068 لم يكن له طريقٌ إلى القراءة */}
+            {p.driveFileId && (p.invoice || waiting || recordable) && <DocumentReread documentId={p.id} canEdit={canEdit} />}
           </div>
         )}
       </section>

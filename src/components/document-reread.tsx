@@ -30,6 +30,8 @@ interface Preview {
     lines: ReadLine[];
   };
   linesWritten?: number;
+  /** مستندٌ بلا فاتورة — حُفظت قراءتُه ليُقيَّد بها */
+  savedForRecording?: boolean;
   taxStatus?: string;
   note?: string;
   /** القراءةُ لا تستقيم — تُقال بأرقامها، ولا تُكتَب مبالغُها. */
@@ -77,8 +79,9 @@ export function DocumentReread({
     }
     if (apply) {
       setPreview(null);
-      const text =
-        `كُتبت القراءة — ${countNoun(r.data.linesWritten ?? 0, ITEM)}.`
+      const text = r.data.savedForRecording
+        ? "حُفظت القراءة على المستند — قيّده الآن من «عاينها وقيّدها» أدناه."
+        : `كُتبت القراءة — ${countNoun(r.data.linesWritten ?? 0, ITEM)}.`
         + (r.data.taxStatus === "VALID" ? " وصارت الفاتورة مستوفيةَ الأركان." : "")
         + (r.data.problem ? ` ${r.data.problem}` : "");
       setDone(text);

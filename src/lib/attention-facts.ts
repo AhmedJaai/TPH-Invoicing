@@ -523,6 +523,10 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     heldBankRows: Number(counts?.held_rows ?? 0),
     unclassifiedBankAmountMinor: Number(counts?.unclassified_amount ?? 0),
     statementGaps: await latestStatementGaps(),
+    misplacedFiles: (await db.execute<{ id: string; message: string; file_name: string }>(sql`
+      select d.id, i.message, d.file_name from issues i join documents d on d.id = i.entity_id
+       where i.code = 'FILE_IN_WRONG_MONTH' and i.status = 'OPEN' order by i.created_at desc limit 20`)).rows
+      .map((r) => ({ label: r.file_name.slice(0, 50), sub: r.message.replace(/^«[^»]*» /, ""), href: documentHref(r.id) })),
     suppliersMissingStatement: missingStatements,
     suppliersMissingStatementCount: missingStatementRows.length,
     suppliersWithoutContract: noContract,

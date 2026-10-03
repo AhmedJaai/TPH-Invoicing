@@ -65,6 +65,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
     "@auth/drizzle-adapter": "^1.11.3",
+    "@napi-rs/canvas": "0.1.100",
     "drizzle-orm": "^0.45.2",
     "googleapis": "^178.0.0",
     "heic-convert": "^2.1.0",

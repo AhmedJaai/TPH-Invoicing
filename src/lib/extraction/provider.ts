@@ -34,7 +34,7 @@ export interface ExtractionSuccess {
    * من أين قُرئ: نصُّ الملفّ، أم صورةٌ مضمَّنة في PDF ممسوح، أم صورةٌ
    * رُفعت. به يُقاس كم من الأرشيف يعتمد على نموذج الرؤية.
    */
-  textSource?: "TEXT" | "PDF_EMBEDDED" | "DIRECT";
+  textSource?: "TEXT" | "PDF_EMBEDDED" | "PDF_RENDERED" | "DIRECT";
 }
 
 export interface ExtractionFailure {

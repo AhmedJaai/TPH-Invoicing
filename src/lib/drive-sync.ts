@@ -27,7 +27,8 @@ export interface WalkOptions {
    * اسمُ كلِّ ملفٍّ معروفٍ كما هو في الدرايف الآن — لا يُقرأ ثانيةً، لكنّ اسمه
    * قد تغيّر بيدٍ هناك («0044.pdf» واسمُه عندنا قياسيّ)، والتسميةُ تحكم على ما عندنا.
    */
-  onKnown?: (fileId: string, name: string) => void;
+  /** `month` مجلدُ الشهر الذي وُجد فيه — ليُقابَل بشهر قيده (`misplacedFiles`) */
+  onKnown?: (fileId: string, name: string, month: string) => void;
   /**
    * مهلةٌ يقف عندها المشي (وقتٌ مطلق بالمللي ثانية).
    *
@@ -118,7 +119,7 @@ export async function walkArchive(
       */
       for (const file of children) {
         if (isFolder(file) || file.name === SUPPLIER_INFO_CARD || /\.(txt|md)$/i.test(file.name)) continue;
-        if (known?.has(file.id)) { options.onKnown?.(file.id, file.name); continue; }
+        if (known?.has(file.id)) { options.onKnown?.(file.id, file.name, month.name); continue; }
         out.push({ month: month.name, folderName: "", file });
       }
       const perFolder = await inBatches(folders, FOLDER_CONCURRENCY, async (folder) => {
@@ -129,7 +130,7 @@ export async function walkArchive(
           .filter((f) => !/\.(txt|md)$/i.test(f.name))
           .filter((f) => {
             if (!known?.has(f.id)) return true;
-            options.onKnown?.(f.id, f.name);
+            options.onKnown?.(f.id, f.name, month.name);
             return false;
           })
           .map((file) => ({ month: month.name, folderName: folder.name, file }));
@@ -151,4 +152,24 @@ export function recentMonths(count: number, from = new Date()): string[] {
     if (m === 0) { m = 12; y -= 1; }
   }
   return out;
+}
+
+
+/**
+ * ملفٌّ في مجلد شهرٍ غير شهر قيده — يُنبَّه ولا يُنقل (الأرشيفُ لا يُنقل فيه شيء).
+ *
+ * فاتورتا زاكوباك لأغسطس (2823 · 2894) كانتا في «2026-09/Zacopack» ولم يقل شيء — والقيدُ
+ * نفسُه صحيحٌ في أغسطس (الشهرُ من تاريخ الفاتورة)، فلا خطأ في المال؛ لكنّ من يفتّش
+ * الدرايف بالشهر لا يجدهما. فيُقال اسمُه وشهرُه ومجلدُه، والنقلُ بيد صاحبه.
+ */
+export function misplacedFiles(
+  seen: ReadonlyMap<string, string>,
+  recorded: readonly { driveFileId: string; month: string | null; fileName: string; documentId: string }[],
+): { documentId: string; fileName: string; folderMonth: string; month: string }[] {
+  return recorded.flatMap((r) => {
+    const folderMonth = seen.get(r.driveFileId);
+    return folderMonth && r.month && folderMonth !== r.month
+      ? [{ documentId: r.documentId, fileName: r.fileName, folderMonth, month: r.month }]
+      : [];
+  });
 }

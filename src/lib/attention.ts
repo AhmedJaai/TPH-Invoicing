@@ -151,6 +151,9 @@ export interface AttentionFacts {
   /** مورّدون يخالف آخرُ كشفٍ منهم دفترَنا (`latestStatementGaps`) — ما يطالبوننا به غيرُ ما ندين به */
   statementGaps?: { supplierName: string; slug: string; day: string; theirsMinor: number; oursMinor: number; gapMinor: number }[];
 
+  /** ملفّاتٌ في مجلد شهرٍ غير شهر فاتورتها (`misplacedFiles`) — تُنقل بيد صاحبها */
+  misplacedFiles?: { label: string; sub: string; href: string }[];
+
   /** مورّدون لهم فواتير ولم يصل كشفهم */
   suppliersMissingStatement: string[];
   /**
@@ -608,6 +611,23 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
   }
 
   /* ── متوسّط ── */
+  const misplaced = f.misplacedFiles ?? [];
+  if (misplaced.length > 0) {
+    out.push({
+      id: "files-wrong-month",
+      area: "DATA",
+      severity: "MEDIUM",
+      title: `${countNoun(misplaced.length, DOCUMENT)} في مجلد شهرٍ غير شهر فاتورتها`,
+      detail: "قيدُها في شهرها الصحيح من تاريخ الفاتورة — لكنّ من يفتّش الدرايف بالشهر لا يجدها. والنظامُ لا ينقل في الأرشيف شيئاً.",
+      action: "انقلها في الدرايف إلى مجلد شهرها، والتنبيهُ يُحسم في المزامنة التالية.",
+      actionLabel: "افتح الدرايف",
+      href: "/documents/drive",
+      count: misplaced.length,
+      impact: { kind: "UNATTRIBUTED", amountMinor: null },
+      evidence: misplaced,
+    });
+  }
+
   if ((f.suppliersMissingStatementCount ?? f.suppliersMissingStatement.length) > 0) {
     const missingCount = f.suppliersMissingStatementCount ?? f.suppliersMissingStatement.length;
     out.push({
