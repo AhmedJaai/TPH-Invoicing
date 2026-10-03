@@ -127,7 +127,12 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
                     and l.invoice_date >= now() - interval '365 days'
                ), 0))::bigint as annual_minor
         from pairs p
+        /*
+          وما تضاعف فوق ثلاثة أضعاف وحدةٌ أخرى لا سعرٌ ارتفع: «تشيز كيك الربتزل» قطعةً
+          بـ١٢٫٥٠ ثمّ صينيةً بـ١٧٥ قيل «ارتفع ١٣٠٠٪ ويكلّفك ٩٧٥ في السنة» (لوريفا، سبتمبر ٢٠٢٦).
+        */
         where p.then_price > 0 and (p.now_price - p.then_price) * 100 >= 5 * p.then_price
+          and p.now_price <= 3 * p.then_price
         order by annual_minor desc, (p.now_price - p.then_price) desc limit 10
       `),
     db.execute<{ start: string | null; end: string | null }>(sql`

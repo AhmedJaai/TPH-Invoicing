@@ -23,7 +23,6 @@ export const ATTENTION_IDS = [
   "unclassified-bank",
   "held-bank-rows",
   "price-rises",
-  "statement-ledger-gap",
   "lifecycle-anomalies",
   "bounced-payments",
   "missing-statements",
@@ -55,6 +54,7 @@ export const SIGNAL_IDS: ReadonlySet<AttentionId> = new Set<AttentionId>([
   "duplicate-payments-claimed",
   "unbacked-payments",
   "price-rises",
+  "statement-ledger-gap",
   "lifecycle-anomalies",
   "bounced-payments",
 ]);
