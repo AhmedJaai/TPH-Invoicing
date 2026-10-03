@@ -332,3 +332,35 @@ describe("النواة المشتركة — لا جشع في الكشوف أيض
     expect(r.lines[0].invoice?.invoiceId).toBe("z");
   });
 });
+
+describe("لوريفا: كشفٌ بالمبلغ قبل الضريبة، ورقمٌ قُرئ مقلوباً", () => {
+  const d = (s: string) => new Date(`${s}T00:00:00Z`);
+  const ours = [
+    { invoiceId: "a", invoiceNumber: "SI-0086", invoiceDate: d("2026-09-28"), totalMinor: 519_40, subtotalMinor: 451_65 },
+    { invoiceId: "b", invoiceNumber: "0059-SI", invoiceDate: d("2026-09-13"), totalMinor: 506_00, subtotalMinor: 440_00 },
+    { invoiceId: "c", invoiceNumber: "SI-0071", invoiceDate: d("2026-09-21"), totalMinor: 310_50, subtotalMinor: 270_00 },
+    { invoiceId: "e", invoiceNumber: "SI-0077", invoiceDate: d("2026-09-24"), totalMinor: 241_50, subtotalMinor: 210_00, grossMinor: 220_00 },
+  ];
+  const lines = [
+    { date: d("2026-09-28"), ref: "SI-0086", description: null, debitMinor: 451_65, creditMinor: 0 },
+    { date: d("2026-09-13"), ref: "SI-0059", description: null, debitMinor: 440_00, creditMinor: 0 },
+    { date: d("2026-09-21"), ref: "SI-0071", description: null, debitMinor: 330_00, creditMinor: 0 },
+    { date: d("2026-09-24"), ref: "SI-0077", description: null, debitMinor: 220_00, creditMinor: 0 },
+  ];
+  const r = reconcileStatement(lines, ours);
+
+  it("الصافي مطابقةٌ لا فرق، والرقمُ المقلوب هو نفسُه", () => {
+    expect(r.lines[0]).toMatchObject({ status: "MATCHED", differenceMinor: 0 });
+    expect(r.lines[1]).toMatchObject({ status: "MATCHED", invoice: { invoiceId: "b" } });
+    expect(r.missingFromArchive).toHaveLength(0);
+    expect(r.notInStatement.map((i) => i.invoiceId)).not.toContain("b");
+  });
+
+  it("والمبلغُ قبل الخصم (مجموعُ البنود) مطابقةٌ كذلك", () => {
+    expect(r.lines[3]).toMatchObject({ status: "MATCHED", differenceMinor: 0 });
+  });
+
+  it("وما لا يساوي إجماليّاً ولا صافياً ولا ما قبل الخصم فرقٌ حقيقيّ يُعلَن", () => {
+    expect(r.lines[2].status).toBe("AMOUNT_MISMATCH");
+  });
+});

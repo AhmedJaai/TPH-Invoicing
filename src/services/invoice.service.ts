@@ -139,7 +139,7 @@ export async function createInvoice(tx: Tx, input: CreateInvoiceInput): Promise<
   if (inv) {
     await matchLateInvoice(tx, {
       id: inv.id, supplierId: input.supplierId, invoiceNumber: input.invoiceNumber,
-      invoiceDate: input.invoiceDate, totalMinor: input.totalMinor,
+      invoiceDate: input.invoiceDate, totalMinor: input.totalMinor, subtotalMinor: input.subtotalMinor,
     });
   }
 

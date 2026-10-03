@@ -17,7 +17,7 @@ import type { Tx } from "./types";
 
 export async function matchLateInvoice(
   tx: Tx,
-  invoice: { id: string; supplierId: string; invoiceNumber: string; invoiceDate: Date; totalMinor: number },
+  invoice: { id: string; supplierId: string; invoiceNumber: string; invoiceDate: Date; totalMinor: number; subtotalMinor?: number | null },
 ): Promise<number> {
   /* الفاتورةُ سطرٌ واحد في كشوف مورّدها — فإن طوبقت بسطرٍ فلا تُطابَق بثانٍ (غاناش) */
   const [already] = await tx.select({ id: statementLines.id }).from(statementLines)
@@ -41,7 +41,7 @@ export async function matchLateInvoice(
 
   const inputs: StatementLineInput[] = waiting.map((w) => ({ date: w.date, ref: w.ref, description: w.description, debitMinor: w.debitMinor, creditMinor: 0 }));
   const result = reconcileStatement(inputs, [{
-    invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, invoiceDate: invoice.invoiceDate, totalMinor: invoice.totalMinor,
+    invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, invoiceDate: invoice.invoiceDate, totalMinor: invoice.totalMinor, subtotalMinor: invoice.subtotalMinor,
   }]);
   const hit = result.lines.find((l) => l.status === "MATCHED" && l.invoice?.invoiceId === invoice.id);
   if (!hit) return 0;

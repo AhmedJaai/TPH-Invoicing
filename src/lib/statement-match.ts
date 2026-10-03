@@ -28,6 +28,16 @@ export interface OurInvoice {
   invoiceNumber: string;
   invoiceDate: Date;
   totalMinor: number;
+  /**
+   * قبل الضريبة — بعضُ الكشوف تكتب المبلغ قبلها (لوريفا: ٤٥١٫٦٥ وفاتورتُنا ٥١٩٫٤٠ = ×١٫١٥)،
+   * فالمساواةُ به مطابقةٌ لا «فرقُ مبلغ». والمجهولُ لا يُقابَل.
+   */
+  subtotalMinor?: number | null;
+  /**
+   * مجموعُ بنودها قبل الخصم — ولوريفا يكتب في كشفه المبلغَ قبل خصم المنتج (SI-0071:
+   * ٣٣٠ وبعد الخصم ٢٧٠)، وختاميُّه يطابق دفترنا. فهو بابٌ ثالث للمساواة لا فرق.
+   */
+  grossMinor?: number | null;
 }
 
 /**
@@ -87,11 +97,12 @@ export interface Reconciliation {
 }
 
 import { reconcile, type Claim } from "./bank/optimizer";
+import { unreverseInvoiceNumber } from "./invoice-number";
 import { INVOICE, countNoun } from "./arabic";
 
 /** توحيد رقم الفاتورة للمقارنة: بلا رموز ولا فراغ، بحروف كبيرة. */
 export function normalizeRef(value: string | null | undefined): string {
-  return (value ?? "").replace(/[^\p{L}\p{N}]+/gu, "").toUpperCase();
+  return unreverseInvoiceNumber(value ?? "").replace(/[^\p{L}\p{N}]+/gu, "").toUpperCase();
 }
 
 /**
@@ -109,6 +120,19 @@ function refMatches(theirs: string, ours: string): boolean {
 }
 
 const DAY = 86_400_000;
+
+/**
+ * مبلغُ سطر الكشف يساوي فاتورتَنا — بأيّ صيغةٍ كتبها المورّد: بالضريبة، أو قبلها
+ * (لوريفا ٤٥١٫٦٥ = ٥١٩٫٤٠ ÷ ١٫١٥)، أو قبل الخصم (SI-0071: ٣٣٠ وبعده ٢٧٠).
+ * والمجهولُ من الثلاثة لا يُقابَل.
+ */
+export function amountAgrees(
+  o: Pick<OurInvoice, "totalMinor" | "subtotalMinor" | "grossMinor">,
+  amountMinor: number,
+  tolerance = 1,
+): boolean {
+  return [o.totalMinor, o.subtotalMinor, o.grossMinor].some((v) => v != null && Math.abs(v - amountMinor) <= tolerance);
+}
 
 /**
  * رقمان مختلفان قد يكونان رقماً واحداً أخطأت قراءتُه — خانةٌ أو خانتان بالطول نفسه
@@ -169,7 +193,7 @@ export function reconcileStatement(
 
     for (const o of ourByRef) {
       const byRef = theirRef.length > 0 && refMatches(theirRef, o.ref);
-      const amountClose = Math.abs(o.invoice.totalMinor - line.debitMinor) <= tolerance;
+      const amountClose = amountAgrees(o.invoice, line.debitMinor, tolerance);
       const dateClose =
         Math.abs(o.invoice.invoiceDate.getTime() - line.date.getTime()) <= windowMs;
 
@@ -264,7 +288,8 @@ export function reconcileStatement(
     }
 
     const invoice = invoiceById.get(hit.candidate.invoiceIds[0])!;
-    const difference = line.debitMinor - invoice.totalMinor;
+    /* كشفٌ يكتب المبلغ قبل الضريبة يُقابَل بصافينا — فالضريبةُ ليست «فرقاً» */
+    const difference = amountAgrees(invoice, line.debitMinor, tolerance) ? 0 : line.debitMinor - invoice.totalMinor;
     const byRef = hit.candidate.parts.reference === 1;
     const dateClose = hit.candidate.parts.date === 1;
 

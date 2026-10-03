@@ -4,7 +4,7 @@
  *
  * دالة خالصة عمداً — لا تلمس الشبكة ولا قاعدة البيانات، فتُختبر كلها.
  */
-import { sameInvoiceNumber } from "@/lib/invoice-number";
+import { sameInvoiceNumber, unreverseInvoiceNumber } from "@/lib/invoice-number";
 import { parseRiyals } from "@/lib/money";
 import { drivePathFor, monthOf, resolveReceiptFiling } from "@/lib/filing";
 import {
@@ -110,7 +110,8 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     : undefined;
   const totalMinor = parseRiyals(x.totalAmount) ?? (isStatement ? parseRiyals(x.closingBalance ?? "") : null) ?? undefined;
   const invoiceDate = isCalendarDate(x.invoiceDate) ? x.invoiceDate : statementEnd;
-  const invoiceNumber = x.invoiceNumber.trim() || undefined;
+  /* «0059-SI» قُرئ مقلوباً من سطرٍ يمينيّ — يُكتب «SI-0059» في القيد والاسم */
+  const invoiceNumber = unreverseInvoiceNumber(x.invoiceNumber.trim()) || undefined;
 
   const isPaymentDoc = x.documentKind === "RECEIPT" || x.documentKind === "CASH_RECEIPT";
 

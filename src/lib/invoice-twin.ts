@@ -6,6 +6,7 @@
  * فيُقارَن بمفتاحٍ لا يعرف الفواصل ولا حالة الحروف. ونسخةٌ رقمُها لم يُقرأ
  * كما قُرئ في أختها تُعرف بيومها ومبلغها معاً — فتُترك للإنسان ولا تُقيَّد.
  */
+import { unreverseInvoiceNumber } from "./invoice-number";
 
 export interface RecordedInvoice {
   id: string;
@@ -22,7 +23,7 @@ export type InvoiceTwin =
 
 /** الرقمُ بلا فواصل ولا حالة حروف — «INV/2026/05297» و«inv-2026-05297» واحد. */
 export function invoiceNumberKey(n: string): string {
-  return n.normalize("NFKC").replace(/[^\p{L}\p{N}]/gu, "").toLowerCase();
+  return unreverseInvoiceNumber(n.normalize("NFKC")).replace(/[^\p{L}\p{N}]/gu, "").toLowerCase();
 }
 
 export function findInvoiceTwin(

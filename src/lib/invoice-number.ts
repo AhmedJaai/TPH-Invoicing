@@ -11,9 +11,20 @@
  * في المقطع الرقميّ تسقط. فـ«04»=«4»، و«INV/2026/00124»=«INV-2026-124»،
  * و«SI0051»=«SI-51».
  */
+/**
+ * رقمٌ قُرئ مقلوباً من ورقةٍ عربيّة — «0059-SI» وهو «SI-0059» (لوريفا، سبتمبر ٢٠٢٦):
+ * اتّجاهُ السطر من اليمين قدّم الأرقامَ على الحروف، فلم يطابق الرقمُ سطرَه في كشف
+ * المورّد وقيل «ناقصة» و«ليست في كشفه» عن فاتورةٍ واحدة. ولا مورّدَ عندنا يُقدّم
+ * الأرقامَ على حروف رقمه — فمقطعان: أرقامٌ ثمّ حروف، يُقلبان.
+ */
+export function unreverseInvoiceNumber(raw: string): string {
+  const m = raw.trim().match(/^(\d+)([-/_ ])([A-Za-z]+)$/);
+  return m ? `${m[3]}${m[2]}${m[1]}` : raw;
+}
+
 export function normalizeInvoiceNumber(raw: string | null | undefined): string {
   if (!raw) return "";
-  return raw
+  return unreverseInvoiceNumber(raw)
     .trim()
     .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
     .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))

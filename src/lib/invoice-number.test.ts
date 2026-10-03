@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeInvoiceNumber, sameInvoiceNumber } from "./invoice-number";
+import { normalizeInvoiceNumber, sameInvoiceNumber, unreverseInvoiceNumber } from "./invoice-number";
 
 describe("normalizeInvoiceNumber", () => {
   it("يُسقط الأصفار البادئة — «04» هي «4» (صورة ثانية للافا)", () => {
@@ -34,5 +34,15 @@ describe("normalizeInvoiceNumber", () => {
 
   it("الصفر وحده يبقى صفراً", () => {
     expect(normalizeInvoiceNumber("000")).toBe("0");
+  });
+});
+
+describe("الرقمُ المقلوب من سطرٍ يمينيّ", () => {
+  it("«0059-SI» هو «SI-0059»، وما سواه لا يُمسّ", () => {
+    expect(unreverseInvoiceNumber("0059-SI")).toBe("SI-0059");
+    expect(sameInvoiceNumber("0059-SI", "SI-0059")).toBe(true);
+    expect(unreverseInvoiceNumber("INV/2026/00124")).toBe("INV/2026/00124");
+    expect(unreverseInvoiceNumber("260410")).toBe("260410");
+    expect(unreverseInvoiceNumber("2026-INV-5")).toBe("2026-INV-5");
   });
 });

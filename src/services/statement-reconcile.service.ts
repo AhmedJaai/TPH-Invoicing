@@ -13,7 +13,7 @@ import { db } from "@/db";
 import { invoices, issues, statementLines, statements } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
-import { reconcileStatement, type OurInvoice, type StatementLineInput } from "@/lib/statement-match";
+import { amountAgrees, reconcileStatement, type OurInvoice, type StatementLineInput } from "@/lib/statement-match";
 import type { Conn, Tx } from "./types";
 
 export interface ReconcileInput {
@@ -63,6 +63,8 @@ export async function reconcileAndPersist(input: ReconcileInput) {
       invoiceNumber: invoices.invoiceNumber,
       invoiceDate: invoices.invoiceDate,
       totalMinor: invoices.totalMinor,
+      subtotalMinor: invoices.subtotalMinor,
+      grossMinor: sql<number | null>`(select sum(l.line_total_minor)::int from invoice_lines l where l.invoice_id = ${invoices}.id)`,
     })
     .from(invoices)
     .where(and(
@@ -332,12 +334,13 @@ export async function latestStatementDiscrepancies(supplierId: string, conn: Con
   const from = new Date(`${st.ps}T00:00:00Z`);
   const to = new Date(`${st.pe}T00:00:00Z`);
   const PAD_MS = 7 * 86_400_000;
-  const ours = (await conn.execute<{ id: string; num: string; d: string; total: number }>(sql`
-    select i.id, i.invoice_number as num, i.invoice_date::date::text as d, i.total_minor as total
+  const ours = (await conn.execute<{ id: string; num: string; d: string; total: number; sub: number | null; gross: number | null }>(sql`
+    select i.id, i.invoice_number as num, i.invoice_date::date::text as d, i.total_minor as total, i.subtotal_minor as sub,
+           (select sum(l.line_total_minor)::int from invoice_lines l where l.invoice_id = i.id) as gross
       from invoices i join documents d on d.id = i.document_id
      where i.supplier_id = ${supplierId} and d.status <> 'REJECTED'
        and i.invoice_date between ${new Date(from.getTime() - PAD_MS)} and ${new Date(to.getTime() + PAD_MS)}`)).rows
-    .map((o) => ({ invoiceId: o.id, invoiceNumber: o.num, invoiceDate: new Date(`${o.d}T00:00:00Z`), totalMinor: Number(o.total) }));
+    .map((o) => ({ invoiceId: o.id, invoiceNumber: o.num, invoiceDate: new Date(`${o.d}T00:00:00Z`), totalMinor: Number(o.total), subtotalMinor: o.sub === null ? null : Number(o.sub), grossMinor: o.gross === null ? null : Number(o.gross) }));
 
   const kept = stored.filter((l) => l.status === "MATCHED" && l.invoiceId);
   const keptIds = new Set(kept.map((l) => l.invoiceId!));
@@ -363,7 +366,8 @@ export async function latestStatementDiscrepancies(supplierId: string, conn: Con
     priceDiffs: [...groups.entries()].flatMap(([inv, g]) => {
       const o = byId.get(inv);
       const theirs = g.reduce((sum, p) => sum + p.debit, 0);
-      if (!o || theirs === o.totalMinor) return [];
+      /* بالضريبة أو قبلها — الكشفُ الذي يكتب الصافي ليس مخالفاً */
+      if (!o || amountAgrees(o, theirs)) return [];
       return [{ ref: g.map((p) => p.ref).filter(Boolean).join("، ") || null, day: day(g[0].d), theirsMinor: theirs, oursMinor: o.totalMinor, invoiceId: inv, invoiceNumber: o.invoiceNumber }];
     }),
     /* في مدّته وحدها — النافذةُ الموسَّعة للمطابقة لا للدعوى */
