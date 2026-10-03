@@ -24,6 +24,8 @@ interface Finding {
 
 interface AnalysisResponse {
   originalFileName: string;
+  /** بصمةُ الملفّ — بها يُعاد الحكمُ بعد التعديل على ما قرأه الخادم */
+  sha256?: string;
   sizeBytes: number;
   model?: string;
   provider?: string;
@@ -86,6 +88,9 @@ type Item =
       startedAt?: number;
       finishedInMs?: number;
       archiveError?: string;
+      /** يُعاد الحكمُ بعد تعديل — الزرُّ ينتظره */
+      reviewing?: boolean;
+      reviewError?: string;
     }
   | { id: string; fileName: string; state: "archived"; archived: Archived; previewUrl: string; mime: string };
 
@@ -469,6 +474,49 @@ export function Uploader({
    */
   const itemsRef = useRef<Item[]>([]);
   itemsRef.current = items;
+  const chosenRef = useRef(chosen);
+  chosenRef.current = chosen;
+
+  /*
+    ── الحكمُ بعد التعديل ──
+    كان يُبنى مرّةً حين يُقرأ الملفّ: كشفٌ لم يُقرأ تاريخُه فكتبه صاحبُه بيده، وبقي الزرُّ
+    مقفلاً والشهرُ فارغاً (أوراق الزيتون، ٣ أكتوبر ٢٠٢٦). فكلُّ تعديلٍ أو اختيارِ مورّدٍ
+    يعيد الحكمَ في الخادم على قراءته هو — والزرُّ ينتظره.
+  */
+  const reviewTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const rejudge = useCallback((id: string) => {
+    const prevTimer = reviewTimers.current.get(id);
+    if (prevTimer) clearTimeout(prevTimer);
+    setItems((prev) => prev.map((x) => (x.id === id && x.state === "done" ? { ...x, reviewing: true, reviewError: undefined } : x)));
+    reviewTimers.current.set(id, setTimeout(async () => {
+      reviewTimers.current.delete(id);
+      const it = itemsRef.current.find((x) => x.id === id);
+      if (!it || it.state !== "done" || !it.data.sha256) {
+        setItems((prev) => prev.map((x) => (x.id === id && x.state === "done" ? { ...x, reviewing: false } : x)));
+        return;
+      }
+      const sent = it.edited;
+      const r = await postJson<{ result: AnalysisResponse["result"] }>("/api/analyze/review", {
+        sha256: it.data.sha256,
+        originalFileName: it.data.originalFileName,
+        supplierId: chosenRef.current[id]?.id ?? null,
+        invoiceNumber: sent.invoiceNumber,
+        invoiceDate: sent.invoiceDate,
+        vat: sent.vat,
+        total: sent.total,
+      });
+      setItems((prev) => prev.map((x) => {
+        if (x.id !== id || x.state !== "done") return x;
+        /* تعديلٌ أحدث وصل في أثناء الطلب — حكمُه في الطريق */
+        if (x.edited !== sent) return x;
+        if (!r.ok) return { ...x, reviewing: false, reviewError: r.error };
+        const oldName = x.data.result.proposedFileName ?? "";
+        /* الاسمُ يتبع الحكمَ ما لم يكتبه صاحبُه بيده */
+        const fileName = !x.edited.fileName || x.edited.fileName === oldName ? r.data.result.proposedFileName ?? "" : x.edited.fileName;
+        return { ...x, reviewing: false, data: { ...x.data, result: r.data.result }, edited: { ...x.edited, fileName } };
+      }));
+    }, 400));
+  }, []);
 
   /* روابطُ المعاينة تُحرَّر حين تُغادَر الصفحة — لا تبقى ملفّاتٌ في الذاكرة */
   const urls = useRef(new Set<string>());
@@ -550,7 +598,9 @@ export function Uploader({
         it.id === id && it.state === "done" ? { ...it, edited: { ...it.edited, [key]: value } } : it,
       ),
     );
-  }, []);
+    /* اسمُ الملفّ لا يغيّر الحكم */
+    if (key !== "fileName") rejudge(id);
+  }, [rejudge]);
 
   const remove = useCallback((id: string) => {
     const it = itemsRef.current.find((x) => x.id === id);
@@ -869,12 +919,18 @@ export function Uploader({
                     canCreateSupplier={canCreateSupplier}
                     suppliers={suppliers}
                     chosen={chosen[item.id]}
-                    onChoose={(sup) => setChosen((prev) => ({ ...prev, [item.id]: sup }))}
+                    onChoose={(sup) => {
+                      chosenRef.current = { ...chosenRef.current, [item.id]: sup };
+                      setChosen((prev) => ({ ...prev, [item.id]: sup }));
+                      rejudge(item.id);
+                    }}
                     onCreated={(sup) => {
                       setSuppliers((prev) =>
                         prev.some((x) => x.id === sup.id) ? prev : [...prev, sup].sort((a, b) => a.nameAr.localeCompare(b.nameAr, "ar")),
                       );
+                      chosenRef.current = { ...chosenRef.current, [item.id]: sup };
                       setChosen((prev) => ({ ...prev, [item.id]: sup }));
+                      rejudge(item.id);
                     }}
                     onEdit={(k, v) => editField(item.id, k, v)}
                     onArchive={() => archive(item.id)}
@@ -980,8 +1036,13 @@ function ReviewCard({
   const needsSupplier = !chosen && !r.supplier;
   const decisions = low.size + blocking.length + (needsSupplier ? 1 : 0);
   const otherWeak = [...low].filter((k) => LOW_OTHER[k]).map((k) => LOW_OTHER[k]);
-  /* ضعفُ الحقول يُرى في الحقول نفسها — فلا يُكرَّر بنصّه في القائمة */
-  const findings = r.findings.filter((f) => f.code !== ISSUE.LOW_CONFIDENCE_FIELD);
+  /*
+    ضعفُ الحقول يُرى في الحقول نفسها — فلا يُكرَّر بنصّه في القائمة. أمّا ما **يمنع**
+    فيُقال ولو كان رمزُه رمزَ الضعف: «لم يُقرأ تاريخ المستند» كان يُخفى فيبقى الزرُّ
+    مقفلاً بلا سببٍ مكتوب (كشف أوراق الزيتون، ٣ أكتوبر ٢٠٢٦).
+  */
+  const findings = r.findings.filter((f) => f.code !== ISSUE.LOW_CONFIDENCE_FIELD || f.severity === "BLOCKER");
+  const isStatement = r.documentKind === "STATEMENT";
   const [showPaper, setShowPaper] = useState(false);
   const fid = (k: string) => `${item.id}-${k}`;
 
@@ -1038,8 +1099,9 @@ function ReviewCard({
 
           <Group title="المستند">
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <Field id={fid("number")} label="رقم الفاتورة" value={item.edited.invoiceNumber} weak={low.has(LOW.number)} onChange={(v) => onEdit("invoiceNumber", v)} />
-              <Field id={fid("date")} label="التاريخ" type="date" value={item.edited.invoiceDate} weak={low.has(LOW.date)} onChange={(v) => onEdit("invoiceDate", v)} />
+              {/* الكشفُ لا رقمَ فاتورةٍ له — هويّتُه مورّدُه وآخرُ أيّامه */}
+              {!isStatement && <Field id={fid("number")} label="رقم الفاتورة" value={item.edited.invoiceNumber} weak={low.has(LOW.number)} onChange={(v) => onEdit("invoiceNumber", v)} />}
+              <Field id={fid("date")} label={isStatement ? "آخرُ يومٍ في الكشف" : "التاريخ"} type="date" value={item.edited.invoiceDate} weak={low.has(LOW.date)} onChange={(v) => onEdit("invoiceDate", v)} />
               <div className="col-span-2 min-w-0 sm:col-span-1">
                 <p className="text-xs font-bold text-ink-soft">الشهر المحاسبيّ</p>
                 <p className="nums mt-1.5 flex min-h-11 items-center rounded-lg bg-sunken px-3 text-sm sm:min-h-10">
@@ -1059,6 +1121,12 @@ function ReviewCard({
                 </span>
               ) : undefined}
             >
+              {isStatement ? (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  {/* الكشفُ يُقيَّد ولو لم يُقرأ رصيدُه — أسطرُه تُقرأ منه بعد الأرشفة */}
+                  <Field id={fid("total")} label="الرصيد الختاميّ (اختياريّ)" inputMode="decimal" value={item.edited.total} weak={low.has(LOW.amounts)} onChange={(v) => onEdit("total", v)} />
+                </div>
+              ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <div className="col-span-2 min-w-0 sm:col-span-1">
                   <p className="text-xs font-bold text-ink-soft">قبل الضريبة</p>
@@ -1069,6 +1137,7 @@ function ReviewCard({
                 <Field id={fid("vat")} label="الضريبة" inputMode="decimal" value={item.edited.vat} weak={low.has(LOW.amounts)} onChange={(v) => onEdit("vat", v)} />
                 <Field id={fid("total")} label="الإجمالي" inputMode="decimal" value={item.edited.total} weak={low.has(LOW.amounts)} onChange={(v) => onEdit("total", v)} />
               </div>
+              )}
               <p className="mt-2 text-[11px] leading-relaxed text-muted">
                 الخادمُ يعيد الحسابَ والحكمَ الضريبيّ حين تؤكّد — ما تكتبه هنا يُقرأ ولا يُصدَّق بلا فحص.
               </p>
@@ -1163,14 +1232,18 @@ function ReviewCard({
         )}
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted">
-            {r.canArchive
-              ? "لا يُحفَظ شيءٌ قبل تأكيدك — ثمّ يُرفع الملفُّ الأصليّ إلى مجلّده ويُقيَّد."
-              : "لا يُؤرشَف قبل معالجة ما يمنعه — مذكورٌ أعلاه."}
+            {item.reviewing
+              ? "يعيد الفحصَ بما صحّحت…"
+              : item.reviewError
+                ? `تعذّر إعادةُ الفحص: ${item.reviewError}`
+                : r.canArchive
+                  ? "لا يُحفَظ شيءٌ قبل تأكيدك — ثمّ يُرفع الملفُّ الأصليّ إلى مجلّده ويُقيَّد."
+                  : "لا يُؤرشَف قبل معالجة ما يمنعه — مذكورٌ في «ملاحظاتُ الفحص»."}
           </p>
           <button
             type="button"
             onClick={onArchive}
-            disabled={!r.canArchive || item.archiving}
+            disabled={!r.canArchive || item.archiving || item.reviewing}
             className={`${buttonClass("primary", "md")} w-full sm:w-auto`}
           >
             {item.archiving ? "يؤرشف…" : item.archiveError ? (

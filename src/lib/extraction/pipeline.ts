@@ -99,8 +99,17 @@ export function runPipeline(input: PipelineInput): PipelineResult {
 
   const subtotalMinor = parseRiyals(x.subtotalAmount) ?? undefined;
   const vatMinor = parseRiyals(x.vatAmount) ?? undefined;
-  const totalMinor = parseRiyals(x.totalAmount) ?? undefined;
-  const invoiceDate = isCalendarDate(x.invoiceDate) ? x.invoiceDate : undefined;
+  /*
+    الكشفُ لا يُطلب له «تاريخُ المستند» ولا «إجماليّ» (`schemas-by-kind`) — يُقرأ أسطرُه
+    ورصيداه. فكان التاريخُ فارغاً في كلّ كشفٍ يُرفع، و«لم يُقرأ تاريخ المستند» يقفل الأرشفة
+    (أوراق الزيتون، ٣ أكتوبر ٢٠٢٦). فتاريخُه آخرُ أيّام أسطره، ومبلغُ اسمه رصيدُه الختاميّ.
+  */
+  const isStatement = x.documentKind === "STATEMENT";
+  const statementEnd = isStatement
+    ? (x.statementLines ?? []).map((l) => l.date).filter(isCalendarDate).sort().at(-1)
+    : undefined;
+  const totalMinor = parseRiyals(x.totalAmount) ?? (isStatement ? parseRiyals(x.closingBalance ?? "") : null) ?? undefined;
+  const invoiceDate = isCalendarDate(x.invoiceDate) ? x.invoiceDate : statementEnd;
   const invoiceNumber = x.invoiceNumber.trim() || undefined;
 
   const isPaymentDoc = x.documentKind === "RECEIPT" || x.documentKind === "CASH_RECEIPT";

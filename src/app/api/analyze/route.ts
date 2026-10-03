@@ -6,16 +6,17 @@
  */
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { and, eq, gt, inArray, ne, or } from "drizzle-orm";
+import { and, eq, gt, ne, or } from "drizzle-orm";
 import { db } from "@/db";
-import { documents, extractionCache, invoices, supplierAliases, suppliers } from "@/db/schema";
+import { documents, extractionCache, invoices } from "@/db/schema";
 import { withDeadline } from "@/lib/ai/deadline";
 import { extractDocument, isSupportedUpload, uploadMimeType } from "@/lib/extraction";
 import { runPipeline } from "@/lib/extraction/pipeline";
 import type { ExtractionOutcome, ExtractionSuccess } from "@/lib/extraction/provider";
-import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
+import { matchSupplier } from "@/lib/supplier-match";
 import { companyConfig } from "@/config/drive";
 import { guard, respondTo } from "@/services/guard";
+import { loadSupplierRecords } from "@/services/upload-review.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,34 +27,6 @@ export const maxDuration = 60;
 */
 const MAX_BYTES = 4 * 1024 * 1024;
 
-async function loadSuppliers(): Promise<SupplierRecord[]> {
-  const rows = await db
-    .select({
-      id: suppliers.id,
-      slug: suppliers.slug,
-      nameAr: suppliers.nameAr,
-      nameEn: suppliers.nameEn,
-      driveFolderName: suppliers.driveFolderName,
-      vatNumber: suppliers.vatNumber,
-      issuesInvoices: suppliers.issuesInvoices,
-      contractOnFile: suppliers.contractOnFile,
-    })
-    .from(suppliers)
-    .where(eq(suppliers.isActive, true));
-
-  const ids = rows.map((r) => r.id);
-  const aliasRows = ids.length
-    ? await db
-        .select({ supplierId: supplierAliases.supplierId, normalized: supplierAliases.normalized })
-        .from(supplierAliases)
-        .where(inArray(supplierAliases.supplierId, ids))
-    : [];
-
-  return rows.map((r) => ({
-    ...r,
-    aliases: aliasRows.filter((a) => a.supplierId === r.id).map((a) => ({ normalized: a.normalized })),
-  }));
-}
 
 export async function POST(request: Request) {
   /* النداء لا يعيش أطول من المسار — يقف بمهلةٍ معلَنة قبل أن يُقتَل */
@@ -126,7 +99,7 @@ async function handle(request: Request) {
     );
   }
 
-  const supplierList = await loadSuppliers();
+  const supplierList = await loadSupplierRecords();
 
   /*
     قراءةٌ حُفظت لهذا الملفّ خلال الساعة لا تُدفع ثانيةً.
