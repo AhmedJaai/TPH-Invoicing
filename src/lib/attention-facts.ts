@@ -432,13 +432,17 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     والنسخةُ تُعرف برقمها المقروء مقيَّداً لمورّدها نفسه — فيُقال «ارفضها» لا «قيّدها».
   */
   const unrecordedRows = (await db.execute<{
-    id: string; file_name: string; supplier: string | null; twin: string | null; total_text: string | null;
+    id: string; file_name: string; supplier: string | null; twin: string | null; twin_total: number | null; total_text: string | null;
   }>(sql`
     select d.id, d.file_name, s.name_ar as supplier, d.extraction_json->>'totalAmount' as total_text,
            (select i2.invoice_number from invoices i2
              where i2.supplier_id = d.supplier_id
                and i2.invoice_number = nullif(trim(d.extraction_json->>'invoiceNumber'), '')
-             limit 1) as twin
+             limit 1) as twin,
+           (select i2.total_minor from invoices i2
+             where i2.supplier_id = d.supplier_id
+               and i2.invoice_number = nullif(trim(d.extraction_json->>'invoiceNumber'), '')
+             limit 1) as twin_total
       from documents d
       left join invoices i on i.document_id = d.id
       left join statements st on st.document_id = d.id
@@ -454,7 +458,10 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
       const minor = r.total_text ? parseRiyals(r.total_text) : null;
       return {
         label: (r.supplier ?? r.file_name).slice(0, 45),
-        sub: r.twin
+        /* الرقمُ نفسُه بمبلغٍ آخر فاتورةٌ أعاد المورّدُ إصدارَها — لا نسخة */
+        sub: r.twin && minor !== null && r.twin_total !== null && Number(r.twin_total) !== minor
+          ? `فاتورةٌ مصحَّحة لـ${r.twin} (${formatRiyalsDisplay(Number(r.twin_total))} ← ${formatRiyalsDisplay(minor)}) — استبدل بها المقيَّدة`
+          : r.twin
           ? `نسخةٌ من الفاتورة ${r.twin} المقيَّدة — ارفضها`
           : `${r.file_name.slice(0, 40)} — قيّدها من ملفّها`,
         amountMinor: minor ?? undefined,

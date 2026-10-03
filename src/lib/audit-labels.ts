@@ -108,6 +108,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   RECONCILIATION_BALANCES_SET: "رصيدا الشهر في التسوية",
   DOCUMENT_STATUS_CHANGED: "تغيير حال مستند",
   INVOICE_FIELDS_CORRECTED: "تصحيح حقول فاتورة",
+  INVOICE_REPLACED: "فاتورةٌ مصحَّحة حلّت محلّ المقيَّدة",
   DOCUMENT_REREAD: "إعادة قراءة مستند",
   DOCUMENT_RECORDED_BY_HAND: "قيدُ فاتورةٍ من مستندٍ بيد",
   ALERT_RESOLVED: "إغلاق تنبيه",

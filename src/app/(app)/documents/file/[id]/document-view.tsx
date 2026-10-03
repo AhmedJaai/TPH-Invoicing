@@ -17,6 +17,8 @@ import { DocumentReread } from "@/components/document-reread";
 import { RejectDocument } from "@/components/reject-document";
 import { RestoreDocument } from "@/components/restore-document";
 import { ConfirmDocument } from "@/components/confirm-document";
+import { ReplaceInvoice } from "@/components/replace-invoice";
+import { formatRiyalsDisplay } from "@/lib/money";
 import { loadDocumentProfile } from "@/services/document-profile.service";
 import { DOCUMENT_KIND_LABEL, DOCUMENT_STATUS_BADGE, documentHref } from "@/lib/document-labels";
 import { GAP_TEXT, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
@@ -75,6 +77,9 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
   /* ── الجوابُ في سطر: ما حالُه وما يمنعه ── */
   /* الرقمُ نفسه بأيّ صيغة نسخةٌ يقيناً؛ واليومُ والمبلغ نفسهما شبهٌ يُقارَن ولا يُحسَم */
   const sureTwin = p.twin?.how === "same-number" ? p.twin : null;
+  /* الرقمُ نفسُه والمبلغُ غيرُه: أعاد المورّدُ إصدارَها (خصمٌ أو تصحيح) — لا نسخة */
+  const corrected = sureTwin && isInvoiceKind && sureTwin.totalMinor !== null && sureTwin.readTotalMinor !== null
+    && sureTwin.totalMinor !== sureTwin.readTotalMinor && p.status !== "REJECTED" && !p.invoice ? sureTwin : null;
   const likeTwin = p.twin?.how === "same-day-and-total" && isInvoiceKind ? p.twin : null;
   const headline = p.invoice
     ? { tone: "ok" as const, icon: CircleCheck, text: "قُيِّدت له فاتورة" }
@@ -82,6 +87,8 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
       ? { tone: "ok" as const, icon: CircleCheck, text: "قُيِّد كشفاً" }
       : p.status === "REJECTED"
         ? { tone: "danger" as const, icon: CircleX, text: "رُفض — لا يدخل الحساب" }
+        : corrected
+          ? { tone: "warn" as const, icon: TriangleAlert, text: `فاتورةٌ مصحَّحة لـ${corrected.number} — مبلغُها ${formatRiyalsDisplay(corrected.readTotalMinor!)} والمقيَّدةُ ${formatRiyalsDisplay(corrected.totalMinor!)}: استبدل بها المقيَّدة، أو ارفضها إن كانت خطأ` }
         : sureTwin && isInvoiceKind
           ? { tone: "warn" as const, icon: TriangleAlert, text: `نسخةٌ من الفاتورة ${sureTwin.number} المقيَّدة — ارفضه ولا تقيّده ثانيةً` }
         : sureTwin
@@ -192,7 +199,7 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
 
         {p.twin && (sureTwin || likeTwin) && showAmounts && (
           <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
-            {likeTwin ? "لمورّدها نفسه باليوم والمبلغ نفسيهما، ورقمُها غيرُ رقمها:" : isInvoiceKind ? "برقمها المقروء نفسه ولمورّدها نفسه — قارِن ثمّ ارفض هذه النسخة." : "الفاتورةُ التي تلته برقمه نفسه:"}
+            {likeTwin ? "لمورّدها نفسه باليوم والمبلغ نفسيهما، ورقمُها غيرُ رقمها:" : corrected ? "برقمها نفسه ولمورّدها نفسه ومبلغُها غيرُه — أعاد المورّدُ إصدارَها؟" : isInvoiceKind ? "برقمها المقروء نفسه ولمورّدها نفسه — قارِن ثمّ ارفض هذه النسخة." : "الفاتورةُ التي تلته برقمه نفسه:"}
             <LinkButton href={invoiceHref(p.twin.id)} size="sm" icon={Receipt}>افتح الفاتورة المقيَّدة</LinkButton>
           </p>
         )}
@@ -226,6 +233,9 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
         {canEdit && (
           <div className="mt-4 flex flex-wrap items-start gap-2 border-t border-line-soft pt-4">
             {waiting && showAmounts && (p.invoice || p.statementId) && <ConfirmDocument documentId={p.id} variant="primary" />}
+            {corrected && showAmounts && (
+              <ReplaceInvoice documentId={p.id} number={corrected.number} before={formatRiyalsDisplay(corrected.totalMinor!)} after={formatRiyalsDisplay(corrected.readTotalMinor!)} />
+            )}
             {p.status === "REJECTED" ? (
               <RestoreDocument documentId={p.id} />
             ) : (

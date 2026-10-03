@@ -272,6 +272,15 @@ export async function refreshStatementFindings(tx: Tx, statementId: string): Pro
     severity: "WARN",
     message: `${countNoun(Number(left.n), INVOICE)} في كشف المورّد بقيمة ${formatRiyalsDisplay(Number(left.total))} ريال ولا ملف لها عندنا — اطلبها منه`,
   });
+  /* «يخالف مبلغها» من أسطره المتنازَع عليها — فاتورةٌ مصحَّحة أو مقروءةٌ من جديد تُسقطه */
+  const [{ disputed }] = (await tx.execute<{ disputed: number }>(sql`
+    select count(*)::int as disputed from statement_lines where statement_id = ${statementId} and match_status = 'DISPUTED'`)).rows;
+  const amountOpen = and(open(ISSUE.STATEMENT_AMOUNT_MISMATCH), sql`${issues.message} like '%يخالف مبلغها%'`);
+  if (Number(disputed) === 0) {
+    await tx.update(issues).set({ status: "RESOLVED", resolvedAt: new Date() }).where(amountOpen);
+  } else {
+    await tx.update(issues).set({ message: `${countNoun(Number(disputed), INVOICE)} يخالف مبلغها في الكشف مبلغها عندنا` }).where(amountOpen);
+  }
   if (st.closing !== null && st.end) {
     await put(ISSUE.STATEMENT_LEDGER_GAP, await storedLedgerGap(tx, statementId, st.supplierId, st.end, st.closing));
   }

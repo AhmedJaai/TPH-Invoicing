@@ -70,7 +70,8 @@ export interface DocumentProfile {
     fromName: string[];
   };
   /** فاتورةٌ مقيَّدةٌ لمورّده برقمه المقروء — فالمستندُ نسخةٌ منها يُرفض لا يُقيَّد. */
-  twin: { id: string; number: string; how: InvoiceTwin["kind"] } | null;
+  /** `totalMinor` المقيَّدة و`readTotalMinor` ما قُرئ هنا — الرقمُ نفسُه بمبلغٍ آخر فاتورةٌ مصحَّحة لا نسخة */
+  twin: { id: string; number: string; how: InvoiceTwin["kind"]; totalMinor: number | null; readTotalMinor: number | null } | null;
   /** ما يمنع القيد بعينه — `missingFromReading`، وفارغٌ لما قُيِّد. */
   missing: string[];
   verdict: AutoArchiveVerdict;
@@ -187,7 +188,9 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
         { supplierId, invoiceNumber: readNumber ?? fromName.invoiceNumber, invoiceDate: readDate ?? fromName.date, totalMinor: totalForMissing },
       )
     : null;
-  const twinRow = twinFound ? { id: twinFound.invoice.id, number: twinFound.invoice.invoiceNumber, how: twinFound.kind } : null;
+  const twinRow = twinFound
+    ? { id: twinFound.invoice.id, number: twinFound.invoice.invoiceNumber, how: twinFound.kind, totalMinor: twinFound.invoice.totalMinor, readTotalMinor: totalForMissing ?? null }
+    : null;
 
   /* الاسمُ من المصدر الواحد لشاشة التسمية — فلا يقول الملفُّ غيرَ ما تقوله */
   const named = row.driveFileId ? (await loadNamedDocuments()).find((d) => d.documentId === id) : undefined;

@@ -32,6 +32,7 @@ export type AuditAction =
   | "INVOICES_MARKED_PAID"
   /* تصحيحُ حقلٍ قرأه النموذج خطأً — بقيمته قبلَه وبعدَه */
   | "INVOICE_FIELDS_CORRECTED"
+  | "INVOICE_REPLACED"
   | "SUPPLIER_ALIAS_LEARNED"
   | "STATEMENT_RECONCILED"
   | "PRODUCT_LINKED"

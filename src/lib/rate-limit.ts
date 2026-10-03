@@ -103,6 +103,7 @@ export const RULES: Record<string, RateLimitRule> = {
   "statement-invoices": { limit: 60, windowSeconds: 3600 },
   /* تُستدعى مع كلّ تعديلٍ في بطاقة الرفع — بلا نموذج */
   "analyze-review": { limit: 600, windowSeconds: 3600 },
+  "invoice-replace": { limit: 60, windowSeconds: 3600 },
   /* كلُّ نداءٍ قراءةُ نموذجٍ مدفوعة */
   "document-reread": { limit: 30, windowSeconds: 3600 },
   /* قرارُ صفٍّ ملتبس في الكشف */

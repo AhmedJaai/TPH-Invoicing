@@ -58,7 +58,7 @@ export function filingMonthFor(invoiceDate: Date, fallbackMonth: string): string
 }
 
 /** ما يُحفظ من الخصم والرسوم بعد الضريبة — ما فسّر الفرقَ وحده، وإلّا فراغ. */
-function postVatOf(input: Pick<CreateInvoiceInput, "subtotalMinor" | "vatMinor" | "totalMinor" | "discountReadMinor" | "chargesReadMinor">) {
+export function postVatOf(input: Pick<CreateInvoiceInput, "subtotalMinor" | "vatMinor" | "totalMinor" | "discountReadMinor" | "chargesReadMinor">) {
   if (input.subtotalMinor === null || input.vatMinor === null) return { discountMinor: null, chargesMinor: null };
   const t = checkInvoiceTotals(input.subtotalMinor, input.vatMinor, input.totalMinor, {
     discountMinor: input.discountReadMinor, chargesMinor: input.chargesReadMinor,
