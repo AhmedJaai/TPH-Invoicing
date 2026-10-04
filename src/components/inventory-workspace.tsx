@@ -97,7 +97,7 @@ export function InventoryWorkspace({
       actual: l.actualMilli === null ? "" : trim(canonicalToQuantity(l.actualMilli, l.baseUnit)),
       varianceText: l.varianceMilli === null ? null : formatSignedQuantity(l.varianceMilli, l.baseUnit),
       /* النسبةُ المعروضة هي نسبةُ الاستهلاك — جوابُ «كم ضاع ممّا صُرف» */
-      varianceBpText: l.varianceConsumptionBp === null ? "نسبةٌ غير محسوبة" : formatBp(l.varianceConsumptionBp),
+      varianceBpText: l.varianceConsumptionBp === null ? "نسبةٌ غير محسوبة" : `${formatBp(l.varianceConsumptionBp)} من صرفه`,
       varianceCostMinor: showAmounts ? l.varianceCostMinor : null,
       flags: l.flags.map((f) => FLAG_LABEL[f]),
       negative: (l.varianceMilli ?? 0) < 0,
@@ -202,17 +202,31 @@ export function InventoryWorkspace({
               return (
                 <li key={l.productId} className="px-4 py-3">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                    <Link href={`/inventory/items/${l.productId}`} className="min-w-0 flex-1 truncate text-[13px] font-bold hover:text-accent hover:underline hover:underline-offset-4">
-                      {l.productName}
-                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <Link href={`/inventory/items/${l.productId}`} className="block truncate text-[13px] font-bold hover:text-accent hover:underline hover:underline-offset-4">
+                        {l.productName}
+                      </Link>
+                      {/* الأرقامُ بلا أسماء سُئل عنها: «ايش هذي النسب؟» — فيُقال من أين جاءت */}
+                      {l.theoreticalConsumptionMilli !== null && l.actualMilli !== null && l.theoreticalClosingMilli !== null && (
+                        <p className="mt-0.5 text-[11px] text-muted">
+                          صرفتْه المبيعاتُ <span className="nums">{q(l.theoreticalConsumptionMilli, l.baseUnit)} {storedUnitLabel(l.baseUnit)}</span>
+                          {" · "}كان ينبغي أن يبقى <span className="nums">{q(l.theoreticalClosingMilli, l.baseUnit)}</span>
+                          {" · "}وُجد <span className="nums">{q(l.actualMilli, l.baseUnit)}</span>
+                        </p>
+                      )}
+                    </div>
                     <DirectionTag milli={l.varianceMilli} />
                     <span className={`nums text-[13px] font-bold ${DIRECTION[d].text}`}>
                       {formatSignedQuantity(l.varianceMilli, l.baseUnit)}
                     </span>
-                    <span className="nums w-16 text-end text-xs text-muted">{formatBp(l.varianceConsumptionBp)}</span>
+                    <span className="text-end text-xs text-muted">
+                      <span className="nums">{formatBp(l.varianceConsumptionBp)}</span> من صرفه
+                    </span>
                     {showAmounts && (
-                      <span className="w-24 text-end text-[13px]">
-                        {l.varianceCostMinor === null ? <span className="text-[11px] text-muted">كلفةٌ غير معروفة</span> : <Money minor={Math.abs(l.varianceCostMinor)} />}
+                      <span className="w-28 text-end text-[13px]">
+                        {l.varianceCostMinor === null
+                          ? <span className="text-[11px] text-muted">كلفةٌ غير معروفة</span>
+                          : <><span className="text-[11px] text-muted">قيمتُه </span><Money minor={Math.abs(l.varianceCostMinor)} /></>}
                       </span>
                     )}
                   </div>
@@ -226,7 +240,7 @@ export function InventoryWorkspace({
         )}
         {top.length > 0 && (
           <p className="mt-2 text-[11px] leading-relaxed text-muted">
-            النسبةُ على <strong>الاستهلاك المتوقَّع</strong> — «كم ضاع ممّا كان ينبغي أن يُصرَف». {valuationNote(report)}
+            النسبةُ = الفرقُ ÷ ما صرفته المبيعاتُ بالوصفات — «من كلّ ١٠٠ جرامٍ كان ينبغي أن تُصرَف، كم ذهبت ولم تُبَع؟». والمبلغُ قيمةُ الفرق بالريال. {valuationNote(report)}
           </p>
         )}
       </Section>

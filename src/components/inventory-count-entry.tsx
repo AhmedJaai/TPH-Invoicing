@@ -288,7 +288,7 @@ export function InventoryCountEntry({
                       </p>
                       <p className="text-[11px] text-muted">
                         <span className="nums">{row.varianceBpText}</span>
-                        {row.varianceCostMinor !== null && <> · <Money minor={Math.abs(row.varianceCostMinor)} /></>}
+                        {row.varianceCostMinor !== null && <> · قيمتُه <Money minor={Math.abs(row.varianceCostMinor)} /></>}
                       </p>
                     </>
                   ) : (
