@@ -258,7 +258,8 @@ function readItem(row: readonly string[], n: number, at: At, out: ParsedCatalog)
   }
 
   const costText = text(row, at("cost"));
-  const packCostMinor = costText === "" ? null : parseRiyals(costText);
+  /* فودكس يحسب الكلفةَ متوسّطاً بأربع خانات («11.6668») — تُقرَّب إلى الهللة كما تُقرأ كلفةُ الصنف المباع */
+  const packCostMinor = costText === "" ? null : parseSourceCostMinor(costText);
   if (packCostMinor === null || packCostMinor < 0) {
     out.issues.push({ row: n, reason: "كلفةٌ غير مقروءة", detail: `«${name}» كلفتُه «${costText}»` });
     return;

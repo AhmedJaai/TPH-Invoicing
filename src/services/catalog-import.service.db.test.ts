@@ -137,6 +137,26 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
       expect(imported.unmappedProducts).toBe(0);
     }));
 
+  /*
+    «Cheese Pretzel» (أكتوبر ٢٠٢٦): بيع قبل أن يُرفع الكتالوج فأُنشئ له صنفٌ بلا رمز،
+    ثمّ ردّ فهرسُ الفرادة الكتالوجَ كلَّه بـ«سُجّل هذا من قبل».
+  */
+  it("وصنفٌ مباعٌ أُنشئ قبل الكتالوج يُتبنّى برمزه ولا يُكرَّر", () =>
+    withRollback(async (tx) => {
+      const actorId = await makeActor(tx);
+      await tx.execute(sql`update products set foodics_product_sku = null, is_active = false where foodics_product_sku = 'sk-0007' or (name_ar = 'Latte' and is_menu_item)`);
+      const [orphan] = (await tx.execute<{ id: string }>(sql`
+        insert into products (id, name_ar, category, base_unit, is_stock_item, is_menu_item, is_active)
+        values (gen_random_uuid()::text, 'Latte', 'OTHER', 'PIECE', false, true, true) returning id`)).rows;
+
+      const r = await importAll(tx, actorId);
+
+      expect(r.menuProducts.linkedByName).toBeGreaterThanOrEqual(1);
+      const rows = (await tx.execute<{ id: string; sku: string | null }>(sql`
+        select id, foodics_product_sku sku from products where name_ar = 'Latte' and is_menu_item and is_active`)).rows;
+      expect(rows).toEqual([{ id: orphan.id, sku: "sk-0007" }]);
+    }));
+
   it("ورفعُه مرّتين لا يُنشئ نسخةَ وصفةٍ ثانية", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);

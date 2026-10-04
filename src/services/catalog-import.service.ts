@@ -280,6 +280,38 @@ async function upsertMenuProducts(
 
   const sourceId = await ensureFoodicsSource(tx);
 
+  /*
+    ── صنفٌ مباعٌ أُنشئ قبل الكتالوج يُتبنّى ولا يُكرَّر ──
+
+    «Cheese Pretzel» (أكتوبر ٢٠٢٦): ظهر في ملفّ المبيعات قبل أن يُرفع الكتالوج،
+    فأُنشئ له صنفٌ بلا رمز ورُبط به رمزُ نقاط البيع. ثمّ جاء الكتالوج برمزه،
+    فحاول إنشاءَ صنفٍ ثانٍ بالاسم نفسه فردّه فهرسُ الفرادة — وسقطت الرفعةُ كلُّها
+    بـ«سُجّل هذا من قبل».
+
+    فيُتبنّى أوّلاً بالرمز من ربط نقاط البيع (خبرٌ من المصدر)، ثمّ بالاسم مساواةً
+    بعد التطبيع — وكلاهما لصنفٍ لا رمزَ كتالوجٍ له، فلا يُنتزع صنفٌ من رمزٍ آخر.
+  */
+  const linked = await tx
+    .select({ sku: posProducts.externalId, id: products.id })
+    .from(posProducts)
+    .innerJoin(products, eq(products.id, posProducts.productId))
+    .where(and(
+      eq(posProducts.sourceId, sourceId),
+      inArray(posProducts.externalId, menu.map((m) => m.productSku)),
+      isNull(products.foodicsProductSku),
+    ));
+  const idByPosSku = new Map(linked.map((r) => [r.sku, r.id] as const));
+  const orphanMenu = await tx
+    .select({ id: products.id, nameAr: products.nameAr })
+    .from(products)
+    .where(and(isNull(products.foodicsProductSku), eq(products.isMenuItem, true), eq(products.isActive, true)));
+  const menuIdByName = new Map<string, string>();
+  for (const r of orphanMenu) {
+    const k = nameKey(r.nameAr);
+    menuIdByName.set(k, menuIdByName.has(k) ? "" : r.id);
+  }
+  const adopted = new Set<string>();
+
   for (const item of menu) {
     const patch = {
       nameAr: item.name,
@@ -294,8 +326,18 @@ async function upsertMenuProducts(
     };
 
     const known = idBySku.get(item.productSku);
+    const orphan = known ? undefined : idByPosSku.get(item.productSku) || menuIdByName.get(nameKey(item.name)) || undefined;
     let id: string;
-    if (known) {
+    if (orphan && !adopted.has(orphan)) {
+      adopted.add(orphan);
+      await tx.update(products).set(patch).where(eq(products.id, orphan));
+      id = orphan;
+      out.menuProducts.linkedByName++;
+      out.changes.push({
+        sku: item.productSku, name: item.name, action: "LINKED_BY_NAME",
+        detail: "صنفٌ أُنشئ من المبيعات قبل الكتالوج — رُبط برمزه ولم يُكرَّر",
+      });
+    } else if (known) {
       await tx.update(products).set(patch).where(eq(products.id, known));
       id = known;
       out.menuProducts.updated++;

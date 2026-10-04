@@ -87,6 +87,16 @@ describe("أصنافُ المخزون — ٦٠ صنفاً", () => {
   });
 });
 
+describe("كلفةُ العبوة بأربع منازل", () => {
+  /* تصديرُ أكتوبر ٢٠٢٦: «تشيز برتزل» ‏11.6668 و«حليب كوكنت» ‏9.7825 — كانا يُردّان فيسقطان من الكتالوج */
+  it("تُقرَّب إلى الهللة ولا يسقط الصنف", () => {
+    const head = "id,name,sku,storage_unit,ingredient_unit,storage_to_ingredient_factor,cost,minimum_level,par_level,maximum_level,category_reference,barcode,name_localized";
+    const r = parseCatalogFile(Buffer.from(`\uFEFF${head}\nx,"تشيز برتزل",sk-0900,حبة,حبة,1,11.6668,,,,,,\n`, "utf8"));
+    expect(r.issues).toEqual([]);
+    expect(r.items[0].packCostMinor).toBe(1167);
+  });
+});
+
 describe("الأصناف المباعة — ٥٨ صنفاً", () => {
   const parsed = read(PRODUCTS);
 
