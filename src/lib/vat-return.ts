@@ -14,6 +14,9 @@
  *      وما يختاره صاحبُ المقهى من صادرٍ آخر (إيجار · كهرباء · مورّدٌ بلا فاتورةٍ عندنا)
  *      ضريبتُه ١٥/١١٥ منه.
  *
+ * والفاتورةُ التي حكمت الآلةُ «لا تُخصم» لركنٍ لم يُقرأ تُحسب إن أقرّ صاحبُ المقهى أنّها ضريبيّةٌ
+ * على الورقة، وضريبتُها المقروءة أو 15/115 من إجماليّها — وما قُرئت ضريبتُه صفراً لا يُحسب.
+ *
  * والحركةُ التي سدّدت فاتورةً محسوبةً لا تُضمّ: ضريبتُها في الفاتورة، وضمُّها يعدّها مرّتين.
  * والتقريبُ مرّةً على المجموع لا على كلّ حركة.
  */
@@ -99,6 +102,21 @@ export interface VatInvoice {
   inputVatStatus: InputVatStatus;
   /** `null` لم تُقرأ ضريبتُها — لا صفر. */
   vatMinor: number | null;
+  totalMinor: number;
+  /** إقرارُ صاحب المقهى: `true` ضريبيّةٌ على الورقة فتُحسب، `false` لا تُحسب، `null` حكمُ الآلة. */
+  choice: boolean | null;
+}
+
+/** تُحسب في الخصم؟ — إقرارُ الإنسان يغلب حكمَ الآلة، إلّا ضريبةً قُرئت صفراً: لا شيء فيها يُخصم. */
+export function invoiceIncluded(i: VatInvoice): boolean {
+  if (i.choice === false) return false;
+  if (i.choice === true) return i.vatMinor !== 0;
+  return i.inputVatStatus === "ELIGIBLE" && i.vatMinor !== null;
+}
+
+/** ضريبتُها في الخصم: المقروءة، وإلّا 15/115 من الإجمالي — لما أقرّه إنسانٌ ضريبيّاً بنسبة ١٥٪. */
+export function invoiceVat(i: Pick<VatInvoice, "vatMinor" | "totalMinor">): number {
+  return i.vatMinor ?? vatInsideGross(i.totalMinor);
 }
 
 export type VatTxCategory = string;
@@ -150,7 +168,12 @@ export function txVat(tx: Pick<VatTx, "direction" | "category" | "amountMinor">)
 export interface VatReturn {
   output: { grossMinor: number; vatMinor: number; count: number };
   input: {
-    invoices: { vatMinor: number; count: number };
+    invoices: {
+      vatMinor: number;
+      count: number;
+      /** منها بإقرارك — وما حُسبت ضريبتُه 15/115 من إجماليّه لأنّها لم تُقرأ. */
+      confirmed: { count: number; vatMinor: number; derivedCount: number };
+    };
     bankVat: { vatMinor: number; count: number };
     selected: { grossMinor: number; vatMinor: number; count: number };
     totalMinor: number;
@@ -162,8 +185,9 @@ export interface VatReturn {
 }
 
 export function computeVatReturn(input: { invoices: readonly VatInvoice[]; txs: readonly VatTx[] }): VatReturn {
-  const eligible = input.invoices.filter((i) => i.inputVatStatus === "ELIGIBLE" && i.vatMinor !== null);
-  const rest = input.invoices.filter((i) => !(i.inputVatStatus === "ELIGIBLE" && i.vatMinor !== null));
+  const eligible = input.invoices.filter(invoiceIncluded);
+  const rest = input.invoices.filter((i) => !invoiceIncluded(i));
+  const confirmed = eligible.filter((i) => i.choice === true && !(i.inputVatStatus === "ELIGIBLE" && i.vatMinor !== null));
 
   let outGross = 0, outCount = 0;
   let bankVat = 0, bankVatCount = 0;
@@ -176,15 +200,23 @@ export function computeVatReturn(input: { invoices: readonly VatInvoice[]; txs: 
     else { selGross += tx.amountMinor; selCount++; }
   }
 
-  const invoiceVat = eligible.reduce((s, i) => s + (i.vatMinor ?? 0), 0);
+  const invoicesVat = eligible.reduce((s, i) => s + invoiceVat(i), 0);
   const outputVat = vatInsideGross(outGross);
   const selectedVat = vatInsideGross(selGross);
-  const inputTotal = invoiceVat + bankVat + selectedVat;
+  const inputTotal = invoicesVat + bankVat + selectedVat;
 
   return {
     output: { grossMinor: outGross, vatMinor: outputVat, count: outCount },
     input: {
-      invoices: { vatMinor: invoiceVat, count: eligible.length },
+      invoices: {
+        vatMinor: invoicesVat,
+        count: eligible.length,
+        confirmed: {
+          count: confirmed.length,
+          vatMinor: confirmed.reduce((s, i) => s + invoiceVat(i), 0),
+          derivedCount: confirmed.filter((i) => i.vatMinor === null).length,
+        },
+      },
       bankVat: { vatMinor: bankVat, count: bankVatCount },
       selected: { grossMinor: selGross, vatMinor: selectedVat, count: selCount },
       totalMinor: inputTotal,

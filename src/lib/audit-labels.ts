@@ -147,6 +147,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   INVENTORY_MOVEMENT_RECORDED: "قيد حركة مخزون",
   WASTE_RECORDED: "تسجيل هدر",
   VAT_TX_CHOSEN: "اختيار حركة في إقرار الضريبة",
+  VAT_INVOICE_CHOSEN: "إقرار فاتورة في خصم الضريبة",
   /* قيودٌ قديمة كُتبت قبل أن يكون لها اسم */
   DELETE_DUPLICATE_TRANSACTION: "حذف حركة مكرَّرة",
   BANK_MATCH_UNDONE: "تراجع عن مطابقة",

@@ -80,7 +80,7 @@
 | `src/services/mark-paid-undo.service.ts` · `/api/mark-paid/undo` | التراجعُ عن إقرار السداد من الإشعار: إلغاءٌ (`VOID`) لا حذف، خلال ثلاثين دقيقة، بلا حركة بنك، في شهرٍ مفتوح |
 | `src/components/pay-run-planner.tsx` | مخطِّطُ الدفعة: اختيارٌ مورّداً مورّداً يغيّر المجموع والملفّ (`/api/payment-run?suppliers=`)، وما يبقى لكلٍّ بعده |
 | `src/lib/accountant-pack.ts` · `/api/export/accountant` · `/close/pack` | **حزمةُ المحاسب**: Excel بستّ أوراق لشهرٍ واحد، وورقةٌ تُطبَع PDF بالأرقام نفسها (`summarize` · `vatByStatus` · `outflowByCategory` · `expensesByCategory`)، والمجهولُ «غير معروف» لا صفر. و«صادرٌ بلا تفسير» (`unexplained`) لا «لم يُطابَق»: رسومُ الشبكة مفسَّرةٌ ببابها |
-| `src/lib/vat-return.ts` · `vat-return.service.ts` · `/api/vat-choice` · `/close/vat` | **إقرارُ الضريبة**: المخرجاتُ من وارد البنك، والمدخلاتُ من الفواتير `ELIGIBLE` وضريبة الرسوم وما يختاره صاحبُه من الصادر (`vat_tx_choices`)؛ والفترةُ ربعٌ أو شهر وآخرُ موعدها (`filingDeadline`) |
+| `src/lib/vat-return.ts` · `vat-return.service.ts` · `/api/vat-choice` · `/close/vat` | **إقرارُ الضريبة**: المخرجاتُ من وارد البنك، والمدخلاتُ من الفواتير `ELIGIBLE` وضريبة الرسوم وما يختاره صاحبُه من الصادر (`vat_tx_choices`) وما يُقرّ أنّه ضريبيٌّ من الفواتير (`vat_invoice_choices`)؛ والفترةُ ربعٌ أو شهر وآخرُ موعدها (`filingDeadline`) |
 | `src/lib/audit-kinds.ts` | أبوابُ سجلّ التدقيق بنمطٍ يقرؤه JavaScript وPostgres معاً، والتعلّمُ الآليّ مخفيٌّ افتراضاً |
 | `src/lib/attention-triage.ts` | فرزُ «يحتاج قرارك»: الإشاراتُ في المال، وما يُحسم في موضعه، والمعلَّقُ بنوعه لا مجموعاً |
 | `src/lib/layout-guards.test.ts` | الشبكةُ المتجاوبة لها عمودٌ أساسيّ صريح — العمودُ الضمنيّ `auto` يفيض على الجوّال |

@@ -10,8 +10,10 @@ import { useState, useTransition } from "react";
 import { postJson } from "@/lib/http-client";
 import { ActionButton, toast } from "./ui-client";
 
-async function send(ids: readonly string[], included: boolean | null): Promise<boolean> {
-  const res = await postJson("/api/vat-choice", { ids, included });
+type Kind = "tx" | "invoice";
+
+async function send(ids: readonly string[], included: boolean | null, kind: Kind = "tx"): Promise<boolean> {
+  const res = await postJson("/api/vat-choice", { kind, ids, included });
   if (!res.ok) {
     toast({ title: "لم يُحفَظ الاختيار", body: res.error, tone: "danger" });
     return false;
@@ -69,11 +71,13 @@ export function VatBulk({
   included,
   children,
   variant = "secondary",
+  kind = "tx",
 }: {
   ids: readonly string[];
   included: boolean | null;
   children: React.ReactNode;
-  variant?: "secondary" | "quiet";
+  variant?: "secondary" | "quiet" | "subtle";
+  kind?: Kind;
 }) {
   const router = useRouter();
   const [, start] = useTransition();
@@ -84,7 +88,7 @@ export function VatBulk({
       disabled={ids.length === 0}
       reason="لا حركةَ يتغيّر اختيارُها"
       onAction={async () => {
-        const ok = await send(ids, included);
+        const ok = await send(ids, included, kind);
         if (ok) start(() => { router.refresh(); });
         return ok;
       }}

@@ -1936,3 +1936,14 @@ export const vatTxChoices = pgTable("vat_tx_choices", {
   decidedById: text("decided_by_id").references(() => users.id),
   decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * فاتورةٌ أقرّ صاحبُ المقهى أنّها ضريبيّةٌ على الورقة فتُحسب في خصم الإقرار — أو أخرجها منه.
+ * لا يغيّر الفاتورة (والشهرُ المقفل لا تُصحَّح فيه). انظر `061`.
+ */
+export const vatInvoiceChoices = pgTable("vat_invoice_choices", {
+  invoiceId: text("invoice_id").primaryKey().references(() => invoices.id, { onDelete: "cascade" }),
+  included: boolean("included").notNull(),
+  decidedById: text("decided_by_id").references(() => users.id),
+  decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
+});

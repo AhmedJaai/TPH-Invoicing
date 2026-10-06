@@ -6,6 +6,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
+import { formatRiyalsDisplay } from "@/lib/money";
 import { Badge, Callout, Card, DataTable, EmptyState, KeyFigure, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
 import { VatBulk, VatTxToggle } from "@/components/vat-choice";
 import { DAY, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
@@ -66,7 +67,17 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
   const credits = view.txs.filter((t) => t.direction === "CREDIT");
   const vatLines = view.txs.filter((t) => t.direction === "DEBIT" && (t.category === "POS_VAT" || t.category === "BANK_VAT"));
   const debits = view.txs.filter((t) => t.direction === "DEBIT" && !vatLines.includes(t));
-  const notDeductible = view.invoices.filter((i) => !(i.inputVatStatus === "ELIGIBLE" && i.vatMinor !== null));
+  const notDeductible = view.invoices.filter((i) => !i.included);
+  const confirmed = view.invoices.filter((i) => i.included && i.choice === true);
+  /* ما يُقرّ: ضريبتُه غير صفرٍ مقروء، ولم يُخرجه صاحبُه بيده */
+  const confirmable = notDeductible.filter((i) => i.vatMinor !== 0 && i.choice !== false);
+  const supplierGroups = new Map<string, { supplierId: string; supplier: string; ids: string[] }>();
+  for (const i of confirmable) {
+    const g = supplierGroups.get(i.supplierId) ?? { supplierId: i.supplierId, supplier: i.supplier, ids: [] };
+    g.ids.push(i.id);
+    supplierGroups.set(i.supplierId, g);
+  }
+  const bySupplier = [...supplierGroups.values()].filter((g) => g.ids.length > 1);
   const changed = view.txs.filter((t) => t.choice !== null).map((t) => t.id);
 
   /*
@@ -142,7 +153,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
               icon={ArrowUpRight}
               label="ضريبة المدخلات"
               value={<Money minor={r.input.totalMinor} currency />}
-              sub={`من ${countNoun(r.input.invoices.count, INVOICE)} مستوفيةٍ وضريبةِ الرسوم وما اخترتَه من الكشف.`}
+              sub={`من ${countNoun(r.input.invoices.count, INVOICE)} وضريبةِ الرسوم وما اخترتَه من الكشف.`}
             />
           </div>
 
@@ -166,7 +177,13 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
             <Card padded={false}>
               <dl className="divide-y divide-line-soft text-sm">
                 <Line label="ضريبةُ المبيعات الواردة إلى البنك" hint={countNoun(r.output.count, TRANSACTION)} gross={r.output.count > 0 ? r.output.grossMinor : undefined} minor={r.output.vatMinor} />
-                <Line label="− ضريبةُ الفواتير المستوفية" hint={`${countNoun(r.input.invoices.count, INVOICE)}`} minor={-r.input.invoices.vatMinor} />
+                <Line
+                  label="− ضريبةُ الفواتير"
+                  hint={r.input.invoices.confirmed.count > 0
+                    ? `${countNoun(r.input.invoices.count, INVOICE)} — منها ${r.input.invoices.confirmed.count} بإقرارك`
+                    : `${countNoun(r.input.invoices.count, INVOICE)} مستوفية`}
+                  minor={-r.input.invoices.vatMinor}
+                />
                 <Line label="− ضريبةُ رسوم الشبكة والبنك" hint={countNoun(r.input.bankVat.count, TRANSACTION)} minor={-r.input.bankVat.vatMinor} />
                 <Line label="− ضريبةُ حركاتٍ اخترتَها من الكشف" hint={countNoun(r.input.selected.count, TRANSACTION)} gross={r.input.selected.count > 0 ? r.input.selected.grossMinor : undefined} minor={-r.input.selected.vatMinor} />
                 <div className="flex items-center justify-between gap-3 bg-sunken/60 px-4 py-3 font-bold sm:px-5">
@@ -242,24 +259,39 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
             )}
           </Section>
 
-          {/* ── الفواتير التي لا تُخصم ── */}
+          {/* ── الفواتير التي لا تُخصم: تُضاف بإقرارك ── */}
           <Section
+            id="invoices"
             title="فواتيرُ لا تُخصم ضريبتُها"
             icon={FileWarning}
             count={notDeductible.length}
             hint={
               notDeductible.length === 0
-                ? `كلُّ فواتير الفترة (${countNoun(r.input.invoices.count, INVOICE)}) مستوفيةٌ وضريبتُها محسوبة.`
-                : "ينقصها ركنٌ من أركان الفاتورة الضريبيّة (رقمُ المورّد أو رقمُنا أو تفصيلُ الضريبة)، أو لم تُقرأ ضريبتُها. افتح الفاتورة: إن كانت مستوفيةً فصحّحها تُحسب، وإلّا فاطلب من المورّد فاتورةً ضريبيّة."
+                ? `كلُّ فواتير الفترة (${countNoun(r.input.invoices.count, INVOICE)}) محسوبةٌ في الخصم.`
+                : "حكم النظامُ أنّها لا تُخصم لأنّ ركناً من الفاتورة الضريبيّة لم يُقرأ — والعمودُ «ما لم يُقرأ» يسمّيه. انظر الورقة: إن كانت فاتورةً ضريبيّةً فيها رقمُ المورّد الضريبيّ ورقمُنا فاضغط «احسبها»، فتدخل الخصمَ بضريبتها المقروءة، أو 15/115 من إجماليّها إن لم تُقرأ ضريبتُها. ولا تتغيّر الفاتورةُ نفسُها؛ وفي الشهر المفتوح افتحها وصحّحها، فذلك العلاجُ الدائم."
             }
+            action={confirmable.length > 1 ? (
+              <VatBulk kind="invoice" ids={confirmable.map((i) => i.id)} included variant="subtle">
+                احسبها كلَّها ({confirmable.length})
+              </VatBulk>
+            ) : undefined}
           >
             {notDeductible.length > 0 && (
               <>
                 <p className="mb-3 text-xs text-ink-soft">
                   ضريبتُها المقروءة <Money minor={r.notDeductible.vatKnownMinor} currency />
-                  {r.notDeductible.vatUnknownCount > 0 && ` · و${countNoun(r.notDeductible.vatUnknownCount, INVOICE)} ضريبتُها غير معروفة`}
-                  {" "}— لا تدخل الحساب.
+                  {r.notDeductible.vatUnknownCount > 0 && ` · و${countNoun(r.notDeductible.vatUnknownCount, INVOICE)} ضريبتُها غير مقروءة`}
+                  {" "}— لا تدخل الحساب حتى تُقرّها.
                 </p>
+                {bySupplier.length > 1 && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {bySupplier.map((g) => (
+                      <VatBulk key={g.supplierId} kind="invoice" ids={g.ids} included>
+                        احسب فواتير {g.supplier} ({g.ids.length})
+                      </VatBulk>
+                    ))}
+                  </div>
+                )}
                 <DataTable
                   columns={invoiceColumns}
                   rows={notDeductible}
@@ -271,10 +303,32 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
               </>
             )}
           </Section>
+
+          {confirmed.length > 0 && (
+            <Section
+              title="فواتيرُ حسبتَها بإقرارك"
+              count={confirmed.length}
+              hint={`ضريبتُها في الخصم ${riyalsText(r.input.invoices.confirmed.vatMinor)}${r.input.invoices.confirmed.derivedCount > 0 ? ` — منها ${countNoun(r.input.invoices.confirmed.derivedCount, INVOICE)} حُسبت ضريبتُها 15/115 من إجماليّها لأنّها لم تُقرأ` : ""}. والإقرارُ في سجلّ التدقيق باسمك.`}
+              action={<VatBulk kind="invoice" ids={confirmed.map((i) => i.id)} included={null} variant="quiet">تراجع عنها كلِّها</VatBulk>}
+            >
+              <DataTable
+                columns={confirmedColumns}
+                rows={confirmed}
+                keyOf={(i) => i.id}
+                hrefOf={(i) => `/purchases/invoices/${i.id}`}
+                searchOf={(i) => `${i.supplier} ${i.number}`}
+                searchLabel="ابحث في الفواتير"
+              />
+            </Section>
+          )}
         </>
       )}
     </PageShell>
   );
+}
+
+function riyalsText(minor: number): string {
+  return `${formatRiyalsDisplay(minor)} ريالاً`;
 }
 
 function Line({ label, hint, gross, minor }: { label: string; hint?: string; gross?: number; minor: number }) {
@@ -338,7 +392,47 @@ const invoiceColumns: Column<VatInvoiceRow>[] = [
   { key: "supplier", header: "المورّد", primary: true, cell: (i) => i.supplier },
   { key: "number", header: "الرقم", cell: (i) => <bdi dir="ltr" className="font-mono text-xs">{i.number}</bdi>, secondary: true },
   { key: "day", header: "التاريخ", cell: (i) => formatDay(i.day), secondary: true },
-  { key: "status", header: "الحال", cell: (i) => <Badge tone={i.inputVatStatus === "UNKNOWN" ? "muted" : "warn"}>{i.vatMinor === null ? "ضريبتُها غير مقروءة" : INPUT_VAT_LABEL[i.inputVatStatus]}</Badge> },
+  {
+    key: "missing",
+    header: "ما لم يُقرأ",
+    cell: (i) => (
+      <span className="text-xs leading-relaxed">
+        {i.reasons.join(" · ") || INPUT_VAT_LABEL[i.inputVatStatus]}
+        {i.supplierVat && i.reasons.includes("رقمُ المورّد الضريبيّ") && (
+          <span className="block text-muted">في سجلّ المورّد <bdi dir="ltr" className="font-mono">{i.supplierVat}</bdi></span>
+        )}
+      </span>
+    ),
+  },
   { key: "total", header: "الإجمالي", numeric: true, cell: (i) => <Money minor={i.totalMinor} /> },
-  { key: "vat", header: "الضريبة", numeric: true, cell: (i) => (i.vatMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={i.vatMinor} />) },
+  {
+    key: "vat",
+    header: "الضريبة",
+    numeric: true,
+    cell: (i) => i.vatMinor === null
+      ? <span className="text-muted" title="15/115 من الإجمالي إن حسبتَها"><Money minor={i.vatUsedMinor} /> تقديراً</span>
+      : <Money minor={i.vatMinor} />,
+  },
+  {
+    key: "act",
+    header: "",
+    wrap: true,
+    cell: (i) => i.vatMinor === 0
+      ? <span className="text-xs text-muted">لا ضريبةَ فيها{i.monthOpen ? " — صحّحها إن كانت" : ""}</span>
+      : <VatBulk kind="invoice" ids={[i.id]} included variant="subtle">احسبها</VatBulk>,
+  },
+];
+
+const confirmedColumns: Column<VatInvoiceRow>[] = [
+  { key: "supplier", header: "المورّد", primary: true, cell: (i) => i.supplier },
+  { key: "number", header: "الرقم", cell: (i) => <bdi dir="ltr" className="font-mono text-xs">{i.number}</bdi>, secondary: true },
+  { key: "day", header: "التاريخ", cell: (i) => formatDay(i.day), secondary: true },
+  { key: "total", header: "الإجمالي", numeric: true, cell: (i) => <Money minor={i.totalMinor} /> },
+  {
+    key: "vat",
+    header: "الضريبة المخصومة",
+    numeric: true,
+    cell: (i) => <span><Money minor={i.vatUsedMinor} />{i.vatMinor === null && <span className="ms-1 text-[11px] text-muted">15/115</span>}</span>,
+  },
+  { key: "act", header: "", wrap: true, cell: (i) => <VatBulk kind="invoice" ids={[i.id]} included={null} variant="quiet">تراجع</VatBulk> },
 ];

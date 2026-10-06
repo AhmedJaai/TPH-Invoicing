@@ -2,7 +2,7 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٥٨
+## الجداول — ٥٩
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` · `payments` `payment_allocations`
@@ -11,7 +11,7 @@
 `audit_logs` `rate_limits` `expenses`
 `counterparties` `counterparty_evidence` · `branches` `bank_accounts` `reconciliation_periods`
 `sale_payments` `refunds` `refund_lines` `settlement_batches`
-`adjudications` `decision_history` · `ai_findings` · `extraction_cache` · `alert_resolutions` · `vat_tx_choices`
+`adjudications` `decision_history` · `ai_findings` · `extraction_cache` · `alert_resolutions` · `vat_tx_choices` `vat_invoice_choices`
 `recipes` `recipe_versions` `recipe_ingredients` · `sales_imports` `sales_import_rows`
 `inventory_counts` `inventory_count_lines` `inventory_count_snapshots` `inventory_movements` `waste_records`
 `inventory_count_openings` `inventory_receipts`
@@ -102,6 +102,7 @@
 | `058_bank_held_missing_from_file.sql` | `bank_held_rows`: نوعٌ ثالث `MISSING_FROM_FILE` (حركةٌ عندنا وليست في كشف البنك الذي يغطّي يومها) وقرارُ `REMOVED` — تُحذف هي ومصروفُها ما لم تُطابَق بدفعة |
 | `059_bank_account_opened_on.sql` | `bank_accounts.opened_on` (YYYY-MM-DD) — يومُ فتح الحساب؛ تغطيةُ الكشف في شهر الفتح تبدأ منه (إقفال مايو ٢٠٢٦) |
 | `060_vat_tx_choices.sql` | `vat_tx_choices` — أيُّ حركات البنك تُعدّ في إقرار الضريبة، ما خالف الأصلَ وحده (`lib/vat-return.ts`) |
+| `061_vat_invoice_choices.sql` | `vat_invoice_choices` — فاتورةٌ يُقرّ صاحبُها أنّها ضريبيّةٌ على الورقة فتُحسب في خصم الإقرار، بلا تعديلها (الشهرُ المقفل) |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

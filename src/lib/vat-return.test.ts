@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   computeVatReturn, filingDeadline, isIncluded, parseVatPeriod, periodBounds, periodMonths,
-  previousQuarter, quarterOfMonth, txVat, vatInsideGross, type VatTx,
+  invoiceIncluded, previousQuarter, quarterOfMonth, txVat, vatInsideGross, type VatInvoice, type VatTx,
 } from "./vat-return";
+
+const inv = (o: Partial<VatInvoice>): VatInvoice => ({
+  id: "i", inputVatStatus: "ELIGIBLE", vatMinor: 0, totalMinor: 11_500, choice: null, ...o,
+});
 
 const tx = (o: Partial<VatTx>): VatTx => ({
   id: "t", direction: "CREDIT", category: "POS_SETTLEMENT", amountMinor: 0, choice: null, coveredByInvoice: false, ...o,
@@ -66,9 +70,9 @@ describe("الإقرار", () => {
   it("المستحقّ = المخرجات − المدخلات، والتقريب على المجموع", () => {
     const r = computeVatReturn({
       invoices: [
-        { id: "a", inputVatStatus: "ELIGIBLE", vatMinor: 15_000 },
-        { id: "b", inputVatStatus: "NOT_ELIGIBLE", vatMinor: 3_000 },
-        { id: "c", inputVatStatus: "ELIGIBLE", vatMinor: null },
+        inv({ id: "a", vatMinor: 15_000 }),
+        inv({ id: "b", inputVatStatus: "NOT_ELIGIBLE", vatMinor: 3_000 }),
+        inv({ id: "c", vatMinor: null }),
       ],
       txs: [
         tx({ id: "s1", amountMinor: 100 }), tx({ id: "s2", amountMinor: 100 }), tx({ id: "s3", amountMinor: 100 }),
@@ -79,7 +83,7 @@ describe("الإقرار", () => {
       ],
     });
     expect(r.output).toEqual({ grossMinor: 1_150_000, vatMinor: 150_000, count: 4 });
-    expect(r.input.invoices).toEqual({ vatMinor: 15_000, count: 1 });
+    expect(r.input.invoices).toEqual({ vatMinor: 15_000, count: 1, confirmed: { count: 0, vatMinor: 0, derivedCount: 0 } });
     expect(r.input.bankVat).toEqual({ vatMinor: 300, count: 1 });
     expect(r.input.selected).toEqual({ grossMinor: 115_000, vatMinor: 15_000, count: 1 });
     expect(r.input.totalMinor).toBe(30_300);
@@ -87,7 +91,26 @@ describe("الإقرار", () => {
     expect(r.netMinor).toBe(119_700);
   });
   it("المدخلات أكبر: رصيدٌ سالبٌ لك لا صفر", () => {
-    const r = computeVatReturn({ invoices: [{ id: "a", inputVatStatus: "ELIGIBLE", vatMinor: 500 }], txs: [] });
+    const r = computeVatReturn({ invoices: [inv({ id: "a", vatMinor: 500 })], txs: [] });
     expect(r.netMinor).toBe(-500);
+  });
+});
+
+describe("فاتورةٌ تقرّ أنّها ضريبيّة", () => {
+  it("إقرارُك يُدخل ما حكمت الآلةُ «لا تُخصم» لركنٍ لم يُقرأ — بضريبتها المقروءة", () => {
+    const r = computeVatReturn({ invoices: [inv({ inputVatStatus: "NOT_ELIGIBLE", vatMinor: 2_480, choice: true })], txs: [] });
+    expect(r.input.invoices).toEqual({ vatMinor: 2_480, count: 1, confirmed: { count: 1, vatMinor: 2_480, derivedCount: 0 } });
+    expect(r.notDeductible.count).toBe(0);
+  });
+  it("وضريبتُها غير مقروءة: 15/115 من الإجمالي، ويُقال", () => {
+    const r = computeVatReturn({ invoices: [inv({ inputVatStatus: "NOT_ELIGIBLE", vatMinor: null, totalMinor: 115_000, choice: true })], txs: [] });
+    expect(r.input.invoices.confirmed).toEqual({ count: 1, vatMinor: 15_000, derivedCount: 1 });
+  });
+  it("ضريبةٌ قُرئت صفراً لا تُحسب ولو أقررت — لا شيء فيها يُخصم", () => {
+    expect(invoiceIncluded(inv({ inputVatStatus: "NOT_ELIGIBLE", vatMinor: 0, choice: true }))).toBe(false);
+  });
+  it("«لا تحسبها» تُخرج المستوفية", () => {
+    expect(invoiceIncluded(inv({ vatMinor: 100, choice: false }))).toBe(false);
+    expect(invoiceIncluded(inv({ vatMinor: 100 }))).toBe(true);
   });
 });

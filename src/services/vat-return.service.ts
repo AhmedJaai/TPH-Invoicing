@@ -6,14 +6,15 @@
  */
 import { inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bankTransactions, vatTxChoices } from "@/db/schema";
+import { bankTransactions, invoices as invoicesTable, vatInvoiceChoices, vatTxChoices } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { coverageStartFor, monthGapDays } from "@/lib/bank/coverage";
 import { categoryLabel } from "@/lib/accountant-pack";
 import { recognizePos } from "@/lib/bank/pos";
-import type { InputVatStatus } from "@/lib/validation";
+import { isValidSaudiVat, type InputVatStatus } from "@/lib/validation";
+import { companyConfig } from "@/config/drive";
 import {
-  computeVatReturn, includedByDefault, isIncluded, periodBounds, periodMonths, txVat,
+  computeVatReturn, includedByDefault, invoiceIncluded, invoiceVat, type VatInvoice, isIncluded, periodBounds, periodMonths, txVat,
   type VatPeriod, type VatReturn, type VatTx,
 } from "@/lib/vat-return";
 import { todayInRiyadh } from "@/lib/riyadh-time";
@@ -55,14 +56,20 @@ export interface VatTxRow extends VatTx {
   vatMinor: number;
 }
 
-export interface VatInvoiceRow {
-  id: string;
+export interface VatInvoiceRow extends VatInvoice {
   supplier: string;
+  supplierId: string;
   number: string;
   day: string;
-  inputVatStatus: InputVatStatus;
-  vatMinor: number | null;
-  totalMinor: number;
+  /** لماذا حكمت الآلةُ «لا تُخصم» — بالأركان التي لم تُقرأ. */
+  reasons: string[];
+  /** رقمُ المورّد في سجلّه — شاهدٌ لمن يُقرّ أنّ الورقة تحمله. */
+  supplierVat: string | null;
+  included: boolean;
+  /** ضريبتُها في الخصم إن حُسبت. */
+  vatUsedMinor: number;
+  /** الشهرُ مفتوح — فتُصحَّح الفاتورةُ نفسُها، وذلك العلاجُ الدائم. */
+  monthOpen: boolean;
 }
 
 export interface VatMonthCoverage {
@@ -85,13 +92,18 @@ export async function loadVatReturn(period: VatPeriod): Promise<VatReturnView> {
   const months = periodMonths(period);
 
   const invoices = (await db.execute<{
-    id: string; supplier: string; number: string; day: string;
+    id: string; supplier: string; supplier_id: string; number: string; day: string;
     input_vat_status: InputVatStatus; vat_minor: number | null; total_minor: number;
+    seller_vat: string | null; buyer_vat: string | null; supplier_vat: string | null;
+    choice: boolean | null; closed: boolean;
   }>(sql`
-    select i.id, s.name_ar as supplier, i.invoice_number as number,
+    select i.id, s.name_ar as supplier, s.id as supplier_id, i.invoice_number as number,
            to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as day,
-           i.input_vat_status::text as input_vat_status, i.vat_minor, i.total_minor
+           i.input_vat_status::text as input_vat_status, i.vat_minor, i.total_minor,
+           i.seller_vat, i.buyer_vat, s.vat_number as supplier_vat, c.included as choice,
+           month_is_closed(i.period_month) as closed
     from invoices i join suppliers s on s.id = i.supplier_id
+    left join vat_invoice_choices c on c.invoice_id = i.id
     where i.period_month in (${sql.join(months.map((m) => sql`${m}`), sql`, `)})
       and i.tax_status <> 'NOT_APPLICABLE'
     order by i.invoice_date, i.invoice_number
@@ -144,20 +156,49 @@ export async function loadVatReturn(period: VatPeriod): Promise<VatReturnView> {
     }];
   });
 
-  const result = computeVatReturn({
-    invoices: invoices.map((i) => ({ id: i.id, inputVatStatus: i.input_vat_status, vatMinor: i.vat_minor })),
-    txs: rows,
+  const invoiceRows: VatInvoiceRow[] = invoices.map((i) => {
+    const base: VatInvoice = {
+      id: i.id, inputVatStatus: i.input_vat_status, vatMinor: i.vat_minor, totalMinor: i.total_minor, choice: i.choice,
+    };
+    return {
+      ...base,
+      supplier: i.supplier, supplierId: i.supplier_id, number: i.number, day: i.day,
+      reasons: missingPillars(i),
+      supplierVat: i.supplier_vat,
+      included: invoiceIncluded(base),
+      vatUsedMinor: invoiceVat(base),
+      monthOpen: !i.closed,
+    };
   });
+
+  const result = computeVatReturn({ invoices: invoiceRows, txs: rows });
 
   return {
     result,
     txs: rows,
-    invoices: invoices.map((i) => ({
-      id: i.id, supplier: i.supplier, number: i.number, day: i.day,
-      inputVatStatus: i.input_vat_status, vatMinor: i.vat_minor, totalMinor: i.total_minor,
-    })),
+    invoices: invoiceRows,
     coverage: await coverageOf(months),
   };
+}
+
+/** أركانُ الفاتورة الضريبيّة التي لم تُقرأ — بالفحص نفسه الذي حكم (`validation.ts`). */
+function missingPillars(i: { number: string; seller_vat: string | null; buyer_vat: string | null; vat_minor: number | null }): string[] {
+  const out: string[] = [];
+  if (!i.number.trim()) out.push("رقمُ الفاتورة");
+  if (!isValidSaudiVat(i.seller_vat)) out.push("رقمُ المورّد الضريبيّ");
+  const buyer = (i.buyer_vat ?? "").replace(/\D/g, "");
+  if (buyer !== companyVatDigits()) out.push(buyer ? "رقمُنا الضريبيّ (قُرئ غيرَه)" : "رقمُنا الضريبيّ");
+  if (i.vat_minor === null) out.push("مبلغُ الضريبة");
+  else if (i.vat_minor === 0) out.push("الضريبةُ صفرٌ مقروء");
+  return out;
+}
+
+function companyVatDigits(): string {
+  try {
+    return companyConfig.vatNumber.replace(/\D/g, "");
+  } catch {
+    return "";
+  }
 }
 
 const SCHEME_NAME: Readonly<Record<string, string>> = {
@@ -251,6 +292,55 @@ export async function chooseVatTxs(ids: readonly string[], included: boolean | n
         القرار: included === null ? "الأصل" : included ? "تُعدّ في الإقرار" : "لا تُعدّ",
         الحركات: unique.length,
         ...(unique.length > 1 ? { المعرّفات: unique.slice(0, 50) } : {}),
+      },
+    }, t);
+    return unique.length;
+  });
+}
+
+/**
+ * يُقرّ أنّ فواتيرَ ضريبيّةٌ على الورقة فتُحسب في الخصم (`true`)، أو يُخرجها (`false`)، أو يعيدها
+ * إلى حكم الآلة (`null`). وما وافق حكمَ الآلة لا يُحفَظ.
+ */
+export async function chooseVatInvoices(ids: readonly string[], included: boolean | null, actorId: string): Promise<number> {
+  const unique = [...new Set(ids)];
+  return db.transaction(async (t) => {
+    const found = await t
+      .select({
+        id: invoicesTable.id, number: invoicesTable.invoiceNumber, taxStatus: invoicesTable.taxStatus,
+        inputVatStatus: invoicesTable.inputVatStatus, vatMinor: invoicesTable.vatMinor,
+      })
+      .from(invoicesTable).where(inArray(invoicesTable.id, unique));
+    if (found.length !== unique.length) throw new VatChoiceRefused("فاتورةٌ لم تعد موجودة — حدّث الصفحة");
+    if (found.some((f) => f.taxStatus === "NOT_APPLICABLE")) {
+      throw new VatChoiceRefused("عرضُ السعر والفاتورةُ المبدئيّة ليسا فاتورةً ضريبيّة — لا تُخصم ضريبتُهما");
+    }
+    const zero = found.find((f) => f.vatMinor === 0);
+    if (included && zero) {
+      throw new VatChoiceRefused(
+        `الفاتورة ${zero.number} قُرئت ضريبتُها صفراً — لا شيء فيها يُخصم. إن كانت على الورقة ضريبة فصحّح مبلغها من الفاتورة.`,
+      );
+    }
+
+    const machine = (f: (typeof found)[number]) => f.inputVatStatus === "ELIGIBLE" && f.vatMinor !== null;
+    const keep = included === null ? [] : found.filter((f) => machine(f) !== included);
+    const reset = found.filter((f) => !keep.includes(f)).map((f) => f.id);
+    if (reset.length > 0) await t.delete(vatInvoiceChoices).where(inArray(vatInvoiceChoices.invoiceId, reset));
+    if (keep.length > 0 && included !== null) {
+      await t.insert(vatInvoiceChoices)
+        .values(keep.map((f) => ({ invoiceId: f.id, included, decidedById: actorId })))
+        .onConflictDoUpdate({
+          target: vatInvoiceChoices.invoiceId,
+          set: { included, decidedById: actorId, decidedAt: sql`now()` },
+        });
+    }
+
+    await recordAudit({
+      actorId, action: "VAT_INVOICE_CHOSEN", entityType: "invoice",
+      entityId: unique.length === 1 ? unique[0] : `${unique.length} فاتورة`,
+      after: {
+        القرار: included === null ? "حكمُ الآلة" : included ? "ضريبيّةٌ على الورقة — تُحسب في الخصم" : "لا تُحسب في الخصم",
+        الفواتير: found.map((f) => f.number).slice(0, 50),
       },
     }, t);
     return unique.length;
