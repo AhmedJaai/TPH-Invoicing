@@ -57,5 +57,6 @@
   "056_supplier_item_aliases.sql": "caaaf4d545dee7c8e19c63b32c4d6a205549a33fa33f084e5ae719176a689175",
   "057_document_origin_statement.sql": "b7c694d9ca62b8ef3be3398db46312e41d0bc8695dc8764a8f786cdaaf11ec6e",
   "058_bank_held_missing_from_file.sql": "5ef47881ee8d0df53ec5a14a68129f2e6390f3aa104f4a725a21f9dea1aff997",
-  "059_bank_account_opened_on.sql": "5b6f7677a75be751ea3bfaf1c27c38be4f19ea0bf72c4a2fa6b90103b25d69db"
+  "059_bank_account_opened_on.sql": "5b6f7677a75be751ea3bfaf1c27c38be4f19ea0bf72c4a2fa6b90103b25d69db",
+  "060_vat_tx_choices.sql": "9925ef8fd509db2966f6780d9c198e25620760329c9abc8ebe2533f48552dd55"
 }

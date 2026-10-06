@@ -106,7 +106,9 @@ export type AuditAction =
   | "INVENTORY_COUNT_REOPENED"
   | "INVENTORY_COUNT_DISCARDED"
   | "INVENTORY_MOVEMENT_RECORDED"
-  | "WASTE_RECORDED";
+  | "WASTE_RECORDED"
+  /* حركةُ بنكٍ ضُمّت إلى إقرار الضريبة أو أُخرجت منه */
+  | "VAT_TX_CHOSEN";
 
 export async function recordAudit(entry: {
   actorId?: string | null;

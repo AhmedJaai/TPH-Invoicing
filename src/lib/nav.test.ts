@@ -149,7 +149,7 @@ describe("visibleChildren و entryHref", () => {
   });
 
   it("لا تعرض شريط ألسنة لمساحة بلا ألسنة", () => {
-    for (const href of ["/", "/attention", "/close"]) {
+    for (const href of ["/", "/attention"]) {
       const area = AREAS.find((a) => a.href === href)!;
       expect(visibleChildren("OWNER", area)).toEqual([]);
     }

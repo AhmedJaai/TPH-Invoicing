@@ -1923,3 +1923,16 @@ export const alertResolutions = pgTable("alert_resolutions", {
   userId: text("user_id").references(() => users.id),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/* ──────────────────── إقرارُ الضريبة ──────────────────── */
+
+/**
+ * أيُّ حركات البنك تُعدّ في إقرار الضريبة — ما خالف الأصلَ وحده (`lib/vat-return.ts`).
+ * اختيارٌ لا مال: لا يغيّر حركةً ولا فاتورة. انظر `060`.
+ */
+export const vatTxChoices = pgTable("vat_tx_choices", {
+  bankTransactionId: text("bank_transaction_id").primaryKey().references(() => bankTransactions.id, { onDelete: "cascade" }),
+  included: boolean("included").notNull(),
+  decidedById: text("decided_by_id").references(() => users.id),
+  decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
+});

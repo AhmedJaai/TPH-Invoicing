@@ -78,11 +78,13 @@ export function recognizePos(
   if (ref) {
     const [, merchantId, scheme, yy, mmdd] = ref;
     /*
-      سطر REFERENCE لا يحمل كلمةً تقول ما هو — فالاتجاه وحده يفصل:
-      الوارد تسوية، والصادر رسمٌ من الشبكة.
+      سطر REFERENCE لا يحمل كلمةً تقول ما هو — فالاتجاه يفصل الوارد (تسوية) عن الصادر،
+      والرمزُ يفصل الصادر: `F?`/`AF` رسمٌ، و`V?`/`AV` ضريبتُه. كان الصادر كلُّه «رسماً»
+      فغابت ضريبةُ رسوم الشبكة (VS ‏١٥٪ من FS) عن ضريبة المدخلات — ٣٣٠ ريالاً في ربعٍ واحد.
+      وهي الرموزُ نفسُها في الصيغة الأخرى: `POS FV Fe es` رسمٌ و`POS VM VA T` ضريبة.
     */
     return {
-      kind: direction === "CREDIT" ? "POS_SETTLEMENT" : "POS_FEE",
+      kind: direction === "CREDIT" ? "POS_SETTLEMENT" : isVatCode(scheme) ? "POS_VAT" : "POS_FEE",
       merchantId,
       scheme,
       batchDate: `${yy}${mmdd}`,
@@ -90,6 +92,11 @@ export function recognizePos(
   }
 
   return fromType(transactionType);
+}
+
+/** رمزُ سطرٍ صادرٍ من الشبكة يقول «ضريبة»: `VS` مدى · `VM` ماستر · `VV` فيزا · `AV` أمريكان. */
+function isVatCode(code: string): boolean {
+  return /^(V[A-Z]|AV)$/i.test(code);
 }
 
 /**

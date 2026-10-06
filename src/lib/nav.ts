@@ -153,7 +153,10 @@ export const AREAS: readonly NavArea[] = [
     chord: "c",
     needs: "month:close",
     owns: [],
-    children: [],
+    children: [
+      { href: "/close", label: "إقفال الشهر" },
+      { href: "/close/vat", label: "إقرار الضريبة" },
+    ],
   },
   {
     href: "/inventory",

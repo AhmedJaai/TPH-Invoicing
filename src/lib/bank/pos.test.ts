@@ -35,11 +35,15 @@ describe("recognizePos — صفوف حقيقية", () => {
     expect(p.kind).toBe("POS_VAT");
   });
 
-  it("سطر REFERENCE يُفصَل بالاتجاه وحده", () => {
+  it("سطر REFERENCE: الاتجاه يفصل التسوية، والرمزُ يفصل الرسم عن ضريبته", () => {
     expect(recognizePos("REFERENCE : 81140155 MC26 0831 000000", "CREDIT")!.kind)
       .toBe("POS_SETTLEMENT");
-    expect(recognizePos("REFERENCE : 81140155 VM26 0826 000000", "DEBIT")!.kind)
-      .toBe("POS_FEE");
+    for (const code of ["FS", "FM", "FV", "AF"]) {
+      expect(recognizePos(`REFERENCE : 81140155 ${code}26 0826 000000`, "DEBIT")!.kind).toBe("POS_FEE");
+    }
+    for (const code of ["VS", "VM", "VV", "AV"]) {
+      expect(recognizePos(`REFERENCE : 81140155 ${code}26 0826 000000`, "DEBIT")!.kind).toBe("POS_VAT");
+    }
   });
 
   it("سطر REFERENCE يُخرج التاجر والشبكة والتاريخ", () => {
