@@ -80,9 +80,41 @@ describe("التحقّق من القراءة", () => {
     expect(c.map((x) => x.code)).toContain("LINES_NOT_SUBTOTAL");
   });
 
-  it("يكشف تاريخاً ليس بالصيغة المطلوبة", () => {
-    const c = findConflicts(invoice({ invoiceDate: "14/08/2026" }));
-    expect(c.map((x) => x.code)).toContain("DATE_INVALID");
+  it("يكشف تاريخاً لا يُفهَم — وما يفهمه الخادم بصيغةٍ أخرى لا يُدفع نداءٌ لإعادته", () => {
+    expect(findConflicts(invoice({ invoiceDate: "منتصف أغسطس" })).map((x) => x.code)).toContain("DATE_INVALID");
+    expect(findConflicts(invoice({ invoiceDate: "2026-02-30" })).map((x) => x.code)).toContain("DATE_INVALID");
+    expect(findConflicts(invoice({ invoiceDate: "14/08/2026" }))).toEqual([]);
+  });
+
+  it("التاريخ الهجريّ المنقول كما طُبع لا يُعاد عنه السؤال — لا يُدفَع النموذج إلى تحويله", () => {
+    expect(findConflicts(invoice({ invoiceDate: "1448-03-05" }), { today: "2026-10-07" })).toEqual([]);
+  });
+
+  it("تاريخٌ صحيحٌ في التقويم وليس معقولاً: بعد اليوم أو أقدم من سنةٍ ونصف", () => {
+    const ctx = { today: "2026-10-07" };
+    expect(findConflicts(invoice({ invoiceDate: "2062-09-13" }), ctx).map((x) => x.code)).toEqual(["DATE_IMPLAUSIBLE"]);
+    expect(findConflicts(invoice({ invoiceDate: "2016-09-13" }), ctx).map((x) => x.code)).toEqual(["DATE_IMPLAUSIBLE"]);
+    expect(findConflicts(invoice({ invoiceDate: "2026-10-07" }), ctx)).toEqual([]);
+    expect(findConflicts(invoice({ invoiceDate: "2025-04-08" }), ctx)).toEqual([]);
+    /* بلا «اليوم» لا يُحكم */
+    expect(findConflicts(invoice({ invoiceDate: "2062-09-13" }))).toEqual([]);
+  });
+
+  it("رقمُ البائع الضريبيّ: شكلُه، وألّا يكون رقمَنا", () => {
+    const ctx = { companyVat: "310007971600003" };
+    expect(findConflicts(invoice({ sellerVatNumber: "31012239350000" }), ctx).map((x) => x.code)).toEqual(["VAT_FORMAT"]);
+    expect(findConflicts(invoice({ sellerVatNumber: "310007971600003" }), ctx).map((x) => x.code)).toEqual(["PARTIES_SWAPPED"]);
+    expect(findConflicts(invoice({ sellerVatNumber: "310122393500003" }), ctx)).toEqual([]);
+    expect(findConflicts(invoice({ sellerVatNumber: "" }), ctx)).toEqual([]);
+  });
+
+  it("كمّيّةٌ بأرقامٍ عربيّة يُفحص حسابُ سطرها — وبأعدادٍ صحيحة", () => {
+    const line = (quantity: string, lineTotal: string) =>
+      findConflicts(invoice({ lines: [{ description: "بن", quantity, unitPrice: "45.00", lineTotal }] })).map((x) => x.code);
+    expect(line("٢", "95.00")).toContain("LINE_MATH");
+    expect(line("٢", "90.00")).not.toContain("LINE_MATH");
+    expect(line("١٢٫٥", "562.50")).not.toContain("LINE_MATH");
+    expect(line("2.5 كجم", "112.50")).not.toContain("LINE_MATH");
   });
 
   it("يكشف مبلغاً لا يُقرأ", () => {

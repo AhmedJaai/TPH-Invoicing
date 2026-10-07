@@ -66,6 +66,15 @@ export function decide(a: Assignment): Decision {
     return { disposition: "SUGGEST", reasons };
   }
 
+  /*
+    فواتيرُ متساويةُ المبلغ مُثّلت بأقدمها: مرشّحٌ واحد يخفي منافسيه
+    المتكافئين، فشرطُ الهامش يمرّ زوراً. والأقدمُ سياسةٌ لا إثبات.
+  */
+  if (a.candidate.ambiguity) {
+    reasons.push(a.candidate.ambiguity);
+    return { disposition: "SUGGEST", reasons };
+  }
+
   if (score < AUTO_SCORE - SCORE_EPSILON) {
     reasons.push(`الترجيح ${Math.round(score * 100)} من مئة — دون حدّ التلقائية`);
     return { disposition: "SUGGEST", reasons };

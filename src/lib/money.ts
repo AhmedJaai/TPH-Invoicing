@@ -44,6 +44,15 @@ export function milliMinorToMinor(milliMinor: number): number {
  */
 export const TOTAL_ROUNDING_TOLERANCE_MINOR = HALALAS_PER_RIYAL;
 
+/**
+ * ما دون هللةٍ واحدة تقريبٌ لا دَين ولا فائض — فاتورة ١٥٠٠٫٠١ سُدّدت بـ١٥٠٠٫٠٠.
+ *
+ * كانت القاعدةُ مكتوبةً في أربعة مواضع (`SETTLED_TOLERANCE_MINOR` ·
+ * `SETTLE_TOLERANCE_MINOR` · `remaining <= 1` · `tolerance = 1`): تُستورَد من هنا
+ * ولا تُنسَخ، فلا يقول موضعٌ «مسدَّدة» وآخرُ «عليك هللتان».
+ */
+export const HALALA_TOLERANCE_MINOR = 1;
+
 /** هل الفرق بين المجموع والإجمالي تقريبُ مورّد لا خطأ قراءة؟ */
 export function isSupplierRounding(
   subtotalMinor: number,

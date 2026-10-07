@@ -7,6 +7,9 @@
  */
 
 import type { InputVatStatus, TaxStatus } from "./validation";
+import { formatRiyals } from "./money";
+import { formatDay } from "./riyadh-time";
+import { SETTLED_TOLERANCE_MINOR } from "./supplier-balances";
 
 export interface PayableInvoice {
   invoiceId: string;
@@ -96,7 +99,7 @@ export function buildPaymentRun(
 ): PaymentRun {
   const inScope = invoices.filter((i) => {
     const remaining = i.totalMinor - i.allocatedMinor;
-    if (remaining <= 1) return false; // مسدَّدة (بتسامح هللة تقريب)
+    if (remaining <= SETTLED_TOLERANCE_MINOR) return false; // مسدَّدة (بتسامح هللة تقريب)
     return options.includeOlderUnpaid ? i.periodMonth <= month : i.periodMonth === month;
   });
 
@@ -183,34 +186,71 @@ export function resolvePayeeAccount(
   return { account: null, note: "الحسابُ غير معروف — أدخله في البنك" };
 }
 
+/**
+ * خليّةٌ تبدأ بـ= أو + أو - أو @ (أو بمحرف جدولة/سطر) تنفّذها جداولُ البيانات
+ * **صيغةً**. واسمُ المورّد ورقمُ الفاتورة نصٌّ قرأه نموذجٌ من ورقة — «-1+2» أو
+ * «=HYPERLINK(...)» رقمُ فاتورةٍ ممكن. فتُسبَق بفاصلةٍ عليا: تُقرأ نصّاً.
+ */
+export function csvSafeCell(value: string): string {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
+/** مورّدو الدفعة الذين لا حسابَ معروفاً لهم — لا يدخلون قسمَ التحويل من الملفّ. */
+export function suppliersMissingAccount(
+  run: Pick<PaymentRun, "ready">,
+  accounts: ReadonlyMap<string, PayeeAccount>,
+): SupplierPayment[] {
+  return run.ready.filter((s) => !accounts.get(s.supplierId)?.account);
+}
+
 export function toBankTransferCsv(
   run: PaymentRun,
   accounts: ReadonlyMap<string, PayeeAccount> = new Map(),
 ): string {
+  const row = (s: SupplierPayment) => {
+    const acc = accounts.get(s.supplierId) ?? resolvePayeeAccount([]);
+    return [
+      s.supplierName,
+      acc.account ?? "",
+      /* من الهللات نصّاً — لا قسمةَ عشريّة في مبلغٍ يُحوَّل */
+      formatRiyals(s.totalMinor),
+      "SAR",
+      String(s.invoiceCount),
+      s.invoices.map((i) => i.invoiceNumber).join(" | "),
+      `سداد فواتير ${run.month}`,
+      acc.note ?? "",
+    ];
+  };
+  const missing = suppliersMissingAccount(run, accounts);
+  const withAccount = run.ready.filter((s) => !missing.includes(s));
   const rows = [
     ["اسم المستفيد", "حساب المستفيد", "المبلغ", "العملة", "عدد الفواتير", "أرقام الفواتير", "البيان", "تنبيه"],
-    ...run.ready.map((s) => {
-      const acc = accounts.get(s.supplierId) ?? resolvePayeeAccount([]);
-      return [
-        s.supplierName,
-        acc.account ?? "",
-        (s.totalMinor / 100).toFixed(2),
-        "SAR",
-        String(s.invoiceCount),
-        s.invoices.map((i) => i.invoiceNumber).join(" | "),
-        `سداد فواتير ${run.month}`,
-        acc.note ?? "",
-      ];
-    }),
+    ...withAccount.map(row),
+    /*
+      مَن لا حسابَ له خارجَ قسم التحويل: ملفٌّ يُرفع إلى البنك وفيه خانةُ حسابٍ
+      فارغة يُردّ كلُّه أو يُكمَل باليد وسط الصفوف — وهو أخطرُ موضعٍ للخطأ.
+      فيُفصَلون في آخره بعنوانٍ يقول ما هم، ولا يُسقَطون فيُنسَوا.
+    */
+    ...(missing.length > 0
+      ? [[], ["يحتاج حساباً — ليس في التحويل: احذف هذا القسم قبل الرفع وحوّل لهم بعد إدخال حسابهم"], ...missing.map(row)]
+      : []),
   ];
-  const escape = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const escape = (v: string) => {
+    const safe = csvSafeCell(v);
+    return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  };
   return "\ufeff" + rows.map((r) => r.map(escape).join(",")).join("\r\n");
 }
 
 /** رسالة واتساب جاهزة للمورّد بأرقام فواتيره المحجوزة. */
-export function buildSupplierMessage(supplierName: string, held: readonly HeldInvoice[]): string {
+export function buildSupplierMessage(
+  supplierName: string,
+  held: readonly HeldInvoice[],
+  /** رقمُنا الضريبيّ من الإعداد (`companyConfig.vatNumber`) — لا يُكتب باليد في نصّ. */
+  companyVat: string | null,
+): string {
   const lines = held.map(
-    (h) => `• فاتورة ${h.invoice.invoiceNumber} بتاريخ ${h.invoice.invoiceDate.toISOString().slice(0, 10)}`,
+    (h) => `• فاتورة ${h.invoice.invoiceNumber} بتاريخ ${formatDay(h.invoice.invoiceDate)}`,
   );
   return [
     `السلام عليكم ${supplierName}،`,
@@ -218,7 +258,7 @@ export function buildSupplierMessage(supplierName: string, held: readonly HeldIn
     `الفواتير التالية لا تحمل بيانات الفاتورة الضريبية الكاملة:`,
     ...lines,
     ``,
-    `نحتاج فاتورة ضريبية تحمل رقمنا الضريبي 310007971600003 لنتمكّن من السداد.`,
+    `نحتاج فاتورة ضريبية تحمل رقمنا الضريبي${companyVat ? ` ${companyVat}` : ""} لنتمكّن من السداد.`,
     `شاكرين لكم.`,
   ].join("\n");
 }

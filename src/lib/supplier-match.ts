@@ -27,7 +27,15 @@ export interface SupplierMatch {
   confidence: number;
   /** مرشّحون للعرض حين لا تكون المطابقة قاطعة */
   candidates: SupplierRecord[];
+  /**
+   * الاسمُ يطابق والرقمُ الضريبيّ المقروء يخالف المخزَّن — منشأتان باسمٍ متقارب
+   * ورقمين مختلفين كيانان. فلا يُحسَم: المورّدُ في `candidates` ويقرّر إنسان.
+   */
+  vatConflict?: boolean;
 }
+
+/** الجملةُ التي تُقال حين يُردّ الحسمُ لاختلاف الرقم الضريبيّ. */
+export const VAT_CONFLICT_NOTE = "الاسمُ يطابق مورّداً مسجَّلاً والرقمُ الضريبيّ يخالف رقمَه — تحقّق أهو هو";
 
 /** مسافة تشابه بسيطة بين نصّين مطبَّعين، من ٠ إلى ١. */
 export function similarity(a: string, b: string): number {
@@ -52,26 +60,32 @@ export function similarity(a: string, b: string): number {
   return Math.max(containment, overlap);
 }
 
+/**
+ * تشابهُ ثلاثيّات الحروف (Dice) — **للاقتراح وحده**.
+ *
+ * `similarity` تعرف الاحتواء وتقاطع الكلمات؛ فخطأُ حرفٍ في القراءة يُسقط
+ * المرشّح كلَّه: «غاناش» و«غناش»، «Lorefa» و«Loreva» بلا كلمةٍ مشتركة = صفر،
+ * فلا يظهر المورّدُ حتّى اقتراحاً ويُنشأ ثانٍ. وهذه لا تحسم شيئاً — الحسمُ
+ * بـ`similarity` وحدها.
+ */
+export function trigramSimilarity(a: string, b: string): number {
+  const grams = (v: string) => {
+    const padded = `  ${v.replace(/\s+/g, " ").trim()} `;
+    const out = new Set<string>();
+    for (let i = 0; i + 3 <= padded.length; i++) out.add(padded.slice(i, i + 3));
+    return out;
+  };
+  if (!a.trim() || !b.trim()) return 0;
+  const x = grams(a);
+  const y = grams(b);
+  let shared = 0;
+  for (const g of x) if (y.has(g)) shared++;
+  return (2 * shared) / (x.size + y.size);
+}
+
 const digitsOnly = (v?: string | null) => (v ?? "").replace(/\D/g, "");
 
-/**
- * اسمُ الشهرة داخل الاسم النظاميّ — دليلٌ قويّ لا تشابهٌ ضعيف.
- *
- * المستندات تحمل الاسم النظاميّ كاملاً: «مؤسسة أوراق الزيتون التجارية».
- * والمخزَّن اسمُ الشهرة: «أوراق الزيتون». والتشابهُ الحرفيّ بينهما
- * ‏٠٫٦٧ — دون حدّ الترجيح، فيُردّ الكشفُ بـ«لم يُعرف المورّد» وهو
- * مذكورٌ في صدر صفحته.
- *
- * وقِيس على كشف أوراق الزيتون الحقيقيّ فوقع فعلاً.
- *
- * ولا تُحذَف صيغُ الشركات بقائمةٍ ثابتة — «محمصة» في «المحمصة الغربية»
- * أصلُ الاسم لا زائدة، وحذفُها يُنشئ خلطاً. وإنّما يُسأل سؤالٌ أضيق:
- * **أكلماتُ المخزَّن كلُّها واردةٌ في المستخرَج بترتيبها؟** فإن كانت،
- * فالمستخرَج هو نفسه موسَّعاً — لا اسمٌ آخر يشبهه.
- *
- * ويُشترَط طولٌ معتبَر للمخزَّن (كلمتان فأكثر، أو كلمةٌ من خمسة أحرف)
- * كي لا يبتلع اسمٌ قصيرٌ كلَّ ما احتواه.
- */
+/** أكلماتُ `needle` كلُّها واردةٌ في `haystack` بترتيبها؟ — الشرحُ فوق `containsTradeName`. */
 function containsWords(haystack: string, needle: string): boolean {
   const a = haystack.split(/\s+/).filter(Boolean);
   const b = needle.split(/\s+/).filter(Boolean);
@@ -139,6 +153,18 @@ export function matchSupplier(
     if (byVat) return { supplier: byVat, method: "VAT", confidence: 1, candidates: [] };
   }
 
+  /*
+    ما بعد الرقم الضريبيّ مطابقةٌ بالاسم — ولا يُحسَم بها مورّدٌ رقمُه المخزَّن
+    يخالف المقروء (كلاهما ١٥ خانة): تُخفَّض إلى اقتراح ويُقال لماذا.
+  */
+  const settle = (supplier: SupplierRecord, method: MatchMethod, confidence: number): SupplierMatch => {
+    const stored = digitsOnly(supplier.vatNumber);
+    if (vat.length === 15 && stored.length === 15 && stored !== vat) {
+      return { method: "NONE", confidence: Math.min(confidence, 0.6), candidates: [supplier], vatConflict: true };
+    }
+    return { supplier, method, confidence, candidates: [] };
+  };
+
   const names = [extracted.supplierNameAr, extracted.supplierNameEn]
     .filter((n): n is string => Boolean(n?.trim()))
     .map(normalizeName);
@@ -146,15 +172,21 @@ export function matchSupplier(
   if (names.length === 0) return { method: "NONE", confidence: 0, candidates: [] };
 
   for (const name of names) {
-    const byAlias = suppliers.find((s) => s.aliases.some((a) => a.normalized === name));
-    if (byAlias) return { supplier: byAlias, method: "ALIAS", confidence: 0.95, candidates: [] };
+    /*
+      واحدٌ لا غير: فرادةُ البديل في القاعدة لكلّ مورّدٍ لا عبرهم، فإن حمله
+      مورّدان كان `find` يحسم لأوّلهما ترتيباً بثقة ٠٫٩٥ — وبقيّةُ الدالّة
+      تشترط الواحد.
+    */
+    const byAlias = suppliers.filter((s) => s.aliases.some((a) => a.normalized === name));
+    if (byAlias.length === 1) return settle(byAlias[0], "ALIAS", 0.95);
+    if (byAlias.length > 1) return { method: "NONE", confidence: 0.6, candidates: byAlias.slice(0, 4) };
   }
 
   for (const name of names) {
     const byName = suppliers.find(
       (s) => normalizeName(s.nameAr) === name || (s.nameEn && normalizeName(s.nameEn) === name),
     );
-    if (byName) return { supplier: byName, method: "NAME", confidence: 0.9, candidates: [] };
+    if (byName) return settle(byName, "NAME", 0.9);
   }
 
   /*
@@ -170,7 +202,7 @@ export function matchSupplier(
         || s.aliases.some((a) => squash(a.normalized) === flat),
     );
     if (bySquash.length === 1) {
-      return { supplier: bySquash[0], method: "ALIAS", confidence: 0.93, candidates: [] };
+      return settle(bySquash[0], "ALIAS", 0.93);
     }
   }
 
@@ -187,7 +219,7 @@ export function matchSupplier(
     );
     /* واحدٌ لا غير — فإن احتواها اسمان لم يعد الاحتواء دليلاً */
     if (byContain.length === 1) {
-      return { supplier: byContain[0], method: "NAME", confidence: 0.88, candidates: [] };
+      return settle(byContain[0], "NAME", 0.88);
     }
     if (byContain.length > 1) {
       return { method: "NONE", confidence: 0.6, candidates: byContain.slice(0, 4) };
@@ -196,27 +228,53 @@ export function matchSupplier(
 
   const scored = suppliers
     .map((s) => {
-      const best = Math.max(
-        ...names.flatMap((n) => [
-          similarity(n, normalizeName(s.nameAr)),
-          s.nameEn ? similarity(n, normalizeName(s.nameEn)) : 0,
-          ...s.aliases.map((a) => similarity(n, a.normalized)),
-        ]),
-      );
-      return { supplier: s, score: best };
+      const stored = [normalizeName(s.nameAr), ...(s.nameEn ? [normalizeName(s.nameEn)] : []), ...s.aliases.map((a) => a.normalized)];
+      const score = Math.max(...names.flatMap((n) => stored.map((v) => similarity(n, v))));
+      /* خطأُ حرفٍ في القراءة: يُظهر المرشّحَ ولا يحسمه */
+      const loose = Math.max(score, ...names.flatMap((n) => stored.map((v) => trigramSimilarity(n, v))));
+      return { supplier: s, score, loose };
     })
-    .filter((x) => x.score >= 0.45)
-    .sort((a, b) => b.score - a.score)
+    .filter((x) => x.loose >= 0.45)
+    .sort((a, b) => b.loose - a.loose)
     .slice(0, 4);
 
   if (scored.length === 0) return { method: "NONE", confidence: 0, candidates: [] };
 
   // تشابه عالٍ جداً وبفارق واضح عن التالي ← نرجّحه، وما دونه اقتراح للمراجعة.
-  const clear = scored[0].score >= 0.85 && (scored.length === 1 || scored[0].score - scored[1].score >= 0.2);
+  const clear = scored[0].score >= 0.85 && (scored.length === 1 || scored[0].score - scored[1].loose >= 0.2);
+  if (clear) {
+    const settled = settle(scored[0].supplier, "FUZZY", scored[0].score);
+    if (settled.supplier) return { ...settled, candidates: scored.map((x) => x.supplier) };
+    return settled;
+  }
   return {
-    supplier: clear ? scored[0].supplier : undefined,
-    method: clear ? "FUZZY" : "NONE",
-    confidence: scored[0].score,
+    method: "NONE",
+    confidence: scored[0].loose,
     candidates: scored.map((x) => x.supplier),
   };
+}
+
+/**
+ * أهذا الاسمُ مورّدٌ مسجَّل، أم يشبه مسجَّلين؟ — دالّةٌ خالصة يُختبَر بها القرار.
+ *
+ * التطابقُ بالاسم المطبَّع أو ببديلٍ «هو نفسه». وما دونه (احتواءٌ، تشابهٌ،
+ * خطأُ حرف) **سؤالٌ لا حسم**: «سرد كو» أُنشئ وعندنا «سرد للتجارة»، ولم يكشفه
+ * إلّا `db:split-check` بعد أن انقسمت الفواتيرُ والدفعات بينهما.
+ */
+export function resolveNewSupplierName(
+  list: readonly SupplierRecord[],
+  input: { nameAr: string; nameEn?: string },
+): { same: SupplierRecord } | { similar: SupplierRecord[] } {
+  const names = [input.nameAr, input.nameEn].filter((n): n is string => Boolean(n?.trim())).map(normalizeName);
+  const same = list.find((s) =>
+    names.some((n) =>
+      normalizeName(s.nameAr) === n
+      || normalizeName(s.driveFolderName) === n
+      || (s.nameEn ? normalizeName(s.nameEn) === n : false)));
+  if (same) return { same };
+  const m = matchSupplier(list, { supplierNameAr: input.nameAr, supplierNameEn: input.nameEn });
+  /* بديلٌ مكتوبٌ بنصّه لمورّدٍ واحد: هو اسمُه الآخر */
+  if (m.supplier && m.method === "ALIAS" && m.confidence >= 0.95) return { same: m.supplier };
+  const similar = [...(m.supplier ? [m.supplier] : []), ...m.candidates.filter((c) => c.id !== m.supplier?.id)];
+  return { similar: similar.slice(0, 4) };
 }

@@ -20,8 +20,10 @@
  * صفراً، والمحسوب عندنا ليس ما في المستند.** يُكشَف التعارض ويُعاد
  * السؤال؛ فإن بقي رُفع إلى إنسان.
  */
-import { parseRiyals, checkInvoiceTotals, TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
-import { VAT_RATE } from "@/config/drive";
+import { parseRiyals, checkInvoiceTotals, TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyals, formatRiyalsDisplay } from "@/lib/money";
+import { parseLineQuantity } from "@/lib/line-pricing";
+import { decimalToMilli } from "@/lib/inventory/units";
+import { normalizeDocumentDate } from "@/lib/document-date";
 import type { ExtractionResult } from "./schema";
 
 export type ConflictCode =
@@ -30,6 +32,9 @@ export type ConflictCode =
   | "LINES_NOT_SUBTOTAL"
   | "LINE_MATH"
   | "DATE_INVALID"
+  | "DATE_IMPLAUSIBLE"
+  | "VAT_FORMAT"
+  | "PARTIES_SWAPPED"
   | "AMOUNT_UNREADABLE";
 
 export interface ExtractionConflict {
@@ -49,12 +54,44 @@ function money(v: string): number | null {
 }
 
 /**
- * الكميّة قد تُكتب «2» أو «2.5» أو «2 كجم».
- * ويُقرأ منها العدد وحده؛ وما لا عدد فيه لا يُفحَص حسابُه.
+ * الكمّيّة بالمِلّي (عددٌ صحيح) — بقارئ القيد نفسه (`parseLineQuantity`).
+ *
+ * كان هنا قارئٌ ثانٍ يبحث عن `\d` وحدها: «٢» و«١٢٫٥» تعودان `null` فيُتخطّى
+ * فحصُ السطر صامتاً، ويُضرَب العددُ عائماً. فصارت القاعدة واحدة والحساب صحيحاً.
  */
-function quantity(v: string): number | null {
-  const m = v.replace(/[،,]/g, "").match(/-?\d+(?:\.\d+)?/);
-  return m ? Number(m[0]) : null;
+function quantityMilli(v: string): number | null {
+  return decimalToMilli(parseLineQuantity(v));
+}
+
+/** نسبة الضريبة ١٥٪ — بسطاً ومقاماً صحيحين، لا `0.15` عائمة. */
+const VAT_PERCENT = 15;
+
+/** ما يُتوقَّع ضريبةً من صافٍ — للعرض في الرسالة وحده. */
+function expectedVat(subtotal: number): number {
+  return Math.floor((subtotal * VAT_PERCENT + 50) / 100);
+}
+
+/** سنةٌ هجريّة مكتوبةٌ بصيغة التاريخ: «1448-03-05». لا تُحوَّل ولا يُعاد عنها السؤال. */
+export function looksHijri(value: string): boolean {
+  return /^1[345]\d{2}-\d{2}-\d{2}$/.test(value.trim());
+}
+
+/** أقدمُ ما يُعدّ تاريخُ مستندٍ معقولاً: ثمانية عشر شهراً قبل اليوم */
+const MAX_AGE_MONTHS = 18;
+
+function monthsBefore(today: string, months: number): string {
+  const [y, m, d] = today.split("-").map(Number);
+  const at = new Date(Date.UTC(y, m - 1 - months, d));
+  return at.toISOString().slice(0, 10);
+}
+
+const SAUDI_VAT_RE = /^3\d{13}3$/;
+
+export interface ConflictContext {
+  /** «اليوم» بتوقيت الرياض `YYYY-MM-DD` — به تُفحص معقوليّة التاريخ. بلا قيمةٍ لا تُفحص. */
+  today?: string;
+  /** رقمُنا الضريبيّ — به يُكشف تبديلُ البائع والمشتري. */
+  companyVat?: string;
 }
 
 /**
@@ -68,7 +105,7 @@ export function isCalendarDate(value: string): boolean {
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
 }
 
-export function findConflicts(x: ExtractionResult): ExtractionConflict[] {
+export function findConflicts(x: ExtractionResult, ctx: ConflictContext = {}): ExtractionConflict[] {
   const conflicts: ExtractionConflict[] = [];
 
   const isStatement = x.documentKind === "STATEMENT";
@@ -89,15 +126,62 @@ export function findConflicts(x: ExtractionResult): ExtractionConflict[] {
     }
   }
 
-  /* ── التاريخ ── */
-  if (x.invoiceDate.trim() !== "" && !isCalendarDate(x.invoiceDate)) {
-    conflicts.push({
-      code: "DATE_INVALID",
-      fields: ["invoiceDate"],
-      message: DATE_RE.test(x.invoiceDate)
-        ? `التاريخ «${x.invoiceDate}» ليس يوماً في التقويم`
-        : `التاريخ «${x.invoiceDate}» ليس بصيغة YYYY-MM-DD`,
-    });
+  /*
+    ── التاريخ ──
+
+    الهجريّ المنقول كما طُبع ليس خطأَ قراءة: لا يُعاد عنه السؤال (فيُدفَع النموذج
+    إلى تحويله ظنّاً) — يُعلَن مجهولاً في `extractDocument` ويسدّه رمزُ الفاتورة إن وُجد.
+  */
+  if (x.invoiceDate.trim() !== "" && !looksHijri(x.invoiceDate)) {
+    if (!isCalendarDate(x.invoiceDate)) {
+      /* «13/09/2026» يفهمه الخادم — فلا يُدفع نداءٌ لإعادة كتابته */
+      if (normalizeDocumentDate(x.invoiceDate) === null) {
+        conflicts.push({
+          code: "DATE_INVALID",
+          fields: ["invoiceDate"],
+          message: DATE_RE.test(x.invoiceDate)
+            ? `التاريخ «${x.invoiceDate}» ليس يوماً في التقويم`
+            : `التاريخ «${x.invoiceDate}» لا يُفهَم — اكتبه YYYY-MM-DD كما طُبع`,
+        });
+      }
+    } else if (ctx.today && isCalendarDate(ctx.today)) {
+      /*
+        يومٌ صحيحٌ في التقويم وليس معقولاً: «2062-09-13» أو «2016-09-13» رقمٌ
+        مقلوبٌ في السنة يضع الفاتورة في شهرٍ ضريبيّ خاطئ. يُعاد السؤال، فإن عاد
+        الجوابُ نفسُه بقي تنبيهاً لمن يراجع.
+      */
+      if (x.invoiceDate > ctx.today) {
+        conflicts.push({
+          code: "DATE_IMPLAUSIBLE",
+          fields: ["invoiceDate"],
+          message: `التاريخ «${x.invoiceDate}» بعد اليوم (${ctx.today})`,
+        });
+      } else if (x.invoiceDate < monthsBefore(ctx.today, MAX_AGE_MONTHS)) {
+        conflicts.push({
+          code: "DATE_IMPLAUSIBLE",
+          fields: ["invoiceDate"],
+          message: `التاريخ «${x.invoiceDate}» أقدم من سنةٍ ونصف — تحقّق من السنة`,
+        });
+      }
+    }
+  }
+
+  /* ── الرقم الضريبيّ للبائع: شكلُه، وألّا يكون رقمَنا ── */
+  if (!isStatement && !isPayment) {
+    const sellerVat = x.sellerVatNumber.replace(/\s+/g, "");
+    if (sellerVat !== "" && ctx.companyVat && sellerVat === ctx.companyVat) {
+      conflicts.push({
+        code: "PARTIES_SWAPPED",
+        fields: ["sellerVatNumber", "buyerVatNumber"],
+        message: `الرقم الضريبيّ للبائع «${sellerVat}» هو رقمُنا نحن — ونحن المشتري. اقرأ رقم البائع من موضعه`,
+      });
+    } else if (sellerVat !== "" && !SAUDI_VAT_RE.test(sellerVat)) {
+      conflicts.push({
+        code: "VAT_FORMAT",
+        fields: ["sellerVatNumber"],
+        message: `الرقم الضريبيّ للبائع «${sellerVat}» ليس ١٥ رقماً أوّلها وآخرها ٣`,
+      });
+    }
   }
 
   const subtotal = money(x.subtotalAmount);
@@ -131,8 +215,9 @@ export function findConflicts(x: ExtractionResult): ExtractionConflict[] {
         تصحيحٌ بل إعادةُ قراءة: إن عاد الرقم نفسه فهو ما في المستند،
         ويُترَك لـ`validation.ts` أن ينبّه أحمد.
       */
-      const expected = Math.round(subtotal * VAT_RATE);
-      if (Math.abs(expected - vat) > TOTAL_ROUNDING_TOLERANCE_MINOR) {
+      const expected = expectedVat(subtotal);
+      /* بالأعداد الصحيحة: ‎|الضريبة×١٠٠ − الصافي×١٥| ≤ ريال×١٠٠ — كما في `auto-archive` */
+      if (Math.abs(vat * 100 - subtotal * VAT_PERCENT) > TOTAL_ROUNDING_TOLERANCE_MINOR * 100) {
         conflicts.push({
           code: "VAT_RATE_ODD",
           fields: ["subtotalAmount", "vatAmount"],
@@ -147,13 +232,13 @@ export function findConflicts(x: ExtractionResult): ExtractionConflict[] {
   /* ── البنود ── */
   if (x.lines.length > 0) {
     for (const [i, line] of x.lines.entries()) {
-      const q = quantity(line.quantity);
+      const qMilli = quantityMilli(line.quantity);
       const unit = money(line.unitPrice);
       const lineTotal = money(line.lineTotal);
-      if (q === null || unit === null || lineTotal === null) continue;
+      if (qMilli === null || unit === null || lineTotal === null) continue;
 
-      const expected = Math.round(q * unit);
-      if (Math.abs(expected - lineTotal) > TOTAL_ROUNDING_TOLERANCE_MINOR) {
+      /* الكمّيّة بالمِلّي × السعر بالهللات، يُقابَل بإجماليّ السطر × ١٠٠٠ — بلا عددٍ عشريّ */
+      if (Math.abs(qMilli * unit - lineTotal * 1000) > TOTAL_ROUNDING_TOLERANCE_MINOR * 1000) {
         conflicts.push({
           code: "LINE_MATH",
           fields: [`lines[${i}]`],
@@ -227,18 +312,18 @@ export function deriveAmounts(x: ExtractionResult): ExtractionResult {
   const subtotal = total - vat;
   if (subtotal < 0) return x;
 
-  return { ...x, subtotalAmount: (subtotal / 100).toFixed(2) };
+  return { ...x, subtotalAmount: formatRiyals(subtotal) };
 }
 
 /** يصوغ سؤال الإعادة — موجَّهاً إلى ما اختلّ وحده. */
 export function describeConflicts(conflicts: readonly ExtractionConflict[]): string {
   const fields = [...new Set(conflicts.flatMap((c) => c.fields))];
   return (
-    "القراءة لا تستقيم حسابياً:\n" +
+    "في القراءة ما لا يستقيم:\n" +
     conflicts.map((c) => `- ${c.message}`).join("\n") +
     `\n\nأعد قراءة هذه الحقول من المستند وحدها: ${fields.join("، ")}. ` +
-    "انسخ ما هو مطبوع حرفياً ولا تحسب ولا تصحّح. " +
-    "إن كان المطبوع نفسه لا يستقيم فأبقِه كما هو. " +
+    "انسخ ما هو مطبوع حرفياً ولا تحسب ولا تصحّح، ولا تغيّر رقماً ليستقيم الجمع. " +
+    "إن كان المطبوع نفسه لا يستقيم فأبقِه كما هو — ذلك جوابٌ مقبول. " +
     "أعد الكائن كاملاً بالمخطّط نفسه."
   );
 }

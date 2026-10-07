@@ -22,12 +22,31 @@ export function unreverseInvoiceNumber(raw: string): string {
   return m ? `${m[3]}${m[2]}${m[1]}` : raw;
 }
 
+/** الأرقامُ العربيّة والفارسيّة لاتينيّةً — أوّلُ خطوةٍ في كلّ توحيدٍ لرقم فاتورة. */
+export function latinDigits(raw: string): string {
+  return raw
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
+}
+
+/*
+ * ── ثلاثُ صيغٍ لثلاثة أسئلة، وأساسُها واحد ──
+ *
+ * كانت ثلاثَ دوالّ في ثلاثة ملفّات لا تتّفق حتّى على الأرقام العربيّة: «٠٤»
+ * مفتاحُه غيرُ «04» عند التوأم ومطابقة الكشف. فصار أساسُها واحداً هنا
+ * (`latinDigits` + `unreverseInvoiceNumber`)، ويبقى الفرقُ المقصود وحده:
+ *
+ *   `normalizeInvoiceNumber` — **للتنبيه** («مسجّلة مسبقاً»): تُسقط الأصفار
+ *     البادئة، فـ«04»=«4». إنسانٌ يرى التنبيه ويقرّر.
+ *   `invoiceNumberKey` (`invoice-twin.ts`) — **للحكم الآليّ** (رفضُ نسخة، تبنّي
+ *     ملفّ، استبدالُ قيد): الأصفارُ تبقى، فـ«05297» غيرُ «5297» — دمجُ فاتورتين
+ *     آلياً أسوأ من تنبيهٍ فائت.
+ *   `normalizeRef` (`statement-match.ts`) — **للاحتواء** في مرجع كشفٍ طويل.
+ */
 export function normalizeInvoiceNumber(raw: string | null | undefined): string {
   if (!raw) return "";
-  return unreverseInvoiceNumber(raw)
-    .trim()
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+  return latinDigits(unreverseInvoiceNumber(raw)
+    .trim())
     .toUpperCase()
     .replace(/([A-Z؀-ۿ])(\d)/g, "$1 $2")
     .replace(/(\d)([A-Z؀-ۿ])/g, "$1 $2")

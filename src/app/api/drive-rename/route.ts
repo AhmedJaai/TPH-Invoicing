@@ -153,6 +153,7 @@ export async function POST(request: Request) {
   const { done, failed, authExpired } = await applyRenames(
     drive,
     targets.map((t) => ({ driveFileId: t.doc.driveFileId, fileName: t.doc.fileName, proposed: t.proposed })),
+    { actorId: user.id, via: "اختيارٌ بيد" },
   );
 
   if (done.length > 0) {

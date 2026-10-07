@@ -29,7 +29,15 @@ const UNIT_WORDS: { re: RegExp; unit: StoredUnit }[] = [
 ];
 
 const toAsciiDigits = (s: string) =>
-  s.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/[٫]/g, ".").replace(/[×xX*]/g, " × ");
+  s.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/[٫]/g, ".");
+
+/**
+ * علامةُ الضرب **بين رقمين وحدها**: «24x250» ← «24 × 250».
+ *
+ * كان كلُّ حرف x يصير «×»، فتنكسر «Extra» إلى «e» و«tra» و«Mix» إلى «mi»
+ * و«Box» إلى «bo» — ويضعف اقتراحُ الصنف لكلّ اسمٍ فيه x.
+ */
+const withTimes = (s: string) => s.replace(/(\d)\s*[×xX*]\s*(?=\d)/g, "$1 × ");
 
 function unitOf(word: string): StoredUnit | null {
   const w = word.replace(/[.,،]/g, "");
@@ -45,7 +53,7 @@ function unitOf(word: string): StoredUnit | null {
  *   «24x250ml»          → 24 × 250 ML
  */
 export function guessPackSpec(description: string): PackGuess | null {
-  const text = toAsciiDigits(description)
+  const text = withTimes(toAsciiDigits(description))
     .replace(/(\d)([^\d\s.×])/g, "$1 $2")
     .replace(/([^\d\s.×])(\d)/g, "$1 $2");
   const tokens = text.split(/\s+/).filter(Boolean);

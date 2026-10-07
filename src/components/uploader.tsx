@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { NETWORK_ERROR, postJson, readResponse, request } from "@/lib/http-client";
+import { SimilarSuppliers, readSimilar, type SimilarSupplier } from "./similar-suppliers";
 import { FIELD, FILE, countNoun } from "@/lib/arabic";
 import { ISSUE } from "@/lib/issue-codes";
 import { buttonClass } from "./ui-tokens";
@@ -325,17 +326,25 @@ function SupplierPicker({
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [similar, setSimilar] = useState<SimilarSupplier[]>([]);
 
   const active = chosen ?? detected;
 
-  const create = async () => {
+  const create = async (confirmNew = false) => {
     const nameAr = name.trim();
     if (nameAr.length < 2) return;
     setBusy(true);
     setError(null);
     try {
-      const r = await postJson<{ supplier: { id: string; nameAr: string } }>("/api/supplier", { nameAr });
-      if (!r.ok) { setError(r.error); return; }
+      const r = await postJson<{ supplier: { id: string; nameAr: string } }>("/api/supplier", { nameAr, ...(confirmNew ? { confirmNew: true } : {}) });
+      if (!r.ok) {
+        /* يشبه مسجَّلاً — يُسأل «أهو هو؟» ولا يُنشأ ثانٍ بصمت */
+        const alike = r.status === 409 ? readSimilar(r.data) : [];
+        setSimilar(alike);
+        if (alike.length === 0) setError(r.error);
+        return;
+      }
+      setSimilar([]);
       onCreated({ id: r.data.supplier.id, nameAr: r.data.supplier.nameAr });
       toast({ tone: "ok", title: "أُنشئ المورّد", body: r.data.supplier.nameAr });
       setCreating(false);
@@ -401,7 +410,7 @@ function SupplierPicker({
           <input
             aria-label="اسم المورّد الجديد"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); setSimilar([]); }}
             onKeyDown={(e) => { if (e.key === "Enter") void create(); }}
             placeholder="اسم المورّد كما على الفاتورة"
             dir="auto"
@@ -417,9 +426,17 @@ function SupplierPicker({
           >
             أنشئه
           </button>
-          <button type="button" onClick={() => { setCreating(false); setError(null); }} className={buttonClass("quiet", "sm")}>
+          <button type="button" onClick={() => { setCreating(false); setError(null); setSimilar([]); }} className={buttonClass("quiet", "sm")}>
             إلغاء
           </button>
+          <div className="w-full">
+            <SimilarSuppliers
+              similar={similar}
+              busy={busy}
+              onPick={(s) => { onChoose({ id: s.id, nameAr: s.nameAr }); setSimilar([]); setCreating(false); setName(""); }}
+              onCreateAnyway={() => void create(true)}
+            />
+          </div>
         </div>
       ) : canCreate ? (
         <button type="button" onClick={() => setCreating(true)} className={`mt-1.5 ${buttonClass("quiet", "sm")} -ms-2`}>

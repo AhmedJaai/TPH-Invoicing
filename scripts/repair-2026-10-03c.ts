@@ -45,7 +45,7 @@ async function main() {
     if (process.env.DRIVE_ALLOW_WRITE === "true" && r.drive && name !== r.file) {
       const drive = await driveForCli(async () =>
         (await db.select({ t: accounts.refresh_token }).from(accounts).where(eq(accounts.provider, "google")).limit(1))[0]?.t ?? null);
-      const out = await applyRenames(drive, [{ driveFileId: r.drive, fileName: r.file, proposed: name }]);
+      const out = await applyRenames(drive, [{ driveFileId: r.drive, fileName: r.file, proposed: name }], { actorId: AHMED, via: "نصُّ إصلاح" });
       if (out.done.length) {
         await recordAudit({ actorId: AHMED, action: "DRIVE_FILE_RENAMED", entityType: "drive", entityId: "rename",
           after: { الفعل: "إعادة تسمية", المصدر: WHY, الملفّات: out.done.map((d) => `${d.from} ← ${d.to}`) } });

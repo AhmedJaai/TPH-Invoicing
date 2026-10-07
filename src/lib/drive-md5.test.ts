@@ -15,8 +15,12 @@ const read = (...p: string[]) => readFileSync(path.join("src", ...p), "utf8");
 describe("drive_md5 موصولٌ من الدرايف إلى التحليل", () => {
   it("القائمةُ وبياناتُ الملفّ تطلبان md5Checksum", () => {
     const drive = read("lib", "drive.ts");
-    expect(drive).toMatch(/files\([^)]*\bmd5Checksum\b[^)]*\)/);
-    expect(drive).toMatch(/fields: "id, name, mimeType, size, modifiedTime, parents, md5Checksum"/);
+    /* قائمةُ الحقول واحدةٌ للبابين — وفيها البصمتان */
+    const fields = /const FILE_FIELDS =\s*"([^"]+)"/.exec(drive)?.[1] ?? "";
+    expect(fields).toMatch(/\bmd5Checksum\b/);
+    expect(fields).toMatch(/\bsha256Checksum\b/);
+    expect(drive).toMatch(/fields: `nextPageToken, files\(\$\{FILE_FIELDS\}\)`/);
+    expect(drive).toMatch(/fields: FILE_FIELDS,/);
   });
 
   it("المزامنة تحفظه في المسارين", () => {

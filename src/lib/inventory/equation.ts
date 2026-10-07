@@ -30,6 +30,8 @@
  * لم يُسجَّل، وهو خبرٌ تامّ عن سجلٍّ نملكه كلَّه.
  */
 
+import { roundHalfAwayFromZero } from "./units";
+
 /** الفرقُ يُنسَب إلى المتوقَّع — بنقاط الأساس، عدداً صحيحاً (١٠٠ = ١٪). */
 export const BP = 10_000;
 
@@ -113,8 +115,8 @@ export function stockVariance(terms: StockTerms, actualMilli: number | null): St
     varianceConsumptionBp:
       consumption === null || consumption === 0
         ? null
-        : Math.round((variance * BP) / Math.abs(consumption)),
-    varianceBp: closing === 0 ? null : Math.round((variance * BP) / Math.abs(closing)),
+        : roundHalfAwayFromZero((variance * BP) / Math.abs(consumption)),
+    varianceBp: closing === 0 ? null : roundHalfAwayFromZero((variance * BP) / Math.abs(closing)),
   };
 }
 

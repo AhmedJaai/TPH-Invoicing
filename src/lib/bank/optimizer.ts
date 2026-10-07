@@ -22,6 +22,17 @@
  * كل تخصيصٍ محتمل، مع قطع الفرع متى استحال أن يبلغ أفضلَ ما وُجد.
  * وهي مسألة صعبة نظرياً، فلها ميزانيّة عقد؛ فإن نفدت رجع إلى الجشع
  * **وأعلن ذلك** في `exact`. والتقريب المعلَن خيرٌ من ادّعاء المثالية.
+ *
+ * **والمجموعُ مجموعُ أوزانٍ لا درجاتٍ خامّ** (`weight`): مجموعُ الدرجات
+ * يبيع مطابقةً قويّة بمطابقتين ضعيفتين — حركةٌ لها ٠٫٩٠ على فاتورةٍ تُحرَم
+ * منها لتأخذها أخرى بـ٠٫٥٥ وتُعطى بديلاً بـ٠٫٥٠، لأنّ ١٫٠٥ > ٠٫٩٠. فيخرج
+ * اقتراحان ضعيفان بدل حسمٍ صحيح. والوزنُ المحدَّب يُبقي «اثنتان قويّتان
+ * خيرٌ من واحدة» (٩٤+٩٣ على ٩٥) ويمنع «ضعيفتان خيرٌ من قويّة».
+ *
+ * **وتُحلّ كلُّ مكوّنةٍ مستقلّةٍ وحدها**: الحركاتُ التي لا تتشارك فاتورةً
+ * (مورّدون مختلفون) لا يؤثّر بعضها في بعض. وكانت تُحلّ معاً بميزانيّةٍ
+ * واحدة، فمورّدٌ واحد صعب يُنفدها فتُنزَّل **كلّ** مطابقات الكشف إلى
+ * اقتراح. فلكلّ مكوّنةٍ ميزانيّتُها، وما لم يُثبَت يُسمّى بحركاته.
  */
 import type { Candidate } from "./candidates";
 
@@ -46,19 +57,38 @@ export interface Unassigned {
 export interface Reconciliation {
   assigned: Assignment[];
   unassigned: Unassigned[];
-  /** هل بُلغ الحلّ الأمثل يقيناً، أم نفدت الميزانيّة فرُجع إلى الجشع؟ */
+  /** هل بُلغ الحلّ الأمثل يقيناً في **كلّ** مكوّنة، أم نفدت ميزانيّةُ إحداها؟ */
   exact: boolean;
+  /**
+   * حركاتُ المكوّنات التي لم يُثبَت حلُّها — هي وحدها تُنزَّل إلى اقتراح.
+   * وما عداها حلُّه يقين ولو تعسّر غيرُه.
+   */
+  inexactTransactionIds: string[];
   /** مجموع درجات ما خُصّص — مقياس جودة الحلّ. */
   totalScore: number;
 }
 
 /**
- * أقصى عدد عقد يُفحَص قبل الرجوع إلى الجشع.
+ * أقصى عدد عقد يُفحَص **في المكوّنة الواحدة** قبل الرجوع إلى الجشع.
  *
  * المسألة صعبة نظرياً (تعبئة مجموعات)، فلا يُترَك البحث بلا حدّ في
  * مسارٍ يعمل داخل طلب HTTP. والحدّ سخيّ لأحجام الكشوف الواقعية.
  */
 export const NODE_BUDGET = 200_000;
+
+/**
+ * وزنُ المرشّح في هدف المحسِّن: الدرجةُ مرفوعةً إلى الرابعة.
+ *
+ * ‏٠٫٩٠ ← ٠٫٦٦ · ٠٫٥٥ ← ٠٫٠٩ · ٠٫٥٠ ← ٠٫٠٦: فلا تُشترى قويّةٌ بضعيفتين.
+ * ‏٠٫٩٥ ← ٠٫٨١ · ٠٫٩٤ ← ٠٫٧٨ · ٠٫٩٣ ← ٠٫٧٥: واثنتان قويّتان تغلبان واحدة.
+ * والترتيبُ بين مرشّحَي الحركة الواحدة لا يتغيّر — الدالّة متزايدة.
+ */
+export function weight(score: number): number {
+  const s = Math.max(0, score);
+  return s * s * s * s;
+}
+
+interface Group { transactionId: string; options: Claim[] }
 
 /**
  * يوزّع الفواتير على الحركات بلا تكرار.
@@ -83,7 +113,7 @@ export function reconcile(claims: readonly Claim[]): Reconciliation {
     الحركة التي لها مرشّح واحد تُحسم بلا تفريع، فتقييدها مبكّراً يقطع
     فروعاً كثيرة. وعند التساوي يُرتَّب بالمعرّف كي تثبت النتيجة.
   */
-  const groups = [...byTransaction.entries()]
+  const groups: Group[] = [...byTransaction.entries()]
     .map(([transactionId, list]) => ({
       transactionId,
       options: [...list].sort(
@@ -98,10 +128,64 @@ export function reconcile(claims: readonly Claim[]): Reconciliation {
         a.transactionId.localeCompare(b.transactionId),
     );
 
-  /** أفضل درجةٍ ممكنة لكل مجموعةٍ بعد الحاليّة — أساس القطع. */
+  const chosen = new Map<string, Claim>();
+  const inexact: string[] = [];
+
+  for (const component of components(groups)) {
+    const solved = solve(component);
+    for (const [transactionId, claim] of solved.chosen) chosen.set(transactionId, claim);
+    if (!solved.exact) inexact.push(...component.map((g) => g.transactionId));
+  }
+
+  return {
+    ...collect(groups, chosen),
+    exact: inexact.length === 0,
+    inexactTransactionIds: inexact.sort((a, b) => a.localeCompare(b)),
+  };
+}
+
+/**
+ * المكوّنات المتّصلة: حركتان في مكوّنةٍ واحدة إن تشاركتا فاتورةً، مباشرةً
+ * أو عبر سلسلة. (اتّحاد المجموعات — Union-Find.)
+ */
+function components(groups: readonly Group[]): Group[][] {
+  const parent = groups.map((_, i) => i);
+  const find = (i: number): number => {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]];
+      i = parent[i];
+    }
+    return i;
+  };
+
+  const ownerOfInvoice = new Map<string, number>();
+  groups.forEach((g, i) => {
+    for (const option of g.options) {
+      for (const id of option.candidate.invoiceIds) {
+        const owner = ownerOfInvoice.get(id);
+        if (owner === undefined) ownerOfInvoice.set(id, i);
+        else parent[find(i)] = find(owner);
+      }
+    }
+  });
+
+  /* بترتيب الحركات كما رُتّبت — كي تثبت النتيجة */
+  const byRoot = new Map<number, Group[]>();
+  groups.forEach((g, i) => {
+    const root = find(i);
+    const list = byRoot.get(root) ?? [];
+    list.push(g);
+    byRoot.set(root, list);
+  });
+  return [...byRoot.values()];
+}
+
+/** يحلّ مكوّنةً واحدة بميزانيّتها. */
+function solve(groups: readonly Group[]): { chosen: Map<string, Claim>; exact: boolean } {
+  /** أفضل وزنٍ ممكن لكل مجموعةٍ بعد الحاليّة — أساس القطع. */
   const suffixBest: number[] = new Array(groups.length + 1).fill(0);
   for (let i = groups.length - 1; i >= 0; i--) {
-    suffixBest[i] = suffixBest[i + 1] + (groups[i].options[0]?.candidate.score ?? 0);
+    suffixBest[i] = suffixBest[i + 1] + weight(groups[i].options[0]?.candidate.score ?? 0);
   }
 
   let bestScore = -1;
@@ -131,7 +215,7 @@ export function reconcile(claims: readonly Claim[]): Reconciliation {
       if (option.candidate.invoiceIds.some((id) => taken.has(id))) continue;
       for (const id of option.candidate.invoiceIds) taken.add(id);
       current[index] = option;
-      walk(index + 1, score + option.candidate.score);
+      walk(index + 1, score + weight(option.candidate.score));
       current[index] = null;
       for (const id of option.candidate.invoiceIds) taken.delete(id);
       if (exhausted) return;
@@ -144,6 +228,11 @@ export function reconcile(claims: readonly Claim[]): Reconciliation {
 
   walk(0, 0);
 
+  const found = new Map<string, Claim>();
+  bestChoice.forEach((claim, i) => {
+    if (claim) found.set(groups[i].transactionId, claim);
+  });
+
   /*
     نفدت الميزانيّة: يُرجَع إلى الجشع بالدرجة. وهو أضعف، لكنّه معلَنٌ
     في `exact` فلا يُدَّعى ما ليس كذلك.
@@ -154,29 +243,16 @@ export function reconcile(claims: readonly Claim[]): Reconciliation {
       وما وجده البحث قبل النفاد لا يُرمى إن كان أعلى من الجشع — كان
       يُرجَع حلٌّ مجموعه ٩٥ وفي اليد ١٨٧. ويبقى `exact: false` في الحالين.
     */
-    const fallbackScore = fallback.assigned.reduce((s, a) => s + a.candidate.score, 0);
-    if (bestScore > fallbackScore) {
-      const found = new Map<string, Claim>();
-      bestChoice.forEach((claim, i) => {
-        if (claim) found.set(groups[i].transactionId, claim);
-      });
-      return { ...collect(groups, found), exact: false };
-    }
-    return { ...fallback, exact: false };
+    let fallbackScore = 0;
+    for (const claim of fallback.values()) fallbackScore += weight(claim.candidate.score);
+    return { chosen: bestScore > fallbackScore ? found : fallback, exact: false };
   }
 
-  const chosen = new Map<string, Claim>();
-  bestChoice.forEach((claim, i) => {
-    if (claim) chosen.set(groups[i].transactionId, claim);
-  });
-
-  return { ...collect(groups, chosen), exact: true };
+  return { chosen: found, exact: true };
 }
 
 /** الجشع بالدرجة — يُستعمل حين تنفد ميزانيّة البحث وحدها. */
-function greedy(
-  groups: readonly { transactionId: string; options: Claim[] }[],
-): Omit<Reconciliation, "exact"> {
+function greedy(groups: readonly Group[]): Map<string, Claim> {
   const ordered = groups
     .flatMap((g) => g.options)
     .sort(
@@ -194,7 +270,7 @@ function greedy(
     chosen.set(claim.transactionId, claim);
     for (const id of claim.candidate.invoiceIds) taken.add(id);
   }
-  return collect(groups, chosen);
+  return chosen;
 }
 
 /**
@@ -205,9 +281,9 @@ function greedy(
  * وحسبانه منافساً يُنتج «تردّداً» كاذباً يوقف مطابقةً صحيحة.
  */
 function collect(
-  groups: readonly { transactionId: string; options: Claim[] }[],
+  groups: readonly Group[],
   chosen: ReadonlyMap<string, Claim>,
-): Omit<Reconciliation, "exact"> {
+): Omit<Reconciliation, "exact" | "inexactTransactionIds"> {
   const taken = new Set<string>();
   for (const claim of chosen.values()) {
     for (const id of claim.candidate.invoiceIds) taken.add(id);

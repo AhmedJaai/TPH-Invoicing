@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runReconciliation } from "./reconcile.service";
+import { pickCandidate, planFor, runReconciliation } from "./reconcile.service";
 import type { OpenInvoice } from "@/lib/bank/candidates";
 import type { SupplierIdentity } from "@/lib/bank/entities";
 import { buildMemory } from "@/lib/bank/classification";
@@ -284,9 +284,10 @@ describe("حالات التحكيم تُحسَب دائماً", () => {
   it("تُحسَب وإن لم يُستدعَ حَكَم — فمعرفة كم التبس أهمّ من حلّه", () => {
     const { adjudicationCases } = runReconciliation({
       rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" })],
+      /* بفرق هللة: متقاربان لا متماثلان — المتماثلان يُمثَّلان بأقدمهما ولا حَكَم بينهما */
       invoices: [
         invoice({ id: "a", outstandingMinor: 1_000_00 }),
-        invoice({ id: "b", outstandingMinor: 1_000_00 }),
+        invoice({ id: "b", outstandingMinor: 1_000_01 }),
       ],
       suppliers,
     });
@@ -363,5 +364,76 @@ describe("القراءة البصرية لا تُحسَم تلقائياً", () 
     expect(results[0].decision?.disposition).toBe("SUGGEST");
     expect(results[0].decision?.reasons.some((r) => r.includes("بصرياً"))).toBe(true);
     expect(planned).toHaveLength(0);
+  });
+});
+
+
+describe("إقرارُ اقتراحٍ بيد — الخطّة من المحرّك والاختيارُ من قائمته", () => {
+  const two = [
+    invoice({ id: "a", outstandingMinor: 1_000_00 }),
+    invoice({ id: "b", outstandingMinor: 1_000_01, invoiceDate: day("2026-08-01") }),
+  ];
+  const engine = () => runReconciliation({
+    rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" })],
+    invoices: two, suppliers,
+  });
+  const byId = new Map(two.map((i) => [i.id, i]));
+  const txOf = { key: "t1", supplierId: "S1", amountMinor: 1_000_00, paidAt: day("2026-08-11") };
+
+  it("الاقتراحُ لا يدخل planned، ومرشّحوه معروضون ليُختار بينهم", () => {
+    const e = engine();
+    expect(e.planned).toEqual([]);
+    expect(e.results[0].decision?.disposition).toBe("SUGGEST");
+    expect(e.candidatesByKey.get("t1")?.map((c) => c.invoiceIds[0]).sort()).toEqual(["a", "b"]);
+  });
+
+  it("بلا اختيار يُقَرّ ما رسا عليه المحرّك", () => {
+    const e = engine();
+    expect(pickCandidate(e, "t1")?.invoiceIds).toEqual(e.results[0].candidate?.invoiceIds);
+  });
+
+  it("والمختارُ يجب أن يكون من قائمة الخادم — فاتورةٌ من خارجها لا تُكتب", () => {
+    const e = engine();
+    expect(pickCandidate(e, "t1", ["b"])?.invoiceIds).toEqual(["b"]);
+    expect(pickCandidate(e, "t1", ["ليست-مرشّحة"])).toBeNull();
+    expect(pickCandidate(e, "t1", ["a", "b"])).toBeNull();
+  });
+
+  it("الخطّة يحسبها الخادم: التخصيصُ بقدر المتبقّي، والمقيَّدُ ما خرج من الحساب", () => {
+    const e = engine();
+    const plan = planFor(txOf, pickCandidate(e, "t1", ["b"])!, byId, { fullAmount: true })!;
+    expect(plan.allocations).toEqual([{ invoiceId: "b", amountMinor: 1_000_00 }]);
+    expect(plan.amountMinor).toBe(1_000_00);
+    expect(plan.feeMinor).toBe(0);
+  });
+
+  it("الزائدُ على الفاتورة يبقى غير مخصَّص — لا دفعةٌ تنقص عن حركتها", () => {
+    const over = { invoiceIds: ["a"], outcome: "OVERPAYMENT" as const, allocatedMinor: 1_000_00,
+      parts: { supplier: 1, amount: 0.5, date: 1, reference: 0 }, score: 0.7, evidence: [] };
+    const plan = planFor({ ...txOf, amountMinor: 1_500_00 }, over, byId, { fullAmount: true })!;
+    expect(plan.amountMinor).toBe(1_500_00);
+    expect(plan.allocations).toEqual([{ invoiceId: "a", amountMinor: 1_000_00 }]);
+  });
+
+  it("فاتورةٌ من المرشّح سُدّدت بعده أو لمورّدٍ آخر — لا خطّة", () => {
+    const gone = { invoiceIds: ["a", "سُدّدت"], outcome: "MULTI_INVOICE" as const, allocatedMinor: 1_000_00,
+      parts: { supplier: 1, amount: 1, date: 1, reference: 0 }, score: 0.9, evidence: [] };
+    expect(planFor(txOf, gone, byId)).toBeNull();
+    const other = new Map([["a", { ...two[0], supplierId: "S2" }]]);
+    expect(planFor(txOf, { ...gone, invoiceIds: ["a"] }, other)).toBeNull();
+  });
+});
+
+describe("تنزيلُ ما لم يُثبَت يقع على مكوّنته وحدها", () => {
+  it("مورّدٌ سهل يُحسَم تلقائياً ولو كان في الكشف غيرُه", () => {
+    const { results } = runReconciliation({
+      rows: [
+        row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" }),
+        row({ key: "t2", description: "شركة أنس غالب خاشقجي التجارية", amountMinor: 700_00 }),
+      ],
+      invoices: [invoice({ id: "i1" }), invoice({ id: "i2", supplierId: "S2", outstandingMinor: 700_00, totalMinor: 700_00 })],
+      suppliers,
+    });
+    expect(results.map((r) => r.decision?.disposition)).toEqual(["AUTO", "AUTO"]);
   });
 });

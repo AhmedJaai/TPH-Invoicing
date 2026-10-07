@@ -206,6 +206,24 @@ export const documents = pgTable("documents", {
    */
   origin: text("origin"),
   originStatementId: text("origin_statement_id"),
+
+  /* ── أثرُ الدخول والقراءة (066) ── */
+  /** كم مرّةً حُووِلت قراءتُه آلياً — بعد الثالثة لا يُعاد ويُنتظَر إنسان. */
+  readAttempts: integer("read_attempts").notNull().default(0),
+  /** سببُ آخر فشلٍ بنصّه (تعذّر التنزيل · ردُّ النموذج) — يُعرض في ملفّ المستند. */
+  lastReadError: text("last_read_error"),
+  lastReadAt: timestamp("last_read_at", { withTimezone: true }),
+  /** الاسمُ يوم وصل — يُملأ مرّةً، والتسميةُ تكتب فوق `fileName` وحده. */
+  originalFileName: text("original_file_name"),
+  /** بابُ الدخول: `UPLOAD` · `DRIVE_SYNC`. والفراغ: ما سبق العمود — غير معروف. */
+  source: text("source"),
+  /** متى وُضع في الدرايف، وآخرُ من عدّله هناك — لا من فتح المتصفّح وقت المزامنة. */
+  driveCreatedAt: timestamp("drive_created_at", { withTimezone: true }),
+  driveModifiedBy: text("drive_modified_by"),
+  /** لماذا رُفض: «نسخةٌ من …» · «رُفع ولم يُقيَّد». */
+  statusNote: text("status_note"),
+  /** الأصلُ الذي هذا نسخةٌ منه بالبصمة. */
+  duplicateOfId: text("duplicate_of_id"),
   uploadedAt: now(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
@@ -219,6 +237,7 @@ export const documents = pgTable("documents", {
   uniqueIndex("documents_sha_uniq").on(t.sha256).where(sql`status <> 'REJECTED'`),
   index("documents_period_supplier_idx").on(t.periodMonth, t.supplierId),
   index("documents_status_idx").on(t.status),
+  index("documents_drive_md5_idx").on(t.driveMd5).where(sql`drive_md5 is not null`),
 ]);
 
 /* ───────────────────────── الفواتير ───────────────────────── */
@@ -1148,6 +1167,14 @@ export const saleLines = pgTable("sale_lines", {
    */
   isModifier: boolean("is_modifier").notNull().default(false),
   parentExternalId: text("parent_external_id"),
+  /**
+   * **سطرُ** الأصل (`external_id` في البيعة نفسها) لا رمزُه (`065`).
+   *
+   * لاتيه عاديّ ولاتيه بإكسترا شوت في طلبٍ واحد يحملان الرمزَ نفسَه؛ فالربطُ
+   * بالرمز ينسب الخيارَ إلى الاثنين. والفارغُ سطرٌ قُيِّد قبل العمود — يُقرأ
+   * بالرمز حتى يُعاد رفعُ ملفّه.
+   */
+  parentLineExternalId: text("parent_line_external_id"),
   /** المُعدِّلات كما وردت — تُحفَظ على الأصل، وما لا يُربَط منها يُعلَن في التغطية. */
   modifiers: jsonb("modifiers"),
   /**
@@ -1560,9 +1587,16 @@ export const wasteRecords = pgTable("waste_records", {
   countId: text("count_id").references(() => inventoryCounts.id, { onDelete: "set null" }),
   createdById: text("created_by_id").references(() => users.id),
   createdAt: now(),
+  /** أُبطل — يبقى السطرُ بسببه ويخرج من الحساب (`064`). */
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+  voidedById: text("voided_by_id").references(() => users.id),
+  voidReason: text("void_reason"),
+  /** مفتاحُ الطلب من المتصفّح — ضغطتان على «سجّل» سطرٌ واحد. */
+  clientRequestId: text("client_request_id"),
 }, (t) => [
   index("waste_records_product_idx").on(t.productId, t.occurredOn),
   index("waste_records_count_idx").on(t.countId),
+  uniqueIndex("waste_records_client_request_uq").on(t.clientRequestId).where(sql`client_request_id is not null`),
 ]);
 
 /* ───────────────────────── سجل التدقيق ───────────────────────── */
@@ -1946,4 +1980,41 @@ export const vatInvoiceChoices = pgTable("vat_invoice_choices", {
   included: boolean("included").notNull(),
   decidedById: text("decided_by_id").references(() => users.id),
   decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * لقطةُ «الإقرار المقدَّم» — ما قُدِّم للهيئة عن الفترة، بأرقامه ولقطة حسابه. لا تُحذف:
+ * التراجعُ `voidedAt` بسببه، ولكلّ فترةٍ لقطةٌ قائمة واحدة. انظر `062`.
+ */
+export const vatFilings = pgTable("vat_filings", {
+  id: id(),
+  /** `2026-Q3` أو `2026-07` — `periodKey` في `lib/vat-return.ts`. */
+  periodKey: text("period_key").notNull(),
+  /** يومُ التقديم `YYYY-MM-DD` بتوقيت الرياض. */
+  filedOn: text("filed_on").notNull(),
+  /** رقمُ مرجع الإقرار في بوّابة الهيئة — إن كُتب. */
+  reference: text("reference"),
+  outputVatMinor: integer("output_vat_minor").notNull(),
+  inputVatMinor: integer("input_vat_minor").notNull(),
+  carriedInMinor: integer("carried_in_minor").notNull().default(0),
+  netMinor: integer("net_minor").notNull(),
+  /** ما فُعل بالرصيد الدائن: `CARRY` يُرحَّل للفترة التالية، `REFUND` طُلب استردادُه. */
+  creditDisposition: text("credit_disposition"),
+  snapshot: jsonb("snapshot").notNull(),
+  filedById: text("filed_by_id").references(() => users.id),
+  createdAt: now(),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+  voidedById: text("voided_by_id").references(() => users.id),
+  voidReason: text("void_reason"),
+}, (t) => [uniqueIndex("vat_filings_live_period_uniq").on(t.periodKey).where(sql`voided_at is null`)]);
+
+/**
+ * مبيعاتُ النقد التي لم تُودَع، شهراً شهراً وشاملةَ الضريبة — يكتبها صاحبُ المقهى للإقرار.
+ * وغيابُ الصفّ «لم يُكتب» لا «صفر». انظر `063`.
+ */
+export const vatPeriodInputs = pgTable("vat_period_inputs", {
+  month: text("month").primaryKey(),
+  cashSalesGrossMinor: integer("cash_sales_gross_minor").notNull(),
+  updatedById: text("updated_by_id").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

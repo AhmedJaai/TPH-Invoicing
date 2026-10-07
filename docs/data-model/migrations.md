@@ -2,7 +2,7 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٥٩
+## الجداول — ٦١
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` · `payments` `payment_allocations`
@@ -11,7 +11,7 @@
 `audit_logs` `rate_limits` `expenses`
 `counterparties` `counterparty_evidence` · `branches` `bank_accounts` `reconciliation_periods`
 `sale_payments` `refunds` `refund_lines` `settlement_batches`
-`adjudications` `decision_history` · `ai_findings` · `extraction_cache` · `alert_resolutions` · `vat_tx_choices` `vat_invoice_choices`
+`adjudications` `decision_history` · `ai_findings` · `extraction_cache` · `alert_resolutions` · `vat_tx_choices` `vat_invoice_choices` `vat_filings` `vat_period_inputs`
 `recipes` `recipe_versions` `recipe_ingredients` · `sales_imports` `sales_import_rows`
 `inventory_counts` `inventory_count_lines` `inventory_count_snapshots` `inventory_movements` `waste_records`
 `inventory_count_openings` `inventory_receipts`
@@ -103,6 +103,11 @@
 | `059_bank_account_opened_on.sql` | `bank_accounts.opened_on` (YYYY-MM-DD) — يومُ فتح الحساب؛ تغطيةُ الكشف في شهر الفتح تبدأ منه (إقفال مايو ٢٠٢٦) |
 | `060_vat_tx_choices.sql` | `vat_tx_choices` — أيُّ حركات البنك تُعدّ في إقرار الضريبة، ما خالف الأصلَ وحده (`lib/vat-return.ts`) |
 | `061_vat_invoice_choices.sql` | `vat_invoice_choices` — فاتورةٌ يُقرّ صاحبُها أنّها ضريبيّةٌ على الورقة فتُحسب في خصم الإقرار، بلا تعديلها (الشهرُ المقفل) |
+| `062_vat_filings.sql` | `vat_filings` — لقطةُ الإقرار كما قُدِّم للهيئة؛ تُبطَل بسببها ولا تُحذف، ولكلّ فترةٍ لقطةٌ قائمة واحدة |
+| `063_vat_period_inputs.sql` | `vat_period_inputs` — مبيعاتُ النقد التي لم تُودَع، شهراً شهراً؛ وغيابُ الصفّ «لم يُكتب» لا صفر |
+| `064_waste_void_and_request_key.sql` | `waste_records`: إبطالٌ بسببه (`voided_at` …) ومفتاحُ طلبٍ فريد يمنع سطرين من ضغطتين |
+| `065_sale_line_parent_line.sql` | `sale_lines.parent_line_external_id` — خيارُ الإضافة يُربَط بسطر أصله لا برمزه |
+| `066_document_intake_trace.sql` | `documents`: أثرُ الدخول والقراءة (المصدر · محاولاتُ القراءة وسببُ فشلها · الاسمُ الأصليّ · نسخةُ ماذا) وفهرسُ `drive_md5` |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

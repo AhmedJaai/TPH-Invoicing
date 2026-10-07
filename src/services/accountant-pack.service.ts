@@ -11,16 +11,17 @@ import { buildAccountantPack, type PackInput, type Sheet } from "@/lib/accountan
 import type { InputVatStatus, TaxStatus } from "@/lib/validation";
 import { formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
 
+/* اليومُ يُرجعه الاستعلامُ نصّاً بتوقيت الرياض — كان يُقطع من UTC فتُكتب دفعةُ فجر ١ أكتوبر «٣٠ سبتمبر» */
 const day = (v: unknown): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? "").slice(0, 10));
 
 export async function loadAccountantPack(month: string): Promise<{ sheets: Sheet[]; input: PackInput }> {
   const [invoices, payments, expenses, bank, closed] = await Promise.all([
     db.execute<{
-      number: string; date: Date; supplier: string | null; seller_vat: string | null;
+      number: string; date: string; supplier: string | null; seller_vat: string | null;
       subtotal: number | null; vat: number | null; total: number;
       tax: TaxStatus; input_vat: InputVatStatus; paid: number;
     }>(sql`
-      select i.invoice_number as number, i.invoice_date as date, s.name_ar as supplier, i.seller_vat,
+      select i.invoice_number as number, to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as date, s.name_ar as supplier, i.seller_vat,
              i.subtotal_minor as subtotal, i.vat_minor as vat, i.total_minor as total,
              i.tax_status as tax, i.input_vat_status as input_vat,
              coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = i.id), 0)::bigint as paid
@@ -30,10 +31,10 @@ export async function loadAccountantPack(month: string): Promise<{ sheets: Sheet
        order by i.invoice_date, i.invoice_number
     `),
     db.execute<{
-      date: Date; supplier: string | null; amount: number; fee: number; method: string; status: string;
+      date: string; supplier: string | null; amount: number; fee: number; method: string; status: string;
       invoices: string[] | null; from_bank: boolean;
     }>(sql`
-      select p.paid_at as date, s.name_ar as supplier, p.amount_minor as amount, p.fee_minor as fee,
+      select to_char(p.paid_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as date, s.name_ar as supplier, p.amount_minor as amount, p.fee_minor as fee,
              p.method, p.status,
              (select array_agg(i.invoice_number order by i.invoice_date)
                 from payment_allocations pa join invoices i on i.id = pa.invoice_id
@@ -50,8 +51,8 @@ export async function loadAccountantPack(month: string): Promise<{ sheets: Sheet
        where period_month = ${month}
        order by occurred_on
     `),
-    db.execute<{ date: Date; description: string | null; beneficiary: string | null; direction: "DEBIT" | "CREDIT"; amount: number; category: string; matched: boolean }>(sql`
-      select value_date as date, description, beneficiary_raw as beneficiary, direction, amount_minor as amount,
+    db.execute<{ date: string; description: string | null; beneficiary: string | null; direction: "DEBIT" | "CREDIT"; amount: number; category: string; matched: boolean }>(sql`
+      select to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as date, description, beneficiary_raw as beneficiary, direction, amount_minor as amount,
              category, (matched_payment_id is not null) as matched
         from bank_transactions
        where to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM') = ${month}

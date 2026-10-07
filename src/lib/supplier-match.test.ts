@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchSupplier, similarity, type SupplierRecord } from "./supplier-match";
+import { matchSupplier, resolveNewSupplierName, similarity, trigramSimilarity, type SupplierRecord } from "./supplier-match";
 import { normalizeName } from "./suppliers-seed";
 
 const make = (
@@ -196,5 +196,76 @@ describe("عيوبُ تصدير الأهليّ في اسم المستفيد", ()
     const list = [s("أوراق الزيتون"), s("أوراق الزيت")];
     expect(matchSupplier(list, { supplierNameAr: "مؤسسة الرياض للتجارة" }).supplier)
       .toBeUndefined();
+  });
+});
+
+describe("الرقمُ الضريبيّ المخالف يوقف الحسمَ بالاسم", () => {
+  it("الاسمُ يطابق والرقمُ المقروء يخالف المخزَّن ← اقتراحٌ لا حسم", () => {
+    const m = matchSupplier(suppliers, { sellerVatNumber: "310999999900003", supplierNameAr: "أوراق الزيتون" });
+    expect(m.supplier).toBeUndefined();
+    expect(m.method).toBe("NONE");
+    expect(m.vatConflict).toBe(true);
+    expect(m.candidates.map((c) => c.slug)).toEqual(["OliveLeaves"]);
+  });
+
+  it("والبديلُ والاحتواءُ كذلك", () => {
+    expect(matchSupplier(suppliers, { sellerVatNumber: "310999999900003", supplierNameAr: "KHALID SAED BN MAHFUS TRADING" }).vatConflict).toBe(true);
+    expect(matchSupplier(suppliers, { sellerVatNumber: "310999999900003", supplierNameAr: "مؤسسة أوراق الزيتون التجارية" }).vatConflict).toBe(true);
+  });
+
+  it("ومن لا رقمَ مخزَّناً له، أو قُرئ رقمُه ناقصاً، يُحسَم بالاسم كما كان", () => {
+    expect(matchSupplier(suppliers, { sellerVatNumber: "310999999900003", supplierNameAr: "سرد كو" }).supplier?.slug).toBe("SardCo");
+    expect(matchSupplier(suppliers, { sellerVatNumber: "31099", supplierNameAr: "أوراق الزيتون" }).supplier?.slug).toBe("OliveLeaves");
+  });
+});
+
+describe("الاسمُ البديل المشترك لا يحسمه أوّلُ صفّ", () => {
+  const shared = [
+    make("A", "ألف", "Alpha", null, ["مؤسسة النخبة للتوريد"]),
+    make("B", "باء", "Beta", null, ["مؤسسة النخبة للتوريد"]),
+  ];
+  it("بديلٌ يحمله مورّدان ← مرشّحان بلا حسم", () => {
+    const m = matchSupplier(shared, { supplierNameAr: "مؤسسة النخبة للتوريد" });
+    expect(m.supplier).toBeUndefined();
+    expect(m.candidates.map((c) => c.slug).sort()).toEqual(["A", "B"]);
+  });
+});
+
+describe("خطأُ حرفٍ في القراءة يُظهر المرشّحَ ولا يحسمه", () => {
+  const list = [make("Ganache", "غاناش", "Ganache", null), make("Lorefa", "لوريفا", "Lorefa", null)];
+  it("«غناش» تقترح «غاناش»، و«Loreva» تقترح «Lorefa»", () => {
+    const a = matchSupplier(list, { supplierNameAr: "غناش" });
+    expect(a.supplier).toBeUndefined();
+    expect(a.candidates.map((c) => c.slug)).toContain("Ganache");
+    const b = matchSupplier(list, { supplierNameEn: "Loreva" });
+    expect(b.supplier).toBeUndefined();
+    expect(b.candidates.map((c) => c.slug)).toContain("Lorefa");
+  });
+  it("واسمٌ لا يشبه شيئاً لا يقترح أحداً", () => {
+    expect(matchSupplier(list, { supplierNameAr: "مطبعة الرياض" }).candidates).toEqual([]);
+    expect(trigramSimilarity("", "غاناش")).toBe(0);
+    expect(trigramSimilarity("غاناش", "غاناش")).toBe(1);
+  });
+});
+
+describe("إنشاءُ مورّدٍ جديد — «أتقصد فلاناً؟»", () => {
+  it("الاسمُ نفسه مطبَّعاً أو الإنجليزيّ أو البديلُ بنصّه ← هو نفسه", () => {
+    expect(resolveNewSupplierName(suppliers, { nameAr: " أوراق  الزيتون " })).toMatchObject({ same: { slug: "OliveLeaves" } });
+    expect(resolveNewSupplierName(suppliers, { nameAr: "جديد", nameEn: "olive leaves" })).toMatchObject({ same: { slug: "OliveLeaves" } });
+    expect(resolveNewSupplierName(suppliers, { nameAr: "شركة الصرد للتعبئة" })).toMatchObject({ same: { slug: "SardCo" } });
+  });
+
+  it("«سرد» يشبه «سرد كو» و«سرد للتجارة» ← يُسأل ولا يُنشأ ولا يُحسَم", () => {
+    const r = resolveNewSupplierName(suppliers, { nameAr: "سرد" });
+    expect("similar" in r && r.similar.map((s) => s.slug).sort()).toEqual(["SardCo", "SardTrading"]);
+  });
+
+  it("والاسمُ النظاميّ الذي يحوي اسمَ الشهرة يُسأل عنه — لا يُفترض أنّه هو", () => {
+    const r = resolveNewSupplierName(suppliers, { nameAr: "مؤسسة أوراق الزيتون التجارية" });
+    expect("similar" in r && r.similar.map((s) => s.slug)).toEqual(["OliveLeaves"]);
+  });
+
+  it("واسمٌ لا يشبه أحداً ← لا مرشّحين، فيُنشأ", () => {
+    expect(resolveNewSupplierName(suppliers, { nameAr: "مطبعة الرياض الحديثة" })).toEqual({ similar: [] });
   });
 });

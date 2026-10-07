@@ -62,7 +62,7 @@ export async function recordCreditNote(
     appliesToMonth: inv.periodMonth,
     acknowledgeTwin: true,
   });
-  const out = await allocate(tx, paymentId, input.amountMinor, [{ invoiceId: inv.id, amountMinor: input.amountMinor }]);
+  const out = await allocate(tx, paymentId, [{ invoiceId: inv.id, amountMinor: input.amountMinor }]);
   if (out.allocatedMinor !== input.amountMinor) {
     throw new CreditNoteRefused("لم يُخصَّص الإشعارُ كلُّه على الفاتورة — لم يُكتب شيء");
   }

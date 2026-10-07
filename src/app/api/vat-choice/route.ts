@@ -23,7 +23,8 @@ const Body = z.object({
 export async function POST(request: Request) {
   let user;
   try {
-    user = await guard("vat-choice", "bank:edit");
+    /* صلاحيّةُ الصفحة نفسُها: من يصنّف البنك (`bank:edit`) لا يغيّر إقراراً لا يراه */
+    user = await guard("vat-choice", "month:close");
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
@@ -41,6 +42,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, count: n });
   } catch (e) {
     if (e instanceof VatChoiceRefused) return NextResponse.json({ error: e.message }, { status: 409 });
+    const mapped = respondTo(e);
+    if (mapped) return mapped;
     throw e;
   }
 }

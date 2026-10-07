@@ -16,11 +16,12 @@
  */
 
 import type { drive_v3 } from "googleapis";
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, statements, suppliers } from "@/db/schema";
-import { isDriveAuthError, renameFile } from "@/lib/drive";
-import { canonicalName } from "@/lib/canonical-name";
+import { DriveAuthExpiredError, isDriveAuthError, probeFile, renameFile } from "@/lib/drive";
+import { canonicalName, renameGate } from "@/lib/canonical-name";
+import { resolveNameCollision } from "@/lib/naming";
 import { recordAudit } from "@/lib/audit";
 
 export interface RenameTarget {
@@ -38,45 +39,112 @@ export interface RenameOutcome {
 /**
  * يسمّي في الدرايف ثمّ في القيد، ملفّاً ملفّاً. فشلُ ملفٍّ لا يوقف البقيّة
  * ويُعلَن؛ والتفويضُ المنتهي يوقفها لأنّها كلّها ستُردّ بالسبب نفسه.
+ *
+ * ولكلّ ملفٍّ أربعُ خطوات، بترتيبها:
+ *   ١. يُسأل الدرايف عن اسمه الحاليّ (`renameGate`) — ما غُيّر هناك بيدٍ لا يُكتب فوقه.
+ *   ٢. يُسأل القيدُ عن اسمٍ مثله في المجلّد نفسه — الدرايف يقبل اسمين متطابقين، فتُلحَق «(2)».
+ *   ٣. يُكتب أثرُه **قبل** النداء: معرّفُ المستند ومعرّفُ الملفّ والاسمان. كان الأثرُ سطراً
+ *      واحداً للدفعة يُكتب بعدها كلّها، بلا معرّف — فإن قُتل الطلب بعد عشرين تسمية
+ *      وقعت في الأرشيف بلا أثر.
+ *   ٤. يُسمّى، ثمّ يُحدَّث القيد — واسمُ الوصول يُحفظ مرّةً ولا يُكتب فوقه.
  */
 export async function applyRenames(
   drive: drive_v3.Drive,
   targets: readonly RenameTarget[],
+  trace: { actorId: string; via: string },
 ): Promise<RenameOutcome> {
   const done: RenameOutcome["done"] = [];
   const failed: RenameOutcome["failed"] = [];
   let authExpired = false;
 
   for (const t of targets) {
+    const [doc] = await db
+      .select({ id: documents.id, driveFolderId: documents.driveFolderId })
+      .from(documents)
+      .where(eq(documents.driveFileId, t.driveFileId))
+      .limit(1);
+    /* ما لا سجلَّ له عندنا لا يُمسّ */
+    if (!doc) {
+      failed.push({ from: t.fileName, error: "لا سجلَّ له عندنا — لم يُسمَّ" });
+      continue;
+    }
+
     let renamedInDrive = false;
+    let proposed = t.proposed;
     try {
-      await renameFile(drive, t.driveFileId, t.proposed);
+      const gate = renameGate(t.fileName, await probeFile(drive, t.driveFileId));
+      if (!gate.go) {
+        if (gate.liveName !== undefined) await adoptLiveName(doc.id, t, gate.liveName);
+        failed.push({ from: t.fileName, error: gate.reason });
+        continue;
+      }
+
+      const siblings = doc.driveFolderId
+        ? await db.select({ fileName: documents.fileName }).from(documents)
+            .where(and(eq(documents.driveFolderId, doc.driveFolderId), ne(documents.id, doc.id)))
+        : [];
+      proposed = resolveNameCollision(t.proposed, siblings.map((r) => r.fileName));
+
+      await recordAudit({
+        actorId: trace.actorId,
+        action: "DRIVE_FILE_RENAME_INTENT",
+        entityType: "document",
+        entityId: doc.id,
+        before: { fileName: t.fileName },
+        after: { fileName: proposed, driveFileId: t.driveFileId, المصدر: trace.via },
+      });
+
+      await renameFile(drive, t.driveFileId, proposed);
       renamedInDrive = true;
       await db
         .update(documents)
-        .set({ fileName: t.proposed })
+        .set({ fileName: proposed, originalFileName: sql`coalesce(original_file_name, file_name)` })
         .where(eq(documents.driveFileId, t.driveFileId));
-      done.push({ from: t.fileName, to: t.proposed });
+      done.push({ from: t.fileName, to: proposed });
     } catch (e) {
       /*
         وإن سُمّي في الدرايف وتعذّر قيدُه عندنا فهو **تسميةٌ وقعت**:
         تُسجَّل في الأثر بالاسمين، وإلّا بقي في الأرشيف تغييرٌ لا يعرف
         أحدٌ مصدره.
       */
-      if (!renamedInDrive && isDriveAuthError(e)) {
+      if (!renamedInDrive && (isDriveAuthError(e) || e instanceof DriveAuthExpiredError)) {
         authExpired = true;
         break;
       }
-      if (renamedInDrive) done.push({ from: t.fileName, to: t.proposed });
-      failed.push({
-        from: t.fileName,
-        error: renamedInDrive
-          ? `سُمّي في الدرايف وتعذّر تحديث القيد: ${(e as Error).message}`
-          : (e as Error).message,
-      });
+      if (renamedInDrive) done.push({ from: t.fileName, to: proposed });
+      const error = renamedInDrive
+        ? `سُمّي في الدرايف وتعذّر تحديث القيد: ${(e as Error).message}`
+        : (e as Error).message;
+      failed.push({ from: t.fileName, error });
+      /* النيّةُ كُتبت قبل النداء — فما لم يقع يُقال إنّه لم يقع، بسببه */
+      await recordAudit({
+        actorId: trace.actorId,
+        action: "DRIVE_FILE_RENAME_FAILED",
+        entityType: "document",
+        entityId: doc.id,
+        before: { fileName: t.fileName },
+        after: { fileName: proposed, driveFileId: t.driveFileId, المصدر: trace.via, السبب: error.slice(0, 300), "سُمّي في الدرايف": renamedInDrive },
+      }).catch(() => undefined);
     }
   }
   return { done, failed, authExpired };
+}
+
+/** الاسمُ في الدرايف هو الحقيقة: يُحدَّث القيدُ به ويُكتب الاسمان، ولا يُسمّى الملفّ في هذه الدورة. */
+async function adoptLiveName(documentId: string, t: RenameTarget, liveName: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.update(documents)
+      .set({ fileName: liveName, originalFileName: sql`coalesce(original_file_name, file_name)` })
+      .where(eq(documents.id, documentId));
+    await recordAudit({
+      actorId: null,
+      action: "DRIVE_NAME_CHANGED_EXTERNALLY",
+      entityType: "document",
+      entityId: documentId,
+      before: { fileName: t.fileName },
+      after: { fileName: liveName, driveFileId: t.driveFileId },
+    }, tx);
+  });
 }
 
 /** ما يُسمّى في النداء الواحد — والباقي في الذي يليه، فلا يتجاوز المسارُ عمره. */
@@ -139,7 +207,7 @@ export async function renameArchived(
     }
   }
 
-  const outcome = await applyRenames(drive, targets.slice(0, MAX_AUTO));
+  const outcome = await applyRenames(drive, targets.slice(0, MAX_AUTO), { actorId, via });
   if (outcome.done.length > 0) {
     await recordAudit({
       actorId,

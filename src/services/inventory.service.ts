@@ -24,7 +24,7 @@ import { recordAudit } from "@/lib/audit";
 import { MILLI_MINOR } from "@/lib/money";
 import { createHash } from "node:crypto";
 import { isStoredUnit, type StoredUnit } from "@/lib/unit-conversion";
-import { MILLI, sameUnitFamily, toCanonical } from "@/lib/inventory/units";
+import { MILLI, decimalToMilli, sameUnitFamily, toCanonical } from "@/lib/inventory/units";
 import {
   ENGINE_VERSION, reconcile, type CountedProduct, type EngineInput, type EngineReport, type OpeningSource,
 } from "@/lib/inventory/engine";
@@ -164,7 +164,13 @@ export async function loadSoldLines(
                    from sale_lines ml
                    left join pos_products pp2 on pp2.id = ml.pos_product_id
                   where ml.sale_id = s.id and ml.is_modifier
-                    and ml.parent_external_id = pp.external_id
+                    /*
+                      الخيارُ لسطر أصله (065). وما قُيِّد قبل العمود فارغٌ فيه،
+                      فيُقرأ بالرمز كما كان — حتى يُعاد رفعُ ملفّه.
+                    */
+                    and case when ml.parent_line_external_id is not null
+                             then ml.parent_line_external_id = sl.external_id
+                             else ml.parent_external_id = pp.external_id end
                ) m
            ), '{}') as modifier_ids
       from sale_lines sl
@@ -185,7 +191,7 @@ export async function loadSoldLines(
     posProductExternalId: r.pos_external_id === null ? null : String(r.pos_external_id),
     menuProductId: r.menu_product_id === null ? null : String(r.menu_product_id),
     /* `numeric(12,3)` يعود نصّاً — ويُقرأ إلى المِلّي بلا فاصلةٍ عائمة في الطريق */
-    quantityMilli: Math.round(Number(r.quantity) * 1000),
+    quantityMilli: soldMilli(r.quantity),
     lineTotalMinor: Number(r.line_total_minor),
     isRefund: Boolean(r.is_refund),
     isVoid: Boolean(r.is_void),
@@ -194,6 +200,13 @@ export async function loadSoldLines(
       ? (r.modifier_ids as unknown[]).filter((x): x is string => typeof x === "string")
       : [],
   }));
+}
+
+/** كمّيّةُ سطر البيع من نصّ `numeric` — وما لا يُقرأ عطبٌ يُسمَع لا صفرٌ يُحسَب. */
+function soldMilli(quantity: unknown): number {
+  const milli = decimalToMilli(String(quantity));
+  if (milli === null) throw new Error(`كمّيّةُ سطر بيعٍ لا تُقرأ: «${String(quantity)}»`);
+  return milli;
 }
 
 /**
@@ -566,6 +579,8 @@ async function loadWaste(
     })
     .from(wasteRecords)
     .where(and(
+      /* المُبطَلُ يبقى في السجلّ ويخرج من الحساب (`064`) */
+      sql`${wasteRecords.voidedAt} is null`,
       sql`${wasteRecords.occurredOn} >= ${periodStart}`,
       sql`${wasteRecords.occurredOn} <= ${periodEnd}`,
       branchId ? sql`(${wasteRecords.branchId} = ${branchId} or ${wasteRecords.branchId} is null)` : sql`true`,

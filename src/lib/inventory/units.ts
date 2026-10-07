@@ -120,6 +120,52 @@ export function unitChoices(baseUnit: StoredUnit): StoredUnit[] {
 const DECIMAL = /^\s*([+-]?)(\d*)(?:[.,](\d*))?\s*$/;
 
 /**
+ * الأرقامُ العربيّة‑الهنديّة والفارسيّة إلى اللاتينيّة، والفاصلةُ العشريّة
+ * العربيّة «٫» إلى نقطة.
+ *
+ * لوحةُ مفاتيحٍ عربيّة على الجوّال تكتب «٥٫٢» — وهي رقمٌ صحيحٌ تماماً.
+ * وكان القارئُ يقبل `\d` اللاتينيّة وحدها فيردّها «رقمٌ لا يُقرأ» لمن
+ * يقف عند الرفّ. ولا تُسقَط هنا فواصلُ الآلاف: ذاك قرارُ مسار الاستيراد
+ * (`normaliseNumeric`)، لا قرارُ خانةٍ يكتبها إنسان.
+ */
+export function toLatinDigits(raw: string): string {
+  return raw
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/٫/g, ".");
+}
+
+/**
+ * «5,200» — أهي خمسةٌ وخُمس أم خمسةُ آلافٍ ومئتان؟
+ *
+ * فاصلةٌ واحدة بعدها ثلاثُ خاناتٍ بالضبط، ولا نقطة، وما قبلها لا يبدأ
+ * بصفر: تُكتب هكذا فاصلةُ الآلاف، وتُكتب هكذا فاصلةٌ عشريّة بثلاث منازل.
+ * والتخمينُ بينهما فرقٌ بألف ضعف، **فيُردّ ويُسأل صاحبُه**. و«0,500»
+ * عشريّةٌ بلا لبس، و«10,5» كذلك.
+ */
+const AMBIGUOUS_COMMA = /^\s*[+-]?[1-9]\d{0,2},\d{3}\s*$/;
+
+export function isAmbiguousThousands(value: string): boolean {
+  return AMBIGUOUS_COMMA.test(toLatinDigits(value));
+}
+
+/** رسالةُ اللبس — واحدةٌ لكلّ خانةٍ يكتبها إنسان. */
+export function ambiguousThousandsMessage(value: string): string {
+  const [whole, frac] = toLatinDigits(value).trim().replace(/^[+-]/, "").split(",");
+  return `«${value.trim()}» تحتمل قراءتين: ${whole}.${frac} أم ${whole}${frac}؟ اكتبها بنقطةٍ أو بلا فاصلة`;
+}
+
+/**
+ * التقريبُ إلى أقرب صحيح، **والنصفُ بعيداً عن الصفر في الجهتين**.
+ *
+ * ‏`Math.round(-2.5)` = ‎-2 و`Math.round(2.5)` = 3: السالبُ يُقرَّب نحو
+ * الصفر والموجبُ بعيداً عنه، فنقصٌ وزيادةٌ متساويان لا يتقاصّان إلى صفر.
+ */
+export function roundHalfAwayFromZero(value: number): number {
+  return value < 0 ? -Math.round(-value) : Math.round(value);
+}
+
+/**
  * نصٌّ عشريّ ← مِلّي، **بلا فاصلةٍ عائمة في الطريق**.
  *
  * ‏`Number("0.333") * 1000` يعطي `333.00000000000006`. والتقريبُ بعده
@@ -130,16 +176,18 @@ const DECIMAL = /^\s*([+-]?)(\d*)(?:[.,](\d*))?\s*$/;
  * فألفُ سطرٍ مقصوصٍ يعطي نقصاً حقيقياً في الجرد.
  *
  * ويُرجع `null` لما ليس عدداً — لا صفراً. فالصفرُ يُقرأ «لا شيء»
- * والمقصودُ «لم يُقرأ».
+ * والمقصودُ «لم يُقرأ». **و«5,200» ليست عدداً نعرفه** (`isAmbiguousThousands`).
  */
 export function decimalToMilli(value: string | number | null | undefined): number | null {
   if (value === null || value === undefined) return null;
   if (typeof value === "number") {
     if (!Number.isFinite(value)) return null;
-    return Math.round(value * MILLI);
+    return roundHalfAwayFromZero(value * MILLI);
   }
 
-  const m = DECIMAL.exec(value);
+  const latin = toLatinDigits(value);
+  if (AMBIGUOUS_COMMA.test(latin)) return null;
+  const m = DECIMAL.exec(latin);
   if (!m) return null;
   const [, sign, whole, frac = ""] = m;
   if (whole === "" && frac === "") return null;

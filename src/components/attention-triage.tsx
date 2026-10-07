@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
   Activity, ArrowDown, ArrowLeft, Ban, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, CircleAlert,
-  CircleCheck, CircleDot, CircleHelp, Clock, Copy, FileClock, FolderInput, FileSearch, FileSignature, FileText, FileWarning, FileX,
+  CircleCheck, CircleDot, CircleHelp, Clock, Copy, FileClock, FolderInput, FolderX, FileSearch, FileSignature, FileText, FileWarning, FileX,
   Hourglass, Info, Landmark, Lightbulb, ListChecks, type LucideIcon, Percent, ReceiptText, RotateCcw, Scale,
   ScanSearch, ShieldAlert, Sparkles, TrendingUp, TriangleAlert, Undo2, Unlink, Zap,
 } from "lucide-react";
@@ -66,6 +66,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "missing-statements": FileClock,
   "statement-ledger-gap": Scale,
   "files-wrong-month": FolderInput,
+  "files-missing-in-drive": FolderX,
   "unknown-tax": FileSearch,
   "no-lines": FileWarning,
   "unrecorded-invoices": FileX,

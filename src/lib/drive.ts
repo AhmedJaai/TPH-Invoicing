@@ -20,6 +20,35 @@ export interface DriveFile {
   parents?: string[];
   /** بصمةُ المحتوى من الدرايف — قراءةٌ بلا تنزيل. غائبةٌ لمستندات جوجل والمجلّدات. */
   md5Checksum?: string;
+  /** وبصمتُه `sha256` — هي بصمةُ الرفع نفسُها، فيلتقي بها البابان بلا تنزيل. */
+  sha256Checksum?: string;
+  /** متى وُضع في الدرايف — لا متى رأته المزامنة. */
+  createdTime?: string;
+  /** آخرُ من عدّله هناك (اسمُه المعروض) — من وضعه أو من سمّاه بيده. */
+  lastModifiedBy?: string;
+}
+
+/**
+ * ما يُطلَب عن كلّ ملفّ — في السرد وفي السؤال بالمعرّف معاً، فلا يفترقان.
+ * الحقلُ الغائب من هنا يعود `undefined` بصمت (`drive-md5.test.ts`).
+ */
+const FILE_FIELDS =
+  "id, name, mimeType, size, modifiedTime, createdTime, parents, md5Checksum, sha256Checksum, lastModifyingUser(displayName)";
+
+function toDriveFile(f: drive_v3.Schema$File): DriveFile | null {
+  if (!f.id || !f.name || !f.mimeType) return null;
+  return {
+    id: f.id,
+    name: f.name,
+    mimeType: f.mimeType,
+    size: f.size ? Number(f.size) : undefined,
+    modifiedTime: f.modifiedTime ?? undefined,
+    parents: f.parents ?? undefined,
+    md5Checksum: f.md5Checksum ?? undefined,
+    sha256Checksum: f.sha256Checksum ?? undefined,
+    createdTime: f.createdTime ?? undefined,
+    lastModifiedBy: f.lastModifyingUser?.displayName ?? undefined,
+  };
 }
 
 export const FOLDER_MIME = "application/vnd.google-apps.folder";
@@ -78,7 +107,7 @@ export async function listChildren(
   do {
     const res = await drive.files.list({
       q: `'${folderId}' in parents and trashed = false`,
-      fields: "nextPageToken, files(id, name, mimeType, size, modifiedTime, parents, md5Checksum)",
+      fields: `nextPageToken, files(${FILE_FIELDS})`,
       pageSize: 1000,
       orderBy: "name",
       pageToken,
@@ -87,16 +116,8 @@ export async function listChildren(
     });
 
     for (const f of res.data.files ?? []) {
-      if (!f.id || !f.name || !f.mimeType) continue;
-      out.push({
-        id: f.id,
-        name: f.name,
-        mimeType: f.mimeType,
-        size: f.size ? Number(f.size) : undefined,
-        modifiedTime: f.modifiedTime ?? undefined,
-        parents: f.parents ?? undefined,
-        md5Checksum: f.md5Checksum ?? undefined,
-      });
+      const file = toDriveFile(f);
+      if (file) out.push(file);
     }
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken);
@@ -284,24 +305,39 @@ export async function getFileMeta(
   try {
     const res = await drive.files.get({
       fileId,
-      fields: "id, name, mimeType, size, modifiedTime, parents, md5Checksum",
+      fields: FILE_FIELDS,
       supportsAllDrives: true,
     });
-    const f = res.data;
-    if (!f.id || !f.name || !f.mimeType) return null;
-    return {
-      id: f.id,
-      name: f.name,
-      mimeType: f.mimeType,
-      size: f.size ? Number(f.size) : undefined,
-      modifiedTime: f.modifiedTime ?? undefined,
-      parents: f.parents ?? undefined,
-      md5Checksum: f.md5Checksum ?? undefined,
-    };
+    return toDriveFile(res.data);
   } catch (e) {
     /* الغائب يُتخطّى، أمّا التفويض المنتهي فيُعلَن — لا يُقرأ «غير موجود» */
     if (isDriveAuthError(e)) throw new DriveAuthExpiredError();
     return null;
+  }
+}
+
+/**
+ * أما زال الملفُّ في الدرايف؟ — قراءةٌ محضة، وجوابٌ من أربعة لا من اثنين.
+ *
+ * `getFileMeta` يردّ `null` لكلّ خطأ غير التفويض، فعطبٌ عابر يُقرأ «غير موجود». وهنا
+ * الفرقُ هو الحكم: «غاب» (٤٠٤) و«في السلّة» يفتحان تنبيهاً، و«لا يُعرف» لا يفتح شيئاً —
+ * ما لم يُقرأ لا يُحكَم بغيابه.
+ */
+export type FilePresence =
+  | { state: "present"; name: string; parentId: string | null }
+  | { state: "trashed" }
+  | { state: "gone" }
+  | { state: "unknown" };
+
+export async function probeFile(drive: drive_v3.Drive, fileId: string): Promise<FilePresence> {
+  try {
+    const res = await drive.files.get({ fileId, fields: "id, name, parents, trashed", supportsAllDrives: true });
+    if (res.data.trashed) return { state: "trashed" };
+    if (!res.data.name) return { state: "unknown" };
+    return { state: "present", name: res.data.name, parentId: res.data.parents?.[0] ?? null };
+  } catch (e) {
+    if (isDriveAuthError(e)) throw new DriveAuthExpiredError();
+    return isDriveNotFound(e) ? { state: "gone" } : { state: "unknown" };
   }
 }
 

@@ -17,6 +17,7 @@ import {
   buildInvoiceFileName, buildStatementFileName, looksLikeExtension, parseFileName, type ParsedFileName,
 } from "./naming";
 import { invoiceNumberKey } from "./invoice-twin";
+import type { FilePresence } from "./drive";
 
 export interface NamedDocument {
   driveFileId: string;
@@ -58,7 +59,7 @@ export type NameVerdict =
  * يُفتَح به، وهو بعينه ما يمنعه هذا التعليق.
  *
  * فلا يُقرأ امتداداً إلّا ما كان امتداداً معروفاً؛ وإلّا فمن نوع
- * المحتوى المقيَّد، وإلّا `pdf`. والمبلغُ ليس امتداداً.
+ * المحتوى المقيَّد، وإلّا لا يُقترَح اسم. والمبلغُ ليس امتداداً.
  */
 const EXTENSION_BY_MIME: Record<string, string> = {
   "application/pdf": "pdf",
@@ -71,11 +72,15 @@ const EXTENSION_BY_MIME: Record<string, string> = {
   "image/gif": "gif",
 };
 
-function extensionOf(fileName: string, mimeType?: string | null): string {
+/**
+ * `null` حين لا يُعرف: كان يُفترَض `pdf` لكلّ نوعٍ خارج الجدول — فيُقترَح لصورة BMP
+ * أو لمستند وورد اسمٌ بامتداد pdf، وذاك كسرُ الملفّ الذي يمنعه التعليقُ أعلاه.
+ */
+function extensionOf(fileName: string, mimeType?: string | null): string | null {
   const dot = fileName.lastIndexOf(".");
   const candidate = dot > 0 ? fileName.slice(dot + 1) : "";
   if (looksLikeExtension(candidate)) return candidate.toLowerCase();
-  return EXTENSION_BY_MIME[(mimeType ?? "").toLowerCase()] ?? "pdf";
+  return EXTENSION_BY_MIME[(mimeType ?? "").toLowerCase()] ?? null;
 }
 
 /**
@@ -112,6 +117,7 @@ export function canonicalName(doc: NamedDocument): NameVerdict {
   if (doc.totalMinor === null) return { status: "CANNOT", reason: "لا إجماليّ مقيَّد له" };
 
   const extension = extensionOf(doc.fileName, doc.mimeType);
+  if (!extension) return { status: "CANNOT", reason: "اسمُه بلا امتداد ونوعُ محتواه غير معروف — لا يُخمَّن له امتداد" };
   const shared = { date: doc.date, amountMinor: doc.totalMinor, extension };
 
   let proposed: string;
@@ -171,4 +177,30 @@ function contradiction(doc: NamedDocument, p: ParsedFileName): NameVerdict {
     slashInName ? "«/» في الاسم" : null,
   ].filter(Boolean).join(" · ");
   return { status: "RENAME", proposed, reason: `يُقرأ اسمُه ويخالف المقيَّد: ${why}` };
+}
+
+/**
+ * أيُسمّى الآن؟ — يُسأل الدرايف عن الاسم الحاليّ قبل أن يُكتب فوقه.
+ *
+ * الاسمُ المقترَح بُني من `documents.fileName` المخزَّن. فإن غيّر إنسانٌ الاسمَ في الدرايف
+ * بعد آخر مزامنة كُتب فوق اسمه — وهو ما يمنعه القرار «يبقى ما كتبه إنسان». فما خالف
+ * اسمُه الحاليُّ المخزَّنَ لا يُسمّى في هذه الدورة: يُحدَّث القيد ويُعاد الحكمُ على الاسم
+ * الجديد. وما لم يُعرف حالُه لا يُكتب فوقه.
+ */
+export type RenameGate =
+  | { go: true }
+  | { go: false; reason: string; liveName?: string };
+
+export function renameGate(storedName: string, presence: FilePresence): RenameGate {
+  if (presence.state === "gone") return { go: false, reason: "لم يعد في الدرايف — لم يُسمَّ" };
+  if (presence.state === "trashed") return { go: false, reason: "في سلّة الدرايف — لم يُسمَّ" };
+  if (presence.state === "unknown") return { go: false, reason: "تعذّر التحقّق من اسمه الحاليّ في الدرايف — لم يُسمَّ" };
+  if (presence.name !== storedName) {
+    return {
+      go: false,
+      liveName: presence.name,
+      reason: `غُيّر اسمُه في الدرايف بيدٍ إلى «${presence.name}» — حُدّث القيد ولم يُكتب فوقه`,
+    };
+  }
+  return { go: true };
 }

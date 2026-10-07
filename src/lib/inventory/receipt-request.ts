@@ -6,12 +6,16 @@
  * بقراءةٍ عشريّة — **ولا تُشتقّ منها كمّيّة**.
  */
 import { z } from "zod";
-import { decimalToMilli } from "./units";
+import { ambiguousThousandsMessage, decimalToMilli, isAmbiguousThousands } from "./units";
 import { firstMessage, isoDate, storedUnit } from "./count-request";
 
 const id = z.string().trim().min(1).max(64);
 
 const quantity = z.string().max(24).transform((v, ctx) => {
+  if (isAmbiguousThousands(v)) {
+    ctx.addIssue({ code: "custom", message: ambiguousThousandsMessage(v) });
+    return z.NEVER;
+  }
   const milli = decimalToMilli(v.trim());
   if (milli === null || milli <= 0) {
     ctx.addIssue({ code: "custom", message: `كمّيّةٌ غير مقروءة: «${v}» — الاستلامُ كمّيّةٌ موجبة` });

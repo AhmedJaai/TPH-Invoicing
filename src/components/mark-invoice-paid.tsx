@@ -6,6 +6,8 @@ import { Banknote, Landmark, Wallet } from "lucide-react";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { postJson } from "@/lib/http-client";
 import { readDrawn } from "@/lib/drawn-credit";
+import { todayInRiyadh } from "@/lib/riyadh-time";
+import { shiftDays } from "@/lib/inventory/week";
 import { ACT } from "@/lib/ui-terms";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
@@ -86,6 +88,7 @@ export function MarkInvoicePaid({
   label,
   layout = "inline",
   startOpen = false,
+  invoiceDay,
 }: {
   invoiceId: string;
   /** المتبقّي نصّاً مقروءاً — من الخادم، لا يُحسَب هنا. */
@@ -94,12 +97,24 @@ export function MarkInvoicePaid({
   layout?: "inline" | "panel";
   /** يُفتح والسؤالُ مطروح — حين جاء صاحبُه ليسجّل السداد نفسَه. */
   startOpen?: boolean;
+  /** يومُ الفاتورة (YYYY-MM-DD) — اختصارٌ ليوم السداد لمن دفع يوم الاستلام. */
+  invoiceDay?: string;
 }) {
   const router = useRouter();
   const [state, setState] = useState<State>(startOpen ? "choose" : "idle");
   const [message, setMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  /*
+    يومُ السداد يُسأل ولا يُفترض: كان كلُّ إقرارٍ يُؤرَّخ بيوم الضغط، فيبتعد عن
+    حوالته في الكشف (نافذةُ الربط أسبوعان) وتقع الدفعةُ في شهرٍ غير شهرها.
+  */
+  const today = todayInRiyadh();
+  const yesterday = shiftDays(today, -1);
+  const [paidOn, setPaidOn] = useState(today);
+  /* الخادمُ وجد سداداً بالمورّد واليوم والمبلغ نفسها — يُسأل: أهو سدادٌ آخر؟ */
+  const [twin, setTwin] = useState(false);
   const panel = layout === "panel";
+  const dayOk = /^\d{4}-\d{2}-\d{2}$/.test(paidOn) && paidOn <= today;
 
   function fail(r: Awaited<ReturnType<typeof post>>, back: State) {
     setMessage(
@@ -119,11 +134,19 @@ export function MarkInvoicePaid({
     setState("confirm-owner");
   }
 
-  async function run(source: "OWNER" | "BANK") {
+  async function run(source: "OWNER" | "BANK", acknowledgeTwin = false) {
     setState("busy");
     setMessage(null);
-    const r = await post({ invoiceIds: [invoiceId], source });
-    if (!r || !r.ok) return fail(r, source === "OWNER" ? "confirm-owner" : "confirm-bank");
+    const r = await post(
+      source === "OWNER"
+        ? { invoiceIds: [invoiceId], source }
+        : { invoiceIds: [invoiceId], source, paidOn, ...(acknowledgeTwin ? { acknowledgeTwin: true } : {}) },
+    );
+    if (!r || !r.ok) {
+      setTwin(source === "BANK" && r?.status === 409 && r.data.twin === true);
+      return fail(r, source === "OWNER" ? "confirm-owner" : "confirm-bank");
+    }
+    setTwin(false);
 
     /*
       «٢٠٠» تقول إنّ الطلب فُهم، لا إنّ شيئاً كُتب — المسار يردّ
@@ -172,7 +195,7 @@ export function MarkInvoicePaid({
   */
   const stop = (e: { stopPropagation(): void }) => e.stopPropagation();
 
-  const back = (to: State) => () => { setState(to); setMessage(null); if (to !== "confirm-owner") setPreview(null); };
+  const back = (to: State) => () => { setState(to); setMessage(null); setTwin(false); if (to !== "confirm-owner") setPreview(null); };
 
   return (
     <div
@@ -247,10 +270,41 @@ export function MarkInvoicePaid({
           <p className={panel ? "text-xs leading-relaxed text-ink-soft" : "text-[11px] text-muted"}>
             تُنشأ دفعةٌ بـ<bdi className="nums font-bold text-ink">{label}</bdi> وتُخصَّص عليها — ويمكنك التراجع من الإشعار.
           </p>
+          <div className={panel ? "mt-3 flex flex-wrap items-center gap-2" : "flex flex-wrap items-center justify-end gap-1.5"}>
+            <label className="flex items-center gap-1.5 text-[11px] font-bold text-ink-soft">
+              يوم السداد
+              <input
+                type="date"
+                dir="ltr"
+                value={paidOn}
+                max={today}
+                disabled={state === "busy"}
+                onChange={(e) => { setPaidOn(e.target.value); setTwin(false); setMessage(null); }}
+                aria-invalid={!dayOk}
+                className="nums h-9 rounded-lg border border-line-input bg-raised px-2 text-xs font-normal text-ink"
+              />
+            </label>
+            {paidOn !== today && (
+              <button type="button" disabled={state === "busy"} onClick={() => { setPaidOn(today); setTwin(false); }} className={buttonClass("quiet", "sm")}>اليوم</button>
+            )}
+            {paidOn !== yesterday && (
+              <button type="button" disabled={state === "busy"} onClick={() => { setPaidOn(yesterday); setTwin(false); }} className={buttonClass("quiet", "sm")}>أمس</button>
+            )}
+            {invoiceDay && invoiceDay <= today && paidOn !== invoiceDay && invoiceDay !== yesterday && invoiceDay !== today && (
+              <button type="button" disabled={state === "busy"} onClick={() => { setPaidOn(invoiceDay); setTwin(false); }} className={buttonClass("quiet", "sm")}>يوم الفاتورة</button>
+            )}
+          </div>
+          {!dayOk && <p className="mt-1 text-[11px] font-bold text-danger">يوم السداد لا يكون بعد اليوم.</p>}
           <div className={panel ? "mt-3 flex flex-wrap gap-2" : "flex flex-wrap gap-1.5"}>
-            <button aria-busy={state === "busy"} type="button" disabled={state === "busy"} onClick={() => run("BANK")} className={buttonClass("primary", "sm")}>
-              {ACT.recordBankTransfer}
-            </button>
+            {twin ? (
+              <button aria-busy={state === "busy"} type="button" disabled={state === "busy" || !dayOk} onClick={() => run("BANK", true)} className={buttonClass("primary", "sm")}>
+                سدادٌ آخر — سجّله
+              </button>
+            ) : (
+              <button aria-busy={state === "busy"} type="button" disabled={state === "busy" || !dayOk} onClick={() => run("BANK")} className={buttonClass("primary", "sm")}>
+                {ACT.recordBankTransfer}
+              </button>
+            )}
             <button type="button" onClick={back("choose")} className={buttonClass("quiet", "sm")}>تراجع</button>
           </div>
         </div>

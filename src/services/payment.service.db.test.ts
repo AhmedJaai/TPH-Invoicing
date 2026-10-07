@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { and, eq, sql } from "drizzle-orm";
-import { payments } from "@/db/schema";
+import { monthCloses, paymentAllocations, payments, users } from "@/db/schema";
 import {
-  PaymentTwinError, allocate, createPayment, recordBankPayment,
+  PaymentTwinError, allocate, createPayment, recordBankPayment, reversePayment,
 } from "./payment.service";
+import { MonthClosedError } from "./validation.service";
 import { caught, day, makeInvoice, makeSupplier, pgErrorOf, withRollback } from "@/test/db";
 import type { Tx } from "./types";
 
@@ -94,5 +95,76 @@ describe("التخصيص فوق الفاتورة — القاعدة ترفضه (
       const err = pgErrorOf(await caught(allocate(tx, b, 3_000_00, [{ invoiceId, amountMinor: 3_000_00 }])));
       expect(err?.code).toBe("23514");
       expect(err?.message).toMatch(/الفاتورة/);
+    }));
+});
+
+describe("allocate — مبلغُ الدفعة من القاعدة لا من المستدعي", () => {
+  it("رقمٌ خاطئ يمرّره المستدعي (صفر) لا يُصفّر القابلَ للتخصيص", () =>
+    withRollback(async (tx) => {
+      const supplierId = await makeSupplier(tx);
+      const invoiceId = await makeInvoice(tx, supplierId, 1_000_00, "2026-08-10");
+      const pay = await createPayment(tx, {
+        supplierId, paidAt: day("2026-08-20"), amountMinor: 1_000_00, method: "BANK_TRANSFER",
+      });
+      const out = await allocate(tx, pay, 0, [{ invoiceId, amountMinor: 1_000_00 }]);
+      expect(out.allocatedMinor).toBe(1_000_00);
+    }));
+
+  it("ولا يُخصَّص فوق صافي الدفعة ولو قال المستدعي إنّها أكبر", () =>
+    withRollback(async (tx) => {
+      const supplierId = await makeSupplier(tx);
+      const invoiceId = await makeInvoice(tx, supplierId, 1_000_00, "2026-08-10");
+      const pay = await createPayment(tx, {
+        supplierId, paidAt: day("2026-08-20"), amountMinor: 400_00, method: "BANK_TRANSFER",
+      });
+      const out = await allocate(tx, pay, 9_999_00, [{ invoiceId, amountMinor: 1_000_00 }]);
+      expect(out.allocatedMinor).toBe(400_00);
+      expect(out.unallocatedMinor).toBe(600_00);
+    }));
+});
+
+async function someUser(tx: Tx): Promise<string> {
+  const [u] = await tx.insert(users).values({ email: `reverse-${Date.now()}-${Math.random()}@test.local`, name: "اختبار" }).returning({ id: users.id });
+  return u.id;
+}
+
+describe("reversePayment — تحرس نفسها", () => {
+  it("ردٌّ ثانٍ لا يكتب: يبقى الحالُ والسببُ الأوّلان", () =>
+    withRollback(async (tx) => {
+      const supplierId = await makeSupplier(tx);
+      const invoiceId = await makeInvoice(tx, supplierId, 500_00, "2026-08-10");
+      const pay = await createPayment(tx, {
+        supplierId, paidAt: day("2026-08-20"), amountMinor: 500_00, method: "BANK_TRANSFER",
+      });
+      await allocate(tx, pay, [{ invoiceId, amountMinor: 500_00 }]);
+      const userId = await someUser(tx);
+
+      const first = await reversePayment(tx, { paymentId: pay, kind: "REVERSED", reason: "ارتدّت الحوالة", userId });
+      expect(first.alreadyReversed).toBe(false);
+      expect(first.freedMinor).toBe(500_00);
+
+      const second = await reversePayment(tx, { paymentId: pay, kind: "VOID", reason: "ضغطةٌ ثانية", userId });
+      expect(second).toMatchObject({ alreadyReversed: true, status: "REVERSED", freedMinor: 0, reason: "ارتدّت الحوالة" });
+      const [row] = await tx.select({ status: payments.status, reason: payments.reversalReason, voidedAt: payments.voidedAt })
+        .from(payments).where(eq(payments.id, pay));
+      expect(row).toEqual({ status: "REVERSED", reason: "ارتدّت الحوالة", voidedAt: null });
+    }));
+
+  it("دفعةٌ على فاتورةِ شهرٍ مقفل لا تُردّ — MonthClosedError، والتخصيصُ باقٍ", () =>
+    withRollback(async (tx) => {
+      const supplierId = await makeSupplier(tx);
+      const invoiceId = await makeInvoice(tx, supplierId, 500_00, "2026-07-10");
+      const pay = await createPayment(tx, {
+        supplierId, paidAt: day("2026-09-02"), amountMinor: 500_00, method: "BANK_TRANSFER",
+      });
+      await allocate(tx, pay, [{ invoiceId, amountMinor: 500_00 }]);
+      const userId = await someUser(tx);
+      /* فاتورةُ يوليو: شهرٌ يقفله `month-guard.db.test` نفسُه، فلا يصطدم بغيره */
+      await tx.insert(monthCloses).values({ month: "2026-07", status: "CLOSED" });
+
+      const e = await caught(reversePayment(tx, { paymentId: pay, kind: "VOID", reason: "خطأ", userId }));
+      expect(e).toBeInstanceOf(MonthClosedError);
+      const left = await tx.select({ id: paymentAllocations.id }).from(paymentAllocations).where(eq(paymentAllocations.paymentId, pay));
+      expect(left).toHaveLength(1);
     }));
 });

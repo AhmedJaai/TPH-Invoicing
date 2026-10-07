@@ -70,7 +70,7 @@ async function main() {
     if (now && now.fileName !== GOLDEN_CUP_NAME) {
       const drive = await driveForCli(async () =>
         (await db.select({ t: accounts.refresh_token }).from(accounts).where(eq(accounts.provider, "google")).limit(1))[0]?.t ?? null);
-      const out = await applyRenames(drive, [{ driveFileId: gc.driveFileId, fileName: now.fileName, proposed: GOLDEN_CUP_NAME }]);
+      const out = await applyRenames(drive, [{ driveFileId: gc.driveFileId, fileName: now.fileName, proposed: GOLDEN_CUP_NAME }], { actorId: AHMED, via: "نصُّ إصلاح" });
       if (out.done.length) {
         await recordAudit({ actorId: AHMED, action: "DRIVE_FILE_RENAMED", entityType: "drive", entityId: "rename",
           after: { الفعل: "إعادة تسمية", المصدر: `عرضُ سعرٍ قُيِّد كشفاً — ${WHY}`, الملفّات: out.done.map((d) => `${d.from} ← ${d.to}`) } });

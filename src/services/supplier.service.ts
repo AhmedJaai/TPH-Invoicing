@@ -5,9 +5,11 @@
  * لا يُطالَب بما لا يملك، والذي بلا عقد يُنبَّه عليه. فجمعُ ذلك في مكان
  * واحد يمنع أن يفحص كل مسار بقواعد مختلفة.
  */
-import { eq, or } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { supplierAliases, suppliers } from "@/db/schema";
+import { recordAudit } from "@/lib/audit";
+import { resolveNewSupplierName } from "@/lib/supplier-match";
 import { normalizeName } from "@/lib/suppliers-seed";
 import type { Tx } from "./types";
 
@@ -85,53 +87,115 @@ export interface CreateSupplierInput {
   nameEn?: string;
   driveFolderName?: string;
   vatNumber?: string;
+  /** رأى المستخدمُ من يشبهونه وقال «هو غيرُهم» — يُنشأ ولا يُسأل ثانيةً. */
+  confirmNew?: boolean;
 }
 
-export interface CreatedSupplier {
+export interface SupplierLite {
   id: string;
   nameAr: string;
   slug: string;
-  existed: boolean;
 }
 
+export type CreateSupplierOutcome =
+  | ({ kind: "created" } & SupplierLite)
+  /** هو نفسُه — بالاسم، أو بالرقم الضريبيّ (`by: "VAT"`: الرقمُ لمورّدٍ باسمٍ آخر) */
+  | ({ kind: "existed"; by: "NAME" | "VAT" } & SupplierLite)
+  /** يشبه مسجَّلين — لم يُنشأ شيء، ويقرّر الإنسان */
+  | { kind: "similar"; similar: SupplierLite[] };
+
+const digits = (v?: string | null) => (v ?? "").replace(/\D/g, "");
+
 /**
- * ينشئ مورّداً، أو يرجع الموجود باسمه.
+ * ينشئ مورّداً، أو يرجع الموجود، أو يسأل «أتقصد فلاناً؟».
  * الإرجاع بدل الإنشاء مقصود: صفّان لمورّد واحد يقسمان بياناته — كشفه هنا
  * وفواتيره هناك — وقد رأينا ذلك يُنتج «عشر فواتير ناقصة» وهي عندنا.
+ *
+ * في معاملةٍ واحدة بقفل: كان فحصاً ثمّ إدراجاً بلا معاملة، فطلبان متزامنان
+ * يُنشئان مورّدين. والرقمُ الضريبيّ يُسأل عنه **أوّلاً** — هو الهويّة — فرقمٌ
+ * مسجَّلٌ لمورّدٍ آخر يُرجعه باسمه بدل أن يصطدم بفرادة العمود خطأً خامّاً.
+ * والرمزُ يُجرَّب حتّى يخلو (كان يُلحَق به «2» مرّةً واحدة). والتدقيقُ في
+ * المعاملة نفسها.
  */
-export async function createSupplier(input: CreateSupplierInput): Promise<CreatedSupplier> {
+export async function createSupplier(input: CreateSupplierInput, actorId: string | null): Promise<CreateSupplierOutcome> {
   const nameAr = input.nameAr.trim();
+  const nameEn = input.nameEn?.trim() || undefined;
   const normalized = normalizeName(nameAr);
+  const vat = digits(input.vatNumber);
 
-  const [existing] = await db
-    .select({ id: suppliers.id, nameAr: suppliers.nameAr, slug: suppliers.slug })
-    .from(suppliers)
-    .where(or(eq(suppliers.nameAr, nameAr), eq(suppliers.driveFolderName, nameAr)))
-    .limit(1);
+  return db.transaction(async (t) => {
+    await t.execute(sql`select pg_advisory_xact_lock(hashtext('supplier-create'))`);
 
-  if (existing) return { ...existing, existed: true };
+    const rows = await t
+      .select({
+        id: suppliers.id, slug: suppliers.slug, nameAr: suppliers.nameAr, nameEn: suppliers.nameEn,
+        driveFolderName: suppliers.driveFolderName, vatNumber: suppliers.vatNumber,
+        issuesInvoices: suppliers.issuesInvoices, contractOnFile: suppliers.contractOnFile,
+        isActive: suppliers.isActive,
+      })
+      .from(suppliers);
+    const aliasRows = await t
+      .select({ supplierId: supplierAliases.supplierId, normalized: supplierAliases.normalized })
+      .from(supplierAliases);
+    const all = rows.map((r) => ({
+      ...r,
+      aliases: aliasRows.filter((a) => a.supplierId === r.id).map((a) => ({ normalized: a.normalized })),
+    }));
 
-  let slug = deriveSlug(input.nameEn, nameAr);
-  const taken = await db.select({ slug: suppliers.slug }).from(suppliers).where(eq(suppliers.slug, slug));
-  if (taken.length > 0) slug = `${slug}2`;
+    if (vat) {
+      const byVat = all.find((s) => digits(s.vatNumber) === vat);
+      if (byVat) return { kind: "existed", by: "VAT", id: byVat.id, nameAr: byVat.nameAr, slug: byVat.slug };
+    }
 
-  const [created] = await db
-    .insert(suppliers)
-    .values({
-      slug,
-      driveFolderName: input.driveFolderName?.trim() || nameAr,
-      nameAr,
-      nameEn: input.nameEn?.trim() || null,
-      vatNumber: input.vatNumber?.trim() || null,
-    })
-    .returning({ id: suppliers.id, nameAr: suppliers.nameAr, slug: suppliers.slug });
+    /* المعطَّلُ بالدمج لا يُقترَح ولا يُرجَع — لكنّ اسمَه بنصّه ما زال محجوزاً له */
+    const exact = all.find((s) => s.nameAr === nameAr || s.driveFolderName === nameAr);
+    if (exact) return { kind: "existed", by: "NAME", id: exact.id, nameAr: exact.nameAr, slug: exact.slug };
 
-  await db
-    .insert(supplierAliases)
-    .values({ supplierId: created.id, value: nameAr, normalized, kind: "NAME_VARIANT", source: "MANUAL" })
-    .onConflictDoNothing();
+    const resolved = resolveNewSupplierName(all.filter((s) => s.isActive), { nameAr, nameEn });
+    if ("same" in resolved) {
+      return { kind: "existed", by: "NAME", id: resolved.same.id, nameAr: resolved.same.nameAr, slug: resolved.same.slug };
+    }
+    if (resolved.similar.length > 0 && !input.confirmNew) {
+      return { kind: "similar", similar: resolved.similar.map((s) => ({ id: s.id, nameAr: s.nameAr, slug: s.slug })) };
+    }
 
-  return { ...created, existed: false };
+    const base = deriveSlug(nameEn, nameAr);
+    const taken = new Set(all.map((s) => s.slug));
+    let slug = base;
+    for (let n = 2; taken.has(slug); n++) slug = `${base.slice(0, 30)}${n}`;
+
+    const [created] = await t
+      .insert(suppliers)
+      .values({
+        slug,
+        driveFolderName: input.driveFolderName?.trim() || nameAr,
+        nameAr,
+        nameEn: nameEn ?? null,
+        vatNumber: vat || null,
+      })
+      .returning({ id: suppliers.id, nameAr: suppliers.nameAr, slug: suppliers.slug });
+
+    await t
+      .insert(supplierAliases)
+      .values({ supplierId: created.id, value: nameAr, normalized, kind: "NAME_VARIANT", source: "MANUAL" })
+      .onConflictDoNothing();
+
+    await recordAudit({
+      actorId,
+      action: "SUPPLIER_CREATED",
+      entityType: "supplier",
+      entityId: created.id,
+      after: {
+        الاسم: nameAr,
+        الرمز: slug,
+        "مجلد الدرايف": input.driveFolderName?.trim() || nameAr,
+        ...(vat ? { "الرقم الضريبي": vat } : {}),
+        ...(resolved.similar.length > 0 ? { "أُنشئ مع وجود من يشبهه": resolved.similar.map((s) => s.nameAr) } : {}),
+      },
+    }, t);
+
+    return { kind: "created", ...created };
+  });
 }
 
 /**

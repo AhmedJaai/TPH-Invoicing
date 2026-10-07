@@ -8,9 +8,10 @@ import { Money } from "./money";
 import { Monogram } from "./ui";
 import { Sheet, toast, Reveal } from "./ui-client";
 import { buttonClass } from "./ui-tokens";
-import { postJson } from "@/lib/http-client";
+import { NETWORK_ERROR, postJson, readResponse } from "@/lib/http-client";
 import { readDrawn } from "@/lib/drawn-credit";
 import { INVOICE, SUPPLIER, countNoun } from "@/lib/arabic";
+import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
 
 /**
  * مخطِّطُ الدفعة — اختر من تدفع له، وانظر الأثر، ونزّل الملفّ، وسجّل السداد.
@@ -49,12 +50,19 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* يومُ الحوالة — يُسأل ولا يُفترض يومَ الضغط: به يلتقي الإقرارُ بحوالته في الكشف */
+  const today = todayInRiyadh();
+  const [paidOn, setPaidOn] = useState(today);
+  const dayOk = /^\d{4}-\d{2}-\d{2}$/.test(paidOn) && paidOn <= today;
+  /* مورّدون ردّهم الخادم: لهم سدادٌ بالمبلغ واليوم نفسيهما — يُسأل عنهم ولا يُسكَت */
+  const [twins, setTwins] = useState<string[]>([]);
 
   const chosen = useMemo(() => suppliers.filter((s) => picked.has(s.supplierId)), [suppliers, picked]);
   const totalMinor = chosen.reduce((s, x) => s + x.totalMinor, 0);
   /* من خُصم له رصيدٌ لا يُوسَم هنا: الإقرارُ يسدّد الفاتورة كلَّها لا ما حُوِّل */
   const markable = chosen.filter((s) => s.creditAppliedMinor === 0);
-  const missingAccount = chosen.filter((s) => !s.account).length;
+  const noAccount = chosen.filter((s) => !s.account);
+  const missingAccount = noAccount.length;
   const allPicked = picked.size === suppliers.length;
 
   function toggle(id: string) {
@@ -75,23 +83,63 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
     });
   }
 
-  const exportHref = `/api/payment-run?month=${month}${allPicked ? "" : `&suppliers=${chosen.map((s) => s.supplierId).join(",")}`}`;
+  /*
+    التنزيلُ طلبُ POST لا رابط: التصديرُ يُكتب في سجلّ التدقيق، والرابطُ يجلبه
+    المتصفّحُ مسبقاً فيُقيَّد تصديرٌ لم يقع. فيُجلَب الملفُّ ثمّ يُسلَّم للمتصفّح.
+  */
+  const [exporting, setExporting] = useState(false);
+  async function exportFile() {
+    setExporting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/payment-run", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ month, ...(allPicked ? {} : { suppliers: chosen.map((s) => s.supplierId) }) }),
+      });
+      if (!res.ok) {
+        const failed = await readResponse(res);
+        setError(failed.ok ? "تعذّر التنزيل — أعد المحاولة." : failed.error);
+        return;
+      }
+      const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? `payment-run-${month}.csv`;
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ tone: "ok", title: "نُزّل ملفّ التحويلات", body: name });
+    } catch {
+      setError(NETWORK_ERROR);
+    } finally {
+      setExporting(false);
+    }
+  }
 
-  async function markPaid() {
+  async function markPaid(only?: readonly string[]) {
     setBusy(true);
     setError(null);
+    const acknowledge = only !== undefined;
+    const targets = only ? markable.filter((s) => only.includes(s.supplierId)) : markable;
+    const twinIds: string[] = [];
     const paymentIds: string[] = [];
     const drawn: { paymentId: string; invoiceId: string }[] = [];
     let marked = 0;
     const failures: string[] = [];
     /* مورّداً مورّداً — فيُكتب لكلٍّ قيدُه في السجلّ، ويُعرف أيُّها فشل */
-    for (const s of markable) {
+    for (const s of targets) {
       const r = await postJson<{ marked?: number; totalMinor?: number; paymentIds?: string[]; drawn?: unknown; message?: string }>("/api/mark-paid", {
         invoiceIds: s.invoices.map((i) => i.id),
         supplierId: s.supplierId,
+        paidOn,
         note: `دفعة ${month} — ${s.name}`,
+        ...(acknowledge ? { acknowledgeTwin: true } : {}),
       });
       if (!r.ok) {
+        if (r.status === 409 && r.data?.twin === true) twinIds.push(s.supplierId);
         failures.push(`${s.name}: ${r.error}`);
         continue;
       }
@@ -101,6 +149,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
     }
     setBusy(false);
     setConfirming(false);
+    setTwins(twinIds);
 
     if (failures.length > 0) setError(failures.join(" · "));
     if (marked > 0) {
@@ -145,17 +194,17 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
             <p className="text-xl font-bold leading-tight"><Money minor={totalMinor} currency /></p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {chosen.length > 0 ? (
-              <a href={exportHref} className={buttonClass("secondary")} download>
-                <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
-                نزّل ملفّ التحويلات
-              </a>
-            ) : (
-              <span className={`${buttonClass("secondary")} pointer-events-none opacity-50`} aria-disabled="true" title="اختر مورّداً أوّلاً">
-                <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
-                نزّل ملفّ التحويلات
-              </span>
-            )}
+            <button
+              type="button"
+              disabled={chosen.length === 0 || exporting}
+              aria-busy={exporting}
+              onClick={exportFile}
+              className={buttonClass("secondary")}
+              title={chosen.length === 0 ? "اختر مورّداً أوّلاً" : undefined}
+            >
+              <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
+              نزّل ملفّ التحويلات
+            </button>
             <button
               type="button"
               disabled={markable.length === 0 || busy}
@@ -171,10 +220,15 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
         {missingAccount > 0 && chosen.length > 0 && (
           <p className="mt-2 flex items-center gap-1.5 text-[11px] text-warn">
             <ShieldAlert className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            {missingAccount === 1 ? "مورّدٌ واحد" : countNoun(missingAccount, SUPPLIER)} بلا حسابٍ معروف — يخرج في الملفّ فارغاً بتنبيه، فأكمِله عند البنك.
+            {missingAccount === 1 ? "مورّدٌ واحد" : countNoun(missingAccount, SUPPLIER)} بلا حسابٍ معروف ({noAccount.map((s) => s.name).join("، ")}) — يخرج في آخر الملفّ بقسمٍ منفصل «يحتاج حساباً» لا بين التحويلات.
           </p>
         )}
         {error && <p role="alert" className="mt-2 text-xs font-bold text-danger">{error}</p>}
+        {twins.length > 0 && (
+          <button type="button" disabled={busy} aria-busy={busy} onClick={() => markPaid(twins)} className={`${buttonClass("secondary", "sm")} mt-2`}>
+            سدادٌ آخر حقّاً — سجّل {countNoun(twins.length, SUPPLIER)}
+          </button>
+        )}
       </div>
 
       <ul className="space-y-2">
@@ -255,7 +309,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
         footer={
           <>
             <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={() => setConfirming(false)}>تراجع</button>
-            <button aria-busy={busy} type="button" className={buttonClass("primary")} disabled={busy} onClick={markPaid}>
+            <button aria-busy={busy} type="button" className={buttonClass("primary")} disabled={busy || !dayOk} onClick={() => markPaid()}>
               أكّد السداد
             </button>
           </>
@@ -267,9 +321,25 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
             <p className="text-sm font-bold">
               <Money minor={markable.reduce((s, x) => s + x.totalMinor, 0)} currency /> لـ{countNoun(markable.length, SUPPLIER)}
             </p>
-            <p className="text-[11px] text-ink-soft">{countNoun(markable.reduce((s, x) => s + x.invoices.length, 0), INVOICE)} تصير مسدَّدة اليوم.</p>
+            <p className="text-[11px] text-ink-soft">{countNoun(markable.reduce((s, x) => s + x.invoices.length, 0), INVOICE)} تصير مسدَّدة بتاريخ {dayOk ? formatDay(paidOn) : "—"}.</p>
           </div>
         </div>
+        <label className="mt-3 block">
+          <span className="text-xs font-bold">يوم التحويل</span>
+          <input
+            type="date"
+            dir="ltr"
+            value={paidOn}
+            max={today}
+            disabled={busy}
+            onChange={(e) => setPaidOn(e.target.value)}
+            aria-invalid={!dayOk}
+            className="nums mt-1 block h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm sm:h-10"
+          />
+          <span className={`mt-1 block text-[11px] ${dayOk ? "text-muted" : "font-bold text-danger"}`}>
+            {dayOk ? "اليومُ الذي خرجت فيه الحوالة من البنك — به تُطابَق حين يصل الكشف." : "يوم التحويل لا يكون بعد اليوم."}
+          </span>
+        </label>
         <p className="mt-3 text-xs leading-relaxed text-muted">
           حين يصل كشف البنك يطابق ما بقي، ولا يُنشئ سداداً ثانياً لفاتورةٍ خُصّصت. وإن ضغطتَ خطأً فزرُّ «تراجع» في الإشعار يُلغي ما كُتب.
         </p>

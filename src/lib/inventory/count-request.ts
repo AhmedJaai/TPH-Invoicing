@@ -17,7 +17,7 @@
  * ووحدةٌ مستقلّة عن المسار كي تُختبَر بلا خادمٍ ولا جلسة.
  */
 import { z } from "zod";
-import { decimalToMilli } from "./units";
+import { ambiguousThousandsMessage, decimalToMilli, isAmbiguousThousands } from "./units";
 import { STORED_UNITS, type StoredUnit } from "@/lib/unit-conversion";
 
 const MAX_ITEMS = 2000;
@@ -43,6 +43,11 @@ export const quantityText = z
   .union([z.string().max(24, "كمّيّةٌ أطول من المعقول"), z.null()])
   .transform((v, ctx) => {
     if (v === null || v.trim() === "") return null;
+    /* «5,200» لا تُخمَّن — فرقٌ بألف ضعف */
+    if (isAmbiguousThousands(v)) {
+      ctx.addIssue({ code: "custom", message: ambiguousThousandsMessage(v) });
+      return z.NEVER;
+    }
     const milli = decimalToMilli(v.trim());
     if (milli === null || milli < 0) {
       ctx.addIssue({ code: "custom", message: `كمّيّةٌ غير مقروءة: «${v}» — اكتب رقماً موجباً` });

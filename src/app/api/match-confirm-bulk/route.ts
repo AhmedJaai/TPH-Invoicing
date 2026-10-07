@@ -20,22 +20,18 @@
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
-import { eq, inArray, sql } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  bankTransactions, decisionHistory, invoices, paymentAllocations,
-  supplierAliases, suppliers,
-} from "@/db/schema";
+import { bankTransactions, decisionHistory } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { allocate, recordBankPayment, claimBankTransaction, AlreadyMatchedError } from "@/services/payment.service";
 import { MonthClosedError } from "@/services/validation.service";
 import { recordAudit } from "@/lib/audit";
-import { runReconciliation } from "@/services/reconcile.service";
-import { loadMerchantMemory } from "@/services/counterparty.service";
-import { loadSupplierProfiles } from "@/services/supplier-profile.service";
-import type { SupplierIdentity } from "@/lib/bank/entities";
-import type { OpenInvoice } from "@/lib/bank/candidates";
+import { planFor, type PlannedPayment } from "@/services/reconcile.service";
+import type { Candidate } from "@/lib/bank/candidates";
+import { pickCandidate, recomputeMatches } from "@/services/match-recompute.service";
 import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
+import { formatRiyalsDisplay } from "@/lib/money";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -52,6 +48,12 @@ export const MAX_BULK = 50;
 const Body = z.object({
   /** معرّفات الحركات وحدها — ولا شيء غيرها يُؤخَذ من المتصفّح. */
   transactionIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
+  /**
+   * لحركةٍ واحدة: المرشّحُ الذي اختاره صاحبُ العمل من القائمة التي عرضها
+   * الخادم — **بمعرّفات فواتيره وحدها**. يُتحقَّق أنّه ممّا يحسبه الخادم
+   * الآن، والمبلغُ والتخصيصُ يحسبهما الخادم.
+   */
+  candidateInvoiceIds: z.array(z.string().trim().min(1).max(64)).max(20).optional(),
 });
 type Body = z.infer<typeof Body>;
 
@@ -101,7 +103,9 @@ export async function POST(request: Request) {
       outcomes.push({ transactionId: tx.id, ok: false, reason: "مطابَقة أصلاً" });
       return false;
     }
-    if (tx.matchDisposition !== "SUGGEST") {
+    /* ومن اختار فاتورةً بعينها لحركةٍ في «يُراجَع» فقد قرّر — يُتحقَّق من اختياره أدناه */
+    const pickedByHand = (body.candidateInvoiceIds?.length ?? 0) > 0 && tx.matchDisposition === "REVIEW";
+    if (tx.matchDisposition !== "SUGGEST" && !pickedByHand) {
       outcomes.push({
         transactionId: tx.id, ok: false,
         reason: "ليست اقتراحاً — الإقرار الجماعيّ للاقتراحات وحدها",
@@ -134,99 +138,96 @@ export async function POST(request: Request) {
     });
   }
 
+  /* اختيارُ مرشّحٍ بعينه لحركةٍ واحدة — لا يُعمَّم على دفعة */
+  const chosenInvoiceIds = body.candidateInvoiceIds ?? [];
+  if (chosenInvoiceIds.length > 0 && ids.length !== 1) {
+    return NextResponse.json({ error: "اختيارُ الفاتورة لحركةٍ واحدة في المرّة" }, { status: 400 });
+  }
+
   /* ── الحقائق كما هي الآن، لا كما كانت لحظة الاستيراد ── */
-  const identityRows = await db
-    .select({
-      id: suppliers.id, nameAr: suppliers.nameAr, slug: suppliers.slug,
-      nameEn: suppliers.nameEn, driveFolderName: suppliers.driveFolderName,
-      aliases: sql<string>`coalesce(string_agg(${supplierAliases.value}, '||'), '')`,
-    })
-    .from(suppliers)
-    .leftJoin(supplierAliases, eq(supplierAliases.supplierId, suppliers.id))
-    .where(eq(suppliers.isActive, true))
-    .groupBy(suppliers.id);
-
-  const supplierIdentities: SupplierIdentity[] = identityRows.map((r) => ({
-    supplierId: r.id, nameAr: r.nameAr, slug: r.slug,
-    nameEn: r.nameEn, driveFolderName: r.driveFolderName,
-    aliases: r.aliases.split("||").filter(Boolean),
-  }));
-
-  const invRows = await db
-    .select({
-      id: invoices.id, supplierId: invoices.supplierId,
-      invoiceNumber: invoices.invoiceNumber, invoiceDate: invoices.invoiceDate,
-      periodMonth: invoices.periodMonth, totalMinor: invoices.totalMinor,
-      allocated: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}),0)::int`,
-    })
-    .from(invoices)
-    .leftJoin(paymentAllocations, eq(paymentAllocations.invoiceId, invoices.id))
-    .groupBy(invoices.id);
-
-  const open: OpenInvoice[] = invRows
-    .map((r) => ({
-      id: r.id, supplierId: r.supplierId, invoiceNumber: r.invoiceNumber,
-      invoiceDate: r.invoiceDate, periodMonth: r.periodMonth,
-      totalMinor: r.totalMinor - Number(r.allocated),
-      outstandingMinor: r.totalMinor - Number(r.allocated),
-    }))
-    .filter((i) => i.outstandingMinor > 0);
-
-  const memory = await loadMerchantMemory();
-  /*
-    ملامح السداد: كيف يُسدَّد كل مورّد عادةً. ترجّح بين متقاربَين ولا
-    تُنشئ مطابقةً بلا دليل.
-  */
-  const profiles = await loadSupplierProfiles();
-
-  /*
-    يُعاد الحساب على الحركات المختارة **مجتمعةً**.
-
-    ولو حُسبت كلٌّ وحدها لجاز أن تطلب حركتان الفاتورةَ نفسها فتُخصَّص
-    مرّتين — وهو ما يفعله المطابق الجشع بالضبط. والمحسِّن يوزّعها على
-    الفترة كلّها فلا تُحجَز فاتورةٌ لاثنتين.
-  */
-  const engine = runReconciliation({
-    rows: eligible.map((tx) => ({
-      key: tx.id,
-      valueDate: tx.valueDate,
-      description: tx.description ?? "",
-      beneficiaryRaw: tx.beneficiaryRaw,
-      transactionType: tx.transactionType,
-      amountMinor: tx.amountMinor,
-      direction: tx.direction,
-    })),
-    invoices: open,
-    suppliers: supplierIdentities,
-    memory,
-    profiles,
-  });
+  const { engine, invoiceById } = await recomputeMatches(eligible);
 
   const plannedByKey = new Map(engine.planned.map((p) => [p.transactionKey, p]));
   const resultByKey = new Map(engine.results.map((r) => [r.key, r]));
+  /*
+    إقرارُ حركةٍ واحدة بيدٍ غيرُ الإقرار الجماعيّ.
+
+    الجماعيّ يُغري بالثقة، فلا يكتب إلّا ما بلغ الحسمَ في إعادة الحساب.
+    أمّا من فتح حركةً واحدة وضغط «قيّدها على هذه الفاتورة» فقد **أقرّ**
+    اقتراحاً — وكان يُردّ دائماً: الاقتراحُ الذي سببُه درجةٌ دون الحدّ أو
+    مرشّحٌ قريب أو سدادٌ جزئيّ يعود اقتراحاً في كلّ إعادة حساب، فلا يُقَرّ
+    من أيّ شاشة، ولا يبقى إلّا «قيّد على حسابه» وهو قد يسدّد غير المقصودة.
+    فيُكتب مرشّحُ المحرّك (أو الذي اختاره من قائمته) ما دام صالحاً الآن:
+    فواتيرُه مفتوحة، ولمورّد الحركة، والتخصيصُ يحسبه الخادم.
+  */
+  const single = ids.length === 1;
   let confirmed = 0;
 
   for (const tx of eligible) {
-    const plan = plannedByKey.get(tx.id);
     const result = resultByKey.get(tx.id);
+    let plan: PlannedPayment | undefined = chosenInvoiceIds.length > 0 ? undefined : plannedByKey.get(tx.id);
+    let byHand = false;
+    let candidate: Candidate | null = result?.candidate ?? null;
+
+    /* بلا اختيارٍ صريح لا يُقَرّ ما نزل دون الاقتراح — الضعيفُ يُختار بعينه أو يُترَك */
+    const confirmableByHand = chosenInvoiceIds.length > 0 || result?.decision?.disposition !== "REVIEW";
+    if (!plan && single && result?.supplierId && confirmableByHand) {
+      candidate = pickCandidate(engine, tx.id, chosenInvoiceIds);
+      if (chosenInvoiceIds.length > 0 && !candidate) {
+        outcomes.push({
+          transactionId: tx.id, ok: false,
+          reason: "الفاتورة المختارة لم تعد مرشّحةً لهذه الحركة — سُدّدت أو تغيّرت. حدّث القائمة واختر من جديد",
+        });
+        continue;
+      }
+      const made = candidate
+        ? planFor(
+            { key: tx.id, supplierId: result.supplierId, amountMinor: tx.amountMinor, paidAt: tx.valueDate },
+            candidate, invoiceById, { fullAmount: true },
+          )
+        : null;
+      if (made) {
+        plan = made;
+        byHand = true;
+      }
+    }
 
     /*
-      لا يُقَرّ إلّا ما بلغ الحسمَ في إعادة الحساب.
+      لا يُقَرّ جماعةً إلّا ما بلغ الحسمَ في إعادة الحساب.
 
       واقتراحٌ لم يعد يبلغه ليس خطأً في المستخدم: هو تغيّرٌ في الواقع —
       سُدّدت فاتورته، أو ظهر مرشّحٌ ينافسها. فيُعاد بسببه ليُقرَّر بيدٍ
       لا بضغطةٍ جماعية.
     */
     if (!plan) {
+      const last = result?.decision?.reasons?.[result.decision.reasons.length - 1];
       outcomes.push({
         transactionId: tx.id,
         ok: false,
-        reason:
-          result?.decision?.reasons?.[result.decision.reasons.length - 1]
-          ?? "لم تعد تبلغ حدّ الحسم — راجعها وحدها",
+        reason: !single && candidate
+          ? `${last ?? "لم تعد تبلغ حدّ الحسم"} — أقِرّها وحدها من صفّها`
+          : last ?? "لم تعد تبلغ حدّ الحسم — راجعها وحدها",
       });
       continue;
     }
+
+    /*
+      الأدلّةُ التي يُبنى عليها القيدُ تُحفَظ معه — لا أدلّةُ لحظة الاستيراد
+      وقد تخالف ما كُتب فعلاً.
+    */
+    const evidence = {
+      تصنيف: result?.classificationReason ?? null,
+      مستفيد: result?.supplierEvidence ?? [],
+      مطابقة: [
+        ...(byHand ? (candidate?.evidence ?? []) : (result?.decision?.reasons ?? [])),
+        byHand ? "أقرّها إنسانٌ على هذا المرشّح بعد إعادة الحساب" : "أُقرّت بعد إعادة الحساب",
+      ],
+      درجةالمستفيد: Math.round((result?.supplierScore ?? 0) * 100),
+      فواتير: plan.allocations.map((a) => a.invoiceId),
+    };
+    const unallocated = plan.amountMinor - plan.feeMinor
+      - plan.allocations.reduce((n, a) => n + a.amountMinor, 0);
+    const decided = plan;
 
     /*
       ══ لماذا معاملةٌ لكلّ حركة، لا معاملةٌ للجميع ══
@@ -245,16 +246,16 @@ export async function POST(request: Request) {
     try {
       paymentId = await db.transaction(async (t) => {
         const { id } = await recordBankPayment(t, {
-          supplierId: plan.supplierId,
-          paidAt: plan.paidAt,
-          amountMinor: plan.amountMinor,
+          supplierId: decided.supplierId,
+          paidAt: decided.paidAt,
+          amountMinor: decided.amountMinor,
           method: "BANK_TRANSFER",
           beneficiaryNameRaw: (tx.beneficiaryRaw ?? tx.description ?? "").slice(0, 200),
-          appliesToMonth: plan.primaryMonth,
-          feeMinor: plan.feeMinor,
+          appliesToMonth: decided.primaryMonth,
+          feeMinor: decided.feeMinor,
         });
 
-        await allocate(t, id, plan.amountMinor, plan.allocations);
+        await allocate(t, id, decided.amountMinor, decided.allocations);
 
         /*
           شرطُ السباق، ويُفحَص أثرُه: كان الشرط في `where` ولا يُعدّ ما
@@ -264,9 +265,17 @@ export async function POST(request: Request) {
         await claimBankTransaction(t, tx.id, {
           matchedPaymentId: id,
           matchStatus: "MATCHED",
-          matchDisposition: "AUTO",
+          /*
+            قرارٌ أقرّه إنسان ليس «طُوبقت تلقائياً»: كان يُكتب `AUTO`
+            فتعرضه الشاشةُ كذلك ويدخل مقياسَ الحسم التلقائيّ. `null` كما
+            يكتب «قيّد على حسابه» — و«سُجّلت سداداً» شارتُه.
+          */
+          matchDisposition: null,
+          matchOutcome: candidate?.outcome ?? tx.matchOutcome,
+          matchScore: candidate ? Math.round(candidate.score * 100) : tx.matchScore,
+          matchEvidence: evidence,
           lifecycle: "POSTED",
-          supplierId: plan.supplierId,
+          supplierId: decided.supplierId,
           category: "SUPPLIER",
           /* بابٌ أقرّه إنسانٌ بضغطته — ولا يبقى مصدرُه «مجهولاً» بجانبه */
           classificationSource: "HUMAN",
@@ -277,14 +286,37 @@ export async function POST(request: Request) {
           event: "MATCH_CONFIRMED",
           actor: "HUMAN",
           actorId: user.id,
-          detail: `إقرارٌ جماعيّ بعد إعادة الحساب — ${countNoun(plan.allocations.length, INVOICE)}`,
+          detail: `${byHand ? "إقرارُ اقتراحٍ بيد" : "إقرارٌ"} بعد إعادة الحساب — ${countNoun(decided.allocations.length, INVOICE)}`,
           payload: {
             الدفعة: id,
-            الفواتير: plan.allocations.map((a) => a.invoiceId),
-            الرسم: plan.feeMinor,
+            الفواتير: decided.allocations.map((a) => a.invoiceId),
+            الرسم: decided.feeMinor,
+            "بقي غير مخصَّص": unallocated,
             "أُعيد الحساب": true,
+            "اختيارٌ بيد": byHand,
+            النتيجة: candidate?.outcome ?? null,
           },
         });
+
+        /*
+          أثرُ التدقيق داخل معاملة المال: كان يُكتب بعد الإيداع وبلا مقبض،
+          فإن سقط بقي المالُ مكتوباً بلا أثر.
+        */
+        await recordAudit({
+          actorId: user.id,
+          action: "MATCH_CONFIRMED",
+          entityType: "bank_transaction",
+          entityId: tx.id,
+          before: { القرار: tx.matchDisposition, النتيجة: tx.matchOutcome, الدرجة: tx.matchScore },
+          after: {
+            الفعل: byHand ? "إقرارُ اقتراحٍ بيد بعد إعادة الحساب" : "إقرارُ اقتراحٍ بعد إعادة الحساب",
+            الدفعة: id,
+            المبلغ_بالهللات: decided.amountMinor,
+            الرسم_بالهللات: decided.feeMinor,
+            التخصيصات: decided.allocations,
+            "بقي غير مخصَّص": unallocated,
+          },
+        }, t);
 
         return id;
       });
@@ -303,25 +335,12 @@ export async function POST(request: Request) {
     outcomes.push({
       transactionId: tx.id,
       ok: true,
-      reason: `أُقرّت على ${countNoun(plan.allocations.length, INVOICE)}`,
+      reason: `أُقرّت على ${countNoun(decided.allocations.length, INVOICE)}`
+        + (unallocated > 0 ? ` · وبقي ${formatRiyalsDisplay(unallocated)} غير مخصَّص على حساب المورّد` : ""),
       paymentId,
-      invoiceIds: plan.allocations.map((a) => a.invoiceId),
+      invoiceIds: decided.allocations.map((a) => a.invoiceId),
     });
   }
-
-  await recordAudit({
-    actorId: user.id,
-    action: "MATCH_CONFIRMED",
-    entityType: "bank_transaction",
-    entityId: `bulk:${confirmed}`,
-    after: {
-      الفعل: "إقرارٌ جماعيّ لاقتراحات المطابقة",
-      "طُلبت": ids.length,
-      "أُقرّت": confirmed,
-      "رُدّت": outcomes.filter((o) => !o.ok).length,
-      "أسباب الردّ": outcomes.filter((o) => !o.ok).map((o) => o.reason),
-    },
-  });
 
   return NextResponse.json({
     ok: true,
@@ -330,7 +349,9 @@ export async function POST(request: Request) {
     outcomes,
     message:
       confirmed === ids.length
-        ? `أُقرّت ${countNoun(confirmed, TRANSACTION)}`
+        ? single
+          ? outcomes.find((o) => o.ok)?.reason ?? `أُقرّت ${countNoun(confirmed, TRANSACTION)}`
+          : `أُقرّت ${countNoun(confirmed, TRANSACTION)}`
         : `أُقرّت ${confirmed} من ${ids.length} — والباقي تغيّر حاله فيُراجَع وحده`,
   });
 }

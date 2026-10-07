@@ -380,3 +380,24 @@ describe("ما بعد آخر أيّام الكشف", () => {
     expect(r.notInStatement.map((i) => i.invoiceId)).toEqual(["c"]);
   });
 });
+
+describe("دائنُ الكشف — قاعدةٌ واحدة مع حساب المورّد (classifyCredit)", () => {
+  it("«مردود بضاعة» إشعارٌ دائن لا سداد، و«حوالة» سداد", () => {
+    const r = reconcileStatement([
+      { date: new Date("2026-08-10T00:00:00Z"), description: "مردود بضاعة", debitMinor: 0, creditMinor: 70_00 },
+      { date: new Date("2026-08-12T00:00:00Z"), description: "حوالة بنكية", debitMinor: 0, creditMinor: 500_00 },
+    ], []);
+    expect(r.lines.map((l) => l.status)).toEqual(["CREDIT_NOTE", "PAYMENT"]);
+  });
+});
+
+describe("مذكّرة الفروق — المالُ من الهللات نصّاً", () => {
+  it("لا قسمةَ عشريّة: 1,234.05 لا 1234.05 ولا 1,234.1", () => {
+    const r = reconcileStatement([
+      { date: new Date("2026-08-10T00:00:00Z"), ref: "X-9001", debitMinor: 1_234_05, creditMinor: 0 },
+    ], []);
+    const memo = buildDiscrepancyMemo("المورّد", "أغسطس 2026", r);
+    expect(memo).toContain("1,234.05 ريال");
+    expect(memo).not.toContain("2026-08-10");
+  });
+});

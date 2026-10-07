@@ -74,8 +74,10 @@
     "next-auth": "^5.0.0-beta.32",
     "pdfjs-dist": "^4.10.38",
     "pg": "^8.23.0",
+    "qr": "^0.7.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "sharp": "^0.35.4",
     "unpdf": "^1.7.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.5.4"

@@ -26,7 +26,8 @@ export interface SalesLineItem {
   externalProductId: string;
   name: string;
   category?: string;
-  quantity: number;
+  /** بالمِلّي — الكمّيّةُ لا تمرّ بالفاصلة العائمة (`inventory/units.ts`). */
+  quantityMilli: number;
   unitPriceMinor: number;
   lineTotalMinor: number;
 }

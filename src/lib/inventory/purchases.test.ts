@@ -146,3 +146,56 @@ describe("الكلفة", () => {
     expect(quantityInBaseUnits(2_000_000, "G")).toBe(2000);
   });
 });
+
+describe("الصفرُ ليس كمّيّة، والسالبُ مرتجعٌ يُسمّى", () => {
+  it("بندٌ كمّيّتُه صفر «لم تُقرأ كمّيّتُه» — لا مشترياتٌ معروفةٌ بصفر", () => {
+    expect(purchaseQuantity(line({ qty: "0" }), "KG")).toEqual({ known: false, reason: "MISSING_QUANTITY" });
+    expect(purchaseQuantity(line({ qty: "0.000" }), "KG")).toEqual({ known: false, reason: "MISSING_QUANTITY" });
+  });
+
+  it("والسالبُ يُنقص المشتريات ويُحفَظ مقدارُه مرتجعاً", () => {
+    const s = summarisePurchases(
+      [
+        line({ lineId: "a", qty: "10", lineTotalMinor: 450_000 }),
+        line({ lineId: "b", qty: "-2", lineTotalMinor: -90_000 }),
+      ],
+      () => "KG",
+    );
+    const p = s.byProduct.get("p-coffee")!;
+    expect(canonicalToQuantity(p.canonicalMilli, "KG")).toBe(8);
+    expect(canonicalToQuantity(p.returnsMilli, "KG")).toBe(2);
+    expect(p.knownCostMinor).toBe(360_000);
+  });
+});
+
+describe("الضربُ لا يتجاوز العددَ الآمن بصمت", () => {
+  it("ما جاوز العددَ الصحيح الآمن «لم تُقرأ كمّيّتُه»", () => {
+    /* ‏١٠٠٬٠٠٠ كرتون × ١٠٠٠ × ١٠٠٠ لتر — خطأُ قراءةٍ لا شراء */
+    expect(purchaseQuantity(line({ qty: "100000", packSize: "1000", contentUnit: "L", contentQuantity: "1000" }), "L"))
+      .toEqual({ known: false, reason: "MISSING_QUANTITY" });
+  });
+
+  it("وما دونه يُحسَب بالضبط حيث كانت العائمةُ تُخطئ", () => {
+    /* ‏٩٠٠٧ × ١٠٠٠ × ١٠٠٠٫٠٠١ مل: حاصلُ الضرب ‏≈9×10^18 قبل القسمة */
+    const q = purchaseQuantity(line({ qty: "9007", packSize: "1000", contentUnit: "ML", contentQuantity: "1000.001" }), "ML");
+    expect(q).toEqual({ known: true, canonicalMilli: 9_007_009_007_000 });
+  });
+
+  it("والكسرُ يُقرَّب نصفُه بعيداً عن الصفر", () => {
+    /* ‏٠٫٠٠١ × ٠٫٥ × ١ جرام = ‏٠٫٠٠٠٥ جرام = نصفُ مِلّي‑جرام */
+    expect(purchaseQuantity(line({ qty: "0.001", packSize: "0.5", contentUnit: "G", contentQuantity: "1" }), "G"))
+      .toEqual({ known: true, canonicalMilli: 1 });
+    expect(purchaseQuantity(line({ qty: "-0.001", packSize: "0.5", contentUnit: "G", contentQuantity: "1" }), "G"))
+      .toEqual({ known: true, canonicalMilli: -1 });
+  });
+});
+
+describe("كلفةُ الفرق: نقصٌ وزيادةٌ متساويان يتقاصّان", () => {
+  it("−٠٫٥ هللة و+٠٫٥ هللة مجموعُهما صفر", () => {
+    /* ‏٥ مِلّي‑كيلو بـ١٠٠ هللة للكيلو = نصفُ هللة */
+    const up = varianceCostMinor(5_000, 100_000, "KG");
+    const down = varianceCostMinor(-5_000, 100_000, "KG");
+    expect(up).toBe(1);
+    expect(down).toBe(-1);
+  });
+});

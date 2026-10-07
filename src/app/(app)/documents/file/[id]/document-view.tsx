@@ -110,6 +110,9 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
     { gap: "SUPPLIER_UNKNOWN", ok: !gaps.has("SUPPLIER_UNKNOWN"), title: "مورّدٌ معروفٌ عندنا" },
     { gap: "ARITHMETIC", ok: !gaps.has("ARITHMETIC"), title: "حسابٌ مستقيم: الصافي + الضريبة = الإجماليّ" },
     { gap: "UNVERIFIED_IMAGE", ok: !gaps.has("UNVERIFIED_IMAGE"), title: "قراءةٌ موثوقة: نصٌّ مكتوب، أو صورةٌ لها شاهد" },
+    /* لا يظهران إلّا إن منعا: رمزٌ يخالف المقيَّد، أو مبلغٌ تبدّل عند إعادة السؤال */
+    ...(gaps.has("QR_MISMATCH") ? [{ gap: "QR_MISMATCH" as const, ok: false, title: "رمزُ الفاتورة (QR) لا يخالف المقيَّد" }] : []),
+    ...(gaps.has("REASK_CHANGED") ? [{ gap: "REASK_CHANGED" as const, ok: false, title: "مبلغٌ لم يتبدّل عند إعادة القراءة" }] : []),
   ];
 
   const lastReason = p.history

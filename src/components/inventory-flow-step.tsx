@@ -184,7 +184,7 @@ export function FlowStep({
                   plain={row.purchasesZero}
                   source={row.purchasesText === null
                     ? "بندٌ لم تُعرَف كمّيّتُه أو استلامٌ لم يُحسَم"
-                    : row.manualReceiptsText !== null ? `منها ${row.manualReceiptsText} أُدخلت يدوياً` : "من الفواتير"}
+                    : `${row.manualReceiptsText !== null ? `منها ${row.manualReceiptsText} أُدخلت يدوياً` : "من الفواتير"}${row.supplierReturn ? " · وطُرح منها مرتجعٌ للمورّد" : ""}`}
                   action={canEdit ? (
                     <button
                       type="button"

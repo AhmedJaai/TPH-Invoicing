@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCashFileName, buildInvoiceFileName, buildReceiptFileName, buildStatementFileName,
-  looksLikeExtension, parseFileName, resolveNameCollision, splitSlugAndBeneficiary,
+  looksLikeExtension, parseFileName, resolveNameCollision, safeToken, splitSlugAndBeneficiary,
 } from "./naming";
 
 /** الأسماء المختصرة المعروفة — لاحظ PURE-Oska الذي يحمل شرطة داخله. */
@@ -105,6 +105,51 @@ describe("تكرار الاسم", () => {
     expect(resolveNameCollision("a_SAR1.00.pdf", existing)).toBe("a_SAR1.00 (2).pdf");
     expect(resolveNameCollision("a_SAR1.00.pdf", [...existing, "a_SAR1.00 (2).pdf"]))
       .toBe("a_SAR1.00 (3).pdf");
+  });
+});
+
+describe("اسمٌ بلا امتداد", () => {
+  it("لا تُلحَق به نقطةٌ يتيمة عند التكرار", () => {
+    const name = "2026-09-06_AVAL_Invoice_INV-1_SAR996.19";
+    expect(resolveNameCollision(name, [name])).toBe(`${name} (2)`);
+  });
+});
+
+describe("مقاطعُ الاسم لا تحمل ما يرفضه نظامُ ملفّات", () => {
+  it("المحظورُ يُكتب «-» والطرفان يُقصّان", () => {
+    expect(safeToken(' A:B*C?"D<E>F|G/H\\I ')).toBe("A-B-C--D-E-F-G-H-I");
+    expect(safeToken("x".repeat(200))).toHaveLength(80);
+  });
+
+  it("ذهابٌ وإياب: ما يُبنى يُقرأ بقيمه نفسها", () => {
+    const cases = [
+      { invoiceNumber: "260340", amountMinor: 41_000, extension: "pdf" },
+      { invoiceNumber: "INV-2026-00130", amountMinor: 99_619, extension: "pdf" },
+      { invoiceNumber: "B07/2026/17328", amountMinor: 38_200, extension: "jpg" },
+      { invoiceNumber: "A_12_B", amountMinor: 5, extension: "heic" },
+      { invoiceNumber: " 0044: ", amountMinor: 1_234_567_89, extension: "png" },
+      { invoiceNumber: "فاتورة ٣", amountMinor: 100, extension: "pdf" },
+    ];
+    for (const c of cases) {
+      const name = buildInvoiceFileName({ date: "2026-09-04", slug: "OliveLeaves", ...c });
+      expect(name, name).not.toMatch(/[\\/:*?"<>|]/);
+      const r = parseFileName(name, SLUGS);
+      expect(r.ok, name).toBe(true);
+      if (!r.ok) continue;
+      expect(r.value).toMatchObject({
+        kind: "INVOICE", date: "2026-09-04", slug: "OliveLeaves",
+        invoiceNumber: safeToken(c.invoiceNumber), amountMinor: c.amountMinor, extension: c.extension,
+      });
+    }
+  });
+
+  it("والكشفُ بلا مبلغ والنسخةُ الثانية كذلك", () => {
+    const statement = parseFileName(buildStatementFileName({ date: "2026-08-31", slug: "AVAL" }), ["AVAL"]);
+    expect(statement.ok && statement.value).toMatchObject({ kind: "STATEMENT", slug: "AVAL", amountMinor: undefined });
+    const copy = parseFileName(buildInvoiceFileName({
+      date: "2026-09-04", slug: "OliveLeaves", invoiceNumber: "1", amountMinor: 100, duplicateIndex: 3,
+    }), SLUGS);
+    expect(copy.ok && copy.value.duplicateIndex).toBe(3);
   });
 });
 

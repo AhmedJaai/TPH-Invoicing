@@ -260,7 +260,7 @@ export async function InvoiceView({
             </p>
           ) : canPay ? (
             <>
-              <MarkInvoicePaid invoiceId={inv.id} label={formatRiyals(p.remainingMinor)} layout="panel" startOpen={act === "pay"} />
+              <MarkInvoicePaid invoiceId={inv.id} label={formatRiyals(p.remainingMinor)} layout="panel" startOpen={act === "pay"} invoiceDay={todayInRiyadh(inv.date)} />
               <p className="mt-3 text-[11px] leading-relaxed text-muted">
                 إن كانت حوالةً من حساب المقهى وسيصل كشفُها، فانتظره — تُطابَق حينها وحدها.
               </p>

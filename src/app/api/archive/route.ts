@@ -19,7 +19,7 @@ import { parseRiyals } from "@/lib/money";
 import { diffCorrections, recordAudit } from "@/lib/audit";
 import {
   assertNotDuplicate, createDocument, DuplicateDocumentError,
-  recordFindings, sha256Of,
+  md5Of, recordFindings, recordUploadOrphan, sha256Of,
 } from "@/services/document.service";
 import {
   archiveToDrive, DriveUnavailableError, NoDriveAuthorizationError, UnknownYearError,
@@ -293,6 +293,7 @@ export async function POST(request: Request) {
     const needsReview = !can(user.role, "amounts:view");
 
     // ── القاعدة ──
+    const driveMd5 = md5Of(data);
     const documentId = await db.transaction(async (tx) => {
       const docId = await createDocument(tx, {
         driveFileId: uploaded.fileId,
@@ -301,6 +302,7 @@ export async function POST(request: Request) {
         mimeType: body.mimeType,
         sizeBytes: data.length,
         sha256,
+        driveMd5,
         kind: body.documentKind,
         periodMonth,
         supplierId: body.supplierId,
@@ -411,6 +413,25 @@ export async function POST(request: Request) {
       ]);
 
       return docId;
+    }).catch(async (e: unknown) => {
+      /*
+        الملفُّ في الدرايف والقيدُ رُدّ — ولا يُحذف من الأرشيف شيء. فيُحفظ له صفٌّ مرفوضٌ
+        بسببه كي لا تقيّده المزامنةُ التالية من اسمه (`recordUploadOrphan`). وتعذُّرُ هذا
+        الصفّ لا يحجب الخطأ الأصليّ: هو ما يُقال لصاحبه.
+      */
+      const code = (e as { code?: string; cause?: { code?: string } }).code ?? (e as { cause?: { code?: string } }).cause?.code;
+      await recordUploadOrphan({
+        driveFileId: uploaded.fileId,
+        driveFolderId: uploaded.folderId,
+        fileName: uploaded.fileName,
+        mimeType: body.mimeType,
+        sizeBytes: data.length,
+        driveMd5,
+        periodMonth,
+        uploadedById: user.id,
+        reason: e instanceof MonthClosedError ? e.message : code ? `ردّت القاعدةُ القيد (${code})` : "تعذّر القيد",
+      }).catch(() => undefined);
+      throw e;
     });
 
     const corrections = diffCorrections(serverRaw ?? {}, {

@@ -154,6 +154,9 @@ export interface AttentionFacts {
   /** ملفّاتٌ في مجلد شهرٍ غير شهر فاتورتها (`misplacedFiles`) — تُنقل بيد صاحبها */
   misplacedFiles?: { label: string; sub: string; href: string }[];
 
+  /** مستنداتٌ مقيَّدة لم يعد ملفُّها في الدرايف — حُذف أو في السلّة (`missingFromDrive`) */
+  missingFiles?: { label: string; sub: string; href: string }[];
+
   /** مورّدون لهم فواتير ولم يصل كشفهم */
   suppliersMissingStatement: string[];
   /**
@@ -625,6 +628,23 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: misplaced.length,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
       evidence: misplaced,
+    });
+  }
+
+  const missingFiles = f.missingFiles ?? [];
+  if (missingFiles.length > 0) {
+    out.push({
+      id: "files-missing-in-drive",
+      area: "DATA",
+      severity: "MEDIUM",
+      title: `${countNoun(missingFiles.length, DOCUMENT)} مقيَّدة ولم يعد ملفُّها في الدرايف`,
+      detail: "القيدُ قائمٌ والورقةُ غابت — حُذفت أو أُلقيت في السلّة. والفاتورةُ بلا ورقتها لا تسند خصمَ ضريبتها عند الفحص.",
+      action: "استعِدها من سلّة الدرايف (تُفرَّغ بعد ثلاثين يوماً)، والتنبيهُ يُحسم في المزامنة التالية.",
+      actionLabel: "افتح الدرايف",
+      href: "/documents/drive",
+      count: missingFiles.length,
+      impact: { kind: "UNATTRIBUTED", amountMinor: null },
+      evidence: missingFiles,
     });
   }
 

@@ -9,6 +9,7 @@ import { Money } from "@/components/money";
 import { Callout, EmptyState, LinkTabs, NoAccess, Section, Stat, StatGrid } from "@/components/ui";
 import { PayRunPlanner, WhatsAppLink, type PlannerSupplier } from "@/components/pay-run-planner";
 import { buildSupplierMessage } from "@/lib/payment-run";
+import { companyConfig } from "@/config/drive";
 import { previousMonth } from "@/lib/filing";
 import { INVOICE, SUPPLIER, countNoun } from "@/lib/arabic";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
@@ -57,6 +58,13 @@ export default async function PaymentsPage({
       : Promise.resolve([]),
   ]);
   const owedBy = new Map(balances.map((b) => [b.supplierId, b.owedMinor]));
+  /* رقمُنا الضريبيّ من الإعداد — وإن غاب المتغيّر قيلت الرسالةُ بلا رقمٍ ولا تسقط الصفحة */
+  let companyVat: string | null = null;
+  try {
+    companyVat = companyConfig.vatNumber;
+  } catch {
+    companyVat = null;
+  }
   const slugBy = new Map(slugs.map((s) => [s.id, s.slug]));
 
   const planner: PlannerSupplier[] = run.ready.map((s) => {
@@ -209,7 +217,7 @@ export default async function PaymentsPage({
                         {reasons.length === 1 ? reasons[0] : reasons.map((r) => `• ${r}`).join(" ")}
                       </p>
                       <div className="mt-3">
-                        <WhatsAppLink href={`https://wa.me/?text=${encodeURIComponent(buildSupplierMessage(name, list))}`} />
+                        <WhatsAppLink href={`https://wa.me/?text=${encodeURIComponent(buildSupplierMessage(name, list, companyVat))}`} />
                       </div>
                     </article>
                   );

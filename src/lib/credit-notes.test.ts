@@ -86,3 +86,17 @@ describe("explainByCredit", () => {
     expect(explainByCredit(0, [line({ id: "cn", description: "مرتجع" })])).toBeNull();
   });
 });
+
+describe("classifyCredit — الكلمةُ الصريحة تسبق", () => {
+  it("«تسوية بحوالة» و«سداد بعد الخصم» سدادٌ لا إشعار", () => {
+    expect(classifyCredit(line({ id: "a", description: "تسوية بحوالة بنكية" }))).toBe("PAYMENT");
+    expect(classifyCredit(line({ id: "b", description: "سداد بعد الخصم" }))).toBe("PAYMENT");
+  });
+  it("و«إشعار دائن» باسمه إشعارٌ ولو ذُكر معه سداد", () => {
+    expect(classifyCredit(line({ id: "c", description: "إشعار دائن عن دفعة مرتجعة" }))).toBe("CREDIT_NOTE");
+    expect(classifyCredit(line({ id: "d", reference: "CN-123", description: null }))).toBe("CREDIT_NOTE");
+  });
+  it("و«مردود بضاعة» إشعار", () => {
+    expect(classifyCredit(line({ id: "e", description: "مردود بضاعة" }))).toBe("CREDIT_NOTE");
+  });
+});

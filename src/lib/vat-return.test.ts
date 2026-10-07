@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  computeVatReturn, filingDeadline, isIncluded, parseVatPeriod, periodBounds, periodMonths,
-  invoiceIncluded, previousQuarter, quarterOfMonth, txVat, vatInsideGross, type VatInvoice, type VatTx,
+  computeVatReturn, filingDeadline, isIncluded, monthsBefore, nextQuarter, parseVatPeriod, periodBounds, periodKey, periodMonths,
+  invoiceIncluded, previousQuarter, quarterOfMonth, txBlocked, txVat, vatInsideGross, vatOnNet, type VatInvoice, type VatTx,
 } from "./vat-return";
 
 const inv = (o: Partial<VatInvoice>): VatInvoice => ({
@@ -82,7 +82,7 @@ describe("الإقرار", () => {
         tx({ id: "u", direction: "DEBIT", category: "UTILITY", amountMinor: 50_000 }),
       ],
     });
-    expect(r.output).toEqual({ grossMinor: 1_150_000, vatMinor: 150_000, count: 4 });
+    expect(r.output).toEqual({ grossMinor: 1_150_000, vatMinor: 150_000, count: 4, cashGrossMinor: 0, netMinor: 1_000_000 });
     expect(r.input.invoices).toEqual({ vatMinor: 15_000, count: 1, confirmed: { count: 0, vatMinor: 0, derivedCount: 0 } });
     expect(r.input.bankVat).toEqual({ vatMinor: 300, count: 1 });
     expect(r.input.selected).toEqual({ grossMinor: 115_000, vatMinor: 15_000, count: 1 });
@@ -112,5 +112,111 @@ describe("فاتورةٌ تقرّ أنّها ضريبيّة", () => {
   it("«لا تحسبها» تُخرج المستوفية", () => {
     expect(invoiceIncluded(inv({ vatMinor: 100, choice: false }))).toBe(false);
     expect(invoiceIncluded(inv({ vatMinor: 100 }))).toBe(true);
+  });
+});
+
+describe("ما لا يُضمّ مهما اختير", () => {
+  it("راتبٌ وزكاةٌ وتحويلٌ شخصيّ وحركةٌ داخليّة: لا ضريبةَ فيها — ولو وصل اختيارُها", () => {
+    for (const category of ["SALARY", "ZAKAT", "PERSONAL", "INTERNAL"]) {
+      const t = tx({ direction: "DEBIT", category, amountMinor: 115_000, choice: true });
+      expect(txBlocked(t), category).not.toBeNull();
+      expect(isIncluded(t), category).toBe(false);
+    }
+    const r = computeVatReturn({ invoices: [], txs: [tx({ direction: "DEBIT", category: "SALARY", amountMinor: 115_000, choice: true })] });
+    expect(r.input.totalMinor).toBe(0);
+  });
+  it("والإيجارُ والحكوميّ يُضمّان باختيار", () => {
+    expect(txBlocked(tx({ direction: "DEBIT", category: "RENT" }))).toBeNull();
+    expect(txBlocked(tx({ direction: "DEBIT", category: "GOVERNMENT" }))).toBeNull();
+  });
+  it("حوالةٌ ارتدّت وعودتُها: لا مدخلاتٍ ولا مبيعات", () => {
+    expect(isIncluded(tx({ direction: "DEBIT", category: "SUPPLIER", choice: true, bounced: true }))).toBe(false);
+    expect(isIncluded(tx({ direction: "CREDIT", category: "SUPPLIER", choice: true, bounced: true }))).toBe(false);
+  });
+});
+
+describe("فاتورةٌ تنتظر المراجعة", () => {
+  it("قراءةُ نموذجٍ لم يُقرّها أحد لا يحكم لها حكمُ الآلة", () => {
+    expect(invoiceIncluded(inv({ vatMinor: 1_500, awaitingReview: true }))).toBe(false);
+    expect(invoiceIncluded(inv({ vatMinor: 1_500, awaitingReview: false }))).toBe(true);
+  });
+  it("وإقرارُ صاحبها يُدخلها — ويُعدّ «بإقرارك»", () => {
+    const r = computeVatReturn({ invoices: [inv({ vatMinor: 1_500, awaitingReview: true, choice: true })], txs: [] });
+    expect(r.input.invoices.confirmed.count).toBe(1);
+    expect(r.input.invoices.vatMinor).toBe(1_500);
+  });
+});
+
+describe("النقدُ والرصيدُ المرحَّل والوعاء", () => {
+  it("نقدٌ لم يُودَع يدخل المخرجات، والتقريبُ على مجموعه مع البنك", () => {
+    const r = computeVatReturn({ invoices: [], txs: [tx({ amountMinor: 100 })], cashSalesGrossMinor: 100 });
+    /* 200 × 15/115 = 26.09 — لا 13 + 13 */
+    expect(r.output.vatMinor).toBe(26);
+    expect(r.output.grossMinor).toBe(100);
+    expect(r.output.cashGrossMinor).toBe(100);
+    expect(r.output.netMinor).toBe(174);
+    expect(r.netMinor).toBe(26);
+  });
+  it("رصيدٌ دائنٌ مرحَّل يُنقص المستحقّ", () => {
+    const r = computeVatReturn({ invoices: [], txs: [tx({ amountMinor: 1_150_000 })], carriedInMinor: 20_000 });
+    expect(r.carriedInMinor).toBe(20_000);
+    expect(r.netMinor).toBe(130_000);
+  });
+  it("وعاءُ المشتريات: الصافي المقروء، وإلّا الإجماليّ ناقصاً الضريبة، ووعاءُ ضريبة الرسوم 100/15 منها", () => {
+    const r = computeVatReturn({
+      invoices: [
+        inv({ id: "a", vatMinor: 1_500, totalMinor: 14_000, subtotalMinor: 10_000 }),
+        inv({ id: "b", vatMinor: 1_500, totalMinor: 11_500 }),
+      ],
+      txs: [
+        tx({ direction: "DEBIT", category: "POS_VAT", amountMinor: 150 }),
+        tx({ direction: "DEBIT", category: "RENT", amountMinor: 115_000, choice: true }),
+      ],
+    });
+    expect(r.input.baseMinor).toBe(10_000 + 10_000 + 1_000 + 100_000);
+  });
+  it("ما قُرئت ضريبتُه صفراً يُعدّ «مشترياتٍ بلا ضريبة» بإجماليّه", () => {
+    const r = computeVatReturn({ invoices: [inv({ vatMinor: 0, totalMinor: 5_000 }), inv({ id: "b", vatMinor: 150 })], txs: [] });
+    expect(r.zeroRated).toEqual({ count: 1, totalMinor: 5_000 });
+  });
+  it("١٥٪ من الصافي ضربٌ صحيح", () => {
+    expect(vatOnNet(57_400)).toBe(8_610);
+    expect(vatOnNet(1)).toBe(0);
+    expect(vatOnNet(10)).toBe(2);
+  });
+});
+
+describe("خصائصُ الفترة والحساب", () => {
+  it("كلُّ يومٍ في السنة يقع في ربعٍ واحدٍ بالضبط", () => {
+    const quarters = [1, 2, 3, 4].map((q) => periodBounds(parseVatPeriod(`2028-Q${q}`)!));
+    for (let d = Date.UTC(2028, 0, 1); d < Date.UTC(2029, 0, 1); d += 86_400_000) {
+      const day = new Date(d).toISOString().slice(0, 10);
+      expect(quarters.filter((b) => day >= b.from && day < b.until).length, day).toBe(1);
+      const own = periodBounds(quarterOfMonth(day.slice(0, 7)));
+      expect(day >= own.from && day < own.until, day).toBe(true);
+    }
+  });
+  it("التالي والسابق متعاكسان، والأشهرُ السابقة تعبر السنة", () => {
+    for (const key of ["2026-Q1", "2026-Q4", "2027-Q2"]) {
+      const q = quarterOfMonth(periodMonths(parseVatPeriod(key)!)[0]);
+      expect(periodKey(previousQuarter(nextQuarter(q)))).toBe(key);
+    }
+    expect(monthsBefore("2026-02", 3)).toEqual(["2025-11", "2025-12", "2026-01"]);
+    expect(monthsBefore("2026-07", 3)).toEqual(["2026-04", "2026-05", "2026-06"]);
+  });
+  it("الصافي لا يتغيّر بترتيب الحركات، والاختيارُ ثمّ إعادتُه يعيد الرقم", () => {
+    const txs = [
+      tx({ id: "1", amountMinor: 333 }), tx({ id: "2", amountMinor: 777 }),
+      tx({ id: "3", direction: "DEBIT", category: "RENT", amountMinor: 4_750_001, choice: true }),
+      tx({ id: "4", direction: "DEBIT", category: "POS_VAT", amountMinor: 17 }),
+      tx({ id: "5", direction: "DEBIT", category: "UTILITY", amountMinor: 99_999 }),
+    ];
+    const invoices = [inv({ id: "a", vatMinor: 1_234 }), inv({ id: "b", vatMinor: null, inputVatStatus: "UNKNOWN" })];
+    const base = computeVatReturn({ invoices, txs });
+    expect(computeVatReturn({ invoices: [...invoices].reverse(), txs: [...txs].reverse() }).netMinor).toBe(base.netMinor);
+    const chosen = txs.map((t) => (t.id === "5" ? { ...t, choice: true } : t));
+    expect(computeVatReturn({ invoices, txs: chosen }).netMinor).not.toBe(base.netMinor);
+    expect(computeVatReturn({ invoices, txs: chosen.map((t) => (t.id === "5" ? { ...t, choice: null } : t)) }).netMinor).toBe(base.netMinor);
+    expect(base.input.totalMinor).toBe(base.input.invoices.vatMinor + base.input.bankVat.vatMinor + base.input.selected.vatMinor);
   });
 });

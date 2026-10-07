@@ -76,7 +76,8 @@ export async function itemMovements(productId: string, limit = 40): Promise<Item
        limit ${limit}
     `),
     db.execute<Record<string, unknown>>(sql`
-      select w.id, w.occurred_on as day, w.quantity_milli, w.unit, w.reason, w.note
+      select w.id, w.occurred_on as day, w.quantity_milli, w.unit, w.reason, w.note,
+             w.voided_at, w.void_reason
         from waste_records w
        where w.product_id = ${productId}
        order by w.occurred_on desc
@@ -125,13 +126,15 @@ export async function itemMovements(productId: string, limit = 40): Promise<Item
       kind: "WASTE",
       day: String(r.day),
       title: `هدرٌ مسجَّل — ${WASTE_REASON[String(r.reason)] ?? String(r.reason)}`,
-      detail: r.note ? String(r.note) : null,
+      detail: r.voided_at
+        ? `أُبطل${r.void_reason ? `: ${String(r.void_reason)}` : ""}`
+        : r.note ? String(r.note) : null,
       milli: Number(r.quantity_milli),
       unit: unitOf(r.unit),
       invoiceQty: null,
       amountMinor: null,
       href: null,
-      voided: false,
+      voided: r.voided_at !== null,
     })),
     ...moves.rows.map((r): ItemMovement => ({
       id: `mov:${r.id}`,

@@ -14,26 +14,33 @@ import { readJson } from "@/lib/request-body";
 import { autoRecordRefusal, findInvoiceTwin, twinReason } from "@/lib/invoice-twin";
 import { loadRecordedInvoices } from "@/services/document-backlog.service";
 import { refreshTokenFor } from "@/services/drive.service";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { and, eq, gt, inArray, ne, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  documents, invoices, issues, payments, statements,
+  documents, extractionCache, invoices, issues, payments, statements,
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { ISSUE } from "@/lib/issue-codes";
 import { guard, respondTo } from "@/services/guard";
-import { DriveAuthExpiredError, driveForUser, downloadFile, getFileMeta, isDriveAuthError } from "@/lib/drive";
-import { misplacedFiles, recentMonths, walkArchive, type ArchiveEntry } from "@/lib/drive-sync";
+import {
+  DriveAuthExpiredError, driveForUser, downloadFile, getFileMeta, isDriveAuthError, probeFile, type DriveFile,
+} from "@/lib/drive";
+import {
+  archivePlace, DriveArchiveInvisibleError, misplacedFiles, missingFromDrive, recentMonths, walkArchive,
+  type ArchiveEntry, type WalkResult,
+} from "@/lib/drive-sync";
 import { parseFileName } from "@/lib/naming";
 import { KNOWN_SLUGS } from "@/lib/suppliers-seed";
 import { planImport } from "@/lib/archive-import";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import { extractDocument } from "@/lib/extraction";
+import { extractionSchema } from "@/lib/extraction/schema";
+import type { ExtractionOutcome, ExtractionSuccess } from "@/lib/extraction/provider";
 import { reviewConfirmed } from "@/lib/confirm";
 import { parseRiyals } from "@/lib/money";
-import { companyConfig } from "@/config/drive";
+import { companyConfig, driveConfig } from "@/config/drive";
 import { recordAudit } from "@/lib/audit";
 import { createPayment, PaymentTwinError } from "@/services/payment.service";
 import { createInvoice, createStatement, replaceLines } from "@/services/invoice.service";
@@ -43,6 +50,7 @@ import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { canonicalName } from "@/lib/canonical-name";
 import { autoArchive, sumLineTotals, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
+import { qrArchiveFacts } from "@/lib/extraction/evidence";
 import { fillFromFileName } from "@/lib/extraction/filename-facts";
 import { parseStatementExtras } from "@/lib/extraction/statement-extras";
 import { renameArchived } from "@/services/drive-rename.service";
@@ -53,6 +61,7 @@ import { driveWritesAllowed } from "@/lib/drive-readonly";
 import { FILE, MONTH, countNoun } from "@/lib/arabic";
 import { withDeadline } from "@/lib/ai/deadline";
 import { consume } from "@/services/rate-limit.service";
+import { acquireLease, releaseLease } from "@/services/job-state.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -81,6 +90,19 @@ const MAX_CONTENT_PER_CALL = 2;
  */
 const WALK_BUDGET_MS = 20_000;
 const CONTENT_BUDGET_MS = 28_000;
+
+/**
+ * عقدُ القراءة: مزامنةٌ واحدة تقرأ بالذكاء في الوقت الواحد.
+ *
+ * التوقيتُ في `localStorage` لكلّ جهاز، فالهاتفُ والحاسوبُ يزامنان معاً ويدفع كلٌّ منهما
+ * ثمنَ قراءة الملفّين نفسيهما. وعمرُ العقد فوق عمر المسار بقليل: طلبٌ قُتل لا يحجزه.
+ */
+const SYNC_LEASE = "drive-sync-lease";
+const SYNC_LEASE_MS = 70_000;
+/** كم مقيَّداً لم يُرَ ملفُّه يُسأل عنه الدرايف في النداء الواحد — والباقي في الذي يليه. */
+const MAX_PROBES_PER_CALL = 10;
+/** قراءةٌ حُفظت لهذه البصمة خلال يومٍ لا تُدفع ثانيةً. */
+const READING_FRESH_MS = 24 * 60 * 60 * 1000;
 
 const Body = z.object({
   /** مزامنةٌ خلفيّة من القشرة — التفويضُ الغائب يُردّ ردّاً سليماً بـ`needsAuth`. */
@@ -134,6 +156,25 @@ async function handle(request: Request) {
   const parsedBody = await readJson(request, Body, { emptyOk: true });
   if (!parsedBody.ok) return parsedBody.response;
   const body: Body = parsedBody.body;
+
+  /* المعاينةُ والتسجيلُ بالاسم لا يدفعان شيئاً فلا يُحجَزان — العقدُ على القراءة بالذكاء وحدها */
+  const leased = body.apply === true && body.readContent === true;
+  const holder = randomUUID();
+  if (leased && !(await acquireLease(SYNC_LEASE, holder, SYNC_LEASE_MS))) {
+    const error = "مزامنةٌ أخرى تقرأ الدرايف الآن — من جهازٍ أو لسانٍ آخر. انتظر دقيقةً ثمّ أعد المحاولة.";
+    return body.background === true
+      ? NextResponse.json({ busy: true, error })
+      : NextResponse.json({ busy: true, error }, { status: 409 });
+  }
+  try {
+    return await sync(user, body);
+  } finally {
+    /* ردُّ العقد لا يُسقط ردَّ المزامنة — وإن تعذّر انقضى بعمره */
+    if (leased) await releaseLease(SYNC_LEASE, holder).catch(() => undefined);
+  }
+}
+
+async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
   const apply = body.apply === true;
 
   /*
@@ -172,14 +213,47 @@ async function handle(request: Request) {
     ? await processDocumentBacklog(user.id, drive)
     : { recorded: 0, approved: 0, renamed: [] as { from: string; to: string }[], reread: 0, notes: [] as string[] };
 
-  const knownRows = await db.select({ id: documents.driveFileId, md5: documents.driveMd5, name: documents.fileName }).from(documents);
+  const direct = Array.isArray(body.fileIds) ? body.fileIds.slice(0, 8) : [];
+  const notes: string[] = [];
+
+  /*
+    القراءةُ بالمعرّف تُنادى حتى أربعين مرّةً بملفّين — وكانت كلُّ دفعةٍ تحمّل جدول
+    المستندات كلَّه. فيُسأل فيها عن المعرّفات المطلوبة وحدها، ثمّ عن بصمات ما وُجد.
+  */
+  const knownColumns = {
+    docId: documents.id, id: documents.driveFileId, md5: documents.driveMd5, sha256: documents.sha256,
+    name: documents.fileName, status: documents.status, folderId: documents.driveFolderId,
+  };
+  const knownRows = direct.length > 0
+    ? await db.select(knownColumns).from(documents).where(inArray(documents.driveFileId, direct))
+    : await db.select(knownColumns).from(documents);
   /* اسمُ الملفّ المعروف كما هو في الدرايف الآن — يُقارن بما عندنا بعد المشي */
   const liveNames = new Map<string, string>();
   /** مجلدُ الشهر الذي وُجد فيه كلُّ ملفٍّ معروف */
   const liveMonths = new Map<string, string>();
+  /** آخرُ من عدّل الملفَّ المعروف في الدرايف — يُكتب في أثر الاسم الذي تغيّر هناك */
+  const liveModifiers = new Map<string, string>();
   const known = new Set(knownRows.map((d) => d.id).filter((v): v is string => Boolean(v)));
-  /* بصمةُ ما أُرشف — نسخةٌ من ملفٍّ مقيَّد (في مجلّدٍ آخر أو باسمٍ آخر) تُعرف قبل أن تُنزَّل أو تُقرأ */
-  const knownMd5 = new Set(knownRows.map((d) => d.md5).filter((v): v is string => Boolean(v)));
+  /*
+    بصمةُ ما قُيِّد — نسخةٌ من ملفٍّ مقيَّد (في مجلّدٍ آخر أو باسمٍ آخر) تُعرف قبل أن تُنزَّل
+    أو تُقرأ. بالبصمتين: `md5` لما قيّدته المزامنة، و`sha256` لما رُفع من التطبيق — وكان
+    الثاني لا يُعرف، فنسخةُ المرفوع تُقرأ بالذكاء في كلّ مزامنةٍ ثمّ يردّها القيدُ الفريد.
+  */
+  const byMd5 = new Map<string, Original>();
+  const bySha = new Map<string, Original>();
+  const indexOriginals = (rows: readonly (typeof knownRows)[number][]) => {
+    for (const r of rows) {
+      const original = { docId: r.docId, name: r.name };
+      /* غيرُ المرفوض هو الأصل متى وُجد */
+      if (r.md5 && (r.status !== "REJECTED" || !byMd5.has(r.md5))) byMd5.set(r.md5, original);
+      if (r.sha256 && (r.status !== "REJECTED" || !bySha.has(r.sha256))) bySha.set(r.sha256, original);
+    }
+  };
+  indexOriginals(knownRows);
+  const originalOf = (file: DriveFile): Original | null =>
+    (file.sha256Checksum ? bySha.get(file.sha256Checksum) : undefined)
+    ?? (file.md5Checksum ? byMd5.get(file.md5Checksum) : undefined)
+    ?? null;
 
   const months = Array.isArray(body.onlyMonths) && body.onlyMonths.length > 0
     ? body.onlyMonths.slice(0, 36)
@@ -198,8 +272,8 @@ async function handle(request: Request) {
   let fresh: ArchiveEntry[];
   let pendingMonths: string[] = [];
   let truncated = false;
-
-  const direct = Array.isArray(body.fileIds) ? body.fileIds.slice(0, 8) : [];
+  /** المشيُ نفسُه — غائبٌ في القراءة بالمعرّف، فلا يُحكَم فيها على ما غاب من الدرايف */
+  let walk: WalkResult | null = null;
 
   if (direct.length > 0) {
     /*
@@ -210,18 +284,25 @@ async function handle(request: Request) {
       المتصفّح: من أرسل معرّفاً لا يُملي علينا أين هو.
     */
     const entries: ArchiveEntry[] = [];
+    const yearFolderIds = Object.values(driveConfig.yearFolderIds);
     try {
     for (const id of direct) {
       /* ما هو مسجَّل لا يُقرأ ثانيةً — استخراجٌ بلا سبب */
       if (known.has(id)) continue;
       const file = await getFileMeta(drive, id);
-      if (!file) continue;
-      const folder = file.parents?.[0] ? await getFileMeta(drive, file.parents[0]) : null;
-      const monthFolder = folder?.parents?.[0]
-        ? await getFileMeta(drive, folder.parents[0])
-        : null;
-      if (!folder || !monthFolder || !/^\d{4}-\d{2}$/.test(monthFolder.name)) continue;
-      entries.push({ month: monthFolder.name, folderName: folder.name, file });
+      if (!file) { notes.push(`${id} — لم يُقرأ: لا يُرى بتفويضك، أو حُذف من الدرايف`); continue; }
+      /*
+        موضعُه من الأرشيف بالحكم الواحد (`archivePlace`): في مجلّد مورّدٍ داخل شهر، أو في
+        مجلّد الشهر نفسه — والشهرُ لا يُقبل إلّا تحت سنةٍ مهيّأة. وما لا موضعَ له يُقال
+        سببُه؛ كان يُتخطّى بصمت.
+      */
+      const parent = file.parents?.[0] ? await getFileMeta(drive, file.parents[0]) : null;
+      let place = archivePlace(parent, null, yearFolderIds);
+      if (!place.ok && place.needsGrandparent && parent?.parents?.[0]) {
+        place = archivePlace(parent, await getFileMeta(drive, parent.parents[0]), yearFolderIds);
+      }
+      if (!place.ok) { notes.push(`${file.name} — لم يُقرأ: ${place.reason}`); continue; }
+      entries.push({ month: place.month, folderName: place.folderName, file });
     }
     } catch (e) {
       if (e instanceof DriveAuthExpiredError) {
@@ -229,19 +310,39 @@ async function handle(request: Request) {
       }
       throw e;
     }
+    /* بصماتُ ما وُجد — يُسأل عنها وحدها */
+    const md5s = entries.flatMap((e) => (e.file.md5Checksum ? [e.file.md5Checksum] : []));
+    const shas = entries.flatMap((e) => (e.file.sha256Checksum ? [e.file.sha256Checksum] : []));
+    if (md5s.length + shas.length > 0) {
+      indexOriginals(await db.select(knownColumns).from(documents).where(or(
+        md5s.length > 0 ? inArray(documents.driveMd5, md5s) : undefined,
+        shas.length > 0 ? inArray(documents.sha256, shas) : undefined,
+      )));
+    }
     fresh = entries;
   } else {
     try {
-      const walked = await walkArchive(drive, { months, knownFileIds: known, deadline, onKnown: (id, name, month) => { liveNames.set(id, name); liveMonths.set(id, month); } });
+      const walked = await walkArchive(drive, {
+        months, knownFileIds: known, deadline,
+        onKnown: (id, name, month, file) => {
+          liveNames.set(id, name);
+          liveMonths.set(id, month);
+          if (file.lastModifiedBy) liveModifiers.set(id, file.lastModifiedBy);
+        },
+      });
+      walk = walked;
       fresh = walked.entries;
       pendingMonths = walked.pendingMonths;
       truncated = walked.truncated;
+      /* ما لم يقرأه المشي يُقال — مجلّدٌ تعذّر سردُه، أو مجلّدٌ فرعيّ لا يُنزَل إليه */
+      notes.push(...walked.notes);
     } catch (e) {
       /* التفويض المنتهي خبرٌ يُصلحه صاحبه — لا «لا جديد» ولا عطبٌ مبهم */
       if (e instanceof DriveAuthExpiredError) {
         return needsAuth(e.message);
       }
-      const error = `تعذّرت قراءة الدرايف: ${(e as Error).message}`;
+      /* حسابٌ لا يرى الأرشيف: السببُ بنصّه، لا «تعذّرت قراءة الدرايف» مبهمة */
+      const error = e instanceof DriveArchiveInvisibleError ? e.message : `تعذّرت قراءة الدرايف: ${(e as Error).message}`;
       await markDriveFailed(user.id, error);
       return NextResponse.json({ error }, { status: 502 });
     }
@@ -261,11 +362,12 @@ async function handle(request: Request) {
   const named: { entry: ArchiveEntry; parsed: ReturnType<typeof parseFileName> }[] = [];
   const unnamed: ArchiveEntry[] = [];
 
-  /** نسخٌ من ملفّاتٍ مقيَّدة — تُذكَر ولا تُقرأ ولا تُقيَّد. */
-  const copies: string[] = [];
+  /** نسخٌ من ملفّاتٍ مقيَّدة — لا تُقرأ، وتُقيَّد «نسخةً» مرّةً فلا تُعدّ جديدةً كلَّ مزامنة. */
+  const copies: { entry: ArchiveEntry; original: Original }[] = [];
   for (const entry of fresh) {
-    if (entry.file.md5Checksum && knownMd5.has(entry.file.md5Checksum)) {
-      copies.push(entry.file.name);
+    const original = originalOf(entry.file);
+    if (original) {
+      copies.push({ entry, original });
       continue;
     }
     const parsed = parseFileName(entry.file.name, KNOWN_SLUGS);
@@ -291,6 +393,7 @@ async function handle(request: Request) {
       ok: true,
       applied: false,
       summary: scanned,
+      notes: notes.slice(0, 20),
       files: fresh.slice(0, 40).map((e) => ({
         fileId: e.file.id,
         name: e.file.name,
@@ -308,9 +411,11 @@ async function handle(request: Request) {
   let paymentsAdopted = 0;
   /** ملفّاتٌ شهرُها مقفل — تُعرَض ولا تُسجَّل حتى يُفتَح. */
   let closedMonthSkipped = 0;
-  const notes: string[] = [];
+  /** مستنداتٌ أنشأها هذا النداء — تُكتب في أثره، فيُجاب «أيُّ مزامنةٍ قيّدت هذه الفاتورة؟» */
+  const createdDocIds: string[] = [];
   if (copies.length > 0) {
-    notes.push(`${countNoun(copies.length, FILE)} نسخةٌ من ملفٍّ مؤرشَف (البصمةُ نفسُها) — لم تُقرأ ولم تُقيَّد: ${copies.slice(0, 3).join("، ")}`);
+    for (const c of copies) await recordCopy(c.entry, c.original);
+    notes.push(`${countNoun(copies.length, FILE)} نسخةٌ من ملفٍّ مقيَّد (البصمةُ نفسُها) — لم تُقرأ، وقُيِّدت نسخةً في «رُفض»: ${copies.slice(0, 3).map((c) => c.entry.file.name).join("، ")}`);
   }
 
   for (const { entry, parsed } of named.slice(0, MAX_NAMED_PER_CALL)) {
@@ -332,7 +437,7 @@ async function handle(request: Request) {
       يقطع حلقة المزامنة كلّها.
     */
     /* تُعدّ بعد نجاح المعاملة — ما رُدّ لم يُسجَّل */
-    let done = { doc: false, invoice: false, adopted: false };
+    let done: { doc: string | null; invoice: boolean; adopted: boolean } = { doc: null, invoice: false, adopted: false };
     try {
     await db.transaction(async (tx) => {
       const [doc] = await tx.insert(documents).values({
@@ -341,17 +446,19 @@ async function handle(request: Request) {
         fileName: entry.file.name,
         mimeType: entry.file.mimeType,
         sizeBytes: entry.file.size ?? null,
-        /* لا تنزيل هنا فلا `sha256` — وبصمةُ الدرايف تكفي لمعرفته إن رُفع ثانيةً */
+        /* لا تنزيل هنا — فالبصمتان من الدرايف: بهما يُعرف إن رُفع ثانيةً من أيّ باب */
+        sha256: entry.file.sha256Checksum ?? null,
         driveMd5: entry.file.md5Checksum ?? null,
         kind: plan.documentKind as never,
         status: "ARCHIVED",
         periodMonth: entry.month,
         supplierId: supplier?.id ?? null,
         uploadedById: user.id,
+        ...driveOrigin(entry),
       }).onConflictDoNothing().returning({ id: documents.id });
 
       if (!doc) return; // سُجّل بين الفحص والكتابة — لا نكرّره
-      done = { ...done, doc: true };
+      done = { ...done, doc: doc.id };
 
       /*
         الاسمُ كتبه إنسان — فلا يُسأل عن أوّل فاتورة؛ لكنّ الرقمَ نفسه بصيغةٍ ثانية
@@ -440,7 +547,7 @@ async function handle(request: Request) {
         }
       }
     });
-    if (done.doc) { created++; recordedFileIds.add(entry.file.id); }
+    if (done.doc) { created++; recordedFileIds.add(entry.file.id); createdDocIds.push(done.doc); }
     if (done.invoice) invoicesCreated++;
     if (done.adopted) paymentsAdopted++;
     } catch (e) {
@@ -452,6 +559,10 @@ async function handle(request: Request) {
 
   // ── الملفات التي لا يُفهم اسمها: تُقرأ بمحتواها ──
   let read = 0;
+  /** ما حُسم أمرُه بلا قراءة — نسخةٌ، أو ملفٌّ تعذّر تنزيلُه أو قراءتُه، أو عرضُ سعر: قُيِّد فلا يعود */
+  let settled = 0;
+  /** ما لا يُفهم اسمُه وشهرُه مقفل — لا يُقرأ حتى يُفتَح، فلا يُعدّ «باقياً» تتابعه الشاشة */
+  let closedUnnamed = 0;
   let autoArchived = 0;
   const reviewGaps = new Map<AutoArchiveGap, number>();
   const readFailures: string[] = [];
@@ -482,6 +593,7 @@ async function handle(request: Request) {
       if (closed) {
         notes.push(`${entry.file.name} — لم يُقرأ: ${new MonthClosedError(closed).message}`);
         closedMonthSkipped++;
+        closedUnnamed++;
         continue;
       }
       readable.push(entry);
@@ -495,6 +607,21 @@ async function handle(request: Request) {
       */
       if (Date.now() - startedAt >= CONTENT_BUDGET_MS) break;
 
+      /*
+        ما لا يُنزَّل يُقيَّد بسببه ولا يبقى أوّلَ الطابور.
+
+        كان فشلُ التنزيل — مستندُ جوجل أصليّ، اختصار، ملفٌّ ضخم — يُذكَر ثمّ يُترَك بلا
+        صفّ، فيعود في كلّ مزامنةٍ ويأكل إحدى خانتَي القراءة إلى الأبد. والعميلُ يعيد
+        المحاولة ثلاثاً على العطب العابر قبل أن يرمي، فما وصل هنا يُقيَّد «ينتظر» بسببه
+        ويُعاد من ملفّه بيد صاحبه.
+      */
+      if (entry.file.mimeType.startsWith("application/vnd.google-apps.")) {
+        const reason = "مستندُ جوجل لا ملفّ — نزّله PDF وضعه في المجلّد";
+        readFailures.push(`${entry.file.name} — ${reason}`);
+        await recordUnread(entry, null, entry.file.mimeType, user.id, "UNKNOWN", { error: reason });
+        settled++;
+        continue;
+      }
       let data: Buffer;
       let mimeType: string;
       try {
@@ -504,10 +631,36 @@ async function handle(request: Request) {
           return needsAuth(new DriveAuthExpiredError().message);
         }
         readFailures.push(`${entry.file.name} — تعذّر التنزيل`);
+        await recordUnread(entry, null, entry.file.mimeType, user.id, "UNKNOWN", {
+          error: `تعذّر تنزيلُه من الدرايف: ${(e as Error).message}`,
+        });
+        settled++;
         continue;
       }
 
-      const extraction = await extractDocument({
+      /*
+        «أعندنا هو؟» قبل «ما فيه؟» — بالبصمة بعد التنزيل وقبل النداء المدفوع. ما لا يعطيه
+        الدرايف بصمةً في القائمة يُعرف هنا: نسخةٌ ممّا رُفع من التطبيق لا تُقرأ ثانيةً.
+      */
+      const sha256 = createHash("sha256").update(data).digest("hex");
+      const [sameContent] = await db
+        .select({ docId: documents.id, name: documents.fileName })
+        .from(documents)
+        .where(and(eq(documents.sha256, sha256), ne(documents.status, "REJECTED")))
+        .limit(1);
+      if (sameContent) {
+        await recordCopy(entry, sameContent);
+        notes.push(`${entry.file.name} — نسخةٌ من «${sameContent.name}» (البصمةُ نفسُها) — لم تُقرأ، وقُيِّدت نسخةً في «رُفض»`);
+        settled++;
+        continue;
+      }
+
+      /*
+        القراءةُ تُحفظ ببصمة الملفّ لحظةَ تمامها وتُسأل قبل أن تُطلَب — كما في الرفع. كان
+        الطلبُ إن قُتل بعد الاستخراج وقبل الكتابة دُفع ثمنُ القراءة وأُعيدت في المزامنة التالية.
+      */
+      const saved = await savedReading(sha256);
+      const extraction: ExtractionOutcome = saved ?? await extractDocument({
         data, mimeType,
         companyVat: companyConfig.vatNumber,
         companyName: companyConfig.nameAr,
@@ -517,9 +670,11 @@ async function handle(request: Request) {
       if (!extraction.ok) {
         readFailures.push(`${entry.file.name} — ${extraction.reason}`);
         /* يُقيَّد مستنداً «لم يُقرأ» فيظهر في المستندات بسببه — ولا يعود أوّلَ الطابور */
-        await recordUnread(entry, data, mimeType, user.id, "UNKNOWN");
+        await recordUnread(entry, data, mimeType, user.id, "UNKNOWN", { error: extraction.reason });
+        settled++;
         continue;
       }
+      if (!saved) await saveReading(sha256, extraction, user.id);
 
       const x = extraction.value;
 
@@ -542,7 +697,8 @@ async function handle(request: Request) {
       */
       if (x.documentKind === "QUOTATION") {
         quotations.push(`${entry.file.name} — عرض سعر، حُفظ ولم يُقيَّد`);
-        await recordUnread(entry, data, mimeType, user.id, "QUOTATION", x);
+        await recordUnread(entry, data, mimeType, user.id, "QUOTATION", { reading: x });
+        settled++;
         continue;
       }
 
@@ -607,6 +763,8 @@ async function handle(request: Request) {
         linesTotalMinor: sumLineTotals(x.lines as { lineTotal?: string }[], (v) => parseRiyals(v)),
         /* الكشفُ يُقيَّد أدناه متى عُرف مورّدُه — وتاريخُه من القراءة أو من شهر المجلّد */
         statementRecorded: x.documentKind === "STATEMENT" && Boolean(supplier),
+        /* رمزُ الفاتورة الضريبيّ (QR) شاهدٌ من خارج النموذج، وما تبدّل عند إعادة السؤال */
+        ...qrArchiveFacts(extraction.evidence ?? null),
       });
 
       /*
@@ -625,7 +783,7 @@ async function handle(request: Request) {
       const finalName = entry.file.name;
 
       /* تُعدّ بعد نجاح المعاملة — ما رُدّ لم يُسجَّل ولم يُقرأ */
-      let recorded = false;
+      let recorded: string | null = null;
       let invoiceCreated = false;
       try {
       await db.transaction(async (tx) => {
@@ -635,7 +793,7 @@ async function handle(request: Request) {
           fileName: finalName,
           mimeType,
           sizeBytes: data.length,
-          sha256: createHash("sha256").update(data).digest("hex"),
+          sha256,
           driveMd5: entry.file.md5Checksum ?? createHash("md5").update(data).digest("hex"),
           kind: x.documentKind as never,
           /*
@@ -652,10 +810,13 @@ async function handle(request: Request) {
           textSource: extraction.textSource ?? null,
           fieldConfidence: x.confidence as never,
           uploadedById: user.id,
+          readAttempts: 1,
+          lastReadAt: new Date(),
+          ...driveOrigin(entry),
         }).onConflictDoNothing().returning({ id: documents.id });
 
         if (!doc) return;
-        recorded = true;
+        recorded = doc.id;
 
         /* الكشف: هويّتُه مورّدُه وفترتُه — لا رقمٌ ولا إجماليّ */
         if (x.documentKind === "STATEMENT" && supplier) {
@@ -720,7 +881,7 @@ async function handle(request: Request) {
         await applySupplierCredit(tx, supplier.id, { forwardDays: SETTLEMENT_FORWARD_DAYS });
       });
       if (recorded) {
-        created++; read++; recordedFileIds.add(entry.file.id);
+        created++; read++; recordedFileIds.add(entry.file.id); createdDocIds.push(recorded);
         if (verdict.auto) autoArchived++;
         else for (const g of verdict.gaps) reviewGaps.set(g, (reviewGaps.get(g) ?? 0) + 1);
       }
@@ -734,7 +895,10 @@ async function handle(request: Request) {
     }
   }
 
-  const remaining = Math.max(0, unnamed.length - read);
+  /* الباقي ما ينتظر قراءةً فعلاً — لا ما قُيِّد بسببه، ولا ما يحجزه شهرٌ مقفل */
+  const remaining = Math.max(0, unnamed.length - read - settled - closedUnnamed);
+  /* والمسمّى فوق حدّ النداء: كان يُسقَط من الخلاصة بصمت — ترحيلُ شهرٍ كاملٍ يقول «سُجّل ٦٠» ولا يقول إنّ ثلاثين بقيت */
+  const remainingNamed = Math.max(0, named.length - MAX_NAMED_PER_CALL);
 
   if (created > 0) {
     await recordAudit({
@@ -749,6 +913,7 @@ async function handle(request: Request) {
         فواتير: invoicesCreated,
         "إيصالات عُلِّقت على دفعةٍ قائمة": paymentsAdopted,
         قُرئ_محتواها: read,
+        المستندات: createdDocIds,
       },
     });
   }
@@ -773,10 +938,28 @@ async function handle(request: Request) {
     غُيّر اسمُ ملفٍّ هناك بيد («0044.pdf») وبقي عندنا قياسيّاً، فلم تره التسميةُ أبداً.
     فيُحدَّث ما عندنا من الدرايف، ويدخل التسميةَ مع ما قُيِّد للتوّ.
   */
-  const storedName = new Map(knownRows.filter((r) => r.id).map((r) => [r.id!, r.name]));
-  const drifted = [...liveNames].filter(([id, name]) => storedName.get(id) !== undefined && storedName.get(id) !== name);
+  const stored = new Map(knownRows.flatMap((r) => (r.id ? [[r.id, r] as const] : [])));
+  const drifted = [...liveNames].filter(([id, name]) => stored.get(id) !== undefined && stored.get(id)?.name !== name);
   for (const [id, name] of drifted) {
-    await db.update(documents).set({ fileName: name }).where(eq(documents.driveFileId, id));
+    const before = stored.get(id);
+    if (!before) continue;
+    /*
+      الاسمُ الذي كان عندنا لا يضيع: يُحفظ «اسمَ الوصول» إن لم يُحفظ، ويُكتب الاسمان في
+      الأثر مع آخر من عدّل الملفَّ هناك — كان يُكتب فوقه بلا سطر، فلا يُعرف متى تغيّر ولا بيد مَن.
+    */
+    await db.transaction(async (t) => {
+      await t.update(documents)
+        .set({ fileName: name, originalFileName: sql`coalesce(original_file_name, file_name)` })
+        .where(eq(documents.driveFileId, id));
+      await recordAudit({
+        actorId: null,
+        action: "DRIVE_NAME_CHANGED_EXTERNALLY",
+        entityType: "document",
+        entityId: before.docId,
+        before: { fileName: before.name },
+        after: { fileName: name, driveFileId: id, "آخر من عدّله في الدرايف": liveModifiers.get(id) ?? "غير معروف" },
+      }, t);
+    });
   }
   const justRecorded = [...new Set([...recordedFileIds, ...drifted.map(([id]) => id)])];
 
@@ -804,6 +987,52 @@ async function handle(request: Request) {
       }
     });
     for (const w of wrong) notes.push(`${w.fileName} — في مجلد ${w.folderMonth} وفاتورتُه لـ${w.month}`);
+  }
+
+  /*
+    ── ما قُيِّد ولم يعد في مجلّده ──
+
+    يُحكَم على ما سُرد مجلّدُه كاملاً وحده، ثمّ يُسأل الدرايف عن الملفّ نفسه: نُقل إلى
+    مجلّدٍ آخر (يُحدَّث مجلّدُه عندنا ولا تنبيه)، أم حُذف أو أُلقي في السلّة (تنبيهٌ في
+    «يحتاج قرارك» — ويُستعاد من سلّة الدرايف خلال ثلاثين يوماً). وما لم يُعرف حالُه لا
+    يُحكَم بغيابه. قراءةٌ محضة: لا شيء يُمسّ في الأرشيف.
+  */
+  if (walk) {
+    const present = knownRows.flatMap((r) => (r.id && walk.seenFileIds.has(r.id) ? [r.docId] : []));
+    if (present.length > 0) {
+      await db.update(issues).set({ status: "RESOLVED", resolvedAt: new Date() }).where(and(
+        eq(issues.code, ISSUE.FILE_MISSING_IN_DRIVE), eq(issues.status, "OPEN"), inArray(issues.entityId, present),
+      ));
+    }
+    const unseen = missingFromDrive(
+      knownRows.flatMap((r) => (r.id && r.status !== "REJECTED" ? [{ ...r, driveFileId: r.id, driveFolderId: r.folderId }] : [])),
+      walk,
+    );
+    try {
+      for (const doc of unseen.slice(0, MAX_PROBES_PER_CALL)) {
+        const presence = await probeFile(drive, doc.driveFileId);
+        if (presence.state === "unknown") continue;
+        if (presence.state === "present") {
+          if (presence.parentId && presence.parentId !== doc.driveFolderId) {
+            await db.update(documents).set({ driveFolderId: presence.parentId }).where(eq(documents.id, doc.docId));
+          }
+          continue;
+        }
+        const where = presence.state === "trashed" ? "في سلّة الدرايف" : "حُذف من الدرايف";
+        const [open] = await db.select({ id: issues.id }).from(issues)
+          .where(and(eq(issues.code, ISSUE.FILE_MISSING_IN_DRIVE), eq(issues.status, "OPEN"), eq(issues.entityId, doc.docId))).limit(1);
+        if (!open) {
+          await db.insert(issues).values({
+            code: ISSUE.FILE_MISSING_IN_DRIVE, severity: "WARN", entityType: "document", entityId: doc.docId,
+            message: `«${doc.name}» ${where} — استعِده من سلّة الدرايف (تُفرَّغ بعد ثلاثين يوماً)، فالقيدُ بلا ورقته لا يسند خصمَ ضريبته`,
+          });
+        }
+        notes.push(`${doc.name} — ${where}`);
+      }
+    } catch (e) {
+      /* التفويضُ انتهى في أثناء السؤال: ما قُيِّد قبله قائم، والباقي في المزامنة التالية */
+      if (!(e instanceof DriveAuthExpiredError)) throw e;
+    }
   }
 
   /*
@@ -869,6 +1098,7 @@ async function handle(request: Request) {
     applied: true,
     summary: {
       ...scanned, created, invoicesCreated, paymentsAdopted, closedMonthSkipped, contentRead: read, remainingUnnamed: remaining,
+      remainingNamed,
       autoArchived, needsReview: read - autoArchived, renamed: renamed.length,
     },
     /* لماذا لم يدخل ما لم يدخل — مجموعاً بالسبب، فيُعرَف أيُّ شرطٍ يُسقط أكثر */
@@ -888,6 +1118,85 @@ export async function POST(request: Request) {
   return withDeadline(55_000, () => handle(request));
 }
 
+/** الأصلُ الذي وُجدت نسختُه بالبصمة. */
+interface Original { docId: string; name: string }
+
+/** من أين جاء الملفّ ومتى وُضع — يُكتب مع كلّ صفٍّ تُنشئه المزامنة (066). */
+function driveOrigin(entry: ArchiveEntry) {
+  const created = entry.file.createdTime ? new Date(entry.file.createdTime) : null;
+  return {
+    source: "DRIVE_SYNC",
+    originalFileName: entry.file.name,
+    driveCreatedAt: created && !Number.isNaN(created.getTime()) ? created : null,
+    driveModifiedBy: entry.file.lastModifiedBy ?? null,
+  };
+}
+
+const TEXT_SOURCES = ["TEXT", "PDF_EMBEDDED", "PDF_RENDERED", "DIRECT"] as const;
+
+/** قراءةٌ حُفظت لهذه البصمة — تُفحَص بالمخطّط نفسه قبل أن تُصدَّق، وما لا يطابقه يُقرأ من جديد. */
+async function savedReading(sha256: string): Promise<ExtractionSuccess | null> {
+  const [row] = await db
+    .select({ extraction: extractionCache.extraction, model: extractionCache.model, textSource: extractionCache.textSource })
+    .from(extractionCache)
+    .where(and(eq(extractionCache.sha256, sha256), gt(extractionCache.createdAt, new Date(Date.now() - READING_FRESH_MS))))
+    .limit(1);
+  if (!row) return null;
+  const parsed = extractionSchema.safeParse(row.extraction);
+  if (!parsed.success) return null;
+  return {
+    ok: true,
+    value: parsed.data,
+    model: row.model ?? "cache",
+    provider: "deepseek",
+    usage: { inputTokens: 0, outputTokens: 0 },
+    textSource: TEXT_SOURCES.find((t) => t === row.textSource),
+  };
+}
+
+async function saveReading(sha256: string, extraction: ExtractionSuccess, userId: string): Promise<void> {
+  const reading = {
+    extraction: extraction.value, model: extraction.model, textSource: extraction.textSource ?? null, userId,
+  };
+  await db.insert(extractionCache).values({ sha256, ...reading })
+    .onConflictDoUpdate({ target: extractionCache.sha256, set: { ...reading, createdAt: new Date() } });
+}
+
+/**
+ * نسخةٌ بالبصمة من ملفٍّ مقيَّد — تُقيَّد مرّةً «مرفوضةً» بسببها ولا تُقرأ.
+ *
+ * بلا صفٍّ تبقى «ملفّاً جديداً» فتُعدّ وتُذكَر في كلّ مزامنةٍ إلى الأبد. والمرفوضُ خارج
+ * الفهرس الفريد وخارج التسمية (`loadNamedDocuments`)، وسببُه يُعرض في «رُفض» من الأثر.
+ * ولا تُحفظ لها `sha256`: فإن أعادها إنسانٌ للمراجعة لم يصطدم بفرادة بصمة أصلها.
+ */
+async function recordCopy(entry: ArchiveEntry, original: Original): Promise<void> {
+  const reason = `نسخةٌ من «${original.name}» — البصمةُ نفسُها`;
+  await db.transaction(async (t) => {
+    const [doc] = await t.insert(documents).values({
+      driveFileId: entry.file.id,
+      driveFolderId: entry.file.parents?.[0] ?? null,
+      fileName: entry.file.name,
+      mimeType: entry.file.mimeType,
+      sizeBytes: entry.file.size ?? null,
+      driveMd5: entry.file.md5Checksum ?? null,
+      kind: "UNKNOWN",
+      status: "REJECTED",
+      statusNote: reason,
+      duplicateOfId: original.docId,
+      periodMonth: entry.month,
+      ...driveOrigin(entry),
+    }).onConflictDoNothing().returning({ id: documents.id });
+    if (!doc) return;
+    await recordAudit({
+      actorId: null,
+      action: "DOCUMENT_REJECTED",
+      entityType: "document",
+      entityId: doc.id,
+      after: { الملف: entry.file.name, السبب: reason, الأصل: original.docId, المصدر: "مزامنة الدرايف" },
+    }, t);
+  });
+}
+
 /**
  * ملفٌّ قُرئ ولن يُقيَّد فاتورةً — عرضُ سعر، أو قراءةٌ فشلت — يُحفظ مستنداً.
  *
@@ -897,24 +1206,30 @@ export async function POST(request: Request) {
  */
 async function recordUnread(
   entry: ArchiveEntry,
-  data: Buffer,
+  /** `null`: لم يُنزَّل أصلاً — فلا بصمةَ له إلّا ما أعطاه الدرايف */
+  data: Buffer | null,
   mimeType: string,
   userId: string,
   kind: "QUOTATION" | "UNKNOWN",
-  reading?: unknown,
+  outcome: { reading?: unknown; error?: string } = {},
 ): Promise<void> {
   await db.insert(documents).values({
     driveFileId: entry.file.id,
     driveFolderId: entry.file.parents?.[0] ?? null,
     fileName: entry.file.name,
     mimeType,
-    sizeBytes: data.length,
-    sha256: createHash("sha256").update(data).digest("hex"),
-    driveMd5: entry.file.md5Checksum ?? createHash("md5").update(data).digest("hex"),
+    sizeBytes: data ? data.length : entry.file.size ?? null,
+    sha256: data ? createHash("sha256").update(data).digest("hex") : null,
+    driveMd5: entry.file.md5Checksum ?? (data ? createHash("md5").update(data).digest("hex") : null),
     kind,
     status: kind === "QUOTATION" ? "ARCHIVED" : "NEEDS_REVIEW",
     periodMonth: entry.month,
-    extractionJson: reading ?? null,
+    extractionJson: outcome.reading ?? null,
     uploadedById: userId,
+    /* سببُ الفشل بنصّه — كان يظهر مرّةً في ردّ المزامنة ثمّ يضيع، فيقول ملفُّ المستند «لم يُقرأ» ولا يقول لماذا */
+    readAttempts: 1,
+    lastReadAt: new Date(),
+    lastReadError: outcome.error ? outcome.error.slice(0, 500) : null,
+    ...driveOrigin(entry),
   }).onConflictDoNothing();
 }

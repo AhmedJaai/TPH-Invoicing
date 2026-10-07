@@ -67,7 +67,8 @@ export type LineFlag =
   | "UNIT_CONFLICT"
   | "RECIPE_UNIT_MISMATCH"
   | "OUT_OF_SCOPE"
-  | "RECEIPT_POSSIBLE_DUPLICATE";
+  | "RECEIPT_POSSIBLE_DUPLICATE"
+  | "SUPPLIER_RETURN";
 
 export const FLAG_LABEL: Record<LineFlag, string> = {
   OPENING_UNKNOWN: "الرصيد الافتتاحيّ غير معروف — لا جردَ سابقٌ ولا رصيدٌ مكتوب",
@@ -79,6 +80,7 @@ export const FLAG_LABEL: Record<LineFlag, string> = {
   RECIPE_UNIT_MISMATCH: "وحدةُ الوصفة لا تُحوَّل إلى وحدة الصنف",
   OUT_OF_SCOPE: "خارج هذا الجرد باختيارك — وقائعُه محسوبة ولا فرقَ له",
   RECEIPT_POSSIBLE_DUPLICATE: "كمّيّةٌ مستلَمة قد تكون هي نفسَ بندِ فاتورة — فالمشتريات غير معروفة حتى تُحسَم",
+  SUPPLIER_RETURN: "في مشترياته مرتجعٌ للمورّد (بندُ فاتورةٍ بكمّيّةٍ سالبة) — وقد طُرح منها",
 };
 
 /** مصدرُ الرصيد الافتتاحيّ — بترتيبٍ ثابت لا تتنافس فيه المصادر. */
@@ -238,6 +240,14 @@ export interface EngineReport {
     purchasesTotalMinor: number;
     /** النقصُ والزيادةُ وحجمُهما — لا يتقاصّان (`variance-summary.ts`). */
     summary: VarianceSummary;
+    /**
+     * المجانيّ: صُنع واستُهلك ولم يُقبَض عنه — **بندٌ على حدة**.
+     *
+     * وهو داخلٌ في الاستهلاك المتوقَّع أصلاً؛ يُعرَض هنا ليُعرَف كم كلّفت
+     * الضيافةُ ومشروباتُ الموظّفين. و`costMinor` `null` حين يُجهَل سعرُ مكوّنٍ
+     * منه — لا مجموعٌ ناقصٌ يبدو تامّاً. وغائبٌ في تقريرٍ أُقفل قبله.
+     */
+    complimentary?: { lines: number; unitsMilli: number; costMinor: number | null };
   };
   consumption: ConsumptionResult;
   purchases: PurchaseSummary;
@@ -288,6 +298,7 @@ export function reconcile(input: EngineInput): EngineReport {
   );
 
   let varianceCostTotal = 0;
+  let complimentaryCost: number | null = 0;
   let linesWithKnownCost = 0;
   let linesCounted = 0;
   let linesWithVariance = 0;
@@ -358,6 +369,8 @@ export function reconcile(input: EngineInput): EngineReport {
       purchasesMilli = null;
       flags.push("RECEIPT_POSSIBLE_DUPLICATE");
     }
+    /* مرتجعٌ للمورّد دخل المشتريات بالسالب — يُسمّى ولا يُكتَم */
+    if (purchasesMilli !== null && (bought?.returnsMilli ?? 0) > 0) flags.push("SUPPLIER_RETURN");
     purchasesTotalMinor += bought?.knownCostMinor ?? 0;
 
     const terms: StockTerms = {
@@ -404,6 +417,14 @@ export function reconcile(input: EngineInput): EngineReport {
         : fallback !== null ? "LATEST_KNOWN"
           : catalog !== null ? "CATALOG" : "UNKNOWN";
     if (rate === null) flags.push("COST_UNKNOWN");
+
+    /* كلفةُ ما خرج مجاناً من هذا المكوّن — ومجهولُ السعر يجعل المجموعَ مجهولاً */
+    const freeMilli = used && used.unitConflict === null && sameUnitFamily(used.unit, product.baseUnit)
+      ? used.fromComplimentaryMilli : 0;
+    if (freeMilli !== 0) {
+      const cost = varianceCostMinor(freeMilli, rate, product.baseUnit);
+      complimentaryCost = cost === null || complimentaryCost === null ? null : complimentaryCost + cost;
+    }
 
     const varianceCost = varianceCostMinor(result.varianceMilli, rate, product.baseUnit);
     if (varianceCost !== null) {
@@ -480,6 +501,7 @@ export function reconcile(input: EngineInput): EngineReport {
       salesTotalMinor: consumption.included.totalMinor + consumption.excludedTotals.totalMinor,
       purchasesTotalMinor,
       summary: summariseVariance(lines),
+      complimentary: complimentaryTotals(input.soldLines, complimentaryCost),
     },
     consumption,
     purchases,
@@ -502,6 +524,19 @@ export function topVariances(report: EngineReport, limit = 5): ReportLine[] {
       return Math.abs(b.varianceBp ?? 0) - Math.abs(a.varianceBp ?? 0);
     })
     .slice(0, limit);
+}
+
+/** ما بِيع مجاناً في الفترة — عدداً ووحداتٍ، وكلفتُه من أسطر المكوّنات. */
+function complimentaryTotals(
+  soldLines: EngineInput["soldLines"],
+  costMinor: number | null,
+): NonNullable<EngineReport["totals"]["complimentary"]> {
+  const free = soldLines.filter((l) => l.isComplimentary && !l.isVoid && !l.isRefund);
+  return {
+    lines: free.length,
+    unitsMilli: free.reduce((s, l) => s + l.quantityMilli, 0),
+    costMinor: free.length === 0 ? 0 : costMinor,
+  };
 }
 
 /** أيّامُ الفترة شاملةً — YYYY-MM-DD. */

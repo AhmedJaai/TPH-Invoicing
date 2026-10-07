@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import * as XLSX from "xlsx";
 import { adapterFor, contentFingerprint, findHeader, foodicsExcelAdapter } from "./foodics-excel";
 import { mapColumns, normaliseHeader } from "./columns";
-import { detectDateOrder, parseBusinessDate, parseSourceCostMinor, parseQuantityMilli } from "./values";
+import { detectDateOrder, microToMinor, parseBusinessDate, parseSourceCostMinor, parseQuantityMilli, readSalesAmount } from "./values";
 import { toSalesTransactions, type ParsedSalesFile } from "./file-import";
 import { readWorkbookSafely } from "@/lib/bank/parsers/safe-xlsx";
 
@@ -277,5 +277,114 @@ describe("حالاتٌ تُصنَع لأنّها لم ترد", () => {
   it("والمحوِّلُ يُعرَف بالترويسة لا باسم الملفّ", () => {
     expect(adapterFor([HEADER])).toBe(foodicsExcelAdapter);
     expect(adapterFor([["a", "b"]])).toBeNull();
+  });
+});
+
+/* ═══════════ ما أصلحه التدقيق (أكتوبر ٢٠٢٦) ═══════════ */
+
+describe("الترويسةُ تُطابَق كلماتٍ لا حروفاً", () => {
+  it("«count» داخل «discount%» ليست الكمّيّة، و«date» داخل «updated_at» ليست التاريخ", () => {
+    const m = mapColumns(["customer_name", "discount%", "updated_at", "item_notes"]);
+    expect(m.index.quantity).toBeUndefined();
+    expect(m.index.businessDate).toBeUndefined();
+    expect(m.index.productName).toBeUndefined();
+    /* و«discount%» هو الخصمُ نفسُه — لا الكمّيّة */
+    expect(m.index.discount).toBe(1);
+    expect(m.unrecognised).toEqual(["customer_name", "updated_at", "item_notes"]);
+  });
+
+  it("والعملةُ بين قوسين زينة: «Net Sales (SAR)» هو صافي المبيعات", () => {
+    const m = mapColumns(["Product Name", "Quantity Sold", "Net Sales (SAR)", "Total Net Sales"]);
+    expect(m.index.productName).toBe(0);
+    expect(m.index.quantity).toBe(1);
+    expect(m.index.lineTotal).toBe(2);
+  });
+
+  it("وكلمتان متتاليتان داخل ترويسةٍ أطول تكفيان", () => {
+    expect(mapColumns(["Total Net Sales"]).index.lineTotal).toBe(0);
+    expect(mapColumns(["اسم الصنف المباع"]).index.productName).toBe(0);
+  });
+
+  it("وترويسةُ التصدير الحقيقيّ تُفهَم كما كانت", () => {
+    const real = parseReal();
+    expect(real.unrecognisedColumns).toEqual([
+      "discount_name", "tax_exclusive_unit_price", "tax_exclusive_total_price", "tax_exclusive_discount_amount",
+      "customer_name", "customer_dial_code", "customer_phone",
+    ]);
+  });
+});
+
+describe("المبلغُ غير المقروء ليس صفراً", () => {
+  it("الفارغُ و«-» فارغان، والنصُّ الغريب «لم يُقرأ»", () => {
+    expect(readSalesAmount("")).toEqual({ state: "EMPTY" });
+    expect(readSalesAmount("-")).toEqual({ state: "EMPTY" });
+    expect(readSalesAmount(undefined)).toEqual({ state: "EMPTY" });
+    expect(readSalesAmount("n/a")).toEqual({ state: "UNREADABLE" });
+    expect(readSalesAmount("12..5")).toEqual({ state: "UNREADABLE" });
+    expect(readSalesAmount("3.3913")).toEqual({ state: "OK", micro: 339_130 });
+    expect(readSalesAmount("١٬٢٣٤٫٥٠")).toEqual({ state: "OK", micro: 123_450_000 });
+    expect(microToMinor(339_130)).toBe(339);
+  });
+
+  it("إجماليُّ سطرٍ لا يُقرأ يردّ الصفَّ بسببه — لا يُكتَب ٠٫٠٠", () => {
+    const parsed = foodicsExcelAdapter.parse(sheet([
+      line({ order_reference: 1 }),
+      line({ order_reference: 2, total_price: "عشرون" }),
+    ]), {});
+    expect(parsed.rows.map((r) => r.status)).toEqual(["PARSED", "ERROR"]);
+    expect(parsed.rows[1].reason).toContain("إجمالي السطر");
+    expect(parsed.sales).toHaveLength(1);
+  });
+
+  it("وضريبةُ التصدير الحقيقيّ (أربعُ منازل) تُقرأ — كانت صفراً لكلّ بيعة", () => {
+    const real = parseReal();
+    const first = real.sales.find((s) => s.externalId === "FDX:19586")!;
+    /* ‏26 ريالاً شاملةً = ‏3.3913 ضريبة */
+    expect(first.vatMinor).toBe(339);
+    expect(real.sales.filter((s) => !s.isVoid && s.netMinor > 0).every((s) => s.vatMinor >= 0)).toBe(true);
+    expect(real.sales.reduce((a, s) => a + s.vatMinor, 0)).toBeGreaterThan(0);
+  });
+});
+
+describe("المجانيّ يُشتقّ من الصفّ ولا يُخترَع", () => {
+  it("منتجٌ له سعرٌ وإجماليُّه صفر مجانيّ؛ وما سعرُه صفرٌ أصلاً ليس كذلك", () => {
+    const parsed = foodicsExcelAdapter.parse(sheet([
+      line({ order_reference: 1, unit_price: 20, total_price: 0 }),
+      line({ order_reference: 2, unit_price: 0, total_price: 0, sku: "sk-0900", name: "Tap water" }),
+      line({ order_reference: 3, unit_price: 20, total_price: 20 }),
+      line({ order_reference: 4, unit_price: 20, total_price: 0, status: "Void" }),
+      line({ order_reference: 5, unit_price: 20, total_price: 0, status: "Returned" }),
+    ]), {});
+    expect(parsed.sales.map((s) => s.lines[0].isComplimentary)).toEqual([true, false, false, false, false]);
+  });
+
+  it("والتصديرُ الحقيقيّ لا مجانيَّ فيه — فلا يُخترَع", () => {
+    expect(parseReal().sales.flatMap((s) => s.lines).filter((l) => l.isComplimentary)).toHaveLength(0);
+  });
+});
+
+describe("الخيارُ يتبع سطرَ أصله لا رمزَه", () => {
+  it("لاتيه عاديّ ولاتيه بإكسترا شوت في طلبٍ واحد: الخيارُ للثاني وحده", () => {
+    const parsed = foodicsExcelAdapter.parse(sheet([
+      line({ order_reference: 7 }),
+      line({ order_reference: 7 }),
+      line({ order_reference: 7, type: "خيار الإضافة", parent_item_sku: "sk-0001", sku: "mod-1", name: "Extra shot", unit_price: 0, total_price: 0 }),
+    ]), {});
+    const [plain, withShot, shot] = parsed.sales[0].lines;
+    expect(shot.isModifier).toBe(true);
+    expect(shot.parentLineExternalId).toBe(withShot.externalId);
+    expect(shot.parentLineExternalId).not.toBe(plain.externalId);
+    expect(plain.modifiers).toBeNull();
+    expect(withShot.modifiers).toEqual(["Extra shot"]);
+  });
+
+  it("وكلُّ خيارٍ في التصدير الحقيقيّ له سطرُ أصل", () => {
+    const mods = parseReal().sales.flatMap((s) => s.lines).filter((l) => l.isModifier);
+    expect(mods.every((l) => l.parentLineExternalId !== null)).toBe(true);
+  });
+
+  it("والكمّيّةُ في نوع الموصل بالمِلّي — بلا عائمة", () => {
+    const tx = toSalesTransactions(foodicsExcelAdapter.parse(sheet([line({ quantity: 3 })]), {}));
+    expect(tx[0].lines[0].quantityMilli).toBe(3000);
   });
 });

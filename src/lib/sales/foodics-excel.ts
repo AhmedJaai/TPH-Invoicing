@@ -17,6 +17,8 @@
  *   • `business_date` **عددٌ تسلسليّ**، ويُصيَّر «9/19/26» بسنةٍ من
  *     خانتين وترتيبٍ يتبع تنسيقَ الملفّ. فيُقرأ من القيمة الخام.
  *   • لا وقتَ بيعٍ إطلاقاً، ولا عَلَمَ ضيافة، ولا رقمَ نسخةٍ للتصدير.
+ *   • `total_taxes` بأربع منازل (`3.3913`) — فتُقرأ بدقّتها ويُقرَّب
+ *     مجموعُ البيعة مرّةً (`readSalesAmount`).
  *
  * ── وما بُني على ذلك ──
  *
@@ -26,8 +28,8 @@
  */
 import { mapColumns, FIELD_LABEL, type ColumnMap } from "./columns";
 import {
-  detectDateOrder, parseBusinessDate, parseMoneyMinor, parseQuantityMilli,
-  parseSoldAt, parseSourceCostMinor, type DateOrder,
+  detectDateOrder, microToMinor, parseBusinessDate, parseQuantityMilli,
+  parseSoldAt, parseSourceCostMinor, readSalesAmount, type DateOrder,
 } from "./values";
 import type { ParsedRow, ParsedSale, ParsedSaleLine, SalesFileAdapter } from "./file-import";
 
@@ -170,6 +172,10 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
     const occurrence = new Map<string, number>();
     /** مُعدِّلاتٌ تنتظر أصلَها: مفتاحُ الطلب+الأصل ← الأسطر. */
     const pendingModifiers: { saleKey: string; parentSku: string; line: ParsedSaleLine }[] = [];
+    /** آخرُ صفّ منتجٍ بهذا الرمز في هذا الطلب — الخيارُ يتبع ما قبله في الملفّ. */
+    const lastProductLine = new Map<string, ParsedSaleLine>();
+    /** ضريبةُ البيعة بجزء المئة ألف — تُقرَّب مرّةً بعد الجمع لا في كلّ سطر. */
+    const vatMicro = new Map<string, number>();
 
     body.forEach((row, i) => {
       const rowNumber = header.rowIndex + i + 2;
@@ -219,10 +225,47 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
       const isVoid = VOIDED.has(statusText);
       const sourceStatus = (cell(row, index.lineStatus) ?? cell(row, index.orderStatus) ?? "").trim() || null;
 
-      const lineTotalMinor = parseMoneyMinor(cell(row, index.lineTotal)) ?? 0;
-      const unitPriceMinor = parseMoneyMinor(cell(row, index.unitPrice))
+      /*
+        ── المبالغ: الفارغُ صفرٌ مشروع، وما لا يُقرأ يُردّ الصفُّ بسببه ──
+
+        خيارٌ بلا سعرٍ خانتُه فارغة، وذاك صفرٌ بحقّ. أمّا نصٌّ لم يُفهَم
+        فكان يُكتَب ٠٫٠٠ ريالاً — ينقص إيرادُ اليوم بلا شكوى. فيُعامَل
+        كما تُعامَل الكمّيّة.
+      */
+      const totalCell = readSalesAmount(cell(row, index.lineTotal));
+      const priceCell = readSalesAmount(cell(row, index.unitPrice));
+      const discountCell = readSalesAmount(cell(row, index.discount));
+      const vatCell = readSalesAmount(cell(row, index.vat));
+      const grossCell = readSalesAmount(cell(row, index.gross));
+      const unreadable = (
+        [["lineTotal", totalCell], ["unitPrice", priceCell], ["discount", discountCell], ["vat", vatCell], ["gross", grossCell]] as const
+      ).find(([, c]) => c.state === "UNREADABLE");
+      if (unreadable) {
+        const field = unreadable[0];
+        reject("ERROR", `تعذّرت قراءة ${FIELD_LABEL[field]}: «${(cell(row, index[field]) ?? "").trim()}»`);
+        return;
+      }
+
+      const lineTotalMinor = totalCell.state === "OK" ? microToMinor(totalCell.micro) : 0;
+      const pricedMinor = priceCell.state === "OK" ? microToMinor(priceCell.micro) : null;
+      const unitPriceMinor = pricedMinor
         ?? (quantityMilli !== 0 ? Math.round((lineTotalMinor * 1000) / quantityMilli) : 0);
+      const discountMinor = discountCell.state === "OK" ? microToMinor(discountCell.micro) : 0;
       const sourceUnitCostMinor = parseSourceCostMinor(cell(row, index.unitCost));
+
+      /*
+        ── المجانيّ: يُشتقّ من الصفّ حين يقطع به، ولا يُخترَع ──
+
+        منتجٌ تامّ (لا خيار، لا ملغى، لا مرتجَع) **له سعرٌ مكتوب** وخرج
+        بلا ثمن: إجماليُّه صفر، أو خصمُه يبلغ سعرَه كلَّه. فقد صُنع
+        واستُهلك ولم يُقبَض عنه — ضيافةٌ أو مشروبُ موظَّف. والصنفُ الذي
+        سعرُه صفرٌ أصلاً ليس مجانيّاً بهذا الدليل.
+      */
+      const listMinor = pricedMinor === null ? 0 : Math.round((Math.abs(pricedMinor) * Math.abs(quantityMilli)) / 1000);
+      const isComplimentary = !isModifier && !isVoid && !isRefund && listMinor > 0 && (
+        (totalCell.state === "OK" && lineTotalMinor === 0)
+        || Math.abs(discountMinor) >= listMinor
+      );
 
       const orderId = (cell(row, index.orderId) ?? "").trim();
       const saleExternalId = shape === SHAPE_ORDER_ITEMS && orderId !== ""
@@ -267,10 +310,13 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
         sourceStatus,
         isRefund,
         isVoid,
-        /* لا عَلَمَ ضيافةٍ في هذا المصدر — ولا يُخترَع */
-        isComplimentary: false,
+        isComplimentary,
         isModifier,
         parentExternalId: parentSku || null,
+        /* الخيارُ يتبع آخرَ صفّ منتجٍ برمز أصله قبله في طلبه */
+        parentLineExternalId: isModifier && parentSku
+          ? lastProductLine.get(`${saleExternalId}|${parentSku}`)?.externalId ?? null
+          : null,
         modifiers: null,
         sourceUnitCostMinor,
         contentHash: contentFingerprint([
@@ -280,6 +326,7 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
       };
 
       sale.lines.push(line);
+      if (!isModifier) lastProductLine.set(`${saleExternalId}|${productExternalId}`, line);
       if (isModifier && parentSku) pendingModifiers.push({ saleKey: saleExternalId, parentSku, line });
 
       /*
@@ -291,11 +338,11 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
       if (!isModifier && !isVoid) {
         if (isRefund) sale.refundMinor += Math.abs(lineTotalMinor);
         else {
-          sale.grossMinor += parseMoneyMinor(cell(row, index.gross)) ?? Math.abs(lineTotalMinor);
+          sale.grossMinor += grossCell.state === "OK" ? microToMinor(grossCell.micro) : Math.abs(lineTotalMinor);
           sale.netMinor += Math.abs(lineTotalMinor);
         }
-        sale.discountMinor += parseMoneyMinor(cell(row, index.discount)) ?? 0;
-        sale.vatMinor += parseMoneyMinor(cell(row, index.vat)) ?? 0;
+        sale.discountMinor += discountMinor;
+        if (vatCell.state === "OK") vatMicro.set(saleExternalId, (vatMicro.get(saleExternalId) ?? 0) + vatCell.micro);
       }
 
       rows.push({ rowNumber, raw, status: "PARSED", reason: null, saleExternalId });
@@ -305,8 +352,11 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
     let orphans = 0;
     for (const { saleKey, parentSku, line } of pendingModifiers) {
       const sale = sales.get(saleKey);
-      const parent = sale?.lines.find((l) => !l.isModifier && l.productExternalId === parentSku);
+      /* سطرُ الأصل الذي سبقه في الملفّ؛ وإن سبق الخيارُ أصلَه فأوّلُ منتجٍ برمزه */
+      const parent = sale?.lines.find((l) => !l.isModifier && l.externalId === line.parentLineExternalId)
+        ?? sale?.lines.find((l) => !l.isModifier && l.productExternalId === parentSku);
       if (!parent) { orphans++; continue; }
+      line.parentLineExternalId = parent.externalId;
       parent.modifiers = [...(parent.modifiers ?? []), line.name];
     }
     if (orphans > 0) {
@@ -316,6 +366,7 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
     /* حالُ الطلب تُحفَظ، ولا تُسقِط بنداً صُنع: الملغى يُعرَف ببنده */
     for (const sale of sales.values()) {
       sale.isVoid = sale.lines.length > 0 && sale.lines.every((l) => l.isVoid);
+      sale.vatMinor = microToMinor(vatMicro.get(sale.externalId) ?? 0);
     }
 
     const dates = [...sales.values()].map((s) => s.businessDate).sort();

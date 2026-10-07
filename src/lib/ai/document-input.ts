@@ -19,7 +19,7 @@
  * كشوف البنك: «لا يُرمى الملفّ كاملاً إلى نموذج لغويّ ويُقال له افهمه».
  * وهي هنا نفسها، مطبَّقةً على الفواتير.
  */
-import { extractPdfWords, ROW_TOLERANCE, type PdfWord } from "@/lib/bank/parsers/pdf-text";
+import { extractPdfWords, MAX_TEXT_PAGES, ROW_TOLERANCE, type PdfWord } from "@/lib/bank/parsers/pdf-text";
 import { extractEmbeddedJpegs, type EmbeddedImage } from "./pdf-images";
 import { isDeepseekImageType } from "./models";
 
@@ -35,9 +35,22 @@ export const PDF_TYPE = "application/pdf";
  */
 export const MIN_INVOICE_WORDS = 60;
 
+/**
+ * `pagesRead` و`pagesTotal`: كم صفحةً بلغت النموذجَ من كم. كان الاقتطاع صامتاً —
+ * فاتورةُ جملةٍ من خمس صفحات تُقرأ ثلاثٌ منها ثمّ «مجموع البنود لا يوافق الصافي»
+ * بلا تفسير. `null` حين لا يُعرف عددُ صفحات الملفّ (بنيةٌ تعذّرت قراءتُها).
+ */
 export type DocumentInput =
-  | { mode: "TEXT"; text: string; pageCount: number; wordCount: number }
-  | { mode: "IMAGE"; images: EmbeddedImage[]; source: "PDF_EMBEDDED" | "PDF_RENDERED" | "DIRECT" }
+  | { mode: "TEXT"; text: string; pageCount: number; wordCount: number; pagesRead: number }
+  | {
+      mode: "IMAGE";
+      images: EmbeddedImage[];
+      source: "PDF_EMBEDDED" | "PDF_RENDERED" | "DIRECT";
+      pagesRead: number;
+      pagesTotal: number | null;
+      /** في الملفّ نصٌّ مخفيّ وضعه ماسحٌ فوق الصورة — لم يُؤخَذ به */
+      ocrLayer?: boolean;
+    }
   | { mode: "UNREADABLE"; reason: string };
 
 const ARABIC_RE = /[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]/;
@@ -196,18 +209,143 @@ export async function normalizeImage(data: Buffer, mimeType: string): Promise<Em
 
 /** أقصى ما يُرسَم: صفحاتُ الفاتورة الأولى تكفي */
 const MAX_RENDERED_PAGES = 3;
+/** حدّا مقياس الرسم: لا تصغيرَ دون الأصل، ولا تكبيرَ يملأ الذاكرة لصفحةٍ صغيرة */
+const MIN_RENDER_SCALE = 1;
+const MAX_RENDER_SCALE = 4;
 
-/** يرسم صفحاتِ الـPDF صوراً — حين لا نصَّ فيه ولا صورةَ موضوعة. */
-export async function renderPdfPages(data: Buffer): Promise<EmbeddedImage[]> {
+/**
+ * مقياسٌ يبلغ بأطول ضلعٍ ما يُرسَل (٢٠٠٠ بكسل) مباشرةً.
+ *
+ * كان ٢ ثابتاً: صفحة A4 تخرج ١٦٨٤ بكسلاً (~١٤٤ نقطة في البوصة) وهو حدٌّ أدنى
+ * لأرقام جدولٍ صغيرة، وصفحةٌ كبيرة تُكبَّر ثمّ تُصغَّر بلا فائدة.
+ */
+export function renderScaleFor(pageWidth: number, pageHeight: number): number {
+  const longest = Math.max(pageWidth, pageHeight);
+  if (!(longest > 0)) return 2;
+  return Math.min(MAX_RENDER_SCALE, Math.max(MIN_RENDER_SCALE, MAX_IMAGE_SIDE / longest));
+}
+
+/** يرسم صفحاتِ الـPDF صوراً — حين لا نصَّ فيه ولا صورةَ موضوعة. ومعها عددُ صفحات الملفّ. */
+export async function renderPdfPages(data: Buffer): Promise<{ images: EmbeddedImage[]; pageCount: number }> {
   const { getDocumentProxy, renderPageAsImage } = await import("unpdf");
   const pdf = await getDocumentProxy(new Uint8Array(data));
   const pages = Math.min(pdf.numPages, MAX_RENDERED_PAGES);
   const out: EmbeddedImage[] = [];
   for (let n = 1; n <= pages; n++) {
-    const png = await renderPageAsImage(pdf, n, { canvasImport: () => import("@napi-rs/canvas"), scale: 2 });
+    const viewport = (await pdf.getPage(n)).getViewport({ scale: 1 });
+    const png = await renderPageAsImage(pdf, n, {
+      canvasImport: () => import("@napi-rs/canvas"),
+      scale: renderScaleFor(viewport.width, viewport.height),
+    });
     out.push(await normalizeImage(Buffer.from(png), "image/png"));
   }
-  return out;
+  return { images: out, pageCount: pdf.numPages };
+}
+
+/** تطبيقاتُ مسحٍ وقراءةٍ آليّة: اسمُها في «منتج الملفّ» يكفي وحده */
+const SCAN_APP_RE = /adobe scan|camscanner|scanner|scansnap|genius scan|turboscan|office lens|microsoft lens|paperstream|naps2|vuescan|ocrmypdf|tesseract|abbyy|finereader|readiris|\bocr\b/i;
+/** أجهزةٌ تمسح وتطبع: اسمُها لا يكفي إلّا ومعه صورةٌ بحجم صفحة */
+const SCAN_DEVICE_RE = /canon|epson|ricoh|xerox|kyocera|konica|minolta|brother|lexmark|toshiba|sharp mx|hp scan|scanjet|officejet|laserjet|workcentre|imagerunner/i;
+/** أطولُ ضلعٍ يُعدّ به المضمَّنُ «صورةَ صفحة» لا شعاراً */
+const PAGE_IMAGE_SIDE = 1000;
+
+/** أيدلّ «منتج الملفّ» على أنّه مسحٌ ضوئيّ؟ */
+export function producerLooksScanned(producer: string, hasPageImage: boolean): boolean {
+  if (SCAN_APP_RE.test(producer)) return true;
+  return hasPageImage && SCAN_DEVICE_RE.test(producer);
+}
+
+/**
+ * أنصُّ هذا الملفّ قراءةُ ماسحٍ فوق صورة؟
+ *
+ * تطبيقات المسح (Adobe Scan · CamScanner · الماسحات المكتبيّة) تضع فوق صورة
+ * الورقة نصّاً قرأته هي بـOCR، مكتوباً بنمط «لا يُرسَم» (`3 Tr`) ليُبحث فيه.
+ * وذاك النصّ قراءةٌ آليّة رديئة للعربيّة والأرقام — لا «نصٌّ مكتوبٌ يقيناً».
+ * وكان يُعدّ نصّاً متى بلغ ستّين كلمة، فيُعفى من الشاهد المستقلّ ويدخل آلياً.
+ *
+ * علامتان، وتكفي إحداهما:
+ *   ١. **نمط الرسم**: نظامُ المورّد يكتب نصّه مرئيّاً والماسح يكتبه مخفيّاً —
+ *      فإن كان جُلّ ما يُكتب في الصفحة الأولى مخفيّاً وفيها صورة فهي ممسوحة.
+ *   ٢. **منتج الملفّ** في بياناته: اسمُ تطبيق مسح، أو اسمُ جهازٍ ومعه صورةٌ
+ *      بحجم صفحة.
+ * وأيّ عطبٍ في الفحص يعود `false`: يبقى الملفّ على مساره كما كان.
+ */
+export async function hasHiddenOcrLayer(data: Buffer): Promise<boolean> {
+  try {
+    const { getDocumentProxy, getResolvedPDFJS } = await import("unpdf");
+    const { OPS } = await getResolvedPDFJS();
+    const pdf = await getDocumentProxy(new Uint8Array(data));
+    try {
+      const meta = await pdf.getMetadata().catch(() => null);
+      const info: unknown = meta?.info;
+      const producer = info && typeof info === "object"
+        ? ["Producer", "Creator"].map((k) => {
+            const v: unknown = Reflect.get(info, k);
+            return typeof v === "string" ? v : "";
+          }).join(" ")
+        : "";
+      if (producer.trim() !== "") {
+        const hasPageImage = extractEmbeddedJpegs(data).some((i) => Math.max(i.width, i.height) >= PAGE_IMAGE_SIDE);
+        if (producerLooksScanned(producer, hasPageImage)) return true;
+      }
+
+      /* قد يتعثّر تحميلُ الخطوط في بيئةٍ قديمة فتنقص القائمة — فلا يُحكم إلّا بما ظهر */
+      const ops = await (await pdf.getPage(1)).getOperatorList();
+      const showOps = new Set<number>([OPS.showText, OPS.showSpacedText, OPS.nextLineShowText, OPS.nextLineSetSpacingShowText]);
+      const imageOps = new Set<number>([OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintImageXObjectRepeat]);
+      let mode = 0;
+      const saved: number[] = [];
+      let hidden = 0;
+      let visible = 0;
+      let images = 0;
+      for (let i = 0; i < ops.fnArray.length; i++) {
+        const fn = ops.fnArray[i];
+        if (fn === OPS.save) saved.push(mode);
+        else if (fn === OPS.restore) mode = saved.pop() ?? 0;
+        else if (fn === OPS.setTextRenderingMode) mode = Number(ops.argsArray[i]?.[0] ?? 0);
+        else if (imageOps.has(fn)) images++;
+        else if (showOps.has(fn)) {
+          /* ٣: لا يُرسَم · ٧: قصٌّ بلا رسم */
+          if (mode === 3 || mode === 7) hidden++;
+          else visible++;
+        }
+      }
+      return images > 0 && hidden > 0 && hidden >= visible * 4;
+    } finally {
+      await pdf.destroy().catch(() => undefined);
+    }
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * صور الملفّ الممسوح: الموضوعةُ فيه أوّلاً (بدقّتها الأصليّة) ثمّ الرسم.
+ *
+ * وكلُّ صورةٍ منتزَعة تمرّ بـ`normalizeImage` كما يمرّ المرسوم: كانت تُرسَل
+ * خاماً بحجمها الكامل (مسحُ ٣٠٠ نقطةٍ بأربع صفحات ميجابايتاتٌ في الطلب).
+ * وما لا تفتحه `sharp` منها ليس صورةً سليمة — فيُترَك المسار كلُّه للرسم،
+ * وهو يحترم ترتيب الصفحات ودورانَها ويفكّ كلَّ ضغط.
+ */
+async function scannedImages(
+  data: Buffer,
+  pageCount: number | null,
+): Promise<Extract<DocumentInput, { mode: "IMAGE" }> | null> {
+  const embedded = extractEmbeddedJpegs(data);
+  if (embedded.length > 0) {
+    try {
+      const images: EmbeddedImage[] = [];
+      for (const img of embedded) images.push(await normalizeImage(img.data, img.mimeType));
+      return { mode: "IMAGE", images, source: "PDF_EMBEDDED", pagesRead: images.length, pagesTotal: pageCount };
+    } catch {
+      /* صورةٌ قُصّت خطأً — يُجرَّب الرسم */
+    }
+  }
+  const rendered = await renderPdfPages(data).catch(() => null);
+  if (rendered && rendered.images.length > 0) {
+    return { mode: "IMAGE", images: rendered.images, source: "PDF_RENDERED", pagesRead: rendered.images.length, pagesTotal: rendered.pageCount };
+  }
+  return null;
 }
 
 export async function resolveDocumentInput(
@@ -217,7 +355,7 @@ export async function resolveDocumentInput(
   if (isDeepseekImageType(mimeType) || HEIF_TYPES.has(mimeType)) {
     try {
       const image = await normalizeImage(data, mimeType);
-      return { mode: "IMAGE", source: "DIRECT", images: [image] };
+      return { mode: "IMAGE", source: "DIRECT", images: [image], pagesRead: 1, pagesTotal: 1 };
     } catch (e) {
       return { mode: "UNREADABLE", reason: `تعذّر فتح الصورة: ${(e as Error).message}` };
     }
@@ -235,25 +373,36 @@ export async function resolveDocumentInput(
       تعذّرت قراءة بنية الـPDF — وقد يكون مع ذلك صورةً تُنتزَع.
       فلا يُيأس هنا؛ يُجرَّب المسار الثاني.
     */
-    const salvaged = extractEmbeddedJpegs(data);
-    if (salvaged.length > 0) {
-      return { mode: "IMAGE", images: salvaged, source: "PDF_EMBEDDED" };
-    }
+    const salvaged = await scannedImages(data, null);
+    if (salvaged) return salvaged;
     return { mode: "UNREADABLE", reason: `تعذّرت قراءة الملفّ: ${(e as Error).message}` };
   }
 
+  const asText = (): DocumentInput => ({
+    mode: "TEXT",
+    text: layoutText(words.words),
+    pageCount: words.pageCount,
+    wordCount: words.words.length,
+    pagesRead: Math.min(words.pageCount, MAX_TEXT_PAGES),
+  });
+
   if (words.words.length >= MIN_INVOICE_WORDS) {
-    return {
-      mode: "TEXT",
-      text: layoutText(words.words),
-      pageCount: words.pageCount,
-      wordCount: words.words.length,
-    };
+    /*
+      نصٌّ كثير — أكتبه نظامُ المورّد أم قرأه ماسح؟ النصّ المخفيّ فوق صورةٍ
+      قراءةُ OCR لا نقل: يُقرأ الملفّ صورةً ويُطلَب له شاهدٌ كأيّ ممسوح.
+      وإن لم تُنتزَع له صورةٌ ولا رُسم بقي نصّه — القليل خيرٌ من لا شيء.
+    */
+    if (await hasHiddenOcrLayer(data)) {
+      const scanned = await scannedImages(data, words.pageCount);
+      if (scanned) return { ...scanned, ocrLayer: true };
+    }
+    return asText();
   }
 
-  const images = extractEmbeddedJpegs(data);
-  if (images.length > 0) {
-    return { mode: "IMAGE", images, source: "PDF_EMBEDDED" };
+  const embedded = extractEmbeddedJpegs(data);
+  if (embedded.length > 0) {
+    const scanned = await scannedImages(data, words.pageCount);
+    if (scanned) return scanned;
   }
 
   /*
@@ -267,39 +416,22 @@ export async function resolveDocumentInput(
     فالعتبة تفاضلٌ بين مسارين حين يوجد المساران، لا شرطُ قبولٍ حين لا
     بديل. و«لا يُقرأ» تبقى لمن لا نصّ له ولا صورة.
   */
-  if (words.words.length > 0) {
-    return {
-      mode: "TEXT",
-      text: layoutText(words.words),
-      pageCount: words.pageCount,
-      wordCount: words.words.length,
-    };
-  }
+  if (words.words.length > 0) return asText();
 
   /*
     لا نصّ ولا صورةٌ موضوعة — فتُرسَم الصفحة.
 
     فاتورةُ زاكوباك 3068 (٣ أكتوبر ٢٠٢٦) طُبعت بـ«Microsoft Print To PDF»: الصفحةُ أشكالٌ
     مرسومة، لا نصَّ يُنتزَع ولا JPEG يُقصّ — فقيل «لم يُقرأ» عن فاتورةٍ واضحةٍ تماماً،
-    وأُرشفت بلا قيد. والرسمُ (`unpdf` على `@napi-rs/canvas`) يُخرج صورتَها كما تُرى.
+    وأُرشفت بلا قيد. والرسمُ (`unpdf` على `@napi-rs/canvas`) يُخرج صورتَها كما تُرى —
+    ومعه ما ضُغط بـ`CCITTFax` و`JBIG2` و`JPX`، فمحرّك الرسم يفكّها.
   */
-  const rendered = await renderPdfPages(data).catch(() => []);
-  if (rendered.length > 0) {
-    return { mode: "IMAGE", images: rendered, source: "PDF_RENDERED" };
-  }
+  const rendered = await scannedImages(data, words.pageCount);
+  if (rendered) return rendered;
 
-  /*
-    لا نصّ يُقرأ ولا صورةَ تُنتزَع ولا رسم.
-
-    غالباً مسحٌ بضغط `CCITTFax` أو `JBIG2` — وهما خارج ما ينتزعه
-    `pdf-images.ts`، وذلك حدٌّ معلَن هناك. والقول «لم يُقرأ» هنا أصدق
-    من إرسال صفحةٍ فارغة إلى النموذج ثمّ عرضِ ما يخترعه.
-  */
+  /* لا نصّ يُقرأ ولا صورةَ تُنتزَع ولا رسمٌ خرج — يُعلَن ولا تُرسَل صفحةٌ فارغة */
   return {
     mode: "UNREADABLE",
-    reason:
-      words.words.length === 0
-        ? "ملفّ PDF مصوَّر بضغطٍ لا يُنتزَع منه صورة — يحتاج قراءةً يدوية"
-        : `نصّ الملفّ أقلّ من أن يُقرأ (${words.words.length} كلمة) ولا صورةَ فيه`,
+    reason: "ملفّ PDF لا نصَّ فيه ولم تُرسَم صفحتُه — يحتاج قراءةً يدوية، أو صوّر الورقة وارفع الصورة",
   };
 }

@@ -59,5 +59,10 @@
   "058_bank_held_missing_from_file.sql": "5ef47881ee8d0df53ec5a14a68129f2e6390f3aa104f4a725a21f9dea1aff997",
   "059_bank_account_opened_on.sql": "5b6f7677a75be751ea3bfaf1c27c38be4f19ea0bf72c4a2fa6b90103b25d69db",
   "060_vat_tx_choices.sql": "9925ef8fd509db2966f6780d9c198e25620760329c9abc8ebe2533f48552dd55",
-  "061_vat_invoice_choices.sql": "1af15f908f9d392519cf99fb505715177813330bcb855c19de3058ef17fca533"
+  "061_vat_invoice_choices.sql": "1af15f908f9d392519cf99fb505715177813330bcb855c19de3058ef17fca533",
+  "062_vat_filings.sql": "83f6f018bd2623596994f86580bfac5a4ee3ba18cf068590a1ba74fcd2a71b8b",
+  "063_vat_period_inputs.sql": "2ae5ecfc7ce40e6d681bbed2e668163b16029d6c161600b9f0fa7e21d7a10c31",
+  "064_waste_void_and_request_key.sql": "48f1483e3e043c381ae6315c9d288ad634dc08169bf398a9e7035bf40e133a83",
+  "065_sale_line_parent_line.sql": "9c7dc852898f474a2e2471b5ac98bfee49eaf283f7cad4c8b988647385f4f82c",
+  "066_document_intake_trace.sql": "6688b0881aac732264baca17f812cccf2e9fc3aaee4b4ca19e1295ef5523ae51"
 }

@@ -20,7 +20,7 @@ import { isOwnersPayment } from "@/services/payment-echo.service";
 import { NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bankTransactions, decisionHistory, payments } from "@/db/schema";
+import { bankTransactions, classificationSourceEnum, decisionHistory, payments } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { recordAudit } from "@/lib/audit";
 import { refreshPaymentStatus, reversePayment } from "@/services/payment.service";
@@ -73,13 +73,19 @@ export async function POST(request: Request) {
         لا تكتبان ردَّين.
       */
       const [prior] = (
-        await db.execute<{ category: string | null }>(sql`
-          select payload->>'الباب السابق' as category from decision_history
+        await db.execute<{ category: string | null; source: string | null }>(sql`
+          select payload->>'الباب السابق' as category, payload->>'المصدر السابق' as source from decision_history
            where bank_transaction_id = ${tx.id} and event = 'MATCH_REJECTED'
            order by created_at desc limit 1
         `)
       ).rows;
       const restored = (prior?.category ?? "UNKNOWN") as typeof tx.category;
+      /*
+        ومصدرُ التصنيف يعود معه: الإعلانُ يكتبه `HUMAN`، ولو بقي لَما عادت
+        الحركةُ إلى الطابور (الطابور لا يسأل عمّا صنّفه إنسان). وما أُعلن قبل
+        حفظ المصدر السابق لم يتغيّر مصدرُه أصلاً فيُترَك.
+      */
+      const priorSource = classificationSourceEnum.enumValues.find((v) => v === prior?.source);
       const undone = await db.transaction(async (t) => {
         const rows = await t.update(bankTransactions).set({
           matchStatus: "UNMATCHED",
@@ -87,6 +93,7 @@ export async function POST(request: Request) {
           matchDisposition: "REVIEW",
           lifecycle: "SUGGESTED",
           category: restored,
+          ...(priorSource ? { classificationSource: priorSource } : {}),
         }).where(and(eq(bankTransactions.id, tx.id), eq(bankTransactions.matchOutcome, "NOT_A_PAYMENT")))
           .returning({ id: bankTransactions.id });
         if (rows.length === 0) return false;

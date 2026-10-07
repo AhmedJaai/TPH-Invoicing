@@ -84,7 +84,7 @@ describe("reconcile — لا جشع", () => {
 
   it("لا مطالبات فلا تسوية", () => {
     expect(reconcile([])).toEqual({
-      assigned: [], unassigned: [], exact: true, totalScore: 0,
+      assigned: [], unassigned: [], exact: true, inexactTransactionIds: [], totalScore: 0,
     });
   });
 });
@@ -242,5 +242,77 @@ describe("reconcile — أعلى مجموع لا أعلى درجة", () => {
     const used = r.assigned.flatMap((a) => a.candidate.invoiceIds);
     expect(new Set(used).size).toBe(used.length);
     expect(typeof r.exact).toBe("boolean");
+  });
+});
+
+
+describe("reconcile — لا تُباع قويّةٌ بضعيفتين", () => {
+  /*
+    مجموعُ الدرجات الخامّ: ٠٫٥٥ + ٠٫٥٠ = ١٫٠٥ > ٠٫٩٠، فتُحرَم «س» من
+    فاتورتها القويّة وتخرج اقتراحان ضعيفان بدل حسمٍ صحيح.
+  */
+  it("مطابقةٌ بـ٩٠ لا تُترَك لاثنتين بـ٥٥ و٥٠", () => {
+    const r = reconcile([
+      claim("X", cand({ invoiceIds: ["1"], score: 0.9 })),
+      claim("X", cand({ invoiceIds: ["2"], score: 0.5 })),
+      claim("Y", cand({ invoiceIds: ["1"], score: 0.55 })),
+    ]);
+    const x = r.assigned.find((a) => a.transactionId === "X")!;
+    expect(x.candidate.invoiceIds).toEqual(["1"]);
+    expect(r.unassigned.map((u) => u.transactionId)).toEqual(["Y"]);
+  });
+});
+
+describe("reconcile — المكوّنات المستقلّة", () => {
+  /** مكوّنةٌ متشابكة تُنفد ميزانيّتها: ٢٢ حركة على ١٨ فاتورة. */
+  const hard = () => {
+    const invoiceIds = Array.from({ length: 18 }, (_, i) => `H${i}`);
+    return Array.from({ length: 22 }, (_, t) =>
+      invoiceIds.map((id, k) =>
+        claim(`HT${String(t).padStart(2, "0")}`, cand({ invoiceIds: [id], score: 0.5 + ((t + k) % 17) / 100 })),
+      ),
+    ).flat();
+  };
+
+  it("مورّدٌ صعب لا يُنزِّل يقينَ غيره", () => {
+    const easy = [
+      claim("E1", cand({ invoiceIds: ["e1"], score: 0.95 })),
+      claim("E2", cand({ invoiceIds: ["e2"], score: 0.93 })),
+    ];
+    const alone = reconcile(hard());
+    const r = reconcile([...hard(), ...easy]);
+
+    /* السهلتان مخصَّصتان، وليستا في ما لم يُثبَت — مهما كان حالُ الصعبة */
+    expect(r.assigned.filter((a) => a.transactionId.startsWith("E"))).toHaveLength(2);
+    expect(r.inexactTransactionIds.some((id) => id.startsWith("E"))).toBe(false);
+    /* وحالُ الصعبة كما لو حُلّت وحدها: المكوّنات لا يؤثّر بعضها في بعض */
+    expect(r.exact).toBe(alone.exact);
+    expect(r.inexactTransactionIds).toEqual(alone.inexactTransactionIds);
+    if (!alone.exact) expect(alone.inexactTransactionIds).toHaveLength(22);
+  });
+
+  it("حركتان تتّصلان عبر فاتورةٍ وسيطة مكوّنةٌ واحدة — ولا تُخصَّص فاتورةٌ مرّتين", () => {
+    const r = reconcile([
+      claim("A", cand({ invoiceIds: ["1", "2"], score: 0.9 })),
+      claim("B", cand({ invoiceIds: ["2", "3"], score: 0.9 })),
+      claim("C", cand({ invoiceIds: ["3"], score: 0.92 })),
+      claim("D", cand({ invoiceIds: ["9"], score: 0.6 })),
+    ]);
+    const used = r.assigned.flatMap((a) => a.candidate.invoiceIds);
+    expect(new Set(used).size).toBe(used.length);
+    expect(r.assigned.map((a) => a.transactionId).sort()).toEqual(["A", "C", "D"]);
+    expect(r.exact).toBe(true);
+  });
+});
+
+describe("decide — المتماثلات لا تُحسَم", () => {
+  it("مرشّحٌ مثّل فواتير متساوية يُقترَح ولو علت درجته وغاب منافسه", () => {
+    const d = decide({
+      transactionId: "T",
+      candidate: cand({ invoiceIds: ["1"], score: 0.97, ambiguity: "ثلاث فواتير بالمبلغ نفسه" }),
+      runnerUpScore: null,
+    });
+    expect(d.disposition).toBe("SUGGEST");
+    expect(d.reasons).toContain("ثلاث فواتير بالمبلغ نفسه");
   });
 });

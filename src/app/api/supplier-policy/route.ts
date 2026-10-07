@@ -89,15 +89,17 @@ export async function POST(request: Request) {
     );
   }
 
-  await db.update(suppliers).set(next).where(eq(suppliers.id, id));
-
-  await recordAudit({
-    actorId: user.id,
-    action: "SUPPLIER_UPDATED",
-    entityType: "supplier",
-    entityId: id,
-    before,
-    after: next,
+  /* التغييرُ وأثرُه في معاملةٍ واحدة — لا سياسةَ تتغيّر بلا سجلّ */
+  await db.transaction(async (t) => {
+    await t.update(suppliers).set(next).where(eq(suppliers.id, id));
+    await recordAudit({
+      actorId: user.id,
+      action: "SUPPLIER_UPDATED",
+      entityType: "supplier",
+      entityId: id,
+      before,
+      after: next,
+    }, t);
   });
 
   return NextResponse.json({ ok: true, policy: next });

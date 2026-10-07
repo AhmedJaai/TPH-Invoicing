@@ -132,6 +132,8 @@ export const RULES: Record<string, RateLimitRule> = {
     لا دلوَ «أكّد» ولا دلوَه، والتسمية والتصدير بلا حدٍّ مسمّى.
   */
   "match-confirm-bulk": { limit: 100, windowSeconds: 3600 },
+  /* قراءةُ مرشّحي حركة — تُفتح صفّاً صفّاً في طابور المراجعة */
+  "match-candidates": { limit: 300, windowSeconds: 3600 },
   "drive-rename": { limit: 60, windowSeconds: 3600 },
   "payment-run": { limit: 60, windowSeconds: 3600 },
   "ops-db-identity": { limit: 30, windowSeconds: 3600 },

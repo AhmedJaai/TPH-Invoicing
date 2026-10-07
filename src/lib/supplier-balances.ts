@@ -17,9 +17,10 @@
  * ولا يُخصم رصيدُ مورّدٍ من دَين مورّدٍ آخر: المالُ عند غاناش لا يسدّد
  * الكوب الذهبي.
  */
+import { HALALA_TOLERANCE_MINOR } from "./money";
 
 /** ما دون هللةٍ واحدة تقريبٌ لا دَين — فاتورة ١٥٠٠٫٠١ سُدّدت بـ١٥٠٠٫٠٠. */
-export const SETTLED_TOLERANCE_MINOR = 1;
+export const SETTLED_TOLERANCE_MINOR = HALALA_TOLERANCE_MINOR;
 
 export interface SupplierBalanceInput {
   supplierId: string;

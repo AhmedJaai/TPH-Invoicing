@@ -12,6 +12,8 @@ import { products, suppliers } from "@/db/schema";
 import { storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
 import { milliToDecimal } from "@/lib/inventory/units";
 import type { DuplicateRow, ReceiptRow } from "@/components/inventory-flow-step";
+import type { WasteRow } from "@/components/inventory-waste";
+import { listWaste } from "./inventory-movement.service";
 import { loadManualOpenings, loadReceiptDuplicates, type CountHeader } from "./inventory.service";
 import { listReceipts } from "./inventory-receipt.service";
 import { loadPurchaseLinks, loadStockItemOptions, type PurchaseLinkRow, type StockItemOption } from "./inventory-purchase-link.service";
@@ -25,6 +27,8 @@ export async function loadWorkspaceInputs(header: CountHeader, conn: Conn = db):
   /** بنودُ فواتير الأسبوع وربطُها بأصناف الجرد — للمفتوح وحده؛ المقفَلُ يُقرأ من أسطره. */
   purchaseLinks: PurchaseLinkRow[];
   stockOptions: StockItemOption[];
+  /** هدرُ الأسبوع المسجَّل — للمفتوح وحده؛ المقفَلُ لا يُبطَل فيه شيء. */
+  waste: WasteRow[];
 }> {
   const receipts = await listReceipts(header.periodStart, header.periodEnd, header.branchId, conn);
 
@@ -38,6 +42,10 @@ export async function loadWorkspaceInputs(header: CountHeader, conn: Conn = db):
   const purchaseLinks = header.status === "FINALISED"
     ? []
     : await loadPurchaseLinks(header.periodStart, header.periodEnd, stockOptions, conn);
+
+  const waste = header.status === "FINALISED"
+    ? []
+    : await listWaste(header.periodStart, header.periodEnd, header.branchId, conn);
 
   const supplierRows = await conn.select({ id: suppliers.id, name: suppliers.nameAr })
     .from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.nameAr));
@@ -67,5 +75,13 @@ export async function loadWorkspaceInputs(header: CountHeader, conn: Conn = db):
     manualOpenings: await loadManualOpenings(header.id, conn),
     purchaseLinks,
     stockOptions,
+    waste: waste.map((w) => ({
+      id: w.id,
+      productName: w.productName,
+      occurredOn: w.occurredOn,
+      quantityText: `${milliToDecimal(w.quantityMilli)} ${storedUnitLabel(w.unit)}`,
+      reason: w.reason,
+      note: w.note,
+    })),
   };
 }

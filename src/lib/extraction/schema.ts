@@ -87,7 +87,7 @@ export const extractionSchema = z.object({
   invoiceNumber: z.string().describe("رقم الفاتورة أو الإيصال، أو فارغ"),
   invoiceDate: z
     .string()
-    .describe("تاريخ المستند بصيغة YYYY-MM-DD ميلادية. حوّل التاريخ الهجري إن كان هو الوحيد. فارغ إن لم يظهر."),
+    .describe("تاريخ المستند الميلاديّ بصيغة YYYY-MM-DD. إن لم يظهر إلا الهجريّ فانسخه كما طُبع بسنته الهجرية ولا تحوّله. فارغ إن لم يظهر."),
 
   subtotalAmount: moneyString.describe("صافي المبلغ الخاضع للضريبة بعد الخصم الذي يخفض الوعاء، كما هو مطبوع"),
   vatAmount: moneyString.describe("مبلغ ضريبة القيمة المضافة كما هو مطبوع"),

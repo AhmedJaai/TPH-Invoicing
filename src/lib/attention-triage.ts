@@ -28,6 +28,7 @@ export const ATTENTION_IDS = [
   "missing-statements",
   "statement-ledger-gap",
   "files-wrong-month",
+  "files-missing-in-drive",
   "unknown-tax",
   "no-lines",
   "unrecorded-invoices",

@@ -117,6 +117,58 @@ const SYNONYMS = Object.fromEntries(
   ]),
 ) as unknown as Record<SalesColumn, readonly string[]>;
 
+/** فواصلُ الكلمات في الترويسة — ما يُسقطه التطبيعُ هو ما يفصل كلمةً عن أخرى. */
+const WORD_BREAK = /[\s _\-./\\()[\]{}:؛,،'"#*%]+/;
+
+/** زينةٌ لا تغيّر معنى العمود: العملةُ بعد «Net Sales». */
+const DECORATION = new Set(["sar", "sr", "ريال", "بالريال", "رس"].map(normaliseHeader));
+
+interface HeaderWords {
+  /** كلماتُ الترويسة مطبَّعةً بترتيبها. */
+  words: string[];
+  /** وهي بلا ما بين قوسين وبلا الزينة — «Net Sales (SAR)» ← «netsales». */
+  core: string;
+}
+
+function headerWords(raw: string): HeaderWords {
+  const folded = foldPresentationForms(raw);
+  const split = (text: string) => text.split(WORD_BREAK).map(normaliseHeader).filter((w) => w !== "");
+  return {
+    words: split(folded),
+    core: split(folded.replace(/\([^)]*\)|\[[^\]]*\]/g, " ")).filter((w) => !DECORATION.has(w)).join(""),
+  };
+}
+
+/**
+ * أتحمل هذه الترويسةُ المرادفَ **كلماتٍ** لا حروفاً؟
+ *
+ * ── ولماذا ليس «يحتوي» ──
+ *
+ * كان يكفي أن تحتوي الترويسةُ المرادفَ سلسلةً فرعيّة: «count» داخل
+ * «discount%»، و«date» داخل «updated_at»، و«name» داخل «customer_name»،
+ * و«item» داخل «item_status». فمتى غيّر فودكس اسمَ عمود الكمّيّة التقط
+ * القارئُ **الخصمَ كمّيّةً** بلا أن يشكو — ثمّ بُني عليه جردُ أسبوع.
+ *
+ * فالمرادفُ يطابق في حالين:
+ *   • هو الترويسةُ كلُّها بعد إسقاط القوسين والعملة: «Net Sales (SAR)»؛
+ *   • أو هو **كلمتان متتاليتان فأكثر** منها: «Total Net Sales».
+ * والكلمةُ المفردة داخل ترويسةٍ أطول لا تكفي: «name» في «customer name»
+ * ليست اسمَ الصنف.
+ */
+function looselyMatches(header: HeaderWords, synonym: string): boolean {
+  if (header.core === synonym) return true;
+  const { words } = header;
+  for (let from = 0; from < words.length; from++) {
+    let joined = words[from];
+    for (let to = from + 1; to < words.length; to++) {
+      joined += words[to];
+      if (joined === synonym) return true;
+      if (joined.length >= synonym.length) break;
+    }
+  }
+  return false;
+}
+
 export interface ColumnMap {
   index: Partial<Record<SalesColumn, number>>;
   recognised: string[];
@@ -126,12 +178,13 @@ export interface ColumnMap {
 /**
  * يربط الترويسات بالحقول.
  *
- * والمطابقةُ بالمساواة أوّلاً ثمّ بالاحتواء: «Net Sales (SAR)» يحتوي
- * «netsales». والأوّلُ يفوز — فلا يُسرَق عمودٌ فُهم بالضبط لصالح آخر
- * فُهم بالتقريب.
+ * والمطابقةُ بالمساواة أوّلاً ثمّ **بالكلمات** (`looselyMatches`): «Net Sales
+ * (SAR)» هو «netsales». والأوّلُ يفوز — فلا يُسرَق عمودٌ فُهم بالضبط لصالح
+ * آخر فُهم بالتقريب.
  */
 export function mapColumns(header: readonly string[]): ColumnMap {
   const normalised = header.map((h) => normaliseHeader(h ?? ""));
+  const worded = header.map((h) => headerWords(h ?? ""));
   const index: Partial<Record<SalesColumn, number>> = {};
   const taken = new Set<number>();
 
@@ -142,12 +195,12 @@ export function mapColumns(header: readonly string[]): ColumnMap {
     return true;
   };
 
-  for (const pass of ["exact", "contains"] as const) {
+  for (const pass of ["exact", "words"] as const) {
     for (const field of Object.keys(SYNONYMS) as SalesColumn[]) {
       if (index[field] !== undefined) continue;
       for (const syn of SYNONYMS[field]) {
         const at = normalised.findIndex((h, i) =>
-          !taken.has(i) && h !== "" && (pass === "exact" ? h === syn : h.includes(syn)),
+          !taken.has(i) && h !== "" && (pass === "exact" ? h === syn : looselyMatches(worded[i], syn)),
         );
         if (at >= 0 && claim(field, at)) break;
       }

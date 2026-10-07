@@ -46,6 +46,7 @@ import { adapterFor } from "@/lib/sales/foodics-excel";
 import { milliToDecimal } from "@/lib/inventory/units";
 import type { ParsedSale, ParsedSalesFile } from "@/lib/sales/file-import";
 import { recordAudit } from "@/lib/audit";
+import { createId } from "@/lib/id";
 import type { Conn } from "./types";
 
 export const FOODICS_SOURCE_NAME = "فودكس";
@@ -164,7 +165,16 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
     .where(eq(salesImports.fileSha256, sha))
     .limit(1);
 
-  if (seen) {
+  /*
+    ── يُردّ بالبصمة ما استُورد كاملاً وحده ──
+
+    ملفٌّ انتهى `FAILED` (لم يُفهَم منه سطر) أو `PARTIAL` (سقطت منه صفوف) كان
+    يُردّ إلى الأبد «مستورَدٌ من قبل» — فإن أُصلح القارئُ لم يستطع صاحبُه رفعَ
+    الملفّ نفسِه. فيُعاد، والمنعُ من التكرار باقٍ على مفتاح الطلب والسطر.
+  */
+  const retryOf = seen && seen.status !== "IMPORTED" ? seen.id : null;
+
+  if (seen && retryOf === null) {
     return {
       importId: seen.id,
       status: "DUPLICATE",
@@ -194,6 +204,7 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
   const workbook = readWorkbookSafely(input.buffer, { includeRaw: true });
   let parsed: ParsedSalesFile | null = null;
   let adapterName = "";
+  let truncatedSheet: string | null = null;
 
   for (const sheet of workbook.sheets) {
     const adapter = adapterFor(sheet.grid);
@@ -203,7 +214,25 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
       fallbackBusinessDate: input.fallbackBusinessDate,
       branchLabel: input.branchLabel,
     });
+    truncatedSheet = sheet.truncated.rows ? sheet.name : null;
     if (!parsed.blocked) break;
+  }
+
+  /*
+    ── الورقةُ المبتورة لا تُستورَد ──
+
+    القارئُ يقصّ عند حدّه ويكتفي بتحذير. والاستيرادُ يُلغي كلَّ سطرٍ مقيَّدٍ
+    لبيعةٍ وردت في الملفّ ولم يرد هو فيه («غاب عن التصدير الأحدث») — وذاك
+    يصحّ إن كان الملفُّ كاملاً. فطلبٌ قُصّ نصفُه يُلغى نصفُه الآخر صامتاً،
+    وينخفض الاستهلاكُ المتوقَّع. فيُرفَض ولا يُكتَب شيء.
+  */
+  if (parsed && !parsed.blocked && truncatedSheet !== null) {
+    parsed = {
+      ...parsed,
+      blocked:
+        `الورقة «${truncatedSheet}» أطولُ ممّا يُقرأ في مرّة، فقُرئ أوّلُها فقط — ولم يُكتَب شيء. ` +
+        "صدِّر من فودكس أسبوعاً واحداً في الملفّ وارفع كلَّ أسبوعٍ وحده.",
+    };
   }
 
   if (!parsed || parsed.blocked) {
@@ -275,8 +304,11 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
   }
 
   const messages: string[] = [...workbook.warnings, ...file.warnings];
+  if (retryOf !== null) {
+    messages.push("هذا الملفُّ رُفع من قبل ولم يُستورَد كاملاً — أُعيدت قراءتُه، وما كان مقيَّداً منه لم يُكتَب مرّتين.");
+  }
   const written = await writeImport({
-    file, sourceId, branchId, sha, input, messages, conn,
+    file, sourceId, branchId, sha, input, messages, conn, retryOf,
   });
 
   await recordAudit({
@@ -307,6 +339,8 @@ interface WriteInput {
   input: ImportInput;
   messages: string[];
   conn: Conn;
+  /** استيرادٌ سابقٌ للملفّ عينِه لم يكتمل — يُخلي بصمتَه لهذا ويبقى أثراً. */
+  retryOf: string | null;
 }
 
 async function writeImport(w: WriteInput): Promise<ImportResult> {
@@ -314,6 +348,16 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
   const messages = [...w.messages];
 
   return w.conn.transaction(async (tx) => {
+    /*
+      بصمةُ الملفّ فريدة. فالمحاولةُ السابقة تُخلي البصمةَ **داخل المعاملة** —
+      إن سقطت هذه عادت تلك كما كانت — وتبقى بصفوفها الخام وأسبابها.
+    */
+    if (w.retryOf !== null) {
+      await tx.update(salesImports)
+        .set({ fileSha256: `${sha}:superseded:${w.retryOf}` })
+        .where(eq(salesImports.id, w.retryOf));
+    }
+
     const [imp] = await tx
       .insert(salesImports)
       .values({
@@ -396,13 +440,14 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
 
     /* ── البيعات: المفتاحُ يقول «هو هو»، والبصمةُ تقول «تغيّر» ── */
     const wanted = file.sales.map((s) => s.externalId);
-    const existing = new Map(
-      wanted.length === 0 ? [] : (await tx
+    const existing = new Map<string, string>();
+    for (const part of chunks(wanted, 1000)) {
+      const rows = await tx
         .select({ id: sales.id, externalId: sales.externalId })
         .from(sales)
-        .where(and(eq(sales.sourceId, sourceId), inArray(sales.externalId, wanted)))
-      ).map((r) => [r.externalId, r.id] as const),
-    );
+        .where(and(eq(sales.sourceId, sourceId), inArray(sales.externalId, part)));
+      for (const r of rows) existing.set(r.externalId, r.id);
+    }
 
     const saleIdByExternal = new Map<string, string>();
     /** رقمُ الصفّ ← ما وقع له، فيُكتَب في الخام بحاله وسببه. */
@@ -414,69 +459,135 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
     let lineCount = 0;
     let unitsMilli = 0;
 
-    for (const sale of file.sales) {
+    /*
+      ── دفعاتٌ لا طلبٌ طلباً ──
+
+      كان لكلّ بيعةٍ إدراجٌ أو تحديث ثمّ قراءةُ أسطرها ثمّ إدراجُها: أسبوعٌ
+      حقيقيّ (١٬٠٩٠ طلباً) أكثرُ من ثلاثة آلاف رحلةٍ إلى القاعدة في معاملةٍ
+      واحدة تحت مهلة ستّين ثانية — وملفُّ شهرٍ يسقط بها. فالبيعاتُ تُكتَب
+      دفعةً (الجديدُ يُدرَج، والقائمُ يُحدَّث بمفتاحه الأساسيّ)، وأسطرُ
+      القائم تُقرأ باستعلامٍ لكلّ ألف بيعة، ثمّ يُقرَّر في الذاكرة ويُكتَب دفعةً.
+    */
+    const saleRows = file.sales.map((sale) => {
       const prior = existing.get(sale.externalId);
-      let saleId: string;
-
-      if (prior) {
-        /*
-          ── الطلبُ مقيَّد، والملفُّ يتكلّم عنه ثانيةً ──
-
-          ولا يُردّ: قد يكون تصديراً مصحَّحاً. تُحدَّث مجاميعُ البيعة
-          دائماً (فهي مشتقّة)، ثمّ يُقرَّر لكلّ سطرٍ على حدة.
-        */
-        await tx
-          .update(sales)
-          .set({
-            /* تصديرٌ بلا فرعٍ لا يمحو فرعاً عُرف — المجهولُ لا يغلب المعلوم */
-            branchId: sql`coalesce(${branchId}, ${sales.branchId})`,
-            soldAt: sale.soldAt,
-            businessDate: sale.businessDate,
-            grossMinor: sale.grossMinor,
-            discountMinor: sale.discountMinor,
-            refundMinor: sale.refundMinor,
-            vatMinor: sale.vatMinor,
-            netMinor: sale.netMinor,
-            orderCount: sale.orderCount,
-            isVoid: sale.isVoid,
-            importId: imp.id,
-          })
-          .where(eq(sales.id, prior));
-        saleId = prior;
-        salesRestated++;
-      } else {
-        const [row] = await tx
-          .insert(sales)
-          .values({
-            sourceId, branchId,
-            externalId: sale.externalId,
-            soldAt: sale.soldAt,
-            businessDate: sale.businessDate,
-            grossMinor: sale.grossMinor,
-            discountMinor: sale.discountMinor,
-            refundMinor: sale.refundMinor,
-            vatMinor: sale.vatMinor,
-            netMinor: sale.netMinor,
-            orderCount: sale.orderCount,
-            isVoid: sale.isVoid,
-            importId: imp.id,
-          })
-          .returning({ id: sales.id });
-        saleId = row.id;
-        salesWritten++;
-      }
-
-      saleIdByExternal.set(sale.externalId, saleId);
+      const id = prior ?? createId();
+      saleIdByExternal.set(sale.externalId, id);
+      if (prior) salesRestated++;
+      else salesWritten++;
       lineCount += sale.lines.length;
       unitsMilli += sale.lines
         .filter((l) => !l.isModifier)
         .reduce((s, l) => s + (l.isVoid ? 0 : l.isRefund ? -l.quantityMilli : l.quantityMilli), 0);
+      return {
+        id, sourceId, branchId,
+        externalId: sale.externalId,
+        soldAt: sale.soldAt,
+        businessDate: sale.businessDate,
+        grossMinor: sale.grossMinor,
+        discountMinor: sale.discountMinor,
+        refundMinor: sale.refundMinor,
+        vatMinor: sale.vatMinor,
+        netMinor: sale.netMinor,
+        orderCount: sale.orderCount,
+        isVoid: sale.isVoid,
+        importId: imp.id,
+      };
+    });
+    for (const part of chunks(saleRows, 500)) {
+      await tx.insert(sales).values(part).onConflictDoUpdate({
+        target: sales.id,
+        /*
+          الطلبُ مقيَّد والملفُّ يتكلّم عنه ثانيةً: مجاميعُه مشتقّةٌ فتُحدَّث
+          دائماً، ثمّ يُقرَّر لكلّ سطرٍ على حدة.
+        */
+        set: {
+          /* تصديرٌ بلا فرعٍ لا يمحو فرعاً عُرف — المجهولُ لا يغلب المعلوم */
+          branchId: sql`coalesce(excluded.branch_id, sales.branch_id)`,
+          soldAt: sql`excluded.sold_at`,
+          businessDate: sql`excluded.business_date`,
+          grossMinor: sql`excluded.gross_minor`,
+          discountMinor: sql`excluded.discount_minor`,
+          refundMinor: sql`excluded.refund_minor`,
+          vatMinor: sql`excluded.vat_minor`,
+          netMinor: sql`excluded.net_minor`,
+          orderCount: sql`excluded.order_count`,
+          isVoid: sql`excluded.is_void`,
+          importId: sql`excluded.import_id`,
+        },
+      });
+    }
 
-      const outcome = await writeLines(tx, saleId, sale, posByExternal, Boolean(prior));
-      for (const rev of outcome.revised) {
-        revisions.push({ saleExternalId: sale.externalId, ...rev });
+    /* أسطرُ البيعات القائمة — كلُّها باستعلامٍ لكلّ ألف بيعة */
+    const priorLines = new Map<string, Map<string, PriorLine>>();
+    for (const part of chunks([...existing.values()], 1000)) {
+      const rows = await tx
+        .select({
+          id: saleLines.id, saleId: saleLines.saleId, externalId: saleLines.externalId,
+          contentHash: saleLines.contentHash, sourceStatus: saleLines.sourceStatus,
+          quantity: saleLines.quantity, isComplimentary: saleLines.isComplimentary,
+          isModifier: saleLines.isModifier, parentLineExternalId: saleLines.parentLineExternalId,
+        })
+        .from(saleLines)
+        .where(inArray(saleLines.saleId, part));
+      for (const r of rows) {
+        if (r.externalId === null) continue;
+        let of = priorLines.get(r.saleId);
+        if (!of) priorLines.set(r.saleId, (of = new Map()));
+        of.set(r.externalId, { ...r, externalId: r.externalId });
       }
+    }
+
+    const fresh: SaleLineRow[] = [];
+    const changed: (SaleLineRow & { id: string })[] = [];
+    const removed: string[] = [];
+    for (const sale of file.sales) {
+      const saleId = saleIdByExternal.get(sale.externalId)!;
+      const outcome = decideLines(saleId, sale, posByExternal, priorLines.get(saleId) ?? new Map());
+      fresh.push(...outcome.fresh);
+      changed.push(...outcome.changed);
+      removed.push(...outcome.removed);
+      for (const rev of outcome.revised) revisions.push({ saleExternalId: sale.externalId, ...rev });
       for (const [rowNumber, o] of outcome.byRow) rowOutcome.set(rowNumber, o);
+      if (outcome.keptDespiteAbsence > 0) {
+        messages.push(
+          `يومُ ${sale.businessDate}: الملفُّ يذكر أقلَّ من نصف أصنافه المقيَّدة — يبدو تقريراً مرشَّحاً، ` +
+          `فلم يُلغَ ما غاب عنه (${outcome.keptDespiteAbsence}). إن كان التقريرُ كاملاً فارفعه بلا ترشيح.`,
+        );
+      }
+    }
+
+    for (const part of chunks(fresh, 500)) {
+      await tx.insert(saleLines).values(part).onConflictDoNothing();
+    }
+    for (const part of chunks(changed, 500)) {
+      await tx.insert(saleLines).values(part).onConflictDoUpdate({
+        target: saleLines.id,
+        set: {
+          posProductId: sql`excluded.pos_product_id`,
+          description: sql`excluded.description`,
+          quantity: sql`excluded.quantity`,
+          unitPriceMinor: sql`excluded.unit_price_minor`,
+          lineTotalMinor: sql`excluded.line_total_minor`,
+          sourceStatus: sql`excluded.source_status`,
+          isRefund: sql`excluded.is_refund`,
+          isVoid: sql`excluded.is_void`,
+          isComplimentary: sql`excluded.is_complimentary`,
+          isModifier: sql`excluded.is_modifier`,
+          parentExternalId: sql`excluded.parent_external_id`,
+          parentLineExternalId: sql`excluded.parent_line_external_id`,
+          modifiers: sql`excluded.modifiers`,
+          contentHash: sql`excluded.content_hash`,
+        },
+      });
+    }
+    for (const part of chunks(removed, 1000)) {
+      await tx.update(saleLines)
+        .set({
+          isVoid: true,
+          sourceStatus: REMOVED_STATUS,
+          contentHash: sql`concat(${REMOVED_STATUS}::text, ':', sale_lines.external_id)`,
+        })
+        .where(inArray(saleLines.id, part));
     }
 
     /* ── وكلُّ صفٍّ يُحفَظ خاماً بحاله وسببه ── */
@@ -563,48 +674,64 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
   });
 }
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+function chunks<T>(items: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+type SaleLineRow = typeof saleLines.$inferInsert;
+
+interface PriorLine {
+  id: string;
+  externalId: string;
+  contentHash: string | null;
+  sourceStatus: string | null;
+  quantity: string | null;
+  isComplimentary: boolean;
+  isModifier: boolean;
+  parentLineExternalId: string | null;
+}
 
 interface LineOutcome {
   byRow: Map<number, { status: "PARSED" | "DUPLICATE" | "REVISED"; reason: string | null }>;
   revised: { lineExternalId: string; was: string; now: string }[];
+  /** أسطرٌ لم تكن مقيَّدة — تُدرَج. */
+  fresh: SaleLineRow[];
+  /** أسطرٌ مقيَّدة تغيّر ما يُكتَب لها — تُحدَّث بمفتاحها. */
+  changed: (SaleLineRow & { id: string })[];
+  /** أسطرٌ مقيَّدة غابت عن الملفّ — تُلغى ولا تُحذف. */
+  removed: string[];
+  /** غابت ولم تُلغَ: الملفُّ يبدو مرشَّحاً لا كاملاً. */
+  keptDespiteAbsence: number;
 }
 
+/** أقلُّ من نصف أصناف اليوم المقيَّدة ← التقريرُ مرشَّحٌ لا مصحَّح. */
+const PRODUCT_MIX_COMPLETE_SHARE = 0.5;
+
 /**
- * يكتب أسطر البيعة، ويقرّر لكلّ سطرٍ: جديدٌ أم مكرَّرٌ أم مُراجَع.
+ * يقرّر لكلّ سطرٍ في البيعة: جديدٌ أم مكرَّرٌ أم مُراجَع — **في الذاكرة**،
+ * والكتابةُ دفعةً بعده.
  *
- * ── ولا يُحذَف سطرٌ لم يذكره الملفّ ──
+ * ── وما غاب عن التصدير الأحدث يُلغى ولا يُحذف ──
  *
- * تصديرٌ أضيق (يومٌ واحد من أسبوع، أو تقريرٌ مرشَّح) لا يعني أنّ ما
- * سكت عنه لم يقع. فالحذفُ على السكوت يُفقد بيعاتٍ حقيقيّة بلا أثر —
- * والنقصُ لا يُرى في أيّ مجموع. فما سكت عنه الملفّ يبقى كما هو.
+ * البيعةُ في الملفّ كاملة (الطلبُ كلُّه، أو اليومُ كلُّه في مزيج المنتجات)؛
+ * فسطرٌ قُيِّد من تصديرٍ سابقٍ ولم يرد في هذا لم يعد في المصدر — طلبٌ صُحّح
+ * فنقص صنفاً، أو تكرّر الصنفُ مرّةً أقلّ. فيُعلَّم ملغًى ويُعلَن في «ما
+ * رُوجع»، ولا يُحذف: إعادةُ استيراد الملفّ الكامل تعيده.
+ *
+ * **و«كاملة» تُفحَص في مزيج المنتجات**: مفتاحُه اليوم، وتقريرٌ مرشَّحٌ بتصنيفٍ
+ * واحد يحمل المفتاحَ نفسَه — فكان بقيّةُ اليوم يُلغى صامتاً وينخفض الاستهلاك.
+ * فإن ذكر الملفُّ أقلَّ من نصف أصناف اليوم المقيَّدة لم يُلغَ شيءٌ ويُقال ذلك.
  */
-async function writeLines(
-  tx: Tx,
+export function decideLines(
   saleId: string,
   sale: ParsedSale,
   posByExternal: ReadonlyMap<string, string>,
-  saleExisted: boolean,
-): Promise<LineOutcome> {
-  const out: LineOutcome = { byRow: new Map(), revised: [] };
+  prior: ReadonlyMap<string, PriorLine>,
+): LineOutcome {
+  const out: LineOutcome = { byRow: new Map(), revised: [], fresh: [], changed: [], removed: [], keptDespiteAbsence: 0 };
   if (sale.lines.length === 0) return out;
-
-  const prior = saleExisted
-    ? new Map(
-        (await tx
-          .select({
-            id: saleLines.id, externalId: saleLines.externalId,
-            contentHash: saleLines.contentHash, sourceStatus: saleLines.sourceStatus,
-            quantity: saleLines.quantity,
-          })
-          .from(saleLines)
-          .where(eq(saleLines.saleId, saleId))
-        ).filter((r): r is typeof r & { externalId: string } => r.externalId !== null)
-         .map((r) => [r.externalId, r] as const),
-      )
-    : new Map();
-
-  const fresh: (typeof saleLines.$inferInsert)[] = [];
 
   for (const l of sale.lines) {
     const values = {
@@ -621,18 +748,27 @@ async function writeLines(
       isComplimentary: l.isComplimentary,
       isModifier: l.isModifier,
       parentExternalId: l.parentExternalId,
+      parentLineExternalId: l.parentLineExternalId,
       modifiers: (l.modifiers ?? null) as never,
       contentHash: l.contentHash,
     };
 
     const was = prior.get(l.externalId);
     if (!was) {
-      fresh.push(values);
+      out.fresh.push(values);
       for (const n of l.rowNumbers) out.byRow.set(n, { status: "PARSED", reason: null });
       continue;
     }
 
     if (was.contentHash === l.contentHash) {
+      /*
+        ما يقوله المصدرُ لم يتغيّر — وما **نشتقّه نحن** منه قد تغيّر: سطرُ الأصل
+        للخيار (`065`) وعَلَمُ المجانيّ لم يكونا يُكتبان. فيُملآن بلا إعلان
+        مراجعة: المصدرُ لم يراجِع شيئاً.
+      */
+      if (was.isComplimentary !== l.isComplimentary || was.parentLineExternalId !== l.parentLineExternalId) {
+        out.changed.push({ ...values, id: was.id });
+      }
       for (const n of l.rowNumbers) {
         out.byRow.set(n, { status: "DUPLICATE", reason: "مقيَّدٌ من قبل بلا تغيير — لم يُكتب مرّتين" });
       }
@@ -646,7 +782,7 @@ async function writeLines(
       بحال `Void`. فردُّه «مكرَّراً» يُبقي في قيدنا مبيعاً لم يقع،
       ويُحسَب استهلاكُه في الجرد.
     */
-    await tx.update(saleLines).set(values).where(eq(saleLines.id, was.id));
+    out.changed.push({ ...values, id: was.id });
     const describe = (status: string | null, qty: string | null) =>
       `${status ?? "—"} × ${qty ?? "—"}`;
     out.revised.push({
@@ -662,29 +798,26 @@ async function writeLines(
     }
   }
 
-  /*
-    ── ما غاب عن التصدير الأحدث يُلغى ولا يُحذف ──
-
-    البيعةُ في الملفّ كاملة (الطلبُ كلُّه، أو اليومُ كلُّه في مزيج المنتجات)؛ فسطرٌ
-    قُيِّد من تصديرٍ سابقٍ ولم يرد في هذا لم يعد في المصدر — طلبٌ صُحّح فنقص صنفاً،
-    أو تكرّر الصنفُ مرّةً أقلّ. وكان يبقى محسوباً في المبيعات والاستهلاك. فيُعلَّم
-    ملغًى ويُعلَن في «ما رُوجع»، ولا يُحذف: إعادةُ استيراد الملفّ الكامل تعيده.
-  */
   const inFile = new Set(sale.lines.map((l) => l.externalId));
-  for (const [externalId, was] of prior) {
-    if (inFile.has(externalId) || was.sourceStatus === REMOVED_STATUS) continue;
-    await tx.update(saleLines)
-      .set({ isVoid: true, sourceStatus: REMOVED_STATUS, contentHash: `${REMOVED_STATUS}:${externalId}` })
-      .where(eq(saleLines.id, was.id));
+  const absent = [...prior.values()].filter((was) => !inFile.has(was.externalId) && was.sourceStatus !== REMOVED_STATUS);
+  if (absent.length === 0) return out;
+
+  if (sale.externalId.startsWith("PMIX:")) {
+    const live = [...prior.values()].filter((was) => !was.isModifier && was.sourceStatus !== REMOVED_STATUS).length;
+    const named = sale.lines.filter((l) => !l.isModifier).length;
+    if (live > 0 && named < live * PRODUCT_MIX_COMPLETE_SHARE) {
+      out.keptDespiteAbsence = absent.length;
+      return out;
+    }
+  }
+
+  for (const was of absent) {
+    out.removed.push(was.id);
     out.revised.push({
-      lineExternalId: externalId,
+      lineExternalId: was.externalId,
       was: `${was.sourceStatus ?? "—"} × ${was.quantity ?? "—"}`,
       now: "غاب عن التصدير الأحدث — أُلغي",
     });
-  }
-
-  for (let i = 0; i < fresh.length; i += 500) {
-    await tx.insert(saleLines).values(fresh.slice(i, i + 500)).onConflictDoNothing();
   }
   return out;
 }

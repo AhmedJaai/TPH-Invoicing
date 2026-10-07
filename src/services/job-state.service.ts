@@ -41,3 +41,28 @@ export async function markRan(name: string, fingerprint: string, conn: Conn = db
   await conn.insert(jobState).values({ name, fingerprint, ranAt: new Date() })
     .onConflictDoUpdate({ target: jobState.name, set: { fingerprint, ranAt: new Date() } });
 }
+
+/**
+ * عقدٌ زمنيّ على عملٍ لا يجري مرّتين معاً — يُؤخَذ في أوّله ويُرَدّ في آخره.
+ *
+ * مزامنةُ الدرايف تُطلَق من كلّ جهازٍ بتوقيته: الهاتفُ والحاسوبُ يفتحان معاً فيقرأ كلٌّ
+ * منهما الملفّين نفسيهما بالذكاء (نداءٌ مدفوع مرّتين)، ثمّ يردّ القيدُ الفريد الثاني.
+ * والعقدُ صفٌّ في `job_state`: يُكتب إن لم يكن، أو إن انقضى عمرُه — في عبارةٍ واحدة،
+ * فلا يأخذه اثنان. وانقضاءُ العمر يحرّر عقدَ طلبٍ قتلته المنصّة قبل أن يردّه.
+ */
+export async function acquireLease(name: string, holder: string, ttlMs: number, conn: Conn = db): Promise<boolean> {
+  const { rows } = await conn.execute<{ name: string }>(sql`
+    insert into job_state (name, fingerprint, ran_at) values (${name}, ${holder}, now())
+    on conflict (name) do update set fingerprint = excluded.fingerprint, ran_at = now()
+      where job_state.ran_at < now() - make_interval(secs => ${Math.ceil(ttlMs / 1000)}::int)
+    returning name
+  `);
+  return rows.length > 0;
+}
+
+/** يردّه صاحبُه وحده — عقدٌ أخذه طلبٌ آخر بعد انقضاء عمره لا يُمسّ. */
+export async function releaseLease(name: string, holder: string, conn: Conn = db): Promise<void> {
+  await conn.execute(sql`
+    update job_state set ran_at = to_timestamp(0) where name = ${name} and fingerprint = ${holder}
+  `);
+}

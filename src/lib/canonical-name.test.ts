@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalName, type NamedDocument } from "./canonical-name";
+import { renameGate, canonicalName, type NamedDocument } from "./canonical-name";
 
 const doc = (over: Partial<NamedDocument>): NamedDocument => ({
   driveFileId: "f1",
@@ -119,6 +119,23 @@ describe("الاسم القياسيّ يُشتقّ من المقيَّد لا م
   });
 });
 
+describe("الامتدادُ لا يُخمَّن", () => {
+  it("بلا امتدادٍ ونوعُ المحتوى خارج المعروف — لا يُقترَح pdf", () => {
+    for (const mimeType of ["application/octet-stream", "image/bmp", "application/msword", null]) {
+      const v = canonicalName(doc({ fileName: "IMG_2041", mimeType }));
+      expect(v.status, String(mimeType)).toBe("CANNOT");
+    }
+  });
+
+  it("والاسمُ المبنيّ يُقرأ ولا يُقترَح له اسمٌ ثانٍ — لا حلقةَ تسمية", () => {
+    const first = canonicalName(doc({ fileName: "فاتورة ٣.pdf", invoiceNumber: "B07/2026:17328" }));
+    expect(first.status).toBe("RENAME");
+    if (first.status !== "RENAME") return;
+    expect(first.proposed).toBe("2026-08-06_KohiRoastary_Invoice_B07-2026-17328_SAR833.75.pdf");
+    expect(canonicalName(doc({ fileName: first.proposed, invoiceNumber: "B07/2026:17328" })).status).toBe("OK");
+  });
+});
+
 describe("الاسمُ المقروء المخالف", () => {
   const base = {
     driveFileId: "f", kind: "TAX_INVOICE", slug: "FoodicsKsa", date: "2026-09-08", totalMinor: 425728, invoiceNumber: "INV-KSA-0270644",
@@ -131,5 +148,26 @@ describe("الاسمُ المقروء المخالف", () => {
     const v = canonicalName({ ...base, slug: "JmlaTqnya", invoiceNumber: "B07/2026/17328", totalMinor: 38200, date: "2026-09-21",
       fileName: "2026-09-21_SUPAKT3A2_Invoice_B07/2026/17328_SAR382.00.pdf" });
     expect(v).toMatchObject({ status: "RENAME", proposed: "2026-09-21_JmlaTqnya_Invoice_B07-2026-17328_SAR382.00.pdf" });
+  });
+});
+
+describe("لا يُكتب فوق اسمٍ غُيّر في الدرايف بيد", () => {
+  const stored = "فاتورة ٣.pdf";
+
+  it("الاسمُ الحاليّ هو المخزَّن — يُسمّى", () => {
+    expect(renameGate(stored, { state: "present", name: stored, parentId: "p" })).toEqual({ go: true });
+  });
+
+  it("غُيّر هناك — لا يُسمّى، ويُعاد الاسمُ الحاليّ ليُحدَّث به القيد", () => {
+    const g = renameGate(stored, { state: "present", name: "0044.pdf", parentId: "p" });
+    expect(g).toMatchObject({ go: false, liveName: "0044.pdf" });
+  });
+
+  it("محذوفٌ أو في السلّة أو مجهولُ الحال — لا يُسمّى ولا يُحدَّث القيد", () => {
+    for (const state of ["gone", "trashed", "unknown"] as const) {
+      const g = renameGate(stored, { state });
+      expect(g.go, state).toBe(false);
+      if (!g.go) expect(g.liveName, state).toBeUndefined();
+    }
   });
 });

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DATE_WINDOW_DAYS, MAX_GROUP_SIZE,
-  amountScore, dateScore, findSubsets, generateCandidates, rankPool, referenceScore,
+  amountScore, dateScore, findSubsets, generateCandidates, instalmentPercent, rankPool, referenceScore,
+  searchCandidates, searchSubsets,
   type MatchInput, type OpenInvoice,
 } from "./candidates";
 
@@ -317,5 +318,181 @@ describe("ترتيب بركة البحث بالصلة", () => {
     const subsets = findSubsets([...noise, ...wanted], 1_000_00, 100, 8, day("2026-08-05"));
     expect(subsets.some((s) => s.length === 2 && s.every((i) => ["a", "b"].includes(i.id))))
       .toBe(true);
+  });
+});
+
+
+describe("searchSubsets — بحثٌ بحدٍّ معلَن", () => {
+  it("بركةٌ صغيرةُ الفواتير لا مجموعةَ فيها تنتهي بالقطع لا بالعدّ", () => {
+    /* أربعون فاتورةً بمئة ريال ودفعةٌ بمليون: أكبرُ ما يُبلَغ ٨٠٠ — يُقطَع من أوّل فرع */
+    const many = Array.from({ length: 40 }, (_, i) => inv({ id: `i${i}`, outstandingMinor: 100_00 + i }));
+    const started = Date.now();
+    const r = searchSubsets(many, 3_999_00);
+    expect(r.subsets).toEqual([]);
+    expect(r.exhausted).toBe(false);
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  it("وما لا يُقطَع يقف عند ميزانيّته ويُعلن", () => {
+    /* مبالغُ متباعدةٌ لا تجتمع على الهدف، والهدفُ في وسط المدى فلا قطعَ مبكّراً */
+    const many = Array.from({ length: 40 }, (_, i) =>
+      inv({ id: `i${String(i).padStart(2, "0")}`, outstandingMinor: 1_000_00 + i * 7_919 + 211 }));
+    const r = searchSubsets(many, 17_777_53, { toleranceMinor: 0, nodeBudget: 2_000 });
+    expect(r.exhausted).toBe(true);
+  });
+
+  it("الأصغرُ عدداً يُعاد أوّلاً", () => {
+    const rows = [
+      inv({ id: "big", outstandingMinor: 900_00 }),
+      inv({ id: "x", outstandingMinor: 600_00 }),
+      inv({ id: "y", outstandingMinor: 300_00 }),
+      inv({ id: "a", outstandingMinor: 500_00 }),
+      inv({ id: "b", outstandingMinor: 250_00 }),
+      inv({ id: "c", outstandingMinor: 150_00 }),
+    ];
+    const { subsets } = searchSubsets(rows, 900_00);
+    expect(subsets[0].map((i) => i.id)).toEqual(["big"]);
+    expect(subsets[1]).toHaveLength(2);
+    for (let i = 1; i < subsets.length; i++) {
+      expect(subsets[i].length).toBeGreaterThanOrEqual(subsets[i - 1].length);
+    }
+  });
+
+  it("المتساوياتُ صنفٌ واحد يُؤخَذ بالأقدم — لا خمسٌ وأربعون مجموعةً متكافئة", () => {
+    const ten = Array.from({ length: 10 }, (_, i) =>
+      inv({ id: `d${i}`, outstandingMinor: 350_00, invoiceDate: day(`2026-08-${String(i + 1).padStart(2, "0")}`) }));
+    const { subsets } = searchSubsets(ten, 700_00);
+    expect(subsets).toHaveLength(1);
+    expect(subsets[0].map((i) => i.id).sort()).toEqual(["d0", "d1"]);
+  });
+});
+
+describe("فواتير متساوية المبلغ", () => {
+  const ten = Array.from({ length: 10 }, (_, i) =>
+    inv({
+      id: `d${i}`, outstandingMinor: 350_00, invoiceNumber: `77${i}0${i}`,
+      invoiceDate: day(`2026-08-${String(i + 1).padStart(2, "0")}`),
+    }));
+
+  it("دفعةٌ تسدّد واحدةً من عشر: مرشّحٌ واحد هو الأقدم، موسومٌ بالتباسه", () => {
+    const all = generateCandidates(tx({ amountMinor: 350_00 }), ten);
+    expect(all).toHaveLength(1);
+    expect(all[0].invoiceIds).toEqual(["d0"]);
+    expect(all[0].ambiguity).toContain("بالمبلغ نفسه");
+  });
+
+  it("والمرجعُ يعيّنها فلا التباس", () => {
+    const all = generateCandidates(tx({ amountMinor: 350_00, references: ["77404"] }), ten);
+    expect(all[0].invoiceIds).toEqual(["d4"]);
+    expect(all[0].ambiguity).toBeUndefined();
+  });
+
+  it("ومن سدّد الصنفَ كلَّه لم يلتبس عليه شيء", () => {
+    const two = ten.slice(0, 2);
+    const group = generateCandidates(tx({ amountMinor: 700_00 }), two)
+      .find((c) => c.invoiceIds.length === 2)!;
+    expect(group.ambiguity).toBeUndefined();
+  });
+});
+
+describe("المجموعة ورسمُ تحويلها", () => {
+  const three = [
+    inv({ id: "a", outstandingMinor: 1_800_00 }),
+    inv({ id: "b", outstandingMinor: 1_450_00 }),
+    inv({ id: "c", outstandingMinor: 1_250_00 }),
+  ];
+
+  it("ثلاث فواتير وعشرون ريالاً رسماً تُوجَد — وكانت «لا فاتورة تقابله»", () => {
+    const all = generateCandidates(tx({ amountMinor: 4_520_00 }), three);
+    const group = all.find((c) => c.invoiceIds.length === 3)!;
+    expect(group.outcome).toBe("MULTI_INVOICE");
+    expect(group.parts.amount).toBe(1);
+    expect(group.allocatedMinor).toBe(4_500_00);
+    expect(group.evidence.join(" ")).toContain("رسم تحويل 20.00");
+  });
+
+  it("وما جاوز حدّ الرسم لا يُفترَض", () => {
+    const all = generateCandidates(tx({ amountMinor: 4_600_00 }), three);
+    expect(all.find((c) => c.invoiceIds.length === 3)).toBeUndefined();
+  });
+
+  it("ولا يُبحَث عن رسمٍ حين توجد مطابقةٌ تامّة", () => {
+    const rows = [...three, inv({ id: "exact", outstandingMinor: 4_520_00 })];
+    const all = generateCandidates(tx({ amountMinor: 4_520_00 }), rows);
+    expect(all.find((c) => c.invoiceIds.length === 3)).toBeUndefined();
+    expect(all[0].invoiceIds).toEqual(["exact"]);
+  });
+});
+
+describe("مجموعةٌ تنقص عنها الدفعة", () => {
+  it("بستّين هللةً تُسمّى سداداً جزئيّاً — فلا تُحسَم وتترك فاتورةً مفتوحةً بهللات", () => {
+    const rows = [
+      inv({ id: "a", outstandingMinor: 1_200_00 }),
+      inv({ id: "b", outstandingMinor: 800_60 }),
+    ];
+    const group = generateCandidates(tx({ amountMinor: 2_000_00 }), rows)
+      .find((c) => c.invoiceIds.length === 2)!;
+    expect(group.outcome).toBe("PARTIAL_PAYMENT");
+    expect(group.evidence.join(" ")).toContain("تنقص عن المجموع 0.60");
+  });
+
+  it("وبهللةٍ واحدة تبقى مجموعةً بمبلغها", () => {
+    const rows = [
+      inv({ id: "a", outstandingMinor: 1_200_00 }),
+      inv({ id: "b", outstandingMinor: 800_01 }),
+    ];
+    const group = generateCandidates(tx({ amountMinor: 2_000_00 }), rows)
+      .find((c) => c.invoiceIds.length === 2)!;
+    expect(group.outcome).toBe("MULTI_INVOICE");
+  });
+});
+
+describe("القسط والعربون", () => {
+  it("نصفُ الفاتورة تماماً يُرشَّح سداداً جزئيّاً — وكان لا يظهر أبداً", () => {
+    const all = generateCandidates(
+      tx({ amountMinor: 2_500_00, supplierScore: 1 }),
+      [inv({ id: "a", totalMinor: 5_000_00, outstandingMinor: 5_000_00 })],
+    );
+    expect(all).toHaveLength(1);
+    expect(all[0].outcome).toBe("PARTIAL_PAYMENT");
+    expect(all[0].allocatedMinor).toBe(2_500_00);
+    expect(all[0].score).toBeGreaterThanOrEqual(0.5);
+    expect(all[0].evidence.join(" ")).toContain("50٪ من إجماليّ الفاتورة (5,000.00)");
+  });
+
+  it("ونسبةٌ غير مألوفة لا تُرشَّح", () => {
+    expect(generateCandidates(
+      tx({ amountMinor: 2_100_00 }),
+      [inv({ id: "a", totalMinor: 5_000_00, outstandingMinor: 5_000_00 })],
+    )).toEqual([]);
+  });
+
+  it("النسبة تُقاس بالأعداد الصحيحة ضمن هللة", () => {
+    expect(instalmentPercent(333_33, 1_111_10)).toBe(30);
+    expect(instalmentPercent(333_35, 1_111_10)).toBeNull();
+    expect(instalmentPercent(0, 1_000_00)).toBeNull();
+  });
+});
+
+describe("أرقام الأدلّة تمرّ بمنسّق المال", () => {
+  it("«يبقى 1,234.50» لا «1234.5»", () => {
+    const [c] = generateCandidates(
+      tx({ amountMinor: 20_000_00 }),
+      [inv({ id: "a", outstandingMinor: 21_234_50 })],
+    );
+    expect(c.evidence.join(" ")).toContain("يبقى 1,234.50 ريالاً");
+  });
+});
+
+describe("فرق التاريخ بأيّام الرياض", () => {
+  it("فاتورةٌ خُزّنت مساءً وحركةٌ بمنتصف الليل: الفرقُ أيّامٌ صحيحة", () => {
+    /* ٢٢:٣٠ UTC يوم ٩ = ٠١:٣٠ يوم ١٠ بتوقيت الرياض */
+    const stored = new Date("2026-08-09T22:30:00Z");
+    expect(dateScore(day("2026-08-10"), stored)).toBe(1);
+    const { candidates } = searchCandidates(
+      tx({ valueDate: day("2026-08-13") }),
+      [inv({ id: "a", invoiceDate: stored })],
+    );
+    expect(candidates[0].evidence.join(" ")).toContain("فرق التاريخ 3 أيّام");
   });
 });

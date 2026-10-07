@@ -15,7 +15,7 @@
  * ويُعرَض عددُه ومبلغُه كي يُعرَف حجمُ ما خرج من الحساب.**
  */
 import type { StoredUnit } from "@/lib/unit-conversion";
-import { decimalToMilli, sameUnitFamily, toCanonical, MILLI } from "./units";
+import { decimalToMilli, roundHalfAwayFromZero, sameUnitFamily, toCanonical, MILLI } from "./units";
 import { MILLI_MINOR } from "@/lib/money";
 
 /** سطرُ فاتورةٍ بمواصفة عبوة صنفِ مورّده. */
@@ -111,7 +111,12 @@ export function purchaseQuantity(
   }
 
   const qtyMilli = decimalToMilli(line.qty);
-  if (qtyMilli === null) return { known: false, reason: "MISSING_QUANTITY" };
+  /*
+    والصفرُ ليس كمّيّة: بندٌ كمّيّتُه صفرٌ وله مبلغ لم تُقرأ كمّيّتُه، ولو
+    عُدّ «معروفاً» لدخل مبلغُه الكلفةَ بلا شيءٍ على الرفّ. والسالبُ يمرّ —
+    مرتجعٌ للمورّد يُنقص المشتريات — **ويُسمّى** (`returnsMilli`).
+  */
+  if (qtyMilli === null || qtyMilli === 0) return { known: false, reason: "MISSING_QUANTITY" };
 
   const packMilli = decimalToMilli(line.packSize);
   const contentMilli = decimalToMilli(line.contentQuantity);
@@ -126,9 +131,23 @@ export function purchaseQuantity(
     return { known: false, reason: "UNIT_FAMILY_MISMATCH" };
   }
 
-  /* ثلاثةُ أعدادٍ بالمِلّي مضروبةٌ ببعضها = مِلّي³، فيُقسَم على ‏١٠٦ */
-  const inContentUnitMilli = (qtyMilli * packMilli * contentMilli) / (MILLI * MILLI);
-  return { known: true, canonicalMilli: Math.round(toCanonical(inContentUnitMilli, line.contentUnit)) };
+  /*
+    ثلاثةُ أعدادٍ بالمِلّي مضروبةٌ ببعضها = مِلّي³، فيُقسَم على ‏١٠٦.
+
+    والضربُ بـ`BigInt`: ‏١٠٠٠ كرتون × ١٠٠٠ حبّة × ١٠٠٠ مل = ‏10^18، فوق
+    العدد الصحيح الآمن — فتضيع الدقّةُ **بصمت**، وخطأُ قراءةٍ واحد في
+    كمّيّة الفاتورة يكفي لبلوغه. وما لم يعُد عدداً آمناً «لم تُقرأ كمّيّتُه».
+  */
+  const UNIT = BigInt(MILLI) * BigInt(MILLI);
+  const product = BigInt(qtyMilli) * BigInt(packMilli) * BigInt(contentMilli)
+    * BigInt(toCanonical(1, line.contentUnit));
+  const negative = product < BigInt(0);
+  const abs = negative ? -product : product;
+  /* القسمةُ الصحيحة تقصّ، فيُضاف النصفُ قبلها: النصفُ بعيداً عن الصفر */
+  const rounded = (abs + UNIT / BigInt(2)) / UNIT;
+  if (rounded > BigInt(Number.MAX_SAFE_INTEGER)) return { known: false, reason: "MISSING_QUANTITY" };
+  const canonicalMilli = Number(rounded);
+  return { known: true, canonicalMilli: negative ? -canonicalMilli : canonicalMilli };
 }
 
 export interface PurchaseGap {
@@ -155,6 +174,13 @@ export interface ProductPurchases {
   costedMilli: number;
   /** وما دخل منها بإدخالٍ يدويّ — يُعرَض مصدرُ الكمّيّة لا الكمّيّةُ وحدها. */
   manualMilli: number;
+  /**
+   * ما رُدّ إلى المورّد — بنودٌ كمّيّتُها سالبة، **بمقدارها الموجب**.
+   *
+   * وهي مطروحةٌ من `canonicalMilli` أصلاً؛ تُحفَظ هنا لتُسمّى: مشترياتٌ
+   * «١٠ كجم» فيها مرتجعُ كيلوين غيرُ مشترياتٍ «١٠ كجم» بلا مرتجع.
+   */
+  returnsMilli: number;
   lines: number;
   invoiceLineIds: string[];
   /** معرّفاتُ الاستلامات اليدويّة — تُحفَظ في لقطة الجرد المقفَل. */
@@ -210,11 +236,12 @@ export function summarisePurchases(
     if (!acc) {
       acc = {
         productId: line.productId, canonicalMilli: 0, knownCostMinor: 0, costedMilli: 0,
-        manualMilli: 0, lines: 0, invoiceLineIds: [], receiptIds: [],
+        manualMilli: 0, returnsMilli: 0, lines: 0, invoiceLineIds: [], receiptIds: [],
       };
       byProduct.set(line.productId, acc);
     }
     acc.canonicalMilli += q.canonicalMilli;
+    if (q.canonicalMilli < 0) acc.returnsMilli += -q.canonicalMilli;
     if (line.costKnown !== false) {
       acc.knownCostMinor += line.lineTotalMinor;
       acc.costedMilli += q.canonicalMilli;
@@ -290,5 +317,6 @@ export function varianceCostMinor(
 ): number | null {
   if (varianceCanonicalMilli === null || unitRateMilliMinor === null) return null;
   const baseUnits = quantityInBaseUnits(varianceCanonicalMilli, baseUnit);
-  return Math.round((baseUnits * unitRateMilliMinor) / MILLI_MINOR);
+  /* والفرقُ بإشارته: نقصٌ وزيادةٌ متساويان يتقاصّان إلى صفرٍ لا إلى هللة */
+  return roundHalfAwayFromZero((baseUnits * unitRateMilliMinor) / MILLI_MINOR);
 }

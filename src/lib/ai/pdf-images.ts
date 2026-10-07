@@ -1,5 +1,5 @@
 /**
- * صور الـPDF — بلا محرّك رسمٍ ولا حزمةٍ جديدة.
+ * صور الـPDF الموضوعة فيه — تُنتزَع كما هي، بلا رسم.
  *
  * ── لماذا هذا الملفّ موجود أصلاً ──
  *
@@ -7,26 +7,18 @@
  * «webp, png, jpeg, and gif». و١٥٧ من ١٥٨ مستنداً في أرشيف المقهى PDF.
  * فبين الأرشيف والنموذج جدارٌ يجب أن يُعبَر.
  *
- * ── ولماذا لا يُرسَم ──
+ * ── المقصّ أوّلاً، ثمّ الرسم ──
  *
- * الطريق المعتاد: `pdfjs` يرسم الصفحة على لوحة، واللوحةُ في Node تحتاج
- * حزمةً ثنائية (`@napi-rs/canvas` أو `canvas`). وهي تُضيف ميغابايتات
- * إلى حزمة النشر، وثنائيّاً يجب أن يوافق منصّة Vercel، وتحديثاتٍ
- * تُتابَع — كلّ ذلك لأجل حالةٍ واحدة.
+ * **المستند الممسوح ضوئياً صورتُه JPEG موضوعةٌ في الـPDF كما هي.** الماسح
+ * يُنتج JPEG ثمّ يلفّه في غلاف PDF، فالبايتات المطلوبة موجودة في الملفّ
+ * حرفيّاً بدقّتها الأصليّة — تُنتزَع ولا تُرسَم.
  *
- * والملاحظة التي تُغني عنها: **المستند الممسوح ضوئياً صورتُه JPEG
- * موضوعةٌ في الـPDF كما هي.** الماسح يُنتج JPEG ثمّ يلفّه في غلاف PDF،
- * فالبايتات المطلوبة موجودة في الملفّ حرفيّاً — لا تُرسَم، تُنتزَع.
+ * ── حدّ هذا المسار، وما يسدّه ──
  *
- * فما نحتاجه ليس رسّاماً بل مِقصّاً.
- *
- * ── حدّ هذا المسار، معلَناً ──
- *
- * يعمل على `DCTDecode` (أي JPEG) وحده، وهو الغالب في المسح الملوَّن.
- * ولا يعمل على `JBIG2Decode` و`CCITTFaxDecode` (المسح الأبيض والأسود
- * في بعض الماسحات المكتبية) ولا `JPXDecode` (JPEG 2000). وما لم يُنتزَع
- * **يُعلَن أنّه لم يُقرأ** ويُرفع إلى مراجعةٍ بشرية — ولا يُدَّعى فيه
- * شيء. والحدّ المعلوم سلفاً حدٌّ يُعرَض، لا خطأٌ يقع.
+ * يعمل على `DCTDecode` (أي JPEG) وحده. وما ضُغط بـ`JBIG2Decode` أو
+ * `CCITTFaxDecode` (المسح الأبيض والأسود) أو `JPXDecode` لا يُنتزَع هنا —
+ * فيُرسَم: منذ ٣ أكتوبر ٢٠٢٦ يرسم `renderPdfPages` (في `document-input.ts`)
+ * الصفحةَ بـ`unpdf` على `@napi-rs/canvas`، ومحرّكه يفكّ الضغوط كلَّها.
  */
 
 /** أقلّ حجمٍ يُعتدّ به صورةَ مستند — ما دونه شعارٌ أو أيقونة. */
@@ -45,7 +37,7 @@ export interface EmbeddedImage {
 /**
  * أبعاد JPEG من علاماته.
  *
- * تُقرأ لسببين: استبعادُ الشعارات الصغيرة، وترتيبُ الصور بالأكبر —
+ * تُقرأ لسببين: استبعادُ الشعارات الصغيرة، واختيارُ الأكبر —
  * فصفحةُ الفاتورة أكبر ما في الملفّ.
  */
 function jpegSize(buf: Buffer): { width: number; height: number } | null {
@@ -86,30 +78,25 @@ function jpegSize(buf: Buffer): { width: number; height: number } | null {
  * فما ليس JPEG سليماً يسقط هنا لا عند المزوّد.
  */
 export function extractEmbeddedJpegs(pdf: Buffer): EmbeddedImage[] {
-  const found: EmbeddedImage[] = [];
+  const found: (EmbeddedImage & { order: number })[] = [];
   let i = 0;
 
   while (i < pdf.length - 3) {
     // بداية JPEG: FF D8 FF
     if (pdf[i] === 0xff && pdf[i + 1] === 0xd8 && pdf[i + 2] === 0xff) {
-      // النهاية: FF D9 — ويُبحث عنها بعد البداية
-      let j = i + 3;
-      let end = -1;
-      while (j < pdf.length - 1) {
-        if (pdf[j] === 0xff && pdf[j + 1] === 0xd9) {
-          end = j + 2;
-          break;
-        }
-        j++;
+      const end = jpegEnd(pdf, i);
+      if (end < 0) {
+        /* بدايةٌ بلا نهايةٍ سليمة — تُتخطّى ولا يُترَك ما بعدها */
+        i += 3;
+        continue;
       }
-      if (end < 0) break;
 
       const slice = pdf.subarray(i, end);
       if (slice.length >= MIN_IMAGE_BYTES) {
         const size = jpegSize(slice);
         // ما لا تُقرأ أبعادُه ليس JPEG سليماً — يُترَك ولا يُرسَل
         if (size && size.width >= 200 && size.height >= 200) {
-          found.push({ data: Buffer.from(slice), mimeType: "image/jpeg", ...size });
+          found.push({ data: Buffer.from(slice), mimeType: "image/jpeg", ...size, order: found.length });
         }
       }
       i = end;
@@ -119,14 +106,54 @@ export function extractEmbeddedJpegs(pdf: Buffer): EmbeddedImage[] {
   }
 
   /*
-    الأكبر أوّلاً.
+    الأكبر يُختار، وبترتيب ظهوره يُرسَل.
 
-    الملفّ قد يحمل شعاراً وختماً وصفحة. والصفحة أكبرها بمساحتها —
-    فالترتيب بالمساحة يضع ما يُقرأ في المقدّمة، والسقف يقطع ما بعده.
+    الملفّ قد يحمل شعاراً وختماً وصفحات. والصفحات أكبرها بمساحتها — فالسقف
+    يأخذ الأكبر. لكنّ الإرسال «الأكبر أوّلاً» كان يضع صفحة البنود قبل
+    الترويسة في فاتورةٍ من صفحتين؛ فيُعاد ما اختير إلى ترتيبه في الملفّ.
   */
   return found
     .sort((a, b) => b.width * b.height - a.width * a.height)
-    .slice(0, MAX_IMAGES);
+    .slice(0, MAX_IMAGES)
+    .sort((a, b) => a.order - b.order)
+    .map((img) => ({ data: img.data, mimeType: img.mimeType, width: img.width, height: img.height }));
+}
+
+/**
+ * نهاية JPEG يبدأ عند `start` — موضعُ ما بعد `FFD9`، أو ‎-1.
+ *
+ * يمشي على المقاطع بأطوالها حتى بدء المسح (`SOS`) ثمّ يبحث عن النهاية في
+ * بيانات المسح. كان يأخذ أوّل `FFD9` بعد البداية — وصورةُ الكاميرا تحمل في
+ * مقطع EXIF مصغَّرةً لها `FFD8…FFD9` خاصّة، فتُقصّ الصورة عند نهاية المصغَّرة
+ * وتُرمى. والمشي بالأطوال يتخطّى المصغَّرة مع مقطعها.
+ */
+function jpegEnd(buf: Buffer, start: number): number {
+  let i = start + 2;
+  /* ── المقاطع قبل المسح ── */
+  while (i + 3 < buf.length) {
+    if (buf[i] !== 0xff) return -1;
+    const marker = buf[i + 1];
+    if (marker === 0xff) { i++; continue; } // حشو
+    if (marker === 0xd9) return i + 2;
+    if (marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7) || marker === 0x01) { i += 2; continue; }
+    const len = buf.readUInt16BE(i + 2);
+    if (len < 2) return -1;
+    i += 2 + len;
+    if (marker === 0xda) break; // بدأ المسح
+  }
+  /* ── بيانات المسح: FF00 حشوٌ و FFD0–D7 إعادةُ بدء، وما سواهما علامة ── */
+  while (i + 1 < buf.length) {
+    if (buf[i] !== 0xff) { i++; continue; }
+    const marker = buf[i + 1];
+    if (marker === 0x00 || (marker >= 0xd0 && marker <= 0xd7) || marker === 0xff) { i += marker === 0xff ? 1 : 2; continue; }
+    if (marker === 0xd9) return i + 2;
+    /* مقطعٌ داخل صورةٍ تدريجيّة (جدولٌ أو مسحٌ تالٍ) — يُتخطّى بطوله */
+    if (i + 3 >= buf.length) return -1;
+    const len = buf.readUInt16BE(i + 2);
+    if (len < 2) return -1;
+    i += 2 + len;
+  }
+  return -1;
 }
 
 /**

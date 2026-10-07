@@ -96,3 +96,51 @@ describe("الأرشفةُ الآليّة والخصمُ بعد الضريبة",
     expect(autoArchive({ ...clean, totalMinor: 48_500, chargesMinor: 2_500 }).auto).toBe(true);
   });
 });
+
+describe("رمز الفاتورة الضريبيّ (QR) — شاهدٌ من خارج النموذج", () => {
+  /* صورةٌ ممسوحة بلا شاهد: ضريبتُها ليست ١٥٪ ولا بنود ولا رقم في الاسم */
+  const scanned: AutoArchiveFacts = {
+    kind: "TAX_INVOICE", invoiceRecorded: true, textSource: "PDF_EMBEDDED", supplierKnown: true,
+    subtotalMinor: 100_000, vatMinor: 9_000, totalMinor: 109_000, invoiceNumber: "77", fileName: "scan.pdf",
+  };
+
+  it("بلا رمزٍ تنتظر مراجعة", () => {
+    expect(autoArchive(scanned)).toEqual({ auto: false, gaps: ["UNVERIFIED_IMAGE"] });
+  });
+
+  it("رمزٌ يطابق الإجماليّ والضريبة بالهللة يُدخلها وحدها", () => {
+    expect(autoArchive({ ...scanned, qrTotalMinor: 109_000, qrVatMinor: 9_000 })).toEqual({ auto: true, gaps: [] });
+  });
+
+  it("رمزٌ بإجماليٍّ وحده (ضريبتُه لم تُقرأ) يكفي شاهداً — المجهول لا يُعدّ خلافاً", () => {
+    expect(autoArchive({ ...scanned, qrTotalMinor: 109_000, qrVatMinor: null }).auto).toBe(true);
+  });
+
+  it("فرقُ هللاتٍ داخل الريال: لا شاهدٌ ولا خلاف", () => {
+    expect(autoArchive({ ...scanned, qrTotalMinor: 109_040, qrVatMinor: 9_000 })).toEqual({ auto: false, gaps: ["UNVERIFIED_IMAGE"] });
+  });
+
+  it("رقمٌ مقلوبٌ يستقيم جمعُه: الرمز يكشفه", () => {
+    /* قُرئ ١٬٠٩٠ والمطبوع ١٬٩٠٠ — الصافي والإجماليّ انقلبا معاً فاستقام الحساب */
+    const v = autoArchive({ ...scanned, qrTotalMinor: 190_000, qrVatMinor: 9_000 });
+    expect(v.auto).toBe(false);
+    expect(v.gaps).toContain("QR_MISMATCH");
+  });
+
+  it("والنصّ المكتوب لا يُعفى: رمزٌ يخالفه يمنع الدخول الآليّ", () => {
+    const text: AutoArchiveFacts = { ...scanned, textSource: "TEXT" };
+    expect(autoArchive(text).auto).toBe(true);
+    expect(autoArchive({ ...text, qrTotalMinor: 119_000 })).toEqual({ auto: false, gaps: ["QR_MISMATCH"] });
+    expect(autoArchive({ ...text, qrTotalMinor: 109_000, qrVatMinor: 14_000 }).gaps).toEqual(["QR_MISMATCH"]);
+  });
+
+  it("خلافٌ في رقم البائع أو شهر التاريخ يمنع ولو طابق المبلغ", () => {
+    expect(autoArchive({ ...scanned, qrTotalMinor: 109_000, qrVatMinor: 9_000, qrOtherConflict: true }).gaps).toEqual(["QR_MISMATCH"]);
+  });
+
+  it("مبلغٌ بدّله النموذج عند إعادة السؤال لا يدخل إلّا برمزٍ يصدّقه", () => {
+    const text: AutoArchiveFacts = { ...scanned, textSource: "TEXT", reaskChangedMoney: true };
+    expect(autoArchive(text)).toEqual({ auto: false, gaps: ["REASK_CHANGED"] });
+    expect(autoArchive({ ...text, qrTotalMinor: 109_000, qrVatMinor: 9_000 }).auto).toBe(true);
+  });
+});

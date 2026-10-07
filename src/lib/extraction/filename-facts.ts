@@ -50,11 +50,25 @@ export function factsFromFileName(fileName: string | null | undefined): FileName
 export function fillFromFileName(
   x: { invoiceNumber?: string; invoiceDate?: string; totalAmount?: string },
   fileName: string | null | undefined,
+  /**
+   * سجلُّ المصادر (`evidence.provenance`): ما سُدّ من الاسم يُعلَّم `FILENAME` —
+   * كانت قائمةُ «ما سُدّ» تُرمى فيُنسَب للنموذج ما لم يقرأه.
+   */
+  provenance?: Record<string, "QR" | "FILENAME" | "DERIVED">,
 ): string[] {
   const fn = factsFromFileName(fileName);
   const filled: string[] = [];
-  if (!x.invoiceNumber?.trim() && fn.invoiceNumber) { x.invoiceNumber = fn.invoiceNumber; filled.push("رقم الفاتورة"); }
-  if (!x.invoiceDate && fn.date) { x.invoiceDate = fn.date; filled.push("التاريخ"); }
-  if (!x.totalAmount?.trim() && fn.totalMinor !== null) { x.totalAmount = formatRiyals(fn.totalMinor); filled.push("الإجمالي"); }
+  if (!x.invoiceNumber?.trim() && fn.invoiceNumber) {
+    x.invoiceNumber = fn.invoiceNumber; filled.push("رقم الفاتورة");
+    if (provenance) provenance.invoiceNumber = "FILENAME";
+  }
+  if (!x.invoiceDate && fn.date) {
+    x.invoiceDate = fn.date; filled.push("التاريخ");
+    if (provenance) provenance.invoiceDate = "FILENAME";
+  }
+  if (!x.totalAmount?.trim() && fn.totalMinor !== null) {
+    x.totalAmount = formatRiyals(fn.totalMinor); filled.push("الإجمالي");
+    if (provenance) provenance.totalAmount = "FILENAME";
+  }
   return filled;
 }

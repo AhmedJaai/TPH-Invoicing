@@ -10,7 +10,9 @@
  */
 import { ISSUE, ISSUE_TEXT } from "./issue-codes";
 import type { Finding } from "./validation";
-import { formatRiyalsDisplay } from "@/lib/money";
+import { HALALA_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
+import { classifyCredit } from "./credit-notes";
+import { formatDay } from "./riyadh-time";
 
 export interface StatementLineInput {
   date: Date;
@@ -97,12 +99,12 @@ export interface Reconciliation {
 }
 
 import { reconcile, type Claim } from "./bank/optimizer";
-import { unreverseInvoiceNumber } from "./invoice-number";
+import { latinDigits, unreverseInvoiceNumber } from "./invoice-number";
 import { INVOICE, countNoun } from "./arabic";
 
 /** توحيد رقم الفاتورة للمقارنة: بلا رموز ولا فراغ، بحروف كبيرة. */
 export function normalizeRef(value: string | null | undefined): string {
-  return unreverseInvoiceNumber(value ?? "").replace(/[^\p{L}\p{N}]+/gu, "").toUpperCase();
+  return latinDigits(unreverseInvoiceNumber((value ?? "").trim())).replace(/[^\p{L}\p{N}]+/gu, "").toUpperCase();
 }
 
 /**
@@ -129,7 +131,7 @@ const DAY = 86_400_000;
 export function amountAgrees(
   o: Pick<OurInvoice, "totalMinor" | "subtotalMinor" | "grossMinor">,
   amountMinor: number,
-  tolerance = 1,
+  tolerance = HALALA_TOLERANCE_MINOR,
 ): boolean {
   return [o.totalMinor, o.subtotalMinor, o.grossMinor].some((v) => v != null && Math.abs(v - amountMinor) <= tolerance);
 }
@@ -165,7 +167,7 @@ export function reconcileStatement(
   ourInvoices: readonly OurInvoice[],
   options: ReconcileOptions = {},
 ): Reconciliation {
-  const tolerance = options.toleranceMinor ?? 1;
+  const tolerance = options.toleranceMinor ?? HALALA_TOLERANCE_MINOR;
   const windowMs = (options.dateWindowDays ?? 7) * DAY;
 
   const ourByRef = ourInvoices.map((i) => ({ invoice: i, ref: normalizeRef(i.invoiceNumber) }));
@@ -220,7 +222,7 @@ export function reconcileStatement(
       const why: string[] = [];
       if (byRef) why.push(`المورّد كتب مرجعاً يطابق رقم فاتورتنا ${o.invoice.invoiceNumber}`);
       if (amountClose) why.push("المبلغ يطابق");
-      else why.push(`فرق المبلغ ${Math.abs(o.invoice.totalMinor - line.debitMinor) / 100} ريالاً`);
+      else why.push(`فرق المبلغ ${formatRiyalsDisplay(Math.abs(o.invoice.totalMinor - line.debitMinor))} ريالاً`);
       if (dateClose) why.push("التاريخ ضمن النافذة");
       else why.push("التاريخ خارج النافذة");
 
@@ -271,11 +273,15 @@ export function reconcileStatement(
     if (line.debitMinor <= 0) {
       /*
         الدائن ليس دائماً سداداً: قد يكون إشعاراً دائناً — مرتجَعاً أو
-        خصماً — وهو يغيّر ما علينا لا ما دفعناه. ويُفصَل بوصفه.
+        خصماً — وهو يغيّر ما علينا لا ما دفعناه. ويُفصَل بوصفه، **بالقاعدة
+        الواحدة** (`classifyCredit`): كان هنا تعبيرٌ منسوخ أضيقُ منها، فسطرُ
+        «مردود بضاعة» سدادٌ في المطابقة وإشعارٌ في حساب المورّد.
       */
-      const text = `${line.description ?? ""} ${line.ref ?? ""}`;
-      const isCredit = /اشعار\s*دائن|إشعار\s*دائن|credit\s*note|مرتجع|خصم/i.test(text);
-      lines.push({ line, status: isCredit ? "CREDIT_NOTE" : "PAYMENT" });
+      const kind = classifyCredit({
+        id: "", date: line.date, amountMinor: line.creditMinor,
+        description: line.description ?? null, reference: line.ref ?? null,
+      });
+      lines.push({ line, status: kind });
       continue;
     }
 
@@ -415,7 +421,8 @@ export function buildDiscrepancyMemo(
   periodLabel: string,
   r: Reconciliation,
 ): string {
-  const riyals = (m: number) => (m / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  /* من الهللات نصّاً — لا قسمةَ عشريّة في رسالةٍ تُرسَل إلى مورّد */
+  const riyals = formatRiyalsDisplay;
   const out: string[] = [
     `السلام عليكم ${supplierName}،`,
     ``,
@@ -436,7 +443,7 @@ export function buildDiscrepancyMemo(
     out.push(``, `فواتير في كشفكم لم تصلنا نسخها، نرجو إرسالها:`);
     for (const l of r.missingFromArchive) {
       out.push(
-        `  - ${l.line.date.toISOString().slice(0, 10)} · ${l.line.ref || l.line.description || "بلا مرجع"} · ${riyals(l.line.debitMinor)} ريال`,
+        `  - ${formatDay(l.line.date)} · ${l.line.ref || l.line.description || "بلا مرجع"} · ${riyals(l.line.debitMinor)} ريال`,
       );
     }
   }
@@ -453,7 +460,7 @@ export function buildDiscrepancyMemo(
   if (r.notInStatement.length > 0) {
     out.push(``, `فواتير لدينا لم ترد في كشفكم:`);
     for (const i of r.notInStatement) {
-      out.push(`  - ${i.invoiceNumber} · ${i.invoiceDate.toISOString().slice(0, 10)} · ${riyals(i.totalMinor)} ريال`);
+      out.push(`  - ${i.invoiceNumber} · ${formatDay(i.invoiceDate)} · ${riyals(i.totalMinor)} ريال`);
     }
   }
 

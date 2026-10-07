@@ -64,6 +64,11 @@ export type AuditAction =
   | "PAYMENT_RECORDED"
   | "PAYMENT_VOIDED"
   | "DRIVE_FILE_RENAMED"
+  /* أثرُ الملفّ الواحد: يُكتب قبل نداء الدرايف بمعرّفه واسمَيه — فلا تضيع تسميةٌ قُتل طلبُها */
+  | "DRIVE_FILE_RENAME_INTENT"
+  | "DRIVE_FILE_RENAME_FAILED"
+  /* اسمٌ غُيّر في الدرايف بيدٍ فحُدّث ما عندنا — بالاسمين */
+  | "DRIVE_NAME_CHANGED_EXTERNALLY"
   | "PAYMENT_RUN_EXPORTED"
   /* حزمةُ المحاسب — شهرٌ كاملٌ في ملفّ يخرج من النظام، فتنزيلُه أثرٌ يُقيَّد */
   | "ACCOUNTANT_PACK_EXPORTED"
@@ -107,10 +112,18 @@ export type AuditAction =
   | "INVENTORY_COUNT_DISCARDED"
   | "INVENTORY_MOVEMENT_RECORDED"
   | "WASTE_RECORDED"
+  | "WASTE_VOIDED"
   /* حركةُ بنكٍ ضُمّت إلى إقرار الضريبة أو أُخرجت منه */
   | "VAT_TX_CHOSEN"
   /* فاتورةٌ أُقرّت ضريبيّةً فحُسبت في الخصم، أو أُخرجت منه */
-  | "VAT_INVOICE_CHOSEN";
+  | "VAT_INVOICE_CHOSEN"
+  /* الإقرارُ قُدِّم للهيئة فحُفظت لقطتُه، أو تُروجع عن اللقطة */
+  | "VAT_RETURN_FILED"
+  | "VAT_FILING_VOIDED"
+  /* مبيعاتُ النقد غير المودَع كُتبت لشهرٍ في الإقرار */
+  | "VAT_CASH_SALES_SET"
+  /* سجلُّ الإقرار نُزِّل ملفّاً */
+  | "VAT_RETURN_EXPORTED";
 
 export async function recordAudit(entry: {
   actorId?: string | null;

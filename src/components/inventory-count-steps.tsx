@@ -49,6 +49,8 @@ export interface StepRow extends CountRow {
   /** صفرٌ بدليل: «لا مشتريات» — غيرُ «كمّيّة المشتريات غير معروفة». */
   purchasesZero: boolean;
   manualReceiptsText: string | null;
+  /** في مشترياته بندٌ بكمّيّةٍ سالبة — مرتجعٌ للمورّد طُرح منها. */
+  supplierReturn: boolean;
   adjustmentsText: string | null;
   consumptionText: string | null;
   wasteText: string | null;

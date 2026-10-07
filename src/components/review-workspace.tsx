@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Money } from "./money";
@@ -34,6 +34,21 @@ import { SupplierPicker } from "./supplier-picker";
  * و«يُحسَم» توصف بأنّ «تعريفَها يسري على أمثالها» ولا موضع فيها للتعريف.
  * فكانت الصفحة تَعُدّ العمل ولا تُنقصه — وهو أسوأ من ألّا تكون.
  */
+
+type RowMode = "reject" | "define" | "pick";
+
+/** مرشّحٌ كما يحسبه الخادم الآن — `/api/match-candidates`. */
+interface CandidateView {
+  key: string;
+  invoiceIds: string[];
+  recommended: boolean;
+  outcome: string;
+  score: number;
+  parts: { supplier: number; amount: number; date: number; reference: number | null };
+  allocatedMinor: number;
+  evidence: string[];
+  invoices: { id: string; number: string | null; date: string | null; totalMinor: number | null; outstandingMinor: number | null }[];
+}
 
 export interface ReviewWorkspaceProps {
   items: ReviewItem[];
@@ -104,7 +119,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
   /** ما فُرغ منه في هذه الجلسة — يختفي فوراً ولا ينتظر تحديث الصفحة. */
   const [done, setDone] = useState<Map<string, string>>(new Map());
   /** البند المفتوح عليه محرِّرٌ، وأيّ محرِّر. */
-  const [openOn, setOpenOn] = useState<{ id: string; mode: "reject" | "define" } | null>(null);
+  const [openOn, setOpenOn] = useState<{ id: string; mode: RowMode } | null>(null);
   /* انشغالٌ لكلّ صفّ — نقرتان على صفّين لا تتداخل رسالتاهما */
   const [rowBusy, setRowBusy] = useState<Set<string>>(new Set());
   const [rowError, setRowError] = useState<Map<string, string>>(new Map());
@@ -213,6 +228,13 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
   */
   const confirmOne = (id: string) =>
     post("/api/match-confirm-bulk", { transactionIds: [id] }, id, "أُكِّدت", true);
+
+  /*
+    فاتورةٌ بعينها من قائمةٍ حسبها الخادم — تُرسَل معرّفاتُها وحدها، والخادم
+    يتحقّق أنّها ما زالت مرشّحةً ويحسب التخصيص.
+  */
+  const pickOne = (id: string, invoiceIds: string[]) =>
+    post("/api/match-confirm-bulk", { transactionIds: [id], candidateInvoiceIds: invoiceIds }, id, "قُيِّدت على الفاتورة المختارة", true);
 
   const rejectOne = (id: string, kind: string) =>
     post("/api/match-confirm", { transactionId: id, notAPayment: kind }, id, "حُفظت", true);
@@ -377,6 +399,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
             canApprove={canApprove}
             canEdit={canEdit}
             onConfirm={confirmOne}
+            onPick={pickOne}
             onSettle={settleOne}
             onReject={rejectOne}
             onDefine={defineOne}
@@ -395,20 +418,21 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
  */
 function Bucket({
   bucket, items, twins, done, openOn, setOpenOn, rowBusy, rowError, suppliers,
-  canApprove, canEdit, onConfirm, onSettle, onReject, onDefine,
+  canApprove, canEdit, onConfirm, onPick, onSettle, onReject, onDefine,
 }: {
   bucket: ReviewBucket;
   items: ReviewItem[];
   twins: Map<string, number>;
   done: Map<string, string>;
-  openOn: { id: string; mode: "reject" | "define" } | null;
-  setOpenOn: (v: { id: string; mode: "reject" | "define" } | null) => void;
+  openOn: { id: string; mode: RowMode } | null;
+  setOpenOn: (v: { id: string; mode: RowMode } | null) => void;
   rowBusy: Set<string>;
   rowError: Map<string, string>;
   suppliers: readonly { id: string; nameAr: string }[];
   canApprove: boolean;
   canEdit: boolean;
   onConfirm: (id: string) => void;
+  onPick: (id: string, invoiceIds: string[]) => void;
   onSettle: (id: string) => void;
   onReject: (id: string, kind: string) => void;
   onDefine: (id: string, kind: string, name: string, supplierId: string | null) => void;
@@ -439,6 +463,7 @@ function Bucket({
             canApprove={canApprove}
             canEdit={canEdit}
             onConfirm={onConfirm}
+            onPick={onPick}
             onSettle={onSettle}
             onReject={onReject}
             onDefine={onDefine}
@@ -462,20 +487,21 @@ function Bucket({
 /** بندٌ واحد: ما هو، ولماذا هو هنا، وما الذي تفعله به. */
 function Row({
   item: i, bucket, twin, doneMessage, open, setOpen, busy, error, suppliers,
-  canApprove, canEdit, onConfirm, onSettle, onReject, onDefine,
+  canApprove, canEdit, onConfirm, onPick, onSettle, onReject, onDefine,
 }: {
   item: ReviewItem;
   bucket: ReviewBucket;
   twin: boolean;
   doneMessage?: string;
-  open: "reject" | "define" | null;
-  setOpen: (mode: "reject" | "define" | null) => void;
+  open: RowMode | null;
+  setOpen: (mode: RowMode | null) => void;
   busy: boolean;
   error: string | null;
   suppliers: readonly { id: string; nameAr: string }[];
   canApprove: boolean;
   canEdit: boolean;
   onConfirm: (id: string) => void;
+  onPick: (id: string, invoiceIds: string[]) => void;
   onSettle: (id: string) => void;
   onReject: (id: string, kind: string) => void;
   onDefine: (id: string, kind: string, name: string, supplierId: string | null) => void;
@@ -560,6 +586,21 @@ function Row({
               {ACT.recordAgainstInvoice}
             </button>
             )}
+            {/*
+              «مرشّحان متقاربان» كانت تُعرَض بسببها وحده. فتُعرَض الفواتيرُ
+              المرشّحة جنباً إلى جنب كما يحسبها الخادم الآن، ويُختار بضغطة.
+            */}
+            {i.direction === "DEBIT" && i.supplierId && (
+              <button
+                type="button"
+                className={buttonClass("secondary", "sm")}
+                disabled={busy}
+                onClick={() => setOpen(open === "pick" ? null : "pick")}
+                aria-expanded={open === "pick"}
+              >
+                اختر الفاتورة
+              </button>
+            )}
             <button
               type="button"
               className={buttonClass("secondary", "sm")}
@@ -595,6 +636,14 @@ function Row({
           لا رقمَ فاتورةٍ في الحوالة — فتُوزَّع على فواتير {i.supplierName} المفتوحة
           بالأقدم أوّلاً، وما بقي يبقى على حسابه غير مخصَّص.
         </p>
+      )}
+
+      {open === "pick" && (
+        <CandidatePicker
+          transactionId={i.transactionId}
+          busy={busy}
+          onPick={(invoiceIds) => onPick(i.transactionId, invoiceIds)}
+        />
       )}
 
       {/* ── ليست سداداً: السبب ── */}
@@ -681,5 +730,115 @@ function Row({
         </p>
       )}
     </li>
+  );
+}
+
+const OUTCOME_NOTE: Record<string, string> = {
+  EXACT_INVOICE: "فاتورةٌ بمبلغها",
+  MULTI_INVOICE: "عدّة فواتير مجموعُها الدفعة",
+  PARTIAL_PAYMENT: "سدادٌ جزئيّ — يبقى عليها",
+  OVERPAYMENT: "تزيد على المتبقّي — والزائد يبقى على حساب المورّد",
+};
+
+/**
+ * المرشّحون جنباً إلى جنب — من الخادم لحظةَ الفتح، لا ممّا حُفظ عند الاستيراد.
+ * والاختيارُ يُرسِل معرّفات الفواتير وحدها.
+ */
+function CandidatePicker({
+  transactionId, busy, onPick,
+}: {
+  transactionId: string;
+  busy: boolean;
+  onPick: (invoiceIds: string[]) => void;
+}) {
+  const [state, setState] = useState<
+    { status: "loading" } | { status: "error"; message: string } | { status: "ready"; candidates: CandidateView[] }
+  >({ status: "loading" });
+
+  useEffect(() => {
+    let live = true;
+    void postJson<{ candidates?: CandidateView[] }>("/api/match-candidates", { transactionId }).then((r) => {
+      if (!live) return;
+      setState(r.ok
+        ? { status: "ready", candidates: r.data.candidates ?? [] }
+        : { status: "error", message: r.error });
+    });
+    return () => { live = false; };
+  }, [transactionId]);
+
+  return (
+    <div className="mt-2 rounded-xl border border-line bg-sunken px-3 py-2.5" aria-live="polite">
+      <p className="text-xs font-bold">أيّ فاتورةٍ تسدّدها هذه الحوالة؟</p>
+      {state.status === "loading" && <p className="mt-2 text-xs text-muted">يُحسَب المرشّحون على الفواتير كما هي الآن…</p>}
+      {state.status === "error" && (
+        <p role="alert" className="mt-2 text-xs font-bold text-danger">{state.message}</p>
+      )}
+      {state.status === "ready" && state.candidates.length === 0 && (
+        <p className="mt-2 text-xs leading-relaxed text-muted">
+          لا فاتورةَ مفتوحة لهذا المورّد تقارب مبلغَ الحوالة. قيّدها على حسابه، أو ارفع فاتورتَها فتُقترَح هنا.
+        </p>
+      )}
+      {state.status === "ready" && state.candidates.length > 0 && (
+        <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {state.candidates.map((c) => (
+            <li key={c.key} className="flex flex-col rounded-lg border border-line bg-raised p-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge tone={c.score >= 85 ? "ok" : "warn"}>{strength(c.score)}</Badge>
+                {c.recommended && <Badge tone="accent">ترجيحُ النظام</Badge>}
+              </div>
+              <ul className="mt-2 space-y-1">
+                {c.invoices.map((inv) => (
+                  <li key={inv.id} className="flex flex-wrap items-baseline justify-between gap-x-2 text-xs">
+                    <Link href={`/purchases/invoices/${inv.id}`} className="font-bold underline-offset-2 hover:underline">
+                      <bdi>{inv.number ?? "بلا رقم"}</bdi>
+                    </Link>
+                    <span className="text-muted">{inv.date ? <bdi>{formatDay(inv.date.slice(0, 10))}</bdi> : "تاريخٌ غير معروف"}</span>
+                    <span className="nums font-bold">
+                      {inv.outstandingMinor === null ? "غير معروف" : <Money minor={inv.outstandingMinor} />}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
+                {OUTCOME_NOTE[c.outcome] ?? "مرشّح"} · يُخصَّص <Money minor={c.allocatedMinor} />
+              </p>
+              <dl className="mt-2 grid grid-cols-4 gap-1 text-center">
+                <Part label="المورّد" value={c.parts.supplier} />
+                <Part label="المبلغ" value={c.parts.amount} />
+                <Part label="التاريخ" value={c.parts.date} />
+                <Part label="المرجع" value={c.parts.reference} />
+              </dl>
+              <ul className="mt-2 flex-1 space-y-0.5">
+                {c.evidence.slice(1, 5).map((e, n) => (
+                  <li key={n} className="text-[11px] leading-relaxed text-muted" dir="auto">— {e}</li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                aria-busy={busy}
+                disabled={busy}
+                className={`mt-2.5 ${buttonClass(c.recommended ? "primary" : "secondary", "sm")}`}
+                onClick={() => onPick(c.invoiceIds)}
+              >
+                {c.invoices.length > 1 ? "قيّدها على هذه الفواتير" : "قيّدها على هذه الفاتورة"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-[11px] leading-relaxed text-muted">
+        الخادم يتحقّق من اختيارك على الفواتير كما هي لحظةَ الكتابة ويحسب التخصيص — وما زاد يبقى على حساب المورّد غير مخصَّص.
+      </p>
+    </div>
+  );
+}
+
+/** بُعدٌ من أبعاد الترجيح — من مئة، و«—» لما لا يُقاس. */
+function Part({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div className="rounded-md bg-sunken px-1 py-1">
+      <dt className="text-[10px] text-muted">{label}</dt>
+      <dd className="nums text-[11px] font-bold">{value === null ? "—" : value}</dd>
+    </div>
   );
 }

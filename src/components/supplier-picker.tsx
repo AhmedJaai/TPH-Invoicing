@@ -6,6 +6,7 @@ import { Monogram } from "./ui";
 import { ActionButton, toast } from "./ui-client";
 import { buttonClass } from "./ui-tokens";
 import { postJson } from "@/lib/http-client";
+import { SimilarSuppliers, readSimilar, type SimilarSupplier } from "./similar-suppliers";
 import { suggestSuppliers, type SuggestibleSupplier } from "@/lib/supplier-suggest";
 
 /**
@@ -49,18 +50,22 @@ export function SupplierPicker({
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [similar, setSimilar] = useState<SimilarSupplier[]>([]);
   const all = [...suppliers, ...added.filter((a) => !suppliers.some((s) => s.id === a.id))];
   const suggested = suggestSuppliers(text, all);
 
-  async function create(): Promise<boolean> {
+  async function create(confirmNew = false): Promise<boolean> {
     const nameAr = name.trim();
     if (nameAr.length < 2) return false;
     setError(null);
-    const r = await postJson<{ existed?: boolean; supplier: { id: string; nameAr: string; slug?: string } }>("/api/supplier", { nameAr });
+    const r = await postJson<{ existed?: boolean; supplier: { id: string; nameAr: string; slug?: string } }>("/api/supplier", { nameAr, ...(confirmNew ? { confirmNew: true } : {}) });
     if (!r.ok) {
-      setError(r.error);
+      const alike = r.status === 409 ? readSimilar(r.data) : [];
+      setSimilar(alike);
+      setError(alike.length > 0 ? null : r.error);
       return false;
     }
+    setSimilar([]);
     const s = r.data.supplier;
     setAdded((xs) => [...xs, { id: s.id, nameAr: s.nameAr, slug: s.slug ?? null }]);
     onChange(s.id);
@@ -129,7 +134,7 @@ export function SupplierPicker({
               <span className="text-[11px] font-bold text-muted">اسمُ المورّد بالعربية</span>
               <input
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => { setName(e.target.value); setSimilar([]); }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") { e.preventDefault(); void create(); }
                   if (e.key === "Escape") { e.preventDefault(); setCreating(false); }
@@ -139,7 +144,7 @@ export function SupplierPicker({
                 className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm sm:min-h-9"
               />
             </label>
-            <ActionButton variant="primary" size="sm" disabled={name.trim().length < 2} reason="اكتب الاسم — حرفان على الأقلّ" onAction={create}>
+            <ActionButton variant="primary" size="sm" disabled={name.trim().length < 2} reason="اكتب الاسم — حرفان على الأقلّ" onAction={() => create()}>
               أنشئه واختره
             </ActionButton>
             <button type="button" onClick={() => setCreating(false)} className={buttonClass("quiet", "sm")}>تراجع</button>
@@ -147,6 +152,16 @@ export function SupplierPicker({
           <p className="mt-1.5 text-[11px] text-muted">
             وتُكمَل بياناتُه (الرقمُ الضريبيّ، واسمُ مجلّده في الدرايف) من ملفّه بعدها.
           </p>
+          <SimilarSuppliers
+            similar={similar}
+            onPick={(s) => {
+              setAdded((xs) => [...xs, { id: s.id, nameAr: s.nameAr, slug: s.slug ?? null }]);
+              onChange(s.id);
+              setSimilar([]);
+              setCreating(false);
+            }}
+            onCreateAnyway={() => void create(true)}
+          />
           {error && <p role="alert" className="mt-1 text-[11px] font-bold text-danger">{error}</p>}
         </div>
       )}

@@ -8,12 +8,10 @@
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import { importSalesFile } from "@/services/sales-import.service";
+import { MAX_SALES_FILE_BYTES, SALES_FILE_TOO_LARGE } from "@/lib/sales/file-import";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-/** أقصى حجمٍ يُقبَل — تصديرُ شهرٍ كاملٍ دون هذا بكثير. */
-const MAX_BYTES = 8 * 1024 * 1024;
 
 export async function POST(request: Request) {
   let user;
@@ -33,8 +31,8 @@ export async function POST(request: Request) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "لم يصل ملفّ" }, { status: 400 });
   }
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "الملفّ أكبر من ٨ ميجابايت" }, { status: 400 });
+  if (file.size > MAX_SALES_FILE_BYTES) {
+    return NextResponse.json({ error: SALES_FILE_TOO_LARGE }, { status: 413 });
   }
   if (fallbackBusinessDate && !/^\d{4}-\d{2}-\d{2}$/.test(fallbackBusinessDate)) {
     return NextResponse.json({ error: "التاريخ يُكتب YYYY-MM-DD" }, { status: 400 });

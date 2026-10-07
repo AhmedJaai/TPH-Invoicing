@@ -33,6 +33,7 @@ import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { allocate, createPayment, refreshPaymentStatus } from "./payment.service";
 import { echoHeldPaymentIds } from "./payment-echo.service";
 import type { db } from "@/db";
+import { recordAudit } from "@/lib/audit";
 import type { Tx } from "./types";
 
 type Executor = typeof db | Tx;
@@ -112,7 +113,6 @@ async function loadOpenInvoices(
 async function writeCreditPlan(
   tx: Tx,
   allocations: readonly CreditAllocation[],
-  amounts: Map<string, number>,
 ): Promise<number> {
   const byPayment = new Map<string, { invoiceId: string; amountMinor: number }[]>();
   for (const a of allocations) {
@@ -122,7 +122,7 @@ async function writeCreditPlan(
   }
   let written = 0;
   for (const [paymentId, requests] of byPayment) {
-    const outcome = await allocate(tx, paymentId, amounts.get(paymentId) ?? 0, requests);
+    const outcome = await allocate(tx, paymentId, requests);
     written += outcome.allocatedMinor;
   }
   return written;
@@ -164,8 +164,7 @@ export async function applySupplierCredit(
     return { allocations: [], appliedMinor: 0, creditLeftMinor: plan.creditLeftMinor };
   }
 
-  const amounts = new Map(credits.map((c) => [c.paymentId, c.amountMinor]));
-  const applied = await writeCreditPlan(tx, plan.allocations, amounts);
+  const applied = await writeCreditPlan(tx, plan.allocations);
   return { allocations: plan.allocations, appliedMinor: applied, creditLeftMinor: plan.creditLeftMinor };
 }
 
@@ -206,13 +205,29 @@ async function reclaimForwardCredit(tx: Tx, supplierId: string): Promise<number>
   const held = forward.length > 0 ? await echoHeldPaymentIds(tx, supplierId) : new Set<string>();
   const freeable = forward.filter((f) => !held.has(f.payment_id));
   if (freeable.length === 0) return 0;
+  const freed: { الحوالة: string; الفاتورة: string; بالهللات: number }[] = [];
   for (const f of freeable) {
-    await tx.delete(paymentAllocations).where(and(
+    const removed = await tx.delete(paymentAllocations).where(and(
       eq(paymentAllocations.paymentId, f.payment_id),
       eq(paymentAllocations.invoiceId, f.invoice_id),
-    ));
+    )).returning({ amountMinor: paymentAllocations.amountMinor });
+    for (const r of removed) freed.push({ الحوالة: f.payment_id, الفاتورة: f.invoice_id, بالهللات: r.amountMinor });
   }
   for (const id of new Set(freeable.map((f) => f.payment_id))) await refreshPaymentStatus(tx, id);
+  /*
+    فكٌّ آليّ لمالٍ عن فاتورة: يُكتب أثرُه في المعاملة نفسها — وإلّا لم يُعرف بعد
+    شهرٍ لماذا انتقلت حوالةٌ من فاتورةٍ إلى أخرى. بلا فاعل: النظامُ فعلها.
+  */
+  if (freed.length > 0) {
+    await recordAudit({
+      actorId: null,
+      action: "PAYMENT_REALLOCATED",
+      entityType: "supplier",
+      entityId: supplierId,
+      before: { فُكّ_آلياً: freed },
+      after: { السبب: "فاتورةٌ أقدم وصلت متأخّرة — تُستردّ حوالتُها ثمّ تُوزَّع بالأقدم أوّلاً" },
+    }, tx);
+  }
   return freeable.length;
 }
 
@@ -355,7 +370,7 @@ export async function markPaidByOwner(tx: Tx, invoiceId: string): Promise<OwnerP
     /* إقرارُ المالك صريحٌ بفاتورةٍ بعينها، ولا يظهر في كشف المقهى */
     acknowledgeTwin: true,
   });
-  await allocate(tx, ownerPaymentId, plan.ownerPaymentMinor, [
+  await allocate(tx, ownerPaymentId, [
     { invoiceId, amountMinor: plan.ownerPaymentMinor },
   ]);
 
@@ -410,7 +425,7 @@ export async function drawBankCredit(
     const available = Number(r.available);
     if (available <= 0) continue;
     const take = Math.min(available, rest);
-    const out = await allocate(tx, r.id, Number(r.amount_minor), [{ invoiceId: input.invoiceId, amountMinor: take }]);
+    const out = await allocate(tx, r.id, [{ invoiceId: input.invoiceId, amountMinor: take }]);
     if (out.allocatedMinor <= 0) continue;
     drawn.push({ paymentId: r.id, invoiceId: input.invoiceId, amountMinor: out.allocatedMinor, paidOn: r.day });
     rest -= out.allocatedMinor;

@@ -19,13 +19,14 @@
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { recordAudit } from "@/lib/audit";
-import { allocate, createPayment } from "@/services/payment.service";
+import { PaymentTwinError, allocate, createPayment } from "@/services/payment.service";
+import { planHandPayments, type MarkPaidRest } from "@/lib/mark-paid-plan";
 import { CreditError, drawBankCredit, markPaidByOwner, previewOwnerPaid } from "@/services/supplier-credit.service";
 import { INVOICE, countNoun } from "@/lib/arabic";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -45,6 +46,8 @@ const Body = z.object({
   source: z.enum(["BANK", "OWNER"]).optional(),
   /** يُعرض ما سيقع ولا يُكتب شيء — للسداد من حساب المالك. */
   preview: z.boolean().optional(),
+  /** أُقِرّ أنّ سداداً بالمورّد واليوم والمبلغ نفسها واقعةٌ أخرى (ردُّ 409 `twin`). */
+  acknowledgeTwin: z.boolean().optional(),
 });
 type Body = z.infer<typeof Body>;
 
@@ -85,22 +88,25 @@ async function handle(request: Request) {
         return NextResponse.json({ ok: true, preview: plan });
       }
 
-      const outcome = await db.transaction((tx) => markPaidByOwner(tx, invoiceId));
-
-      await recordAudit({
-        actorId: user.id,
-        action: "INVOICE_PAID_BY_OWNER",
-        entityType: "invoice",
-        entityId: invoiceId,
-        after: {
-          الفاتورة: outcome.invoiceNumber,
-          سداد_المالك_بالهللات: outcome.ownerPaymentMinor,
-          فُكّ_عنها: outcome.freed,
-          خُصم_من: outcome.reapplied,
-          بقي_لك_عنده_بالهللات: outcome.creditLeftMinor,
-          ملاحظة: body.note ?? null,
-          مصدر_السداد: "إقرار المالك: من حسابه الشخصيّ أو نقداً",
-        },
+      /* القيدُ والأثرُ في معاملةٍ واحدة: مالٌ يُثبَّت بلا أثرٍ في السجلّ لا يُراجَع */
+      const outcome = await db.transaction(async (tx) => {
+        const out = await markPaidByOwner(tx, invoiceId);
+        await recordAudit({
+          actorId: user.id,
+          action: "INVOICE_PAID_BY_OWNER",
+          entityType: "invoice",
+          entityId: invoiceId,
+          after: {
+            الفاتورة: out.invoiceNumber,
+            سداد_المالك_بالهللات: out.ownerPaymentMinor,
+            فُكّ_عنها: out.freed,
+            خُصم_من: out.reapplied,
+            بقي_لك_عنده_بالهللات: out.creditLeftMinor,
+            ملاحظة: body.note ?? null,
+            مصدر_السداد: "إقرار المالك: من حسابه الشخصيّ أو نقداً",
+          },
+        }, tx);
+        return out;
       });
 
       const moved = outcome.reapplied.reduce((s, r) => s + r.amountMinor, 0);
@@ -134,44 +140,30 @@ async function handle(request: Request) {
   if (body.invoiceIds.length > 50) {
     return NextResponse.json({ error: "خمسون فاتورة في المرّة الواحدة على الأكثر" }, { status: 400 });
   }
-  const conditions = [inArray(invoices.id, body.invoiceIds)];
-  if (body.supplierId) conditions.push(eq(invoices.supplierId, body.supplierId));
-
-  // ما بقي منه شيء غير مسدَّد فقط
-  const rows = await db
-    .select({
-      id: invoices.id,
-      supplierId: invoices.supplierId,
-      invoiceNumber: invoices.invoiceNumber,
-      invoiceDate: invoices.invoiceDate,
-      periodMonth: invoices.periodMonth,
-      totalMinor: invoices.totalMinor,
-      allocated: sql<number>`coalesce((
-        select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = invoices.id
-      ), 0)`,
-    })
-    .from(invoices)
-    .where(and(...conditions));
-
-  /* العتبة نفسها في كلّ شاشةٍ تقول «عليك»: ما بقي فوق هللة */
-  const pending = rows.filter((r) => r.totalMinor - Number(r.allocated) > SETTLED_TOLERANCE_MINOR);
-  if (pending.length === 0) {
-    return NextResponse.json({ ok: true, marked: 0, message: "لا فواتير مفتوحة ضمن النطاق" });
-  }
-
   /*
     يوم السداد لا يوم الفاتورة.
 
     كانت الدفعة تُؤرَّخ بتاريخ الفاتورة، والحوالة الحقيقيّة تظهر في الكشف
     بيوم خصمها — بعده بأيّام. والتوأمة تطابق اليوم، فتفوتها: الواقعة
     الواحدة تُقيَّد دفعتين، والثانية تُخصَّص على فواتير أخرى لم تُدفع.
+
+    ويومٌ بعد اليوم يُردّ ولا يُبدَّل باليوم صامتاً — القيمةُ المبدَّلة تُقرأ جواباً.
   */
   const today = todayInRiyadh();
-  const paidOn = typeof body.paidOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.paidOn) && body.paidOn <= today
-    ? body.paidOn
-    : today;
+  if (body.paidOn && body.paidOn > today) {
+    return NextResponse.json({ error: "يوم السداد لا يكون بعد اليوم — صحّح التاريخ" }, { status: 400 });
+  }
+  const paidOn = body.paidOn ?? today;
   const paidAt = new Date(`${paidOn}T00:00:00Z`);
+  if (Number.isNaN(paidAt.getTime())) {
+    return NextResponse.json({ error: "يوم السداد ليس تاريخاً صحيحاً" }, { status: 400 });
+  }
 
+  const invoiceIds = [...new Set(body.invoiceIds)];
+  const conditions = [inArray(invoices.id, invoiceIds)];
+  if (body.supplierId) conditions.push(eq(invoices.supplierId, body.supplierId));
+
+  let marked = 0;
   let totalMinor = 0;
   /* معرّفاتُ الدفعات المكتوبة — يُعاد بها التراجعُ من الإشعار ما دام قريباً */
   const paymentIds: string[] = [];
@@ -179,78 +171,149 @@ async function handle(request: Request) {
   const drawn: { paymentId: string; invoiceId: string; amountMinor: number; paidOn: string }[] = [];
 
   try {
-  await db.transaction(async (tx) => {
-    for (const inv of pending) {
-      let remaining = inv.totalMinor - Number(inv.allocated);
-      totalMinor += remaining;
+    await db.transaction(async (tx) => {
       /*
-        الحوالةُ في الكشف أوّلاً: إن كان للمورّد حوالةٌ لم تُنسب فهي هذا السداد
-        — وإلّا قُيِّد مرّتين (كوهي وأطلس). وما بقي بعدها يُقيَّد إقراراً.
+        القراءةُ داخل المعاملة وبقفل الصفّ: كان المتبقّي يُقرأ قبلها، فضغطتان أو
+        تبويبان يحسبان الرقم نفسه ولا يردّهما إلّا مؤثِّرُ القاعدة بخطأٍ خامّ.
+        الآن ينتظر الثاني حتّى يُثبَّت الأوّل، ثمّ يجدها مسدَّدة.
       */
-      if (inv.supplierId) {
-        const d = await drawBankCredit(tx, { supplierId: inv.supplierId, invoiceId: inv.id, remainingMinor: remaining, paidOn });
-        drawn.push(...d.drawn);
-        remaining = d.restMinor;
+      const locked = await tx
+        .select({
+          id: invoices.id,
+          supplierId: invoices.supplierId,
+          invoiceNumber: invoices.invoiceNumber,
+          periodMonth: invoices.periodMonth,
+          totalMinor: invoices.totalMinor,
+        })
+        .from(invoices)
+        .where(and(...conditions))
+        .orderBy(invoices.invoiceDate, invoices.id)
+        .for("update");
+      if (locked.length === 0) return;
+
+      const sums = (await tx.execute<{ invoice_id: string; allocated: string | number }>(sql`
+        select pa.invoice_id, coalesce(sum(pa.amount_minor), 0)::bigint as allocated
+          from payment_allocations pa
+         where pa.invoice_id in (${sql.join(locked.map((r) => sql`${r.id}`), sql`, `)})
+         group by pa.invoice_id
+      `)).rows;
+      const allocatedBy = new Map(sums.map((r) => [r.invoice_id, Number(r.allocated)]));
+
+      /* العتبة نفسها في كلّ شاشةٍ تقول «عليك»: ما بقي فوق هللة */
+      const pending = locked
+        .map((r) => ({ ...r, openMinor: r.totalMinor - (allocatedBy.get(r.id) ?? 0) }))
+        .filter((r) => r.openMinor > SETTLED_TOLERANCE_MINOR);
+      if (pending.length === 0) return;
+
+      const rests: MarkPaidRest[] = [];
+      for (const inv of pending) {
+        let remaining = inv.openMinor;
+        totalMinor += remaining;
+        /*
+          الحوالةُ في الكشف أوّلاً: إن كان للمورّد حوالةٌ لم تُنسب فهي هذا السداد
+          — وإلّا قُيِّد مرّتين (كوهي وأطلس). وما بقي بعدها يُقيَّد إقراراً.
+        */
+        if (inv.supplierId) {
+          const d = await drawBankCredit(tx, { supplierId: inv.supplierId, invoiceId: inv.id, remainingMinor: remaining, paidOn });
+          drawn.push(...d.drawn);
+          remaining = d.restMinor;
+        }
+        if (remaining > SETTLED_TOLERANCE_MINOR) {
+          rests.push({ invoiceId: inv.id, supplierId: inv.supplierId, periodMonth: inv.periodMonth, restMinor: remaining });
+        }
       }
-      if (remaining <= SETTLED_TOLERANCE_MINOR) continue;
+
       /*
-        عبر `createPayment` لا إدراجاً باليد: فيُسأل التوأم (الواقعة الواحدة
-        لا تُقيَّد دفعتين) ويُحرَس الشهر المقفل.
+        دفعةٌ لكلّ مورّد لا لكلّ فاتورة (`planHandPayments`): الحوالةُ واحدة
+        فيتبنّاها الكشفُ بمبلغها، وفاتورتان بالمبلغ نفسه لا تصيران توأمَين.
+
+        وعبر `createPayment` لا إدراجاً باليد: فيُسأل التوأم عمّا **سبق** هذا
+        الطلب (الواقعة الواحدة لا تُقيَّد دفعتين) ويُحرَس الشهر المقفل. ومن
+        أقرّ أنّه سدادٌ آخر (`acknowledgeTwin`) يمضي — بيكوف يُدفَع له مرّتين.
       */
-      const payId = await createPayment(tx, {
-        supplierId: inv.supplierId,
-        paidAt,
-        amountMinor: remaining,
-        method: "BANK_TRANSFER",
-        beneficiaryNameRaw: null,
-        appliesToMonth: inv.periodMonth,
-      });
-      /*
-        والتخصيص عبر `allocate` لا إدراجاً باليد: فيُحرَس شهرُ الفاتورة،
-        ويُطرَح الرسم، ويُشتقّ حالُ الدفعة بعده — كان هذا المسار يُدرج
-        التخصيص وينسى الحال، فبقيت دفعةٌ مخصَّصة كاملةً «غير مخصَّصة».
-        وسياسةٌ تتغيّر في الخدمة تبلغ هذا الباب بلا أن يُنسَخ إليه شيء.
-      */
-      await allocate(tx, payId, remaining, [{ invoiceId: inv.id, amountMinor: remaining }]);
-      paymentIds.push(payId);
-    }
-  });
+      for (const plan of planHandPayments(rests)) {
+        const payId = await createPayment(tx, {
+          supplierId: plan.supplierId,
+          paidAt,
+          amountMinor: plan.amountMinor,
+          method: "BANK_TRANSFER",
+          beneficiaryNameRaw: null,
+          appliesToMonth: plan.appliesToMonth,
+          acknowledgeTwin: body.acknowledgeTwin === true,
+        });
+        /*
+          والتخصيص عبر `allocate` لا إدراجاً باليد: فيُحرَس شهرُ الفاتورة،
+          ويُطرَح الرسم، ويُشتقّ حالُ الدفعة بعده — كان هذا المسار يُدرج
+          التخصيص وينسى الحال، فبقيت دفعةٌ مخصَّصة كاملةً «غير مخصَّصة».
+          وسياسةٌ تتغيّر في الخدمة تبلغ هذا الباب بلا أن يُنسَخ إليه شيء.
+        */
+        const out = await allocate(tx, payId, plan.allocations);
+        if (out.allocatedMinor !== plan.amountMinor) {
+          throw new MarkPaidRaced();
+        }
+        paymentIds.push(payId);
+      }
+
+      marked = pending.length;
+      /* الأثرُ في المعاملة نفسها: إن سقط الطلبُ بعدها لم يبقَ مالٌ بلا سجلّ */
+      await recordAudit({
+        actorId: user.id,
+        action: "INVOICES_MARKED_PAID",
+        entityType: "invoice",
+        entityId: body.supplierId ?? "manual",
+        after: {
+          نوع: "وسم يدوي بالسداد",
+          عدد_الفواتير: pending.length,
+          المبلغ_بالهللات: totalMinor,
+          الفواتير: pending.map((p) => p.invoiceNumber),
+          الدفعات: paymentIds,
+          ملاحظة: body.note ?? null,
+          // لم يأتِ من كشف بنك — تمييزه مهم عند أي مراجعة لاحقة
+          مصدر_السداد: "إقرار المالك لا مطابقة بنكية",
+          يوم_السداد: paidOn,
+          أُقرّ_أنّه_سدادٌ_آخر: body.acknowledgeTwin === true,
+          نُسب_من_حوالات_الكشف: drawn.map((d) => ({ الحوالة: d.paymentId, يومها: d.paidOn, بالهللات: d.amountMinor })),
+        },
+      }, tx);
+    });
   } catch (e) {
+    /*
+      التوأمُ يُقال بما يُفعل فيه: الشاشةُ تعرض «سدادٌ آخر — سجّله» وتعيد الطلب
+      بـ`acknowledgeTwin`. وكان يُردّ بجملةٍ ولا مخرج.
+    */
+    if (e instanceof PaymentTwinError) {
+      return NextResponse.json({
+        error: "لهذا المورّد سدادٌ مقيَّدٌ بالمبلغ نفسه في اليوم نفسه. إن كان هذا سداداً آخر فأقِرّ به، وإلّا فغيّر يوم السداد أو افتح المقيَّد.",
+        twin: true,
+      }, { status: 409 });
+    }
+    if (e instanceof MarkPaidRaced) {
+      return NextResponse.json({ error: "تغيّر ما على هذه الفواتير أثناء الحفظ — لم يُكتب شيء. حدّث الصفحة وأعد." }, { status: 409 });
+    }
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
 
-  await recordAudit({
-    actorId: user.id,
-    action: "INVOICES_MARKED_PAID",
-    entityType: "invoice",
-    entityId: body.supplierId ?? "manual",
-    after: {
-      نوع: "وسم يدوي بالسداد",
-      عدد_الفواتير: pending.length,
-      المبلغ_بالهللات: totalMinor,
-      الفواتير: pending.map((p) => p.invoiceNumber),
-      ملاحظة: body.note ?? null,
-      // لم يأتِ من كشف بنك — تمييزه مهم عند أي مراجعة لاحقة
-      مصدر_السداد: "إقرار المالك لا مطابقة بنكية",
-      يوم_السداد: paidOn,
-      نُسب_من_حوالات_الكشف: drawn.map((d) => ({ الحوالة: d.paymentId, يومها: d.paidOn, بالهللات: d.amountMinor })),
-    },
-  });
+  if (marked === 0) {
+    return NextResponse.json({ ok: true, marked: 0, message: "لا فواتير مفتوحة ضمن النطاق" });
+  }
 
   const drawnMinor = drawn.reduce((s, d) => s + d.amountMinor, 0);
   const drawnDays = [...new Set(drawn.map((d) => d.paidOn))];
 
   return NextResponse.json({
     ok: true,
-    marked: pending.length,
+    marked,
     totalMinor,
     paymentIds,
     drawn: drawn.map((d) => ({ paymentId: d.paymentId, invoiceId: d.invoiceId })),
-    message: `سُجّل سداد ${countNoun(pending.length, INVOICE)} بقيمة ${formatRiyalsDisplay(totalMinor)} ريال`
+    message: `سُجّل سداد ${countNoun(marked, INVOICE)} بقيمة ${formatRiyalsDisplay(totalMinor)} ريال`
       + (drawnMinor > 0
-        ? ` · منها ${formatRiyalsDisplay(drawnMinor)} من حوالةٍ في الكشف لم تكن منسوبة (${drawnDays.join("، ")}) — فلم تُقيَّد مرّتين`
+        ? ` · منها ${formatRiyalsDisplay(drawnMinor)} من حوالةٍ في الكشف لم تكن منسوبة (${drawnDays.map((d) => formatDay(d)).join("، ")}) — فلم تُقيَّد مرّتين`
         : ""),
   });
 }
+
+/** التخصيصُ لم يبلغ مبلغَ الدفعة — تغيّرت الفاتورةُ بين القراءة والكتابة. */
+class MarkPaidRaced extends Error {}

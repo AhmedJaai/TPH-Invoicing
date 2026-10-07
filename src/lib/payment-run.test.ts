@@ -111,9 +111,37 @@ describe("ملف التحويلات", () => {
     expect(line).toContain("SA0380000000608010167519");
   });
 
-  it("ولا حسابَ يُخمَّن: المجهولُ فارغٌ ومعه تنبيه", () => {
-    const line = toBankTransferCsv(run).split("\r\n")[1];
-    expect(line).toContain("الحسابُ غير معروف");
+  it("ولا حسابَ يُخمَّن: المجهولُ خارجَ قسم التحويل، بعنوانه وتنبيهه", () => {
+    const lines = toBankTransferCsv(run).split("\r\n");
+    expect(lines).toHaveLength(4);
+    expect(lines[1]).toBe("");
+    expect(lines[2]).toContain("يحتاج حساباً");
+    expect(lines[3]).toContain("الحسابُ غير معروف");
+  });
+
+  it("ومن له حسابٌ في قسم التحويل وحده — لا عنوانَ ولا قسمَ ثانياً", () => {
+    const sid = run.ready[0].supplierId;
+    const accounts = new Map([[sid, resolvePayeeAccount([{ kind: "IBAN", normalized: "SA0380000000608010167519" }])]]);
+    expect(toBankTransferCsv(run, accounts).split("\r\n")).toHaveLength(2);
+  });
+
+  it("خليّةٌ تبدأ بعلامة صيغة تُسبَق بفاصلةٍ عليا — لا تُنفَّذ في إكسل", () => {
+    const evil = buildPaymentRun([
+      inv({ invoiceId: "1", supplierName: "=HYPERLINK(\"http://x\")", invoiceNumber: "-1+2" }),
+      inv({ invoiceId: "2", supplierId: "s2", supplierName: "@SUM(A1)", invoiceNumber: "+966" }),
+    ], "2026-08");
+    const accounts = new Map(evil.ready.map((r) => [r.supplierId, { account: "SA0380000000608010167519", note: null }]));
+    const csv = toBankTransferCsv(evil, accounts);
+    for (const line of csv.split("\r\n").slice(1)) {
+      for (const cell of line.split(",")) expect(cell.replace(/^"/, "")).not.toMatch(/^[=+\-@]/);
+    }
+    expect(csv).toContain("'-1+2");
+    expect(csv).toContain("'+966");
+  });
+
+  it("المبلغُ من الهللات نصّاً", () => {
+    const one = buildPaymentRun([inv({ invoiceId: "1", totalMinor: 1_000_07 })], "2026-08");
+    expect(toBankTransferCsv(one)).toContain("1000.07");
   });
 
   it("يبدأ بعلامة ترميز ليقرأه إكسل العربي", () => {
@@ -124,7 +152,7 @@ describe("ملف التحويلات", () => {
     const tricky = buildPaymentRun([
       inv({ invoiceId: "1", supplierName: 'مؤسسة "أ, ب"' }),
     ], "2026-08");
-    const line = toBankTransferCsv(tricky).split("\r\n")[1];
+    const line = toBankTransferCsv(tricky).split("\r\n")[3];
     expect(line.startsWith('"مؤسسة ""أ, ب"""')).toBe(true);
   });
 });
@@ -134,7 +162,7 @@ describe("رسالة المورّد", () => {
     const run = buildPaymentRun([
       inv({ invoiceId: "1", invoiceNumber: "990", taxStatus: "INVALID" }),
     ], "2026-08");
-    const msg = buildSupplierMessage("بيكوف", run.held);
+    const msg = buildSupplierMessage("بيكوف", run.held, "310007971600003");
     expect(msg).toContain("بيكوف");
     expect(msg).toContain("990");
     expect(msg).toContain("310007971600003");

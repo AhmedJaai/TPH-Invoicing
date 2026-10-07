@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CircleAlert, CircleCheck, FilePlus2, Plus, TriangleAlert } from "lucide-react";
 import { postJson } from "@/lib/http-client";
+import { SimilarSuppliers, readSimilar, type SimilarSupplier } from "./similar-suppliers";
 import { parseRiyals, TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import { normalizeDocumentDate } from "@/lib/document-date";
 import { isValidSaudiVat } from "@/lib/validation";
@@ -93,6 +94,7 @@ export function DocumentRecord({
   const [error, setError] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [similar, setSimilar] = useState<SimilarSupplier[]>([]);
 
   const set = (patch: Partial<typeof f>) => { setF((x) => ({ ...x, ...patch })); setVerdict(null); };
 
@@ -125,14 +127,22 @@ export function DocumentRecord({
     return true;
   }
 
-  async function createSupplier() {
+  async function createSupplier(confirmNew = false) {
     const nameAr = newName.trim();
     if (nameAr.length < 2) return false;
     const r = await postJson<{ supplier: { id: string; nameAr: string } }>("/api/supplier", {
       nameAr,
       vatNumber: isValidSaudiVat(f.sellerVat) ? f.sellerVat : undefined,
+      ...(confirmNew ? { confirmNew: true } : {}),
     });
-    if (!r.ok) { setError(r.error); return false; }
+    if (!r.ok) {
+      /* يشبه مسجَّلاً — يُسأل «أهو هو؟» ولا يُنشأ ثانٍ بصمت */
+      const alike = r.status === 409 ? readSimilar(r.data) : [];
+      setSimilar(alike);
+      if (alike.length === 0) setError(r.error);
+      return false;
+    }
+    setSimilar([]);
     setList((xs) => [...xs, { id: r.data.supplier.id, nameAr: r.data.supplier.nameAr }]);
     setSupplierId(r.data.supplier.id);
     setCreating(false);
@@ -196,10 +206,24 @@ export function DocumentRecord({
                 className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm sm:min-h-9"
               />
             </label>
-            <ActionButton variant="primary" size="sm" disabled={newName.trim().length < 2} reason="اكتب الاسم — حرفان على الأقلّ" onAction={createSupplier}>
+            <ActionButton variant="primary" size="sm" disabled={newName.trim().length < 2} reason="اكتب الاسم — حرفان على الأقلّ" onAction={() => createSupplier()}>
               أنشئه
             </ActionButton>
-            <button type="button" onClick={() => setCreating(false)} className={buttonClass("quiet", "sm")}>تراجع</button>
+            <button type="button" onClick={() => { setCreating(false); setSimilar([]); }} className={buttonClass("quiet", "sm")}>تراجع</button>
+            <div className="w-full">
+              <SimilarSuppliers
+                similar={similar}
+                onPick={(s) => {
+                  setList((xs) => (xs.some((x) => x.id === s.id) ? xs : [...xs, { id: s.id, nameAr: s.nameAr }]));
+                  setSupplierId(s.id);
+                  setVerdict(null);
+                  setSimilar([]);
+                  setCreating(false);
+                  setNewName("");
+                }}
+                onCreateAnyway={() => void createSupplier(true)}
+              />
+            </div>
           </div>
         )}
       </div>

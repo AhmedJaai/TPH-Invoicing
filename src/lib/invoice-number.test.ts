@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { normalizeInvoiceNumber, sameInvoiceNumber, unreverseInvoiceNumber } from "./invoice-number";
+import { invoiceNumberKey } from "./invoice-twin";
+import { normalizeRef } from "./statement-match";
 
 describe("normalizeInvoiceNumber", () => {
   it("يُسقط الأصفار البادئة — «04» هي «4» (صورة ثانية للافا)", () => {
@@ -44,5 +46,24 @@ describe("الرقمُ المقلوب من سطرٍ يمينيّ", () => {
     expect(unreverseInvoiceNumber("INV/2026/00124")).toBe("INV/2026/00124");
     expect(unreverseInvoiceNumber("260410")).toBe("260410");
     expect(unreverseInvoiceNumber("2026-INV-5")).toBe("2026-INV-5");
+  });
+});
+
+describe("صيغُ الرقم الثلاث — أساسٌ واحد وفرقٌ مقصود", () => {
+  /* [أ، ب، أيتساويان تنبيهاً؟، أيتساويان حكماً آليّاً؟، أيتساويان مرجعَ كشف؟] */
+  const table: [string, string, boolean, boolean, boolean][] = [
+    ["INV/2026/05297", "inv 2026-05297", true, true, true],
+    ["٠٤", "04", true, true, true],
+    ["INV-۱۲", "INV-12", true, true, true],
+    ["0059-SI", "SI-0059", true, true, true],
+    [" SI-0059 ", "SI-0059", true, true, true],
+    ["04", "4", true, false, false],
+    ["INV-05297", "INV-5297", true, false, false],
+    ["INV-12", "INV-13", false, false, false],
+  ];
+  it.each(table)("%s و %s", (a, b, warn, auto, ref) => {
+    expect(sameInvoiceNumber(a, b)).toBe(warn);
+    expect(invoiceNumberKey(a) === invoiceNumberKey(b)).toBe(auto);
+    expect(normalizeRef(a) === normalizeRef(b)).toBe(ref);
   });
 });

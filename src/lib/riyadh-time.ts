@@ -103,3 +103,13 @@ export function formatMonth(month: string): string {
 export function formatRange(from: Date | string, to: Date | string): string {
   return `من ${formatDay(from)} إلى ${formatDay(to)}`;
 }
+
+/**
+ * رقمُ اليوم بتوقيت الرياض — عددٌ صحيح يُطرَح.
+ *
+ * فرقُ الأيّام كان يُحسب بقسمة فرق الطوابع، فيدخل كسرُ يومٍ في حدّ نافذةٍ
+ * تُقاس بالأيّام. والرياض بلا توقيتٍ صيفيّ: ثلاث ساعاتٍ ثابتة.
+ */
+export function riyadhDayNumber(at: Date): number {
+  return Math.floor((at.getTime() + 3 * 3_600_000) / 86_400_000);
+}

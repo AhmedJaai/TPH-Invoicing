@@ -8,6 +8,18 @@
  */
 import type { SalesTransaction } from "./connector";
 
+/**
+ * أقصى حجمٍ لملفّ المبيعات — **تحت حدّ المنصّة لا فوقه**.
+ *
+ * دوالّ Vercel تردّ جسمَ الطلب فوق ٤٫٥ ميجابايت بـ413 قبل أن يبلغ الكود،
+ * فكان حدُّ «٨ ميجابايت» وعداً لا يُوفى: يرى صاحبُ المقهى خطأً ليس منّا
+ * ولا بلغتنا. وتصديرُ أسبوعٍ حقيقيّ (٢٬٠٨١ صفّاً) دون ربع ميجابايت.
+ * ويُفحَص في المتصفّح قبل الرفع وفي الخادم بعده — بالثابت نفسه.
+ */
+export const MAX_SALES_FILE_BYTES = 4 * 1024 * 1024;
+export const SALES_FILE_TOO_LARGE =
+  "الملفّ أكبر من ٤ ميجابايت — صدِّر من فودكس أسبوعاً واحداً في الملفّ وارفع كلَّ أسبوعٍ وحده.";
+
 export type ParsedRowStatus = "PARSED" | "SKIPPED" | "ERROR" | "DUPLICATE" | "REVISED";
 
 export interface ParsedSaleLine {
@@ -29,7 +41,12 @@ export interface ParsedSaleLine {
   sourceStatus: string | null;
   isRefund: boolean;
   isVoid: boolean;
-  /** لا دليلَ عليه في تصدير فودكس — يبقى `false` ولا يُخترَع. */
+  /**
+   * بندٌ له سعرٌ وخرج بلا ثمن — ضيافةٌ أو مشروبُ موظَّف.
+   *
+   * لا عَلَمَ له في تصدير فودكس، **ولا يُخترَع**: يُشتقّ من الصفّ نفسِه حين
+   * يقطع به — منتجٌ تامّ سعرُه موجبٌ وإجماليُّه صفر، أو خصمُه يبلغ سعرَه.
+   */
   isComplimentary: boolean;
   /**
    * خيارُ إضافةٍ لا منتج: كمّيّتُه كمّيّةُ أصله، وسعرُه مشمولٌ في الأصل.
@@ -37,6 +54,14 @@ export interface ParsedSaleLine {
    */
   isModifier: boolean;
   parentExternalId: string | null;
+  /**
+   * **سطرُ** الأصل لا رمزُه: آخرُ صفّ منتجٍ بذلك الرمز قبل الخيار في طلبه.
+   *
+   * طلبٌ فيه لاتيه عاديّ ولاتيه بـ«إكسترا شوت» يحمل الرمزَ نفسَه مرّتين؛
+   * فالربطُ بالرمز ينسب الخيارَ إلى الاثنين، ومتى رُبط مكوّنٌ بالخيار
+   * حُسب مرّتين.
+   */
+  parentLineExternalId: string | null;
   /** أسماءُ خيارات هذا البند — تُحفَظ على الأصل للعرض. */
   modifiers: string[] | null;
   /** كلفةُ المصدر — تُحفَظ للمقارنة ولا يُقوَّم بها فرقٌ (تكون دائريّة). */
@@ -131,7 +156,7 @@ export function toSalesTransactions(file: ParsedSalesFile): SalesTransaction[] {
       externalProductId: l.productExternalId,
       name: l.name,
       category: l.category ?? undefined,
-      quantity: l.quantityMilli / 1000,
+      quantityMilli: l.quantityMilli,
       unitPriceMinor: l.unitPriceMinor,
       lineTotalMinor: l.lineTotalMinor,
     })),

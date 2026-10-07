@@ -2,15 +2,11 @@
  * قراءةُ قيم الخلايا — وما لا يُقرأ يُعلَن، لا يُقرأ صفراً.
  */
 import { parseRiyals } from "@/lib/money";
-import { decimalToMilli } from "@/lib/inventory/units";
+import { decimalToMilli, roundHalfAwayFromZero, toLatinDigits } from "@/lib/inventory/units";
 
 /** الأرقام العربية‑الهندية إلى اللاتينية، وإسقاطُ فواصل الآلاف. */
 export function normaliseNumeric(raw: string): string {
-  return raw
-    .trim()
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
-    .replace(/٫/g, ".")
+  return toLatinDigits(raw.trim())
     .replace(/[,٬  \s]/g, "");
 }
 
@@ -28,6 +24,44 @@ export function parseMoneyMinor(raw: string | undefined): number | null {
   const text = raw.trim();
   if (text === "") return null;
   return parseRiyals(text);
+}
+
+/** جزءٌ من مئة ألفٍ من الريال — دقّةُ ما يكتبه فودكس (`3.3913`). */
+export const MICRO_PER_MINOR = 1000;
+
+export type SalesAmount =
+  | { state: "EMPTY" }
+  | { state: "UNREADABLE" }
+  | { state: "OK"; micro: number };
+
+/**
+ * مبلغٌ من ملفّ المبيعات — **والفارغُ غيرُ ما لا يُقرأ**.
+ *
+ * كان `parseMoneyMinor(...) ?? 0` يجمعهما في صفر: خانةٌ فارغة لخيارٍ بلا
+ * سعر صفرٌ مشروع، أمّا نصٌّ لم يُفهَم فكان يصير ٠٫٠٠ ريالاً بلا شكوى —
+ * فينقص إيرادُ اليوم. وضريبةُ فودكس بأربع منازل (`3.3913`) يردّها
+ * `parseRiyals` عن قصد، **فكانت ضريبةُ كلّ بيعةٍ صفراً**.
+ *
+ * فتُقرأ هنا بخمس منازل بلا عائمة، ويُقرَّب مجموعُها مرّةً لا كلُّ سطر.
+ * و«-» خانةٌ فارغة عند فودكس.
+ */
+export function readSalesAmount(raw: string | undefined): SalesAmount {
+  if (raw === undefined) return { state: "EMPTY" };
+  const text = normaliseNumeric(raw).replace(/(?:SAR|SR|ريال|ر\.?س|﷼)/gi, "");
+  if (text === "" || text === "-" || text === "—") return { state: "EMPTY" };
+  const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(text);
+  if (!m) return { state: "UNREADABLE" };
+  const whole = Number(m[2]);
+  /* خمسُ منازل تُقرأ، والسادسةُ تُقرِّب ما قبلها */
+  const padded = ((m[3] ?? "") + "000000").slice(0, 6);
+  const micro = whole * 100_000 + Math.round(Number(padded) / 10);
+  if (!Number.isSafeInteger(micro)) return { state: "UNREADABLE" };
+  return { state: "OK", micro: m[1] === "-" ? -micro : micro };
+}
+
+/** جزءُ المئة ألف ← هللة، والنصفُ بعيداً عن الصفر. */
+export function microToMinor(micro: number): number {
+  return roundHalfAwayFromZero(micro / MICRO_PER_MINOR);
 }
 
 /**

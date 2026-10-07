@@ -25,6 +25,7 @@
  * والفرق بين `REVERSED` و`VOID` أنّ الأولى وقعت ثمّ رُدّت — ولها أثرٌ
  * في الكشف — والثانية لم تقع.
  */
+import { HALALA_TOLERANCE_MINOR } from "./money";
 
 export type PaymentStatus =
   | "UNAPPLIED"
@@ -59,7 +60,7 @@ export interface PaymentFacts {
  * هللةٌ واحدة — نفسها في `allocation.ts`. والفرق فوقها فائضٌ يُعلَن،
  * لأنّ الفائض الصامت هو بالضبط ما يجعل رصيد المورّد يكذب.
  */
-export const SETTLE_TOLERANCE_MINOR = 1;
+export const SETTLE_TOLERANCE_MINOR = HALALA_TOLERANCE_MINOR;
 
 /**
  * يشتقّ الحال من الأرقام — لا يُحفَظ حالٌ يخالف ما تقوله التخصيصات.

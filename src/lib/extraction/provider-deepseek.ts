@@ -29,15 +29,20 @@ import { extractionSchema } from "./schema";
 import { classifierSchema, schemaFor, widen, type DocumentKind } from "./schemas-by-kind";
 import {
   buildInstructions,
+  type ExtractionFailureKind,
   type ExtractionOutcome,
   type ExtractionProvider,
   type ExtractionRequest,
 } from "./provider";
-import { callDeepseek, parseJsonLoose, type DeepseekMessage, type ContentPart } from "@/lib/ai/deepseek";
+import { callDeepseek, parseJsonLoose, type DeepseekFailureKind, type DeepseekMessage, type ContentPart } from "@/lib/ai/deepseek";
 import { isDeepseekConfigured } from "@/lib/ai/models";
 import { resolveDocumentInput, type DocumentInput } from "@/lib/ai/document-input";
 import { detailFor } from "@/lib/ai/pdf-images";
 import { describeConflicts, findConflicts } from "./validate-extraction";
+import { emptyEvidence } from "./evidence";
+import { PROMPT_VERSION, SCHEMA_VERSION } from "./versions";
+import { todayInRiyadh } from "@/lib/riyadh-time";
+import type { ExtractionResult } from "./schema";
 
 /**
  * يصف المخطّط للنموذج.
@@ -56,6 +61,17 @@ const JSON_RULE =
   "كلّ حقلٍ في المخطّط مطلوب: الحقل النصّيّ الذي لم يظهر في المستند اتركه \"\"، والقائمة التي لم تُقرأ []، " +
   "والثقة رقمٌ بين 0 و1 دائماً. ولا تخترع قيمة.";
 
+/**
+ * يُسقط علامتَي السياج من نصّ المستند قبل لفّه بهما.
+ *
+ * كان النصّ يُحاط بـ`<<<DOCUMENT>>>` كما هو: ملفٌّ يحمل في نصّه
+ * «<<<END DOCUMENT>>>» (ولو أبيضَ على أبيض) يخرج من السياج فيُقرأ ما بعده
+ * تعليماتٍ لا بيانات. فما شابه العلامة في النصّ يُفكّ قبل اللفّ.
+ */
+export function sanitizeDocumentText(text: string): string {
+  return text.replace(/<{2,}\s*(END\s+)?DOCUMENT\s*>{2,}/gi, "‹$1DOCUMENT›");
+}
+
 /** يبني أجزاء الرسالة من المستند — نصّاً أو صوراً. */
 function documentParts(input: DocumentInput): ContentPart[] {
   if (input.mode === "TEXT") {
@@ -65,7 +81,7 @@ function documentParts(input: DocumentInput): ContentPart[] {
         text:
           "نصّ المستند مستخرَجٌ من الملفّ بمواضعه، والصفوف محفوظة:\n\n" +
           "<<<DOCUMENT>>>\n" +
-          input.text +
+          sanitizeDocumentText(input.text) +
           "\n<<<END DOCUMENT>>>",
       },
     ];
@@ -104,6 +120,36 @@ function taskFor(input: DocumentInput): "TEXT" | "VISION" {
   return input.mode === "TEXT" ? "TEXT" : "VISION";
 }
 
+/** نوعُ عطب النداء إلى نوع فشل القراءة — به يُعرف أالعطبُ في القارئ أم في الملفّ. */
+export function failureKindOf(kind: DeepseekFailureKind): ExtractionFailureKind {
+  switch (kind) {
+    case "NO_BALANCE": return "NO_BALANCE";
+    case "NOT_CONFIGURED": return "NOT_CONFIGURED";
+    case "AI_UNAVAILABLE": return "TRANSIENT";
+    default: return "INVALID";
+  }
+}
+
+const MONEY_KEYS = ["subtotalAmount", "vatAmount", "totalAmount", "discountAmount", "chargesAmount"] as const;
+
+/**
+ * الحقول الماليّة التي تبدّلت بين جوابين.
+ *
+ * عند «الإجماليّ لا يساوي الصافي + الضريبة» يُعاد السؤال، والنموذج تحت ذلك
+ * يميل إلى تغيير رقمٍ ليستقيم الجمع لا إلى إعادة القراءة — فيخرج حسابٌ مستقيم
+ * برقمٍ لم يُطبع. فما تبدّل يُعلَّم، ولا يدخل آلياً بلا شاهدٍ من خارج النموذج.
+ * (الفراغ الذي مُلئ ليس تبدّلاً: قراءةٌ أُكملت.)
+ */
+export function changedMoneyFields(first: ExtractionResult, second: ExtractionResult): string[] {
+  const out: string[] = [];
+  for (const key of MONEY_KEYS) {
+    const a = (first[key] ?? "").trim();
+    const b = (second[key] ?? "").trim();
+    if (a !== "" && a !== b) out.push(key);
+  }
+  return out;
+}
+
 async function extractWithDeepseek(request: ExtractionRequest): Promise<ExtractionOutcome> {
   if (!isDeepseekConfigured()) {
     /*
@@ -114,13 +160,14 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
     return {
       ok: false,
       provider: "deepseek",
+      kind: "NOT_CONFIGURED",
       reason: "قراءةُ المستندات متوقّفة: القارئ غير مهيّأ في الخادم. لم يُحفَظ شيء — أبلِغ مالك الحساب ثمّ أعد المحاولة.",
     };
   }
 
   const input = await resolveDocumentInput(request.data, request.mimeType);
   if (input.mode === "UNREADABLE") {
-    return { ok: false, provider: "deepseek", reason: input.reason };
+    return { ok: false, provider: "deepseek", kind: "UNREADABLE", reason: input.reason };
   }
 
   const task = taskFor(input);
@@ -133,6 +180,7 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
 
   let inputTokens = 0;
   let outputTokens = 0;
+  let cachedTokens = 0;
 
   /* ── المرحلة الأولى: ما هذا المستند؟ ── */
   const classified = await callDeepseek({
@@ -164,6 +212,7 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
   if (classified.ok) {
     inputTokens += classified.usage.inputTokens;
     outputTokens += classified.usage.outputTokens;
+    cachedTokens += classified.usage.cachedTokens;
     const parsed = parseJsonLoose(classified.text);
     if (parsed.ok) {
       const c = classifierSchema.safeParse(parsed.value);
@@ -179,7 +228,7 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
       الواحد ويضيع السبب. أمّا الجوابُ غير الصالح فيمضي بالمخطّط الكامل.
       وإكمالُها يعني نداءً ثانياً يفشل بالسبب نفسه ويُضاعف الانتظار.
     */
-    return { ok: false, provider: "deepseek", reason: classified.reason };
+    return { ok: false, provider: "deepseek", kind: failureKindOf(classified.kind), reason: classified.reason };
   }
 
   /*
@@ -211,7 +260,11 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
 
   /* ── المرحلة الثانية، ومعها إعادةٌ موجَّهة عند الاختلال ── */
   let lastReason = classified.ok ? "" : classified.reason;
+  let lastKind: ExtractionFailureKind = "INVALID";
   let ceiling = ceilingFor(kind);
+  /** أوّلُ جوابٍ استقام شكلُه — يُقابَل به ما بعد إعادة السؤال */
+  let firstValue: ExtractionResult | null = null;
+  const conflictContext = { today: todayInRiyadh(), companyVat: request.companyVat };
 
   for (let pass = 1; pass <= 3; pass++) {
     /*
@@ -226,7 +279,7 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
 
     if (!response.ok) {
       if (response.kind === "NOT_CONFIGURED" || response.kind === "NO_BALANCE") {
-        return { ok: false, provider: "deepseek", reason: response.reason };
+        return { ok: false, provider: "deepseek", kind: failureKindOf(response.kind), reason: response.reason };
       }
       /*
         الانقطاع وحده يُعاد عليه بسقفٍ أعلى — مرّةً واحدة.
@@ -241,11 +294,13 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
         continue;
       }
       lastReason = response.reason;
+      lastKind = failureKindOf(response.kind);
       break;
     }
 
     inputTokens += response.usage.inputTokens;
     outputTokens += response.usage.outputTokens;
+    cachedTokens += response.usage.cachedTokens;
 
     const parsed = parseJsonLoose(response.text);
     if (!parsed.ok) {
@@ -284,18 +339,37 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
       بعينه** ويُطلَب منه إعادةُ قراءة تلك الحقول وحدها. وأكثر الاختلال
       خطأُ قراءةٍ في رقم واحد، لا عجزٌ عن الفهم.
     */
-    const conflicts = findConflicts(value);
-    if (conflicts.length === 0 || pass === 2) {
+    const conflicts = findConflicts(value, conflictContext);
+    /*
+      يُعاد السؤال مرّةً واحدة عن التعارض. وكان الشرط `pass === 2` — فجوابٌ أوّل
+      انقطع (فرُفع سقفُه) يجعل أوّلَ جوابٍ سليمٍ «المحاولة الثانية» ويُحرَم الإعادة.
+    */
+    if (conflicts.length === 0 || firstValue !== null || pass === 3) {
+      const evidence = emptyEvidence();
+      evidence.promptVersion = PROMPT_VERSION;
+      evidence.schemaVersion = SCHEMA_VERSION;
+      evidence.provider = "deepseek";
+      /* ما بقي متعارضاً يُحفظ بنصّه ويُعرض لمن يراجع — كان يُرمى فتعود القراءة «ناجحة» بلا أثر */
+      evidence.unresolvedConflicts = conflicts.map((c) => c.message);
+      evidence.reaskChanged = firstValue ? changedMoneyFields(firstValue, value) : [];
+      evidence.pages =
+        input.mode === "TEXT"
+          ? { read: input.pagesRead, total: input.pageCount }
+          : input.pagesTotal !== null
+            ? { read: input.pagesRead, total: input.pagesTotal }
+            : null;
       return {
         ok: true,
         textSource: input.mode === "TEXT" ? "TEXT" : input.source,
         provider: "deepseek",
         value,
         model: response.model,
-        usage: { inputTokens, outputTokens },
+        usage: { inputTokens, outputTokens, cachedTokens },
+        evidence,
       };
     }
 
+    firstValue = value;
     askMessages.push(
       { role: "assistant", content: response.text.slice(0, 600) },
       { role: "user", content: describeConflicts(conflicts) },
@@ -306,6 +380,7 @@ async function extractWithDeepseek(request: ExtractionRequest): Promise<Extracti
   return {
     ok: false,
     provider: "deepseek",
+    kind: lastKind,
     reason: lastReason || "تعذّر استخراج حقول هذا المستند",
   };
 }

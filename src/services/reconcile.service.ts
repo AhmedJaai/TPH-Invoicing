@@ -15,7 +15,7 @@ import {
   type ClassificationSource, type MerchantMemory,
 } from "@/lib/bank/classification";
 import { resolveSupplier, type SupplierIdentity } from "@/lib/bank/entities";
-import { generateCandidates, type Candidate, type OpenInvoice } from "@/lib/bank/candidates";
+import { searchCandidates, type Candidate, type OpenInvoice } from "@/lib/bank/candidates";
 import { reconcile, type Claim } from "@/lib/bank/optimizer";
 import { decide, type Decision } from "@/lib/bank/decision";
 import { planAdjudication, type AdjudicationCase } from "@/lib/bank/adjudicate";
@@ -118,6 +118,14 @@ export interface ReconcileResult {
   adjudicationCases: AdjudicationCase[];
   /** خطّة الكتابة — لا تُنفَّذ إلّا بموافقة، ومصدرها المحرّك وحده. */
   planned: PlannedPayment[];
+  /**
+   * كلُّ ما رُشّح لكلّ حركة، مرتّباً بالدرجة — بمفتاح الحركة.
+   *
+   * لمن يُقرّ بيده: الاقتراحُ الذي لا يبلغ الحسمَ يُعرَض بمرشّحيه ليُختار
+   * بينهم، والخادمُ يتحقّق أنّ المختار من هذه القائمة لحظةَ الكتابة
+   * (`planFor`). ولا يُكتَب منها شيءٌ بلا إقرار.
+   */
+  candidatesByKey: ReadonlyMap<string, readonly Candidate[]>;
   summary: {
     /** هل بلغ المحسِّن الحلّ الأمثل يقيناً؟ */
     exact: boolean;
@@ -195,6 +203,17 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
     return { key: row.key, canonical, classification };
   });
 
+  const preparedByKey = new Map(prepared.map((p) => [p.key, p]));
+  const invoiceById = new Map(invoices.map((i) => [i.id, i]));
+  const invoicesBySupplier = new Map<string, OpenInvoice[]>();
+  for (const i of invoices) {
+    const list = invoicesBySupplier.get(i.supplierId) ?? [];
+    list.push(i);
+    invoicesBySupplier.set(i.supplierId, list);
+  }
+  /** حركاتٌ نفدت ميزانيّةُ بحث مجموعاتها — قائمةُ مرشّحيها قد تنقص. */
+  const incompleteSearch = new Set<string>();
+
   const claims: Claim[] = [];
   const perKey = new Map<string, { supplierId: string | null; score: number; evidence: string[] }>();
   const candidatesByKey = new Map<string, Candidate[]>();
@@ -231,7 +250,7 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
     });
     if (!resolution) continue;
 
-    for (const candidate of generateCandidates(
+    const search = searchCandidates(
       {
         transactionId: p.key,
         valueDate: p.canonical.valueDate,
@@ -241,17 +260,19 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
         references: matchableReferences(p.canonical.references).map((r) => r.value),
         profile: profiles.get(resolution.supplierId),
       },
-      invoices,
-    )) {
+      /* فواتيرُ مورّدها وحده — لا مسحٌ لكلّ الفواتير لكلّ حركة */
+      invoicesBySupplier.get(resolution.supplierId) ?? [],
+    );
+    if (search.subsetSearchExhausted) incompleteSearch.add(p.key);
+    for (const candidate of search.candidates) {
       claims.push({ transactionId: p.key, candidate });
-      const list = candidatesByKey.get(p.key) ?? [];
-      list.push(candidate);
-      candidatesByKey.set(p.key, list);
     }
+    if (search.candidates.length > 0) candidatesByKey.set(p.key, search.candidates);
   }
 
-  const { assigned, exact } = reconcile(claims);
+  const { assigned, exact, inexactTransactionIds } = reconcile(claims);
   const decided = new Map(assigned.map((a) => [a.transactionId, { a, d: decide(a) }]));
+  const inexact = new Set(inexactTransactionIds);
 
   /*
     الحلّ التقريبيّ لا يُطابَق تلقائياً.
@@ -263,21 +284,28 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
   /*
     والقراءة البصرية كذلك: كلاهما «حسابٌ صحيح على مدخلٍ غير مثبت».
   */
-  const demotion =
-    !exact
+  /*
+    وتُنزَّل حركاتُ المكوّنة التي لم يُثبَت حلُّها وحدها — لا الكشفُ كلُّه:
+    مورّدٌ واحد صعب لا يُعاقَب به ثلاثمئة حركةٍ حلُّها يقين.
+    وكذلك من نفدت ميزانيّةُ بحث مجموعاته: قائمةُ مرشّحيه قد تنقص.
+  */
+  const demotionFor = (key: string): string | null =>
+    inexact.has(key)
       ? "الحلّ تقريبيّ: نفدت ميزانيّة البحث فلم يُثبَت أنّه الأفضل — فيُقترَح ولا يُطابَق"
-      : readSource === "VISION"
-        ? "الكشف قُرئ بصرياً من صورة — فلا يُطابَق تلقائياً مهما بلغت الدرجة"
-        : null;
+      : incompleteSearch.has(key)
+        ? "بحثُ مجموعات الفواتير لم يكتمل: قد يوجد مرشّحٌ لم يُفحَص — فيُقترَح ولا يُطابَق"
+        : readSource === "VISION"
+          ? "الكشف قُرئ بصرياً من صورة — فلا يُطابَق تلقائياً مهما بلغت الدرجة"
+          : null;
 
-  if (demotion !== null) {
-    for (const [key, entry] of decided) {
-      if (entry.d.disposition !== "AUTO") continue;
-      decided.set(key, {
-        a: entry.a,
-        d: { disposition: "SUGGEST", reasons: [...entry.d.reasons, demotion] },
-      });
-    }
+  for (const [key, entry] of decided) {
+    if (entry.d.disposition !== "AUTO") continue;
+    const demotion = demotionFor(key);
+    if (demotion === null) continue;
+    decided.set(key, {
+      a: entry.a,
+      d: { disposition: "SUGGEST", reasons: [...entry.d.reasons, demotion] },
+    });
   }
 
   const results: TransactionResult[] = prepared.map((p) => {
@@ -336,55 +364,13 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
   const planned: PlannedPayment[] = [];
   for (const r of results) {
     if (r.decision?.disposition !== "AUTO" || !r.candidate || !r.supplierId) continue;
-
-    const chosen = invoices.filter((i) => r.candidate!.invoiceIds.includes(i.id));
-    if (chosen.length === 0) continue;
-
-    /*
-      يُوزَّع المبلغ على الفواتير بترتيب تاريخها — الأقدم أوّلاً — ولا
-      يتجاوز مجموعُ التخصيصات قيمةَ الدفعة ولا قيمةَ أيّ فاتورة.
-    */
-    let left = r.candidate.allocatedMinor;
-    const allocations: PlannedPayment["allocations"] = [];
-    for (const inv of [...chosen].sort((a, b) => a.invoiceDate.getTime() - b.invoiceDate.getTime())) {
-      if (left <= 0) break;
-      const take = Math.min(left, inv.outstandingMinor);
-      if (take <= 0) continue;
-      allocations.push({ invoiceId: inv.id, amountMinor: take });
-      left -= take;
-    }
-    if (allocations.length === 0) continue;
-
-    const months = [...new Set(chosen.map((i) => i.periodMonth))].sort();
-
-    /*
-      الرسم يُفصَل قبل الكتابة.
-
-      الشرط أن يزيد المدفوع على مجموع الفواتير بقدرٍ في حدّ رسم التحويل.
-      وما جاوز الحدّ ليس رسماً بل فرقاً يُحقَّق فيه — فلا يُفترَض،
-      لأنّ التسامح الذي يبتلع كل فرق يُخفي أخطاءً بدل أن يُصلحها.
-    */
-    const txAmount = prepared.find((p) => p.key === r.key)!.canonical.amountMinor;
-    const invoiceSum = allocations.reduce((sum, a) => sum + a.amountMinor, 0);
-    const fee = splitBankFee(txAmount, invoiceSum);
-
-    planned.push({
-      transactionKey: r.key,
-      supplierId: r.supplierId,
-      /*
-        المبلغ المسجَّل هو ما خرج من الحساب فعلاً — بما فيه الرسم.
-        والرسم يُعلَن في حقله، فيخرج من القسمة ولا يُخصَّص على مورّد.
-        وكتابةُ المبلغ ناقصاً الرسم تجعل الدفعة لا تساوي الحركة، فتختلّ
-        معادلة الكشف بمقدار الرسوم كلِّها.
-      */
-      amountMinor: fee ? txAmount : r.candidate.allocatedMinor,
-      paidAt: prepared.find((p) => p.key === r.key)!.canonical.valueDate,
-      allocations,
-      months,
-      primaryMonth: months[months.length - 1],
-      feeMinor: fee?.feeMinor ?? 0,
-      feeReason: fee?.reason ?? null,
-    });
+    const p = preparedByKey.get(r.key);
+    if (!p) continue;
+    const plan = planFor(
+      { key: r.key, supplierId: r.supplierId, amountMinor: p.canonical.amountMinor, paidAt: p.canonical.valueDate },
+      r.candidate, invoiceById,
+    );
+    if (plan) planned.push(plan);
   }
 
   const summary = {
@@ -406,14 +392,84 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
   const adjudicationCases = planAdjudication(
     results.map((r) => ({
       transactionId: r.key,
-      amountMinor: prepared.find((p) => p.key === r.key)?.canonical.amountMinor ?? 0,
+      amountMinor: preparedByKey.get(r.key)?.canonical.amountMinor ?? 0,
       supplierId: r.supplierId,
       candidates: candidatesByKey.get(r.key) ?? [],
       decision: r.decision,
     })),
   ).cases;
 
-  return { results, planned, adjudicationCases, summary };
+  return { results, planned, candidatesByKey, adjudicationCases, summary };
+}
+
+/**
+ * خطّةُ الكتابة لمرشّحٍ بعينه — مصدرُها المحرّك وحده.
+ *
+ * تُستعمل للتلقائيّ (`planned`) ولما يُقرّه إنسانٌ من اقتراح: المرشّحُ من
+ * قائمةٍ حسبها الخادم، والتخصيصُ يحسبه الخادم — والمتصفّح لا يُرسل إلّا
+ * معرّفات.
+ *
+ * و`fullAmount` لإقرار الإنسان: المقيَّدُ هو ما خرج من الحساب كلُّه، وما
+ * زاد على الفواتير يبقى «غير مخصَّص» (حالٌ صحيحة) — لا دفعةٌ تنقص عن
+ * حركتها.
+ */
+export function planFor(
+  tx: { key: string; supplierId: string; amountMinor: number; paidAt: Date },
+  candidate: Candidate,
+  invoiceById: ReadonlyMap<string, OpenInvoice>,
+  options: { fullAmount?: boolean } = {},
+): PlannedPayment | null {
+  const chosen = candidate.invoiceIds
+    .map((id) => invoiceById.get(id))
+    .filter((i): i is OpenInvoice => i !== undefined);
+  /* فاتورةٌ من المرشّح لم تعد مفتوحة — فالمرشّحُ لم يعد صالحاً كلُّه */
+  if (chosen.length === 0 || chosen.length !== candidate.invoiceIds.length) return null;
+  if (chosen.some((i) => i.supplierId !== tx.supplierId)) return null;
+
+  /*
+    يُوزَّع المبلغ على الفواتير بترتيب تاريخها — الأقدم أوّلاً — ولا
+    يتجاوز مجموعُ التخصيصات قيمةَ الدفعة ولا قيمةَ أيّ فاتورة.
+  */
+  let left = candidate.allocatedMinor;
+  const allocations: PlannedPayment["allocations"] = [];
+  for (const inv of [...chosen].sort((a, b) => a.invoiceDate.getTime() - b.invoiceDate.getTime())) {
+    if (left <= 0) break;
+    const take = Math.min(left, inv.outstandingMinor);
+    if (take <= 0) continue;
+    allocations.push({ invoiceId: inv.id, amountMinor: take });
+    left -= take;
+  }
+  if (allocations.length === 0) return null;
+
+  const months = [...new Set(chosen.map((i) => i.periodMonth))].sort();
+
+  /*
+    الرسم يُفصَل قبل الكتابة.
+
+    الشرط أن يزيد المدفوع على مجموع الفواتير بقدرٍ في حدّ رسم التحويل.
+    وما جاوز الحدّ ليس رسماً بل فرقاً يُحقَّق فيه — فلا يُفترَض،
+    لأنّ التسامح الذي يبتلع كل فرق يُخفي أخطاءً بدل أن يُصلحها.
+  */
+  const invoiceSum = allocations.reduce((sum, a) => sum + a.amountMinor, 0);
+  const fee = splitBankFee(tx.amountMinor, invoiceSum);
+
+  return {
+    transactionKey: tx.key,
+    supplierId: tx.supplierId,
+    /*
+      المبلغ المسجَّل هو ما خرج من الحساب فعلاً — بما فيه الرسم.
+      والرسم يُعلَن في حقله، فيخرج من القسمة ولا يُخصَّص على مورّد.
+      وكتابةُ المبلغ ناقصاً الرسم تجعل الدفعة لا تساوي الحركة، فتختلّ
+      معادلة الكشف بمقدار الرسوم كلِّها.
+    */
+    amountMinor: fee || options.fullAmount ? tx.amountMinor : candidate.allocatedMinor,
+    paidAt: tx.paidAt,
+    allocations,
+    months,
+    primaryMonth: months[months.length - 1],
+    feeMinor: fee?.feeMinor ?? 0,
+    feeReason: fee?.reason ?? null,
+  };
 }
 
 /**
@@ -425,4 +481,28 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
 function outcomeWithout(isPayment: boolean, supplierId: string | null): Outcome {
   if (!isPayment) return "NOT_A_PAYMENT";
   return supplierId === null ? "UNKNOWN_ENTITY" : "KNOWN_SUPPLIER_NO_INVOICE";
+}
+
+/** مفتاحُ المرشّح: فواتيرُه مرتّبةً — به يُقابَل اختيارُ المتصفّح بما حسبه الخادم. */
+export function candidateKey(invoiceIds: readonly string[]): string {
+  return [...invoiceIds].sort().join("+");
+}
+
+/**
+ * المرشّحُ الذي يُقَرّ لهذه الحركة.
+ *
+ * بلا اختيار: ما رسا عليه المحرّك. وباختيار: المرشّحُ الذي فواتيرُه هي
+ * المختارةُ **بعينها** من قائمة الخادم — وما ليس فيها لا يُكتَب، مهما
+ * أرسل المتصفّح.
+ */
+export function pickCandidate(
+  engine: ReconcileResult,
+  transactionId: string,
+  chosenInvoiceIds?: readonly string[],
+): Candidate | null {
+  const settled = engine.results.find((r) => r.key === transactionId)?.candidate ?? null;
+  if (!chosenInvoiceIds || chosenInvoiceIds.length === 0) return settled;
+  const wanted = candidateKey(chosenInvoiceIds);
+  return (engine.candidatesByKey.get(transactionId) ?? [])
+    .find((c) => candidateKey(c.invoiceIds) === wanted) ?? null;
 }

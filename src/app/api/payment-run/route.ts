@@ -1,14 +1,29 @@
-/** يصدّر دفعة الشهر ملفَّ تحويلات جماعية للبنك. */
+/**
+ * يصدّر دفعة الشهر ملفَّ تحويلات جماعية للبنك.
+ *
+ * **POST لا GET**: التصديرُ يكتب في سجلّ التدقيق، ورابطُ `<a download>` يجلبه
+ * المتصفّحُ أو إضافةٌ مسبقاً فيُكتب «صُدّرت الدفعة» ولم يُصدَّر شيء. واسمُ
+ * الملفّ يحمل لحظةَ تصديره — نسختان من الشهر نفسه لا تختلطان.
+ */
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
+import { todayInRiyadh } from "@/lib/riyadh-time";
 import { guard, respondTo } from "@/services/guard";
-import { toBankTransferCsv } from "@/lib/payment-run";
+import { suppliersMissingAccount, toBankTransferCsv } from "@/lib/payment-run";
 import { loadPayeeAccounts } from "@/services/payee-account.service";
 import { recordAudit } from "@/lib/audit";
 import { loadPaymentRun } from "@/services/payment-run.service";
 
 export const runtime = "nodejs";
 
-export async function GET(request: Request) {
+const Body = z.object({
+  month: z.string().regex(/^\d{4}-\d{2}$/, "شهر غير صالح"),
+  /** مورّدون بأعيانهم من الجاهزين — وغيابُه «الكلّ». */
+  suppliers: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)).max(500).optional(),
+}).strict();
+
+export async function POST(request: Request) {
   let user;
   try {
     user = await guard("payment-run", "payment:approve");
@@ -18,10 +33,9 @@ export async function GET(request: Request) {
     throw e;
   }
 
-  const month = new URL(request.url).searchParams.get("month") ?? "";
-  if (!/^\d{4}-\d{2}$/.test(month)) {
-    return NextResponse.json({ error: "شهر غير صالح" }, { status: 400 });
-  }
+  const read = await readJson(request, Body);
+  if (!read.ok) return read.response;
+  const { month } = read.body;
 
   /*
     الملفّ يطابق الصفحة: البناءُ نفسُه من `payment-run.service` — رصيدٌ لنا
@@ -34,8 +48,7 @@ export async function GET(request: Request) {
     يأخذ من المتصفّح إلّا المعرّفات: المبالغُ من البناء نفسه، وما ليس في
     «الجاهز» يُتجاهَل فلا يُحوَّل لمحجوزٍ أو مغطّى.
   */
-  const picked = new URL(request.url).searchParams.get("suppliers");
-  const only = picked ? new Set(picked.split(",").filter((x) => /^[A-Za-z0-9_-]{1,64}$/.test(x))) : null;
+  const only = read.body.suppliers ? new Set(read.body.suppliers) : null;
   const ready = only ? full.ready.filter((r) => only.has(r.supplierId)) : full.ready;
   if (ready.length === 0) {
     return NextResponse.json({ error: "لا مورّد جاهزاً في ما اخترته — حدّث الصفحة." }, { status: 400 });
@@ -55,14 +68,22 @@ export async function GET(request: Request) {
       "جاهز بالهللات": run.readyTotalMinor,
       "محجوز بالهللات": run.heldTotalMinor,
       مورّدون: run.ready.length,
+      "بلا حسابٍ معروف": suppliersMissingAccount(run, accounts).map((s) => s.supplierName),
       ...(only ? { "اختيارٌ من الجاهزين": `${run.ready.length} من ${full.ready.length}` } : {}),
     },
   });
 
+  /* يومُ التصدير وساعتُه بتوقيت الرياض: «2026-10-07_1432» */
+  const now = new Date();
+  const clock = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit", hour12: false })
+    .format(now).replace(":", "");
+  const stamp = `${todayInRiyadh(now)}_${clock}`;
+
   return new NextResponse(toBankTransferCsv(run, accounts), {
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="payment-run-${month}.csv"`,
+      "content-disposition": `attachment; filename="payment-run-${month}_${stamp}.csv"`,
+      "cache-control": "no-store",
     },
   });
 }

@@ -8,6 +8,7 @@ import { ArrowLeft, CircleAlert, CircleCheck, Copy, FileSpreadsheet, Loader2, Tr
 import { buttonClass } from "./ui";
 import { formatWeek } from "./inventory-ui";
 import { PRODUCT, countNoun } from "@/lib/arabic";
+import { MAX_SALES_FILE_BYTES, SALES_FILE_TOO_LARGE } from "@/lib/sales/file-import";
 
 /**
  * رفعُ ملفّ مبيعات فودكس.
@@ -35,6 +36,7 @@ interface ImportResponse {
 }
 
 const SHAPE_LABEL: Record<string, string> = {
+  FOODICS_ORDER_ITEMS: "تصديرُ بنود الطلبات — لكلّ صفٍّ رقمُ طلبه",
   FOODICS_ORDERS: "تصديرُ طلبات — لكلّ صفٍّ رقمُ طلبه",
   FOODICS_PRODUCT_MIX: "تصديرُ مزيج أصناف — «كم بِيع من كلٍّ في اليوم»",
 };
@@ -139,7 +141,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
                 <Upload className="h-5 w-5" strokeWidth={1.75} aria-hidden />
               </span>
               <span className="text-sm font-bold">اختر ملفّ مبيعات فودكس</span>
-              <span className="max-w-sm text-xs leading-relaxed text-muted">Excel أو CSV حتى ٨ ميجابايت. والملفُّ نفسُه مرّتين لا يُضاعف شيئاً.</span>
+              <span className="max-w-sm text-xs leading-relaxed text-muted">Excel أو CSV حتى ٤ ميجابايت — أسبوعٌ في الملفّ. والملفُّ نفسُه مرّتين لا يُضاعف شيئاً.</span>
               <input
                 type="file"
                 accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -147,7 +149,11 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   e.target.value = "";
-                  if (f) { setFile(f); setError(null); }
+                  if (!f) return;
+                  /* يُقال قبل الرفع — المنصّةُ تردّ الكبيرَ بخطأٍ لا يُفهَم */
+                  if (f.size > MAX_SALES_FILE_BYTES) { setFile(null); setError(SALES_FILE_TOO_LARGE); return; }
+                  setFile(f);
+                  setError(null);
                 }}
               />
             </label>

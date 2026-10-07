@@ -7,6 +7,7 @@
  * بقي، والفائض يُعلَن ولا يُبتلَع.
  */
 import { LINK_WINDOW_DAYS } from "@/lib/hand-payment-link";
+import { currentMonthRiyadh, todayInRiyadh } from "@/lib/riyadh-time";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { bankTransactions, invoices, paymentAllocations, payments } from "@/db/schema";
 import { assertMonthsOpen } from "./month-guard";
@@ -146,7 +147,11 @@ export async function findPaymentTwin(
 }
 
 export async function createPayment(tx: Tx, input: CreatePaymentInput): Promise<string> {
-  await assertMonthsOpen(tx, [input.appliesToMonth ?? input.paidAt.toISOString().slice(0, 7)]);
+  /*
+    الشهرُ بتوقيت الرياض: حوالةٌ في الواحدة فجراً أوّلَ الشهر هي من الشهر
+    الجديد، وكان `toISOString` يحسبها في السابق فيُفحَص قفلُ شهرٍ غير شهرها.
+  */
+  await assertMonthsOpen(tx, [input.appliesToMonth ?? currentMonthRiyadh(input.paidAt)]);
 
   /*
     ── الواقعة الواحدة لا تُقيَّد دفعتين ──
@@ -193,7 +198,7 @@ export async function findManualTwin(
   input: { supplierId: string | null; paidAt: Date; amountMinor: number },
 ): Promise<{ id: string; paidAt: Date } | null> {
   if (!input.supplierId) return null;
-  const day = input.paidAt.toISOString().slice(0, 10);
+  const day = todayInRiyadh(input.paidAt);
   const [row] = await tx
     .select({ id: payments.id, paidAt: payments.paidAt })
     .from(payments)
@@ -250,7 +255,7 @@ export async function recordBankPayment(
       amountMinor: input.amountMinor,
     });
     if (manual) {
-      await assertMonthsOpen(tx, [manual.paidAt.toISOString().slice(0, 7), input.appliesToMonth]);
+      await assertMonthsOpen(tx, [currentMonthRiyadh(manual.paidAt), input.appliesToMonth]);
       await tx
         .update(payments)
         .set({
@@ -354,6 +359,8 @@ export interface ReverseOutcome {
   freedInvoiceIds: string[];
   freedMinor: number;
   reason: string;
+  /** كانت مردودةً أو ملغاةً من قبل — لم يُكتب شيء، وبقي سببُها الأوّل ومن ردّها. */
+  alreadyReversed: boolean;
   /**
    * ما كانت الدفعة تغطّيه قبل الردّ — **فاتورةً فاتورة بمبلغها**.
    *
@@ -374,12 +381,44 @@ export interface ReverseOutcome {
  * والدفعة تبقى بحالها وسببها ومن ردّها — لا تُحذَف. والحذف يجعل الفاتورة
  * تعود مستحقّةً بلا سببٍ ظاهر، فيُدفَع ثمنها مرّتين. وما كانت تغطّيه
  * يخرج في `previousAllocations` كي يُقيَّد أثراً لا يُمحى.
+ *
+ * ── وتحرس نفسها ──
+ *
+ * لها سبعةُ مستدعين، وكانت الحراسةُ موزّعةً عليهم (كما كان سؤالُ التوأم قبل
+ * أن ينتقل إلى `createPayment`): **ردٌّ ثانٍ لا يكتب** — كان يمحو السببَ الأوّل
+ * ومَن ردّ ويقلب `REVERSED` إلى `VOID` — و**الشهرُ المقفل لا يُفكّ عن فواتيره
+ * تخصيص**: يُرمى `MonthClosedError` بجملته، لا خطأُ المؤثِّر الخامّ. وربطُ
+ * الحركة (`matched_payment_id`) شأنُ المستدعي: التراجعُ عن الربط غيرُ ردّ المال.
  */
 export async function reversePayment(tx: Tx, input: ReverseInput): Promise<ReverseOutcome> {
+  const [current] = await tx
+    .select({ status: payments.status, reversalReason: payments.reversalReason })
+    .from(payments)
+    .where(eq(payments.id, input.paymentId))
+    .for("update");
+  if (!current) throw new Error(`reversePayment: لا دفعة بالمعرّف ${input.paymentId}`);
+  if (current.status === "REVERSED" || current.status === "VOID") {
+    return {
+      status: current.status,
+      freedInvoiceIds: [],
+      freedMinor: 0,
+      reason: current.reversalReason ?? input.reason,
+      alreadyReversed: true,
+      previousAllocations: [],
+    };
+  }
+
   const allocations = await tx
-    .select({ invoiceId: paymentAllocations.invoiceId, amountMinor: paymentAllocations.amountMinor })
+    .select({
+      invoiceId: paymentAllocations.invoiceId,
+      amountMinor: paymentAllocations.amountMinor,
+      month: invoices.periodMonth,
+    })
     .from(paymentAllocations)
+    .innerJoin(invoices, eq(invoices.id, paymentAllocations.invoiceId))
     .where(eq(paymentAllocations.paymentId, input.paymentId));
+
+  await assertMonthsOpen(tx, allocations.map((a) => a.month));
 
   const plan = planReversal(allocations, input.kind, input.reason);
 
@@ -401,6 +440,7 @@ export async function reversePayment(tx: Tx, input: ReverseInput): Promise<Rever
     freedInvoiceIds: plan.freedInvoiceIds,
     freedMinor: plan.freedMinor,
     reason: plan.reason,
+    alreadyReversed: false,
     previousAllocations: allocations.map((a) => ({
       invoiceId: a.invoiceId,
       amountMinor: a.amountMinor,
@@ -418,13 +458,31 @@ export interface AllocationOutcome {
 /**
  * يخصّص دفعةً على فواتير.
  * الحساب في lib/allocation.ts دالةً خالصة؛ وهذه تكتب ما خطّطته.
+ *
+ * **مبلغُ الدفعة يُقرأ من القاعدة لا من المستدعي.** كان وسيطاً يُصدَّق، ومن
+ * مرّر `amounts.get(id) ?? 0` صار القابلُ للتخصيص صفراً بصمت. فالصيغةُ
+ * `allocate(tx, id, requests)`؛ والرباعيّةُ القديمة مقبولةٌ ورقمُها **لا
+ * يُستعمل** — مصدرٌ واحد للرقم.
  */
 export async function allocate(
   tx: Tx,
   paymentId: string,
-  paymentAmountMinor: number,
   requests: readonly AllocationRequest[],
+): Promise<AllocationOutcome>;
+/** @deprecated الرقمُ الممرَّر لا يُستعمل — المبلغُ من القاعدة. اكتب `allocate(tx, id, requests)`. */
+export async function allocate(
+  tx: Tx,
+  paymentId: string,
+  ignoredAmountMinor: number,
+  requests: readonly AllocationRequest[],
+): Promise<AllocationOutcome>;
+export async function allocate(
+  tx: Tx,
+  paymentId: string,
+  third: number | readonly AllocationRequest[],
+  fourth?: readonly AllocationRequest[],
 ): Promise<AllocationOutcome> {
+  const requests = typeof third === "number" ? fourth ?? [] : third;
   if (requests.length > 0) {
     const months = await tx
       .select({ month: invoices.periodMonth })
@@ -447,12 +505,13 @@ export async function allocate(
     الحالة معالَجة.
   */
   const [meta] = await tx
-    .select({ feeMinor: payments.feeMinor })
+    .select({ amountMinor: payments.amountMinor, feeMinor: payments.feeMinor })
     .from(payments)
     .where(eq(payments.id, paymentId))
     .limit(1);
+  if (!meta) throw new Error(`allocate: لا دفعة بالمعرّف ${paymentId}`);
 
-  const distributable = Math.max(0, paymentAmountMinor - (meta?.feeMinor ?? 0));
+  const distributable = Math.max(0, meta.amountMinor - meta.feeMinor);
   const plan = planAllocations(distributable, Number(already[0]?.sum ?? 0), requests);
 
   let count = 0;

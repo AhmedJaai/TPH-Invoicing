@@ -267,11 +267,24 @@ function withSuffix(base: string, extension: string, duplicateIndex?: number): s
   return `${base}${suffix}.${extension}`;
 }
 
+/**
+ * مقطعٌ من اسم ملفّ — لا يحمل ما يرفضه نظامُ ملفّات.
+ *
+ * «/» يكسر تنزيلَ الملفّ ونسخَه («B07/2026/17328»)، و«: * ? " < > |» لا تُنزَّل على
+ * ويندوز، والمسافةُ في الطرف تُقصّ هناك بصمت. فتُكتب كلُّها «-»، ويُقصّ الطرفان،
+ * ويُحدّ الطول — دالّةٌ واحدة لكلّ مقطع، فلا يفترق بابٌ عن باب.
+ */
+const UNSAFE_IN_NAME = /[\\/:*?"<>|\u0000-\u001f]/g;
+const MAX_TOKEN_LENGTH = 80;
+
+export function safeToken(value: string): string {
+  return value.replace(UNSAFE_IN_NAME, "-").trim().slice(0, MAX_TOKEN_LENGTH).trim();
+}
+
 export function buildInvoiceFileName(
   o: BuildOptions & { slug: string; invoiceNumber: string },
 ): string {
-  /* «/» في اسم ملفٍّ يكسر تنزيلَه ونسخَه («B07/2026/17328») — يُكتب «-» */
-  const base = `${o.date}_${o.slug}_Invoice_${o.invoiceNumber.replace(/[\\/]/g, "-")}_SAR${formatRiyals(o.amountMinor)}`;
+  const base = `${o.date}_${safeToken(o.slug)}_Invoice_${safeToken(o.invoiceNumber)}_SAR${formatRiyals(o.amountMinor)}`;
   return withSuffix(base, o.extension ?? "pdf", o.duplicateIndex);
 }
 
@@ -280,20 +293,20 @@ export function buildStatementFileName(
 ): string {
   /* الكشف بلا رصيدٍ مقروء يُسمَّى بلا مبلغ — لا يُكتب له صفر */
   const amount = o.amountMinor === undefined ? "" : `_SAR${formatRiyals(o.amountMinor)}`;
-  const base = `${o.date}_${o.slug}_Statement${amount}`;
+  const base = `${o.date}_${safeToken(o.slug)}_Statement${amount}`;
   return withSuffix(base, o.extension ?? "pdf", o.duplicateIndex);
 }
 
 export function buildReceiptFileName(
   o: BuildOptions & { slug: string; beneficiary?: string },
 ): string {
-  const who = o.beneficiary ? `${o.slug}-${o.beneficiary}` : o.slug;
+  const who = safeToken(o.beneficiary ? `${o.slug}-${o.beneficiary}` : o.slug);
   const base = `${o.date}_Receipt_${who}_SAR${formatRiyals(o.amountMinor)}`;
   return withSuffix(base, o.extension ?? "pdf", o.duplicateIndex);
 }
 
 export function buildCashFileName(o: BuildOptions & { description: string }): string {
-  const base = `${o.date}_Cash_${o.description}_SAR${formatRiyals(o.amountMinor)}`;
+  const base = `${o.date}_Cash_${safeToken(o.description)}_SAR${formatRiyals(o.amountMinor)}`;
   return withSuffix(base, o.extension ?? "jpg", o.duplicateIndex);
 }
 
@@ -309,8 +322,10 @@ export function resolveNameCollision(
   if (!taken.has(desired)) return desired;
 
   const { base, extension } = splitExtension(desired);
+  /* اسمٌ بلا امتداد («…_SAR996.19») لا تُلحَق به نقطةٌ يتيمة */
+  const tail = extension ? `.${extension}` : "";
   for (let i = 2; i < 1000; i++) {
-    const candidate = `${base} (${i}).${extension}`;
+    const candidate = `${base} (${i})${tail}`;
     if (!taken.has(candidate)) return candidate;
   }
   throw new Error(`تعذّر إيجاد اسم متاح للملف: ${desired}`);

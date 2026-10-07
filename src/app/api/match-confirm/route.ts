@@ -15,7 +15,7 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bankTransactions, decisionHistory, invoices } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { allocate, claimBankTransaction, recordBankPayment } from "@/services/payment.service";
+import { AlreadyMatchedError, allocate, claimBankTransaction, recordBankPayment } from "@/services/payment.service";
 import { recordAudit } from "@/lib/audit";
 import { HandLinkRefused, linkHandPayment, loadHandPaymentLinks } from "@/services/account-review.service";
 import { resyncBankExpenses } from "@/services/expense.service";
@@ -37,13 +37,6 @@ const Body = z.object({
   transactionId: z.string().trim().min(1).max(64).optional(),
   /** أو مجموعةٌ تُسدَّد معاً — في معاملةٍ واحدة لا خمسَ عشرة. */
   transactionIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
-  /** الفواتير التي تفسّر الحركة — تُقبَل كما هي. */
-  invoiceIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
-  /**
-   * أو توزيعٌ يكتبه صاحب العمل بنفسه — والمبلغُ لا يُؤخَذ منه: الخادمُ يوزّع
-   * مبلغَ الحركة نفسه على الفواتير التي سمّاها.
-   */
-  split: z.array(z.object({ invoiceId: z.string().trim().min(1).max(64), amountMinor: z.number().int() })).max(100).optional(),
   /** أو: ليست سداد فاتورة، وهذا سببها. */
   notAPayment: z.enum(["ADVANCE", "INTERNAL", "PERSONAL", "BANK_FEE"]).optional(),
   /** لمن دُفعت المقدَّمة، إن لم يُعرَف المورّد من الحركة. */
@@ -129,11 +122,12 @@ async function handle(request: Request) {
   */
   if (!body.notAPayment) {
     const link = (await loadHandPaymentLinks()).find((l) => l.transferId === tx.id);
-    /* فاتورةٌ أخرى اختارها صاحبُ العمل بعينها لا يُتجاوز اختيارُه */
-    const picked = [...(body.invoiceIds ?? []), ...(body.split ?? []).map((x) => x.invoiceId)];
-    const samePick = link !== undefined
-      && (body.settleSupplier === true || picked.length === 0 || picked.every((id) => link.invoices.some((i) => i.id === id)));
-    if (link && samePick) {
+    /*
+      (حقلا `invoiceIds` و`split` حُذفا من الطلب: بقيا بعد حذف فرعيهما، فكان
+      الطلبُ يقبل توزيعاً بمبالغ ثمّ يتجاهله بصمت. واختيارُ فاتورةٍ بعينها
+      يمرّ بـmatch-confirm-bulk ويتحقّق منه الخادم.)
+    */
+    if (link) {
       try {
         await db.transaction((t) => linkHandPayment(t, link, user.id));
       } catch (e) {
@@ -218,17 +212,29 @@ async function handle(request: Request) {
     }
 
     await db.transaction(async (t) => {
-      await t
+      /*
+        بشرط ألّا تكون قُيّدت بين القراءة والكتابة: كان الشرطُ المعرّفَ وحده،
+        فحركةٌ قُيّدت سداداً من تبويبٍ آخر تصير «متجاهَلة» ومعها دفعتُها —
+        ويُشتقّ لها مصروفٌ فوق السداد. والرميُ يُلغي المعاملة كلَّها (409).
+      */
+      const declared = await t
         .update(bankTransactions)
         .set({
           category: kind.category,
+          /* بابٌ أقرّه إنسانٌ بضغطته — ولا يبقى مصدرُه مصدرَ القاعدة بجانبه */
+          classificationSource: "HUMAN",
           matchStatus: "IGNORED",
           matchDisposition: null,
           matchOutcome: "NOT_A_PAYMENT",
           /* «ليست سداداً» إقرارٌ تامّ لا نقص — فلا تبقى في المعلَّق */
           lifecycle: "CONFIRMED",
         })
-        .where(eq(bankTransactions.id, tx.id));
+        .where(and(
+          eq(bankTransactions.id, tx.id),
+          sql`${bankTransactions.matchedPaymentId} is null`,
+        ))
+        .returning({ id: bankTransactions.id });
+      if (declared.length === 0) throw new AlreadyMatchedError();
 
       await t.insert(decisionHistory).values({
         bankTransactionId: tx.id,
@@ -236,7 +242,7 @@ async function handle(request: Request) {
         actor: "HUMAN",
         actorId: user.id,
         detail: `أُعلنت ليست سداد فاتورة: ${kind.label}`,
-        payload: { الباب: kind.category, "الباب السابق": tx.category },
+        payload: { الباب: kind.category, "الباب السابق": tx.category, "المصدر السابق": tx.classificationSource },
       });
 
       await resyncBankExpenses(t, user.id, { transactionIds: [tx.id], insertMissing: true });
@@ -312,30 +318,6 @@ async function settleAccounts(
   group: (typeof bankTransactions.$inferSelect)[],
   supplierId: string,
 ) {
-  const open = (await db
-    .select({
-      id: invoices.id,
-      invoiceDate: invoices.invoiceDate,
-      periodMonth: invoices.periodMonth,
-      totalMinor: invoices.totalMinor,
-      allocated: sql<number>`coalesce((select sum(pa.amount_minor)::int
-        from payment_allocations pa where pa.invoice_id = ${invoices}.id), 0)`,
-    })
-    .from(invoices)
-    .where(eq(invoices.supplierId, supplierId)))
-    .map((i) => ({
-      invoiceId: i.id,
-      invoiceDate: i.invoiceDate,
-      periodMonth: i.periodMonth,
-      outstandingMinor: i.totalMinor - Number(i.allocated),
-    }))
-    .filter((i) => i.outstandingMinor > 0);
-
-  /** المستحقّ وهو يتناقص — فلا تُخصَّص فاتورةٌ لدفعتين. */
-  const remaining = new Map(open.map((i) => [i.invoiceId, i.outstandingMinor]));
-  const ordered = [...group].sort(
-    (a, b) => a.valueDate.getTime() - b.valueDate.getTime());
-
   let paidCount = 0;
   /** دفعاتٌ كانت مقيَّدةً من إيصالها فتُبنّيت ولم تُنسَخ. */
   let adopted = 0;
@@ -343,7 +325,42 @@ async function settleAccounts(
   let unappliedTotal = 0;
   let invoiceCount = 0;
 
+  const ordered = [...group].sort(
+    (a, b) => a.valueDate.getTime() - b.valueDate.getTime());
+  let left = 0;
+
   await db.transaction(async (t) => {
+    /*
+      قفلٌ على المورّد، ثمّ قراءةُ المفتوح **بعده وبمقبض المعاملة**.
+
+      كان المتبقّي يُحسَب قبل المعاملة وبلا قفل: طلبان متزامنان للمورّد نفسه
+      يخطّطان على الصورة نفسها، فيسقط أحدهما بمؤثِّر ٠٢٦ خطأَ قاعدةٍ غيرَ
+      مترجَم. والثاني ينتظر الآن حتّى يودَع الأوّل ثمّ يخطّط على ما بقي.
+    */
+    await t.execute(sql`select pg_advisory_xact_lock(hashtext(${`supplier-settle:${supplierId}`}))`);
+
+    const open = (await t
+      .select({
+        id: invoices.id,
+        invoiceDate: invoices.invoiceDate,
+        periodMonth: invoices.periodMonth,
+        totalMinor: invoices.totalMinor,
+        allocated: sql<number>`coalesce((select sum(pa.amount_minor)::int
+          from payment_allocations pa where pa.invoice_id = ${invoices}.id), 0)`,
+      })
+      .from(invoices)
+      .where(eq(invoices.supplierId, supplierId)))
+      .map((i) => ({
+        invoiceId: i.id,
+        invoiceDate: i.invoiceDate,
+        periodMonth: i.periodMonth,
+        outstandingMinor: i.totalMinor - Number(i.allocated),
+      }))
+      .filter((i) => i.outstandingMinor > 0);
+
+    /** المستحقّ وهو يتناقص — فلا تُخصَّص فاتورةٌ لدفعتين. */
+    const remaining = new Map(open.map((i) => [i.invoiceId, i.outstandingMinor]));
+
     for (const tx of ordered) {
       const plan = settleSupplierAccount(
         tx.amountMinor,
@@ -412,9 +429,11 @@ async function settleAccounts(
       unappliedTotal += plan.remainingMinor;
       invoiceCount += plan.allocations.length;
     }
-  });
 
-  await recordAudit({
+    left = [...remaining.values()].reduce((n, v) => n + Math.max(0, v), 0);
+
+    /* أثرُ التدقيق داخل معاملة المال — إن سقط سقطت معه ولا يبقى مالٌ بلا أثر */
+    await recordAudit({
     actorId: userId,
     action: "MATCH_CONFIRMED",
     entityType: "supplier",
@@ -428,10 +447,10 @@ async function settleAccounts(
       "دفعاتٌ تُبنّيت من إيصالاتها": adopted,
       السياسة: "الأقدم أوّلاً — لا رقم فاتورة في الحوالة",
     },
+    }, t);
   });
 
   const money = formatRiyalsDisplay;
-  const left = [...remaining.values()].reduce((n, v) => n + Math.max(0, v), 0);
 
   return NextResponse.json({
     ok: true,

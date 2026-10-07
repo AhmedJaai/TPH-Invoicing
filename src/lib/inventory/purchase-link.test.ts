@@ -50,3 +50,22 @@ describe("suggestStockItem — يتعلّم من الربط السابق", () =>
     expect(suggestStockItem("اثيوبيا قوجي كيلو", options)?.id).toBe("eth");
   });
 });
+
+describe("حرفُ x في الاسم ليس علامةَ ضرب", () => {
+  const options = [
+    { id: "mix", nameAr: "خلطة", nameEn: "Berry Mix" },
+    { id: "extra", nameAr: "زيت", nameEn: "Extra Virgin Oil" },
+    { id: "box", nameAr: "علب", nameEn: "Cake Box" },
+  ];
+
+  it("«Extra» و«Mix» و«Box» تبقى كلماتٍ كاملة", () => {
+    expect(suggestStockItem("Extra Virgin 1L", options)?.id).toBe("extra");
+    expect(suggestStockItem("Mix 500g", options)?.id).toBe("mix");
+    expect(suggestStockItem("Box 10x10", options)?.id).toBe("box");
+  });
+
+  it("وبين رقمين تبقى ضرباً — بمسافةٍ وبلا مسافة", () => {
+    expect(guessPackSpec("Oxford Mix 6 x 1 kg")).toEqual({ packSize: "6", contentQuantity: "1", contentUnit: "KG" });
+    expect(guessPackSpec("Max 12X330ml")).toEqual({ packSize: "12", contentQuantity: "330", contentUnit: "ML" });
+  });
+});

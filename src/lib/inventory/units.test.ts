@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalToQuantity, convertMilli, decimalToMilli, formatQuantity, formatSignedQuantity, fromCanonical, milliToDecimal, sameUnitFamily, toCanonical, unitChoices, unitFamily } from "./units";
+import { ambiguousThousandsMessage, canonicalToQuantity, convertMilli, decimalToMilli, formatQuantity, isAmbiguousThousands, roundHalfAwayFromZero, formatSignedQuantity, fromCanonical, milliToDecimal, sameUnitFamily, toCanonical, unitChoices, unitFamily } from "./units";
 
 /**
  * الوحدةُ الداخليّة: مِلّي من أصغر وحدةٍ في العائلة.
@@ -84,6 +84,38 @@ describe("العدد العشريّ يُقرأ حروفاً لا بالفاصل�
     expect(decimalToMilli(null)).toBeNull();
     expect(decimalToMilli(undefined)).toBeNull();
     expect(decimalToMilli("12kg")).toBeNull();
+  });
+
+  it("الأرقامُ العربيّة والفارسيّة تُقرأ — لوحةُ الجوّال تكتبها", () => {
+    expect(decimalToMilli("٥٫٢")).toBe(5200);
+    expect(decimalToMilli("۵٫۲")).toBe(5200);
+    expect(decimalToMilli("٥.٢")).toBe(5200);
+    expect(decimalToMilli("١٢")).toBe(12_000);
+    expect(decimalToMilli("٥٫٢ كجم")).toBeNull();
+  });
+
+  it("«5,200» لا تُخمَّن: أهي ٥٫٢ أم ٥٢٠٠؟ — تُردّ", () => {
+    expect(decimalToMilli("5,200")).toBeNull();
+    expect(decimalToMilli("٥,٢٠٠")).toBeNull();
+    expect(isAmbiguousThousands("5,200")).toBe(true);
+    expect(isAmbiguousThousands("125,000")).toBe(true);
+    expect(ambiguousThousandsMessage("5,200")).toContain("5.200 أم 5200");
+    /* وما لا لبسَ فيه يُقرأ كما كان */
+    expect(isAmbiguousThousands("0,500")).toBe(false);
+    expect(decimalToMilli("0,500")).toBe(500);
+    expect(decimalToMilli("10,5")).toBe(10_500);
+    expect(decimalToMilli("5,20")).toBe(5200);
+    expect(decimalToMilli("5.200")).toBe(5200);
+    expect(isAmbiguousThousands("5200")).toBe(false);
+  });
+
+  it("والنصفُ يُقرَّب بعيداً عن الصفر في الجهتين", () => {
+    expect(roundHalfAwayFromZero(2.5)).toBe(3);
+    expect(roundHalfAwayFromZero(-2.5)).toBe(-3);
+    expect(roundHalfAwayFromZero(-2.4)).toBe(-2);
+    expect(roundHalfAwayFromZero(0)).toBe(0);
+    expect(decimalToMilli(-0.0005)).toBe(-1);
+    expect(decimalToMilli(0.0005)).toBe(1);
   });
 
   it("ويُكتَب إلى عمود numeric(…,3) بثلاث خانات", () => {

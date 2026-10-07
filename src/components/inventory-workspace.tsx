@@ -9,7 +9,7 @@ import { Money, Prose } from "./money";
 import { DiscardCount, FinaliseCount, RecomputeCount, ReopenCount } from "./inventory-actions";
 import { InventoryCountSteps, type StepRow } from "./inventory-count-steps";
 import type { DuplicateRow, ReceiptRow } from "./inventory-flow-step";
-import { InventoryWaste } from "./inventory-waste";
+import { InventoryWaste, type WasteRow } from "./inventory-waste";
 import { DIRECTION, DirectionTag, MagnitudeBar, VarianceSplit, directionOf, formatWeek, type StepId } from "./inventory-ui";
 import { CATEGORY_LABEL, type ProductCategory } from "@/lib/products";
 import { storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
@@ -49,6 +49,7 @@ export function InventoryWorkspace({
   manualOpenings,
   purchaseLinks,
   stockOptions,
+  waste,
   stale = [],
   today,
   initialStep,
@@ -73,6 +74,8 @@ export function InventoryWorkspace({
   manualOpenings: ReadonlyMap<string, { enteredMilli: number; unit: StoredUnit }>;
   purchaseLinks: PurchaseLinkRow[];
   stockOptions: StockItemOption[];
+  /** هدرُ الأسبوع المسجَّل غيرُ المُبطَل — يُعرَض ومعه «أبطِله». */
+  waste: WasteRow[];
   /** ما تغيّر تحته بعد إقفاله — يُقال، والعلاجُ إعادةُ الفتح. */
   stale?: StaleReason[];
   today: string;
@@ -112,6 +115,7 @@ export function InventoryWorkspace({
       purchasesText: q(l.purchasesMilli, l.baseUnit),
       purchasesZero: l.purchasesMilli === 0,
       manualReceiptsText: l.manualReceiptsMilli > 0 ? q(l.manualReceiptsMilli, l.baseUnit) : null,
+      supplierReturn: l.flags.includes("SUPPLIER_RETURN"),
       adjustmentsText: l.adjustmentsInMilli === 0 && l.adjustmentsOutMilli === 0
         ? null
         : q(l.adjustmentsInMilli - l.adjustmentsOutMilli, l.baseUnit),
@@ -252,6 +256,24 @@ export function InventoryWorkspace({
         أو شراءً لم يُقيَّد، أو نقلاً لم يُسجَّل. وتسميتُه هدراً دعوى سببٍ
         بلا دليل.
       */}
+      {/*
+        المجانيّ صُنع واستُهلك — داخلٌ في «ما صرفته المبيعات» أصلاً، فلا يظهر
+        فرقاً. ويُقال على حدة ليُعرَف كم كلّف.
+      */}
+      {(report.totals.complimentary?.lines ?? 0) > 0 && report.totals.complimentary && (
+        <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs leading-relaxed text-ink-soft">
+          <strong className="text-ink">خرج مجاناً هذا الأسبوع:</strong>{" "}
+          <span className="nums">{trim(report.totals.complimentary.unitsMilli / 1000)}</span> وحدة في{" "}
+          {countNoun(report.totals.complimentary.lines, LINE)} بيع
+          {showAmounts && (
+            report.totals.complimentary.costMinor === null
+              ? <> — كلفةُ مكوّناتها غير معروفةٍ كلِّها.</>
+              : <> — كلفةُ مكوّناتها <Money minor={report.totals.complimentary.costMinor} />.</>
+          )}
+          {" "}محسوبٌ في الاستهلاك المتوقَّع، فليس من الفرق.
+        </p>
+      )}
+
       <Callout tone="muted" icon={ShieldCheck} title="هذا فرقُ جرد، لا هدر">
         الفرقُ الواحد قد يكون جرعةً أكبر ممّا في الوصفة، أو ميزاناً غير معاير، أو كمّيّةً دخلت ولم تُقيَّد،
         أو نقلاً لم يُسجَّل، أو عدّاً مستعجلاً. راجِعه قبل أن تعدّه فاقداً — وما تعرف سببَه سجِّله هدراً
@@ -263,6 +285,7 @@ export function InventoryWorkspace({
           countId={header.id}
           branchId={header.branchId}
           defaultDate={header.periodEnd}
+          recorded={waste}
           items={report.lines.filter((l) => l.inScope).map((l) => ({
             id: l.productId,
             name: l.productName,

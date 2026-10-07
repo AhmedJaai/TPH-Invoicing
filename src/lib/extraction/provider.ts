@@ -13,6 +13,7 @@
  *              ولا يُبدَّل المزوّد صامتاً.
  */
 import type { ExtractionResult } from "./schema";
+import type { ExtractionEvidence } from "./evidence";
 
 export type ProviderName = "deepseek" | "claude" | "gemini" | "ollama";
 
@@ -29,18 +30,41 @@ export interface ExtractionSuccess {
   value: ExtractionResult;
   model: string;
   provider: ProviderName;
-  usage?: { inputTokens: number; outputTokens: number };
+  /** `cachedTokens`: ما أصاب خزينَ المزوّد من المدخَل — يُخصَم سعرُه */
+  usage?: { inputTokens: number; outputTokens: number; cachedTokens?: number };
   /**
    * من أين قُرئ: نصُّ الملفّ، أم صورةٌ مضمَّنة في PDF ممسوح، أم صورةٌ
    * رُفعت. به يُقاس كم من الأرشيف يعتمد على نموذج الرؤية.
    */
   textSource?: "TEXT" | "PDF_EMBEDDED" | "PDF_RENDERED" | "DIRECT";
+  /**
+   * ما يُقابَل به اقتراحُ النموذج، وما وقع أثناء قراءته (`evidence.ts`): رمز
+   * الفاتورة الضريبيّ، ومصدرُ ما لم يقرأه النموذج، وما بقي متعارضاً.
+   */
+  evidence?: ExtractionEvidence;
 }
+
+/**
+ * لماذا فشلت القراءة — لأنّ «رصيدٌ نفد» و«ملفٌّ لا يُقرأ» ليسا شيئاً واحداً:
+ *
+ *   NO_BALANCE · NOT_CONFIGURED · TRANSIENT — العطبُ عندنا أو عند المزوّد لا
+ *     في الملفّ. فلا يُقيَّد الملفّ «لم يُقرأ»؛ يُوقَف الطابور ويُعاد لاحقاً.
+ *   UNREADABLE — الملفّ نفسه لا نصَّ فيه ولا صورة.
+ *   INVALID    — النموذج أجاب ولم يستقم جوابُه بعد المحاولات.
+ */
+export type ExtractionFailureKind = "NO_BALANCE" | "NOT_CONFIGURED" | "TRANSIENT" | "UNREADABLE" | "INVALID";
 
 export interface ExtractionFailure {
   ok: false;
   reason: string;
   provider: ProviderName;
+  /** غائبٌ عند المزوّدين الخاملين — ويُعامَل غيابُه كعطبٍ في الملفّ (السلوك السابق) */
+  kind?: ExtractionFailureKind;
+}
+
+/** أالعطبُ في القارئ لا في الملفّ؟ — فلا يُحكم على الملفّ به. */
+export function isReaderOutage(failure: ExtractionFailure): boolean {
+  return failure.kind === "NO_BALANCE" || failure.kind === "NOT_CONFIGURED" || failure.kind === "TRANSIENT";
 }
 
 export type ExtractionOutcome = ExtractionSuccess | ExtractionFailure;
@@ -59,7 +83,12 @@ export function selectedProviderName(): ProviderName {
   return (PROVIDER_NAMES as readonly string[]).includes(raw) ? (raw as ProviderName) : "deepseek";
 }
 
-/** التعليمات مشتركة بين المزوّدين حتى تُقارن دقّتهما على أساس واحد. */
+/**
+ * التعليمات مشتركة بين المزوّدين حتى تُقارن دقّتهما على أساس واحد.
+ *
+ * وقائمة المورّدين تُرتَّب ترتيباً ثابتاً: المزوّد يخصم ما طابق بادئتَه من
+ * المدخَل، وترتيبٌ يتبدّل بين نداءٍ وآخر يكسر البادئة لكلّ النداءات.
+ */
 export function buildInstructions(
   companyVat: string,
   companyName: string,
@@ -75,7 +104,7 @@ export function buildInstructions(
 الرقم الضريبي لمنشأتنا: ${companyVat}
 نحن دائماً المشتري في هذه المستندات، لا البائع.
 
-موردونا المعروفون: ${supplierNames.join(" · ")}
+موردونا المعروفون: ${[...supplierNames].sort().join(" · ")}
 
 قواعد الاستخراج:
 - انسخ الأرقام كما هي حرفياً. لا تحسب ولا تصحّح ولا تستنتج مبلغاً غائباً.
@@ -84,6 +113,6 @@ export function buildInstructions(
 - ميّز الرقم الضريبي للبائع عن رقم المشتري بموضعه في المستند لا بشكله. رقمنا ${companyVat} هو رقم المشتري دائماً.
 - المستند الذي يحمل «عرض سعر» أو Quotation أو Proforma ليس فاتورة مهما شابهها.
 - المستند الذي يجمع عدة عمليات بتواريخ مختلفة ورصيد مُدوَّر هو كشف حساب لا فاتورة. وفي كشف الحساب انسخ كل سطر في statementLines بتاريخه ومرجعه ومدينه ودائنه، وانسخ الرصيدين الافتتاحي والختامي كما هما — ولا تجمع ولا تحسب رصيداً.
-- التاريخ بصيغة YYYY-MM-DD ميلادية. إن لم يظهر إلا التاريخ الهجري فحوّله واخفض ثقة التاريخ.
+- التاريخ الميلاديّ بصيغة YYYY-MM-DD. وإن لم يظهر إلا التاريخ الهجري فانسخه كما طُبع بسنته الهجرية (مثل 1448-03-05) ولا تحوّله إلى الميلاديّ أبداً — التحويل ليس من عملك.
 - الثقة تقديرك الصادق للوضوح: المستند الممسوح بجودة رديئة ثقته منخفضة ولو قرأتَه.`;
 }

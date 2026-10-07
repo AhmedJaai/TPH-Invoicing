@@ -29,8 +29,19 @@ const CREDIT_MARKERS = [
   /مرتجع/i, /مردود/i, /خصم/i, /تسويه/i, /تسوية/i, /\bCN[-\s]?\d/i,
 ];
 
+/*
+  ما يقول صراحةً إنّه مالٌ دُفع. «تسوية بحوالة» و«سداد بعد الخصم» سدادٌ لا
+  إشعار: الكلمةُ الصريحة تسبق — وإلّا عُدّ مالٌ خرج تخفيضاً لم يخرج له مال.
+*/
+const PAYMENT_MARKERS = [
+  /حوال[ةه]/i, /تحويل/i, /سداد/i, /دفع[ةه]/i, /\bpayment\b/i, /\btransfer\b/i, /\breceipt\b/i, /سند\s*قبض/i,
+];
+
 export function classifyCredit(line: CreditLine): CreditKind {
   const text = `${line.description ?? ""} ${line.reference ?? ""}`;
+  /* «إشعار دائن» باسمه يسبق كلَّ شيء: المورّدُ سمّاه */
+  if (/[اإ]شعار\s*دائن|credit\s*note|\bCN[-\s]?\d/i.test(text)) return "CREDIT_NOTE";
+  if (PAYMENT_MARKERS.some((m) => m.test(text))) return "PAYMENT";
   return CREDIT_MARKERS.some((m) => m.test(text)) ? "CREDIT_NOTE" : "PAYMENT";
 }
 

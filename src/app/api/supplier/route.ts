@@ -9,7 +9,8 @@ import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import { createSupplier } from "@/services/supplier.service";
-import { recordAudit } from "@/lib/audit";
+import { isValidSaudiVat } from "@/lib/validation";
+import { latinDigits } from "@/lib/invoice-number";
 
 export const runtime = "nodejs";
 
@@ -18,7 +19,15 @@ const Body = z.object({
   nameEn: z.string().max(200).optional(),
   /** اسم مجلد الدرايف — يُشتقّ من الاسم إن غاب */
   driveFolderName: z.string().max(200).optional(),
-  vatNumber: z.string().max(30).optional(),
+  /*
+    الرقمُ الضريبيّ السعوديّ ١٥ خانةً تبدأ وتنتهي بـ٣ (`isValidSaudiVat`). كان
+    يُحفظ أيُّ نصٍّ حتّى ٣٠ حرفاً — ورقمٌ ناقصٌ خانةً يصير هويّةً لا تطابق شيئاً.
+    والفارغُ «غير معروف» ومقبول.
+  */
+  vatNumber: z.string().max(30).optional()
+    .refine((v) => !v?.trim() || isValidSaudiVat(v), "الرقم الضريبيّ 15 رقماً يبدأ بـ3 وينتهي بـ3 — صحّحه أو اتركه فارغاً"),
+  /** «هو غيرُ من يشبهونه» — بعد ردّ 409 `similar`. */
+  confirmNew: z.boolean().optional(),
 });
 type Body = z.infer<typeof Body>;
 
@@ -41,39 +50,41 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "اكتب اسم المورّد" }, { status: 400 });
   }
 
-  /* الإنشاء في الخدمة وحدها — كان مكتوباً هنا مرّةً ثانية بقواعده */
-  let created;
+  /* الإنشاء في الخدمة وحدها — وفيها التدقيقُ داخل معاملة الإنشاء */
+  let out;
   try {
-    created = await createSupplier({
+    out = await createSupplier({
       nameAr,
       nameEn: body.nameEn,
       driveFolderName: body.driveFolderName,
-      vatNumber: body.vatNumber,
-    });
+      vatNumber: body.vatNumber ? latinDigits(body.vatNumber) : undefined,
+      confirmNew: body.confirmNew,
+    }, user.id);
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
   }
 
-  if (created.existed) {
+  if (out.kind === "similar") {
     return NextResponse.json({
-      ok: true, existed: true, supplier: { id: created.id, nameAr: created.nameAr, slug: created.slug },
-      message: `«${created.nameAr}» مسجّل مسبقاً`,
+      error: `يشبه ${out.similar.map((s) => `«${s.nameAr}»`).join(" و")} المسجَّل — اختره إن كان هو، أو أنشئه جديداً إن كان غيرَه`,
+      similar: out.similar,
+    }, { status: 409 });
+  }
+
+  const supplier = { id: out.id, nameAr: out.nameAr, slug: out.slug };
+  if (out.kind === "existed") {
+    return NextResponse.json({
+      ok: true, existed: true, supplier,
+      message: out.by === "VAT"
+        ? `هذا الرقمُ الضريبيّ مسجَّلٌ لـ«${out.nameAr}» — اختير هو`
+        : `«${out.nameAr}» مسجّل مسبقاً`,
     });
   }
 
-  const slug = created.slug;
-  await recordAudit({
-    actorId: user.id,
-    action: "SUPPLIER_CREATED",
-    entityType: "supplier",
-    entityId: created.id,
-    after: { الاسم: nameAr, الرمز: slug, "مجلد الدرايف": body.driveFolderName?.trim() || nameAr },
-  });
-
   return NextResponse.json({
-    ok: true, existed: false, supplier: { id: created.id, nameAr: created.nameAr, slug: created.slug },
-    message: `أُنشئ «${nameAr}» برمز ${slug}`,
+    ok: true, existed: false, supplier,
+    message: `أُنشئ «${nameAr}» برمز ${out.slug}`,
   });
 }
