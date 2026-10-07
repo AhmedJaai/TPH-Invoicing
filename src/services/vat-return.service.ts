@@ -19,8 +19,8 @@ import { companyConfig } from "@/config/drive";
 import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import {
   computeVatReturn, includedByDefault, invoiceIncluded, invoiceVat, isIncluded, machineEligible, monthsBefore,
-  nextQuarter, NO_VAT_DEBIT_CATEGORIES, parseVatPeriod, periodBounds, periodKey, periodMonths, previousQuarter, quarterOfMonth,
-  txBlocked, txVat, vatInsideGross, vatOnNet,
+  nextQuarter, parseVatPeriod, periodBounds, periodKey, periodMonths, previousQuarter, quarterOfMonth,
+  txBlocked, txCaution, txVat, vatInsideGross, vatOnNet,
   type VatInvoice, type VatPeriod, type VatQuarter, type VatReturn, type VatTx,
 } from "@/lib/vat-return";
 import { todayInRiyadh } from "@/lib/riyadh-time";
@@ -90,6 +90,8 @@ export interface VatTxRow extends VatTx {
   vatMinor: number;
   /** لماذا لا تُضمّ مهما اختير — `null` تُضمّ. */
   blocked: string | null;
+  /** بابٌ لا ضريبةَ فيه غالباً — تنبيهٌ لا منع. */
+  caution: string | null;
 }
 
 export interface VatInvoiceRow extends VatInvoice {
@@ -267,6 +269,7 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
       included: isIncluded(base),
       vatMinor: txVat(base),
       blocked: txBlocked(base),
+      caution: txCaution(base),
     }];
   });
 
@@ -473,13 +476,6 @@ export async function chooseVatTxs(ids: readonly string[], included: boolean | n
     await assertNotFiled(t, found.map((f) => f.month));
 
     if (included) {
-      /* الشاشةُ لا تعرض زرَّ «احسب كلَّ الرواتب» — والخادمُ لا يثق بالشاشة */
-      const noVat = found.find((f) => f.direction === "DEBIT" && NO_VAT_DEBIT_CATEGORIES.has(f.category ?? ""));
-      if (noVat) {
-        throw new VatChoiceRefused(
-          `«${categoryLabel(noVat.category ?? "")}» لا ضريبةَ فيه — لا يُضمّ إلى الخصم. إن كان التصنيفُ خطأً فصحّحه من «البنك» أوّلاً.`,
-        );
-      }
       const idList = sql.join(unique.map((id) => sql`${id}`), sql`, `);
       const covered = (await t.execute<{ id: string }>(sql`
         select bt.id from bank_transactions bt

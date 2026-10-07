@@ -109,14 +109,13 @@ describe("ما لا يدخل الخصم", () => {
       expect(view.result.input.invoices.vatMinor).toBe(0);
     }));
 
-  it("الراتبُ لا يُضمّ ولو وصل معرّفُه — والإيجارُ يُضمّ", () =>
+  it("ما صُنِّف «راتباً» يُضمّ باختيار صاحبه كالإيجار — الاختيارُ يغلب التصنيف", () =>
     withRollback(async (tx) => {
       const actor = await someone(tx);
-      const salary = await bankTx(tx, { iso: "2098-08-01", amountMinor: 4000_00, category: "SALARY" });
+      const salary = await bankTx(tx, { iso: "2098-08-01", amountMinor: 1150_00, category: "SALARY" });
       const rent = await bankTx(tx, { iso: "2098-08-01", amountMinor: 11500_00, category: "RENT" });
-      expect(await caught(chooseVatTxs([salary], true, actor, tx))).toBeInstanceOf(VatChoiceRefused);
-      await chooseVatTxs([rent], true, actor, tx);
-      expect((await loadVatReturn(Q, tx)).result.input.selected.vatMinor).toBe(1500_00);
+      await chooseVatTxs([salary, rent], true, actor, tx);
+      expect((await loadVatReturn(Q, tx)).result.input.selected.vatMinor).toBe(1650_00);
     }));
 
   it("حدُّ الربع بتوقيت الرياض: ٣٠ سبتمبر ٢١:٣٠ UTC هو ١ أكتوبر", () =>

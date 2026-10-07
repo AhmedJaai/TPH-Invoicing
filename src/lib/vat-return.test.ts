@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeVatReturn, filingDeadline, isIncluded, monthsBefore, nextQuarter, parseVatPeriod, periodBounds, periodKey, periodMonths,
-  invoiceIncluded, previousQuarter, quarterOfMonth, txBlocked, txVat, vatInsideGross, vatOnNet, type VatInvoice, type VatTx,
+  invoiceIncluded, previousQuarter, quarterOfMonth, txBlocked, txCaution, txVat, vatInsideGross, vatOnNet, type VatInvoice, type VatTx,
 } from "./vat-return";
 
 const inv = (o: Partial<VatInvoice>): VatInvoice => ({
@@ -116,14 +116,18 @@ describe("فاتورةٌ تقرّ أنّها ضريبيّة", () => {
 });
 
 describe("ما لا يُضمّ مهما اختير", () => {
-  it("راتبٌ وزكاةٌ وتحويلٌ شخصيّ وحركةٌ داخليّة: لا ضريبةَ فيها — ولو وصل اختيارُها", () => {
+  it("راتبٌ وزكاةٌ وتحويلٌ شخصيّ وحركةٌ داخليّة: لا تُضمّ من نفسها، وتُضمّ باختيار صاحبها — بتنبيهٍ لا بمنع", () => {
     for (const category of ["SALARY", "ZAKAT", "PERSONAL", "INTERNAL"]) {
-      const t = tx({ direction: "DEBIT", category, amountMinor: 115_000, choice: true });
-      expect(txBlocked(t), category).not.toBeNull();
-      expect(isIncluded(t), category).toBe(false);
+      expect(isIncluded(tx({ direction: "DEBIT", category, amountMinor: 115_000 })), category).toBe(false);
+      const chosen = tx({ direction: "DEBIT", category, amountMinor: 115_000, choice: true });
+      expect(txBlocked(chosen), category).toBeNull();
+      expect(txCaution(chosen), category).not.toBeNull();
+      expect(isIncluded(chosen), category).toBe(true);
     }
-    const r = computeVatReturn({ invoices: [], txs: [tx({ direction: "DEBIT", category: "SALARY", amountMinor: 115_000, choice: true })] });
-    expect(r.input.totalMinor).toBe(0);
+    /* حوالةٌ «شخصيّة» هي شراءٌ دُفع من الحساب: اختيارُها يدخل الخصم 15/115 */
+    const r = computeVatReturn({ invoices: [], txs: [tx({ direction: "DEBIT", category: "PERSONAL", amountMinor: 115_000, choice: true })] });
+    expect(r.input.totalMinor).toBe(15_000);
+    expect(txCaution(tx({ direction: "DEBIT", category: "RENT" }))).toBeNull();
   });
   it("والإيجارُ والحكوميّ يُضمّان باختيار", () => {
     expect(txBlocked(tx({ direction: "DEBIT", category: "RENT" }))).toBeNull();

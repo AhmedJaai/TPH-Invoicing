@@ -81,6 +81,10 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
   /* ما يُقرّ: ضريبتُه غير صفرٍ مقروء، ولم يُخرجه صاحبُه بيده */
   const confirmable = notDeductible.filter((i) => i.choice !== false);
   const knownFromRecord = confirmable.filter((i) => i.knownFromRecord);
+  /* ما اختاره صاحبُه ومنعه الحساب — يُسمّى بسببه، فلا يختفي اختيارٌ بصمت */
+  const overridden = debits.filter((t) => t.choice === true && !t.included);
+  /* مستوفيةٌ أخرجها انتظارُ المراجعة وحده — تُسمّى بمبلغها، فلا يرتفع المستحقّ بلا تفسير */
+  const awaiting = confirmable.filter((i) => i.awaitingReview && i.inputVatStatus === "ELIGIBLE" && i.vatMinor !== null);
   const derived = confirmable.filter((i) => i.vatMinor === null);
   const lost = lostBySupplier(notDeductible);
   const supplierGroups = new Map<string, { supplierId: string; supplier: string; ids: string[] }>();
@@ -214,6 +218,41 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
             {view.carriedFrom && (
               <Callout tone="ok" icon={Landmark}>
                 رصيدٌ دائنٌ مرحَّل من {quarterLabel(view.carriedFrom)}: {riyalsText(r.carriedInMinor)} — أُنقص من المستحقّ.
+              </Callout>
+            )}
+            {overridden.length > 0 && (
+              <Callout
+                tone="info"
+                icon={FileWarning}
+                title={`${countNoun(overridden.length, TRANSACTION)} اخترتَها ولا تُحسب: ${riyalsText(overridden.reduce((s, t) => s + t.vatMinor, 0))}`}
+              >
+                فاتورةُ كلٍّ منها محسوبةٌ في الخصم، فلو حُسبت الحوالةُ معها خُصمت ضريبتُها مرّتين. إن أردتَ حسابَها من الحوالة فأخرِج فاتورتَها من{" "}
+                <a href="#invoices" className="font-bold underline underline-offset-2">قوائم الفواتير</a> أوّلاً.
+                <ul className="mt-2 space-y-1 text-xs">
+                  {overridden.map((t) => (
+                    <li key={t.id} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                      <span>{formatDay(t.day)} — {t.label}</span>
+                      <span><Money minor={t.amountMinor} /> · ضريبتُها <Money minor={t.vatMinor} /></span>
+                    </li>
+                  ))}
+                </ul>
+              </Callout>
+            )}
+            {awaiting.length > 0 && (
+              <Callout
+                tone="warn"
+                icon={FileWarning}
+                title={`خرجت من الخصم ${countNoun(awaiting.length, INVOICE)} لأنّ مستندَها لم يُراجَع: ${riyalsText(awaiting.reduce((s, i) => s + i.vatUsedMinor, 0))}`}
+              >
+                فواتيرُ مستوفيةٌ قرأها النظام ولم يُقرّ أحدٌ قراءتَها بعد، فلا تُحسب من نفسها. راجِعها من «المراجعة» فتدخل، أو احسبها هنا بإقرارك — وهي بتفاصيلها في{" "}
+                <a href="#invoices" className="font-bold underline underline-offset-2">«فواتيرُ لا تُخصم ضريبتُها»</a>، ولكلٍّ منها زرُّها.
+                {!filing && (
+                  <span className="mt-2 block">
+                    <VatBulk kind="invoice" ids={awaiting.map((i) => i.id)} included variant="subtle">
+                      {`احسبها كلَّها (${awaiting.length})`}
+                    </VatBulk>
+                  </span>
+                )}
               </Callout>
             )}
             {r.input.selected.count > 0 && (
@@ -612,7 +651,7 @@ function txColumns(kind: "debit" | "credit" | "vat", filed?: string): Column<Vat
           <span className="truncate">{t.label}</span>
           {t.coveredByInvoice && t.direction === "DEBIT" && <Badge tone="ok">فاتورتُها محسوبة</Badge>}
           {t.bounced && <Badge tone="muted">ارتدّت</Badge>}
-          {t.blocked !== null && !t.coveredByInvoice && !t.bounced && <Badge tone="muted">{t.blocked}</Badge>}
+          {t.caution !== null && <Badge tone={t.included ? "warn" : "muted"}>{t.included ? "بابٌ لا ضريبةَ فيه غالباً — احتفظ بفاتورتها" : "لا ضريبةَ فيه غالباً"}</Badge>}
           {t.supplierHasInvoices && t.blocked === null && t.direction === "DEBIT" && <Badge tone="warn">لمورّدها فواتيرُ محسوبة — تحقّق قبل أن تحسبها</Badge>}
           {t.choice !== null && <Badge tone="accent">باختيارك</Badge>}
         </span>

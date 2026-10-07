@@ -171,18 +171,25 @@ export interface VatTx {
 }
 
 /**
- * أبوابُ صادرٍ لا ضريبةَ فيها أصلاً — راتبٌ وزكاةٌ وتحويلٌ شخصيّ وحركةٌ داخليّة. لا تُضمّ إلى
- * الخصم ولو طُلب: 15/115 منها ضريبةٌ لم تُدفع. والخادمُ يرفضها، لا الشاشةُ وحدها.
- * و«حكوميّ» ليس منها: بعضُ رسومه (اشتراكاتُ منصّات) تحمل ضريبةً بفاتورة.
+ * أبوابُ صادرٍ لا ضريبةَ فيها **في الغالب** — راتبٌ وزكاةٌ وتحويلٌ شخصيّ وحركةٌ داخليّة. لا تُضمّ
+ * من نفسها ولا بزرٍّ جماعيّ، **لكنّ اختيارَ صاحب المقهى يغلب**: حوالةٌ «شخصيّة» قد تكون شراءً
+ * دُفع من الحساب، وهو من رأى الورقة. مُنعت مرّةً منعاً قاطعاً (٧ أكتوبر ٢٠٢٦) فسقط من الخصم
+ * ما اختاره بيده وارتفع المستحقّ — فعادت تنبيهاً لا منعاً.
  */
 export const NO_VAT_DEBIT_CATEGORIES: ReadonlySet<string> = new Set(["SALARY", "ZAKAT", "PERSONAL", "INTERNAL"]);
+
+/** بابٌ لا ضريبةَ فيه غالباً — يُنبَّه عليه ولا يُمنع. */
+export function txCaution(tx: Pick<VatTx, "direction" | "category">): string | null {
+  return tx.direction === "DEBIT" && NO_VAT_DEBIT_CATEGORIES.has(tx.category)
+    ? "لا ضريبةَ في هذا الباب غالباً — احسبها إن كانت شراءً بفاتورةٍ ضريبيّة"
+    : null;
+}
 
 /** لماذا لا تُضمّ هذه الحركة مهما اختير — `null` تُضمّ. */
 export function txBlocked(tx: Pick<VatTx, "direction" | "category" | "coveredByInvoice" | "bounced">): string | null {
   if (tx.bounced) return "ارتدّت الحوالة — لا شراءَ فيها ولا بيع";
   if (tx.direction !== "DEBIT") return null;
   if (tx.coveredByInvoice) return "ضريبتُها محسوبةٌ في فاتورتها";
-  if (NO_VAT_DEBIT_CATEGORIES.has(tx.category)) return "لا ضريبةَ في هذا الباب";
   return null;
 }
 
@@ -208,7 +215,7 @@ export function includedByDefault(tx: Pick<VatTx, "direction" | "category">): bo
   return VAT_ITSELF.has(tx.category);
 }
 
-/** أتُعدّ هذه الحركة؟ — والمسدِّدةُ فاتورةً محسوبةً، والمرتدّةُ، وما لا ضريبةَ في بابه لا تُعدّ ولو اختيرت. */
+/** أتُعدّ هذه الحركة؟ — والمسدِّدةُ فاتورةً محسوبةً والمرتدّةُ لا تُعدّان ولو اختيرتا. */
 export function isIncluded(tx: VatTx): boolean {
   if (txBlocked(tx) !== null) return false;
   return tx.choice ?? includedByDefault(tx);
