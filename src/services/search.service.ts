@@ -7,14 +7,14 @@
  * وكل نتيجة تحمل **وجهة تفتح السجلّ نفسه** لا صفحةً عامّة يبحث فيها
  * المستخدم من جديد.
  */
-import { and, eq, gte, ilike, lte, or, sql, type AnyColumn } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, lt, lte, or, sql, type AnyColumn } from "drizzle-orm";
 import { db } from "@/db";
 import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import {
   bankTransactions, documents, invoices, products, supplierProducts, suppliers,
 } from "@/db/schema";
 import {
-  amountRange, parseSearch, rankHits,
+  amountRange, escapeLike, parseSearch, rankHits, utcRange,
   type SearchHit, type SearchIntent,
 } from "@/lib/search";
 import { invoiceHref } from "@/lib/invoice-profile";
@@ -56,7 +56,8 @@ export async function search(
   const intent = parseSearch(raw);
   if (!intent) return { intent: null, hits: [] };
 
-  const like = `%${intent.term}%`;
+  /* رموز LIKE في نصّ المستخدم تُطابَق حرفاً — «50%» ليست بدلاً عامّاً */
+  const like = `%${escapeLike(intent.term)}%`;
   const jobs: Promise<SearchHit[]>[] = [];
 
   if (intent.targets.includes("invoices")) jobs.push(findInvoices(intent, like, access.amounts));
@@ -102,7 +103,9 @@ async function findInvoices(intent: SearchIntent, like: string, amounts: boolean
   if (intent.kind === "TEXT") clauses.push(likeNormalized(suppliers.nameAr, like));
   if (intent.kind === "MONTH") clauses.push(eq(invoices.periodMonth, intent.term));
   if (intent.kind === "DATE") {
-    clauses.push(sql`to_char(${invoices.invoiceDate}, 'YYYY-MM-DD') = ${intent.term}`);
+    /* نطاقٌ يُخدَم من `invoices_date_idx` ولا يتبع منطقة الجلسة */
+    const day = utcRange(intent.term);
+    if (day) clauses.push(and(gte(invoices.invoiceDate, day.from), lt(invoices.invoiceDate, day.until)));
   }
   if (intent.amountMinor !== undefined) {
     const { min, max } = amountRange(intent.amountMinor);
@@ -126,6 +129,11 @@ async function findInvoices(intent: SearchIntent, like: string, amounts: boolean
     .from(invoices)
     .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
     .where(or(...clauses))
+    /*
+      الترتيبُ قبل القطع: كان `limit` بلا `order by` فيختار المخطِّطُ أيَّ
+      ستّةٍ شاء — قد يُخفي الأحدث ويتبدّل الجواب بين مرّتين.
+    */
+    .orderBy(desc(invoices.invoiceDate), asc(invoices.id))
     .limit(PER_KIND);
 
   return rows.map((r) => ({
@@ -168,6 +176,8 @@ async function findSuppliers(intent: SearchIntent, like: string, amounts: boolea
     })
     .from(suppliers)
     .where(or(...clauses))
+    /* العاملُ قبل المعطَّل، ثمّ بالاسم — ترتيبٌ ثابت قبل القطع */
+    .orderBy(desc(suppliers.isActive), asc(suppliers.nameAr), asc(suppliers.id))
     .limit(PER_KIND);
 
   return rows.map((r) => ({
@@ -200,6 +210,7 @@ async function findProducts(like: string): Promise<SearchHit[]> {
       likeNormalized(supplierProducts.displayName, like),
       likeNormalized(supplierProducts.normalizedDescription, like),
     ))
+    .orderBy(asc(supplierProducts.displayName), asc(supplierProducts.id))
     .limit(PER_KIND);
 
   return rows.map((r) => ({
@@ -218,11 +229,9 @@ async function findBankTx(intent: SearchIntent, like: string): Promise<SearchHit
     clauses.push(likeNormalized(bankTransactions.beneficiaryRaw, like));
     clauses.push(ilike(bankTransactions.ref, like));
   }
-  if (intent.kind === "DATE") {
-    clauses.push(sql`to_char(${bankTransactions.valueDate}, 'YYYY-MM-DD') = ${intent.term}`);
-  }
-  if (intent.kind === "MONTH") {
-    clauses.push(sql`to_char(${bankTransactions.valueDate}, 'YYYY-MM') = ${intent.term}`);
+  if (intent.kind === "DATE" || intent.kind === "MONTH") {
+    const span = utcRange(intent.term);
+    if (span) clauses.push(and(gte(bankTransactions.valueDate, span.from), lt(bankTransactions.valueDate, span.until)));
   }
   if (intent.amountMinor !== undefined) {
     const { min, max } = amountRange(intent.amountMinor);
@@ -242,6 +251,7 @@ async function findBankTx(intent: SearchIntent, like: string): Promise<SearchHit
     })
     .from(bankTransactions)
     .where(or(...clauses))
+    .orderBy(desc(bankTransactions.valueDate), asc(bankTransactions.id))
     .limit(PER_KIND);
 
   return rows.map((r) => ({
@@ -273,6 +283,7 @@ async function findDocuments(intent: SearchIntent, like: string): Promise<Search
     })
     .from(documents)
     .where(or(...clauses))
+    .orderBy(sql`${documents.periodMonth} desc nulls last`, desc(documents.uploadedAt), asc(documents.id))
     .limit(PER_KIND);
 
   return rows.map((r) => ({

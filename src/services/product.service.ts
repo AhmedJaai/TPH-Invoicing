@@ -100,7 +100,7 @@ export async function listSupplierProducts(): Promise<SupplierProductRow[]> {
            sp.confirmed_at is not null as confirmed,
            coalesce(count(l.id), 0)::int as order_count,
            coalesce((array_agg(l.unit_price_minor order by l.invoice_date desc nulls last))[1], 0)::int as last_price,
-           coalesce(sum(l.line_total_minor), 0)::int as total_spent
+           coalesce(sum(l.line_total_minor), 0)::bigint as total_spent
       from supplier_products sp
       join suppliers s on s.id = sp.supplier_id
       left join products p on p.id = sp.product_id

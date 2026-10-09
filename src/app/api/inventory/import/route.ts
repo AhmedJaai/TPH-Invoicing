@@ -6,7 +6,7 @@
  * يشكّ صاحبُه، والجوابُ الصحيح «هذا عندي، وهذه نتيجتُه» لا «فشل».
  */
 import { NextResponse } from "next/server";
-import { guard, respondTo } from "@/services/guard";
+import { guard, respondTo, failWith } from "@/services/guard";
 import { importSalesFile } from "@/services/sales-import.service";
 import { MAX_SALES_FILE_BYTES, SALES_FILE_TOO_LARGE } from "@/lib/sales/file-import";
 
@@ -53,8 +53,6 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(result);
   } catch (e) {
-    const mapped = respondTo(e);
-    if (mapped) return mapped;
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    return failWith(e, "inventory-import");
   }
 }

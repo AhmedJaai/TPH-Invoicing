@@ -7,6 +7,7 @@
  *
  * ولا يُستدعى إلا بعد تأكيد بشري صريح في شاشة المعاينة.
  */
+import { signatureMatches } from "@/lib/file-signature";
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { normalizeDocumentDate } from "@/lib/document-date";
@@ -52,23 +53,6 @@ export const runtime = "nodejs";
 */
 const MAX_ARCHIVE_BYTES = 3 * 1024 * 1024;
 const MAX_BODY_BYTES = Math.ceil(MAX_ARCHIVE_BYTES * 1.4) + 256 * 1024;
-
-/**
- * البايتات الأولى تطابق النوع المعلَن — لا يُصدَّق المتصفّح في نوع الملفّ.
- */
-function signatureMatches(mimeType: string, data: Buffer): boolean {
-  const head = data.subarray(0, 16);
-  const hex = head.toString("hex");
-  if (mimeType === "application/pdf") return head.subarray(0, 5).toString("latin1") === "%PDF-";
-  if (mimeType === "image/jpeg") return hex.startsWith("ffd8ff");
-  if (mimeType === "image/png") return hex.startsWith("89504e470d0a1a0a");
-  if (mimeType === "image/gif") return head.subarray(0, 4).toString("latin1") === "GIF8";
-  if (mimeType === "image/webp") {
-    return head.subarray(0, 4).toString("latin1") === "RIFF" && head.subarray(8, 12).toString("latin1") === "WEBP";
-  }
-  if (mimeType === "image/heic" || mimeType === "image/heif") return head.subarray(4, 8).toString("latin1") === "ftyp";
-  return false;
-}
 
 /** اسمٌ لا يصعد مجلّداً ولا يُنشئ مسارات. */
 const SAFE_NAME = /^(?!\.{1,2}$)[^/\\\u0000-\u001f]{1,160}$/;

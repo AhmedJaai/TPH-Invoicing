@@ -6,7 +6,7 @@
  * ومعه المرشّحون، فتسأل الشاشةُ صاحبَها أهو نفسُ البند أم شحنةٌ أخرى.
  */
 import { NextResponse } from "next/server";
-import { guard, pgErrorCode, respondTo } from "@/services/guard";
+import { guard, pgErrorCode, respondTo, failWith } from "@/services/guard";
 import {
   PossibleDuplicateReceiptError, createReceipt, resolveReceipt, updateReceipt, voidReceipt,
 } from "@/services/inventory-receipt.service";
@@ -95,9 +95,7 @@ export async function POST(request: Request) {
     if (code === "23505") {
       return NextResponse.json({ error: "هذا البندُ مرتبطٌ باستلامٍ آخر — والبندُ الواحد لا يمثّل شحنتين." }, { status: 409 });
     }
-    const mapped = respondTo(e);
-    if (mapped) return mapped;
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    return failWith(e, "inventory-receipt");
   }
 }
 

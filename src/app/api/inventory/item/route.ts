@@ -6,7 +6,7 @@
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { guard, respondTo } from "@/services/guard";
+import { guard, respondTo, failWith } from "@/services/guard";
 import { ItemInUseError, restoreStockItem, retireStockItem } from "@/services/recipe.service";
 
 export const runtime = "nodejs";
@@ -51,8 +51,6 @@ export async function POST(request: Request) {
   } catch (e) {
     /* «مستعمَلٌ في وصفة» خبرٌ عن الحال لا عطبٌ في الطلب */
     if (e instanceof ItemInUseError) return NextResponse.json({ error: e.message }, { status: 409 });
-    const mapped = respondTo(e);
-    if (mapped) return mapped;
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    return failWith(e, "inventory-item");
   }
 }

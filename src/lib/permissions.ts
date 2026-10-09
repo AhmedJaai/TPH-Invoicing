@@ -20,7 +20,14 @@ export type Capability =
   | "supplier:view"
   | "supplier:edit"
   | "amounts:view"
+  /**
+   * تصحيحُ مبالغ الفاتورة ومورّدها — كتابةٌ لا تُعار من «رؤية المبالغ».
+   * اليومَ يملكها كلُّ من يرى؛ وأوّلُ دورٍ «قراءة فقط» لا يرث الكتابةَ بالاسم.
+   */
+  | "invoice:edit"
   | "reports:view"
+  /** تنزيلُ حزمة المحاسب وملفّ الإقرار — قراءةٌ لا تُعار من «إقفال الشهر». */
+  | "reports:export"
   | "bank:view"
   | "bank:edit"
   | "expense:edit"
@@ -52,14 +59,14 @@ export type Capability =
 const MATRIX: Record<Role, readonly Capability[]> = {
   OWNER: [
     "document:upload", "document:view", "supplier:view", "supplier:edit",
-    "amounts:view", "reports:view", "bank:view", "bank:edit", "payroll:view",
+    "amounts:view", "invoice:edit", "reports:view", "reports:export", "bank:view", "bank:edit", "payroll:view",
     "expense:edit", "payment:approve", "month:close", "month:reopen", "users:manage", "audit:view",
     "inventory:view", "inventory:count", "inventory:reopen", "recipe:edit",
   ],
   // المحاسب يرى كل المالية ولا يدير المستخدمين
   ACCOUNTANT: [
     "document:upload", "document:view", "supplier:view", "supplier:edit",
-    "amounts:view", "reports:view", "bank:view", "bank:edit",
+    "amounts:view", "invoice:edit", "reports:view", "reports:export", "bank:view", "bank:edit",
     "expense:edit", "month:close", "audit:view",
     "inventory:view", "inventory:count", "recipe:edit",
   ],
@@ -83,7 +90,9 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "supplier:view": "عرض المورّدين",
   "supplier:edit": "تعديل المورّدين والأصناف",
   "amounts:view": "رؤية المبالغ",
+  "invoice:edit": "تصحيح مبالغ الفاتورة ومورّدها",
   "reports:view": "عرض التقارير",
+  "reports:export": "تنزيل ملفّات المحاسب والإقرار",
   "bank:view": "عرض كشف البنك",
   "bank:edit": "تصنيف حركات البنك",
   "expense:edit": "تعديل المصروفات",

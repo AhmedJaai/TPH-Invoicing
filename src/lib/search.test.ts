@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { AMOUNT_WINDOW_MINOR, amountRange, normalizeArabic, normalizeDigits, parseSearch, rankHits, type SearchHit } from "./search";
+import {
+  AMOUNT_WINDOW_MINOR, amountRange, escapeLike, normalizeArabic, normalizeDigits, parseSearch, rankHits, utcRange,
+  type SearchHit,
+} from "./search";
 
 describe("parseSearch", () => {
   it("الفراغ لا يُنتج بحثاً", () => {
@@ -177,5 +180,42 @@ describe("توحيدُ العربية متطابقٌ مع ما تفعله الق
   it("والتاء المربوطة كذلك", () => {
     expect(normalizeArabic("محمصة")).toBe("محمصه");
     expect(asDatabaseWould("محمصة أطلس")).toContain("محمصه");
+  });
+});
+
+describe("escapeLike — نصُّ المستخدم يُطابَق حرفاً", () => {
+  it("النسبة والشرطة السفليّة والمائلة تُهرَّب", () => {
+    expect(escapeLike("50%")).toBe("50\\%");
+    expect(escapeLike("INV_12")).toBe("INV\\_12");
+    expect(escapeLike("a\\b")).toBe("a\\\\b");
+  });
+
+  it("والنصّ العاديّ يبقى كما هو", () => {
+    expect(escapeLike("أوراق الزيتون 2026-08")).toBe("أوراق الزيتون 2026-08");
+  });
+});
+
+describe("utcRange — نطاقٌ يُخدَم من الفهرس", () => {
+  it("اليوم: من منتصف ليله إلى منتصف ليل تاليه", () => {
+    const r = utcRange("2026-08-17")!;
+    expect(r.from.toISOString()).toBe("2026-08-17T00:00:00.000Z");
+    expect(r.until.toISOString()).toBe("2026-08-18T00:00:00.000Z");
+  });
+
+  it("آخر يومٍ في الشهر يعبر إلى الشهر التالي", () => {
+    expect(utcRange("2026-12-31")!.until.toISOString()).toBe("2027-01-01T00:00:00.000Z");
+  });
+
+  it("الشهر: من أوّله إلى أوّل تاليه", () => {
+    const r = utcRange("2026-12")!;
+    expect(r.from.toISOString()).toBe("2026-12-01T00:00:00.000Z");
+    expect(r.until.toISOString()).toBe("2027-01-01T00:00:00.000Z");
+  });
+
+  it("تاريخٌ لا وجود له لا يُبحث به", () => {
+    expect(utcRange("2026-13-01")).toBeNull();
+    expect(utcRange("2026-02-31")).toBeNull();
+    expect(utcRange("2026-08-00")).toBeNull();
+    expect(utcRange("لافا")).toBeNull();
   });
 });

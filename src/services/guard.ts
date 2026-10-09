@@ -74,6 +74,36 @@ export function respondTo(e: unknown): NextResponse | null {
   return null;
 }
 
+/**
+ * خاتمةُ المسار: ما نعرفه يُقال بنصّه، وما لا نعرفه عطبُ خادمٍ برقم مرجع.
+ *
+ * كانت عشرةُ مسارات تختم بـ`{ error: (e as Error).message }` و400 لكلّ خطأ. وخطأ
+ * Drizzle يحمل نصَّ الاستعلام وقيمَه، وخطأ `pg` يحمل اسمَ المضيف — فيُعرَض على
+ * الشاشة SQL وأسماءُ جداول، ويُسمّى عطبُ الخادم «خطأَ إدخال». فرسائلُنا (بالعربيّة،
+ * يرميها الخادمُ عمداً) تبقى كما هي بـ400، وغيرُها 500 برسالةٍ عامّة، والتفصيلُ
+ * في سجلّ الخادم تحت المرجع نفسه.
+ */
+export function failWith(e: unknown, route: string): NextResponse {
+  const mapped = respondTo(e);
+  if (mapped) return mapped;
+  const own = ownMessage(e);
+  if (own) return NextResponse.json({ error: own }, { status: 400 });
+  const ref = crypto.randomUUID().slice(0, 8);
+  console.error(`[${route}] عطبٌ غير متوقَّع (المرجع ${ref})`, e);
+  return NextResponse.json(
+    { error: `عطبٌ في الخادم — أعد المحاولة، وإن تكرّر فاذكر المرجع ${ref}`, ref },
+    { status: 500 },
+  );
+}
+
+/** رسالةٌ كتبناها نحن: عربيّة، وليست استعلاماً فاشلاً ولا خطأً من القاعدة. */
+function ownMessage(e: unknown): string | null {
+  if (!(e instanceof Error) || pgErrorCode(e)) return null;
+  const m = e.message;
+  if (m.startsWith("Failed query") || !/[\u0600-\u06FF]/.test(m)) return null;
+  return m.slice(0, 300);
+}
+
 /** رمز خطأ PostgreSQL — على الخطأ نفسه أو على سببه (Drizzle يلفّه). */
 export function pgErrorCode(e: unknown): string | undefined {
   const err = e as { code?: unknown; cause?: { code?: unknown } } | null;

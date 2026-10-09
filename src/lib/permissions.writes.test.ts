@@ -22,6 +22,15 @@ describe("فصل صلاحيات الكتابة عن القراءة", () => {
     }
   });
 
+  it("تصحيحُ مبالغ الفاتورة وتنزيلُ الحزمة قدرتان صريحتان — لا يملكهما مديرُ المشتريات", () => {
+    for (const role of ["OWNER", "ACCOUNTANT"] as const) {
+      expect(can(role, "invoice:edit")).toBe(true);
+      expect(can(role, "reports:export")).toBe(true);
+    }
+    expect(can("PURCHASING", "invoice:edit")).toBe(false);
+    expect(can("PURCHASING", "reports:export")).toBe(false);
+  });
+
   it("اعتماد الدفعات يبقى للمالك وحده", () => {
     expect(can("OWNER", "payment:approve")).toBe(true);
     expect(can("ACCOUNTANT", "payment:approve")).toBe(false);

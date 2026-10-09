@@ -12,7 +12,7 @@ import { can } from "@/lib/permissions";
 import { activeProviderName } from "@/lib/extraction";
 import { deepseekBaseUrl, deepseekKey } from "@/lib/ai/models";
 import { createOAuthClient } from "@/lib/drive";
-import { openToken } from "@/lib/token-crypto";
+import { isSealed, openToken, tokenEncryptionEnabled } from "@/lib/token-crypto";
 import { accounts } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { isAuthBypassed } from "@/lib/session";
@@ -34,6 +34,9 @@ function dbHost(): { host: string; pooled: boolean } | null {
   }
 }
 
+const ANONYMOUS_TTL_MS = 30_000;
+let anonymousAnswer: { healthy: boolean; at: number } | null = null;
+
 /**
  * الفحص العلنيّ مختصر عمداً.
  *
@@ -47,6 +50,18 @@ export async function GET() {
   const viewer = await currentUser().catch(() => null);
   const detailed = viewer !== null && can(viewer.role, "audit:view");
   const info = dbHost();
+
+  /*
+    المجهولُ لا يوقظ القاعدةَ بكلّ طلب: المسارُ علنيّ وبلا حدّ طلبات، فمن عرف
+    الرابط أبقى حاسوبَ Neon مستيقظاً أو أغرق اتّصالَ الدالّة. فجوابُه يُحفظ
+    نصفَ دقيقةٍ في ذاكرة الدالّة — والمخوَّل يفحص دائماً.
+  */
+  if (!detailed && anonymousAnswer && started - anonymousAnswer.at < ANONYMOUS_TTL_MS) {
+    return NextResponse.json(
+      { healthy: anonymousAnswer.healthy, at: new Date(anonymousAnswer.at).toISOString() },
+      { status: anonymousAnswer.healthy ? 200 : 503 },
+    );
+  }
 
   let database: { ok: boolean; latencyMs?: number; error?: string };
   try {
@@ -77,7 +92,7 @@ export async function GET() {
       clientConfigured: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
       allowlistCount: (process.env.ALLOWED_EMAILS ?? "").split(",").filter(Boolean).length,
     },
-    auth: { bypassed: isAuthBypassed() },
+    auth: { bypassed: isAuthBypassed(), tokenEncryptionKey: tokenEncryptionEnabled() },
     drive: {
       foldersConfigured: Boolean(
         process.env.DRIVE_ACCOUNTS_FOLDER_ID && process.env.DRIVE_YEAR_2026_FOLDER_ID,
@@ -115,7 +130,8 @@ export async function GET() {
     ورمزُ الدرايف: كان منتهياً والمزامنة تقول «لا جديد» والفحص أخضر.
     فللمخوَّل وحده يُجدَّد رمزُه — قراءةٌ لا تمسّ الأرشيف.
   */
-  let driveToken: { ok: boolean; error?: string } | undefined;
+  /* ورمزٌ محفوظٌ خامّاً (بلا `TOKEN_ENCRYPTION_KEY`) يُقال للمخوَّل — كان يسقط التشفيرُ بصمت */
+  let driveToken: { ok: boolean; error?: string; sealed?: boolean } | undefined;
   if (detailed && viewer) {
     const [row] = await db
       .select({ token: accounts.refresh_token })
@@ -129,7 +145,7 @@ export async function GET() {
         const client = createOAuthClient();
         client.setCredentials({ refresh_token: openToken(row.token) });
         const t = await client.getAccessToken();
-        driveToken = t.token ? { ok: true } : { ok: false, error: "لم يصدر رمز وصول" };
+        driveToken = t.token ? { ok: true, sealed: isSealed(row.token) } : { ok: false, error: "لم يصدر رمز وصول" };
       } catch (e) {
         driveToken = { ok: false, error: (e as Error).message.slice(0, 80) };
       }
@@ -137,6 +153,7 @@ export async function GET() {
   }
 
   if (!detailed) {
+    anonymousAnswer = { healthy, at: started };
     return NextResponse.json(
       { healthy, at: new Date().toISOString() },
       { status: healthy ? 200 : 503 },

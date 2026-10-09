@@ -18,7 +18,7 @@ import {
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
-import { DriveAuthExpiredError, driveForUser, downloadFile, isDriveAuthError } from "@/lib/drive";
+import { DriveAuthExpiredError, DriveFileTooLargeError, driveForUser, downloadFile, isDriveAuthError } from "@/lib/drive";
 import { extractDocument, isSupportedUpload } from "@/lib/extraction";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import {
@@ -115,9 +115,12 @@ async function handle(request: Request) {
       if (isDriveAuthError(e)) {
         return NextResponse.json({ error: new DriveAuthExpiredError().message }, { status: 428 });
       }
+      /* نصُّ خطأ جوجل (وفيه معرّفُ الملفّ) لسجلّ الخادم لا للشاشة */
+      console.error("[statement-reconcile] تعذّر تنزيل الكشف:", e);
+      const tooBig = e instanceof DriveFileTooLargeError;
       return NextResponse.json(
-        { error: `تعذّر تنزيل الكشف من الدرايف: ${(e as Error).message}` },
-        { status: 502 },
+        { error: tooBig ? e.message : "تعذّر تنزيل الكشف من الدرايف — تحقّق من أنّ الملفّ ما زال في مكانه ثمّ أعد المحاولة" },
+        { status: tooBig ? 413 : 502 },
       );
     }
 

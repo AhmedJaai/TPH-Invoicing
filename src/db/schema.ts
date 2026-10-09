@@ -256,6 +256,8 @@ export const documents = pgTable("documents", {
    */
   uniqueIndex("documents_sha_uniq").on(t.sha256).where(sql`status <> 'REJECTED'`),
   index("documents_period_supplier_idx").on(t.periodMonth, t.supplierId),
+  /* ترشيحُ صفحة المستندات بالمورّد — الفهرسُ أعلاه يبدأ بالشهر فلا يخدمه */
+  index("documents_supplier_created_idx").on(t.supplierId, t.uploadedAt.desc()),
   index("documents_status_idx").on(t.status),
   index("documents_drive_md5_idx").on(t.driveMd5).where(sql`drive_md5 is not null`),
 ]);
@@ -370,6 +372,7 @@ export const invoiceLines = pgTable("invoice_lines", {
   index("invoice_lines_supplier_product_idx").on(t.supplierProductId),
   index("invoice_lines_item_idx").on(t.normalizedDescription),
   index("invoice_lines_item_date_idx").on(t.normalizedDescription, t.invoiceDate),
+  index("invoice_lines_supplier_item_idx").on(t.supplierId, t.normalizedDescription),
 ]);
 
 /* ───────────────────────── كشوف الموردين ───────────────────────── */
@@ -669,6 +672,8 @@ export const bankTransactions = pgTable("bank_transactions", {
   index("bank_tx_type_idx").on(t.transactionType),
   index("bank_tx_account_idx").on(t.bankAccountId),
   index("bank_tx_lifecycle_idx").on(t.lifecycle),
+  /* حذفُ قاعدةٍ (ON DELETE SET NULL) لا يمسح الجدول كلَّه */
+  index("bank_tx_rule_idx").on(t.ruleId).where(sql`rule_id is not null`),
   /* 048 — حركةُ بنكٍ واحدة لكلّ دفعة */
   uniqueIndex("bank_tx_matched_payment_uniq").on(t.matchedPaymentId).where(sql`matched_payment_id is not null`),
   /*

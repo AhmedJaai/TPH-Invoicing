@@ -3,7 +3,7 @@
  *
  *   GET /api/export/accountant?month=YYYY-MM
  *
- * لمن يقفل الشهر (`month:close`) — المالكُ والمحاسب. والتنزيلُ يُقيَّد في
+ * لمن يملك `reports:export` — المالكُ والمحاسب اليوم. والتنزيلُ يُقيَّد في
  * سجلّ التدقيق: ملفٌّ فيه فواتيرُ الشهر ودفعاتُه يخرج من النظام.
  * والأوراقُ من اليمين إلى اليسار، والمالُ خلايا عدديّة بتنسيق المال
  * فيجمعها المحاسب، والمجهولُ نصُّ «غير معروف» فلا يُجمع صفراً.
@@ -21,7 +21,7 @@ export const maxDuration = 60;
 export async function GET(request: Request) {
   let user;
   try {
-    user = await guard("accountant-pack", "month:close");
+    user = await guard("accountant-pack", "reports:export");
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;

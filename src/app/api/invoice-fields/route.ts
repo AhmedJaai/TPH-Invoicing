@@ -78,8 +78,8 @@ export async function POST(request: Request) {
       الصلاحيةُ صلاحيةُ رفع (مديرُ المشتريات يصحّح الرقمَ والتاريخ)، والشاشةُ ليست حارساً.
     */
     const touchesMoney = b.subtotal !== undefined || b.vat !== undefined || b.total !== undefined || b.discount !== undefined || b.charges !== undefined || b.supplierId !== undefined;
-    if (touchesMoney && !can(user.role, "amounts:view")) {
-      return NextResponse.json({ error: "تعديل المبالغ أو المورّد يحتاج صلاحية عرض المبالغ — اطلبه من مالك الحساب." }, { status: 403 });
+    if (touchesMoney && !can(user.role, "invoice:edit")) {
+      return NextResponse.json({ error: "تعديل المبالغ أو المورّد يحتاج صلاحية «تصحيح مبالغ الفاتورة ومورّدها» — اطلبها من مالك الحساب." }, { status: 403 });
     }
 
     const out = await db.transaction((tx) => correctInvoice(tx, {

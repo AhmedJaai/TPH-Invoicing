@@ -20,6 +20,7 @@ import {
 } from "@/components/ui";
 import { invoiceReasons } from "@/lib/invoice-findings";
 import { invoiceHref } from "@/lib/invoice-profile";
+import { escapeLike } from "@/lib/search";
 import { loadPendingReview } from "@/services/document-review.service";
 import { GAP_TEXT } from "@/lib/extraction/auto-archive";
 import { companyConfig } from "@/config/drive";
@@ -106,7 +107,7 @@ export default async function DocumentsPage({
   if (p.supplier) base.push(eq(documents.supplierId, p.supplier));
   if (p.kind) base.push(sql`${documents.kind}::text = ${p.kind}`);
   // البحث في اسم الملف كما هو في الدرايف — وهو ما يتذكّره المستخدم عادةً
-  if (q) base.push(ilike(documents.fileName, `%${q}%`));
+  if (q) base.push(ilike(documents.fileName, `%${escapeLike(q)}%`));
   const where = and(...base, ...(statusFilter ? [statusFilter] : []));
   const whereBase = base.length ? and(...base) : undefined;
 

@@ -9,7 +9,7 @@ import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { productCategoryEnum } from "@/db/schema";
 import { NextResponse } from "next/server";
-import { guard, respondTo } from "@/services/guard";
+import { guard, respondTo, failWith } from "@/services/guard";
 import { linkToProduct, unlink } from "@/services/product.service";
 import { recordAudit } from "@/lib/audit";
 import { PRODUCT, countNoun } from "@/lib/arabic";
@@ -87,6 +87,6 @@ export async function POST(request: Request) {
       }`,
     });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    return failWith(e, "product");
   }
 }

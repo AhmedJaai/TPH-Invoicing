@@ -48,6 +48,40 @@ export function normalizeArabic(s: string): string {
     .trim();
 }
 
+/**
+ * يهرّب رموز LIKE في نصّ المستخدم كي يُطابَق حرفاً بحرف.
+ *
+ * «50%» و«INV_12» كانا يُقرآن بدلاً عامّاً: `%` أيّ نصّ و`_` أيّ حرف —
+ * وأسماءُ ملفّاتنا القياسيّة مليئةٌ بالشرطة السفليّة. والشرطةُ المائلة
+ * حرفُ التهريب الافتراضيّ في Postgres فتُهرَّب أوّلاً.
+ */
+export function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+/**
+ * حدّا يومٍ أو شهرٍ تقويميّ كما يُخزَّنان (منتصف ليل UTC): [from, until).
+ *
+ * `to_char(col, …) = term` يلفّ العمود فيُعطّل فهرسه ويتبع منطقة الجلسة.
+ * والنطاقُ يُخدَم من الفهرس ولا يتبع منطقة. ويُرجع `null` لتاريخٍ لا وجود
+ * له («2026-13-45») — فلا يُبحث به أصلاً.
+ */
+export function utcRange(term: string): { from: Date; until: Date } | null {
+  const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(term);
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = m[3] === undefined ? null : Number(m[3]);
+  if (month < 1 || month > 12) return null;
+  const from = new Date(Date.UTC(year, month - 1, day ?? 1));
+  /* Date.UTC يُدحرج «31 فبراير» إلى مارس — فما تغيّر شهرُه ليس يوماً قائماً */
+  if (from.getUTCMonth() !== month - 1) return null;
+  const until = day === null
+    ? new Date(Date.UTC(year, month, 1))
+    : new Date(Date.UTC(year, month - 1, day + 1));
+  return { from, until };
+}
+
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const VAT_RE = /^\d{15}$/;

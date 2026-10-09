@@ -9,7 +9,7 @@
  * فيُعرَض ما سيقع بالضبط — كما تُعايَن دفعةُ أوّل الشهر قبل إقرارها.
  */
 import { NextResponse } from "next/server";
-import { guard, respondTo } from "@/services/guard";
+import { guard, respondTo, failWith } from "@/services/guard";
 import { importFoodicsCatalog, type CatalogFile } from "@/services/catalog-import.service";
 
 export const runtime = "nodejs";
@@ -67,8 +67,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(result);
   } catch (e) {
-    const mapped = respondTo(e);
-    if (mapped) return mapped;
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    return failWith(e, "inventory-catalog");
   }
 }

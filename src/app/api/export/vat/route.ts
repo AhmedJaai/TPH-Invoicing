@@ -4,7 +4,7 @@
  *   GET /api/export/vat?period=2026-Q3   (أو YYYY-MM)
  *
  * من مادّة صفحة الإقرار نفسِها (`loadVatReturn`)، فلا يخالف رقمُه رقمَها. لمن يرى الصفحة
- * (`month:close`)، والتنزيلُ يُقيَّد: ملفٌّ فيه فواتيرُ الفترة ومبيعاتُها يخرج من النظام.
+ * (`reports:export`)، والتنزيلُ يُقيَّد: ملفٌّ فيه فواتيرُ الفترة ومبيعاتُها يخرج من النظام.
  */
 import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
@@ -21,7 +21,7 @@ export const maxDuration = 60;
 export async function GET(request: Request) {
   let user;
   try {
-    user = await guard("vat-export", "month:close");
+    user = await guard("vat-export", "reports:export");
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;

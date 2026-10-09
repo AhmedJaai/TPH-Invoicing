@@ -9,7 +9,7 @@
  */
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { guard, respondTo } from "@/services/guard";
+import { guard, respondTo, failWith } from "@/services/guard";
 import {
   CountLockedError, NotAWeekError, OverlappingPeriodError, ScopeItemNotInCountError,
   canonicalCounts, discardCount, finaliseCount, recomputeCount, reopenCount, saveActualCounts, saveCountScope,
@@ -154,8 +154,6 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json({ error: e.message }, { status: 409 });
     }
-    const mapped = respondTo(e);
-    if (mapped) return mapped;
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    return failWith(e, "inventory-count");
   }
 }

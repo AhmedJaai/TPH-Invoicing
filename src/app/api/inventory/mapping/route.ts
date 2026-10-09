@@ -9,7 +9,7 @@ import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { productCategoryEnum } from "@/db/schema";
 import { NextResponse } from "next/server";
-import { guard, respondTo } from "@/services/guard";
+import { guard, respondTo, failWith } from "@/services/guard";
 import { mapPosProducts, unmapPosProducts } from "@/services/pos-mapping.service";
 import { PRODUCT, countNoun } from "@/lib/arabic";
 
@@ -60,8 +60,6 @@ export async function POST(request: Request) {
       message: `رُبط ${countNoun(result.mapped, PRODUCT)} بـ«${result.productName}»${result.createdProduct ? " (أُنشئ الآن)" : ""}`,
     });
   } catch (e) {
-    const mapped = respondTo(e);
-    if (mapped) return mapped;
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    return failWith(e, "inventory-mapping");
   }
 }

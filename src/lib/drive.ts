@@ -135,6 +135,21 @@ export const isFolder = (f: DriveFile): boolean => f.mimeType === FOLDER_MIME;
  * فتقول الشاشة «٠ ملفّات جديدة» والدرايف لم يُقرأ منه حرف. والصمتُ هنا
  * أسوأ من العطب: يُطمئن صاحب العمل إلى أنّ أرشيفه كلّه مقيَّد.
  */
+/** أكبرُ ملفٍّ يُنزَّل من الدرايف للقراءة — الفاتورةُ والكشفُ دون ذلك بكثير. */
+export const MAX_DOWNLOAD_BYTES = 25 * 1024 * 1024;
+
+/** ملفٌّ في الأرشيف أكبر من أن يُقرأ — يُقال حجمُه، ولا تُحمَّل به الذاكرة. */
+export class DriveFileTooLargeError extends Error {
+  readonly sizeBytes: number;
+  constructor(sizeBytes: number) {
+    super(
+      `حجمُه ${Math.ceil(sizeBytes / (1024 * 1024))} ميجابايت — أكبر من حدّ القراءة (${MAX_DOWNLOAD_BYTES / (1024 * 1024)} ميجابايت). صغّره أو قسّمه ثمّ ضعه في المجلّد`,
+    );
+    this.name = "DriveFileTooLargeError";
+    this.sizeBytes = sizeBytes;
+  }
+}
+
 export class DriveAuthExpiredError extends Error {
   constructor() {
     super(
@@ -276,13 +291,21 @@ export async function downloadFile(
 ): Promise<{ data: Buffer; mimeType: string }> {
   const meta = await drive.files.get({
     fileId,
-    fields: "mimeType",
+    fields: "mimeType, size",
     supportsAllDrives: true,
   });
 
+  /*
+    الحجمُ يُسأل قبل التنزيل: فيديو أُسقط في الأرشيف خطأً كان يُقرأ كلُّه في الذاكرة
+    فتسقط الدالّةُ في كلّ مزامنة. والسقفُ يُمرَّر إلى العميل أيضاً — فما كذب حجمُه
+    المعلَن يقف عنده.
+  */
+  const size = meta.data.size ? Number(meta.data.size) : null;
+  if (size !== null && size > MAX_DOWNLOAD_BYTES) throw new DriveFileTooLargeError(size);
+
   const res = await drive.files.get(
     { fileId, alt: "media", supportsAllDrives: true },
-    { responseType: "arraybuffer" },
+    { responseType: "arraybuffer", maxContentLength: MAX_DOWNLOAD_BYTES },
   );
 
   return {

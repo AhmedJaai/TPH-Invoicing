@@ -119,10 +119,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       await db
         .update(accounts)
         .set({
-          access_token: account.access_token ?? null,
-          expires_at: account.expires_at ?? null,
+          /*
+            رمزُ الوصول (صالحٌ ساعةً بنطاق الدرايف كلّه) ورمزُ الهويّة لا يُحفظان:
+            لا يقرؤهما أحد — `driveForUser` يجدّد من رمز التجديد دائماً — وكانا
+            يُكتبان نصّاً خامّاً بجانب رمز تجديدٍ مختوم.
+          */
+          access_token: null,
+          expires_at: null,
           scope: account.scope ?? null,
-          id_token: account.id_token ?? null,
+          id_token: null,
           token_type: account.token_type ?? null,
           /* جوجل لا تُعيد رمز التجديد في كلّ دخول — لا يُمحى القائم بفراغ */
           /* ويُشفَّر إن ضُبط TOKEN_ENCRYPTION_KEY — فمن قرأ القاعدة لا يملك الدرايف */

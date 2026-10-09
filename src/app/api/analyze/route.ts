@@ -4,6 +4,7 @@
  *
  * لا يرفع شيئاً إلى الدرايف — الرفع خطوة مستقلة بعد تأكيد المستخدم.
  */
+import { signatureMatches, sniffMimeType } from "@/lib/file-signature";
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { and, eq, ne, or } from "drizzle-orm";
@@ -64,15 +65,28 @@ async function handle(request: Request) {
     return NextResponse.json({ error: "حجم الملف يتجاوز ٤ ميجابايت — صغّره (صوّره بدقّة أقلّ) ثمّ أعد المحاولة" }, { status: 400 });
   }
   /* كروم يرسل HEIC بنوعٍ فارغ — فيُعرف من الامتداد */
-  const mimeType = uploadMimeType(file.type, file.name);
-  if (!isSupportedUpload(mimeType)) {
+  const declaredType = uploadMimeType(file.type, file.name);
+  if (!isSupportedUpload(declaredType)) {
     return NextResponse.json(
-      { error: `نوع غير مدعوم (${mimeType || "مجهول"}) — المقبول PDF أو صورة (JPG · PNG · HEIC)` },
+      { error: `نوع غير مدعوم (${declaredType || "مجهول"}) — المقبول PDF أو صورة (JPG · PNG · HEIC)` },
       { status: 400 },
     );
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  /*
+    النوعُ من بصمة الملفّ لا ممّا أعلنه المتصفّح: ما لا بصمةَ مقبولةً له لا يبلغ
+    محلِّلاً. وما أُعلن بنوعٍ وبصمتُه نوعٌ آخر مقبول (صورةُ آيفون حُوِّلت JPEG
+    وبقي اسمُها HEIC) يُقرأ بنوعه الحقيقيّ — لا يُردّ على صاحبه.
+  */
+  const sniffed = sniffMimeType(buffer);
+  if (!sniffed) {
+    return NextResponse.json(
+      { error: "محتوى الملفّ ليس PDF ولا صورة — تأكّد من الملفّ ثمّ أعد المحاولة" },
+      { status: 400 },
+    );
+  }
+  const mimeType = signatureMatches(declaredType, buffer) ? declaredType : sniffed;
   const sha256 = createHash("sha256").update(buffer).digest("hex");
   /* بصمةُ الدرايف — لما قيّدته المزامنةُ بالاسم بلا تنزيل فلا `sha256` له */
   const md5 = createHash("md5").update(buffer).digest("hex");

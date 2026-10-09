@@ -13,6 +13,10 @@ const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health"];
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const ACCEPTED_BODIES = /^(application\/json|multipart\/form-data|application\/x-www-form-urlencoded)/i;
 
+function hasSessionCookie(request: NextRequest): boolean {
+  return request.cookies.has("authjs.session-token") || request.cookies.has("__Secure-authjs.session-token");
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -27,6 +31,19 @@ export function proxy(request: NextRequest) {
   */
   if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth") && WRITE_METHODS.has(request.method)) {
     const origin = request.headers.get("origin");
+    /*
+      `Sec-Fetch-Site` يكتبه المتصفّح ولا تملكه الصفحة: «من موقعٍ آخر» يُردّ ولو
+      غاب `Origin`. والطلبُ الكاتب الذي يحمل كعكةَ الجلسة ولا يقول من أين جاء
+      (لا `Origin` ولا `Sec-Fetch-Site`) ليس متصفّحاً نعرفه — كلُّ متصفّحٍ حديث
+      يرسل `Origin` مع كلّ طلبٍ كاتب. والنصُّ المحلّيّ بلا كعكةٍ يمرّ كما كان.
+    */
+    const fetchSite = request.headers.get("sec-fetch-site");
+    if (fetchSite === "cross-site") {
+      return NextResponse.json({ error: "طلبٌ من موقعٍ آخر — رُفض" }, { status: 403 });
+    }
+    if (!origin && !fetchSite && hasSessionCookie(request)) {
+      return NextResponse.json({ error: "طلبٌ لا يُعرف مصدرُه — رُفض. حدّث الصفحة ثمّ أعد المحاولة" }, { status: 403 });
+    }
     if (origin) {
       let sameHost = false;
       try { sameHost = new URL(origin).host === request.nextUrl.host; } catch { sameHost = false; }
@@ -46,9 +63,7 @@ export function proxy(request: NextRequest) {
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
   // وجود كعكة الجلسة فحص مبدئي فقط؛ التحقق الفعلي في الخادم.
-  const hasSession =
-    request.cookies.has("authjs.session-token") ||
-    request.cookies.has("__Secure-authjs.session-token");
+  const hasSession = hasSessionCookie(request);
 
   if (!hasSession) {
     // واجهات البرمجة تردّ 401 بصيغة JSON — تحويلها إلى صفحة HTML

@@ -177,6 +177,28 @@ describe("المكوّنات لا تقرأ الردّ JSON مباشرة", () => 
   });
 });
 
+/* ── ٣أ. نصُّ الخطأ الخامّ لا يُعاد إلى المتصفّح ── */
+
+/**
+ * `{ error: (e as Error).message }` يعرض خطأ Drizzle بنصّ استعلامه وقيمه، وخطأ `pg`
+ * باسم مضيفه. فالخاتمةُ `failWith(e, route)` (`services/guard.ts`): رسائلُنا بنصّها،
+ * وغيرُها ٥٠٠ برقم مرجع.
+ */
+const RAW_ERROR_BODY = /error:\s*\(e as Error\)\.message\s*[,}]/;
+
+describe("المسارات لا تعيد نصَّ الخطأ الخامّ", () => {
+  it("لا مسارَ يفعل", () => {
+    const offenders = SRC.filter(
+      (f) => f.includes(`${path.sep}app${path.sep}api${path.sep}`) && RAW_ERROR_BODY.test(readFileSync(f, "utf8")),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("والحارس يُمسك الشكل الخاطئ", () => {
+    expect(RAW_ERROR_BODY.test("return NextResponse.json({ error: (e as Error).message }, { status: 400 });")).toBe(true);
+  });
+});
+
 /* ── ٣ب. جسمُ الطلب يُفحَص وقتَ التشغيل ── */
 
 /**

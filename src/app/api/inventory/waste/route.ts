@@ -8,7 +8,7 @@
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
-import { guard, respondTo } from "@/services/guard";
+import { guard, respondTo, failWith } from "@/services/guard";
 import {
   MovementRefused, recordMovement, recordWaste, voidWaste,
   WASTE_REASON_LABEL, MOVEMENT_KIND_LABEL,
@@ -65,9 +65,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, message: "أُبطل الهدر — وعاد مقدارُه إلى «الفرق غير المفسَّر»." });
     } catch (e) {
       if (e instanceof MovementRefused) return NextResponse.json({ error: e.message }, { status: 409 });
-      const mapped = respondTo(e);
-      if (mapped) return mapped;
-      return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+      return failWith(e, "inventory-waste");
     }
   }
 
@@ -120,8 +118,6 @@ export async function POST(request: Request) {
     });
   } catch (e) {
     if (e instanceof MovementRefused) return NextResponse.json({ error: e.message }, { status: 409 });
-    const mapped = respondTo(e);
-    if (mapped) return mapped;
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    return failWith(e, "inventory-waste");
   }
 }

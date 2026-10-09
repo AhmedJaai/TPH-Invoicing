@@ -110,6 +110,7 @@
 | `066_document_intake_trace.sql` | `documents`: أثرُ الدخول والقراءة (المصدر · محاولاتُ القراءة وسببُ فشلها · الاسمُ الأصليّ · نسخةُ ماذا) وفهرسُ `drive_md5` |
 | `067_supplier_profile.sql` | `suppliers`: `payment_terms_days` (فراغُه «غير معروف» لا صفر) · `phone_e164` · `email` · `contact_name` · `iban` المكتوب بيد ومن كتبه ومتى؛ وقيدان على العمودين الجديدين وحدهما |
 | `068_extraction_evidence.sql` | `documents.extraction_evidence` و`extraction_prompt_version`، و`extraction_cache`: `evidence` · `prompt_version` · `schema_version` · `provider` — ما قوبل به اقتراحُ النموذج (رمزُ QR ومصدرُ كلّ حقل) |
+| `069_lookup_indexes.sql` | فهارس: `documents(supplier_id, created_at desc)` · `invoice_lines(supplier_id, normalized_description)` · `bank_transactions(rule_id)` الجزئيّ |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 
