@@ -130,6 +130,15 @@ export interface ConsumptionResult {
  * ‏`q ÷ (1 − loss)` لا `q × (1 + loss)`: الفاقدُ نسبةٌ من **المصروف**
  * لا من الواصل.
  */
+/**
+ * أقصى فاقدِ تجهيزٍ يُحسَب به — دون المئة بالمئة.
+ *
+ * القسمةُ على `(1 − الفاقد)`: مئةٌ بالمئة قسمةٌ على صفر (∞)، وما فوقها
+ * استهلاكٌ **سالب** — وكلاهما كان يُكتب في سطر الجرد. وذاك خطأٌ حسابيٌّ يقينيّ
+ * فيُردّ عند الحفظ؛ وما دونه يُقبَل كما كتبه صاحبُه ولو كبُر.
+ */
+export const MAX_PREP_LOSS_BP = 9_999;
+
 export function ingredientForSale(
   soldQuantityMilli: number,
   ingredientQuantityMilli: number,
@@ -144,7 +153,7 @@ export function ingredientForSale(
 ): number {
   const base = (soldQuantityMilli * ingredientQuantityMilli * scale) / yieldMilli;
   if (prepLossBp === null || prepLossBp <= 0) return Math.round(base);
-  return Math.round((base * 10_000) / (10_000 - prepLossBp));
+  return Math.round((base * 10_000) / (10_000 - Math.min(prepLossBp, MAX_PREP_LOSS_BP)));
 }
 
 /**

@@ -7,7 +7,10 @@
  */
 import { reconcileAndPersist } from "./statement-reconcile.service";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { documents, invoiceLines, invoices, statements, supplierItemAliases, suppliers } from "@/db/schema";
+import { documents, invoiceLines, invoices, issues, statements, supplierItemAliases, suppliers } from "@/db/schema";
+import { ISSUE, ISSUE_TEXT } from "@/lib/issue-codes";
+import { findStatementTwin } from "@/lib/statement-twin";
+import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { invoiceNumberKey } from "@/lib/invoice-twin";
 import { normalizeItem } from "@/lib/items";
 import { parseLineQuantity, reconcileInvoiceLines, resolveLinePricing } from "@/lib/line-pricing";
@@ -103,6 +106,29 @@ async function adoptStatementInvoice(tx: Tx, input: CreateInvoiceInput, periodMo
   }).where(eq(invoices.id, twin.id));
   await tx.delete(documents).where(and(eq(documents.id, twin.document_id), eq(documents.origin, STATEMENT_LINE_ORIGIN)));
   return twin.id;
+}
+
+/**
+ * لماذا أرجعت `createInvoice` فراغاً؟ — الفاتورةُ التي سبقت إلى القيد، وبأيّ بابٍ سبقت.
+ *
+ * الإدراجُ `onConflictDoNothing` فيُرجع `null` بلا سبب: المستدعي لا يعرف أكان
+ * التعارضُ على (المورّد، الرقم) أم على المستند، ولا أيُّ فاتورةٍ هي. فيُسأل هنا
+ * ليقول المستدعي «مقيَّدةٌ برقم كذا» ويفتحها — والفشلُ يُسمَع.
+ */
+export async function findInvoiceConflict(
+  tx: Tx,
+  input: Pick<CreateInvoiceInput, "documentId" | "supplierId" | "invoiceNumber">,
+): Promise<{ id: string; invoiceNumber: string; by: "NUMBER" | "DOCUMENT" } | null> {
+  const [byDocument] = await tx
+    .select({ id: invoices.id, invoiceNumber: invoices.invoiceNumber })
+    .from(invoices).where(eq(invoices.documentId, input.documentId)).limit(1);
+  if (byDocument) return { ...byDocument, by: "DOCUMENT" };
+  const [byNumber] = await tx
+    .select({ id: invoices.id, invoiceNumber: invoices.invoiceNumber })
+    .from(invoices)
+    .where(and(eq(invoices.supplierId, input.supplierId), eq(invoices.invoiceNumber, input.invoiceNumber)))
+    .limit(1);
+  return byNumber ? { ...byNumber, by: "NUMBER" } : null;
 }
 
 export async function createInvoice(tx: Tx, input: CreateInvoiceInput): Promise<string | null> {
@@ -348,7 +374,11 @@ export async function createStatement(tx: Tx, input: CreateStatementInput): Prom
     })
     .returning({ id: statements.id });
 
-  if (!row || lines.length === 0) return;
+  if (!row) return;
+  if (lines.length === 0) {
+    await flagStatementTwin(tx, row.id, input.supplierId, start, end, input.closingBalanceMinor);
+    return;
+  }
 
   /*
     ويُطابَق بفواتيرنا حين يُقيَّد — لا حين يضغط أحدٌ «أعِد المطابقة».
@@ -361,6 +391,36 @@ export async function createStatement(tx: Tx, input: CreateStatementInput): Prom
     statementId: row.id, supplierId: input.supplierId, supplierName: sup?.nameAr ?? "", documentId: input.documentId,
     lines: [...lines], openingMinor: input.openingBalanceMinor, closingMinor: input.closingBalanceMinor,
     actorId: null, persist: true, tx,
+  });
+  /* بعد المطابقة: هي تستبدل تنبيهات الكشف المفتوحة، فما يُكتب قبلها يُمحى */
+  await flagStatementTwin(tx, row.id, input.supplierId, start, end, input.closingBalanceMinor);
+}
+
+/**
+ * كشفٌ يشبه مقيَّداً للمورّد نفسه (`findStatementTwin`) — تنبيهٌ على الكشف الجديد
+ * يسمّي الأقدم. **لا يُمنَع القيد ولا يُحذف شيء**: يقرّر الإنسان أيُّهما يُرفض.
+ */
+async function flagStatementTwin(
+  tx: Tx, statementId: string, supplierId: string, start: Date, end: Date, closingBalanceMinor: number | null | undefined,
+): Promise<void> {
+  const others = await tx
+    .select({
+      id: statements.id, periodStart: statements.periodStart, periodEnd: statements.periodEnd,
+      closingBalanceMinor: statements.closingBalanceMinor,
+    })
+    .from(statements)
+    .where(eq(statements.supplierId, supplierId));
+  const twin = findStatementTwin(
+    others.map((o) => ({ ...o, periodStart: todayInRiyadh(o.periodStart), periodEnd: todayInRiyadh(o.periodEnd) })),
+    { id: statementId, periodStart: todayInRiyadh(start), periodEnd: todayInRiyadh(end), closingBalanceMinor: closingBalanceMinor ?? null },
+  );
+  if (!twin) return;
+  await tx.insert(issues).values({
+    code: ISSUE.STATEMENT_POSSIBLE_DUPLICATE,
+    severity: ISSUE_TEXT.STATEMENT_POSSIBLE_DUPLICATE.severity,
+    entityType: "statement",
+    entityId: statementId,
+    message: `يشبه كشفاً مقيَّداً لهذا المورّد عن المدّة نفسها (${formatDay(start)} – ${formatDay(end)}) — إن كان الملفُّ نفسَه بصيغةٍ أخرى فارفض أحدَهما «مكرّر»، وإلّا فتجاهل`,
   });
 }
 

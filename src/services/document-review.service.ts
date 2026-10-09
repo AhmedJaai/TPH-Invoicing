@@ -5,6 +5,7 @@
  * فلا يعدّ اللوحُ «٧ تجتمع فيها» ثمّ يعتمد الفعلُ خمسة.
  */
 
+import { parseEvidence, qrArchiveFacts } from "@/lib/extraction/evidence";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, statements, suppliers } from "@/db/schema";
@@ -58,6 +59,7 @@ export async function loadPendingReview(limit = 200) {
                                                    then ${documents.extractionJson}->'lines' else '[]'::jsonb end) l)
       ) end`,
       statementId: statements.id,
+      evidence: documents.extractionEvidence,
     })
     .from(documents)
     .leftJoin(suppliers, eq(suppliers.id, documents.supplierId))
@@ -67,7 +69,7 @@ export async function loadPendingReview(limit = 200) {
     .orderBy(asc(documents.periodMonth))
     .limit(limit);
 
-  return rows.map(({ reading, ...d }) => {
+  return rows.map(({ reading, evidence, ...d }) => {
     const x = (reading ?? {}) as { documentKind?: string; lines?: { lineTotal?: string }[] };
     const readKind = x.documentKind ?? d.kind;
     const isStatement = readKind === "STATEMENT" || d.kind === "STATEMENT";
@@ -95,6 +97,8 @@ export async function loadPendingReview(limit = 200) {
         invoiceNumber: d.invoiceNumber,
         fileName: d.fileName,
         linesTotalMinor: sumLineTotals(x.lines, (v) => parseRiyals(v)),
+        /* رمزُ الفاتورة وما تبدّل عند إعادة السؤال — كما حُكم بهما لحظةَ القراءة، فلا يُدخله الاستدراكُ وقد مُنع */
+        ...qrArchiveFacts(parseEvidence(evidence)),
       }) as AutoArchiveVerdict,
     };
   });

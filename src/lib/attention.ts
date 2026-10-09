@@ -237,6 +237,12 @@ export interface AttentionFacts {
   bankLastDay?: string | null;
   bankStaleDays?: number | null;
 
+  /**
+   * إقرارُ الربع المنقضي لم يُسجَّل تقديمُه — من أوّل يومٍ بعد الربع حتى «قدّمتُه».
+   * `daysLeft` سالبٌ بعد فوات الموعد. وغيابُه: قُدِّم، أو لا بيانات للربع.
+   */
+  vatReturnDue?: { periodKey: string; label: string; deadline: string; daysLeft: number } | null;
+
   /** أصناف ارتفع سعرها عند مورّدها */
   priceRises: AttentionEvidence[];
   priceRiseAnnualMinor: number;
@@ -276,6 +282,32 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       count: f.bankGapDays,
       impact: { kind: "BLOCKED", amountMinor: null },
       evidence: f.bankGapRanges,
+    });
+  }
+
+  /*
+    موعدُ الإقرار عند الهيئة: من لم يفتح صفحتَه لا يعلم أنّ الموعد بعد أيّام، والتأخيرُ غرامة.
+    يبقى حتى يُسجَّل «قدّمتُه». والمبلغُ في صفحته — لا يُحسب هنا مع كلّ فتح.
+  */
+  if (f.vatReturnDue) {
+    const v = f.vatReturnDue;
+    const late = v.daysLeft < 0;
+    out.push({
+      id: "vat-return-due",
+      area: "VAT",
+      severity: late || v.daysLeft <= 10 ? "HIGH" : "MEDIUM",
+      title: late
+        ? `فات موعدُ إقرار ضريبة ${v.label} منذ ${countNoun(-v.daysLeft, DAY)}`
+        : `إقرار ضريبة ${v.label}: آخرُ موعده ${formatDay(v.deadline)} — بعد ${countNoun(v.daysLeft, DAY)}`,
+      detail: late
+        ? "إن كنتَ قدّمتَه فسجّله ليخرج من هنا؛ وإلّا فالتأخيرُ عليه غرامةٌ عند الهيئة."
+        : "يُقدَّم ويُسدَّد في بوّابة هيئة الزكاة والضريبة والجمارك. حسابُه وما ينقصه في صفحته.",
+      action: "راجِع الحساب، قدّمه في البوّابة، ثمّ سجّل «قدّمتُه».",
+      actionLabel: "افتح الإقرار",
+      href: `/close/vat?period=${v.periodKey}`,
+      count: 1,
+      impact: { kind: "OWED", amountMinor: null },
+      evidence: [],
     });
   }
 

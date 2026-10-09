@@ -273,3 +273,25 @@ describe("حسابُ المستفيد", () => {
   });
 });
 
+
+describe("حسابُ المستفيد — ما كتبه صاحبُ المقهى بيده يمضي ويُقال", () => {
+  const IBAN = "SA0380000000608010167519";
+  const OTHER = "SA4420000001234567891234";
+  it("بلا دليلٍ في الكشوف: المكتوبُ بيد يُكتب، مع تنبيه أوّل تحويل", () => {
+    const a = resolvePayeeAccount([], IBAN);
+    expect(a.account).toBe(IBAN);
+    expect(a.note).toContain("لم يُحوَّل له من قبل");
+  });
+  it("يطابق الكشف: بلا تنبيه", () => {
+    expect(resolvePayeeAccount([{ kind: "IBAN", normalized: IBAN }], IBAN)).toEqual({ account: IBAN, note: null });
+  });
+  it("يخالف الكشف: يبقى ما كتبه — لا يُبدَّل ولا يُحجَب — ويُقال إنّه يخالف", () => {
+    const a = resolvePayeeAccount([{ kind: "IBAN", normalized: OTHER }], IBAN);
+    expect(a.account).toBe(IBAN);
+    expect(a.note).toContain("يخالف");
+  });
+  it("ويحسم تعدّدَ حسابات الكشوف", () => {
+    const a = resolvePayeeAccount([{ kind: "IBAN", normalized: IBAN }, { kind: "IBAN", normalized: OTHER }], OTHER);
+    expect(a).toEqual({ account: OTHER, note: null });
+  });
+});

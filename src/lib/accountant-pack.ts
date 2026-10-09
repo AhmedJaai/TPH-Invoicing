@@ -219,7 +219,8 @@ export function buildAccountantPack(p: PackInput): Sheet[] {
     ["مجموع الفواتير", riyals(s.invoicesTotalMinor)],
     ["الضريبة المقروءة", riyals(s.vatKnownMinor)],
     ["فواتير ضريبتُها غير مقروءة", { count: s.vatUnknownCount }],
-    ["ضريبة المدخلات القابلة للخصم", riyals(s.deductibleVatMinor)],
+    /* حكمُ النظام على الفواتير وحده — رقمُ الإقرار يضيف ما أُقرّ بيد وضريبةَ الرسوم وما اختير من الكشف */
+    ["ضريبة الفواتير المستوفية (حكم النظام — رقمُ الإقرار في سجلّه)", riyals(s.deductibleVatMinor)],
     ["ما سُدّد منها", riyals(s.paidMinor)],
     ["ما بقي عليها", riyals(s.openMinor)],
     [],
@@ -231,7 +232,7 @@ export function buildAccountantPack(p: PackInput): Sheet[] {
     ["صادر البنك", riyals(s.bankOutMinor)],
     ["صادرٌ بلا تفسير (غير مصنَّف أو لمورّدٍ بلا دفعة)", { count: s.bankUnexplainedCount }],
     [],
-    ["ملاحظة", "المبيعات غير موصولة بالنظام — الإيراد ليس في هذه الحزمة. والمجهولُ مكتوبٌ «غير معروف» لا صفراً."],
+    ["ملاحظة", "الإيرادُ ليس في هذه الحزمة: ضريبةُ المخرجات وحسابُ الإقرار في «سجلّ الإقرار» من صفحة إقرار الضريبة. والمجهولُ مكتوبٌ «غير معروف» لا صفراً."],
   ];
 
   const invoices: Cell[][] = [

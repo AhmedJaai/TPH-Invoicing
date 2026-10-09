@@ -16,6 +16,7 @@
  * دالّةٌ خالصة — تأخذ وقائع وتُرجع دلاءً مرتّبة.
  */
 import { formatMonth } from "./riyadh-time";
+import { formatRiyalsDisplay } from "./money";
 
 export type Cadence = "MONTHLY" | "QUARTERLY" | "ANNUAL";
 
@@ -52,6 +53,11 @@ export interface OutlookInput {
   /** فواتيرُ هذا الشهر المفتوحة حتى اليوم. */
   nextRun: SupplierDue[];
   recurring: RecurringInput[];
+  /**
+   * متكرّرٌ قُيِّد له مصروفٌ هذا الشهر (مربوطٌ بـ`recurring_expense_id`) — دُفع،
+   * فلا يُطرَح من الرصيد ثانيةً في «بقيّة الشهر». وغيابُه «لا يُعرف»: يُعرض الكلّ.
+   */
+  paidThisMonth?: ReadonlySet<string>;
   /** آخرُ رصيدٍ معروف — `null` مجهول. */
   balanceMinor: number | null;
   balanceAsOf: string | null;
@@ -138,6 +144,8 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
 
   const recurringLines = (month: string, filter: (day: number | null) => boolean): OutflowLine[] =>
     input.recurring
+      /* ما دُفع هذا الشهر خرج من الرصيد فعلاً — إسقاطُه ثانيةً يُنقص النقدَ مرّتين */
+      .filter((r) => !(month === thisMonth && input.paidThisMonth?.has(r.id)))
       .map((r) => ({ r, o: occursIn(r, month) }))
       .filter(({ o }) => o.occurs && filter(o.day))
       .map(({ r, o }) => ({
@@ -148,6 +156,12 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
         kind: "RECURRING" as const,
         href: "/settings#recurring",
       }));
+
+  /* ما أُسقط من «بقيّة الشهر» لأنّه دُفع — يُسمّى بمبلغه، فلا يرتفع «يبقى بعدها» بلا تفسير */
+  const settled = input.recurring
+    .filter((r) => input.paidThisMonth?.has(r.id) && occursIn(r, thisMonth).occurs)
+    .map((r) => `${r.label} ${formatRiyalsDisplay(r.amountMinor)}`);
+  const settledNote = settled.length > 0 ? ` · وخرج منها ما قُيِّد دفعُه: ${settled.join("، ")}` : "";
 
   const raw: Omit<OutlookBucket, "totalMinor" | "afterMinor">[] = [
     {
@@ -160,7 +174,7 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
     {
       id: "rest",
       title: `بقيّة ${formatMonth(thisMonth)}`,
-      when: "مصروفاتٌ متكرّرة لم يحن يومُها — أو يومُها غير محدَّد فتحقّق أدُفعت",
+      when: `مصروفاتٌ متكرّرة لم يُقيَّد دفعُها هذا الشهر — لم يحن يومُها أو يومُها غير محدَّد${settledNote}`,
       tone: "warn",
       lines: recurringLines(thisMonth, (day) => day === null || day >= todayDay),
     },

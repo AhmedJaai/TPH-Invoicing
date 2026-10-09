@@ -57,6 +57,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "unbacked-payments": ReceiptText,
   "open-blockers": Ban,
   "vat-at-risk": Percent,
+  "vat-return-due": CalendarClock,
   "overdue": Clock,
   "unclassified-bank": Landmark,
   "held-bank-rows": CircleHelp,

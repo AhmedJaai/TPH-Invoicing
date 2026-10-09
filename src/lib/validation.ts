@@ -5,8 +5,9 @@
  *   رقم فاتورة + الرقم الضريبي للبائع + الرقم الضريبي للمشتري مطابقاً + تفصيل الضريبة.
  * والفاتورة المبسطة بلا رقم ضريبي للمشتري لا تصلح لخصم ضريبة المدخلات.
  */
-import { FIXED_ASSET_THRESHOLD_MINOR, VAT_RATE } from "@/config/drive";
-import { checkInvoiceTotals } from "./money";
+import { FIXED_ASSET_THRESHOLD_MINOR } from "@/config/drive";
+import { checkInvoiceTotals, formatRiyalsDisplay, TOTAL_ROUNDING_TOLERANCE_MINOR } from "./money";
+import { vatInsideGross, vatOnNet } from "./vat-return";
 import { ISSUE, ISSUE_TEXT, type IssueCode, type Severity } from "./issue-codes";
 
 export interface Finding {
@@ -116,11 +117,21 @@ export function validateInvoice(
   const hasNumber = Boolean(candidate.invoiceNumber?.trim());
   if (!hasNumber && !isNotInvoice) findings.push(finding(ISSUE.MISSING_INVOICE_NUMBER));
 
-  const hasSellerVat = isValidSaudiVat(candidate.sellerVat);
-  if (!hasSellerVat && !isNotInvoice) findings.push(finding(ISSUE.MISSING_SELLER_VAT));
-
   const buyerVat = normalizeVat(candidate.buyerVat);
   const companyVat = normalizeVat(context.companyVat);
+
+  /*
+    رقمُنا في خانة البائع قراءةٌ وضعت رقمَ المشتري موضعَ البائع — يصحّ شكلاً (١٥ خانة) فكانت
+    الفاتورةُ تُحكم «ضريبيّة كاملة» وبائعُها نحن. فهو ركنٌ لم يُقرأ.
+  */
+  const sellerIsUs = companyVat.length > 0 && normalizeVat(candidate.sellerVat) === companyVat;
+  const hasSellerVat = isValidSaudiVat(candidate.sellerVat) && !sellerIsUs;
+  if (!hasSellerVat && !isNotInvoice) {
+    findings.push(sellerIsUs
+      ? finding(ISSUE.MISSING_SELLER_VAT, { variant: "UNREADABLE", message: "قُرئ رقمُ منشأتنا في خانة البائع — رقمُ المورّد الضريبيّ لم يُقرأ؛ صحّحه من الورقة" })
+      : finding(ISSUE.MISSING_SELLER_VAT));
+  }
+
   const hasBuyerVat = buyerVat.length > 0;
   const buyerVatMatches = hasBuyerVat && buyerVat === companyVat;
 
@@ -169,34 +180,48 @@ export function validateInvoice(
       findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
         severity: "INFO",
         variant: "ROUNDING",
-        message: `المورّد قرّب الإجمالي: ${(subtotalMinor + vatMinor) / 100} صار ${totalMinor / 100}`,
+        message: `المورّد قرّب الإجمالي: ${formatRiyalsDisplay(subtotalMinor + vatMinor)} صار ${formatRiyalsDisplay(totalMinor)}`,
       }));
     } else if (totals.verdict === "ADJUSTED") {
       /* خصمٌ أو رسومٌ بعد الضريبة: المستحقّ غيرُ الصافي والضريبة، والضريبةُ كما هي */
       const parts = [
-        totals.discountMinor !== null ? `خصمٌ ${totals.discountMinor / 100}` : null,
-        totals.chargesMinor !== null ? `رسومٌ ${totals.chargesMinor / 100}` : null,
+        totals.discountMinor !== null ? `خصمٌ ${formatRiyalsDisplay(totals.discountMinor)}` : null,
+        totals.chargesMinor !== null ? `رسومٌ ${formatRiyalsDisplay(totals.chargesMinor)}` : null,
       ].filter(Boolean).join(" و");
       findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
         severity: "INFO",
         variant: totals.chargesMinor !== null && totals.discountMinor === null ? "CHARGES" : "DISCOUNT",
-        message: `${parts} بعد الضريبة: الصافي والضريبة ${(subtotalMinor + vatMinor) / 100} والمستحقّ ${totalMinor / 100}`,
+        message: `${parts} بعد الضريبة: الصافي والضريبة ${formatRiyalsDisplay(subtotalMinor + vatMinor)} والمستحقّ ${formatRiyalsDisplay(totalMinor)}`,
       }));
     } else if (totals.verdict === "MISMATCH") {
       findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
-        message: `المجموع ${totalMinor / 100} لا يساوي الصافي ${subtotalMinor / 100} زائد الضريبة ${vatMinor / 100}`,
+        message: `المجموع ${formatRiyalsDisplay(totalMinor)} لا يساوي الصافي ${formatRiyalsDisplay(subtotalMinor)} زائد الضريبة ${formatRiyalsDisplay(vatMinor)}`,
       }));
     } else if (hasVatBreakdown) {
-      const expected = Math.round(subtotalMinor * VAT_RATE);
+      /* ضربٌ صحيح (×15 ÷100) — لا `× 0.15` عائماً في حسابٍ ماليّ */
+      const expected = vatOnNet(subtotalMinor);
       // نتسامح بهللة واحدة لاختلاف التقريب لدى المورد.
       if (Math.abs(expected - vatMinor) > 1) {
         findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
           severity: "INFO",
           variant: "RATE",
-          message: `الضريبة ${vatMinor / 100} تخالف ١٥٪ من الصافي (${expected / 100}) — تحقّق من وجود بنود معفاة`,
+          message: `الضريبة ${formatRiyalsDisplay(vatMinor)} تخالف ١٥٪ من الصافي (${formatRiyalsDisplay(expected)}) — تحقّق من وجود بنود معفاة`,
         }));
       }
     }
+  }
+
+  /*
+    بلا صافٍ مقروء لا يجري الفحصُ أعلاه — فكانت ضريبةٌ وإجماليٌّ وحدهما يصيران «ضريبيّة كاملة»
+    بلا مقابلةٍ بشيء. وأقصى ضريبةٍ في إجماليٍّ 15/115 منه: ما جاوزها (بأكثر من التسامح) قراءةٌ
+    خاطئة لأحد الرقمين، فالحكمُ «لم تُقرأ» حتى يُصحَّح — لا خصمَ على رقمٍ مستحيل.
+  */
+  const vatImplausible = !subtotalKnown && vatKnown && totalKnown && totalMinor > 0
+    && vatMinor > vatInsideGross(totalMinor) + TOTAL_ROUNDING_TOLERANCE_MINOR;
+  if (vatImplausible) {
+    findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
+      message: `الضريبة ${formatRiyalsDisplay(vatMinor)} أكبرُ ممّا يحتمله الإجمالي ${formatRiyalsDisplay(totalMinor)} (أقصاها ${formatRiyalsDisplay(vatInsideGross(totalMinor))}) — أحدُ الرقمين قُرئ خطأً`,
+    }));
   }
 
   /*
@@ -210,7 +235,7 @@ export function validateInvoice(
   let taxStatus: TaxStatus;
   if (isNotInvoice) taxStatus = "NOT_APPLICABLE";
   else if (pillarsFailing) taxStatus = "INVALID";
-  else if (!vatKnown) taxStatus = "UNKNOWN";
+  else if (!vatKnown || vatImplausible) taxStatus = "UNKNOWN";
   else taxStatus = hasVatBreakdown ? "VALID" : "INVALID";
 
   const inputVatStatus: InputVatStatus =
@@ -232,7 +257,7 @@ export function validateInvoice(
   const isFixedAsset = totalKnown && assetBasis > FIXED_ASSET_THRESHOLD_MINOR;
   if (isFixedAsset) {
     findings.push(finding(ISSUE.POSSIBLE_FIXED_ASSET, {
-      message: `مبلغ ${assetBasis / 100} ريال يتجاوز حد الرسملة ٣٬٠٠٠ — راجع إن كانت معدّة تُهلك`,
+      message: `مبلغ ${formatRiyalsDisplay(assetBasis)} ريال يتجاوز حد الرسملة ٣٬٠٠٠ — راجع إن كانت معدّة تُهلك`,
     }));
   }
 

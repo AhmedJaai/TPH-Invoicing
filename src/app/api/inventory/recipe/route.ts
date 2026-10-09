@@ -14,6 +14,7 @@ import {
   saveRecipeVersion, type IngredientDraft,
 } from "@/services/recipe.service";
 import { decimalToMilli } from "@/lib/inventory/units";
+import { MAX_PREP_LOSS_BP } from "@/lib/inventory/consumption";
 import { isStoredUnit } from "@/lib/unit-conversion";
 
 export const runtime = "nodejs";
@@ -91,7 +92,7 @@ export async function POST(request: Request) {
         const milli = decimalToMilli(String(raw.prepLossPercent).trim());
         if (milli === null) return NextResponse.json({ error: "نسبةُ فاقد التجهيز غير مقروءة" }, { status: 400 });
         prepLossBp = Math.round(milli / 10);
-        if (prepLossBp < 0 || prepLossBp >= 10_000) {
+        if (prepLossBp < 0 || prepLossBp > MAX_PREP_LOSS_BP) {
           return NextResponse.json({ error: "فاقدُ التجهيز بين صفرٍ ومئة بالمئة (غير شاملٍ للمئة)" }, { status: 400 });
         }
       }

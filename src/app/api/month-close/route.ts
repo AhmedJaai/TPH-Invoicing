@@ -11,11 +11,12 @@
 import { z } from "zod";
 import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bankAccounts, monthCloses, reconciliationPeriods } from "@/db/schema";
 import { parseRiyals } from "@/lib/money";
 import { guard, respondTo } from "@/services/guard";
+import { lockMonthForClose } from "@/services/month-guard";
 import { can } from "@/lib/permissions";
 import { buildMonthClose } from "@/lib/month-close";
 import { gatherMonthFacts } from "@/lib/month-close-facts";
@@ -131,18 +132,27 @@ export async function POST(request: Request) {
     if (!existing || existing.status !== "CLOSED") {
       return NextResponse.json({ error: "هذا الشهر ليس مقفلاً" }, { status: 409 });
     }
-    await db.update(monthCloses)
-      .set({ status: "OPEN", closedAt: null, closedById: null })
-      .where(eq(monthCloses.id, existing.id));
-
-    await recordAudit({
-      actorId: user.id,
-      action: "MONTH_REOPENED",
-      entityType: "month_close",
-      entityId: body.month,
-      before: { الحالة: "CLOSED" },
-      after: { الحالة: "OPEN", السبب: body.note ?? null, ملاحظة: "أُعيد فتح الشهر" },
+    /* الفتحُ وأثرُه في معاملةٍ واحدة، وبشرط أنّه ما زال مقفلاً */
+    const reopened = await db.transaction(async (t) => {
+      await lockMonthForClose(t, body.month);
+      const rows = await t.update(monthCloses)
+        .set({ status: "OPEN", closedAt: null, closedById: null })
+        .where(and(eq(monthCloses.id, existing.id), eq(monthCloses.status, "CLOSED")))
+        .returning({ id: monthCloses.id });
+      if (rows.length === 0) return false;
+      await recordAudit({
+        actorId: user.id,
+        action: "MONTH_REOPENED",
+        entityType: "month_close",
+        entityId: body.month,
+        before: { الحالة: "CLOSED" },
+        after: { الحالة: "OPEN", السبب: body.note ?? null, ملاحظة: "أُعيد فتح الشهر" },
+      }, t);
+      return true;
     });
+    if (!reopened) {
+      return NextResponse.json({ error: "هذا الشهر ليس مقفلاً — ربما فُتح من نافذةٍ أخرى. حدّث الصفحة" }, { status: 409 });
+    }
 
     return NextResponse.json({ ok: true, report, status: "OPEN", message: `أُعيد فتح ${body.month}` });
   }
@@ -180,27 +190,37 @@ export async function POST(request: Request) {
     ملاحظة: body.note ?? null,
   };
 
-  if (existing) {
-    await db.update(monthCloses)
-      .set({ status: "CLOSED", checklist: checklist as never, closedById: user.id, closedAt: new Date() })
-      .where(eq(monthCloses.id, existing.id));
-  } else {
-    await db.insert(monthCloses).values({
+  /*
+    الكتابةُ وأثرُها في معاملةٍ واحدة بقفل الشهر الحصريّ: ينتظر الإقفالُ كلَّ
+    كتابةٍ ماليّة بدأت قبله في هذا الشهر (`assertMonthsOpen` يأخذ القفلَ
+    مشتركاً)، وما يأتي بعده يراه مقفلاً. وضغطتان متزامنتان لا تكتبان شهادتين.
+  */
+  const closedNow = await db.transaction(async (t) => {
+    await lockMonthForClose(t, body.month);
+    const rows = await t.insert(monthCloses).values({
       month: body.month,
       status: "CLOSED",
       checklist: checklist as never,
       closedById: user.id,
       closedAt: new Date(),
-    });
-  }
-
-  await recordAudit({
-    actorId: user.id,
-    action: "MONTH_CLOSED",
-    entityType: "month_close",
-    entityId: body.month,
-    after: { ...checklist, حقائق: facts },
+    }).onConflictDoUpdate({
+      target: monthCloses.month,
+      set: { status: "CLOSED", checklist: checklist as never, closedById: user.id, closedAt: new Date() },
+      setWhere: sql`${monthCloses.status} <> 'CLOSED'`,
+    }).returning({ id: monthCloses.id });
+    if (rows.length === 0) return false;
+    await recordAudit({
+      actorId: user.id,
+      action: "MONTH_CLOSED",
+      entityType: "month_close",
+      entityId: body.month,
+      after: { ...checklist, حقائق: facts },
+    }, t);
+    return true;
   });
+  if (!closedNow) {
+    return NextResponse.json({ error: "الشهر مقفل بالفعل" }, { status: 409 });
+  }
 
   return NextResponse.json({
     ok: true,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMonthClose, type MonthFacts } from "./month-close";
+import { buildMonthClose, monthBalances, type MonthFacts } from "./month-close";
 
 const clean: MonthFacts = {
   month: "2026-08",
@@ -14,10 +14,13 @@ const clean: MonthFacts = {
   documentsNeedingReview: 0,
   suppliersWithInvoices: 9,
   suppliersWithStatement: 9,
+  suppliersWithStatementIssues: 0,
   bankImportCoversMonth: true,
   bankGapDays: 0,
   bankUnexplainedCount: 0,
   bankUnexplainedMinor: 0,
+  bankSupplierUnpostedCount: 0,
+  bankSupplierUnpostedMinor: 0,
   bankBalanceStatus: "BALANCED",
   bankBalanceDifferenceMinor: 0,
 };
@@ -204,5 +207,74 @@ describe("ما يُفحَص على الفواتير لا يُعلَن ناجحا
     expect(ids).not.toContain("paid");
     expect(ids).not.toContain("statements");
     expect(r.items.find((i) => i.id === "has-invoices")!.state).toBe("BLOCK");
+  });
+});
+
+describe("إقرارُ الضريبة في قائمة الإقفال", () => {
+  it("آخرُ شهرٍ في الربع ينبّه إلى إقراره وموعده — ولا يمنع الإقفال", () => {
+    const r = buildMonthClose({ ...clean, month: "2026-09", vatFiled: false });
+    const item = r.items.find((i) => i.id === "vat-return");
+    expect(item?.state).toBe("WARN");
+    expect(item?.href).toBe("/close/vat?period=2026-Q3");
+    expect(r.canClose).toBe(true);
+  });
+  it("وبعد تسجيل التقديم يمرّ", () => {
+    expect(state(buildMonthClose({ ...clean, month: "2026-09", vatFiled: true }), "vat-return")).toBe("PASS");
+  });
+  it("وشهرٌ في وسط الربع لا يحمل البند", () => {
+    expect(state(buildMonthClose({ ...clean, vatFiled: false }), "vat-return")).toBeUndefined();
+  });
+});
+
+
+describe("الإقفال يرى ما كان يفوته", () => {
+  it("حوالاتُ مورّدين بلا قيد تنبيهٌ بعددها ومبلغها — لا تمنع، وتُقَرّ بسبب", () => {
+    const r = buildMonthClose({ ...clean, bankSupplierUnpostedCount: 20, bankSupplierUnpostedMinor: 72_904_68 });
+    const item = r.items.find((i) => i.id === "bank-supplier-unposted")!;
+    expect(item.state).toBe("WARN");
+    expect(item.detail).toContain("72,904.68");
+    expect(item.href).toBe("/bank");
+    expect(r.canClose).toBe(true);
+  });
+
+  it("كشفٌ وصل وفيه فروق ليس «وصل وتطابق»", () => {
+    const r = buildMonthClose({ ...clean, suppliersWithStatementIssues: 2 });
+    const item = r.items.find((i) => i.id === "statements")!;
+    expect(item.state).toBe("WARN");
+    expect(item.detail).toContain("فروقٌ مع دفترنا");
+    expect(r.canClose).toBe(true);
+  });
+});
+
+describe("monthBalances — افتتاحيُّ الأولى وختاميُّ الأخيرة", () => {
+  const p = (over: Partial<Parameters<typeof monthBalances>[0][number]>) => ({
+    bankAccountId: "A", periodStart: "2026-08-01", periodEnd: "2026-08-31",
+    openingMinor: 0, closingMinor: 0, reviewed: false, ...over,
+  });
+
+  it("كشفان نصف شهريّان لا يُجمَع افتتاحيّاهما", () => {
+    expect(monthBalances([
+      p({ periodEnd: "2026-08-15", openingMinor: 10_000_00, closingMinor: 12_000_00 }),
+      p({ periodStart: "2026-08-16", openingMinor: 12_000_00, closingMinor: 9_000_00 }),
+    ])).toEqual({ openingMinor: 10_000_00, closingMinor: 9_000_00 });
+  });
+
+  it("حسابان يُجمَعان", () => {
+    expect(monthBalances([
+      p({ openingMinor: 100, closingMinor: 300 }),
+      p({ bankAccountId: "B", openingMinor: 50, closingMinor: 20 }),
+    ])).toEqual({ openingMinor: 150, closingMinor: 320 });
+  });
+
+  it("ما أدخله إنسان يغلب ما قُرئ للمدّة نفسها", () => {
+    expect(monthBalances([
+      p({ periodEnd: "2026-08-15", openingMinor: 1, closingMinor: 2 }),
+      p({ openingMinor: 7, closingMinor: 9, reviewed: true }),
+    ])).toEqual({ openingMinor: 7, closingMinor: 9 });
+  });
+
+  it("بلا فترات أو برصيدٍ لم يُقرأ: مجهولٌ لا صفر", () => {
+    expect(monthBalances([])).toEqual({ openingMinor: null, closingMinor: null });
+    expect(monthBalances([p({ openingMinor: null, closingMinor: 5 })])).toEqual({ openingMinor: null, closingMinor: 5 });
   });
 });

@@ -22,6 +22,8 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* على الفاتورة إشعارٌ يشبهه — يُسأل ولا يُمنَع */
+  const [duplicate, setDuplicate] = useState(false);
 
   if (!open) {
     return (
@@ -32,7 +34,7 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
     );
   }
 
-  async function save() {
+  async function save(acknowledgeDuplicate = false) {
     setBusy(true);
     setError(null);
     const r = await postJson<{ message?: string }>("/api/credit-note", {
@@ -41,12 +43,15 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
       issuedOn,
       ...(reference.trim() ? { reference: reference.trim() } : {}),
       ...(reason.trim() ? { reason: reason.trim() } : {}),
+      ...(acknowledgeDuplicate ? { acknowledgeDuplicate: true } : {}),
     });
     setBusy(false);
     if (!r.ok) {
+      setDuplicate(r.status === 409 && r.data.duplicate === true);
       setError(r.error);
       return;
     }
+    setDuplicate(false);
     toast({ title: r.data.message ?? "قُيِّد الإشعار", tone: "ok" });
     setOpen(false);
     setAmount("");
@@ -66,7 +71,7 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
           المبلغ (ريال)
           <input
             type="text" inputMode="decimal" dir="ltr" autoFocus
-            value={amount} onChange={(e) => setAmount(e.target.value)} disabled={busy} placeholder="700"
+            value={amount} onChange={(e) => { setAmount(e.target.value); setDuplicate(false); }} disabled={busy} placeholder="700"
             className="nums mt-1 block min-h-11 w-28 rounded-lg border border-line-input bg-raised px-2 text-center text-sm"
           />
         </label>
@@ -95,8 +100,8 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
       </label>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       <div className="mt-3 flex gap-2">
-        <button type="button" onClick={save} disabled={busy || amount.trim() === ""} className={buttonClass("primary", "sm")}>
-          {busy ? "يُقيَّد…" : "قيّد الإشعار"}
+        <button type="button" onClick={() => save(duplicate)} disabled={busy || amount.trim() === ""} className={buttonClass("primary", "sm")}>
+          {busy ? "يُقيَّد…" : duplicate ? "إشعارٌ آخر — قيّده" : "قيّد الإشعار"}
         </button>
         <button type="button" onClick={() => { setOpen(false); setError(null); }} disabled={busy} className={buttonClass("quiet", "sm")}>
           ألغِ

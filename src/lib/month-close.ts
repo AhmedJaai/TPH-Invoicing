@@ -13,7 +13,8 @@
 
 import type { BalanceStatus } from "@/lib/bank/balance-equation";
 import { DAY, DOCUMENT, INVOICE, SUPPLIER, TRANSACTION, WARNING, countNoun } from "./arabic";
-import { formatMonth } from "./riyadh-time";
+import { formatDay, formatMonth } from "./riyadh-time";
+import { filingDeadline, periodKey, periodMonths, quarterLabel, quarterOfMonth } from "./vat-return";
 
 export type CheckState = "PASS" | "WARN" | "BLOCK";
 
@@ -46,6 +47,11 @@ export interface MonthFacts {
   suppliersWithInvoices: number;
   /** منهم من وصل كشفه عن الشهر */
   suppliersWithStatement: number;
+  /**
+   * ومنهم من وصل كشفُه وعليه فرقٌ مفتوح مع دفترنا (فاتورةٌ ناقصة، مبلغٌ
+   * يخالف، ختاميٌّ لا يوافق). وصولُ الكشف ليس تطابقَه.
+   */
+  suppliersWithStatementIssues: number;
   bankImportCoversMonth: boolean;
   /**
    * أيامٌ في الشهر لم يغطّها كشفٌ بنكيّ.
@@ -57,9 +63,17 @@ export interface MonthFacts {
   /** حركاتٌ في الشهر لا يُعرف ما هي — لا مطابَقة ولا مصنَّفة. */
   bankUnexplainedCount: number;
   bankUnexplainedMinor: number;
+  /**
+   * حوالاتٌ صادرة عُرف أنّها لمورّد (أو لها اقتراحٌ ينتظر) ولم تُقيَّد دفعة.
+   * ليست «بلا تفسير» — بابُها معروف — فكانت لا يراها الإقفال.
+   */
+  bankSupplierUnpostedCount: number;
+  bankSupplierUnpostedMinor: number;
   /** حال معادلة الكشف: افتتاحي + وارد − صادر = ختامي. */
   bankBalanceStatus: BalanceStatus;
   bankBalanceDifferenceMinor: number | null;
+  /** أسُجِّل تقديمُ إقرار ربعِ هذا الشهر؟ — غيابُه «لم يُسأل» فلا يُعرض البند. */
+  vatFiled?: boolean;
 }
 
 export interface MonthCloseReport {
@@ -86,6 +100,7 @@ export function fixHref(id: string, month: string): string {
     case "bank": case "bank-coverage": return "/bank";
     case "bank-balance": return "#balances";
     case "bank-unexplained": return "/attention?item=unclassified-bank";
+    case "bank-supplier-unposted": return "/bank";
     case "fixed-assets": return `/purchases/invoices?month=${month}`;
     default: return "/attention";
   }
@@ -161,7 +176,10 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
         facts.notTaxValidCount === 0
           ? "كلّها تصلح لخصم المدخلات"
           : `${countNoun(facts.notTaxValidCount, INVOICE)} لا تصلح لخصم المدخلات`,
-      action: facts.notTaxValidCount === 0 ? undefined : "اطلب البديل من المورّد قبل السداد",
+      /* أغلبُها ركنٌ لم يُقرأ والورقةُ سليمة — فالعلاجُ عندنا قبل أن يُطالَب المورّد */
+      action: facts.notTaxValidCount === 0
+        ? undefined
+        : "انظر الورقة: إن حملت الرقمين فصحّح الفاتورة أو احسبها من «إقرار الضريبة»؛ وإن نقص ركنٌ عليها فاطلب البديل من المورّد قبل السداد",
     });
 
     items.push({
@@ -185,18 +203,29 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
 
   if (facts.invoiceCount > 0) {
     const missingStatements = Math.max(0, facts.suppliersWithInvoices - facts.suppliersWithStatement);
+    /*
+      ثلاثُ حالات لا اثنتان: لم يصل · وصل وفيه فروق · وصل وتطابق. كان البندُ
+      يفحص الوصولَ وحده واسمُه «وتطابقت» — فيمرّ أخضرَ وكشفٌ يخالف الدفتر.
+      تنبيهٌ لا مانع: الفرقُ قد يكون عند المورّد لا عندنا، ويُقَرّ بسببٍ مكتوب.
+    */
+    const differing = facts.suppliersWithStatementIssues;
+    const parts = [
+      missingStatements > 0 ? `${missingStatements} من ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} لم يصل كشفه` : null,
+      differing > 0 ? `${countNoun(differing, SUPPLIER)} وصل كشفه وفيه فروقٌ مع دفترنا` : null,
+    ].filter((x): x is string => x !== null);
     items.push({
       id: "statements",
       label: "كشوف المورّدين وصلت وتطابقت",
-      state: missingStatements === 0 ? "PASS" : "WARN",
+      state: parts.length === 0 ? "PASS" : "WARN",
       detail:
-        missingStatements === 0
-          ? `كشوف ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} كاملة`
-          : `${missingStatements} من ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} لم يصل كشفه`,
+        parts.length === 0
+          ? `كشوف ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} وصلت ولا فرق مفتوح فيها`
+          : parts.join(" · "),
       action:
-        missingStatements === 0
-          ? undefined
-          : "اطلب الكشف — هو وحده يكشف فاتورة حُمّلت عليك ولم تصلك",
+        parts.length === 0 ? undefined
+        : missingStatements > 0
+          ? "اطلب الكشف — هو وحده يكشف فاتورة حُمّلت عليك ولم تصلك"
+          : "افتح الكشوف وانظر الفروق: فاتورةٌ ناقصة، أو مبلغٌ يخالف، أو ختاميٌّ لا يوافق",
     });
   }
 
@@ -276,6 +305,24 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     }
   }
 
+  /*
+    حوالاتُ مورّدين بلا قيد.
+
+    «بلا تفسير» = لم تُطابَق **و** بابُها مجهول. فحوالةٌ عُرف مورّدُها ولم
+    تُقيَّد دفعةً لا تُعدّ هناك — وهي الحالُ التي أخرجت عشرين حوالةً
+    بـ٧٢٬٩٠٤٫٦٨ من الطابور. تنبيهٌ يُقَرّ بسببٍ مكتوب لا مانع: قد تكون دفعةً
+    مقدَّمة أو تنتظر فاتورتها، وذلك قرارُ صاحبها.
+  */
+  if (facts.bankImportCoversMonth && facts.bankSupplierUnpostedCount > 0) {
+    items.push({
+      id: "bank-supplier-unposted",
+      label: "حوالات المورّدين مقيَّدة",
+      state: "WARN",
+      detail: `${countNoun(facts.bankSupplierUnpostedCount, TRANSACTION)} لمورّدين بقيمة ${riyals(facts.bankSupplierUnpostedMinor)} ريال لم تُقيَّد سداداً — فما عليك لهم يظهر أكثر ممّا هو`,
+      action: "قيّدها على فواتيرها أو على حساب المورّد من طابور المراجعة",
+    });
+  }
+
   if (facts.fixedAssetCount > 0) {
     items.push({
       id: "fixed-assets",
@@ -283,6 +330,24 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
       state: "WARN",
       detail: `${countNoun(facts.fixedAssetCount, INVOICE)} فوق حدّ الرسملة`,
       action: "راجعها مع المحاسب — صرفها دفعة واحدة يشوّه ربح الشهر",
+    });
+  }
+
+  /*
+    آخرُ شهرٍ في الربع يحمل إقرارَه: الإقفالُ لا يعرف أنّ بعده موعداً عند الهيئة.
+    تنبيهٌ لا مانع — الإقرارُ يُعَدّ بعد إقفال أشهره.
+  */
+  const quarter = quarterOfMonth(facts.month);
+  if (facts.vatFiled !== undefined && periodMonths(quarter)[2] === facts.month) {
+    items.push({
+      id: "vat-return",
+      label: `إقرار ضريبة ${quarterLabel(quarter)} قُدِّم`,
+      state: facts.vatFiled ? "PASS" : "WARN",
+      detail: facts.vatFiled
+        ? "سُجّل تقديمُه"
+        : `هذا آخرُ شهرٍ في الربع — آخرُ موعدٍ لتقديم إقراره وسداده ${formatDay(filingDeadline(quarter))}`,
+      action: facts.vatFiled ? undefined : "راجِع حسابَه وقدّمه في بوّابة الهيئة ثمّ سجّل «قدّمتُه»",
+      href: facts.vatFiled ? undefined : `/close/vat?period=${periodKey(quarter)}`,
     });
   }
 
@@ -294,4 +359,51 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   const warnings = items.filter((i) => i.state === "WARN");
 
   return { month: facts.month, items, blockers, warnings, canClose: blockers.length === 0 };
+}
+
+/* ─────────────────── رصيدا الشهر من فترات التسوية ─────────────────── */
+
+export interface BalancePeriod {
+  bankAccountId: string;
+  /** YYYY-MM-DD */
+  periodStart: string;
+  periodEnd: string;
+  openingMinor: number | null;
+  closingMinor: number | null;
+  /** أدخله أو راجعه إنسان — يغلب ما قُرئ من الكشف. */
+  reviewed: boolean;
+}
+
+/**
+ * افتتاحيُّ الشهر وختاميُّه من فتراته — لكلّ حسابٍ ثمّ الجمع.
+ *
+ * كان يُجمَع افتتاحيُّ **كلّ** فترةٍ في الشهر: كشفان نصف شهريّان يعطيان
+ * افتتاحيَّ الأوّل + افتتاحيَّ الثاني. والصواب لكلّ حساب: افتتاحيُّ أُولى
+ * فتراته وختاميُّ أخراها، ثمّ الجمع عبر الحسابات. وعند التساوي يغلب ما
+ * راجعه إنسان. وحسابٌ بلا رصيدٍ معروف يجعل المجموع مجهولاً — لا صفراً.
+ */
+export function monthBalances(
+  periods: readonly BalancePeriod[],
+): { openingMinor: number | null; closingMinor: number | null } {
+  const byAccount = new Map<string, BalancePeriod[]>();
+  for (const p of periods) {
+    const list = byAccount.get(p.bankAccountId) ?? [];
+    list.push(p);
+    byAccount.set(p.bankAccountId, list);
+  }
+  if (byAccount.size === 0) return { openingMinor: null, closingMinor: null };
+
+  let opening: number | null = 0;
+  let closing: number | null = 0;
+  for (const list of byAccount.values()) {
+    const first = [...list].sort((a, b) =>
+      a.periodStart.localeCompare(b.periodStart) || Number(b.reviewed) - Number(a.reviewed)
+      || b.periodEnd.localeCompare(a.periodEnd))[0];
+    const last = [...list].sort((a, b) =>
+      b.periodEnd.localeCompare(a.periodEnd) || Number(b.reviewed) - Number(a.reviewed)
+      || a.periodStart.localeCompare(b.periodStart))[0];
+    opening = opening === null || first.openingMinor === null ? null : opening + first.openingMinor;
+    closing = closing === null || last.closingMinor === null ? null : closing + last.closingMinor;
+  }
+  return { openingMinor: opening, closingMinor: closing };
 }

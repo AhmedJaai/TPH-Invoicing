@@ -118,6 +118,19 @@ export const suppliers = pgTable("suppliers", {
   /** حد الرصيد الذي يفتح تنبيهاً، بالهللات. فارغ = بلا حد */
   balanceAlertMinor: integer("balance_alert_minor"),
 
+  /*
+    ما يكتبه الإنسان عن مورّده (الهجرة `suppliers-payments__supplier_profile`):
+    أجلُ السداد بالأيّام — `null` «غير معروف» لا صفر (الصفرُ «نقداً») — وبياناتُ
+    التواصل، وآيبانٌ يُكتب بيد لمن لا دليلَ له في الكشوف بعد.
+  */
+  paymentTermsDays: integer("payment_terms_days"),
+  phoneE164: text("phone_e164"),
+  email: text("email"),
+  contactName: text("contact_name"),
+  iban: text("iban"),
+  ibanSetAt: timestamp("iban_set_at", { withTimezone: true }),
+  ibanSetById: text("iban_set_by_id").references(() => users.id),
+
   isActive: boolean("is_active").notNull().default(true),
   createdAt: now(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -196,6 +209,13 @@ export const documents = pgTable("documents", {
   /** مخرجات النموذج الخام قبل أي تصحيح يدوي — لا تُعدَّل أبداً */
   extractionJson: jsonb("extraction_json"),
   extractionModel: text("extraction_model"),
+  /**
+   * أدلّة القراءة (`extraction/evidence.ts`): رمز الفاتورة الضريبيّ كما فُكّ، ومصدرُ ما لم
+   * يقرأه النموذج (رمز · اسم الملفّ · محسوب)، وما بقي متعارضاً. `NULL` لما قُرئ قبله.
+   */
+  extractionEvidence: jsonb("extraction_evidence"),
+  /** نسخةُ الموجِّه التي قُرئ بها — ليُعرف «متى تغيّر ما» */
+  extractionPromptVersion: text("extraction_prompt_version"),
   /** ثقة كل حقل على حدة، لتلوين الحقول منخفضة الثقة بالأصفر */
   fieldConfidence: jsonb("field_confidence"),
 
@@ -1937,6 +1957,12 @@ export const extractionCache = pgTable("extraction_cache", {
   extraction: jsonb("extraction").notNull(),
   model: text("model"),
   textSource: text("text_source"),
+  /** أدلّة القراءة — تُنقل إلى `documents.extraction_evidence` عند الأرشفة */
+  evidence: jsonb("evidence"),
+  /** بأيّ موجِّهٍ ومخطّطٍ ومزوّدٍ قُرئ: قراءةٌ بنسخةٍ سابقة لا تُعاد من الخزين */
+  promptVersion: text("prompt_version"),
+  schemaVersion: text("schema_version"),
+  provider: text("provider"),
   userId: text("user_id").references(() => users.id),
   createdAt: now(),
 });

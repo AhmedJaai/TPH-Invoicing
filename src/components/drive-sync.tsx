@@ -19,6 +19,8 @@ interface Summary {
   invoicesCreated?: number;
   contentRead?: number;
   remainingUnnamed?: number;
+  /** مسمّاةٌ فوق حدّ النداء الواحد — يُتابَع حتى تصفر. */
+  remainingNamed?: number;
   /** أشهرٌ أوقفتها المهلة — يستأنفها الطلب التالي. */
   pendingMonths?: string[];
   truncated?: boolean;
@@ -50,6 +52,8 @@ interface Result {
   files?: ScannedFile[];
   notes?: string[];
   readFailures?: string[];
+  /** القارئُ متوقّف (رصيدٌ نفد · انقطاع): لم يُحكم على ملفٍّ به، وتعود الملفّاتُ في المزامنة التالية */
+  readerOutage?: string | null;
   /** ما سُمّي آلياً بعد أرشفته — بالاسمين. */
   renamed?: { from: string; to: string }[];
   /** لماذا لم يدخل ما لم يدخل — مجموعاً بالسبب. */
@@ -187,6 +191,25 @@ export function DriveSync() {
               newFiles: json.summary.newFiles + next.summary.newFiles,
               understoodByName: json.summary.understoodByName + next.summary.understoodByName,
               needContentReading: json.summary.needContentReading + next.summary.needContentReading,
+            },
+          };
+        }
+
+        /*
+          المسمّاةُ فوق حدّ النداء (ترحيلُ شهرٍ كامل) تُسجَّل على دفعات — كانت الخلاصةُ
+          تقول ما سُجّل ولا تقول إنّ الباقي ينتظر ضغطةً ثانية.
+        */
+        for (let more = 0; apply && (json.summary.remainingNamed ?? 0) > 0 && more < 10; more++) {
+          const next = await post({ full, apply: true, months: 3 });
+          suggestions.push(...(next.renameSuggestions ?? []));
+          absorb(next);
+          json = {
+            ...json,
+            summary: {
+              ...json.summary,
+              created: (json.summary.created ?? 0) + (next.summary.created ?? 0),
+              invoicesCreated: (json.summary.invoicesCreated ?? 0) + (next.summary.invoicesCreated ?? 0),
+              remainingNamed: next.summary.remainingNamed ?? 0,
             },
           };
         }
@@ -494,6 +517,12 @@ export function DriveSync() {
                 ))}
               </ul>
             </div>
+          )}
+
+          {result?.readerOutage && (
+            <p role="alert" className="mt-3 rounded-lg bg-danger-bg px-3 py-2 text-[11px] leading-relaxed text-danger">
+              <b>توقّفت القراءة:</b> {result.readerOutage} — لم يُقيَّد ما بقي «لم يُقرأ»؛ يعود في المزامنة التالية.
+            </p>
           )}
 
           {result?.readFailures && result.readFailures.length > 0 && (

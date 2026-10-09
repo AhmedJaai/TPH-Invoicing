@@ -14,7 +14,7 @@
  * ولا يبلغ حكمُ النموذج `AUTO` أبداً. هذا بابٌ مفتوحٌ للحساب وحده.
  */
 import {
-  buildAdjudicationPrompt, validateVerdict, VERDICT_NONE,
+  buildAdjudicationPrompt, validateVerdict, VERDICT_NONE, ADJUDICATOR_PROMPT_VERSION, ADJUDICATOR_SCHEMA_VERSION,
 } from "@/lib/bank/adjudicator-prompt";
 import { selectedAdjudicator, type AdjudicatorProvider } from "@/lib/bank/adjudicator-provider";
 import { auditReasons, type EvidenceFacts, type ReasonAudit } from "@/lib/bank/reason-codes";
@@ -23,7 +23,6 @@ import type { AdjudicationCase } from "@/lib/bank/adjudicate";
 import type { Candidate } from "@/lib/bank/candidates";
 import type { CanonicalTransaction } from "@/lib/bank/canonical";
 import type { TxKind } from "@/lib/bank/taxonomy";
-import { PROMPT_VERSION, SCHEMA_VERSION } from "@/lib/extraction/versions";
 
 export type { AdjudicatorProvider } from "@/lib/bank/adjudicator-provider";
 
@@ -252,8 +251,8 @@ function provenanceOf(
   return {
     provider: provider.name,
     model: provider.model,
-    promptVersion: PROMPT_VERSION,
-    schemaVersion: SCHEMA_VERSION,
+    promptVersion: ADJUDICATOR_PROMPT_VERSION,
+    schemaVersion: ADJUDICATOR_SCHEMA_VERSION,
     durationMs,
     modelConfidence: verdict.confidence,
     modelReason: verdict.reason,

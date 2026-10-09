@@ -1,5 +1,7 @@
 "use client";
 
+import { ExtractionEvidencePanel } from "@/components/extraction-evidence";
+import { parseEvidence } from "@/lib/extraction/evidence";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -31,6 +33,8 @@ interface AnalysisResponse {
   model?: string;
   provider?: string;
   extraction?: Record<string, unknown>;
+  /** أدلّةُ القراءة للعرض (رمزُ الفاتورة ومصادرُ الحقول) — والخادمُ يقرؤها من حفظه لا من هنا */
+  evidence?: unknown;
   result: {
     documentKind: string;
     supplier?: { id: string; slug: string; nameAr: string };
@@ -1160,6 +1164,8 @@ function ReviewCard({
               </p>
             </Group>
           )}
+
+          <ExtractionEvidencePanel evidence={parseEvidence(item.data.evidence)} showAmounts={canSeeAmounts} />
 
           {findings.length > 0 && (
             <Group title="ملاحظاتُ الفحص">

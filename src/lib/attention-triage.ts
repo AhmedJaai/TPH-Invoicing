@@ -19,6 +19,7 @@ export const ATTENTION_IDS = [
   "unbacked-payments",
   "open-blockers",
   "vat-at-risk",
+  "vat-return-due",
   "overdue",
   "unclassified-bank",
   "held-bank-rows",

@@ -22,6 +22,14 @@ import { ALL_REASON_CODES } from "./reason-codes";
 export const VERDICT_NONE = "NONE";
 
 /**
+ * نسختا موجِّه الحَكَم وشكلِ جوابه — تُرفعان مع كلّ تغييرٍ في `buildAdjudicationPrompt`
+ * أو `adjudicationSchema`. كان أثرُ كلّ تحكيمٍ يُختم بنسخة موجِّه **قراءة الفواتير**:
+ * فتغييرُ ذاك يغيّر ختم التحكيم، وتغييرُ موجِّه الحَكَم لا يظهر.
+ */
+export const ADJUDICATOR_PROMPT_VERSION = "2026-10-09.1";
+export const ADJUDICATOR_SCHEMA_VERSION = "2026-10-09.1";
+
+/**
  * مهمّة الحَكَم مقيَّدة عمداً.
  *
  * كان يُقال له «أنت مدقّق مالي» — وهي صفةٌ تدعوه إلى التصرّف كوكيل:

@@ -44,7 +44,7 @@
 | `src/lib/extraction/validate-extraction.ts` | أقرأ النموذجُ صحيحاً؟ — سؤالٌ غير «أهذه الفاتورة سليمة؟»، وجوابُه يُعيد السؤال موجَّهاً |
 | `src/lib/extraction/schemas-by-kind.ts` | مخطّط لكل نوع مستند — لا ثلاثون حقلاً لفاتورةٍ فيها ستّة |
 | `src/lib/extraction/statement-extras.ts` | أسطر الكشف ورصيداه من مخرَج النموذج الخام — والرصيد المجهول `null` لا صفر |
-| `src/lib/extraction/benchmark.ts` | مقياس النماذج — **الخطأ الواثق** يسبق الدقّة · **لا تصل إليها شاشة** |
+| `src/lib/extraction/benchmark.ts` | مقياس النماذج — **الخطأ الواثق** يسبق الدقّة · يستدعيه `scripts/benchmark-providers.ts` (`bench:extraction`) على ما أقرّه إنسان · **لا تصل إليها شاشة** |
 | `src/lib/extraction/versions.ts` | نسخ الموجِّه والمخطّط، والنماذج مثبَّتة لا عائمة |
 | `src/services/counterparty.service.ts` | تأكيدٌ واحد يعمّ على أمثاله |
 | `src/lib/bank/decision.ts` | تلقائيّ/اقتراح/مراجعة بقاعدة الهامش |

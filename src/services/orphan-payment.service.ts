@@ -10,12 +10,14 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { documents, payments, suppliers } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { assertMonthsOpen } from "./month-guard";
-import { reversePayment } from "./payment.service";
+import { findPaymentTwin, reversePayment } from "./payment.service";
+import { currentMonthRiyadh, formatDay } from "@/lib/riyadh-time";
 import type { OrphanPaymentRequest } from "@/lib/orphan-payment";
 import type { Tx } from "./types";
 
 export class OrphanPaymentError extends Error {
-  constructor(message: string, readonly status: 404 | 409) {
+  /** `twin`: للمورّد سدادٌ بالمبلغ واليوم نفسيهما — تسأل الشاشةُ «أهي واقعةٌ أخرى؟». */
+  constructor(message: string, readonly status: 404 | 409, readonly twin = false) {
     super(message);
     this.name = "OrphanPaymentError";
   }
@@ -57,7 +59,7 @@ export async function resolveOrphanPayment(
     throw new OrphanPaymentError("لهذه الدفعة حركةُ بنك — عرّف جهتها من صفحة البنك.", 409);
   }
 
-  await assertMonthsOpen(t, [p.appliesToMonth, p.paidAt.toISOString().slice(0, 7)]);
+  await assertMonthsOpen(t, [p.appliesToMonth, currentMonthRiyadh(p.paidAt)]);
 
   if (req.action === "assign") {
     const [s] = await t
@@ -66,6 +68,24 @@ export async function resolveOrphanPayment(
       .where(eq(suppliers.id, req.supplierId))
       .limit(1);
     if (!s || !s.isActive) throw new OrphanPaymentError("لا مورّد قائم بهذا المعرّف.", 404);
+
+    /*
+      التوأمُ يُسأل لحظةَ النسب: دفعةٌ بلا مورّد لا تُسأل عنه عند إنشائها
+      (`findPaymentTwin` يُرجع فراغاً)، فإن نُسبت بلا سؤال صارت «رصيداً له» وهي
+      نسخةٌ من حوالةٍ مقيَّدة — الريالُ محسوبٌ مرّتين. كشفٌ لا قيد: يُقَرّ فيمضي.
+    */
+    if (!req.acknowledgeTwin) {
+      const twin = await findPaymentTwin(t, { supplierId: s.id, paidAt: p.paidAt, amountMinor: p.amountMinor });
+      if (twin && twin.id !== p.id) {
+        throw new OrphanPaymentError(
+          `لـ${s.nameAr} سدادٌ مقيَّدٌ بالمبلغ نفسه في ${formatDay(p.paidAt)}`
+          + (twin.hasBankRow ? " وله حركةٌ في الكشف" : "")
+          + " — قد تكون هذه نسختَه من الإيصال. إن كانت هي فألغِ قيدَها «ليست لمورّد»، وإن كانت سداداً آخر فأقِرّ وانسبها.",
+          409,
+          true,
+        );
+      }
+    }
 
     const rows = await t
       .update(payments)
@@ -88,7 +108,10 @@ export async function resolveOrphanPayment(
       entityType: "payment",
       entityId: p.id,
       before: { المورّد: null },
-      after: { المورّد: s.nameAr, المبلغ: p.amountMinor, السبب: "نُسبت دفعةٌ بلا مورّد من إيصالها" },
+      after: {
+        المورّد: s.nameAr, المبلغ: p.amountMinor, السبب: "نُسبت دفعةٌ بلا مورّد من إيصالها",
+        ...(req.acknowledgeTwin ? { "أُقرّ أنّها سدادٌ آخر": true } : {}),
+      },
     }, t);
 
     return { message: `نُسبت إلى ${s.nameAr} — وصارت رصيداً له يُخصم من دَينه.` };

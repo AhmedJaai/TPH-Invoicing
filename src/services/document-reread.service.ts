@@ -178,7 +178,7 @@ export async function rereadDocument(opts: {
     (زاكوباك 3068: أُرسم الـPDF فقُرئ كاملاً، ولا سبيلَ إلى حفظ قراءته).
   */
   if (!doc.invoiceId) {
-    fillFromFileName(x, doc.fileName);
+    fillFromFileName(x, doc.fileName, outcome.evidence?.provenance);
     const list = await loadSupplierRecords();
     const matched = matchSupplier(list, { sellerVatNumber: x.sellerVatNumber, supplierNameAr: x.supplierNameAr, supplierNameEn: x.supplierNameEn });
     const kind = (["TAX_INVOICE", "SIMPLIFIED_INVOICE", "STATEMENT", "QUOTATION", "PROFORMA", "RECEIPT", "CASH_RECEIPT"] as const)
@@ -186,6 +186,7 @@ export async function rereadDocument(opts: {
     await db.transaction(async (t) => {
       await t.update(documents).set({
         extractionJson: x as never, extractionModel: outcome.model, textSource: outcome.textSource ?? null, kind,
+        extractionEvidence: outcome.evidence ?? null, extractionPromptVersion: outcome.evidence?.promptVersion ?? null,
         supplierId: doc.supplierId ?? matched.supplier?.id ?? null,
         /* المؤرشفُ بلا قيدٍ يعود إلى المراجعة — لا يبقى مؤرشفاً بلا شيء */
         status: "NEEDS_REVIEW",

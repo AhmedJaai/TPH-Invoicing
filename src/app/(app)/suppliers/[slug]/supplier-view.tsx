@@ -12,7 +12,7 @@ import { DetailFrame, type DetailMode } from "@/components/detail-frame";
 import { Money } from "@/components/money";
 import { LiveMoney } from "@/components/live-money";
 import {
-  Badge, Card, DataTable, Delta, EmptyState, KeyValue, LinkButton, LinkTabs, Meter, Monogram, Section, Sparkline, TONE_TEXT,
+  Badge, Callout, Card, DataTable, Delta, EmptyState, KeyValue, LinkButton, LinkTabs, Meter, Monogram, Section, Sparkline, TONE_TEXT,
   Timeline, type TimelineItem, type Tone,
 } from "@/components/ui";
 import { AgeingBar } from "@/components/supplier-intel";
@@ -33,8 +33,12 @@ import { listOpenFindings } from "@/services/supplier-analysis.service";
 import { FindingsList, RunAnalysis, type FindingView } from "@/components/ai-analysis";
 import { splitSupplierCredit } from "@/lib/supplier-requests";
 import { SupplierPolicy } from "@/components/supplier-policy";
+import { SupplierEdit } from "@/components/supplier-edit";
+import { SUPPLIER_CATEGORY_LABEL, pastDueOf, whatsappHref } from "@/lib/supplier-edit";
+import { formatRiyals } from "@/lib/money";
 import { AccountReview } from "@/components/account-review";
-import { formatDay, formatRange } from "@/lib/riyadh-time";
+import { formatDay, formatRange, todayInRiyadh } from "@/lib/riyadh-time";
+import { buttonClass } from "@/components/ui-tokens";
 import { METHOD_LABEL, paymentStatusLabel } from "@/lib/payment-state";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { ACTION_LABEL } from "@/lib/audit-labels";
@@ -155,6 +159,14 @@ export async function SupplierView({
   const creditSplit = splitSupplierCredit(creditLeft, n("advance"));
   const ageing = ageOwed(ages.get(s.id) ?? [], balance);
   const ageOf = new Map((ages.get(s.id) ?? []).map((a) => [a.id, a.ageDays]));
+
+  /*
+    المتأخّرُ بأجل المورّد نفسه (`payment_terms_days`) — و`null` حين يُجهل الأجل:
+    لا يُقال «متأخّر» عن مورّدٍ أمهلنا، ولا «في أجله» عن غير علم.
+  */
+  const pastDue = pastDueOf(ages.get(s.id) ?? [], s.paymentTermsDays, todayInRiyadh());
+  /* سقفٌ كتبه صاحبُ المقهى لما عليه لهذا المورّد — وتجاوزُه يُقال في رأس ملفّه */
+  const overAlert = s.balanceAlertMinor !== null && balance > s.balanceAlertMinor;
 
   const canAnalyze = can(user.role, "supplier:edit");
   const canApprove = can(user.role, "payment:approve");
@@ -861,14 +873,68 @@ export async function SupplierView({
                 }}
               />
 
+              {showAmounts && overAlert && s.balanceAlertMinor !== null && (
+                <Callout tone="warn" title="تجاوز ما عليك له الحدَّ الذي وضعتَه">
+                  عليك له <Money minor={balance} /> والحدُّ <Money minor={s.balanceAlertMinor} /> — الحدُّ من «عدّل بياناته» أدناه، يُرفَع أو يُمحى منه.
+                </Callout>
+              )}
+              {showAmounts && pastDue && pastDue.count > 0 && (
+                <Callout tone="warn" title={`${countNoun(pastDue.count, INVOICE)} جاوزت أجلَها`}>
+                  بقي عليها <Money minor={pastDue.totalMinor} />، وأقدمُها جاوز استحقاقَه بـ{countNoun(pastDue.oldestDays, DAY)} —
+                  بأجل هذا المورّد ({s.paymentTermsDays === 0 ? "نقداً" : countNoun(s.paymentTermsDays ?? 0, DAY)}) الذي كتبتَه في بياناته.
+                </Callout>
+              )}
+
               <Card>
-                <h3 className="mb-4 text-sm font-bold">بياناته</h3>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold">بياناته</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {s.phoneE164 && (
+                      <a href={whatsappHref(s.phoneE164, "")} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
+                        واتساب {s.contactName ?? ""}
+                      </a>
+                    )}
+                    {canAnalyze && (
+                      <SupplierEdit
+                        supplierId={s.id}
+                        initial={{
+                          nameAr: s.nameAr,
+                          nameEn: s.nameEn ?? "",
+                          vatNumber: s.vatNumber ?? "",
+                          crNumber: s.crNumber ?? "",
+                          category: s.category,
+                          paymentTermsDays: s.paymentTermsDays === null ? "" : String(s.paymentTermsDays),
+                          balanceAlert: s.balanceAlertMinor === null ? "" : formatRiyals(s.balanceAlertMinor),
+                          phone: s.phoneE164 ?? "",
+                          email: s.email ?? "",
+                          contactName: s.contactName ?? "",
+                          iban: s.iban ?? "",
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
                 <KeyValue
                   columns={4}
                   items={[
                     { label: "الرقم الضريبي", value: <Fact value={s.vatNumber} missing="ناقص" ltr /> },
                     { label: "السجل التجاري", value: <Fact value={s.crNumber} missing="ناقص" ltr /> },
-                    { label: "شروط السداد", value: <Fact value={s.paymentTerms} missing="غير محدّدة" soft /> },
+                    {
+                      label: "أجل السداد",
+                      value: <Fact
+                        value={s.paymentTermsDays === null ? s.paymentTerms : s.paymentTermsDays === 0 ? "نقداً" : countNoun(s.paymentTermsDays, DAY)}
+                        missing="غير معروف — العمرُ من تاريخ الفاتورة" soft
+                      />,
+                    },
+                    { label: "التصنيف", value: <Fact value={SUPPLIER_CATEGORY_LABEL[s.category]} /> },
+                    { label: "المندوب", value: <Fact value={s.contactName} missing="غير معروف" soft /> },
+                    { label: "الجوّال", value: <Fact value={s.phoneE164} missing="غير معروف" soft ltr /> },
+                    { label: "البريد", value: <Fact value={s.email} missing="غير معروف" soft ltr /> },
+                    { label: "الآيبان (بيد)", value: <Fact value={s.iban} missing="لم يُكتب — يُعرف من الكشوف إن حُوِّل له" soft ltr /> },
+                    ...(showAmounts ? [{
+                      label: "حدّ التنبيه",
+                      value: s.balanceAlertMinor === null ? <Fact value={null} missing="بلا حدّ" soft /> : <Money minor={s.balanceAlertMinor} />,
+                    }] : []),
                     {
                       label: "عقد التوريد",
                       value: <Fact value={s.contractOnFile ? "موجود" : null} missing={s.contractRequired && !s.issuesInvoices ? "ناقص" : "غير مطلوب"} soft={!(s.contractRequired && !s.issuesInvoices)} />,

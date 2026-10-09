@@ -77,3 +77,23 @@ describe("paidAt وvalueDate لا يُكتبان بلحظة الخادم", () =>
     expect(NOW_AS_CIVIL_DATE.test("createdAt: new Date()")).toBe(false);
   });
 });
+
+/* ── تسامحُ الريال: القاعدةُ والشيفرةُ رقمٌ واحد ── */
+
+/*
+  قيدُ إجماليّ الفاتورة في القاعدة يكتب التسامحَ رقماً بيد (`<= 100`)، والشيفرةُ تقرؤه من
+  `TOTAL_ROUNDING_TOLERANCE_MINOR`. لو تغيّر أحدُهما افترقا بصمت: فاتورةٌ تقبلها الشيفرةُ
+  وتردّها القاعدة، أو العكس. فيُقابَل آخرُ تعريفٍ للقيد بالثابت.
+*/
+describe("تسامح الريال في القاعدة هو الثابتُ في الشيفرة", () => {
+  it("آخرُ هجرةٍ تعرّف قيدَ الإجمالي تكتب التسامحَ نفسَه", async () => {
+    const { TOTAL_ROUNDING_TOLERANCE_MINOR } = await import("./money");
+    const CHECK = /abs\(subtotal_minor \+ vat_minor[^\n]*- total_minor\) <= (\d+)/;
+    const defining = readdirSync("drizzle/sql").filter((f) => f.endsWith(".sql")).sort()
+      .map((f) => ({ f, m: CHECK.exec(readFileSync(path.join("drizzle", "sql", f), "utf8")) }))
+      .filter((x) => x.m !== null);
+    expect(defining.length).toBeGreaterThan(0);
+    const last = defining[defining.length - 1];
+    expect(Number(last.m?.[1]), last.f).toBe(TOTAL_ROUNDING_TOLERANCE_MINOR);
+  });
+});

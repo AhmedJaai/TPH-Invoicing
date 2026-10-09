@@ -17,9 +17,12 @@ import { products, recipeIngredients, recipeVersions, recipes } from "@/db/schem
 import { recordAudit } from "@/lib/audit";
 import { isStoredUnit, type StoredUnit } from "@/lib/unit-conversion";
 import { RECIPE_EPOCH, type RecipeVersionInput } from "@/lib/inventory/recipe";
-import { recipeCost, type CostedIngredient, type RecipeCost } from "@/lib/inventory/recipe-cost";
+import { MAX_PREP_LOSS_BP } from "@/lib/inventory/consumption";
+import { recipeCost, type CostBasis, type CostedIngredient, type RecipeCost } from "@/lib/inventory/recipe-cost";
 import { milliToDecimal } from "@/lib/inventory/units";
 import { milliMinorToMinor } from "@/lib/money";
+import { todayInRiyadh } from "@/lib/riyadh-time";
+import { latestInvoiceUnitCosts } from "./inventory.service";
 import type { Conn } from "./types";
 
 export interface IngredientDraft {
@@ -68,6 +71,11 @@ function validateDraft(ingredients: readonly IngredientDraft[]): void {
     if (!isStoredUnit(ing.unit)) throw new Error("وحدةُ مكوّنٍ غير معروفة");
     if (!Number.isInteger(ing.quantityMilli) || ing.quantityMilli <= 0) {
       throw new Error("كمّيّةُ المكوّن تكون أكبر من صفر");
+    }
+    /* مئةٌ بالمئة قسمةٌ على صفر، وما فوقها استهلاكٌ سالب — يُردّ من كلّ باب */
+    const loss = ing.prepLossBp ?? null;
+    if (loss !== null && (!Number.isInteger(loss) || loss < 0 || loss > MAX_PREP_LOSS_BP)) {
+      throw new Error("فاقدُ التجهيز أقلُّ من مئةٍ بالمئة — المئةُ قسمةٌ على صفر");
     }
   }
   /* المكوّنُ يتكرّر بخيارين مختلفين — ولا يتكرّر بالخيار نفسه */
@@ -354,8 +362,19 @@ export interface RecipeRow {
   activeVersion: number | null;
   activeFrom: string | null;
   ingredientCount: number;
-  /** كلفةُ مكوّناتها بالهللات، و`null` إن جُهل مكوّنٌ واحد. */
+  /**
+   * كلفةُ وحدةٍ مباعة بالهللات، و`null` إن جُهل مكوّنٌ واحد.
+   *
+   * بآخر فاتورةٍ لكلّ مكوّنٍ حيث وُجدت، وإلّا بكلفة الكتالوج — و`costBasis`
+   * يقول أيّهما.
+   */
   costMinor: number | null;
+  costBasis: CostBasis | "MIXED" | null;
+  /**
+   * والكلفةُ بالكتالوج وحده — **لمقابلة المعلَنة عند فودكس**: كلاهما معياريّ،
+   * فمخالفتُهما خبرٌ عن الوصفة لا عن سعر السوق.
+   */
+  catalogCostMinor: number | null;
   /** وما جُهلت كلفتُه بأسمائه وأسبابه — «لماذا لا رقمَ هنا». */
   unknownCost: RecipeCost["unknown"];
   /** سعرُ بيعه عند نقاط البيع. */
@@ -428,7 +447,8 @@ export async function listRecipes(conn: Conn = db): Promise<RecipeRow[]> {
     وهي على فيرسل في المجمَّع طابورٌ على اتّصالٍ واحد.
   */
   const ings = await conn.execute<Record<string, unknown>>(sql`
-    select r.id as recipe_id, i.product_id, p.name_ar, i.quantity_milli, i.unit,
+    select r.id as recipe_id, i.product_id, p.name_ar, i.quantity_milli, i.unit, i.prep_loss_bp,
+           v.yield_quantity_milli, v.yield_unit,
            p.base_unit, p.catalog_pack_milli, p.catalog_pack_cost_minor
       from recipes r
       join recipe_versions v on v.recipe_id = r.id
@@ -458,12 +478,21 @@ export async function listRecipes(conn: Conn = db): Promise<RecipeRow[]> {
     `)).rows.map((r) => String(r.recipe_id)),
   );
 
+  /*
+    آخرُ كلفةٍ من فاتورةٍ لكلّ مكوّن — الواقعُ قبل التقدير، بالترتيب الذي
+    يقوِّم به الجرد. وما لا فاتورةَ له يُسعَّر بالكتالوج ويُقال.
+  */
+  const invoiceRates = await latestInvoiceUnitCosts(todayInRiyadh(), conn);
+
   const byRecipe = new Map<string, CostedIngredient[]>();
+  /** ناتجُ النسخة السارية عدداً ممّا يُباع — والحبّةُ وحدها تُترجَم إليه. */
+  const yieldByRecipe = new Map<string, number>();
   for (const r of ings.rows) {
     const unit = r.unit;
     const base = r.base_unit;
     if (!isStoredUnit(unit) || !isStoredUnit(base)) continue;
     const key = String(r.recipe_id);
+    if (r.yield_unit === "PIECE" && r.yield_quantity_milli !== null) yieldByRecipe.set(key, Number(r.yield_quantity_milli));
     const list = byRecipe.get(key) ?? [];
     list.push({
       productId: String(r.product_id),
@@ -473,13 +502,17 @@ export async function listRecipes(conn: Conn = db): Promise<RecipeRow[]> {
       baseUnit: base,
       packMilli: r.catalog_pack_milli === null ? null : Number(r.catalog_pack_milli),
       packCostMinor: r.catalog_pack_cost_minor === null ? null : Number(r.catalog_pack_cost_minor),
+      prepLossBp: r.prep_loss_bp === null ? null : Number(r.prep_loss_bp),
+      invoiceRateMilliMinor: invoiceRates.get(String(r.product_id)) ?? null,
     });
     byRecipe.set(key, list);
   }
 
   return rows.rows.map((r) => {
     const mine = byRecipe.get(String(r.recipe_id)) ?? [];
-    const cost = recipeCost(mine);
+    const yieldMilli = yieldByRecipe.get(String(r.recipe_id));
+    const cost = recipeCost(mine, { yieldMilli, preferInvoice: true });
+    const catalogCost = recipeCost(mine, { yieldMilli });
     const costByProduct = new Map(cost.lines.map((l) => [l.productId, l.costMilliMinor] as const));
     return {
       recipeId: String(r.recipe_id),
@@ -490,6 +523,8 @@ export async function listRecipes(conn: Conn = db): Promise<RecipeRow[]> {
       activeFrom: r.active_from === null ? null : String(r.active_from),
       ingredientCount: Number(r.ingredient_count),
       costMinor: cost.costMinor,
+      costBasis: cost.basis,
+      catalogCostMinor: catalogCost.costMinor,
       unknownCost: cost.unknown,
       priceMinor: r.price_minor === null ? null : Number(r.price_minor),
       declaredCostMinor: r.declared_cost === null ? null : Number(r.declared_cost),

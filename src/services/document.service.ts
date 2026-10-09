@@ -5,6 +5,7 @@
  * طبقة أولى؛ والقيد الفريد في القاعدة هو الحاجز الذي لا يفلت من طلبين
  * متزامنين.
  */
+import type { ExtractionEvidence } from "@/lib/extraction/evidence";
 import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -60,6 +61,8 @@ export interface CreateDocumentInput {
   supplierId?: string | null;
   rawExtraction?: unknown;
   extractionModel?: string | null;
+  /** أدلّةُ القراءة كما حفظها الخادم (`extraction/evidence.ts`) */
+  extractionEvidence?: ExtractionEvidence | null;
   fieldConfidence?: unknown;
   uploadedById: string;
   /** من أين قُرئ — نصّاً أم صورة. */
@@ -93,6 +96,8 @@ export async function createDocument(tx: Tx, input: CreateDocumentInput): Promis
       // مخرجات النموذج الخام تُحفظ كما هي ولا تُعدَّل — هي المرجع عند أي مراجعة
       extractionJson: (input.rawExtraction ?? null) as never,
       extractionModel: input.extractionModel ?? null,
+      extractionEvidence: input.extractionEvidence ?? null,
+      extractionPromptVersion: input.extractionEvidence?.promptVersion ?? null,
       textSource: input.textSource ?? null,
       fieldConfidence: (input.fieldConfidence ?? null) as never,
       uploadedById: input.uploadedById,

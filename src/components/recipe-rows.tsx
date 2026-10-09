@@ -48,6 +48,17 @@ export function RecipeRows({
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  /*
+    ── بم تُحسَب الكلفةُ المعروضة — يختاره صاحبُها ──
+
+    الافتراضُ آخرُ فاتورةٍ لكلّ مكوّن (ثمنٌ دُفع)، وما لا فاتورةَ له بكلفة
+    الكتالوج. والرقمُ يخالف ما كان يُعرَض (الكتالوج وحده)، فيُقال هنا ما
+    تغيّر ولماذا، ومعه زرٌّ يعيد حسابَ الكتالوج.
+  */
+  const [byCatalog, setByCatalog] = useState(false);
+  const invoicePriced = rows.some((r) => r.costBasis === "INVOICE" || r.costBasis === "MIXED");
+  const costOf = (r: RecipeRow) => (byCatalog ? r.catalogCostMinor : r.costMinor);
+  const basisOf = (r: RecipeRow) => (byCatalog ? (r.catalogCostMinor === null ? null : "CATALOG" as const) : r.costBasis);
 
   const q = query.trim().toLowerCase();
   const visible = q === "" ? rows : rows.filter((r) =>
@@ -72,6 +83,19 @@ export function RecipeRows({
           <p className="text-xs text-muted" aria-live="polite">
             {q ? <><span className="nums">{visible.length}</span> من <span className="nums">{rows.length}</span></> : <><span className="nums">{rows.length}</span> وصفة</>}
           </p>
+        </div>
+      )}
+
+      {invoicePriced && (
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-raised px-4 py-3 text-xs leading-relaxed text-ink-soft">
+          <p className="min-w-0 flex-1">
+            {byCatalog
+              ? <>الكلفةُ معروضةٌ <strong className="text-ink">بكلفة الكتالوج</strong> — الرقمُ المعياريّ المكتوب في فودكس.</>
+              : <>الكلفةُ معروضةٌ <strong className="text-ink">بآخر فاتورةٍ</strong> لكلّ مكوّن — ثمنٌ دُفع فعلاً — وما لا فاتورةَ له فبكلفة الكتالوج. فقد تخالف ما كان يُعرَض بالكتالوج وحده.</>}
+          </p>
+          <button type="button" onClick={() => setByCatalog((v) => !v)} aria-pressed={byCatalog} className={buttonClass("secondary", "sm")}>
+            {byCatalog ? "اعرضها بآخر فاتورة" : "اعرضها بكلفة الكتالوج"}
+          </button>
         </div>
       )}
 
@@ -108,17 +132,32 @@ export function RecipeRows({
                   <span className="nums text-xs text-muted md:text-ink-soft">{row.ingredientCount} مكوّن</span>
                   <span className="col-start-2 text-xs md:col-start-auto md:text-end">
                     <span className="text-[11px] text-muted md:hidden">الكلفة </span>
-                    {row.costMinor === null
-                      ? <span className="text-[11px] text-muted">غير معروفة</span>
-                      : <Money minor={row.costMinor} />}
+                    {(() => {
+                      const cost = costOf(row);
+                      const basis = basisOf(row);
+                      return (
+                        <>
+                          {cost === null
+                            ? <span className="text-[11px] text-muted">غير معروفة</span>
+                            : <Money minor={cost} />}
+                          {/* أساسُ الكلفة يُعلَن مع الرقم — فاتورةٌ دُفعت غيرُ رقمٍ كُتب في فودكس */}
+                          {cost !== null && basis !== null && (
+                            <span className="block text-[10px] font-normal text-muted">{COST_BASIS_LABEL[basis]}</span>
+                          )}
+                        </>
+                      );
+                    })()}
                   </span>
                   <span className="hidden text-end text-xs text-muted md:block">
                     {row.priceMinor === null ? "—" : <Money minor={row.priceMinor} />}
                   </span>
                   <span className="hidden text-end text-xs font-bold md:block">
-                    {row.costMinor === null || row.priceMinor === null
-                      ? <span className="font-normal text-muted">—</span>
-                      : <Money minor={row.priceMinor - row.costMinor} />}
+                    {(() => {
+                      const cost = costOf(row);
+                      return cost === null || row.priceMinor === null
+                        ? <span className="font-normal text-muted">—</span>
+                        : <Money minor={row.priceMinor - cost} />;
+                    })()}
                   </span>
                 </button>
 
@@ -139,6 +178,12 @@ export function RecipeRows({
     </div>
   );
 }
+
+const COST_BASIS_LABEL = {
+  INVOICE: "بآخر فاتورة",
+  CATALOG: "بكلفة الكتالوج",
+  MIXED: "فواتيرُ وكتالوج",
+} as const;
 
 interface Draft {
   productId: string;

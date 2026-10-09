@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  CONFIDENT, rankProviders, scoreProvider,
+  CONFIDENT, formatBenchmark, predictionFromReading, rankProviders, scoreProvider,
   type GroundTruth, type Prediction,
 } from "./benchmark";
 
@@ -131,5 +131,64 @@ describe("rankProviders", () => {
 
   it("لا نتائج فلا ترتيب", () => {
     expect(rankProviders([])).toEqual([]);
+  });
+});
+
+describe("predictionFromReading — قراءةٌ محفوظة أو جديدة إلى توقّعٍ يُقاس", () => {
+  const meta = { documentId: "a", provider: "deepseek", model: "m", promptVersion: "p", schemaVersion: "s", durationMs: 10 };
+  const parse = (v: string) => (/^\d+(\.\d{1,2})?$/.test(v) ? Math.round(Number(v) * 100) : null);
+
+  it("يقرأ الحقول المقيسة وحدها — ولا يشترط المخطّط كاملاً", () => {
+    const p = predictionFromReading(
+      { invoiceNumber: " 260138 ", invoiceDate: "2026-09-13T10:00", totalAmount: "165.00", vatAmount: "21.52",
+        supplierNameAr: "", supplierNameEn: "Olive Leaves", lines: [{}, {}], confidence: { amounts: 0.9, junk: "x" } },
+      meta, parse,
+    );
+    expect(p).toMatchObject({
+      invoiceNumber: "260138", invoiceDate: "2026-09-13", totalMinor: 16500, vatMinor: 2152,
+      subtotalMinor: 14348, supplierName: "Olive Leaves", lineCount: 2, confidence: { amounts: 0.9 },
+    });
+    expect(p.failed).toBeUndefined();
+  });
+
+  it("المجهول يبقى مجهولاً: لا صافٍ يُشتقّ بلا ضريبة، ولا صفر", () => {
+    const p = predictionFromReading({ totalAmount: "165.00", vatAmount: "" }, meta, parse);
+    expect(p.subtotalMinor).toBeUndefined();
+    expect(p.vatMinor).toBeUndefined();
+  });
+
+  it("لا قراءة: فشلٌ يُعدّ فشلاً لا فراغاً", () => {
+    expect(predictionFromReading(null, meta, parse).failed).toBe(true);
+  });
+});
+
+describe("scoreProvider — قواعد المقارنة التي كانت في النصّ", () => {
+  it("المورّد يُقاس على اسميه معاً وبالاحتواء", () => {
+    const r = scoreProvider(
+      [truth({ documentId: "a", supplierName: "أوراق الزيتون", supplierAliases: ["Olive Leaves"] })],
+      [pred({ documentId: "a", supplierName: "Olive Leaves Trading Est." })],
+    )!;
+    expect(r.fields.find((f) => f.field === "supplierName")).toMatchObject({ correct: 1, wrong: 0 });
+  });
+
+  it("ضريبةٌ مقيَّدة صفراً وحقلٌ تركه النموذج فارغاً: قولٌ واحد", () => {
+    const r = scoreProvider(
+      [truth({ documentId: "a", vatMinor: 0 })],
+      [pred({ documentId: "a", vatMinor: undefined })],
+    )!;
+    expect(r.fields.find((f) => f.field === "vatMinor")).toMatchObject({ correct: 1, missed: 0 });
+  });
+
+  it("الخطأ الواثق يُحسب من ثقة النموذج لا من عدد الأخطاء", () => {
+    const r = scoreProvider(
+      [truth({ documentId: "a", totalMinor: 1000 }), truth({ documentId: "b", totalMinor: 1000 })],
+      [
+        pred({ documentId: "a", totalMinor: 9999, subtotalMinor: undefined, vatMinor: undefined, confidence: { amounts: 0.95 } }),
+        pred({ documentId: "b", totalMinor: 9999, subtotalMinor: undefined, vatMinor: undefined, confidence: { amounts: 0.4 } }),
+      ],
+    )!;
+    /* خطآن، وواحدٌ منهما فقط واثق */
+    expect(r.fields.find((f) => f.field === "totalMinor")!.wrong).toBe(2);
+    expect(formatBenchmark("x", r)).toContain("الخطأ الواثق");
   });
 });

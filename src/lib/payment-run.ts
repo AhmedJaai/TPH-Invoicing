@@ -174,8 +174,23 @@ export interface PayeeAccount {
 
 export function resolvePayeeAccount(
   evidence: readonly { kind: string; normalized: string }[],
+  /**
+   * آيبانٌ كتبه صاحبُ المقهى في ملفّ المورّد. **ما كتبه بيده يمضي** — وقد نُبِّه
+   * عند حفظه إن خالف الكشوف — ويُقال بجانبه إن خالف، ولا يُبدَّل ولا يُحجَب.
+   */
+  manualIban?: string | null,
 ): PayeeAccount {
   const distinct = (kind: string) => [...new Set(evidence.filter((e) => e.kind === kind).map((e) => e.normalized))];
+  if (manualIban) {
+    const seen = distinct("IBAN");
+    const agrees = seen.length === 0 || seen.includes(manualIban);
+    return {
+      account: manualIban,
+      note: seen.length === 0
+        ? "آيبانٌ مكتوبٌ بيد — لم يُحوَّل له من قبل، فتحقّق منه قبل أوّل تحويل"
+        : agrees ? null : "مكتوبٌ بيد ويخالف الحسابَ الذي حُوِّل له في الكشوف — تأكّد من المورّد قبل التحويل",
+    };
+  }
   for (const kind of ["IBAN", "ACCOUNT"] as const) {
     const values = distinct(kind);
     if (values.length === 1) return { account: values[0], note: null };
@@ -183,7 +198,7 @@ export function resolvePayeeAccount(
       return { account: null, note: `له ${values.length} حسابات في الكشوف — اختر الصحيح في البنك` };
     }
   }
-  return { account: null, note: "الحسابُ غير معروف — أدخله في البنك" };
+  return { account: null, note: "الحسابُ غير معروف — أدخله في ملفّ المورّد" };
 }
 
 /**

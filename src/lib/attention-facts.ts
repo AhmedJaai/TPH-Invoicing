@@ -25,6 +25,7 @@ import { latestStatementGaps } from "@/services/statement-reconcile.service";
 import { txHref } from "@/lib/inspector";
 import { documentHref } from "@/lib/document-labels";
 import { parseRiyals } from "@/lib/money";
+import { filingDeadline, periodBounds, periodKey, previousQuarter, quarterLabel, quarterOfMonth } from "./vat-return";
 
 interface Row {
   [key: string]: unknown;
@@ -497,6 +498,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     bankBalanceDifferenceMinor: balance.differenceMinor,
     bankLastDay,
     bankStaleDays,
+    vatReturnDue: await vatReturnDue(),
     openBlockers: Number(counts?.open_blockers ?? 0),
     pendingDocuments: Number(counts?.pending_docs ?? 0),
     /*
@@ -560,4 +562,20 @@ function doublePaidEvidence(g: DoublePaidGroup): AttentionEvidence {
       + (g.distinctOperations ? " · بمراجعِ سدادٍ مختلفة" : " · بلا مرجعٍ يفصلهما"),
     amountMinor: g.excessMinor,
   };
+}
+
+/** إقرارُ الربع المنقضي إن لم يُسجَّل تقديمُه وفي الربع حركةُ بنك — وإلّا `null`. */
+async function vatReturnDue(): Promise<AttentionFacts["vatReturnDue"]> {
+  const due = previousQuarter(quarterOfMonth(currentMonthRiyadh()));
+  const key = periodKey(due);
+  const { from, until } = periodBounds(due);
+  const [row] = (await db.execute<{ filed: boolean; has_data: boolean }>(sql`
+    select exists (select 1 from vat_filings where period_key = ${key} and voided_at is null) as filed,
+           exists (select 1 from bank_transactions bt
+                    where (bt.value_date at time zone 'Asia/Riyadh')::date >= ${from}::date
+                      and (bt.value_date at time zone 'Asia/Riyadh')::date < ${until}::date) as has_data
+  `)).rows;
+  if (!row || row.filed || !row.has_data) return null;
+  const deadline = filingDeadline(due);
+  return { periodKey: key, label: quarterLabel(due), deadline, daysLeft: -daysSinceRiyadh(deadline) };
 }

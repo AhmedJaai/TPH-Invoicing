@@ -285,3 +285,43 @@ describe("رقمُ المنشأة المقروء ناقصاً", () => {
     expect(hasBlocker(r.findings)).toBe(true);
   });
 });
+
+describe("رقمُنا في خانة البائع ليس رقمَ مورّد", () => {
+  it("قراءةٌ وضعت رقمَ المشتري موضعَ البائع ← ركنٌ لم يُقرأ، لا «ضريبيّة كاملة»", () => {
+    const r = validateInvoice({
+      kind: "TAX_INVOICE", invoiceNumber: "77", sellerVat: "٣١٠٠٠٧٩٧١٦٠٠٠٠٣", buyerVat: COMPANY_VAT,
+      subtotalMinor: 10_000, vatMinor: 1_500, totalMinor: 11_500,
+    }, ctx);
+    expect(r.taxStatus).toBe("INVALID");
+    expect(r.inputVatStatus).toBe("NOT_ELIGIBLE");
+    expect(r.findings.find((f) => f.code === ISSUE.MISSING_SELLER_VAT)?.variant).toBe("UNREADABLE");
+  });
+});
+
+describe("ضريبةٌ وإجماليٌّ بلا صافٍ مقروء", () => {
+  const base = { kind: "TAX_INVOICE" as const, invoiceNumber: "9", sellerVat: "310111111100003", buyerVat: COMPANY_VAT };
+  it("ضريبةٌ يحتملها الإجمالي ← صالحة", () => {
+    expect(validateInvoice({ ...base, vatMinor: 1_500, totalMinor: 11_500 }, ctx).taxStatus).toBe("VALID");
+    /* رسومٌ بعد الضريبة تُنقص النسبة ولا تزيدها */
+    expect(validateInvoice({ ...base, vatMinor: 1_500, totalMinor: 14_000 }, ctx).taxStatus).toBe("VALID");
+  });
+  it("ضريبةٌ فوق 15/115 من الإجمالي ← «لم تُقرأ» لا خصم: 1,500 والصواب 150", () => {
+    const r = validateInvoice({ ...base, vatMinor: 150_000, totalMinor: 115_000 }, ctx);
+    expect(r.taxStatus).toBe("UNKNOWN");
+    expect(r.inputVatStatus).toBe("UNKNOWN");
+    expect(codes(r)).toContain(ISSUE.VAT_MATH_MISMATCH);
+  });
+  it("وفرقُ التقريب ضمن الريال لا يُسقطها", () => {
+    expect(validateInvoice({ ...base, vatMinor: 15_090, totalMinor: 115_000 }, ctx).taxStatus).toBe("VALID");
+  });
+});
+
+describe("رسائلُ المبالغ بمنزلتين", () => {
+  it("«660.10» لا «660.1»", () => {
+    const r = validateInvoice({
+      kind: "TAX_INVOICE", invoiceNumber: "1", sellerVat: "310111111100003", buyerVat: COMPANY_VAT,
+      subtotalMinor: 57_400, vatMinor: 8_610, totalMinor: 66_000,
+    }, ctx);
+    expect(r.findings.find((f) => f.variant === "ROUNDING")?.message).toContain("660.10");
+  });
+});

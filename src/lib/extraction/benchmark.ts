@@ -14,6 +14,11 @@ export interface GroundTruth {
   documentId: string;
   kind: string;
   supplierName?: string;
+  /**
+   * أسماءُ المورّد الأخرى المسجَّلة (الإنجليزيّ مع العربيّ): الفاتورة قد تحمل أحدهما،
+   * ومطابقةُ الإنجليزيّ بالعربيّ وحده تعدّ الصوابَ خطأً.
+   */
+  supplierAliases?: string[];
   invoiceNumber?: string;
   invoiceDate?: string;
   subtotalMinor?: number;
@@ -22,7 +27,7 @@ export interface GroundTruth {
   lineCount?: number;
 }
 
-export interface Prediction extends Partial<GroundTruth> {
+export interface Prediction extends Partial<Omit<GroundTruth, "supplierAliases">> {
   documentId: string;
   provider: string;
   model: string;
@@ -81,12 +86,27 @@ export const CONFIDENT = 0.8;
 /** فرق يُغتفَر في المبالغ: هللة. */
 export const AMOUNT_TOLERANCE_MINOR = 1;
 
+/* NFKC أوّلاً: «ﻣﺆﺳﺴﺔ» (شكلُ عرض) و«مؤسسة» نصّان مختلفان بايتاً */
 function normalize(v: string): string {
-  return v.replace(/[ً-ْـ]/g, "").replace(/[إأآٱ]/g, "ا").replace(/ى/g, "ي")
+  return v.normalize("NFKC").replace(/[ً-ْـ]/g, "").replace(/[إأآٱ]/g, "ا").replace(/ى/g, "ي")
     .replace(/ة/g, "ه").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+/** المطبوع يحمل «مؤسسة» و«المحدودة» حول الاسم المسجَّل — فيكفي الاحتواء من أحد الطرفين. */
+function sameSupplier(names: readonly string[], got: string): boolean {
+  const g = normalize(got).replace(/\s+/g, "");
+  if (g === "") return false;
+  return names.some((n) => {
+    const w = normalize(n).replace(/\s+/g, "");
+    return w !== "" && (g === w || g.includes(w) || w.includes(g));
+  });
+}
+
+/** رقمُ الفاتورة يُقابَل بلا فراغاته: «INV 12» و«INV12» رقمٌ واحد. */
 function same(field: FieldName, truth: unknown, got: unknown): boolean {
+  if (field === "invoiceNumber" && typeof truth === "string" && typeof got === "string") {
+    return normalize(truth).replace(/\s+/g, "") === normalize(got).replace(/\s+/g, "");
+  }
   if (typeof truth === "number" && typeof got === "number") {
     const tolerance = field.endsWith("Minor") ? AMOUNT_TOLERANCE_MINOR : 0;
     return Math.abs(truth - got) <= tolerance;
@@ -142,11 +162,18 @@ export function scoreProvider(
         continue;
       }
       if (got === undefined || got === null || got === "") {
-        score.missed++;
+        /*
+          الصفر المؤكَّد والحقل الفارغ يتّفقان في الضريبة: فاتورةٌ بلا بند ضريبة تُقيَّد
+          صفراً، والنموذج يترك الحقل فارغاً لأنّه لم يُطبَع — وهما قولٌ واحد.
+        */
+        if (score.field === "vatMinor" && expected === 0) score.correct++;
+        else score.missed++;
         continue;
       }
 
-      const hit = same(score.field, expected, got);
+      const hit = score.field === "supplierName" && typeof got === "string"
+        ? sameSupplier([String(expected), ...(truth.supplierAliases ?? [])], got)
+        : same(score.field, expected, got);
       if (hit) score.correct++;
       else score.wrong++;
 
@@ -196,4 +223,81 @@ export function rankProviders(results: readonly BenchmarkResult[]): BenchmarkRes
       (b.overallAccuracy ?? 0) - (a.overallAccuracy ?? 0) ||
       (a.medianDurationMs ?? Infinity) - (b.medianDurationMs ?? Infinity),
   );
+}
+
+/** ما يلزم لتحويل قراءةٍ (محفوظةٍ أو جديدة) إلى توقّعٍ يُقاس. */
+export interface PredictionMeta {
+  documentId: string;
+  provider: string;
+  model: string;
+  promptVersion: string;
+  schemaVersion: string;
+  durationMs: number;
+}
+
+/**
+ * قراءةٌ — كما حُفظت أو كما عادت الآن — إلى توقّعٍ يُقاس.
+ *
+ * مرنةٌ عمداً: تُقرأ الحقول المقيسة وحدها ولا يُشترَط المخطّط كاملاً. اشتراطُه كان
+ * يُسقط كلَّ ما حُفظ قبل آخر حقلٍ أُضيف، فيقيس المقياسُ تطوّرَ مخطّطنا ويعرضه ضعفاً
+ * في المزوّد. والصافي يُشتقّ هنا (الإجماليّ − الضريبة) كما يشتقّه `extractDocument`:
+ * فلا يُقارَن طرفٌ بعد المعالجة بطرفٍ قبلها. و`parse` يُحقَن ليبقى الملفّ خالصاً.
+ */
+export function predictionFromReading(
+  reading: unknown,
+  meta: PredictionMeta,
+  parse: (amount: string) => number | null,
+): Prediction {
+  if (reading === null || reading === undefined || typeof reading !== "object") {
+    return { ...meta, failed: true };
+  }
+  const text = (key: string): string | undefined => {
+    const v: unknown = Reflect.get(reading, key);
+    return typeof v === "string" && v.trim() !== "" ? v.trim() : undefined;
+  };
+  const money = (key: string): number | undefined => {
+    const v = text(key);
+    return v === undefined ? undefined : parse(v) ?? undefined;
+  };
+  const total = money("totalAmount");
+  const vat = money("vatAmount");
+  let subtotal = money("subtotalAmount");
+  if (subtotal === undefined && total !== undefined && vat !== undefined && total - vat >= 0) subtotal = total - vat;
+
+  const confidence: Record<string, number> = {};
+  const rawConfidence: unknown = Reflect.get(reading, "confidence");
+  if (rawConfidence && typeof rawConfidence === "object") {
+    for (const [k, v] of Object.entries(rawConfidence)) if (typeof v === "number") confidence[k] = v;
+  }
+  const lines: unknown = Reflect.get(reading, "lines");
+
+  return {
+    ...meta,
+    kind: text("documentKind"),
+    supplierName: text("supplierNameAr") ?? text("supplierNameEn"),
+    invoiceNumber: text("invoiceNumber"),
+    invoiceDate: text("invoiceDate")?.slice(0, 10),
+    subtotalMinor: subtotal,
+    vatMinor: vat,
+    totalMinor: total,
+    lineCount: Array.isArray(lines) && lines.length > 0 ? lines.length : undefined,
+    confidence,
+  };
+}
+
+/** جدولُ نتيجةٍ للطباعة — نصٌّ خالص، بلا لون. */
+export function formatBenchmark(label: string, r: BenchmarkResult | null): string {
+  if (!r) return `\n── ${label} ──\n  لا يُقاس: لا قراءةَ واحدة`;
+  const pct = (v: number | null) => (v === null ? "لا يُقاس" : `${(v * 100).toFixed(1)}%`);
+  const lines = [`\n── ${label} ── (${r.provider} · ${r.model} · موجِّه ${r.promptVersion})`];
+  for (const f of r.fields) {
+    lines.push(
+      `  ${f.field.padEnd(14)} صحيح ${String(f.correct).padStart(3)} · خطأ ${String(f.wrong).padStart(3)} · ` +
+      `لم يُقرأ ${String(f.missed).padStart(3)} · لا حقيقة ${String(f.notApplicable).padStart(3)} → ${pct(f.accuracy)}`,
+    );
+  }
+  lines.push(`  الدقّة الإجماليّة : ${pct(r.overallAccuracy)}`);
+  lines.push(`  الخطأ الواثق      : ${pct(r.confidentErrorRate)} — أخطأ وثقتُه ${CONFIDENT} فأعلى (المعيار الحاكم)`);
+  lines.push(`  فشل الاستخراج     : ${r.failures} من ${r.documents}`);
+  return lines.join("\n");
 }

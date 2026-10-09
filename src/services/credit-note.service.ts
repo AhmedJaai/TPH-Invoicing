@@ -13,19 +13,30 @@ import { eq, sql } from "drizzle-orm";
 import { invoices } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { formatDay } from "@/lib/riyadh-time";
 import { allocate, createPayment } from "./payment.service";
 import type { Tx } from "./types";
 
 export class CreditNoteRefused extends Error {
-  constructor(message: string) {
+  /** `duplicate`: يشبه إشعاراً مقيَّداً على الفاتورة — يُسأل ويمضي بإقرار، لا يُمنَع. */
+  constructor(message: string, readonly duplicate = false) {
     super(message);
     this.name = "CreditNoteRefused";
   }
 }
 
+/** الاسمُ الذي يُحفظ به الإشعار على دفعته — ومنه يُعرف مرجعُه عند السؤال عن تكراره. */
+export function creditNoteLabel(reference: string | null): string {
+  return reference ? `إشعار دائن ${reference}` : "إشعار دائن";
+}
+
 export async function recordCreditNote(
   tx: Tx,
-  input: { invoiceId: string; amountMinor: number; issuedOn: string; reference: string | null; reason: string | null },
+  input: {
+    invoiceId: string; amountMinor: number; issuedOn: string; reference: string | null; reason: string | null;
+    /** أُقِرّ أنّه إشعارٌ آخر غيرُ المقيَّد الذي يشبهه. */
+    acknowledgeDuplicate?: boolean;
+  },
   actorId: string,
 ): Promise<{ paymentId: string; remainingMinor: number }> {
   if (!Number.isInteger(input.amountMinor) || input.amountMinor <= 0) {
@@ -52,12 +63,42 @@ export async function recordCreditNote(
     );
   }
 
+  /*
+    ضغطتان تقيّدان الإشعارَ مرّتين ما دام مجموعُهما دون المتبقّي: `findPaymentTwin`
+    يستثني الإشعار عمداً (لا يتبنّاه كشف). فيُسأل هنا عن إشعارٍ على **هذه الفاتورة**
+    بالمرجع نفسه، أو بالمبلغ واليوم نفسيهما. كشفٌ لا قيد: مرتجعان متساويان في يومٍ
+    واحد ممكنان، فيمضي الثاني بإقرار.
+  */
+  if (!input.acknowledgeDuplicate) {
+    const label = creditNoteLabel(input.reference);
+    const [same] = (await tx.execute<{ amount_minor: number; day: string; label: string | null }>(sql`
+      select p.amount_minor, to_char(p.paid_at at time zone 'UTC', 'YYYY-MM-DD') as day, p.beneficiary_name_raw as label
+        from payments p
+        join payment_allocations pa on pa.payment_id = p.id
+       where pa.invoice_id = ${inv.id}
+         and p.method = 'CREDIT_NOTE'
+         and p.status not in ('REVERSED', 'VOID')
+         and (
+           (${input.reference}::text is not null and p.beneficiary_name_raw = ${label})
+           or (p.amount_minor = ${input.amountMinor} and p.paid_at = ${`${input.issuedOn}T00:00:00Z`}::timestamptz)
+         )
+       limit 1
+    `)).rows;
+    if (same) {
+      throw new CreditNoteRefused(
+        `على فاتورة ${inv.number} إشعارٌ مقيَّد يشبهه (${formatRiyalsDisplay(Number(same.amount_minor))} بتاريخ ${formatDay(same.day)}`
+        + `${same.label && same.label !== "إشعار دائن" ? ` · ${same.label}` : ""}) — إن كان هذا إشعاراً آخر فأقِرّ وقيّده`,
+        true,
+      );
+    }
+  }
+
   const paymentId = await createPayment(tx, {
     supplierId: inv.supplierId,
     paidAt: new Date(`${input.issuedOn}T00:00:00Z`),
     amountMinor: input.amountMinor,
     method: "CREDIT_NOTE",
-    beneficiaryNameRaw: input.reference ? `إشعار دائن ${input.reference}` : "إشعار دائن",
+    beneficiaryNameRaw: creditNoteLabel(input.reference),
     /* يسوّي فاتورتَه — فشهرُه شهرُها، وقفلُه قفلُها */
     appliesToMonth: inv.periodMonth,
     acknowledgeTwin: true,

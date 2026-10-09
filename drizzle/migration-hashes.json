@@ -64,5 +64,7 @@
   "063_vat_period_inputs.sql": "2ae5ecfc7ce40e6d681bbed2e668163b16029d6c161600b9f0fa7e21d7a10c31",
   "064_waste_void_and_request_key.sql": "48f1483e3e043c381ae6315c9d288ad634dc08169bf398a9e7035bf40e133a83",
   "065_sale_line_parent_line.sql": "9c7dc852898f474a2e2471b5ac98bfee49eaf283f7cad4c8b988647385f4f82c",
-  "066_document_intake_trace.sql": "6688b0881aac732264baca17f812cccf2e9fc3aaee4b4ca19e1295ef5523ae51"
+  "066_document_intake_trace.sql": "6688b0881aac732264baca17f812cccf2e9fc3aaee4b4ca19e1295ef5523ae51",
+  "067_supplier_profile.sql": "bdebc7f1c70422b758f1b3ebfc98f1a8b867aa05bf16200325f0832d261fc3d6",
+  "068_extraction_evidence.sql": "c89a6bc135d217dc2df4cf6d262b98d68ca1560aa96f8a9d032880066248a12e"
 }

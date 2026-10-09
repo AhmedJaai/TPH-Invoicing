@@ -63,6 +63,22 @@ describe("buildCashOutlook", () => {
     expect(o.buckets.find((b) => b.id === "rest")).toBeUndefined();
   });
 
+  it("المتكرّرُ الذي قُيِّد دفعُه هذا الشهر لا يُطرَح من الرصيد ثانيةً — ويبقى في الشهر القادم", () => {
+    const o = buildCashOutlook({ ...base, recurring: [rent], balanceMinor: 5_000_000, paidThisMonth: new Set(["r1"]) });
+    expect(o.buckets.map((b) => b.id)).toEqual(["next-month"]);
+    expect(o.totalMinor).toBe(1_500_000);
+    const unpaid = buildCashOutlook({ ...base, recurring: [rent], balanceMinor: 5_000_000 });
+    expect(unpaid.totalMinor).toBe(3_000_000);
+  });
+
+  it("وما خرج من «بقيّة الشهر» لأنّه دُفع يُسمّى بمبلغه في سطر الدلو", () => {
+    const other = { ...rent, id: "r2", label: "اشتراكٌ آخر" };
+    const o = buildCashOutlook({ ...base, recurring: [rent, other], balanceMinor: 5_000_000, paidThisMonth: new Set(["r1"]) });
+    const rest = o.buckets.find((b) => b.id === "rest");
+    expect(rest?.lines.map((l) => l.label)).toEqual(["اشتراكٌ آخر"]);
+    expect(rest?.when).toContain(`وخرج منها ما قُيِّد دفعُه: ${rent.label}`);
+  });
+
   it("الرصيدُ المجهول لا يُرسَم — لا «يبقى بعدها» عن غير علم", () => {
     const o = buildCashOutlook({ ...base, overdueRun: [{ supplierId: "a", supplierName: "أ", amountMinor: 5 }] });
     expect(o.buckets[0].afterMinor).toBeNull();

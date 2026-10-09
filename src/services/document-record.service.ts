@@ -22,7 +22,7 @@ import { reviewConfirmed, type ConfirmReview } from "@/lib/confirm";
 import { normalizeDocumentDate } from "@/lib/document-date";
 import { parseRiyals } from "@/lib/money";
 import { companyConfig } from "@/config/drive";
-import { createInvoice, replaceLines } from "@/services/invoice.service";
+import { createInvoice, replaceLines, findInvoiceConflict } from "@/services/invoice.service";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import { recordAudit } from "@/lib/audit";
@@ -193,7 +193,15 @@ export async function recordDocumentByHand(
       inputVatStatus: review.inputVatStatus,
       isFixedAsset: review.isFixedAsset,
     });
-    if (!id) throw new RecordRefused("قُيِّدت فاتورةٌ لهذا المستند للتوّ — حدّث الصفحة");
+    if (!id) {
+      /* التعارضُ يُقال باسمه: على هذا المستند، أم رقمٌ مقيَّدٌ للمورّد من ملفٍّ آخر */
+      const clash = await findInvoiceConflict(tx, { documentId: doc.id, supplierId: supplier.id, invoiceNumber: number });
+      throw new RecordRefused(
+        clash?.by === "NUMBER"
+          ? `فاتورة ${clash.invoiceNumber} مقيَّدةٌ لهذا المورّد من ملفٍّ آخر — لم تُقيَّد ثانيةً. افتحها من فواتيره، وإن كان هذا نسخةً فارفضه «مكرّرة»`
+          : "قُيِّدت فاتورةٌ لهذا المستند للتوّ — حدّث الصفحة",
+      );
+    }
     await replaceLines(tx, {
       invoiceId: id,
       supplierId: supplier.id,

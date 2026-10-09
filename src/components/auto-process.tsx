@@ -23,6 +23,15 @@ import { toast } from "./ui-client";
  */
 const BACKLOG_EVERY_MS = 10 * 60_000;
 const SYNC_EVERY_MS = 3 * 60 * 60_000;
+/** مزامنةٌ تعثّرت (شبكةٌ انقطعت، ٥٠٢، مزامنةٌ أخرى جارية) تُعاد بعد خمس دقائق لا بعد ثلاث ساعات. */
+const SYNC_RETRY_MS = 5 * 60_000;
+/**
+ * فحصٌ أوسع مرّةً في الأسبوع: الدوريّةُ تفحص شهرين، ففاتورةُ يوليو التي تصل في أكتوبر
+ * وتوضع في مجلّد شهرها لا تُرى أبداً. فيُمشى على سنةٍ كاملة أسبوعياً، وما أوقفته المهلة يُستأنف.
+ */
+const DEEP_EVERY_MS = 7 * 24 * 60 * 60_000;
+const DEEP_MONTHS = 12;
+const DEEP_MAX_ROUNDS = 6;
 const AUTH_TOLD_KEY = "tph:drive-auth-told";
 
 function due(key: string, every: number): boolean {
@@ -32,6 +41,24 @@ function due(key: string, every: number): boolean {
     localStorage.setItem(key, String(Date.now()));
   } catch { /* بلا تخزين: يقع ولا ضرر */ }
   return true;
+}
+
+/** أحان وقتُه؟ — بلا كتابة: الطابعُ يُكتب بعد ردٍّ ناجح (`stamp`)، لا قبل الطلب. */
+function elapsed(key: string, every: number): boolean {
+  try {
+    return Date.now() - Number(localStorage.getItem(key) ?? 0) >= every;
+  } catch { return true; }
+}
+
+function stamp(key: string, at = Date.now()) {
+  try { localStorage.setItem(key, String(at)); } catch { /* بلا تخزين: يُعاد ولا ضرر */ }
+}
+
+interface SyncReply {
+  summary?: { created?: number; truncated?: boolean; pendingMonths?: string[] };
+  needsAuth?: boolean;
+  busy?: boolean;
+  error?: string;
 }
 
 function tellOnce(message: string) {
@@ -56,13 +83,31 @@ export function AutoProcess({ drive = true }: { drive?: boolean }) {
     (async () => {
       let changed = false;
       /* وضعُ التجربة لا يحمل تفويض درايف عمداً — فلا يُسأل الدرايف ولا يُنذَر بتوقّفٍ مقصود */
-      if (drive && due("tph:auto-sync", SYNC_EVERY_MS)) {
-        const r = await postJson<{ summary?: { created?: number }; needsAuth?: boolean; error?: string }>(
+      if (drive && elapsed("tph:auto-sync", SYNC_EVERY_MS)) {
+        const deep = elapsed("tph:auto-sync-deep", DEEP_EVERY_MS);
+        /* طلبٌ جارٍ: لا يبدأ لسانٌ آخر مثلَه قبل خمس دقائق — والطابعُ الصحيح يُكتب بعد الردّ */
+        stamp("tph:auto-sync", Date.now() - SYNC_EVERY_MS + SYNC_RETRY_MS);
+        let r = await postJson<SyncReply>(
           "/api/drive-sync",
-          { apply: true, readContent: true, months: 2, background: true },
+          { apply: true, readContent: true, months: deep ? DEEP_MONTHS : 2, background: true },
         );
+        /* الفحصُ الأوسع قد توقفه المهلة — تُستأنف أشهرُه الباقية بلا إعادة ما مضى */
+        for (let round = 0; deep && r.ok && r.data.summary?.truncated && (r.data.summary.pendingMonths?.length ?? 0) > 0 && round < DEEP_MAX_ROUNDS; round++) {
+          if ((r.data.summary.created ?? 0) > 0) changed = true;
+          r = await postJson<SyncReply>(
+            "/api/drive-sync",
+            { apply: true, readContent: true, onlyMonths: r.data.summary.pendingMonths, background: true },
+          );
+        }
+        /*
+          الطابعُ بعد الردّ لا قبله: كان يُكتب قبل الإرسال، ففشلٌ عابر يُعدّ «وقعت» ولا تُعاد
+          إلّا بعد ثلاث ساعات. والمتعثّرةُ (والتي ردّتها مزامنةٌ أخرى جارية) تُعاد بعد خمس دقائق.
+        */
+        const succeeded = r.ok && !r.data.busy && !r.data.needsAuth;
+        stamp("tph:auto-sync", succeeded || (r.ok && r.data.needsAuth) ? Date.now() : Date.now() - SYNC_EVERY_MS + SYNC_RETRY_MS);
+        if (succeeded && deep && !r.data.summary?.truncated) stamp("tph:auto-sync-deep");
         if (r.ok && r.data.needsAuth) tellOnce(r.data.error ?? "تفويضُ الدرايف غائبٌ أو منتهٍ — سجّل الخروج ثمّ الدخول.");
-        else if (r.ok && (r.data.summary?.created ?? 0) > 0) changed = true;
+        else if (succeeded && (r.data.summary?.created ?? 0) > 0) changed = true;
       }
       if (due("tph:auto-backlog", BACKLOG_EVERY_MS)) {
         const r = await postJson<{ recorded?: number; approved?: number; renamed?: unknown[]; reread?: number; handLinked?: number }>(

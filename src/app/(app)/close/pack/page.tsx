@@ -136,7 +136,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
                   ["مجموع الفواتير", <Money key="t" minor={s.invoicesTotalMinor} />],
                   ["الضريبة المقروءة", <Money key="v" minor={s.vatKnownMinor} />],
                   ["فواتير ضريبتُها غير مقروءة", <span key="u" className={`nums ${s.vatUnknownCount > 0 ? "text-warn" : ""}`}>{s.vatUnknownCount}</span>],
-                  ["ضريبة المدخلات القابلة للخصم", <Money key="d" minor={s.deductibleVatMinor} />],
+                  ["ضريبة الفواتير المستوفية (رقمُ الإقرار في صفحته)", <Money key="d" minor={s.deductibleVatMinor} />],
                   ["ما سُدّد منها", <Money key="p" minor={s.paidMinor} />],
                   ["ما بقي عليها", <Money key="o" minor={s.openMinor} />],
                 ]}

@@ -5,10 +5,11 @@
  * الرئيسيةُ أن تقول «دفعة الشهر ١٢ ألفاً» لنسخت الاستعلام — وافترق يوماً.
  * فصار هنا، والبناءُ نفسُه في `lib/payment-run.ts` الخالصة.
  */
-import { eq, sql } from "drizzle-orm";
+import { eq, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, paymentAllocations, suppliers } from "@/db/schema";
 import { buildPaymentRun, type PayableInvoice, type PaymentRun } from "@/lib/payment-run";
+import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { loadSupplierBalances } from "./supplier-balance.service";
 
 export async function loadPaymentRun(
@@ -42,7 +43,14 @@ export async function loadPaymentRun(
     .leftJoin(suppliers, eq(invoices.supplierId, suppliers.id))
     .leftJoin(documents, eq(documents.id, invoices.documentId))
     .leftJoin(paymentAllocations, eq(paymentAllocations.invoiceId, invoices.id))
-    .groupBy(invoices.id, suppliers.nameAr);
+    /*
+      ما لا يدخل الدفعةَ لا يُحمَّل: كانت كلُّ فواتير التاريخ تُجلب في كلّ طلب ثمّ
+      تُصفّى في الذاكرة. الشرطان هنا هما شرطا `buildPaymentRun` نفسُهما (شهرٌ حتّى
+      شهر الدفعة، ومتبقٍّ فوق الهللة) — وهي تعيد فحصهما، فلا يفترقان.
+    */
+    .where(lte(invoices.periodMonth, month))
+    .groupBy(invoices.id, suppliers.nameAr)
+    .having(sql`${invoices.totalMinor} - coalesce(sum(${paymentAllocations.amountMinor}), 0) > ${SETTLED_TOLERANCE_MINOR}`);
 
   /* رصيدٌ لنا عند كلّ مورّد — يُخصم من دفعته فلا يُحوَّل الريال مرّتين */
   const creditBySupplier = credit ?? new Map((await loadSupplierBalances()).map((b) => [b.supplierId, b.creditMinor]));

@@ -522,3 +522,20 @@ describe("كشفُ المورّد يخالف دفترَنا", () => {
     expect(ids({ statementGaps: [] })).not.toContain("statement-ledger-gap");
   });
 });
+
+describe("موعدُ إقرار الضريبة", () => {
+  const due = { periodKey: "2026-Q3", label: "الربع الثالث 2026", deadline: "2026-10-31" };
+  it("يظهر بموعده ورابطِ صفحته حتى يُسجَّل تقديمُه", () => {
+    const [item] = buildAttention({ ...quiet, vatReturnDue: { ...due, daysLeft: 24 } }).filter((i) => i.id === "vat-return-due");
+    expect(item).toMatchObject({ area: "VAT", severity: "MEDIUM", href: "/close/vat?period=2026-Q3" });
+    expect(item.impact.amountMinor).toBeNull();
+  });
+  it("يشتدّ قبل الموعد بعشرة أيّام وبعد فواته", () => {
+    const sev = (daysLeft: number) => buildAttention({ ...quiet, vatReturnDue: { ...due, daysLeft } }).find((i) => i.id === "vat-return-due")?.severity;
+    expect(sev(10)).toBe("HIGH");
+    expect(sev(-3)).toBe("HIGH");
+  });
+  it("وما قُدِّم لا يظهر", () => {
+    expect(buildAttention({ ...quiet, vatReturnDue: null }).some((i) => i.id === "vat-return-due")).toBe(false);
+  });
+});

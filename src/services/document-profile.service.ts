@@ -17,6 +17,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, documents, invoices, statements, suppliers, users } from "@/db/schema";
 import { autoArchive, sumLineTotals, type AutoArchiveVerdict } from "@/lib/extraction/auto-archive";
+import { parseEvidence, qrArchiveFacts, type ExtractionEvidence } from "@/lib/extraction/evidence";
 import { canonicalName, type NameVerdict } from "@/lib/canonical-name";
 import { factsFromFileName } from "@/lib/extraction/filename-facts";
 import { normalizeDocumentDate } from "@/lib/document-date";
@@ -36,6 +37,16 @@ export interface DocumentProfile {
   periodMonth: string | null;
   uploadedAt: Date;
   uploadedBy: string | null;
+  /** بابُ الدخول (`UPLOAD` · `DRIVE_SYNC`) — `null` لما سبق العمود: غير معروف. */
+  source: string | null;
+  /** متى وُضع في الدرايف وآخرُ من عدّله هناك — لما جاءت به المزامنة. */
+  driveCreatedAt: Date | null;
+  driveModifiedBy: string | null;
+  /** الاسمُ يوم وصل، إن تغيّر بعده. */
+  originalFileName: string | null;
+  /** سببُ آخر قراءةٍ فشلت بنصّه، ولماذا رُفض. */
+  lastReadError: string | null;
+  statusNote: string | null;
   textSource: string | null;
   model: string | null;
   confidence: Record<string, number> | null;
@@ -75,6 +86,8 @@ export interface DocumentProfile {
   /** ما يمنع القيد بعينه — `missingFromReading`، وفارغٌ لما قُيِّد. */
   missing: string[];
   verdict: AutoArchiveVerdict;
+  /** أدلّةُ القراءة: رمزُ الفاتورة، ومصدرُ ما لم يقرأه النموذج، وما بقي متعارضاً — `null` لما قُرئ قبل حفظها. */
+  evidence: ExtractionEvidence | null;
   /** حكمُ الاسم القياسيّ — `null` لما لا ملفَّ له في الدرايف أو رُفض. */
   name: NameVerdict | null;
   history: { id: string; action: string; at: Date; actor: string | null; after: unknown }[];
@@ -94,10 +107,17 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
       periodMonth: documents.periodMonth,
       uploadedAt: documents.uploadedAt,
       uploadedBy: users.name,
+      source: documents.source,
+      driveCreatedAt: documents.driveCreatedAt,
+      driveModifiedBy: documents.driveModifiedBy,
+      originalFileName: documents.originalFileName,
+      lastReadError: documents.lastReadError,
+      statusNote: documents.statusNote,
       textSource: documents.textSource,
       model: documents.extractionModel,
       confidence: documents.fieldConfidence,
       reading: documents.extractionJson,
+      evidence: documents.extractionEvidence,
       supplierId: suppliers.id,
       supplierName: suppliers.nameAr,
       supplierSlug: suppliers.slug,
@@ -121,6 +141,7 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
   if (!row) return null;
 
   const x = (row.reading ?? null) as StoredReading | null;
+  const evidence = parseEvidence(row.evidence);
   const fromName = factsFromFileName(row.fileName);
   const readKind = x?.documentKind ?? null;
   const kind = row.kind === "UNKNOWN" && readKind ? readKind : row.kind;
@@ -174,6 +195,7 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
     invoiceNumber: row.invoiceNumber,
     fileName: row.fileName,
     linesTotalMinor: sumLineTotals(x?.lines, (v) => parseRiyals(v)),
+    ...qrArchiveFacts(evidence),
   });
 
   /* التوأمُ بالقاعدة نفسها التي يسألها القيدُ الآليّ — الرقمُ بأيّ صيغة، أو اليومُ والمبلغ */
@@ -217,6 +239,12 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
     periodMonth: row.periodMonth,
     uploadedAt: row.uploadedAt,
     uploadedBy: row.uploadedBy,
+    source: row.source,
+    driveCreatedAt: row.driveCreatedAt,
+    driveModifiedBy: row.driveModifiedBy,
+    originalFileName: row.originalFileName !== row.fileName ? row.originalFileName : null,
+    lastReadError: row.lastReadError,
+    statusNote: row.statusNote,
     textSource: row.textSource,
     model: row.model,
     confidence: (row.confidence ?? null) as Record<string, number> | null,
@@ -257,6 +285,7 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
     twin: twinRow,
     missing,
     verdict,
+    evidence,
     name,
     history,
   };

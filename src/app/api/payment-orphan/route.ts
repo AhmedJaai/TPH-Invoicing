@@ -5,6 +5,8 @@
  * المالُ مالُ الدفعة المقيَّدة، والخادمُ يقرؤه.
  */
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { db } from "@/db";
 import { guard, respondTo } from "@/services/guard";
 import { parseOrphanPaymentRequest } from "@/lib/orphan-payment";
@@ -22,21 +24,19 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  let raw: unknown;
-  try {
-    raw = await request.json();
-  } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
-  }
-
-  const parsed = parseOrphanPaymentRequest(raw);
+  /* القراءةُ بـ`readJson` كبقيّة المسارات؛ والفحصُ الدقيق برسائله في `parseOrphanPaymentRequest` */
+  const read = await readJson(request, z.unknown());
+  if (!read.ok) return read.response;
+  const parsed = parseOrphanPaymentRequest(read.body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
   try {
     const r = await db.transaction((t) => resolveOrphanPayment(t, parsed.request, user.id));
     return NextResponse.json({ ok: true, message: r.message });
   } catch (e) {
-    if (e instanceof OrphanPaymentError) return NextResponse.json({ error: e.message }, { status: e.status });
+    if (e instanceof OrphanPaymentError) {
+      return NextResponse.json({ error: e.message, ...(e.twin ? { twin: true } : {}) }, { status: e.status });
+    }
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;

@@ -3,9 +3,9 @@
  * `recurring_expenses`، والرصيدُ من آخر فترة تسويةٍ معروفة. والبناءُ في
  * `lib/cash-outlook.ts` الخالصة.
  */
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
-import { recurringExpenses } from "@/db/schema";
+import { expenses, recurringExpenses } from "@/db/schema";
 import {
   asCadence, buildCashOutlook, dueThisWeek, type CashOutlook, type RecurringInput, type SupplierDue, type WeekDue,
 } from "@/lib/cash-outlook";
@@ -46,10 +46,14 @@ export async function loadCashOutlook(): Promise<CashOutlook & { runMonth: strin
   const thisMonth = currentMonthRiyadh();
   const runMonth = previousMonth(thisMonth);
 
-  const [balances, recurring, cash] = await Promise.all([
+  const [balances, recurring, cash, paid] = await Promise.all([
     loadSupplierBalances(),
     loadRecurringInputs(),
     loadCashPosition(),
+    /* ما قُيِّد من مصروفٍ هذا الشهر مربوطاً بمتوقَّعه — دُفع، فلا يُسقَط ثانيةً */
+    db.select({ id: expenses.recurringExpenseId })
+      .from(expenses)
+      .where(and(eq(expenses.periodMonth, thisMonth), isNotNull(expenses.recurringExpenseId))),
   ]);
   const credit = new Map(balances.map((b) => [b.supplierId, b.creditMinor]));
   const overdue = await loadPaymentRun(runMonth, { creditBySupplier: credit });
@@ -67,6 +71,7 @@ export async function loadCashOutlook(): Promise<CashOutlook & { runMonth: strin
     heldMinor: overdue.heldTotalMinor,
     nextRun: dues(next),
     recurring,
+    paidThisMonth: new Set(paid.flatMap((p) => (p.id ? [p.id] : []))),
     balanceMinor: cash.balanceMinor,
     balanceAsOf: cash.asOf,
   });

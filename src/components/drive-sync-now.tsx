@@ -27,6 +27,8 @@ interface SyncSummary {
   autoArchived?: number;
   needsReview?: number;
   remainingUnnamed?: number;
+  /** مسمّاةٌ فوق حدّ النداء الواحد — تُسجَّل في الذي يليه. */
+  remainingNamed?: number;
   pendingMonths?: string[];
   truncated?: boolean;
 }
@@ -50,6 +52,7 @@ interface Outcome {
   autoArchived: number;
   needsReview: number;
   remaining: number;
+  remainingNamed: number;
   approved: number;
   renamed: { from: string; to: string }[];
   failures: number;
@@ -93,7 +96,7 @@ export function DriveSyncNow({
   async function run() {
     setError(null);
     setOutcome(null);
-    const o: Outcome = { newFiles: 0, created: 0, autoArchived: 0, needsReview: 0, remaining: 0, approved: 0, renamed: [], failures: 0 };
+    const o: Outcome = { newFiles: 0, created: 0, autoArchived: 0, needsReview: 0, remaining: 0, remainingNamed: 0, approved: 0, renamed: [], failures: 0 };
     const absorb = (r: SyncReply, countNew: boolean) => {
       if (countNew) o.newFiles += r.summary.newFiles ?? 0;
       o.created += r.summary.created ?? 0;
@@ -103,6 +106,7 @@ export function DriveSyncNow({
       o.renamed.push(...(r.renamed ?? []));
       o.failures += r.readFailures?.length ?? 0;
       o.remaining = r.summary.remainingUnnamed ?? 0;
+      o.remainingNamed = r.summary.remainingNamed ?? 0;
     };
     const fail = (text: string, status: number) => {
       setError({ text, auth: status === 428 });
@@ -123,7 +127,7 @@ export function DriveSyncNow({
 
       /* ٢. ما لا يُفهم اسمُه يُقرأ بمحتواه على دفعات — حتى يفرغ أو تبلغ خمسَ دفعات */
       setPhase("read");
-      for (let round = 0; o.remaining > 0 && round < 5; round++) {
+      for (let round = 0; (o.remaining > 0 || o.remainingNamed > 0) && round < 5; round++) {
         r = await postJson<SyncReply>("/api/drive-sync", { apply: true, readContent: true, months: 3 });
         if (!r.ok) return fail(r.error, r.status);
         absorb(r.data, false);
@@ -256,9 +260,9 @@ function OutcomePanel({ o }: { o: Outcome }) {
           </div>
         ))}
       </dl>
-      {o.remaining > 0 && (
+      {o.remaining + o.remainingNamed > 0 && (
         <p className="mt-3 text-xs text-ink-soft">
-          وبقي {countNoun(o.remaining, FILE)} لم يُقرأ بعد — يُكمَل في المزامنة القادمة، أو اضغط «زامن الآن» ثانيةً.
+          وبقي {countNoun(o.remaining + o.remainingNamed, FILE)} لم يُسجَّل أو يُقرأ بعد — يُكمَل في المزامنة القادمة، أو اضغط «زامن الآن» ثانيةً.
         </p>
       )}
       {o.failures > 0 && (

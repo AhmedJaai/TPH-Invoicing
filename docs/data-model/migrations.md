@@ -108,6 +108,8 @@
 | `064_waste_void_and_request_key.sql` | `waste_records`: إبطالٌ بسببه (`voided_at` …) ومفتاحُ طلبٍ فريد يمنع سطرين من ضغطتين |
 | `065_sale_line_parent_line.sql` | `sale_lines.parent_line_external_id` — خيارُ الإضافة يُربَط بسطر أصله لا برمزه |
 | `066_document_intake_trace.sql` | `documents`: أثرُ الدخول والقراءة (المصدر · محاولاتُ القراءة وسببُ فشلها · الاسمُ الأصليّ · نسخةُ ماذا) وفهرسُ `drive_md5` |
+| `067_supplier_profile.sql` | `suppliers`: `payment_terms_days` (فراغُه «غير معروف» لا صفر) · `phone_e164` · `email` · `contact_name` · `iban` المكتوب بيد ومن كتبه ومتى؛ وقيدان على العمودين الجديدين وحدهما |
+| `068_extraction_evidence.sql` | `documents.extraction_evidence` و`extraction_prompt_version`، و`extraction_cache`: `evidence` · `prompt_version` · `schema_version` · `provider` — ما قوبل به اقتراحُ النموذج (رمزُ QR ومصدرُ كلّ حقل) |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

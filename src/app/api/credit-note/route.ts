@@ -6,6 +6,7 @@
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { readJson } from "@/lib/request-body";
 import { db } from "@/db";
 import { guard, respondTo } from "@/services/guard";
 import { CreditNoteRefused, recordCreditNote } from "@/services/credit-note.service";
@@ -20,19 +21,16 @@ const Body = z.object({
   issuedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "التاريخ بصيغة YYYY-MM-DD"),
   reference: z.string().trim().max(60).optional(),
   reason: z.string().trim().max(200).optional(),
+  /** «إشعارٌ آخر» — بعد ردّ 409 `duplicate`. */
+  acknowledgeDuplicate: z.boolean().optional(),
 }).strict();
 
 export async function POST(request: Request) {
   try {
     const user = await guard("credit-note", "payment:approve");
-    let raw: unknown;
-    try {
-      raw = await request.json();
-    } catch {
-      return NextResponse.json({ error: "تعذّرت قراءة الطلب." }, { status: 400 });
-    }
-    const parsed = Body.safeParse(raw);
-    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلبٌ غير مفهوم" }, { status: 400 });
+    const read = await readJson(request, Body);
+    if (!read.ok) return read.response;
+    const parsed = { data: read.body };
     const amountMinor = parseRiyals(parsed.data.amount);
     if (amountMinor === null || amountMinor <= 0) {
       return NextResponse.json({ error: "مبلغُ الإشعار لم يُفهم — اكتبه رقماً بالريال" }, { status: 400 });
@@ -44,6 +42,7 @@ export async function POST(request: Request) {
       issuedOn: parsed.data.issuedOn,
       reference: parsed.data.reference || null,
       reason: parsed.data.reason || null,
+      acknowledgeDuplicate: parsed.data.acknowledgeDuplicate === true,
     }, user.id));
     return NextResponse.json({
       ok: true,
@@ -52,7 +51,10 @@ export async function POST(request: Request) {
         : "قُيِّد الإشعار — والفاتورةُ مسوّاةٌ كلُّها",
     });
   } catch (e) {
-    if (e instanceof CreditNoteRefused || e instanceof MonthClosedError) {
+    if (e instanceof CreditNoteRefused) {
+      return NextResponse.json({ error: e.message, ...(e.duplicate ? { duplicate: true } : {}) }, { status: 409 });
+    }
+    if (e instanceof MonthClosedError) {
       return NextResponse.json({ error: e.message }, { status: 409 });
     }
     const mapped = respondTo(e);

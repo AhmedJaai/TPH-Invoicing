@@ -9,7 +9,7 @@ import { Money } from "./money";
 import { Toolbar } from "./inventory-toolbar";
 import { DIRECTION, type Direction } from "./inventory-ui";
 import { PRODUCT, countNoun } from "@/lib/arabic";
-import { decimalToMilli } from "@/lib/inventory/units";
+import { decimalToMilli, isAmbiguousThousands } from "@/lib/inventory/units";
 
 /**
  * شاشةُ العدّ الأسبوعيّ — خانةٌ واحدة لكلّ صنف.
@@ -113,6 +113,17 @@ export function InventoryCountEntry({
     /* بعد الحفظ: ما لم يمسّه صاحبُه منذ آخر وصول يأخذ قيمةَ الخادم الجديدة */
     setSyncedSig(sig);
     setSyncedInitial(initial);
+    /*
+      ما حُفظ للتوّ يعود من الخادم **بوحدة الصنف**: ‏٥٫٢ كجم تعود «5200». فتعود
+      وحدتُه معه — وإلّا عُرض «5200 كجم»، وأيُّ تعديلٍ بعده يُرسَل بألف ضعف.
+    */
+    setUnits((u) => {
+      const next = { ...u };
+      for (const r of rows) {
+        if (sent[r.productId] !== undefined && (values[r.productId] ?? "") === sent[r.productId]) next[r.productId] = r.baseUnit;
+      }
+      return next;
+    });
     setValues((v) => {
       const next = { ...v };
       for (const r of rows) {
@@ -139,6 +150,54 @@ export function InventoryCountEntry({
   const invalid = dirty.filter((r) => !validQuantity(values[r.productId] ?? ""));
 
   useEffect(() => { onDirtyChange?.(dirty.length); }, [dirty.length, onDirtyChange]);
+
+  /*
+    ── مسوّدةٌ على هذا الجهاز ──
+
+    ما كُتب ولم يُحفَظ كان في ذاكرة الصفحة وحدها: يُقفَل الهاتفُ أو يُبدَّل
+    التطبيق أو تُحدَّث الصفحة فيضيع عدُّ ثلاثين صنفاً. فيُكتَب عند كلّ تغييرٍ في
+    هذا المتصفّح ويُستعاد عند الفتح — **ولا يُحفَظ في الخادم إلّا بضغطة**؛
+    والمستعادُ يُقال إنّه مستعاد، ومعه زرٌّ يتجاهله.
+  */
+  const draftKey = `count:${countId}`;
+  const [draftReady, setDraftReady] = useState(false);
+  const [restored, setRestored] = useState(0);
+  const editable = canEdit && !locked;
+
+  useEffect(() => {
+    if (!editable) return;
+    const draft = readDraft(draftKey);
+    const known = new Map(rows.map((r) => [r.productId, r] as const));
+    const mine = Object.entries(draft).filter(([id, d]) => {
+      const row = known.get(id);
+      return row !== undefined && d.value !== row.actual && row.unitChoices.some((c) => c.value === d.unit);
+    });
+    /* تُقرأ مرّةً عند الفتح من خارج React — ولا تُعرَف وقتَ الرسم في الخادم */
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (mine.length > 0) {
+      setValues((v) => ({ ...v, ...Object.fromEntries(mine.map(([id, d]) => [id, d.value])) }));
+      setUnits((u) => ({ ...u, ...Object.fromEntries(mine.map(([id, d]) => [id, d.unit])) }));
+      setRestored(mine.length);
+    }
+    setDraftReady(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, editable]);
+
+  const dirtySig = dirty.map((r) => `${r.productId}=${values[r.productId] ?? ""}@${units[r.productId] ?? r.baseUnit}`).join("|");
+  useEffect(() => {
+    if (!draftReady) return;
+    writeDraft(draftKey, Object.fromEntries(dirty.map((r) => [
+      r.productId, { value: values[r.productId] ?? "", unit: units[r.productId] ?? r.baseUnit },
+    ])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, draftReady, dirtySig]);
+
+  function discardDraft() {
+    setValues(initial);
+    setUnits(Object.fromEntries(rows.map((r) => [r.productId, r.baseUnit])));
+    setRestored(0);
+  }
 
   async function save() {
     if (dirty.length === 0 || invalid.length > 0) return;
@@ -180,10 +239,17 @@ export function InventoryCountEntry({
     }
   }
 
-  const editable = canEdit && !locked;
-
   return (
     <div>
+      {restored > 0 && dirty.length > 0 && (
+        <div role="status" className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3 text-xs leading-relaxed">
+          <p className="min-w-0 flex-1">
+            <strong>مسوّدةٌ على هذا الجهاز لم تُحفَظ:</strong> استُعيد عدُّ {countNoun(restored, PRODUCT)} كتبتَه قبل أن تُغلَق الصفحة.
+            راجِعه ثمّ اضغط «احفظ العدّ» — لم يصل الخادمَ منه شيء.
+          </p>
+          <button type="button" onClick={discardDraft} disabled={busy} className={buttonClass("quiet", "sm")}>تجاهل المسوّدة</button>
+        </div>
+      )}
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div className="max-w-2xl">
           <h2 className="text-base font-bold">{locked ? "ما وُجد على الرفّ" : "اكتب ما وجدتَه على الرفّ"}</h2>
@@ -279,7 +345,9 @@ export function InventoryCountEntry({
                 {/* الفرقُ من الخادم وحده — وما كُتب ولم يُحفَظ يُقال إنّه لم يُحسَب بعد */}
                 <div className="min-w-0 text-end md:text-start">
                   {changed ? (
-                    <p className={`text-[11px] ${bad ? "font-bold text-danger" : "text-muted"}`}>{bad ? "رقمٌ لا يُقرأ" : "يُحسَب بعد الحفظ"}</p>
+                    <p className={`text-[11px] ${bad ? "font-bold text-danger" : "text-muted"}`}>
+                      {bad ? (isAmbiguousThousands(value) ? "بنقطةٍ أم بلا فاصلة؟ اكتبها 5.2 أو 5200" : "رقمٌ لا يُقرأ") : "يُحسَب بعد الحفظ"}
+                    </p>
                   ) : row.varianceText && d ? (
                     <>
                       <p className={`flex items-center justify-end gap-1 text-[13px] font-bold md:justify-start ${DIRECTION[d].text}`}>
@@ -326,6 +394,34 @@ export function InventoryCountEntry({
       )}
     </div>
   );
+}
+
+interface DraftEntry { value: string; unit: string }
+
+/** مسوّدةُ هذا الجرد في المتصفّح — وما تعذّرت قراءتُه «لا مسوّدة». */
+function readDraft(key: string): Record<string, DraftEntry> {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+    if (typeof parsed !== "object" || parsed === null) return {};
+    const out: Record<string, DraftEntry> = {};
+    for (const [id, d] of Object.entries(parsed)) {
+      if (typeof d === "object" && d !== null && "value" in d && "unit" in d
+        && typeof d.value === "string" && typeof d.unit === "string") {
+        out[id] = { value: d.value, unit: d.unit };
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** والتخزينُ قد يُمنَع (تصفّحٌ خاصّ، امتلاء) — فالمسوّدةُ تحسينٌ لا شرط. */
+function writeDraft(key: string, draft: Record<string, DraftEntry>): void {
+  try {
+    if (Object.keys(draft).length === 0) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, JSON.stringify(draft));
+  } catch { /* لا مسوّدة — والعدُّ يبقى في الصفحة كما كان */ }
 }
 
 /**

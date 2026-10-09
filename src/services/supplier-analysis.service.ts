@@ -9,6 +9,7 @@
  *     (`markPaidByOwner`، `applySupplierCredit`) — فيحرسه مؤثِّر القاعدة.
  *   - كلّ تحليلٍ وكلّ قرارٍ في سجلّ التدقيق.
  */
+import { todayInRiyadh } from "@/lib/riyadh-time";
 import { reversePayment } from "@/services/payment.service";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -147,7 +148,8 @@ export async function gatherSupplierFacts(supplierId: string): Promise<SupplierF
     supplierId,
     supplierName: s.nameAr,
     aliases,
-    today: new Date().toISOString().slice(0, 10),
+    /* «اليوم» بتوقيت الرياض: بـUTC يكون أمسِ بين منتصف الليل والثالثة فجراً، فيُحسب عمرُ الفاتورة بيومٍ ناقص */
+    today: todayInRiyadh(),
     lastBankDate: iso(last?.d ?? null),
     invoices: invRows.map((r, k) => ({
       ref: `F${k + 1}`, id: r.id, number: r.invoice_number, date: iso(r.invoice_date)!,

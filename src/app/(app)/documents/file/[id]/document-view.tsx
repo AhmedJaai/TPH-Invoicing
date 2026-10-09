@@ -22,6 +22,7 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { loadDocumentProfile } from "@/services/document-profile.service";
 import { DOCUMENT_KIND_LABEL, DOCUMENT_STATUS_BADGE, documentHref } from "@/lib/document-labels";
 import { GAP_TEXT, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
+import { ExtractionEvidencePanel } from "@/components/extraction-evidence";
 import { FIELD_LABEL, LOW_CONFIDENCE, invoiceHref } from "@/lib/invoice-profile";
 import { actionLabel } from "@/lib/audit-labels";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
@@ -133,7 +134,16 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
         </>
       ),
     })),
-    { id: "arrived", title: "وصل", meta: formatDay(p.uploadedAt), icon: FileText, body: p.uploadedBy ? <>رفعه <bdi>{p.uploadedBy}</bdi></> : "من مزامنة الدرايف" },
+    {
+      id: "arrived", title: "وصل", meta: formatDay(p.uploadedAt), icon: FileText,
+      /*
+        ما جاءت به المزامنةُ لا يُنسب إلى من فتح المتصفّح وقتَها: يُقال من وضعه في الدرايف
+        ومتى، إن عُرف. وما سبق عمودَ المصدر يبقى على ما كان يُقال.
+      */
+      body: p.source === "DRIVE_SYNC"
+        ? <>من مزامنة الدرايف{p.driveModifiedBy ? <> — آخرُ من عدّله هناك <bdi>{p.driveModifiedBy}</bdi></> : null}{p.driveCreatedAt ? <> · وُضع فيه {formatDay(p.driveCreatedAt)}</> : null}</>
+        : p.uploadedBy ? <>رفعه <bdi>{p.uploadedBy}</bdi></> : "من مزامنة الدرايف",
+    },
   ];
 
   const confidence = p.confidence ? Object.entries(p.confidence).sort(([, a], [, b]) => a - b) : [];
@@ -199,6 +209,19 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
             <dd className="mt-1 font-bold">{formatDay(p.uploadedAt)}</dd>
           </div>
         </dl>
+
+        {p.lastReadError && !p.reading && (
+          <p className="mt-4 flex items-start gap-2 rounded-lg bg-warn-bg px-3 py-2 text-xs text-ink-soft">
+            <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warn" strokeWidth={2.25} aria-hidden />
+            <span><b>لم يُقرأ:</b> {p.lastReadError}</span>
+          </p>
+        )}
+        {p.status === "REJECTED" && p.statusNote && (
+          <p className="mt-4 text-xs text-ink-soft"><b>سببُ الرفض:</b> {p.statusNote}</p>
+        )}
+        {p.originalFileName && (
+          <p className="mt-3 text-[11px] text-muted">وصل باسم <bdi dir="ltr">{p.originalFileName}</bdi></p>
+        )}
 
         {p.twin && (sureTwin || likeTwin) && showAmounts && (
           <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
@@ -305,7 +328,7 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
             <div className="rounded-xl border border-line bg-raised shadow-raised">
               <p className="flex items-center gap-2 border-b border-line-soft px-4 py-3 text-xs font-bold">
                 <Sparkles className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />
-                {p.verdict.auto ? "اجتمعت فيه شروطُ الدخول وحده الأربعة" : "لم يدخل وحده — لم يجتمع فيه كلُّ شرط"}
+                {p.verdict.auto ? "اجتمعت فيه شروطُ الدخول وحده" : "لم يدخل وحده — لم يجتمع فيه كلُّ شرط، والحكمُ لك"}
               </p>
               <ul className="divide-y divide-line-soft">
                 {conditions.map((c) => (
@@ -322,6 +345,8 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
               </ul>
             </div>
           )}
+
+          <ExtractionEvidencePanel evidence={p.evidence} showAmounts={showAmounts} />
 
           {lastReason && (
             <p className="rounded-lg bg-sunken px-3 py-2 text-[11px] leading-relaxed text-ink-soft">

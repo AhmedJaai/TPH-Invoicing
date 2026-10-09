@@ -6,14 +6,15 @@
  */
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { and, eq, gt, ne, or } from "drizzle-orm";
+import { and, eq, ne, or } from "drizzle-orm";
 import { db } from "@/db";
-import { documents, extractionCache, invoices } from "@/db/schema";
+import { documents, invoices } from "@/db/schema";
 import { withDeadline } from "@/lib/ai/deadline";
 import { extractDocument, isSupportedUpload, uploadMimeType } from "@/lib/extraction";
 import { runPipeline } from "@/lib/extraction/pipeline";
 import { fillFromFileName } from "@/lib/extraction/filename-facts";
-import type { ExtractionOutcome, ExtractionSuccess } from "@/lib/extraction/provider";
+import { isReaderOutage, type ExtractionOutcome } from "@/lib/extraction/provider";
+import { loadCachedReading, saveCachedReading } from "@/services/reading-cache.service";
 import { matchSupplier } from "@/lib/supplier-match";
 import { companyConfig } from "@/config/drive";
 import { guard, respondTo } from "@/services/guard";
@@ -109,22 +110,11 @@ async function handle(request: Request) {
     حُفظت قراءتُه قبل ثوانٍ في extraction_cache — نداءان إلى أربعة تُدفع
     ثانيةً عن الملفّ نفسه.
   */
-  const [recent] = await db
-    .select({ extraction: extractionCache.extraction, model: extractionCache.model, textSource: extractionCache.textSource })
-    .from(extractionCache)
-    .where(and(eq(extractionCache.sha256, sha256), gt(extractionCache.createdAt, new Date(Date.now() - 60 * 60 * 1000))))
-    .limit(1);
+  /* تُفحص بالمخطّط وبنسخة الموجِّه — ما لا يطابق القائمَ يُقرأ من جديد (`reading-cache.service`) */
+  const recent = await loadCachedReading(sha256, 60 * 60 * 1000);
 
   const extraction: ExtractionOutcome = recent
-    ? {
-        ok: true,
-        value: recent.extraction as ExtractionSuccess["value"],
-        model: recent.model ?? "cache",
-        provider: "deepseek",
-        usage: { inputTokens: 0, outputTokens: 0 },
-        textSource: (recent.textSource ?? undefined) as ExtractionSuccess["textSource"],
-      }
-    : await extractDocument({
+    ?? await extractDocument({
         data: buffer,
         mimeType,
         companyVat: companyConfig.vatNumber,
@@ -133,6 +123,22 @@ async function handle(request: Request) {
       });
 
   if (!extraction.ok) {
+    /*
+      «القارئ متوقّف» ليس «الملفّ لا يُقرأ»: الأوّل لا يُصلحه تصويرٌ أوضح. فيُقال
+      لمن يرفع ما وقع — ٤٠٢ لرصيدٍ نفد، ٥٠٣ لانقطاعٍ أو قارئٍ غير مهيّأ — وأنّ ملفَّه سليم.
+    */
+    if (isReaderOutage(extraction)) {
+      console.error(`[analyze] القارئ متوقّف (${extraction.kind}): ${extraction.reason}`);
+      return NextResponse.json(
+        {
+          error: extraction.kind === "NO_BALANCE"
+            ? "قراءةُ المستندات متوقّفة: نفد رصيدُ القارئ. ملفُّك سليم ولم يُحفَظ شيء — أبلِغ مالك الحساب ليشحن الرصيد، ثمّ أعد الرفع."
+            : `قراءةُ المستندات متوقّفة مؤقّتاً (${extraction.reason}). ملفُّك سليم ولم يُحفَظ شيء — أعد المحاولة بعد دقائق.`,
+          readerOutage: extraction.kind,
+        },
+        { status: extraction.kind === "NO_BALANCE" ? 402 : 503 },
+      );
+    }
     return NextResponse.json({ error: extraction.reason }, { status: 502 });
   }
 
@@ -141,22 +147,10 @@ async function handle(request: Request) {
     فاتورةُ أوراق الزيتون «فاتورة - 260340 - …» تُقيَّد من الدرايف وتُقفل حين تُرفع من هنا.
     ويُسدّ قبل الحفظ: الأرشفةُ تقرأ القراءةَ المحفوظة نفسها.
   */
-  fillFromFileName(extraction.value, file.name);
+  fillFromFileName(extraction.value, file.name, extraction.evidence?.provenance);
 
-  /* ما قرأه النموذج يُحفظ هنا، وتقرؤه الأرشفة ببصمة الملفّ — لا من المتصفّح */
-  await db.insert(extractionCache).values({
-    sha256,
-    extraction: extraction.value as never,
-    model: extraction.model,
-    textSource: extraction.textSource ?? null,
-    userId: user.id,
-  }).onConflictDoUpdate({
-    target: extractionCache.sha256,
-    set: {
-      extraction: extraction.value as never, model: extraction.model,
-      textSource: extraction.textSource ?? null, userId: user.id, createdAt: new Date(),
-    },
-  });
+  /* ما قرأه النموذج — وأدلّتُه — يُحفظ هنا، وتقرؤه الأرشفة ببصمة الملفّ لا من المتصفّح */
+  if (!recent) await saveCachedReading(sha256, extraction, user.id);
 
   const match = matchSupplier(supplierList, {
     sellerVatNumber: extraction.value.sellerVatNumber,
@@ -190,6 +184,8 @@ async function handle(request: Request) {
     provider: extraction.provider,
     usage: extraction.usage,
     extraction: extraction.value,
+    /* من أين جاء ما لم يقرأه النموذج، وما في رمز الفاتورة — للعرض؛ والخادمُ يقرؤه من حفظه لا من هنا */
+    evidence: extraction.evidence ?? null,
     supplierMatch: {
       method: match.method,
       confidence: match.confidence,

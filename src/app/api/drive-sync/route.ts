@@ -16,10 +16,10 @@ import { loadRecordedInvoices } from "@/services/document-backlog.service";
 import { refreshTokenFor } from "@/services/drive.service";
 import { createHash, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { and, eq, gt, inArray, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  documents, extractionCache, invoices, issues, payments, statements,
+  documents, invoices, issues, payments, statements,
   supplierAliases, suppliers,
 } from "@/db/schema";
 import { ISSUE } from "@/lib/issue-codes";
@@ -36,8 +36,8 @@ import { KNOWN_SLUGS } from "@/lib/suppliers-seed";
 import { planImport } from "@/lib/archive-import";
 import { matchSupplier, type SupplierRecord } from "@/lib/supplier-match";
 import { extractDocument } from "@/lib/extraction";
-import { extractionSchema } from "@/lib/extraction/schema";
-import type { ExtractionOutcome, ExtractionSuccess } from "@/lib/extraction/provider";
+import { isReaderOutage, type ExtractionOutcome } from "@/lib/extraction/provider";
+import { loadCachedReading, saveCachedReading } from "@/services/reading-cache.service";
 import { reviewConfirmed } from "@/lib/confirm";
 import { parseRiyals } from "@/lib/money";
 import { companyConfig, driveConfig } from "@/config/drive";
@@ -566,6 +566,8 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
   let autoArchived = 0;
   const reviewGaps = new Map<AutoArchiveGap, number>();
   const readFailures: string[] = [];
+  /** القارئُ نفسُه متوقّف (رصيدٌ نفد · انقطاع) — يقف الطابور ولا يُحكم على ملفٍّ به */
+  let readerOutage: string | null = null;
   /** التسعيرات: تُعرَض ولا تُقيَّد. */
   const quotations: string[] = [];
 
@@ -659,7 +661,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
         القراءةُ تُحفظ ببصمة الملفّ لحظةَ تمامها وتُسأل قبل أن تُطلَب — كما في الرفع. كان
         الطلبُ إن قُتل بعد الاستخراج وقبل الكتابة دُفع ثمنُ القراءة وأُعيدت في المزامنة التالية.
       */
-      const saved = await savedReading(sha256);
+      const saved = await loadCachedReading(sha256, READING_FRESH_MS);
       const extraction: ExtractionOutcome = saved ?? await extractDocument({
         data, mimeType,
         companyVat: companyConfig.vatNumber,
@@ -667,6 +669,15 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
         supplierNames: supplierList.map((s) => `${s.nameAr} (${s.slug})`),
       });
 
+      if (!extraction.ok && isReaderOutage(extraction)) {
+        /*
+          العطبُ في القارئ لا في الملفّ — رصيدٌ نفد، أو المزوّدُ لم يردّ. كان الملفُّ
+          يُقيَّد «لم يُقرأ» فلا يعود، فتُحوِّل ساعةُ انقطاعٍ كلَّ ما مرّ فيها إلى عملٍ
+          يدويّ دائم. فلا يُقيَّد شيء: يقف الطابور بسببه، وتعود الملفّاتُ في المزامنة التالية.
+        */
+        readerOutage = extraction.reason;
+        break;
+      }
       if (!extraction.ok) {
         readFailures.push(`${entry.file.name} — ${extraction.reason}`);
         /* يُقيَّد مستنداً «لم يُقرأ» فيظهر في المستندات بسببه — ولا يعود أوّلَ الطابور */
@@ -674,7 +685,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
         settled++;
         continue;
       }
-      if (!saved) await saveReading(sha256, extraction, user.id);
+      if (!saved) await saveCachedReading(sha256, extraction, user.id);
 
       const x = extraction.value;
 
@@ -683,7 +694,8 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
         يُؤخَذ من الاسم: كتبه نظامُ المورّد لا نموذجُنا. سدٌّ لفراغ لا
         تصحيحٌ لقراءة.
       */
-      fillFromFileName(x, entry.file.name);
+      const evidence = extraction.evidence ?? null;
+      fillFromFileName(x, entry.file.name, evidence?.provenance);
 
       /*
         ── التسعيرة تُحذَّر ولا تُسجَّل ──
@@ -764,7 +776,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
         /* الكشفُ يُقيَّد أدناه متى عُرف مورّدُه — وتاريخُه من القراءة أو من شهر المجلّد */
         statementRecorded: x.documentKind === "STATEMENT" && Boolean(supplier),
         /* رمزُ الفاتورة الضريبيّ (QR) شاهدٌ من خارج النموذج، وما تبدّل عند إعادة السؤال */
-        ...qrArchiveFacts(extraction.evidence ?? null),
+        ...qrArchiveFacts(evidence),
       });
 
       /*
@@ -807,6 +819,8 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
           supplierId: supplier?.id ?? null,
           extractionJson: x as never,
           extractionModel: extraction.model,
+          extractionEvidence: evidence,
+          extractionPromptVersion: evidence?.promptVersion ?? null,
           textSource: extraction.textSource ?? null,
           fieldConfidence: x.confidence as never,
           uploadedById: user.id,
@@ -1108,6 +1122,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
     renameFailures,
     notes: notes.slice(0, 20),
     readFailures,
+    readerOutage,
     quotations,
     renameSuggestions,
   });
@@ -1130,36 +1145,6 @@ function driveOrigin(entry: ArchiveEntry) {
     driveCreatedAt: created && !Number.isNaN(created.getTime()) ? created : null,
     driveModifiedBy: entry.file.lastModifiedBy ?? null,
   };
-}
-
-const TEXT_SOURCES = ["TEXT", "PDF_EMBEDDED", "PDF_RENDERED", "DIRECT"] as const;
-
-/** قراءةٌ حُفظت لهذه البصمة — تُفحَص بالمخطّط نفسه قبل أن تُصدَّق، وما لا يطابقه يُقرأ من جديد. */
-async function savedReading(sha256: string): Promise<ExtractionSuccess | null> {
-  const [row] = await db
-    .select({ extraction: extractionCache.extraction, model: extractionCache.model, textSource: extractionCache.textSource })
-    .from(extractionCache)
-    .where(and(eq(extractionCache.sha256, sha256), gt(extractionCache.createdAt, new Date(Date.now() - READING_FRESH_MS))))
-    .limit(1);
-  if (!row) return null;
-  const parsed = extractionSchema.safeParse(row.extraction);
-  if (!parsed.success) return null;
-  return {
-    ok: true,
-    value: parsed.data,
-    model: row.model ?? "cache",
-    provider: "deepseek",
-    usage: { inputTokens: 0, outputTokens: 0 },
-    textSource: TEXT_SOURCES.find((t) => t === row.textSource),
-  };
-}
-
-async function saveReading(sha256: string, extraction: ExtractionSuccess, userId: string): Promise<void> {
-  const reading = {
-    extraction: extraction.value, model: extraction.model, textSource: extraction.textSource ?? null, userId,
-  };
-  await db.insert(extractionCache).values({ sha256, ...reading })
-    .onConflictDoUpdate({ target: extractionCache.sha256, set: { ...reading, createdAt: new Date() } });
 }
 
 /**

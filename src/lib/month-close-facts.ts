@@ -11,12 +11,22 @@ import { bankTransactions, documents, invoices, issues } from "@/db/schema";
 import { nextMonth } from "./filing";
 import { coverageStartFor, monthGapDays } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
-import type { MonthFacts } from "./month-close";
+import { monthBalances, type MonthFacts } from "./month-close";
+import { ISSUE } from "./issue-codes";
+import { periodKey, quarterOfMonth } from "./vat-return";
 import { SETTLED_TOLERANCE_MINOR } from "./supplier-balances";
 
 export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
   const start = new Date(`${month}-01T00:00:00Z`);
   const end = new Date(`${nextMonth(month)}-01T00:00:00Z`);
+
+  const supplierUnposted = sql`${bankTransactions.direction} = 'DEBIT'
+    and ${bankTransactions.matchedPaymentId} is null
+    and ${bankTransactions.matchStatus} = 'UNMATCHED'
+    and (
+      ${bankTransactions.category} = 'SUPPLIER'
+      or (${bankTransactions.category} <> 'UNKNOWN' and ${bankTransactions.matchDisposition} in ('SUGGEST', 'REVIEW'))
+    )`;
 
   const [inv] = await db
     .select({
@@ -70,6 +80,16 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
        )
   `)).rows;
 
+  /* ومنهم من على كشفه في الشهر فرقٌ مفتوح — ما يكتبه `refreshStatementFindings` */
+  const [stmtIssues] = (await db.execute<{ n: number }>(sql`
+    select count(distinct st.supplier_id)::int as n
+      from statements st
+      join issues iss on iss.entity_type = 'statement' and iss.entity_id = st.id and iss.status = 'OPEN'
+     where st.period_end >= ${start} and st.period_end < ${end}
+       and iss.code in (${ISSUE.STATEMENT_LEDGER_GAP}, ${ISSUE.STATEMENT_AMOUNT_MISMATCH}, ${ISSUE.INVOICE_IN_STATEMENT_NOT_ARCHIVED})
+       and exists (select 1 from invoices i where i.supplier_id = st.supplier_id and i.period_month = ${month})
+  `)).rows;
+
   const [bank] = await db
     .select({
       n: sql<number>`count(*)::int`,
@@ -85,6 +105,12 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
         where ${bankTransactions.matchStatus} = 'UNMATCHED'
           and ${bankTransactions.category} = 'UNKNOWN'
       ), 0)::bigint`,
+      /*
+        صادرٌ لمورّدٍ بلا دفعة: بابُه «مورّد»، أو رجّح له المحرّكُ شيئاً ولم
+        يُبتّ وبابُه معلوم (المجهولُ البابِ معدودٌ في «بلا تفسير» فوق).
+      */
+      supplierUnposted: sql<number>`count(*) filter (where ${supplierUnposted})::int`,
+      supplierUnpostedMinor: sql<number>`coalesce(sum(${bankTransactions.amountMinor}) filter (where ${supplierUnposted}), 0)::bigint`,
       creditsMinor: sql<number>`coalesce(sum(${bankTransactions.amountMinor})
         filter (where ${bankTransactions.direction} = 'CREDIT'), 0)::bigint`,
       debitsMinor: sql<number>`coalesce(sum(${bankTransactions.amountMinor})
@@ -127,22 +153,36 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     الأرصدة تُقرأ من فترة التسوية إن سُجّلت. وما لم يُسجَّل يبقى `null`
     — لا صفراً: افتراضُ الصفر يخترع فرقاً بحجم الرصيد كلِّه.
   */
-  const [period] = await db.execute<{ opening: number | null; closing: number | null }>(sql`
-    select sum(opening_balance_minor)::bigint as opening,
-           sum(closing_balance_minor)::bigint as closing
-    from reconciliation_periods
-    where period_start >= ${monthStartIso} and period_end <= ${monthEndIso}
-  `).then((r) => r.rows);
+  const periods = (await db.execute<{
+    account: string; ps: string; pe: string; opening: number | null; closing: number | null; reviewed: boolean;
+  }>(sql`
+    select bank_account_id as account, period_start as ps, period_end as pe,
+           opening_balance_minor as opening, closing_balance_minor as closing,
+           (reviewed_at is not null) as reviewed
+      from reconciliation_periods
+     where period_start >= ${monthStartIso} and period_end <= ${monthEndIso}
+  `)).rows;
+  const period = monthBalances(periods.map((p) => ({
+    bankAccountId: p.account, periodStart: p.ps, periodEnd: p.pe,
+    openingMinor: p.opening === null ? null : Number(p.opening),
+    closingMinor: p.closing === null ? null : Number(p.closing),
+    reviewed: Boolean(p.reviewed),
+  })));
 
   const balance = checkBalance({
-    openingMinor: period?.opening == null ? null : Number(period.opening),
-    closingMinor: period?.closing == null ? null : Number(period.closing),
+    openingMinor: period.openingMinor,
+    closingMinor: period.closingMinor,
     creditsMinor: Number(bank?.creditsMinor ?? 0),
     debitsMinor: Number(bank?.debitsMinor ?? 0),
   });
 
+  const quarterKey = periodKey(quarterOfMonth(month));
+  const [filed] = (await db.execute<{ n: number }>(sql`
+    select count(*)::int as n from vat_filings where period_key = ${quarterKey} and voided_at is null`)).rows;
+
   return {
     month,
+    vatFiled: Number(filed?.n ?? 0) > 0,
     invoiceCount: Number(inv?.invoiceCount ?? 0),
     notTaxValidCount: Number(inv?.notTaxValidCount ?? 0),
     unknownTaxCount: Number(inv?.unknownTaxCount ?? 0),
@@ -154,10 +194,13 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     documentsNeedingReview: Number(docs?.needingReview ?? 0),
     suppliersWithInvoices: Number(inv?.suppliersWithInvoices ?? 0),
     suppliersWithStatement: Number(stmt?.n ?? 0),
+    suppliersWithStatementIssues: Number(stmtIssues?.n ?? 0),
     bankImportCoversMonth: Number(bank?.n ?? 0) > 0,
     bankGapDays: gapDays,
     bankUnexplainedCount: Number(bank?.unexplained ?? 0),
     bankUnexplainedMinor: Number(bank?.unexplainedMinor ?? 0),
+    bankSupplierUnpostedCount: Number(bank?.supplierUnposted ?? 0),
+    bankSupplierUnpostedMinor: Number(bank?.supplierUnpostedMinor ?? 0),
     bankBalanceStatus: balance.status,
     bankBalanceDifferenceMinor: balance.differenceMinor,
   };

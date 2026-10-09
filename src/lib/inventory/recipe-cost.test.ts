@@ -151,3 +151,50 @@ describe("الكلفةُ المعلَنة تكشف الوصفةَ الناقصة
     expect(cost.lines.reduce((s, l) => s + toMinor(l.costMilliMinor!), 0)).toBe(8);
   });
 });
+
+describe("الكلفةُ بقاعدة الاستهلاك نفسِها", () => {
+  const coffee: CostedIngredient = {
+    productId: "c", name: "بنّ", quantityMilli: 20_000, unit: "G", baseUnit: "G",
+    packMilli: 1_000_000, packCostMinor: 10_000,
+  };
+
+  it("بلا فاقدٍ ولا ناتج: ٢٠ جراماً من كيلو بمئة ريال = ريالان", () => {
+    expect(recipeCost([coffee]).costMinor).toBe(200);
+    expect(recipeCost([coffee]).basis).toBe("CATALOG");
+  });
+
+  it("وفاقدُ التجهيز يدخل الكلفة: ٨٪ ← ‏٢٠ ÷ ٠٫٩٢ جراماً", () => {
+    /* ‏21.739 جراماً × ٠٫١٠ ريال = ‏٢٫١٧ */
+    expect(recipeCost([{ ...coffee, prepLossBp: 800 }]).costMinor).toBe(217);
+  });
+
+  it("وناتجُ الوصفة يقسمها: دفعةٌ تُخرج أربعَ قطع كلفةُ القطعة ربعُها", () => {
+    expect(recipeCost([coffee], { yieldMilli: 4000 }).costMinor).toBe(50);
+  });
+
+  it("والفاتورةُ تُقدَّم على الكتالوج حين تُطلَب — ويُعلَن الأساس", () => {
+    /* ‏١١٥ ريالاً للكيلو في آخر فاتورة = ‏١١٫٥ هللة للجرام = ‏١١٬٥٠٠ مِلّي‑هللة */
+    const priced = { ...coffee, invoiceRateMilliMinor: 11_500 };
+    const cost = recipeCost([priced], { preferInvoice: true });
+    expect(cost.costMinor).toBe(230);
+    expect(cost.basis).toBe("INVOICE");
+    /* وبلا طلبٍ يبقى حسابُ الكتالوج — لمقابلة المعلَنة */
+    expect(recipeCost([priced]).costMinor).toBe(200);
+  });
+
+  it("ومكوّنٌ بفاتورةٍ وآخرُ بلا فاتورة: خليطٌ يُسمّى", () => {
+    const cup: CostedIngredient = {
+      productId: "k", name: "كاس", quantityMilli: 1000, unit: "PIECE", baseUnit: "PIECE",
+      packMilli: 500_000, packCostMinor: 21_500,
+    };
+    const cost = recipeCost([{ ...coffee, invoiceRateMilliMinor: 11_500 }, cup], { preferInvoice: true });
+    expect(cost.basis).toBe("MIXED");
+    expect(cost.costMinor).toBe(230 + 43);
+  });
+
+  it("وفاتورةٌ تُغني عن عبوةِ كتالوجٍ غائبة", () => {
+    const cost = recipeCost([{ ...coffee, packMilli: null, packCostMinor: null, invoiceRateMilliMinor: 11_500 }], { preferInvoice: true });
+    expect(cost.costMinor).toBe(230);
+    expect(cost.unknown).toEqual([]);
+  });
+});

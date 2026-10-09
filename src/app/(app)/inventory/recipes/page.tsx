@@ -74,7 +74,8 @@ export default async function RecipesPage() {
     فكلُّ قطعةٍ تُباع لا تُخصَم من المخزون، ويظهر ما اشتُري منها
     كلُّه «فرقاً» في آخر الأسبوع.
   */
-  const suspicious = rows.filter((r) => declaredCostDisagrees(r.costMinor, r.declaredCostMinor));
+  /* المعلَنةُ تُقابَل بكلفة الكتالوج — كلاهما معياريّ؛ وكلفةُ الفاتورة تتحرّك مع السوق */
+  const suspicious = rows.filter((r) => declaredCostDisagrees(r.catalogCostMinor, r.declaredCostMinor));
 
   const canWriteManually = menuProducts.length > 0 && ingredients.length > 0;
 
@@ -161,7 +162,7 @@ export default async function RecipesPage() {
                     {suspicious.map((r) => (
                       <li key={r.recipeId} className="flex flex-wrap items-baseline gap-x-2">
                         <span className="font-bold text-ink">{r.menuProductName}</span>
-                        <span>وصفتُه <Money minor={r.costMinor!} /> والمعلَنة <Money minor={r.declaredCostMinor!} /></span>
+                        <span>وصفتُه <Money minor={r.catalogCostMinor!} /> والمعلَنة <Money minor={r.declaredCostMinor!} /></span>
                       </li>
                     ))}
                   </ul>

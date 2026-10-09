@@ -37,12 +37,31 @@ export async function firstClosedMonth(
   return rows[0]?.month ?? null;
 }
 
+const monthLockKey = (month: string) => `month-close:${month}`;
+
+/** القفلُ الحصريّ على الشهر — للإقفال وإعادة الفتح، داخل معاملتهما. */
+export async function lockMonthForClose(tx: Tx, month: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${monthLockKey(month)}))`);
+}
+
 export async function assertMonthsOpen(
   tx: Tx,
   months: readonly (string | null | undefined)[],
 ): Promise<void> {
   const list = [...new Set(months.filter((m): m is string => Boolean(m)))];
   if (list.length === 0) return;
+  /*
+    قفلٌ مشترك على الشهر حتّى آخر المعاملة، ثمّ القراءة.
+
+    كان الفحصُ قراءةً بلا قفل: معاملةٌ رأت الشهر «مفتوحاً»، ثمّ أُقفل وأُودع
+    الإقفال، ثمّ أودعت هي — دفعةٌ في شهرٍ مقفل لا تعكسها شهادتُه. فالكاتبون
+    يتشاركون القفل ولا يتزاحمون، والإقفالُ يأخذه حصريّاً (`lockMonthForClose`)
+    فينتظر من بدأ قبله، ومن يأتي بعده يرى الشهر مقفلاً. والترتيبُ ثابت كي
+    لا يتعانق قفلان.
+  */
+  for (const month of [...list].sort()) {
+    await tx.execute(sql`select pg_advisory_xact_lock_shared(hashtext(${monthLockKey(month)}))`);
+  }
   const [row] = await tx
     .select({ month: monthCloses.month })
     .from(monthCloses)

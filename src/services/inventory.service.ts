@@ -614,6 +614,26 @@ function fallbackCosts(
 }
 
 /**
+ * آخرُ كلفةٍ من فاتورةٍ لكلّ صنف حتى يومٍ بعينه — بمِلّي‑الهللة لوحدة الأساس.
+ *
+ * هي عينُ ما يقوِّم به الجردُ فرقَه حين لا شراءَ في أسبوعه (`fallbackCosts`)،
+ * تُتاح لكلفة الوصفة: **قاعدةٌ واحدة للكلفة لا اثنتان**. وما لا فاتورةَ له في
+ * النافذة غائبٌ عن الخريطة — لا صفراً.
+ */
+export async function latestInvoiceUnitCosts(asOf: string, conn: Conn = db): Promise<Map<string, number>> {
+  const units = await conn.select({ id: products.id, baseUnit: products.baseUnit })
+    .from(products).where(eq(products.isStockItem, true));
+  /* الفترةُ يومُ الغد: فكلُّ ما حتى اليوم «قبلها» */
+  const next = shiftDays(asOf, 1);
+  const { lookback } = await loadPurchaseLines(next, next, conn);
+  const out = new Map<string, number>();
+  for (const [id, rate] of fallbackCosts(lookback, new Map(units.map((u) => [u.id, u.baseUnit])))) {
+    if (rate !== null && rate > 0) out.set(id, rate);
+  }
+  return out;
+}
+
+/**
  * كلفةُ الكتالوج المعياريّة — بمِلّي‑الهللة لوحدة الأساس.
  *
  * وهي العبوةُ وكلفتُها كما كتبهما المقهى في نقاط البيع: كرتونٌ فيه
@@ -1312,8 +1332,18 @@ export async function saveActualCounts(
     الشاشة فارغة. والترتيبُ كان مضموناً في الواجهة وحدها، وذلك اتّفاقٌ
     لا حارس.
   */
-  await recomputeCount(countId, conn);
   if (entries.length === 0) return recomputeCount(countId, conn);
+  /*
+    ولا يُعاد الحسابُ كلُّه قبل كلّ حفظ: كان يُحسَب الجردُ مرّتين في كلّ ضغطة
+    (مبيعاتُ الأسبوع والوصفاتُ والفواتير، مرّتين). فيُسأل «ألِما في الطلب
+    أسطر؟» باستعلامٍ واحد، ولا تُهيَّأ إلّا إن غاب منها سطر.
+  */
+  const wanted = [...new Set(entries.map((e) => e.productId))];
+  const present = await conn
+    .select({ productId: inventoryCountLines.productId })
+    .from(inventoryCountLines)
+    .where(and(eq(inventoryCountLines.countId, countId), inArray(inventoryCountLines.productId, wanted)));
+  if (present.length < wanted.length) await recomputeCount(countId, conn);
 
   await conn.transaction(async (tx) => {
     for (const e of entries) {

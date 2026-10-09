@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeConsumption, ingredientForSale, type SoldLineInput } from "./consumption";
+import { computeConsumption, ingredientForSale, MAX_PREP_LOSS_BP, type SoldLineInput } from "./consumption";
 import { indexRecipeVersions, effectiveVersion, type RecipeVersionInput } from "./recipe";
 import { canonicalToQuantity, toCanonical } from "./units";
 
@@ -270,5 +270,14 @@ describe("ingredientForSale — يُقرَّب بعد التحويل لا قبل
     /* جرامٌ = ١٠٠٠ مِلّي‑جرام، فعُشرُه ١٠٠ — وكان يُقرَّب قبل التحويل صفراً */
     expect(perSale).toBe(toCanonical(1000, "G") / 10);
     expect(perSale).toBeGreaterThan(0);
+  });
+});
+
+describe("فاقدُ التجهيز محدود — لا قسمةَ على صفر ولا استهلاكَ سالباً", () => {
+  it("مئةٌ بالمئة وما فوقها تُحدّ دونها — عددٌ منتهٍ موجب", () => {
+    const capped = ingredientForSale(1000, 20_000, 1000, MAX_PREP_LOSS_BP);
+    expect(Number.isFinite(capped) && capped > 0).toBe(true);
+    expect(ingredientForSale(1000, 20_000, 1000, 10_000)).toBe(capped);
+    expect(ingredientForSale(1000, 20_000, 1000, 15_000)).toBe(capped);
   });
 });

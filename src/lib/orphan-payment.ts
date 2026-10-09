@@ -15,7 +15,11 @@ import { firstMessage } from "./inventory/count-request";
 const id = z.string().trim().min(1).max(64);
 
 export const orphanPaymentRequest = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("assign"), paymentId: id, supplierId: id }).strict(),
+  z.object({
+    action: z.literal("assign"), paymentId: id, supplierId: id,
+    /** أُقِرّ أنّ للمورّد سداداً آخر بالمبلغ واليوم نفسيهما وهذه واقعةٌ ثانية. */
+    acknowledgeTwin: z.boolean().optional(),
+  }).strict(),
   z.object({
     action: z.literal("void"),
     paymentId: id,

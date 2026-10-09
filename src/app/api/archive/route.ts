@@ -31,6 +31,7 @@ import { createInvoice, createStatement, replaceLines } from "@/services/invoice
 import { parseStatementExtras } from "@/lib/extraction/statement-extras";
 import { createPayment, findPaymentTwin } from "@/services/payment.service";
 import { extractionCache, payments } from "@/db/schema";
+import { parseEvidence } from "@/lib/extraction/evidence";
 import { can, ForbiddenError } from "@/lib/permissions";
 import { eq } from "drizzle-orm";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
@@ -244,7 +245,7 @@ export async function POST(request: Request) {
       الخادم) فلا أسطر ولا دعوى — لا يُصدَّق ما أُرسل بدلاً منه.
     */
     const [cached] = await db
-      .select({ extraction: extractionCache.extraction, model: extractionCache.model, textSource: extractionCache.textSource })
+      .select({ extraction: extractionCache.extraction, model: extractionCache.model, textSource: extractionCache.textSource, evidence: extractionCache.evidence })
       .from(extractionCache)
       .where(eq(extractionCache.sha256, sha256))
       .limit(1);
@@ -308,6 +309,7 @@ export async function POST(request: Request) {
         supplierId: body.supplierId,
         rawExtraction: serverRaw ?? undefined,
         extractionModel: cached?.model ?? undefined,
+        extractionEvidence: parseEvidence(cached?.evidence),
         textSource: cached?.textSource ?? undefined,
         fieldConfidence: (serverRaw as { confidence?: unknown } | null)?.confidence,
         uploadedById: user.id,

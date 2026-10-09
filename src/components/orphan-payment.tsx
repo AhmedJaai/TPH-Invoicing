@@ -30,20 +30,24 @@ export function OrphanPayment({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  /* للمورّد سدادٌ بالمبلغ واليوم نفسيهما — يُسأل قبل أن تُنسب نسخةٌ ثانية */
+  const [twin, setTwin] = useState(false);
 
-  async function submit() {
+  async function submit(acknowledgeTwin = false) {
     if (busy) return;
     setBusy(true);
     setError(null);
     const body = mode === "assign"
-      ? { action: "assign", paymentId, supplierId }
+      ? { action: "assign", paymentId, supplierId, ...(acknowledgeTwin ? { acknowledgeTwin: true } : {}) }
       : { action: "void", paymentId, reason };
     const r = await postJson<{ message: string }>("/api/payment-orphan", body);
     setBusy(false);
     if (!r.ok) {
+      setTwin(mode === "assign" && r.status === 409 && r.data.twin === true);
       setError(r.error);
       return;
     }
+    setTwin(false);
     /* بلا «تراجع»: مسارُ الدفعة اليتيمة لا يملك ردّاً، والزرُّ الذي لا يعمل أسوأ من غيابه */
     setDone(r.data.message);
     toast({ tone: "ok", title: r.data.message });
@@ -89,14 +93,14 @@ export function OrphanPayment({
           <select
             aria-label="المورّد"
             value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value)}
+            onChange={(e) => { setSupplierId(e.target.value); setTwin(false); setError(null); }}
             className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-surface px-2 text-xs lg:min-h-9"
           >
             <option value="">اختر المورّد…</option>
             {suppliers.map((s) => <option key={s.id} value={s.id}>{s.nameAr}</option>)}
           </select>
-          <button aria-busy={busy} type="button" disabled={busy || !supplierId} onClick={submit} className={buttonClass("primary", "sm")}>
-            انسبها
+          <button aria-busy={busy} type="button" disabled={busy || !supplierId} onClick={() => submit(twin)} className={buttonClass("primary", "sm")}>
+            {twin ? "سدادٌ آخر — انسبها" : "انسبها"}
           </button>
         </div>
       )}
@@ -112,7 +116,7 @@ export function OrphanPayment({
               placeholder="ما هي؟ أجرة · تحويل شخصيّ · مصروف…"
               className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-surface px-2 text-xs lg:min-h-9"
             />
-            <button aria-busy={busy} type="button" disabled={busy || reason.trim().length < 3} onClick={submit} className={buttonClass("danger", "sm")}>
+            <button aria-busy={busy} type="button" disabled={busy || reason.trim().length < 3} onClick={() => submit()} className={buttonClass("danger", "sm")}>
               ألغِ قيدَها
             </button>
           </div>

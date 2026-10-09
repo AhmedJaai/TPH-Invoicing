@@ -35,13 +35,21 @@ export async function loadSupplierBalances(
   executor: Executor = db,
   supplierId?: string,
 ): Promise<SupplierBalance[]> {
+  /*
+    رصيدُ مورّدٍ واحد لا يجمع جدولَ التخصيصات كلَّه: الشرطُ يدخل كلَّ جزءٍ من
+    الاستعلام — كان يُبنى المجموعان على الجدول كلّه ثمّ يُصفّى في آخر سطر.
+  */
+  const ofInvoices = supplierId ? sql`where invoice_id in (select id from invoices where supplier_id = ${supplierId})` : sql``;
+  const ofPayments = supplierId ? sql`where payment_id in (select id from payments where supplier_id = ${supplierId})` : sql``;
+  const invoiceOwner = supplierId ? sql`i.supplier_id = ${supplierId}` : sql`i.supplier_id is not null`;
+  const paymentOwner = supplierId ? sql`p.supplier_id = ${supplierId}` : sql`p.supplier_id is not null`;
   const rows = (
     await executor.execute<Row>(sql`
       with alloc_by_invoice as (
-        select invoice_id, sum(amount_minor)::bigint as s from payment_allocations group by invoice_id
+        select invoice_id, sum(amount_minor)::bigint as s from payment_allocations ${ofInvoices} group by invoice_id
       ),
       alloc_by_payment as (
-        select payment_id, sum(amount_minor)::bigint as s from payment_allocations group by payment_id
+        select payment_id, sum(amount_minor)::bigint as s from payment_allocations ${ofPayments} group by payment_id
       ),
       inv as (
         select i.supplier_id,
@@ -51,7 +59,7 @@ export async function loadSupplierBalances(
                count(*) filter (where i.total_minor - coalesce(a.s, 0) > ${SETTLED_TOLERANCE_MINOR})::int as open_count
           from invoices i
           left join alloc_by_invoice a on a.invoice_id = i.id
-         where i.supplier_id is not null
+         where ${invoiceOwner}
          group by i.supplier_id
       ),
       pay as (
@@ -62,7 +70,7 @@ export async function loadSupplierBalances(
                sum(greatest(0, p.amount_minor - p.fee_minor - coalesce(b.s, 0)))::bigint as credit
           from payments p
           left join alloc_by_payment b on b.payment_id = p.id
-         where p.supplier_id is not null and p.status not in ('REVERSED', 'VOID')
+         where ${paymentOwner} and p.status not in ('REVERSED', 'VOID')
          group by p.supplier_id
       )
       select s.id as supplier_id,
