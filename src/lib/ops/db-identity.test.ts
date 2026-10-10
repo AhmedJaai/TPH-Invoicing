@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  checkIsolation, connectionWarnings, environmentOf, parseConnection, requiresPooler,
+  checkIsolation, connectionWarnings, environmentOf, parseConnection, poolSize, requiresPooler, SERVERLESS_POOL_MAX,
   type DbFingerprint,
 } from "./db-identity";
 
@@ -128,5 +128,34 @@ describe("المجمَّعة إلزاماً في السحابة", () => {
 
   it("والسلسلة الغائبة ليست مخالفة — غيابها عطبٌ آخر يُعلَن في موضعه", () => {
     expect(requiresPooler({ VERCEL: "1" }, undefined).violation).toBe(false);
+  });
+});
+
+describe("حجم تجمّع الاتّصالات", () => {
+  const direct = "postgresql://u:p@ep-cool-1.c-2.us-east-2.aws.neon.tech/neondb";
+  const pooled = "postgresql://u:p@ep-cool-1-pooler.c-2.us-east-2.aws.neon.tech/neondb";
+
+  it("السحابة على المجمَّعة تفتح بضعة اتّصالات — فيتوازى `Promise.all` فعلاً", () => {
+    expect(poolSize({ VERCEL: "1" }, pooled)).toBe(SERVERLESS_POOL_MAX);
+    expect(SERVERLESS_POOL_MAX).toBeGreaterThan(1);
+  });
+
+  it("والنقطة المباشرة تبقى على واحد — لا تُزاد على حصّةٍ تنفد", () => {
+    expect(poolSize({ VERCEL: "1" }, direct)).toBe(1);
+    expect(poolSize({ VERCEL: "1", DB_POOL_MAX: "8" }, direct)).toBe(1);
+    expect(poolSize({ VERCEL: "1" }, undefined)).toBe(1);
+  });
+
+  it("`DB_POOL_MAX` يضبطه في حدوده، وما لا يُقرأ عدداً يُهمَل", () => {
+    expect(poolSize({ VERCEL: "1", DB_POOL_MAX: "3" }, pooled)).toBe(3);
+    expect(poolSize({ VERCEL: "1", DB_POOL_MAX: "1" }, pooled)).toBe(1);
+    for (const bad of ["0", "50", "2.5", "كثير", ""]) {
+      expect(poolSize({ VERCEL: "1", DB_POOL_MAX: bad }, pooled)).toBe(SERVERLESS_POOL_MAX);
+    }
+  });
+
+  it("والجهاز المحلّيّ عشرة كما كان", () => {
+    expect(poolSize({}, pooled)).toBe(10);
+    expect(poolSize({}, "postgres://tph@127.0.0.1:55432/tph_x")).toBe(10);
   });
 });

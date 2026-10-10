@@ -152,3 +152,26 @@ export function requiresPooler(
   const neon = conn.host.endsWith(".neon.tech");
   return { serverless, pooled: conn.pooled, violation: serverless && neon && !conn.pooled };
 }
+
+/** كم اتّصالاً تفتح النسخةُ السحابيّة على النقطة المجمَّعة ما لم يُضبَط `DB_POOL_MAX`. */
+export const SERVERLESS_POOL_MAX = 5;
+
+/**
+ * حجمُ تجمّع الاتّصالات.
+ *
+ * كان في السحابة اتّصالاً واحداً، فكلُّ `Promise.all` في محمِّلات الصفحات يصطفّ
+ * عليه ويجري واحداً بعد واحد — والنسخةُ الواحدة تخدم طلباتٍ متزامنة فتصطفّ كلُّها
+ * خلفه. والنقطةُ المجمَّعة (PgBouncer) تحتمل عدّة اتّصالاتٍ لكلّ نسخة: اتّصالُ
+ * العميل الخامل لا يحجز اتّصالاً في القاعدة. فالمجمَّعةُ تأخذ بضعة، وغيرُها يبقى
+ * على واحد — نقطةُ Neon المباشرة تنفد حصّتُها، ولا تُزاد عليها.
+ *
+ * و`DB_POOL_MAX` يضبطه من أراد (١–١٠) بلا نشرٍ جديد للشيفرة؛ وما لا يُقرأ عدداً يُهمَل.
+ */
+export function poolSize(env: Record<string, string | undefined>, url: string | undefined): number {
+  const { serverless, pooled } = requiresPooler(env, url);
+  if (!serverless) return 10;
+  if (!pooled) return 1;
+  const asked = Number(env.DB_POOL_MAX);
+  if (Number.isInteger(asked) && asked >= 1 && asked <= 10) return asked;
+  return SERVERLESS_POOL_MAX;
+}

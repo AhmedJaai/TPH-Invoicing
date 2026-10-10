@@ -34,8 +34,6 @@ export interface SupplierMatch {
   vatConflict?: boolean;
 }
 
-/** الجملةُ التي تُقال حين يُردّ الحسمُ لاختلاف الرقم الضريبيّ. */
-export const VAT_CONFLICT_NOTE = "الاسمُ يطابق مورّداً مسجَّلاً والرقمُ الضريبيّ يخالف رقمَه — تحقّق أهو هو";
 
 /** مسافة تشابه بسيطة بين نصّين مطبَّعين، من ٠ إلى ١. */
 export function similarity(a: string, b: string): number {

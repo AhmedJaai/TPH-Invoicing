@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
-import { requiresPooler } from "@/lib/ops/db-identity";
+import { poolSize, requiresPooler } from "@/lib/ops/db-identity";
 
 declare global {
   var __tphPool: Pool | undefined;
@@ -22,8 +22,13 @@ const pool =
   globalThis.__tphPool ??
   new Pool({
     connectionString: process.env.DATABASE_URL,
-    // كل استدعاء سحابي يخدم طلباً واحداً، فاتصال واحد يكفيه ولا يزاحم غيره
-    max: isServerless ? 1 : 10,
+    /*
+      على النقطة المجمَّعة بضعةُ اتّصالاتٍ لكلّ نسخة: باتّصالٍ واحد كان كلُّ
+      `Promise.all` يجري واحداً بعد واحد، ومعاملةٌ طويلة (استيراد بنك) تحجز كلَّ
+      صفحةٍ أخرى تخدمها النسخةُ نفسها. ويبقى «داخل المعاملة اكتب بـ`t`» قائماً:
+      `db` داخلها يكتب **خارج** المعاملة على اتّصالٍ آخر.
+    */
+    max: poolSize(process.env, process.env.DATABASE_URL),
     // ينتهي الانتظار بخطأ مفهوم بدل الوقوف إلى الأبد
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: 10_000,
@@ -33,6 +38,16 @@ const pool =
   });
 
 if (!isServerless) globalThis.__tphPool = pool;
+
+/*
+  اتّصالٌ خامل تقطعه القاعدة (أو يعود من تعليق الدالّة مقطوعاً) يرفع `error` على
+  التجمّع — وبلا سامعٍ يُسقط العمليّةَ كلَّها. فيُسجَّل ويُترَك للتجمّع أن يفتح غيره.
+*/
+if (pool.listenerCount("error") === 0) {
+  pool.on("error", (e) => {
+    console.error(JSON.stringify({ kind: "db-idle-connection-error", message: e.message }));
+  });
+}
 
 /*
   والنقطة المجمَّعة لا تُفرَض بالوثيقة وحدها: سطرٌ في السجلّ عند كلّ بدء

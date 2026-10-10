@@ -261,6 +261,8 @@ export const documents = pgTable("documents", {
   index("documents_supplier_created_idx").on(t.supplierId, t.uploadedAt.desc()),
   index("documents_status_idx").on(t.status),
   index("documents_drive_md5_idx").on(t.driveMd5).where(sql`drive_md5 is not null`),
+  /* البحثُ الشامل `ilike '%…%'` — ثلاثيّاتُ الحروف (هجرة معلّقة: nextjs-perf__search_trgm) */
+  index("documents_file_name_trgm_idx").using("gin", sql`${t.fileName} gin_trgm_ops`),
 ]);
 
 /* ───────────────────────── الفواتير ───────────────────────── */
@@ -340,6 +342,8 @@ export const invoices = pgTable("invoices", {
   index("invoices_date_idx").on(t.invoiceDate),
   index("invoices_posted_idx").on(t.postedToAccounting),
   index("invoices_tax_status_idx").on(t.taxStatus),
+  /* البحثُ الشامل `ilike '%…%'` — ثلاثيّاتُ الحروف (هجرة معلّقة: nextjs-perf__search_trgm) */
+  index("invoices_number_trgm_idx").using("gin", sql`${t.invoiceNumber} gin_trgm_ops`),
 ]);
 
 export const invoiceLines = pgTable("invoice_lines", {
@@ -675,6 +679,10 @@ export const bankTransactions = pgTable("bank_transactions", {
   index("bank_tx_lifecycle_idx").on(t.lifecycle),
   /* حذفُ قاعدةٍ (ON DELETE SET NULL) لا يمسح الجدول كلَّه */
   index("bank_tx_rule_idx").on(t.ruleId).where(sql`rule_id is not null`),
+  /* البحثُ الشامل — التعبيرُ نفسُه في `likeNormalized` (هجرة معلّقة: nextjs-perf__search_trgm) */
+  index("bank_tx_description_trgm_idx").using("gin", sql`translate(${t.description}, 'إأآٱىة', 'اااايه') gin_trgm_ops`),
+  index("bank_tx_beneficiary_trgm_idx").using("gin", sql`translate(${t.beneficiaryRaw}, 'إأآٱىة', 'اااايه') gin_trgm_ops`),
+  index("bank_tx_ref_trgm_idx").using("gin", sql`${t.ref} gin_trgm_ops`),
   /* 048 — حركةُ بنكٍ واحدة لكلّ دفعة */
   uniqueIndex("bank_tx_matched_payment_uniq").on(t.matchedPaymentId).where(sql`matched_payment_id is not null`),
   /*
@@ -872,6 +880,9 @@ export const supplierProducts = pgTable("supplier_products", {
 }, (t) => [
   uniqueIndex("supplier_products_uniq").on(t.supplierId, t.normalizedDescription),
   index("supplier_products_product_idx").on(t.productId),
+  /* البحثُ الشامل — التعبيرُ نفسُه في `likeNormalized` (هجرة معلّقة: nextjs-perf__search_trgm) */
+  index("supplier_products_display_trgm_idx").using("gin", sql`translate(${t.displayName}, 'إأآٱىة', 'اااايه') gin_trgm_ops`),
+  index("supplier_products_normalized_trgm_idx").using("gin", sql`translate(${t.normalizedDescription}, 'إأآٱىة', 'اااايه') gin_trgm_ops`),
 ]);
 
 /**

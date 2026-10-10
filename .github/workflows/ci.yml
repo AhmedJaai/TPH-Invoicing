@@ -5,9 +5,19 @@ on:
     branches: [main]
   pull_request:
 
+# الفحص يقرأ ولا يكتب: لا نشر ولا هجرة ولا سرّ — فالرمزُ للقراءة وحدها
+permissions:
+  contents: read
+
+# دفعٌ جديد على الفرع نفسه يُلغي فحصَ ما قبله — النتيجةُ التي تهمّ نتيجةُ آخر كوميت
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -44,6 +54,7 @@ jobs:
   # الاختبارات النقيّة لا تُثبت أنّ النظام يعمل — هذه تلمس قاعدة
   database:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16

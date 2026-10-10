@@ -70,5 +70,6 @@
   "069_lookup_indexes.sql": "85394a77b499cdbbf42e9c37a48f9b2d5f4b04c11123f1a3b2976d904da2dfc6",
   "070_ai_usage.sql": "1ff1fdb8a840bbc4cdc3bc6125da7cb30f089941855c32a561f0371ec007d22c",
   "071_role_auditor.sql": "ead8c77d96f14a8d3b7a1f3c1bd9234dcbe967b627ad72d2d0221ac8632cca5c",
-  "072_payment_hold_overrides.sql": "37fdc45edb4c454c2e20da7384fd566a1d10deae1f042869df3fdf5192c047e6"
+  "072_payment_hold_overrides.sql": "37fdc45edb4c454c2e20da7384fd566a1d10deae1f042869df3fdf5192c047e6",
+  "073_search_trgm.sql": "e9116839d81e85d76f54fd6612965e68b0932867623354317d8811ffd54a6416"
 }

@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, Check, Inbox, Minus, TriangleAlert, type LucideIcon
 import { Money, Prose } from "./money";
 import { LiveMoney } from "./live-money";
 import { ScrollX } from "./scroll-x";
-import { LinkPending, SortHeader, SortSelect, TableFilter } from "./ui-client";
+import { LinkPending, RowLink, SortHeader, SortSelect, TableFilter } from "./ui-client";
 import { parseSort, sortRows, type SortValue } from "@/lib/table-sort";
 
 /**
@@ -917,7 +917,7 @@ export function DataTable<T>({
                     >
                       {i === 0 && href && (
                         /* يُبلَغ بـTab ويُسمّى بعموده الأساسيّ — كان `tabIndex={-1}` فلا يفتح الصفَّ إلّا الفأرةُ وJ/K */
-                        <Link href={href} scroll={false} data-row-link="" aria-label="افتح التفصيل" aria-labelledby={`${uid}-r${r}`} className="absolute inset-0 rounded-lg" />
+                        <RowLink href={href} labelledBy={`${uid}-r${r}`} className="absolute inset-0 rounded-lg" />
                       )}
                       {c.cell(row)}
                     </td>
@@ -940,7 +940,7 @@ export function DataTable<T>({
                 className={`rounded-xl border border-line bg-raised p-4 shadow-raised transition-[background-color,transform] ${href ? "card-rows relative active:scale-[0.99] active:bg-hover" : ""}`}
               >
                 {href && (
-                  <Link href={href} scroll={false} data-row-link="" aria-label="افتح التفصيل" className="absolute inset-0 rounded-xl" />
+                  <RowLink href={href} className="absolute inset-0 rounded-xl" />
                 )}
                 <div>
                   {/* «كم؟» في سطر العنوان مقابل الاسم — كان المبلغُ خانةً بين الخانات بخطّ ١٢ */}

@@ -32,21 +32,28 @@ export default async function ClosePage() {
     );
   }
 
-  // الأشهر التي فيها بيانات فعلاً، مع الشهر المنقضي دائماً
-  const rows = await db
-    .select({ month: invoices.periodMonth })
-    .from(invoices)
-    .groupBy(invoices.periodMonth)
-    .orderBy(desc(invoices.periodMonth));
-
   const previous = previousMonth(currentMonthRiyadh());
-  const months = [...new Set([previous, ...rows.map((r) => r.month)])].sort().reverse();
 
-  const closed = await db
-    .select({ month: monthCloses.month, status: monthCloses.status, closedAt: monthCloses.closedAt })
-    .from(monthCloses)
-    .where(sql`${monthCloses.status} = 'CLOSED'`)
-    .orderBy(desc(monthCloses.month));
+  /*
+    الأشهرُ والمقفلُ منها وحقائقُ الشهر المنقضي تُطلَب معاً — كانت ثلاثَ مراحل
+    ينتظر كلٌّ ما قبله. والشهرُ المنقضي في القائمة دائماً، فهو المفتوحُ عليه.
+  */
+  const [rows, closed, previousFacts] = await Promise.all([
+    // الأشهر التي فيها بيانات فعلاً، مع الشهر المنقضي دائماً
+    db
+      .select({ month: invoices.periodMonth })
+      .from(invoices)
+      .groupBy(invoices.periodMonth)
+      .orderBy(desc(invoices.periodMonth)),
+    db
+      .select({ month: monthCloses.month, status: monthCloses.status, closedAt: monthCloses.closedAt })
+      .from(monthCloses)
+      .where(sql`${monthCloses.status} = 'CLOSED'`)
+      .orderBy(desc(monthCloses.month)),
+    gatherMonthFacts(previous),
+  ]);
+
+  const months = [...new Set([previous, ...rows.map((r) => r.month)])].sort().reverse();
 
   if (rows.length === 0) {
     return (
@@ -62,7 +69,7 @@ export default async function ClosePage() {
   }
 
   const selected = months.includes(previous) ? previous : months[0];
-  const report = buildMonthClose(await gatherMonthFacts(selected));
+  const report = buildMonthClose(selected === previous ? previousFacts : await gatherMonthFacts(selected));
   const status = closed.some((c) => c.month === selected) ? "CLOSED" : "OPEN";
 
   return (

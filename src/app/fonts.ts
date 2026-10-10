@@ -5,13 +5,14 @@ import localFont from "next/font/local";
  *
  * الأوزانُ المستعملة وحدها: كانت الخفيفةُ (٣٠٠) تُحمَّل في كلّ صفحة ولا
  * يستعملها صنفٌ واحد — ٧٢ ك.ب بلا أثر.
+ * وكذا السوداء (٩٠٠، ٧٧ ك.ب): خمسةُ عناوين طلبت ٨٠٠ فسقطت عليها، وكلُّ
+ * ما سواها غامقٌ (٧٠٠) — فصارت الخمسةُ غامقةً مثله ولم يعد يُحمَّل ملفٌّ لأجلها.
  */
 export const thmanyahSans = localFont({
   src: [
     { path: "../fonts/thmanyahsans-Regular.woff2", weight: "400", style: "normal" },
     { path: "../fonts/thmanyahsans-Medium.woff2", weight: "500", style: "normal" },
     { path: "../fonts/thmanyahsans-Bold.woff2", weight: "700", style: "normal" },
-    { path: "../fonts/thmanyahsans-Black.woff2", weight: "900", style: "normal" },
   ],
   variable: "--font-thmanyah",
   display: "swap",

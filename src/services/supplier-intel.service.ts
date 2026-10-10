@@ -121,11 +121,15 @@ export interface SupplierIntel {
  */
 export async function loadSupplierIntel(
   supplierId: string,
-  /** فواتيرُه المفتوحة كما يعدّها مصدرُ الأرصدة (`openCount`) — «المسدَّد» ما عداها. */
-  openCount: number,
+  /**
+   * فواتيرُه المفتوحة كما يعدّها مصدرُ الأرصدة (`openCount`) — «المسدَّد» ما عداها.
+   * وتُقبل وعداً: ملفُّ المورّد يطلب الرصيدَ وهذه معاً، لا واحداً بعد واحد.
+   */
+  openCountInput: number | Promise<number>,
   eventLimit = 16,
 ): Promise<SupplierIntel> {
-  const [counts, settlements, lines, events, lastPay] = await Promise.all([
+  const [openCount, counts, settlements, lines, events, lastPay] = await Promise.all([
+    openCountInput,
     db.execute<{ invoice_count: number }>(sql`
       select count(*)::int as invoice_count from invoices where supplier_id = ${supplierId}
     `),

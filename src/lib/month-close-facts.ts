@@ -28,7 +28,11 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
       or (${bankTransactions.category} <> 'UNKNOWN' and ${bankTransactions.matchDisposition} in ('SUGGEST', 'REVIEW'))
     )`;
 
-  const [inv] = await db
+  /*
+    الاستعلاماتُ لا يعتمد أحدُها على الآخر — تُطلَق معاً ويُنتظَر أطولُها،
+    لا مجموعُها. والحسابُ بعدها كما كان، على النتائج نفسها.
+  */
+  const invP = db
     .select({
       invoiceCount: sql<number>`count(*)::int`,
       /* «لا تصلح لخصم المدخلات» ما فيه ضريبةٌ تضيع — لا فاتورةُ مورّدٍ لا يفرض ضريبة */
@@ -50,7 +54,7 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     .from(invoices)
     .where(eq(invoices.periodMonth, month));
 
-  const [docs] = await db
+  const docsP = db
     .select({
       needingReview: sql<number>`count(*) filter (where ${documents.status} in ('PENDING','NEEDS_REVIEW'))::int`,
     })
@@ -58,7 +62,7 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     .where(eq(documents.periodMonth, month));
 
   // التنبيهات المانعة المفتوحة على مستندات هذا الشهر
-  const [blockers] = await db
+  const blockersP = db
     .select({ n: sql<number>`count(*)::int` })
     .from(issues)
     .where(sql`${issues.status} = 'OPEN' and ${issues.severity} = 'BLOCKER' and exists (
@@ -69,7 +73,7 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     من له فواتير في الشهر ووصل كشفه — لا كلُّ من وصل كشفه. كان الطرح بين
     عدّين مختلفَي الأصل يُعطي «١٠ من ١٤» والصحيح غيره.
   */
-  const [stmt] = (await db.execute<{ n: number }>(sql`
+  const stmtP = db.execute<{ n: number }>(sql`
     select count(distinct i.supplier_id)::int as n
       from invoices i
      where i.period_month = ${month}
@@ -78,19 +82,19 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
           where st.supplier_id = i.supplier_id
             and st.period_end >= ${start} and st.period_end < ${end}
        )
-  `)).rows;
+  `);
 
   /* ومنهم من على كشفه في الشهر فرقٌ مفتوح — ما يكتبه `refreshStatementFindings` */
-  const [stmtIssues] = (await db.execute<{ n: number }>(sql`
+  const stmtIssuesP = db.execute<{ n: number }>(sql`
     select count(distinct st.supplier_id)::int as n
       from statements st
       join issues iss on iss.entity_type = 'statement' and iss.entity_id = st.id and iss.status = 'OPEN'
      where st.period_end >= ${start} and st.period_end < ${end}
        and iss.code in (${ISSUE.STATEMENT_LEDGER_GAP}, ${ISSUE.STATEMENT_AMOUNT_MISMATCH}, ${ISSUE.INVOICE_IN_STATEMENT_NOT_ARCHIVED})
        and exists (select 1 from invoices i where i.supplier_id = st.supplier_id and i.period_month = ${month})
-  `)).rows;
+  `);
 
-  const [bank] = await db
+  const bankP = db
     .select({
       n: sql<number>`count(*)::int`,
       /*
@@ -129,31 +133,26 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
   const monthStartIso = `${month}-01`;
   const monthEndIso = new Date(end.getTime() - 86_400_000).toISOString().slice(0, 10);
 
-  const importPeriods = (
-    await db.execute<{ start: string | null; end: string | null }>(sql`
-      select to_char(min(value_date), 'YYYY-MM-DD') as start,
-             to_char(max(value_date), 'YYYY-MM-DD') as end
-      from bank_transactions
-      group by bank_import_id
-    `)
-  ).rows
-    .filter((r): r is { start: string; end: string } => r.start !== null && r.end !== null);
+  const importPeriodsP = db.execute<{ start: string | null; end: string | null }>(sql`
+    select to_char(min(value_date), 'YYYY-MM-DD') as start,
+           to_char(max(value_date), 'YYYY-MM-DD') as end
+    from bank_transactions
+    group by bank_import_id
+  `);
 
   /* الرأسُ والوسطُ والذيل — `monthGapDays` تشرح لِمَ لا فترةَ حارسة */
   /*
     والتغطيةُ تبدأ من يوم فتح الحساب إن كان في الشهر: الحسابُ فُتح في مايو ٢٠٢٦ فكان الإقفالُ
     يُردّ بأيّامٍ قبل وجوده. والقاعدةُ نفسُها باقية — يومُ الفتح معلومةٌ تُكتب لا استثناء.
   */
-  const [opened] = (await db.execute<{ d: string | null }>(sql`
-    select min(opened_on) as d from bank_accounts where is_active`)).rows;
-  const coverageStart = coverageStartFor(monthStartIso, monthEndIso, opened?.d);
-  const gapDays = coverageStart === null ? 0 : monthGapDays(importPeriods, coverageStart, monthEndIso) ?? 0;
+  const openedP = db.execute<{ d: string | null }>(sql`
+    select min(opened_on) as d from bank_accounts where is_active`);
 
   /*
     الأرصدة تُقرأ من فترة التسوية إن سُجّلت. وما لم يُسجَّل يبقى `null`
     — لا صفراً: افتراضُ الصفر يخترع فرقاً بحجم الرصيد كلِّه.
   */
-  const periods = (await db.execute<{
+  const periodsP = db.execute<{
     account: string; ps: string; pe: string; opening: number | null; closing: number | null; reviewed: boolean;
   }>(sql`
     select bank_account_id as account, period_start as ps, period_end as pe,
@@ -161,7 +160,28 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
            (reviewed_at is not null) as reviewed
       from reconciliation_periods
      where period_start >= ${monthStartIso} and period_end <= ${monthEndIso}
-  `)).rows;
+  `);
+
+  const quarterKey = periodKey(quarterOfMonth(month));
+  const filedP = db.execute<{ n: number }>(sql`
+    select count(*)::int as n from vat_filings where period_key = ${quarterKey} and voided_at is null`);
+
+  const [
+    [inv], [docs], [blockers], stmtRes, stmtIssuesRes, [bank], importPeriodsRes, openedRes, periodsRes, filedRes,
+  ] = await Promise.all([
+    invP, docsP, blockersP, stmtP, stmtIssuesP, bankP, importPeriodsP, openedP, periodsP, filedP,
+  ]);
+  const [stmt] = stmtRes.rows;
+  const [stmtIssues] = stmtIssuesRes.rows;
+  const [opened] = openedRes.rows;
+  const [filed] = filedRes.rows;
+  const periods = periodsRes.rows;
+
+  const importPeriods = importPeriodsRes.rows
+    .filter((r): r is { start: string; end: string } => r.start !== null && r.end !== null);
+  const coverageStart = coverageStartFor(monthStartIso, monthEndIso, opened?.d);
+  const gapDays = coverageStart === null ? 0 : monthGapDays(importPeriods, coverageStart, monthEndIso) ?? 0;
+
   const period = monthBalances(periods.map((p) => ({
     bankAccountId: p.account, periodStart: p.ps, periodEnd: p.pe,
     openingMinor: p.opening === null ? null : Number(p.opening),
@@ -175,10 +195,6 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     creditsMinor: Number(bank?.creditsMinor ?? 0),
     debitsMinor: Number(bank?.debitsMinor ?? 0),
   });
-
-  const quarterKey = periodKey(quarterOfMonth(month));
-  const [filed] = (await db.execute<{ n: number }>(sql`
-    select count(*)::int as n from vat_filings where period_key = ${quarterKey} and voided_at is null`)).rows;
 
   return {
     month,

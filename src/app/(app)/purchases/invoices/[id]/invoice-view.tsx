@@ -98,13 +98,16 @@ export async function InvoiceView({
   }
 
   const { invoice: inv, supplier, document: doc } = p;
-  const nav = await neighbours(supplier.id, inv.date, inv.id);
   const canEdit = can(user.role, "document:upload");
   const canPay = can(user.role, "payment:approve");
-  const supplierOptions = canEdit
-    ? (await db.select({ id: suppliers.id, name: suppliers.nameAr }).from(suppliers)
-      .where(or(eq(suppliers.isActive, true), eq(suppliers.id, supplier.id))).orderBy(asc(suppliers.nameAr)))
-    : [];
+  /* الجارتان وقائمةُ المورّدين لا يعتمد أحدُهما على الآخر — يُطلَبان معاً */
+  const [nav, supplierOptions] = await Promise.all([
+    neighbours(supplier.id, inv.date, inv.id),
+    canEdit
+      ? db.select({ id: suppliers.id, name: suppliers.nameAr }).from(suppliers)
+        .where(or(eq(suppliers.isActive, true), eq(suppliers.id, supplier.id))).orderBy(asc(suppliers.nameAr))
+      : Promise.resolve([]),
+  ]);
 
   const verdict = evaluateInvoice(
     {

@@ -8,6 +8,7 @@ import "@/lib/zod-ar";
 import { NextResponse } from "next/server";
 import { requireUser, UnauthenticatedError, type CurrentUser } from "@/lib/session";
 import { ForbiddenError, type Capability } from "@/lib/permissions";
+import { describeError, logEvent } from "@/lib/log";
 import { consume, RateLimitedError } from "./rate-limit.service";
 import { MonthClosedError } from "./validation.service";
 import { AlreadyMatchedError, PaymentTwinError } from "./payment.service";
@@ -89,7 +90,8 @@ export function failWith(e: unknown, route: string): NextResponse {
   const own = ownMessage(e);
   if (own) return NextResponse.json({ error: own }, { status: 400 });
   const ref = crypto.randomUUID().slice(0, 8);
-  console.error(`[${route}] عطبٌ غير متوقَّع (المرجع ${ref})`, e);
+  /* سطرٌ واحد بالمرجع نفسه — بلا `params:`: قيمُ الإدخال (مبالغُ وأسماء) لا تدخل السجلّ */
+  logEvent("route-error", { route, ref, ...describeError(e) });
   return NextResponse.json(
     { error: `عطبٌ في الخادم — أعد المحاولة، وإن تكرّر فاذكر المرجع ${ref}`, ref },
     { status: 500 },

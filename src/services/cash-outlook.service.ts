@@ -10,10 +10,11 @@ import {
   asCadence, buildCashOutlook, dueThisWeek, type CashOutlook, type RecurringInput, type SupplierDue, type WeekDue,
 } from "@/lib/cash-outlook";
 import { previousMonth } from "@/lib/filing";
-import type { PaymentRun } from "@/lib/payment-run";
+import { buildPaymentRun, type PaymentRun } from "@/lib/payment-run";
 import { currentMonthRiyadh, todayInRiyadh } from "@/lib/riyadh-time";
 import { loadCashPosition } from "./briefing.service";
-import { loadPaymentRun } from "./payment-run.service";
+import { loadHoldOverrides } from "./payment-hold.service";
+import { loadPayableInvoices } from "./payment-run.service";
 import { loadSupplierBalances } from "./supplier-balance.service";
 
 function dues(run: PaymentRun): SupplierDue[] {
@@ -46,7 +47,11 @@ export async function loadCashOutlook(): Promise<CashOutlook & { runMonth: strin
   const thisMonth = currentMonthRiyadh();
   const runMonth = previousMonth(thisMonth);
 
-  const [balances, recurring, cash, paid] = await Promise.all([
+  /*
+    الدفعتان من استعلامٍ واحد: صفوفُ الشهر الجاري تحوي صفوفَ ما قبله، والبناءُ
+    يعيد فحصَ الشهر — فلا رحلتان إلى القاعدة بعد انتهاء ما فوقهما.
+  */
+  const [balances, recurring, cash, paid, payable, overrides] = await Promise.all([
     loadSupplierBalances(),
     loadRecurringInputs(),
     loadCashPosition(),
@@ -54,15 +59,17 @@ export async function loadCashOutlook(): Promise<CashOutlook & { runMonth: strin
     db.select({ id: expenses.recurringExpenseId })
       .from(expenses)
       .where(and(eq(expenses.periodMonth, thisMonth), isNotNull(expenses.recurringExpenseId))),
+    loadPayableInvoices(thisMonth),
+    loadHoldOverrides(),
   ]);
   const credit = new Map(balances.map((b) => [b.supplierId, b.creditMinor]));
-  const overdue = await loadPaymentRun(runMonth, { creditBySupplier: credit });
+  const overdue = buildPaymentRun(payable, runMonth, { includeOlderUnpaid: true, creditBySupplier: credit, overrides });
   /* ما خصمته الدفعةُ الأولى من رصيدنا لا يُخصم ثانيةً من الثانية */
   const left = new Map(credit);
   for (const s of [...overdue.ready, ...overdue.coveredByCredit]) {
     left.set(s.supplierId, Math.max(0, (left.get(s.supplierId) ?? 0) - s.creditAppliedMinor));
   }
-  const next = await loadPaymentRun(thisMonth, { includeOlderUnpaid: false, creditBySupplier: left });
+  const next = buildPaymentRun(payable, thisMonth, { includeOlderUnpaid: false, creditBySupplier: left, overrides });
 
   const outlook = buildCashOutlook({
     today: todayInRiyadh(),

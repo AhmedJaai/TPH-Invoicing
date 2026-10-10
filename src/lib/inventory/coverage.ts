@@ -97,6 +97,9 @@ const MAX_EXAMPLES = 5;
 /** أيّامُ الفترة كلُّها — نصوصاً، بلا `Date` فلا تتسلّل منطقةُ الجلسة. */
 export function daysBetween(start: string, end: string): string[] {
   const out: string[] = [];
+  /* نصٌّ ليس تاريخاً لا يُقرأ: `+""` صفر، فكانت بدايةٌ فارغة تصير سنةَ ١٩٠٠ وفترةً من ٤٦ ألفَ يوم */
+  const DAY = /^\d{4}-\d{2}-\d{2}/;
+  if (!DAY.test(start) || !DAY.test(end)) return out;
   const from = Date.UTC(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10));
   const to = Date.UTC(+end.slice(0, 4), +end.slice(5, 7) - 1, +end.slice(8, 10));
   if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return out;

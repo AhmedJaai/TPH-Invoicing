@@ -47,8 +47,13 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
   const period: VatPeriod = parseVatPeriod(q.period) ?? due;
   const quarter: VatQuarter = period.kind === "quarter" ? period : quarterOfMonth(period.month);
 
-  const [first] = (await db.execute<{ m: string | null }>(sql`
-    select to_char(min(value_date at time zone 'Asia/Riyadh'), 'YYYY-MM') as m from bank_transactions`)).rows;
+  /* أوّلُ شهرٍ في البنك (لقائمة الأرباع) والإقرارُ نفسُه لا يعتمد أحدُهما على الآخر — يُطلَبان معاً */
+  const [firstRes, view] = await Promise.all([
+    db.execute<{ m: string | null }>(sql`
+      select to_char(min(value_date at time zone 'Asia/Riyadh'), 'YYYY-MM') as m from bank_transactions`),
+    loadVatReturn(period),
+  ]);
+  const [first] = firstRes.rows;
   const quarters: VatQuarter[] = [];
   for (let p = current, i = 0; i < 8; i++, p = previousQuarter(p)) {
     quarters.push(p);
@@ -56,7 +61,6 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
   }
   if (!quarters.some((p) => periodKey(p) === periodKey(quarter))) quarters.push(quarter);
 
-  const view = await loadVatReturn(period);
   const { result: r, filing } = view;
   /* الإقرارُ ربعيّ: موعدُ الشهر موعدُ ربعه، لا آخرُ الشهر التالي له */
   const deadline = filingDeadline(quarter);

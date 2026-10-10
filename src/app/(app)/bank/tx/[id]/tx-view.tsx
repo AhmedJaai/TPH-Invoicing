@@ -52,14 +52,20 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
     );
   }
 
-  const allocations = tx.paymentId && can(user.role, "amounts:view") ? await loadTxAllocations(tx.paymentId) : [];
-  const allocated = allocations.reduce((s, a) => s + a.amountMinor, 0);
   const canUndo = can(user.role, "payment:approve");
-  /* حوالةٌ لم تُربط وسدادُها مقيَّدٌ بيد — «لا فاتورة مفتوحة» صحيحٌ حرفاً، فيُقال لماذا */
-  const handLink = !tx.paymentId && canUndo
-    ? (await loadHandPaymentLinks()).find((l) => l.transferId === id) ?? null
-    : null;
-  const bounce = canUndo ? await findBouncePartner(db, id) : null;
+  /* التخصيصاتُ وربطُ اليد وشريكُ الارتداد لا يعتمد أحدُها على الآخر — تُطلَب معاً */
+  const [allocations, handLinks, bounce] = await Promise.all([
+    tx.paymentId && can(user.role, "amounts:view") ? loadTxAllocations(tx.paymentId) : Promise.resolve([]),
+    /*
+      حوالةٌ لم تُربط وسدادُها مقيَّدٌ بيد — «لا فاتورة مفتوحة» صحيحٌ حرفاً، فيُقال لماذا.
+      والأزواجُ تُشتقّ كلُّها ثمّ يُؤخذ زوجُ هذه الحوالة: الاشتقاقُ توزيعٌ بين الحوالات،
+      فزوجُ الواحدة لا يُعرَف بمعزلٍ عن غيرها.
+    */
+    !tx.paymentId && canUndo ? loadHandPaymentLinks() : Promise.resolve([]),
+    canUndo ? findBouncePartner(db, id) : Promise.resolve(null),
+  ]);
+  const allocated = allocations.reduce((s, a) => s + a.amountMinor, 0);
+  const handLink = handLinks.find((l) => l.transferId === id) ?? null;
   const title = tx.who || tx.description?.trim().slice(0, 60) || "حركة بلا وصف";
 
   return (

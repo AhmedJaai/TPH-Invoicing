@@ -65,8 +65,10 @@ export async function GET() {
 
   let database: { ok: boolean; latencyMs?: number; error?: string };
   try {
+    /* زمنُ استعلام الفحص وحده — كان يُحسَب من أوّل الطلب فيدخل فيه قراءةُ الجلسة */
+    const queryStarted = Date.now();
     await db.execute(sql`select 1`);
-    database = { ok: true, latencyMs: Date.now() - started };
+    database = { ok: true, latencyMs: Date.now() - queryStarted };
   } catch (e) {
     database = { ok: false, error: (e as Error).message.slice(0, 160) };
   }

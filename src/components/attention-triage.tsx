@@ -138,7 +138,7 @@ export function TriageSummary({ items }: { items: readonly AttentionItem[] }) {
     >
       <div className="flex flex-col gap-4 p-4 sm:p-5 xl:flex-row xl:items-center xl:gap-0">
         <div className="flex items-center gap-4 xl:w-72 xl:shrink-0 xl:pe-6">
-          <span className="nums text-[2.9rem] font-black leading-none tracking-tight">{items.length}</span>
+          <span className="nums text-[2.9rem] font-bold leading-none tracking-tight">{items.length}</span>
           <div className="min-w-0">
             <p className="text-sm font-bold leading-snug">{waitingPhrase(items.length)}</p>
             <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold">

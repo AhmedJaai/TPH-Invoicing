@@ -4,6 +4,7 @@
  * الحساب في `src/lib/supplier-balances.ts` دالّةً خالصة؛ وهذا يجمع
  * أرقامها باستعلامٍ واحد لكلّ المورّدين (أو لمورّدٍ بعينه).
  */
+import { cache } from "react";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -31,10 +32,27 @@ interface Row {
   [key: string]: unknown;
 }
 
+/**
+ * أرصدةُ كلّ المورّدين مرّةً في رسم الصفحة الواحد.
+ *
+ * الرئيسيّة كانت تحسبها ثلاثاً في الطلب نفسه (الأرقام، و«ما تغيّر»، والدفعة)،
+ * و«النقد القادم» مرّتين. و`cache()` من React عمرُها رسمُ صفحةٍ واحد على الخادم
+ * — لا تعبر طلباً إلى طلب، فلا رصيدَ قديماً بعد كتابة. وخارج الرسم (المسارات
+ * والاختبارات) تمرّ بلا حفظ. وما يُقرأ داخل معاملةٍ (بمقبضها) أو لمورّدٍ بعينه
+ * لا يمرّ بها أبداً: يُقرأ من القاعدة لحظتَه.
+ */
+const allBalancesOncePerRender = cache((): Promise<SupplierBalance[]> => queryBalances(db));
+
 export async function loadSupplierBalances(
   executor: Executor = db,
   supplierId?: string,
 ): Promise<SupplierBalance[]> {
+  /* نسخةٌ لكلّ قارئ: مَن رتّب قائمتَه لا يرتّب قائمةَ غيره */
+  if (executor === db && supplierId === undefined) return [...(await allBalancesOncePerRender())];
+  return queryBalances(executor, supplierId);
+}
+
+async function queryBalances(executor: Executor, supplierId?: string): Promise<SupplierBalance[]> {
   /*
     رصيدُ مورّدٍ واحد لا يجمع جدولَ التخصيصات كلَّه: الشرطُ يدخل كلَّ جزءٍ من
     الاستعلام — كان يُبنى المجموعان على الجدول كلّه ثمّ يُصفّى في آخر سطر.

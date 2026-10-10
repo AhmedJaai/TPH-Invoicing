@@ -103,7 +103,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
         <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 border-ink pb-5">
           <div className="min-w-0">
             <p className="text-[11px] font-bold tracking-wide text-muted">حزمة المحاسب</p>
-            <h1 className="mt-1 text-2xl font-extrabold leading-tight">{formatMonth(month)}</h1>
+            <h1 className="mt-1 text-2xl font-bold leading-tight">{formatMonth(month)}</h1>
             <p className={`mt-1.5 text-xs font-bold ${input.closed ? "text-ok" : "text-warn"}`}>
               {input.closed ? "الشهرُ مُقفَل — أرقامُه ثابتة." : "الشهرُ مفتوح — قد تتغيّر أرقامُه بما يُضاف بعد اليوم."}
             </p>

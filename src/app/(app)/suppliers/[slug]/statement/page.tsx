@@ -143,7 +143,7 @@ export default async function SupplierStatementPage({
         <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 border-ink pb-5">
           <div className="min-w-0">
             <p className="text-[11px] font-bold tracking-wide text-muted">كشف حساب مورّد</p>
-            <h1 className="mt-1 text-2xl font-extrabold leading-tight">{s.nameAr}</h1>
+            <h1 className="mt-1 text-2xl font-bold leading-tight">{s.nameAr}</h1>
             <p className="mt-1.5 text-xs text-ink-soft">
               {s.vatNumber ? <>الرقم الضريبيّ <bdi dir="ltr" className="font-mono">{s.vatNumber}</bdi></> : "لا رقمَ ضريبيّاً مسجَّلاً له"}
               {s.crNumber && <> · السجلّ <bdi dir="ltr" className="font-mono">{s.crNumber}</bdi></>}

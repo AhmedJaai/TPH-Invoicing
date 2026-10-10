@@ -5,6 +5,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { NoAccess } from "@/components/ui";
+import { SectionBoundary } from "@/components/ui-client";
 import { prioritize } from "@/lib/attention";
 import { attentionItems } from "@/lib/work";
 import { inLens, landing, parseLens } from "@/lib/attention-triage";
@@ -165,9 +166,11 @@ export default async function AttentionPage({
               workspace={
                 workspace ? (
                   /* اللوحُ يُقرأ من القاعدة — لا ينتظره ما فوقه */
-                  <Suspense key={selected.id} fallback={<WorkspaceSkeleton />}>
-                    {workspace}
-                  </Suspense>
+                  <SectionBoundary key={selected.id} what="لوح هذا البند">
+                    <Suspense fallback={<WorkspaceSkeleton />}>
+                      {workspace}
+                    </Suspense>
+                  </SectionBoundary>
                 ) : undefined
               }
             />

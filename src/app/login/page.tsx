@@ -77,7 +77,7 @@ export default async function LoginPage({
             <BrandMark className="h-9 w-auto text-accent" />
             <p className="text-base font-bold">ذا بوبليك هاوس</p>
           </div>
-          <h1 className="text-[1.9rem] font-extrabold leading-tight tracking-tight">أهلاً بعودتك</h1>
+          <h1 className="text-[1.9rem] font-bold leading-tight tracking-tight">أهلاً بعودتك</h1>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">
             الدخول مقصور على فريق المؤسسة. سجّل بحساب جوجل الذي يملك صلاحية أرشيف الدرايف.
           </p>

@@ -13,6 +13,7 @@ import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { Badge, EmptyState, Kbd, KeyFigure, LinkButton, Meter, Section, Stepper, buttonClass } from "@/components/ui";
+import { SectionBoundary } from "@/components/ui-client";
 import { TaskList } from "@/components/task-list";
 import { Changes } from "@/components/changes";
 import { prioritize } from "@/lib/attention";
@@ -292,9 +293,11 @@ export default async function HomePage() {
 
         <div className="space-y-10">
           {can(user.role, "month:close") && !start.knowsNothing && (
-            <Suspense fallback={<CloseCardSkeleton />}>
-              <CloseCard month={runMonth} />
-            </Suspense>
+            <SectionBoundary what={`تقدّم إقفال ${formatMonth(runMonth)}`}>
+              <Suspense fallback={<CloseCardSkeleton />}>
+                <CloseCard month={runMonth} />
+              </Suspense>
+            </SectionBoundary>
           )}
 
           {!start.knowsNothing && (

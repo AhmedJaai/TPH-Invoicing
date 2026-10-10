@@ -2,8 +2,9 @@
 
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronsUpDown, CircleAlert, CircleCheck, Info, Search, TriangleAlert, Undo2, X } from "lucide-react";
+import { catchError, type ErrorInfo } from "next/error";
+import { useCallback, useDeferredValue, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, CircleAlert, CircleCheck, Info, RotateCw, Search, TriangleAlert, Undo2, X } from "lucide-react";
 import { buttonClass, fieldClass, type ButtonVariant } from "./ui-tokens";
 import { normalizeArabic, normalizeDigits } from "@/lib/search";
 import { shortcutKey } from "@/lib/shortcut-keys";
@@ -396,20 +397,37 @@ function fold(s: string): string {
  * الصفوفُ مرسومةٌ في الخادم ومعها نصُّها في `data-filter`، وهذا يُخفي ما
  * لا يطابق. فالجدولُ يبقى مكوّنَ خادم، والبحثُ فوري.
  */
+/*
+  نصُّ الصفّ مطويّاً — يُطوى مرّةً ويُحفَظ ما بقي نصُّه كما هو. كان يُطوى من جديد
+  لكلّ صفٍّ مع كلّ حرف (أربعمئة صفٍّ × كلّ ضغطة).
+*/
+const foldedRows = new WeakMap<HTMLElement, { raw: string; folded: string }>();
+
+function foldedText(el: HTMLElement): string {
+  const raw = el.dataset.filter ?? "";
+  const kept = foldedRows.get(el);
+  if (kept && kept.raw === raw) return kept.folded;
+  const folded = fold(raw);
+  foldedRows.set(el, { raw, folded });
+  return folded;
+}
+
 export function TableFilter({ label, total }: { label: string; total: number }) {
   const ref = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
+  /* الحقلُ يكتب فوراً، وإخفاءُ الصفوف يلحق به — فلا يتأخّر الحرفُ على جدولٍ طويل */
+  const applied = useDeferredValue(q);
   const [shown, setShown] = useState(total);
 
   useEffect(() => {
     const root = ref.current?.closest("[data-filter-root]");
     if (!root) return;
-    const words = fold(q).split(/\s+/).filter(Boolean);
+    const words = fold(applied).split(/\s+/).filter(Boolean);
     function apply() {
       const rows = root!.querySelectorAll<HTMLElement>("[data-filter]");
       let visibleDesktop = 0;
       rows.forEach((el) => {
-        const text = fold(el.dataset.filter ?? "");
+        const text = foldedText(el);
         const hit = words.every((w) => text.includes(w));
         if (el.hidden === hit) el.hidden = !hit;
         if (hit && el.tagName === "TR") visibleDesktop++;
@@ -434,7 +452,7 @@ export function TableFilter({ label, total }: { label: string; total: number }) 
       observer.disconnect();
       cancelAnimationFrame(frame);
     };
-  }, [q, total]);
+  }, [applied, total]);
 
   return (
     <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -469,6 +487,78 @@ export function TableFilter({ label, total }: { label: string; total: number }) 
       </p>
     </div>
   );
+}
+
+/* ─────────────────────────── رابطُ الصفّ ─────────────────────────── */
+
+/**
+ * رابطُ صفٍّ في جدول — يُجلَب مسبقاً عند القصد لا عند الظهور.
+ *
+ * `<Link>` يجلب مسبقاً كلَّ رابطٍ يدخل الشاشة؛ وقائمةٌ من ستّين فاتورةً ستّون
+ * طلباً إلى الخادم (كلٌّ يمرّ بالحارس وبقراءة الجلسة) لملفّاتٍ لن يُفتح منها إلّا
+ * واحد. فلا يُجلَب شيءٌ حتى يمرّ المؤشّر على الصفّ أو يُلمَس أو يبلغه Tab — ثمّ
+ * يعود الجلبُ المسبق الافتراضيّ لذلك الصفّ وحده، فيصل هيكلُ اللوح قبل النقر.
+ */
+export function RowLink({
+  href,
+  className,
+  labelledBy,
+}: {
+  href: string;
+  className: string;
+  /** معرّفُ خليّة العمود الأساسيّ — يُسمّى بها الرابط لقارئ الشاشة. */
+  labelledBy?: string;
+}) {
+  const [intent, setIntent] = useState(false);
+  const show = () => setIntent(true);
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      prefetch={intent ? null : false}
+      onMouseEnter={show}
+      onTouchStart={show}
+      onFocus={show}
+      data-row-link=""
+      aria-label="افتح التفصيل"
+      aria-labelledby={labelledBy}
+      className={className}
+    />
+  );
+}
+
+/* ─────────────────────────── حدُّ خطأ القسم ─────────────────────────── */
+
+/**
+ * عطبُ قسمٍ يبقى في قسمه.
+ *
+ * كان فشلُ استعلامٍ واحد (بطاقةُ الإقفال في «اليوم»، أو لوحُ بندٍ في «يحتاج
+ * قرارك») يستبدل الصفحةَ كلَّها بـ«تعذّر عرض هذه الصفحة». وهذا أصدق: ما قُرئ
+ * يبقى ظاهراً، وما لم يُقرأ يُقال باسمه ومعه «أعد المحاولة». والعرضُ قراءةٌ لا
+ * كتابة — لم يضِع قيد. و`redirect` و`notFound` يمرّان ولا يُلتقطان.
+ */
+export const SectionBoundary = catchError(
+  (props: { what: string }, { error, retry }: ErrorInfo) => (
+    <div role="alert" className="rounded-xl border border-danger/25 bg-danger-bg px-4 py-4">
+      <p className="flex items-center gap-2 text-sm font-bold text-danger">
+        <CircleAlert className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+        تعذّر عرض {props.what}
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+        بقيّةُ الصفحة كما قُرئت، ولم يُكتب شيء. غالباً انقطاعٌ عابر في الاتّصال بالقاعدة.
+        {isDigested(error) && <> إن تكرّر فانقل هذا الرمز لمن يصلحه: <span className="nums nums-count" dir="ltr">{error.digest}</span></>}
+      </p>
+      <button type="button" onClick={() => retry()} className={`mt-3 ${buttonClass("secondary", "sm")}`}>
+        <RotateCw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+        أعد المحاولة
+      </button>
+    </div>
+  ),
+);
+
+function isDigested(error: unknown): error is { digest: string } {
+  return typeof error === "object" && error !== null && "digest" in error
+    && typeof error.digest === "string" && error.digest.length > 0;
 }
 
 /* ─────────────────────────── ترتيبُ الجدول ─────────────────────────── */
@@ -618,10 +708,6 @@ type ControlExtras = { invalid?: boolean; fieldSize?: "sm" | "md" };
 */
 export function Input({ id, invalid, fieldSize, className = "", ...rest }: React.ComponentProps<"input"> & ControlExtras) {
   return <input id={id} {...rest} className={`${fieldClass(fieldSize, invalid)} ${className}`} />;
-}
-
-export function Select({ id, invalid, fieldSize, className = "", children, ...rest }: React.ComponentProps<"select"> & ControlExtras) {
-  return <select id={id} {...rest} className={`${fieldClass(fieldSize, invalid)} ${className}`}>{children}</select>;
 }
 
 /**

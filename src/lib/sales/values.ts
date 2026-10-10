@@ -98,15 +98,27 @@ export function parseSourceCostMinor(raw: string | undefined): number | null {
 
 export type DateOrder = "ISO" | "DMY" | "MDY" | "AMBIGUOUS";
 
-const ISO = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/;
 /**
  * صيغةُ الشرطة المائلة — والسنةُ خانتان أو أربع.
  *
  * تصديرُ فودكس الحقيقيّ يُصيَّر «9/19/26»: سنةٌ من خانتين. ومحلِّلٌ
  * يطلب أربعاً يردّ **كلّ صفٍّ في الملفّ** — وذلك يُقرأ «الملفّ غير
  * مفهوم» بينما هو مفهومٌ تماماً.
+ *
+ * **والتاريخُ يُفصَل عن وقته قبل القراءة** (`dateToken`). كان الفراغُ يُسقَط
+ * أوّلاً فيلتصق الوقتُ بالسنة: «19/09/2026 14:30» تصير «19/09/202614:30»،
+ * و`(\d{2}|\d{4})` يأخذ «20» فتُقرأ سنةَ ٢٠٢٠ — يومُ بيعٍ كاملٌ في سنةٍ أخرى
+ * بلا شكوى؛ و«3/9/2026» بلا وقتٍ مثلُها. فصارت الأربعُ تُجرَّب قبل الخانتين،
+ * وما تلاه رقمٌ (سنةٌ من ثلاثٍ أو خمس) لا يُقرأ. كشفه `values.test.ts`.
  */
-const SLASH = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2}|\d{4})/;
+const SLASH = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4}|\d{2})(?!\d)/;
+const ISO_DATE = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?!\d)/;
+
+/** التاريخُ وحده من خانةٍ قد تحمل وقتاً — والفراغُ حول الفاصل يُحتمَل. */
+function dateToken(raw: string): string {
+  return toLatinDigits(raw.trim()).replace(/\s*([-/])\s*/g, "$1").split(/\s+/)[0];
+}
+
 /** يومُ إكسل الصفر: ٣٠ ديسمبر ١٨٩٩ — ونظامُ ١٩٠٠ فيه يومُ كبيسٍ وهميّ. */
 const EXCEL_EPOCH = Date.UTC(1899, 11, 30);
 
@@ -133,8 +145,8 @@ export function detectDateOrder(samples: readonly string[]): DateOrder {
   let monthFirst = false;
 
   for (const s of samples) {
-    const text = normaliseNumeric(s).slice(0, 10);
-    if (ISO.test(text)) { sawIso = true; continue; }
+    const text = dateToken(s);
+    if (ISO_DATE.test(text)) { sawIso = true; continue; }
     const m = SLASH.exec(text);
     if (!m) continue;
     const a = Number(m[1]);
@@ -162,13 +174,14 @@ export function parseBusinessDate(raw: string | undefined, order: DateOrder = "I
   const text = normaliseNumeric(raw);
   if (text === "") return null;
 
-  const iso = ISO.exec(text);
+  const token = dateToken(raw);
+  const iso = ISO_DATE.exec(token);
   if (iso) {
     const [, y, m, d] = iso.map(Number) as unknown as [string, number, number, number];
     return valid(y, m, d) ? `${y}-${pad(m)}-${pad(d)}` : null;
   }
 
-  const slash = SLASH.exec(text);
+  const slash = SLASH.exec(token);
   if (slash) {
     const a = Number(slash[1]);
     const b = Number(slash[2]);

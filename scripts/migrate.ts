@@ -37,6 +37,9 @@ function reapplyTargets(argv: readonly string[]): Set<string> {
   return out;
 }
 
+/** أقصى انتظارٍ لقفل جدولٍ داخل هجرة — فوقه تفشل ولا تجمّد الموقع. */
+const LOCK_TIMEOUT = "10s";
+
 async function main() {
   /*
     ── المتغيّرُ الغائب يُقال باسمه ──
@@ -148,6 +151,15 @@ async function main() {
     process.stdout.write(`  … ${name}`);
     try {
       await client.query("begin");
+      /*
+        ── القفلُ يُنتظَر عشرَ ثوانٍ لا بلا حدّ ──
+
+        `ALTER TABLE` يطلب قفلاً حصريّاً، فإن كان طلبٌ طويل يقرأ الجدول (استيرادُ
+        كشفٍ ستّين ثانية) وقفت الهجرةُ خلفه — **ووقف خلفها كلُّ قارئٍ جديد للجدول**:
+        الموقعُ الحيّ يتجمّد حتى تنتهي مهلةُ البناء. فتفشل الهجرةُ سريعاً والتطبيقُ
+        القديم يعمل، ويُعاد النشر. و`set local` يزول مع المعاملة.
+      */
+      await client.query(`set local lock_timeout = '${LOCK_TIMEOUT}'`);
       await client.query(sql);
       await client.query(
         `insert into schema_migrations (name, sha256) values ($1, $2)
@@ -161,6 +173,9 @@ async function main() {
       await client.query("rollback");
       console.log(`\r  ✕ ${name} — فشلت`);
       console.error((e as Error).message);
+      if ((e as { code?: string }).code === "55P03") {
+        console.error(`  جدولٌ تمسّه الهجرة بقي مقفلاً ${LOCK_TIMEOUT} — طلبٌ طويل يقرؤه. لم يُكتَب شيء؛ أعِد النشر بعد انتهائه.`);
+      }
       await finish(1);
     }
   }

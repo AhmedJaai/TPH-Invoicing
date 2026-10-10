@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { desc, eq, sql } from "drizzle-orm";
 import {
-  Banknote, CalendarClock, FileText, History, Printer, Scale, ScrollText, Sparkles, Tags, Timer,
+  Banknote, CalendarClock, FileText, History, Printer, Scale, ScrollText, Sparkles, Store, Tags, Timer,
 } from "lucide-react";
 import { db } from "@/db";
 import { invoices, suppliers } from "@/db/schema";
@@ -95,22 +95,42 @@ export async function SupplierView({
   const showAmounts = can(user.role, "amounts:view");
 
   const [s] = await db.select().from(suppliers).where(eq(suppliers.slug, slug));
-  if (!s) notFound();
+  if (!s) {
+    /* في اللوح يُقال الخبرُ في اللوح نفسه — صفحةُ ٤٠٤ العامّة كانت تأخذ مكانَه بلا إطاره ولا زرّ إغلاقه */
+    if (mode !== "drawer") notFound();
+    return (
+      <DetailFrame mode={mode} fullHref="/suppliers" user={user} width="page" title="مورّدٌ غير موجود">
+        <EmptyState
+          icon={Store}
+          title="لا يوجد مورّدٌ بهذا الرابط."
+          hint="ربما دُمج في مورّدٍ آخر فتغيّر رمزُه — ابحث عنه باسمه في قائمة المورّدين."
+          action={<LinkButton href="/suppliers" variant="primary">المورّدون</LinkButton>}
+        />
+      </DetailFrame>
+    );
+  }
 
-  const [statsRes, balRows, ages, findingsRaw] = await Promise.all([
+  /*
+    كلُّ ما في الملفّ يحتاج معرّفَ المورّد وحده — فيُطلَب معاً ويُنتظَر أطولُه. كان
+    نحوَ اثني عشر استعلاماً ينتظر كلٌّ ما قبله، واللوحُ يفتح بمجموع أزمنتها.
+  */
+
+  /* آخرُ كشفٍ قُرئ رصيدُه — تاريخُه يُحسب في الاستعلام نفسه، فلا ينتظر استعلامُ «عند الكشف» استعلامَ الإحصاء */
+  const reportedDay = sql`(select to_char(period_end, 'YYYY-MM-DD')::date from statements
+          where supplier_id = ${s.id} and closing_balance_minor is not null
+          order by period_end desc nulls last limit 1)`;
+
+  const balP = loadSupplierBalances(db, s.id);
+
+  const [
+    statsRes, balRows, ages, findingsRaw, intel, atStatementRes, invoicesAtStatementRes, why,
+    priceRes, recent, statementRes, paymentRes,
+  ] = await Promise.all([
     db.execute<Record<string, number | string | null>>(sql`
       select
-        (select count(*)::int from invoices where supplier_id = ${s.id})            as invoice_count,
-        (select coalesce(sum(total_minor), 0)::bigint from invoices
-          where supplier_id = ${s.id})                                             as billed,
+        inv.invoice_count, inv.billed, inv.tax_valid, inv.tax_invalid, inv.tax_unknown, inv.active_months,
         (select coalesce(sum(pa.amount_minor), 0)::bigint from payment_allocations pa
           join invoices i on i.id = pa.invoice_id where i.supplier_id = ${s.id})    as paid,
-        (select count(*)::int from invoices
-          where supplier_id = ${s.id} and tax_status = 'VALID')                     as tax_valid,
-        (select count(*)::int from invoices
-          where supplier_id = ${s.id} and tax_status = 'INVALID')                   as tax_invalid,
-        (select count(*)::int from invoices
-          where supplier_id = ${s.id} and tax_status = 'UNKNOWN')                   as tax_unknown,
         (select count(*)::int from statements where supplier_id = ${s.id})          as statement_count,
         -- آخرُ رصيدٍ ختاميّ قرأناه من كشوفه. وقد يغيب: كشفٌ وصل ولم
         -- يُقرأ رصيدُه ليس كشفاً يقول «صفر».
@@ -126,18 +146,115 @@ export async function SupplierView({
                 generate_series(date_trunc('month', coalesce(st.period_start, st.period_end)),
                                 date_trunc('month', st.period_end), interval '1 month') m
           where st.supplier_id = ${s.id} and st.period_end is not null)            as statement_months,
-        (select count(distinct period_month)::int from invoices
-          where supplier_id = ${s.id})                                             as active_months,
         (select count(*)::int from supplier_aliases where supplier_id = ${s.id})    as alias_count,
         (select count(*)::int from supplier_products where supplier_id = ${s.id})   as product_count,
         -- المقدَّمة المعلَنة — وحدها «لك عنده» (SCN-105)
         (select coalesce(sum(amount_minor - fee_minor), 0)::bigint from payments
           where supplier_id = ${s.id} and status = 'ADVANCE')                       as advance
+      /* فواتيرُه تُمسَح مرّةً واحدة — كانت ستّةَ استعلاماتٍ فرعيّة على الجدول نفسه */
+      from (
+        select count(*)::int                                          as invoice_count,
+               coalesce(sum(total_minor), 0)::bigint                  as billed,
+               count(*) filter (where tax_status = 'VALID')::int      as tax_valid,
+               count(*) filter (where tax_status = 'INVALID')::int    as tax_invalid,
+               count(*) filter (where tax_status = 'UNKNOWN')::int    as tax_unknown,
+               count(distinct period_month)::int                      as active_months
+          from invoices where supplier_id = ${s.id}
+      ) inv
     `),
-    loadSupplierBalances(db, s.id),
+    balP,
     loadOpenInvoiceAges(s.id),
     showAmounts ? listOpenFindings(s.id) : Promise.resolve([]),
+    /* «المسدَّد» ما عدا المفتوحَ الذي يعدّه مصدرُ الأرصدة — لا عتبةٌ ثانية */
+    loadSupplierIntel(s.id, balP.then((rows) => rows[0]?.openCount ?? 0)),
+    db.execute<{ billed: string; paid: string; allocated_after: string }>(sql`
+      select
+        (select coalesce(sum(total_minor), 0)::bigint from invoices
+          where supplier_id = ${s.id} and invoice_date::date <= ${reportedDay}) as billed,
+        (select coalesce(sum(amount_minor - fee_minor), 0)::bigint from payments
+          where supplier_id = ${s.id} and status not in ('REVERSED','VOID')
+            and paid_at::date <= ${reportedDay})                                as paid,
+        /* ما سُدّد بعد الكشف من فواتير سبقته — يبدو مفتوحاً عنده ومسدَّداً اليوم */
+        (select coalesce(sum(pa.amount_minor), 0)::bigint
+           from payment_allocations pa
+           join payments p on p.id = pa.payment_id
+           join invoices i on i.id = pa.invoice_id
+          where p.supplier_id = ${s.id} and p.status not in ('REVERSED','VOID')
+            and p.paid_at::date > ${reportedDay}
+            and i.invoice_date::date <= ${reportedDay})                         as allocated_after
+    `),
+    db.execute<{ invoice_number: string; total_minor: string }>(sql`
+      select invoice_number, total_minor from invoices
+       where supplier_id = ${s.id} and invoice_date::date <= ${reportedDay}
+    `),
+    /* ما يفسّر الفرق — سطراً سطراً من آخر كشف، لا رقماً واحداً */
+    showAmounts ? latestStatementDiscrepancies(s.id) : Promise.resolve(null),
+    /*
+      تغيّر السعر للتقييم: متوسّط سعر الوحدة في أوّل شهر مقابل آخر شهر، من
+      بنودٍ بسعرٍ موثوق وحدها — وإلّا بقي `null` ولم يُقيَّم البُعد.
+    */
+    db.execute<{ month: string; avg_unit: string; lines: number }>(sql`
+      select i.period_month as month, avg(l.unit_price_minor)::bigint as avg_unit, count(*)::int as lines
+      from invoice_lines l
+      join invoices i on i.id = l.invoice_id
+      where l.supplier_id = ${s.id} and l.unit_price_minor is not null and l.unit_price_minor > 0
+      group by i.period_month
+      having count(*) >= 3
+      order by i.period_month
+    `),
+    /* ── بيانات اللسان المفتوح وحده ── */
+    tab === "invoices"
+      ? db
+          .select({
+            id: invoices.id,
+            number: invoices.invoiceNumber,
+            date: invoices.invoiceDate,
+            total: invoices.totalMinor,
+            taxStatus: invoices.taxStatus,
+            /* `${invoices}.id` لا `${invoices.id}` — الثاني يصمت في الاستعلام الفرعيّ */
+            allocated: sql<number>`coalesce((
+              select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = ${invoices}.id
+            ), 0)`,
+          })
+          .from(invoices)
+          .where(eq(invoices.supplierId, s.id))
+          .orderBy(desc(invoices.invoiceDate))
+          .limit(60)
+      : Promise.resolve([]),
+    /* كشوفُه ودفعاتُه تُجلَب مهما كان اللسان: عددُها يظهر على اللسانين */
+    db.execute<{ id: string; ps: string; pe: string; closing: number | null; lines: number; matched: number }>(sql`
+      select st.id, st.period_start::text as ps, st.period_end::text as pe, st.closing_balance_minor as closing,
+             (select count(*)::int from statement_lines sl where sl.statement_id = st.id) as lines,
+             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'MATCHED') as matched
+        from statements st
+       where st.supplier_id = ${s.id}
+       order by st.period_end desc
+       limit 24
+    `),
+    /*
+      دفعاته — والسؤال الذي تُفتح له الصفحة قبل التفاوض «لِمَ عليّ هذا؟»
+      لا يُجاب إلّا بالطرفين: ما فُوتر وما دُفع.
+    */
+    showAmounts
+      ? db.execute<{
+          id: string; d: string; amount: string; fee: string; method: string;
+          status: string; allocated: string; tx: string | null;
+        }>(sql`
+          select p.id, p.paid_at::date::text as d, p.amount_minor as amount, p.fee_minor as fee,
+                 p.method::text as method, p.status::text as status,
+                 coalesce((select sum(a.amount_minor)::int from payment_allocations a
+                            where a.payment_id = p.id), 0) as allocated,
+                 (select bt.id from bank_transactions bt where bt.matched_payment_id = p.id limit 1) as tx
+            from payments p
+           where p.supplier_id = ${s.id}
+           order by p.paid_at desc
+           limit 60
+        `)
+      : Promise.resolve(null),
   ]);
+  const priceRows = priceRes.rows;
+  const statementRows = statementRes.rows;
+  const paymentRows = paymentRes?.rows ?? [];
 
   const stats = statsRes.rows[0];
   const n = (k: string) => Number(stats?.[k] ?? 0);
@@ -148,8 +265,6 @@ export async function SupplierView({
     من `loadSupplierBalances` وحدها، كما في القائمة والرئيسية.
   */
   const bal = balRows[0];
-  /* «المسدَّد» ما عدا المفتوحَ الذي يعدّه مصدرُ الأرصدة — لا عتبةٌ ثانية */
-  const intel = await loadSupplierIntel(s.id, bal?.openCount ?? 0);
   const balance = bal?.owedMinor ?? 0;
   const creditLeft = bal?.creditLeftMinor ?? 0;
   /* مالٌ دُفع ولم يُنسب، وفاتورةٌ مفتوحة معاً — المجموعُ صفرٌ والحقيقةُ غيرُ معروفة */
@@ -188,34 +303,12 @@ export async function SupplierView({
   const reportedRaw = stats?.["reported_balance"];
   const reportedAt = typeof stats?.["reported_at"] === "string" ? (stats["reported_at"] as string) : null;
 
-  const [atStatement] = reportedAt
-    ? (await db.execute<{ billed: string; paid: string; allocated_after: string }>(sql`
-        select
-          (select coalesce(sum(total_minor), 0)::bigint from invoices
-            where supplier_id = ${s.id} and invoice_date::date <= ${reportedAt}::date) as billed,
-          (select coalesce(sum(amount_minor - fee_minor), 0)::bigint from payments
-            where supplier_id = ${s.id} and status not in ('REVERSED','VOID')
-              and paid_at::date <= ${reportedAt}::date)                                as paid,
-          /* ما سُدّد بعد الكشف من فواتير سبقته — يبدو مفتوحاً عنده ومسدَّداً اليوم */
-          (select coalesce(sum(pa.amount_minor), 0)::bigint
-             from payment_allocations pa
-             join payments p on p.id = pa.payment_id
-             join invoices i on i.id = pa.invoice_id
-            where p.supplier_id = ${s.id} and p.status not in ('REVERSED','VOID')
-              and p.paid_at::date > ${reportedAt}::date
-              and i.invoice_date::date <= ${reportedAt}::date)                         as allocated_after
-      `)).rows
-    : [];
+  /* بلا كشفٍ قُرئ رصيدُه لا «عند الكشف»: الاستعلامان يعودان فارغَين، ولا يُبنى عليهما */
+  const atStatement = reportedAt ? atStatementRes.rows[0] : undefined;
   const invoicesAtStatement = reportedAt
-    ? (await db.execute<{ invoice_number: string; total_minor: string }>(sql`
-        select invoice_number, total_minor from invoices
-         where supplier_id = ${s.id} and invoice_date::date <= ${reportedAt}::date
-      `)).rows.map((r) => ({ invoiceNumber: r.invoice_number, totalMinor: Number(r.total_minor) }))
+    ? invoicesAtStatementRes.rows.map((r) => ({ invoiceNumber: r.invoice_number, totalMinor: Number(r.total_minor) }))
     : [];
   const paidAfterStatement = atStatement ? paidNet - Number(atStatement.paid) : 0;
-
-  /* ما يفسّر الفرق — سطراً سطراً من آخر كشف، لا رقماً واحداً */
-  const why = showAmounts ? await latestStatementDiscrepancies(s.id) : null;
 
   const account = buildSupplierAccount({
     billedMinor: atStatement ? Number(atStatement.billed) : billed,
@@ -225,21 +318,6 @@ export async function SupplierView({
     invoicesAtStatement,
   });
 
-  /*
-    تغيّر السعر للتقييم: متوسّط سعر الوحدة في أوّل شهر مقابل آخر شهر، من
-    بنودٍ بسعرٍ موثوق وحدها — وإلّا بقي `null` ولم يُقيَّم البُعد.
-  */
-  const priceRows = (
-    await db.execute<{ month: string; avg_unit: string; lines: number }>(sql`
-      select i.period_month as month, avg(l.unit_price_minor)::bigint as avg_unit, count(*)::int as lines
-      from invoice_lines l
-      join invoices i on i.id = l.invoice_id
-      where l.supplier_id = ${s.id} and l.unit_price_minor is not null and l.unit_price_minor > 0
-      group by i.period_month
-      having count(*) >= 3
-      order by i.period_month
-    `)
-  ).rows;
   const priceChangePct =
     priceRows.length >= 2 && Number(priceRows[0].avg_unit) > 0
       ? ((Number(priceRows[priceRows.length - 1].avg_unit) - Number(priceRows[0].avg_unit)) / Number(priceRows[0].avg_unit)) * 100
@@ -258,58 +336,6 @@ export async function SupplierView({
     priceChangePct,
   });
 
-  /* ── بيانات اللسان المفتوح وحده ── */
-  const recent = tab === "invoices"
-    ? await db
-        .select({
-          id: invoices.id,
-          number: invoices.invoiceNumber,
-          date: invoices.invoiceDate,
-          total: invoices.totalMinor,
-          taxStatus: invoices.taxStatus,
-          /* `${invoices}.id` لا `${invoices.id}` — الثاني يصمت في الاستعلام الفرعيّ */
-          allocated: sql<number>`coalesce((
-            select sum(pa.amount_minor)::int from payment_allocations pa where pa.invoice_id = ${invoices}.id
-          ), 0)`,
-        })
-        .from(invoices)
-        .where(eq(invoices.supplierId, s.id))
-        .orderBy(desc(invoices.invoiceDate))
-        .limit(60)
-    : [];
-
-  const statementRows = (
-    await db.execute<{ id: string; ps: string; pe: string; closing: number | null; lines: number; matched: number }>(sql`
-      select st.id, st.period_start::text as ps, st.period_end::text as pe, st.closing_balance_minor as closing,
-             (select count(*)::int from statement_lines sl where sl.statement_id = st.id) as lines,
-             (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'MATCHED') as matched
-        from statements st
-       where st.supplier_id = ${s.id}
-       order by st.period_end desc
-       limit 24
-    `)
-  ).rows;
-
-  /*
-    دفعاته — والسؤال الذي تُفتح له الصفحة قبل التفاوض «لِمَ عليّ هذا؟»
-    لا يُجاب إلّا بالطرفين: ما فُوتر وما دُفع.
-  */
-  const paymentRows = showAmounts
-    ? (await db.execute<{
-        id: string; d: string; amount: string; fee: string; method: string;
-        status: string; allocated: string; tx: string | null;
-      }>(sql`
-        select p.id, p.paid_at::date::text as d, p.amount_minor as amount, p.fee_minor as fee,
-               p.method::text as method, p.status::text as status,
-               coalesce((select sum(a.amount_minor)::int from payment_allocations a
-                          where a.payment_id = p.id), 0) as allocated,
-               (select bt.id from bank_transactions bt where bt.matched_payment_id = p.id limit 1) as tx
-          from payments p
-         where p.supplier_id = ${s.id}
-         order by p.paid_at desc
-         limit 60
-      `)).rows
-    : [];
   const paymentCount = showAmounts ? paymentRows.length : 0;
 
   const rel = intel.reliability;

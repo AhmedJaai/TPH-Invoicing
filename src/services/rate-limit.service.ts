@@ -5,6 +5,7 @@
  * ثمّ يُقارَن الراجع بالحدّ. فلا يقع سباق بين قراءة وكتابة، ولا يفلت طلبان
  * متزامنان من العدّ.
  */
+import { after } from "next/server";
 import { lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { rateLimits } from "@/db/schema";
@@ -28,10 +29,24 @@ export class RateLimitedError extends Error {
   }
 }
 
-/** تنظيف النوافذ المنقضية — رخيص ويجري أحياناً لا في كل طلب. */
-async function sweep(before: Date): Promise<void> {
+/**
+ * تنظيف النوافذ المنقضية — رخيص ويجري أحياناً لا في كل طلب.
+ *
+ * ولا ينتظره صاحبُ الطلب: يُجدوَل بعد إرسال الردّ (`after`)، وفشلُه يُسجَّل ولا
+ * يُسقط طلباً نجح عدُّه. وخارج الطلب (نصٌّ أو اختبار) لا `after`، فيُطلَق ولا يُنتظَر.
+ */
+function sweep(before: Date): void {
   if (Math.random() > 0.02) return;
-  await db.delete(rateLimits).where(lt(rateLimits.windowStart, before));
+  const run = () =>
+    db.delete(rateLimits).where(lt(rateLimits.windowStart, before)).then(
+      () => undefined,
+      (e: unknown) => console.error("[rate-limit] تعذّر كنس النوافذ المنقضية", e),
+    );
+  try {
+    after(run);
+  } catch {
+    void run();
+  }
 }
 
 /** عدُّ القراءات الرخيصة — في ذاكرة هذه النسخة من الدالّة. */
@@ -78,7 +93,7 @@ export async function consume(route: string, actorId: string): Promise<RateLimit
   const count = Number(row?.count ?? 1);
   const decision = decide(count, rule, now);
 
-  await sweep(new Date(now.getTime() - rule.windowSeconds * 4000));
+  sweep(new Date(now.getTime() - rule.windowSeconds * 4000));
 
   if (!decision.allowed) {
     alreadyBlocked.remember(key, rule, now, count);

@@ -8,20 +8,17 @@
  * ولا يُسجَّل جسمُ الطلب ولا ترويساته: فيها الكعكة والمبالغ.
  */
 import type { Instrumentation } from "next";
+import { describeError, logEvent } from "@/lib/log";
 
 export const onRequestError: Instrumentation.onRequestError = async (err, request, context) => {
-  const e = err as { message?: string; digest?: string; code?: string; stack?: string };
-  console.error(JSON.stringify({
-    kind: "request-error",
-    at: new Date().toISOString(),
+  const digest = (err as { digest?: unknown } | null)?.digest;
+  logEvent("request-error", {
     method: request.method,
     path: request.path.split("?")[0],
     route: context.routePath,
     routeType: context.routeType,
-    digest: e.digest,
-    code: e.code,
-    /* رسالة Drizzle تُلحق `params:` بقيم الإدخال — مبالغ وأسماء — فتُقصّ قبل التسجيل */
-    message: (e.message ?? String(err)).split("\nparams:")[0].slice(0, 300),
-    stack: e.stack?.split("\n").slice(0, 4).join(" | "),
-  }));
+    digest: typeof digest === "string" ? digest : undefined,
+    /* رسالة Drizzle تُلحق `params:` بقيم الإدخال — مبالغ وأسماء — و`describeError` يقصّها */
+    ...describeError(err),
+  });
 };

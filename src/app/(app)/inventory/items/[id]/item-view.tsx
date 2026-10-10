@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import {
-  ArrowDownToLine, BookOpen, ClipboardCheck, FileText, Repeat, Trash2, type LucideIcon,
+  ArrowDownToLine, BookOpen, ClipboardCheck, FileText, PackageSearch, Repeat, Trash2, type LucideIcon,
 } from "lucide-react";
 import { db } from "@/db";
 import { products } from "@/db/schema";
@@ -10,7 +10,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { DetailFrame, type DetailMode } from "@/components/detail-frame";
 import {
-  Badge, Callout, Card, EmptyState, KeyValue, NoAccess, Section, Timeline, type TimelineItem, type Tone,
+  Badge, Callout, Card, EmptyState, KeyValue, LinkButton, NoAccess, Section, Timeline, type TimelineItem, type Tone,
 } from "@/components/ui";
 import { Money } from "@/components/money";
 import { DIRECTION, VarianceSplit, directionOf, formatWeek } from "@/components/inventory-ui";
@@ -63,7 +63,20 @@ export async function ItemView({
     .from(products)
     .where(eq(products.id, id))
     .limit(1);
-  if (!product) notFound();
+  if (!product) {
+    /* في اللوح يُقال الخبرُ في اللوح نفسه — صفحةُ ٤٠٤ العامّة كانت تأخذ مكانَه بلا إطاره ولا زرّ إغلاقه */
+    if (mode !== "drawer") notFound();
+    return (
+      <DetailFrame mode={mode} fullHref={fullHref} user={user} width="page" title="صنفٌ غير موجود">
+        <EmptyState
+          icon={PackageSearch}
+          title="لا يوجد هذا الصنف."
+          hint="ربما دُمج في صنفٍ آخر أو حُذف من الكتالوج — والأثرُ في سجلّ التدقيق."
+          action={<LinkButton href="/inventory" variant="primary">الجرد</LinkButton>}
+        />
+      </DetailFrame>
+    );
+  }
 
   const showAmounts = can(user.role, "amounts:view");
   const [history, movements, usage] = await Promise.all([

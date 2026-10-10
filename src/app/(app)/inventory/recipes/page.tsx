@@ -36,34 +36,34 @@ export default async function RecipesPage() {
     );
   }
 
-  const rows = await listRecipes();
-
-  const menuProducts = await db
-    .select({ id: products.id, nameAr: products.nameAr })
-    .from(products)
-    .where(and(eq(products.isActive, true), eq(products.isMenuItem, true)))
-    .orderBy(asc(products.nameAr));
-
-  const ingredients = await db
-    .select({ id: products.id, nameAr: products.nameAr, baseUnit: products.baseUnit })
-    .from(products)
-    .where(and(eq(products.isActive, true), eq(products.isStockItem, true)))
-    .orderBy(asc(products.nameAr));
-
-  /* ما بِيع هذا الشهر ولا وصفةَ له — السؤالُ الحقيقيّ في هذه الشاشة */
-  const missing = await db.execute<Record<string, unknown>>(sql`
-    select p.id, p.name_ar,
-           coalesce(sum(sl.line_total_minor), 0)::bigint as sold_minor
-      from sale_lines sl
-      join pos_products pp on pp.id = sl.pos_product_id
-      join products p on p.id = pp.product_id
-      left join recipes r on r.product_id = p.id
-     where r.id is null
-       and not sl.is_void
-     group by p.id
-     order by sold_minor desc
-     limit 20
-  `);
+  /* أربعةُ استعلاماتٍ مستقلّة — تُطلَب معاً لا واحداً بعد واحد */
+  const [rows, menuProducts, ingredients, missing] = await Promise.all([
+    listRecipes(),
+    db
+      .select({ id: products.id, nameAr: products.nameAr })
+      .from(products)
+      .where(and(eq(products.isActive, true), eq(products.isMenuItem, true)))
+      .orderBy(asc(products.nameAr)),
+    db
+      .select({ id: products.id, nameAr: products.nameAr, baseUnit: products.baseUnit })
+      .from(products)
+      .where(and(eq(products.isActive, true), eq(products.isStockItem, true)))
+      .orderBy(asc(products.nameAr)),
+    /* ما بِيع هذا الشهر ولا وصفةَ له — السؤالُ الحقيقيّ في هذه الشاشة */
+    db.execute<Record<string, unknown>>(sql`
+      select p.id, p.name_ar,
+             coalesce(sum(sl.line_total_minor), 0)::bigint as sold_minor
+        from sale_lines sl
+        join pos_products pp on pp.id = sl.pos_product_id
+        join products p on p.id = pp.product_id
+        left join recipes r on r.product_id = p.id
+       where r.id is null
+         and not sl.is_void
+       group by p.id
+       order by sold_minor desc
+       limit 20
+    `),
+  ]);
 
   /*
     ── وصفةٌ فيها التغليفُ وحدَه ──

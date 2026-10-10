@@ -27,9 +27,16 @@ export const MAX_AMOUNT_MINOR = 2_147_483_647;
  */
 export const MILLI_MINOR = 1_000;
 
-/** معدَّلٌ بمِلّي‑الهللة ← مبلغاً بالهللات، بتقريبٍ واحد. */
+/**
+ * معدَّلٌ بمِلّي‑الهللة ← مبلغاً بالهللات، بتقريبٍ واحد.
+ *
+ * والنصفُ بعيداً عن الصفر: `Math.round` يقرّب السالبَ نحو الأعلى (‎−١٫٥ ← ‎−١)،
+ * فكان مرتجعٌ بنصف هللةٍ يُقرَّب بغير ما قُرِّب به شراؤه، وما دون النصف يعود
+ * «سالبَ صفر». كشفه `money.property.test.ts`.
+ */
 export function milliMinorToMinor(milliMinor: number): number {
-  return Math.round(milliMinor / MILLI_MINOR);
+  const rounded = Math.round(Math.abs(milliMinor) / MILLI_MINOR);
+  return milliMinor < 0 && rounded !== 0 ? -rounded : rounded;
 }
 
 /**

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import path from "node:path";
+import { Linter } from "eslint";
+import tsParser from "@typescript-eslint/parser";
+import tph from "../../eslint-rules/index.mjs";
 
 /**
  * حارسُ مصيدةٍ تُسقِط المال، ولا يراها المترجم ولا تُصدر خطأً.
@@ -23,84 +24,50 @@ import path from "node:path";
  * **والقاعدة هي التي أنقذت المال، لا الشيفرة.** ولولا ذلك المؤثِّر
  * لخرج ضعفُ المبلغ إلى المورّد بلا شكوى.
  *
- * ── ولماذا يُحرَس نصّاً ──
+ * ── ولماذا يُحرَس بقراءة الشيفرة ──
  *
  * لا يكشفه `tsc` (النوعان واحد)، ولا اختبارٌ نقيّ (لا قاعدة فيه)،
  * ولا يرمي في التشغيل (يُرجع صفراً صامتاً). فالحارس الوحيد الممكن أن
- * يُقرأ الملفّ ويُمنَع الشكل الخاطئ من العودة.
+ * تُقرأ الشيفرة ويُمنَع الشكل الخاطئ من العودة.
  *
  * والصواب `${invoices}.id` — مرجعُ الجدول ثمّ الاسم حرفياً.
- */
-
-/**
- * كلُّ ملفٍّ في `src` — لا قائمةٌ تُكتب باليد.
  *
- * كانت القائمة أربعة ملفّات، والشكلُ الممنوع قائمٌ خارجها في صفحة
- * الفواتير — سليماً بالمصادفة لأنّ فيها `leftJoin`. والقائمة اليدويّة
- * هي ما قرّر المستودع ضدّه في عدد الهجرات: ما يُكتب باليد يُنسى.
+ * ── وأين الحارسُ اليوم ──
+ *
+ * كان انتظاماً على نصّ كلّ ملفّ؛ وصار قاعدةَ ESLint
+ * `tph/no-column-in-correlated-subquery` (`eslint-rules/index.mjs`): تقرأ قالبَ
+ * `sql` نفسَه، وجداولُها من `schema.ts`، وتظهر في المحرّر عند السطر. والشجرةُ
+ * كلُّها تُفحَص بها في `npm run lint` وفي `code-guards.test.ts`. وهنا الأشكالُ
+ * الثلاثة التي حدّدت القاعدة — على المخطّط الحقيقيّ لا على قائمةٍ تُكتب باليد.
  */
-function walk(dir: string, out: string[] = []): string[] {
-  for (const name of readdirSync(dir)) {
-    const full = path.join(dir, name);
-    if (statSync(full).isDirectory()) walk(full, out);
-    else if (/\.(ts|tsx)$/.test(name) && !/\.test\.ts$/.test(name)) out.push(full);
-  }
-  return out;
+const linter = new Linter();
+
+function caught(code: string): number {
+  const messages = linter.verify(`const q = ${code};`, {
+    files: ["**/*.ts"],
+    languageOptions: { parser: tsParser },
+    plugins: { tph },
+    rules: { "tph/no-column-in-correlated-subquery": "error" },
+  }, { filename: "src/x.ts" });
+  if (messages.some((m) => m.fatal)) throw new Error("مثالٌ لا يُحلَّل");
+  return messages.length;
 }
 
-const GUARDED = walk("src");
-
-/**
- * الشكل الممنوع: `${table.column}` داخل `select ... where` فرعيّ.
- *
- * ويُضيَّق عمداً على الاستعلامات الفرعية: `${table.column}` في تجميعٍ
- * عاديّ على الاستعلام الرئيس صحيحٌ وشائع، فمنعُه كلّه يُنتج حارساً
- * يُتجاوَز بدل أن يُصلَح.
- */
-const TABLES = [...readFileSync("src/db/schema.ts", "utf8").matchAll(/export const (\w+) = pgTable\(/g)]
-  .map((m) => m[1]);
-
-/*
-  يُضيَّق على جداول المخطّط وحدها وعلى استعلامٍ فرعيّ يُفتح بقوس: `${s.id}`
-  قيمةٌ من الشيفرة لا عمود، ومنعُها يُنتج حارساً يُتجاوَز بدل أن يُصلَح.
-*/
-const CORRELATED = new RegExp(
-  `\\(\\s*select[\\s\\S]{0,200}?where[^\`)]{0,120}?\\$\\{(?:${TABLES.join("|")})\\.[a-zA-Z]+\\}`,
-  "i",
-);
-
 describe("الاستعلام الفرعيّ المرتبط يُكتب بالمرجع لا بالعمود", () => {
-  it("كلّ ملفّات src تحت الحراسة", () => {
-    expect(GUARDED.length).toBeGreaterThan(100);
-  });
-
-  for (const file of GUARDED) {
-    it(`${file} لا يحمل الشكل الصامت`, () => {
-      const source = readFileSync(file, "utf8");
-      const hit = CORRELATED.exec(source);
-      expect(
-        hit === null,
-        hit
-          ? `شكلٌ يُرجع صفراً صامتاً: «${hit[0].slice(0, 90)}…» — اكتبه \${table}.column`
-          : "",
-      ).toBe(true);
-    });
-  }
-
-  it("والحارس نفسه يُمسك الشكل الخاطئ — وإلّا كان طمأنينةً بلا سند", () => {
-    const bad =
-      "sql`coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = ${invoices.id}), 0)`";
-    expect(CORRELATED.test(bad)).toBe(true);
+  it("الحارس يُمسك الشكل الخاطئ — وإلّا كان طمأنينةً بلا سند", () => {
+    expect(caught(
+      "sql`coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = ${invoices.id}), 0)`",
+    )).toBe(1);
   });
 
   it("ولا يمسك الصواب", () => {
-    const good =
-      "sql`coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = ${invoices}.id), 0)`";
-    expect(CORRELATED.test(good)).toBe(false);
+    expect(caught(
+      "sql`coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = ${invoices}.id), 0)`",
+    )).toBe(0);
   });
 
   it("ولا يمسك التجميع العاديّ على الاستعلام الرئيس", () => {
-    const fine = "sql`coalesce(sum(${paymentAllocations.amountMinor}),0)::int`";
-    expect(CORRELATED.test(fine)).toBe(false);
+    expect(caught("sql`coalesce(sum(${paymentAllocations.amountMinor}),0)::int`")).toBe(0);
   });
 });
+

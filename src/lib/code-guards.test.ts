@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import { ESLint } from "eslint";
+import tsParser from "@typescript-eslint/parser";
+import tph from "../../eslint-rules/index.mjs";
+import { tphGuards } from "../../eslint.config.mjs";
 
 /**
- * حرّاسٌ يقرؤون الشيفرة نصّاً — لأخطاءٍ لا يراها المترجم ولا يرميها التشغيل.
+ * حرّاسٌ يقرؤون الشيفرة — لأخطاءٍ لا يراها المترجم ولا يرميها التشغيل.
  *
  * كلٌّ منها وقع فعلاً في هذا المستودع، ومرّت عليه الاختبارات النقيّة
  * خضراء. والحارس يُثبت نفسه أيضاً: يُمسك الشكل الخاطئ في مثالٍ مكتوب،
@@ -22,232 +25,46 @@ function walk(dir: string, out: string[] = []): string[] {
 
 const SRC = walk("src");
 
-/* ── ١. الكتابة داخل المعاملة بمقبضها، لا بـ`db` ── */
+/* ── ١–٤. ما صار قواعدَ ESLint ── */
 
 /**
- * يُرجع كلَّ وصولٍ إلى `db` داخل دالّةٍ مُمرَّرة إلى `transaction(…)`.
+ * خمسةُ حرّاسٍ كانت هنا انتظاماً يقرأ النصّ — `db` داخل معاملة، و`renameFile` خارج
+ * خدمته، و`await res.json()` في شاشة، ونصُّ الخطأ الخامّ وجسمُ الطلب المصبوب
+ * بـ`as` في مسار، وقسمةُ المال المضمَّنة — ومعها حارسُ `allocation-sql.test.ts`.
+ * صارت قواعدَ في `eslint-rules/index.mjs` تقرأ شجرةَ الشيفرة وتظهر في المحرّر
+ * عند السطر، وأمثلتُها الخاطئة والصائبة في `lint-rules.test.ts`.
  *
- * وقع في `/api/counterparty`: الكتابة بـ`db` داخل `db.transaction(t)`.
- * على Vercel في المجمَّع اتّصالٌ واحد تحجزه المعاملة، فينتظر `db` عشر
- * ثوانٍ ثمّ يسقط؛ ومحلّياً يسقط بالمفتاح الأجنبيّ. فلم يُحفَظ تعريفُ
- * جهةٍ واحد من الواجهة خمسة أيّام.
- *
- * وكان الحارس انتظاماً يرى صياغةً واحدة — `async (t) => {` — فيفلت منه
- * المعامل المنمَّط، والسهم بلا أقواس، و`function`، والجسم تعبيراً، و`db`
- * مُمرَّراً حجّةً. والصياغة تتغيّر بلا قصد، فالحارس يقرأ شجرة المترجم لا
- * النصّ: كلُّ دالّةٍ حجّةٍ لـ`transaction` بأيّ شكل، وكلُّ معرِّفٍ اسمه `db`
- * داخلها ليس اسمَ خاصيّة.
+ * والشجرةُ تُفحَص هنا بالقواعد نفسها وبنطاقها نفسه (`tphGuards` من
+ * `eslint.config.mjs`): فلا يمرّ `npm test` وحده على ما يخالفها، والقاعدةُ
+ * مكتوبةٌ مرّةً واحدة.
  */
-export function dbInsideTransactions(source: string, fileName = "x.ts"): string[] {
-  const sf = ts.createSourceFile(
-    fileName,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
-  const hits: string[] = [];
-  const lineOf = (n: ts.Node) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
-
-  const isTransactionCall = (n: ts.CallExpression) => {
-    const callee = n.expression;
-    const name = ts.isPropertyAccessExpression(callee)
-      ? callee.name.text
-      : ts.isIdentifier(callee)
-        ? callee.text
-        : null;
-    return name === "transaction";
-  };
-
-  // المعرِّف `db` بمعنى الكائن العامّ — لا `x.db` ولا `{ db: … }` ولا اسمَ معاملٍ يحجبه.
-  const isGlobalDbRef = (id: ts.Identifier) => {
-    const p = id.parent;
-    if (ts.isPropertyAccessExpression(p) && p.name === id) return false;
-    if ((ts.isPropertyAssignment(p) || ts.isPropertySignature(p) || ts.isPropertyDeclaration(p)) && p.name === id) return false;
-    if (ts.isParameter(p) || ts.isVariableDeclaration(p) || ts.isBindingElement(p)) return false;
-    return true;
-  };
-
-  const scan = (fn: ts.ArrowFunction | ts.FunctionExpression) => {
-    const shadowed = fn.parameters.some((prm) => ts.isIdentifier(prm.name) && prm.name.text === "db");
-    if (shadowed) return;
-    const inner = (x: ts.Node) => {
-      if (ts.isIdentifier(x) && x.text === "db" && isGlobalDbRef(x)) {
-        hits.push(`${lineOf(x)}: ${x.parent.getText(sf).replace(/\s+/g, " ").slice(0, 60)}`);
-      }
-      ts.forEachChild(x, inner);
-    };
-    inner(fn.body);
-  };
-
-  const visit = (n: ts.Node) => {
-    if (ts.isCallExpression(n) && isTransactionCall(n)) {
-      for (const arg of n.arguments) {
-        if (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) scan(arg);
-      }
-    }
-    ts.forEachChild(n, visit);
-  };
-  visit(sf);
-  return hits;
-}
-
-describe("لا وصولَ إلى db داخل معاملة", () => {
-  const withTx = SRC.filter((f) => readFileSync(f, "utf8").includes("transaction("));
-
-  it("الحارس يرى معاملاتٍ فعلاً — لا يمرّ لأنّه لم يجد شيئاً", () => {
-    expect(withTx.length).toBeGreaterThan(10);
-  });
-
-  for (const file of withTx) {
-    it(file, () => {
-      expect(dbInsideTransactions(readFileSync(file, "utf8"), file)).toEqual([]);
+describe("حرّاسُ ESLint المحلّيّة على الشجرة كلّها", () => {
+  it("لا مخالفةَ في src ولا scripts", async () => {
+    const eslint = new ESLint({
+      overrideConfigFile: true,
+      overrideConfig: [
+        {
+          files: ["**/*.ts", "**/*.tsx"],
+          languageOptions: { parser: tsParser, parserOptions: { ecmaFeatures: { jsx: true } } },
+          // تعليقاتُ تعطيلٍ لقواعدَ لا تُحمَّل هنا ليست خطأً في هذا الفحص
+          linterOptions: { reportUnusedDisableDirectives: "off" },
+        },
+        ...tphGuards,
+      ],
     });
-  }
+    const results = await eslint.lintFiles(["src", "scripts"]);
+    // الحارس يرى الشجرة فعلاً — لا يمرّ لأنّه لم يجد شيئاً
+    expect(results.length).toBeGreaterThan(300);
+    const offences = results.flatMap((r) =>
+      r.messages
+        .filter((m) => m.fatal || m.ruleId?.startsWith("tph/"))
+        .map((m) => `${path.relative(process.cwd(), r.filePath)}:${m.line} ${m.ruleId ?? "parse"} — ${m.message}`));
+    expect(offences).toEqual([]);
+  }, 120_000);
 
-  // الأشكال الستّة التي أفلت منها الانتظام القديم إلّا أوّلها — ومعها ما حوله.
-  const BAD: Record<string, string> = {
-    "سهمٌ بجسم": "await db.transaction(async (tx) => { await tx.insert(a); await db.insert(b); });",
-    "معاملٌ منمَّط": "await db.transaction(async (tx: Tx) => { await db.update(b).set({}); });",
-    "سهمٌ بلا async يُرجع": "await db.transaction((tx) => { return db.insert(a); });",
-    "function": "await db.transaction(async function (tx) { await db.delete(a); });",
-    "معاملٌ بلا أقواس": "await db.transaction(async tx => { await db.select().from(a); });",
-    "db حجّةً في جسمٍ تعبير": "await db.transaction(async (tx) => write(tx, db));",
-    "جسمٌ تعبيرٌ مباشر": "await db.transaction((tx) => db.insert(a).values(v));",
-    "متداخلٌ في دالّةٍ داخلها": "await db.transaction(async (tx) => { await Promise.all(xs.map((x) => db.insert(x))); });",
-  };
-  for (const [label, code] of Object.entries(BAD)) {
-    it(`والحارس يُمسك: ${label}`, () => {
-      expect(dbInsideTransactions(code).length).toBeGreaterThan(0);
-    });
-  }
-
-  const GOOD: Record<string, string> = {
-    "المقبض وحده": "await db.transaction(async (t) => { await t.insert(a); await t.update(b).set({}); });",
-    "مقبضٌ منمَّط يُمرَّر": "await db.transaction((tx: Tx) => markPaidByOwner(tx, invoiceId));",
-    "db خارج المعاملة": "const rows = await db.select().from(a); await db.transaction(async (tx) => tx.insert(b));",
-    "خاصيّةٌ اسمها db": "await db.transaction(async (tx) => { log({ db: 1 }); cfg.db.name; });",
-  };
-  for (const [label, code] of Object.entries(GOOD)) {
-    it(`ولا يُمسك الصواب: ${label}`, () => {
-      expect(dbInsideTransactions(code)).toEqual([]);
-    });
-  }
-});
-
-/* ── ٢. تسمية ملفّات الدرايف في موضعٍ واحد ── */
-
-/**
- * القيد الأوّل: لا تسمية بلا أثرٍ في السجلّ بالاسمين، ولا لما لم يُحسَم.
- * وكانت المزامنة تسمّي وحدها قبل التقييد، بلا أثر. فلا يُستدعى
- * `renameFile` إلّا من خدمة التسمية — وهي التي تكتب الأثر، ولا تسمّي
- * آلياً إلّا ما أُرشِف (إذن أحمد في ٢٤ سبتمبر ٢٠٢٦).
- */
-const RENAME_ALLOWED = new Set([
-  path.join("src", "lib", "drive.ts"),
-  path.join("src", "services", "drive-rename.service.ts"),
-]);
-
-describe("renameFile لا يُستدعى إلّا من خدمة التسمية", () => {
-  it("لا مستدعٍ آخر", () => {
-    const offenders = SRC.filter(
-      (f) => !RENAME_ALLOWED.has(f) && /\brenameFile\s*\(/.test(readFileSync(f, "utf8")),
-    );
-    expect(offenders).toEqual([]);
-  });
-});
-
-/* ── ٣. الردّ يُقرأ نصّاً قبل JSON ── */
-
-/**
- * مهلة المنصّة (٥٠٤) وحدّ الحجم (٤١٣) يعودان صفحةً نصّية، فينفجر
- * `res.json()` بـ«Unexpected token». والقراءة في `lib/http-client`.
- */
-const BARE_JSON = /await\s+res\.json\(\)/;
-
-describe("المكوّنات لا تقرأ الردّ JSON مباشرة", () => {
-  for (const file of SRC.filter((f) => f.includes(`${path.sep}components${path.sep}`) || f.endsWith(".tsx"))) {
-    it(file, () => {
-      expect(BARE_JSON.test(readFileSync(file, "utf8"))).toBe(false);
-    });
-  }
-
-  it("والحارس يُمسك الشكل الخاطئ", () => {
-    expect(BARE_JSON.test("const json = await res.json();")).toBe(true);
-  });
-});
-
-/* ── ٣أ. نصُّ الخطأ الخامّ لا يُعاد إلى المتصفّح ── */
-
-/**
- * `{ error: (e as Error).message }` يعرض خطأ Drizzle بنصّ استعلامه وقيمه، وخطأ `pg`
- * باسم مضيفه. فالخاتمةُ `failWith(e, route)` (`services/guard.ts`): رسائلُنا بنصّها،
- * وغيرُها ٥٠٠ برقم مرجع.
- */
-const RAW_ERROR_BODY = /error:\s*\(e as Error\)\.message\s*[,}]/;
-
-describe("المسارات لا تعيد نصَّ الخطأ الخامّ", () => {
-  it("لا مسارَ يفعل", () => {
-    const offenders = SRC.filter(
-      (f) => f.includes(`${path.sep}app${path.sep}api${path.sep}`) && RAW_ERROR_BODY.test(readFileSync(f, "utf8")),
-    );
-    expect(offenders).toEqual([]);
-  });
-
-  it("والحارس يُمسك الشكل الخاطئ", () => {
-    expect(RAW_ERROR_BODY.test("return NextResponse.json({ error: (e as Error).message }, { status: 400 });")).toBe(true);
-  });
-});
-
-/* ── ٣ب. جسمُ الطلب يُفحَص وقتَ التشغيل ── */
-
-/**
- * `(await request.json()) as Body` وعدٌ للمترجم لا فحصٌ للطلب: رقمٌ حيث يُنتظر
- * نصّ يصير ٥٠٠ بلا جملة. فالمساراتُ تقرأ بـ`readJson(request, Schema)`
- * (`lib/request-body.ts`) أو بـ`safeParse`.
- */
-const CAST_BODY = /request\.json\(\)[^;\n]*\)\s*as\s+\w+/;
-
-describe("المسارات لا تصبّ جسمَ الطلب بـ«as»", () => {
-  for (const file of SRC.filter((f) => f.includes(`${path.sep}app${path.sep}api${path.sep}`))) {
-    it(file, () => {
-      expect(CAST_BODY.test(readFileSync(file, "utf8"))).toBe(false);
-    });
-  }
-
-  it("والحارس يُمسك الشكل الخاطئ", () => {
-    expect(CAST_BODY.test("body = (await request.json()) as Body;")).toBe(true);
-    expect(CAST_BODY.test("const body = ((await request.json().catch(() => ({}))) ?? {}) as Body;")).toBe(true);
-  });
-
-  it("ولا يُمسك الصواب", () => {
-    expect(CAST_BODY.test("const read = await readJson(request, Body);")).toBe(false);
-  });
-});
-
-/* ── ٤. المال المعروض يمرّ بمنسّقٍ واحد ── */
-
-/**
- * كان المبلغ نفسه يُكتب «1500.00» في رسالة و«1,500.00» في أخرى: تسع
- * دوالّ محلّية وخمسٌ وعشرون قسمةً مضمَّنة. فما يُعرض لإنسان يمرّ بـ
- * `formatRiyalsDisplay`. والمستثنى ما يُقرأ آلةً: ملفّ التحويل للبنك،
- * ونصُّ النموذج، والمبلغ المشتقّ نصّاً في مخرَج القراءة.
- */
-const RAW_RIYALS = /\/ 100\)\.toFixed\(2\)/;
-const RAW_RIYALS_ALLOWED = new Set([
-  path.join("src", "lib", "payment-run.ts"),
-  path.join("src", "lib", "extraction", "validate-extraction.ts"),
-  path.join("src", "services", "adjudicator.service.ts"),
-  path.join("src", "lib", "bank", "adjudicator-prompt.ts"),
-  path.join("src", "lib", "money.ts"),
-]);
-
-describe("لا قسمةَ مال مضمَّنة في نصٍّ يُعرض", () => {
-  it("كلّ مبلغٍ معروض عبر formatRiyalsDisplay", () => {
-    const offenders = SRC.filter(
-      (f) => !RAW_RIYALS_ALLOWED.has(f) && RAW_RIYALS.test(readFileSync(f, "utf8")),
-    );
-    expect(offenders).toEqual([]);
+  it("والنطاقُ يحمل القواعدَ السبع — لا قاعدةٌ مكتوبةٌ ولم تُفعَّل", () => {
+    const enabled = new Set(tphGuards.flatMap((c) => Object.keys(c.rules ?? {})));
+    expect([...enabled].sort()).toEqual(Object.keys(tph.rules).map((r) => `tph/${r}`).sort());
   });
 });
 

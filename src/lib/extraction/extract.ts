@@ -15,7 +15,6 @@
  *
  * وبعد التخصيص صار الجواب معلوماً بالبناء، ويُحفَظ في `notes`.
  */
-import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { extractionSchema } from "./schema";
 import { classifierSchema, schemaFor, widen } from "./schemas-by-kind";
@@ -71,6 +70,8 @@ async function extractWithClaude(input: ExtractionRequest): Promise<ExtractionOu
     return { ok: false, provider: "claude", reason: `نوع ملف غير مدعوم: ${input.mimeType}` };
   }
 
+  /* المزوّدُ خامل (لا يُختار إلّا بمتغيّرَين) — فحزمتُه تُحمَّل عند اختياره، لا مع كلّ بدءٍ بارد */
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const client = new Anthropic();
   const base64 = input.data.toString("base64");
 

@@ -160,6 +160,27 @@ function isDraftPayload(x: unknown): x is DraftPayload {
 }
 
 const MAX_BYTES = 3 * 1024 * 1024;
+
+/**
+ * الملفُّ نصّاً base64 — بقارئ المتصفّح نفسه.
+ *
+ * كان يُبنى بحلقةٍ تلصق النصَّ قطعةً قطعة ثمّ `btoa`، في الخيط الرئيس: ثلاثةُ
+ * ميجابايت تجمّد واجهةَ الجوّال لحظةً لكلّ بطاقة. و`FileReader` يُخرج النصَّ نفسَه
+ * (ما بعد الفاصلة في `data:`) ولا يحجز الواجهة.
+ */
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("تعذّرت قراءةُ الملفّ من جهازك."));
+    reader.onload = () => {
+      const url = typeof reader.result === "string" ? reader.result : "";
+      const comma = url.indexOf(",");
+      if (comma < 0) reject(new Error("تعذّرت قراءةُ الملفّ من جهازك."));
+      else resolve(url.slice(comma + 1));
+    };
+    reader.readAsDataURL(blob);
+  });
+}
 /** صورةٌ أكبر من هذا تُصغَّر في المتصفّح قبل الإرسال */
 const IMAGE_SHRINK_BYTES = 1.5 * 1024 * 1024;
 const IMAGE_MAX_SIDE = 2400;
@@ -692,17 +713,12 @@ export function Uploader({
     const reading: Item = { id, fileName: file.name, state: "reading", startedAt: Date.now(), previewUrl, mime: file.type };
     setItems((prev) => prev.map((it) => (it.id === id ? reading : it)));
 
-    // نحتفظ بالبايتات لأنّ الأرشفة ترفع الملف الأصلي نفسه لا نسخة معاد بناؤها
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    let binary = "";
-    for (let i = 0; i < bytes.length; i += 0x8000) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    }
-    const fileBase64 = btoa(binary);
-
     const failed = (error: string): Item => ({ id, fileName: file.name, state: "failed", error, file, previewUrl, mime: file.type });
 
     try {
+      // نحتفظ بالبايتات لأنّ الأرشفة ترفع الملف الأصلي نفسه لا نسخة معاد بناؤها
+      const fileBase64 = await blobToBase64(file);
+
       const body = new FormData();
       body.append("file", file);
       const r = await request<AnalysisResponse>("/api/analyze", { method: "POST", body });

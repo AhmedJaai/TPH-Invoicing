@@ -52,6 +52,17 @@ describe("الهجرات تُطبَّق مع النشر", () => {
   it("ومشغّلُ الهجرات يقرأ `process.env.DATABASE_URL`", () => {
     expect(readFileSync("scripts/migrate.ts", "utf8")).toContain("process.env.DATABASE_URL");
   });
+
+  it("والهجرةُ لا تنتظر قفلَ جدولٍ بلا حدّ — تفشل سريعاً ولا تجمّد الموقع الحيّ", () => {
+    const migrate = readFileSync("scripts/migrate.ts", "utf8");
+    const begin = migrate.indexOf('client.query("begin")');
+    const timeout = migrate.indexOf("set local lock_timeout");
+    const run = migrate.indexOf("client.query(sql)");
+    expect(begin).toBeGreaterThan(-1);
+    /* داخل المعاملة وقبل نصّ الهجرة: `set local` خارج معاملةٍ لا يفعل شيئاً */
+    expect(timeout).toBeGreaterThan(begin);
+    expect(run).toBeGreaterThan(timeout);
+  });
 });
 
 describe("المستودع والقاعدة يتحرّكان معاً", () => {
@@ -104,4 +115,71 @@ describe("الهجرةُ المطبَّقة لا تُعدَّل — الإضاف
       expect(sha, `${name} تغيّرت بعد إدخالها — اكتب هجرةً جديدة بدل تعديلها`).toBe(manifest[name]);
     });
   }
+});
+
+/*
+  ── «الإضافة آمنة، والحذفُ وإعادةُ التسمية على نشرتين» ──
+
+  الهجرةُ تجري في `vercel-build` **قبل** رفع الكود، فبينهما نافذةٌ يعمل فيها الكود
+  القديم على المخطّط الجديد: عمودٌ حُذف أو أُعيدت تسميتُه يُسقط كلَّ استعلامٍ يقرؤه
+  حتى يكتمل النشر — وإن سقط البناءُ بعد الهجرة بقي الموقعُ معطوباً. كانت القاعدةُ
+  وصيّةً في `CLAUDE.md`؛ وهذا فحصُها.
+
+  يُفحَص ما بعد `FIRST_CHECKED` وحده: ما قبله طُبّق ولا يُعدَّل. وما كان مقصوداً
+  (النشرةُ الثانية من حذفٍ على نشرتين، بعد أن لم يبقَ كودٌ يقرأ العمود) يُعلَن بسطر
+  تعليقٍ في الهجرة نفسها: `-- two-step-ok: <السبب>`.
+*/
+const FIRST_CHECKED = 73;
+
+export function destructiveStatements(sql: string): string[] {
+  if (/^[ \t]*--[ \t]*two-step-ok:[ \t]*\S/m.test(sql)) return [];
+  const code = sql
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--[^\n]*/g, " ")
+    // نصوصُ الدوالّ والقيمُ الحرفيّة ليست أوامر
+    .replace(/'(?:[^']|'')*'/g, "''");
+  const RULES: [RegExp, string][] = [
+    [/\bdrop\s+column\b/i, "حذفُ عمود"],
+    [/\bdrop\s+table\b/i, "حذفُ جدول"],
+    [/\brename\s+(column\b|to\b|constraint\b)/i, "إعادةُ تسمية"],
+    [/\balter\s+column\s+\S+\s+(set\s+data\s+)?type\b/i, "تغييرُ نوع عمود"],
+    [/\balter\s+column\s+\S+\s+set\s+not\s+null\b/i, "NOT NULL على عمودٍ قائم"],
+  ];
+  return RULES.filter(([re]) => re.test(code)).map(([, label]) => label);
+}
+
+describe("الهجرةُ الجديدة إضافةٌ — والحذفُ وإعادةُ التسمية على نشرتين", () => {
+  const files = readdirSync("drizzle/sql").filter((f) => f.endsWith(".sql") && Number(f.slice(0, 3)) >= FIRST_CHECKED);
+
+  for (const name of files) {
+    it(name, () => {
+      expect(
+        destructiveStatements(readFileSync(`drizzle/sql/${name}`, "utf8")),
+        `${name}: الكود القديم يعمل على المخطّط الجديد حتى يكتمل النشر — اقسمها على نشرتين، أو أعلِن \`-- two-step-ok: السبب\``,
+      ).toEqual([]);
+    });
+  }
+
+  it("والحارس يُمسك الأشكال الخمسة", () => {
+    expect(destructiveStatements("alter table invoices drop column note;")).toEqual(["حذفُ عمود"]);
+    expect(destructiveStatements("DROP TABLE IF EXISTS old_things;")).toEqual(["حذفُ جدول"]);
+    expect(destructiveStatements("alter table a rename column x to y;")).toEqual(["إعادةُ تسمية"]);
+    expect(destructiveStatements("alter table a rename to b;")).toEqual(["إعادةُ تسمية"]);
+    expect(destructiveStatements("alter table a alter column x type bigint;")).toEqual(["تغييرُ نوع عمود"]);
+    expect(destructiveStatements("alter table a alter column x set not null;")).toEqual(["NOT NULL على عمودٍ قائم"]);
+  });
+
+  it("ولا يُمسك الإضافة، ولا ما في تعليقٍ أو نصّ", () => {
+    expect(destructiveStatements("alter table a add column note text;")).toEqual([]);
+    expect(destructiveStatements("create table t (id text primary key, at timestamptz not null default now());")).toEqual([]);
+    expect(destructiveStatements("create index if not exists i on a (x) where y is not null;")).toEqual([]);
+    expect(destructiveStatements("drop index if exists old_idx; drop trigger if exists t on a;")).toEqual([]);
+    expect(destructiveStatements("-- لا نكتب drop column هنا\nalter table a add column b int;")).toEqual([]);
+    expect(destructiveStatements("/* rename to */ comment on column a.b is 'was: drop table x';")).toEqual([]);
+  });
+
+  it("والمقصودُ يُعلَن بسببه — لا بعلَمٍ فارغ", () => {
+    expect(destructiveStatements("-- two-step-ok: لم يبقَ قارئٌ منذ النشرة 0.9\nalter table a drop column x;")).toEqual([]);
+    expect(destructiveStatements("-- two-step-ok:\nalter table a drop column x;")).toEqual(["حذفُ عمود"]);
+  });
 });

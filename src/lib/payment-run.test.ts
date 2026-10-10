@@ -531,3 +531,29 @@ describe("اختيارُ صاحب الدفعة في الشاشة", () => {
       .toEqual({ skipSuppliers: ["s1"], skipInvoices: [], partial: { s1: "10" } });
   });
 });
+
+describe("دفعتان من صفوفٍ واحدة — «النقد القادم» يستعلم مرّةً", () => {
+  /* صفوفُ الشهر الجاري تحوي صفوفَ ما قبله؛ فالدفعةُ المبنيّة منها كالمبنيّة من صفوف شهرها وحده */
+  const older = [
+    inv({ invoiceId: "jul", periodMonth: "2026-07", totalMinor: 7_000 }),
+    inv({ invoiceId: "aug-1", periodMonth: "2026-08", totalMinor: 10_000, allocatedMinor: 4_000 }),
+    inv({ invoiceId: "aug-held", periodMonth: "2026-08", supplierId: "s2", supplierName: "بيكوف", taxStatus: "UNKNOWN" }),
+  ];
+  const current = [
+    inv({ invoiceId: "sep-1", periodMonth: "2026-09", totalMinor: 20_000 }),
+    inv({ invoiceId: "sep-2", periodMonth: "2026-09", supplierId: "s2", supplierName: "بيكوف", totalMinor: 3_000 }),
+  ];
+  const credit = new Map([["s1", 2_000]]);
+
+  it("دفعةُ الشهر المنقضي لا تتغيّر بوجود صفوف الشهر الجاري", () => {
+    const options = { includeOlderUnpaid: true, creditBySupplier: credit };
+    expect(buildPaymentRun([...older, ...current], "2026-08", options))
+      .toEqual(buildPaymentRun(older, "2026-08", options));
+  });
+
+  it("ودفعةُ الشهر الجاري وحده لا تأخذ من المتأخّر", () => {
+    const options = { includeOlderUnpaid: false };
+    expect(buildPaymentRun([...older, ...current], "2026-09", options))
+      .toEqual(buildPaymentRun(current, "2026-09", options));
+  });
+});

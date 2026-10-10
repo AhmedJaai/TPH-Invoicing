@@ -160,7 +160,7 @@ export function MonthClose({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-muted">إقفال {formatMonth(month)}</p>
-                <p className="mt-1 text-2xl font-extrabold tracking-tight">
+                <p className="mt-1 text-2xl font-bold tracking-tight">
                   {isClosed ? "الشهرُ مُقفَل" : report.canClose ? "جاهزٌ للإقفال" : "لا يُقفَل بعد"}
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-ink-soft">

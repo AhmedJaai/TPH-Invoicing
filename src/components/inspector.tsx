@@ -253,7 +253,7 @@ export function InspectorPanel({
               ref={headingRef}
               tabIndex={-1}
               dir="auto"
-              className="text-lg font-extrabold leading-snug tracking-tight outline-none sm:text-xl"
+              className="text-lg font-bold leading-snug tracking-tight outline-none sm:text-xl"
             >
               {title}
             </h2>
