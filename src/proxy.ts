@@ -57,6 +57,17 @@ export function proxy(request: NextRequest) {
     }
   }
 
+  /*
+    صفحةُ الدخول تمسح ما خزّنه المتصفّح من صفحات: الخروجُ (فعلُ خادمٍ في
+    `user-menu.tsx`) ينتهي إليها، وجهازُ الكاشير مشترك — زرُّ «رجوع» بعد الخروج قد
+    يعرض صفحةً ماليّة من خزينه. («cache» وحدها: التفضيلاتُ المحفوظة تبقى.)
+  */
+  if (pathname === "/login" || (pathname === "/api/auth/signout" && request.method === "POST")) {
+    const response = NextResponse.next();
+    response.headers.set("Clear-Site-Data", '"cache"');
+    return response;
+  }
+
   // وضع التجربة يفتح الأبواب عمداً، ولا يعمل في الإنتاج — راجع lib/preview-mode.ts
   if (previewAllowed(process.env)) return NextResponse.next();
 

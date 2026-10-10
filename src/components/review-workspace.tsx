@@ -67,6 +67,39 @@ const BUCKET_DOT: Record<ReviewBucket, string> = {
   RESOLVE: "bg-info",
 };
 
+/**
+ * ما ردّه الإقرارُ الجماعيّ — كلُّ سببٍ بحركته: لمن، وبكم، ورابطُ ملفّها.
+ * كان السببُ مجرّداً ويُقصّ عند ستّة، فمن رُدّت له تسعٌ لا يعرف أيَّها يقصد كلٌّ.
+ */
+function RejectedList({ rejected, items }: { rejected: { transactionId: string; reason: string }[]; items: ReviewItem[] }) {
+  const [all, setAll] = useState(false);
+  const byId = new Map(items.map((i) => [i.transactionId, i]));
+  const shown = all ? rejected : rejected.slice(0, 6);
+  return (
+    <>
+      <ul className="mt-1.5 space-y-1">
+        {shown.map((r) => {
+          const tx = byId.get(r.transactionId);
+          return (
+            <li key={r.transactionId} className="text-xs leading-relaxed text-ink-soft">
+              <Link href={txHref(r.transactionId)} className="font-bold text-accent hover:underline" dir="auto">
+                {tx ? (tx.beneficiary || tx.supplierName || tx.description.slice(0, 40) || "حركة") : "حركة"}
+              </Link>
+              {tx && <> · <Money minor={tx.amountMinor} /></>}
+              {" — "}{r.reason}
+            </li>
+          );
+        })}
+      </ul>
+      {rejected.length > shown.length && (
+        <button type="button" onClick={() => setAll(true)} className="mt-1.5 min-h-8 text-xs font-bold text-accent hover:underline">
+          اعرض الباقي (<span className="nums">{rejected.length - shown.length}</span>)
+        </button>
+      )}
+    </>
+  );
+}
+
 /** أبواب الحركة — هي نفسها المعروضة في «حلّ المعلّقات» بصفحة البنك. */
 const KINDS: { value: string; label: string }[] = [
   { value: "SUPPLIER", label: "سداد مورّد" },
@@ -276,7 +309,13 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
         .map((o) => ({ transactionId: o.transactionId, reason: o.reason ?? "رُدّ" }));
 
       /* لم يُكتب شيء — فالنتيجة ليست نجاحاً وإن كان الرمز ٢٠٠ */
-      setResult({ ok: (r.data.confirmed ?? 0) > 0, message: r.data.message ?? "", rejected });
+      /* خمسون في المرّة: ما لم يُرسَل يُقال بعدده ولا يُترَك للعدّ */
+      const left = Math.max(0, confirmable.length - 50);
+      setResult({
+        ok: (r.data.confirmed ?? 0) > 0,
+        message: `${r.data.message ?? ""}${left > 0 ? ` · بقي ${left} لم يُرسَل — اضغط ثانيةً لتكمل.` : ""}`,
+        rejected,
+      });
       router.refresh();
     } finally {
       setBusy(false);
@@ -368,13 +407,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
                 {result.message}
               </p>
               {result.rejected && result.rejected.length > 0 && (
-                <ul className="mt-1.5 space-y-0.5">
-                  {result.rejected.slice(0, 6).map((r) => (
-                    <li key={r.transactionId} className="text-xs leading-relaxed text-ink-soft">
-                      {r.reason}
-                    </li>
-                  ))}
-                </ul>
+                <RejectedList rejected={result.rejected} items={items} />
               )}
             </div>
           )}

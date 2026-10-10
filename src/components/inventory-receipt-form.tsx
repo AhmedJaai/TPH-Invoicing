@@ -1,5 +1,6 @@
 "use client";
 
+import { DateChips } from "./date-chips";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
@@ -66,6 +67,8 @@ export function ReceiptForm({
   const [earlier, setEarlier] = useState<{ id: string; receivedOn: string }[]>([]);
 
   async function send(resolution: { kind: "LINK"; invoiceLineId: string } | { kind: "SEPARATE" } | null) {
+    /* Enter مرّتين أو ضغطتان: الثانيةُ لا تكتب استلاماً ثانياً */
+    if (busy) return;
     setBusy(true);
     setError(null);
     const r = await postJson("/api/inventory/receipt", {
@@ -102,14 +105,24 @@ export function ReceiptForm({
   const outside = date !== "" && (date < periodStart || date > periodEnd);
 
   return (
-    <div className="mt-3 animate-rise rounded-xl border border-accent-line bg-accent-soft/40 p-4">
+    /*
+      نموذجٌ حقيقيّ: Enter في حقل الكمّيّة يحفظ. وحين يُسأل «أهي من هذه الفاتورة؟»
+      (مرشّحون ظاهرون) لا يحفظ Enter شيئاً — الجوابُ بأزراره.
+    */
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (candidates === null && quantity.trim() !== "" && date !== "") void send(null);
+      }}
+      className="mt-3 animate-rise rounded-xl border border-accent-line bg-accent-soft/40 p-4"
+    >
       <p className="text-[11px] font-bold">كمّيّةٌ دخلت الرفّ — {productName}</p>
 
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="text-[11px] text-muted">
           الكمّيّة
           <input
-            type="text" inputMode="decimal" dir="ltr" autoFocus
+            type="text" inputMode="decimal" dir="ltr" autoFocus enterKeyHint="done"
             value={quantity} onChange={(e) => setQuantity(e.target.value)} disabled={busy}
             placeholder="20"
             className="nums mt-1 block min-h-11 w-24 rounded-lg border border-line-input bg-raised px-2 text-center text-sm"
@@ -130,6 +143,7 @@ export function ReceiptForm({
             type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={busy}
             className="nums mt-1 block min-h-11 rounded-lg border border-line-input bg-raised px-2 text-sm"
           />
+          <DateChips value={date} onPick={setDate} disabled={busy} hijri={false} />
         </label>
         <button type="button" onClick={() => setMore((m) => !m)} className={buttonClass("quiet", "sm")}>
           {more ? "أخفِ التفاصيل" : "تفاصيل اختياريّة"}
@@ -221,8 +235,7 @@ export function ReceiptForm({
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             aria-busy={busy}
-            type="button" disabled={busy || quantity.trim() === "" || date === ""}
-            onClick={() => void send(null)}
+            type="submit" disabled={busy || quantity.trim() === "" || date === ""}
             className={buttonClass("primary", "sm")}
           >
             احفظ الكمّيّة
@@ -231,7 +244,7 @@ export function ReceiptForm({
         </div>
       )}
 
-      {error && <p className="mt-2 text-[11px] leading-relaxed text-danger">{error}</p>}
-    </div>
+      {error && <p role="alert" className="mt-2 text-[11px] leading-relaxed text-danger">{error}</p>}
+    </form>
   );
 }

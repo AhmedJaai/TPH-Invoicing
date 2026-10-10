@@ -1,3 +1,4 @@
+import { whatsappHref } from "@/lib/supplier-edit";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { asc, eq, sql } from "drizzle-orm";
@@ -112,7 +113,7 @@ export default async function StatementsPage({
                 </span>
               </span>
               <a
-                href={`https://wa.me/?text=${encodeURIComponent(buildStatementRequest(m.nameAr, missingMonth))}`}
+                href={whatsappHref(m.phoneE164, buildStatementRequest(m.nameAr, missingMonth))}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`اطلب كشف ${m.nameAr} عبر واتساب`}

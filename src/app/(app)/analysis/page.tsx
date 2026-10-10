@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { CalendarClock, Info, Layers, Link2, ShoppingBasket, Tags, TrendingDown, TrendingUp } from "lucide-react";
 import { db } from "@/db";
 import { invoiceLines, suppliers } from "@/db/schema";
@@ -9,7 +9,7 @@ import { can } from "@/lib/permissions";
 import { Money, PageShell } from "@/components/page-shell";
 import { summarizeItems, type ItemSummary, type LineRow } from "@/lib/analytics";
 import {
-  Badge, Callout, DataTable, Delta, EmptyState, LinkButton, LinkTabs, Meter, Monogram, NoAccess, Section,
+  Badge, Callout, DataTable, Delta, EmptyState, LinkButton, LinkTabs, Meter, Monogram, NoAccess, Section, Sparkline,
 } from "@/components/ui";
 import { Figure } from "@/components/supplier-intel";
 import { PRODUCT, countNoun, DAY, TIME } from "@/lib/arabic";
@@ -21,6 +21,9 @@ import { listProducts, listSupplierProducts, mappingCoverage } from "@/services/
 import { suggestMerges, type SupplierItem } from "@/lib/products";
 
 export const dynamic = "force-dynamic";
+
+/** حدُّ ما يُقرأ من البنود في الطلب — وبلوغُه يُعلَن ولا يُقصّ بصمت. */
+const LINE_LIMIT = 20_000;
 
 /**
  * الأصناف والأسعار — ما اشتريتَه، وكيف تحرّك سعرُه، وعند مَن.
@@ -81,7 +84,9 @@ export default async function ItemsAndPricesPage({
       })
       .from(invoiceLines)
       .leftJoin(suppliers, eq(invoiceLines.supplierId, suppliers.id))
-      .limit(20000),
+      /* الأحدثُ أوّلاً: إن بُلغ الحدُّ سقط الأقدمُ لا عشوائيٌّ — ويُقال ذلك في الصفحة */
+      .orderBy(desc(invoiceLines.invoiceDate))
+      .limit(LINE_LIMIT),
     gatherHealthFacts().then(buildDataHealth),
     canMap
       ? Promise.all([listSupplierProducts(), listProducts(), mappingCoverage()])
@@ -190,6 +195,11 @@ export default async function ItemsAndPricesPage({
         )}
       </div>
 
+      {rows.length >= LINE_LIMIT && (
+        <Callout tone="warn" icon={Info} className="mt-4" title="الأرقامُ على أحدث البنود وحدها">
+          بلغت بنودُ الفواتير حدَّ ما تقرؤه هذه الصفحة (<span className="nums">{LINE_LIMIT}</span> بنداً) — فالأقدمُ منها غير محسوبٍ في المتوسّطات ودورات الشراء. آخرُ سعرٍ وما تحرّك صحيحان.
+        </Callout>
+      )}
       {lineCoverage && lineCoverage.state !== "GOOD" && (
         <Callout tone="warn" icon={Info} className="mt-4" title="الأرقامُ على جزءٍ من الفواتير">
           أرقام هذه الصفحة مبنيّة على {lineCoverage.detail}. الباقي غير محسوب فيها.
@@ -256,6 +266,20 @@ export default async function ItemsAndPricesPage({
                 {
                   key: "delta", header: "التغيّر",
                   cell: (i) => <Delta pct={pctOf(i)} favourable={i.priceChange!.direction === "down"} />,
+                },
+                {
+                  /* سؤالُ «هل يرتفع؟» زمنيّ: آخرُ الأسعار خطّاً، الأقدمُ يميناً كما تُقرأ الصفحة */
+                  key: "trail", header: "اتّجاهه", secondary: true,
+                  cell: (i) => i.priceTrail.length >= 3 ? (
+                    <Sparkline
+                      values={[...i.priceTrail].reverse()}
+                      tone={i.priceChange!.direction === "down" ? "ok" : "warn"}
+                      className="h-7 w-20"
+                      label={`سعرُ ${i.displayName} في آخر ${i.priceTrail.length} مرّات شراء — ${i.priceChange!.direction === "down" ? "ينخفض" : "يرتفع"}`}
+                    />
+                  ) : (
+                    <span className="text-[11px] text-muted">مرّتان فقط</span>
+                  ),
                 },
                 {
                   key: "when", header: "متى", secondary: true,

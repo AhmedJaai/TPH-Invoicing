@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { commandsFor, matchCommands } from "./commands";
+import { commandsFor, matchCommands, withinOneEdit } from "./commands";
 import { can } from "./permissions";
 
 const ids = (cs: { id: string }[]) => cs.map((c) => c.id);
@@ -46,7 +46,7 @@ describe("commandsFor", () => {
 
   it("أفعالُ الواجهة لا تنتقل — تحمل حدثها ووجهةً موجودة", () => {
     const view = commandsFor("OWNER").filter((c) => c.event);
-    expect(view.map((c) => c.event).sort()).toEqual(["amounts", "shortcuts", "theme"]);
+    expect(view.map((c) => c.event).sort()).toEqual(["amounts", "shortcuts", "theme", "theme-system"]);
     for (const c of view) expect(c.href).toBe("/");
   });
 
@@ -83,6 +83,31 @@ describe("matchCommands", () => {
     expect(matchCommands("Upload", all)[0].id).toBe("upload");
   });
 
+  it("خطأٌ إملائيٌّ واحد يُغتفَر حين لا يطابق شيءٌ حرفيّاً — «استيرد كشف» و«اقفال الشهور»", () => {
+    expect(matchCommands("استيرد كشف", all).map((c) => c.id)).toContain("bank-import");
+    expect(matchCommands("اقفال الشهور", all)[0].id).toBe("close-month");
+    expect(matchCommands("invoce", all).map((c) => c.id)).toContain("upload");
+  });
+
+  it("والمطابقةُ الحرفيّة لا يزاحمها قريب — «جرد» لا يجرّ ما يشبهه", () => {
+    const exact = matchCommands("جرد", all).map((c) => c.id);
+    const loose = matchCommands("جرذ", all).map((c) => c.id);
+    expect(exact).toContain("count");
+    /* ثلاثةُ أحرف: دون حدّ الاغتفار */
+    expect(loose).toEqual([]);
+  });
+
+  it("withinOneEdit: حرفٌ زائد أو ناقص أو مبدَّل أو متجاوران انقلبا — لا أكثر", () => {
+    expect(withinOneEdit("استورد", "استيرد")).toBe(true);
+    expect(withinOneEdit("شهور", "شهر")).toBe(true);
+    expect(withinOneEdit("شهر", "شهور")).toBe(true);
+    expect(withinOneEdit("invocie", "invoice")).toBe(true);
+    expect(withinOneEdit("invoice", "invoice")).toBe(true);
+    expect(withinOneEdit("بنك", "كشف")).toBe(false);
+    expect(withinOneEdit("استورد", "اسنيرد")).toBe(false);
+    expect(withinOneEdit("ab", "abcd")).toBe(false);
+  });
+
   it("ما لا يطابق شيئاً يُرجع فراغاً — لا أقرب ما يكون", () => {
     expect(matchCommands("زززز", all)).toEqual([]);
   });
@@ -92,5 +117,12 @@ describe("matchCommands", () => {
     const firstPage = groups.indexOf("PAGE");
     expect(firstPage).toBeGreaterThan(0);
     expect(groups.slice(firstPage).every((g) => g === "PAGE")).toBe(true);
+  });
+});
+
+describe("إقرارُ الضريبة يُوجَد بمرادفاته", () => {
+  it.each(["vat", "هيئة", "زكاة", "اقرار الضريبه"])("«%s» يجد «قدّم إقرار الضريبة»", (q) => {
+    const found = matchCommands(q, commandsFor("OWNER"));
+    expect(found.map((c) => c.id)).toContain("vat-file");
   });
 });

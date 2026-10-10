@@ -1,3 +1,4 @@
+import { whatsappHref } from "@/lib/supplier-edit";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Clock, FileWarning, Hourglass, PiggyBank, Receipt, Sparkles, Store, Wallet } from "lucide-react";
@@ -54,7 +55,7 @@ const VIEWS: readonly View[] = ["all", "owed", "overdue", "credit", "idle"];
 export default async function SuppliersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ unbacked?: string; view?: string }>;
+  searchParams: Promise<{ unbacked?: string; view?: string; sort?: string }>;
 }) {
   const user = await currentUser();
   if (!user) redirect("/login?from=/suppliers");
@@ -168,6 +169,7 @@ export default async function SuppliersPage({
       key: "name",
       header: "المورّد",
       primary: true,
+      sortBy: (r) => r.nameAr,
       cell: (r) => (
         <span className="flex min-w-0 items-center gap-3">
           <Monogram name={r.nameAr} className="h-9 w-9 text-sm" />
@@ -203,6 +205,8 @@ export default async function SuppliersPage({
             key: "balance",
             header: "الحساب",
             numeric: true,
+            /* «من أكبرُ دَين؟»: ما عليك موجباً، وما لك سالباً، ومن لا تعاملَ معه مجهولٌ يقع آخراً لا صفراً */
+            sortBy: (r) => (r.owedMinor > 0 ? r.owedMinor : r.creditLeftMinor > 0 ? -r.creditLeftMinor : r.idle ? null : 0),
             cell: (r) =>
               r.owedMinor > 0 ? (
                 <span className="inline-flex items-baseline gap-1.5 font-bold">
@@ -226,6 +230,8 @@ export default async function SuppliersPage({
           {
             key: "age",
             header: "أقدم دَين",
+            sortBy: (r) => r.ageing.oldestOwedDays,
+            sortFirst: "desc",
             cell: (r) =>
               r.ageing.oldestOwedDays === null ? (
                 <span className="text-muted">—</span>
@@ -241,6 +247,8 @@ export default async function SuppliersPage({
       key: "last",
       header: "آخر تعامل",
       secondary: true,
+      sortBy: (r) => r.lastActivity ?? null,
+      sortFirst: "desc",
       cell: (r) =>
         r.lastActivity ? (
           <span className="whitespace-nowrap text-ink-soft">
@@ -383,6 +391,7 @@ export default async function SuppliersPage({
           hrefOf={(r) => `/suppliers/${r.slug}`}
           searchOf={(r) => [r.nameAr, r.nameEn, r.slug, r.vatNumber, r.aliases].filter(Boolean).join(" ")}
           searchLabel="ابحث باسم المورّد أو اسمه في البنك"
+          sort={params.sort ?? null}
           columns={columns}
           empty={
             <EmptyState
@@ -496,7 +505,7 @@ function UnbackedSection({ groups, count }: { groups: ReturnType<typeof groupUnb
                   {g.supplierId && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       <a
-                        href={`https://wa.me/?text=${encodeURIComponent(buildInvoiceRequest(g))}`}
+                        href={whatsappHref(g.supplierPhone, buildInvoiceRequest(g))}
                         target="_blank"
                         rel="noopener noreferrer"
                         className={buttonClass("primary", "sm")}

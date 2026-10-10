@@ -15,18 +15,26 @@ export function Money({
   minor,
   tone,
   currency = false,
+  signed = false,
 }: {
   minor: number;
   tone?: "warn" | "danger" | "ok";
   currency?: boolean;
+  /** السالبُ يُلوَّن دائماً — لعمودٍ يختلط فيه الداخلُ بالخارج (صافٍ، فرق). */
+  signed?: boolean;
 }) {
-  const cls = tone === "warn" ? "text-warn" : tone === "danger" ? "text-danger" : tone === "ok" ? "text-ok" : "";
+  const shade = tone ?? (signed && minor < 0 ? "danger" : undefined);
+  const cls = shade === "warn" ? "text-warn" : shade === "danger" ? "text-danger" : shade === "ok" ? "text-ok" : "";
   const whole = Math.floor(Math.abs(minor) / 100);
   const frac = String(Math.abs(minor) % 100).padStart(2, "0");
   const digits = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const figure = (
     <span className={`nums whitespace-nowrap ${cls}`} dir="ltr">
-      {minor < 0 ? "-" : ""}
+      {/*
+        علامةُ الطرح الحقيقيّة (U+2212) لا شرطةُ لوحة المفاتيح: بعرض الرقم فتصطفّ
+        الخانات، وأوضحُ من شرطةٍ قصيرة تُقرأ موجباً بنظرة. وقارئُ الشاشة يسمع «سالب».
+      */}
+      {minor < 0 && <><span aria-hidden>−</span><span className="sr-only">سالب </span></>}
       {digits}
       <span className="nums-frac">.{frac}</span>
     </span>

@@ -10,6 +10,7 @@
  * الرمز الباهت أو المطويّ قد لا يُفكّ وهو على الورقة.
  */
 import { isDeepseekImageType } from "@/lib/ai/models";
+import { assertHeifOpenable, MAX_IMAGE_PIXELS } from "@/lib/file-signature";
 import { parseZatcaQrText, type ZatcaQrFacts } from "./zatca-tlv";
 
 export type QrReading =
@@ -60,9 +61,10 @@ async function toRgba(data: Buffer, mimeType: string): Promise<RgbaImage> {
   let source = data;
   if (HEIF_TYPES.has(mimeType)) {
     const { default: convert } = await import("heic-convert");
+    assertHeifOpenable(data);
     source = Buffer.from(await convert({ buffer: data, format: "JPEG", quality: 0.92 }));
   }
-  const { data: raw, info } = await sharp(source)
+  const { data: raw, info } = await sharp(source, { limitInputPixels: MAX_IMAGE_PIXELS })
     .rotate()
     .resize({ width: MAX_QR_SIDE, height: MAX_QR_SIDE, fit: "inside", withoutEnlargement: true })
     .ensureAlpha()

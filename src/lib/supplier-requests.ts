@@ -13,6 +13,8 @@ export interface UnbackedPayment {
   supplierId: string | null;
   supplierName: string | null;
   supplierSlug: string | null;
+  /** رقمُه بصيغة E.164 إن كُتب في ملفّه — يُفتح واتساب عليه لا على شاشة اختيار جهة. */
+  supplierPhone?: string | null;
   /** YYYY-MM-DD */
   paidOn: string;
   amountMinor: number;
@@ -33,6 +35,7 @@ export interface UnbackedSupplier {
   supplierId: string | null;
   supplierName: string;
   supplierSlug: string | null;
+  supplierPhone?: string | null;
   totalMinor: number;
   payments: UnbackedPayment[];
 }
@@ -49,6 +52,7 @@ export function groupUnbackedBySupplier(rows: readonly UnbackedPayment[]): Unbac
       supplierId: r.supplierId,
       supplierName: r.supplierName ?? "بلا مورّد",
       supplierSlug: r.supplierSlug,
+      supplierPhone: r.supplierPhone ?? null,
       totalMinor: 0,
       payments: [],
     };

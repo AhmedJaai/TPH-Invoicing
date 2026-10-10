@@ -102,3 +102,29 @@ describe("timeAgo — «أمس» يومُ التقويم بتوقيت الريا
     expect(timeAgo(new Date("2026-09-26T00:40:00Z"), now)).toBe("قبل 12 دقيقة");
   });
 });
+
+import { dateShortcuts, formatHijri } from "./riyadh-time";
+
+describe("اختصاراتُ حقل التاريخ", () => {
+  it("اليوم وأمس وآخرُ الشهر الماضي", () => {
+    expect(dateShortcuts("2026-10-09").map((c) => c.value)).toEqual(["2026-10-09", "2026-10-08", "2026-09-30"]);
+  });
+  it("أوّلُ الشهر: أمس هو آخرُ الشهر الماضي", () => {
+    expect(dateShortcuts("2026-03-01").map((c) => c.value)).toEqual(["2026-03-01", "2026-02-28", "2026-02-28"]);
+  });
+  it("أوّلُ السنة يعبر إلى ديسمبر", () => {
+    expect(dateShortcuts("2027-01-01")[2].value).toBe("2026-12-31");
+  });
+});
+
+describe("المقابلُ الهجريّ للعرض", () => {
+  it("يُكتب بتقويم أمّ القرى", () => {
+    const h = formatHijri("2026-10-09");
+    expect(h).toMatch(/144[78]/);
+  });
+  it("ما لا يُفهَم لا يُخترَع له تاريخ", () => {
+    expect(formatHijri("")).toBeNull();
+    expect(formatHijri("2026-13-45x")).toBeNull();
+    expect(formatHijri(null)).toBeNull();
+  });
+});

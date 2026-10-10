@@ -2,6 +2,7 @@ import { MobileTabBar, Sidebar, AreaTabs, type ShellCounts } from "./nav";
 import { CommandPalette } from "./command-palette";
 import { Suspense, ViewTransition } from "react";
 import { AutoProcess } from "./auto-process";
+import { ShellWatch } from "./shell-watch";
 import { HashScroll } from "./hash-scroll";
 import { TrialBanner } from "./trial-banner";
 import { UserMenu } from "./user-menu";
@@ -11,6 +12,8 @@ import { Topbar, DropAnywhere } from "./topbar";
 import { Toaster } from "./ui-client";
 import { InspectorLauncher } from "./inspector";
 import { Tooltips } from "./tooltips";
+import { ServiceWorkerRegistration } from "./service-worker";
+import { ShellUserProvider } from "./shell-context";
 import { can, type Role } from "@/lib/permissions";
 import { inboxCount, workCount } from "@/lib/work";
 import { isAuthBypassed } from "@/lib/session";
@@ -70,7 +73,15 @@ export function AppShell({
       <div id="app-content" className="min-w-0">
         <TrialBanner />
         <Topbar role={user.role} controls={<ViewControls />} />
-        {children}
+        {/* الهيكلُ (`loading.tsx`) يقرأ الدورَ والاسمَ من هنا — ألسنتُه وتحيّتُه كالتي ستصل */}
+        <ShellUserProvider
+          user={{
+            role: user.role,
+            firstName: user.name && user.name !== "وضع التجربة" ? user.name.split(" ")[0] : null,
+          }}
+        >
+          {children}
+        </ShellUserProvider>
       </div>
 
       <InspectorLauncher />
@@ -92,7 +103,9 @@ export function AppShell({
       <KeyboardShortcuts role={user.role} />
       <DropAnywhere role={user.role} />
       <Toaster />
+      <ServiceWorkerRegistration />
       {can(user.role, "document:upload") && can(user.role, "amounts:view") && <AutoProcess drive={!isAuthBypassed()} />}
+      <ShellWatch />
       <Suspense fallback={null}>
         <HashScroll />
       </Suspense>

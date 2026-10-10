@@ -14,6 +14,7 @@ import { pendingDecision } from "@/lib/bank/pending";
 import { toCanonical, type CanonicalTransaction } from "@/lib/bank/canonical";
 import { groupByIdentity } from "@/lib/bank/pattern";
 import type { TxCategory } from "@/lib/bank/rules";
+import type { LedgerSearch } from "@/lib/bank/ledger-search";
 import { findDoublePaid, partitionDoublePaid, type DoublePaidTx } from "@/lib/bank/double-paid";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
@@ -282,11 +283,24 @@ export interface Ledger {
   months: string[];
 }
 
-export async function loadLedger(view: TxView, month: string | null): Promise<Ledger> {
-  const inMonth = month ? sql`to_char(${bankTransactions.valueDate}, 'YYYY-MM') = ${month}` : undefined;
-  const where = and(viewWhere(view), inMonth);
+/** حدُّ نتائج البحث — يبحث في الحركات كلِّها، ويُقال إن زادت المطابِقاتُ عليه. */
+export const SEARCH_LIMIT = 300;
 
-  const [rows, countRows, monthRows] = await Promise.all([
+export async function loadLedger(view: TxView, month: string | null, search: LedgerSearch | null = null): Promise<Ledger> {
+  const inMonth = month ? sql`to_char(${bankTransactions.valueDate}, 'YYYY-MM') = ${month}` : undefined;
+  /*
+    البحثُ في الخادم لا في الصفوف المرسومة: نصُّ البنك واسمُ المستفيد، أو المبلغ إن
+    قُرئ ما كُتب مبلغاً — في الحركات كلِّها (ضمن اللسان والشهر المختارَين).
+  */
+  const matches = search
+    ? sql`(${bankTransactions.description} ilike ${search.like} or ${bankTransactions.beneficiaryRaw} ilike ${search.like}${
+        search.amount
+          ? sql` or ${bankTransactions.amountMinor} between ${search.amount.fromMinor} and ${search.amount.toMinor}`
+          : sql``})`
+    : undefined;
+  const where = and(viewWhere(view), inMonth, matches);
+
+  const [rows, countRows, monthRows, matchedRows] = await Promise.all([
     db.select({
       id: bankTransactions.id,
       valueDate: bankTransactions.valueDate,
@@ -308,7 +322,7 @@ export async function loadLedger(view: TxView, month: string | null): Promise<Le
       .from(bankTransactions)
       .where(where)
       .orderBy(desc(bankTransactions.valueDate), desc(bankTransactions.amountMinor))
-      .limit(txLimit(month)),
+      .limit(search ? SEARCH_LIMIT : txLimit(month)),
 
     db.execute<Record<TxView, number>>(sql`
       select
@@ -324,6 +338,11 @@ export async function loadLedger(view: TxView, month: string | null): Promise<Le
     db.execute<{ m: string }>(sql`
       select distinct to_char(value_date, 'YYYY-MM') as m from bank_transactions order by 1 desc
     `),
+
+    /* عددُ ما طابق البحثَ كلّه — كي يُقال «أوّلُ ٣٠٠ من N» ولا تُقصّ القائمة بصمت */
+    search
+      ? db.select({ n: sql<number>`count(*)::int` }).from(bankTransactions).where(where)
+      : Promise.resolve(null),
   ]);
 
   const c = countRows.rows[0];
@@ -357,7 +376,7 @@ export async function loadLedger(view: TxView, month: string | null): Promise<Le
         evidence: readEvidence(t.matchEvidence),
       },
     })),
-    total: counts[view],
+    total: matchedRows ? Number(matchedRows[0]?.n ?? rows.length) : counts[view],
     counts,
     months: monthRows.rows.map((r) => r.m),
   };

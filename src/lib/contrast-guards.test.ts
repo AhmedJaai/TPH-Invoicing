@@ -50,6 +50,8 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ["ok", "ok-bg", 4.5], ["warn", "warn-bg", 4.5], ["danger", "danger-bg", 4.5], ["info", "info-bg", 4.5],
   ["ok", "raised", 4.5], ["warn", "raised", 4.5], ["danger", "raised", 4.5], ["info", "raised", 4.5],
   ["frame-ink", "frame", 4.5], ["frame-muted", "frame", 4.5], ["frame-accent", "frame", 4.5],
+  /* حلقةُ التركيز فوق الإطار — مكوّنُ واجهةٍ لا نصّ: ‎3:1‎ */
+  ["frame-ring", "frame", 3],
   ["line-input", "raised", 3],
 ];
 
@@ -65,6 +67,46 @@ describe("تباينُ الرموز على حدّ AA", () => {
       });
     }
   }
+});
+
+/*
+  كسرُ الهللات يُبهَّت بشفافيّة (`.nums-frac`) — والشفافيّةُ فوق لونٍ تُنزل تباينَه.
+  فيُحسب اللونُ الممزوج فعلاً على كلّ أرضيّةٍ يقع عليها مبلغ، بالوضعين: كان ‎0.55‎
+  يعطي ‎3.89:1‎ على الأبيض. والملوَّنُ والخافت لا يُبهَّتان أصلاً (قاعدةٌ ثانية تعيد
+  شفافيّتَهما ‎1‎) — فإن حُذفت سقط هذا.
+*/
+function blend(fg: string, bg: string, alpha: number): string {
+  const ch = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
+  return "#" + [1, 3, 5].map((i) => Math.round(ch(fg, i) * alpha + ch(bg, i) * (1 - alpha)).toString(16).padStart(2, "0")).join("");
+}
+
+describe("كسرُ الهللات لا ينزل تحت AA", () => {
+  const m = /\.nums-frac\s*\{\s*opacity:\s*([\d.]+)/.exec(css);
+  const alpha = m ? Number(m[1]) : NaN;
+
+  it("الشفافيّةُ مقروءةٌ من globals.css", () => {
+    expect(alpha).toBeGreaterThan(0);
+    expect(alpha).toBeLessThanOrEqual(1);
+  });
+
+  for (const [name, set] of [["الفاتح", light], ["الداكن", dark]] as const) {
+    for (const bg of ["raised", "surface", "sunken", "hover"]) {
+      it(`${name}: كسرُ الحبر على ${bg} ≥ 4.5`, () => {
+        const ink = set.get("ink")!;
+        const ground = set.get(bg)!;
+        expect(contrast(blend(ink, ground, alpha), ground)).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+
+  it("الملوَّنُ والخافت لا يُبهَّتان — قاعدةٌ تعيد شفافيّتَهما كاملة", () => {
+    const rule = /:is\(([^{]*)\)\s*\.nums-frac\s*\{([^}]*)\}/.exec(css);
+    expect(rule, "قاعدةُ الكسر الملوَّن غائبة").not.toBeNull();
+    for (const cls of [".text-danger", ".text-warn", ".text-ok", ".text-info", ".text-muted", ".text-ink-soft", ".text-accent"]) {
+      expect(rule![1]).toContain(cls);
+    }
+    expect(rule![2]).toMatch(/opacity:\s*1\s*;/);
+  });
 });
 
 /*

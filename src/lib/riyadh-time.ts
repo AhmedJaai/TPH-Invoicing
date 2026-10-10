@@ -113,3 +113,38 @@ export function formatRange(from: Date | string, to: Date | string): string {
 export function riyadhDayNumber(at: Date): number {
   return Math.floor((at.getTime() + 3 * 3_600_000) / 86_400_000);
 }
+
+/* ─────────────────────────── اختصاراتُ التاريخ والهجريّ ─────────────────────────── */
+
+function shiftIsoDay(day: string, n: number): string {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+/**
+ * أشيعُ ما يُدخَل في حقل تاريخ: اليوم، أمس، آخرُ الشهر الماضي — بتوقيت الرياض.
+ * تملأ الحقلَ بضغطةٍ بدل ثلاث عجلاتٍ في منتقي الهاتف. `today` بصيغة YYYY-MM-DD.
+ */
+export function dateShortcuts(today: string = todayInRiyadh()): { label: string; value: string }[] {
+  const firstOfMonth = `${today.slice(0, 7)}-01`;
+  return [
+    { label: "اليوم", value: today },
+    { label: "أمس", value: shiftIsoDay(today, -1) },
+    { label: "آخر الشهر الماضي", value: shiftIsoDay(firstOfMonth, -1) },
+  ];
+}
+
+const HIJRI = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura-nu-latn", {
+  timeZone: "UTC", day: "numeric", month: "long", year: "numeric",
+});
+
+/**
+ * مقابلُ اليوم بتقويم أمّ القرى — للعرض وحده (عقودُ الإيجار وبعضُ المعاملات
+ * الحكوميّة هجريّة). لا يُخزَّن ولا يُحسَب به؛ وما لا يُفهَم `null`.
+ */
+export function formatHijri(day: string | null | undefined): string | null {
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const at = new Date(`${day}T12:00:00Z`);
+  if (Number.isNaN(at.getTime())) return null;
+  return HIJRI.format(at);
+}

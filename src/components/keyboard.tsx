@@ -10,6 +10,7 @@ import { Sheet } from "./ui-client";
 import { triggerCapture } from "./nav";
 import { SHORTCUTS_EVENT } from "@/lib/ui-events";
 import { isInspectorPath, pathOf } from "@/lib/inspector";
+import { shortcutKey } from "@/lib/shortcut-keys";
 
 /**
  * لوحةُ المفاتيح — لمن يعمل بها كلَّ يوم.
@@ -23,6 +24,9 @@ import { isInspectorPath, pathOf } from "@/lib/inspector";
  * والاختصارُ ظاهرٌ في الواجهة (بجانب المدخل في الشريط، وفي هذه القائمة):
  * الاختصارُ الذي لا يُرى لا يوجد إلّا لمن بناه. ولا يعمل شيءٌ منها
  * والمؤشّرُ في حقلٍ يُكتب فيه، ولا وحوارٌ مفتوح.
+ *
+ * وتعمل ولوحةُ الكتابة عربيّة: الحرفُ يُقرأ من موضع مفتاحه (`shortcutKey`)،
+ * فـ«ل» على مفتاح G هي G — بلا تبديل اللغة في كلّ مرّة.
  */
 const CHORD_MS = 1200;
 
@@ -62,6 +66,8 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
       const el = list[next];
       el.dataset.navActive = "true";
       el.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      /* التركيزُ الحقيقيّ ينتقل مع العلامة — قارئُ الشاشة يسمع الصفّ، وTab يكمل منه */
+      el.querySelector<HTMLElement>("a[data-row-link]")?.focus({ preventScroll: true });
       /* لوحُ الفحص مفتوح: ينتقل إلى ملفّ الصفّ التالي في مكانه — مراجعةُ قائمةٍ بلا ذهابٍ وإياب */
       const href = el.dataset.href;
       if (open && href && isInspectorPath(href)) router.replace(href, { scroll: false });
@@ -80,13 +86,15 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (typingIn(e.target)) return;
       if (document.querySelector("dialog[open]")) return;
+      /* ما يُكتب بطريقة إدخالٍ مركّبة ليس اختصاراً */
+      if (e.isComposing) return;
 
-      const key = e.key.toLowerCase();
+      const key = shortcutKey(e);
 
       if (pendingG.current !== null) {
         window.clearTimeout(pendingG.current);
         pendingG.current = null;
-        const hit = chords.find((c) => c.chord === key);
+        const hit = key ? chords.find((c) => c.chord === key) : undefined;
         if (hit) {
           e.preventDefault();
           router.push(hit.href);
@@ -98,10 +106,11 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
         pendingG.current = window.setTimeout(() => { pendingG.current = null; }, CHORD_MS);
         return;
       }
-      if (e.key === "?") { e.preventDefault(); setHelp(true); return; }
+      if (key === "?") { e.preventDefault(); setHelp(true); return; }
       if (key === "j") { e.preventDefault(); move(1); return; }
       if (key === "k") { e.preventDefault(); move(-1); return; }
-      if (e.key === "Enter" && openActive()) { e.preventDefault(); return; }
+      /* Enter على رابطٍ مركَّز يفتحه المتصفّحُ نفسُه — لا يُفتح مرّتين */
+      if (e.key === "Enter" && !(e.target instanceof HTMLAnchorElement) && openActive()) { e.preventDefault(); return; }
       if (key === "u" && can(role, "document:upload")) { e.preventDefault(); triggerCapture(); return; }
     }
 
@@ -110,7 +119,7 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
   }, [chords, role, router]);
 
   return (
-    <Sheet open={help} onClose={() => setHelp(false)} title="اختصارات لوحة المفاتيح" description="تعمل من أيّ صفحة ما دام المؤشّر خارج حقلٍ يُكتب فيه." size="md">
+    <Sheet open={help} onClose={() => setHelp(false)} title="اختصارات لوحة المفاتيح" description="تعمل من أيّ صفحة ما دام المؤشّر خارج حقلٍ يُكتب فيه — ولوحةُ الكتابة عربيّةً أو إنجليزيّة." size="md">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 sm:grid-cols-2">
         <ShortcutGroup
           title="عامّ"
@@ -120,6 +129,7 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
             ...(can(role, "document:upload") ? [{ keys: ["U"], label: "ارفع مستنداً أو صوّره" }] : []),
             { keys: ["?"], label: "هذه القائمة" },
             { keys: ["Esc"], label: "أغلق ما فُتح" },
+            { keys: ["⌘", "Z"], label: "تراجَع عن آخر فعلٍ يقبل التراجع" },
           ]}
         />
         <ShortcutGroup

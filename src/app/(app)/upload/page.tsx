@@ -1,3 +1,4 @@
+import { MyUploads } from "@/components/my-uploads";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
@@ -54,6 +55,9 @@ export default async function UploadPage() {
         canCreateSupplier={can(user.role, "supplier:edit")}
         suppliers={rows}
       />
+
+      {/* من يرفع يرى أين وقف ما رفعه اليوم — بلا مبالغ، فلا يسأل «هل وصل؟» */}
+      <MyUploads userId={user.id} canOpen={can(user.role, "document:view")} />
 
       {waiting !== null && waiting > 0 && (
         <Callout

@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "./submit-button";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -184,7 +185,7 @@ export function DriveSyncNow({
             </button>
           ) : state === "disconnected" && reconnect ? (
             <form action={reconnect}>
-              <button type="submit" className={buttonClass("primary", "lg")}>أعد ربط الدرايف</button>
+              <SubmitButton className={buttonClass("primary", "lg")}>أعد ربط الدرايف</SubmitButton>
             </form>
           ) : (
             <button type="button" disabled className={buttonClass("secondary", "lg")}>زامن الآن</button>

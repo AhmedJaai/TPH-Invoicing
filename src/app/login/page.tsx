@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/submit-button";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
 import { BrandMark } from "@/components/icons";
@@ -100,12 +101,12 @@ export default async function LoginPage({
             }}
             className="mt-8"
           >
-            <button type="submit" className={`${buttonClass("primary", "lg")} w-full`}>
+            <SubmitButton className={`${buttonClass("primary", "lg")} w-full`}>
               <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
                 <path fill="#fff" d="M21.35 11.1H12v2.9h5.35c-.23 1.5-1.73 4.4-5.35 4.4a5.9 5.9 0 0 1 0-11.8c1.8 0 3 .77 3.7 1.43l2.5-2.4A9.3 9.3 0 0 0 12 3a9 9 0 1 0 0 18c5.2 0 8.65-3.65 8.65-8.8 0-.6-.07-1.05-.15-1.5Z" />
               </svg>
               الدخول بحساب جوجل
-            </button>
+            </SubmitButton>
           </form>
 
           <p className="mt-6 text-xs leading-relaxed text-muted">

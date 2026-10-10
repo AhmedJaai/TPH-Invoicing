@@ -10,6 +10,7 @@ import { Money } from "./money";
 import { checkInvoiceTotals, parseRiyals } from "@/lib/money";
 import { isValidSaudiVat } from "@/lib/validation";
 import type { InvoiceReason } from "@/lib/invoice-findings";
+import { changesLine, fixChanges } from "@/lib/invoice-fix-changes";
 
 /**
  * «لماذا ناقصةُ ركن» — ومعها ما يُصلحها.
@@ -74,24 +75,28 @@ export function InvoiceFix({
   const unreadable = !form.total.trim()
     || [form.subtotal, form.vat, form.total, form.discount, form.charges].some((v) => v.trim() !== "" && parseRiyals(v) === null);
 
+  /** الحقولُ كما تُرسَل — `to` ما يُكتب، و`from` ما كان (ما لم يتغيّر لا يُرسَل). */
+  const payload = (to: typeof initial, from: typeof initial) => ({
+    invoiceId,
+    invoiceNumber: to.invoiceNumber,
+    sellerVat: to.sellerVat,
+    buyerVat: to.buyerVat,
+    subtotal: to.subtotal,
+    vat: to.vat,
+    total: to.total,
+    ...(to.discount !== from.discount ? { discount: to.discount } : {}),
+    ...(to.charges !== from.charges ? { charges: to.charges } : {}),
+    /* ما لم يتغيّر لا يُرسَل — فلا يُسأل عن صلاحيةٍ لم يُطلب بها شيء */
+    ...(to.invoiceDate !== from.invoiceDate ? { invoiceDate: to.invoiceDate } : {}),
+    ...(to.supplierId !== from.supplierId ? { supplierId: to.supplierId } : {}),
+  });
+
   async function save() {
     setBusy(true);
     setFailed(false);
     setMessage(null);
-    const r = await postJson<{ taxStatus: string; releasedMinor?: number }>("/api/invoice-fields", {
-      invoiceId,
-      invoiceNumber: form.invoiceNumber,
-      sellerVat: form.sellerVat,
-      buyerVat: form.buyerVat,
-      subtotal: form.subtotal,
-      vat: form.vat,
-      total: form.total,
-      ...(form.discount !== initial.discount ? { discount: form.discount } : {}),
-      ...(form.charges !== initial.charges ? { charges: form.charges } : {}),
-      /* ما لم يتغيّر لا يُرسَل — فلا يُسأل عن صلاحيةٍ لم يُطلب بها شيء */
-      ...(form.invoiceDate !== initial.invoiceDate ? { invoiceDate: form.invoiceDate } : {}),
-      ...(form.supplierId !== initial.supplierId ? { supplierId: form.supplierId } : {}),
-    });
+    const saved = form;
+    const r = await postJson<{ taxStatus: string; releasedMinor?: number }>("/api/invoice-fields", payload(saved, initial));
     setBusy(false);
     if (!r.ok) {
       setFailed(true);
@@ -99,12 +104,33 @@ export function InvoiceFix({
       return;
     }
     const valid = r.data.taxStatus === "VALID";
+    const released = (r.data.releasedMinor ?? 0) > 0;
+    /* ما تغيّر يُقال من كم إلى كم — الأرقامُ على الصفحة ستتبدّل بعد لحظة */
+    const changed = changesLine(fixChanges(initial, saved, (id) => suppliers.find((s) => s.id === id)?.name ?? null));
     toast({
       tone: valid ? "ok" : "warn",
       title: "حُفظ التصحيح",
-      body: (r.data.releasedMinor ?? 0) > 0
-        ? "وفُكّ عنها سدادُ المورّد السابق — عاد رصيداً له يُخصم من فواتيره."
-        : valid ? "وأعاد الخادمُ الحكمَ عليها: صارت مستوفيةَ الأركان." : "وما زال فيها ما يُراجَع — الأسبابُ أعلاه.",
+      body: [
+        changed,
+        released
+          ? "فُكّ عنها سدادُ المورّد السابق — عاد رصيداً له يُخصم من فواتيره"
+          : valid ? "أعاد الخادمُ الحكمَ عليها: صارت مستوفيةَ الأركان" : "ما زال فيها ما يُراجَع — الأسبابُ أعلاه",
+      ].filter(Boolean).join(" — "),
+      duration: 12_000,
+      /*
+        التراجعُ يعيد القيمَ السابقة بالمسار نفسه (فيُعاد الحكمُ ويُحرَس الشهرُ المقفل).
+        ولا يُعرَض حين تغيّر المورّد: فكُّ السداد لا يعود بإعادة الاسم، و«تمّ التراجع» كذب.
+      */
+      undo: released || saved.supplierId !== initial.supplierId ? undefined : {
+        run: async () => {
+          const u = await postJson<{ taxStatus: string }>("/api/invoice-fields", payload(initial, saved));
+          if (u.ok) {
+            setForm(initial);
+            router.refresh();
+          }
+          return u.ok;
+        },
+      },
     });
     setOpen(false);
     router.refresh();

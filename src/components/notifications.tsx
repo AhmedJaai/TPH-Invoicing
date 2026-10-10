@@ -87,12 +87,23 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
     setOpen(false);
   }
 
+  /*
+    حدُّ القراءة تفضيلُ عرضٍ لا قيدٌ ماليّ — فيُطفأ العدّادُ فوراً ويُعاد إن ردّ
+    الخادمُ بخطأ. (التفاؤلُ ممنوعٌ في الكتابة الماليّة وحدها.)
+  */
   async function markSeen() {
+    if (!feed || marking) return;
+    const before = feed;
     setMarking(true);
+    setError(null);
+    setFeed({ ...feed, unread: 0, seenAt: new Date().toISOString() });
     const r = await postJson<{ seenAt: string }>("/api/notifications", { action: "seen" });
     setMarking(false);
-    if (r.ok && feed) setFeed({ ...feed, unread: 0, seenAt: r.data.seenAt });
-    else if (!r.ok) setError(r.error);
+    if (r.ok) setFeed((f) => (f ? { ...f, unread: 0, seenAt: r.data.seenAt } : f));
+    else {
+      setFeed(before);
+      setError(`لم تُعلَّم مقروءةً: ${r.error}`);
+    }
   }
 
   const unread = feed?.unread ?? 0;
@@ -109,7 +120,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
       >
         <Bell className="h-[18px] w-[18px]" strokeWidth={1.9} aria-hidden />
         {unread > 0 && (
-          <span dir="ltr" className="nums absolute end-1 top-1 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-raised">
+          <span dir="ltr" className="nums nums-count absolute end-1 top-1 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-raised">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -126,7 +137,6 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
               <RefreshCw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> حدّث
             </button>
             <button
-              aria-busy={marking}
               type="button"
               disabled={marking || unread === 0}
               onClick={markSeen}
@@ -138,18 +148,18 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
           </>
         }
       >
-        <div role="tablist" aria-label="الإشعارات" className="mb-4 inline-flex rounded-lg bg-sunken p-1">
+        {/* زرّان بحالٍ مضغوطة لا «ألسنة»: نمطُ `tab` يَعِد بلوحٍ وأسهمٍ لم تكن */}
+        <div role="group" aria-label="أيَّ الإشعارات تعرض" className="mb-4 inline-flex rounded-lg bg-sunken p-1">
           {([["new", "الجديد"], ["digest", "ملخّص اليوم"]] as const).map(([k, label]) => (
             <button
               key={k}
-              role="tab"
               type="button"
-              aria-selected={tab === k}
+              aria-pressed={tab === k}
               onClick={() => setTab(k)}
               className={`min-h-9 rounded-md px-3 text-xs font-bold transition-colors ${tab === k ? "bg-raised text-ink shadow-raised" : "text-muted hover:text-ink"}`}
             >
               {label}
-              {k === "new" && unread > 0 && <span className="nums ms-1.5 rounded-full bg-danger px-1.5 text-[10px] text-raised">{unread}</span>}
+              {k === "new" && unread > 0 && <span className="nums nums-count ms-1.5 rounded-full bg-danger px-1.5 text-[10px] text-raised">{unread}</span>}
             </button>
           ))}
         </div>
@@ -230,7 +240,7 @@ function DigestPanel({ feed }: { feed: NoticeFeed }) {
           <li key={r.label}>
             <Link href={r.href} className="flex min-h-12 items-center justify-between gap-3 px-4 transition-colors hover:bg-hover">
               <span className="text-[13px]">{r.label}</span>
-              <span className={`nums text-base font-bold ${r.n === 0 ? "text-muted" : ""}`}>{r.n}</span>
+              <span className={`nums nums-count text-base font-bold ${r.n === 0 ? "text-muted" : ""}`}>{r.n}</span>
             </Link>
           </li>
         ))}

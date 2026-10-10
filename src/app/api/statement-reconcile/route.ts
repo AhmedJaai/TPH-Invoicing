@@ -28,6 +28,7 @@ import { parseStatementExtras } from "@/lib/extraction/statement-extras";
 import { companyConfig } from "@/config/drive";
 import { reconcileAndPersist } from "@/services/statement-reconcile.service";
 import { withDeadline } from "@/lib/ai/deadline";
+import { signatureMatches, sniffMimeType } from "@/lib/file-signature";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -137,7 +138,12 @@ async function handle(request: Request) {
       return NextResponse.json({ error: "نوع غير مدعوم — المقبول PDF أو صورة" }, { status: 400 });
     }
     data = Buffer.from(await file.arrayBuffer());
-    mimeType = file.type;
+    /* النوعُ من بصمة الملفّ لا ممّا أعلنه المتصفّح — قبل أيّ محلِّل */
+    const sniffed = sniffMimeType(data);
+    if (!sniffed) {
+      return NextResponse.json({ error: "محتوى الملفّ ليس PDF ولا صورة — تحقّق من الملفّ ثمّ أعد الرفع" }, { status: 400 });
+    }
+    mimeType = signatureMatches(file.type, data) ? file.type : sniffed;
     fileName = file.name;
     const given = String(form.get("supplierId") ?? "").trim();
     supplierId = given || null;

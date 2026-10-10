@@ -22,6 +22,7 @@ export const roleEnum = pgEnum("role", [
   "OWNER",      // المالك — كل شيء
   "ACCOUNTANT", // المحاسب — كل المالية عدا إدارة المستخدمين
   "PURCHASING", // مدير المشتريات — الرفع والمتابعة فقط
+  "AUDITOR",    // المراجع — قراءةٌ فقط (هجرة معلّقة: security__role_auditor)
 ]);
 
 export const users = pgTable("users", {
@@ -744,6 +745,24 @@ export const rateLimits = pgTable("rate_limits", {
   primaryKey({ columns: [t.key, t.windowStart] }),
   index("rate_limits_window_idx").on(t.windowStart),
 ]);
+
+/**
+ * دفترُ نداءات الذكاء — كم نداءً، بأيّ نموذج، وكم كلّف تقديراً.
+ *
+ * كانت الحدودُ لكلّ مستخدمٍ ولكلّ مسارٍ في الساعة، ولا شيءَ يجمع: ثلاثةُ مستخدمين ×
+ * مساراتٌ عدّة × يومٌ كامل آلافُ النداءات قبل أن ينتبه أحد. والكلفةُ **تقديرٌ بالدولار**
+ * (جزءٌ من مليون، عدداً صحيحاً) من تسعيرة الذروة — لا مالٌ يُقيَّد ولا يُبنى عليه قرارٌ ماليّ.
+ */
+export const aiUsage = pgTable("ai_usage", {
+  id: id(),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  task: text("task").notNull(),
+  model: text("model").notNull(),
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  cachedTokens: integer("cached_tokens").notNull().default(0),
+  costMicroUsd: bigint("cost_micro_usd", { mode: "number" }).notNull().default(0),
+}, (t) => [index("ai_usage_at_idx").on(t.at)]);
 
 
 /* ───────────────────────── الأصناف المعيارية ───────────────────────── */
@@ -2048,4 +2067,17 @@ export const vatPeriodInputs = pgTable("vat_period_inputs", {
   cashSalesGrossMinor: integer("cash_sales_gross_minor").notNull(),
   updatedById: text("updated_by_id").references(() => users.id),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * قرارُ المالك بإدخال فاتورةٍ محجوزة في دفعة الشهر — صفٌّ لكلّ فاتورة، بسبب حجزها
+ * لحظةَ القرار وبما كتبه سبباً. يُنبَّه ولا يُمنَع (٧ أكتوبر ٢٠٢٦)، وحذفُ الصفّ
+ * يعيدها إلى الحجز. لا مبلغَ فيه: الدفعةُ تُبنى في الخادم من الفاتورة نفسها.
+ */
+export const paymentHoldOverrides = pgTable("payment_hold_overrides", {
+  invoiceId: text("invoice_id").primaryKey().references(() => invoices.id, { onDelete: "cascade" }),
+  holdReason: text("hold_reason").notNull(),
+  note: text("note").notNull(),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
 });

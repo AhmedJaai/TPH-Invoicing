@@ -21,6 +21,7 @@ import { autoRereadGaps } from "@/services/document-reread.service";
 import { missingFromReading, recordFromStoredReadings } from "@/services/document-backlog.service";
 import { normalizeDocumentDate } from "@/lib/document-date";
 import { parseRiyals } from "@/lib/money";
+import type { AutoWorkItem } from "@/lib/auto-work";
 
 export async function loadPendingReview(limit = 200) {
   const rows = await db
@@ -123,10 +124,13 @@ function missingFor(reading: unknown, supplierKnown: boolean, fileName: string, 
  */
 export async function approveEligible(actorId: string, limit = 80): Promise<{
   approved: number; driveFileIds: string[]; failed: string[]; remaining: number;
+  /** ما اعتُمد بعينه — يُقال لصاحبه ولا يتبدّل طابورُه بصمت. */
+  done: AutoWorkItem[];
 }> {
   const eligible = (await loadPendingReview(500)).filter((d) => d.status === "NEEDS_REVIEW" && d.verdict.auto);
   const driveFileIds: string[] = [];
   const failed: string[] = [];
+  const done: AutoWorkItem[] = [];
   let approved = 0;
   for (const d of eligible.slice(0, limit)) {
     try {
@@ -148,13 +152,14 @@ export async function approveEligible(actorId: string, limit = 80): Promise<{
       });
       if (ok) {
         approved++;
+        done.push({ documentId: d.id, fileName: d.fileName, supplierName: d.supplierName, what: "approved", totalMinor: d.totalMinor });
         if (d.driveFileId) driveFileIds.push(d.driveFileId);
       }
     } catch (e) {
       failed.push(`${d.fileName}: ${(e as Error).message.slice(0, 80)}`);
     }
   }
-  return { approved, driveFileIds, failed, remaining: Math.max(0, eligible.length - limit) };
+  return { approved, driveFileIds, failed, remaining: Math.max(0, eligible.length - limit), done };
 }
 
 /**
@@ -167,9 +172,13 @@ export async function approveEligible(actorId: string, limit = 80): Promise<{
 export async function processDocumentBacklog(
   actorId: string,
   drive: drive_v3.Drive | null,
-): Promise<{ recorded: number; approved: number; renamed: { from: string; to: string }[]; reread: number; notes: string[] }> {
+): Promise<{
+  recorded: number; approved: number; renamed: { from: string; to: string }[]; reread: number; notes: string[];
+  /** ما قُيِّد وما اعتُمد بأعيانه ومبالغه — ما يحرّك رقماً يُقال (`lib/auto-work.ts`). */
+  done: AutoWorkItem[];
+}> {
   const notes: string[] = [];
-  const { recorded } = await recordFromStoredReadings(actorId);
+  const { recorded, items } = await recordFromStoredReadings(actorId);
   const approval = await approveEligible(actorId);
   notes.push(...approval.failed);
 
@@ -194,7 +203,15 @@ export async function processDocumentBacklog(
     renamed = outcome.done;
     notes.push(...outcome.failed.map((f) => `${f.from}: ${f.error}`));
   }
-  return { recorded, approved: approval.approved, renamed, reread, notes };
+  /* ما قُيِّد ثمّ اعتُمد في المرّة نفسها يُقال «قُيِّد» — هو الذي زاد ما عليك */
+  const recordedDocs = new Set(items.map((i) => i.documentId));
+  const done: AutoWorkItem[] = [
+    ...items.filter((i) => i.kind === "INVOICE").map((i): AutoWorkItem => ({
+      documentId: i.documentId, fileName: i.fileName, supplierName: i.supplierName, what: "recorded", totalMinor: i.totalMinor,
+    })),
+    ...approval.done.filter((d) => !recordedDocs.has(d.documentId)),
+  ];
+  return { recorded, approved: approval.approved, renamed, reread, notes, done };
 }
 
 /**

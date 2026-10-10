@@ -12,7 +12,7 @@ import { can } from "@/lib/permissions";
 import { activeProviderName } from "@/lib/extraction";
 import { deepseekBaseUrl, deepseekKey } from "@/lib/ai/models";
 import { createOAuthClient } from "@/lib/drive";
-import { isSealed, openToken, tokenEncryptionEnabled } from "@/lib/token-crypto";
+import { openToken, sealedWithCurrentKey, tokenEncryptionEnabled } from "@/lib/token-crypto";
 import { accounts } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { isAuthBypassed } from "@/lib/session";
@@ -131,7 +131,7 @@ export async function GET() {
     فللمخوَّل وحده يُجدَّد رمزُه — قراءةٌ لا تمسّ الأرشيف.
   */
   /* ورمزٌ محفوظٌ خامّاً (بلا `TOKEN_ENCRYPTION_KEY`) يُقال للمخوَّل — كان يسقط التشفيرُ بصمت */
-  let driveToken: { ok: boolean; error?: string; sealed?: boolean } | undefined;
+  let driveToken: { ok: boolean; error?: string; sealed?: boolean; fix?: string } | undefined;
   if (detailed && viewer) {
     const [row] = await db
       .select({ token: accounts.refresh_token })
@@ -145,7 +145,10 @@ export async function GET() {
         const client = createOAuthClient();
         client.setCredentials({ refresh_token: openToken(row.token) });
         const t = await client.getAccessToken();
-        driveToken = t.token ? { ok: true, sealed: isSealed(row.token) } : { ok: false, error: "لم يصدر رمز وصول" };
+        const sealed = sealedWithCurrentKey(row.token);
+        driveToken = t.token
+          ? { ok: true, sealed, ...(sealed ? {} : { fix: "الرمز غير مختومٍ بالمفتاح الجاري — سجّل الخروج ثمّ الدخول، أو شغّل scripts/reseal-drive-tokens.ts" }) }
+          : { ok: false, error: "لم يصدر رمز وصول" };
       } catch (e) {
         driveToken = { ok: false, error: (e as Error).message.slice(0, 80) };
       }
@@ -160,12 +163,21 @@ export async function GET() {
     );
   }
 
+  /*
+    في الإنتاج غيابُ مفتاح التشفير عطبٌ يُقال: رمزُ الدرايف (بنطاق الدرايف كلّه) يُحفظ
+    خامّاً ولا يقول أحدٌ شيئاً. للمخوَّل وحده — جوابُ المجهول لا يتغيّر به.
+  */
+  const tokenKeyMissing = process.env.VERCEL_ENV === "production" && !tokenEncryptionEnabled();
+
   /* المستطلِع يقرأ الرمز لا الجسم: قارئٌ معطَّل أو رمزُ درايف منتهٍ = 503 */
-  const overall = healthy && (providerReachable?.ok ?? true) && (driveToken?.ok ?? true);
+  const overall = healthy && !tokenKeyMissing && (providerReachable?.ok ?? true) && (driveToken?.ok ?? true);
   return NextResponse.json(
     {
       healthy: overall,
       checks: { ...checks, providerReachable, driveToken },
+      ...(tokenKeyMissing
+        ? { problems: ["TOKEN_ENCRYPTION_KEY غير مضبوط في الإنتاج (٣٢ حرفاً فأكثر) — رمزُ الدرايف يُحفظ بلا تشفير. اضبطه في Vercel ثمّ سجّل الخروج والدخول"] }
+        : {}),
       at: new Date().toISOString(),
     },
     { status: overall ? 200 : 503 },

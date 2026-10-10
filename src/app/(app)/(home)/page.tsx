@@ -1,3 +1,7 @@
+import { WhyNumber } from "@/components/why-number";
+import { WhatsNew } from "@/components/whats-new";
+import { ShareBrief } from "@/components/share-brief";
+import { buildBrief } from "@/lib/morning-brief";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -8,7 +12,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
-import { Badge, EmptyState, KeyFigure, LinkButton, Meter, Section, Stepper, buttonClass } from "@/components/ui";
+import { Badge, EmptyState, Kbd, KeyFigure, LinkButton, Meter, Section, Stepper, buttonClass } from "@/components/ui";
 import { TaskList } from "@/components/task-list";
 import { Changes } from "@/components/changes";
 import { prioritize } from "@/lib/attention";
@@ -43,6 +47,9 @@ const SHOWN = 5;
  *
  * والأقسامُ البطيئة (الإقفال) تصل بعد الصفحة في `Suspense` — فلا ينتظرها ما فوقها.
  */
+/** ما يُسأل عنه لعرض بنود «الجديد» — صلاحياتُ `NewsItem.needs`. */
+const NEWS_CAPABILITIES = ["payment:approve", "bank:view", "document:upload", "document:view"] as const;
+
 export default async function HomePage() {
   const user = await currentUser();
   if (!user) redirect("/login?from=/");
@@ -106,13 +113,33 @@ export default async function HomePage() {
       display
       intro={summary.join(" ")}
       actions={
-        first ? (
-          <LinkButton href={first.href} variant="primary" size="lg" icon={ArrowLeft}>
-            {`ابدأ بالأهمّ: ${first.actionLabel ?? "افتح"}`}
-          </LinkButton>
-        ) : undefined
+        <>
+          {/* الإحاطةُ نصّاً لمن يريد إطلاعَ شريكه أو محاسبه — من الأرقام نفسها أدناه */}
+          {!start.knowsNothing && (
+            <ShareBrief
+              text={buildBrief({
+                dateLabel: longDate(),
+                knowsNothing: start.knowsNothing,
+                owedMinor: totals.owedMinor,
+                owedSuppliers: totals.owedSuppliers,
+                weekMinor: week ? week.totalMinor : null,
+                balanceMinor: cash ? cash.balanceMinor : undefined,
+                pending: attention.length,
+              })}
+            />
+          )}
+          {first && (
+            <LinkButton href={first.href} variant="primary" size="lg" icon={ArrowLeft}>
+              {`ابدأ بالأهمّ: ${first.actionLabel ?? "افتح"}`}
+            </LinkButton>
+          )}
+        </>
       }
     >
+      {!start.knowsNothing && (
+        <WhatsNew allowed={NEWS_CAPABILITIES.filter((c) => can(user.role, c))} />
+      )}
+
       {start.incomplete && (
         <section aria-labelledby="start-title" className="mb-8 rounded-2xl border border-accent-line bg-accent-soft/60 p-5 sm:p-6">
           <h2 id="start-title" className="flex items-center gap-2 text-base font-bold">
@@ -158,6 +185,8 @@ export default async function HomePage() {
             {totals.creditLeftMinor > 0 && (
               <p className="text-xs text-ink-soft">ولك عندهم <Money minor={totals.creditLeftMinor} /></p>
             )}
+            {/* الرقمُ يتغيّر بقيدٍ أو سداد — وهنا يُقال بماذا، ومن فعله */}
+            <WhyNumber figure="owed" auditHref={can(user.role, "audit:view") ? "/settings/audit?kind=money" : undefined} />
           </KeyFigure>
           {week && (
             <KeyFigure
@@ -241,7 +270,7 @@ export default async function HomePage() {
                 </Link>
               )}
               <p className="mt-3 hidden text-[11px] text-muted lg:block">
-                تنقّل بين البنود بـ<kbd className="rounded border border-line px-1">J</kbd> و<kbd className="rounded border border-line px-1">K</kbd>، وافتح بـ<kbd className="rounded border border-line px-1">Enter</kbd>.
+                تنقّل بين البنود بـ<Kbd>J</Kbd> و<Kbd>K</Kbd>، وافتح بـ<Kbd>Enter</Kbd>.
               </p>
             </>
           ) : start.knowsNothing ? (

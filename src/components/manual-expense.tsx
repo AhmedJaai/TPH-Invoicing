@@ -1,5 +1,6 @@
 "use client";
 
+import { DateChips } from "./date-chips";
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CircleAlert, Plus, TriangleAlert } from "lucide-react";
@@ -159,6 +160,7 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
                 aria-invalid={tried && !!problems.date}
                 className={`nums ${field} ${border(problems.date)}`}
               />
+              <DateChips value={occurredOn} onPick={setOccurredOn} />
               {tried && problems.date && <span className="mt-1 block text-[11px] font-bold text-danger">{problems.date}</span>}
             </label>
           </div>

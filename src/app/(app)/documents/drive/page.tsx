@@ -13,6 +13,8 @@ import { DOCUMENT, FILE, countNoun, timeAgo } from "@/lib/arabic";
 import { formatDay, formatMoment } from "@/lib/riyadh-time";
 import { DriveSyncNow } from "@/components/drive-sync-now";
 import { loadDriveStatus, type DriveStatus } from "@/services/drive-status.service";
+import { AutoWorkSwitch } from "@/components/auto-work-switch";
+import { loadAutoPause } from "@/services/auto-process.service";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +35,7 @@ export default async function DrivePage() {
   if (!user) redirect("/login?from=/documents/drive");
   if (!can(user.role, "document:upload")) redirect("/documents");
 
-  const s = await loadDriveStatus(user.id);
+  const [s, auto] = await Promise.all([loadDriveStatus(user.id), loadAutoPause()]);
   const n = s.naming;
   const toRename = n.toRenameArchived + n.toRenamePending;
 
@@ -50,6 +52,13 @@ export default async function DrivePage() {
       intro="أرشيفُ المقهى في جوجل درايف: يُقرأ الجديدُ منه وحده، ويُسمّى المؤرشَفُ على الصيغة وحده. هنا حالُه وما فعله — والتحكّمُ اليدويّ إن لم ترد الانتظار."
     >
       <DriveSyncNow {...statusCopy(s)} state={s.state} facts={syncFacts(s)} reconnect={reconnect} />
+
+      {/* ضابطُ ما يجري وحده — لمن يملك الاعتماد، وهو مَن يجري العملُ باسمه */}
+      {can(user.role, "amounts:view") && (
+        <div className="mt-3">
+          <AutoWorkSwitch paused={auto.paused} since={auto.since ? formatMoment(auto.since) : null} />
+        </div>
+      )}
 
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
         <KeyFigure

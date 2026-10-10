@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ReceiptText } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
-import { toast } from "./ui-client";
+import { Field, Input, MoneyInput, toast } from "./ui-client";
 
 /**
  * «وصل إشعارٌ دائن؟» — مرتجعٌ أو خصمٌ من المورّد على هذه الفاتورة.
@@ -35,6 +35,8 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
   }
 
   async function save(acknowledgeDuplicate = false) {
+    /* Enter مرّتين أو ضغطتان: الثانيةُ لا تُرسل إشعاراً ثانياً */
+    if (busy || amount.trim() === "") return;
     setBusy(true);
     setError(null);
     const r = await postJson<{ message?: string }>("/api/credit-note", {
@@ -61,52 +63,65 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
   }
 
   return (
-    <div className="mt-4 animate-rise rounded-xl border border-line bg-raised p-4">
+    /* نموذجٌ حقيقيّ: Enter في أيّ حقلٍ يقيّد، و«تمّ» في لوحة مفاتيح الهاتف كذلك */
+    <form
+      onSubmit={(e) => { e.preventDefault(); void save(duplicate); }}
+      className="mt-4 animate-rise rounded-xl border border-line bg-raised p-4"
+    >
       <p className="text-xs font-bold">إشعارٌ دائن على هذه الفاتورة</p>
       <p className="mt-1 text-[11px] leading-relaxed text-muted">
         يُنقص ما بقي عليها ولا يُعدّ مالاً خرج — ولا ينتظر كشفَ بنك.
       </p>
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <label className="text-[11px] text-muted">
-          المبلغ (ريال)
-          <input
-            type="text" inputMode="decimal" dir="ltr" autoFocus
-            value={amount} onChange={(e) => { setAmount(e.target.value); setDuplicate(false); }} disabled={busy} placeholder="700"
-            className="nums mt-1 block min-h-11 w-28 rounded-lg border border-line-input bg-raised px-2 text-center text-sm"
-          />
-        </label>
-        <label className="text-[11px] text-muted">
-          تاريخه
-          <input
-            type="date" value={issuedOn} onChange={(e) => setIssuedOn(e.target.value)} disabled={busy}
-            className="nums mt-1 block min-h-11 rounded-lg border border-line-input bg-raised px-2 text-sm"
-          />
-        </label>
-        <label className="text-[11px] text-muted">
-          رقمُه (اختياريّ)
-          <input
-            type="text" dir="ltr" value={reference} onChange={(e) => setReference(e.target.value)} disabled={busy} maxLength={60}
-            className="nums mt-1 block min-h-11 w-32 rounded-lg border border-line-input bg-raised px-2 text-sm"
-          />
-        </label>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Field label="المبلغ (ريال)" required>
+          {({ invalid, ...p }) => (
+            <MoneyInput
+              {...p}
+              invalid={invalid}
+              autoFocus
+              enterKeyHint="done"
+              value={amount}
+              onChange={(v) => { setAmount(v); setDuplicate(false); }}
+              disabled={busy}
+              placeholder="700"
+            />
+          )}
+        </Field>
+        <Field label="تاريخه">
+          {({ invalid, ...p }) => (
+            <Input {...p} invalid={invalid} type="date" className="nums" value={issuedOn} onChange={(e) => setIssuedOn(e.target.value)} disabled={busy} />
+          )}
+        </Field>
+        <Field label="رقمُه (اختياريّ)" className="col-span-2 sm:col-span-1">
+          {({ invalid, ...p }) => (
+            <Input {...p} invalid={invalid} type="text" dir="ltr" className="nums" enterKeyHint="done" value={reference} onChange={(e) => setReference(e.target.value)} disabled={busy} maxLength={60} />
+          )}
+        </Field>
       </div>
-      <label className="mt-2 block text-[11px] text-muted">
-        السبب (اختياريّ)
-        <input
-          type="text" value={reason} onChange={(e) => setReason(e.target.value)} disabled={busy} maxLength={200}
-          placeholder="مرتجعُ حليبٍ منتهٍ · خصمُ كمّيّة"
-          className="mt-1 block min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-sm"
-        />
-      </label>
+      <Field label="السبب (اختياريّ)" className="mt-3">
+        {({ invalid, ...p }) => (
+          <Input
+            {...p}
+            invalid={invalid}
+            type="text"
+            enterKeyHint="done"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            disabled={busy}
+            maxLength={200}
+            placeholder="مرتجعُ حليبٍ منتهٍ · خصمُ كمّيّة"
+          />
+        )}
+      </Field>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       <div className="mt-3 flex gap-2">
-        <button type="button" onClick={() => save(duplicate)} disabled={busy || amount.trim() === ""} className={buttonClass("primary", "sm")}>
-          {busy ? "يُقيَّد…" : duplicate ? "إشعارٌ آخر — قيّده" : "قيّد الإشعار"}
+        <button type="submit" aria-busy={busy} disabled={busy || amount.trim() === ""} className={buttonClass("primary", "sm")}>
+          <span>{duplicate ? "إشعارٌ آخر — قيّده" : "قيّد الإشعار"}</span>
         </button>
         <button type="button" onClick={() => { setOpen(false); setError(null); }} disabled={busy} className={buttonClass("quiet", "sm")}>
           ألغِ
         </button>
       </div>
-    </div>
+    </form>
   );
 }

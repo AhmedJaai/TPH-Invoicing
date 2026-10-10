@@ -67,6 +67,6 @@ export function refusalReason(env: PreviewEnv): string | null {
  * دورٌ آخر. والمتغيّرُ لا أثر له خارج وضع التجربة (`previewAllowed`)، وما
  * ليس دوراً معروفاً يُرَدّ إلى المالك ولا يُخترَع له دور.
  */
-export function previewRole(requested: string | undefined): "OWNER" | "ACCOUNTANT" | "PURCHASING" {
-  return requested === "ACCOUNTANT" || requested === "PURCHASING" ? requested : "OWNER";
+export function previewRole(requested: string | undefined): "OWNER" | "ACCOUNTANT" | "PURCHASING" | "AUDITOR" {
+  return requested === "ACCOUNTANT" || requested === "PURCHASING" || requested === "AUDITOR" ? requested : "OWNER";
 }

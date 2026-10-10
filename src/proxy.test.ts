@@ -55,3 +55,13 @@ describe("الطلب الكاتب على /api", () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe("الخروج يمسح خزين المتصفّح", () => {
+  it("صفحةُ الدخول تحمل Clear-Site-Data، وصفحاتُ التطبيق لا تحملها", () => {
+    const login = proxy(new NextRequest("https://app.example.com/login"));
+    expect(login.headers.get("clear-site-data")).toBe('"cache"');
+    const inside = proxy(new NextRequest("https://app.example.com/suppliers", { headers: { cookie: SESSION } }));
+    expect(inside.headers.get("clear-site-data")).toBeNull();
+  });
+});
+

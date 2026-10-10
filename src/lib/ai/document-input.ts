@@ -22,6 +22,7 @@
 import { extractPdfWords, MAX_TEXT_PAGES, ROW_TOLERANCE, type PdfWord } from "@/lib/bank/parsers/pdf-text";
 import { extractEmbeddedJpegs, type EmbeddedImage } from "./pdf-images";
 import { isDeepseekImageType } from "./models";
+import { assertHeifOpenable, MAX_IMAGE_PIXELS } from "@/lib/file-signature";
 
 export const PDF_TYPE = "application/pdf";
 
@@ -197,9 +198,11 @@ export async function normalizeImage(data: Buffer, mimeType: string): Promise<Em
   if (HEIF_TYPES.has(mimeType)) {
     /* sharp المبنيّ سلفاً لا يفكّ HEVC — فيُفكّ بـlibheif المترجَم إلى WebAssembly */
     const { default: convert } = await import("heic-convert");
+    /* المحوِّل يفكّ الصورةَ كلَّها في الذاكرة — فأبعادُها تُسأل قبله */
+    assertHeifOpenable(data);
     source = Buffer.from(await convert({ buffer: data, format: "JPEG", quality: 0.92 }));
   }
-  const { data: jpeg, info } = await sharp(source)
+  const { data: jpeg, info } = await sharp(source, { limitInputPixels: MAX_IMAGE_PIXELS })
     .rotate()
     .resize({ width: MAX_IMAGE_SIDE, height: MAX_IMAGE_SIDE, fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: 85 })

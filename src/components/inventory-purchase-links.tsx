@@ -115,7 +115,8 @@ function LinkRow({ row, options, canEdit, onSaved }: {
   const ordered = suggested ? [suggested, ...options.filter((o) => o.id !== suggested.id)] : options;
 
   async function save() {
-    if (!product || !unitOk) return;
+    /* Enter مرّتين أو والحقولُ ناقصة: لا طلبَ ثانياً ولا ناقصاً */
+    if (busy || !product || !unitOk || contentQuantity.trim() === "" || packSize.trim() === "") return;
     setBusy(true);
     setError(null);
     const r = await postJson<{ message?: string }>("/api/inventory/purchase-link", {
@@ -170,7 +171,8 @@ function LinkRow({ row, options, canEdit, onSaved }: {
       )}
 
       {showForm && (
-        <div className="mt-2 flex flex-wrap items-end gap-2">
+        /* نموذجٌ حقيقيّ: Enter في حقل العبوة يربط */
+        <form onSubmit={(e) => { e.preventDefault(); void save(); }} className="mt-2 flex flex-wrap items-end gap-2">
           <label className="min-w-0 flex-1 basis-56 text-[11px] text-muted">
             صنفُ الجرد
             <select
@@ -218,19 +220,19 @@ function LinkRow({ row, options, canEdit, onSaved }: {
             </select>
           </label>
           <button
-            type="button"
-            onClick={save}
+            type="submit"
+            aria-busy={busy}
             disabled={busy || !product || !unitOk || contentQuantity.trim() === "" || packSize.trim() === ""}
             className={buttonClass("primary", "sm")}
           >
-            {busy ? "يُحفَظ…" : "اربط"}
+            <span>اربط</span>
           </button>
           {isLinked && (
             <button type="button" onClick={() => setEditing(false)} disabled={busy} className={buttonClass("quiet", "sm")}>
               ألغِ
             </button>
           )}
-        </div>
+        </form>
       )}
 
       {showForm && (row.guessedPack || (suggested && !row.productId)) && (

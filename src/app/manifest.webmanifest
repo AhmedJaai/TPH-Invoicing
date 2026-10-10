@@ -17,6 +17,14 @@
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
+  "share_target": {
+    "action": "/share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [{ "name": "files", "accept": ["image/*", "application/pdf", ".pdf"] }]
+    }
+  },
   "shortcuts": [
     { "name": "صوّر فاتورة أو ارفعها", "short_name": "ارفع", "url": "/upload", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "يحتاج قرارك", "short_name": "قرارك", "url": "/attention", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },

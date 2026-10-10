@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ViewTransition } from "react";
-import { Inbox, type LucideIcon } from "lucide-react";
+import { Suspense, ViewTransition, useId } from "react";
+import { ArrowDown, ArrowUp, Check, Inbox, Minus, TriangleAlert, type LucideIcon } from "lucide-react";
 import { Money, Prose } from "./money";
 import { LiveMoney } from "./live-money";
 import { ScrollX } from "./scroll-x";
-import { LinkPending, TableFilter } from "./ui-client";
+import { LinkPending, SortHeader, SortSelect, TableFilter } from "./ui-client";
+import { parseSort, sortRows, type SortValue } from "@/lib/table-sort";
 
 /**
  * عناصر الواجهة المشتركة — نظامُ التصميم الثاني.
@@ -108,7 +109,7 @@ export function Section({
           {Icon && <Icon className="h-[18px] w-[18px] text-muted" strokeWidth={1.75} aria-hidden />}
           {title}
           {count !== undefined && (
-            <span className="nums rounded-full bg-sunken px-2 py-0.5 text-[11px] font-bold text-ink-soft">{count}</span>
+            <span className="nums nums-count rounded-full bg-sunken px-2 py-0.5 text-[11px] font-bold text-ink-soft">{count}</span>
           )}
         </h2>
         {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
@@ -175,9 +176,25 @@ export function Badge({
   );
 }
 
-export function Kbd({ children }: { children: React.ReactNode }) {
+/**
+ * مفتاحُ اختصار — شكلٌ واحد في التطبيق كلّه، و`dir="ltr"` كي لا ينقلب «⌘K».
+ * `frame` للشريط الجانبيّ الداكن، و`inherit` لما يقع فوق زرٍّ ملوَّن فيأخذ لونه.
+ */
+export function Kbd({
+  children,
+  tone = "surface",
+  className = "",
+}: {
+  children: React.ReactNode;
+  tone?: "surface" | "frame" | "inherit";
+  className?: string;
+}) {
+  const skin =
+    tone === "frame" ? "border-frame-line text-frame-muted"
+    : tone === "inherit" ? "border-current/25"
+    : "border-line border-b-2 bg-raised text-ink-soft";
   return (
-    <kbd dir="ltr" className="inline-flex min-w-5 items-center justify-center rounded-md border border-line border-b-2 bg-raised px-1 font-sans text-[11px] font-medium leading-4 text-ink-soft">
+    <kbd dir="ltr" className={`inline-flex min-w-5 shrink-0 items-center justify-center rounded-md border px-1 font-sans text-[11px] font-medium leading-4 ${skin} ${className}`}>
       {children}
     </kbd>
   );
@@ -214,9 +231,12 @@ export function Stat({
           {label}
         </p>
         {/* `.nums` على الرقم وحده — «غير معروف» تُكتب بخطّ الواجهة */}
-        <p className={`${isNumeric(value) || minor !== undefined ? "nums " : ""}mt-2.5 text-[1.6rem] font-semibold leading-none tracking-tight sm:text-[1.75rem] ${tone ? TONE_TEXT[tone] : ""}`}>
-          {minor !== undefined ? <LiveMoney minor={minor} /> : value}
-        </p>
+        {/* الرقمُ يصغر بمقاس بطاقته (`cqi`): مبلغٌ سداسيّ في عمودٍ من اثنين على الجوّال لا يفيض */}
+        <div className="@container mt-2.5">
+          <p className={`${isNumeric(value) || minor !== undefined ? "nums " : ""}text-[clamp(1.15rem,13cqi,1.6rem)] font-semibold leading-none tracking-tight sm:text-[1.75rem] ${tone ? TONE_TEXT[tone] : ""}`}>
+            {minor !== undefined ? <LiveMoney minor={minor} /> : value}
+          </p>
+        </div>
         {sub && (
           <p className="mt-auto pt-2.5 text-xs leading-relaxed text-muted">
             {typeof sub === "string" ? <Prose text={sub} /> : sub}
@@ -274,7 +294,9 @@ export function KeyFigure({
         {delta !== undefined && <Delta pct={delta} />}
       </span>
       {/* الرقمُ الكبير نصفُ غامق — الثقةُ في الحجم لا في الوزن (Stripe) */}
-      <span className={`mt-4 block text-[1.6rem] font-semibold leading-none tracking-tight sm:text-[2rem] ${ink}`}>{value}</span>
+      <span className="@container mt-4 block">
+        <span className={`block text-[clamp(1.15rem,13cqi,1.6rem)] font-semibold leading-none tracking-tight sm:text-[2rem] ${ink}`}>{value}</span>
+      </span>
       {sub && <span className="mt-3 block text-xs leading-relaxed text-muted">{sub}</span>}
     </>
   );
@@ -317,9 +339,11 @@ export function Delta({ pct, favourable }: { pct: number | null; favourable?: bo
   const tone = favourable === true ? "text-ok bg-ok-bg" : favourable === false ? "text-warn bg-warn-bg" : "text-ink-soft bg-sunken";
   return (
     <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[11px] font-bold ${tone}`}>
-      <span aria-hidden>{up ? "▲" : pct < 0 ? "▼" : "•"}</span>
+      {/* أيقوناتُ lucide لا حروفٌ بخطّ النظام: «▲▼» تختلف وزناً بين الأجهزة وقد تصير رمزاً ملوَّناً */}
+      {up ? <ArrowUp className="h-3 w-3" strokeWidth={2.5} aria-hidden /> : pct < 0 ? <ArrowDown className="h-3 w-3" strokeWidth={2.5} aria-hidden /> : <Minus className="h-3 w-3" strokeWidth={2.5} aria-hidden />}
       <span className="sr-only">{up ? "ارتفاع" : pct < 0 ? "انخفاض" : "ثبات"}</span>
-      <span className="nums">{Math.abs(Math.round(pct))}</span>٪
+      {/* «٪» حرفٌ عربيّ يقلب موضعَ الرقم بجوار نصٍّ لاتينيّ — يُعزَل الاثنان معاً */}
+      <bdi dir="rtl"><span className="nums nums-count">{Math.abs(Math.round(pct))}</span>٪</bdi>
     </span>
   );
 }
@@ -563,7 +587,8 @@ export function KeyValue({
       {items.map((i) => (
         <div key={i.label} className="min-w-0">
           <dt className="text-[11px] font-medium text-muted">{i.label}</dt>
-          <dd className="mt-1 text-sm font-medium leading-snug">{i.value}</dd>
+          {/* آيبانٌ أو رقمٌ ضريبيّ أو اسمُ ملفّ — سلسلةٌ بلا مسافات تُكسَر ولا تفيض من عمودها */}
+          <dd className="mt-1 break-words text-sm font-medium leading-snug [overflow-wrap:anywhere]">{i.value}</dd>
           {i.hint && <dd className="mt-0.5 text-[11px] text-muted">{i.hint}</dd>}
         </div>
       ))}
@@ -633,7 +658,11 @@ export function Stepper({
           }`}
         >
           <span aria-hidden className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 text-xs font-bold ${DOT[s.state]}`}>
-            {s.state === "done" ? "✓" : s.state === "blocked" ? "!" : <span className="nums">{i + 1}</span>}
+            {s.state === "done"
+              ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
+              : s.state === "blocked"
+                ? <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
+                : <span className="nums nums-count">{i + 1}</span>}
           </span>
           <div className="min-w-0 flex-1 basis-48">
             <p className={`text-sm font-bold ${s.state === "done" ? "text-muted" : ""}`}>
@@ -679,7 +708,7 @@ export function LinkTabs({
           )}
           <span className="relative">{t.label}</span>
           {t.count !== undefined && t.count !== null && (
-            <span className={`nums relative rounded-full px-1.5 text-[10px] ${t.active ? "bg-inverse-ink/15" : "bg-sunken"}`}>{t.count}</span>
+            <span className={`nums nums-count relative rounded-full px-1.5 text-[10px] ${t.active ? "bg-inverse-ink/15" : "bg-sunken"}`}>{t.count}</span>
           )}
           <LinkPending />
         </Link>
@@ -739,6 +768,13 @@ export interface Column<T> {
    * الجوّال وما لا فأرةَ له ظاهرٌ دائماً — لا شيء يُخبَّأ عن اللمس.
    */
   reveal?: boolean;
+  /**
+   * قيمةُ الترتيب — بها يصير رأسُ العمود زرّاً يرتّب (والجدولُ يأخذ `sort`).
+   * مالٌ بالهللات أو نصّ؛ و`null` لما لا يُعرف: يقع آخراً ولا يُعدّ صفراً.
+   */
+  sortBy?: (row: T) => SortValue;
+  /** اتّجاهُ الضغطة الأولى — الأصل: المالُ من الأكبر والنصُّ من أوّله. */
+  sortFirst?: "asc" | "desc";
 }
 
 /** فوق كم صفّاً يثبت رأسُ الجدول ويُبحَث فيه. */
@@ -750,16 +786,21 @@ const LONG_TABLE = 15;
  * - رأسٌ ثابت وبحثٌ داخل الجدول حين تطول الصفوف (`searchOf`).
  * - عمودُ المال يصطفّ على آخر خانة.
  * - الصفُّ كلُّه يفتح سجلَّه، والرابطُ طبقةٌ تحت المحتوى لا غلاف.
- * - `j`/`k` تتنقّل بين الصفوف و`Enter` تفتح (`data-nav-item`).
+ * - `j`/`k` تتنقّل بين الصفوف و`Enter` تفتح (`data-nav-item`)، وTab يبلغ رابطَ
+ *   الصفّ باسم عموده الأساسيّ.
+ * - الترتيبُ بالعمود: `sortBy` على العمود و`sort` من عنوان الصفحة
+ *   (`searchParams.sort`) — رأسُ العمود يكتب `?sort=key.desc` والخادمُ يرتّب.
  */
 export function DataTable<T>({
   columns,
-  rows,
+  rows: given,
   keyOf,
   empty,
   hrefOf,
   searchOf,
   searchLabel = "ابحث في هذا الجدول",
+  sort,
+  sortParam = "sort",
 }: {
   columns: readonly Column<T>[];
   rows: readonly T[];
@@ -769,7 +810,20 @@ export function DataTable<T>({
   /** نصُّ الصفّ للبحث داخل الجدول — يظهر الحقل حين تطول الصفوف. */
   searchOf?: (row: T) => string;
   searchLabel?: string;
+  /**
+   * قيمةُ `?sort=` كما وصلت (أو `null` حين لا ترتيب) — تمريرُها يفعّل الترتيبَ
+   * بالأعمدة التي تحمل `sortBy`. وما لا يُفهم منها يُهمَل.
+   */
+  sort?: string | null;
+  /** اسمُ الوسيط في العنوان — لصفحةٍ فيها جدولان يُرتَّبان. */
+  sortParam?: string;
 }) {
+  const uid = useId();
+  const sortable = sort !== undefined ? columns.filter((c) => c.sortBy) : [];
+  const active = sortable.length > 0 ? parseSort(sort, sortable.map((c) => c.key)) : null;
+  const by = active ? sortable.find((c) => c.key === active.key)?.sortBy : undefined;
+  const rows = active && by ? sortRows(given, by, active.dir) : given;
+
   if (rows.length === 0) {
     return (
       <>
@@ -785,6 +839,10 @@ export function DataTable<T>({
 
   const primary = columns.find((c) => c.primary) ?? columns[0];
   const rest = columns.filter((c) => c !== primary);
+  /* بطاقةُ الجوّال: أوّلُ عمودِ مالٍ (لا فعلٍ ولا لوح) يُرفع إلى سطر العنوان */
+  const amount = rest.find((c) => c.numeric && !c.reveal && !c.wrap && c.header);
+  const main = rest.filter((c) => c !== amount && !c.secondary);
+  const extra = rest.filter((c) => c !== amount && c.secondary);
   const long = rows.length > LONG_TABLE;
   const searchable = !!searchOf && rows.length > 8;
 
@@ -794,6 +852,17 @@ export function DataTable<T>({
     /* `@container`: جدولٌ أو بطاقاتٌ بمقاس الوعاء لا الشاشة — يصحّ في الصفحة وفي لوح الفحص */
     <div data-filter-root="" className="@container relative">
       {searchable && <TableFilter label={searchLabel} total={rows.length} />}
+      {/* الجوّال بلا رؤوس أعمدة — الترتيبُ نفسُه بقائمةٍ فوق البطاقات */}
+      {sortable.length > 0 && (
+        <div className="mb-3 @xl:hidden">
+          <Suspense fallback={null}>
+            <SortSelect
+              param={sortParam}
+              options={sortable.map((c) => ({ key: c.key, label: c.header, first: c.sortFirst ?? (c.numeric ? "desc" : "asc") }))}
+            />
+          </Suspense>
+        </div>
+      )}
 
       {/* الحاسوب: جدول */}
       <ScrollX
@@ -802,21 +871,33 @@ export function DataTable<T>({
         <table className="w-full border-separate border-spacing-0 text-[13px]">
           <thead className={long ? "sticky top-0 z-10" : ""}>
             <tr>
-              {columns.map((c) => (
-                <th
-                  key={c.key}
-                  scope="col"
-                  className={`whitespace-nowrap border-b border-line bg-sunken/80 px-3.5 py-2.5 text-[11px] font-bold text-muted backdrop-blur first:rounded-ss-xl last:rounded-se-xl ${
-                    c.numeric ? "text-start" : c.align === "end" ? "text-end" : "text-start"
-                  } ${c.secondary ? "hidden @4xl:table-cell" : ""}`}
-                >
-                  {c.header || <span className="sr-only">الفعل</span>}
-                </th>
-              ))}
+              {columns.map((c) => {
+                const canSort = sort !== undefined && !!c.sortBy && !!c.header;
+                const dir = active?.key === c.key ? active.dir : null;
+                return (
+                  <th
+                    key={c.key}
+                    scope="col"
+                    aria-sort={canSort ? (dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none") : undefined}
+                    className={`whitespace-nowrap border-b border-line bg-sunken/80 px-3.5 py-2.5 text-[11px] font-bold text-muted backdrop-blur first:rounded-ss-xl last:rounded-se-xl ${
+                      c.numeric ? "text-start" : c.align === "end" ? "text-end" : "text-start"
+                    } ${c.secondary ? "hidden @4xl:table-cell" : ""}`}
+                  >
+                    {canSort ? (
+                      /* الرأسُ يقرأ العنوانَ في المتصفّح — وريثما يُركَّب يُرى نصُّه كما كان */
+                      <Suspense fallback={c.header}>
+                        <SortHeader param={sortParam} sortKey={c.key} first={c.sortFirst ?? (c.numeric ? "desc" : "asc")}>{c.header}</SortHeader>
+                      </Suspense>
+                    ) : (
+                      c.header || <span className="sr-only">الفعل</span>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => {
+            {rows.map((row, r) => {
               const href = hrefOf?.(row);
               return (
                 <tr
@@ -829,12 +910,14 @@ export function DataTable<T>({
                   {columns.map((c, i) => (
                     <td
                       key={c.key}
+                      id={href && c === primary ? `${uid}-r${r}` : undefined}
                       className={`border-b border-line-soft px-3.5 py-3 align-middle group-last:border-b-0 ${
                         c.numeric ? "nums-col" : c.align === "end" ? "text-end" : "text-start"
                       } ${c.secondary ? "hidden @4xl:table-cell" : ""} ${c.reveal ? "row-reveal" : ""}`}
                     >
                       {i === 0 && href && (
-                        <Link href={href} scroll={false} aria-label="افتح التفصيل" tabIndex={-1} className="absolute inset-0" />
+                        /* يُبلَغ بـTab ويُسمّى بعموده الأساسيّ — كان `tabIndex={-1}` فلا يفتح الصفَّ إلّا الفأرةُ وJ/K */
+                        <Link href={href} scroll={false} data-row-link="" aria-label="افتح التفصيل" aria-labelledby={`${uid}-r${r}`} className="absolute inset-0 rounded-lg" />
                       )}
                       {c.cell(row)}
                     </td>
@@ -857,18 +940,45 @@ export function DataTable<T>({
                 className={`rounded-xl border border-line bg-raised p-4 shadow-raised transition-[background-color,transform] ${href ? "card-rows relative active:scale-[0.99] active:bg-hover" : ""}`}
               >
                 {href && (
-                  <Link href={href} scroll={false} aria-label="افتح التفصيل" className="absolute inset-0 rounded-xl" />
+                  <Link href={href} scroll={false} data-row-link="" aria-label="افتح التفصيل" className="absolute inset-0 rounded-xl" />
                 )}
                 <div>
-                  <p className="text-sm font-bold leading-snug">{primary.cell(row)}</p>
-                  <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
-                    {rest.map((c) => (
-                      <div key={c.key} className="min-w-0">
-                        <dt className="text-[11px] text-muted">{c.header}</dt>
-                        <dd className={c.wrap ? "text-xs" : "truncate text-xs"}>{c.cell(row)}</dd>
-                      </div>
-                    ))}
-                  </dl>
+                  {/* «كم؟» في سطر العنوان مقابل الاسم — كان المبلغُ خانةً بين الخانات بخطّ ١٢ */}
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 flex-1 text-sm font-bold leading-snug">{primary.cell(row)}</p>
+                    {amount && (
+                      <p className="shrink-0 text-end">
+                        <span className="block text-[11px] text-muted">{amount.header}</span>
+                        <span className="block text-[15px] font-bold leading-snug">{amount.cell(row)}</span>
+                      </p>
+                    )}
+                  </div>
+                  {main.length > 0 && (
+                    <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
+                      {main.map((c) => (
+                        <div key={c.key} className="min-w-0">
+                          <dt className="text-[11px] text-muted">{c.header}</dt>
+                          <dd className={c.wrap ? "text-xs" : "truncate text-xs"}>{c.cell(row)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                  {/* الثانويُّ (ما يُخفى في الجدول الضيّق) يُطوى هنا — لا يزاحم ما يُقرأ أوّلاً */}
+                  {extra.length > 0 && (
+                    <details className="mt-2">
+                      <summary className="inline-flex min-h-9 cursor-pointer list-none items-center text-[11px] font-bold text-ink-soft [&::-webkit-details-marker]:hidden">
+                        المزيد
+                      </summary>
+                      <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-2">
+                        {extra.map((c) => (
+                          <div key={c.key} className="min-w-0">
+                            <dt className="text-[11px] text-muted">{c.header}</dt>
+                            <dd className={c.wrap ? "text-xs" : "truncate text-xs"}>{c.cell(row)}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
+                  )}
                 </div>
               </div>
             </li>

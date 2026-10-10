@@ -151,3 +151,55 @@ describe("dueThisWeek — ما يخرج في الأيّام السبعة الق�
     expect(w.lines).toEqual([]);
   });
 });
+
+/* ── «ماذا لو أجّلتُ هذا؟» — تجربةٌ تنقل الخروجَ ولا تُسقطه ── */
+import { LATER_BUCKET, whatIfDefer, type OutlookBucket } from "./cash-outlook";
+
+describe("ماذا لو أجّلتُ هذا؟", () => {
+  const line = (id: string, amountMinor: number) => ({ id, label: id, amountMinor, kind: "SUPPLIER" as const, href: "/payments" });
+  const bucket = (id: string, lines: ReturnType<typeof line>[]): OutlookBucket => ({
+    id, title: id, when: "", tone: "neutral", lines, totalMinor: lines.reduce((s, l) => s + l.amountMinor, 0), afterMinor: null,
+  });
+  const base = [
+    bucket("overdue", [line("run:a", 60_000), line("run:b", 30_000)]),
+    bucket("rest", [line("rec:rent", 50_000)]),
+    bucket("next-run", [line("next:a", 20_000)]),
+  ];
+
+  it("بلا تأجيل: أرقامُ الخادم كما هي، والعجزُ حيث يقع", () => {
+    const w = whatIfDefer(base, 100_000, new Set());
+    expect(w.buckets.map((b) => b.afterMinor)).toEqual([10_000, -40_000, -60_000]);
+    expect(w.shortfallAt).toBe("rest");
+    expect(w.deferredMinor).toBe(0);
+    expect(w.lowestMinor).toBe(-60_000);
+  });
+
+  it("السطرُ المؤجَّل ينتقل إلى المرحلة التالية بمبلغه", () => {
+    const w = whatIfDefer(base, 100_000, new Set(["run:a"]));
+    expect(w.buckets[0].totalMinor).toBe(30_000);
+    expect(w.buckets[1].totalMinor).toBe(110_000);
+    expect(w.buckets.map((b) => b.afterMinor)).toEqual([70_000, -40_000, -60_000]);
+    expect(w.deferredMinor).toBe(60_000);
+  });
+
+  it("المجموعُ لا يتغيّر — التأجيلُ لا يُسقط خروجاً", () => {
+    const total = (bs: readonly OutlookBucket[]) => bs.reduce((s, b) => s + b.totalMinor, 0);
+    const w = whatIfDefer(base, 100_000, new Set(["run:a", "rec:rent", "next:a"]));
+    expect(total(w.buckets)).toBe(total(base));
+  });
+
+  it("ما أُجِّل من آخر مرحلة يذهب إلى «بعد ذلك» ولا يختفي", () => {
+    const w = whatIfDefer(base, 100_000, new Set(["next:a"]));
+    const later = w.buckets.at(-1);
+    expect(later?.id).toBe(LATER_BUCKET);
+    expect(later?.totalMinor).toBe(20_000);
+    expect(w.buckets[2].totalMinor).toBe(0);
+  });
+
+  it("الرصيدُ المجهول يبقى مجهولاً — لا يُحسب من صفر", () => {
+    const w = whatIfDefer(base, null, new Set(["run:a"]));
+    expect(w.buckets.every((b) => b.afterMinor === null)).toBe(true);
+    expect(w.shortfallAt).toBeNull();
+    expect(w.lowestMinor).toBeNull();
+  });
+});

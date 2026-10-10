@@ -26,10 +26,10 @@ import { invoices } from "@/db/schema";
 import { guard, respondTo } from "@/services/guard";
 import { recordAudit } from "@/lib/audit";
 import { PaymentTwinError, allocate, createPayment } from "@/services/payment.service";
-import { planHandPayments, type MarkPaidRest } from "@/lib/mark-paid-plan";
+import { distributePartial, planHandPayments, type MarkPaidRest } from "@/lib/mark-paid-plan";
 import { CreditError, drawBankCredit, markPaidByOwner, previewOwnerPaid } from "@/services/supplier-credit.service";
 import { INVOICE, countNoun } from "@/lib/arabic";
-import { formatRiyalsDisplay } from "@/lib/money";
+import { formatRiyalsDisplay, parseRiyals } from "@/lib/money";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 
 export const runtime = "nodejs";
@@ -48,6 +48,11 @@ const Body = z.object({
   preview: z.boolean().optional(),
   /** أُقِرّ أنّ سداداً بالمورّد واليوم والمبلغ نفسها واقعةٌ أخرى (ردُّ 409 `twin`). */
   acknowledgeTwin: z.boolean().optional(),
+  /**
+   * «ادفع كذا فقط» — بالريال نصّاً لا عدداً عائماً. لمورّدٍ واحد (`supplierId`)،
+   * ويُفحَص على المفتوح كما يُقرأ داخل المعاملة، ويُوزَّع بالأقدم أوّلاً.
+   */
+  partialAmount: z.string().trim().min(1).max(20).optional(),
 });
 type Body = z.infer<typeof Body>;
 
@@ -159,6 +164,21 @@ async function handle(request: Request) {
     return NextResponse.json({ error: "يوم السداد ليس تاريخاً صحيحاً" }, { status: 400 });
   }
 
+  /*
+    المبلغُ الجزئيّ: ما كتبه صاحبُ الدفعة يُفهَم هنا هللاتٍ صحيحة أو يُردّ — وحدُّه
+    الأعلى (المفتوح) يُفحَص داخل المعاملة لا على رقمٍ جاء به المتصفّح.
+  */
+  let partialMinor: number | null = null;
+  if (body.partialAmount !== undefined) {
+    if (!body.supplierId) {
+      return NextResponse.json({ error: "المبلغ الجزئيّ يُسجَّل لمورّدٍ واحد — حدّده" }, { status: 400 });
+    }
+    partialMinor = parseRiyals(body.partialAmount);
+    if (partialMinor === null || partialMinor <= SETTLED_TOLERANCE_MINOR) {
+      return NextResponse.json({ error: "المبلغ الجزئيّ ليس مبلغاً صحيحاً — اكتبه بالريال مثل 1500.00" }, { status: 400 });
+    }
+  }
+
   const invoiceIds = [...new Set(body.invoiceIds)];
   const conditions = [inArray(invoices.id, invoiceIds)];
   if (body.supplierId) conditions.push(eq(invoices.supplierId, body.supplierId));
@@ -169,6 +189,8 @@ async function handle(request: Request) {
   const paymentIds: string[] = [];
   /* ما نُسب من حوالاتٍ في الكشف — ويُفكّ بالتراجع ولا تُلغى الحوالة */
   const drawn: { paymentId: string; invoiceId: string; amountMinor: number; paidOn: string }[] = [];
+  /* مجموعُ المفتوح على المختار قبل السداد الجزئيّ — يُقال به «بقي كذا» */
+  let openBeforeMinor = 0;
 
   try {
     await db.transaction(async (tx) => {
@@ -205,9 +227,22 @@ async function handle(request: Request) {
         .filter((r) => r.openMinor > SETTLED_TOLERANCE_MINOR);
       if (pending.length === 0) return;
 
+      /*
+        الجزئيّ: يُوزَّع على المفتوح بالأقدم أوّلاً (القفلُ مرتَّبٌ بتاريخ الفاتورة).
+        وما زاد على المفتوح يُردّ بمبلغ المفتوح ولا يُقصّ — لم يُكتب شيء بعد.
+      */
+      let payBy: Map<string, number> | null = null;
+      if (partialMinor !== null) {
+        const split = distributePartial(pending.map((p) => ({ invoiceId: p.id, openMinor: p.openMinor })), partialMinor);
+        if (!split.ok) throw new PartialRejected(split.openMinor);
+        payBy = new Map(split.shares.map((s) => [s.invoiceId, s.payMinor]));
+        openBeforeMinor = pending.reduce((s, p) => s + p.openMinor, 0);
+      }
+      const paying = payBy === null ? pending : pending.filter((p) => payBy.has(p.id));
+
       const rests: MarkPaidRest[] = [];
-      for (const inv of pending) {
-        let remaining = inv.openMinor;
+      for (const inv of paying) {
+        let remaining = payBy?.get(inv.id) ?? inv.openMinor;
         totalMinor += remaining;
         /*
           الحوالةُ في الكشف أوّلاً: إن كان للمورّد حوالةٌ لم تُنسب فهي هذا السداد
@@ -254,7 +289,7 @@ async function handle(request: Request) {
         paymentIds.push(payId);
       }
 
-      marked = pending.length;
+      marked = paying.length;
       /* الأثرُ في المعاملة نفسها: إن سقط الطلبُ بعدها لم يبقَ مالٌ بلا سجلّ */
       await recordAudit({
         actorId: user.id,
@@ -262,10 +297,11 @@ async function handle(request: Request) {
         entityType: "invoice",
         entityId: body.supplierId ?? "manual",
         after: {
-          نوع: "وسم يدوي بالسداد",
-          عدد_الفواتير: pending.length,
+          نوع: partialMinor === null ? "وسم يدوي بالسداد" : "سدادٌ جزئيّ بقرار صاحب الدفعة",
+          عدد_الفواتير: paying.length,
           المبلغ_بالهللات: totalMinor,
-          الفواتير: pending.map((p) => p.invoiceNumber),
+          ...(partialMinor === null ? {} : { المفتوح_قبله_بالهللات: openBeforeMinor, بقي_بعده_بالهللات: openBeforeMinor - totalMinor }),
+          الفواتير: paying.map((p) => p.invoiceNumber),
           الدفعات: paymentIds,
           ملاحظة: body.note ?? null,
           // لم يأتِ من كشف بنك — تمييزه مهم عند أي مراجعة لاحقة
@@ -285,6 +321,12 @@ async function handle(request: Request) {
       return NextResponse.json({
         error: "لهذا المورّد سدادٌ مقيَّدٌ بالمبلغ نفسه في اليوم نفسه. إن كان هذا سداداً آخر فأقِرّ به، وإلّا فغيّر يوم السداد أو افتح المقيَّد.",
         twin: true,
+      }, { status: 409 });
+    }
+    if (e instanceof PartialRejected) {
+      return NextResponse.json({
+        error: `المبلغ الجزئيّ أكبر من المفتوح على هذه الفواتير (${formatRiyalsDisplay(e.openMinor)} ريال) — لم يُكتب شيء. صحّح المبلغ.`,
+        openMinor: e.openMinor,
       }, { status: 409 });
     }
     if (e instanceof MarkPaidRaced) {
@@ -308,7 +350,10 @@ async function handle(request: Request) {
     totalMinor,
     paymentIds,
     drawn: drawn.map((d) => ({ paymentId: d.paymentId, invoiceId: d.invoiceId })),
-    message: `سُجّل سداد ${countNoun(marked, INVOICE)} بقيمة ${formatRiyalsDisplay(totalMinor)} ريال`
+    ...(partialMinor === null ? {} : { partial: true, leftMinor: openBeforeMinor - totalMinor }),
+    message: (partialMinor === null
+      ? `سُجّل سداد ${countNoun(marked, INVOICE)} بقيمة ${formatRiyalsDisplay(totalMinor)} ريال`
+      : `سُجّل سدادٌ جزئيّ ${formatRiyalsDisplay(totalMinor)} ريال على ${countNoun(marked, INVOICE)} (الأقدمُ أوّلاً) · بقي ${formatRiyalsDisplay(openBeforeMinor - totalMinor)}`)
       + (drawnMinor > 0
         ? ` · منها ${formatRiyalsDisplay(drawnMinor)} من حوالةٍ في الكشف لم تكن منسوبة (${drawnDays.map((d) => formatDay(d)).join("، ")}) — فلم تُقيَّد مرّتين`
         : ""),
@@ -317,3 +362,10 @@ async function handle(request: Request) {
 
 /** التخصيصُ لم يبلغ مبلغَ الدفعة — تغيّرت الفاتورةُ بين القراءة والكتابة. */
 class MarkPaidRaced extends Error {}
+
+/** المبلغُ الجزئيّ لا يصحّ على المفتوح كما قُرئ في المعاملة — يُردّ ولا يُقصّ. */
+class PartialRejected extends Error {
+  constructor(readonly openMinor: number) {
+    super("partial rejected");
+  }
+}

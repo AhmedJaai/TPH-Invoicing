@@ -132,6 +132,23 @@ export interface ItemSummary {
   averageDaysBetweenOrders: number | null;
   /** تغيّر السعر عند هذا المورّد */
   priceChange: PriceChange | null;
+  /**
+   * آخرُ أسعار الوحدة بترتيب تواريخها (الأقدمُ أوّلاً) — لرسم الاتّجاه. سعرٌ لكلّ يوم
+   * شراء (آخرُ سطرٍ فيه)، وما لا تاريخَ له لا يدخل: لا يُوضَع سعرٌ في زمنٍ مخترَع.
+   */
+  priceTrail: number[];
+}
+
+/** كم نقطةً تُرسَم في منحنى السعر. */
+export const PRICE_TRAIL_POINTS = 12;
+
+function priceTrailOf(dated: readonly LineRow[]): number[] {
+  const byDay = new Map<string, number>();
+  for (const r of dated) {
+    if (!r.invoiceDate || r.unitPriceMinor <= 0) continue;
+    byDay.set(r.invoiceDate.toISOString().slice(0, 10), r.unitPriceMinor);
+  }
+  return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, price]) => price).slice(-PRICE_TRAIL_POINTS);
 }
 
 /**
@@ -208,6 +225,7 @@ export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
       priceChange: detectPriceChange(
         dated.map((r) => ({ date: r.invoiceDate!, unitPriceMinor: r.unitPriceMinor })),
       ),
+      priceTrail: priceTrailOf(dated),
     });
   }
 

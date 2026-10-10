@@ -13,6 +13,7 @@ import { openShortcuts } from "@/lib/ui-events";
 import { NotificationsBell } from "./notifications";
 import { CaptureButton } from "./nav";
 import { toast } from "./ui-client";
+import { Kbd } from "./ui";
 import { useShellPath } from "./use-shell-path";
 
 /**
@@ -81,7 +82,7 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
         >
           <Search className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
           <span className="flex-1 truncate">ابحث عن مورّدٍ أو فاتورةٍ أو مبلغ — أو اكتب فعلاً</span>
-          <kbd dir="ltr" className="shrink-0 rounded border border-line bg-sunken px-1.5 text-[10px] leading-4">⌘K</kbd>
+          <Kbd>⌘K</Kbd>
         </button>
 
         <div className="flex shrink-0 items-center gap-1">
@@ -116,6 +117,9 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
 /**
  * الإفلاتُ في أيّ صفحة — اسحب فاتورةً من سطح المكتب إلى أيّ موضعٍ في
  * التطبيق فتُقرأ. كان لا يقبلها إلّا مربّعٌ في صفحة الرفع.
+ *
+ * واللصقُ كذلك: لقطةُ شاشةٍ لإيصال تحويلٍ من تطبيق البنك تُنسخ ثمّ ⌘V في أيّ
+ * صفحة — خارج حقلٍ يُكتب فيه — فتُقرأ.
  */
 export function DropAnywhere({ role }: { role: Role }) {
   const router = useRouter();
@@ -160,11 +164,30 @@ export function DropAnywhere({ role }: { role: Role }) {
       if (window.location.pathname !== "/upload") router.push("/upload");
     }
 
+    function paste(e: ClipboardEvent) {
+      const files = Array.from(e.clipboardData?.files ?? []);
+      if (files.length === 0) return; // نصٌّ يُلصق — ليس لنا
+      const el = e.target;
+      /* في حقلٍ يُكتب فيه اللصقُ للحقل؛ وفي حوارٍ مفتوح لا يُنقَل المستخدمُ من تحته */
+      if (el instanceof HTMLElement && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (document.querySelector("dialog[open]")) return;
+      const n = queueCapture(files);
+      if (n === 0) {
+        toast({ tone: "warn", title: "لا يُقرأ إلّا PDF أو صورة.", body: "ما لُصق ليس صورةً ولا PDF." });
+        return;
+      }
+      e.preventDefault();
+      toast({ tone: "info", title: n === 1 ? "لُصق مستندٌ — يُقرأ الآن" : "لُصقت مستنداتٌ — تُقرأ الآن" });
+      if (window.location.pathname !== "/upload") router.push("/upload");
+    }
+
+    window.addEventListener("paste", paste);
     window.addEventListener("dragenter", enter);
     window.addEventListener("dragleave", leave);
     window.addEventListener("dragover", overFn);
     window.addEventListener("drop", drop);
     return () => {
+      window.removeEventListener("paste", paste);
       window.removeEventListener("dragenter", enter);
       window.removeEventListener("dragleave", leave);
       window.removeEventListener("dragover", overFn);

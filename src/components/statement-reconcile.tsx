@@ -319,6 +319,9 @@ function Count({ label, value, tone }: { label: string; value: number; tone?: "o
 function ResultView({ result }: { result: Result }) {
   const s = result.summary;
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
+  /* العنوانُ يقول العددَ كاملاً — فالقائمةُ تُوسَّع إليه ولا تقف دونه بلا سبيل */
+  const [allExtra, setAllExtra] = useState(false);
+  const [allUnread, setAllUnread] = useState(false);
   const clean = s.missingFromArchive === 0 && s.amountMismatches === 0 && s.billedDifferenceMinor === 0;
 
   return (
@@ -356,12 +359,17 @@ function ResultView({ result }: { result: Result }) {
         <Callout tone="warn" icon={CircleAlert} title={`${countNoun(result.unreadLines.length, LINE)} لم يُقرأ مبلغُه أو تاريخُه`}>
           لم تُطابَق ولم تُحذف — راجعها في الكشف نفسه.
           <ul className="mt-1.5 space-y-0.5">
-            {result.unreadLines.slice(0, 12).map((u, i) => (
+            {(allUnread ? result.unreadLines : result.unreadLines.slice(0, 12)).map((u, i) => (
               <li key={i} className="text-[11px]" dir="auto">
                 <bdi className="nums">{u.date || "بلا تاريخ"}</bdi> · {u.description || "بلا وصف"} · <bdi className="nums">{u.amountText || "بلا مبلغ"}</bdi>
               </li>
             ))}
           </ul>
+          {!allUnread && result.unreadLines.length > 12 && (
+            <button type="button" onClick={() => setAllUnread(true)} className="mt-1.5 min-h-8 text-[11px] font-bold text-accent hover:underline">
+              اعرض الباقي (<span className="nums">{result.unreadLines.length - 12}</span>)
+            </button>
+          )}
         </Callout>
       )}
 
@@ -407,7 +415,7 @@ function ResultView({ result }: { result: Result }) {
           <h3 className="text-sm font-bold">عندك ولم ترد في كشفه — {result.extra.length}</h3>
           <p className="mt-0.5 text-[11px] text-muted">تحقّق أنّها ليست مكرّرةً عندك، ولا تخصّ مورّداً آخر.</p>
           <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-lg border border-line">
-            {result.extra.slice(0, 15).map((m, i) => (
+            {(allExtra ? result.extra : result.extra.slice(0, 15)).map((m, i) => (
               <li key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
                 <bdi dir="ltr" className="font-mono">{m.invoiceNumber}</bdi>
                 <bdi className="nums text-muted">{m.date}</bdi>
@@ -415,6 +423,11 @@ function ResultView({ result }: { result: Result }) {
               </li>
             ))}
           </ul>
+          {!allExtra && result.extra.length > 15 && (
+            <button type="button" onClick={() => setAllExtra(true)} className={`${buttonClass("quiet", "sm")} mt-2`}>
+              اعرض الباقي (<span className="nums">{result.extra.length - 15}</span>)
+            </button>
+          )}
         </section>
       )}
 

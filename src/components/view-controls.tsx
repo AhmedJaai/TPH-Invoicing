@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 
 /**
  * ضبطُ العرض: الظلامُ، وإخفاءُ الأرقام.
@@ -23,6 +24,36 @@ const AMOUNTS_KEY = "tph.amounts";
 
 type Theme = "light" | "dark" | "system";
 
+/** لونا شريط المتصفّح — `--surface` في الوضعين (`globals.css` · `layout.tsx`). */
+const THEME_COLOR = { light: "#f6f4ef", dark: "#0e0d0b" } as const;
+
+/**
+ * لونُ شريط المتصفّح يتبع الوضعَ **المختار** لا وضعَ الجهاز وحده.
+ *
+ * `themeColor` في `layout.tsx` وسمان مربوطان بـ`prefers-color-scheme`، والزرُّ
+ * يكتب `data-theme` وحده — فمن اختار الداكن وجهازُه فاتح رأى شريطَ الحالة
+ * كريميّاً فوق تطبيقٍ أسود. فيُكتب اللونُ المختار في الوسمين معاً، ويعودان
+ * إلى أصلهما حين يُتبَع الجهاز.
+ */
+export function syncThemeColor() {
+  const chosen = document.documentElement.getAttribute("data-theme");
+  document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => {
+    const own = (m.media || "").includes("dark") ? THEME_COLOR.dark : THEME_COLOR.light;
+    m.content = chosen === "dark" ? THEME_COLOR.dark : chosen === "light" ? THEME_COLOR.light : own;
+  });
+}
+
+/** «اتبع الجهاز»: يُمحى الاختيار فيعود الوضعُ إلى ما يقوله النظام (ليلاً داكن، نهاراً فاتح). */
+export function followSystemTheme() {
+  document.documentElement.removeAttribute("data-theme");
+  try {
+    localStorage.removeItem(THEME_KEY);
+  } catch {
+    /* كما في `toggleTheme` */
+  }
+  syncThemeColor();
+}
+
 export function toggleTheme() {
   const root = document.documentElement;
   const chosen = root.getAttribute("data-theme");
@@ -37,6 +68,7 @@ export function toggleTheme() {
   } catch {
     /* متصفّحٌ يمنع التخزين — يبقى الاختيار لهذه الجلسة وحدها */
   }
+  syncThemeColor();
 }
 
 export function toggleAmounts() {
@@ -65,6 +97,9 @@ export function ViewControls() {
     لا الحال («بدّل الوضع») فلا يختلف بين الخادم والمتصفّح. والقارئُ
     يعرف الحالَ من الصفحة نفسها لا من نصّ الزرّ.
   */
+  /* وسما اللون يرسمهما الخادم بلا علمٍ بالاختيار — يُصحَّحان حين تُركَّب الضوابط */
+  useEffect(() => { syncThemeColor(); }, []);
+
   const btn =
     "inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-soft transition-colors hover:bg-hover hover:text-ink lg:h-9 lg:w-9";
 
@@ -85,7 +120,7 @@ export function ViewControls() {
         type="button"
         onClick={toggleTheme}
         className={btn}
-        data-tip="بدّل بين الوضع الفاتح والداكن"
+        data-tip="بدّل بين الوضع الفاتح والداكن — و«اتبع وضع الجهاز» في لوحة الأوامر"
         aria-label="بدّل الوضع الفاتح والداكن"
       >
         <Sun className="icon-dark h-[18px] w-[18px]" />

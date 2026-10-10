@@ -218,6 +218,68 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
   };
 }
 
+/* ─────────────────────────── ماذا لو أجّلتُ هذا؟ ─────────────────────────── */
+
+export interface WhatIf {
+  buckets: OutlookBucket[];
+  shortfallAt: string | null;
+  /** ما أُجِّل — بالهللات. */
+  deferredMinor: number;
+  /** أدنى ما يبلغه الرصيدُ في الإسقاط — `null` إن جُهل الرصيد. */
+  lowestMinor: number | null;
+}
+
+/** معرّفُ الدلو الذي يستقبل ما أُجِّل من آخر مرحلة. */
+export const LATER_BUCKET = "later";
+
+/**
+ * «ماذا لو أجّلتُ هذا؟» — ينقل كلَّ سطرٍ مؤجَّل إلى المرحلة التالية ويعيد حساب
+ * «يبقى بعدها» لكلّ مرحلة. **تجربةٌ في المتصفّح لا قيد**: جمعٌ وطرحُ أعدادٍ صحيحة
+ * من أرقام الخادم نفسها، والمجموعُ الكلّيّ لا يتغيّر — التأجيلُ ينقل الخروجَ ولا
+ * يُسقطه. وما أُجِّل من آخر مرحلة يذهب إلى «بعد ذلك» ولا يختفي. والرصيدُ المجهول
+ * يبقى مجهولاً: لا يُرسَم خطٌّ من صفرٍ مخترَع.
+ */
+export function whatIfDefer(
+  buckets: readonly OutlookBucket[],
+  balanceMinor: number | null,
+  deferred: ReadonlySet<string>,
+): WhatIf {
+  const staged: { bucket: OutlookBucket; lines: OutflowLine[] }[] = buckets.map((b) => ({ bucket: b, lines: [] }));
+  const later: OutflowLine[] = [];
+  let deferredMinor = 0;
+  buckets.forEach((b, i) => {
+    for (const line of b.lines) {
+      if (!deferred.has(line.id)) {
+        staged[i].lines.push(line);
+        continue;
+      }
+      deferredMinor += line.amountMinor;
+      if (i + 1 < staged.length) staged[i + 1].lines.push(line);
+      else later.push(line);
+    }
+  });
+  const all = later.length > 0
+    ? [...staged, {
+        bucket: { id: LATER_BUCKET, title: "بعد ذلك", when: "ما أجّلتَه من آخر مرحلة — يبقى مستحقّاً", tone: "neutral" as const, lines: [], totalMinor: 0, afterMinor: null },
+        lines: later,
+      }]
+    : staged;
+
+  let running = balanceMinor;
+  let lowest = balanceMinor;
+  let shortfallAt: string | null = null;
+  const out = all.map(({ bucket, lines }) => {
+    const totalMinor = lines.reduce((s, l) => s + l.amountMinor, 0);
+    if (running !== null) {
+      running -= totalMinor;
+      if (lowest === null || running < lowest) lowest = running;
+      if (running < 0 && shortfallAt === null && totalMinor > 0) shortfallAt = bucket.id;
+    }
+    return { ...bucket, lines, totalMinor, afterMinor: running };
+  });
+  return { buckets: out, shortfallAt, deferredMinor, lowestMinor: lowest };
+}
+
 /* ─────────────────────────── هذا الأسبوع ─────────────────────────── */
 
 export interface WeekLine extends OutflowLine {

@@ -139,7 +139,70 @@ export const RULES: Record<string, RateLimitRule> = {
   "ops-db-identity": { limit: 30, windowSeconds: 3600 },
   "document-status": { limit: 120, windowSeconds: 3600 },
   "alert-resolve": { limit: 120, windowSeconds: 3600 },
+  /* إدارةُ المستخدمين — أفعالٌ قليلة للمالك وحده */
+  users: { limit: 60, windowSeconds: 3600 },
 };
+
+/**
+ * قراءاتٌ رخيصة تُعدّ في ذاكرة الدالّة لا في القاعدة.
+ *
+ * الجرسُ يسأل مع كلّ صفحة، والبحثُ مع كلّ حرف — وكان كلُّ سؤالٍ منهما يكتب صفّاً
+ * في Neon قبل أن يقرأ (كلفةُ نقلٍ وحساب؛ وقد نفد حدُّ النقل في ٢٧ سبتمبر). والعدُّ
+ * في الذاكرة لكلّ نسخةٍ من الدالّة: الحدُّ يصير تقريبيّاً (أضعافَه إن تعدّدت النسخ)،
+ * وهو كافٍ لما لا نموذجَ فيه ولا كتابة — يوقف الحلقةَ العالقة ولا يحرس مالاً.
+ * وكلُّ ما سواهما يبقى في القاعدة.
+ */
+export const MEMORY_COUNTED_ROUTES: ReadonlySet<string> = new Set(["notifications", "search"]);
+
+/** بلا حدّ: لا يُعدّ أصلاً — عدُّ ما لا يُرفَض كتابةٌ بلا نفع. */
+export function isUnlimited(rule: RateLimitRule): boolean {
+  return rule.limit >= Number.MAX_SAFE_INTEGER;
+}
+
+/**
+ * عدّادُ نوافذ في الذاكرة — وذاكرةُ «مَن رُدّ في هذه النافذة».
+ *
+ * خالصٌ من الوقت: الساعةُ تُعطى. والحجمُ محدود: ما انقضت نافذتُه يُكنَس حين يكبر.
+ */
+export class MemoryWindowCounter {
+  private readonly counts = new Map<string, { windowMs: number; count: number }>();
+  constructor(private readonly maxKeys = 5_000) {}
+
+  /** يزيد العدّ ويُعيده. */
+  hit(key: string, rule: RateLimitRule, at: Date): number {
+    const windowMs = windowStart(at, rule.windowSeconds).getTime();
+    const entry = this.counts.get(key);
+    if (entry && entry.windowMs === windowMs) {
+      entry.count += 1;
+      return entry.count;
+    }
+    if (this.counts.size >= this.maxKeys) this.prune(at.getTime() - rule.windowSeconds * 1000);
+    this.counts.set(key, { windowMs, count: 1 });
+    return 1;
+  }
+
+  /** العدُّ المحفوظ لهذه النافذة، أو صفرٌ إن لم يُحفظ شيء. */
+  peek(key: string, rule: RateLimitRule, at: Date): number {
+    const entry = this.counts.get(key);
+    return entry && entry.windowMs === windowStart(at, rule.windowSeconds).getTime() ? entry.count : 0;
+  }
+
+  /** يحفظ عدّاً جاء من القاعدة — ليُردّ التالي بلا كتابة. */
+  remember(key: string, rule: RateLimitRule, at: Date, count: number): void {
+    if (this.counts.size >= this.maxKeys) this.prune(at.getTime() - rule.windowSeconds * 1000);
+    this.counts.set(key, { windowMs: windowStart(at, rule.windowSeconds).getTime(), count });
+  }
+
+  private prune(olderThanMs: number): void {
+    for (const [k, v] of this.counts) if (v.windowMs < olderThanMs) this.counts.delete(k);
+    /* كلُّها حيّة وما زال ممتلئاً: يُفرَّغ — عدٌّ يبدأ من جديد خيرٌ من ذاكرةٍ تكبر بلا حدّ */
+    if (this.counts.size >= this.maxKeys) this.counts.clear();
+  }
+
+  get size(): number {
+    return this.counts.size;
+  }
+}
 
 export function ruleFor(route: string): RateLimitRule {
   return RULES[route] ?? { limit: 120, windowSeconds: 3600 };

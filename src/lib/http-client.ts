@@ -30,6 +30,9 @@ export type ApiResult<T> =
       sessionExpired?: boolean;
     };
 
+/** حدثٌ في النافذة حين يردّ الخادمُ 401 — تسمعه القشرة (`shell-watch.tsx`). */
+export const SESSION_EXPIRED_EVENT = "tph:session-expired";
+
 export const NETWORK_ERROR =
   "تعذّر الاتصال بالخادم — لم يصل الطلب. تحقّق من الشبكة ثمّ أعد المحاولة.";
 
@@ -59,6 +62,14 @@ export async function readResponse<T = Record<string, unknown>>(res: Response): 
   if (res.ok && obj) return { ok: true, status: res.status, data: obj as T };
 
   const serverMessage = obj && typeof obj.error === "string" ? obj.error : null;
+  /*
+    انتهت الجلسة: يُعلَن للقشرة فتعرض «ادخل ثانيةً» في لسانٍ آخر — كان العلمُ
+    `sessionExpired` لا يقرؤه أحد، فيبقى سطرٌ أحمر ولا طريقَ إلى الدخول إلّا
+    بمغادرة الصفحة وضياع ما كُتب فيها.
+  */
+  if (res.status === 401 && typeof window !== "undefined") {
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
   return {
     ok: false,
     status: res.status,

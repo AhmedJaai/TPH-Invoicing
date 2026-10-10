@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { SavedViews } from "@/components/saved-views";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, asc, count, desc, eq, ilike, inArray, sql, type SQL } from "drizzle-orm";
@@ -379,6 +381,18 @@ export default async function DocumentsPage({
                 </Link>
               )}
             </div>
+            {/* الترشيحُ الذي يُفتح كلَّ أسبوع يُحفَظ باسمه — على هذا الجهاز */}
+            <Suspense fallback={null}>
+              <SavedViews
+                scope="documents"
+                suggestedName={[
+                  p.month ? formatMonth(p.month) : null,
+                  p.kind ? KIND_LABEL[p.kind] ?? p.kind : null,
+                  p.supplier ? supplierRows.find((r) => r.id === p.supplier)?.nameAr ?? null : null,
+                  q ? `«${q}»` : null,
+                ].filter(Boolean).join(" · ") || "عرضي"}
+              />
+            </Suspense>
           </div>
 
           {/* العدُّ فوق الفراغ يكرّر ما يقوله الفراغ نفسه */}

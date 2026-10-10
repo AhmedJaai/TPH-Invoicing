@@ -1,4 +1,5 @@
 import { mainClass, type ShellWidth } from "./page-shell";
+import { SkeletonAreaTabs } from "./shell-context";
 
 /**
  * ما يُعرَض ريثما تُبنى الصفحة على الخادم — داخل القشرة الثابتة، في موضع
@@ -12,16 +13,36 @@ export function PageSkeleton({
   stats = 4,
   rows = 6,
   width = "wide",
+  eyebrow,
+  display = false,
 }: {
-  title: string;
+  /** اسمُ الصفحة كما سيصل — نصٌّ، أو التحيّةُ في «اليوم». */
+  title: React.ReactNode;
   stats?: number;
   rows?: number;
   width?: ShellWidth;
+  /** السطرُ الصغير فوق العنوان — كما في `PageShell`. */
+  eyebrow?: React.ReactNode;
+  /** مقاسُ عنوان العرض — لـ«اليوم» وحدها، كما في `PageShell`. */
+  display?: boolean;
 }) {
   return (
     <main id="main" className={mainClass(width)} aria-busy="true">
-      <h1 className="font-display text-[1.8rem] font-bold leading-[1.2] tracking-tight sm:text-[2.2rem]">{title}</h1>
+      {eyebrow && <p className="mb-1.5 text-xs font-medium text-muted">{eyebrow}</p>}
+      <h1
+        className={
+          display
+            ? "font-display text-[2.1rem] font-bold leading-[1.15] tracking-tight sm:text-[2.7rem]"
+            : "font-display text-[1.8rem] font-bold leading-[1.2] tracking-tight sm:text-[2.2rem]"
+        }
+      >
+        {title}
+      </h1>
       <div className="skeleton mt-3 h-4 w-72 max-w-full" />
+      {/* ألسنةُ المساحة نفسُها (لا تحتاج بيانات): كان المحتوى ينزل ستّين بكسلاً لحظةَ وصوله */}
+      <div className="mt-5">
+        <SkeletonAreaTabs />
+      </div>
 
       {stats > 0 && (
         <div className="mt-8 grid grid-cols-2 gap-3 xl:grid-cols-4">

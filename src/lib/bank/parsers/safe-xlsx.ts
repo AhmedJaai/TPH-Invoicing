@@ -10,18 +10,20 @@
  * يرفعه مستخدم، وورقةٌ بمليون صفّ كلفةٌ ولو لم يُرَد بها سوء. وما قُصّ
  * يُعلَن — صفوفاً وأعمدةً وخلايا.
  *
- * ثلاثة حروس:
+ * أربعة حروس:
  *
  *   ١. **مفاتيح النموذج الأوّليّ تُنزَع** من كلّ ما يعود. فلو أفلح
  *      التلويث في وسم الخلايا لم يبلغ كائناتنا. وهذا يمنع الأثر لا
  *      السبب — لكنّ الأثر هو ما يضرّ.
  *   ٢. **الحجم والعدد محدودان**: ورقةٌ بمليون صفّ ليست كشفَ حساب، وهي
  *      كلفةُ حجبِ خدمةٍ سواءٌ أُريد بها ذلك أم لا.
+ *   ٠. **ما ينفكّ إليه الأرشيف يُسأل قبل فكّه** — حدُّ الرفع على الحجم المضغوط وحده.
  *   ٣. **`sheetRows` تُمرَّر إلى المكتبة نفسها**، فيتوقّف التحليل عند
  *      الحدّ بدل أن يقرأ الكلّ ثمّ نقصّه — والقصّ بعد القراءة لا يمنع
  *      كلفتها.
  */
 import * as XLSX from "xlsx";
+import { zipBombReason } from "@/lib/file-signature";
 
 /** أقصى عدد صفوفٍ يُقرأ من ورقة. كشفُ سنةٍ كاملة دون هذا بكثير. */
 export const MAX_ROWS = 50_000;
@@ -94,6 +96,10 @@ export interface ReadOptions {
 
 export function readWorkbookSafely(buffer: Buffer, options: ReadOptions = {}): SafeWorkbook {
   const warnings: string[] = [];
+
+  /* XLSX أرشيفٌ مضغوط: ما ينفكّ إليه يُسأل من فهرسه قبل أن يُفكّ (`file-signature.ts`) */
+  const bomb = zipBombReason(buffer);
+  if (bomb) throw new Error(bomb);
 
   const wb = XLSX.read(buffer, {
     type: "buffer",

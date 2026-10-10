@@ -5,12 +5,23 @@
  * مدير المشتريات الذي يستدعي واجهة الأرقام مباشرةً يجب أن يُرفض بـ403.
  */
 
-export type Role = "OWNER" | "ACCOUNTANT" | "PURCHASING";
+/**
+ * «المراجع» (AUDITOR) يرى ولا يغيّر: المحاسبُ القانونيّ الخارجيّ أو الشريك في موسم
+ * الإقرار. لا قدرةَ كتابةٍ له واحدة — يحرسه `permissions.writes.test.ts`.
+ */
+export type Role = "OWNER" | "ACCOUNTANT" | "PURCHASING" | "AUDITOR";
+
+export const ROLES: readonly Role[] = ["OWNER", "ACCOUNTANT", "PURCHASING", "AUDITOR"];
+
+export function isRole(v: unknown): v is Role {
+  return typeof v === "string" && ROLES.some((r) => r === v);
+}
 
 export const ROLE_LABEL: Record<Role, string> = {
   OWNER: "المالك",
   ACCOUNTANT: "المحاسب",
   PURCHASING: "مدير المشتريات",
+  AUDITOR: "المراجع (قراءة فقط)",
 };
 
 /** كل قدرة في النظام، مفصولة عن الأدوار حتى تُراجَع الجداول لا الشروط المتناثرة. */
@@ -31,6 +42,10 @@ export type Capability =
   | "bank:view"
   | "bank:edit"
   | "expense:edit"
+  /**
+   * ⚠ معرَّفةٌ ولا تُفرَض بعد: لا صفحةَ ولا مسارَ يسأل عنها، فمن يملك `bank:view` يرى
+   * حوالات الرواتب في كشف البنك والمصروفات. فلا تُعدّ حمايةً قائمة — انظر `SECURITY.md` §٥.
+   */
   | "payroll:view"
   | "payment:approve"
   | "month:close"
@@ -72,7 +87,21 @@ const MATRIX: Record<Role, readonly Capability[]> = {
   ],
   // مدير المشتريات يرفع ويتابع الناقص فقط — لا أرقام مالية ولا بنك ولا رواتب
   PURCHASING: ["document:upload", "document:view", "supplier:view", "inventory:view", "inventory:count"],
+  // المراجع يقرأ المالية كلَّها وينزّل حزمة المحاسب — ولا يكتب شيئاً، ولا يرى الرواتب
+  AUDITOR: [
+    "document:view", "supplier:view", "amounts:view", "reports:view", "reports:export",
+    "bank:view", "audit:view", "inventory:view",
+  ],
 };
+
+/**
+ * قدراتُ القراءة — وما عداها كتابة. «المراجع» لا يملك إلّا منها.
+ * (`reports:export` تنزيلٌ يُقيَّد في السجلّ ولا يغيّر بياناً.)
+ */
+export const READ_CAPABILITIES: readonly Capability[] = [
+  "document:view", "supplier:view", "amounts:view", "reports:view", "reports:export",
+  "bank:view", "payroll:view", "audit:view", "inventory:view",
+];
 
 export function can(role: Role | undefined | null, capability: Capability): boolean {
   if (!role) return false;
@@ -124,7 +153,7 @@ export function require_(role: Role | undefined | null, capability: Capability):
 
 /**
  * قائمة الدخول البيضاء وأدوارها، من متغيّر البيئة.
- * الصيغة: "ahmed@x.com:OWNER,acc@x.com:ACCOUNTANT,buy@x.com:PURCHASING"
+ * الصيغة: "ahmed@x.com:OWNER,acc@x.com:ACCOUNTANT,buy@x.com:PURCHASING,cpa@x.com:AUDITOR"
  */
 export function parseAllowlist(raw: string | undefined): Map<string, Role> {
   const map = new Map<string, Role>();
@@ -133,8 +162,7 @@ export function parseAllowlist(raw: string | undefined): Map<string, Role> {
     const [email, role] = entry.split(":").map((s) => s?.trim());
     if (!email) continue;
     const normalized = email.toLowerCase();
-    const resolved: Role =
-      role === "OWNER" || role === "ACCOUNTANT" || role === "PURCHASING" ? role : "PURCHASING";
+    const resolved: Role = isRole(role) ? role : "PURCHASING";
     map.set(normalized, resolved);
   }
   return map;

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Suspense, ViewTransition, use, useRef, useState } from "react";
-import { Camera, Ellipsis, Plus, Search, Upload } from "lucide-react";
+import { Suspense, ViewTransition, use, useEffect, useRef, useState } from "react";
+import { Camera, Ellipsis, FolderOpen, Plus, Search, Upload } from "lucide-react";
 import { can, type Role } from "@/lib/permissions";
 import {
   activeArea,
@@ -18,6 +18,7 @@ import {
 } from "@/lib/nav";
 import { queueCapture } from "@/lib/capture-queue";
 import { BrandMark, NavGlyph } from "./icons";
+import { Kbd } from "./ui";
 import { openCommandPalette } from "@/lib/ui-events";
 import { LinkPending, Sheet, toast } from "./ui-client";
 import { useShellPath } from "./use-shell-path";
@@ -70,7 +71,7 @@ export function Sidebar({
         >
           <Search className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
           <span className="flex-1 truncate">ابحث أو انتقل…</span>
-          <kbd dir="ltr" className="shrink-0 rounded border border-frame-line px-1.5 text-[10px] leading-4">⌘K</kbd>
+          <Kbd tone="frame">⌘K</Kbd>
         </button>
         <CaptureButton role={role} variant="frame" />
       </div>
@@ -105,9 +106,10 @@ export function Sidebar({
                       <span className="min-w-0 flex-1 truncate">{a.label}</span>
                       <LinkPending />
                       <CountBadge counts={counts} href={a.href} className="rounded-full bg-frame-accent px-1.5 text-[11px] font-bold leading-5 text-frame" />
-                      <kbd dir="ltr" aria-hidden className="hidden shrink-0 rounded border border-frame-line px-1 text-[10px] leading-4 text-frame-muted group-hover:inline-block">
-                        G {a.chord.toUpperCase()}
-                      </kbd>
+                      {/* يظهر بالفأرة **وبالتركيز** — من يتنقّل بالمفاتيح أحوجُ إليه. ومكانُه محجوزٌ فلا يزيح الاسم */}
+                      <span aria-hidden className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                        <Kbd tone="frame">G {a.chord.toUpperCase()}</Kbd>
+                      </span>
                     </Link>
                   </li>
                 );
@@ -219,7 +221,8 @@ export function MobileTabBar({
 
   return (
     <>
-      <div className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-line bg-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
+      {/* `data-under-inspector`: لوحُ الفحص على الجوّال يُخمِله — كان يبقى في ترتيب Tab خلف لوحٍ يعلن أنّه `aria-modal` */}
+      <div data-under-inspector="" className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-line bg-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
         <nav className="mx-auto flex max-w-lg items-stretch" aria-label="المساحات">
           {left.map((a) => (
             <Tab key={a.href} role={role} area={a} current={area?.href === a.href} counts={counts} />
@@ -246,6 +249,12 @@ export function MobileTabBar({
       </div>
 
       <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="كلّ المساحات">
+        {/* زرُّ الوسط يفتح الكاميرا وحدها — وهذا بابُ الملفّ (PDF وصل في واتساب) من حيث أنت */}
+        {canCapture && (
+          <div className="mb-4">
+            <CaptureButton role={role} variant="file" />
+          </div>
+        )}
         <ul className="grid grid-cols-3 gap-2">
           {[...tabs, ...more].map((a) => {
             const on = area?.href === a.href;
@@ -315,9 +324,18 @@ function CountBadge({ counts, href, className }: { counts?: Promise<ShellCounts>
 function CountBadgeValue({ counts, href, className }: { counts: Promise<ShellCounts>; href: string; className: string }) {
   const c = use(counts);
   const n = href === "/attention" ? c.pending : c.documents;
+  /*
+    شارةُ أيقونة التطبيق المثبَّت (Badging API) بعدد «يحتاج قرارك» — يُرى على
+    الشاشة الرئيسيّة للهاتف بلا فتح التطبيق. والمتصفّحُ الذي لا يعرفها يتجاهل.
+  */
+  useEffect(() => {
+    if (href !== "/attention" || n === null || !("setAppBadge" in navigator)) return;
+    const done = n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge();
+    done.catch(() => { /* غيرُ مثبَّتٍ أو بلا إذن — لا شارة */ });
+  }, [href, n]);
   if (n === 0) return null;
   return (
-    <span className={`nums ${className}`} aria-label={n === null ? "تعذّر العدّ" : `${n} بانتظارك`}>
+    <span className={`nums nums-count ${className}`} aria-label={n === null ? "تعذّر العدّ" : `${n} بانتظارك`}>
       {n === null ? "؟" : n}
     </span>
   );
@@ -330,7 +348,7 @@ function CountBadgeValue({ counts, href, className }: { counts: Promise<ShellCou
  * ثمّ ينقل الملفّ إلى قارئ المستندات. كان زرّاً ينقلك إلى صفحة الرفع
  * لتضغط زرّاً ثانياً فيها.
  */
-export function CaptureButton({ role, variant }: { role: Role; variant: "frame" | "fab" | "bar" }) {
+export function CaptureButton({ role, variant }: { role: Role; variant: "frame" | "fab" | "bar" | "file" }) {
   const router = useRouter();
   const ref = useRef<HTMLInputElement>(null);
   if (!can(role, "document:upload")) return null;
@@ -369,10 +387,29 @@ export function CaptureButton({ role, variant }: { role: Role; variant: "frame" 
         <button
           type="button"
           onClick={() => ref.current?.click()}
-          aria-label="صوّر مستنداً أو ارفعه"
+          aria-label="صوّر مستنداً بالكاميرا"
           className="-mt-5 grid h-14 w-14 place-items-center rounded-2xl bg-accent text-accent-ink shadow-lifted ring-4 ring-surface transition-transform active:scale-95"
         >
           <Camera className="h-6 w-6" strokeWidth={2} aria-hidden />
+        </button>
+      </>
+    );
+  }
+
+  if (variant === "file") {
+    return (
+      <>
+        {input}
+        <button
+          type="button"
+          onClick={() => ref.current?.click()}
+          className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-accent-line bg-accent-soft px-4 text-start text-sm font-bold text-accent"
+        >
+          <FolderOpen className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
+          <span className="min-w-0">
+            ارفع ملفّاً من جهازك
+            <span className="block text-[11px] font-medium text-ink-soft">PDF أو صورٌ محفوظة — وزرُّ الوسط للكاميرا</span>
+          </span>
         </button>
       </>
     );
@@ -404,7 +441,7 @@ export function CaptureButton({ role, variant }: { role: Role; variant: "frame" 
       >
         <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden />
         ارفع مستنداً
-        <kbd dir="ltr" className="rounded border border-frame/25 px-1 text-[10px] leading-4">U</kbd>
+        <Kbd tone="inherit">U</Kbd>
       </button>
     </>
   );

@@ -13,7 +13,9 @@ import { request } from "@/lib/http-client";
 import type { Role } from "@/lib/permissions";
 import { NavGlyph } from "./icons";
 import { PALETTE_EVENT, openCommandPalette, openShortcuts } from "@/lib/ui-events";
-import { toggleAmounts, toggleTheme } from "./view-controls";
+import { followSystemTheme, toggleAmounts, toggleTheme } from "./view-controls";
+import { shortcutKey } from "@/lib/shortcut-keys";
+import { Kbd } from "./ui";
 
 /**
  * لوحةُ الأوامر — البحثُ والانتقالُ والفعلُ من موضعٍ واحد.
@@ -103,11 +105,13 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
     function onKey(e: KeyboardEvent) {
       const el = e.target as HTMLElement | null;
       const typing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      /* بموضع المفتاح: Ctrl+K ولوحةُ الكتابة عربيّة يصل «ن» */
+      const key = shortcutKey(e);
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && key === "k") {
         e.preventDefault();
         if (dialogRef.current?.open) close();
         else open(true);
-      } else if (e.key === "/" && !typing && !document.querySelector("dialog[open]")) {
+      } else if (key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey && !typing && !e.isComposing && !document.querySelector("dialog[open]")) {
         e.preventDefault();
         open(true);
       }
@@ -120,6 +124,21 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
       window.removeEventListener(PALETTE_EVENT, openByPointer);
     };
   }, [open, close]);
+
+  /*
+    لوحةُ مفاتيح الهاتف لا تُنقص `vh`: كانت النتائجُ السفلى تقع تحتها ولا تُبلَغ
+    بالتمرير. فيُكتب ارتفاعُ ما يُرى فعلاً (`visualViewport`) في `--vvh`، والقائمةُ
+    تُقصّ عليه.
+  */
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const d = dialogRef.current;
+    if (!vv || !d) return;
+    const sync = () => d.style.setProperty("--vvh", `${Math.round(vv.height)}px`);
+    sync();
+    vv.addEventListener("resize", sync);
+    return () => vv.removeEventListener("resize", sync);
+  }, []);
 
   useEffect(() => {
     if (!canSearch || q.trim().length < MIN_CHARS) return;
@@ -189,6 +208,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
       if (row.type === "command" && row.command.event) {
         if (row.command.event === "shortcuts") openShortcuts();
         if (row.command.event === "theme") toggleTheme();
+        if (row.command.event === "theme-system") followSystemTheme();
         if (row.command.event === "amounts") toggleAmounts();
         return;
       }
@@ -235,7 +255,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
       ref={dialogRef}
       aria-label="ابحث أو انتقل"
       onClick={(e) => { if (e.target === dialogRef.current) close(); }}
-      className="palette m-0 mx-auto mt-[10vh] w-[min(42rem,calc(100vw-1.5rem))] max-w-none overflow-hidden rounded-2xl border border-line bg-overlay p-0 text-ink shadow-overlay"
+      className="palette m-0 mx-auto mt-2 w-[min(42rem,calc(100vw-1.5rem))] sm:mt-[10vh] max-w-none overflow-hidden rounded-2xl border border-line bg-overlay p-0 text-ink shadow-overlay"
     >
       <div className="flex items-center gap-3 border-b border-line px-4">
         <Search className="h-[18px] w-[18px] shrink-0 text-accent" strokeWidth={2} aria-hidden />
@@ -260,7 +280,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
         {busy ? (
           <span aria-hidden className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-line border-t-accent" />
         ) : (
-          <kbd className="hidden shrink-0 rounded-md border border-line px-1.5 text-[11px] text-muted sm:block">Esc</kbd>
+          <span className="hidden shrink-0 sm:block"><Kbd>Esc</Kbd></span>
         )}
       </div>
 
@@ -272,7 +292,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
         {busy ? "يبحث" : failed ? "تعذّر البحث" : `${rows.length} نتيجة`}
       </p>
 
-      <ul id="palette-results" ref={listRef} role="listbox" aria-label="النتائج" className="max-h-[min(62vh,30rem)] overflow-y-auto py-2">
+      <ul id="palette-results" ref={listRef} role="listbox" aria-label="النتائج" className="max-h-[min(62vh,30rem,calc(var(--vvh,100dvh)-8.5rem))] overflow-y-auto overscroll-contain py-2">
         {rows.map((r, i) => {
           const g = groupOf(r);
           const first = i === 0 || groupOf(rows[i - 1]) !== g;
@@ -389,8 +409,4 @@ function RowBody({ row }: { row: Row }) {
       )}
     </span>
   );
-}
-
-function Kbd({ children }: { children: React.ReactNode }) {
-  return <kbd className="inline-flex min-w-5 justify-center rounded border border-line bg-raised px-1 font-sans leading-4">{children}</kbd>;
 }

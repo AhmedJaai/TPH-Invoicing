@@ -27,6 +27,9 @@ export type AuditAction =
   | "ISSUE_WAIVED"
   | "MONTH_CLOSED"
   | "USER_ROLE_CHANGED"
+  /* تعطيلُ مستخدمٍ أو إعادةُ تفعيله، وإنهاءُ جلساته — من «المستخدمون» في الإعدادات */
+  | "USER_ACCESS_CHANGED"
+  | "USER_SESSIONS_ENDED"
   | "DRIVE_SYNCED"
   | "BANK_IMPORTED"
   | "INVOICES_MARKED_PAID"
@@ -70,6 +73,12 @@ export type AuditAction =
   /* اسمٌ غُيّر في الدرايف بيدٍ فحُدّث ما عندنا — بالاسمين */
   | "DRIVE_NAME_CHANGED_EXTERNALLY"
   | "PAYMENT_RUN_EXPORTED"
+  /* محجوزةٌ أدخلها المالكُ في الدفعة بقراره، أو أعادها إلى الحجز — بسببه وبالضريبة المعرّضة */
+  | "PAYMENT_HOLD_OVERRIDDEN"
+  | "PAYMENT_HOLD_RESTORED"
+  /* العملُ الآليّ (الاستدراكُ والمزامنةُ الخلفيّة) أُوقف أو شُغّل بيد */
+  | "DOCUMENT_AUTO_PAUSED"
+  | "DOCUMENT_AUTO_RESUMED"
   /* حزمةُ المحاسب — شهرٌ كاملٌ في ملفّ يخرج من النظام، فتنزيلُه أثرٌ يُقيَّد */
   | "ACCOUNTANT_PACK_EXPORTED"
   | "EXPENSES_DERIVED"

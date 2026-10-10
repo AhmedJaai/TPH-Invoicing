@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { Maximize2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Maximize2, X } from "lucide-react";
 import { isInspectorPath, pathOf } from "@/lib/inspector";
 import { useDragToDismiss } from "./ui-client";
 
@@ -129,15 +129,51 @@ export function InspectorPanel({
   }, []);
   useEffect(() => {
     if (desktop) return;
-    const content = document.getElementById("app-content");
-    content?.setAttribute("inert", "");
+    /* كلُّ ما تحت اللوح خامل — المحتوى وشريطُ التنقّل السفليّ وزرُّ الالتقاط معه */
+    const under = Array.from(document.querySelectorAll<HTMLElement>("#app-content, [data-under-inspector]"))
+      .filter((el) => !el.hasAttribute("inert"));
+    under.forEach((el) => el.setAttribute("inert", ""));
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      content?.removeAttribute("inert");
+      under.forEach((el) => el.removeAttribute("inert"));
       document.body.style.overflow = prev;
     };
   }, [desktop]);
+
+  /*
+   * ── السابق والتالي ──
+   * الصفوفُ نفسُها التي تتنقّل بينها J/K — بزرّين ظاهرين و«٣ من ٤٠». على الجوّال
+   * اللوحُ يغطّي القائمة، فكانت مراجعةُ عشرة ملفّاتٍ فتحاً وإغلاقاً عشر مرّات.
+   * والقائمةُ تُقرأ من الصفحة تحت اللوح (ظاهرُها وحده، بلا تكرارِ جدولٍ وبطاقاته).
+   */
+  const [siblings, setSiblings] = useState<{ at: number; total: number; prev?: string; next?: string } | null>(null);
+  /* المسارُ في التبعيّات: ملفٌّ يخلف ملفّاً في اللوح نفسه يعيد العدَّ ولو لم يُركَّب اللوحُ من جديد */
+  const herePath = usePathname();
+  useEffect(() => {
+    if (busy) return;
+    /* بعد الرسم: القائمةُ تُقرأ من DOM الصفحة تحت اللوح لا من حالٍ في React */
+    const frame = requestAnimationFrame(() => {
+    const here = window.location.pathname;
+    const seen = new Set<string>();
+    const hrefs: string[] = [];
+    document.querySelectorAll<HTMLElement>("#app-content [data-href]").forEach((el) => {
+      const href = el.dataset.href ?? "";
+      /* `hidden`: صفٌّ أخفاه بحثُ الجدول ليس في القائمة التي يراها صاحبُها */
+      if (!href || !isInspectorPath(href) || el.closest("[hidden]")) return;
+      const path = pathOf(href);
+      if (seen.has(path)) return;
+      seen.add(path);
+      hrefs.push(href);
+    });
+    const at = hrefs.findIndex((h) => pathOf(h) === here);
+    setSiblings(at === -1 || hrefs.length < 2 ? null : { at, total: hrefs.length, prev: hrefs[at - 1], next: hrefs[at + 1] });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [busy, herePath]);
+  const step = useCallback((href: string | undefined) => {
+    if (href) router.replace(href, { scroll: false });
+  }, [router]);
 
   /* ── Escape ── */
   useEffect(() => {
@@ -224,6 +260,33 @@ export function InspectorPanel({
             {intro && <p className="mt-1 text-xs leading-relaxed text-ink-soft">{intro}</p>}
           </div>
           <div className="flex shrink-0 items-center gap-1" onPointerDown={(e) => e.stopPropagation()}>
+            {siblings && (
+              <div className="flex items-center" role="group" aria-label="التنقّل بين ملفّات القائمة">
+                <button
+                  type="button"
+                  onClick={() => step(siblings.prev)}
+                  disabled={!siblings.prev}
+                  aria-label="الملفّ السابق في القائمة"
+                  data-tip="السابق (K)"
+                  className="grid h-11 w-9 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent sm:h-9 sm:w-8"
+                >
+                  <ChevronUp className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                </button>
+                <span className="nums nums-count px-0.5 text-[11px] text-muted" aria-live="polite">
+                  <span className="sr-only">الملفّ </span>{siblings.at + 1}<span aria-hidden> / </span><span className="sr-only"> من </span>{siblings.total}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => step(siblings.next)}
+                  disabled={!siblings.next}
+                  aria-label="الملفّ التالي في القائمة"
+                  data-tip="التالي (J)"
+                  className="grid h-11 w-9 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent sm:h-9 sm:w-8"
+                >
+                  <ChevronDown className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                </button>
+              </div>
+            )}
             {fullHref && <a
               href={fullHref}
               data-full-page=""

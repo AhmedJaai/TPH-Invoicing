@@ -32,9 +32,10 @@ export function CashFlowChart({
 
   return (
     <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
-      <div className="mb-4 flex flex-wrap items-center gap-4 text-[11px] font-bold text-ink-soft" aria-hidden>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-accent" /> وارد</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-sand" /> صادر</span>
+      {/* اللونان من عائلةٍ واحدة، فالصادرُ مخطَّط: يُفرَّق بالنقش لا باللون وحده */}
+      <div className="mb-4 flex flex-wrap items-center gap-4 text-[11px] font-bold text-ink-soft">
+        <span className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-sm bg-accent" /> وارد</span>
+        <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2.5 w-2.5 rounded-sm ${OUT_FILL}`} /> صادر</span>
       </div>
       <ol className="space-y-1">
         {[...months].reverse().map((m) => {
@@ -54,7 +55,7 @@ export function CashFlowChart({
                 </span>
                 <span className="min-w-0 space-y-1.5">
                   <Bar tone="bg-accent" width={pct(m.inMinor)} label="وارد" minor={m.inMinor} />
-                  <Bar tone="bg-sand" width={pct(m.outMinor)} label="صادر" minor={m.outMinor} />
+                  <Bar tone={OUT_FILL} width={pct(m.outMinor)} label="صادر" minor={m.outMinor} />
                 </span>
                 <span className="col-span-2 flex items-baseline justify-between gap-2 border-t border-line-soft pt-1.5 text-end sm:col-span-1 sm:block sm:border-0 sm:pt-0">
                   <span className="text-[10px] font-bold text-muted sm:block">الصافي</span>
@@ -71,14 +72,18 @@ export function CashFlowChart({
   );
 }
 
+/** الصادر: لونُه وخطوطٌ مائلة فوقه — يُعرَف وإن لم يُميَّز اللون. */
+const OUT_FILL = "bg-sand bg-[repeating-linear-gradient(135deg,transparent_0_3px,var(--raised)_3px_5px)]";
+
 function Bar({ tone, width, label, minor }: { tone: string; width: string; label: string; minor: number }) {
   return (
     <span className="flex items-center gap-2">
       <span className="relative h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-sunken">
         <span className={`absolute inset-y-0 start-0 rounded-full ${tone}`} style={{ width }} title={label} />
       </span>
-      <span className="relative w-[5.5rem] shrink-0 text-end text-[11px] font-bold text-ink-soft">
-        <span className="sr-only">{label} </span>
+      <span className="relative w-[7rem] shrink-0 text-end text-[11px] font-bold text-ink-soft sm:w-[5.5rem]">
+        {/* على الجوّال تُكتب التسمية بجانب الرقم — المفتاحُ أعلى القائمة بعيدٌ عن الشريط */}
+        <span className="me-1 font-normal text-muted sm:sr-only">{label}</span>
         <Money minor={minor} />
       </span>
     </span>

@@ -295,3 +295,239 @@ describe("حسابُ المستفيد — ما كتبه صاحبُ المقهى 
     expect(a).toEqual({ account: OTHER, note: null });
   });
 });
+
+/* ── قاعدةُ ٧ أكتوبر ٢٠٢٦: يُنبَّه ولا يُمنَع، ولا رقمَ يُبدَّل بصمت ── */
+
+import { afterPayment, applyPartialAmounts, holdReasonOf, isOverridableHold, transferAfterCredit } from "./payment-run";
+import { distributePartial } from "./mark-paid-plan";
+import { EMPTY_SELECTION, planSupplier, readSelection } from "./pay-run-selection";
+
+describe("قرارُ المالك في المحجوز", () => {
+  const heldInv = inv({ invoiceId: "h1", totalMinor: 23_000, vatMinor: 3_000, taxStatus: "INVALID" });
+
+  it("بلا قرار: تبقى محجوزةً ولا تدخل الجاهز", () => {
+    const run = buildPaymentRun([heldInv], "2026-08");
+    expect(run.ready).toHaveLength(0);
+    expect(run.held).toHaveLength(1);
+    expect(run.overridden).toHaveLength(0);
+    expect(run.vatAtRiskMinor).toBe(3_000);
+  });
+
+  it("بقراره: تدخل بمبلغها، وتُسرَد بسبب حجزها وسببه، والضريبةُ المعرّضة تبقى ظاهرة", () => {
+    const run = buildPaymentRun([heldInv], "2026-08", { overrides: new Map([["h1", { note: "لا يسلّم قبل السداد" }]]) });
+    expect(run.readyTotalMinor).toBe(23_000);
+    expect(run.held).toHaveLength(0);
+    expect(run.heldTotalMinor).toBe(0);
+    expect(run.overridden).toHaveLength(1);
+    expect(run.overridden[0].reason).toBe("NOT_TAX_VALID");
+    expect(run.overridden[0].override?.note).toBe("لا يسلّم قبل السداد");
+    /* القرارُ يُدخل الفاتورة ولا يردّ ضريبتَها */
+    expect(run.vatAtRiskMinor).toBe(3_000);
+  });
+
+  it("ضريبةٌ لم تُقرأ تُعَدّ مجهولةً بعد القرار ولا تُجمَع صفراً", () => {
+    const run = buildPaymentRun(
+      [inv({ invoiceId: "h2", vatMinor: null, inputVatStatus: "NOT_ELIGIBLE" })],
+      "2026-08",
+      { overrides: new Map([["h2", { note: "متّفقٌ عليه" }]]) },
+    );
+    expect(run.vatAtRiskMinor).toBe(0);
+    expect(run.vatAtRiskUnknown).toBe(1);
+  });
+
+  it("ما لم يُؤكَّد مستندُه لا يُدخله قرار — مبلغُه لم يره إنسان", () => {
+    const run = buildPaymentRun(
+      [inv({ invoiceId: "r1", needsReview: true })],
+      "2026-08",
+      { overrides: new Map([["r1", { note: "ادفعها" }]]) },
+    );
+    expect(run.ready).toHaveLength(0);
+    expect(run.held[0].reason).toBe("NEEDS_REVIEW");
+    expect(isOverridableHold("NEEDS_REVIEW")).toBe(false);
+  });
+
+  it("قرارٌ على فاتورةٍ صارت صالحة لا أثر له — هي في الجاهز بلا وسم", () => {
+    const run = buildPaymentRun([inv({ invoiceId: "ok" })], "2026-08", { overrides: new Map([["ok", { note: "قديم" }]]) });
+    expect(run.overridden).toHaveLength(0);
+    expect(run.readyTotalMinor).toBe(10_000);
+  });
+
+  it("سببُ الحجز قاعدةٌ واحدة يقرؤها البناءُ ومسارُ القرار", () => {
+    expect(holdReasonOf({ needsReview: false, taxStatus: "VALID", inputVatStatus: "ELIGIBLE" })).toBeNull();
+    expect(holdReasonOf({ needsReview: true, taxStatus: "VALID", inputVatStatus: "ELIGIBLE" })).toBe("NEEDS_REVIEW");
+    expect(holdReasonOf({ needsReview: false, taxStatus: "UNKNOWN", inputVatStatus: "ELIGIBLE" })).toBe("TAX_UNKNOWN");
+    expect(holdReasonOf({ needsReview: false, taxStatus: "VALID", inputVatStatus: "NOT_ELIGIBLE" })).toBe("NO_VAT_DEDUCTION");
+  });
+
+  it("الملفُّ يسمّي ما دخل بقرار المالك في صفّ مورّده", () => {
+    const run = buildPaymentRun([heldInv], "2026-08", { overrides: new Map([["h1", { note: "س" }]]) });
+    const csv = toBankTransferCsv(run, new Map([["s1", { account: "SA0380000000608010167519", note: null }]]));
+    expect(csv).toContain("بقرار المالك وهي محجوزة: h1");
+  });
+});
+
+describe("استثناءُ فاتورةٍ واحدة", () => {
+  it("المستثناةُ لا تُحوَّل، والباقي بمبلغه", () => {
+    const run = buildPaymentRun(
+      [inv({ invoiceId: "a", totalMinor: 10_000 }), inv({ invoiceId: "b", totalMinor: 5_000 })],
+      "2026-08",
+      { excludeInvoiceIds: new Set(["b"]) },
+    );
+    expect(run.ready[0].invoiceCount).toBe(1);
+    expect(run.readyTotalMinor).toBe(10_000);
+  });
+
+  it("الرصيدُ يُخصم ممّا بقي بعد الاستثناء لا ممّا استُثني", () => {
+    const run = buildPaymentRun(
+      [inv({ invoiceId: "a", totalMinor: 10_000 }), inv({ invoiceId: "b", totalMinor: 5_000 })],
+      "2026-08",
+      { excludeInvoiceIds: new Set(["a"]), creditBySupplier: new Map([["s1", 8_000]]) },
+    );
+    /* بقيت فاتورةُ الخمسين، والرصيدُ ثمانون: يغطّيها كلَّها ولا يُحوَّل شيء */
+    expect(run.ready).toHaveLength(0);
+    expect(run.coveredByCredit[0].creditAppliedMinor).toBe(5_000);
+  });
+
+  it("استثناءُ كلّ فواتير مورّدٍ يُخرجه من الدفعة", () => {
+    const run = buildPaymentRun([inv({ invoiceId: "a" })], "2026-08", { excludeInvoiceIds: new Set(["a"]) });
+    expect(run.ready).toHaveLength(0);
+    expect(run.coveredByCredit).toHaveLength(0);
+  });
+});
+
+describe("«ادفع كذا فقط» في الملفّ", () => {
+  const base = () => buildPaymentRun(
+    [inv({ invoiceId: "a", totalMinor: 10_000 }), inv({ invoiceId: "z", supplierId: "s2", supplierName: "بيكوف", totalMinor: 30_000 })],
+    "2026-08",
+  );
+
+  it("الجزئيُّ يُحوَّل بمبلغه ويُحفَظ الكلُّ بجانبه", () => {
+    const { run, errors } = applyPartialAmounts(base(), new Map([["s2", 12_550]]));
+    expect(errors).toEqual([]);
+    const s2 = run.ready.find((s) => s.supplierId === "s2");
+    expect(s2?.totalMinor).toBe(12_550);
+    expect(s2?.fullMinor).toBe(30_000);
+    expect(run.readyTotalMinor).toBe(22_550);
+  });
+
+  it("ما زاد على ما يُحوَّل يُردّ ولا يُقصّ", () => {
+    const { run, errors } = applyPartialAmounts(base(), new Map([["s2", 30_001]]));
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("بيكوف");
+    /* لم يُبدَّل شيء */
+    expect(run.readyTotalMinor).toBe(40_000);
+  });
+
+  it.each([0, -500, 12.5, Number.NaN])("مبلغٌ ليس عدداً صحيحاً موجباً (%s) يُردّ", (bad) => {
+    expect(applyPartialAmounts(base(), new Map([["s2", bad]])).errors).toHaveLength(1);
+  });
+
+  it("مبلغٌ يساوي الكلّ ليس جزئيّاً", () => {
+    const { run, errors } = applyPartialAmounts(base(), new Map([["s2", 30_000]]));
+    expect(errors).toEqual([]);
+    expect(run.ready.find((s) => s.supplierId === "s2")?.fullMinor).toBeUndefined();
+  });
+
+  it("مبلغٌ لمورّدٍ ليس بين الجاهزين يُردّ", () => {
+    expect(applyPartialAmounts(base(), new Map([["ghost", 100]])).errors).toHaveLength(1);
+  });
+
+  it("الملفُّ يقول المبلغين في صفّ الجزئيّ", () => {
+    const { run } = applyPartialAmounts(base(), new Map([["s2", 12_550]]));
+    const csv = toBankTransferCsv(run, new Map([["s2", { account: "SA0380000000608010167519", note: null }]]));
+    expect(csv).toContain("بيكوف,SA0380000000608010167519,125.50,SAR");
+    expect(csv).toContain("دفعٌ جزئيّ: 125.50 من 300.00");
+    expect(csv).toContain("سداد جزئيّ من فواتير 2026-08");
+  });
+});
+
+describe("توزيعُ السداد الجزئيّ على الفواتير — الأقدمُ أوّلاً", () => {
+  const open = [
+    { invoiceId: "old", openMinor: 10_000 },
+    { invoiceId: "mid", openMinor: 5_000 },
+    { invoiceId: "new", openMinor: 7_000 },
+  ];
+
+  it("يملأ الأقدمَ ثمّ ما يليه، ويترك ما لم يبلغه", () => {
+    const r = distributePartial(open, 12_000);
+    expect(r).toEqual({
+      ok: true,
+      shares: [{ invoiceId: "old", payMinor: 10_000 }, { invoiceId: "mid", payMinor: 2_000 }],
+      untouched: ["new"],
+    });
+  });
+
+  it("مجموعُ الحصص هو المبلغُ بالهللة", () => {
+    const r = distributePartial(open, 21_999);
+    expect(r.ok && r.shares.reduce((s, x) => s + x.payMinor, 0)).toBe(21_999);
+  });
+
+  it("ما زاد على المفتوح يُردّ بمبلغ المفتوح — لا يُقصّ", () => {
+    expect(distributePartial(open, 22_001)).toEqual({ ok: false, reason: "EXCEEDS_OPEN", openMinor: 22_000 });
+  });
+
+  it("المفتوحُ كلُّه مقبول", () => {
+    const r = distributePartial(open, 22_000);
+    expect(r.ok && r.untouched).toEqual([]);
+  });
+
+  it.each([0, -1, 0.5, Number.NaN, Number.POSITIVE_INFINITY])("ما ليس عدداً صحيحاً موجباً (%s) يُردّ", (bad) => {
+    expect(distributePartial(open, bad).ok).toBe(false);
+  });
+});
+
+describe("ما يبقى عليك بعد الدفعة — لا يُقصّ عند الصفر", () => {
+  it("الباقي يُقال بمبلغه", () => {
+    expect(afterPayment(50_000, 30_000)).toEqual({ state: "remaining", minor: 20_000 });
+  });
+  it("الدفعُ الزائد يُقال زيادةً بمبلغها لا «يبقى 0.00»", () => {
+    expect(afterPayment(30_000, 65_000)).toEqual({ state: "over", minor: 35_000 });
+  });
+  it("السدادُ التامّ (بتسامح الهللة) ليس زيادةً ولا باقياً", () => {
+    expect(afterPayment(30_000, 30_000)).toEqual({ state: "settled" });
+    expect(afterPayment(30_000, 30_001)).toEqual({ state: "settled" });
+  });
+  it("ما عليك مجهول ← مجهول، لا صفر", () => {
+    expect(afterPayment(null, 30_000)).toEqual({ state: "unknown" });
+  });
+});
+
+describe("اختيارُ صاحب الدفعة في الشاشة", () => {
+  const s = { supplierId: "s1", creditMinor: 0, invoices: [{ id: "a", openMinor: 10_000 }, { id: "b", openMinor: 5_000 }] };
+
+  it("بلا اختيار: الكلّ بمبلغه", () => {
+    expect(planSupplier(s, EMPTY_SELECTION)).toMatchObject({ on: true, payingMinor: 15_000, skippedInvoices: 0, partialMinor: null });
+  });
+
+  it("فاتورةٌ مستثناة تُنقص المجموعَ بمبلغها", () => {
+    const p = planSupplier(s, { ...EMPTY_SELECTION, skipInvoices: ["b"] });
+    expect(p).toMatchObject({ on: true, payingMinor: 10_000, skippedInvoices: 1, invoiceIds: ["a"] });
+  });
+
+  it("استثناءُ كلّ فواتيره يُخرجه", () => {
+    expect(planSupplier(s, { ...EMPTY_SELECTION, skipInvoices: ["a", "b"] })).toMatchObject({ on: false, payingMinor: 0 });
+  });
+
+  it("المبلغُ الجزئيّ الصحيح هو ما يخرج", () => {
+    expect(planSupplier(s, { ...EMPTY_SELECTION, partial: { s1: "75.50" } })).toMatchObject({ partialMinor: 7_550, payingMinor: 7_550, partialError: null });
+  });
+
+  it("الجزئيُّ الأكبر ممّا يُحوَّل يُقال خطأً ولا يُحسَب — والمجموعُ يبقى الكلّ", () => {
+    const p = planSupplier(s, { ...EMPTY_SELECTION, partial: { s1: "151" } });
+    expect(p.partialMinor).toBeNull();
+    expect(p.partialError).not.toBeNull();
+    expect(p.payingMinor).toBe(15_000);
+  });
+
+  it("الرصيدُ يُخصم بقاعدة الخادم نفسها", () => {
+    expect(transferAfterCredit(15_000, 4_000)).toEqual({ transferMinor: 11_000, creditAppliedMinor: 4_000 });
+    expect(planSupplier({ ...s, creditMinor: 4_000 }, EMPTY_SELECTION)).toMatchObject({ fullMinor: 11_000, creditAppliedMinor: 4_000 });
+  });
+
+  it("ما حُفظ في المتصفّح يُقرأ بفحص — والتالفُ «لا اختيار»", () => {
+    expect(readSelection(null)).toEqual(EMPTY_SELECTION);
+    expect(readSelection("x")).toEqual(EMPTY_SELECTION);
+    expect(readSelection({ skipSuppliers: ["s1", 5], skipInvoices: "no", partial: { s1: "10", s2: 7 } }))
+      .toEqual({ skipSuppliers: ["s1"], skipInvoices: [], partial: { s1: "10" } });
+  });
+});

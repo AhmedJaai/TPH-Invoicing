@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /**
  * التلميحُ — طبقةٌ واحدة في القشرة لكلّ ما يحمل `data-tip`.
@@ -22,6 +22,7 @@ export function Tooltips() {
   const timer = useRef<number | null>(null);
   const lastHide = useRef(0);
   const target = useRef<HTMLElement | null>(null);
+  const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function place(el: HTMLElement) {
@@ -70,13 +71,28 @@ export function Tooltips() {
     };
   }, []);
 
+  /*
+    الحافّةُ تُقصّ على **طرف** التلميح لا مركزه: كان `left` يُحصَر ثمّ يُزاح نصفَ
+    العرض، فتلميحٌ عريض لزرٍّ في طرف الشريط يخرج نصفُه من الشاشة. فيُقاس عرضُه
+    بعد الرسم وقبل أن يُرى، ويُحصَر مركزُه بين (٨ + نصفه) و(العرض − ٨ − نصفه).
+  */
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!tip || !el) return;
+    const half = el.offsetWidth / 2;
+    const max = document.documentElement.clientWidth - 8 - half;
+    const x = max < 8 + half ? document.documentElement.clientWidth / 2 : Math.min(max, Math.max(8 + half, tip.x));
+    el.style.left = `${Math.round(x)}px`;
+  }, [tip]);
+
   if (!tip) return null;
   return (
     <div
+      ref={box}
       role="tooltip"
       className="tip no-print pointer-events-none fixed z-[80] max-w-64 rounded-md bg-inverse-surface px-2 py-1 text-[11px] font-bold leading-snug text-inverse-ink shadow-lifted"
       style={{
-        left: `clamp(8px, ${tip.x}px, calc(100vw - 8px))`,
+        left: tip.x,
         top: tip.y,
         translate: `-50% ${tip.below ? "0" : "-100%"}`,
       }}

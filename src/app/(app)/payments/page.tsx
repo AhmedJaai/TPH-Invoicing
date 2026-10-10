@@ -7,8 +7,9 @@ import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { Callout, EmptyState, LinkTabs, NoAccess, Section, Stat, StatGrid } from "@/components/ui";
-import { PayRunPlanner, WhatsAppLink, type PlannerSupplier } from "@/components/pay-run-planner";
-import { buildSupplierMessage } from "@/lib/payment-run";
+import { HoldOverride, PayRunPlanner, WhatsAppLink, type PlannerSupplier } from "@/components/pay-run-planner";
+import { buildSupplierMessage, isOverridableHold } from "@/lib/payment-run";
+import { whatsappHref } from "@/lib/supplier-edit";
 import { companyConfig } from "@/config/drive";
 import { previousMonth } from "@/lib/filing";
 import { INVOICE, SUPPLIER, countNoun } from "@/lib/arabic";
@@ -50,14 +51,20 @@ export default async function PaymentsPage({
   const defaultMonth = previousMonth(current);
   const month = /^\d{4}-\d{2}$/.test(raw ?? "") ? raw! : defaultMonth;
 
-  const [run, balances] = await Promise.all([loadPaymentRun(month), loadSupplierBalances()]);
+  const balances = await loadSupplierBalances();
+  const creditBy = new Map(balances.map((b) => [b.supplierId, b.creditMinor]));
+  const run = await loadPaymentRun(month, { creditBySupplier: creditBy });
+  /* المحجوزون كذلك: رقمُ واتساب كلٍّ منهم من ملفّه، لا شاشةُ اختيار جهة */
+  const supplierIds = [...new Set([...run.ready.map((r) => r.supplierId), ...run.held.map((h) => h.invoice.supplierId)])];
   const [accounts, slugs] = await Promise.all([
     loadPayeeAccounts(run.ready.map((r) => r.supplierId)),
-    run.ready.length > 0
-      ? db.select({ id: suppliersTable.id, slug: suppliersTable.slug }).from(suppliersTable).where(inArray(suppliersTable.id, run.ready.map((r) => r.supplierId)))
+    supplierIds.length > 0
+      ? db.select({ id: suppliersTable.id, slug: suppliersTable.slug, phone: suppliersTable.phoneE164 }).from(suppliersTable).where(inArray(suppliersTable.id, supplierIds))
       : Promise.resolve([]),
   ]);
   const owedBy = new Map(balances.map((b) => [b.supplierId, b.owedMinor]));
+  const phoneBy = new Map(slugs.map((s) => [s.id, s.phone]));
+  const ownerBy = new Map(run.overridden.map((o) => [o.invoice.invoiceId, { hold: o.message, note: o.override?.note ?? "" }]));
   /* رقمُنا الضريبيّ من الإعداد — وإن غاب المتغيّر قيلت الرسالةُ بلا رقمٍ ولا تسقط الصفحة */
   let companyVat: string | null = null;
   try {
@@ -73,8 +80,7 @@ export default async function PaymentsPage({
       supplierId: s.supplierId,
       name: s.supplierName,
       slug: slugBy.get(s.supplierId) ?? null,
-      totalMinor: s.totalMinor,
-      creditAppliedMinor: s.creditAppliedMinor,
+      creditMinor: Math.max(0, creditBy.get(s.supplierId) ?? 0),
       owedMinor: owedBy.get(s.supplierId) ?? null,
       account: acc?.account ?? null,
       accountNote: acc?.note ?? null,
@@ -84,15 +90,17 @@ export default async function PaymentsPage({
         date: formatDay(i.invoiceDate),
         openMinor: i.totalMinor - i.allocatedMinor,
         href: invoiceHref(i.invoiceId),
+        owner: ownerBy.get(i.invoiceId) ?? null,
       })),
     };
   });
 
+  /* بالمعرّف لا بالاسم — الاسمُ ليس هويّة: مورّدان بالاسم نفسه لا يُدمجان في بطاقة */
   const heldBySupplier = new Map<string, typeof run.held>();
   for (const h of run.held) {
-    const list = heldBySupplier.get(h.invoice.supplierName) ?? [];
+    const list = heldBySupplier.get(h.invoice.supplierId) ?? [];
     list.push(h);
-    heldBySupplier.set(h.invoice.supplierName, list);
+    heldBySupplier.set(h.invoice.supplierId, list);
   }
 
   const months = [previousMonth(defaultMonth), defaultMonth, current];
@@ -104,7 +112,7 @@ export default async function PaymentsPage({
       width="wide"
       title="دفعة الشهر"
       eyebrow={`مستحقّات ${formatMonth(month)} وما تأخّر قبلها`}
-      intro="اختر من تحوِّل له هذه المرّة، وانظر ما يبقى عليك لكلٍّ بعدها، ثمّ نزّل ملفّ التحويلات أو سجّل السداد."
+      intro="اختر من تحوِّل له هذه المرّة وأيَّ فواتيره وكم، وانظر ما يبقى عليك لكلٍّ بعدها، ثمّ نزّل ملفّ التحويلات أو سجّل السداد."
     >
       <div className="mb-6">
         <LinkTabs
@@ -126,7 +134,7 @@ export default async function PaymentsPage({
         const covered = run.coveredByCredit.reduce((s, c) => s + c.creditAppliedMinor, 0);
         const vatUnknownOnly = run.vatAtRiskUnknown > 0 && run.vatAtRiskMinor === 0;
         const calm: string[] = [];
-        if (run.held.length === 0) calm.push("لا شيء محجوز");
+        if (run.held.length === 0 && run.overridden.length === 0) calm.push("لا شيء محجوز");
         if (run.vatAtRiskMinor === 0 && run.vatAtRiskUnknown === 0) calm.push("لا ضريبة مدخلاتٍ تضيع بهذه الدفعة");
         if (covered === 0) calm.push("لا مورّد يغطّيه رصيدُك كلَّه");
         return (
@@ -143,7 +151,7 @@ export default async function PaymentsPage({
                   value={vatUnknownOnly ? "غير معروف" : undefined}
                   minor={vatUnknownOnly ? undefined : run.vatAtRiskMinor}
                   tone={run.vatAtRiskMinor ? "danger" : undefined}
-                  sub={run.vatAtRiskUnknown > 0 ? `${run.vatAtRiskMinor > 0 ? "وأكثر: " : ""}${countNoun(run.vatAtRiskUnknown, INVOICE)} بلا ضريبةٍ مقروءة` : undefined}
+                  sub={run.overridden.length > 0 && run.vatAtRiskUnknown === 0 ? `منها ما أدخلتَه في الدفعة بقرارك (${countNoun(run.overridden.length, INVOICE)})` : run.vatAtRiskUnknown > 0 ? `${run.vatAtRiskMinor > 0 ? "وأكثر: " : ""}${countNoun(run.vatAtRiskUnknown, INVOICE)} بلا ضريبةٍ مقروءة` : undefined}
                 />
               )}
               {covered > 0 && (
@@ -188,12 +196,18 @@ export default async function PaymentsPage({
           )}
 
           {run.held.length > 0 && (
-            <Section title="محجوزٌ حتى تُعالَج" count={run.held.length} hint="لا يدخل ملفّ التحويلات. اطلب الفاتورة الصحيحة قبل السداد — والرسالةُ جاهزة.">
+            <Section title="محجوزٌ حتى تُعالَج" count={run.held.length} hint="لا يدخل ملفّ التحويلات ما لم تُدخله أنت. اطلب الفاتورة الصحيحة قبل السداد — والرسالةُ جاهزة.">
               <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
-                {[...heldBySupplier].map(([name, list]) => {
+                {[...heldBySupplier].map(([supplierId, list]) => {
+                  const name = list[0].invoice.supplierName;
                   const reasons = [...new Set(list.map((h) => h.message))];
+                  /* ما يُدخله قرارُه: أسبابُ الضريبة. وما لم يُؤكَّد مستندُه يُفتح ويُؤكَّد */
+                  const overridable = list.filter((h) => isOverridableHold(h.reason));
+                  const unconfirmed = list.filter((h) => h.reason === "NEEDS_REVIEW");
+                  const atRisk = overridable.filter((h) => h.reason !== "TAX_UNKNOWN");
+                  const phone = phoneBy.get(supplierId) ?? null;
                   return (
-                    <article key={name} className="rounded-xl border border-warn/25 bg-raised p-4 shadow-raised">
+                    <article key={supplierId} className="rounded-xl border border-warn/25 bg-raised p-4 shadow-raised">
                       <div className="flex items-baseline justify-between gap-3">
                         <h3 className="text-sm font-bold">{name}</h3>
                         <span className="text-sm font-bold text-warn">
@@ -216,9 +230,39 @@ export default async function PaymentsPage({
                       <p className="mt-2 text-xs leading-relaxed text-ink-soft">
                         {reasons.length === 1 ? reasons[0] : reasons.map((r) => `• ${r}`).join(" ")}
                       </p>
-                      <div className="mt-3">
-                        <WhatsAppLink href={`https://wa.me/?text=${encodeURIComponent(buildSupplierMessage(name, list, companyVat))}`} />
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <WhatsAppLink href={whatsappHref(phone, buildSupplierMessage(name, list, companyVat))} />
+                        {overridable.length > 0 && (
+                          <HoldOverride
+                            month={month}
+                            supplierName={name}
+                            invoiceIds={overridable.map((h) => h.invoice.invoiceId)}
+                            openMinor={overridable.reduce((s, h) => s + h.invoice.totalMinor - h.invoice.allocatedMinor, 0)}
+                            vatAtRiskMinor={atRisk.reduce((s, h) => s + (h.invoice.vatMinor ?? 0), 0)}
+                            vatAtRiskUnknown={atRisk.filter((h) => h.invoice.vatMinor === null).length}
+                          />
+                        )}
                       </div>
+                      {!phone && (
+                        <p className="mt-2 text-[11px] text-muted">
+                          لا رقمَ له عندنا — تختار الجهةَ في واتساب.{" "}
+                          {slugBy.get(supplierId) && (
+                            <Link href={`/suppliers/${slugBy.get(supplierId)}`} className="font-bold text-accent hover:underline">أضف رقمه في ملفّه</Link>
+                          )}
+                        </p>
+                      )}
+                      {unconfirmed.length > 0 && (
+                        <p className="mt-2 text-[11px] leading-relaxed text-muted">
+                          {overridable.length > 0 ? `${countNoun(unconfirmed.length, INVOICE)} منها ` : ""}
+                          مستندُها لم يُؤكَّد — مبلغُها قرأه النظام ولم تره بعد، فافتحها وأكّدها لتدخل الدفعة:{" "}
+                          {unconfirmed.map((h, i) => (
+                            <span key={h.invoice.invoiceId}>
+                              {i > 0 && "، "}
+                              <Link href={invoiceHref(h.invoice.invoiceId)} className="font-bold text-accent hover:underline"><bdi dir="ltr">{h.invoice.invoiceNumber}</bdi></Link>
+                            </span>
+                          ))}
+                        </p>
+                      )}
                     </article>
                   );
                 })}

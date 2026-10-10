@@ -26,6 +26,8 @@ import {
   modelFor,
   type AiTask,
 } from "./models";
+import { aiBudgetVerdict, recordAiUsage } from "@/services/ai-usage.service";
+import { createRedactor } from "./redact";
 
 export type DeepseekFailureKind =
   | "NOT_CONFIGURED"
@@ -180,7 +182,19 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
     };
   }
 
+  /* السقفُ اليوميّ إن ضبطه صاحبُ النظام (`AI_DAILY_BUDGET_USD`) — وبلا ضبطٍ لا يُسأل شيء */
+  const budget = await aiBudgetVerdict();
+  if (!budget.allowed) {
+    return {
+      ok: false, kind: "AI_UNAVAILABLE", reason: budget.reason,
+      model, task: call.task, durationMs: 0, attempts: 0,
+    };
+  }
+
   const thinking = call.thinking ?? thinkingFor(call.task);
+
+  /* الآيبانُ والجوّال لا يغادران: رموزٌ ثابتة داخل النداء تُعاد في الجواب (`redact.ts`) */
+  const redactor = createRedactor();
 
   const body = JSON.stringify({
     model,
@@ -188,7 +202,12 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
     max_tokens: call.maxTokens,
     ...(call.json ? { response_format: { type: "json_object" } } : {}),
     ...(thinking ? {} : { thinking: { type: "disabled" } }),
-    messages: call.messages,
+    messages: call.messages.map((m) => ({
+      ...m,
+      content: typeof m.content === "string"
+        ? redactor.redact(m.content)
+        : m.content.map((part) => (part.type === "text" ? { ...part, text: redactor.redact(part.text) } : part)),
+    })),
   });
 
   let lastReason = "";
@@ -244,7 +263,8 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
       lastReason =
         (e as Error).name === "AbortError"
           ? `تجاوز النداء المهلة (${Math.round(budget / 1000)} ثانية)`
-          : `تعذّر الوصول إلى المزوّد: ${(e as Error).message}`;
+          : "تعذّر الوصول إلى المزوّد";
+      if ((e as Error).name !== "AbortError") console.error(`[deepseek] ${call.task}: تعذّر الوصول —`, (e as Error).message);
       if (attempt < MAX_ATTEMPTS) {
         await wait(retryBaseMs() * 2 ** (attempt - 1));
         continue;
@@ -286,7 +306,14 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
         };
       }
 
-      lastReason = `المزوّد ردّ ${response.status}: ${text.slice(0, 160)}`;
+      /*
+        جسمُ ردّ المزوّد لسجلّ الخادم لا للشاشة: قد يحمل معرّفَ الحساب أو الطلب عنده،
+        وكان أوّلُ ١٦٠ حرفاً منه يبلغ المستخدمَ في رسالة الخطأ. فيُقال له الرمزُ ومعناه.
+      */
+      console.error(`[deepseek] ${call.task}: ردّ ${response.status} — ${text.slice(0, 400)}`);
+      lastReason = `المزوّد ردّ ${response.status}${
+        response.status === 429 ? " (حدّ الطلبات عنده)" : response.status >= 500 ? " (عطبٌ عنده)" : ""
+      }`;
       if (RETRYABLE_STATUS.has(response.status) && attempt < MAX_ATTEMPTS) {
         await wait(retryBaseMs() * 2 ** (attempt - 1));
         continue;
@@ -339,14 +366,22 @@ export async function callDeepseek(call: DeepseekCall): Promise<DeepseekResult> 
       cachedTokens: payload.usage?.prompt_cache_hit_tokens ?? 0,
     };
 
+    const estimatedCostUsd = estimateCostUsd(call.task, usage);
+    /* كلُّ نداءٍ نجح يُقيَّد في الدفتر — ولا يُسقط القراءةَ إن تعذّر القيد */
+    await recordAiUsage({
+      task: call.task, model,
+      inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, cachedTokens: usage.cachedTokens ?? 0,
+      estimatedCostUsd,
+    });
+
     return {
       ok: true,
-      text,
+      text: redactor.restore(text),
       model,
       task: call.task,
       durationMs: Date.now() - started,
       usage,
-      estimatedCostUsd: estimateCostUsd(call.task, usage),
+      estimatedCostUsd,
       attempts: attempt,
     };
   }

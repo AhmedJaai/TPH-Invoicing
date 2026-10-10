@@ -24,6 +24,7 @@ import { bankLabel, detectBank } from "@/lib/bank/parsers/detect";
 import { adapterFor, adapterNotices } from "@/lib/bank/parsers/adapters";
 import { MAX_VISION_PAGES, validateVision } from "@/lib/bank/vision-statement";
 import { selectedVision } from "./statement-vision.service";
+import { sniffMimeType } from "@/lib/file-signature";
 
 export type StatementSource = "SPREADSHEET" | "PDF_TEXT" | "PDF_SCANNED" | "PDF_VISION";
 
@@ -68,7 +69,18 @@ export async function readStatementFile(
   fileName: string,
   mimeType?: string,
 ): Promise<StatementRead> {
-  if (!isPdf(fileName, mimeType)) {
+  /*
+    النوعُ من بصمة الملفّ لا من اسمه: ما سُمّي PDF وليس PDF لا يبلغ محلِّلَ الـPDF،
+    وPDF سُمّي جدولاً يُقرأ PDF — لا يُرمى إلى قارئ الجداول فيقول «لا حركة».
+  */
+  const reallyPdf = sniffMimeType(buffer) === "application/pdf";
+  if (isPdf(fileName, mimeType) && !reallyPdf) {
+    return {
+      bank: "غير محدَّد", rows: [], warnings: [], source: "PDF_TEXT",
+      blocked: "الملفّ مسمّىً PDF ومحتواه ليس PDF — نزّله من البنك من جديد، أو ارفعه بصيغة Excel.",
+    };
+  }
+  if (!reallyPdf) {
     const parsed = parseBankStatement(buffer);
     /*
       البنك يُكشَف من محتوى الملفّ لا يُفترَض. وحين لا يُعرَف لا

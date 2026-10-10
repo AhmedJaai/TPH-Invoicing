@@ -1,10 +1,11 @@
+import { parseLedgerSearch } from "@/lib/bank/ledger-search";
 import { BankHeldRows } from "@/components/bank-held-rows";
 import { loadOpenHeldRows } from "@/services/bank-held.service";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ArrowLeft, CalendarRange, CircleAlert, CircleCheck, Clock3, Inbox, Landmark,
-  ListFilter, Upload,
+  ListFilter, Search, Upload,
 } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
@@ -53,7 +54,7 @@ const VIEW_LABEL: Record<TxView, string> = {
 export default async function BankPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tx?: string; show?: string; month?: string }>;
+  searchParams: Promise<{ tx?: string; show?: string; month?: string; q?: string }>;
 }) {
   const params = await searchParams;
   const user = await currentUser();
@@ -70,6 +71,7 @@ export default async function BankPage({
     ? (params.show as TxView)
     : "out";
   const month = params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : null;
+  const search = parseLedgerSearch(params.q);
 
   /* الرابطُ القديم `/bank?tx=` يفتح ملفَّ الحركة — تبقى الإشاراتُ المحفوظة تعمل */
   if (params.tx) redirect(txHref(params.tx));
@@ -77,7 +79,7 @@ export default async function BankPage({
   const [coverage, queue, ledger, doublePaid, handLinks, held] = await Promise.all([
     loadBankCoverage(),
     loadBankQueue(),
-    loadLedger(view, month),
+    loadLedger(view, month, search),
     countOpenDoublePaid(),
     can(user.role, "payment:approve") ? loadHandPaymentLinks() : Promise.resolve([]),
     loadOpenHeldRows(),
@@ -90,12 +92,14 @@ export default async function BankPage({
   const stale = staleDays !== null && staleDays > BANK_STALE_DAYS;
   const queuedTx = queue.groups.reduce((n, g) => n + g.items.length, 0);
 
-  const href = (next: { show?: TxView; month?: string | null }) => {
+  const href = (next: { show?: TxView; month?: string | null; q?: null }) => {
     const q = new URLSearchParams();
     const s = next.show ?? view;
     const m = next.month === undefined ? month : next.month;
     if (s !== "out") q.set("show", s);
     if (m) q.set("month", m);
+    /* البحثُ يبقى مع تبديل اللسان والشهر — ويُمسَح بزرّه */
+    if (search && next.q !== null) q.set("q", search.text);
     const qs = q.toString();
     return `/bank${qs ? `?${qs}` : ""}#transactions`;
   };
@@ -218,10 +222,37 @@ export default async function BankPage({
               )}
             </div>
 
-            {ledger.total > ledger.rows.length && (
+            {/* بحثٌ في الحركات كلِّها عند الخادم — لا في الصفوف المرسومة وحدها */}
+            <form action="/bank#transactions" className="mb-3 flex flex-wrap items-center gap-2" role="search">
+              <label className="relative flex min-w-0 flex-1 basis-64 items-center sm:max-w-md">
+                <Search className="pointer-events-none absolute start-3 h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
+                <input
+                  name="q"
+                  type="search"
+                  defaultValue={search?.text ?? ""}
+                  placeholder="ابحث في كلّ الحركات: مبلغٌ أو اسمٌ أو نصّ البنك"
+                  aria-label="ابحث في كلّ الحركات بالمبلغ أو الاسم أو نصّ البنك"
+                  dir="auto"
+                  className="min-h-11 w-full rounded-lg border border-line-input bg-raised ps-9 pe-3 text-sm sm:min-h-9"
+                />
+              </label>
+              {view !== "out" && <input type="hidden" name="show" value={view} />}
+              {month && <input type="hidden" name="month" value={month} />}
+              <button type="submit" className={buttonClass("secondary", "sm")}>ابحث</button>
+              {search && <LinkButton href={href({ q: null })} size="sm" variant="quiet">امسح البحث</LinkButton>}
+            </form>
+
+            {search ? (
+              <p className="mb-3 text-xs text-ink-soft" role="status">
+                {ledger.total === 0 ? "لا حركةَ تطابق" : <><span className="nums">{ledger.total}</span> تطابق</>} «<bdi>{search.text}</bdi>»
+                {search.amount ? " (مبلغاً أو نصّاً)" : ""} في «{VIEW_LABEL[view]}»{month ? ` في ${formatMonth(month)}` : " في كلّ الأشهر"}
+                {ledger.total > ledger.rows.length && <> — يُعرَض أحدثُ <span className="nums">{ledger.rows.length}</span>؛ ضيّق البحثَ أو اختر شهراً</>}
+                {view !== "all" && <> · <Link href={href({ show: "all" })} className="font-bold text-accent hover:underline">ابحث في كلّ الأنواع</Link></>}
+              </p>
+            ) : ledger.total > ledger.rows.length && (
               <p className="mb-3 flex items-start gap-2 text-xs text-muted">
                 <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-                <span>يُعرَض أحدثُ {countNoun(txLimit(month), TRANSACTION)} من <span className="nums">{ledger.total}</span> — والبحثُ فيها وحدها. اختر شهراً لترى حركاته كلَّها.</span>
+                <span>يُعرَض أحدثُ {countNoun(txLimit(month), TRANSACTION)} من <span className="nums">{ledger.total}</span>. ابحث أعلاه في الحركات كلِّها، أو اختر شهراً لترى حركاته.</span>
               </p>
             )}
 
@@ -230,12 +261,12 @@ export default async function BankPage({
               keyOf={(t) => t.id}
               hrefOf={(t) => txHref(t.id)}
               searchOf={(t) => [t.who, t.description, CATEGORY_LABEL[t.category], formatDay(t.valueDate), formatRiyalsDisplay(t.amountMinor)].filter(Boolean).join(" ")}
-              searchLabel="ابحث بالجهة أو المبلغ أو نصّ البنك"
+              searchLabel="صفِّ المعروض"
               empty={
                 <EmptyState
                   compact
                   icon={ListFilter}
-                  title={`لا حركات في «${VIEW_LABEL[view]}»${month ? ` في ${formatMonth(month)}` : ""}.`}
+                  title={search ? `لا حركةَ تطابق «${search.text}».` : `لا حركات في «${VIEW_LABEL[view]}»${month ? ` في ${formatMonth(month)}` : ""}.`}
                   hint="جرّب لساناً آخر أو شهراً آخر."
                   action={<LinkButton href={href({ show: "all", month: null })} size="sm">اعرض الكلّ</LinkButton>}
                 />

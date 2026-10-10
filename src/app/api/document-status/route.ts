@@ -19,6 +19,7 @@ import { recordAudit } from "@/lib/audit";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { renameArchived } from "@/services/drive-rename.service";
 import { processDocumentBacklog } from "@/services/document-review.service";
+import { isAutoPaused } from "@/services/auto-process.service";
 import { refreshTokenFor } from "@/services/drive.service";
 import { driveForUser } from "@/lib/drive";
 import { driveWritesAllowed } from "@/lib/drive-readonly";
@@ -79,11 +80,21 @@ export async function POST(request: Request) {
       الخلفيُّ لا يُعاد ما لم تتغيّر بصمةُ ما يعمل عليه أو تمضِ ستُّ ساعات — كان
       يجري كلَّ عشر دقائق لكلّ جهاز ولو لم يتغيّر صفّ (`job-state.service.ts`).
     */
+    /*
+      موقوفٌ بيد صاحبه: الخلفيُّ لا يقيّد ولا يعتمد حتى يشغّله. والضغطُ بيدٍ يجري —
+      من ضغط «أكّد المؤهَّل» طلب العملَ بعينه.
+    */
+    if (body.background && await isAutoPaused()) {
+      return NextResponse.json({
+        ok: true, skipped: true, paused: true, message: "العمل الآليّ موقوف",
+        recorded: 0, approved: 0, renamed: [], reread: 0, notes: [], handLinked: 0, done: [],
+      });
+    }
     const fingerprint = await backlogFingerprint();
     if (body.background && !(await isDue("backlog", fingerprint, BACKLOG_MAX_AGE_MS))) {
       return NextResponse.json({
         ok: true, skipped: true, message: "لا جديد منذ آخر استدراك",
-        recorded: 0, approved: 0, renamed: [], reread: 0, notes: [], handLinked: 0,
+        recorded: 0, approved: 0, renamed: [], reread: 0, notes: [], handLinked: 0, done: [],
       });
     }
     const r = await processDocumentBacklog(user.id, drive);

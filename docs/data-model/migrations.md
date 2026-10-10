@@ -2,13 +2,13 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٦١
+## الجداول — ٦٣
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
-`suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` · `payments` `payment_allocations`
+`suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` · `payments` `payment_allocations` `payment_hold_overrides`
 `bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes` · `job_state`
 `products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products`
-`audit_logs` `rate_limits` `expenses`
+`audit_logs` `rate_limits` `ai_usage` `expenses`
 `counterparties` `counterparty_evidence` · `branches` `bank_accounts` `reconciliation_periods`
 `sale_payments` `refunds` `refund_lines` `settlement_batches`
 `adjudications` `decision_history` · `ai_findings` · `extraction_cache` · `alert_resolutions` · `vat_tx_choices` `vat_invoice_choices` `vat_filings` `vat_period_inputs`
@@ -111,6 +111,9 @@
 | `067_supplier_profile.sql` | `suppliers`: `payment_terms_days` (فراغُه «غير معروف» لا صفر) · `phone_e164` · `email` · `contact_name` · `iban` المكتوب بيد ومن كتبه ومتى؛ وقيدان على العمودين الجديدين وحدهما |
 | `068_extraction_evidence.sql` | `documents.extraction_evidence` و`extraction_prompt_version`، و`extraction_cache`: `evidence` · `prompt_version` · `schema_version` · `provider` — ما قوبل به اقتراحُ النموذج (رمزُ QR ومصدرُ كلّ حقل) |
 | `069_lookup_indexes.sql` | فهارس: `documents(supplier_id, created_at desc)` · `invoice_lines(supplier_id, normalized_description)` · `bank_transactions(rule_id)` الجزئيّ |
+| `070_ai_usage.sql` | `ai_usage` — سجلُّ نداءات الذكاء برموزها وكلفتها التقديريّة (ميكرو دولار)؛ للسقف اليوميّ الاختياريّ وبطاقة الإنفاق |
+| `071_role_auditor.sql` | `role`: قيمةٌ جديدة `AUDITOR` — دورُ قراءةٍ لا يملك صلاحيّةَ كتابة |
+| `072_payment_hold_overrides.sql` | `payment_hold_overrides` — فاتورةٌ محجوزة أدخلها صاحبُها الدفعةَ بسببٍ مكتوب؛ غيابُ الصفّ «لا قرار» |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

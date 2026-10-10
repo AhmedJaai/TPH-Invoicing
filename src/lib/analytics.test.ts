@@ -345,3 +345,28 @@ describe("spendTrend — الشهر الجاري يُقارَن بمثله", () 
     expect(spendTrend(rows, new Date(Date.UTC(2026, 8, 6))).pct).toBeNull();
   });
 });
+
+describe("منحنى سعر الصنف", () => {
+  const row = (date: string | null, unitPriceMinor: number): LineRow => ({
+    normalizedDescription: "حليب", description: "حليب", supplierId: "s1", supplierName: "المراعي",
+    invoiceDate: date ? new Date(`${date}T00:00:00Z`) : null, quantity: 1, unitPriceMinor, lineTotalMinor: unitPriceMinor,
+  });
+
+  it("الأسعارُ بترتيب تواريخها، الأقدمُ أوّلاً — مهما كان ترتيبُ القراءة", () => {
+    const [item] = summarizeItems([row("2026-03-01", 700), row("2026-01-01", 500), row("2026-02-01", 600)]);
+    expect(item.priceTrail).toEqual([500, 600, 700]);
+  });
+
+  it("ما لا تاريخَ له لا يُوضَع في زمنٍ مخترَع", () => {
+    const [item] = summarizeItems([row("2026-01-01", 500), row(null, 999), row("2026-02-01", 600)]);
+    expect(item.priceTrail).toEqual([500, 600]);
+  });
+
+  it("يومٌ واحد نقطةٌ واحدة، والمنحنى آخرُ اثنتي عشرة", () => {
+    const rows = Array.from({ length: 15 }, (_, i) => row(`2026-01-${String(i + 1).padStart(2, "0")}`, 100 + i));
+    const [item] = summarizeItems([...rows, row("2026-01-15", 999)]);
+    expect(item.priceTrail).toHaveLength(12);
+    expect(item.priceTrail.at(-1)).toBe(999);
+    expect(item.priceTrail[0]).toBe(103);
+  });
+});

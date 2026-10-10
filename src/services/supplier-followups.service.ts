@@ -36,9 +36,9 @@ export async function loadUnbackedPayments(): Promise<UnbackedPayment[]> {
     await db.execute<{
       id: string; supplier_id: string | null; name_ar: string | null; slug: string | null;
       d: string; amount_minor: number; unbacked: number; tx: string | null; issues: boolean | null;
-      drive_file_id: string | null;
+      drive_file_id: string | null; phone: string | null;
     }>(sql`
-      select p.id, p.supplier_id, s.name_ar, s.slug, p.paid_at::date::text as d, p.amount_minor,
+      select p.id, p.supplier_id, s.name_ar, s.slug, s.phone_e164 as phone, p.paid_at::date::text as d, p.amount_minor,
              coalesce(s.issues_invoices, true) as issues,
              p.amount_minor - p.fee_minor
                - coalesce((select sum(a.amount_minor)::int from payment_allocations a
@@ -69,6 +69,7 @@ export async function loadUnbackedPayments(): Promise<UnbackedPayment[]> {
     supplierId: r.supplier_id,
     supplierName: r.name_ar,
     supplierSlug: r.slug,
+    supplierPhone: r.phone,
     paidOn: String(r.d).slice(0, 10),
     amountMinor: Number(r.amount_minor),
     unbackedMinor: Number(r.unbacked),
@@ -84,13 +85,15 @@ export interface MissingStatementSupplier {
   slug: string;
   invoiceCount: number;
   lastInvoiceDate: string | null;
+  /** رقمُه بصيغة E.164 إن كُتب في ملفّه — يُفتح واتساب عليه. */
+  phoneE164: string | null;
 }
 
 /** مورّدون لهم فواتير عندنا ولا كشف منهم ينتهي في الشهر المطلوب. */
 export async function loadMissingStatementSuppliers(month: string): Promise<MissingStatementSupplier[]> {
   const rows = (
-    await db.execute<{ id: string; name_ar: string; slug: string; invoices: number; last_invoice: string | null }>(sql`
-      select s.id, s.name_ar, s.slug, count(i.id)::int as invoices,
+    await db.execute<{ id: string; name_ar: string; slug: string; invoices: number; last_invoice: string | null; phone: string | null }>(sql`
+      select s.id, s.name_ar, s.slug, s.phone_e164 as phone, count(i.id)::int as invoices,
              to_char(max(i.invoice_date), 'YYYY-MM-DD') as last_invoice
         from invoices i
         join suppliers s on s.id = i.supplier_id
@@ -101,7 +104,7 @@ export async function loadMissingStatementSuppliers(month: string): Promise<Miss
           where st.supplier_id = i.supplier_id
             and to_char(st.period_end, 'YYYY-MM') = ${month}
        )
-       group by s.id, s.name_ar, s.slug
+       group by s.id, s.name_ar, s.slug, s.phone_e164
        order by count(i.id) desc, s.name_ar
     `)
   ).rows;
@@ -112,5 +115,6 @@ export async function loadMissingStatementSuppliers(month: string): Promise<Miss
     slug: r.slug,
     invoiceCount: Number(r.invoices),
     lastInvoiceDate: r.last_invoice,
+    phoneE164: r.phone,
   }));
 }

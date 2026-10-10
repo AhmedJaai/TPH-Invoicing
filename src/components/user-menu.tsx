@@ -1,3 +1,4 @@
+import { SubmitButton } from "./submit-button";
 import { LogOut } from "lucide-react";
 import { signOut } from "@/auth";
 import { isAuthBypassed } from "@/lib/session";
@@ -29,16 +30,15 @@ export function UserMenu({ name, role, tone = "surface" }: { name?: string | nul
             await signOut({ redirectTo: "/login" });
           }}
         >
-          <button
-            type="submit"
-            aria-label="اخرج من الحساب"
+          <SubmitButton
+            label="اخرج من الحساب"
             title="اخرج"
             className={`grid h-11 w-11 place-items-center rounded-lg transition-colors sm:h-8 sm:w-8 ${
               frame ? "text-frame-muted hover:bg-frame-raised hover:text-frame-ink" : "text-muted hover:bg-hover hover:text-ink"
             }`}
           >
             <LogOut className="h-4 w-4" strokeWidth={2} aria-hidden />
-          </button>
+          </SubmitButton>
         </form>
       )}
     </div>

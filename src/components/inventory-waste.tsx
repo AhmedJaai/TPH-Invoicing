@@ -1,5 +1,6 @@
 "use client";
 
+import { DateChips } from "./date-chips";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
@@ -139,7 +140,11 @@ export function InventoryWaste({
         يبقى سؤالاً مفتوحاً — ولا يُسمّى هدراً.
       </p>
 
-      <div className="mt-3 flex flex-wrap items-end gap-2">
+      {/* نموذجٌ حقيقيّ: Enter في حقل الكمّيّة يسجّل، و«تمّ» في لوحة مفاتيح الهاتف كذلك */}
+      <form
+        onSubmit={(e) => { e.preventDefault(); if (productId && quantity.trim() !== "") void submit(); }}
+        className="mt-3 flex flex-wrap items-end gap-2"
+      >
         <label className="min-w-0 flex-1">
           <span className="block text-[11px] text-muted">الصنف</span>
           <select
@@ -153,7 +158,7 @@ export function InventoryWaste({
         <label className="w-28">
           <span className="block text-[11px] text-muted">الكمّيّة {item ? `(${item.unitLabel})` : ""}</span>
           <input
-            type="text" inputMode="decimal" dir="ltr"
+            type="text" inputMode="decimal" dir="ltr" enterKeyHint="done"
             value={quantity} onChange={(e) => edit(setQuantity)(e.target.value)}
             className="nums mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-center text-sm"
           />
@@ -167,12 +172,13 @@ export function InventoryWaste({
             {REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
         </label>
-        <label className="w-36">
+        <label className="min-w-36">
           <span className="block text-[11px] text-muted">التاريخ</span>
           <input
             type="date" value={occurredOn} onChange={(e) => edit(setOccurredOn)(e.target.value)}
-            className="nums mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-sm"
+            className="nums mt-1 block min-h-11 w-36 rounded-lg border border-line-input bg-raised px-2 text-sm"
           />
+          <DateChips value={occurredOn} onPick={edit(setOccurredOn)} hijri={false} />
         </label>
         <input
           type="text" value={note} onChange={(e) => setNote(e.target.value)}
@@ -182,13 +188,13 @@ export function InventoryWaste({
         />
         <button
           aria-busy={busy}
-          type="button" onClick={submit}
+          type="submit"
           disabled={busy || !productId || quantity.trim() === ""}
           className={buttonClass("primary")}
         >
           سجِّل الهدر
         </button>
-      </div>
+      </form>
 
       {message && <p role={failed ? "alert" : "status"} className={`mt-2 text-xs ${failed ? "text-danger" : "text-ok"}`}>{message}</p>}
 

@@ -226,15 +226,40 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                 icon={FileWarning}
                 title={`${countNoun(overridden.length, TRANSACTION)} اخترتَها ولا تُحسب: ${riyalsText(overridden.reduce((s, t) => s + t.vatMinor, 0))}`}
               >
-                فاتورةُ كلٍّ منها محسوبةٌ في الخصم، فلو حُسبت الحوالةُ معها خُصمت ضريبتُها مرّتين. إن أردتَ حسابَها من الحوالة فأخرِج فاتورتَها من{" "}
-                <a href="#invoices" className="font-bold underline underline-offset-2">قوائم الفواتير</a> أوّلاً.
-                <ul className="mt-2 space-y-1 text-xs">
-                  {overridden.map((t) => (
-                    <li key={t.id} className="flex flex-wrap items-baseline justify-between gap-x-3">
-                      <span>{formatDay(t.day)} — {t.label}</span>
-                      <span><Money minor={t.amountMinor} /> · ضريبتُها <Money minor={t.vatMinor} /></span>
-                    </li>
-                  ))}
+                فاتورةُ كلٍّ منها محسوبةٌ في الخصم، فلو حُسبت الحوالةُ معها خُصمت ضريبتُها مرّتين. اختيارُك باقٍ — و«احسبها من الحوالة» يُخرج فاتورتَها بعينها فتُحسب الحوالةُ بدلها.
+                <ul className="mt-2 space-y-2 text-xs">
+                  {overridden.map((t) => {
+                    /* الفرقُ في الخصم لو بُدّلت: ضريبةُ الحوالة بدل ضريبة فواتيرها — والمجهولُ لا يُجمَع صفراً */
+                    const known = t.covering.every((c) => c.vatMinor !== null);
+                    const invoiceVat = t.covering.reduce((sum, c) => sum + (c.vatMinor ?? 0), 0);
+                    /* ضريبةُ الحوالة كما يحسبها الإقرار (`txVat`) — لا حسابَ ثانٍ هنا */
+                    const swapVat = t.vatMinor;
+                    return (
+                      <li key={t.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                        <span className="min-w-0 flex-1 basis-56">
+                          {formatDay(t.day)} — {t.label} · <Money minor={t.amountMinor} />
+                          <span className="block text-[11px] text-ink-soft">{t.blocked ?? "لا تُحسب"}</span>
+                        </span>
+                        {!filing && t.covering.length > 0 && (
+                          <VatBulk
+                            kind="invoice"
+                            ids={t.covering.map((c) => c.id)}
+                            included={false}
+                            variant="secondary"
+                            confirm={{
+                              title: "احسبها من الحوالة",
+                              consequence: known
+                                ? `تخرج ${countNoun(t.covering.length, INVOICE)} من الخصم (ضريبتُها ${riyalsText(invoiceVat)}) وتُحسب الحوالةُ بدلها (ضريبتُها ${riyalsText(swapVat)}) — فيتغيّر ما يُخصم بـ${riyalsText(Math.abs(swapVat - invoiceVat))} ${swapVat >= invoiceVat ? "زيادةً" : "نقصاً"}.`
+                                : `تخرج ${countNoun(t.covering.length, INVOICE)} من الخصم وتُحسب الحوالةُ بدلها (ضريبتُها ${riyalsText(swapVat)}). ضريبةُ الفاتورة لم تُقرأ كلُّها، فالفرقُ غير معروف.`,
+                              acknowledgement: "أعلم أنّ الفاتورة هي سندُ الخصم عند الهيئة، وأختار حسابَها من الحوالة",
+                            }}
+                          >
+                            احسبها من الحوالة
+                          </VatBulk>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </Callout>
             )}

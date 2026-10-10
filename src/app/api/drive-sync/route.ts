@@ -55,6 +55,8 @@ import { fillFromFileName } from "@/lib/extraction/filename-facts";
 import { parseStatementExtras } from "@/lib/extraction/statement-extras";
 import { renameArchived } from "@/services/drive-rename.service";
 import { processDocumentBacklog } from "@/services/document-review.service";
+import { isAutoPaused } from "@/services/auto-process.service";
+import type { AutoWorkItem } from "@/lib/auto-work";
 import { markDriveChecked, markDriveFailed } from "@/services/drive-status.service";
 import { previewAllowed } from "@/lib/preview-mode";
 import { driveWritesAllowed } from "@/lib/drive-readonly";
@@ -157,6 +159,11 @@ async function handle(request: Request) {
   if (!parsedBody.ok) return parsedBody.response;
   const body: Body = parsedBody.body;
 
+  /* موقوفٌ بيد صاحبه: المزامنةُ الخلفيّة لا تقرأ ولا تقيّد حتى يشغّلها — و«زامن الآن» بيدٍ يعمل */
+  if (body.background === true && await isAutoPaused()) {
+    return NextResponse.json({ paused: true });
+  }
+
   /* المعاينةُ والتسجيلُ بالاسم لا يدفعان شيئاً فلا يُحجَزان — العقدُ على القراءة بالذكاء وحدها */
   const leased = body.apply === true && body.readContent === true;
   const holder = randomUUID();
@@ -211,7 +218,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
   const firstCall = !body.fileIds?.length && !body.onlyMonths?.length;
   const backlog = apply && firstCall
     ? await processDocumentBacklog(user.id, drive)
-    : { recorded: 0, approved: 0, renamed: [] as { from: string; to: string }[], reread: 0, notes: [] as string[] };
+    : { recorded: 0, approved: 0, renamed: [] as { from: string; to: string }[], reread: 0, notes: [] as string[], done: [] as AutoWorkItem[] };
 
   const direct = Array.isArray(body.fileIds) ? body.fileIds.slice(0, 8) : [];
   const notes: string[] = [];
@@ -1118,7 +1125,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
     /* لماذا لم يدخل ما لم يدخل — مجموعاً بالسبب، فيُعرَف أيُّ شرطٍ يُسقط أكثر */
     reviewReasons: [...reviewGaps.entries()].map(([gap, count]) => ({ gap, count })),
     renamed: [...backlog.renamed, ...renamed],
-    backlog: { recorded: backlog.recorded, approved: backlog.approved, notes: backlog.notes.slice(0, 10) },
+    backlog: { recorded: backlog.recorded, approved: backlog.approved, notes: backlog.notes.slice(0, 10), done: backlog.done.slice(0, 80) },
     renameFailures,
     notes: notes.slice(0, 20),
     readFailures,

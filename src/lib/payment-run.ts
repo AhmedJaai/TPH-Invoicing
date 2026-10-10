@@ -30,6 +30,26 @@ export interface PayableInvoice {
 
 export type HoldReason = "NEEDS_REVIEW" | "NOT_TAX_VALID" | "NO_VAT_DEDUCTION" | "TAX_UNKNOWN";
 
+/**
+ * ما يُدخله صاحبُ المال في الدفعة بقراره وهو محجوز (قاعدةُ ٧ أكتوبر ٢٠٢٦: يُنبَّه
+ * ولا يُمنَع). أسبابُ الضريبة كلُّها — المالُ مالُه والضريبةُ المعرّضة تُقال له
+ * بمبلغها. وما لم يُؤكَّد مستندُه يبقى: مبلغُه قرأه نموذجٌ ولم يره إنسان، وعلاجُه
+ * ضغطةُ تأكيدٍ في ملفّه لا تجاوزٌ هنا.
+ */
+export const OVERRIDABLE_HOLDS: readonly HoldReason[] = ["NOT_TAX_VALID", "NO_VAT_DEDUCTION", "TAX_UNKNOWN"];
+
+export function isOverridableHold(reason: HoldReason): boolean {
+  return OVERRIDABLE_HOLDS.includes(reason);
+}
+
+/** قرارُ المالك بإدخال فاتورةٍ محجوزة — يُحفَظ بسببه (`payment_hold_overrides`). */
+export interface HoldOverride {
+  /** ما كتبه صاحبُ القرار سبباً. */
+  note: string;
+  byName?: string | null;
+  at?: Date | null;
+}
+
 export interface SupplierPayment {
   supplierId: string;
   supplierName: string;
@@ -39,12 +59,19 @@ export interface SupplierPayment {
   invoiceCount: number;
   /** رصيدٌ لنا عند المورّد خُصم من هذه الدفعة. */
   creditAppliedMinor: number;
+  /**
+   * ما كان سيُحوَّل لو دُفع المختارُ كلُّه — يحضر حين اختار صاحبُ الدفعة أن يدفع
+   * جزءاً (`applyPartialAmounts`)، فيُقال «X من Y» ولا يُخفى الباقي.
+   */
+  fullMinor?: number;
 }
 
 export interface HeldInvoice {
   invoice: PayableInvoice;
   reason: HoldReason;
   message: string;
+  /** حاضرٌ حين أدخلها المالكُ في الدفعة بقراره. */
+  override?: HoldOverride;
 }
 
 export interface PaymentRun {
@@ -63,8 +90,14 @@ export interface PaymentRun {
   held: HeldInvoice[];
   heldTotalMinor: number;
   /**
-   * ضريبة مدخلات معرّضة داخل المحجوز: ما حُجز لأنّ خصمه لا يجوز. وما ليست
-   * ضريبتُه مقروءة يُعَدّ في `vatAtRiskUnknown` ولا يُجمَع صفراً.
+   * محجوزاتٌ أدخلها المالكُ في الدفعة بقراره — هي في `ready` بمبالغها، وتُسرَد
+   * هنا بسبب حجزها وسبب قراره كي يبقى التنبيهُ ظاهراً ويُرَدّ القرارُ إن شاء.
+   */
+  overridden: HeldInvoice[];
+  /**
+   * ضريبة مدخلات معرّضة: ما حُجز لأنّ خصمه لا يجوز — **وما أُدخل بقرار المالك
+   * كذلك**، فالقرارُ يُدخل الفاتورة ولا يردّ ضريبتَها. وما ليست ضريبتُه مقروءة
+   * يُعَدّ في `vatAtRiskUnknown` ولا يُجمَع صفراً.
    */
   vatAtRiskMinor: number;
   vatAtRiskUnknown: number;
@@ -95,6 +128,10 @@ export function buildPaymentRun(
     includeOlderUnpaid?: boolean;
     /** رصيدٌ لنا عند كلّ مورّد لم يُخصم من فاتورة — يُخصم من دفعته. */
     creditBySupplier?: ReadonlyMap<string, number>;
+    /** محجوزاتٌ قرّر المالكُ إدخالها — بمعرّف الفاتورة. ما لا يُتجاوَز حجزُه يبقى محجوزاً. */
+    overrides?: ReadonlyMap<string, HoldOverride>;
+    /** فواتيرُ جاهزةٌ استثناها صاحبُ الدفعة هذه المرّة — لا تُحوَّل ولا يُخصم لها رصيد. */
+    excludeInvoiceIds?: ReadonlySet<string>;
   } = {},
 ): PaymentRun {
   const inScope = invoices.filter((i) => {
@@ -104,24 +141,28 @@ export function buildPaymentRun(
   });
 
   const held: HeldInvoice[] = [];
+  const overridden: HeldInvoice[] = [];
   const payable: PayableInvoice[] = [];
 
   for (const inv of inScope) {
-    if (inv.needsReview) {
-      held.push({ invoice: inv, reason: "NEEDS_REVIEW", message: HOLD_TEXT.NEEDS_REVIEW });
-    } else if (inv.taxStatus === "UNKNOWN") {
-      held.push({ invoice: inv, reason: "TAX_UNKNOWN", message: HOLD_TEXT.TAX_UNKNOWN });
-    } else if (inv.taxStatus !== "VALID") {
-      held.push({ invoice: inv, reason: "NOT_TAX_VALID", message: HOLD_TEXT.NOT_TAX_VALID });
-    } else if (inv.inputVatStatus !== "ELIGIBLE") {
-      held.push({ invoice: inv, reason: "NO_VAT_DEDUCTION", message: HOLD_TEXT.NO_VAT_DEDUCTION });
-    } else {
+    const reason = holdReasonOf(inv);
+    if (reason === null) {
       payable.push(inv);
+      continue;
+    }
+    const override = isOverridableHold(reason) ? options.overrides?.get(inv.invoiceId) : undefined;
+    if (override) {
+      /* قرارُ المالك يُدخلها بمبلغها — والتنبيهُ يبقى معها ولا يُمحى */
+      overridden.push({ invoice: inv, reason, message: HOLD_TEXT[reason], override });
+      payable.push(inv);
+    } else {
+      held.push({ invoice: inv, reason, message: HOLD_TEXT[reason] });
     }
   }
 
   const bySupplier = new Map<string, SupplierPayment>();
   for (const inv of payable) {
+    if (options.excludeInvoiceIds?.has(inv.invoiceId)) continue;
     const entry =
       bySupplier.get(inv.supplierId) ??
       { supplierId: inv.supplierId, supplierName: inv.supplierName, invoices: [], totalMinor: 0, invoiceCount: 0, creditAppliedMinor: 0 };
@@ -132,15 +173,14 @@ export function buildPaymentRun(
   }
 
   for (const entry of bySupplier.values()) {
-    const credit = Math.max(0, options.creditBySupplier?.get(entry.supplierId) ?? 0);
-    const applied = Math.min(credit, entry.totalMinor);
-    entry.creditAppliedMinor = applied;
-    entry.totalMinor -= applied;
+    const split = transferAfterCredit(entry.totalMinor, options.creditBySupplier?.get(entry.supplierId) ?? 0);
+    entry.creditAppliedMinor = split.creditAppliedMinor;
+    entry.totalMinor = split.transferMinor;
   }
 
   const all = [...bySupplier.values()];
   // ما لم يُقرأ أو لم يُؤكَّد لا يُعرَف أنّ ضريبته ضائعة — المعرّض ما لا يُخصم يقيناً
-  const atRisk = held.filter((h) => h.reason === "NOT_TAX_VALID" || h.reason === "NO_VAT_DEDUCTION");
+  const atRisk = [...held, ...overridden].filter((h) => h.reason === "NOT_TAX_VALID" || h.reason === "NO_VAT_DEDUCTION");
   const ready = all.filter((s) => s.totalMinor > 0).sort((a, b) => b.totalMinor - a.totalMinor);
   const coveredByCredit = all.filter((s) => s.totalMinor === 0);
 
@@ -151,12 +191,87 @@ export function buildPaymentRun(
     readyTotalMinor: ready.reduce((s, r) => s + r.totalMinor, 0),
     held,
     heldTotalMinor: held.reduce((s, h) => s + (h.invoice.totalMinor - h.invoice.allocatedMinor), 0),
+    overridden,
     vatAtRiskMinor: atRisk.reduce((s, h) => s + (h.invoice.vatMinor ?? 0), 0),
     vatAtRiskUnknown: atRisk.filter((h) => h.invoice.vatMinor === null).length,
   };
 }
 
-/** ملف تحويلات جماعية بصيغة CSV، بترميز يقرأه إكسل العربي. */
+/** لِمَ تُحجَز هذه الفاتورة؟ — و`null` إن كانت تُدفَع. القاعدةُ واحدة للبناء ولمسار القرار. */
+export function holdReasonOf(inv: Pick<PayableInvoice, "needsReview" | "taxStatus" | "inputVatStatus">): HoldReason | null {
+  if (inv.needsReview) return "NEEDS_REVIEW";
+  if (inv.taxStatus === "UNKNOWN") return "TAX_UNKNOWN";
+  if (inv.taxStatus !== "VALID") return "NOT_TAX_VALID";
+  if (inv.inputVatStatus !== "ELIGIBLE") return "NO_VAT_DEDUCTION";
+  return null;
+}
+
+/**
+ * ما يُحوَّل بعد خصم رصيدٍ لنا عند المورّد — أعدادٌ صحيحة بالهللات.
+ * مصدرٌ واحد: الخادمُ يبني به الدفعة، والشاشةُ تعرض به أثرَ استثناء فاتورة
+ * قبل أن تسأل الخادم (والملفُّ والقيدُ من الخادم دائماً).
+ */
+export function transferAfterCredit(openMinor: number, creditMinor: number): { transferMinor: number; creditAppliedMinor: number } {
+  const open = Math.max(0, openMinor);
+  const applied = Math.min(Math.max(0, creditMinor), open);
+  return { transferMinor: open - applied, creditAppliedMinor: applied };
+}
+
+/**
+ * «ادفع كذا فقط» — مبلغٌ جزئيّ لمورّدٍ من الجاهزين.
+ *
+ * المبلغُ يأتي من المتصفّح، فلا يُصدَّق إلّا بعد فحصه على ما بناه الخادم: عددٌ
+ * صحيح بالهللات، فوق الصفر، ولا يزيد على ما سيُحوَّل له. والزائدُ **يُردّ ولا
+ * يُقصّ** — المبلغُ المبدَّل بصمتٍ يُقرأ جواباً. ومبلغٌ يساوي الكلّ ليس جزئيّاً.
+ */
+export function applyPartialAmounts(
+  run: PaymentRun,
+  partialBySupplier: ReadonlyMap<string, number>,
+): { run: PaymentRun; errors: string[] } {
+  const errors: string[] = [];
+  const known = new Set(run.ready.map((s) => s.supplierId));
+  for (const id of partialBySupplier.keys()) {
+    if (!known.has(id)) errors.push("مبلغٌ جزئيّ لمورّدٍ ليس بين الجاهزين — حدّث الصفحة");
+  }
+  const ready = run.ready.map((s) => {
+    const partial = partialBySupplier.get(s.supplierId);
+    if (partial === undefined) return s;
+    if (!Number.isSafeInteger(partial) || partial <= 0) {
+      errors.push(`${s.supplierName}: المبلغ الجزئيّ ليس مبلغاً صحيحاً`);
+      return s;
+    }
+    if (partial > s.totalMinor) {
+      errors.push(`${s.supplierName}: ${formatRiyals(partial)} أكبر ممّا يُحوَّل له (${formatRiyals(s.totalMinor)})`);
+      return s;
+    }
+    return partial === s.totalMinor ? s : { ...s, totalMinor: partial, fullMinor: s.totalMinor };
+  });
+  return {
+    run: { ...run, ready, readyTotalMinor: ready.reduce((sum, r) => sum + r.totalMinor, 0) },
+    errors,
+  };
+}
+
+/**
+ * ما يبقى عليك للمورّد بعد هذه الدفعة — **ولا يُقصّ عند الصفر**.
+ *
+ * كان السطرُ `Math.max(0, …)`: فمن حوّل أكثر ممّا عليه (رصيدٌ دائن وصل بعد بناء
+ * الدفعة، أو فاتورةٌ خارج «عليك») قرأ «يبقى 0.00» والزيادةُ خارجةٌ من ماله.
+ */
+export type AfterPayment =
+  | { state: "unknown" }
+  | { state: "remaining"; minor: number }
+  | { state: "settled" }
+  | { state: "over"; minor: number };
+
+export function afterPayment(owedMinor: number | null, payingMinor: number): AfterPayment {
+  if (owedMinor === null) return { state: "unknown" };
+  const left = owedMinor - payingMinor;
+  if (left > SETTLED_TOLERANCE_MINOR) return { state: "remaining", minor: left };
+  if (left < -SETTLED_TOLERANCE_MINOR) return { state: "over", minor: -left };
+  return { state: "settled" };
+}
+
 /**
  * حسابُ المستفيد — من أدلّة الكشف لا من ذاكرةِ أحد.
  *
@@ -222,6 +337,15 @@ export function toBankTransferCsv(
   run: PaymentRun,
   accounts: ReadonlyMap<string, PayeeAccount> = new Map(),
 ): string {
+  /* ما أدخله المالكُ وهو محجوز يُسمّى في صفّ مورّده — إن كان بين فواتير الصفّ */
+  const byOwner = new Map<string, string[]>();
+  for (const o of run.overridden) {
+    const supplier = run.ready.find((s) => s.invoices.some((i) => i.invoiceId === o.invoice.invoiceId));
+    if (!supplier) continue;
+    byOwner.set(supplier.supplierId, [...(byOwner.get(supplier.supplierId) ?? []), o.invoice.invoiceNumber]);
+  }
+  const ownerNote = (numbers: string[] | undefined) =>
+    numbers && numbers.length > 0 ? `بقرار المالك وهي محجوزة: ${numbers.join(" | ")}` : null;
   const row = (s: SupplierPayment) => {
     const acc = accounts.get(s.supplierId) ?? resolvePayeeAccount([]);
     return [
@@ -232,8 +356,13 @@ export function toBankTransferCsv(
       "SAR",
       String(s.invoiceCount),
       s.invoices.map((i) => i.invoiceNumber).join(" | "),
-      `سداد فواتير ${run.month}`,
-      acc.note ?? "",
+      s.fullMinor === undefined ? `سداد فواتير ${run.month}` : `سداد جزئيّ من فواتير ${run.month}`,
+      [
+        acc.note,
+        /* الجزئيُّ يُقال بمبلغيه: من يرفع الملفَّ يرى أنّ الباقي لم يُنسَ */
+        s.fullMinor === undefined ? null : `دفعٌ جزئيّ: ${formatRiyals(s.totalMinor)} من ${formatRiyals(s.fullMinor)}`,
+        ownerNote(byOwner.get(s.supplierId)),
+      ].filter(Boolean).join(" — "),
     ];
   };
   const missing = suppliersMissingAccount(run, accounts);

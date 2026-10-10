@@ -6,18 +6,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Camera, Check, CircleAlert, CircleCheck, ExternalLink, FileText, FolderOpen, Info, Plus,
-  RotateCw, TriangleAlert, Upload, X,
+  Camera, Check, CircleAlert, CircleCheck, ExternalLink, FileText, FolderOpen, Info, Layers, Plus,
+  RotateCw, TriangleAlert, Upload, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { NETWORK_ERROR, postJson, readResponse, request } from "@/lib/http-client";
 import { SimilarSuppliers, readSimilar, type SimilarSupplier } from "./similar-suppliers";
 import { FIELD, FILE, countNoun } from "@/lib/arabic";
 import { ISSUE } from "@/lib/issue-codes";
-import { buttonClass } from "./ui-tokens";
-import { toast } from "./ui-client";
+import { buttonClass, fieldClass } from "./ui-tokens";
+import { createLimiter } from "@/lib/async-pool";
+import { deleteDraft, loadDrafts, saveDraft } from "@/lib/review-drafts";
+import { Sheet, toast } from "./ui-client";
+import { imagesToPdf, type JpegPage } from "@/lib/images-to-pdf";
 import { Money } from "./money";
 import { onCaptured, takeCaptured } from "@/lib/capture-queue";
+import { takeShared } from "@/lib/shared-inbox";
 
 interface Finding {
   code: string;
@@ -77,6 +81,8 @@ interface Archived {
  * بجانبها لا في نافذةٍ أخرى. ولا يغادر الجهاز.
  */
 type Item =
+  /** ينتظر دوره — يُقرأ ثلاثةٌ معاً لا عشرون (`READ_CONCURRENCY`) */
+  | { id: string; fileName: string; state: "queued"; previewUrl?: string; mime: string }
   | { id: string; fileName: string; state: "reading"; startedAt: number; previewUrl: string; mime: string }
   /** `file` لما يُعاد: فشلٌ عابر لا يُطلب له البحثُ عن الملفّ ثانيةً */
   | { id: string; fileName: string; state: "failed"; error: string; file?: File; previewUrl?: string; mime: string }
@@ -122,6 +128,37 @@ const LOW = {
 /** حقولٌ لا تُحرَّر هنا — يُقال إنّها ضعيفة ولا يُعرَض لها حقل. */
 const LOW_OTHER: Record<string, string> = { النوع: "نوع المستند", "الأرقام الضريبية": "الأرقام الضريبيّة" };
 
+/**
+ * كم ملفّاً يُقرأ معاً. كلُّ قراءةٍ طلبٌ يستدعي الذكاء تحت مهلة ٦٠ ثانية — وعشرون
+ * معاً يتعثّر بعضُها بحدّ المعدّل أو المهلة فيُعرَض «فشل» لملفٍّ سليم.
+ */
+const READ_CONCURRENCY = 3;
+
+/** ما يُحفَظ من بطاقة المراجعة في هذا المتصفّح حتّى تُؤرشَف (`review-drafts.ts`). */
+interface DraftPayload {
+  fileName: string;
+  mimeType: string;
+  fileBase64: string;
+  data: AnalysisResponse;
+  edited: Record<string, string>;
+  chosen?: SupplierOption;
+}
+
+const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null && !Array.isArray(x);
+
+/** المحفوظُ يُفحَص شكلُه قبل أن يُرسَم — نسخةٌ قديمة أو تالفة تُمحى ولا تُسقط الصفحة. */
+function isDraftPayload(x: unknown): x is DraftPayload {
+  if (!isRecord(x)) return false;
+  if (typeof x.fileName !== "string" || typeof x.mimeType !== "string" || typeof x.fileBase64 !== "string") return false;
+  if (!isRecord(x.edited) || !Object.values(x.edited).every((v) => typeof v === "string")) return false;
+  if (x.chosen !== undefined && !(isRecord(x.chosen) && typeof x.chosen.id === "string" && typeof x.chosen.nameAr === "string")) return false;
+  const data = x.data;
+  if (!isRecord(data) || typeof data.originalFileName !== "string" || !isRecord(data.result)) return false;
+  const r = data.result;
+  return typeof r.documentKind === "string" && typeof r.canArchive === "boolean"
+    && Array.isArray(r.findings) && Array.isArray(r.lowConfidenceFields) && Array.isArray(r.supplierCandidates);
+}
+
 const MAX_BYTES = 3 * 1024 * 1024;
 /** صورةٌ أكبر من هذا تُصغَّر في المتصفّح قبل الإرسال */
 const IMAGE_SHRINK_BYTES = 1.5 * 1024 * 1024;
@@ -157,6 +194,33 @@ async function prepareForUpload(file: File): Promise<File> {
     return heif && !file.type ? new File([file], file.name, { type: ext === "heif" ? "image/heif" : "image/heic" }) : file;
   }
 }
+
+/**
+ * صورةٌ من رابطها المحلّيّ إلى صفحة JPEG بأطول ضلعٍ `maxSide` — لضمّ الصفحات.
+ * تُرسَم على لوحٍ فتخرج JPEG مهما كان أصلُها (PNG · WebP)، وبحجمٍ يُبقي الملفَّ
+ * المضموم تحت حدّ الرفع.
+ */
+async function pageFromImage(url: string, maxSide: number, quality: number): Promise<JpegPage> {
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("تعذّر رسمُ الصورة في هذا المتصفّح.");
+  /* أرضيّةٌ بيضاء: JPEG بلا شفافيّة، وPNG شفّافٌ كان يخرج أسود */
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+  if (!blob) throw new Error("تعذّر تحويلُ الصورة.");
+  return { jpeg: new Uint8Array(await blob.arrayBuffer()), width: canvas.width, height: canvas.height };
+}
+
+/** درجاتُ الضمّ: الأدقُّ أوّلاً، ثمّ أصغرُ حتّى يقع الملفُّ تحت حدّ الرفع. */
+const MERGE_STEPS: readonly (readonly [number, number])[] = [[2000, 0.85], [1600, 0.78], [1300, 0.7]];
 
 /* ─────────────────────────── الأجزاء الصغيرة ─────────────────────────── */
 
@@ -271,9 +335,7 @@ function Field({
         placeholder={placeholder ?? "لم يُقرأ — اكتبه من الورقة"}
         aria-describedby={weak ? `${id}-weak` : undefined}
         dir="auto"
-        className={`nums mt-1.5 min-h-11 w-full rounded-lg border bg-raised px-3 text-sm placeholder:text-muted placeholder:font-sans sm:min-h-10 ${
-          weak ? "border-warn bg-warn-bg/40" : "border-line-input"
-        }`}
+        className={`nums mt-1.5 placeholder:font-sans ${fieldClass("md")} ${weak ? "border-warn! bg-warn-bg/40!" : ""}`}
       />
       {weak && <p id={`${id}-weak`} className="mt-1 text-[11px] text-warn">قُرئ بثقةٍ ضعيفة — قارنه بالورقة.</p>}
     </div>
@@ -454,12 +516,75 @@ function SupplierPicker({
   );
 }
 
-/** الورقةُ بجانب القراءة — صورةٌ تُعرَض، وPDF يُضمَّن على الحاسوب. */
-function Paper({ url, mime, name }: { url: string; mime: string; name: string }) {
-  if (mime.startsWith("image/")) {
-    // eslint-disable-next-line @next/next/no-img-element -- رابطٌ محلّيّ (blob:) لا يمرّ بمحسِّن الصور
-    return <img src={url} alt={`الورقة: ${name}`} className="mx-auto max-h-[70vh] w-full rounded-lg object-contain" />;
+/**
+ * صورةُ الورقة بتكبيرٍ وتدوير — رقمٌ صغير في فاتورةٍ صُوّرت مائلةً يُقرأ هنا لا
+ * في تطبيقٍ آخر. التكبيرُ عرضٌ داخل إطارٍ يُمرَّر (ويبقى القرصُ بإصبعين)، والتدويرُ
+ * يرسم نسخةً مُدارةً محلّياً: **للعرض وحده** — الملفُّ الذي يُؤرشَف هو الأصل كما رُفع.
+ */
+function ImagePaper({ url, name }: { url: string; name: string }) {
+  const [zoom, setZoom] = useState(1);
+  const [turned, setTurned] = useState<{ url: string; quarter: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => () => { if (turned) URL.revokeObjectURL(turned.url); }, [turned]);
+
+  async function rotate() {
+    if (busy) return;
+    const quarter = ((turned?.quarter ?? 0) + 1) % 4;
+    if (quarter === 0) { setTurned(null); return; }
+    setBusy(true);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      const swap = quarter % 2 === 1;
+      const canvas = document.createElement("canvas");
+      canvas.width = swap ? img.naturalHeight : img.naturalWidth;
+      canvas.height = swap ? img.naturalWidth : img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((quarter * Math.PI) / 2);
+      ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+      if (blob) setTurned({ url: URL.createObjectURL(blob), quarter });
+    } catch {
+      /* صورةٌ لا يفكّها المتصفّح (HEIC في كروم) — تبقى كما هي */
+    } finally {
+      setBusy(false);
+    }
   }
+
+  const tool = "grid h-11 w-11 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-hover hover:text-ink disabled:opacity-40 sm:h-8 sm:w-8";
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-end gap-0.5" role="group" aria-label="عرضُ الورقة">
+        <button type="button" onClick={() => setZoom((z) => Math.max(1, z - 0.5))} disabled={zoom <= 1} aria-label="صغّر الورقة" className={tool}>
+          <ZoomOut className="h-4 w-4" strokeWidth={2} aria-hidden />
+        </button>
+        <span className="nums nums-count w-10 text-center text-[11px] text-muted" dir="ltr" aria-live="polite">{Math.round(zoom * 100)}%</span>
+        <button type="button" onClick={() => setZoom((z) => Math.min(4, z + 0.5))} disabled={zoom >= 4} aria-label="كبّر الورقة" className={tool}>
+          <ZoomIn className="h-4 w-4" strokeWidth={2} aria-hidden />
+        </button>
+        <button type="button" onClick={() => void rotate()} aria-busy={busy} aria-label="أدِر الورقة ربعَ دورة" className={tool}>
+          <RotateCw className="h-4 w-4" strokeWidth={2} aria-hidden />
+        </button>
+      </div>
+      <div className="max-h-[70vh] overflow-auto overscroll-contain rounded-lg [touch-action:pan-x_pan-y_pinch-zoom]">
+        {/* eslint-disable-next-line @next/next/no-img-element -- رابطٌ محلّيّ (blob:) لا يمرّ بمحسِّن الصور */}
+        <img
+          src={turned?.url ?? url}
+          alt={`الورقة: ${name}`}
+          style={zoom === 1 ? undefined : { width: `${zoom * 100}%`, maxWidth: "none" }}
+          className={zoom === 1 ? "mx-auto max-h-[70vh] w-full rounded-lg object-contain" : "block rounded-lg"}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** الورقةُ بجانب القراءة — صورةٌ تُعرَض بتكبيرٍ وتدوير، وPDF يُضمَّن على الحاسوب. */
+function Paper({ url, mime, name }: { url: string; mime: string; name: string }) {
+  if (mime.startsWith("image/")) return <ImagePaper url={url} name={name} />;
   if (mime === "application/pdf" || /\.pdf$/i.test(name)) {
     /* `iframe` لا `object`: سياسةُ المحتوى تمنع `object-src` كلَّه (`next.config.ts`) */
     return <iframe src={url} title={`الورقة: ${name}`} className="h-[70vh] w-full rounded-lg border-0 bg-raised" />;
@@ -546,24 +671,26 @@ export function Uploader({
     return () => { all.forEach((u) => URL.revokeObjectURL(u)); all.clear(); };
   }, []);
 
-  const analyze = useCallback(async (picked: File) => {
-    const id = `${picked.name}-${Date.now()}-${Math.random()}`;
+  /** يقرأ ملفّاً واحداً حان دورُه — والبندُ في القائمة منذ اختير («ينتظر دوره»). */
+  const read = useCallback(async (id: string, picked: File) => {
     const file = await prepareForUpload(picked);
 
     /* الحدّ يُقال قبل الإرسال — لا ٤١٣ نصّيّ من المنصّة بعده */
     if (file.size > MAX_BYTES) {
-      setItems((prev) => [{
+      const tooBig: Item = {
         id, fileName: file.name, state: "failed", mime: file.type,
         error: file.type.startsWith("image/")
           ? "الصورة أكبر من ٣ ميجابايت ولم يستطع المتصفّح تصغيرها — صدّرها JPG من تطبيق الصور ثمّ أعد المحاولة."
           : "الملف أكبر من ٣ ميجابايت — حدّ الأرشفة. اضغط الـPDF ثمّ أعد المحاولة.",
-      }, ...prev]);
+      };
+      setItems((prev) => prev.map((it) => (it.id === id ? tooBig : it)));
       return;
     }
 
     const previewUrl = URL.createObjectURL(file);
     urls.current.add(previewUrl);
-    setItems((prev) => [{ id, fileName: file.name, state: "reading", startedAt: Date.now(), previewUrl, mime: file.type }, ...prev]);
+    const reading: Item = { id, fileName: file.name, state: "reading", startedAt: Date.now(), previewUrl, mime: file.type };
+    setItems((prev) => prev.map((it) => (it.id === id ? reading : it)));
 
     // نحتفظ بالبايتات لأنّ الأرشفة ترفع الملف الأصلي نفسه لا نسخة معاد بناؤها
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -613,6 +740,102 @@ export function Uploader({
     }
   }, []);
 
+  /*
+    ── طابورُ القراءة ──
+    الملفُّ يظهر في القائمة فور اختياره «ينتظر دوره»، ويُقرأ ثلاثةٌ معاً. وما أُزيل
+    وهو ينتظر لا يُقرأ — لا يُدفَع ثمنُ قراءةِ ما لم يُرَد.
+  */
+  const [limit] = useState(() => createLimiter(READ_CONCURRENCY));
+  const cancelled = useRef(new Set<string>());
+  const analyze = useCallback((picked: File) => {
+    const id = `${picked.name}-${Date.now()}-${Math.random()}`;
+    setItems((prev) => [{ id, fileName: picked.name, state: "queued", mime: picked.type }, ...prev]);
+    void limit(async () => {
+      if (cancelled.current.delete(id)) return;
+      try {
+        await read(id, picked);
+      } catch (e) {
+        /* تصغيرُ الصورة أو قراءةُ بايتاتها تعثّر قبل الإرسال — يُقال ولا يبقى «ينتظر دوره» إلى الأبد */
+        setItems((prev) => prev.map((it) => (it.id === id ? { id, fileName: picked.name, state: "failed", error: (e as Error).message || "تعذّرت قراءةُ الملفّ من جهازك.", file: picked, mime: picked.type } : it)));
+      }
+    });
+  }, [limit, read]);
+
+  /*
+    ── ما صُحّح لا يضيع بتحديث الصفحة ──
+    بطاقاتُ المراجعة (القراءةُ والتصحيحاتُ والمورّدُ المختار والملفّ) تُحفَظ في هذا
+    المتصفّح حتّى تُؤرشَف أو تُزال، وتُستعاد عند العودة. والخادمُ يعيد الفحصَ عند
+    التأكيد كما يفعل دائماً — المحفوظُ مدخلٌ لا حكم.
+  */
+  const savedSig = useRef(new Map<string, string>());
+  const [draftsFailed, setDraftsFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void loadDrafts().then((rows) => {
+      if (!alive || rows.length === 0) return;
+      const restored: Item[] = [];
+      const picks: Record<string, SupplierOption> = {};
+      for (const row of rows) {
+        const p = row.payload;
+        if (!isDraftPayload(p)) { void deleteDraft(row.id); continue; }
+        let previewUrl: string;
+        try {
+          const bytes = Uint8Array.from(atob(p.fileBase64), (c) => c.charCodeAt(0));
+          previewUrl = URL.createObjectURL(new Blob([bytes], { type: p.mimeType }));
+        } catch {
+          void deleteDraft(row.id);
+          continue;
+        }
+        urls.current.add(previewUrl);
+        restored.push({ id: row.id, fileName: p.fileName, state: "done", data: p.data, edited: p.edited, fileBase64: p.fileBase64, mimeType: p.mimeType, previewUrl });
+        if (p.chosen) picks[row.id] = p.chosen;
+      }
+      if (restored.length === 0) return;
+      setItems((prev) => [...prev, ...restored.filter((r) => !prev.some((x) => x.id === r.id))]);
+      setChosen((prev) => ({ ...picks, ...prev }));
+      toast({
+        tone: "info",
+        title: restored.length === 1 ? "استُعيد مستندٌ لم يُؤرشَف" : `استُعيدت ${countNoun(restored.length, FILE)} لم تُؤرشَف`,
+        body: "بما صحّحتَه قبل أن تغادر الصفحة — راجِعها ثمّ أكّد.",
+      });
+    });
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const live = new Set<string>();
+      for (const it of items) {
+        if (it.state !== "done") continue;
+        live.add(it.id);
+        const pick = chosen[it.id];
+        const sig = JSON.stringify([it.edited, it.data.result, pick?.id ?? null]);
+        if (savedSig.current.get(it.id) === sig) continue;
+        savedSig.current.set(it.id, sig);
+        const payload: DraftPayload = { fileName: it.fileName, mimeType: it.mimeType, fileBase64: it.fileBase64, data: it.data, edited: it.edited, chosen: pick };
+        void saveDraft(it.id, payload).then((ok) => { if (!ok) setDraftsFailed(true); });
+      }
+      for (const id of [...savedSig.current.keys()]) {
+        if (live.has(id)) continue;
+        savedSig.current.delete(id);
+        void deleteDraft(id);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [items, chosen]);
+
+  /*
+    تحذيرُ الخروج لما يضيع فعلاً: ملفٌّ ينتظر أو يُقرأ (لم يصل بعد)، وبطاقةُ مراجعةٍ
+    تعذّر حفظُها في المتصفّح. وما حُفظ يُستعاد فلا يُسأل عنه.
+  */
+  const atRisk = items.some((i) => i.state === "queued" || i.state === "reading" || (draftsFailed && i.state === "done"));
+  useEffect(() => {
+    if (!atRisk) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [atRisk]);
+
   const editField = useCallback((id: string, key: string, value: string) => {
     setItems((prev) =>
       prev.map((it) =>
@@ -625,6 +848,7 @@ export function Uploader({
 
   const remove = useCallback((id: string) => {
     const it = itemsRef.current.find((x) => x.id === id);
+    if (it?.state === "queued") cancelled.current.add(id);
     if (it?.previewUrl) { URL.revokeObjectURL(it.previewUrl); urls.current.delete(it.previewUrl); }
     setItems((prev) => prev.filter((x) => x.id !== id));
   }, []);
@@ -740,7 +964,7 @@ export function Uploader({
   const handleFiles = useCallback(
     (files: FileList | null) => {
       if (!files?.length) return;
-      for (const f of Array.from(files)) void analyze(f);
+      for (const f of Array.from(files)) analyze(f);
     },
     [analyze],
   );
@@ -751,14 +975,81 @@ export function Uploader({
   */
   useEffect(() => {
     const take = () => {
-      for (const f of takeCaptured()) void analyze(f);
+      for (const f of takeCaptured()) analyze(f);
     };
     take();
     return onCaptured(take);
   }, [analyze]);
 
+  /*
+    ما شورِك إلى التطبيق المثبَّت (واتساب ← مشاركة) يضعه عاملُ الخدمة في صندوقٍ
+    مؤقّت ويفتح هذه الصفحة بـ`?shared=`. فيُؤخذ ويُقرأ، ويُنظَّف العنوان كي لا
+    يُعاد السؤالُ عند التحديث. و«٠» تعني أنّ المشاركة لم تحمل ملفّاً يُقرأ.
+  */
+  useEffect(() => {
+    const flag = new URLSearchParams(window.location.search).get("shared");
+    let alive = true;
+    void takeShared().then((files) => {
+      if (!alive) return;
+      for (const f of files) analyze(f);
+      if (flag !== null) {
+        if (files.length === 0) {
+          toast({ tone: "warn", title: "لم يصل ملفٌّ من المشاركة.", body: "شارِك صورةً أو PDF — النصُّ والروابط لا تُقرأ. أو اختر الملفّ من هنا." });
+        }
+        router.replace("/upload", { scroll: false });
+      }
+    });
+    return () => { alive = false; };
+  }, [analyze, router]);
+
+  /*
+    ── صفحاتُ مستندٍ واحد ──
+    فاتورةٌ من ورقتين صُوّرتا تصلان بطاقتَين تُقرآن ناقصتَين (البنودُ في واحدةٍ
+    والإجماليُّ في أخرى). فتُضمّ الصورُ المختارة بترتيب اختيارها في PDF واحد هنا
+    في المتصفّح، وتُزال بطاقاتُها، ويُقرأ المضمومُ مستنداً واحداً.
+  */
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergePick, setMergePick] = useState<string[]>([]);
+  const [mergeBusy, setMergeBusy] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
+  const mergeable = items.filter((i): i is Extract<Item, { state: "done" }> => i.state === "done" && i.mimeType.startsWith("image/") && !i.archiving);
+
+  async function mergePages() {
+    if (mergeBusy) return;
+    const chosenPages = mergePick
+      .map((id) => itemsRef.current.find((x) => x.id === id))
+      .filter((x): x is Extract<Item, { state: "done" }> => x?.state === "done" && !x.archiving);
+    if (chosenPages.length < 2) return;
+    setMergeBusy(true);
+    setMergeError(null);
+    try {
+      let pdf: Uint8Array<ArrayBuffer> | null = null;
+      for (const [side, quality] of MERGE_STEPS) {
+        const pages: JpegPage[] = [];
+        for (const it of chosenPages) pages.push(await pageFromImage(it.previewUrl, side, quality));
+        const built = imagesToPdf(pages);
+        if (built.length <= MAX_BYTES) { pdf = built; break; }
+      }
+      if (!pdf) {
+        setMergeError("الصفحاتُ المضمومة أكبر من ٣ ميجابايت حتّى بعد التصغير — ضُمّ عدداً أقلّ، أو ارفعها مستنداتٍ منفصلة.");
+        return;
+      }
+      const file = new File([pdf], `مستند-${chosenPages.length}-صفحات.pdf`, { type: "application/pdf" });
+      chosenPages.forEach((it) => remove(it.id));
+      analyze(file);
+      setMergeOpen(false);
+      setMergePick([]);
+      toast({ tone: "info", title: `ضُمّت ${chosenPages.length} صفحات في مستندٍ واحد`, body: "يُقرأ الآن من جديد — راجِعه ثمّ أكّد." });
+    } catch (e) {
+      setMergeError((e as Error).message || "تعذّر ضمُّ الصفحات.");
+    } finally {
+      setMergeBusy(false);
+    }
+  }
+
   const count = (s: Item["state"]) => items.filter((i) => i.state === s).length;
   const reading = count("reading");
+  const queued = count("queued");
   const review = count("done");
   const archivedN = count("archived");
   const failedN = count("failed");
@@ -861,8 +1152,19 @@ export function Uploader({
             </h2>
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted" aria-live="polite">
               {reading > 0 && <span>يُقرأ {countNoun(reading, FILE)}</span>}
+              {queued > 0 && <span>وينتظر دورَه {countNoun(queued, FILE)}</span>}
               {review > 0 && <span className="font-bold text-accent">ينتظر تأكيدك {countNoun(review, FILE)}</span>}
               {archivedN > 0 && <span className="text-ok">أُرشف {countNoun(archivedN, FILE)}</span>}
+              {mergeable.length >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => { setMergePick([]); setMergeError(null); setMergeOpen(true); }}
+                  className={buttonClass("quiet", "sm")}
+                >
+                  <Layers className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                  صفحاتُ مستندٍ واحد؟ ضُمّها
+                </button>
+              )}
               {failedN > 0 && (
                 /*
                   «مسح» كان يرمي كلّ القراءات — ومنها ما دُفع ثمنُ قراءته ولم
@@ -882,7 +1184,11 @@ export function Uploader({
           <ul className="space-y-3">
             {items.map((item) => (
               <li key={item.id}>
-                {item.state === "reading" ? (
+                {item.state === "queued" ? (
+                  <Row name={item.fileName} steps={["todo", "todo", "todo"]} onRemove={() => remove(item.id)}>
+                    <p className="text-xs text-muted">ينتظر دورَه — يُقرأ {READ_CONCURRENCY === 3 ? "ثلاثةُ ملفّاتٍ" : `${READ_CONCURRENCY} ملفّات`} معاً كي لا تتعثّر القراءة.</p>
+                  </Row>
+                ) : item.state === "reading" ? (
                   <Row name={item.fileName} steps={["current", "todo", "todo"]}>
                     <Elapsed startedAt={item.startedAt} slowAfter={25} text="يقرأ الورقة ويستخرج حقولها…" slowText="القراءة أبطأ من المعتاد — ما زالت جارية" />
                   </Row>
@@ -904,7 +1210,7 @@ export function Uploader({
                           onClick={() => {
                             const file = item.file!;
                             remove(item.id);
-                            void analyze(file);
+                            analyze(file);
                           }}
                           className={buttonClass("secondary", "sm")}
                         >
@@ -961,6 +1267,63 @@ export function Uploader({
               </li>
             ))}
           </ul>
+
+          <Sheet
+            open={mergeOpen}
+            onClose={() => { if (!mergeBusy) setMergeOpen(false); }}
+            title="ضُمَّ صفحاتِ مستندٍ واحد"
+            description="اختر الصورَ بترتيب صفحاتها — تصير ملفَّ PDF واحداً يُقرأ من جديد، وتُزال بطاقاتُها المنفردة."
+            footer={
+              <>
+                <button type="button" onClick={() => setMergeOpen(false)} disabled={mergeBusy} className={buttonClass("quiet", "sm")}>
+                  ألغِ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void mergePages()}
+                  aria-busy={mergeBusy}
+                  disabled={mergeBusy || mergePick.length < 2}
+                  title={mergePick.length < 2 ? "اختر صفحتَين على الأقلّ" : undefined}
+                  className={buttonClass("primary", "sm")}
+                >
+                  <span>{mergePick.length >= 2 ? `ضُمّ ${mergePick.length} صفحات` : "ضُمّها"}</span>
+                </button>
+              </>
+            }
+          >
+            <ul className="space-y-2">
+              {mergeable.map((it) => {
+                const at = mergePick.indexOf(it.id);
+                return (
+                  <li key={it.id}>
+                    <label className={`flex min-h-16 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 ${at !== -1 ? "border-accent-line bg-accent-soft" : "border-line bg-raised"}`}>
+                      <input
+                        type="checkbox"
+                        checked={at !== -1}
+                        disabled={mergeBusy}
+                        onChange={(e) => setMergePick((prev) => (e.target.checked ? [...prev, it.id] : prev.filter((x) => x !== it.id)))}
+                        className="h-4 w-4 shrink-0 accent-[var(--accent)]"
+                      />
+                      {/* eslint-disable-next-line @next/next/no-img-element -- رابطٌ محلّيّ (blob:) لا يمرّ بمحسِّن الصور */}
+                      <img src={it.previewUrl} alt="" className="h-12 w-12 shrink-0 rounded-md border border-line object-cover" />
+                      <bdi dir="ltr" className="min-w-0 flex-1 truncate font-mono text-xs">{it.fileName}</bdi>
+                      {at !== -1 && (
+                        <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-ink">
+                          صفحة <span className="nums nums-count">{at + 1}</span>
+                        </span>
+                      )}
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+            {mergeError && (
+              <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2 text-xs leading-relaxed text-danger">
+                <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                <span>{mergeError}</span>
+              </p>
+            )}
+          </Sheet>
 
           {archivedN > 0 && (
             <p className="mt-4 text-xs text-muted">
@@ -1068,7 +1431,8 @@ function ReviewCard({
   const fid = (k: string) => `${item.id}-${k}`;
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-accent-line bg-raised shadow-lifted animate-rise">
+    /* `overflow-clip` لا `hidden`: `hidden` يجعل البطاقةَ وعاءَ تمريرٍ فلا يلتصق ذيلُها بأسفل الشاشة */
+    <article className="overflow-clip rounded-2xl border border-accent-line bg-raised shadow-lifted animate-rise">
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line-soft px-4 py-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-2">
           <span className="inline-flex shrink-0 items-center rounded-full border border-line bg-sunken px-2 py-0.5 text-[11px] font-bold text-ink-soft">
@@ -1235,7 +1599,11 @@ function ReviewCard({
         </aside>
       </div>
 
-      <footer className="border-t border-line-soft bg-sunken/40 px-4 py-3.5 sm:px-5">
+      {/*
+        على الجوّال الذيلُ يلتصق فوق شريط التنقّل ما دامت البطاقةُ على الشاشة: من قرأ
+        «قُرئ كلُّ شيءٍ بثقة» يؤكّد من حيث هو، ومعه الإجماليّ — كان يمرّر شاشتين إلى الزرّ.
+      */}
+      <footer className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 border-t border-line-soft bg-raised px-4 py-3 sm:px-5 lg:static lg:bg-sunken/40 lg:py-3.5">
         {item.archiving && (
           <div className="mb-3">
             <Elapsed startedAt={item.startedAt} slowAfter={30} text="يرفع إلى الدرايف ويقيّد…" slowText="يرفع… الخادم بطيء، امنحه لحظة" />
@@ -1253,8 +1621,17 @@ function ReviewCard({
             </div>
           </div>
         )}
+        {canSeeAmounts && !isStatement && (
+          <p className="mb-2 flex items-baseline justify-between gap-3 text-xs text-muted lg:hidden">
+            <span>الإجماليّ كما سيُقيَّد</span>
+            {item.edited.total.trim()
+              ? <bdi dir="ltr" className="nums text-[15px] font-bold text-ink">{item.edited.total}</bdi>
+              : <span className="font-bold text-warn">غير معروف</span>}
+          </p>
+        )}
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-muted">
+          {/* الطمأنةُ المعتادة لا تزاحم الزرَّ الملتصق على الجوّال — وما يمنع أو يتعثّر يُقال دائماً */}
+          <p className={`text-xs text-muted ${!item.reviewing && !item.reviewError && r.canArchive ? "hidden sm:block" : ""}`}>
             {item.reviewing
               ? "يعيد الفحصَ بما صحّحت…"
               : item.reviewError

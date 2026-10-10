@@ -8,19 +8,26 @@
 import { eq, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { documents, invoices, paymentAllocations, suppliers } from "@/db/schema";
-import { buildPaymentRun, type PayableInvoice, type PaymentRun } from "@/lib/payment-run";
+import { buildPaymentRun, type HoldOverride, type PayableInvoice, type PaymentRun } from "@/lib/payment-run";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { loadSupplierBalances } from "./supplier-balance.service";
+import { loadHoldOverrides } from "./payment-hold.service";
 
 export async function loadPaymentRun(
   month: string,
   {
     includeOlderUnpaid = true,
     creditBySupplier: credit,
+    excludeInvoiceIds,
+    overrides: givenOverrides,
   }: {
     includeOlderUnpaid?: boolean;
     /** رصيدُنا عند كلّ مورّد — يُمرَّر حين تُبنى دفعتان متتاليتان كي لا يُخصم الرصيدُ مرّتين. */
     creditBySupplier?: Map<string, number>;
+    /** فواتيرُ جاهزةٌ استثناها صاحبُ الدفعة هذه المرّة (معرّفاتٌ من المتصفّح، والمبالغُ من هنا). */
+    excludeInvoiceIds?: ReadonlySet<string>;
+    /** قراراتُ المالك في المحجوز — تُمرَّر حين قُرئت من قبل، وإلّا تُقرأ هنا. */
+    overrides?: ReadonlyMap<string, HoldOverride>;
   } = {},
 ): Promise<PaymentRun> {
   const rows = await db
@@ -54,6 +61,11 @@ export async function loadPaymentRun(
 
   /* رصيدٌ لنا عند كلّ مورّد — يُخصم من دفعته فلا يُحوَّل الريال مرّتين */
   const creditBySupplier = credit ?? new Map((await loadSupplierBalances()).map((b) => [b.supplierId, b.creditMinor]));
+  /*
+    ما أدخله المالكُ بقراره يدخل في كلّ شاشةٍ تقرأ الدفعة (الصفحة والملفّ والرئيسيّة
+    والنقد القادم) — وإلّا قال الملفُّ رقماً والرئيسيّةُ غيرَه.
+  */
+  const overrides = givenOverrides ?? await loadHoldOverrides();
 
   return buildPaymentRun(
     rows.map<PayableInvoice>((r) => ({
@@ -72,6 +84,6 @@ export async function loadPaymentRun(
     })),
     month,
     /* «أدرجها في دفعة أوّل الشهر» كانت خطوةً لا تُنفَّذ: ما فات شهرُه لا يدخل الدفعة أبداً */
-    { creditBySupplier, includeOlderUnpaid },
+    { creditBySupplier, includeOlderUnpaid, overrides, excludeInvoiceIds },
   );
 }

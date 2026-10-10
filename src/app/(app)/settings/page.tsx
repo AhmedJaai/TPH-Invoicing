@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
-import { Activity, Cpu, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound } from "lucide-react";
+import { Activity, Cpu, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound, UsersRound } from "lucide-react";
 import { BankRules, type BankRuleRow } from "@/components/bank-rules";
 import { CATEGORY_LABEL, isTxCategory } from "@/lib/bank/rules";
 import { asCadence } from "@/lib/cash-outlook";
@@ -15,7 +15,11 @@ import { gatherHealthFacts } from "@/lib/data-health-facts";
 import { RecurringExpenses, type ExpenseRow } from "@/components/recurring-expenses";
 import { monthlyShare } from "@/lib/cashflow";
 import { Callout, KeyValue, Meter, NoAccess, Section } from "@/components/ui";
-import { ALIAS, countNoun } from "@/lib/arabic";
+import { ALIAS, countNoun, timeAgo } from "@/lib/arabic";
+import { UserAdmin } from "@/components/user-admin";
+import { aiSpendThisMonth } from "@/services/ai-usage.service";
+import { dailyBudgetMicroUsd, formatUsd } from "@/lib/ai/usage-ledger";
+import { listUsersForAdmin } from "@/services/user-admin.service";
 
 export const dynamic = "force-dynamic";
 
@@ -96,8 +100,15 @@ export default async function SettingsPage() {
   */
   const showMoney = can(user.role, "amounts:view");
   const showRules = can(user.role, "bank:view");
+  /* إدارةُ المستخدمين للمالك وحده — والخادمُ يحرسها بالقدرة نفسها (`/api/users`) */
+  /* ما أنفقه القارئُ هذا الشهر — `null` إن لم يُعرف (لا يُعرض صفراً)، وصفرُ نداءٍ «لم يُقيَّد شيء» */
+  const spend = showMoney ? await aiSpendThisMonth() : null;
+  const aiSpend = spend && spend.calls > 0 ? spend : null;
+  const aiBudget = dailyBudgetMicroUsd(process.env.AI_DAILY_BUDGET_USD);
+  const managedUsers = can(user.role, "users:manage") && !isAuthBypassed() ? await listUsersForAdmin() : null;
   const toc = [
     { id: "account", label: "الحساب", icon: UserRound },
+    ...(managedUsers ? [{ id: "users", label: "المستخدمون", icon: UsersRound }] : []),
     ...(showMoney ? [{ id: "recurring", label: "المصروفات المتكرّرة", icon: Repeat }] : []),
     ...(showRules ? [{ id: "rules", label: "قواعد التصنيف", icon: SlidersHorizontal }] : []),
     { id: "health", label: "صحّة البيانات", icon: Activity },
@@ -129,7 +140,7 @@ export default async function SettingsPage() {
                 items={[
                   { label: "أنت", value: user.name ?? "مستخدم" },
                   { label: "دورك", value: ROLE_LABEL[user.role] },
-                  { label: "المستخدمون", value: <span className="nums">{Number(f?.users ?? 0)}</span>, hint: "إضافةُ مستخدمٍ أو تغيير دوره من قائمة الدخول عند النشر" },
+                  { label: "المستخدمون", value: <span className="nums">{Number(f?.users ?? 0)}</span>, hint: managedUsers ? "الدورُ والتعطيلُ والجلسات في «المستخدمون» أدناه؛ وإضافةُ بريدٍ جديد من قائمة الدخول عند النشر" : "يديرهم مالكُ الحساب" },
                 ]}
               />
               {isAuthBypassed() && (
@@ -139,6 +150,26 @@ export default async function SettingsPage() {
               )}
             </div>
           </Section>
+
+          {managedUsers && (
+            <Section
+              id="users"
+              title="المستخدمون"
+              icon={UsersRound}
+              count={managedUsers.length}
+              hint="مَن يدخل، وبأيّ دور، ومَن جلستُه قائمة. بريدٌ جديد يُضاف إلى قائمة الدخول عند النشر ويظهر هنا بعد أوّل دخوله؛ ودورُه بعدها يتغيّر من هنا."
+            >
+              <UserAdmin
+                meId={user.id}
+                users={managedUsers.map((u) => ({
+                  id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive,
+                  activeSessions: u.activeSessions,
+                  lastSeenAbout: u.lastSeenAbout ? timeAgo(u.lastSeenAbout) : null,
+                  note: u.note,
+                }))}
+              />
+            </Section>
+          )}
 
           {showMoney && (
             <Section
@@ -213,6 +244,14 @@ export default async function SettingsPage() {
                 <Cpu className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
                 <p className="mt-2 text-sm font-bold">قارئ المستندات</p>
                 <p className="mt-0.5 text-[11px] text-muted"><bdi dir="ltr">{activeProviderName()}</bdi> — يُضبط عند النشر</p>
+                {showMoney && (
+                  <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
+                    {aiSpend === null
+                      ? "إنفاقُه هذا الشهر: غير معروف — لم يُقيَّد نداءٌ في الدفتر بعد"
+                      : <>إنفاقُه هذا الشهر تقديراً: <bdi dir="ltr" className="nums font-bold">${formatUsd(aiSpend.costMicroUsd)}</bdi> في <span className="nums">{aiSpend.calls}</span> نداء</>}
+                    {aiBudget !== null && <> · سقفُ اليوم <bdi dir="ltr" className="nums">${formatUsd(aiBudget)}</bdi></>}
+                  </p>
+                )}
               </div>
             </div>
           </Section>

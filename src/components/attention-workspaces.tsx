@@ -1,3 +1,4 @@
+import { whatsappHref } from "@/lib/supplier-edit";
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -106,7 +107,7 @@ export async function UnbackedWorkspace({ canApprove }: { canApprove: boolean })
                 ومن لا يصدر فواتير يُطلَب منه عقدُ توريد لا فاتورة.
               */}
               <a
-                href={`https://wa.me/?text=${encodeURIComponent(buildInvoiceRequest(g))}`}
+                href={whatsappHref(g.supplierPhone, buildInvoiceRequest(g))}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={buttonClass("primary", "sm")}
@@ -423,7 +424,7 @@ export async function StatementRequestWorkspace({ canEdit = false }: { canEdit?:
           </span>
           <span className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
             <a
-              href={`https://wa.me/?text=${encodeURIComponent(buildStatementRequest(m.nameAr, month))}`}
+              href={whatsappHref(m.phoneE164, buildStatementRequest(m.nameAr, month))}
               target="_blank"
               rel="noopener noreferrer"
               className={buttonClass("secondary", "sm")}

@@ -68,6 +68,20 @@ const COVERED_BY_INVOICE = sql`(exists (
     left join vat_invoice_choices ic on ic.invoice_id = i.id
     where e.bank_transaction_id = bt.id and ${INVOICE_COUNTED}))`;
 
+/**
+ * الفواتيرُ المحسوبة التي تغطّي الحركة (`bt`) — بمعرّفاتها. بها يُنفَّذ «احسبها من
+ * الحوالة» بضغطة: تُخرَج فاتورتُها بعينها، لا بالبحث عنها في جدولٍ آخر. الشرطُ شرطُ
+ * `COVERED_BY_INVOICE` نفسُه.
+ */
+const COVERING_INVOICES = sql`(select coalesce(jsonb_agg(distinct jsonb_build_object('id', x.id, 'vat', x.vat_minor)), '[]'::jsonb) from (
+    select i.id, i.vat_minor from payment_allocations pa join invoices i on i.id = pa.invoice_id
+      left join vat_invoice_choices ic on ic.invoice_id = i.id
+     where pa.payment_id = bt.matched_payment_id and ${INVOICE_COUNTED}
+    union
+    select i.id, i.vat_minor from expenses e join invoices i on i.id = e.invoice_id
+      left join vat_invoice_choices ic on ic.invoice_id = i.id
+     where e.bank_transaction_id = bt.id and ${INVOICE_COUNTED}) x)`;
+
 /** الحركةُ (`bt`) طرفٌ في زوجٍ حُسم «ارتدّت» (`bank-bounce.service.ts`) — خروجُه أو عودتُه. */
 const BOUNCED = sql`exists (
     select 1 from alert_resolutions ar
@@ -80,6 +94,15 @@ const SUPPLIER_LOOKBACK_MONTHS = 3;
 /** تاريخُ الفاتورة أبعدُ من هذا عن شهرها المحاسبيّ يُنبَّه عليه — سنةٌ قُرئت خطأً غالباً. */
 const FAR_DATE_MONTHS = 12;
 
+/** يُقرأ بفحصٍ لا بتحويل نوع — وما لا يُفهَم يُسقَط. */
+function readCovering(v: unknown): { id: string; vatMinor: number | null }[] {
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((x) =>
+    typeof x === "object" && x !== null && "id" in x && typeof x.id === "string"
+      ? [{ id: x.id, vatMinor: "vat" in x && typeof x.vat === "number" ? x.vat : null }]
+      : []);
+}
+
 export interface VatTxRow extends VatTx {
   day: string;
   /** صادرٌ لمورّدٍ له فواتيرُ محسوبة (في الفترة أو قبلها بقليل) ولم تُطابَق به — ضمُّه قد يعدّ ضريبتَها مرّتين. */
@@ -90,6 +113,11 @@ export interface VatTxRow extends VatTx {
   vatMinor: number;
   /** لماذا لا تُضمّ مهما اختير — `null` تُضمّ. */
   blocked: string | null;
+  /**
+   * الفواتيرُ المحسوبة التي تغطّيها — يحضر لما اختاره صاحبُه ولم يُحسَب، كي يُخرَج
+   * فاتورتُها بعينها بضغطة. `vatMinor` الفارغ «لم تُقرأ» لا صفر.
+   */
+  covering: { id: string; vatMinor: number | null }[];
   /** بابٌ لا ضريبةَ فيه غالباً — تنبيهٌ لا منع. */
   caution: string | null;
 }
@@ -225,7 +253,7 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
   const txs = (await conn.execute<{
     id: string; day: string; direction: "DEBIT" | "CREDIT"; category: string; amount_minor: number;
     label: string | null; choice: boolean | null; covered: boolean; supplier_has_invoices: boolean;
-    description: string | null; bounced: boolean;
+    description: string | null; bounced: boolean; covering: unknown;
   }>(sql`
     select bt.id,
            to_char(bt.value_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as day,
@@ -239,6 +267,8 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
                 and i.period_month in (${supplierMonths})
                 and ${INVOICE_COUNTED})) as supplier_has_invoices,
            ${COVERED_BY_INVOICE} as covered,
+           /* لما اختاره صاحبُه وحده — الباقي لا يُسأل عنه */
+           case when c.included is true and bt.direction = 'DEBIT' then ${COVERING_INVOICES} else '[]'::jsonb end as covering,
            ${BOUNCED} as bounced
     from bank_transactions bt
     left join suppliers s on s.id = bt.supplier_id
@@ -269,6 +299,7 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
       included: isIncluded(base),
       vatMinor: txVat(base),
       blocked: txBlocked(base),
+      covering: readCovering(r.covering),
       caution: txCaution(base),
     }];
   });

@@ -42,7 +42,7 @@ export interface Command {
    * فعلٌ في الواجهة لا صفحة — يفتح قائمةَ الاختصارات أو يبدّل الوضع.
    * و`href` معه `/` كي يبقى كلُّ أمرٍ ذا وجهةٍ موجودة.
    */
-  event?: "shortcuts" | "theme" | "amounts";
+  event?: "shortcuts" | "theme" | "theme-system" | "amounts";
 }
 
 /**
@@ -160,12 +160,23 @@ const ACTIONS: readonly Command[] = [
     needs: "supplier:view",
     keywords: ["كشف", "مورد", "مطابقه", "statement"],
   },
+  {
+    /* «إقرار الضريبة» كان صفحةً بلا مرادف — من كتب «vat» أو «هيئة» أو «زكاة» لم يجد شيئاً */
+    id: "vat-file",
+    label: "قدّم إقرار الضريبة",
+    hint: "حسابُ الربع وما يُخصم — ثمّ «قدّمتُه للهيئة»",
+    group: "ACTION",
+    href: "/close/vat",
+    needs: "month:close",
+    keywords: ["ضريبه", "اقرار", "هيئه", "زكاه", "قيمه", "مضافه", "ربع", "vat", "zatca", "tax", "return"],
+  },
 ];
 
 /** أفعالُ الواجهة — لا صفحة لها. */
 const VIEW: readonly Command[] = [
   { id: "shortcuts", label: "اختصارات لوحة المفاتيح", hint: "?", group: "ACTION", href: "/", event: "shortcuts", keywords: ["اختصار", "مفاتيح", "shortcuts", "keyboard"] },
   { id: "theme", label: "بدّل الوضع الفاتح والداكن", group: "ACTION", href: "/", event: "theme", keywords: ["داكن", "ليلي", "فاتح", "dark", "theme"] },
+  { id: "theme-system", label: "اتبع وضع الجهاز", hint: "فاتحٌ نهاراً وداكنٌ ليلاً كما يضبطه جهازك", group: "ACTION", href: "/", event: "theme-system", keywords: ["جهاز", "نظام", "تلقائي", "داكن", "فاتح", "system", "auto", "theme"] },
   { id: "amounts", label: "أخفِ المبالغ أو أظهرها", hint: "للعرض على غيرك", group: "ACTION", href: "/", event: "amounts", keywords: ["اخف", "اخفاء", "مبالغ", "hide", "privacy"] },
 ];
 
@@ -232,6 +243,36 @@ function fold(s: string): string {
 }
 
 /**
+ * أبين الكلمتين فرقُ تحريرٍ واحد على الأكثر؟ (حرفٌ زائد أو ناقص أو مبدَّل،
+ * أو حرفان متجاوران انقلبا — Damerau-Levenshtein ≤ 1.)
+ *
+ * بلا جدول: الفرقُ الواحد يُفحَص بمسحةٍ واحدة من أوّل اختلاف.
+ */
+export function withinOneEdit(a: string, b: string): boolean {
+  if (a === b) return true;
+  const la = a.length;
+  const lb = b.length;
+  if (Math.abs(la - lb) > 1) return false;
+  let i = 0;
+  while (i < la && i < lb && a[i] === b[i]) i++;
+  if (la === lb) {
+    /* تبديلُ حرف، أو انقلابُ متجاورَين */
+    if (a.slice(i + 1) === b.slice(i + 1)) return true;
+    return a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2);
+  }
+  /* حرفٌ زائد في الأطول */
+  return la > lb ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1);
+}
+
+/** أقصرُ كلمةٍ يُغتفَر فيها خطأ — دونها يصير كلُّ شيءٍ قريباً من كلّ شيء. */
+const FUZZY_MIN = 4;
+
+/** «ال» التعريف تسقط قبل المقارنة — «الشهور» تُقاس على «شهر». */
+function bare(w: string): string {
+  return w.length > FUZZY_MIN && w.startsWith("ال") ? w.slice(2) : w;
+}
+
+/**
  * ترتيبُ الأوامر بما كُتب.
  *
  * كلُّ كلمةٍ من المكتوب يجب أن تقع في الاسم أو التلميح أو الكلمات — «كشف
@@ -241,26 +282,37 @@ function fold(s: string): string {
  *
  * والفارغُ يُرجع القائمةَ كما هي — اللوحةُ المفتوحة بلا كتابةٍ دليلٌ
  * بما يمكن فعله.
+ *
+ * والخطأُ الإملائيّ الواحد يُغتفَر **حين لا يطابق شيءٌ حرفيّاً** وحده: «استيرد
+ * كشف» يجد «استورد كشف البنك» بدرجةٍ أدنى. فالمطابقةُ الحرفيّة لا يزاحمها قريب.
  */
 export function matchCommands(query: string, commands: readonly Command[]): Command[] {
   const words = fold(query).split(" ").filter(Boolean);
   if (words.length === 0) return [...commands];
 
-  const scored: { c: Command; score: number; i: number }[] = [];
-  commands.forEach((c, i) => {
-    const label = fold(c.label);
-    const labelWords = label.split(" ");
-    const extra = [c.hint ?? "", ...(c.keywords ?? [])].map(fold);
-    let score = 0;
-    for (const w of words) {
-      if (labelWords.some((lw) => lw.startsWith(w) || lw.startsWith(`ال${w}`))) score += 4;
-      else if (label.includes(w)) score += 3;
-      else if (extra.some((e) => e.split(" ").some((ew) => ew.startsWith(w)))) score += 2;
-      else if (extra.some((e) => e.includes(w))) score += 1;
-      else return; // كلمةٌ لم تقع في شيء — ليس هذا ما قُصد
-    }
-    scored.push({ c, score, i });
-  });
+  const score = (fuzzy: boolean) => {
+    const out: { c: Command; score: number; i: number }[] = [];
+    commands.forEach((c, i) => {
+      const label = fold(c.label);
+      const labelWords = label.split(" ");
+      const extra = [c.hint ?? "", ...(c.keywords ?? [])].map(fold);
+      const extraWords = extra.flatMap((e) => e.split(" "));
+      let score = 0;
+      for (const w of words) {
+        if (labelWords.some((lw) => lw.startsWith(w) || lw.startsWith(`ال${w}`))) score += 4;
+        else if (label.includes(w)) score += 3;
+        else if (extraWords.some((ew) => ew.startsWith(w))) score += 2;
+        else if (extra.some((e) => e.includes(w))) score += 1;
+        else if (fuzzy && w.length >= FUZZY_MIN && [...labelWords, ...extraWords].some((x) => x.length >= FUZZY_MIN - 1 && withinOneEdit(bare(x), bare(w)))) score += 0.5;
+        else return; // كلمةٌ لم تقع في شيء — ليس هذا ما قُصد
+      }
+      out.push({ c, score, i });
+    });
+    return out;
+  };
+
+  const exact = score(false);
+  const scored = exact.length > 0 ? exact : score(true);
 
   /*
     الأفعالُ ثمّ الصفحات، والأقوى داخل كلٍّ أوّلاً. وكان الترتيبُ بالقوّة

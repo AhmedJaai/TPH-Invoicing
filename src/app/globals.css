@@ -67,6 +67,8 @@
   --frame-muted: #ddd7c6;      /* ‎5.24:1‎ على الإطار */
   --frame-line: #6e6856;
   --frame-accent: #efe8d1;     /* كريميّ — ونصُّ الإطار عليه ‎6.15:1‎ */
+  /* حلقةُ التركيز فوق الإطار: `--ring` لونُ العلامة، والإطارُ بلونها — ‎1.00:1‎ فلا تُرى. الكريميّ ‎6.15:1‎ */
+  --frame-ring: #efe8d1;
 
   /* الارتفاع: ظلٌّ دافئ لا رماديّ */
   --shadow-xs: 0 1px 0 rgb(40 30 10 / 0.04);
@@ -157,6 +159,7 @@
     --frame-muted: #b3ac99;
     --frame-line: #39352b;
     --frame-accent: #d4c9a3;
+    --frame-ring: #d4c9a3;
 
     --shadow-xs: 0 0 0 1px rgb(255 255 255 / 0.02);
     --shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.03);
@@ -210,6 +213,7 @@
   --frame-muted: #b3ac99;
   --frame-line: #39352b;
   --frame-accent: #d4c9a3;
+  --frame-ring: #d4c9a3;
 
   --shadow-xs: 0 0 0 1px rgb(255 255 255 / 0.02);
   --shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.03);
@@ -334,9 +338,23 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* الكسرُ أخفت من الصحيح — العين تقرأ الريالات وتمرّ على الهللات */
+/*
+ * الكسرُ أخفت من الصحيح — العين تقرأ الريالات وتمرّ على الهللات. لكنّه جزءٌ
+ * من المبلغ في نظامٍ يطابق بالهللة، فلا ينزل تحت ‎4.5:1‎:
+ *
+ * - الحبرُ: كانت الشفافيّة ‎0.55‎ = ‎3.89:1‎ على الأبيض و‎3.70:1‎ على البئر؛ وعند
+ *   ‎0.65‎ صارت ‎5.3:1‎ و‎4.9:1‎ (والداكن ‎6.9:1‎). يحرسها `contrast-guards.test.ts`.
+ * - النصُّ الملوَّن والثانويّ (خطر · تنبيه · سليم · خافت…) لا يحتمل أيَّ تبهيت —
+ *   الأحمرُ عند ‎0.55‎ كان ‎2.70:1‎ والخافتُ ‎2.26:1‎ — فيبقى كسرُه بلون صحيحه
+ *   كاملاً، ويُميَّز بالوزن لا باللون.
+ */
 .nums-frac {
-  opacity: 0.55;
+  opacity: 0.65;
+}
+:is(.text-danger, .text-warn, .text-ok, .text-info, .text-muted, .text-ink-soft, .text-accent, .text-plum, .text-sand,
+    .text-inverse-ink, .text-accent-ink, .text-frame, .text-frame-ink, .text-frame-muted, .text-raised) .nums-frac {
+  opacity: 1;
+  font-weight: 400;
 }
 
 /*
@@ -376,6 +394,24 @@ body {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: var(--radius-control);
+}
+
+/* فوق الإطار الداكن (الشريط الجانبيّ) الحلقةُ كريميّة — لونُ العلامة فوق نفسه لا يُرى */
+.bg-frame :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline-color: var(--frame-ring);
+}
+
+/*
+ * سفاري الآيفون يكبّر الصفحةَ عند تركيز حقلٍ خطُّه دون ‎16px‎ ولا يعيدها — وكلُّ
+ * حقلٍ في التطبيق ‎12–14px‎. فعلى اللمس وحده يُكتب في الحقول بـ‎16px‎، والتكبيرُ
+ * باليد باقٍ لمن أراده. (بلا طبقة: يغلب أصنافَ `text-sm` و`text-xs`.)
+ */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 /* الحقل يُعلن تركيزه بحدّه كذلك — الحلقةُ خارجه والحدُّ داخله */
@@ -463,18 +499,22 @@ body {
  * زرٌّ كالذي في تطبيقات البنوك: يُري صاحبُ المقهى الشاشةَ أحداً بلا
  * مبالغ. بالتنقيط لا بالطمس — `blur` يترك طولَ الرقم، وطولُه وحده يقول
  * «هذا بالآلاف». و`.nums` لا يوضَع إلّا على أرقامٍ صرفة.
+ *
+ * و`.nums-count` لما هو **عددٌ لا مبلغ** (رقمُ الخطوة، عدّادُ القسم، «١٢ من ٤٠»)
+ * — كان يُخفى مع المال فتصير الخطواتُ «••••». الاستثناءُ بالاسم لا القاعدة:
+ * رقمٌ نُسي وسمُه يُخفى ولا يُكشَف، ومن ظنّ أنّه أخفى لا يُري ما لا يريد.
  */
-html[data-amounts="hidden"] .nums {
+html[data-amounts="hidden"] .nums:not(.nums-count) {
   position: relative;
   color: transparent !important;
   user-select: none;
 }
 
-html[data-amounts="hidden"] .nums * {
+html[data-amounts="hidden"] .nums:not(.nums-count) * {
   color: transparent !important;
 }
 
-html[data-amounts="hidden"] .nums::after {
+html[data-amounts="hidden"] .nums:not(.nums-count)::after {
   content: "••••";
   position: absolute;
   inset: 0;
@@ -486,7 +526,7 @@ html[data-amounts="hidden"] .nums::after {
   font-size: 0.85em;
 }
 
-html[data-amounts="hidden"] .nums-col .nums::after {
+html[data-amounts="hidden"] .nums-col .nums:not(.nums-count)::after {
   justify-content: flex-end;
 }
 
@@ -520,7 +560,7 @@ html[data-amounts="hidden"] .icon-hidden { display: block; }
  * رابطاً — ترميزٌ باطل يُسقط الترطيب فيتوقّف تفاعلُ الصفحة كلّها. فالرابطُ
  * طبقةٌ مطلقة، وما كان تفاعليّاً داخل المحتوى يُرفَع فوقها.
  */
-.card-rows :where(a, button, input, select, label, summary):not([aria-label="افتح التفصيل"]) {
+.card-rows :where(a, button, input, select, label, summary):not([data-row-link], [aria-label="افتح التفصيل"]) {
   position: relative;
 }
 
@@ -623,8 +663,8 @@ html[data-amounts="hidden"] .icon-hidden { display: block; }
   height: 0.3rem;
   margin: 0.5rem auto 0;
   border-radius: 999px;
+  /* كاملُ اللون (‎3.57:1‎): هو الإشارةُ الوحيدة إلى أنّ الورقة تُسحب — بنصف الشفافيّة كان ‎1.9:1‎ */
   background: var(--line-input);
-  opacity: 0.55;
 }
 @media (min-width: 640px) {
   .grabber { display: none; }
@@ -992,8 +1032,8 @@ details[open]::details-content {
   from { opacity: 0; transform: translateY(calc(8px * var(--travel))); filter: blur(calc(2px * var(--travel))); }
 }
 
-/* الصفُّ المختار بلوحة المفاتيح (j/k) */
-[data-nav-item][data-nav-active="true"] {
+/* الصفُّ المختار بلوحة المفاتيح (j/k) — وحين يحمل رابطُه التركيزَ فحلقتُه تكفي */
+[data-nav-item][data-nav-active="true"]:not(:has([data-row-link]:focus-visible)) {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: var(--radius-card);
@@ -1035,17 +1075,96 @@ details[open]::details-content {
   html { scroll-behavior: auto !important; }
 }
 
-/* ── الطباعة: كشفُ المورّد وحزمةُ المحاسب تُطبَع أو تُحفَظ PDF ── */
+/*
+ * ── الطباعة: كشفُ المورّد وحزمةُ المحاسب تُطبَع أو تُحفَظ PDF ──
+ *
+ * الورقُ أبيض مهما كان وضعُ الشاشة. كانت ستّةُ رموزٍ وحدها تعود إلى الفاتح،
+ * فيُطبع من الوضع الداكن نصٌّ كريميّ (`--ink-soft` · `--accent` · ألوانُ الحال)
+ * على ورقٍ أبيض — شبهُ مخفيّ. فتُعاد **كلُّ** الرموز، بالمحدِّدات الثلاثة التي
+ * يُكتب بها الداكن كي لا تغلبها خصوصيّتُه، وتسقط الظلال.
+ */
+@page {
+  size: A4;
+  margin: 14mm 12mm 16mm;
+  @bottom-center {
+    content: counter(page) " / " counter(pages);
+    font-size: 9pt;
+    color: #444444;
+  }
+}
+
 @media print {
-  :root {
+  :root,
+  :root[data-theme],
+  :root:not([data-theme="light"]) {
+    color-scheme: light;
     --surface: #ffffff;
     --raised: #ffffff;
+    --overlay: #ffffff;
     --sunken: #f4f4f4;
+    --hover: #ffffff;
+
     --ink: #000000;
+    --ink-soft: #333333;
     --muted: #444444;
     --line: #cccccc;
+    --line-soft: #dddddd;
+    --line-input: #8d877b;
+    --line-strong: #000000;
+
+    --accent: #5a5444;
+    --accent-strong: #48432f;
+    --accent-ink: #ffffff;
+    --accent-soft: #ebe8dd;
+    --accent-line: #cdc7b3;
+
+    --inverse-surface: #1b1a17;
+    --inverse-ink: #f6f4ef;
+
+    --ok: #1f7a3d;
+    --ok-bg: #e6f4ea;
+    --warn: #9a4d00;
+    --warn-bg: #fcf0dc;
+    --danger: #b8261b;
+    --danger-bg: #fdeceb;
+    --info: #2d5bc4;
+    --info-bg: #e8eefc;
+    --plum: #8a2f74;
+    --plum-bg: #f6e8f3;
+    --sand: #7a5a1e;
+    --sand-bg: #f4ecda;
+
+    --shadow-xs: none;
+    --shadow-raised: none;
+    --shadow-lifted: none;
+    --shadow-overlay: none;
   }
   .no-print { display: none !important; }
   body { background: #fff; padding: 0; }
   main { padding: 0 !important; max-width: none !important; }
+
+  /* شاراتُ الحال وخلفيّاتُ الرؤوس تُطبع بلونها — المتصفّحُ يُسقطها ما لم يُطلَب */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* رأسُ الأعمدة يتكرّر في كلّ ورقة، والصفُّ لا ينقسم بين ورقتين */
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  tr, li, dl > div { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
+
+  /* الجدولُ الطويل يُطبع كلُّه: لا نافذةَ تمريرٍ تقصّه، ولا رأسٌ لاصق، ولا حافّةٌ متدرّجة */
+  .scroll-x {
+    overflow: visible !important;
+    max-height: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+  }
+  thead.sticky { position: static; }
+
+  /* الهللاتُ على الورق بحبرها كاملاً — التبهيتُ للشاشة */
+  .nums-frac { opacity: 1; }
+  .skeleton { animation: none; }
 }

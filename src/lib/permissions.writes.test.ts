@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { can } from "./permissions";
+import { can, capabilitiesOf, isRole, parseAllowlist, READ_CAPABILITIES } from "./permissions";
 
 /**
  * الكتابة لا تُحرَس بصلاحية قراءة.
@@ -90,5 +90,37 @@ describe("فصل صلاحيات الكتابة عن القراءة", () => {
       if (can(role, "bank:edit")) expect(can(role, "bank:view")).toBe(true);
       if (can(role, "inventory:count")) expect(can(role, "inventory:view")).toBe(true);
     }
+  });
+
+  /*
+    «المراجع» للمحاسب الخارجيّ: يرى ولا يغيّر. وأيُّ قدرةِ كتابةٍ تُضاف له سهواً
+    تُسقط هذا الاختبار — القائمةُ البيضاء للقراءة هي الحكم لا أسماءٌ تُعدّ هنا.
+  */
+  it("المراجع لا يملك قدرةَ كتابةٍ واحدة", () => {
+    const writes = capabilitiesOf("AUDITOR").filter((c) => !READ_CAPABILITIES.includes(c));
+    expect(writes).toEqual([]);
+    for (const c of ["document:upload", "invoice:edit", "bank:edit", "expense:edit", "payment:approve", "month:close", "month:reopen", "users:manage", "supplier:edit", "inventory:count", "recipe:edit"] as const) {
+      expect(can("AUDITOR", c)).toBe(false);
+    }
+  });
+
+  it("ويقرأ المالية وينزّل حزمة المحاسب — ولا يرى الرواتب", () => {
+    for (const c of ["amounts:view", "bank:view", "reports:view", "reports:export", "audit:view"] as const) {
+      expect(can("AUDITOR", c)).toBe(true);
+    }
+    expect(can("AUDITOR", "payroll:view")).toBe(false);
+  });
+
+  it("إدارةُ المستخدمين للمالك وحده", () => {
+    expect(can("OWNER", "users:manage")).toBe(true);
+    for (const role of ["ACCOUNTANT", "PURCHASING", "AUDITOR"] as const) expect(can(role, "users:manage")).toBe(false);
+  });
+
+  it("القائمة البيضاء تقبل المراجع، وما ليس دوراً يُردّ إلى الأضيق لا إلى الأوسع", () => {
+    const list = parseAllowlist("a@x.com:OWNER, cpa@x.com:AUDITOR, who@x.com:ADMIN, bare@x.com");
+    expect(list.get("cpa@x.com")).toBe("AUDITOR");
+    expect(list.get("who@x.com")).toBe("PURCHASING");
+    expect(list.get("bare@x.com")).toBe("PURCHASING");
+    expect(isRole("ADMIN")).toBe(false);
   });
 });

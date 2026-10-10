@@ -1,10 +1,13 @@
 "use client";
 
 import Link, { useLinkStatus } from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { CircleAlert, CircleCheck, Info, Search, TriangleAlert, Undo2, X } from "lucide-react";
-import { buttonClass, type ButtonVariant } from "./ui-tokens";
+import { ArrowDown, ArrowUp, ChevronsUpDown, CircleAlert, CircleCheck, Info, Search, TriangleAlert, Undo2, X } from "lucide-react";
+import { buttonClass, fieldClass, type ButtonVariant } from "./ui-tokens";
 import { normalizeArabic, normalizeDigits } from "@/lib/search";
+import { shortcutKey } from "@/lib/shortcut-keys";
+import { formatSort, nextSort, parseSort, type SortDir } from "@/lib/table-sort";
 
 /**
  * عناصر تحتاج تفاعلاً — الإقرار، والبحثُ داخل الجدول، والإشعاراتُ
@@ -402,15 +405,35 @@ export function TableFilter({ label, total }: { label: string; total: number }) 
     const root = ref.current?.closest("[data-filter-root]");
     if (!root) return;
     const words = fold(q).split(/\s+/).filter(Boolean);
-    const rows = root.querySelectorAll<HTMLElement>("[data-filter]");
-    let visibleDesktop = 0;
-    rows.forEach((el) => {
-      const text = fold(el.dataset.filter ?? "");
-      const hit = words.every((w) => text.includes(w));
-      el.hidden = !hit;
-      if (hit && el.tagName === "TR") visibleDesktop++;
+    function apply() {
+      const rows = root!.querySelectorAll<HTMLElement>("[data-filter]");
+      let visibleDesktop = 0;
+      rows.forEach((el) => {
+        const text = fold(el.dataset.filter ?? "");
+        const hit = words.every((w) => text.includes(w));
+        if (el.hidden === hit) el.hidden = !hit;
+        if (hit && el.tagName === "TR") visibleDesktop++;
+      });
+      setShown(words.length === 0 ? total : visibleDesktop);
+    }
+    apply();
+    /*
+      بعد فعلٍ ثمّ `router.refresh()` تصل صفوفٌ جديدة أو مستبدَلة بلا `hidden` —
+      وإن بقي عددُها كما كان لم يجرِ هذا الأثر، فظهر ما لا يطابق المكتوبَ والعدّادُ
+      يقول غير ما يُرى. فيُعاد التطبيقُ كلّما تبدّلت صفوفُ الجدول (لا صفاتُها:
+      كتابةُ `hidden` هنا لا توقظه).
+    */
+    let frame = 0;
+    const observer = new MutationObserver((changes) => {
+      if (!changes.some((m) => [...m.addedNodes].some((n) => n instanceof HTMLElement && (n.matches("[data-filter]") || n.querySelector("[data-filter]") !== null)))) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(apply);
     });
-    setShown(words.length === 0 ? total : visibleDesktop);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
   }, [q, total]);
 
   return (
@@ -428,14 +451,208 @@ export function TableFilter({ label, total }: { label: string; total: number }) 
           className="min-h-11 w-full rounded-lg border border-line-input bg-raised ps-9 pe-3 text-sm sm:min-h-9"
         />
       </label>
+      {/* أعدادُ صفوفٍ لا مبالغ — `nums-count` يُبقيها ظاهرةً و«أخفِ المبالغ» مضغوط */}
       <p className="text-xs text-muted" aria-live="polite">
         {q ? (
-          shown === 0 ? "لا صفّ يطابق." : <><span className="nums">{shown}</span> من <span className="nums">{total}</span></>
+          shown === 0 ? (
+            /* الفراغُ يُقال بما يُخرج منه: رأسُ جدولٍ فوق لا شيء لا يقول ما العمل */
+            <>
+              لا صفّ يطابق «<bdi>{q}</bdi>» في المعروض.{" "}
+              <button type="button" onClick={() => { setQ(""); ref.current?.focus(); }} className="min-h-8 font-bold text-accent hover:underline">
+                امسح البحث
+              </button>
+            </>
+          ) : <><span className="nums nums-count">{shown}</span> من <span className="nums nums-count">{total}</span></>
         ) : (
-          <><span className="nums">{total}</span> صفّاً</>
+          <><span className="nums nums-count">{total}</span> صفّاً</>
         )}
       </p>
     </div>
+  );
+}
+
+/* ─────────────────────────── ترتيبُ الجدول ─────────────────────────── */
+
+function sortHref(pathname: string, params: URLSearchParams, param: string, value: string | null): string {
+  const q = new URLSearchParams(params);
+  if (value) q.set(param, value);
+  else q.delete(param);
+  const s = q.toString();
+  return s ? `${pathname}?${s}` : pathname;
+}
+
+/**
+ * رأسُ عمودٍ يرتّب — يكتب `?sort=key.desc` في العنوان ويُبقي ما فيه من تصفية.
+ * ثلاثُ ضغطات: الاتّجاهُ الطبيعيّ، ثمّ عكسُه، ثمّ ترتيبُ الخادم. والسهمُ يقول
+ * الحال، و`aria-sort` على الخليّة يقولها لقارئ الشاشة.
+ */
+export function SortHeader({
+  param,
+  sortKey,
+  first,
+  children,
+}: {
+  param: string;
+  sortKey: string;
+  first: SortDir;
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const current = parseSort(params.get(param), [sortKey]);
+  const next = nextSort(current, sortKey, first);
+  const Icon = current?.dir === "asc" ? ArrowUp : current?.dir === "desc" ? ArrowDown : ChevronsUpDown;
+  return (
+    <Link
+      href={sortHref(pathname, params, param, formatSort(next))}
+      scroll={false}
+      replace
+      data-tip={next ? (next.dir === "desc" ? "رتّب تنازليّاً" : "رتّب تصاعديّاً") : "أعِد الترتيبَ الأصليّ"}
+      className={`-mx-1.5 inline-flex min-h-7 items-center gap-1 rounded-md px-1.5 transition-colors hover:bg-hover hover:text-ink ${current ? "text-ink" : ""}`}
+    >
+      {children}
+      <Icon className={`h-3 w-3 shrink-0 ${current ? "text-accent" : "opacity-60"}`} strokeWidth={2.25} aria-hidden />
+      <LinkPending />
+    </Link>
+  );
+}
+
+/** الترتيبُ على الجوّال — البطاقاتُ بلا رؤوس أعمدة، فقائمةٌ واحدة فوقها. */
+export function SortSelect({
+  param,
+  options,
+}: {
+  param: string;
+  options: readonly { key: string; label: string; first: SortDir }[];
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const id = useId();
+  const current = parseSort(params.get(param), options.map((o) => o.key));
+  return (
+    <label htmlFor={id} className="flex items-center gap-2 text-xs text-muted">
+      <span className="shrink-0 font-bold">رتّب حسب</span>
+      <select
+        id={id}
+        value={formatSort(current) ?? ""}
+        onChange={(e) => router.replace(sortHref(pathname, params, param, e.target.value || null), { scroll: false })}
+        className={`${fieldClass("sm")} max-w-56`}
+      >
+        <option value="">الترتيب الأصليّ</option>
+        {options.flatMap((o) => {
+          const second: SortDir = o.first === "desc" ? "asc" : "desc";
+          const word = (d: SortDir) => (d === "asc" ? "تصاعديّاً" : "تنازليّاً");
+          return [o.first, second].map((d) => (
+            <option key={`${o.key}.${d}`} value={`${o.key}.${d}`}>{o.label} — {word(d)}</option>
+          ));
+        })}
+      </select>
+    </label>
+  );
+}
+
+/* ─────────────────────────── الحقول ─────────────────────────── */
+
+/**
+ * حقلٌ بتسميته وتلميحه وخطئه — والربطُ (`htmlFor` · `aria-describedby` ·
+ * `aria-invalid`) يُكتب هنا مرّةً لا في كلّ نموذج.
+ *
+ * `children` دالّةٌ تأخذ ما يُنشَر على عنصر الإدخال، فيصلح لـ`Input` و`Select`
+ * و`MoneyInput` ولأيّ ضابطٍ آخر:
+ *
+ *   <Field label="المبلغ" error={err}>{(p) => <MoneyInput {...p} value={v} onChange={setV} />}</Field>
+ */
+export function Field({
+  label,
+  hint,
+  error,
+  required,
+  className = "",
+  children,
+}: {
+  label: React.ReactNode;
+  /** سطرٌ هادئ تحت الحقل — يُخفى حين يُعرَض خطأ. */
+  hint?: React.ReactNode;
+  /** رسالةُ الخطأ — وجودُها يجعل الحقل `aria-invalid`. */
+  error?: React.ReactNode;
+  required?: boolean;
+  className?: string;
+  children: (control: { id: string; "aria-describedby"?: string; "aria-invalid"?: true; required?: true; invalid: boolean }) => React.ReactNode;
+}) {
+  const id = useId();
+  const noteId = `${id}-note`;
+  const invalid = error !== undefined && error !== null && error !== false && error !== "";
+  return (
+    <div className={`min-w-0 ${className}`}>
+      <label htmlFor={id} className="block text-xs font-bold text-ink-soft">
+        {label}
+        {required && <span className="ms-1 text-danger" aria-hidden>*</span>}
+      </label>
+      <div className="mt-1.5">
+        {children({
+          id,
+          "aria-describedby": invalid || hint ? noteId : undefined,
+          "aria-invalid": invalid ? true : undefined,
+          required: required ? true : undefined,
+          invalid,
+        })}
+      </div>
+      {invalid ? (
+        <p id={noteId} role="alert" className="mt-1 flex items-start gap-1 text-[11px] font-bold leading-relaxed text-danger">
+          <CircleAlert className="mt-px h-3 w-3 shrink-0" strokeWidth={2.25} aria-hidden />
+          <span>{error}</span>
+        </p>
+      ) : hint ? (
+        <p id={noteId} className="mt-1 text-[11px] leading-relaxed text-muted">{hint}</p>
+      ) : null}
+    </div>
+  );
+}
+
+type ControlExtras = { invalid?: boolean; fieldSize?: "sm" | "md" };
+
+/*
+  اسمُ الحقل يصله من `Field` (`id` ↔ `htmlFor`) — أو `aria-label` ممّن استعمله
+  وحده. فلا يُكتب حقلٌ بهذه العناصر بلا أحدهما.
+*/
+export function Input({ id, invalid, fieldSize, className = "", ...rest }: React.ComponentProps<"input"> & ControlExtras) {
+  return <input id={id} {...rest} className={`${fieldClass(fieldSize, invalid)} ${className}`} />;
+}
+
+export function Select({ id, invalid, fieldSize, className = "", children, ...rest }: React.ComponentProps<"select"> & ControlExtras) {
+  return <select id={id} {...rest} className={`${fieldClass(fieldSize, invalid)} ${className}`}>{children}</select>;
+}
+
+/**
+ * حقلُ مبلغ — يفتح لوحةَ الأرقام على الجوّال، ويُكتب من اليسار بخطّ الأرقام.
+ * والقيمةُ **نصّ** كما كُتبت: الطلبُ يحملها نصّاً والخادمُ يحوّلها إلى هللات
+ * (`src/lib/money.ts`) — لا عددَ عائماً في الطريق.
+ */
+export function MoneyInput({
+  id,
+  value,
+  onChange,
+  invalid,
+  fieldSize,
+  className = "",
+  ...rest
+}: Omit<React.ComponentProps<"input">, "value" | "onChange" | "type" | "inputMode"> & ControlExtras & {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <input
+      id={id}
+      {...rest}
+      type="text"
+      inputMode="decimal"
+      dir="ltr"
+      autoComplete="off"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`nums text-end ${fieldClass(fieldSize, invalid)} ${className}`}
+    />
   );
 }
 
@@ -535,7 +752,7 @@ export function Toaster() {
     for (const [id, t] of timers.current) arm(id, Math.max(1800, t.left));
   }
 
-  async function runUndo(t: LiveToast) {
+  const runUndo = useCallback(async (t: LiveToast) => {
     if (!t.undo || t.state !== "idle") return;
     setItems((xs) => xs.map((x) => (x.id === t.id ? { ...x, state: "undoing" } : x)));
     let ok = true;
@@ -546,12 +763,32 @@ export function Toaster() {
     }
     setItems((xs) => xs.map((x) => (x.id === t.id ? { ...x, state: ok ? "undone" : "undo-failed" } : x)));
     arm(t.id, 3000);
-  }
+  }, [arm]);
+
+  /*
+    ⌘Z / Ctrl+Z يتراجع عن أحدث إشعارٍ حيٍّ يقبل التراجع — من يعمل بالمفاتيح
+    (J/K ثمّ فعل) لا يطارد زرّاً في زاوية الشاشة قبل أن تنتهي مهلتُه. وفي حقلٍ
+    يُكتب فيه يبقى ⌘Z للكتابة.
+  */
+  const live = useRef<LiveToast[]>([]);
+  useEffect(() => { live.current = items; }, [items]);
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || shortcutKey(e) !== "z") return;
+      const el = e.target;
+      if (el instanceof HTMLElement && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      const t = [...live.current].reverse().find((x) => x.undo && x.state === "idle" && !x.leaving);
+      if (!t) return;
+      e.preventDefault();
+      void runUndo(t);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [runUndo]);
 
   return (
+    /* بلا `aria-live` هنا: كلُّ إشعارٍ منطقةٌ حيّة بدوره (`status` · `alert`)، والاثنان معاً يُقرآن مرّتين */
     <div
-      aria-live="polite"
-      aria-relevant="additions"
       onMouseEnter={pause}
       onMouseLeave={resume}
       onFocus={pause}

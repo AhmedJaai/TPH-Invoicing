@@ -13,9 +13,9 @@ describe("أبواب سجلّ التدقيق", () => {
     expect(auditKind("BANK_RULE_LEARNED")).toBe("learned");
   });
 
-  it("كلُّ فعلٍ مسمّى له بابٌ غير «أخرى» — إلّا تغيير الدور", () => {
+  it("كلُّ فعلٍ مسمّى له بابٌ غير «أخرى» — إلّا إدارةَ المستخدمين", () => {
     const orphans = Object.keys(ACTION_LABEL).filter((a) => auditKind(a) === "other");
-    expect(orphans).toEqual(["USER_ROLE_CHANGED"]);
+    expect(orphans).toEqual(["USER_ROLE_CHANGED", "USER_ACCESS_CHANGED", "USER_SESSIONS_ENDED"]);
   });
 
   it("يرفض باباً غير معروف في العنوان", () => {
