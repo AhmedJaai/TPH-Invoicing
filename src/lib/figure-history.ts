@@ -10,7 +10,12 @@ import { actionLabel } from "./audit-labels";
 import { invoiceHref } from "./invoice-profile";
 import { txHref } from "./inspector";
 
-export type FigureId = "owed";
+export type FigureId = "owed" | "vat" | "payrun";
+
+const INVOICE_MOVERS = [
+  "DOCUMENT_ARCHIVED", "DOCUMENT_REREAD", "DOCUMENT_RECORDED_BY_HAND", "DOCUMENT_REJECTED", "STATEMENT_INVOICES_RECORDED",
+  "INVOICE_FIELDS_CORRECTED", "INVOICE_REPLACED",
+] as const;
 
 /** الأفعالُ التي تغيّر «عليك للمورّدين»: ما يزيد المفتوحَ على الفواتير وما يُنقصه. */
 export const FIGURE_ACTIONS: Record<FigureId, readonly string[]> = {
@@ -20,10 +25,21 @@ export const FIGURE_ACTIONS: Record<FigureId, readonly string[]> = {
     "INVOICES_MARKED_PAID", "INVOICE_PAID_BY_OWNER", "PAYMENT_RECORDED", "PAYMENT_VOIDED", "PAYMENT_REALLOCATED",
     "PAYMENT_CREDIT_NOTE_RECORDED", "PAYMENT_ECHO_MERGED", "SUPPLIER_CREDIT_APPLIED", "MATCH_CONFIRMED", "MATCH_UNDONE",
   ],
+  /* «تسدّده للهيئة»: اختياراتُ الإقرار والنقدُ المكتوب، وما يغيّر الفواتيرَ المخصومة أو واردَ البنك */
+  vat: [
+    "VAT_TX_CHOSEN", "VAT_INVOICE_CHOSEN", "VAT_CASH_SALES_SET", "VAT_RETURN_FILED", "VAT_FILING_VOIDED",
+    ...INVOICE_MOVERS, "BANK_IMPORTED", "COUNTERPARTY_CONFIRMED", "MATCH_CONFIRMED", "MATCH_UNDONE",
+  ],
+  /* «دفعةُ الشهر»: ما يفتح فاتورةً أو يغلقها، وقرارُ صاحبها في المحجوز */
+  payrun: [
+    "PAYMENT_HOLD_OVERRIDDEN", "PAYMENT_HOLD_RESTORED", "PAYMENT_RUN_EXPORTED",
+    ...INVOICE_MOVERS, "INVOICES_MARKED_PAID", "INVOICE_PAID_BY_OWNER", "PAYMENT_RECORDED", "PAYMENT_VOIDED",
+    "PAYMENT_REALLOCATED", "PAYMENT_CREDIT_NOTE_RECORDED", "SUPPLIER_CREDIT_APPLIED", "MATCH_CONFIRMED", "MATCH_UNDONE",
+  ],
 };
 
 export function isFigureId(v: string | null | undefined): v is FigureId {
-  return v === "owed";
+  return typeof v === "string" && Object.hasOwn(FIGURE_ACTIONS, v);
 }
 
 export interface AuditRow {

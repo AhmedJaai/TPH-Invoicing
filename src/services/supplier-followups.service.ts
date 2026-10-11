@@ -8,7 +8,9 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
-import type { UnbackedPayment } from "@/lib/supplier-requests";
+import { alertResolutions } from "@/db/schema";
+import { recordAudit } from "@/lib/audit";
+import { groupUnbackedBySupplier, invoiceRequestKey, type UnbackedPayment } from "@/lib/supplier-requests";
 
 /** ما دون الريال بقيّةُ تقريبٍ لا دفعةٌ بلا فاتورة. */
 export const UNBACKED_FLOOR_MINOR = 100;
@@ -117,4 +119,39 @@ export async function loadMissingStatementSuppliers(month: string): Promise<Miss
     lastInvoiceDate: r.last_invoice,
     phoneE164: r.phone,
   }));
+}
+
+/* ─────────────────────────── سجلُّ المطالبات ─────────────────────────── */
+
+/**
+ * متى طولب كلُّ مورّدٍ بفواتيره — بمفتاح `invoiceRequestKey`، وكم يوماً مضى.
+ * كان زرُّ «اطلب الفاتورة» يفتح واتساب ولا يترك أثراً: يُطلَب مرّتين أو يُنسى.
+ */
+export async function loadInvoiceRequestMarks(): Promise<Map<string, number>> {
+  const res = await db.execute<{ key: string; days: number }>(sql`
+    select key, ((now() at time zone 'Asia/Riyadh')::date - (at at time zone 'Asia/Riyadh')::date)::int as days
+      from alert_resolutions
+     where key like 'supplier-request:%'
+  `);
+  return new Map(res.rows.map((r) => [r.key, Number(r.days)]));
+}
+
+/**
+ * يقيّد «طولب اليوم» لمورّدٍ — والمفتاحُ يُشتقّ في الخادم من دفعاته التي بلا مستند
+ * الآن، لا ممّا أرسله المتصفّح. `false`: لا دفعةَ له بلا مستند (وصلت فواتيرُه).
+ */
+export async function markInvoicesRequested(supplierId: string, actorId: string): Promise<boolean> {
+  const group = groupUnbackedBySupplier(await loadUnbackedPayments()).find((g) => g.supplierId === supplierId);
+  const key = group ? invoiceRequestKey(group) : null;
+  if (!group || !key) return false;
+  await db.transaction(async (t) => {
+    await t.insert(alertResolutions)
+      .values({ key, decision: "REQUESTED", userId: actorId })
+      .onConflictDoUpdate({ target: alertResolutions.key, set: { decision: "REQUESTED", userId: actorId, at: new Date() } });
+    await recordAudit({
+      actorId, action: "SUPPLIER_REQUEST_SENT", entityType: "supplier", entityId: supplierId,
+      after: { المورّد: group.supplierName, بلا_مستند_بالهللة: group.totalMinor, الدفعات: group.payments.length },
+    }, t);
+  });
+  return true;
 }

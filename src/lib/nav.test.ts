@@ -118,7 +118,7 @@ describe("visibleAreas", () => {
 
   it("الإعدادات وسجلّ التدقيق في روابط الحساب لا في المساحات", () => {
     const hrefs = visibleAccountLinks("OWNER").map((l) => l.href);
-    expect(hrefs).toEqual(["/settings", "/settings/audit"]);
+    expect(hrefs).toEqual(["/settings", "/settings/choices", "/settings/audit"]);
     expect(visibleAccountLinks("PURCHASING").map((l) => l.href)).toEqual(["/settings"]);
   });
 
@@ -141,8 +141,8 @@ describe("visibleAreas", () => {
 describe("visibleChildren و entryHref", () => {
   it("تحجب اللسان الذي لا يملك الدور صلاحيته", () => {
     const payments = AREAS.find((a) => a.href === "/payments")!;
-    // المحاسب لا يعتمد الدفعات — فلا يرى إلّا النقد القادم، ولسانٌ واحد ليس تفريعاً
-    expect(visibleChildren("ACCOUNTANT", payments)).toEqual([]);
+    // المحاسب لا يعتمد الدفعات — فلا يرى «دفعة الشهر»، ويبقى له النقدُ القادم وتقويمُه
+    expect(visibleChildren("ACCOUNTANT", payments).map((c) => c.href)).toEqual(["/cash", "/cash/calendar"]);
     // ومدخلُه إلى المساحة النقدُ القادم لا صفحةٌ تردّه
     expect(entryHref("ACCOUNTANT", payments)).toBe("/cash");
     expect(entryHref("OWNER", payments)).toBe("/payments");

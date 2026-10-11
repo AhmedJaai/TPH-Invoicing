@@ -7,10 +7,15 @@ import { PageShell } from "@/components/page-shell";
 import { NoAccess } from "@/components/ui";
 import { SectionBoundary } from "@/components/ui-client";
 import { prioritize } from "@/lib/attention";
-import { attentionItems } from "@/lib/work";
+import { attentionItems, snoozedAttention } from "@/lib/work";
 import { inLens, landing, parseLens } from "@/lib/attention-triage";
 import { loadStartState } from "@/services/start.service";
 import { DoublePaidWorkspace } from "@/components/double-paid-section";
+import { FirstTransferWorkspace, IbanGuardWorkspace } from "@/components/iban-guard";
+import { SnoozeControl } from "@/components/attention-snooze";
+import { SnoozedList } from "@/components/attention-snoozed";
+import { snoozeOptions } from "@/lib/attention-snooze";
+import { todayInRiyadh } from "@/lib/riyadh-time";
 import { ReviewSection } from "@/components/review-section";
 import {
   ContractPolicyWorkspace, InboxWorkspace, StatementRequestWorkspace, UnbackedWorkspace,
@@ -54,7 +59,8 @@ export default async function AttentionPage({
     );
   }
 
-  const items = await attentionItems();
+  const [items, snoozed] = await Promise.all([attentionItems(), snoozedAttention()]);
+  const snoozedBlock = snoozed.length > 0 ? <SnoozedList snoozed={snoozed} canEdit={can(user.role, "bank:edit")} /> : null;
   const { top, rest } = prioritize(items, items.length);
   const ordered = [...top, ...rest];
   const params = await searchParams;
@@ -94,7 +100,8 @@ export default async function AttentionPage({
       فحين لا مستندَ ولا كشف يُقال ذلك، ويُدَلّ على البداية.
     */
     const start = await loadStartState();
-    return shell(start.knowsNothing ? <KnowsNothing start={start} /> : <AllClear start={start} canPay={can(user.role, "payment:approve")} />);
+    /* «لا شيء ينتظرك» والمؤجَّلُ قائم: يُقال تحته — لا طمأنينةَ تُخفي ما أُجِّل */
+    return shell(<>{start.knowsNothing ? <KnowsNothing start={start} /> : <AllClear start={start} canPay={can(user.role, "payment:approve")} />}{snoozedBlock}</>);
   }
 
   const canEdit = can(user.role, "bank:edit");
@@ -114,13 +121,17 @@ export default async function AttentionPage({
     ) : id === "unclassified-bank" ? (
       <ReviewSection canApprove={canApprove} canEdit={canEdit} />
     ) : id === "unbacked-payments" ? (
-      <UnbackedWorkspace canApprove={canApprove} />
+      <UnbackedWorkspace canApprove={canApprove} canRequest={can(user.role, "supplier:edit")} />
     ) : id === "pending-documents" || id === "open-blockers" ? (
       <InboxWorkspace canUpload={canUpload} canConfirm={canUpload && can(user.role, "amounts:view")} />
     ) : id === "no-contract" ? (
       <ContractPolicyWorkspace canEdit={canEditSupplier} />
     ) : id === "missing-statements" ? (
       <StatementRequestWorkspace canEdit={canEditSupplier} />
+    ) : id === "iban-mismatch" ? (
+      <IbanGuardWorkspace canEdit={canEdit} />
+    ) : id === "first-transfers" ? (
+      <FirstTransferWorkspace canEdit={canEdit} />
     ) : undefined;
 
   return shell(
@@ -163,6 +174,7 @@ export default async function AttentionPage({
               item={selected}
               list={list}
               lens={lens}
+              extraAction={canEdit ? <SnoozeControl itemId={selected.id} options={snoozeOptions(todayInRiyadh())} /> : undefined}
               workspace={
                 workspace ? (
                   /* اللوحُ يُقرأ من القاعدة — لا ينتظره ما فوقه */
@@ -177,6 +189,7 @@ export default async function AttentionPage({
           </div>
         </div>
       )}
+      {snoozedBlock}
     </>,
   );
 }

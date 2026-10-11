@@ -4,6 +4,7 @@ import { CircleCheck, PauseCircle, ShieldCheck } from "lucide-react";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
+import { WhyNumber } from "@/components/why-number";
 import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { Callout, EmptyState, LinkTabs, NoAccess, Section, Stat, StatGrid } from "@/components/ui";
@@ -158,6 +159,9 @@ export default async function PaymentsPage({
                 <Stat label="يغطّيه رصيدُك عندهم" minor={covered} sub={countNoun(run.coveredByCredit.length, SUPPLIER)} />
               )}
             </StatGrid>
+            <p className="mt-2">
+              <WhyNumber figure="payrun" auditHref={can(user.role, "audit:view") ? "/settings/audit?kind=money" : undefined} />
+            </p>
             {calm.length > 0 && (
               <p className="mt-3 flex items-center gap-2 text-xs text-muted">
                 <CircleCheck className="h-3.5 w-3.5 shrink-0 text-ok" strokeWidth={2} aria-hidden />

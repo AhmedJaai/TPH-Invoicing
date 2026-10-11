@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { sql } from "drizzle-orm";
 import { ArrowDownLeft, ArrowUpRight, Banknote, CalendarClock, CircleCheck, ClipboardList, Download, FileWarning, Landmark, Receipt, SearchCheck, TriangleAlert } from "lucide-react";
 import { db } from "@/db";
@@ -9,6 +10,10 @@ import { Money } from "@/components/money";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { Badge, Callout, Card, DataTable, EmptyState, KeyFigure, LinkButton, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
 import { VatBulk, VatCashField, VatFilePanel, VatTxToggle, VatVoidFiling } from "@/components/vat-choice";
+import { SalesWitnessPanel, SalesWitnessSkeleton } from "@/components/sales-witness";
+import { SectionBoundary } from "@/components/ui-client";
+import { WhyNumber } from "@/components/why-number";
+import { FiledQuartersSection } from "@/components/vat-compare";
 import { DAY, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { INPUT_VAT_LABEL } from "@/lib/accountant-pack";
 import { currentMonthRiyadh, daysSinceRiyadh, formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
@@ -164,7 +169,11 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                 : daysLeft >= 0 ? `آخرُ موعدٍ لتقديم ${quarterLabel(quarter)} وسداده ${formatDay(deadline)} — بعد ${countNoun(daysLeft, DAY)}.`
                 : `فات موعدُ تقديم ${quarterLabel(quarter)} (${formatDay(deadline)}) منذ ${countNoun(-daysLeft, DAY)} — إن كنتَ قدّمتَه فسجّله.`
               }
-            />
+            >
+              {can(user.role, "amounts:view") && (
+                <WhyNumber figure="vat" auditHref={can(user.role, "audit:view") ? "/settings/audit?kind=money" : undefined} />
+              )}
+            </KeyFigure>
             <KeyFigure
               icon={ArrowDownLeft}
               label="ضريبة المخرجات"
@@ -368,6 +377,18 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                 ))}
               </div>
             </Card>
+            {/* شاهدٌ لا يُنتظَر: يُقرأ من مبيعات فودكس بعد أن تُرسَم الصفحة، وعطبُه لا يُسقط الإقرار */}
+            <SectionBoundary what="شاهد فودكس">
+              <Suspense fallback={<SalesWitnessSkeleton />}>
+                <SalesWitnessPanel
+                  months={view.cash.map((c) => ({
+                    month: c.month,
+                    cashTypedGrossMinor: c.grossMinor,
+                    returnOutputVatMinor: view.byMonth.find((m) => m.month === c.month)?.outputVatMinor ?? r.output.vatMinor,
+                  }))}
+                />
+              </Suspense>
+            </SectionBoundary>
           </Section>
 
           {toReview.length > 0 && (
@@ -577,6 +598,11 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
           )}
         </>
       )}
+      <SectionBoundary what="مقارنة الأرباع">
+        <Suspense fallback={null}>
+          <FiledQuartersSection />
+        </Suspense>
+      </SectionBoundary>
     </PageShell>
   );
 }

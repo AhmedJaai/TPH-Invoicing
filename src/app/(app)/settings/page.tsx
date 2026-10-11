@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
-import { Activity, Cpu, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound, UsersRound } from "lucide-react";
+import { Activity, CalendarClock, Cpu, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound, UsersRound } from "lucide-react";
 import { BankRules, type BankRuleRow } from "@/components/bank-rules";
 import { CATEGORY_LABEL, isTxCategory } from "@/lib/bank/rules";
 import { asCadence } from "@/lib/cash-outlook";
@@ -14,7 +14,7 @@ import { buildDataHealth, type HealthState } from "@/lib/data-health";
 import { gatherHealthFacts } from "@/lib/data-health-facts";
 import { RecurringExpenses, type ExpenseRow } from "@/components/recurring-expenses";
 import { monthlyShare } from "@/lib/cashflow";
-import { Callout, KeyValue, Meter, NoAccess, Section } from "@/components/ui";
+import { Callout, KeyValue, LinkButton, Meter, NoAccess, Section } from "@/components/ui";
 import { ALIAS, countNoun, timeAgo } from "@/lib/arabic";
 import { UserAdmin } from "@/components/user-admin";
 import { aiSpendThisMonth } from "@/services/ai-usage.service";
@@ -150,6 +150,12 @@ export default async function SettingsPage() {
               )}
             </div>
           </Section>
+
+          {can(user.role, "reports:view") && (
+            <Callout tone="accent" icon={CalendarClock} className="mt-6" title="الوثائق والتراخيص" action={<LinkButton href="/settings/obligations" variant="secondary" size="sm">افتحها</LinkButton>}>
+              السجلّ التجاريّ ورخصة البلديّة والشهادات الصحّيّة والإقامات وعقد الإيجار — بتاريخ انتهائها، ويذكّرك النظام قبله.
+            </Callout>
+          )}
 
           {managedUsers && (
             <Section

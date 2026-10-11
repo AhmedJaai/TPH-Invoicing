@@ -187,6 +187,8 @@ const VIEW: readonly Command[] = [
 const SECONDARY: readonly Command[] = [
   { id: "p:analysis", label: "الأصناف والأسعار", hint: "المورّدون", group: "PAGE", href: "/analysis", needs: "amounts:view", keywords: ["سعر", "اسعار", "صنف", "prices"] },
   { id: "p:expenses", label: "المصروفات", hint: "البنك", group: "PAGE", href: "/money/expenses", needs: "bank:view", keywords: ["مصروف", "ايجار", "رواتب", "expenses"] },
+  { id: "p:obligations", label: "الوثائق والتراخيص", hint: "ما ينتهي: رخصة، شهادة، إقامة، عقد", group: "PAGE", href: "/settings/obligations", needs: "reports:view", keywords: ["رخصه", "سجل", "تجاري", "بلديه", "اقامه", "شهاده", "صحيه", "عقد", "ايجار", "انتهاء", "تجديد", "licence", "expiry"] },
+  { id: "p:owner", label: "بينك وبين المقهى", hint: "ما دفعتَه من جيبك وما أخذتَه", group: "PAGE", href: "/money/owner", needs: "bank:view", keywords: ["مالك", "سحب", "مسحوبات", "شخصي", "جاري", "owner", "drawings"] },
   { id: "p:trend", label: "اتّجاه الجرد", hint: "الجرد", group: "PAGE", href: "/inventory/trend", needs: "amounts:view", keywords: ["فرق", "اتجاه", "trend"] },
   { id: "p:mapping", label: "منتجات تحتاج ربطاً", hint: "الجرد", group: "PAGE", href: "/inventory/mapping", needs: "inventory:view", keywords: ["ربط", "منتج", "mapping"] },
 ];

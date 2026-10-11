@@ -12,8 +12,9 @@ import { NoStatementsButton } from "./no-statements-button";
 import { RejectDocument } from "./reject-document";
 import { SupplierPolicy } from "./supplier-policy";
 import { OrphanPayment } from "./orphan-payment";
-import { buildInvoiceRequest, buildStatementRequest, groupUnbackedBySupplier } from "@/lib/supplier-requests";
-import { loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
+import { buildInvoiceRequest, buildStatementRequest, groupUnbackedBySupplier, invoiceRequestKey } from "@/lib/supplier-requests";
+import { loadInvoiceRequestMarks, loadMissingStatementSuppliers, loadUnbackedPayments } from "@/services/supplier-followups.service";
+import { RequestInvoiceLink } from "./request-invoice-link";
 import { DOCUMENT, PAYMENT_RECORD, countNoun } from "@/lib/arabic";
 import { needsContract } from "@/lib/supplier-policy-rules";
 import { GAP_TEXT } from "@/lib/extraction/auto-archive";
@@ -55,8 +56,10 @@ import { txHref } from "@/lib/inspector";
 const LIST = "divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised";
 
 /** «دفعاتٌ لم تُنسب إلى فاتورة» — تُطلَب فواتيرُها من هنا. */
-export async function UnbackedWorkspace({ canApprove }: { canApprove: boolean }) {
-  const groups = groupUnbackedBySupplier(await loadUnbackedPayments());
+export async function UnbackedWorkspace({ canApprove, canRequest = false }: { canApprove: boolean; canRequest?: boolean }) {
+  /* متى طولب كلٌّ — فيُقال «طولب قبل ٩ أيّام — ذكِّره» ولا يُطلَب مرّتين */
+  const [payments, marks] = await Promise.all([loadUnbackedPayments(), loadInvoiceRequestMarks()]);
+  const groups = groupUnbackedBySupplier(payments);
   /* قائمةُ المورّدين لا تُقرأ إلّا حين توجد دفعةٌ بلا جهة تُنسَب إلى أحدهم */
   const hasOrphans = groups.some((g) => !g.supplierId && g.payments.some((p) => !p.bankTransactionId));
   const supplierOptions = hasOrphans && canApprove
@@ -106,17 +109,13 @@ export async function UnbackedWorkspace({ canApprove }: { canApprove: boolean })
                 الرسالةُ تُبنى من الوقائع — تواريخُ الدفعات ومبالغُها —
                 ومن لا يصدر فواتير يُطلَب منه عقدُ توريد لا فاتورة.
               */}
-              <a
+              <RequestInvoiceLink
                 href={whatsappHref(g.supplierPhone, buildInvoiceRequest(g))}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonClass("primary", "sm")}
-              >
-                <MessageCircle className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                {g.payments.every((p) => !p.issuesInvoices)
-                  ? "اطلب عقد التوريد (واتساب)"
-                  : "اطلب الفاتورة (واتساب)"}
-              </a>
+                supplierId={g.supplierId}
+                label={g.payments.every((p) => !p.issuesInvoices) ? "اطلب عقد التوريد (واتساب)" : "اطلب الفاتورة (واتساب)"}
+                requestedDaysAgo={marks.get(invoiceRequestKey(g) ?? "") ?? null}
+                canMark={canRequest}
+              />
               {g.supplierSlug && <LinkButton href={`/suppliers/${g.supplierSlug}`} size="sm" variant="quiet">ملفّه</LinkButton>}
             </div>
           ) : (

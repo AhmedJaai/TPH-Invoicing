@@ -29,6 +29,8 @@ export interface InvoiceFilters {
   overdue?: boolean;
   /** فيها ضريبةٌ مقروءة — «معرّضة للضياع» ما فيه ضريبة وحده */
   withVat?: boolean;
+  /** فوق حدّ الرسملة — «أصلٌ ثابت» كما وسمها الفحصُ عند القيد */
+  fixedAsset?: boolean;
   page: number;
 }
 
@@ -49,6 +51,7 @@ export function parseFilters(raw: Record<string, string | undefined>): InvoiceFi
     noLines: raw.noLines === "1",
     overdue: raw.overdue === "1",
     withVat: raw.withVat === "1",
+    fixedAsset: raw.asset === "1",
     page: Number.isFinite(page) && page > 0 ? Math.floor(page) : 1,
   };
 }
@@ -69,6 +72,7 @@ export function linkTo(
   if (next.noLines) params.set("noLines", "1");
   if (next.overdue) params.set("overdue", "1");
   if (next.withVat) params.set("withVat", "1");
+  if (next.fixedAsset) params.set("asset", "1");
 
   const page = patch.page ?? 1;
   if (page > 1) params.set("page", String(page));
@@ -79,7 +83,7 @@ export function linkTo(
 
 /** هل من مُرشِّح فعّال؟ يُستعمل لعرض زرّ «امسح الترشيح». */
 export function hasFilters(f: InvoiceFilters): boolean {
-  return Boolean(f.month || f.supplier || f.tax || f.paid || f.noLines || f.overdue || f.withVat);
+  return Boolean(f.month || f.supplier || f.tax || f.paid || f.noLines || f.overdue || f.withVat || f.fixedAsset);
 }
 
 export const TAX_LABEL: Record<TaxFilter, string> = {
@@ -110,6 +114,7 @@ export function describe(f: InvoiceFilters, supplierName?: string | null): strin
   if (f.overdue) parts.push(`مضى على استحقاقها ${countNoun(OVERDUE_DAYS, DAY)}`);
   if (f.noLines) parts.push("بلا بنود مقروءة");
   if (f.withVat) parts.push("فيها ضريبة");
+  if (f.fixedAsset) parts.push("أصولٌ ثابتة (فوق حدّ الرسملة)");
   if (f.month) parts.push(`في ${f.month}`);
   return parts.length === 0 ? "كل الفواتير" : parts.join(" · ");
 }

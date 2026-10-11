@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { CircleAlert, FlaskConical, Repeat, RotateCcw, Store } from "lucide-react";
+import { CircleAlert, FlaskConical, Repeat, RotateCcw, Store, Percent } from "lucide-react";
 import { Money } from "./money";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
@@ -136,7 +136,7 @@ export function CashTimeline({
                         </label>
                         <Link href={l.href} className="flex min-w-0 flex-1 items-center gap-3 py-2.5 transition-colors hover:text-accent">
                           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-sunken text-ink-soft">
-                            {l.kind === "SUPPLIER" ? <Store className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : <Repeat className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />}
+                            {l.kind === "SUPPLIER" ? <Store className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : l.kind === "VAT" ? <Percent className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : <Repeat className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-[13px]">
                             {l.label}

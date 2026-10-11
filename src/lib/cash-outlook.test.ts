@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, buildCashOutlook, dueThisWeek, occursIn, type OutlookInput, type RecurringInput } from "./cash-outlook";
+import { addMonths, buildCashOutlook, dueThisWeek, floorBreach, occursIn, parseStoredMinor, type OutlookInput, type RecurringInput } from "./cash-outlook";
 
 const base: OutlookInput = {
   today: "2026-09-24",
@@ -201,5 +201,89 @@ describe("ماذا لو أجّلتُ هذا؟", () => {
     expect(w.buckets.every((b) => b.afterMinor === null)).toBe(true);
     expect(w.shortfallAt).toBeNull();
     expect(w.lowestMinor).toBeNull();
+  });
+});
+
+describe("buildCashOutlook — ضريبةُ القيمة المضافة", () => {
+  const q3 = { periodKey: "2026-Q3", label: "الربع الثالث 2026", deadline: "2026-10-31", amountMinor: 900_000, accruing: false };
+
+  it("بلا ضريبةٍ ممرَّرة لا يتغيّر شيء", () => {
+    const o = buildCashOutlook({ ...base, overdueRun: [{ supplierId: "a", supplierName: "أ", amountMinor: 10_000 }] });
+    expect(o.totalMinor).toBe(10_000);
+    expect(o.vatIncluded).toEqual([]);
+  });
+
+  it("موعدُها الشهرَ القادم تقع «خلاله» وتُطرح من الرصيد", () => {
+    const o = buildCashOutlook({ ...base, balanceMinor: 1_000_000, vat: [q3] });
+    const b = o.buckets.find((x) => x.id === "next-month");
+    expect(b?.lines.map((l) => [l.kind, l.amountMinor])).toEqual([["VAT", 900_000]]);
+    expect(b?.afterMinor).toBe(100_000);
+    expect(o.vatIncluded.map((v) => v.periodKey)).toEqual(["2026-Q3"]);
+    expect(b?.when).toContain("ضريبة");
+  });
+
+  it("موعدُها هذا الشهر في بقيّته، وما فات موعدُه متأخّرٌ الآن", () => {
+    const now = buildCashOutlook({ ...base, today: "2026-10-12", runMonth: "2026-09", vat: [q3] });
+    expect(now.buckets.map((b) => b.id)).toEqual(["rest"]);
+    const late = buildCashOutlook({ ...base, today: "2026-11-03", runMonth: "2026-10", vat: [q3] });
+    expect(late.buckets.map((b) => b.id)).toEqual(["overdue"]);
+  });
+
+  it("موعدُها بعد الأفق «جنِّب له» ولا تُطرح من الرصيد", () => {
+    const q4 = { ...q3, periodKey: "2026-Q4", deadline: "2027-01-31", accruing: true };
+    const o = buildCashOutlook({ ...base, today: "2026-10-12", balanceMinor: 500_000, vat: [q4] });
+    expect(o.buckets).toEqual([]);
+    expect(o.totalMinor).toBe(0);
+    expect(o.vatAhead.map((v) => v.periodKey)).toEqual(["2026-Q4"]);
+  });
+
+  it("المجهولُ لا يدخل رقماً ولا صفراً — يُعلَن", () => {
+    const o = buildCashOutlook({ ...base, vat: [{ ...q3, amountMinor: null }] });
+    expect(o.buckets).toEqual([]);
+    expect(o.vatUnknown).toHaveLength(1);
+    expect(o.vatIncluded).toEqual([]);
+  });
+
+  it("رصيدٌ دائن أو صفرٌ لا خروجَ فيه", () => {
+    const o = buildCashOutlook({ ...base, vat: [{ ...q3, amountMinor: -40_000 }, { ...q3, periodKey: "z", amountMinor: 0 }] });
+    expect(o.buckets).toEqual([]);
+    expect(o.vatIncluded).toEqual([]);
+    expect(o.vatAhead).toEqual([]);
+  });
+});
+
+describe("floorBreach — حدُّ الرصيد الأدنى", () => {
+  const input: OutlookInput = {
+    ...base,
+    balanceMinor: 5_000_000,
+    overdueRun: [{ supplierId: "a", supplierName: "أ", amountMinor: 1_000_000 }],
+    nextRun: [{ supplierId: "b", supplierName: "ب", amountMinor: 2_500_000 }, { supplierId: "c", supplierName: "ج", amountMinor: 300_000 }],
+  };
+
+  it("أوّلُ مرحلةٍ ينزل بعدها الرصيدُ تحت الحدّ، بما يسبّبه", () => {
+    const o = buildCashOutlook(input);
+    const b = floorBreach(o.buckets, 2_000_000);
+    expect(b?.bucketId).toBe("next-run");
+    expect(b?.afterMinor).toBe(1_200_000);
+    expect(b?.shortMinor).toBe(800_000);
+    expect(b?.causes.map((c) => c.label)).toEqual(["ب", "ج"]);
+  });
+
+  it("على الحدّ تماماً ليس كسراً", () => {
+    const o = buildCashOutlook(input);
+    expect(floorBreach(o.buckets, 1_200_000)).toBeNull();
+    expect(floorBreach(o.buckets, 1_200_001)?.bucketId).toBe("next-run");
+  });
+
+  it("بلا حدٍّ مكتوب، أو برصيدٍ مجهول، لا إنذار", () => {
+    expect(floorBreach(buildCashOutlook(input).buckets, null)).toBeNull();
+    expect(floorBreach(buildCashOutlook({ ...input, balanceMinor: null }).buckets, 2_000_000)).toBeNull();
+  });
+});
+
+describe("parseStoredMinor — الحدُّ المخزَّن", () => {
+  it("عددٌ صحيح موجب بالهللات، وما لا يُفهم «لم يُضبط» لا صفر", () => {
+    expect(parseStoredMinor("2000000")).toBe(2_000_000);
+    for (const v of [null, undefined, "", "0", "-5", "12.5", "abc", "99999999999"]) expect(parseStoredMinor(v)).toBeNull();
   });
 });

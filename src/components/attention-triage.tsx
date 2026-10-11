@@ -64,6 +64,11 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "price-rises": TrendingUp,
   "lifecycle-anomalies": Unlink,
   "bounced-payments": Undo2,
+  "iban-mismatch": ShieldAlert,
+  "first-transfers": ShieldAlert,
+  "pos-missing-settlement": Hourglass,
+  "recurring-anomalies": RotateCcw,
+  "obligations-expiring": FileClock,
   "missing-statements": FileClock,
   "statement-ledger-gap": Scale,
   "files-wrong-month": FolderInput,
@@ -348,8 +353,11 @@ export function ItemDetail({
   list,
   lens,
   workspace,
+  extraAction,
 }: {
   item: AttentionItem;
+  /** فعلٌ جانبيّ بجوار الفعل الأوّل — «أجِّله». */
+  extraAction?: React.ReactNode;
   /** القائمةُ المعروضة (بعد التصفية) — منها السابقُ والتالي. */
   list: readonly AttentionItem[];
   lens: Lens;
@@ -473,6 +481,7 @@ export function ItemDetail({
                 <span className="text-[11px] text-muted">يُفتح موضعُ إصلاحه — ويخرج من هنا حين يُصلَح.</span>
               </>
             )}
+            {extraAction && <span className="ms-auto">{extraAction}</span>}
           </div>
         </div>
       </header>

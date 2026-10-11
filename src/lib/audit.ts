@@ -89,6 +89,13 @@ export type AuditAction =
   | "DOCUMENT_REREAD"
   | "DOCUMENT_RECORDED_BY_HAND"
   | "ALERT_RESOLVED"
+  /* «طلبتُ الفواتير من المورّد» — أثرُ ضغطة واتساب، فيُعرف مَن طولب ومتى */
+  | "SUPPLIER_REQUEST_SENT"
+  /* وثيقةٌ لها تاريخُ انتهاء (رخصة · إقامة · عقد) — أُضيفت أو عُدّلت أو أُرشفت */
+  | "DOCUMENT_EXPIRY_SAVED"
+  | "DOCUMENT_EXPIRY_CLOSED"
+  /* حدُّ الرصيد الأدنى الذي يُنبَّه تحته «النقد القادم» */
+  | "PAYMENT_CASH_FLOOR_SET"
   /* ── الجرد وتسوية المخزون ── */
   | "SALES_IMPORTED"
   /* كتالوجُ فودكس: الأصنافُ والعبواتُ والوصفات */

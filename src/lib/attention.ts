@@ -1,10 +1,13 @@
 import {
-  BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, countNoun,
+  BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, countNoun, type NounForms,
 } from "./arabic";
 import { OVERDUE_DAYS } from "./invoice-filter";
 import { formatDay } from "./riyadh-time";
 import { formatRiyalsDisplay } from "./money";
 import { txHref } from "@/lib/inspector";
+
+/** «وثيقة» لما له تاريخُ انتهاء — غيرُ «مستند» الفواتير والكشوف. */
+const PAPER: NounForms = { one: "وثيقة", two: "وثيقتان", few: "وثائق", many: "وثيقةً" };
 
 /** بعد كم يوماً من آخر كشفٍ يصير وقوفُه بنداً — الكشفُ يُستورَد أسبوعيّاً. */
 export const BANK_STALE_DAYS = 7;
@@ -176,6 +179,27 @@ export interface AttentionFacts {
    * والمالُ في حساب المقهى. كانت الدالّةُ مبنيّةً ومختبَرة ولا تصل إليها
    * شاشة.
    */
+  /**
+   * حوالاتٌ لمورّدٍ ذهبت إلى آيبانٍ غير المعروف له (`lib/bank/iban-guard.ts`) ولم يُقَل
+   * فيها «أعرفه» بعد. تنبيهٌ يُغلق بضغطة — لا منع.
+   */
+  ibanAlerts?: AttentionEvidence[];
+  ibanAlertMinor?: number;
+  /** أوّلُ حوالةٍ إلى آيبانٍ لم يُرَ من قبل، فوق الحدّ — للعلم، تُغلق بـ«أعرفه». */
+  firstTransfers?: AttentionEvidence[];
+  firstTransferMinor?: number;
+  /**
+   * أيّامُ بيعٍ معتادة لم تصل تسويةُ شبكتها (`lib/bank/pos-watch.ts`) — ووسيطُ مثلها تقديرٌ
+   * لما غاب لا مبلغٌ واقع. وما أسكته صاحبُه لا يُعدّ.
+   */
+  missingSettlements?: { day: string; usualMinor: number | null }[];
+  /**
+   * وثائقُ انتهت أو دخلت مهلةَ تذكيرها (`lib/obligations.ts`) — يكتبها صاحبُها بيده.
+   * `daysLeft` سالبٌ بعد الانتهاء.
+   */
+  expiringObligations?: { title: string; kindLabel: string; expiresOn: string; daysLeft: number }[];
+  /** خصمٌ متكرّر تكرّر في شهره أو ارتفع عن عادته (`lib/recurring-detect.ts`) — والمبلغُ الزائد. */
+  recurringAnomalies?: { label: string; kind: "TWICE" | "ROSE"; amountMinor: number; day: string }[];
   bouncedPayments?: AttentionEvidence[];
   bouncedPaymentMinor?: number;
   firstBouncedTransactionId?: string | null;
@@ -594,6 +618,131 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       amountMinor: f.lifecycleAnomalyMinor ?? undefined,
       impact: { kind: "UNATTRIBUTED", amountMinor: f.lifecycleAnomalyMinor ?? null },
       evidence: f.lifecycleAnomalies!.slice(0, 6),
+    });
+  }
+
+  /*
+    حوالةٌ إلى حسابٍ غير حساب المورّد المعروف: «غيّرنا حسابنا» أشيعُ احتيالٍ على المنشآت
+    الصغيرة. حرجٌ لأنّ ما يُستردّ يُستردّ في أيّامه الأولى — ويُغلق بـ«أعرفه» إن كان حسابَه.
+  */
+  if ((f.ibanAlerts?.length ?? 0) > 0) {
+    const n = f.ibanAlerts!.length;
+    out.push({
+      id: "iban-mismatch",
+      area: "PAYMENTS",
+      severity: "CRITICAL",
+      title: n === 1
+        ? "حوالةٌ لمورّد ذهبت إلى حسابٍ غير حسابه المعروف"
+        : `${countNoun(n, SUPPLIER)} حُوِّل لهم إلى حسابٍ غير المعروف`,
+      detail: "الآيبانُ في كشف البنك يخالف المكتوبَ في ملفّ المورّد أو ما حُوِّل له من قبل. قد يكون له حسابٌ ثانٍ — وقد تكون رسالةَ «غيّرنا حسابنا» مزوّرة.",
+      action: "قابِل الآيبانين: إن كنت تعرفه فأغلِقه بـ«أعرفه»، وإلّا فاتّصل بالمورّد على رقمه المعروف وبالبنك قبل أيّ تحويلٍ آخر.",
+      actionLabel: "قابِل الحسابين",
+      href: "/attention?item=iban-mismatch",
+      count: n,
+      amountMinor: f.ibanAlertMinor ?? undefined,
+      impact: { kind: "AT_RISK", amountMinor: f.ibanAlertMinor ?? null },
+      evidence: f.ibanAlerts!.slice(0, 6),
+    });
+  }
+
+  /*
+    الغائبُ لا يُرى في جدول: يومٌ يصل في مثله إيداعُ الشبكة ولم يصل. تحذيرٌ لا حكم —
+    قد يكون المقهى مغلقاً، فيُسكته صاحبُه في صفحته بسببه. والمبلغُ تقديرٌ فلا يُجمع أثراً.
+  */
+  if ((f.missingSettlements?.length ?? 0) > 0) {
+    const days = f.missingSettlements!;
+    out.push({
+      id: "pos-missing-settlement",
+      area: "BANK",
+      severity: "HIGH",
+      title: days.length === 1
+        ? `تسويةُ شبكةِ ${formatDay(days[0].day)} لم تصل`
+        : `${countNoun(days.length, DAY)} لم تصل تسويةُ شبكتها`,
+      detail: "في مثل هذه الأيّام من الأسابيع السابقة وصل إيداعُ الشبكة، ولا إيداعَ لها في كشف البنك.",
+      action: "راجِع تقريرَ الجهاز لليوم ثمّ البنك — وإن كان المقهى مغلقاً فأسكِتها من صفحتها.",
+      actionLabel: "افتح تسويات الشبكة",
+      href: "/money/pos#missing",
+      count: days.length,
+      impact: { kind: "AT_RISK", amountMinor: null },
+      evidence: days.slice(0, 6).map((d) => ({
+        label: formatDay(d.day),
+        sub: d.usualMinor === null ? "لا تقديرَ لمثله" : `وسيطُ مثله ${formatRiyalsDisplay(d.usualMinor)} — تقدير`,
+      })),
+    });
+  }
+
+  /*
+    رخصةٌ أو إقامةٌ أو عقدٌ يقترب انتهاؤه: الغرامةُ والإغلاقُ أغلى من خطأ فاتورة، ولا
+    فاتورةَ تذكّر بها. المنتهي حرج، وما في أسبوعه عالٍ، وما في مهلته متوسّط.
+  */
+  if ((f.expiringObligations?.length ?? 0) > 0) {
+    const list = f.expiringObligations!;
+    const expired = list.filter((o) => o.daysLeft < 0).length;
+    const soonest = Math.min(...list.map((o) => o.daysLeft));
+    out.push({
+      id: "obligations-expiring",
+      area: "DATA",
+      severity: expired > 0 ? "CRITICAL" : soonest <= 7 ? "HIGH" : "MEDIUM",
+      title: list.length === 1
+        ? `«${list[0].title.slice(0, 50)}» ${list[0].daysLeft < 0 ? "انتهت" : `تنتهي ${formatDay(list[0].expiresOn)}`}`
+        : expired > 0
+          ? `${countNoun(list.length, PAPER)} بين منتهٍ وقريب الانتهاء`
+          : `${countNoun(list.length, PAPER)} يقترب انتهاؤها`,
+      detail: "وثائقُ أدخلتَها بتاريخ انتهائها — انتهت أو دخلت مهلةَ التذكير التي كتبتَها لها.",
+      action: "جدِّدها ثمّ اكتب تاريخَها الجديد — أو أجِّل التذكير إن كان التجديدُ جارياً.",
+      actionLabel: "افتح الوثائق",
+      href: "/settings/obligations",
+      count: list.length,
+      impact: { kind: "AT_RISK", amountMinor: null },
+      evidence: list.slice(0, 6).map((o) => ({
+        label: o.title.slice(0, 45),
+        sub: `${o.kindLabel} · ${o.daysLeft < 0 ? "انتهت" : "تنتهي"} ${formatDay(o.expiresOn)}`,
+      })),
+    });
+  }
+
+  /* خصمٌ شهريٌّ خرج عن عادته: مرّتين في شهره (يُطالَب به) أو ارتفع (يُسأل عنه). */
+  if ((f.recurringAnomalies?.length ?? 0) > 0) {
+    const list = f.recurringAnomalies!;
+    const twiceMinor = list.filter((a) => a.kind === "TWICE").reduce((s, a) => s + a.amountMinor, 0);
+    out.push({
+      id: "recurring-anomalies",
+      area: "BANK",
+      severity: "MEDIUM",
+      title: list.length === 1
+        ? `«${list[0].label.slice(0, 40)}» ${list[0].kind === "TWICE" ? "خُصم مرّتين هذا الشهر" : "ارتفع عن عادته"}`
+        : `${list.length} خصوماتٍ متكرّرة خرجت عن عادتها`,
+      detail: "جهةٌ يُخصم لها كلَّ شهرٍ مبلغٌ متقارب — وآخرُ خصمٍ لها تكرّر في شهره أو زاد بأكثر من ١٠٪.",
+      action: "راجِعها: طالِب بما خُصم مرّتين، واسأل عن الزيادة — أو أسكِتها إن كانت متّفقاً عليها.",
+      actionLabel: "افتح المتكرّر",
+      href: "/money/recurring",
+      count: list.length,
+      amountMinor: twiceMinor > 0 ? twiceMinor : undefined,
+      impact: { kind: "RECOVERABLE", amountMinor: twiceMinor > 0 ? twiceMinor : null },
+      evidence: list.slice(0, 6).map((a) => ({
+        label: a.label.slice(0, 45),
+        sub: `${a.kind === "TWICE" ? "خُصم مرّتين" : "ارتفع"} · ${formatDay(a.day)}`,
+        amountMinor: a.amountMinor,
+      })),
+    });
+  }
+
+  /* مستفيدٌ جديد: للعلم لا للمنع — حين يكون للحساب مفوَّضٌ ثانٍ يرى صاحبُه كلَّ مستفيدٍ مرّة */
+  if ((f.firstTransfers?.length ?? 0) > 0) {
+    const n = f.firstTransfers!.length;
+    out.push({
+      id: "first-transfers",
+      area: "BANK",
+      severity: "MEDIUM",
+      title: n === 1 ? "حوالةٌ أولى إلى حسابٍ لم يُحوَّل له من قبل" : `حوالاتٌ أولى إلى ${n} حساباتٍ لم يُحوَّل لها من قبل`,
+      detail: "آيبانٌ يظهر في كشف البنك أوّلَ مرّة وبمبلغٍ فوق خمسمئة ريال. للعلم: إن كنتَ من حوّل فأغلِقه.",
+      action: "انظر المستفيدَ والمبلغ: «أعرفه» يُغلقه ولا يُذكر ثانيةً.",
+      actionLabel: "انظر المستفيدين",
+      href: "/attention?item=first-transfers",
+      count: n,
+      amountMinor: f.firstTransferMinor ?? undefined,
+      impact: { kind: "UNATTRIBUTED", amountMinor: f.firstTransferMinor ?? null },
+      evidence: f.firstTransfers!.slice(0, 6),
     });
   }
 

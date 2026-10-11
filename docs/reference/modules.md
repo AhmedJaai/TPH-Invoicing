@@ -77,6 +77,13 @@
 | `src/services/briefing.service.ts` | إحاطةُ الصباح: آخرُ رصيدٍ معروف (`null` مجهول)، وتقدّمُ الإقفال، والتحيّةُ بساعة الرياض |
 | `src/services/payment-run.service.ts` | **دفعةُ الشهر من القاعدة في موضعٍ واحد** — للصفحة والملفّ والرئيسية والنقد القادم؛ ويقبل رصيداً ممرَّراً كي لا يُخصم مرّتين |
 | `src/lib/cash-outlook.ts` · `cash-outlook.service.ts` | **النقد القادم** (`/cash`): الدفعتان والمتكرّرُ بيومه إن عُرف، والواردُ غير محسوب فالرصيدُ بعده حدٌّ أدنى |
+| `src/lib/bank/pos-watch.ts` · `pos-watch.service.ts` | **تسوياتُ الشبكة** (`/money/pos`): الرسمُ الفعليّ شهراً بشهر، وأيّامُ بيعٍ لم تصل تسويتُها — تستدعي `groupBatches` |
+| `src/lib/recurring-detect.ts` · `recurring-watch.service.ts` | **الاشتراكات والمتكرّر** (`/money/recurring`): سلاسلُ الخصم الشهريّ من الكشف، وما تكرّر أو ارتفع أو غاب — اقتراحٌ لا قيد |
+| `src/lib/owner-account.ts` · `owner-account.service.ts` | **بينك وبين المقهى** (`/money/owner`): دفعاتُ `OWNER_ACCOUNT` وحركاتُ `PERSONAL` برصيدٍ جارٍ |
+| `src/lib/sales/overview.ts` · `sales-overview.service.ts` | **المبيعات** (`/inventory/sales`): يوماً بيوم وصنفاً بصنف وما خرج بلا مال — غيرُ المستورَد `null` |
+| `src/lib/obligations.ts` · `obligation.service.ts` | **الوثائق والتراخيص** (`/settings/obligations`): تواريخُ الانتهاء ومهلةُ التذكير |
+| `src/lib/commitments.ts` | **تقويمُ الالتزامات** (`/cash/calendar`): من وقائع «النقد القادم» والوثائق يوماً بيوم |
+| `src/lib/signal-decisions.ts` · `/api/signal` | إسكاتُ ملاحظةٍ محسوبة أو تأجيلُها — بمفتاحٍ من الحدث |
 | `src/services/mark-paid-undo.service.ts` · `/api/mark-paid/undo` | التراجعُ عن إقرار السداد من الإشعار: إلغاءٌ (`VOID`) لا حذف، خلال ثلاثين دقيقة، بلا حركة بنك، في شهرٍ مفتوح |
 | `src/components/pay-run-planner.tsx` | مخطِّطُ الدفعة: اختيارٌ مورّداً مورّداً يغيّر المجموع والملفّ (`/api/payment-run?suppliers=`)، وما يبقى لكلٍّ بعده |
 | `src/lib/accountant-pack.ts` · `/api/export/accountant` · `/close/pack` | **حزمةُ المحاسب**: Excel بستّ أوراق لشهرٍ واحد، وورقةٌ تُطبَع PDF بالأرقام نفسها (`summarize` · `vatByStatus` · `outflowByCategory` · `expensesByCategory`)، والمجهولُ «غير معروف» لا صفر. و«صادرٌ بلا تفسير» (`unexplained`) لا «لم يُطابَق»: رسومُ الشبكة مفسَّرةٌ ببابها |
@@ -152,6 +159,15 @@
 | `src/services/recipe.service.ts` | النسخةُ تُغلَق سابقتُها ثمّ تُفتَح — ومؤثِّرُ `036` يمنع التداخل في القاعدة |
 | `src/components/recipe-rows.tsx` | الوصفةُ تتمدّد في صفّها — **والتصحيحُ غيرُ التغيير**: زرّان لا زرّ، ولكلٍّ أثرُه في الزمن |
 | `src/components/retire-item.tsx` | الصنفُ **يُخرَج ولا يُحذَف** — بنودُ فواتيره وأسطرُ جرده المقفَل تبقى |
+| `src/lib/bank/iban-guard.ts` · `iban-guard.service.ts` · `/api/iban-guard` | **حارسُ الآيبان**: حوالةٌ لمورّدٍ إلى حسابٍ غير المكتوب في ملفّه أو غير ما حُوِّل له مرّتين، وأوّلُ حوالةٍ فوق ٥٠٠ ريال إلى آيبانٍ جديد — تنبيهٌ يُغلق بـ«أعرفه» (`alert_resolutions`)، لا منع |
+| `src/lib/choices.ts` · `choices.service.ts` · `/settings/choices` | **«ما قرّرتَه»**: كلُّ اختيارٍ بيد صاحبه بحاله (يعمل · لا يُطبَّق بسببه · مقفل) وأثره وزرّ سحبه عبر المسارات القائمة — وحكمُ الإقرار من `loadVatReturn` نفسها |
+| `src/lib/attention-snooze.ts` · `/api/attention-snooze` | **«أجِّله»**: بندُ الطابور يخرج من العدّ إلى يومه؛ المفتاحُ فيه مبلغُه وعددُه فيعود إن تغيّرا. `attentionSplit` في `work.ts` مصدرُ المفتوح والمؤجَّل |
+| `src/lib/income-sheet.ts` · `income-sheet.service.ts` · `/close/pnl` | **قائمةُ الدخل الناقصةُ المعلَنة** فوق `buildProfitLoss`: المبيعاتُ من إقرار الشهر، و«الباقي على أساسٍ نقديّ» لا يُحسب لشهرٍ ناقص؛ تكلفةُ المبيعات تبقى «غير معروف» |
+| `src/lib/sales/witness.ts` · `sales-witness.service.ts` | ملفُّ فودكس **شاهداً** على ضريبة مبيعات الإقرار والنقد المكتوب بيد — يُعرض الفرقُ والتغطية ولا يدخل الحساب |
+| `src/lib/sales/weekday-habit.ts` · `/inventory/habit` | **عادةُ البيع**: وسيطُ ما بيع لكلّ صنفٍ في كلّ يوم أسبوع عبر ٨ أسابيع — يُحجب دون ٦ صالحة، ولا يُمدّ خطٌّ إلى المستقبل |
+| `src/lib/cash-runway.ts` · `src/lib/supplier-leverage.ts` · `src/lib/vat-compare.ts` · `src/lib/inventory/waste-board.ts` · `src/lib/extraction/qr-coverage.ts` | أسطرٌ على شاشاتٍ قائمة: أيّامُ النقد الباقية (`/cash`) · أيّامُ السداد وتركّزُ المورّدين (`/suppliers`) · الأرباعُ المقدَّمة جنباً إلى جنب (`/close/vat`) · كلفةُ الهدر بأسبابه (سجلّ الجرد) · رمزُ QR في فواتير المورّد (ملفُّه) — كلٌّ يُحجب أو يقول «غير معروف» حين ينقص أساسُه |
+| `src/components/post-action.tsx` | زرُّ قرارٍ صغير بلا مال: يرسل جسماً ثابتاً، يُعلن ما وقع، ويحمل «تراجع» — لإغلاق تنبيهٍ أو سحب اختيار |
+
 
 ## مبنيٌّ ولا يصل إليه أحد
 

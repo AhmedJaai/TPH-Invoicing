@@ -1,4 +1,7 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { WasteBoardSection } from "@/components/waste-board";
+import { SectionBoundary } from "@/components/ui-client";
 import Link from "next/link";
 import { ClipboardCheck, TrendingUp } from "lucide-react";
 import { currentUser } from "@/lib/session";
@@ -162,6 +165,12 @@ export default async function InventoryHistoryPage() {
           * مقامُ النسبة ناقص: بعضُ الاستهلاك في ذلك الأسبوع لا تُعرَف كلفتُه، فالنسبةُ على ما عُرف وحده.
         </p>
       )}
+      {/* الهدرُ يُقرأ بعد الجدول، وعطبُه لا يُسقط السجلّ */}
+      <SectionBoundary what="لوحة الهدر">
+        <Suspense fallback={null}>
+          <WasteBoardSection />
+        </Suspense>
+      </SectionBoundary>
     </PageShell>
   );
 }

@@ -7,6 +7,7 @@ import { CircleAlert, CircleCheck, Copy, FileSearch, GitCompareArrows, MessageCi
 import { postJson, request } from "@/lib/http-client";
 import { INVOICE, LINE, countNoun } from "@/lib/arabic";
 import { formatRange } from "@/lib/riyadh-time";
+import { whatsappHref } from "@/lib/supplier-edit";
 import { Money } from "./money";
 import { Badge, Callout, DataTable, EmptyState, Monogram, Section } from "./ui";
 import { Sheet, toast } from "./ui-client";
@@ -36,7 +37,7 @@ export interface SupplierOption {
 interface Result {
   persisted: boolean;
   fileName: string;
-  supplier: { id: string; nameAr: string };
+  supplier: { id: string; nameAr: string; phoneE164?: string | null };
   period: { start: string; end: string };
   summary: {
     statementLines: number; ourInvoices: number; matched: number;
@@ -455,7 +456,7 @@ function ResultView({ result }: { result: Result }) {
             <Copy className="h-4 w-4" strokeWidth={2} aria-hidden />
             {copied === "ok" ? "✓ نُسخت" : "انسخ المذكّرة"}
           </button>
-          <a href={`https://wa.me/?text=${encodeURIComponent(result.memo)}`} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
+          <a href={whatsappHref(result.supplier.phoneE164, result.memo)} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
             <MessageCircle className="h-4 w-4" strokeWidth={2} aria-hidden />
             أرسلها واتساب
           </a>

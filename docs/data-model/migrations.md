@@ -2,13 +2,13 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٦٣
+## الجداول — ٦٥
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` · `payments` `payment_allocations` `payment_hold_overrides`
 `bank_imports` `bank_transactions` `bank_held_rows` `bank_rules` · `statements` `statement_lines` · `month_closes` · `job_state`
 `products` `recurring_expenses` · `sales` `sale_lines` `sales_sources` `pos_products`
-`audit_logs` `rate_limits` `ai_usage` `expenses`
+`audit_logs` `rate_limits` `ai_usage` `expenses` · `obligations` `app_settings`
 `counterparties` `counterparty_evidence` · `branches` `bank_accounts` `reconciliation_periods`
 `sale_payments` `refunds` `refund_lines` `settlement_batches`
 `adjudications` `decision_history` · `ai_findings` · `extraction_cache` · `alert_resolutions` · `vat_tx_choices` `vat_invoice_choices` `vat_filings` `vat_period_inputs`
@@ -115,6 +115,8 @@
 | `071_role_auditor.sql` | `role`: قيمةٌ جديدة `AUDITOR` — دورُ قراءةٍ لا يملك صلاحيّةَ كتابة |
 | `072_payment_hold_overrides.sql` | `payment_hold_overrides` — فاتورةٌ محجوزة أدخلها صاحبُها الدفعةَ بسببٍ مكتوب؛ غيابُ الصفّ «لا قرار» |
 | `073_search_trgm.sql` | امتدادُ `pg_trgm` وسبعةُ فهارس GIN على ما يُبحث فيه بـ«يحتوي»: وصفُ حركة البنك ومستفيدُها ومرجعُها، اسمُ الملفّ، رقمُ الفاتورة، واسمُ صنف المورّد |
+| `074_obligations.sql` | `obligations` — وثائقُ المقهى وتراخيصُه بتاريخ انتهائها (سجلٌّ تجاريّ، رخص، إقامات، إيجار)؛ تُجدَّد وتُؤرشَف ولا تُحذف |
+| `075_app_settings.sql` | `app_settings` — إعداداتٌ بمفتاحٍ وقيمة يكتبها صاحبُ المقهى (أرضيّةُ النقد)؛ غيابُ المفتاح «لم يُكتب» |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

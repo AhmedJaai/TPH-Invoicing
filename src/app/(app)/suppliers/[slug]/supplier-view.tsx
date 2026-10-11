@@ -1,3 +1,6 @@
+import { Suspense } from "react";
+import { SupplierQrLine } from "@/components/supplier-qr";
+import { SectionBoundary } from "@/components/ui-client";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { desc, eq, sql } from "drizzle-orm";
@@ -936,6 +939,7 @@ export async function SupplierView({
                           contactName: s.contactName ?? "",
                           iban: s.iban ?? "",
                         }}
+                        termsHint={rel.medianDays !== null ? { medianDays: rel.medianDays, sampleCount: rel.sampleCount } : undefined}
                       />
                     )}
                   </div>
@@ -974,6 +978,12 @@ export async function SupplierView({
                     },
                   ]}
                 />
+                {/* عدٌّ من أدلّة القراءة — يُقرأ بعد الرسم، وعطبُه لا يُسقط الملفّ */}
+                <SectionBoundary what="رمز الفاتورة الإلكترونيّة">
+                  <Suspense fallback={null}>
+                    <SupplierQrLine supplierId={s.id} slug={s.slug} />
+                  </Suspense>
+                </SectionBoundary>
               </Card>
 
               {/* «تعاملك معه» تقييمٌ لا فعلَ له — خلف لسانٍ يُفتَح عند التفاوض. */}

@@ -539,3 +539,57 @@ describe("موعدُ إقرار الضريبة", () => {
     expect(buildAttention({ ...quiet, vatReturnDue: null }).some((i) => i.id === "vat-return-due")).toBe(false);
   });
 });
+
+describe("ملاحظاتُ الشبكة والمتكرّر", () => {
+  const base = (): AttentionFacts => ({
+    openBlockers: 0, pendingDocuments: 0, duplicatePayments: 0, duplicatePaymentAmountMinor: 0, duplicatePaymentEvidence: [],
+    notTaxValidCount: 0, vatAtRiskMinor: 0, vatAtRiskEvidence: [], unknownTaxCount: 0, unknownTaxEvidence: [],
+    overdueMinor: 0, overdueSuppliers: [], unclassifiedBankTx: 0, unclassifiedBankAmountMinor: 0, heldBankRows: 0,
+    suppliersMissingStatement: [], suppliersWithoutContract: [], invoicesWithoutLines: 0,
+    unbackedPaymentCount: 0, unbackedPaymentMinor: 0, unbackedPaymentEvidence: [],
+    duplicateExpenses: 0, duplicateExpenseAmountMinor: 0, duplicateExpenseEvidence: [],
+    bankGapDays: 0, bankGapRanges: [], bankBalanceDifferenceMinor: null, priceRises: [], priceRiseAnnualMinor: 0,
+  });
+
+  it("تسويةٌ لم تصل بندٌ يفتح صفحتَها، وتقديرُها لا يُجمع أثراً", () => {
+    const item = buildAttention({ ...base(), missingSettlements: [{ day: "2026-07-20", usualMinor: 900_00 }] })
+      .find((i) => i.id === "pos-missing-settlement");
+    expect(item?.href).toBe("/money/pos#missing");
+    expect(item?.impact).toEqual({ kind: "AT_RISK", amountMinor: null });
+    expect(item?.count).toBe(1);
+  });
+
+  it("المتكرّر: ما خُصم مرّتين يُستردّ بمبلغه، والارتفاعُ وحده بلا مبلغٍ يُستردّ", () => {
+    const twice = buildAttention({ ...base(), recurringAnomalies: [{ label: "إنترنت", kind: "TWICE", amountMinor: 460_00, day: "2026-08-09" }] })
+      .find((i) => i.id === "recurring-anomalies");
+    expect(twice?.impact).toEqual({ kind: "RECOVERABLE", amountMinor: 460_00 });
+    const rose = buildAttention({ ...base(), recurringAnomalies: [{ label: "إنترنت", kind: "ROSE", amountMinor: 60_00, day: "2026-08-07" }] })
+      .find((i) => i.id === "recurring-anomalies");
+    expect(rose?.impact.amountMinor).toBeNull();
+    expect(rose?.href).toBe("/money/recurring");
+  });
+
+  it("بلا وقائع لا بند", () => {
+    const ids = buildAttention(base()).map((i) => i.id);
+    expect(ids).not.toContain("pos-missing-settlement");
+    expect(ids).not.toContain("recurring-anomalies");
+  });
+});
+
+describe("وثائقُ تنتهي", () => {
+  it("المنتهي حرج، وما في أسبوعه عالٍ، وما في مهلته متوسّط — ويفتح صفحةَ الوثائق", () => {
+    const one = (daysLeft: number) => buildAttention({
+      ...quiet,
+      expiringObligations: [{ title: "رخصة البلديّة", kindLabel: "رخصة البلديّة", expiresOn: "2026-10-20", daysLeft }],
+    }).find((i) => i.id === "obligations-expiring");
+    expect(one(-2)?.severity).toBe("CRITICAL");
+    expect(one(5)?.severity).toBe("HIGH");
+    expect(one(20)?.severity).toBe("MEDIUM");
+    expect(one(20)?.href).toBe("/settings/obligations");
+    expect(one(20)?.impact).toEqual({ kind: "AT_RISK", amountMinor: null });
+  });
+
+  it("بلا وثائقَ لا بند", () => {
+    expect(buildAttention({ ...quiet, expiringObligations: [] }).map((i) => i.id)).not.toContain("obligations-expiring");
+  });
+});

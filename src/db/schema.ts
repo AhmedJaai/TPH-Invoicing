@@ -2092,3 +2092,37 @@ export const paymentHoldOverrides = pgTable("payment_hold_overrides", {
   createdById: text("created_by_id").references(() => users.id),
   createdAt: now(),
 });
+
+/**
+ * وثيقةٌ لها تاريخُ انتهاء — سجلٌّ تجاريّ، رخصة، شهادةٌ صحّيّة، إقامة، عقدُ إيجار.
+ * يكتبها صاحبُ المقهى بيده، ويذكّر بها النظامُ قبل موعدها بمهلتها (`lib/obligations.ts`).
+ * `closedAt` أرشفةٌ لا حذف. الهجرة المعلّقة `product-a__obligations`.
+ */
+export const obligations = pgTable("obligations", {
+  id: id(),
+  kind: text("kind").notNull(),
+  title: text("title").notNull(),
+  issuer: text("issuer"),
+  reference: text("reference"),
+  holder: text("holder"),
+  /** YYYY-MM-DD — شرطُ الوثيقة: لا تُحفظ بلا تاريخ. */
+  expiresOn: text("expires_on").notNull(),
+  remindDays: integer("remind_days").notNull().default(30),
+  note: text("note"),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  closedById: text("closed_by_id").references(() => users.id),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("obligations_open_expiry_idx").on(t.expiresOn).where(sql`closed_at is null`)]);
+
+/**
+ * ما يضبطه صاحبُ المقهى مرّةً ويقرؤه الحساب (`services/app-settings.service.ts`) —
+ * وغيابُ الصفّ «لم يُضبط». الهجرة المعلّقة `product-a__app_settings`.
+ */
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedById: text("updated_by_id").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

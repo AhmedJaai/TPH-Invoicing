@@ -32,7 +32,19 @@ export interface SupplierEditInitial {
 
 const FIELD = "mt-1 block min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm sm:min-h-10";
 
-export function SupplierEdit({ supplierId, initial }: { supplierId: string; initial: SupplierEditInitial }) {
+export function SupplierEdit({
+  supplierId,
+  initial,
+  termsHint,
+}: {
+  supplierId: string;
+  initial: SupplierEditInitial;
+  /**
+   * عادةُ السداد الفعليّة (وسيطُ الأيّام من الفاتورة إلى اكتمال سدادها، وعددُ العيّنات) —
+   * تُقترَح أجلاً حين الحقلُ فارغ وحده، ولا يُكتب شيءٌ بلا ضغطة ثمّ «احفظ».
+   */
+  termsHint?: { medianDays: number; sampleCount: number };
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(initial);
@@ -138,6 +150,14 @@ export function SupplierEdit({ supplierId, initial }: { supplierId: string; init
             أجلُ السداد (أيّام)
             <input value={form.paymentTermsDays} onChange={(e) => set({ paymentTermsDays: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" placeholder="0 = نقداً · فارغ = غير معروف" className={`nums ${FIELD}`} />
             <span className="mt-1 block text-[11px] font-normal text-muted">به يُحسب «جاوز أجلَه» في ملفّه — لا ستّون يوماً للجميع.</span>
+            {termsHint && form.paymentTermsDays.trim() === "" && (
+              <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-accent-line bg-accent-soft px-2.5 py-1.5 text-[11px] font-normal text-ink-soft">
+                <span>تدفع له عادةً بعد <bdi className="nums font-bold text-ink">{termsHint.medianDays}</bdi> يوماً (وسيطُ <bdi className="nums">{termsHint.sampleCount}</bdi> فاتورةً سُدّدت).</span>
+                <button type="button" disabled={busy} onClick={() => set({ paymentTermsDays: String(termsHint.medianDays) })} className="font-bold text-accent hover:underline">
+                  اكتبه أجلاً
+                </button>
+              </span>
+            )}
           </label>
           <label className="text-xs font-bold">
             نبّهني إن تجاوز ما عليّ له (ريال)

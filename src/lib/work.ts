@@ -25,10 +25,63 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { buildAttention, type AttentionItem } from "./attention";
 import { gatherAttentionFacts } from "./attention-facts";
+import { partitionSnoozed, type SnoozedItem } from "./attention-snooze";
+import { todayInRiyadh } from "./riyadh-time";
+import { loadOpenIbanWatch } from "@/services/iban-guard.service";
+import { groupIban } from "./bank/iban-guard";
+import { loadMissingSettlementFacts } from "@/services/pos-watch.service";
+import { loadRecurringAnomalies } from "@/services/recurring-watch.service";
+import { loadDueObligations } from "@/services/obligation.service";
+import { OBLIGATION_KIND_LABEL } from "./obligations";
 
-export const attentionItems = cache(
-  async (): Promise<AttentionItem[]> => buildAttention(await gatherAttentionFacts()),
-);
+/** كلُّ البنود كما يبنيها `buildAttention` — قبل أن يُفرز المؤجَّل. */
+const builtAttention = cache(async (): Promise<AttentionItem[]> => {
+  /* حارسُ الآيبان وقائعُه مستقلّة — تُطلَب مع البقيّة لا بعدها */
+  /* تُبدأ الآن وتُنتظر مع البقيّة — لا رحلةٌ بعد رحلة */
+  const watchPromise = loadOpenIbanWatch();
+  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs] = await Promise.all([
+    gatherAttentionFacts(), watchPromise.then((w) => w.alerts), loadMissingSettlementFacts(), loadRecurringAnomalies(), loadDueObligations(),
+  ]);
+  const { first } = await watchPromise;
+  return buildAttention({
+    ...facts,
+    missingSettlements,
+    recurringAnomalies,
+    expiringObligations: dueDocs.map((o) => ({ title: o.title, kindLabel: OBLIGATION_KIND_LABEL[o.kind], expiresOn: o.expiresOn, daysLeft: o.daysLeft })),
+    ibanAlerts: iban.map((a) => ({
+      label: a.supplierName.slice(0, 45),
+      sub: `إلى ${groupIban(a.seenIban)} — والمعروفُ ${a.knownIbans.map(groupIban).join(" أو ")}`,
+      amountMinor: a.totalMinor,
+      href: `/suppliers/${a.supplierSlug}`,
+    })),
+    ibanAlertMinor: iban.reduce((s, a) => s + a.totalMinor, 0),
+    firstTransfers: first.map((f) => ({
+      label: (f.payee ?? "مستفيدٌ غير معروف").slice(0, 45),
+      sub: `إلى ${groupIban(f.iban)}`,
+      amountMinor: f.totalMinor,
+    })),
+    firstTransferMinor: first.reduce((s, f) => s + f.totalMinor, 0),
+  });
+});
+
+/**
+ * المفتوحُ والمؤجَّل («أجِّله إلى…»، `attention-snooze.ts`). المؤجَّلُ يخرج من العدّ
+ * ولا يُخفى: تعرضه `/attention` في سطرٍ يُفتح، ويعود في يومه أو إن تغيّر مبلغُه.
+ */
+export const attentionSplit = cache(async (): Promise<{ active: AttentionItem[]; snoozed: SnoozedItem[] }> => {
+  const [items, rows] = await Promise.all([
+    builtAttention(),
+    db.execute<{ key: string; decision: string; note: string | null }>(sql`
+      select key, decision, note from alert_resolutions where key like 'attn:%'
+    `),
+  ]);
+  return partitionSnoozed(items, rows.rows, todayInRiyadh());
+});
+
+export const attentionItems = cache(async (): Promise<AttentionItem[]> => (await attentionSplit()).active);
+
+/** ما أُجِّل من البنود — بيوم عودته وسببه. */
+export const snoozedAttention = cache(async (): Promise<SnoozedItem[]> => (await attentionSplit()).snoozed);
 
 /** عددُ ما ينتظر قراراً — وهو عددُ بنود `/attention` نفسه. */
 export const workCount = cache(async (): Promise<number> => (await attentionItems()).length);

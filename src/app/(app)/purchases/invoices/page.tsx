@@ -91,6 +91,7 @@ export default async function InvoicesPage({
   /* وفاتورةُ سطر الكشف (057) لا ملفَّ لها تُقرأ منه بنود — ليست «بلا بنود مقروءة» */
   if (f.noLines) others.push(sql`${lineCount} = 0 and not exists (select 1 from ${documents} where ${documents}.id = ${invoices}.document_id and ${documents}.origin is not null)`);
   if (f.withVat) others.push(sql`${invoices.vatMinor} > 0`);
+  if (f.fixedAsset) others.push(sql`${invoices.isFixedAsset}`);
   if (f.overdue) {
     others.push(sql`${remaining} > 0`);
     others.push(sql`${invoices.invoiceDate} < now() - interval '${sql.raw(String(OVERDUE_DAYS))} days'`);
@@ -285,6 +286,9 @@ export default async function InvoicesPage({
               </Toggle>
               <Toggle href={linkTo(f, { noLines: !f.noLines })} on={Boolean(f.noLines)}>
                 بلا بنود
+              </Toggle>
+              <Toggle href={linkTo(f, { fixedAsset: !f.fixedAsset })} on={Boolean(f.fixedAsset)}>
+                أصولٌ ثابتة
               </Toggle>
             </div>
           </div>

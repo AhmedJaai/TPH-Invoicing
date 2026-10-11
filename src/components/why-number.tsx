@@ -36,7 +36,7 @@ function readMovers(v: unknown): Mover[] {
   });
 }
 
-export function WhyNumber({ figure, auditHref }: { figure: "owed"; auditHref?: string }) {
+export function WhyNumber({ figure, auditHref }: { figure: "owed" | "vat" | "payrun"; auditHref?: string }) {
   const [state, setState] = useState<"idle" | "loading" | "ready" | "failed">("idle");
   const [movers, setMovers] = useState<Mover[]>([]);
   const [error, setError] = useState("");
@@ -65,7 +65,7 @@ export function WhyNumber({ figure, auditHref }: { figure: "owed"; auditHref?: s
         {() => (
           <div>
             <p className="text-sm font-bold">آخرُ ما حرّكه</p>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-muted">من سجلّ التدقيق: ما قُيِّد وما سُدِّد وما صُحِّح — الأحدثُ أوّلاً.</p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{figure === "vat" ? "من سجلّ التدقيق: ما اخترتَه للإقرار وما قُيِّد أو صُحِّح من فواتير وما استُورد من كشوف — الأحدثُ أوّلاً." : figure === "payrun" ? "من سجلّ التدقيق: ما قُيِّد وما سُدِّد وما قرّرتَه في المحجوز — الأحدثُ أوّلاً." : "من سجلّ التدقيق: ما قُيِّد وما سُدِّد وما صُحِّح — الأحدثُ أوّلاً."}</p>
             {state === "loading" && <p className="mt-3 text-xs text-muted" role="status">يُجلَب…</p>}
             {state === "failed" && <p className="mt-3 text-xs font-bold text-danger" role="alert">{error}</p>}
             {state === "ready" && movers.length === 0 && <p className="mt-3 text-xs text-muted">لا قيدَ في السجلّ حرّكه بعد.</p>}

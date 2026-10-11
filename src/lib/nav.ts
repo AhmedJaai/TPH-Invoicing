@@ -126,6 +126,8 @@ export const AREAS: readonly NavArea[] = [
     children: [
       { href: "/payments", label: "دفعة الشهر", needs: "payment:approve" },
       { href: "/cash", label: "النقد القادم", needs: "bank:view" },
+      /* الوقائعُ نفسُها يوماً بيوم، ومعها موعدُ الإقرار وانتهاءُ الوثائق */
+      { href: "/cash/calendar", label: "تقويم الالتزامات", needs: "bank:view" },
     ],
   },
   {
@@ -137,10 +139,13 @@ export const AREAS: readonly NavArea[] = [
     question: "ما دخل وما خرج، وأين ذهب المال",
     chord: "b",
     needs: "bank:view",
-    owns: ["/money/expenses", "/money/statement"],
+    owns: ["/money/expenses", "/money/statement", "/money/owner"],
     children: [
       { href: "/bank", label: "حركة البنك" },
       { href: "/money", label: "أين ذهب" },
+      /* من الكشف نفسه: ما تأخذه الشبكة وما لم يصل، وما يتكرّر خصمُه كلَّ شهر */
+      { href: "/money/pos", label: "تسويات الشبكة" },
+      { href: "/money/recurring", label: "الاشتراكات والمتكرّر" },
     ],
   },
   {
@@ -156,6 +161,8 @@ export const AREAS: readonly NavArea[] = [
     children: [
       { href: "/close", label: "إقفال الشهر" },
       { href: "/close/vat", label: "إقرار الضريبة" },
+      /* «هل ربحتُ هذا الشهر؟» بما يُعرف وحده — `lib/income-sheet.ts` */
+      { href: "/close/pnl", label: "قائمة الدخل" },
     ],
   },
   {
@@ -174,8 +181,12 @@ export const AREAS: readonly NavArea[] = [
       { href: "/inventory/import", label: "الاستيراد", needs: "inventory:count" },
       /* السجلُّ جوابُه بالريال — فمن لا يرى المبالغ لا يُفتَح له */
       { href: "/inventory/history", label: "سجلّ الجرد", needs: "amounts:view" },
+      /* ما استُورد من ملفّ فودكس مقروءاً مبيعاتٍ — بالريال، فلمن يرى المبالغ */
+      { href: "/inventory/sales", label: "المبيعات", needs: "amounts:view" },
       { href: "/inventory/recipes", label: "الوصفات", needs: "recipe:edit" },
       { href: "/inventory/items", label: "الأصناف" },
+      /* وسيطُ ما يُباع في كلّ يومٍ من الأسبوع — عادةٌ لا توقّع (`lib/sales/weekday-habit.ts`) */
+      { href: "/inventory/habit", label: "عادةُ البيع" },
     ],
   },
 ];
@@ -185,6 +196,8 @@ export const AREAS: readonly NavArea[] = [
  */
 export const ACCOUNT_LINKS: readonly (NavLink & { icon: NavIcon })[] = [
   { href: "/settings", label: "الإعدادات", needs: "supplier:view", icon: "settings" },
+  /* دفترُ الاختيارات: ما قرّره صاحبُه بيده، بحاله وزرّ سحبه (`lib/choices.ts`) */
+  { href: "/settings/choices", label: "ما قرّرتَه", needs: "amounts:view", icon: "decisions" },
   { href: "/settings/audit", label: "سجلّ التدقيق", needs: "audit:view", icon: "audit" },
 ];
 

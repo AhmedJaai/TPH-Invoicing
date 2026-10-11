@@ -67,3 +67,16 @@ describe("describe", () => {
     expect(describeFilters(parseFilters({ supplier: "Loreva" }))).toBe("من Loreva");
   });
 });
+
+describe("مرشِّح الأصول الثابتة", () => {
+  it("يُقرأ من الرابط ويُكتب فيه ويُوصَف", () => {
+    const f = parseFilters({ asset: "1", month: "2026-09" });
+    expect(f.fixedAsset).toBe(true);
+    expect(linkTo(f, {})).toBe("/purchases/invoices?month=2026-09&asset=1");
+    expect(linkTo(f, { fixedAsset: false })).toBe("/purchases/invoices?month=2026-09");
+    expect(hasFilters(parseFilters({ asset: "1" }))).toBe(true);
+    expect(describeFilters(parseFilters({ asset: "1" }))).toContain("أصولٌ ثابتة");
+    expect(parseFilters({ asset: "yes" }).fixedAsset).toBe(false);
+  });
+});
+

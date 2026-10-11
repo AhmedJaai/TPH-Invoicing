@@ -15,8 +15,8 @@
  *
  * دالّةٌ خالصة — تأخذ وقائع وتُرجع دلاءً مرتّبة.
  */
-import { formatMonth } from "./riyadh-time";
-import { formatRiyalsDisplay } from "./money";
+import { formatDay, formatMonth } from "./riyadh-time";
+import { MAX_AMOUNT_MINOR, formatRiyalsDisplay } from "./money";
 
 export type Cadence = "MONTHLY" | "QUARTERLY" | "ANNUAL";
 
@@ -61,6 +61,27 @@ export interface OutlookInput {
   /** آخرُ رصيدٍ معروف — `null` مجهول. */
   balanceMinor: number | null;
   balanceAsOf: string | null;
+  /**
+   * ضريبةُ القيمة المضافة المستحقّة للهيئة — إقرارٌ انقضت فترتُه ولم يُقدَّم، والفترةُ
+   * الجارية «حتى اليوم». غيابُها: لا يُسقَط شيء (كما كان). انظر `VatDue`.
+   */
+  vat?: readonly VatDue[];
+}
+
+/**
+ * مستحقُّ الضريبة لفترة — أكبرُ خروجٍ منفردٍ في السنة، وكان الإسقاطُ لا يعرفه.
+ *
+ * `amountMinor` من حساب الإقرار نفسه (`computeVatReturn`): موجبٌ يُسدَّد، وصفرٌ أو
+ * سالبٌ لا خروجَ فيه، و`null` **لا يُعرف** — شهرٌ من الفترة بلا كشف بنك، فالرقمُ
+ * الناقص لا يُكتب رقماً. و`accruing` الفترةُ لم تنتهِ: المبلغُ «حتى اليوم» ويكبر.
+ */
+export interface VatDue {
+  periodKey: string;
+  label: string;
+  /** آخرُ يومٍ للتقديم والسداد — YYYY-MM-DD. */
+  deadline: string;
+  amountMinor: number | null;
+  accruing: boolean;
 }
 
 export interface OutflowLine {
@@ -68,7 +89,7 @@ export interface OutflowLine {
   label: string;
   sub?: string;
   amountMinor: number;
-  kind: "SUPPLIER" | "RECURRING";
+  kind: "SUPPLIER" | "RECURRING" | "VAT";
   href: string;
 }
 
@@ -93,6 +114,12 @@ export interface CashOutlook {
   /** أوّلُ دلوٍ يقصر عنه الرصيد — `null` إن لم يقصر أو جُهل. */
   shortfallAt: string | null;
   recurringCount: number;
+  /** ما دخل الجدولَ من الضريبة بمبلغه — يُسمّى كي لا يتغيّر رقمٌ بلا سبب. */
+  vatIncluded: VatDue[];
+  /** موعدُه بعد أفق الجدول (آخر الشهر القادم) — «جنِّب له»، ولا يُطرح من الرصيد هنا. */
+  vatAhead: VatDue[];
+  /** فترةٌ لا يُعرف مستحقُّها — يُقال ولا يُسقَط صفراً. */
+  vatUnknown: VatDue[];
 }
 
 export function addMonths(month: string, n: number): string {
@@ -163,20 +190,40 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
     .map((r) => `${r.label} ${formatRiyalsDisplay(r.amountMinor)}`);
   const settledNote = settled.length > 0 ? ` · وخرج منها ما قُيِّد دفعُه: ${settled.join("، ")}` : "";
 
+  /*
+    الضريبة: كلُّ مستحقٍّ معلومٍ موجب يقع في مرحلة موعده. ما فات موعدُه متأخّرٌ الآن،
+    وما موعدُه بعد الشهر القادم خارج الأفق فيُعلَن «جنِّب له». والمجهولُ لا يدخل رقماً.
+  */
+  const vat = input.vat ?? [];
+  const vatKnown = vat.filter((v) => v.amountMinor !== null && v.amountMinor > 0);
+  const vatLine = (v: VatDue): OutflowLine => ({
+    id: `vat:${v.periodKey}`,
+    label: `ضريبةُ القيمة المضافة — ${v.label}`,
+    sub: `${v.accruing ? "حتى اليوم، وتكبر · " : ""}آخرُ موعدها ${formatDay(v.deadline)}`,
+    amountMinor: v.amountMinor ?? 0,
+    kind: "VAT" as const,
+    href: `/close/vat?period=${v.periodKey}`,
+  });
+  const vatIn = (pick: (deadlineMonth: string) => boolean) =>
+    vatKnown.filter((v) => pick(v.deadline.slice(0, 7))).map(vatLine);
+  const vatIncluded = vatKnown.filter((v) => v.deadline.slice(0, 7) <= nextMonth);
+  const vatAhead = vatKnown.filter((v) => v.deadline.slice(0, 7) > nextMonth);
+  const vatUnknown = vat.filter((v) => v.amountMinor === null);
+
   const raw: Omit<OutlookBucket, "totalMinor" | "afterMinor">[] = [
     {
       id: "overdue",
       title: "متأخّرٌ الآن",
       when: `دفعةُ ${formatMonth(input.runMonth)} — كان موعدُها أوّل ${formatMonth(thisMonth)}`,
       tone: "danger",
-      lines: supplierLines(input.overdueRun, "run"),
+      lines: [...supplierLines(input.overdueRun, "run"), ...vatIn((m) => m < thisMonth)],
     },
     {
       id: "rest",
       title: `بقيّة ${formatMonth(thisMonth)}`,
       when: `مصروفاتٌ متكرّرة لم يُقيَّد دفعُها هذا الشهر — لم يحن يومُها أو يومُها غير محدَّد${settledNote}`,
       tone: "warn",
-      lines: recurringLines(thisMonth, (day) => day === null || day >= todayDay),
+      lines: [...recurringLines(thisMonth, (day) => day === null || day >= todayDay), ...vatIn((m) => m === thisMonth)],
     },
     {
       id: "next-run",
@@ -190,7 +237,7 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
       title: `خلال ${formatMonth(nextMonth)}`,
       when: "المصروفاتُ المتكرّرة المسجّلة",
       tone: "neutral",
-      lines: recurringLines(nextMonth, (day) => day !== 1),
+      lines: [...recurringLines(nextMonth, (day) => day !== 1), ...vatIn((m) => m === nextMonth)],
     },
   ];
 
@@ -204,7 +251,9 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
         running -= totalMinor;
         if (running < 0 && shortfallAt === null) shortfallAt = b.id;
       }
-      return { ...b, totalMinor, afterMinor: running };
+      /* عنوانُ المرحلة يصف الدفعةَ والمتكرّر — فإن دخلتها الضريبةُ قيل */
+      const when = b.lines.some((l) => l.kind === "VAT") ? `${b.when} · ومعها ضريبةُ القيمة المضافة بموعد إقرارها` : b.when;
+      return { ...b, when, totalMinor, afterMinor: running };
     });
 
   return {
@@ -215,6 +264,9 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
     balanceAsOf: input.balanceAsOf,
     shortfallAt,
     recurringCount: input.recurring.length,
+    vatIncluded,
+    vatAhead,
+    vatUnknown,
   };
 }
 
@@ -357,4 +409,50 @@ export function dueThisWeek(
 
   lines.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "") || b.amountMinor - a.amountMinor);
   return { from: input.today, to, lines, totalMinor: lines.reduce((s, l) => s + l.amountMinor, 0), undated };
+}
+
+/* ─────────────────────────── حدُّ الرصيد الأدنى ─────────────────────────── */
+
+export interface FloorBreach {
+  /** أوّلُ مرحلةٍ ينزل بعدها الرصيدُ تحت الحدّ. */
+  bucketId: string;
+  title: string;
+  /** الرصيدُ بعدها — حدٌّ أدنى، لأنّ الوارد لا يُحسب. */
+  afterMinor: number;
+  /** كم ينقص عن الحدّ. */
+  shortMinor: number;
+  /** أكبرُ ما في تلك المرحلة — «ما يسبّبه». */
+  causes: { label: string; amountMinor: number }[];
+}
+
+/**
+ * متى ينزل الرصيدُ تحت الحدّ الذي كتبه صاحبُه؟ — أوّلُ مرحلةٍ في الإسقاط يصير
+ * «يبقى بعدها» دونه، وأكبرُ ثلاثة أسطرٍ فيها.
+ *
+ * `null` في ثلاث: لم يُكتب حدّ، أو الرصيدُ مجهول (لا إنذارَ ولا «سليم» عن غير علم —
+ * `afterMinor` فيها `null`)، أو لا مرحلةَ تكسره. والمتّصلُ يفرّق بينها بما يعرف.
+ * والواردُ غير محسوب: فالإنذارُ «إن لم يدخل شيء»، ويُقال ذلك.
+ */
+export function floorBreach(buckets: readonly OutlookBucket[], floorMinor: number | null): FloorBreach | null {
+  if (floorMinor === null) return null;
+  for (const b of buckets) {
+    if (b.afterMinor === null) return null;
+    if (b.afterMinor < floorMinor) {
+      return {
+        bucketId: b.id,
+        title: b.title,
+        afterMinor: b.afterMinor,
+        shortMinor: floorMinor - b.afterMinor,
+        causes: [...b.lines].sort((x, y) => y.amountMinor - x.amountMinor).slice(0, 3).map((l) => ({ label: l.label, amountMinor: l.amountMinor })),
+      };
+    }
+  }
+  return null;
+}
+
+/** الحدُّ كما خُزّن نصّاً ← هللاتٌ صحيحة موجبة — وما لا يُفهم `null` «لم يُضبط» لا صفر. */
+export function parseStoredMinor(value: string | null | undefined): number | null {
+  if (!value || !/^\d{1,10}$/.test(value)) return null;
+  const n = Number(value);
+  return Number.isSafeInteger(n) && n > 0 && n <= MAX_AMOUNT_MINOR ? n : null;
 }

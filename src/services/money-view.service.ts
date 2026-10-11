@@ -111,7 +111,7 @@ export async function loadMoneyView(month: string | null): Promise<MoneyView> {
     outMinor += minor;
     if (c === "UNKNOWN") add("unknown", "unknown", "لم يُصنَّف بعد", "/bank?show=unknown#transactions", minor);
     else if (c === "SUPPLIER") add("purchases", "purchases", "المورّدون — سدادٌ وشراءُ بضاعة", "/suppliers", minor);
-    else if (c === "PERSONAL") add("owner", "owner", "سحبُ المالك — تحويلاتٌ شخصيّة", "/bank?show=all#transactions", minor);
+    else if (c === "PERSONAL") add("owner", "owner", "سحبُ المالك — تحويلاتٌ شخصيّة", "/money/owner", minor);
     else if (c === "INTERNAL" || c === "POS_SETTLEMENT") add("internal", "internal", "حركةٌ تشغيليّة بين الحسابات", "/bank?show=all#transactions", minor);
     else if (FEES.includes(c)) add("fees", "fees", "رسومُ البنك والشبكة وضرائبُها", "/bank?show=fees#transactions", minor);
     /* الوصفُ الصريح يُقدَّم على التصنيف المستنتَج — «شراء بضاعة» مشترياتٌ لا راتب */

@@ -26,6 +26,11 @@ export const ATTENTION_IDS = [
   "price-rises",
   "lifecycle-anomalies",
   "bounced-payments",
+  "iban-mismatch",
+  "first-transfers",
+  "pos-missing-settlement",
+  "recurring-anomalies",
+  "obligations-expiring",
   "missing-statements",
   "statement-ledger-gap",
   "files-wrong-month",
@@ -60,6 +65,9 @@ export const SIGNAL_IDS: ReadonlySet<AttentionId> = new Set<AttentionId>([
   "statement-ledger-gap",
   "lifecycle-anomalies",
   "bounced-payments",
+  "iban-mismatch",
+  "pos-missing-settlement",
+  "recurring-anomalies",
 ]);
 
 export function isSignal(item: Pick<AttentionItem, "id">): boolean {
@@ -76,6 +84,8 @@ export const IN_PLACE_IDS: ReadonlySet<AttentionId> = new Set<AttentionId>([
   "open-blockers",
   "no-contract",
   "missing-statements",
+  "iban-mismatch",
+  "first-transfers",
 ]);
 
 export function resolvesInPlace(item: Pick<AttentionItem, "id">): boolean {

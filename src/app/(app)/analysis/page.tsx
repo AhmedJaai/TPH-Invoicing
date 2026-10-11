@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
-import { CalendarClock, Info, Layers, Link2, ShoppingBasket, Tags, TrendingDown, TrendingUp } from "lucide-react";
+import { CalendarClock, Info, Layers, Link2, MessageCircle, ShoppingBasket, Tags, TrendingDown, TrendingUp } from "lucide-react";
 import { db } from "@/db";
 import { invoiceLines, suppliers } from "@/db/schema";
 import { currentUser } from "@/lib/session";
@@ -14,6 +14,9 @@ import {
 import { Figure } from "@/components/supplier-intel";
 import { PRODUCT, countNoun, DAY, TIME } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
+import { whatsappHref } from "@/lib/supplier-edit";
+import { buildPriceRiseMessage, yearlyQuantity } from "@/lib/supplier-requests";
+import { buttonClass } from "@/components/ui-tokens";
 import { buildDataHealth } from "@/lib/data-health";
 import { gatherHealthFacts } from "@/lib/data-health-facts";
 import { ProductMapping } from "@/components/product-mapping";
@@ -91,7 +94,7 @@ export default async function ItemsAndPricesPage({
     canMap
       ? Promise.all([listSupplierProducts(), listProducts(), mappingCoverage()])
       : Promise.resolve(null),
-    db.select({ id: suppliers.id, slug: suppliers.slug }).from(suppliers),
+    db.select({ id: suppliers.id, slug: suppliers.slug, phone: suppliers.phoneE164 }).from(suppliers),
   ]);
 
   const items = summarizeItems(
@@ -121,6 +124,8 @@ export default async function ItemsAndPricesPage({
   }
 
   const slugOf = new Map(slugRows.map((r) => [r.id, r.slug]));
+  const phoneOf = new Map(slugRows.map((r) => [r.id, r.phone]));
+  const day = (d: Date) => d.toISOString().slice(0, 10);
   const lineCoverage = health.metrics.find((m) => m.id === "lines");
   const totalSpend = items.reduce((s, i) => s + i.totalSpentMinor, 0);
 
@@ -284,6 +289,29 @@ export default async function ItemsAndPricesPage({
                 {
                   key: "when", header: "متى", secondary: true,
                   cell: (i) => <span className="whitespace-nowrap text-xs text-ink-soft">{formatDay(i.priceChange!.currentDate)}</span>,
+                },
+                {
+                  /* ما ارتفع يُسأل عنه مورّدُه — برسالةٍ فيها السعران وتاريخاهما، تُعدَّل قبل الإرسال */
+                  key: "ask", header: "", align: "end", reveal: true,
+                  cell: (i) => i.priceChange!.direction === "up" ? (
+                    <a
+                      href={whatsappHref(i.supplierId ? phoneOf.get(i.supplierId) : null, buildPriceRiseMessage({
+                        supplierName: i.supplierName,
+                        itemName: i.displayName,
+                        previousMinor: i.priceChange!.previousMinor,
+                        currentMinor: i.priceChange!.currentMinor,
+                        previousDay: day(i.priceChange!.previousDate),
+                        currentDay: day(i.priceChange!.currentDate),
+                        yearQuantity: yearlyQuantity(i.totalQuantity, i.firstOrderedAt, i.lastOrderedAt),
+                      }))}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${buttonClass("quiet", "sm")} relative whitespace-nowrap`}
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                      اسأل المورّد
+                    </a>
+                  ) : null,
                 },
               ]}
             />

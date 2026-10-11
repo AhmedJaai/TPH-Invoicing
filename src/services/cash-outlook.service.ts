@@ -7,7 +7,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { expenses, recurringExpenses } from "@/db/schema";
 import {
-  asCadence, buildCashOutlook, dueThisWeek, type CashOutlook, type RecurringInput, type SupplierDue, type WeekDue,
+  asCadence, buildCashOutlook, dueThisWeek, floorBreach, type CashOutlook, type FloorBreach, type RecurringInput, type SupplierDue, type VatDue, type WeekDue,
 } from "@/lib/cash-outlook";
 import { previousMonth } from "@/lib/filing";
 import { buildPaymentRun, type PaymentRun } from "@/lib/payment-run";
@@ -16,6 +16,13 @@ import { loadCashPosition } from "./briefing.service";
 import { loadHoldOverrides } from "./payment-hold.service";
 import { loadPayableInvoices } from "./payment-run.service";
 import { loadSupplierBalances } from "./supplier-balance.service";
+import { filingDeadline, periodKey, previousQuarter, quarterLabel, quarterOfMonth, type VatQuarter } from "@/lib/vat-return";
+import { loadVatReturn } from "./vat-return.service";
+import { loadCashFloor } from "./app-settings.service";
+import { buildCommitments, type Commitments } from "@/lib/commitments";
+import { OBLIGATION_KIND_LABEL } from "@/lib/obligations";
+import { loadObligations } from "./obligation.service";
+import { pgErrorCode } from "./guard";
 
 function dues(run: PaymentRun): SupplierDue[] {
   return run.ready.map((s) => ({ supplierId: s.supplierId, supplierName: s.supplierName, amountMinor: s.totalMinor }));
@@ -43,7 +50,47 @@ export function weekDue(run: PaymentRun, recurring: readonly RecurringInput[]): 
   return dueThisWeek({ today: todayInRiyadh(), overdueRun: dues(run), recurring: [...recurring] });
 }
 
-export async function loadCashOutlook(): Promise<CashOutlook & { runMonth: string; thisMonth: string }> {
+/**
+ * مستحقُّ الضريبة لربعٍ من حساب الإقرار نفسه (`loadVatReturn`) — لا حسابٌ ثانٍ.
+ * `null`: الربعُ المنقضي قُدِّم (لا خروجَ ينتظر)، أو لا حركةَ فيه ولا فاتورة.
+ * والمبلغُ `null` حين يغيب كشفُ شهرٍ انقضى من الربع: الناقصُ لا يُكتب رقماً.
+ */
+async function vatDueFor(quarter: VatQuarter, accruing: boolean): Promise<VatDue | null> {
+  const view = await loadVatReturn(quarter);
+  if (view.filing) return null;
+  if (view.txs.length === 0 && view.invoices.length === 0) return null;
+  const blind = view.coverage.some((c) => !c.open && c.gapDays === null);
+  return {
+    periodKey: periodKey(quarter),
+    label: quarterLabel(quarter),
+    deadline: filingDeadline(quarter),
+    amountMinor: blind ? null : view.result.netMinor,
+    accruing,
+  };
+}
+
+/** الربعُ المنقضي إن لم يُقدَّم، والربعُ الجاري «حتى اليوم». */
+export async function loadVatDues(): Promise<VatDue[]> {
+  const current = quarterOfMonth(currentMonthRiyadh());
+  const [previous, running] = await Promise.all([vatDueFor(previousQuarter(current), false), vatDueFor(current, true)]);
+  return [previous, running].flatMap((v) => (v ? [v] : []));
+}
+
+/** وقائعُ الإسقاط كما حُمّلت — يبني منها تقويمُ الالتزامات يوماً بيوم، بلا تحميلٍ ثانٍ. */
+export interface OutlookInputs {
+  overdueRun: SupplierDue[];
+  nextRun: SupplierDue[];
+  recurring: RecurringInput[];
+  paidThisMonth: Set<string>;
+  vat: VatDue[];
+}
+
+/**
+ * `withVat: false` يعرض الإسقاطَ كما كان قبل أن تدخله الضريبة — زرٌّ في الصفحة،
+ * كي يرى صاحبُها الرقمين ويعرف من أين الفرق.
+ */
+export async function loadCashOutlook(opts: { withVat?: boolean } = {}): Promise<CashOutlook & { runMonth: string; thisMonth: string; vatOff: VatDue[]; floorMinor: number | null; breach: FloorBreach | null; inputs: OutlookInputs }> {
+  const withVat = opts.withVat ?? true;
   const thisMonth = currentMonthRiyadh();
   const runMonth = previousMonth(thisMonth);
 
@@ -51,7 +98,7 @@ export async function loadCashOutlook(): Promise<CashOutlook & { runMonth: strin
     الدفعتان من استعلامٍ واحد: صفوفُ الشهر الجاري تحوي صفوفَ ما قبله، والبناءُ
     يعيد فحصَ الشهر — فلا رحلتان إلى القاعدة بعد انتهاء ما فوقهما.
   */
-  const [balances, recurring, cash, paid, payable, overrides] = await Promise.all([
+  const [balances, recurring, cash, paid, payable, overrides, vat, floorMinor] = await Promise.all([
     loadSupplierBalances(),
     loadRecurringInputs(),
     loadCashPosition(),
@@ -61,6 +108,8 @@ export async function loadCashOutlook(): Promise<CashOutlook & { runMonth: strin
       .where(and(eq(expenses.periodMonth, thisMonth), isNotNull(expenses.recurringExpenseId))),
     loadPayableInvoices(thisMonth),
     loadHoldOverrides(),
+    loadVatDues(),
+    loadCashFloor(),
   ]);
   const credit = new Map(balances.map((b) => [b.supplierId, b.creditMinor]));
   const overdue = buildPaymentRun(payable, runMonth, { includeOlderUnpaid: true, creditBySupplier: credit, overrides });
@@ -71,6 +120,7 @@ export async function loadCashOutlook(): Promise<CashOutlook & { runMonth: strin
   }
   const next = buildPaymentRun(payable, thisMonth, { includeOlderUnpaid: false, creditBySupplier: left, overrides });
 
+  const paidThisMonth = new Set(paid.flatMap((p) => (p.id ? [p.id] : [])));
   const outlook = buildCashOutlook({
     today: todayInRiyadh(),
     runMonth,
@@ -78,9 +128,39 @@ export async function loadCashOutlook(): Promise<CashOutlook & { runMonth: strin
     heldMinor: overdue.heldTotalMinor,
     nextRun: dues(next),
     recurring,
-    paidThisMonth: new Set(paid.flatMap((p) => (p.id ? [p.id] : []))),
+    paidThisMonth,
     balanceMinor: cash.balanceMinor,
     balanceAsOf: cash.asOf,
+    vat: withVat ? vat : [],
   });
-  return { ...outlook, runMonth, thisMonth };
+  /* ما أُخرج بطلب صاحبه يُسمّى — فلا يُظنّ أنّ الضريبةَ صفر */
+  return {
+    ...outlook, runMonth, thisMonth, vatOff: withVat ? [] : vat, floorMinor, breach: floorBreach(outlook.buckets, floorMinor),
+    inputs: { overdueRun: dues(overdue), nextRun: dues(next), recurring, paidThisMonth, vat },
+  };
+}
+
+/** كم شهراً يعرض التقويم — الجاري والقادم (أفقُ «النقد القادم» نفسُه) وشهرٌ بعدهما للوثائق والضريبة. */
+export const COMMITMENT_MONTHS = 3;
+
+/**
+ * تقويمُ الالتزامات — من وقائع «النقد القادم» نفسها ووثائقِ الانتهاء.
+ * وجدولُ الوثائق إن لم تُطبَّق هجرتُه بعد (`42P01`) يُقرأ «لا وثائق».
+ */
+export async function loadCommitments(): Promise<Commitments & { fromMonth: string; hasObligations: boolean }> {
+  const [outlook, docs] = await Promise.all([
+    loadCashOutlook(),
+    loadObligations().then((v) => v.open).catch((e: unknown) => {
+      if (pgErrorCode(e) === "42P01") return [];
+      throw e;
+    }),
+  ]);
+  const built = buildCommitments({
+    today: todayInRiyadh(),
+    fromMonth: outlook.thisMonth,
+    months: COMMITMENT_MONTHS,
+    ...outlook.inputs,
+    expiries: docs.map((o) => ({ id: o.id, title: o.title, kindLabel: OBLIGATION_KIND_LABEL[o.kind], expiresOn: o.expiresOn })),
+  });
+  return { ...built, fromMonth: outlook.thisMonth, hasObligations: docs.length > 0 };
 }

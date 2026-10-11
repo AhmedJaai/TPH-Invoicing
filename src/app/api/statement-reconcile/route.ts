@@ -54,6 +54,11 @@ async function loadSuppliers(): Promise<SupplierRecord[]> {
   }));
 }
 
+async function supplierPhone(supplierId: string): Promise<string | null> {
+  const [row] = await db.select({ phone: suppliers.phoneE164 }).from(suppliers).where(eq(suppliers.id, supplierId));
+  return row?.phone ?? null;
+}
+
 async function handle(request: Request) {
   let user;
   try {
@@ -228,7 +233,8 @@ async function handle(request: Request) {
     ok: true,
     persisted: false,
     fileName,
-    supplier: { id: supplierId, nameAr: supplier?.nameAr ?? "—" },
+    /* الرقمُ يصحب المذكّرة — فيفتح واتساب على المورّد لا على شاشة اختيار الجهة */
+    supplier: { id: supplierId, nameAr: supplier?.nameAr ?? "—", phoneE164: await supplierPhone(supplierId) },
     period: { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) },
     model: extraction.model,
     summary: {

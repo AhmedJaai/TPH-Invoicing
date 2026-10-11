@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ACTION_LABEL } from "./audit-labels";
-import { FIGURE_ACTIONS, describeMover, type AuditRow } from "./figure-history";
+import { FIGURE_ACTIONS, describeMover, isFigureId, type AuditRow } from "./figure-history";
 
 const row = (o: Partial<AuditRow>): AuditRow => ({
   action: "PAYMENT_RECORDED", entityType: "payment", entityId: "p1", after: null, actorId: "u1", actorName: "أحمد", ...o,
@@ -8,7 +8,23 @@ const row = (o: Partial<AuditRow>): AuditRow => ({
 
 describe("لماذا هذا الرقم؟", () => {
   it("كلُّ فعلٍ في القائمة فعلٌ معروفٌ له اسمٌ عربيّ", () => {
-    for (const a of FIGURE_ACTIONS.owed) expect(Object.hasOwn(ACTION_LABEL, a), a).toBe(true);
+    for (const list of Object.values(FIGURE_ACTIONS)) {
+      for (const a of list) expect(Object.hasOwn(ACTION_LABEL, a), a).toBe(true);
+      expect(new Set(list).size, "فعلٌ مكرَّر").toBe(list.length);
+    }
+  });
+
+  it("الأرقامُ المعروفة ثلاثة، وما عداها يُردّ — و«__proto__» ليس رقماً", () => {
+    expect(isFigureId("owed") && isFigureId("vat") && isFigureId("payrun")).toBe(true);
+    expect(isFigureId("__proto__")).toBe(false);
+    expect(isFigureId("toString")).toBe(false);
+    expect(isFigureId(null)).toBe(false);
+  });
+
+  it("اختيارُ حركةٍ في الإقرار يحرّك رقمَ الضريبة لا «عليك»", () => {
+    expect(FIGURE_ACTIONS.vat).toContain("VAT_TX_CHOSEN");
+    expect(FIGURE_ACTIONS.owed).not.toContain("VAT_TX_CHOSEN");
+    expect(FIGURE_ACTIONS.payrun).toContain("PAYMENT_HOLD_OVERRIDDEN");
   });
 
   it("فعلُك يُقال «أنت»، وفعلُ غيرك باسمه", () => {

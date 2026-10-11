@@ -101,7 +101,7 @@ export function fixHref(id: string, month: string): string {
     case "bank-balance": return "#balances";
     case "bank-unexplained": return "/attention?item=unclassified-bank";
     case "bank-supplier-unposted": return "/bank";
-    case "fixed-assets": return `/purchases/invoices?month=${month}`;
+    case "fixed-assets": return `/purchases/invoices?month=${month}&asset=1`;
     default: return "/attention";
   }
 }

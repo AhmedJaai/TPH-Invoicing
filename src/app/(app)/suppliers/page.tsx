@@ -1,3 +1,6 @@
+import { Suspense } from "react";
+import { SupplierLeverage } from "@/components/supplier-leverage";
+import { SectionBoundary } from "@/components/ui-client";
 import { whatsappHref } from "@/lib/supplier-edit";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -8,12 +11,13 @@ import { PageShell } from "@/components/page-shell";
 import { AccountReview } from "@/components/account-review";
 import { Money } from "@/components/money";
 import {
-  Badge, Callout, Card, DataTable, EmptyState, LinkButton, LinkTabs, Monogram, Section, buttonClass, type Column,
+  Badge, Callout, Card, DataTable, EmptyState, LinkButton, LinkTabs, Monogram, Section, type Column,
 } from "@/components/ui";
 import { AgeingBar, Figure } from "@/components/supplier-intel";
 import { SUPPLIER, countNoun, INVOICE, PAYMENT_RECORD, DAY } from "@/lib/arabic";
-import { buildInvoiceRequest, groupUnbackedBySupplier } from "@/lib/supplier-requests";
-import { loadUnbackedPayments } from "@/services/supplier-followups.service";
+import { buildInvoiceRequest, groupUnbackedBySupplier, invoiceRequestKey } from "@/lib/supplier-requests";
+import { loadInvoiceRequestMarks, loadUnbackedPayments } from "@/services/supplier-followups.service";
+import { RequestInvoiceLink } from "@/components/request-invoice-link";
 import { loadBalanceTotals, loadOpenInvoiceAges, loadOverdueBalances } from "@/services/supplier-balance.service";
 import { loadSupplierDirectory } from "@/services/supplier-intel.service";
 import { listOpenFindings } from "@/services/supplier-analysis.service";
@@ -328,6 +332,14 @@ export default async function SuppliersPage({
         )
       )}
 
+      {showAmounts && knows && (
+        <SectionBoundary what="أرقام التفاوض">
+          <Suspense fallback={null}>
+            <SupplierLeverage />
+          </Suspense>
+        </SectionBoundary>
+      )}
+
       {showAmounts && unbackedTotal > 0 && !unbackedView && (
         <Callout
           tone="info"
@@ -340,7 +352,7 @@ export default async function SuppliersPage({
         </Callout>
       )}
 
-      {unbackedView && showAmounts && <UnbackedSection groups={unbackedGroups} count={unbackedPayments.length} />}
+      {unbackedView && showAmounts && <UnbackedSection groups={unbackedGroups} count={unbackedPayments.length} canRequest={can(user.role, "supplier:edit")} />}
 
       {/* ── القائمة ── */}
       <Section
@@ -449,7 +461,8 @@ export default async function SuppliersPage({
  * «لمن دفعنا بلا فاتورة؟» — يفتحها بندُ الطابور (`?unbacked=1#unbacked`).
  * مورّداً مورّداً، ومع كلٍّ رسالةُ طلبه جاهزة.
  */
-function UnbackedSection({ groups, count }: { groups: ReturnType<typeof groupUnbackedBySupplier>; count: number }) {
+async function UnbackedSection({ groups, count, canRequest }: { groups: ReturnType<typeof groupUnbackedBySupplier>; count: number; canRequest: boolean }) {
+  const marks = await loadInvoiceRequestMarks();
   return (
     <div id="unbacked" className="scroll-mt-28">
       <Section
@@ -504,14 +517,13 @@ function UnbackedSection({ groups, count }: { groups: ReturnType<typeof groupUnb
                   </ul>
                   {g.supplierId && (
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <a
+                      <RequestInvoiceLink
                         href={whatsappHref(g.supplierPhone, buildInvoiceRequest(g))}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={buttonClass("primary", "sm")}
-                      >
-                        {g.payments.every((p) => !p.issuesInvoices) ? "اطلب عقد التوريد (واتساب)" : "اطلب الفاتورة (واتساب)"}
-                      </a>
+                        supplierId={g.supplierId}
+                        label={g.payments.every((p) => !p.issuesInvoices) ? "اطلب عقد التوريد (واتساب)" : "اطلب الفاتورة (واتساب)"}
+                        requestedDaysAgo={marks.get(invoiceRequestKey(g) ?? "") ?? null}
+                        canMark={canRequest}
+                      />
                       {g.supplierSlug && <LinkButton href={`/suppliers/${g.supplierSlug}`} size="sm">ملفّه</LinkButton>}
                     </div>
                   )}
