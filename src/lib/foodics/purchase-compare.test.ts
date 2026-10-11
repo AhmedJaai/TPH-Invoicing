@@ -47,13 +47,46 @@ describe("مشترياتُ فودكس أمام فواتيرنا", () => {
     expect(r.onlyFoodics).toHaveLength(1);
   });
 
-  it("بلا رقمٍ يجمعهما: المورّدُ المربوط والتاريخُ القريب والمبلغُ معاً", () => {
-    const p = purchase({ invoiceNumber: "خطأ", linkedSupplierId: "s1", invoiceDate: "2026-10-05" });
+  it("المورّدُ نفسُه واليومُ نفسُه والمبلغُ نفسُه ← موجودة، ولو كُتب الرقمُ في فودكس على غير صيغته", () => {
+    const p = purchase({ invoiceNumber: "رقمٌ آخر", linkedSupplierId: "s1" });
+    const r = comparePurchases([p], [invoice({ invoiceNumber: "X9" })]);
+    expect(r.matched[0]).toMatchObject({ basis: "SUPPLIER_DAY_AMOUNT", agrees: true, numberConfirms: false });
+    expect(r.onlyFoodics).toEqual([]);
+  });
+
+  it("والرقمُ إن طابق تأكيدٌ زائد يُقال", () => {
+    const r = comparePurchases([purchase({ linkedSupplierId: "s1" })], [invoice()]);
+    expect(r.matched[0]).toMatchObject({ basis: "SUPPLIER_DAY_AMOUNT", numberConfirms: true });
+  });
+
+  it("اليومُ يومُ الفاتورة أو يومُ إدخالها في فودكس", () => {
+    const p = purchase({ invoiceNumber: null, linkedSupplierId: "s1", invoiceDate: "2026-10-05", businessDate: "2026-10-07" });
+    expect(comparePurchases([p], [invoice({ day: "2026-10-05" })]).matched[0].basis).toBe("SUPPLIER_DAY_AMOUNT");
+    expect(comparePurchases([p], [invoice({ day: "2026-10-07" })]).matched[0].basis).toBe("SUPPLIER_DAY_AMOUNT");
+  });
+
+  it("تاريخٌ يبعد أيّاماً بالمبلغ نفسِه يُقبَل ويُقال إنّه قريب؛ والبعيدُ لا", () => {
+    const p = purchase({ invoiceNumber: "خطأ", linkedSupplierId: "s1", invoiceDate: "2026-10-05", businessDate: "2026-10-05" });
     expect(comparePurchases([p], [invoice({ invoiceNumber: "X9" })]).matched[0].basis).toBe("SUPPLIER_DATE_AMOUNT");
-    /* وبلا ربطٍ لا يُطابَق بالمبلغ وحده */
-    expect(comparePurchases([{ ...p, linkedSupplierId: null }], [invoice({ invoiceNumber: "X9" })]).matched).toHaveLength(0);
-    /* ولا بتاريخٍ بعيد */
     expect(comparePurchases([p], [invoice({ invoiceNumber: "X9", day: "2026-09-20" })]).matched).toHaveLength(0);
+  });
+
+  it("بلا ربطٍ لا يُطابَق بالمبلغ واليوم — مورّدٌ مجهول لا يُنسَب إليه", () => {
+    expect(comparePurchases([purchase({ invoiceNumber: "خطأ" })], [invoice({ invoiceNumber: "X9" })]).matched).toHaveLength(0);
+  });
+
+  it("الرقمُ والمبلغُ معاً يُحجَزان أوّلاً: حركةٌ أخرى بالمبلغ نفسِه لا تأخذ فاتورةَ غيرها", () => {
+    /* فاتورتان للمورّد في اليوم نفسِه؛ الحركةُ «أ» رقمُها X ومبلغُها مبلغُ Y خطأً */
+    const r = comparePurchases(
+      [
+        purchase({ id: "a", reference: "PUR-000001", linkedSupplierId: "s1", invoiceNumber: "X", totalMinor: 28_000 }),
+        purchase({ id: "b", reference: "PUR-000002", linkedSupplierId: "s1", invoiceNumber: "Y", totalMinor: 28_000 }),
+      ],
+      [invoice({ id: "ix", invoiceNumber: "X", totalMinor: 26_000 }), invoice({ id: "iy", invoiceNumber: "Y", totalMinor: 28_000 })],
+    );
+    const by = new Map(r.matched.map((m) => [m.purchase.id, m]));
+    expect(by.get("b")).toMatchObject({ invoice: expect.objectContaining({ id: "iy" }), agrees: true });
+    expect(by.get("a")).toMatchObject({ invoice: expect.objectContaining({ id: "ix" }), agrees: false, basis: "NUMBER", gapMinor: 2_000 });
   });
 
   it("فاتورةٌ واحدة لا تُؤخَذ مرّتين — المكرَّرُ في فودكس يظهر زائداً", () => {

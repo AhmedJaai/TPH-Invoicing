@@ -22,9 +22,10 @@ import { invoiceSignalKey as invoiceKey, purchaseSignalKey as purchaseKey } from
 export const dynamic = "force-dynamic";
 
 const BASIS: Record<MatchBasis, string> = {
+  SUPPLIER_DAY_AMOUNT: "بالمورّد واليوم والمبلغ",
+  SUPPLIER_DATE_AMOUNT: "بالمورّد والمبلغ، بتاريخٍ قريب",
   NUMBER: "برقم الفاتورة",
   NUMBER_TAIL: "بآخر أرقامها",
-  SUPPLIER_DATE_AMOUNT: "بالمورّد والتاريخ والمبلغ",
 };
 
 
@@ -114,7 +115,7 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
         />
         <KeyFigure
           icon={Scale}
-          label="اتّفقا رقماً ومبلغاً"
+          label="اتّفقا: المورّدُ واليومُ والمبلغ"
           tone={differs.length > 0 ? "warn" : "ok"}
           value={<span className="nums">{agreed.length}</span>}
           sub={differs.length > 0 ? <>و{countNoun(differs.length, INVOICE)} اختلف مبلغُها بين الطرفين.</> : "ولا فاتورةَ اختلف مبلغُها."}
@@ -183,7 +184,7 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
           title="مورّدو فودكس ومن يقابلهم عندنا"
           icon={Link2}
           count={unlinked.length}
-          hint="الاسمُ ليس هويّة: «Lanius» في فودكس «سرد كو» عندنا. فالاقتراحُ من الفواتير التي طابقت رقماً ومبلغاً لا من الاسم، والربطُ بضغطتك. وبعد الربط تُقابَل حركاتُ المورّد التي لا رقمَ يجمعها بفواتيره بتاريخها ومبلغها."
+          hint="الاسمُ ليس هويّة: «Lanius» في فودكس «سرد كو» عندنا. فالاقتراحُ من الفواتير التي طابقت رقماً ومبلغاً لا من الاسم، والربطُ بضغطتك. والمقابلةُ بالمورّد واليوم والمبلغ تحتاج الربط — بدونه لا يبقى إلّا رقمُ الفاتورة."
         >
           {unlinked.length === 0 ? (
             <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">كلُّ مورّدٍ له حركاتُ شراءٍ مربوط.</p>
@@ -230,10 +231,10 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
       {differs.length > 0 && (
         <Section
           id="differs"
-          title="الفاتورةُ نفسُها والمبلغُ مختلف"
+          title="الرقمُ نفسُه والمبلغُ مختلف"
           icon={Scale}
           count={differs.length}
-          hint="الرقمُ واحدٌ عند الطرفين والإجماليُّ ليس واحداً. أحدُهما قُرئ أو أُدخل خطأً — افتح المستندَ واحكم. إن كان الخطأُ في قراءتنا فصحِّح الفاتورة، وإن كان في فودكس فصحِّحه هناك."
+          hint="لم تُوجد للحركة فاتورةٌ بمبلغها، ووُجدت فاتورةٌ برقمها بمبلغٍ آخر. أحدُ الطرفين قُرئ أو أُدخل خطأً — افتح المستندَ واحكم."
         >
           <ul className="space-y-2">
             {differs.map((m) => <DiffersRow key={m.purchase.id} m={m} canSilence={canSilence} />)}
@@ -247,7 +248,7 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
         title="في فودكس ولا فاتورةَ عندنا"
         icon={FileQuestion}
         count={onlyFoodics.length}
-        hint="حركةُ شراءٍ مُرحَّلةٌ في فودكس لم تُوجد لها فاتورةٌ برقمها، ولا بمورّدها المربوط وتاريخها ومبلغها. إمّا أنّ المستندَ لم يصل الدرايف، أو أنّ رقمَه كُتب في فودكس على غير ما في الفاتورة ومورّدُه لم يُربَط."
+        hint="حركةُ شراءٍ مُرحَّلةٌ في فودكس لا فاتورةَ عندنا لمورّدها بمبلغها في يومها ولا قريباً منه. لمورّدٍ مربوط: المستندُ لم يصل الدرايف، أو مبلغُه في فودكس غيرُ ما في الفاتورة. ولغير المربوط: اربطه أعلاه أوّلاً."
       >
         <DataTable<PurchaseSide>
           rows={onlyFoodics}
@@ -294,7 +295,7 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
       </Section>
 
       {/* ── المتّفقة ── */}
-      <Section id="agreed" title="اتّفقا" icon={CircleCheck} count={agreed.length} hint="فاتورةٌ مؤكَّدةٌ من جهتين: مستندُها في الدرايف وحركتُها في فودكس، بالمبلغ نفسه.">
+      <Section id="agreed" title="اتّفقا" icon={CircleCheck} count={agreed.length} hint="فاتورةٌ مؤكَّدةٌ من جهتين: للمورّد نفسِه في اليوم نفسِه بالمبلغ نفسِه. رقمُ الفاتورة لا يُشترَط — يُكتب في فودكس بيدٍ — وإن طابق فتأكيدٌ زائد.">
         <details className="rounded-xl border border-line bg-raised px-4 py-3 text-xs shadow-raised">
           <summary className="cursor-pointer font-bold text-ink-soft">اعرض {countNoun(agreed.length, INVOICE)}</summary>
           <div className="mt-3">
@@ -305,7 +306,7 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
               columns={[
                 { key: "date", header: "التاريخ", primary: true, cell: (m) => <span><bdi className="font-bold">{formatDay(m.invoice.day)}</bdi><span className="ms-2 text-xs text-muted">{m.invoice.supplierName}</span></span> },
                 { key: "number", header: "رقمُ الفاتورة", cell: (m) => <bdi dir="ltr" className="font-mono text-xs">{m.invoice.invoiceNumber}</bdi> },
-                { key: "basis", header: "طُوبقت", secondary: true, cell: (m) => <span className="text-muted">{BASIS[m.basis]}</span> },
+                { key: "basis", header: "طُوبقت", secondary: true, cell: (m) => <span className="text-muted">{BASIS[m.basis]}{m.numberConfirms && m.basis !== "NUMBER" && <span className="ms-2"><Badge tone="ok">والرقمُ يؤكّده</Badge></span>}</span> },
                 { key: "total", header: "الإجمالي", numeric: true, cell: (m) => <Money minor={m.invoice.totalMinor} /> },
               ]}
             />

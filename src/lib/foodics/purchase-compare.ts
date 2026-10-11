@@ -11,8 +11,10 @@
  * **ولا يُكتب من هنا شيء**: لا تُنشأ فاتورةٌ من حركة فودكس ولا يُصحَّح مبلغ. فودكس
  * يُخطئ في إدخاله كما نخطئ في قراءتنا، والحكمُ لصاحب المقهى أمام المستند.
  *
- * والمطابقةُ برقم الفاتورة أوّلاً (هو ما كتبه المورّد)، ثمّ بالمورّد والتاريخ
- * والمبلغ معاً. والاسمُ لا يُطابَق به: «مورد حبوب قهوة» عند فودكس خمسةُ مورّدين.
+ * **والمطابقةُ بالمورّد واليوم والمبلغ — لا برقم الفاتورة** (أحمد، ١١ أكتوبر ٢٠٢٦): الرقمُ
+ * يُكتب في فودكس بيدٍ وعلى غير صيغة المورّد، فغيابُ تطابقه لا يعني غيابَ الفاتورة.
+ * فاتورةٌ للمورّد نفسِه في اليوم نفسِه بالمبلغ نفسِه **موجودة**؛ والرقمُ إن طابق تأكيدٌ
+ * زائد يُقال، وإن خالف لا يُسقِط شيئاً. والاسمُ لا يُطابَق به: «مورد حبوب قهوة» خمسةُ مورّدين.
  */
 import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import { daysBetween } from "@/lib/riyadh-time";
@@ -54,21 +56,25 @@ function digitTail(raw: string | null | undefined): string {
 
 /** أقلُّ طولٍ لذيلِ الأرقام يُعتدّ به — ما دونه («003») يتكرّر بين المورّدين. */
 const MIN_TAIL_DIGITS = 4;
-/** كم يوماً يُتسامح به بين تاريخ الفاتورة عندنا وتاريخها في فودكس حين لا رقمَ يجمعهما. */
+/** كم يوماً يُتسامح به بين تاريخ الفاتورة عندنا وتاريخها في فودكس حين لا يتّفق اليوم. */
 export const DATE_WINDOW_DAYS = 3;
 
 export type MatchBasis =
-  /** الرقمُ نفسُه. */
+  /** المورّدُ المربوط واليومُ والمبلغُ — القاعدة. */
+  | "SUPPLIER_DAY_AMOUNT"
+  /** المورّدُ المربوط والمبلغُ، والتاريخُ يبعد أيّاماً (أُدخلت في فودكس بعد وصولها). */
+  | "SUPPLIER_DATE_AMOUNT"
+  /** الرقمُ نفسُه — لمورّدٍ لم يُربَط، أو حين اختلف المبلغ. */
   | "NUMBER"
   /** ذيلُ الأرقام نفسُه والمبلغُ أو المورّدُ يؤيّده. */
-  | "NUMBER_TAIL"
-  /** لا رقمَ يجمعهما: المورّدُ المربوط والتاريخُ القريب والمبلغُ نفسُه. */
-  | "SUPPLIER_DATE_AMOUNT";
+  | "NUMBER_TAIL";
 
 export interface MatchedPair {
   purchase: PurchaseSide;
   invoice: InvoiceSide;
   basis: MatchBasis;
+  /** رقمُ الفاتورة عند الطرفين واحد — تأكيدٌ زائد، لا شرط. */
+  numberConfirms: boolean;
   /** فودكس − فاتورتُنا. داخل السماحة «متّفقان». */
   gapMinor: number;
   agrees: boolean;
@@ -110,37 +116,77 @@ export function comparePurchases(purchases: readonly PurchaseSide[], invoices: r
     if (free.length === 0) return null;
     return free.sort((a, b) =>
       Number(b.supplierId === p.linkedSupplierId) - Number(a.supplierId === p.linkedSupplierId)
+      /* الرقمُ المطابق يرجّح بين متساويَين — تأكيدٌ زائد */
+      || Number(normaliseInvoiceNumber(b.invoiceNumber) === normaliseInvoiceNumber(p.invoiceNumber) && normaliseInvoiceNumber(p.invoiceNumber) !== "")
+        - Number(normaliseInvoiceNumber(a.invoiceNumber) === normaliseInvoiceNumber(p.invoiceNumber) && normaliseInvoiceNumber(p.invoiceNumber) !== "")
       || Math.abs(a.totalMinor - p.totalMinor) - Math.abs(b.totalMinor - p.totalMinor)
       || Math.abs(daysBetween(a.day, dateOf(p))) - Math.abs(daysBetween(b.day, dateOf(p)))
       || a.id.localeCompare(b.id),
     )[0];
+  };
+  const sameNumber = (p: PurchaseSide, i: InvoiceSide) => {
+    const key = normaliseInvoiceNumber(p.invoiceNumber);
+    return key !== "" && key === normaliseInvoiceNumber(i.invoiceNumber);
   };
   const take = (p: PurchaseSide, i: InvoiceSide, basis: MatchBasis) => {
     takenInvoices.add(i.id);
     takenPurchases.add(p.id);
     const gapMinor = p.totalMinor - i.totalMinor;
     matched.push({
-      purchase: p, invoice: i, basis, gapMinor, agrees: within(gapMinor),
+      purchase: p, invoice: i, basis, gapMinor, agrees: within(gapMinor), numberConfirms: sameNumber(p, i),
       supplierConflict: p.linkedSupplierId !== null && p.linkedSupplierId !== i.supplierId,
     });
   };
+  /** يومُ الفاتورة عندنا هو يومُها في فودكس — تاريخُ فاتورتها أو يومُ إدخالها. */
+  const sameDay = (p: PurchaseSide, i: InvoiceSide) => i.day === p.invoiceDate || i.day === p.businessDate;
 
-  /* ١. الرقمُ نفسُه — ولمورّدٍ مربوطٍ بغير مورّد الفاتورة يُشترط اتّفاقُ المبلغ */
   const byNumber = new Map<string, InvoiceSide[]>();
   for (const i of invoices) {
     const key = normaliseInvoiceNumber(i.invoiceNumber);
     if (key !== "") byNumber.set(key, [...(byNumber.get(key) ?? []), i]);
   }
+  const numberCandidates = (p: PurchaseSide) => byNumber.get(normaliseInvoiceNumber(p.invoiceNumber)) ?? [];
+
+  /*
+    ١. ما اجتمع فيه الرقمُ والمبلغ — أقوى دليل، فيُحجَز أوّلاً: وإلّا أخذت حركةٌ أخرى
+       بالمبلغ نفسِه في اليوم نفسِه فاتورةً هي لغيرها رقماً ومبلغاً.
+  */
   for (const p of sortedPurchases) {
-    const key = normaliseInvoiceNumber(p.invoiceNumber);
-    if (key === "") continue;
-    const candidates = (byNumber.get(key) ?? []).filter((i) =>
-      p.linkedSupplierId === null || i.supplierId === p.linkedSupplierId || within(p.totalMinor - i.totalMinor));
-    const found = pick(p, candidates);
+    if (normaliseInvoiceNumber(p.invoiceNumber) === "") continue;
+    const found = pick(p, numberCandidates(p).filter((i) =>
+      within(p.totalMinor - i.totalMinor) && (p.linkedSupplierId === null || i.supplierId === p.linkedSupplierId)));
+    if (found) take(p, found, p.linkedSupplierId !== null && sameDay(p, found) ? "SUPPLIER_DAY_AMOUNT" : "NUMBER");
+  }
+
+  /* ٢. القاعدة: المورّدُ المربوط واليومُ نفسُه والمبلغُ نفسُه — والرقمُ لا يُسأل عنه */
+  for (const p of sortedPurchases) {
+    if (takenPurchases.has(p.id) || p.linkedSupplierId === null) continue;
+    const found = pick(p, invoices.filter((i) =>
+      i.supplierId === p.linkedSupplierId && within(p.totalMinor - i.totalMinor) && sameDay(p, i)));
+    if (found) take(p, found, "SUPPLIER_DAY_AMOUNT");
+  }
+
+  /* ٣. والمبلغُ نفسُه للمورّد نفسِه بتاريخٍ يبعد أيّاماً — فاتورةٌ أُدخلت في فودكس بعد يومها */
+  for (const p of sortedPurchases) {
+    if (takenPurchases.has(p.id) || p.linkedSupplierId === null) continue;
+    const found = pick(p, invoices.filter((i) =>
+      i.supplierId === p.linkedSupplierId
+      && within(p.totalMinor - i.totalMinor)
+      && Math.abs(daysBetween(i.day, dateOf(p))) <= DATE_WINDOW_DAYS));
+    if (found) take(p, found, "SUPPLIER_DATE_AMOUNT");
+  }
+
+  /*
+    ٤. الرقمُ نفسُه والمبلغُ مختلف — يُقرَن ليُعرَض الفرق. ولمورّدٍ مربوط يُشترط أن تكون
+       الفاتورةُ فاتورتَه: رقمٌ يتكرّر بين المورّدين لا يجمع حركةً بفاتورة غيره.
+  */
+  for (const p of sortedPurchases) {
+    if (takenPurchases.has(p.id) || normaliseInvoiceNumber(p.invoiceNumber) === "") continue;
+    const found = pick(p, numberCandidates(p).filter((i) => p.linkedSupplierId === null || i.supplierId === p.linkedSupplierId));
     if (found) take(p, found, "NUMBER");
   }
 
-  /* ٢. ذيلُ الأرقام — يؤيّده المورّدُ المربوط أو المبلغُ نفسُه */
+  /* ٥. ذيلُ الأرقام — يؤيّده المورّدُ المربوط أو المبلغُ نفسُه */
   const byTail = new Map<string, InvoiceSide[]>();
   for (const i of invoices) {
     const tail = digitTail(i.invoiceNumber);
@@ -154,17 +200,6 @@ export function comparePurchases(purchases: readonly PurchaseSide[], invoices: r
       i.supplierId === p.linkedSupplierId || within(p.totalMinor - i.totalMinor));
     const found = pick(p, candidates);
     if (found) take(p, found, "NUMBER_TAIL");
-  }
-
-  /* ٣. بلا رقمٍ يجمعهما: المورّدُ المربوط والتاريخُ القريب والمبلغُ نفسُه — الثلاثةُ معاً */
-  for (const p of sortedPurchases) {
-    if (takenPurchases.has(p.id) || p.linkedSupplierId === null) continue;
-    const candidates = invoices.filter((i) =>
-      i.supplierId === p.linkedSupplierId
-      && within(p.totalMinor - i.totalMinor)
-      && Math.abs(daysBetween(i.day, dateOf(p))) <= DATE_WINDOW_DAYS);
-    const found = pick(p, candidates);
-    if (found) take(p, found, "SUPPLIER_DATE_AMOUNT");
   }
 
   const foodicsSince = purchases.length === 0 ? null : purchases.map((p) => p.businessDate).sort()[0];
@@ -217,7 +252,7 @@ export function suggestSupplierLinks(matched: readonly MatchedPair[]): SupplierL
   const tally = new Map<string, Map<string, { name: string; n: number }>>();
   for (const m of matched) {
     const f = m.purchase.foodicsSupplierId;
-    if (!f || m.purchase.linkedSupplierId !== null || !m.agrees || m.basis === "SUPPLIER_DATE_AMOUNT") continue;
+    if (!f || m.purchase.linkedSupplierId !== null || !m.agrees || !m.numberConfirms) continue;
     let of = tally.get(f);
     if (!of) tally.set(f, (of = new Map()));
     const cell = of.get(m.invoice.supplierId) ?? { name: m.invoice.supplierName, n: 0 };
