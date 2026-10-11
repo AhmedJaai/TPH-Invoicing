@@ -149,6 +149,9 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   /* الجرد وتسوية المخزون */
   SALES_IMPORTED: "استيراد ملفّ مبيعات",
   SUPPLIER_FOODICS_LINKED: "ربط مورّد فودكس بمورّد",
+  FINANCE_DECLARATION_CREATED: "إقرارُ مصروفٍ خارج الكشف أو توزيعُه",
+  FINANCE_DECLARATION_VOIDED: "سحبُ إقرارٍ ماليّ",
+  FINANCE_PNL_FROZEN: "تجميدُ قائمة دخل شهر",
   POS_PRODUCT_MAPPED: "ربط صنف فودكس",
   POS_PRODUCT_UNMAPPED: "فكّ ربط صنف فودكس",
   RECIPE_CREATED: "إنشاء وصفة",

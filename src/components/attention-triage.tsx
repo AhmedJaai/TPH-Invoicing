@@ -1,9 +1,6 @@
 import Link from "next/link";
 import {
-  Activity, ArrowDown, ArrowLeft, Ban, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, CircleAlert,
-  CircleCheck, CircleDot, CircleHelp, Clock, Copy, FileClock, FolderInput, FolderX, FileSearch, FileSignature, FileText, FileWarning, FileX,
-  Hourglass, Info, Landmark, Lightbulb, ListChecks, type LucideIcon, Percent, ReceiptText, RotateCcw, Scale,
-  ScanSearch, ShieldAlert, Sparkles, TrendingUp, TriangleAlert, Undo2, Unlink, Zap,
+  Activity, ArrowDown, ArrowLeft, Ban, Banknote, Boxes, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDot, CircleHelp, Clock, Copy, FileClock, FileSearch, FileSignature, FileText, FileWarning, FileX, FolderInput, FolderX, HandCoins, Hourglass, Info, Landmark, Lightbulb, Link2, ListChecks, Percent, ReceiptText, RefreshCw, RotateCcw, Scale, ScanSearch, ShieldAlert, Sparkles, TrendingUp, TriangleAlert, Undo2, Unlink, Zap, type LucideIcon,
 } from "lucide-react";
 import { Money, Prose } from "./money";
 import { Badge, DoneMark, FlowItem, Kbd, LinkButton, LinkTabs, Stepper, buttonClass, type Tone } from "./ui";
@@ -70,6 +67,12 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "foodics-card-gap": Scale,
   "foodics-purchase-differs": Scale,
   "foodics-purchase-missing": FileSearch,
+  "foodics-stale": RefreshCw,
+  "foodics-till-gap": Banknote,
+  "finance-incomplete": HandCoins,
+  "stock-links-ready": Link2,
+  "stock-gap-shortage": Boxes,
+  "stock-gap-over": Boxes,
   "proforma-without-invoice": FileWarning,
   "recurring-anomalies": RotateCcw,
   "obligations-expiring": FileClock,

@@ -32,6 +32,12 @@ export const ATTENTION_IDS = [
   "foodics-card-gap",
   "foodics-purchase-differs",
   "foodics-purchase-missing",
+  "foodics-stale",
+  "foodics-till-gap",
+  "finance-incomplete",
+  "stock-links-ready",
+  "stock-gap-shortage",
+  "stock-gap-over",
   "proforma-without-invoice",
   "recurring-anomalies",
   "obligations-expiring",
@@ -75,6 +81,10 @@ export const SIGNAL_IDS: ReadonlySet<AttentionId> = new Set<AttentionId>([
   "foodics-card-gap",
   "foodics-purchase-differs",
   "foodics-purchase-missing",
+  /* صندوقٌ فرقُه ظاهر وصنفٌ تكرّر فرقُه: ملاحظاتٌ محسوبة تُسكَت بسببها من صفحتها */
+  "foodics-till-gap",
+  "stock-gap-shortage",
+  "stock-gap-over",
   "recurring-anomalies",
 ]);
 

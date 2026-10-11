@@ -125,8 +125,50 @@ export const FoodicsTill = z.object({
   variance: amount,
   opened_at: z.string().nullable().optional(),
   closed_at: z.string().nullable().optional(),
+  /* الاسمُ وحده: كائنُ المستخدم يحمل بريدَه وبصمةَ رمزه، ولا يدخل منهما شيء */
+  user: z.object({ name: z.string().nullable().optional() }).nullable().optional(),
+  device: z.object({ name: z.string().nullable().optional() }).nullable().optional(),
 });
 export type FoodicsTill = z.infer<typeof FoodicsTill>;
+
+/** حركاتُ الصرف التي يكتبها فودكس وحده مع كلّ طلب. */
+export const STOCK_MOVE = { CONSUMPTION: 8, RETURN: 9, WASTE: 10 } as const;
+export const STOCK_MOVE_KINDS: readonly number[] = [STOCK_MOVE.CONSUMPTION, STOCK_MOVE.RETURN, STOCK_MOVE.WASTE];
+
+const StockItem = {
+  id: z.string(),
+  name: z.string(),
+  sku: z.string().nullable().optional(),
+  storage_unit: z.string().nullable().optional(),
+  ingredient_unit: z.string().nullable().optional(),
+  storage_to_ingredient_factor: z.number().nullable().optional(),
+};
+
+/** حركةُ صرفٍ ببنودها — الكمّيّةُ بوحدة التخزين، والكلفةُ كلفةُ فودكس للسطر. */
+export const FoodicsStockMove = z.object({
+  id: z.string(),
+  type: z.number(),
+  status: z.number(),
+  business_date: z.string(),
+  items: z.array(z.object({ ...StockItem, pivot: z.object({ quantity: z.number(), cost: amount }) })).optional(),
+});
+export type FoodicsStockMove = z.infer<typeof FoodicsStockMove>;
+
+/** جردٌ كتبه من عدّ الرفّ. `variance_*` حسابُ فودكس، والمعدودُ `quantity`. */
+export const FoodicsStockCount = z.object({
+  id: z.string(),
+  reference: z.string(),
+  business_date: z.string(),
+  status: z.number(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  creator: z.object({ name: z.string().nullable().optional() }).nullable().optional(),
+  items: z.array(z.object({
+    ...StockItem,
+    pivot: z.object({ quantity: z.number(), variance_quantity: amount, variance_cost: amount }),
+  })).optional(),
+});
+export type FoodicsStockCount = z.infer<typeof FoodicsStockCount>;
 
 /** صنفُ مخزونٍ في كتالوج فودكس. المحذوفُ يحمل `deleted_at`. */
 export const FoodicsInventoryItem = z.object({

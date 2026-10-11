@@ -206,6 +206,17 @@ export interface AttentionFacts {
   foodicsPurchaseDiffers?: { supplierName: string; invoiceNumber: string; gapMinor: number }[];
   foodicsPurchaseMissing?: { supplierName: string; invoiceNumber: string | null; totalMinor: number }[];
   /**
+   * ما تقوله المساحةُ الماليّة (`services/finance-attention.service.ts`): ما ينقص ربحَ الشهر
+   * ولا يُعرَف إلّا من صاحبه، وربطٌ جاهزٌ بدليل، وصندوقٌ فرقُه ظاهر، ومزامنةٌ وقفت، وصنفٌ
+   * تكرّر فرقُه. كلُّها لها جوابٌ ممكن — وما أسكته صاحبُه لا يُعدّ.
+   */
+  financeRentLumps?: { day: string; amountMinor: number }[];
+  financeLastMonthMissing?: { month: string; rent: boolean; salary: boolean } | null;
+  stockLinksReady?: { count: number; valueMinor: number };
+  foodicsTillGaps?: { day: string; userName: string | null; varianceMinor: number; uncounted: boolean }[];
+  foodicsStaleHours?: number | null;
+  stockRecurringGaps?: { productId: string; name: string; kind: "SHORTAGE" | "OVER_AVAILABLE"; months: number; totalMinor: number; byWitness: boolean }[];
+  /**
    * وثائقُ انتهت أو دخلت مهلةَ تذكيرها (`lib/obligations.ts`) — يكتبها صاحبُها بيده.
    * `daysLeft` سالبٌ بعد الانتهاء.
    */
@@ -777,6 +788,146 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       amountMinor: list.reduce((s, x) => s + x.totalMinor, 0),
       impact: { kind: "UNATTRIBUTED", amountMinor: list.reduce((s, x) => s + x.totalMinor, 0) },
       evidence: list.slice(0, 6).map((x) => ({ label: `${x.supplierName} · ${x.invoiceNumber ?? "بلا رقم"}`, amountMinor: x.totalMinor })),
+    });
+  }
+
+  /* ── المساحةُ الماليّة ── */
+
+  /*
+    مزامنةٌ وقفت بلا أن يعلم أحد: فودكس يُقرأ حين يُفتَح التطبيق، فإن مضى يومٌ وأكثر
+    فمبيعاتُ أمس وصناديقُه ليست هنا — وكلُّ رقمٍ في «المالية» ناقصٌ بقدرها.
+  */
+  if (f.foodicsStaleHours != null) {
+    const days = Math.floor(f.foodicsStaleHours / 24);
+    out.push({
+      id: "foodics-stale",
+      area: "DATA",
+      severity: days >= 3 ? "HIGH" : "MEDIUM",
+      title: days >= 1 ? `فودكس لم يُقرأ منذ ${countNoun(days, DAY)}` : "فودكس لم يُقرأ منذ أكثر من يوم",
+      detail: "آخرُ مزامنةٍ ناجحة قديمة: مبيعاتُ الأيّام بعدها وصناديقُها ليست في النظام، فأرقامُ «المالية» والجرد ناقصةٌ بقدرها.",
+      action: "اضغط «زامن الآن». إن رفض فودكس المفتاح فقد أُلغي من «Authorized Apps» ويُطلَب غيرُه.",
+      actionLabel: "زامن فودكس",
+      href: "/money/foodics",
+      count: 1,
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: [],
+    });
+  }
+
+  /*
+    ربحٌ ينقصه الإيجارُ أو الرواتب ليس ربحاً — وما ينقصه لا يُعرَف إلّا من صاحبه.
+    بندٌ واحد: دفعةُ إيجارٍ لم تُوزَّع، أو شهرٌ انتهى بلا إيجارٍ ولا رواتب.
+  */
+  const lumps = f.financeRentLumps ?? [];
+  const missing = f.financeLastMonthMissing ?? null;
+  if (lumps.length > 0 || missing) {
+    const names = [missing?.rent ? "الإيجار" : null, missing?.salary ? "الرواتب" : null].filter((x): x is string => x !== null);
+    out.push({
+      id: "finance-incomplete",
+      area: "DATA",
+      severity: "MEDIUM",
+      title: lumps.length > 0
+        ? "إيجارٌ في الكشف لم يُقَل كم شهراً يغطّي"
+        : `ربحُ ${formatMonth(missing?.month ?? "")} ينقصه ${names.join(" و")}`,
+      detail: lumps.length > 0
+        ? `شهرُ الدفع يحمل الدفعةَ كلَّها والأشهرُ حوله «ربحٌ قبل الإيجار»${missing && names.length > 0 ? ` — و${formatMonth(missing.month)} ينقصه ${names.join(" و")}` : ""}.`
+        : "لا شيءَ مقيَّدٌ له في الكشف ولا بإقرارك — فالرقمُ «ربحٌ قبل كذا» لا «صافي الربح».",
+      action: "قل ما لا يراه الكشف: كم شهراً تغطّي دفعةُ الإيجار، وما يُدفَع نقداً أو من حسابٍ شخصيّ.",
+      actionLabel: "أكمِل ربحَ الشهر",
+      href: `/finance/inputs${missing ? `?month=${missing.month}` : ""}`,
+      count: Math.max(1, lumps.length),
+      impact: { kind: "BLOCKED", amountMinor: lumps.length > 0 ? lumps.reduce((s, l) => s + l.amountMinor, 0) : null },
+      evidence: lumps.slice(0, 4).map((l) => ({ label: `إيجارٌ خرج ${formatDay(l.day)}`, sub: "لم يُوزَّع على أشهره", amountMinor: l.amountMinor })),
+    });
+  }
+
+  /* بنودُ فواتير اتّفق دليلُ فودكس على صنفها وعبوتها: ضغطةٌ ترفع تغطيةَ «المشترى والمباع» */
+  if ((f.stockLinksReady?.count ?? 0) > 0) {
+    const ready = f.stockLinksReady!;
+    out.push({
+      id: "stock-links-ready",
+      area: "DATA",
+      severity: "OPPORTUNITY",
+      title: `${countNoun(ready.count, PRODUCT)} من الفواتير جاهزةٌ للربط بأصناف المخزون`,
+      detail: "يقابل كلّاً منها في فودكس بندُ شراءٍ للمورّد نفسه بالمبلغ نفسه، اختار له من أدخله صنفَ المخزون وكمّيّته. بلا ربطها تبقى مشترياتُ أصنافها «غير معروفة».",
+      action: "راجِعها وأقِرّها بضغطة — أو عدِّل ما تراه غيرَ ذلك.",
+      actionLabel: "اربط البنود",
+      href: "/finance/stock/links?view=ready",
+      count: ready.count,
+      impact: { kind: "UNATTRIBUTED", amountMinor: ready.valueMinor },
+      evidence: [],
+    });
+  }
+
+  /* صندوقٌ أُقفل بلا عدّ أو بفرقٍ فوق الفكّة — يُسأل عنه من أقفله، ولا يُسمّى ضياعاً */
+  if ((f.foodicsTillGaps?.length ?? 0) > 0) {
+    const tills = f.foodicsTillGaps!;
+    const uncounted = tills.filter((t) => t.uncounted).length;
+    out.push({
+      id: "foodics-till-gap",
+      area: "BANK",
+      severity: "MEDIUM",
+      title: tills.length === 1
+        ? (tills[0].uncounted ? `صندوقُ ${formatDay(tills[0].day)} أُقفل بلا عدّ` : `صندوقُ ${formatDay(tills[0].day)}: المعدودُ غيرُ المتوقَّع`)
+        : `${tills.length} صناديقَ معدودُها غيرُ المتوقَّع`,
+      detail: uncounted > 0
+        ? "صندوقٌ أُقفل والمعدودُ فيه صفرٌ وفودكس يتوقّع نقداً — لم يُعَدّ عند الإقفال. وغيرُه فرقُه فوق الفكّة."
+        : "النقدُ المعدود عند الإقفال يبعد عمّا يتوقّعه فودكس بأكثر من فكّة. نقدُ المقهى لا يدخل البنك، فهذا العدُّ عينُه الوحيدة.",
+      action: "اسأل من أقفل الصندوق: أعُدّ؟ أأُخذ منه ما لم يُسجَّل «سحباً» في فودكس؟ وما عرفتَ سببَه فأسكِته.",
+      actionLabel: "افتح النقد والصندوق",
+      href: "/finance/position#cash",
+      count: tills.length,
+      impact: { kind: "AT_RISK", amountMinor: tills.filter((t) => t.varianceMinor < 0).reduce((s, t) => s - t.varianceMinor, 0) || null },
+      evidence: tills.slice(0, 6).map((t) => ({
+        label: `صندوقُ ${formatDay(t.day)}${t.userName ? ` · فتحه ${t.userName}` : ""}`,
+        sub: t.uncounted ? "أُقفل بلا عدّ" : t.varianceMinor < 0 ? "المعدودُ أقلّ من المتوقَّع" : "المعدودُ أكثر من المتوقَّع",
+        amountMinor: Math.abs(t.varianceMinor),
+      })),
+    });
+  }
+
+  /*
+    صنفٌ تكرّر فرقُه شهرين فأكثر — بسؤالٍ محدَّد لا بحكم: النقصُ «راجِع الوصفة أو سجِّل
+    الهدر»، والاستهلاكُ فوق المتاح «فاتورةٌ ناقصة؟».
+  */
+  const recurring = f.stockRecurringGaps ?? [];
+  const shortages = recurring.filter((g) => g.kind === "SHORTAGE");
+  const overs = recurring.filter((g) => g.kind === "OVER_AVAILABLE");
+  if (shortages.length > 0) {
+    out.push({
+      id: "stock-gap-shortage",
+      area: "DATA",
+      severity: "MEDIUM",
+      title: shortages.length === 1
+        ? `«${shortages[0].name}» يخرج من الرفّ أكثر ممّا تفسّره وصفتُه — ${shortages[0].months} أشهرٍ متتالية`
+        : `${countNoun(shortages.length, PRODUCT)} تخرج من الرفّ أكثر ممّا تفسّره وصفاتُها`,
+      detail: "الفرقُ تكرّر شهرين فأكثر فليس عدّاً مستعجلاً. قد يكون هدراً لا يُسجَّل، أو وصفةً أصغر من الواقع (جرعةٌ أكبر، ضبطُ طحن)، أو تسريباً — البياناتُ لا تحسم.",
+      action: "راجِع الوصفة: أتطابق ما يُصرَف فعلاً؟ وسجِّل الهدرَ حين يقع ليخرج من الفرق.",
+      actionLabel: "افتح المشترى والمباع",
+      href: "/finance/stock#recurring",
+      count: shortages.length,
+      impact: { kind: "AT_RISK", amountMinor: shortages.reduce((s, g) => s + g.totalMinor, 0) },
+      evidence: shortages.slice(0, 6).map((g) => ({
+        label: g.name, sub: `${g.months} أشهرٍ متتالية${g.byWitness ? " · بمشتريات فودكس" : ""}`, amountMinor: g.totalMinor,
+        href: `/finance/stock/item?id=${g.productId}&month=all`,
+      })),
+    });
+  }
+  if (overs.length > 0) {
+    out.push({
+      id: "stock-gap-over",
+      area: "INVOICES",
+      severity: "MEDIUM",
+      title: overs.length === 1
+        ? `«${overs[0].name}» بِيع منه أكثر ممّا اشتُري — فاتورةٌ ناقصة؟`
+        : `${countNoun(overs.length, PRODUCT)} بِيع منها أكثر ممّا اشتُري — فواتيرُ ناقصة؟`,
+      detail: "الاستهلاكُ النظريّ فاق المتاح شهرين فأكثر. ليس ربحاً: فاتورةُ شراءٍ لم تُقيَّد أو لم تُربَط بالصنف، أو وصفةٌ تقول أكثر ممّا يُصرَف.",
+      action: "افتح الصنف: أفواتيرُه كاملةٌ ومربوطة؟ ثمّ راجِع الوصفة.",
+      actionLabel: "افتح المشترى والمباع",
+      href: "/finance/stock#recurring",
+      count: overs.length,
+      impact: { kind: "UNATTRIBUTED", amountMinor: overs.reduce((s, g) => s + g.totalMinor, 0) },
+      evidence: overs.slice(0, 6).map((g) => ({ label: g.name, sub: `${g.months} أشهرٍ متتالية`, amountMinor: g.totalMinor, href: `/finance/stock/item?id=${g.productId}&month=all` })),
     });
   }
 

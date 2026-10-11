@@ -2228,8 +2228,69 @@ export const foodicsTills = pgTable("foodics_tills", {
   varianceMinor: integer("variance_minor"),
   openedAt: timestamp("opened_at", { withTimezone: true }),
   closedAt: timestamp("closed_at", { withTimezone: true }),
+  /** من فتح الصندوق وعلى أيّ جهاز (079) — للعرض بجانب الفرق، لا اتّهاماً. */
+  userName: text("user_name"),
+  deviceName: text("device_name"),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("foodics_tills_date_idx").on(t.businessDate)]);
+
+/**
+ * جردُ فودكس (079): ما عدّه إنسانٌ على الرفّ. الكمّيّةُ المعدودة واقعة؛ و«الفرق» بجانبها
+ * حسابُ فودكس — شاهدٌ لا يُبنى عليه.
+ */
+export const foodicsStockCounts = pgTable("foodics_stock_counts", {
+  id: text("id").primaryKey(),
+  reference: text("reference").notNull(),
+  businessDate: text("business_date").notNull(),
+  /** آخرُ يومِ بيعٍ سبق العدّ — `stockDayOf` في `lib/foodics/stock.ts`. */
+  stockDay: text("stock_day").notNull(),
+  status: integer("status").notNull(),
+  creatorName: text("creator_name"),
+  countedAt: timestamp("counted_at", { withTimezone: true }),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }).notNull(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("foodics_stock_counts_day_idx").on(t.stockDay)]);
+
+export const foodicsStockCountItems = pgTable("foodics_stock_count_items", {
+  countId: text("count_id").notNull().references(() => foodicsStockCounts.id, { onDelete: "cascade" }),
+  itemId: text("item_id").notNull(),
+  sku: text("sku"),
+  name: text("name").notNull(),
+  storageUnit: text("storage_unit"),
+  ingredientUnit: text("ingredient_unit"),
+  factorMilli: bigint("factor_milli", { mode: "number" }),
+  quantityMilli: bigint("quantity_milli", { mode: "number" }).notNull(),
+  varianceQuantityMilli: bigint("variance_quantity_milli", { mode: "number" }),
+  varianceCostMinor: integer("variance_cost_minor"),
+}, (t) => [
+  primaryKey({ columns: [t.countId, t.itemId] }),
+  index("foodics_stock_count_items_sku_idx").on(t.sku),
+]);
+
+/** صرفُ فودكس مجموعاً يوماً بصنفٍ بنوع (079) — ٨ طلب · ٩ ردُّ مرتجَع · ١٠ هدر. */
+export const foodicsItemMoves = pgTable("foodics_item_moves", {
+  businessDate: text("business_date").notNull(),
+  kind: integer("kind").notNull(),
+  itemId: text("item_id").notNull(),
+  sku: text("sku"),
+  name: text("name").notNull(),
+  storageUnit: text("storage_unit"),
+  ingredientUnit: text("ingredient_unit"),
+  storageMicro: bigint("storage_micro", { mode: "number" }).notNull(),
+  ingredientMilli: bigint("ingredient_milli", { mode: "number" }),
+  costMicro: bigint("cost_micro", { mode: "number" }).notNull(),
+  txCount: integer("tx_count").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.businessDate, t.kind, t.itemId] }),
+  index("foodics_item_moves_sku_idx").on(t.sku, t.businessDate),
+]);
+
+/** يومٌ قُرئ صرفُه كلُّه — يفرّق «لم يُصرَف شيء» عن «لم نقرأ». */
+export const foodicsMoveDays = pgTable("foodics_move_days", {
+  businessDate: text("business_date").primaryKey(),
+  txCount: integer("tx_count").notNull(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const foodicsSyncRuns = pgTable("foodics_sync_runs", {
   id: id(),
@@ -2241,3 +2302,46 @@ export const foodicsSyncRuns = pgTable("foodics_sync_runs", {
   error: text("error"),
   startedById: text("started_by_id").references(() => users.id),
 }, (t) => [index("foodics_sync_runs_started_idx").on(t.startedAt)]);
+
+/* ───────────────────────── المساحةُ الماليّة (080) ───────────────────────── */
+
+/**
+ * إقرارُ المالك عمّا لا يراه الكشف — طبقةُ قراءةٍ فوق الدفاتر، لا قيد.
+ * `SPREAD` يوزّع حركةَ بنكٍ على أشهر · `OFF_BOOK` مصروفٌ شهريّ خارج الكشف · `NONE` «لا يوجد».
+ */
+export const financeDeclarations = pgTable("finance_declarations", {
+  id: id(),
+  kind: text("kind").$type<"SPREAD" | "OFF_BOOK" | "NONE">().notNull(),
+  category: text("category").notNull(),
+  label: text("label").notNull(),
+  amountMinor: integer("amount_minor").notNull(),
+  fromMonth: text("from_month").notNull(),
+  toMonth: text("to_month").notNull(),
+  bankTransactionId: text("bank_transaction_id").references(() => bankTransactions.id, { onDelete: "set null" }),
+  note: text("note"),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+  voidedById: text("voided_by_id").references(() => users.id),
+});
+
+/** قائمةُ دخل الشهر المقفل كما جُمِّدت — تُقرأ ولا يُعاد حسابُها. */
+export const financeSnapshots = pgTable("finance_snapshots", {
+  month: text("month").primaryKey(),
+  payload: jsonb("payload").notNull(),
+  frozenAt: timestamp("frozen_at", { withTimezone: true }).notNull().defaultNow(),
+  frozenById: text("frozen_by_id").references(() => users.id),
+});
+
+/** قراءةُ النموذج لأرقامٍ محسوبة، بمدخلاتها وبصمتها. */
+export const financeReadings = pgTable("finance_readings", {
+  id: id(),
+  scope: text("scope").notNull(),
+  month: text("month").notNull(),
+  factsHash: text("facts_hash").notNull(),
+  facts: jsonb("facts").notNull(),
+  reading: jsonb("reading").notNull(),
+  model: text("model").notNull(),
+  createdAt: now(),
+  createdById: text("created_by_id").references(() => users.id),
+}, (t) => [index("finance_readings_scope_idx").on(t.scope, t.month, t.createdAt)]);

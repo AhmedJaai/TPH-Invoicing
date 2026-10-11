@@ -3,6 +3,8 @@
  *
  *   npm run foodics:sync -- --i-know-this-is-production                    ما تغيّر منذ آخر مرّة
  *   npm run foodics:sync -- --from 2026-05-05 --to 2026-10-11 --i-know-this-is-production
+ *   npm run foodics:sync -- --moves --from 2026-05-05 --to 2026-10-11 --i-know-this-is-production
+ *       صرفُ الأصناف وحده (حركةٌ لكلّ طلب — ٢١ ألفاً)، يوماً يوماً، وما قُرئ يومُه يُتخطّى
  *
  * المدى يُقرأ أسبوعاً أسبوعاً: كلُّ أسبوعٍ استيرادٌ مستقلّ بمعاملته، فإن سقط واحدٌ
  * بقي ما قبله وأُعيد هو وحده. والتشغيلُ مرّتين لا يضاعف شيئاً — المفتاحُ معرّفُ فودكس.
@@ -35,6 +37,14 @@ async function main() {
     process.exit(1);
   }
 
+  if (process.argv.includes("--moves")) {
+    const r = await runFoodicsSync({ actorId: null, window: { from, to }, movesOnly: true });
+    console.log(`${from} → ${to}  ${r.status}  أيّامُ صرفٍ ${r.counts.moveDays}` + (r.counts.rejected ? ` · مردود ${r.counts.rejected}` : ""));
+    for (const p of r.counts.problems.slice(0, 10)) console.log(`   ! ${p}`);
+    if (r.error) console.error(`   ✕ ${r.error}`);
+    process.exit(r.status === "FAILED" ? 1 : 0);
+  }
+
   let first = true;
   let failed = false;
   for (let start = from; start <= to; start = addDays(start, 7)) {
@@ -45,7 +55,7 @@ async function main() {
     const c = r.counts;
     console.log(
       `${start} → ${end}  ${r.status}  طلبات ${c.ordersRead} · بيعاتٌ جديدة ${c.salesWritten} · مُعادة ${c.salesRestated} · أسطرٌ روجعت ${c.linesRevised}` +
-      (c.purchases ? ` · مشتريات ${c.purchases} · مورّدون ${c.suppliers} · صناديق ${c.tills}` : "") +
+      (c.purchases ? ` · مشتريات ${c.purchases} · مورّدون ${c.suppliers} · صناديق ${c.tills} · جرود ${c.stockCounts}` : "") +
       (c.rejected ? ` · مردود ${c.rejected}` : ""),
     );
     for (const p of c.problems.slice(0, 5)) console.log(`   ! ${p}`);

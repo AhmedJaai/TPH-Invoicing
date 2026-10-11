@@ -61,6 +61,8 @@
     "db:restore-verify": "tsx --env-file=.env scripts/restore-verify.ts",
     "db:backfill-layers": "tsx --env-file=.env scripts/backfill-layers.ts",
     "foodics:sync": "tsx --env-file=.env scripts/foodics-sync.ts",
+    "finance:report": "tsx --env-file=.env scripts/finance-report.ts",
+    "finance:reading-eval": "tsx --env-file=.env scripts/finance-reading-eval.ts",
     "docs:handbook": "tsx scripts/build-handbook.ts",
     "ui:crawl": "tsx scripts/ui-crawl.ts"
   },

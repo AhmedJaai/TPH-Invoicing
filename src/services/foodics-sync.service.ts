@@ -15,18 +15,20 @@ import { createHash } from "node:crypto";
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  foodicsOrderPayments, foodicsOrders, foodicsPurchaseItems, foodicsPurchases,
-  foodicsSuppliers, foodicsSyncRuns, foodicsTills, salesImports, salesSources,
+  foodicsItemMoves, foodicsMoveDays, foodicsOrderPayments, foodicsOrders, foodicsPurchaseItems, foodicsPurchases,
+  foodicsStockCountItems, foodicsStockCounts, foodicsSuppliers, foodicsSyncRuns, foodicsTills, salesImports, salesSources,
 } from "@/db/schema";
 import { fetchAll, fetchPage, foodicsConfigured, FoodicsNotConfiguredError } from "@/lib/foodics/client";
 import { parseFoodicsMoment, quantityToMilli, riyalsToMinor } from "@/lib/foodics/money";
 import { FOODICS_API_ADAPTER, isSettledOrder, mirrorOrder, ordersToSalesFile } from "@/lib/foodics/orders";
 import {
-  FoodicsCatalogProduct, FoodicsInventoryItem, FoodicsInventoryTx, FoodicsOrder, FoodicsSupplier, FoodicsTill, INVENTORY_TX,
+  FoodicsCatalogProduct, FoodicsInventoryItem, FoodicsInventoryTx, FoodicsOrder, FoodicsStockCount, FoodicsStockMove,
+  FoodicsSupplier, FoodicsTill, INVENTORY_TX, STOCK_MOVE_KINDS,
 } from "@/lib/foodics/types";
+import { aggregateMoves, daysOf, stockCountRow } from "@/lib/foodics/stock";
 import { catalogItemsFromApi, catalogProductsFromApi } from "@/lib/foodics/catalog";
 import type { ParsedCatalog } from "@/lib/inventory/foodics-catalog";
-import { addDays } from "@/lib/riyadh-time";
+import { addDays, todayInRiyadh } from "@/lib/riyadh-time";
 import { ensureFoodicsSource, importParsedSales } from "./sales-import.service";
 
 const ORDER_INCLUDE = "payments.payment_method,products.product.category,products.options.modifier_option,products.taxes,branch,original_order,combos";
@@ -43,6 +45,9 @@ export interface SyncCounts {
   purchases: number;
   suppliers: number;
   tills: number;
+  /** جرودُ فودكس المقروءة، وأيّامُ الصرف التي أُعيد جمعُها. */
+  stockCounts: number;
+  moveDays: number;
   /** صفوفٌ ردّها المخطّط أو لم يُقرأ مبلغُها — تُقال ولا تُبتلَع. */
   rejected: number;
   problems: string[];
@@ -51,7 +56,7 @@ export interface SyncCounts {
 }
 
 function emptyCounts(): SyncCounts {
-  return { ordersRead: 0, ordersMirrored: 0, salesWritten: 0, salesRestated: 0, linesRevised: 0, purchases: 0, suppliers: 0, tills: 0, rejected: 0, problems: [], partial: false };
+  return { ordersRead: 0, ordersMirrored: 0, salesWritten: 0, salesRestated: 0, linesRevised: 0, purchases: 0, suppliers: 0, tills: 0, stockCounts: 0, moveDays: 0, rejected: 0, problems: [], partial: false };
 }
 
 function chunks<T>(items: readonly T[], size: number): T[][] {
@@ -263,7 +268,7 @@ export async function syncPurchases(counts: SyncCounts): Promise<void> {
 /* ─────────────────────────── الصناديق ─────────────────────────── */
 
 export async function syncTills(counts: SyncCounts): Promise<void> {
-  const { items, rejected } = await fetchAll("tills", FoodicsTill);
+  const { items, rejected } = await fetchAll("tills", FoodicsTill, { include: "user,device" });
   counts.rejected += rejected;
   for (const part of chunks(items, 300)) {
     await db.insert(foodicsTills).values(part.map((x) => ({
@@ -271,17 +276,89 @@ export async function syncTills(counts: SyncCounts): Promise<void> {
       openingMinor: riyalsToMinor(x.opening_amount), closingMinor: riyalsToMinor(x.closing_amount),
       estimatedCashMinor: riyalsToMinor(x.estimated_cash), varianceMinor: riyalsToMinor(x.variance),
       openedAt: parseFoodicsMoment(x.opened_at), closedAt: parseFoodicsMoment(x.closed_at),
+      userName: x.user?.name?.trim() || null, deviceName: x.device?.name?.trim() || null,
     }))).onConflictDoUpdate({
       target: foodicsTills.id,
       set: {
         businessDate: sql`excluded.business_date`, openingMinor: sql`excluded.opening_minor`,
         closingMinor: sql`excluded.closing_minor`, estimatedCashMinor: sql`excluded.estimated_cash_minor`,
         varianceMinor: sql`excluded.variance_minor`, openedAt: sql`excluded.opened_at`,
-        closedAt: sql`excluded.closed_at`, syncedAt: sql`now()`,
+        closedAt: sql`excluded.closed_at`, userName: sql`excluded.user_name`,
+        deviceName: sql`excluded.device_name`, syncedAt: sql`now()`,
       },
     });
   }
   counts.tills += items.length;
+}
+
+/* ─────────────────────────── شاهدُ المخزون ─────────────────────────── */
+
+/** جرودُ فودكس — عشراتٌ لا آلاف، فتُقرأ كلُّها: جردٌ عُدّل بعد أسبوعٍ لا يفوت. */
+export async function syncStockCounts(counts: SyncCounts): Promise<void> {
+  const { items, rejected } = await fetchAll("inventory_counts", FoodicsStockCount, { include: "items,creator" });
+  counts.rejected += rejected;
+  const rows = items.flatMap((c) => {
+    const row = stockCountRow(c);
+    if (row === null) {
+      counts.rejected++;
+      counts.problems.push(`الجرد ${c.reference}: كمّيّةٌ لم تُقرأ — لم يدخل المرآة`);
+      return [];
+    }
+    return [row];
+  });
+  if (rows.length === 0) return;
+  await db.transaction(async (t) => {
+    for (const part of chunks(rows, 100)) {
+      await t.insert(foodicsStockCounts).values(part.map((r) => r.head)).onConflictDoUpdate({
+        target: foodicsStockCounts.id,
+        set: {
+          reference: sql`excluded.reference`, businessDate: sql`excluded.business_date`, stockDay: sql`excluded.stock_day`,
+          status: sql`excluded.status`, creatorName: sql`excluded.creator_name`, countedAt: sql`excluded.counted_at`,
+          sourceUpdatedAt: sql`excluded.source_updated_at`, syncedAt: sql`now()`,
+        },
+      });
+      /* بنودُ الجرد تُستبدَل كلُّها: بندٌ حُذف عند فودكس لا يبقى عندنا */
+      const ids = part.map((r) => r.head.id);
+      await t.execute(sql`delete from foodics_stock_count_items where count_id = any(${`{${ids.join(",")}}`}::text[])`);
+      for (const ip of chunks(part.flatMap((r) => r.items), 500)) await t.insert(foodicsStockCountItems).values(ip);
+    }
+  });
+  counts.stockCounts += rows.length;
+}
+
+/** أدنى ما يبقى من مهلة المسار ليُحسَب الفرقُ المتكرّر بعد المزامنة. */
+const GAPS_MIN_BUDGET_MS = 25_000;
+
+/** كم يوماً يُعاد جمعُ صرفه في المزامنة الجارية — مرتجَعٌ أو هدرٌ يُكتب لطلب الأمس. */
+const MOVE_REFRESH_DAYS = 2;
+
+/**
+ * صرفُ فودكس يوماً يوماً: تُقرأ حركاتُ اليوم كلُّها ثمّ يُستبدَل مجموعُه في معاملةٍ واحدة.
+ * فاليومُ إمّا كاملٌ وله صفٌّ في `foodics_move_days`، وإمّا لم يُقرأ — لا نصفَ يوم.
+ */
+export async function syncItemMoves(from: string, to: string, counts: SyncCounts, deadlineAt: number | null = null): Promise<void> {
+  for (const day of daysOf(from, to)) {
+    if (deadlineAt !== null && Date.now() > deadlineAt) { counts.partial = true; return; }
+    const moves: FoodicsStockMove[] = [];
+    for (const kind of STOCK_MOVE_KINDS) {
+      const got = await fetchAll("inventory_transactions", FoodicsStockMove, { "filter[type]": kind, "filter[business_date]": day, include: "items" });
+      counts.rejected += got.rejected;
+      if (got.rejected > 0) counts.problems.push(`${got.rejected} حركةَ صرفٍ في ${day} لم تطابق الصيغة المعروفة`);
+      moves.push(...got.items);
+    }
+    const { rows, unread } = aggregateMoves(moves);
+    if (unread > 0) {
+      counts.rejected += unread;
+      counts.problems.push(`${unread} بندَ صرفٍ في ${day} لم تُقرأ كمّيّتُه أو كلفتُه`);
+    }
+    await db.transaction(async (t) => {
+      await t.delete(foodicsItemMoves).where(eq(foodicsItemMoves.businessDate, day));
+      for (const part of chunks(rows, 500)) await t.insert(foodicsItemMoves).values(part);
+      await t.insert(foodicsMoveDays).values({ businessDate: day, txCount: moves.length })
+        .onConflictDoUpdate({ target: foodicsMoveDays.businessDate, set: { txCount: sql`excluded.tx_count`, syncedAt: sql`now()` } });
+    });
+    counts.moveDays++;
+  }
 }
 
 /* ─────────────────────────── التشغيل ─────────────────────────── */
@@ -294,6 +371,8 @@ export interface SyncOptions {
   budgetMs?: number;
   /** الطلباتُ وحدها (للتعبئة أسبوعاً أسبوعاً). */
   ordersOnly?: boolean;
+  /** صرفُ الأصناف وحده لمدى `window` — للتعبئة التاريخيّة (`--moves`). */
+  movesOnly?: boolean;
 }
 
 export interface SyncResult {
@@ -322,12 +401,17 @@ export async function runFoodicsSync(options: SyncOptions): Promise<SyncResult> 
 
   let error: string | null = null;
   try {
-    if (!options.ordersOnly) {
+    if (options.movesOnly && options.window) {
+      await syncItemMoves(options.window.from, options.window.to, counts, deadlineAt);
+    } else if (!options.ordersOnly) {
       await syncSuppliers(counts);
       await syncPurchases(counts);
       await syncTills(counts);
+      await syncStockCounts(counts);
     }
-    if (options.window) {
+    if (options.movesOnly) {
+      /* لا طلبات في هذا التشغيل */
+    } else if (options.window) {
       await syncOrders(options.window, options.actorId, counts, deadlineAt);
     } else {
       const known = await lastKnownUpdate();
@@ -335,6 +419,21 @@ export async function runFoodicsSync(options: SyncOptions): Promise<SyncResult> 
         ? new Date(known.getTime() - OVERLAP_MINUTES * 60_000)
         : new Date(Date.now() - FIRST_RUN_DAYS * 86_400_000);
       await syncOrders({ updatedAfter: since }, options.actorId, counts, deadlineAt);
+      /* آخرُ ما يُقرأ: إن ضاق الوقتُ بقي ما سبق كاملاً وقيل «بقي ما يُكمَل» */
+      const today = todayInRiyadh();
+      await syncItemMoves(addDays(today, -MOVE_REFRESH_DAYS), today, counts, deadlineAt);
+      /*
+        والفرقُ المتكرّر في الأصناف يُعاد حسابُه هنا ويُحفَظ — «يحتاج قرارك» يقرؤه محفوظاً
+        ولا يحسبه. يُتخطّى إن ضاق الوقت: حسابُه ثلاثةُ أشهرٍ من الأسطر.
+      */
+      if (!counts.partial && (deadlineAt === null || deadlineAt - Date.now() > GAPS_MIN_BUDGET_MS)) {
+        try {
+          const { refreshRecurringGaps } = await import("./finance-attention.service");
+          await refreshRecurringGaps();
+        } catch (e) {
+          counts.problems.push(`تعذّر حسابُ الفرق المتكرّر في الأصناف: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
     }
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);

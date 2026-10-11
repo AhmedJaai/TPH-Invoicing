@@ -89,7 +89,7 @@ export function PurchaseLinkPanel({
   );
 }
 
-function LinkRow({ row, options, canEdit, onSaved }: {
+export function LinkRow({ row, options, canEdit, onSaved }: {
   row: PurchaseLinkRow;
   options: StockItemOption[];
   canEdit: boolean;

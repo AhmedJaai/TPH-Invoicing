@@ -100,6 +100,10 @@ export type AuditAction =
   | "SALES_IMPORTED"
   /* مورّدُ فودكس رُبط بمورّدنا أو فُكّ — قرارُ إنسانٍ تقوم عليه مقارنةُ المشتريات */
   | "SUPPLIER_FOODICS_LINKED"
+  /* المساحةُ الماليّة: إقرارُ المالك عمّا لا يراه الكشف، وتجميدُ تقرير الشهر المقفل */
+  | "FINANCE_DECLARATION_CREATED"
+  | "FINANCE_DECLARATION_VOIDED"
+  | "FINANCE_PNL_FROZEN"
   /* كتالوجُ فودكس: الأصنافُ والعبواتُ والوصفات */
   | "CATALOG_IMPORTED"
   | "POS_PRODUCT_MAPPED"

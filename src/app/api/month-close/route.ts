@@ -23,6 +23,8 @@ import { gatherMonthFacts } from "@/lib/month-close-facts";
 import { recordAudit } from "@/lib/audit";
 import { WARNING, countNoun } from "@/lib/arabic";
 import { monthEndDay } from "@/lib/riyadh-time";
+import { describeError, logEvent } from "@/lib/log";
+import { freezePnl } from "@/services/profit.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -222,10 +224,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "الشهر مقفل بالفعل" }, { status: 409 });
   }
 
+  /*
+    الشهرُ المقفل تقريرُه ثابت: تُجمَّد قائمةُ دخله الآن كما تُحسَب (`finance_snapshots`).
+    وتعثّرُ التجميد لا يُسقط الإقفال — الشهادةُ كُتبت، والتجميدُ يُعاد من «المالية».
+  */
+  let frozen = true;
+  try {
+    await freezePnl(body.month, user.id);
+  } catch (e) {
+    frozen = false;
+    logEvent("finance.freeze_failed", { month: body.month, ...describeError(e) });
+  }
+
   return NextResponse.json({
     ok: true,
     report,
     status: "CLOSED",
-    message: `أُقفل ${body.month}${report.warnings.length ? ` مع إقرار ${countNoun(report.warnings.length, WARNING)}` : ""}`,
+    message: `أُقفل ${body.month}${report.warnings.length ? ` مع إقرار ${countNoun(report.warnings.length, WARNING)}` : ""}${frozen ? "" : " — وتعذّر تجميدُ تقرير ربحه، جمِّده من «المالية»"}`,
   });
 }

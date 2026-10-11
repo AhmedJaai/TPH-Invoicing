@@ -69,7 +69,7 @@
 | `src/lib/supplier-suggest.ts` · `src/components/supplier-picker.tsx` | «لعلّه هذا المورّد» من نصّ البنك: اقتراحٌ لا قرار، ومنتقٍ واحد لطابور البنك ومراجعة الحركات |
 | `src/lib/preview-mode.ts` | وضع المعاينة — لا يعمل في الإنتاج مهما فُعِّل المتغيّر |
 | `src/lib/canonical-name.ts` | الاسم القياسيّ من المقيَّد — ولا يُمَسّ اسمٌ يُقرأ |
-| `src/lib/nav.ts` | **ثماني مساحاتٍ في ثلاث مجموعات** (اليوم · المال · التشغيل)، ولكلٍّ أيقونتُها وحرفُ `G` وسؤالُها. `entryHref` يفتح أوّلَ لسانٍ يملكه الدور، و`chordsFor` اختصاراتُ لوحة المفاتيح. الإعدادات في `ACCOUNT_LINKS` |
+| `src/lib/nav.ts` | **تسعُ مساحاتٍ في ثلاث مجموعات** (اليوم · المال · التشغيل)، ولكلٍّ أيقونتُها وحرفُ `G` وسؤالُها. `entryHref` يفتح أوّلَ لسانٍ يملكه الدور، و`chordsFor` اختصاراتُ لوحة المفاتيح. الإعدادات في `ACCOUNT_LINKS` |
 | `src/components/page-shell.tsx` · `nav.tsx` · `topbar.tsx` | القشرة: إطارٌ داكن، وشريطٌ علويّ (موضعك · بحث · إشعارات · رفع)، وشريطُ جوّالٍ بزرّ التقاطٍ في الوسط، و`DropAnywhere` للإفلات في أيّ صفحة |
 | `src/lib/capture-queue.ts` | يحمل الملفّ من زرّ الكاميرا أو الإفلات في أيّ صفحة إلى القارئ في `/upload` |
 | `src/components/keyboard.tsx` · `src/lib/ui-events.ts` | ⌘K · `G` ثمّ حرف · J/K/Enter · U · ? — وأحداثُ فتح اللوحة والقائمة بلا استيرادٍ دائريّ |
@@ -80,7 +80,6 @@
 | `src/lib/bank/pos-watch.ts` · `pos-watch.service.ts` | **تسوياتُ الشبكة** (`/money/pos`): الرسمُ الفعليّ شهراً بشهر، وأيّامُ بيعٍ لم تصل تسويتُها — تستدعي `groupBatches` |
 | `src/lib/recurring-detect.ts` · `recurring-watch.service.ts` | **الاشتراكات والمتكرّر** (`/money/recurring`): سلاسلُ الخصم الشهريّ من الكشف، وما تكرّر أو ارتفع أو غاب — اقتراحٌ لا قيد |
 | `src/lib/owner-account.ts` · `owner-account.service.ts` | **بينك وبين المقهى** (`/money/owner`): دفعاتُ `OWNER_ACCOUNT` وحركاتُ `PERSONAL` برصيدٍ جارٍ |
-| `src/lib/sales/overview.ts` · `sales-overview.service.ts` | **المبيعات** (`/inventory/sales`): يوماً بيوم وصنفاً بصنف وما خرج بلا مال — غيرُ المستورَد `null` |
 | `src/lib/obligations.ts` · `obligation.service.ts` | **الوثائق والتراخيص** (`/settings/obligations`): تواريخُ الانتهاء ومهلةُ التذكير |
 | `src/lib/commitments.ts` | **تقويمُ الالتزامات** (`/cash/calendar`): من وقائع «النقد القادم» والوثائق يوماً بيوم |
 | `src/lib/signal-decisions.ts` · `/api/signal` | إسكاتُ ملاحظةٍ محسوبة أو تأجيلُها — بمفتاحٍ من الحدث |
@@ -166,7 +165,14 @@
 | `src/lib/bank/iban-guard.ts` · `iban-guard.service.ts` · `/api/iban-guard` | **حارسُ الآيبان**: حوالةٌ لمورّدٍ إلى حسابٍ غير المكتوب في ملفّه أو غير ما حُوِّل له مرّتين، وأوّلُ حوالةٍ فوق ٥٠٠ ريال إلى آيبانٍ جديد — تنبيهٌ يُغلق بـ«أعرفه» (`alert_resolutions`)، لا منع |
 | `src/lib/choices.ts` · `choices.service.ts` · `/settings/choices` | **«ما قرّرتَه»**: كلُّ اختيارٍ بيد صاحبه بحاله (يعمل · لا يُطبَّق بسببه · مقفل) وأثره وزرّ سحبه عبر المسارات القائمة — وحكمُ الإقرار من `loadVatReturn` نفسها |
 | `src/lib/attention-snooze.ts` · `/api/attention-snooze` | **«أجِّله»**: بندُ الطابور يخرج من العدّ إلى يومه؛ المفتاحُ فيه مبلغُه وعددُه فيعود إن تغيّرا. `attentionSplit` في `work.ts` مصدرُ المفتوح والمؤجَّل |
-| `src/lib/income-sheet.ts` · `income-sheet.service.ts` · `/close/pnl` | **قائمةُ الدخل الناقصةُ المعلَنة** فوق `buildProfitLoss`: المبيعاتُ من إقرار الشهر، و«الباقي على أساسٍ نقديّ» لا يُحسب لشهرٍ ناقص؛ تكلفةُ المبيعات تبقى «غير معروف» |
+| `src/lib/finance/pnl.ts` · `profit.service.ts` · `/finance` | **قائمةُ الدخل الصادقة** — الموضعُ الواحد لـ«كم ربحتُ؟»: إيرادُ ما دفعه الزبائن، تكلفةُ المبيعات بالجرد (أو المشتريات حين لا عدّ)، المصروفاتُ وإقراراتُ المالك؛ والرقمُ يُسمّى بما يشمله. `/finance/rows` الصفوفُ التي كوّنته، `/finance/report` ورقةُ المحاسب، `/finance/inputs` ما لا يراه الكشف |
+| `src/lib/finance/stock-window.ts` · `stock-flow.ts` · `stock-flow.service.ts` · `/finance/stock` | **المشترى مقابل المباع** لكلّ صنفٍ من عدٍّ إلى عدّ: مشترى (فواتيرُنا المربوطة) − مباعٌ نظريّاً − هدرٌ مسجَّل، والفرقُ غير المفسَّر؛ فودكس شاهدٌ بجانبه |
+| `src/lib/finance/link-evidence.ts` · `stock-link.service.ts` · `/finance/stock/links` | **ربطُ بنود الفواتير بأصناف المخزون** بدليل فودكس (المورّدُ والأيّامُ والمبلغُ نفسُها) — يُقترَح ويُقرّ بضغطة |
+| `sales-analysis.service.ts` · `/finance/sales` | **المبيعات**: يوماً وساعةً وصنفاً بهامشه، ما صعد وما هبط، وما خرج من الإيراد — بإيراد قائمة الدخل نفسِه |
+| `finance-position.service.ts` · `/finance/position` | **الوضع الآن**: رصيدُ البنك، المستحقُّ للمورّدين، ضريبةُ الإقرار، النقدُ والصندوق — كلٌّ من مصدره القائم |
+| `src/lib/finance/reading.ts` · `finance-reading.service.ts` | **القراءةُ الذكيّة**: حقائقُ مرقَّمة يحسبها الخادم، ويُتحقَّق أنّ كلَّ رقمٍ ذكره النموذج منها؛ تُحفَظ بمدخلاتها (`npm run finance:reading-eval`) |
+| `src/lib/finance/stock-gaps.ts` · `finance-attention.service.ts` | بنودُ المالية في «يحتاج قرارك»: إيجارٌ لم يُوزَّع، ربطٌ جاهز، صندوقٌ فرقُه ظاهر، مزامنةٌ وقفت، صنفٌ تكرّر فرقُه |
+| `src/lib/foodics/stock.ts` | شاهدُ المخزون من فودكس: عدُّ الرفّ، وصرفُ الأصناف مجموعاً يوماً بصنف (`foodics:sync -- --moves`) |
 | `src/lib/sales/witness.ts` · `sales-witness.service.ts` | ملفُّ فودكس **شاهداً** على ضريبة مبيعات الإقرار والنقد المكتوب بيد — يُعرض الفرقُ والتغطية ولا يدخل الحساب |
 | `src/lib/foodics/client.ts` · `types.ts` · `money.ts` | عميلُ واجهة فودكس (`GET` وحده، صفحاتٌ وإعادةٌ عند ٤٢٩) ومخطّطاتٌ تُسقِط ما لم يُسمَّ، والريالُ بكسوره إلى هللات بلا عائمة |
 | `src/lib/foodics/orders.ts` | الطلبُ من الواجهة ← `ParsedSalesFile` بمفاتيح ملفّ الإكسل نفسِها، ومرآةُ رأسه ودفعاته |

@@ -76,5 +76,7 @@
   "075_app_settings.sql": "b9a85486189bd52f7ca6ace541be4e325c4bdd545a1ceacac87ccc62bcb9e817",
   "076_foodics_mirror.sql": "648e1cfb7f845f3d89215a551686d522f286940b3c9e928c68500181ef1eafae",
   "077_alert_resolution_signals.sql": "0e524bf6ff94b3fb947066079ce2965a6dd58bc95e584012dfd2e2772600ebfb",
-  "078_alert_resolution_signal_keys.sql": "82481a7a2d67e0e038047d059ba4e968cb57c526088a8c0e0b8f32b7103ef01b"
+  "078_alert_resolution_signal_keys.sql": "82481a7a2d67e0e038047d059ba4e968cb57c526088a8c0e0b8f32b7103ef01b",
+  "079_foodics_stock_witness.sql": "27971433c6790ee3a607d0f32125a2e27f2f2d6fcd3fb8c1289e2ccb2c32d67d",
+  "080_finance.sql": "197b934c512200247d3429bae7d647ca557c5e31fe0b0583b3ee8fbedfee2003"
 }

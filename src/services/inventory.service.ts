@@ -198,6 +198,63 @@ export async function loadSoldLines(
   }));
 }
 
+/**
+ * أسطرُ المبيعات مجموعةً يوماً بصنفٍ بحال — لتقارير الشهر التي تمرّ على عشرات الآلاف.
+ *
+ * الحسابُ خطّيٌّ في الكمّيّة، فمجموعُ مئةِ كوبٍ يُستهلَك له ما يُستهلَك لها كوباً كوباً
+ * (والتقريبُ مرّةً لا مئة). ولا يصلح إن رُبط مكوّنٌ بخيارٍ بعينه — ذاك يُحسَب على
+ * البنود التي تحمله وحدها — فيسأل المستدعي `needsModifierDetail` أوّلاً.
+ */
+export async function loadSoldTotals(periodStart: string, periodEnd: string, conn: Conn = db): Promise<SoldLineInput[]> {
+  const rows = await conn.execute<Record<string, unknown>>(sql`
+    select s.business_date::text as business_date,
+           coalesce(pp.external_id, 'NAME:' || sl.description) as key,
+           min(sl.description)       as description,
+           pp.external_id            as pos_external_id,
+           pp.product_id             as menu_product_id,
+           sl.is_refund,
+           (sl.is_void or s.is_void) as is_void,
+           sl.is_complimentary,
+           sum(sl.quantity)::text    as quantity,
+           sum(sl.line_total_minor)::bigint as line_total_minor
+      from sale_lines sl
+      join sales s on s.id = sl.sale_id
+      left join pos_products pp on pp.id = sl.pos_product_id
+     where s.business_date >= ${periodStart} and s.business_date <= ${periodEnd} and not sl.is_modifier
+     group by 1, 2, pp.external_id, pp.product_id, sl.is_refund, (sl.is_void or s.is_void), sl.is_complimentary
+  `);
+  return rows.rows.map((r) => {
+    const id = `${String(r.business_date)}|${String(r.key)}|${r.is_refund ? "R" : ""}${r.is_void ? "V" : ""}${r.is_complimentary ? "C" : ""}`;
+    return {
+      saleId: id, lineId: id,
+      businessDate: String(r.business_date),
+      posProductName: String(r.description),
+      posProductExternalId: r.pos_external_id === null ? null : String(r.pos_external_id),
+      menuProductId: r.menu_product_id === null ? null : String(r.menu_product_id),
+      quantityMilli: soldMilli(r.quantity),
+      lineTotalMinor: Number(r.line_total_minor),
+      isRefund: Boolean(r.is_refund),
+      isVoid: Boolean(r.is_void),
+      isComplimentary: Boolean(r.is_complimentary),
+      modifierExternalIds: [],
+    };
+  });
+}
+
+/** أفي الوصفات مكوّنٌ مربوطٌ بخيار؟ — عندها يلزم تفصيلُ البنود لا مجموعُها. */
+export function needsModifierDetail(versions: readonly { ingredients: readonly { modifierExternalId?: string | null }[] }[]): boolean {
+  return versions.some((v) => v.ingredients.some((g) => g.modifierExternalId != null));
+}
+
+/** أسطرُ الفترة لتقارير الشهر: المجموعُ حيث يكفي، والتفصيلُ حيث يلزم. */
+export async function loadSoldForReport(
+  periodStart: string, periodEnd: string,
+  versions: readonly { ingredients: readonly { modifierExternalId?: string | null }[] }[],
+  conn: Conn = db,
+): Promise<SoldLineInput[]> {
+  return needsModifierDetail(versions) ? loadSoldLines(periodStart, periodEnd, null, conn) : loadSoldTotals(periodStart, periodEnd, conn);
+}
+
 /** كمّيّةُ سطر البيع من نصّ `numeric` — وما لا يُقرأ عطبٌ يُسمَع لا صفرٌ يُحسَب. */
 function soldMilli(quantity: unknown): number {
   const milli = decimalToMilli(String(quantity));
@@ -561,7 +618,7 @@ async function loadMovements(
   return { inByProduct, outByProduct };
 }
 
-async function loadWaste(
+export async function loadWaste(
   periodStart: string,
   periodEnd: string,
   branchId: string | null,
@@ -590,7 +647,7 @@ async function loadWaste(
 }
 
 /** معدَّلُ كلفةِ الوحدة من آخر شراءٍ معروفِ الكمّيّة قبل الفترة — بمِلّي‑الهللة. */
-function fallbackCosts(
+export function fallbackCosts(
   lookback: readonly PurchaseLineInput[],
   baseUnitOf: ReadonlyMap<string, StoredUnit>,
 ): Map<string, number | null> {
@@ -639,7 +696,7 @@ export async function latestInvoiceUnitCosts(asOf: string, conn: Conn = db): Pro
  * ولا تُستعمَل إلّا حين لا فاتورةَ: **الفاتورةُ واقعةٌ والكتالوجُ
  * تقدير.**
  */
-async function catalogCosts(
+export async function catalogCosts(
   baseUnitOf: ReadonlyMap<string, StoredUnit>,
   conn: Conn,
 ): Promise<Map<string, number | null>> {

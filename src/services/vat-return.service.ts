@@ -444,7 +444,7 @@ function posLabel(what: string, description: string | null, direction: "DEBIT" |
 }
 
 /** أيّامُ كلّ شهرٍ بلا كشف — المبيعاتُ من البنك، فاليومُ الغائب مبيعاتٌ غائبة. */
-async function coverageOf(months: readonly string[], conn: Conn): Promise<VatMonthCoverage[]> {
+export async function coverageOf(months: readonly string[], conn: Conn = db): Promise<VatMonthCoverage[]> {
   const periods = (await conn.execute<{ start: string | null; end: string | null }>(sql`
     select to_char(min(value_date at time zone 'Asia/Riyadh'), 'YYYY-MM-DD') as start,
            to_char(max(value_date at time zone 'Asia/Riyadh'), 'YYYY-MM-DD') as end

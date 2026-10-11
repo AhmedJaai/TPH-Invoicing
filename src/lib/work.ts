@@ -34,6 +34,7 @@ import { loadMissingSettlementFacts } from "@/services/pos-watch.service";
 import { loadRecurringAnomalies } from "@/services/recurring-watch.service";
 import { loadDueObligations } from "@/services/obligation.service";
 import { loadFoodicsAttentionFacts } from "@/services/foodics-attention.service";
+import { loadFinanceAttentionFacts } from "@/services/finance-attention.service";
 import { loadOrphanProformas } from "@/services/proforma-watch.service";
 import { OBLIGATION_KIND_LABEL } from "./obligations";
 
@@ -42,9 +43,9 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
   /* حارسُ الآيبان وقائعُه مستقلّة — تُطلَب مع البقيّة لا بعدها */
   /* تُبدأ الآن وتُنتظر مع البقيّة — لا رحلةٌ بعد رحلة */
   const watchPromise = loadOpenIbanWatch();
-  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas] = await Promise.all([
+  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas, finance] = await Promise.all([
     gatherAttentionFacts(), watchPromise.then((w) => w.alerts), loadMissingSettlementFacts(), loadRecurringAnomalies(), loadDueObligations(),
-    loadFoodicsAttentionFacts(), loadOrphanProformas(),
+    loadFoodicsAttentionFacts(), loadOrphanProformas(), loadFinanceAttentionFacts(),
   ]);
   const { first } = await watchPromise;
   return buildAttention({
@@ -54,6 +55,12 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
     foodicsCardGaps: foodics.cardGaps,
     foodicsPurchaseDiffers: foodics.purchaseDiffers,
     foodicsPurchaseMissing: foodics.purchaseMissing,
+    financeRentLumps: finance.rentLumps,
+    financeLastMonthMissing: finance.lastMonthMissing,
+    stockLinksReady: finance.readyLinks,
+    foodicsTillGaps: finance.tillGaps,
+    foodicsStaleHours: finance.foodicsStaleHours,
+    stockRecurringGaps: finance.recurring.map((g) => ({ productId: g.productId, name: g.name, kind: g.kind, months: g.months.length, totalMinor: g.totalMinor, byWitness: g.byWitness })),
     recurringAnomalies,
     expiringObligations: dueDocs.map((o) => ({ title: o.title, kindLabel: OBLIGATION_KIND_LABEL[o.kind], expiresOn: o.expiresOn, daysLeft: o.daysLeft })),
     ibanAlerts: iban.map((a) => ({

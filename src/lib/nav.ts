@@ -2,8 +2,8 @@
  * نموذج التنقّل — الإصدار الثاني: أعمالٌ لا جداول، في ثلاث مجموعات.
  *
  *   اليوم      — ما حال المقهى؟ · ما ينتظر قراري؟ · ما الذي وصلني؟
- *   المال      — لمن أدين؟ · ماذا أدفع هذا الأسبوع وهل يكفي النقد؟ ·
- *                أين ذهب المال؟ · هل يُقفَل الشهر؟
+ *   المال      — هل ربحتُ ولماذا؟ · لمن أدين؟ · ماذا أدفع هذا الأسبوع وهل يكفي
+ *                النقد؟ · أين ذهب المال؟ · هل يُقفَل الشهر؟
  *   التشغيل    — أين ذهب ما اشتريتُه؟
  *
  * كان ستَّ مساحاتٍ تحت كلٍّ منها ألسنة، و«المال» تجمع البنكَ والإقفالَ
@@ -28,7 +28,7 @@ export type NavGroup = "today" | "money" | "ops";
 /** مفتاحُ الأيقونة — يُرسَم في `components/icons.tsx`. */
 export type NavIcon =
   | "today" | "decisions" | "documents" | "suppliers" | "payments"
-  | "bank" | "close" | "inventory" | "settings" | "audit";
+  | "bank" | "close" | "inventory" | "settings" | "audit" | "finance";
 
 export interface NavArea extends NavLink {
   /** الاسم القصير لشريط الجوّال. */
@@ -93,6 +93,29 @@ export const AREAS: readonly NavArea[] = [
       { href: "/documents", label: "المستندات" },
       { href: "/upload", label: "ارفع مستنداً", needs: "document:upload" },
       { href: "/documents/drive", label: "الدرايف", needs: "document:upload" },
+    ],
+  },
+  /*
+    «المالية» أوّلُ المال: باقي المجموعة يجيب «ماذا دفعتُ ولمن؟»، وهذه تجيب «هل المقهى
+    رابح؟» (أحمد، ١١ أكتوبر ٢٠٢٦). ودخلتها قائمةُ الدخل من «الإقفال» والمبيعاتُ من
+    «الجرد» — جوابٌ واحد لكلّ سؤال، لا شاشتان برقمين.
+  */
+  {
+    href: "/finance",
+    label: "المالية",
+    short: "المالية",
+    icon: "finance",
+    group: "money",
+    question: "هل ربحتَ، وكم، ولماذا — وما وضعك الآن",
+    chord: "f",
+    needs: "amounts:view",
+    owns: ["/finance/rows", "/finance/report", "/finance/inputs"],
+    children: [
+      { href: "/finance", label: "الربح" },
+      { href: "/finance/position", label: "الوضع الآن" },
+      { href: "/finance/sales", label: "المبيعات" },
+      /* لكلّ صنف مخزون: كم اشتُري، كم بِيع منه، وأين ذهب الباقي */
+      { href: "/finance/stock", label: "المشترى والمباع" },
     ],
   },
   {
@@ -165,8 +188,6 @@ export const AREAS: readonly NavArea[] = [
     children: [
       { href: "/close", label: "إقفال الشهر" },
       { href: "/close/vat", label: "إقرار الضريبة" },
-      /* «هل ربحتُ هذا الشهر؟» بما يُعرف وحده — `lib/income-sheet.ts` */
-      { href: "/close/pnl", label: "قائمة الدخل" },
     ],
   },
   {
@@ -185,8 +206,6 @@ export const AREAS: readonly NavArea[] = [
       { href: "/inventory/import", label: "الاستيراد", needs: "inventory:count" },
       /* السجلُّ جوابُه بالريال — فمن لا يرى المبالغ لا يُفتَح له */
       { href: "/inventory/history", label: "سجلّ الجرد", needs: "amounts:view" },
-      /* ما استُورد من ملفّ فودكس مقروءاً مبيعاتٍ — بالريال، فلمن يرى المبالغ */
-      { href: "/inventory/sales", label: "المبيعات", needs: "amounts:view" },
       { href: "/inventory/recipes", label: "الوصفات", needs: "recipe:edit" },
       { href: "/inventory/items", label: "الأصناف" },
       /* وسيطُ ما يُباع في كلّ يومٍ من الأسبوع — عادةٌ لا توقّع (`lib/sales/weekday-habit.ts`) */
