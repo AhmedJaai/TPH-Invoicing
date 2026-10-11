@@ -67,6 +67,11 @@ const BUCKET_DOT: Record<ReviewBucket, string> = {
   RESOLVE: "bg-info",
 };
 
+/** حرفُ الاختصار على الزرّ نفسه — للحاسوب وحده، ولا يُقرأ مرّتين لقارئ الشاشة. */
+function KeyHint({ children }: { children: string }) {
+  return <span aria-hidden className="hidden rounded border border-current/30 px-1 text-[10px] font-bold leading-4 opacity-70 lg:inline">{children}</span>;
+}
+
 /**
  * ما ردّه الإقرارُ الجماعيّ — كلُّ سببٍ بحركته: لمن، وبكم، ورابطُ ملفّها.
  * كان السببُ مجرّداً ويُقصّ عند ستّة، فمن رُدّت له تسعٌ لا يعرف أيَّها يقصد كلٌّ.
@@ -554,7 +559,8 @@ function Row({
   const canAct = bucket === "RESOLVE" ? canEdit : canApprove;
 
   return (
-    <li className="px-4 py-3">
+    /* `data-nav-item`: J/K تختاره، و A/X/S تفعل فيه (`keyboard.tsx`) */
+    <li className="px-4 py-3" data-nav-item="">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="flex flex-wrap items-baseline gap-2">
           <span className="text-sm font-medium">{i.supplierName ?? "جهة غير معروفة"}</span>
@@ -605,8 +611,11 @@ function Row({
                 disabled={busy}
                 onClick={() => onSettle(i.transactionId)}
                 title="تُسجَّل سداداً لهذا المورّد وتُخصم من أقدم فواتيره، وما بقي يبقى بلا فاتورة"
+                data-key-action="approve"
+                data-key-then="next"
               >
                 {ACT.settleOnAccount}
+                <KeyHint>A</KeyHint>
               </button>
             ) : (
             <button
@@ -615,8 +624,11 @@ function Row({
               className={buttonClass("primary", "sm")}
               disabled={busy}
               onClick={() => onConfirm(i.transactionId)}
+              data-key-action="approve"
+              data-key-then="next"
             >
               {ACT.recordAgainstInvoice}
+              <KeyHint>A</KeyHint>
             </button>
             )}
             {/*
@@ -640,8 +652,10 @@ function Row({
               disabled={busy}
               onClick={() => setOpen(open === "reject" ? null : "reject")}
               aria-expanded={open === "reject"}
+              data-key-action="reject"
             >
               ليست سداداً
+              <KeyHint>X</KeyHint>
             </button>
           </>
         )}

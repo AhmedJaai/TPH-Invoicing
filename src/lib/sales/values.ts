@@ -1,8 +1,9 @@
 /**
  * قراءةُ قيم الخلايا — وما لا يُقرأ يُعلَن، لا يُقرأ صفراً.
  */
-import { parseRiyals } from "@/lib/money";
+import { HALALAS_PER_RIYAL, parseRiyals } from "@/lib/money";
 import { decimalToMilli, roundHalfAwayFromZero, toLatinDigits } from "@/lib/inventory/units";
+import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
 
 /** الأرقام العربية‑الهندية إلى اللاتينية، وإسقاطُ فواصل الآلاف. */
 export function normaliseNumeric(raw: string): string {
@@ -80,9 +81,17 @@ export function microToMinor(micro: number): number {
 export function parseSourceCostMinor(raw: string | undefined): number | null {
   if (raw === undefined) return null;
   const text = normaliseNumeric(raw);
-  if (text === "" || !/^-?\d+(\.\d+)?$/.test(text)) return null;
-  const value = Math.round(Number(text) * 100);
-  return Number.isSafeInteger(value) ? value : null;
+  const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(text);
+  if (text === "" || !m) return null;
+  /*
+    من النصّ إلى الهللات بلا عددٍ عائم: منزلتان تُؤخذان، والثالثةُ تقرّب (النصفُ
+    بعيداً عن الصفر). كان `Math.round(Number(text) * 100)`: و`1.005 × 100` عائمةً
+    ‎100.49999…‎ فتُقرأ ١٠٠ لا ١٠١ — نصفُ هللةٍ يضيع بحسب تمثيل الرقم لا بحسب قيمته.
+  */
+  const frac = m[3] ?? "";
+  const value = Number(m[2]) * HALALAS_PER_RIYAL + Number(frac.slice(0, 2).padEnd(2, "0")) + (frac.charAt(2) >= "5" ? 1 : 0);
+  if (!Number.isSafeInteger(value)) return null;
+  return m[1] === "-" && value !== 0 ? -value : value;
 }
 
 /*
@@ -202,7 +211,7 @@ export function parseBusinessDate(raw: string | undefined, order: DateOrder = "I
   if (/^\d{5}(\.\d+)?$/.test(text)) {
     const serial = Number(text);
     if (serial > 20_000 && serial < 80_000) {
-      return new Date(EXCEL_EPOCH + Math.floor(serial) * 86_400_000).toISOString().slice(0, 10);
+      return isoDay(new Date(EXCEL_EPOCH + Math.floor(serial) * MS_PER_DAY));
     }
   }
 

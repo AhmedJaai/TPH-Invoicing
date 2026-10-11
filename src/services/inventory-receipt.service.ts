@@ -28,6 +28,7 @@ import { duplicateCandidates, RECEIPT_MATCH_WINDOW_DAYS, type DuplicateCandidate
 import type { StoredUnit } from "@/lib/unit-conversion";
 import type { Conn } from "./types";
 import { invoiceLinesForMatch, linkedInvoiceLineIds } from "./inventory.service";
+import { isoDay } from "@/lib/riyadh-time";
 
 export type ReceiptResolution =
   | { kind: "LINK"; invoiceLineId: string }
@@ -116,7 +117,7 @@ async function earlierManualReceipts(
 
 function shift(d: string, n: number): string {
   const [y, m, dd] = d.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, dd + n)).toISOString().slice(0, 10);
+  return isoDay(new Date(Date.UTC(y, m - 1, dd + n)));
 }
 
 async function stockProduct(productId: string, conn: Conn) {

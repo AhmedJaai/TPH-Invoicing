@@ -26,6 +26,7 @@ import { matchSupplier } from "@/lib/supplier-match";
 import { loadSuppliers, missingFromReading, supplierByVatInName, type StoredReading } from "@/services/document-backlog.service";
 import { loadNamedDocuments } from "@/services/drive-status.service";
 import { findInvoiceTwin, type InvoiceTwin } from "@/lib/invoice-twin";
+import { isoDay } from "@/lib/riyadh-time";
 
 export interface DocumentProfile {
   id: string;
@@ -205,7 +206,7 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
           .from(invoices).where(eq(invoices.supplierId, supplierId)))
           .map((r) => ({
             id: r.id, supplierId, invoiceNumber: r.number ?? "",
-            invoiceDate: r.date ? r.date.toISOString().slice(0, 10) : null, totalMinor: r.total,
+            invoiceDate: r.date ? isoDay(r.date) : null, totalMinor: r.total,
           })),
         { supplierId, invoiceNumber: readNumber ?? fromName.invoiceNumber, invoiceDate: readDate ?? fromName.date, totalMinor: totalForMissing },
       )

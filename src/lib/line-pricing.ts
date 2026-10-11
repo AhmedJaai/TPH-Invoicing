@@ -14,7 +14,8 @@
  *
  * القاعدة: ما دفعناه فعلاً هو الحقيقة، وسعر القائمة يُحفظ للمقارنة لا للتحليل.
  */
-import { VAT_RATE } from "@/config/drive";
+import { grossOfNetExact, netInsideGross } from "./vat";
+import { latinDigits } from "./digits";
 
 export type PricingBasis =
   /** الضرب يستقيم — لا خصم ولا التباس */
@@ -66,9 +67,7 @@ function near(a: number, b: number, rel = REL): boolean {
  */
 export function parseLineQuantity(raw: string | null | undefined): string | null {
   if (raw == null) return null;
-  let s = raw
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+  let s = latinDigits(raw)
     .replace(/٫/g, ".")
     .replace(/٬/g, "");
   /* «2,5» فاصلةٌ عشريّة، و«1,200» فاصلُ آلاف */
@@ -114,7 +113,7 @@ export function resolveLinePricing(input: LinePricingInput): LinePricing | null 
   }
 
   // الإجمالي شامل الضريبة وسعر الوحدة صافٍ — الصافي هو الصحيح
-  if (near(total!, expected * (1 + VAT_RATE))) {
+  if (near(total!, grossOfNetExact(expected))) {
     return {
       effectiveUnitMinor: unit!, netTotalMinor: Math.round(expected),
       listUnitMinor: null, discountMinor: 0, basis: "TOTAL_INCLUDES_VAT",
@@ -189,14 +188,13 @@ export function reconcileInvoiceLines<T extends LineToReconcile>(
 
   if (near(sum, subtotalMinor)) return { lines: [...lines], verdict: "NET" };
 
-  if (near(sum, subtotalMinor * (1 + VAT_RATE))) {
+  if (near(sum, grossOfNetExact(subtotalMinor))) {
     /*
       القسمة بأعدادٍ صحيحة (×١٠٠ ÷ ١١٥) ثمّ يُردّ فرقُ التقريب إلى أكبر
       بند — فيجمع الصافي إلى الصافي بالهللة. وكان كلّ بندٍ يُقرَّب وحده
       بعددٍ عشريّ فيفترق المجموع عن الصافي بهللات.
     */
-    const pct = Math.round(VAT_RATE * 100);
-    const shrink = (m: number) => Math.round((m * 100) / (100 + pct));
+    const shrink = netInsideGross;
     const scaled = lines.map((l) => ({
       ...l,
       effectiveUnitMinor: shrink(l.effectiveUnitMinor),

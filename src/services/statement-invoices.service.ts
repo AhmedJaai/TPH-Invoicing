@@ -25,6 +25,11 @@ import { applySupplierCredit } from "./supplier-credit.service";
 import { firstClosedMonth } from "./month-guard";
 import { refreshStatementFindings } from "./statement-reconcile.service";
 import type { Tx } from "./types";
+import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
+import { STATEMENT_DATE_WINDOW_DAYS } from "@/lib/statement-match";
+
+/** فاتورةٌ عندنا بمبلغ السطر نفسه في هذه الأيّام قد تكون هي برقمٍ آخر — فلا يُقيَّد السطرُ فاتورةً جديدة. */
+const SAME_AMOUNT_WINDOW_DAYS = 3;
 
 export class StatementInvoicesRefused extends Error {
   constructor(message: string, readonly status = 409) {
@@ -85,8 +90,8 @@ export async function recordStatementOnlyInvoices(
     المورّد في مدّة الكشف أصلاً (غاناش يونيو).
   */
   const span = lines.map((l) => l.date.getTime());
-  const from = Math.min(...span) - 7 * 86_400_000;
-  const to = Math.max(...span) + 7 * 86_400_000;
+  const from = Math.min(...span) - STATEMENT_DATE_WINDOW_DAYS * MS_PER_DAY;
+  const to = Math.max(...span) + STATEMENT_DATE_WINDOW_DAYS * MS_PER_DAY;
   /* فاتورةٌ عندنا في المدّة لم يطابقها سطرٌ من أيّ كشف — قد تكون أصلَ سطرٍ بترقيمٍ آخر */
   const matchedAnywhere = new Set((await tx.select({ id: statementLines.matchedInvoiceId }).from(statementLines)
     .innerJoin(statements, eq(statements.id, statementLines.statementId))
@@ -126,7 +131,7 @@ export async function recordStatementOnlyInvoices(
       continue;
     }
     /* فاتورةٌ عندنا باليوم والمبلغ نفسيهما لم يطابقها سطر — قد تكون هي برقمٍ آخر: لا يُخمَّن */
-    const sameDayAmount = ours.some((o) => o.total === l.debitMinor && Math.abs(o.date.getTime() - l.date.getTime()) <= 3 * 86_400_000);
+    const sameDayAmount = ours.some((o) => o.total === l.debitMinor && Math.abs(o.date.getTime() - l.date.getTime()) <= SAME_AMOUNT_WINDOW_DAYS * MS_PER_DAY);
     if (sameDayAmount && !matchedByNumber) { out.alreadyRecorded++; continue; }
     const month = monthOf(l.date);
     if (await firstClosedMonth(tx, [month])) { out.closedMonth.push({ number, month }); continue; }
@@ -143,7 +148,7 @@ export async function recordStatementOnlyInvoices(
       originStatementId: st.id,
     }).returning({ id: documents.id });
 
-    const day = l.date.toISOString().slice(0, 10);
+    const day = isoDay(l.date);
     const review = reviewConfirmed(
       { documentKind: "TAX_INVOICE", supplierId: st.supplierId, invoiceNumber: number, invoiceDate: day,
         subtotalMinor: null, vatMinor: null, totalMinor: l.debitMinor, sellerVat: null, buyerVat: null },

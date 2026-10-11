@@ -30,6 +30,7 @@
  * وإلّا لصار «عشرون عبوة» و«عشرون حبّة» سواءً في المعادلة.
  */
 import { type StoredUnit, storedUnitLabel } from "@/lib/unit-conversion";
+import { latinDigits } from "@/lib/digits";
 
 /** كم مِلّي‑وحدةٍ صغرى في مِلّي‑واحدٍ من هذه الوحدة. */
 const IN_SMALLEST: Record<StoredUnit, number> = {
@@ -129,10 +130,7 @@ const DECIMAL = /^\s*([+-]?)(\d*)(?:[.,](\d*))?\s*$/;
  * (`normaliseNumeric`)، لا قرارُ خانةٍ يكتبها إنسان.
  */
 export function toLatinDigits(raw: string): string {
-  return raw
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
-    .replace(/٫/g, ".");
+  return latinDigits(raw).replace(/٫/g, ".");
 }
 
 /**

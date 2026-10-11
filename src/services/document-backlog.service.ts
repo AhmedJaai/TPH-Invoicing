@@ -29,6 +29,7 @@ import { recordAudit } from "@/lib/audit";
 import { MonthClosedError } from "@/services/validation.service";
 import type { Conn } from "./types";
 import { autoRecordRefusal, type RecordedInvoice } from "@/lib/invoice-twin";
+import { monthEndDay, isoDay } from "@/lib/riyadh-time";
 
 export interface StoredReading {
   documentKind?: string;
@@ -75,10 +76,7 @@ export function supplierByVatInName(list: readonly SupplierRecord[], fileName: s
 
 /** آخرُ يومٍ من «YYYY-MM» — بالتقويم لا بالحدس. */
 function lastDayOf(month: string): string | null {
-  const m = month.match(/^(\d{4})-(\d{2})$/);
-  if (!m) return null;
-  const d = new Date(Date.UTC(+m[1], +m[2], 0));
-  return d.toISOString().slice(0, 10);
+  return /^\d{4}-\d{2}$/.test(month) ? monthEndDay(month) : null;
 }
 
 /** ما نقص بعينه — الجملةُ التي تُقال تحت المستند. */
@@ -393,6 +391,6 @@ export async function loadRecordedInvoices(conn: Conn = db): Promise<RecordedInv
     .filter((r): r is typeof r & { supplierId: string } => r.supplierId !== null)
     .map((r) => ({
       id: r.id, supplierId: r.supplierId, invoiceNumber: r.invoiceNumber ?? "",
-      invoiceDate: r.invoiceDate ? r.invoiceDate.toISOString().slice(0, 10) : null, totalMinor: r.totalMinor,
+      invoiceDate: r.invoiceDate ? isoDay(r.invoiceDate) : null, totalMinor: r.totalMinor,
     }));
 }

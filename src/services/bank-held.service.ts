@@ -21,6 +21,8 @@ import { toCanonical } from "@/lib/bank/canonical";
 import { factKey, identityKeyOf } from "@/lib/bank/sync";
 import { assertMonthsOpen } from "./month-guard";
 import type { Conn, Tx } from "./types";
+import { isoDay } from "@/lib/riyadh-time";
+import { monthOf } from "@/lib/filing";
 
 export type HeldKind = "AMBIGUOUS" | "CONFLICT" | "MISSING_FROM_FILE";
 export type HeldDecision = "SAME" | "ADDED" | "CHECKED" | "REMOVED";
@@ -209,12 +211,12 @@ async function resolveMissing(
       }
       const linked = await tx.select({ id: expenses.id, month: expenses.periodMonth, amountMinor: expenses.amountMinor, label: expenses.label })
         .from(expenses).where(eq(expenses.bankTransactionId, t.id));
-      await assertMonthsOpen(tx, [t.valueDate.toISOString().slice(0, 7), ...linked.map((e) => e.month)]);
+      await assertMonthsOpen(tx, [monthOf(t.valueDate), ...linked.map((e) => e.month)]);
       if (linked.length > 0) await tx.delete(expenses).where(inArray(expenses.id, linked.map((e) => e.id)));
       await tx.delete(bankTransactions).where(eq(bankTransactions.id, t.id));
       removed = true;
       facts = {
-        الحركة: t.id, اليوم: t.valueDate.toISOString().slice(0, 10), المبلغ: t.amountMinor, الاتجاه: t.direction,
+        الحركة: t.id, اليوم: isoDay(t.valueDate), المبلغ: t.amountMinor, الاتجاه: t.direction,
         الوصف: t.description, الهويّة: t.identityKey, الاستيراد: t.bankImportId,
         مصروفاتٌ_حُذفت: linked.map((e) => `${e.label} · ${e.amountMinor}`),
       };

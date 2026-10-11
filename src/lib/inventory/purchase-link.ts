@@ -12,6 +12,7 @@
  * أصناف الجرد اسماً. والإنسانُ يؤكّد (درس «العنب»: الاسمُ المتشابه ليس هويّة).
  */
 import type { StoredUnit } from "@/lib/unit-conversion";
+import { latinDigits } from "@/lib/digits";
 
 export interface PackGuess {
   /** كم عبوةً صغرى في الوحدة الواحدة من الفاتورة — «12» في «12 × 1 لتر». */
@@ -28,8 +29,7 @@ const UNIT_WORDS: { re: RegExp; unit: StoredUnit }[] = [
   { re: /^(مل|مليلتر|ملي|ml)$/i, unit: "ML" },
 ];
 
-const toAsciiDigits = (s: string) =>
-  s.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/[٫]/g, ".");
+const toAsciiDigits = (s: string) => latinDigits(s).replace(/[٫]/g, ".");
 
 /**
  * علامةُ الضرب **بين رقمين وحدها**: «24x250» ← «24 × 250».

@@ -35,6 +35,7 @@ import { echoHeldPaymentIds } from "./payment-echo.service";
 import type { db } from "@/db";
 import { recordAudit } from "@/lib/audit";
 import type { Tx } from "./types";
+import { isoDay } from "@/lib/riyadh-time";
 
 type Executor = typeof db | Tx;
 
@@ -326,7 +327,7 @@ export async function previewOwnerPaid(executor: Executor, invoiceId: string): P
     ownerPaymentMinor,
     freed: [...freedByPayment.entries()].map(([paymentId, amountMinor]) => ({
       paymentId,
-      paidAt: new Date(freedRows.find((f) => f.payment_id === paymentId)!.paid_at).toISOString().slice(0, 10),
+      paidAt: isoDay(new Date(freedRows.find((f) => f.payment_id === paymentId)!.paid_at)),
       amountMinor,
     })),
     reapplied: [...reappliedByInvoice.entries()].map(([id, amountMinor]) => ({

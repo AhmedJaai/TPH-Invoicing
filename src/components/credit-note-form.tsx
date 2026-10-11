@@ -1,5 +1,6 @@
 "use client";
 
+import { DateChips } from "./date-chips";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ReceiptText } from "lucide-react";
@@ -89,7 +90,10 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
         </Field>
         <Field label="تاريخه">
           {({ invalid, ...p }) => (
-            <Input {...p} invalid={invalid} type="date" className="nums" value={issuedOn} onChange={(e) => setIssuedOn(e.target.value)} disabled={busy} />
+            <>
+              <Input {...p} invalid={invalid} type="date" className="nums" value={issuedOn} onChange={(e) => setIssuedOn(e.target.value)} disabled={busy} />
+              <DateChips value={issuedOn} onPick={setIssuedOn} disabled={busy} hijri={false} />
+            </>
           )}
         </Field>
         <Field label="رقمُه (اختياريّ)" className="col-span-2 sm:col-span-1">

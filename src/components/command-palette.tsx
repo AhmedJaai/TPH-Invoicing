@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -10,9 +11,12 @@ import { KIND_LABEL, parseSearch, type SearchHit } from "@/lib/search";
 import { COMMAND_GROUP_LABEL, commandsFor, matchCommands, type Command } from "@/lib/commands";
 import { activeArea } from "@/lib/nav";
 import { request } from "@/lib/http-client";
-import type { Role } from "@/lib/permissions";
+import { can, type Role } from "@/lib/permissions";
 import { NavGlyph } from "./icons";
 import { PALETTE_EVENT, openCommandPalette, openShortcuts } from "@/lib/ui-events";
+import { movePaletteCursor, type PaletteKey } from "@/lib/palette-keys";
+import { parseQuestion } from "@/lib/ask";
+import { currentMonthRiyadh } from "@/lib/riyadh-time";
 import { followSystemTheme, toggleAmounts, toggleTheme } from "./view-controls";
 import { shortcutKey } from "@/lib/shortcut-keys";
 import { Kbd } from "./ui";
@@ -53,6 +57,27 @@ const HIT_ICON: Record<SearchHit["kind"], LucideIcon> = {
   document: FileText,
 };
 
+/** جوابُ السؤال بالكلمات كما يردّه `/api/ask` — يُقرأ بفحصٍ لا بتحويل نوع. */
+type PaletteAnswer =
+  | { state: "ANSWER"; label: string; amountMinor: number; basis: string; href: string }
+  | { state: "AMBIGUOUS"; names: string[] }
+  | { state: "UNKNOWN_SUPPLIER"; text: string }
+  | { state: "FAILED"; error: string }
+  | { state: "NONE" };
+
+function readAnswer(v: unknown): PaletteAnswer {
+  if (typeof v !== "object" || v === null || !("state" in v)) return { state: "NONE" };
+  if (v.state === "ANSWER" && "label" in v && typeof v.label === "string" && "amountMinor" in v && typeof v.amountMinor === "number"
+    && Number.isSafeInteger(v.amountMinor) && "basis" in v && typeof v.basis === "string" && "href" in v && typeof v.href === "string" && v.href.startsWith("/")) {
+    return { state: "ANSWER", label: v.label, amountMinor: v.amountMinor, basis: v.basis, href: v.href };
+  }
+  if (v.state === "AMBIGUOUS" && "names" in v && Array.isArray(v.names)) {
+    return { state: "AMBIGUOUS", names: v.names.filter((n): n is string => typeof n === "string") };
+  }
+  if (v.state === "UNKNOWN_SUPPLIER" && "text" in v && typeof v.text === "string") return { state: "UNKNOWN_SUPPLIER", text: v.text };
+  return { state: "NONE" };
+}
+
 function readRecent(): Recent[] {
   try {
     const raw = localStorage.getItem(RECENT_KEY);
@@ -84,6 +109,8 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [active, setActive] = useState(0);
+  const [answer, setAnswer] = useState<{ q: string; value: PaletteAnswer } | null>(null);
+  const canAsk = can(role, "amounts:view");
   const [recent, setRecent] = useState<Recent[]>([]);
 
   const commands = useMemo(() => commandsFor(role), [role]);
@@ -170,6 +197,34 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
     };
   }, [q, canSearch]);
 
+  /*
+    سؤالٌ بالكلمات («كم دفعتُ للمراعي في سبتمبر؟»): يُفهَم هنا بمحلّلٍ حتميّ ليُعرف
+    أسؤالٌ هو، والرقمُ من الخادم. ولمن يرى المبالغ وحده — وغيرُه يمضي بحثُه كما كان.
+  */
+  const asking = useMemo(
+    () => canAsk && parseQuestion(q, currentMonthRiyadh()) !== null,
+    [q, canAsk],
+  );
+  useEffect(() => {
+    if (!asking) return;
+    const abort = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const r = await request<{ answer?: unknown }>(`/api/ask?q=${encodeURIComponent(q)}`, { signal: abort.signal });
+        if (abort.signal.aborted) return;
+        setAnswer(r.ok ? { q, value: readAnswer(r.data.answer) } : { q, value: { state: "FAILED", error: r.error } });
+      } catch {
+        /* أُلغي لأنّ سؤالاً أحدث بدأ — لا عطب */
+      }
+    }, DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      abort.abort();
+    };
+  }, [q, asking]);
+  /* الجوابُ جوابُ ما كُتب الآن — جوابُ نصٍّ سابق لا يُعرَض فوق سؤالٍ غيره */
+  const shownAnswer = asking && answer?.q === q ? answer.value : null;
+
   function onChange(value: string) {
     setQ(value);
     setActive(0);
@@ -232,14 +287,25 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
     listRef.current?.querySelector(`[data-index="${current}"]`)?.scrollIntoView({ block: "nearest" });
   }, [current]);
 
+  const groupOf = (r: Row) => (r.type === "hit" || r.type === "verb" ? "RECORDS" : r.type === "recent" ? "RECENT" : r.command.group);
+
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (rows.length === 0) return;
-    if (e.key === "ArrowDown") { e.preventDefault(); setActive((current + 1) % rows.length); }
-    if (e.key === "ArrowUp") { e.preventDefault(); setActive((current - 1 + rows.length) % rows.length); }
-    if (e.key === "Enter") { e.preventDefault(); go(rows[current]); }
+    if (e.key === "Enter") { e.preventDefault(); go(rows[current]); return; }
+    /*
+      Tab بين المجموعات، و Home/End للطرفين حين الحقلُ فارغ وحده — وفيه نصٌّ يبقيان
+      لمؤشّر الكتابة. والحسابُ في `movePaletteCursor` (مختبَر).
+    */
+    const key: PaletteKey | null =
+      e.key === "ArrowDown" || e.key === "ArrowUp" ? e.key
+      : e.key === "Tab" ? (e.shiftKey ? "PrevGroup" : "NextGroup")
+      : (e.key === "Home" || e.key === "End") && e.currentTarget.value === "" ? e.key
+      : null;
+    if (key === null) return;
+    e.preventDefault();
+    setActive(movePaletteCursor(rows.map(groupOf), current, key));
   }
 
-  const groupOf = (r: Row) => (r.type === "hit" || r.type === "verb" ? "RECORDS" : r.type === "recent" ? "RECENT" : r.command.group);
   const GROUP_LABEL: Record<string, string> = { ...COMMAND_GROUP_LABEL, RECORDS: "في سجلّاتك", RECENT: "فتحتَها مؤخّراً" };
 
   const intentLine =
@@ -283,6 +349,26 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
           <span className="hidden shrink-0 sm:block"><Kbd>Esc</Kbd></span>
         )}
       </div>
+
+      {asking && (
+        <div className="border-b border-line-soft bg-accent-soft/50 px-4 py-3" role="status">
+          {shownAnswer === null ? (
+            <p className="text-xs text-muted">يحسب الجواب…</p>
+          ) : shownAnswer.state === "ANSWER" ? (
+            <Link href={shownAnswer.href} onClick={() => close()} className="group block">
+              <span className="block text-[11px] font-bold text-ink-soft">{shownAnswer.label}</span>
+              <span className="mt-0.5 block text-xl font-bold leading-tight"><Money minor={shownAnswer.amountMinor} currency /></span>
+              <span className="mt-0.5 block text-[11px] text-muted">{shownAnswer.basis} · <span className="font-bold text-accent group-hover:underline">افتح مصدره</span></span>
+            </Link>
+          ) : shownAnswer.state === "AMBIGUOUS" ? (
+            <p className="text-xs leading-relaxed text-ink-soft">أيَّهم تقصد؟ {shownAnswer.names.join(" · ")} — اكتب الاسمَ أتمّ.</p>
+          ) : shownAnswer.state === "UNKNOWN_SUPPLIER" ? (
+            <p className="text-xs leading-relaxed text-ink-soft">لا مورّدَ مسجَّلاً باسمٍ فيه «{shownAnswer.text}» — فلا رقمَ يُقال.</p>
+          ) : shownAnswer.state === "FAILED" ? (
+            <p className="text-xs font-bold text-danger">{shownAnswer.error}</p>
+          ) : null}
+        </div>
+      )}
 
       {intentLine && (
         <p className="border-b border-line-soft bg-sunken/60 px-4 py-2 text-[11px] text-ink-soft">{intentLine}</p>
@@ -331,7 +417,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
 
       {searching && busy && hits.length === 0 && rows.length === 0 && <p className="px-4 pb-4 text-xs text-muted">يبحث في سجلّاتك…</p>}
       {failed && <p className="px-4 pb-3 text-xs text-danger">تعذّر البحث في السجلّات: {failed}</p>}
-      {rows.length === 0 && !busy && (
+      {rows.length === 0 && !busy && !asking && (
         <p className="px-4 py-8 text-center text-xs text-muted">
           لا شيء يطابق «{q}».{canSearch && " جرّب رقم فاتورة أو مبلغاً أو اسم مورّد."}
         </p>
@@ -339,6 +425,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
 
       <div className="hidden items-center gap-4 border-t border-line bg-sunken/50 px-4 py-2.5 text-[11px] text-muted sm:flex">
         <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> للتنقّل</span>
+        <span className="flex items-center gap-1"><Kbd>Tab</Kbd> للمجموعة التالية</span>
         <span className="flex items-center gap-1"><Kbd>↵</Kbd> للفتح</span>
         <span className="ms-auto flex items-center gap-1"><Kbd>?</Kbd> كلُّ الاختصارات</span>
       </div>

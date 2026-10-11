@@ -16,7 +16,7 @@ import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { counterparties, counterpartyEvidence, suppliers } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { INVOICE, countNoun } from "@/lib/arabic";
-import { latinDigits } from "@/lib/invoice-number";
+import { latinDigits } from "@/lib/digits";
 import { parseRiyals } from "@/lib/money";
 import { normalizeIban, normalizePhoneE164, type SupplierProfileRequest } from "@/lib/supplier-edit";
 import { normalizeName } from "@/lib/suppliers-seed";

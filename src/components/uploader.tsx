@@ -1,6 +1,7 @@
 "use client";
 
 import { ExtractionEvidencePanel } from "@/components/extraction-evidence";
+import { PriceMovesNote, readPriceMoves } from "./price-moves-note";
 import { parseEvidence } from "@/lib/extraction/evidence";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -39,6 +40,8 @@ interface AnalysisResponse {
   extraction?: Record<string, unknown>;
   /** أدلّةُ القراءة للعرض (رمزُ الفاتورة ومصادرُ الحقول) — والخادمُ يقرؤها من حفظه لا من هنا */
   evidence?: unknown;
+  /** ما تحرّك سعرُه عن آخر توريدٍ من المورّد المطابَق — يحسبه الخادم، ويُقرأ بفحص. */
+  priceMoves?: unknown;
   result: {
     documentKind: string;
     supplier?: { id: string; slug: string; nameAr: string };
@@ -1543,6 +1546,14 @@ function ReviewCard({
                 الخادمُ يعيد الحسابَ والحكمَ الضريبيّ حين تؤكّد — ما تكتبه هنا يُقرأ ولا يُصدَّق بلا فحص.
               </p>
             </Group>
+          )}
+
+          {/*
+            السعرُ مقابل آخر توريد — للمورّد الذي طابقه الخادمُ وحده: من اختار غيرَه
+            بيده لا تُعرَض له مقارنةٌ بأسعار مورّدٍ آخر.
+          */}
+          {canSeeAmounts && !isStatement && r.supplier && (!chosen || chosen.id === r.supplier.id) && (
+            <PriceMovesNote moves={readPriceMoves(item.data.priceMoves)} supplierName={r.supplier.nameAr} />
           )}
 
           <ExtractionEvidencePanel evidence={parseEvidence(item.data.evidence)} showAmounts={canSeeAmounts} />

@@ -9,6 +9,8 @@
  * دالّةٌ خالصة. والأيّامُ بتوقيت الرياض (`today` يُمرَّر). وما لا تاريخَ له لا
  * يُحفظ أصلاً: التاريخُ شرطُ الوثيقة هنا، فلا «غير معروف» يُحسب به.
  */
+import { daysBetween, isoDay } from "@/lib/riyadh-time";
+
 
 export const OBLIGATION_KINDS = [
   "COMMERCIAL_REGISTER", "MUNICIPAL_LICENCE", "CIVIL_DEFENCE", "HEALTH_CERTIFICATE",
@@ -67,17 +69,12 @@ export const EXPIRY_LEVEL_LABEL: Record<ExpiryLevel, string> = {
 export function isRealDay(day: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
   const d = new Date(`${day}T00:00:00Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === day;
-}
-
-function dayNumber(day: string): number {
-  const [y, m, d] = day.split("-").map(Number);
-  return Math.floor(Date.UTC(y, m - 1, d) / 86_400_000);
+  return !Number.isNaN(d.getTime()) && isoDay(d) === day;
 }
 
 /** كم يوماً بقي — سالبٌ بعد الانتهاء، وصفرٌ يومَه. */
 export function daysLeft(expiresOn: string, today: string): number {
-  return dayNumber(expiresOn) - dayNumber(today);
+  return daysBetween(today, expiresOn);
 }
 
 export function expiryLevel(o: Pick<Obligation, "expiresOn" | "remindDays">, today: string): ExpiryLevel {

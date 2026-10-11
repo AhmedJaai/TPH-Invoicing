@@ -64,6 +64,7 @@ import { FILE, MONTH, countNoun } from "@/lib/arabic";
 import { withDeadline } from "@/lib/ai/deadline";
 import { consume } from "@/services/rate-limit.service";
 import { acquireLease, releaseLease } from "@/services/job-state.service";
+import { monthEndDay, isoDayOrNull } from "@/lib/riyadh-time";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -842,8 +843,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
         /* الكشف: هويّتُه مورّدُه وفترتُه — لا رقمٌ ولا إجماليّ */
         if (x.documentKind === "STATEMENT" && supplier) {
           /* بلا تاريخٍ مقروء: آخرُ يومٍ من شهر المجلّد — كتبه إنسان */
-          const [y, m] = entry.month.split("-").map(Number);
-          const end = x.invoiceDate || new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+          const end = x.invoiceDate || monthEndDay(entry.month);
           const parsed = parseStatementExtras(x);
           await createStatement(tx, {
             documentId: doc.id,
@@ -1102,7 +1102,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
         mimeType: r.mimeType,
         kind: r.kind,
         slug: r.slug,
-        date: (r.invoiceDate ?? r.statementEnd)?.toISOString().slice(0, 10) ?? null,
+        date: isoDayOrNull(r.invoiceDate ?? r.statementEnd),
         totalMinor: r.invoiceTotal ?? r.statementTotal ?? null,
         invoiceNumber: r.invoiceNumber ?? null,
       });

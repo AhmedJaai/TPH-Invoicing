@@ -14,6 +14,8 @@
  *
  * دوالُّ خالصة. المالُ بالهللات والكمّيّةُ بالمِلّي، والنِّسبُ بنقاط الأساس.
  */
+import { isoDay } from "@/lib/riyadh-time";
+
 
 export interface SalesDay {
   /** يومُ العمل في ملفّ فودكس — YYYY-MM-DD. */
@@ -28,7 +30,7 @@ export interface SalesDay {
 
 function shift(day: string, n: number): string {
   const [y, m, d] = day.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+  return isoDay(new Date(Date.UTC(y, m - 1, d + n)));
 }
 
 function median(values: readonly number[]): number | null {

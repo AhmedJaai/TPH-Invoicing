@@ -33,6 +33,7 @@ import { CLASSIFICATION_VERSION } from "@/lib/bank/classification";
 import { deriveLifecycle } from "@/lib/bank/lifecycle";
 import { TRANSACTION, countNoun } from "@/lib/arabic";
 import type { TxCategory } from "@/lib/bank/rules";
+import { monthOf } from "@/lib/filing";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -314,7 +315,7 @@ export async function POST(request: Request) {
     .where(eq(counterparties.id, result.counterpartyId));
 
   /* المصروفُ يتبع التصنيفَ الجديد في شهره — يُقيَّد أو يُصحَّح بابُه وحده */
-  const derived = await deriveOpenMonths(rows.map((r) => r.valueDate.toISOString().slice(0, 7)), user.id);
+  const derived = await deriveOpenMonths(rows.map((r) => monthOf(r.valueDate)), user.id);
 
   const parts = [`حُفظت «${party?.name}»`];
   parts.push(`وطُبّقت على ${countNoun(rows.length, TRANSACTION)}`);

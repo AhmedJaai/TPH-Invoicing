@@ -36,6 +36,7 @@ import { METHOD_LABEL, paymentStatusLabel } from "@/lib/payment-state";
 import { actionLabel } from "@/lib/audit-labels";
 import { ITEM, PAYMENT_RECORD, REASON, countNoun } from "@/lib/arabic";
 import { txHref } from "@/lib/inspector";
+import { monthOf } from "@/lib/filing";
 
 
 /**
@@ -430,7 +431,7 @@ export async function InvoiceView({
                 {p.statementLines.map((s) => (
                   <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                     <span>
-                      كشف {formatMonth(s.periodEnd.toISOString().slice(0, 7))} · {formatDay(s.date)}
+                      كشف {formatMonth(monthOf(s.periodEnd))} · {formatDay(s.date)}
                       {s.ref && <> · <bdi className="nums">{s.ref}</bdi></>}
                     </span>
                     <span className="flex items-center gap-2">

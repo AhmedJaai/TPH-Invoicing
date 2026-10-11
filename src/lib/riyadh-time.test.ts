@@ -128,3 +128,94 @@ describe("المقابلُ الهجريّ للعرض", () => {
     expect(formatHijri(null)).toBeNull();
   });
 });
+
+import { MS_PER_DAY, addDays, dayNumber, daysBetween, daysInMonth, isoDay, monthEndDay } from "./riyadh-time";
+
+/*
+ * المالكُ الواحد يعطي ما كانت تعطيه النسخُ المحلّيّة — حرفاً بحرف.
+ *
+ * كلُّ صيغةٍ قديمة منسوخةٌ هنا كما كانت في موضعها، وتُقابَل على كلّ يومٍ من
+ * ٢٠٢٤ (كبيسة) إلى ٢٠٢٨ (كبيسة). فلا رقمَ على شاشةٍ تغيّر بالتوحيد.
+ */
+describe("حسابُ الأيّام والأشهر: المالكُ الواحد يطابق ما حلّ محلَّه", () => {
+  const days: string[] = [];
+  for (let t = Date.UTC(2024, 0, 1); t <= Date.UTC(2028, 11, 31); t += 86_400_000) {
+    days.push(new Date(t).toISOString().slice(0, 10));
+  }
+  const months = [...new Set(days.map((d) => d.slice(0, 7)))];
+  const shifts = [-400, -31, -7, -1, 0, 1, 3, 7, 30, 45, 366];
+
+  /* كما كانت في payment-echo · hand-payment-link · expense.service */
+  const oldParseNumber = (d: string) => Math.round(Date.parse(`${d}T00:00:00Z`) / 86_400_000);
+  /* كما كانت في recurring-detect · obligations */
+  const oldUtcNumber = (day: string) => {
+    const [y, m, d] = day.split("-").map(Number);
+    return Math.floor(Date.UTC(y, m - 1, d) / 86_400_000);
+  };
+  /* كما كانت في inventory/week · signal-decisions · inventory.service · cash-outlook */
+  const oldShift = (day: string, n: number) => {
+    const [y, m, d] = day.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+  };
+  /* كما كانت في صفحة كشف المورّد */
+  const oldNoonShift = (day: string, n: number) => {
+    const d = new Date(`${day}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+
+  it("رقمُ اليوم بالصيغتين القديمتين", () => {
+    for (const d of days) {
+      expect(dayNumber(d)).toBe(oldParseNumber(d));
+      expect(dayNumber(d)).toBe(oldUtcNumber(d));
+    }
+  });
+
+  it("فرقُ الأيّام كما في cash-runway و supplier-edit و inventory/receipts و bank/coverage", () => {
+    for (let i = 0; i < days.length; i += 13) {
+      for (const n of shifts) {
+        const a = days[i];
+        const b = oldShift(a, n);
+        const oldRunway = Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+        const t = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+        const oldApart = Math.abs(t(a) - t(b)) / 86_400_000;
+        expect(daysBetween(a, b)).toBe(oldRunway);
+        expect(daysBetween(a, b)).toBe(n);
+        expect(Math.abs(daysBetween(a, b))).toBe(oldApart);
+      }
+    }
+  });
+
+  it("إزاحةُ الأيّام بالصيغتين القديمتين", () => {
+    for (let i = 0; i < days.length; i += 3) {
+      for (const n of shifts) {
+        expect(addDays(days[i], n)).toBe(oldShift(days[i], n));
+        expect(addDays(days[i], n)).toBe(oldNoonShift(days[i], n));
+      }
+    }
+  });
+
+  it("طولُ الشهر وآخرُ يومه", () => {
+    for (const month of months) {
+      const [y, m] = month.split("-").map(Number);
+      expect(daysInMonth(month)).toBe(new Date(Date.UTC(y, m, 0)).getUTCDate());
+      expect(monthEndDay(month)).toBe(new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10));
+      expect(monthEndDay(month)).toBe(`${month}-${String(daysInMonth(month)).padStart(2, "0")}`);
+    }
+    expect(monthEndDay("2024-02")).toBe("2024-02-29");
+    expect(monthEndDay("2026-02")).toBe("2026-02-28");
+    expect(monthEndDay("2026-12")).toBe("2026-12-31");
+  });
+
+  it("يومُ التاريخ المخزَّن هو يومُ UTC لا يومُ الرياض", () => {
+    expect(isoDay(new Date("2026-09-30T00:00:00Z"))).toBe("2026-09-30");
+    /* ٢٢:٣٠ UTC هي ١:٣٠ فجرَ الغد في الرياض — والمخزَّن يبقى على يومه */
+    expect(isoDay(new Date("2026-09-30T22:30:00Z"))).toBe("2026-09-30");
+    expect(MS_PER_DAY).toBe(24 * 60 * 60 * 1000);
+  });
+
+  it("ما لا يُقرأ لا يصير رقماً", () => {
+    expect(Number.isNaN(dayNumber("غير تاريخ"))).toBe(true);
+    expect(Number.isNaN(dayNumber(""))).toBe(true);
+  });
+});

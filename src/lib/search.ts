@@ -8,6 +8,7 @@
  *
  * دالّة خالصة: تأخذ نصّاً وتُرجع خطّة بحث. لا قاعدة بيانات هنا.
  */
+import { latinDigits } from "./digits";
 
 export type SearchKind =
   | "AMOUNT"      // مبلغ بالريال
@@ -30,12 +31,8 @@ export interface SearchIntent {
 export type SearchTarget =
   | "invoices" | "suppliers" | "products" | "bankTransactions" | "documents";
 
-const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
-
-/** يحوّل الأرقام العربية إلى لاتينية كي يُبحث بها. */
-export function normalizeDigits(s: string): string {
-  return s.replace(/[٠-٩]/g, (d) => String(ARABIC_DIGITS.indexOf(d)));
-}
+/** يحوّل الأرقام العربية (والفارسيّة) إلى لاتينية كي يُبحث بها. */
+export const normalizeDigits = latinDigits;
 
 /** يُسقط التشكيل ويوحّد الألف والياء والتاء المربوطة. */
 export function normalizeArabic(s: string): string {

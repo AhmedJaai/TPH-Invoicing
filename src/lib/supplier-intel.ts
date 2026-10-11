@@ -7,6 +7,8 @@
  * تحرّك السعر، ومن القيود كشفَ حسابٍ يُطبَع. وما لا تكفي بياناتُه
  * يبقى `null` — «غير معروف» — ولا يصير صفراً.
  */
+import { MS_PER_DAY } from "@/lib/riyadh-time";
+
 
 /* ───────────────────────── أعمار الدَّين ───────────────────────── */
 
@@ -127,7 +129,7 @@ export function paymentReliability(
   counts: { invoiceCount: number; settledCount: number },
 ): PaymentReliability {
   const days = settlements
-    .map((s) => Math.round((dayMs(s.settledOn) - dayMs(s.invoiceDate)) / 86_400_000))
+    .map((s) => Math.round((dayMs(s.settledOn) - dayMs(s.invoiceDate)) / MS_PER_DAY))
     .filter((d) => Number.isFinite(d));
   const clamped = days.map((d) => Math.max(0, d)).sort((a, b) => a - b);
   const enough = clamped.length >= MIN_SETTLED_SAMPLE;

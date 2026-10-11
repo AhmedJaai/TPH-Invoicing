@@ -15,8 +15,9 @@
  *
  * دالّةٌ خالصة — تأخذ وقائع وتُرجع دلاءً مرتّبة.
  */
-import { formatDay, formatMonth } from "./riyadh-time";
+import { formatDay, formatMonth, addDays, daysInMonth } from "./riyadh-time";
 import { MAX_AMOUNT_MINOR, formatRiyalsDisplay } from "./money";
+import { addMonths, monthsBetween } from "./filing";
 
 export type Cadence = "MONTHLY" | "QUARTERLY" | "ANNUAL";
 
@@ -120,18 +121,6 @@ export interface CashOutlook {
   vatAhead: VatDue[];
   /** فترةٌ لا يُعرف مستحقُّها — يُقال ولا يُسقَط صفراً. */
   vatUnknown: VatDue[];
-}
-
-export function addMonths(month: string, n: number): string {
-  const [y, m] = month.split("-").map(Number);
-  const idx = y * 12 + (m - 1) + n;
-  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, "0")}`;
-}
-
-function monthsBetween(from: string, to: string): number {
-  const [fy, fm] = from.split("-").map(Number);
-  const [ty, tm] = to.split("-").map(Number);
-  return (ty * 12 + tm) - (fy * 12 + fm);
 }
 
 /**
@@ -349,16 +338,6 @@ export interface WeekDue {
   undated: number;
 }
 
-function shiftDay(day: string, n: number): string {
-  const [y, m, d] = day.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
-}
-
-function monthLength(month: string): number {
-  const [y, m] = month.split("-").map(Number);
-  return new Date(Date.UTC(y, m, 0)).getUTCDate();
-}
-
 /**
  * ما يخرج في الأيّام السبعة القادمة — جوابُ «ماذا أدفع هذا الأسبوع؟» في
  * إحاطة الصباح. من المصادر نفسها التي يبني منها `buildCashOutlook`:
@@ -370,7 +349,7 @@ export function dueThisWeek(
   input: Pick<OutlookInput, "today" | "overdueRun" | "recurring">,
   days = 7,
 ): WeekDue {
-  const to = shiftDay(input.today, days - 1);
+  const to = addDays(input.today, days - 1);
   const months = [...new Set([input.today.slice(0, 7), to.slice(0, 7)])];
 
   const lines: WeekLine[] = input.overdueRun
@@ -394,7 +373,7 @@ export function dueThisWeek(
         if (month === input.today.slice(0, 7)) undated++;
         continue;
       }
-      const date = `${month}-${String(Math.min(o.day, monthLength(month))).padStart(2, "0")}`;
+      const date = `${month}-${String(Math.min(o.day, daysInMonth(month))).padStart(2, "0")}`;
       if (date < input.today || date > to) continue;
       lines.push({
         id: `rec:${r.id}:${date}`,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, buildCashOutlook, dueThisWeek, floorBreach, occursIn, parseStoredMinor, type OutlookInput, type RecurringInput } from "./cash-outlook";
+import { addMonths } from "./filing";
+import { buildCashOutlook, dueThisWeek, floorBreach, occursIn, parseStoredMinor, type OutlookInput, type RecurringInput } from "./cash-outlook";
 
 const base: OutlookInput = {
   today: "2026-09-24",

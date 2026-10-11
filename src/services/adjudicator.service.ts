@@ -23,6 +23,8 @@ import type { AdjudicationCase } from "@/lib/bank/adjudicate";
 import type { Candidate } from "@/lib/bank/candidates";
 import type { CanonicalTransaction } from "@/lib/bank/canonical";
 import type { TxKind } from "@/lib/bank/taxonomy";
+import { formatRiyals } from "@/lib/money";
+import { isoDay } from "@/lib/riyadh-time";
 
 export type { AdjudicatorProvider } from "@/lib/bank/adjudicator-provider";
 
@@ -311,8 +313,8 @@ function buildEntityPrompt(
     "٣) إن لم يترجّح شيء فاكتب NONE — الترك أسلم من نسبة مالٍ إلى جهة خاطئة.",
     "",
     "الحركة:",
-    `  التاريخ: ${tx.valueDate.toISOString().slice(0, 10)}`,
-    `  المبلغ: ${(tx.amountMinor / 100).toFixed(2)}`,
+    `  التاريخ: ${isoDay(tx.valueDate)}`,
+    `  المبلغ: ${formatRiyals(tx.amountMinor)}`,
     `  المستفيد كما كتبه البنك: ${tx.beneficiaryRaw ?? "—"}`,
     `  الوصف: ${tx.description ?? "—"}`,
     `  نوع العملية: ${tx.transactionType ?? "—"}`,

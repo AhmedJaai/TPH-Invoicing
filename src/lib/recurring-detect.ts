@@ -16,6 +16,8 @@
 import { payeeKey } from "./bank/double-paid";
 import { MATCH_TOLERANCE_PCT, isExpenseCategory } from "./expenses";
 import type { TxCategory } from "./bank/rules";
+import { dayNumber, daysInMonth } from "@/lib/riyadh-time";
+import { addMonths } from "./filing";
 
 export interface DebitTx {
   id: string;
@@ -78,17 +80,6 @@ function median(values: readonly number[]): number {
 
 function within(amountMinor: number, usualMinor: number): boolean {
   return Math.abs(amountMinor - usualMinor) * 100 <= usualMinor * MATCH_TOLERANCE_PCT;
-}
-
-function dayNumber(day: string): number {
-  const [y, m, d] = day.split("-").map(Number);
-  return Math.floor(Date.UTC(y, m - 1, d) / 86_400_000);
-}
-
-function addMonth(month: string, n: number): string {
-  const [y, m] = month.split("-").map(Number);
-  const idx = y * 12 + (m - 1) + n;
-  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, "0")}`;
 }
 
 function labelOf(tx: DebitTx): string {
@@ -190,7 +181,7 @@ export function detectRecurring(rows: readonly DebitTx[], lastBankDay: string | 
 
     /* غاب: الشهرُ التالي لآخر خصمٍ انقضى كلُّه في الكشف ولا خصمَ فيه */
     if (lastBankDay) {
-      const next = addMonth(lastMonth, 1);
+      const next = addMonths(lastMonth, 1);
       if (lastBankDay.slice(0, 7) > next) notes.push({ kind: "MISSING", month: next });
     }
 
@@ -237,8 +228,6 @@ export function registeredFor(
 
 /** أوّلُ استحقاقٍ قادمٍ للسلسلة بيومها المعتاد — يُكتب `startsOn` عند إقرارها. */
 export function nextDueOn(series: Pick<RecurringSeries, "lastDay" | "dayOfMonth">): string {
-  const month = addMonth(series.lastDay.slice(0, 7), 1);
-  const [y, m] = month.split("-").map(Number);
-  const length = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  return `${month}-${String(Math.min(series.dayOfMonth, length)).padStart(2, "0")}`;
+  const month = addMonths(series.lastDay.slice(0, 7), 1);
+  return `${month}-${String(Math.min(series.dayOfMonth, daysInMonth(month))).padStart(2, "0")}`;
 }

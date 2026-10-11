@@ -6,7 +6,8 @@
  * فيُقارَن بمفتاحٍ لا يعرف الفواصل ولا حالة الحروف. ونسخةٌ رقمُها لم يُقرأ
  * كما قُرئ في أختها تُعرف بيومها ومبلغها معاً — فتُترك للإنسان ولا تُقيَّد.
  */
-import { latinDigits, unreverseInvoiceNumber } from "./invoice-number";
+import { latinDigits } from "./digits";
+import { unreverseInvoiceNumber } from "./invoice-number";
 
 export interface RecordedInvoice {
   id: string;

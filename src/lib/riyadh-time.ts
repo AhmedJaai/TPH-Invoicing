@@ -25,7 +25,7 @@ export function todayInRiyadh(at: Date = new Date()): string {
 /** كم يوماً مضى على يومٍ (`YYYY-MM-DD`) حتى اليوم بتوقيت الرياض. */
 export function daysSinceRiyadh(day: string, at: Date = new Date()): number {
   const t = (d: string) => Date.parse(`${d}T00:00:00Z`);
-  return Math.round((t(todayInRiyadh(at)) - t(day)) / 86_400_000);
+  return Math.round((t(todayInRiyadh(at)) - t(day)) / MS_PER_DAY);
 }
 
 /** YYYY-MM بتوقيت الرياض. */
@@ -111,15 +111,66 @@ export function formatRange(from: Date | string, to: Date | string): string {
  * تُقاس بالأيّام. والرياض بلا توقيتٍ صيفيّ: ثلاث ساعاتٍ ثابتة.
  */
 export function riyadhDayNumber(at: Date): number {
-  return Math.floor((at.getTime() + 3 * 3_600_000) / 86_400_000);
+  return Math.floor((at.getTime() + 3 * 3_600_000) / MS_PER_DAY);
+}
+
+/* ─────────────────────────── حسابُ الأيّام والأشهر — مالكٌ واحد ─────────────────────────── */
+
+/*
+ * اليومُ التقويميّ `YYYY-MM-DD` والشهرُ `YYYY-MM` يُحسبان هنا وحده.
+ *
+ * كانت «زِد أيّاماً» مكتوبةً ستَّ مرّات، و«رقمُ اليوم» ستّاً بصيغتين، و«آخرُ
+ * يومٍ في الشهر» إحدى عشرة، والرقم `86_400_000` في خمسةٍ وثلاثين موضعاً. كلُّها
+ * كانت تعطي الجواب نفسه — والخطرُ في السابعة التي تُكتب بعدها بخطأ.
+ */
+
+/** مِلّي‑ثانية في اليوم. */
+export const MS_PER_DAY = 86_400_000;
+
+/**
+ * يومُ التاريخ المخزَّن `YYYY-MM-DD` — **كما خُزّن (UTC)، لا يومُ الرياض**.
+ *
+ * تواريخُ المستندات والحركات تُحفَظ عند منتصف ليل UTC، فيومُها هو يومُ UTC.
+ * و«اليوم» الذي نحن فيه شيءٌ آخر: `todayInRiyadh()`.
+ */
+export function isoDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/** يومُ التاريخ المخزَّن، أو `null` إن لم يكن تاريخ — «غير معروف» لا يومٌ مخترَع. */
+export function isoDayOrNull(date: Date | null | undefined): string | null {
+  return date ? isoDay(date) : null;
+}
+
+/** رقمُ اليوم التقويميّ منذ ١٩٧٠ — عددٌ صحيح يُطرَح. وما لا يُقرأ `NaN`. */
+export function dayNumber(day: string): number {
+  return Math.round(Date.parse(`${day}T00:00:00Z`) / MS_PER_DAY);
+}
+
+/** كم يوماً من `from` إلى `to` — موجبٌ إن كان `to` بعده. */
+export function daysBetween(from: string, to: string): number {
+  return dayNumber(to) - dayNumber(from);
+}
+
+/** يزيح يوماً أيّاماً — نصّاً إلى نصّ، بلا منطقةٍ زمنيّة. */
+export function addDays(day: string, n: number): string {
+  const [y, m, d] = day.split("-").map(Number);
+  return isoDay(new Date(Date.UTC(y, m - 1, d + n)));
+}
+
+/** عددُ أيّام الشهر `YYYY-MM`. */
+export function daysInMonth(month: string): number {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+/** آخرُ يومٍ من الشهر `YYYY-MM` — `YYYY-MM-DD`. */
+export function monthEndDay(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return isoDay(new Date(Date.UTC(y, m, 0)));
 }
 
 /* ─────────────────────────── اختصاراتُ التاريخ والهجريّ ─────────────────────────── */
-
-function shiftIsoDay(day: string, n: number): string {
-  const [y, m, d] = day.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
-}
 
 /**
  * أشيعُ ما يُدخَل في حقل تاريخ: اليوم، أمس، آخرُ الشهر الماضي — بتوقيت الرياض.
@@ -129,8 +180,8 @@ export function dateShortcuts(today: string = todayInRiyadh()): { label: string;
   const firstOfMonth = `${today.slice(0, 7)}-01`;
   return [
     { label: "اليوم", value: today },
-    { label: "أمس", value: shiftIsoDay(today, -1) },
-    { label: "آخر الشهر الماضي", value: shiftIsoDay(firstOfMonth, -1) },
+    { label: "أمس", value: addDays(today, -1) },
+    { label: "آخر الشهر الماضي", value: addDays(firstOfMonth, -1) },
   ];
 }
 

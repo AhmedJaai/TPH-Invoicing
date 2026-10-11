@@ -1,4 +1,5 @@
 import { formatRiyalsDisplay } from "./money";
+import { MS_PER_DAY } from "@/lib/riyadh-time";
 
 /**
  * ما يُطلَب من المورّد — فاتورةٌ لمالٍ خرج بلا مستند، وكشفٌ غاب.
@@ -153,7 +154,7 @@ export const YEARLY_RATE_MIN_DAYS = 60;
  */
 export function yearlyQuantity(totalQuantity: number | null, firstDay: Date | null, lastDay: Date | null): number | null {
   if (totalQuantity === null || totalQuantity <= 0 || !firstDay || !lastDay) return null;
-  const days = Math.round((lastDay.getTime() - firstDay.getTime()) / 86_400_000);
+  const days = Math.round((lastDay.getTime() - firstDay.getTime()) / MS_PER_DAY);
   if (days < YEARLY_RATE_MIN_DAYS) return null;
   return Math.round((totalQuantity * 365) / days);
 }

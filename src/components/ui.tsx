@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, Check, Inbox, Minus, TriangleAlert, type LucideIcon
 import { Money, Prose } from "./money";
 import { LiveMoney } from "./live-money";
 import { ScrollX } from "./scroll-x";
-import { LinkPending, RowLink, SortHeader, SortSelect, TableFilter } from "./ui-client";
+import { LinkPending, RowLink, SelectAll, SelectBox, SortHeader, SortSelect, TableFilter } from "./ui-client";
 import { parseSort, sortRows, type SortValue } from "@/lib/table-sort";
 
 /**
@@ -801,6 +801,8 @@ export function DataTable<T>({
   searchLabel = "ابحث في هذا الجدول",
   sort,
   sortParam = "sort",
+  selectable,
+  bulk,
 }: {
   columns: readonly Column<T>[];
   rows: readonly T[];
@@ -817,6 +819,14 @@ export function DataTable<T>({
   sort?: string | null;
   /** اسمُ الوسيط في العنوان — لصفحةٍ فيها جدولان يُرتَّبان. */
   sortParam?: string;
+  /**
+   * تحديدٌ متعدّد: مربّعٌ في أوّل كلّ صفٍّ يقبله (`when`) ومربّعُ «الكلّ» في الرأس،
+   * و`Shift` يحدّد المدى. الحالُ في المتصفّح (`BulkBar` في `ui-client`)، والمربّعُ
+   * يحمل مفتاحَ الصفّ واسمَه وحدهما — والفعلُ الجماعيّ يرسل معرّفاتٍ لا أرقاماً.
+   */
+  selectable?: { label: (row: T) => string; when?: (row: T) => boolean };
+  /** شريطُ الأفعال الجماعيّة — مكوّنُ متصفّحٍ يبنيه صاحبُ الصفحة على `BulkBar`. */
+  bulk?: React.ReactNode;
 }) {
   const uid = useId();
   const sortable = sort !== undefined ? columns.filter((c) => c.sortBy) : [];
@@ -871,6 +881,11 @@ export function DataTable<T>({
         <table className="w-full border-separate border-spacing-0 text-[13px]">
           <thead className={long ? "sticky top-0 z-10" : ""}>
             <tr>
+              {selectable && (
+                <th scope="col" className="w-10 border-b border-line bg-sunken ps-3.5 text-start">
+                  <SelectAll />
+                </th>
+              )}
               {columns.map((c) => {
                 const canSort = sort !== undefined && !!c.sortBy && !!c.header;
                 const dir = active?.key === c.key ? active.dir : null;
@@ -907,6 +922,11 @@ export function DataTable<T>({
                   data-href={href}
                   className={`group transition-colors duration-(--dur-1) hover:bg-hover ${href ? "card-rows relative cursor-pointer" : ""}`}
                 >
+                  {selectable && (
+                    <td className="w-10 border-b border-line-soft ps-3.5 align-middle group-last:border-b-0">
+                      {(selectable.when?.(row) ?? true) && <SelectBox id={keyOf(row)} label={selectable.label(row)} />}
+                    </td>
+                  )}
                   {columns.map((c, i) => (
                     <td
                       key={c.key}
@@ -945,6 +965,7 @@ export function DataTable<T>({
                 <div>
                   {/* «كم؟» في سطر العنوان مقابل الاسم — كان المبلغُ خانةً بين الخانات بخطّ ١٢ */}
                   <div className="flex items-start justify-between gap-3">
+                    {selectable && (selectable.when?.(row) ?? true) && <SelectBox id={keyOf(row)} label={selectable.label(row)} />}
                     <p className="min-w-0 flex-1 text-sm font-bold leading-snug">{primary.cell(row)}</p>
                     {amount && (
                       <p className="shrink-0 text-end">
@@ -985,6 +1006,7 @@ export function DataTable<T>({
           );
         })}
       </ul>
+      {bulk}
     </div>
   );
 }

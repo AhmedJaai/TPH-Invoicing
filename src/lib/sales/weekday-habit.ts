@@ -10,7 +10,8 @@
  * (مغلقٌ أو ملفٌّ ناقص) لا صفر؛ أمّا يومٌ بيع فيه غيرُ هذا الصنف فصفرُه حقيقيّ.
  * والكمّيّاتُ أعدادٌ صحيحة بالمِلّي.
  */
-import { dayOfWeek, shiftDays } from "../inventory/week";
+import { dayOfWeek } from "../inventory/week";
+import { addDays } from "@/lib/riyadh-time";
 
 export const HABIT_WEEKS = 8;
 export const HABIT_MIN_WEEKS = 6;
@@ -54,7 +55,6 @@ export interface WeekdayHabit {
   items: ItemHabit[];
 }
 
-const addDays = shiftDays;
 
 /** 0 الأحد … 6 السبت. */
 export const weekdayOf = dayOfWeek;

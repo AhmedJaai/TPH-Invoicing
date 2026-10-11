@@ -6,9 +6,10 @@ import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
 import { ConfirmAction, Sheet, toast } from "./ui-client";
 import { CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, CircleAlert, RefreshCw, Store, TriangleAlert } from "lucide-react";
-import { shiftDays, weekOf, type Week } from "@/lib/inventory/week";
+import { weekOf, type Week } from "@/lib/inventory/week";
 import { ITEM, countNoun } from "@/lib/arabic";
 import { WEEK, formatWeek } from "./inventory-ui";
+import { addDays, MS_PER_DAY } from "@/lib/riyadh-time";
 
 /**
  * يبدأ جردَ أسبوع.
@@ -92,7 +93,7 @@ export function StartCount({
         <button
           type="button"
           aria-label="الأسبوع السابق"
-          onClick={() => setWeek(weekOf(shiftDays(week.start, -7)))}
+          onClick={() => setWeek(weekOf(addDays(week.start, -7)))}
           className={`${buttonClass("secondary", "md")} w-11 px-0 sm:w-11`}
         >
           <ChevronRight className="h-5 w-5" strokeWidth={2} aria-hidden />
@@ -100,14 +101,14 @@ export function StartCount({
         <div className="min-w-0 flex-1 rounded-xl border border-line bg-sunken/60 px-4 py-2.5 text-center" aria-live="polite">
           <p className="text-[15px] font-bold leading-snug sm:text-base">{formatWeek(week.start, week.end)}</p>
           <p className="mt-0.5 text-[11px] text-muted">
-            {atLatest ? "آخرُ أسبوعٍ اكتمل" : `قبل ${countNoun(Math.round((Date.parse(defaultStart) - Date.parse(week.start)) / (7 * 86_400_000)), WEEK)}`}
+            {atLatest ? "آخرُ أسبوعٍ اكتمل" : `قبل ${countNoun(Math.round((Date.parse(defaultStart) - Date.parse(week.start)) / (7 * MS_PER_DAY)), WEEK)}`}
           </p>
         </div>
         <button
           type="button"
           aria-label="الأسبوع التالي"
           disabled={atLatest}
-          onClick={() => setWeek(weekOf(shiftDays(week.start, 7)))}
+          onClick={() => setWeek(weekOf(addDays(week.start, 7)))}
           className={`${buttonClass("secondary", "md")} w-11 px-0 sm:w-11`}
         >
           <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />

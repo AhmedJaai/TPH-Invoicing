@@ -14,7 +14,7 @@ import { EmptyState, LinkTabs, NoAccess } from "@/components/ui";
 import { buttonClass } from "@/components/ui-tokens";
 import { ENTITY_LABEL, actionLabel, labelValue } from "@/lib/audit-labels";
 import { AUDIT_KIND_LABEL, KIND_PATTERN, LEARNED_ACTIONS, auditKind, isAuditKind, type AuditKind } from "@/lib/audit-kinds";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 import { txHref } from "@/lib/inspector";
 
 export const dynamic = "force-dynamic";
@@ -138,7 +138,7 @@ export default async function AuditTrailPage({
   const today = todayInRiyadh();
   const y = new Date(`${today}T12:00:00Z`);
   y.setUTCDate(y.getUTCDate() - 1);
-  const yesterday = y.toISOString().slice(0, 10);
+  const yesterday = isoDay(y);
   const days = new Map<string, typeof rows>();
   for (const r of rows) {
     const key = DAY_KEY.format(r.at);

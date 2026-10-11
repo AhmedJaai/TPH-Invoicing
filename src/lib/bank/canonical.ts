@@ -216,7 +216,12 @@ export function beneficiaryFrom(description: string | null | undefined): string 
  * قرأنا رقماً آخر لا تاريخ قيمة.
  */
 const STATED_VALUE_DATE = /value\s*date\s*:?\s*(\d{2})\/(\d{2})\/(\d{4})/i;
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * أبعدُ ما يُقبل بين تاريخ العمود والتاريخ المذكور في النصّ: أسبوع. ومن يبحث عن
+ * توأم حركةٍ يوسّع نافذتَه بالقدر نفسه (`/api/bank-import`) — رقمٌ واحد.
+ */
+export const STATED_VALUE_DATE_LIMIT_DAYS = 7;
+const WEEK_MS = STATED_VALUE_DATE_LIMIT_DAYS * 24 * 60 * 60 * 1000;
 
 export function statedValueDate(description: string | null | undefined, column: Date): Date {
   const m = STATED_VALUE_DATE.exec(description ?? "");

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   computeVatReturn, filingDeadline, isIncluded, monthsBefore, nextQuarter, parseVatPeriod, periodBounds, periodKey, periodMonths,
-  invoiceIncluded, previousQuarter, quarterOfMonth, txBlocked, txCaution, txVat, vatInsideGross, vatOnNet, type VatInvoice, type VatTx,
+  invoiceIncluded, previousQuarter, quarterOfMonth, txBlocked, txCaution, txVat, type VatInvoice, type VatTx,
 } from "./vat-return";
+import { vatInsideGross, vatOnNet } from "./vat";
 
 const inv = (o: Partial<VatInvoice>): VatInvoice => ({
   id: "i", inputVatStatus: "ELIGIBLE", vatMinor: 0, totalMinor: 11_500, choice: null, ...o,

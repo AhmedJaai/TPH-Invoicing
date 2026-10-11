@@ -82,6 +82,23 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
       return true;
     }
 
+    /*
+      الفعلُ نفسُه بالمفاتيح: الصفُّ المختار يعلن أزرارَه (`data-key-action`)، والمفتاحُ
+      يضغط الزرَّ ذاتَه — فالمسارُ والحراسةُ والتراجعُ هي هي، لا طريقٌ ثانٍ إلى المال.
+      وما يُحسَم بضغطة (`data-key-then="next"`) ينقل العلامةَ إلى ما يليه: مراجعةُ
+      أربعين حركة أربعون ضغطة.
+    */
+    function actOnActive(action: "approve" | "reject"): boolean {
+      const row = document.querySelector<HTMLElement>('[data-nav-item][data-nav-active="true"]');
+      const button = row?.querySelector<HTMLButtonElement>(`button[data-key-action="${action}"]:not(:disabled)`);
+      if (!row || !button) return false;
+      const advance = button.dataset.keyThen === "next";
+      button.click();
+      if (advance) move(1);
+      else button.focus({ preventScroll: true });
+      return true;
+    }
+
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (typingIn(e.target)) return;
@@ -112,6 +129,10 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
       /* Enter على رابطٍ مركَّز يفتحه المتصفّحُ نفسُه — لا يُفتح مرّتين */
       if (e.key === "Enter" && !(e.target instanceof HTMLAnchorElement) && openActive()) { e.preventDefault(); return; }
       if (key === "u" && can(role, "document:upload")) { e.preventDefault(); triggerCapture(); return; }
+      /* في الطوابير: أقرّ · ارفض · تخطَّ — على الصفّ المختار وحده، وإلّا لا يُلتقط المفتاح */
+      if (key === "a" && actOnActive("approve")) { e.preventDefault(); return; }
+      if (key === "x" && actOnActive("reject")) { e.preventDefault(); return; }
+      if (key === "s" && document.querySelector('[data-nav-item][data-nav-active="true"] [data-key-action]')) { e.preventDefault(); move(1); return; }
     }
 
     window.addEventListener("keydown", onKey);
@@ -140,6 +161,14 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
             { keys: ["Enter"], label: "افتح الصفّ المختار" },
             { keys: ["J", "K"], label: "واللوحُ مفتوح: الملفُّ التالي في مكانه" },
             { keys: ["Esc"], label: "أغلق اللوح" },
+          ]}
+        />
+        <ShortcutGroup
+          title="في طابور المراجعة"
+          rows={[
+            { keys: ["A"], label: "أقِرَّ اقتراحَ الصفّ المختار" },
+            { keys: ["X"], label: "ليست سداداً — افتح أسبابَه" },
+            { keys: ["S"], label: "تخطَّ إلى التالي" },
           ]}
         />
         <ShortcutGroup

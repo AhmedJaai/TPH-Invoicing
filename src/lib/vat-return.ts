@@ -24,19 +24,8 @@
  * 15/115 من الوارد كلِّه. صنفٌ بنسبة صفر أو قسيمةٌ تُستحقّ ضريبتُها عند استعمالها يكسره.
  */
 import type { InputVatStatus } from "./validation";
-
-/** نسبةُ الضريبة في المملكة: ١٥٪ — فالضريبةُ من المبلغ الشامل ١٥ من ١١٥. */
-export const VAT_PERCENT = 15;
-
-/** ضريبةٌ داخل مبلغٍ شاملها، بالهللات وبتقريبٍ واحد. */
-export function vatInsideGross(grossMinor: number): number {
-  return Math.round((grossMinor * VAT_PERCENT) / (100 + VAT_PERCENT));
-}
-
-/** ضريبةُ صافٍ قبلها: ١٥٪ منه، بالهللات وبتقريبٍ واحد — ضربٌ صحيح لا `× 0.15` عائماً. */
-export function vatOnNet(netMinor: number): number {
-  return Math.round((netMinor * VAT_PERCENT) / 100);
-}
+import { monthEndDay } from "@/lib/riyadh-time";
+import { netOfVat, vatInsideGross } from "./vat";
 
 /* ───────────── الفترة: شهرٌ أو ربعٌ ميلاديّ ───────────── */
 
@@ -108,9 +97,7 @@ export function monthsBefore(month: string, count: number): string[] {
  */
 export function filingDeadline(p: VatPeriod): string {
   const { until } = periodBounds(p);
-  const [y, m] = until.split("-").map(Number);
-  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  return `${until.slice(0, 7)}-${String(lastDay).padStart(2, "0")}`;
+  return monthEndDay(until.slice(0, 7));
 }
 
 const QUARTER_NAME = ["الأول", "الثاني", "الثالث", "الرابع"] as const;
@@ -286,7 +273,7 @@ export function computeVatReturn(input: VatReturnInput): VatReturn {
   const inputTotal = invoicesVat + bankVat + selectedVat;
   /* ضريبةُ الرسوم مبلغُها الضريبةُ نفسُها: وعاؤها 100/15 منها */
   const invoicesBase = eligible.reduce((s, i) => s + (i.subtotalMinor ?? i.totalMinor - invoiceVat(i)), 0);
-  const inputBase = invoicesBase + (selGross - selectedVat) + Math.round((bankVat * 100) / VAT_PERCENT);
+  const inputBase = invoicesBase + (selGross - selectedVat) + netOfVat(bankVat);
 
   return {
     output: {

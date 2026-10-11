@@ -106,3 +106,31 @@ describe("checkInvoiceTotals — الخصمُ والرسومُ بعد الضري
     expect(checkInvoiceTotals(925_00, 138_75, 1088_75, { discountMinor: 25_00 }).verdict).toBe("MISMATCH");
   });
 });
+
+/*
+ * خمسُ دوالّ محلّيّة كانت تنسّق الريال بقسمةٍ عائمة (`month-close` · `attention` ·
+ * `double-paid` · `adjudicator-prompt` · `adjudicator.service`) وصارت تستدعي المالك.
+ * كلٌّ منها منسوخةٌ هنا كما كانت، ويُقابَل نصُّها بنصّه — فلا رسالةَ تغيّر حرفٌ منها.
+ */
+describe("المنسّقُ الواحد يطابق النسخَ المحلّيّة التي حلّ محلَّها", () => {
+  const amounts: number[] = [];
+  for (let m = -1_100; m <= 2_100; m++) amounts.push(m);
+  for (let m = 2_100; m <= 60_000_000; m += 12_347) amounts.push(m, -m);
+  amounts.push(66_010, 60_375, 1_757_200, 99_999_999, 2_147_483_647, -2_147_483_647);
+
+  const oldLocale = (m: number) => (m / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const oldIntl = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const oldFixed = (m: number) => (m / 100).toFixed(2);
+
+  it("formatRiyalsDisplay = toLocaleString و Intl.NumberFormat بمنزلتين", () => {
+    for (const m of amounts) {
+      expect(formatRiyalsDisplay(m)).toBe(oldLocale(m));
+      expect(formatRiyalsDisplay(m)).toBe(oldIntl.format(m / 100));
+      expect(formatRiyalsDisplay(Math.abs(m))).toBe(oldIntl.format(Math.abs(m) / 100));
+    }
+  });
+
+  it("formatRiyals = ‎(m / 100).toFixed(2)‎ — نصُّ النموذج لم يتغيّر", () => {
+    for (const m of amounts) expect(formatRiyals(m)).toBe(oldFixed(m));
+  });
+});

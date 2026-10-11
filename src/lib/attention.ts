@@ -276,9 +276,7 @@ const RANK: Record<AttentionSeverity, number> = {
   CRITICAL: 0, HIGH: 1, MEDIUM: 2, OPPORTUNITY: 3,
 };
 
-const riyals = (m: number) =>
-  new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    .format(Math.abs(m) / 100);
+const riyals = (m: number) => formatRiyalsDisplay(Math.abs(m));
 
 export function buildAttention(f: AttentionFacts): AttentionItem[] {
   const out: AttentionItem[] = [];

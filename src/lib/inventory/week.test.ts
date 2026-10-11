@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { dayOfWeek, isInventoryWeek, lastCompleteWeek, nextWeek, shiftDays, weekOf } from "./week";
+import { addDays as shiftDays } from "@/lib/riyadh-time";
+import { dayOfWeek, isInventoryWeek, lastCompleteWeek, nextWeek, weekOf } from "./week";
 
 describe("أسبوعُ الجرد من الأحد إلى السبت", () => {
   it("‏١٣ سبتمبر ٢٠٢٦ أحدٌ و١٩ سبتها — وهو أسبوعُ التصدير الحقيقيّ", () => {

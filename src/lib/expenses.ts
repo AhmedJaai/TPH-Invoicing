@@ -9,6 +9,7 @@
  */
 import { createHash } from "node:crypto";
 import { CATEGORY_LABEL, type TxCategory } from "./bank/rules";
+import { isoDay } from "@/lib/riyadh-time";
 
 export type ExpenseSource = "BANK" | "INVOICE" | "MANUAL";
 
@@ -145,7 +146,7 @@ export function deriveFromBank(
     out.push({
       bankTransactionId: tx.id,
       periodMonth: periodOf(tx.valueDate),
-      occurredOn: tx.valueDate.toISOString().slice(0, 10),
+      occurredOn: isoDay(tx.valueDate),
       category: tx.category,
       label: bankExpenseLabel(tx),
       amountMinor: Math.abs(tx.amountMinor),

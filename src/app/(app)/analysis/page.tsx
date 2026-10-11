@@ -13,7 +13,7 @@ import {
 } from "@/components/ui";
 import { Figure } from "@/components/supplier-intel";
 import { PRODUCT, countNoun, DAY, TIME } from "@/lib/arabic";
-import { formatDay } from "@/lib/riyadh-time";
+import { formatDay, MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
 import { whatsappHref } from "@/lib/supplier-edit";
 import { buildPriceRiseMessage, yearlyQuantity } from "@/lib/supplier-requests";
 import { buttonClass } from "@/components/ui-tokens";
@@ -49,7 +49,7 @@ type View = "prices" | "spend" | "mapping";
 
 function daysSince(date: Date | null): number | null {
   if (!date) return null;
-  return Math.floor((Date.now() - date.getTime()) / 86_400_000);
+  return Math.floor((Date.now() - date.getTime()) / MS_PER_DAY);
 }
 
 const pctOf = (i: ItemSummary) => (i.priceChange?.deltaRatio == null ? null : Math.round(i.priceChange.deltaRatio * 100));
@@ -125,7 +125,7 @@ export default async function ItemsAndPricesPage({
 
   const slugOf = new Map(slugRows.map((r) => [r.id, r.slug]));
   const phoneOf = new Map(slugRows.map((r) => [r.id, r.phone]));
-  const day = (d: Date) => d.toISOString().slice(0, 10);
+  const day = (d: Date) => isoDay(d);
   const lineCoverage = health.metrics.find((m) => m.id === "lines");
   const totalSpend = items.reduce((s, i) => s + i.totalSpentMinor, 0);
 

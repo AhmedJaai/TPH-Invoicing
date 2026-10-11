@@ -113,7 +113,7 @@ export function RecipeEditor({
         footer={
           <>
             {message && <p role={failed ? "alert" : "status"} className={`me-auto self-center text-xs ${failed ? "text-danger" : "text-ok"}`}>{message}</p>}
-            <button type="button" onClick={() => setOpen(false)} className={buttonClass("quiet")}>أغلِق</button>
+            <button type="button" onClick={() => setOpen(false)} className={buttonClass("quiet")}>إلغاء</button>
             <button aria-busy={busy} type="button" onClick={save} disabled={busy || !ready} className={buttonClass("primary")}>
               احفظ النسخة وفعِّلها
             </button>

@@ -14,7 +14,7 @@ import {
   findFirstTransfers, findIbanAlerts, firstTransferKey, ibanAlertKey, sharedIbans, type FirstTransfer, type IbanAlert,
 } from "@/lib/bank/iban-guard";
 import { normalizeIban } from "@/lib/supplier-edit";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 import type { Conn, Tx } from "./types";
 
 /** لا يُسأل اليومَ عن حوالةٍ أقدم من هذا — ما قبله يبني «الحسابَ المعروف» وحده. */
@@ -31,7 +31,7 @@ export interface IbanAlertRow extends IbanAlert {
 function windowStart(today: string): string {
   const d = new Date(`${today}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() - IBAN_ALERT_WINDOW_DAYS);
-  return d.toISOString().slice(0, 10);
+  return isoDay(d);
 }
 
 /** كلُّ ما يراه الحارس: المفتوحُ وما أُغلق بقرار — والشاشةُ تفرز. */
@@ -185,7 +185,7 @@ export async function loadFirstTransfers(
   return findFirstTransfers(
     transfers.rows.map((r) => ({ id: r.id, day: r.day, amountMinor: Number(r.amount_minor), text: r.text, payee: r.payee })),
     new Set(own.flatMap((o) => (o.iban ? [normalizeIban(o.iban)] : []))),
-    since.toISOString().slice(0, 10),
+    isoDay(since),
   )
     .filter((f) => !asked.has(f.iban))
     .map((f) => {

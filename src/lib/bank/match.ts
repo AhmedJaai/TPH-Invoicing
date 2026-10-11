@@ -7,6 +7,7 @@
  */
 import { normalizeName } from "@/lib/suppliers-seed";
 import { findRule, type BankRule } from "./rules";
+import { isoDay } from "@/lib/riyadh-time";
 
 export interface BankTx {
   id: string;
@@ -181,7 +182,7 @@ export function findDuplicatePayments(
     if (tx.direction !== "DEBIT" || isInternalNoise(tx)) continue;
     const rule = findRule(`${tx.description} ${tx.transactionType}`, rules);
     if (rule && rule.category !== "SUPPLIER") continue;
-    const key = `${tx.valueDate.toISOString().slice(0, 10)}|${tx.amountMinor}|${normalizeName(tx.description).slice(0, 30)}`;
+    const key = `${isoDay(tx.valueDate)}|${tx.amountMinor}|${normalizeName(tx.description).slice(0, 30)}`;
     const list = groups.get(key) ?? [];
     list.push(tx);
     groups.set(key, list);

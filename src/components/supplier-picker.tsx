@@ -147,7 +147,7 @@ export function SupplierPicker({
             <ActionButton variant="primary" size="sm" disabled={name.trim().length < 2} reason="اكتب الاسم — حرفان على الأقلّ" onAction={() => create()}>
               أنشئه واختره
             </ActionButton>
-            <button type="button" onClick={() => setCreating(false)} className={buttonClass("quiet", "sm")}>تراجع</button>
+            <button type="button" onClick={() => setCreating(false)} className={buttonClass("quiet", "sm")}>إلغاء</button>
           </div>
           <p className="mt-1.5 text-[11px] text-muted">
             وتُكمَل بياناتُه (الرقمُ الضريبيّ، واسمُ مجلّده في الدرايف) من ملفّه بعدها.

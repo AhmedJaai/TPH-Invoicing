@@ -15,6 +15,8 @@
  *
  * كشفٌ لا قيد: يُعرض بدليله، والدمجُ بإقرار الإنسان (`account-review.service.ts`).
  */
+import { dayNumber } from "@/lib/riyadh-time";
+
 
 /** نافذةُ الأيّام بين الإقرار وحوالته — الإقرارُ أُرِّخ بيوم الفاتورة أو يوم الضغط. */
 export const ECHO_WINDOW_DAYS = 14;
@@ -46,10 +48,6 @@ export interface PaymentEcho {
 }
 
 const LIVE = (s: string) => s !== "REVERSED" && s !== "VOID";
-
-function dayNumber(day: string): number {
-  return Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
-}
 
 /**
  * يقرن كلَّ إقرارٍ بأقرب حوالةٍ تسعه — وكلُّ حوالةٍ لإقرارٍ واحد.

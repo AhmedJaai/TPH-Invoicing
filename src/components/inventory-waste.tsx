@@ -241,7 +241,7 @@ export function InventoryWaste({
                     >
                       أبطِل الهدر
                     </button>
-                    <button type="button" disabled={busy} onClick={() => setVoiding(null)} className={buttonClass("quiet", "sm")}>تراجع</button>
+                    <button type="button" disabled={busy} onClick={() => setVoiding(null)} className={buttonClass("quiet", "sm")}>إلغاء</button>
                     {voidError && <span role="alert" className="w-full text-danger">{voidError}</span>}
                   </span>
                 )}

@@ -18,6 +18,8 @@ import { z } from "zod";
 import type { Candidate } from "./candidates";
 import type { CanonicalTransaction } from "./canonical";
 import { ALL_REASON_CODES } from "./reason-codes";
+import { formatRiyals } from "@/lib/money";
+import { isoDay } from "@/lib/riyadh-time";
 
 export const VERDICT_NONE = "NONE";
 
@@ -65,9 +67,8 @@ export interface AdjudicationPayload {
   prompt: string;
 }
 
-function money(minor: number): string {
-  return (minor / 100).toFixed(2);
-}
+/* للنموذج لا للعين: «1500.00» بلا فواصل آلاف — نصّاً من الهللات بلا قسمة */
+const money = formatRiyals;
 
 /**
  * يبني ما يُعرَض.
@@ -119,7 +120,7 @@ export function buildAdjudicationPrompt(
     `   ${ALL_REASON_CODES.join(" · ")}`,
     "",
     "الحركة:",
-    `  التاريخ: ${tx.valueDate.toISOString().slice(0, 10)}`,
+    `  التاريخ: ${isoDay(tx.valueDate)}`,
     `  المبلغ: ${money(tx.amountMinor)} ${tx.direction === "DEBIT" ? "صادر" : "وارد"}`,
     `  المستفيد كما كتبه البنك: ${tx.beneficiaryRaw ?? "—"}`,
     `  الوصف: ${tx.description ?? "—"}`,

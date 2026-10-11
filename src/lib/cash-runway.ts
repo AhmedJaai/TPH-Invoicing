@@ -8,6 +8,8 @@
  * ولا يُقال رقمٌ على أساسٍ ناقص: رصيدٌ مجهول، أو كشفٌ واقف أكثر من أسبوع، أو تاريخٌ
  * أقصر من ثلاثين يوماً — كلٌّ يُحجب بسببه. والقسمةُ أعدادٌ صحيحة.
  */
+import { daysBetween } from "@/lib/riyadh-time";
+
 
 /** نافذةُ المعدّل بالأيّام — شهران يحملان إيجاراً ورواتبَ ودفعةَ مورّدين مرّتين. */
 export const RUNWAY_WINDOW_DAYS = 60;
@@ -38,10 +40,6 @@ export interface Runway {
   dailyOutflowMinor: number | null;
   /** أيّامُ النافذة التي بُني عليها المعدّل. */
   basisDays: number;
-}
-
-function daysBetween(from: string, to: string): number {
-  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
 export function buildRunway(input: RunwayInput): Runway {

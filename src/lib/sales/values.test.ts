@@ -101,6 +101,44 @@ describe("parseSourceCostMinor", () => {
     expect(parseSourceCostMinor("0")).toBe(0);
   });
 
+  /*
+   * كانت `Math.round(Number(text) * 100)`. والقارئُ النصّيّ يطابقها على كلّ قيمة،
+   * إلّا **النصفَ بالضبط** (منزلةٌ ثالثةٌ ٥ وما بعدها أصفار): هناك كان الجوابُ
+   * يتبع تمثيلَ الرقم العائم، وصار يُقرَّب للأعلى دائماً. والسالبُ نصفُه بعيداً عن الصفر.
+   */
+  it("يطابق القارئَ العائم القديم إلّا عند نصف الهللة بالضبط", () => {
+    const old = (text: string) => Math.round(Number(text) * 100);
+    let halves = 0;
+    let changed = 0;
+    for (let i = 0; i < 3_000_000; i += 7) {
+      const text = `${Math.floor(i / 100_000)}.${String(i % 100_000).padStart(5, "0")}`;
+      const exactHalf = text.endsWith("500");
+      if (exactHalf) halves++;
+      if (parseSourceCostMinor(text) === old(text)) continue;
+      changed++;
+      expect(exactHalf).toBe(true);
+      expect(parseSourceCostMinor(text)).toBe(old(text) + 1);
+    }
+    expect(halves).toBeGreaterThan(0);
+    expect(changed).toBeLessThan(halves);
+    /* بمنزلتين أو أقلّ — كلفةُ الكتالوج المكتوبة بيد — لا فرق البتّة */
+    for (let m = 0; m <= 200_000; m += 3) {
+      const text = `${Math.floor(m / 100)}.${String(m % 100).padStart(2, "0")}`;
+      expect(parseSourceCostMinor(text)).toBe(m);
+      expect(parseSourceCostMinor(text)).toBe(old(text));
+    }
+    expect(parseSourceCostMinor("12")).toBe(1_200);
+    expect(parseSourceCostMinor("12.5")).toBe(1_250);
+  });
+
+  it("النصفُ يُقرَّب بقيمته لا بتمثيله", () => {
+    expect(Math.round(Number("1.005") * 100)).toBe(100);
+    expect(parseSourceCostMinor("1.005")).toBe(101);
+    expect(parseSourceCostMinor("-1.005")).toBe(-101);
+    expect(parseSourceCostMinor("1.00499")).toBe(100);
+    expect(parseSourceCostMinor("-0.001")).toBe(0);
+  });
+
   it("الفارغُ وما لا يُقرأ null", () => {
     expect(parseSourceCostMinor(undefined)).toBeNull();
     expect(parseSourceCostMinor("")).toBeNull();

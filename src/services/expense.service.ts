@@ -24,6 +24,7 @@ import {
   type Expense,
   type RecurringExpense,
 } from "@/lib/expenses";
+import { daysBetween } from "@/lib/riyadh-time";
 
 export interface DeriveResult {
   scanned: number;
@@ -88,6 +89,9 @@ async function loadBankForExpenses(month?: string, conn: Conn = db): Promise<{ t
   return { txs, already };
 }
 
+/** مصروفٌ يدويٌّ بلا حركة، بمبلغ الحركة نفسه وفي هذه الأيّام منها: هو هو — يُتبنّى ولا يُكرَّر. */
+const MANUAL_ADOPTION_WINDOW_DAYS = 3;
+
 /** حركاتُ مصروفٍ في الكشف لم تُقيَّد بعد — لشهرٍ أو للكلّ. */
 export async function countUnrecordedBankExpenses(month?: string): Promise<{ count: number; amountMinor: number }> {
   const { txs, already } = await loadBankForExpenses(month);
@@ -124,10 +128,9 @@ export async function deriveExpensesFromBank(
     .from(expenses)
     .where(and(eq(expenses.source, "MANUAL"), sql`${expenses.bankTransactionId} is null`,
       inArray(expenses.periodMonth, [...new Set(candidates.map((c) => c.periodMonth))])));
-  const dayNo = (d: string) => Math.round(Date.parse(`${d}T00:00:00Z`) / 86_400_000);
   const adoptions: { expenseId: string; bankTransactionId: string }[] = [];
   const toInsert = candidates.filter((c) => {
-    const i = manual.findIndex((m) => m.amountMinor === c.amountMinor && Math.abs(dayNo(m.occurredOn) - dayNo(c.occurredOn)) <= 3);
+    const i = manual.findIndex((m) => m.amountMinor === c.amountMinor && Math.abs(daysBetween(m.occurredOn, c.occurredOn)) <= MANUAL_ADOPTION_WINDOW_DAYS);
     if (i < 0) return true;
     adoptions.push({ expenseId: manual[i].id, bankTransactionId: c.bankTransactionId });
     manual.splice(i, 1);

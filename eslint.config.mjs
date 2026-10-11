@@ -24,17 +24,16 @@ export const tphGuards = [
     rules: { "tph/rename-file-only-in-service": "error" },
   },
   {
-    // ما يُقرأ آلةً لا إنساناً: ملفُّ التحويل للبنك، ونصُّ النموذج، ومخرَجُ القراءة
+    // ما يُقرأ آلةً (ملفُّ البنك، نصُّ النموذج) يكتب `formatRiyals` — فلا استثناءَ إلّا للمالك واختباراته
     files: ["src/**/*.{ts,tsx}"],
-    ignores: [
-      "src/**/*.test.ts",
-      "src/lib/money.ts",
-      "src/lib/payment-run.ts",
-      "src/lib/extraction/validate-extraction.ts",
-      "src/services/adjudicator.service.ts",
-      "src/lib/bank/adjudicator-prompt.ts",
-    ],
+    ignores: ["src/**/*.test.ts", "src/lib/money.ts"],
     rules: { "tph/no-inline-riyals-format": "error" },
+  },
+  {
+    // يومُ التاريخ المخزَّن `isoDay`، و«الآن» `todayInRiyadh` — والقصُّ الخامّ في مالكه وحده
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/**/*.test.ts", "src/lib/riyadh-time.ts", "src/test/**"],
+    rules: { "tph/no-raw-iso-slice": "error" },
   },
   {
     files: ["src/**/*.tsx", "src/components/**/*.ts"],

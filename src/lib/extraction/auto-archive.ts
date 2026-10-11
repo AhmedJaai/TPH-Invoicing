@@ -25,6 +25,7 @@
  */
 
 import { TOTAL_ROUNDING_TOLERANCE_MINOR, checkInvoiceTotals } from "@/lib/money";
+import { vatMatchesStandardRate } from "@/lib/vat";
 
 export interface AutoArchiveFacts {
   /** نوعُ المستند كما قرأه النموذج — والآليّ للفواتير وحدها. */
@@ -92,7 +93,7 @@ const INVOICE_KINDS = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE"]);
 
 /** ضريبةُ القيمة المضافة ١٥٪ من الصافي — بتسامح ريالٍ كتقريب المورّد. */
 function vatIsStandardRate(subtotal: number, vat: number): boolean {
-  return subtotal > 0 && Math.abs(vat * 100 - subtotal * 15) <= TOTAL_ROUNDING_TOLERANCE_MINOR * 100;
+  return subtotal > 0 && vatMatchesStandardRate(subtotal, vat, TOTAL_ROUNDING_TOLERANCE_MINOR);
 }
 
 /** أرقامُ الفاتورة (ثلاثةٌ فأكثر) مكتوبةٌ في اسم الملفّ كتلةً واحدة، أو ضمن كتلةٍ لستّةٍ فأكثر؟ */

@@ -19,7 +19,7 @@
  * أسبوعٌ كامل قبل المقصود. وتاريخُ البيعة `business_date` مكتوبٌ
  * بيوم العمل أصلاً، فيلتقيان.
  */
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { todayInRiyadh, addDays } from "@/lib/riyadh-time";
 
 /** الفترةُ بيومَيها، شاملةً الطرفين. */
 export interface Week {
@@ -37,17 +37,11 @@ export function dayOfWeek(date: string): number {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
 
-/** يزيح تاريخاً أيّاماً — نصّاً إلى نصّ. */
-export function shiftDays(date: string, days: number): string {
-  const [y, m, d] = date.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
-}
-
 /** الأسبوعُ الذي يقع فيه هذا اليوم: أحدُه وسبتُه. */
 export function weekOf(date: string): Week {
   if (!DATE.test(date)) throw new Error("التاريخ يُكتب YYYY-MM-DD");
-  const start = shiftDays(date, -dayOfWeek(date));
-  return { start, end: shiftDays(start, 6) };
+  const start = addDays(date, -dayOfWeek(date));
+  return { start, end: addDays(start, 6) };
 }
 
 /**
@@ -59,18 +53,18 @@ export function weekOf(date: string): Week {
  * السابقَ إلى أن يبدأ الأحد.
  */
 export function lastCompleteWeek(today: string = todayInRiyadh()): Week {
-  return weekOf(shiftDays(weekOf(today).start, -1));
+  return weekOf(addDays(weekOf(today).start, -1));
 }
 
 /** أهذه الفترةُ أسبوعٌ كامل من أحدٍ إلى سبت؟ */
 export function isInventoryWeek(start: string, end: string): boolean {
   if (!DATE.test(start) || !DATE.test(end)) return false;
-  return dayOfWeek(start) === 0 && dayOfWeek(end) === 6 && shiftDays(start, 6) === end;
+  return dayOfWeek(start) === 0 && dayOfWeek(end) === 6 && addDays(start, 6) === end;
 }
 
 /** الأسبوعُ الذي يلي هذا — لتسلسلٍ بلا فجوة. */
 export function nextWeek(week: Week): Week {
-  return weekOf(shiftDays(week.end, 1));
+  return weekOf(addDays(week.end, 1));
 }
 
 /** «أسبوع ١٣–١٩ سبتمبر» — تسميةٌ تُقرأ في قائمةٍ من الجردات. */

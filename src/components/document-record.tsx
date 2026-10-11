@@ -153,8 +153,11 @@ export function DocumentRecord({
 
   const miss = (word: string) => missing.some((m) => m.startsWith(word));
 
+  /* ما غُيّر عن المقروء ولم يُقيَّد بعد — لوحُ الفحص يسأل قبل أن يرميه (`data-dirty`) */
+  const touched = (Object.keys(f) as (keyof typeof f)[]).some((k) => f[k] !== initial[k]) || supplierId !== (initial.supplierId ?? "");
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-dirty={touched ? "قيد المستند" : undefined}>
       {fromName.length > 0 && (
         <p className="rounded-lg bg-info-bg px-3 py-2 text-[11px] leading-relaxed text-info">
           {fromName.join(" و")} مأخوذٌ من اسم الملفّ لا من القراءة — قارنه بالورقة.
@@ -209,7 +212,7 @@ export function DocumentRecord({
             <ActionButton variant="primary" size="sm" disabled={newName.trim().length < 2} reason="اكتب الاسم — حرفان على الأقلّ" onAction={() => createSupplier()}>
               أنشئه
             </ActionButton>
-            <button type="button" onClick={() => { setCreating(false); setSimilar([]); }} className={buttonClass("quiet", "sm")}>تراجع</button>
+            <button type="button" onClick={() => { setCreating(false); setSimilar([]); }} className={buttonClass("quiet", "sm")}>إلغاء</button>
             <div className="w-full">
               <SimilarSuppliers
                 similar={similar}

@@ -8,6 +8,7 @@
  * التطبيع محافظ عمداً: يوحّد الشكل ولا يحذف معنى. «حليب كامل الدسم» و«حليب
  * خالي الدسم» يبقيان صنفين مختلفين، لأنّ دمجهما يفسد تحليل الاستهلاك.
  */
+import { latinDigits } from "./digits";
 
 /** وحدات القياس الشائعة في فواتير المقهى وصيغها المختلفة. */
 const UNIT_FORMS: Record<string, string> = {
@@ -20,13 +21,6 @@ const UNIT_FORMS: Record<string, string> = {
   كيس: "bag", bag: "bag",
   عبوة: "pack", عبوه: "pack", pack: "pack", pkt: "pack",
 };
-
-/** يحوّل الأرقام العربية الهندية إلى لاتينية. */
-function latinDigits(value: string): string {
-  return value
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
-}
 
 /**
  * يطبّع وصف الصنف: حروف صغيرة، بلا تشكيل، همزات موحّدة، أرقام لاتينية،

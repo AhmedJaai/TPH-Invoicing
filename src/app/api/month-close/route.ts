@@ -22,6 +22,7 @@ import { buildMonthClose } from "@/lib/month-close";
 import { gatherMonthFacts } from "@/lib/month-close-facts";
 import { recordAudit } from "@/lib/audit";
 import { WARNING, countNoun } from "@/lib/arabic";
+import { monthEndDay } from "@/lib/riyadh-time";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -87,8 +88,7 @@ export async function POST(request: Request) {
     if (!account) {
       return NextResponse.json({ error: "لا حساب بنكيّ معروف بعد — استورد كشفاً أوّلاً" }, { status: 409 });
     }
-    const [y, m] = body.month.split("-").map(Number);
-    const periodEnd = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    const periodEnd = monthEndDay(body.month);
 
     await db.transaction(async (t) => {
       await t.insert(reconciliationPeriods).values({

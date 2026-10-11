@@ -16,6 +16,7 @@ import { recordAudit } from "@/lib/audit";
 import { REVERSAL_WINDOW_DAYS, reversalKey } from "@/lib/bank/reversal";
 import { reversePayment } from "./payment.service";
 import type { Conn, Tx } from "./types";
+import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
 
 export class BounceRefused extends Error {
   constructor(message: string) {
@@ -32,7 +33,7 @@ export async function resolveBounce(
   const [out] = await tx.select().from(bankTransactions).where(eq(bankTransactions.id, input.outgoingId)).for("update");
   const [back] = await tx.select().from(bankTransactions).where(eq(bankTransactions.id, input.incomingId)).for("update");
   if (!out || !back) throw new BounceRefused("لم تُوجد الحركتان — حدّث الصفحة");
-  const gapDays = (back.valueDate.getTime() - out.valueDate.getTime()) / 86_400_000;
+  const gapDays = (back.valueDate.getTime() - out.valueDate.getTime()) / MS_PER_DAY;
   if (out.direction !== "DEBIT" || back.direction !== "CREDIT" || out.amountMinor !== back.amountMinor
     || gapDays <= 0 || gapDays > REVERSAL_WINDOW_DAYS + 1) {
     throw new BounceRefused("الحركتان ليستا خروجاً وعودةً بالمبلغ نفسه في نافذة الأيّام");
@@ -51,7 +52,7 @@ export async function resolveBounce(
       const r = await reversePayment(tx, {
         paymentId: p.id,
         kind: "REVERSED",
-        reason: `ارتدّت الحوالة: عاد المبلغ نفسه في ${back.valueDate.toISOString().slice(0, 10)}`,
+        reason: `ارتدّت الحوالة: عاد المبلغ نفسه في ${isoDay(back.valueDate)}`,
         userId: actorId,
       });
       freedInvoices = r.freedInvoiceIds.length;

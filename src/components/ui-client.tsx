@@ -143,7 +143,7 @@ export function ConfirmAction({
               {confirmLabel}
             </button>
             <button type="button" disabled={busy} onClick={cancel} className={buttonClass("quiet", "sm")}>
-              تراجع
+              إلغاء
             </button>
           </div>
         </div>
@@ -189,7 +189,9 @@ export function Reveal({
  * - النجاحُ علامةٌ قصيرة ثمّ يعود — إلّا إن أُزيل الزرُّ لأنّ عمله انتهى.
  * - `onAction` يُرجع `false` إن فشل، فلا تُعرَض علامةُ نجاح. والرسالةُ
  *   عند من ناداه — هو يعرف ما يقول.
- * - `reason`: لماذا هو معطَّل — تُقرأ تحت الفأرة ولقارئ الشاشة.
+ * - `reason`: لماذا هو معطَّل — تُقرأ تحت الفأرة ولقارئ الشاشة، **وباللمس**:
+ *   الزرُّ المعطَّل بسببٍ يبقى يستقبل الضغطة (`aria-disabled` لا `disabled`) فيقول
+ *   سببَه إشعاراً. كان على الجوّال ضابطاً باهتاً لا يستجيب ولا يُعرف لماذا.
  */
 export function ActionButton({
   onAction,
@@ -225,7 +227,11 @@ export function ActionButton({
   }, [done]);
 
   async function run() {
-    if (running.current || disabled) return;
+    if (disabled) {
+      if (reason) toast({ tone: "info", title: reason, duration: 3500 });
+      return;
+    }
+    if (running.current) return;
     running.current = true;
     setBusy(true);
     let ok = true;
@@ -245,13 +251,15 @@ export function ActionButton({
       <button
         type="button"
         onClick={run}
-        disabled={disabled}
+        /* معطَّلٌ بلا سبب: `disabled` كما كان. وبسبب: يبقى يُضغط ليقوله */
+        disabled={disabled && !reason}
+        aria-disabled={disabled && reason ? true : undefined}
         aria-busy={busy}
         data-done={done || undefined}
         aria-label={label}
         title={disabled ? reason : undefined}
         aria-describedby={disabled && reason ? reasonId : undefined}
-        className={`${buttonClass(variant, size)} ${className}`}
+        className={`${buttonClass(variant, size)} ${disabled && reason ? "cursor-not-allowed opacity-50" : ""} ${className}`}
       >
         {children}
       </button>
@@ -1043,5 +1051,148 @@ export function Sheet({
         )}
       </div>
     </dialog>
+  );
+}
+
+/* ─────────────────────────── التحديدُ المتعدّد ─────────────────────────── */
+
+/*
+  الجدولُ يرسمه الخادم، والتحديدُ حالٌ في المتصفّح: مربّعاتٌ تحمل مفتاحَ صفّها
+  (`data-select`)، وشريطٌ (`BulkBar`) يقرؤها من DOM الجدول نفسه — كما يقرأ
+  `TableFilter` صفوفَه. الصفُّ مرسومٌ مرّتين (جدولٌ وبطاقات) فالمربّعان يتبع أحدُهما
+  الآخر. وحدثُ `tph:select` يُعلِم الشريطَ ومربّعَ «الكلّ» بما تغيّر.
+*/
+const SELECT_EVENT = "tph:select";
+
+function selectRoot(el: Element | null): HTMLElement | null {
+  return el?.closest<HTMLElement>("[data-filter-root]") ?? null;
+}
+
+function boxes(root: HTMLElement): HTMLInputElement[] {
+  return Array.from(root.querySelectorAll<HTMLInputElement>("input[data-select]"));
+}
+
+/** المربّعاتُ الظاهرة في العرض القائم (جدولاً أو بطاقات) — بترتيبها، وما أخفاه البحثُ خارجها. */
+function visibleBoxes(root: HTMLElement): HTMLInputElement[] {
+  return boxes(root).filter((b) => b.offsetParent !== null && !b.closest("[hidden]"));
+}
+
+function setSelected(root: HTMLElement, id: string, on: boolean) {
+  for (const b of boxes(root)) if (b.dataset.select === id) b.checked = on;
+}
+
+function selectedIds(root: HTMLElement): string[] {
+  return [...new Set(boxes(root).filter((b) => b.checked).map((b) => b.dataset.select ?? ""))].filter(Boolean);
+}
+
+/** مربّعُ الصفّ — `Shift` مع النقر يحدّد المدى بينه وبين آخر ما نُقر. */
+export function SelectBox({ id, label }: { id: string; label: string }) {
+  return (
+    <label className="relative grid h-11 w-8 shrink-0 cursor-pointer place-items-center sm:h-8">
+      <input
+        type="checkbox"
+        data-select={id}
+        data-select-label={label}
+        aria-label={`حدّد ${label}`}
+        className="h-4 w-4 accent-[var(--accent)]"
+        onClick={(e) => {
+          const root = selectRoot(e.currentTarget);
+          if (!root) return;
+          const on = e.currentTarget.checked;
+          const list = visibleBoxes(root);
+          const at = list.indexOf(e.currentTarget);
+          const from = list.findIndex((b) => b.dataset.select === root.dataset.selectAnchor);
+          if (e.shiftKey && from !== -1 && at !== -1) {
+            for (const b of list.slice(Math.min(from, at), Math.max(from, at) + 1)) setSelected(root, b.dataset.select ?? "", on);
+          } else {
+            setSelected(root, id, on);
+          }
+          root.dataset.selectAnchor = id;
+          root.dispatchEvent(new Event(SELECT_EVENT));
+        }}
+      />
+    </label>
+  );
+}
+
+function useSelection(ref: React.RefObject<HTMLElement | null>): { ids: string[]; root: HTMLElement | null } {
+  const [ids, setIds] = useState<string[]>([]);
+  const [root, setRoot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const r = selectRoot(ref.current);
+    setRoot(r);
+    if (!r) return;
+    const sync = () => setIds(selectedIds(r));
+    r.addEventListener(SELECT_EVENT, sync);
+    /* بعد فعلٍ ثمّ `router.refresh()` تخرج صفوفٌ من الجدول — فيخرج معها ما كان محدَّداً منها */
+    const observer = new MutationObserver(sync);
+    observer.observe(r, { childList: true, subtree: true });
+    return () => {
+      r.removeEventListener(SELECT_EVENT, sync);
+      observer.disconnect();
+    };
+  }, [ref]);
+  return { ids, root };
+}
+
+/** مربّعُ «الكلّ» في رأس الجدول — يحدّد الظاهرَ وحده (ما أخفاه البحثُ لا يُحدَّد من ورائه). */
+export function SelectAll() {
+  const ref = useRef<HTMLInputElement>(null);
+  const { ids, root } = useSelection(ref);
+  const total = root ? new Set(visibleBoxes(root).map((b) => b.dataset.select)).size : 0;
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = ids.length > 0 && ids.length < total;
+  }, [ids, total]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      aria-label="حدّد كلَّ الظاهر في هذا الجدول"
+      checked={total > 0 && ids.length >= total}
+      onChange={(e) => {
+        if (!root) return;
+        const on = e.currentTarget.checked;
+        if (!on) for (const b of boxes(root)) b.checked = false;
+        else for (const b of visibleBoxes(root)) setSelected(root, b.dataset.select ?? "", true);
+        root.dispatchEvent(new Event(SELECT_EVENT));
+      }}
+      className="h-4 w-4 accent-[var(--accent)]"
+    />
+  );
+}
+
+/**
+ * شريطُ الأفعال الجماعيّة — يظهر أسفلَ الشاشة ما دام شيءٌ محدَّداً: «محدَّد N — افعل كذا».
+ * يُمرَّر في `bulk` لـ`DataTable`؛ و`children` يأخذ المحدَّدَ (بمفاتيحه وأسمائه) ودالّةَ
+ * إفراغه. الفعلُ نفسُه عند صاحب الصفحة: يرسل المعرّفاتِ والخادمُ يحكم على كلّ صفّ.
+ */
+export function BulkBar({ children }: {
+  children: (selected: { id: string; label: string }[], clear: () => void) => React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { ids, root } = useSelection(ref);
+  const clear = useCallback(() => {
+    if (!root) return;
+    for (const b of boxes(root)) b.checked = false;
+    root.dispatchEvent(new Event(SELECT_EVENT));
+  }, [root]);
+  const selected = ids.map((id) => ({
+    id,
+    label: root ? boxes(root).find((b) => b.dataset.select === id)?.dataset.selectLabel ?? id : id,
+  }));
+  return (
+    <div ref={ref}>
+      {ids.length > 0 && (
+        <div
+          role="region"
+          aria-label="أفعالٌ على المحدَّد"
+          className="no-print sticky bottom-20 z-20 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-accent-line bg-overlay px-4 py-3 shadow-overlay lg:bottom-4"
+        >
+          <p className="text-[13px] font-bold">محدَّد <span className="nums nums-count">{ids.length}</span></p>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{children(selected, clear)}</div>
+          <button type="button" onClick={clear} className={buttonClass("quiet", "sm")}>ألغِ التحديد</button>
+        </div>
+      )}
+    </div>
   );
 }

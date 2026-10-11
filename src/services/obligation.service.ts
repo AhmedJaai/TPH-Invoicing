@@ -10,7 +10,7 @@ import {
   OBLIGATION_KIND_LABEL, dueObligations, isObligationKind, type DueObligation, type Obligation, type ObligationKind,
 } from "@/lib/obligations";
 import { silencedKeys } from "@/lib/signal-decisions";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 import { pgErrorCode } from "./guard";
 
 type Row = typeof obligations.$inferSelect;
@@ -44,7 +44,7 @@ export async function loadObligations(): Promise<ObligationsView> {
   ]);
   return {
     open: open.map(toObligation),
-    archived: archived.map((r) => ({ ...toObligation(r), closedOn: r.closedAt ? r.closedAt.toISOString().slice(0, 10) : null })),
+    archived: archived.map((r) => ({ ...toObligation(r), closedOn: r.closedAt ? isoDay(r.closedAt) : null })),
     silenced: silencedKeys(decisions.rows, todayInRiyadh()),
   };
 }

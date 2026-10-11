@@ -27,6 +27,7 @@ import { refreshStatementFindings } from "./statement-reconcile.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
 import type { StoredReading } from "./document-backlog.service";
 import type { Tx } from "./types";
+import { isoDay } from "@/lib/riyadh-time";
 
 export class ReplaceRefused extends Error {
   constructor(message: string, readonly status = 409) {
@@ -86,7 +87,7 @@ export async function replaceWithCorrectedInvoice(tx: Tx, documentId: string, ac
   const kind = doc.kind === "SIMPLIFIED_INVOICE" ? "SIMPLIFIED_INVOICE" as const : "TAX_INVOICE" as const;
   const review = reviewConfirmed(
     {
-      documentKind: kind, supplierId: doc.supplierId, invoiceNumber: old.number, invoiceDate: date ?? old.date.toISOString().slice(0, 10),
+      documentKind: kind, supplierId: doc.supplierId, invoiceNumber: old.number, invoiceDate: date ?? isoDay(old.date),
       subtotalMinor, vatMinor, totalMinor,
       discountMinor: parseRiyals(r?.discountAmount ?? ""), chargesMinor: parseRiyals(r?.chargesAmount ?? ""),
       sellerVat: r?.sellerVatNumber?.trim() || null, buyerVat: r?.buyerVatNumber?.trim() || null,

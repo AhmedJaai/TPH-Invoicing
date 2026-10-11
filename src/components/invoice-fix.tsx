@@ -163,7 +163,8 @@ export function InvoiceFix({
   }
 
   return (
-    <div className="space-y-3">
+    /* `data-dirty`: لوحُ الفحص يسأل قبل أن يستبدل الملفَّ أو يُغلق وفيه تصحيحٌ لم يُحفَظ */
+    <div className="space-y-3" data-dirty={open && dirty ? "تصحيح الفاتورة" : undefined}>
       {reasons.length > 0 && (
         <ul className="space-y-1.5">
           {reasons.map((r) => (

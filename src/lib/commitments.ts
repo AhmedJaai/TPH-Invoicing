@@ -12,7 +12,9 @@
  *
  * دالّةٌ خالصة.
  */
-import { addMonths, occursIn, type RecurringInput, type SupplierDue, type VatDue } from "./cash-outlook";
+import { occursIn, type RecurringInput, type SupplierDue, type VatDue } from "./cash-outlook";
+import { daysInMonth } from "@/lib/riyadh-time";
+import { addMonths } from "./filing";
 
 export type CommitmentKind = "SUPPLIER_RUN" | "RECURRING" | "VAT" | "EXPIRY";
 
@@ -72,10 +74,6 @@ export interface Commitments {
   totalMinor: number;
 }
 
-function monthLength(month: string): number {
-  const [y, m] = month.split("-").map(Number);
-  return new Date(Date.UTC(y, m, 0)).getUTCDate();
-}
 
 const sum = (list: readonly SupplierDue[]) => list.reduce((s, x) => s + Math.max(0, x.amountMinor), 0);
 
@@ -115,7 +113,7 @@ export function buildCommitments(input: CommitmentsInput): Commitments {
       if (month === thisMonth && input.paidThisMonth?.has(r.id)) continue;
       const c: Commitment = { id: `rec:${r.id}:${month}`, kind: "RECURRING", label: r.label, amountMinor: r.amountMinor, href: "/settings#recurring" };
       if (o.day === null) undated.set(month, [...(undated.get(month) ?? []), c]);
-      else put(`${month}-${String(Math.min(o.day, monthLength(month))).padStart(2, "0")}`, c);
+      else put(`${month}-${String(Math.min(o.day, daysInMonth(month))).padStart(2, "0")}`, c);
     }
   }
 

@@ -8,6 +8,7 @@
  * ودوالّ خالصة: تأخذ فترات وتُرجع تداخلها وفجواتها.
  */
 import { DAY as DAY_NOUN, GAP, countNoun } from "@/lib/arabic";
+import { MS_PER_DAY, daysBetween, isoDay } from "@/lib/riyadh-time";
 
 export interface Period {
   start: string;
@@ -39,18 +40,17 @@ export interface Coverage {
   coveredDays: number;
 }
 
-const DAY = 86_400_000;
-
 function toTime(iso: string): number {
   return new Date(`${iso}T00:00:00Z`).getTime();
 }
 
 function toIso(time: number): string {
-  return new Date(time).toISOString().slice(0, 10);
+  return isoDay(new Date(time));
 }
 
-function daysBetween(a: string, b: string): number {
-  return Math.round((toTime(b) - toTime(a)) / DAY) + 1;
+/** عددُ الأيّام من `a` إلى `b` **شاملاً الطرفين**. */
+function inclusiveDays(a: string, b: string): number {
+  return daysBetween(a, b) + 1;
 }
 
 /**
@@ -73,7 +73,7 @@ export function analyzeCoverage(periods: readonly Period[]): Coverage {
       const start = sorted[i].start > sorted[j].start ? sorted[i].start : sorted[j].start;
       const end = sorted[i].end < sorted[j].end ? sorted[i].end : sorted[j].end;
       if (start > end) continue;
-      overlaps.push({ a: sorted[i], b: sorted[j], start, end, days: daysBetween(start, end) });
+      overlaps.push({ a: sorted[i], b: sorted[j], start, end, days: inclusiveDays(start, end) });
     }
   }
 
@@ -81,7 +81,7 @@ export function analyzeCoverage(periods: readonly Period[]): Coverage {
   const merged: { start: string; end: string }[] = [];
   for (const p of sorted) {
     const last = merged[merged.length - 1];
-    if (last && toTime(p.start) <= toTime(last.end) + DAY) {
+    if (last && toTime(p.start) <= toTime(last.end) + MS_PER_DAY) {
       if (p.end > last.end) last.end = p.end;
     } else {
       merged.push({ start: p.start, end: p.end });
@@ -90,13 +90,13 @@ export function analyzeCoverage(periods: readonly Period[]): Coverage {
 
   const gaps: Gap[] = [];
   for (let i = 1; i < merged.length; i++) {
-    const gapStart = toIso(toTime(merged[i - 1].end) + DAY);
-    const gapEnd = toIso(toTime(merged[i].start) - DAY);
+    const gapStart = toIso(toTime(merged[i - 1].end) + MS_PER_DAY);
+    const gapEnd = toIso(toTime(merged[i].start) - MS_PER_DAY);
     if (toTime(gapStart) > toTime(gapEnd)) continue;
-    gaps.push({ start: gapStart, end: gapEnd, days: daysBetween(gapStart, gapEnd) });
+    gaps.push({ start: gapStart, end: gapEnd, days: inclusiveDays(gapStart, gapEnd) });
   }
 
-  const coveredDays = merged.reduce((s, m) => s + daysBetween(m.start, m.end), 0);
+  const coveredDays = merged.reduce((s, m) => s + inclusiveDays(m.start, m.end), 0);
 
   return {
     from: merged[0].start,
@@ -162,8 +162,8 @@ export function monthGapDays(
 
   const cov = analyzeCoverage(clipped);
   const inner = cov.gaps.reduce((sum, g) => sum + g.days, 0);
-  const head = cov.from !== null && cov.from > monthStart ? daysBetween(monthStart, cov.from) - 1 : 0;
-  const tail = cov.to !== null && cov.to < monthEnd ? daysBetween(cov.to, monthEnd) - 1 : 0;
+  const head = cov.from !== null && cov.from > monthStart ? inclusiveDays(monthStart, cov.from) - 1 : 0;
+  const tail = cov.to !== null && cov.to < monthEnd ? inclusiveDays(cov.to, monthEnd) - 1 : 0;
   return head + inner + tail;
 }
 

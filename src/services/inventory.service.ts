@@ -36,6 +36,7 @@ import type { PurchaseLineInput } from "@/lib/inventory/purchases";
 import { purchaseQuantity } from "@/lib/inventory/purchases";
 import { loadRecipeVersions } from "./recipe.service";
 import { isInventoryWeek, weekLabel, weekOf } from "@/lib/inventory/week";
+import { addDays } from "@/lib/riyadh-time";
 
 /** كم يوماً يُنظَر إلى الوراء بحثاً عن آخر كلفةٍ معروفة حين لا شراءَ في الفترة. */
 const COST_LOOKBACK_DAYS = 180;
@@ -102,11 +103,6 @@ export interface CountHeader {
   note: string | null;
   /** نطاقُ الجرد موروثٌ أم صريح (`041`). */
   scopeSource: "INHERITED" | "EXPLICIT";
-}
-
-function shiftDays(date: string, days: number): string {
-  const [y, m, d] = date.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
 /* ─────────────────────────── القراءة ─────────────────────────── */
@@ -228,8 +224,8 @@ export async function loadPurchaseLines(
   /** فواتيرُ تلي نهايةَ الفترة بأيّامٍ قليلة — التباسُ استلامٍ يُعرَض. */
   ambiguous: PurchaseLineInput[];
 }> {
-  const from = shiftDays(periodStart, -COST_LOOKBACK_DAYS);
-  const until = shiftDays(periodEnd, RECEIPT_AMBIGUITY_DAYS);
+  const from = addDays(periodStart, -COST_LOOKBACK_DAYS);
+  const until = addDays(periodEnd, RECEIPT_AMBIGUITY_DAYS);
 
   /*
     ── تاريخُ الدخول: الحقيقيّ إن وُجد، وإلّا تاريخُ الفاتورة نائباً ──
@@ -409,7 +405,7 @@ export async function resolveOpenings(
       from inventory_count_lines l
       join inventory_counts c on c.id = l.count_id
      where c.status = 'FINALISED'
-       and c.period_end = ${shiftDays(periodStart, -1)}
+       and c.period_end = ${addDays(periodStart, -1)}
        and ${branchId ? sql`c.branch_id = ${branchId}` : sql`c.branch_id is null`}
        and l.in_scope
        and l.actual_milli is not null
@@ -430,7 +426,7 @@ export async function resolveOpenings(
          أوّلُها. والأقدمُ منه كالجرد الأقدم: يُسقط ما استُهلك بينهما، فالفجوةُ
          «غير معروف» لا رقمُ يونيو في أسبوع سبتمبر.
        */
-       and m.occurred_on between ${shiftDays(periodStart, -1)} and ${periodStart}
+       and m.occurred_on between ${addDays(periodStart, -1)} and ${periodStart}
        and ${branchId ? sql`(m.branch_id = ${branchId} or m.branch_id is null)` : sql`true`}
      order by m.product_id, m.occurred_on desc, m.created_at desc
   `);
@@ -469,8 +465,8 @@ export async function loadReceiptDuplicates(
   if (open.rows.length === 0) return [];
 
   const productIds = [...new Set(open.rows.map((r) => String(r.product_id)))];
-  const from = shiftDays(periodStart, -RECEIPT_MATCH_WINDOW_DAYS);
-  const until = shiftDays(periodEnd, RECEIPT_MATCH_WINDOW_DAYS);
+  const from = addDays(periodStart, -RECEIPT_MATCH_WINDOW_DAYS);
+  const until = addDays(periodEnd, RECEIPT_MATCH_WINDOW_DAYS);
   const lines = await invoiceLinesForMatch(productIds, from, until, baseUnitOf, conn);
   const linked = await linkedInvoiceLineIds(conn);
 
@@ -624,7 +620,7 @@ export async function latestInvoiceUnitCosts(asOf: string, conn: Conn = db): Pro
   const units = await conn.select({ id: products.id, baseUnit: products.baseUnit })
     .from(products).where(eq(products.isStockItem, true));
   /* الفترةُ يومُ الغد: فكلُّ ما حتى اليوم «قبلها» */
-  const next = shiftDays(asOf, 1);
+  const next = addDays(asOf, 1);
   const { lookback } = await loadPurchaseLines(next, next, conn);
   const out = new Map<string, number>();
   for (const [id, rate] of fallbackCosts(lookback, new Map(units.map((u) => [u.id, u.baseUnit])))) {

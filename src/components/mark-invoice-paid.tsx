@@ -6,8 +6,7 @@ import { Banknote, Landmark, Wallet } from "lucide-react";
 import { formatRiyalsDisplay } from "@/lib/money";
 import { postJson } from "@/lib/http-client";
 import { readDrawn } from "@/lib/drawn-credit";
-import { todayInRiyadh } from "@/lib/riyadh-time";
-import { shiftDays } from "@/lib/inventory/week";
+import { todayInRiyadh, addDays } from "@/lib/riyadh-time";
 import { ACT } from "@/lib/ui-terms";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
@@ -109,7 +108,7 @@ export function MarkInvoicePaid({
     حوالته في الكشف (نافذةُ الربط أسبوعان) وتقع الدفعةُ في شهرٍ غير شهرها.
   */
   const today = todayInRiyadh();
-  const yesterday = shiftDays(today, -1);
+  const yesterday = addDays(today, -1);
   const [paidOn, setPaidOn] = useState(today);
   /* الخادمُ وجد سداداً بالمورّد واليوم والمبلغ نفسها — يُسأل: أهو سدادٌ آخر؟ */
   const [twin, setTwin] = useState(false);
@@ -235,7 +234,7 @@ export function MarkInvoicePaid({
                 onClick={() => setState("confirm-bank")}
               />
             </div>
-            <button type="button" onClick={back("idle")} className={buttonClass("quiet", "sm")}>تراجع</button>
+            <button type="button" onClick={back("idle")} className={buttonClass("quiet", "sm")}>إلغاء</button>
           </fieldset>
         ) : (
           <>
@@ -246,7 +245,7 @@ export function MarkInvoicePaid({
             <button type="button" disabled={state === "previewing"} onClick={() => setState("confirm-bank")} className={buttonClass("secondary", "sm")}>
               حوالة من حساب المقهى
             </button>
-            <button type="button" onClick={back("idle")} className={buttonClass("quiet", "sm")}>تراجع</button>
+            <button type="button" onClick={back("idle")} className={buttonClass("quiet", "sm")}>إلغاء</button>
           </>
         )
       )}
@@ -260,7 +259,7 @@ export function MarkInvoicePaid({
             <button aria-busy={state === "busy"} type="button" disabled={state === "busy"} onClick={() => run("OWNER")} className={buttonClass("primary", "sm")}>
               {ACT.paidFromOwner}
             </button>
-            <button type="button" onClick={back("choose")} className={buttonClass("quiet", "sm")}>تراجع</button>
+            <button type="button" onClick={back("choose")} className={buttonClass("quiet", "sm")}>إلغاء</button>
           </div>
         </div>
       )}
@@ -305,7 +304,7 @@ export function MarkInvoicePaid({
                 {ACT.recordBankTransfer}
               </button>
             )}
-            <button type="button" onClick={back("choose")} className={buttonClass("quiet", "sm")}>تراجع</button>
+            <button type="button" onClick={back("choose")} className={buttonClass("quiet", "sm")}>إلغاء</button>
           </div>
         </div>
       )}

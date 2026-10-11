@@ -295,7 +295,7 @@ function FindingCard({
               <button type="button" className={buttonClass("secondary", "sm")} onClick={() => decide("dismiss")}>
                 احفظ الرفض
               </button>
-              <button type="button" className={buttonClass("quiet", "sm")} onClick={() => setState("idle")}>تراجع</button>
+              <button type="button" className={buttonClass("quiet", "sm")} onClick={() => setState("idle")}>إلغاء</button>
             </>
           ) : moneyAction ? (
             <>

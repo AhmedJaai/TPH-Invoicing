@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import { guard, respondTo } from "@/services/guard";
 import { createSupplier } from "@/services/supplier.service";
 import { isValidSaudiVat } from "@/lib/validation";
-import { latinDigits } from "@/lib/invoice-number";
+import { latinDigits } from "@/lib/digits";
 
 export const runtime = "nodejs";
 

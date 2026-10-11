@@ -23,6 +23,7 @@ import { DriveAuthExpiredError, isDriveAuthError, probeFile, renameFile } from "
 import { canonicalName, renameGate } from "@/lib/canonical-name";
 import { resolveNameCollision } from "@/lib/naming";
 import { recordAudit } from "@/lib/audit";
+import { isoDayOrNull } from "@/lib/riyadh-time";
 
 export interface RenameTarget {
   driveFileId: string;
@@ -196,7 +197,7 @@ export async function renameArchived(
       mimeType: r.mimeType,
       kind: r.kind,
       slug: r.slug,
-      date: (r.invoiceDate ?? r.statementEnd)?.toISOString().slice(0, 10) ?? null,
+      date: isoDayOrNull(r.invoiceDate ?? r.statementEnd),
       totalMinor: r.invoiceTotal ?? r.statementTotal ?? null,
       invoiceNumber: r.invoiceNumber ?? null,
     });

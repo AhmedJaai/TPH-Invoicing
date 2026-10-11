@@ -8,7 +8,7 @@ import { bankTransactions, suppliers } from "@/db/schema";
 import { formatRiyalsDisplay } from "./money";
 import type { AttentionEvidence, AttentionFacts } from "./attention";
 import { previousMonth } from "./filing";
-import { currentMonthRiyadh, daysSinceRiyadh, formatDay } from "./riyadh-time";
+import { currentMonthRiyadh, daysSinceRiyadh, formatDay, isoDay } from "./riyadh-time";
 import { findReversals, reversalKey } from "./bank/reversal";
 import { analyzeCoverage } from "./bank/coverage";
 import { checkBalance } from "./bank/balance-equation";
@@ -227,7 +227,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     q1
   ).rows.map<AttentionEvidence>((r) => ({
     label: String(r.invoice_number),
-    sub: `${r.name_ar ?? "—"} · ${new Date(r.invoice_date as string).toISOString().slice(0, 10)}`,
+    sub: `${r.name_ar ?? "—"} · ${isoDay(new Date(r.invoice_date as string))}`,
     amountMinor: Number(r.vat_minor),
     /*
       «بعضهم ما عندهم ضريبة، أو ما سجّلوا ضريبتي وتعدّلت» (أحمد) — فالإصلاحُ

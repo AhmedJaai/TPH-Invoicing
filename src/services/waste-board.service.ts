@@ -6,7 +6,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { buildWasteBoard, WASTE_REASON_LABEL, type WasteBoard, type WasteReason, type WasteRate } from "@/lib/inventory/waste-board";
 import { isStoredUnit } from "@/lib/unit-conversion";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 
 export const WASTE_BOARD_WEEKS = 8;
 
@@ -18,7 +18,7 @@ export async function loadWasteBoard(): Promise<WasteBoard & { since: string }> 
   const today = todayInRiyadh();
   const d = new Date(`${today}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() - WASTE_BOARD_WEEKS * 7);
-  const since = d.toISOString().slice(0, 10);
+  const since = isoDay(d);
 
   const [records, rateRows] = await Promise.all([
     db.execute<{ product_id: string; name: string; reason: string; quantity_milli: string; unit: string }>(sql`

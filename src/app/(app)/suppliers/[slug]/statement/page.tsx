@@ -14,7 +14,7 @@ import { PrintButton } from "@/components/print-button";
 import { loadFirstActivity, loadStatementLedger } from "@/services/supplier-intel.service";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
 import { METHOD_LABEL } from "@/lib/payment-state";
-import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
+import { formatDay, todayInRiyadh, addDays } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -32,12 +32,6 @@ export const dynamic = "force-dynamic";
  */
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function shiftDays(day: string, days: number): string {
-  const d = new Date(`${day}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 function safe(read: () => string): string {
   try {
@@ -86,8 +80,8 @@ export default async function SupplierStatementPage({
   const presets = [
     { label: "كلّ التعامل", from: first ?? today, to: today },
     { label: "هذه السنة", from: `${year}-01-01`, to: today },
-    { label: "آخر 90 يوماً", from: shiftDays(today, -89), to: today },
-    { label: "آخر 30 يوماً", from: shiftDays(today, -29), to: today },
+    { label: "آخر 90 يوماً", from: addDays(today, -89), to: today },
+    { label: "آخر 30 يوماً", from: addDays(today, -29), to: today },
   ];
 
   /* الرصيدُ عند المصدر الواحد — يُقارَن بختاميّ الكشف حين يمتدّ الكشف إلى اليوم */

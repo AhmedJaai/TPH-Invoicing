@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DISMISSED, addDays, isSilenced, signalPrefix, silencedKeys, snoozeDay, snoozedUntil } from "./signal-decisions";
+import { addDays } from "./riyadh-time";
+import { DISMISSED, isSilenced, signalPrefix, silencedKeys, snoozeDay, snoozedUntil } from "./signal-decisions";
 
 describe("signal-decisions", () => {
   it("المفتاحُ يُقبل ببادئته المعروفة وحدها", () => {

@@ -37,6 +37,7 @@ import { InvoiceLinesRefused, replaceLines } from "@/services/invoice.service";
 import { assertMonthsOpen } from "@/services/month-guard";
 import { reviewConfirmed } from "@/lib/confirm";
 import { TOTAL_ROUNDING_TOLERANCE_MINOR, checkInvoiceTotals, formatRiyalsDisplay, parseRiyals, type PostVatAdjustments } from "@/lib/money";
+import { isoDay } from "@/lib/riyadh-time";
 
 export interface RereadRead {
   subtotalMinor: number | null;
@@ -222,7 +223,7 @@ export async function rereadDocument(opts: {
       documentKind: doc.kind,
       supplierId: doc.supplierId,
       invoiceNumber: doc.invoiceNumber,
-      invoiceDate: doc.invoiceDate ? doc.invoiceDate.toISOString().slice(0, 10) : null,
+      invoiceDate: doc.invoiceDate ? isoDay(doc.invoiceDate) : null,
       subtotalMinor: after.subtotalMinor,
       vatMinor: after.vatMinor,
       totalMinor: total,

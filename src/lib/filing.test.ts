@@ -84,3 +84,36 @@ describe("مسار المجلد المعروض قبل الحفظ", () => {
       .toBe("ACCOUNTS / 2026 / 2026-08 / Olive Leaves");
   });
 });
+
+import { addMonths, monthsBetween, nextMonth as nextM, previousMonth as prevM } from "./filing";
+
+describe("حسابُ الأشهر: مالكٌ واحد يطابق الصيغتين القديمتين", () => {
+  /* كما كانتا في هذا الملفّ قبل أن تُبنيا على `addMonths` */
+  const oldNext = (month: string) => {
+    const [y, m] = month.split("-").map(Number);
+    return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+  };
+  const oldPrevious = (month: string) => {
+    const [y, m] = month.split("-").map(Number);
+    return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+  };
+
+  it("الشهرُ التالي والسابق لكلّ شهرٍ من ١٩٩٠ إلى ٢١٠٠", () => {
+    for (let y = 1990; y <= 2100; y++) {
+      for (let m = 1; m <= 12; m++) {
+        const month = `${y}-${String(m).padStart(2, "0")}`;
+        expect(nextM(month)).toBe(oldNext(month));
+        expect(prevM(month)).toBe(oldPrevious(month));
+        expect(addMonths(month, 0)).toBe(month);
+        expect(monthsBetween(month, addMonths(month, 17))).toBe(17);
+        expect(monthsBetween(month, addMonths(month, -5))).toBe(-5);
+      }
+    }
+  });
+
+  it("يعبر السنة في الاتّجاهين", () => {
+    expect(addMonths("2026-11", 3)).toBe("2027-02");
+    expect(addMonths("2026-02", -3)).toBe("2025-11");
+    expect(monthsBetween("2026-12", "2027-01")).toBe(1);
+  });
+});

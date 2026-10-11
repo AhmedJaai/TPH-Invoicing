@@ -11,6 +11,7 @@ import {
   COMPARE_WEEKS, buildDailySeries, buildLeakSummary, buildMenuMix, comparable,
   type DailySeries, type ItemSales, type LeakDay, type LeakKind, type LeakSummary, type MenuMix, type SalesDay,
 } from "@/lib/sales/overview";
+import { isoDay } from "@/lib/riyadh-time";
 
 export const PERIOD_CHOICES = [7, 28, 90] as const;
 export type PeriodDays = (typeof PERIOD_CHOICES)[number];
@@ -36,7 +37,7 @@ export interface SalesOverview {
 
 function shift(day: string, n: number): string {
   const [y, m, d] = day.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+  return isoDay(new Date(Date.UTC(y, m - 1, d + n)));
 }
 
 function isLeakKind(v: string): v is LeakKind {

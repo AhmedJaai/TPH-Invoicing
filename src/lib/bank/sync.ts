@@ -31,6 +31,7 @@
  */
 import { normalizeText, type CanonicalTransaction } from "./canonical";
 import { operationRef, operationRefs } from "./identity";
+import { isoDay } from "@/lib/riyadh-time";
 
 /** على أيّ شيء قامت الهويّة. */
 export type IdentityBasis = "REFERENCE" | "FACTS";
@@ -91,7 +92,7 @@ export const UNKNOWN_ACCOUNT = "~";
  */
 export function factKey(row: RowFacts): string {
   return [
-    row.valueDate.toISOString().slice(0, 10),
+    isoDay(row.valueDate),
     String(row.amountMinor),
     row.direction,
     identityText(row.description),
@@ -116,7 +117,7 @@ export function beneficiaryKey(row: { beneficiaryRaw?: string | null }): string 
 /** المفتاح المتساهل: كالوقائع، والوصفُ بلا أرقام. */
 export function looseKey(row: RowFacts): string {
   return [
-    row.valueDate.toISOString().slice(0, 10),
+    isoDay(row.valueDate),
     String(row.amountMinor),
     row.direction,
     looseText(row.description),
@@ -418,11 +419,11 @@ export function storedMissingFromFile<R extends { id: string; valueDate: Date; b
     ...result.ambiguous.map((a) => a.verdict.againstId),
     ...result.conflict.map((c) => c.verdict.againstId),
   ]);
-  const from = period.start.toISOString().slice(0, 10);
-  const to = period.end.toISOString().slice(0, 10);
+  const from = isoDay(period.start);
+  const to = isoDay(period.end);
   return stored.filter((s) => {
     if (seen.has(s.id) || s.bankAccountId !== accountId) return false;
-    const day = s.valueDate.toISOString().slice(0, 10);
+    const day = isoDay(s.valueDate);
     return day >= from && day <= to;
   });
 }

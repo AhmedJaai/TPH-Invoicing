@@ -13,8 +13,9 @@ import { db } from "@/db";
 import { invoices, issues, statementLines, statements } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { TOTAL_ROUNDING_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
-import { amountAgrees, reconcileStatement, type OurInvoice, type StatementLineInput } from "@/lib/statement-match";
+import { amountAgrees, reconcileStatement, STATEMENT_DATE_WINDOW_DAYS, type OurInvoice, type StatementLineInput } from "@/lib/statement-match";
 import type { Conn, Tx } from "./types";
+import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
 
 export interface ReconcileInput {
   statementId: string | null;
@@ -56,7 +57,7 @@ export async function reconcileAndPersist(input: ReconcileInput) {
    * عن المطابقة، فتُعلَن «ناقصة» وهي عندنا — وإنذارٌ كاذب في هذا الموضع
    * يُفقد الميزة كلّها قيمتها.
    */
-  const PAD_MS = 7 * 86_400_000;
+  const PAD_MS = STATEMENT_DATE_WINDOW_DAYS * MS_PER_DAY;
   const ours: OurInvoice[] = await conn
     .select({
       invoiceId: invoices.id,
@@ -88,7 +89,7 @@ export async function reconcileAndPersist(input: ReconcileInput) {
     periodStart: start,
     periodEnd: end,
   });
-  const periodLabel = `${start.toISOString().slice(0, 10)} إلى ${end.toISOString().slice(0, 10)}`;
+  const periodLabel = `${isoDay(start)} إلى ${isoDay(end)}`;
 
   /*
     ── كشفُه مقابلَ دفترنا ──
@@ -199,7 +200,7 @@ async function ledgerGapFinding(
   /* الكشفُ نفسُه يذكر سداداً في آخر أيّامه (هنقري مان ٥ يونيو) — فسدادُ ذلك اليوم داخلٌ فيه */
   creditOnEnd: boolean,
 ) {
-  const day = end.toISOString().slice(0, 10);
+  const day = isoDay(end);
   const ids = [...new Set(matched.map((m) => m.invoiceId))];
   /*
     والمطابَقةُ تُحسب بقيمتها عندنا ما دام سطرُها يساويها بأيّ صيغة — لوريفا يكتب المبلغ
@@ -291,7 +292,7 @@ async function storedLedgerGap(conn: Conn, statementId: string, supplierId: stri
     .from(statementLines).where(eq(statementLines.statementId, statementId));
   return ledgerGapFinding(conn, supplierId, end, closingMinor,
     rows.flatMap((m) => (m.status === "MATCHED" && m.invoiceId ? [{ invoiceId: m.invoiceId, debitMinor: m.debitMinor }] : [])),
-    rows.some((m) => m.creditMinor > 0 && m.date.toISOString().slice(0, 10) === end.toISOString().slice(0, 10)));
+    rows.some((m) => m.creditMinor > 0 && isoDay(m.date) === isoDay(end)));
 }
 
 export interface SupplierLedgerGap {
@@ -321,7 +322,7 @@ export async function latestStatementGaps(conn: Conn = db): Promise<SupplierLedg
   for (const l of latest) {
     const end = new Date(l.pe);
     const f = await storedLedgerGap(conn, l.id, l.supplier_id, end, Number(l.cb));
-    if (f) out.push({ supplierName: l.name_ar, slug: l.slug, day: end.toISOString().slice(0, 10), theirsMinor: Number(l.cb), oursMinor: f.owedMinor, gapMinor: f.gapMinor });
+    if (f) out.push({ supplierName: l.name_ar, slug: l.slug, day: isoDay(end), theirsMinor: Number(l.cb), oursMinor: f.owedMinor, gapMinor: f.gapMinor });
   }
   return out.sort((a, b) => Math.abs(b.gapMinor) - Math.abs(a.gapMinor));
 }
@@ -364,7 +365,7 @@ export async function latestStatementDiscrepancies(supplierId: string, conn: Con
 
   const from = new Date(`${st.ps}T00:00:00Z`);
   const to = new Date(`${st.pe}T00:00:00Z`);
-  const PAD_MS = 7 * 86_400_000;
+  const PAD_MS = STATEMENT_DATE_WINDOW_DAYS * MS_PER_DAY;
   const ours = (await conn.execute<{ id: string; num: string; d: string; total: number; sub: number | null; gross: number | null }>(sql`
     select i.id, i.invoice_number as num, i.invoice_date::date::text as d, i.total_minor as total, i.subtotal_minor as sub,
            (select sum(l.line_total_minor)::int from invoice_lines l where l.invoice_id = i.id) as gross
@@ -380,7 +381,7 @@ export async function latestStatementDiscrepancies(supplierId: string, conn: Con
     ours.filter((o) => !keptIds.has(o.invoiceId)),
   );
   const byId = new Map(ours.map((o) => [o.invoiceId, o]));
-  const day = (d: Date) => d.toISOString().slice(0, 10);
+  const day = (d: Date) => isoDay(d);
 
   /* الفاتورةُ الجامعة (هنقري مان) تطابق أسطراً — تُقابَل بمجموعها لا بكلّ سطر */
   const pairs = [

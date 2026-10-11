@@ -341,3 +341,15 @@ describe("روابطُ الدور تصل ولا تُردّ", () => {
     }
   });
 });
+
+describe("نقطةُ المساحة من وجهات بنود الطابور", () => {
+  it("كلُّ بندٍ يُعَدّ لمساحة وجهته — بأطول بادئة، وبلا استعلامه", async () => {
+    const { areaCounts } = await import("./nav");
+    expect(areaCounts(["/bank#import", "/bank/tx/abc", "/close/vat?period=2026-Q3", "/purchases/invoices?overdue=1"]))
+      .toEqual({ "/bank": 2, "/close": 1, [activeArea("/purchases/invoices")?.href ?? ""]: 1 });
+  });
+  it("ما وجهتُه الطابورُ نفسُه أو «اليوم» لا يُعَدّ لمساحة", async () => {
+    const { areaCounts } = await import("./nav");
+    expect(areaCounts(["/attention?item=x", "/", "/no-such-page"])).toEqual({});
+  });
+});

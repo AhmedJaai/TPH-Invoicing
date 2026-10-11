@@ -36,9 +36,3 @@ export const companyConfig = {
   get vatNumber() { return required("COMPANY_VAT_NUMBER"); },
   get crNumber() { return process.env.COMPANY_CR_NUMBER ?? ""; },
 };
-
-/** حد رسملة الأصل الثابت: ٣٬٠٠٠ ريال. */
-export const FIXED_ASSET_THRESHOLD_MINOR = 300_000;
-
-/** نسبة ضريبة القيمة المضافة في السعودية. */
-export const VAT_RATE = 0.15;

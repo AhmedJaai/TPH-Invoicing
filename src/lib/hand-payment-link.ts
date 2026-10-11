@@ -13,6 +13,8 @@
  *   - **الحوالةُ أكبر**: اقتراحٌ يُقَرّ — والفرقُ رصيدٌ للمورّد إلى أن يُفسَّر
  *     (رونة: ٢٥ رسمُ توصيلٍ في الفاتورة لم يُقرأ، فإجماليُّها ٤٦٢ لا ٤٣٧).
  */
+import { dayNumber } from "@/lib/riyadh-time";
+
 
 export const LINK_WINDOW_DAYS = 14;
 
@@ -43,7 +45,6 @@ export interface HandPaymentLink {
   exact: boolean;
 }
 
-const dayNumber = (d: string) => Math.round(Date.parse(`${d}T00:00:00Z`) / 86_400_000);
 
 /**
  * يقرن كلَّ حوالةٍ بدفعةٍ واحدة وكلَّ دفعةٍ بحوالةٍ واحدة: المطابقُ مبلغاً

@@ -285,6 +285,22 @@ export function activeArea(pathname: string): NavArea | undefined {
   return best;
 }
 
+/**
+ * كم بنداً من «يحتاج قرارك» يُعالَج في كلّ مساحة — من وجهات البنود نفسها، بلا
+ * استعلامٍ جديد. يُرسَم **نقطةً** في الشريط لا عدداً: العددُ واحدٌ للعمل الباقي
+ * (شارةُ «يحتاج قرارك»)، والنقطةُ تقول أين يقع. وما وجهتُه الطابورُ نفسُه أو
+ * «اليوم» لا يُعَدّ لمساحةٍ أخرى.
+ */
+export function areaCounts(hrefs: readonly string[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const href of hrefs) {
+    const area = activeArea(href.split(/[?#]/)[0]);
+    if (!area || area.href === "/" || area.href === "/attention") continue;
+    out[area.href] = (out[area.href] ?? 0) + 1;
+  }
+  return out;
+}
+
 /** اللسان الظاهر داخل المساحة — أطول بادئة أيضاً. */
 export function activeChild(pathname: string, area: NavArea): NavLink | undefined {
   const path = normalize(pathname);

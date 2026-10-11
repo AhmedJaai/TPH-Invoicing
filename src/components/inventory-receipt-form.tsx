@@ -227,7 +227,7 @@ export function ReceiptForm({
               شحنةٌ أخرى — احفظها منفصلة
             </button>
             <button type="button" disabled={busy} onClick={() => setCandidates(null)} className={buttonClass("quiet", "sm")}>
-              تراجع
+              إلغاء
             </button>
           </div>
         </div>
@@ -240,7 +240,7 @@ export function ReceiptForm({
           >
             احفظ الكمّيّة
           </button>
-          <button type="button" disabled={busy} onClick={onDone} className={buttonClass("quiet", "sm")}>تراجع</button>
+          <button type="button" disabled={busy} onClick={onDone} className={buttonClass("quiet", "sm")}>إلغاء</button>
         </div>
       )}
 

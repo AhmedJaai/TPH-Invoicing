@@ -24,6 +24,8 @@
  */
 import { z } from "zod";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { latinDigits } from "@/lib/digits";
+import { isoDay } from "@/lib/riyadh-time";
 
 /** أقصى عدد صفحاتٍ تُقرأ بصرياً — الكشف الطويل يُطلَب نصّاً. */
 export const MAX_VISION_PAGES = 20;
@@ -35,8 +37,7 @@ export const MAX_VISION_PAGES = 20;
  * `123456.00000000001`. وكلاهما يفسد المال بصمت.
  */
 export function parseAmountToMinor(raw: string): number | null {
-  const cleaned = raw
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+  const cleaned = latinDigits(raw)
     .replace(/[٫,\s]/g, (m) => (m === "٫" ? "." : ""))
     .replace(/[^\d.\-]/g, "")
     .trim();
@@ -104,7 +105,7 @@ function parseDate(raw: string): Date | null {
   const date = new Date(`${y}-${mo}-${d}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return null;
   /* والتاريخ الذي يعيد كتابته غير ما كُتب شهرٌ زائد أو يومٌ لا وجود له */
-  if (date.toISOString().slice(0, 10) !== `${y}-${mo}-${d}`) return null;
+  if (isoDay(date) !== `${y}-${mo}-${d}`) return null;
   return date;
 }
 

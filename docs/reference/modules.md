@@ -126,7 +126,11 @@
 | `src/lib/code-guards.test.ts` | حرّاسٌ نصّيّة: لا `db.` داخل معاملة · لا `renameFile` خارج `/api/drive-rename` · لا `res.json()` خامّ |
 | `src/services/month-guard.ts` | `assertMonthsOpen(tx, months)` — في `createPayment` و`allocate` و`createInvoice`، ومؤثِّرات ٠٢٨ خلفه |
 | `src/lib/bank/statement-balances.ts` | رصيدا كلّ شهرٍ من عمود الرصيد، إن استقامت السلسلة — وإلّا مجهول |
-| `src/lib/riyadh-time.ts` | «اليوم» و«الشهر الجاري» بتوقيت الرياض — لا `toISOString().slice(0, 7)` |
+| `src/lib/riyadh-time.ts` | «اليوم» و«الشهر الجاري» بتوقيت الرياض، **وحسابُ الأيّام كلُّه**: `isoDay` (يومُ التاريخ المخزَّن) · `addDays` · `dayNumber` · `daysBetween` · `daysInMonth` · `monthEndDay` · `MS_PER_DAY`. والأشهرُ (`addMonths` · `monthsBetween` · `monthOf`) في `filing.ts` |
+| `src/lib/vat.ts` | **نسبةُ الضريبة ١٥٪ في موضعٍ واحد**، بأعدادٍ صحيحة: `vatOnNet` · `vatInsideGross` · `netInsideGross` · `netOfVat` · `grossOfVat` · `vatMatchesStandardRate` — ويحرسه `vat.test.ts` |
+| `src/lib/digits.ts` | `latinDigits`: الأرقامُ العربيّة والفارسيّة إلى اللاتينيّة — لكلّ قارئٍ عدا هويّة حركة البنك |
+| `src/lib/env-check.ts` | فحصُ متغيّرات البيئة عند الإقلاع (`instrumentation.ts`) وفي `/api/health` — يقول ولا يمنع، وبلا قيم |
+| `src/config/finance.ts` | حدُّ رسملة الأصل الثابت |
 | `src/lib/token-crypto.ts` | رمز الدرايف مشفَّراً (`sealToken`/`openToken`) — يُفعَّل بـ`TOKEN_ENCRYPTION_KEY`، وبلا مفتاحٍ لا يتغيّر شيء. **كلّ `setCredentials` يمرّ بـ`openToken`** |
 | `src/services/guard.ts` | `guard(route, capability)` + `respondTo(e)` → 401/403/429. **مدخل كل واجهة** |
 | `src/lib/inventory/units.ts` | **الكمّيّة عددٌ صحيح بالمِلّي** — كما أنّ المال هللات. ولا جسر بين وزنٍ وحجم، ولا بين حبّةٍ وعبوة |

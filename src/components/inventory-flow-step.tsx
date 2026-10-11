@@ -343,7 +343,7 @@ function OpeningEditor({ countId, row, onDone }: { countId: string; row: StepRow
             أفرِغه — يعود كما كان
           </button>
         )}
-        <button type="button" disabled={busy} onClick={onDone} className={buttonClass("quiet", "sm")}>تراجع</button>
+        <button type="button" disabled={busy} onClick={onDone} className={buttonClass("quiet", "sm")}>إلغاء</button>
       </div>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
     </div>
@@ -399,7 +399,7 @@ function ReceiptList({ receipts, canEdit }: { receipts: ReceiptRow[]; canEdit: b
               >
                 ألغِها — وتبقى في السجلّ
               </button>
-              <button type="button" onClick={() => setVoiding(null)} className={buttonClass("quiet", "sm")}>تراجع</button>
+              <button type="button" onClick={() => setVoiding(null)} className={buttonClass("quiet", "sm")}>إلغاء</button>
             </span>
           )}
         </li>

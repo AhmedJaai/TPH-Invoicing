@@ -9,6 +9,24 @@
  */
 import type { Instrumentation } from "next";
 import { describeError, logEvent } from "@/lib/log";
+import { checkEnv } from "@/lib/env-check";
+
+/**
+ * عند إقلاع الخادم: ما نقص أو تعطّل من متغيّرات البيئة يُقال في سطرٍ واحد —
+ * **ولا يُمنَع الإقلاع أبداً**. أسماءٌ بلا قيم. انظر `lib/env-check.ts`.
+ */
+export function register(): void {
+  try {
+    const problems = checkEnv(process.env);
+    if (problems.length === 0) return;
+    logEvent("env-check", {
+      missing: problems.filter((p) => p.kind === "missing").map((p) => p.name).join(" "),
+      malformed: problems.filter((p) => p.kind === "malformed").map((p) => p.name).join(" "),
+    }, "warn");
+  } catch {
+    /* الفحصُ لا يُسقط الإقلاع */
+  }
+}
 
 export const onRequestError: Instrumentation.onRequestError = async (err, request, context) => {
   const digest = (err as { digest?: unknown } | null)?.digest;

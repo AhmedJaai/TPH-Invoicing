@@ -14,14 +14,26 @@ export function monthOf(date: Date): string {
   return `${y}-${m}`;
 }
 
-export function nextMonth(month: string): string {
+/** يزيح شهراً محاسبيّاً `YYYY-MM` أشهراً — وحسابُ الأشهر كلُّه من هنا. */
+export function addMonths(month: string, n: number): string {
   const [y, m] = month.split("-").map(Number);
-  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+  const idx = y * 12 + (m - 1) + n;
+  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, "0")}`;
+}
+
+/** كم شهراً من `from` إلى `to`. */
+export function monthsBetween(from: string, to: string): number {
+  const [fy, fm] = from.split("-").map(Number);
+  const [ty, tm] = to.split("-").map(Number);
+  return (ty * 12 + tm) - (fy * 12 + fm);
+}
+
+export function nextMonth(month: string): string {
+  return addMonths(month, 1);
 }
 
 export function previousMonth(month: string): string {
-  const [y, m] = month.split("-").map(Number);
-  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+  return addMonths(month, -1);
 }
 
 export interface InvoiceFilingInput {

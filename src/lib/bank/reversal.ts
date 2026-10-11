@@ -1,4 +1,5 @@
 import { formatRiyalsDisplay } from "@/lib/money";
+import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
 /**
  * عكس الدفعة.
  *
@@ -33,7 +34,6 @@ export interface Reversal {
 /** أقصى أيامٍ بين الخصم وردّه. */
 export const REVERSAL_WINDOW_DAYS = 14;
 
-const DAY = 86_400_000;
 
 /**
  * يكشف ما رُدّ.
@@ -56,7 +56,7 @@ export function findReversals(rows: readonly ReversalInput[]): Reversal[] {
       .filter((c) => {
         const gap = c.valueDate.getTime() - out.valueDate.getTime();
         // الردّ يأتي **بعد** الخصم لا قبله
-        return gap > 0 && gap <= REVERSAL_WINDOW_DAYS * DAY;
+        return gap > 0 && gap <= REVERSAL_WINDOW_DAYS * MS_PER_DAY;
       })
       .sort((a, b) => a.valueDate.getTime() - b.valueDate.getTime())[0];
 
@@ -66,7 +66,7 @@ export function findReversals(rows: readonly ReversalInput[]): Reversal[] {
     found.push({
       outgoing: out,
       incoming: back,
-      daysApart: Math.round((back.valueDate.getTime() - out.valueDate.getTime()) / DAY),
+      daysApart: Math.round((back.valueDate.getTime() - out.valueDate.getTime()) / MS_PER_DAY),
       samePartyEvidence: sameParty(out.party, back.party),
     });
   }
@@ -92,7 +92,7 @@ function sameParty(a: string | null, b: string | null): boolean {
 export function describeReversal(r: Reversal): string {
   const amount = formatRiyalsDisplay(r.outgoing.amountMinor);
   const base =
-    `خرج ${amount} في ${r.outgoing.valueDate.toISOString().slice(0, 10)} ` +
+    `خرج ${amount} في ${isoDay(r.outgoing.valueDate)} ` +
     `وعاد بعد ${r.daysApart} ${r.daysApart === 1 ? "يوم" : "أيام"}`;
 
   return r.samePartyEvidence

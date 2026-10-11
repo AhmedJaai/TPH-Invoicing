@@ -304,21 +304,82 @@ const noInlineRiyalsFormat = {
     docs: { description: "لا قسمةَ مالٍ مضمَّنة في نصٍّ يُعرض" },
     schema: [],
     messages: {
-      inline: "`(x / 100).toFixed(2)` تنسيقُ مالٍ مضمَّن — استعمل `formatRiyalsDisplay` (`lib/money.ts`).",
+      inline: "قسمةُ مالٍ مضمَّنة في تنسيق (`/ 100` ثمّ `toFixed`/`toLocaleString`/`format`) — استعمل `formatRiyalsDisplay`، وللآلة `formatRiyals` (`lib/money.ts`).",
+    },
+  },
+  create(context) {
+    /** `x / 100` أو `x / HALALAS_PER_RIYAL` — ولو داخل `Math.abs(…)` */
+    const dividesByHundred = (o) => {
+      if (o?.type === "CallExpression" && o.callee.type === "MemberExpression"
+        && o.callee.object.type === "Identifier" && o.callee.object.name === "Math" && o.arguments.length === 1) {
+        return dividesByHundred(o.arguments[0]);
+      }
+      if (o?.type !== "BinaryExpression" || o.operator !== "/") return false;
+      const r = o.right;
+      return (r.type === "Literal" && r.value === 100)
+        || (r.type === "Identifier" && r.name === "HALALAS_PER_RIYAL");
+    };
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (c.type !== "MemberExpression" || c.computed) return;
+        const name = c.property.name;
+        /* `(x / 100).toFixed(2)` */
+        if (name === "toFixed") {
+          if (node.arguments.length !== 1 || node.arguments[0].type !== "Literal" || node.arguments[0].value !== 2) return;
+          if (dividesByHundred(c.object)) context.report({ node, messageId: "inline" });
+          return;
+        }
+        /* `(x / 100).toLocaleString(…)` — وقع في `month-close.ts` */
+        if (name === "toLocaleString") {
+          if (dividesByHundred(c.object)) context.report({ node, messageId: "inline" });
+          return;
+        }
+        /* `new Intl.NumberFormat(…).format(x / 100)` — وقع في `attention.ts` و`double-paid.ts` */
+        if (name === "format" && node.arguments.length === 1 && dividesByHundred(node.arguments[0])) {
+          context.report({ node, messageId: "inline" });
+        }
+      },
+    };
+  },
+};
+
+/* ── ٨. يومُ التاريخ وشهرُه باسمٍ يقول المقصود ── */
+
+/**
+ * `toISOString().slice(0, 10)` كان في مئة موضع: أغلبُها يومُ مستندٍ مخزَّنٍ (UTC، صحيح)،
+ * وبعضُها كان «اليوم» أو «الشهر الجاري» فاختار شهرَ UTC حتى الثالثة فجراً بتوقيت
+ * الرياض. والقارئُ لا يميّز الآمنَ من الخطِر. فالمخزَّنُ `isoDay(date)` / `monthOf(date)`،
+ * و«الآن» `todayInRiyadh()` / `currentMonthRiyadh()` — والصيغةُ الخامّ في مالكها وحده.
+ */
+/** @type {import("eslint").Rule.RuleModule} */
+const noRawIsoSlice = {
+  meta: {
+    type: "problem",
+    docs: { description: "يومُ التاريخ وشهرُه عبر riyadh-time / filing لا بقصّ النصّ" },
+    schema: [],
+    messages: {
+      raw: "`toISOString().slice(0, {{n}})` — للتاريخ المخزَّن `{{fn}}` ، ولِـ«الآن» `{{now}}` (`lib/riyadh-time.ts`).",
     },
   },
   create(context) {
     return {
       CallExpression(node) {
         const c = node.callee;
-        if (c.type !== "MemberExpression" || c.computed || c.property.name !== "toFixed") return;
-        if (node.arguments.length !== 1 || node.arguments[0].type !== "Literal" || node.arguments[0].value !== 2) return;
-        const o = c.object;
-        if (o.type !== "BinaryExpression" || o.operator !== "/") return;
-        const r = o.right;
-        const isHundred = (r.type === "Literal" && r.value === 100)
-          || (r.type === "Identifier" && r.name === "HALALAS_PER_RIYAL");
-        if (isHundred) context.report({ node, messageId: "inline" });
+        if (c.type !== "MemberExpression" || c.computed || c.property.name !== "slice") return;
+        const [a, b] = node.arguments;
+        if (node.arguments.length !== 2 || a.type !== "Literal" || a.value !== 0 || b.type !== "Literal") return;
+        if (b.value !== 10 && b.value !== 7) return;
+        const o = c.object.type === "ChainExpression" ? c.object.expression : c.object;
+        if (o.type !== "CallExpression" || o.callee.type !== "MemberExpression" || o.callee.computed) return;
+        if (o.callee.property.name !== "toISOString") return;
+        context.report({
+          node,
+          messageId: "raw",
+          data: b.value === 10
+            ? { n: "10", fn: "isoDay(date)", now: "todayInRiyadh()" }
+            : { n: "7", fn: "monthOf(date)", now: "currentMonthRiyadh()" },
+        });
       },
     };
   },
@@ -335,6 +396,7 @@ const plugin = {
     "no-column-in-correlated-subquery": noColumnInCorrelatedSubquery,
     "rename-file-only-in-service": renameFileOnlyInService,
     "no-inline-riyals-format": noInlineRiyalsFormat,
+    "no-raw-iso-slice": noRawIsoSlice,
   },
 };
 

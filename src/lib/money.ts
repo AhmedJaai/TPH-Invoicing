@@ -3,6 +3,7 @@
  * السبب: خطأ «فاتورة بـ٣٬٤٠٠ قُيّدت ١٬٧٠٠» لا يجوز أن يتكرر من جهة النظام،
  * والفاصلة العائمة في جافاسكربت تُنتج 0.1 + 0.2 = 0.30000000000000004.
  */
+import { latinDigits } from "./digits";
 
 export const HALALAS_PER_RIYAL = 100;
 
@@ -124,11 +125,8 @@ export function checkInvoiceTotals(
 
 /** يحوّل نصاً مثل "410.00" أو "410" أو "١٬٢٣٤٫٥٠" إلى هللات. */
 export function parseRiyals(input: string): number | null {
-  const normalized = input
-    .trim()
-    // الأرقام العربية الهندية إلى اللاتينية
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+  // الأرقام العربية الهندية إلى اللاتينية
+  const normalized = latinDigits(input.trim())
     /*
       رمزُ العملة يُسقَط.
 

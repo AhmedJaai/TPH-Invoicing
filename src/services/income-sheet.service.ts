@@ -5,7 +5,7 @@
  */
 import { buildIncomeSheet, type IncomeSheet } from "@/lib/income-sheet";
 import { expectedDaysOf } from "@/lib/sales/witness";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 import { loadAccountantPack } from "./accountant-pack.service";
 import { loadSalesDays } from "./sales-witness.service";
 import { loadVatReturn } from "./vat-return.service";
@@ -23,7 +23,7 @@ export interface IncomeSheetView {
 
 function nextMonthStart(month: string): string {
   const [y, m] = month.split("-").map(Number);
-  return new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+  return isoDay(new Date(Date.UTC(y, m, 1)));
 }
 
 export async function loadIncomeSheet(month: string): Promise<IncomeSheetView> {

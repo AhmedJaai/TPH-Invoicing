@@ -6,7 +6,7 @@ import {
   ScanSearch, ShieldAlert, Sparkles, TrendingUp, TriangleAlert, Undo2, Unlink, Zap,
 } from "lucide-react";
 import { Money, Prose } from "./money";
-import { Badge, DoneMark, FlowItem, LinkButton, LinkTabs, Stepper, buttonClass, type Tone } from "./ui";
+import { Badge, DoneMark, FlowItem, Kbd, LinkButton, LinkTabs, Stepper, buttonClass, type Tone } from "./ui";
 import {
   AREA_LABEL, IMPACT_LABEL, SEVERITY_LABEL, countBySeverity,
   type AttentionEvidence, type AttentionItem, type AttentionSeverity, type ImpactKind,
@@ -254,8 +254,7 @@ export function TriageList({
         );
       })}
       <p className="hidden px-1 text-[11px] text-muted lg:block">
-        تنقّل بـ<kbd className="rounded border border-line px-1">J</kbd> و<kbd className="rounded border border-line px-1">K</kbd>،
-        وافتح بـ<kbd className="rounded border border-line px-1">Enter</kbd>.
+        تنقّل بـ<Kbd>J</Kbd> و<Kbd>K</Kbd>، وافتح بـ<Kbd>Enter</Kbd>.
       </p>
     </div>
   );

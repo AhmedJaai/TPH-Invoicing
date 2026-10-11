@@ -21,7 +21,7 @@ import { INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { applyAdjudication, runReconciliation } from "@/services/reconcile.service";
 import { adjudicate } from "@/services/adjudicator.service";
 import { selectedAdjudicator } from "@/lib/bank/adjudicator-provider";
-import { toCanonical } from "@/lib/bank/canonical";
+import { toCanonical, STATED_VALUE_DATE_LIMIT_DAYS } from "@/lib/bank/canonical";
 import { deriveLifecycle } from "@/lib/bank/lifecycle";
 import { loadMerchantMemory } from "@/services/counterparty.service";
 import { loadSupplierProfiles } from "@/services/supplier-profile.service";
@@ -30,6 +30,8 @@ import type { SupplierIdentity } from "@/lib/bank/entities";
 import { monthBalancesFromStatement } from "@/lib/bank/statement-balances";
 import { linkExactHandPayments, reserveForHandPayments } from "@/services/account-review.service";
 import { withDeadline } from "@/lib/ai/deadline";
+import { MS_PER_DAY, isoDay, isoDayOrNull } from "@/lib/riyadh-time";
+import { monthOf } from "@/lib/filing";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -176,8 +178,8 @@ async function handle(request: Request) {
         تُوسَّع النافذة أسبوعاً من كلّ طرف — حدُّ `statedValueDate` نفسه:
         حركةٌ خُزّنت بتاريخ عمودها ويقول نصُّها غيره كانت تقع خارجها فتُدرَج ثانية.
       */
-      gte(bankTransactions.valueDate, new Date(Math.min(...times) - 7 * 86_400_000)),
-      lte(bankTransactions.valueDate, new Date(Math.max(...times) + 7 * 86_400_000)),
+      gte(bankTransactions.valueDate, new Date(Math.min(...times) - STATED_VALUE_DATE_LIMIT_DAYS * MS_PER_DAY)),
+      lte(bankTransactions.valueDate, new Date(Math.max(...times) + STATED_VALUE_DATE_LIMIT_DAYS * MS_PER_DAY)),
     ));
 
   const knownRows: KnownRow[] = priorRows.map((r) => {
@@ -215,7 +217,7 @@ async function handle(request: Request) {
     قيدها يُردّ 409. فالجديدُ في شهرٍ مقفل لا يُقيَّد، ويُعدّ ويُقال —
     ويُعاد فتح الشهر إن كان مقصوداً. (المعروف من قبل لا يمسّه هذا.)
   */
-  const monthOfRow = (f: (typeof sync.fresh)[number]) => f.row.raw.valueDate.toISOString().slice(0, 7);
+  const monthOfRow = (f: (typeof sync.fresh)[number]) => monthOf(f.row.raw.valueDate);
   const freshMonths = [...new Set(sync.fresh.map(monthOfRow))];
   const closedMonths = freshMonths.length === 0
     ? []
@@ -273,8 +275,8 @@ async function handle(request: Request) {
   const thisPeriod =
     parsed.periodStart && parsed.periodEnd
       ? [{
-          start: parsed.periodStart.toISOString().slice(0, 10),
-          end: parsed.periodEnd.toISOString().slice(0, 10),
+          start: isoDay(parsed.periodStart),
+          end: isoDay(parsed.periodEnd),
           label: "هذا الملفّ",
         }]
       : [];
@@ -339,7 +341,7 @@ async function handle(request: Request) {
         o.invoiceId,
         {
           number: o.invoiceNumber,
-          date: o.invoiceDate.toISOString().slice(0, 10),
+          date: isoDay(o.invoiceDate),
           outstandingMinor: o.outstandingMinor,
         },
       ]),
@@ -414,8 +416,8 @@ async function handle(request: Request) {
     exact: engine.summary.exact,
     bank: parsed.bank,
     accountNumber: parsed.accountNumber,
-    periodStart: parsed.periodStart?.toISOString().slice(0, 10),
-    periodEnd: parsed.periodEnd?.toISOString().slice(0, 10),
+    periodStart: isoDayOrNull(parsed.periodStart) ?? undefined,
+    periodEnd: isoDayOrNull(parsed.periodEnd) ?? undefined,
     totalRows: parsed.rows.length,
     /*
       الأعداد من المحرّك — لا من المُطابِق القديم. كانت الشاشة تعرض
@@ -483,20 +485,20 @@ async function handle(request: Request) {
         /* عندنا وليست في الكشف — تُحفظ بعد التطبيق ليقرّر فيها إنسان */
         missingFromFile: missingFromFile.length,
         missingFromFileRows: missingFromFile.slice(0, 10).map((m) => ({
-          date: m.valueDate.toISOString().slice(0, 10),
+          date: isoDay(m.valueDate),
           amountMinor: m.amountMinor,
           direction: m.direction,
           description: (m.description ?? "").slice(0, 90),
         })),
         byReference: sync.known.filter((k) => k.verdict.basis === "REFERENCE").length,
         ambiguousRows: sync.ambiguous.slice(0, 10).map((a) => ({
-          date: a.row.raw.valueDate.toISOString().slice(0, 10),
+          date: isoDay(a.row.raw.valueDate),
           amountMinor: a.row.raw.amountMinor,
           description: (a.row.raw.description ?? "").slice(0, 90),
           reason: a.verdict.reason,
         })),
         conflictRows: sync.conflict.slice(0, 10).map((c) => ({
-          date: c.row.raw.valueDate.toISOString().slice(0, 10),
+          date: isoDay(c.row.raw.valueDate),
           amountMinor: c.row.raw.amountMinor,
           description: (c.row.raw.description ?? "").slice(0, 90),
           reason: c.verdict.reason,
@@ -509,7 +511,7 @@ async function handle(request: Request) {
       preview: engine.planned.slice(0, 40).map((p) => {
         const r = engineByKey.get(p.transactionKey)!;
         return {
-          date: p.paidAt.toISOString().slice(0, 10),
+          date: isoDay(p.paidAt),
           amountMinor: p.amountMinor,
           supplierName: supplierIdentities.find((s) => s.supplierId === p.supplierId)?.nameAr ?? "—",
           invoiceNumbers: p.allocations.map((a) =>
@@ -533,7 +535,7 @@ async function handle(request: Request) {
         .slice(0, 60)
         .map(({ r, tx }) => ({
           id: r.key,
-          date: tx.valueDate.toISOString().slice(0, 10),
+          date: isoDay(tx.valueDate),
           amountMinor: tx.amountMinor,
           description: tx.description.slice(0, 140),
           suggestedAlias: suggestAlias(tx.beneficiaryRaw ?? tx.description),
@@ -550,7 +552,7 @@ async function handle(request: Request) {
         .sort((a, b) => b.tx.amountMinor - a.tx.amountMinor)
         .slice(0, 20)
         .map(({ r, tx }) => ({
-          date: tx.valueDate.toISOString().slice(0, 10),
+          date: isoDay(tx.valueDate),
           amountMinor: tx.amountMinor,
           supplierName:
             supplierIdentities.find((s) => s.supplierId === r.supplierId)?.nameAr ?? "—",
@@ -667,7 +669,7 @@ async function handle(request: Request) {
     return plannedByKey.has(f.row.key) ? [{
       key: f.row.key,
       supplierId: decided?.supplierId ?? null,
-      day: f.row.raw.valueDate.toISOString().slice(0, 10),
+      day: isoDay(f.row.raw.valueDate),
       amountMinor: f.row.raw.amountMinor,
       direction: f.row.raw.direction,
     }] : [];
@@ -991,7 +993,7 @@ async function handle(request: Request) {
   }))));
   /* ومصروفُ ما صُنّف من الجديد يُقيَّد وحده — لا ينتظر زرّاً في صفحة المصروفات */
   const derived = newRows > 0
-    ? await deriveOpenMonths(freshRows.map((f) => f.row.raw.valueDate.toISOString().slice(0, 7)), user.id)
+    ? await deriveOpenMonths(freshRows.map((f) => monthOf(f.row.raw.valueDate)), user.id)
     : { created: 0, notes: [] };
   linkNotes.push(...derived.notes);
 
@@ -1018,7 +1020,7 @@ async function handle(request: Request) {
       conflict: sync.conflict.length,
       missingFromFile: missingFromFile.length,
       conflictRows: sync.conflict.slice(0, 10).map((c) => ({
-        date: c.row.raw.valueDate.toISOString().slice(0, 10),
+        date: isoDay(c.row.raw.valueDate),
         amountMinor: c.row.raw.amountMinor,
         description: (c.row.raw.description ?? "").slice(0, 90),
         reason: c.verdict.reason,

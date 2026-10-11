@@ -9,7 +9,7 @@
  *     (`markPaidByOwner`، `applySupplierCredit`) — فيحرسه مؤثِّر القاعدة.
  *   - كلّ تحليلٍ وكلّ قرارٍ في سجلّ التدقيق.
  */
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 import { reversePayment } from "@/services/payment.service";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -39,7 +39,7 @@ import {
   type OwnerPaidPlan,
 } from "./supplier-credit.service";
 
-const iso = (d: Date | string | null) => (d ? new Date(d).toISOString().slice(0, 10) : null);
+const iso = (d: Date | string | null) => (d ? isoDay(new Date(d)) : null);
 
 /* ───────────────────────── الوقائع ───────────────────────── */
 

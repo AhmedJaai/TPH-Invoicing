@@ -9,7 +9,8 @@
  * جديدة) تغيّر المفتاح **وعاد البندُ قبل يومه** — تأجيلُ ما كان لا يُسكت ما استجدّ.
  */
 import type { AttentionItem } from "./attention";
-import { addDays, snoozeDay } from "./signal-decisions";
+import { snoozeDay } from "./signal-decisions";
+import { addDays, isoDay } from "@/lib/riyadh-time";
 
 /** أبعدُ تأجيل: شهر — ما يُؤجَّل أبعدَ منه يُنسى، وذلك حسمٌ لا تأجيل. */
 export const SNOOZE_MAX_DAYS = 31;
@@ -61,7 +62,7 @@ export function validSnoozeDay(day: string, today: string): boolean {
 /** اختياراتُ التأجيل الجاهزة — غداً، بعد ثلاثة، بعد أسبوع، وأوّلُ الشهر القادم. */
 export function snoozeOptions(today: string): { label: string; day: string }[] {
   const [y, m] = today.split("-").map(Number);
-  const nextMonth = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+  const nextMonth = isoDay(new Date(Date.UTC(y, m, 1)));
   const options = [
     { label: "غداً", day: addDays(today, 1) },
     { label: "بعد ٣ أيّام", day: addDays(today, 3) },

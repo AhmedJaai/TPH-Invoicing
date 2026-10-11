@@ -14,6 +14,7 @@
  */
 import { EXCLUSION_LABEL, type ConsumptionResult, type ExclusionReason } from "./consumption";
 import { PURCHASE_GAP_LABEL, type PurchaseGapReason, type PurchaseSummary } from "./purchases";
+import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
 
 export type Readiness = "READY" | "PARTIAL" | "BLOCKED";
 
@@ -104,8 +105,8 @@ export function daysBetween(start: string, end: string): string[] {
   const to = Date.UTC(+end.slice(0, 4), +end.slice(5, 7) - 1, +end.slice(8, 10));
   if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return out;
 
-  for (let t = from; t <= to; t += 86_400_000) {
-    out.push(new Date(t).toISOString().slice(0, 10));
+  for (let t = from; t <= to; t += MS_PER_DAY) {
+    out.push(isoDay(new Date(t)));
   }
   return out;
 }

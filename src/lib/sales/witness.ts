@@ -8,6 +8,9 @@
  * والشاهدُ الناقص يُقال ناقصاً: «يغطّي ٢٧ يوماً من ٣٠». وما لا ملفَّ له `null`
  * («لا ملفَّ لهذا الشهر») لا صفر — صفرٌ هنا يقول إنّ المقهى لم يبع شيئاً.
  */
+import { daysInMonth } from "@/lib/riyadh-time";
+import { grossOfVat } from "@/lib/vat";
+
 
 export interface WitnessDay {
   /** `YYYY-MM-DD` — يومُ العمل في ملفّ فودكس. */
@@ -64,11 +67,6 @@ export interface SalesWitness {
 /** فرقٌ دون هذا في ضريبة الشهر تقريبُ هللاتٍ على مئات البيعات — لا يُقال فرقاً. */
 export const WITNESS_VAT_TOLERANCE_MINOR = 500;
 
-function daysInMonth(month: string): number {
-  const [y, m] = month.split("-").map(Number);
-  return new Date(Date.UTC(y, m, 0)).getUTCDate();
-}
-
 /** أيّامُ الشهر المنتظَرة: كلُّه إن انقضى، وحتى أمس إن كان جارياً، وصفرٌ إن لم يبدأ. */
 export function expectedDaysOf(month: string, today: string): number {
   const total = daysInMonth(month);
@@ -104,7 +102,7 @@ export function buildSalesWitness(input: SalesWitnessInput): SalesWitness {
     coveredDays,
     salesMinor, vatMinor, refundMinor,
     vatGapMinor,
-    /* 15 من كلّ 115: الضريبةُ × 115 ÷ 15 — عددٌ صحيح بالتقريب إلى الهللة */
-    grossGapMinor: Math.sign(vatGapMinor) * Math.round((Math.abs(vatGapMinor) * 115) / 15),
+    /* المبلغُ الشامل الذي فيه هذا الفرق من الضريبة — عددٌ صحيح بالتقريب إلى الهللة */
+    grossGapMinor: Math.sign(vatGapMinor) * grossOfVat(Math.abs(vatGapMinor)),
   };
 }

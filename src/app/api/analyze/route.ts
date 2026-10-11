@@ -19,6 +19,9 @@ import { loadCachedReading, saveCachedReading } from "@/services/reading-cache.s
 import { matchSupplier } from "@/lib/supplier-match";
 import { companyConfig } from "@/config/drive";
 import { guard, respondTo } from "@/services/guard";
+import { can } from "@/lib/permissions";
+import { itemKeys, priceMovesAtReview, type PriceMove } from "@/lib/price-at-review";
+import { loadLastItemPrices } from "@/services/price-review.service";
 import { loadSupplierRecords } from "@/services/upload-review.service";
 
 export const runtime = "nodejs";
@@ -190,9 +193,25 @@ async function handle(request: Request) {
     fileAlreadyUploaded: false,
   });
 
+  /*
+    سعرُ كلّ بندٍ مقابل آخر سعرٍ قُيِّد له عند المورّد نفسه — يُقال لحظةَ المراجعة
+    والمندوبُ عند الباب، لا بعد القيد. ولمن يرى المبالغ وحده، وللمورّد المعروف وحده.
+    وتعذُّرُه لا يُسقط القراءة: هو عونٌ لا شرط.
+  */
+  let priceMoves: PriceMove[] = [];
+  if (match.supplier && can(user.role, "amounts:view") && extraction.value.lines.length > 0) {
+    try {
+      const last = await loadLastItemPrices(match.supplier.id, itemKeys(extraction.value.lines));
+      priceMoves = priceMovesAtReview(extraction.value.lines, last).slice(0, 20);
+    } catch (e) {
+      console.error("[analyze] تعذّرت مقارنةُ الأسعار", e);
+    }
+  }
+
   return NextResponse.json({
     originalFileName: file.name,
     sizeBytes: file.size,
+    priceMoves,
     sha256,
     model: extraction.model,
     provider: extraction.provider,

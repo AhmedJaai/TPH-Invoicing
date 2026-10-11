@@ -35,7 +35,12 @@ import { useShellPath } from "./use-shell-path";
  */
 
 /** عدّادا القشرة — `null` حين تعذّر العدّ فيُكتب «؟» لا صفرٌ يقول «لا شيء ينتظرك». */
-export type ShellCounts = { pending: number | null; documents: number | null };
+export type ShellCounts = {
+  pending: number | null;
+  documents: number | null;
+  /** كم بنداً من الطابور يقع في كلّ مساحة (بمسارها) — تُرسَم نقطةً. */
+  areas?: Record<string, number>;
+};
 
 export function Sidebar({
   role,
@@ -313,11 +318,33 @@ function Tab({ role, area, current, counts }: { role: Role; area: NavArea; curre
 
 /** الشارةُ تنتظر عددها وحدها — فلا ينتظره رسمُ الصفحة. */
 function CountBadge({ counts, href, className }: { counts?: Promise<ShellCounts>; href: string; className: string }) {
-  if (!counts || (href !== "/attention" && href !== "/documents")) return null;
+  if (!counts) return null;
+  if (href !== "/attention" && href !== "/documents") {
+    return (
+      <Suspense fallback={null}>
+        <AreaDot counts={counts} href={href} frame={className.includes("frame")} />
+      </Suspense>
+    );
+  }
   return (
     <Suspense fallback={null}>
       <CountBadgeValue counts={counts} href={href} className={className} />
     </Suspense>
+  );
+}
+
+/**
+ * نقطةٌ بجانب المساحة التي فيها ما ينتظر قراراً — تُعرف بلا فتحها. نقطةٌ لا عدد:
+ * العددُ واحدٌ (شارةُ «يحتاج قرارك»)، وهذه تقول أين يقع بعضُه.
+ */
+function AreaDot({ counts, href, frame }: { counts: Promise<ShellCounts>; href: string; /** على الإطار الزيتيّ — لونُ إبرازه الكريميّ. */ frame: boolean }) {
+  const n = use(counts).areas?.[href] ?? 0;
+  if (n === 0) return null;
+  return (
+    <span className="relative grid h-4 w-4 shrink-0 place-items-center" data-tip={`فيها ${n} ممّا يحتاج قرارك`}>
+      <span aria-hidden className={`h-2 w-2 rounded-full ${frame ? "bg-frame-accent" : "bg-accent"}`} />
+      <span className="sr-only">فيها {n} ممّا يحتاج قرارك</span>
+    </span>
   );
 }
 

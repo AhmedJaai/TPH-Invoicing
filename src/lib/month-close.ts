@@ -15,6 +15,7 @@ import type { BalanceStatus } from "@/lib/bank/balance-equation";
 import { DAY, DOCUMENT, INVOICE, SUPPLIER, TRANSACTION, WARNING, countNoun } from "./arabic";
 import { formatDay, formatMonth } from "./riyadh-time";
 import { filingDeadline, periodKey, periodMonths, quarterLabel, quarterOfMonth } from "./vat-return";
+import { formatRiyalsDisplay } from "./money";
 
 export type CheckState = "PASS" | "WARN" | "BLOCK";
 
@@ -84,8 +85,7 @@ export interface MonthCloseReport {
   canClose: boolean;
 }
 
-const riyals = (m: number) =>
-  (m / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const riyals = formatRiyalsDisplay;
 
 /** أين يُصلَح كلُّ بند — مرشَّحاً بالشهر حيث يقبل الترشيح. */
 export function fixHref(id: string, month: string): string {

@@ -20,11 +20,12 @@ import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "@/lib/money";
 import {
   computeVatReturn, includedByDefault, invoiceIncluded, invoiceVat, isIncluded, machineEligible, monthsBefore,
   nextQuarter, parseVatPeriod, periodBounds, periodKey, periodMonths, previousQuarter, quarterOfMonth,
-  txBlocked, txCaution, txVat, vatInsideGross, vatOnNet,
+  txBlocked, txCaution, txVat,
   type VatInvoice, type VatPeriod, type VatQuarter, type VatReturn, type VatTx,
 } from "@/lib/vat-return";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { todayInRiyadh, monthEndDay } from "@/lib/riyadh-time";
 import type { Conn } from "./types";
+import { vatInsideGross, vatOnNet } from "@/lib/vat";
 
 /** رسومٌ لا ضريبةَ تُستردّ منها بذاتها — ضريبتُها في حركتها المستقلّة، فعرضُها للاختيار يعدّها مرّتين. */
 const FEE_ONLY: ReadonlySet<string> = new Set(["POS_FEE", "BANK_FEE"]);
@@ -455,8 +456,7 @@ async function coverageOf(months: readonly string[], conn: Conn): Promise<VatMon
 
   return months.map((month) => {
     const start = `${month}-01`;
-    const [y, m] = month.split("-").map(Number);
-    const monthEnd = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    const monthEnd = monthEndDay(month);
     const open = today <= monthEnd;
     const end = open ? today : monthEnd;
     const from = coverageStartFor(start, end, opened?.d);

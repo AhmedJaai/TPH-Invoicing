@@ -14,6 +14,7 @@
  * وما لا مقامَ له `null` لا صفر: شهرٌ بلا تسوياتٍ لا «نسبتُه ٠».
  */
 import { groupBatches, recognizePos, type PosDetails } from "./pos";
+import { isoDay } from "@/lib/riyadh-time";
 
 export type PosKind = PosDetails["kind"];
 
@@ -242,7 +243,7 @@ export function settlementDays(rows: readonly PosTx[]): SettlementDay[] {
 
 function shift(day: string, n: number): string {
   const [y, m, d] = day.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+  return isoDay(new Date(Date.UTC(y, m - 1, d + n)));
 }
 
 function weekday(day: string): number {

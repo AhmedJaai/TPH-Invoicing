@@ -5,10 +5,11 @@
  *   رقم فاتورة + الرقم الضريبي للبائع + الرقم الضريبي للمشتري مطابقاً + تفصيل الضريبة.
  * والفاتورة المبسطة بلا رقم ضريبي للمشتري لا تصلح لخصم ضريبة المدخلات.
  */
-import { FIXED_ASSET_THRESHOLD_MINOR } from "@/config/drive";
+import { FIXED_ASSET_THRESHOLD_MINOR } from "@/config/finance";
 import { checkInvoiceTotals, formatRiyalsDisplay, TOTAL_ROUNDING_TOLERANCE_MINOR } from "./money";
-import { vatInsideGross, vatOnNet } from "./vat-return";
+import { vatInsideGross, vatOnNet } from "./vat";
 import { ISSUE, ISSUE_TEXT, type IssueCode, type Severity } from "./issue-codes";
+import { latinDigits } from "./digits";
 
 export interface Finding {
   code: IssueCode;
@@ -82,11 +83,6 @@ export interface ValidationResult {
  * «٣١٠٠٠٧٩٧١٦٠٠٠٠٣» كلَّه فصار طوله صفراً، وحُكم على فاتورةٍ سليمة أنّها
  * بلا رقمٍ ضريبيّ فضاعت ضريبتها.
  */
-function latinDigits(value: string): string {
-  return value
-    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
-}
 
 /** الرقم الضريبي السعودي: ١٥ رقماً يبدأ بـ٣ وينتهي بـ٣. */
 export function isValidSaudiVat(value: string | null | undefined): boolean {

@@ -14,7 +14,7 @@ import { listCounts, recurringVariances, type RecurringItem } from "@/services/i
 import { formatBp } from "@/lib/inventory/equation";
 import { combineSummaries } from "@/lib/inventory/variance-summary";
 import { formatSignedQuantity } from "@/lib/inventory/units";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { todayInRiyadh, addDays } from "@/lib/riyadh-time";
 
 export const dynamic = "force-dynamic";
 
@@ -49,9 +49,7 @@ export default async function InventoryTrendPage({
   }
 
   const chosen = WINDOWS.find((w) => w.key === params.window) ?? WINDOWS[0];
-  const since = new Date(Date.parse(`${todayInRiyadh()}T00:00:00Z`) - chosen.weeks * 7 * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+  const since = addDays(todayInRiyadh(), -chosen.weeks * 7);
 
   const all = await listCounts(80);
   const finalisedAll = all.filter((c) => c.status === "FINALISED").length;

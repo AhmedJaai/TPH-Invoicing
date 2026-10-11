@@ -40,7 +40,12 @@ export function VatTxToggle({
   const checked = optimistic ?? included;
 
   async function toggle() {
-    if (locked || pending) return;
+    /* المقفلُ يقول سببَه حين يُضغط — على اللمس لا `title` يُرى */
+    if (locked) {
+      toast({ tone: "info", title: locked, duration: 3500 });
+      return;
+    }
+    if (pending) return;
     const next = !checked;
     setOptimistic(next);
     const ok = await send([id], next);
@@ -57,7 +62,7 @@ export function VatTxToggle({
         type="checkbox"
         className="h-4 w-4 accent-[var(--accent)]"
         checked={checked}
-        disabled={Boolean(locked)}
+        aria-disabled={locked ? true : undefined}
         aria-busy={pending}
         aria-label={locked ? `${label} — ${locked}` : `احسب ${label} في الإقرار`}
         onChange={toggle}
@@ -161,6 +166,7 @@ export function VatCashField({ month, label, initial, locked }: {
           title={locked}
           className={FIELD}
         />
+        {locked && <span className="mt-1 block text-[11px] leading-relaxed text-muted">{locked}</span>}
       </label>
       <ActionButton
         size="sm"
@@ -259,7 +265,7 @@ export function VatFilePanel({ period, today, credit, disabled }: {
             >
               سجّل التقديم
             </ActionButton>
-            <button type="button" onClick={() => setOpen(false)} className={buttonClass("quiet", "sm")}>تراجع</button>
+            <button type="button" onClick={() => setOpen(false)} className={buttonClass("quiet", "sm")}>إلغاء</button>
           </div>
         </div>
       </Reveal>

@@ -10,6 +10,9 @@
  * الملفّ قد يكون الأحدث أوّلاً أو الأقدم أوّلاً، فيُختار الاتّجاه الذي
  * تستقيم عليه السلسلة. وما لا يستقيم يبقى مجهولاً — لا صفراً.
  */
+import { monthEndDay } from "@/lib/riyadh-time";
+import { monthOf } from "@/lib/filing";
+
 export interface BalanceRow {
   rowNumber: number;
   valueDate: Date;
@@ -28,11 +31,6 @@ export interface MonthBalance {
 }
 
 const signed = (r: BalanceRow) => (r.direction === "CREDIT" ? r.amountMinor : -r.amountMinor);
-
-function monthEnd(month: string): string {
-  const [y, m] = month.split("-").map(Number);
-  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
-}
 
 function consistentSteps(chrono: readonly BalanceRow[]): boolean[] {
   const ok: boolean[] = [true];
@@ -57,7 +55,7 @@ export function monthBalancesFromStatement(rows: readonly BalanceRow[]): MonthBa
 
   const byMonth = new Map<string, BalanceRow[]>();
   for (const r of chrono) {
-    const m = r.valueDate.toISOString().slice(0, 7);
+    const m = monthOf(r.valueDate);
     const list = byMonth.get(m) ?? [];
     list.push(r);
     byMonth.set(m, list);
@@ -73,7 +71,7 @@ export function monthBalancesFromStatement(rows: readonly BalanceRow[]): MonthBa
     out.push({
       month,
       periodStart: `${month}-01`,
-      periodEnd: monthEnd(month),
+      periodEnd: monthEndDay(month),
       openingMinor: (first.balanceMinor as number) - signed(first),
       closingMinor: last.balanceMinor as number,
       rows: list.length,

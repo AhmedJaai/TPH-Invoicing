@@ -102,7 +102,7 @@ export function SupplierEdit({
         description="الحقلُ الفارغ «غير معروف». ولا يُحفَظ شيءٌ حتى تضغط «احفظ»."
         footer={
           <>
-            <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={close}>تراجع</button>
+            <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={close}>إلغاء</button>
             <button
               type="button"
               aria-busy={busy}

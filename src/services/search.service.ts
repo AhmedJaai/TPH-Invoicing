@@ -20,6 +20,7 @@ import {
 import { invoiceHref } from "@/lib/invoice-profile";
 import { txHref } from "@/lib/inspector";
 import { documentHref } from "@/lib/document-labels";
+import { isoDay } from "@/lib/riyadh-time";
 
 /** أقصى ما يُرجَع من كل نوع — الشاشة لا تسع أكثر، والقاعدة لا تُتعب. */
 export const PER_KIND = 6;
@@ -140,7 +141,7 @@ async function findInvoices(intent: SearchIntent, like: string, amounts: boolean
     kind: "invoice" as const,
     id: r.id,
     title: `فاتورة ${r.number ?? "بلا رقم"}`,
-    subtitle: `${r.supplier ?? "بلا مورّد"} · ${r.date.toISOString().slice(0, 10)}${
+    subtitle: `${r.supplier ?? "بلا مورّد"} · ${isoDay(r.date)}${
       r.taxStatus === "INVALID" ? " · ضريبتها ناقصة" : ""
     }`,
     amountMinor: r.total,
@@ -258,7 +259,7 @@ async function findBankTx(intent: SearchIntent, like: string): Promise<SearchHit
     kind: "bankTransaction" as const,
     id: r.id,
     title: (r.beneficiary ?? r.description ?? "حركة بنكية").slice(0, 60),
-    subtitle: `${r.date.toISOString().slice(0, 10)} · ${
+    subtitle: `${isoDay(r.date)} · ${
       r.direction === "DEBIT" ? "صادر" : "وارد"
     }${r.category === "UNKNOWN" ? " · غير مصنَّفة" : ""}`,
     amountMinor: r.amount,

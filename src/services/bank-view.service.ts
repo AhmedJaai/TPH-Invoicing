@@ -20,6 +20,7 @@ import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
 import type { QueueGroup, QueueItem, QueueReason } from "@/components/reconcile-queue";
 import type { MatchExplanation } from "@/components/match-explain";
+import { isoDay } from "@/lib/riyadh-time";
 
 /* ─────────────────────────── التغطية ─────────────────────────── */
 
@@ -151,7 +152,7 @@ export async function loadBankQueue(): Promise<BankQueue> {
     const ev = readEvidence(t.matchEvidence);
     return {
       id: t.id,
-      date: t.valueDate.toISOString().slice(0, 10),
+      date: isoDay(t.valueDate),
       amountMinor: t.amountMinor,
       direction: t.direction,
       description: (t.description ?? "").slice(0, 160),

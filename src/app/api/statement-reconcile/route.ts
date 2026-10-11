@@ -29,6 +29,7 @@ import { companyConfig } from "@/config/drive";
 import { reconcileAndPersist } from "@/services/statement-reconcile.service";
 import { withDeadline } from "@/lib/ai/deadline";
 import { signatureMatches, sniffMimeType } from "@/lib/file-signature";
+import { isoDay } from "@/lib/riyadh-time";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -235,7 +236,7 @@ async function handle(request: Request) {
     fileName,
     /* الرقمُ يصحب المذكّرة — فيفتح واتساب على المورّد لا على شاشة اختيار الجهة */
     supplier: { id: supplierId, nameAr: supplier?.nameAr ?? "—", phoneE164: await supplierPhone(supplierId) },
-    period: { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) },
+    period: { start: isoDay(start), end: isoDay(end) },
     model: extraction.model,
     summary: {
       statementLines: parsedLines.length,
@@ -251,7 +252,7 @@ async function handle(request: Request) {
       balanceArithmeticOk: result.balanceArithmeticOk,
     },
     missing: result.missingFromArchive.map((l) => ({
-      date: l.line.date.toISOString().slice(0, 10),
+      date: isoDay(l.line.date),
       ref: l.line.ref ?? l.line.description ?? "—",
       amountMinor: l.line.debitMinor,
     })),
@@ -263,7 +264,7 @@ async function handle(request: Request) {
     })),
     extra: result.notInStatement.map((i) => ({
       invoiceNumber: i.invoiceNumber,
-      date: i.invoiceDate.toISOString().slice(0, 10),
+      date: isoDay(i.invoiceDate),
       amountMinor: i.totalMinor,
     })),
     findings: result.findings,

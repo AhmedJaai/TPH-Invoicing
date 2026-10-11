@@ -21,6 +21,7 @@ import { previewAllowed } from "@/lib/preview-mode";
 import { inboxCount } from "@/lib/work";
 import { driveState, type DriveState } from "@/lib/drive-state";
 import { refreshTokenFor } from "./drive.service";
+import { isoDayOrNull } from "@/lib/riyadh-time";
 
 export type NamedRecord = NamedDocument & {
   invoiceId: string | null;
@@ -76,7 +77,7 @@ export async function loadNamedDocuments(): Promise<NamedRecord[]> {
       mimeType: r.mimeType,
       kind: r.kind,
       slug: r.slug,
-      date: (r.invoiceDate ?? r.statementEnd)?.toISOString().slice(0, 10) ?? null,
+      date: isoDayOrNull(r.invoiceDate ?? r.statementEnd),
       totalMinor: r.invoiceTotal ?? r.statementTotal ?? null,
       invoiceNumber: r.invoiceNumber ?? null,
       invoiceId: r.invoiceId ?? null,

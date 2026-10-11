@@ -27,6 +27,7 @@ import { refreshPaymentStatus } from "./payment.service";
 import { applySupplierCredit } from "./supplier-credit.service";
 import { reviewConfirmed } from "@/lib/confirm";
 import type { Tx } from "./types";
+import { isoDay } from "@/lib/riyadh-time";
 
 export class InvoiceCorrectionRefused extends Error {
   constructor(message: string, readonly status = 409) {
@@ -163,7 +164,7 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
       documentKind: row.documentKind ?? "TAX_INVOICE",
       supplierId,
       invoiceNumber: next.invoiceNumber,
-      invoiceDate: date.toISOString().slice(0, 10),
+      invoiceDate: isoDay(date),
       subtotalMinor: next.subtotalMinor,
       vatMinor: next.vatMinor,
       totalMinor: next.totalMinor,
@@ -222,10 +223,10 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
     before: {
       ...{ invoiceNumber: row.invoiceNumber, sellerVat: row.sellerVat, buyerVat: row.buyerVat },
       ...{ subtotalMinor: row.subtotalMinor, vatMinor: row.vatMinor, totalMinor: row.totalMinor },
-      invoiceDate: row.invoiceDate.toISOString().slice(0, 10), periodMonth: row.periodMonth, supplierId: row.supplierId,
+      invoiceDate: isoDay(row.invoiceDate), periodMonth: row.periodMonth, supplierId: row.supplierId,
     },
     after: {
-      ...next, invoiceDate: date.toISOString().slice(0, 10), periodMonth, supplierId,
+      ...next, invoiceDate: isoDay(date), periodMonth, supplierId,
       taxStatus: review.taxStatus, inputVatStatus: review.inputVatStatus,
       ...(released.length > 0 ? { "فُكّ عنها سدادُ المورّد السابق": released } : {}),
     },

@@ -5,7 +5,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { buildSalesWitness, type SalesWitness, type WitnessDay } from "@/lib/sales/witness";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 import type { Conn } from "./types";
 
 export interface WitnessMonthInput {
@@ -30,7 +30,7 @@ export async function loadSalesDays(from: string, until: string, conn: Conn = db
 
 function nextMonthStart(month: string): string {
   const [y, m] = month.split("-").map(Number);
-  return new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+  return isoDay(new Date(Date.UTC(y, m, 1)));
 }
 
 export async function loadSalesWitness(months: readonly WitnessMonthInput[], conn: Conn = db): Promise<SalesWitness[]> {

@@ -26,6 +26,7 @@ import {
 } from "./purchases";
 import { sameUnitFamily } from "./units";
 import { milliMinorToMinor } from "@/lib/money";
+import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
 
 /**
  * بم قُوِّمت كلفةُ الفرق.
@@ -543,8 +544,8 @@ function complimentaryTotals(
 function everyDay(start: string, end: string): string[] {
   const out: string[] = [];
   const [y, m, d] = start.split("-").map(Number);
-  for (let t = Date.UTC(y, m - 1, d); ; t += 86_400_000) {
-    const day = new Date(t).toISOString().slice(0, 10);
+  for (let t = Date.UTC(y, m - 1, d); ; t += MS_PER_DAY) {
+    const day = isoDay(new Date(t));
     if (day > end || out.length > 400) break;
     out.push(day);
   }

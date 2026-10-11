@@ -22,6 +22,8 @@
  * أمّا الكمّيّةُ المختلفة (عشرون مقابل ثمانية عشر) فلا تُعدّ تكراراً —
  * والتنبيهُ الذي يصيح في كلّ شحنة يُعلّم صاحبَه ألّا يقرأه.
  */
+import { daysBetween } from "@/lib/riyadh-time";
+
 
 /** نافذةُ الشَّبَه بالأيّام — هي نافذةُ مطابقة الفاتورة في المشروع. */
 export const RECEIPT_MATCH_WINDOW_DAYS = 7;
@@ -60,8 +62,7 @@ export interface DuplicateCandidate {
 
 /** الفرقُ بالأيّام بين تاريخين `YYYY-MM-DD` — بلا منطقةٍ زمنيّة. */
 export function daysApart(a: string, b: string): number {
-  const t = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
-  return Math.abs(t(a) - t(b)) / 86_400_000;
+  return Math.abs(daysBetween(a, b));
 }
 
 /**

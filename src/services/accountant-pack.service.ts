@@ -9,10 +9,10 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { buildAccountantPack, type PackInput, type Sheet } from "@/lib/accountant-pack";
 import type { InputVatStatus, TaxStatus } from "@/lib/validation";
-import { formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
+import { formatMonth, todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 
 /* اليومُ يُرجعه الاستعلامُ نصّاً بتوقيت الرياض — كان يُقطع من UTC فتُكتب دفعةُ فجر ١ أكتوبر «٣٠ سبتمبر» */
-const day = (v: unknown): string => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? "").slice(0, 10));
+const day = (v: unknown): string => (v instanceof Date ? isoDay(v) : String(v ?? "").slice(0, 10));
 
 export async function loadAccountantPack(month: string): Promise<{ sheets: Sheet[]; input: PackInput }> {
   const [invoices, payments, expenses, bank, closed] = await Promise.all([

@@ -16,6 +16,7 @@ import { guard, respondTo } from "@/services/guard";
 import { parseRiyals } from "@/lib/money";
 import { recordAudit } from "@/lib/audit";
 import type { TxCategory } from "@/lib/bank/rules";
+import { isoDay } from "@/lib/riyadh-time";
 
 export const runtime = "nodejs";
 
@@ -111,7 +112,7 @@ export async function POST(request: Request) {
   let startsOn: string | null = null;
   if (body.startsOn) {
     const d = new Date(`${body.startsOn}T12:00:00Z`);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.startsOn) || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== body.startsOn) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.startsOn) || Number.isNaN(d.getTime()) || isoDay(d) !== body.startsOn) {
       return NextResponse.json({ error: "تاريخ أوّل استحقاقٍ غير صالح" }, { status: 400 });
     }
     startsOn = body.startsOn;

@@ -1,3 +1,4 @@
+import { DocumentsBulk } from "@/components/documents-bulk";
 import { Suspense } from "react";
 import { SavedViews } from "@/components/saved-views";
 import Link from "next/link";
@@ -494,6 +495,11 @@ export default async function DocumentsPage({
                 keyOf={(r) => r.id}
                 /* كلُّ صفٍّ يفتح ملفًّا: فاتورتَه إن قُيِّدت، وإلّا ملفَّ المستند — لا صفَّ ميّتاً */
                 hrefOf={(r) => (r.invoiceId && showAmounts ? invoiceHref(r.invoiceId) : documentHref(r.id))}
+                /* ما ينتظر يُحدَّد ويُعتمَد جماعةً — لمن يعتمد ويرى المبالغ، كالاعتماد صفّاً صفّاً */
+                selectable={canDecide && showAmounts
+                  ? { label: (r) => r.invoiceNumber ? `${r.supplierName ?? "مستند"} ${r.invoiceNumber}` : r.fileName, when: (r) => isWaiting(r.status) }
+                  : undefined}
+                bulk={canDecide && showAmounts ? <DocumentsBulk /> : undefined}
                 columns={[
                   {
                     key: "doc",

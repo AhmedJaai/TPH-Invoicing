@@ -8,6 +8,8 @@
  *
  * دالة خالصة: تأخذ أرقاماً وتُرجع خطّة. الكتابة مسؤولية الخدمة.
  */
+import { MS_PER_DAY } from "@/lib/riyadh-time";
+
 
 export interface AllocationRequest {
   invoiceId: string;
@@ -98,7 +100,7 @@ export function settleSupplierAccount(
   paidAt: Date,
   invoices: readonly OpenInvoice[],
 ): AllocationPlan {
-  const horizon = paidAt.getTime() + SETTLEMENT_FORWARD_DAYS * 86_400_000;
+  const horizon = paidAt.getTime() + SETTLEMENT_FORWARD_DAYS * MS_PER_DAY;
 
   const eligible = invoices
     .filter((i) => i.outstandingMinor > 0 && i.invoiceDate.getTime() <= horizon)
@@ -179,7 +181,7 @@ export function planCreditApplication(
     let available = c.availableMinor;
     const horizon = options.forwardDays === null
       ? Number.POSITIVE_INFINITY
-      : c.paidAt.getTime() + options.forwardDays * 86_400_000;
+      : c.paidAt.getTime() + options.forwardDays * MS_PER_DAY;
 
     for (const inv of open) {
       if (available <= 0) break;

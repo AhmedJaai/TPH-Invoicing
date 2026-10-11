@@ -135,9 +135,32 @@ describe("tph/no-inline-riyals-format", () => {
   cases("no-inline-riyals-format", {
     "الشكلُ الذي وقع": "const label = `${(amountMinor / 100).toFixed(2)} ريال`;",
     "بالثابت": "const label = (amountMinor / HALALAS_PER_RIYAL).toFixed(2);",
+    "بفواصل الآلاف": 'const riyals = (m: number) => (m / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });',
+    "بمنسّق Intl": 'const riyals = (m: number) => new Intl.NumberFormat("en-US").format(m / 100);',
+    "بالقيمة المطلقة": 'const riyals = (m: number) => new Intl.NumberFormat("en-US").format(Math.abs(m) / 100);',
+    "المطلقُ خارج القسمة": "const label = Math.abs(m / 100).toFixed(2);",
   }, {
+    "للآلة بلا قسمة": "const cell = formatRiyals(amountMinor);",
+    "تاريخٌ لا مال": "const day = DAY_FORMAT.format(d);",
+    "عددٌ بلا قسمة": 'const n = count.toLocaleString("en-US");',
     "المنسّقُ الواحد": "const label = formatRiyalsDisplay(amountMinor);",
     "نسبةٌ لا مال": "const pct = (bp / 100).toFixed(1);",
     "قسمةٌ أخرى": "const kb = (bytes / 1024).toFixed(2);",
+  });
+});
+
+describe("tph/no-raw-iso-slice", () => {
+  cases("no-raw-iso-slice", {
+    "يومُ مستند": "const day = tx.valueDate.toISOString().slice(0, 10);",
+    "شهرُ UTC الذي أخطأ «الشهرَ الجاري»": "const month = new Date().toISOString().slice(0, 7);",
+    "بسلسلةٍ اختياريّة": "const day = r.invoiceDate?.toISOString().slice(0, 10) ?? null;",
+    "على سطرين": "const since = new Date(t)\n  .toISOString()\n  .slice(0, 10);",
+  }, {
+    "المخزَّن باسمه": "const day = isoDay(tx.valueDate);",
+    "الشهرُ المحاسبيّ": "const month = monthOf(tx.valueDate);",
+    "اليومُ بتوقيت الرياض": "const today = todayInRiyadh();",
+    "قصُّ نصٍّ آخر": "const ref = crypto.randomUUID().slice(0, 8);",
+    "قصُّ يومٍ نصّيّ": "const month = day.slice(0, 7);",
+    "الطابعُ كاملاً": "const at = new Date().toISOString();",
   });
 });

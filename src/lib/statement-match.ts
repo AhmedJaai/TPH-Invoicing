@@ -12,7 +12,7 @@ import { ISSUE, ISSUE_TEXT } from "./issue-codes";
 import type { Finding } from "./validation";
 import { HALALA_TOLERANCE_MINOR, formatRiyalsDisplay } from "@/lib/money";
 import { classifyCredit } from "./credit-notes";
-import { formatDay } from "./riyadh-time";
+import { formatDay, MS_PER_DAY, isoDay } from "./riyadh-time";
 
 export interface StatementLineInput {
   date: Date;
@@ -99,7 +99,8 @@ export interface Reconciliation {
 }
 
 import { reconcile, type Claim } from "./bank/optimizer";
-import { latinDigits, unreverseInvoiceNumber } from "./invoice-number";
+import { latinDigits } from "./digits";
+import { unreverseInvoiceNumber } from "./invoice-number";
 import { INVOICE, countNoun } from "./arabic";
 
 /** توحيد رقم الفاتورة للمقارنة: بلا رموز ولا فراغ، بحروف كبيرة. */
@@ -121,7 +122,6 @@ function refMatches(theirs: string, ours: string): boolean {
   return theirs.includes(ours) || ours.includes(theirs);
 }
 
-const DAY = 86_400_000;
 
 /**
  * مبلغُ سطر الكشف يساوي فاتورتَنا — بأيّ صيغةٍ كتبها المورّد: بالضريبة، أو قبلها
@@ -162,13 +162,20 @@ export interface ReconcileOptions {
   inOtherStatements?: ReadonlySet<string>;
 }
 
+/**
+ * نافذةُ التاريخ بين سطر الكشف وفاتورتنا: سبعةُ أيّام. والاستعلامُ الذي يجلب فواتيرَنا
+ * يُوسَّع بها من الطرفين (`statement-reconcile` · `statement-invoices`) — فلا تُخفى
+ * فاتورةٌ يراها المطابِق. رقمٌ واحد: لو وُسّعت هنا وحدها لطابق ما لا يُجلَب.
+ */
+export const STATEMENT_DATE_WINDOW_DAYS = 7;
+
 export function reconcileStatement(
   statementLines: readonly StatementLineInput[],
   ourInvoices: readonly OurInvoice[],
   options: ReconcileOptions = {},
 ): Reconciliation {
   const tolerance = options.toleranceMinor ?? HALALA_TOLERANCE_MINOR;
-  const windowMs = (options.dateWindowDays ?? 7) * DAY;
+  const windowMs = (options.dateWindowDays ?? STATEMENT_DATE_WINDOW_DAYS) * MS_PER_DAY;
 
   const ourByRef = ourInvoices.map((i) => ({ invoice: i, ref: normalizeRef(i.invoiceNumber) }));
 
@@ -286,7 +293,7 @@ export function reconcileStatement(
     }
 
     debitIndex++;
-    const fingerprint = `${line.date.toISOString().slice(0, 10)}|${line.debitMinor}|${normalizeRef(line.ref ?? line.description)}`;
+    const fingerprint = `${isoDay(line.date)}|${line.debitMinor}|${normalizeRef(line.ref ?? line.description)}`;
     if (seenLines.has(fingerprint)) {
       lines.push({ line, status: "DUPLICATE_LINE" });
       continue;

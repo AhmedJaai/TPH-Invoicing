@@ -6,6 +6,7 @@ import { ReviewWorkspace } from "./review-workspace";
 import type { ReviewItem } from "@/lib/bank/review-queue";
 import { pendingDecision } from "@/lib/bank/pending";
 import { toCanonical } from "@/lib/bank/canonical";
+import { isoDay } from "@/lib/riyadh-time";
 
 /**
  * ورشةُ قرار حركات البنك — كانت صفحةً كاملة تُسمّى «طابور المراجعة».
@@ -87,7 +88,7 @@ export async function ReviewSection({
 
     return {
       transactionId: r.id,
-      valueDate: r.valueDate.toISOString().slice(0, 10),
+      valueDate: isoDay(r.valueDate),
       amountMinor: r.amountMinor,
       direction: r.direction,
       /*

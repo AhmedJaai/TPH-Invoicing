@@ -9,7 +9,7 @@ import {
   type MissingSettlement, type MonthFees, type PosKind, type PosTx, type SettlementDay,
 } from "@/lib/bank/pos-watch";
 import { silencedKeys } from "@/lib/signal-decisions";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 
 /** كم يوماً إلى الوراء يُسأل فيه عن تسويةٍ غائبة — ما قبله تاريخٌ لا عمل. */
 export const MISSING_LOOKBACK_DAYS = 45;
@@ -109,7 +109,7 @@ export async function loadPosWatch(): Promise<PosWatch> {
 export async function loadMissingSettlementFacts(): Promise<MissingSettlement[]> {
   const today = todayInRiyadh();
   const [y, m, d] = today.split("-").map(Number);
-  const since = new Date(Date.UTC(y, m - 1, d - (MISSING_LOOKBACK_DAYS + 60))).toISOString().slice(0, 10);
+  const since = isoDay(new Date(Date.UTC(y, m - 1, d - (MISSING_LOOKBACK_DAYS + 60))));
   const [{ rows, lastBankDay }, decisions] = await Promise.all([loadPosRows(since), loadDecisions(["pos-missing"])]);
   return missingSettlements(rows, {
     lastBankDay,

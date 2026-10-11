@@ -15,6 +15,7 @@ import { monthBalances, type MonthFacts } from "./month-close";
 import { ISSUE } from "./issue-codes";
 import { periodKey, quarterOfMonth } from "./vat-return";
 import { SETTLED_TOLERANCE_MINOR } from "./supplier-balances";
+import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
 
 export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
   const start = new Date(`${month}-01T00:00:00Z`);
@@ -131,7 +132,7 @@ export async function gatherMonthFacts(month: string): Promise<MonthFacts> {
     لا يومٌ لم يجرِ فيه شيء.
   */
   const monthStartIso = `${month}-01`;
-  const monthEndIso = new Date(end.getTime() - 86_400_000).toISOString().slice(0, 10);
+  const monthEndIso = isoDay(new Date(end.getTime() - MS_PER_DAY));
 
   const importPeriodsP = db.execute<{ start: string | null; end: string | null }>(sql`
     select to_char(min(value_date), 'YYYY-MM-DD') as start,

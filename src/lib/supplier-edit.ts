@@ -11,9 +11,10 @@
  *   • أجلُ السداد أيّامٌ صحيحة؛ والفراغ «غير معروف» لا صفر.
  */
 import { z } from "zod";
-import { latinDigits } from "./invoice-number";
+import { latinDigits } from "./digits";
 import { isValidSaudiVat } from "./validation";
 import { parseRiyals } from "./money";
+import { daysBetween } from "@/lib/riyadh-time";
 
 /** الآيبانُ بلا فراغاتٍ وبحروفٍ كبيرة وأرقامٍ لاتينيّة. */
 export function normalizeIban(raw: string): string {
@@ -72,7 +73,7 @@ export function dueDay(invoiceDay: string, termsDays: number | null | undefined)
 export function daysPastDue(invoiceDay: string, termsDays: number | null | undefined, today: string): number | null {
   const due = dueDay(invoiceDay, termsDays);
   if (!due) return null;
-  return Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${due}T00:00:00Z`)) / 86_400_000);
+  return daysBetween(due, today);
 }
 
 export const SUPPLIER_CATEGORIES = ["COFFEE", "FOOD", "PACKAGING", "EQUIPMENT", "WATER", "UTILITIES", "OTHER"] as const;

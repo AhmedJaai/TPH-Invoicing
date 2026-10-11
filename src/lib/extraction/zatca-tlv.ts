@@ -15,6 +15,8 @@
  */
 import { parseRiyals } from "@/lib/money";
 import { normalizeDocumentDate } from "@/lib/document-date";
+import { latinDigits } from "@/lib/digits";
+import { isoDay } from "@/lib/riyadh-time";
 
 export interface ZatcaQrFacts {
   /** اسم البائع كما كتبه نظامه — `null` إن كان فارغاً */
@@ -42,15 +44,7 @@ export type ZatcaTlvResult =
 
 const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
 const VAT_RE = /^3\d{13}3$/;
-const ARABIC_DIGITS = /[٠-٩۰-۹]/g;
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
-
-function westernDigits(s: string): string {
-  return s.replace(ARABIC_DIGITS, (d) => {
-    const code = d.charCodeAt(0);
-    return String(code >= 0x06f0 ? code - 0x06f0 : code - 0x0660);
-  });
-}
 
 /** base64 إلى بايتات — `null` إن لم يكن base64 سليماً (ورابطُ موقعٍ في رمزٍ ليس كذلك). */
 export function decodeBase64Strict(text: string): Uint8Array | null {
@@ -73,7 +67,7 @@ export function decodeBase64Strict(text: string): Uint8Array | null {
  * وقتٌ محلّيّ كتبه نظام المورّد في السعوديّة، فيُؤخَذ يومُه كما هو.
  */
 function riyadhDate(raw: string): string | null {
-  const s = westernDigits(raw).trim();
+  const s = latinDigits(raw).trim();
   const zoned = /^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?\s*(Z|[+-]\d{2}:?\d{2})$/i.exec(s);
   if (zoned) {
     const [, y, mo, d, h, mi, sec = "00", zone] = zoned;
@@ -81,7 +75,7 @@ function riyadhDate(raw: string): string | null {
     const at = new Date(`${y}-${mo}-${d}T${h}:${mi}:${sec}${offset}`);
     if (Number.isNaN(at.getTime())) return null;
     /* الرياض +٣ بلا توقيتٍ صيفيّ */
-    return normalizeDocumentDate(new Date(at.getTime() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10));
+    return normalizeDocumentDate(isoDay(new Date(at.getTime() + 3 * 60 * 60 * 1000)));
   }
   return normalizeDocumentDate(s);
 }
@@ -123,7 +117,7 @@ export function parseZatcaTlvBytes(bytes: Uint8Array): ZatcaTlvResult {
     }
   }
 
-  const vatDigits = westernDigits(text[2]).replace(/\s+/g, "");
+  const vatDigits = latinDigits(text[2]).replace(/\s+/g, "");
   return {
     ok: true,
     facts: {

@@ -23,11 +23,12 @@ import { txHref } from "@/lib/inspector";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { formatDay, formatMonth, todayInRiyadh } from "@/lib/riyadh-time";
 import {
-  includedByDefault, machineEligible, periodKey, quarterLabel, quarterOfMonth, vatInsideGross, type VatQuarter,
+  includedByDefault, machineEligible, periodKey, quarterLabel, quarterOfMonth, type VatQuarter,
 } from "@/lib/vat-return";
 import { snoozedAttention } from "@/lib/work";
 import { loadPayeeAccounts } from "./payee-account.service";
 import { loadVatFiling, loadVatReturn } from "./vat-return.service";
+import { vatInsideGross } from "@/lib/vat";
 
 /** كم ربعاً يُعاد حسابُ إقراره هنا — ما قبلها يُعدّ ولا يُفصَّل (كلُّ ربعٍ استعلاماتُ إقرارٍ كامل). */
 export const CHOICE_QUARTERS = 4;

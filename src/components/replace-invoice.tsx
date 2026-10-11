@@ -49,7 +49,7 @@ export function ReplaceInvoice({ documentId, number, before, after }: { document
         >
           {busy ? "يستبدل…" : "نعم، استبدلها"}
         </button>
-        <button type="button" disabled={busy} className={buttonClass("quiet", "sm")} onClick={() => setAsking(false)}>تراجع</button>
+        <button type="button" disabled={busy} className={buttonClass("quiet", "sm")} onClick={() => setAsking(false)}>إلغاء</button>
       </span>
       {error && <span role="alert" className="text-danger">{error}</span>}
     </span>

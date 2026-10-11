@@ -6,7 +6,7 @@
  */
 import { detectPriceChange, normalizeItem, type PriceChange } from "./items";
 import type { InputVatStatus } from "./validation";
-import { currentMonthRiyadh, dayOfMonthRiyadh } from "./riyadh-time";
+import { currentMonthRiyadh, dayOfMonthRiyadh, MS_PER_DAY, isoDay } from "./riyadh-time";
 
 /* ───────────────────────── حالة السداد ───────────────────────── */
 
@@ -47,7 +47,7 @@ export function paymentStatus(row: InvoicePaymentRow): PaymentStatus {
 export type AgeBucket = "current" | "d30" | "d60" | "d90" | "older";
 
 export function ageBucket(invoiceDate: Date, asOf: Date): AgeBucket {
-  const days = Math.floor((asOf.getTime() - invoiceDate.getTime()) / 86_400_000);
+  const days = Math.floor((asOf.getTime() - invoiceDate.getTime()) / MS_PER_DAY);
   if (days < 30) return "current";
   if (days < 60) return "d30";
   if (days < 90) return "d60";
@@ -89,7 +89,7 @@ export function buildAging(rows: readonly AgingRow[], asOf: Date): SupplierAging
     entry.totalMinor += row.outstandingMinor;
     entry.oldestDays = Math.max(
       entry.oldestDays,
-      Math.floor((asOf.getTime() - row.invoiceDate.getTime()) / 86_400_000),
+      Math.floor((asOf.getTime() - row.invoiceDate.getTime()) / MS_PER_DAY),
     );
     map.set(row.supplierId, entry);
   }
@@ -146,7 +146,7 @@ function priceTrailOf(dated: readonly LineRow[]): number[] {
   const byDay = new Map<string, number>();
   for (const r of dated) {
     if (!r.invoiceDate || r.unitPriceMinor <= 0) continue;
-    byDay.set(r.invoiceDate.toISOString().slice(0, 10), r.unitPriceMinor);
+    byDay.set(isoDay(r.invoiceDate), r.unitPriceMinor);
   }
   return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, price]) => price).slice(-PRICE_TRAIL_POINTS);
 }
@@ -198,12 +198,12 @@ export function summarizeItems(rows: readonly LineRow[]): ItemSummary[] {
     );
 
     // متوسط الفترة بين الطلبات — يُحسب من التواريخ الفريدة لا من كل سطر
-    const uniqueDays = [...new Set(dated.map((r) => r.invoiceDate!.toISOString().slice(0, 10)))].sort();
+    const uniqueDays = [...new Set(dated.map((r) => isoDay(r.invoiceDate!)))].sort();
     let averageDaysBetweenOrders: number | null = null;
     if (uniqueDays.length >= 2) {
       const first = new Date(`${uniqueDays[0]}T00:00:00Z`).getTime();
       const last = new Date(`${uniqueDays[uniqueDays.length - 1]}T00:00:00Z`).getTime();
-      averageDaysBetweenOrders = Math.round((last - first) / 86_400_000 / (uniqueDays.length - 1));
+      averageDaysBetweenOrders = Math.round((last - first) / MS_PER_DAY / (uniqueDays.length - 1));
     }
 
     const latest = dated[dated.length - 1] ?? list[list.length - 1];

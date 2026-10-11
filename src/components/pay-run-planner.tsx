@@ -536,7 +536,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
         size="sm"
         footer={
           <>
-            <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={() => setConfirming(false)}>تراجع</button>
+            <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={() => setConfirming(false)}>إلغاء</button>
             <button aria-busy={busy} type="button" className={buttonClass("primary")} disabled={busy || !dayOk} onClick={() => markPaid()}>
               أكّد السداد
             </button>

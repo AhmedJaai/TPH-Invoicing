@@ -25,6 +25,8 @@ import { parseLineQuantity } from "@/lib/line-pricing";
 import { decimalToMilli } from "@/lib/inventory/units";
 import { normalizeDocumentDate } from "@/lib/document-date";
 import type { ExtractionResult } from "./schema";
+import { vatMatchesStandardRate, vatOnNet } from "@/lib/vat";
+import { isoDay } from "@/lib/riyadh-time";
 
 export type ConflictCode =
   | "TOTAL_NOT_SUM"
@@ -63,14 +65,6 @@ function quantityMilli(v: string): number | null {
   return decimalToMilli(parseLineQuantity(v));
 }
 
-/** نسبة الضريبة ١٥٪ — بسطاً ومقاماً صحيحين، لا `0.15` عائمة. */
-const VAT_PERCENT = 15;
-
-/** ما يُتوقَّع ضريبةً من صافٍ — للعرض في الرسالة وحده. */
-function expectedVat(subtotal: number): number {
-  return Math.floor((subtotal * VAT_PERCENT + 50) / 100);
-}
-
 /** سنةٌ هجريّة مكتوبةٌ بصيغة التاريخ: «1448-03-05». لا تُحوَّل ولا يُعاد عنها السؤال. */
 export function looksHijri(value: string): boolean {
   return /^1[345]\d{2}-\d{2}-\d{2}$/.test(value.trim());
@@ -82,7 +76,7 @@ const MAX_AGE_MONTHS = 18;
 function monthsBefore(today: string, months: number): string {
   const [y, m, d] = today.split("-").map(Number);
   const at = new Date(Date.UTC(y, m - 1 - months, d));
-  return at.toISOString().slice(0, 10);
+  return isoDay(at);
 }
 
 const SAUDI_VAT_RE = /^3\d{13}3$/;
@@ -215,9 +209,9 @@ export function findConflicts(x: ExtractionResult, ctx: ConflictContext = {}): E
         تصحيحٌ بل إعادةُ قراءة: إن عاد الرقم نفسه فهو ما في المستند،
         ويُترَك لـ`validation.ts` أن ينبّه أحمد.
       */
-      const expected = expectedVat(subtotal);
+      const expected = vatOnNet(subtotal);
       /* بالأعداد الصحيحة: ‎|الضريبة×١٠٠ − الصافي×١٥| ≤ ريال×١٠٠ — كما في `auto-archive` */
-      if (Math.abs(vat * 100 - subtotal * VAT_PERCENT) > TOTAL_ROUNDING_TOLERANCE_MINOR * 100) {
+      if (!vatMatchesStandardRate(subtotal, vat, TOTAL_ROUNDING_TOLERANCE_MINOR)) {
         conflicts.push({
           code: "VAT_RATE_ODD",
           fields: ["subtotalAmount", "vatAmount"],

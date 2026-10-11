@@ -81,7 +81,23 @@ export function InspectorPanel({
     [],
   );
 
-  const close = useCallback(() => leave(() => router.back()), [leave, router]);
+  /*
+    ── ما كُتب ولم يُحفَظ ──
+    نموذجٌ في اللوح يعلن `data-dirty="اسمه"` ما دام فيه ما لم يُحفَظ (تصحيحُ فاتورة،
+    قيدُ مستندٍ بيد). وكلُّ ما يُخرج من الملفّ — إغلاقٌ، صفٌّ آخر، رابط، Escape،
+    سحب — يمرّ من هنا: يُسأل أوّلاً ولا يُرمى ما كُتب بنقرةٍ على صفٍّ مجاور.
+  */
+  const [held, setHeld] = useState<{ what: string; go: () => void } | null>(null);
+  const guarded = useCallback((go: () => void) => {
+    const dirty = document.querySelector<HTMLElement>(".inspector [data-dirty]");
+    if (!dirty) {
+      go();
+      return;
+    }
+    setHeld({ what: dirty.dataset.dirty || "ما كتبتَه", go });
+  }, []);
+
+  const close = useCallback(() => guarded(() => leave(() => router.back())), [guarded, leave, router]);
   const { ref: panelRef, handle } = useDragToDismiss<HTMLElement>(close);
 
   /* ── الدخول ── */
@@ -172,8 +188,8 @@ export function InspectorPanel({
     return () => cancelAnimationFrame(frame);
   }, [busy, herePath]);
   const step = useCallback((href: string | undefined) => {
-    if (href) router.replace(href, { scroll: false });
-  }, [router]);
+    if (href) guarded(() => router.replace(href, { scroll: false }));
+  }, [router, guarded]);
 
   /* ── Escape ── */
   useEffect(() => {
@@ -209,15 +225,14 @@ export function InspectorPanel({
       if (a.pathname === window.location.pathname && a.search === window.location.search) return; // مرساةٌ في الملفّ نفسه
       if (href.startsWith("/api/")) return;
       e.preventDefault();
-      if (isInspectorPath(href)) {
-        router.replace(href, { scroll: false });
-      } else {
-        leave(() => router.push(href));
-      }
+      guarded(() => {
+        if (isInspectorPath(href)) router.replace(href, { scroll: false });
+        else leave(() => router.push(href));
+      });
     }
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
-  }, [router, leave]);
+  }, [router, leave, guarded]);
 
   const data = state;
 
@@ -307,6 +322,17 @@ export function InspectorPanel({
             </button>
           </div>
         </header>
+        {held && (
+          <div role="alertdialog" aria-label="لم يُحفَظ بعد" className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-warn/30 bg-warn-bg px-4 py-2.5 text-xs sm:px-6">
+            <p className="min-w-0 flex-1 basis-48 font-bold text-ink">عندك «{held.what}» لم يُحفَظ — إن تركتَه ضاع ما كتبت.</p>
+            <button type="button" autoFocus onClick={() => setHeld(null)} className="min-h-9 rounded-lg bg-accent px-3 font-bold text-accent-ink hover:bg-accent-strong">
+              ابقَ وأكمِل
+            </button>
+            <button type="button" onClick={() => { const go = held.go; setHeld(null); go(); }} className="min-h-9 rounded-lg border border-line-input bg-raised px-3 font-bold text-ink hover:bg-hover">
+              اترك ما كتبت
+            </button>
+          </div>
+        )}
         {actions && (
           <div className="flex flex-wrap items-center gap-2 border-b border-line-soft bg-raised px-4 py-2.5 sm:px-6">{actions}</div>
         )}

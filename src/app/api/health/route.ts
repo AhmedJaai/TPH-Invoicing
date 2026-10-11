@@ -17,6 +17,7 @@ import { accounts } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { isAuthBypassed } from "@/lib/session";
 import { requiresPooler } from "@/lib/ops/db-identity";
+import { checkEnv, describeEnvProblem } from "@/lib/env-check";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -170,6 +171,8 @@ export async function GET() {
     خامّاً ولا يقول أحدٌ شيئاً. للمخوَّل وحده — جوابُ المجهول لا يتغيّر به.
   */
   const tokenKeyMissing = process.env.VERCEL_ENV === "production" && !tokenEncryptionEnabled();
+  /* وما نقص أو تعطّل من متغيّرات البيئة يُسمّى — إعلاماً: لا يغيّر `healthy` ولا رمزَ الردّ */
+  const envProblems = checkEnv(process.env).map(describeEnvProblem);
 
   /* المستطلِع يقرأ الرمز لا الجسم: قارئٌ معطَّل أو رمزُ درايف منتهٍ = 503 */
   const overall = healthy && !tokenKeyMissing && (providerReachable?.ok ?? true) && (driveToken?.ok ?? true);
@@ -180,6 +183,7 @@ export async function GET() {
       ...(tokenKeyMissing
         ? { problems: ["TOKEN_ENCRYPTION_KEY غير مضبوط في الإنتاج (٣٢ حرفاً فأكثر) — رمزُ الدرايف يُحفظ بلا تشفير. اضبطه في Vercel ثمّ سجّل الخروج والدخول"] }
         : {}),
+      ...(envProblems.length > 0 ? { env: envProblems } : {}),
       at: new Date().toISOString(),
     },
     { status: overall ? 200 : 503 },

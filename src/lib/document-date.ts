@@ -10,15 +10,8 @@
  * (صيغةٌ أمريكيّة)، وإن استحال الاثنان فالتاريخُ مجهول لا مخمَّن.
  * والهجريّ (سنةٌ قبل ١٦٠٠) لا يُحوَّل هنا — يُعلَن مجهولاً.
  */
+import { latinDigits } from "./digits";
 
-const ARABIC_DIGITS = /[٠-٩۰-۹]/g;
-
-function westernDigits(s: string): string {
-  return s.replace(ARABIC_DIGITS, (d) => {
-    const code = d.charCodeAt(0);
-    return String(code >= 0x06f0 ? code - 0x06f0 : code - 0x0660);
-  });
-}
 
 function valid(y: number, m: number, d: number): string | null {
   if (y < 1900 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return null;
@@ -29,7 +22,7 @@ function valid(y: number, m: number, d: number): string | null {
 
 export function normalizeDocumentDate(raw: string | null | undefined): string | null {
   if (!raw) return null;
-  const s = westernDigits(raw).trim();
+  const s = latinDigits(raw).trim();
 
   /* سنةٌ أوّلاً: 2026-09-13 · 2026/9/13 · 2026.09.13 · 2026-09-13T15:13 */
   let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:$|[T\s])/);

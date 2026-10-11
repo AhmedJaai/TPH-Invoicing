@@ -15,7 +15,7 @@ import { Tooltips } from "./tooltips";
 import { ServiceWorkerRegistration } from "./service-worker";
 import { ShellUserProvider } from "./shell-context";
 import { can, type Role } from "@/lib/permissions";
-import { inboxCount, workCount } from "@/lib/work";
+import { inboxCount, workCount, workByArea } from "@/lib/work";
 import { isAuthBypassed } from "@/lib/session";
 
 /**
@@ -50,7 +50,9 @@ export function AppShell({
   const counts: Promise<ShellCounts> = Promise.all([
     can(user.role, "reports:view") ? workCount().catch(() => null) : Promise.resolve(0),
     inboxCount().catch(() => null),
-  ]).then(([pending, documents]) => ({ pending, documents }));
+    /* من بنود الطابور نفسها (مخبّأةٌ في الطلب) — لا استعلامَ ثانٍ */
+    can(user.role, "reports:view") ? workByArea().catch(() => ({})) : Promise.resolve({}),
+  ]).then(([pending, documents, areas]) => ({ pending, documents, areas }));
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">

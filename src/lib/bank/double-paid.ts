@@ -1,5 +1,7 @@
 import { normalizeText } from "./canonical";
 import { TIME, countNoun } from "@/lib/arabic";
+import { formatRiyalsDisplay } from "@/lib/money";
+import { isoDay } from "@/lib/riyadh-time";
 
 /**
  * الفاتورة الواحدة سُدّدت مرّتين.
@@ -93,7 +95,7 @@ export function payeeKey(tx: DoublePaidTx): string {
   return `TEXT:${text.replace(/\d+/g, "").trim().slice(0, 40)}`;
 }
 
-const dayOf = (d: Date) => d.toISOString().slice(0, 10);
+const dayOf = (d: Date) => isoDay(d);
 
 /**
  * يجمع ما خرج مرّتين لجهةٍ واحدة بمبلغٍ واحد في يومٍ واحد.
@@ -205,8 +207,7 @@ export function partitionDoublePaid(
  * مالاً بلا مرجعٍ تبحث به في سجلّها.
  */
 export function buildDoublePaidClaim(group: DoublePaidGroup): string {
-  const riyals = (m: number) =>
-    new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(m / 100);
+  const riyals = formatRiyalsDisplay;
   const refs = group.transactions.map((t, i) => `• السداد ${i + 1}: المرجع ${t.operationRef?.replace(/^[A-Z_]+:/, "") ?? "غير مذكور في الكشف"}`);
   return [
     `السلام عليكم،`,

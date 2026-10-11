@@ -21,7 +21,7 @@ import { MAX_PREP_LOSS_BP } from "@/lib/inventory/consumption";
 import { recipeCost, type CostBasis, type CostedIngredient, type RecipeCost } from "@/lib/inventory/recipe-cost";
 import { milliToDecimal } from "@/lib/inventory/units";
 import { milliMinorToMinor } from "@/lib/money";
-import { todayInRiyadh } from "@/lib/riyadh-time";
+import { todayInRiyadh, isoDay } from "@/lib/riyadh-time";
 import { latestInvoiceUnitCosts } from "./inventory.service";
 import type { Conn } from "./types";
 
@@ -90,7 +90,7 @@ function validateDraft(ingredients: readonly IngredientDraft[]): void {
 /** اليومُ السابق — نصّاً، بلا `Date` محلّيّة تجرّ منطقةَ الجلسة. */
 export function previousDay(date: string): string {
   const [y, m, d] = date.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+  return isoDay(new Date(Date.UTC(y, m - 1, d - 1)));
 }
 
 /**
