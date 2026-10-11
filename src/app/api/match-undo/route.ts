@@ -21,7 +21,8 @@ import { NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bankTransactions, classificationSourceEnum, decisionHistory, payments } from "@/db/schema";
-import { guard, respondTo } from "@/services/guard";
+import { failWith, guard, respondTo } from "@/services/guard";
+import { MonthClosedError } from "@/services/validation.service";
 import { recordAudit } from "@/lib/audit";
 import { refreshPaymentStatus, reversePayment } from "@/services/payment.service";
 
@@ -130,7 +131,9 @@ export async function POST(request: Request) {
   let reversedPayment = false;
   let previousAllocations: { invoiceId: string; amountMinor: number }[] = [];
 
-  const done = await db.transaction(async (t) => {
+  let done: boolean;
+  try {
+  done = await db.transaction(async (t) => {
     const unlinked = await t
       .update(bankTransactions)
       .set({
@@ -259,6 +262,18 @@ export async function POST(request: Request) {
     }, t);
     return true;
   });
+  } catch (e) {
+    /*
+      الفكُّ يردّ تخصيصاً على فاتورةٍ شهرُها مقفل — والمقفلُ لا يُكتب فيه من أيّ باب. كان
+      يخرج «ردّ الخادم بخطأ (500)» فلا يُعرَف ما المانع ولا ما العمل؛ فيُقال الشهرُ والطريق.
+    */
+    if (e instanceof MonthClosedError) {
+      return NextResponse.json({
+        error: `لم تُفكّ: هذه الدفعة مخصَّصةٌ على فاتورةٍ في شهرٍ مقفل. ${e.message.split(".")[0]} — أعد فتحه من صفحة الإقفال، ثمّ فُكّ المطابقة وأقفله ثانيةً.`,
+      }, { status: 409 });
+    }
+    return failWith(e, "match-undo");
+  }
 
   if (!done) {
     return NextResponse.json({ error: "فُكّت هذه المطابقة من قبل — حدّث الصفحة" }, { status: 409 });

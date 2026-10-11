@@ -34,6 +34,7 @@ import { loadMissingSettlementFacts } from "@/services/pos-watch.service";
 import { loadRecurringAnomalies } from "@/services/recurring-watch.service";
 import { loadDueObligations } from "@/services/obligation.service";
 import { loadFoodicsAttentionFacts } from "@/services/foodics-attention.service";
+import { loadOrphanProformas } from "@/services/proforma-watch.service";
 import { OBLIGATION_KIND_LABEL } from "./obligations";
 
 /** كلُّ البنود كما يبنيها `buildAttention` — قبل أن يُفرز المؤجَّل. */
@@ -41,14 +42,15 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
   /* حارسُ الآيبان وقائعُه مستقلّة — تُطلَب مع البقيّة لا بعدها */
   /* تُبدأ الآن وتُنتظر مع البقيّة — لا رحلةٌ بعد رحلة */
   const watchPromise = loadOpenIbanWatch();
-  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics] = await Promise.all([
+  const [facts, iban, missingSettlements, recurringAnomalies, dueDocs, foodics, orphanProformas] = await Promise.all([
     gatherAttentionFacts(), watchPromise.then((w) => w.alerts), loadMissingSettlementFacts(), loadRecurringAnomalies(), loadDueObligations(),
-    loadFoodicsAttentionFacts(),
+    loadFoodicsAttentionFacts(), loadOrphanProformas(),
   ]);
   const { first } = await watchPromise;
   return buildAttention({
     ...facts,
     missingSettlements,
+    orphanProformas,
     foodicsCardGaps: foodics.cardGaps,
     foodicsPurchaseDiffers: foodics.purchaseDiffers,
     foodicsPurchaseMissing: foodics.purchaseMissing,

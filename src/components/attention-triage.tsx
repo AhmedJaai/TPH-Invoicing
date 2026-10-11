@@ -70,6 +70,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "foodics-card-gap": Scale,
   "foodics-purchase-differs": Scale,
   "foodics-purchase-missing": FileSearch,
+  "proforma-without-invoice": FileWarning,
   "recurring-anomalies": RotateCcw,
   "obligations-expiring": FileClock,
   "missing-statements": FileClock,

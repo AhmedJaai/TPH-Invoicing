@@ -23,6 +23,8 @@ export interface FoodicsAttentionFacts {
 
 export const purchaseSignalKey = (purchaseId: string) => `foodics-purchase:${purchaseId}`;
 export const invoiceSignalKey = (invoiceId: string) => `foodics-purchase:inv-${invoiceId}`;
+/** مورّدٌ فواتيرُه لا تدخل مخزونَ فودكس أصلاً — قرارٌ واحد يُغني عن إسكاتها واحدةً واحدة. */
+export const supplierSignalKey = (supplierId: string) => `foodics-purchase:sup-${supplierId}`;
 
 export async function loadFoodicsAttentionFacts(): Promise<FoodicsAttentionFacts> {
   const since = addDays(todayInRiyadh(), -CARD_LOOKBACK_DAYS);

@@ -32,6 +32,7 @@ export const ATTENTION_IDS = [
   "foodics-card-gap",
   "foodics-purchase-differs",
   "foodics-purchase-missing",
+  "proforma-without-invoice",
   "recurring-anomalies",
   "obligations-expiring",
   "missing-statements",

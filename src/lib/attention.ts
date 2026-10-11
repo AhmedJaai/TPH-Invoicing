@@ -2,7 +2,7 @@ import {
   BLOCKER, DAY, DOCUMENT, INVOICE, ITEM, PAYMENT, PAYMENT_RECORD, PRODUCT, SUPPLIER, TRANSACTION, countNoun, type NounForms,
 } from "./arabic";
 import { OVERDUE_DAYS } from "./invoice-filter";
-import { formatDay } from "./riyadh-time";
+import { formatDay, formatMonth } from "./riyadh-time";
 import { formatRiyalsDisplay } from "./money";
 import { txHref } from "@/lib/inspector";
 
@@ -193,6 +193,11 @@ export interface AttentionFacts {
    * لما غاب لا مبلغٌ واقع. وما أسكته صاحبُه لا يُعدّ.
    */
   missingSettlements?: { day: string; usualMinor: number | null }[];
+  /**
+   * فواتيرُ مبدئيّة (Proforma) لم تصل فاتورتُها الضريبيّة (`proforma-watch.service.ts`) —
+   * ما يُحوَّل على أساسها لا يجد فاتورتَه فيُخصَّص على أقدم فواتير المورّد.
+   */
+  orphanProformas?: { supplierName: string; supplierSlug: string; number: string | null; periodMonth: string | null }[];
   /**
    * ما اختلف فيه فودكس مع البنك ومع الفواتير (`services/foodics-attention.service.ts`) —
    * فودكس شاهدٌ: يُقال الفرقُ بطرفيه ولا يُسمّى ضياعاً، وما أسكته صاحبُه لا يُعدّ.
@@ -672,6 +677,33 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       evidence: days.slice(0, 6).map((d) => ({
         label: formatDay(d.day),
         sub: d.usualMinor === null ? "لا تقديرَ لمثله" : `وسيطُ مثله ${formatRiyalsDisplay(d.usualMinor)} — تقدير`,
+      })),
+    });
+  }
+
+  /*
+    مبدئيّةٌ في الدرايف بلا أصلها: لا تُقيَّد ديناً ولا تُخصم ضريبتُها، وما حُوِّل على أساسها
+    يُخصَّص بالأقدم أوّلاً على فاتورةٍ سابقة — فيبدو القديمُ مسدَّداً وهو ليس المقصود.
+  */
+  if ((f.orphanProformas?.length ?? 0) > 0) {
+    const list = f.orphanProformas!;
+    out.push({
+      id: "proforma-without-invoice",
+      area: "INVOICES",
+      severity: "HIGH",
+      title: list.length === 1
+        ? `فاتورةٌ مبدئيّة من ${list[0].supplierName} بلا فاتورتها الضريبيّة`
+        : `${list.length} فواتيرَ مبدئيّة بلا فواتيرها الضريبيّة`,
+      detail: "ما في الدرايف «Proforma» لا الفاتورةُ الأصليّة: لا تُقيَّد ولا تُخصم ضريبتُها، وما تحوّله للمورّد على أساسها يُخصَّص على أقدم فواتيره المفتوحة.",
+      action: "اطلب الفاتورةَ الضريبيّة من المورّد وارفعها — وراجِع أين خُصِّص ما حوّلتَه له.",
+      actionLabel: list.length === 1 ? "افتح حسابَ المورّد" : "افتح المستندات",
+      href: list.length === 1 ? `/suppliers/${list[0].supplierSlug}` : "/documents",
+      count: list.length,
+      impact: { kind: "BLOCKED", amountMinor: null },
+      evidence: list.slice(0, 6).map((p) => ({
+        label: `${p.supplierName} · ${p.number ?? "بلا رقم"}`,
+        sub: p.periodMonth ? `مبدئيّةُ ${formatMonth(p.periodMonth)}` : "مبدئيّة",
+        href: `/suppliers/${p.supplierSlug}`,
       })),
     });
   }

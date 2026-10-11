@@ -74,5 +74,6 @@
   "073_search_trgm.sql": "e9116839d81e85d76f54fd6612965e68b0932867623354317d8811ffd54a6416",
   "074_obligations.sql": "fe64761cd9fe4c42f6a4aa63de3ce8bb9bbadb072f9d1ea1704d23ca7c3fbbf6",
   "075_app_settings.sql": "b9a85486189bd52f7ca6ace541be4e325c4bdd545a1ceacac87ccc62bcb9e817",
-  "076_foodics_mirror.sql": "648e1cfb7f845f3d89215a551686d522f286940b3c9e928c68500181ef1eafae"
+  "076_foodics_mirror.sql": "648e1cfb7f845f3d89215a551686d522f286940b3c9e928c68500181ef1eafae",
+  "077_alert_resolution_signals.sql": "0e524bf6ff94b3fb947066079ce2965a6dd58bc95e584012dfd2e2772600ebfb"
 }

@@ -17,7 +17,8 @@ import type { InvoiceSide, MatchBasis, MatchedPair, PurchaseSide } from "@/lib/f
 import { loadPairLines, loadPurchaseWitness, type FoodicsSupplierRow } from "@/services/foodics-compare.service";
 import { loadFoodicsStatus } from "@/services/foodics-sync.service";
 import { loadFoodicsSilenced } from "@/services/foodics-takings.service";
-import { invoiceSignalKey as invoiceKey, purchaseSignalKey as purchaseKey } from "@/services/foodics-attention.service";
+import { invoiceSignalKey as invoiceKey, purchaseSignalKey as purchaseKey, supplierSignalKey as supplierKey } from "@/services/foodics-attention.service";
+import { PostAction } from "@/components/post-action";
 
 export const dynamic = "force-dynamic";
 
@@ -67,9 +68,17 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
 
   const differs = c.matched.filter((m) => !m.agrees && !silenced.has(purchaseKey(m.purchase.id)));
   const onlyFoodics = c.onlyFoodics.filter((p) => !silenced.has(purchaseKey(p.id)));
-  const onlyOurs = c.onlyOurs.filter((i) => !silenced.has(invoiceKey(i.id)));
+  const onlyOurs = c.onlyOurs.filter((i) => !silenced.has(invoiceKey(i.id)) && !silenced.has(supplierKey(i.supplierId)));
+  /* مورّدو ما بقي، بعدد فواتيرهم ومجموعها — ليُسكَت المورّدُ كلُّه بضغطة إن كان لا يدخل فودكس */
+  const oursBySupplier = [...onlyOurs.reduce((m, i) => {
+    const cell = m.get(i.supplierId) ?? { id: i.supplierId, name: i.supplierName, count: 0, totalMinor: 0 };
+    cell.count++;
+    cell.totalMinor += i.totalMinor;
+    return m.set(i.supplierId, cell);
+  }, new Map<string, { id: string; name: string; count: number; totalMinor: number }>()).values()].sort((a, b) => b.count - a.count);
+  const excludedSuppliers = w.ourSuppliers.filter((s) => silenced.has(supplierKey(s.id)));
   const agreed = c.matched.filter((m) => m.agrees);
-  const silencedCount = c.matched.filter((m) => !m.agrees).length - differs.length + (c.onlyFoodics.length - onlyFoodics.length) + (c.onlyOurs.length - onlyOurs.length);
+  const silencedCount = c.matched.filter((m) => !m.agrees).length - differs.length + (c.onlyFoodics.length - onlyFoodics.length) + c.onlyOurs.filter((i) => silenced.has(invoiceKey(i.id))).length;
 
   const suggestion = new Map(w.suggestions.map((s) => [s.foodicsSupplierId, s]));
   const active = w.foodicsSuppliers.filter((s) => s.purchases > 0);
@@ -274,6 +283,28 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
         count={onlyOurs.length}
         hint="فاتورةٌ لمورّدٍ يتابعه فودكس، بعد أوّل حركةٍ فيه، ولا حركةَ شراءٍ تقابلها. بضاعتُها لم تدخل مخزونَ فودكس — فحسابُه للمخزون ناقصٌ بقدرها. (جردُنا لا يتأثّر: يُحسَب من فواتيرنا.)"
       >
+        {canSilence && oursBySupplier.length > 0 && (
+          <div className="mb-3 rounded-xl border border-line bg-raised px-4 py-3 shadow-raised">
+            <p className="text-xs font-bold text-ink-soft">مورّدٌ لا تدخل بضاعتُه مخزونَ فودكس أصلاً؟ أخرِجه كلَّه بضغطة — ولا تعود فواتيرُه إلى هذه القائمة.</p>
+            <ul className="mt-2 flex flex-wrap gap-2">
+              {oursBySupplier.map((sp) => (
+                <li key={sp.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line-soft bg-sunken/40 px-2.5 py-1.5 text-xs">
+                  <span className="font-bold">{sp.name}</span>
+                  <span className="text-muted"><span className="nums">{sp.count}</span> · <Money minor={sp.totalMinor} /></span>
+                  <PostAction
+                    url="/api/signal"
+                    body={{ key: supplierKey(sp.id), action: "dismiss" }}
+                    undo={{ body: { key: supplierKey(sp.id), action: "reopen" } }}
+                    variant="quiet"
+                    done={`أُخرج «${sp.name}» من المقارنة`}
+                  >
+                    لا يدخل فودكس
+                  </PostAction>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <DataTable<InvoiceSide>
           rows={onlyOurs}
           keyOf={(i) => i.id}
@@ -286,6 +317,19 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
             ...(canSilence ? [{ key: "act", header: "", wrap: true, cell: (i: InvoiceSide) => <span className="flex flex-wrap gap-1"><SignalControls signalKey={invoiceKey(i.id)} dismissLabel="لا تدخل مخزونَ فودكس" snoozeDays={30} /></span> }] : []),
           ]}
         />
+        {excludedSuppliers.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+            <span className="font-bold">أخرجتَهم من المقارنة:</span>
+            {excludedSuppliers.map((sp) => (
+              <span key={sp.id} className="flex items-center gap-1 rounded-lg border border-line-soft px-2 py-1">
+                {sp.name}
+                {canSilence && (
+                  <PostAction url="/api/signal" body={{ key: supplierKey(sp.id), action: "reopen" }} variant="quiet" done={`عاد «${sp.name}» إلى المقارنة`}>أعِده</PostAction>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
         {c.outOfScope > 0 && (
           <p className="mt-3 text-xs leading-relaxed text-muted">
             و{countNoun(c.outOfScope, INVOICE)} أخرى خارج المقارنة: لمورّدٍ لا يتابعه فودكس (معدّات، خدمات، اشتراكات) أو قبل <bdi>{formatDay(c.foodicsSince)}</bdi>.
