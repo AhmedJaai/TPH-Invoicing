@@ -120,6 +120,7 @@
 | `075_app_settings.sql` | `app_settings` — إعداداتٌ بمفتاحٍ وقيمة يكتبها صاحبُ المقهى (أرضيّةُ النقد)؛ غيابُ المفتاح «لم يُكتب» |
 | `076_foodics_mirror.sql` | مرآةُ فودكس: `foodics_orders` · `foodics_order_payments` · `foodics_suppliers` · `foodics_purchases` · `foodics_purchase_items` · `foodics_tills` · `foodics_sync_runs` — بمعرّف فودكس مفتاحاً؛ شاهدٌ يُقارَن به ولا يُحسَب منه مال |
 | `077_alert_resolution_signals.sql` | يوسّع قيدَ `alert_resolutions.decision` بـ`DISMISSED` و`SNOOZED:YYYY-MM-DD` — كان «أسكِتها» يُردّ بـ٥٠٠ |
+| `078_alert_resolution_signal_keys.sql` | يوسّع قيدَ `alert_resolutions.key` بصيغة مفاتيح الملاحظات (`pos-missing:…` · `foodics-purchase:…`) — تتمّةُ 077 |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 
