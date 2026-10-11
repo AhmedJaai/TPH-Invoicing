@@ -20,6 +20,8 @@ export const SIGNAL_PREFIXES = [
   "obligation",
   "cash-floor",
   "qty-outlier",
+  "foodics-card",
+  "foodics-purchase",
 ] as const;
 
 export type SignalPrefix = (typeof SIGNAL_PREFIXES)[number];
@@ -34,6 +36,8 @@ export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
   obligation: "وثيقةٌ تنتهي",
   "cash-floor": "الرصيدُ تحت حدّه",
   "qty-outlier": "كمّيّةٌ على غير العادة",
+  "foodics-card": "فرقٌ بين بطاقات فودكس ودفعة البنك",
+  "foodics-purchase": "فرقٌ بين مشتريات فودكس وفواتيرنا",
 };
 
 const KEY_RE = /^[a-z-]{3,24}:[^\s]{1,160}$/;

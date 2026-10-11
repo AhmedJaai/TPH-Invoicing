@@ -342,7 +342,16 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
           sale.netMinor += Math.abs(lineTotalMinor);
         }
         sale.discountMinor += discountMinor;
-        if (vatCell.state === "OK") vatMicro.set(saleExternalId, (vatMicro.get(saleExternalId) ?? 0) + vatCell.micro);
+      }
+      /*
+        ── الضريبةُ صافيةٌ وكاملة — كما تكتبها مزامنةُ الواجهة (`lib/foodics/orders.ts`) ──
+
+        ضريبةُ الخيار المدفوع في صفّه لا في صفّ أصله (فُحص: «Special milk» ‎0.52174‎
+        بجانب «Matcha» ‎3.26087‎)، فإسقاطُ صفوف الخيارات كان يُنقص ضريبةَ اليوم. وضريبةُ
+        المرتجَع كانت تُجمَع موجبةً فتزيدها. فتُجمَع لكلّ صفٍّ لم يُلغَ، وتُطرَح للمرتجَع.
+      */
+      if (!isVoid && vatCell.state === "OK") {
+        vatMicro.set(saleExternalId, (vatMicro.get(saleExternalId) ?? 0) + (isRefund ? -vatCell.micro : vatCell.micro));
       }
 
       rows.push({ rowNumber, raw, status: "PARSED", reason: null, saleExternalId });

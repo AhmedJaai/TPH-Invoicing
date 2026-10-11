@@ -98,6 +98,8 @@ export type AuditAction =
   | "PAYMENT_CASH_FLOOR_SET"
   /* ── الجرد وتسوية المخزون ── */
   | "SALES_IMPORTED"
+  /* مورّدُ فودكس رُبط بمورّدنا أو فُكّ — قرارُ إنسانٍ تقوم عليه مقارنةُ المشتريات */
+  | "SUPPLIER_FOODICS_LINKED"
   /* كتالوجُ فودكس: الأصنافُ والعبواتُ والوصفات */
   | "CATALOG_IMPORTED"
   | "POS_PRODUCT_MAPPED"

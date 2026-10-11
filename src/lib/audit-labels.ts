@@ -148,6 +148,7 @@ export const ACTION_LABEL: Record<AuditAction | LegacyAction, string> = {
   INVENTORY_RECEIPT_RESOLVED: "حسم استلام بضاعة",
   /* الجرد وتسوية المخزون */
   SALES_IMPORTED: "استيراد ملفّ مبيعات",
+  SUPPLIER_FOODICS_LINKED: "ربط مورّد فودكس بمورّد",
   POS_PRODUCT_MAPPED: "ربط صنف فودكس",
   POS_PRODUCT_UNMAPPED: "فكّ ربط صنف فودكس",
   RECIPE_CREATED: "إنشاء وصفة",

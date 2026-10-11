@@ -60,6 +60,7 @@
     "db:backup": "tsx --env-file=.env scripts/backup.ts",
     "db:restore-verify": "tsx --env-file=.env scripts/restore-verify.ts",
     "db:backfill-layers": "tsx --env-file=.env scripts/backfill-layers.ts",
+    "foodics:sync": "tsx --env-file=.env scripts/foodics-sync.ts",
     "docs:handbook": "tsx scripts/build-handbook.ts",
     "ui:crawl": "tsx scripts/ui-crawl.ts"
   },

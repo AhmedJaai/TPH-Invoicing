@@ -254,7 +254,31 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
     };
   }
 
-  const file = parsed;
+  return importParsedSales({
+    file: parsed, sha, adapterName, input,
+    messages: workbook.warnings, retryOf,
+  }, conn);
+}
+
+export interface ParsedImportInput {
+  file: ParsedSalesFile;
+  /** بصمةُ ما يُستورَد — الملفُّ بايتاً ببايت، أو محتوى ما جاء من الواجهة. */
+  sha: string;
+  adapterName: string;
+  /** `actorId` فارغٌ حين تجري المزامنةُ بلا إنسان (المجدوَلة). */
+  input: { fileName: string; actorId: string | null; branchLabel?: string; buffer: { byteLength: number } };
+  messages: readonly string[];
+  retryOf: string | null;
+}
+
+/**
+ * يكتب «ملفّ مبيعات» مقروءاً — من أيّ باب جاء.
+ *
+ * الإكسلُ والواجهةُ يلتقيان هنا: فحصُ تداخل الصيغ، والكتابةُ بطبقاتها الثلاث،
+ * وسجلُّ التدقيق — مسارٌ واحد، فلا تُنسَخ قاعدةٌ لبابٍ ثانٍ.
+ */
+export async function importParsedSales(p: ParsedImportInput, conn: Conn = db): Promise<ImportResult> {
+  const { file, sha, adapterName, input, retryOf } = p;
   const sourceId = await ensureFoodicsSource(conn);
   const branchId = await resolveBranch(input.branchLabel ?? file.sales[0]?.branchLabel ?? null, conn);
 
@@ -303,7 +327,7 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
     }
   }
 
-  const messages: string[] = [...workbook.warnings, ...file.warnings];
+  const messages: string[] = [...p.messages, ...file.warnings];
   if (retryOf !== null) {
     messages.push("هذا الملفُّ رُفع من قبل ولم يُستورَد كاملاً — أُعيدت قراءتُه، وما كان مقيَّداً منه لم يُكتَب مرّتين.");
   }
@@ -336,7 +360,7 @@ interface WriteInput {
   sourceId: string;
   branchId: string | null;
   sha: string;
-  input: ImportInput;
+  input: ParsedImportInput["input"];
   messages: string[];
   conn: Conn;
   /** استيرادٌ سابقٌ للملفّ عينِه لم يكتمل — يُخلي بصمتَه لهذا ويبقى أثراً. */

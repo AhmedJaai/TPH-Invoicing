@@ -168,6 +168,11 @@
 | `src/lib/attention-snooze.ts` · `/api/attention-snooze` | **«أجِّله»**: بندُ الطابور يخرج من العدّ إلى يومه؛ المفتاحُ فيه مبلغُه وعددُه فيعود إن تغيّرا. `attentionSplit` في `work.ts` مصدرُ المفتوح والمؤجَّل |
 | `src/lib/income-sheet.ts` · `income-sheet.service.ts` · `/close/pnl` | **قائمةُ الدخل الناقصةُ المعلَنة** فوق `buildProfitLoss`: المبيعاتُ من إقرار الشهر، و«الباقي على أساسٍ نقديّ» لا يُحسب لشهرٍ ناقص؛ تكلفةُ المبيعات تبقى «غير معروف» |
 | `src/lib/sales/witness.ts` · `sales-witness.service.ts` | ملفُّ فودكس **شاهداً** على ضريبة مبيعات الإقرار والنقد المكتوب بيد — يُعرض الفرقُ والتغطية ولا يدخل الحساب |
+| `src/lib/foodics/client.ts` · `types.ts` · `money.ts` | عميلُ واجهة فودكس (`GET` وحده، صفحاتٌ وإعادةٌ عند ٤٢٩) ومخطّطاتٌ تُسقِط ما لم يُسمَّ، والريالُ بكسوره إلى هللات بلا عائمة |
+| `src/lib/foodics/orders.ts` | الطلبُ من الواجهة ← `ParsedSalesFile` بمفاتيح ملفّ الإكسل نفسِها، ومرآةُ رأسه ودفعاته |
+| `src/lib/foodics/takings.ts` · `foodics-takings.service.ts` | بطاقاتُ فودكس أمام دفعات البنك (موضعُ الإقفال يُبحَث عنه)، والنقدُ والآجلُ شهراً بشهر — `/money/foodics` |
+| `src/lib/foodics/purchase-compare.ts` · `foodics-compare.service.ts` | مشترياتُ فودكس أمام فواتيرنا واقتراحُ ربط المورّد من الفواتير المطابِقة — `/purchases/foodics` · `/api/foodics-link` |
+| `foodics-sync.service.ts` · `scripts/foodics-sync.ts` | المزامنة: المرآةُ + مجالُ المبيعات عبر `importParsedSales` — `/api/foodics-sync` · `npm run foodics:sync` |
 | `src/lib/sales/weekday-habit.ts` · `/inventory/habit` | **عادةُ البيع**: وسيطُ ما بيع لكلّ صنفٍ في كلّ يوم أسبوع عبر ٨ أسابيع — يُحجب دون ٦ صالحة، ولا يُمدّ خطٌّ إلى المستقبل |
 | `src/lib/cash-runway.ts` · `src/lib/supplier-leverage.ts` · `src/lib/vat-compare.ts` · `src/lib/inventory/waste-board.ts` · `src/lib/extraction/qr-coverage.ts` | أسطرٌ على شاشاتٍ قائمة: أيّامُ النقد الباقية (`/cash`) · أيّامُ السداد وتركّزُ المورّدين (`/suppliers`) · الأرباعُ المقدَّمة جنباً إلى جنب (`/close/vat`) · كلفةُ الهدر بأسبابه (سجلّ الجرد) · رمزُ QR في فواتير المورّد (ملفُّه) — كلٌّ يُحجب أو يقول «غير معروف» حين ينقص أساسُه |
 | `src/components/post-action.tsx` | زرُّ قرارٍ صغير بلا مال: يرسل جسماً ثابتاً، يُعلن ما وقع، ويحمل «تراجع» — لإغلاق تنبيهٍ أو سحب اختيار |

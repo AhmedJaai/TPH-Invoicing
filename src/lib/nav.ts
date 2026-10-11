@@ -111,6 +111,8 @@ export const AREAS: readonly NavArea[] = [
       { href: "/purchases/invoices", label: "الفواتير", needs: "amounts:view" },
       { href: "/statements", label: "الكشوف", needs: "amounts:view" },
       { href: "/analysis", label: "الأصناف والأسعار", needs: "amounts:view" },
+      /* شاهدٌ ثانٍ على المشتريات: ما أُدخل في فودكس أمام ما في الدرايف */
+      { href: "/purchases/foodics", label: "فودكس والفواتير", needs: "amounts:view" },
     ],
   },
   {
@@ -146,6 +148,8 @@ export const AREAS: readonly NavArea[] = [
       /* من الكشف نفسه: ما تأخذه الشبكة وما لم يصل، وما يتكرّر خصمُه كلَّ شهر */
       { href: "/money/pos", label: "تسويات الشبكة" },
       { href: "/money/recurring", label: "الاشتراكات والمتكرّر" },
+      /* ما قبضه فودكس بطاقةً ونقداً أمام ما دخل الحساب */
+      { href: "/money/foodics", label: "فودكس والبنك" },
     ],
   },
   {

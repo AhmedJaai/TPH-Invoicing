@@ -15,6 +15,7 @@ import { toast } from "./ui-client";
  *
  *   - الاستدراكُ عند فتح أيّ صفحة، مرّةً كلَّ عشر دقائق على الأكثر.
  *   - مزامنةُ الدرايف للجديد كلَّ ثلاث ساعات.
+ *   - وقراءةُ ما تغيّر في فودكس كلَّ ثلاث ساعات (لمن يملك رفعَ المبيعات؛ وغيرُه يُردّ بصمت).
  *
  * والتوقيتُ في `localStorage` لراحة الجهاز وحده: إن تعذّر قُرئ «لم يقع»
  * فيُعاد — وهو آمن لأنّ كلَّ خطوةٍ تسأل القاعدة قبل أن تكتب.
@@ -152,6 +153,18 @@ export function AutoProcess({ drive = true }: { drive?: boolean }) {
           arrived += r.data.summary?.created ?? 0;
           done.push(...readAutoWork(r.data.backlog?.done));
           if ((r.data.summary?.created ?? 0) > 0 || done.length > 0) changed = true;
+        }
+      }
+      /*
+        فودكس: ما تغيّر منذ آخر قراءة. صامتٌ إن لم يكن موصولاً أو لم يأتِ بجديد؛
+        والطابعُ بعد الردّ، والمتعثّرةُ تُعاد بعد خمس دقائق — كالدرايف.
+      */
+      if (elapsed("tph:auto-foodics", SYNC_EVERY_MS)) {
+        stamp("tph:auto-foodics", Date.now() - SYNC_EVERY_MS + SYNC_RETRY_MS);
+        const r = await postJson<{ counts?: { salesWritten?: number; linesRevised?: number } }>("/api/foodics-sync", { background: true });
+        if (r.ok) {
+          stamp("tph:auto-foodics");
+          if ((r.data.counts?.salesWritten ?? 0) + (r.data.counts?.linesRevised ?? 0) > 0) changed = true;
         }
       }
       if (due("tph:auto-backlog", BACKLOG_EVERY_MS)) {

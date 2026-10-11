@@ -2,7 +2,7 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٦٥
+## الجداول — ٧٢
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` · `payments` `payment_allocations` `payment_hold_overrides`
@@ -15,6 +15,7 @@
 `recipes` `recipe_versions` `recipe_ingredients` · `sales_imports` `sales_import_rows`
 `inventory_counts` `inventory_count_lines` `inventory_count_snapshots` `inventory_movements` `waste_records`
 `inventory_count_openings` `inventory_receipts`
+`foodics_orders` `foodics_order_payments` `foodics_suppliers` `foodics_purchases` `foodics_purchase_items` `foodics_tills` `foodics_sync_runs`
 
 التعريف في `src/db/schema.ts`.
 
@@ -117,6 +118,7 @@
 | `073_search_trgm.sql` | امتدادُ `pg_trgm` وسبعةُ فهارس GIN على ما يُبحث فيه بـ«يحتوي»: وصفُ حركة البنك ومستفيدُها ومرجعُها، اسمُ الملفّ، رقمُ الفاتورة، واسمُ صنف المورّد |
 | `074_obligations.sql` | `obligations` — وثائقُ المقهى وتراخيصُه بتاريخ انتهائها (سجلٌّ تجاريّ، رخص، إقامات، إيجار)؛ تُجدَّد وتُؤرشَف ولا تُحذف |
 | `075_app_settings.sql` | `app_settings` — إعداداتٌ بمفتاحٍ وقيمة يكتبها صاحبُ المقهى (أرضيّةُ النقد)؛ غيابُ المفتاح «لم يُكتب» |
+| `076_foodics_mirror.sql` | مرآةُ فودكس: `foodics_orders` · `foodics_order_payments` · `foodics_suppliers` · `foodics_purchases` · `foodics_purchase_items` · `foodics_tills` · `foodics_sync_runs` — بمعرّف فودكس مفتاحاً؛ شاهدٌ يُقارَن به ولا يُحسَب منه مال |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

@@ -24,6 +24,8 @@ export async function changesSinceFinalise(header: CountHeader, conn: Conn = db)
     select
       (select count(*)::int from sales_imports si
         where si.created_at > ${f} and si.status <> 'FAILED'
+          /* مزامنةُ الواجهة تعيد قراءةَ أيّامٍ مقيَّدة: ما لم تكتب سطراً ولم تراجِع سطراً لم تغيّر شيئاً */
+          and (si.adapter <> 'FOODICS_API' or si.imported_rows + si.revised_rows > 0)
           and si.period_start <= ${header.periodEnd} and si.period_end >= ${header.periodStart}) as sales,
       (select count(distinct i.id)::int from invoices i
         join invoice_lines il on il.invoice_id = i.id

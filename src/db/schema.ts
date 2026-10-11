@@ -2126,3 +2126,118 @@ export const appSettings = pgTable("app_settings", {
   updatedById: text("updated_by_id").references(() => users.id),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/* ───────────────────────── مرآةُ فودكس ───────────────────────── */
+
+/**
+ * ما يقوله فودكس، محفوظاً كما قاله — **شاهدٌ يُقارَن به، لا دفترٌ يُحسَب منه**.
+ * المفتاحُ معرّفُ فودكس، فالمزامنةُ مرّتين تُحدِّث ولا تضاعف. انظر `076`.
+ */
+export const foodicsOrders = pgTable("foodics_orders", {
+  id: text("id").primaryKey(),
+  reference: integer("reference").notNull(),
+  businessDate: text("business_date").notNull(),
+  status: integer("status").notNull(),
+  type: integer("type").notNull(),
+  source: integer("source").notNull(),
+  totalMinor: integer("total_minor").notNull(),
+  discountMinor: integer("discount_minor").notNull().default(0),
+  vatMinor: integer("vat_minor").notNull().default(0),
+  originalReference: integer("original_reference"),
+  openedAt: timestamp("opened_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }).notNull(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("foodics_orders_date_idx").on(t.businessDate),
+  index("foodics_orders_reference_idx").on(t.reference),
+  index("foodics_orders_updated_idx").on(t.sourceUpdatedAt),
+]);
+
+export const foodicsOrderPayments = pgTable("foodics_order_payments", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().references(() => foodicsOrders.id, { onDelete: "cascade" }),
+  /** ١ نقد · ٢ بطاقة · ٥ حسابٌ آجل — `PAYMENT_TYPE` في `lib/foodics/types.ts`. */
+  methodType: integer("method_type").notNull(),
+  methodName: text("method_name").notNull(),
+  /** سالبٌ في طلب المرتجَع. */
+  amountMinor: integer("amount_minor").notNull(),
+  tipsMinor: integer("tips_minor").notNull().default(0),
+  businessDate: text("business_date").notNull(),
+  addedAt: timestamp("added_at", { withTimezone: true }),
+}, (t) => [
+  index("foodics_order_payments_order_idx").on(t.orderId),
+  index("foodics_order_payments_date_idx").on(t.businessDate, t.methodType),
+]);
+
+export const foodicsSuppliers = pgTable("foodics_suppliers", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  /** الربطُ بمورّدنا قرارُ إنسان — الاسمُ ليس هويّة. */
+  supplierId: text("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
+  linkedById: text("linked_by_id").references(() => users.id),
+  linkedAt: timestamp("linked_at", { withTimezone: true }),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("foodics_suppliers_supplier_idx").on(t.supplierId)]);
+
+export const foodicsPurchases = pgTable("foodics_purchases", {
+  id: text("id").primaryKey(),
+  reference: text("reference").notNull(),
+  /** ١ شراء · ٤ مرتجَعٌ إلى المورّد. */
+  type: integer("type").notNull(),
+  status: integer("status").notNull(),
+  businessDate: text("business_date").notNull(),
+  foodicsSupplierId: text("foodics_supplier_id").references(() => foodicsSuppliers.id, { onDelete: "set null" }),
+  invoiceNumber: text("invoice_number"),
+  invoiceDate: text("invoice_date"),
+  subtotalMinor: integer("subtotal_minor").notNull(),
+  paidTaxMinor: integer("paid_tax_minor").notNull().default(0),
+  additionalCostMinor: integer("additional_cost_minor").notNull().default(0),
+  totalMinor: integer("total_minor").notNull(),
+  notes: text("notes"),
+  postedAt: timestamp("posted_at", { withTimezone: true }),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }).notNull(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("foodics_purchases_date_idx").on(t.businessDate),
+  index("foodics_purchases_supplier_idx").on(t.foodicsSupplierId),
+]);
+
+export const foodicsPurchaseItems = pgTable("foodics_purchase_items", {
+  purchaseId: text("purchase_id").notNull().references(() => foodicsPurchases.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  itemId: text("item_id").notNull(),
+  sku: text("sku"),
+  name: text("name").notNull(),
+  storageUnit: text("storage_unit"),
+  quantityMilli: bigint("quantity_milli", { mode: "number" }).notNull(),
+  /** كلفةُ السطر كلِّه قبل الضريبة — لا سعرُ الوحدة. */
+  costMinor: integer("cost_minor").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.purchaseId, t.position] }),
+  index("foodics_purchase_items_sku_idx").on(t.sku),
+]);
+
+export const foodicsTills = pgTable("foodics_tills", {
+  id: text("id").primaryKey(),
+  businessDate: text("business_date").notNull(),
+  openingMinor: integer("opening_minor"),
+  closingMinor: integer("closing_minor"),
+  estimatedCashMinor: integer("estimated_cash_minor"),
+  varianceMinor: integer("variance_minor"),
+  openedAt: timestamp("opened_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("foodics_tills_date_idx").on(t.businessDate)]);
+
+export const foodicsSyncRuns = pgTable("foodics_sync_runs", {
+  id: id(),
+  scope: text("scope").notNull(),
+  status: text("status").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  counts: jsonb("counts"),
+  error: text("error"),
+  startedById: text("started_by_id").references(() => users.id),
+}, (t) => [index("foodics_sync_runs_started_idx").on(t.startedAt)]);
