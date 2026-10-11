@@ -209,14 +209,14 @@ export function compareCardTakings(
   return { batches: rows.reverse(), months, unsettled };
 }
 
-/* ─────────────────────────── النقدُ والآجل ─────────────────────────── */
+/* ─────────────────────────── النقدُ ومشروباتُ الموظّفين ─────────────────────────── */
 
 export interface CashMonthInput {
   month: string;
   /** نقدٌ قبضه فودكس، صافياً ممّا رُدّ نقداً. */
   cashMinor: number;
-  /** ما قُيّد على حسابٍ آجل — بِيع ولم يُقبَض. */
-  houseAccountMinor: number;
+  /** ما قُيّد على «House Account» — مشروباتُ الموظّفين: ليست بيعاً ولا ديناً ولا ضريبةَ عليها. */
+  staffDrinksMinor: number;
   /** طرقُ دفعٍ أخرى (بطاقةُ هديّة، طرفٌ ثالث). */
   otherMinor: number;
   /** مجموعُ فروق إقفال الصندوق (المعدود − المتوقَّع). `null` لا صناديقَ مقفلة. */

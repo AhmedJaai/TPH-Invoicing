@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { request } from "@/lib/http-client";
 import Link from "next/link";
-import { ArrowLeft, CircleAlert, CircleCheck, Eye, FileSpreadsheet, Files, Loader2 } from "lucide-react";
+import { ArrowLeft, CircleAlert, CircleCheck, Eye, FileSpreadsheet, Files, Loader2, PlugZap } from "lucide-react";
 import { buttonClass } from "./ui";
 
 /**
@@ -50,6 +50,8 @@ interface CatalogResult {
 export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defaultFrom: string }) {
   const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
+  /** من أين يُقرأ الكتالوج: واجهةُ فودكس مباشرةً، أو ملفّاتُه الثلاثة. */
+  const [fromFoodics, setFromFoodics] = useState(false);
   const [effectiveFrom, setEffectiveFrom] = useState(defaultFrom);
   const [busy, setBusy] = useState<"preview" | "commit" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +66,13 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
     form.append("effectiveFrom", effectiveFrom);
     if (dryRun) form.append("dryRun", "true");
 
-    const r = await request<CatalogResult>("/api/inventory/catalog", { method: "POST", body: form });
+    const r = fromFoodics
+      ? await request<CatalogResult>("/api/inventory/catalog", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ source: "foodics-api", effectiveFrom, dryRun }),
+        })
+      : await request<CatalogResult>("/api/inventory/catalog", { method: "POST", body: form });
     setBusy(null);
     if (!r.ok) { setError(r.error); return; }
     setResult(r.data);
@@ -87,7 +95,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
       <div className="rounded-2xl border border-line bg-raised shadow-raised">
         {/* ── ثلاثُ مراحل ظاهرة: اختر ← عاين ← نفِّذ ── */}
         <ol className="flex border-b border-line text-[11px] font-bold" aria-label="مراحل رفع الكتالوج">
-          {["اختر الملفّات", "عاين ما سيقع", "نفِّذ"].map((label, i) => (
+          {["اختر المصدر", "عاين ما سيقع", "نفِّذ"].map((label, i) => (
             <li
               key={label}
               aria-current={stage === i + 1 ? "step" : undefined}
@@ -102,7 +110,26 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
         </ol>
 
         <div className="p-4 sm:p-5">
-          <label className="group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line-input bg-sunken/40 px-5 py-7 text-center transition-colors hover:border-accent hover:bg-accent-soft/40 focus-within:border-accent">
+          {/* ── المصدر: فودكس مباشرةً، أو الملفّاتُ الثلاثة ── */}
+          <div className={`mb-3 flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 ${fromFoodics ? "border-accent-line bg-accent-soft/40" : "border-line bg-sunken/40"}`}>
+            <PlugZap className={`h-5 w-5 shrink-0 ${fromFoodics ? "text-accent" : "text-muted"}`} strokeWidth={1.75} aria-hidden />
+            <div className="min-w-0 flex-1 basis-56">
+              <p className="text-sm font-bold">{fromFoodics ? "يُقرأ من فودكس مباشرةً" : "اقرأه من فودكس مباشرةً"}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-muted">
+                أصنافُ المخزون والأصنافُ المباعة والوصفات من واجهة فودكس — بلا تصديرٍ ولا رفع. والمعاينةُ قبل الكتابة كما في الملفّات.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => { setFromFoodics(!fromFoodics); setFiles([]); setResult(null); setError(null); }}
+              className={buttonClass(fromFoodics ? "secondary" : "primary", "sm")}
+            >
+              {fromFoodics ? "ارفع ملفّاتٍ بدلاً منه" : "اقرأ من فودكس"}
+            </button>
+          </div>
+
+          {!fromFoodics && <label className="group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line-input bg-sunken/40 px-5 py-7 text-center transition-colors hover:border-accent hover:bg-accent-soft/40 focus-within:border-accent">
             <span className="grid h-12 w-12 place-items-center rounded-full bg-accent-soft text-accent">
               <Files className="h-5 w-5" strokeWidth={1.75} aria-hidden />
             </span>
@@ -120,7 +147,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
                 setError(null);
               }}
             />
-          </label>
+          </label>}
 
           {files.length > 0 && (
             <ul className="mt-3 flex flex-wrap gap-2">
@@ -156,7 +183,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
             <button
               type="button"
               onClick={() => void send(true)}
-              disabled={busy !== null || files.length === 0}
+              disabled={busy !== null || (!fromFoodics && files.length === 0)}
               /* بعد المعاينة الفعلُ التالي هو التنفيذ — فلا زرّان رئيسيّان متجاوران */
               className={buttonClass(result?.dryRun ? "secondary" : "primary")}
             >
@@ -172,7 +199,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
                 {busy === "commit" ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />يُكتَب…</> : "نفِّذ الاستيراد"}
               </button>
             )}
-            {files.length === 0 && !committed && <span className="text-[11px] text-muted">لا يُكتب شيءٌ قبل أن ترى ما سيقع.</span>}
+            {files.length === 0 && !fromFoodics && !committed && <span className="text-[11px] text-muted">لا يُكتب شيءٌ قبل أن ترى ما سيقع.</span>}
           </div>
 
           {error && (

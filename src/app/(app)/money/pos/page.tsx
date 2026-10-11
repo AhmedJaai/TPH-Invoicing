@@ -250,9 +250,9 @@ export default async function PosPage() {
         />
       </Section>
 
-      <Callout tone="info" icon={Info} className="mt-8">
-        <strong className="text-ink">ما لا تقوله هذه الصفحة:</strong> هل طابقت التسويةُ مبيعاتِ البطاقات في فودكس — تقريرُ طرق الدفع غيرُ مستورَد،
-        فلا يُقارَن به. الغيابُ هنا يُعرف من عادة الأيّام السابقة وحدها.
+      <Callout tone="info" icon={Info} className="mt-8" action={<LinkButton href="/money/foodics" variant="secondary" size="sm">فودكس والبنك</LinkButton>}>
+        <strong className="text-ink">هل طابقت التسويةُ مبيعاتِ البطاقات؟</strong> هذه الصفحةُ من كشف البنك وحده: الغيابُ فيها يُعرف من عادة الأيّام السابقة.
+        ومقابلةُ كلّ دفعةٍ بما سجّله فودكس بطاقةً في «فودكس والبنك».
       </Callout>
     </PageShell>
   );

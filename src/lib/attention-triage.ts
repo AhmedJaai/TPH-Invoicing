@@ -29,6 +29,9 @@ export const ATTENTION_IDS = [
   "iban-mismatch",
   "first-transfers",
   "pos-missing-settlement",
+  "foodics-card-gap",
+  "foodics-purchase-differs",
+  "foodics-purchase-missing",
   "recurring-anomalies",
   "obligations-expiring",
   "missing-statements",
@@ -67,6 +70,10 @@ export const SIGNAL_IDS: ReadonlySet<AttentionId> = new Set<AttentionId>([
   "bounced-payments",
   "iban-mismatch",
   "pos-missing-settlement",
+  /* فروقُ فودكس ملاحظاتٌ محسوبة: تُراجَع في صفحتها وتُسكَت بسببها — لا واقعةٌ مقيَّدة */
+  "foodics-card-gap",
+  "foodics-purchase-differs",
+  "foodics-purchase-missing",
   "recurring-anomalies",
 ]);
 

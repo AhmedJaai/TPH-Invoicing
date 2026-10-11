@@ -173,6 +173,8 @@
 | `src/lib/foodics/takings.ts` · `foodics-takings.service.ts` | بطاقاتُ فودكس أمام دفعات البنك (موضعُ الإقفال يُبحَث عنه)، والنقدُ والآجلُ شهراً بشهر — `/money/foodics` |
 | `src/lib/foodics/purchase-compare.ts` · `foodics-compare.service.ts` | مشترياتُ فودكس أمام فواتيرنا واقتراحُ ربط المورّد من الفواتير المطابِقة — `/purchases/foodics` · `/api/foodics-link` |
 | `foodics-sync.service.ts` · `scripts/foodics-sync.ts` | المزامنة: المرآةُ + مجالُ المبيعات عبر `importParsedSales` — `/api/foodics-sync` · `npm run foodics:sync` |
+| `src/lib/foodics/catalog.ts` | كتالوجُ فودكس من الواجهة ← `ParsedCatalog` — «اقرأ من فودكس» في `/inventory/import` |
+| `foodics-attention.service.ts` | فروقُ فودكس (دفعةٌ · فاتورةٌ بمبلغين · شراءٌ بلا فاتورة) بنوداً في «يحتاج قرارك» |
 | `src/lib/sales/weekday-habit.ts` · `/inventory/habit` | **عادةُ البيع**: وسيطُ ما بيع لكلّ صنفٍ في كلّ يوم أسبوع عبر ٨ أسابيع — يُحجب دون ٦ صالحة، ولا يُمدّ خطٌّ إلى المستقبل |
 | `src/lib/cash-runway.ts` · `src/lib/supplier-leverage.ts` · `src/lib/vat-compare.ts` · `src/lib/inventory/waste-board.ts` · `src/lib/extraction/qr-coverage.ts` | أسطرٌ على شاشاتٍ قائمة: أيّامُ النقد الباقية (`/cash`) · أيّامُ السداد وتركّزُ المورّدين (`/suppliers`) · الأرباعُ المقدَّمة جنباً إلى جنب (`/close/vat`) · كلفةُ الهدر بأسبابه (سجلّ الجرد) · رمزُ QR في فواتير المورّد (ملفُّه) — كلٌّ يُحجب أو يقول «غير معروف» حين ينقص أساسُه |
 | `src/components/post-action.tsx` | زرُّ قرارٍ صغير بلا مال: يرسل جسماً ثابتاً، يُعلن ما وقع، ويحمل «تراجع» — لإغلاق تنبيهٍ أو سحب اختيار |

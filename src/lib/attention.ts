@@ -194,6 +194,13 @@ export interface AttentionFacts {
    */
   missingSettlements?: { day: string; usualMinor: number | null }[];
   /**
+   * ما اختلف فيه فودكس مع البنك ومع الفواتير (`services/foodics-attention.service.ts`) —
+   * فودكس شاهدٌ: يُقال الفرقُ بطرفيه ولا يُسمّى ضياعاً، وما أسكته صاحبُه لا يُعدّ.
+   */
+  foodicsCardGaps?: { day: string; gapMinor: number }[];
+  foodicsPurchaseDiffers?: { supplierName: string; invoiceNumber: string; gapMinor: number }[];
+  foodicsPurchaseMissing?: { supplierName: string; invoiceNumber: string | null; totalMinor: number }[];
+  /**
    * وثائقُ انتهت أو دخلت مهلةَ تذكيرها (`lib/obligations.ts`) — يكتبها صاحبُها بيده.
    * `daysLeft` سالبٌ بعد الانتهاء.
    */
@@ -666,6 +673,78 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
         label: formatDay(d.day),
         sub: d.usualMinor === null ? "لا تقديرَ لمثله" : `وسيطُ مثله ${formatRiyalsDisplay(d.usualMinor)} — تقدير`,
       })),
+    });
+  }
+
+  /*
+    فودكس والبنك: دفعةٌ لم يُوجد لها مقطعٌ من بطاقات فودكس يقاربها. «وصل أقلّ» مالٌ قد
+    يكون لم يصل؛ و«وصل أكثر» بيعٌ دُفع بالبطاقة وسُجّل بغيرها — يُراجَع ولا يُخاف عليه.
+  */
+  if ((f.foodicsCardGaps?.length ?? 0) > 0) {
+    const gaps = f.foodicsCardGaps!;
+    const short = gaps.filter((g) => g.gapMinor > 0);
+    const shortMinor = short.reduce((s, g) => s + g.gapMinor, 0);
+    out.push({
+      id: "foodics-card-gap",
+      area: "BANK",
+      severity: short.length > 0 ? "HIGH" : "MEDIUM",
+      title: gaps.length === 1
+        ? `دفعةُ شبكةِ ${formatDay(gaps[0].day)} لا تطابق بطاقاتِ فودكس`
+        : `${gaps.length} دفعاتِ شبكةٍ لا تطابق بطاقاتِ فودكس`,
+      detail: short.length > 0
+        ? "فودكس سجّل بطاقاتٍ أكثر ممّا دخل الحسابَ في بعضها — وفي غيرها دخل أكثر ممّا سجّل."
+        : "دخل الحسابَ من الشبكة أكثر ممّا سجّله فودكس بطاقةً — بيعٌ سُجّل نقداً ودُفع بالبطاقة، أو عمليّةٌ على الجهاز بلا طلب.",
+      action: "افتح الدفعةَ وقارِن: تقريرُ إقفال الجهاز لتلك الليلة وطلباتُها في فودكس. وما عرفتَ سببَه فأسكِته.",
+      actionLabel: "افتح فودكس والبنك",
+      href: "/money/foodics#flagged",
+      count: gaps.length,
+      impact: { kind: "AT_RISK", amountMinor: short.length > 0 ? shortMinor : null },
+      evidence: gaps.slice(0, 6).map((g) => ({
+        label: `دفعةُ ${formatDay(g.day)}`,
+        sub: g.gapMinor > 0 ? "وصل البنكَ أقلّ ممّا في فودكس" : "وصل البنكَ أكثر ممّا في فودكس",
+        amountMinor: Math.abs(g.gapMinor),
+      })),
+    });
+  }
+
+  /* فاتورةٌ واحدة ومبلغان: أحدُ الطرفين قرأ أو أدخل خطأً، والمستندُ هو الحكم */
+  if ((f.foodicsPurchaseDiffers?.length ?? 0) > 0) {
+    const list = f.foodicsPurchaseDiffers!;
+    out.push({
+      id: "foodics-purchase-differs",
+      area: "INVOICES",
+      severity: "MEDIUM",
+      title: list.length === 1
+        ? `فاتورةُ ${list[0].supplierName} مبلغُها في فودكس غيرُ ما عندنا`
+        : `${countNoun(list.length, INVOICE)} مبلغُها في فودكس غيرُ ما عندنا`,
+      detail: "الرقمُ واحدٌ عند الطرفين والإجماليُّ ليس واحداً — أحدُهما قُرئ أو أُدخل خطأً.",
+      action: "افتح المستندَ واحكم: صحِّح الفاتورةَ إن كان الخطأُ في قراءتنا، أو صحِّح فودكس إن كان فيه.",
+      actionLabel: "قارِن في فودكس والفواتير",
+      href: "/purchases/foodics#differs",
+      count: list.length,
+      impact: { kind: "UNATTRIBUTED", amountMinor: list.reduce((s, x) => s + Math.abs(x.gapMinor), 0) },
+      evidence: list.slice(0, 6).map((x) => ({ label: `${x.supplierName} · ${x.invoiceNumber}`, sub: "الفرقُ بين الطرفين", amountMinor: Math.abs(x.gapMinor) })),
+    });
+  }
+
+  /* بضاعةٌ أُدخلت مخزونَ فودكس لمورّدٍ نعرفه ولا فاتورةَ لها في الدرايف — مستندٌ لم يصل */
+  if ((f.foodicsPurchaseMissing?.length ?? 0) > 0) {
+    const list = f.foodicsPurchaseMissing!;
+    out.push({
+      id: "foodics-purchase-missing",
+      area: "INVOICES",
+      severity: "MEDIUM",
+      title: list.length === 1
+        ? `شراءٌ من ${list[0].supplierName} في فودكس بلا فاتورةٍ عندنا`
+        : `${list.length} حركاتِ شراءٍ في فودكس بلا فاتورةٍ عندنا`,
+      detail: "حركةُ شراءٍ مُرحَّلةٌ في فودكس لمورّدٍ مربوط، ولا فاتورةَ برقمها ولا بتاريخها ومبلغها في الدرايف.",
+      action: "اطلب الفاتورةَ من المورّد أو ارفعها — وإن لم تكن فاتورةً تُنتظَر فأسكِتها من صفحتها.",
+      actionLabel: "افتح فودكس والفواتير",
+      href: "/purchases/foodics#only-foodics",
+      count: list.length,
+      amountMinor: list.reduce((s, x) => s + x.totalMinor, 0),
+      impact: { kind: "UNATTRIBUTED", amountMinor: list.reduce((s, x) => s + x.totalMinor, 0) },
+      evidence: list.slice(0, 6).map((x) => ({ label: `${x.supplierName} · ${x.invoiceNumber ?? "بلا رقم"}`, amountMinor: x.totalMinor })),
     });
   }
 

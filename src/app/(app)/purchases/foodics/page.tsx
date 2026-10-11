@@ -17,6 +17,7 @@ import type { InvoiceSide, MatchBasis, MatchedPair, PurchaseSide } from "@/lib/f
 import { loadPairLines, loadPurchaseWitness, type FoodicsSupplierRow } from "@/services/foodics-compare.service";
 import { loadFoodicsStatus } from "@/services/foodics-sync.service";
 import { loadFoodicsSilenced } from "@/services/foodics-takings.service";
+import { invoiceSignalKey as invoiceKey, purchaseSignalKey as purchaseKey } from "@/services/foodics-attention.service";
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +27,6 @@ const BASIS: Record<MatchBasis, string> = {
   SUPPLIER_DATE_AMOUNT: "بالمورّد والتاريخ والمبلغ",
 };
 
-const purchaseKey = (id: string) => `foodics-purchase:${id}`;
-const invoiceKey = (id: string) => `foodics-purchase:inv-${id}`;
 
 /**
  * فودكس والفواتير — مشترياتُ فودكس أمام فواتير الدرايف.
@@ -363,7 +362,7 @@ function DiffersRow({ m, canSilence }: { m: MatchedPair; canSilence: boolean }) 
       <div className="flex shrink-0 flex-wrap items-center gap-1">
         <LinkButton href={`/purchases/foodics?p=${encodeURIComponent(m.purchase.id)}`} variant="secondary" size="sm">قارِن البنود</LinkButton>
         <LinkButton href={invoiceHref(m.invoice.id)} variant="secondary" size="sm">افتح الفاتورة</LinkButton>
-        {canSilence && <SignalControls signalKey={`foodics-purchase:${m.purchase.id}`} dismissLabel="عرفتُ سببَه" snoozeDays={30} />}
+        {canSilence && <SignalControls signalKey={purchaseKey(m.purchase.id)} dismissLabel="عرفتُ سببَه" snoozeDays={30} />}
       </div>
     </li>
   );

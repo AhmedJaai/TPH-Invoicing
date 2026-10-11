@@ -50,7 +50,8 @@ async function loadItems(from: string, to: string): Promise<ItemSales[]> {
            coalesce(pp.name, l.description) as name,
            max(pp.category) as category,
            (sum(l.quantity) * 1000)::bigint as qty,
-           sum(l.line_total_minor)::bigint as sales
+           /* المجّانيّ ومشروبُ الموظَّف يُعدّان كمّيّةً ولا يُحسَبان إيراداً — لم يُقبَض عنهما شيء */
+           sum(case when l.is_complimentary then 0 else l.line_total_minor end)::bigint as sales
       from sale_lines l
       join sales s on s.id = l.sale_id
       left join pos_products pp on pp.id = l.pos_product_id

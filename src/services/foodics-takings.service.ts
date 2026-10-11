@@ -41,19 +41,40 @@ export interface FoodicsTakings {
 /** الطلبُ المغلق والمرتجَع وحدهما مالٌ وقع — الملغى لم يُقبَض عنه شيء. */
 const SETTLED = sql`o.status in (${ORDER_STATUS.CLOSED}, ${ORDER_STATUS.RETURNED})`;
 
-export async function loadFoodicsTakings(): Promise<FoodicsTakings> {
-  const [pos, cardDays, span, monthly, tills, bankOther, typed] = await Promise.all([
+/**
+ * بطاقاتُ فودكس أمام دفعات البنك. `sinceDay` يقصر القراءةَ على ما بعده — لعدّاد
+ * القشرة الذي يُحسَب مع كلّ صفحة؛ وأوّلُ دفعةٍ بعده لا تُحمَّل ما سبقها.
+ */
+export async function loadCardComparison(sinceDay: string | null = null): Promise<{ card: CardComparison; lastBankDay: string | null; untimed: number }> {
+  const since = sinceDay ? sql`and p.added_at >= ${sinceDay}::date - interval '2 days'` : sql.empty();
+  const [pos, rows, until] = await Promise.all([
     loadPosWatch(),
     db.execute<{ at_ms: string | null; amount_minor: number }>(sql`
       select (extract(epoch from p.added_at) * 1000)::bigint as at_ms, p.amount_minor
         from foodics_order_payments p join foodics_orders o on o.id = p.order_id
-       where ${SETTLED} and p.method_type = ${PAYMENT_TYPE.CARD}
+       where ${SETTLED} and p.method_type = ${PAYMENT_TYPE.CARD} ${since}
     `),
-    db.execute<{ first: string | null; last: string | null; n: number; until_ms: string | null }>(sql`
+    db.execute<{ until_ms: string | null }>(sql`select (extract(epoch from max(source_updated_at)) * 1000)::bigint as until_ms from foodics_orders`),
+  ]);
+  const timed = rows.rows.flatMap((r) => (r.at_ms === null ? [] : [{ atMs: Number(r.at_ms), amountMinor: Number(r.amount_minor) }]));
+  const card = compareCardTakings(
+    timed,
+    pos.days
+      .filter((d) => d.batches > 0 && (sinceDay === null || d.day >= sinceDay))
+      .map((d) => ({ day: d.day, settlementMinor: d.settlementMinor, byValueDate: d.byValueDate })),
+    pos.lastBankDay,
+    until.rows[0]?.until_ms ? Number(until.rows[0].until_ms) : null,
+  );
+  return { card, lastBankDay: pos.lastBankDay, untimed: rows.rows.length - timed.length };
+}
+
+export async function loadFoodicsTakings(): Promise<FoodicsTakings> {
+  const [compared, span, monthly, tills, bankOther, typed] = await Promise.all([
+    loadCardComparison(),
+    db.execute<{ first: string | null; last: string | null; n: number }>(sql`
       select min(coalesce(to_char(p.added_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD'), p.business_date)) as first,
              max(coalesce(to_char(p.added_at at time zone 'Asia/Riyadh', 'YYYY-MM-DD'), p.business_date)) as last,
-             count(*)::int as n,
-             (select (extract(epoch from max(source_updated_at)) * 1000)::bigint from foodics_orders) as until_ms
+             count(*)::int as n
         from foodics_order_payments p join foodics_orders o on o.id = p.order_id
        where ${SETTLED}
     `),
@@ -82,21 +103,13 @@ export async function loadFoodicsTakings(): Promise<FoodicsTakings> {
 
   const firstDay = span.rows[0]?.first ?? null;
   const lastDay = span.rows[0]?.last ?? null;
-  const timed = cardDays.rows.flatMap((r) => (r.at_ms === null ? [] : [{ atMs: Number(r.at_ms), amountMinor: Number(r.amount_minor) }]));
-  const card = compareCardTakings(
-    timed,
-    pos.days.filter((d) => d.batches > 0).map((d) => ({ day: d.day, settlementMinor: d.settlementMinor, byValueDate: d.byValueDate })),
-    pos.lastBankDay,
-    span.rows[0]?.until_ms ? Number(span.rows[0].until_ms) : null,
-  );
-
   const variance = new Map(tills.rows.map((r) => [r.month, r.variance === null ? null : Number(r.variance)]));
   const other = new Map(bankOther.rows.map((r) => [r.month, Number(r.total)]));
   const typedBy = new Map(typed.rows.map((r) => [r.month, Number(r.cash_sales_gross_minor)]));
   const inputs: CashMonthInput[] = monthly.rows.map((r) => ({
     month: r.month,
     cashMinor: Number(r.cash),
-    houseAccountMinor: Number(r.house),
+    staffDrinksMinor: Number(r.house),
     otherMinor: Number(r.other),
     tillVarianceMinor: variance.get(r.month) ?? null,
     bankOtherCreditsMinor: other.get(r.month) ?? 0,
@@ -106,9 +119,9 @@ export async function loadFoodicsTakings(): Promise<FoodicsTakings> {
   return {
     hasOrders: Number(span.rows[0]?.n ?? 0) > 0,
     firstDay, lastDay,
-    lastBankDay: pos.lastBankDay,
-    card,
+    lastBankDay: compared.lastBankDay,
+    card: compared.card,
     cash: summariseCash(inputs),
-    untimedCardPayments: cardDays.rows.length - timed.length,
+    untimedCardPayments: compared.untimed,
   };
 }

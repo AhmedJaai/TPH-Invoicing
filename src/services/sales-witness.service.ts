@@ -40,3 +40,19 @@ export async function loadSalesWitness(months: readonly WitnessMonthInput[], con
   const today = todayInRiyadh();
   return sorted.map((m) => buildSalesWitness({ ...m, today, days }));
 }
+
+/**
+ * ما قبضه فودكس نقداً شهراً بشهر (من دفعات طلباته) — يُعرَض بجانب خانة النقد المكتوبة بيد.
+ * الشهرُ الغائب «فودكس لم يُقرأ له» لا صفر.
+ */
+export async function loadFoodicsCashByMonth(months: readonly string[], conn: Conn = db): Promise<Map<string, number>> {
+  if (months.length === 0) return new Map();
+  const rows = (await conn.execute<{ month: string; cash: string }>(sql`
+    select substr(p.business_date, 1, 7) as month, sum(p.amount_minor)::bigint as cash
+      from foodics_order_payments p join foodics_orders o on o.id = p.order_id
+     where o.status in (4, 5) and p.method_type = 1
+       and substr(p.business_date, 1, 7) = any(${`{${months.join(",")}}`}::text[])
+     group by 1
+  `)).rows;
+  return new Map(rows.map((r) => [r.month, Number(r.cash)]));
+}

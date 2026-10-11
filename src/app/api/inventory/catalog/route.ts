@@ -9,8 +9,12 @@
  * فيُعرَض ما سيقع بالضبط — كما تُعايَن دفعةُ أوّل الشهر قبل إقرارها.
  */
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { readJson } from "@/lib/request-body";
+import { foodicsConfigured } from "@/lib/foodics/client";
 import { guard, respondTo, failWith } from "@/services/guard";
-import { importFoodicsCatalog, type CatalogFile } from "@/services/catalog-import.service";
+import { importFoodicsCatalog, importParsedCatalog, type CatalogFile } from "@/services/catalog-import.service";
+import { fetchFoodicsCatalog } from "@/services/foodics-sync.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,6 +23,12 @@ export const maxDuration = 60;
 const MAX_BYTES = 4 * 1024 * 1024;
 const MAX_FILES = 3;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const ApiBody = z.object({
+  source: z.literal("foodics-api"),
+  effectiveFrom: z.string().regex(DATE, "تاريخُ سريان الوصفات يُكتب YYYY-MM-DD"),
+  dryRun: z.boolean().optional(),
+}).strict();
 
 export async function POST(request: Request) {
   let user;
@@ -32,6 +42,23 @@ export async function POST(request: Request) {
     const mapped = respondTo(e);
     if (mapped) return mapped;
     throw e;
+  }
+
+  /* ── من واجهة فودكس مباشرةً: الطلبُ JSON لا ملفّات، والمسارُ بعده واحد ── */
+  if ((request.headers.get("content-type") ?? "").includes("application/json")) {
+    const read = await readJson(request, ApiBody);
+    if (!read.ok) return read.response;
+    if (!foodicsConfigured()) {
+      return NextResponse.json({ error: "فودكس غير موصول: مفتاحُ الربط غير مضبوطٍ في بيئة الخادم. ارفع الملفّات الثلاثة بدلاً منه." }, { status: 409 });
+    }
+    try {
+      const parsed = await fetchFoodicsCatalog();
+      return NextResponse.json(await importParsedCatalog(parsed, {
+        effectiveFrom: read.body.effectiveFrom, actorId: user.id, dryRun: read.body.dryRun === true,
+      }));
+    } catch (e) {
+      return failWith(e, "inventory-catalog");
+    }
   }
 
   const form = await request.formData().catch(() => null);

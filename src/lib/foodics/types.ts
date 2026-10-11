@@ -127,3 +127,33 @@ export const FoodicsTill = z.object({
   closed_at: z.string().nullable().optional(),
 });
 export type FoodicsTill = z.infer<typeof FoodicsTill>;
+
+/** صنفُ مخزونٍ في كتالوج فودكس. المحذوفُ يحمل `deleted_at`. */
+export const FoodicsInventoryItem = z.object({
+  sku: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
+  storage_unit: z.string().nullable().optional(),
+  ingredient_unit: z.string().nullable().optional(),
+  storage_to_ingredient_factor: z.number().nullable().optional(),
+  cost: amount,
+  deleted_at: z.string().nullable().optional(),
+});
+export type FoodicsInventoryItem = z.infer<typeof FoodicsInventoryItem>;
+
+/** صنفٌ يُباع ومكوّناتُ وصفته — كمّيّةُ المكوّن بوحدة صرفه. */
+export const FoodicsCatalogProduct = z.object({
+  sku: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
+  price: amount,
+  cost: amount,
+  is_active: z.boolean().nullable().optional(),
+  deleted_at: z.string().nullable().optional(),
+  ingredients: z.array(z.object({
+    sku: z.string().nullable().optional(),
+    name: z.string().nullable().optional(),
+    ingredient_unit: z.string().nullable().optional(),
+    deleted_at: z.string().nullable().optional(),
+    pivot: z.object({ quantity: z.number().nullable().optional() }),
+  })).optional(),
+});
+export type FoodicsCatalogProduct = z.infer<typeof FoodicsCatalogProduct>;

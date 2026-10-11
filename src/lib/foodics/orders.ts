@@ -20,7 +20,7 @@ import { contentFingerprint } from "@/lib/sales/foodics-excel";
 import type { ParsedRow, ParsedSale, ParsedSaleLine, ParsedSalesFile } from "@/lib/sales/file-import";
 import { microToMinor } from "@/lib/sales/values";
 import { parseFoodicsMoment, quantityToMilli, riyalsToMicro, riyalsToMinor } from "./money";
-import { ORDER_STATUS, PRODUCT_STATUS, type FoodicsOrder } from "./types";
+import { ORDER_STATUS, PAYMENT_TYPE, PRODUCT_STATUS, type FoodicsOrder } from "./types";
 
 export const FOODICS_API_ADAPTER = "FOODICS_API";
 export const SHAPE_API_ORDERS = "FOODICS_API_ORDERS";
@@ -30,6 +30,18 @@ const SETTLED_ORDER = new Set<number>([ORDER_STATUS.CLOSED, ORDER_STATUS.RETURNE
 
 export function isSettledOrder(order: Pick<FoodicsOrder, "status">): boolean {
   return SETTLED_ORDER.has(order.status);
+}
+
+/**
+ * طلبٌ على «House Account» وحده — **مشروبُ موظَّف، لا بيع** (أحمد، ١١ أكتوبر ٢٠٢٦).
+ *
+ * يُصنَع ويُستهلَك فيدخل الجرد، ولا يُقبَض عنه شيء: فلا إيرادَ له ولا ضريبة، وليس
+ * ديناً على أحد. فبنودُه «مجّانيّة» (`isComplimentary`) ومجاميعُه المالية صفرٌ بدليل.
+ * وطلبٌ دُفع بعضُه على الحساب وبعضُه بغيره يبقى بيعاً — لم يقع مثلُه في ٢٢ ألف طلب.
+ */
+export function isStaffOrder(order: Pick<FoodicsOrder, "payments">): boolean {
+  const payments = order.payments ?? [];
+  return payments.length > 0 && payments.every((p) => p.payment_method?.type === PAYMENT_TYPE.HOUSE_ACCOUNT);
 }
 
 /** حالُ البند بالكلمة التي يكتبها تصديرُ فودكس — وعليها بصمةُ المحتوى. */
@@ -83,6 +95,7 @@ export function ordersToSalesFile(orders: readonly FoodicsOrder[]): ConvertedOrd
       continue;
     }
 
+    const staff = isStaffOrder(order);
     const saleExternalId = `FDX:${order.reference}`;
     const businessDate = order.business_date;
     const branchLabel = order.branch?.reference?.trim() || order.branch?.name?.trim() || null;
@@ -131,7 +144,7 @@ export function ordersToSalesFile(orders: readonly FoodicsOrder[]): ConvertedOrd
         sourceStatus,
         isRefund,
         isVoid,
-        isComplimentary: !isVoid && !isRefund && listMinor > 0 && (lineTotalMinor === 0 || Math.abs(lineDiscountMinor) >= listMinor),
+        isComplimentary: !isVoid && !isRefund && (staff || (listMinor > 0 && (lineTotalMinor === 0 || Math.abs(lineDiscountMinor) >= listMinor))),
         isModifier: false,
         parentExternalId: null,
         parentLineExternalId: null,
@@ -208,6 +221,14 @@ export function ordersToSalesFile(orders: readonly FoodicsOrder[]): ConvertedOrd
 
     /* خصمُ الطلب كلِّه فوق خصم بنوده */
     discountMinor += riyalsToMinor(order.discount_amount) ?? 0;
+
+    /* مشروبُ الموظَّف: كمّيّاتُه تبقى للجرد، ومالُه صفرٌ بدليل — لا إيرادَ ولا ضريبةَ ولا مردود */
+    if (staff) {
+      grossMinor = 0;
+      refundMinor = 0;
+      discountMinor = 0;
+      vatMicro = 0;
+    }
 
     sales.push({
       externalId: saleExternalId,

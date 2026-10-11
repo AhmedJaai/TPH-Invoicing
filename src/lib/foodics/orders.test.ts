@@ -108,6 +108,18 @@ describe("الطلبُ من الواجهة هو الطلبُ من الإكسل",
     expect(out.problems[0].reference).toBe(22690);
   });
 
+  it("طلبٌ على House Account مشروبُ موظَّف: يُستهلَك في الجرد ولا إيرادَ له ولا ضريبة", () => {
+    const staff = order({ payments: [{ id: "pay-h", amount: 33, payment_method: { name: "House Account", type: PAYMENT_TYPE.HOUSE_ACCOUNT } }] });
+    const sale = ordersToSalesFile([staff]).file.sales[0];
+    expect(sale).toMatchObject({ grossMinor: 0, netMinor: 0, vatMinor: 0, refundMinor: 0, isVoid: false });
+    const products = sale.lines.filter((l) => !l.isModifier);
+    expect(products.every((l) => l.isComplimentary)).toBe(true);
+    expect(products.map((l) => l.quantityMilli)).toEqual([1000, 1000]);
+    /* والبصمةُ لم تتغيّر: المصدرُ لم يراجِع شيئاً، فلا يُعلَن «مُراجَع» */
+    const paid = ordersToSalesFile([order()]).file.sales[0];
+    expect(sale.lines.map((l) => l.contentHash)).toEqual(paid.lines.map((l) => l.contentHash));
+  });
+
   it("الصنفُ نفسُه مرّتين في الطلب سطران لا واحد", () => {
     const p = { quantity: 1, unit_price: 19, total_price: 19, status: PRODUCT_STATUS.CLOSED, product: { sku: "sk-7", name: "Latte" } };
     const sale = ordersToSalesFile([order({ products: [{ id: "a", ...p }, { id: "b", ...p }] })]).file.sales[0];

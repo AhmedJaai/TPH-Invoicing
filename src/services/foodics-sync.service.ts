@@ -22,8 +22,10 @@ import { fetchAll, fetchPage, foodicsConfigured, FoodicsNotConfiguredError } fro
 import { parseFoodicsMoment, quantityToMilli, riyalsToMinor } from "@/lib/foodics/money";
 import { FOODICS_API_ADAPTER, isSettledOrder, mirrorOrder, ordersToSalesFile } from "@/lib/foodics/orders";
 import {
-  FoodicsInventoryTx, FoodicsOrder, FoodicsSupplier, FoodicsTill, INVENTORY_TX,
+  FoodicsCatalogProduct, FoodicsInventoryItem, FoodicsInventoryTx, FoodicsOrder, FoodicsSupplier, FoodicsTill, INVENTORY_TX,
 } from "@/lib/foodics/types";
+import { catalogItemsFromApi, catalogProductsFromApi } from "@/lib/foodics/catalog";
+import type { ParsedCatalog } from "@/lib/inventory/foodics-catalog";
 import { addDays } from "@/lib/riyadh-time";
 import { ensureFoodicsSource, importParsedSales } from "./sales-import.service";
 
@@ -378,4 +380,27 @@ export async function loadFoodicsStatus(): Promise<FoodicsStatus> {
     lastDay: o?.last ?? null,
     purchases: Number(p?.n ?? 0),
   };
+}
+
+/* ─────────────────────────── الكتالوج ─────────────────────────── */
+
+/**
+ * كتالوجُ فودكس من واجهته — أصنافُ المخزون والأصنافُ المباعة والوصفات — بالصيغة التي
+ * يكتبها `importParsedCatalog`. قراءةٌ وحدها: الكتابةُ بعد معاينةٍ وإقرار، كالملفّات.
+ */
+export async function fetchFoodicsCatalog(): Promise<{ file: { fileName: string }; result: ParsedCatalog }[]> {
+  if (!foodicsConfigured()) throw new FoodicsNotConfiguredError();
+  const [items, products] = await Promise.all([
+    fetchAll("inventory_items", FoodicsInventoryItem),
+    fetchAll("products", FoodicsCatalogProduct, { include: "ingredients" }),
+  ]);
+  const stock = catalogItemsFromApi(items.items);
+  const menu = catalogProductsFromApi(products.items);
+  if (items.rejected > 0) stock.warnings.push(`${items.rejected} صنفَ مخزونٍ لم يطابق الصيغة المعروفة — لم يُقرأ.`);
+  if (products.rejected > 0) menu.products.warnings.push(`${products.rejected} صنفاً مباعاً لم يطابق الصيغة المعروفة — لم يُقرأ.`);
+  return [
+    { file: { fileName: "فودكس · أصناف المخزون" }, result: stock },
+    { file: { fileName: "فودكس · الأصناف المباعة" }, result: menu.products },
+    { file: { fileName: "فودكس · الوصفات" }, result: menu.recipes },
+  ];
 }

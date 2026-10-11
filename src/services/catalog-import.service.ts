@@ -65,6 +65,9 @@ export interface CatalogImportInput {
   dryRun?: boolean;
 }
 
+/** ما تحتاجه الكتابةُ من الطلب — بلا الملفّات: الكتالوجُ قد يأتي من الواجهة. */
+export type CatalogWriteInput = Pick<CatalogImportInput, "effectiveFrom" | "actorId" | "dryRun">;
+
 export interface CatalogFileResult {
   fileName: string;
   kind: CatalogKind | null;
@@ -105,12 +108,24 @@ export async function importFoodicsCatalog(
   input: CatalogImportInput,
   conn: Conn = db,
 ): Promise<CatalogImportResult> {
-  if (!DATE.test(input.effectiveFrom)) throw new Error("تاريخُ سريان الوصفات يُكتب YYYY-MM-DD");
   if (input.files.length === 0) throw new Error("لم يُرفَع ملفّ");
+  return importParsedCatalog(
+    input.files.map((file) => ({ file: { fileName: file.fileName }, result: parseCatalogFile(file.buffer) })),
+    input,
+    conn,
+  );
+}
 
-  const parsed: { file: CatalogFile; result: ParsedCatalog }[] = input.files.map((file) => ({
-    file, result: parseCatalogFile(file.buffer),
-  }));
+/**
+ * يكتب كتالوجاً مقروءاً — من ملفّاته أو من واجهة فودكس (`lib/foodics/catalog.ts`).
+ * مسارٌ واحد: المعاينةُ، وحمايةُ ما كتبه إنسان، ونسخُ الوصفات بتاريخها — لا تُنسَخ لبابٍ ثانٍ.
+ */
+export async function importParsedCatalog(
+  parsed: readonly { file: { fileName: string }; result: ParsedCatalog }[],
+  input: CatalogWriteInput,
+  conn: Conn = db,
+): Promise<CatalogImportResult> {
+  if (!DATE.test(input.effectiveFrom)) throw new Error("تاريخُ سريان الوصفات يُكتب YYYY-MM-DD");
 
   const files: CatalogFileResult[] = parsed.map(({ file, result }) => ({
     fileName: file.fileName,
@@ -178,7 +193,7 @@ class DryRun extends Error {}
 
 async function upsertStockItems(
   items: readonly StockItemRow[],
-  input: CatalogImportInput,
+  input: CatalogWriteInput,
   out: CatalogImportResult,
   tx: Conn,
 ): Promise<Map<string, string>> {
@@ -265,7 +280,7 @@ async function upsertStockItems(
 
 async function upsertMenuProducts(
   menu: readonly MenuProductRow[],
-  input: CatalogImportInput,
+  input: CatalogWriteInput,
   out: CatalogImportResult,
   tx: Conn,
 ): Promise<Map<string, string>> {
@@ -410,7 +425,7 @@ async function writeRecipes(
   itemIdBySku: ReadonlyMap<string, string>,
   itemUnitBySku: ReadonlyMap<string, StoredUnit>,
   menuIdBySku: ReadonlyMap<string, string>,
-  input: CatalogImportInput,
+  input: CatalogWriteInput,
   out: CatalogImportResult,
   tx: Conn,
 ): Promise<void> {
