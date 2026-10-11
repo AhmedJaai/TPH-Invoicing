@@ -27,7 +27,9 @@ export type FlowMissing =
   /** وصفتان تذكرانه بعائلتَي وحدة. */
   | "UNIT_CONFLICT"
   | "NO_OPENING_COUNT"
-  | "NO_CLOSING_COUNT";
+  | "NO_CLOSING_COUNT"
+  /** الفرقُ فوق عشرة أضعاف ما بِيع من الصنف وبألف ريالٍ فأكثر — عدٌّ أو إدخالُ شراءٍ خاطئ على الأرجح. */
+  | "SUSPECT_ENTRY";
 
 export const FLOW_MISSING_LABEL: Record<FlowMissing, string> = {
   PURCHASES_UNLINKED: "لم يُربَط به بندُ فاتورةٍ — مشترياتُه غير معروفة",
@@ -37,6 +39,7 @@ export const FLOW_MISSING_LABEL: Record<FlowMissing, string> = {
   UNIT_CONFLICT: "وصفتان تذكرانه بوحدتين لا تتحوّلان",
   NO_OPENING_COUNT: "لم يُعَدّ في أوّل الفترة",
   NO_CLOSING_COUNT: "لم يُعَدّ في آخرها",
+  SUSPECT_ENTRY: "رقمٌ مشكوكٌ فيه: الفرقُ فوق عشرة أضعاف ما بِيع — عدٌّ أو كمّيّةُ شراءٍ أُدخلت خطأً",
 };
 
 /** ما يُكمِل كلَّ نقص — وجهةٌ واحدة لكلٍّ. */
@@ -48,6 +51,7 @@ export const FLOW_MISSING_HREF: Record<FlowMissing, string> = {
   UNIT_CONFLICT: "/inventory/recipes",
   NO_OPENING_COUNT: "/inventory",
   NO_CLOSING_COUNT: "/inventory",
+  SUSPECT_ENTRY: "/inventory",
 };
 
 /**
@@ -56,6 +60,31 @@ export const FLOW_MISSING_HREF: Record<FlowMissing, string> = {
  * فودكس ١٣٥ يُنتج «استُهلك أكثر من المتاح بمئة كيلو» — وهو نقصُ ربطٍ لا واقعة.
  */
 export const WITNESS_COMPLETENESS_BP = 8_000;
+
+/**
+ * حدودُ الرقم المشكوك فيه. قيس على أشهر المقهى: ماتشا عُدّت «٥٩٠ كيلو» في يوليو فصار فرقُها
+ * ‏٣٨٤ ألفَ ريال، وسكّرٌ «٥٬٥٠٠ كيلو»؛ وبنُّ سومطرة نزل من ستّة كيلو إلى صفر **بحقّ** (نفد).
+ * فالقفزةُ من صفرٍ أو إليه لا تُشكّ إلّا إن كبُرت قيمتُها، والفرقُ لا يُشكّ إلّا إن فاق ما
+ * بِيع عشرةَ أضعاف — خطأُ إدخالٍ يُسمّى ويُخرَج، لا فاقدٌ يُحاسَب عليه أحد.
+ */
+export const SUSPECT_FLOOR_MINOR = 1_000_00;
+export const SUSPECT_COUNT_MULTIPLE = 20;
+export const SUSPECT_FROM_ZERO_MINOR = 5_000_00;
+export const SUSPECT_GAP_MULTIPLE = 10;
+
+/** أقفز العدُّ بين الطرفين قفزةً لا تُصدَّق؟ — بالكمّيّتين وقيمتَيهما. */
+export function suspectCountJump(openMilli: number, closeMilli: number, openMinor: number, closeMinor: number): boolean {
+  if (Math.abs(openMinor - closeMinor) < SUSPECT_FLOOR_MINOR) return false;
+  const small = Math.min(openMilli, closeMilli);
+  const large = Math.max(openMilli, closeMilli);
+  return small > 0 ? large > small * SUSPECT_COUNT_MULTIPLE : Math.max(openMinor, closeMinor) >= SUSPECT_FROM_ZERO_MINOR;
+}
+
+/** أيفوق الفرقُ ما بِيع عشرةَ أضعافٍ وبألف ريالٍ فأكثر؟ */
+function suspectGap(gapMilli: number | null, gapMinor: number | null, consumedMilli: number | null): boolean {
+  if (gapMilli === null || gapMinor === null || consumedMilli === null) return false;
+  return Math.abs(gapMinor) >= SUSPECT_FLOOR_MINOR && Math.abs(gapMilli) > Math.max(0, consumedMilli) * SUSPECT_GAP_MULTIPLE;
+}
 
 export type CostBasis = "PERIOD_PURCHASES" | "LAST_INVOICE" | "CATALOG";
 
@@ -140,6 +169,16 @@ export function buildFlowItem(i: FlowItemInput): FlowItem {
   const witnessUnexplainedMilli = i.witnessPurchasedMilli !== null && consumedMilli !== null && i.openingMilli !== null && i.closingMilli !== null
     ? i.openingMilli + i.witnessPurchasedMilli - consumedMilli - i.wasteMilli - i.closingMilli : null;
 
+  let gapMilli = unexplainedMilli;
+  let gapMinor = cost(unexplainedMilli);
+  let witnessGapMilli = witnessUnexplainedMilli;
+  let witnessGapMinor = cost(witnessUnexplainedMilli);
+  /* فرقٌ لا يُصدَّق يُخرَج ويُسمّى — في فرقنا، وفي فرق الشاهد حين لا فرقَ لنا */
+  if (suspectGap(gapMilli, gapMinor, consumedMilli) || (gapMilli === null && suspectGap(witnessGapMilli, witnessGapMinor, consumedMilli))) {
+    gapMilli = null; gapMinor = null; witnessGapMilli = null; witnessGapMinor = null;
+    missing.push("SUSPECT_ENTRY");
+  }
+
   return {
     ...i,
     purchasedKnownMilli,
@@ -148,11 +187,11 @@ export function buildFlowItem(i: FlowItemInput): FlowItem {
     wasteMinor: cost(i.wasteMilli),
     surplusMilli,
     surplusMinor: cost(surplusMilli),
-    unexplainedMilli,
-    unexplainedMinor: cost(unexplainedMilli),
+    unexplainedMilli: gapMilli,
+    unexplainedMinor: gapMinor,
     missing,
-    witnessUnexplainedMilli,
-    witnessUnexplainedMinor: cost(witnessUnexplainedMilli),
+    witnessUnexplainedMilli: witnessGapMilli,
+    witnessUnexplainedMinor: witnessGapMinor,
   };
 }
 

@@ -162,7 +162,7 @@ export function buildMonthFacts(view: PnlView, earlier: readonly PnlView[], sale
   if (actions.readyLinks.count > 0) {
     f.count("إجراءٌ متاح — عددُ بنود الفواتير الجاهزة للربط بضغطة (بدليل فودكس)", actions.readyLinks.count);
     f.sar("قيمةُ مشتريات البنود الجاهزة للربط", actions.readyLinks.valueMinor);
-    f.pct("التغطيةُ الكلّيّة بعد إقرار الجاهز", actions.readyLinks.afterBp);
+    f.pct("نسبةُ المربوط من قيمة المشتريات كلَّ الوقت بعد إقرار الجاهز", actions.readyLinks.afterBp);
   }
   if (view.input.cogs.wasteMinor === 0) f.note("إجراءٌ متاح", "سجلُّ الهدر فارغٌ هذا الشهر: ما يُرمى ولا يُكتب يبقى داخل الفرق غير المفسَّر — يُسجَّل من «الجرد»");
   return f.facts;

@@ -52,17 +52,17 @@ export default async function StockLinksPage({ searchParams }: { searchParams: P
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
         <KeyFigure
           icon={Link2}
-          label="يدخل الحسابَ اليوم"
+          label="مربوطٌ من قيمة المشتريات"
           tone={(coverage.nowBp ?? 0) >= 8_000 ? "ok" : "warn"}
           value={<span className="nums">{formatShare(coverage.nowBp)}</span>}
-          sub={<><Money minor={links.measuredMinor} /> من <Money minor={links.totalMinor - links.notStockMinor} /> مشترياتٍ كلَّ الوقت — مربوطٌ بصنفٍ وعبوتُه معروفة.</>}
+          sub={<><Money minor={links.measuredMinor} /> من <Money minor={links.totalMinor - links.notStockMinor} /> مشترياتٍ كلَّ الوقت — بندُه مربوطٌ بصنفٍ وعبوتُه معروفة. والصنفُ يدخل تقريرَ «المشترى والمباع» حين يبلغ المربوطُ منه أربعةَ أخماس ما أُدخل في فودكس.</>}
         />
         <KeyFigure
           icon={Scale}
           label="جاهزٌ بدليل فودكس"
           value={<span className="nums">{ready.length}</span>}
           sub={ready.length > 0
-            ? <>بقيمة <strong className="text-ink"><Money minor={links.readyMinor} /></strong>. إقرارُها يرفع التغطيةَ إلى <strong className="text-ink">{formatShare(coverage.afterBp)}</strong>.</>
+            ? <>بقيمة <strong className="text-ink"><Money minor={links.readyMinor} /></strong>. إقرارُها يرفع المربوطَ إلى <strong className="text-ink">{formatShare(coverage.afterBp)}</strong>.</>
             : "لا بندَ اتّفق عليه دليلُ فودكس صنفاً وعبوةً بعد."}
         >
           {canEdit && ready.length > 0 && <ApproveReady ids={ready.map((r) => r.supplierProductId)} count={ready.length} />}

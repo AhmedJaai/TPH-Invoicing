@@ -29,6 +29,7 @@ import {
   buildPnl, isTaxSettlement, RECOVERABLE_VAT, spreadShare,
   type ExcludedRow, type OpexRow, type Pnl, type PnlInput, type StockCogs,
 } from "@/lib/finance/pnl";
+import { suspectCountJump } from "@/lib/finance/stock-flow";
 import { previousMonth, stockWindow, type StockWindow } from "@/lib/finance/stock-window";
 import { addDays, currentMonthRiyadh, daysBetween, daysInMonth, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import type { StoredUnit } from "@/lib/unit-conversion";
@@ -257,10 +258,6 @@ function sumDays<T>(map: ReadonlyMap<string, T>, from: string, to: string, pick:
 
 /* ─────────────────────────── تكلفةُ المبيعات بالجرد ─────────────────────────── */
 
-/** قفزةٌ بين عدَّين فوق هذا الضِعف وهذه القيمة خطأُ إدخالٍ على الأرجح — يُخرَج الصنفُ ويُسمّى. */
-const SUSPECT_MULTIPLE = 20;
-const SUSPECT_FLOOR_MINOR = 1_000_00;
-
 async function countValuesAt(day: string, basics: StockBasics, conn: Conn): Promise<Map<string, number>> {
   const rows = await conn.execute<{ sku: string | null; quantity_milli: string; factor_milli: string | null }>(sql`
     select distinct on (i.item_id) i.sku, i.quantity_milli::text, i.factor_milli::text
@@ -310,8 +307,8 @@ async function stockCogs(
     const closingMinor = varianceCostMinor(closeMilli, rate, base);
     if (openingMinor === null || closingMinor === null) continue;
     const name = basics.nameOf.get(productId) ?? productId;
-    const [small, large] = openMilli < closeMilli ? [openMilli, closeMilli] : [closeMilli, openMilli];
-    if (large > small * SUSPECT_MULTIPLE && Math.abs(openingMinor - closingMinor) >= SUSPECT_FLOOR_MINOR) {
+    /* قفزةٌ لا تُصدَّق خطأُ إدخالٍ على الأرجح — يُخرَج الصنفُ ويُسمّى (`suspectCountJump`) */
+    if (suspectCountJump(openMilli, closeMilli, openingMinor, closingMinor)) {
       suspectItems.push(name);
       continue;
     }

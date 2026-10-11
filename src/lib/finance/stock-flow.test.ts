@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFlowItem, totalFlow, type FlowItemInput } from "./stock-flow";
+import { buildFlowItem, suspectCountJump, totalFlow, type FlowItemInput } from "./stock-flow";
 
 /** بنٌّ بالجرام: ١٠٠ ريالٍ للكيلو = ١٠ هللات للجرام = ‎10_000‎ مِلّي‑هللة. */
 const base: FlowItemInput = {
@@ -70,6 +70,28 @@ describe("الفرق غير المفسَّر", () => {
     const f = buildFlowItem({ ...base, rateMilliMinor: null, costBasis: null });
     expect(f.unexplainedMilli).toBe(2_000_000);
     expect(f.unexplainedMinor).toBeNull();
+  });
+});
+
+describe("الرقمُ المشكوك فيه", () => {
+  it("ماتشا عُدّت ٥٩٠ كيلو: فرقٌ فوق عشرة أضعاف ما بِيع يُخرَج ويُسمّى", () => {
+    const f = buildFlowItem({ ...base, name: "ماتشا", openingMilli: 590_000_000, consumed: { milli: 1_000_000, salesMilli: 1_000_000, staffMilli: 0, refundsMilli: 0 }, closingMilli: 500_000 });
+    expect(f.unexplainedMilli).toBeNull();
+    expect(f.missing).toEqual(["SUSPECT_ENTRY"]);
+  });
+  it("وفرقٌ كبيرٌ بالنسبة صغيرٌ بالريال لا يُشكّ فيه", () => {
+    /* مصّاصات: فرقُ ثلاثمئة حبّةٍ بعشرة ريالات */
+    const f = buildFlowItem({ ...base, baseUnit: "PIECE", rateMilliMinor: 2_125, purchasedMilli: 400_000, openingMilli: 0, closingMilli: 0, wasteMilli: 0, consumed: { milli: 20_000, salesMilli: 20_000, staffMilli: 0, refundsMilli: 0 } });
+    expect(f.unexplainedMilli).toBe(380_000);
+    expect(f.missing).toEqual([]);
+  });
+  it("قفزةُ العدّ: عشرون ضِعفاً بألف ريال، أو من صفرٍ بخمسة آلاف", () => {
+    expect(suspectCountJump(1_000, 590_000, 65_000, 38_000_000)).toBe(true);
+    /* بنٌّ نفد: من ستّة كيلو إلى صفر — حقّ */
+    expect(suspectCountJump(6_675_000, 0, 60_000, 0)).toBe(false);
+    /* سكّر «٥٬٥٠٠ كيلو» من لا شيء */
+    expect(suspectCountJump(0, 5_500_000_000, 0, 1_650_000)).toBe(true);
+    expect(suspectCountJump(5_000, 6_000, 50_000, 60_000)).toBe(false);
   });
 });
 

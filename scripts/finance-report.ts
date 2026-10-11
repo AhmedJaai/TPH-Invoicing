@@ -24,9 +24,14 @@ function printFlow(label: string, f: StockFlow, detail: boolean) {
     `${label}  ${f.window.from}→${f.window.to}  عدّ: ${f.window.openingCountDay ?? "لا"}(${f.openingSource ?? "-"}) → ${f.window.closingCountDay ?? "لا"}(${f.closingSource ?? "-"})\n` +
     `   مشترى(داخل الحساب) ${r(t.purchasedMinor)} من ${r(f.coverage.invoiceLinesMinor)} — تغطية ${pct(f.coverage.bp)}\n` +
     `   مستهلَك نظريّاً ${r(t.consumedMinor)} (منه موظّفون ${r(t.staffMinor)}) · هدر مسجَّل ${r(t.wasteMinor)}\n` +
-    `   فرق غير مفسَّر: نقص ${r(t.shortageMinor)} · زيادة ${r(t.overageMinor)} · مقيس ${t.measured}/${t.items} · بلا عدّ ${r(t.surplusNoCountMinor)}\n` +
+    `   فرق غير مفسَّر بفواتيرنا: نقص ${r(t.shortageMinor)} · زيادة ${r(t.overageMinor)} · مقيس ${t.measured}/${t.items} — وبمشتريات فودكس: نقص ${r(t.witnessShortageMinor)} في ${t.witnessMeasured}\n` +
     `   مبيعاتٌ خارج الاستهلاك ${r(f.coverage.salesExcludedMinor)} من ${r(f.coverage.salesExcludedMinor + f.coverage.salesIncludedMinor)} · صرفُ فودكس ${f.coverage.witnessDays}/${f.coverage.days} يوماً`,
   );
+  const gapOf = (x: StockFlow["items"][number]) => x.unexplainedMinor ?? (x.witnessUnexplainedMinor !== null && x.witnessUnexplainedMinor > 0 ? x.witnessUnexplainedMinor : null);
+  const top = f.items.flatMap((x) => { const g = gapOf(x); return g === null || g === 0 ? [] : [{ x, g }]; }).sort((a, b) => Math.abs(b.g) - Math.abs(a.g)).slice(0, 5);
+  for (const { x, g } of top) console.log(`     ▸ ${x.name.padEnd(24)} ${r(g).padStart(10)}${x.unexplainedMinor === null ? " (بمشتريات فودكس)" : ""}`);
+  const suspects = f.items.filter((x) => x.missing.includes("SUSPECT_ENTRY")).map((x) => x.name);
+  if (suspects.length > 0) console.log(`     مشكوكٌ في رقمه: ${suspects.join("، ")}`);
   if (!detail) return;
   const q = (milli: number | null, unit: Parameters<typeof canonicalToQuantity>[1]) => (milli === null ? "؟" : canonicalToQuantity(milli, unit).toFixed(2));
   const rows = [...f.items].sort((a, b) => Math.abs(b.unexplainedMinor ?? b.witnessUnexplainedMinor ?? 0) - Math.abs(a.unexplainedMinor ?? a.witnessUnexplainedMinor ?? 0));
@@ -67,7 +72,7 @@ async function main() {
   for (const m of months) printFlow(m, await loadMonthStockFlow(m), Boolean(only));
   if (!only) {
     const all = await loadCumulativeStockFlow();
-    if (all) printFlow("تراكميّ", all, true);
+    if (all) printFlow("تراكميّ", all, false);
   }
   process.exit(0);
 }
