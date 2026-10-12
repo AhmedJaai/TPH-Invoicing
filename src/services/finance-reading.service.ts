@@ -120,7 +120,6 @@ export function buildMonthFacts(view: PnlView, earlier: readonly PnlView[], sale
     if (p.gaps.some((g) => g.id === gap)) f.note(`مصروف «${CATEGORY_LABEL[gap]}» في ${m}`, "غير معروف: لا شيءَ مقيَّدٌ في الكشف ولا بإقرار المالك — ليس صفراً");
   }
   f.sar(`مجموعُ المصروفات التشغيليّة المعروفة في ${m}`, p.opexMinor);
-  f.sar("تحويلاتٌ شخصيّة للمالك من حساب المقهى (ليست مصروفاً)", view.input.ownerDrawsMinor);
 
   /* ── ما صعد وما هبط وما هامشُه ضعيف ── */
   if (!open && pm && previousWhole) {

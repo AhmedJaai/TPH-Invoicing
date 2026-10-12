@@ -103,8 +103,6 @@ export interface PnlInput {
   declaredNone: readonly TxCategory[];
   /** أيّامٌ بلا كشف بنك — `null` لا كشفَ للشهر. */
   bankGapDays: number | null;
-  /** تحويلاتٌ شخصيّة للمالك — ليست مصروفاً، وتُعرَض تحت الربح. */
-  ownerDrawsMinor: number;
 }
 
 export type PnlGapId = "NO_REVENUE" | "SALES_DAYS" | "OPEN" | "COGS_IS_PURCHASES" | "RENT" | "SALARY" | "RENT_LUMP" | "BANK_DAYS" | "NO_BANK";
@@ -272,7 +270,6 @@ export function buildPnl(input: PnlInput): Pnl {
   lines.push({ id: "profit", label: profitLabel, amountMinor: profitMinor, kind: "total", note: profitMinor === null ? "يلزمه إيرادٌ وتكلفة" : undefined });
 
   /* ── للعلم: ما ليس مصروفاً ── */
-  if (input.ownerDrawsMinor > 0) lines.push({ id: "owner-draws", label: "تحويلاتٌ شخصيّة للمالك — ليست مصروفاً", amountMinor: input.ownerDrawsMinor, kind: "memo" });
   const excludedMinor = input.excluded.reduce((s, x) => s + x.amountMinor, 0);
   if (excludedMinor > 0) lines.push({ id: "excluded", label: "ضريبةٌ سُدّدت أو تُخصَم في الإقرار — ليست مصروفاً", amountMinor: excludedMinor, kind: "memo" });
   if (c.staffMinor !== null && c.staffMinor > 0) lines.push({ id: "staff-drinks", label: "مشروباتُ الموظّفين بتكلفتها — داخلةٌ في تكلفة المبيعات", amountMinor: c.staffMinor, kind: "memo" });

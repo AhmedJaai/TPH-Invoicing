@@ -12,7 +12,8 @@
  *   - **المخزون**: ما عُدّ على الرفّ في طرفَي الشهر (`stock-flow.service.ts`) مقوَّماً بآخر
  *     كلفةٍ معروفة عند آخره — معدَّلٌ واحد للطرفين، فتغيّرُ السعر لا يصير تكلفة.
  *   - **المصروفات**: جدولُ `expenses` بشهره، ناقصاً ما ليس مصروفاً (ضريبةُ الرسوم، سدادُ
- *     الهيئة)، ومعه ما أقرّه المالك (`finance_declarations`).
+ *     الهيئة)، ومعه تحويلاتُ حساب المالك من الكشف (مصروفٌ بقرار أحمد) وما أقرّه
+ *     (`finance_declarations`).
  *
  * قراءةٌ وحدها: لا يُنشئ قيداً ولا يمسّ مالاً مقيَّداً. والتجميدُ (`freezePnl`) يحفظ
  * التقريرَ نفسَه لا رقماً في دفتر.
@@ -376,7 +377,7 @@ export interface ExpenseRowView extends OpexRow {
   declarationId: string | null;
 }
 
-async function loadOpex(month: string, declarations: readonly Declaration[], conn: Conn): Promise<{ opex: ExpenseRowView[]; excluded: (ExcludedRow & { id: string })[]; declaredNone: TxCategory[]; ownerDrawsMinor: number }> {
+async function loadOpex(month: string, declarations: readonly Declaration[], conn: Conn): Promise<{ opex: ExpenseRowView[]; excluded: (ExcludedRow & { id: string })[]; declaredNone: TxCategory[] }> {
   const [rows, draws] = await Promise.all([
     conn.execute<{ id: string; category: string; label: string; amount_minor: number; source: string; occurred_on: string; bank_transaction_id: string | null; description: string | null; beneficiary: string | null }>(sql`
       select e.id, e.category::text as category, e.label, e.amount_minor, e.source::text as source, e.occurred_on,
@@ -385,10 +386,18 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
        where e.period_month = ${month}
        order by e.amount_minor desc
     `),
-    conn.execute<{ total: string }>(sql`
-      select coalesce(sum(amount_minor), 0)::bigint as total from bank_transactions
+    /*
+      تحويلاتُ حساب المالك **مصروف** (أحمد، ١٢ أكتوبر ٢٠٢٦: «التحويلات لحساب المالك مصروف»).
+      ليست في جدول `expenses` — تصنيفُها هناك «ليس مصروفاً» — فتُقرأ من الكشف صفّاً صفّاً
+      وتدخل قائمةَ الدخل باسمها. اختيارُ صاحب المقهى يغلب التصنيف.
+    */
+    conn.execute<{ id: string; day: string; amount_minor: number; label: string | null }>(sql`
+      select id, to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD') as day, amount_minor,
+             coalesce(nullif(beneficiary_raw, ''), left(description, 60)) as label
+        from bank_transactions
        where direction = 'DEBIT' and category = 'PERSONAL'
          and to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM') = ${month}
+       order by amount_minor desc
     `),
   ]);
   const spreadTx = new Map(declarations.filter((d) => d.kind === "SPREAD" && d.bankTransactionId).map((d) => [d.bankTransactionId, d]));
@@ -416,7 +425,10 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
       if (amountMinor > 0) opex.push({ id: `decl-${d.id}`, category: d.category, label: d.label, amountMinor, source: d.kind, occurredOn: null, bankTransactionId: d.bankTransactionId, declarationId: d.id });
     }
   }
-  return { opex, excluded, declaredNone, ownerDrawsMinor: Number(draws.rows[0]?.total ?? 0) };
+  for (const d of draws.rows) {
+    opex.push({ id: `owner-${d.id}`, category: "PERSONAL", label: d.label ?? "تحويلٌ لحساب المالك", amountMinor: d.amount_minor, source: "BANK", occurredOn: d.day, bankTransactionId: d.id, declarationId: null });
+  }
+  return { opex, excluded, declaredNone };
 }
 
 /* ─────────────────────────── قائمةُ الشهر ─────────────────────────── */
@@ -521,7 +533,6 @@ async function computePnl(month: string, shared: Shared, conn: Conn): Promise<Om
     },
     opex: opexData.opex, excluded: opexData.excluded, declaredNone: opexData.declaredNone,
     bankGapDays: coverage[0]?.gapDays ?? null,
-    ownerDrawsMinor: opexData.ownerDrawsMinor,
   };
   return {
     month, pnl: buildPnl(input), input, revenue, window, stock: stock.cogs,

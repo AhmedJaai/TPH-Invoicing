@@ -53,7 +53,7 @@ async function printPnl() {
       `${v.month}${v.closed ? " [مقفل]" : ""}  الإيراد ${r(p.revenueMinor)} (مدفوع ${r(v.revenue?.paidMinor ?? null)} − ضريبة ${r(v.revenue?.vatMinor ?? null)}) · أيّام ${v.revenue?.coveredDays}/${v.revenue?.expectedDays}\n` +
       `   التكلفة [${p.cogsMethod}] ${r(p.cogsMinor)} — مشتريات ${r(c.purchasesMinor)} (${c.purchasesInvoices} فاتورة) · نظريّة ${r(c.theoreticalMinor)} · بالجرد ${r(c.stock?.minor ?? null)}${c.stock ? ` (مخزون ${r(c.stock.openingValueMinor)}→${r(c.stock.closingValueMinor)} · ${c.stock.countedItems} صنفاً · مشكوك: ${c.stock.suspectItems.join("،") || "لا"})` : ` (${c.stockMissing})`} · فودكس ${r(c.foodicsMinor)}\n` +
       `   مجمل ${r(p.grossProfitMinor)} (${pct(p.grossMarginBp)}) · فرق غير مفسَّر ${r(p.unexplainedMinor)} · مصروفات ${r(p.opexMinor)} [${p.opexByCategory.map((o) => `${o.category} ${r(o.amountMinor)}`).join(" · ")}]\n` +
-      `   ⇒ ${p.profitLabel}: ${r(p.profitMinor)} (${pct(p.netMarginBp)}) · ينقصه: ${p.gaps.map((g) => g.id).join(",") || "لا شيء"} · مسحوبات ${r(v.input.ownerDrawsMinor)} · مستثنى ${r(v.excludedRows.reduce((s, x) => s + x.amountMinor, 0))}`,
+      `   ⇒ ${p.profitLabel}: ${r(p.profitMinor)} (${pct(p.netMarginBp)}) · ينقصه: ${p.gaps.map((g) => g.id).join(",") || "لا شيء"} · مستثنى ${r(v.excludedRows.reduce((s, x) => s + x.amountMinor, 0))}`,
     );
   }
 }

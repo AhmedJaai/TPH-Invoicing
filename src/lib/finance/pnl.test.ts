@@ -15,7 +15,7 @@ const base: PnlInput = {
     { category: "SALARY", label: "رواتب", amountMinor: 1_200_000, source: "BANK" },
     { category: "POS_FEE", label: "رسوم", amountMinor: 120_000, source: "BANK" },
   ],
-  excluded: [], declaredNone: [], bankGapDays: 0, ownerDrawsMinor: 2_000_000,
+  excluded: [], declaredNone: [], bankGapDays: 0,
 };
 
 describe("قائمةُ الدخل", () => {
@@ -32,6 +32,12 @@ describe("قائمةُ الدخل", () => {
     expect(p.gaps).toEqual([]);
     /* الجرد − النظريّة − الهدر */
     expect(p.unexplainedMinor).toBe(400_000);
+  });
+  it("تحويلاتُ المالك مصروفٌ كغيره — تُطرَح من الربح (أحمد، ١٢ أكتوبر ٢٠٢٦)", () => {
+    const p = buildPnl({ ...base, opex: [...base.opex, { category: "PERSONAL", label: "تحويل للمالك", amountMinor: 2_000_000, source: "BANK" }] });
+    expect(p.opexMinor).toBe(4_120_000);
+    expect(p.profitMinor).toBe(2_880_000);
+    expect(p.lines.some((l) => l.id === "op-PERSONAL")).toBe(true);
   });
   it("بلا إيجار: «الربح قبل الإيجار» لا «صافي الربح» — وسطرُه غير معروف لا صفر", () => {
     const p = buildPnl({ ...base, opex: base.opex.filter((o) => o.category !== "RENT") });

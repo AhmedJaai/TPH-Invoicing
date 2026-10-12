@@ -27,7 +27,6 @@ function hrefOf(id: string, month: string): string | null {
   if (id === "opex") return `/finance/rows?month=${month}&line=opex`;
   if (id.startsWith("op-")) return `/finance/rows?month=${month}&line=opex&category=${id.slice(3)}`;
   if (id === "excluded") return `/finance/rows?month=${month}&line=excluded`;
-  if (id === "owner-draws") return `/bank?month=${month}&category=PERSONAL`;
   return null;
 }
 
