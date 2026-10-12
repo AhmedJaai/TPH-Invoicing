@@ -70,7 +70,7 @@ export async function loadCountDays(conn: Conn = db): Promise<{ ours: string[]; 
  * المعدودُ في يومٍ لكلّ صنف بالمِلّي المعياريّ، ومصدرُه. جردُنا المقفَل يغلب صنفاً صنفاً،
  * وما لم يكن في نطاقه يسدّه عدُّ فودكس لتلك الليلة.
  */
-async function loadCountAt(day: string, stock: ReadonlyMap<string, { id: string; baseUnit: StoredUnit }>, conn: Conn): Promise<{ values: Map<string, number>; source: CountSource | null }> {
+export async function loadCountAt(day: string, stock: ReadonlyMap<string, { id: string; baseUnit: StoredUnit }>, conn: Conn): Promise<{ values: Map<string, number>; source: CountSource | null }> {
   /* عدّان في الليلة نفسِها: الأحدثُ يغلب لكلّ صنف */
   const rows = await conn.execute<{ sku: string | null; quantity_milli: string; factor_milli: string | null }>(sql`
     select distinct on (i.item_id) i.sku, i.quantity_milli::text, i.factor_milli::text

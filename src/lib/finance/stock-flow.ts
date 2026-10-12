@@ -31,29 +31,6 @@ export type FlowMissing =
   /** الفرقُ فوق عشرة أضعاف ما بِيع من الصنف وبألف ريالٍ فأكثر — عدٌّ أو إدخالُ شراءٍ خاطئ على الأرجح. */
   | "SUSPECT_ENTRY";
 
-export const FLOW_MISSING_LABEL: Record<FlowMissing, string> = {
-  PURCHASES_UNLINKED: "لم يُربَط به بندُ فاتورةٍ — مشترياتُه غير معروفة",
-  PURCHASES_UNMEASURED: "بندُ فاتورةٍ مربوطٌ لم تُعرَف كمّيّتُه (مواصفةُ العبوة)",
-  PURCHASES_BELOW_WITNESS: "المربوطُ من فواتيرنا أقلُّ كثيراً ممّا أُدخل في فودكس — بنودٌ لم تُربَط",
-  NO_RECIPE: "لا وصفةَ تصل إليه — ما بِيع منه غير معروف",
-  UNIT_CONFLICT: "وصفتان تذكرانه بوحدتين لا تتحوّلان",
-  NO_OPENING_COUNT: "لم يُعَدّ في أوّل الفترة",
-  NO_CLOSING_COUNT: "لم يُعَدّ في آخرها",
-  SUSPECT_ENTRY: "رقمٌ مشكوكٌ فيه: الفرقُ فوق عشرة أضعاف ما بِيع — عدٌّ أو كمّيّةُ شراءٍ أُدخلت خطأً",
-};
-
-/** ما يُكمِل كلَّ نقص — وجهةٌ واحدة لكلٍّ. */
-export const FLOW_MISSING_HREF: Record<FlowMissing, string> = {
-  PURCHASES_UNLINKED: "/finance/stock/links",
-  PURCHASES_UNMEASURED: "/finance/stock/links",
-  PURCHASES_BELOW_WITNESS: "/finance/stock/links",
-  NO_RECIPE: "/inventory/recipes",
-  UNIT_CONFLICT: "/inventory/recipes",
-  NO_OPENING_COUNT: "/inventory",
-  NO_CLOSING_COUNT: "/inventory",
-  SUSPECT_ENTRY: "/inventory",
-};
-
 /**
  * دون هذه النسبة من مشتريات فودكس لا تُعدّ مشترياتُنا المربوطة كاملة (بنقاط الأساس).
  * فودكس هنا شاهدٌ على **اكتمال الربط** لا مصدرٌ للرقم: بنٌّ رُبط منه ٢١ كيلو وأُدخل في
@@ -87,12 +64,6 @@ function suspectGap(gapMilli: number | null, gapMinor: number | null, consumedMi
 }
 
 export type CostBasis = "PERIOD_PURCHASES" | "LAST_INVOICE" | "CATALOG";
-
-export const COST_BASIS_LABEL: Record<CostBasis, string> = {
-  PERIOD_PURCHASES: "متوسّطُ شراء الفترة",
-  LAST_INVOICE: "آخرُ فاتورةٍ قبلها",
-  CATALOG: "كلفةُ الكتالوج (تقدير)",
-};
 
 export interface FlowItemInput {
   productId: string;
