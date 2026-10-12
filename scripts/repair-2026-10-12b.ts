@@ -9,7 +9,7 @@
  */
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { documents, invoices, monthCloses } from "@/db/schema";
+import { documents, monthCloses } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
 import { allocate } from "@/services/payment.service";
 import { replaceWithCorrectedInvoice } from "@/services/invoice-replace.service";

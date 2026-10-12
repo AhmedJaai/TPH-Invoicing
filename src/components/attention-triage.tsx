@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  Activity, ArrowDown, ArrowLeft, Ban, Banknote, Boxes, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDot, CircleHelp, Clock, Copy, FileClock, FileSearch, FileSignature, FileText, FileWarning, FileX, FolderInput, FolderX, HandCoins, Hourglass, Info, Landmark, Lightbulb, Link2, ListChecks, Percent, ReceiptText, RefreshCw, RotateCcw, Scale, ScanSearch, ShieldAlert, Sparkles, TrendingUp, TriangleAlert, Undo2, Unlink, Zap, type LucideIcon,
+  Activity, ArrowDown, ArrowLeft, Ban, Banknote, Boxes, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleDot, CircleHelp, Clock, Copy, CopyX, FileClock, FileSearch, FileSignature, FileText, FileWarning, FileX, FolderInput, FolderX, HandCoins, Hourglass, Info, Landmark, Lightbulb, Link2, ListChecks, Percent, ReceiptText, RefreshCw, RotateCcw, Scale, ScanSearch, ShieldAlert, Sparkles, TrendingUp, TriangleAlert, Undo2, Unlink, Zap, type LucideIcon,
 } from "lucide-react";
 import { Money, Prose } from "./money";
 import { Badge, DoneMark, FlowItem, Kbd, LinkButton, LinkTabs, Stepper, buttonClass, type Tone } from "./ui";
@@ -74,6 +74,7 @@ const GLYPH: Record<AttentionId, LucideIcon> = {
   "stock-gap-shortage": Boxes,
   "stock-gap-over": Boxes,
   "proforma-without-invoice": FileWarning,
+  "repeat-delivery": CopyX,
   "recurring-anomalies": RotateCcw,
   "obligations-expiring": FileClock,
   "missing-statements": FileClock,

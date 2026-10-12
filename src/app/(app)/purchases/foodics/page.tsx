@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CircleCheck, FileQuestion, FileX2, Link2, PackageSearch, Scale, Undo2, X } from "lucide-react";
+import { CircleCheck, CopyX, FileQuestion, FileX2, Link2, PackageSearch, Scale, Undo2, X } from "lucide-react";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { PageShell } from "@/components/page-shell";
@@ -19,6 +19,7 @@ import { loadFoodicsStatus } from "@/services/foodics-sync.service";
 import { loadFoodicsSilenced } from "@/services/foodics-takings.service";
 import { invoiceSignalKey as invoiceKey, purchaseSignalKey as purchaseKey, supplierSignalKey as supplierKey } from "@/services/foodics-attention.service";
 import { PostAction } from "@/components/post-action";
+import { loadRepeatDeliveries, type RepeatDelivery } from "@/services/repeat-delivery.service";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,9 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
   }
 
   const params = await searchParams;
-  const [status, w, silenced] = await Promise.all([loadFoodicsStatus(), loadPurchaseWitness(), loadFoodicsSilenced("foodics-purchase")]);
+  const [status, w, silenced, repeats] = await Promise.all([
+    loadFoodicsStatus(), loadPurchaseWitness(), loadFoodicsSilenced("foodics-purchase"), loadRepeatDeliveries({ includeSilenced: true }),
+  ]);
   const canLink = can(user.role, "supplier:edit");
   const canSilence = can(user.role, "bank:edit");
   const canSync = can(user.role, "inventory:count");
@@ -184,6 +187,21 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
             </div>
           </div>
         </section>
+      )}
+
+      {/* ── توريدٌ بفاتورتين ── */}
+      {repeats.length > 0 && (
+        <Section
+          id="repeat"
+          title="توريدٌ يبدو مقيَّداً مرّتين"
+          icon={CopyX}
+          count={repeats.filter((r) => !r.silenced).length}
+          hint="فاتورتان للمورّد نفسِه بالأصناف والكمّيّات نفسِها، وبينهما أيّامٌ أقلّ من عادته في التوريد. الأرجح أنّ إحداهما أُلغيت وصدرت الأخرى مكانها. اسأل المورّد — وإن كانا توريدَين فعلاً فأغلِق السؤال."
+        >
+          <ul className="space-y-2">
+            {repeats.map((r) => <RepeatRow key={r.key} r={r} canSilence={canSilence} />)}
+          </ul>
+        </Section>
       )}
 
       {/* ── ربطُ المورّدين ── */}
@@ -388,6 +406,33 @@ function LinkedRow({ s, canLink, suppliers }: { s: FoodicsSupplierRow; canLink: 
           <FoodicsSupplierLink foodicsSupplierId={s.id} linkedSupplierId={s.linkedSupplierId} suggestedSupplierId={null} suppliers={suppliers} />
         </div>
       )}
+    </li>
+  );
+}
+
+function RepeatRow({ r, canSilence }: { r: RepeatDelivery; canSilence: boolean }) {
+  const gap = r.gapDays === 0 ? "في اليوم نفسِه" : r.gapDays === 1 ? "بينهما يوم" : r.gapDays === 2 ? "بينهما يومان" : `بينهما ${r.gapDays} أيّام`;
+  return (
+    <li className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 ${r.silenced ? "border-line bg-surface" : "border-warn/30 bg-warn-bg"}`}>
+      <div className="min-w-0 flex-1 basis-56">
+        <p className="text-sm font-bold">
+          {r.supplierName} · <bdi dir="ltr">{r.first.number}</bdi> (<bdi>{formatDay(r.first.day)}</bdi>) و<bdi dir="ltr">{r.second.number}</bdi> (<bdi>{formatDay(r.second.day)}</bdi>)
+        </p>
+        <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
+          البنودُ والكمّيّاتُ واحدة، {gap}: <Money minor={r.first.totalMinor} /> و<Money minor={r.second.totalMinor} />.
+          {r.foodicsReceipts === 1 && " وفودكس استلم من المورّد مرّةً واحدة في تلك الأيّام."}
+          {r.foodicsReceipts === 0 && " ولا استلامَ من المورّد في فودكس في تلك الأيّام."}
+          {r.bothPaid ? " سُدِّدتا كلتاهما — إن كانت إحداهما ملغاةً فلك عند المورّد " : " إن كانت إحداهما ملغاةً فلا تدفع "}
+          <Money minor={r.atStakeMinor} />.
+        </p>
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-1">
+        <LinkButton href={invoiceHref(r.first.id)} variant="secondary" size="sm">الأولى</LinkButton>
+        <LinkButton href={invoiceHref(r.second.id)} variant="secondary" size="sm">الثانية</LinkButton>
+        {canSilence && (r.silenced
+          ? <SignalControls signalKey={r.key} silenced />
+          : <SignalControls signalKey={r.key} dismissLabel="توريدان فعلاً" snoozeDays={7} />)}
+      </div>
     </li>
   );
 }

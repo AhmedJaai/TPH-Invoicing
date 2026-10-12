@@ -199,6 +199,14 @@ export interface AttentionFacts {
    */
   orphanProformas?: { supplierName: string; supplierSlug: string; number: string | null; periodMonth: string | null }[];
   /**
+   * توريدٌ يبدو مقيَّداً مرّتين (`repeat-delivery.service.ts`): فاتورتان للمورّد نفسِه ببنودٍ
+   * وكمّيّاتٍ واحدة بينهما أيّامٌ أقلّ من إيقاعه — ملغاةٌ وبديلتُها بقيتا معاً.
+   */
+  repeatDeliveries?: {
+    supplierName: string; firstNumber: string; secondNumber: string; gapDays: number;
+    atStakeMinor: number; bothPaid: boolean; foodicsReceipts: number | null;
+  }[];
+  /**
    * ما اختلف فيه فودكس مع البنك ومع الفواتير (`services/foodics-attention.service.ts`) —
    * فودكس شاهدٌ: يُقال الفرقُ بطرفيه ولا يُسمّى ضياعاً، وما أسكته صاحبُه لا يُعدّ.
    */
@@ -688,6 +696,42 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       evidence: days.slice(0, 6).map((d) => ({
         label: formatDay(d.day),
         sub: d.usualMinor === null ? "لا تقديرَ لمثله" : `وسيطُ مثله ${formatRiyalsDisplay(d.usualMinor)} — تقدير`,
+      })),
+    });
+  }
+
+  /*
+    توريدٌ واحد بفاتورتين: أفال ألغت 00080 وأصدرت 00084 بالبنود نفسها بعد يومين، وكشفُها
+    حملهما معاً فدُفعتا — ‏١٬٩٩٨٫٧٠ لم يرها أحدٌ شهرين. سؤالٌ لا حكم: يُغلق بـ«توريدان فعلاً».
+  */
+  if ((f.repeatDeliveries?.length ?? 0) > 0) {
+    const list = f.repeatDeliveries!;
+    const total = list.reduce((s, r) => s + r.atStakeMinor, 0);
+    const paid = list.filter((r) => r.bothPaid).length;
+    out.push({
+      id: "repeat-delivery",
+      area: "INVOICES",
+      severity: paid > 0 ? "CRITICAL" : "HIGH",
+      title: list.length === 1
+        ? `توريدٌ من ${list[0].supplierName} يبدو مقيَّداً مرّتين`
+        : `${list.length} توريداتٍ تبدو مقيَّدةً مرّتين`,
+      detail: "فاتورتان للمورّد نفسِه بالأصناف والكمّيّات نفسِها وبينهما أيّامٌ أقلّ من عادته — الأرجح أنّ إحداهما أُلغيت وصدرت الأخرى مكانها وبقيتا معاً."
+        + (paid > 0 ? " وقد سُدِّدتا كلتاهما." : ""),
+      action: paid > 0
+        ? "اسأل المورّد: إن كانت إحداهما ملغاةً فألغِها عندنا واطلب إشعاراً دائناً أو خصماً من القادمة."
+        : "اسأل المورّد قبل أن تدفع: إن كانت إحداهما ملغاةً فألغِها عندنا.",
+      actionLabel: "قارِن الفاتورتين",
+      href: "/purchases/foodics#repeat",
+      count: list.length,
+      amountMinor: total,
+      impact: { kind: paid > 0 ? "RECOVERABLE" : "AT_RISK", amountMinor: total },
+      evidence: list.slice(0, 6).map((r) => ({
+        label: `${r.supplierName} · ${r.firstNumber} و${r.secondNumber}`,
+        sub: `بينهما ${r.gapDays === 0 ? "اليومُ نفسُه" : r.gapDays === 1 ? "يوم" : r.gapDays === 2 ? "يومان" : `${r.gapDays} أيّام`}`
+          + (r.foodicsReceipts === 1 ? " · وفودكس استلم مرّةً واحدة" : r.foodicsReceipts === 0 ? " · ولا استلامَ في فودكس" : "")
+          + (r.bothPaid ? " · سُدِّدتا" : ""),
+        amountMinor: r.atStakeMinor,
+        href: "/purchases/foodics#repeat",
       })),
     });
   }

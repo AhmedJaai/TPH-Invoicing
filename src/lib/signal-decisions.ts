@@ -25,6 +25,7 @@ export const SIGNAL_PREFIXES = [
   "foodics-till",
   "stock-link",
   "stock-gap",
+  "repeat-delivery",
 ] as const;
 
 export type SignalPrefix = (typeof SIGNAL_PREFIXES)[number];
@@ -44,6 +45,7 @@ export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
   "foodics-till": "فرقٌ بين المعدود في الصندوق والمتوقَّع",
   "stock-link": "بندُ فاتورةٍ ليس مخزوناً",
   "stock-gap": "فرقٌ متكرّر في صنف مخزون",
+  "repeat-delivery": "توريدٌ يبدو مقيَّداً مرّتين",
 };
 
 const KEY_RE = /^[a-z-]{3,24}:[^\s]{1,160}$/;

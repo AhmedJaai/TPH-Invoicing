@@ -39,6 +39,7 @@ export const ATTENTION_IDS = [
   "stock-gap-shortage",
   "stock-gap-over",
   "proforma-without-invoice",
+  "repeat-delivery",
   "recurring-anomalies",
   "obligations-expiring",
   "missing-statements",
