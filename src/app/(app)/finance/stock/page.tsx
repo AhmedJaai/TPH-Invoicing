@@ -7,7 +7,7 @@ import { PageShell } from "@/components/page-shell";
 import { Money } from "@/components/money";
 import { MaybeMoney } from "@/components/finance-bits";
 import { SignalControls } from "@/components/signal-controls";
-import { Badge, Callout, DataTable, KeyFigure, LinkButton, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
+import { Callout, DataTable, KeyFigure, LinkButton, LinkTabs, NoAccess, Section, type Column } from "@/components/ui";
 import { BALANCE_NOTE_LABEL, PURCHASE_SOURCE_LABEL, type BalanceItem } from "@/lib/finance/stock-balance";
 import { readableQuantity } from "@/lib/finance/quantity";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -53,10 +53,21 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
       cell: (x) => (x.purchasedMilli === null ? <span className="text-[11px] font-bold text-ink-soft">غير معروف</span> : (
         <span className="block">
           <span className="nums">{qty(x, x.purchasedMilli)}</span>
-          <span className="block text-[10px] text-muted">{x.purchasedMinor !== null && <Money minor={x.purchasedMinor} />}{x.source === "FOODICS" && " · فودكس"}</span>
+          {x.purchasedMinor !== null && <span className="block text-[10px] text-muted"><Money minor={x.purchasedMinor} /></span>}
         </span>
       )),
       sortBy: (x) => x.purchasedMinor,
+    },
+    {
+      /* الرقمان معاً منذ البداية، وأيُّهما اعتُمد — «يشوف إيش اللي أدقّ» */
+      key: "sources", header: "فواتيرُنا / فودكس", numeric: true, secondary: true,
+      cell: (x) => (
+        <span className="block text-[11px]">
+          <span className={`nums block ${x.source === "INVOICES" || x.source === "SAME" ? "font-bold text-ink" : "text-muted"}`}>{x.invoicesToDateMilli === null ? "لم تُربَط" : qty(x, x.invoicesToDateMilli)}</span>
+          <span className={`nums block ${x.source === "FOODICS" || x.source === "SAME" ? "font-bold text-ink" : "text-muted"}`}>{x.foodicsToDateMilli === null ? "لم يُدخَل" : qty(x, x.foodicsToDateMilli)}</span>
+          {x.source && <span className="block text-[10px] text-muted">{PURCHASE_SOURCE_LABEL[x.source]}</span>}
+        </span>
+      ),
     },
     {
       key: "sold", header: month ? "بِيع منه في الشهر" : "بِيع منه", numeric: true,
@@ -124,7 +135,7 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
           icon={ShoppingCart}
           label={month ? "اشتُري في الشهر" : "اشتُري"}
           value={<Money minor={t.purchasedMinor} currency />}
-          sub={<>من فواتيرنا المربوطة <Money minor={t.purchasedFromInvoicesMinor} />، والباقي ممّا أُدخل في فودكس.{b.unlinkedInvoiceMinor > 0 && <> وبنودُ فواتير بـ<strong className="text-ink"><Money minor={b.unlinkedInvoiceMinor} /></strong> لم تُربَط بصنفٍ بعد.</>}</>}
+          sub={<>من المصدرين معاً، ويُعتمَد أكملُهما لكلّ صنف: فواتيرُنا أكمل في <strong className="text-ink">{t.invoicesBetter}</strong>، وفودكس في <strong className="text-ink">{t.foodicsBetter}</strong>، واتّفقا في {t.sourcesAgree}.{b.unlinkedInvoiceMinor > 0 && <> بنودُ فواتير بـ<Money minor={b.unlinkedInvoiceMinor} /> لم تُربَط بعد.</>}</>}
           href="/finance/stock/links"
         />
         <KeyFigure
@@ -192,8 +203,8 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
         <ul className="list-disc space-y-0.5 ps-4">
           <li><strong className="text-ink">المتوقَّع متبقّياً = كلُّ ما اشتُري − كلُّ ما بِيع منه − الهدر المسجَّل</strong>، منذ البداية. لا يحتاج جرداً.</li>
           <li><strong className="text-ink">الضائع = المتوقَّع يومَ العدّ − ما عُدّ على الرفّ</strong>. قد يكون هدراً لم يُسجَّل، أو جرعةً أكبر من الوصفة، أو تسريباً — البياناتُ لا تحسم.</li>
-          <li>المشترى من فواتيرنا المربوطة بالصنف حين تكتمل، وإلّا ممّا أُدخل في فودكس (<Badge tone="muted">فودكس</Badge>). والوحدةُ والعبوةُ من كتالوج فودكس.</li>
-          <li>{PURCHASE_SOURCE_LABEL.INVOICES} أدقّ: كلُّ بندٍ تربطه يُخرج صنفَه من «غير معروف» ومن «بِيع أكثر ممّا اشتُري».</li>
+          <li>المشترى يُحسَب من <strong className="text-ink">فواتيرنا المربوطة</strong> ومن <strong className="text-ink">ما أُدخل في فودكس</strong> معاً، ويُعتمَد أكملُهما: الشراءُ يسقط من سجلٍّ ولا يُخترَع فيه. والرقمان في عمود «فواتيرُنا / فودكس» منذ البداية، والغامقُ ما اعتُمد.</li>
+          <li>الوحدةُ والعبوةُ من كتالوج فودكس. وكلُّ بندِ فاتورةٍ تربطه يُكمل سجلَّ صنفه.</li>
         </ul>
       </Callout>
     </PageShell>

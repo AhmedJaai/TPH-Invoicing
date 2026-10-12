@@ -9,7 +9,8 @@ const r = (over: Partial<RangeFigures> = {}): RangeFigures => ({
 const base: BalanceItemInput = {
   productId: "p", name: "بنّ", baseUnit: "G", rateMilliMinor: 10_000,
   period: r({ foodicsMilli: 30_000_000, foodicsMinor: 300_000, soldMilli: 25_000_000 }),
-  toDate: r(), toCount: null, count: null,
+  /* شهرٌ: سبعون كيلو اشتُريت قبله، ومئةٌ حتى آخره */
+  before: r({ foodicsMilli: 70_000_000, foodicsMinor: 700_000 }), toDate: r(), toCount: null, count: null,
 };
 
 describe("المشترى والمباع والمتوقَّع — بلا اشتراط جرد", () => {
@@ -39,7 +40,7 @@ describe("المشترى والمباع والمتوقَّع — بلا اشتر
     expect(b.lostMilli).toBeNull();
   });
   it("لا شراءَ ولا وصفة: غير معروف لا صفر", () => {
-    const b = buildBalanceItem({ ...base, period: r({ foodicsMilli: null, soldMilli: null }), toDate: r({ foodicsMilli: null, soldMilli: null }) });
+    const b = buildBalanceItem({ ...base, before: null, period: r({ foodicsMilli: null, soldMilli: null }), toDate: r({ foodicsMilli: null, soldMilli: null }) });
     expect(b.purchasedMilli).toBeNull();
     expect(b.expectedMilli).toBeNull();
     expect(b.notes).toEqual(["NO_PURCHASES", "NO_RECIPE"]);
@@ -51,12 +52,30 @@ describe("المشترى والمباع والمتوقَّع — بلا اشتر
   });
 });
 
-describe("مصدرُ المشترى", () => {
-  it("فواتيرُنا حين تكتمل، وفودكس حين ينقص ربطُها", () => {
-    expect(chooseSource(r({ invoicesMilli: 95_000_000 }))).toBe("INVOICES");
+describe("المشترى من المصدرين: الأكملُ هو الأدقّ", () => {
+  it("يُقال أيُّهما أكمل، ومتى اتّفقا", () => {
+    expect(chooseSource(r({ invoicesMilli: 145_000_000 }))).toBe("INVOICES");
     expect(chooseSource(r({ invoicesMilli: 21_000_000 }))).toBe("FOODICS");
+    expect(chooseSource(r({ invoicesMilli: 99_000_000 }))).toBe("SAME");
     expect(chooseSource(r({ invoicesMilli: 21_000_000, foodicsMilli: null }))).toBe("INVOICES");
     expect(chooseSource(r({ foodicsMilli: null }))).toBeNull();
+  });
+  it("فواتيرُنا أكمل: يُحسَب بها المتوقَّع ولو أُدخل في فودكس أقلّ", () => {
+    const b = buildBalanceItem({ ...base, toDate: r({ invoicesMilli: 145_000_000, invoicesMinor: 1_450_000 }) });
+    expect(b.source).toBe("INVOICES");
+    expect(b.expectedMilli).toBe(65_000_000);
+    expect(b.invoicesToDateMilli).toBe(145_000_000);
+    expect(b.foodicsToDateMilli).toBe(100_000_000);
+  });
+  it("مشترى الشهر تراكميّ: فاتورةُ آخر يونيو المدخَلةُ في فودكس أوّلَ يوليو لا تُحسَب مرّتين", () => {
+    /* حتى آخر يونيو: فواتيرُنا ٥٠ وفودكس ٤٥. حتى آخر يوليو: كلاهما ٦٠ */
+    const b = buildBalanceItem({
+      ...base,
+      before: r({ invoicesMilli: 50_000_000, invoicesMinor: 500_000, foodicsMilli: 45_000_000, foodicsMinor: 450_000 }),
+      toDate: r({ invoicesMilli: 60_000_000, invoicesMinor: 600_000, foodicsMilli: 60_000_000, foodicsMinor: 600_000, soldMilli: 40_000_000 }),
+    });
+    expect(b.purchasedMilli).toBe(10_000_000);
+    expect(b.purchasedMinor).toBe(100_000);
   });
 });
 

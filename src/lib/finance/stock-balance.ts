@@ -9,19 +9,26 @@
  * والجردُ — إن وُجد — يقول كم ضاع: **الضائع = المتوقَّع يومَ العدّ − المعدود**. بلا عدٍّ يبقى
  * «المتوقَّع» ولا يُقال «ضاع» شيء: قد يكون على الرفّ.
  *
- * والمشترى من فواتيرنا المربوطة حين تكتمل، وإلّا ممّا أُدخل في فودكس (صنفُه ووحدتُه
- * وعبوتُه معروفةٌ هناك) — ويُقال مصدرُه. وما لا يُعرَف يبقى «غير معروف» لا صفراً.
+ * والمشترى يُحسَب **من المصدرين معاً** — فواتيرِنا المربوطة وما أُدخل في فودكس — ويُؤخَذ
+ * أكملُهما عند كلّ تاريخ (أحمد، ١٢ أكتوبر ٢٠٢٦: «حساب المشترى من فودكس والفواتير ويشوف
+ * إيش اللي أدقّ»). الشراءُ يسقط من سجلٍّ ولا يُخترَع فيه: فاتورةٌ لم تُربَط، أو بضاعةٌ لم
+ * تُدخَل في فودكس — فالأكملُ هو الأدقّ. والمقارنةُ **تراكميّة**: فاتورةٌ بتاريخ ٣٠ يونيو
+ * أُدخلت في فودكس ٢ يوليو لا تُحسَب مرّتين. والرقمان يُعرَضان معاً ويُقال أيُّهما اعتُمد.
  */
 import type { StoredUnit } from "@/lib/unit-conversion";
 import { varianceCostMinor } from "@/lib/inventory/purchases";
-import { SUSPECT_FLOOR_MINOR, SUSPECT_GAP_MULTIPLE, WITNESS_COMPLETENESS_BP } from "./stock-flow";
+import { SUSPECT_FLOOR_MINOR, SUSPECT_GAP_MULTIPLE } from "./stock-flow";
 
-export type PurchaseSource = "INVOICES" | "FOODICS";
+export type PurchaseSource = "INVOICES" | "FOODICS" | "SAME";
 
 export const PURCHASE_SOURCE_LABEL: Record<PurchaseSource, string> = {
-  INVOICES: "من فواتيرنا",
-  FOODICS: "ممّا أُدخل في فودكس",
+  INVOICES: "فواتيرُنا أكمل",
+  FOODICS: "فودكس أكمل",
+  SAME: "المصدران متّفقان",
 };
+
+/** دون هذا الفرق (بنقاط الأساس) يُعدّ المصدران متّفقَين. */
+export const SOURCES_AGREE_BP = 200;
 
 /** كمّيّاتُ مدًى واحد بالمِلّي المعياريّ. */
 export interface RangeFigures {
@@ -42,8 +49,9 @@ export interface BalanceItemInput {
   name: string;
   baseUnit: StoredUnit;
   rateMilliMinor: number | null;
-  /** المدّةُ المعروضة، ومنذ البداية حتى آخرها، ومنذ البداية حتى يوم العدّ. */
+  /** المدّةُ المعروضة، ومنذ البداية حتى عشيّتها (`null` لكلّ الوقت)، وحتى آخرها، وحتى يوم العدّ. */
   period: RangeFigures;
+  before: RangeFigures | null;
   toDate: RangeFigures;
   toCount: RangeFigures | null;
   count: { day: string; milli: number; source: "OURS" | "FOODICS" } | null;
@@ -69,7 +77,11 @@ export interface BalanceItem {
   productId: string;
   name: string;
   baseUnit: StoredUnit;
+  /** أيُّ المصدرين أكمل منذ البداية — `null` لا شراءَ معروفاً من أيّهما. */
   source: PurchaseSource | null;
+  /** ما يقوله كلُّ مصدرٍ منذ البداية — يُعرَضان معاً. `null` غير معروف. */
+  invoicesToDateMilli: number | null;
+  foodicsToDateMilli: number | null;
   purchasedMilli: number | null;
   purchasedMinor: number | null;
   soldMilli: number | null;
@@ -86,40 +98,47 @@ export interface BalanceItem {
   notes: BalanceNote[];
 }
 
-/**
- * المصدرُ يُختار مرّةً لكلّ صنف على كلّ ما مضى، ثمّ يُستعمَل لكلّ المدد: فواتيرُنا إن عُرفت
- * ولم تكن دون أربعة أخماس ما في فودكس (ربطٌ ناقص)، وإلّا فودكس، وإلّا فواتيرُنا كما هي.
- */
-export function chooseSource(toDate: RangeFigures): PurchaseSource | null {
-  const { invoicesMilli: ours, foodicsMilli: theirs } = toDate;
-  if (ours !== null && (theirs === null || theirs <= 0 || ours * 10_000 >= theirs * WITNESS_COMPLETENESS_BP)) return "INVOICES";
-  if (theirs !== null && theirs > 0) return "FOODICS";
-  return ours !== null ? "INVOICES" : null;
+/** الأكملُ من المصدرين حتى تاريخ: كمّيّتُه وقيمتُه. `null` لا يُعرَف من أيّهما. */
+function best(r: RangeFigures): { milli: number; minor: number } | null {
+  const ours = r.invoicesMilli === null ? null : { milli: r.invoicesMilli, minor: r.invoicesMinor };
+  const theirs = r.foodicsMilli === null ? null : { milli: r.foodicsMilli, minor: r.foodicsMinor };
+  if (ours === null) return theirs;
+  if (theirs === null) return ours;
+  return theirs.milli > ours.milli ? theirs : ours;
 }
 
-const bought = (r: RangeFigures, source: PurchaseSource | null): { milli: number | null; minor: number | null } =>
-  source === "INVOICES" ? { milli: r.invoicesMilli, minor: r.invoicesMilli === null ? null : r.invoicesMinor }
-  : source === "FOODICS" ? { milli: r.foodicsMilli, minor: r.foodicsMilli === null ? null : r.foodicsMinor }
-  : { milli: null, minor: null };
+/** أيُّ المصدرين أكمل منذ البداية؟ — للعرض بجانب الرقمين. */
+export function chooseSource(toDate: RangeFigures): PurchaseSource | null {
+  const { invoicesMilli: ours, foodicsMilli: theirs } = toDate;
+  if (ours === null && theirs === null) return null;
+  if (ours === null) return "FOODICS";
+  if (theirs === null) return "INVOICES";
+  const large = Math.max(ours, theirs);
+  if (large === 0 || Math.abs(ours - theirs) * 10_000 <= large * SOURCES_AGREE_BP) return "SAME";
+  return theirs > ours ? "FOODICS" : "INVOICES";
+}
 
-const remaining = (r: RangeFigures, source: PurchaseSource | null): number | null => {
-  const b = bought(r, source).milli;
-  return b === null || r.soldMilli === null ? null : b - r.soldMilli - r.wasteMilli;
+const remaining = (r: RangeFigures): number | null => {
+  const b = best(r);
+  return b === null || r.soldMilli === null ? null : b.milli - r.soldMilli - r.wasteMilli;
 };
 
 export function buildBalanceItem(i: BalanceItemInput): BalanceItem {
   const source = chooseSource(i.toDate);
   const cost = (milli: number | null) => varianceCostMinor(milli, i.rateMilliMinor, i.baseUnit);
-  const period = bought(i.period, source);
-  const expectedMilli = remaining(i.toDate, source);
+  /* مشترى المدّة = الأكملُ حتى آخرها − الأكملُ حتى عشيّتها: تراكميٌّ فلا يُحسَب شراءٌ مرّتين */
+  const end = best(i.toDate);
+  const start = i.before === null ? { milli: 0, minor: 0 } : best(i.before) ?? { milli: 0, minor: 0 };
+  const period = end === null ? { milli: null, minor: null } : { milli: end.milli - start.milli, minor: end.minor - start.minor };
+  const expectedMilli = remaining(i.toDate);
   const notes: BalanceNote[] = [];
-  if (source === null || bought(i.toDate, source).milli === null) notes.push("NO_PURCHASES");
+  if (end === null) notes.push("NO_PURCHASES");
   if (i.toDate.soldMilli === null) notes.push("NO_RECIPE");
   if (expectedMilli !== null && expectedMilli < 0) notes.push("SOLD_MORE_THAN_BOUGHT");
 
   let lostMilli: number | null = null;
   if (i.count !== null && i.toCount !== null) {
-    const expectedAtCount = remaining(i.toCount, source);
+    const expectedAtCount = remaining(i.toCount);
     /* متوقَّعٌ سالبٌ يومَ العدّ: المشترى المسجَّل ناقص — لا يُقاس عليه ضياع */
     if (expectedAtCount !== null && expectedAtCount >= 0) lostMilli = expectedAtCount - i.count.milli;
   }
@@ -131,6 +150,7 @@ export function buildBalanceItem(i: BalanceItemInput): BalanceItem {
   }
   return {
     productId: i.productId, name: i.name, baseUnit: i.baseUnit, source,
+    invoicesToDateMilli: i.toDate.invoicesMilli, foodicsToDateMilli: i.toDate.foodicsMilli,
     purchasedMilli: period.milli, purchasedMinor: period.minor,
     soldMilli: i.period.soldMilli, soldMinor: cost(i.period.soldMilli),
     staffMilli: i.period.staffMilli, wasteMilli: i.period.wasteMilli,
@@ -141,8 +161,10 @@ export function buildBalanceItem(i: BalanceItemInput): BalanceItem {
 
 export interface BalanceTotals {
   purchasedMinor: number;
-  /** منه ما جاء من فواتيرنا — والباقي ممّا أُدخل في فودكس. */
-  purchasedFromInvoicesMinor: number;
+  /** كم صنفاً كلُّ مصدرٍ فيه أكمل، وكم اتّفقا. */
+  invoicesBetter: number;
+  foodicsBetter: number;
+  sourcesAgree: number;
   soldMinor: number;
   /** المتوقَّع متبقّياً (الموجب) — وما بِيع فوق المشترى على حدة. */
   expectedMinor: number;
@@ -159,7 +181,9 @@ export function totalBalance(items: readonly BalanceItem[]): BalanceTotals {
   const sum = (xs: readonly number[]) => xs.reduce((s, x) => s + x, 0);
   return {
     purchasedMinor: sum(items.map((x) => x.purchasedMinor ?? 0)),
-    purchasedFromInvoicesMinor: sum(items.map((x) => (x.source === "INVOICES" ? x.purchasedMinor ?? 0 : 0))),
+    invoicesBetter: items.filter((x) => x.source === "INVOICES").length,
+    foodicsBetter: items.filter((x) => x.source === "FOODICS").length,
+    sourcesAgree: items.filter((x) => x.source === "SAME").length,
     soldMinor: sum(items.map((x) => x.soldMinor ?? 0)),
     expectedMinor: sum(items.map((x) => Math.max(0, x.expectedMinor ?? 0))),
     shortPurchasesMinor: sum(items.map((x) => Math.max(0, -(x.expectedMinor ?? 0)))),

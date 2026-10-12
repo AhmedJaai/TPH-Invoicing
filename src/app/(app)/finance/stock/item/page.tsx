@@ -61,7 +61,10 @@ export default async function StockItemPage({ searchParams }: { searchParams: Pr
         <Card>
           <p className="text-[11px] font-bold text-muted">{month ? "اشتُري في الشهر" : "اشتُري"}</p>
           <p className="nums mt-1.5 text-[17px] font-semibold">{qty(item.purchasedMilli)}</p>
-          <p className="mt-1 text-[11px] text-muted">{item.source ? PURCHASE_SOURCE_LABEL[item.source] : "لا شراءَ مسجَّلاً"}{item.purchasedMinor !== null && <> · <Money minor={item.purchasedMinor} /></>}</p>
+          <p className="mt-1 text-[11px] text-muted">
+            {item.source ? PURCHASE_SOURCE_LABEL[item.source] : "لا شراءَ مسجَّلاً"}{item.purchasedMinor !== null && <> · <Money minor={item.purchasedMinor} /></>}
+            <span className="block">منذ البداية — فواتيرُنا: <span className="nums">{item.invoicesToDateMilli === null ? "لم تُربَط" : qty(item.invoicesToDateMilli)}</span> · فودكس: <span className="nums">{item.foodicsToDateMilli === null ? "لم يُدخَل" : qty(item.foodicsToDateMilli)}</span></span>
+          </p>
         </Card>
         <Card>
           <p className="text-[11px] font-bold text-muted">{month ? "بِيع منه في الشهر" : "بِيع منه"}</p>
@@ -114,7 +117,7 @@ export default async function StockItemPage({ searchParams }: { searchParams: Pr
       </Section>
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-x-6 lg:grid-cols-2">
-        <Section title="فواتيرُه المربوطة" icon={Receipt} count={detail.purchases.length} hint={item.source === "FOODICS" ? "المشترى أعلاه ممّا أُدخل في فودكس — وهذه بنودُ فواتيرنا المربوطة به، وهي أقلّ." : undefined}>
+        <Section title="فواتيرُه المربوطة" icon={Receipt} count={detail.purchases.length} hint={item.source === "FOODICS" ? "فودكس أكمل لهذا الصنف — وهذه بنودُ فواتيرنا المربوطة به، وهي أقلّ." : undefined}>
           <DataTable
             columns={[
               { key: "supplier", header: "المورّد", primary: true, cell: (r) => r.supplierName || "استلامٌ يدويّ" },

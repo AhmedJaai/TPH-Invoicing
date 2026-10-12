@@ -14,7 +14,7 @@ import { summarisePurchases, type PurchaseLineInput } from "@/lib/inventory/purc
 import { indexRecipeVersions } from "@/lib/inventory/recipe";
 import { toCanonical } from "@/lib/inventory/units";
 import { buildBalanceItem, totalBalance, type BalanceItem, type BalanceTotals, type RangeFigures } from "@/lib/finance/stock-balance";
-import { monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
+import { addDays, monthEndDay, todayInRiyadh } from "@/lib/riyadh-time";
 import type { StoredUnit } from "@/lib/unit-conversion";
 import { loadPurchaseLines, loadSoldForReport } from "./inventory.service";
 import { loadRates } from "./profit.service";
@@ -137,13 +137,14 @@ export async function loadStockBalance(month: string | null, opts: { trendFor?: 
   const period = figures(data, from ?? BEGINNING, to);
   const toDate = from === null ? period : figures(data, BEGINNING, to);
   const toCount = countDay ? figures(data, BEGINNING, countDay) : null;
+  const before = from === null ? null : figures(data, BEGINNING, addDays(from, -1));
   const empty: RangeFigures = { invoicesMilli: null, invoicesMinor: 0, foodicsMilli: null, foodicsMinor: 0, soldMilli: null, staffMilli: 0, wasteMilli: 0 };
 
   const items = data.stock.map((p) => {
     const counted = count.values.get(p.id);
     return buildBalanceItem({
       productId: p.id, name: p.name, baseUnit: p.baseUnit, rateMilliMinor: rates.get(p.id) ?? null,
-      period: period.get(p.id) ?? empty, toDate: toDate.get(p.id) ?? empty,
+      period: period.get(p.id) ?? empty, before: before === null ? null : before.get(p.id) ?? empty, toDate: toDate.get(p.id) ?? empty,
       toCount: counted === undefined ? null : toCount?.get(p.id) ?? null,
       count: counted === undefined || countDay === null || count.source === null ? null : { day: countDay, milli: counted, source: count.source },
     });
@@ -156,16 +157,17 @@ export async function loadStockBalance(month: string | null, opts: { trendFor?: 
   const trend: StockBalance["trend"] = [];
   const product = opts.trendFor ? data.stock.find((p) => p.id === opts.trendFor) : undefined;
   if (product) {
-    const source = items.find((x) => x.productId === product.id)?.source ?? null;
+    /* الأكملُ من المصدرين حتى تاريخ — كما في `stock-balance.ts` */
+    const bestOf = (r: RangeFigures) => (r.invoicesMilli === null ? r.foodicsMilli : r.foodicsMilli === null ? r.invoicesMilli : Math.max(r.invoicesMilli, r.foodicsMilli));
     for (const m of opts.months ?? []) {
       const end = monthEndDay(m) < to ? monthEndDay(m) : to;
       if (`${m}-01` > to) continue;
       const inMonth = figures(data, `${m}-01`, end).get(product.id) ?? empty;
       const through = figures(data, BEGINNING, end).get(product.id) ?? empty;
-      const boughtOf = (r: RangeFigures) => (source === "INVOICES" ? r.invoicesMilli : source === "FOODICS" ? r.foodicsMilli : null);
-      const b = boughtOf(through);
+      const earlier = figures(data, BEGINNING, addDays(`${m}-01`, -1)).get(product.id) ?? empty;
+      const b = bestOf(through);
       trend.push({
-        month: m, purchasedMilli: boughtOf(inMonth), soldMilli: inMonth.soldMilli,
+        month: m, purchasedMilli: b === null ? null : b - (bestOf(earlier) ?? 0), soldMilli: inMonth.soldMilli,
         expectedMilli: b === null || through.soldMilli === null ? null : b - through.soldMilli - through.wasteMilli,
       });
     }
