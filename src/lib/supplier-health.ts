@@ -78,7 +78,7 @@ export function scoreVat(f: SupplierFacts): DimensionScore {
   if (judged === 0) {
     return { dimension: "VAT", grade: "UNRATED",
       reason: f.taxUnknownCount > 0
-        ? `${countNoun(f.taxUnknownCount, INVOICE)} لم يُقرأ تفصيلها الضريبي بعد.`
+        ? `${countNoun(f.taxUnknownCount, INVOICE)} لم يقرأ تفصيلها الضريبي بعد.`
         : "لا فواتير مقروءة بعد." };
   }
   const ratio = f.taxValidCount / judged;
@@ -91,7 +91,7 @@ export function scoreVat(f: SupplierFacts): DimensionScore {
       reason: `${pct}٪ فقط مستوفية — ${countNoun(f.taxInvalidCount, INVOICE)} ينقصها ركن.` };
   }
   return { dimension: "VAT", grade: "POOR",
-    reason: `${pct}٪ مستوفية — ${countNoun(f.taxInvalidCount, INVOICE)} ضريبتها معرَّضة للرفض.` };
+    reason: `${pct}٪ مستوفية — ${countNoun(f.taxInvalidCount, INVOICE)} ضريبتها معرّضة للرفض.` };
 }
 
 export function scoreStatements(f: SupplierFacts): DimensionScore {
@@ -152,5 +152,5 @@ export const GRADE_LABEL: Record<Grade, string> = {
   GOOD: "سليم",
   FAIR: "يحتاج نظراً",
   POOR: "يحتاج معالجة",
-  UNRATED: "غير مقيَّم",
+  UNRATED: "غير مقيّم",
 };

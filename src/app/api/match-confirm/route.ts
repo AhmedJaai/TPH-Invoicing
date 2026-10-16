@@ -27,7 +27,7 @@ export const runtime = "nodejs";
 
 /** ما يُعلَن به أنّ الحركة ليست سداد فاتورة. */
 const NOT_PAYMENT_KINDS = {
-  ADVANCE: { category: "SUPPLIER", label: "دفعة مقدَّمة لمورّد" },
+  ADVANCE: { category: "SUPPLIER", label: "دفعة مقدّمة لمورّد" },
   INTERNAL: { category: "INTERNAL", label: "تحويل داخلي" },
   PERSONAL: { category: "PERSONAL", label: "تحويل شخصي" },
   BANK_FEE: { category: "BANK_FEE", label: "رسم بنكيّ" },
@@ -105,10 +105,10 @@ async function handle(request: Request) {
       .orderBy(desc(decisionHistory.createdAt))
       .limit(1);
     if (recent) {
-      return NextResponse.json({ ok: true, message: "قُيّدت من قبل — لم يُكتب شيءٌ ثانيةً" });
+      return NextResponse.json({ ok: true, message: "قيّدت من قبل — لم يكتب شيء ثانيةً" });
     }
     return NextResponse.json(
-      { error: "هذه الحركة سُجّلت سداداً من قبل — افتحها في صفحة البنك لترى دفعتها" },
+      { error: "هذه الحركة سجّلت سداداً من قبل — افتحها في صفحة البنك لترى دفعتها" },
       { status: 409 },
     );
   }
@@ -136,7 +136,7 @@ async function handle(request: Request) {
       }
       return NextResponse.json({
         ok: true,
-        message: `رُبطت بسدادٍ قيّدتَه بيدك (${formatRiyalsDisplay(link.paymentMinor)}${link.invoices[0] ? ` · ${link.invoices[0].number}` : ""}) — لم تُنشأ دفعةٌ ثانية`
+        message: `ربطت بسداد قيّدته بيدك (${formatRiyalsDisplay(link.paymentMinor)}${link.invoices[0] ? ` · ${link.invoices[0].number}` : ""}) — لم تنشأ دفعة ثانية`
           + (link.extraMinor > 0 ? ` · وزادت ${formatRiyalsDisplay(link.extraMinor)} رصيداً للمورّد` : ""),
       });
     }
@@ -145,7 +145,7 @@ async function handle(request: Request) {
   /* ── ليست سداد فاتورة ── */
   if (body.notAPayment) {
     const kind = NOT_PAYMENT_KINDS[body.notAPayment];
-    if (!kind) return NextResponse.json({ error: "سببٌ غير معروف" }, { status: 400 });
+    if (!kind) return NextResponse.json({ error: "سبب غير معروف" }, { status: 400 });
 
     /*
       الدفعة المقدَّمة **مالٌ خرج**، لا حركةٌ تُتجاهَل.
@@ -160,7 +160,7 @@ async function handle(request: Request) {
       const supplierId = body.supplierId ?? tx.supplierId;
       if (!supplierId) {
         return NextResponse.json(
-          { error: "الدفعة المقدَّمة تحتاج مورّداً — لمن دُفعت؟" },
+          { error: "الدفعة المقدّمة تحتاج مورّداً — لمن دفعت؟" },
           { status: 400 },
         );
       }
@@ -192,7 +192,7 @@ async function handle(request: Request) {
           event: "MATCH_CONFIRMED",
           actor: "HUMAN",
           actorId: user.id,
-          detail: "دفعةٌ مقدَّمة لمورّد — رصيدٌ ينتظر فاتورته",
+          detail: "دفعة مقدّمة لمورّد — رصيد ينتظر فاتورته",
           payload: { الدفعة: id, المورّد: supplierId, المبلغ: tx.amountMinor },
         });
 
@@ -201,13 +201,13 @@ async function handle(request: Request) {
           action: "PAYMENT_RECORDED",
           entityType: "bank_transaction",
           entityId: tx.id,
-          after: { الفعل: "قُيّدت دفعةً مقدَّمة", الدفعة: id, المورّد: supplierId, المبلغ_بالهللات: tx.amountMinor },
+          after: { الفعل: "قيّدت دفعةً مقدّمة", الدفعة: id, المورّد: supplierId, المبلغ_بالهللات: tx.amountMinor },
         }, t);
       });
 
       return NextResponse.json({
         ok: true,
-        message: "قُيّدت دفعةً مقدَّمة — تُخصَّص على فاتورة المورّد حين تصل",
+        message: "قيّدت دفعةً مقدّمة — تخصّص على فاتورة المورّد حين تصل",
       });
     }
 
@@ -241,7 +241,7 @@ async function handle(request: Request) {
         event: "MATCH_REJECTED",
         actor: "HUMAN",
         actorId: user.id,
-        detail: `أُعلنت ليست سداد فاتورة: ${kind.label}`,
+        detail: `أعلنت ليست سداد فاتورة: ${kind.label}`,
         payload: { الباب: kind.category, "الباب السابق": tx.category, "المصدر السابق": tx.classificationSource },
       });
 
@@ -253,11 +253,11 @@ async function handle(request: Request) {
         entityType: "bank_transaction",
         entityId: tx.id,
         before: { الباب: tx.category, القرار: tx.matchDisposition },
-        after: { الفعل: "أُعلنت ليست سداد فاتورة", السبب: kind.label },
+        after: { الفعل: "أعلنت ليست سداد فاتورة", السبب: kind.label },
       }, t);
     });
 
-    return NextResponse.json({ ok: true, message: `حُفظت: ${kind.label}` });
+    return NextResponse.json({ ok: true, message: `حفظت: ${kind.label}` });
   }
 
   /* ── سدادٌ على حساب المورّد ── */
@@ -282,7 +282,7 @@ async function handle(request: Request) {
     const supplierId = [...suppliers][0];
     if (suppliers.size !== 1 || !supplierId) {
       return NextResponse.json(
-        { error: "لا يُسدَّد حسابٌ بلا مورّد واحد يجمع الحركات" },
+        { error: "لا يسدّد حساب بلا مورّد واحد يجمع الحركات" },
         { status: 400 },
       );
     }
@@ -292,7 +292,7 @@ async function handle(request: Request) {
     const already = group.filter((g) => g.matchedPaymentId !== null);
     if (already.length > 0) {
       return NextResponse.json(
-        { error: `${already.length} من هذه الحركات سُجّلت سداداً بالفعل` },
+        { error: `${already.length} من هذه الحركات سجّلت سداداً بالفعل` },
         { status: 409 },
       );
     }
@@ -308,7 +308,7 @@ async function handle(request: Request) {
     (يعيد الحساب في الخادم)، والسداد على الحساب بـ settleSupplier أعلاه.
   */
   return NextResponse.json(
-    { error: "حدّد الفعل: سدادٌ على حساب المورّد، أو «ليست سداداً»" },
+    { error: "حدّد الفعل: سداد على حساب المورّد، أو «ليست سداداً»" },
     { status: 400 },
   );
 }
@@ -413,13 +413,13 @@ async function settleAccounts(
         actor: "HUMAN",
         actorId: userId,
         detail: plan.allocations.length > 0
-          ? "سدادٌ على حساب المورّد — لا رقمَ فاتورةٍ في الحوالة، فوُزّع بالأقدم أوّلاً"
-          : "سدادٌ على حساب المورّد — لا فاتورة مفتوحة تقابله",
+          ? "سداد على حساب المورّد — لا رقم فاتورة في الحوالة، فوزّع بالأقدم أوّلاً"
+          : "سداد على حساب المورّد — لا فاتورة مفتوحة تقابله",
         payload: {
           المبلغ: tx.amountMinor,
-          "فواتير سُدِّدت": plan.allocations.length,
-          "خُصِّص": plan.allocatedMinor,
-          "بقي غير مخصَّص": plan.remainingMinor,
+          "فواتير سدّدت": plan.allocations.length,
+          "خصّص": plan.allocatedMinor,
+          "بقي غير مخصّص": plan.remainingMinor,
           السياسة: "الأقدم أوّلاً",
         },
       });
@@ -439,12 +439,12 @@ async function settleAccounts(
     entityType: "supplier",
     entityId: supplierId,
     after: {
-      الفعل: "سدادٌ على حساب المورّد",
+      الفعل: "سداد على حساب المورّد",
       حركات: paidCount,
-      "فواتير سُدِّدت": invoiceCount,
-      "خُصِّص": allocatedTotal,
-      "بقي غير مخصَّص": unappliedTotal,
-      "دفعاتٌ تُبنّيت من إيصالاتها": adopted,
+      "فواتير سدّدت": invoiceCount,
+      "خصّص": allocatedTotal,
+      "بقي غير مخصّص": unappliedTotal,
+      "دفعات تبنّيت من إيصالاتها": adopted,
       السياسة: "الأقدم أوّلاً — لا رقم فاتورة في الحوالة",
     },
     }, t);
@@ -459,10 +459,10 @@ async function settleAccounts(
     unapplied: unappliedTotal,
     supplierBalanceAfter: left,
     message: invoiceCount === 0
-      ? `قُيّد ${money(allocatedTotal + unappliedTotal)} على حساب المورّد — لا فاتورة مفتوحة تقابله، فبقي غير مخصَّص`
-      : `سُدِّد ${money(allocatedTotal)} على ${countNoun(invoiceCount, INVOICE)} بالأقدم أوّلاً (لا رقمَ فاتورةٍ في الحوالة)`
-        + (unappliedTotal > 0 ? ` · وبقي ${money(unappliedTotal)} غير مخصَّص` : "")
+      ? `قيّد ${money(allocatedTotal + unappliedTotal)} على حساب المورّد — لا فاتورة مفتوحة تقابله، فبقي غير مخصّص`
+      : `سدّد ${money(allocatedTotal)} على ${countNoun(invoiceCount, INVOICE)} بالأقدم أوّلاً (لا رقم فاتورة في الحوالة)`
+        + (unappliedTotal > 0 ? ` · وبقي ${money(unappliedTotal)} غير مخصّص` : "")
         + ` · رصيد المورّد بعدها ${money(left)}`
-        + (adopted > 0 ? ` · و${adopted} منها كانت مقيَّدةً من إيصالها فلم تُكرَّر` : ""),
+        + (adopted > 0 ? ` · و${adopted} منها كانت مقيّدةً من إيصالها فلم تكرّر` : ""),
   });
 }

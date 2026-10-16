@@ -38,8 +38,8 @@ const SRC = walk("src");
  * `eslint.config.mjs`): فلا يمرّ `npm test` وحده على ما يخالفها، والقاعدةُ
  * مكتوبةٌ مرّةً واحدة.
  */
-describe("حرّاسُ ESLint المحلّيّة على الشجرة كلّها", () => {
-  it("لا مخالفةَ في src ولا scripts", async () => {
+describe("حرّاس ESLint المحلّيّة على الشجرة كلّها", () => {
+  it("لا مخالفة في src ولا scripts", async () => {
     const eslint = new ESLint({
       overrideConfigFile: true,
       overrideConfig: [
@@ -62,7 +62,7 @@ describe("حرّاسُ ESLint المحلّيّة على الشجرة كلّها"
     expect(offences).toEqual([]);
   }, 120_000);
 
-  it("والنطاقُ يحمل القواعدَ السبع — لا قاعدةٌ مكتوبةٌ ولم تُفعَّل", () => {
+  it("والنطاق يحمل القواعد السبع — لا قاعدة مكتوبة ولم تفعّل", () => {
     const enabled = new Set(tphGuards.flatMap((c) => Object.keys(c.rules ?? {})));
     expect([...enabled].sort()).toEqual(Object.keys(tph.rules).map((r) => `tph/${r}`).sort());
   });
@@ -115,7 +115,7 @@ export function unnamedFields(source: string): string[] {
   return out;
 }
 
-describe("لا حقلَ ولا قائمةَ بلا اسم", () => {
+describe("لا حقل ولا قائمة بلا اسم", () => {
   for (const file of SRC.filter((f) => f.endsWith(".tsx"))) {
     const source = readFileSync(file, "utf8");
     if (!FIELD_TAG.test(source)) continue;
@@ -124,12 +124,12 @@ describe("لا حقلَ ولا قائمةَ بلا اسم", () => {
     });
   }
 
-  it("والحارس يُمسك الشكل الخاطئ", () => {
+  it("والحارس يمسك الشكل الخاطئ", () => {
     expect(unnamedFields('<select value={m}>')).toHaveLength(1);
     expect(unnamedFields('<input placeholder="سبب الإقفال" />')).toHaveLength(1);
   });
 
-  it("ولا يُمسك الصواب", () => {
+  it("ولا يمسك الصواب", () => {
     expect(unnamedFields('<select aria-label="الشهر" value={m}>')).toEqual([]);
     expect(unnamedFields('<label><span>الشهر</span><input value={m} /></label>')).toEqual([]);
     expect(unnamedFields('<input type="hidden" name="x" />')).toEqual([]);
@@ -159,7 +159,7 @@ export function shortButtons(source: string): string[] {
   return out;
 }
 
-describe("لا زرَّ أقصر من إبهام", () => {
+describe("لا زرّ أقصر من إبهام", () => {
   for (const file of SRC.filter((f) => f.endsWith(".tsx"))) {
     const source = readFileSync(file, "utf8");
     if (!source.includes("<button")) continue;
@@ -168,11 +168,11 @@ describe("لا زرَّ أقصر من إبهام", () => {
     });
   }
 
-  it("والحارس يُمسك الشكل الخاطئ", () => {
+  it("والحارس يمسك الشكل الخاطئ", () => {
     expect(shortButtons('<button className="px-3 py-1.5 text-xs">أ</button>')).toHaveLength(1);
   });
 
-  it("ولا يُمسك الصواب", () => {
+  it("ولا يمسك الصواب", () => {
     expect(shortButtons('<button className="min-h-11 px-3 py-1.5">أ</button>')).toEqual([]);
     expect(shortButtons('<button className={buttonClass("primary", "sm")}>أ</button>')).toEqual([]);
   });
@@ -187,14 +187,14 @@ describe("لا زرَّ أقصر من إبهام", () => {
 */
 const FADED_TEXT = /\btext-(muted|ink-soft)\/\d+/;
 
-describe("لا نصَّ ثانويّاً مبهَّتاً دون حدّ التباين", () => {
+describe("لا نصّ ثانويّاً مبهّتاً دون حدّ التباين", () => {
   it("لا text-muted/NN ولا text-ink-soft/NN في الواجهة", () => {
     const hits = SRC.filter((f) => f.endsWith(".tsx"))
       .filter((f) => FADED_TEXT.test(readFileSync(f, "utf8")));
     expect(hits).toEqual([]);
   });
 
-  it("والحارس يُمسك الشكل الخاطئ", () => {
+  it("والحارس يمسك الشكل الخاطئ", () => {
     expect(FADED_TEXT.test('className="text-muted/80"')).toBe(true);
     expect(FADED_TEXT.test('className="text-muted"')).toBe(false);
   });

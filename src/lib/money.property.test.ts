@@ -19,14 +19,14 @@ const toIndic = (s: string) => s.replace(/\d/g, (d) => String.fromCharCode(0x066
 const toPersian = (s: string) => s.replace(/\d/g, (d) => String.fromCharCode(0x06f0 + Number(d)));
 
 describe("parseRiyals ↔ formatRiyals — خصائص", () => {
-  it("كلُّ مبلغٍ في المدى يذهب نصّاً ويعود بالهللة", () => {
+  it("كلّ مبلغ في المدى يذهب نصّاً ويعود بالهللة", () => {
     fc.assert(fc.property(minor, (n) => {
       expect(parseRiyals(formatRiyals(n))).toBe(n);
       expect(parseRiyals(formatRiyalsDisplay(n))).toBe(n);
     }), RUNS);
   });
 
-  it("الأرقامُ العربيّة والفارسيّة وفواصلُها تُقرأ كاللاتينيّة", () => {
+  it("الأرقام العربيّة والفارسيّة وفواصلها تقرأ كاللاتينيّة", () => {
     fc.assert(fc.property(minor, (n) => {
       const display = formatRiyalsDisplay(n);
       const arabic = toIndic(display).replace(/,/g, "٬").replace(".", "٫");
@@ -37,7 +37,7 @@ describe("parseRiyals ↔ formatRiyals — خصائص", () => {
     }), RUNS);
   });
 
-  it("ما جاوز عمودَ المال «لم يُقرأ» لا رقماً يُسقط الكتابة", () => {
+  it("ما جاوز عمود المال «لم يقرأ» لا رقماً يسقط الكتابة", () => {
     fc.assert(fc.property(fc.integer({ min: MAX_AMOUNT_MINOR + 1, max: Number.MAX_SAFE_INTEGER }), (n) => {
       expect(parseRiyals(formatRiyals(n))).toBeNull();
       expect(parseRiyals(formatRiyals(-n))).toBeNull();
@@ -50,7 +50,7 @@ describe("parseRiyals ↔ formatRiyals — خصائص", () => {
     maxLength: 14,
   });
 
-  it("أيُّ نصٍّ: هللاتٌ صحيحة داخل المدى أو null — ولا ثالث", () => {
+  it("أيّ نصّ: هللات صحيحة داخل المدى أو null — ولا ثالث", () => {
     fc.assert(fc.property(fc.oneof(moneyish, fc.string({ maxLength: 20 })), (text) => {
       const got = parseRiyals(text);
       if (got === null) return;
@@ -61,7 +61,7 @@ describe("parseRiyals ↔ formatRiyals — خصائص", () => {
     }), RUNS);
   });
 
-  it("لا صفرَ عن نصٍّ ليس فيه صفر، ولا مبلغَ عن نصٍّ بلا رقم", () => {
+  it("لا صفر عن نصّ ليس فيه صفر، ولا مبلغ عن نصّ بلا رقم", () => {
     fc.assert(fc.property(fc.oneof(moneyish, fc.string({ maxLength: 20 })), (text) => {
       const got = parseRiyals(text);
       if (got === null) return;
@@ -70,7 +70,7 @@ describe("parseRiyals ↔ formatRiyals — خصائص", () => {
     }), RUNS);
   });
 
-  it("المنزلةُ الثالثة تُقبَل صفراً وحده — وغيرُه لا يُقرَّب", () => {
+  it("المنزلة الثالثة تقبل صفراً وحده — وغيره لا يقرّب", () => {
     fc.assert(fc.property(
       fc.integer({ min: 0, max: 20_000_000 }), fc.integer({ min: 0, max: 99 }), fc.integer({ min: 0, max: 9 }),
       (whole, cents, third) => {
@@ -83,7 +83,7 @@ describe("parseRiyals ↔ formatRiyals — خصائص", () => {
 });
 
 describe("milliMinorToMinor", () => {
-  it("يقرّب مرّةً واحدة، والنصفُ إلى أعلى", () => {
+  it("يقرّب مرّةً واحدة، والنصف إلى أعلى", () => {
     expect(milliMinorToMinor(0)).toBe(0);
     expect(milliMinorToMinor(499)).toBe(0);
     expect(milliMinorToMinor(500)).toBe(1);
@@ -95,7 +95,7 @@ describe("milliMinorToMinor", () => {
     expect(milliMinorToMinor(2_125 * 4_000)).toBe(8_500);
   });
 
-  it("السالبُ مرآةُ الموجب — مرتجعٌ بنصف هللةٍ لا يُقرَّب بغير ما قُرِّب به شراؤه", () => {
+  it("السالب مرآة الموجب — مرتجع بنصف هللة لا يقرّب بغير ما قرّب به شراؤه", () => {
     expect(milliMinorToMinor(-500)).toBe(-1);
     expect(milliMinorToMinor(-1_500)).toBe(-2);
     expect(milliMinorToMinor(-499)).toBe(0);
@@ -104,7 +104,7 @@ describe("milliMinorToMinor", () => {
     expect(Object.is(milliMinorToMinor(-1), 0)).toBe(true);
   });
 
-  it("خاصّيّة: متماثلٌ حول الصفر، وخطؤه نصفُ هللةٍ على الأكثر", () => {
+  it("خاصّيّة: متماثل حول الصفر، وخطؤه نصف هللة على الأكثر", () => {
     fc.assert(fc.property(fc.integer({ min: 0, max: MAX_AMOUNT_MINOR * MILLI_MINOR }), (m) => {
       const up = milliMinorToMinor(m);
       const down = milliMinorToMinor(-m);
@@ -114,7 +114,7 @@ describe("milliMinorToMinor", () => {
     }), RUNS);
   });
 
-  it("خاصّيّة: مضاعفاتُ الألف تعود هللاتِها بالضبط", () => {
+  it("خاصّيّة: مضاعفات الألف تعود هللاتها بالضبط", () => {
     fc.assert(fc.property(minor, (n) => {
       expect(milliMinorToMinor(n * MILLI_MINOR)).toBe(n);
     }), RUNS);

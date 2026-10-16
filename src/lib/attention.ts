@@ -40,7 +40,7 @@ export const AREA_LABEL: Record<AttentionArea, string> = {
 
 export const SEVERITY_LABEL: Record<AttentionSeverity, string> = {
   CRITICAL: "حرج",
-  HIGH: "عالٍ",
+  HIGH: "عال",
   MEDIUM: "متوسّط",
   OPPORTUNITY: "فرصة",
 };
@@ -75,12 +75,12 @@ export interface AttentionImpact {
 }
 
 export const IMPACT_LABEL: Record<ImpactKind, string> = {
-  RECOVERABLE: "قد يُسترد",
-  AT_RISK: "معرَّض للضياع",
-  ANNUAL: "أثر سنويّ مقدَّر",
+  RECOVERABLE: "قد يسترد",
+  AT_RISK: "معرّض للضياع",
+  ANNUAL: "أثر سنويّ مقدّر",
   OWED: "مستحقّ عليك",
   BLOCKED: "يوقف عملاً",
-  UNATTRIBUTED: "لم يُنسب بعد",
+  UNATTRIBUTED: "لم ينسب بعد",
 };
 
 export interface AttentionItem {
@@ -328,7 +328,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       severity: "CRITICAL",
       title: `${countNoun(f.bankGapDays, DAY)} بلا كشف بنكيّ`,
       detail: "حركات هذه الأيام غائبة لا معدومة — ولا يظهر غيابها في أي عدّاد.",
-      action: "استورد الكشف الذي يغطّيها قبل أن تُقرأ أرقام الشهر.",
+      action: "استورد الكشف الذي يغطّيها قبل أن تقرأ أرقام الشهر.",
       actionLabel: "استورد كشفاً",
       /* الفجوة تُسدّ بالاستيراد — فيُفتَح موضعُه لا رأسُ الصفحة وفوقه ألفُ حركة */
       href: "/bank#import",
@@ -350,12 +350,12 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "VAT",
       severity: late || v.daysLeft <= 10 ? "HIGH" : "MEDIUM",
       title: late
-        ? `فات موعدُ إقرار ضريبة ${v.label} منذ ${countNoun(-v.daysLeft, DAY)}`
-        : `إقرار ضريبة ${v.label}: آخرُ موعده ${formatDay(v.deadline)} — بعد ${countNoun(v.daysLeft, DAY)}`,
+        ? `فات موعد إقرار ضريبة ${v.label} منذ ${countNoun(-v.daysLeft, DAY)}`
+        : `إقرار ضريبة ${v.label}: آخر موعده ${formatDay(v.deadline)} — بعد ${countNoun(v.daysLeft, DAY)}`,
       detail: late
-        ? "إن كنتَ قدّمتَه فسجّله ليخرج من هنا؛ وإلّا فالتأخيرُ عليه غرامةٌ عند الهيئة."
-        : "يُقدَّم ويُسدَّد في بوّابة هيئة الزكاة والضريبة والجمارك. حسابُه وما ينقصه في صفحته.",
-      action: "راجِع الحساب، قدّمه في البوّابة، ثمّ سجّل «قدّمتُه».",
+        ? "إن كنت قدّمته فسجّله ليخرج من هنا؛ وإلّا فالتأخير عليه غرامة عند الهيئة."
+        : "يقدّم ويسدّد في بوّابة هيئة الزكاة والضريبة والجمارك. حسابه وما ينقصه في صفحته.",
+      action: "راجع الحساب، قدّمه في البوّابة، ثمّ سجّل «قدّمته».",
       actionLabel: "افتح الإقرار",
       href: `/close/vat?period=${v.periodKey}`,
       count: 1,
@@ -374,7 +374,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "BANK",
       severity: "HIGH",
       title: `كشف البنك يقف عند ${formatDay(f.bankLastDay)}`,
-      detail: `مضى ${countNoun(f.bankStaleDays, DAY)} لا يعرف النظام ما دخل فيها وما خرج — فما دفعتَه لمورّديك ورصيدُ كلٍّ منهم على ما قبلها.`,
+      detail: `مضى ${countNoun(f.bankStaleDays, DAY)} لا يعرف النظام ما دخل فيها وما خرج — فما دفعته لمورّديك ورصيد كلّ منهم على ما قبلها.`,
       action: "استورد الكشف من اليوم التالي له إلى اليوم.",
       actionLabel: "استورد كشفاً",
       href: "/bank#import",
@@ -396,13 +396,13 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "bank-balance-difference",
       area: "BANK",
       severity: small ? "MEDIUM" : "CRITICAL",
-      title: small ? `فرقٌ صغير بين رصيد البنك وحركاته (${formatRiyalsDisplay(diff)})` : "رصيد البنك لا يطابق حركاته المقروءة",
+      title: small ? `فرق صغير بين رصيد البنك وحركاته (${formatRiyalsDisplay(diff)})` : "رصيد البنك لا يطابق حركاته المقروءة",
       detail:
         f.bankBalanceDifferenceMinor > 0
-          ? `البنك يقول رصيداً أعلى بـ${formatRiyalsDisplay(diff)} — حركةٌ واردة لم تُقرأ، أو صادرةٌ قُرئت مرّتين.`
-          : `البنك يقول رصيداً أقلّ بـ${formatRiyalsDisplay(diff)} — حركةٌ صادرة لم تُقرأ، أو واردةٌ قُرئت مرّتين.`,
-      action: "راجع الكشف: الفرق يعني حركاتٍ لم تصل، لا خطأ في المطابقة.",
-      actionLabel: "اكتب رصيدَي الشهر",
+          ? `البنك يقول رصيداً أعلى بـ${formatRiyalsDisplay(diff)} — حركة واردة لم تقرأ، أو صادرة قرئت مرّتين.`
+          : `البنك يقول رصيداً أقلّ بـ${formatRiyalsDisplay(diff)} — حركة صادرة لم تقرأ، أو واردة قرئت مرّتين.`,
+      action: "راجع الكشف: الفرق يعني حركات لم تصل، لا خطأ في المطابقة.",
+      actionLabel: "اكتب رصيدي الشهر",
       /*
         الفرق يُفحَص بالمعادلة، ومكانُ كتابة الرصيدين قائمةُ الإقفال —
         وكان يفتح صفحة البنك عاريةً فلا يجد صاحبُ المقهى فيها ما يفعله.
@@ -420,9 +420,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "duplicate-expenses",
       area: "DATA",
       severity: "HIGH",
-      title: `مصروفٌ وصل مرّتين — ${countNoun(f.duplicateExpenses, ITEM)}`,
-      detail: "الحدث الواحد يصل من كشف البنك ومن مستندٍ رُفع — فيُقيَّد مرّتين ويعلو مصروف الشهر.",
-      action: "راجعها واحذف الزائد بيدك — أيّهما الصحيح قرارُك لا قرارُ النظام.",
+      title: `مصروف وصل مرّتين — ${countNoun(f.duplicateExpenses, ITEM)}`,
+      detail: "الحدث الواحد يصل من كشف البنك ومن مستند رفع — فيقيّد مرّتين ويعلو مصروف الشهر.",
+      action: "راجعها واحذف الزائد بيدك — أيّهما الصحيح قرارك لا قرار النظام.",
       actionLabel: "احذف الزائد",
       href: "/money/expenses",
       count: f.duplicateExpenses,
@@ -445,7 +445,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "duplicate-payments",
       area: "BANK",
       severity: "CRITICAL",
-      title: `مالٌ خرج مرّتين في يومٍ واحد — ${countNoun(f.duplicatePayments, PAYMENT)}`,
+      title: `مال خرج مرّتين في يوم واحد — ${countNoun(f.duplicatePayments, PAYMENT)}`,
       /*
         الجملةُ تتبع الدليل. كانت تقول «ولكلٍّ مرجعُ سدادٍ مستقلّ» دائماً،
         والدليلُ تحتها في اللوح نفسه يقول «بلا مرجعٍ يفصلهما» — فتناقض
@@ -454,15 +454,15 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       */
       detail:
         (f.duplicatePaymentsDistinct ?? 0) === f.duplicatePayments
-          ? "خرج المال مرّتين لنفس الجهة بنفس المبلغ — ولكلٍّ مرجعُ سدادٍ مستقلّ،"
-            + " فهما عمليّتان لا نسخةُ استيراد."
-          : "خرج المال مرّتين لنفس الجهة بنفس المبلغ في اليوم نفسه — ولا مرجعَ في الكشف"
-            + " يفصل بين الصفّين في بعضها، فالأرجح سدادٌ مكرَّر ولم يُقطَع به.",
+          ? "خرج المال مرّتين لنفس الجهة بنفس المبلغ — ولكلّ مرجع سداد مستقلّ،"
+            + " فهما عمليّتان لا نسخة استيراد."
+          : "خرج المال مرّتين لنفس الجهة بنفس المبلغ في اليوم نفسه — ولا مرجع في الكشف"
+            + " يفصل بين الصفّين في بعضها، فالأرجح سداد مكرّر ولم يقطع به.",
       action:
         (f.duplicatePaymentsDistinct ?? 0) === f.duplicatePayments
-          ? "طالِب الجهة بردّ الزائد — والاسترداد يصعب كلّما تأخّر."
-          : "انظر في إيصالات السداد أو تطبيق البنك: إن ظهر السدادُ مرّتين فطالِب الجهة بردّ الزائد.",
-      actionLabel: "طالِب بالردّ",
+          ? "طالب الجهة بردّ الزائد — والاسترداد يصعب كلّما تأخّر."
+          : "انظر في إيصالات السداد أو تطبيق البنك: إن ظهر السداد مرّتين فطالب الجهة بردّ الزائد.",
+      actionLabel: "طالب بالردّ",
       /* الحسمُ صار في البند نفسه — ولوحُ فعله تحته، لا في صفحةٍ أخرى */
       href: "/attention?item=duplicate-payments",
       count: f.duplicatePayments,
@@ -482,9 +482,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "duplicate-payments-claimed",
       area: "BANK",
       severity: "MEDIUM",
-      title: `مطالبةٌ بمالٍ خرج مرّتين تنتظر الردّ — ${countNoun(f.duplicatePaymentsClaimed ?? 0, ITEM)}`,
-      detail: "طالبتَ الجهة بردّ الزائد، ولم يُعلَن أنّه عاد.",
-      action: "تابع الجهة. وإن عاد المال فاضغط «استُردّ» عند الحركتين.",
+      title: `مطالبة بمال خرج مرّتين تنتظر الردّ — ${countNoun(f.duplicatePaymentsClaimed ?? 0, ITEM)}`,
+      detail: "طالبت الجهة بردّ الزائد، ولم يعلن أنّه عاد.",
+      action: "تابع الجهة. وإن عاد المال فاضغط «استردّ» عند الحركتين.",
       actionLabel: "تابع المطالبة",
       /* الحسمُ صار في البند نفسه — ولوحُ فعله تحته، لا في صفحةٍ أخرى */
       href: "/attention?item=duplicate-payments-claimed",
@@ -508,12 +508,12 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "PAYMENTS",
       severity: "HIGH",
       /* الاسم نفسه المعروض في «حسابات المورّدين» وفي «حركة البنك» — حرفاً بحرف */
-      title: `${countNoun(f.unbackedPaymentCount, PAYMENT_RECORD)} لم تُنسب إلى فاتورة`,
+      title: `${countNoun(f.unbackedPaymentCount, PAYMENT_RECORD)} لم تنسب إلى فاتورة`,
       detail:
-        "مالٌ وصل المورّد ولا مستندَ يقابله — فلا خصمَ لمدخلاته،"
-        + " ورصيدُ المورّد عندنا غير مُتحقَّق منه.",
+        "مال وصل المورّد ولا مستند يقابله — فلا خصم لمدخلاته،"
+        + " ورصيد المورّد عندنا غير متحقّق منه.",
       action:
-        "اطلب الفاتورة من المورّد، أو أعلِن أنّه لا يصدر فواتير واطلب عقد توريد.",
+        "اطلب الفاتورة من المورّد، أو أعلن أنّه لا يصدر فواتير واطلب عقد توريد.",
       actionLabel: "اطلب الفواتير",
       /* القائمة نفسها التي عُدّت — لا جدول المورّدين العامّ (BTN-110) */
       href: "/suppliers?unbacked=1#unbacked",
@@ -529,7 +529,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "open-blockers",
       area: "DATA",
       severity: "CRITICAL",
-      title: `${countNoun(f.openBlockers, BLOCKER)} لم يُعالَج`,
+      title: `${countNoun(f.openBlockers, BLOCKER)} لم يعالج`,
       detail: "يمنع إقفال الشهر ويشوّه أرقامه.",
       action: "عالجها أو تجاوزها بسبب مكتوب.",
       actionLabel: "راجع المستندات",
@@ -581,8 +581,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "BANK",
       severity: "HIGH",
       title: `${countNoun(f.unclassifiedBankTx, TRANSACTION)} في البنك تنتظر قرارك`,
-      detail: `بقيمة ${riyals(f.unclassifiedBankAmountMinor)} ريال — لم يُعرَف بابُها، أو عُرف أنّها سدادُ مورّد ولم تُقيَّد بعد.`,
-      action: "احسمها مرّة — وما تعرّفه يسري على أمثاله في كلّ كشفٍ بعده.",
+      detail: `بقيمة ${riyals(f.unclassifiedBankAmountMinor)} ريال — لم يعرف بابها، أو عرف أنّها سداد مورّد ولم تقيّد بعد.`,
+      action: "احسمها مرّة — وما تعرّفه يسري على أمثاله في كلّ كشف بعده.",
       actionLabel: "احسم الحركات",
       /* التصنيف في الطابور — لا أعلى صفحة البنك وألفُ حركةٍ فوقها */
       href: "/attention?item=unclassified-bank",
@@ -598,9 +598,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "held-bank-rows",
       area: "BANK",
       severity: "HIGH",
-      title: `${countNoun(f.heldBankRows, TRANSACTION)} في البنك تنتظر قرارك — الدليلُ لا يحسمها`,
-      detail: "صفٌّ من الكشف يشبه حركةً مقيَّدة ولا يُعرف أهو هي أم ثانية، أو مرجعٌ مكرَّرٌ بمبلغٍ آخر، أو حركةٌ عندنا ليست في كشف البنك الذي يغطّي يومها. وبلا قرارٍ تضيع حوالةٌ حقيقيّة أو يبقى مكرَّرٌ يُفسد الرصيد.",
-      action: "احسم كلَّ واحدةٍ في صفحة البنك، والقرارُ يُذكَر فلا يعود بإعادة الاستيراد.",
+      title: `${countNoun(f.heldBankRows, TRANSACTION)} في البنك تنتظر قرارك — الدليل لا يحسمها`,
+      detail: "صفّ من الكشف يشبه حركةً مقيّدة ولا يعرف أهو هي أم ثانية، أو مرجع مكرّر بمبلغ آخر، أو حركة عندنا ليست في كشف البنك الذي يغطّي يومها. وبلا قرار تضيع حوالة حقيقيّة أو يبقى مكرّر يفسد الرصيد.",
+      action: "احسم كلّ واحدة في صفحة البنك، والقرار يذكر فلا يعود بإعادة الاستيراد.",
       actionLabel: "احسمها في صفحة البنك",
       href: "/bank#queue",
       count: f.heldBankRows,
@@ -616,7 +616,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "SUPPLIERS",
       severity: f.priceRiseAnnualMinor > 100_000 ? "HIGH" : "MEDIUM",
       title: "ارتفاع أسعار المورّدين",
-      detail: `${countNoun(f.priceRises.length, PRODUCT)} ارتفع سعره عند مورّده — والأثرُ بكمّيّة ما اشتريتَه منه في آخر سنة.`,
+      detail: `${countNoun(f.priceRises.length, PRODUCT)} ارتفع سعره عند مورّده — والأثر بكمّيّة ما اشتريته منه في آخر سنة.`,
       action: "فاوض على الثلاثة الأعلى أثراً، واطلب عرضاً من مورّد بديل لتفاوض بورقة في يدك.",
       actionLabel: "قارن الأسعار",
       /*
@@ -638,8 +638,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "lifecycle-anomalies",
       area: "BANK",
       severity: "HIGH",
-      title: `${countNoun(n, TRANSACTION)} قرارُها والمالُ فيها متناقضان`,
-      detail: "حُسمت ولم تُقيَّد بدفعة، أو قُيّدت وأُعلن أنّها ليست سداداً — عطبٌ يُعرَض ولا يُصحَّح آلياً، فقد يكون فشلَ كتابة أو حذفاً بيد.",
+      title: `${countNoun(n, TRANSACTION)} قرارها والمال فيها متناقضان`,
+      detail: "حسمت ولم تقيّد بدفعة، أو قيّدت وأعلن أنّها ليست سداداً — عطب يعرض ولا يصحّح آلياً، فقد يكون فشل كتابة أو حذفاً بيد.",
       action: "افتح الحركة وقرّر أيّ الطرفين الصحيح.",
       actionLabel: "احسم الحركة",
       href: f.firstAnomalyTransactionId ? txHref(f.firstAnomalyTransactionId) : "/bank",
@@ -661,11 +661,11 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "PAYMENTS",
       severity: "CRITICAL",
       title: n === 1
-        ? "حوالةٌ لمورّد ذهبت إلى حسابٍ غير حسابه المعروف"
-        : `${countNoun(n, SUPPLIER)} حُوِّل لهم إلى حسابٍ غير المعروف`,
-      detail: "الآيبانُ في كشف البنك يخالف المكتوبَ في ملفّ المورّد أو ما حُوِّل له من قبل. قد يكون له حسابٌ ثانٍ — وقد تكون رسالةَ «غيّرنا حسابنا» مزوّرة.",
-      action: "قابِل الآيبانين: إن كنت تعرفه فأغلِقه بـ«أعرفه»، وإلّا فاتّصل بالمورّد على رقمه المعروف وبالبنك قبل أيّ تحويلٍ آخر.",
-      actionLabel: "قابِل الحسابين",
+        ? "حوالة لمورّد ذهبت إلى حساب غير حسابه المعروف"
+        : `${countNoun(n, SUPPLIER)} حوّل لهم إلى حساب غير المعروف`,
+      detail: "الآيبان في كشف البنك يخالف المكتوب في ملفّ المورّد أو ما حوّل له من قبل. قد يكون له حساب ثان — وقد تكون رسالة «غيّرنا حسابنا» مزوّرة.",
+      action: "قابل الآيبانين: إن كنت تعرفه فأغلقه بـ«أعرفه»، وإلّا فاتّصل بالمورّد على رقمه المعروف وبالبنك قبل أيّ تحويل آخر.",
+      actionLabel: "قابل الحسابين",
       href: "/attention?item=iban-mismatch",
       count: n,
       amountMinor: f.ibanAlertMinor ?? undefined,
@@ -685,17 +685,17 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "BANK",
       severity: "HIGH",
       title: days.length === 1
-        ? `تسويةُ شبكةِ ${formatDay(days[0].day)} لم تصل`
-        : `${countNoun(days.length, DAY)} لم تصل تسويةُ شبكتها`,
-      detail: "في مثل هذه الأيّام من الأسابيع السابقة وصل إيداعُ الشبكة، ولا إيداعَ لها في كشف البنك.",
-      action: "راجِع تقريرَ الجهاز لليوم ثمّ البنك — وإن كان المقهى مغلقاً فأسكِتها من صفحتها.",
+        ? `تسوية شبكة ${formatDay(days[0].day)} لم تصل`
+        : `${countNoun(days.length, DAY)} لم تصل تسوية شبكتها`,
+      detail: "في مثل هذه الأيّام من الأسابيع السابقة وصل إيداع الشبكة، ولا إيداع لها في كشف البنك.",
+      action: "راجع تقرير الجهاز لليوم ثمّ البنك — وإن كان المقهى مغلقاً فأسكتها من صفحتها.",
       actionLabel: "افتح تسويات الشبكة",
       href: "/money/pos#missing",
       count: days.length,
       impact: { kind: "AT_RISK", amountMinor: null },
       evidence: days.slice(0, 6).map((d) => ({
         label: formatDay(d.day),
-        sub: d.usualMinor === null ? "لا تقديرَ لمثله" : `وسيطُ مثله ${formatRiyalsDisplay(d.usualMinor)} — تقدير`,
+        sub: d.usualMinor === null ? "لا تقدير لمثله" : `وسيط مثله ${formatRiyalsDisplay(d.usualMinor)} — تقدير`,
       })),
     });
   }
@@ -713,23 +713,23 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "INVOICES",
       severity: paid > 0 ? "CRITICAL" : "HIGH",
       title: list.length === 1
-        ? `توريدٌ من ${list[0].supplierName} يبدو مقيَّداً مرّتين`
-        : `${list.length} توريداتٍ تبدو مقيَّدةً مرّتين`,
-      detail: "فاتورتان للمورّد نفسِه بالأصناف والكمّيّات نفسِها وبينهما أيّامٌ أقلّ من عادته — الأرجح أنّ إحداهما أُلغيت وصدرت الأخرى مكانها وبقيتا معاً."
-        + (paid > 0 ? " وقد سُدِّدتا كلتاهما." : ""),
+        ? `توريد من ${list[0].supplierName} يبدو مقيّداً مرّتين`
+        : `${list.length} توريدات تبدو مقيّدةً مرّتين`,
+      detail: "فاتورتان للمورّد نفسه بالأصناف والكمّيّات نفسها وبينهما أيّام أقلّ من عادته — الأرجح أنّ إحداهما ألغيت وصدرت الأخرى مكانها وبقيتا معاً."
+        + (paid > 0 ? " وقد سدّدتا كلتاهما." : ""),
       action: paid > 0
-        ? "اسأل المورّد: إن كانت إحداهما ملغاةً فألغِها عندنا واطلب إشعاراً دائناً أو خصماً من القادمة."
-        : "اسأل المورّد قبل أن تدفع: إن كانت إحداهما ملغاةً فألغِها عندنا.",
-      actionLabel: "قارِن الفاتورتين",
+        ? "اسأل المورّد: إن كانت إحداهما ملغاةً فألغها عندنا واطلب إشعاراً دائناً أو خصماً من القادمة."
+        : "اسأل المورّد قبل أن تدفع: إن كانت إحداهما ملغاةً فألغها عندنا.",
+      actionLabel: "قارن الفاتورتين",
       href: "/purchases/foodics#repeat",
       count: list.length,
       amountMinor: total,
       impact: { kind: paid > 0 ? "RECOVERABLE" : "AT_RISK", amountMinor: total },
       evidence: list.slice(0, 6).map((r) => ({
         label: `${r.supplierName} · ${r.firstNumber} و${r.secondNumber}`,
-        sub: `بينهما ${r.gapDays === 0 ? "اليومُ نفسُه" : r.gapDays === 1 ? "يوم" : r.gapDays === 2 ? "يومان" : `${r.gapDays} أيّام`}`
-          + (r.foodicsReceipts === 1 ? " · وفودكس استلم مرّةً واحدة" : r.foodicsReceipts === 0 ? " · ولا استلامَ في فودكس" : "")
-          + (r.bothPaid ? " · سُدِّدتا" : ""),
+        sub: `بينهما ${r.gapDays === 0 ? "اليوم نفسه" : r.gapDays === 1 ? "يوم" : r.gapDays === 2 ? "يومان" : `${r.gapDays} أيّام`}`
+          + (r.foodicsReceipts === 1 ? " · وفودكس استلم مرّةً واحدة" : r.foodicsReceipts === 0 ? " · ولا استلام في فودكس" : "")
+          + (r.bothPaid ? " · سدّدتا" : ""),
         amountMinor: r.atStakeMinor,
         href: "/purchases/foodics#repeat",
       })),
@@ -747,17 +747,17 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "INVOICES",
       severity: "HIGH",
       title: list.length === 1
-        ? `فاتورةٌ مبدئيّة من ${list[0].supplierName} بلا فاتورتها الضريبيّة`
-        : `${list.length} فواتيرَ مبدئيّة بلا فواتيرها الضريبيّة`,
-      detail: "ما في الدرايف «Proforma» لا الفاتورةُ الأصليّة: لا تُقيَّد ولا تُخصم ضريبتُها، وما تحوّله للمورّد على أساسها يُخصَّص على أقدم فواتيره المفتوحة.",
-      action: "اطلب الفاتورةَ الضريبيّة من المورّد وارفعها — وراجِع أين خُصِّص ما حوّلتَه له.",
-      actionLabel: list.length === 1 ? "افتح حسابَ المورّد" : "افتح المستندات",
+        ? `فاتورة مبدئيّة من ${list[0].supplierName} بلا فاتورتها الضريبيّة`
+        : `${list.length} فواتير مبدئيّة بلا فواتيرها الضريبيّة`,
+      detail: "ما في الدرايف «Proforma» لا الفاتورة الأصليّة: لا تقيّد ولا تخصم ضريبتها، وما تحوّله للمورّد على أساسها يخصّص على أقدم فواتيره المفتوحة.",
+      action: "اطلب الفاتورة الضريبيّة من المورّد وارفعها — وراجع أين خصّص ما حوّلته له.",
+      actionLabel: list.length === 1 ? "افتح حساب المورّد" : "افتح المستندات",
       href: list.length === 1 ? `/suppliers/${list[0].supplierSlug}` : "/documents",
       count: list.length,
       impact: { kind: "BLOCKED", amountMinor: null },
       evidence: list.slice(0, 6).map((p) => ({
         label: `${p.supplierName} · ${p.number ?? "بلا رقم"}`,
-        sub: p.periodMonth ? `مبدئيّةُ ${formatMonth(p.periodMonth)}` : "مبدئيّة",
+        sub: p.periodMonth ? `مبدئيّة ${formatMonth(p.periodMonth)}` : "مبدئيّة",
         href: `/suppliers/${p.supplierSlug}`,
       })),
     });
@@ -776,19 +776,19 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "BANK",
       severity: short.length > 0 ? "HIGH" : "MEDIUM",
       title: gaps.length === 1
-        ? `دفعةُ شبكةِ ${formatDay(gaps[0].day)} لا تطابق بطاقاتِ فودكس`
-        : `${gaps.length} دفعاتِ شبكةٍ لا تطابق بطاقاتِ فودكس`,
+        ? `دفعة شبكة ${formatDay(gaps[0].day)} لا تطابق بطاقات فودكس`
+        : `${gaps.length} دفعات شبكة لا تطابق بطاقات فودكس`,
       detail: short.length > 0
-        ? "فودكس سجّل بطاقاتٍ أكثر ممّا دخل الحسابَ في بعضها — وفي غيرها دخل أكثر ممّا سجّل."
-        : "دخل الحسابَ من الشبكة أكثر ممّا سجّله فودكس بطاقةً — بيعٌ سُجّل نقداً ودُفع بالبطاقة، أو عمليّةٌ على الجهاز بلا طلب.",
-      action: "افتح الدفعةَ وقارِن: تقريرُ إقفال الجهاز لتلك الليلة وطلباتُها في فودكس. وما عرفتَ سببَه فأسكِته.",
+        ? "فودكس سجّل بطاقات أكثر ممّا دخل الحساب في بعضها — وفي غيرها دخل أكثر ممّا سجّل."
+        : "دخل الحساب من الشبكة أكثر ممّا سجّله فودكس بطاقةً — بيع سجّل نقداً ودفع بالبطاقة، أو عمليّة على الجهاز بلا طلب.",
+      action: "افتح الدفعة وقارن: تقرير إقفال الجهاز لتلك الليلة وطلباتها في فودكس. وما عرفت سببه فأسكته.",
       actionLabel: "افتح فودكس والبنك",
       href: "/money/foodics#flagged",
       count: gaps.length,
       impact: { kind: "AT_RISK", amountMinor: short.length > 0 ? shortMinor : null },
       evidence: gaps.slice(0, 6).map((g) => ({
-        label: `دفعةُ ${formatDay(g.day)}`,
-        sub: g.gapMinor > 0 ? "وصل البنكَ أقلّ ممّا في فودكس" : "وصل البنكَ أكثر ممّا في فودكس",
+        label: `دفعة ${formatDay(g.day)}`,
+        sub: g.gapMinor > 0 ? "وصل البنك أقلّ ممّا في فودكس" : "وصل البنك أكثر ممّا في فودكس",
         amountMinor: Math.abs(g.gapMinor),
       })),
     });
@@ -802,15 +802,15 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "INVOICES",
       severity: "MEDIUM",
       title: list.length === 1
-        ? `فاتورةُ ${list[0].supplierName} مبلغُها في فودكس غيرُ ما عندنا`
-        : `${countNoun(list.length, INVOICE)} مبلغُها في فودكس غيرُ ما عندنا`,
-      detail: "الرقمُ واحدٌ عند الطرفين والإجماليُّ ليس واحداً — أحدُهما قُرئ أو أُدخل خطأً.",
-      action: "افتح المستندَ واحكم: صحِّح الفاتورةَ إن كان الخطأُ في قراءتنا، أو صحِّح فودكس إن كان فيه.",
-      actionLabel: "قارِن في فودكس والفواتير",
+        ? `فاتورة ${list[0].supplierName} مبلغها في فودكس غير ما عندنا`
+        : `${countNoun(list.length, INVOICE)} مبلغها في فودكس غير ما عندنا`,
+      detail: "الرقم واحد عند الطرفين والإجماليّ ليس واحداً — أحدهما قرئ أو أدخل خطأً.",
+      action: "افتح المستند واحكم: صحّح الفاتورة إن كان الخطأ في قراءتنا، أو صحّح فودكس إن كان فيه.",
+      actionLabel: "قارن في فودكس والفواتير",
       href: "/purchases/foodics#differs",
       count: list.length,
       impact: { kind: "UNATTRIBUTED", amountMinor: list.reduce((s, x) => s + Math.abs(x.gapMinor), 0) },
-      evidence: list.slice(0, 6).map((x) => ({ label: `${x.supplierName} · ${x.invoiceNumber}`, sub: "الفرقُ بين الطرفين", amountMinor: Math.abs(x.gapMinor) })),
+      evidence: list.slice(0, 6).map((x) => ({ label: `${x.supplierName} · ${x.invoiceNumber}`, sub: "الفرق بين الطرفين", amountMinor: Math.abs(x.gapMinor) })),
     });
   }
 
@@ -822,10 +822,10 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "INVOICES",
       severity: "MEDIUM",
       title: list.length === 1
-        ? `شراءٌ من ${list[0].supplierName} في فودكس بلا فاتورةٍ عندنا`
-        : `${list.length} حركاتِ شراءٍ في فودكس بلا فاتورةٍ عندنا`,
-      detail: "حركةُ شراءٍ مُرحَّلةٌ في فودكس لمورّدٍ مربوط، ولا فاتورةَ برقمها ولا بتاريخها ومبلغها في الدرايف.",
-      action: "اطلب الفاتورةَ من المورّد أو ارفعها — وإن لم تكن فاتورةً تُنتظَر فأسكِتها من صفحتها.",
+        ? `شراء من ${list[0].supplierName} في فودكس بلا فاتورة عندنا`
+        : `${list.length} حركات شراء في فودكس بلا فاتورة عندنا`,
+      detail: "حركة شراء مرحّلة في فودكس لمورّد مربوط، ولا فاتورة برقمها ولا بتاريخها ومبلغها في الدرايف.",
+      action: "اطلب الفاتورة من المورّد أو ارفعها — وإن لم تكن فاتورةً تنتظر فأسكتها من صفحتها.",
       actionLabel: "افتح فودكس والفواتير",
       href: "/purchases/foodics#only-foodics",
       count: list.length,
@@ -847,9 +847,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "foodics-stale",
       area: "DATA",
       severity: days >= 3 ? "HIGH" : "MEDIUM",
-      title: days >= 1 ? `فودكس لم يُقرأ منذ ${countNoun(days, DAY)}` : "فودكس لم يُقرأ منذ أكثر من يوم",
-      detail: "آخرُ مزامنةٍ ناجحة قديمة: مبيعاتُ الأيّام بعدها وصناديقُها ليست في النظام، فأرقامُ «المالية» والجرد ناقصةٌ بقدرها.",
-      action: "اضغط «زامن الآن». إن رفض فودكس المفتاح فقد أُلغي من «Authorized Apps» ويُطلَب غيرُه.",
+      title: days >= 1 ? `فودكس لم يقرأ منذ ${countNoun(days, DAY)}` : "فودكس لم يقرأ منذ أكثر من يوم",
+      detail: "آخر مزامنة ناجحة قديمة: مبيعات الأيّام بعدها وصناديقها ليست في النظام، فأرقام «المالية» والجرد ناقصة بقدرها.",
+      action: "اضغط «زامن الآن». إن رفض فودكس المفتاح فقد ألغي من «Authorized Apps» ويطلب غيره.",
       actionLabel: "زامن فودكس",
       href: "/money/foodics",
       count: 1,
@@ -871,17 +871,17 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "DATA",
       severity: "MEDIUM",
       title: lumps.length > 0
-        ? "إيجارٌ في الكشف لم يُقَل كم شهراً يغطّي"
-        : `ربحُ ${formatMonth(missing?.month ?? "")} ينقصه ${names.join(" و")}`,
+        ? "إيجار في الكشف لم يقل كم شهراً يغطّي"
+        : `ربح ${formatMonth(missing?.month ?? "")} ينقصه ${names.join(" و")}`,
       detail: lumps.length > 0
-        ? `شهرُ الدفع يحمل الدفعةَ كلَّها والأشهرُ حوله «ربحٌ قبل الإيجار»${missing && names.length > 0 ? ` — و${formatMonth(missing.month)} ينقصه ${names.join(" و")}` : ""}.`
-        : "لا شيءَ مقيَّدٌ له في الكشف ولا بإقرارك — فالرقمُ «ربحٌ قبل كذا» لا «صافي الربح».",
-      action: "قل ما لا يراه الكشف: كم شهراً تغطّي دفعةُ الإيجار، وما يُدفَع نقداً أو من حسابٍ شخصيّ.",
-      actionLabel: "أكمِل ربحَ الشهر",
+        ? `شهر الدفع يحمل الدفعة كلّها والأشهر حوله «ربح قبل الإيجار»${missing && names.length > 0 ? ` — و${formatMonth(missing.month)} ينقصه ${names.join(" و")}` : ""}.`
+        : "لا شيء مقيّد له في الكشف ولا بإقرارك — فالرقم «ربح قبل كذا» لا «صافي الربح».",
+      action: "قل ما لا يراه الكشف: كم شهراً تغطّي دفعة الإيجار، وما يدفع نقداً أو من حساب شخصيّ.",
+      actionLabel: "أكمل ربح الشهر",
       href: `/finance/inputs${missing ? `?month=${missing.month}` : ""}`,
       count: Math.max(1, lumps.length),
       impact: { kind: "BLOCKED", amountMinor: lumps.length > 0 ? lumps.reduce((s, l) => s + l.amountMinor, 0) : null },
-      evidence: lumps.slice(0, 4).map((l) => ({ label: `إيجارٌ خرج ${formatDay(l.day)}`, sub: "لم يُوزَّع على أشهره", amountMinor: l.amountMinor })),
+      evidence: lumps.slice(0, 4).map((l) => ({ label: `إيجار خرج ${formatDay(l.day)}`, sub: "لم يوزّع على أشهره", amountMinor: l.amountMinor })),
     });
   }
 
@@ -892,9 +892,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "stock-links-ready",
       area: "DATA",
       severity: "OPPORTUNITY",
-      title: `${countNoun(ready.count, PRODUCT)} من الفواتير جاهزةٌ للربط بأصناف المخزون`,
-      detail: "يقابل كلّاً منها في فودكس بندُ شراءٍ للمورّد نفسه بالمبلغ نفسه، اختار له من أدخله صنفَ المخزون وكمّيّته. بلا ربطها تبقى مشترياتُ أصنافها «غير معروفة».",
-      action: "راجِعها وأقِرّها بضغطة — أو عدِّل ما تراه غيرَ ذلك.",
+      title: `${countNoun(ready.count, PRODUCT)} من الفواتير جاهزة للربط بأصناف المخزون`,
+      detail: "يقابل كلّاً منها في فودكس بند شراء للمورّد نفسه بالمبلغ نفسه، اختار له من أدخله صنف المخزون وكمّيّته. بلا ربطها تبقى مشتريات أصنافها «غير معروفة».",
+      action: "راجعها وأقرّها بضغطة — أو عدّل ما تراه غير ذلك.",
       actionLabel: "اربط البنود",
       href: "/finance/stock/links?view=ready",
       count: ready.count,
@@ -912,19 +912,19 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "BANK",
       severity: "MEDIUM",
       title: tills.length === 1
-        ? (tills[0].uncounted ? `صندوقُ ${formatDay(tills[0].day)} أُقفل بلا عدّ` : `صندوقُ ${formatDay(tills[0].day)}: المعدودُ غيرُ المتوقَّع`)
-        : `${tills.length} صناديقَ معدودُها غيرُ المتوقَّع`,
+        ? (tills[0].uncounted ? `صندوق ${formatDay(tills[0].day)} أقفل بلا عدّ` : `صندوق ${formatDay(tills[0].day)}: المعدود غير المتوقّع`)
+        : `${tills.length} صناديق معدودها غير المتوقّع`,
       detail: uncounted > 0
-        ? "صندوقٌ أُقفل والمعدودُ فيه صفرٌ وفودكس يتوقّع نقداً — لم يُعَدّ عند الإقفال. وغيرُه فرقُه فوق الفكّة."
-        : "النقدُ المعدود عند الإقفال يبعد عمّا يتوقّعه فودكس بأكثر من فكّة. نقدُ المقهى لا يدخل البنك، فهذا العدُّ عينُه الوحيدة.",
-      action: "اسأل من أقفل الصندوق: أعُدّ؟ أأُخذ منه ما لم يُسجَّل «سحباً» في فودكس؟ وما عرفتَ سببَه فأسكِته.",
+        ? "صندوق أقفل والمعدود فيه صفر وفودكس يتوقّع نقداً — لم يعدّ عند الإقفال. وغيره فرقه فوق الفكّة."
+        : "النقد المعدود عند الإقفال يبعد عمّا يتوقّعه فودكس بأكثر من فكّة. نقد المقهى لا يدخل البنك، فهذا العدّ عينه الوحيدة.",
+      action: "اسأل من أقفل الصندوق: أعدّ؟ أأخذ منه ما لم يسجّل «سحباً» في فودكس؟ وما عرفت سببه فأسكته.",
       actionLabel: "افتح النقد والصندوق",
       href: "/finance/position#cash",
       count: tills.length,
       impact: { kind: "AT_RISK", amountMinor: tills.filter((t) => t.varianceMinor < 0).reduce((s, t) => s - t.varianceMinor, 0) || null },
       evidence: tills.slice(0, 6).map((t) => ({
-        label: `صندوقُ ${formatDay(t.day)}${t.userName ? ` · فتحه ${t.userName}` : ""}`,
-        sub: t.uncounted ? "أُقفل بلا عدّ" : t.varianceMinor < 0 ? "المعدودُ أقلّ من المتوقَّع" : "المعدودُ أكثر من المتوقَّع",
+        label: `صندوق ${formatDay(t.day)}${t.userName ? ` · فتحه ${t.userName}` : ""}`,
+        sub: t.uncounted ? "أقفل بلا عدّ" : t.varianceMinor < 0 ? "المعدود أقلّ من المتوقّع" : "المعدود أكثر من المتوقّع",
         amountMinor: Math.abs(t.varianceMinor),
       })),
     });
@@ -943,16 +943,16 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "DATA",
       severity: "MEDIUM",
       title: shortages.length === 1
-        ? `«${shortages[0].name}» يخرج من الرفّ أكثر ممّا تفسّره وصفتُه — ${shortages[0].months} أشهرٍ متتالية`
-        : `${countNoun(shortages.length, PRODUCT)} تخرج من الرفّ أكثر ممّا تفسّره وصفاتُها`,
-      detail: "الفرقُ تكرّر شهرين فأكثر فليس عدّاً مستعجلاً. قد يكون هدراً لا يُسجَّل، أو وصفةً أصغر من الواقع (جرعةٌ أكبر، ضبطُ طحن)، أو تسريباً — البياناتُ لا تحسم.",
-      action: "راجِع الوصفة: أتطابق ما يُصرَف فعلاً؟ وسجِّل الهدرَ حين يقع ليخرج من الفرق.",
+        ? `«${shortages[0].name}» يخرج من الرفّ أكثر ممّا تفسّره وصفته — ${shortages[0].months} أشهر متتالية`
+        : `${countNoun(shortages.length, PRODUCT)} تخرج من الرفّ أكثر ممّا تفسّره وصفاتها`,
+      detail: "الفرق تكرّر شهرين فأكثر فليس عدّاً مستعجلاً. قد يكون هدراً لا يسجّل، أو وصفةً أصغر من الواقع (جرعة أكبر، ضبط طحن)، أو تسريباً — البيانات لا تحسم.",
+      action: "راجع الوصفة: أتطابق ما يصرف فعلاً؟ وسجّل الهدر حين يقع ليخرج من الفرق.",
       actionLabel: "افتح المشترى والمباع",
       href: "/finance/stock#recurring",
       count: shortages.length,
       impact: { kind: "AT_RISK", amountMinor: shortages.reduce((s, g) => s + g.totalMinor, 0) },
       evidence: shortages.slice(0, 6).map((g) => ({
-        label: g.name, sub: `${g.months} أشهرٍ متتالية${g.byWitness ? " · بمشتريات فودكس" : ""}`, amountMinor: g.totalMinor,
+        label: g.name, sub: `${g.months} أشهر متتالية${g.byWitness ? " · بمشتريات فودكس" : ""}`, amountMinor: g.totalMinor,
         href: `/finance/stock/item?id=${g.productId}&month=all`,
       })),
     });
@@ -963,15 +963,15 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "INVOICES",
       severity: "MEDIUM",
       title: overs.length === 1
-        ? `«${overs[0].name}» بِيع منه أكثر ممّا اشتُري — فاتورةٌ ناقصة؟`
-        : `${countNoun(overs.length, PRODUCT)} بِيع منها أكثر ممّا اشتُري — فواتيرُ ناقصة؟`,
-      detail: "الاستهلاكُ النظريّ فاق المتاح شهرين فأكثر. ليس ربحاً: فاتورةُ شراءٍ لم تُقيَّد أو لم تُربَط بالصنف، أو وصفةٌ تقول أكثر ممّا يُصرَف.",
-      action: "افتح الصنف: أفواتيرُه كاملةٌ ومربوطة؟ ثمّ راجِع الوصفة.",
+        ? `«${overs[0].name}» بيع منه أكثر ممّا اشتري — فاتورة ناقصة؟`
+        : `${countNoun(overs.length, PRODUCT)} بيع منها أكثر ممّا اشتري — فواتير ناقصة؟`,
+      detail: "الاستهلاك النظريّ فاق المتاح شهرين فأكثر. ليس ربحاً: فاتورة شراء لم تقيّد أو لم تربط بالصنف، أو وصفة تقول أكثر ممّا يصرف.",
+      action: "افتح الصنف: أفواتيره كاملة ومربوطة؟ ثمّ راجع الوصفة.",
       actionLabel: "افتح المشترى والمباع",
       href: "/finance/stock#recurring",
       count: overs.length,
       impact: { kind: "UNATTRIBUTED", amountMinor: overs.reduce((s, g) => s + g.totalMinor, 0) },
-      evidence: overs.slice(0, 6).map((g) => ({ label: g.name, sub: `${g.months} أشهرٍ متتالية`, amountMinor: g.totalMinor, href: `/finance/stock/item?id=${g.productId}&month=all` })),
+      evidence: overs.slice(0, 6).map((g) => ({ label: g.name, sub: `${g.months} أشهر متتالية`, amountMinor: g.totalMinor, href: `/finance/stock/item?id=${g.productId}&month=all` })),
     });
   }
 
@@ -990,10 +990,10 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: list.length === 1
         ? `«${list[0].title.slice(0, 50)}» ${list[0].daysLeft < 0 ? "انتهت" : `تنتهي ${formatDay(list[0].expiresOn)}`}`
         : expired > 0
-          ? `${countNoun(list.length, PAPER)} بين منتهٍ وقريب الانتهاء`
+          ? `${countNoun(list.length, PAPER)} بين منته وقريب الانتهاء`
           : `${countNoun(list.length, PAPER)} يقترب انتهاؤها`,
-      detail: "وثائقُ أدخلتَها بتاريخ انتهائها — انتهت أو دخلت مهلةَ التذكير التي كتبتَها لها.",
-      action: "جدِّدها ثمّ اكتب تاريخَها الجديد — أو أجِّل التذكير إن كان التجديدُ جارياً.",
+      detail: "وثائق أدخلتها بتاريخ انتهائها — انتهت أو دخلت مهلة التذكير التي كتبتها لها.",
+      action: "جدّدها ثمّ اكتب تاريخها الجديد — أو أجّل التذكير إن كان التجديد جارياً.",
       actionLabel: "افتح الوثائق",
       href: "/settings/obligations",
       count: list.length,
@@ -1014,10 +1014,10 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "BANK",
       severity: "MEDIUM",
       title: list.length === 1
-        ? `«${list[0].label.slice(0, 40)}» ${list[0].kind === "TWICE" ? "خُصم مرّتين هذا الشهر" : "ارتفع عن عادته"}`
-        : `${list.length} خصوماتٍ متكرّرة خرجت عن عادتها`,
-      detail: "جهةٌ يُخصم لها كلَّ شهرٍ مبلغٌ متقارب — وآخرُ خصمٍ لها تكرّر في شهره أو زاد بأكثر من ١٠٪.",
-      action: "راجِعها: طالِب بما خُصم مرّتين، واسأل عن الزيادة — أو أسكِتها إن كانت متّفقاً عليها.",
+        ? `«${list[0].label.slice(0, 40)}» ${list[0].kind === "TWICE" ? "خصم مرّتين هذا الشهر" : "ارتفع عن عادته"}`
+        : `${list.length} خصومات متكرّرة خرجت عن عادتها`,
+      detail: "جهة يخصم لها كلّ شهر مبلغ متقارب — وآخر خصم لها تكرّر في شهره أو زاد بأكثر من ١٠٪.",
+      action: "راجعها: طالب بما خصم مرّتين، واسأل عن الزيادة — أو أسكتها إن كانت متّفقاً عليها.",
       actionLabel: "افتح المتكرّر",
       href: "/money/recurring",
       count: list.length,
@@ -1025,7 +1025,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       impact: { kind: "RECOVERABLE", amountMinor: twiceMinor > 0 ? twiceMinor : null },
       evidence: list.slice(0, 6).map((a) => ({
         label: a.label.slice(0, 45),
-        sub: `${a.kind === "TWICE" ? "خُصم مرّتين" : "ارتفع"} · ${formatDay(a.day)}`,
+        sub: `${a.kind === "TWICE" ? "خصم مرّتين" : "ارتفع"} · ${formatDay(a.day)}`,
         amountMinor: a.amountMinor,
       })),
     });
@@ -1038,9 +1038,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "first-transfers",
       area: "BANK",
       severity: "MEDIUM",
-      title: n === 1 ? "حوالةٌ أولى إلى حسابٍ لم يُحوَّل له من قبل" : `حوالاتٌ أولى إلى ${n} حساباتٍ لم يُحوَّل لها من قبل`,
-      detail: "آيبانٌ يظهر في كشف البنك أوّلَ مرّة وبمبلغٍ فوق خمسمئة ريال. للعلم: إن كنتَ من حوّل فأغلِقه.",
-      action: "انظر المستفيدَ والمبلغ: «أعرفه» يُغلقه ولا يُذكر ثانيةً.",
+      title: n === 1 ? "حوالة أولى إلى حساب لم يحوّل له من قبل" : `حوالات أولى إلى ${n} حسابات لم يحوّل لها من قبل`,
+      detail: "آيبان يظهر في كشف البنك أوّل مرّة وبمبلغ فوق خمسمئة ريال. للعلم: إن كنت من حوّل فأغلقه.",
+      action: "انظر المستفيد والمبلغ: «أعرفه» يغلقه ولا يذكر ثانيةً.",
       actionLabel: "انظر المستفيدين",
       href: "/attention?item=first-transfers",
       count: n,
@@ -1056,9 +1056,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "bounced-payments",
       area: "BANK",
       severity: "HIGH",
-      title: n === 1 ? "حوالةٌ لمورّد خرجت ثمّ عادت" : `${countNoun(n, TRANSACTION)} لمورّدين خرجت ثمّ عادت`,
-      detail: "المبلغ نفسه رجع إلى الحساب بعد أيّام — فالفاتورة التي قُيّدت عليها تبدو مسدَّدةً ولم تُسدَّد.",
-      action: "افتح الحركة: «ارتدّت» تردّ الدفعة فتعود الفاتورة مستحقّة (ثمّ أعِد التحويل)، أو «ليست ردّاً» فيُغلق التنبيه.",
+      title: n === 1 ? "حوالة لمورّد خرجت ثمّ عادت" : `${countNoun(n, TRANSACTION)} لمورّدين خرجت ثمّ عادت`,
+      detail: "المبلغ نفسه رجع إلى الحساب بعد أيّام — فالفاتورة التي قيّدت عليها تبدو مسدّدةً ولم تسدّد.",
+      action: "افتح الحركة: «ارتدّت» تردّ الدفعة فتعود الفاتورة مستحقّة (ثمّ أعد التحويل)، أو «ليست ردّاً» فيغلق التنبيه.",
       actionLabel: "افتح الحركة",
       href: f.firstBouncedTransactionId ? txHref(f.firstBouncedTransactionId) : "/bank",
       count: n,
@@ -1080,10 +1080,10 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "SUPPLIERS",
       severity: "HIGH",
       title: gaps.length === 1
-        ? `كشفُ ${gaps[0].supplierName} يخالف دفترَنا بـ${formatRiyalsDisplay(total)}`
-        : `${countNoun(gaps.length, SUPPLIER)} يخالف كشفُهم دفترَنا`,
-      detail: "ما يطالبك به المورّدُ في آخر كشفه غيرُ ما تدين له به في دفترك: فاتورةٌ في كشفه لم تصلك، أو سدادٌ قيّدتَه لم يصله.",
-      action: "افتح الكشف: «قيّدها من الكشف» لما لا ملفَّ له، أو اطلب من المورّد ما ينقص.",
+        ? `كشف ${gaps[0].supplierName} يخالف دفترنا بـ${formatRiyalsDisplay(total)}`
+        : `${countNoun(gaps.length, SUPPLIER)} يخالف كشفهم دفترنا`,
+      detail: "ما يطالبك به المورّد في آخر كشفه غير ما تدين له به في دفترك: فاتورة في كشفه لم تصلك، أو سداد قيّدته لم يصله.",
+      action: "افتح الكشف: «قيّدها من الكشف» لما لا ملفّ له، أو اطلب من المورّد ما ينقص.",
       actionLabel: "افتح الكشف",
       href: gaps.length === 1 ? `/statements?supplier=${encodeURIComponent(gaps[0].slug)}` : "/statements",
       count: gaps.length,
@@ -1091,7 +1091,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       impact: { kind: "UNATTRIBUTED", amountMinor: total },
       evidence: gaps.map((g) => ({
         label: g.supplierName,
-        sub: `كشفُه ${formatRiyalsDisplay(g.theirsMinor)} يوم ${formatDay(g.day)} · دفترُنا ${g.oursMinor >= 0 ? formatRiyalsDisplay(g.oursMinor) : `لنا عنده ${formatRiyalsDisplay(-g.oursMinor)}`}`,
+        sub: `كشفه ${formatRiyalsDisplay(g.theirsMinor)} يوم ${formatDay(g.day)} · دفترنا ${g.oursMinor >= 0 ? formatRiyalsDisplay(g.oursMinor) : `لنا عنده ${formatRiyalsDisplay(-g.oursMinor)}`}`,
         amountMinor: Math.abs(g.gapMinor),
         href: `/statements?supplier=${encodeURIComponent(g.slug)}`,
       })),
@@ -1105,9 +1105,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "files-wrong-month",
       area: "DATA",
       severity: "MEDIUM",
-      title: `${countNoun(misplaced.length, DOCUMENT)} في مجلد شهرٍ غير شهر فاتورتها`,
-      detail: "قيدُها في شهرها الصحيح من تاريخ الفاتورة — لكنّ من يفتّش الدرايف بالشهر لا يجدها. والنظامُ لا ينقل في الأرشيف شيئاً.",
-      action: "انقلها في الدرايف إلى مجلد شهرها، والتنبيهُ يُحسم في المزامنة التالية.",
+      title: `${countNoun(misplaced.length, DOCUMENT)} في مجلد شهر غير شهر فاتورتها`,
+      detail: "قيدها في شهرها الصحيح من تاريخ الفاتورة — لكنّ من يفتّش الدرايف بالشهر لا يجدها. والنظام لا ينقل في الأرشيف شيئاً.",
+      action: "انقلها في الدرايف إلى مجلد شهرها، والتنبيه يحسم في المزامنة التالية.",
       actionLabel: "افتح الدرايف",
       href: "/documents/drive",
       count: misplaced.length,
@@ -1122,9 +1122,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "files-missing-in-drive",
       area: "DATA",
       severity: "MEDIUM",
-      title: `${countNoun(missingFiles.length, DOCUMENT)} مقيَّدة ولم يعد ملفُّها في الدرايف`,
-      detail: "القيدُ قائمٌ والورقةُ غابت — حُذفت أو أُلقيت في السلّة. والفاتورةُ بلا ورقتها لا تسند خصمَ ضريبتها عند الفحص.",
-      action: "استعِدها من سلّة الدرايف (تُفرَّغ بعد ثلاثين يوماً)، والتنبيهُ يُحسم في المزامنة التالية.",
+      title: `${countNoun(missingFiles.length, DOCUMENT)} مقيّدة ولم يعد ملفّها في الدرايف`,
+      detail: "القيد قائم والورقة غابت — حذفت أو ألقيت في السلّة. والفاتورة بلا ورقتها لا تسند خصم ضريبتها عند الفحص.",
+      action: "استعدها من سلّة الدرايف (تفرّغ بعد ثلاثين يوماً)، والتنبيه يحسم في المزامنة التالية.",
       actionLabel: "افتح الدرايف",
       href: "/documents/drive",
       count: missingFiles.length,
@@ -1140,8 +1140,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       area: "SUPPLIERS",
       severity: "MEDIUM",
       /* الضميرُ يتبع العدد: «كشفُه» لواحد، و«كشفُهما» لاثنين، و«كشوفُهم» لما فوقهما */
-      title: `${countNoun(missingCount, SUPPLIER)} ${missingCount === 1 ? "لم يصل كشفُه" : missingCount === 2 ? "لم يصل كشفُهما" : "لم تصل كشوفُهم"}`,
-      detail: "الكشف وحده يكشف فاتورة حُمّلت عليك ولم تصلك — ولا يظهر ذلك في أرشيفك مهما فتّشته.",
+      title: `${countNoun(missingCount, SUPPLIER)} ${missingCount === 1 ? "لم يصل كشفه" : missingCount === 2 ? "لم يصل كشفهما" : "لم تصل كشوفهم"}`,
+      detail: "الكشف وحده يكشف فاتورة حمّلت عليك ولم تصلك — ولا يظهر ذلك في أرشيفك مهما فتّشته.",
       action: "اطلب الكشف الشهري منهم، ثمّ طابقه.",
       actionLabel: "اطلب الكشوف",
       /* تسمّي الغائبين — والصفحة بلا مرشِّح تعرض ما وصل لا ما غاب (BTN-110) */
@@ -1157,9 +1157,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "unknown-tax",
       area: "DATA",
       severity: "MEDIUM",
-      title: `${countNoun(f.unknownTaxCount, INVOICE)} لم يُقرأ تفصيلها الضريبي`,
+      title: `${countNoun(f.unknownTaxCount, INVOICE)} لم يقرأ تفصيلها الضريبي`,
       // الفرق عن «غير صالحة» مقصود: هذه تُقرأ، وتلك يُطالَب مورّدها
-      detail: "حالتها مجهولة لا غير صالحة. لا تُطالِب مورّدها قبل قراءتها.",
+      detail: "حالتها مجهولة لا غير صالحة. لا تطالب مورّدها قبل قراءتها.",
       action: "اقرأ محتواها من صفحة المستندات.",
       actionLabel: "اقرأ تفصيلها",
       href: "/purchases/invoices?tax=UNKNOWN",
@@ -1176,9 +1176,9 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "unrecorded-invoices",
       area: "INVOICES",
       severity: "HIGH",
-      title: `${countNoun(unrecorded.length, INVOICE)} أُرشفت ولم تُقيَّد`,
-      detail: "مستنداتُ فواتير في الأرشيف بلا صفّ فاتورة — لا تدخل «كم أدين» ولا دفعةَ الشهر، فالمستحقُّ أقلُّ من حقيقته بقدرها.",
-      action: "افتح كلّاً منها: قيّدها بضغطة إن كانت فاتورة، أو ارفضها إن كانت نسخةً من فاتورةٍ مقيَّدة.",
+      title: `${countNoun(unrecorded.length, INVOICE)} أرشفت ولم تقيّد`,
+      detail: "مستندات فواتير في الأرشيف بلا صفّ فاتورة — لا تدخل «كم أدين» ولا دفعة الشهر، فالمستحقّ أقلّ من حقيقته بقدرها.",
+      action: "افتح كلّاً منها: قيّدها بضغطة إن كانت فاتورة، أو ارفضها إن كانت نسخةً من فاتورة مقيّدة.",
       actionLabel: "قيّدها أو ارفضها",
       href: unrecorded[0].href ?? "/documents",
       count: unrecorded.length,
@@ -1211,8 +1211,8 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       id: "pending-documents",
       area: "INVOICES",
       severity: "MEDIUM",
-      title: `${countNoun(f.pendingDocuments, DOCUMENT)} لم يُبتّ فيه`,
-      detail: "مرفوع ولم يُعتمد ولم يُرفض.",
+      title: `${countNoun(f.pendingDocuments, DOCUMENT)} لم يبتّ فيه`,
+      detail: "مرفوع ولم يعتمد ولم يرفض.",
       action: "راجعه واعتمده أو ارفضه.",
       actionLabel: "اعتمدها أو ارفضها",
       href: "/documents?status=NEEDS_REVIEW",
@@ -1230,7 +1230,7 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       title: `${countNoun(f.suppliersWithoutContract.length, SUPPLIER)} لا يصدر فواتير وبلا عقد`,
       detail: `${f.suppliersWithoutContract.join(" · ")} — بلا عقد لا خصم ضريبة ولا إثبات مصروف.`,
       action: "وقّع عقد توريد مكتوباً، أو استبدله بمورّد يصدر فواتير ضريبية.",
-      actionLabel: "أعلِن سياسة مستنداتهم",
+      actionLabel: "أعلن سياسة مستنداتهم",
       href: "/suppliers#no-contract",
       count: f.suppliersWithoutContract.length,
       impact: { kind: "AT_RISK", amountMinor: null },

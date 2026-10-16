@@ -71,7 +71,7 @@ async function handle(request: Request) {
   }
 
   const form = await request.formData().catch(() => null);
-  if (!form) return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
+  if (!form) return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلغ مالك الحساب." }, { status: 400 });
 
   const statementId = String(form.get("statementId") ?? "").trim();
   const file = form.get("file");
@@ -179,7 +179,7 @@ async function handle(request: Request) {
   if (!supplierId) {
     return NextResponse.json(
       {
-        error: "لم يُعرف المورّد من الكشف — اختره يدوياً",
+        error: "لم يعرف المورّد من الكشف — اختره يدوياً",
         needsSupplier: true,
         candidates: supplierList.map((s) => ({ id: s.id, nameAr: s.nameAr })),
       },
@@ -200,7 +200,7 @@ async function handle(request: Request) {
 
   if (parsedLines.length === 0) {
     return NextResponse.json(
-      { error: "لم تُقرأ أي حركة من الكشف. تأكّد أنّ الملف كشف حساب لا فاتورة." },
+      { error: "لم تقرأ أي حركة من الكشف. تأكّد أنّ الملف كشف حساب لا فاتورة." },
       { status: 400 },
     );
   }

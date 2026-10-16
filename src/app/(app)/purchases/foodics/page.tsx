@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 
 const BASIS: Record<MatchBasis, string> = {
   SUPPLIER_DAY_AMOUNT: "بالمورّد واليوم والمبلغ",
-  SUPPLIER_DATE_AMOUNT: "بالمورّد والمبلغ، بتاريخٍ قريب",
+  SUPPLIER_DATE_AMOUNT: "بالمورّد والمبلغ، بتاريخ قريب",
   NUMBER: "برقم الفاتورة",
   NUMBER_TAIL: "بآخر أرقامها",
 };
@@ -60,10 +60,10 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
 
   if (c.foodicsSince === null) {
     return (
-      <PageShell user={user} width="wide" title="فودكس والفواتير" intro="ما أُدخل في فودكس شراءً، أمام ما في الدرايف من فواتير.">
+      <PageShell user={user} width="wide" title="فودكس والفواتير" intro="ما أدخل في فودكس شراءً، أمام ما في الدرايف من فواتير.">
         <FoodicsStatusBar status={status} canSync={canSync} />
         <div className="mt-6">
-          <EmptyState icon={PackageSearch} title="لا حركاتِ شراءٍ من فودكس بعد." hint="تُقرأ حركاتُ الشراء ومورّدوها من واجهة فودكس، ثمّ تُقابَل بفواتيرك. اضغط «زامن الآن» أعلاه." />
+          <EmptyState icon={PackageSearch} title="لا حركات شراء من فودكس بعد." hint="تقرأ حركات الشراء ومورّدوها من واجهة فودكس، ثمّ تقابل بفواتيرك. اضغط «زامن الآن» أعلاه." />
         </div>
       </PageShell>
     );
@@ -103,18 +103,18 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
       user={user}
       width="wide"
       title="فودكس والفواتير"
-      eyebrow={<>حركاتُ الشراء في فودكس منذ <bdi>{formatDay(c.foodicsSince)}</bdi></>}
-      intro="ما أُدخل في فودكس شراءً أمام ما في الدرايف من فواتير: ما اتّفقا عليه، وما في أحدهما وليس في الآخر، وما اختلف مبلغُه."
+      eyebrow={<>حركات الشراء في فودكس منذ <bdi>{formatDay(c.foodicsSince)}</bdi></>}
+      intro="ما أدخل في فودكس شراءً أمام ما في الدرايف من فواتير: ما اتّفقا عليه، وما في أحدهما وليس في الآخر، وما اختلف مبلغه."
     >
       <FoodicsStatusBar status={status} canSync={canSync} />
 
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
         <KeyFigure
           icon={FileQuestion}
-          label="في فودكس ولا فاتورةَ عندنا"
+          label="في فودكس ولا فاتورة عندنا"
           tone={onlyFoodics.length > 0 ? "warn" : "ok"}
           value={<span className="nums">{onlyFoodics.length}</span>}
-          sub={onlyFoodics.length > 0 ? <>بمجموع <Money minor={sum(onlyFoodics)} /> — مستندٌ لم يصل الدرايف، أو مورّدٌ لم يُربَط بعد.</> : "كلُّ حركةِ شراءٍ لها فاتورةٌ عندنا."}
+          sub={onlyFoodics.length > 0 ? <>بمجموع <Money minor={sum(onlyFoodics)} /> — مستند لم يصل الدرايف، أو مورّد لم يربط بعد.</> : "كلّ حركة شراء لها فاتورة عندنا."}
           href="#only-foodics"
         />
         <KeyFigure
@@ -122,56 +122,56 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
           label="عندنا وليست في فودكس"
           tone={onlyOurs.length > 0 ? "warn" : "ok"}
           value={<span className="nums">{onlyOurs.length}</span>}
-          sub={onlyOurs.length > 0 ? <>بمجموع <Money minor={sum(onlyOurs)} /> — بضاعةٌ لم تدخل مخزونَ فودكس.</> : "لا فاتورةَ لمورّدٍ يتابعه فودكس غائبةٌ عنه."}
+          sub={onlyOurs.length > 0 ? <>بمجموع <Money minor={sum(onlyOurs)} /> — بضاعة لم تدخل مخزون فودكس.</> : "لا فاتورة لمورّد يتابعه فودكس غائبة عنه."}
           href="#only-ours"
         />
         <KeyFigure
           icon={Scale}
-          label="اتّفقا: المورّدُ واليومُ والمبلغ"
+          label="اتّفقا: المورّد واليوم والمبلغ"
           tone={differs.length > 0 ? "warn" : "ok"}
           value={<span className="nums">{agreed.length}</span>}
-          sub={differs.length > 0 ? <>و{countNoun(differs.length, INVOICE)} اختلف مبلغُها بين الطرفين.</> : "ولا فاتورةَ اختلف مبلغُها."}
+          sub={differs.length > 0 ? <>و{countNoun(differs.length, INVOICE)} اختلف مبلغها بين الطرفين.</> : "ولا فاتورة اختلف مبلغها."}
           href={differs.length > 0 ? "#differs" : "#agreed"}
         />
       </div>
 
       {/* ── لوحُ البنود ── */}
       {openPurchase && lines && (
-        <section aria-label="بنودُ الحركة" className="mt-6 rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
+        <section aria-label="بنود الحركة" className="mt-6 rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-muted">حركةُ شراءٍ في فودكس</p>
+              <p className="text-[11px] font-bold text-muted">حركة شراء في فودكس</p>
               <h2 className="mt-0.5 text-base font-bold">
                 <bdi dir="ltr">{openPurchase.reference}</bdi> · {openPurchase.foodicsSupplierName ?? "بلا مورّد"} · فاتورة <bdi dir="ltr">{openPurchase.invoiceNumber ?? "—"}</bdi>
               </h2>
               <p className="mt-1 text-xs text-ink-soft">
                 في فودكس <Money minor={openPurchase.totalMinor} />
-                {openPair ? <> · عندنا <Money minor={openPair.invoice.totalMinor} /> ({openPair.invoice.supplierName} · <bdi dir="ltr">{openPair.invoice.invoiceNumber}</bdi>)</> : " · لا فاتورةَ تقابلها عندنا"}
+                {openPair ? <> · عندنا <Money minor={openPair.invoice.totalMinor} /> ({openPair.invoice.supplierName} · <bdi dir="ltr">{openPair.invoice.invoiceNumber}</bdi>)</> : " · لا فاتورة تقابلها عندنا"}
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              {openPair && <LinkButton href={invoiceHref(openPair.invoice.id)} variant="secondary" size="sm">افتح فاتورتَنا</LinkButton>}
-              <LinkButton href="/purchases/foodics" variant="quiet" size="sm" icon={X}>أغلِق</LinkButton>
+              {openPair && <LinkButton href={invoiceHref(openPair.invoice.id)} variant="secondary" size="sm">افتح فاتورتنا</LinkButton>}
+              <LinkButton href="/purchases/foodics" variant="quiet" size="sm" icon={X}>أغلق</LinkButton>
             </div>
           </div>
           <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
             <div className="min-w-0">
-              <p className="mb-2 text-xs font-bold text-ink-soft">كما أُدخلت في فودكس (قبل الضريبة)</p>
+              <p className="mb-2 text-xs font-bold text-ink-soft">كما أدخلت في فودكس (قبل الضريبة)</p>
               <DataTable
                 rows={lines.foodics.map((l, i) => ({ ...l, i }))}
                 keyOf={(l) => String(l.i)}
                 columns={[
                   { key: "name", header: "الصنف", primary: true, cell: (l) => <span>{l.name}</span> },
                   { key: "qty", header: "الكمّيّة", numeric: true, cell: (l) => <span className="nums">{milliToDecimal(l.quantityMilli)}{l.unit ? ` ${l.unit}` : ""}</span> },
-                  { key: "cost", header: "كلفةُ السطر", numeric: true, cell: (l) => <Money minor={l.costMinor} /> },
+                  { key: "cost", header: "كلفة السطر", numeric: true, cell: (l) => <Money minor={l.costMinor} /> },
                 ]}
               />
             </div>
             <div className="min-w-0">
-              <p className="mb-2 text-xs font-bold text-ink-soft">كما قُرئت من فاتورتنا</p>
+              <p className="mb-2 text-xs font-bold text-ink-soft">كما قرئت من فاتورتنا</p>
               {lines.ours.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs text-muted">
-                  {openPair ? "فاتورتُنا بلا بنودٍ مقروءة." : "لا فاتورةَ تقابل هذه الحركة."}
+                  {openPair ? "فاتورتنا بلا بنود مقروءة." : "لا فاتورة تقابل هذه الحركة."}
                 </p>
               ) : (
                 <DataTable
@@ -180,7 +180,7 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
                   columns={[
                     { key: "name", header: "البند", primary: true, cell: (l) => <span>{l.description}</span> },
                     { key: "qty", header: "الكمّيّة", numeric: true, cell: (l) => <span className="nums">{l.qty ?? "—"}</span> },
-                    { key: "total", header: "إجماليُّ السطر", numeric: true, cell: (l) => (l.lineTotalMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={l.lineTotalMinor} />) },
+                    { key: "total", header: "إجماليّ السطر", numeric: true, cell: (l) => (l.lineTotalMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={l.lineTotalMinor} />) },
                   ]}
                 />
               )}
@@ -193,10 +193,10 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
       {repeats.length > 0 && (
         <Section
           id="repeat"
-          title="توريدٌ يبدو مقيَّداً مرّتين"
+          title="توريد يبدو مقيّداً مرّتين"
           icon={CopyX}
           count={repeats.filter((r) => !r.silenced).length}
-          hint="فاتورتان للمورّد نفسِه بالأصناف والكمّيّات نفسِها، وبينهما أيّامٌ أقلّ من عادته في التوريد. الأرجح أنّ إحداهما أُلغيت وصدرت الأخرى مكانها. اسأل المورّد — وإن كانا توريدَين فعلاً فأغلِق السؤال."
+          hint="فاتورتان للمورّد نفسه بالأصناف والكمّيّات نفسها، وبينهما أيّام أقلّ من عادته في التوريد. الأرجح أنّ إحداهما ألغيت وصدرت الأخرى مكانها. اسأل المورّد — وإن كانا توريدين فعلاً فأغلق السؤال."
         >
           <ul className="space-y-2">
             {repeats.map((r) => <RepeatRow key={r.key} r={r} canSilence={canSilence} />)}
@@ -211,10 +211,10 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
           title="مورّدو فودكس ومن يقابلهم عندنا"
           icon={Link2}
           count={unlinked.length}
-          hint="الاسمُ ليس هويّة: «Lanius» في فودكس «سرد كو» عندنا. فالاقتراحُ من الفواتير التي طابقت رقماً ومبلغاً لا من الاسم، والربطُ بضغطتك. والمقابلةُ بالمورّد واليوم والمبلغ تحتاج الربط — بدونه لا يبقى إلّا رقمُ الفاتورة."
+          hint="الاسم ليس هويّة: «Lanius» في فودكس «سرد كو» عندنا. فالاقتراح من الفواتير التي طابقت رقماً ومبلغاً لا من الاسم، والربط بضغطتك. والمقابلة بالمورّد واليوم والمبلغ تحتاج الربط — بدونه لا يبقى إلّا رقم الفاتورة."
         >
           {unlinked.length === 0 ? (
-            <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">كلُّ مورّدٍ له حركاتُ شراءٍ مربوط.</p>
+            <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">كلّ مورّد له حركات شراء مربوط.</p>
           ) : (
             <ul className="space-y-2">
               {unlinked.map((s) => {
@@ -227,10 +227,10 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
                       <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
                         <span className="nums">{s.purchases}</span> حركة بمجموع <Money minor={s.totalMinor} />.{" "}
                         {hint
-                          ? <>المقترَح «{hint.supplierName}»: <span className="nums">{hint.evidence}</span> من حركاته طابقت فواتيرَه رقماً ومبلغاً.</>
+                          ? <>المقترح «{hint.supplierName}»: <span className="nums">{hint.evidence}</span> من حركاته طابقت فواتيره رقماً ومبلغاً.</>
                           : byName
-                            ? <>لم تطابق حركاتُه فاتورةً برقمها بعد. الاسمُ يشبه «{byName.supplierName}» — <strong>شبهُ اسمٍ لا دليل</strong>، فتحقّق قبل أن تربط.</>
-                            : "لا اقتراح: لم تطابق حركاتُه فواتيرَ مورّدٍ واحد. إن كان اسماً جامعاً لعدّة مورّدين («مورد حبوب قهوة») فاتركه بلا ربط."}
+                            ? <>لم تطابق حركاته فاتورةً برقمها بعد. الاسم يشبه «{byName.supplierName}» — <strong>شبه اسم لا دليل</strong>، فتحقّق قبل أن تربط.</>
+                            : "لا اقتراح: لم تطابق حركاته فواتير مورّد واحد. إن كان اسماً جامعاً لعدّة مورّدين («مورد حبوب قهوة») فاتركه بلا ربط."}
                       </p>
                     </div>
                     {canLink && (
@@ -258,10 +258,10 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
       {differs.length > 0 && (
         <Section
           id="differs"
-          title="الرقمُ نفسُه والمبلغُ مختلف"
+          title="الرقم نفسه والمبلغ مختلف"
           icon={Scale}
           count={differs.length}
-          hint="لم تُوجد للحركة فاتورةٌ بمبلغها، ووُجدت فاتورةٌ برقمها بمبلغٍ آخر. أحدُ الطرفين قُرئ أو أُدخل خطأً — افتح المستندَ واحكم."
+          hint="لم توجد للحركة فاتورة بمبلغها، ووجدت فاتورة برقمها بمبلغ آخر. أحد الطرفين قرئ أو أدخل خطأً — افتح المستند واحكم."
         >
           <ul className="space-y-2">
             {differs.map((m) => <DiffersRow key={m.purchase.id} m={m} canSilence={canSilence} />)}
@@ -272,23 +272,23 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
       {/* ── في فودكس ولا فاتورة ── */}
       <Section
         id="only-foodics"
-        title="في فودكس ولا فاتورةَ عندنا"
+        title="في فودكس ولا فاتورة عندنا"
         icon={FileQuestion}
         count={onlyFoodics.length}
-        hint="حركةُ شراءٍ مُرحَّلةٌ في فودكس لا فاتورةَ عندنا لمورّدها بمبلغها في يومها ولا قريباً منه. لمورّدٍ مربوط: المستندُ لم يصل الدرايف، أو مبلغُه في فودكس غيرُ ما في الفاتورة. ولغير المربوط: اربطه أعلاه أوّلاً."
+        hint="حركة شراء مرحّلة في فودكس لا فاتورة عندنا لمورّدها بمبلغها في يومها ولا قريباً منه. لمورّد مربوط: المستند لم يصل الدرايف، أو مبلغه في فودكس غير ما في الفاتورة. ولغير المربوط: اربطه أعلاه أوّلاً."
       >
         <DataTable<PurchaseSide>
           rows={onlyFoodics}
           keyOf={(p) => p.id}
           hrefOf={(p) => `/purchases/foodics?p=${encodeURIComponent(p.id)}`}
-          empty={<span>كلُّ حركةِ شراءٍ في فودكس لها فاتورةٌ عندنا.</span>}
+          empty={<span>كلّ حركة شراء في فودكس لها فاتورة عندنا.</span>}
           columns={[
-            { key: "date", header: "تاريخُها", primary: true, cell: (p) => <span><bdi className="font-bold">{formatDay(p.invoiceDate ?? p.businessDate)}</bdi><span className="ms-2 text-xs text-muted">{p.foodicsSupplierName ?? "بلا مورّد"}</span></span> },
-            { key: "number", header: "رقمُ الفاتورة في فودكس", cell: (p) => <bdi dir="ltr" className="font-mono text-xs">{p.invoiceNumber ?? "—"}</bdi> },
-            { key: "ref", header: "مرجعُ فودكس", secondary: true, cell: (p) => <bdi dir="ltr" className="font-mono text-xs text-muted">{p.reference}</bdi> },
-            { key: "linked", header: "المورّد", secondary: true, cell: (p) => (p.linkedSupplierId ? <Badge tone="ok">مربوط</Badge> : <Badge>لم يُربَط</Badge>) },
+            { key: "date", header: "تاريخها", primary: true, cell: (p) => <span><bdi className="font-bold">{formatDay(p.invoiceDate ?? p.businessDate)}</bdi><span className="ms-2 text-xs text-muted">{p.foodicsSupplierName ?? "بلا مورّد"}</span></span> },
+            { key: "number", header: "رقم الفاتورة في فودكس", cell: (p) => <bdi dir="ltr" className="font-mono text-xs">{p.invoiceNumber ?? "—"}</bdi> },
+            { key: "ref", header: "مرجع فودكس", secondary: true, cell: (p) => <bdi dir="ltr" className="font-mono text-xs text-muted">{p.reference}</bdi> },
+            { key: "linked", header: "المورّد", secondary: true, cell: (p) => (p.linkedSupplierId ? <Badge tone="ok">مربوط</Badge> : <Badge>لم يربط</Badge>) },
             { key: "total", header: "الإجمالي", numeric: true, cell: (p) => <Money minor={p.totalMinor} /> },
-            ...(canSilence ? [{ key: "act", header: "", wrap: true, cell: (p: PurchaseSide) => <span className="flex flex-wrap gap-1"><SignalControls signalKey={purchaseKey(p.id)} dismissLabel="ليست فاتورةً تُنتظَر" snoozeDays={30} /></span> }] : []),
+            ...(canSilence ? [{ key: "act", header: "", wrap: true, cell: (p: PurchaseSide) => <span className="flex flex-wrap gap-1"><SignalControls signalKey={purchaseKey(p.id)} dismissLabel="ليست فاتورةً تنتظر" snoozeDays={30} /></span> }] : []),
           ]}
         />
       </Section>
@@ -299,11 +299,11 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
         title="عندنا وليست في فودكس"
         icon={FileX2}
         count={onlyOurs.length}
-        hint="فاتورةٌ لمورّدٍ يتابعه فودكس، بعد أوّل حركةٍ فيه، ولا حركةَ شراءٍ تقابلها. بضاعتُها لم تدخل مخزونَ فودكس — فحسابُه للمخزون ناقصٌ بقدرها. (جردُنا لا يتأثّر: يُحسَب من فواتيرنا.)"
+        hint="فاتورة لمورّد يتابعه فودكس، بعد أوّل حركة فيه، ولا حركة شراء تقابلها. بضاعتها لم تدخل مخزون فودكس — فحسابه للمخزون ناقص بقدرها. (جردنا لا يتأثّر: يحسب من فواتيرنا.)"
       >
         {canSilence && oursBySupplier.length > 0 && (
           <div className="mb-3 rounded-xl border border-line bg-raised px-4 py-3 shadow-raised">
-            <p className="text-xs font-bold text-ink-soft">مورّدٌ لا تدخل بضاعتُه مخزونَ فودكس أصلاً؟ أخرِجه كلَّه بضغطة — ولا تعود فواتيرُه إلى هذه القائمة.</p>
+            <p className="text-xs font-bold text-ink-soft">مورّد لا تدخل بضاعته مخزون فودكس أصلاً؟ أخرجه كلّه بضغطة — ولا تعود فواتيره إلى هذه القائمة.</p>
             <ul className="mt-2 flex flex-wrap gap-2">
               {oursBySupplier.map((sp) => (
                 <li key={sp.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line-soft bg-sunken/40 px-2.5 py-1.5 text-xs">
@@ -314,7 +314,7 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
                     body={{ key: supplierKey(sp.id), action: "dismiss" }}
                     undo={{ body: { key: supplierKey(sp.id), action: "reopen" } }}
                     variant="quiet"
-                    done={`أُخرج «${sp.name}» من المقارنة`}
+                    done={`أخرج «${sp.name}» من المقارنة`}
                   >
                     لا يدخل فودكس
                   </PostAction>
@@ -327,22 +327,22 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
           rows={onlyOurs}
           keyOf={(i) => i.id}
           hrefOf={(i) => invoiceHref(i.id)}
-          empty={<span>لا فاتورةَ لمورّدٍ يتابعه فودكس غائبةٌ عنه.</span>}
+          empty={<span>لا فاتورة لمورّد يتابعه فودكس غائبة عنه.</span>}
           columns={[
-            { key: "date", header: "تاريخُها", primary: true, cell: (i) => <span><bdi className="font-bold">{formatDay(i.day)}</bdi><span className="ms-2 text-xs text-muted">{i.supplierName}</span></span> },
-            { key: "number", header: "رقمُ الفاتورة", cell: (i) => <bdi dir="ltr" className="font-mono text-xs">{i.invoiceNumber}</bdi> },
+            { key: "date", header: "تاريخها", primary: true, cell: (i) => <span><bdi className="font-bold">{formatDay(i.day)}</bdi><span className="ms-2 text-xs text-muted">{i.supplierName}</span></span> },
+            { key: "number", header: "رقم الفاتورة", cell: (i) => <bdi dir="ltr" className="font-mono text-xs">{i.invoiceNumber}</bdi> },
             { key: "total", header: "الإجمالي", numeric: true, cell: (i) => <Money minor={i.totalMinor} /> },
-            ...(canSilence ? [{ key: "act", header: "", wrap: true, cell: (i: InvoiceSide) => <span className="flex flex-wrap gap-1"><SignalControls signalKey={invoiceKey(i.id)} dismissLabel="لا تدخل مخزونَ فودكس" snoozeDays={30} /></span> }] : []),
+            ...(canSilence ? [{ key: "act", header: "", wrap: true, cell: (i: InvoiceSide) => <span className="flex flex-wrap gap-1"><SignalControls signalKey={invoiceKey(i.id)} dismissLabel="لا تدخل مخزون فودكس" snoozeDays={30} /></span> }] : []),
           ]}
         />
         {excludedSuppliers.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
-            <span className="font-bold">أخرجتَهم من المقارنة:</span>
+            <span className="font-bold">أخرجتهم من المقارنة:</span>
             {excludedSuppliers.map((sp) => (
               <span key={sp.id} className="flex items-center gap-1 rounded-lg border border-line-soft px-2 py-1">
                 {sp.name}
                 {canSilence && (
-                  <PostAction url="/api/signal" body={{ key: supplierKey(sp.id), action: "reopen" }} variant="quiet" done={`عاد «${sp.name}» إلى المقارنة`}>أعِده</PostAction>
+                  <PostAction url="/api/signal" body={{ key: supplierKey(sp.id), action: "reopen" }} variant="quiet" done={`عاد «${sp.name}» إلى المقارنة`}>أعده</PostAction>
                 )}
               </span>
             ))}
@@ -350,14 +350,14 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
         )}
         {c.outOfScope > 0 && (
           <p className="mt-3 text-xs leading-relaxed text-muted">
-            و{countNoun(c.outOfScope, INVOICE)} أخرى خارج المقارنة: لمورّدٍ لا يتابعه فودكس (معدّات، خدمات، اشتراكات) أو قبل <bdi>{formatDay(c.foodicsSince)}</bdi>.
-            ربطُ مورّدٍ أعلاه يُدخل فواتيرَه في المقارنة.
+            و{countNoun(c.outOfScope, INVOICE)} أخرى خارج المقارنة: لمورّد لا يتابعه فودكس (معدّات، خدمات، اشتراكات) أو قبل <bdi>{formatDay(c.foodicsSince)}</bdi>.
+            ربط مورّد أعلاه يدخل فواتيره في المقارنة.
           </p>
         )}
       </Section>
 
       {/* ── المتّفقة ── */}
-      <Section id="agreed" title="اتّفقا" icon={CircleCheck} count={agreed.length} hint="فاتورةٌ مؤكَّدةٌ من جهتين: للمورّد نفسِه في اليوم نفسِه بالمبلغ نفسِه. رقمُ الفاتورة لا يُشترَط — يُكتب في فودكس بيدٍ — وإن طابق فتأكيدٌ زائد.">
+      <Section id="agreed" title="اتّفقا" icon={CircleCheck} count={agreed.length} hint="فاتورة مؤكّدة من جهتين: للمورّد نفسه في اليوم نفسه بالمبلغ نفسه. رقم الفاتورة لا يشترط — يكتب في فودكس بيد — وإن طابق فتأكيد زائد.">
         <details className="rounded-xl border border-line bg-raised px-4 py-3 text-xs shadow-raised">
           <summary className="cursor-pointer font-bold text-ink-soft">اعرض {countNoun(agreed.length, INVOICE)}</summary>
           <div className="mt-3">
@@ -367,8 +367,8 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
               hrefOf={(m) => `/purchases/foodics?p=${encodeURIComponent(m.purchase.id)}`}
               columns={[
                 { key: "date", header: "التاريخ", primary: true, cell: (m) => <span><bdi className="font-bold">{formatDay(m.invoice.day)}</bdi><span className="ms-2 text-xs text-muted">{m.invoice.supplierName}</span></span> },
-                { key: "number", header: "رقمُ الفاتورة", cell: (m) => <bdi dir="ltr" className="font-mono text-xs">{m.invoice.invoiceNumber}</bdi> },
-                { key: "basis", header: "طُوبقت", secondary: true, cell: (m) => <span className="text-muted">{BASIS[m.basis]}{m.numberConfirms && m.basis !== "NUMBER" && <span className="ms-2"><Badge tone="ok">والرقمُ يؤكّده</Badge></span>}</span> },
+                { key: "number", header: "رقم الفاتورة", cell: (m) => <bdi dir="ltr" className="font-mono text-xs">{m.invoice.invoiceNumber}</bdi> },
+                { key: "basis", header: "طوبقت", secondary: true, cell: (m) => <span className="text-muted">{BASIS[m.basis]}{m.numberConfirms && m.basis !== "NUMBER" && <span className="ms-2"><Badge tone="ok">والرقم يؤكّده</Badge></span>}</span> },
                 { key: "total", header: "الإجمالي", numeric: true, cell: (m) => <Money minor={m.invoice.totalMinor} /> },
               ]}
             />
@@ -380,14 +380,14 @@ export default async function FoodicsPurchasesPage({ searchParams }: { searchPar
         <Callout tone="info" icon={Undo2} className="mt-8">
           {w.returns.length > 0 && (
             <>
-              <strong className="text-ink">مرتجَعٌ إلى المورّد في فودكس:</strong>{" "}
+              <strong className="text-ink">مرتجع إلى المورّد في فودكس:</strong>{" "}
               {w.returns.map((r, i) => (
                 <span key={r.reference}>{i > 0 && " · "}<bdi dir="ltr">{r.reference}</bdi> ({r.supplierName ?? "بلا مورّد"} · <bdi>{formatDay(r.businessDate)}</bdi> · <Money minor={r.totalMinor} />)</span>
               ))}
-              . تأكّد أنّ له إشعاراً دائناً عندنا — لا يُطابَق هنا بفاتورة.{" "}
+              . تأكّد أنّ له إشعاراً دائناً عندنا — لا يطابق هنا بفاتورة.{" "}
             </>
           )}
-          {silencedCount > 0 && <>وأسكتَّ {silencedCount} من بنود هذه الصفحة — تجدها في <Link href="/settings/choices" className="font-bold underline underline-offset-4">ما قرّرتَه</Link>.</>}
+          {silencedCount > 0 && <>وأسكتّ {silencedCount} من بنود هذه الصفحة — تجدها في <Link href="/settings/choices" className="font-bold underline underline-offset-4">ما قرّرته</Link>.</>}
         </Callout>
       )}
     </PageShell>
@@ -411,7 +411,7 @@ function LinkedRow({ s, canLink, suppliers }: { s: FoodicsSupplierRow; canLink: 
 }
 
 function RepeatRow({ r, canSilence }: { r: RepeatDelivery; canSilence: boolean }) {
-  const gap = r.gapDays === 0 ? "في اليوم نفسِه" : r.gapDays === 1 ? "بينهما يوم" : r.gapDays === 2 ? "بينهما يومان" : `بينهما ${r.gapDays} أيّام`;
+  const gap = r.gapDays === 0 ? "في اليوم نفسه" : r.gapDays === 1 ? "بينهما يوم" : r.gapDays === 2 ? "بينهما يومان" : `بينهما ${r.gapDays} أيّام`;
   return (
     <li className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 ${r.silenced ? "border-line bg-surface" : "border-warn/30 bg-warn-bg"}`}>
       <div className="min-w-0 flex-1 basis-56">
@@ -419,10 +419,10 @@ function RepeatRow({ r, canSilence }: { r: RepeatDelivery; canSilence: boolean }
           {r.supplierName} · <bdi dir="ltr">{r.first.number}</bdi> (<bdi>{formatDay(r.first.day)}</bdi>) و<bdi dir="ltr">{r.second.number}</bdi> (<bdi>{formatDay(r.second.day)}</bdi>)
         </p>
         <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
-          البنودُ والكمّيّاتُ واحدة، {gap}: <Money minor={r.first.totalMinor} /> و<Money minor={r.second.totalMinor} />.
+          البنود والكمّيّات واحدة، {gap}: <Money minor={r.first.totalMinor} /> و<Money minor={r.second.totalMinor} />.
           {r.foodicsReceipts === 1 && " وفودكس استلم من المورّد مرّةً واحدة في تلك الأيّام."}
-          {r.foodicsReceipts === 0 && " ولا استلامَ من المورّد في فودكس في تلك الأيّام."}
-          {r.bothPaid ? " سُدِّدتا كلتاهما — إن كانت إحداهما ملغاةً فلك عند المورّد " : " إن كانت إحداهما ملغاةً فلا تدفع "}
+          {r.foodicsReceipts === 0 && " ولا استلام من المورّد في فودكس في تلك الأيّام."}
+          {r.bothPaid ? " سدّدتا كلتاهما — إن كانت إحداهما ملغاةً فلك عند المورّد " : " إن كانت إحداهما ملغاةً فلا تدفع "}
           <Money minor={r.atStakeMinor} />.
         </p>
       </div>
@@ -446,13 +446,13 @@ function DiffersRow({ m, canSilence }: { m: MatchedPair; canSilence: boolean }) 
         </p>
         <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
           في فودكس <Money minor={m.purchase.totalMinor} /> وعندنا <Money minor={m.invoice.totalMinor} /> — الفرق <Money minor={m.gapMinor} signed />.
-          {m.supplierConflict && " ومورّدُ فودكس مربوطٌ بغير مورّد هذه الفاتورة — راجِع الربط."}
+          {m.supplierConflict && " ومورّد فودكس مربوط بغير مورّد هذه الفاتورة — راجع الربط."}
         </p>
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-1">
-        <LinkButton href={`/purchases/foodics?p=${encodeURIComponent(m.purchase.id)}`} variant="secondary" size="sm">قارِن البنود</LinkButton>
+        <LinkButton href={`/purchases/foodics?p=${encodeURIComponent(m.purchase.id)}`} variant="secondary" size="sm">قارن البنود</LinkButton>
         <LinkButton href={invoiceHref(m.invoice.id)} variant="secondary" size="sm">افتح الفاتورة</LinkButton>
-        {canSilence && <SignalControls signalKey={purchaseKey(m.purchase.id)} dismissLabel="عرفتُ سببَه" snoozeDays={30} />}
+        {canSilence && <SignalControls signalKey={purchaseKey(m.purchase.id)} dismissLabel="عرفت سببه" snoozeDays={30} />}
       </div>
     </li>
   );

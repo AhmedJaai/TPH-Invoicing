@@ -118,14 +118,14 @@ export function spendSpikes(rows: readonly SupplierSpend[], limit = 2): Change[]
     .slice(0, limit)
     .map(({ r, avg }) => ({
       id: `spend:${r.slug}`,
-      label: `${r.name} — إنفاقٌ فوق المعتاد`,
-      baseline: "آخرُ ثلاثين يوماً مقابل متوسّط الأشهر الثلاثة قبلها",
+      label: `${r.name} — إنفاق فوق المعتاد`,
+      baseline: "آخر ثلاثين يوماً مقابل متوسّط الأشهر الثلاثة قبلها",
       direction: "UP" as const,
       pct: pctChange(r.last30Minor, avg),
       currentMinor: r.last30Minor,
       previousMinor: avg,
       favourable: null,
-      detail: "تحقّق أنّه طلبٌ لا خطأٌ ولا فاتورةٌ مكرّرة",
+      detail: "تحقّق أنّه طلب لا خطأ ولا فاتورة مكرّرة",
       href: `/suppliers/${encodeURIComponent(r.slug)}`,
     }));
 }
@@ -157,8 +157,8 @@ export function buildChanges(f: ChangeFacts): Change[] {
       detail:
         dir === "NEW" ? `أوّل مشتريات في ${f.thisMonthLabel}`
         : dir === "FLAT" ? "قريبة ممّا كانت"
-        : dir === "UP" ? "أنفقتَ أكثر — تحقّق أنّه نموٌّ لا تسرّب"
-        : "أنفقتَ أقلّ",
+        : dir === "UP" ? "أنفقت أكثر — تحقّق أنّه نموّ لا تسرّب"
+        : "أنفقت أقلّ",
       href: "/purchases/invoices",
     });
   }
@@ -186,7 +186,7 @@ export function buildChanges(f: ChangeFacts): Change[] {
       id: "outstanding",
       /* «عليك للمورّدين» هو الاسم الوحيد لهذا المفهوم في التطبيق كلّه */
       label: "عليك للمورّدين",
-      baseline: "عن قبل ثلاثين يوماً (تقديرٌ من تواريخ الفواتير والدفعات)",
+      baseline: "عن قبل ثلاثين يوماً (تقدير من تواريخ الفواتير والدفعات)",
       direction: dir,
       pct: pctChange(f.outstandingNow, f.outstandingThen),
       currentMinor: f.outstandingNow,
@@ -194,8 +194,8 @@ export function buildChanges(f: ChangeFacts): Change[] {
       // ارتفاع ما عليك ليس في صالحك، وانخفاضه في صالحك
       favourable: dir === "FLAT" ? null : dir === "DOWN",
       detail:
-        dir === "UP" ? "تراكم أكثر ممّا سدَّدتَ"
-        : dir === "DOWN" ? "سدَّدتَ أكثر ممّا تراكم"
+        dir === "UP" ? "تراكم أكثر ممّا سدّدت"
+        : dir === "DOWN" ? "سدّدت أكثر ممّا تراكم"
         : "لم يتغيّر كثيراً",
       /* «المفتوح» لا «لم يُسدَّد»: الثاني يُسقط المسدَّدة جزئيّاً (invoice-filter.ts) */
       href: "/purchases/invoices?paid=OPEN",
@@ -214,7 +214,7 @@ export function buildChanges(f: ChangeFacts): Change[] {
       favourable: false,
       detail:
         f.risingAnnualMinor > 0
-          ? `${countNoun(f.risingItems, PRODUCT)} · أثرها السنويّ المقدَّر`
+          ? `${countNoun(f.risingItems, PRODUCT)} · أثرها السنويّ المقدّر`
           : `${countNoun(f.risingItems, PRODUCT)}`,
       href: "/analysis",
     });
@@ -233,7 +233,7 @@ export function buildChanges(f: ChangeFacts): Change[] {
       pct: null,
       currentCount: f.newUnclassified,
       favourable: false,
-      detail: "تُنسَب إلى المورّدين ظلماً حتى تُصنَّف",
+      detail: "تنسب إلى المورّدين ظلماً حتى تصنّف",
       href: "/bank",
     });
   }

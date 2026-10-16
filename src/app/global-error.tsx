@@ -17,7 +17,7 @@ export default function GlobalError({
         <main style={{ maxWidth: "28rem", margin: "0 auto", textAlign: "center" }}>
           <h1 style={{ fontSize: "1.15rem" }}>تعذّر تشغيل التطبيق</h1>
           <p style={{ fontSize: "0.9rem", lineHeight: 1.7, color: "#57534b" }}>
-            لم يُكتب شيء. أعد المحاولة بعد لحظة، فإن تكرّر فانقل الرمز أدناه لمن يصلحه.
+            لم يكتب شيء. أعد المحاولة بعد لحظة، فإن تكرّر فانقل الرمز أدناه لمن يصلحه.
           </p>
           {error.digest && <p dir="ltr" style={{ fontSize: "0.75rem", color: "#6d685e" }}>{error.digest}</p>}
           <button

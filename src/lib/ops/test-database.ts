@@ -56,16 +56,16 @@ export function needsBranchMarker(url: string | undefined): boolean {
 export function testDatabaseProblem(url: string | undefined, env: TestDatabaseEnv = {}): string | null {
   if (!url) return "TEST_DATABASE_URL غير مضبوط — اختبارات القاعدة لا تقرأ DATABASE_URL";
   const parsed = parse(url);
-  if (!parsed) return "TEST_DATABASE_URL ليس سلسلة اتّصالٍ صالحة";
+  if (!parsed) return "TEST_DATABASE_URL ليس سلسلة اتّصال صالحة";
   if (!/^postgres(ql)?:$/.test(parsed.protocol)) return "TEST_DATABASE_URL ليس سلسلة Postgres";
 
   if (!LOCAL_HOSTS.has(parsed.hostname)) {
     const acknowledged = env.TEST_DATABASE_NEON_ENDPOINT?.trim();
     if (!acknowledged) return `المضيف ${parsed.hostname} ليس محلّيّاً`;
     const endpoint = neonEndpointOf(parsed.hostname);
-    if (endpoint === null) return `المضيف ${parsed.hostname} ليس محلّيّاً ولا نقطةَ Neon`;
+    if (endpoint === null) return `المضيف ${parsed.hostname} ليس محلّيّاً ولا نقطة Neon`;
     if (endpoint !== acknowledged.replace(/-pooler$/, "")) {
-      return `TEST_DATABASE_NEON_ENDPOINT يسمّي «${acknowledged}» والسلسلة تشير إلى «${endpoint}» — ليست فرعَ الاختبار المُقَرّ`;
+      return `TEST_DATABASE_NEON_ENDPOINT يسمّي «${acknowledged}» والسلسلة تشير إلى «${endpoint}» — ليست فرع الاختبار المقرّ`;
     }
   }
 

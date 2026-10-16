@@ -73,7 +73,7 @@ export function RecurringExpenses({
   async function create() {
     const ok = await send({ action: "create", label, amount, category, cadence, startsOn: startsOn || undefined });
     if (ok) {
-      toast({ tone: "ok", title: `أُضيف «${label.trim()}»`, body: startsOn ? "ويظهر في النقد القادم في يومه." : "ويظهر في النقد القادم بلا يومٍ محدَّد." });
+      toast({ tone: "ok", title: `أضيف «${label.trim()}»`, body: startsOn ? "ويظهر في النقد القادم في يومه." : "ويظهر في النقد القادم بلا يوم محدّد." });
       setLabel("");
       setAmount("");
       setStartsOn("");
@@ -85,8 +85,8 @@ export function RecurringExpenses({
     if (ok) {
       toast({
         tone: "ok",
-        title: `عُطّل «${r.label}»`,
-        body: "خرج من المتوقَّع ومن النقد القادم — ولم يُحذف.",
+        title: `عطّل «${r.label}»`,
+        body: "خرج من المتوقّع ومن النقد القادم — ولم يحذف.",
         undo: { run: () => send({ action: "activate", id: r.id }) },
       });
     }
@@ -108,7 +108,7 @@ export function RecurringExpenses({
                   <span className="block truncate text-sm font-bold">{r.label}</span>
                   <span className="block text-[11px] text-muted">
                     {CATEGORY_LABEL[r.category]} · {CADENCE_LABEL[r.cadence]}
-                    {r.startsOn ? ` · من ${r.startsOn}` : " · يومٌ غير محدَّد"}
+                    {r.startsOn ? ` · من ${r.startsOn}` : " · يوم غير محدّد"}
                     {r.cadence !== "MONTHLY" && <> · <Money minor={r.amountMinor} /> لكلّ دورة</>}
                   </span>
                 </span>
@@ -130,26 +130,26 @@ export function RecurringExpenses({
             ))}
           </ul>
           <p className="flex items-center justify-between gap-3 border-t border-line bg-sunken/60 px-4 py-2.5 text-xs font-bold">
-            <span>المتوقَّع شهرياً</span>
+            <span>المتوقّع شهرياً</span>
             <Money minor={monthlyTotal} />
           </p>
         </div>
       ) : (
         <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs leading-relaxed text-muted">
-          لا مصروفَ متكرّراً مسجّلاً بعد. سجّل الإيجار والرواتب هنا فيظهر خروجُهما في «النقد القادم» ويُقابَل المتوقَّعُ بالفعليّ.
+          لا مصروف متكرّراً مسجّلاً بعد. سجّل الإيجار والرواتب هنا فيظهر خروجهما في «النقد القادم» ويقابل المتوقّع بالفعليّ.
         </p>
       )}
 
       {inactive.length > 0 && (
         <details className="rounded-xl border border-dashed border-line px-4 py-2">
-          <summary className="flex min-h-11 cursor-pointer items-center text-xs text-muted sm:min-h-8">معطَّلة (<span className="nums">{inactive.length}</span>)</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center text-xs text-muted sm:min-h-8">معطّلة (<span className="nums">{inactive.length}</span>)</summary>
           <ul className="divide-y divide-line-soft pb-1">
             {inactive.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-3 py-2 text-muted">
                 <span className="min-w-0 truncate text-xs">{r.label} · {CATEGORY_LABEL[r.category]}</span>
                 {canEdit && (
                   <button type="button" onClick={() => void send({ action: "activate", id: r.id })} disabled={busy} className={buttonClass("quiet", "sm")}>
-                    <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> فعِّله
+                    <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> فعّله
                   </button>
                 )}
               </li>
@@ -163,7 +163,7 @@ export function RecurringExpenses({
           className="rounded-xl border border-line bg-raised p-4 shadow-raised"
           onSubmit={(e) => { e.preventDefault(); void create(); }}
         >
-          <p className="mb-3 text-[13px] font-bold">أضِف مصروفاً متكرّراً</p>
+          <p className="mb-3 text-[13px] font-bold">أضف مصروفاً متكرّراً</p>
           <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <label className="block text-xs lg:col-span-2">
               <span className="font-bold text-ink-soft">الاسم</span>
@@ -190,14 +190,14 @@ export function RecurringExpenses({
               </select>
             </label>
             <label className="block text-xs sm:col-span-2 lg:col-span-2">
-              <span className="font-bold text-ink-soft">أوّلُ استحقاق <span className="font-normal text-muted">(اختياريّ — منه يومُ الشهر)</span></span>
+              <span className="font-bold text-ink-soft">أوّل استحقاق <span className="font-normal text-muted">(اختياريّ — منه يوم الشهر)</span></span>
               <input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} dir="ltr" className={`${field} mt-1.5`} />
             </label>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button aria-busy={busy} type="submit" disabled={busy || label.trim().length < 2 || !amount.trim()} className={buttonClass("primary", "sm")}>
               <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-              أضِف
+              أضف
             </button>
             {error && <p role="alert" className="text-xs font-bold text-danger">{error}</p>}
           </div>

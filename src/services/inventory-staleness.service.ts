@@ -24,7 +24,7 @@ export async function changesSinceFinalise(header: CountHeader, conn: Conn = db)
     select
       (select count(*)::int from sales_imports si
         where si.created_at > ${f} and si.status <> 'FAILED'
-          /* مزامنةُ الواجهة تعيد قراءةَ أيّامٍ مقيَّدة: ما لم تكتب سطراً ولم تراجِع سطراً لم تغيّر شيئاً */
+          /* مزامنة الواجهة تعيد قراءة أيّام مقيّدة: ما لم تكتب سطراً ولم تراجع سطراً لم تغيّر شيئاً */
           and (si.adapter <> 'FOODICS_API' or si.imported_rows + si.revised_rows > 0)
           and si.period_start <= ${header.periodEnd} and si.period_end >= ${header.periodStart}) as sales,
       (select count(distinct i.id)::int from invoices i
@@ -43,8 +43,8 @@ export async function changesSinceFinalise(header: CountHeader, conn: Conn = db)
         where coalesce(rv.activated_at, rv.created_at) > ${f} and rv.status = 'ACTIVE'
           and rv.effective_from <= ${header.periodEnd}) as recipes,
       /*
-        افتتاحيُّه فعليُّ الجرد الذي قبله — فإن أُعيد فتحُ ذاك (مسوّدةٌ الآن) أو
-        أُقفل ثانيةً بعد هذا، فقد تغيّر أوّلُ طرفٍ في معادلته.
+        افتتاحيّه فعليّ الجرد الذي قبله — فإن أعيد فتح ذاك (مسوّدة الآن) أو
+        أقفل ثانيةً بعد هذا، فقد تغيّر أوّل طرف في معادلته.
       */
       (select count(*)::int from inventory_counts p
         where p.period_end = to_char(${header.periodStart}::date - 1, 'YYYY-MM-DD')
@@ -52,10 +52,10 @@ export async function changesSinceFinalise(header: CountHeader, conn: Conn = db)
           and (p.status = 'DRAFT' or p.finalised_at > ${f})) as previous
   `)).rows;
   const out: StaleReason[] = [];
-  if (r.sales > 0) out.push({ label: "ملفُّ مبيعاتٍ لأيّامه استُورد بعد الإقفال", count: r.sales });
-  if (r.invoices > 0) out.push({ label: "فاتورةُ شراءٍ لأسبوعه قُيّدت بعد الإقفال", count: r.invoices });
-  if (r.linked > 0) out.push({ label: "صنفُ مورّدٍ من فواتيره رُبط بصنف جردٍ بعد الإقفال", count: r.linked });
-  if (r.recipes > 0) out.push({ label: "نسخةُ وصفةٍ تسري فيه فُعّلت بعد الإقفال", count: r.recipes });
-  if (r.previous > 0) out.push({ label: "جردُ الأسبوع الذي قبله أُعيد فتحُه بعد إقفال هذا — فرصيدُه الافتتاحيّ قد تغيّر", count: r.previous });
+  if (r.sales > 0) out.push({ label: "ملفّ مبيعات لأيّامه استورد بعد الإقفال", count: r.sales });
+  if (r.invoices > 0) out.push({ label: "فاتورة شراء لأسبوعه قيّدت بعد الإقفال", count: r.invoices });
+  if (r.linked > 0) out.push({ label: "صنف مورّد من فواتيره ربط بصنف جرد بعد الإقفال", count: r.linked });
+  if (r.recipes > 0) out.push({ label: "نسخة وصفة تسري فيه فعّلت بعد الإقفال", count: r.recipes });
+  if (r.previous > 0) out.push({ label: "جرد الأسبوع الذي قبله أعيد فتحه بعد إقفال هذا — فرصيده الافتتاحيّ قد تغيّر", count: r.previous });
   return out;
 }

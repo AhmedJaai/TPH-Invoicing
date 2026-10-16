@@ -44,8 +44,8 @@ async function paidInvoice(tx: Tx, eligible: boolean) {
   return { s, inv, out };
 }
 
-describe("الحوالةُ التي سدّدت فاتورةً محسوبة «مغطّاة» — لا تُخصم ضريبتُها مرّتين", () => {
-  it("فاتورةٌ مستوفية: حوالتُها مغطّاة، وضمُّها يُرفض", () =>
+describe("الحوالة التي سدّدت فاتورةً محسوبة «مغطّاة» — لا تخصم ضريبتها مرّتين", () => {
+  it("فاتورة مستوفية: حوالتها مغطّاة، وضمّها يرفض", () =>
     withRollback(async (tx) => {
       const actor = await someone(tx);
       const p = await paidInvoice(tx, true);
@@ -55,7 +55,7 @@ describe("الحوالةُ التي سدّدت فاتورةً محسوبة «م�
       expect(await caught(chooseVatTxs([p.out], true, actor, tx))).toBeInstanceOf(VatChoiceRefused);
     }));
 
-  it("فاتورةٌ «لا تُخصم» حُسبت بإقرار صاحبها: حوالتُها تصير مغطّاة — كانت تبقى قابلةً للضمّ", () =>
+  it("فاتورة «لا تخصم» حسبت بإقرار صاحبها: حوالتها تصير مغطّاة — كانت تبقى قابلةً للضمّ", () =>
     withRollback(async (tx) => {
       const actor = await someone(tx);
       const p = await paidInvoice(tx, false);
@@ -77,7 +77,7 @@ describe("الحوالةُ التي سدّدت فاتورةً محسوبة «م�
       expect(await caught(chooseVatTxs([p.out], true, actor, tx))).toBeInstanceOf(VatChoiceRefused);
     }));
 
-  it("فاتورةٌ مستوفية أخرجها صاحبُها: لا تغطّي حوالتَها", () =>
+  it("فاتورة مستوفية أخرجها صاحبها: لا تغطّي حوالتها", () =>
     withRollback(async (tx) => {
       const actor = await someone(tx);
       const p = await paidInvoice(tx, true);
@@ -87,7 +87,7 @@ describe("الحوالةُ التي سدّدت فاتورةً محسوبة «م�
       expect(view.result.input.invoices.vatMinor).toBe(0);
     }));
 
-  it("حوالةٌ غيرُ مطابَقة لمورّدٍ له فاتورةٌ محسوبة في الربع السابق: تحذير", () =>
+  it("حوالة غير مطابقة لمورّد له فاتورة محسوبة في الربع السابق: تحذير", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       await makeInvoice(tx, s, 1150_00, "2098-06-20");
@@ -98,7 +98,7 @@ describe("الحوالةُ التي سدّدت فاتورةً محسوبة «م�
 });
 
 describe("ما لا يدخل الخصم", () => {
-  it("فاتورةٌ مستندُها ينتظر المراجعة لا تُحسب حتى تُراجَع", () =>
+  it("فاتورة مستندها ينتظر المراجعة لا تحسب حتى تراجع", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 1150_00, "2098-08-10");
@@ -109,7 +109,7 @@ describe("ما لا يدخل الخصم", () => {
       expect(view.result.input.invoices.vatMinor).toBe(0);
     }));
 
-  it("ما صُنِّف «راتباً» يُضمّ باختيار صاحبه كالإيجار — الاختيارُ يغلب التصنيف", () =>
+  it("ما صنّف «راتباً» يضمّ باختيار صاحبه كالإيجار — الاختيار يغلب التصنيف", () =>
     withRollback(async (tx) => {
       const actor = await someone(tx);
       const salary = await bankTx(tx, { iso: "2098-08-01", amountMinor: 1150_00, category: "SALARY" });
@@ -118,7 +118,7 @@ describe("ما لا يدخل الخصم", () => {
       expect((await loadVatReturn(Q, tx)).result.input.selected.vatMinor).toBe(1650_00);
     }));
 
-  it("حدُّ الربع بتوقيت الرياض: ٣٠ سبتمبر ٢١:٣٠ UTC هو ١ أكتوبر", () =>
+  it("حدّ الربع بتوقيت الرياض: ٣٠ سبتمبر ٢١:٣٠ UTC هو ١ أكتوبر", () =>
     withRollback(async (tx) => {
       const late = await bankTx(tx, { iso: "", at: new Date("2098-09-30T21:30:00Z"), amountMinor: 115_00, direction: "CREDIT", category: "POS_SETTLEMENT" });
       const inside = await bankTx(tx, { iso: "", at: new Date("2098-09-30T20:30:00Z"), amountMinor: 115_00, direction: "CREDIT", category: "POS_SETTLEMENT" });
@@ -129,8 +129,8 @@ describe("ما لا يدخل الخصم", () => {
     }));
 });
 
-describe("النقدُ ولقطةُ التقديم", () => {
-  it("نقدٌ غير مودَع يدخل المخرجات، ومحوُه يعيد «لم يُكتب»", () =>
+describe("النقد ولقطة التقديم", () => {
+  it("نقد غير مودع يدخل المخرجات، ومحوه يعيد «لم يكتب»", () =>
     withRollback(async (tx) => {
       const actor = await someone(tx);
       await setVatCashSales("2098-08", 1150_00, actor, tx);
@@ -142,13 +142,13 @@ describe("النقدُ ولقطةُ التقديم", () => {
       expect(view.cash.find((c) => c.month === "2098-08")?.grossMinor).toBeNull();
     }));
 
-  it("ربعٌ لم ينتهِ لا يُقدَّم", () =>
+  it("ربع لم ينته لا يقدّم", () =>
     withRollback(async (tx) => {
       const e = await caught(fileVatReturn({ periodKey: "2098-Q3", filedOn: "2098-10-05", reference: null, creditDisposition: null }, await someone(tx), tx));
       expect(e).toBeInstanceOf(VatChoiceRefused);
     }));
 
-  it("التقديمُ يحفظ الرقم ويقفل الاختيارات، والرصيدُ الدائن يُرحَّل، والتراجعُ يفتح", () =>
+  it("التقديم يحفظ الرقم ويقفل الاختيارات، والرصيد الدائن يرحّل، والتراجع يفتح", () =>
     withRollback(async (tx) => {
       const actor = await someone(tx);
       /* ربعٌ مضى: فاتورةٌ بضريبة 150 ولا مبيعات — رصيدٌ دائن */

@@ -54,8 +54,8 @@ export function DoublePaidActions({
       const previous: Decision | "OPEN" = decision ?? "OPEN";
       toast({
         tone: next === "OPEN" ? "info" : "ok",
-        title: r.data.message ?? "حُفظ",
-        body: "كُتب القرارُ في سجلّ التدقيق باسمك.",
+        title: r.data.message ?? "حفظ",
+        body: "كتب القرار في سجلّ التدقيق باسمك.",
         undo: {
           run: async () => {
             const u = await send(previous);
@@ -89,13 +89,13 @@ export function DoublePaidActions({
         )}
         {canEdit && decision === null && (
           <button aria-busy={busy === "CLAIMED"} type="button" disabled={busy !== null} onClick={() => void decide("CLAIMED")} className={buttonClass("secondary", "sm")}>
-            طالبتُ الجهة
+            طالبت الجهة
           </button>
         )}
         {canEdit && !closed && (
           <button aria-busy={busy === "RECOVERED"} type="button" disabled={busy !== null} onClick={() => void decide("RECOVERED")} className={buttonClass("secondary", "sm")}>
             <Check className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-            استُردّ المال
+            استردّ المال
           </button>
         )}
         {canEdit && !closed && (
@@ -104,8 +104,8 @@ export function DoublePaidActions({
             variant="quiet"
             tone="warn"
             title="ليس سداداً مزدوجاً؟"
-            consequence="يخرج هذا التنبيه من «يحتاج قرارك» ولا يُطالَب بالمال. استعمله حين تكون العمليّتان مستحقّتين فعلاً — فاتورتان بالمبلغ نفسه مثلاً. ويُكتب قرارك في سجلّ التدقيق باسمك، ويمكن فتحه ثانيةً."
-            acknowledgement="تحقّقتُ أنّ المال خرج مرّتين عن حقّ"
+            consequence="يخرج هذا التنبيه من «يحتاج قرارك» ولا يطالب بالمال. استعمله حين تكون العمليّتان مستحقّتين فعلاً — فاتورتان بالمبلغ نفسه مثلاً. ويكتب قرارك في سجلّ التدقيق باسمك، ويمكن فتحه ثانيةً."
+            acknowledgement="تحقّقت أنّ المال خرج مرّتين عن حقّ"
             confirmLabel="نعم، ليس ازدواجاً"
             disabled={busy !== null}
             onConfirm={() => decide("NOT_DUPLICATE")}

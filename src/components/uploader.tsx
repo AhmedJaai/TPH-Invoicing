@@ -118,7 +118,7 @@ const KIND_LABEL: Record<string, string> = {
   CASH_RECEIPT: "إيصال نقدي",
   CONTRACT: "عقد",
   UTILITY: "مرافق وحكومي",
-  UNKNOWN: "غير محدَّد",
+  UNKNOWN: "غير محدّد",
 };
 
 /** أسماءُ الثقة كما يكتبها مسارُ القراءة (`pipeline.ts`) — عربيّةٌ لا مفاتيح. */
@@ -174,11 +174,11 @@ const MAX_BYTES = 3 * 1024 * 1024;
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("تعذّرت قراءةُ الملفّ من جهازك."));
+    reader.onerror = () => reject(new Error("تعذّرت قراءة الملفّ من جهازك."));
     reader.onload = () => {
       const url = typeof reader.result === "string" ? reader.result : "";
       const comma = url.indexOf(",");
-      if (comma < 0) reject(new Error("تعذّرت قراءةُ الملفّ من جهازك."));
+      if (comma < 0) reject(new Error("تعذّرت قراءة الملفّ من جهازك."));
       else resolve(url.slice(comma + 1));
     };
     reader.readAsDataURL(blob);
@@ -233,13 +233,13 @@ async function pageFromImage(url: string, maxSide: number, quality: number): Pro
   canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
   canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("تعذّر رسمُ الصورة في هذا المتصفّح.");
+  if (!ctx) throw new Error("تعذّر رسم الصورة في هذا المتصفّح.");
   /* أرضيّةٌ بيضاء: JPEG بلا شفافيّة، وPNG شفّافٌ كان يخرج أسود */
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-  if (!blob) throw new Error("تعذّر تحويلُ الصورة.");
+  if (!blob) throw new Error("تعذّر تحويل الصورة.");
   return { jpeg: new Uint8Array(await blob.arrayBuffer()), width: canvas.width, height: canvas.height };
 }
 
@@ -346,7 +346,7 @@ function Field({
         {weak && (
           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-warn">
             <TriangleAlert className="h-3 w-3" strokeWidth={2.25} aria-hidden />
-            راجِعه
+            راجعه
           </span>
         )}
       </label>
@@ -356,12 +356,12 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         type={type}
         inputMode={inputMode}
-        placeholder={placeholder ?? "لم يُقرأ — اكتبه من الورقة"}
+        placeholder={placeholder ?? "لم يقرأ — اكتبه من الورقة"}
         aria-describedby={weak ? `${id}-weak` : undefined}
         dir="auto"
         className={`nums mt-1.5 placeholder:font-sans ${fieldClass("md")} ${weak ? "border-warn! bg-warn-bg/40!" : ""}`}
       />
-      {weak && <p id={`${id}-weak`} className="mt-1 text-[11px] text-warn">قُرئ بثقةٍ ضعيفة — قارنه بالورقة.</p>}
+      {weak && <p id={`${id}-weak`} className="mt-1 text-[11px] text-warn">قرئ بثقة ضعيفة — قارنه بالورقة.</p>}
     </div>
   );
 }
@@ -436,7 +436,7 @@ function SupplierPicker({
       }
       setSimilar([]);
       onCreated({ id: r.data.supplier.id, nameAr: r.data.supplier.nameAr });
-      toast({ tone: "ok", title: "أُنشئ المورّد", body: r.data.supplier.nameAr });
+      toast({ tone: "ok", title: "أنشئ المورّد", body: r.data.supplier.nameAr });
       setCreating(false);
       setName("");
     } finally {
@@ -451,17 +451,17 @@ function SupplierPicker({
         {!active ? (
           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-danger">
             <CircleAlert className="h-3 w-3" strokeWidth={2.25} aria-hidden />
-            لم يُعرف — اختره أو أنشئه
+            لم يعرف — اختره أو أنشئه
           </span>
         ) : chosen ? (
           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-ok">
             <Check className="h-3 w-3" strokeWidth={2.5} aria-hidden />
-            اخترتَه
+            اخترته
           </span>
         ) : weak ? (
           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-warn">
             <TriangleAlert className="h-3 w-3" strokeWidth={2.25} aria-hidden />
-            راجِعه
+            راجعه
           </span>
         ) : (
           <span className="text-[11px] text-muted">عرفه النظام</span>
@@ -581,7 +581,7 @@ function ImagePaper({ url, name }: { url: string; name: string }) {
   const tool = "grid h-11 w-11 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-hover hover:text-ink disabled:opacity-40 sm:h-8 sm:w-8";
   return (
     <div>
-      <div className="mb-1.5 flex items-center justify-end gap-0.5" role="group" aria-label="عرضُ الورقة">
+      <div className="mb-1.5 flex items-center justify-end gap-0.5" role="group" aria-label="عرض الورقة">
         <button type="button" onClick={() => setZoom((z) => Math.max(1, z - 0.5))} disabled={zoom <= 1} aria-label="صغّر الورقة" className={tool}>
           <ZoomOut className="h-4 w-4" strokeWidth={2} aria-hidden />
         </button>
@@ -589,7 +589,7 @@ function ImagePaper({ url, name }: { url: string; name: string }) {
         <button type="button" onClick={() => setZoom((z) => Math.min(4, z + 0.5))} disabled={zoom >= 4} aria-label="كبّر الورقة" className={tool}>
           <ZoomIn className="h-4 w-4" strokeWidth={2} aria-hidden />
         </button>
-        <button type="button" onClick={() => void rotate()} aria-busy={busy} aria-label="أدِر الورقة ربعَ دورة" className={tool}>
+        <button type="button" onClick={() => void rotate()} aria-busy={busy} aria-label="أدر الورقة ربع دورة" className={tool}>
           <RotateCw className="h-4 w-4" strokeWidth={2} aria-hidden />
         </button>
       </div>
@@ -775,7 +775,7 @@ export function Uploader({
         await read(id, picked);
       } catch (e) {
         /* تصغيرُ الصورة أو قراءةُ بايتاتها تعثّر قبل الإرسال — يُقال ولا يبقى «ينتظر دوره» إلى الأبد */
-        setItems((prev) => prev.map((it) => (it.id === id ? { id, fileName: picked.name, state: "failed", error: (e as Error).message || "تعذّرت قراءةُ الملفّ من جهازك.", file: picked, mime: picked.type } : it)));
+        setItems((prev) => prev.map((it) => (it.id === id ? { id, fileName: picked.name, state: "failed", error: (e as Error).message || "تعذّرت قراءة الملفّ من جهازك.", file: picked, mime: picked.type } : it)));
       }
     });
   }, [limit, read]);
@@ -814,8 +814,8 @@ export function Uploader({
       setChosen((prev) => ({ ...picks, ...prev }));
       toast({
         tone: "info",
-        title: restored.length === 1 ? "استُعيد مستندٌ لم يُؤرشَف" : `استُعيدت ${countNoun(restored.length, FILE)} لم تُؤرشَف`,
-        body: "بما صحّحتَه قبل أن تغادر الصفحة — راجِعها ثمّ أكّد.",
+        title: restored.length === 1 ? "استعيد مستند لم يؤرشف" : `استعيدت ${countNoun(restored.length, FILE)} لم تؤرشف`,
+        body: "بما صحّحته قبل أن تغادر الصفحة — راجعها ثمّ أكّد.",
       });
     });
     return () => { alive = false; };
@@ -940,7 +940,7 @@ export function Uploader({
         );
         toast({
           tone: "ok",
-          title: "أُرشف المستند",
+          title: "أرشف المستند",
           body: done.needsReview ? "وينتظر من يرى المبالغ ليؤكّدها." : json.fileName,
         });
         // تحديث أرقام الصفحة: عدد المستندات المؤرشفة وغيرها
@@ -1013,7 +1013,7 @@ export function Uploader({
       for (const f of files) analyze(f);
       if (flag !== null) {
         if (files.length === 0) {
-          toast({ tone: "warn", title: "لم يصل ملفٌّ من المشاركة.", body: "شارِك صورةً أو PDF — النصُّ والروابط لا تُقرأ. أو اختر الملفّ من هنا." });
+          toast({ tone: "warn", title: "لم يصل ملفّ من المشاركة.", body: "شارك صورةً أو PDF — النصّ والروابط لا تقرأ. أو اختر الملفّ من هنا." });
         }
         router.replace("/upload", { scroll: false });
       }
@@ -1050,7 +1050,7 @@ export function Uploader({
         if (built.length <= MAX_BYTES) { pdf = built; break; }
       }
       if (!pdf) {
-        setMergeError("الصفحاتُ المضمومة أكبر من ٣ ميجابايت حتّى بعد التصغير — ضُمّ عدداً أقلّ، أو ارفعها مستنداتٍ منفصلة.");
+        setMergeError("الصفحات المضمومة أكبر من ٣ ميجابايت حتّى بعد التصغير — ضمّ عدداً أقلّ، أو ارفعها مستندات منفصلة.");
         return;
       }
       const file = new File([pdf], `مستند-${chosenPages.length}-صفحات.pdf`, { type: "application/pdf" });
@@ -1058,9 +1058,9 @@ export function Uploader({
       analyze(file);
       setMergeOpen(false);
       setMergePick([]);
-      toast({ tone: "info", title: `ضُمّت ${chosenPages.length} صفحات في مستندٍ واحد`, body: "يُقرأ الآن من جديد — راجِعه ثمّ أكّد." });
+      toast({ tone: "info", title: `ضمّت ${chosenPages.length} صفحات في مستند واحد`, body: "يقرأ الآن من جديد — راجعه ثمّ أكّد." });
     } catch (e) {
-      setMergeError((e as Error).message || "تعذّر ضمُّ الصفحات.");
+      setMergeError((e as Error).message || "تعذّر ضمّ الصفحات.");
     } finally {
       setMergeBusy(false);
     }
@@ -1111,7 +1111,7 @@ export function Uploader({
           )}
           <div className={compact ? "min-w-0" : "sm:mt-4"}>
             <p className={`font-bold ${compact ? "text-sm" : "text-lg sm:text-xl"}`}>
-              {dragging ? "أفلِت الملفّات هنا" : compact ? "ملفٌّ آخر؟" : (
+              {dragging ? "أفلت الملفّات هنا" : compact ? "ملفّ آخر؟" : (
                 <>
                   <span className="sm:hidden">صوّر الفاتورة أو اختر ملفّها</span>
                   <span className="hidden sm:inline">اسحب الفواتير هنا</span>
@@ -1121,7 +1121,7 @@ export function Uploader({
             {!compact && (
               <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-ink-soft">
                 <span className="hidden sm:inline">أو اخترها من جهازك — صوراً أو PDF، ملفّاً أو عدّة ملفّات. </span>
-                اسمُ الملفّ الأصليّ لا يهمّ: يقرأ النظامُ الورقةَ نفسها.
+                اسم الملفّ الأصليّ لا يهمّ: يقرأ النظام الورقة نفسها.
               </p>
             )}
           </div>
@@ -1157,7 +1157,7 @@ export function Uploader({
         </div>
         {!compact && (
           <p className="mt-5 text-center text-[11px] text-muted">
-            حتى ٣ ميجابايت للملفّ · لا يُحفَظ شيءٌ قبل أن تؤكّد ما قُرئ
+            حتى ٣ ميجابايت للملفّ · لا يحفظ شيء قبل أن تؤكّد ما قرئ
           </p>
         )}
       </div>
@@ -1170,10 +1170,10 @@ export function Uploader({
               في هذه الجلسة <span className="nums ms-1 rounded-full bg-sunken px-2 py-0.5 text-[11px] text-ink-soft">{items.length}</span>
             </h2>
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted" aria-live="polite">
-              {reading > 0 && <span>يُقرأ {countNoun(reading, FILE)}</span>}
-              {queued > 0 && <span>وينتظر دورَه {countNoun(queued, FILE)}</span>}
+              {reading > 0 && <span>يقرأ {countNoun(reading, FILE)}</span>}
+              {queued > 0 && <span>وينتظر دوره {countNoun(queued, FILE)}</span>}
               {review > 0 && <span className="font-bold text-accent">ينتظر تأكيدك {countNoun(review, FILE)}</span>}
-              {archivedN > 0 && <span className="text-ok">أُرشف {countNoun(archivedN, FILE)}</span>}
+              {archivedN > 0 && <span className="text-ok">أرشف {countNoun(archivedN, FILE)}</span>}
               {mergeable.length >= 2 && (
                 <button
                   type="button"
@@ -1181,7 +1181,7 @@ export function Uploader({
                   className={buttonClass("quiet", "sm")}
                 >
                   <Layers className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                  صفحاتُ مستندٍ واحد؟ ضُمّها
+                  صفحات مستند واحد؟ ضمّها
                 </button>
               )}
               {failedN > 0 && (
@@ -1205,7 +1205,7 @@ export function Uploader({
               <li key={item.id}>
                 {item.state === "queued" ? (
                   <Row name={item.fileName} steps={["todo", "todo", "todo"]} onRemove={() => remove(item.id)}>
-                    <p className="text-xs text-muted">ينتظر دورَه — يُقرأ {READ_CONCURRENCY === 3 ? "ثلاثةُ ملفّاتٍ" : `${READ_CONCURRENCY} ملفّات`} معاً كي لا تتعثّر القراءة.</p>
+                    <p className="text-xs text-muted">ينتظر دوره — يقرأ {READ_CONCURRENCY === 3 ? "ثلاثة ملفّات" : `${READ_CONCURRENCY} ملفّات`} معاً كي لا تتعثّر القراءة.</p>
                   </Row>
                 ) : item.state === "reading" ? (
                   <Row name={item.fileName} steps={["current", "todo", "todo"]}>
@@ -1243,9 +1243,9 @@ export function Uploader({
                   <Row name={item.archived.fileName} steps={["done", "done", "done"]} tone="ok" mono>
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                       <p className="min-w-0 text-ink-soft">
-                        <span className="font-bold text-ok">أُرشف</span>
+                        <span className="font-bold text-ok">أرشف</span>
                         {item.archived.folder && <> في <bdi dir="ltr" className="text-muted">{item.archived.folder}</bdi></>}
-                        {item.archived.renamed && <span className="block text-[11px] text-warn">أُضيف إلى الاسم رقمُ نسخة — لم يُستبدل ملفٌّ قائم.</span>}
+                        {item.archived.renamed && <span className="block text-[11px] text-warn">أضيف إلى الاسم رقم نسخة — لم يستبدل ملفّ قائم.</span>}
                         {item.archived.needsReview && <span className="block text-[11px] text-warn">ينتظر من يرى المبالغ ليؤكّدها.</span>}
                       </p>
                       <span className="flex gap-1.5">
@@ -1290,22 +1290,22 @@ export function Uploader({
           <Sheet
             open={mergeOpen}
             onClose={() => { if (!mergeBusy) setMergeOpen(false); }}
-            title="ضُمَّ صفحاتِ مستندٍ واحد"
-            description="اختر الصورَ بترتيب صفحاتها — تصير ملفَّ PDF واحداً يُقرأ من جديد، وتُزال بطاقاتُها المنفردة."
+            title="ضمّ صفحات مستند واحد"
+            description="اختر الصور بترتيب صفحاتها — تصير ملفّ PDF واحداً يقرأ من جديد، وتزال بطاقاتها المنفردة."
             footer={
               <>
                 <button type="button" onClick={() => setMergeOpen(false)} disabled={mergeBusy} className={buttonClass("quiet", "sm")}>
-                  ألغِ
+                  ألغ
                 </button>
                 <button
                   type="button"
                   onClick={() => void mergePages()}
                   aria-busy={mergeBusy}
                   disabled={mergeBusy || mergePick.length < 2}
-                  title={mergePick.length < 2 ? "اختر صفحتَين على الأقلّ" : undefined}
+                  title={mergePick.length < 2 ? "اختر صفحتين على الأقلّ" : undefined}
                   className={buttonClass("primary", "sm")}
                 >
-                  <span>{mergePick.length >= 2 ? `ضُمّ ${mergePick.length} صفحات` : "ضُمّها"}</span>
+                  <span>{mergePick.length >= 2 ? `ضمّ ${mergePick.length} صفحات` : "ضمّها"}</span>
                 </button>
               </>
             }
@@ -1346,9 +1346,9 @@ export function Uploader({
 
           {archivedN > 0 && (
             <p className="mt-4 text-xs text-muted">
-              ما أُرشف تجده في{" "}
+              ما أرشف تجده في{" "}
               <Link href="/documents?status=ARCHIVED" className="font-bold text-accent hover:underline">المستندات</Link>
-              {" "}— وما ينتظر تأكيدَ غيرك تحت «ينتظر المراجعة».
+              {" "}— وما ينتظر تأكيد غيرك تحت «ينتظر المراجعة».
             </p>
           )}
         </div>
@@ -1389,7 +1389,7 @@ function Row({
         <span className="flex items-center gap-2">
           <Steps at={steps} />
           {onRemove && (
-            <button type="button" onClick={onRemove} aria-label="أزِله من القائمة" className="-me-1 grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-hover hover:text-ink">
+            <button type="button" onClick={onRemove} aria-label="أزله من القائمة" className="-me-1 grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-hover hover:text-ink">
               <X className="h-4 w-4" strokeWidth={2} aria-hidden />
             </button>
           )}
@@ -1462,7 +1462,7 @@ function ReviewCard({
         <span className="flex items-center gap-2">
           <Steps at={["done", item.archiving ? "done" : "current", item.archiving ? "current" : "todo"]} />
           {!item.archiving && (
-            <button type="button" onClick={onRemove} aria-label="أزِله دون أرشفة" className="-me-1 grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-hover hover:text-ink">
+            <button type="button" onClick={onRemove} aria-label="أزله دون أرشفة" className="-me-1 grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-hover hover:text-ink">
               <X className="h-4 w-4" strokeWidth={2} aria-hidden />
             </button>
           )}
@@ -1475,14 +1475,14 @@ function ReviewCard({
           {decisions === 0 ? (
             <p className="flex items-start gap-2 rounded-xl border border-ok/25 bg-ok-bg px-3.5 py-2.5 text-xs font-bold text-ok">
               <CircleCheck className="mt-px h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-              قُرئ كلُّ شيءٍ بثقة — قارِن بالورقة إن شئت، ثمّ أكّد.
+              قرئ كلّ شيء بثقة — قارن بالورقة إن شئت، ثمّ أكّد.
             </p>
           ) : (
             <p className="flex items-start gap-2 rounded-xl border border-warn/25 bg-warn-bg px-3.5 py-2.5 text-xs font-bold text-warn">
               <TriangleAlert className="mt-px h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
               <span>
-                {countNoun(decisions, FIELD)} {decisions <= 2 ? (decisions === 1 ? "يحتاج" : "يحتاجان") : "تحتاج"} نظرك قبل الأرشفة — موسومةٌ بـ«راجِعه».
-                {otherWeak.length > 0 && <span className="block font-normal text-ink-soft">وقُرئ بثقةٍ ضعيفة: {otherWeak.join(" · ")}.</span>}
+                {countNoun(decisions, FIELD)} {decisions <= 2 ? (decisions === 1 ? "يحتاج" : "يحتاجان") : "تحتاج"} نظرك قبل الأرشفة — موسومة بـ«راجعه».
+                {otherWeak.length > 0 && <span className="block font-normal text-ink-soft">وقرئ بثقة ضعيفة: {otherWeak.join(" · ")}.</span>}
               </span>
             </p>
           )}
@@ -1505,11 +1505,11 @@ function ReviewCard({
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {/* الكشفُ لا رقمَ فاتورةٍ له — هويّتُه مورّدُه وآخرُ أيّامه */}
               {!isStatement && <Field id={fid("number")} label="رقم الفاتورة" value={item.edited.invoiceNumber} weak={low.has(LOW.number)} onChange={(v) => onEdit("invoiceNumber", v)} />}
-              <Field id={fid("date")} label={isStatement ? "آخرُ يومٍ في الكشف" : "التاريخ"} type="date" value={item.edited.invoiceDate} weak={low.has(LOW.date)} onChange={(v) => onEdit("invoiceDate", v)} />
+              <Field id={fid("date")} label={isStatement ? "آخر يوم في الكشف" : "التاريخ"} type="date" value={item.edited.invoiceDate} weak={low.has(LOW.date)} onChange={(v) => onEdit("invoiceDate", v)} />
               <div className="col-span-2 min-w-0 sm:col-span-1">
                 <p className="text-xs font-bold text-ink-soft">الشهر المحاسبيّ</p>
                 <p className="nums mt-1.5 flex min-h-11 items-center rounded-lg bg-sunken px-3 text-sm sm:min-h-10">
-                  {r.periodMonth ?? <span className="font-sans text-muted">يُحدَّد من التاريخ</span>}
+                  {r.periodMonth ?? <span className="font-sans text-muted">يحدّد من التاريخ</span>}
                 </p>
               </div>
             </div>
@@ -1521,7 +1521,7 @@ function ReviewCard({
               aside={low.has(LOW.amounts) ? (
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-warn">
                   <TriangleAlert className="h-3 w-3" strokeWidth={2.25} aria-hidden />
-                  قُرئت بثقةٍ ضعيفة
+                  قرئت بثقة ضعيفة
                 </span>
               ) : undefined}
             >
@@ -1543,7 +1543,7 @@ function ReviewCard({
               </div>
               )}
               <p className="mt-2 text-[11px] leading-relaxed text-muted">
-                الخادمُ يعيد الحسابَ والحكمَ الضريبيّ حين تؤكّد — ما تكتبه هنا يُقرأ ولا يُصدَّق بلا فحص.
+                الخادم يعيد الحساب والحكم الضريبيّ حين تؤكّد — ما تكتبه هنا يقرأ ولا يصدّق بلا فحص.
               </p>
             </Group>
           )}
@@ -1559,7 +1559,7 @@ function ReviewCard({
           <ExtractionEvidencePanel evidence={parseEvidence(item.data.evidence)} showAmounts={canSeeAmounts} />
 
           {findings.length > 0 && (
-            <Group title="ملاحظاتُ الفحص">
+            <Group title="ملاحظات الفحص">
               <ul className="space-y-1.5">
                 {findings.map((f, i) => {
                   const Icon = f.severity === "BLOCKER" ? CircleAlert : f.severity === "WARN" ? TriangleAlert : Info;
@@ -1581,7 +1581,7 @@ function ReviewCard({
           {r.proposedFileName && (
             <details className="group rounded-xl border border-line bg-sunken/40 px-3.5 py-2.5">
               <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold text-ink-soft">
-                اسمُ الملفّ ووجهتُه في الدرايف
+                اسم الملفّ ووجهته في الدرايف
                 <span className="text-[11px] font-normal text-muted group-open:hidden">اعرضه</span>
               </summary>
               <label htmlFor={fid("file")} className="mt-2 block text-[11px] text-muted">الاسم الجديد</label>
@@ -1601,7 +1601,7 @@ function ReviewCard({
           <div className="lg:hidden">
             <button type="button" onClick={() => setShowPaper((v) => !v)} className={buttonClass("quiet", "sm")} aria-expanded={showPaper}>
               <FileText className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              {showPaper ? "أخفِ الورقة" : "قارِن بالورقة"}
+              {showPaper ? "أخف الورقة" : "قارن بالورقة"}
             </button>
             {showPaper && (
               <div className="mt-2 rounded-xl border border-line bg-sunken p-2">
@@ -1619,7 +1619,7 @@ function ReviewCard({
         </div>
 
         <aside className="hidden border-s border-line-soft bg-sunken/60 p-3 lg:block" aria-label="الورقة">
-          <p className="mb-2 px-1 text-[11px] font-bold text-muted">الورقة — قارِن بها</p>
+          <p className="mb-2 px-1 text-[11px] font-bold text-muted">الورقة — قارن بها</p>
           <div className="sticky top-24">
             <Paper url={item.previewUrl} mime={item.mimeType} name={item.fileName} />
           </div>
@@ -1650,7 +1650,7 @@ function ReviewCard({
         )}
         {canSeeAmounts && !isStatement && (
           <p className="mb-2 flex items-baseline justify-between gap-3 text-xs text-muted lg:hidden">
-            <span>الإجماليّ كما سيُقيَّد</span>
+            <span>الإجماليّ كما سيقيّد</span>
             {item.edited.total.trim()
               ? <bdi dir="ltr" className="nums text-[15px] font-bold text-ink">{item.edited.total}</bdi>
               : <span className="font-bold text-warn">غير معروف</span>}
@@ -1660,12 +1660,12 @@ function ReviewCard({
           {/* الطمأنةُ المعتادة لا تزاحم الزرَّ الملتصق على الجوّال — وما يمنع أو يتعثّر يُقال دائماً */}
           <p className={`text-xs text-muted ${!item.reviewing && !item.reviewError && r.canArchive ? "hidden sm:block" : ""}`}>
             {item.reviewing
-              ? "يعيد الفحصَ بما صحّحت…"
+              ? "يعيد الفحص بما صحّحت…"
               : item.reviewError
-                ? `تعذّر إعادةُ الفحص: ${item.reviewError}`
+                ? `تعذّر إعادة الفحص: ${item.reviewError}`
                 : r.canArchive
-                  ? "لا يُحفَظ شيءٌ قبل تأكيدك — ثمّ يُرفع الملفُّ الأصليّ إلى مجلّده ويُقيَّد."
-                  : "لا يُؤرشَف قبل معالجة ما يمنعه — مذكورٌ في «ملاحظاتُ الفحص»."}
+                  ? "لا يحفظ شيء قبل تأكيدك — ثمّ يرفع الملفّ الأصليّ إلى مجلّده ويقيّد."
+                  : "لا يؤرشف قبل معالجة ما يمنعه — مذكور في «ملاحظات الفحص»."}
           </p>
           <button
             type="button"
@@ -1676,7 +1676,7 @@ function ReviewCard({
             {item.archiving ? "يؤرشف…" : item.archiveError ? (
               <><RotateCw className="h-4 w-4" strokeWidth={2} aria-hidden />أعد المحاولة</>
             ) : (
-              <><Check className="h-4 w-4" strokeWidth={2.25} aria-hidden />أكّد وأرشِف</>
+              <><Check className="h-4 w-4" strokeWidth={2.25} aria-hidden />أكّد وأرشف</>
             )}
           </button>
         </div>

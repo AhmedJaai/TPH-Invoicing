@@ -139,7 +139,7 @@ export async function loadPairLines(purchaseId: string, invoiceId: string | null
 
 export class UnknownFoodicsSupplierError extends Error {
   constructor() {
-    super("مورّدُ فودكس هذا غير معروف — زامن فودكس ثمّ أعد المحاولة.");
+    super("مورّد فودكس هذا غير معروف — زامن فودكس ثمّ أعد المحاولة.");
     this.name = "UnknownFoodicsSupplierError";
   }
 }

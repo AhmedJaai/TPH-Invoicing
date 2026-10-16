@@ -30,9 +30,9 @@ export type TruthVerdict =
 export const VERDICT_LABEL: Record<TruthVerdict, string> = {
   VERIFIED: "مطابق",
   CORRECTED: "يحتاج تصحيحاً",
-  DUPLICATE: "مكرَّر",
+  DUPLICATE: "مكرّر",
   MISSING: "مفقود",
-  AMBIGUOUS: "لا يُقطَع فيه",
+  AMBIGUOUS: "لا يقطع فيه",
 };
 
 /** ما في الأرشيف. */
@@ -108,7 +108,7 @@ export function auditTruth(
         detail: "الملفّ في الأرشيف ولا قيد له في القاعدة",
         driveId: file.driveId,
         documentId: null,
-        suggestion: "أعد مزامنة الدرايف — أو ارفعه إن كان أُضيف يدوياً",
+        suggestion: "أعد مزامنة الدرايف — أو ارفعه إن كان أضيف يدوياً",
       });
       continue;
     }
@@ -118,10 +118,10 @@ export function auditTruth(
       out.push({
         verdict: "DUPLICATE",
         label: file.fileName,
-        detail: `${matches.length} قيداً لملفٍّ واحد`,
+        detail: `${matches.length} قيداً لملفّ واحد`,
         driveId: file.driveId,
         documentId: matches[0].documentId,
-        suggestion: "أبقِ الأقدم واحذف الباقي — بعد التأكّد أنّ لا فاتورة تعتمد عليه",
+        suggestion: "أبق الأقدم واحذف الباقي — بعد التأكّد أنّ لا فاتورة تعتمد عليه",
       });
       continue;
     }
@@ -138,11 +138,11 @@ export function auditTruth(
         label: file.fileName,
         detail:
           file.totalMinor === null
-            ? "اسم الملفّ لا يحمل إجمالاً يُقابَل"
-            : "القيد بلا إجمالٍ مقروء",
+            ? "اسم الملفّ لا يحمل إجمالاً يقابل"
+            : "القيد بلا إجمال مقروء",
         driveId: file.driveId,
         documentId: record.documentId,
-        suggestion: "افتح المستند وأثبِت إجماليه بيدك",
+        suggestion: "افتح المستند وأثبت إجماليه بيدك",
       });
       continue;
     }
@@ -157,7 +157,7 @@ export function auditTruth(
           `${formatRiyalsDisplay(record.totalMinor)} — فرق ${formatRiyalsDisplay(diff)}`,
         driveId: file.driveId,
         documentId: record.documentId,
-        suggestion: "افتح الأصل واحسم أيّهما الصحيح — لا يُصحَّح آلياً",
+        suggestion: "افتح الأصل واحسم أيّهما الصحيح — لا يصحّح آلياً",
       });
       continue;
     }
@@ -173,7 +173,7 @@ export function auditTruth(
         detail: `الأصل شهر ${file.periodMonth} والقيد ${record.periodMonth}`,
         driveId: file.driveId,
         documentId: record.documentId,
-        suggestion: "الشهر يُشتقّ من تاريخ الفاتورة لا من موضع الملفّ",
+        suggestion: "الشهر يشتقّ من تاريخ الفاتورة لا من موضع الملفّ",
       });
       continue;
     }
@@ -195,20 +195,20 @@ export function auditTruth(
       out.push({
         verdict: "AMBIGUOUS",
         label: r.fileName,
-        detail: "قيدٌ بلا معرّف درايف — لا يُقابَل بأصل",
+        detail: "قيد بلا معرّف درايف — لا يقابل بأصل",
         driveId: null,
         documentId: r.documentId,
-        suggestion: "أعد مزامنة الدرايف كي يُربَط بأصله",
+        suggestion: "أعد مزامنة الدرايف كي يربط بأصله",
       });
       continue;
     }
     out.push({
       verdict: "MISSING",
       label: r.fileName,
-      detail: "قيدٌ في القاعدة ولا أصل له في الأرشيف",
+      detail: "قيد في القاعدة ولا أصل له في الأرشيف",
       driveId: r.driveId,
       documentId: r.documentId,
-      suggestion: "الملفّ نُقل أو حُذف من الدرايف — لا تحذف القيد قبل معرفة أين ذهب",
+      suggestion: "الملفّ نقل أو حذف من الدرايف — لا تحذف القيد قبل معرفة أين ذهب",
     });
   }
 

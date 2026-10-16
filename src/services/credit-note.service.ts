@@ -40,7 +40,7 @@ export async function recordCreditNote(
   actorId: string,
 ): Promise<{ paymentId: string; remainingMinor: number }> {
   if (!Number.isInteger(input.amountMinor) || input.amountMinor <= 0) {
-    throw new CreditNoteRefused("مبلغُ الإشعار رقمٌ أكبر من صفر");
+    throw new CreditNoteRefused("مبلغ الإشعار رقم أكبر من صفر");
   }
   const [inv] = await tx
     .select({
@@ -49,7 +49,7 @@ export async function recordCreditNote(
     })
     .from(invoices).where(eq(invoices.id, input.invoiceId)).for("update");
   if (!inv) throw new CreditNoteRefused("الفاتورة غير موجودة — حدّث الصفحة");
-  if (!inv.supplierId) throw new CreditNoteRefused("الفاتورة بلا مورّد — لا حسابَ يُخصم منه الإشعار");
+  if (!inv.supplierId) throw new CreditNoteRefused("الفاتورة بلا مورّد — لا حساب يخصم منه الإشعار");
 
   const [{ allocated }] = (await tx.execute<{ allocated: number }>(sql`
     select coalesce(sum(amount_minor), 0)::int as allocated from payment_allocations where invoice_id = ${inv.id}
@@ -58,7 +58,7 @@ export async function recordCreditNote(
   if (input.amountMinor > outstanding) {
     throw new CreditNoteRefused(
       outstanding <= 0
-        ? `فاتورة ${inv.number} مسدَّدةٌ كلُّها — الإشعارُ عليها رصيدٌ للمورّد، فكّ سدادها أوّلاً إن كان الإشعارُ قبله`
+        ? `فاتورة ${inv.number} مسدّدة كلّها — الإشعار عليها رصيد للمورّد، فكّ سدادها أوّلاً إن كان الإشعار قبله`
         : `الإشعار (${formatRiyalsDisplay(input.amountMinor)}) أكبر ممّا بقي على فاتورة ${inv.number} (${formatRiyalsDisplay(outstanding)})`,
     );
   }
@@ -86,8 +86,8 @@ export async function recordCreditNote(
     `)).rows;
     if (same) {
       throw new CreditNoteRefused(
-        `على فاتورة ${inv.number} إشعارٌ مقيَّد يشبهه (${formatRiyalsDisplay(Number(same.amount_minor))} بتاريخ ${formatDay(same.day)}`
-        + `${same.label && same.label !== "إشعار دائن" ? ` · ${same.label}` : ""}) — إن كان هذا إشعاراً آخر فأقِرّ وقيّده`,
+        `على فاتورة ${inv.number} إشعار مقيّد يشبهه (${formatRiyalsDisplay(Number(same.amount_minor))} بتاريخ ${formatDay(same.day)}`
+        + `${same.label && same.label !== "إشعار دائن" ? ` · ${same.label}` : ""}) — إن كان هذا إشعاراً آخر فأقرّ وقيّده`,
         true,
       );
     }
@@ -105,7 +105,7 @@ export async function recordCreditNote(
   });
   const out = await allocate(tx, paymentId, [{ invoiceId: inv.id, amountMinor: input.amountMinor }]);
   if (out.allocatedMinor !== input.amountMinor) {
-    throw new CreditNoteRefused("لم يُخصَّص الإشعارُ كلُّه على الفاتورة — لم يُكتب شيء");
+    throw new CreditNoteRefused("لم يخصّص الإشعار كلّه على الفاتورة — لم يكتب شيء");
   }
 
   await recordAudit({

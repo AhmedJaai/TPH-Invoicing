@@ -82,7 +82,7 @@ async function queryBalances(executor: Executor, supplierId?: string): Promise<S
       ),
       pay as (
         select p.supplier_id,
-               /* ما خرج مالاً — والإشعارُ الدائن تسويةٌ لم يخرج لها مال، يُعدّ وحده */
+               /* ما خرج مالاً — والإشعار الدائن تسوية لم يخرج لها مال، يعدّ وحده */
                coalesce(sum(p.amount_minor - p.fee_minor) filter (where p.method <> 'CREDIT_NOTE'), 0)::bigint as paid_net,
                coalesce(sum(p.amount_minor) filter (where p.method = 'CREDIT_NOTE'), 0)::bigint as credit_notes,
                sum(greatest(0, p.amount_minor - p.fee_minor - coalesce(b.s, 0)))::bigint as credit

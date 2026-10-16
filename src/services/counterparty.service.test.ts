@@ -10,7 +10,7 @@ const base: RawBankRow = {
 const row = (over: Partial<RawBankRow>) => toCanonical({ ...base, ...over });
 
 describe("evidenceFrom", () => {
-  it("تلتقط رقم الهوية — وهو ما يعمّ على ثلاثين حركة بتأكيدٍ واحد", () => {
+  it("تلتقط رقم الهوية — وهو ما يعمّ على ثلاثين حركة بتأكيد واحد", () => {
     const e = evidenceFrom(row({
       description: "احمد محمد يسلم الجعيدي BEN ID:2149830115 تحويل الى الاهل",
     }));
@@ -43,14 +43,14 @@ describe("evidenceFrom", () => {
     expect(e.some((x) => x.kind === "REFERENCE")).toBe(false);
   });
 
-  it("توحّد القيمة للمطابقة وتُبقي الأصل", () => {
+  it("توحّد القيمة للمطابقة وتبقي الأصل", () => {
     const e = evidenceFrom(row({ beneficiaryRaw: "  مؤسّسة  الأحمد " }));
     const name = e.find((x) => x.kind === "NAME")!;
     expect(name.value).toBe("مؤسّسة  الأحمد");
     expect(name.normalized).toBe("مؤسسه الاحمد");
   });
 
-  it("لا تُكرّر الدليل الواحد", () => {
+  it("لا تكرّر الدليل الواحد", () => {
     const e = evidenceFrom(row({
       description: "تحويل 12600000942005 الى 12600000942005",
     }));
@@ -61,7 +61,7 @@ describe("evidenceFrom", () => {
     expect(evidenceFrom(row({ beneficiaryRaw: "أب" })).some((x) => x.kind === "NAME")).toBe(false);
   });
 
-  it("حركة بلا شيء لا تُنتج أدلّة كاذبة", () => {
+  it("حركة بلا شيء لا تنتج أدلّة كاذبة", () => {
     expect(evidenceFrom(row({ description: null, beneficiaryRaw: null }))).toEqual([]);
   });
 });

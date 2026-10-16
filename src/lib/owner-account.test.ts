@@ -11,7 +11,7 @@ describe("buildOwnerAccount", () => {
     expect(signedMinor({ kind: "TOOK_OUT", amountMinor: 100 })).toBe(-100);
   });
 
-  it("الرصيدُ الجاري بترتيب الأيّام، والعرضُ الأحدثُ أوّلاً", () => {
+  it("الرصيد الجاري بترتيب الأيّام، والعرض الأحدث أوّلاً", () => {
     const a = buildOwnerAccount([
       e("c", "2026-03-10", "TOOK_OUT", 5000_00),
       e("a", "2026-01-05", "PAID_FOR_CAFE", 1200_50),
@@ -25,7 +25,7 @@ describe("buildOwnerAccount", () => {
     expect(a.paidForCafeMinor + a.putInMinor - a.tookOutMinor).toBe(a.balanceMinor);
   });
 
-  it("السنواتُ كلٌّ بصافيها، ومجموعُها الرصيد", () => {
+  it("السنوات كلّ بصافيها، ومجموعها الرصيد", () => {
     const a = buildOwnerAccount([
       e("a", "2025-12-30", "TOOK_OUT", 1000_00),
       e("b", "2026-01-02", "PUT_IN", 400_00),
@@ -38,7 +38,7 @@ describe("buildOwnerAccount", () => {
     expect(a.years.reduce((s, y) => s + y.netMinor, 0)).toBe(a.balanceMinor);
   });
 
-  it("بلا قيودٍ لا سطورَ ولا سنوات", () => {
+  it("بلا قيود لا سطور ولا سنوات", () => {
     const a = buildOwnerAccount([]);
     expect(a.lines).toEqual([]);
     expect(a.years).toEqual([]);

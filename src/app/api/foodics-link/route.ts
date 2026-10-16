@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     const done = await linkFoodicsSupplier(read.body.foodicsSupplierId, read.body.supplierId, user.id);
     return NextResponse.json({
       ok: true,
-      message: done.supplierName ? `رُبط «${done.name}» بـ«${done.supplierName}»` : `فُكّ ربطُ «${done.name}»`,
+      message: done.supplierName ? `ربط «${done.name}» بـ«${done.supplierName}»` : `فكّ ربط «${done.name}»`,
     });
   } catch (e) {
     if (e instanceof UnknownFoodicsSupplierError) return NextResponse.json({ error: e.message }, { status: 404 });

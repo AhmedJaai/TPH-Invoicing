@@ -40,8 +40,8 @@ const maybe = (minor: number | null | undefined): Cell => (minor === null || min
 
 /** سندُ حساب الفاتورة في الخصم. */
 function basis(i: VatExportInvoice): string {
-  if (i.choice !== true) return "حكمُ النظام: مستوفية";
-  return i.vatMinor === null ? "إقرارُ صاحب المنشأة — الضريبةُ 15/115 من الإجمالي (لم تُقرأ)" : "إقرارُ صاحب المنشأة — الضريبةُ كما قُرئت";
+  if (i.choice !== true) return "حكم النظام: مستوفية";
+  return i.vatMinor === null ? "إقرار صاحب المنشأة — الضريبة 15/115 من الإجمالي (لم تقرأ)" : "إقرار صاحب المنشأة — الضريبة كما قرئت";
 }
 
 export function buildVatSheets(p: VatExportInput): Sheet[] {
@@ -50,25 +50,25 @@ export function buildVatSheets(p: VatExportInput): Sheet[] {
   const summary: Cell[][] = [
     ["سجلّ إقرار ضريبة القيمة المضافة", p.label],
     ["الفترة", p.periodKey],
-    ["أُعدّ في", p.generatedAt],
-    ["حالُه", p.filing ? `قُدِّم في ${p.filing.filedOn}${p.filing.reference ? ` — مرجع ${p.filing.reference}` : ""}` : "لم يُسجَّل تقديمُه — الأرقامُ حيّة وقد تتغيّر"],
-    ...(p.filing ? [["الصافي المقدَّم", riyals(p.filing.netMinor)] satisfies Cell[]] : []),
+    ["أعدّ في", p.generatedAt],
+    ["حاله", p.filing ? `قدّم في ${p.filing.filedOn}${p.filing.reference ? ` — مرجع ${p.filing.reference}` : ""}` : "لم يسجّل تقديمه — الأرقام حيّة وقد تتغيّر"],
+    ...(p.filing ? [["الصافي المقدّم", riyals(p.filing.netMinor)] satisfies Cell[]] : []),
     [],
     ["البند", "المبلغ قبل الضريبة", "الضريبة"],
     ["المبيعات الخاضعة للنسبة الأساسيّة", riyals(r.output.netMinor), riyals(r.output.vatMinor)],
-    ["  منها واردُ البنك (شاملَ الضريبة)", riyals(r.output.grossMinor), ""],
-    ["  منها نقدٌ لم يُودَع كتبه صاحبُه (شاملَ الضريبة)", riyals(r.output.cashGrossMinor), ""],
+    ["  منها وارد البنك (شامل الضريبة)", riyals(r.output.grossMinor), ""],
+    ["  منها نقد لم يودع كتبه صاحبه (شامل الضريبة)", riyals(r.output.cashGrossMinor), ""],
     ["المشتريات الخاضعة للنسبة الأساسيّة", riyals(r.input.baseMinor), riyals(r.input.totalMinor)],
-    ["  ضريبةُ الفواتير", { count: r.input.invoices.count }, riyals(r.input.invoices.vatMinor)],
+    ["  ضريبة الفواتير", { count: r.input.invoices.count }, riyals(r.input.invoices.vatMinor)],
     ["  منها بإقرار صاحب المنشأة", { count: r.input.invoices.confirmed.count }, riyals(r.input.invoices.confirmed.vatMinor)],
-    ["  ضريبةُ رسوم الشبكة والبنك", { count: r.input.bankVat.count }, riyals(r.input.bankVat.vatMinor)],
-    ["  ضريبةُ حركاتٍ مختارة من الكشف بلا فاتورةٍ مرفوعة (15/115)", riyals(r.input.selected.grossMinor), riyals(r.input.selected.vatMinor)],
-    ["مشترياتٌ قُرئت ضريبتُها صفراً", riyals(r.zeroRated.totalMinor), ""],
-    ["رصيدٌ دائنٌ مرحَّل من الفترة السابقة", "", riyals(r.carriedInMinor)],
-    [r.netMinor >= 0 ? "صافي الضريبة المستحقّة" : "صافي الضريبة — رصيدٌ للمنشأة", "", riyals(Math.abs(r.netMinor))],
+    ["  ضريبة رسوم الشبكة والبنك", { count: r.input.bankVat.count }, riyals(r.input.bankVat.vatMinor)],
+    ["  ضريبة حركات مختارة من الكشف بلا فاتورة مرفوعة (15/115)", riyals(r.input.selected.grossMinor), riyals(r.input.selected.vatMinor)],
+    ["مشتريات قرئت ضريبتها صفراً", riyals(r.zeroRated.totalMinor), ""],
+    ["رصيد دائن مرحّل من الفترة السابقة", "", riyals(r.carriedInMinor)],
+    [r.netMinor >= 0 ? "صافي الضريبة المستحقّة" : "صافي الضريبة — رصيد للمنشأة", "", riyals(Math.abs(r.netMinor))],
     [],
-    ["فواتيرُ لم تُخصم", { count: r.notDeductible.count }, riyals(r.notDeductible.vatKnownMinor)],
-    ["ملاحظة", "ضريبةُ المخرجات 15/115 من الوارد المحسوب — بافتراض أنّ كلَّ المبيعات بالنسبة الأساسيّة. والمجهولُ مكتوبٌ «غير معروف» لا صفراً."],
+    ["فواتير لم تخصم", { count: r.notDeductible.count }, riyals(r.notDeductible.vatKnownMinor)],
+    ["ملاحظة", "ضريبة المخرجات 15/115 من الوارد المحسوب — بافتراض أنّ كلّ المبيعات بالنسبة الأساسيّة. والمجهول مكتوب «غير معروف» لا صفراً."],
   ];
 
   const invoiceHead: Cell[] = ["رقم الفاتورة", "التاريخ", "الشهر المحاسبيّ", "المورّد", "الرقم الضريبيّ على الفاتورة", "الرقم في سجلّ المورّد", "قبل الضريبة", "الضريبة المقروءة", "الإجمالي", "الضريبة المخصومة", "السند", "ملاحظات"];
@@ -76,11 +76,11 @@ export function buildVatSheets(p: VatExportInput): Sheet[] {
     i.number, i.day, i.periodMonth, i.supplier, i.sellerVat ?? UNKNOWN, i.supplierVat ?? UNKNOWN,
     maybe(i.subtotalMinor), maybe(i.vatMinor), riyals(i.totalMinor),
     i.included ? riyals(i.vatUsedMinor) : "",
-    i.included ? basis(i) : i.choice === false ? "أخرجها صاحبُ المنشأة" : "لم تُخصم",
+    i.included ? basis(i) : i.choice === false ? "أخرجها صاحب المنشأة" : "لم تخصم",
     note,
   ];
   const noteOf = (i: VatExportInvoice) => [
-    ...(i.carriedFromMonth ? [`مرحَّلة من ${i.carriedFromMonth}`] : []), ...i.warnings,
+    ...(i.carriedFromMonth ? [`مرحّلة من ${i.carriedFromMonth}`] : []), ...i.warnings,
   ].join(" · ");
 
   const inputs: Cell[][] = [invoiceHead, ...p.invoices.filter((i) => i.included).map((i) => invoiceRow(i, noteOf(i)))];
@@ -108,9 +108,9 @@ export function buildVatSheets(p: VatExportInput): Sheet[] {
     days.set(t.day, d);
   }
   const outputs: Cell[][] = [
-    ["اليوم", "عدد الحركات", "الوارد المحسوب (شاملَ الضريبة)"],
+    ["اليوم", "عدد الحركات", "الوارد المحسوب (شامل الضريبة)"],
     ...[...days.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([d, v]): Cell[] => [d, { count: v.count }, riyals(v.gross)]),
-    ...p.cash.filter((c) => c.grossMinor !== null).map((c): Cell[] => [`${c.month} — نقدٌ لم يُودَع`, "", riyals(c.grossMinor ?? 0)]),
+    ...p.cash.filter((c) => c.grossMinor !== null).map((c): Cell[] => [`${c.month} — نقد لم يودع`, "", riyals(c.grossMinor ?? 0)]),
   ];
 
   return [
@@ -118,6 +118,6 @@ export function buildVatSheets(p: VatExportInput): Sheet[] {
     { name: "سجلّ المدخلات", rows: inputs },
     { name: "مدخلات من الكشف", rows: bankInputs },
     { name: "سجلّ المخرجات", rows: outputs },
-    { name: "لم تُخصم", rows: excluded },
+    { name: "لم تخصم", rows: excluded },
   ];
 }

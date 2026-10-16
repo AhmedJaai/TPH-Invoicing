@@ -102,25 +102,25 @@ export async function recordDocumentByHand(
     .limit(1);
 
   if (!doc) throw new RecordRefused("لا يوجد هذا المستند", 404);
-  if (doc.invoiceId) throw new RecordRefused("له فاتورةٌ مقيَّدة — صحّحها من ملفّها لا بقيدٍ ثانٍ");
-  if (doc.statementId) throw new RecordRefused("قُيِّد كشفاً — لا يُقيَّد فاتورةً فوقه");
-  if (doc.status === "REJECTED") throw new RecordRefused("المستندُ مرفوض — أعِده إلى المراجعة أوّلاً");
+  if (doc.invoiceId) throw new RecordRefused("له فاتورة مقيّدة — صحّحها من ملفّها لا بقيد ثان");
+  if (doc.statementId) throw new RecordRefused("قيّد كشفاً — لا يقيّد فاتورةً فوقه");
+  if (doc.status === "REJECTED") throw new RecordRefused("المستند مرفوض — أعده إلى المراجعة أوّلاً");
 
   const [supplier] = await conn
     .select({ id: suppliers.id, issuesInvoices: suppliers.issuesInvoices, contractOnFile: suppliers.contractOnFile })
     .from(suppliers)
     .where(eq(suppliers.id, input.supplierId))
     .limit(1);
-  if (!supplier) throw new RecordRefused("المورّدُ غير موجود — اختره من القائمة أو أنشئه", 400);
+  if (!supplier) throw new RecordRefused("المورّد غير موجود — اختره من القائمة أو أنشئه", 400);
 
   const date = normalizeDocumentDate(input.invoiceDate);
   const number = input.invoiceNumber.trim();
   const totalMinor = parseRiyals(input.total);
   const subtotalMinor = input.subtotal?.trim() ? parseRiyals(input.subtotal) : null;
   const vatMinor = input.vat?.trim() ? parseRiyals(input.vat) : null;
-  if (totalMinor === null) throw new RecordRefused("الإجماليّ لا يُقرأ مبلغاً", 400);
-  if (input.subtotal?.trim() && subtotalMinor === null) throw new RecordRefused("الصافي لا يُقرأ مبلغاً", 400);
-  if (input.vat?.trim() && vatMinor === null) throw new RecordRefused("الضريبة لا تُقرأ مبلغاً", 400);
+  if (totalMinor === null) throw new RecordRefused("الإجماليّ لا يقرأ مبلغاً", 400);
+  if (input.subtotal?.trim() && subtotalMinor === null) throw new RecordRefused("الصافي لا يقرأ مبلغاً", 400);
+  if (input.vat?.trim() && vatMinor === null) throw new RecordRefused("الضريبة لا تقرأ مبلغاً", 400);
 
   /* الرقمُ نفسه بأيّ صيغة — «INV/2026/05297» هو «INV-2026-05297» */
   const key = number ? invoiceNumberKey(number) : "";
@@ -162,10 +162,10 @@ export async function recordDocumentByHand(
   const overridable = review.blockers.length > 0 && review.blockers.every((b) => OVERRIDABLE.has(b.code));
   const reason = input.override?.trim() ?? "";
   if (reason && !overridable) {
-    throw new RecordRefused("هذا المانعُ لا يُتجاوز: فاتورةٌ مكرَّرة أو ليست فاتورة. عالجه أو ارفض المستند.", 400);
+    throw new RecordRefused("هذا المانع لا يتجاوز: فاتورة مكرّرة أو ليست فاتورة. عالجه أو ارفض المستند.", 400);
   }
   if (reason && reason.length < MIN_OVERRIDE_REASON) {
-    throw new RecordRefused("اكتب سبباً يُفهم بعد شهر — لماذا تُقيَّد رغم المانع؟", 400);
+    throw new RecordRefused("اكتب سبباً يفهم بعد شهر — لماذا تقيّد رغم المانع؟", 400);
   }
   const overriding = overridable && reason.length >= MIN_OVERRIDE_REASON;
 
@@ -198,8 +198,8 @@ export async function recordDocumentByHand(
       const clash = await findInvoiceConflict(tx, { documentId: doc.id, supplierId: supplier.id, invoiceNumber: number });
       throw new RecordRefused(
         clash?.by === "NUMBER"
-          ? `فاتورة ${clash.invoiceNumber} مقيَّدةٌ لهذا المورّد من ملفٍّ آخر — لم تُقيَّد ثانيةً. افتحها من فواتيره، وإن كان هذا نسخةً فارفضه «مكرّرة»`
-          : "قُيِّدت فاتورةٌ لهذا المستند للتوّ — حدّث الصفحة",
+          ? `فاتورة ${clash.invoiceNumber} مقيّدة لهذا المورّد من ملفّ آخر — لم تقيّد ثانيةً. افتحها من فواتيره، وإن كان هذا نسخةً فارفضه «مكرّرة»`
+          : "قيّدت فاتورة لهذا المستند للتوّ — حدّث الصفحة",
       );
     }
     await replaceLines(tx, {
@@ -226,8 +226,8 @@ export async function recordDocumentByHand(
         الإجمالي: input.total,
         الحال_الضريبية: review.taxStatus,
         السبب: overriding
-          ? `قُيِّدت رغم المانع: ${review.blockers.map((b) => b.message).join("؛ ")} — لأنّ: ${reason}`
-          : "أكملَ الإنسانُ ما لم يُقرأ وقُيِّدت الفاتورة",
+          ? `قيّدت رغم المانع: ${review.blockers.map((b) => b.message).join("؛ ")} — لأنّ: ${reason}`
+          : "أكمل الإنسان ما لم يقرأ وقيّدت الفاتورة",
       },
     }, tx);
     /* المؤرشَفُ اعتُمد من قبل — فيُخصم رصيدُ المورّد كما في الاعتماد */

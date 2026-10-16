@@ -223,7 +223,7 @@ function FindingCard({
       setState("preview");
       return;
     }
-    setMessage({ text: String(r.data.message ?? "حُفظ"), bad: false });
+    setMessage({ text: String(r.data.message ?? "حفظ"), bad: false });
     setState("done");
     router.refresh();
   }
@@ -262,12 +262,12 @@ function FindingCard({
 
       {state === "preview" && preview && (
         <p className="mt-3 rounded-lg border border-warn/25 bg-warn-bg p-3 text-xs leading-relaxed">
-          تُقيَّد فاتورة {preview.invoiceNumber} مسدَّدةً من حسابك بـ{formatRiyalsDisplay(preview.ownerPaymentMinor)}
+          تقيّد فاتورة {preview.invoiceNumber} مسدّدةً من حسابك بـ{formatRiyalsDisplay(preview.ownerPaymentMinor)}
           {preview.freed.length > 0 && (
             <>
-              {" · "}وتُفَكّ عنها حوالاتُ المقهى ({formatRiyalsDisplay(preview.freed.reduce((s, x) => s + x.amountMinor, 0))})
+              {" · "}وتفكّ عنها حوالات المقهى ({formatRiyalsDisplay(preview.freed.reduce((s, x) => s + x.amountMinor, 0))})
               {preview.reapplied.length > 0 && (
-                <> وتُخصم من: {preview.reapplied.map((x) => `فاتورة ${x.invoiceNumber} بـ${formatRiyalsDisplay(x.amountMinor)}`).join("، ")}</>
+                <> وتخصم من: {preview.reapplied.map((x) => `فاتورة ${x.invoiceNumber} بـ${formatRiyalsDisplay(x.amountMinor)}`).join("، ")}</>
               )}
             </>
           )}
@@ -283,7 +283,7 @@ function FindingCard({
             onChange={(e) => setNote(e.target.value)}
             maxLength={500}
             className="mt-1 block min-h-11 w-full rounded-lg border border-line-input bg-surface px-3 text-sm"
-            placeholder="مثلاً: سدّدتُها بحوالةٍ من حسابٍ آخر"
+            placeholder="مثلاً: سدّدتها بحوالة من حساب آخر"
           />
         </label>
       )}
@@ -313,7 +313,7 @@ function FindingCard({
                   onClick={() => decide("accept")}
                   title={canApprove ? undefined : "إقرار ما يكتب سداداً لمن يعتمد السداد"}
                 >
-                  {f.action?.type === "OWNER_PAID" ? ACT.paidFromOwner : f.action?.type === "VOID_DUPLICATE" ? "هي دفعةٌ واحدة — ألغِ المكرّرة" : "اخصم الرصيد من فواتيره"}
+                  {f.action?.type === "OWNER_PAID" ? ACT.paidFromOwner : f.action?.type === "VOID_DUPLICATE" ? "هي دفعة واحدة — ألغ المكرّرة" : "اخصم الرصيد من فواتيره"}
                 </button>
               )}
               <button type="button" disabled={state === "busy"} className={buttonClass("quiet", "sm")} onClick={() => setState("dismissing")}>
@@ -323,7 +323,7 @@ function FindingCard({
           ) : (
             <>
               <button type="button" disabled={state === "busy"} className={buttonClass("secondary", "sm")} onClick={() => decide("accept")}>
-                صحيح — عُلم
+                صحيح — علم
               </button>
               <button type="button" disabled={state === "busy"} className={buttonClass("quiet", "sm")} onClick={() => setState("dismissing")}>
                 ليس صحيحاً

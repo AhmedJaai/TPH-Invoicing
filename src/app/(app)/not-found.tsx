@@ -21,7 +21,7 @@ export default function NotFound() {
         </span>
         <h1 className="mt-4 text-lg font-bold">لم نجد هذه الصفحة</h1>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-soft">
-          قد يكون الرابط قديماً، أو المورّد دُمج في غيره فتغيّر رمزه، أو السجلُّ لم يعد قائماً.
+          قد يكون الرابط قديماً، أو المورّد دمج في غيره فتغيّر رمزه، أو السجلّ لم يعد قائماً.
           ابحث عنه باسمه أو رقمه أو مبلغه — <Kbd>⌘K</Kbd> أو <Kbd>/</Kbd> من أيّ صفحة.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">

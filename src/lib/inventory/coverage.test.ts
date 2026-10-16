@@ -68,12 +68,12 @@ const input = (over: Partial<CoverageInput> = {}): CoverageInput => ({
 });
 
 describe("daysBetween", () => {
-  it("الطرفان داخلان، ويومٌ واحد يومٌ واحد", () => {
+  it("الطرفان داخلان، ويوم واحد يوم واحد", () => {
     expect(daysBetween("2026-09-01", "2026-09-07")).toEqual(WEEK);
     expect(daysBetween("2026-09-01", "2026-09-01")).toEqual(["2026-09-01"]);
   });
 
-  it("يعبر حافّةَ الشهر والسنة والكبيسة بلا يومٍ ناقصٍ ولا مكرَّر", () => {
+  it("يعبر حافّة الشهر والسنة والكبيسة بلا يوم ناقص ولا مكرّر", () => {
     expect(daysBetween("2026-08-30", "2026-09-02")).toEqual(["2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02"]);
     expect(daysBetween("2026-12-31", "2027-01-01")).toEqual(["2026-12-31", "2027-01-01"]);
     expect(daysBetween("2028-02-28", "2028-03-01")).toEqual(["2028-02-28", "2028-02-29", "2028-03-01"]);
@@ -81,7 +81,7 @@ describe("daysBetween", () => {
     expect(daysBetween("2026-01-01", "2026-12-31")).toHaveLength(365);
   });
 
-  it("نهايةٌ قبل البداية أو نصٌّ ليس تاريخاً: لا أيّام — لا فترةٌ مخترَعة", () => {
+  it("نهاية قبل البداية أو نصّ ليس تاريخاً: لا أيّام — لا فترة مخترعة", () => {
     expect(daysBetween("2026-09-07", "2026-09-01")).toEqual([]);
     expect(daysBetween("", "2026-09-01")).toEqual([]);
     expect(daysBetween("أمس", "اليوم")).toEqual([]);
@@ -89,7 +89,7 @@ describe("daysBetween", () => {
 });
 
 describe("computeCoverage", () => {
-  it("أسبوعٌ كامل وكلُّه محسوب: جاهز، والنِّسبُ مئةٌ بالمئة", () => {
+  it("أسبوع كامل وكلّه محسوب: جاهز، والنّسب مئة بالمئة", () => {
     const c = computeCoverage(input());
     expect(c.readiness).toBe("READY");
     expect(c.sales.periodDays).toBe(7);
@@ -99,18 +99,18 @@ describe("computeCoverage", () => {
     expect(c.sales.unitsCoveredBp).toBe(10_000);
     expect(c.purchases.coveredBp).toBe(10_000);
     expect(c.gaps).toEqual([]);
-    expect(describeCoverage(c)).toContain("كلُّ ما بِيع");
+    expect(describeCoverage(c)).toContain("كلّ ما بيع");
   });
 
-  it("يومٌ ناقص في الوسط: جزئيّ ويُسمّى اليوم", () => {
+  it("يوم ناقص في الوسط: جزئيّ ويسمّى اليوم", () => {
     const c = computeCoverage(input({ salesBusinessDates: WEEK.filter((d) => d !== "2026-09-04") }));
     expect(c.readiness).toBe("PARTIAL");
     expect(c.sales.missingDays).toEqual(["2026-09-04"]);
     expect(c.sales.daysWithSales).toBe(6);
-    expect(describeCoverage(c)).toContain("يوماً بلا مبيعاتٍ");
+    expect(describeCoverage(c)).toContain("يوماً بلا مبيعات");
   });
 
-  it("ملفّان متداخلان ويومٌ خارج الفترة: اليومُ يُعدّ مرّةً، والخارجُ لا يُعدّ", () => {
+  it("ملفّان متداخلان ويوم خارج الفترة: اليوم يعدّ مرّةً، والخارج لا يعدّ", () => {
     const c = computeCoverage(input({
       salesBusinessDates: [...WEEK, "2026-09-03", "2026-09-04", "2026-08-31", "2026-09-08"],
     }));
@@ -119,7 +119,7 @@ describe("computeCoverage", () => {
     expect(c.readiness).toBe("READY");
   });
 
-  it("لا مبيعاتٍ أصلاً: متعذّر، والنِّسبُ «لا تُعرَف» — لا مئةٌ على مجموعةٍ فارغة ولا صفر", () => {
+  it("لا مبيعات أصلاً: متعذّر، والنّسب «لا تعرف» — لا مئة على مجموعة فارغة ولا صفر", () => {
     const c = computeCoverage(input({
       salesBusinessDates: [],
       consumption: consumption({ lines: 0, unitsMilli: 0, totalMinor: 0 }),
@@ -130,10 +130,10 @@ describe("computeCoverage", () => {
     expect(c.sales.unitsCoveredBp).toBeNull();
     expect(c.purchases.coveredBp).toBeNull();
     expect(c.sales.missingDays).toHaveLength(7);
-    expect(describeCoverage(c)).toContain("لا مبيعاتٍ في هذه الفترة");
+    expect(describeCoverage(c)).toContain("لا مبيعات في هذه الفترة");
   });
 
-  it("مبيعاتٌ ولم يدخل الحسابَ منها سطر: متعذّر — ويقول لماذا", () => {
+  it("مبيعات ولم يدخل الحساب منها سطر: متعذّر — ويقول لماذا", () => {
     const c = computeCoverage(input({
       consumption: consumption(
         { lines: 0, unitsMilli: 0, totalMinor: 0 },
@@ -142,10 +142,10 @@ describe("computeCoverage", () => {
     }));
     expect(c.readiness).toBe("BLOCKED");
     expect(c.sales.coveredBp).toBe(0);
-    expect(describeCoverage(c)).toContain("لم يدخل الحسابَ سطرُ بيعٍ واحد");
+    expect(describeCoverage(c)).toContain("لم يدخل الحساب سطر بيع واحد");
   });
 
-  it("فجوةُ مبيعاتٍ تُجمَع بسببها، بعددها ومالها وحصّتها من الوحدات وأسمائها", () => {
+  it("فجوة مبيعات تجمع بسببها، بعددها ومالها وحصّتها من الوحدات وأسمائها", () => {
     const c = computeCoverage(input({
       consumption: consumption(
         { lines: 8, unitsMilli: 8_500, totalMinor: 18_000 },
@@ -166,7 +166,7 @@ describe("computeCoverage", () => {
     expect(c.sales.lines).toBe(11);
   });
 
-  it("الملغى ليس فجوة: لم يُصنَع، فلا يُنقص الجاهزيّة ولا حصّةَ الوحدات", () => {
+  it("الملغى ليس فجوة: لم يصنع، فلا ينقص الجاهزيّة ولا حصّة الوحدات", () => {
     const c = computeCoverage(input({
       consumption: consumption(
         { lines: 10, unitsMilli: 10_000, totalMinor: 20_000 },
@@ -179,15 +179,15 @@ describe("computeCoverage", () => {
     expect(c.sales.excludedUnitsMilli).toBe(0);
   });
 
-  it("سطرُ شراءٍ لم تُعرَف كمّيّتُه: جزئيّ، ونسبتُه من مال المشتريات", () => {
+  it("سطر شراء لم تعرف كمّيّته: جزئيّ، ونسبته من مال المشتريات", () => {
     const c = computeCoverage(input({ purchases: purchases([7_500], [gap("حليب كرتون", 2_500)]) }));
     expect(c.readiness).toBe("PARTIAL");
     expect(c.purchases).toMatchObject({ lines: 2, includedLines: 1, excludedLines: 1, excludedTotalMinor: 2_500, coveredBp: 7_500 });
     expect(c.gaps).toEqual([expect.objectContaining({ kind: "PURCHASES", reason: "NO_PACK_SPEC", count: 1, totalMinor: 2_500, examples: ["حليب كرتون"] })]);
-    expect(describeCoverage(c)).toContain("سطرَ شراءٍ لم تُعرَف كمّيّتُه");
+    expect(describeCoverage(c)).toContain("سطر شراء لم تعرف كمّيّته");
   });
 
-  it("تضاربُ الوحدات والتباسُ الاستلام واحتمالُ التكرار فجواتٌ تُنقص الجاهزيّة", () => {
+  it("تضارب الوحدات والتباس الاستلام واحتمال التكرار فجوات تنقص الجاهزيّة", () => {
     const c = computeCoverage(input({
       unitConflicts: ["حليب"],
       unitlessItems: ["مصّاصات"],
@@ -203,13 +203,13 @@ describe("computeCoverage", () => {
     expect(ambiguous).toMatchObject({ count: 2, totalMinor: 5_000, examples: ["لوريفا · INV-9"] });
   });
 
-  it("النطاقُ اختيارُ إنسانٍ لا فجوة: يُعلَن ولا يُنقص «جاهز»", () => {
+  it("النطاق اختيار إنسان لا فجوة: يعلن ولا ينقص «جاهز»", () => {
     const c = computeCoverage(input({ scope: { included: 12, excluded: ["مصّاصات", "مناديل"] } }));
     expect(c.readiness).toBe("READY");
     expect(c.scope).toEqual({ included: 12, excluded: 2, excludedNames: ["مصّاصات", "مناديل"] });
   });
 
-  it("الأمثلةُ خمسةٌ على الأكثر، والعددُ كاملٌ", () => {
+  it("الأمثلة خمسة على الأكثر، والعدد كامل", () => {
     const many = Array.from({ length: 9 }, (_, i) => excluded("NO_RECIPE", `صنف ${i}`, 100, 100));
     const c = computeCoverage(input({ consumption: consumption({ lines: 1, unitsMilli: 1_000, totalMinor: 1_000 }, many) }));
     const g = c.gaps.find((x) => x.reason === "NO_RECIPE")!;

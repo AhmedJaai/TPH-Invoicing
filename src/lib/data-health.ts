@@ -102,7 +102,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     coverage: tax,
     known: input.invoicesWithTaxDetail,
     total: input.invoices,
-    detail: `${input.invoicesWithTaxDetail} من ${countNoun(input.invoices, INVOICE)} عُرفت ضريبتها (${pct(tax)})`,
+    detail: `${input.invoicesWithTaxDetail} من ${countNoun(input.invoices, INVOICE)} عرفت ضريبتها (${pct(tax)})`,
     action: tax >= 0.95 ? undefined : "الباقي حالته مجهولة لا غير صالحة — اقرأ مستنداتها",
   });
 
@@ -132,7 +132,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     detail:
       input.bankTx === 0
         ? "لا حركات بعد"
-        : `${countNoun(input.unclassifiedBankTx, TRANSACTION)} لم تُصنَّف بعد`,
+        : `${countNoun(input.unclassifiedBankTx, TRANSACTION)} لم تصنّف بعد`,
     action: input.unclassifiedBankTx === 0 ? undefined : "صنّفها من صفحة المال — تصنيف واحد يسري على أمثاله",
   });
 
@@ -148,7 +148,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
       input.suppliersWithInvoices === 0
         ? "لا مورّدين بعد"
         : `${input.suppliersWithStatements} من ${countNoun(input.suppliersWithInvoices, SUPPLIER)} وصل كشفه`,
-    action: statements >= 0.95 ? undefined : "اطلب الكشوف — هي وحدها تكشف فاتورة حُمّلت عليك ولم تصلك",
+    action: statements >= 0.95 ? undefined : "اطلب الكشوف — هي وحدها تكشف فاتورة حمّلت عليك ولم تصلك",
   });
 
   /*

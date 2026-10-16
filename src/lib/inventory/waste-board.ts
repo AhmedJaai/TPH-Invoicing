@@ -17,11 +17,11 @@ export type WasteReason = "EXPIRED" | "SPILLED" | "FAILED_PREP" | "CALIBRATION" 
 export const WASTE_REASON_LABEL: Record<WasteReason, string> = {
   EXPIRED: "انتهت صلاحيّته",
   SPILLED: "انسكب",
-  FAILED_PREP: "تحضيرٌ فاشل",
-  CALIBRATION: "معايرةُ الماكينة",
-  STAFF_DRINK: "مشروبُ موظَّف",
+  FAILED_PREP: "تحضير فاشل",
+  CALIBRATION: "معايرة الماكينة",
+  STAFF_DRINK: "مشروب موظّف",
   DAMAGED: "تلف",
-  OTHER: "سببٌ آخر",
+  OTHER: "سبب آخر",
 };
 
 export interface WasteEntry {

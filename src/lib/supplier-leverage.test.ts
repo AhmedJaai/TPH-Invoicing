@@ -3,8 +3,8 @@ import { concentration, weightedDaysToPay } from "./supplier-leverage";
 
 const sp = (id: string, minor: number) => ({ supplierId: id, name: id, slug: id, minor });
 
-describe("أيّام السداد المرجَّحة", () => {
-  it("الفاتورةُ الكبيرة تزن أكثر", () => {
+describe("أيّام السداد المرجّحة", () => {
+  it("الفاتورة الكبيرة تزن أكثر", () => {
     const r = weightedDaysToPay([
       { days: 60, amountMinor: 10_000_00 },
       { days: 0, amountMinor: 100_00 }, { days: 0, amountMinor: 100_00 }, { days: 0, amountMinor: 100_00 }, { days: 0, amountMinor: 100_00 },
@@ -17,14 +17,14 @@ describe("أيّام السداد المرجَّحة", () => {
     expect(weightedDaysToPay([])).toEqual({ weightedDays: null, sampleCount: 0 });
   });
 
-  it("المدفوعةُ قبل تاريخها صفرُ يومٍ لا يومٌ سالب", () => {
+  it("المدفوعة قبل تاريخها صفر يوم لا يوم سالب", () => {
     const r = weightedDaysToPay(Array.from({ length: 5 }, () => ({ days: -4, amountMinor: 100_00 })));
     expect(r.weightedDays).toBe(0);
   });
 });
 
 describe("تركّز المورّدين", () => {
-  it("حصّةُ الثلاثة الأوائل، والأوّلُ فوق ٤٠٪ يُسمّى", () => {
+  it("حصّة الثلاثة الأوائل، والأوّل فوق ٤٠٪ يسمّى", () => {
     const c = concentration([sp("a", 5_000_00), sp("b", 2_000_00), sp("c", 2_000_00), sp("d", 1_000_00)]);
     expect(c?.totalMinor).toBe(10_000_00);
     expect(c?.top.map((t) => [t.supplierId, t.shareBp])).toEqual([["a", 5_000], ["b", 2_000], ["c", 2_000]]);

@@ -109,14 +109,14 @@ export async function loadMoneyView(month: string | null): Promise<MoneyView> {
     const c = r.category as TxCategory;
     const minor = Number(r.amount_minor);
     outMinor += minor;
-    if (c === "UNKNOWN") add("unknown", "unknown", "لم يُصنَّف بعد", "/bank?show=unknown#transactions", minor);
-    else if (c === "SUPPLIER") add("purchases", "purchases", "المورّدون — سدادٌ وشراءُ بضاعة", "/suppliers", minor);
-    else if (c === "PERSONAL") add("owner", "owner", "سحبُ المالك — تحويلاتٌ شخصيّة", "/money/owner", minor);
-    else if (c === "INTERNAL" || c === "POS_SETTLEMENT") add("internal", "internal", "حركةٌ تشغيليّة بين الحسابات", "/bank?show=all#transactions", minor);
-    else if (FEES.includes(c)) add("fees", "fees", "رسومُ البنك والشبكة وضرائبُها", "/bank?show=fees#transactions", minor);
+    if (c === "UNKNOWN") add("unknown", "unknown", "لم يصنّف بعد", "/bank?show=unknown#transactions", minor);
+    else if (c === "SUPPLIER") add("purchases", "purchases", "المورّدون — سداد وشراء بضاعة", "/suppliers", minor);
+    else if (c === "PERSONAL") add("owner", "owner", "سحب المالك — تحويلات شخصيّة", "/money/owner", minor);
+    else if (c === "INTERNAL" || c === "POS_SETTLEMENT") add("internal", "internal", "حركة تشغيليّة بين الحسابات", "/bank?show=all#transactions", minor);
+    else if (FEES.includes(c)) add("fees", "fees", "رسوم البنك والشبكة وضرائبها", "/bank?show=fees#transactions", minor);
     /* الوصفُ الصريح يُقدَّم على التصنيف المستنتَج — «شراء بضاعة» مشترياتٌ لا راتب */
     else if (isExpenseCategory(c) && looksLikeGoodsPurchase(r.description ?? "", r.beneficiary_raw)) {
-      add("purchases", "purchases", "المورّدون — سدادٌ وشراءُ بضاعة", "/suppliers", minor);
+      add("purchases", "purchases", "المورّدون — سداد وشراء بضاعة", "/suppliers", minor);
     } else add(c, "expense", CATEGORY_LABEL[c] ?? c, month ? `/money/expenses?month=${month}` : "/money/expenses", minor);
   }
 
@@ -138,13 +138,13 @@ export async function loadMoneyView(month: string | null): Promise<MoneyView> {
   if (unknown.count > 0) {
     contributions.push({
       id: "bank-unknown",
-      label: "حركات لم يُعرف وجهها",
+      label: "حركات لم يعرف وجهها",
       count: unknown.count,
       /* مبلغُها معلوم وإن جُهل وجهُها — فيُذكر */
       amountMinor: unknown.minor,
       unit: "حركة",
       included: false,
-      reason: "خارج الرقم حتى تُصنَّف — ومبلغها معلوم",
+      reason: "خارج الرقم حتى تصنّف — ومبلغها معلوم",
       href: "/bank?show=unknown#transactions",
     });
   }

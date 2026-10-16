@@ -31,21 +31,21 @@ export const SIGNAL_PREFIXES = [
 export type SignalPrefix = (typeof SIGNAL_PREFIXES)[number];
 
 export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
-  "pos-missing": "تسويةُ شبكةٍ لم تصل",
-  "pos-fee-rise": "ارتفاعُ رسوم الشبكة",
-  "recurring-suggest": "اقتراحُ مصروفٍ متكرّر",
-  "recurring-twice": "خصمٌ تكرّر في الشهر",
-  "recurring-rose": "خصمٌ ارتفع عن عادته",
-  "recurring-missing": "خصمٌ معتادٌ غاب",
-  obligation: "وثيقةٌ تنتهي",
-  "cash-floor": "الرصيدُ تحت حدّه",
-  "qty-outlier": "كمّيّةٌ على غير العادة",
-  "foodics-card": "فرقٌ بين بطاقات فودكس ودفعة البنك",
-  "foodics-purchase": "فرقٌ بين مشتريات فودكس وفواتيرنا",
-  "foodics-till": "فرقٌ بين المعدود في الصندوق والمتوقَّع",
-  "stock-link": "بندُ فاتورةٍ ليس مخزوناً",
-  "stock-gap": "فرقٌ متكرّر في صنف مخزون",
-  "repeat-delivery": "توريدٌ يبدو مقيَّداً مرّتين",
+  "pos-missing": "تسوية شبكة لم تصل",
+  "pos-fee-rise": "ارتفاع رسوم الشبكة",
+  "recurring-suggest": "اقتراح مصروف متكرّر",
+  "recurring-twice": "خصم تكرّر في الشهر",
+  "recurring-rose": "خصم ارتفع عن عادته",
+  "recurring-missing": "خصم معتاد غاب",
+  obligation: "وثيقة تنتهي",
+  "cash-floor": "الرصيد تحت حدّه",
+  "qty-outlier": "كمّيّة على غير العادة",
+  "foodics-card": "فرق بين بطاقات فودكس ودفعة البنك",
+  "foodics-purchase": "فرق بين مشتريات فودكس وفواتيرنا",
+  "foodics-till": "فرق بين المعدود في الصندوق والمتوقّع",
+  "stock-link": "بند فاتورة ليس مخزوناً",
+  "stock-gap": "فرق متكرّر في صنف مخزون",
+  "repeat-delivery": "توريد يبدو مقيّداً مرّتين",
 };
 
 const KEY_RE = /^[a-z-]{3,24}:[^\s]{1,160}$/;

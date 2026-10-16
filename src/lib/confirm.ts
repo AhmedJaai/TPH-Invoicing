@@ -114,7 +114,7 @@ export function reviewConfirmed(
     findings.push({
       code: ISSUE.LOW_CONFIDENCE_FIELD,
       severity: "BLOCKER",
-      message: "لم يُحدَّد المورد — لا يمكن الأرشفة بلا مورد مسجّل",
+      message: "لم يحدّد المورد — لا يمكن الأرشفة بلا مورد مسجّل",
     });
   }
 
@@ -122,7 +122,7 @@ export function reviewConfirmed(
     findings.push({
       code: ISSUE.LOW_CONFIDENCE_FIELD,
       severity: "BLOCKER",
-      message: "لم يُقرأ تاريخ المستند — لا يمكن تحديد الشهر بدونه",
+      message: "لم يقرأ تاريخ المستند — لا يمكن تحديد الشهر بدونه",
     });
   }
 
@@ -131,7 +131,7 @@ export function reviewConfirmed(
     findings.push({
       code: ISSUE.LOW_CONFIDENCE_FIELD,
       severity: "BLOCKER",
-      message: "لم يُقرأ المبلغ الإجمالي — لا يمكن تسمية الملف بدونه",
+      message: "لم يقرأ المبلغ الإجمالي — لا يمكن تسمية الملف بدونه",
     });
   }
 
@@ -144,7 +144,7 @@ export function reviewConfirmed(
     findings.push({
       code: ISSUE.MISSING_INVOICE_NUMBER,
       severity: "BLOCKER",
-      message: "فاتورة بلا رقم — أدخل رقم الفاتورة قبل الأرشفة، وإلّا لن تُسجَّل كفاتورة",
+      message: "فاتورة بلا رقم — أدخل رقم الفاتورة قبل الأرشفة، وإلّا لن تسجّل كفاتورة",
     });
   }
 

@@ -13,47 +13,47 @@ const inv = (over: Partial<VatInvoiceChoiceInput>): VatInvoiceChoiceInput => ({
 });
 
 describe("دفتر الاختيارات — إقرار الضريبة", () => {
-  it("ما لم يُختَر لا يدخل الدفتر", () => {
+  it("ما لم يختر لا يدخل الدفتر", () => {
     expect(vatTxChoiceRows([tx({ choice: null })], null)).toEqual([]);
     expect(vatInvoiceChoiceRows([inv({ choice: null })], null)).toEqual([]);
   });
 
-  it("حوالةٌ ضُمّت وتُحسب: تعمل، وأثرُها ضريبتُها، وتُسحَب", () => {
+  it("حوالة ضمّت وتحسب: تعمل، وأثرها ضريبتها، وتسحب", () => {
     const [r] = vatTxChoiceRows([tx({})], null);
     expect(r).toMatchObject({ state: "APPLIED", effectMinor: 150_00, reason: null });
-    expect(r.revoke).toEqual({ url: "/api/vat-choice", needs: "month:close", body: { kind: "tx", ids: ["t1"], included: null }, label: "أعِدها إلى الأصل" });
+    expect(r.revoke).toEqual({ url: "/api/vat-choice", needs: "month:close", body: { kind: "tx", ids: ["t1"], included: null }, label: "أعدها إلى الأصل" });
   });
 
-  it("حوالةٌ اختيرت ولا تُحسب: «لا يُطبَّق الآن» بسببها ومبلغها — وأثرُها صفرٌ معلوم", () => {
-    const [r] = vatTxChoiceRows([tx({ included: false, blocked: "ضريبتُها محسوبةٌ في فاتورتها" })], null);
+  it("حوالة اختيرت ولا تحسب: «لا يطبّق الآن» بسببها ومبلغها — وأثرها صفر معلوم", () => {
+    const [r] = vatTxChoiceRows([tx({ included: false, blocked: "ضريبتها محسوبة في فاتورتها" })], null);
     expect(r.state).toBe("NOT_APPLIED");
     expect(r.effectMinor).toBe(0);
-    expect(r.reason).toContain("ضريبتُها محسوبةٌ في فاتورتها");
+    expect(r.reason).toContain("ضريبتها محسوبة في فاتورتها");
     expect(r.reason).toContain("150.00");
     expect(r.revoke).not.toBeNull();
   });
 
-  it("ما أُخرج وكان يُضمّ أصلاً أثرُه سالب، وما لم يكن يُضمّ لا أثرَ له بالريال", () => {
+  it("ما أخرج وكان يضمّ أصلاً أثره سالب، وما لم يكن يضمّ لا أثر له بالريال", () => {
     const [byDefault] = vatTxChoiceRows([tx({ choice: false, included: false, includedByDefault: true, direction: "CREDIT" })], null);
-    expect(byDefault).toMatchObject({ state: "APPLIED", effectMinor: -150_00, choice: "أخرجتَها من المبيعات" });
+    expect(byDefault).toMatchObject({ state: "APPLIED", effectMinor: -150_00, choice: "أخرجتها من المبيعات" });
     const [never] = vatTxChoiceRows([tx({ choice: false, included: false })], null);
     expect(never.effectMinor).toBeNull();
   });
 
-  it("الإقرارُ المقدَّم يقفل: يُقرأ ولا يُسحَب", () => {
-    const [r] = vatTxChoiceRows([tx({})], "إقرارُ الربع الثالث 2026");
+  it("الإقرار المقدّم يقفل: يقرأ ولا يسحب", () => {
+    const [r] = vatTxChoiceRows([tx({})], "إقرار الربع الثالث 2026");
     expect(r.state).toBe("LOCKED");
     expect(r.revoke).toBeNull();
-    expect(r.reason).toContain("قُدِّم");
+    expect(r.reason).toContain("قدّم");
   });
 
-  it("فاتورةٌ أُقرّت وضريبتُها صفرٌ مقروء: لا تُطبَّق ويُقال لماذا", () => {
+  it("فاتورة أقرّت وضريبتها صفر مقروء: لا تطبّق ويقال لماذا", () => {
     const [r] = vatInvoiceChoiceRows([inv({ included: false, vatMinor: 0, vatUsedMinor: 0 })], null);
     expect(r.state).toBe("NOT_APPLIED");
     expect(r.reason).toContain("صفراً");
   });
 
-  it("فاتورةٌ أُخرجت وكانت الآلةُ تحسبها: أثرُها سالب", () => {
+  it("فاتورة أخرجت وكانت الآلة تحسبها: أثرها سالب", () => {
     const [r] = vatInvoiceChoiceRows([inv({ choice: false, included: false, machineEligible: true })], null);
     expect(r.effectMinor).toBe(-30_00);
     expect(r.revoke?.body).toEqual({ kind: "invoice", ids: ["i1"], included: null });
@@ -61,7 +61,7 @@ describe("دفتر الاختيارات — إقرار الضريبة", () => {
 });
 
 describe("خلاصة الدفتر", () => {
-  it("ما لا يُطبَّق يُرفع، والبابُ الفارغ لا يُعرض، والأحدثُ أوّلاً", () => {
+  it("ما لا يطبّق يرفع، والباب الفارغ لا يعرض، والأحدث أوّلاً", () => {
     const rows = [
       ...vatTxChoiceRows([
         tx({ id: "a", day: "2026-07-01" }),
@@ -77,7 +77,7 @@ describe("خلاصة الدفتر", () => {
     expect(s.byGroup[0].rows.map((r) => r.id)).toEqual(["vat-tx:c", "vat-tx:b", "vat-tx:a"]);
   });
 
-  it("دفترٌ فارغ خلاصتُه فارغة", () => {
+  it("دفتر فارغ خلاصته فارغة", () => {
     expect(summarizeChoices([])).toEqual({ total: 0, notApplied: [], byGroup: [] });
   });
 });

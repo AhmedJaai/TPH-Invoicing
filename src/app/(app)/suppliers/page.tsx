@@ -84,7 +84,7 @@ export default async function SuppliersPage({
         <EmptyState
           icon={Store}
           title="لا مورّدين بعد."
-          hint="يُنشَأ المورّد حين تُقرأ أوّل فاتورة منه — أو تختاره «مورّداً جديداً» في شاشة الرفع."
+          hint="ينشأ المورّد حين تقرأ أوّل فاتورة منه — أو تختاره «مورّداً جديداً» في شاشة الرفع."
           action={<LinkButton href="/upload" variant="primary">ارفع مستنداً</LinkButton>}
         />
       </PageShell>
@@ -186,10 +186,10 @@ export default async function SuppliersPage({
                 ? "لا فاتورة ولا دفعة بعد"
                 : r.openCount > 0
                   ? `${countNoun(r.openCount, INVOICE)} مفتوحة`
-                  : !r.issuesInvoices ? "لا يصدر فواتير — يُسدَّد عند الدفع"
-                  : r.invoiceCount > 0 ? "فواتيره مسدَّدة" : "دفعاتٌ بلا فواتير"}
+                  : !r.issuesInvoices ? "لا يصدر فواتير — يسدّد عند الدفع"
+                  : r.invoiceCount > 0 ? "فواتيره مسدّدة" : "دفعات بلا فواتير"}
               {r.contract && <Badge tone="warn">يحتاج عقداً</Badge>}
-              {r.paper && <Badge>فواتيرُه ورقيّة</Badge>}
+              {r.paper && <Badge>فواتيره ورقيّة</Badge>}
             </span>
           </span>
         </span>
@@ -225,7 +225,7 @@ export default async function SuppliersPage({
               ) : (
                 r.openCount > 0 ? (
                   /* فاتورةٌ مفتوحة يقابلها مالٌ لم يُنسب — ليس «متّزناً» يُترك */
-                  <span className="text-[11px] font-bold text-warn">متّزنٌ على الورق</span>
+                  <span className="text-[11px] font-bold text-warn">متّزن على الورق</span>
                 ) : (
                   <span className="text-[11px] text-muted">{r.idle ? "—" : "متّزن"}</span>
                 )
@@ -233,7 +233,7 @@ export default async function SuppliersPage({
           },
           {
             key: "age",
-            header: "أقدم دَين",
+            header: "أقدم دين",
             sortBy: (r) => r.ageing.oldestOwedDays,
             sortFirst: "desc",
             cell: (r) =>
@@ -271,8 +271,8 @@ export default async function SuppliersPage({
       width="wide"
       title="حسابات المورّدين"
       intro={showAmounts
-        ? "لمن تدين، وكم، ومنذ متى — بعد خصم ما دفعتَه لكلٍّ منهم، وما بقي لك عندهم."
-        : "المورّدون وفواتيرُهم المفتوحة وآخرُ تعاملٍ معهم — والمبالغُ خارج صلاحيتك."}
+        ? "لمن تدين، وكم، ومنذ متى — بعد خصم ما دفعته لكلّ منهم، وما بقي لك عندهم."
+        : "المورّدون وفواتيرهم المفتوحة وآخر تعامل معهم — والمبالغ خارج صلاحيتك."}
       actions={
         showAmounts && can(user.role, "payment:approve") ? (
           <>
@@ -294,29 +294,29 @@ export default async function SuppliersPage({
               tone={totals.owedMinor > 0 ? "warn" : undefined}
               value={<Money minor={totals.owedMinor} currency />}
               sub={totals.owedMinor > 0
-                ? `${countNoun(totals.owedSuppliers, SUPPLIER)} · على ${countNoun(totals.openInvoiceCount, INVOICE)} مفتوحة، بعد خصم ما دفعتَه لهم`
-                : "لا فاتورة مفتوحة إلّا وقد غطّاها ما دفعتَه."}
+                ? `${countNoun(totals.owedSuppliers, SUPPLIER)} · على ${countNoun(totals.openInvoiceCount, INVOICE)} مفتوحة، بعد خصم ما دفعته لهم`
+                : "لا فاتورة مفتوحة إلّا وقد غطّاها ما دفعته."}
             >
               <AgeingBar buckets={allBuckets} />
             </Figure>
             <Figure
               icon={Hourglass}
-              label="متأخّرٌ أكثر من 60 يوماً"
+              label="متأخّر أكثر من 60 يوماً"
               href="/suppliers?view=overdue"
               tone={overdueMinor > 0 ? "danger" : "ok"}
               value={<Money minor={overdueMinor} />}
               sub={overdueMinor > 0
-                ? `عند ${countNoun(overdue.length, SUPPLIER)} · أقدمُه منذ ${countNoun(oldestOverdue, DAY)}`
-                : "لا دَين تجاوز ستّين يوماً بعد خصم أرصدتك."}
+                ? `عند ${countNoun(overdue.length, SUPPLIER)} · أقدمه منذ ${countNoun(oldestOverdue, DAY)}`
+                : "لا دين تجاوز ستّين يوماً بعد خصم أرصدتك."}
             />
             <Figure
               icon={PiggyBank}
-              label="رصيدٌ لك عندهم"
+              label="رصيد لك عندهم"
               href="/suppliers?view=credit"
               value={<Money minor={totals.creditLeftMinor} />}
               sub={totals.creditLeftMinor > 0
-                ? `${countNoun(totals.creditSuppliers, SUPPLIER)} · مالٌ دفعتَه ولم تصلك فاتورتُه — يُخصَم من فواتيرهم القادمة`
-                : "لا مال دفعتَه إلّا وفاتورتُه عندك."}
+                ? `${countNoun(totals.creditSuppliers, SUPPLIER)} · مال دفعته ولم تصلك فاتورته — يخصم من فواتيرهم القادمة`
+                : "لا مال دفعته إلّا وفاتورته عندك."}
             />
           </div>
         ) : (
@@ -324,10 +324,10 @@ export default async function SuppliersPage({
           <Callout
             tone="accent"
             icon={Sparkles}
-            title="لا يعرف النظام بعدُ لمن تدين"
+            title="لا يعرف النظام بعد لمن تدين"
             action={<LinkButton href="/upload" variant="primary" size="sm">ارفع مستنداً</LinkButton>}
           >
-            لا فاتورةَ ولا دفعةَ مقيّدة لأيّ مورّد. ارفع فواتيرهم واستورد كشف البنك، فيظهر هنا ما عليك وما لك ومنذ متى.
+            لا فاتورة ولا دفعة مقيّدة لأيّ مورّد. ارفع فواتيرهم واستورد كشف البنك، فيظهر هنا ما عليك وما لك ومنذ متى.
           </Callout>
         )
       )}
@@ -347,8 +347,8 @@ export default async function SuppliersPage({
           className="mt-4"
           action={<LinkButton href="/suppliers?unbacked=1#unbacked" size="sm">اعرضها واطلب فواتيرها</LinkButton>}
         >
-          <strong className="text-ink">{countNoun(unbackedPayments.length, PAYMENT_RECORD)} دفعتَها ولم يصل مستندُها</strong>{" "}
-          — <Money minor={unbackedTotal} />. بلا فاتورةٍ ضريبية لا يُخصَم مدخلُها.
+          <strong className="text-ink">{countNoun(unbackedPayments.length, PAYMENT_RECORD)} دفعتها ولم يصل مستندها</strong>{" "}
+          — <Money minor={unbackedTotal} />. بلا فاتورة ضريبية لا يخصم مدخلها.
         </Callout>
       )}
 
@@ -374,24 +374,24 @@ export default async function SuppliersPage({
         </div>
 
         {(needContract.length > 0 || paperOnly.length > 0) && view === "all" && (
-          <Callout tone="warn" icon={Clock} className="mb-3" title="ما يُطلَب من مورّدين">
+          <Callout tone="warn" icon={Clock} className="mb-3" title="ما يطلب من مورّدين">
             {needContract.length > 0 && (
               <p id="no-contract" className="scroll-mt-24">
                 <span className="font-bold text-ink">{countNoun(needContract.length, SUPPLIER)} يحتاج عقد توريد</span> — لا يصدرون فواتير ضريبية،
-                وبلا عقدٍ مكتوب لا خصمَ ضريبة ولا إثباتَ مصروف:{" "}
+                وبلا عقد مكتوب لا خصم ضريبة ولا إثبات مصروف:{" "}
                 {needContract.map((r, i) => (
                   <span key={r.id}>
                     {i > 0 && " · "}
                     <Link href={`/suppliers/${r.slug}?tab=profile`} className="font-medium underline underline-offset-4 hover:text-ink">{r.nameAr}</Link>
                   </span>
                 ))}
-                . ومن لا يحتاج عقداً تُطفئه من ملفّه.
+                . ومن لا يحتاج عقداً تطفئه من ملفّه.
               </p>
             )}
             {paperOnly.length > 0 && (
               <p className={needContract.length > 0 ? "mt-1" : ""}>
-                <span className="font-bold text-ink">{countNoun(paperOnly.length, SUPPLIER)} فواتيرُه ورقيّة</span> — فاتورتُه موجودةٌ باليد، والمطلوبُ
-                تصويرُها ورفعُها: {paperOnly.map((r) => r.nameAr).join(" · ")}.
+                <span className="font-bold text-ink">{countNoun(paperOnly.length, SUPPLIER)} فواتيره ورقيّة</span> — فاتورته موجودة باليد، والمطلوب
+                تصويرها ورفعها: {paperOnly.map((r) => r.nameAr).join(" · ")}.
               </p>
             )}
           </Callout>
@@ -411,13 +411,13 @@ export default async function SuppliersPage({
               icon={Store}
               title={
                 view === "owed" ? "لا مورّد عليك له شيء."
-                : view === "overdue" ? "لا دَين تجاوز ستّين يوماً."
+                : view === "overdue" ? "لا دين تجاوز ستّين يوماً."
                 : view === "credit" ? "لا رصيد لك عند أحد."
-                : view === "idle" ? "كلُّ مورّدٍ مسجَّل تعاملتَ معه."
+                : view === "idle" ? "كلّ مورّد مسجّل تعاملت معه."
                 : "لا مورّدين في هذه القائمة."
               }
-              hint={view === "owed" || view === "overdue" ? "كلُّ فاتورةٍ مفتوحة غطّاها ما دفعتَه — بحسب ما قُيّد من فواتير ودفعات." : undefined}
-              action={<LinkButton href="/suppliers" size="sm">كلُّ المورّدين</LinkButton>}
+              hint={view === "owed" || view === "overdue" ? "كلّ فاتورة مفتوحة غطّاها ما دفعته — بحسب ما قيّد من فواتير ودفعات." : undefined}
+              action={<LinkButton href="/suppliers" size="sm">كلّ المورّدين</LinkButton>}
             />
           }
         />
@@ -429,7 +429,7 @@ export default async function SuppliersPage({
           title="اقتراحات التحليل"
           icon={Sparkles}
           count={findings.length > 0 ? findings.length : undefined}
-          hint="يقرأ التحليلُ فواتير المورّد ودفعاته وكشوفه ويقترح ما يصحّح حسابه. الأرقامُ يحسبها الخادم، ولا يُكتب شيءٌ حتى تُقرّه."
+          hint="يقرأ التحليل فواتير المورّد ودفعاته وكشوفه ويقترح ما يصحّح حسابه. الأرقام يحسبها الخادم، ولا يكتب شيء حتى تقرّه."
           action={
             can(user.role, "supplier:edit") && worth.length > 0 ? (
               <RunAnalysis
@@ -466,14 +466,14 @@ async function UnbackedSection({ groups, count, canRequest }: { groups: ReturnTy
   return (
     <div id="unbacked" className="scroll-mt-28">
       <Section
-        title="دفعاتٌ لم تُنسب إلى فاتورة"
+        title="دفعات لم تنسب إلى فاتورة"
         icon={FileWarning}
         count={count}
-        hint={`عند ${countNoun(groups.filter((g) => g.supplierId).length, SUPPLIER)}. بلا فاتورةٍ ضريبية لا يُخصَم مدخلُها. ومن لا يصدر فواتير يُطلَب منه عقدُ توريد بدلها — وهو معدودٌ هنا كغيره، فالمال خرج.`}
+        hint={`عند ${countNoun(groups.filter((g) => g.supplierId).length, SUPPLIER)}. بلا فاتورة ضريبية لا يخصم مدخلها. ومن لا يصدر فواتير يطلب منه عقد توريد بدلها — وهو معدود هنا كغيره، فالمال خرج.`}
         action={<LinkButton href="/suppliers" size="sm" variant="quiet">كلّ الحسابات</LinkButton>}
       >
         {groups.length === 0 ? (
-          <EmptyState compact title="لا دفعة بلا فاتورة." hint="كلّ ما دُفع له مستندُه." />
+          <EmptyState compact title="لا دفعة بلا فاتورة." hint="كلّ ما دفع له مستنده." />
         ) : (
           <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 xl:grid-cols-2">
             {groups.map((g) => (
@@ -489,7 +489,7 @@ async function UnbackedSection({ groups, count, canRequest }: { groups: ReturnTy
                       )}
                       <span className="block text-[11px] text-muted">
                         {countNoun(g.payments.length, PAYMENT_RECORD)}
-                        {g.supplierId ? " بلا فاتورة" : " لم تُعرَف جهتها — افتح حركتها وحدّد مورّدها"}
+                        {g.supplierId ? " بلا فاتورة" : " لم تعرف جهتها — افتح حركتها وحدّد مورّدها"}
                       </span>
                     </span>
                     <span className="shrink-0 text-end">

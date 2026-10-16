@@ -42,7 +42,7 @@ export function planImport(parsed: ParsedFileName, hasSupplier: boolean): Import
   const documentKind = KIND_FROM_NAME[parsed.kind] ?? "UNKNOWN";
 
   if (!hasSupplier && parsed.slug) notes.push(`المورد ${parsed.slug} غير مسجّل`);
-  if (parsed.amountMinor === undefined) notes.push("لا مبلغ في الاسم — سُجّل مستنداً بلا قيد");
+  if (parsed.amountMinor === undefined) notes.push("لا مبلغ في الاسم — سجّل مستنداً بلا قيد");
   if (parsed.monthOnly) notes.push("الاسم يحمل الشهر بلا يوم");
   if (parsed.kind === "INVOICE" && !parsed.invoiceNumber) notes.push("فاتورة بلا رقم في الاسم");
   if (parsed.kind === "SALES_INVOICE") notes.push("فاتورة صادرة منّا — لا تدخل المشتريات");

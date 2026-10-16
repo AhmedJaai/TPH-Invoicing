@@ -27,13 +27,13 @@ const inv = (over: Partial<PackInput["invoices"][number]> = {}): PackInput["invo
 });
 
 describe("حزمة المحاسب", () => {
-  it("ستُّ أوراقٍ بترتيب ما يُسأل عنه", () => {
+  it("ستّ أوراق بترتيب ما يسأل عنه", () => {
     expect(buildAccountantPack(base).map((s) => s.name)).toEqual([
       "الملخّص", "الفواتير", "الضريبة", "الدفعات", "المصروفات", "حركات البنك",
     ]);
   });
 
-  it("الضريبةُ المجهولة «غير معروف» لا صفر — وتُعَدّ في الملخّص", () => {
+  it("الضريبة المجهولة «غير معروف» لا صفر — وتعدّ في الملخّص", () => {
     const p = { ...base, invoices: [inv(), inv({ number: "INV-2", vatMinor: null, subtotalMinor: null, inputVatStatus: "UNKNOWN" })] };
     const sheet = buildAccountantPack(p).find((s) => s.name === "الفواتير")!;
     expect(sheet.rows[2][5]).toBe("غير معروف");
@@ -41,36 +41,36 @@ describe("حزمة المحاسب", () => {
     expect(summarize(p).vatKnownMinor).toBe(1_500);
   });
 
-  it("الضريبة القابلة للخصم من «تُخصم» وحدها", () => {
+  it("الضريبة القابلة للخصم من «تخصم» وحدها", () => {
     const p = { ...base, invoices: [inv(), inv({ number: "X", inputVatStatus: "NOT_ELIGIBLE", vatMinor: 900 })] };
     expect(summarize(p).deductibleVatMinor).toBe(1_500);
   });
 
-  it("المبالغ تُكتب ريالاتٍ بمنزلتين من هللاتٍ صحيحة — لا قسمةَ عائمة", () => {
+  it("المبالغ تكتب ريالات بمنزلتين من هللات صحيحة — لا قسمة عائمة", () => {
     const sheet = buildAccountantPack({ ...base, invoices: [inv({ totalMinor: 1_234_567 })] }).find((s) => s.name === "الفواتير")!;
     expect(sheet.rows[1][6]).toEqual({ riyals: "12345.67" });
   });
 
-  it("الدفعةُ المردودة والملغاة لا تُجمعان في «دفعات الشهر»", () => {
+  it("الدفعة المردودة والملغاة لا تجمعان في «دفعات الشهر»", () => {
     const pay = (status: string) => ({ date: "2026-08-05", supplier: "م", amountMinor: 1_000, feeMinor: 0, method: "BANK_TRANSFER", status, invoices: [], fromBank: true });
     expect(summarize({ ...base, payments: [pay("APPLIED"), pay("REVERSED"), pay("VOID")] }).paymentsMinor).toBe(1_000);
   });
 
-  it("الإشعارُ الدائن ليس دفعة — يُعدّ وحده ولا يدخل «دفعات الشهر»", () => {
+  it("الإشعار الدائن ليس دفعة — يعدّ وحده ولا يدخل «دفعات الشهر»", () => {
     const pay = (method: string) => ({ date: "2026-08-05", supplier: "م", amountMinor: 700, feeMinor: 0, method, status: "APPLIED", invoices: [], fromBank: false });
     const s = summarize({ ...base, payments: [pay("BANK_TRANSFER"), pay("CREDIT_NOTE")] });
     expect(s.paymentsMinor).toBe(700);
     expect(s.creditNotesMinor).toBe(700);
   });
 
-  it("المسدَّد لا يتجاوز الإجماليّ والباقي لا يصير سالباً", () => {
+  it("المسدّد لا يتجاوز الإجماليّ والباقي لا يصير سالباً", () => {
     const s = summarize({ ...base, invoices: [inv({ paidMinor: 20_000 })] });
     expect(s.paidMinor).toBe(11_500);
     expect(s.openMinor).toBe(0);
   });
 });
 
-describe("ضريبةُ المدخلات بحالها — مصدرُ الورقة والحزمة المطبوعة", () => {
+describe("ضريبة المدخلات بحالها — مصدر الورقة والحزمة المطبوعة", () => {
   it("يجمع المقروء ويعدّ المجهول ولا يجمعه صفراً", () => {
     const p = {
       ...base,
@@ -88,18 +88,18 @@ describe("ضريبةُ المدخلات بحالها — مصدرُ الورقة
     ]);
   });
 
-  it("الباقي على الفاتورة لا يقلّ عن صفر — الزائدُ رصيدٌ لا دينٌ سالب", () => {
+  it("الباقي على الفاتورة لا يقلّ عن صفر — الزائد رصيد لا دين سالب", () => {
     expect(invoiceOpenMinor(inv({ paidMinor: 4_000 }))).toBe(7_500);
     expect(invoiceOpenMinor(inv({ paidMinor: 20_000 }))).toBe(0);
   });
 });
 
-describe("صادرُ البنك في الحزمة", () => {
+describe("صادر البنك في الحزمة", () => {
   const row = (over: Partial<PackInput["bank"][number]>): PackInput["bank"][number] => ({
     date: "2026-08-05", description: "—", direction: "DEBIT", amountMinor: 1_000, category: "POS_FEE", matched: false, ...over,
   });
 
-  it("رسومُ الشبكة والرواتبُ مفسَّرةٌ ببابها — لا «لم يُطابَق»", () => {
+  it("رسوم الشبكة والرواتب مفسّرة ببابها — لا «لم يطابق»", () => {
     const p = {
       ...base,
       bank: [
@@ -114,7 +114,7 @@ describe("صادرُ البنك في الحزمة", () => {
     expect(summarize(p).bankUnexplainedCount).toBe(2);
   });
 
-  it("الصادرُ بأبوابه، الأكبرُ أوّلاً، والواردُ لا يدخله", () => {
+  it("الصادر بأبوابه، الأكبر أوّلاً، والوارد لا يدخله", () => {
     const p = {
       ...base,
       bank: [row({ amountMinor: 100 }), row({ amountMinor: 200 }), row({ category: "RENT", amountMinor: 4_750_000 }), row({ direction: "CREDIT", amountMinor: 9 })],
@@ -126,8 +126,8 @@ describe("صادرُ البنك في الحزمة", () => {
   });
 });
 
-describe("المصروفاتُ بأبوابها", () => {
-  it("تُجمع بالباب، الأكبرُ أوّلاً", () => {
+describe("المصروفات بأبوابها", () => {
+  it("تجمع بالباب، الأكبر أوّلاً", () => {
     const e = (category: string, amountMinor: number) => ({ date: "2026-08-01", category, label: "—", amountMinor, source: "BANK" });
     const p = { ...base, expenses: [e("POS_FEE", 40), e("POS_FEE", 60), e("RENT", 4_750_000)] };
     expect(expensesByCategory(p)).toEqual([

@@ -41,7 +41,7 @@ export function startState(f: StartFacts): StartState {
     {
       id: "documents",
       title: "ارفع فواتيرك أو زامن الدرايف",
-      detail: "منها يعرف النظام لمن تدين وكم — ويقرأ كلَّ فاتورة ويعرضها عليك قبل الحفظ.",
+      detail: "منها يعرف النظام لمن تدين وكم — ويقرأ كلّ فاتورة ويعرضها عليك قبل الحفظ.",
       href: "/upload",
       action: "ارفع مستنداً",
       done: f.documents > 0,
@@ -49,7 +49,7 @@ export function startState(f: StartFacts): StartState {
     {
       id: "bank",
       title: "استورد كشف البنك",
-      detail: "منه يُعرَف ما خرج من الحساب وما سُدّد من الفواتير — ملفّ Excel أو PDF نصّيّ من بنكك.",
+      detail: "منه يعرف ما خرج من الحساب وما سدّد من الفواتير — ملفّ Excel أو PDF نصّيّ من بنكك.",
       href: "/bank#import",
       action: "استورد الكشف",
       done: f.bankTransactions > 0,
@@ -57,7 +57,7 @@ export function startState(f: StartFacts): StartState {
     {
       id: "catalog",
       title: "ارفع كتالوج فودكس (للجرد)",
-      detail: "الأصنافُ والوصفات — بها يُحسَب ما كان ينبغي أن يبقى على الرفّ. ليست شرطاً لما قبلها.",
+      detail: "الأصناف والوصفات — بها يحسب ما كان ينبغي أن يبقى على الرفّ. ليست شرطاً لما قبلها.",
       href: "/inventory/import",
       action: "ارفع الكتالوج",
       done: f.recipes > 0,

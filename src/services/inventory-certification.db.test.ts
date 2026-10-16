@@ -32,8 +32,8 @@ const WEEK = { start: "2026-09-13", end: "2026-09-19" };
 
 const file = (path: string) => ({ fileName: path.split("/").pop()!, buffer: readFileSync(path) });
 
-describe("شهادةُ الجرد الأسبوعيّ على بيانات المقهى الحقيقيّة", () => {
-  it("من الكتالوج والمبيعات إلى جردٍ مقفَلٍ يُقرأ في السجلّ والاتّجاه", () =>
+describe("شهادة الجرد الأسبوعيّ على بيانات المقهى الحقيقيّة", () => {
+  it("من الكتالوج والمبيعات إلى جرد مقفل يقرأ في السجلّ والاتّجاه", () =>
     withRollback(async (tx) => {
       const log: string[] = [];
       const actorId = await makeActor(tx);
@@ -52,7 +52,7 @@ describe("شهادةُ الجرد الأسبوعيّ على بيانات الم�
         select id from products where foodics_product_sku is not null
       `)).rows.map((r) => String(r.id));
       await isolateProducts(tx, [...stock.map((s) => s.id), ...menu]);
-      log.push(`الكتالوج: ${catalog.stockItems.created} صنفَ مخزون · ${catalog.recipes.written} وصفة`);
+      log.push(`الكتالوج: ${catalog.stockItems.created} صنف مخزون · ${catalog.recipes.written} وصفة`);
 
       /* ٢ · المبيعات — ومرّةً ثانية: الملفُّ عينُه لا يدخل مرّتين */
       const sales = await importSalesFile(
@@ -62,14 +62,14 @@ describe("شهادةُ الجرد الأسبوعيّ على بيانات الم�
         { buffer: readFileSync(SALES), fileName: "sales-again.xlsx", actorId, branchLabel: branch.nameAr }, tx,
       );
       expect(again.status).toBe("DUPLICATE");
-      log.push(`المبيعات: ${JSON.stringify(sales.status)} · والملفُّ نفسُه ثانيةً ${again.status}`);
+      log.push(`المبيعات: ${JSON.stringify(sales.status)} · والملفّ نفسه ثانيةً ${again.status}`);
 
       /* ٣ · الجرد: والمربوطُ بالكتالوج لا يُسأل عن ربطه */
       const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
       let report = await recomputeCount(countId, tx);
       expect(report.lines).toHaveLength(60);
       expect(report.coverage.readiness).not.toBe("BLOCKED");
-      log.push(`التغطية: ${report.coverage.readiness} · أسطرُ بيعٍ ${report.coverage.sales.includedLines} من ${report.coverage.sales.lines}`);
+      log.push(`التغطية: ${report.coverage.readiness} · أسطر بيع ${report.coverage.sales.includedLines} من ${report.coverage.sales.lines}`);
 
       /* ٤ · النطاق: خمسةٌ خارجه، صراحةً — ويبقى بعد «التحديث» */
       const sorted = [...stock].sort((a, b) => a.sku.localeCompare(b.sku));
@@ -89,7 +89,7 @@ describe("شهادةُ الجرد الأسبوعيّ على بيانات الم�
       expect(canonicalToQuantity(line.theoreticalConsumptionMilli!, "KG")).toBe(5.715);
       const knownConsumption = report.lines.filter((l) => l.inScope && l.theoreticalConsumptionMilli !== null).length;
       const unknownConsumption = report.lines.filter((l) => l.inScope && l.theoreticalConsumptionMilli === null).length;
-      log.push(`الاستهلاكُ المتوقَّع: معروفٌ لـ${knownConsumption} · مجهولٌ لـ${unknownConsumption} (لا وصفةَ تصل إليه) — معلَن`);
+      log.push(`الاستهلاك المتوقّع: معروف لـ${knownConsumption} · مجهول لـ${unknownConsumption} (لا وصفة تصل إليه) — معلن`);
 
       /* ٦ · الافتتاحيُّ: لا جردَ سابق، فكلُّه مجهول — ثمّ يُدخَل للبنّ بالكيلو */
       expect(report.lines.filter((l) => l.inScope && l.openingSource === "UNKNOWN")).toHaveLength(55);
@@ -97,7 +97,7 @@ describe("شهادةُ الجرد الأسبوعيّ على بيانات الم�
       line = (await recomputeCount(countId, tx)).lines.find((l) => l.productId === coffee)!;
       expect(line.openingMilli).toBe(toCanonical(8_000_000, "G"));
       expect(line.openingSource).toBe("MANUAL");
-      log.push("الافتتاحيّ: ٨ كجم بنٍّ أُدخلت بالكيلو فحُفظت ٨٬٠٠٠ جرام — «أُدخل يدوياً»");
+      log.push("الافتتاحيّ: ٨ كجم بنّ أدخلت بالكيلو فحفظت ٨٬٠٠٠ جرام — «أدخل يدوياً»");
 
       /* ٧ · كمّيّةٌ مستلَمة: ٢ كجم يوم ١٦ */
       const receiptId = await createReceipt({
@@ -120,7 +120,7 @@ describe("شهادةُ الجرد الأسبوعيّ على بيانات الم�
       expect(await caught(createReceipt({
         productId: coffee, branchId: branch.id, receivedOn: "2026-09-18", enteredMilli: 2000, unit: "KG",
       }, actorId, tx))).toBeInstanceOf(PossibleDuplicateReceiptError);
-      log.push("الاستلام: ٢ كجم يدوياً، ثمّ فاتورتُها ← مجهولةٌ حتى رُبطتا ← ٢ كجم مرّةً واحدة");
+      log.push("الاستلام: ٢ كجم يدوياً، ثمّ فاتورتها ← مجهولة حتى ربطتا ← ٢ كجم مرّةً واحدة");
 
       /* ٩ · العدُّ والفرق: ٨ + ٢ − ٥٫٧١٥ = ٤٫٢٨٥ متوقَّعاً، ووُجد ٤٫٢ ← −٨٥ جراماً */
       report = await saveActualCounts(countId, [{ productId: coffee, actualMilli: toCanonical(4_200_000, "G") }], actorId, tx);
@@ -128,7 +128,7 @@ describe("شهادةُ الجرد الأسبوعيّ على بيانات الم�
       expect(canonicalToQuantity(line.theoreticalClosingMilli!, "KG")).toBe(4.285);
       expect(canonicalToQuantity(line.varianceMilli!, "G")).toBe(-85);
       expect(report.totals.summary.shortageCostMinor).toBeGreaterThan(0);
-      log.push(`الفرق: متوقَّع ٤٫٢٨٥ كجم · فعليّ ٤٫٢ · فرقٌ −٨٥ جم · نقصٌ ${report.totals.summary.shortageCostMinor} هللة`);
+      log.push(`الفرق: متوقّع ٤٫٢٨٥ كجم · فعليّ ٤٫٢ · فرق −٨٥ جم · نقص ${report.totals.summary.shortageCostMinor} هللة`);
 
       /* ١٠ · الإقفال — والمقفَلُ لا يتغيّر بتصحيح وصفةٍ ولا باستلامٍ متأخّر */
       await finaliseCount(countId, actorId, tx);
@@ -159,7 +159,7 @@ describe("شهادةُ الجرد الأسبوعيّ على بيانات الم�
       `)).rows;
       expect((snap.provenance.receiptIds as string[])).toContain(receiptId);
       expect((snap.provenance.scope as { source: string }).source).toBe("EXPLICIT");
-      log.push("الإقفال: لقطةٌ بمصادر الافتتاحيّ والاستلامات والنطاق — والوصفةُ والاستلامُ المتأخّر مردودان");
+      log.push("الإقفال: لقطة بمصادر الافتتاحيّ والاستلامات والنطاق — والوصفة والاستلام المتأخّر مردودان");
 
       /* ١١ · السجلُّ والاتّجاه يقرآن الجردَ المقفَل */
       const history = (await listCounts(10, tx)).find((c) => c.id === countId)!;
@@ -167,13 +167,13 @@ describe("شهادةُ الجرد الأسبوعيّ على بيانات الم�
       expect(history.itemsInScope).toBe(55);
       const trend = combineSummaries([history.summary]);
       expect(trend.shortageCostMinor).toBe(history.summary.shortageCostMinor);
-      log.push(`السجلّ: نقص ${history.summary.shortageCostMinor} · زيادة ${history.summary.overageCostMinor} · عُدّ ${history.itemsCounted} من ${history.itemsInScope}`);
+      log.push(`السجلّ: نقص ${history.summary.shortageCostMinor} · زيادة ${history.summary.overageCostMinor} · عدّ ${history.itemsCounted} من ${history.itemsInScope}`);
 
       /* ١٢ · والناقصُ معلَن: أرصدةٌ مجهولة وفجواتٌ بأسمائها */
       const unknownOpenings = frozen.lines.filter((l) => l.inScope && l.openingSource === "UNKNOWN").length;
       expect(unknownOpenings).toBe(54);
-      log.push(`المعلَن: ${unknownOpenings} صنفاً افتتاحيُّه مجهول · فجواتُ التغطية ${frozen.coverage.gaps.map((g) => `${g.label} (${g.count})`).join(" · ") || "لا شيء"}`);
+      log.push(`المعلن: ${unknownOpenings} صنفاً افتتاحيّه مجهول · فجوات التغطية ${frozen.coverage.gaps.map((g) => `${g.label} (${g.count})`).join(" · ") || "لا شيء"}`);
 
-      console.log(["", "── شهادةُ الجرد على بيانات المقهى ──", ...log.map((l) => `  ✓ ${l}`), ""].join("\n"));
+      console.log(["", "── شهادة الجرد على بيانات المقهى ──", ...log.map((l) => `  ✓ ${l}`), ""].join("\n"));
     }), 60_000);
 });

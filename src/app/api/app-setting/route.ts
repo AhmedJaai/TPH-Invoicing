@@ -35,12 +35,12 @@ export async function POST(request: Request) {
 
   if (raw === "") {
     await saveCashFloor(null, user.id);
-    return NextResponse.json({ ok: true, message: "رُفع الحدّ — لن يُنبَّه على الرصيد" });
+    return NextResponse.json({ ok: true, message: "رفع الحدّ — لن ينبّه على الرصيد" });
   }
   const minor = parseRiyals(raw);
   if (minor === null || minor <= 0) {
     return NextResponse.json({ error: "اكتب مبلغاً موجباً بالريال — أو اتركه فارغاً لرفع الحدّ" }, { status: 400 });
   }
   await saveCashFloor(minor, user.id);
-  return NextResponse.json({ ok: true, message: `حُفظ الحدّ: ${formatRiyalsDisplay(minor)} ريال` });
+  return NextResponse.json({ ok: true, message: `حفظ الحدّ: ${formatRiyalsDisplay(minor)} ريال` });
 }

@@ -64,6 +64,6 @@ export async function GET(request: Request) {
     });
   } catch (e) {
     console.error("[accountant-pack]", e);
-    return NextResponse.json({ error: "تعذّر إعداد الحزمة — لم يُكتب شيء. أعد المحاولة بعد لحظة." }, { status: 500 });
+    return NextResponse.json({ error: "تعذّر إعداد الحزمة — لم يكتب شيء. أعد المحاولة بعد لحظة." }, { status: 500 });
   }
 }

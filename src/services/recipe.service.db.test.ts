@@ -40,8 +40,8 @@ async function rowFor(tx: Tx, menuProductId: string) {
   return rows.find((r) => r.menuProductId === menuProductId)!;
 }
 
-describe("تصحيحُ الوصفة", () => {
-  it("أوّلُ نسخةٍ تسري منذ البداية ولو كُتب لها تاريخٌ متأخّر", () =>
+describe("تصحيح الوصفة", () => {
+  it("أوّل نسخة تسري منذ البداية ولو كتب لها تاريخ متأخّر", () =>
     withRollback(async (tx) => {
       const { latte } = await setup(tx);
       const row = await rowFor(tx, latte);
@@ -51,7 +51,7 @@ describe("تصحيحُ الوصفة", () => {
       expect(row.versions).toBe(1);
     }));
 
-  it("يُصحَّح في مكانه فلا نسخةَ ثانية — والتصحيحُ يسري على الأسابيع كلِّها", () =>
+  it("يصحّح في مكانه فلا نسخة ثانية — والتصحيح يسري على الأسابيع كلّها", () =>
     withRollback(async (tx) => {
       const { actorId, coffee, cup, latte } = await setup(tx);
 
@@ -69,7 +69,7 @@ describe("تصحيحُ الوصفة", () => {
       expect(row.ingredients.find((i) => i.productId === coffee)!.quantity).toBe("18");
     }));
 
-  it("والمصحَّحُ يصير مكتوباً بيد إنسان — فلا يكتب فوقه استيرادٌ قادم", () =>
+  it("والمصحّح يصير مكتوباً بيد إنسان — فلا يكتب فوقه استيراد قادم", () =>
     withRollback(async (tx) => {
       const { actorId, coffee, latte } = await setup(tx);
 
@@ -91,7 +91,7 @@ describe("تصحيحُ الوصفة", () => {
       expect(row.source).toBe("HUMAN");
     }));
 
-  it("ومكوّنٌ يُحذَف من الوصفة بالتصحيح", () =>
+  it("ومكوّن يحذف من الوصفة بالتصحيح", () =>
     withRollback(async (tx) => {
       const { actorId, coffee, latte } = await setup(tx);
 
@@ -104,7 +104,7 @@ describe("تصحيحُ الوصفة", () => {
       expect(row.ingredientCount).toBe(1);
     }));
 
-  it("ولا يقع على ما حُسب به جردٌ مقفَل — يُطلَب تغييرٌ مؤرَّخ", () =>
+  it("ولا يقع على ما حسب به جرد مقفل — يطلب تغيير مؤرّخ", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee, latte } = await setup(tx);
 
@@ -126,7 +126,7 @@ describe("تصحيحُ الوصفة", () => {
       expect(row.correctable).toBe(false);
     }));
 
-  it("والتغييرُ المؤرَّخ يمرّ فوق الجرد المقفَل — لأنّه لا يمسّ ما مضى", () =>
+  it("والتغيير المؤرّخ يمرّ فوق الجرد المقفل — لأنّه لا يمسّ ما مضى", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee, latte } = await setup(tx);
 
@@ -147,8 +147,8 @@ describe("تصحيحُ الوصفة", () => {
     }));
 });
 
-describe("حذفُ الوصفة", () => {
-  it("تُحذَف بنسخها كلِّها", () =>
+describe("حذف الوصفة", () => {
+  it("تحذف بنسخها كلّها", () =>
     withRollback(async (tx) => {
       const { actorId, latte } = await setup(tx);
 
@@ -159,7 +159,7 @@ describe("حذفُ الوصفة", () => {
       expect(rows.some((r) => r.menuProductId === latte)).toBe(false);
     }));
 
-  it("ولا تُحذَف وقد حُسب بها جردٌ مقفَل", () =>
+  it("ولا تحذف وقد حسب بها جرد مقفل", () =>
     withRollback(async (tx) => {
       const { actorId, branch, latte } = await setup(tx);
 
@@ -172,8 +172,8 @@ describe("حذفُ الوصفة", () => {
     }));
 });
 
-describe("إخراجُ صنفٍ من الجرد", () => {
-  it("يمتنع ما دام مكوّناً في وصفةٍ سارية — ويسمّيها", () =>
+describe("إخراج صنف من الجرد", () => {
+  it("يمتنع ما دام مكوّناً في وصفة سارية — ويسمّيها", () =>
     withRollback(async (tx) => {
       const { actorId, coffee } = await setup(tx);
 
@@ -182,7 +182,7 @@ describe("إخراجُ صنفٍ من الجرد", () => {
       expect((e as Error).message).toContain("لاتيه");
     }));
 
-  it("ويقع بعد حذفه من وصفاتها — تعطيلاً لا حذفاً، فيبقى تاريخُه", () =>
+  it("ويقع بعد حذفه من وصفاتها — تعطيلاً لا حذفاً، فيبقى تاريخه", () =>
     withRollback(async (tx) => {
       const { actorId, coffee, cup, latte } = await setup(tx);
 

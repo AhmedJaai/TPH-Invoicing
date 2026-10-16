@@ -39,7 +39,7 @@ describe("buildCashFlow", () => {
     expect(c.months[0].byCategory[0]).toEqual({ category: "SALARY", amountMinor: 70_000 });
   });
 
-  it("يُعلن غير المصنَّف لأنّه يُضعف الثقة", () => {
+  it("يعلن غير المصنّف لأنّه يضعف الثقة", () => {
     const c = buildCashFlow([
       mv("2026-08", "DEBIT", "UNKNOWN", 30_000),
       mv("2026-08", "DEBIT", "RENT", 10_000),
@@ -72,19 +72,19 @@ describe("buildProfitLoss", () => {
     expect(sales.unavailableReason).toContain("غير موصولة");
   });
 
-  it("لا تُعرض تكلفة مبيعات من المشتريات — الفرق بينهما المخزون", () => {
+  it("لا تعرض تكلفة مبيعات من المشتريات — الفرق بينهما المخزون", () => {
     const cogs = buildProfitLoss(base).lines.find((l) => l.id === "cogs")!;
     expect(cogs.amountMinor).toBeNull();
     expect(cogs.unavailableReason).toContain("المخزون");
   });
 
-  it("مجمل الربح والربح التشغيلي غير متاحين ولا يُحسبان صفراً", () => {
+  it("مجمل الربح والربح التشغيلي غير متاحين ولا يحسبان صفراً", () => {
     const pl = buildProfitLoss(base);
     expect(pl.lines.find((l) => l.id === "gross")!.amountMinor).toBeNull();
     expect(pl.lines.find((l) => l.id === "operating-profit")!.amountMinor).toBeNull();
   });
 
-  it("المصروفات التشغيلية تُجمع وتُرتَّب بالأكبر", () => {
+  it("المصروفات التشغيلية تجمع وترتّب بالأكبر", () => {
     const pl = buildProfitLoss(base);
     const total = pl.lines.find((l) => l.id === "operating-total")!;
     expect(total.amountMinor).toBe(100_000);
@@ -93,7 +93,7 @@ describe("buildProfitLoss", () => {
     expect(first).toBeLessThan(second);
   });
 
-  it("القائمة تُعلن ما ينقصها", () => {
+  it("القائمة تعلن ما ينقصها", () => {
     const pl = buildProfitLoss(base);
     expect(pl.complete).toBe(false);
     expect(pl.missing).toContain("المبيعات");
@@ -119,26 +119,26 @@ describe("monthlyShare", () => {
 describe("compareExpenses", () => {
   const rent: RecurringExpense = { id: "r", label: "إيجار المحل", category: "RENT", amountMinor: 950_000, cadence: "ANNUAL" };
 
-  it("يقابل المتوقَّع بالفعلي ويحسب الفرق", () => {
+  it("يقابل المتوقّع بالفعلي ويحسب الفرق", () => {
     const c = compareExpenses([rent], [{ category: "RENT", amountMinor: 80_000 }]);
     expect(c[0].expectedMinor).toBe(79_167);
     expect(c[0].actualMinor).toBe(80_000);
     expect(c[0].overspent).toBe(true);
   });
 
-  it("تصنيف بلا مصروف متوقَّع يظهر بمتوقَّع صفر — وذلك صادق", () => {
+  it("تصنيف بلا مصروف متوقّع يظهر بمتوقّع صفر — وذلك صادق", () => {
     const c = compareExpenses([], [{ category: "SALARY", amountMinor: 60_000 }]);
     expect(c[0].expectedMinor).toBe(0);
     expect(c[0].varianceMinor).toBe(60_000);
   });
 
-  it("مصروف متوقَّع لم يُصرف يظهر بفعليّ صفر", () => {
+  it("مصروف متوقّع لم يصرف يظهر بفعليّ صفر", () => {
     const c = compareExpenses([rent], []);
     expect(c[0].actualMinor).toBe(0);
     expect(c[0].overspent).toBe(false);
   });
 
-  it("يرتّب بأكبر فرق ليُنظَر فيه أوّلاً", () => {
+  it("يرتّب بأكبر فرق لينظر فيه أوّلاً", () => {
     const c = compareExpenses(
       [rent, { id: "s", label: "اشتراك", category: "UTILITY", amountMinor: 1_000, cadence: "MONTHLY" }],
       [{ category: "RENT", amountMinor: 200_000 }, { category: "UTILITY", amountMinor: 1_100 }],
@@ -147,8 +147,8 @@ describe("compareExpenses", () => {
   });
 });
 
-describe("buildCashFlow — عددُ ما لم يُصنَّف", () => {
-  it("يعدّ الحركات لا الصفوف المجمَّعة — خمسٌ في صفٍّ واحد خمس", () => {
+describe("buildCashFlow — عدد ما لم يصنّف", () => {
+  it("يعدّ الحركات لا الصفوف المجمّعة — خمس في صفّ واحد خمس", () => {
     const c = buildCashFlow([
       { month: "2026-08", direction: "DEBIT", category: "UNKNOWN", amountMinor: 235_000, count: 5 },
       { month: "2026-08", direction: "DEBIT", category: "RENT", amountMinor: 1_500_000, count: 1 },

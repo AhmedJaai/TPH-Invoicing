@@ -28,7 +28,7 @@ export function NoStatementsButton({ supplierId }: { supplierId: string }) {
           const r = await postJson("/api/supplier-policy", { supplierId, issuesStatements: false });
           setBusy(false);
           if (!r.ok) { setError(r.error); return; }
-          toast({ tone: "ok", title: "حُفظ: لا يصدر كشوفاً", body: "لن يُطلَب منه كشفٌ بعد اليوم — ويُعاد من صفحته إن تغيّر." });
+          toast({ tone: "ok", title: "حفظ: لا يصدر كشوفاً", body: "لن يطلب منه كشف بعد اليوم — ويعاد من صفحته إن تغيّر." });
           router.refresh();
         }}
       >

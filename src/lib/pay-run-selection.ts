@@ -84,7 +84,7 @@ export function planSupplier(s: SelectableSupplier, selection: PayRunSelection):
   if (on && written !== undefined) {
     const minor = parseRiyals(written);
     if (minor === null || minor <= 0) partialError = "ليس مبلغاً — اكتبه بالريال مثل 1500.00";
-    else if (minor > transferMinor) partialError = "أكبر ممّا يُحوَّل له";
+    else if (minor > transferMinor) partialError = "أكبر ممّا يحوّل له";
     /* مبلغٌ يساوي الكلّ ليس جزئيّاً */
     else if (minor < transferMinor) partialMinor = minor;
   }

@@ -9,21 +9,21 @@ const rates = new Map<string, WasteRate>([
 ]);
 
 describe("لوحة الهدر", () => {
-  it("كلفةُ السجلّ = الكمّيّة × سعر الوحدة من آخر جرد", () => {
+  it("كلفة السجلّ = الكمّيّة × سعر الوحدة من آخر جرد", () => {
     expect(entryCostMinor(e({}), rates.get("milk"))).toBe(12_00);
   });
 
-  it("ما لا سعرَ له، أو وحدتُه غيرُ وحدة السعر، مجهولٌ لا صفر", () => {
+  it("ما لا سعر له، أو وحدته غير وحدة السعر، مجهول لا صفر", () => {
     expect(entryCostMinor(e({ productId: "beans", unit: "KG" }), rates.get("beans"))).toBeNull();
     expect(entryCostMinor(e({ productId: "syrup" }), undefined)).toBeNull();
     expect(entryCostMinor(e({ unit: "KG" }), rates.get("milk"))).toBeNull();
   });
 
-  it("وحدةٌ من العائلة نفسها تُحوَّل: 500 مل من صنفٍ سعرُه باللتر", () => {
+  it("وحدة من العائلة نفسها تحوّل: 500 مل من صنف سعره باللتر", () => {
     expect(entryCostMinor(e({ quantityMilli: 500_000, unit: "ML" }), rates.get("milk"))).toBe(3_00);
   });
 
-  it("المجموعُ لما عُرف وحده، والمجهولُ يُعَدّ بجانبه في سببه", () => {
+  it("المجموع لما عرف وحده، والمجهول يعدّ بجانبه في سببه", () => {
     const b = buildWasteBoard([
       e({}),
       e({ reason: "SPILLED", quantityMilli: 500 }),
@@ -39,17 +39,17 @@ describe("لوحة الهدر", () => {
     ]);
   });
 
-  it("أكثرُ الأصناف هدراً ثلاثةٌ بالكلفة المعروفة — وما جُهلت كلفتُه لا يتصدّر بصفر", () => {
+  it("أكثر الأصناف هدراً ثلاثة بالكلفة المعروفة — وما جهلت كلفته لا يتصدّر بصفر", () => {
     const b = buildWasteBoard([e({}), e({}), e({ productId: "beans", productName: "بنّ", unit: "KG" })], rates);
     expect(b.topProducts).toEqual([{ productId: "milk", productName: "حليب", count: 2, costMinor: 24_00 }]);
   });
 
-  it("«انتهت صلاحيّتُه» مرّتين لصنفٍ إشارة، ومرّةٌ ليست إشارة", () => {
+  it("«انتهت صلاحيّته» مرّتين لصنف إشارة، ومرّة ليست إشارة", () => {
     const b = buildWasteBoard([e({}), e({}), e({ productId: "beans", productName: "بنّ", unit: "KG" }), e({ reason: "SPILLED" })], rates);
     expect(b.repeatedExpiry).toEqual([{ productId: "milk", productName: "حليب", count: 2 }]);
   });
 
-  it("بلا سجلّات: لوحةٌ فارغة", () => {
+  it("بلا سجلّات: لوحة فارغة", () => {
     expect(buildWasteBoard([], rates)).toEqual({ recordCount: 0, knownCostMinor: 0, unknownCount: 0, byReason: [], topProducts: [], repeatedExpiry: [] });
   });
 });

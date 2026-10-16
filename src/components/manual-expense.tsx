@@ -40,8 +40,8 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
 
   const minor = amount.trim() ? parseRiyals(amount) : null;
   const problems = {
-    label: label.trim().length < 2 ? "اكتب ما دُفع له — حرفان على الأقلّ." : null,
-    amount: !amount.trim() ? "اكتب المبلغ." : minor === null || minor <= 0 ? "مبلغٌ لا يُقرأ — اكتبه أرقاماً مثل 350 أو 1,250.50" : null,
+    label: label.trim().length < 2 ? "اكتب ما دفع له — حرفان على الأقلّ." : null,
+    amount: !amount.trim() ? "اكتب المبلغ." : minor === null || minor <= 0 ? "مبلغ لا يقرأ — اكتبه أرقاماً مثل 350 أو 1,250.50" : null,
     date: /^\d{4}-\d{2}-\d{2}$/.test(occurredOn) ? null : "اختر تاريخ الدفع.",
   };
   const valid = !problems.label && !problems.amount && !problems.date;
@@ -68,7 +68,7 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
         else setError(r.error);
         return;
       }
-      toast({ tone: "ok", title: r.data.message ?? "قُيّد المصروف", body: "ويظهر في شهره أدناه — وله زرُّ حذفٍ إن قُيّد خطأً." });
+      toast({ tone: "ok", title: r.data.message ?? "قيّد المصروف", body: "ويظهر في شهره أدناه — وله زرّ حذف إن قيّد خطأً." });
       setLabel("");
       setAmount("");
       setDuplicate(null);
@@ -93,15 +93,15 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
       <Sheet
         open={open}
         onClose={close}
-        title="مصروفٌ دُفع خارج البنك"
-        description="نقداً أو من حسابٍ آخر — ما لا يظهر في كشف البنك فلا يُشتقّ منه."
+        title="مصروف دفع خارج البنك"
+        description="نقداً أو من حساب آخر — ما لا يظهر في كشف البنك فلا يشتقّ منه."
         size="sm"
         footer={
           duplicate ? (
             <>
               <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={() => setDuplicate(null)}>لا — لا تقيّده</button>
               <button aria-busy={busy} type="button" className={buttonClass("primary")} disabled={busy} onClick={() => save(true)}>
-                نعم — مصروفٌ ثانٍ، قيّده
+                نعم — مصروف ثان، قيّده
               </button>
             </>
           ) : (
@@ -148,7 +148,7 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
               />
               {tried && problems.amount
                 ? <span id={`${ids}-amount`} className="mt-1 block text-[11px] font-bold text-danger">{problems.amount}</span>
-                : minor !== null && minor > 0 && <span id={`${ids}-amount`} className="mt-1 block text-[11px] text-muted">يُقيَّد <Money minor={minor} /> ريالاً</span>}
+                : minor !== null && minor > 0 && <span id={`${ids}-amount`} className="mt-1 block text-[11px] text-muted">يقيّد <Money minor={minor} /> ريالاً</span>}
             </label>
             <label className="block">
               <span className="text-xs font-bold">تاريخ الدفع</span>
@@ -170,7 +170,7 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
             <select value={category} onChange={(e) => setCategory(e.target.value as TxCategory)} className={`${field} border-line-input`}>
               {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
             </select>
-            <span className="mt-1 block text-[11px] text-muted">سدادُ المورّدين ليس هنا — محسوبٌ في المشتريات، وقيدُه مصروفاً يضاعفه.</span>
+            <span className="mt-1 block text-[11px] text-muted">سداد المورّدين ليس هنا — محسوب في المشتريات، وقيده مصروفاً يضاعفه.</span>
           </label>
 
           {/* زرٌّ مخفيّ كي يُرسَل النموذج بـEnter من أيّ حقل */}
@@ -180,13 +180,13 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
         {duplicate && (
           <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-warn/25 bg-warn-bg px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" strokeWidth={2} aria-hidden />
-            <span><span className="font-bold text-warn">{duplicate}</span> — إن ضغطتَ مرّتين فلا تقيّده؛ وإن كانا مصروفين حقيقيّين فأكّد.</span>
+            <span><span className="font-bold text-warn">{duplicate}</span> — إن ضغطت مرّتين فلا تقيّده؛ وإن كانا مصروفين حقيقيّين فأكّد.</span>
           </p>
         )}
         {error && (
           <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2.5 text-xs font-bold text-danger">
             <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-            {error} — ما كتبتَه باقٍ، فأعد المحاولة.
+            {error} — ما كتبته باق، فأعد المحاولة.
           </p>
         )}
       </Sheet>

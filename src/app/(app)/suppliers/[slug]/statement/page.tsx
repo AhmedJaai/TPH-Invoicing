@@ -139,7 +139,7 @@ export default async function SupplierStatementPage({
             <p className="text-[11px] font-bold tracking-wide text-muted">كشف حساب مورّد</p>
             <h1 className="mt-1 text-2xl font-bold leading-tight">{s.nameAr}</h1>
             <p className="mt-1.5 text-xs text-ink-soft">
-              {s.vatNumber ? <>الرقم الضريبيّ <bdi dir="ltr" className="font-mono">{s.vatNumber}</bdi></> : "لا رقمَ ضريبيّاً مسجَّلاً له"}
+              {s.vatNumber ? <>الرقم الضريبيّ <bdi dir="ltr" className="font-mono">{s.vatNumber}</bdi></> : "لا رقم ضريبيّاً مسجّلاً له"}
               {s.crNumber && <> · السجلّ <bdi dir="ltr" className="font-mono">{s.crNumber}</bdi></>}
             </p>
           </div>
@@ -176,7 +176,7 @@ export default async function SupplierStatementPage({
               compact
               icon={ScrollText}
               title="لا قيد في هذه الفترة."
-              hint={first ? `أوّلُ تعاملٍ معه في ${formatDay(first)} — اختر «كلّ التعامل».` : "لا فاتورة منه ولا دفعة له بعد."}
+              hint={first ? `أوّل تعامل معه في ${formatDay(first)} — اختر «كلّ التعامل».` : "لا فاتورة منه ولا دفعة له بعد."}
             />
           </div>
         ) : (
@@ -194,7 +194,7 @@ export default async function SupplierStatementPage({
               <tbody>
                 <tr className="border-b border-line-soft text-ink-soft">
                   <td className="whitespace-nowrap px-2.5 py-2">{formatDay(from)}</td>
-                  <td className="px-2.5 py-2 font-bold">رصيدٌ مُرحَّل</td>
+                  <td className="px-2.5 py-2 font-bold">رصيد مرحّل</td>
                   <td className="px-2.5 py-2" />
                   <td className="px-2.5 py-2" />
                   <td className="nums-col px-2.5 py-2 font-bold"><Balance minor={ledger.openingMinor} /></td>
@@ -229,16 +229,16 @@ export default async function SupplierStatementPage({
 
         <footer className="mt-6 space-y-1.5 border-t border-line pt-4 text-[11px] leading-relaxed text-muted">
           <p>
-            الرصيدُ الموجب مستحقٌّ للمورّد علينا، والسالبُ رصيدٌ لنا عنده. المدفوعاتُ بما وصل المورّد بعد رسم التحويل،
-            والمردودةُ والملغاةُ لا تدخل.
+            الرصيد الموجب مستحقّ للمورّد علينا، والسالب رصيد لنا عنده. المدفوعات بما وصل المورّد بعد رسم التحويل،
+            والمردودة والملغاة لا تدخل.
           </p>
           {coversToday && drift !== 0 && (
             <p className="text-ink-soft">
-              وحسابُه في النظام اليوم <Balance minor={systemNet ?? 0} />، والفرقُ <Money minor={Math.abs(drift)} /> كسورُ تقريبٍ
-              على فواتير عُدّت مسدَّدة — أو تخصيصٌ يستحقّ المراجعة في ملفّه.
+              وحسابه في النظام اليوم <Balance minor={systemNet ?? 0} />، والفرق <Money minor={Math.abs(drift)} /> كسور تقريب
+              على فواتير عدّت مسدّدة — أو تخصيص يستحقّ المراجعة في ملفّه.
             </p>
           )}
-          <p>صدر من نظام {companyConfig.nameAr} بتاريخ {formatDay(today)} — من القيود المسجَّلة حتى تاريخه.</p>
+          <p>صدر من نظام {companyConfig.nameAr} بتاريخ {formatDay(today)} — من القيود المسجّلة حتى تاريخه.</p>
         </footer>
       </article>
     </main>

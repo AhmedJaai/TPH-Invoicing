@@ -24,8 +24,8 @@ async function pair(tx: Tx) {
   return { actorId: u.id, inv, pay, out: out.id, back: back.id };
 }
 
-describe("حوالةٌ لمورّدٍ خرجت ثمّ عادت", () => {
-  it("«ارتدّت» تردّ الدفعة فتعود الفاتورة مستحقّة، وتُعرَّف العودة، ولا يعود التنبيه", () =>
+describe("حوالة لمورّد خرجت ثمّ عادت", () => {
+  it("«ارتدّت» تردّ الدفعة فتعود الفاتورة مستحقّة، وتعرّف العودة، ولا يعود التنبيه", () =>
     withRollback(async (tx) => {
       const p = await pair(tx);
       expect(await findBouncePartner(tx, p.out)).toMatchObject({ outgoingId: p.out, incomingId: p.back });
@@ -40,7 +40,7 @@ describe("حوالةٌ لمورّدٍ خرجت ثمّ عادت", () => {
       expect(await caught(resolveBounce(tx, { outgoingId: p.out, incomingId: p.back, decision: "BOUNCED" }, p.actorId))).toBeInstanceOf(BounceRefused);
     }));
 
-  it("«ليست ردّاً» لا يمسّ الدفعة ويُغلق التنبيه", () =>
+  it("«ليست ردّاً» لا يمسّ الدفعة ويغلق التنبيه", () =>
     withRollback(async (tx) => {
       const p = await pair(tx);
       await resolveBounce(tx, { outgoingId: p.out, incomingId: p.back, decision: "NOT_BOUNCE" }, p.actorId);

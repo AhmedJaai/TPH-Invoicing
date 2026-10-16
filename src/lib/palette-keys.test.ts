@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { movePaletteCursor } from "./palette-keys";
 
-describe("تنقّلُ لوحة الأوامر بالمفاتيح", () => {
+describe("تنقّل لوحة الأوامر بالمفاتيح", () => {
   const groups = ["RECENT", "RECENT", "ACTION", "ACTION", "ACTION", "PAGE", "PAGE"];
 
   it("السهمان يدوران عند الطرفين", () => {
@@ -20,13 +20,13 @@ describe("تنقّلُ لوحة الأوامر بالمفاتيح", () => {
     expect(movePaletteCursor(groups, 6, "NextGroup")).toBe(0);
   });
 
-  it("Shift+Tab: بدايةُ مجموعتي من وسطها، ثمّ التي قبلها، ويدور", () => {
+  it("Shift+Tab: بداية مجموعتي من وسطها، ثمّ التي قبلها، ويدور", () => {
     expect(movePaletteCursor(groups, 4, "PrevGroup")).toBe(2);
     expect(movePaletteCursor(groups, 2, "PrevGroup")).toBe(0);
     expect(movePaletteCursor(groups, 0, "PrevGroup")).toBe(5);
   });
 
-  it("قائمةٌ فارغة لا تُسقط شيئاً", () => {
+  it("قائمة فارغة لا تسقط شيئاً", () => {
     expect(movePaletteCursor([], 3, "NextGroup")).toBe(0);
   });
 });

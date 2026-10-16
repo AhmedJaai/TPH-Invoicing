@@ -102,12 +102,12 @@ export const SUPPLIER_SEED: SupplierSeed[] = [
   {
     slug: "HungryManBakery", driveFolderName: "Hungry Man Bakery ", nameAr: "هنقري مان بيكري (صيغة ثانية)",
     nameEn: "Hungry Man Bakery", category: "FOOD",
-    notes: "صيغة اسم ثانية ظهرت في الأرشيف — تُدمج مع HungryMan عند التوحيد",
+    notes: "صيغة اسم ثانية ظهرت في الأرشيف — تدمج مع HungryMan عند التوحيد",
   },
   {
     slug: "Ganache-AGK", driveFolderName: "Ganache (AGK) ", nameAr: "غاناش (صيغة ثانية)", nameEn: "Ganache AGK",
     category: "FOOD",
-    notes: "صيغة اسم ثانية في كشوف مايو — تُدمج مع Ganache عند التوحيد",
+    notes: "صيغة اسم ثانية في كشوف مايو — تدمج مع Ganache عند التوحيد",
   },
   {
     slug: "SabeaJar", driveFolderName: "Sales - Sabea Jar (فاتورة صادرة)", nameAr: "سبعة جرة — عميل",

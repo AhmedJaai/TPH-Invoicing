@@ -48,7 +48,7 @@ export default async function UploadPage() {
       user={user}
       width="page"
       title="ارفع مستنداً"
-      intro="صوّر الفاتورة أو اختر ملفّها كما وصلك — يقرأ النظامُ المورّدَ والرقمَ والتاريخَ والمبالغ، وتؤكّدها أنت قبل أن يُحفَظ شيء."
+      intro="صوّر الفاتورة أو اختر ملفّها كما وصلك — يقرأ النظام المورّد والرقم والتاريخ والمبالغ، وتؤكّدها أنت قبل أن يحفظ شيء."
     >
       <Uploader
         canSeeAmounts={showAmounts}
@@ -67,13 +67,13 @@ export default async function UploadPage() {
           title={`${countNoun(waiting, DOCUMENT)} ${waiting <= 2 ? (waiting === 1 ? "ينتظر" : "ينتظران") : "تنتظر"} مراجعتك`}
           action={<LinkButton href="/documents?status=NEEDS_REVIEW" size="sm" variant="primary">راجعها</LinkButton>}
         >
-          وصلت من الدرايف أو رُفعت قبلُ ولم تدخل وحدها — لكلٍّ سببُه في المستندات.
+          وصلت من الدرايف أو رفعت قبل ولم تدخل وحدها — لكلّ سببه في المستندات.
         </Callout>
       )}
 
       {!showAmounts && (
         <p className="mt-6 text-xs leading-relaxed text-muted">
-          دورك لا يشمل الأرقام المالية — تُرفع المستندات وتُقرأ دون مبالغها، ويؤكّدها من يراها.
+          دورك لا يشمل الأرقام المالية — ترفع المستندات وتقرأ دون مبالغها، ويؤكّدها من يراها.
         </p>
       )}
 
@@ -83,16 +83,16 @@ export default async function UploadPage() {
           tone="muted"
           icon={FolderSync}
           className="mt-12"
-          title="وما يصل إلى الدرايف يُقرأ وحده"
-          action={<LinkButton href="/documents/drive" size="sm" variant="secondary">حالُ الدرايف</LinkButton>}
+          title="وما يصل إلى الدرايف يقرأ وحده"
+          action={<LinkButton href="/documents/drive" size="sm" variant="secondary">حال الدرايف</LinkButton>}
         >
-          يُفحص الدرايف كلَّ ثلاث ساعات ويُسمّى المؤرشَفُ على الصيغة — بلا زرّ. وإن وضعتَ ملفّاً فيه بيدك ولا تريد
+          يفحص الدرايف كلّ ثلاث ساعات ويسمّى المؤرشف على الصيغة — بلا زرّ. وإن وضعت ملفّاً فيه بيدك ولا تريد
           الانتظار، افحصه الآن من لسان «الدرايف».
         </Callout>
       )}
       {showAmounts && (
         <p className="mt-4 text-xs text-muted">
-          ولمراجعة المورّدين وما عليك لكلٍّ منهم:{" "}
+          ولمراجعة المورّدين وما عليك لكلّ منهم:{" "}
           <Link href="/suppliers" className="font-bold text-accent hover:underline">حسابات المورّدين</Link>
         </p>
       )}

@@ -12,8 +12,8 @@ import path from "node:path";
  */
 const read = (...p: string[]) => readFileSync(path.join("src", ...p), "utf8");
 
-describe("drive_md5 موصولٌ من الدرايف إلى التحليل", () => {
-  it("القائمةُ وبياناتُ الملفّ تطلبان md5Checksum", () => {
+describe("drive_md5 موصول من الدرايف إلى التحليل", () => {
+  it("القائمة وبيانات الملفّ تطلبان md5Checksum", () => {
     const drive = read("lib", "drive.ts");
     /* قائمةُ الحقول واحدةٌ للبابين — وفيها البصمتان */
     const fields = /const FILE_FIELDS =\s*"([^"]+)"/.exec(drive)?.[1] ?? "";

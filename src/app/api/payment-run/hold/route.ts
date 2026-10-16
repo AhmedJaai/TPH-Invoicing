@@ -43,13 +43,13 @@ export async function POST(request: Request) {
       return NextResponse.json({
         ok: true,
         restored: numbers.length,
-        message: numbers.length === 0 ? "لم تكن في الدفعة بقرار — لا شيء تغيّر" : `أُعيدت ${countNoun(numbers.length, INVOICE)} إلى الحجز`,
+        message: numbers.length === 0 ? "لم تكن في الدفعة بقرار — لا شيء تغيّر" : `أعيدت ${countNoun(numbers.length, INVOICE)} إلى الحجز`,
       });
     }
 
     const note = read.body.note ?? "";
     if (note.length < 3) {
-      return NextResponse.json({ error: "اكتب سبباً — يُحفَظ مع قرارك ويُعرَض بجانبه" }, { status: 400 });
+      return NextResponse.json({ error: "اكتب سبباً — يحفظ مع قرارك ويعرض بجانبه" }, { status: 400 });
     }
     const out = await overrideHolds({ invoiceIds, note, actorId: user.id, month });
     return NextResponse.json({
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       openMinor: out.openMinor,
       vatAtRiskMinor: out.vatAtRiskMinor,
       vatAtRiskUnknown: out.vatAtRiskUnknown,
-      message: `دخلت ${countNoun(out.invoiceNumbers.length, INVOICE)} الدفعةَ بقرارك — ${formatRiyalsDisplay(out.openMinor)} ريال`,
+      message: `دخلت ${countNoun(out.invoiceNumbers.length, INVOICE)} الدفعة بقرارك — ${formatRiyalsDisplay(out.openMinor)} ريال`,
     });
   } catch (e) {
     if (e instanceof HoldDecisionError) {

@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
   if (out.kind === "similar") {
     return NextResponse.json({
-      error: `يشبه ${out.similar.map((s) => `«${s.nameAr}»`).join(" و")} المسجَّل — اختره إن كان هو، أو أنشئه جديداً إن كان غيرَه`,
+      error: `يشبه ${out.similar.map((s) => `«${s.nameAr}»`).join(" و")} المسجّل — اختره إن كان هو، أو أنشئه جديداً إن كان غيره`,
       similar: out.similar,
     }, { status: 409 });
   }
@@ -78,13 +78,13 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true, existed: true, supplier,
       message: out.by === "VAT"
-        ? `هذا الرقمُ الضريبيّ مسجَّلٌ لـ«${out.nameAr}» — اختير هو`
+        ? `هذا الرقم الضريبيّ مسجّل لـ«${out.nameAr}» — اختير هو`
         : `«${out.nameAr}» مسجّل مسبقاً`,
     });
   }
 
   return NextResponse.json({
     ok: true, existed: false, supplier,
-    message: `أُنشئ «${nameAr}» برمز ${out.slug}`,
+    message: `أنشئ «${nameAr}» برمز ${out.slug}`,
   });
 }

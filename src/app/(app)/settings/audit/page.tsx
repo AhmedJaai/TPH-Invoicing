@@ -153,7 +153,7 @@ export default async function AuditTrailPage({
       user={user}
       width="page"
       title="سجلّ التدقيق"
-      intro="ما فُعل، ومن فعله، ومتى — بتوقيت الرياض. لا يُعدَّل ولا يُحذف."
+      intro="ما فعل، ومن فعله، ومتى — بتوقيت الرياض. لا يعدّل ولا يحذف."
     >
       <div className="mb-6">
         <LinkTabs
@@ -172,7 +172,7 @@ export default async function AuditTrailPage({
       {rows.length === 0 ? (
         <EmptyState
           title={page > 1 ? "لا أقدم من هذا." : "لا شيء في هذا الباب بعد."}
-          hint="كلُّ فعلٍ يكتب مالاً أو يغيّر حالاً يُقيَّد هنا باسم فاعله ووقته."
+          hint="كلّ فعل يكتب مالاً أو يغيّر حالاً يقيّد هنا باسم فاعله ووقته."
           action={page > 1 ? <Link href={pageHref(page - 1)} className={buttonClass("secondary", "sm")}>الأحدث</Link> : undefined}
         />
       ) : (
@@ -210,7 +210,7 @@ export default async function AuditTrailPage({
                               </summary>
                               <div className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-3 rounded-lg bg-sunken/60 p-3 sm:grid-cols-2">
                                 <Detail value={r.before} label="قبل" />
-                                <Detail value={r.after} label={r.before ? "بعد" : "ما كُتب"} />
+                                <Detail value={r.after} label={r.before ? "بعد" : "ما كتب"} />
                               </div>
                             </details>
                           )}

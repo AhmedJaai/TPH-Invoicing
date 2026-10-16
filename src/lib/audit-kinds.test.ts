@@ -3,17 +3,17 @@ import { auditKind, isAuditKind } from "./audit-kinds";
 import { ACTION_LABEL } from "./audit-labels";
 
 describe("أبواب سجلّ التدقيق", () => {
-  it("المالُ قبل المورّدين: رصيدُ المورّد المخصوم سدادٌ لا تعديلُ مورّد", () => {
+  it("المال قبل المورّدين: رصيد المورّد المخصوم سداد لا تعديل مورّد", () => {
     expect(auditKind("SUPPLIER_CREDIT_APPLIED")).toBe("money");
     expect(auditKind("SUPPLIER_UPDATED")).toBe("suppliers");
   });
 
-  it("التعلّمُ الآليّ بابٌ وحده — يُخفى افتراضاً", () => {
+  it("التعلّم الآليّ باب وحده — يخفى افتراضاً", () => {
     expect(auditKind("SUPPLIER_ALIAS_LEARNED")).toBe("learned");
     expect(auditKind("BANK_RULE_LEARNED")).toBe("learned");
   });
 
-  it("كلُّ فعلٍ مسمّى له بابٌ غير «أخرى» — إلّا إدارةَ المستخدمين", () => {
+  it("كلّ فعل مسمّى له باب غير «أخرى» — إلّا إدارة المستخدمين", () => {
     const orphans = Object.keys(ACTION_LABEL).filter((a) => auditKind(a) === "other");
     expect(orphans).toEqual(["USER_ROLE_CHANGED", "USER_ACCESS_CHANGED", "USER_SESSIONS_ENDED"]);
   });

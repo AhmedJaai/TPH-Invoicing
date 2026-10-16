@@ -60,7 +60,7 @@ export function ProfitTrend({ months, active, hrefOf }: { months: readonly Trend
         <span className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-sm bg-accent" /> الإيراد</span>
         <span className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-sm bg-sand" /> التكلفة والمصروفات</span>
         <span className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-sm bg-plum" /> الربح</span>
-        <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2.5 w-2.5 rounded-sm bg-plum ${HATCH}`} /> ربحٌ ينقصه عنصر</span>
+        <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2.5 w-2.5 rounded-sm bg-plum ${HATCH}`} /> ربح ينقصه عنصر</span>
       </div>
       <ol className="space-y-1">
         {months.map((m) => {

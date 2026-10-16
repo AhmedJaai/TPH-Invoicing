@@ -60,7 +60,7 @@ export function SupplierPolicy({
       setMessage(r.error);
       return;
     }
-    setMessage("حُفظت السياسة.");
+    setMessage("حفظت السياسة.");
     router.refresh();
   }
 
@@ -68,9 +68,9 @@ export function SupplierPolicy({
 
   return (
     <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
-      <h3 className="text-sm font-bold">ما يُطلَب من هذا المورّد</h3>
+      <h3 className="text-sm font-bold">ما يطلب من هذا المورّد</h3>
       <p className="mt-1 text-xs leading-relaxed text-muted">
-        يكتبها صاحبُ العمل ولا يستنتجها النظام — فغيابُ المستند عندنا لا يعني أنّه غير موجود.
+        يكتبها صاحب العمل ولا يستنتجها النظام — فغياب المستند عندنا لا يعني أنّه غير موجود.
         وعليها يتوقّف ما يظهر في «يحتاج قرارك».
       </p>
 
@@ -80,38 +80,38 @@ export function SupplierPolicy({
           disabled={!canEdit || busy}
           onChange={(v) => set({ issuesInvoices: v, ...(v ? {} : { paperInvoices: false }) })}
           label="يصدر فواتير ضريبية"
-          hint="فاتورةٌ فيها رقمُه الضريبيّ وأركانُ الفاتورة — وبها وحدها تُخصَم ضريبةُ المدخلات."
+          hint="فاتورة فيها رقمه الضريبيّ وأركان الفاتورة — وبها وحدها تخصم ضريبة المدخلات."
         />
         <Choice
           checked={form.paperInvoices}
           disabled={!canEdit || busy || !form.issuesInvoices}
           onChange={(v) => set({ paperInvoices: v })}
-          label="فواتيرُه ورقيّة تُسلَّم باليد"
+          label="فواتيره ورقيّة تسلّم باليد"
           hint={
             form.issuesInvoices
-              ? "موجودةٌ حقّاً وإن لم تُرفَع — فلا يُطالَب بعقدٍ، ويُطالَب برفع الورقة."
-              : "لا يُختار إلّا لمن يصدر فواتير: الورقيّة فاتورةٌ موجودةٌ لم تُرفَع."
+              ? "موجودة حقّاً وإن لم ترفع — فلا يطالب بعقد، ويطالب برفع الورقة."
+              : "لا يختار إلّا لمن يصدر فواتير: الورقيّة فاتورة موجودة لم ترفع."
           }
         />
         <Choice
           checked={form.contractRequired}
           disabled={!canEdit || busy}
           onChange={(v) => set({ contractRequired: v })}
-          label="يُطلَب منه عقد توريد"
-          hint="أطفئها لمن يُشترى منه مرّةً في السنة — فلا يُعرَض عليك تنبيهٌ لا تفعل فيه شيئاً."
+          label="يطلب منه عقد توريد"
+          hint="أطفئها لمن يشترى منه مرّةً في السنة — فلا يعرض عليك تنبيه لا تفعل فيه شيئاً."
         />
         <Choice
           checked={form.contractOnFile}
           disabled={!canEdit || busy}
           onChange={(v) => set({ contractOnFile: v })}
-          label="العقد موجودٌ عندي"
-          hint="وقّعتَه واحتفظتَ به — فيسكت التنبيه."
+          label="العقد موجود عندي"
+          hint="وقّعته واحتفظت به — فيسكت التنبيه."
         />
       </div>
 
       {conflict && (
         <p className="mt-3 rounded-lg border border-warn/40 bg-warn-bg px-3 py-2 text-xs leading-relaxed text-warn">
-          لا يجتمعان: «ورقيّة» تعني أنّ الفاتورة موجودةٌ ولم تُرفَع، و«لا يصدر فواتير» تعني
+          لا يجتمعان: «ورقيّة» تعني أنّ الفاتورة موجودة ولم ترفع، و«لا يصدر فواتير» تعني
           أنّها غير موجودة.
         </p>
       )}

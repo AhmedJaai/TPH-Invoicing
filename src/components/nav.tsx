@@ -384,7 +384,7 @@ export function CaptureButton({ role, variant }: { role: Role; variant: "frame" 
     if (!files?.length) return;
     const n = queueCapture(files);
     if (n === 0) {
-      toast({ tone: "warn", title: "لا يُقرأ إلّا PDF أو صورة.", body: "اختر فاتورةً أو إيصالاً أو كشفاً بإحدى الصيغتين." });
+      toast({ tone: "warn", title: "لا يقرأ إلّا PDF أو صورة.", body: "اختر فاتورةً أو إيصالاً أو كشفاً بإحدى الصيغتين." });
       return;
     }
     router.push("/upload");
@@ -435,7 +435,7 @@ export function CaptureButton({ role, variant }: { role: Role; variant: "frame" 
           <FolderOpen className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
           <span className="min-w-0">
             ارفع ملفّاً من جهازك
-            <span className="block text-[11px] font-medium text-ink-soft">PDF أو صورٌ محفوظة — وزرُّ الوسط للكاميرا</span>
+            <span className="block text-[11px] font-medium text-ink-soft">PDF أو صور محفوظة — وزرّ الوسط للكاميرا</span>
           </span>
         </button>
       </>

@@ -28,7 +28,7 @@ const prior = (sku: string, over: Record<string, unknown> = {}) => [`${sku}#P#1`
 }] as const;
 
 describe("decideLines", () => {
-  it("الجديدُ يُدرَج، والمطابقُ لا يُكتَب، والمتغيّرُ يُحدَّث ويُعلَن", () => {
+  it("الجديد يدرج، والمطابق لا يكتب، والمتغيّر يحدّث ويعلن", () => {
     const out = decideLines("s1", sale("FDX:1", [
       line("a"), line("b"), line("c", { contentHash: "h-c2", sourceStatus: "Void", isVoid: true }),
     ]), new Map(), new Map([prior("b"), prior("c")]));
@@ -38,33 +38,33 @@ describe("decideLines", () => {
     expect(out.removed).toEqual([]);
   });
 
-  it("سطرُ طلبٍ غاب عن تصديرٍ أحدث يُلغى", () => {
+  it("سطر طلب غاب عن تصدير أحدث يلغى", () => {
     const out = decideLines("s1", sale("FDX:1", [line("a")]), new Map(), new Map([prior("a"), prior("b")]));
     expect(out.removed).toEqual(["id-b"]);
     expect(out.revised[0].now).toContain("غاب عن التصدير");
   });
 
-  it("وما أُلغي من قبل لا يُعلَن ثانيةً", () => {
+  it("وما ألغي من قبل لا يعلن ثانيةً", () => {
     const out = decideLines("s1", sale("FDX:1", [line("a")]), new Map(),
       new Map([prior("a"), prior("b", { sourceStatus: "REMOVED_IN_LATER_EXPORT" })]));
     expect(out.removed).toEqual([]);
   });
 
-  it("مزيجُ منتجاتٍ مرشَّحٌ (صنفٌ من خمسة) لا يُلغي بقيّةَ اليوم", () => {
+  it("مزيج منتجات مرشّح (صنف من خمسة) لا يلغي بقيّة اليوم", () => {
     const out = decideLines("s1", sale("PMIX:b:2026-09-13", [line("a")]), new Map(),
       new Map([prior("a"), prior("b"), prior("c"), prior("d"), prior("e")]));
     expect(out.removed).toEqual([]);
     expect(out.keptDespiteAbsence).toBe(4);
   });
 
-  it("ومزيجٌ مصحَّحٌ نقص صنفاً من خمسة يُلغيه", () => {
+  it("ومزيج مصحّح نقص صنفاً من خمسة يلغيه", () => {
     const out = decideLines("s1", sale("PMIX:b:2026-09-13", [line("a"), line("b"), line("c"), line("d")]), new Map(),
       new Map([prior("a"), prior("b"), prior("c"), prior("d"), prior("e")]));
     expect(out.removed).toEqual(["id-e"]);
     expect(out.keptDespiteAbsence).toBe(0);
   });
 
-  it("ما نشتقّه نحن (سطرُ الأصل، المجانيّ) يُملأ بلا إعلان مراجعة", () => {
+  it("ما نشتقّه نحن (سطر الأصل، المجانيّ) يملأ بلا إعلان مراجعة", () => {
     const mod = line("m", { isModifier: true, parentExternalId: "a", parentLineExternalId: "a#P#1" });
     const out = decideLines("s1", sale("FDX:1", [line("a"), mod]), new Map(),
       new Map([prior("a"), prior("m", { isModifier: true })]));

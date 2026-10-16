@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     .where(eq(bankTransactions.id, read.body.transactionId));
   if (!tx) return NextResponse.json({ error: "لا توجد هذه الحركة" }, { status: 404 });
   if (tx.matchedPaymentId) {
-    return NextResponse.json({ error: "هذه الحركة سُجّلت سداداً من قبل" }, { status: 409 });
+    return NextResponse.json({ error: "هذه الحركة سجّلت سداداً من قبل" }, { status: 409 });
   }
 
   const { engine, invoiceById } = await recomputeMatches([tx]);

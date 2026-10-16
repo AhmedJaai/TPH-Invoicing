@@ -138,7 +138,7 @@ export function buildPriceRiseMessage(f: PriceRiseFacts): string {
     `لاحظنا تغيّراً في سعر «${f.itemName}» في فواتيركم لمؤسسة ذا بوبليك هاوس:`,
     `• ${f.previousDay}: ${formatRiyalsDisplay(f.previousMinor)} ريال للوحدة`,
     `• ${f.currentDay}: ${formatRiyalsDisplay(f.currentMinor)} ريال للوحدة (بزيادة ${formatRiyalsDisplay(delta)})`,
-    ...(annual !== null ? [`وبمعدّل شرائنا منكم تبلغ الزيادةُ نحو ${formatRiyalsDisplay(annual)} ريال سنويّاً.`] : []),
+    ...(annual !== null ? [`وبمعدّل شرائنا منكم تبلغ الزيادة نحو ${formatRiyalsDisplay(annual)} ريال سنويّاً.`] : []),
     ``,
     `نرجو إفادتنا بسبب التغيّر، وإمكان تثبيت السعر السابق.`,
     `شاكرين لكم.`,
@@ -176,5 +176,5 @@ export const REMIND_AFTER_DAYS = 7;
 /** «طولب اليوم» · «طولب قبل ٩ أيّام — ذكِّره» */
 export function describeRequested(daysAgo: number): string {
   const when = daysAgo <= 0 ? "اليوم" : daysAgo === 1 ? "أمس" : daysAgo === 2 ? "قبل يومين" : daysAgo <= 10 ? `قبل ${daysAgo} أيّام` : `قبل ${daysAgo} يوماً`;
-  return daysAgo >= REMIND_AFTER_DAYS ? `طولب ${when} — ذكِّره` : `طولب ${when}`;
+  return daysAgo >= REMIND_AFTER_DAYS ? `طولب ${when} — ذكّره` : `طولب ${when}`;
 }

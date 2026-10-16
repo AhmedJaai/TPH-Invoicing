@@ -69,7 +69,7 @@ export async function loadAccountantPack(month: string): Promise<{ sheets: Sheet
     invoices: invoices.rows.map((r) => ({
       number: r.number,
       date: day(r.date),
-      supplier: r.supplier ?? "غير محدَّد",
+      supplier: r.supplier ?? "غير محدّد",
       sellerVat: r.seller_vat,
       subtotalMinor: r.subtotal === null ? null : Number(r.subtotal),
       vatMinor: r.vat === null ? null : Number(r.vat),

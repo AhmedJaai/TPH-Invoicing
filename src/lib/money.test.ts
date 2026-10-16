@@ -46,7 +46,7 @@ describe("تحويل المبالغ", () => {
     expect(parseRiyals("437.0")).toBe(43_700);
   });
 
-  it("ويردّ المنزلة الثالثة غير الصفر — والمجهول يُعلَن ولا يُقرَّب", () => {
+  it("ويردّ المنزلة الثالثة غير الصفر — والمجهول يعلن ولا يقرّب", () => {
     expect(parseRiyals("437.005")).toBeNull();
     expect(parseRiyals("437.123")).toBeNull();
   });
@@ -68,7 +68,7 @@ describe("تحويل المبالغ", () => {
 });
 
 describe("parseRiyals — سقف عمود المال", () => {
-  it("يردّ ما لا يتّسع له العمود بدل أن يُسقط الخادم", () => {
+  it("يردّ ما لا يتّسع له العمود بدل أن يسقط الخادم", () => {
     expect(parseRiyals("99999999999999999")).toBeNull();
     expect(parseRiyals("21474836.48")).toBeNull();
   });
@@ -77,27 +77,27 @@ describe("parseRiyals — سقف عمود المال", () => {
   });
 });
 
-describe("checkInvoiceTotals — الخصمُ والرسومُ بعد الضريبة", () => {
-  it("الصافي + الضريبة = الإجماليّ: لا خصمَ يُطرح ولو قُرئ (كان قبل الضريبة)", () => {
+describe("checkInvoiceTotals — الخصم والرسوم بعد الضريبة", () => {
+  it("الصافي + الضريبة = الإجماليّ: لا خصم يطرح ولو قرئ (كان قبل الضريبة)", () => {
     expect(checkInvoiceTotals(1000_00, 150_00, 1150_00, { discountMinor: 100_00 }))
       .toEqual({ verdict: "EXACT", discountMinor: null, chargesMinor: null });
   });
-  it("الخصمُ بعد الضريبة يفسّر الفرق: يُطرح والضريبةُ كما هي", () => {
+  it("الخصم بعد الضريبة يفسّر الفرق: يطرح والضريبة كما هي", () => {
     expect(checkInvoiceTotals(1000_00, 150_00, 1100_00, { discountMinor: 50_00 }))
       .toEqual({ verdict: "ADJUSTED", discountMinor: 50_00, chargesMinor: null });
   });
-  it("رسومُ التوصيل بعد الضريبة تفسّر الزيادة — رونة ٩٢٥ + ١٣٨٫٧٥ + ٢٥", () => {
+  it("رسوم التوصيل بعد الضريبة تفسّر الزيادة — رونة ٩٢٥ + ١٣٨٫٧٥ + ٢٥", () => {
     expect(checkInvoiceTotals(925_00, 138_75, 1088_75, { chargesMinor: 25_00 }))
       .toEqual({ verdict: "ADJUSTED", discountMinor: null, chargesMinor: 25_00 });
   });
-  it("وكلاهما معاً حين لا يفسّره أحدُهما وحده", () => {
+  it("وكلاهما معاً حين لا يفسّره أحدهما وحده", () => {
     expect(checkInvoiceTotals(1000_00, 150_00, 1125_00, { discountMinor: 50_00, chargesMinor: 25_00 }))
       .toEqual({ verdict: "ADJUSTED", discountMinor: 50_00, chargesMinor: 25_00 });
   });
-  it("ولا يُحفظ ما لم يلزم: الخصمُ وحده يكفي فالرسومُ المقروءة لا تُكتب", () => {
+  it("ولا يحفظ ما لم يلزم: الخصم وحده يكفي فالرسوم المقروءة لا تكتب", () => {
     expect(checkInvoiceTotals(1000_00, 150_00, 1100_00, { discountMinor: 50_00, chargesMinor: 25_00 }).chargesMinor).toBeNull();
   });
-  it("وتقريبُ المورّد بريالٍ تقريبٌ لا خصم", () => {
+  it("وتقريب المورّد بريال تقريب لا خصم", () => {
     expect(checkInvoiceTotals(574_00, 86_10, 660_00).verdict).toBe("ROUNDING");
   });
   it("وما لا يفسّره المقروء — لا يستقيم", () => {
@@ -112,7 +112,7 @@ describe("checkInvoiceTotals — الخصمُ والرسومُ بعد الضري
  * `double-paid` · `adjudicator-prompt` · `adjudicator.service`) وصارت تستدعي المالك.
  * كلٌّ منها منسوخةٌ هنا كما كانت، ويُقابَل نصُّها بنصّه — فلا رسالةَ تغيّر حرفٌ منها.
  */
-describe("المنسّقُ الواحد يطابق النسخَ المحلّيّة التي حلّ محلَّها", () => {
+describe("المنسّق الواحد يطابق النسخ المحلّيّة التي حلّ محلّها", () => {
   const amounts: number[] = [];
   for (let m = -1_100; m <= 2_100; m++) amounts.push(m);
   for (let m = 2_100; m <= 60_000_000; m += 12_347) amounts.push(m, -m);
@@ -130,7 +130,7 @@ describe("المنسّقُ الواحد يطابق النسخَ المحلّيّ
     }
   });
 
-  it("formatRiyals = ‎(m / 100).toFixed(2)‎ — نصُّ النموذج لم يتغيّر", () => {
+  it("formatRiyals = ‎(m / 100).toFixed(2)‎ — نصّ النموذج لم يتغيّر", () => {
     for (const m of amounts) expect(formatRiyals(m)).toBe(oldFixed(m));
   });
 });

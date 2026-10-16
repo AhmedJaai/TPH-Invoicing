@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { diffCorrections } from "./audit";
 
 describe("رصد التصحيحات اليدوية", () => {
-  it("لا يرصد شيئاً حين لا يُعدَّل شيء", () => {
+  it("لا يرصد شيئاً حين لا يعدّل شيء", () => {
     const x = { invoiceNumber: "260302", totalAmount: "130.00" };
     expect(diffCorrections(x, x)).toEqual({});
   });
 
-  it("يرصد الحقل المعدَّل وحده", () => {
+  it("يرصد الحقل المعدّل وحده", () => {
     const d = diffCorrections(
       { invoiceNumber: "26O302", totalAmount: "130.00" },
       { invoiceNumber: "260302", totalAmount: "130.00" },

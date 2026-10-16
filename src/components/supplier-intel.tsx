@@ -29,7 +29,7 @@ export function AgeingBar({
     <div>
       <div
         role="img"
-        aria-label={`توزيعُ الدَّين على أعماره: ${AGE_BUCKETS.map((b, i) => `${b.label} ${Math.round((buckets[i] * 100) / total)}٪`).join("، ")}`}
+        aria-label={`توزيع الدّين على أعماره: ${AGE_BUCKETS.map((b, i) => `${b.label} ${Math.round((buckets[i] * 100) / total)}٪`).join("، ")}`}
         className={`flex w-full gap-0.5 overflow-hidden rounded-full bg-sunken ${compact ? "h-1.5" : "h-2.5"}`}
       >
         {buckets.map((v, i) =>

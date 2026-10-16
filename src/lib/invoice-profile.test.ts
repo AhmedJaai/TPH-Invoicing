@@ -4,8 +4,8 @@ import { TOTAL_ROUNDING_TOLERANCE_MINOR } from "./money";
 
 const prev = (unitPriceMinor: number) => ({ unitPriceMinor, date: new Date("2026-08-01"), invoiceNumber: "A-1" });
 
-describe("priceMove — سعرُ البند مقابل آخر شراء", () => {
-  it("ارتفاعٌ بنسبةٍ صحيحة من الهللات", () => {
+describe("priceMove — سعر البند مقابل آخر شراء", () => {
+  it("ارتفاع بنسبة صحيحة من الهللات", () => {
     const m = priceMove(4600, prev(4000));
     expect(m).toMatchObject({ deltaMinor: 600, percent: 15, direction: "up", previousNumber: "A-1" });
   });
@@ -18,7 +18,7 @@ describe("priceMove — سعرُ البند مقابل آخر شراء", () => {
     expect(priceMove(4000, prev(4000))).toMatchObject({ deltaMinor: 0, percent: 0, direction: "same" });
   });
 
-  it("السابقُ صفرٌ → النسبة مجهولة لا صفر", () => {
+  it("السابق صفر → النسبة مجهولة لا صفر", () => {
     expect(priceMove(500, prev(0)).percent).toBeNull();
   });
 
@@ -27,8 +27,8 @@ describe("priceMove — سعرُ البند مقابل آخر شراء", () => {
   });
 });
 
-describe("weakFields — ما قُرئ بثقةٍ ضعيفة", () => {
-  it("المجهولُ لا يُعدّ ضعيفاً", () => {
+describe("weakFields — ما قرئ بثقة ضعيفة", () => {
+  it("المجهول لا يعدّ ضعيفاً", () => {
     expect(weakFields(null)).toEqual([]);
   });
 
@@ -36,13 +36,13 @@ describe("weakFields — ما قُرئ بثقةٍ ضعيفة", () => {
     expect(weakFields({ amounts: 0.5, invoiceNumber: 0.7, invoiceDate: 0.95 })).toEqual(["المبالغ", "رقم الفاتورة"]);
   });
 
-  it("الحدُّ نفسُه مقبول", () => {
+  it("الحدّ نفسه مقبول", () => {
     expect(weakFields({ amounts: 0.8 })).toEqual([]);
   });
 });
 
 describe("amountsAddUp — الصافي + الضريبة = الإجمالي", () => {
-  it("مجهولٌ إن لم يُقرأ الصافي أو الضريبة", () => {
+  it("مجهول إن لم يقرأ الصافي أو الضريبة", () => {
     expect(amountsAddUp(null, 150, 1150, TOTAL_ROUNDING_TOLERANCE_MINOR)).toBeNull();
     expect(amountsAddUp(1000, null, 1150, TOTAL_ROUNDING_TOLERANCE_MINOR)).toBeNull();
   });

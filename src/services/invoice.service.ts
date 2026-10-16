@@ -302,7 +302,7 @@ export async function replaceLines(tx: Tx, input: ReplaceLinesInput): Promise<nu
        limit 1
     `)).rows;
     if (held) throw new InvoiceLinesRefused(
-      `البندُ «${held.description}» مربوطٌ بكمّيّةٍ استُلمت بيدك، ولم يرد في القراءة الجديدة — فُكَّ ربطَه من الجرد أوّلاً، أو صحّح البنود بيدك.`,
+      `البند «${held.description}» مربوط بكمّيّة استلمت بيدك، ولم يرد في القراءة الجديدة — فكّ ربطه من الجرد أوّلاً، أو صحّح البنود بيدك.`,
     );
   }
   for (const { reuse, values } of plan) {
@@ -420,7 +420,7 @@ async function flagStatementTwin(
     severity: ISSUE_TEXT.STATEMENT_POSSIBLE_DUPLICATE.severity,
     entityType: "statement",
     entityId: statementId,
-    message: `يشبه كشفاً مقيَّداً لهذا المورّد عن المدّة نفسها (${formatDay(start)} – ${formatDay(end)}) — إن كان الملفُّ نفسَه بصيغةٍ أخرى فارفض أحدَهما «مكرّر»، وإلّا فتجاهل`,
+    message: `يشبه كشفاً مقيّداً لهذا المورّد عن المدّة نفسها (${formatDay(start)} – ${formatDay(end)}) — إن كان الملفّ نفسه بصيغة أخرى فارفض أحدهما «مكرّر»، وإلّا فتجاهل`,
   });
 }
 

@@ -33,7 +33,7 @@ describe("scoreDocuments", () => {
     expect(scoreDocuments(f({ issuesInvoices: false, contractOnFile: true })).grade).toBe("FAIR");
   });
 
-  it("بلا فواتير بعد: غير مقيَّم لا رديء", () => {
+  it("بلا فواتير بعد: غير مقيّم لا رديء", () => {
     expect(scoreDocuments(f({ invoiceCount: 0 })).grade).toBe("UNRATED");
   });
 });
@@ -43,13 +43,13 @@ describe("scoreVat", () => {
     expect(scoreVat(f({ issuesInvoices: false })).grade).toBe("POOR");
   });
 
-  it("ما لم يُقرأ لا يُحكَم عليه", () => {
+  it("ما لم يقرأ لا يحكم عليه", () => {
     const s = scoreVat(f({ taxValidCount: 0, taxUnknownCount: 7 }));
     expect(s.grade).toBe("UNRATED");
     expect(s.reason).toContain("7");
   });
 
-  it("المجهول لا يخفض النسبة — تُحسب على المحكوم عليه وحده", () => {
+  it("المجهول لا يخفض النسبة — تحسب على المحكوم عليه وحده", () => {
     const s = scoreVat(f({ taxValidCount: 10, taxInvalidCount: 0, taxUnknownCount: 90 }));
     expect(s.grade).toBe("GOOD");
   });
@@ -60,7 +60,7 @@ describe("scoreVat", () => {
     expect(scoreVat(f({ taxValidCount: 5, taxInvalidCount: 5 })).grade).toBe("POOR");
   });
 
-  it("السبب يذكر عدد الناقصة كي يُفاوَض به", () => {
+  it("السبب يذكر عدد الناقصة كي يفاوض به", () => {
     expect(scoreVat(f({ taxValidCount: 5, taxInvalidCount: 5 })).reason).toContain("5");
   });
 });
@@ -70,7 +70,7 @@ describe("scoreStatements", () => {
     expect(scoreStatements(f({ statementCount: 0, activeMonths: 4 })).grade).toBe("POOR");
   });
 
-  it("كشفٌ لكل شهر: سليم", () => {
+  it("كشف لكل شهر: سليم", () => {
     expect(scoreStatements(f({ statementCount: 4, activeMonths: 4 })).grade).toBe("GOOD");
   });
 
@@ -78,13 +78,13 @@ describe("scoreStatements", () => {
     expect(scoreStatements(f({ statementCount: 1, activeMonths: 4 })).grade).toBe("FAIR");
   });
 
-  it("بلا تعامل: غير مقيَّم", () => {
+  it("بلا تعامل: غير مقيّم", () => {
     expect(scoreStatements(f({ activeMonths: 0, statementCount: 0 })).grade).toBe("UNRATED");
   });
 });
 
 describe("scorePricing", () => {
-  it("تعذُّر القياس لا يُنتج حكماً", () => {
+  it("تعذّر القياس لا ينتج حكماً", () => {
     expect(scorePricing(f({ priceChangePct: null })).grade).toBe("UNRATED");
   });
 
@@ -110,14 +110,14 @@ describe("overallGrade", () => {
     expect(overallGrade(scores)).toBe("POOR");
   });
 
-  it("غير المقيَّم لا يُخفّف الحكم ولا يشدّده", () => {
+  it("غير المقيّم لا يخفّف الحكم ولا يشدّده", () => {
     expect(overallGrade([
       { dimension: "VAT", grade: "GOOD", reason: "" },
       { dimension: "PRICING", grade: "UNRATED", reason: "" },
     ])).toBe("GOOD");
   });
 
-  it("لا شيء مقيَّم فلا حكم", () => {
+  it("لا شيء مقيّم فلا حكم", () => {
     expect(overallGrade([{ dimension: "PRICING", grade: "UNRATED", reason: "" }])).toBe("UNRATED");
     expect(overallGrade([])).toBe("UNRATED");
   });
@@ -128,7 +128,7 @@ describe("overallGrade", () => {
 });
 
 describe("buildSupplierHealth", () => {
-  it("أربعة أبعاد دائماً، ولكلٍّ سبب مكتوب", () => {
+  it("أربعة أبعاد دائماً، ولكلّ سبب مكتوب", () => {
     const scores = buildSupplierHealth(f());
     expect(scores).toHaveLength(4);
     for (const s of scores) expect(s.reason.length).toBeGreaterThan(0);

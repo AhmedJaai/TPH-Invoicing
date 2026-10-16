@@ -157,7 +157,7 @@ function toActivity(r: { id: string; at: Date; action: string; actor: string | n
     const lines = linesOf(field(r.after, "الملفّات"));
     return { id: r.id, at: r.at, kind: "RENAMED", actor: r.actor, count: countOf(field(r.after, "عدد")) || lines.length, lines };
   }
-  return { id: r.id, at: r.at, kind: "SYNCED", actor: r.actor, count: countOf(field(r.after, "سُجّلت")), lines: [] };
+  return { id: r.id, at: r.at, kind: "SYNCED", actor: r.actor, count: countOf(field(r.after, "سجّلت")), lines: [] };
 }
 
 /**

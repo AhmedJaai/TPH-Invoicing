@@ -58,8 +58,8 @@ export async function POST(request: Request) {
       ...r,
       message:
         r.created === 0
-          ? "لا جديد — كل حركة مصنَّفة مقيَّدة أصلاً."
-          : `قُيّد ${r.created} مصروفاً، منها ${r.linkedToRecurring} مربوطة بمصروف متوقَّع.`,
+          ? "لا جديد — كل حركة مصنّفة مقيّدة أصلاً."
+          : `قيّد ${r.created} مصروفاً، منها ${r.linkedToRecurring} مربوطة بمصروف متوقّع.`,
     });
   }
 
@@ -67,15 +67,15 @@ export async function POST(request: Request) {
     if (!body.id) return NextResponse.json({ error: "حدّد المصروف" }, { status: 400 });
     const outcome = await deleteExpense(user.id, body.id);
     if (outcome === "NOT_FOUND") {
-      return NextResponse.json({ error: "حُذف هذا القيد من قبل — حدّث الصفحة" }, { status: 404 });
+      return NextResponse.json({ error: "حذف هذا القيد من قبل — حدّث الصفحة" }, { status: 404 });
     }
     if (outcome === "BANK_DERIVED") {
       return NextResponse.json(
-        { error: "هذا القيد مشتقٌّ من كشف البنك ويعود عند الاشتقاق — احذف الآخر، أو صحّح تصنيف الحركة" },
+        { error: "هذا القيد مشتقّ من كشف البنك ويعود عند الاشتقاق — احذف الآخر، أو صحّح تصنيف الحركة" },
         { status: 409 },
       );
     }
-    return NextResponse.json({ ok: true, message: "حُذف القيد — وأثره في سجلّ التدقيق" });
+    return NextResponse.json({ ok: true, message: "حذف القيد — وأثره في سجلّ التدقيق" });
   }
 
   const label = body.label?.trim();
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
 
   if (!body.category || !isExpenseCategory(body.category)) {
     return NextResponse.json(
-      { error: "اختر تصنيفاً يصحّ أن يكون مصروفاً — سداد المورّد محسوبٌ في المشتريات" },
+      { error: "اختر تصنيفاً يصحّ أن يكون مصروفاً — سداد المورّد محسوب في المشتريات" },
       { status: 400 },
     );
   }
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       .limit(1);
     if (twin) {
       return NextResponse.json(
-        { error: `قُيّد «${label}» بالمبلغ نفسه قبل لحظات — إن كان مصروفاً ثانياً فأكّد ذلك`, duplicateOf: twin.id },
+        { error: `قيّد «${label}» بالمبلغ نفسه قبل لحظات — إن كان مصروفاً ثانياً فأكّد ذلك`, duplicateOf: twin.id },
         { status: 409 },
       );
     }
@@ -131,5 +131,5 @@ export async function POST(request: Request) {
 
   /* التدقيق في recordManualExpense — كان يُكتب هنا ثانيةً فيُقيَّد الحدث مرّتين */
 
-  return NextResponse.json({ ok: true, id, message: `قُيّد «${label}»` });
+  return NextResponse.json({ ok: true, id, message: `قيّد «${label}»` });
 }

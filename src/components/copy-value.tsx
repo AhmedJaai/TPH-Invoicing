@@ -21,9 +21,9 @@ export function CopyValue({ value, label, children, className = "" }: {
   async function copy() {
     try {
       await navigator.clipboard.writeText(value);
-      toast({ tone: "ok", title: `نُسخ ${label}`, body: value, duration: 2500 });
+      toast({ tone: "ok", title: `نسخ ${label}`, body: value, duration: 2500 });
     } catch {
-      toast({ tone: "warn", title: "تعذّر النسخ", body: "المتصفّح منعه — حدّد النصَّ يدويّاً." });
+      toast({ tone: "warn", title: "تعذّر النسخ", body: "المتصفّح منعه — حدّد النصّ يدويّاً." });
     }
   }
   return (

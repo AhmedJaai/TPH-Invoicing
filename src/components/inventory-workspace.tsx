@@ -100,7 +100,7 @@ export function InventoryWorkspace({
       actual: l.actualMilli === null ? "" : trim(canonicalToQuantity(l.actualMilli, l.baseUnit)),
       varianceText: l.varianceMilli === null ? null : formatSignedQuantity(l.varianceMilli, l.baseUnit),
       /* النسبةُ المعروضة هي نسبةُ الاستهلاك — جوابُ «كم ضاع ممّا صُرف» */
-      varianceBpText: l.varianceConsumptionBp === null ? "نسبةٌ غير محسوبة" : `${formatBp(l.varianceConsumptionBp)} من صرفه`,
+      varianceBpText: l.varianceConsumptionBp === null ? "نسبة غير محسوبة" : `${formatBp(l.varianceConsumptionBp)} من صرفه`,
       varianceCostMinor: showAmounts ? l.varianceCostMinor : null,
       flags: l.flags.map((f) => FLAG_LABEL[f]),
       negative: (l.varianceMilli ?? 0) < 0,
@@ -164,39 +164,39 @@ export function InventoryWorkspace({
         foot={measured ? (
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Mini
-              label="النقصُ من كلفة الاستهلاك"
+              label="النقص من كلفة الاستهلاك"
               value={summary.shortageRateBp === null ? "غير محسوبة" : formatBp(-summary.shortageRateBp)}
-              hint={summary.consumptionCostComplete ? "كم ضاع ممّا كان ينبغي أن يُصرَف" : "على ما عُرفت كلفتُه — المقامُ ناقص"}
+              hint={summary.consumptionCostComplete ? "كم ضاع ممّا كان ينبغي أن يصرف" : "على ما عرفت كلفته — المقام ناقص"}
             />
             {showAmounts && (
               <Mini
-                label="حجمُ الفروق"
+                label="حجم الفروق"
                 value={<Money minor={summary.absoluteCostMinor} />}
-                hint={`نقصٌ وزيادةٌ معاً · والصافي ⁦${formatRiyalsDisplay(summary.netCostMinor)}⁩`}
+                hint={`نقص وزيادة معاً · والصافي ⁦${formatRiyalsDisplay(summary.netCostMinor)}⁩`}
               />
             )}
             <Mini
-              label="أصنافٌ حُسب فرقُها"
+              label="أصناف حسب فرقها"
               value={<span className="nums">{summary.linesMeasured} من {inScopeCount}</span>}
-              hint={summary.linesWithoutCost > 0 ? `منها ${countNoun(summary.linesWithoutCost, PRODUCT)} كلفتُه غير معروفة` : "كلُّها معروفةُ الكلفة"}
+              hint={summary.linesWithoutCost > 0 ? `منها ${countNoun(summary.linesWithoutCost, PRODUCT)} كلفته غير معروفة` : "كلّها معروفة الكلفة"}
             />
           </dl>
         ) : undefined}
       />
 
       <Section
-        title="أكبرُ الفروق"
+        title="أكبر الفروق"
         className="mt-0!"
-        hint={anyCost ? "مرتَّبةٌ بالكلفة لا بالكمّيّة — كيلو بنٍّ أثقل من لترِ حليبٍ بأضعاف، والعين لا تقرأ ذلك من الكمّيّتين." : undefined}
+        hint={anyCost ? "مرتّبة بالكلفة لا بالكمّيّة — كيلو بنّ أثقل من لتر حليب بأضعاف، والعين لا تقرأ ذلك من الكمّيّتين." : undefined}
       >
         {top.length === 0 ? (
           <EmptyState
             compact
             icon={Package}
-            title={measured ? "لا فرقَ في ما عُدّ — كلُّه مطابق." : "لم يُحسَب فرقٌ بعد."}
+            title={measured ? "لا فرق في ما عدّ — كلّه مطابق." : "لم يحسب فرق بعد."}
             hint={measured
-              ? "كلُّ صنفٍ عُدّ وُجد منه ما كان متوقَّعاً."
-              : "يُحسَب لكلّ صنفٍ عُدّ وعُرفت حدودُ معادلته — أدخِل ما وجدتَه في الخطوة الثالثة."}
+              ? "كلّ صنف عدّ وجد منه ما كان متوقّعاً."
+              : "يحسب لكلّ صنف عدّ وعرفت حدود معادلته — أدخل ما وجدته في الخطوة الثالثة."}
           />
         ) : (
           <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
@@ -213,9 +213,9 @@ export function InventoryWorkspace({
                       {/* الأرقامُ بلا أسماء سُئل عنها: «ايش هذي النسب؟» — فيُقال من أين جاءت */}
                       {l.theoreticalConsumptionMilli !== null && l.actualMilli !== null && l.theoreticalClosingMilli !== null && (
                         <p className="mt-0.5 text-[11px] text-muted">
-                          صرفتْه المبيعاتُ <span className="nums">{q(l.theoreticalConsumptionMilli, l.baseUnit)} {storedUnitLabel(l.baseUnit)}</span>
+                          صرفته المبيعات <span className="nums">{q(l.theoreticalConsumptionMilli, l.baseUnit)} {storedUnitLabel(l.baseUnit)}</span>
                           {" · "}كان ينبغي أن يبقى <span className="nums">{q(l.theoreticalClosingMilli, l.baseUnit)}</span>
-                          {" · "}وُجد <span className="nums">{q(l.actualMilli, l.baseUnit)}</span>
+                          {" · "}وجد <span className="nums">{q(l.actualMilli, l.baseUnit)}</span>
                         </p>
                       )}
                     </div>
@@ -229,8 +229,8 @@ export function InventoryWorkspace({
                     {showAmounts && (
                       <span className="w-28 text-end text-[13px]">
                         {l.varianceCostMinor === null
-                          ? <span className="text-[11px] text-muted">كلفةٌ غير معروفة</span>
-                          : <><span className="text-[11px] text-muted">قيمتُه </span><Money minor={Math.abs(l.varianceCostMinor)} /></>}
+                          ? <span className="text-[11px] text-muted">كلفة غير معروفة</span>
+                          : <><span className="text-[11px] text-muted">قيمته </span><Money minor={Math.abs(l.varianceCostMinor)} /></>}
                       </span>
                     )}
                   </div>
@@ -244,7 +244,7 @@ export function InventoryWorkspace({
         )}
         {top.length > 0 && (
           <p className="mt-2 text-[11px] leading-relaxed text-muted">
-            النسبةُ = الفرقُ ÷ ما صرفته المبيعاتُ بالوصفات — «من كلّ ١٠٠ جرامٍ كان ينبغي أن تُصرَف، كم ذهبت ولم تُبَع؟». والمبلغُ قيمةُ الفرق بالريال. {valuationNote(report)}
+            النسبة = الفرق ÷ ما صرفته المبيعات بالوصفات — «من كلّ ١٠٠ جرام كان ينبغي أن تصرف، كم ذهبت ولم تبع؟». والمبلغ قيمة الفرق بالريال. {valuationNote(report)}
           </p>
         )}
       </Section>
@@ -267,17 +267,17 @@ export function InventoryWorkspace({
           {countNoun(report.totals.complimentary.lines, LINE)} بيع
           {showAmounts && (
             report.totals.complimentary.costMinor === null
-              ? <> — كلفةُ مكوّناتها غير معروفةٍ كلِّها.</>
-              : <> — كلفةُ مكوّناتها <Money minor={report.totals.complimentary.costMinor} />.</>
+              ? <> — كلفة مكوّناتها غير معروفة كلّها.</>
+              : <> — كلفة مكوّناتها <Money minor={report.totals.complimentary.costMinor} />.</>
           )}
-          {" "}محسوبٌ في الاستهلاك المتوقَّع، فليس من الفرق.
+          {" "}محسوب في الاستهلاك المتوقّع، فليس من الفرق.
         </p>
       )}
 
-      <Callout tone="muted" icon={ShieldCheck} title="هذا فرقُ جرد، لا هدر">
-        الفرقُ الواحد قد يكون جرعةً أكبر ممّا في الوصفة، أو ميزاناً غير معاير، أو كمّيّةً دخلت ولم تُقيَّد،
-        أو نقلاً لم يُسجَّل، أو عدّاً مستعجلاً. راجِعه قبل أن تعدّه فاقداً — وما تعرف سببَه سجِّله هدراً
-        أدناه فيخرج من «الفرق غير المفسَّر».
+      <Callout tone="muted" icon={ShieldCheck} title="هذا فرق جرد، لا هدر">
+        الفرق الواحد قد يكون جرعةً أكبر ممّا في الوصفة، أو ميزاناً غير معاير، أو كمّيّةً دخلت ولم تقيّد،
+        أو نقلاً لم يسجّل، أو عدّاً مستعجلاً. راجعه قبل أن تعدّه فاقداً — وما تعرف سببه سجّله هدراً
+        أدناه فيخرج من «الفرق غير المفسّر».
       </Callout>
 
       {!locked && inScopeCount > 0 && canCount && (
@@ -305,30 +305,30 @@ export function InventoryWorkspace({
       ok: coverage.readiness === "READY",
       warn: coverage.readiness === "PARTIAL",
       text: coverage.readiness === "READY"
-        ? "كلُّ ما بِيع مربوطٌ وله وصفةٌ سارية."
-        : coverage.readiness === "PARTIAL" ? "التقريرُ جزئيّ — وما نقص مكتوبٌ فيه." : "لا مبيعاتَ داخلةٌ في الحساب — لا يُقفَل.",
+        ? "كلّ ما بيع مربوط وله وصفة سارية."
+        : coverage.readiness === "PARTIAL" ? "التقرير جزئيّ — وما نقص مكتوب فيه." : "لا مبيعات داخلة في الحساب — لا يقفل.",
     },
     {
       ok: uncounted === 0 && inScopeCount > 0,
       warn: uncounted > 0,
       text: uncounted === 0
-        ? `عُدّت الأصنافُ كلُّها (${countNoun(inScopeCount, PRODUCT)}).`
-        : `${countNoun(uncounted, PRODUCT)} بلا عدّ — يُقفَل بلا فرقٍ محسوب.`,
+        ? `عدّت الأصناف كلّها (${countNoun(inScopeCount, PRODUCT)}).`
+        : `${countNoun(uncounted, PRODUCT)} بلا عدّ — يقفل بلا فرق محسوب.`,
     },
     {
       ok: duplicates.length === 0,
       warn: duplicates.length > 0,
       text: duplicates.length === 0
-        ? "لا استلامَ يدويّاً يشبه بندَ فاتورة."
-        : `${countNoun(duplicates.length, LINE)} استلامٍ قد يكون مكرَّراً — المشترياتُ غير معروفة حتى تُحسَم.`,
+        ? "لا استلام يدويّاً يشبه بند فاتورة."
+        : `${countNoun(duplicates.length, LINE)} استلام قد يكون مكرّراً — المشتريات غير معروفة حتى تحسم.`,
     },
   ];
 
   const finalise = locked ? (
     <div className="space-y-4">
-      <Callout tone="ok" icon={Lock} title={`أُقفل هذا الجرد${header.finalisedAt ? ` في ${formatDay(header.finalisedAt)}` : ""}`}>
-        أرقامُه مجمَّدة، وأصولُها محفوظة — نسخُ الوصفات، وأسطرُ الفواتير، والكمّيّاتُ المستلَمة يدوياً،
-        ومصادرُ الأرصدة الافتتاحيّة، ونطاقُ الجرد. ولا تغيّره وصفةٌ تُعدَّل بعده ولا فاتورةٌ تصل.
+      <Callout tone="ok" icon={Lock} title={`أقفل هذا الجرد${header.finalisedAt ? ` في ${formatDay(header.finalisedAt)}` : ""}`}>
+        أرقامه مجمّدة، وأصولها محفوظة — نسخ الوصفات، وأسطر الفواتير، والكمّيّات المستلمة يدوياً،
+        ومصادر الأرصدة الافتتاحيّة، ونطاق الجرد. ولا تغيّره وصفة تعدّل بعده ولا فاتورة تصل.
       </Callout>
       {canReopen && <ReopenCount countId={header.id} />}
     </div>
@@ -350,10 +350,10 @@ export function InventoryWorkspace({
         <Callout
           tone="warn"
           icon={TriangleAlert}
-          title="لا يُقفَل جردٌ لا يُحسَب"
-          action={<LinkButton href="/inventory/import#sales" variant="primary" size="sm" icon={FileSpreadsheet}>استورِد المبيعات</LinkButton>}
+          title="لا يقفل جرد لا يحسب"
+          action={<LinkButton href="/inventory/import#sales" variant="primary" size="sm" icon={FileSpreadsheet}>استورد المبيعات</LinkButton>}
         >
-          استورِد مبيعاتِ الفترة واربط أصنافَها أوّلاً — ثمّ أعِد الحساب.
+          استورد مبيعات الفترة واربط أصنافها أوّلاً — ثمّ أعد الحساب.
         </Callout>
       ) : canCount ? (
         <FinaliseCount
@@ -363,12 +363,12 @@ export function InventoryWorkspace({
           totalItems={inScopeCount}
         />
       ) : (
-        <p className="text-xs text-muted">الإقفالُ خارج صلاحيتك.</p>
+        <p className="text-xs text-muted">الإقفال خارج صلاحيتك.</p>
       )}
       {/* بُدئ خطأً أو تُرك ناقصاً — يُلغى ويُبدأ أسبوعُه من جديد، والمقفَلُ يُعاد فتحُه لا يُلغى */}
       {canCount && (
         <div className="flex flex-wrap items-center gap-3 border-t border-line-soft pt-4">
-          <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-muted">لا تريد إكمالَه؟ ألغِه وابدأ أسبوعَه من جديد، أو ابدأ غيرَه.</p>
+          <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-muted">لا تريد إكماله؟ ألغه وابدأ أسبوعه من جديد، أو ابدأ غيره.</p>
           <DiscardCount
             countId={header.id}
             week={{ start: header.periodStart, end: header.periodEnd }}
@@ -388,13 +388,13 @@ export function InventoryWorkspace({
           title="تغيّر ما تحت هذا الجرد بعد إقفاله"
           className="mb-4"
           action={canReopen
-            ? <Link href="?step=close" className="text-xs font-bold text-accent hover:underline">أعِد فتحه ليُعاد حسابُه</Link>
+            ? <Link href="?step=close" className="text-xs font-bold text-accent hover:underline">أعد فتحه ليعاد حسابه</Link>
             : undefined}
         >
           <ul className="mt-1 space-y-0.5">
             {stale.map((r) => <li key={r.label}>{r.label} <span className="nums text-muted">· {r.count}</span></li>)}
           </ul>
-          <p className="mt-1">الأرقامُ أدناه كما أُقفلت — ولا تشمل ما وصل بعدها.</p>
+          <p className="mt-1">الأرقام أدناه كما أقفلت — ولا تشمل ما وصل بعدها.</p>
         </Callout>
       )}
       <CoverageBanner
@@ -410,8 +410,8 @@ export function InventoryWorkspace({
         {report.lines.length === 0 ? (
           <EmptyState
             icon={Package}
-            title="لا صنفَ مخزونٍ مسجَّل بعد."
-            hint="تُبنى الأصناف من كتالوج فودكس أو من بنود فواتير المورّدين — وبعدها يُعَدّ هنا."
+            title="لا صنف مخزون مسجّل بعد."
+            hint="تبنى الأصناف من كتالوج فودكس أو من بنود فواتير المورّدين — وبعدها يعدّ هنا."
             action={<LinkButton href="/inventory/import#catalog" variant="primary" size="sm">ارفع كتالوج فودكس</LinkButton>}
           />
         ) : (
@@ -470,10 +470,10 @@ function CoverageBanner({
   const noSales = coverage.sales.lines === 0;
 
   const meters: { label: string; value: number; max: number; empty?: string }[] = [
-    { label: "أسطرُ بيعٍ دخلت الحساب", value: coverage.sales.includedLines, max: coverage.sales.lines, empty: "لا مبيعاتٍ مستورَدة" },
-    { label: "أيّامٌ فيها مبيعات", value: coverage.sales.daysWithSales, max: coverage.sales.periodDays },
-    { label: "أسطرُ شراءٍ عُرفت كمّيّتُها", value: coverage.purchases.includedLines, max: coverage.purchases.lines, empty: "لا فواتيرَ في الفترة" },
-    { label: "أصنافٌ عُدّت", value: report.totals.linesCounted, max: inScopeCount },
+    { label: "أسطر بيع دخلت الحساب", value: coverage.sales.includedLines, max: coverage.sales.lines, empty: "لا مبيعات مستوردة" },
+    { label: "أيّام فيها مبيعات", value: coverage.sales.daysWithSales, max: coverage.sales.periodDays },
+    { label: "أسطر شراء عرفت كمّيّتها", value: coverage.purchases.includedLines, max: coverage.purchases.lines, empty: "لا فواتير في الفترة" },
+    { label: "أصناف عدّت", value: report.totals.linesCounted, max: inScopeCount },
   ];
 
   return (
@@ -481,10 +481,10 @@ function CoverageBanner({
       <span aria-hidden className={`absolute inset-y-0 start-0 w-1 ${skin.stripe}`} />
       <div className="p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 id="coverage-title" className="sr-only">جاهزيّةُ الحساب</h2>
+          <h2 id="coverage-title" className="sr-only">جاهزيّة الحساب</h2>
           <Badge tone={skin.tone} dot>{`الحساب ${READINESS_LABEL[coverage.readiness]}`}</Badge>
-          {locked ? <Badge dot>مقفَل</Badge> : <Badge tone="accent" dot>مسوّدة</Badge>}
-          {header.reopenCount > 0 && <Badge tone="warn">أُعيد فتحُه {header.reopenCount === 1 ? "مرّة" : `${header.reopenCount} مرّات`}</Badge>}
+          {locked ? <Badge dot>مقفل</Badge> : <Badge tone="accent" dot>مسوّدة</Badge>}
+          {header.reopenCount > 0 && <Badge tone="warn">أعيد فتحه {header.reopenCount === 1 ? "مرّة" : `${header.reopenCount} مرّات`}</Badge>}
           <span className="text-xs text-muted">أسبوع {formatWeek(header.periodStart, header.periodEnd)}{header.branchName ? ` · ${header.branchName}` : ""}</span>
         </div>
 
@@ -521,8 +521,8 @@ function CoverageBanner({
         */}
         {coverage.scope.excluded > 0 && (
           <p className="mt-4 text-xs leading-relaxed text-ink-soft">
-            و<span className="font-bold">{countNoun(coverage.scope.excluded, PRODUCT)}</span> خارج هذا الجرد باختيارك — وقائعُها
-            محسوبة ولا فرقَ لها ولا تدخل المجاميع
+            و<span className="font-bold">{countNoun(coverage.scope.excluded, PRODUCT)}</span> خارج هذا الجرد باختيارك — وقائعها
+            محسوبة ولا فرق لها ولا تدخل المجاميع
             {coverage.scope.excludedNames.length > 0 && <span className="text-muted">: {coverage.scope.excludedNames.join(" · ")}</span>}.
           </p>
         )}
@@ -559,15 +559,15 @@ function CoverageBanner({
       {!locked && (
         <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3 sm:px-5">
           {noSales ? (
-            <LinkButton href="/inventory/import#sales" variant="primary" size="sm" icon={FileSpreadsheet}>استورِد مبيعات الأسبوع</LinkButton>
+            <LinkButton href="/inventory/import#sales" variant="primary" size="sm" icon={FileSpreadsheet}>استورد مبيعات الأسبوع</LinkButton>
           ) : (
-            <LinkButton href="/inventory/import#sales" size="sm" icon={FileSpreadsheet}>استورِد مبيعاتٍ أحدث</LinkButton>
+            <LinkButton href="/inventory/import#sales" size="sm" icon={FileSpreadsheet}>استورد مبيعات أحدث</LinkButton>
           )}
           {coverage.gaps.some((g) => g.reason === "UNMAPPED_POS_PRODUCT") && (
             <LinkButton href="/inventory/mapping" size="sm" icon={Link2}>اربط منتجات فودكس</LinkButton>
           )}
           {canCount && <RecomputeCount countId={header.id} />}
-          <span className="text-[11px] text-muted">بعد استيرادٍ أو تصحيحِ وصفة، أعِد الحساب.</span>
+          <span className="text-[11px] text-muted">بعد استيراد أو تصحيح وصفة، أعد الحساب.</span>
         </div>
       )}
     </section>
@@ -591,7 +591,7 @@ function gapAction(g: CoverageGap, locked: boolean): { href: string; label: stri
     case "UNIT_FAMILY_MISMATCH":
       /* المقفَلُ لا يُعاد حسابُه — فالربطُ له يخدم الجردَ القادم من صفحة الأصناف */
       return locked
-        ? { href: "/purchases/products", label: "الأصنافُ والعبوات" }
+        ? { href: "/purchases/products", label: "الأصناف والعبوات" }
         : { href: "?step=flow", label: "اربطها في الخطوة الثانية" };
     case "MISSING_QUANTITY":
       return { href: "/purchases/invoices", label: "الفواتير" };
@@ -623,7 +623,7 @@ function valuationNote(report: EngineReport): string {
   const bases = new Set(report.lines.filter((l) => l.varianceCostMinor !== null).map((l) => l.valuationBasis));
   if (bases.size === 0) return "";
   if (bases.size === 1) return VALUATION_LABEL[[...bases][0]] + ".";
-  return "قُوِّم بعضُه بمتوسّط شراء الفترة وبعضُه بآخر كلفةٍ معروفة.";
+  return "قوّم بعضه بمتوسّط شراء الفترة وبعضه بآخر كلفة معروفة.";
 }
 
 /** رقمٌ بلا أصفارٍ زائدة — «٢» لا «٢٫٠٠٠». */

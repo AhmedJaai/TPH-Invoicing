@@ -39,8 +39,8 @@ const allocationsOf = async (tx: Tx, paymentId: string) =>
   tx.select({ invoiceId: paymentAllocations.invoiceId, amountMinor: paymentAllocations.amountMinor })
     .from(paymentAllocations).where(eq(paymentAllocations.paymentId, paymentId));
 
-describe("الدفعةُ التي قُيِّدت مرّتين — كوهي كما في الإنتاج", () => {
-  it("يُكشف الصدى، ويُدمج: يُلغى الإقرار وتأخذ الحوالةُ فاتورتَه، والفاتورةُ الأحدث تظهر مفتوحة", () =>
+describe("الدفعة التي قيّدت مرّتين — كوهي كما في الإنتاج", () => {
+  it("يكشف الصدى، ويدمج: يلغى الإقرار وتأخذ الحوالة فاتورته، والفاتورة الأحدث تظهر مفتوحة", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const aug6 = await makeInvoice(tx, s, 833_75, "2026-08-06");
@@ -63,7 +63,7 @@ describe("الدفعةُ التي قُيِّدت مرّتين — كوهي كم�
       expect((await loadPaymentEchoes(tx)).filter((e) => e.supplierId === s)).toEqual([]);
     }));
 
-  it("يُرفض دمجُ ما ليس صدى — الخادمُ يعيد اشتقاق الزوج", () =>
+  it("يرفض دمج ما ليس صدى — الخادم يعيد اشتقاق الزوج", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 575_00, "2026-08-13");
@@ -77,8 +77,8 @@ describe("الدفعةُ التي قُيِّدت مرّتين — كوهي كم�
     }));
 });
 
-describe("«سجّل أنّها سُدّدت» يأخذ حوالةَ الكشف غيرَ المنسوبة أوّلاً", () => {
-  it("يُنسب من الحوالة ولا يبقى شيءٌ يُقيَّد إقراراً، والتراجعُ يفكّها ولا يلغيها", () =>
+describe("«سجّل أنّها سدّدت» يأخذ حوالة الكشف غير المنسوبة أوّلاً", () => {
+  it("ينسب من الحوالة ولا يبقى شيء يقيّد إقراراً، والتراجع يفكّها ولا يلغيها", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 575_00, "2026-09-15");
@@ -95,7 +95,7 @@ describe("«سجّل أنّها سُدّدت» يأخذ حوالةَ الكشف 
       expect(b.status).not.toBe("VOID");
     }));
 
-  it("حوالةٌ أبعد من النافذة، أو دفعةٌ بلا حركة بنك، لا تُؤخذ", () =>
+  it("حوالة أبعد من النافذة، أو دفعة بلا حركة بنك، لا تؤخذ", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 100_00, "2026-09-15");
@@ -120,8 +120,8 @@ async function waitingTransfer(
   return t.id;
 }
 
-describe("حوالةُ الطابور وسدادُها المقيَّد بيد — مختبرات القهوة ورونة", () => {
-  it("المبلغُ نفسه: تُربط الحوالةُ بالدفعة ولا تُنشأ ثانية، والفاتورةُ تبقى مسدَّدة", () =>
+describe("حوالة الطابور وسدادها المقيّد بيد — مختبرات القهوة ورونة", () => {
+  it("المبلغ نفسه: تربط الحوالة بالدفعة ولا تنشأ ثانية، والفاتورة تبقى مسدّدة", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 638_00, "2026-09-08");
@@ -140,7 +140,7 @@ describe("حوالةُ الطابور وسدادُها المقيَّد بيد �
       expect(await allocationsOf(tx, hand)).toEqual([{ invoiceId: inv, amountMinor: 638_00 }]);
     }));
 
-  it("الحوالةُ أكبر: تأخذ الدفعةُ مبلغَها، والزائدُ رصيدٌ لا يُخصَّص على الفاتورة نفسها", () =>
+  it("الحوالة أكبر: تأخذ الدفعة مبلغها، والزائد رصيد لا يخصّص على الفاتورة نفسها", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 437_00, "2026-09-06");
@@ -155,7 +155,7 @@ describe("حوالةُ الطابور وسدادُها المقيَّد بيد �
       expect(await allocationsOf(tx, hand)).toEqual([{ invoiceId: inv, amountMinor: 437_00 }]);
     }));
 
-  it("لا يُربط ما ليس زوجاً — الحوالةُ أقلّ من الدفعة", () =>
+  it("لا يربط ما ليس زوجاً — الحوالة أقلّ من الدفعة", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 500_00, "2026-09-06");
@@ -166,8 +166,8 @@ describe("حوالةُ الطابور وسدادُها المقيَّد بيد �
     }));
 });
 
-describe("سدادٌ بيدٍ خرج من حوالةٍ جامعة لم تُنسب — غاناش", () => {
-  it("يُلغى الإقرارُ وتُسدَّد فاتورتُه من الحوالة، وينقص الرصيدُ بقدرها", () =>
+describe("سداد بيد خرج من حوالة جامعة لم تنسب — غاناش", () => {
+  it("يلغى الإقرار وتسدّد فاتورته من الحوالة، وينقص الرصيد بقدرها", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 455_40, "2026-08-14");
@@ -183,7 +183,7 @@ describe("سدادٌ بيدٍ خرج من حوالةٍ جامعة لم تُنس�
       expect(await allocationsOf(tx, lump)).toEqual([{ invoiceId: inv, amountMinor: 455_40 }]);
     }));
 
-  it("لا يُدمج إن لم تسع الحوالةُ الإقرار", () =>
+  it("لا يدمج إن لم تسع الحوالة الإقرار", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 455_40, "2026-08-14");
@@ -193,8 +193,8 @@ describe("سدادٌ بيدٍ خرج من حوالةٍ جامعة لم تُنس�
     }));
 });
 
-describe("التخصيصُ الثاني للدفعة نفسها على الفاتورة نفسها يُضاف — رونة", () => {
-  it("٤٣٧ ثمّ ٢٥ على الفاتورة نفسها = ٤٦٢، لا ٤٣٧ مع «خُصّصت» كاذبة", () =>
+describe("التخصيص الثاني للدفعة نفسها على الفاتورة نفسها يضاف — رونة", () => {
+  it("٤٣٧ ثمّ ٢٥ على الفاتورة نفسها = ٤٦٢، لا ٤٣٧ مع «خصّصت» كاذبة", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 462_00, "2026-09-06");
@@ -206,8 +206,8 @@ describe("التخصيصُ الثاني للدفعة نفسها على الفا�
     }));
 });
 
-describe("كشفٌ يصل بعد «سُدّدت» — الحالةُ التي وصفها أحمد: ٣٬٠٠٠ ريال", () => {
-  it("حوالةٌ عُرف مورّدُها وبابُها «غير معروف» تُربط بالسداد اليدويّ ولا تنتظر إقراراً يكتب دفعةً ثانية", () =>
+describe("كشف يصل بعد «سدّدت» — الحالة التي وصفها أحمد: ٣٬٠٠٠ ريال", () => {
+  it("حوالة عرف مورّدها وبابها «غير معروف» تربط بالسداد اليدويّ ولا تنتظر إقراراً يكتب دفعةً ثانية", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 3000_00, "2026-09-01");
@@ -217,7 +217,7 @@ describe("كشفٌ يصل بعد «سُدّدت» — الحالةُ التي و
       expect(l).toMatchObject({ transferId: t, paymentId: hand, exact: true });
     }));
 
-  it("فاتورةٌ ثانيةٌ مفتوحةٌ بالمبلغ نفسه لا تأخذ الحوالة — تُحجَز للسداد المقيَّد ولو قُيِّد بعدها بأيّام", () =>
+  it("فاتورة ثانية مفتوحة بالمبلغ نفسه لا تأخذ الحوالة — تحجز للسداد المقيّد ولو قيّد بعدها بأيّام", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const first = await makeInvoice(tx, s, 3000_00, "2026-09-01");
@@ -235,7 +235,7 @@ describe("كشفٌ يصل بعد «سُدّدت» — الحالةُ التي و
       expect((await findManualTwin(tx, { supplierId: s, paidAt: day("2026-09-04"), amountMinor: 3000_00 }))?.id).toBe(hand);
     }));
 
-  it("والسدادُ الذي له حركةُ بنكٍ لا يُحجَز له شيء — الحوالةُ الجديدة دفعةٌ أخرى حقّاً", () =>
+  it("والسداد الذي له حركة بنك لا يحجز له شيء — الحوالة الجديدة دفعة أخرى حقّاً", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       await bankPayment(tx, s, 3000_00, "2026-09-04");
@@ -247,8 +247,8 @@ describe("كشفٌ يصل بعد «سُدّدت» — الحالةُ التي و
 });
 
 
-describe("الرصيدُ الوهميّ لا يُخصَم آلياً — حوالةٌ هي صدى سدادٍ مقيَّد", () => {
-  it("فاتورةٌ جديدة لا تُغلَق بحوالةٍ هي سدادُ فاتورةٍ أخرى، والإنسانُ يقرّر", () =>
+describe("الرصيد الوهميّ لا يخصم آلياً — حوالة هي صدى سداد مقيّد", () => {
+  it("فاتورة جديدة لا تغلق بحوالة هي سداد فاتورة أخرى، والإنسان يقرّر", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const a = await makeInvoice(tx, s, 1000_00, "2026-09-01");
@@ -264,8 +264,8 @@ describe("الرصيدُ الوهميّ لا يُخصَم آلياً — حوا�
     }));
 });
 
-describe("رسمُ التحويل في الربط بالسداد اليدويّ", () => {
-  it("٣٬٠٠٥٫٧٥ على سدادٍ بـ٣٬٠٠٠: الزائدُ رسمٌ لا رصيدٌ للمورّد، والآليُّ بيد النظام", () =>
+describe("رسم التحويل في الربط بالسداد اليدويّ", () => {
+  it("٣٬٠٠٥٫٧٥ على سداد بـ٣٬٠٠٠: الزائد رسم لا رصيد للمورّد، والآليّ بيد النظام", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 3000_00, "2026-09-01");
@@ -285,8 +285,8 @@ describe("رسمُ التحويل في الربط بالسداد اليدويّ"
     }));
 });
 
-describe("لا مالَ على فاتورةٍ لم يُقِرّها أحد", () => {
-  it("الخصمُ الآليّ يتخطّى فاتورةً مستندُها ينتظر المراجعة، ويخصم بعد الإقرار", () =>
+describe("لا مال على فاتورة لم يقرّها أحد", () => {
+  it("الخصم الآليّ يتخطّى فاتورةً مستندها ينتظر المراجعة، ويخصم بعد الإقرار", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       await createPayment(tx, { supplierId: s, paidAt: day("2026-09-01"), amountMinor: 700_00, method: "BANK_TRANSFER", acknowledgeTwin: true });
@@ -300,8 +300,8 @@ describe("لا مالَ على فاتورةٍ لم يُقِرّها أحد", () 
     }));
 });
 
-describe("التراجعُ عن ربط حوالةٍ ورثت إقرارَ صاحب العمل", () => {
-  it("الحوالةُ التي انتقل إليها السدادُ اليدويّ بدمج الصدى إقرارُه — لا تُردّ بالتراجع", () =>
+describe("التراجع عن ربط حوالة ورثت إقرار صاحب العمل", () => {
+  it("الحوالة التي انتقل إليها السداد اليدويّ بدمج الصدى إقراره — لا تردّ بالتراجع", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const bankId = await bankPayment(tx, s, 900_00, "2026-09-02");

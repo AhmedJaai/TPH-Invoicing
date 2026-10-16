@@ -116,7 +116,7 @@ export async function setObligationClosed(id: string, closed: boolean, actorId: 
       .where(and(eq(obligations.id, id)));
     await recordAudit({
       actorId, action: "DOCUMENT_EXPIRY_CLOSED", entityType: "obligation", entityId: id,
-      after: { العنوان: before.title, الحال: closed ? "أُرشفت" : "أُعيدت" },
+      after: { العنوان: before.title, الحال: closed ? "أرشفت" : "أعيدت" },
     }, t);
     return true;
   });

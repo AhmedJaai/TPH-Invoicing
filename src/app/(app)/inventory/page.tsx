@@ -76,9 +76,9 @@ export default async function InventoryPage({
         <PageShell
           user={user}
           width="wide"
-          eyebrow={`جردٌ مفتوح${header.branchName ? ` · ${header.branchName}` : ""}`}
+          eyebrow={`جرد مفتوح${header.branchName ? ` · ${header.branchName}` : ""}`}
           title="الجرد الحالي"
-          intro={`أسبوع ${formatWeek(header.periodStart, header.periodEnd)} — ما كان ينبغي أن يبقى على الرفّ، مقابلَ ما وُجد فعلاً.`}
+          intro={`أسبوع ${formatWeek(header.periodStart, header.periodEnd)} — ما كان ينبغي أن يبقى على الرفّ، مقابل ما وجد فعلاً.`}
           actions={
             <>
               {canCountHere && (
@@ -96,8 +96,8 @@ export default async function InventoryPage({
           }
         >
           {otherDrafts.length > 0 && (
-            <nav aria-label="جرودٌ مفتوحةٌ أخرى" className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-sunken/50 px-4 py-3 text-xs">
-              <span className="font-bold text-muted">{otherDrafts.length === 1 ? "جردٌ آخرُ مفتوح:" : "جرودٌ أخرى مفتوحة:"}</span>
+            <nav aria-label="جرود مفتوحة أخرى" className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-sunken/50 px-4 py-3 text-xs">
+              <span className="font-bold text-muted">{otherDrafts.length === 1 ? "جرد آخر مفتوح:" : "جرود أخرى مفتوحة:"}</span>
               {otherDrafts.map((d) => (
                 <Link
                   key={d.id}
@@ -140,10 +140,10 @@ export default async function InventoryPage({
   const canCount = can(user.role, "inventory:count");
 
   const intro = !progress.done.catalog
-    ? "الجردُ يُقابل ما وُجد على الرفّ بما كان ينبغي أن يُصرَف. وذاك يحتاج ثلاثَ خطواتٍ بترتيبها — أوّلُها الكتالوج."
+    ? "الجرد يقابل ما وجد على الرفّ بما كان ينبغي أن يصرف. وذاك يحتاج ثلاث خطوات بترتيبها — أوّلها الكتالوج."
     : !progress.done.sales
-      ? "الكتالوجُ عندك. بقي ملفُّ مبيعات الأسبوع ليُعرَف ما كان ينبغي أن يُصرَف."
-      : `جاهزٌ لجرد أسبوع ${formatWeek(week.start, week.end)} — آخرِ أسبوعٍ اكتمل.`;
+      ? "الكتالوج عندك. بقي ملفّ مبيعات الأسبوع ليعرف ما كان ينبغي أن يصرف."
+      : `جاهز لجرد أسبوع ${formatWeek(week.start, week.end)} — آخر أسبوع اكتمل.`;
 
   return (
     <PageShell
@@ -164,17 +164,17 @@ export default async function InventoryPage({
           <div className="min-w-0">
             <h2 id="setup-title" className="flex items-center gap-2 text-base font-bold">
               <Sparkles className="h-[18px] w-[18px] text-accent" strokeWidth={2} aria-hidden />
-              {setup.counts === 0 && !progress.done.catalog ? "جهّز أوّلَ جرد" : "بقي ما يُكمل الجرد"}
+              {setup.counts === 0 && !progress.done.catalog ? "جهّز أوّل جرد" : "بقي ما يكمل الجرد"}
             </h2>
             <p className="mb-4 mt-1 text-xs leading-relaxed text-ink-soft">
-              لا يقول لك الجردُ «لا فرق» وهو لا يعرف ما بِيع. أكمل الخطوات بترتيبها — كلٌّ منها مرّةً، ثمّ المبيعاتُ كلَّ أحد.
+              لا يقول لك الجرد «لا فرق» وهو لا يعرف ما بيع. أكمل الخطوات بترتيبها — كلّ منها مرّةً، ثمّ المبيعات كلّ أحد.
             </p>
             <SetupJourney facts={setup} />
           </div>
           <div className="min-w-0">
-            <h3 className="text-[13px] font-bold">كيف يُحسَب فرقُ الجرد</h3>
+            <h3 className="text-[13px] font-bold">كيف يحسب فرق الجرد</h3>
             <p className="mb-3 mt-1 text-xs leading-relaxed text-ink-soft">
-              ثلاثةُ حدودٍ محسوبة، وحدٌّ واحدٌ تُدخله أنت: ما وجدتَه على الرفّ.
+              ثلاثة حدود محسوبة، وحدّ واحد تدخله أنت: ما وجدته على الرفّ.
             </p>
             <EquationExplainer />
           </div>
@@ -191,16 +191,16 @@ export default async function InventoryPage({
               branches={branchRows.map((b) => ({ id: b.id, name: b.nameAr }))}
               prerequisite={
                 !progress.done.catalog
-                  ? "بلا كتالوجٍ لا وصفةَ تُحسَب بها المبيعات — فيخرج الجرد بلا فرقٍ محسوب. ابدأ بالكتالوج أوّلاً."
+                  ? "بلا كتالوج لا وصفة تحسب بها المبيعات — فيخرج الجرد بلا فرق محسوب. ابدأ بالكتالوج أوّلاً."
                   : !progress.done.sales
-                    ? "لا مبيعاتٍ مستورَدة بعد — تستطيع أن تبدأ وتعدّ، ويُحسَب الفرقُ حين يصل ملفُّ الأسبوع."
+                    ? "لا مبيعات مستوردة بعد — تستطيع أن تبدأ وتعدّ، ويحسب الفرق حين يصل ملفّ الأسبوع."
                     : null
               }
             />
           ) : (
             <Card>
-              <p className="text-sm font-bold">لا جردَ مفتوحاً الآن.</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted">بدءُ الجرد خارج صلاحيتك — يبدؤه المالك أو المدير، ثمّ تجده هنا لتعدّ.</p>
+              <p className="text-sm font-bold">لا جرد مفتوحاً الآن.</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">بدء الجرد خارج صلاحيتك — يبدؤه المالك أو المدير، ثمّ تجده هنا لتعدّ.</p>
             </Card>
           )}
         </div>
@@ -210,18 +210,18 @@ export default async function InventoryPage({
           <div className="grid grid-cols-2 gap-3">
             <FactTile
               icon={Package}
-              label="أصنافُ المخزون"
-              value={setup.stockItems === 0 ? "لا أصنافَ بعد" : countNoun(setup.stockItems, PRODUCT)}
+              label="أصناف المخزون"
+              value={setup.stockItems === 0 ? "لا أصناف بعد" : countNoun(setup.stockItems, PRODUCT)}
               tone={setup.stockItems === 0 ? "muted" : undefined}
-              sub={setup.stockItems === 0 ? "تُنشئها الفواتيرُ والكتالوج" : "ما يُعَدّ على الرفّ"}
+              sub={setup.stockItems === 0 ? "تنشئها الفواتير والكتالوج" : "ما يعدّ على الرفّ"}
               href="/inventory/items"
             />
             <FactTile
               icon={BookOpen}
               label="الوصفات"
-              value={setup.recipes === 0 ? "لا وصفاتٍ بعد" : countNoun(setup.recipes, RECIPE)}
+              value={setup.recipes === 0 ? "لا وصفات بعد" : countNoun(setup.recipes, RECIPE)}
               tone={setup.recipes === 0 ? "warn" : undefined}
-              sub={setup.recipes === 0 ? "بلا وصفةٍ لا يُعرَف ما صُرف" : `لـ${countNoun(setup.menuItems, PRODUCT)} في القائمة`}
+              sub={setup.recipes === 0 ? "بلا وصفة لا يعرف ما صرف" : `لـ${countNoun(setup.menuItems, PRODUCT)} في القائمة`}
               href={can(user.role, "recipe:edit") ? (setup.recipes === 0 ? "/inventory/import#catalog" : "/inventory/recipes") : undefined}
             />
             <FactTile
@@ -230,16 +230,16 @@ export default async function InventoryPage({
               value={setup.salesThrough ? `حتى ${formatDay(setup.salesThrough)}` : "لم تصل بعد"}
               tone={setup.salesThrough ? undefined : "warn"}
               sub={setup.salesThrough
-                ? (setup.unmapped > 0 ? `و${countNoun(setup.unmapped, PRODUCT)} مباعٌ ينتظر الربط` : "من ملفّات فودكس المستورَدة")
-                : "من ملفّ فودكس وحده — لا تُفترَض"}
+                ? (setup.unmapped > 0 ? `و${countNoun(setup.unmapped, PRODUCT)} مباع ينتظر الربط` : "من ملفّات فودكس المستوردة")
+                : "من ملفّ فودكس وحده — لا تفترض"}
               href={canCount ? (setup.unmapped > 0 ? "/inventory/mapping" : "/inventory/import#sales") : undefined}
             />
             <FactTile
               icon={ClipboardCheck}
-              label="جرداتٌ مقفَلة"
-              value={setup.finalised === 0 ? "لا جردَ بعد" : countNoun(setup.finalised, COUNT)}
+              label="جردات مقفلة"
+              value={setup.finalised === 0 ? "لا جرد بعد" : countNoun(setup.finalised, COUNT)}
               tone={setup.finalised === 0 ? "muted" : undefined}
-              sub={setup.finalised === 0 ? "يمتلئ السجلّ بأوّل إقفال" : "مجمَّدةٌ كما أُقفلت"}
+              sub={setup.finalised === 0 ? "يمتلئ السجلّ بأوّل إقفال" : "مجمّدة كما أقفلت"}
               href={showAmounts && setup.finalised > 0 ? "/inventory/history" : undefined}
             />
           </div>
@@ -255,7 +255,7 @@ export default async function InventoryPage({
       */}
       {recent.length > 0 && (
         <Section
-          title="آخرُ ما أُقفل"
+          title="آخر ما أقفل"
           icon={History}
           action={showAmounts ? (
             <Link href="/inventory/history" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">

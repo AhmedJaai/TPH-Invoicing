@@ -85,8 +85,8 @@ async function importAndMap(
 
 /* ─────────────────── الاستيراد ─────────────────── */
 
-describe("استيرادُ المبيعات لا يُضاعِف", () => {
-  it("الملفُّ عينُه مرّتين: الثانيةُ تُردّ `DUPLICATE` ولا تُكتب بيعةٌ واحدة", () =>
+describe("استيراد المبيعات لا يضاعف", () => {
+  it("الملفّ عينه مرّتين: الثانية تردّ `DUPLICATE` ولا تكتب بيعة واحدة", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const buffer = salesFile(3);
@@ -103,7 +103,7 @@ describe("استيرادُ المبيعات لا يُضاعِف", () => {
       expect(await countSales(tx, "FDX:ORD-")).toBe(before);
     }));
 
-  it("وملفٌّ آخر يحمل الطلباتِ نفسَها لا يضاعفها — المنعُ على المفتاح الطبيعيّ لا على البصمة", () =>
+  it("وملفّ آخر يحمل الطلبات نفسها لا يضاعفها — المنع على المفتاح الطبيعيّ لا على البصمة", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
 
@@ -132,7 +132,7 @@ describe("استيرادُ المبيعات لا يُضاعِف", () => {
     تصدير الأمس يصل اليوم بحال `Void`؛ ولو رُدّ الملفُّ «مكرَّراً» لبقي
     في قيدنا مبيعاً لم يقع، وحُسب استهلاكُه في الجرد.
   */
-  it("تصديرٌ مصحَّح يُقرأ مراجعةً لا تكراراً — ويُحدَّث السطر", () =>
+  it("تصدير مصحّح يقرأ مراجعةً لا تكراراً — ويحدّث السطر", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
 
@@ -168,7 +168,7 @@ describe("استيرادُ المبيعات لا يُضاعِف", () => {
       expect(raw.rows[0].reason).toContain("تغيّر ما يقوله المصدر");
     }));
 
-  it("وخيارُ الإضافة يُقيَّد ولا يدخل طابور الربط", () =>
+  it("وخيار الإضافة يقيّد ولا يدخل طابور الربط", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       await importSalesFile({
@@ -191,7 +191,7 @@ describe("استيرادُ المبيعات لا يُضاعِف", () => {
       expect(queue.map((q) => q.externalId)).not.toContain("sk-0039");
     }));
 
-  it("ولا صفَّ يُرمى صامتاً — الخامُ محفوظٌ بحاله وسببه", () =>
+  it("ولا صفّ يرمى صامتاً — الخام محفوظ بحاله وسببه", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const buffer = workbook([
@@ -216,7 +216,7 @@ describe("استيرادُ المبيعات لا يُضاعِف", () => {
 /* ─────────────────── دورةُ الجرد ─────────────────── */
 
 describe("الجرد من طرفه إلى طرفه", () => {
-  it("مبيعاتٌ ووصفةٌ ومشترياتٌ وعدٌّ فعليّ ← فرقٌ محسوب", () =>
+  it("مبيعات ووصفة ومشتريات وعدّ فعليّ ← فرق محسوب", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -259,7 +259,7 @@ describe("الجرد من طرفه إلى طرفه", () => {
       expect(line.varianceCostMinor).toBe(-187_50);
     }));
 
-  it("والهدرُ المسجَّل يخرج من الفرق — لا يزيد الرفَّ ولا ينقصه", () =>
+  it("والهدر المسجّل يخرج من الفرق — لا يزيد الرفّ ولا ينقصه", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -304,7 +304,7 @@ describe("الجرد من طرفه إلى طرفه", () => {
     آخر، **والبيعةُ التي لم يُقرأ فرعُها ليست «لفرعٍ آخر»** — هي بيعةٌ
     لا نعرف أين وقعت، وإخراجُها يُظهر الاستهلاك صفراً بلا شكوى.
   */
-  it("مبيعاتُ فرعٍ آخر لا تُحسَب على هذا المخزون، والبيعةُ بلا فرعٍ تُحسَب", () =>
+  it("مبيعات فرع آخر لا تحسب على هذا المخزون، والبيعة بلا فرع تحسب", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const mine = await makeBranch(tx);
@@ -331,7 +331,7 @@ describe("الجرد من طرفه إلى طرفه", () => {
       expect(canonicalToQuantity(report.lines[0].theoreticalConsumptionMilli!, "G")).toBe(200);
     }));
 
-  it("وجردٌ واحد للفترة الواحدة — ضغطتان لا تُنشئان جردين", () =>
+  it("وجرد واحد للفترة الواحدة — ضغطتان لا تنشئان جردين", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branchId = (await makeBranch(tx)).id;
@@ -362,7 +362,7 @@ describe("الجرد من طرفه إلى طرفه", () => {
     ومؤثِّرُ `037` يبقى خلفه لمن كتب في القاعدة مباشرةً — يُثبته
     `db:verify`.
   */
-  it("وفترةٌ ليست أسبوعاً تُردّ، ومعها الأسبوعُ الصحيح", () =>
+  it("وفترة ليست أسبوعاً تردّ، ومعها الأسبوع الصحيح", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branchId = (await makeBranch(tx)).id;
@@ -378,7 +378,7 @@ describe("الجرد من طرفه إلى طرفه", () => {
       expect((e as Error).message).toContain("2026-09-05");
     }));
 
-  it("والأسبوعُ التالي يُقبَل — السادسُ يبدأ بعد الخامس", () =>
+  it("والأسبوع التالي يقبل — السادس يبدأ بعد الخامس", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branchId = (await makeBranch(tx)).id;
@@ -390,7 +390,7 @@ describe("الجرد من طرفه إلى طرفه", () => {
       expect(second.countId).not.toBe(first.countId);
     }));
 
-  it("والفترةُ نفسُها في فرعٍ آخر جردٌ آخر — لا تداخل", () =>
+  it("والفترة نفسها في فرع آخر جرد آخر — لا تداخل", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const mine = (await makeBranch(tx)).id;
@@ -406,8 +406,8 @@ describe("الجرد من طرفه إلى طرفه", () => {
 
 /* ─────────────────── الثباتُ التاريخيّ ─────────────────── */
 
-describe("التقريرُ المقفَل لا يتغيّر", () => {
-  it("تعديلُ الوصفة بعد الإقفال لا يمسّ التقرير", () =>
+describe("التقرير المقفل لا يتغيّر", () => {
+  it("تعديل الوصفة بعد الإقفال لا يمسّ التقرير", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -447,7 +447,7 @@ describe("التقريرُ المقفَل لا يتغيّر", () => {
       expect(canonicalToQuantity(reread.lines[0].varianceMilli!, "KG")).toBe(-0.5);
     }));
 
-  it("والقاعدةُ ترفض الكتابةَ في جردٍ مقفَل — لا الشيفرةُ وحدها", () =>
+  it("والقاعدة ترفض الكتابة في جرد مقفل — لا الشيفرة وحدها", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const coffee = await makeStockProduct(tx, "بنّ", "KG", "COFFEE");
@@ -464,10 +464,10 @@ describe("التقريرُ المقفَل لا يتغيّر", () => {
           .set({ actualMilli: kg(99) })
           .where(eq(inventoryCountLines.countId, countId)),
       );
-      expect(pgErrorOf(e)?.message).toContain("مقفَل");
+      expect(pgErrorOf(e)?.message).toContain("مقفل");
     }));
 
-  it("والخدمةُ تقول ذلك بلغةٍ تُقرأ قبل أن يصل الطلبُ إلى القاعدة", () =>
+  it("والخدمة تقول ذلك بلغة تقرأ قبل أن يصل الطلب إلى القاعدة", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const coffee = await makeStockProduct(tx, "بنّ", "KG", "COFFEE");
@@ -483,7 +483,7 @@ describe("التقريرُ المقفَل لا يتغيّر", () => {
       expect(e).toBeInstanceOf(CountLockedError);
     }));
 
-  it("ولقطةُ جردٍ مقفَل لا تُحذَف", () =>
+  it("ولقطة جرد مقفل لا تحذف", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const coffee = await makeStockProduct(tx, "بنّ", "KG", "COFFEE");
@@ -498,10 +498,10 @@ describe("التقريرُ المقفَل لا يتغيّر", () => {
       const e = await caught(
         tx.delete(inventoryCountSnapshots).where(eq(inventoryCountSnapshots.countId, countId)),
       );
-      expect(pgErrorOf(e)?.message).toContain("لا تُعدَّل");
+      expect(pgErrorOf(e)?.message).toContain("لا تعدّل");
     }));
 
-  it("وإعادةُ الفتح فعلٌ بسببٍ مكتوب، وعدّادُها يبقى", () =>
+  it("وإعادة الفتح فعل بسبب مكتوب، وعدّادها يبقى", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const coffee = await makeStockProduct(tx, "بنّ", "KG", "COFFEE");
@@ -515,7 +515,7 @@ describe("التقريرُ المقفَل لا يتغيّر", () => {
 
       await expect(reopenCount(countId, "لا", actorId, tx)).rejects.toThrow();
 
-      await reopenCount(countId, "وصلت فاتورةٌ متأخّرة", actorId, tx);
+      await reopenCount(countId, "وصلت فاتورة متأخّرة", actorId, tx);
       const header = await loadCountHeader(countId, tx);
       expect(header?.status).toBe("DRAFT");
       expect(header?.reopenCount).toBe(1);
@@ -527,8 +527,8 @@ describe("التقريرُ المقفَل لا يتغيّر", () => {
 
 /* ─────────────────── نسخُ الوصفة ─────────────────── */
 
-describe("نسخُ الوصفة لا تتداخل", () => {
-  it("تفعيلُ نسخةٍ يُغلق سابقتَها في اليوم الذي قبلها", () =>
+describe("نسخ الوصفة لا تتداخل", () => {
+  it("تفعيل نسخة يغلق سابقتها في اليوم الذي قبلها", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const coffee = await makeStockProduct(tx, "بنّ", "KG", "COFFEE");
@@ -561,7 +561,7 @@ describe("نسخُ الوصفة لا تتداخل", () => {
     بدأت أوّلُ النسخ يومَ رفعها خرج **١٧٠٦ سطرَ بيعٍ من ١٧١٧** من
     الحساب — ٩٩٫٨٪ من الوحدات — والوصفاتُ كلُّها صحيحة.
   */
-  it("أوّلُ نسخةٍ تسري منذ البداية، فتغطّي ما بِيع قبل كتابتها", () =>
+  it("أوّل نسخة تسري منذ البداية، فتغطّي ما بيع قبل كتابتها", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const coffee = await makeStockProduct(tx, "بنّ", "KG", "COFFEE");
@@ -583,7 +583,7 @@ describe("نسخُ الوصفة لا تتداخل", () => {
       expect(String(v.effective_from)).toBe(RECIPE_EPOCH);
     }));
 
-  it("والتغييرُ اللاحق وحده يُؤرَّخ — ونسخةٌ تبدأ قبل السارية تُرَدّ", () =>
+  it("والتغيير اللاحق وحده يؤرّخ — ونسخة تبدأ قبل السارية تردّ", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const coffee = await makeStockProduct(tx, "بنّ", "KG", "COFFEE");
@@ -608,7 +608,7 @@ describe("نسخُ الوصفة لا تتداخل", () => {
       }, tx)).rejects.toThrow(/تبدأ في 2026-09-08/);
     }));
 
-  it("والمؤثِّرُ في القاعدة يمنع التداخل ولو التُفّ على الخدمة", () =>
+  it("والمؤثّر في القاعدة يمنع التداخل ولو التفّ على الخدمة", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const coffee = await makeStockProduct(tx, "بنّ", "KG", "COFFEE");
@@ -629,8 +629,8 @@ describe("نسخُ الوصفة لا تتداخل", () => {
 
 /* ─────────────────── الافتتاحيّ والتاريخ ─────────────────── */
 
-describe("الافتتاحيُّ من آخر جردٍ مقفَل", () => {
-  it("فعليُّ الأسبوع الأوّل هو افتتاحيُّ الثاني — ولا يُقرأ صفراً حين لا سابق", () =>
+describe("الافتتاحيّ من آخر جرد مقفل", () => {
+  it("فعليّ الأسبوع الأوّل هو افتتاحيّ الثاني — ولا يقرأ صفراً حين لا سابق", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -656,7 +656,7 @@ describe("الافتتاحيُّ من آخر جردٍ مقفَل", () => {
       expect(canonicalToQuantity(secondReport.lines[0].openingMilli!, "KG")).toBe(8);
     }));
 
-  it("وتاريخُ الصنف يجمع جرداته — وبه يُفرَّق المتكرّرُ من الحادثة", () =>
+  it("وتاريخ الصنف يجمع جرداته — وبه يفرّق المتكرّر من الحادثة", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -700,8 +700,8 @@ const REAL_TO = "2026-09-19";
  */
 const TOP_SKU = "sk-0058";
 
-describe("التصديرُ الحقيقيّ يدخل القاعدة", () => {
-  it("‏١٬٠٩٠ طلباً و٢٬٠٨١ سطراً منها ٣٦٤ خيارَ إضافة — ثمّ الملفُّ عينُه تكرار", () =>
+describe("التصدير الحقيقيّ يدخل القاعدة", () => {
+  it("‏١٬٠٩٠ طلباً و٢٬٠٨١ سطراً منها ٣٦٤ خيار إضافة — ثمّ الملفّ عينه تكرار", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -742,7 +742,7 @@ describe("التصديرُ الحقيقيّ يدخل القاعدة", () => {
     وهذا هو موضعُ الفحص: البياناتُ الحقيقيّة فيها الحالاتُ الثلاث،
     والملفُّ المصنوع لا يضمنها.
   */
-  it("وأكثرُها مبيعاً ٢٧٦ كوباً مصنوعاً من ٢٩٣ — ‏٢٠ جراماً لكلٍّ = ‏٥٫٥٢ كجم", () =>
+  it("وأكثرها مبيعاً ٢٧٦ كوباً مصنوعاً من ٢٩٣ — ‏٢٠ جراماً لكلّ = ‏٥٫٥٢ كجم", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -836,7 +836,7 @@ async function makePurchase(
  * والسؤالان اللذان لا يجيبهما اختبارٌ نقيّ: أيبقى العدُّ المكتوب بعد
  * الاستبعاد؟ وأيتوارَث الاختيارُ إلى جرد الأسبوع القادم؟
  */
-describe("نطاقُ الجرد", () => {
+describe("نطاق الجرد", () => {
   async function twoItems(tx: Tx) {
     const actorId = await makeActor(tx);
     const branch = await makeBranch(tx);
@@ -863,7 +863,7 @@ describe("نطاقُ الجرد", () => {
     return { actorId, branch, coffee, straws };
   }
 
-  it("المستبعَدُ تُحسَب وقائعُه ولا فرقَ له — ولا يدخل المجاميع", () =>
+  it("المستبعد تحسب وقائعه ولا فرق له — ولا يدخل المجاميع", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee, straws } = await twoItems(tx);
       const { countId } = await startCount({
@@ -882,7 +882,7 @@ describe("نطاقُ الجرد", () => {
       expect(report.coverage.scope.included).toBe(1);
     }));
 
-  it("والعدُّ المكتوب يبقى في القاعدة — يُستبعَد الصنفُ ثمّ يعود فيعود فرقُه", () =>
+  it("والعدّ المكتوب يبقى في القاعدة — يستبعد الصنف ثمّ يعود فيعود فرقه", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await twoItems(tx);
       const { countId } = await startCount({
@@ -906,7 +906,7 @@ describe("نطاقُ الجرد", () => {
       )).toBe(-2.5);
     }));
 
-  it("والاختيارُ يُتوارَث إلى جرد الأسبوع التالي — ولا يُسأل عنه كلَّ أحد", () =>
+  it("والاختيار يتوارث إلى جرد الأسبوع التالي — ولا يسأل عنه كلّ أحد", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee, straws } = await twoItems(tx);
 
@@ -929,7 +929,7 @@ describe("نطاقُ الجرد", () => {
       expect(report.lines.find((l) => l.productId === coffee)!.inScope).toBe(true);
     }));
 
-  it("ولا يُكتَب نطاقٌ في جردٍ مقفَل", () =>
+  it("ولا يكتب نطاق في جرد مقفل", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee, straws } = await twoItems(tx);
       const { countId } = await startCount({
@@ -943,8 +943,8 @@ describe("نطاقُ الجرد", () => {
     }));
 });
 
-describe("إلغاءُ جردٍ لم يُقفَل — «ابدأه من جديد»", () => {
-  it("يُحذف المسوّدةُ وأسطرُها، ويُحفَظ عدُّها في السجلّ، ويُبدأ أسبوعُه ثانيةً", () =>
+describe("إلغاء جرد لم يقفل — «ابدأه من جديد»", () => {
+  it("يحذف المسوّدة وأسطرها، ويحفظ عدّها في السجلّ، ويبدأ أسبوعه ثانيةً", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -967,7 +967,7 @@ describe("إلغاءُ جردٍ لم يُقفَل — «ابدأه من جديد
       expect(again.countId).not.toBe(countId);
     }));
 
-  it("المقفَلُ لا يُلغى — يُعاد فتحُه بسببٍ مكتوب", () =>
+  it("المقفل لا يلغى — يعاد فتحه بسبب مكتوب", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);

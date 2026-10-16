@@ -72,7 +72,7 @@ export function SupplierPicker({
     setCreating(false);
     toast({
       tone: "ok",
-      title: r.data.existed ? "مسجَّلٌ من قبل — اختير" : "أُنشئ المورّد واختير",
+      title: r.data.existed ? "مسجّل من قبل — اختير" : "أنشئ المورّد واختير",
       body: s.nameAr,
     });
     return true;
@@ -81,7 +81,7 @@ export function SupplierPicker({
     <div className="mt-3 space-y-2">
       {suggested.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-bold text-muted">لعلّه — اسمُه في نصّ البنك:</span>
+          <span className="text-[11px] font-bold text-muted">لعلّه — اسمه في نصّ البنك:</span>
           {suggested.map((s) => (
             <button
               key={s.id}
@@ -124,14 +124,14 @@ export function SupplierPicker({
           className={buttonClass("quiet", "sm")}
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          ليس في القائمة؟ مورّدٌ جديد
+          ليس في القائمة؟ مورّد جديد
         </button>
       )}
       {!chipsOnly && creating && (
         <div className="rounded-lg border border-line-soft bg-sunken/50 p-2.5">
           <div className="flex flex-wrap items-end gap-2">
             <label className="min-w-[10rem] flex-1">
-              <span className="text-[11px] font-bold text-muted">اسمُ المورّد بالعربية</span>
+              <span className="text-[11px] font-bold text-muted">اسم المورّد بالعربية</span>
               <input
                 value={name}
                 onChange={(e) => { setName(e.target.value); setSimilar([]); }}
@@ -150,7 +150,7 @@ export function SupplierPicker({
             <button type="button" onClick={() => setCreating(false)} className={buttonClass("quiet", "sm")}>إلغاء</button>
           </div>
           <p className="mt-1.5 text-[11px] text-muted">
-            وتُكمَل بياناتُه (الرقمُ الضريبيّ، واسمُ مجلّده في الدرايف) من ملفّه بعدها.
+            وتكمل بياناته (الرقم الضريبيّ، واسم مجلّده في الدرايف) من ملفّه بعدها.
           </p>
           <SimilarSuppliers
             similar={similar}

@@ -108,8 +108,8 @@ export async function recordStatementOnlyInvoices(
     });
   if (!matchedByNumber && inWindow.length > 0) {
     throw new StatementInvoicesRefused(
-      "مراجعُ هذا الكشف ليست أرقامَ فواتيرنا (لم يطابق سطرٌ منه فاتورةً برقمها) — فلا يُقيَّد منه شيءٌ آلياً، "
-      + "وقد تكون فواتيرُه عندنا بأرقامٍ أخرى. قارِنه بالفواتير من صفحة المورّد.",
+      "مراجع هذا الكشف ليست أرقام فواتيرنا (لم يطابق سطر منه فاتورةً برقمها) — فلا يقيّد منه شيء آلياً، "
+      + "وقد تكون فواتيره عندنا بأرقام أخرى. قارنه بالفواتير من صفحة المورّد.",
     );
   }
 
@@ -179,7 +179,7 @@ export async function recordStatementOnlyInvoices(
       after: {
         الكشف: st.fileName,
         الفواتير: out.created.map((c) => `${c.number} · ${c.date} · ${formatRiyalsDisplay(c.amountMinor)}`),
-        السبب: "فواتيرُ يذكرها كشفُ المورّد ولا ملفَّ لها — قُيِّدت منه، ولا تُخصم ضريبتُها حتى يصل ملفُّها",
+        السبب: "فواتير يذكرها كشف المورّد ولا ملفّ لها — قيّدت منه، ولا تخصم ضريبتها حتى يصل ملفّها",
         شهرٌ_مقفل: out.closedMonth.map((c) => `${c.number} (${c.month})`),
       },
     }, tx);

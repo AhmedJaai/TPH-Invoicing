@@ -36,7 +36,7 @@ export function implicitGridColumns(source: string): string[] {
   return out;
 }
 
-describe("الشبكةُ المتجاوبة لها عمودٌ صريح على الجوّال", () => {
+describe("الشبكة المتجاوبة لها عمود صريح على الجوّال", () => {
   for (const file of walk("src")) {
     const source = readFileSync(file, "utf8");
     if (!source.includes("grid-cols")) continue;
@@ -45,11 +45,11 @@ describe("الشبكةُ المتجاوبة لها عمودٌ صريح على ا
     });
   }
 
-  it("والحارس يُمسك الشكل الخاطئ", () => {
+  it("والحارس يمسك الشكل الخاطئ", () => {
     expect(implicitGridColumns('<div className="mt-10 grid gap-8 xl:grid-cols-[1fr_2fr]">')).toHaveLength(1);
   });
 
-  it("ولا يُمسك الصواب", () => {
+  it("ولا يمسك الصواب", () => {
     expect(implicitGridColumns('<div className="grid grid-cols-[minmax(0,1fr)] xl:grid-cols-2">')).toEqual([]);
     expect(implicitGridColumns('<div className="grid h-7 w-7 place-items-center">')).toEqual([]);
   });

@@ -33,9 +33,9 @@ export interface OwnerEntry {
 }
 
 export const OWNER_ENTRY_LABEL: Record<OwnerEntryKind, string> = {
-  PAID_FOR_CAFE: "سدّدتَ عن المقهى",
-  PUT_IN: "أدخلتَ إلى الحساب",
-  TOOK_OUT: "أخذتَ من الحساب",
+  PAID_FOR_CAFE: "سدّدت عن المقهى",
+  PUT_IN: "أدخلت إلى الحساب",
+  TOOK_OUT: "أخذت من الحساب",
 };
 
 /** أثرُ القيد على الرصيد: ما له موجب، وما عليه سالب. */

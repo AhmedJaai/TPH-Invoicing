@@ -7,8 +7,8 @@ import { importSalesFile } from "./sales-import.service";
 import { changesSinceFinalise } from "./inventory-staleness.service";
 import { toCanonical } from "@/lib/inventory/units";
 
-describe("الجردُ المقفَل يقول إن تغيّر ما تحته", () => {
-  it("ملفُّ مبيعاتٍ لأيّامه بعد الإقفال يُقال — والتقريرُ يبقى كما أُقفل", () =>
+describe("الجرد المقفل يقول إن تغيّر ما تحته", () => {
+  it("ملفّ مبيعات لأيّامه بعد الإقفال يقال — والتقرير يبقى كما أقفل", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -25,6 +25,6 @@ describe("الجردُ المقفَل يقول إن تغيّر ما تحته", (
       await tx.execute(sql`update sales_imports set created_at = now() + interval '1 hour' where file_name = 'late.xlsx'`);
 
       const stale = await changesSinceFinalise((await loadCountHeader(countId, tx))!, tx);
-      expect(stale.map((r) => r.label)).toEqual(["ملفُّ مبيعاتٍ لأيّامه استُورد بعد الإقفال"]);
+      expect(stale.map((r) => r.label)).toEqual(["ملفّ مبيعات لأيّامه استورد بعد الإقفال"]);
     }));
 });

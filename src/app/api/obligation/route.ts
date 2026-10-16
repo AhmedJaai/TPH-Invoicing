@@ -13,17 +13,17 @@ import { createObligation, setObligationClosed, updateObligation, type Obligatio
 
 export const runtime = "nodejs";
 
-const Id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, "معرّفٌ غير صالح");
+const Id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, "معرّف غير صالح");
 const optional = (max: number) => z.string().max(max).optional();
 
 const Fields = z.object({
   kind: z.enum(OBLIGATION_KINDS),
-  title: z.string().trim().min(2, "اكتب اسمَ الوثيقة").max(120),
+  title: z.string().trim().min(2, "اكتب اسم الوثيقة").max(120),
   issuer: optional(120),
   reference: optional(80),
   holder: optional(120),
-  expiresOn: z.string().refine(isRealDay, "تاريخُ الانتهاء غير صالح — بصيغة YYYY-MM-DD"),
-  remindDays: z.number().int().min(1, "المهلةُ يومٌ على الأقلّ").max(MAX_REMIND_DAYS, `المهلةُ ${MAX_REMIND_DAYS} يوماً على الأكثر`).optional(),
+  expiresOn: z.string().refine(isRealDay, "تاريخ الانتهاء غير صالح — بصيغة YYYY-MM-DD"),
+  remindDays: z.number().int().min(1, "المهلة يوم على الأقلّ").max(MAX_REMIND_DAYS, `المهلة ${MAX_REMIND_DAYS} يوماً على الأكثر`).optional(),
   note: optional(500),
 });
 
@@ -66,15 +66,15 @@ export async function POST(request: Request) {
   try {
     if (body.action === "create") {
       const id = await createObligation(toInput(body), user.id);
-      return NextResponse.json({ ok: true, id, message: `أُضيفت «${body.title}»` });
+      return NextResponse.json({ ok: true, id, message: `أضيفت «${body.title}»` });
     }
     const found =
       body.action === "update" ? await updateObligation(body.id, toInput(body), user.id)
       : await setObligationClosed(body.id, body.action === "close", user.id);
-    if (!found) return NextResponse.json({ error: "الوثيقة غير موجودة — ربما حُذفت. حدّث الصفحة" }, { status: 404 });
+    if (!found) return NextResponse.json({ error: "الوثيقة غير موجودة — ربما حذفت. حدّث الصفحة" }, { status: 404 });
     return NextResponse.json({
       ok: true,
-      message: body.action === "update" ? "حُفظ التعديل" : body.action === "close" ? "أُرشفت — لن يُذكَّر بها" : "أُعيدت إلى المتابعة",
+      message: body.action === "update" ? "حفظ التعديل" : body.action === "close" ? "أرشفت — لن يذكّر بها" : "أعيدت إلى المتابعة",
     });
   } catch (e) {
     const mapped = respondTo(e);

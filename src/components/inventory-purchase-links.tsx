@@ -43,11 +43,11 @@ export function PurchaseLinkPanel({
           <h3 id="purchase-links-title" className="text-sm font-bold">
             {open.length > 0
               ? <>{countNoun(open.length, PRODUCT)} من فواتير الأسبوع لا يدخل الجرد</>
-              : <>كلُّ ما في فواتير الأسبوع يدخل الجرد</>}
+              : <>كلّ ما في فواتير الأسبوع يدخل الجرد</>}
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-            اسمُ الصنف في الفاتورة غيرُ اسمه في الوصفة. اربط كلَّ بندٍ بصنف الجرد وقل كم في الوحدة الواحدة منه —
-            مرّةً واحدة، ويُحسَب في كلّ جردٍ بعدها.
+            اسم الصنف في الفاتورة غير اسمه في الوصفة. اربط كلّ بند بصنف الجرد وقل كم في الوحدة الواحدة منه —
+            مرّةً واحدة، ويحسب في كلّ جرد بعدها.
           </p>
           {saved && <p role="status" className="mt-2 text-xs font-medium text-ok">{saved}</p>}
         </div>
@@ -72,7 +72,7 @@ export function PurchaseLinkPanel({
             className="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink"
           >
             <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showLinked ? "rotate-180" : ""}`} aria-hidden />
-            ما رُبط ودخل الجرد ({linked.length})
+            ما ربط ودخل الجرد ({linked.length})
           </button>
           {showLinked && (
             <ul className="mt-2 divide-y divide-line">
@@ -131,7 +131,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
       setError(r.error);
       return;
     }
-    onSaved(`${row.displayName}: ${r.data.message ?? "حُفظ الربط"}`);
+    onSaved(`${row.displayName}: ${r.data.message ?? "حفظ الربط"}`);
     setEditing(false);
     router.refresh();
   }
@@ -147,7 +147,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
           <span className="text-muted"> · {row.supplierName}</span>
         </p>
         <p className="text-[11px] text-muted">
-          الكمّيّة <span className="nums">{row.qtyText}</span> · {row.lines === 1 ? "بندٌ واحد" : <><span className="nums">{row.lines}</span> بنود</>}
+          الكمّيّة <span className="nums">{row.qtyText}</span> · {row.lines === 1 ? "بند واحد" : <><span className="nums">{row.lines}</span> بنود</>}
           {row.invoiceNumbers.length > 0 && <> · <span dir="ltr" className="nums">{row.invoiceNumbers.join("، ")}</span></>}
         </p>
       </div>
@@ -165,7 +165,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
         </p>
       ) : (
         <p className="mt-1 text-xs text-warn">
-          {row.productName && <>مربوطٌ بـ«{row.productName}» — </>}
+          {row.productName && <>مربوط بـ«{row.productName}» — </>}
           {row.statusLabel}
         </p>
       )}
@@ -174,7 +174,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
         /* نموذجٌ حقيقيّ: Enter في حقل العبوة يربط */
         <form onSubmit={(e) => { e.preventDefault(); void save(); }} className="mt-2 flex flex-wrap items-end gap-2">
           <label className="min-w-0 flex-1 basis-56 text-[11px] text-muted">
-            صنفُ الجرد
+            صنف الجرد
             <select
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
@@ -184,7 +184,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
               <option value="">— اختر —</option>
               {ordered.map((o) => (
                 <option key={o.id} value={o.id}>
-                  {o.nameAr}{o.id === suggested?.id && o.id !== row.productId ? " · مقترَح" : ""}
+                  {o.nameAr}{o.id === suggested?.id && o.id !== row.productId ? " · مقترح" : ""}
                 </option>
               ))}
             </select>
@@ -229,7 +229,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
           </button>
           {isLinked && (
             <button type="button" onClick={() => setEditing(false)} disabled={busy} className={buttonClass("quiet", "sm")}>
-              ألغِ
+              ألغ
             </button>
           )}
         </form>
@@ -238,12 +238,12 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
       {showForm && (row.guessedPack || (suggested && !row.productId)) && (
         <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted">
           <Sparkles className="h-3 w-3" aria-hidden />
-          قُرئ المقترَحُ من اسم البند — تأكّد منه قبل الربط.
+          قرئ المقترح من اسم البند — تأكّد منه قبل الربط.
         </p>
       )}
       {product && contentUnit !== "" && !unitOk && (
         <p className="mt-1 text-[11px] text-warn">
-          «{product.nameAr}» يُقاس بـ{storedUnitLabel(product.baseUnit)} — اختر وحدةً من عائلته.
+          «{product.nameAr}» يقاس بـ{storedUnitLabel(product.baseUnit)} — اختر وحدةً من عائلته.
         </p>
       )}
       {error && <p role="alert" className="mt-1 text-xs text-danger">{error}</p>}

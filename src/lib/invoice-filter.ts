@@ -89,15 +89,15 @@ export function hasFilters(f: InvoiceFilters): boolean {
 export const TAX_LABEL: Record<TaxFilter, string> = {
   VALID: "مستوفية الأركان",
   INVALID: "ينقصها ركن",
-  UNKNOWN: "لم تُقرأ ضريبتها",
-  NOT_APPLICABLE: "لا تُقيَّد",
+  UNKNOWN: "لم تقرأ ضريبتها",
+  NOT_APPLICABLE: "لا تقيّد",
 };
 
 export const PAID_LABEL: Record<PaidFilter, string> = {
   OPEN: "عليها رصيد",
-  UNPAID: "لم تُسدَّد",
-  PARTIAL: "سُدّدت جزئياً",
-  PAID: "مسدَّدة",
+  UNPAID: "لم تسدّد",
+  PARTIAL: "سدّدت جزئياً",
+  PAID: "مسدّدة",
 };
 
 /**
@@ -114,7 +114,7 @@ export function describe(f: InvoiceFilters, supplierName?: string | null): strin
   if (f.overdue) parts.push(`مضى على استحقاقها ${countNoun(OVERDUE_DAYS, DAY)}`);
   if (f.noLines) parts.push("بلا بنود مقروءة");
   if (f.withVat) parts.push("فيها ضريبة");
-  if (f.fixedAsset) parts.push("أصولٌ ثابتة (فوق حدّ الرسملة)");
+  if (f.fixedAsset) parts.push("أصول ثابتة (فوق حدّ الرسملة)");
   if (f.month) parts.push(`في ${f.month}`);
   return parts.length === 0 ? "كل الفواتير" : parts.join(" · ");
 }

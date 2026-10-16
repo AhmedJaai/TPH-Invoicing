@@ -226,7 +226,7 @@ async function reclaimForwardCredit(tx: Tx, supplierId: string): Promise<number>
       entityType: "supplier",
       entityId: supplierId,
       before: { فُكّ_آلياً: freed },
-      after: { السبب: "فاتورةٌ أقدم وصلت متأخّرة — تُستردّ حوالتُها ثمّ تُوزَّع بالأقدم أوّلاً" },
+      after: { السبب: "فاتورة أقدم وصلت متأخّرة — تستردّ حوالتها ثمّ توزّع بالأقدم أوّلاً" },
     }, tx);
   }
   return freeable.length;
@@ -260,7 +260,7 @@ async function loadInvoiceForOwner(executor: Executor, invoiceId: string) {
     `)
   ).rows;
   if (!inv) throw new CreditError("الفاتورة غير موجودة", 404);
-  if (!inv.supplier_id) throw new CreditError("الفاتورة بلا مورّد — لا حساب تُقيَّد عليه", 400);
+  if (!inv.supplier_id) throw new CreditError("الفاتورة بلا مورّد — لا حساب تقيّد عليه", 400);
 
   const allocs = (
     await executor.execute<{ payment_id: string; amount_minor: number; method: string; paid_at: Date | string }>(sql`
@@ -284,7 +284,7 @@ export async function previewOwnerPaid(executor: Executor, invoiceId: string): P
   const ownerPaymentMinor = inv.total_minor - keptMinor;
 
   if (ownerPaymentMinor <= SETTLED_TOLERANCE_MINOR) {
-    throw new CreditError("هذه الفاتورة مقيَّدةٌ سداداً من خارج حساب المقهى أصلاً");
+    throw new CreditError("هذه الفاتورة مقيّدة سداداً من خارج حساب المقهى أصلاً");
   }
 
   /* المحاكاة: الحوالات بعد الفكّ، وفواتير المورّد الأخرى */

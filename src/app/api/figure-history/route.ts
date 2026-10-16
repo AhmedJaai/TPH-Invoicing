@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   }
   const figure = new URL(request.url).searchParams.get("figure");
   if (!isFigureId(figure)) {
-    return NextResponse.json({ error: "رقمٌ غير معروف" }, { status: 400 });
+    return NextResponse.json({ error: "رقم غير معروف" }, { status: 400 });
   }
   return NextResponse.json({ ok: true, movers: await loadFigureMovers(figure, user.id) }, { headers: { "cache-control": "no-store" } });
 }

@@ -53,7 +53,7 @@ export default async function CountReportPage({
       user={user}
       width="wide"
       title="تقرير الجرد"
-      eyebrow={`${locked ? "جردٌ مقفَل" : "جردٌ مفتوح"}${header.branchName ? ` · ${header.branchName}` : ""}`}
+      eyebrow={`${locked ? "جرد مقفل" : "جرد مفتوح"}${header.branchName ? ` · ${header.branchName}` : ""}`}
       intro={`أسبوع ${formatWeek(header.periodStart, header.periodEnd)}`}
       actions={can(user.role, "amounts:view")
         ? <LinkButton href="/inventory/history" size="sm" icon={History}>سجلّ الجرد</LinkButton>

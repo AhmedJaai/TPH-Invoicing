@@ -59,8 +59,8 @@ async function line(tx: Tx, countId: string, productId: string) {
 
 /* ───────────────────── الرصيدُ الافتتاحيّ ───────────────────── */
 
-describe("الرصيدُ الافتتاحيّ اليدويّ", () => {
-  it("‏٥٫٢ كجم تُدخَل بالكيلو فيتسلّمها المحرّك ‏٥٢٠٠ جرام — ومصدرُها «يدويّ»", () =>
+describe("الرصيد الافتتاحيّ اليدويّ", () => {
+  it("‏٥٫٢ كجم تدخل بالكيلو فيتسلّمها المحرّك ‏٥٢٠٠ جرام — ومصدرها «يدويّ»", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx);
       const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
@@ -77,7 +77,7 @@ describe("الرصيدُ الافتتاحيّ اليدويّ", () => {
       expect(audit.n).toBe(1);
     }));
 
-  it("وبلا جردٍ سابق ولا إدخال — غيرُ معروف، لا صفر", () =>
+  it("وبلا جرد سابق ولا إدخال — غير معروف، لا صفر", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx);
       const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
@@ -87,7 +87,7 @@ describe("الرصيدُ الافتتاحيّ اليدويّ", () => {
       expect(l.theoreticalClosingMilli).toBeNull();
     }));
 
-  it("وفعليُّ الجرد المقفَل السابق افتتاحيُّ ما بعده — «من جرد الأسبوع السابق»", () =>
+  it("وفعليّ الجرد المقفل السابق افتتاحيّ ما بعده — «من جرد الأسبوع السابق»", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx, 0);
       const prev = await startCount({ periodStart: PREV.start, periodEnd: PREV.end, branchId: branch.id, actorId }, tx);
@@ -101,7 +101,7 @@ describe("الرصيدُ الافتتاحيّ اليدويّ", () => {
       expect(l.openingRef).toBe(prev.countId);
     }));
 
-  it("وجردٌ قبل أسبوعين لا يصير افتتاحيّاً — الفجوةُ «غير معروف» لا رقمٌ يُسقط استهلاكَ أسبوعٍ كامل", () =>
+  it("وجرد قبل أسبوعين لا يصير افتتاحيّاً — الفجوة «غير معروف» لا رقم يسقط استهلاك أسبوع كامل", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx, 0);
       const old = await startCount({ periodStart: "2026-08-30", periodEnd: "2026-09-05", branchId: branch.id, actorId }, tx);
@@ -114,7 +114,7 @@ describe("الرصيدُ الافتتاحيّ اليدويّ", () => {
       expect(l.openingSource).toBe("UNKNOWN");
     }));
 
-  it("ورصيدٌ افتتاحيّ مسجَّلٌ حركةً قبل أشهر لا يسدّ فجوةً — «غير معروف» لا رقمُ يونيو", () =>
+  it("ورصيد افتتاحيّ مسجّل حركةً قبل أشهر لا يسدّ فجوةً — «غير معروف» لا رقم يونيو", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx, 0);
       await tx.execute(sql`
@@ -127,7 +127,7 @@ describe("الرصيدُ الافتتاحيّ اليدويّ", () => {
       expect(l.openingSource).toBe("UNKNOWN");
     }));
 
-  it("واليدويّ يغلب السابقَ صراحةً — ويبقى تاريخُه، والإفراغُ يُعيد السابقَ لا الصفر", () =>
+  it("واليدويّ يغلب السابق صراحةً — ويبقى تاريخه، والإفراغ يعيد السابق لا الصفر", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx, 0);
       const prev = await startCount({ periodStart: PREV.start, periodEnd: PREV.end, branchId: branch.id, actorId }, tx);
@@ -156,7 +156,7 @@ describe("الرصيدُ الافتتاحيّ اليدويّ", () => {
       expect(l.openingSource).toBe("PREVIOUS_COUNT");
     }));
 
-  it("ووحدةٌ من عائلةٍ أخرى تُردّ — اللترُ لا يصير جراماً", () =>
+  it("ووحدة من عائلة أخرى تردّ — اللتر لا يصير جراماً", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx, 0);
       const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
@@ -164,7 +164,7 @@ describe("الرصيدُ الافتتاحيّ اليدويّ", () => {
         .toBeInstanceOf(Error);
     }));
 
-  it("والفرعُ لا يرث افتتاحيَّ فرعٍ آخر", () =>
+  it("والفرع لا يرث افتتاحيّ فرع آخر", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx, 0);
       const other = await makeBranch(tx);
@@ -181,8 +181,8 @@ describe("الرصيدُ الافتتاحيّ اليدويّ", () => {
 
 /* ───────────────────── الكمّيّةُ المستلَمة ───────────────────── */
 
-describe("الكمّيّةُ المستلَمة يدوياً", () => {
-  it("‏٥ + ٢٠ مستلَمة − ١٢ استهلاك = ١٣ متوقَّعاً، والفعليّ ١٠٫٥ ← فرقٌ −٢٫٥ — في المعادلة نفسِها", () =>
+describe("الكمّيّة المستلمة يدوياً", () => {
+  it("‏٥ + ٢٠ مستلمة − ١٢ استهلاك = ١٣ متوقّعاً، والفعليّ ١٠٫٥ ← فرق −٢٫٥ — في المعادلة نفسها", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx);
       const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
@@ -201,7 +201,7 @@ describe("الكمّيّةُ المستلَمة يدوياً", () => {
       expect(kgOf(l.varianceMilli)).toBe(-2.5);
     }));
 
-  it("وبلا مشترياتٍ ولا استلام — صفرٌ حقيقيّ لا مجهول", () =>
+  it("وبلا مشتريات ولا استلام — صفر حقيقيّ لا مجهول", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx);
       const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
@@ -210,7 +210,7 @@ describe("الكمّيّةُ المستلَمة يدوياً", () => {
       expect(l.flags).not.toContain("PURCHASES_UNKNOWN");
     }));
 
-  it("وبندُ فاتورةٍ بعشرين كيلو يُحسَب مرّةً واحدة", () =>
+  it("وبند فاتورة بعشرين كيلو يحسب مرّةً واحدة", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx);
       await makeInvoicePurchase(tx, coffee, "2026-09-14", 1760_00, { packSize: "1", contentUnit: "KG", contentQuantity: "20", qty: "1" });
@@ -218,7 +218,7 @@ describe("الكمّيّةُ المستلَمة يدوياً", () => {
       expect(kgOf((await line(tx, countId, coffee)).purchasesMilli)).toBe(20);
     }));
 
-  it("وبندٌ لا تُعرَف كمّيّتُه — المشترياتُ مجهولة لا صفر، ثمّ يحلّها استلامٌ مرتبطٌ به", () =>
+  it("وبند لا تعرف كمّيّته — المشتريات مجهولة لا صفر، ثمّ يحلّها استلام مرتبط به", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx);
       const lineId = await makeInvoicePurchase(tx, coffee, "2026-09-14", 1760_00, null);
@@ -240,7 +240,7 @@ describe("الكمّيّةُ المستلَمة يدوياً", () => {
       expect(l.unitCostMilliMinor).toBe(88_00 * 1000 / 1000);
     }));
 
-  it("والاستلامُ الذي يشبه بنداً قائماً يُردّ قبل أن يُكتَب — ولا يُحسَب أربعين", () =>
+  it("والاستلام الذي يشبه بنداً قائماً يردّ قبل أن يكتب — ولا يحسب أربعين", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx);
       const lineId = await makeInvoicePurchase(tx, coffee, "2026-09-14", 1760_00, { packSize: "1", contentUnit: "KG", contentQuantity: "20", qty: "1" });
@@ -260,7 +260,7 @@ describe("الكمّيّةُ المستلَمة يدوياً", () => {
       expect(kgOf((await line(tx, countId, coffee)).purchasesMilli)).toBe(20);
     }));
 
-  it("وشحنتان حقيقيّتان متساويتان — يُؤكَّد انفصالُهما فتُحسَبان معاً", () =>
+  it("وشحنتان حقيقيّتان متساويتان — يؤكّد انفصالهما فتحسبان معاً", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx);
       await makeInvoicePurchase(tx, coffee, "2026-09-14", 1760_00, { packSize: "1", contentUnit: "KG", contentQuantity: "20", qty: "1" });
@@ -273,7 +273,7 @@ describe("الكمّيّةُ المستلَمة يدوياً", () => {
       expect(kgOf((await line(tx, countId, coffee)).purchasesMilli)).toBe(40);
     }));
 
-  it("والفاتورةُ التي تصل بعد الاستلام تُكشَف عند الحساب — المشترياتُ مجهولة حتى تُحسَم", () =>
+  it("والفاتورة التي تصل بعد الاستلام تكشف عند الحساب — المشتريات مجهولة حتى تحسم", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx);
       const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
@@ -294,7 +294,7 @@ describe("الكمّيّةُ المستلَمة يدوياً", () => {
       expect(kgOf((await line(tx, countId, coffee)).purchasesMilli)).toBe(20);
     }));
 
-  it("واستلامُ ١٨ لبندِ فاتورةٍ بتاريخ ٢٠ — يدخل أسبوعَ ١٨ ولا يُعاد في أسبوع ٢٠", () =>
+  it("واستلام ١٨ لبند فاتورة بتاريخ ٢٠ — يدخل أسبوع ١٨ ولا يعاد في أسبوع ٢٠", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx, 0);
       const lineId = await makeInvoicePurchase(tx, coffee, "2026-09-20", 1760_00, { packSize: "1", contentUnit: "KG", contentQuantity: "20", qty: "1" });
@@ -309,25 +309,25 @@ describe("الكمّيّةُ المستلَمة يدوياً", () => {
       expect(kgOf((await line(tx, next.countId, coffee)).purchasesMilli)).toBe(0);
     }));
 
-  it("والإلغاءُ يُخرجه من الحساب ولا يمحوه", () =>
+  it("والإلغاء يخرجه من الحساب ولا يمحوه", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx);
       const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
       const id = await createReceipt({
         productId: coffee, branchId: branch.id, receivedOn: "2026-09-16", enteredMilli: 20_000, unit: "KG",
       }, actorId, tx);
-      await voidReceipt(id, "أُدخلت بالخطأ", actorId, tx);
+      await voidReceipt(id, "أدخلت بالخطأ", actorId, tx);
 
       expect((await line(tx, countId, coffee)).purchasesMilli).toBe(0);
       const [row] = (await tx.execute<{ void_reason: string }>(sql`select void_reason from inventory_receipts where id = ${id}`)).rows;
-      expect(row.void_reason).toBe("أُدخلت بالخطأ");
+      expect(row.void_reason).toBe("أدخلت بالخطأ");
     }));
 });
 
 /* ───────────────────── الجردُ المقفَل ───────────────────── */
 
-describe("المقفَلُ لا يعني غيرَ ما عناه يومَ أُقفل", () => {
-  it("لا استلامَ في أسبوعه ولا افتتاحيَّ فيه — والقاعدةُ ترفض لا الواجهة وحدها", () =>
+describe("المقفل لا يعني غير ما عناه يوم أقفل", () => {
+  it("لا استلام في أسبوعه ولا افتتاحيّ فيه — والقاعدة ترفض لا الواجهة وحدها", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee } = await cafe(tx);
       const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
@@ -346,14 +346,14 @@ describe("المقفَلُ لا يعني غيرَ ما عناه يومَ أُق�
         insert into inventory_count_openings (id, count_id, product_id, entered_milli, entered_unit, canonical_milli)
         values ('x-open', ${countId}, ${coffee}, 1000, 'KG', 1000000)
       `));
-      expect(String((bypass as Error).message) + String((bypass as { cause?: Error }).cause?.message ?? "")).toContain("مقفَل");
+      expect(String((bypass as Error).message) + String((bypass as { cause?: Error }).cause?.message ?? "")).toContain("مقفل");
     }));
 });
 
 /* ───────────────────── نطاقُ الجرد ───────────────────── */
 
-describe("نطاقُ الجرد حالٌ محفوظة", () => {
-  it("الجديدُ يرث نطاقَ سابقه ويُقال إنّه موروث", () =>
+describe("نطاق الجرد حال محفوظة", () => {
+  it("الجديد يرث نطاق سابقه ويقال إنّه موروث", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee, milk, cups } = await cafe(tx, 0);
       const prev = await startCount({ periodStart: PREV.start, periodEnd: PREV.end, branchId: branch.id, actorId }, tx);
@@ -366,7 +366,7 @@ describe("نطاقُ الجرد حالٌ محفوظة", () => {
       expect([...scope.excluded].sort()).toEqual([milk, cups].sort());
     }));
 
-  it("واختيارُ الكلّ صراحةً يبقى الكلَّ بعد التحديث — لا يُورَّث ثانيةً", () =>
+  it("واختيار الكلّ صراحةً يبقى الكلّ بعد التحديث — لا يورّث ثانيةً", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee, milk, cups } = await cafe(tx, 0);
       const prev = await startCount({ periodStart: PREV.start, periodEnd: PREV.end, branchId: branch.id, actorId }, tx);
@@ -384,7 +384,7 @@ describe("نطاقُ الجرد حالٌ محفوظة", () => {
       expect(report.lines.every((l) => l.inScope)).toBe(true);
     }));
 
-  it("واختيارُ بعضها صراحةً يبقى كما هو بعد التحديث", () =>
+  it("واختيار بعضها صراحةً يبقى كما هو بعد التحديث", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee, milk, cups } = await cafe(tx, 0);
       const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
@@ -394,7 +394,7 @@ describe("نطاقُ الجرد حالٌ محفوظة", () => {
       expect(report.lines.filter((l) => !l.inScope).map((l) => l.productId).sort()).toEqual([milk, cups].sort());
     }));
 
-  it("والحفظُ عمليّةٌ واحدة — معرّفٌ غريبٌ واحد يُلغي الكلّ ولا يبقى نصفُ نطاق", () =>
+  it("والحفظ عمليّة واحدة — معرّف غريب واحد يلغي الكلّ ولا يبقى نصف نطاق", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee, milk } = await cafe(tx, 0);
       const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
@@ -414,8 +414,8 @@ describe("نطاقُ الجرد حالٌ محفوظة", () => {
 
 /* ───────────────────── النقصُ والزيادة ───────────────────── */
 
-describe("النقصُ والزيادةُ لا يتقاصّان في الاتّجاه", () => {
-  it("أسبوعٌ نقص وأسبوعٌ زاد بالمقدار نفسه — الصافي صفر، والنقصُ والحجمُ ليسا صفراً", () =>
+describe("النقص والزيادة لا يتقاصّان في الاتّجاه", () => {
+  it("أسبوع نقص وأسبوع زاد بالمقدار نفسه — الصافي صفر، والنقص والحجم ليسا صفراً", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee, latte } = await cafe(tx, 0);
 

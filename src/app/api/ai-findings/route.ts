@@ -66,6 +66,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: e.message }, { status: e.status });
     }
     console.error("[ai-findings]", e);
-    return NextResponse.json({ error: "تعذّر حفظ القرار — لم يُكتب شيء" }, { status: 500 });
+    return NextResponse.json({ error: "تعذّر حفظ القرار — لم يكتب شيء" }, { status: 500 });
   }
 }

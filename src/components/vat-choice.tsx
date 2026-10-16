@@ -16,7 +16,7 @@ type Kind = "tx" | "invoice";
 async function send(ids: readonly string[], included: boolean | null, kind: Kind = "tx"): Promise<boolean> {
   const res = await postJson("/api/vat-choice", { kind, ids, included });
   if (!res.ok) {
-    toast({ title: "لم يُحفَظ الاختيار", body: res.error, tone: "danger" });
+    toast({ title: "لم يحفظ الاختيار", body: res.error, tone: "danger" });
     return false;
   }
   return true;
@@ -93,7 +93,7 @@ export function VatBulk({
   if (confirm) {
     return (
       <ConfirmAction
-        label={typeof children === "string" ? children : "نفِّذ"}
+        label={typeof children === "string" ? children : "نفّذ"}
         title={confirm.title}
         consequence={confirm.consequence}
         acknowledgement={confirm.acknowledgement}
@@ -114,7 +114,7 @@ export function VatBulk({
       size="sm"
       variant={variant}
       disabled={ids.length === 0}
-      reason="لا حركةَ يتغيّر اختيارُها"
+      reason="لا حركة يتغيّر اختيارها"
       onAction={async () => {
         const ok = await send(ids, included, kind);
         if (ok) start(() => { router.refresh(); });
@@ -161,7 +161,7 @@ export function VatCashField({ month, label, initial, locked }: {
           onChange={(e) => setValue(e.target.value)}
           inputMode="decimal"
           dir="ltr"
-          placeholder="لم يُكتب"
+          placeholder="لم يكتب"
           disabled={Boolean(locked)}
           title={locked}
           className={FIELD}
@@ -173,7 +173,7 @@ export function VatCashField({ month, label, initial, locked }: {
         disabled={!dirty || Boolean(locked)}
         reason={locked ?? "لم يتغيّر المبلغ"}
         onAction={async () => {
-          const ok = await act({ action: "cash", month, amount: value.trim() || null }, "لم يُحفَظ مبلغُ النقد");
+          const ok = await act({ action: "cash", month, amount: value.trim() || null }, "لم يحفظ مبلغ النقد");
           if (ok) start(() => { router.refresh(); });
           return ok;
         }}
@@ -215,14 +215,14 @@ export function VatFilePanel({ period, today, credit, disabled }: {
           onClick={() => setOpen(true)}
           className={buttonClass("primary", "sm")}
         >
-          قدّمتُه للهيئة
+          قدّمته للهيئة
         </button>
       )}
       <Reveal open={open}>
         <div className="space-y-3 rounded-xl border border-line bg-raised p-4">
-          <p className="text-sm font-bold">تسجيلُ تقديم الإقرار</p>
+          <p className="text-sm font-bold">تسجيل تقديم الإقرار</p>
           <p className="text-xs leading-relaxed text-ink-soft">
-            يُحفَظ الرقمُ كما هو الآن وتُقفل اختياراتُ الربع، وما يتغيّر بعده يُعرض «فرقاً منذ التقديم». التقديمُ نفسُه في بوّابة الهيئة.
+            يحفظ الرقم كما هو الآن وتقفل اختيارات الربع، وما يتغيّر بعده يعرض «فرقاً منذ التقديم». التقديم نفسه في بوّابة الهيئة.
           </p>
           <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
             <label className="block">
@@ -236,9 +236,9 @@ export function VatFilePanel({ period, today, credit, disabled }: {
           </div>
           {credit && (
             <fieldset>
-              <legend className="mb-1 text-[11px] font-medium text-muted">الصافي رصيدٌ لك — ماذا اخترتَ في البوّابة؟</legend>
+              <legend className="mb-1 text-[11px] font-medium text-muted">الصافي رصيد لك — ماذا اخترت في البوّابة؟</legend>
               <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
-                {([["CARRY", "يُرحَّل للربع التالي"], ["REFUND", "طلبتُ استردادَه"]] as const).map(([v, text]) => (
+                {([["CARRY", "يرحّل للربع التالي"], ["REFUND", "طلبت استرداده"]] as const).map(([v, text]) => (
                   <label key={v} className="flex min-h-11 items-center gap-2 sm:min-h-0">
                     <input type="radio" name={`vat-credit-${period}`} checked={disposition === v} onChange={() => setDisposition(v)} className="h-4 w-4 accent-[var(--accent)]" />
                     {text}
@@ -252,11 +252,11 @@ export function VatFilePanel({ period, today, credit, disabled }: {
               size="sm"
               variant="primary"
               disabled={missing || !filedOn}
-              reason={missing ? "اختر ما فُعل بالرصيد" : "اكتب يومَ التقديم"}
+              reason={missing ? "اختر ما فعل بالرصيد" : "اكتب يوم التقديم"}
               onAction={async () => {
-                const ok = await act({ action: "file", period, filedOn, reference: reference.trim() || null, creditDisposition: credit ? disposition : null }, "لم يُسجَّل التقديم");
+                const ok = await act({ action: "file", period, filedOn, reference: reference.trim() || null, creditDisposition: credit ? disposition : null }, "لم يسجّل التقديم");
                 if (ok) {
-                  toast({ title: "سُجّل تقديمُ الإقرار", body: "حُفظ رقمُه وأُقفلت اختياراتُ الربع.", tone: "ok" });
+                  toast({ title: "سجّل تقديم الإقرار", body: "حفظ رقمه وأقفلت اختيارات الربع.", tone: "ok" });
                   setOpen(false);
                   start(() => { router.refresh(); });
                 }
@@ -289,10 +289,10 @@ export function VatVoidFiling({ period }: { period: string }) {
       <Reveal open={open}>
         <div className="space-y-3 rounded-xl border border-warn/30 bg-warn-bg p-4">
           <p className="text-xs leading-relaxed text-ink-soft">
-            يفتح اختياراتِ الربع فيتغيّر رقمُه بما تغيّر بعد التقديم. اللقطةُ المحفوظة تبقى في السجلّ بسبب التراجع. ولا يغيّر شيئاً عند الهيئة.
+            يفتح اختيارات الربع فيتغيّر رقمه بما تغيّر بعد التقديم. اللقطة المحفوظة تبقى في السجلّ بسبب التراجع. ولا يغيّر شيئاً عند الهيئة.
           </p>
           <label className="block">
-            <span className="mb-1 block text-[11px] font-medium text-muted">سببُ التراجع</span>
+            <span className="mb-1 block text-[11px] font-medium text-muted">سبب التراجع</span>
             <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} className={FIELD} />
           </label>
           <div className="flex flex-wrap gap-2">
@@ -309,7 +309,7 @@ export function VatVoidFiling({ period }: { period: string }) {
             >
               تراجع عن التسجيل
             </ActionButton>
-            <button type="button" onClick={() => setOpen(false)} className={buttonClass("quiet", "sm")}>أبقِه</button>
+            <button type="button" onClick={() => setOpen(false)} className={buttonClass("quiet", "sm")}>أبقه</button>
           </div>
         </div>
       </Reveal>

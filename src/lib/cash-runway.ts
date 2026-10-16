@@ -60,8 +60,8 @@ export function buildRunway(input: RunwayInput): Runway {
 }
 
 export const RUNWAY_BLOCK_LABEL: Record<RunwayBlock, string> = {
-  NO_BALANCE: "لا يُحسب: الرصيدُ غير معروف",
-  STALE: "لا يُحسب: الكشفُ واقفٌ منذ أكثر من أسبوع — رصيدُه لا يصف اليوم",
-  SHORT_HISTORY: "لا يُحسب بعد: يلزمه ثلاثون يوماً من الكشف على الأقلّ",
-  NO_OUTFLOW: "لا يُحسب: لا صادرَ في الكشف يُبنى عليه معدّل",
+  NO_BALANCE: "لا يحسب: الرصيد غير معروف",
+  STALE: "لا يحسب: الكشف واقف منذ أكثر من أسبوع — رصيده لا يصف اليوم",
+  SHORT_HISTORY: "لا يحسب بعد: يلزمه ثلاثون يوماً من الكشف على الأقلّ",
+  NO_OUTFLOW: "لا يحسب: لا صادر في الكشف يبنى عليه معدّل",
 };

@@ -96,7 +96,7 @@ export function buildGate(checks: readonly GateCheck[]): GateReport {
         key,
         label: GATE_LABEL[key] ?? key,
         status: "UNKNOWN",
-        detail: "لم يُفحَص — والبند الساقط لا يجوز أن يختفي من التقرير",
+        detail: "لم يفحص — والبند الساقط لا يجوز أن يختفي من التقرير",
       },
   );
 
@@ -110,10 +110,10 @@ export function buildGate(checks: readonly GateCheck[]): GateReport {
     failed,
     unknown,
     verdict: ready
-      ? "جاهز للإنتاج — كلّ بندٍ فُحص ونجح."
+      ? "جاهز للإنتاج — كلّ بند فحص ونجح."
       : failed > 0
-        ? `غير جاهز: ${countNoun(failed, ITEM)} فشل${unknown > 0 ? ` و${unknown} لم يُفحَص` : ""}.`
-        : `غير جاهز: ${countNoun(unknown, ITEM)} لم يُفحَص. و«لم نتحقّق» ليست «لا بأس».`,
+        ? `غير جاهز: ${countNoun(failed, ITEM)} فشل${unknown > 0 ? ` و${unknown} لم يفحص` : ""}.`
+        : `غير جاهز: ${countNoun(unknown, ITEM)} لم يفحص. و«لم نتحقّق» ليست «لا بأس».`,
   };
 }
 

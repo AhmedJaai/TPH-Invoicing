@@ -31,9 +31,9 @@ export function ObligationForm({ existing }: { existing?: Obligation }) {
   const [error, setError] = useState<string | null>(null);
 
   const remind = Number(remindDays);
-  const titleError = title.trim().length < 2 ? "اكتب اسمَ الوثيقة" : null;
-  const dateError = !isRealDay(expiresOn) ? "اختر تاريخَ الانتهاء" : null;
-  const remindError = !Number.isInteger(remind) || remind < 1 || remind > MAX_REMIND_DAYS ? `من يومٍ إلى ${MAX_REMIND_DAYS} يوماً` : null;
+  const titleError = title.trim().length < 2 ? "اكتب اسم الوثيقة" : null;
+  const dateError = !isRealDay(expiresOn) ? "اختر تاريخ الانتهاء" : null;
+  const remindError = !Number.isInteger(remind) || remind < 1 || remind > MAX_REMIND_DAYS ? `من يوم إلى ${MAX_REMIND_DAYS} يوماً` : null;
 
   async function save(): Promise<boolean> {
     setTried(true);
@@ -48,7 +48,7 @@ export function ObligationForm({ existing }: { existing?: Obligation }) {
       setError(r.error);
       return false;
     }
-    toast({ tone: "ok", title: typeof r.data.message === "string" ? r.data.message : "حُفظ" });
+    toast({ tone: "ok", title: typeof r.data.message === "string" ? r.data.message : "حفظ" });
     setOpen(false);
     if (!existing) {
       setTitle(""); setIssuer(""); setReference(""); setHolder(""); setExpiresOn(""); setNote(""); setTried(false);
@@ -61,13 +61,13 @@ export function ObligationForm({ existing }: { existing?: Obligation }) {
     <>
       <button type="button" onClick={() => setOpen(true)} className={`${buttonClass(existing ? "quiet" : "primary", existing ? "sm" : "md")} relative`}>
         {existing ? <Pencil className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> : <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />}
-        {existing ? "عدِّل أو جدِّد" : "أضِف وثيقة"}
+        {existing ? "عدّل أو جدّد" : "أضف وثيقة"}
       </button>
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
-        title={existing ? `تعديل «${existing.title}»` : "وثيقةٌ جديدة"}
-        description={existing ? "للتجديد: اكتب تاريخَ الانتهاء الجديد — والقديمُ يبقى في سجلّ التدقيق." : "ما له تاريخُ انتهاءٍ يُغرَّم على فواته: رخصة، شهادة، إقامة، عقد."}
+        title={existing ? `تعديل «${existing.title}»` : "وثيقة جديدة"}
+        description={existing ? "للتجديد: اكتب تاريخ الانتهاء الجديد — والقديم يبقى في سجلّ التدقيق." : "ما له تاريخ انتهاء يغرّم على فواته: رخصة، شهادة، إقامة، عقد."}
         footer={
           <>
             <button type="button" onClick={() => setOpen(false)} className={buttonClass("quiet")}>إلغاء</button>
@@ -83,22 +83,22 @@ export function ObligationForm({ existing }: { existing?: Obligation }) {
               </select>
             )}
           </Field>
-          <Field label="اسمُ الوثيقة" required error={tried ? titleError : null} hint="كما تعرفها: «رخصة البلديّة — النسيم».">
+          <Field label="اسم الوثيقة" required error={tried ? titleError : null} hint="كما تعرفها: «رخصة البلديّة — النسيم».">
             {({ invalid, ...p }) => <Input {...p} invalid={invalid} value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />}
           </Field>
-          <Field label="تاريخُ الانتهاء" required error={tried ? dateError : null} hint="بالميلاديّ.">
+          <Field label="تاريخ الانتهاء" required error={tried ? dateError : null} hint="بالميلاديّ.">
             {({ invalid, ...p }) => <Input {...p} invalid={invalid} type="date" dir="ltr" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} />}
           </Field>
-          <Field label="ذكِّرني قبلها بكم يوماً" required error={tried ? remindError : null} hint="ثلاثون للرخص، وتسعون لعقد الإيجار.">
+          <Field label="ذكّرني قبلها بكم يوماً" required error={tried ? remindError : null} hint="ثلاثون للرخص، وتسعون لعقد الإيجار.">
             {({ invalid, ...p }) => <Input {...p} invalid={invalid} type="text" inputMode="numeric" dir="ltr" className="nums" value={remindDays} onChange={(e) => setRemindDays(e.target.value.replace(/[^\d]/g, ""))} />}
           </Field>
-          <Field label="الجهة المُصدِرة">
+          <Field label="الجهة المصدرة">
             {({ invalid, ...p }) => <Input {...p} invalid={invalid} value={issuer} maxLength={120} onChange={(e) => setIssuer(e.target.value)} />}
           </Field>
-          <Field label="رقمُ الوثيقة">
+          <Field label="رقم الوثيقة">
             {({ invalid, ...p }) => <Input {...p} invalid={invalid} dir="ltr" value={reference} maxLength={80} onChange={(e) => setReference(e.target.value)} />}
           </Field>
-          <Field label="لمن" hint="اسمُ الموظّف في الإقامة والشهادة الصحّيّة.">
+          <Field label="لمن" hint="اسم الموظّف في الإقامة والشهادة الصحّيّة.">
             {({ invalid, ...p }) => <Input {...p} invalid={invalid} value={holder} maxLength={120} onChange={(e) => setHolder(e.target.value)} />}
           </Field>
           <Field label="ملاحظة">

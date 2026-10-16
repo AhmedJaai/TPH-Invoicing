@@ -235,8 +235,8 @@ async function ledgerGapFinding(
     gapMinor: gap,
     code: ISSUE.STATEMENT_LEDGER_GAP,
     severity: "WARN" as const,
-    message: `كشفُه يقول إنّا ندين له ${formatRiyalsDisplay(closingMinor)} يوم ${day}، ودفترُنا يقول ${owed >= 0 ? formatRiyalsDisplay(owed) : `لنا عنده ${formatRiyalsDisplay(-owed)}`} — `
-      + (gap < 0 ? `ينقصنا ${formatRiyalsDisplay(-gap)}: فواتيرُ في كشفه لم تُقيَّد، أو سدادٌ مقيَّدٌ لم يقع` : `يزيدنا ${formatRiyalsDisplay(gap)}: سدادٌ لم يُقيَّد، أو فاتورةٌ عندنا ليست في كشفه`),
+    message: `كشفه يقول إنّا ندين له ${formatRiyalsDisplay(closingMinor)} يوم ${day}، ودفترنا يقول ${owed >= 0 ? formatRiyalsDisplay(owed) : `لنا عنده ${formatRiyalsDisplay(-owed)}`} — `
+      + (gap < 0 ? `ينقصنا ${formatRiyalsDisplay(-gap)}: فواتير في كشفه لم تقيّد، أو سداد مقيّد لم يقع` : `يزيدنا ${formatRiyalsDisplay(gap)}: سداد لم يقيّد، أو فاتورة عندنا ليست في كشفه`),
   };
 }
 

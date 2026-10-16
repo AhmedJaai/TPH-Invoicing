@@ -154,22 +154,22 @@ export async function savePurchaseLink(
   actorId: string,
   conn: Conn = db,
 ): Promise<{ productName: string }> {
-  if (!DECIMAL.test(input.packSize) || (decimalToMilli(input.packSize) ?? 0) <= 0) throw new PurchaseLinkRefused("عددُ العبوات في الوحدة رقمٌ أكبر من صفر");
-  if (!DECIMAL.test(input.contentQuantity) || (decimalToMilli(input.contentQuantity) ?? 0) <= 0) throw new PurchaseLinkRefused("كمّيّةُ العبوة رقمٌ أكبر من صفر");
+  if (!DECIMAL.test(input.packSize) || (decimalToMilli(input.packSize) ?? 0) <= 0) throw new PurchaseLinkRefused("عدد العبوات في الوحدة رقم أكبر من صفر");
+  if (!DECIMAL.test(input.contentQuantity) || (decimalToMilli(input.contentQuantity) ?? 0) <= 0) throw new PurchaseLinkRefused("كمّيّة العبوة رقم أكبر من صفر");
 
   const [sp] = await conn.select({
     id: supplierProducts.id, productId: supplierProducts.productId, packSize: supplierProducts.packSize,
     contentQuantity: supplierProducts.contentQuantity, contentUnit: supplierProducts.contentUnit, name: supplierProducts.displayName,
   }).from(supplierProducts).where(eq(supplierProducts.id, input.supplierProductId)).limit(1);
-  if (!sp) throw new PurchaseLinkRefused("صنفُ المورّد غير موجود — حدّث الصفحة");
+  if (!sp) throw new PurchaseLinkRefused("صنف المورّد غير موجود — حدّث الصفحة");
 
   const [product] = await conn.select({ id: products.id, nameAr: products.nameAr, baseUnit: products.baseUnit, isStockItem: products.isStockItem })
     .from(products).where(eq(products.id, input.productId)).limit(1);
   if (!product || !product.isStockItem) throw new PurchaseLinkRefused("اختر صنفاً من أصناف الجرد");
   if (!isStoredUnit(product.baseUnit) || !sameUnitFamily(input.contentUnit, product.baseUnit)) {
     throw new PurchaseLinkRefused(
-      `«${product.nameAr}» يُقاس بـ${isStoredUnit(product.baseUnit) ? storedUnitLabel(product.baseUnit) : product.baseUnit}`
-      + ` — و${storedUnitLabel(input.contentUnit)} لا تُحوَّل إليه. اختر وحدةً من عائلته.`,
+      `«${product.nameAr}» يقاس بـ${isStoredUnit(product.baseUnit) ? storedUnitLabel(product.baseUnit) : product.baseUnit}`
+      + ` — و${storedUnitLabel(input.contentUnit)} لا تحوّل إليه. اختر وحدةً من عائلته.`,
     );
   }
 

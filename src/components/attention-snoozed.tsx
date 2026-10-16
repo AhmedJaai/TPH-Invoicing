@@ -14,7 +14,7 @@ export function SnoozedList({ snoozed, canEdit }: { snoozed: readonly SnoozedIte
     <details className="mt-8">
       <summary className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-xs font-bold text-ink-soft hover:text-ink">
         <AlarmClock className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-        مؤجَّل: {countNoun(snoozed.length, ITEM)} — خارج العدّ حتى يومه
+        مؤجّل: {countNoun(snoozed.length, ITEM)} — خارج العدّ حتى يومه
       </summary>
       <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised">
         {snoozed.map(({ item, until, note }) => (
@@ -27,9 +27,9 @@ export function SnoozedList({ snoozed, canEdit }: { snoozed: readonly SnoozedIte
             </span>
             {item.amountMinor !== undefined && <span className="text-sm font-bold"><Money minor={item.amountMinor} /></span>}
             {canEdit && (
-              <PostAction url="/api/attention-snooze" body={{ itemId: item.id, until: null }} variant="quiet" done="عاد البندُ إلى الطابور">
+              <PostAction url="/api/attention-snooze" body={{ itemId: item.id, until: null }} variant="quiet" done="عاد البند إلى الطابور">
                 <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                أعِده الآن
+                أعده الآن
               </PostAction>
             )}
           </li>

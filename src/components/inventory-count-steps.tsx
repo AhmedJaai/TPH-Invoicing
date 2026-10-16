@@ -145,23 +145,23 @@ export function InventoryCountSteps({
     },
     flow: {
       title: "ما دخل وما خرج",
-      status: unknownInputs > 0 ? `${unknownInputs} ينقصه حدّ` : "المعادلةُ معروفة",
+      status: unknownInputs > 0 ? `${unknownInputs} ينقصه حدّ` : "المعادلة معروفة",
       done: locked || unknownInputs === 0,
       warn: !locked && unknownInputs > 0,
     },
     count: {
       title: "كم وجدنا؟",
-      status: `عُدّ ${counted} من ${inScope.length}`,
+      status: `عدّ ${counted} من ${inScope.length}`,
       done: locked || (inScope.length > 0 && counted === inScope.length),
     },
     review: {
       title: "ماذا اختلف؟",
-      status: measured ? "النقصُ والزيادة" : "لم يُحسَب بعد",
+      status: measured ? "النقص والزيادة" : "لم يحسب بعد",
       done: locked,
     },
     close: {
-      title: locked ? "حالُ الجرد" : "أقفِل الجرد",
-      status: locked ? "مقفَل" : "بعد المراجعة",
+      title: locked ? "حال الجرد" : "أقفل الجرد",
+      status: locked ? "مقفل" : "بعد المراجعة",
       done: locked,
     },
   };
@@ -235,7 +235,7 @@ export function InventoryCountSteps({
               {step === "count" && dirtyCount > 0 && (
                 <span className="flex items-center gap-1.5 text-xs text-warn">
                   <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                  {countNoun(dirtyCount, PRODUCT)} لم يُحفَظ بعد
+                  {countNoun(dirtyCount, PRODUCT)} لم يحفظ بعد
                 </span>
               )}
               <button type="button" onClick={() => go(next)} className={buttonClass("primary")}>
@@ -392,7 +392,7 @@ function ScopePicker({
 
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
-    toast({ tone: "ok", title: `حُفظ النطاق — يُعَدّ ${countNoun(chosen, PRODUCT)}.` });
+    toast({ tone: "ok", title: `حفظ النطاق — يعدّ ${countNoun(chosen, PRODUCT)}.` });
     router.refresh();
     onDone();
   }
@@ -410,29 +410,29 @@ function ScopePicker({
       <div className="mb-4 max-w-3xl">
         <h2 className="text-base font-bold">اختر ما ستعدّه على الرفّ</h2>
         <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-          <strong>والخارجُ ليس صفراً</strong>: تُحسَب مشترياتُه واستهلاكُه المتوقَّع ويُعرضان، ولا يُحسَب له فرقٌ
-          ولا يدخل المجاميع — لأنّ الفرق يقتضي عدّاً. وما أدخلتَه من عدٍّ يبقى محفوظاً إن أعدتَه.
+          <strong>والخارج ليس صفراً</strong>: تحسب مشترياته واستهلاكه المتوقّع ويعرضان، ولا يحسب له فرق
+          ولا يدخل المجاميع — لأنّ الفرق يقتضي عدّاً. وما أدخلته من عدّ يبقى محفوظاً إن أعدته.
         </p>
         {!explicit && inherited && (
           <p className="mt-2 flex items-start gap-1.5 text-xs font-bold leading-relaxed text-warn">
             <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-            هذا الاختيار موروثٌ من جردك السابق ولم تحفظه بعد — احفظه كما هو أو غيِّره.
+            هذا الاختيار موروث من جردك السابق ولم تحفظه بعد — احفظه كما هو أو غيّره.
           </p>
         )}
-        {explicit && <p className="mt-2 text-xs text-muted">نطاقٌ حفظتَه لهذا الجرد — لا يتغيّر بتغيّر الجرد السابق.</p>}
+        {explicit && <p className="mt-2 text-xs text-muted">نطاق حفظته لهذا الجرد — لا يتغيّر بتغيّر الجرد السابق.</p>}
       </div>
 
       <Toolbar query={query} setQuery={setQuery} category={category} setCategory={setCategory} categories={categories}>
         {canEdit && (
           <>
-            <button type="button" onClick={() => setAll(true)} className={buttonClass("secondary", "sm")}>أدخِل المعروض</button>
-            <button type="button" onClick={() => setAll(false)} className={buttonClass("secondary", "sm")}>أخرِج المعروض</button>
+            <button type="button" onClick={() => setAll(true)} className={buttonClass("secondary", "sm")}>أدخل المعروض</button>
+            <button type="button" onClick={() => setAll(false)} className={buttonClass("secondary", "sm")}>أخرج المعروض</button>
           </>
         )}
       </Toolbar>
 
       {visible.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line px-5 py-10 text-center text-sm text-muted">لا صنفَ يطابق هذا الترشيح.</p>
+        <p className="rounded-xl border border-dashed border-line px-5 py-10 text-center text-sm text-muted">لا صنف يطابق هذا الترشيح.</p>
       ) : (
         <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {visible.map((row) => {
@@ -452,12 +452,12 @@ function ScopePicker({
                   <span className="min-w-0 flex-1">
                     <span className={`block truncate text-[13px] font-bold ${on ? "" : "text-muted"}`}>{row.productName}</span>
                     <span className="block truncate text-[11px] text-muted">
-                      {row.categoryLabel} · يُعَدّ بـ{row.unitLabel}
-                      {row.actual.trim() !== "" && <span className="nums"> · عُدّ: {row.actual}</span>}
+                      {row.categoryLabel} · يعدّ بـ{row.unitLabel}
+                      {row.actual.trim() !== "" && <span className="nums"> · عدّ: {row.actual}</span>}
                     </span>
                   </span>
                   {picked[row.productId] !== row.inScope && (
-                    <span className="shrink-0 rounded-full bg-warn-bg px-2 py-0.5 text-[10px] font-bold text-warn">غُيِّر</span>
+                    <span className="shrink-0 rounded-full bg-warn-bg px-2 py-0.5 text-[10px] font-bold text-warn">غيّر</span>
                   )}
                 </label>
               </li>
@@ -470,19 +470,19 @@ function ScopePicker({
       <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-10 mt-5 lg:bottom-4">
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-overlay/95 px-4 py-3 shadow-overlay backdrop-blur">
           <p className="min-w-0 flex-1 text-[13px]">
-            <span className="font-bold">يُعَدّ {countNoun(chosen, PRODUCT)}</span>
+            <span className="font-bold">يعدّ {countNoun(chosen, PRODUCT)}</span>
             <span className="text-muted"> من {rows.length}</span>
-            {changed.length > 0 && <span className="text-warn"> · {changed.length} تغييراً لم يُحفَظ</span>}
+            {changed.length > 0 && <span className="text-warn"> · {changed.length} تغييراً لم يحفظ</span>}
           </p>
           {error && <p role="alert" className="w-full text-xs text-danger sm:order-last">{error}</p>}
           {canEdit ? (
             <button type="button" onClick={save} aria-busy={busy} disabled={busy || chosen === 0} className={buttonClass("primary")}>
-              {changed.length > 0 ? "احفظ النطاق وتابِع" : explicit ? "تابِع" : "احفظه كما هو وتابِع"}
+              {changed.length > 0 ? "احفظ النطاق وتابع" : explicit ? "تابع" : "احفظه كما هو وتابع"}
               <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
             </button>
           ) : (
             <button type="button" onClick={onDone} className={buttonClass("primary")}>
-              تابِع <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
+              تابع <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
             </button>
           )}
         </div>

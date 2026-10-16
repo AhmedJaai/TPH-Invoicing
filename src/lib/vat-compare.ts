@@ -71,18 +71,18 @@ export interface NetDriver {
  */
 export function netDrivers(previous: FiledQuarter, current: FiledQuarter): NetDriver[] {
   const drivers: NetDriver[] = [
-    { label: "ضريبةُ المبيعات", effectMinor: current.outputVatMinor - previous.outputVatMinor },
-    { label: "رصيدٌ مرحَّل من الربع السابق", effectMinor: -(current.carriedInMinor - previous.carriedInMinor) },
+    { label: "ضريبة المبيعات", effectMinor: current.outputVatMinor - previous.outputVatMinor },
+    { label: "رصيد مرحّل من الربع السابق", effectMinor: -(current.carriedInMinor - previous.carriedInMinor) },
   ];
   const parts: [string, number | null, number | null][] = [
-    ["خصمُ الفواتير", previous.fromInvoicesMinor, current.fromInvoicesMinor],
-    ["خصمُ ضريبة الرسوم", previous.fromFeesMinor, current.fromFeesMinor],
-    ["خصمُ ما اخترتَه من الصادر", previous.fromSelectedMinor, current.fromSelectedMinor],
+    ["خصم الفواتير", previous.fromInvoicesMinor, current.fromInvoicesMinor],
+    ["خصم ضريبة الرسوم", previous.fromFeesMinor, current.fromFeesMinor],
+    ["خصم ما اخترته من الصادر", previous.fromSelectedMinor, current.fromSelectedMinor],
   ];
   if (parts.every(([, a, b]) => a !== null && b !== null)) {
     for (const [label, a, b] of parts) drivers.push({ label, effectMinor: -((b ?? 0) - (a ?? 0)) });
   } else {
-    drivers.push({ label: "ضريبةُ المدخلات (أبوابُها غير محفوظة في اللقطة)", effectMinor: -(current.inputVatMinor - previous.inputVatMinor) });
+    drivers.push({ label: "ضريبة المدخلات (أبوابها غير محفوظة في اللقطة)", effectMinor: -(current.inputVatMinor - previous.inputVatMinor) });
   }
   return drivers
     .filter((d) => d.effectMinor !== 0)

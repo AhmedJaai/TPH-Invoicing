@@ -46,7 +46,7 @@ export function BankRules({ rows, canEdit }: { rows: BankRuleRow[]; canEdit: boo
   if (rows.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs leading-relaxed text-muted">
-        لا قواعد بعد — تُنشأ من «صنّفها» عند استيراد كشف البنك، ثمّ تُطبَّق على كلّ كشفٍ بعده.
+        لا قواعد بعد — تنشأ من «صنّفها» عند استيراد كشف البنك، ثمّ تطبّق على كلّ كشف بعده.
       </p>
     );
   }
@@ -59,10 +59,10 @@ export function BankRules({ rows, canEdit }: { rows: BankRuleRow[]; canEdit: boo
     setBusy(false);
     setAsking(null);
     if (res.ok) {
-      toast({ tone: "ok", title: "حُذفت القاعدة", body: "الحركاتُ المصنَّفة بها قبلُ تبقى على تصنيفها." });
+      toast({ tone: "ok", title: "حذفت القاعدة", body: "الحركات المصنّفة بها قبل تبقى على تصنيفها." });
       router.refresh();
     } else {
-      toast({ tone: "danger", title: "لم تُحذف القاعدة", body: res.error });
+      toast({ tone: "danger", title: "لم تحذف القاعدة", body: res.error });
     }
   }
 

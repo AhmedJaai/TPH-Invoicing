@@ -12,8 +12,8 @@ const base: FlowItemInput = {
   witnessConsumedMilli: null, witnessWasteMilli: null, witnessPurchasedMilli: null,
 };
 
-describe("الفرق غير المفسَّر", () => {
-  it("افتتاحيّ + مشترى − مستهلَك − هدر − ختاميّ", () => {
+describe("الفرق غير المفسّر", () => {
+  it("افتتاحيّ + مشترى − مستهلك − هدر − ختاميّ", () => {
     const f = buildFlowItem(base);
     /* ٥ + ٢٠ − ١٢ − ٠٫٥ − ١٠٫٥ = ٢ كجم */
     expect(f.unexplainedMilli).toBe(2_000_000);
@@ -22,70 +22,70 @@ describe("الفرق غير المفسَّر", () => {
     expect(f.staffMinor).toBe(6_000);
     expect(f.missing).toEqual([]);
   });
-  it("بلا عدٍّ في طرفٍ لا فرق — يبقى «مشترى أكثر من المباع»", () => {
+  it("بلا عدّ في طرف لا فرق — يبقى «مشترى أكثر من المباع»", () => {
     const f = buildFlowItem({ ...base, openingMilli: null });
     expect(f.unexplainedMilli).toBeNull();
     expect(f.surplusMilli).toBe(7_500_000);
     expect(f.missing).toEqual(["NO_OPENING_COUNT"]);
   });
-  it("صنفٌ لم يُربَط به بندٌ قطّ: مشترياتُه غير معروفة لا صفر", () => {
+  it("صنف لم يربط به بند قطّ: مشترياته غير معروفة لا صفر", () => {
     const f = buildFlowItem({ ...base, purchasedMilli: 0, purchasedMinor: 0, everLinked: false });
     expect(f.purchasedKnownMilli).toBeNull();
     expect(f.unexplainedMilli).toBeNull();
     expect(f.surplusMilli).toBeNull();
     expect(f.missing).toContain("PURCHASES_UNLINKED");
   });
-  it("وشاهدُ فودكس يسدّه باسمه", () => {
+  it("وشاهد فودكس يسدّه باسمه", () => {
     const f = buildFlowItem({ ...base, purchasedMilli: 0, purchasedMinor: 0, everLinked: false, witnessPurchasedMilli: 20_000_000 });
     expect(f.unexplainedMilli).toBeNull();
     expect(f.witnessUnexplainedMilli).toBe(2_000_000);
   });
-  it("مربوطٌ أقلُّ كثيراً ممّا في فودكس: نقصُ ربطٍ لا «استهلاكٌ فوق المتاح»", () => {
+  it("مربوط أقلّ كثيراً ممّا في فودكس: نقص ربط لا «استهلاك فوق المتاح»", () => {
     const f = buildFlowItem({ ...base, purchasedMilli: 2_100_000, witnessPurchasedMilli: 20_000_000 });
     expect(f.purchasedKnownMilli).toBeNull();
     expect(f.unexplainedMilli).toBeNull();
     expect(f.missing).toEqual(["PURCHASES_BELOW_WITNESS"]);
     expect(f.witnessUnexplainedMilli).toBe(2_000_000);
   });
-  it("وفودكس الأقلّ لا يُسقط مشترياتِنا — فواتيرُنا الأصل", () => {
+  it("وفودكس الأقلّ لا يسقط مشترياتنا — فواتيرنا الأصل", () => {
     const f = buildFlowItem({ ...base, witnessPurchasedMilli: 5_000_000 });
     expect(f.unexplainedMilli).toBe(2_000_000);
   });
-  it("بندٌ مربوطٌ بلا مواصفة عبوة يُخرج مشترياتِ صنفه كلَّها إلى مجهول", () => {
+  it("بند مربوط بلا مواصفة عبوة يخرج مشتريات صنفه كلّها إلى مجهول", () => {
     const f = buildFlowItem({ ...base, unmeasuredLines: 1, unmeasuredMinor: 45_000 });
     expect(f.purchasedKnownMilli).toBeNull();
     expect(f.missing).toContain("PURCHASES_UNMEASURED");
   });
-  it("بلا وصفة: الاستهلاكُ مجهول", () => {
+  it("بلا وصفة: الاستهلاك مجهول", () => {
     const f = buildFlowItem({ ...base, consumed: null });
     expect(f.consumedMinor).toBeNull();
     expect(f.unexplainedMilli).toBeNull();
     expect(f.missing).toContain("NO_RECIPE");
   });
-  it("فرقٌ سالب يبقى سالباً — خطأُ بياناتٍ لا يُطوى", () => {
+  it("فرق سالب يبقى سالباً — خطأ بيانات لا يطوى", () => {
     const f = buildFlowItem({ ...base, purchasedMilli: 10_000_000 });
     expect(f.unexplainedMilli).toBe(-8_000_000);
   });
-  it("بلا كلفة: الكمّيّةُ معروفة والقيمةُ لا", () => {
+  it("بلا كلفة: الكمّيّة معروفة والقيمة لا", () => {
     const f = buildFlowItem({ ...base, rateMilliMinor: null, costBasis: null });
     expect(f.unexplainedMilli).toBe(2_000_000);
     expect(f.unexplainedMinor).toBeNull();
   });
 });
 
-describe("الرقمُ المشكوك فيه", () => {
-  it("ماتشا عُدّت ٥٩٠ كيلو: فرقٌ فوق عشرة أضعاف ما بِيع يُخرَج ويُسمّى", () => {
+describe("الرقم المشكوك فيه", () => {
+  it("ماتشا عدّت ٥٩٠ كيلو: فرق فوق عشرة أضعاف ما بيع يخرج ويسمّى", () => {
     const f = buildFlowItem({ ...base, name: "ماتشا", openingMilli: 590_000_000, consumed: { milli: 1_000_000, salesMilli: 1_000_000, staffMilli: 0, refundsMilli: 0 }, closingMilli: 500_000 });
     expect(f.unexplainedMilli).toBeNull();
     expect(f.missing).toEqual(["SUSPECT_ENTRY"]);
   });
-  it("وفرقٌ كبيرٌ بالنسبة صغيرٌ بالريال لا يُشكّ فيه", () => {
+  it("وفرق كبير بالنسبة صغير بالريال لا يشكّ فيه", () => {
     /* مصّاصات: فرقُ ثلاثمئة حبّةٍ بعشرة ريالات */
     const f = buildFlowItem({ ...base, baseUnit: "PIECE", rateMilliMinor: 2_125, purchasedMilli: 400_000, openingMilli: 0, closingMilli: 0, wasteMilli: 0, consumed: { milli: 20_000, salesMilli: 20_000, staffMilli: 0, refundsMilli: 0 } });
     expect(f.unexplainedMilli).toBe(380_000);
     expect(f.missing).toEqual([]);
   });
-  it("قفزةُ العدّ: عشرون ضِعفاً بألف ريال، أو من صفرٍ بخمسة آلاف", () => {
+  it("قفزة العدّ: عشرون ضعفاً بألف ريال، أو من صفر بخمسة آلاف", () => {
     expect(suspectCountJump(1_000, 590_000, 65_000, 38_000_000)).toBe(true);
     /* بنٌّ نفد: من ستّة كيلو إلى صفر — حقّ */
     expect(suspectCountJump(6_675_000, 0, 60_000, 0)).toBe(false);
@@ -96,7 +96,7 @@ describe("الرقمُ المشكوك فيه", () => {
 });
 
 describe("المجموع", () => {
-  it("النقصُ والزيادةُ لا يتقاصّان", () => {
+  it("النقص والزيادة لا يتقاصّان", () => {
     const t = totalFlow([buildFlowItem(base), buildFlowItem({ ...base, productId: "q", purchasedMilli: 18_000_000 })]);
     expect(t.shortageMinor).toBe(20_000);
     expect(t.overageMinor).toBe(0);
@@ -104,7 +104,7 @@ describe("المجموع", () => {
     expect(u.shortageMinor).toBe(20_000);
     expect(u.overageMinor).toBe(-20_000);
   });
-  it("بلا صنفٍ مقيس المجاميعُ غير معروفة لا صفر", () => {
+  it("بلا صنف مقيس المجاميع غير معروفة لا صفر", () => {
     const t = totalFlow([buildFlowItem({ ...base, openingMilli: null })]);
     expect(t.shortageMinor).toBeNull();
     expect(t.surplusNoCountMinor).toBe(75_000);

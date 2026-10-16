@@ -24,7 +24,7 @@ export interface JpegPage {
 const LONG_SIDE_PT = 842;
 
 export function imagesToPdf(pages: readonly JpegPage[]): Uint8Array<ArrayBuffer> {
-  if (pages.length === 0) throw new Error("لا صورةَ تُضمّ.");
+  if (pages.length === 0) throw new Error("لا صورة تضمّ.");
   for (const p of pages) {
     if (!(p.width > 0 && p.height > 0) || p.jpeg.length < 4 || p.jpeg[0] !== 0xff || p.jpeg[1] !== 0xd8) {
       throw new Error("إحدى الصور ليست JPEG صالحة.");

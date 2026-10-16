@@ -20,44 +20,44 @@ describe("الطلب الكاتب على /api", () => {
     expect(res.status).toBe(200);
   });
 
-  it("متصفّحٌ بلا Sec-Fetch-Site يمرّ بأصله الصحيح", () => {
+  it("متصفّح بلا Sec-Fetch-Site يمرّ بأصله الصحيح", () => {
     const res = proxy(post({ cookie: SESSION, origin: "https://app.example.com", "content-type": "application/json" }));
     expect(res.status).toBe(200);
   });
 
-  it("من أصلٍ آخر يُردّ", () => {
+  it("من أصل آخر يردّ", () => {
     const res = proxy(post({ cookie: SESSION, origin: "https://evil.example", "content-type": "application/json" }));
     expect(res.status).toBe(403);
   });
 
-  it("«cross-site» يُردّ ولو غاب Origin", () => {
+  it("«cross-site» يردّ ولو غاب Origin", () => {
     const res = proxy(post({ cookie: SESSION, "sec-fetch-site": "cross-site" }));
     expect(res.status).toBe(403);
   });
 
-  it("بكعكة جلسةٍ ولا يُعرف مصدرُه يُردّ", () => {
+  it("بكعكة جلسة ولا يعرف مصدره يردّ", () => {
     const res = proxy(post({ cookie: SESSION, "content-type": "application/json" }));
     expect(res.status).toBe(403);
   });
 
-  it("بلا كعكةٍ ولا مصدر (نصٌّ محلّيّ) يبلغ فحصَ الدخول لا فحصَ المصدر", () => {
+  it("بلا كعكة ولا مصدر (نصّ محلّيّ) يبلغ فحص الدخول لا فحص المصدر", () => {
     const res = proxy(post({ "content-type": "application/json" }));
     expect(res.status).toBe(401);
   });
 
-  it("مساراتُ Auth.js لا يمسّها هذا الحارس", () => {
+  it("مسارات Auth.js لا يمسّها هذا الحارس", () => {
     const res = proxy(post({ cookie: SESSION }, "/api/auth/signout"));
     expect(res.status).toBe(200);
   });
 
-  it("والقراءةُ لا يُسأل عن مصدرها", () => {
+  it("والقراءة لا يسأل عن مصدرها", () => {
     const res = proxy(new NextRequest("https://app.example.com/api/search?q=x", { headers: { cookie: SESSION } }));
     expect(res.status).toBe(200);
   });
 });
 
 describe("الخروج يمسح خزين المتصفّح", () => {
-  it("صفحةُ الدخول تحمل Clear-Site-Data، وصفحاتُ التطبيق لا تحملها", () => {
+  it("صفحة الدخول تحمل Clear-Site-Data، وصفحات التطبيق لا تحملها", () => {
     const login = proxy(new NextRequest("https://app.example.com/login"));
     expect(login.headers.get("clear-site-data")).toBe('"cache"');
     const inside = proxy(new NextRequest("https://app.example.com/suppliers", { headers: { cookie: SESSION } }));

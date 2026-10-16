@@ -143,7 +143,7 @@ export class DriveFileTooLargeError extends Error {
   readonly sizeBytes: number;
   constructor(sizeBytes: number) {
     super(
-      `حجمُه ${Math.ceil(sizeBytes / (1024 * 1024))} ميجابايت — أكبر من حدّ القراءة (${MAX_DOWNLOAD_BYTES / (1024 * 1024)} ميجابايت). صغّره أو قسّمه ثمّ ضعه في المجلّد`,
+      `حجمه ${Math.ceil(sizeBytes / (1024 * 1024))} ميجابايت — أكبر من حدّ القراءة (${MAX_DOWNLOAD_BYTES / (1024 * 1024)} ميجابايت). صغّره أو قسّمه ثمّ ضعه في المجلّد`,
     );
     this.name = "DriveFileTooLargeError";
     this.sizeBytes = sizeBytes;
@@ -153,7 +153,7 @@ export class DriveFileTooLargeError extends Error {
 export class DriveAuthExpiredError extends Error {
   constructor() {
     super(
-      "انتهى تفويض الدرايف فلم يُقرأ منه شيء — سجّل الخروج ثمّ الدخول بحساب جوجل ووافق على صلاحية الدرايف، ثمّ أعد الفحص.",
+      "انتهى تفويض الدرايف فلم يقرأ منه شيء — سجّل الخروج ثمّ الدخول بحساب جوجل ووافق على صلاحية الدرايف، ثمّ أعد الفحص.",
     );
     this.name = "DriveAuthExpiredError";
   }

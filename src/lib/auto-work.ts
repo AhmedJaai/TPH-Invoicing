@@ -80,23 +80,23 @@ export function summarizeAutoWork(items: readonly AutoWorkItem[], counts: AutoWo
     approved.length > 0 ? `اعتمد ${countNoun(approved.length, DOCUMENT)}` : null,
     recorded.length + approved.length === 0 && arrived > 0 ? `قرأ ${countNoun(arrived, DOCUMENT)} جديداً من الدرايف` : null,
   ].filter(Boolean);
-  const title = head.length > 0 ? `النظام ${head.join(" و")} وحده` : "عملٌ آليّ وقع في الخلفيّة";
+  const title = head.length > 0 ? `النظام ${head.join(" و")} وحده` : "عمل آليّ وقع في الخلفيّة";
 
   const names = [...new Set(recorded.concat(approved).map((i) => i.supplierName).filter((n): n is string => !!n))];
   const lines = [
     recorded.length > 0
       ? (owedAddedMinor > 0
           ? `زاد ما عليك للمورّدين ${formatRiyalsDisplay(owedAddedMinor)}`
-          : "قُيِّدت فواتير")
-        + (owedUnknown > 0 ? `${owedAddedMinor > 0 ? " — و" : " — "}${countNoun(owedUnknown, INVOICE)} لم يُعرف مبلغُها` : "")
-        + " (قراءتُها كاملةٌ ولا نسخةَ لها)"
+          : "قيّدت فواتير")
+        + (owedUnknown > 0 ? `${owedAddedMinor > 0 ? " — و" : " — "}${countNoun(owedUnknown, INVOICE)} لم يعرف مبلغها` : "")
+        + " (قراءتها كاملة ولا نسخة لها)"
       : null,
-    approved.length > 0 ? "المعتمَدُ اجتمعت فيه شروطُ الأرشفة الآليّة فخرج من طابور المراجعة" : null,
+    approved.length > 0 ? "المعتمد اجتمعت فيه شروط الأرشفة الآليّة فخرج من طابور المراجعة" : null,
     names.length > 0 ? `${names.slice(0, MAX_NAMES).join("، ")}${names.length > MAX_NAMES ? ` و${names.length - MAX_NAMES} غيرهم` : ""}` : null,
     recorded.length + approved.length > 0 && arrived > 0 ? `ووصل ${countNoun(arrived, DOCUMENT)} جديداً من الدرايف` : null,
-    linked > 0 ? `ورُبط ${linked} في البنك بسدادٍ قيّدتَه بيدك` : null,
-    renamed > 0 ? `وسُمّي ${countNoun(renamed, FILE)} في الدرايف` : null,
-    reread > 0 ? `وأُعيدت قراءةُ ${countNoun(reread, INVOICE)}` : null,
+    linked > 0 ? `وربط ${linked} في البنك بسداد قيّدته بيدك` : null,
+    renamed > 0 ? `وسمّي ${countNoun(renamed, FILE)} في الدرايف` : null,
+    reread > 0 ? `وأعيدت قراءة ${countNoun(reread, INVOICE)}` : null,
   ].filter(Boolean);
 
   return {

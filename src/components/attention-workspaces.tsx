@@ -70,7 +70,7 @@ export async function UnbackedWorkspace({ canApprove, canRequest = false }: { ca
         .orderBy(asc(suppliers.nameAr))
     : [];
   if (groups.length === 0) {
-    return <Done>لا دفعة بلا مستند — كلّ ما دُفع له مستندُه.</Done>;
+    return <Done>لا دفعة بلا مستند — كلّ ما دفع له مستنده.</Done>;
   }
 
   return (
@@ -96,8 +96,8 @@ export async function UnbackedWorkspace({ canApprove, canRequest = false }: { ca
                 {g.supplierId
                   ? " بلا مستند"
                   : g.payments.some((p) => p.bankTransactionId)
-                    ? " لم تُعرَف جهتها — افتح حركتها وحدّد مورّدها"
-                    : " لم تُعرَف جهتها"}
+                    ? " لم تعرف جهتها — افتح حركتها وحدّد مورّدها"
+                    : " لم تعرف جهتها"}
               </span>
             </span>
             <span className="shrink-0 text-[14px] font-bold"><Money minor={g.totalMinor} /></span>
@@ -141,8 +141,8 @@ export async function UnbackedWorkspace({ canApprove, canRequest = false }: { ca
               {g.payments.filter((p) => !p.bankTransactionId).map((p) => (
                 <div key={p.paymentId} className="w-full rounded-lg border border-line-soft bg-sunken/60 p-3">
                   <p className="mb-2 text-[11px] leading-relaxed text-ink-soft">
-                    <Money minor={p.unbackedMinor} /> في {formatDay(p.paidOn)} — لا حركةَ بنكٍ لها ولا مورّد.
-                    {p.receiptDriveFileId ? " افتح إيصالها لترى لمن حُوّلت." : ""}
+                    <Money minor={p.unbackedMinor} /> في {formatDay(p.paidOn)} — لا حركة بنك لها ولا مورّد.
+                    {p.receiptDriveFileId ? " افتح إيصالها لترى لمن حوّلت." : ""}
                   </p>
                   {canApprove ? (
                     <OrphanPayment
@@ -151,7 +151,7 @@ export async function UnbackedWorkspace({ canApprove, canRequest = false }: { ca
                       receiptUrl={p.receiptDriveFileId ? `https://drive.google.com/file/d/${p.receiptDriveFileId}/view` : null}
                     />
                   ) : (
-                    <p className="text-[11px] text-muted">حسمُها لمن يعتمد السداد.</p>
+                    <p className="text-[11px] text-muted">حسمها لمن يعتمد السداد.</p>
                   )}
                 </div>
               ))}
@@ -182,7 +182,7 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
   const rows = all.slice(0, 40);
 
   if (rows.length === 0) {
-    return <Done>لا مستند ينتظر — كلُّ ما وصل اعتُمد أو رُفض.</Done>;
+    return <Done>لا مستند ينتظر — كلّ ما وصل اعتمد أو رفض.</Done>;
   }
 
   /*
@@ -204,8 +204,8 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
           <p className="flex min-w-0 flex-1 items-start gap-2 text-xs leading-relaxed">
             <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-ok" strokeWidth={2} aria-hidden />
             <span>
-              <strong>{countNoun(eligible.length, DOCUMENT)} يُحسَم الآن بلا مراجعة</strong> — تجتمع فيها الشروط، أو
-              قراءتُها كاملة وفاتورتُها لم تُقيَّد. الضغطُ يقيّد الفواتير ويعتمدها ويسمّي ملفّاتها، ويبقى ما لا
+              <strong>{countNoun(eligible.length, DOCUMENT)} يحسم الآن بلا مراجعة</strong> — تجتمع فيها الشروط، أو
+              قراءتها كاملة وفاتورتها لم تقيّد. الضغط يقيّد الفواتير ويعتمدها ويسمّي ملفّاتها، ويبقى ما لا
               يستقيم بعد القيد بسببه.
             </span>
           </p>
@@ -215,15 +215,15 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
       <details className="group rounded-xl border border-line-soft bg-sunken/60">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 text-xs font-bold text-ink-soft [&::-webkit-details-marker]:hidden">
           <CircleHelp className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-          متى يدخل المستندُ وحده، وماذا يتغيّر إن اعتمدته؟
+          متى يدخل المستند وحده، وماذا يتغيّر إن اعتمدته؟
           <ChevronDown className="ms-auto h-3.5 w-3.5 transition-transform group-open:rotate-180" strokeWidth={2} aria-hidden />
         </summary>
         <p className="px-4 pb-3 text-[11px] leading-relaxed text-ink-soft">
-          يدخل المستندُ وحده إذا عُرف <strong>مورّدُه</strong>، وقُيّدت له <strong>فاتورة</strong> (رقمٌ وتاريخٌ وإجماليّ)،
-          و<strong>استقام حسابُه</strong>، وكانت <strong>قراءتُه موثوقة</strong> (نصٌّ مكتوب، أو صورةٌ ضريبتُها ١٥٪ من صافيها
-          أو رقمُها في اسم الملفّ). وما لم يجتمع فيه ذلك يُكتَب تحته ما نقص بعينه.{" "}
-          <strong>المطلوب:</strong> أصلح الناقص أو قارن بالورقة ثمّ اعتمد — فتدخل الفاتورةُ دفعةَ الشهر، ويُخصم منها
-          ما دفعتَه للمورّد مقدَّماً، ويُسمّى ملفُّها. وإن كان المستندُ خطأً فارفضه.
+          يدخل المستند وحده إذا عرف <strong>مورّده</strong>، وقيّدت له <strong>فاتورة</strong> (رقم وتاريخ وإجماليّ)،
+          و<strong>استقام حسابه</strong>، وكانت <strong>قراءته موثوقة</strong> (نصّ مكتوب، أو صورة ضريبتها ١٥٪ من صافيها
+          أو رقمها في اسم الملفّ). وما لم يجتمع فيه ذلك يكتب تحته ما نقص بعينه.{" "}
+          <strong>المطلوب:</strong> أصلح الناقص أو قارن بالورقة ثمّ اعتمد — فتدخل الفاتورة دفعة الشهر، ويخصم منها
+          ما دفعته للمورّد مقدّماً، ويسمّى ملفّها. وإن كان المستند خطأً فارفضه.
         </p>
       </details>
       <ul className={LIST}>
@@ -240,7 +240,7 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-bold">
-                      {d.supplierName ?? "مورّدٌ لم يُعرَف"}
+                      {d.supplierName ?? "مورّد لم يعرف"}
                     </span>
                     <span className="block truncate text-[11px] text-muted" dir="ltr">{d.fileName}</span>
                   </span>
@@ -267,17 +267,17 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
               </div>
               <div className="sm:ps-11">
                 {d.recordable ? (
-                  <Note tone="ok">قراءتُه كاملة — يُقيَّد ويُحسَم تلقائياً الآن، أو بالضغط أعلاه.</Note>
+                  <Note tone="ok">قراءته كاملة — يقيّد ويحسم تلقائياً الآن، أو بالضغط أعلاه.</Note>
                 ) : d.invoiceId === null && d.statementId === null ? (
                   <div className="mt-2 rounded-lg border border-warn/25 bg-warn-bg px-3 py-2 text-[11px] leading-relaxed text-warn">
-                    <p className="font-bold">لم يُقيَّد — ينقصه:</p>
+                    <p className="font-bold">لم يقيّد — ينقصه:</p>
                     <ul className="list-inside list-disc">
-                      {(d.missing.length > 0 ? d.missing : ["ليس فاتورةً ولا كشفاً — إيصالٌ أو نوعٌ يُحسَم بيد"]).map((m) => <li key={m}>{m}</li>)}
+                      {(d.missing.length > 0 ? d.missing : ["ليس فاتورةً ولا كشفاً — إيصال أو نوع يحسم بيد"]).map((m) => <li key={m}>{m}</li>)}
                     </ul>
                     <p className="text-ink-soft">ارفضه وارفعه من صفحة الرفع لتكتب الناقص بيدك.</p>
                   </div>
                 ) : d.statementId !== null ? (
-                  <Note>كشفُ حسابٍ مقيَّد — لا يُسأل عن رقم فاتورة.</Note>
+                  <Note>كشف حساب مقيّد — لا يسأل عن رقم فاتورة.</Note>
                 ) : (
                   <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg bg-sunken/60 px-3 py-2.5 sm:grid-cols-5">
                     <ReadField label="رقم الفاتورة" value={<bdi className="nums">{d.invoiceNumber}</bdi>} />
@@ -288,7 +288,7 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
                   </dl>
                 )}
                 {(d.invoiceId !== null || d.statementId !== null) && gaps.length === 0 && (
-                  <Note tone="ok">تجتمع فيه الشروط — يُعتمَد تلقائياً.</Note>
+                  <Note tone="ok">تجتمع فيه الشروط — يعتمد تلقائياً.</Note>
                 )}
                 {(d.invoiceId !== null || d.statementId !== null) && gaps.length > 0 && (
                   <ul className="mt-2 space-y-0.5 text-[11px] leading-relaxed text-warn">
@@ -308,7 +308,7 @@ export async function InboxWorkspace({ canUpload, canConfirm }: { canUpload: boo
       </ul>
       {all.length > rows.length && (
         <p className="text-[11px] text-muted">
-          يُعرض أوّلُ {rows.length} — وبقي <span className="nums">{all.length - rows.length}</span> يظهر حين يُحسم ما هنا.
+          يعرض أوّل {rows.length} — وبقي <span className="nums">{all.length - rows.length}</span> يظهر حين يحسم ما هنا.
         </p>
       )}
     </div>
@@ -351,7 +351,7 @@ export async function ContractPolicyWorkspace({ canEdit }: { canEdit: boolean })
 
   const need = rows.filter(needsContract);
   if (need.length === 0) {
-    return <Done>لا مورّد بلا مستندٍ مطلوب — كلٌّ أُعلنت سياستُه.</Done>;
+    return <Done>لا مورّد بلا مستند مطلوب — كلّ أعلنت سياسته.</Done>;
   }
 
   return (
@@ -365,7 +365,7 @@ export async function ContractPolicyWorkspace({ canEdit }: { canEdit: boolean })
               <Link href={`/suppliers/${r.slug}`} className="block truncate text-[14px] font-bold hover:text-accent">
                 {r.nameAr}
               </Link>
-              <span className="block text-[11px] text-muted">لا يصدر فواتير ضريبية، ولا عقدَ عندنا</span>
+              <span className="block text-[11px] text-muted">لا يصدر فواتير ضريبية، ولا عقد عندنا</span>
             </span>
           </div>
           {/*
@@ -403,7 +403,7 @@ export async function StatementRequestWorkspace({ canEdit = false }: { canEdit?:
   const rows = await loadMissingStatementSuppliers(month);
 
   if (rows.length === 0) {
-    return <Done>وصل كشفُ كلّ مورّدٍ له تعامل.</Done>;
+    return <Done>وصل كشف كلّ مورّد له تعامل.</Done>;
   }
 
   return (

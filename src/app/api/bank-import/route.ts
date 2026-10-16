@@ -69,7 +69,7 @@ async function handle(request: Request) {
 
   if (parsed.rows.length === 0) {
     return NextResponse.json(
-      { error: parsed.warnings[0]?.reason ?? "لم تُقرأ أي حركة من الملف" },
+      { error: parsed.warnings[0]?.reason ?? "لم تقرأ أي حركة من الملف" },
       { status: 400 },
     );
   }
@@ -746,7 +746,7 @@ async function handle(request: Request) {
                 مطابقة: decided.decision?.reasons ?? [],
                 درجةالمستفيد: Math.round(decided.supplierScore * 100),
                 ...(reservedForHand.has(key)
-                  ? { سدادمقيّدبيد: "بمبلغها نفسه للمورّد نفسه — تُربط به ولا تُكتب دفعةً ثانية" }
+                  ? { سدادمقيّدبيد: "بمبلغها نفسه للمورّد نفسه — تربط به ولا تكتب دفعةً ثانية" }
                   : {}),
               }
             : null,
@@ -786,7 +786,7 @@ async function handle(request: Request) {
         event: "CLASSIFIED",
         actor: decided?.classificationSource === "MEMORY" ? "MEMORY" : "SYSTEM",
         actorId: user.id,
-        detail: decided?.classificationReason ?? "بلا سبب مسجَّل",
+        detail: decided?.classificationReason ?? "بلا سبب مسجّل",
         payload: {
           الباب: decided?.category,
           المصدر: decided?.classificationSource,
@@ -826,7 +826,7 @@ async function handle(request: Request) {
           payload: {
             الثقة: verdict.provenance.modelConfidence,
             "أدلّة صحّت": verdict.provenance.upheldCodes,
-            "أدلّة رُدّت": verdict.provenance.refutedCodes,
+            "أدلّة ردّت": verdict.provenance.refutedCodes,
           },
         });
       }
@@ -884,7 +884,7 @@ async function handle(request: Request) {
                 category: "SUPPLIER" as const,
                 supplierId: plan.supplierId,
                 classificationSource: "STRUCTURE" as const,
-                classificationReason: `طُوبقت مع ${countNoun(plan.allocations.length, INVOICE)} للمورّد`,
+                classificationReason: `طوبقت مع ${countNoun(plan.allocations.length, INVOICE)} للمورّد`,
               }),
         })
         .where(eq(bankTransactions.id, inserted.id));
@@ -901,7 +901,7 @@ async function handle(request: Request) {
         event: "POSTED",
         actor: "SYSTEM",
         actorId: user.id,
-        detail: `طُوبقت مع ${countNoun(plan.allocations.length, INVOICE)}`,
+        detail: `طوبقت مع ${countNoun(plan.allocations.length, INVOICE)}`,
         payload: { الدفعة: paymentId, الشهور: plan.months },
       });
     }
@@ -982,7 +982,7 @@ async function handle(request: Request) {
     bankImportId: importId ?? null,
     bankAccountId,
     againstTransactionId: m.id,
-    reason: "عندنا وليست في كشف البنك الذي يغطّي يومها — مكرّرةٌ دخلت مرّتين، أو حركةٌ لم تقع",
+    reason: "عندنا وليست في كشف البنك الذي يغطّي يومها — مكرّرة دخلت مرّتين، أو حركة لم تقع",
     valueDate: m.valueDate,
     description: m.description,
     beneficiaryRaw: m.beneficiaryRaw,
@@ -1034,17 +1034,17 @@ async function handle(request: Request) {
     rejectedByConstraint,
     message:
       newRows === 0
-        ? `هذا الكشف مقيَّد عندك من قبل — ${countNoun(canonicalRows.length, TRANSACTION)} كلّها مسجَّلة، فلم تُضَف واحدة${
+        ? `هذا الكشف مقيّد عندك من قبل — ${countNoun(canonicalRows.length, TRANSACTION)} كلّها مسجّلة، فلم تضف واحدة${
             missingFromFile.length > 0 ? `. وعندك ${countNoun(missingFromFile.length, TRANSACTION)} في مدّته ليست فيه — لقرارك في صفحة البنك` : ""
           }.`
         : `تمّت المزامنة: ${countNoun(canonicalRows.length, TRANSACTION)} في الملفّ · ${sync.known.length} موجودة · ${newRows} جديدة${
             sync.ambiguous.length > 0 ? ` · ${sync.ambiguous.length} للمراجعة` : ""
           }${
-            sync.conflict.length > 0 ? ` · ${sync.conflict.length} تضارب هويّة — لم تُقيَّد` : ""
+            sync.conflict.length > 0 ? ` · ${sync.conflict.length} تضارب هويّة — لم تقيّد` : ""
           }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} ردّها قيد القاعدة` : ""}${
-            handLinked > 0 ? ` · ${handLinked} رُبطت بسدادٍ قيّدتَه بيدك` : ""
-          }${derived.created > 0 ? ` · ${derived.created} قُيّدت مصروفاً` : ""}${
-            held > 0 ? ` · ${held} محفوظةٌ لقرارك في صفحة البنك` : ""
+            handLinked > 0 ? ` · ${handLinked} ربطت بسداد قيّدته بيدك` : ""
+          }${derived.created > 0 ? ` · ${derived.created} قيّدت مصروفاً` : ""}${
+            held > 0 ? ` · ${held} محفوظة لقرارك في صفحة البنك` : ""
           }.`,
     handLinked,
     linkNotes,

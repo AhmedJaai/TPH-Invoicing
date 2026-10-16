@@ -66,7 +66,7 @@ function input(over: Partial<EngineInput> = {}): EngineInput {
 }
 
 describe("المحرّك — من البيعة إلى الفرق", () => {
-  it("١٠٠ مشروبٍ: افتتاحيّ ٥ + شراء ٢٠ − استهلاك ١٫٨ = ٢٣٫٢ متوقَّعاً", () => {
+  it("١٠٠ مشروب: افتتاحيّ ٥ + شراء ٢٠ − استهلاك ١٫٨ = ٢٣٫٢ متوقّعاً", () => {
     const r = reconcile(input());
     const coffee = r.lines.find((l) => l.productId === COFFEE)!;
 
@@ -77,7 +77,7 @@ describe("المحرّك — من البيعة إلى الفرق", () => {
     expect(canonicalToQuantity(coffee.varianceMilli!, "KG")).toBe(-12.7);
   });
 
-  it("وكلفةُ الوحدة من مشتريات الفترة، وكلفةُ الفرق عددٌ صحيح", () => {
+  it("وكلفة الوحدة من مشتريات الفترة، وكلفة الفرق عدد صحيح", () => {
     const r = reconcile(input());
     const coffee = r.lines.find((l) => l.productId === COFFEE)!;
     /* ‏١٬٥٠٠ ريالاً على ٢٠ كجم = ٧٥ للكيلو */
@@ -86,7 +86,7 @@ describe("المحرّك — من البيعة إلى الفرق", () => {
     expect(Number.isInteger(coffee.varianceCostMinor!)).toBe(true);
   });
 
-  it("والحليبُ لم يُشترَ في الفترة — مشترياتُه صفرٌ حقيقيّ، وكلفتُه من السابق", () => {
+  it("والحليب لم يشتر في الفترة — مشترياته صفر حقيقيّ، وكلفته من السابق", () => {
     const r = reconcile(input());
     const milk = r.lines.find((l) => l.productId === MILK)!;
     expect(milk.purchasesMilli).toBe(0);
@@ -95,13 +95,13 @@ describe("المحرّك — من البيعة إلى الفرق", () => {
     expect(milk.unitCostMinor).toBe(12_00);
   });
 
-  it("ونسخةُ المحرّك مكتوبةٌ في التقرير", () => {
+  it("ونسخة المحرّك مكتوبة في التقرير", () => {
     expect(reconcile(input()).engineVersion).toBe(ENGINE_VERSION);
   });
 });
 
-describe("التغطيةُ تُحسَب ولا تُدَّعى", () => {
-  it("تغطيةٌ تامّةٌ لأسبوعٍ فيه مبيعاتُ كلّ يوم ← READY", () => {
+describe("التغطية تحسب ولا تدّعى", () => {
+  it("تغطية تامّة لأسبوع فيه مبيعات كلّ يوم ← READY", () => {
     const days = ["2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05", "2026-09-06", "2026-09-07"];
     const r = reconcile(input({
       soldLines: days.flatMap((d, i) => soldLines(10, d).map((l) => ({ ...l, lineId: `l${i}` }))),
@@ -110,7 +110,7 @@ describe("التغطيةُ تُحسَب ولا تُدَّعى", () => {
     expect(r.coverage.gaps).toEqual([]);
   });
 
-  it("وأيّامٌ بلا مبيعاتٍ تُعلَن — الفترةُ الناقصة ليست فترةً كاملة", () => {
+  it("وأيّام بلا مبيعات تعلن — الفترة الناقصة ليست فترةً كاملة", () => {
     const r = reconcile(input());
     expect(r.coverage.readiness).toBe("PARTIAL");
     expect(r.coverage.sales.daysWithSales).toBe(1);
@@ -118,7 +118,7 @@ describe("التغطيةُ تُحسَب ولا تُدَّعى", () => {
     expect(r.coverage.sales.missingDays).toHaveLength(6);
   });
 
-  it("وصنفٌ بِيع بلا وصفةٍ يُعلَن بعدده ومبلغه ونسبتِه من المبيعات", () => {
+  it("وصنف بيع بلا وصفة يعلن بعدده ومبلغه ونسبته من المبيعات", () => {
     const r = reconcile(input({
       soldLines: [
         ...soldLines(100),
@@ -139,7 +139,7 @@ describe("التغطيةُ تُحسَب ولا تُدَّعى", () => {
     expect(r.coverage.sales.coveredBp).toBe(7500);
   });
 
-  it("وبندُ شراءٍ لم تُعرَف كمّيّتُه يُخرج مشترياتِ صنفه إلى «مجهول» — لا ينقصها صامتاً", () => {
+  it("وبند شراء لم تعرف كمّيّته يخرج مشتريات صنفه إلى «مجهول» — لا ينقصها صامتاً", () => {
     const r = reconcile(input({
       purchaseLines: [purchase(), purchase({ lineId: "il-2", packSize: null, lineTotalMinor: 450_00 })],
     }));
@@ -151,12 +151,12 @@ describe("التغطيةُ تُحسَب ولا تُدَّعى", () => {
     expect(r.coverage.gaps.some((g) => g.reason === "NO_PACK_SPEC")).toBe(true);
   });
 
-  it("ولا مبيعاتٍ أصلاً ← BLOCKED، ولا يُحسَب فرقٌ على فراغ", () => {
+  it("ولا مبيعات أصلاً ← BLOCKED، ولا يحسب فرق على فراغ", () => {
     const r = reconcile(input({ soldLines: [] }));
     expect(r.coverage.readiness).toBe("BLOCKED");
   });
 
-  it("وصنفٌ لم يُعَدّ يُوسَم ولا يدخل مجموع الكلفة", () => {
+  it("وصنف لم يعدّ يوسم ولا يدخل مجموع الكلفة", () => {
     const r = reconcile(input({ actualByProduct: new Map([[COFFEE, kg(10.5)]]) }));
     const milk = r.lines.find((l) => l.productId === MILK)!;
     expect(milk.flags).toContain("NOT_COUNTED");
@@ -164,7 +164,7 @@ describe("التغطيةُ تُحسَب ولا تُدَّعى", () => {
     expect(r.totals.linesCounted).toBe(1);
   });
 
-  it("والافتتاحيُّ المجهول يُوسَم ويمنع الحساب — ولا يُقرأ صفراً", () => {
+  it("والافتتاحيّ المجهول يوسم ويمنع الحساب — ولا يقرأ صفراً", () => {
     const r = reconcile(input({ openingByProduct: new Map([[MILK, L(30)]]) }));
     const coffee = r.lines.find((l) => l.productId === COFFEE)!;
     expect(coffee.flags).toContain("OPENING_UNKNOWN");
@@ -172,8 +172,8 @@ describe("التغطيةُ تُحسَب ولا تُدَّعى", () => {
   });
 });
 
-describe("المجموعُ يقول ما سقط منه", () => {
-  it("كلفةُ الفروق لا تشمل ما جُهلت كلفتُه، ويُعَدّ ذلك", () => {
+describe("المجموع يقول ما سقط منه", () => {
+  it("كلفة الفروق لا تشمل ما جهلت كلفته، ويعدّ ذلك", () => {
     const r = reconcile(input({ fallbackCostByProduct: new Map() }));
     const milk = r.lines.find((l) => l.productId === MILK)!;
     expect(milk.varianceCostMinor).toBeNull();
@@ -182,7 +182,7 @@ describe("المجموعُ يقول ما سقط منه", () => {
     expect(r.totals.linesWithVariance).toBe(2);
   });
 
-  it("وأكبرُ الفروق مرتَّبةٌ بالكلفة لا بالكمّيّة", () => {
+  it("وأكبر الفروق مرتّبة بالكلفة لا بالكمّيّة", () => {
     const r = reconcile(input());
     const top = topVariances(r, 5);
     expect(top[0].productId).toBe(COFFEE);
@@ -190,8 +190,8 @@ describe("المجموعُ يقول ما سقط منه", () => {
   });
 });
 
-describe("تغيُّرُ الوصفة لا يُعاد به حسابُ ما مضى", () => {
-  it("بيعاتُ الأسبوع الأوّل بـ٢٠ جراماً وإن صارت الوصفةُ ١٨ بعده", () => {
+describe("تغيّر الوصفة لا يعاد به حساب ما مضى", () => {
+  it("بيعات الأسبوع الأوّل بـ٢٠ جراماً وإن صارت الوصفة ١٨ بعده", () => {
     const twenty: RecipeVersionInput = {
       ...RECIPE, id: "v-20", effectiveFrom: "2026-09-01", effectiveTo: "2026-09-07",
       ingredients: [{ productId: COFFEE, quantityMilli: 20_000, unit: "G", prepLossBp: null }],
@@ -224,8 +224,8 @@ describe("تغيُّرُ الوصفة لا يُعاد به حسابُ ما مض�
  * الجوابُ: الفرقُ وحده. أمّا الوقائع — افتتاحيٌّ ومشترياتٌ واستهلاكٌ
  * متوقَّع — فتُحسَب وتُعرَض، وإلّا لم يُعرَف حجمُ ما خرج من الحساب.
  */
-describe("نطاقُ الجرد", () => {
-  it("الخارجُ تُحسَب وقائعُه ولا يُحسَب فرقُه", () => {
+describe("نطاق الجرد", () => {
+  it("الخارج تحسب وقائعه ولا يحسب فرقه", () => {
     const r = reconcile(input({ inScopeByProduct: new Set([MILK]) }));
     const coffee = r.lines.find((l) => l.productId === COFFEE)!;
 
@@ -252,7 +252,7 @@ describe("نطاقُ الجرد", () => {
     expect(topVariances(some).map((l) => l.productId)).toEqual([MILK]);
   });
 
-  it("والعدُّ المكتوب يبقى في مدخل المحرّك — الاستبعادُ لا يمحوه", () => {
+  it("والعدّ المكتوب يبقى في مدخل المحرّك — الاستبعاد لا يمحوه", () => {
     /*
       يُمرَّر العدُّ كاملاً ويُستبعَد الصنف. فلو كان الاستبعادُ محواً
       لما عاد الفرقُ بعودة الصنف — ويعود، وهذا ما يُثبته الشوطان.
@@ -266,7 +266,7 @@ describe("نطاقُ الجرد", () => {
     )).toBe(-12.7);
   });
 
-  it("والنطاقُ يُعلَن في التغطية بعدده وأسمائه — ولا يُنقص الحكم", () => {
+  it("والنطاق يعلن في التغطية بعدده وأسمائه — ولا ينقص الحكم", () => {
     const some = reconcile(input({ inScopeByProduct: new Set([MILK]) }));
 
     expect(some.coverage.scope.included).toBe(1);
@@ -285,19 +285,19 @@ describe("نطاقُ الجرد", () => {
     expect(some.coverage.readiness).toBe(all.coverage.readiness);
   });
 
-  it("وغيابُ النطاق يعني «الكلُّ داخل» — فلا يتغيّر ما كان", () => {
+  it("وغياب النطاق يعني «الكلّ داخل» — فلا يتغيّر ما كان", () => {
     const r = reconcile(input());
     expect(r.lines.every((l) => l.inScope)).toBe(true);
     expect(r.coverage.scope.excluded).toBe(0);
   });
 });
 
-describe("الاستهلاكُ الصفرُ بدليل", () => {
+describe("الاستهلاك الصفر بدليل", () => {
   /* مبيعاتٌ في كلّ يومٍ من الأسبوع — وهو شرطُ الدليل */
   const wholeWeek = ["01", "02", "03", "04", "05", "06", "07"]
     .flatMap((d, i) => soldLines(10, `2026-09-${d}`).map((l) => ({ ...l, lineId: `w${i}` })));
 
-  it("مكوّنٌ في وصفةٍ سارية لم يُبَع ما يستهلكه في أسبوعٍ فيه مبيعات — صفرٌ لا مجهول", () => {
+  it("مكوّن في وصفة سارية لم يبع ما يستهلكه في أسبوع فيه مبيعات — صفر لا مجهول", () => {
     const OTHER = "p-other";
     const r = reconcile(input({
       soldLines: wholeWeek,
@@ -312,7 +312,7 @@ describe("الاستهلاكُ الصفرُ بدليل", () => {
     expect(other.flags).not.toContain("CONSUMPTION_UNKNOWN");
   });
 
-  it("ويومان من سبعة لا يكفيان — مجهولٌ لا صفر، فلا تصير المشترياتُ كلُّها فرقاً", () => {
+  it("ويومان من سبعة لا يكفيان — مجهول لا صفر، فلا تصير المشتريات كلّها فرقاً", () => {
     const OTHER = "p-other";
     const r = reconcile(input({
       soldLines: wholeWeek.slice(0, 2),
@@ -327,7 +327,7 @@ describe("الاستهلاكُ الصفرُ بدليل", () => {
     expect(other.flags).toContain("CONSUMPTION_UNKNOWN");
   });
 
-  it("ومقهىً يُغلق يوماً: يومٌ غطّاه الملفّ بلا بيعٍ دليلٌ كيومٍ فيه بيع — صفرٌ لا مجهول", () => {
+  it("ومقهىً يغلق يوماً: يوم غطّاه الملفّ بلا بيع دليل كيوم فيه بيع — صفر لا مجهول", () => {
     const OTHER = "p-other";
     const sixDays = wholeWeek.filter((l) => l.businessDate !== "2026-09-05");
     const r = reconcile(input({
@@ -342,12 +342,12 @@ describe("الاستهلاكُ الصفرُ بدليل", () => {
     expect(r.lines.find((l) => l.productId === OTHER)!.theoreticalConsumptionMilli).toBe(0);
   });
 
-  it("وبلا مبيعاتٍ في الفترة — مجهولٌ لا صفر: الغيابُ غيابُ ملفّ لا غيابُ بيع", () => {
+  it("وبلا مبيعات في الفترة — مجهول لا صفر: الغياب غياب ملفّ لا غياب بيع", () => {
     const r = reconcile(input({ soldLines: [] }));
     expect(r.lines.every((l) => l.theoreticalConsumptionMilli === null)).toBe(true);
   });
 
-  it("وصنفٌ لا تصل إليه وصفة — مجهولٌ صادق", () => {
+  it("وصنف لا تصل إليه وصفة — مجهول صادق", () => {
     const LOOSE = "p-loose";
     const r = reconcile(input({
       products: [...PRODUCTS, { id: LOOSE, nameAr: "منظّف", category: "OTHER", baseUnit: "L" as const }],

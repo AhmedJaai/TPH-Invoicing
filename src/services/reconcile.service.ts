@@ -291,11 +291,11 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
   */
   const demotionFor = (key: string): string | null =>
     inexact.has(key)
-      ? "الحلّ تقريبيّ: نفدت ميزانيّة البحث فلم يُثبَت أنّه الأفضل — فيُقترَح ولا يُطابَق"
+      ? "الحلّ تقريبيّ: نفدت ميزانيّة البحث فلم يثبت أنّه الأفضل — فيقترح ولا يطابق"
       : incompleteSearch.has(key)
-        ? "بحثُ مجموعات الفواتير لم يكتمل: قد يوجد مرشّحٌ لم يُفحَص — فيُقترَح ولا يُطابَق"
+        ? "بحث مجموعات الفواتير لم يكتمل: قد يوجد مرشّح لم يفحص — فيقترح ولا يطابق"
         : readSource === "VISION"
-          ? "الكشف قُرئ بصرياً من صورة — فلا يُطابَق تلقائياً مهما بلغت الدرجة"
+          ? "الكشف قرئ بصرياً من صورة — فلا يطابق تلقائياً مهما بلغت الدرجة"
           : null;
 
   for (const [key, entry] of decided) {
@@ -327,7 +327,7 @@ export function runReconciliation(input: ReconcileInput): ReconcileResult {
           disposition: "REVIEW",
           reasons: [
             supplier.supplierId === null
-              ? "لم يُعرَف المستفيد — عرِّفه مرّةً فيُعرَف ما يشبهه"
+              ? "لم يعرف المستفيد — عرّفه مرّةً فيعرف ما يشبهه"
               : "المورّد معروف ولا فاتورة مفتوحة تطابق هذه الدفعة",
           ],
         }

@@ -97,40 +97,40 @@ function ItemGlyph({ id, className, strokeWidth = 2 }: { id: string; className: 
 const IMPACT: Record<ImpactKind, { icon: LucideIcon; text: string; hint: string; unknownHint: string }> = {
   RECOVERABLE: {
     icon: RotateCcw, text: "text-ok",
-    hint: "مالٌ خرج وقد يعود إن طولبت به.",
-    unknownHint: "قد يعود مالٌ، وقدرُه لم يُحسَب بعد.",
+    hint: "مال خرج وقد يعود إن طولبت به.",
+    unknownHint: "قد يعود مال، وقدره لم يحسب بعد.",
   },
   AT_RISK: {
     icon: ShieldAlert, text: "text-danger",
-    hint: "مالٌ قد يضيع إن لم يُعالَج.",
-    unknownHint: "قد يضيع مالٌ لا يُعرف قدرُه حتى يُقرأ ما وراءه.",
+    hint: "مال قد يضيع إن لم يعالج.",
+    unknownHint: "قد يضيع مال لا يعرف قدره حتى يقرأ ما وراءه.",
   },
   OWED: {
     icon: Clock, text: "text-warn",
-    hint: "مستحقٌّ عليك للمورّدين — لا مالٌ يضيع.",
-    unknownHint: "مستحقٌّ عليك لم يُعرف قدرُه بعد.",
+    hint: "مستحقّ عليك للمورّدين — لا مال يضيع.",
+    unknownHint: "مستحقّ عليك لم يعرف قدره بعد.",
   },
   UNATTRIBUTED: {
     icon: CircleHelp, text: "text-info",
-    hint: "مبلغٌ معلوم لم يُنسب إلى وجهه بعد.",
-    unknownHint: "ينقص أرقامَك بقدرٍ لا يُعرف حتى يصل ما غاب.",
+    hint: "مبلغ معلوم لم ينسب إلى وجهه بعد.",
+    unknownHint: "ينقص أرقامك بقدر لا يعرف حتى يصل ما غاب.",
   },
   ANNUAL: {
     icon: TrendingUp, text: "text-plum",
-    hint: "تقديرٌ على سنةٍ قادمة، لا مالٌ خرج.",
-    unknownHint: "أثرٌ سنويّ لم يُقدَّر بعد.",
+    hint: "تقدير على سنة قادمة، لا مال خرج.",
+    unknownHint: "أثر سنويّ لم يقدّر بعد.",
   },
   BLOCKED: {
     icon: Ban, text: "text-muted",
-    hint: "مبلغُ ما يوقفه — لا مالٌ خرج.",
-    unknownHint: "لا مالَ فيه، لكنّه يوقف عملاً غيره.",
+    hint: "مبلغ ما يوقفه — لا مال خرج.",
+    unknownHint: "لا مال فيه، لكنّه يوقف عملاً غيره.",
   },
 };
 
 /* ─────────────────────────── الخلاصة ─────────────────────────── */
 
 function waitingPhrase(n: number): string {
-  if (n === 1) return "بندٌ واحد ينتظر قرارك";
+  if (n === 1) return "بند واحد ينتظر قرارك";
   if (n === 2) return "بندان ينتظران قرارك";
   return `${nounForm(n, ITEM)} تنتظر قرارك`;
 }
@@ -173,7 +173,7 @@ export function TriageSummary({ items }: { items: readonly AttentionItem[] }) {
         {stakes.length > 0 && (
           <div className="min-w-0 flex-1 border-t border-line-soft pt-4 xl:border-t-0 xl:border-s xl:ps-6 xl:pt-0">
             <p className="mb-2.5 text-[11px] font-medium text-muted">
-              المالُ المعلَّق بها — كلُّ نوعٍ وحده، ولا يُجمع نوعٌ إلى نوع
+              المال المعلّق بها — كلّ نوع وحده، ولا يجمع نوع إلى نوع
             </p>
             <dl className="grid grid-cols-2 gap-x-5 gap-y-3.5 sm:grid-cols-3 xl:flex xl:flex-wrap xl:gap-x-8">
               {stakes.map((s) => (
@@ -207,7 +207,7 @@ function StakeFigure({ stake: s }: { stake: Stake }) {
       </dd>
       <dd className="mt-0.5 text-[11px] text-muted">
         {countNoun(s.items, ITEM)}
-        {!allUnknown && s.unknown > 0 && " · وبعضُها لم يُقدَّر"}
+        {!allUnknown && s.unknown > 0 && " · وبعضها لم يقدّر"}
       </dd>
     </div>
   );
@@ -217,7 +217,7 @@ function StakeFigure({ stake: s }: { stake: Stake }) {
 export function TriageTabs({ items, lens }: { items: readonly AttentionItem[]; lens: Lens }) {
   return (
     <LinkTabs
-      label="صفِّ البنود"
+      label="صفّ البنود"
       items={lensTabs(items).map((t) => ({
         href: lensHref(t.lens),
         label: t.label,
@@ -333,7 +333,7 @@ function TriageRow({ item, lens, active, then }: { item: AttentionItem; lens: Le
           {inPlace && (
             <span className="inline-flex items-center gap-1 font-bold text-accent">
               <Zap className="h-3 w-3" strokeWidth={2.25} aria-hidden />
-              يُحسم هنا
+              يحسم هنا
             </span>
           )}
         </p>
@@ -393,7 +393,7 @@ export function ItemDetail({
           className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-ink-soft hover:text-accent"
         >
           <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden />
-          كلُّ البنود
+          كلّ البنود
           <span className="nums font-medium text-muted">({list.length})</span>
         </Link>
         <Pager nav={nav} total={list.length} lens={lens} />
@@ -408,7 +408,7 @@ export function ItemDetail({
               {isSignal(item) && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-plum/25 bg-plum-bg px-2 py-0.5 text-[11px] font-bold leading-5 text-plum">
                   <Activity className="h-3 w-3" strokeWidth={2.25} aria-hidden />
-                  إشارةٌ في المال
+                  إشارة في المال
                 </span>
               )}
             </div>
@@ -440,7 +440,7 @@ export function ItemDetail({
                   </span>
                 ) : (
                   <span className="text-base font-bold text-ink-soft">
-                    {kind === "BLOCKED" ? "بلا مبلغ" : "قدرُه غير معروف"}
+                    {kind === "BLOCKED" ? "بلا مبلغ" : "قدره غير معروف"}
                   </span>
                 )}
               </p>
@@ -485,7 +485,7 @@ export function ItemDetail({
                 <LinkButton href={item.href} variant="primary" size="md" icon={ArrowLeft}>
                   {item.actionLabel ?? "افتح السجلّات"}
                 </LinkButton>
-                <span className="text-[11px] text-muted">يُفتح موضعُ إصلاحه — ويخرج من هنا حين يُصلَح.</span>
+                <span className="text-[11px] text-muted">يفتح موضع إصلاحه — ويخرج من هنا حين يصلح.</span>
               </>
             )}
             {extraAction && <span className="ms-auto">{extraAction}</span>}
@@ -506,7 +506,7 @@ export function ItemDetail({
               <Zap className="h-[18px] w-[18px] text-accent" strokeWidth={2} aria-hidden />
               احسمه هنا
             </h3>
-            <p className="text-[11px] text-muted">ما تفعله يُحفَظ فوراً، ويخرج البندُ من الطابور حين يُحسَم كلُّه.</p>
+            <p className="text-[11px] text-muted">ما تفعله يحفظ فوراً، ويخرج البند من الطابور حين يحسم كلّه.</p>
           </div>
           {workspace}
         </section>
@@ -557,7 +557,7 @@ function EvidenceList({ evidence }: { evidence: readonly AttentionEvidence[] }) 
     <section aria-labelledby="evidence-title" className="overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
       <h3 id="evidence-title" className="flex items-center gap-2 border-b border-line-soft px-5 py-3.5 text-sm font-bold">
         <ScanSearch className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-        ما بُني عليه هذا البند
+        ما بني عليه هذا البند
         <span className="nums rounded-full bg-sunken px-2 py-0.5 text-[11px] text-ink-soft">{evidence.length}</span>
       </h3>
       <ul className="divide-y divide-line-soft">
@@ -567,7 +567,7 @@ function EvidenceList({ evidence }: { evidence: readonly AttentionEvidence[] }) 
         <details className="group border-t border-line-soft">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-1.5 text-xs font-bold text-accent hover:bg-hover [&::-webkit-details-marker]:hidden">
             <span className="group-open:hidden">اعرض الباقي <span className="nums">({rest.length})</span></span>
-            <span className="hidden group-open:inline">أخفِ الباقي</span>
+            <span className="hidden group-open:inline">أخف الباقي</span>
             <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" strokeWidth={2} aria-hidden />
           </summary>
           <ul className="divide-y divide-line-soft border-t border-line-soft">
@@ -616,7 +616,7 @@ export function WorkspaceSkeleton() {
           <div className="skeleton h-8 w-28 rounded-lg" />
         </div>
       ))}
-      <span className="sr-only">يُحمّل لوحُ الفعل…</span>
+      <span className="sr-only">يحمّل لوح الفعل…</span>
     </div>
   );
 }
@@ -637,10 +637,10 @@ export function AllClear({ start, canPay = false }: { start: StartState; canPay?
         </span>
         <h2 className="mt-4 text-lg font-bold">لا شيء ينتظر قرارك.</h2>
         <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-ink-soft">
-          كلُّ ما يعرفه النظام سليم. وحين يصل مستندٌ أو كشفٌ يحتاج قراراً يظهر هنا بسببه وفعله.
+          كلّ ما يعرفه النظام سليم. وحين يصل مستند أو كشف يحتاج قراراً يظهر هنا بسببه وفعله.
         </p>
         <ul className="mx-auto mt-5 flex max-w-lg flex-wrap justify-center gap-x-5 gap-y-2 text-xs font-medium text-ink-soft">
-          {["لا مالٌ خرج مرّتين", "لا دفعةٌ بلا مستند", "لا مستندٌ ينتظر"].map((t) => (
+          {["لا مال خرج مرّتين", "لا دفعة بلا مستند", "لا مستند ينتظر"].map((t) => (
             <li key={t} className="inline-flex items-center gap-1.5">
               <CircleCheck className="h-3.5 w-3.5 text-ok" strokeWidth={2.25} aria-hidden />
               {t}
@@ -656,9 +656,9 @@ export function AllClear({ start, canPay = false }: { start: StartState; canPay?
         <section className="rounded-2xl border border-accent-line bg-accent-soft/60 p-5">
           <h2 className="flex items-center gap-2 text-sm font-bold">
             <Sparkles className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />
-            الفراغُ على ما قُرئ وحده
+            الفراغ على ما قرئ وحده
           </h2>
-          <p className="mb-4 mt-1 text-xs leading-relaxed text-ink-soft">ما لم يُستورَد مجهولٌ لا سليم — أكمِله ليُفحَص.</p>
+          <p className="mb-4 mt-1 text-xs leading-relaxed text-ink-soft">ما لم يستورد مجهول لا سليم — أكمله ليفحص.</p>
           <StartSteps start={start} />
         </section>
       )}
@@ -672,10 +672,10 @@ export function KnowsNothing({ start }: { start: StartState }) {
     <section className="animate-rise rounded-2xl border border-accent-line bg-accent-soft/60 p-5 sm:p-6">
       <h2 className="flex items-center gap-2 text-base font-bold">
         <Sparkles className="h-[18px] w-[18px] text-accent" strokeWidth={2} aria-hidden />
-        لا يعرف النظامُ شيئاً بعد
+        لا يعرف النظام شيئاً بعد
       </h2>
       <p className="mb-4 mt-1 max-w-2xl text-xs leading-relaxed text-ink-soft">
-        يظهر هنا ما يحتاج قرارك حين يقرأ مستنداتِك وكشفَ بنكك — والفراغُ الآن لا يعني أنّ كلَّ شيءٍ سليم.
+        يظهر هنا ما يحتاج قرارك حين يقرأ مستنداتك وكشف بنكك — والفراغ الآن لا يعني أنّ كلّ شيء سليم.
       </p>
       <StartSteps start={start} />
     </section>
@@ -710,9 +710,9 @@ export function LensEmpty({ lens }: { lens: Lens }) {
         <CircleCheck className="h-5 w-5" strokeWidth={1.9} aria-hidden />
       </span>
       <p className="mt-3 text-sm font-bold">لا شيء في «{label}» الآن.</p>
-      <p className="mx-auto mt-1 max-w-sm text-xs text-muted">حُسم ما كان فيه — وبقي غيرُه في الطابور.</p>
+      <p className="mx-auto mt-1 max-w-sm text-xs text-muted">حسم ما كان فيه — وبقي غيره في الطابور.</p>
       <div className="mt-5">
-        <LinkButton href="/attention" variant="primary" icon={ArrowLeft}>اعرض كلَّ البنود</LinkButton>
+        <LinkButton href="/attention" variant="primary" icon={ArrowLeft}>اعرض كلّ البنود</LinkButton>
       </div>
     </div>
   );

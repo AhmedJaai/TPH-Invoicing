@@ -147,7 +147,7 @@ export interface LinkResult {
  */
 export async function linkToProduct(input: LinkInput): Promise<LinkResult> {
   if (input.supplierProductIds.length === 0) {
-    throw new Error("لم تُحدَّد أصناف للربط");
+    throw new Error("لم تحدّد أصناف للربط");
   }
 
   let productId = input.productId ?? "";

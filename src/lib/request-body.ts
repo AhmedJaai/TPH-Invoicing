@@ -21,7 +21,7 @@ export async function readJson<S extends z.ZodType>(
     raw = await request.json();
   } catch {
     if (!options.emptyOk) {
-      return { ok: false, response: NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 }) };
+      return { ok: false, response: NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلغ مالك الحساب." }, { status: 400 }) };
     }
     raw = {};
   }
@@ -29,7 +29,7 @@ export async function readJson<S extends z.ZodType>(
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const field = issue?.path.length ? ` (${issue.path.join(".")})` : "";
-    return { ok: false, response: NextResponse.json({ error: `طلبٌ غير مفهوم${field}: ${issue?.message ?? ""}`.trim() }, { status: 400 }) };
+    return { ok: false, response: NextResponse.json({ error: `طلب غير مفهوم${field}: ${issue?.message ?? ""}`.trim() }, { status: 400 }) };
   }
   return { ok: true, body: parsed.data };
 }

@@ -133,7 +133,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "audit:view": "عرض سجلّ التدقيق",
   "inventory:view": "عرض الجرد",
   "inventory:count": "إدخال الجرد وإقفاله",
-  "inventory:reopen": "إعادة فتح جردٍ مقفَل",
+  "inventory:reopen": "إعادة فتح جرد مقفل",
   "recipe:edit": "تعديل الوصفات",
 };
 

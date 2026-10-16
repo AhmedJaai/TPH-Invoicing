@@ -203,8 +203,8 @@ export default async function InvoicesPage({
         /* قاعدةٌ بلا فاتورة: لا «٠٫٠٠ بقي» — فالصفرُ يُقرأ «لا دَين» */
         <EmptyState
           icon={Receipt}
-          title="لم تُسجَّل فاتورةٌ بعد."
-          hint="تُسجَّل الفاتورة حين يُرفع مستندُها أو يُقرأ من الدرايف. صوّرها أو اختر ملفّها، ويقرأ النظامُ مورّدَها ومبالغها لتؤكّدها."
+          title="لم تسجّل فاتورة بعد."
+          hint="تسجّل الفاتورة حين يرفع مستندها أو يقرأ من الدرايف. صوّرها أو اختر ملفّها، ويقرأ النظام مورّدها ومبالغها لتؤكّدها."
           action={<LinkButton href="/upload" variant="primary" icon={Upload}>ارفع أوّل فاتورة</LinkButton>}
         />
       ) : (
@@ -213,10 +213,10 @@ export default async function InvoicesPage({
           {/* على الجوّال: ما بقي أوّلاً بعرض الشاشة، والرقمان الآخران تحته جنباً إلى جنب */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="order-2 sm:order-1">
-              <Stat icon={FileText} label="المعروض" value={countNoun(count, INVOICE)} sub="الصفُّ كلُّه يفتح ملفَّ فاتورته." />
+              <Stat icon={FileText} label="المعروض" value={countNoun(count, INVOICE)} sub="الصفّ كلّه يفتح ملفّ فاتورته." />
             </div>
             <div className="order-3 sm:order-2">
-              <Stat icon={Scale} label="قيمتها" minor={Number(t.billed)} sub="مجموعُ إجماليّاتها بالضريبة." />
+              <Stat icon={Scale} label="قيمتها" minor={Number(t.billed)} sub="مجموع إجماليّاتها بالضريبة." />
             </div>
             {/*
               ── ليست «عليك» ──
@@ -234,8 +234,8 @@ export default async function InvoicesPage({
               href={f.paid === "OPEN" ? undefined : linkTo(f, { paid: "OPEN" })}
               sub={
                 Number(t.openN) > 0
-                  ? `على ${countNoun(Number(t.openN), INVOICE)} — وحسابُ كلّ مورّدٍ بعد رصيدك عنده في «المورّدون».`
-                  : "لا شيء باقٍ على ما يُعرَض."
+                  ? `على ${countNoun(Number(t.openN), INVOICE)} — وحساب كلّ مورّد بعد رصيدك عنده في «المورّدون».`
+                  : "لا شيء باق على ما يعرض."
               }
             />
             </div>
@@ -288,7 +288,7 @@ export default async function InvoicesPage({
                 بلا بنود
               </Toggle>
               <Toggle href={linkTo(f, { fixedAsset: !f.fixedAsset })} on={Boolean(f.fixedAsset)}>
-                أصولٌ ثابتة
+                أصول ثابتة
               </Toggle>
             </div>
           </div>
@@ -303,7 +303,7 @@ export default async function InvoicesPage({
               empty={
                 <EmptyState
                   icon={CircleCheck}
-                  title={f.paid === "OPEN" ? "لا فاتورة عليها رصيدٌ ضمن هذا الترشيح." : "لا فاتورة تطابق هذا الترشيح."}
+                  title={f.paid === "OPEN" ? "لا فاتورة عليها رصيد ضمن هذا الترشيح." : "لا فاتورة تطابق هذا الترشيح."}
                   hint="جرّب توسيعه، أو امسحه لترى كلّ الفواتير."
                   action={<LinkButton href="/purchases/invoices" variant="primary">امسح الترشيح</LinkButton>}
                 />
@@ -351,7 +351,7 @@ export default async function InvoicesPage({
                       <Link
                         href={invoiceHref(r.id, "tax")}
                         className="relative inline-flex items-center gap-1.5 underline-offset-4 hover:underline"
-                        title="لماذا؟ وكيف تُصلَح"
+                        title="لماذا؟ وكيف تصلح"
                       >
                         {badge}
                         <span className="text-[11px] text-muted">{gaps.length > 0 ? `ينقصها: ${gaps.join("، ")}` : "لماذا؟"}</span>
@@ -367,7 +367,7 @@ export default async function InvoicesPage({
                   cell: (r) =>
                     Number(r.lineCount) > 0
                       ? <span className="nums">{r.lineCount}</span>
-                      : <span className="text-[11px] text-warn">لم تُقرأ</span>,
+                      : <span className="text-[11px] text-warn">لم تقرأ</span>,
                 },
                 { key: "total", header: "الإجمالي", numeric: true, cell: (r) => <Money minor={r.total} /> },
                 {
@@ -376,11 +376,11 @@ export default async function InvoicesPage({
                   numeric: true,
                   cell: (r: Row) => {
                     const rem = r.total - Number(r.allocated);
-                    if (rem <= SETTLED_TOLERANCE_MINOR) return <Badge tone="ok" dot>مسدَّدة</Badge>;
+                    if (rem <= SETTLED_TOLERANCE_MINOR) return <Badge tone="ok" dot>مسدّدة</Badge>;
                     return (
                       <span className="inline-flex flex-col items-end">
                         <span className="font-bold"><Money minor={rem} tone="warn" /></span>
-                        {Number(r.allocated) > 0 && <span className="text-[10px] text-muted">سُدّد بعضُها</span>}
+                        {Number(r.allocated) > 0 && <span className="text-[10px] text-muted">سدّد بعضها</span>}
                       </span>
                     );
                   },

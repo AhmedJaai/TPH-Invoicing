@@ -46,11 +46,11 @@ export default async function ObligationsPage() {
 
   if (view.open.length === 0 && view.archived.length === 0) {
     return (
-      <PageShell user={user} width="wide" title="الوثائق والتراخيص" intro="ما له تاريخُ انتهاء: السجلّ التجاريّ، رخصة البلديّة، الدفاع المدنيّ، الشهادات الصحّيّة، الإقامات، عقد الإيجار.">
+      <PageShell user={user} width="wide" title="الوثائق والتراخيص" intro="ما له تاريخ انتهاء: السجلّ التجاريّ، رخصة البلديّة، الدفاع المدنيّ، الشهادات الصحّيّة، الإقامات، عقد الإيجار.">
         <EmptyState
           icon={FileBadge}
-          title="لم تُدخَل وثيقةٌ بعد."
-          hint="أدخِل وثائقَ المقهى بتاريخ انتهائها مرّةً (نحو عشر)، فيذكّرك النظام قبل كلٍّ بمهلتها في «يحتاج قرارك». وحتى تُدخَل لا يُقال «لا شيء ينتهي» — النظامُ لا يعرف."
+          title="لم تدخل وثيقة بعد."
+          hint="أدخل وثائق المقهى بتاريخ انتهائها مرّةً (نحو عشر)، فيذكّرك النظام قبل كلّ بمهلتها في «يحتاج قرارك». وحتى تدخل لا يقال «لا شيء ينتهي» — النظام لا يعرف."
           action={canEdit ? <ObligationForm /> : undefined}
         />
       </PageShell>
@@ -62,7 +62,7 @@ export default async function ObligationsPage() {
       user={user}
       width="wide"
       title="الوثائق والتراخيص"
-      intro="ما له تاريخُ انتهاءٍ يُغرَّم على فواته — يذكّرك النظام قبل كلٍّ بمهلتها في «يحتاج قرارك»."
+      intro="ما له تاريخ انتهاء يغرّم على فواته — يذكّرك النظام قبل كلّ بمهلتها في «يحتاج قرارك»."
       actions={canEdit ? <ObligationForm /> : undefined}
     >
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
@@ -71,24 +71,24 @@ export default async function ObligationsPage() {
           tone={expired.length > 0 ? "danger" : "ok"}
           label="انتهت"
           value={<span className="nums nums-count">{expired.length}</span>}
-          sub={expired.length > 0 ? expired.slice(0, 3).map((r) => r.title).join("، ") : "لا وثيقةَ منتهية ممّا أدخلتَه."}
+          sub={expired.length > 0 ? expired.slice(0, 3).map((r) => r.title).join("، ") : "لا وثيقة منتهية ممّا أدخلته."}
         />
         <KeyFigure
           icon={CalendarClock}
           tone={due.length > 0 ? "warn" : undefined}
           label="داخل مهلة التذكير"
           value={<span className="nums nums-count">{due.length}</span>}
-          sub={due.length > 0 ? due.slice(0, 3).map((r) => r.title).join("، ") : "لا شيء يقترب موعدُه ممّا أدخلتَه."}
+          sub={due.length > 0 ? due.slice(0, 3).map((r) => r.title).join("، ") : "لا شيء يقترب موعده ممّا أدخلته."}
         />
         <KeyFigure
           icon={ShieldCheck}
-          label="أقربُ موعد"
+          label="أقرب موعد"
           value={next ? <bdi className="text-xl">{formatDay(next.expiresOn)}</bdi> : <span className="text-xl text-muted">—</span>}
-          sub={next ? `${next.title} — ${describeDaysLeft(next.left)}` : "كلُّ ما أدخلتَه منتهٍ."}
+          sub={next ? `${next.title} — ${describeDaysLeft(next.left)}` : "كلّ ما أدخلته منته."}
         />
       </div>
 
-      <Section title="الوثائق" icon={FileBadge} count={rows.length} hint="الأقربُ انتهاءً أوّلاً. «جدِّد» بتعديل تاريخ الانتهاء؛ و«أرشِف» لما لم يعد لازماً — لا يُحذف.">
+      <Section title="الوثائق" icon={FileBadge} count={rows.length} hint="الأقرب انتهاءً أوّلاً. «جدّد» بتعديل تاريخ الانتهاء؛ و«أرشف» لما لم يعد لازماً — لا يحذف.">
         <DataTable<(typeof rows)[number]>
           rows={rows}
           keyOf={(r) => r.id}
@@ -126,7 +126,7 @@ export default async function ObligationsPage() {
               cell: (r) => (
                 <span className="flex flex-col items-start gap-1">
                   <Badge tone={LEVEL_TONE[r.level]} dot>{EXPIRY_LEVEL_LABEL[r.level]}</Badge>
-                  <span className="text-[11px] text-muted">{describeDaysLeft(r.left)} · تذكيرٌ قبلها بـ{r.remindDays} يوماً{r.snoozed && " · أجّلتَ تذكيرَها"}</span>
+                  <span className="text-[11px] text-muted">{describeDaysLeft(r.left)} · تذكير قبلها بـ{r.remindDays} يوماً{r.snoozed && " · أجّلت تذكيرها"}</span>
                 </span>
               ),
             },
@@ -147,7 +147,7 @@ export default async function ObligationsPage() {
                       {canEdit && (
                         <PostAction url="/api/obligation" body={{ action: "close", id: r.id }} undo={{ body: { action: "reopen", id: r.id } }} variant="quiet">
                           <Archive className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                          أرشِف
+                          أرشف
                         </PostAction>
                       )}
                     </span>
@@ -159,7 +159,7 @@ export default async function ObligationsPage() {
       </Section>
 
       {view.archived.length > 0 && (
-        <Section title="المؤرشَف" icon={Archive} count={view.archived.length} hint="لا يُذكَّر بها. تُعاد إن أُرشفت خطأً.">
+        <Section title="المؤرشف" icon={Archive} count={view.archived.length} hint="لا يذكّر بها. تعاد إن أرشفت خطأً.">
           <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
             {view.archived.map((o) => (
               <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-[13px]">
@@ -170,7 +170,7 @@ export default async function ObligationsPage() {
                 {canEdit && (
                   <PostAction url="/api/obligation" body={{ action: "reopen", id: o.id }} variant="quiet">
                     <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                    أعِدها
+                    أعدها
                   </PostAction>
                 )}
               </li>

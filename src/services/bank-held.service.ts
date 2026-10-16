@@ -107,18 +107,18 @@ export async function resolveHeldRow(
   actorId: string,
 ): Promise<{ transactionId: string | null; removed?: boolean }> {
   const [row] = await tx.select().from(bankHeldRows).where(eq(bankHeldRows.id, id)).for("update");
-  if (!row) throw new HeldRowRefused("لم يُوجد الصفّ — حدّث الصفحة");
-  if (row.resolvedAt) throw new HeldRowRefused("حُسم هذا الصفّ من قبل — حدّث الصفحة");
+  if (!row) throw new HeldRowRefused("لم يوجد الصفّ — حدّث الصفحة");
+  if (row.resolvedAt) throw new HeldRowRefused("حسم هذا الصفّ من قبل — حدّث الصفحة");
   if (row.kind === "MISSING_FROM_FILE") return resolveMissing(tx, row, decision, actorId);
-  if (decision === "REMOVED") throw new HeldRowRefused("الحذفُ لحركةٍ عندنا ليست في الكشف — وهذا صفٌّ من الكشف");
+  if (decision === "REMOVED") throw new HeldRowRefused("الحذف لحركة عندنا ليست في الكشف — وهذا صفّ من الكشف");
   if (decision === "ADDED" && row.kind === "CONFLICT") {
-    throw new HeldRowRefused("المتضاربُ لا يُضاف: مرجعُه لحركةٍ مقيَّدة بمبلغٍ آخر — انظر الملفّ ثمّ «تحقّقتُ»");
+    throw new HeldRowRefused("المتضارب لا يضاف: مرجعه لحركة مقيّدة بمبلغ آخر — انظر الملفّ ثمّ «تحقّقت»");
   }
   if (decision === "SAME" && row.kind === "CONFLICT") decision = "CHECKED";
 
   let transactionId: string | null = null;
   if (decision === "ADDED" && !row.bankImportId) {
-    throw new HeldRowRefused("حُذف الاستيرادُ الذي جاء منه هذا الصفّ — استورد الكشفَ ثانيةً فيعود إن كان حركةً أخرى");
+    throw new HeldRowRefused("حذف الاستيراد الذي جاء منه هذا الصفّ — استورد الكشف ثانيةً فيعود إن كان حركةً أخرى");
   }
   if (decision === "ADDED" && row.bankImportId) {
     /*
@@ -176,7 +176,7 @@ export async function resolveHeldRow(
     entityId: id,
     before: { النوع: row.kind, السبب: row.reason, تشبه: row.againstTransactionId },
     after: {
-      القرار: decision === "ADDED" ? "حركةٌ أخرى — أُضيفت" : decision === "SAME" ? "هي نفسها" : "تحقّقتُ",
+      القرار: decision === "ADDED" ? "حركة أخرى — أضيفت" : decision === "SAME" ? "هي نفسها" : "تحقّقت",
       الحركة: transactionId,
     },
   }, tx);
@@ -198,7 +198,7 @@ async function resolveMissing(
   actorId: string,
 ): Promise<{ transactionId: string | null; removed: boolean }> {
   if (decision !== "REMOVED" && decision !== "CHECKED") {
-    throw new HeldRowRefused("هذه حركةٌ عندنا ليست في الكشف — «احذفها» أو «أبقِها»");
+    throw new HeldRowRefused("هذه حركة عندنا ليست في الكشف — «احذفها» أو «أبقها»");
   }
   let removed = false;
   let facts: Record<string, unknown> = {};
@@ -207,7 +207,7 @@ async function resolveMissing(
       .where(eq(bankTransactions.id, row.againstTransactionId)).for("update");
     if (t) {
       if (t.matchedPaymentId || t.matchStatus === "MATCHED") {
-        throw new HeldRowRefused("الحركةُ مطابَقةٌ بدفعة — فكّ المطابقة من صفحتها أوّلاً، ثمّ احذفها");
+        throw new HeldRowRefused("الحركة مطابقة بدفعة — فكّ المطابقة من صفحتها أوّلاً، ثمّ احذفها");
       }
       const linked = await tx.select({ id: expenses.id, month: expenses.periodMonth, amountMinor: expenses.amountMinor, label: expenses.label })
         .from(expenses).where(eq(expenses.bankTransactionId, t.id));
@@ -233,7 +233,7 @@ async function resolveMissing(
     entityType: "bank_held_row",
     entityId: row.id,
     before: { النوع: row.kind, السبب: row.reason, الحركة: row.againstTransactionId },
-    after: { القرار: removed ? "ليست في الكشف — حُذفت" : "أُبقيت", ...facts },
+    after: { القرار: removed ? "ليست في الكشف — حذفت" : "أبقيت", ...facts },
   }, tx);
   return { transactionId: null, removed };
 }

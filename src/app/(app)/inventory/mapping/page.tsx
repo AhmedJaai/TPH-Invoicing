@@ -47,33 +47,33 @@ export default async function PosMappingPage() {
       user={user}
       width="page"
       title="منتجات تحتاج ربطاً"
-      intro="اربطه مرّةً فيُعرَف في كلّ استيرادٍ بعده — الربطُ على معرّفه عند فودكس لا على اسمه."
+      intro="اربطه مرّةً فيعرف في كلّ استيراد بعده — الربط على معرّفه عند فودكس لا على اسمه."
       actions={can(user.role, "recipe:edit") ? <LinkButton href="/inventory/recipes" size="sm" icon={BookOpen}>الوصفات</LinkButton> : undefined}
     >
       {rows.length === 0 ? (
         setup.sales === 0 ? (
           <EmptyState
             icon={Link2}
-            title="لا مبيعاتٍ مستورَدة بعد."
-            hint="يظهر هنا كلُّ صنفٍ بِيع في فودكس ولا صنفَ يقابله عندنا — مرتَّباً بما بِيع منه. ومن رفع الكتالوجَ قبل المبيعات لا يُسأل هنا عن شيءٍ تقريباً."
+            title="لا مبيعات مستوردة بعد."
+            hint="يظهر هنا كلّ صنف بيع في فودكس ولا صنف يقابله عندنا — مرتّباً بما بيع منه. ومن رفع الكتالوج قبل المبيعات لا يسأل هنا عن شيء تقريباً."
             action={<LinkButton href="/inventory/import#sales" variant="primary" size="sm">ارفع ملفّ المبيعات</LinkButton>}
           />
         ) : (
           <div className="flex items-center gap-3 rounded-xl border border-ok/25 bg-ok-bg px-5 py-6">
             <CircleCheck className="h-6 w-6 shrink-0 text-ok" strokeWidth={2} aria-hidden />
             <div>
-              <p className="text-sm font-bold text-ok">كلُّ ما بِيع مربوطٌ بصنفٍ عندنا.</p>
-              <p className="mt-0.5 text-xs text-ink-soft">والربطُ وحده لا يكفي: يحتاج كلُّ صنفٍ وصفةً سارية ليُحسَب استهلاكُه.</p>
+              <p className="text-sm font-bold text-ok">كلّ ما بيع مربوط بصنف عندنا.</p>
+              <p className="mt-0.5 text-xs text-ink-soft">والربط وحده لا يكفي: يحتاج كلّ صنف وصفةً سارية ليحسب استهلاكه.</p>
             </div>
           </div>
         )
       ) : (
         <>
-          <Callout tone="warn" icon={TriangleAlert} className="mb-6" title={`${countNoun(rows.length, PRODUCT)} بِيع ولا صنفَ يقابله`}>
-            ما لم يُربَط لا يدخل حسابَ الاستهلاك، ويُعلَن في تقرير كلّ جردٍ بنسبة ما يمثّله من المبيعات.
-            والربطُ وحده لا يكفي: يحتاج الصنفُ بعده وصفةً سارية.
+          <Callout tone="warn" icon={TriangleAlert} className="mb-6" title={`${countNoun(rows.length, PRODUCT)} بيع ولا صنف يقابله`}>
+            ما لم يربط لا يدخل حساب الاستهلاك، ويعلن في تقرير كلّ جرد بنسبة ما يمثّله من المبيعات.
+            والربط وحده لا يكفي: يحتاج الصنف بعده وصفةً سارية.
           </Callout>
-          <Section title="غيرُ المربوط" className="mt-0!" hint="مرتَّبٌ بما بِيع منه — فالأكثرُ مبيعاً أثقلُ في الحساب.">
+          <Section title="غير المربوط" className="mt-0!" hint="مرتّب بما بيع منه — فالأكثر مبيعاً أثقل في الحساب.">
             <PosProductMapping
               rows={rows}
               menuProducts={menuProducts.map((p) => ({ id: p.id, name: p.nameAr }))}

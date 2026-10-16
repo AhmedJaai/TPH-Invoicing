@@ -44,8 +44,8 @@ function completedIngredients(productSku: string): CostedIngredient[] {
   return out;
 }
 
-describe("الجاهزُ مقترنٌ بصنفٍ قائم", () => {
-  it("كلُّ منتجٍ وكلُّ صنفٍ في الجدول موجودٌ في الكتالوج", () => {
+describe("الجاهز مقترن بصنف قائم", () => {
+  it("كلّ منتج وكلّ صنف في الجدول موجود في الكتالوج", () => {
     for (const r of READY_MADE) {
       expect(productBySku.has(r.productSku), `منتج ${r.productSku}`).toBe(true);
       expect(itemBySku.has(r.itemSku), `صنف ${r.itemSku}`).toBe(true);
@@ -58,13 +58,13 @@ describe("الجاهزُ مقترنٌ بصنفٍ قائم", () => {
     وهو للقراءة وحدها، ولا يُبنى عليه ربط. لكنّ اسماً يخالف الكتالوج
     يجعل المعاينةَ تعرض شيئاً والاستيرادَ يكتب غيرَه.
   */
-  it("والاسمُ المعروض هو اسمُ الصنف في الكتالوج", () => {
+  it("والاسم المعروض هو اسم الصنف في الكتالوج", () => {
     for (const r of READY_MADE) {
       expect(itemBySku.get(r.itemSku)!.name).toBe(r.itemName);
     }
   });
 
-  it("ولا يتكرّر منتجٌ ولا يُقترَن صنفان بمنتجٍ واحد", () => {
+  it("ولا يتكرّر منتج ولا يقترن صنفان بمنتج واحد", () => {
     const skus = READY_MADE.map((r) => r.productSku);
     expect(new Set(skus).size).toBe(skus.length);
   });
@@ -76,7 +76,7 @@ describe("الجاهزُ مقترنٌ بصنفٍ قائم", () => {
     ‏١٢٫٠٠، وCrinkle ٥٫٠٠، وBrown Butter ٦٫٠٠. **وتطابقٌ تامّ في
     خمسةٍ لا يقع مصادفةً** — هو الدليل على أنّ الاقتران صحيح.
   */
-  it("وخمسةٌ منها تطابق الكلفةَ المعلَنة إلى الهللة", () => {
+  it("وخمسة منها تطابق الكلفة المعلنة إلى الهللة", () => {
     const exact = READY_MADE.filter((r) => {
       const cost = recipeCost(completedIngredients(r.productSku)).costMinor;
       return corroborationGapBp(cost, productBySku.get(r.productSku)!.declaredCostMinor) === 0;
@@ -91,7 +91,7 @@ describe("الجاهزُ مقترنٌ بصنفٍ قائم", () => {
     وما بقي يقارب: الفارقُ تغليفٌ لا يعدّه فودكس في كلفته. واثنان
     يجاوزان الحدّ ولهما ملاحظةٌ مكتوبة — فلا يمرّ فارقٌ صامتاً.
   */
-  it("وما جاوز الحدَّ له ملاحظةٌ تقول لماذا", () => {
+  it("وما جاوز الحدّ له ملاحظة تقول لماذا", () => {
     const loud: string[] = [];
     for (const r of READY_MADE) {
       const cost = recipeCost(completedIngredients(r.productSku)).costMinor;
@@ -105,14 +105,14 @@ describe("الجاهزُ مقترنٌ بصنفٍ قائم", () => {
     expect(loud).toEqual(["Crunchy wafer"]);
   });
 
-  it("و«تشيز مدريد» تُضاف إلى تغليفها ولا تحلّ محلَّه", () => {
+  it("و«تشيز مدريد» تضاف إلى تغليفها ولا تحلّ محلّه", () => {
     const ings = completedIngredients("sk-0023");
     expect(ings.map((i) => i.name).sort()).toEqual(["تشيز مدريد", "شوك", "علب تيكاوي"]);
     /* ‏٠٫٧٦ تغليفاً + ٩٫١٧ كعكةً = ٩٫٩٣ */
     expect(recipeCost(ings).costMinor).toBe(993);
   });
 
-  it("و«الماء» بلا وصفةٍ في الملفّ صار قارورةً واحدة", () => {
+  it("و«الماء» بلا وصفة في الملفّ صار قارورةً واحدة", () => {
     const ings = completedIngredients("sk-0014");
     expect(ings).toHaveLength(1);
     expect(ings[0].name).toBe("مياه معدنية");
@@ -126,21 +126,21 @@ describe("الجاهزُ مقترنٌ بصنفٍ قائم", () => {
     في أيّ ملفّ. واختراعُها يُنتج استهلاكاً مخترَعاً، فتبقى بلا وصفة
     وتُعلَن في التغطية.
   */
-  it("ولا خيارَ إضافةٍ في الجدول — جرعتُه ليست في أيّ ملفّ", () => {
+  it("ولا خيار إضافة في الجدول — جرعته ليست في أيّ ملفّ", () => {
     for (const sku of ["sk-0019", "sk-0020", "sk-0018", "sk-0017", "sk-0068"]) {
       expect(readyMadeFor(sku), sku).toBeUndefined();
     }
   });
 });
 
-describe("فارقُ الشهادة", () => {
-  it("يُحسَب نسبةً إلى المعلَنة", () => {
+describe("فارق الشهادة", () => {
+  it("يحسب نسبةً إلى المعلنة", () => {
     expect(corroborationGapBp(1_000, 1_000)).toBe(0);
     expect(corroborationGapBp(1_100, 1_000)).toBe(1_000);
     expect(corroborationGapBp(900, 1_000)).toBe(1_000);
   });
 
-  it("و`null` حين لا كلفةَ معلَنة — لا صفراً يُقرأ «مطابق»", () => {
+  it("و`null` حين لا كلفة معلنة — لا صفراً يقرأ «مطابق»", () => {
     expect(corroborationGapBp(1_000, null)).toBeNull();
     expect(corroborationGapBp(null, 1_000)).toBeNull();
     expect(corroborationGapBp(1_000, 0)).toBeNull();

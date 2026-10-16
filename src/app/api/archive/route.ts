@@ -125,14 +125,14 @@ function toResponse(e: unknown): NextResponse | null {
   /* سباقُ رفعين للملفّ نفسه: القيدُ الفريد ردّ الثاني — خبرٌ لا عطب */
   const code = (e as { code?: string; cause?: { code?: string } }).code ?? (e as { cause?: { code?: string } }).cause?.code;
   if (code === "23505") {
-    return NextResponse.json({ error: "رُفع هذا الملف أو هذه الفاتورة للتوّ من نافذةٍ أخرى — لم يُقيَّد ثانيةً" }, { status: 409 });
+    return NextResponse.json({ error: "رفع هذا الملف أو هذه الفاتورة للتوّ من نافذة أخرى — لم يقيّد ثانيةً" }, { status: 409 });
   }
   /* قيودُ المال في القاعدة تُقال لقارئها — لا ٥٠٠ بجسمٍ فارغ */
   if (code === "23514" || code === "23503") {
-    return NextResponse.json({ error: "رفضت القاعدة هذه القيم فلم يُقيَّد شيء — راجع المبالغ والمورّد" }, { status: 409 });
+    return NextResponse.json({ error: "رفضت القاعدة هذه القيم فلم يقيّد شيء — راجع المبالغ والمورّد" }, { status: 409 });
   }
   if (code === "22003") {
-    return NextResponse.json({ error: "مبلغٌ أكبر من المعقول — راجع الأصفار" }, { status: 400 });
+    return NextResponse.json({ error: "مبلغ أكبر من المعقول — راجع الأصفار" }, { status: 400 });
   }
   return null;
 }
@@ -160,14 +160,14 @@ export async function POST(request: Request) {
     }
 
     if (!SAFE_NAME.test(body.fileName) || !SAFE_NAME.test(body.folderName)) {
-      throw new InvalidInputError("اسم الملف أو المجلد فيه ما لا يُقبل");
+      throw new InvalidInputError("اسم الملف أو المجلد فيه ما لا يقبل");
     }
 
     /* `Buffer.from(…, "base64")` لا يرمي أبداً — فالتحقّق بالبايتات لا بـ`try` */
     const data = Buffer.from(typeof body.fileBase64 === "string" ? body.fileBase64 : "", "base64");
     if (data.length === 0) throw new InvalidInputError("الملف فارغ");
     if (!signatureMatches(body.mimeType, data)) {
-      throw new InvalidInputError("محتوى الملف لا يطابق نوعه المعلَن");
+      throw new InvalidInputError("محتوى الملف لا يطابق نوعه المعلن");
     }
 
     /*
@@ -415,7 +415,7 @@ export async function POST(request: Request) {
         driveMd5,
         periodMonth,
         uploadedById: user.id,
-        reason: e instanceof MonthClosedError ? e.message : code ? `ردّت القاعدةُ القيد (${code})` : "تعذّر القيد",
+        reason: e instanceof MonthClosedError ? e.message : code ? `ردّت القاعدة القيد (${code})` : "تعذّر القيد",
       }).catch(() => undefined);
       throw e;
     });

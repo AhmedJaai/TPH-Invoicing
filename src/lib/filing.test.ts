@@ -15,7 +15,7 @@ describe("حساب الأشهر", () => {
 });
 
 describe("الشهر = تاريخ الفاتورة لا تاريخ السداد", () => {
-  it("فاتورة ٢٩ أغسطس تبقى في أغسطس ولو سُدّدت في سبتمبر", () => {
+  it("فاتورة ٢٩ أغسطس تبقى في أغسطس ولو سدّدت في سبتمبر", () => {
     const r = resolveInvoiceFiling({ invoiceDate: d("2026-08-29"), isPaid: true });
     expect(r.periodMonth).toBe("2026-08");
     expect(r.carriedForwardFrom).toBeUndefined();
@@ -23,7 +23,7 @@ describe("الشهر = تاريخ الفاتورة لا تاريخ السداد"
 });
 
 describe("ترحيل الفاتورة المتأخرة عن كشف موردها", () => {
-  it("غير مسددة ووصلت بعد الكشف — تُرحَّل مع حفظ الأثر", () => {
+  it("غير مسددة ووصلت بعد الكشف — ترحّل مع حفظ الأثر", () => {
     const r = resolveInvoiceFiling({
       invoiceDate: d("2026-08-31"),
       supplierStatementDate: d("2026-08-28"),
@@ -33,7 +33,7 @@ describe("ترحيل الفاتورة المتأخرة عن كشف موردها"
     expect(r.carriedForwardFrom).toBe("2026-08");
   });
 
-  it("مسددة — لا تُرحَّل مهما تأخرت", () => {
+  it("مسددة — لا ترحّل مهما تأخرت", () => {
     const r = resolveInvoiceFiling({
       invoiceDate: d("2026-08-31"),
       supplierStatementDate: d("2026-08-28"),
@@ -58,7 +58,7 @@ describe("ترحيل الفاتورة المتأخرة عن كشف موردها"
 });
 
 describe("إيصال السداد يتبع شهر فواتيره لا شهر التحويل", () => {
-  it("حُوّل ٢ سبتمبر عن فواتير أغسطس ← مجلد أغسطس", () => {
+  it("حوّل ٢ سبتمبر عن فواتير أغسطس ← مجلد أغسطس", () => {
     expect(resolveReceiptFiling({
       paidAt: d("2026-09-02"),
       settledInvoiceMonths: ["2026-08", "2026-08"],
@@ -87,7 +87,7 @@ describe("مسار المجلد المعروض قبل الحفظ", () => {
 
 import { addMonths, monthsBetween, nextMonth as nextM, previousMonth as prevM } from "./filing";
 
-describe("حسابُ الأشهر: مالكٌ واحد يطابق الصيغتين القديمتين", () => {
+describe("حساب الأشهر: مالك واحد يطابق الصيغتين القديمتين", () => {
   /* كما كانتا في هذا الملفّ قبل أن تُبنيا على `addMonths` */
   const oldNext = (month: string) => {
     const [y, m] = month.split("-").map(Number);
@@ -98,7 +98,7 @@ describe("حسابُ الأشهر: مالكٌ واحد يطابق الصيغتي
     return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
   };
 
-  it("الشهرُ التالي والسابق لكلّ شهرٍ من ١٩٩٠ إلى ٢١٠٠", () => {
+  it("الشهر التالي والسابق لكلّ شهر من ١٩٩٠ إلى ٢١٠٠", () => {
     for (let y = 1990; y <= 2100; y++) {
       for (let m = 1; m <= 12; m++) {
         const month = `${y}-${String(m).padStart(2, "0")}`;

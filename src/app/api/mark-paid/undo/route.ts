@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "تعذّرت قراءة الطلب." }, { status: 400 });
   }
   if (!parsed.success) {
-    return NextResponse.json({ error: "حدّد الدفعات التي يُتراجَع عنها." }, { status: 400 });
+    return NextResponse.json({ error: "حدّد الدفعات التي يتراجع عنها." }, { status: 400 });
   }
   const ids = [...new Set(parsed.data.paymentIds)];
 
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       voided: out.voided,
-      message: `أُلغي الإقرار — عادت فواتيرُ بـ${formatRiyalsDisplay(out.freedMinor)} ريال مفتوحة.`,
+      message: `ألغي الإقرار — عادت فواتير بـ${formatRiyalsDisplay(out.freedMinor)} ريال مفتوحة.`,
     });
   } catch (e) {
     if (e instanceof UndoError) return NextResponse.json({ error: e.message }, { status: e.status });

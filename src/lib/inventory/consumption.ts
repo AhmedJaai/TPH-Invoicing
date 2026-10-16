@@ -58,12 +58,12 @@ export type ExclusionReason =
   | "UNSUPPORTED_YIELD_UNIT";
 
 export const EXCLUSION_LABEL: Record<ExclusionReason, string> = {
-  VOID: "بيعةٌ ملغاة — لم تُصنَع",
-  UNMAPPED_POS_PRODUCT: "صنفُ فودكس غير مربوط بصنفٍ عندنا",
-  NO_RECIPE: "لا وصفةَ لهذا الصنف",
-  NO_EFFECTIVE_VERSION: "لا نسخةَ وصفةٍ سارية في تاريخ البيعة",
-  EMPTY_RECIPE: "وصفةٌ بلا مكوّنات",
-  UNSUPPORTED_YIELD_UNIT: "ناتجُ الوصفة بوحدةٍ لا تُترجَم إلى عددِ ما يُباع",
+  VOID: "بيعة ملغاة — لم تصنع",
+  UNMAPPED_POS_PRODUCT: "صنف فودكس غير مربوط بصنف عندنا",
+  NO_RECIPE: "لا وصفة لهذا الصنف",
+  NO_EFFECTIVE_VERSION: "لا نسخة وصفة سارية في تاريخ البيعة",
+  EMPTY_RECIPE: "وصفة بلا مكوّنات",
+  UNSUPPORTED_YIELD_UNIT: "ناتج الوصفة بوحدة لا تترجم إلى عدد ما يباع",
 };
 
 export interface IngredientConsumption {

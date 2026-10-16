@@ -20,7 +20,7 @@ describe("سجل الموردين الابتدائي", () => {
     }
   });
 
-  it("الموردون بلا فواتير موسومون ومعلَّلون", () => {
+  it("الموردون بلا فواتير موسومون ومعلّلون", () => {
     const without = SUPPLIER_SEED.filter((s) => s.issuesInvoices === false);
     expect(without.map((s) => s.slug).sort()).toEqual(["Mariah", "PURE-Oska", "WaterFilters"]);
     for (const s of without) expect(s.notes, s.slug).toBeTruthy();

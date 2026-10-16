@@ -109,7 +109,7 @@ export function ViewControls() {
         type="button"
         onClick={toggleAmounts}
         className={btn}
-        data-tip="أخفِ المبالغ أو أظهرها — للعرض على غيرك"
+        data-tip="أخف المبالغ أو أظهرها — للعرض على غيرك"
         aria-label="بدّل إخفاء المبالغ"
       >
         <Eye className="icon-shown h-[18px] w-[18px]" />

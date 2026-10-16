@@ -132,7 +132,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     detail:
       facts.openBlockerIssues === 0
         ? "لا شيء يمنع"
-        : `${countNoun(facts.openBlockerIssues, WARNING)} مانع لم يُعالَج`,
+        : `${countNoun(facts.openBlockerIssues, WARNING)} مانع لم يعالج`,
     action: facts.openBlockerIssues === 0 ? undefined : "عالجها أو تجاوزها بسبب مكتوب",
   });
 
@@ -143,7 +143,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     detail:
       facts.documentsNeedingReview === 0
         ? "كل مستندات الشهر مؤرشفة"
-        : `${countNoun(facts.documentsNeedingReview, DOCUMENT)} لم يُبتّ فيه`,
+        : `${countNoun(facts.documentsNeedingReview, DOCUMENT)} لم يبتّ فيه`,
     action: facts.documentsNeedingReview === 0 ? undefined : "راجعها وأرشفها أو ارفضها",
   });
 
@@ -155,10 +155,10 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   if (facts.unknownTaxCount > 0) {
     items.push({
       id: "tax-unknown",
-      label: "كل الفواتير قُرئ تفصيلها الضريبي",
+      label: "كل الفواتير قرئ تفصيلها الضريبي",
       state: "WARN",
-      detail: `${countNoun(facts.unknownTaxCount, INVOICE)} لم يُقرأ تفصيلها الضريبي`,
-      action: "اقرأ محتواها — حالتها مجهولة لا غير صالحة، ولا تُطالِب المورّد قبل ذلك",
+      detail: `${countNoun(facts.unknownTaxCount, INVOICE)} لم يقرأ تفصيلها الضريبي`,
+      action: "اقرأ محتواها — حالتها مجهولة لا غير صالحة، ولا تطالب المورّد قبل ذلك",
     });
   }
 
@@ -179,18 +179,18 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
       /* أغلبُها ركنٌ لم يُقرأ والورقةُ سليمة — فالعلاجُ عندنا قبل أن يُطالَب المورّد */
       action: facts.notTaxValidCount === 0
         ? undefined
-        : "انظر الورقة: إن حملت الرقمين فصحّح الفاتورة أو احسبها من «إقرار الضريبة»؛ وإن نقص ركنٌ عليها فاطلب البديل من المورّد قبل السداد",
+        : "انظر الورقة: إن حملت الرقمين فصحّح الفاتورة أو احسبها من «إقرار الضريبة»؛ وإن نقص ركن عليها فاطلب البديل من المورّد قبل السداد",
     });
 
     items.push({
       id: "paid",
-      label: "مستحقّات الشهر مسدَّدة",
+      label: "مستحقّات الشهر مسدّدة",
       state: facts.unpaidCount === 0 ? "PASS" : "WARN",
       detail:
         facts.unpaidCount === 0
           ? "لا رصيد مستحق"
           : `${countNoun(facts.unpaidCount, INVOICE)} بقيمة ${riyals(facts.unpaidTotalMinor)} ريال`,
-      action: facts.unpaidCount === 0 ? undefined : "أدرجها في دفعة أوّل الشهر أو اعتمدها مسدَّدة",
+      action: facts.unpaidCount === 0 ? undefined : "أدرجها في دفعة أوّل الشهر أو اعتمدها مسدّدة",
     });
   }
 
@@ -211,7 +211,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
     const differing = facts.suppliersWithStatementIssues;
     const parts = [
       missingStatements > 0 ? `${missingStatements} من ${countNoun(facts.suppliersWithInvoices, SUPPLIER)} لم يصل كشفه` : null,
-      differing > 0 ? `${countNoun(differing, SUPPLIER)} وصل كشفه وفيه فروقٌ مع دفترنا` : null,
+      differing > 0 ? `${countNoun(differing, SUPPLIER)} وصل كشفه وفيه فروق مع دفترنا` : null,
     ].filter((x): x is string => x !== null);
     items.push({
       id: "statements",
@@ -224,8 +224,8 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
       action:
         parts.length === 0 ? undefined
         : missingStatements > 0
-          ? "اطلب الكشف — هو وحده يكشف فاتورة حُمّلت عليك ولم تصلك"
-          : "افتح الكشوف وانظر الفروق: فاتورةٌ ناقصة، أو مبلغٌ يخالف، أو ختاميٌّ لا يوافق",
+          ? "اطلب الكشف — هو وحده يكشف فاتورة حمّلت عليك ولم تصلك"
+          : "افتح الكشوف وانظر الفروق: فاتورة ناقصة، أو مبلغ يخالف، أو ختاميّ لا يوافق",
     });
   }
 
@@ -242,7 +242,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
       وكان «تنبيهاً» فيُقفَل شهرٌ لم يُقرأ منه ريالٌ بنكيّ.
     */
     state: facts.bankImportCoversMonth ? "PASS" : "BLOCK",
-    detail: facts.bankImportCoversMonth ? "في الشهر حركاتٌ من كشف البنك" : "لم يُستورد كشف بنك لهذا الشهر — أيّامه كلّها فجوة",
+    detail: facts.bankImportCoversMonth ? "في الشهر حركات من كشف البنك" : "لم يستورد كشف بنك لهذا الشهر — أيّامه كلّها فجوة",
     action: facts.bankImportCoversMonth ? undefined : "استورد كشف الحساب من صفحة البنك",
   });
 
@@ -285,12 +285,12 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
           ? "الكشف لا يحمل رصيداً افتتاحياً أو ختامياً — فالرصيد لا يمكن فحصه"
           : facts.bankBalanceDifferenceMinor === null || facts.bankBalanceDifferenceMinor === 0
             ? "الافتتاحي والحركات يعطيان الختامي"
-            : `فرقٌ غير مفسَّر: ${riyals(Math.abs(facts.bankBalanceDifferenceMinor))} ريال`,
+            : `فرق غير مفسّر: ${riyals(Math.abs(facts.bankBalanceDifferenceMinor))} ريال`,
       action:
         facts.bankBalanceStatus === "UNEXPLAINED"
-          ? "راجع الكشف — الفرق يعني حركاتٍ لم تُقرأ، لا خطأ مطابقة"
+          ? "راجع الكشف — الفرق يعني حركات لم تقرأ، لا خطأ مطابقة"
           : facts.bankBalanceStatus === "UNKNOWN"
-            ? "اكتب رصيدَي أوّل الشهر وآخره كما في كشف البنك — أو استورد كشفاً فيه عمود الرصيد"
+            ? "اكتب رصيدي أوّل الشهر وآخره كما في كشف البنك — أو استورد كشفاً فيه عمود الرصيد"
             : undefined,
     });
 
@@ -316,9 +316,9 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   if (facts.bankImportCoversMonth && facts.bankSupplierUnpostedCount > 0) {
     items.push({
       id: "bank-supplier-unposted",
-      label: "حوالات المورّدين مقيَّدة",
+      label: "حوالات المورّدين مقيّدة",
       state: "WARN",
-      detail: `${countNoun(facts.bankSupplierUnpostedCount, TRANSACTION)} لمورّدين بقيمة ${riyals(facts.bankSupplierUnpostedMinor)} ريال لم تُقيَّد سداداً — فما عليك لهم يظهر أكثر ممّا هو`,
+      detail: `${countNoun(facts.bankSupplierUnpostedCount, TRANSACTION)} لمورّدين بقيمة ${riyals(facts.bankSupplierUnpostedMinor)} ريال لم تقيّد سداداً — فما عليك لهم يظهر أكثر ممّا هو`,
       action: "قيّدها على فواتيرها أو على حساب المورّد من طابور المراجعة",
     });
   }
@@ -326,7 +326,7 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   if (facts.fixedAssetCount > 0) {
     items.push({
       id: "fixed-assets",
-      label: "الأصول الثابتة رُوجعت",
+      label: "الأصول الثابتة روجعت",
       state: "WARN",
       detail: `${countNoun(facts.fixedAssetCount, INVOICE)} فوق حدّ الرسملة`,
       action: "راجعها مع المحاسب — صرفها دفعة واحدة يشوّه ربح الشهر",
@@ -341,12 +341,12 @@ export function buildMonthClose(facts: MonthFacts): MonthCloseReport {
   if (facts.vatFiled !== undefined && periodMonths(quarter)[2] === facts.month) {
     items.push({
       id: "vat-return",
-      label: `إقرار ضريبة ${quarterLabel(quarter)} قُدِّم`,
+      label: `إقرار ضريبة ${quarterLabel(quarter)} قدّم`,
       state: facts.vatFiled ? "PASS" : "WARN",
       detail: facts.vatFiled
-        ? "سُجّل تقديمُه"
-        : `هذا آخرُ شهرٍ في الربع — آخرُ موعدٍ لتقديم إقراره وسداده ${formatDay(filingDeadline(quarter))}`,
-      action: facts.vatFiled ? undefined : "راجِع حسابَه وقدّمه في بوّابة الهيئة ثمّ سجّل «قدّمتُه»",
+        ? "سجّل تقديمه"
+        : `هذا آخر شهر في الربع — آخر موعد لتقديم إقراره وسداده ${formatDay(filingDeadline(quarter))}`,
+      action: facts.vatFiled ? undefined : "راجع حسابه وقدّمه في بوّابة الهيئة ثمّ سجّل «قدّمته»",
       href: facts.vatFiled ? undefined : `/close/vat?period=${periodKey(quarter)}`,
     });
   }

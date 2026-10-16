@@ -94,7 +94,7 @@ export function openToken(stored: string): string {
   if (!isSealed(stored)) return stored;
   const keys = readable();
   if (keys.length === 0) {
-    throw new Error("رمز الدرايف مشفَّر و TOKEN_ENCRYPTION_KEY غير مضبوط في هذه البيئة — اضبطه بالقيمة نفسها التي في الإنتاج");
+    throw new Error("رمز الدرايف مشفّر و TOKEN_ENCRYPTION_KEY غير مضبوط في هذه البيئة — اضبطه بالقيمة نفسها التي في الإنتاج");
   }
   if (stored.startsWith(PREFIX_V2)) {
     const rest = stored.slice(PREFIX_V2.length);
@@ -102,7 +102,7 @@ export function openToken(stored: string): string {
     const kid = rest.slice(0, cut);
     const k = keys.find((x) => x.kid === kid);
     if (cut < 0 || !k) {
-      throw new Error("رمز الدرايف مختومٌ بمفتاحٍ غير المضبوط هنا — إن دُوِّر المفتاح فضَع السابق في TOKEN_ENCRYPTION_KEY_PREVIOUS، أو سجّل الخروج ثمّ الدخول");
+      throw new Error("رمز الدرايف مختوم بمفتاح غير المضبوط هنا — إن دوّر المفتاح فضع السابق في TOKEN_ENCRYPTION_KEY_PREVIOUS، أو سجّل الخروج ثمّ الدخول");
     }
     return decrypt(k.v2, rest.slice(cut + 1));
   }

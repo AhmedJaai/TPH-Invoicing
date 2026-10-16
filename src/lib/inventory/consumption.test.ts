@@ -33,7 +33,7 @@ function sold(over: Partial<SoldLineInput> = {}): SoldLineInput {
 
 /* ─────────────────── الحساب ─────────────────── */
 
-describe("استهلاكُ مكوّنٍ واحد", () => {
+describe("استهلاك مكوّن واحد", () => {
   it("٢٠ جراماً × ١٠٠ مشروب = ٢ كجم", () => {
     const versions = indexRecipeVersions([
       version({ ingredients: [{ productId: COFFEE, quantityMilli: 20_000, unit: "G", prepLossBp: null }] }),
@@ -46,18 +46,18 @@ describe("استهلاكُ مكوّنٍ واحد", () => {
     expect(coffee.recipeVersionIds).toEqual(["v1"]);
   });
 
-  it("والصيغةُ نفسُها تُختبَر وحدها", () => {
+  it("والصيغة نفسها تختبر وحدها", () => {
     expect(ingredientForSale(100 * 1000, 20_000, 1000, null)).toBe(2_000_000);
     expect(ingredientForSale(1000, 18_000, 1000, null)).toBe(18_000);
   });
 
-  it("فاقدُ التجهيز يرفع المصروف — ‏`q ÷ (1 − loss)` لا `q × (1 + loss)`", () => {
+  it("فاقد التجهيز يرفع المصروف — ‏`q ÷ (1 − loss)` لا `q × (1 + loss)`", () => {
     /* ٥٪ فاقد: ١٠٠ جرامٍ في الكوب تعني ١٠٥٫٢٦ من الرفّ لا ١٠٥ */
     expect(ingredientForSale(1000, 100_000, 1000, 500)).toBe(105_263);
   });
 });
 
-describe("وصفةٌ بمكوّناتٍ عدّة", () => {
+describe("وصفة بمكوّنات عدّة", () => {
   const versions = indexRecipeVersions([
     version({
       ingredients: [
@@ -68,7 +68,7 @@ describe("وصفةٌ بمكوّناتٍ عدّة", () => {
     }),
   ]);
 
-  it("١٠٠ مشروبٍ تحسب كلَّ مكوّنٍ على حدة", () => {
+  it("١٠٠ مشروب تحسب كلّ مكوّن على حدة", () => {
     const r = computeConsumption([sold({ quantityMilli: 100 * 1000 })], versions);
 
     expect(canonicalToQuantity(r.byIngredient.get(COFFEE)!.canonicalMilli, "KG")).toBe(1.8);
@@ -78,7 +78,7 @@ describe("وصفةٌ بمكوّناتٍ عدّة", () => {
   });
 });
 
-describe("نسخُ الوصفة مؤرَّخة — وهذا شرطُ صدق التقرير التاريخيّ", () => {
+describe("نسخ الوصفة مؤرّخة — وهذا شرط صدق التقرير التاريخيّ", () => {
   const twenty = version({
     id: "v-20", version: 1, effectiveFrom: "2026-09-01", effectiveTo: "2026-09-07",
     ingredients: [{ productId: COFFEE, quantityMilli: 20_000, unit: "G", prepLossBp: null }],
@@ -89,12 +89,12 @@ describe("نسخُ الوصفة مؤرَّخة — وهذا شرطُ صدق ال
   });
   const versions = indexRecipeVersions([twenty, eighteen]);
 
-  it("بيعةُ ٥ سبتمبر تأخذ ٢٠ جراماً، وبيعةُ ٩ سبتمبر تأخذ ١٨", () => {
+  it("بيعة ٥ سبتمبر تأخذ ٢٠ جراماً، وبيعة ٩ سبتمبر تأخذ ١٨", () => {
     expect(effectiveVersion(versions, LATTE, "2026-09-05")?.id).toBe("v-20");
     expect(effectiveVersion(versions, LATTE, "2026-09-09")?.id).toBe("v-18");
   });
 
-  it("وفي الأسبوع الواحد تعمل النسختان معاً — لا الأحدثُ وحدها", () => {
+  it("وفي الأسبوع الواحد تعمل النسختان معاً — لا الأحدث وحدها", () => {
     const r = computeConsumption(
       [
         sold({ businessDate: "2026-09-05", quantityMilli: 100 * 1000 }),
@@ -108,31 +108,31 @@ describe("نسخُ الوصفة مؤرَّخة — وهذا شرطُ صدق ال
     expect(coffee.recipeVersionIds.sort()).toEqual(["v-18", "v-20"]);
   });
 
-  it("وما قبل أوّل نسخةٍ لا وصفةَ له — ولا يُؤخَذ الأقربُ", () => {
+  it("وما قبل أوّل نسخة لا وصفة له — ولا يؤخذ الأقرب", () => {
     expect(effectiveVersion(versions, LATTE, "2026-08-31")).toBeNull();
     const r = computeConsumption([sold({ businessDate: "2026-08-31" })], versions);
     expect(r.byIngredient.size).toBe(0);
     expect(r.excluded[0].reason).toBe("NO_EFFECTIVE_VERSION");
   });
 
-  it("والمسوّدةُ لا تُحسَب ولو غطّى تاريخُها البيعة", () => {
+  it("والمسوّدة لا تحسب ولو غطّى تاريخها البيعة", () => {
     const draft = indexRecipeVersions([version({ status: "DRAFT" })]);
     const r = computeConsumption([sold()], draft);
     expect(r.excluded[0].reason).toBe("NO_EFFECTIVE_VERSION");
   });
 });
 
-describe("الملغى والمرتجَع والمجانيّ — ثلاثةٌ لا واحد", () => {
+describe("الملغى والمرتجع والمجانيّ — ثلاثة لا واحد", () => {
   const versions = indexRecipeVersions([version()]);
 
-  it("الملغى يُستبعَد كلُّه: لم يُصنَع أصلاً", () => {
+  it("الملغى يستبعد كلّه: لم يصنع أصلاً", () => {
     const r = computeConsumption([sold({ isVoid: true, quantityMilli: 50 * 1000 })], versions);
     expect(r.byIngredient.size).toBe(0);
     expect(r.excluded[0].reason).toBe("VOID");
     expect(r.included.lines).toBe(0);
   });
 
-  it("والمرتجَع يُنقص الاستهلاك", () => {
+  it("والمرتجع ينقص الاستهلاك", () => {
     const r = computeConsumption(
       [
         sold({ quantityMilli: 10 * 1000 }),
@@ -146,7 +146,7 @@ describe("الملغى والمرتجَع والمجانيّ — ثلاثةٌ ل
     expect(coffee.fromRefundsMilli).toBe(-36_000);
   });
 
-  it("والمجانيّ يُستهلَك ويُعَدّ على حدة — صُنع فعلاً وخرجت مكوّناتُه", () => {
+  it("والمجانيّ يستهلك ويعدّ على حدة — صنع فعلاً وخرجت مكوّناته", () => {
     const r = computeConsumption(
       [
         sold({ quantityMilli: 10 * 1000 }),
@@ -168,8 +168,8 @@ describe("الملغى والمرتجَع والمجانيّ — ثلاثةٌ ل
   صاحبُه، ويؤيّدها التصدير الحقيقيّ: سعرُه صفرٌ في ١٥٨ مرّة. فالافتراضُ
   ألّا يزيد شيئاً، والبنيةُ تقبل الزيادةَ متى قيلت صراحةً.
 */
-describe("المكوّنُ المرتبطُ بخيار", () => {
-  it("لا يُحسَب حين يغيب الخيار", () => {
+describe("المكوّن المرتبط بخيار", () => {
+  it("لا يحسب حين يغيب الخيار", () => {
     const versions = indexRecipeVersions([version({
       ingredients: [
         { productId: COFFEE, quantityMilli: 18_000, unit: "G", prepLossBp: null },
@@ -180,7 +180,7 @@ describe("المكوّنُ المرتبطُ بخيار", () => {
     expect(canonicalToQuantity(r.byIngredient.get(COFFEE)!.canonicalMilli, "G")).toBe(180);
   });
 
-  it("ويُحسَب حين يحضر — «إكسترا شوت» يزيد ١٨ جراماً", () => {
+  it("ويحسب حين يحضر — «إكسترا شوت» يزيد ١٨ جراماً", () => {
     const versions = indexRecipeVersions([version({
       ingredients: [
         { productId: COFFEE, quantityMilli: 18_000, unit: "G", prepLossBp: null },
@@ -195,7 +195,7 @@ describe("المكوّنُ المرتبطُ بخيار", () => {
     expect(canonicalToQuantity(r.byIngredient.get(COFFEE)!.canonicalMilli, "G")).toBe(360);
   });
 
-  it("و«دبل شوت» بلا مكوّنٍ مرتبطٍ لا يزيد شيئاً وإن حضر", () => {
+  it("و«دبل شوت» بلا مكوّن مرتبط لا يزيد شيئاً وإن حضر", () => {
     const versions = indexRecipeVersions([version()]);
     const withOption = computeConsumption(
       [sold({ quantityMilli: 10 * 1000, modifierExternalIds: ["sk-0039"] })], versions,
@@ -206,10 +206,10 @@ describe("المكوّنُ المرتبطُ بخيار", () => {
   });
 });
 
-describe("ما لا يُحسَب يُعلَن — ولا يُبتلَع", () => {
+describe("ما لا يحسب يعلن — ولا يبتلع", () => {
   const versions = indexRecipeVersions([version()]);
 
-  it("صنفُ فودكس غير المربوط يُستبعَد بسببه، ومعه مبلغُه", () => {
+  it("صنف فودكس غير المربوط يستبعد بسببه، ومعه مبلغه", () => {
     const r = computeConsumption(
       [sold({ menuProductId: null, posProductName: "Iced Tea", lineTotalMinor: 2200 })],
       versions,
@@ -221,12 +221,12 @@ describe("ما لا يُحسَب يُعلَن — ولا يُبتلَع", () => 
     expect(r.excludedTotals.totalMinor).toBe(2200);
   });
 
-  it("وصنفٌ مربوطٌ بلا وصفةٍ أصلاً يُفرَّق عمّن له وصفةٌ غيرُ سارية", () => {
+  it("وصنف مربوط بلا وصفة أصلاً يفرّق عمّن له وصفة غير سارية", () => {
     const r = computeConsumption([sold({ menuProductId: AMERICANO })], versions);
     expect(r.excluded[0].reason).toBe("NO_RECIPE");
   });
 
-  it("وناتجُ الوصفة بلترٍ لا يُترجَم إلى عددِ أكواب — يُعلَن ولا يُفترَض واحداً", () => {
+  it("وناتج الوصفة بلتر لا يترجم إلى عدد أكواب — يعلن ولا يفترض واحداً", () => {
     const batch = indexRecipeVersions([
       version({ yieldQuantityMilli: 2000, yieldUnit: "L" }),
     ]);
@@ -234,7 +234,7 @@ describe("ما لا يُحسَب يُعلَن — ولا يُبتلَع", () => 
     expect(r.excluded[0].reason).toBe("UNSUPPORTED_YIELD_UNIT");
   });
 
-  it("وناتجٌ بالحبّة يقسم — وصفةٌ تُنتج ٤ أكواب", () => {
+  it("وناتج بالحبّة يقسم — وصفة تنتج ٤ أكواب", () => {
     const batch = indexRecipeVersions([
       version({
         yieldQuantityMilli: 4000,
@@ -247,7 +247,7 @@ describe("ما لا يُحسَب يُعلَن — ولا يُبتلَع", () => 
     expect(canonicalToQuantity(r.byIngredient.get(COFFEE)!.canonicalMilli, "G")).toBe(80);
   });
 
-  it("ومكوّنٌ ذُكر بعائلتين يُعلَن تضاربُه ولا يُجمَع", () => {
+  it("ومكوّن ذكر بعائلتين يعلن تضاربه ولا يجمع", () => {
     const clashing = indexRecipeVersions([
       version({ id: "va", menuProductId: LATTE }),
       version({
@@ -263,8 +263,8 @@ describe("ما لا يُحسَب يُعلَن — ولا يُبتلَع", () => 
   });
 });
 
-describe("ingredientForSale — يُقرَّب بعد التحويل لا قبله", () => {
-  it("وصفةٌ بالكيلو لعشر حصص فيها جرامٌ واحد: عُشرُ جرامٍ لكلّ بيعة لا صفر", () => {
+describe("ingredientForSale — يقرّب بعد التحويل لا قبله", () => {
+  it("وصفة بالكيلو لعشر حصص فيها جرام واحد: عشر جرام لكلّ بيعة لا صفر", () => {
     /* ١ مِلّي‑كيلو = جرام؛ والناتجُ ١٠ حصص — فالبيعةُ الواحدة ٠٫١ جرام */
     const perSale = ingredientForSale(1000, 1, 10_000, null, toCanonical(1, "KG"));
     /* جرامٌ = ١٠٠٠ مِلّي‑جرام، فعُشرُه ١٠٠ — وكان يُقرَّب قبل التحويل صفراً */
@@ -273,8 +273,8 @@ describe("ingredientForSale — يُقرَّب بعد التحويل لا قبل
   });
 });
 
-describe("فاقدُ التجهيز محدود — لا قسمةَ على صفر ولا استهلاكَ سالباً", () => {
-  it("مئةٌ بالمئة وما فوقها تُحدّ دونها — عددٌ منتهٍ موجب", () => {
+describe("فاقد التجهيز محدود — لا قسمة على صفر ولا استهلاك سالباً", () => {
+  it("مئة بالمئة وما فوقها تحدّ دونها — عدد منته موجب", () => {
     const capped = ingredientForSale(1000, 20_000, 1000, MAX_PREP_LOSS_BP);
     expect(Number.isFinite(capped) && capped > 0).toBe(true);
     expect(ingredientForSale(1000, 20_000, 1000, 10_000)).toBe(capped);

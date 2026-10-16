@@ -12,8 +12,8 @@ async function someone(tx: Tx): Promise<string> {
   return u.id;
 }
 
-describe("الإشعارُ الدائن — فاتورةٌ بخمسة آلاف وإشعارٌ بسبعمئة = ٤٬٣٠٠", () => {
-  it("يُنقص ما بقي على الفاتورة وما على المقهى للمورّد", () =>
+describe("الإشعار الدائن — فاتورة بخمسة آلاف وإشعار بسبعمئة = ٤٬٣٠٠", () => {
+  it("ينقص ما بقي على الفاتورة وما على المقهى للمورّد", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 5000_00, "2026-09-10");
@@ -26,7 +26,7 @@ describe("الإشعارُ الدائن — فاتورةٌ بخمسة آلاف �
       expect(a.n).toBe(1);
     }));
 
-  it("لا يتجاوز ما بقي — ولا يُكتب شيء", () =>
+  it("لا يتجاوز ما بقي — ولا يكتب شيء", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 500_00, "2026-09-10");
@@ -36,7 +36,7 @@ describe("الإشعارُ الدائن — فاتورةٌ بخمسة آلاف �
       expect(n.n).toBe(0);
     }));
 
-  it("ولا يتبنّاه كشفُ البنك: حوالةٌ بالمبلغ نفسه في اليوم نفسه ليست هو", () =>
+  it("ولا يتبنّاه كشف البنك: حوالة بالمبلغ نفسه في اليوم نفسه ليست هو", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 5000_00, "2026-09-10");

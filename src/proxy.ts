@@ -39,16 +39,16 @@ export function proxy(request: NextRequest) {
     */
     const fetchSite = request.headers.get("sec-fetch-site");
     if (fetchSite === "cross-site") {
-      return NextResponse.json({ error: "طلبٌ من موقعٍ آخر — رُفض" }, { status: 403 });
+      return NextResponse.json({ error: "طلب من موقع آخر — رفض" }, { status: 403 });
     }
     if (!origin && !fetchSite && hasSessionCookie(request)) {
-      return NextResponse.json({ error: "طلبٌ لا يُعرف مصدرُه — رُفض. حدّث الصفحة ثمّ أعد المحاولة" }, { status: 403 });
+      return NextResponse.json({ error: "طلب لا يعرف مصدره — رفض. حدّث الصفحة ثمّ أعد المحاولة" }, { status: 403 });
     }
     if (origin) {
       let sameHost = false;
       try { sameHost = new URL(origin).host === request.nextUrl.host; } catch { sameHost = false; }
       if (!sameHost) {
-        return NextResponse.json({ error: "طلبٌ من موقعٍ آخر — رُفض" }, { status: 403 });
+        return NextResponse.json({ error: "طلب من موقع آخر — رفض" }, { status: 403 });
       }
     }
     const type = request.headers.get("content-type");

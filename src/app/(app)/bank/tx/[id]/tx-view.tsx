@@ -41,11 +41,11 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
   const tx = await loadFocusedTx(id);
   if (!tx) {
     return (
-      <DetailFrame mode={mode} fullHref={fullHref} user={user} width="page" title="حركةٌ غير موجودة">
+      <DetailFrame mode={mode} fullHref={fullHref} user={user} width="page" title="حركة غير موجودة">
         <EmptyState
           icon={CircleAlert}
           title="لا توجد هذه الحركة."
-          hint="ربما دُمجت بنسختها عند تنظيف المكرَّر — والأثرُ في سجلّ التدقيق."
+          hint="ربما دمجت بنسختها عند تنظيف المكرّر — والأثر في سجلّ التدقيق."
           action={<LinkButton href="/bank" variant="primary">سجلّ الحركات</LinkButton>}
         />
       </DetailFrame>
@@ -78,7 +78,7 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
       eyebrow={
         <span className="inline-flex items-center gap-2">
           <Landmark className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          {tx.direction === "DEBIT" ? "صادرٌ من حسابك" : "واردٌ إلى حسابك"} · <bdi>{formatDay(tx.valueDate)}</bdi>
+          {tx.direction === "DEBIT" ? "صادر من حسابك" : "وارد إلى حسابك"} · <bdi>{formatDay(tx.valueDate)}</bdi>
         </span>
       }
     >
@@ -102,29 +102,29 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
             ]}
           />
           <div>
-            <p className="text-[11px] font-medium text-muted">نصُّ البنك كما ورد</p>
+            <p className="text-[11px] font-medium text-muted">نصّ البنك كما ورد</p>
             <p className="mt-1 break-words rounded-lg bg-sunken px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-soft" dir="auto">
               {tx.description ?? "—"}
             </p>
           </div>
         </div>
         <div>
-          <p className="mb-2 text-[11px] font-bold text-muted">لماذا طُوبقت — وكيف تتراجع</p>
+          <p className="mb-2 text-[11px] font-bold text-muted">لماذا طوبقت — وكيف تتراجع</p>
           <MatchExplain match={tx.match} canUndo={canUndo} inline />
           {bounce && <BankBounce pair={bounce} currentId={id} />}
           {handLink && (
             <div className="mt-3 rounded-xl border border-accent-line bg-accent-soft/50 p-3 text-xs leading-relaxed">
-              <p className="font-bold">سدادُها مقيَّدٌ بيدك من قبل</p>
+              <p className="font-bold">سدادها مقيّد بيدك من قبل</p>
               <p className="mt-1 text-ink-soft">
-                في {formatDay(handLink.paymentDay)} قيّدتَ سداداً لـ{handLink.supplierName} بـ<Money minor={handLink.paymentMinor} />
-                {handLink.invoices.length > 0 && <> عن {handLink.invoices.map((i) => i.number).join("، ")}</>}، فأُغلقت فاتورتُه
-                — ولذلك لم يجد المطابقُ فاتورةً مفتوحة. هذه الحوالةُ هي ذلك السداد
-                {handLink.exact ? "." : <>، وزادت عليه <Money minor={handLink.extraMinor} /> (توصيلٌ في الفاتورة؟ صحّح إجماليَّها).</>}
+                في {formatDay(handLink.paymentDay)} قيّدت سداداً لـ{handLink.supplierName} بـ<Money minor={handLink.paymentMinor} />
+                {handLink.invoices.length > 0 && <> عن {handLink.invoices.map((i) => i.number).join("، ")}</>}، فأغلقت فاتورته
+                — ولذلك لم يجد المطابق فاتورةً مفتوحة. هذه الحوالة هي ذلك السداد
+                {handLink.exact ? "." : <>، وزادت عليه <Money minor={handLink.extraMinor} /> (توصيل في الفاتورة؟ صحّح إجماليّها).</>}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <AccountReview size="sm" variant="primary" />
                 {!handLink.exact && handLink.invoices[0] && (
-                  <LinkButton href={`/purchases/invoices/${handLink.invoices[0].id}?act=fix#fix`} size="sm">صحّح إجماليَّ {handLink.invoices[0].number}</LinkButton>
+                  <LinkButton href={`/purchases/invoices/${handLink.invoices[0].id}?act=fix#fix`} size="sm">صحّح إجماليّ {handLink.invoices[0].number}</LinkButton>
                 )}
               </div>
             </div>
@@ -137,7 +137,7 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
           title="ما سدّدته"
           icon={Receipt}
           count={allocations.length}
-          hint={allocated < tx.amountMinor ? "وما بقي منها رصيدٌ لك عند المورّد — يُخصم من فواتيره القادمة." : undefined}
+          hint={allocated < tx.amountMinor ? "وما بقي منها رصيد لك عند المورّد — يخصم من فواتيره القادمة." : undefined}
           className="mt-8"
         >
           <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">

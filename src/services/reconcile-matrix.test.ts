@@ -48,13 +48,13 @@ const run = (input: Parameters<typeof runReconciliation>[0]) => {
 /* ───────────────────── ١–٦: المبلغ ───────────────────── */
 
 describe("المصفوفة · المبلغ", () => {
-  it("١. مبلغٌ مطابق تماماً لفاتورةٍ واحدة → يُكتَب", () => {
+  it("١. مبلغ مطابق تماماً لفاتورة واحدة → يكتب", () => {
     const r = run({ rows: [tx({ key: "t" })], invoices: [inv({ id: "i" })], suppliers });
     expect(r.of("t").decision?.disposition).toBe("AUTO");
     expect(r.plan("t")?.allocations).toEqual([{ invoiceId: "i", amountMinor: 1_000_00 }]);
   });
 
-  it("٢. مجموع فاتورتين يطابق الدفعة → تُكتبان معاً", () => {
+  it("٢. مجموع فاتورتين يطابق الدفعة → تكتبان معاً", () => {
     const r = run({
       rows: [tx({ key: "t", amountMinor: 1_800_00 })],
       invoices: [inv({ id: "a", outstandingMinor: 1_200_00 }), inv({ id: "b", outstandingMinor: 600_00 })],
@@ -64,7 +64,7 @@ describe("المصفوفة · المبلغ", () => {
     expect(r.plan("t")?.allocations.reduce((s, a) => s + a.amountMinor, 0)).toBe(1_800_00);
   });
 
-  it("٣. سدادٌ جزئيّ → يُخصَّص بقدره ولا يُقفِل الفاتورة", () => {
+  it("٣. سداد جزئيّ → يخصّص بقدره ولا يقفل الفاتورة", () => {
     const r = run({
       rows: [tx({ key: "t", amountMinor: 400_00 })],
       invoices: [inv({ id: "i", outstandingMinor: 1_000_00, invoiceNumber: "260342" })],
@@ -77,7 +77,7 @@ describe("المصفوفة · المبلغ", () => {
     if (p) expect(p.allocations.reduce((s, a) => s + a.amountMinor, 0)).toBeLessThanOrEqual(400_00);
   });
 
-  it("٤. زيادةٌ في حدّ رسم التحويل → مطابقةٌ تامّة ورسمٌ مفصول", () => {
+  it("٤. زيادة في حدّ رسم التحويل → مطابقة تامّة ورسم مفصول", () => {
     const r = run({
       rows: [tx({ key: "t", amountMinor: 1_015_00 })],
       invoices: [inv({ id: "i" })], suppliers,
@@ -86,7 +86,7 @@ describe("المصفوفة · المبلغ", () => {
     expect(r.plan("t")?.allocations[0].amountMinor).toBe(1_000_00);
   });
 
-  it("٥. زيادةٌ فوق حدّ الرسم → لا تُحسَم تلقائياً", () => {
+  it("٥. زيادة فوق حدّ الرسم → لا تحسم تلقائياً", () => {
     const r = run({
       rows: [tx({ key: "t", amountMinor: 1_500_00 })],
       invoices: [inv({ id: "i" })], suppliers,
@@ -95,7 +95,7 @@ describe("المصفوفة · المبلغ", () => {
     expect(r.plan("t")).toBeNull();
   });
 
-  it("٦. لا يُخصَّص فوق قيمة الفاتورة أبداً", () => {
+  it("٦. لا يخصّص فوق قيمة الفاتورة أبداً", () => {
     const r = run({
       rows: [tx({ key: "t", amountMinor: 5_000_00 })],
       invoices: [inv({ id: "i", outstandingMinor: 1_000_00 })], suppliers,
@@ -107,7 +107,7 @@ describe("المصفوفة · المبلغ", () => {
 /* ───────────────────── ٧–١١: الجهة ───────────────────── */
 
 describe("المصفوفة · الجهة", () => {
-  it("٧. مستفيدٌ غير معروف → يُعلَن ولا يُخمَّن", () => {
+  it("٧. مستفيد غير معروف → يعلن ولا يخمّن", () => {
     const r = run({
       rows: [tx({ key: "t", beneficiaryRaw: "جهة لا نعرفها", description: "حوالة" })],
       invoices: [inv({ id: "i" })], suppliers,
@@ -117,7 +117,7 @@ describe("المصفوفة · الجهة", () => {
   });
 
   /* الاسم الثلاثيّ: «سرد» ثلاثة أحرف و«للتجاره» عامّة — فبقي بلا مميِّز */
-  it("٨. اسمٌ تجاريّ ثلاثيّ يُعرَف — ولا يبقى بلا كلمةٍ مميّزة", () => {
+  it("٨. اسم تجاريّ ثلاثيّ يعرف — ولا يبقى بلا كلمة مميّزة", () => {
     const r = run({
       rows: [tx({ key: "t", beneficiaryRaw: "سرد للتجارة", amountMinor: 11_600_00 })],
       invoices: [inv({ id: "i", supplierId: "S3", outstandingMinor: 11_600_00 })],
@@ -126,13 +126,13 @@ describe("المصفوفة · الجهة", () => {
     expect(r.of("t").supplierId).toBe("S3");
   });
 
-  it("٩. مورّدٌ معروف بلا فاتورة مفتوحة → يُعلَن ولا يُطابَق", () => {
+  it("٩. مورّد معروف بلا فاتورة مفتوحة → يعلن ولا يطابق", () => {
     const r = run({ rows: [tx({ key: "t" })], invoices: [], suppliers });
     expect(r.of("t").outcome).toBe("KNOWN_SUPPLIER_NO_INVOICE");
     expect(r.plan("t")).toBeNull();
   });
 
-  it("١٠. فاتورةُ مورّدٍ آخر لا تُنسَب إليه", () => {
+  it("١٠. فاتورة مورّد آخر لا تنسب إليه", () => {
     const r = run({
       rows: [tx({ key: "t", beneficiaryRaw: "لافا كمبوتشا" })],
       invoices: [inv({ id: "i", supplierId: "S1" })], suppliers,
@@ -157,7 +157,7 @@ describe("المصفوفة · التنازع", () => {
     حركةٍ تطلبها، فتُطابَق واحدة وتبقى الأخرى معلّقة — أو أسوأ: تُخصَّص
     الفاتورة مرّتين.
   */
-  it("١٢. حركتان تطلبان الفاتورة نفسها → لا تُخصَّص مرّتين", () => {
+  it("١٢. حركتان تطلبان الفاتورة نفسها → لا تخصّص مرّتين", () => {
     const r = run({
       rows: [tx({ key: "a" }), tx({ key: "b" })],
       invoices: [inv({ id: "i" })], suppliers,
@@ -166,7 +166,7 @@ describe("المصفوفة · التنازع", () => {
     expect(claimed.filter((x) => x === "i").length).toBeLessThanOrEqual(1);
   });
 
-  it("١٣. مرشّحان متقاربان → لا حسمَ تلقائيّ", () => {
+  it("١٣. مرشّحان متقاربان → لا حسم تلقائيّ", () => {
     const r = run({
       rows: [tx({ key: "t" })],
       invoices: [
@@ -178,7 +178,7 @@ describe("المصفوفة · التنازع", () => {
     expect(r.of("t").decision?.disposition).not.toBe("AUTO");
   });
 
-  it("١٤. الفارق الواضح يُحسَم", () => {
+  it("١٤. الفارق الواضح يحسم", () => {
     const r = run({
       rows: [tx({ key: "t" })],
       invoices: [inv({ id: "a" }), inv({ id: "b", outstandingMinor: 7_777_00 })],
@@ -187,7 +187,7 @@ describe("المصفوفة · التنازع", () => {
     expect(r.plan("t")?.allocations[0].invoiceId).toBe("a");
   });
 
-  it("١٥. الفاتورة المسدَّدة لا تدخل الترشيح", () => {
+  it("١٥. الفاتورة المسدّدة لا تدخل الترشيح", () => {
     const r = run({
       rows: [tx({ key: "t" })],
       invoices: [inv({ id: "paid", outstandingMinor: 0 }), inv({ id: "open" })],
@@ -200,7 +200,7 @@ describe("المصفوفة · التنازع", () => {
 /* ───────────────────── ١٦–١٩: الزمن ───────────────────── */
 
 describe("المصفوفة · الزمن", () => {
-  it("١٦. فاتورةٌ قبل الدفعة بأيام → عاديّة", () => {
+  it("١٦. فاتورة قبل الدفعة بأيام → عاديّة", () => {
     const r = run({
       rows: [tx({ key: "t", valueDate: day("2026-08-15") })],
       invoices: [inv({ id: "i", invoiceDate: day("2026-08-10") })], suppliers,
@@ -209,7 +209,7 @@ describe("المصفوفة · الزمن", () => {
   });
 
   /* تصل الفاتورة ثمّ تُدفَع — ولا يُنسَب سدادٌ إلى ما لم يكن موجوداً */
-  it("١٧. فاتورةٌ بعد الدفعة بأسبوعين → لا تُنسَب إليها", () => {
+  it("١٧. فاتورة بعد الدفعة بأسبوعين → لا تنسب إليها", () => {
     const r = run({
       rows: [tx({ key: "t", valueDate: day("2026-08-01") })],
       invoices: [inv({ id: "i", invoiceDate: day("2026-08-20") })], suppliers,
@@ -217,7 +217,7 @@ describe("المصفوفة · الزمن", () => {
     expect(r.of("t").candidate?.parts.date ?? 0).toBe(0);
   });
 
-  it("١٨. فاتورةٌ بعد الدفعة بيوم → ممكنةٌ لا مرجَّحة", () => {
+  it("١٨. فاتورة بعد الدفعة بيوم → ممكنة لا مرجّحة", () => {
     const r = run({
       rows: [tx({ key: "t", valueDate: day("2026-08-10") })],
       invoices: [inv({ id: "i", invoiceDate: day("2026-08-11") })], suppliers,
@@ -227,7 +227,7 @@ describe("المصفوفة · الزمن", () => {
     expect(d).toBeLessThanOrEqual(0.5);
   });
 
-  it("١٩. الشهر الحاكم أحدثُ شهور الفاتورة لا أقدمُها", () => {
+  it("١٩. الشهر الحاكم أحدث شهور الفاتورة لا أقدمها", () => {
     const r = run({
       rows: [tx({ key: "t", amountMinor: 2_000_00, valueDate: day("2026-09-01") })],
       invoices: [
@@ -256,7 +256,7 @@ describe("المصفوفة · ما ليس سداداً", () => {
     expect(r.of("t").candidate).toBeNull();
   });
 
-  it("٢١. الراتب لا يُطابَق بفاتورة", () => {
+  it("٢١. الراتب لا يطابق بفاتورة", () => {
     const r = run({
       rows: [tx({ key: "t", beneficiaryRaw: "محمد علي", description: "رواتب موظفين" })],
       invoices: [inv({ id: "i" })], suppliers,
@@ -265,7 +265,7 @@ describe("المصفوفة · ما ليس سداداً", () => {
   });
 
   /* «زاتكا» ليست صدقة — والحكوميّ يسبق الزكاة في الترتيب */
-  it("٢٢. سدادٌ حكوميّ لا يُقرأ زكاةً", () => {
+  it("٢٢. سداد حكوميّ لا يقرأ زكاةً", () => {
     const r = run({
       rows: [tx({ key: "t", description: "سداد فاتورة زاتكا الضريبة" })],
       invoices: [inv({ id: "i" })], suppliers,

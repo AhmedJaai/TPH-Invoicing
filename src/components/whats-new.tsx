@@ -52,7 +52,7 @@ export function WhatsNew({ allowed }: { allowed: readonly NewsItem["needs"][] })
         <button
           type="button"
           onClick={dismiss}
-          aria-label="قرأتُه — أخفِ الجديد"
+          aria-label="قرأته — أخف الجديد"
           className="-m-2 grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-hover hover:text-ink sm:m-0 sm:h-8 sm:w-8"
         >
           <X className="h-4 w-4" strokeWidth={2} aria-hidden />

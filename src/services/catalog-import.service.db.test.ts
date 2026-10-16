@@ -38,8 +38,8 @@ async function importAll(tx: Tx, actorId: string, over: Partial<{ effectiveFrom:
   );
 }
 
-describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
-  it("‏٦٠ صنفَ مخزون و٥٨ صنفاً يُباع و٤٩ وصفة — من ثلاثة ملفّاتٍ في طلبٍ واحد", () =>
+describe("الكتالوج الحقيقيّ يدخل القاعدة", () => {
+  it("‏٦٠ صنف مخزون و٥٨ صنفاً يباع و٤٩ وصفة — من ثلاثة ملفّات في طلب واحد", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const r = await importAll(tx, actorId);
@@ -66,7 +66,7 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
     خُلط النطاقان لصار صفّاً واحداً — بوصفةٍ تستهلك نفسَها. وهذا
     الاختبار يقف على ذلك الحدّ بعينه.
   */
-  it("ورمزٌ واحدٌ يصير صفّين لا صفّاً — البنُّ ليس الإسبريسو", () =>
+  it("ورمز واحد يصير صفّين لا صفّاً — البنّ ليس الإسبريسو", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       await importAll(tx, actorId);
@@ -91,7 +91,7 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
       expect(rows.rows[1].stock).toBe(false);
     }));
 
-  it("والعبوةُ تُحفَظ بثلاثتها ولا تُحفَظ قسمتُها", () =>
+  it("والعبوة تحفظ بثلاثتها ولا تحفظ قسمتها", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       await importAll(tx, actorId);
@@ -114,7 +114,7 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
     رمزُ الكتالوج هو رمزُ تصدير المبيعات نفسُه. فمن استورد الكتالوج
     ثمّ المبيعات لم يُسأل عن ربطِ شيء — وكان الطابورُ ٤٤ سؤالاً.
   */
-  it("ومن استورد الكتالوج قبل المبيعات لم يُسأل عن ربطِ صنف", () =>
+  it("ومن استورد الكتالوج قبل المبيعات لم يسأل عن ربط صنف", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -141,7 +141,7 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
     «Cheese Pretzel» (أكتوبر ٢٠٢٦): بيع قبل أن يُرفع الكتالوج فأُنشئ له صنفٌ بلا رمز،
     ثمّ ردّ فهرسُ الفرادة الكتالوجَ كلَّه بـ«سُجّل هذا من قبل».
   */
-  it("وصنفٌ مباعٌ أُنشئ قبل الكتالوج يُتبنّى برمزه ولا يُكرَّر", () =>
+  it("وصنف مباع أنشئ قبل الكتالوج يتبنّى برمزه ولا يكرّر", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       await tx.execute(sql`update products set foodics_product_sku = null, is_active = false where foodics_product_sku = 'sk-0007' or (name_ar = 'Latte' and is_menu_item)`);
@@ -157,7 +157,7 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
       expect(rows).toEqual([{ id: orphan.id, sku: "sk-0007" }]);
     }));
 
-  it("ورفعُه مرّتين لا يُنشئ نسخةَ وصفةٍ ثانية", () =>
+  it("ورفعه مرّتين لا ينشئ نسخة وصفة ثانية", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       await importAll(tx, actorId);
@@ -175,7 +175,7 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
     من عدّل جرعةً بيده لا يُلغى عملُه لأنّ ملفّاً رُفع. ويُعلَن أنّ
     الاستيراد تخطّاه — فالتخطّي الصامت يجعل صاحبَه يظنّ أنّ تعديله ضاع.
   */
-  it("ووصفةٌ كتبها إنسانٌ يتخطّاها الاستيراد ويُعلن ذلك", () =>
+  it("ووصفة كتبها إنسان يتخطّاها الاستيراد ويعلن ذلك", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       await importAll(tx, actorId);
@@ -208,7 +208,7 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
       expect(Number(ing.q)).toBe(21_000);
     }));
 
-  it("والمعاينةُ تحسب ولا تكتب", () =>
+  it("والمعاينة تحسب ولا تكتب", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const preview = await importAll(tx, actorId, { dryRun: true });
@@ -222,7 +222,7 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
       expect(Number(n.rows[0].n)).toBe(0);
     }));
 
-  it("وملفُّ الوصفات وحدَه يُعلن ما نقصه ولا يكتب نصفَ وصفة", () =>
+  it("وملفّ الوصفات وحده يعلن ما نقصه ولا يكتب نصف وصفة", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const r = await importFoodicsCatalog(
@@ -234,7 +234,7 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
       expect(r.blocked[0].reason).toContain("الأصناف المباعة");
     }));
 
-  it("وتاريخُ سريانٍ غيرُ مكتوبٍ يُردّ قبل أن يُقرأ ملفّ", () =>
+  it("وتاريخ سريان غير مكتوب يردّ قبل أن يقرأ ملفّ", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const e = await caught(importFoodicsCatalog(
@@ -244,14 +244,14 @@ describe("الكتالوجُ الحقيقيّ يدخل القاعدة", () => {
     }));
 });
 
-describe("الجاهزُ يُشترى ويُباع كما هو", () => {
+describe("الجاهز يشترى ويباع كما هو", () => {
   /*
     ── والتغليفُ يبقى، والصنفُ يُضاف إليه ──
 
     «تشيز مدريد» في الملفّ شوكةٌ وعلبةٌ — والكعكةُ ليست فيه. فتُضاف
     الكعكةُ **إلى** ما جاء، لا بدلاً منه: الشوكةُ تُستهلَك أيضاً.
   */
-  it("«تشيز مدريد» صارت ثلاثةَ مكوّنات — والكعكةُ فيها", () =>
+  it("«تشيز مدريد» صارت ثلاثة مكوّنات — والكعكة فيها", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       await importAll(tx, actorId);
@@ -273,7 +273,7 @@ describe("الجاهزُ يُشترى ويُباع كما هو", () => {
       expect(cake.unit).toBe("PIECE");
     }));
 
-  it("و«الماء» بلا وصفةٍ في الملفّ صارت قارورةً واحدة", () =>
+  it("و«الماء» بلا وصفة في الملفّ صارت قارورةً واحدة", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       await importAll(tx, actorId);
@@ -314,7 +314,7 @@ describe("الجاهزُ يُشترى ويُباع كما هو", () => {
       expect(row.unit).toBe("ML");
     }));
 
-  it("ومبيعُ الحلى صار يُخصَم من المخزون — ٩٧ قطعةَ تشيز مدريد", () =>
+  it("ومبيع الحلى صار يخصم من المخزون — ٩٧ قطعة تشيز مدريد", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -341,7 +341,7 @@ describe("الجاهزُ يُشترى ويُباع كما هو", () => {
     }));
 });
 
-describe("الكتالوجُ يُقوِّم الفرق حين لا فاتورة", () => {
+describe("الكتالوج يقوّم الفرق حين لا فاتورة", () => {
   /*
     ── الفاتورةُ واقعةٌ والكتالوجُ تقدير ──
 
@@ -356,7 +356,7 @@ describe("الكتالوجُ يُقوِّم الفرق حين لا فاتورة"
     ‏١٣–١٩. فخرج ١٧٠٦ سطرَ بيعٍ من ١٧١٧ من الحساب. وأوّلُ نسخةٍ تسري
     منذ البداية، فتغطّيه.
   */
-  it("بنُّ إثيوبيا: ‏٥٫٧١٥ كجم — ولو رُفع الكتالوجُ بسريانٍ بعد الأسبوع", () =>
+  it("بنّ إثيوبيا: ‏٥٫٧١٥ كجم — ولو رفع الكتالوج بسريان بعد الأسبوع", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);

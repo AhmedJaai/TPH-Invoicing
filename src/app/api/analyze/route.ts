@@ -54,7 +54,7 @@ async function handle(request: Request) {
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب." }, { status: 400 });
+    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلغ مالك الحساب." }, { status: 400 });
   }
 
   const file = form.get("file");
@@ -111,7 +111,7 @@ async function handle(request: Request) {
   if (duplicateFile) {
     return NextResponse.json(
       {
-        error: `هذا الملف رُفع من قبل («${duplicateFile.fileName}») — لم يُقرأ ثانيةً`,
+        error: `هذا الملف رفع من قبل («${duplicateFile.fileName}») — لم يقرأ ثانيةً`,
         duplicateDocumentId: duplicateFile.id,
       },
       { status: 409 },
@@ -149,8 +149,8 @@ async function handle(request: Request) {
       return NextResponse.json(
         {
           error: extraction.kind === "NO_BALANCE"
-            ? "قراءةُ المستندات متوقّفة: نفد رصيدُ القارئ. ملفُّك سليم ولم يُحفَظ شيء — أبلِغ مالك الحساب ليشحن الرصيد، ثمّ أعد الرفع."
-            : `قراءةُ المستندات متوقّفة مؤقّتاً (${extraction.reason}). ملفُّك سليم ولم يُحفَظ شيء — أعد المحاولة بعد دقائق.`,
+            ? "قراءة المستندات متوقّفة: نفد رصيد القارئ. ملفّك سليم ولم يحفظ شيء — أبلغ مالك الحساب ليشحن الرصيد، ثمّ أعد الرفع."
+            : `قراءة المستندات متوقّفة مؤقّتاً (${extraction.reason}). ملفّك سليم ولم يحفظ شيء — أعد المحاولة بعد دقائق.`,
           readerOutage: extraction.kind,
         },
         { status: extraction.kind === "NO_BALANCE" ? 402 : 503 },
@@ -204,7 +204,7 @@ async function handle(request: Request) {
       const last = await loadLastItemPrices(match.supplier.id, itemKeys(extraction.value.lines));
       priceMoves = priceMovesAtReview(extraction.value.lines, last).slice(0, 20);
     } catch (e) {
-      console.error("[analyze] تعذّرت مقارنةُ الأسعار", e);
+      console.error("[analyze] تعذّرت مقارنة الأسعار", e);
     }
   }
 

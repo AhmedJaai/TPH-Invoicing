@@ -26,8 +26,8 @@ export type OpexSource = "BANK" | "INVOICE" | "MANUAL" | "SPREAD" | "OFF_BOOK";
 export const OPEX_SOURCE_LABEL: Record<OpexSource, string> = {
   BANK: "من كشف البنك",
   INVOICE: "من فاتورة",
-  MANUAL: "قُيِّد بيد",
-  SPREAD: "حصّةُ الشهر من دفعةٍ تغطّي أشهراً — بإقرار المالك",
+  MANUAL: "قيّد بيد",
+  SPREAD: "حصّة الشهر من دفعة تغطّي أشهراً — بإقرار المالك",
   OFF_BOOK: "خارج الكشف — بإقرار المالك",
 };
 
@@ -161,14 +161,14 @@ export function buildPnl(input: PnlInput): Pnl {
   /* ── الإيراد ── */
   const revenueMinor = input.revenue ? input.revenue.paidMinor - input.revenue.vatMinor : null;
   if (input.revenue === null) {
-    gaps.push({ id: "NO_REVENUE", label: "لا مبيعاتٍ مقروءةً من فودكس لهذا الشهر", action: "زامن فودكس", href: "/money/foodics" });
+    gaps.push({ id: "NO_REVENUE", label: "لا مبيعات مقروءةً من فودكس لهذا الشهر", action: "زامن فودكس", href: "/money/foodics" });
   } else if (!input.open && input.revenue.coveredDays < input.revenue.expectedDays) {
     const n = input.revenue.expectedDays - input.revenue.coveredDays;
-    gaps.push({ id: "SALES_DAYS", label: `${n} يوماً من الشهر بلا مبيعاتٍ مقروءة — الإيرادُ ناقص إن كان المقهى مفتوحاً فيها`, action: "راجِع أيّام المبيعات", href: `/finance/sales?month=${month}` });
+    gaps.push({ id: "SALES_DAYS", label: `${n} يوماً من الشهر بلا مبيعات مقروءة — الإيراد ناقص إن كان المقهى مفتوحاً فيها`, action: "راجع أيّام المبيعات", href: `/finance/sales?month=${month}` });
   }
-  if (input.open) gaps.push({ id: "OPEN", label: "الشهرُ لم ينتهِ — أرقامُه حتى آخر يومٍ مقروء", action: "تُكمَل بانتهائه", href: `/finance?month=${month}` });
+  if (input.open) gaps.push({ id: "OPEN", label: "الشهر لم ينته — أرقامه حتى آخر يوم مقروء", action: "تكمل بانتهائه", href: `/finance?month=${month}` });
 
-  lines.push({ id: "revenue", label: "الإيراد — ما دفعه الزبائن بلا ضريبته", amountMinor: revenueMinor, kind: "total", note: input.revenue === null ? "لا مبيعاتٍ مقروءة" : undefined });
+  lines.push({ id: "revenue", label: "الإيراد — ما دفعه الزبائن بلا ضريبته", amountMinor: revenueMinor, kind: "total", note: input.revenue === null ? "لا مبيعات مقروءة" : undefined });
 
   /* ── تكلفةُ المبيعات ── */
   const c = input.cogs;
@@ -177,35 +177,35 @@ export function buildPnl(input: PnlInput): Pnl {
   if (cogsMethod === "PURCHASES") {
     gaps.push({
       id: "COGS_IS_PURCHASES",
-      label: `التكلفةُ هنا مشترياتُ الشهر لا ما استُهلك منه — ${c.stockMissing ?? "لا عدَّ يفصل المخزون"}`,
-      action: "أدخِل الجرد", href: "/inventory",
+      label: `التكلفة هنا مشتريات الشهر لا ما استهلك منه — ${c.stockMissing ?? "لا عدّ يفصل المخزون"}`,
+      action: "أدخل الجرد", href: "/inventory",
     });
   }
   lines.push({
     id: "cogs",
-    label: cogsMethod === "STOCK" ? "تكلفةُ المبيعات — بالجرد (مشتريات + مخزونُ أوّله − مخزونُ آخره)"
-      : cogsMethod === "PURCHASES" ? "تكلفةُ المبيعات — مشترياتُ الشهر (لا عدَّ يفصل المخزون)" : "تكلفةُ المبيعات",
+    label: cogsMethod === "STOCK" ? "تكلفة المبيعات — بالجرد (مشتريات + مخزون أوّله − مخزون آخره)"
+      : cogsMethod === "PURCHASES" ? "تكلفة المبيعات — مشتريات الشهر (لا عدّ يفصل المخزون)" : "تكلفة المبيعات",
     amountMinor: cogsMinor, kind: "item", negative: true,
-    note: cogsMethod === null ? "لا فاتورةَ مقيَّدةً ولا جرد" : c.stock
-      ? `من عدّ ${formatDay(c.stock.openingDay)} إلى عدّ ${formatDay(c.stock.closingDay)} · ${c.stock.countedItems} صنفاً معدوداً${c.stock.adjustedDays > 0 ? ` · ${c.stock.adjustedDays} أيّامٍ بين العدّ وطرف الشهر سُدّت بالاستهلاك النظريّ` : ""}`
+    note: cogsMethod === null ? "لا فاتورة مقيّدةً ولا جرد" : c.stock
+      ? `من عدّ ${formatDay(c.stock.openingDay)} إلى عدّ ${formatDay(c.stock.closingDay)} · ${c.stock.countedItems} صنفاً معدوداً${c.stock.adjustedDays > 0 ? ` · ${c.stock.adjustedDays} أيّام بين العدّ وطرف الشهر سدّت بالاستهلاك النظريّ` : ""}`
       : undefined,
   });
   const unexplainedMinor = c.stock && c.theoreticalMinor !== null ? c.stock.minor - c.theoreticalMinor - c.wasteMinor : null;
   if (c.stock) {
-    lines.push({ id: "cogs-theoretical", label: "منها ما تفسّره الوصفات (الاستهلاكُ النظريّ)", amountMinor: c.theoreticalMinor, kind: "sub", note: c.theoreticalMinor === null ? "لا وصفاتٍ أو لا كلفة" : undefined });
-    lines.push({ id: "cogs-waste", label: "وهدرٌ مسجَّل", amountMinor: c.wasteMinor, kind: "sub" });
+    lines.push({ id: "cogs-theoretical", label: "منها ما تفسّره الوصفات (الاستهلاك النظريّ)", amountMinor: c.theoreticalMinor, kind: "sub", note: c.theoreticalMinor === null ? "لا وصفات أو لا كلفة" : undefined });
+    lines.push({ id: "cogs-waste", label: "وهدر مسجّل", amountMinor: c.wasteMinor, kind: "sub" });
     lines.push({
       id: "cogs-unexplained",
       /* السالبُ ليس ربحاً: صُرف نظريّاً أكثر ممّا خرج من الرفّ — خطأُ بياناتٍ يُسمّى */
       label: unexplainedMinor !== null && unexplainedMinor < 0
-        ? "والوصفاتُ تقول أكثر ممّا خرج من الرفّ — فاتورةٌ لم تُقيَّد، أو وصفةٌ أكبر من الواقع، أو عدٌّ خاطئ"
-        : "وفرقٌ غير مفسَّر — هدرٌ لم يُسجَّل، أو وصفةٌ أصغر من الواقع، أو مستلزماتٌ بلا وصفة",
+        ? "والوصفات تقول أكثر ممّا خرج من الرفّ — فاتورة لم تقيّد، أو وصفة أكبر من الواقع، أو عدّ خاطئ"
+        : "وفرق غير مفسّر — هدر لم يسجّل، أو وصفة أصغر من الواقع، أو مستلزمات بلا وصفة",
       amountMinor: unexplainedMinor, kind: "sub",
     });
   }
 
   const grossProfitMinor = revenueMinor !== null && cogsMinor !== null ? revenueMinor - cogsMinor : null;
-  lines.push({ id: "gross", label: "مجملُ الربح", amountMinor: grossProfitMinor, kind: "total", note: grossProfitMinor === null ? "يلزمه إيرادٌ وتكلفة" : undefined });
+  lines.push({ id: "gross", label: "مجمل الربح", amountMinor: grossProfitMinor, kind: "total", note: grossProfitMinor === null ? "يلزمه إيراد وتكلفة" : undefined });
 
   /* ── المصروفاتُ التشغيليّة ── */
   const byCategory = new Map<TxCategory, { amountMinor: number; sources: Set<OpexSource> }>();
@@ -229,8 +229,8 @@ export function buildPnl(input: PnlInput): Pnl {
   for (const e of missingEssentials) {
     gaps.push({
       id: e.id,
-      label: `لا ${e.name === "الإيجار" ? "إيجارَ" : "رواتبَ"} مقيَّدةً لهذا الشهر — لا في الكشف ولا بإقرارك`,
-      action: `أدخِل ${e.name}`, href: `/finance/inputs?month=${month}&category=${e.category}`,
+      label: `لا ${e.name === "الإيجار" ? "إيجار" : "رواتب"} مقيّدةً لهذا الشهر — لا في الكشف ولا بإقرارك`,
+      action: `أدخل ${e.name}`, href: `/finance/inputs?month=${month}&category=${e.category}`,
     });
   }
   /* إيجارٌ خرج من الكشف دفعةً ولم يُقَل كم شهراً يغطّي: شهرُه يحمله كلَّه وجيرانُه بلا إيجار */
@@ -238,23 +238,23 @@ export function buildPnl(input: PnlInput): Pnl {
   if (rentLump > 0) {
     gaps.push({
       id: "RENT_LUMP",
-      label: "الإيجارُ هنا دفعةٌ من الكشف بكامل مبلغها — إن كانت تغطّي أشهراً فشهرُها يحملها كلَّها",
+      label: "الإيجار هنا دفعة من الكشف بكامل مبلغها — إن كانت تغطّي أشهراً فشهرها يحملها كلّها",
       action: "قل كم شهراً تغطّي", href: `/finance/inputs?month=${month}&category=RENT`,
     });
   }
-  if (input.bankGapDays === null) gaps.push({ id: "NO_BANK", label: "لا كشفَ بنكٍ لهذا الشهر — مصروفاتُه من الكشف غائبة", action: "استورد كشفاً", href: "/bank#import" });
+  if (input.bankGapDays === null) gaps.push({ id: "NO_BANK", label: "لا كشف بنك لهذا الشهر — مصروفاته من الكشف غائبة", action: "استورد كشفاً", href: "/bank#import" });
   else if (input.bankGapDays > 0 && !input.open) gaps.push({ id: "BANK_DAYS", label: `${input.bankGapDays} يوماً بلا كشف بنك — ما خرج فيها غير معروف`, action: "استورد كشفاً", href: "/bank#import" });
 
   for (const x of opexByCategory) {
     lines.push({
       id: `op-${x.category}`, label: x.label, amountMinor: x.amountMinor, kind: "item", negative: true,
-      note: x.sources.some((s) => s === "SPREAD" || s === "OFF_BOOK") ? "فيها ما أقررتَه بيدك" : undefined,
+      note: x.sources.some((s) => s === "SPREAD" || s === "OFF_BOOK") ? "فيها ما أقررته بيدك" : undefined,
     });
   }
   for (const e of missingEssentials) {
-    lines.push({ id: `op-${e.category}`, label: CATEGORY_LABEL[e.category], amountMinor: null, kind: "item", negative: true, note: "لا شيءَ مقيَّد — غير معروف لا صفر" });
+    lines.push({ id: `op-${e.category}`, label: CATEGORY_LABEL[e.category], amountMinor: null, kind: "item", negative: true, note: "لا شيء مقيّد — غير معروف لا صفر" });
   }
-  lines.push({ id: "opex", label: "مجموعُ المصروفات التشغيليّة المعروفة", amountMinor: opexMinor, kind: "item", negative: true });
+  lines.push({ id: "opex", label: "مجموع المصروفات التشغيليّة المعروفة", amountMinor: opexMinor, kind: "item", negative: true });
 
   /* ── الربح واسمُه ── */
   const profitMinor = grossProfitMinor !== null ? grossProfitMinor - opexMinor : null;
@@ -267,12 +267,12 @@ export function buildPnl(input: PnlInput): Pnl {
     else if (cogsMethod === "PURCHASES") profitLabel += " — بتكلفة المشتريات";
     if (input.open) profitLabel += " — حتى اليوم";
   }
-  lines.push({ id: "profit", label: profitLabel, amountMinor: profitMinor, kind: "total", note: profitMinor === null ? "يلزمه إيرادٌ وتكلفة" : undefined });
+  lines.push({ id: "profit", label: profitLabel, amountMinor: profitMinor, kind: "total", note: profitMinor === null ? "يلزمه إيراد وتكلفة" : undefined });
 
   /* ── للعلم: ما ليس مصروفاً ── */
   const excludedMinor = input.excluded.reduce((s, x) => s + x.amountMinor, 0);
-  if (excludedMinor > 0) lines.push({ id: "excluded", label: "ضريبةٌ سُدّدت أو تُخصَم في الإقرار — ليست مصروفاً", amountMinor: excludedMinor, kind: "memo" });
-  if (c.staffMinor !== null && c.staffMinor > 0) lines.push({ id: "staff-drinks", label: "مشروباتُ الموظّفين بتكلفتها — داخلةٌ في تكلفة المبيعات", amountMinor: c.staffMinor, kind: "memo" });
+  if (excludedMinor > 0) lines.push({ id: "excluded", label: "ضريبة سدّدت أو تخصم في الإقرار — ليست مصروفاً", amountMinor: excludedMinor, kind: "memo" });
+  if (c.staffMinor !== null && c.staffMinor > 0) lines.push({ id: "staff-drinks", label: "مشروبات الموظّفين بتكلفتها — داخلة في تكلفة المبيعات", amountMinor: c.staffMinor, kind: "memo" });
 
   return {
     month,

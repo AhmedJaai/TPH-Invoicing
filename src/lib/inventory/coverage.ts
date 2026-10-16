@@ -223,7 +223,7 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
     gaps.push({
       kind: "ITEMS",
       reason: "UNIT_CONFLICT",
-      label: "صنفٌ ذُكر بوحدتين من عائلتين مختلفتين — ولا جسرَ بين وزنٍ وحجم",
+      label: "صنف ذكر بوحدتين من عائلتين مختلفتين — ولا جسر بين وزن وحجم",
       count: input.unitConflicts.length,
       totalMinor: 0,
       unitsShareBp: null,
@@ -242,7 +242,7 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
     gaps.push({
       kind: "PURCHASES",
       reason: "RECEIPT_AMBIGUOUS",
-      label: "فاتورةُ شراءٍ تلي نهايةَ الفترة بأيّامٍ قليلة — أوصلت بضاعةً داخلها؟",
+      label: "فاتورة شراء تلي نهاية الفترة بأيّام قليلة — أوصلت بضاعةً داخلها؟",
       count: ambiguous.length,
       totalMinor: ambiguous.reduce((s, a) => s + a.lineTotalMinor, 0),
       unitsShareBp: null,
@@ -261,7 +261,7 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
     gaps.push({
       kind: "PURCHASES",
       reason: "RECEIPT_POSSIBLE_DUPLICATE",
-      label: "كمّيّةٌ أدخلتَها يدوياً قد تكون هي نفسَ بندِ فاتورةٍ وصلت — اربطهما أو أكّد أنّهما شحنتان",
+      label: "كمّيّة أدخلتها يدوياً قد تكون هي نفس بند فاتورة وصلت — اربطهما أو أكّد أنّهما شحنتان",
       count: dup.length,
       totalMinor: 0,
       unitsShareBp: null,
@@ -273,7 +273,7 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
     gaps.push({
       kind: "ITEMS",
       reason: "NO_UNIT",
-      label: "صنفٌ وحدةُ قياسه غير معروفة",
+      label: "صنف وحدة قياسه غير معروفة",
       count: input.unitlessItems.length,
       totalMinor: 0,
       unitsShareBp: null,
@@ -325,22 +325,22 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
 export function describeCoverage(c: CoverageReport): string {
   if (c.readiness === "BLOCKED") {
     return c.sales.lines === 0
-      ? "لا مبيعاتٍ في هذه الفترة — استورِد ملفّ فودكس أوّلاً."
-      : "لم يدخل الحسابَ سطرُ بيعٍ واحد: لا صنفَ مربوطٌ بوصفةٍ سارية.";
+      ? "لا مبيعات في هذه الفترة — استورد ملفّ فودكس أوّلاً."
+      : "لم يدخل الحساب سطر بيع واحد: لا صنف مربوط بوصفة سارية.";
   }
   if (c.readiness === "READY") {
-    return "كلُّ ما بِيع في الفترة مربوطٌ وله وصفةٌ سارية، وكلُّ سطرِ شراءٍ عُرفت كمّيّتُه.";
+    return "كلّ ما بيع في الفترة مربوط وله وصفة سارية، وكلّ سطر شراء عرفت كمّيّته.";
   }
 
   const bits: string[] = [];
   if (c.sales.unitsCoveredBp !== null) {
-    bits.push(`دخل الحسابَ ${Math.round(c.sales.unitsCoveredBp / 100)}٪ من الوحدات المباعة`);
+    bits.push(`دخل الحساب ${Math.round(c.sales.unitsCoveredBp / 100)}٪ من الوحدات المباعة`);
   }
   if (c.sales.missingDays.length > 0) {
-    bits.push(`و${c.sales.missingDays.length} يوماً بلا مبيعاتٍ مستوردة`);
+    bits.push(`و${c.sales.missingDays.length} يوماً بلا مبيعات مستوردة`);
   }
   if (c.purchases.excludedLines > 0) {
-    bits.push(`و${c.purchases.excludedLines} سطرَ شراءٍ لم تُعرَف كمّيّتُه`);
+    bits.push(`و${c.purchases.excludedLines} سطر شراء لم تعرف كمّيّته`);
   }
-  return `تقريرٌ جزئيّ: ${bits.join("، ")}.`;
+  return `تقرير جزئيّ: ${bits.join("، ")}.`;
 }

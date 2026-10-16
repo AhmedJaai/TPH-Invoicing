@@ -30,7 +30,7 @@ describe("loadSupplierBalances", () => {
     ]);
   });
 
-  it("كلُّ قارئٍ يأخذ قائمتَه — ترتيبُ واحدٍ لا يغيّر قائمةَ غيره", async () => {
+  it("كلّ قارئ يأخذ قائمته — ترتيب واحد لا يغيّر قائمة غيره", async () => {
     const first = await loadSupplierBalances();
     first.reverse();
     first.pop();
@@ -38,7 +38,7 @@ describe("loadSupplierBalances", () => {
     expect(second.map((b) => b.supplierId)).toEqual(["s1", "s2"]);
   });
 
-  it("ما يُقرأ بمقبض معاملةٍ يُسأل من المقبض نفسه، لا من المحفوظ ولا من `db`", async () => {
+  it("ما يقرأ بمقبض معاملة يسأل من المقبض نفسه، لا من المحفوظ ولا من `db`", async () => {
     const txExecute = vi.fn().mockResolvedValue({ rows: [row("s9", 1_000)] });
     /* مقبضٌ غيرُ `db` — يكفي أنّه كائنٌ آخر له `execute` */
     const tx: typeof db = Object.create(db, { execute: { value: txExecute } });
@@ -51,13 +51,13 @@ describe("loadSupplierBalances", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it("ورصيدُ مورّدٍ بعينه يُسأل من القاعدة كلَّ مرّة", async () => {
+  it("ورصيد مورّد بعينه يسأل من القاعدة كلّ مرّة", async () => {
     await loadSupplierBalances(db, "s1");
     await loadSupplierBalances(db, "s1");
     expect(execute).toHaveBeenCalledTimes(2);
   });
 
-  it("والمجموعُ من الصفوف نفسها", async () => {
+  it("والمجموع من الصفوف نفسها", async () => {
     const { rows, totals } = await loadBalanceTotals();
     expect(rows).toHaveLength(2);
     expect(totals.owedMinor).toBe(10_000);

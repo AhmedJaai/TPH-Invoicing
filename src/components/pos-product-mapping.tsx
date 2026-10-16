@@ -53,7 +53,7 @@ export function PosProductMapping({
       setError(r.error);
       return;
     }
-    toast({ tone: "ok", title: `رُبط «${row.name}»`, body: "ويُعرَف بمعرّفه في كلّ استيرادٍ بعده." });
+    toast({ tone: "ok", title: `ربط «${row.name}»`, body: "ويعرف بمعرّفه في كلّ استيراد بعده." });
     router.refresh();
   }
 
@@ -67,7 +67,7 @@ export function PosProductMapping({
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-bold" dir="auto">{row.name}</p>
               <p className="mt-0.5 text-[11px] text-muted">
-                <span className="nums">{row.soldUnits}</span> وحدة بِيعت · <Money minor={row.soldMinor} />
+                <span className="nums">{row.soldUnits}</span> وحدة بيعت · <Money minor={row.soldMinor} />
                 {row.category && <> · {row.category}</>}
               </p>
             </div>

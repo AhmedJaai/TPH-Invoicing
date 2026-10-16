@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
     }
     const parsed = Body.safeParse(raw);
-    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلبٌ غير مفهوم" }, { status: 400 });
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلب غير مفهوم" }, { status: 400 });
     const b = parsed.data;
 
     /*

@@ -21,13 +21,13 @@ import { ForbiddenError } from "@/lib/permissions";
  * خاتمةُ المسار: رسالتُنا تُقال بنصّها، وعطبُ الخادم لا يُعرَض نصُّه.
  */
 describe("failWith", () => {
-  it("رسالةٌ كتبناها تبقى بنصّها و400", async () => {
+  it("رسالة كتبناها تبقى بنصّها و400", async () => {
     const res = failWith(new Error("الكمّيّة يجب أن تكون أكبر من صفر"), "inventory-waste");
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "الكمّيّة يجب أن تكون أكبر من صفر" });
   });
 
-  it("خطأ Drizzle لا يُعرَض استعلامُه ولا قيمُه", async () => {
+  it("خطأ Drizzle لا يعرض استعلامه ولا قيمه", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const e = new Error('Failed query: select "id" from "inventory_items" where "id" = $1\nparams: سرّ,abc');
     const res = failWith(e, "inventory-item");
@@ -45,7 +45,7 @@ describe("failWith", () => {
     expect((await res.json()).error).not.toContain("neon");
   });
 
-  it("قيدُ القاعدة المعروف يبقى على ترجمته", () => {
+  it("قيد القاعدة المعروف يبقى على ترجمته", () => {
     const e = Object.assign(new Error("duplicate key"), { code: "23505" });
     expect(failWith(e, "product").status).toBe(409);
   });

@@ -46,7 +46,7 @@ export async function caught(p: Promise<unknown>): Promise<unknown> {
   } catch (e) {
     return e;
   }
-  throw new Error("كان متوقَّعاً أن يُرفَض — فمرّ");
+  throw new Error("كان متوقّعاً أن يرفض — فمرّ");
 }
 
 export async function makeSupplier(tx: Tx): Promise<string> {
@@ -84,7 +84,7 @@ export async function makeInvoice(tx: Tx, supplierId: string, totalMinor: number
     inputVatStatus: "ELIGIBLE",
     isFixedAsset: false,
   });
-  if (!id) throw new Error("لم تُنشَأ فاتورة التجهيز");
+  if (!id) throw new Error("لم تنشأ فاتورة التجهيز");
   return id;
 }
 

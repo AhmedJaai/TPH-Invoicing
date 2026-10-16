@@ -30,8 +30,8 @@ export default function DrawerError({
           <CloudOff className="h-6 w-6" strokeWidth={1.75} aria-hidden />
         </span>
         <p role="alert" className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-ink-soft">
-          فتحُ الملفّ لا يكتب شيئاً، فلم يضِع قيد. وغالباً هو انقطاعٌ عابر في الاتّصال بالقاعدة —
-          أعد المحاولة بعد لحظة، والقائمةُ تحته كما تركتَها.
+          فتح الملفّ لا يكتب شيئاً، فلم يضع قيد. وغالباً هو انقطاع عابر في الاتّصال بالقاعدة —
+          أعد المحاولة بعد لحظة، والقائمة تحته كما تركتها.
         </p>
         {error.digest && (
           <p className="mt-3 text-[11px] text-muted">

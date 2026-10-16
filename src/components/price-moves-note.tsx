@@ -35,10 +35,10 @@ export function PriceMovesNote({ moves, supplierName }: { moves: readonly PriceM
   return (
     <section className={`rounded-xl border px-4 py-3 ${rises.length > 0 ? "border-warn/30 bg-warn-bg" : "border-line bg-sunken/50"}`}>
       <h4 className="text-xs font-bold">
-        {rises.length > 0 ? "أسعارٌ ارتفعت عن آخر توريد" : "أسعارٌ انخفضت عن آخر توريد"}
+        {rises.length > 0 ? "أسعار ارتفعت عن آخر توريد" : "أسعار انخفضت عن آخر توريد"}
       </h4>
       <p className="mt-0.5 text-[11px] leading-relaxed text-ink-soft">
-        سعرُ الوحدة كما قُرئ مقابل آخر سعرٍ قُيِّد للصنف نفسه عند {supplierName}. دون 3٪ لا يُذكَر.
+        سعر الوحدة كما قرئ مقابل آخر سعر قيّد للصنف نفسه عند {supplierName}. دون 3٪ لا يذكر.
       </p>
       <ul className="mt-2 space-y-1.5">
         {moves.map((m) => {

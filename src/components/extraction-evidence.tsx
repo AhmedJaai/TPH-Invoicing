@@ -67,14 +67,14 @@ export function ExtractionEvidencePanel({
     <div className={`rounded-xl border border-line bg-raised shadow-raised ${className}`}>
       <p className="flex items-center gap-2 border-b border-line-soft px-4 py-3 text-xs font-bold">
         <QrCode className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />
-        ما يُقابَل به ما قرأه النموذج
+        ما يقابل به ما قرأه النموذج
       </p>
 
       <div className="space-y-3 px-4 py-3 text-xs">
         {qr?.status === "FOUND" && (
           <div>
             <p className="leading-relaxed text-ink-soft">
-              رمزُ الفاتورة الضريبيّ (QR) قُرئ من الملفّ نفسه — كتبه نظامُ المورّد لا النموذج:
+              رمز الفاتورة الضريبيّ (QR) قرئ من الملفّ نفسه — كتبه نظام المورّد لا النموذج:
             </p>
             <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
               <div className="min-w-0">
@@ -126,21 +126,21 @@ export function ExtractionEvidencePanel({
         )}
         {qr?.status === "NONE" && (
           <p className="leading-relaxed text-muted">
-            لم يُقرأ رمزُ فاتورةٍ ضريبيّ (QR) في الملفّ — وقد يكون على الورقة ولم يُفكّ. لا شاهدَ منه.
+            لم يقرأ رمز فاتورة ضريبيّ (QR) في الملفّ — وقد يكون على الورقة ولم يفكّ. لا شاهد منه.
           </p>
         )}
         {qr?.status === "NOT_ZATCA" && (
           <p className="leading-relaxed text-muted">
-            في الملفّ رمزٌ (QR) ليس رمزَ فاتورةٍ ضريبيّة — رابطٌ أو رمزُ دفع. لا شاهدَ منه.
+            في الملفّ رمز (QR) ليس رمز فاتورة ضريبيّة — رابط أو رمز دفع. لا شاهد منه.
           </p>
         )}
         {qr?.status === "SKIPPED" && (
-          <p className="leading-relaxed text-muted">لم يُفحص رمزُ الفاتورة (QR) في هذا الملفّ.</p>
+          <p className="leading-relaxed text-muted">لم يفحص رمز الفاتورة (QR) في هذا الملفّ.</p>
         )}
 
         {sources.length > 0 && (
           <div>
-            <p className="font-bold">لم يقرأه النموذج — سُدّ من غيره:</p>
+            <p className="font-bold">لم يقرأه النموذج — سدّ من غيره:</p>
             <ul className="mt-1 space-y-0.5 text-ink-soft">
               {sources.map(([key, source]) => (
                 <li key={key}>
@@ -148,7 +148,7 @@ export function ExtractionEvidencePanel({
                 </li>
               ))}
             </ul>
-            <p className="mt-1 text-[11px] text-muted">إن خالف الورقةَ فعدّله في حقله — ما تكتبه أنت هو المعتمَد.</p>
+            <p className="mt-1 text-[11px] text-muted">إن خالف الورقة فعدّله في حقله — ما تكتبه أنت هو المعتمد.</p>
           </div>
         )}
 

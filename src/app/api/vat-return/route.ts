@@ -31,7 +31,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("void"),
     period: z.string().regex(/^\d{4}-Q[1-4]$/),
-    reason: z.string().trim().min(3, "اكتب سببَ التراجع").max(300),
+    reason: z.string().trim().min(3, "اكتب سبب التراجع").max(300),
   }),
 ]);
 
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       const raw = body.amount ?? "";
       const minor = raw === "" ? null : parseRiyals(raw);
       if (raw !== "" && (minor === null || minor < 0)) {
-        return NextResponse.json({ error: "مبلغُ النقد لم يُقرأ — اكتبه رقماً مثل 1250.50" }, { status: 400 });
+        return NextResponse.json({ error: "مبلغ النقد لم يقرأ — اكتبه رقماً مثل 1250.50" }, { status: 400 });
       }
       await setVatCashSales(body.month, minor, user.id);
       return NextResponse.json({ ok: true });

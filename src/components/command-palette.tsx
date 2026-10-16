@@ -306,14 +306,14 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
     setActive(movePaletteCursor(rows.map(groupOf), current, key));
   }
 
-  const GROUP_LABEL: Record<string, string> = { ...COMMAND_GROUP_LABEL, RECORDS: "في سجلّاتك", RECENT: "فتحتَها مؤخّراً" };
+  const GROUP_LABEL: Record<string, string> = { ...COMMAND_GROUP_LABEL, RECORDS: "في سجلّاتك", RECENT: "فتحتها مؤخّراً" };
 
   const intentLine =
     intent?.kind === "AMOUNT" && intent.amountMinor !== undefined ? <>يبحث عن مبلغ <Money minor={intent.amountMinor} /> ± ريال في الفواتير والحركات</>
     : intent?.kind === "NUMBER" ? <>يبحث عن رقم <bdi dir="ltr" className="font-mono">{intent.term}</bdi> في الفواتير والمراجع</>
     : intent?.kind === "MONTH" ? <>يبحث في شهر <bdi dir="ltr">{intent.term}</bdi></>
     : intent?.kind === "DATE" ? <>يبحث في يوم <bdi dir="ltr">{intent.term}</bdi></>
-    : intent?.kind === "VAT" ? <>يبحث عن رقمٍ ضريبيّ بين المورّدين</>
+    : intent?.kind === "VAT" ? <>يبحث عن رقم ضريبيّ بين المورّدين</>
     : null;
 
   return (
@@ -340,7 +340,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
           aria-controls="palette-results"
           aria-autocomplete="list"
           aria-activedescendant={rows.length > 0 ? `palette-row-${current}` : undefined}
-          placeholder={canSearch ? "مورّد، رقم فاتورة، مبلغ — أو فعلٌ مثل «أقفل الشهر»" : "اكتب فعلاً أو صفحة"}
+          placeholder={canSearch ? "مورّد، رقم فاتورة، مبلغ — أو فعل مثل «أقفل الشهر»" : "اكتب فعلاً أو صفحة"}
           className="palette-input min-h-14 w-full bg-transparent py-4 text-[15px] placeholder:text-muted"
         />
         {busy ? (
@@ -361,9 +361,9 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
               <span className="mt-0.5 block text-[11px] text-muted">{shownAnswer.basis} · <span className="font-bold text-accent group-hover:underline">افتح مصدره</span></span>
             </Link>
           ) : shownAnswer.state === "AMBIGUOUS" ? (
-            <p className="text-xs leading-relaxed text-ink-soft">أيَّهم تقصد؟ {shownAnswer.names.join(" · ")} — اكتب الاسمَ أتمّ.</p>
+            <p className="text-xs leading-relaxed text-ink-soft">أيّهم تقصد؟ {shownAnswer.names.join(" · ")} — اكتب الاسم أتمّ.</p>
           ) : shownAnswer.state === "UNKNOWN_SUPPLIER" ? (
-            <p className="text-xs leading-relaxed text-ink-soft">لا مورّدَ مسجَّلاً باسمٍ فيه «{shownAnswer.text}» — فلا رقمَ يُقال.</p>
+            <p className="text-xs leading-relaxed text-ink-soft">لا مورّد مسجّلاً باسم فيه «{shownAnswer.text}» — فلا رقم يقال.</p>
           ) : shownAnswer.state === "FAILED" ? (
             <p className="text-xs font-bold text-danger">{shownAnswer.error}</p>
           ) : null}
@@ -427,7 +427,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
         <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> للتنقّل</span>
         <span className="flex items-center gap-1"><Kbd>Tab</Kbd> للمجموعة التالية</span>
         <span className="flex items-center gap-1"><Kbd>↵</Kbd> للفتح</span>
-        <span className="ms-auto flex items-center gap-1"><Kbd>?</Kbd> كلُّ الاختصارات</span>
+        <span className="ms-auto flex items-center gap-1"><Kbd>?</Kbd> كلّ الاختصارات</span>
       </div>
     </dialog>
   );

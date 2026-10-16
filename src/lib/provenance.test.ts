@@ -17,14 +17,14 @@ describe("buildProvenance", () => {
   it("القيمة مجموع ما دخل وحده", () => {
     const p = buildProvenance([
       c({ id: "a", amountMinor: 5000, count: 3 }),
-      c({ id: "b", amountMinor: 900_00, count: 2, included: false, reason: "لم تُقرأ" }),
+      c({ id: "b", amountMinor: 900_00, count: 2, included: false, reason: "لم تقرأ" }),
     ]);
     expect(p.valueMinor).toBe(5000);
     expect(p.includedCount).toBe(3);
     expect(p.excludedCount).toBe(2);
   });
 
-  it("المستبعَد المجهول مبلغه لا يُجمع ولا يُعدّ صفراً", () => {
+  it("المستبعد المجهول مبلغه لا يجمع ولا يعدّ صفراً", () => {
     const p = buildProvenance([
       c({ id: "in", amountMinor: 10_000, count: 10 }),
       c({ id: "out", amountMinor: null, count: 2, included: false, reason: "بلا مبلغ مقروء" }),
@@ -49,13 +49,13 @@ describe("buildProvenance", () => {
     expect(p.confidence).toBe("LOW");
   });
 
-  it("تغطية تامّة حين لا مستبعَد", () => {
+  it("تغطية تامّة حين لا مستبعد", () => {
     const p = buildProvenance([c({ id: "in", count: 4 })]);
     expect(p.coverage).toBe(1);
     expect(p.confidence).toBe("HIGH");
   });
 
-  it("تُقدَّم المُدرَجات على المستبعَدات في العرض", () => {
+  it("تقدّم المدرجات على المستبعدات في العرض", () => {
     const p = buildProvenance([
       c({ id: "out", included: false, reason: "س" }),
       c({ id: "in" }),
@@ -63,7 +63,7 @@ describe("buildProvenance", () => {
     expect(p.contributions.map((x) => x.id)).toEqual(["in", "out"]);
   });
 
-  it("مساهمة بعدد صفر لا تُفسد التغطية", () => {
+  it("مساهمة بعدد صفر لا تفسد التغطية", () => {
     const p = buildProvenance([c({ id: "in", count: 5 }), c({ id: "none", count: 0, included: false })]);
     expect(p.coverage).toBe(1);
   });
@@ -84,7 +84,7 @@ describe("summarize", () => {
   it("تذكر النقص صراحةً", () => {
     const p = buildProvenance([
       c({ id: "in", count: 117 }),
-      c({ id: "out", count: 6, included: false, reason: "لم تُقرأ" }),
+      c({ id: "out", count: 6, included: false, reason: "لم تقرأ" }),
     ]);
     expect(summarize(p)).toBe("117 فاتورة · 6 خارج الرقم");
   });

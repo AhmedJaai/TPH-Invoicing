@@ -50,7 +50,7 @@ interface StateLook {
 }
 
 const DISPOSITION: Record<string, StateLook> = {
-  AUTO: { label: "طُوبقت تلقائياً", tone: "ok", icon: Sparkles },
+  AUTO: { label: "طوبقت تلقائياً", tone: "ok", icon: Sparkles },
   SUGGEST: { label: "اقتراح ينتظر تأكيدك", tone: "warn", icon: Clock3 },
   REVIEW: { label: "تنتظر مراجعتك", tone: "danger", icon: CircleAlert },
 };
@@ -66,13 +66,13 @@ const DISPOSITION: Record<string, StateLook> = {
  */
 export function stateOf(match: MatchExplanation): StateLook | null {
   const decided = match.lifecycle === "CONFIRMED" || match.lifecycle === "POSTED";
-  if (isNotAPayment(match)) return { label: "أُعلنت ليست سداداً", tone: "muted", icon: CircleMinus };
+  if (isNotAPayment(match)) return { label: "أعلنت ليست سداداً", tone: "muted", icon: CircleMinus };
   if (match.matched) {
     return match.disposition === "AUTO"
       ? DISPOSITION.AUTO
-      : { label: "سُجّلت سداداً", tone: "ok", icon: CircleCheck };
+      : { label: "سجّلت سداداً", tone: "ok", icon: CircleCheck };
   }
-  if (decided) return { label: "حُسمت بلا قيد", tone: "ok", icon: CircleDashed };
+  if (decided) return { label: "حسمت بلا قيد", tone: "ok", icon: CircleDashed };
   return match.disposition ? DISPOSITION[match.disposition] : null;
 }
 
@@ -136,7 +136,7 @@ export function MatchExplain({
           <div className="space-y-3 text-start">
             <div>
               <p className="text-[13px] font-bold">{title ? `لماذا: ${title}` : "لماذا هذا الحال؟"}</p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-muted">الأدلّةُ كما حُفظت مع القرار — ترجيحٌ لا يقين.</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-muted">الأدلّة كما حفظت مع القرار — ترجيح لا يقين.</p>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-sunken px-3.5 py-2.5">
               <StateLine look={d} score={match.score} />
@@ -160,7 +160,7 @@ function StateLine({ look, score }: { look: StateLook | null; score: number | nu
           {look.label}
         </Badge>
       ) : (
-        <Badge>لا ترجيحَ محفوظ</Badge>
+        <Badge>لا ترجيح محفوظ</Badge>
       )}
       {score !== null && <span className="text-xs text-muted">{strength(score)}</span>}
     </span>
@@ -173,7 +173,7 @@ function Evidence({ match }: { match: MatchExplanation }) {
   if (!has) {
     return (
       <p className="rounded-xl border border-dashed border-line px-4 py-3 text-xs leading-relaxed text-muted">
-        لم تُحفَظ أدلّةٌ لهذه الحركة — استُوردت قبل أن يبدأ حفظُها، أو صُنّفت بقاعدةٍ لا بترجيح.
+        لم تحفظ أدلّة لهذه الحركة — استوردت قبل أن يبدأ حفظها، أو صنّفت بقاعدة لا بترجيح.
       </p>
     );
   }
@@ -225,16 +225,16 @@ function UndoAction({ match, canUndo, onDone }: { match: MatchExplanation; canUn
     <div>
       <ConfirmAction
         label={notAPayment ? "تراجع عن «ليست سداداً»" : "تراجع عن المطابقة"}
-        title={notAPayment ? "أعِد الحركة إلى الطابور؟" : "فُكَّ هذه المطابقة؟"}
+        title={notAPayment ? "أعد الحركة إلى الطابور؟" : "فكّ هذه المطابقة؟"}
         consequence={
           notAPayment
-            ? "يعود بابُ الحركة إلى ما كان قبل الإعلان، وتعود إلى الطابور تنتظر قراراً: من الجهة، وأيّ فاتورة. لا يُكتب مالٌ الآن، ويُكتب الردّ في سجلّ التدقيق باسمك."
-            : "ستُفكّ التخصيصات، وتُردّ الدفعة وتبقى في السجلّ مردودةً بسببها، وتعود الفاتورة مستحقّة. ويُكتب ذلك في سجلّ التدقيق باسمك."
+            ? "يعود باب الحركة إلى ما كان قبل الإعلان، وتعود إلى الطابور تنتظر قراراً: من الجهة، وأيّ فاتورة. لا يكتب مال الآن، ويكتب الردّ في سجلّ التدقيق باسمك."
+            : "ستفكّ التخصيصات، وتردّ الدفعة وتبقى في السجلّ مردودةً بسببها، وتعود الفاتورة مستحقّة. ويكتب ذلك في سجلّ التدقيق باسمك."
         }
         acknowledgement={
           notAPayment
-            ? "فهمتُ أنّ الحركة تعود إلى الطابور بلا بابٍ محسوم"
-            : "فهمتُ أنّ الفاتورة تعود مستحقّةً حتى تُطابَق من جديد"
+            ? "فهمت أنّ الحركة تعود إلى الطابور بلا باب محسوم"
+            : "فهمت أنّ الفاتورة تعود مستحقّةً حتى تطابق من جديد"
         }
         confirmLabel={notAPayment ? ACT.restoreToQueue : ACT.undoMatch}
         onConfirm={async () => {
@@ -247,7 +247,7 @@ function UndoAction({ match, canUndo, onDone }: { match: MatchExplanation; canUn
             setError(r.error);
             return false;
           }
-          toast({ tone: "ok", title: r.data.message ?? "فُكّت المطابقة" });
+          toast({ tone: "ok", title: r.data.message ?? "فكّت المطابقة" });
           onDone?.();
           router.refresh();
           return true;

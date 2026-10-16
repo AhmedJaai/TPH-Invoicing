@@ -21,8 +21,8 @@ export function ExpenseDelete({ id, label }: { id: string; label: string }) {
       <ConfirmAction
         label="احذف هذا"
         title={`احذف «${label}»؟`}
-        consequence="يُحذف هذا القيد من المصروفات فينخفض مصروف شهره بقدره. ولا يُمَسّ كشف البنك ولا المستند، ويبقى أثر الحذف في سجلّ التدقيق باسمك."
-        acknowledgement="هذا القيد زائد — الحدث نفسه مقيَّدٌ في غيره، أو قُيّد خطأً"
+        consequence="يحذف هذا القيد من المصروفات فينخفض مصروف شهره بقدره. ولا يمسّ كشف البنك ولا المستند، ويبقى أثر الحذف في سجلّ التدقيق باسمك."
+        acknowledgement="هذا القيد زائد — الحدث نفسه مقيّد في غيره، أو قيّد خطأً"
         confirmLabel="احذفه"
         onConfirm={async () => {
           setError(null);
@@ -31,7 +31,7 @@ export function ExpenseDelete({ id, label }: { id: string; label: string }) {
             setError(r.error);
             return false;
           }
-          toast({ tone: "ok", title: r.data.message ?? "حُذف القيد" });
+          toast({ tone: "ok", title: r.data.message ?? "حذف القيد" });
           router.refresh();
           return true;
         }}

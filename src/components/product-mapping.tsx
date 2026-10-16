@@ -68,7 +68,7 @@ function LinkRow({
         newProductName: creating ? newName.trim() : undefined,
         category: creating ? category : undefined,
       });
-      setMessage(r.ok ? (r.data.message ?? "رُبطت") : r.error);
+      setMessage(r.ok ? (r.data.message ?? "ربطت") : r.error);
       /*
         الربط الذي لم يربط شيئاً ليس نجاحاً — والنصّ يقوله («لا أصناف»)
         بينما اللون كان يقول «تمّ». فيُقرأ اللونُ قبل النصّ.
@@ -88,7 +88,7 @@ function LinkRow({
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium">{i.displayName}</span>
               <span className="block text-[11px] text-muted">
-                {i.supplierName} · طُلب {countNoun(i.orderCount, TIME)}
+                {i.supplierName} · طلب {countNoun(i.orderCount, TIME)}
               </span>
             </span>
             <span className="nums shrink-0 text-xs" dir="ltr">
@@ -127,7 +127,7 @@ function LinkRow({
           {creating && (
             <>
               <input
-                aria-label="اسم صنفٍ معياريٍّ جديد"
+                aria-label="اسم صنف معياريّ جديد"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="اسم الصنف المعياري"
@@ -279,7 +279,7 @@ function Triage({
       ) : (
         <p className="mt-4 text-xs leading-relaxed text-muted">
           لا صنف معياري يحمل هذا الاسم. إنشاؤه يجعل ما تشتريه من مورّدين مختلفين
-          يُجمع تحت شيء واحد.
+          يجمع تحت شيء واحد.
         </p>
       )}
 
@@ -300,7 +300,7 @@ function Triage({
           disabled={busy}
           className={buttonClass("quiet", "sm")}
         >
-          تخطَّ
+          تخطّ
         </button>
       </div>
     </div>
@@ -362,8 +362,8 @@ export function ProductMapping({
       <section>
         <h2 className="font-display text-lg font-bold leading-tight">افرزها واحداً واحداً</h2>
         <p className="mb-3 mt-1 max-w-2xl text-xs leading-relaxed text-muted">
-          القرار في كل صنف واحدٌ بسيط: أهو الصنف المعياري نفسه أم لا؟ فيُعرض
-          واحدٌ في كل مرّة، ويُنتقل إلى الذي يليه.
+          القرار في كل صنف واحد بسيط: أهو الصنف المعياري نفسه أم لا؟ فيعرض
+          واحد في كل مرّة، وينتقل إلى الذي يليه.
         </p>
         <Triage queue={singles} products={products} onResolved={(id) => onDone([id])} />
       </section>
@@ -373,7 +373,7 @@ export function ProductMapping({
           <h2 className="text-base font-bold">أصناف قد تكون صنفاً واحداً</h2>
           <p className="mt-1 text-xs leading-relaxed text-muted">
             أصناف تحمل الاسم نفسه عند مورّدين. وتطابق الاسم لا يعني تطابق الصنف —
-            «عنب» عند المحمصة الغربية كيلو بنّ، وعند لافا زجاجة كمبوتشا. فما يُضعف
+            «عنب» عند المحمصة الغربية كيلو بنّ، وعند لافا زجاجة كمبوتشا. فما يضعف
             الاقتراح معروض معه.
           </p>
           <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
@@ -393,8 +393,8 @@ export function ProductMapping({
       <section>
         <h2 className="text-base font-bold">أصناف بلا ربط ({singles.length})</h2>
         <p className="mt-1 text-xs leading-relaxed text-muted">
-          كلٌّ منها صنف مورّد قائم بذاته. ربطه بصنف معياري هو ما يسمح لاحقاً بجمع
-          ما اشتريتَه من مورّدين مختلفين تحت شيء واحد.
+          كلّ منها صنف مورّد قائم بذاته. ربطه بصنف معياري هو ما يسمح لاحقاً بجمع
+          ما اشتريته من مورّدين مختلفين تحت شيء واحد.
         </p>
         {singles.length === 0 ? (
           <p className="mt-3 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-xs text-ok">
@@ -409,7 +409,7 @@ export function ProductMapping({
         )}
         {singles.length > 60 && (
           <p className="mt-2 text-xs text-muted">
-            يُعرض ستّون من {singles.length} — الأكثر إنفاقاً أوّلاً.
+            يعرض ستّون من {singles.length} — الأكثر إنفاقاً أوّلاً.
           </p>
         )}
       </section>
@@ -465,7 +465,7 @@ function UnlinkButton({ id }: { id: string }) {
         }}
         className={buttonClass("quiet", "sm")}
       >
-        فُكّ الربط
+        فكّ الربط
       </button>
       {error && <span role="alert" className="text-[11px] font-bold text-danger">{error}</span>}
     </span>

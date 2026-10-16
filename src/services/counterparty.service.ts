@@ -92,7 +92,7 @@ export interface ConfirmResult {
  */
 export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmResult> {
   const first = input.transactions[0];
-  if (!first) throw new Error("لا حركة تُؤكَّد");
+  if (!first) throw new Error("لا حركة تؤكّد");
 
   /*
     اتحاد الأدلّة لا أدلّة واحدة.
@@ -222,11 +222,11 @@ export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmR
     entityId: counterpartyId,
     after: {
       الجهة: input.displayName ?? first.beneficiary ?? "—",
-      "حركات أُكِّدت": input.transactions.length,
+      "حركات أكّدت": input.transactions.length,
       الباب: input.kind,
-      "أدلّة أُضيفت": added.map((a) => `${a.kind}:${a.value}`),
+      "أدلّة أضيفت": added.map((a) => `${a.kind}:${a.value}`),
       تضارب: conflicts.map((c) => `${c.evidence.kind}:${c.evidence.value} → ${c.ownedBy}`),
-      ...(reused ? { "عُرفت بدليلها": true } : {}),
+      ...(reused ? { "عرفت بدليلها": true } : {}),
     },
   }, w);
 

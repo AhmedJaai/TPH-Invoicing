@@ -67,7 +67,7 @@ export const READY_MADE: readonly ReadyMade[] = [
   { productSku: "sk-0053", itemSku: "sk-0017", quantity: 1, itemName: "كوكيز" },
   {
     productSku: "sk-0054", itemSku: "sk-0014", quantity: 1, itemName: "كرنشي ويفر",
-    note: "كلفةُ الصنف ٧٫٠٠ والمعلَنة ٥٫١٠ — الاقترانُ بيّنٌ والمعلَنةُ قديمة",
+    note: "كلفة الصنف ٧٫٠٠ والمعلنة ٥٫١٠ — الاقتران بيّن والمعلنة قديمة",
   },
   { productSku: "sk-0082", itemSku: "sk-0051", quantity: 1, itemName: "كيكة الباشن" },
   { productSku: "sk-0089", itemSku: "sk-0061", quantity: 1, itemName: "Crinkle cookie" },
@@ -80,7 +80,7 @@ export const READY_MADE: readonly ReadyMade[] = [
   /* وكيسُ الماتشا يُباع كما يُشترى — كيلوٌ من الخام */
   {
     productSku: "sk-0080", itemSku: "sk-0025", quantity: 1000, itemName: "ماتشا خام",
-    note: "كلفةُ الكيلو ٦٥٢٫١٧ والمعلَنة ٧٥٠ — والفارقُ تغليفُ التجزئة",
+    note: "كلفة الكيلو ٦٥٢٫١٧ والمعلنة ٧٥٠ — والفارق تغليف التجزئة",
   },
 ];
 

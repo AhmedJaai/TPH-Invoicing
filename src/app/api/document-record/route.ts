@@ -11,7 +11,7 @@ import { MonthClosedError } from "@/services/validation.service";
 export const runtime = "nodejs";
 
 const Body = z.object({
-  documentId: z.string().min(1, "لم يُذكر المستند"),
+  documentId: z.string().min(1, "لم يذكر المستند"),
   kind: z.enum(["TAX_INVOICE", "SIMPLIFIED_INVOICE"]),
   supplierId: z.string().min(1, "اختر المورّد"),
   invoiceNumber: z.string().max(80),
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   }
   const parsed = Body.safeParse(raw);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلبٌ غير مفهوم" }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلب غير مفهوم" }, { status: 400 });
   }
   const { preview, ...input } = parsed.data;
 

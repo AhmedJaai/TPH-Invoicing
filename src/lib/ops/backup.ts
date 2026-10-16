@@ -205,8 +205,8 @@ export function buildBaselineSql(
   const { pre, post } = buildSchemaSql(cat, ["public"]);
   const rows = migrations.map((m) => `  (${lit(m.name)}, ${lit(m.sha256)})`).join(",\n");
   return [
-    "-- أساس المخطّط — يُولَّد بـ npm run db:backup -- --baseline drizzle/baseline.sql ولا يُحرَّر باليد.",
-    "-- يُطبَّق على قاعدةٍ فارغة وحدها (npm run db:bootstrap)، ثمّ تُطبَّق فوقه الهجرات اللاحقة.",
+    "-- أساس المخطّط — يولّد بـ npm run db:backup -- --baseline drizzle/baseline.sql ولا يحرّر باليد.",
+    "-- يطبّق على قاعدة فارغة وحدها (npm run db:bootstrap)، ثمّ تطبّق فوقه الهجرات اللاحقة.",
     pre,
     post,
     migrations.length > 0 ? `insert into "public"."schema_migrations" (name, sha256) values\n${rows};\n` : "",

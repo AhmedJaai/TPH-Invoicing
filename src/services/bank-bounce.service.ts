@@ -32,7 +32,7 @@ export async function resolveBounce(
 ): Promise<{ freedInvoices: number }> {
   const [out] = await tx.select().from(bankTransactions).where(eq(bankTransactions.id, input.outgoingId)).for("update");
   const [back] = await tx.select().from(bankTransactions).where(eq(bankTransactions.id, input.incomingId)).for("update");
-  if (!out || !back) throw new BounceRefused("لم تُوجد الحركتان — حدّث الصفحة");
+  if (!out || !back) throw new BounceRefused("لم توجد الحركتان — حدّث الصفحة");
   const gapDays = (back.valueDate.getTime() - out.valueDate.getTime()) / MS_PER_DAY;
   if (out.direction !== "DEBIT" || back.direction !== "CREDIT" || out.amountMinor !== back.amountMinor
     || gapDays <= 0 || gapDays > REVERSAL_WINDOW_DAYS + 1) {
@@ -40,7 +40,7 @@ export async function resolveBounce(
   }
   const key = reversalKey(out.id, back.id);
   const [already] = await tx.select({ key: alertResolutions.key }).from(alertResolutions).where(eq(alertResolutions.key, key));
-  if (already) throw new BounceRefused("حُسم هذا من قبل — حدّث الصفحة");
+  if (already) throw new BounceRefused("حسم هذا من قبل — حدّث الصفحة");
 
   let freedInvoices = 0;
   if (input.decision === "BOUNCED") {
@@ -67,7 +67,7 @@ export async function resolveBounce(
     }).where(and(eq(bankTransactions.id, back.id)));
     await tx.insert(decisionHistory).values([
       { bankTransactionId: out.id, event: "MATCH_REVERSED", actor: "HUMAN", actorId, detail: "ارتدّت — عاد المبلغ", payload: { العودة: back.id, الدفعة: p?.id ?? null } },
-      { bankTransactionId: back.id, event: "CLASSIFIED", actor: "HUMAN", actorId, detail: "عودةُ حوالةٍ ارتدّت", payload: { الخروج: out.id } },
+      { bankTransactionId: back.id, event: "CLASSIFIED", actor: "HUMAN", actorId, detail: "عودة حوالة ارتدّت", payload: { الخروج: out.id } },
     ]);
   }
 
@@ -78,7 +78,7 @@ export async function resolveBounce(
     entityType: "alert",
     entityId: key,
     after: {
-      القرار: input.decision === "BOUNCED" ? "ارتدّت — رُدّت الدفعة وعادت فواتيرها مستحقّة" : "ليست ردّاً",
+      القرار: input.decision === "BOUNCED" ? "ارتدّت — ردّت الدفعة وعادت فواتيرها مستحقّة" : "ليست ردّاً",
       الخروج: out.id, العودة: back.id, المبلغ: out.amountMinor, "فواتير عادت مستحقّة": freedInvoices,
     },
   }, tx);

@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: SALES_FILE_TOO_LARGE }, { status: 413 });
   }
   if (fallbackBusinessDate && !/^\d{4}-\d{2}-\d{2}$/.test(fallbackBusinessDate)) {
-    return NextResponse.json({ error: "التاريخ يُكتب YYYY-MM-DD" }, { status: 400 });
+    return NextResponse.json({ error: "التاريخ يكتب YYYY-MM-DD" }, { status: 400 });
   }
 
   try {

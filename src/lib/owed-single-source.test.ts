@@ -27,29 +27,29 @@ export const RAW_OWED = /\btotal_minor\s*-\s*coalesce\s*\(/;
 
 const ALLOWED = new Map<string, string>([
   [path.join("src", "services", "supplier-balance.service.ts"), "المصدر نفسه"],
-  [path.join("src", "services", "supplier-credit.service.ts"), "قائمة الفواتير المفتوحة للتخصيص — سؤالٌ عن الفواتير لا عن «عليك»"],
-  [path.join("src", "lib", "month-close-facts.ts"), "فواتير الشهر غير المسدَّدة في قائمة الإقفال — عدُّ فواتير بعتبة الهللة"],
-  [path.join("src", "lib", "changes-facts.ts"), "«عليك» قبل ثلاثين يوماً بالمعادلة نفسها عند تاريخٍ مضى — لا تجيبه الخدمة"],
+  [path.join("src", "services", "supplier-credit.service.ts"), "قائمة الفواتير المفتوحة للتخصيص — سؤال عن الفواتير لا عن «عليك»"],
+  [path.join("src", "lib", "month-close-facts.ts"), "فواتير الشهر غير المسدّدة في قائمة الإقفال — عدّ فواتير بعتبة الهللة"],
+  [path.join("src", "lib", "changes-facts.ts"), "«عليك» قبل ثلاثين يوماً بالمعادلة نفسها عند تاريخ مضى — لا تجيبه الخدمة"],
 ]);
 
-describe("«كم أدين؟» من مصدرٍ واحد", () => {
-  it("لا طرحَ خامّاً للمخصَّص من إجمالي الفاتورة خارج المواضع المسمّاة", () => {
+describe("«كم أدين؟» من مصدر واحد", () => {
+  it("لا طرح خامّاً للمخصّص من إجمالي الفاتورة خارج المواضع المسمّاة", () => {
     const offenders = walk("src").filter(
       (f) => !ALLOWED.has(f) && RAW_OWED.test(readFileSync(f, "utf8")),
     );
     expect(offenders).toEqual([]);
   });
 
-  it("والمواضع المسمّاة موجودة — لا إذنَ لملفٍّ غائب", () => {
+  it("والمواضع المسمّاة موجودة — لا إذن لملفّ غائب", () => {
     for (const f of ALLOWED.keys()) expect(statSync(f).isFile()).toBe(true);
   });
 
-  it("والحارس يُمسك الشكل الخاطئ", () => {
+  it("والحارس يمسك الشكل الخاطئ", () => {
     expect(RAW_OWED.test("sum(i.total_minor - coalesce((select sum(pa.amount_minor)")).toBe(true);
     expect(RAW_OWED.test("invoices.total_minor-coalesce(a.s, 0)")).toBe(true);
   });
 
-  it("ولا يُمسك غيره", () => {
+  it("ولا يمسك غيره", () => {
     expect(RAW_OWED.test("p.amount_minor - p.fee_minor - coalesce(b.s, 0)")).toBe(false);
   });
 });

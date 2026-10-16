@@ -75,13 +75,13 @@ export async function POST(request: Request) {
     if (only && !only.has(p.supplierId)) continue;
     const minor = parseRiyals(p.amount);
     if (minor === null) {
-      return NextResponse.json({ error: "مبلغٌ جزئيّ لا يُقرأ — اكتبه بالريال مثل 1500.00" }, { status: 400 });
+      return NextResponse.json({ error: "مبلغ جزئيّ لا يقرأ — اكتبه بالريال مثل 1500.00" }, { status: 400 });
     }
     partialBySupplier.set(p.supplierId, minor);
   }
   const applied = applyPartialAmounts(chosen, partialBySupplier);
   if (applied.errors.length > 0) {
-    return NextResponse.json({ error: `${applied.errors.join(" · ")} — لم يُنزَّل ملفّ.` }, { status: 409 });
+    return NextResponse.json({ error: `${applied.errors.join(" · ")} — لم ينزّل ملفّ.` }, { status: 409 });
   }
   const run = applied.run;
   const partials = run.ready.filter((s) => s.fullMinor !== undefined);
@@ -100,11 +100,11 @@ export async function POST(request: Request) {
       "جاهز بالهللات": run.readyTotalMinor,
       "محجوز بالهللات": run.heldTotalMinor,
       مورّدون: run.ready.length,
-      "بلا حسابٍ معروف": suppliersMissingAccount(run, accounts).map((s) => s.supplierName),
-      ...(only ? { "اختيارٌ من الجاهزين": `${run.ready.length} من ${full.ready.length}` } : {}),
+      "بلا حساب معروف": suppliersMissingAccount(run, accounts).map((s) => s.supplierName),
+      ...(only ? { "اختيار من الجاهزين": `${run.ready.length} من ${full.ready.length}` } : {}),
       ...(read.body.excludeInvoices?.length ? { "فواتير مستثناة": read.body.excludeInvoices.length } : {}),
       ...(partials.length > 0
-        ? { "دفعٌ جزئيّ": partials.map((s) => ({ المورّد: s.supplierName, يُحوَّل_بالهللات: s.totalMinor, من_بالهللات: s.fullMinor })) }
+        ? { "دفع جزئيّ": partials.map((s) => ({ المورّد: s.supplierName, يُحوَّل_بالهللات: s.totalMinor, من_بالهللات: s.fullMinor })) }
         : {}),
       ...(byOwner.length > 0
         ? { "بقرار المالك وهي محجوزة": byOwner.map((o) => ({ الفاتورة: o.invoice.invoiceNumber, سبب_الحجز: o.reason, سبب_القرار: o.override?.note ?? null })) }

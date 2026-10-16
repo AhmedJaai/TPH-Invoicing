@@ -41,7 +41,7 @@ describe("runReconciliation", () => {
     expect(summary.notPayment).toBe(1);
   });
 
-  it("مورّد معروف ومبلغ مطابق يُطابَق تلقائياً", () => {
+  it("مورّد معروف ومبلغ مطابق يطابق تلقائياً", () => {
     const { results, summary } = runReconciliation({
       rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون", description: "شراء بضاعة" })],
       invoices: [invoice({ id: "i1" })],
@@ -52,7 +52,7 @@ describe("runReconciliation", () => {
     expect(summary.auto).toBe(1);
   });
 
-  it("الاسم البديل يُعرِّف مورّداً لا يشبه اسمه", () => {
+  it("الاسم البديل يعرّف مورّداً لا يشبه اسمه", () => {
     const { results } = runReconciliation({
       rows: [row({ key: "t1", description: "شركة أنس غالب خاشقجي التجارية" })],
       invoices: [invoice({ id: "i1", supplierId: "S2" })],
@@ -62,7 +62,7 @@ describe("runReconciliation", () => {
     expect(results[0].supplierEvidence.join(" ")).toContain("الاسم البديل");
   });
 
-  it("مورّد معروف بلا فاتورة مفتوحة يُسمّى بذلك لا «مجهول»", () => {
+  it("مورّد معروف بلا فاتورة مفتوحة يسمّى بذلك لا «مجهول»", () => {
     const { results } = runReconciliation({
       rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" })],
       invoices: [],
@@ -71,7 +71,7 @@ describe("runReconciliation", () => {
     expect(results[0].outcome).toBe("KNOWN_SUPPLIER_NO_INVOICE");
   });
 
-  it("مستفيد مجهول يُسمّى مجهولاً — وهو حالٌ مختلف", () => {
+  it("مستفيد مجهول يسمّى مجهولاً — وهو حال مختلف", () => {
     const { results } = runReconciliation({
       rows: [row({ key: "t1", description: "تحويل الى جهة" })],
       invoices: [invoice({ id: "i1" })],
@@ -80,7 +80,7 @@ describe("runReconciliation", () => {
     expect(results[0].outcome).toBe("UNKNOWN_ENTITY");
   });
 
-  it("حركتان تتنافسان على فاتورة: الأقوى تأخذها ولا تُخصَّص مرّتين", () => {
+  it("حركتان تتنافسان على فاتورة: الأقوى تأخذها ولا تخصّص مرّتين", () => {
     const { results } = runReconciliation({
       rows: [
         row({ key: "weak", beneficiaryRaw: "أوراق الزيتون", valueDate: day("2026-09-20") }),
@@ -94,7 +94,7 @@ describe("runReconciliation", () => {
     expect(taken[0].key).toBe("strong");
   });
 
-  it("الذاكرة تُقدَّم على الكلمات في التصنيف", () => {
+  it("الذاكرة تقدّم على الكلمات في التصنيف", () => {
     /*
       المفتاح موحَّد كما يكتبه `identitiesOf` — والاسم يُقرأ بالصيغة
       نفسها التي يُكتب بها. وكان يُكتب موحَّداً ويُقرأ خاماً، فاسمٌ فيه
@@ -110,10 +110,10 @@ describe("runReconciliation", () => {
       memory,
     });
     expect(results[0].kind).toBe("SUPPLIER_PAYMENT");
-    expect(results[0].classificationReason).toContain("أكّدتَ");
+    expect(results[0].classificationReason).toContain("أكّدت");
   });
 
-  it("النمط يُعرَف حين لا اسم للمستفيد ولا حساب", () => {
+  it("النمط يعرف حين لا اسم للمستفيد ولا حساب", () => {
     /*
       وهذه حال كلّ حركةٍ خرجت مجهولةً من كشف أحمد: سدادٌ حكوميّ بلا
       اسمٍ ولا رقم حساب. وكان مفتاح الذاكرة يخرج فارغاً لها، فيؤكّدها
@@ -134,7 +134,7 @@ describe("runReconciliation", () => {
     expect(results[0].classificationReason).toContain("نمط الوصف");
   });
 
-  it("لكل نتيجة سببُ تصنيفها مكتوباً", () => {
+  it("لكل نتيجة سبب تصنيفها مكتوباً", () => {
     const { results } = runReconciliation({
       rows: [
         row({ key: "a", description: "EJAR رقم السداد20904553589" }),
@@ -173,8 +173,8 @@ describe("runReconciliation", () => {
   });
 });
 
-describe("خطّة الكتابة — مصدر قرارٍ واحد", () => {
-  it("التلقائيّ وحده يُكتَب، والاقتراح ينتظر تأكيداً", () => {
+describe("خطّة الكتابة — مصدر قرار واحد", () => {
+  it("التلقائيّ وحده يكتب، والاقتراح ينتظر تأكيداً", () => {
     const { results, planned } = runReconciliation({
       // مرشّحان متساويان: القرار اقتراحٌ لا مطابقة
       rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" })],
@@ -188,7 +188,7 @@ describe("خطّة الكتابة — مصدر قرارٍ واحد", () => {
     expect(planned).toEqual([]);
   });
 
-  it("المطابقة التلقائية تُنتج خطّة تخصيص", () => {
+  it("المطابقة التلقائية تنتج خطّة تخصيص", () => {
     const { planned } = runReconciliation({
       rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" })],
       invoices: [invoice({ id: "a", outstandingMinor: 1_000_00 })],
@@ -258,8 +258,8 @@ describe("خطّة الكتابة — مصدر قرارٍ واحد", () => {
   });
 });
 
-describe("الحلّ التقريبيّ لا يُطابَق تلقائياً", () => {
-  it("حين ينفد البحث يصير التلقائيّ اقتراحاً — وقولُ «تمّت» عنه ادّعاء", () => {
+describe("الحلّ التقريبيّ لا يطابق تلقائياً", () => {
+  it("حين ينفد البحث يصير التلقائيّ اقتراحاً — وقول «تمّت» عنه ادّعاء", () => {
     /*
       حالة متشابكة عمداً كي تنفد ميزانيّة المحسِّن: عشرون حركة تتنافس
       على ستّ عشرة فاتورة لمورّدٍ واحد.
@@ -280,8 +280,8 @@ describe("الحلّ التقريبيّ لا يُطابَق تلقائياً", (
   });
 });
 
-describe("حالات التحكيم تُحسَب دائماً", () => {
-  it("تُحسَب وإن لم يُستدعَ حَكَم — فمعرفة كم التبس أهمّ من حلّه", () => {
+describe("حالات التحكيم تحسب دائماً", () => {
+  it("تحسب وإن لم يستدع حكم — فمعرفة كم التبس أهمّ من حلّه", () => {
     const { adjudicationCases } = runReconciliation({
       rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" })],
       /* بفرق هللة: متقاربان لا متماثلان — المتماثلان يُمثَّلان بأقدمهما ولا حَكَم بينهما */
@@ -295,7 +295,7 @@ describe("حالات التحكيم تُحسَب دائماً", () => {
     expect(adjudicationCases[0].reason).toBe("CLOSE_CANDIDATES");
   });
 
-  it("وما حُسم تلقائياً لا يدخلها", () => {
+  it("وما حسم تلقائياً لا يدخلها", () => {
     const { adjudicationCases } = runReconciliation({
       rows: [row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" })],
       invoices: [invoice({ id: "a", outstandingMinor: 1_000_00 })],
@@ -312,7 +312,7 @@ describe("الرسم يصل إلى المال", () => {
     مالٌ ذهب إلى البنك. وحسابٌ صحيح لا يصل إلى المال أسوأ من عدمه:
     يوهم أنّ الحالة معالَجة.
   */
-  it("خصمٌ يزيد عن الفاتورة بقدر رسم التحويل يُقيَّد رسماً", () => {
+  it("خصم يزيد عن الفاتورة بقدر رسم التحويل يقيّد رسماً", () => {
     const { planned } = runReconciliation({
       rows: [row({
         key: "t1", amountMinor: 1_015_00,
@@ -341,7 +341,7 @@ describe("الرسم يصل إلى المال", () => {
   });
 });
 
-describe("القراءة البصرية لا تُحسَم تلقائياً", () => {
+describe("القراءة البصرية لا تحسم تلقائياً", () => {
   /*
     المعادلة تكشف الخطأ الجسيم — سطراً ساقطاً أو رقماً قُرئ ٧ بدل ١ —
     ولا تكشف تبادلَ وصفين بين سطرين متساويَي المبلغ. فالحساب صحيح على
@@ -353,13 +353,13 @@ describe("القراءة البصرية لا تُحسَم تلقائياً", () 
     suppliers,
   };
 
-  it("المقروء حسابياً يُحسَم", () => {
+  it("المقروء حسابياً يحسم", () => {
     const { results, planned } = runReconciliation(input);
     expect(results[0].decision?.disposition).toBe("AUTO");
     expect(planned).toHaveLength(1);
   });
 
-  it("والمقروء بصرياً يُقترَح ولا يُكتَب", () => {
+  it("والمقروء بصرياً يقترح ولا يكتب", () => {
     const { results, planned } = runReconciliation({ ...input, readSource: "VISION" });
     expect(results[0].decision?.disposition).toBe("SUGGEST");
     expect(results[0].decision?.reasons.some((r) => r.includes("بصرياً"))).toBe(true);
@@ -368,7 +368,7 @@ describe("القراءة البصرية لا تُحسَم تلقائياً", () 
 });
 
 
-describe("إقرارُ اقتراحٍ بيد — الخطّة من المحرّك والاختيارُ من قائمته", () => {
+describe("إقرار اقتراح بيد — الخطّة من المحرّك والاختيار من قائمته", () => {
   const two = [
     invoice({ id: "a", outstandingMinor: 1_000_00 }),
     invoice({ id: "b", outstandingMinor: 1_000_01, invoiceDate: day("2026-08-01") }),
@@ -380,26 +380,26 @@ describe("إقرارُ اقتراحٍ بيد — الخطّة من المحرّ�
   const byId = new Map(two.map((i) => [i.id, i]));
   const txOf = { key: "t1", supplierId: "S1", amountMinor: 1_000_00, paidAt: day("2026-08-11") };
 
-  it("الاقتراحُ لا يدخل planned، ومرشّحوه معروضون ليُختار بينهم", () => {
+  it("الاقتراح لا يدخل planned، ومرشّحوه معروضون ليختار بينهم", () => {
     const e = engine();
     expect(e.planned).toEqual([]);
     expect(e.results[0].decision?.disposition).toBe("SUGGEST");
     expect(e.candidatesByKey.get("t1")?.map((c) => c.invoiceIds[0]).sort()).toEqual(["a", "b"]);
   });
 
-  it("بلا اختيار يُقَرّ ما رسا عليه المحرّك", () => {
+  it("بلا اختيار يقرّ ما رسا عليه المحرّك", () => {
     const e = engine();
     expect(pickCandidate(e, "t1")?.invoiceIds).toEqual(e.results[0].candidate?.invoiceIds);
   });
 
-  it("والمختارُ يجب أن يكون من قائمة الخادم — فاتورةٌ من خارجها لا تُكتب", () => {
+  it("والمختار يجب أن يكون من قائمة الخادم — فاتورة من خارجها لا تكتب", () => {
     const e = engine();
     expect(pickCandidate(e, "t1", ["b"])?.invoiceIds).toEqual(["b"]);
     expect(pickCandidate(e, "t1", ["ليست-مرشّحة"])).toBeNull();
     expect(pickCandidate(e, "t1", ["a", "b"])).toBeNull();
   });
 
-  it("الخطّة يحسبها الخادم: التخصيصُ بقدر المتبقّي، والمقيَّدُ ما خرج من الحساب", () => {
+  it("الخطّة يحسبها الخادم: التخصيص بقدر المتبقّي، والمقيّد ما خرج من الحساب", () => {
     const e = engine();
     const plan = planFor(txOf, pickCandidate(e, "t1", ["b"])!, byId, { fullAmount: true })!;
     expect(plan.allocations).toEqual([{ invoiceId: "b", amountMinor: 1_000_00 }]);
@@ -407,7 +407,7 @@ describe("إقرارُ اقتراحٍ بيد — الخطّة من المحرّ�
     expect(plan.feeMinor).toBe(0);
   });
 
-  it("الزائدُ على الفاتورة يبقى غير مخصَّص — لا دفعةٌ تنقص عن حركتها", () => {
+  it("الزائد على الفاتورة يبقى غير مخصّص — لا دفعة تنقص عن حركتها", () => {
     const over = { invoiceIds: ["a"], outcome: "OVERPAYMENT" as const, allocatedMinor: 1_000_00,
       parts: { supplier: 1, amount: 0.5, date: 1, reference: 0 }, score: 0.7, evidence: [] };
     const plan = planFor({ ...txOf, amountMinor: 1_500_00 }, over, byId, { fullAmount: true })!;
@@ -415,8 +415,8 @@ describe("إقرارُ اقتراحٍ بيد — الخطّة من المحرّ�
     expect(plan.allocations).toEqual([{ invoiceId: "a", amountMinor: 1_000_00 }]);
   });
 
-  it("فاتورةٌ من المرشّح سُدّدت بعده أو لمورّدٍ آخر — لا خطّة", () => {
-    const gone = { invoiceIds: ["a", "سُدّدت"], outcome: "MULTI_INVOICE" as const, allocatedMinor: 1_000_00,
+  it("فاتورة من المرشّح سدّدت بعده أو لمورّد آخر — لا خطّة", () => {
+    const gone = { invoiceIds: ["a", "سدّدت"], outcome: "MULTI_INVOICE" as const, allocatedMinor: 1_000_00,
       parts: { supplier: 1, amount: 1, date: 1, reference: 0 }, score: 0.9, evidence: [] };
     expect(planFor(txOf, gone, byId)).toBeNull();
     const other = new Map([["a", { ...two[0], supplierId: "S2" }]]);
@@ -424,8 +424,8 @@ describe("إقرارُ اقتراحٍ بيد — الخطّة من المحرّ�
   });
 });
 
-describe("تنزيلُ ما لم يُثبَت يقع على مكوّنته وحدها", () => {
-  it("مورّدٌ سهل يُحسَم تلقائياً ولو كان في الكشف غيرُه", () => {
+describe("تنزيل ما لم يثبت يقع على مكوّنته وحدها", () => {
+  it("مورّد سهل يحسم تلقائياً ولو كان في الكشف غيره", () => {
     const { results } = runReconciliation({
       rows: [
         row({ key: "t1", beneficiaryRaw: "أوراق الزيتون" }),

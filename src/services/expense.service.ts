@@ -185,7 +185,7 @@ export async function deriveExpensesFromBank(
         entityType: "expense",
         entityId: month ?? "all",
         after: {
-          قُيّدت: inserted, "رُبطت بمصروفٍ قُيِّد بيد": adoptions.length,
+          قُيّدت: inserted, "ربطت بمصروف قيّد بيد": adoptions.length,
           "تغيّر بابها": sync.updated, "لم تعد مصروفاً": sync.removed,
         },
       }, tx);
@@ -406,7 +406,7 @@ export async function deleteExpense(userId: string, id: string): Promise<DeleteE
       entityType: "expense",
       entityId: id,
       before: row,
-      after: { الفعل: "حُذف القيد", المصدر: row.source },
+      after: { الفعل: "حذف القيد", المصدر: row.source },
     }, t);
     return "DELETED";
   });

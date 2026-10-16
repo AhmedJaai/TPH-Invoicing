@@ -120,7 +120,7 @@ export function ConfirmAction({
               type="button"
               disabled={!understood}
               aria-busy={busy}
-              title={!understood ? "أقرَّ بما فوقه أوّلاً" : undefined}
+              title={!understood ? "أقرّ بما فوقه أوّلاً" : undefined}
               onClick={async () => {
                 if (busy) return;
                 setBusy(true);
@@ -264,7 +264,7 @@ export function ActionButton({
         {children}
       </button>
       {disabled && reason && <span id={reasonId} className="sr-only">{reason}</span>}
-      <span className="sr-only" aria-live="polite">{busy ? "يُنفَّذ" : done ? "تمّ" : ""}</span>
+      <span className="sr-only" aria-live="polite">{busy ? "ينفّذ" : done ? "تمّ" : ""}</span>
     </>
   );
 }
@@ -553,7 +553,7 @@ export const SectionBoundary = catchError(
         تعذّر عرض {props.what}
       </p>
       <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-        بقيّةُ الصفحة كما قُرئت، ولم يُكتب شيء. غالباً انقطاعٌ عابر في الاتّصال بالقاعدة.
+        بقيّة الصفحة كما قرئت، ولم يكتب شيء. غالباً انقطاع عابر في الاتّصال بالقاعدة.
         {isDigested(error) && <> إن تكرّر فانقل هذا الرمز لمن يصلحه: <span className="nums nums-count" dir="ltr">{error.digest}</span></>}
       </p>
       <button type="button" onClick={() => retry()} className={`mt-3 ${buttonClass("secondary", "sm")}`}>
@@ -605,7 +605,7 @@ export function SortHeader({
       href={sortHref(pathname, params, param, formatSort(next))}
       scroll={false}
       replace
-      data-tip={next ? (next.dir === "desc" ? "رتّب تنازليّاً" : "رتّب تصاعديّاً") : "أعِد الترتيبَ الأصليّ"}
+      data-tip={next ? (next.dir === "desc" ? "رتّب تنازليّاً" : "رتّب تصاعديّاً") : "أعد الترتيب الأصليّ"}
       className={`-mx-1.5 inline-flex min-h-7 items-center gap-1 rounded-md px-1.5 transition-colors hover:bg-hover hover:text-ink ${current ? "text-ink" : ""}`}
     >
       {children}
@@ -1147,7 +1147,7 @@ export function SelectAll() {
     <input
       ref={ref}
       type="checkbox"
-      aria-label="حدّد كلَّ الظاهر في هذا الجدول"
+      aria-label="حدّد كلّ الظاهر في هذا الجدول"
       checked={total > 0 && ids.length >= total}
       onChange={(e) => {
         if (!root) return;
@@ -1185,12 +1185,12 @@ export function BulkBar({ children }: {
       {ids.length > 0 && (
         <div
           role="region"
-          aria-label="أفعالٌ على المحدَّد"
+          aria-label="أفعال على المحدّد"
           className="no-print sticky bottom-20 z-20 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-accent-line bg-overlay px-4 py-3 shadow-overlay lg:bottom-4"
         >
-          <p className="text-[13px] font-bold">محدَّد <span className="nums nums-count">{ids.length}</span></p>
+          <p className="text-[13px] font-bold">محدّد <span className="nums nums-count">{ids.length}</span></p>
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{children(selected, clear)}</div>
-          <button type="button" onClick={clear} className={buttonClass("quiet", "sm")}>ألغِ التحديد</button>
+          <button type="button" onClick={clear} className={buttonClass("quiet", "sm")}>ألغ التحديد</button>
         </div>
       )}
     </div>

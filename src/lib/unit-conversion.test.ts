@@ -25,7 +25,7 @@ describe("التحويل داخل العائلة", () => {
     expect(sameFamily("KG", "LITER")).toBe(false);
   });
 
-  it("الحبّة لا تتحوّل إلى عبوة بلا حجمٍ معلوم", () => {
+  it("الحبّة لا تتحوّل إلى عبوة بلا حجم معلوم", () => {
     expect(convert(12, "PACK", "PIECE")).toBeNull();
   });
 
@@ -48,7 +48,7 @@ describe("سعر الوحدة من سعر العبوة", () => {
     expect(r.explanation).toContain("12");
   });
 
-  it("والسعر عددٌ صحيح بالهللات دائماً", () => {
+  it("والسعر عدد صحيح بالهللات دائماً", () => {
     const r = unitPriceFromPack(100_00, { packSize: 3, contentUnit: "KG", contentQuantity: 1 }, "KG")!;
     expect(Number.isInteger(r.unitPriceMinor)).toBe(true);
     expect(r.unitPriceMinor).toBe(3333);
@@ -62,7 +62,7 @@ describe("سعر الوحدة من سعر العبوة", () => {
   });
 
   /* المجهول لا يُحوَّل ولا يُفترَض واحداً */
-  it("حجم العبوة المجهول يُرَدّ لا يُفترَض", () => {
+  it("حجم العبوة المجهول يردّ لا يفترض", () => {
     expect(unitPriceFromPack(100_00, { packSize: null, contentUnit: "LITER", contentQuantity: 1 }, "LITER"))
       .toBeNull();
     expect(unitPriceFromPack(100_00, { packSize: 12, contentUnit: null, contentQuantity: 1 }, "LITER"))
@@ -71,28 +71,28 @@ describe("سعر الوحدة من سعر العبوة", () => {
       .toBeNull();
   });
 
-  it("ولا يُحوَّل عبر العائلات", () => {
+  it("ولا يحوّل عبر العائلات", () => {
     expect(unitPriceFromPack(100_00, { packSize: 12, contentUnit: "LITER", contentQuantity: 1 }, "KG"))
       .toBeNull();
   });
 });
 
-describe("هل يصحّ أن يُقارَنا؟", () => {
+describe("هل يصحّ أن يقارنا؟", () => {
   const p = (unit: BaseUnit | null, price: number | null) =>
     ({ supplierProductId: "x", unitPriceMinor: price, baseUnit: unit });
 
-  it("الوحدتان من عائلةٍ واحدة تُقارَنان", () => {
+  it("الوحدتان من عائلة واحدة تقارنان", () => {
     expect(canCompare(p("KG", 1000), p("GRAM", 1)).comparable).toBe(true);
   });
 
   /* الجواب «لا» ليس عجزاً — هو منعُ رقمٍ كاذب */
-  it("عائلتان مختلفتان لا تُقارَنان", () => {
+  it("عائلتان مختلفتان لا تقارنان", () => {
     const v = canCompare(p("LITER", 800), p("KG", 3000));
     expect(v.comparable).toBe(false);
     expect(v.reason).toContain("عائلتان");
   });
 
-  it("والمجهول لا يُقارَن", () => {
+  it("والمجهول لا يقارن", () => {
     expect(canCompare(p("KG", null), p("KG", 100)).comparable).toBe(false);
     expect(canCompare(p(null, 100), p("KG", 100)).comparable).toBe(false);
   });

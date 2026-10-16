@@ -52,7 +52,7 @@ export function SupplierItemMerge({ supplierId, item, name, options }: {
         className="relative z-10 mt-1 inline-flex min-h-8 items-center gap-1 text-[11px] font-medium text-accent hover:underline"
       >
         <Merge className="h-3 w-3" aria-hidden />
-        {options.some((o) => o.suggested) ? "يشبه صنفاً آخر — هو نفسه؟" : "هو نفسه صنفٌ آخر؟"}
+        {options.some((o) => o.suggested) ? "يشبه صنفاً آخر — هو نفسه؟" : "هو نفسه صنف آخر؟"}
       </button>
     );
   }
@@ -69,21 +69,21 @@ export function SupplierItemMerge({ supplierId, item, name, options }: {
         >
           <option value="">— اختر —</option>
           {options.map((o) => (
-            <option key={o.key} value={o.key}>{o.name}{o.suggested ? " · مقترَح" : ""}</option>
+            <option key={o.key} value={o.key}>{o.name}{o.suggested ? " · مقترح" : ""}</option>
           ))}
         </select>
       </label>
       {target && (
         <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">
-          تُنقل بنودُ «{name}» إلى «{target.name}» ويُجمع تاريخُ سعرهما، ويُكتب بـ«{target.name}» كلُّ بندٍ يأتي بهذا الاسم بعد اليوم.
+          تنقل بنود «{name}» إلى «{target.name}» ويجمع تاريخ سعرهما، ويكتب بـ«{target.name}» كلّ بند يأتي بهذا الاسم بعد اليوم.
         </p>
       )}
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <button type="button" onClick={merge} disabled={busy || !target} aria-busy={busy} className={buttonClass("primary", "sm")}>
-          {busy ? "يُدمج…" : "نعم، صنفٌ واحد"}
+          {busy ? "يدمج…" : "نعم، صنف واحد"}
         </button>
         <button type="button" onClick={() => { setOpen(false); setError(null); }} disabled={busy} className={buttonClass("quiet", "sm")}>
-          ألغِ
+          ألغ
         </button>
       </div>
       {error && <p role="alert" className="mt-1.5 text-xs text-danger">{error}</p>}

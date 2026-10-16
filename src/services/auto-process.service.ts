@@ -42,7 +42,7 @@ export async function setAutoPaused(paused: boolean, actorId: string): Promise<b
         action: paused ? "DOCUMENT_AUTO_PAUSED" : "DOCUMENT_AUTO_RESUMED",
         entityType: "job",
         entityId: "auto-process",
-        after: { الحال: paused ? "موقوف — لا قيدَ ولا اعتمادَ ولا مزامنةَ في الخلفيّة" : "يعمل" },
+        after: { الحال: paused ? "موقوف — لا قيد ولا اعتماد ولا مزامنة في الخلفيّة" : "يعمل" },
       }, t);
     }
     return changed;

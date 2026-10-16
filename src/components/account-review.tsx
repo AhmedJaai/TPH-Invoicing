@@ -63,15 +63,15 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
     setResult(r.data.result);
     const res = r.data.result;
     const parts = [
-      res.invoices.recorded > 0 ? `قُيِّدت ${countNoun(res.invoices.recorded, INVOICE)}` : null,
-      res.merged.length > 0 ? `دُمجت ${countNoun(res.merged.length, PAYMENT)} قُيِّدت مرّتين` : null,
-      res.linked.length > 0 ? `رُبطت ${countNoun(res.linked.length, TRANSACTION)} بسدادٍ قيّدتَه بيدك` : null,
-      res.creditApplied > 0 ? `نُسب ${countNoun(res.creditApplied, PAYMENT)} إلى فواتيرها` : null,
+      res.invoices.recorded > 0 ? `قيّدت ${countNoun(res.invoices.recorded, INVOICE)}` : null,
+      res.merged.length > 0 ? `دمجت ${countNoun(res.merged.length, PAYMENT)} قيّدت مرّتين` : null,
+      res.linked.length > 0 ? `ربطت ${countNoun(res.linked.length, TRANSACTION)} بسداد قيّدته بيدك` : null,
+      res.creditApplied > 0 ? `نسب ${countNoun(res.creditApplied, PAYMENT)} إلى فواتيرها` : null,
     ].filter(Boolean);
     toast({
       tone: parts.length > 0 ? "ok" : "info",
-      title: parts.length > 0 ? "رُوجعت الحسابات" : "الحساباتُ كما هي",
-      body: parts.length > 0 ? parts.join(" · ") : "لم يجد ما يُقيَّد أو يُدمج آلياً.",
+      title: parts.length > 0 ? "روجعت الحسابات" : "الحسابات كما هي",
+      body: parts.length > 0 ? parts.join(" · ") : "لم يجد ما يقيّد أو يدمج آلياً.",
     });
     router.refresh();
   }
@@ -101,14 +101,14 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
     <>
       <button type="button" onClick={start} className={buttonClass(variant, size)}>
         <ScanSearch className={size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4"} strokeWidth={2} aria-hidden />
-        راجِع الحسابات
+        راجع الحسابات
       </button>
 
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
-        title="مراجعةُ الحسابات"
-        description="يطابق كلَّ فاتورةٍ في الأرشيف بمورّدها، وكلَّ دفعةٍ بحوالتها في الكشف — ويقول ما سيقع قبل أن يقع."
+        title="مراجعة الحسابات"
+        description="يطابق كلّ فاتورة في الأرشيف بمورّدها، وكلّ دفعة بحوالتها في الكشف — ويقول ما سيقع قبل أن يقع."
         size="md"
         footer={
           result ? (
@@ -145,13 +145,13 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
               <h3 id="ar-invoices" className="flex items-center gap-2 text-sm font-bold">
                 <FileCheck2 className="h-4 w-4 text-ok" strokeWidth={2} aria-hidden />
                 {p.invoices.items.length > 0
-                  ? `تُقيَّد آلياً — ${countNoun(p.invoices.items.length, INVOICE)}`
-                  : "لا فاتورةَ في الأرشيف تنتظر قيداً آلياً"}
+                  ? `تقيّد آلياً — ${countNoun(p.invoices.items.length, INVOICE)}`
+                  : "لا فاتورة في الأرشيف تنتظر قيداً آلياً"}
               </h3>
               {p.invoices.items.length > 0 && (
                 <>
                   <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                    مورّدُها معروف، ورقمُها وتاريخُها ومبلغُها مقروءة، وليست نسخةً من فاتورةٍ مقيَّدة — بالرقم بأيّ صيغة، ولا باليوم والمبلغ.
+                    مورّدها معروف، ورقمها وتاريخها ومبلغها مقروءة، وليست نسخةً من فاتورة مقيّدة — بالرقم بأيّ صيغة، ولا باليوم والمبلغ.
                   </p>
                   <ul className="mt-2 divide-y divide-line-soft rounded-lg border border-line-soft">
                     {p.invoices.items.map((it) => (
@@ -160,7 +160,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
                           <span className="block truncate font-bold">{it.supplierName}</span>
                           <span className="block truncate text-muted" dir="auto">
                             {it.kind === "STATEMENT" ? "كشف حساب" : it.invoiceNumber} · {formatDay(it.invoiceDate)}
-                            {it.wasArchived ? " · أُرشف بلا قيد" : ""}
+                            {it.wasArchived ? " · أرشف بلا قيد" : ""}
                           </span>
                         </span>
                         {it.totalMinor !== null ? <Money minor={it.totalMinor} /> : <span className="text-muted">غير معروف</span>}
@@ -175,11 +175,11 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
               <section aria-labelledby="ar-echoes">
                 <h3 id="ar-echoes" className="flex items-center gap-2 text-sm font-bold">
                   <Copy className="h-4 w-4 text-warn" strokeWidth={2} aria-hidden />
-                  {`دفعاتٌ قُيِّدت مرّتين — ${countNoun(p.echoes.length, PAYMENT)}`}
+                  {`دفعات قيّدت مرّتين — ${countNoun(p.echoes.length, PAYMENT)}`}
                 </h3>
                 <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                  حوالةٌ في كشف البنك لم تُنسب إلى فاتورة، وإقرارٌ باليد «سُدّدت» بالمبلغ نفسه بلا حركة بنك. فالحسابُ يبدو متّزناً وفاتورةٌ أحدث لم تُسدَّد.
-                  الدمجُ يُلغي الإقرار وينقل سدادَه إلى الحوالة — فتظهر الفاتورةُ غيرُ المسدَّدة عليك.
+                  حوالة في كشف البنك لم تنسب إلى فاتورة، وإقرار باليد «سدّدت» بالمبلغ نفسه بلا حركة بنك. فالحساب يبدو متّزناً وفاتورة أحدث لم تسدّد.
+                  الدمج يلغي الإقرار وينقل سداده إلى الحوالة — فتظهر الفاتورة غير المسدّدة عليك.
                 </p>
                 <ul className="mt-2 space-y-2">
                   {p.echoes.map((e) => (
@@ -197,14 +197,14 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
                             <Money minor={e.amountMinor} />
                           </span>
                           <span className="mt-1 block leading-relaxed text-muted">
-                            حوالةُ الكشف {formatDay(e.bankDay)} · وإقرارٌ باليد {formatDay(e.manualDay)}
+                            حوالة الكشف {formatDay(e.bankDay)} · وإقرار باليد {formatDay(e.manualDay)}
                             {e.invoices.length > 0 && <> سدّد {e.invoices.map((i) => i.number).join("، ")}</>}
                           </span>
                         </span>
                       </label>
                       {e.supplierSlug && (
                         <Link href={`/suppliers/${e.supplierSlug}?tab=payments#detail`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-accent hover:underline">
-                          دفعاتُ {e.supplierName}
+                          دفعات {e.supplierName}
                           <ArrowLeft className="h-3 w-3" aria-hidden />
                         </Link>
                       )}
@@ -218,11 +218,11 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
               <section aria-labelledby="ar-credit-echoes">
                 <h3 id="ar-credit-echoes" className="flex items-center gap-2 text-sm font-bold">
                   <Copy className="h-4 w-4 text-warn" strokeWidth={2} aria-hidden />
-                  {`سدادٌ بيدك خرج من حوالةٍ لم تُنسب — ${countNoun(p.creditEchoes.length, PAYMENT)}`}
+                  {`سداد بيدك خرج من حوالة لم تنسب — ${countNoun(p.creditEchoes.length, PAYMENT)}`}
                 </h3>
                 <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                  وسمتَ الفاتورةَ «سُدّدت» حوالةً، وللمورّد نفسه حوالةٌ في الكشف قبلها لم تُنسب إلى فاتورة وتسعها — فالمالُ عُدَّ مرّتين:
-                  مرّةً سداداً ومرّةً «رصيداً لك». الدمجُ يُلغي الإقرار ويسدّد الفاتورةَ من تلك الحوالة، فينقص الرصيدُ بقدرها.
+                  وسمت الفاتورة «سدّدت» حوالةً، وللمورّد نفسه حوالة في الكشف قبلها لم تنسب إلى فاتورة وتسعها — فالمال عدّ مرّتين:
+                  مرّةً سداداً ومرّةً «رصيداً لك». الدمج يلغي الإقرار ويسدّد الفاتورة من تلك الحوالة، فينقص الرصيد بقدرها.
                 </p>
                 <ul className="mt-2 space-y-2">
                   {p.creditEchoes.map((e) => (
@@ -240,7 +240,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
                             <Money minor={e.amountMinor} />
                           </span>
                           <span className="mt-1 block leading-relaxed text-muted">
-                            إقرارٌ بيدك {formatDay(e.manualDay)}
+                            إقرار بيدك {formatDay(e.manualDay)}
                             {e.invoices.length > 0 && <> لـ{e.invoices.map((i) => i.number).join("، ")}</>}
                             {" · من حوالة "}{e.sources.map((x) => formatDay(x.day)).join(" و")}
                           </span>
@@ -256,10 +256,10 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
               <section aria-labelledby="ar-links">
                 <h3 id="ar-links" className="flex items-center gap-2 text-sm font-bold">
                   <Link2 className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />
-                  {`حوالاتٌ في الطابور سدادُها مقيَّدٌ بيدك — ${countNoun(p.links.length, TRANSACTION)}`}
+                  {`حوالات في الطابور سدادها مقيّد بيدك — ${countNoun(p.links.length, TRANSACTION)}`}
                 </h3>
                 <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                  رُفعت الفاتورةُ وقيل «سُدّدت» فأُغلقت، ثمّ جاء الكشفُ بحوالتها فلم يجد فاتورةً مفتوحة. الربطُ يجعل الحوالةَ دليلَ ذلك السداد — ولا يُنشئ دفعةً ثانية.
+                  رفعت الفاتورة وقيل «سدّدت» فأغلقت، ثمّ جاء الكشف بحوالتها فلم يجد فاتورةً مفتوحة. الربط يجعل الحوالة دليل ذلك السداد — ولا ينشئ دفعةً ثانية.
                 </p>
                 <ul className="mt-2 space-y-2">
                   {p.links.map((l) => (
@@ -279,17 +279,17 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
                             <Money minor={l.transferMinor} />
                           </span>
                           <span id={`${l.key}-why`} className="mt-1 block leading-relaxed text-muted">
-                            حوالةُ {formatDay(l.transferDay)} · وسدادٌ بيدك {formatDay(l.paymentDay)} بـ<Money minor={l.paymentMinor} />
+                            حوالة {formatDay(l.transferDay)} · وسداد بيدك {formatDay(l.paymentDay)} بـ<Money minor={l.paymentMinor} />
                             {l.invoices.length > 0 && <> لـ{l.invoices.map((i) => i.number).join("، ")}</>}
                             {l.exact
-                              ? " — المبلغُ نفسه، يُربط وحده."
-                              : <> — زادت الحوالةُ <Money minor={l.extraMinor} />: يبقى رصيداً للمورّد. فإن كان في الفاتورة (توصيلٌ مثلاً) فصحّح إجماليَّها ويُخصم منه.</>}
+                              ? " — المبلغ نفسه، يربط وحده."
+                              : <> — زادت الحوالة <Money minor={l.extraMinor} />: يبقى رصيداً للمورّد. فإن كان في الفاتورة (توصيل مثلاً) فصحّح إجماليّها ويخصم منه.</>}
                           </span>
                         </span>
                       </label>
                       {!l.exact && l.invoices[0] && (
                         <Link href={`/purchases/invoices/${l.invoices[0].id}?act=fix#fix`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-accent hover:underline">
-                          صحّح إجماليَّ {l.invoices[0].number}
+                          صحّح إجماليّ {l.invoices[0].number}
                           <ArrowLeft className="h-3 w-3" aria-hidden />
                         </Link>
                       )}
@@ -303,11 +303,11 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
               <section aria-labelledby="ar-unproven">
                 <h3 id="ar-unproven" className="flex items-center gap-2 text-sm font-bold">
                   <CircleHelp className="h-4 w-4 text-warn" strokeWidth={2} aria-hidden />
-                  {`قيّدتَها بيدك حوالةً ولا تظهر في الكشف — ${countNoun(p.unproven.length, PAYMENT)}`}
+                  {`قيّدتها بيدك حوالةً ولا تظهر في الكشف — ${countNoun(p.unproven.length, PAYMENT)}`}
                 </h3>
                 <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                  يومُها داخلَ ما استُورد من كشف البنك ولا حوالةَ فيه تقابلها. فإمّا دُفعت من حسابٍ آخر — فسجّلها «من حساب المالك» من فاتورتها —
-                  وإمّا لم تُدفع بعد. لا يُغيَّر فيها شيءٌ هنا.
+                  يومها داخل ما استورد من كشف البنك ولا حوالة فيه تقابلها. فإمّا دفعت من حساب آخر — فسجّلها «من حساب المالك» من فاتورتها —
+                  وإمّا لم تدفع بعد. لا يغيّر فيها شيء هنا.
                 </p>
                 <ul className="mt-2 divide-y divide-line-soft rounded-lg border border-line-soft">
                   {p.unproven.map((u) => (
@@ -319,7 +319,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
                         <span className="min-w-0">
                           <span className="block truncate font-bold">{u.supplierName}</span>
                           <span className="block truncate text-muted" dir="auto">
-                            {formatDay(u.day)}{u.invoices.length > 0 ? ` · ${u.invoices.map((i) => i.number).join("، ")}` : " · لم تُخصَّص على فاتورة"}
+                            {formatDay(u.day)}{u.invoices.length > 0 ? ` · ${u.invoices.map((i) => i.number).join("، ")}` : " · لم تخصّص على فاتورة"}
                           </span>
                         </span>
                         <span className="flex items-center gap-2">
@@ -337,7 +337,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
 
             {nothing && p.invoices.missing.length === 0 && p.unproven.length === 0 && (
               <p className="text-xs leading-relaxed text-muted">
-                كلُّ فاتورةٍ في الأرشيف مقيَّدة، ولا دفعةَ قُيِّدت مرّتين. «انسب الأرصدة» يخصم ما دفعتَه ولم يُنسب من فواتير كلّ مورّد.
+                كلّ فاتورة في الأرشيف مقيّدة، ولا دفعة قيّدت مرّتين. «انسب الأرصدة» يخصم ما دفعته ولم ينسب من فواتير كلّ مورّد.
               </p>
             )}
           </div>
@@ -352,9 +352,9 @@ function LeftForYou({ missing }: { missing: AccountReviewPreview["invoices"]["mi
     <section aria-labelledby="ar-left">
       <h3 id="ar-left" className="flex items-center gap-2 text-sm font-bold">
         <FileQuestion className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-        {`تُترك لقرارك — ${countNoun(missing.length, INVOICE)}`}
+        {`تترك لقرارك — ${countNoun(missing.length, INVOICE)}`}
       </h3>
-      <p className="mt-1 text-[11px] text-muted">لا تُقيَّد آلياً، ولكلٍّ سببُه. افتح ملفَّها لتكمل الناقص أو ترفضها.</p>
+      <p className="mt-1 text-[11px] text-muted">لا تقيّد آلياً، ولكلّ سببه. افتح ملفّها لتكمل الناقص أو ترفضها.</p>
       <ul className="mt-2 divide-y divide-line-soft rounded-lg border border-line-soft">
         {missing.map((m) => (
           <li key={m.documentId}>
@@ -374,10 +374,10 @@ function LeftForYou({ missing }: { missing: AccountReviewPreview["invoices"]["mi
 
 function ReviewResult({ result }: { result: AccountReviewResult }) {
   const rows = [
-    { label: "فواتيرُ قُيِّدت", value: result.invoices.recorded },
-    { label: "دفعاتٌ دُمجت", value: result.merged.length },
-    { label: "حوالاتٌ رُبطت", value: result.linked.length },
-    { label: "دفعاتٌ نُسبت إلى فواتيرها", value: result.creditApplied },
+    { label: "فواتير قيّدت", value: result.invoices.recorded },
+    { label: "دفعات دمجت", value: result.merged.length },
+    { label: "حوالات ربطت", value: result.linked.length },
+    { label: "دفعات نسبت إلى فواتيرها", value: result.creditApplied },
   ];
   return (
     <div className="space-y-5">

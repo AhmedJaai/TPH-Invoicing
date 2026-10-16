@@ -12,10 +12,10 @@ import { caught, pgErrorOf, withRollback } from "@/test/db";
  * الإنتاج، ولم يكشفه اختبار: الدوالُّ الخالصة خضراء والمسارُ لم يلمس قاعدة. فيُكتَب هنا
  * لكلّ بادئةٍ مسجَّلة، بالقرارَين، على المخطّط الحقيقيّ.
  */
-describe("قراراتُ الملاحظات المحسوبة تُحفَظ فعلاً", () => {
+describe("قرارات الملاحظات المحسوبة تحفظ فعلاً", () => {
   const sample = (prefix: string) => `${prefix}:inv-95fc5de2-17ea-4a16-8b59-3145c4b28c49`;
 
-  it("كلُّ بادئةٍ يقبلها المسار يقبلها قيدُ المفتاح، بالإسكات وبالتأجيل", async () => {
+  it("كلّ بادئة يقبلها المسار يقبلها قيد المفتاح، بالإسكات وبالتأجيل", async () => {
     await withRollback(async (tx) => {
       for (const prefix of SIGNAL_PREFIXES) {
         for (const key of [sample(prefix), `${prefix}:2026-10-01`]) {
@@ -31,7 +31,7 @@ describe("قراراتُ الملاحظات المحسوبة تُحفَظ فعل
     });
   });
 
-  it("وما ليس قراراً معروفاً يبقى مرفوضاً — القيدُ وُسِّع ولم يُرخَ", async () => {
+  it("وما ليس قراراً معروفاً يبقى مرفوضاً — القيد وسّع ولم يرخ", async () => {
     await withRollback(async (tx) => {
       const e = await caught((async () => { await tx.insert(alertResolutions).values({ key: "pos-missing:2026-10-01", decision: "WHATEVER" }); })());
       expect(pgErrorOf(e)?.code).toBe("23514");

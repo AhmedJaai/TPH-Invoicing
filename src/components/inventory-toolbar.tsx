@@ -36,7 +36,7 @@ export function Toolbar({
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          aria-label="رشِّح بالباب"
+          aria-label="رشّح بالباب"
           className="min-h-11 rounded-lg border border-line-input bg-raised px-3 text-xs sm:min-h-9"
         >
           <option value="">كلّ الأبواب</option>

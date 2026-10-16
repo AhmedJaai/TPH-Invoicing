@@ -32,12 +32,12 @@ export function ConfirmEligible({ count }: { count: number }) {
           const r = await postJson<{ message?: string }>("/api/document-status", { action: "confirm-eligible" });
           setBusy(false);
           if (!r.ok) { setError(r.error); return; }
-          toast({ tone: "ok", title: "حُسم ما اجتمعت فيه الشروط", body: r.data.message ?? "اعتُمدت" });
+          toast({ tone: "ok", title: "حسم ما اجتمعت فيه الشروط", body: r.data.message ?? "اعتمدت" });
           router.refresh();
         }}
       >
         <CheckCheck className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-        {count === 1 ? "اعتمده" : "اعتمدها كلَّها"}
+        {count === 1 ? "اعتمده" : "اعتمدها كلّها"}
       </button>
       {error && <span role="alert" className="text-[11px] font-bold text-danger">{error}</span>}
     </span>

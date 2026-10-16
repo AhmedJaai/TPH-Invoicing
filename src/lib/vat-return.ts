@@ -168,15 +168,15 @@ export const NO_VAT_DEBIT_CATEGORIES: ReadonlySet<string> = new Set(["SALARY", "
 /** بابٌ لا ضريبةَ فيه غالباً — يُنبَّه عليه ولا يُمنع. */
 export function txCaution(tx: Pick<VatTx, "direction" | "category">): string | null {
   return tx.direction === "DEBIT" && NO_VAT_DEBIT_CATEGORIES.has(tx.category)
-    ? "لا ضريبةَ في هذا الباب غالباً — احسبها إن كانت شراءً بفاتورةٍ ضريبيّة"
+    ? "لا ضريبة في هذا الباب غالباً — احسبها إن كانت شراءً بفاتورة ضريبيّة"
     : null;
 }
 
 /** لماذا لا تُضمّ هذه الحركة مهما اختير — `null` تُضمّ. */
 export function txBlocked(tx: Pick<VatTx, "direction" | "category" | "coveredByInvoice" | "bounced">): string | null {
-  if (tx.bounced) return "ارتدّت الحوالة — لا شراءَ فيها ولا بيع";
+  if (tx.bounced) return "ارتدّت الحوالة — لا شراء فيها ولا بيع";
   if (tx.direction !== "DEBIT") return null;
-  if (tx.coveredByInvoice) return "ضريبتُها محسوبةٌ في فاتورتها";
+  if (tx.coveredByInvoice) return "ضريبتها محسوبة في فاتورتها";
   return null;
 }
 

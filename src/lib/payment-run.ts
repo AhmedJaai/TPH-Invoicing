@@ -108,11 +108,11 @@ const HOLD_TEXT: Record<HoldReason, string> = {
     ملفُّ التحويلات يُرفع إلى البنك فيُحوَّل به مال — وما قرأه النموذج
     ولم يره إنسان لا يدخله. فاتورةٌ منفوخة حسابُها مستقيم تمرّ كلّ فحص.
   */
-  NEEDS_REVIEW: "مستندُها لم يُؤكَّد بعد — افتح المستند وأكّده قبل السداد",
+  NEEDS_REVIEW: "مستندها لم يؤكّد بعد — افتح المستند وأكّده قبل السداد",
   NOT_TAX_VALID: "ليست فاتورة ضريبية كاملة — اطلب البديل قبل السداد",
   NO_VAT_DEDUCTION: "لا تصلح لخصم ضريبة المدخلات — اطلب فاتورة ضريبية",
   // المجهول لا يُسدَّد ولا يُطالَب صاحبه: يُقرأ أوّلاً
-  TAX_UNKNOWN: "لم يُقرأ تفصيلها الضريبي — اقرأ المستند قبل السداد",
+  TAX_UNKNOWN: "لم يقرأ تفصيلها الضريبي — اقرأ المستند قبل السداد",
 };
 
 /**
@@ -231,7 +231,7 @@ export function applyPartialAmounts(
   const errors: string[] = [];
   const known = new Set(run.ready.map((s) => s.supplierId));
   for (const id of partialBySupplier.keys()) {
-    if (!known.has(id)) errors.push("مبلغٌ جزئيّ لمورّدٍ ليس بين الجاهزين — حدّث الصفحة");
+    if (!known.has(id)) errors.push("مبلغ جزئيّ لمورّد ليس بين الجاهزين — حدّث الصفحة");
   }
   const ready = run.ready.map((s) => {
     const partial = partialBySupplier.get(s.supplierId);
@@ -241,7 +241,7 @@ export function applyPartialAmounts(
       return s;
     }
     if (partial > s.totalMinor) {
-      errors.push(`${s.supplierName}: ${formatRiyals(partial)} أكبر ممّا يُحوَّل له (${formatRiyals(s.totalMinor)})`);
+      errors.push(`${s.supplierName}: ${formatRiyals(partial)} أكبر ممّا يحوّل له (${formatRiyals(s.totalMinor)})`);
       return s;
     }
     return partial === s.totalMinor ? s : { ...s, totalMinor: partial, fullMinor: s.totalMinor };
@@ -302,8 +302,8 @@ export function resolvePayeeAccount(
     return {
       account: manualIban,
       note: seen.length === 0
-        ? "آيبانٌ مكتوبٌ بيد — لم يُحوَّل له من قبل، فتحقّق منه قبل أوّل تحويل"
-        : agrees ? null : "مكتوبٌ بيد ويخالف الحسابَ الذي حُوِّل له في الكشوف — تأكّد من المورّد قبل التحويل",
+        ? "آيبان مكتوب بيد — لم يحوّل له من قبل، فتحقّق منه قبل أوّل تحويل"
+        : agrees ? null : "مكتوب بيد ويخالف الحساب الذي حوّل له في الكشوف — تأكّد من المورّد قبل التحويل",
     };
   }
   for (const kind of ["IBAN", "ACCOUNT"] as const) {
@@ -313,7 +313,7 @@ export function resolvePayeeAccount(
       return { account: null, note: `له ${values.length} حسابات في الكشوف — اختر الصحيح في البنك` };
     }
   }
-  return { account: null, note: "الحسابُ غير معروف — أدخله في ملفّ المورّد" };
+  return { account: null, note: "الحساب غير معروف — أدخله في ملفّ المورّد" };
 }
 
 /**
@@ -360,7 +360,7 @@ export function toBankTransferCsv(
       [
         acc.note,
         /* الجزئيُّ يُقال بمبلغيه: من يرفع الملفَّ يرى أنّ الباقي لم يُنسَ */
-        s.fullMinor === undefined ? null : `دفعٌ جزئيّ: ${formatRiyals(s.totalMinor)} من ${formatRiyals(s.fullMinor)}`,
+        s.fullMinor === undefined ? null : `دفع جزئيّ: ${formatRiyals(s.totalMinor)} من ${formatRiyals(s.fullMinor)}`,
         ownerNote(byOwner.get(s.supplierId)),
       ].filter(Boolean).join(" — "),
     ];

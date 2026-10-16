@@ -35,7 +35,7 @@ function Row({ row: r, role }: { row: ChoiceRow; role: Role }) {
           <p className="mt-0.5 break-words text-xs leading-relaxed text-ink-soft [overflow-wrap:anywhere]" dir="auto">{r.choice}</p>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">
             <Badge tone={ui.tone} dot>{CHOICE_STATE_LABEL[r.state]}</Badge>
-            <span>{r.decidedOn ? formatDay(r.decidedOn) : "تاريخُه غير محفوظ"}</span>
+            <span>{r.decidedOn ? formatDay(r.decidedOn) : "تاريخه غير محفوظ"}</span>
           </p>
         </div>
         <div className="shrink-0 text-end">
@@ -45,7 +45,7 @@ function Row({ row: r, role }: { row: ChoiceRow; role: Role }) {
               <span className="block text-sm font-bold"><Money minor={r.effectMinor} signed /></span>
             </>
           ) : (
-            <span className="block text-[11px] text-muted">لا أثرَ يُحسب بالريال</span>
+            <span className="block text-[11px] text-muted">لا أثر يحسب بالريال</span>
           )}
         </div>
       </div>
@@ -56,7 +56,7 @@ function Row({ row: r, role }: { row: ChoiceRow; role: Role }) {
       )}
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
         {r.revoke && can(role, r.revoke.needs) && (
-          <PostAction url={r.revoke.url} body={r.revoke.body} variant="secondary" done="سُحب الاختيار">
+          <PostAction url={r.revoke.url} body={r.revoke.body} variant="secondary" done="سحب الاختيار">
             <Undo2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
             {r.revoke.label}
           </PostAction>
@@ -83,8 +83,8 @@ export default async function ChoicesPage() {
   if (!user) redirect("/login?from=/settings/choices");
   if (!can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} title="ما قرّرتَه">
-        <NoAccess what="دفترُ الاختيارات" />
+      <PageShell user={user} title="ما قرّرته">
+        <NoAccess what="دفتر الاختيارات" />
       </PageShell>
     );
   }
@@ -94,23 +94,23 @@ export default async function ChoicesPage() {
   return (
     <PageShell
       user={user}
-      title="ما قرّرتَه"
-      intro="كلُّ ما اخترتَه أو كتبتَه بيدك: حالُه اليوم، وأثرُه بالريال حيث يُحسب، وزرُّ سحبه. لا يُبطَل اختيارٌ منها بصمت — وما لا يُطبَّق يُقال هنا بسببه."
+      title="ما قرّرته"
+      intro="كلّ ما اخترته أو كتبته بيدك: حاله اليوم، وأثره بالريال حيث يحسب، وزرّ سحبه. لا يبطل اختيار منها بصمت — وما لا يطبّق يقال هنا بسببه."
     >
       {ledger.total === 0 ? (
         <EmptyState
           icon={ListChecks}
           title="لم تقرّر شيئاً بيدك بعد."
-          hint="حين تضمّ حركةً إلى الإقرار، أو تغلق تنبيهاً، أو تكتب سياسةَ مورّدٍ أو قاعدةَ تصنيف، يظهر هنا بتاريخه وأثره."
+          hint="حين تضمّ حركةً إلى الإقرار، أو تغلق تنبيهاً، أو تكتب سياسة مورّد أو قاعدة تصنيف، يظهر هنا بتاريخه وأثره."
         />
       ) : (
         <>
           {ledger.notApplied.length > 0 ? (
-            <Callout tone="warn" icon={CircleSlash} title={`ممّا اخترتَ لا يُطبَّق الآن: ${countNoun(ledger.notApplied.length, ITEM)}`}>
-              اخترتَها وهي لا تعمل اليوم — كلٌّ بسببه في بابه أدناه، مرفوعةً إلى أوّله. اختيارُك محفوظٌ كما هو؛ اسحبه أو عالِج سببَه.
+            <Callout tone="warn" icon={CircleSlash} title={`ممّا اخترت لا يطبّق الآن: ${countNoun(ledger.notApplied.length, ITEM)}`}>
+              اخترتها وهي لا تعمل اليوم — كلّ بسببه في بابه أدناه، مرفوعةً إلى أوّله. اختيارك محفوظ كما هو؛ اسحبه أو عالج سببه.
             </Callout>
           ) : (
-            <Callout tone="ok" icon={CircleCheck} title={`${countNoun(ledger.total, ITEM)} — كلُّها تعمل كما اخترتَ أو مقفلةٌ بإقرارٍ قُدِّم`} />
+            <Callout tone="ok" icon={CircleCheck} title={`${countNoun(ledger.total, ITEM)} — كلّها تعمل كما اخترت أو مقفلة بإقرار قدّم`} />
           )}
 
           {ledger.byGroup.map((g) => (
@@ -122,7 +122,7 @@ export default async function ChoicesPage() {
           ))}
 
           {ledger.olderVatChoices.count > 0 && (
-            <Section title="اختياراتُ إقرارٍ أقدم" hint="أرباعٌ سابقة لا يُعاد حسابُها هنا — تُفتح من صفحة إقرارها.">
+            <Section title="اختيارات إقرار أقدم" hint="أرباع سابقة لا يعاد حسابها هنا — تفتح من صفحة إقرارها.">
               <div className="flex flex-wrap gap-2">
                 {ledger.olderVatChoices.quarters.map((q) => (
                   <LinkButton key={q.key} href={`/close/vat?period=${q.key}`} size="sm">{q.label}</LinkButton>

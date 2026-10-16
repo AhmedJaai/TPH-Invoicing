@@ -102,7 +102,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
     if (r.ok) setFeed((f) => (f ? { ...f, unread: 0, seenAt: r.data.seenAt } : f));
     else {
       setFeed(before);
-      setError(`لم تُعلَّم مقروءةً: ${r.error}`);
+      setError(`لم تعلّم مقروءةً: ${r.error}`);
     }
   }
 
@@ -130,7 +130,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
         open={open}
         onClose={() => setOpen(false)}
         title="الإشعارات"
-        description="ما تغيّر منذ آخر مرّة، وملخّصُ آخر ٢٤ ساعة."
+        description="ما تغيّر منذ آخر مرّة، وملخّص آخر ٢٤ ساعة."
         footer={
           <>
             <button type="button" onClick={() => void load()} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-ink-soft hover:bg-hover sm:min-h-8">
@@ -149,7 +149,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
         }
       >
         {/* زرّان بحالٍ مضغوطة لا «ألسنة»: نمطُ `tab` يَعِد بلوحٍ وأسهمٍ لم تكن */}
-        <div role="group" aria-label="أيَّ الإشعارات تعرض" className="mb-4 inline-flex rounded-lg bg-sunken p-1">
+        <div role="group" aria-label="أيّ الإشعارات تعرض" className="mb-4 inline-flex rounded-lg bg-sunken p-1">
           {([["new", "الجديد"], ["digest", "ملخّص اليوم"]] as const).map(([k, label]) => (
             <button
               key={k}
@@ -173,14 +173,14 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
         {!feed && !error && (
           <div className="space-y-2" aria-busy="true">
             {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-14" />)}
-            <span className="sr-only">يُحمّل…</span>
+            <span className="sr-only">يحمّل…</span>
           </div>
         )}
 
         {feed && tab === "new" && (
           feed.notices.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">
-              لم يقع شيءٌ في الأسبوعين الماضيين يستحقّ إشعاراً.
+              لم يقع شيء في الأسبوعين الماضيين يستحقّ إشعاراً.
             </p>
           ) : (
             <ul className="space-y-1">
@@ -221,18 +221,18 @@ function NoticeRow({ n, unread }: { n: Notice; unread: boolean }) {
 function DigestPanel({ feed }: { feed: NoticeFeed }) {
   const d = feed.digest;
   const rows: { label: string; n: number; href: string }[] = [
-    { label: "مستنداتٌ وصلت", n: d.documentsArrived, href: "/documents" },
-    { label: "أُرشِفت وقُيِّدت", n: d.documentsArchived, href: "/documents" },
+    { label: "مستندات وصلت", n: d.documentsArrived, href: "/documents" },
+    { label: "أرشفت وقيّدت", n: d.documentsArchived, href: "/documents" },
     { label: "تنتظر مراجعتك الآن", n: d.needsReview, href: "/documents" },
-    { label: "دفعاتٌ قُيِّدت", n: d.paymentsRecorded, href: "/bank" },
-    { label: "قراراتٌ حُسمت", n: d.decisionsTaken, href: "/settings/audit" },
+    { label: "دفعات قيّدت", n: d.paymentsRecorded, href: "/bank" },
+    { label: "قرارات حسمت", n: d.decisionsTaken, href: "/settings/audit" },
   ];
   const quiet = rows.every((r) => r.n === 0);
   return (
     <div>
       {quiet && (
         <p className="mb-3 rounded-lg bg-sunken px-3 py-2 text-xs text-muted">
-          يومٌ هادئ: لم يصل مستندٌ ولم يُحسم قرارٌ في آخر ٢٤ ساعة.
+          يوم هادئ: لم يصل مستند ولم يحسم قرار في آخر ٢٤ ساعة.
         </p>
       )}
       <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">

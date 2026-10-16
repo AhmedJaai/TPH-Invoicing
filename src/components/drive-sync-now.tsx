@@ -148,11 +148,11 @@ export function DriveSyncNow({
         tone: "ok",
         title: "تمّت المزامنة",
         body: o.newFiles === 0 && o.renamed.length === 0 && o.approved === 0
-          ? "لا جديد في الدرايف، وكلُّ ما أُرشِف على الصيغة."
+          ? "لا جديد في الدرايف، وكلّ ما أرشف على الصيغة."
           : [
-              o.newFiles > 0 ? `وُجد ${countNoun(o.newFiles, FILE)}` : null,
-              o.autoArchived > 0 ? `أُرشِف ${countNoun(o.autoArchived, DOCUMENT)}` : null,
-              o.renamed.length > 0 ? `سُمّي ${countNoun(o.renamed.length, FILE)}` : null,
+              o.newFiles > 0 ? `وجد ${countNoun(o.newFiles, FILE)}` : null,
+              o.autoArchived > 0 ? `أرشف ${countNoun(o.autoArchived, DOCUMENT)}` : null,
+              o.renamed.length > 0 ? `سمّي ${countNoun(o.renamed.length, FILE)}` : null,
             ].filter(Boolean).join(" · "),
       });
       router.refresh();
@@ -171,7 +171,7 @@ export function DriveSyncNow({
             <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold text-muted">حالُ المزامنة</p>
+            <p className="text-[11px] font-bold text-muted">حال المزامنة</p>
             <h2 id="sync-title" className={`mt-0.5 text-lg font-bold leading-snug ${tone.ink}`}>{headline}</h2>
             <p className="mt-1 text-xs leading-relaxed text-ink-soft">{detail}</p>
           </div>
@@ -191,7 +191,7 @@ export function DriveSyncNow({
             <button type="button" disabled className={buttonClass("secondary", "lg")}>زامن الآن</button>
           )}
           <p className="text-[11px] text-muted sm:text-end">
-            {canRun ? "فحصٌ وقراءةٌ وأرشفةٌ وتسمية — كما تفعل الآليّة." : state === "preview" ? "لا درايف في نسخة التجربة." : "يحتاج تفويضاً من جوجل أوّلاً."}
+            {canRun ? "فحص وقراءة وأرشفة وتسمية — كما تفعل الآليّة." : state === "preview" ? "لا درايف في نسخة التجربة." : "يحتاج تفويضاً من جوجل أوّلاً."}
           </p>
         </div>
       </div>
@@ -212,7 +212,7 @@ export function DriveSyncNow({
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sunken">
             <div className="upload-bar h-full w-1/3 rounded-full bg-accent" />
           </div>
-          <p className="mt-1.5 text-[11px] text-muted">قد يستغرق دقيقةً أو أكثر إن وُجدت ملفّاتٌ تُقرأ بمحتواها. لا تغلق الصفحة.</p>
+          <p className="mt-1.5 text-[11px] text-muted">قد يستغرق دقيقةً أو أكثر إن وجدت ملفّات تقرأ بمحتواها. لا تغلق الصفحة.</p>
         </div>
       )}
 
@@ -235,16 +235,16 @@ export function DriveSyncNow({
 
 function OutcomePanel({ o }: { o: Outcome }) {
   const rows: { label: string; value: string; href?: string; tone?: "ok" | "warn" }[] = [
-    { label: "ملفّاتٌ جديدة في الدرايف", value: o.newFiles === 0 ? "لا شيء" : countNoun(o.newFiles, FILE) },
-    { label: "أُرشِفت وحدها", value: String(o.autoArchived), tone: o.autoArchived > 0 ? "ok" : undefined },
+    { label: "ملفّات جديدة في الدرايف", value: o.newFiles === 0 ? "لا شيء" : countNoun(o.newFiles, FILE) },
+    { label: "أرشفت وحدها", value: String(o.autoArchived), tone: o.autoArchived > 0 ? "ok" : undefined },
     {
       label: "تنتظر مراجعتك",
       value: String(o.needsReview),
       href: o.needsReview > 0 ? "/documents?status=NEEDS_REVIEW" : undefined,
       tone: o.needsReview > 0 ? "warn" : undefined,
     },
-    { label: "اعتُمد ممّا تراكم", value: String(o.approved) },
-    { label: "سُمّيت على الصيغة", value: String(o.renamed.length), tone: o.renamed.length > 0 ? "ok" : undefined },
+    { label: "اعتمد ممّا تراكم", value: String(o.approved) },
+    { label: "سمّيت على الصيغة", value: String(o.renamed.length), tone: o.renamed.length > 0 ? "ok" : undefined },
   ];
   return (
     <div className="mt-4 rounded-xl border border-line bg-sunken/50 p-4">
@@ -263,7 +263,7 @@ function OutcomePanel({ o }: { o: Outcome }) {
       </dl>
       {o.remaining + o.remainingNamed > 0 && (
         <p className="mt-3 text-xs text-ink-soft">
-          وبقي {countNoun(o.remaining + o.remainingNamed, FILE)} لم يُسجَّل أو يُقرأ بعد — يُكمَل في المزامنة القادمة، أو اضغط «زامن الآن» ثانيةً.
+          وبقي {countNoun(o.remaining + o.remainingNamed, FILE)} لم يسجّل أو يقرأ بعد — يكمل في المزامنة القادمة، أو اضغط «زامن الآن» ثانيةً.
         </p>
       )}
       {o.failures > 0 && (

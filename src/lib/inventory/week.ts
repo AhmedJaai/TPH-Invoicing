@@ -39,7 +39,7 @@ export function dayOfWeek(date: string): number {
 
 /** الأسبوعُ الذي يقع فيه هذا اليوم: أحدُه وسبتُه. */
 export function weekOf(date: string): Week {
-  if (!DATE.test(date)) throw new Error("التاريخ يُكتب YYYY-MM-DD");
+  if (!DATE.test(date)) throw new Error("التاريخ يكتب YYYY-MM-DD");
   const start = addDays(date, -dayOfWeek(date));
   return { start, end: addDays(start, 6) };
 }

@@ -84,14 +84,14 @@ export default async function ExpensesPage({
   if (!month) {
     const pendingAll = await countUnrecordedBankExpenses();
     return (
-      <PageShell user={user} width="wide" title="المصروفات" intro="ما صُرف فعلاً في كلّ شهر، وأين، ومقابل ما كان متوقَّعاً.">
+      <PageShell user={user} width="wide" title="المصروفات" intro="ما صرف فعلاً في كلّ شهر، وأين، ومقابل ما كان متوقّعاً.">
         <EmptyState
           icon={Receipt}
-          title="لا مصروفات مقيَّدة بعد."
+          title="لا مصروفات مقيّدة بعد."
           hint={
             pendingAll.count > 0
-              ? `في كشف البنك ${countNoun(pendingAll.count, TRANSACTION)} من أبواب المصروف تنتظر أن تُقيَّد — قيّدها بضغطة، ثمّ أضِف ما دُفع نقداً.`
-              : "تُقيَّد المصروفات من كشف البنك بعد تصنيف حركاته، أو يدوياً لما دُفع نقداً. استورد الكشف أوّلاً إن لم تفعل."
+              ? `في كشف البنك ${countNoun(pendingAll.count, TRANSACTION)} من أبواب المصروف تنتظر أن تقيّد — قيّدها بضغطة، ثمّ أضف ما دفع نقداً.`
+              : "تقيّد المصروفات من كشف البنك بعد تصنيف حركاته، أو يدوياً لما دفع نقداً. استورد الكشف أوّلاً إن لم تفعل."
           }
           action={
             canEdit ? (
@@ -160,7 +160,7 @@ export default async function ExpensesPage({
       user={user}
       width="wide"
       title="المصروفات"
-      intro="ما صُرف فعلاً في الشهر، وأين، ومقابل ما كان متوقَّعاً. وسدادُ المورّدين ليس هنا — محسوبٌ في المشتريات."
+      intro="ما صرف فعلاً في الشهر، وأين، ومقابل ما كان متوقّعاً. وسداد المورّدين ليس هنا — محسوب في المشتريات."
       actions={actions}
     >
       {months.length > 1 && (
@@ -183,32 +183,32 @@ export default async function ExpensesPage({
             label={`الفعليّ في ${formatMonth(month)}`}
             minor={actualTotal}
             tone={incomplete ? "warn" : undefined}
-            note={incomplete ? `${countNoun(actual.length, ITEM)} — وناقصٌ منه ما لم يُقيَّد من الكشف` : countNoun(actual.length, ITEM)}
+            note={incomplete ? `${countNoun(actual.length, ITEM)} — وناقص منه ما لم يقيّد من الكشف` : countNoun(actual.length, ITEM)}
           />
           <Notice
             tone="accent"
             icon={Repeat}
-            title="لا مقارنةَ بالمتوقَّع بعد"
+            title="لا مقارنة بالمتوقّع بعد"
             action={<LinkButton href="/settings" variant="secondary" size="sm" icon={Settings}>سجّلها في الإعدادات</LinkButton>}
             className="h-full sm:items-center"
           >
-            سجّل الإيجار والرواتب والاشتراكات مصروفاتٍ متكرّرة، فيُقابَل بها الفعليُّ كلَّ شهر، ويظهر هنا ما تُوقّع ولم يُصرف.
+            سجّل الإيجار والرواتب والاشتراكات مصروفات متكرّرة، فيقابل بها الفعليّ كلّ شهر، ويظهر هنا ما توقّع ولم يصرف.
           </Notice>
         </div>
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
-          <Hero label="المتوقَّع شهرياً" minor={expectedTotal} note={countNoun(recurring.length, ITEM)} />
+          <Hero label="المتوقّع شهرياً" minor={expectedTotal} note={countNoun(recurring.length, ITEM)} />
           <Hero
             label={`الفعليّ في ${formatMonth(month)}`}
             minor={actualTotal}
             tone={incomplete ? "warn" : undefined}
-            note={incomplete ? `${countNoun(actual.length, ITEM)} — وناقصٌ منه ما لم يُقيَّد` : countNoun(actual.length, ITEM)}
+            note={incomplete ? `${countNoun(actual.length, ITEM)} — وناقص منه ما لم يقيّد` : countNoun(actual.length, ITEM)}
           />
           <Hero
             label="الفرق"
             minor={actualTotal - expectedTotal}
             tone={actualTotal > expectedTotal ? "warn" : "ok"}
-            note={incomplete ? "والفعليُّ ناقص، فالفرقُ مؤقّت" : actualTotal > expectedTotal ? "صُرف أكثر ممّا تُوقّع" : "صُرف أقلّ ممّا تُوقّع"}
+            note={incomplete ? "والفعليّ ناقص، فالفرق مؤقّت" : actualTotal > expectedTotal ? "صرف أكثر ممّا توقّع" : "صرف أقلّ ممّا توقّع"}
           />
         </div>
       )}
@@ -220,10 +220,10 @@ export default async function ExpensesPage({
             <Notice
               tone="warn"
               icon={TriangleAlert}
-              title={`في الكشف ${countNoun(pending.count, TRANSACTION)} من أبواب المصروف لم تُقيَّد بعد`}
+              title={`في الكشف ${countNoun(pending.count, TRANSACTION)} من أبواب المصروف لم تقيّد بعد`}
               action={canEdit ? <DeriveExpenses month={month} variant="primary" label="قيّدها الآن" /> : undefined}
             >
-              فالفعليّ في {formatMonth(month)} أقلّ من الواقع بـ<Money minor={pending.amountMinor} /> ريالاً. ولا يُعدّ هنا سدادُ المورّدين ولا ما يقول وصفُه شراءَ بضاعة.
+              فالفعليّ في {formatMonth(month)} أقلّ من الواقع بـ<Money minor={pending.amountMinor} /> ريالاً. ولا يعدّ هنا سداد المورّدين ولا ما يقول وصفه شراء بضاعة.
             </Notice>
           )}
 
@@ -232,8 +232,8 @@ export default async function ExpensesPage({
               <header className="flex items-start gap-3 px-4 py-3">
                 <Copy className="mt-0.5 h-[18px] w-[18px] shrink-0 text-danger" strokeWidth={2} aria-hidden />
                 <div className="min-w-0 text-xs leading-relaxed text-ink-soft">
-                  <h2 id="dup-title" className="text-[13px] font-bold text-danger">مصروفٌ وصل مرّتين — {countNoun(duplicates.length, ITEM)}</h2>
-                  الحدث نفسه قُيّد من مصدرين، فعلا مصروفُ الشهر بقدر الزائد. أبقِ واحداً واحذف الآخر — وما اشتُقّ من كشف البنك يبقى، لأنّ الاشتقاق يعيده.
+                  <h2 id="dup-title" className="text-[13px] font-bold text-danger">مصروف وصل مرّتين — {countNoun(duplicates.length, ITEM)}</h2>
+                  الحدث نفسه قيّد من مصدرين، فعلا مصروف الشهر بقدر الزائد. أبق واحداً واحذف الآخر — وما اشتقّ من كشف البنك يبقى، لأنّ الاشتقاق يعيده.
                 </div>
               </header>
               <ul className="space-y-2 px-3 pb-3">
@@ -251,7 +251,7 @@ export default async function ExpensesPage({
                             <SourceBadge source={e.source} />
                             <span className="font-bold text-ink"><Money minor={e.amountMinor} /></span>
                             {e.bankTransactionId && (
-                              <Link href={txHref(e.bankTransactionId)} className="inline-flex min-h-11 items-center font-bold text-accent hover:underline sm:min-h-0">حركتُه</Link>
+                              <Link href={txHref(e.bankTransactionId)} className="inline-flex min-h-11 items-center font-bold text-accent hover:underline sm:min-h-0">حركته</Link>
                             )}
                           </span>
                           {canEdit && deletableExpense(e)
@@ -271,7 +271,7 @@ export default async function ExpensesPage({
               <header className="flex items-start gap-3 px-4 py-3">
                 <Store className="mt-0.5 h-[18px] w-[18px] shrink-0 text-danger" strokeWidth={2} aria-hidden />
                 <div className="min-w-0 text-xs leading-relaxed text-ink-soft">
-                  <h2 id="sus-title" className="text-[13px] font-bold text-danger">مصروفاتٌ تحمل أسماء مورّدين — {countNoun(suspects.length, ITEM)}</h2>
+                  <h2 id="sus-title" className="text-[13px] font-bold text-danger">مصروفات تحمل أسماء مورّدين — {countNoun(suspects.length, ITEM)}</h2>
                   إن كانت مشتريات فهي محسوبة مرّتين: في المشتريات وهنا. صنّفها سداد مورّد، فيسري ذلك على أمثالها بلا سؤال.
                 </div>
               </header>
@@ -295,10 +295,10 @@ export default async function ExpensesPage({
             <Notice
               tone="warn"
               icon={CalendarClock}
-              title={`متوقَّعٌ لم يُصرف في ${formatMonth(month)} — ${countNoun(unmet.length, ITEM)}`}
+              title={`متوقّع لم يصرف في ${formatMonth(month)} — ${countNoun(unmet.length, ITEM)}`}
               action={canEdit ? <ManualExpense variant="secondary" /> : undefined}
             >
-              تتكرّر عادةً ولم يُقيَّد لها صرفٌ هذا الشهر: قد تكون دُفعت نقداً ولم تُسجَّل، وقد تكون نُسيت.
+              تتكرّر عادةً ولم يقيّد لها صرف هذا الشهر: قد تكون دفعت نقداً ولم تسجّل، وقد تكون نسيت.
               <ul className="mt-2 divide-y divide-warn/15">
                 {unmet.map((r) => (
                   <li key={r.id} className="flex items-center justify-between gap-3 py-1.5">
@@ -314,9 +314,9 @@ export default async function ExpensesPage({
 
       <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
         {/* ── أين ذهب مصروفُ الشهر ── */}
-        <Section title="الأبواب" icon={PieChart} className="mt-0!" hint={`مصروفُ ${formatMonth(month)} بأبوابه — من القيود أدناه.`}>
+        <Section title="الأبواب" icon={PieChart} className="mt-0!" hint={`مصروف ${formatMonth(month)} بأبوابه — من القيود أدناه.`}>
           {categories.length === 0 ? (
-            <EmptyState compact title="لا قيود في هذا الشهر." hint="قيّد من كشف البنك أو أضِف ما دُفع نقداً." />
+            <EmptyState compact title="لا قيود في هذا الشهر." hint="قيّد من كشف البنك أو أضف ما دفع نقداً." />
           ) : (
             <div className="rounded-2xl border border-line bg-raised p-3 shadow-raised">
               <BarList
@@ -331,13 +331,13 @@ export default async function ExpensesPage({
           */}
           {expectedTotal > 0 && variance.length > 0 && (
             <div className="mt-6">
-              <h3 className="mb-2 text-[13px] font-bold">المتوقَّع مقابل الفعليّ</h3>
+              <h3 className="mb-2 text-[13px] font-bold">المتوقّع مقابل الفعليّ</h3>
               <DataTable
                 rows={variance}
                 keyOf={(v) => v.category}
                 columns={[
                   { key: "category", header: "الباب", primary: true, cell: (v) => v.label },
-                  { key: "expected", header: "المتوقَّع", numeric: true, cell: (v) => v.expectedMinor === 0 ? <span className="text-muted">لم يُتوقَّع</span> : <Money minor={v.expectedMinor} /> },
+                  { key: "expected", header: "المتوقّع", numeric: true, cell: (v) => v.expectedMinor === 0 ? <span className="text-muted">لم يتوقّع</span> : <Money minor={v.expectedMinor} /> },
                   { key: "actual", header: "الفعليّ", numeric: true, cell: (v) => <Money minor={v.actualMinor} /> },
                   {
                     key: "variance", header: "الفرق", numeric: true,
@@ -356,7 +356,7 @@ export default async function ExpensesPage({
             keyOf={(e) => e.id}
             searchOf={(e) => `${CATEGORY_LABEL[e.category] ?? ""} ${e.label} ${formatDay(e.occurredOn)} ${SOURCE_LABEL[e.source]}`}
             searchLabel="ابحث في قيود الشهر"
-            empty={<EmptyState compact title="لا قيود في هذا الشهر." hint="قيّد من كشف البنك أو أضِف ما دُفع نقداً." />}
+            empty={<EmptyState compact title="لا قيود في هذا الشهر." hint="قيّد من كشف البنك أو أضف ما دفع نقداً." />}
             columns={[
               {
                 key: "what", header: "البند", primary: true,
@@ -379,7 +379,7 @@ export default async function ExpensesPage({
                 cell: (e) => (
                   <span className="inline-flex flex-wrap items-center gap-1">
                     <SourceBadge source={e.source} />
-                    {e.recurringExpenseId && <Badge tone="info">مربوطٌ بمتوقَّع</Badge>}
+                    {e.recurringExpenseId && <Badge tone="info">مربوط بمتوقّع</Badge>}
                   </span>
                 ),
               },
@@ -400,7 +400,7 @@ export default async function ExpensesPage({
 const SOURCE_LABEL: Record<Expense["source"], string> = {
   BANK: "من كشف البنك",
   INVOICE: "من فاتورة",
-  MANUAL: "قيدٌ يدويّ",
+  MANUAL: "قيد يدويّ",
 };
 
 const SOURCE_TONE: Record<Expense["source"], Tone | undefined> = {

@@ -142,7 +142,7 @@ export async function POST(request: Request) {
   if (rows.length > 1) {
     if (!groupKey || identities.some((i) => i?.key !== groupKey)) {
       return NextResponse.json({
-        error: "هذه الحركات لا يجمعها مستفيدٌ ولا نمطٌ واحد — تُؤكَّد كلٌّ على حدة",
+        error: "هذه الحركات لا يجمعها مستفيد ولا نمط واحد — تؤكّد كلّ على حدة",
       }, { status: 409 });
     }
   }
@@ -179,7 +179,7 @@ export async function POST(request: Request) {
     });
 
     /* ── ٢. تُنسَب المجموعة إلى جهتها، وبأثرٍ مسجَّل ── */
-    const reason = `أكّدتَها بنفسك${identities[0] ? ` — ${identities[0].label}` : ""}`;
+    const reason = `أكّدتها بنفسك${identities[0] ? ` — ${identities[0].label}` : ""}`;
 
     /*
       والقرارُ القديم يُطوى مع الجواب.
@@ -288,7 +288,7 @@ export async function POST(request: Request) {
     console.error("counterparty:", err.cause ?? err);
     const code = err.cause?.code ? ` (رمز ${err.cause.code})` : "";
     return NextResponse.json(
-      { error: `تعذّر حفظ التعريف، ولم يُكتب منه شيء — أعد المحاولة${code}` },
+      { error: `تعذّر حفظ التعريف، ولم يكتب منه شيء — أعد المحاولة${code}` },
       { status: 500 },
     );
   }
@@ -317,11 +317,11 @@ export async function POST(request: Request) {
   /* المصروفُ يتبع التصنيفَ الجديد في شهره — يُقيَّد أو يُصحَّح بابُه وحده */
   const derived = await deriveOpenMonths(rows.map((r) => monthOf(r.valueDate)), user.id);
 
-  const parts = [`حُفظت «${party?.name}»`];
-  parts.push(`وطُبّقت على ${countNoun(rows.length, TRANSACTION)}`);
-  if (derived.created > 0) parts.push(`وقُيّد ${countNoun(derived.created, TRANSACTION)} مصروفاً`);
+  const parts = [`حفظت «${party?.name}»`];
+  parts.push(`وطبّقت على ${countNoun(rows.length, TRANSACTION)}`);
+  if (derived.created > 0) parts.push(`وقيّد ${countNoun(derived.created, TRANSACTION)} مصروفاً`);
   if (result.conflicts.length > 0) {
-    parts.push(`ودليلٌ أو أكثر (${result.conflicts.length}) يدلّ على جهةٍ أخرى — راجعها`);
+    parts.push(`ودليل أو أكثر (${result.conflicts.length}) يدلّ على جهة أخرى — راجعها`);
   }
 
   return NextResponse.json({

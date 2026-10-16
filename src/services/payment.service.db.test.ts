@@ -15,8 +15,8 @@ async function livePayments(tx: Tx, supplierId: string) {
     .where(and(eq(payments.supplierId, supplierId), sql`${payments.status} not in ('REVERSED','VOID')`));
 }
 
-describe("createPayment — الواقعة الواحدة لا تُقيَّد دفعتين", () => {
-  it("توأمٌ بنفس المورّد واليوم والمبلغ بلا إقرار ← PaymentTwinError، ولا يُكتب شيء", () =>
+describe("createPayment — الواقعة الواحدة لا تقيّد دفعتين", () => {
+  it("توأم بنفس المورّد واليوم والمبلغ بلا إقرار ← PaymentTwinError، ولا يكتب شيء", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       const first = await createPayment(tx, {
@@ -31,7 +31,7 @@ describe("createPayment — الواقعة الواحدة لا تُقيَّد د
       expect(await livePayments(tx, supplierId)).toHaveLength(1);
     }));
 
-  it("ومع الإقرار بأنّها واقعةٌ أخرى تُنشأ الثانية — بيكوف يُدفَع له مرّتين حقيقةً", () =>
+  it("ومع الإقرار بأنّها واقعة أخرى تنشأ الثانية — بيكوف يدفع له مرّتين حقيقةً", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       const input = { supplierId, paidAt: day("2026-08-25"), amountMinor: 150_00, method: "BANK_TRANSFER" as const };
@@ -42,7 +42,7 @@ describe("createPayment — الواقعة الواحدة لا تُقيَّد د
 });
 
 describe("recordBankPayment — الكشف يتبنّى ولا ينسخ", () => {
-  it("قيدٌ يدويّ قبل الحوالة بخمسة أيّام يُتبنّى، ويأخذ تاريخ الكشف، ولا تُنشأ ثانية", () =>
+  it("قيد يدويّ قبل الحوالة بخمسة أيّام يتبنّى، ويأخذ تاريخ الكشف، ولا تنشأ ثانية", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       const manual = await createPayment(tx, {
@@ -60,7 +60,7 @@ describe("recordBankPayment — الكشف يتبنّى ولا ينسخ", () => 
       expect(rows[0].paidAt.toISOString().slice(0, 10)).toBe("2026-08-25");
     }));
 
-  it("ولا يتبنّى ما بعُد أكثر من أسبوعين — تلك واقعةٌ أخرى", () =>
+  it("ولا يتبنّى ما بعد أكثر من أسبوعين — تلك واقعة أخرى", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       await createPayment(tx, {
@@ -75,7 +75,7 @@ describe("recordBankPayment — الكشف يتبنّى ولا ينسخ", () => 
 });
 
 describe("التخصيص فوق الفاتورة — القاعدة ترفضه (026)", () => {
-  it("دفعتان بثلاثة آلاف على فاتورةٍ بثلاثة آلاف ← الثانية تُرَدّ بقيد الفاتورة", () =>
+  it("دفعتان بثلاثة آلاف على فاتورة بثلاثة آلاف ← الثانية تردّ بقيد الفاتورة", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       const invoiceId = await makeInvoice(tx, supplierId, 3_000_00, "2026-08-10");
@@ -98,8 +98,8 @@ describe("التخصيص فوق الفاتورة — القاعدة ترفضه (
     }));
 });
 
-describe("allocate — مبلغُ الدفعة من القاعدة لا من المستدعي", () => {
-  it("رقمٌ خاطئ يمرّره المستدعي (صفر) لا يُصفّر القابلَ للتخصيص", () =>
+describe("allocate — مبلغ الدفعة من القاعدة لا من المستدعي", () => {
+  it("رقم خاطئ يمرّره المستدعي (صفر) لا يصفّر القابل للتخصيص", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       const invoiceId = await makeInvoice(tx, supplierId, 1_000_00, "2026-08-10");
@@ -110,7 +110,7 @@ describe("allocate — مبلغُ الدفعة من القاعدة لا من ا�
       expect(out.allocatedMinor).toBe(1_000_00);
     }));
 
-  it("ولا يُخصَّص فوق صافي الدفعة ولو قال المستدعي إنّها أكبر", () =>
+  it("ولا يخصّص فوق صافي الدفعة ولو قال المستدعي إنّها أكبر", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       const invoiceId = await makeInvoice(tx, supplierId, 1_000_00, "2026-08-10");
@@ -129,7 +129,7 @@ async function someUser(tx: Tx): Promise<string> {
 }
 
 describe("reversePayment — تحرس نفسها", () => {
-  it("ردٌّ ثانٍ لا يكتب: يبقى الحالُ والسببُ الأوّلان", () =>
+  it("ردّ ثان لا يكتب: يبقى الحال والسبب الأوّلان", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       const invoiceId = await makeInvoice(tx, supplierId, 500_00, "2026-08-10");
@@ -143,14 +143,14 @@ describe("reversePayment — تحرس نفسها", () => {
       expect(first.alreadyReversed).toBe(false);
       expect(first.freedMinor).toBe(500_00);
 
-      const second = await reversePayment(tx, { paymentId: pay, kind: "VOID", reason: "ضغطةٌ ثانية", userId });
+      const second = await reversePayment(tx, { paymentId: pay, kind: "VOID", reason: "ضغطة ثانية", userId });
       expect(second).toMatchObject({ alreadyReversed: true, status: "REVERSED", freedMinor: 0, reason: "ارتدّت الحوالة" });
       const [row] = await tx.select({ status: payments.status, reason: payments.reversalReason, voidedAt: payments.voidedAt })
         .from(payments).where(eq(payments.id, pay));
       expect(row).toEqual({ status: "REVERSED", reason: "ارتدّت الحوالة", voidedAt: null });
     }));
 
-  it("دفعةٌ على فاتورةِ شهرٍ مقفل لا تُردّ — MonthClosedError، والتخصيصُ باقٍ", () =>
+  it("دفعة على فاتورة شهر مقفل لا تردّ — MonthClosedError، والتخصيص باق", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       const invoiceId = await makeInvoice(tx, supplierId, 500_00, "2026-07-10");

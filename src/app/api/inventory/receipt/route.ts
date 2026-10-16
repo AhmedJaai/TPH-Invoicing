@@ -50,7 +50,7 @@ export async function POST(request: Request) {
           note: body.note,
           resolution: body.resolution ?? null,
         }, user.id);
-        return NextResponse.json({ ok: true, receiptId: id, message: "قُيّدت الكمّيّةُ المستلَمة — ودخلت حسابَ الجرد." });
+        return NextResponse.json({ ok: true, receiptId: id, message: "قيّدت الكمّيّة المستلمة — ودخلت حساب الجرد." });
       }
       case "update": {
         await updateReceipt(body.receiptId, {
@@ -62,19 +62,19 @@ export async function POST(request: Request) {
           costMinor: body.cost,
           note: body.note,
         }, user.id);
-        return NextResponse.json({ ok: true, message: "عُدّل الاستلام — وما كان مكتوبٌ في سجلّ التدقيق." });
+        return NextResponse.json({ ok: true, message: "عدّل الاستلام — وما كان مكتوب في سجلّ التدقيق." });
       }
       case "void": {
         await voidReceipt(body.receiptId, body.reason, user.id);
-        return NextResponse.json({ ok: true, message: "أُلغي الاستلام — ويبقى في السجلّ بسببه." });
+        return NextResponse.json({ ok: true, message: "ألغي الاستلام — ويبقى في السجلّ بسببه." });
       }
       case "resolve": {
         await resolveReceipt(body.receiptId, body.resolution, user.id);
         return NextResponse.json({
           ok: true,
           message: body.resolution.kind === "LINK"
-            ? "رُبط الاستلامُ ببند الفاتورة — ويُحسَب مرّةً واحدة."
-            : "أُكّد أنّهما شحنتان — ويُحسَب الاثنان.",
+            ? "ربط الاستلام ببند الفاتورة — ويحسب مرّةً واحدة."
+            : "أكّد أنّهما شحنتان — ويحسب الاثنان.",
         });
       }
     }
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     const lockMessage = lockedWeekMessage(e);
     if (code === "23514" && lockMessage) return NextResponse.json({ error: lockMessage }, { status: 409 });
     if (code === "23505") {
-      return NextResponse.json({ error: "هذا البندُ مرتبطٌ باستلامٍ آخر — والبندُ الواحد لا يمثّل شحنتين." }, { status: 409 });
+      return NextResponse.json({ error: "هذا البند مرتبط باستلام آخر — والبند الواحد لا يمثّل شحنتين." }, { status: 409 });
     }
     return failWith(e, "inventory-receipt");
   }
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
 function lockedWeekMessage(e: unknown): string | null {
   const err = e as { message?: unknown; cause?: { message?: unknown } } | null;
   for (const m of [err?.cause?.message, err?.message]) {
-    if (typeof m === "string" && m.includes("جردُه مقفَل")) return m.slice(m.indexOf("هذا"));
+    if (typeof m === "string" && m.includes("جرده مقفل")) return m.slice(m.indexOf("هذا"));
   }
   return null;
 }

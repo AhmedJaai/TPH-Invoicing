@@ -41,11 +41,11 @@ export function DocumentsBulk() {
     if (ok > 0) {
       toast({
         tone: failed.length > 0 ? "warn" : "ok",
-        title: `اعتُمد ${countNoun(ok, DOCUMENT)}`,
+        title: `اعتمد ${countNoun(ok, DOCUMENT)}`,
         body: [
-          "دخلت فواتيرُها المستحقَّ، وخُصم منها ما دُفع للمورّد مقدَّماً",
-          failed.length > 0 ? `ورُدّ ${failed.length} — أسبابُها في الشريط` : null,
-          done < selected.length ? `وأوقفتَ قبل ${selected.length - done}` : null,
+          "دخلت فواتيرها المستحقّ، وخصم منها ما دفع للمورّد مقدّماً",
+          failed.length > 0 ? `وردّ ${failed.length} — أسبابها في الشريط` : null,
+          done < selected.length ? `وأوقفت قبل ${selected.length - done}` : null,
         ].filter(Boolean).join(" · "),
       });
       router.refresh();
@@ -66,11 +66,11 @@ export function DocumentsBulk() {
             className={buttonClass("primary", "sm")}
           >
             <Check className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-            {ACT.approveDocument}{selected.length > 1 ? " — كلَّ المحدَّد" : ""}
+            {ACT.approveDocument}{selected.length > 1 ? " — كلّ المحدّد" : ""}
           </button>
           {progress && (
             <span role="status" className="flex items-center gap-2 text-xs font-bold text-ink-soft">
-              يُعتمَد <span className="nums nums-count">{progress.done + 1}</span> من <span className="nums nums-count">{progress.total}</span>
+              يعتمد <span className="nums nums-count">{progress.done + 1}</span> من <span className="nums nums-count">{progress.total}</span>
               <button type="button" onClick={() => { stop.current = true; }} className="min-h-8 text-accent hover:underline">أوقف بعد الحاليّ</button>
             </span>
           )}

@@ -22,7 +22,7 @@ export function PostAction({
   children,
   variant = "secondary",
   size = "sm",
-  done = "حُفظ",
+  done = "حفظ",
   disabled,
   reason,
   label,

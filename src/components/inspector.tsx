@@ -94,7 +94,7 @@ export function InspectorPanel({
       go();
       return;
     }
-    setHeld({ what: dirty.dataset.dirty || "ما كتبتَه", go });
+    setHeld({ what: dirty.dataset.dirty || "ما كتبته", go });
   }, []);
 
   const close = useCallback(() => guarded(() => leave(() => router.back())), [guarded, leave, router]);
@@ -323,10 +323,10 @@ export function InspectorPanel({
           </div>
         </header>
         {held && (
-          <div role="alertdialog" aria-label="لم يُحفَظ بعد" className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-warn/30 bg-warn-bg px-4 py-2.5 text-xs sm:px-6">
-            <p className="min-w-0 flex-1 basis-48 font-bold text-ink">عندك «{held.what}» لم يُحفَظ — إن تركتَه ضاع ما كتبت.</p>
+          <div role="alertdialog" aria-label="لم يحفظ بعد" className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-warn/30 bg-warn-bg px-4 py-2.5 text-xs sm:px-6">
+            <p className="min-w-0 flex-1 basis-48 font-bold text-ink">عندك «{held.what}» لم يحفظ — إن تركته ضاع ما كتبت.</p>
             <button type="button" autoFocus onClick={() => setHeld(null)} className="min-h-9 rounded-lg bg-accent px-3 font-bold text-accent-ink hover:bg-accent-strong">
-              ابقَ وأكمِل
+              ابق وأكمل
             </button>
             <button type="button" onClick={() => { const go = held.go; setHeld(null); go(); }} className="min-h-9 rounded-lg border border-line-input bg-raised px-3 font-bold text-ink hover:bg-hover">
               اترك ما كتبت
@@ -365,7 +365,7 @@ export function InspectorSkeleton({ title }: { title: string }) {
           </div>
         ))}
       </div>
-      <span className="sr-only">يُحمّل…</span>
+      <span className="sr-only">يحمّل…</span>
     </InspectorPanel>
   );
 }

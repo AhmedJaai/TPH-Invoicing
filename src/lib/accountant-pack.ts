@@ -81,7 +81,7 @@ const UNKNOWN = "غير معروف";
 const riyals = (minor: number): Cell => ({ riyals: formatRiyals(minor) });
 const maybe = (minor: number | null): Cell => (minor === null ? UNKNOWN : riyals(minor));
 
-export const SOURCE_LABEL: Record<string, string> = { BANK: "كشف البنك", INVOICE: "فاتورة", MANUAL: "إدخالٌ يدويّ" };
+export const SOURCE_LABEL: Record<string, string> = { BANK: "كشف البنك", INVOICE: "فاتورة", MANUAL: "إدخال يدويّ" };
 
 export function categoryLabel(c: string): string {
   const labels: Readonly<Record<string, string>> = CATEGORY_LABEL satisfies Record<TxCategory, string>;
@@ -89,8 +89,8 @@ export function categoryLabel(c: string): string {
 }
 
 export const INPUT_VAT_LABEL: Record<InputVatStatus, string> = {
-  ELIGIBLE: "تُخصم",
-  NOT_ELIGIBLE: "لا تُخصم",
+  ELIGIBLE: "تخصم",
+  NOT_ELIGIBLE: "لا تخصم",
   UNKNOWN,
 };
 
@@ -211,17 +211,17 @@ export function buildAccountantPack(p: PackInput): Sheet[] {
   const summary: Cell[][] = [
     ["حزمة المحاسب", p.monthLabel],
     ["الشهر", p.month],
-    ["حالُ الشهر", p.closed ? "مُقفَل" : "مفتوح — قد تتغيّر أرقامه"],
-    ["أُعدّت في", p.generatedAt],
+    ["حال الشهر", p.closed ? "مقفل" : "مفتوح — قد تتغيّر أرقامه"],
+    ["أعدّت في", p.generatedAt],
     [],
     ["المشتريات"],
     ["عدد الفواتير", { count: s.invoiceCount }],
     ["مجموع الفواتير", riyals(s.invoicesTotalMinor)],
     ["الضريبة المقروءة", riyals(s.vatKnownMinor)],
-    ["فواتير ضريبتُها غير مقروءة", { count: s.vatUnknownCount }],
+    ["فواتير ضريبتها غير مقروءة", { count: s.vatUnknownCount }],
     /* حكمُ النظام على الفواتير وحده — رقمُ الإقرار يضيف ما أُقرّ بيد وضريبةَ الرسوم وما اختير من الكشف */
-    ["ضريبة الفواتير المستوفية (حكم النظام — رقمُ الإقرار في سجلّه)", riyals(s.deductibleVatMinor)],
-    ["ما سُدّد منها", riyals(s.paidMinor)],
+    ["ضريبة الفواتير المستوفية (حكم النظام — رقم الإقرار في سجلّه)", riyals(s.deductibleVatMinor)],
+    ["ما سدّد منها", riyals(s.paidMinor)],
     ["ما بقي عليها", riyals(s.openMinor)],
     [],
     ["المال"],
@@ -230,13 +230,13 @@ export function buildAccountantPack(p: PackInput): Sheet[] {
     ["المصروفات", riyals(s.expensesMinor)],
     ["وارد البنك", riyals(s.bankInMinor)],
     ["صادر البنك", riyals(s.bankOutMinor)],
-    ["صادرٌ بلا تفسير (غير مصنَّف أو لمورّدٍ بلا دفعة)", { count: s.bankUnexplainedCount }],
+    ["صادر بلا تفسير (غير مصنّف أو لمورّد بلا دفعة)", { count: s.bankUnexplainedCount }],
     [],
-    ["ملاحظة", "الإيرادُ ليس في هذه الحزمة: ضريبةُ المخرجات وحسابُ الإقرار في «سجلّ الإقرار» من صفحة إقرار الضريبة. والمجهولُ مكتوبٌ «غير معروف» لا صفراً."],
+    ["ملاحظة", "الإيراد ليس في هذه الحزمة: ضريبة المخرجات وحساب الإقرار في «سجلّ الإقرار» من صفحة إقرار الضريبة. والمجهول مكتوب «غير معروف» لا صفراً."],
   ];
 
   const invoices: Cell[][] = [
-    ["رقم الفاتورة", "التاريخ", "المورّد", "الرقم الضريبي للمورّد", "قبل الضريبة", "الضريبة", "الإجمالي", "حالها الضريبي", "ضريبة المدخلات", "المسدَّد", "الباقي"],
+    ["رقم الفاتورة", "التاريخ", "المورّد", "الرقم الضريبي للمورّد", "قبل الضريبة", "الضريبة", "الإجمالي", "حالها الضريبي", "ضريبة المدخلات", "المسدّد", "الباقي"],
     ...p.invoices.map((i) => [
       i.number,
       i.date,
@@ -256,7 +256,7 @@ export function buildAccountantPack(p: PackInput): Sheet[] {
     INPUT_VAT_LABEL[v.status],
     { count: v.count },
     riyals(v.vatKnownMinor),
-    v.unknownVat > 0 ? `منها ${v.unknownVat} ضريبتُها غير مقروءة` : "",
+    v.unknownVat > 0 ? `منها ${v.unknownVat} ضريبتها غير مقروءة` : "",
   ]);
   const vat: Cell[][] = [["ضريبة المدخلات", "عدد الفواتير", "الضريبة المقروءة", "ملاحظة"], ...vatRows];
 
@@ -280,7 +280,7 @@ export function buildAccountantPack(p: PackInput): Sheet[] {
   ];
 
   const bank: Cell[][] = [
-    ["التاريخ", "البيان", "الاتّجاه", "المبلغ", "الباب", "مطابَقة"],
+    ["التاريخ", "البيان", "الاتّجاه", "المبلغ", "الباب", "مطابقة"],
     ...p.bank.map((b) => [
       b.date,
       b.description,

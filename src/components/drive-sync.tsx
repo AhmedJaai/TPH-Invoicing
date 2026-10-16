@@ -146,7 +146,7 @@ export function DriveSync() {
         if (!json) {
           throw new Error(
             res.status === 504 || /timeout|timed out/i.test(text)
-              ? "استغرقت القراءة أكثر من المسموح. جرّب بلا «الأرشيف كله»، أو أعد المحاولة — يُستأنف من حيث وقف."
+              ? "استغرقت القراءة أكثر من المسموح. جرّب بلا «الأرشيف كله»، أو أعد المحاولة — يستأنف من حيث وقف."
               : `تعذّرت المزامنة (${res.status}). ${text.slice(0, 120)}`,
           );
         }
@@ -270,7 +270,7 @@ export function DriveSync() {
         if (apply) {
           toast({
             tone: "ok",
-            title: "سُجّل الجديد من الدرايف",
+            title: "سجّل الجديد من الدرايف",
             body: `دخل وحده ${countNoun(tally.auto, FILE)}${tally.review > 0 ? ` · ينتظر مراجعتك ${countNoun(tally.review, FILE)}` : ""}`,
           });
           router.refresh();
@@ -292,9 +292,9 @@ export function DriveSync() {
             <FolderSync className="h-4 w-4" strokeWidth={2} aria-hidden />
           </span>
           <div className="min-w-0">
-            <p className="text-sm font-bold">ملفّاتٌ جديدة في الدرايف</p>
+            <p className="text-sm font-bold">ملفّات جديدة في الدرايف</p>
             <p className="mt-0.5 text-xs leading-relaxed text-muted">
-              يقارن الدرايف بالمسجَّل ويعرض ما لا سجلّ له — ولا يُسجَّل شيءٌ حتى تضغط «سجّل الجديد».
+              يقارن الدرايف بالمسجّل ويعرض ما لا سجلّ له — ولا يسجّل شيء حتى تضغط «سجّل الجديد».
             </p>
           </div>
         </div>
@@ -321,8 +321,8 @@ export function DriveSync() {
           <div className="min-w-0">
             <h3 className="text-sm font-bold">مزامنة الدرايف</h3>
             <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
-              يقارن ملفات الدرايف بما هو مسجّل عندنا، ويضيف ما لا سجلّ له — كملفٍّ وضعتَه بيدك.
-              لا يعيد قراءة ما قُرئ، ولا حذف ولا نقل.
+              يقارن ملفات الدرايف بما هو مسجّل عندنا، ويضيف ما لا سجلّ له — كملفّ وضعته بيدك.
+              لا يعيد قراءة ما قرئ، ولا حذف ولا نقل.
             </p>
           </div>
         </div>
@@ -362,7 +362,7 @@ export function DriveSync() {
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="النطاق" value={s.scope} />
             <Stat label="ملفات جديدة" value={String(s.newFiles)} tone={s.newFiles ? "warn" : "ok"} />
-            <Stat label="فُهم اسمها" value={String(s.understoodByName)} />
+            <Stat label="فهم اسمها" value={String(s.understoodByName)} />
             <Stat
               label="تحتاج قراءة محتوى"
               value={String(s.needContentReading)}
@@ -373,8 +373,8 @@ export function DriveSync() {
           {result?.applied && (
             <p className="mt-3 flex items-start gap-2 rounded-lg border border-ok/25 bg-ok-bg px-3 py-2 text-xs font-bold text-ok">
               <CircleCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-              سُجّل {s.created ?? 0} مستنداً، منها {countNoun(s.invoicesCreated ?? 0, INVOICE)}
-              {s.contentRead ? ` · قُرئ محتوى ${s.contentRead}` : ""}
+              سجّل {s.created ?? 0} مستنداً، منها {countNoun(s.invoicesCreated ?? 0, INVOICE)}
+              {s.contentRead ? ` · قرئ محتوى ${s.contentRead}` : ""}
               {s.remainingUnnamed ? ` · بقي ${countNoun(s.remainingUnnamed, FILE)} يحتاج قراءة` : ""}
             </p>
           )}
@@ -387,10 +387,10 @@ export function DriveSync() {
           */}
           {result?.backlog && (result.backlog.recorded > 0 || result.backlog.approved > 0) && (
             <p className="mt-2 rounded-lg bg-ok-bg px-3 py-2 text-[11px] font-bold text-ok">
-              استُدرك ما تراكم:
-              {result.backlog.recorded > 0 && ` قُيِّدت ${countNoun(result.backlog.recorded, INVOICE)} من قراءتها المحفوظة`}
+              استدرك ما تراكم:
+              {result.backlog.recorded > 0 && ` قيّدت ${countNoun(result.backlog.recorded, INVOICE)} من قراءتها المحفوظة`}
               {result.backlog.recorded > 0 && result.backlog.approved > 0 && " ·"}
-              {result.backlog.approved > 0 && ` اعتُمد ${countNoun(result.backlog.approved, FILE)} تجتمع فيه الشروط`}
+              {result.backlog.approved > 0 && ` اعتمد ${countNoun(result.backlog.approved, FILE)} تجتمع فيه الشروط`}
             </p>
           )}
           {result?.applied && ((s.autoArchived ?? 0) > 0 || (s.needsReview ?? 0) > 0) && (
@@ -418,7 +418,7 @@ export function DriveSync() {
           {result?.renamed && result.renamed.length > 0 && (
             <details className="mt-2 rounded-lg border border-line bg-raised px-3 py-2 text-[11px]">
               <summary className="cursor-pointer font-bold text-ok">
-                أُعيدت تسمية {countNoun(result.renamed.length, FILE)} في الدرايف آلياً
+                أعيدت تسمية {countNoun(result.renamed.length, FILE)} في الدرايف آلياً
               </summary>
               <ul className="mt-1.5 space-y-0.5 text-muted">
                 {result.renamed.map((r) => (
@@ -439,11 +439,11 @@ export function DriveSync() {
           {result?.quotations && result.quotations.length > 0 && (
             <div className="mt-3 rounded-xl border border-warn/40 bg-warn-bg px-3 py-2.5">
               <p className="text-[11px] font-bold text-warn">
-                {countNoun(result.quotations.length, QUOTATION)} — لم يُسجَّل
+                {countNoun(result.quotations.length, QUOTATION)} — لم يسجّل
               </p>
               <p className="mt-1 text-[11px] text-muted">
-                عرضُ السعر ليس واقعةً ماليّة: لا مالَ خرج ولا التزامَ نشأ. يبقى في
-                الدرايف كما هو، فإن صار فاتورةً سُجّلت الفاتورة.
+                عرض السعر ليس واقعةً ماليّة: لا مال خرج ولا التزام نشأ. يبقى في
+                الدرايف كما هو، فإن صار فاتورةً سجّلت الفاتورة.
               </p>
               <ul className="mt-1.5 space-y-0.5">
                 {result.quotations.slice(0, 6).map((q) => (
@@ -456,10 +456,10 @@ export function DriveSync() {
           {result?.renameSuggestions && result.renameSuggestions.length > 0 && (
             <fieldset className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5">
               <legend className="px-1 text-[11px] font-bold text-warn">
-                {countNoun(result.renameSuggestions.length, FILE)} اسمُه لا يُقرأ — اختر ما يُسمّى
+                {countNoun(result.renameSuggestions.length, FILE)} اسمه لا يقرأ — اختر ما يسمّى
               </legend>
               <p className="text-[11px] leading-relaxed text-muted">
-                لا يُسمّى شيءٌ إلّا ما تختاره، ويُكتب الاسمان في سجلّ التدقيق. ولا حذف ولا نقل.
+                لا يسمّى شيء إلّا ما تختاره، ويكتب الاسمان في سجلّ التدقيق. ولا حذف ولا نقل.
               </p>
               <ul className="mt-1.5 space-y-1">
                 {result.renameSuggestions.map((r) => (
@@ -497,7 +497,7 @@ export function DriveSync() {
                   onClick={() => applyRenames([...chosen])}
                   className={buttonClass("secondary", "sm")}
                 >
-                  {`سمِّ المختار (${chosen.size})`}
+                  {`سمّ المختار (${chosen.size})`}
                 </button>
                 {renamed && (
                   <span className={`text-[11px] ${renamed.ok ? "text-ok" : "text-danger"}`} role="status">
@@ -521,13 +521,13 @@ export function DriveSync() {
 
           {result?.readerOutage && (
             <p role="alert" className="mt-3 rounded-lg bg-danger-bg px-3 py-2 text-[11px] leading-relaxed text-danger">
-              <b>توقّفت القراءة:</b> {result.readerOutage} — لم يُقيَّد ما بقي «لم يُقرأ»؛ يعود في المزامنة التالية.
+              <b>توقّفت القراءة:</b> {result.readerOutage} — لم يقيّد ما بقي «لم يقرأ»؛ يعود في المزامنة التالية.
             </p>
           )}
 
           {result?.readFailures && result.readFailures.length > 0 && (
             <div className="mt-3">
-              <p className="text-[11px] font-bold text-danger">لم تُقرأ</p>
+              <p className="text-[11px] font-bold text-danger">لم تقرأ</p>
               <ul className="mt-1 space-y-0.5">
                 {result.readFailures.map((n, i) => (
                   <li key={i} className="text-[11px] leading-relaxed text-ink-soft">{n}</li>

@@ -23,10 +23,10 @@ export async function POST(request: Request) {
     const read = await readJson(request, Body);
     if (!read.ok) return read.response;
     const done = await approveReadyLinks(read.body.ids, user.id);
-    if (done.linked === 0) return NextResponse.json({ error: "لم يُربَط شيء — تغيّرت الاقتراحات. حدّث الصفحة." }, { status: 409 });
+    if (done.linked === 0) return NextResponse.json({ error: "لم يربط شيء — تغيّرت الاقتراحات. حدّث الصفحة." }, { status: 409 });
     return NextResponse.json({
       ok: true,
-      message: `رُبط ${done.linked} بنداً بقيمة ${formatRiyalsDisplay(done.valueMinor)} ريال${done.skipped > 0 ? ` — وتُخطّي ${done.skipped} تغيّر اقتراحُه` : ""}`,
+      message: `ربط ${done.linked} بنداً بقيمة ${formatRiyalsDisplay(done.valueMinor)} ريال${done.skipped > 0 ? ` — وتخطّي ${done.skipped} تغيّر اقتراحه` : ""}`,
     });
   } catch (e) {
     const mapped = respondTo(e);

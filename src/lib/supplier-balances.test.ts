@@ -5,7 +5,7 @@ const row = (id: string, openMinor: number, creditMinor: number, openCount = 1) 
   supplierBalance({ supplierId: id, billedMinor: 0, openMinor, openCount, paidNetMinor: 0, creditMinor });
 
 describe("supplierBalance", () => {
-  it("رصيدُنا عند المورّد يُخصم من فواتيره المفتوحة", () => {
+  it("رصيدنا عند المورّد يخصم من فواتيره المفتوحة", () => {
     // لوريفا: ثلاث فواتير ١٬٠١٢٫٠٠، وبقي من حوالتها ٦٣٢٫٥٠
     const b = row("loreva", 101_200, 63_250);
     expect(b.owedMinor).toBe(37_950);
@@ -20,7 +20,7 @@ describe("supplierBalance", () => {
 });
 
 describe("totalBalances", () => {
-  it("لا يُخصم رصيدُ مورّدٍ من دَين مورّدٍ آخر", () => {
+  it("لا يخصم رصيد مورّد من دين مورّد آخر", () => {
     const t = totalBalances([row("golden", 1_215_550, 0), row("ganache", 0, 2_909_500, 0)]);
     expect(t.owedMinor).toBe(1_215_550);
     expect(t.creditLeftMinor).toBe(2_909_500);
@@ -28,7 +28,7 @@ describe("totalBalances", () => {
     expect(t.creditSuppliers).toBe(1);
   });
 
-  it("يُعلن ما خُصم من المفتوح كي يُقارَن بالرقم القديم", () => {
+  it("يعلن ما خصم من المفتوح كي يقارن بالرقم القديم", () => {
     const t = totalBalances([row("loreva", 101_200, 63_250, 3), row("aval", 165_715, 0, 2)]);
     expect(t.openInvoicesMinor).toBe(266_915);
     expect(t.offsetMinor).toBe(63_250);
@@ -38,7 +38,7 @@ describe("totalBalances", () => {
 });
 
 describe("overdueOwedMinor", () => {
-  it("رصيدُنا عند المورّد يُخصم من متأخّره أوّلاً — الأقدم أوّلاً", () => {
+  it("رصيدنا عند المورّد يخصم من متأخّره أوّلاً — الأقدم أوّلاً", () => {
     // فاتورة ١٬٧٩٦٫٠٠ عمرها ١٠٧ أيّام، ولنا عنده ٥٠٠ من حوالةٍ لم تُخصَّص
     expect(overdueOwedMinor(179_600, 50_000)).toBe(129_600);
   });
@@ -58,8 +58,8 @@ describe("overdueOwedMinor", () => {
   });
 });
 
-describe("مورّدٌ لا يصدر فواتير — حوالتُه شراءٌ لا رصيد", () => {
-  it("مريم: دفعاتٌ بلا فواتير لا تُقال «لك عنده»", () => {
+describe("مورّد لا يصدر فواتير — حوالته شراء لا رصيد", () => {
+  it("مريم: دفعات بلا فواتير لا تقال «لك عنده»", () => {
     const b = supplierBalance({
       supplierId: "mariah", billedMinor: 0, openMinor: 0, openCount: 0, paidNetMinor: 3_120_00, creditMinor: 3_120_00,
       issuesInvoices: false,
@@ -68,7 +68,7 @@ describe("مورّدٌ لا يصدر فواتير — حوالتُه شراءٌ 
     expect(b.owedMinor).toBe(0);
   });
 
-  it("وما قُيِّد له من فاتورةٍ تسدّده حوالاتُه — لا يُقال «عليك» وقد دُفع", () => {
+  it("وما قيّد له من فاتورة تسدّده حوالاته — لا يقال «عليك» وقد دفع", () => {
     const b = supplierBalance({
       supplierId: "lava", billedMinor: 405_00, openMinor: 405_00, openCount: 1, paidNetMinor: 1_377_00, creditMinor: 1_377_00,
       issuesInvoices: false,
@@ -76,7 +76,7 @@ describe("مورّدٌ لا يصدر فواتير — حوالتُه شراءٌ 
     expect(b).toMatchObject({ owedMinor: 0, creditLeftMinor: 0 });
   });
 
-  it("ومن يصدر فواتير يبقى رصيدُه «لك» كما كان", () => {
+  it("ومن يصدر فواتير يبقى رصيده «لك» كما كان", () => {
     const b = supplierBalance({
       supplierId: "kohi", billedMinor: 0, openMinor: 0, openCount: 0, paidNetMinor: 833_75, creditMinor: 833_75,
     });

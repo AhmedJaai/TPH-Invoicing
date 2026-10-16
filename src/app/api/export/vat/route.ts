@@ -69,6 +69,6 @@ export async function GET(request: Request) {
     });
   } catch (e) {
     console.error("[vat-export]", e);
-    return NextResponse.json({ error: "تعذّر إعداد سجلّ الإقرار — لم يُكتب شيء. أعد المحاولة بعد لحظة." }, { status: 500 });
+    return NextResponse.json({ error: "تعذّر إعداد سجلّ الإقرار — لم يكتب شيء. أعد المحاولة بعد لحظة." }, { status: 500 });
   }
 }

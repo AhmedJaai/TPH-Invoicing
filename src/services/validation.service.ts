@@ -68,7 +68,7 @@ const INVOICE_KINDS = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE", "UTILITY"]);
 
 export async function reviewForArchive(fields: ConfirmedFields): Promise<ReviewResult> {
   const supplier = await supplierContext(fields.supplierId);
-  if (fields.supplierId && !supplier) throw new InvalidInputError("المورد المحدَّد غير موجود");
+  if (fields.supplierId && !supplier) throw new InvalidInputError("المورد المحدّد غير موجود");
 
   /*
     الإجماليّ صفرٌ أو سالب لا يُقيَّد فاتورة.
@@ -82,7 +82,7 @@ export async function reviewForArchive(fields: ConfirmedFields): Promise<ReviewR
     fields.totalMinor !== null && fields.totalMinor !== undefined &&
     fields.totalMinor <= 0
   ) {
-    throw new BlockedError(["الإجماليّ صفرٌ أو سالب — لا تُقيَّد فاتورةٌ بلا مبلغ. صحّحه من المستند نفسه"]);
+    throw new BlockedError(["الإجماليّ صفر أو سالب — لا تقيّد فاتورة بلا مبلغ. صحّحه من المستند نفسه"]);
   }
 
   /*

@@ -14,7 +14,7 @@ async function setup(tx: Tx) {
   }).returning({ id: bankTransactions.id });
   const row = (kind: HeldRowInput["kind"]): HeldRowInput => ({
     kind, bankImportId: imp.id, bankAccountId: null, againstTransactionId: known.id,
-    reason: "بلا مرجعٍ ويشبه حركةً لها مرجع", valueDate: day("2099-08-10"),
+    reason: "بلا مرجع ويشبه حركةً لها مرجع", valueDate: day("2099-08-10"),
     description: "حوالة إلى أفال", beneficiaryRaw: null, transactionType: null,
     amountMinor: 1500_00, direction: "DEBIT", operationRef: null,
   });
@@ -25,8 +25,8 @@ const openHeld = async (tx: Tx) => Number((await tx.execute<{ n: number }>(sql`
   select count(*)::int as n from bank_held_rows where resolved_at is null and amount_minor = 150000
 `)).rows[0].n);
 
-describe("صفوفُ الكشف الملتبسة تُحفظ لقرار إنسان", () => {
-  it("تُحفظ مرّةً — وإعادةُ الاستيراد لا تكرّرها، ولا تعيدها بعد «هي نفسها»", () =>
+describe("صفوف الكشف الملتبسة تحفظ لقرار إنسان", () => {
+  it("تحفظ مرّةً — وإعادة الاستيراد لا تكرّرها، ولا تعيدها بعد «هي نفسها»", () =>
     withRollback(async (tx) => {
       const { actorId, row } = await setup(tx);
       expect(await holdRows([row("AMBIGUOUS")], tx)).toBe(1);
@@ -37,7 +37,7 @@ describe("صفوفُ الكشف الملتبسة تُحفظ لقرار إنسا�
       expect(await openHeld(tx)).toBe(0);
     }));
 
-  it("«حركةٌ أخرى» تُضيفها حركةً بهويّة الوقائع فتدخل الطابور", () =>
+  it("«حركة أخرى» تضيفها حركةً بهويّة الوقائع فتدخل الطابور", () =>
     withRollback(async (tx) => {
       const { actorId, row } = await setup(tx);
       await holdRows([row("AMBIGUOUS")], tx);
@@ -50,7 +50,7 @@ describe("صفوفُ الكشف الملتبسة تُحفظ لقرار إنسا�
       expect(await caught(resolveHeldRow(tx, id, "ADDED", actorId))).toBeInstanceOf(HeldRowRefused);
     }));
 
-  it("والمتضاربُ لا يُضاف — مرجعُه لحركةٍ أخرى", () =>
+  it("والمتضارب لا يضاف — مرجعه لحركة أخرى", () =>
     withRollback(async (tx) => {
       const { actorId, row } = await setup(tx);
       await holdRows([{ ...row("CONFLICT"), amountMinor: 1600_00, operationRef: "FT99001" }], tx);
@@ -59,7 +59,7 @@ describe("صفوفُ الكشف الملتبسة تُحفظ لقرار إنسا�
       await resolveHeldRow(tx, id, "CHECKED", actorId);
     }));
 
-  it("حركةٌ عندنا ليست في الكشف: «احذفها» تحذفها ومصروفَها، والمطابَقةُ لا تُحذف، ولا «حركةٌ أخرى»", () =>
+  it("حركة عندنا ليست في الكشف: «احذفها» تحذفها ومصروفها، والمطابقة لا تحذف، ولا «حركة أخرى»", () =>
     withRollback(async (tx) => {
       const { actorId, known, row } = await setup(tx);
       await tx.insert(expenses).values({ periodMonth: "2099-08", occurredOn: "2099-08-10", category: "BANK_FEE", label: "رسم", amountMinor: 1500_00, source: "BANK", bankTransactionId: known });
@@ -73,7 +73,7 @@ describe("صفوفُ الكشف الملتبسة تُحفظ لقرار إنسا�
       expect(await openHeld(tx)).toBe(0);
     }));
 
-  it("والمطابَقةُ بدفعة لا تُحذف — تُفكّ أوّلاً", () =>
+  it("والمطابقة بدفعة لا تحذف — تفكّ أوّلاً", () =>
     withRollback(async (tx) => {
       const { actorId, known, row } = await setup(tx);
       await tx.update(bankTransactions).set({ matchStatus: "MATCHED" }).where(eq(bankTransactions.id, known));

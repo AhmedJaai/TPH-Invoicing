@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
   const ids = body.supplierProductIds ?? [];
   if (ids.length === 0) {
-    return NextResponse.json({ error: "لم تُحدَّد أصناف" }, { status: 400 });
+    return NextResponse.json({ error: "لم تحدّد أصناف" }, { status: 400 });
   }
 
   if (body.action === "unlink") {
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       entityId: ids[0],
       after: { عدد: ids.length },
     });
-    return NextResponse.json({ ok: true, message: `فُكّ ربط ${countNoun(ids.length, PRODUCT)}` });
+    return NextResponse.json({ ok: true, message: `فكّ ربط ${countNoun(ids.length, PRODUCT)}` });
   }
 
   try {
@@ -82,8 +82,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       ...result,
-      message: `رُبط ${countNoun(result.linked, PRODUCT)} بـ«${result.productName}»${
-        result.createdProduct ? " (أُنشئ الآن)" : ""
+      message: `ربط ${countNoun(result.linked, PRODUCT)} بـ«${result.productName}»${
+        result.createdProduct ? " (أنشئ الآن)" : ""
       }`,
     });
   } catch (e) {

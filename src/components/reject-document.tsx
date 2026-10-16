@@ -34,7 +34,7 @@ export function RejectDocument({ documentId, cancel = false, redirectTo }: {
     return (
       <button type="button" className={buttonClass(cancel ? "danger" : "quiet", "sm")} onClick={() => setAsking(true)}>
         <Ban className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        {cancel ? "ألغِ الفاتورة" : "ارفضه"}
+        {cancel ? "ألغ الفاتورة" : "ارفضه"}
       </button>
     );
   }
@@ -63,16 +63,16 @@ export function RejectDocument({ documentId, cancel = false, redirectTo }: {
           if (!r.ok) { setError(r.error); return; }
           toast({
             tone: "info",
-            title: cancel ? "أُلغيت الفاتورة" : "رُفض المستند",
+            title: cancel ? "ألغيت الفاتورة" : "رفض المستند",
             body: cancel
-              ? "خرجت من المستحقّ، وبقي ملفُّها في الدرايف والأثرُ في السجلّ."
-              : "بقي ملفُّه في الدرايف — تجده تحت «رُفض» في المستندات، ومنه يُعاد إلى المراجعة.",
+              ? "خرجت من المستحقّ، وبقي ملفّها في الدرايف والأثر في السجلّ."
+              : "بقي ملفّه في الدرايف — تجده تحت «رفض» في المستندات، ومنه يعاد إلى المراجعة.",
           });
           if (redirectTo) router.push(redirectTo);
           else router.refresh();
         }}
       >
-        {cancel ? "نعم، ألغِها" : "نعم، ارفضه"}
+        {cancel ? "نعم، ألغها" : "نعم، ارفضه"}
       </button>
       <button type="button" className={buttonClass("quiet", "sm")} onClick={() => { setAsking(false); setError(null); }}>
         تراجع

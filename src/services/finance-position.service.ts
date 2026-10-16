@@ -83,7 +83,7 @@ export async function loadFinancePosition(): Promise<FinancePosition> {
              coalesce(-sum(variance_minor) filter (where variance_minor < 0), 0)::bigint as short,
              coalesce(sum(variance_minor) filter (where variance_minor > 0), 0)::bigint as over,
              count(*)::int as tills,
-             /* صندوقٌ أُقفل بلا عدّ: المعدودُ صفرٌ والمتوقَّعُ مال — الفرقُ هنا «لم يُعَدّ» لا نقص */
+             /* صندوق أقفل بلا عدّ: المعدود صفر والمتوقّع مال — الفرق هنا «لم يعدّ» لا نقص */
              count(*) filter (where closed_at is not null and closing_minor = 0 and estimated_cash_minor > 0)::int as uncounted
         from foodics_tills group by 1
     `),

@@ -36,16 +36,16 @@ interface ImportResponse {
 }
 
 const SHAPE_LABEL: Record<string, string> = {
-  FOODICS_ORDER_ITEMS: "تصديرُ بنود الطلبات — لكلّ صفٍّ رقمُ طلبه",
-  FOODICS_ORDERS: "تصديرُ طلبات — لكلّ صفٍّ رقمُ طلبه",
-  FOODICS_PRODUCT_MIX: "تصديرُ مزيج أصناف — «كم بِيع من كلٍّ في اليوم»",
+  FOODICS_ORDER_ITEMS: "تصدير بنود الطلبات — لكلّ صفّ رقم طلبه",
+  FOODICS_ORDERS: "تصدير طلبات — لكلّ صفّ رقم طلبه",
+  FOODICS_PRODUCT_MIX: "تصدير مزيج أصناف — «كم بيع من كلّ في اليوم»",
 };
 
 const STATUS_LABEL: Record<ImportResponse["status"], { text: string; tone: string; border: string; icon: LucideIcon }> = {
-  IMPORTED: { text: "استُورد كاملاً", tone: "text-ok", border: "border-ok/30", icon: CircleCheck },
-  PARTIAL: { text: "استُورد جزئياً — وما لم يُقرأ محفوظٌ بسببه", tone: "text-warn", border: "border-warn/30", icon: TriangleAlert },
-  FAILED: { text: "لم يُستورَد — راجِع الأعمدة أدناه", tone: "text-danger", border: "border-danger/30", icon: CircleAlert },
-  DUPLICATE: { text: "هذا الملفّ عندنا من قبل — لم يُكتب شيءٌ ثانيةً", tone: "text-ink-soft", border: "border-line", icon: Copy },
+  IMPORTED: { text: "استورد كاملاً", tone: "text-ok", border: "border-ok/30", icon: CircleCheck },
+  PARTIAL: { text: "استورد جزئياً — وما لم يقرأ محفوظ بسببه", tone: "text-warn", border: "border-warn/30", icon: TriangleAlert },
+  FAILED: { text: "لم يستورد — راجع الأعمدة أدناه", tone: "text-danger", border: "border-danger/30", icon: CircleAlert },
+  DUPLICATE: { text: "هذا الملفّ عندنا من قبل — لم يكتب شيء ثانيةً", tone: "text-ink-soft", border: "border-line", icon: Copy },
 };
 
 export function InventoryImport({ canImport, hasCatalog = true }: { canImport: boolean; hasCatalog?: boolean }) {
@@ -97,7 +97,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
   if (!canImport) {
     return (
       <p className="rounded-xl border border-dashed border-line px-5 py-6 text-center text-xs text-muted">
-        استيرادُ المبيعات خارج صلاحيتك — يرفعه من يُدخل الجرد.
+        استيراد المبيعات خارج صلاحيتك — يرفعه من يدخل الجرد.
       </p>
     );
   }
@@ -110,8 +110,8 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
         <p className="flex items-start gap-2 rounded-lg border border-warn/25 bg-warn-bg px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" strokeWidth={2} aria-hidden />
           <span>
-            <strong className="text-ink">ارفع الكتالوجَ قبلها.</strong> المبيعاتُ تُحفَظ الآن، لكنّ استهلاكها يبقى «غير معروف»
-            حتى تصل الوصفات — ولا يُعاد رفعُها بعد ذلك.
+            <strong className="text-ink">ارفع الكتالوج قبلها.</strong> المبيعات تحفظ الآن، لكنّ استهلاكها يبقى «غير معروف»
+            حتى تصل الوصفات — ولا يعاد رفعها بعد ذلك.
           </span>
         </p>
       )}
@@ -126,11 +126,11 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold" dir="auto">{file.name}</p>
-                <p className="text-[11px] text-muted"><span className="nums">{kb(file.size)}</span> · يُقرأ ويُطابَق بأعمدته، ولا يُكتب إن كان عندنا من قبل</p>
+                <p className="text-[11px] text-muted"><span className="nums">{kb(file.size)}</span> · يقرأ ويطابق بأعمدته، ولا يكتب إن كان عندنا من قبل</p>
               </div>
               <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                 <button type="button" onClick={() => void upload()} disabled={busy} className={`${buttonClass("primary")} flex-1 sm:flex-none`}>
-                  {busy ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />يُقرأ الملفّ…</> : <><Upload className="h-4 w-4" strokeWidth={2} aria-hidden />استورِده</>}
+                  {busy ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />يقرأ الملفّ…</> : <><Upload className="h-4 w-4" strokeWidth={2} aria-hidden />استورده</>}
                 </button>
                 <button type="button" onClick={reset} disabled={busy} className={buttonClass("quiet")}>غيّر الملفّ</button>
               </div>
@@ -141,7 +141,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
                 <Upload className="h-5 w-5" strokeWidth={1.75} aria-hidden />
               </span>
               <span className="text-sm font-bold">اختر ملفّ مبيعات فودكس</span>
-              <span className="max-w-sm text-xs leading-relaxed text-muted">Excel أو CSV حتى ٤ ميجابايت — أسبوعٌ في الملفّ. والملفُّ نفسُه مرّتين لا يُضاعف شيئاً.</span>
+              <span className="max-w-sm text-xs leading-relaxed text-muted">Excel أو CSV حتى ٤ ميجابايت — أسبوع في الملفّ. والملفّ نفسه مرّتين لا يضاعف شيئاً.</span>
               <input
                 type="file"
                 accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -162,7 +162,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
           <div className="mt-3">
             {dateOpen ? (
               <label className="block">
-                <span className="block text-[11px] font-medium text-muted">يومُ العمل — يُملأ فقط إن لم يكن في الملفّ عمودُ تاريخ</span>
+                <span className="block text-[11px] font-medium text-muted">يوم العمل — يملأ فقط إن لم يكن في الملفّ عمود تاريخ</span>
                 <input
                   type="date" value={businessDate} onChange={(e) => setBusinessDate(e.target.value)}
                   className="nums mt-1 min-h-11 rounded-lg border border-line-input bg-raised px-3 text-sm"
@@ -170,7 +170,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
               </label>
             ) : (
               <button type="button" onClick={() => setDateOpen(true)} className={`${buttonClass("quiet", "sm")} -ms-2`}>
-                الملفّ بلا عمودِ تاريخ؟ حدِّد يومَ العمل
+                الملفّ بلا عمود تاريخ؟ حدّد يوم العمل
               </button>
             )}
           </div>
@@ -178,7 +178,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
           {error && (
             <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2.5 text-xs leading-relaxed text-danger">
               <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-              <span>{error} {file && "— لم يُكتب شيء، وتستطيع أن تعيد المحاولة."}</span>
+              <span>{error} {file && "— لم يكتب شيء، وتستطيع أن تعيد المحاولة."}</span>
             </p>
           )}
         </div>
@@ -191,7 +191,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
             <div className="min-w-0 flex-1">
               <p className={`text-[15px] font-bold ${status.tone}`}>{status.text}</p>
               <p className="mt-0.5 text-xs text-muted">
-                {result.periodStart ? <>الفترة المقروءة: <strong className="text-ink-soft">{formatWeek(result.periodStart, result.periodEnd ?? result.periodStart)}</strong></> : "لم تُقرأ فترةٌ من الملفّ."}
+                {result.periodStart ? <>الفترة المقروءة: <strong className="text-ink-soft">{formatWeek(result.periodStart, result.periodEnd ?? result.periodStart)}</strong></> : "لم تقرأ فترة من الملفّ."}
                 {result.shape && SHAPE_LABEL[result.shape] && <> · {SHAPE_LABEL[result.shape]}</>}
               </p>
             </div>
@@ -200,14 +200,14 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
           {error && <p role="alert" className="mt-3 rounded-lg bg-danger-bg px-3 py-2 text-xs leading-relaxed text-danger">{error}</p>}
 
           <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Fact label="صفوفٌ في الملفّ" value={result.totals.rows} />
-            <Fact label="قُرئت" value={result.totals.parsed} />
-            <Fact label="بيعاتٌ كُتبت" value={result.totals.salesWritten} />
-            <Fact label="أُعيد بيانُها" value={result.totals.salesRestated} />
-            <Fact label="أسطرُ بيع" value={result.totals.lineCount} />
-            <Fact label="تُخطّيت" value={result.totals.skipped} />
-            <Fact label="لم تُقرأ" value={result.totals.errors} tone={result.totals.errors > 0 ? "text-danger" : undefined} />
-            <Fact label="أصنافٌ تحتاج ربطاً" value={result.unmappedProducts} tone={result.unmappedProducts > 0 ? "text-warn" : undefined} />
+            <Fact label="صفوف في الملفّ" value={result.totals.rows} />
+            <Fact label="قرئت" value={result.totals.parsed} />
+            <Fact label="بيعات كتبت" value={result.totals.salesWritten} />
+            <Fact label="أعيد بيانها" value={result.totals.salesRestated} />
+            <Fact label="أسطر بيع" value={result.totals.lineCount} />
+            <Fact label="تخطّيت" value={result.totals.skipped} />
+            <Fact label="لم تقرأ" value={result.totals.errors} tone={result.totals.errors > 0 ? "text-danger" : undefined} />
+            <Fact label="أصناف تحتاج ربطاً" value={result.unmappedProducts} tone={result.unmappedProducts > 0 ? "text-warn" : undefined} />
           </dl>
 
           {/* العددُ الذي يُنذر يحمل فعلَه — ثمّ الخطوةُ التالية في الطريق */}
@@ -238,13 +238,13 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
           {result.recognisedColumns.length > 0 && (
             <details className="mt-4 rounded-lg border border-line-soft bg-sunken/50 px-3 py-2">
               <summary className="flex min-h-11 cursor-pointer items-center text-xs font-bold sm:min-h-8">
-                الأعمدةُ التي فُهمت ({result.recognisedColumns.length}) — قابِلها بالعين
+                الأعمدة التي فهمت ({result.recognisedColumns.length}) — قابلها بالعين
               </summary>
               <ul className="mt-1 flex flex-wrap gap-1.5 pb-2">
                 {result.recognisedColumns.map((c) => <li key={c} className="rounded-md bg-raised px-2 py-0.5 text-[11px] text-ink-soft" dir="auto">{c}</li>)}
               </ul>
               {result.unrecognisedColumns.length > 0 && (
-                <p className="pb-2 text-[11px] text-muted"><strong>ولم تُقرأ:</strong> {result.unrecognisedColumns.join(" · ")}</p>
+                <p className="pb-2 text-[11px] text-muted"><strong>ولم تقرأ:</strong> {result.unrecognisedColumns.join(" · ")}</p>
               )}
             </details>
           )}

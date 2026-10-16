@@ -96,11 +96,11 @@ export function availableMinor(f: PaymentFacts): number {
 
 /** حالُ الدفعة بالعربيّة — والمردودةُ لا تُحسَب مدفوعة. */
 export const STATUS_LABEL: Record<PaymentStatus, string> = {
-  UNAPPLIED: "لم تُخصَّص",
-  PARTIALLY_APPLIED: "خُصّصت جزئياً",
-  APPLIED: "خُصّصت",
+  UNAPPLIED: "لم تخصّص",
+  PARTIALLY_APPLIED: "خصّصت جزئياً",
+  APPLIED: "خصّصت",
   OVERPAYMENT: "زائدة عن فواتيره",
-  ADVANCE: "مقدَّمة معلَنة",
+  ADVANCE: "مقدّمة معلنة",
   REVERSED: "مردودة",
   VOID: "ملغاة",
 };
@@ -168,6 +168,6 @@ export function planReversal(
     status: kind,
     reason:
       reason.trim() ||
-      (kind === "VOID" ? "سُجّلت خطأً — لم تقع" : "رُدَّ مالها"),
+      (kind === "VOID" ? "سجّلت خطأً — لم تقع" : "ردّ مالها"),
   };
 }

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   const { key, action } = read.body;
   const prefix = signalPrefix(key);
   if (!prefix) {
-    return NextResponse.json({ error: "هذه الملاحظة لا تُحسم من هنا." }, { status: 400 });
+    return NextResponse.json({ error: "هذه الملاحظة لا تحسم من هنا." }, { status: 400 });
   }
   const note = read.body.note?.trim().slice(0, 500) || null;
   const until = action === "snooze" ? addDays(todayInRiyadh(), read.body.days ?? 7) : null;
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       before: before ? { القرار: before.decision, الملاحظة: before.note } : null,
       after: {
         الملاحظة_المحسوبة: SIGNAL_LABEL[prefix],
-        القرار: action === "dismiss" ? "أُسكتت" : until ? `أُجّلت حتى ${until}` : "أُعيدت",
+        القرار: action === "dismiss" ? "أسكتت" : until ? `أجّلت حتى ${until}` : "أعيدت",
         السبب: note,
       },
     }, t);
@@ -75,8 +75,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     message:
-      action === "dismiss" ? "أُسكتت — لن تظهر ثانيةً إلّا إن تغيّر ما بُنيت عليه"
-      : until ? `أُجّلت — تعود بعد ${until}`
-      : "أُعيدت الملاحظة",
+      action === "dismiss" ? "أسكتت — لن تظهر ثانيةً إلّا إن تغيّر ما بنيت عليه"
+      : until ? `أجّلت — تعود بعد ${until}`
+      : "أعيدت الملاحظة",
   });
 }

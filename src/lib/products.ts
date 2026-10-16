@@ -78,10 +78,10 @@ export function suggestMerges(items: readonly SupplierItem[]): MergeSuggestion[]
       );
     }
     if (list.some((i) => i.orderCount === 1)) {
-      caveats.push("أحدهما طُلب مرّة واحدة — الاسم قد يكون مؤقّتاً");
+      caveats.push("أحدهما طلب مرّة واحدة — الاسم قد يكون مؤقّتاً");
     }
     if (normalized.split(" ").length === 1) {
-      caveats.push("الاسم كلمة واحدة — يحتمل معانيَ كثيرة");
+      caveats.push("الاسم كلمة واحدة — يحتمل معاني كثيرة");
     }
 
     out.push({

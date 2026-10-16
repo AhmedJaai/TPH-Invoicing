@@ -40,7 +40,7 @@ describe("planAllocations — خصائص", () => {
     { maxLength: 12 },
   );
 
-  it("لا يُخصَّص فوق المتاح، والمخصَّصُ + الباقي = المتاح بالهللة", () => {
+  it("لا يخصّص فوق المتاح، والمخصّص + الباقي = المتاح بالهللة", () => {
     fc.assert(fc.property(amount, amount, requests, (payment, already, reqs) => {
       const p = planAllocations(payment, already, reqs);
       const available = Math.max(0, payment - already);
@@ -51,7 +51,7 @@ describe("planAllocations — خصائص", () => {
     }), RUNS);
   });
 
-  it("كلُّ سطرٍ موجبٌ صحيح ولا يتجاوز ما طُلب له", () => {
+  it("كلّ سطر موجب صحيح ولا يتجاوز ما طلب له", () => {
     fc.assert(fc.property(amount, amount, requests, (payment, already, reqs) => {
       const p = planAllocations(payment, already, reqs);
       // السطورُ تتبع ترتيبَ الطلبات: يُمشى عليهما معاً
@@ -67,7 +67,7 @@ describe("planAllocations — خصائص", () => {
     }), RUNS);
   });
 
-  it("المطلوبُ = المخصَّص + العجز، ولا عجزَ وباقٍ معاً", () => {
+  it("المطلوب = المخصّص + العجز، ولا عجز وباق معاً", () => {
     fc.assert(fc.property(amount, amount, requests, (payment, already, reqs) => {
       const p = planAllocations(payment, already, reqs);
       const wanted = sum(reqs.map((r) => Math.max(0, r.amountMinor)));
@@ -79,7 +79,7 @@ describe("planAllocations — خصائص", () => {
 });
 
 describe("settleSupplierAccount — خصائص", () => {
-  it("لا تأخذ فاتورةٌ فوق مفتوحها، ولا يتجاوز المجموعُ الحوالة", () => {
+  it("لا تأخذ فاتورة فوق مفتوحها، ولا يتجاوز المجموع الحوالة", () => {
     fc.assert(fc.property(amount, paidAtArb, invoicesArb, (payment, paidAt, invoices) => {
       const p = settleSupplierAccount(payment, paidAt, invoices);
       const open = new Map(invoices.map((i) => [i.invoiceId, i.outstandingMinor]));
@@ -95,7 +95,7 @@ describe("settleSupplierAccount — خصائص", () => {
     }), RUNS);
   });
 
-  it("ترتيبُ المدخل لا يغيّر الخطّة", () => {
+  it("ترتيب المدخل لا يغيّر الخطّة", () => {
     fc.assert(fc.property(
       amount, paidAtArb,
       invoicesArb.chain((inv) => fc.tuple(fc.constant(inv), fc.shuffledSubarray(inv, { minLength: inv.length }))),
@@ -106,7 +106,7 @@ describe("settleSupplierAccount — خصائص", () => {
     ), RUNS);
   });
 
-  it("الأقدمُ أوّلاً: لا يُمسّ أحدثُ وأقدمُ منه مؤهَّلٌ ما زال مفتوحاً", () => {
+  it("الأقدم أوّلاً: لا يمسّ أحدث وأقدم منه مؤهّل ما زال مفتوحاً", () => {
     fc.assert(fc.property(amount, paidAtArb, invoicesArb, (payment, paidAt, invoices) => {
       const p = settleSupplierAccount(payment, paidAt, invoices);
       const got = new Map(p.allocations.map((a) => [a.invoiceId, a.amountMinor]));
@@ -124,7 +124,7 @@ describe("settleSupplierAccount — خصائص", () => {
     }), RUNS);
   });
 
-  it("ما بعد أفق السبعة أيّام لا يُسدَّد آلياً، وما بقي من مالٍ بقي لأنّ المؤهَّل سُدّ كلُّه", () => {
+  it("ما بعد أفق السبعة أيّام لا يسدّد آلياً، وما بقي من مال بقي لأنّ المؤهّل سدّ كلّه", () => {
     fc.assert(fc.property(amount, paidAtArb, invoicesArb, (payment, paidAt, invoices) => {
       const p = settleSupplierAccount(payment, paidAt, invoices);
       const horizon = paidAt.getTime() + SETTLEMENT_FORWARD_DAYS * DAY;
@@ -149,7 +149,7 @@ describe("planCreditApplication — خصائص", () => {
   const creditsArb = fc.uniqueArray(creditArb, { selector: (c) => c.paymentId, maxLength: 6 });
   const forward = fc.option(fc.integer({ min: 0, max: 30 }), { nil: null });
 
-  it("المالُ محفوظ: المطبَّق + الباقي = الرصيد، والمطبَّق + المفتوح = الفواتير", () => {
+  it("المال محفوظ: المطبّق + الباقي = الرصيد، والمطبّق + المفتوح = الفواتير", () => {
     fc.assert(fc.property(creditsArb, invoicesArb, forward, (credits, invoices, forwardDays) => {
       const p = planCreditApplication(credits, invoices, { forwardDays });
       const credit = sum(credits.map((c) => Math.max(0, c.availableMinor)));
@@ -160,7 +160,7 @@ describe("planCreditApplication — خصائص", () => {
     }), RUNS);
   });
 
-  it("لا دفعةٌ تُعطي فوق متاحها ولا فاتورةٌ تأخذ فوق مفتوحها", () => {
+  it("لا دفعة تعطي فوق متاحها ولا فاتورة تأخذ فوق مفتوحها", () => {
     fc.assert(fc.property(creditsArb, invoicesArb, forward, (credits, invoices, forwardDays) => {
       const p = planCreditApplication(credits, invoices, { forwardDays });
       const given = new Map<string, number>();
@@ -175,7 +175,7 @@ describe("planCreditApplication — خصائص", () => {
     }), RUNS);
   });
 
-  it("الآليُّ لا يسدّد فاتورةً بعد أفق دفعتها، وبيد الإنسان (null) لا أفق", () => {
+  it("الآليّ لا يسدّد فاتورةً بعد أفق دفعتها، وبيد الإنسان (null) لا أفق", () => {
     fc.assert(fc.property(creditsArb, invoicesArb, fc.integer({ min: 0, max: 30 }), (credits, invoices, forwardDays) => {
       const auto = planCreditApplication(credits, invoices, { forwardDays });
       const paidAt = new Map(credits.map((c) => [c.paymentId, c.paidAt.getTime()]));
@@ -190,7 +190,7 @@ describe("planCreditApplication — خصائص", () => {
     }), RUNS);
   });
 
-  it("ترتيبُ المدخل لا يغيّر الخطّة", () => {
+  it("ترتيب المدخل لا يغيّر الخطّة", () => {
     fc.assert(fc.property(
       creditsArb.chain((c) => fc.tuple(fc.constant(c), fc.shuffledSubarray(c, { minLength: c.length }))),
       invoicesArb.chain((i) => fc.tuple(fc.constant(i), fc.shuffledSubarray(i, { minLength: i.length }))),

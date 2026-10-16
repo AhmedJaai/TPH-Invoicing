@@ -39,7 +39,7 @@ describe("reviewConfirmed", () => {
     expect(r.blockers.some((b) => b.code === "BUYER_VAT_MISMATCH")).toBe(true);
   });
 
-  it("يمنع عرض السعر من أن يُقيَّد فاتورةً", () => {
+  it("يمنع عرض السعر من أن يقيّد فاتورةً", () => {
     const r = reviewConfirmed(
       { ...validInvoice, documentKind: "QUOTATION" },
       { companyVat: COMPANY_VAT },
@@ -48,7 +48,7 @@ describe("reviewConfirmed", () => {
     expect(r.canCreateInvoice).toBe(false);
   });
 
-  it("يرفض الفاتورة بلا رقم صراحةً بدل أن تُرفع بلا قيد", () => {
+  it("يرفض الفاتورة بلا رقم صراحةً بدل أن ترفع بلا قيد", () => {
     const r = reviewConfirmed({ ...validInvoice, invoiceNumber: "  " }, { companyVat: COMPANY_VAT });
     expect(r.blockers.some((b) => b.code === "MISSING_INVOICE_NUMBER")).toBe(true);
     expect(r.canCreateInvoice).toBe(false);
@@ -65,7 +65,7 @@ describe("reviewConfirmed", () => {
     expect(r.blockers.some((b) => b.message.includes("تاريخ"))).toBe(true);
   });
 
-  it("والتاريخُ المطبوع «12/08/2026» مقروءٌ لا غائب — يُوحَّد ولا يُرمى", () => {
+  it("والتاريخ المطبوع «12/08/2026» مقروء لا غائب — يوحّد ولا يرمى", () => {
     const r = reviewConfirmed({ ...validInvoice, invoiceDate: "12/08/2026" }, { companyVat: COMPANY_VAT });
     expect(r.blockers.some((b) => b.message.includes("تاريخ"))).toBe(false);
     expect(r.canCreateInvoice).toBe(true);
@@ -92,7 +92,7 @@ describe("reviewConfirmed", () => {
     expect(r.isFixedAsset).toBe(true);
   });
 
-  it("الإيصال لا يخضع للفحص الضريبي، ويُقبل بلا رقم فاتورة", () => {
+  it("الإيصال لا يخضع للفحص الضريبي، ويقبل بلا رقم فاتورة", () => {
     const r = reviewConfirmed(
       {
         documentKind: "RECEIPT",

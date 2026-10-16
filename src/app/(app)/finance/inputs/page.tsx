@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 /** ما يُقرّ به: مصروفاتُ تشغيلٍ قد تقع خارج الكشف أو تُدفَع دفعةً لأشهر. */
 const CATEGORIES: readonly TxCategory[] = ["RENT", "SALARY", "UTILITY", "GOVERNMENT", "OTHER"];
-const KIND_LABEL = { SPREAD: "دفعةٌ موزَّعة", OFF_BOOK: "خارج الكشف — شهريّ", NONE: "لا يوجد" } as const;
+const KIND_LABEL = { SPREAD: "دفعة موزّعة", OFF_BOOK: "خارج الكشف — شهريّ", NONE: "لا يوجد" } as const;
 
 /**
  * ما لا يراه الكشف — الإيجارُ الذي يغطّي أشهراً، والراتبُ النقديّ، وما يُدفَع من حسابٍ
@@ -48,17 +48,17 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
     <PageShell
       user={user}
       title="ما لا يراه الكشف"
-      intro="الإيجارُ الذي دُفع مرّةً لأشهر، والراتبُ الذي يُدفَع نقداً، وما يخرج من حسابٍ شخصيّ. قُله مرّةً فيكتمل ربحُ الشهر."
-      actions={<LinkButton href={`/finance?month=${month}`} variant="quiet" size="sm" icon={ArrowRight}>قائمةُ الدخل</LinkButton>}
+      intro="الإيجار الذي دفع مرّةً لأشهر، والراتب الذي يدفع نقداً، وما يخرج من حساب شخصيّ. قله مرّةً فيكتمل ربح الشهر."
+      actions={<LinkButton href={`/finance?month=${month}`} variant="quiet" size="sm" icon={ArrowRight}>قائمة الدخل</LinkButton>}
     >
       {lumps.length > 0 && (
-        <Callout tone="warn" icon={Info} title="إيجارٌ في الكشف لم يُقَل كم شهراً يغطّي">
+        <Callout tone="warn" icon={Info} title="إيجار في الكشف لم يقل كم شهراً يغطّي">
           <ul className="space-y-1">
             {lumps.map((t) => (
               <li key={t.id}><bdi>{formatDay(t.day)}</bdi> — <strong><Money minor={t.amountMinor} currency /></strong> · {t.label}</li>
             ))}
           </ul>
-          <p className="mt-2">شهرُ الدفع يحمله كلَّه اليوم، والأشهرُ حوله «ربحٌ قبل الإيجار». اختر «دفعةٌ في الكشف تغطّي أشهراً» أدناه وحدّد أشهرَها.</p>
+          <p className="mt-2">شهر الدفع يحمله كلّه اليوم، والأشهر حوله «ربح قبل الإيجار». اختر «دفعة في الكشف تغطّي أشهراً» أدناه وحدّد أشهرها.</p>
         </Callout>
       )}
 
@@ -71,12 +71,12 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
           />
         </div>
       ) : (
-        <Callout tone="info" icon={Info} className="mt-5" title="للقراءة فقط">الإقرارُ يكتبه من يملك إقفالَ الشهر.</Callout>
+        <Callout tone="info" icon={Info} className="mt-5" title="للقراءة فقط">الإقرار يكتبه من يملك إقفال الشهر.</Callout>
       )}
 
-      <Section title="ما أقررتَه" icon={HandCoins} count={sorted.length} hint="كلُّ إقرارٍ يدخل قائمةَ الدخل في أشهره باسمه. سحبُه يعيد الشهرَ كما يقوله الكشف.">
+      <Section title="ما أقررته" icon={HandCoins} count={sorted.length} hint="كلّ إقرار يدخل قائمة الدخل في أشهره باسمه. سحبه يعيد الشهر كما يقوله الكشف.">
         {sorted.length === 0 ? (
-          <EmptyState icon={HandCoins} title="لم تُقرّ بشيءٍ بعد." hint="بلا إيجارٍ ولا رواتب يبقى الشهرُ «ربحاً قبل الإيجار» لا «صافي الربح»." />
+          <EmptyState icon={HandCoins} title="لم تقرّ بشيء بعد." hint="بلا إيجار ولا رواتب يبقى الشهر «ربحاً قبل الإيجار» لا «صافي الربح»." />
         ) : (
           <ul className="space-y-2">
             {sorted.map((d) => {
@@ -91,12 +91,12 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
                     </p>
                     <p className="mt-1 text-xs leading-relaxed text-ink-soft">
                       {d.fromMonth === d.toMonth ? formatMonth(d.fromMonth) : <>من {formatMonth(d.fromMonth)} إلى {formatMonth(d.toMonth)} ({months.length} أشهر)</>}
-                      {d.kind === "SPREAD" && <> — <Money minor={d.amountMinor} /> تُوزَّع: <Money minor={spreadShare(d.amountMinor, d.fromMonth, d.toMonth, d.fromMonth)} /> للشهر</>}
+                      {d.kind === "SPREAD" && <> — <Money minor={d.amountMinor} /> توزّع: <Money minor={spreadShare(d.amountMinor, d.fromMonth, d.toMonth, d.fromMonth)} /> للشهر</>}
                       {d.kind === "OFF_BOOK" && <> — <Money minor={d.amountMinor} /> لكلّ شهر</>}
                     </p>
                   </div>
                   {canEdit && (
-                    <PostAction url="/api/finance/declaration" body={{ action: "void", id: d.id }} variant="quiet" done="سُحب الإقرار">اسحبه</PostAction>
+                    <PostAction url="/api/finance/declaration" body={{ action: "void", id: d.id }} variant="quiet" done="سحب الإقرار">اسحبه</PostAction>
                   )}
                 </li>
               );

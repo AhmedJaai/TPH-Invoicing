@@ -19,13 +19,13 @@ function sealV1(plain: string, secret: string): string {
 }
 
 describe("رمز الدرايف في القاعدة", () => {
-  it("بلا مفتاح: يُحفَظ كما هو ويُقرأ كما هو — لا ينكسر الدخول قبل ضبطه", () => {
+  it("بلا مفتاح: يحفظ كما هو ويقرأ كما هو — لا ينكسر الدخول قبل ضبطه", () => {
     expect(tokenEncryptionEnabled()).toBe(false);
     expect(sealToken("1//abc")).toBe("1//abc");
     expect(openToken("1//abc")).toBe("1//abc");
   });
 
-  it("بالمفتاح: يُشفَّر فلا يُقرأ من القاعدة، ويُفكّ إلى أصله", () => {
+  it("بالمفتاح: يشفّر فلا يقرأ من القاعدة، ويفكّ إلى أصله", () => {
     process.env.TOKEN_ENCRYPTION_KEY = KEY;
     const sealed = sealToken("1//secret-refresh-token");
     expect(isSealed(sealed)).toBe(true);
@@ -33,28 +33,28 @@ describe("رمز الدرايف في القاعدة", () => {
     expect(openToken(sealed)).toBe("1//secret-refresh-token");
   });
 
-  it("والتشفير لا يتكرّر على المشفَّر، والخامّ القديم يُقرأ", () => {
+  it("والتشفير لا يتكرّر على المشفّر، والخامّ القديم يقرأ", () => {
     process.env.TOKEN_ENCRYPTION_KEY = KEY;
     const sealed = sealToken("1//x");
     expect(sealToken(sealed)).toBe(sealed);
     expect(openToken("1//legacy")).toBe("1//legacy");
   });
 
-  it("المشفَّر بلا مفتاح يُعلَن ولا يُرسَل إلى جوجل مشفَّراً", () => {
+  it("المشفّر بلا مفتاح يعلن ولا يرسل إلى جوجل مشفّراً", () => {
     process.env.TOKEN_ENCRYPTION_KEY = KEY;
     const sealed = sealToken("1//x");
     delete process.env.TOKEN_ENCRYPTION_KEY;
     expect(() => openToken(sealed)).toThrow(/TOKEN_ENCRYPTION_KEY/);
   });
 
-  it("والعبث بالمشفَّر يُكشَف", () => {
+  it("والعبث بالمشفّر يكشف", () => {
     process.env.TOKEN_ENCRYPTION_KEY = KEY;
     const sealed = sealToken("1//x");
     const tampered = sealed.slice(0, -2) + (sealed.endsWith("A") ? "BB" : "AA");
     expect(() => openToken(tampered)).toThrow();
   });
 
-  it("ما خُتم بالصيغة الأولى يُقرأ كما كان — لا ينقطع الدرايف بالترقية", () => {
+  it("ما ختم بالصيغة الأولى يقرأ كما كان — لا ينقطع الدرايف بالترقية", () => {
     process.env.TOKEN_ENCRYPTION_KEY = KEY;
     const old = sealV1("1//old-token", KEY);
     expect(isSealed(old)).toBe(true);
@@ -66,7 +66,7 @@ describe("رمز الدرايف في القاعدة", () => {
     expect(resealToken(fresh)).toBe(fresh);
   });
 
-  it("تدويرُ المفتاح: ما خُتم بالسابق يُقرأ بـTOKEN_ENCRYPTION_KEY_PREVIOUS ويُعاد ختمُه بالجديد", () => {
+  it("تدوير المفتاح: ما ختم بالسابق يقرأ بـTOKEN_ENCRYPTION_KEY_PREVIOUS ويعاد ختمه بالجديد", () => {
     process.env.TOKEN_ENCRYPTION_KEY = KEY;
     const v2 = sealToken("1//rotating");
     const v1 = sealV1("1//rotating-v1", KEY);
@@ -88,7 +88,7 @@ describe("رمز الدرايف في القاعدة", () => {
     expect(openToken(moved)).toBe("1//rotating");
   });
 
-  it("بلا مفتاح: إعادةُ الختم لا تغيّر شيئاً", () => {
+  it("بلا مفتاح: إعادة الختم لا تغيّر شيئاً", () => {
     expect(resealToken("1//raw")).toBe("1//raw");
   });
 });

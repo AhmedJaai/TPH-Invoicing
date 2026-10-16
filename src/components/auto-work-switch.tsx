@@ -23,7 +23,7 @@ export function AutoWorkSwitch({ paused, since }: { paused: boolean; since: stri
       setError(r.error);
       return false;
     }
-    toast({ tone: next ? "warn" : "ok", title: next ? "أُوقف العمل الآليّ" : "عاد العمل الآليّ", body: r.data.message });
+    toast({ tone: next ? "warn" : "ok", title: next ? "أوقف العمل الآليّ" : "عاد العمل الآليّ", body: r.data.message });
     router.refresh();
     return true;
   }
@@ -40,8 +40,8 @@ export function AutoWorkSwitch({ paused, since }: { paused: boolean; since: stri
         <p className="text-sm font-bold">{paused ? "العمل الآليّ موقوف" : "العمل الآليّ يعمل"}</p>
         <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
           {paused
-            ? <>لا يُقيَّد ولا يُعتمَد ولا يُزامَن شيءٌ في الخلفيّة{since ? <> منذ {since}</> : null} — على كلّ جهاز. «زامن الآن» بيدك يعمل.</>
-            : "يقيّد الفواتيرَ المقروءةَ كاملةً ويعتمد ما اجتمعت فيه الشروط، ويخبرك بما فعل وبكم زاد ما عليك. وما فعله في «آخر ما فعله» أدناه — افتح المستند لتصحّحه أو ترفضه."}
+            ? <>لا يقيّد ولا يعتمد ولا يزامن شيء في الخلفيّة{since ? <> منذ {since}</> : null} — على كلّ جهاز. «زامن الآن» بيدك يعمل.</>
+            : "يقيّد الفواتير المقروءة كاملةً ويعتمد ما اجتمعت فيه الشروط، ويخبرك بما فعل وبكم زاد ما عليك. وما فعله في «آخر ما فعله» أدناه — افتح المستند لتصحّحه أو ترفضه."}
         </p>
         {error && <p role="alert" className="mt-1 text-xs font-bold text-danger">{error}</p>}
       </div>

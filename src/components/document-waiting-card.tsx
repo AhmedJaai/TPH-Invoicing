@@ -59,14 +59,14 @@ export function WaitingCard({
       <div className="flex flex-wrap items-start gap-x-4 gap-y-3 px-4 pt-4 sm:px-5">
         <Monogram name={r.supplierName ?? "؟"} className="h-10 w-10 text-sm" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-bold">{r.supplierName ?? "مورّدٌ لم يُعرَف"}</p>
+          <p className="truncate text-[15px] font-bold">{r.supplierName ?? "مورّد لم يعرف"}</p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
             <span>{kindLabel}</span>
             {r.periodMonth && <><span aria-hidden>·</span><span>{formatMonth(r.periodMonth)}</span></>}
             {r.textSource && (
               <>
                 <span aria-hidden>·</span>
-                <span>{r.textSource === "TEXT" ? "قُرئ من نصّ الملفّ" : "قُرئ من صورة — ظنّاً"}</span>
+                <span>{r.textSource === "TEXT" ? "قرئ من نصّ الملفّ" : "قرئ من صورة — ظنّاً"}</span>
               </>
             )}
           </p>
@@ -122,9 +122,9 @@ export function WaitingCard({
         {/* ما لم يُقيَّد له شيء لا يُعتمد — يُكمَل ويُقيَّد من ملفّه */}
         {canDecide && showAmounts && r.status === "NEEDS_REVIEW" && (r.invoiceId || !RECORDABLE.has(r.kind)) && <ConfirmDocument documentId={r.id} variant="primary" />}
         {canDecide && showAmounts && !r.invoiceId && RECORDABLE.has(r.kind) && (
-          <Link href={documentHref(r.id, "fix")} className={buttonClass("primary", "sm")}>أكمِله وقيّده</Link>
+          <Link href={documentHref(r.id, "fix")} className={buttonClass("primary", "sm")}>أكمله وقيّده</Link>
         )}
-        {!canDecide && <span className="text-[11px] text-muted">الحسمُ لمن يرفع المستندات ويعتمدها.</span>}
+        {!canDecide && <span className="text-[11px] text-muted">الحسم لمن يرفع المستندات ويعتمدها.</span>}
       </div>
     </li>
   );

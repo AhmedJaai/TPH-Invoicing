@@ -47,16 +47,16 @@ export async function resolveOrphanPayment(
     .for("update")
     .limit(1);
 
-  if (!p) throw new OrphanPaymentError("لا دفعة بهذا المعرّف — ربما حُسمت من نافذةٍ أخرى. حدّث الصفحة.", 404);
+  if (!p) throw new OrphanPaymentError("لا دفعة بهذا المعرّف — ربما حسمت من نافذة أخرى. حدّث الصفحة.", 404);
   if (p.status === "REVERSED" || p.status === "VOID") {
-    throw new OrphanPaymentError("هذه الدفعة مُلغاةٌ أو مردودة من قبل — حدّث الصفحة.", 409);
+    throw new OrphanPaymentError("هذه الدفعة ملغاة أو مردودة من قبل — حدّث الصفحة.", 409);
   }
   if (p.supplierId) {
-    throw new OrphanPaymentError("هذه الدفعة منسوبةٌ إلى مورّدٍ من قبل — ولا يُعاد نسبُها من هنا.", 409);
+    throw new OrphanPaymentError("هذه الدفعة منسوبة إلى مورّد من قبل — ولا يعاد نسبها من هنا.", 409);
   }
   /* دفعةٌ لها حركة بنك تُعرَّف جهتُها من الحركة — بابُها صفحةُ البنك */
   if (p.hasBankTx) {
-    throw new OrphanPaymentError("لهذه الدفعة حركةُ بنك — عرّف جهتها من صفحة البنك.", 409);
+    throw new OrphanPaymentError("لهذه الدفعة حركة بنك — عرّف جهتها من صفحة البنك.", 409);
   }
 
   await assertMonthsOpen(t, [p.appliesToMonth, currentMonthRiyadh(p.paidAt)]);
@@ -78,9 +78,9 @@ export async function resolveOrphanPayment(
       const twin = await findPaymentTwin(t, { supplierId: s.id, paidAt: p.paidAt, amountMinor: p.amountMinor });
       if (twin && twin.id !== p.id) {
         throw new OrphanPaymentError(
-          `لـ${s.nameAr} سدادٌ مقيَّدٌ بالمبلغ نفسه في ${formatDay(p.paidAt)}`
-          + (twin.hasBankRow ? " وله حركةٌ في الكشف" : "")
-          + " — قد تكون هذه نسختَه من الإيصال. إن كانت هي فألغِ قيدَها «ليست لمورّد»، وإن كانت سداداً آخر فأقِرّ وانسبها.",
+          `لـ${s.nameAr} سداد مقيّد بالمبلغ نفسه في ${formatDay(p.paidAt)}`
+          + (twin.hasBankRow ? " وله حركة في الكشف" : "")
+          + " — قد تكون هذه نسخته من الإيصال. إن كانت هي فألغ قيدها «ليست لمورّد»، وإن كانت سداداً آخر فأقرّ وانسبها.",
           409,
           true,
         );
@@ -92,7 +92,7 @@ export async function resolveOrphanPayment(
       .set({ supplierId: s.id })
       .where(and(eq(payments.id, p.id), isNull(payments.supplierId)))
       .returning({ id: payments.id });
-    if (rows.length === 0) throw new OrphanPaymentError("نُسبت هذه الدفعة للتوّ من نافذةٍ أخرى.", 409);
+    if (rows.length === 0) throw new OrphanPaymentError("نسبت هذه الدفعة للتوّ من نافذة أخرى.", 409);
 
     /* الإيصالُ يتبع دفعتَه — وإلّا بقي «بلا مورّد» في الأرشيف وحده */
     if (p.documentId) {
@@ -109,12 +109,12 @@ export async function resolveOrphanPayment(
       entityId: p.id,
       before: { المورّد: null },
       after: {
-        المورّد: s.nameAr, المبلغ: p.amountMinor, السبب: "نُسبت دفعةٌ بلا مورّد من إيصالها",
-        ...(req.acknowledgeTwin ? { "أُقرّ أنّها سدادٌ آخر": true } : {}),
+        المورّد: s.nameAr, المبلغ: p.amountMinor, السبب: "نسبت دفعة بلا مورّد من إيصالها",
+        ...(req.acknowledgeTwin ? { "أقرّ أنّها سداد آخر": true } : {}),
       },
     }, t);
 
-    return { message: `نُسبت إلى ${s.nameAr} — وصارت رصيداً له يُخصم من دَينه.` };
+    return { message: `نسبت إلى ${s.nameAr} — وصارت رصيداً له يخصم من دينه.` };
   }
 
   const outcome = await reversePayment(t, { paymentId: p.id, kind: "VOID", reason: req.reason, userId });
@@ -126,5 +126,5 @@ export async function resolveOrphanPayment(
     before: { الحال: p.status, المبلغ: p.amountMinor },
     after: { الحال: outcome.status, السبب: outcome.reason },
   }, t);
-  return { message: "أُلغي قيدُها — ليست سدادَ مورّد. والإيصالُ باقٍ في الأرشيف، والأثرُ في السجلّ." };
+  return { message: "ألغي قيدها — ليست سداد مورّد. والإيصال باق في الأرشيف، والأثر في السجلّ." };
 }

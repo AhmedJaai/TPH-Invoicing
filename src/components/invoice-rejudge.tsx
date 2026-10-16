@@ -27,7 +27,7 @@ export function InvoiceRejudge({ invoiceId }: { invoiceId: string }) {
       setError(r.error);
       return;
     }
-    toast({ tone: r.data.taxStatus === "VALID" ? "ok" : "warn", title: "أُعيد الحكم على الفاتورة" });
+    toast({ tone: r.data.taxStatus === "VALID" ? "ok" : "warn", title: "أعيد الحكم على الفاتورة" });
     router.refresh();
   }
 
@@ -35,7 +35,7 @@ export function InvoiceRejudge({ invoiceId }: { invoiceId: string }) {
     <span className="inline-flex flex-wrap items-center gap-2">
       <button type="button" onClick={run} disabled={busy} aria-busy={busy} className={buttonClass("secondary", "sm")}>
         <RefreshCw className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} aria-hidden />
-        {busy ? "يُعاد…" : "أعِد الحكم"}
+        {busy ? "يعاد…" : "أعد الحكم"}
       </button>
       {error && <span role="alert" className="text-xs text-danger">{error}</span>}
     </span>

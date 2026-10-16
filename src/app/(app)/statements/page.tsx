@@ -57,7 +57,7 @@ export default async function StatementsPage({
              st.closing_balance_minor as closing, d.file_name,
              (select count(*)::int from statement_lines sl where sl.statement_id = st.id) as lines,
              (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'MATCHED') as matched,
-             /* سطورٌ مدينة برقمٍ لم يُطابَق: فواتيرُ يذكرها الكشف ولا ملفَّ لها */
+             /* سطور مدينة برقم لم يطابق: فواتير يذكرها الكشف ولا ملفّ لها */
              (select count(*)::int from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null) as missing,
              (select coalesce(sum(sl.debit_minor), 0)::bigint from statement_lines sl where sl.statement_id = st.id and sl.match_status = 'UNMATCHED' and sl.debit_minor > 0 and sl.ref is not null) as missing_minor
         from statements st
@@ -65,7 +65,7 @@ export default async function StatementsPage({
         left join documents d on d.id = st.document_id
        /*
          «كشوفه» و«طابقها» في ملفّ المورّد تفتح كشوفه وحده (BTN-032) —
-         فالمرشِّح بالمعرّف المختصر، ويُختار المورّد سلفاً في الفحص.
+         فالمرشّح بالمعرّف المختصر، ويختار المورّد سلفاً في الفحص.
        */
        ${params.supplier ? sql`where s.slug = ${params.supplier}` : sql``}
        order by st.period_end desc
@@ -91,12 +91,12 @@ export default async function StatementsPage({
         <h2 id="missing-title" className="flex items-center gap-2 text-sm font-bold">
           <MailQuestion className={`h-4 w-4 ${missing.length > 0 ? "text-warn" : "text-ok"}`} strokeWidth={2} aria-hidden />
           {missing.length === 0
-            ? `وصلت كشوف ${formatMonth(missingMonth)} كلُّها`
-            : `لم يصل كشفُ ${formatMonth(missingMonth)} من ${countNoun(missing.length, SUPPLIER)}`}
+            ? `وصلت كشوف ${formatMonth(missingMonth)} كلّها`
+            : `لم يصل كشف ${formatMonth(missingMonth)} من ${countNoun(missing.length, SUPPLIER)}`}
         </h2>
         <p className="mt-1 text-[11px] leading-relaxed text-muted">
           {missing.length === 0
-            ? "كلُّ مورّدٍ له فواتير عندنا وصل منه كشفٌ ينتهي في هذا الشهر."
+            ? "كلّ مورّد له فواتير عندنا وصل منه كشف ينتهي في هذا الشهر."
             : "لهم فواتير عندنا ولا كشف منهم ينتهي في هذا الشهر. اطلبه، ثمّ ارفعه وطابقه."}
         </p>
       </header>
@@ -128,7 +128,7 @@ export default async function StatementsPage({
         </ul>
       )}
       <p className="border-t border-line-soft px-4 py-2.5 text-[11px] leading-relaxed text-muted sm:px-5">
-        ومن لا يصدر كشوفاً يُعلَن ذلك في ملفّه («بياناته»)، فلا يُطلَب منه.
+        ومن لا يصدر كشوفاً يعلن ذلك في ملفّه («بياناته»)، فلا يطلب منه.
       </p>
     </section>
   );
@@ -138,7 +138,7 @@ export default async function StatementsPage({
       user={user}
       width="wide"
       title="الكشوف"
-      intro="مقابلةُ كشف المورّد بفواتيرك — وهي وحدها تكشف الفاتورة التي حمّلها عليك ولم تصلك، لأنّها ليست في أرشيفك."
+      intro="مقابلة كشف المورّد بفواتيرك — وهي وحدها تكشف الفاتورة التي حمّلها عليك ولم تصلك، لأنّها ليست في أرشيفك."
     >
       {params.supplier && (
         <Callout
@@ -147,7 +147,7 @@ export default async function StatementsPage({
           action={<Link href="/statements" className={buttonClass("secondary", "sm")}>كشوف كلّ المورّدين</Link>}
         >
           {focusSupplier
-            ? <>كشوف <strong className="text-ink">{focusSupplier.nameAr}</strong> وحده — وهو مختارٌ سلفاً في الفحص.</>
+            ? <>كشوف <strong className="text-ink">{focusSupplier.nameAr}</strong> وحده — وهو مختار سلفاً في الفحص.</>
             : <>لا مورّد نشطاً بهذا المعرّف.</>}
         </Callout>
       )}

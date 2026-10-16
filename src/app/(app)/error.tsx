@@ -69,11 +69,11 @@ export default function ErrorPage({
         <h1 className="mt-4 text-lg font-bold">{online ? "تعذّر عرض هذه الصفحة" : "أنت بلا اتّصال"}</h1>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-soft">
           {online
-            ? "عرضُ الصفحة لا يكتب شيئاً، فلم يضِع قيد. الخادمُ لم يردّ — وغالباً هو انقطاعٌ عابر في الاتصال بالقاعدة."
-            : "جهازُك غير موصولٍ بالشبكة. عرضُ الصفحة لا يكتب شيئاً، فلم يضِع قيد — وتُعاد المحاولةُ وحدها حين يعود الاتّصال."}
+            ? "عرض الصفحة لا يكتب شيئاً، فلم يضع قيد. الخادم لم يردّ — وغالباً هو انقطاع عابر في الاتصال بالقاعدة."
+            : "جهازك غير موصول بالشبكة. عرض الصفحة لا يكتب شيئاً، فلم يضع قيد — وتعاد المحاولة وحدها حين يعود الاتّصال."}
         </p>
         <p className="mt-2 min-h-5 text-xs font-bold text-ink-soft" role="status">
-          {left !== null && <>تُعاد المحاولةُ بعد <span className="nums">{left}</span> ث…</>}
+          {left !== null && <>تعاد المحاولة بعد <span className="nums">{left}</span> ث…</>}
         </p>
         {error.digest && (
           <p className="mt-3 text-[11px] text-muted">

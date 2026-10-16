@@ -19,10 +19,10 @@ import { addMonths } from "./filing";
 export type CommitmentKind = "SUPPLIER_RUN" | "RECURRING" | "VAT" | "EXPIRY";
 
 export const COMMITMENT_LABEL: Record<CommitmentKind, string> = {
-  SUPPLIER_RUN: "دفعةُ المورّدين",
+  SUPPLIER_RUN: "دفعة المورّدين",
   RECURRING: "متكرّر",
   VAT: "ضريبة",
-  EXPIRY: "وثيقةٌ تنتهي",
+  EXPIRY: "وثيقة تنتهي",
 };
 
 export interface Commitment {
@@ -94,14 +94,14 @@ export function buildCommitments(input: CommitmentsInput): Commitments {
   const overdueMinor = sum(input.overdueRun);
   if (overdueMinor > 0) {
     put(`${thisMonth}-01`, {
-      id: "run:overdue", kind: "SUPPLIER_RUN", label: "دفعةُ الشهر الماضي — لم تُحوَّل بعد",
+      id: "run:overdue", kind: "SUPPLIER_RUN", label: "دفعة الشهر الماضي — لم تحوّل بعد",
       sub: `${input.overdueRun.filter((s) => s.amountMinor > 0).length} مورّدين`, amountMinor: overdueMinor, href: "/payments",
     });
   }
   const nextMinor = sum(input.nextRun);
   if (nextMinor > 0) {
     put(`${addMonths(thisMonth, 1)}-01`, {
-      id: "run:next", kind: "SUPPLIER_RUN", label: "دفعةُ هذا الشهر",
+      id: "run:next", kind: "SUPPLIER_RUN", label: "دفعة هذا الشهر",
       sub: "من الفواتير المسجّلة حتى اليوم — وتكبر", amountMinor: nextMinor, href: "/payments",
     });
   }
@@ -122,10 +122,10 @@ export function buildCommitments(input: CommitmentsInput): Commitments {
     put(v.deadline, {
       id: `vat:${v.periodKey}`,
       kind: "VAT",
-      label: `آخرُ موعدٍ لإقرار ${v.label}`,
-      sub: v.amountMinor === null ? "مبلغُه غير معروف — شهرٌ منه بلا كشف"
-        : v.amountMinor <= 0 ? "لا مبلغَ يُسدَّد بحساب اليوم — ويُقدَّم الإقرار"
-        : v.accruing ? "المبلغُ حتى اليوم ويكبر" : undefined,
+      label: `آخر موعد لإقرار ${v.label}`,
+      sub: v.amountMinor === null ? "مبلغه غير معروف — شهر منه بلا كشف"
+        : v.amountMinor <= 0 ? "لا مبلغ يسدّد بحساب اليوم — ويقدّم الإقرار"
+        : v.accruing ? "المبلغ حتى اليوم ويكبر" : undefined,
       amountMinor: v.amountMinor === null ? null : Math.max(0, v.amountMinor),
       href: `/close/vat?period=${v.periodKey}`,
     });

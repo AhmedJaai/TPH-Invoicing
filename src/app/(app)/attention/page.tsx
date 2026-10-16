@@ -88,7 +88,7 @@ export default async function AttentionPage({
       user={user}
       width="wide"
       title="يحتاج قرارك"
-      intro="كلُّ ما ينتظر قراراً في مكانٍ واحد — الأهمّ أوّلاً، ولكلٍّ سببُه وأثرُه وفعلُه."
+      intro="كلّ ما ينتظر قراراً في مكان واحد — الأهمّ أوّلاً، ولكلّ سببه وأثره وفعله."
     >
       {children}
     </PageShell>
@@ -166,7 +166,7 @@ export default async function AttentionPage({
             {resolved && (
               <p role="status" className="mb-3 flex animate-rise items-center gap-2 rounded-xl border border-ok/25 bg-ok-bg px-4 py-2.5 text-xs font-bold text-ok">
                 <CircleCheck className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
-                حُسم البندُ الذي كنت فيه وخرج من الطابور — وهذا تاليه.
+                حسم البند الذي كنت فيه وخرج من الطابور — وهذا تاليه.
               </p>
             )}
             <ItemDetail

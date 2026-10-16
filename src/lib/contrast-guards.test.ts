@@ -55,7 +55,7 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ["line-input", "raised", 3],
 ];
 
-describe("تباينُ الرموز على حدّ AA", () => {
+describe("تباين الرموز على حدّ AA", () => {
   for (const [name, set] of [["الفاتح", light], ["الداكن", dark]] as const) {
     for (const [fg, bg, min] of PAIRS) {
       it(`${name}: ${fg} على ${bg} ≥ ${min}`, () => {
@@ -80,18 +80,18 @@ function blend(fg: string, bg: string, alpha: number): string {
   return "#" + [1, 3, 5].map((i) => Math.round(ch(fg, i) * alpha + ch(bg, i) * (1 - alpha)).toString(16).padStart(2, "0")).join("");
 }
 
-describe("كسرُ الهللات لا ينزل تحت AA", () => {
+describe("كسر الهللات لا ينزل تحت AA", () => {
   const m = /\.nums-frac\s*\{\s*opacity:\s*([\d.]+)/.exec(css);
   const alpha = m ? Number(m[1]) : NaN;
 
-  it("الشفافيّةُ مقروءةٌ من globals.css", () => {
+  it("الشفافيّة مقروءة من globals.css", () => {
     expect(alpha).toBeGreaterThan(0);
     expect(alpha).toBeLessThanOrEqual(1);
   });
 
   for (const [name, set] of [["الفاتح", light], ["الداكن", dark]] as const) {
     for (const bg of ["raised", "surface", "sunken", "hover"]) {
-      it(`${name}: كسرُ الحبر على ${bg} ≥ 4.5`, () => {
+      it(`${name}: كسر الحبر على ${bg} ≥ 4.5`, () => {
         const ink = set.get("ink")!;
         const ground = set.get(bg)!;
         expect(contrast(blend(ink, ground, alpha), ground)).toBeGreaterThanOrEqual(4.5);
@@ -99,9 +99,9 @@ describe("كسرُ الهللات لا ينزل تحت AA", () => {
     }
   }
 
-  it("الملوَّنُ والخافت لا يُبهَّتان — قاعدةٌ تعيد شفافيّتَهما كاملة", () => {
+  it("الملوّن والخافت لا يبهّتان — قاعدة تعيد شفافيّتهما كاملة", () => {
     const rule = /:is\(([^{]*)\)\s*\.nums-frac\s*\{([^}]*)\}/.exec(css);
-    expect(rule, "قاعدةُ الكسر الملوَّن غائبة").not.toBeNull();
+    expect(rule, "قاعدة الكسر الملوّن غائبة").not.toBeNull();
     for (const cls of [".text-danger", ".text-warn", ".text-ok", ".text-info", ".text-muted", ".text-ink-soft", ".text-accent"]) {
       expect(rule![1]).toContain(cls);
     }
@@ -114,8 +114,8 @@ describe("كسرُ الهللات لا ينزل تحت AA", () => {
   اختاره بزرّه (`data-theme`). فإن اختلفت الكتلتان رأى صاحبُ الجهاز الداكن
   لوناً غير الذي رآه من ضغط الزرّ — وسقط تباينٌ لا يفحصه أحد.
 */
-describe("الداكنُ واحدٌ بطريقَيه", () => {
-  it("كتلةُ نظام الجهاز تطابق كتلةَ الزرّ رمزاً رمزاً", () => {
+describe("الداكن واحد بطريقيه", () => {
+  it("كتلة نظام الجهاز تطابق كتلة الزرّ رمزاً رمزاً", () => {
     const media = tokens(block(':root:not([data-theme="light"]) {'));
     const button = tokens(block(':root[data-theme="dark"] {'));
     expect(media.size).toBeGreaterThan(10);

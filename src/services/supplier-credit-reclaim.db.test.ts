@@ -13,8 +13,8 @@ const paidOn = async (tx: Tx, invoiceId: string) =>
   Number((await tx.select({ s: sql<number>`coalesce(sum(${paymentAllocations.amountMinor}),0)::int` })
     .from(paymentAllocations).where(eq(paymentAllocations.invoiceId, invoiceId)))[0].s);
 
-describe("الفاتورةُ الأقدم المتأخّرة تستردّ حوالتها (لوريفا)", () => {
-  it("حوالةُ ٢ سبتمبر لفواتير أغسطس — لا لفاتورة ٤ سبتمبر وصلت قبلها", () =>
+describe("الفاتورة الأقدم المتأخّرة تستردّ حوالتها (لوريفا)", () => {
+  it("حوالة ٢ سبتمبر لفواتير أغسطس — لا لفاتورة ٤ سبتمبر وصلت قبلها", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const aug20 = await makeInvoice(tx, s, 600_00, "2026-08-20");

@@ -58,7 +58,7 @@ function rec(over: Partial<RecurringExpense> & { id: string }): RecurringExpense
 }
 
 describe("isExpenseCategory", () => {
-  it("سداد المورّد ليس مصروفاً — فهو محسوبٌ في المشتريات", () => {
+  it("سداد المورّد ليس مصروفاً — فهو محسوب في المشتريات", () => {
     expect(isExpenseCategory("SUPPLIER")).toBe(false);
   });
 
@@ -66,11 +66,11 @@ describe("isExpenseCategory", () => {
     expect(isExpenseCategory("INTERNAL")).toBe(false);
   });
 
-  it("السحب الشخصي توزيعٌ لا مصروف تشغيليّ", () => {
+  it("السحب الشخصي توزيع لا مصروف تشغيليّ", () => {
     expect(isExpenseCategory("PERSONAL")).toBe(false);
   });
 
-  it("المجهول لا يُقيَّد بابَ حساب", () => {
+  it("المجهول لا يقيّد باب حساب", () => {
     expect(isExpenseCategory("UNKNOWN")).toBe(false);
   });
 
@@ -82,11 +82,11 @@ describe("isExpenseCategory", () => {
 });
 
 describe("deriveFromBank", () => {
-  it("الوارد لا يُقيَّد مصروفاً", () => {
+  it("الوارد لا يقيّد مصروفاً", () => {
     expect(deriveFromBank([tx({ id: "a", direction: "CREDIT" })]).candidates).toEqual([]);
   });
 
-  it("سداد المورّد يُستبعَد كي لا يُحسب مرّتين", () => {
+  it("سداد المورّد يستبعد كي لا يحسب مرّتين", () => {
     const out = deriveFromBank([
       tx({ id: "supplier", category: "SUPPLIER" }),
       tx({ id: "rent", category: "RENT" }),
@@ -94,7 +94,7 @@ describe("deriveFromBank", () => {
     expect(out.map((c) => c.bankTransactionId)).toEqual(["rent"]);
   });
 
-  it("ما قُيّد من قبل لا يُقيَّد ثانيةً", () => {
+  it("ما قيّد من قبل لا يقيّد ثانيةً", () => {
     const txs = [tx({ id: "a" }), tx({ id: "b" })];
     const out = deriveFromBank(txs, new Set(["a"])).candidates;
     expect(out).toHaveLength(1);
@@ -108,12 +108,12 @@ describe("deriveFromBank", () => {
     expect(second.candidates).toEqual([]);
   });
 
-  it("المبلغ يُقيَّد موجباً مهما ورد", () => {
+  it("المبلغ يقيّد موجباً مهما ورد", () => {
     const out = deriveFromBank([tx({ id: "a", amountMinor: -500_00 })]).candidates;
     expect(out[0].amountMinor).toBe(500_00);
   });
 
-  it("حركة بصفر لا تُقيَّد", () => {
+  it("حركة بصفر لا تقيّد", () => {
     expect(deriveFromBank([tx({ id: "a", amountMinor: 0 })]).candidates).toEqual([]);
   });
 
@@ -126,15 +126,15 @@ describe("deriveFromBank", () => {
       .toBe("إيجار");
   });
 
-  it("الشهر يُشتقّ من تاريخ الحركة", () => {
+  it("الشهر يشتقّ من تاريخ الحركة", () => {
     const out = deriveFromBank([tx({ id: "a", valueDate: new Date("2026-01-31T22:00:00Z") })]).candidates;
     expect(out[0].periodMonth).toBe("2026-01");
     expect(out[0].occurredOn).toBe("2026-01-31");
   });
 });
 
-describe("شراء البضاعة يُقدَّم على التصنيف", () => {
-  it("وصفٌ يقول شراء بضاعة لا يُقيَّد مصروفاً ولو صنّفته القاعدة راتباً", () => {
+describe("شراء البضاعة يقدّم على التصنيف", () => {
+  it("وصف يقول شراء بضاعة لا يقيّد مصروفاً ولو صنّفته القاعدة راتباً", () => {
     const out = deriveFromBank([
       tx({ id: "goods", category: "SALARY", description: "سالم باحاج شراء بضاعة 121788" }),
     ]);
@@ -142,7 +142,7 @@ describe("شراء البضاعة يُقدَّم على التصنيف", () => {
     expect(out.goodsPurchases.map((g) => g.bankTransactionId)).toEqual(["goods"]);
   });
 
-  it("يُلتقَط من اسم المستفيد أيضاً لا من الوصف وحده", () => {
+  it("يلتقط من اسم المستفيد أيضاً لا من الوصف وحده", () => {
     const out = deriveFromBank([
       tx({ id: "g", category: "OTHER", description: null, beneficiaryRaw: "شراء بضاعه" }),
     ]);
@@ -158,7 +158,7 @@ describe("شراء البضاعة يُقدَّم على التصنيف", () => {
     expect(out.goodsPurchases).toEqual([]);
   });
 
-  it("يُحفظ مبلغه واسمه كي يُعرَض السبب لا أن يختفي بصمت", () => {
+  it("يحفظ مبلغه واسمه كي يعرض السبب لا أن يختفي بصمت", () => {
     const out = deriveFromBank([
       tx({ id: "g", category: "SALARY", beneficiaryRaw: "مخبز", description: "شراء بضاعة", amountMinor: 3_500_00 }),
     ]);
@@ -176,7 +176,7 @@ describe("looksLikeGoodsPurchase", () => {
     expect(looksLikeGoodsPurchase("شراء بضاعه")).toBe(true);
   });
 
-  it("لا تُطلق على ما ليس منه", () => {
+  it("لا تطلق على ما ليس منه", () => {
     expect(looksLikeGoodsPurchase("رواتب شهرية", null)).toBe(false);
     expect(looksLikeGoodsPurchase(null, undefined)).toBe(false);
   });
@@ -191,7 +191,7 @@ describe("monthlyShare", () => {
 });
 
 describe("expectedVsActual", () => {
-  it("الفرق موجب حين يُصرف أكثر من المتوقَّع", () => {
+  it("الفرق موجب حين يصرف أكثر من المتوقّع", () => {
     const v = expectedVsActual(
       [rec({ id: "r", amountMinor: 7_916_00 })],
       [exp({ id: "e", amountMinor: 8_120_00 })],
@@ -217,12 +217,12 @@ describe("expectedVsActual", () => {
     expect(v[0].actualMinor).toBe(0);
   });
 
-  it("المتكرّر المعطَّل لا يُتوقَّع منه شيء", () => {
+  it("المتكرّر المعطّل لا يتوقّع منه شيء", () => {
     const v = expectedVsActual([rec({ id: "r", isActive: false })], [], "2026-09");
     expect(v).toEqual([]);
   });
 
-  it("يُرتَّب بأكبر فرق مطلق", () => {
+  it("يرتّب بأكبر فرق مطلق", () => {
     const v = expectedVsActual(
       [rec({ id: "r1", category: "RENT", amountMinor: 100_00 }),
        rec({ id: "r2", category: "SALARY", amountMinor: 100_00 })],
@@ -235,12 +235,12 @@ describe("expectedVsActual", () => {
 });
 
 describe("unmetRecurring", () => {
-  it("تكشف الإيجار الذي لم يُدفع", () => {
+  it("تكشف الإيجار الذي لم يدفع", () => {
     const out = unmetRecurring([rec({ id: "rent" })], [], "2026-09");
     expect(out.map((r) => r.id)).toEqual(["rent"]);
   });
 
-  it("المربوط صراحةً يُعدّ مدفوعاً ولو نقص مبلغه", () => {
+  it("المربوط صراحةً يعدّ مدفوعاً ولو نقص مبلغه", () => {
     const out = unmetRecurring(
       [rec({ id: "rent", amountMinor: 1_000_00 })],
       [exp({ id: "e", amountMinor: 10_00, recurringExpenseId: "rent" })],
@@ -249,14 +249,14 @@ describe("unmetRecurring", () => {
     expect(out).toEqual([]);
   });
 
-  it("بلا ربط: يُعدّ مدفوعاً إن بلغ صرف بابه حصّة الشهر", () => {
+  it("بلا ربط: يعدّ مدفوعاً إن بلغ صرف بابه حصّة الشهر", () => {
     const rents = [rec({ id: "rent", amountMinor: 1_000_00 })];
     expect(unmetRecurring(rents, [exp({ id: "e", amountMinor: 1_000_00 })], "2026-09")).toEqual([]);
     expect(unmetRecurring(rents, [exp({ id: "e", amountMinor: 999_99 })], "2026-09"))
       .toHaveLength(1);
   });
 
-  it("صرفٌ في شهر آخر لا يُبرئ هذا الشهر", () => {
+  it("صرف في شهر آخر لا يبرئ هذا الشهر", () => {
     const out = unmetRecurring(
       [rec({ id: "rent" })],
       [exp({ id: "e", periodMonth: "2026-08" })],
@@ -265,7 +265,7 @@ describe("unmetRecurring", () => {
     expect(out).toHaveLength(1);
   });
 
-  it("المعطَّل لا يُطالَب به", () => {
+  it("المعطّل لا يطالب به", () => {
     expect(unmetRecurring([rec({ id: "r", isActive: false })], [], "2026-09")).toEqual([]);
   });
 });
@@ -302,7 +302,7 @@ describe("matchRecurring", () => {
     expect(m?.id).toBe("near");
   });
 
-  it("المعطَّل لا يُربط به", () => {
+  it("المعطّل لا يربط به", () => {
     expect(matchRecurring({ category: "RENT", amountMinor: 1_000_00 },
       [rec({ id: "r", isActive: false })])).toBeNull();
   });
@@ -314,7 +314,7 @@ describe("المجاميع", () => {
     expect(totalActual(rows, "2026-09")).toBe(1_000_00);
   });
 
-  it("المتوقَّع يجمع الحصص الشهرية للنشط وحده", () => {
+  it("المتوقّع يجمع الحصص الشهرية للنشط وحده", () => {
     expect(totalExpected([
       rec({ id: "a", amountMinor: 1_200_00, cadence: "ANNUAL" }),
       rec({ id: "b", amountMinor: 100_00 }),
@@ -330,7 +330,7 @@ describe("periodOf", () => {
 });
 
 describe("suspectedSupplierExpenses", () => {
-  it("تكشف قيداً اسمه اسم مورّد مسجَّل", () => {
+  it("تكشف قيداً اسمه اسم مورّد مسجّل", () => {
     const out = suspectedSupplierExpenses(
       [exp({ id: "a", label: "لوريفا كيك", category: "SALARY" })],
       ["لوريفا كيك", "محمصة الغربية"],
@@ -355,7 +355,7 @@ describe("suspectedSupplierExpenses", () => {
     expect(out).toHaveLength(1);
   });
 
-  it("لا تُطلق على راتب موظّف", () => {
+  it("لا تطلق على راتب موظّف", () => {
     const out = suspectedSupplierExpenses(
       [exp({ id: "a", label: "البراء محمد الجعيدي رواتب شهرية" })],
       ["لوريفا كيك"],
@@ -363,7 +363,7 @@ describe("suspectedSupplierExpenses", () => {
     expect(out).toEqual([]);
   });
 
-  it("الاسم القصير جداً لا يُعتدّ به — يُطابق بالمصادفة", () => {
+  it("الاسم القصير جداً لا يعتدّ به — يطابق بالمصادفة", () => {
     const out = suspectedSupplierExpenses(
       [exp({ id: "a", label: "دفعة كهرباء" })],
       ["كه"],
@@ -376,7 +376,7 @@ describe("suspectedSupplierExpenses", () => {
   });
 });
 
-describe("ازدواج المصروف عن حدثٍ واحد", () => {
+describe("ازدواج المصروف عن حدث واحد", () => {
   const e = (over: Partial<Expense> & { id: string }): Expense => ({
     periodMonth: "2026-08",
     occurredOn: "2026-08-05",
@@ -391,7 +391,7 @@ describe("ازدواج المصروف عن حدثٍ واحد", () => {
     القيود القائمة تمنع تكرار السجلّ عن نفس الحركة أو نفس الفاتورة —
     وهذان سجلّان عن مصدرين مختلفين، فيمرّان. والحدث واحد.
   */
-  it("الحدث الواحد من مصدرين يُكشَف", () => {
+  it("الحدث الواحد من مصدرين يكشف", () => {
     const dups = findDuplicateExpenses([
       e({ id: "a", source: "BANK" }),
       e({ id: "b", source: "INVOICE" }),
@@ -433,7 +433,7 @@ describe("ازدواج المصروف عن حدثٍ واحد", () => {
   const snb = (ref: string) =>
     `Saudi Energy رقم السداد3015160477${ref} هاتف الأهلي مرجع سداد689828${ref}045 مرجع13002483${ref}`;
 
-  it("مرجعُ سدادٍ بعد الحرف الستّين يفرّق حدثين", () => {
+  it("مرجع سداد بعد الحرف الستّين يفرّق حدثين", () => {
     const dups = findDuplicateExpenses([
       e({ id: "a", label: snb("1"), amountMinor: 1_699_39, bankTransactionId: "t1" }),
       e({ id: "b", label: snb("2"), amountMinor: 1_699_39, bankTransactionId: "t2" }),
@@ -441,7 +441,7 @@ describe("ازدواج المصروف عن حدثٍ واحد", () => {
     expect(dups).toHaveLength(0);
   });
 
-  it("وحركتان بنكيّتان مختلفتان حدثان — مهما تطابق كلُّ ما عداهما", () => {
+  it("وحركتان بنكيّتان مختلفتان حدثان — مهما تطابق كلّ ما عداهما", () => {
     const dups = findDuplicateExpenses([
       e({ id: "a", bankTransactionId: "t1" }),
       e({ id: "b", bankTransactionId: "t2" }),
@@ -449,7 +449,7 @@ describe("ازدواج المصروف عن حدثٍ واحد", () => {
     expect(dups).toHaveLength(0);
   });
 
-  it("وحركةٌ واحدة تشهد لمصروفين → تكرارٌ حقّاً", () => {
+  it("وحركة واحدة تشهد لمصروفين → تكرار حقّاً", () => {
     const dups = findDuplicateExpenses([
       e({ id: "a", bankTransactionId: "t1" }),
       e({ id: "b", bankTransactionId: "t1" }),
@@ -457,7 +457,7 @@ describe("ازدواج المصروف عن حدثٍ واحد", () => {
     expect(dups).toHaveLength(1);
   });
 
-  it("والمصدران المختلفان بلا أثرٍ متعارض تكرارٌ كذلك", () => {
+  it("والمصدران المختلفان بلا أثر متعارض تكرار كذلك", () => {
     const dups = findDuplicateExpenses([
       e({ id: "a", source: "BANK", bankTransactionId: "t1" }),
       e({ id: "b", source: "INVOICE" }),
@@ -465,7 +465,7 @@ describe("ازدواج المصروف عن حدثٍ واحد", () => {
     expect(dups).toHaveLength(1);
   });
 
-  it("ثلاثة عن حدثٍ واحد: الزائد اثنان", () => {
+  it("ثلاثة عن حدث واحد: الزائد اثنان", () => {
     const dups = findDuplicateExpenses([
       e({ id: "a" }), e({ id: "b", source: "INVOICE" }), e({ id: "c", source: "MANUAL" }),
     ]);
@@ -474,8 +474,8 @@ describe("ازدواج المصروف عن حدثٍ واحد", () => {
   });
 });
 
-describe("unrecordedFromBank — الفعليّ الناقص يُعلَن", () => {
-  it("يعدّ ما سيقيّده الاشتقاق وحده: لا الوارد ولا المورّد ولا البضاعة ولا المقيَّد", () => {
+describe("unrecordedFromBank — الفعليّ الناقص يعلن", () => {
+  it("يعدّ ما سيقيّده الاشتقاق وحده: لا الوارد ولا المورّد ولا البضاعة ولا المقيّد", () => {
     const txs = [
       tx({ id: "fee", category: "POS_FEE", amountMinor: 10_000 }),
       tx({ id: "vat", category: "POS_VAT", amountMinor: 1_500 }),
@@ -487,31 +487,31 @@ describe("unrecordedFromBank — الفعليّ الناقص يُعلَن", () =
     expect(unrecordedFromBank(deriveFromBank(txs, new Set(["done"])))).toEqual({ count: 2, amountMinor: 11_500 });
   });
 
-  it("ولا شيء ناقص ← صفرٌ حقيقيّ", () => {
+  it("ولا شيء ناقص ← صفر حقيقيّ", () => {
     expect(unrecordedFromBank(deriveFromBank([tx({ id: "a" })], new Set(["a"])))).toEqual({ count: 0, amountMinor: 0 });
   });
 });
 
-describe("الزائد يُحذف بعينه (BTN-111)", () => {
+describe("الزائد يحذف بعينه (BTN-111)", () => {
   const e = (id: string, source: "BANK" | "INVOICE" | "MANUAL", tx: string | null = null) => ({
     id, periodMonth: "2026-08", occurredOn: "2026-08-10", category: "UTILITY" as const,
     label: "كهرباء", amountMinor: 450_00, source, bankTransactionId: tx,
   });
 
-  it("المجموعة تحمل قيودها كي يُعرَض كلٌّ بمصدره", () => {
+  it("المجموعة تحمل قيودها كي يعرض كلّ بمصدره", () => {
     const [d] = findDuplicateExpenses([e("b", "BANK", "tx1"), e("m", "MANUAL")]);
     expect(d.members.map((m) => m.id).sort()).toEqual(["b", "m"]);
   });
 
-  it("المشتقّ من البنك لا يُحذف — الاشتقاق يعيده", () => {
+  it("المشتقّ من البنك لا يحذف — الاشتقاق يعيده", () => {
     expect(deletableExpense({ source: "BANK" })).toBe(false);
     expect(deletableExpense({ source: "MANUAL" })).toBe(true);
     expect(deletableExpense({ source: "INVOICE" })).toBe(true);
   });
 });
 
-describe("اسمُ المصروف من حركته", () => {
-  it("المستفيدُ كما في الكشف — لا اسمُ مورّدٍ يشبهه", () => {
+describe("اسم المصروف من حركته", () => {
+  it("المستفيد كما في الكشف — لا اسم مورّد يشبهه", () => {
     /* «كيكي» ليس «لوريفا كيك»: الاسمُ من الكشف لا من سجلّ المورّدين */
     expect(bankExpenseLabel({ beneficiaryRaw: " صالح نزار بن صالح كيكي ", description: "BV:رواتب شهرية", category: "SALARY" }))
       .toBe("صالح نزار بن صالح كيكي");

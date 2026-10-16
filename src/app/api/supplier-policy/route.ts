@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   const body: Body = read.body;
 
   const id = body.supplierId?.trim();
-  if (!id) return NextResponse.json({ error: "لم يُذكر المورّد" }, { status: 400 });
+  if (!id) return NextResponse.json({ error: "لم يذكر المورّد" }, { status: 400 });
 
   const [before] = await db
     .select({
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "لا يجتمعان: «فواتيره ورقيّة» تعني أنّها موجودةٌ ولم تُرفَع، و«لا يصدر فواتير» تعني أنّها غير موجودة. اختر واحدة.",
+          "لا يجتمعان: «فواتيره ورقيّة» تعني أنّها موجودة ولم ترفع، و«لا يصدر فواتير» تعني أنّها غير موجودة. اختر واحدة.",
       },
       { status: 400 },
     );

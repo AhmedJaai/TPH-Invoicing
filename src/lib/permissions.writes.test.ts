@@ -22,7 +22,7 @@ describe("فصل صلاحيات الكتابة عن القراءة", () => {
     }
   });
 
-  it("تصحيحُ مبالغ الفاتورة وتنزيلُ الحزمة قدرتان صريحتان — لا يملكهما مديرُ المشتريات", () => {
+  it("تصحيح مبالغ الفاتورة وتنزيل الحزمة قدرتان صريحتان — لا يملكهما مدير المشتريات", () => {
     for (const role of ["OWNER", "ACCOUNTANT"] as const) {
       expect(can(role, "invoice:edit")).toBe(true);
       expect(can(role, "reports:export")).toBe(true);
@@ -45,7 +45,7 @@ describe("فصل صلاحيات الكتابة عن القراءة", () => {
     الأرقام المالية: الشاشةُ تُخفيها، والصفحاتُ التي جوابُها بالريال
     (سجلُّ الجرد والاتّجاه) تشترط `amounts:view`.
   */
-  it("مديرُ المشتريات يعدّ الرفَّ ولا يرى المبالغ", () => {
+  it("مدير المشتريات يعدّ الرفّ ولا يرى المبالغ", () => {
     expect(can("PURCHASING", "inventory:view")).toBe(true);
     expect(can("PURCHASING", "inventory:count")).toBe(true);
     expect(can("PURCHASING", "amounts:view")).toBe(false);
@@ -53,7 +53,7 @@ describe("فصل صلاحيات الكتابة عن القراءة", () => {
     expect(can("PURCHASING", "recipe:edit")).toBe(false);
   });
 
-  it("والمالكُ والمحاسبُ يكتبان الوصفات ويريان كلفةَ الفرق", () => {
+  it("والمالك والمحاسب يكتبان الوصفات ويريان كلفة الفرق", () => {
     for (const role of ["OWNER", "ACCOUNTANT"] as const) {
       expect(can(role, "recipe:edit")).toBe(true);
       expect(can(role, "inventory:count")).toBe(true);
@@ -68,13 +68,13 @@ describe("فصل صلاحيات الكتابة عن القراءة", () => {
     يُعيد حسابَ جردٍ مقفَل. ومن ملك أحدَهما لا يلزم أن يملك الآخر —
     والصلاحيّةُ المشتركة تُوسّع الأذن بلا قصد.
   */
-  it("وإعادةُ فتح جردٍ مقفَل صلاحيّةٌ مستقلّة، للمالك وحده", () => {
+  it("وإعادة فتح جرد مقفل صلاحيّة مستقلّة، للمالك وحده", () => {
     expect(can("OWNER", "inventory:reopen")).toBe(true);
     expect(can("ACCOUNTANT", "inventory:reopen")).toBe(false);
     expect(can("PURCHASING", "inventory:reopen")).toBe(false);
   });
 
-  it("ولا تُعار من إقفال الشهر", () => {
+  it("ولا تعار من إقفال الشهر", () => {
     const roles = ["OWNER", "ACCOUNTANT", "PURCHASING"] as const;
     const reopenMonth = roles.filter((r) => can(r, "month:reopen"));
     const reopenCount = roles.filter((r) => can(r, "inventory:reopen"));
@@ -96,7 +96,7 @@ describe("فصل صلاحيات الكتابة عن القراءة", () => {
     «المراجع» للمحاسب الخارجيّ: يرى ولا يغيّر. وأيُّ قدرةِ كتابةٍ تُضاف له سهواً
     تُسقط هذا الاختبار — القائمةُ البيضاء للقراءة هي الحكم لا أسماءٌ تُعدّ هنا.
   */
-  it("المراجع لا يملك قدرةَ كتابةٍ واحدة", () => {
+  it("المراجع لا يملك قدرة كتابة واحدة", () => {
     const writes = capabilitiesOf("AUDITOR").filter((c) => !READ_CAPABILITIES.includes(c));
     expect(writes).toEqual([]);
     for (const c of ["document:upload", "invoice:edit", "bank:edit", "expense:edit", "payment:approve", "month:close", "month:reopen", "users:manage", "supplier:edit", "inventory:count", "recipe:edit"] as const) {
@@ -111,12 +111,12 @@ describe("فصل صلاحيات الكتابة عن القراءة", () => {
     expect(can("AUDITOR", "payroll:view")).toBe(false);
   });
 
-  it("إدارةُ المستخدمين للمالك وحده", () => {
+  it("إدارة المستخدمين للمالك وحده", () => {
     expect(can("OWNER", "users:manage")).toBe(true);
     for (const role of ["ACCOUNTANT", "PURCHASING", "AUDITOR"] as const) expect(can(role, "users:manage")).toBe(false);
   });
 
-  it("القائمة البيضاء تقبل المراجع، وما ليس دوراً يُردّ إلى الأضيق لا إلى الأوسع", () => {
+  it("القائمة البيضاء تقبل المراجع، وما ليس دوراً يردّ إلى الأضيق لا إلى الأوسع", () => {
     const list = parseAllowlist("a@x.com:OWNER, cpa@x.com:AUDITOR, who@x.com:ADMIN, bare@x.com");
     expect(list.get("cpa@x.com")).toBe("AUDITOR");
     expect(list.get("who@x.com")).toBe("PURCHASING");

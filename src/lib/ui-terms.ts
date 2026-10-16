@@ -16,26 +16,26 @@ import { TRANSACTION, countNoun } from "./arabic";
 
 export const ACT = {
   /** يُنشئ دفعةً على حساب المورّد ويوزّعها بالأقدم أوّلاً */
-  settleOnAccount: "سدِّد على حساب المورّد",
+  settleOnAccount: "سدّد على حساب المورّد",
   /** يكتب تخصيصاً على فاتورةٍ بعينها */
-  recordAgainstInvoice: "سجِّلها سداداً لهذه الفاتورة",
+  recordAgainstInvoice: "سجّلها سداداً لهذه الفاتورة",
   /** يحفظ هويّة الجهة فتسري على أمثالها */
   saveIdentity: "احفظ التعريف",
-  defineGroup: "عرِّفها",
+  defineGroup: "عرّفها",
   saveIdentityAndNext: "احفظ التعريف وانتقل",
   /** يفكّ التخصيصات ويردّ الدفعة */
-  undoMatch: "فُكَّ المطابقة",
+  undoMatch: "فكّ المطابقة",
   /** يعيد حركةً أُعلنت «ليست سداداً» إلى الطابور */
-  restoreToQueue: "أعِدها إلى الطابور",
+  restoreToQueue: "أعدها إلى الطابور",
   /** يعتمد ما قرأه النموذج فتدخل فاتورتُه ملفّ التحويلات */
   approveDocument: "اعتمد المستند",
   /** يقيّد السداد من حساب المالك وينقل حوالات المقهى عن الفاتورة */
-  paidFromOwner: "سجِّلها مدفوعةً من حسابي",
+  paidFromOwner: "سجّلها مدفوعةً من حسابي",
   /** يُنشئ دفعةً بحوالةٍ من حساب المقهى */
-  recordBankTransfer: "سجِّل الحوالة",
+  recordBankTransfer: "سجّل الحوالة",
 } as const;
 
 /** إقرارٌ جماعيّ — العدد في الاسم كي يُعرف حجم ما يقع. */
 export function recordBatch(n: number): string {
-  return `سجِّل ${countNoun(n, TRANSACTION)}`;
+  return `سجّل ${countNoun(n, TRANSACTION)}`;
 }

@@ -41,7 +41,7 @@ export async function loadOwnerAccount(): Promise<OwnerAccountView> {
       day: r.day,
       kind: "PAID_FOR_CAFE" as const,
       amountMinor: Number(r.amount_minor),
-      label: r.name ?? r.raw ?? "دفعةٌ بلا مورّد",
+      label: r.name ?? r.raw ?? "دفعة بلا مورّد",
       href: r.slug ? `/suppliers/${r.slug}` : "/suppliers",
     })),
     ...moved.rows.map((r) => ({
@@ -49,7 +49,7 @@ export async function loadOwnerAccount(): Promise<OwnerAccountView> {
       day: r.day,
       kind: r.direction === "CREDIT" ? ("PUT_IN" as const) : ("TOOK_OUT" as const),
       amountMinor: Number(r.amount_minor),
-      label: r.beneficiary_raw?.trim() || (r.description ?? "").trim().slice(0, 60) || "تحويلٌ شخصيّ",
+      label: r.beneficiary_raw?.trim() || (r.description ?? "").trim().slice(0, 60) || "تحويل شخصيّ",
       href: txHref(r.id),
     })),
   ];

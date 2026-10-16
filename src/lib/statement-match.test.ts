@@ -54,7 +54,7 @@ describe("reconcileStatement", () => {
     expect(r.lines[0].method).toBe("AMOUNT_DATE");
   });
 
-  it("لا يطابق بالمبلغ إذا بعُد التاريخ", () => {
+  it("لا يطابق بالمبلغ إذا بعد التاريخ", () => {
     const r = reconcileStatement(
       [line({ date: "2026-06-30", debitMinor: 42000 })],
       [inv("a", "260137", "2026-05-14", 42000)],
@@ -124,7 +124,7 @@ describe("reconcileStatement", () => {
     expect(r.notInStatement).toHaveLength(1);
   });
 
-  it("يجمع المحمَّل والمسدَّد ويقارنه بما عندنا", () => {
+  it("يجمع المحمّل والمسدّد ويقارنه بما عندنا", () => {
     const r = reconcileStatement(
       [
         line({ date: "2026-05-14", ref: "260137", debitMinor: 42000 }),
@@ -158,7 +158,7 @@ describe("reconcileStatement", () => {
     expect(r.balanceArithmeticOk).toBe(true);
   });
 
-  it("بلا رصيد ختامي لا يُدّعى فحص لم يجرِ", () => {
+  it("بلا رصيد ختامي لا يدّعى فحص لم يجر", () => {
     const r = reconcileStatement([], []);
     expect(r.balanceArithmeticOk).toBeNull();
   });
@@ -167,7 +167,7 @@ describe("reconcileStatement", () => {
     كان الافتتاحيّ المجهول يُفترَض صفراً فتُحسَب المعادلة على رقمٍ لم
     يُقرأ، ثمّ يُتَّهم المورّد بأنّ «حسابه لا يستقيم» — والخلل عندنا.
   */
-  it("بلا رصيد افتتاحي لا تُحسَب المعادلة ولا يُتَّهم المورّد", () => {
+  it("بلا رصيد افتتاحي لا تحسب المعادلة ولا يتّهم المورّد", () => {
     const r = reconcileStatement(
       [line({ date: "2026-05-14", ref: "260137", debitMinor: 42000 })],
       [inv("a", "260137", "2026-05-14", 42000)],
@@ -178,7 +178,7 @@ describe("reconcileStatement", () => {
     expect(r.findings.some((f) => f.message.includes("لا يستقيم"))).toBe(false);
   });
 
-  it("الافتتاحيّ صفراً مقروءاً يُفحَص — الصفر المقروء ليس كالمجهول", () => {
+  it("الافتتاحيّ صفراً مقروءاً يفحص — الصفر المقروء ليس كالمجهول", () => {
     const r = reconcileStatement(
       [line({ date: "2026-05-14", ref: "260137", debitMinor: 42000 })],
       [inv("a", "260137", "2026-05-14", 42000)],
@@ -248,7 +248,7 @@ describe("النواة المشتركة — لا جشع في الكشوف أيض
     creditMinor: over.creditMinor ?? 0,
   });
 
-  it("الفاتورة لا تُنسب إلى سطرين", () => {
+  it("الفاتورة لا تنسب إلى سطرين", () => {
     const r = reconcileStatement(
       [
         line({ date: "2026-08-10", debitMinor: 500_00 }),
@@ -262,7 +262,7 @@ describe("النواة المشتركة — لا جشع في الكشوف أيض
     expect(matched[0].method).toBe("REF");
   });
 
-  it("السطر المكرَّر في كشف المورّد يُسمّى مكرَّراً لا مفقوداً", () => {
+  it("السطر المكرّر في كشف المورّد يسمّى مكرّراً لا مفقوداً", () => {
     const r = reconcileStatement(
       [
         line({ date: "2026-08-10", ref: "INV-1", debitMinor: 500_00 }),
@@ -273,7 +273,7 @@ describe("النواة المشتركة — لا جشع في الكشوف أيض
     expect(r.lines[1].status).toBe("DUPLICATE_LINE");
   });
 
-  it("الإشعار الدائن يُفصَل عن السداد", () => {
+  it("الإشعار الدائن يفصل عن السداد", () => {
     const r = reconcileStatement(
       [
         line({ date: "2026-08-12", description: "إشعار دائن — مرتجع", creditMinor: 200_00 }),
@@ -285,7 +285,7 @@ describe("النواة المشتركة — لا جشع في الكشوف أيض
     expect(r.lines[1].status).toBe("PAYMENT");
   });
 
-  it("المطابقة بمرجعٍ وتاريخٍ بعيد تُسمّى اختلاف تاريخ", () => {
+  it("المطابقة بمرجع وتاريخ بعيد تسمّى اختلاف تاريخ", () => {
     const r = reconcileStatement(
       [line({ date: "2026-09-30", ref: "INV-1", debitMinor: 500_00 })],
       [inv("i1", "INV-1", 500_00, "2026-08-01")],
@@ -293,7 +293,7 @@ describe("النواة المشتركة — لا جشع في الكشوف أيض
     expect(r.lines[0].status).toBe("DATE_MISMATCH");
   });
 
-  it("لكل سطر مطابَق درجةٌ وسببٌ مكتوب", () => {
+  it("لكل سطر مطابق درجة وسبب مكتوب", () => {
     const r = reconcileStatement(
       [line({ date: "2026-08-10", ref: "INV-1", debitMinor: 500_00 })],
       [inv("i1", "INV-1", 500_00, "2026-08-10")],
@@ -310,7 +310,7 @@ describe("النواة المشتركة — لا جشع في الكشوف أيض
     expect(reconcileStatement(...args)).toEqual(reconcileStatement(...args));
   });
 
-  it("رقمان مختلفان بالمبلغ نفسه ليسا فاتورةً واحدة، والفاتورةُ لا يأخذها سطران (غاناش)", () => {
+  it("رقمان مختلفان بالمبلغ نفسه ليسا فاتورةً واحدة، والفاتورة لا يأخذها سطران (غاناش)", () => {
     const r = reconcileStatement(
       [
         line({ date: "2026-08-10", ref: "CIV-008578381", debitMinor: 45540 }),
@@ -324,7 +324,7 @@ describe("النواة المشتركة — لا جشع في الكشوف أيض
     expect(r.missingFromArchive).toHaveLength(2);
   });
 
-  it("ومرجعٌ هو ترقيمُ المورّد لا رقمُ فاتورتنا يُطابَق بالمبلغ والتاريخ (زاكوباك)", () => {
+  it("ومرجع هو ترقيم المورّد لا رقم فاتورتنا يطابق بالمبلغ والتاريخ (زاكوباك)", () => {
     const r = reconcileStatement(
       [line({ date: "2026-07-20", ref: "SO-0045123", debitMinor: 36540 })],
       [inv("z", "2317", 36540, "2026-07-20")],
@@ -333,7 +333,7 @@ describe("النواة المشتركة — لا جشع في الكشوف أيض
   });
 });
 
-describe("لوريفا: كشفٌ بالمبلغ قبل الضريبة، ورقمٌ قُرئ مقلوباً", () => {
+describe("لوريفا: كشف بالمبلغ قبل الضريبة، ورقم قرئ مقلوباً", () => {
   const d = (s: string) => new Date(`${s}T00:00:00Z`);
   const ours = [
     { invoiceId: "a", invoiceNumber: "SI-0086", invoiceDate: d("2026-09-28"), totalMinor: 519_40, subtotalMinor: 451_65 },
@@ -349,24 +349,24 @@ describe("لوريفا: كشفٌ بالمبلغ قبل الضريبة، ورقم
   ];
   const r = reconcileStatement(lines, ours);
 
-  it("الصافي مطابقةٌ لا فرق، والرقمُ المقلوب هو نفسُه", () => {
+  it("الصافي مطابقة لا فرق، والرقم المقلوب هو نفسه", () => {
     expect(r.lines[0]).toMatchObject({ status: "MATCHED", differenceMinor: 0 });
     expect(r.lines[1]).toMatchObject({ status: "MATCHED", invoice: { invoiceId: "b" } });
     expect(r.missingFromArchive).toHaveLength(0);
     expect(r.notInStatement.map((i) => i.invoiceId)).not.toContain("b");
   });
 
-  it("والمبلغُ قبل الخصم (مجموعُ البنود) مطابقةٌ كذلك", () => {
+  it("والمبلغ قبل الخصم (مجموع البنود) مطابقة كذلك", () => {
     expect(r.lines[3]).toMatchObject({ status: "MATCHED", differenceMinor: 0 });
   });
 
-  it("وما لا يساوي إجماليّاً ولا صافياً ولا ما قبل الخصم فرقٌ حقيقيّ يُعلَن", () => {
+  it("وما لا يساوي إجماليّاً ولا صافياً ولا ما قبل الخصم فرق حقيقيّ يعلن", () => {
     expect(r.lines[2].status).toBe("AMOUNT_MISMATCH");
   });
 });
 
 describe("ما بعد آخر أيّام الكشف", () => {
-  it("فاتورتُنا بعد آخر يومٍ في الكشف لا تُعدّ «لم ترد فيه»", () => {
+  it("فاتورتنا بعد آخر يوم في الكشف لا تعدّ «لم ترد فيه»", () => {
     const dd = (x: string) => new Date(`${x}T00:00:00Z`);
     const r = reconcileStatement(
       [{ date: dd("2026-09-28"), ref: "SI-0086", description: null, debitMinor: 100_00, creditMinor: 0 }],
@@ -381,8 +381,8 @@ describe("ما بعد آخر أيّام الكشف", () => {
   });
 });
 
-describe("دائنُ الكشف — قاعدةٌ واحدة مع حساب المورّد (classifyCredit)", () => {
-  it("«مردود بضاعة» إشعارٌ دائن لا سداد، و«حوالة» سداد", () => {
+describe("دائن الكشف — قاعدة واحدة مع حساب المورّد (classifyCredit)", () => {
+  it("«مردود بضاعة» إشعار دائن لا سداد، و«حوالة» سداد", () => {
     const r = reconcileStatement([
       { date: new Date("2026-08-10T00:00:00Z"), description: "مردود بضاعة", debitMinor: 0, creditMinor: 70_00 },
       { date: new Date("2026-08-12T00:00:00Z"), description: "حوالة بنكية", debitMinor: 0, creditMinor: 500_00 },
@@ -391,8 +391,8 @@ describe("دائنُ الكشف — قاعدةٌ واحدة مع حساب الم
   });
 });
 
-describe("مذكّرة الفروق — المالُ من الهللات نصّاً", () => {
-  it("لا قسمةَ عشريّة: 1,234.05 لا 1234.05 ولا 1,234.1", () => {
+describe("مذكّرة الفروق — المال من الهللات نصّاً", () => {
+  it("لا قسمة عشريّة: 1,234.05 لا 1234.05 ولا 1,234.1", () => {
     const r = reconcileStatement([
       { date: new Date("2026-08-10T00:00:00Z"), ref: "X-9001", debitMinor: 1_234_05, creditMinor: 0 },
     ], []);

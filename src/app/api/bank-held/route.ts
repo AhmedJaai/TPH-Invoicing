@@ -25,9 +25,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       transactionId: out.transactionId,
-      message: out.transactionId ? "أُضيفت حركةً — وتنتظر تصنيفها في الطابور"
-        : out.removed ? "حُذفت الحركةُ ومصروفُها — ليست في كشف البنك"
-        : "حُسم الصفّ — ولن يعود بإعادة الاستيراد",
+      message: out.transactionId ? "أضيفت حركةً — وتنتظر تصنيفها في الطابور"
+        : out.removed ? "حذفت الحركة ومصروفها — ليست في كشف البنك"
+        : "حسم الصفّ — ولن يعود بإعادة الاستيراد",
     });
   } catch (e) {
     if (e instanceof HeldRowRefused) return NextResponse.json({ error: e.message }, { status: 409 });

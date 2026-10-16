@@ -125,7 +125,7 @@ const NOT_PAYMENT: { value: string; label: string }[] = [
     الدفعة المقدَّمة كانت تُحال إلى «صفحة البنك» — وزرُّها هناك لا يظهر
     أبداً. فصارت هنا حيث عُرف المورّد، وتُقيَّد دفعةً حالُها «مقدَّمة».
   */
-  { value: "ADVANCE", label: "دفعة مقدَّمة لمورّد" },
+  { value: "ADVANCE", label: "دفعة مقدّمة لمورّد" },
   { value: "INTERNAL", label: "تحويل داخلي" },
   { value: "PERSONAL", label: "تحويل شخصي" },
   { value: "BANK_FEE", label: "رسم بنكيّ" },
@@ -221,7 +221,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
     */
     const rejected = (data.outcomes ?? []).filter((o) => !o.ok);
     if (data.confirmed === 0 && rejected.length > 0) {
-      errorOn(id, rejected[0]?.reason ?? "لم يُكتب شيء — راجع حال الحركة.");
+      errorOn(id, rejected[0]?.reason ?? "لم يكتب شيء — راجع حال الحركة.");
       busyOn(id, false);
       return;
     }
@@ -242,7 +242,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
             run: async () => {
               const u = await postJson<{ message?: string }>("/api/match-undo", {
                 transactionId: id,
-                reason: "تراجعٌ من إشعار «يحتاج قرارك»",
+                reason: "تراجع من إشعار «يحتاج قرارك»",
               });
               if (!u.ok) return false;
               setDone((d) => {
@@ -265,17 +265,17 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
     المتصفّح لصدَّق الخادمُ اقتراحاً حُسب لحظة الاستيراد وقد سُدّدت فاتورته.
   */
   const confirmOne = (id: string) =>
-    post("/api/match-confirm-bulk", { transactionIds: [id] }, id, "أُكِّدت", true);
+    post("/api/match-confirm-bulk", { transactionIds: [id] }, id, "أكّدت", true);
 
   /*
     فاتورةٌ بعينها من قائمةٍ حسبها الخادم — تُرسَل معرّفاتُها وحدها، والخادم
     يتحقّق أنّها ما زالت مرشّحةً ويحسب التخصيص.
   */
   const pickOne = (id: string, invoiceIds: string[]) =>
-    post("/api/match-confirm-bulk", { transactionIds: [id], candidateInvoiceIds: invoiceIds }, id, "قُيِّدت على الفاتورة المختارة", true);
+    post("/api/match-confirm-bulk", { transactionIds: [id], candidateInvoiceIds: invoiceIds }, id, "قيّدت على الفاتورة المختارة", true);
 
   const rejectOne = (id: string, kind: string) =>
-    post("/api/match-confirm", { transactionId: id, notAPayment: kind }, id, "حُفظت", true);
+    post("/api/match-confirm", { transactionId: id, notAPayment: kind }, id, "حفظت", true);
 
   /*
     السدادُ على حساب المورّد — والسياسة تُقال قبل الضغط لا بعده.
@@ -284,10 +284,10 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
     جهاتِها بيده، فخرجت من الطابور بلا أن يُقيَّد ريالٌ منها.
   */
   const settleOne = (id: string) =>
-    post("/api/match-confirm", { transactionId: id, settleSupplier: true }, id, "قُيِّدت على حسابه", true);
+    post("/api/match-confirm", { transactionId: id, settleSupplier: true }, id, "قيّدت على حسابه", true);
 
   const defineOne = (id: string, kind: string, displayName: string, supplierId: string | null) =>
-    post("/api/counterparty", { transactionId: id, kind, displayName, supplierId }, id, "عُرِّفت");
+    post("/api/counterparty", { transactionId: id, kind, displayName, supplierId }, id, "عرّفت");
 
   async function confirmAll() {
     setBusy(true);
@@ -311,14 +311,14 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
 
       const rejected = (r.data.outcomes ?? [])
         .filter((o) => !o.ok)
-        .map((o) => ({ transactionId: o.transactionId, reason: o.reason ?? "رُدّ" }));
+        .map((o) => ({ transactionId: o.transactionId, reason: o.reason ?? "ردّ" }));
 
       /* لم يُكتب شيء — فالنتيجة ليست نجاحاً وإن كان الرمز ٢٠٠ */
       /* خمسون في المرّة: ما لم يُرسَل يُقال بعدده ولا يُترَك للعدّ */
       const left = Math.max(0, confirmable.length - 50);
       setResult({
         ok: (r.data.confirmed ?? 0) > 0,
-        message: `${r.data.message ?? ""}${left > 0 ? ` · بقي ${left} لم يُرسَل — اضغط ثانيةً لتكمل.` : ""}`,
+        message: `${r.data.message ?? ""}${left > 0 ? ` · بقي ${left} لم يرسل — اضغط ثانيةً لتكمل.` : ""}`,
         rejected,
       });
       router.refresh();
@@ -331,7 +331,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
     return (
       <EmptyState
         title="لا شيء ينتظرك"
-        hint="كل حركة في الكشف لها قرارٌ مسجَّل — إمّا مطابَقة وإمّا معلَنٌ أنّها ليست سداداً."
+        hint="كل حركة في الكشف لها قرار مسجّل — إمّا مطابقة وإمّا معلن أنّها ليست سداداً."
       />
     );
   }
@@ -375,9 +375,9 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
                 {countNoun(confirmable.length, SUGGESTION)} ينتظر تأكيدك
               </p>
               <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                يُعاد حسابها في الخادم قبل الكتابة — على الفواتير كما هي الآن، لا كما
-                كانت لحظة الاستيراد. وما تغيّر حاله يُعاد إليك بسببه ولا يُؤكَّد.
-                {confirmable.length > 50 && " ويُؤكَّد خمسون في المرّة."}
+                يعاد حسابها في الخادم قبل الكتابة — على الفواتير كما هي الآن، لا كما
+                كانت لحظة الاستيراد. وما تغيّر حاله يعاد إليك بسببه ولا يؤكّد.
+                {confirmable.length > 50 && " ويؤكّد خمسون في المرّة."}
               </p>
               {/*
                 كان العدّان يختلفان بلا تفسير: البطاقة تقول «يُقَرّ ٨» والزرّ
@@ -385,8 +385,8 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
               */}
               {alreadyAuto > 0 && (
                 <p className="mt-1 text-xs leading-relaxed text-muted">
-                  ومعها {countNoun(alreadyAuto, TRANSACTION)} طُوبقت تلقائياً ولا تنتظر
-                  تأكيدك — معروضةٌ أدناه للاطّلاع، وبابُ التراجع عنها في صفحة البنك.
+                  ومعها {countNoun(alreadyAuto, TRANSACTION)} طوبقت تلقائياً ولا تنتظر
+                  تأكيدك — معروضة أدناه للاطّلاع، وباب التراجع عنها في صفحة البنك.
                 </p>
               )}
             </div>
@@ -610,7 +610,7 @@ function Row({
                 className={buttonClass("primary", "sm")}
                 disabled={busy}
                 onClick={() => onSettle(i.transactionId)}
-                title="تُسجَّل سداداً لهذا المورّد وتُخصم من أقدم فواتيره، وما بقي يبقى بلا فاتورة"
+                title="تسجّل سداداً لهذا المورّد وتخصم من أقدم فواتيره، وما بقي يبقى بلا فاتورة"
                 data-key-action="approve"
                 data-key-then="next"
               >
@@ -668,7 +668,7 @@ function Row({
             onClick={() => setOpen(open === "define" ? null : "define")}
             aria-expanded={open === "define"}
           >
-            عرِّف هذه الجهة
+            عرّف هذه الجهة
           </button>
         )}
 
@@ -680,8 +680,8 @@ function Row({
       {/* السياسة تُقال قبل الضغط — والمخفيّة تُنتج ثقةً بلا فهم */}
       {canAct && settleable(i) && (
         <p className="mt-1.5 text-xs leading-relaxed text-muted">
-          لا رقمَ فاتورةٍ في الحوالة — فتُوزَّع على فواتير {i.supplierName} المفتوحة
-          بالأقدم أوّلاً، وما بقي يبقى على حسابه غير مخصَّص.
+          لا رقم فاتورة في الحوالة — فتوزّع على فواتير {i.supplierName} المفتوحة
+          بالأقدم أوّلاً، وما بقي يبقى على حسابه غير مخصّص.
         </p>
       )}
 
@@ -711,8 +711,8 @@ function Row({
             ))}
           </div>
           <p className="mt-2 text-xs leading-relaxed text-muted">
-            «دفعة مقدَّمة» تُقيَّد لمورّدها مالاً خرج قبل فاتورته، فيُخصَّص عليها حين تصل —
-            ولا تُتجاهَل كالتحويل الداخليّ.
+            «دفعة مقدّمة» تقيّد لمورّدها مالاً خرج قبل فاتورته، فيخصّص عليها حين تصل —
+            ولا تتجاهل كالتحويل الداخليّ.
           </p>
         </div>
       )}
@@ -720,7 +720,7 @@ function Row({
       {/* ── تعريف الجهة ── */}
       {open === "define" && (
         <div className="mt-2 rounded-xl border border-line bg-sunken px-3 py-2.5">
-          <p className="text-xs font-bold">ما بابُ هذه الحركة؟</p>
+          <p className="text-xs font-bold">ما باب هذه الحركة؟</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {KINDS.map((k) => (
               <button
@@ -765,7 +765,7 @@ function Row({
               {ACT.saveIdentity}
             </button>
             <span className="text-xs leading-relaxed text-muted">
-              ما تؤكّده يصير ذاكرة: يُطبَّق الآن على ما اخترتَه، ويُعرَف به ما يشبهه في الكشوف القادمة بلا سؤال.
+              ما تؤكّده يصير ذاكرة: يطبّق الآن على ما اخترته، ويعرف به ما يشبهه في الكشوف القادمة بلا سؤال.
             </span>
           </div>
         </div>
@@ -781,9 +781,9 @@ function Row({
 }
 
 const OUTCOME_NOTE: Record<string, string> = {
-  EXACT_INVOICE: "فاتورةٌ بمبلغها",
-  MULTI_INVOICE: "عدّة فواتير مجموعُها الدفعة",
-  PARTIAL_PAYMENT: "سدادٌ جزئيّ — يبقى عليها",
+  EXACT_INVOICE: "فاتورة بمبلغها",
+  MULTI_INVOICE: "عدّة فواتير مجموعها الدفعة",
+  PARTIAL_PAYMENT: "سداد جزئيّ — يبقى عليها",
   OVERPAYMENT: "تزيد على المتبقّي — والزائد يبقى على حساب المورّد",
 };
 
@@ -815,14 +815,14 @@ function CandidatePicker({
 
   return (
     <div className="mt-2 rounded-xl border border-line bg-sunken px-3 py-2.5" aria-live="polite">
-      <p className="text-xs font-bold">أيّ فاتورةٍ تسدّدها هذه الحوالة؟</p>
-      {state.status === "loading" && <p className="mt-2 text-xs text-muted">يُحسَب المرشّحون على الفواتير كما هي الآن…</p>}
+      <p className="text-xs font-bold">أيّ فاتورة تسدّدها هذه الحوالة؟</p>
+      {state.status === "loading" && <p className="mt-2 text-xs text-muted">يحسب المرشّحون على الفواتير كما هي الآن…</p>}
       {state.status === "error" && (
         <p role="alert" className="mt-2 text-xs font-bold text-danger">{state.message}</p>
       )}
       {state.status === "ready" && state.candidates.length === 0 && (
         <p className="mt-2 text-xs leading-relaxed text-muted">
-          لا فاتورةَ مفتوحة لهذا المورّد تقارب مبلغَ الحوالة. قيّدها على حسابه، أو ارفع فاتورتَها فتُقترَح هنا.
+          لا فاتورة مفتوحة لهذا المورّد تقارب مبلغ الحوالة. قيّدها على حسابه، أو ارفع فاتورتها فتقترح هنا.
         </p>
       )}
       {state.status === "ready" && state.candidates.length > 0 && (
@@ -831,7 +831,7 @@ function CandidatePicker({
             <li key={c.key} className="flex flex-col rounded-lg border border-line bg-raised p-3">
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge tone={c.score >= 85 ? "ok" : "warn"}>{strength(c.score)}</Badge>
-                {c.recommended && <Badge tone="accent">ترجيحُ النظام</Badge>}
+                {c.recommended && <Badge tone="accent">ترجيح النظام</Badge>}
               </div>
               <ul className="mt-2 space-y-1">
                 {c.invoices.map((inv) => (
@@ -839,7 +839,7 @@ function CandidatePicker({
                     <Link href={`/purchases/invoices/${inv.id}`} className="font-bold underline-offset-2 hover:underline">
                       <bdi>{inv.number ?? "بلا رقم"}</bdi>
                     </Link>
-                    <span className="text-muted">{inv.date ? <bdi>{formatDay(inv.date.slice(0, 10))}</bdi> : "تاريخٌ غير معروف"}</span>
+                    <span className="text-muted">{inv.date ? <bdi>{formatDay(inv.date.slice(0, 10))}</bdi> : "تاريخ غير معروف"}</span>
                     <span className="nums font-bold">
                       {inv.outstandingMinor === null ? "غير معروف" : <Money minor={inv.outstandingMinor} />}
                     </span>
@@ -847,7 +847,7 @@ function CandidatePicker({
                 ))}
               </ul>
               <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
-                {OUTCOME_NOTE[c.outcome] ?? "مرشّح"} · يُخصَّص <Money minor={c.allocatedMinor} />
+                {OUTCOME_NOTE[c.outcome] ?? "مرشّح"} · يخصّص <Money minor={c.allocatedMinor} />
               </p>
               <dl className="mt-2 grid grid-cols-4 gap-1 text-center">
                 <Part label="المورّد" value={c.parts.supplier} />
@@ -874,7 +874,7 @@ function CandidatePicker({
         </ul>
       )}
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
-        الخادم يتحقّق من اختيارك على الفواتير كما هي لحظةَ الكتابة ويحسب التخصيص — وما زاد يبقى على حساب المورّد غير مخصَّص.
+        الخادم يتحقّق من اختيارك على الفواتير كما هي لحظة الكتابة ويحسب التخصيص — وما زاد يبقى على حساب المورّد غير مخصّص.
       </p>
     </div>
   );

@@ -19,7 +19,7 @@ describe("classifyCredit", () => {
     expect(classifyCredit(line({ id: "d", description: "سداد" }))).toBe("PAYMENT");
   });
 
-  it("ما لا دليل فيه يُعدّ سداداً — والسداد هو الأصل في الدائن", () => {
+  it("ما لا دليل فيه يعدّ سداداً — والسداد هو الأصل في الدائن", () => {
     expect(classifyCredit(line({ id: "a" }))).toBe("PAYMENT");
   });
 });
@@ -35,7 +35,7 @@ describe("balanceWithCredits", () => {
     expect(b.creditNoteMinor).toBe(700_00);
   });
 
-  it("والإشعار لا يُعدّ سداداً — من ينظر «كم دفعتُ» لا يجد تخفيضاً بلا مال", () => {
+  it("والإشعار لا يعدّ سداداً — من ينظر «كم دفعت» لا يجد تخفيضاً بلا مال", () => {
     const b = balanceWithCredits({
       billedMinor: 5_000_00, paidMinor: 0,
       credits: [line({ id: "cn", description: "إشعار دائن" })],
@@ -43,7 +43,7 @@ describe("balanceWithCredits", () => {
     expect(b.paidMinor).toBe(0);
   });
 
-  it("السداد في القائمة لا يُطرَح مرّتين", () => {
+  it("السداد في القائمة لا يطرح مرّتين", () => {
     const b = balanceWithCredits({
       billedMinor: 5_000_00, paidMinor: 5_000_00,
       credits: [line({ id: "p", amountMinor: 5_000_00, description: "سداد" })],
@@ -52,7 +52,7 @@ describe("balanceWithCredits", () => {
     expect(b.creditNoteMinor).toBe(0);
   });
 
-  it("لا يُنتج رصيداً سالباً", () => {
+  it("لا ينتج رصيداً سالباً", () => {
     const b = balanceWithCredits({
       billedMinor: 100_00, paidMinor: 0,
       credits: [line({ id: "cn", amountMinor: 900_00, description: "مرتجع" })],
@@ -78,7 +78,7 @@ describe("explainByCredit", () => {
     expect(explainByCredit(700_00, [cn])).not.toBeNull();
   });
 
-  it("ولا يفسَّر بسداد", () => {
+  it("ولا يفسّر بسداد", () => {
     expect(explainByCredit(700_00, [line({ id: "p", description: "سداد" })])).toBeNull();
   });
 
@@ -87,12 +87,12 @@ describe("explainByCredit", () => {
   });
 });
 
-describe("classifyCredit — الكلمةُ الصريحة تسبق", () => {
-  it("«تسوية بحوالة» و«سداد بعد الخصم» سدادٌ لا إشعار", () => {
+describe("classifyCredit — الكلمة الصريحة تسبق", () => {
+  it("«تسوية بحوالة» و«سداد بعد الخصم» سداد لا إشعار", () => {
     expect(classifyCredit(line({ id: "a", description: "تسوية بحوالة بنكية" }))).toBe("PAYMENT");
     expect(classifyCredit(line({ id: "b", description: "سداد بعد الخصم" }))).toBe("PAYMENT");
   });
-  it("و«إشعار دائن» باسمه إشعارٌ ولو ذُكر معه سداد", () => {
+  it("و«إشعار دائن» باسمه إشعار ولو ذكر معه سداد", () => {
     expect(classifyCredit(line({ id: "c", description: "إشعار دائن عن دفعة مرتجعة" }))).toBe("CREDIT_NOTE");
     expect(classifyCredit(line({ id: "d", reference: "CN-123", description: null }))).toBe("CREDIT_NOTE");
   });

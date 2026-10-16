@@ -27,32 +27,32 @@ const scripts = Object.keys(
 );
 
 describe("CLAUDE.md ووثائق docs/ تطابق المستودع", () => {
-  it("جدول الهجرات هو عينُ مجلّد drizzle/sql", () => {
+  it("جدول الهجرات هو عين مجلّد drizzle/sql", () => {
     const listed = [...schemaDoc.matchAll(/^\| `(\d{3}_[\w-]+\.sql)` \|/gm)].map((m) => m[1]).sort();
     const onDisk = readdirSync("drizzle/sql").filter((f) => f.endsWith(".sql")).sort();
     expect(listed).toEqual(onDisk);
   });
 
-  it("كلّ أمرٍ مذكور موجودٌ في package.json", () => {
+  it("كلّ أمر مذكور موجود في package.json", () => {
     const named = new Set(
       [...allDocs.matchAll(/`(?:npm run )?((?:db|drive|ops|bench|try):[\w-]+)`/g)].map((m) => m[1]),
     );
     expect([...named].filter((n) => !scripts.includes(n))).toEqual([]);
   });
 
-  it("كلّ ملفٍّ في جدول المكتبات موجود", () => {
+  it("كلّ ملفّ في جدول المكتبات موجود", () => {
     const files = [...modulesDoc.matchAll(/^\| `((?:src|scripts)\/[^`]+\.tsx?)` \|/gm)].map((m) => m[1]);
     expect(files.length).toBeGreaterThan(40);
     expect(files.filter((f) => !existsSync(f))).toEqual([]);
   });
 
-  it("كلّ مسارٍ يذكره CLAUDE.md موجود — الخريطة التي تدلّ على غائبٍ أسوأ من غيابها", () => {
+  it("كلّ مسار يذكره CLAUDE.md موجود — الخريطة التي تدلّ على غائب أسوأ من غيابها", () => {
     const paths = [...claude.matchAll(/`((?:src|docs|scripts|drizzle)\/[^`*\s]+)`/g)].map((m) => m[1]);
     expect(paths.length).toBeGreaterThan(20);
     expect(paths.filter((f) => !existsSync(f))).toEqual([]);
   });
 
-  it("لا أمرَ يطبّق المخطّط بلا هجرة", () => {
+  it("لا أمر يطبّق المخطّط بلا هجرة", () => {
     expect(scripts).not.toContain("db:push");
   });
 });
@@ -75,19 +75,19 @@ export function arabicCount(text: string): number {
   const t = text.trim().replace(TASHKEEL, "").replace(/[أإآ]/g, "ا");
   if (/^[٠-٩0-9]+$/.test(t)) return Number(t.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))));
   if (t in WORDS) return WORDS[t];
-  throw new Error(`عددٌ لا يُفهَم في الوثيقة: «${text}»`);
+  throw new Error(`عدد لا يفهم في الوثيقة: «${text}»`);
 }
 
 function claimed(re: RegExp, doc: string): number {
   const m = re.exec(doc);
-  if (!m) throw new Error(`لم يُعثَر على العدد في الوثيقة: ${re}`);
+  if (!m) throw new Error(`لم يعثر على العدد في الوثيقة: ${re}`);
   return arabicCount(m[1]);
 }
 
-describe("أعدادُ الوثائق تطابق مصادرها", () => {
-  it("يُفهَم العدد رقماً أو كلمة", () => {
+describe("أعداد الوثائق تطابق مصادرها", () => {
+  it("يفهم العدد رقماً أو كلمة", () => {
     expect(arabicCount("٤١")).toBe(41);
-    expect(arabicCount("أحدَ عشر")).toBe(11);
+    expect(arabicCount("أحد عشر")).toBe(11);
     expect(arabicCount("ستّة عشر")).toBe(16);
     expect(() => arabicCount("بضعة")).toThrow();
   });

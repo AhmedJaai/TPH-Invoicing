@@ -140,7 +140,7 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
   }, [chords, role, router]);
 
   return (
-    <Sheet open={help} onClose={() => setHelp(false)} title="اختصارات لوحة المفاتيح" description="تعمل من أيّ صفحة ما دام المؤشّر خارج حقلٍ يُكتب فيه — ولوحةُ الكتابة عربيّةً أو إنجليزيّة." size="md">
+    <Sheet open={help} onClose={() => setHelp(false)} title="اختصارات لوحة المفاتيح" description="تعمل من أيّ صفحة ما دام المؤشّر خارج حقل يكتب فيه — ولوحة الكتابة عربيّةً أو إنجليزيّة." size="md">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 sm:grid-cols-2">
         <ShortcutGroup
           title="عامّ"
@@ -149,8 +149,8 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
             { keys: ["/"], label: "افتح البحث" },
             ...(can(role, "document:upload") ? [{ keys: ["U"], label: "ارفع مستنداً أو صوّره" }] : []),
             { keys: ["?"], label: "هذه القائمة" },
-            { keys: ["Esc"], label: "أغلق ما فُتح" },
-            { keys: ["⌘", "Z"], label: "تراجَع عن آخر فعلٍ يقبل التراجع" },
+            { keys: ["Esc"], label: "أغلق ما فتح" },
+            { keys: ["⌘", "Z"], label: "تراجع عن آخر فعل يقبل التراجع" },
           ]}
         />
         <ShortcutGroup
@@ -159,16 +159,16 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
             { keys: ["J"], label: "الصفّ التالي" },
             { keys: ["K"], label: "الصفّ السابق" },
             { keys: ["Enter"], label: "افتح الصفّ المختار" },
-            { keys: ["J", "K"], label: "واللوحُ مفتوح: الملفُّ التالي في مكانه" },
+            { keys: ["J", "K"], label: "واللوح مفتوح: الملفّ التالي في مكانه" },
             { keys: ["Esc"], label: "أغلق اللوح" },
           ]}
         />
         <ShortcutGroup
           title="في طابور المراجعة"
           rows={[
-            { keys: ["A"], label: "أقِرَّ اقتراحَ الصفّ المختار" },
-            { keys: ["X"], label: "ليست سداداً — افتح أسبابَه" },
-            { keys: ["S"], label: "تخطَّ إلى التالي" },
+            { keys: ["A"], label: "أقرّ اقتراح الصفّ المختار" },
+            { keys: ["X"], label: "ليست سداداً — افتح أسبابه" },
+            { keys: ["S"], label: "تخطّ إلى التالي" },
           ]}
         />
         <ShortcutGroup

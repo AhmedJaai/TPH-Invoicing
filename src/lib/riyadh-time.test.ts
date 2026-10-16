@@ -18,7 +18,7 @@ describe("الشهر بتوقيت الرياض", () => {
   });
 });
 
-describe("التاريخ كما يُقرأ", () => {
+describe("التاريخ كما يقرأ", () => {
   it("اليوم بالاسم لا بصيغة ISO", () => {
     const day = formatDay(new Date("2026-09-14T09:00:00Z"));
     expect(day).toContain("2026");
@@ -32,11 +32,11 @@ describe("التاريخ كما يُقرأ", () => {
     expect(formatDay(at)).not.toBe(formatDay(new Date("2026-08-31T09:00:00Z")));
   });
 
-  it("سلسلة اليوم لا تُزاح يوماً", () => {
+  it("سلسلة اليوم لا تزاح يوماً", () => {
     expect(formatDay("2026-09-14")).toBe(formatDay(new Date("2026-09-14T09:00:00Z")));
   });
 
-  it("المجهول شَرطة لا تاريخ مخترَع", () => {
+  it("المجهول شرطة لا تاريخ مخترع", () => {
     expect(formatDay(null)).toBe("—");
     expect(formatDay(undefined)).toBe("—");
     expect(formatDay("")).toBe("—");
@@ -67,62 +67,62 @@ describe("daysSinceRiyadh", () => {
 });
 
 describe("formatWeekday", () => {
-  it("اسمُ اليوم ورقمُه بتوقيت الرياض", () => {
+  it("اسم اليوم ورقمه بتوقيت الرياض", () => {
     expect(formatWeekday("2026-09-27")).toBe("الأحد 27");
   });
 });
 
 describe("formatMoment", () => {
   const now = new Date("2026-09-26T09:00:00Z"); // 12:00 م بتوقيت الرياض
-  it("اليومُ وأمسُ باسمهما، والساعةُ بتوقيت الرياض", () => {
+  it("اليوم وأمس باسمهما، والساعة بتوقيت الرياض", () => {
     expect(formatMoment(new Date("2026-09-26T00:12:00Z"), now)).toBe("اليوم 3:12 ص");
     expect(formatMoment(new Date("2026-09-25T13:05:00Z"), now)).toBe("أمس 4:05 م");
   });
   it("ما قبل أمس باسم يومه وتاريخه", () => {
     expect(formatMoment(new Date("2026-09-23T06:30:00Z"), now)).toBe("الأربعاء، 23 سبتمبر · 9:30 ص");
   });
-  it("منتصفُ الليل بتوقيت الرياض يفصل اليوم عن أمس — لا توقيتُ غرينتش", () => {
+  it("منتصف الليل بتوقيت الرياض يفصل اليوم عن أمس — لا توقيت غرينتش", () => {
     // 21:30 غرينتش يوم ٢٥ = 00:30 الرياض يوم ٢٦
     expect(formatMoment(new Date("2026-09-25T21:30:00Z"), now)).toBe("اليوم 12:30 ص");
   });
 });
 
-describe("timeAgo — «أمس» يومُ التقويم بتوقيت الرياض", () => {
+describe("timeAgo — «أمس» يوم التقويم بتوقيت الرياض", () => {
   const now = new Date("2026-09-26T00:52:00Z"); // السبت 3:52 ص بتوقيت الرياض
-  it("ما قبل يومين تقويميّين لا يُقال «أمس» ولو كان دون ٤٨ ساعة", () => {
+  it("ما قبل يومين تقويميّين لا يقال «أمس» ولو كان دون ٤٨ ساعة", () => {
     expect(timeAgo(new Date("2026-09-24T03:25:00Z"), now)).toBe("قبل يومين");
   });
-  it("أمسُ التقويم «أمس»", () => {
+  it("أمس التقويم «أمس»", () => {
     expect(timeAgo(new Date("2026-09-25T08:00:00Z"), now)).toBe("أمس");
   });
-  it("ساعاتٌ قليلة عبر منتصف الليل تبقى بساعاتها", () => {
+  it("ساعات قليلة عبر منتصف الليل تبقى بساعاتها", () => {
     expect(timeAgo(new Date("2026-09-25T20:52:00Z"), now)).toBe("قبل 4 ساعات");
   });
-  it("الدقائقُ دقائق", () => {
+  it("الدقائق دقائق", () => {
     expect(timeAgo(new Date("2026-09-26T00:40:00Z"), now)).toBe("قبل 12 دقيقة");
   });
 });
 
 import { dateShortcuts, formatHijri } from "./riyadh-time";
 
-describe("اختصاراتُ حقل التاريخ", () => {
-  it("اليوم وأمس وآخرُ الشهر الماضي", () => {
+describe("اختصارات حقل التاريخ", () => {
+  it("اليوم وأمس وآخر الشهر الماضي", () => {
     expect(dateShortcuts("2026-10-09").map((c) => c.value)).toEqual(["2026-10-09", "2026-10-08", "2026-09-30"]);
   });
-  it("أوّلُ الشهر: أمس هو آخرُ الشهر الماضي", () => {
+  it("أوّل الشهر: أمس هو آخر الشهر الماضي", () => {
     expect(dateShortcuts("2026-03-01").map((c) => c.value)).toEqual(["2026-03-01", "2026-02-28", "2026-02-28"]);
   });
-  it("أوّلُ السنة يعبر إلى ديسمبر", () => {
+  it("أوّل السنة يعبر إلى ديسمبر", () => {
     expect(dateShortcuts("2027-01-01")[2].value).toBe("2026-12-31");
   });
 });
 
-describe("المقابلُ الهجريّ للعرض", () => {
-  it("يُكتب بتقويم أمّ القرى", () => {
+describe("المقابل الهجريّ للعرض", () => {
+  it("يكتب بتقويم أمّ القرى", () => {
     const h = formatHijri("2026-10-09");
     expect(h).toMatch(/144[78]/);
   });
-  it("ما لا يُفهَم لا يُخترَع له تاريخ", () => {
+  it("ما لا يفهم لا يخترع له تاريخ", () => {
     expect(formatHijri("")).toBeNull();
     expect(formatHijri("2026-13-45x")).toBeNull();
     expect(formatHijri(null)).toBeNull();
@@ -137,7 +137,7 @@ import { MS_PER_DAY, addDays, dayNumber, daysBetween, daysInMonth, isoDay, month
  * كلُّ صيغةٍ قديمة منسوخةٌ هنا كما كانت في موضعها، وتُقابَل على كلّ يومٍ من
  * ٢٠٢٤ (كبيسة) إلى ٢٠٢٨ (كبيسة). فلا رقمَ على شاشةٍ تغيّر بالتوحيد.
  */
-describe("حسابُ الأيّام والأشهر: المالكُ الواحد يطابق ما حلّ محلَّه", () => {
+describe("حساب الأيّام والأشهر: المالك الواحد يطابق ما حلّ محلّه", () => {
   const days: string[] = [];
   for (let t = Date.UTC(2024, 0, 1); t <= Date.UTC(2028, 11, 31); t += 86_400_000) {
     days.push(new Date(t).toISOString().slice(0, 10));
@@ -164,14 +164,14 @@ describe("حسابُ الأيّام والأشهر: المالكُ الواحد 
     return d.toISOString().slice(0, 10);
   };
 
-  it("رقمُ اليوم بالصيغتين القديمتين", () => {
+  it("رقم اليوم بالصيغتين القديمتين", () => {
     for (const d of days) {
       expect(dayNumber(d)).toBe(oldParseNumber(d));
       expect(dayNumber(d)).toBe(oldUtcNumber(d));
     }
   });
 
-  it("فرقُ الأيّام كما في cash-runway و supplier-edit و inventory/receipts و bank/coverage", () => {
+  it("فرق الأيّام كما في cash-runway و supplier-edit و inventory/receipts و bank/coverage", () => {
     for (let i = 0; i < days.length; i += 13) {
       for (const n of shifts) {
         const a = days[i];
@@ -186,7 +186,7 @@ describe("حسابُ الأيّام والأشهر: المالكُ الواحد 
     }
   });
 
-  it("إزاحةُ الأيّام بالصيغتين القديمتين", () => {
+  it("إزاحة الأيّام بالصيغتين القديمتين", () => {
     for (let i = 0; i < days.length; i += 3) {
       for (const n of shifts) {
         expect(addDays(days[i], n)).toBe(oldShift(days[i], n));
@@ -195,7 +195,7 @@ describe("حسابُ الأيّام والأشهر: المالكُ الواحد 
     }
   });
 
-  it("طولُ الشهر وآخرُ يومه", () => {
+  it("طول الشهر وآخر يومه", () => {
     for (const month of months) {
       const [y, m] = month.split("-").map(Number);
       expect(daysInMonth(month)).toBe(new Date(Date.UTC(y, m, 0)).getUTCDate());
@@ -207,14 +207,14 @@ describe("حسابُ الأيّام والأشهر: المالكُ الواحد 
     expect(monthEndDay("2026-12")).toBe("2026-12-31");
   });
 
-  it("يومُ التاريخ المخزَّن هو يومُ UTC لا يومُ الرياض", () => {
+  it("يوم التاريخ المخزّن هو يوم UTC لا يوم الرياض", () => {
     expect(isoDay(new Date("2026-09-30T00:00:00Z"))).toBe("2026-09-30");
     /* ٢٢:٣٠ UTC هي ١:٣٠ فجرَ الغد في الرياض — والمخزَّن يبقى على يومه */
     expect(isoDay(new Date("2026-09-30T22:30:00Z"))).toBe("2026-09-30");
     expect(MS_PER_DAY).toBe(24 * 60 * 60 * 1000);
   });
 
-  it("ما لا يُقرأ لا يصير رقماً", () => {
+  it("ما لا يقرأ لا يصير رقماً", () => {
     expect(Number.isNaN(dayNumber("غير تاريخ"))).toBe(true);
     expect(Number.isNaN(dayNumber(""))).toBe(true);
   });

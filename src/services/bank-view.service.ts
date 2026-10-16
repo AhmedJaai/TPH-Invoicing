@@ -198,7 +198,7 @@ export async function loadBankQueue(): Promise<BankQueue> {
     /* ما لا هويّة له يُعرَض على حدة ولا يُدسّ في مجموعة — يُحسَم وحده */
     ...ungrouped.map((t) => ({
       key: `bare:${t.id}`,
-      identityLabel: "لا هويّة لها — تُحسم وحدها",
+      identityLabel: "لا هويّة لها — تحسم وحدها",
       title: titleOf(t),
       totalMinor: t.amountMinor,
       items: [toItem(t)],

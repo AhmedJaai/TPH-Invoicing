@@ -41,13 +41,13 @@ export default async function FoodicsBankPage() {
 
   if (!t.hasOrders) {
     return (
-      <PageShell user={user} width="wide" title="فودكس والبنك" intro="ما سجّله فودكس مقبوضاً — بالبطاقة والنقد — أمام ما دخل الحسابَ فعلاً.">
+      <PageShell user={user} width="wide" title="فودكس والبنك" intro="ما سجّله فودكس مقبوضاً — بالبطاقة والنقد — أمام ما دخل الحساب فعلاً.">
         <FoodicsStatusBar status={status} canSync={canSync} />
         <div className="mt-6">
           <EmptyState
             icon={Scale}
-            title="لا طلباتٍ من فودكس بعد."
-            hint="تُقرأ الطلباتُ ودفعاتُها من واجهة فودكس، ثمّ تُقابَل بتسويات الشبكة في كشف البنك. اضغط «زامن الآن» أعلاه."
+            title="لا طلبات من فودكس بعد."
+            hint="تقرأ الطلبات ودفعاتها من واجهة فودكس، ثمّ تقابل بتسويات الشبكة في كشف البنك. اضغط «زامن الآن» أعلاه."
           />
         </div>
       </PageShell>
@@ -69,8 +69,8 @@ export default async function FoodicsBankPage() {
       user={user}
       width="wide"
       title="فودكس والبنك"
-      eyebrow={<>كشفُ البنك حتى <bdi>{formatDay(t.lastBankDay)}</bdi></>}
-      intro="ما سجّله فودكس مقبوضاً — بالبطاقة والنقد — أمام ما دخل الحسابَ فعلاً، وأين اختلفا."
+      eyebrow={<>كشف البنك حتى <bdi>{formatDay(t.lastBankDay)}</bdi></>}
+      intro="ما سجّله فودكس مقبوضاً — بالبطاقة والنقد — أمام ما دخل الحساب فعلاً، وأين اختلفا."
     >
       <FoodicsStatusBar status={status} canSync={canSync} />
 
@@ -84,53 +84,53 @@ export default async function FoodicsBankPage() {
             value={month.notable ? <Money minor={Math.abs(month.gapMinor)} /> : <span className="text-2xl">متطابقان</span>}
             sub={
               <>
-                {month.notable && <strong className="text-ink">{month.gapMinor > 0 ? "دخل البنكَ أقلّ ممّا سجّله فودكس. " : "دخل البنكَ أكثر ممّا سجّله فودكس. "}</strong>}
-                سجّل فودكس <Money minor={month.foodicsMinor} /> ودخل البنكَ <Money minor={month.bankMinor} />.
+                {month.notable && <strong className="text-ink">{month.gapMinor > 0 ? "دخل البنك أقلّ ممّا سجّله فودكس. " : "دخل البنك أكثر ممّا سجّله فودكس. "}</strong>}
+                سجّل فودكس <Money minor={month.foodicsMinor} /> ودخل البنك <Money minor={month.bankMinor} />.
               </>
             }
             href="#months"
           />
         ) : (
-          <KeyFigure icon={CreditCard} label="البطاقات" value={<span className="text-xl text-muted">غير معروف</span>} sub="لا دفعةَ في الكشف تقابل ما قُرئ من فودكس بعد." />
+          <KeyFigure icon={CreditCard} label="البطاقات" value={<span className="text-xl text-muted">غير معروف</span>} sub="لا دفعة في الكشف تقابل ما قرئ من فودكس بعد." />
         )}
         <KeyFigure
           icon={Banknote}
-          label={cashMonth ? `نقدٌ لم يدخل البنك — ${formatMonth(cashMonth.month)}` : "النقد"}
+          label={cashMonth ? `نقد لم يدخل البنك — ${formatMonth(cashMonth.month)}` : "النقد"}
           value={cashMonth ? <Money minor={cashMonth.notBankedMinor} /> : <span className="text-xl text-muted">غير معروف</span>}
           sub={cashMonth
-            ? <>قبض فودكس نقداً <Money minor={cashMonth.cashMinor} />{cashMonth.bankOtherCreditsMinor === 0 ? "، ولا إيداعَ في الكشف من غير الشبكة." : <>، ودخل البنكَ من غير الشبكة <Money minor={cashMonth.bankOtherCreditsMinor} />.</>} مبيعاتٌ خاضعةٌ للضريبة.</>
+            ? <>قبض فودكس نقداً <Money minor={cashMonth.cashMinor} />{cashMonth.bankOtherCreditsMinor === 0 ? "، ولا إيداع في الكشف من غير الشبكة." : <>، ودخل البنك من غير الشبكة <Money minor={cashMonth.bankOtherCreditsMinor} />.</>} مبيعات خاضعة للضريبة.</>
             : undefined}
           href="#cash"
         />
         <KeyFigure
           icon={Coffee}
-          label={cashMonth ? `مشروباتُ الموظّفين — ${formatMonth(cashMonth.month)}` : "مشروباتُ الموظّفين"}
+          label={cashMonth ? `مشروبات الموظّفين — ${formatMonth(cashMonth.month)}` : "مشروبات الموظّفين"}
           value={cashMonth ? <Money minor={cashMonth.staffDrinksMinor} /> : <span className="text-xl text-muted">غير معروف</span>}
-          sub="ما قُيّد على «House Account» بسعر القائمة. ليست بيعاً ولا ديناً، ولا ضريبةَ عليها — تُحسَب في الجرد وحده."
+          sub="ما قيّد على «House Account» بسعر القائمة. ليست بيعاً ولا ديناً، ولا ضريبة عليها — تحسب في الجرد وحده."
           href="#staff"
         />
       </div>
 
-      <Callout tone="info" icon={Info} className="mt-4" title="كيف تُقرأ هذه الصفحة">
+      <Callout tone="info" icon={Info} className="mt-4" title="كيف تقرأ هذه الصفحة">
         <ul className="list-disc space-y-0.5 ps-4">
-          <li><strong className="text-ink">دخل البنكَ أقلّ</strong>: فودكس سجّل بطاقاتٍ لم يصل كلُّها — عمليّةٌ مرفوضة سُجّلت مدفوعة، أو دفعةٌ لم تودَع.</li>
-          <li><strong className="text-ink">دخل البنكَ أكثر</strong>: مالُ بطاقةٍ لم يسجّله فودكس بطاقةً — بيعٌ سُجّل نقداً ودُفع بالبطاقة، أو عمليّةٌ على الجهاز بلا طلب.</li>
-          <li>فرقُ <strong className="text-ink">الشهر</strong> هو الحكم. فرقُ الدفعة الواحدة تقريبيّ: وقتُ إقفال الجهاز يتغيّر كلَّ ليلة، فعمليّةٌ على حدّه تظهر زائدةً في دفعةٍ وناقصةً في التي تليها.</li>
+          <li><strong className="text-ink">دخل البنك أقلّ</strong>: فودكس سجّل بطاقات لم يصل كلّها — عمليّة مرفوضة سجّلت مدفوعة، أو دفعة لم تودع.</li>
+          <li><strong className="text-ink">دخل البنك أكثر</strong>: مال بطاقة لم يسجّله فودكس بطاقةً — بيع سجّل نقداً ودفع بالبطاقة، أو عمليّة على الجهاز بلا طلب.</li>
+          <li>فرق <strong className="text-ink">الشهر</strong> هو الحكم. فرق الدفعة الواحدة تقريبيّ: وقت إقفال الجهاز يتغيّر كلّ ليلة، فعمليّة على حدّه تظهر زائدةً في دفعة وناقصةً في التي تليها.</li>
         </ul>
       </Callout>
 
       {/* ── دفعاتٌ فرقُها ظاهر ── */}
       <Section
         id="flagged"
-        title="دفعاتٌ تحتاج نظرك"
+        title="دفعات تحتاج نظرك"
         icon={TriangleAlert}
         count={flagged.length}
-        hint={`دفعةُ بنكٍ تبعد عن بطاقات فودكس التي تقابلها بأكثر من ${formatRiyalsDisplay(CARD_SMALL_MINOR)} ريال. ما عرفتَ سببَه أسكِته فلا يعود.`}
+        hint={`دفعة بنك تبعد عن بطاقات فودكس التي تقابلها بأكثر من ${formatRiyalsDisplay(CARD_SMALL_MINOR)} ريال. ما عرفت سببه أسكته فلا يعود.`}
       >
         {flagged.length === 0 ? (
           <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs leading-relaxed text-muted shadow-raised">
-            لا دفعةَ فرقُها ظاهر في ما يغطّيه الكشف.
-            {silencedRows.length > 0 && <> وأسكتَّ {silencedRows.length} — تجدها أدناه.</>}
+            لا دفعة فرقها ظاهر في ما يغطّيه الكشف.
+            {silencedRows.length > 0 && <> وأسكتّ {silencedRows.length} — تجدها أدناه.</>}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -138,18 +138,18 @@ export default async function FoodicsBankPage() {
               <li key={b.day} className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 ${b.verdict === "BANK_SHORT" ? "border-danger/30 bg-danger-bg" : "border-warn/30 bg-warn-bg"}`}>
                 <div className="min-w-0 flex-1 basis-56">
                   <p className="text-sm font-bold">
-                    دفعةُ <bdi>{formatDay(b.day)}</bdi>: {b.verdict === "BANK_SHORT" ? "دخل البنكَ أقلّ بـ" : "دخل البنكَ أكثر بـ"}<Money minor={Math.abs(b.gapMinor)} />
+                    دفعة <bdi>{formatDay(b.day)}</bdi>: {b.verdict === "BANK_SHORT" ? "دخل البنك أقلّ بـ" : "دخل البنك أكثر بـ"}<Money minor={Math.abs(b.gapMinor)} />
                   </p>
                   <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
-                    سجّل فودكس بالبطاقة <Money minor={b.foodicsMinor} /> <Window b={b} />، ودخل البنكَ <Money minor={b.bankMinor} />.
+                    سجّل فودكس بالبطاقة <Money minor={b.foodicsMinor} /> <Window b={b} />، ودخل البنك <Money minor={b.bankMinor} />.
                     {b.verdict === "BANK_SHORT"
-                      ? " راجِع تقريرَ إقفال الجهاز لتلك الليلة."
-                      : " راجِع طلباتِ تلك الليلة في فودكس: ما دُفع بالبطاقة وسُجّل نقداً."}
+                      ? " راجع تقرير إقفال الجهاز لتلك الليلة."
+                      : " راجع طلبات تلك الليلة في فودكس: ما دفع بالبطاقة وسجّل نقداً."}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-1">
-                  <LinkButton href={`/bank?show=in&month=${b.day.slice(0, 7)}#transactions`} variant="secondary" size="sm">واردُ ذلك الشهر</LinkButton>
-                  {canEdit && <SignalControls signalKey={cardGapKey(b.day)} dismissLabel="عرفتُ سببَه" />}
+                  <LinkButton href={`/bank?show=in&month=${b.day.slice(0, 7)}#transactions`} variant="secondary" size="sm">وارد ذلك الشهر</LinkButton>
+                  {canEdit && <SignalControls signalKey={cardGapKey(b.day)} dismissLabel="عرفت سببه" />}
                 </div>
               </li>
             ))}
@@ -157,11 +157,11 @@ export default async function FoodicsBankPage() {
         )}
         {silencedRows.length > 0 && (
           <details className="mt-3 text-xs text-muted">
-            <summary className="cursor-pointer font-bold">ما أسكتَّه ({silencedRows.length})</summary>
+            <summary className="cursor-pointer font-bold">ما أسكتّه ({silencedRows.length})</summary>
             <ul className="mt-2 space-y-1">
               {silencedRows.map((b) => (
                 <li key={b.day} className="flex flex-wrap items-center gap-2">
-                  <span>دفعةُ <bdi>{formatDay(b.day)}</bdi> · <GapWords gapMinor={b.gapMinor} agrees={false} /></span>
+                  <span>دفعة <bdi>{formatDay(b.day)}</bdi> · <GapWords gapMinor={b.gapMinor} agrees={false} /></span>
                   {canEdit && <SignalControls signalKey={cardGapKey(b.day)} silenced />}
                 </li>
               ))}
@@ -170,8 +170,8 @@ export default async function FoodicsBankPage() {
         )}
         {t.card.unsettled && (
           <p className="mt-3 text-xs leading-relaxed text-muted">
-            وبعد آخر دفعةٍ في الكشف سجّل فودكس بالبطاقة <Money minor={t.card.unsettled.foodicsMinor} /> (منذ <bdi>{formatMoment(new Date(t.card.unsettled.fromMs))}</bdi>) —
-            لم يبلغها الكشفُ بعد، وتُقابَل حين يُستورَد كشفٌ أحدث.
+            وبعد آخر دفعة في الكشف سجّل فودكس بالبطاقة <Money minor={t.card.unsettled.foodicsMinor} /> (منذ <bdi>{formatMoment(new Date(t.card.unsettled.fromMs))}</bdi>) —
+            لم يبلغها الكشف بعد، وتقابل حين يستورد كشف أحدث.
           </p>
         )}
       </Section>
@@ -179,9 +179,9 @@ export default async function FoodicsBankPage() {
       {/* ── البطاقات شهراً بشهر ── */}
       <Section
         id="months"
-        title="البطاقاتُ شهراً بشهر"
+        title="البطاقات شهراً بشهر"
         icon={Landmark}
-        hint="مجموعُ دفعات الشهر عند الطرفين. الشهرُ الجاري ناقصٌ حتى يكتمل كشفُه."
+        hint="مجموع دفعات الشهر عند الطرفين. الشهر الجاري ناقص حتى يكتمل كشفه."
       >
         <DataTable<CardMonth>
           rows={t.card.months}
@@ -207,7 +207,7 @@ export default async function FoodicsBankPage() {
         title="دفعةً بدفعة"
         icon={CreditCard}
         count={shown.length}
-        hint={`كلُّ دفعةٍ في البنك وما يقابلها من بطاقات فودكس، من إقفال الجهاز إلى الذي يليه. وآخرُ ${CARD_RECENT_DAYS} أيّامٍ من الكشف قد لا تكتمل — بعضُ الشبكات تودع متأخّرة — فلا يُحكَم فيها.`}
+        hint={`كلّ دفعة في البنك وما يقابلها من بطاقات فودكس، من إقفال الجهاز إلى الذي يليه. وآخر ${CARD_RECENT_DAYS} أيّام من الكشف قد لا تكتمل — بعض الشبكات تودع متأخّرة — فلا يحكم فيها.`}
       >
         <DataTable<CardBatchRow>
           rows={shown}
@@ -215,7 +215,7 @@ export default async function FoodicsBankPage() {
           columns={[
             {
               key: "day",
-              header: "تاريخُ الدفعة",
+              header: "تاريخ الدفعة",
               primary: true,
               cell: (b) => (
                 <span>
@@ -234,7 +234,7 @@ export default async function FoodicsBankPage() {
                 : <GapWords gapMinor={b.gapMinor} agrees={b.verdict === "AGREES"} quiet={b.verdict === "SMALL_GAP"} />),
             },
             { key: "n", header: "عمليّات", numeric: true, secondary: true, cell: (b) => <span className="nums nums-count">{b.payments}</span> },
-            { key: "window", header: "آخرُ عمليّةٍ فيها", secondary: true, cell: (b) => (b.toMs === null ? <span className="text-muted">—</span> : <bdi className="text-xs text-muted">{formatMoment(new Date(b.toMs))}</bdi>) },
+            { key: "window", header: "آخر عمليّة فيها", secondary: true, cell: (b) => (b.toMs === null ? <span className="text-muted">—</span> : <bdi className="text-xs text-muted">{formatMoment(new Date(b.toMs))}</bdi>) },
           ]}
         />
       </Section>
@@ -242,9 +242,9 @@ export default async function FoodicsBankPage() {
       {/* ── النقد ── */}
       <Section
         id="cash"
-        title="النقدُ شهراً بشهر"
+        title="النقد شهراً بشهر"
         icon={Banknote}
-        hint="النقدُ لا يُقابَل يوماً بيوم — الإيداعُ يجمع أيّاماً. فيُعرَض ما قبضه فودكس نقداً بجانب ما دخل البنكَ من غير الشبكة، وما كتبتَه نقداً للإقرار."
+        hint="النقد لا يقابل يوماً بيوم — الإيداع يجمع أيّاماً. فيعرض ما قبضه فودكس نقداً بجانب ما دخل البنك من غير الشبكة، وما كتبته نقداً للإقرار."
       >
         <DataTable<CashMonth>
           rows={t.cash}
@@ -252,24 +252,24 @@ export default async function FoodicsBankPage() {
           columns={[
             { key: "month", header: "الشهر", primary: true, cell: (m) => <span className="font-bold">{formatMonth(m.month)}</span> },
             { key: "cash", header: "قبضه فودكس نقداً", numeric: true, cell: (m) => <Money minor={m.cashMinor} /> },
-            { key: "bank", header: "دخل البنكَ من غير الشبكة", numeric: true, cell: (m) => (m.bankOtherCreditsMinor === 0 ? <span className="text-muted">لا شيء</span> : <Money minor={m.bankOtherCreditsMinor} />) },
-            { key: "typed", header: "كتبتَه للإقرار", numeric: true, cell: (m) => (m.typedForVatMinor === null ? <span className="text-warn">لم يُكتب</span> : <Money minor={m.typedForVatMinor} />) },
-            { key: "variance", header: "فرقُ عدّ الصندوق", numeric: true, secondary: true, cell: (m) => (m.tillVarianceMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={m.tillVarianceMinor} signed />) },
+            { key: "bank", header: "دخل البنك من غير الشبكة", numeric: true, cell: (m) => (m.bankOtherCreditsMinor === 0 ? <span className="text-muted">لا شيء</span> : <Money minor={m.bankOtherCreditsMinor} />) },
+            { key: "typed", header: "كتبته للإقرار", numeric: true, cell: (m) => (m.typedForVatMinor === null ? <span className="text-warn">لم يكتب</span> : <Money minor={m.typedForVatMinor} />) },
+            { key: "variance", header: "فرق عدّ الصندوق", numeric: true, secondary: true, cell: (m) => (m.tillVarianceMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={m.tillVarianceMinor} signed />) },
           ]}
         />
         <Callout tone="warn" icon={Banknote} className="mt-4" action={can(user.role, "month:close") ? <LinkButton href="/close/vat" variant="secondary" size="sm">افتح الإقرار</LinkButton> : undefined}>
-          <strong className="text-ink">قبض فودكس نقداً <Money minor={cashTotal} /> منذ <bdi>{formatDay(t.firstDay)}</bdi>، ولا أثرَ لإيداعه في الكشف.</strong>{" "}
-          هذه مبيعاتٌ خاضعةٌ للضريبة، والإقرارُ يأخذها ممّا تكتبه بيدك شهراً بشهر. عمودُ «قبضه فودكس نقداً» هو الرقمُ الذي تكتبه — ولا يُكتب في الإقرار من هنا شيء.
-          و«فرقُ عدّ الصندوق» ما عُدّ عند الإقفال ناقصاً ما توقّعه فودكس.
+          <strong className="text-ink">قبض فودكس نقداً <Money minor={cashTotal} /> منذ <bdi>{formatDay(t.firstDay)}</bdi>، ولا أثر لإيداعه في الكشف.</strong>{" "}
+          هذه مبيعات خاضعة للضريبة، والإقرار يأخذها ممّا تكتبه بيدك شهراً بشهر. عمود «قبضه فودكس نقداً» هو الرقم الذي تكتبه — ولا يكتب في الإقرار من هنا شيء.
+          و«فرق عدّ الصندوق» ما عدّ عند الإقفال ناقصاً ما توقّعه فودكس.
         </Callout>
       </Section>
 
       {/* ── مشروباتُ الموظّفين ── */}
       <Section
         id="staff"
-        title="مشروباتُ الموظّفين"
+        title="مشروبات الموظّفين"
         icon={Coffee}
-        hint="ما قُيّد في فودكس على «House Account»، بسعر القائمة. ليست مبيعاتٍ ولا ديناً على أحد، ولا تدخل الإيرادَ ولا ضريبةَ المبيعات؛ وما صُنع منها يُخصَم من المخزون في الجرد كأيّ مشروب."
+        hint="ما قيّد في فودكس على «House Account»، بسعر القائمة. ليست مبيعات ولا ديناً على أحد، ولا تدخل الإيراد ولا ضريبة المبيعات؛ وما صنع منها يخصم من المخزون في الجرد كأيّ مشروب."
       >
         <DataTable<CashMonth>
           rows={t.cash}
@@ -279,7 +279,7 @@ export default async function FoodicsBankPage() {
             { key: "staff", header: "بسعر القائمة", numeric: true, cell: (m) => <Money minor={m.staffDrinksMinor} /> },
           ]}
         />
-        <p className="mt-3 text-xs text-muted">المجموعُ منذ <bdi>{formatDay(t.firstDay)}</bdi>: <Money minor={staffTotal} /> بسعر القائمة — وكلفتُها الفعليّةُ أقلّ، وتظهر في الجرد.</p>
+        <p className="mt-3 text-xs text-muted">المجموع منذ <bdi>{formatDay(t.firstDay)}</bdi>: <Money minor={staffTotal} /> بسعر القائمة — وكلفتها الفعليّة أقلّ، وتظهر في الجرد.</p>
       </Section>
     </PageShell>
   );
@@ -289,11 +289,11 @@ export default async function FoodicsBankPage() {
 function GapWords({ gapMinor, agrees, quiet = false }: { gapMinor: number; agrees: boolean; quiet?: boolean }) {
   if (agrees) return <span className="inline-flex items-center gap-1 text-xs font-bold text-ok"><CircleCheck className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />متطابقان</span>;
   const cls = quiet ? "text-muted" : gapMinor > 0 ? "font-bold text-danger" : "font-bold text-warn";
-  return <span className={`text-xs ${cls}`}>{gapMinor > 0 ? "البنكُ أقلّ بـ" : "البنكُ أكثر بـ"}<Money minor={Math.abs(gapMinor)} /></span>;
+  return <span className={`text-xs ${cls}`}>{gapMinor > 0 ? "البنك أقلّ بـ" : "البنك أكثر بـ"}<Money minor={Math.abs(gapMinor)} /></span>;
 }
 
 /** «من … إلى …» لمقطع الدفعة — أو لا شيء إن كان فارغاً. */
 function Window({ b }: { b: CardBatchRow }) {
-  if (b.fromMs === null || b.toMs === null) return <>(لا عمليّاتٍ في نافذتها)</>;
+  if (b.fromMs === null || b.toMs === null) return <>(لا عمليّات في نافذتها)</>;
   return <>(من <bdi>{formatMoment(new Date(b.fromMs))}</bdi> إلى <bdi>{formatMoment(new Date(b.toMs))}</bdi>)</>;
 }

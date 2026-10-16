@@ -128,8 +128,8 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
       tone: "info",
       title: `وصل ${countNoun(Number(d.arrived), DOCUMENT)}`,
       body: Number(d.archived) === Number(d.arrived)
-        ? "قُرئت كلُّها وأُرشِفت."
-        : `أُرشِف منها ${countNoun(Number(d.archived), DOCUMENT)} والباقي ينتظر.`,
+        ? "قرئت كلّها وأرشفت."
+        : `أرشف منها ${countNoun(Number(d.archived), DOCUMENT)} والباقي ينتظر.`,
       href: "/documents",
     });
   }
@@ -142,7 +142,7 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
       kind: "REVIEW",
       tone: "warn",
       title: `${countNoun(Number(p.review), DOCUMENT)} تنتظر مراجعتك`,
-      body: "قرأها النظام ولم تجتمع شروطُ أرشفتها وحدها.",
+      body: "قرأها النظام ولم تجتمع شروط أرشفتها وحدها.",
       href: "/documents",
     });
   }
@@ -152,8 +152,8 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
       at: new Date(p.stalled_at).toISOString(),
       kind: "STALLED",
       tone: "danger",
-      title: `${countNoun(Number(p.stalled), DOCUMENT)} لم تُقرأ بعد`,
-      body: "تعثّرت قراءتُها — أعد قراءتها من صفحة المستندات.",
+      title: `${countNoun(Number(p.stalled), DOCUMENT)} لم تقرأ بعد`,
+      body: "تعثّرت قراءتها — أعد قراءتها من صفحة المستندات.",
       href: "/documents",
     });
   }
@@ -166,8 +166,8 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
       at: new Date(`${todayInRiyadh()}T00:00:00+03:00`).toISOString(),
       kind: "OVERDUE",
       tone: "warn",
-      title: `${countNoun(overdue.length, SUPPLIER)} تأخّر سدادُهم أكثر من ${countNoun(60, DAY)}`,
-      body: `أقدمُ دَينٍ منذ ${countNoun(oldest, DAY)}.`,
+      title: `${countNoun(overdue.length, SUPPLIER)} تأخّر سدادهم أكثر من ${countNoun(60, DAY)}`,
+      body: `أقدم دين منذ ${countNoun(oldest, DAY)}.`,
       /* من لا يعتمد الدفعة يفتح الحسابات — لا صفحةً تقول «خارج صلاحيتك» */
       href: can(user.role, "payment:approve") ? "/payments" : "/suppliers",
     });
@@ -179,7 +179,7 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
       at: drive.failure.at.toISOString(),
       kind: "DRIVE",
       tone: "danger",
-      title: "مزامنةُ الدرايف متوقّفة",
+      title: "مزامنة الدرايف متوقّفة",
       body: drive.failure.reason,
       href: "/documents/drive",
     });
@@ -191,7 +191,7 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
       kind: "DRIVE",
       tone: "danger",
       title: "الدرايف غير موصول بحسابك",
-      body: "لا مزامنةَ ولا تسمية حتى تعيد الربط.",
+      body: "لا مزامنة ولا تسمية حتى تعيد الربط.",
       href: "/documents/drive",
     });
   }

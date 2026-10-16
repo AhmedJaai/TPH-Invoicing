@@ -67,8 +67,8 @@ export function amountsProblem(subtotal: number | null, vat: number | null, tota
   if (checkInvoiceTotals(subtotal, vat, total, postVat).verdict !== "MISMATCH") return null;
   return `الصافي ${formatRiyalsDisplay(subtotal)} + الضريبة ${formatRiyalsDisplay(vat)} = `
     + `${formatRiyalsDisplay(subtotal + vat)}، والإجمالي ${formatRiyalsDisplay(total)} — `
-    + `فرقُ ${formatRiyalsDisplay(Math.abs(diff))} لا يستقيم. لعلّ في الفاتورة رسمَ توصيلٍ أو خصماً لم يُقرأ؛ `
-    + "فلم تُكتَب المبالغ — صحّحها بيدك إن أردت.";
+    + `فرق ${formatRiyalsDisplay(Math.abs(diff))} لا يستقيم. لعلّ في الفاتورة رسم توصيل أو خصماً لم يقرأ؛ `
+    + "فلم تكتب المبالغ — صحّحها بيدك إن أردت.";
 }
 
 export async function rereadDocument(opts: {
@@ -107,7 +107,7 @@ export async function rereadDocument(opts: {
 
   if (!doc) return { ok: false, status: 404, error: "لا مستند بهذا المعرّف" };
   if (!doc.driveFileId) {
-    return { ok: false, status: 409, error: "هذا المستند بلا ملفٍّ في الدرايف — لا شيء يُعاد قراءتُه." };
+    return { ok: false, status: 409, error: "هذا المستند بلا ملفّ في الدرايف — لا شيء يعاد قراءته." };
   }
 
   let data: Buffer;
@@ -116,12 +116,12 @@ export async function rereadDocument(opts: {
     ({ data, mimeType } = await downloadFile(opts.drive, doc.driveFileId));
   } catch (e) {
     if (isDriveAuthError(e)) {
-      return { ok: false, status: 401, error: "انتهى تفويضُ الدرايف. اخرج وادخل بحساب جوجل ثمّ أعد المحاولة." };
+      return { ok: false, status: 401, error: "انتهى تفويض الدرايف. اخرج وادخل بحساب جوجل ثمّ أعد المحاولة." };
     }
-    return { ok: false, status: 502, error: "تعذّر تنزيلُ الملفّ من الدرايف." };
+    return { ok: false, status: 502, error: "تعذّر تنزيل الملفّ من الدرايف." };
   }
   if (!isSupportedUpload(mimeType)) {
-    return { ok: false, status: 415, error: `نوعُ الملفّ «${mimeType}» لا يُقرأ آلياً — صحّح الحقول بيدك.` };
+    return { ok: false, status: 415, error: `نوع الملفّ «${mimeType}» لا يقرأ آلياً — صحّح الحقول بيدك.` };
   }
 
   const supplierNames = (await db.select({ nameAr: suppliers.nameAr }).from(suppliers)).map((s) => s.nameAr);
@@ -157,7 +157,7 @@ export async function rereadDocument(opts: {
     && Math.abs(doc.storedTotal - read.totalMinor) > TOTAL_ROUNDING_TOLERANCE_MINOR;
   const problem = amountsProblem(read.subtotalMinor, read.vatMinor, total, read)
     ?? (totalConflict
-      ? `الإجماليُّ المقروء ${formatRiyalsDisplay(read.totalMinor!)} يخالف المقيَّد ${formatRiyalsDisplay(doc.storedTotal!)} — بقي المقيَّد.`
+      ? `الإجماليّ المقروء ${formatRiyalsDisplay(read.totalMinor!)} يخالف المقيّد ${formatRiyalsDisplay(doc.storedTotal!)} — بقي المقيّد.`
       : null);
   const amountsOk = amountsProblem(read.subtotalMinor, read.vatMinor, total, read) === null;
   /* الخصمُ والرسومُ يُكتبان مع الصافي والضريبة أو لا يُكتبان — والقيدُ 055 يزنها معاً */
@@ -169,7 +169,7 @@ export async function rereadDocument(opts: {
   if (!opts.apply) {
     return {
       ok: true, applied: false, model: outcome.model, fileName: doc.fileName, read, problem,
-      note: "هذه قراءةٌ جديدة لم تُكتَب بعد. قارنها بالملفّ ثمّ أقرّها — ورقمُ الفاتورة لا يُؤخَذ من النموذج ويبقى كما هو.",
+      note: "هذه قراءة جديدة لم تكتب بعد. قارنها بالملفّ ثمّ أقرّها — ورقم الفاتورة لا يؤخذ من النموذج ويبقى كما هو.",
     };
   }
 
@@ -195,13 +195,13 @@ export async function rereadDocument(opts: {
       await recordAudit({
         actorId: opts.actorId, action: "DOCUMENT_REREAD", entityType: "document", entityId: doc.id,
         after: { الملف: doc.fileName, النوع: kind, المورّد: matched.supplier?.nameAr ?? null, الإجمالي: x.totalAmount, المصدر: outcome.textSource ?? null,
-          السبب: "قُرئ من جديد ولا فاتورةَ له — حُفظت قراءتُه ليُقيَّد بها" },
+          السبب: "قرئ من جديد ولا فاتورة له — حفظت قراءته ليقيّد بها" },
       }, t);
     });
     return { ok: true, applied: true, model: outcome.model, linesWritten: 0, taxStatus: "UNKNOWN", amountsWritten: false, problem, savedForRecording: true };
   }
   if (!doc.supplierId) {
-    return { ok: false, status: 409, error: "لا مورّدَ لهذا المستند — اختره ثمّ أعد القراءة." };
+    return { ok: false, status: 409, error: "لا مورّد لهذا المستند — اختره ثمّ أعد القراءة." };
   }
 
   /*
@@ -293,7 +293,7 @@ export async function rereadDocument(opts: {
         ? msg
         : /مقفَل/.test(cause)
           ? cause
-        : "لم تُكتَب القراءة: رفضتها قيودُ المال في القاعدة — غالباً لأنّ مبالغها لا تستقيم مع ما دُفع. صحّح الحقول بيدك.",
+        : "لم تكتب القراءة: رفضتها قيود المال في القاعدة — غالباً لأنّ مبالغها لا تستقيم مع ما دفع. صحّح الحقول بيدك.",
     };
   }
 

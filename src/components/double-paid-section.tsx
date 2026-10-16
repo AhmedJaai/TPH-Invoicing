@@ -24,8 +24,8 @@ import {
  * ولا تنسخه.
  */
 export const DOUBLE_PAID_DECISION_LABEL: Record<DoublePaidDecision, string> = {
-  CLAIMED: "طولِبَ بها",
-  RECOVERED: "استُردَّ المال",
+  CLAIMED: "طولب بها",
+  RECOVERED: "استردّ المال",
   NOT_DUPLICATE: "ليست ازدواجاً",
 };
 
@@ -121,12 +121,12 @@ export function DoublePaidCard({
           {g.distinctOperations ? (
             <>
               <CircleCheck className="mt-0.5 h-3 w-3 shrink-0 text-ok" strokeWidth={2.25} aria-hidden />
-              بمراجعِ سدادٍ مختلفة — عمليّتان لا نسخةُ استيراد.
+              بمراجع سداد مختلفة — عمليّتان لا نسخة استيراد.
             </>
           ) : (
             <>
               <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={2.25} aria-hidden />
-              بلا مرجعٍ يفصلهما — قد تكون نسخةَ استيراد؛ انظر في تطبيق البنك قبل المطالبة.
+              بلا مرجع يفصلهما — قد تكون نسخة استيراد؛ انظر في تطبيق البنك قبل المطالبة.
             </>
           )}
         </p>
@@ -154,7 +154,7 @@ export async function DoublePaidWorkspace({ canEdit }: { canEdit: boolean }) {
       {openOrClaimed.length === 0 ? (
         <p role="status" className="flex items-center gap-2 rounded-xl border border-ok/25 bg-ok-bg px-4 py-3 text-xs font-bold text-ok">
           <CircleCheck className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-          كلّها حُسمت — لا مطالبة مفتوحة.
+          كلّها حسمت — لا مطالبة مفتوحة.
         </p>
       ) : (
         <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
@@ -172,7 +172,7 @@ export async function DoublePaidWorkspace({ canEdit }: { canEdit: boolean }) {
       {split.closed.length > 0 && (
         <details className="mt-3">
           <summary className="inline-flex min-h-11 cursor-pointer items-center text-xs font-bold text-muted hover:text-ink sm:min-h-0">
-            ما حُسم ({countNoun(split.closed.length, ITEM)}) — يُفتح ثانيةً إن كان القرارُ خطأ
+            ما حسم ({countNoun(split.closed.length, ITEM)}) — يفتح ثانيةً إن كان القرار خطأ
           </summary>
           <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised/70">
             {split.closed.map(({ group: g, decision }) => (
