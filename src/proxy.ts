@@ -8,7 +8,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { previewAllowed } from "@/lib/preview-mode";
 
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health"];
+/* `/i18n/`: قاموسُ الواجهة الإنجليزيّة — نصوصُ أزرارٍ لا بيانات، وصفحةُ الدخول تحتاجه قبل الجلسة */
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health", "/i18n/"];
 
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const ACCEPTED_BODIES = /^(application\/json|multipart\/form-data|application\/x-www-form-urlencoded)/i;
@@ -39,16 +40,16 @@ export function proxy(request: NextRequest) {
     */
     const fetchSite = request.headers.get("sec-fetch-site");
     if (fetchSite === "cross-site") {
-      return NextResponse.json({ error: "طلب من موقع آخر — رفض" }, { status: 403 });
+      return NextResponse.json({ error: "رُفض الطلب لأنه جاء من موقع آخر" }, { status: 403 });
     }
     if (!origin && !fetchSite && hasSessionCookie(request)) {
-      return NextResponse.json({ error: "طلب لا يعرف مصدره — رفض. حدّث الصفحة ثمّ أعد المحاولة" }, { status: 403 });
+      return NextResponse.json({ error: "رُفض الطلب لأن مصدره غير معروف. حدّث الصفحة ثم أعد المحاولة" }, { status: 403 });
     }
     if (origin) {
       let sameHost = false;
       try { sameHost = new URL(origin).host === request.nextUrl.host; } catch { sameHost = false; }
       if (!sameHost) {
-        return NextResponse.json({ error: "طلب من موقع آخر — رفض" }, { status: 403 });
+        return NextResponse.json({ error: "رُفض الطلب لأنه جاء من موقع آخر" }, { status: 403 });
       }
     }
     const type = request.headers.get("content-type");
@@ -80,7 +81,7 @@ export function proxy(request: NextRequest) {
     // واجهات البرمجة تردّ 401 بصيغة JSON — تحويلها إلى صفحة HTML
     // يجعل fetch يتلقّى صفحة دخول بدل رسالة خطأ مفهومة.
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "يلزم تسجيل الدخول" }, { status: 401 });
+      return NextResponse.json({ error: "يجب تسجيل الدخول" }, { status: 401 });
     }
     const url = new URL("/login", request.url);
     url.searchParams.set("from", pathname);

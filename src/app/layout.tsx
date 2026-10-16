@@ -1,11 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import { thmanyahDisplay, thmanyahSans } from "./fonts";
 import "./globals.css";
+import { cookies } from "next/headers";
 import { ThemePrimer } from "@/components/view-controls";
+import { EnglishRuntime } from "@/components/i18n/english-runtime";
+import { asLocale, DICTIONARY_URL, LOCALE_COOKIE } from "@/lib/i18n/locale";
 
 export const metadata: Metadata = {
   title: "ذا بوبليك هاوس — المال والتشغيل",
-  description: "ماذا تحتاج أن تعرف أو تفعل اليوم — من وصول الفاتورة حتى قيدها وسدادها وإقفال الشهر",
+  description: "ماذا تحتاج أن تعرف أو تفعل اليوم، من وصول الفاتورة حتى قيدها وسدادها وإقفال الشهر",
   appleWebApp: { capable: true, title: "ذا بوبليك هاوس", statusBarStyle: "black-translucent" },
   manifest: "/manifest.webmanifest",
 };
@@ -20,15 +23,21 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = asLocale((await cookies()).get(LOCALE_COOKIE)?.value);
+  const en = locale === "en";
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <html lang={locale} dir={en ? "ltr" : "rtl"} className={en ? "i18n-pending" : undefined} suppressHydrationWarning>
       <head>
+        {/* الإنجليزيّة: تُخفى الصفحةُ حتّى تُترجَم فلا يومض العربيّ، والقاموسُ يُطلَب مع الصفحة لا بعدها */}
+        {en && <style>{`html.i18n-pending body{visibility:hidden}`}</style>}
+        {en && <link rel="preload" href={DICTIONARY_URL} as="fetch" crossOrigin="anonymous" />}
         {/* يكتب الوضعَ وإخفاءَ الأرقام قبل أوّل رسم — فلا ومضةَ أبيضَ ولا مبلغٌ يظهر لحظةً */}
         <ThemePrimer />
       </head>
       <body className={`${thmanyahSans.variable} ${thmanyahDisplay.variable} font-sans antialiased`}>
         {children}
+        {en && <EnglishRuntime />}
       </body>
     </html>
   );

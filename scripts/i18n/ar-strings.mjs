@@ -77,17 +77,34 @@ if (cmd === "list") {
   }
   console.log(`stripped ${changed} files`);
 } else if (cmd === "extract") {
+  // القاموس: كلُّ نصٍّ كاملاً، والقالبُ بقيمه خاناتٍ ‎{0}‎ ‎{1}‎ — هكذا يُطابَق ما يُرسم
   const seen = new Map();
+  const add = (v, f) => {
+    v = v.replace(/\s+/g, " ").trim();
+    if (!v || !AR.test(v)) return;
+    if (!seen.has(v)) seen.set(v, new Set());
+    seen.get(v).add(f);
+  };
+  // ما لا يُرسم: أوامرُ النموذج، وقراءةُ المستندات، وبياناتُ الاختبار
+  const notUi = /^src\/(lib\/(ai\/(?!finding-labels)|extraction\/)|test\/|db\/)/;
   for (const f of walk("src")) {
+    if (notUi.test(f.split(path.sep).join("/"))) continue;
     const t = fs.readFileSync(f, "utf8");
-    for (const n of arabicNodes(f, t)) {
-      const v = n.value.replace(/\s+/g, " ").trim();
-      if (!v || !AR.test(v)) continue;
-      if (!seen.has(v)) seen.set(v, { files: new Set(), template: n.head || n.tail });
-      seen.get(v).files.add(f);
-    }
+    const kind = f.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+    const sf = ts.createSourceFile(f, t, ts.ScriptTarget.Latest, true, kind);
+    const visit = (n) => {
+      if (ts.isTemplateExpression(n)) {
+        let v = n.head.text;
+        n.templateSpans.forEach((sp, i) => { v += `{${i}}` + sp.literal.text; });
+        add(v, f);
+      } else if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n) || n.kind === ts.SyntaxKind.JsxText) {
+        add(n.text, f);
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(sf);
   }
-  const arr = [...seen].map(([k, v]) => ({ ar: k, template: v.template, files: [...v.files] }));
+  const arr = [...seen].map(([ar, files]) => ({ ar, files: [...files] }));
   fs.writeFileSync(args[0], JSON.stringify(arr, null, 1));
   console.log(`${arr.length} unique strings`);
 } else {
