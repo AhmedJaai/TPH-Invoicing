@@ -226,7 +226,7 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
         {p.twin && (sureTwin || likeTwin) && showAmounts && (
           <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
             {likeTwin ? "فاتورة لمورّده نفسه وفي اليوم والمبلغ نفسيهما، لكن رقمها مختلف:" : corrected ? "فاتورة بالرقم نفسه ولمورّده نفسه لكن بمبلغ مختلف. هل أعاد المورّد إصدارها؟" : isInvoiceKind ? "فاتورة بالرقم المقروء نفسه ولمورّده نفسه. قارن بينهما ثم ارفض هذه النسخة." : "الفاتورة التي تحمل الرقم نفسه:"}
-            <LinkButton href={invoiceHref(p.twin.id)} size="sm" icon={Receipt}>افتح الفاتورة المقيّدة</LinkButton>
+            <LinkButton href={invoiceHref(p.twin.id)} size="sm" icon={Receipt}>افتح الفاتورة المسجّلة</LinkButton>
           </p>
         )}
 
@@ -275,7 +275,7 @@ export async function DocumentView({ params, mode }: { params: Promise<{ id: str
 
       {/* ── أكمِل الناقص وقيّدها ── */}
       {recordable && !sureTwin && canEdit && showAmounts && (
-        <Section id="fix" icon={Wrench} title={byDesign ? "هل هو فاتورة فعلاً؟ قيّدها" : p.missing.length > 0 ? "أكمل الناقص وقيّدها" : "راجعها وقيّدها"} className="mt-8 scroll-mt-24">
+        <Section id="fix" icon={Wrench} title={byDesign ? "هل هو فاتورة فعلاً؟ سجّلها" : p.missing.length > 0 ? "أكمل البيانات الناقصة وسجّلها" : "راجعها وسجّلها"} className="mt-8 scroll-mt-24">
           {byDesign && (
             <Callout tone="info" className="mb-3" title={`صنّفه النموذج «${DOCUMENT_KIND_LABEL[p.kind] ?? p.kind}»`}>
               هذا النوع لا يُقيَّد فاتورة ولا يدخل في المبالغ المستحقة، وهذا صحيح إن كان عرض سعر فعلاً. أما إن كان فاتورة

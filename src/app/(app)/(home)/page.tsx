@@ -145,7 +145,7 @@ export default async function HomePage() {
         <section aria-labelledby="start-title" className="mb-8 rounded-2xl border border-accent-line bg-accent-soft/60 p-5 sm:p-6">
           <h2 id="start-title" className="flex items-center gap-2 text-base font-bold">
             <Sparkles className="h-[18px] w-[18px] text-accent" strokeWidth={2} aria-hidden />
-            {start.knowsNothing ? "ابدأ من هنا" : "بقي ما يكمل الصورة"}
+            {start.knowsNothing ? "ابدأ من هنا" : "بقيت خطوات لتكتمل الصورة"}
           </h2>
           <p className="mb-4 mt-1 text-xs leading-relaxed text-ink-soft">
             {start.knowsNothing
@@ -173,7 +173,7 @@ export default async function HomePage() {
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <KeyFigure
             icon={Store}
-            label="عليك للمورّدين"
+            label="المستحق للمورّدين"
             href="/suppliers"
             value={<Money minor={totals.owedMinor} />}
             tone={totals.owedMinor > 0 ? "warn" : undefined}
@@ -184,7 +184,7 @@ export default async function HomePage() {
             }
           >
             {totals.creditLeftMinor > 0 && (
-              <p className="text-xs text-ink-soft">ولك عندهم <Money minor={totals.creditLeftMinor} /></p>
+              <p className="text-xs text-ink-soft">ولك رصيد عندهم <Money minor={totals.creditLeftMinor} /></p>
             )}
             {/* الرقمُ يتغيّر بقيدٍ أو سداد — وهنا يُقال بماذا، ومن فعله */}
             <WhyNumber figure="owed" auditHref={can(user.role, "audit:view") ? "/settings/audit?kind=money" : undefined} />
@@ -253,7 +253,7 @@ export default async function HomePage() {
           action={
             attention.length > 0 ? (
               <Link href="/attention" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
-                افتح الطابور كاملاً <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                اعرض القائمة كاملة <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
               </Link>
             ) : undefined
           }
@@ -266,7 +266,7 @@ export default async function HomePage() {
                   href="/attention"
                   className="mt-2 flex min-h-11 items-center justify-center gap-1 rounded-xl border border-dashed border-line text-xs font-medium text-ink-soft transition-colors hover:border-accent-line hover:text-accent"
                 >
-                  والباقي {countNoun(attention.length - SHOWN, ITEM)} في الطابور
+                  والباقي {countNoun(attention.length - SHOWN, ITEM)} في القائمة
                   <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                 </Link>
               )}
@@ -323,7 +323,7 @@ async function CloseCard({ month }: { month: string }) {
       >
         <span className="flex items-center justify-between gap-3">
           <span className="text-[13px] font-bold">
-            {p.closed ? "مقفل" : <><span className="nums">{p.passed}</span> من <span className="nums">{p.total}</span> فحوص سليمة</>}
+            {p.closed ? "مقفل" : <><span className="nums">{p.passed}</span> من <span className="nums">{p.total}</span> فحوص ناجحة</>}
           </span>
           {p.closed ? (
             <Badge tone="ok" dot>مقفل</Badge>

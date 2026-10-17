@@ -223,7 +223,7 @@ export default async function ItemsAndPricesPage({
         <LinkTabs
           label="خيارات الأصناف"
           items={[
-            { href: "/analysis", label: "ما تحرّك سعره", count: priceMoves.length, active: view === "prices" },
+            { href: "/analysis", label: "أصناف تغيّر سعرها", count: priceMoves.length, active: view === "prices" },
             { href: "/analysis?view=spend", label: "حسب الإنفاق", count: items.length, active: view === "spend" },
             ...(canMap ? [{ href: "/analysis?view=mapping", label: "اربط الأصناف", count: unmapped, active: view === "mapping" }] : []),
           ]}
@@ -234,7 +234,7 @@ export default async function ItemsAndPricesPage({
         <>
           <Section
             id="price-moves"
-            title="ما تحرّك سعره"
+            title="أصناف تغيّر سعرها"
             icon={Tags}
             count={priceMoves.length}
             className="mt-6"

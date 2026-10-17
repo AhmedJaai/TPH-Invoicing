@@ -188,7 +188,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
         </Section>
       </div>
 
-      <Section title="ما خرج من الإيراد" icon={Info} hint="وصف لما حدث، وليس اتهاماً لأحد.">
+      <Section title="ما نقص من الإيراد" icon={Info} hint="وصف لما حدث، وليس اتهاماً لأحد.">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Leak label="خصومات الطلبات" minor={a.leaks.discountMinor} sub={`${a.leaks.discountedOrders} طلباً عليها خصم.`} />
           <Leak label="مبالغ ردّت للزبائن" minor={a.leaks.refundsMinor} sub={`${a.leaks.refundOrders} طلباً مرتجعاً.`} />

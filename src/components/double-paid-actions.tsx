@@ -100,13 +100,13 @@ export function DoublePaidActions({
         )}
         {canEdit && !closed && (
           <ConfirmAction
-            label="ليس ازدواجاً"
+            label="ليس مكرراً"
             variant="quiet"
             tone="warn"
             title="ليس سداداً مزدوجاً؟"
             consequence="يختفي هذا التنبيه من «يحتاج قرارك» ولن تُطالَب الجهة بالمال. استخدمه فقط إذا كانت العمليتان مستحقتين فعلاً، كفاتورتين بالمبلغ نفسه مثلاً. يُسجَّل قرارك في سجل التدقيق باسمك، ويمكنك إعادة فتح التنبيه لاحقاً."
             acknowledgement="تحققت أن المبلغ دُفع مرتين عن استحقاق فعلي"
-            confirmLabel="نعم، ليس ازدواجاً"
+            confirmLabel="نعم، ليس مكرراً"
             disabled={busy !== null}
             onConfirm={() => decide("NOT_DUPLICATE")}
           />

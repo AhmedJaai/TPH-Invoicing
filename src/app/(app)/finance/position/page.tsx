@@ -66,7 +66,7 @@ export default async function FinancePositionPage() {
           label="عليك للمورّدين"
           tone={overdueMinor > 0 ? "warn" : undefined}
           value={<Money minor={totals.owedMinor} currency />}
-          sub={<>لـ{countNoun(totals.owedSuppliers, SUPPLIER)}{overdueMinor > 0 && <>، منها <strong className="text-ink"><Money minor={overdueMinor} /></strong> تجاوزت ستين يوماً</>}{totals.creditLeftMinor > 0 && <>. ولك عند مورّدين <Money minor={totals.creditLeftMinor} /></>}.</>}
+          sub={<>لـ{countNoun(totals.owedSuppliers, SUPPLIER)}{overdueMinor > 0 && <>، منها <strong className="text-ink"><Money minor={overdueMinor} /></strong> تجاوزت ستين يوماً</>}{totals.creditLeftMinor > 0 && <>. ولك رصيد عند مورّدين <Money minor={totals.creditLeftMinor} /></>}.</>}
           href="/suppliers"
         />
         <KeyFigure

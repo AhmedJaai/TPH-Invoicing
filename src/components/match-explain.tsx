@@ -160,7 +160,7 @@ function StateLine({ look, score }: { look: StateLook | null; score: number | nu
           {look.label}
         </Badge>
       ) : (
-        <Badge>لا ترجيح محفوظ</Badge>
+        <Badge>لا يوجد ترجيح محفوظ</Badge>
       )}
       {score !== null && <span className="text-xs text-muted">{strength(score)}</span>}
     </span>

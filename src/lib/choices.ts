@@ -21,7 +21,7 @@ export const CHOICE_GROUP_LABEL: Record<ChoiceGroupId, string> = {
   "vat-cash": "مبيعات نقد كتبتها",
   hold: "فواتير موقوفة أدخلتها في الدفعة",
   alert: "تنبيهات أغلقتها",
-  supplier: "ما قلته عن مورّديك",
+  supplier: "ما سجّلته عن مورّديك",
   rule: "قواعد تصنيف كتبتها",
   waiver: "ملاحظات تجاوزتها",
 };
@@ -171,7 +171,7 @@ export function vatInvoiceChoiceRows(invoices: readonly VatInvoiceChoiceInput[],
         url: "/api/vat-choice",
         needs: "month:close",
         body: { kind: "invoice", ids: [i.id], included: null },
-        label: "أعدها إلى حكم النظام",
+        label: "أعدها إلى تقدير النظام",
       },
     };
   });

@@ -146,7 +146,7 @@ export function TriageSummary({ items }: { items: readonly AttentionItem[] }) {
   const stakes = stakeByKind(items);
   return (
     <section
-      aria-label="خلاصة ما ينتظر"
+      aria-label="ملخّص ما ينتظرك"
       className="animate-rise rounded-2xl border border-line bg-raised shadow-raised"
     >
       <div className="flex flex-col gap-4 p-4 sm:p-5 xl:flex-row xl:items-center xl:gap-0">
@@ -408,7 +408,7 @@ export function ItemDetail({
               {isSignal(item) && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-plum/25 bg-plum-bg px-2 py-0.5 text-[11px] font-bold leading-5 text-plum">
                   <Activity className="h-3 w-3" strokeWidth={2.25} aria-hidden />
-                  إشارة في المال
+                  تنبيه مالي
                 </span>
               )}
             </div>
@@ -472,7 +472,7 @@ export function ItemDetail({
               <>
                 <a href="#resolve" className={buttonClass("primary", "md")}>
                   <ArrowDown className="h-4 w-4" strokeWidth={2} aria-hidden />
-                  احسمه هنا
+                  قرّر هنا
                 </a>
                 {outward && (
                   <LinkButton href={item.href} variant="quiet" size="md">
@@ -504,7 +504,7 @@ export function ItemDetail({
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h3 id="resolve-title" className="flex items-center gap-2 text-[15px] font-bold">
               <Zap className="h-[18px] w-[18px] text-accent" strokeWidth={2} aria-hidden />
-              احسمه هنا
+              قرّر هنا
             </h3>
             <p className="text-[11px] text-muted">ما تفعله يُحفظ فوراً، ويخرج البند من القائمة حين يُحسم كله.</p>
           </div>

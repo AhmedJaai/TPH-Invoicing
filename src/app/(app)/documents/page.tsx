@@ -323,7 +323,7 @@ export default async function DocumentsPage({
           {/* ── الحال أوّلاً، ثمّ البحث والترشيح في سطرٍ واحد ── */}
           <div className="space-y-3 border-b border-line pb-3">
             <LinkTabs
-              label="حال المستندات"
+              label="حالة المستندات"
               items={tabs.map((t) => ({ href: t.href, label: t.label, count: t.count, active: tab === t.id }))}
             />
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
@@ -378,7 +378,7 @@ export default async function DocumentsPage({
               />
               {filtered && (
                 <Link href={link({ month: undefined, supplier: undefined, kind: undefined, q: undefined })} className={buttonClass("quiet", "sm")}>
-                  امسح الترشيح
+                  امسح التصفية
                 </Link>
               )}
             </div>
@@ -419,7 +419,7 @@ export default async function DocumentsPage({
                   action={
                     <>
                       <LinkButton href={link({ status: "ARCHIVED" })} icon={Archive}>
-                        افتح المؤرشف ({nArchived})
+                        اعرض المؤرشف ({nArchived})
                       </LinkButton>
                       <LinkButton href="/upload" variant="primary" icon={Upload}>ارفع مستنداً</LinkButton>
                     </>
@@ -544,7 +544,7 @@ export default async function DocumentsPage({
                           {r.status === "REJECTED" && (
                             <span className="block text-[11px] leading-relaxed text-muted">
                               {j
-                                ? <>رُفض في {formatDay(j.at)}{j.by ? <> بواسطة <bdi>{j.by}</bdi></> : null}: {j.reason ?? "بلا سبب مكتوب"}</>
+                                ? <>رُفض في {formatDay(j.at)}{j.by ? <> بواسطة <bdi>{j.by}</bdi></> : null}: {j.reason ?? "بدون سبب مكتوب"}</>
                                 : "مرفوض، ولا يوجد سبب مسجّل في السجل."}
                             </span>
                           )}
@@ -611,7 +611,7 @@ function DrivePulse({ beat }: { beat: DriveHeartbeat }) {
   const state =
     beat.state === "preview" ? { dot: "bg-muted", text: "الدرايف: غير موصول في التجربة" }
     : beat.state === "disconnected" ? { dot: "bg-danger", text: "الدرايف: غير موصول بحسابك" }
-    : beat.state === "failing" && beat.failure ? { dot: "bg-danger", text: `الدرايف: تعثّر ${timeAgo(beat.failure.at)}` }
+    : beat.state === "failing" && beat.failure ? { dot: "bg-danger", text: `الدرايف: فشل ${timeAgo(beat.failure.at)}` }
     : beat.state === "ok" && beat.checkedAt ? { dot: "bg-ok", text: `الدرايف: فحص ${timeAgo(beat.checkedAt)}` }
     : { dot: "bg-warn", text: "الدرايف: لم يُفحص بعد" };
   return (

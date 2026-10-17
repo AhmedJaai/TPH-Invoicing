@@ -157,7 +157,7 @@ export function DocumentRecord({
   const touched = (Object.keys(f) as (keyof typeof f)[]).some((k) => f[k] !== initial[k]) || supplierId !== (initial.supplierId ?? "");
 
   return (
-    <div className="space-y-4" data-dirty={touched ? "قيد المستند" : undefined}>
+    <div className="space-y-4" data-dirty={touched ? "تسجيل المستند" : undefined}>
       {fromName.length > 0 && (
         <p className="rounded-lg bg-info-bg px-3 py-2 text-[11px] leading-relaxed text-info">
           {fromName.join(" و")} مأخوذ من اسم الملف وليس من قراءة المستند، فقارنه بالورقة.
@@ -305,7 +305,7 @@ export function DocumentRecord({
               onAction={() => send(false, overrideReason.trim())}
             >
               <FilePlus2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              قيّدها رغم ذلك
+              سجّلها رغم ذلك
             </ActionButton>
           </div>
         </div>
@@ -322,11 +322,11 @@ export function DocumentRecord({
         {verdict && verdict.blockers.length === 0 && !verdict.recorded ? (
           <ActionButton variant="primary" onAction={() => send(false)}>
             <FilePlus2 className="h-4 w-4" strokeWidth={2} aria-hidden />
-            <span>قيّد الفاتورة</span>
+            <span>سجّل الفاتورة</span>
           </ActionButton>
         ) : (
           <ActionButton variant="primary" disabled={!ready} reason={why} showDone={false} onAction={() => send(true)}>
-            <span>عاين قبل القيد</span>
+            <span>معاينة قبل التسجيل</span>
           </ActionButton>
         )}
         <p className="text-[11px] text-muted">

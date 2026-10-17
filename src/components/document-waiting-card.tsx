@@ -122,7 +122,7 @@ export function WaitingCard({
         {/* ما لم يُقيَّد له شيء لا يُعتمد — يُكمَل ويُقيَّد من ملفّه */}
         {canDecide && showAmounts && r.status === "NEEDS_REVIEW" && (r.invoiceId || !RECORDABLE.has(r.kind)) && <ConfirmDocument documentId={r.id} variant="primary" />}
         {canDecide && showAmounts && !r.invoiceId && RECORDABLE.has(r.kind) && (
-          <Link href={documentHref(r.id, "fix")} className={buttonClass("primary", "sm")}>أكمله وقيّده</Link>
+          <Link href={documentHref(r.id, "fix")} className={buttonClass("primary", "sm")}>أكمله وسجّله</Link>
         )}
         {!canDecide && <span className="text-[11px] text-muted">القرار لمن يرفع المستندات ويعتمدها.</span>}
       </div>

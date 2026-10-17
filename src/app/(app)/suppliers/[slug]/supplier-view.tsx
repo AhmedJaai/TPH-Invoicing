@@ -402,7 +402,7 @@ export async function SupplierView({
                 <span className={`grid h-7 w-7 place-items-center rounded-lg ${balance > 0 ? "bg-warn-bg text-warn" : "bg-sunken text-ink-soft"}`}>
                   <Scale className="h-4 w-4" strokeWidth={2} aria-hidden />
                 </span>
-                {balance > 0 ? "عليك له" : creditLeft > 0 ? "رصيد لك عنده" : offsetting ? "متّزن على الورق" : "الحساب متّزن"}
+                {balance > 0 ? "عليك له" : creditLeft > 0 ? "رصيد لك عنده" : offsetting ? "متوازن على الورق" : "الحساب متوازن"}
               </p>
               {ageing.oldestOwedDays !== null && (
                 /* الدَّينُ القديم يُسدَّد من دفعة الشهر — والشارةُ بابُها لمن يعتمد السداد وحده */
@@ -476,7 +476,7 @@ export async function SupplierView({
             <Card>
               <h2 className="flex items-center gap-2 text-sm font-bold">
                 <ScrollText className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-                ما نعرفه مقابل ما يقوله كشفه
+                سجلاتنا مقارنة بكشف المورّد
               </h2>
               <dl className="mt-3 grid grid-cols-3 gap-3">
                 <Compare
@@ -486,7 +486,7 @@ export async function SupplierView({
                   sub={reportedAt ? `حتى ${formatDay(reportedAt)}` : "من فواتيرنا"}
                 />
                 <Compare
-                  label="ما يقوله كشفه"
+                  label="حسب كشف المورّد"
                   value={account.reportedBalanceMinor}
                   missing="لم يصل كشف"
                   sub={reportedAt ? "آخر رصيد ختامي" : "أو وصل الكشف ولم يُقرأ"}
@@ -526,7 +526,7 @@ export async function SupplierView({
                         {why.priceDiffs.map((d) => (
                           <li key={d.invoiceId} className="flex flex-wrap justify-between gap-x-3">
                             <Link href={invoiceHref(d.invoiceId)} className="font-bold text-accent hover:underline"><bdi className="nums">{d.invoiceNumber}</bdi></Link>
-                            <span>كشفه <Money minor={d.theirsMinor} /> · فاتورتنا <Money minor={d.oursMinor} /> · {d.oursMinor > d.theirsMinor ? "أكثر عندنا بـ" : "أقلّ عندنا بـ"}<Money minor={Math.abs(d.oursMinor - d.theirsMinor)} /></span>
+                            <span>كشفه <Money minor={d.theirsMinor} /> · فاتورتنا <Money minor={d.oursMinor} /> · {d.oursMinor > d.theirsMinor ? "سجلاتنا أعلى بـ" : "سجلاتنا أقل بـ"}<Money minor={Math.abs(d.oursMinor - d.theirsMinor)} /></span>
                           </li>
                         ))}
                       </ul>
@@ -554,7 +554,7 @@ export async function SupplierView({
             <Card>
               <h2 className="flex items-center gap-2 text-sm font-bold">
                 <Timer className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-                كيف تسدّد له
+                طريقة السداد
               </h2>
               {rel.invoiceCount === 0 ? (
                 <p className="mt-3 text-xs leading-relaxed text-muted">غير معروف: لا توجد فاتورة منه بعد، فلا يمكن قياس السداد.</p>
@@ -627,10 +627,10 @@ export async function SupplierView({
 
       {/* ── التفصيل خلف ألسنة، وبجانبه آخرُ ما جرى ── */}
       <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 @5xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <section id="detail" className="min-w-0 scroll-mt-24" aria-label="تفصيل حسابه">
+        <section id="detail" className="min-w-0 scroll-mt-24" aria-label="تفاصيل الحساب">
           <div className="mb-4">
             <LinkTabs
-              label="تفصيل حسابه"
+              label="تفاصيل الحساب"
               items={TABS.filter((t) => showAmounts || t.id !== "payments").map((t) => ({
                 href: `/suppliers/${s.slug}?tab=${t.id}#detail`,
                 label: t.label,
@@ -849,7 +849,7 @@ export async function SupplierView({
                 action={
                   <>
                     {s.issuesStatements && <LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} variant="primary" size="sm">ارفع كشفه وطابقه</LinkButton>}
-                    {showAmounts && <LinkButton href={`/suppliers/${s.slug}/statement`} size="sm" icon={Printer}>كشف حسابه منّا</LinkButton>}
+                    {showAmounts && <LinkButton href={`/suppliers/${s.slug}/statement`} size="sm" icon={Printer}>كشف حسابه من سجلاتنا</LinkButton>}
                   </>
                 }
               />
@@ -882,7 +882,7 @@ export async function SupplierView({
                 </ul>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} size="sm" variant="primary">طابقها بفواتيرك</LinkButton>
-                  {showAmounts && <LinkButton href={`/suppliers/${s.slug}/statement`} size="sm" icon={Printer}>كشف حسابه منّا</LinkButton>}
+                  {showAmounts && <LinkButton href={`/suppliers/${s.slug}/statement`} size="sm" icon={Printer}>كشف حسابه من سجلاتنا</LinkButton>}
                 </div>
               </>
             )
@@ -1010,7 +1010,7 @@ export async function SupplierView({
         <aside aria-labelledby="events-title" className="min-w-0">
           <h2 id="events-title" className="mb-4 flex items-center gap-2 text-[15px] font-bold sm:text-base">
             <History className="h-[18px] w-[18px] text-muted" strokeWidth={1.75} aria-hidden />
-            آخر ما جرى
+            آخر النشاطات
           </h2>
           {timeline.length === 0 ? (
             <EmptyState compact icon={CalendarClock} title="لا توجد أحداث بعد." hint="تظهر هنا الفواتير المرفوعة والدفعات المسجّلة بترتيبها الزمني." />

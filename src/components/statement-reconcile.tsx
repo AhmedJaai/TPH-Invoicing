@@ -332,7 +332,7 @@ function ResultView({ result }: { result: Result }) {
           لا توجد فاتورة سجّلها عليك وليست عندك، ولا فروق في المبالغ.
         </Callout>
       ) : (
-        <Callout tone={s.missingFromArchive > 0 ? "danger" : "warn"} icon={CircleAlert} title="في كشفه ما يخالف فواتيرك">
+        <Callout tone={s.missingFromArchive > 0 ? "danger" : "warn"} icon={CircleAlert} title="كشفه يختلف عن فواتيرك">
           {s.missingFromArchive > 0 && <>{countNoun(s.missingFromArchive, INVOICE)} سجّلها عليك ولا ملف لها عندك. </>}
           {s.amountMismatches > 0 && <>وفي {s.amountMismatches} فرق في المبلغ. </>}
           المذكّرة أسفله جاهزة لإرسالها للمورّد.
@@ -340,7 +340,7 @@ function ResultView({ result }: { result: Result }) {
       )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Count label="أسطر كشفه" value={s.statementLines} />
+        <Count label="أسطر الكشف" value={s.statementLines} />
         <Count label="طُوبقت" value={s.matched} tone="ok" />
         <Count label="سجّلها عليك ولا ملف لها" value={s.missingFromArchive} tone={s.missingFromArchive ? "danger" : "ok"} />
         <Count label="فروق مبالغ" value={s.amountMismatches} tone={s.amountMismatches ? "warn" : "ok"} />
@@ -348,7 +348,7 @@ function ResultView({ result }: { result: Result }) {
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border border-line-soft bg-sunken/50 p-3 text-xs sm:grid-cols-4">
         <div><dt className="text-[11px] text-muted">ما سجّله علينا</dt><dd className="mt-1 font-bold"><Money minor={s.theirBilledMinor} /></dd></div>
-        <div><dt className="text-[11px] text-muted">ما لدينا من فواتيره</dt><dd className="mt-1 font-bold"><Money minor={s.ourBilledMinor} /></dd></div>
+        <div><dt className="text-[11px] text-muted">فواتيره لدينا</dt><dd className="mt-1 font-bold"><Money minor={s.ourBilledMinor} /></dd></div>
         <div>
           <dt className="text-[11px] text-muted">الفرق</dt>
           <dd className={`mt-1 font-bold ${s.billedDifferenceMinor === 0 ? "text-ok" : "text-warn"}`}><Money minor={Math.abs(s.billedDifferenceMinor)} /></dd>
@@ -493,7 +493,7 @@ function RecordMissing({ statementId, count, minor }: { statementId: string; cou
         {count === 1 ? "فاتورة" : <><span className="nums">{count}</span> فواتير</>} في الكشف لا ملف لها (<Money minor={minor} />)
       </span>
       <button type="button" onClick={run} disabled={busy} aria-busy={busy} className={`${buttonClass("secondary", "sm")} whitespace-nowrap`}>
-        {busy ? "جارٍ القيد…" : "قيّدها من الكشف"}
+        {busy ? "جارٍ القيد…" : "سجّلها من الكشف"}
       </button>
       {error && <span role="alert" className="text-[11px] text-danger">{error}</span>}
     </span>

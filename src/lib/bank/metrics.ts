@@ -96,7 +96,7 @@ export function computeMetrics(c: OutcomeCounts): Metric[] {
     },
     {
       key: "coverage",
-      label: "نسبة ما بلغ قراراً",
+      label: "نسبة ما حُسم",
       value: ratio(
         c.auto + c.confirmedByHuman + c.rejectedByHuman,
         c.totalCandidatesForMatching,

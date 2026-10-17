@@ -116,7 +116,7 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
             <div className="mt-3 rounded-xl border border-accent-line bg-accent-soft/50 p-3 text-xs leading-relaxed">
               <p className="font-bold">سبق أن قيّدت سدادها يدوياً</p>
               <p className="mt-1 text-ink-soft">
-                في {formatDay(handLink.paymentDay)} قيّدت سداداً لـ{handLink.supplierName} بمبلغ <Money minor={handLink.paymentMinor} />
+                في {formatDay(handLink.paymentDay)} سجّلت دفعة لـ{handLink.supplierName} بمبلغ <Money minor={handLink.paymentMinor} />
                 {handLink.invoices.length > 0 && <> عن {handLink.invoices.map((i) => i.number).join("، ")}</>}، فأُغلقت فاتورته،
                 ولذلك لم يجد النظام فاتورة مفتوحة للمطابقة. هذه الحوالة هي ذلك السداد
                 {handLink.exact ? "." : <>، وهي أكبر منه بمبلغ <Money minor={handLink.extraMinor} /> (هل أُضيف توصيل إلى الفاتورة؟ صحّح إجماليها).</>}

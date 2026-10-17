@@ -101,7 +101,7 @@ export default async function FinanceRowsPage({ searchParams }: { searchParams: 
       {line === "cogs" && (
         stock ? (
           <>
-            <Callout tone="info" icon={Info} title="المعادلة بأرقامها">
+            <Callout tone="info" icon={Info} title="المعادلة بالأرقام">
               مشتريات الشهر <strong><Money minor={stock.purchasesMonthMinor} /></strong> + مخزون عُدّ في <bdi>{formatDay(stock.openingDay)}</bdi> <strong><Money minor={stock.openingValueMinor} /></strong> − مخزون عُدّ في <bdi>{formatDay(stock.closingDay)}</bdi> <strong><Money minor={stock.closingValueMinor} /></strong>
               {stock.adjustedDays > 0 && <>، ثم عُدّلت الأيام ({stock.adjustedDays}) بين يوم العدّ وحدّ الشهر بما اشتُري وما صُرف نظرياً فيها</>}
               {" "}= <strong><Money minor={stock.minor} currency /></strong>.
