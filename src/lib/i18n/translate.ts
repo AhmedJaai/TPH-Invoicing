@@ -54,6 +54,8 @@ export class Translator {
   private exact = new Map<string, string>();
   private byHead = new Map<string, Template[]>();
   private byTail = new Map<string, Template[]>();
+  /** قوالب طرفاها أقصر من حرفين («{0} … ({1})») — قليلة، فتُفحص كلّها */
+  private loose: Template[] = [];
   private cache = new Map<string, string>();
 
   constructor(dict: Dictionary) {
@@ -65,6 +67,10 @@ export class Translator {
       }
       const order: number[] = [];
       const parts = key.split(SLOT);
+      /* خانةٌ أخيرة تُترك فارغةً أحياناً («…دفعة واحدة{0}.») — يُسجَّل النصّ بدونها أيضاً */
+      if (parts.length === 3 && /^[.،:)]?$/.test(parts[2]) && parts[0].trim() && !this.exact.has(normalize(parts[0] + parts[2]))) {
+        this.exact.set(normalize(parts[0] + parts[2]), en.replace(SLOT, ""));
+      }
       /* قالبٌ نصُّه الثابت أقلّ من ثلاثة أحرف («ال{0}»، «لـ{0}») يطابق كلَّ شيءٍ فيفسد غيره */
       const letters = parts.filter((_, i) => i % 2 === 0).join("").match(/[\u0621-\u064A]/g)?.length ?? 0;
       if (letters < 3) continue;
@@ -81,6 +87,7 @@ export class Translator {
       const tail = parts[parts.length - 1];
       if (head.length >= 2) push(this.byHead, head.slice(0, 2), t);
       else if (tail.length >= 2) push(this.byTail, tail.slice(-2), t);
+      else this.loose.push(t);
     }
   }
 
@@ -104,7 +111,7 @@ export class Translator {
     if (hit !== undefined) return hit;
     if (depth > 3) return latinize(s);
 
-    const cands = [...(this.byHead.get(s.slice(0, 2)) ?? []), ...(this.byTail.get(s.slice(-2)) ?? [])];
+    const cands = [...(this.byHead.get(s.slice(0, 2)) ?? []), ...(this.byTail.get(s.slice(-2)) ?? []), ...this.loose];
     for (const t of cands) {
       const m = t.re.exec(s);
       if (!m) continue;
@@ -127,6 +134,12 @@ export class Translator {
       if (done.some((d, i) => hasArabic(pieces[i]) && d !== pieces[i].trim())) {
         return done.join(latinize(sep));
       }
+    }
+    /* نصٌّ قصير كلُّ كلمةٍ عربيّة فيه معروفة: «٤–١٠ أكتوبر ٢٠٢٦» */
+    const words = s.split(" ");
+    if (words.length <= 5) {
+      const done = words.map((w) => (hasArabic(w) ? this.exact.get(w) : latinize(w)));
+      if (done.every((w) => w !== undefined)) return done.join(" ");
     }
     /* لاحقةٌ أو سابقةٌ رمزيّة: «… (٣)» أو «٣ …» */
     const wrapped = s.match(/^([\d٠-٩٬٫.,%+−\-()\s×·:#…]*)(.*?)([\d٠-٩٬٫.,%+−\-()\s×·:#…]*)$/);
