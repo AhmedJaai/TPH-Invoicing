@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { withRollback } from "@/test/db";
 import { backlogFingerprint, isDue, markRan } from "./job-state.service";
 
-describe("لا يُعاد عملٌ خلفيٌّ ما لم يتغيّر شيء", () => {
-  it("البصمةُ نفسُها في الحدّ ← لا يُعاد؛ وتغيّرُها أو مُضيُّ الحدّ ← يُعاد", () =>
+describe("لا يعاد عمل خلفيّ ما لم يتغيّر شيء", () => {
+  it("البصمة نفسها في الحدّ ← لا يعاد؛ وتغيّرها أو مضيّ الحدّ ← يعاد", () =>
     withRollback(async (tx) => {
       const name = `test-${Math.random()}`;
       const fp = await backlogFingerprint(tx);

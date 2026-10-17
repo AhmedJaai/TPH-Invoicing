@@ -72,7 +72,7 @@ export function SupplierPicker({
     setCreating(false);
     toast({
       tone: "ok",
-      title: r.data.existed ? "مسجَّلٌ من قبل — اختير" : "أُنشئ المورّد واختير",
+      title: r.data.existed ? "المورّد مسجّل من قبل وتم اختياره" : "تم إنشاء المورّد واختياره",
       body: s.nameAr,
     });
     return true;
@@ -81,7 +81,7 @@ export function SupplierPicker({
     <div className="mt-3 space-y-2">
       {suggested.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-bold text-muted">لعلّه — اسمُه في نصّ البنك:</span>
+          <span className="text-[11px] font-bold text-muted">ربما يكون أحد هؤلاء (حسب الاسم في نص البنك):</span>
           {suggested.map((s) => (
             <button
               key={s.id}
@@ -102,7 +102,7 @@ export function SupplierPicker({
         </div>
       )}
       {!chipsOnly && <label htmlFor={id} className="block">
-        <span className="text-[11px] font-bold text-muted">{suggested.length > 0 ? "أو اختر من الكلّ" : "أيّ مورّد؟"}</span>
+        <span className="text-[11px] font-bold text-muted">{suggested.length > 0 ? "أو اختر من كل المورّدين" : "أي مورّد؟"}</span>
         <select
           id={id}
           value={value}
@@ -124,14 +124,14 @@ export function SupplierPicker({
           className={buttonClass("quiet", "sm")}
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          ليس في القائمة؟ مورّدٌ جديد
+          ليس في القائمة؟ مورّد جديد
         </button>
       )}
       {!chipsOnly && creating && (
         <div className="rounded-lg border border-line-soft bg-sunken/50 p-2.5">
           <div className="flex flex-wrap items-end gap-2">
             <label className="min-w-[10rem] flex-1">
-              <span className="text-[11px] font-bold text-muted">اسمُ المورّد بالعربية</span>
+              <span className="text-[11px] font-bold text-muted">اسم المورّد بالعربية</span>
               <input
                 value={name}
                 onChange={(e) => { setName(e.target.value); setSimilar([]); }}
@@ -144,13 +144,13 @@ export function SupplierPicker({
                 className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm sm:min-h-9"
               />
             </label>
-            <ActionButton variant="primary" size="sm" disabled={name.trim().length < 2} reason="اكتب الاسم — حرفان على الأقلّ" onAction={() => create()}>
+            <ActionButton variant="primary" size="sm" disabled={name.trim().length < 2} reason="اكتب الاسم (حرفان على الأقل)" onAction={() => create()}>
               أنشئه واختره
             </ActionButton>
             <button type="button" onClick={() => setCreating(false)} className={buttonClass("quiet", "sm")}>إلغاء</button>
           </div>
           <p className="mt-1.5 text-[11px] text-muted">
-            وتُكمَل بياناتُه (الرقمُ الضريبيّ، واسمُ مجلّده في الدرايف) من ملفّه بعدها.
+            يمكنك إكمال بياناته (الرقم الضريبي واسم مجلده في الدرايف) من ملفه بعد ذلك.
           </p>
           <SimilarSuppliers
             similar={similar}

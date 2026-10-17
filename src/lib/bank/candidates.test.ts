@@ -433,7 +433,7 @@ describe("مجموعةٌ تنقص عنها الدفعة", () => {
     const group = generateCandidates(tx({ amountMinor: 2_000_00 }), rows)
       .find((c) => c.invoiceIds.length === 2)!;
     expect(group.outcome).toBe("PARTIAL_PAYMENT");
-    expect(group.evidence.join(" ")).toContain("تنقص عن المجموع 0.60");
+    expect(group.evidence.join(" ")).toContain("أقل من المجموع بمقدار 0.60");
   });
 
   it("وبهللةٍ واحدة تبقى مجموعةً بمبلغها", () => {
@@ -457,7 +457,7 @@ describe("القسط والعربون", () => {
     expect(all[0].outcome).toBe("PARTIAL_PAYMENT");
     expect(all[0].allocatedMinor).toBe(2_500_00);
     expect(all[0].score).toBeGreaterThanOrEqual(0.5);
-    expect(all[0].evidence.join(" ")).toContain("50٪ من إجماليّ الفاتورة (5,000.00)");
+    expect(all[0].evidence.join(" ")).toContain("50٪ من إجمالي الفاتورة (5,000.00)");
   });
 
   it("ونسبةٌ غير مألوفة لا تُرشَّح", () => {

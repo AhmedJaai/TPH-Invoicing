@@ -70,13 +70,13 @@ const builtAttention = cache(async (): Promise<AttentionItem[]> => {
     expiringObligations: dueDocs.map((o) => ({ title: o.title, kindLabel: OBLIGATION_KIND_LABEL[o.kind], expiresOn: o.expiresOn, daysLeft: o.daysLeft })),
     ibanAlerts: iban.map((a) => ({
       label: a.supplierName.slice(0, 45),
-      sub: `إلى ${groupIban(a.seenIban)} — والمعروفُ ${a.knownIbans.map(groupIban).join(" أو ")}`,
+      sub: `إلى ${groupIban(a.seenIban)}، والمعروف ${a.knownIbans.map(groupIban).join(" أو ")}`,
       amountMinor: a.totalMinor,
       href: `/suppliers/${a.supplierSlug}`,
     })),
     ibanAlertMinor: iban.reduce((s, a) => s + a.totalMinor, 0),
     firstTransfers: first.map((f) => ({
-      label: (f.payee ?? "مستفيدٌ غير معروف").slice(0, 45),
+      label: (f.payee ?? "مستفيد غير معروف").slice(0, 45),
       sub: `إلى ${groupIban(f.iban)}`,
       amountMinor: f.totalMinor,
     })),

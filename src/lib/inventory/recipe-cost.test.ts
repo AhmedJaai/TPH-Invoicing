@@ -34,8 +34,8 @@ function ingredientsOf(productSku: string): CostedIngredient[] {
   });
 }
 
-describe("كلفةُ الوصفة من عبوات مكوّناتها", () => {
-  it("«لاتيه مثلّج»: بنٌّ وحليبٌ ومصّاصةٌ وكاس = ‏٢٫٦٩ ريالاً", () => {
+describe("كلفة الوصفة من عبوات مكوّناتها", () => {
+  it("«لاتيه مثلّج»: بنّ وحليب ومصّاصة وكاس = ‏٢٫٦٩ ريالاً", () => {
     const cost = recipeCost(ingredientsOf("sk-0009"));
     expect(cost.costMilliMinor).toBe(268_868);
     expect(cost.costMinor).toBe(269);
@@ -43,7 +43,7 @@ describe("كلفةُ الوصفة من عبوات مكوّناتها", () => {
     expect(cost.lines).toHaveLength(4);
   });
 
-  it("و«سبانيش لاتيه ساخن» ستّةُ مكوّناتٍ = ‏٤٫٩٤", () => {
+  it("و«سبانيش لاتيه ساخن» ستّة مكوّنات = ‏٤٫٩٤", () => {
     expect(recipeCost(ingredientsOf("sk-0056")).costMinor).toBe(494);
   });
 
@@ -54,7 +54,7 @@ describe("كلفةُ الوصفة من عبوات مكوّناتها", () => {
     `unknown`. ولو جُمع ما عداه لخرج رقمٌ يبدو دقيقاً وهو أقلُّ من
     الحقّ — ثمّ يُبنى عليه هامشٌ يبدو مريحاً.
   */
-  it("ومكوّنٌ بلا كلفةٍ يجعل مجموعَ وصفته مجهولاً — ويُسمّى", () => {
+  it("ومكوّن بلا كلفة يجعل مجموع وصفته مجهولاً — ويسمّى", () => {
     const ings = ingredientsOf("sk-0009");
     ings[1] = { ...ings[1], packCostMinor: null };
     const cost = recipeCost(ings);
@@ -66,7 +66,7 @@ describe("كلفةُ الوصفة من عبوات مكوّناتها", () => {
     expect(cost.lines.find((l) => l.reason === "NO_COST")!.name).toBe(ings[1].name);
   });
 
-  it("ووحدةٌ من عائلةٍ أخرى تُعلَن ولا تُحسَب صفراً", () => {
+  it("ووحدة من عائلة أخرى تعلن ولا تحسب صفراً", () => {
     const ings = ingredientsOf("sk-0009");
     const coffee = ings.findIndex((i) => i.unit === "G");
     ings[coffee] = { ...ings[coffee], baseUnit: "L" };
@@ -75,11 +75,11 @@ describe("كلفةُ الوصفة من عبوات مكوّناتها", () => {
     expect(cost.lines[coffee].reason).toBe("UNIT_MISMATCH");
   });
 
-  it("ووصفةٌ بلا مكوّناتٍ كلفتُها صفرٌ معروف لا مجهول", () => {
+  it("ووصفة بلا مكوّنات كلفتها صفر معروف لا مجهول", () => {
     expect(recipeCost([]).costMinor).toBe(0);
   });
 
-  it("وكلفةُ وحدةِ الأساس تُحسَب من العبوة — ‏٢٫١٢٥ هللة للمصّاصة", () => {
+  it("وكلفة وحدة الأساس تحسب من العبوة — ‏٢٫١٢٥ هللة للمصّاصة", () => {
     const straws = itemBySku.get("sk-0007")!;
     expect(packUnitCostMilliMinor(straws.packQuantityMilli, straws.packCostMinor)).toBe(2_125);
     expect(packUnitCostMilliMinor(null, 8_500)).toBeNull();
@@ -87,7 +87,7 @@ describe("كلفةُ الوصفة من عبوات مكوّناتها", () => {
   });
 });
 
-describe("الكلفةُ المعلَنة تكشف الوصفةَ الناقصة", () => {
+describe("الكلفة المعلنة تكشف الوصفة الناقصة", () => {
   /*
     ── ستّةُ أصنافٍ وصفتُها تغليفٌ فقط ──
 
@@ -96,7 +96,7 @@ describe("الكلفةُ المعلَنة تكشف الوصفةَ الناقصة
     ما اشتُري منها كلُّه «فرقاً» في آخر الأسبوع — وهو فرقٌ مصدرُه
     وصفةٌ ناقصة لا فاقدٌ وقع.
   */
-  it("‏٦ أصنافٍ كلفتُها المعلَنة تُباعد مجموعَ وصفتها", () => {
+  it("‏٦ أصناف كلفتها المعلنة تباعد مجموع وصفتها", () => {
     const off: string[] = [];
     for (const p of PRODUCTS) {
       const lines = LINES.filter((l) => l.productSku === p.productSku);
@@ -109,7 +109,7 @@ describe("الكلفةُ المعلَنة تكشف الوصفةَ الناقصة
     ]);
   });
 
-  it("و«تشيز مدريد» وصفتُه ٠٫٧٦ والمعلَنة ٩٫١٧ — والكعكةُ ليست فيها", () => {
+  it("و«تشيز مدريد» وصفته ٠٫٧٦ والمعلنة ٩٫١٧ — والكعكة ليست فيها", () => {
     const cost = recipeCost(ingredientsOf("sk-0023"));
     expect(cost.costMinor).toBe(76);
     expect(cost.lines.map((l) => l.name)).toEqual(["شوك", "علب تيكاوي"]);
@@ -122,7 +122,7 @@ describe("الكلفةُ المعلَنة تكشف الوصفةَ الناقصة
     والحدُّ نسبةٌ لا مبلغ: ريالٌ في وصفةٍ بريالين خبر، وريالٌ في وصفةٍ
     بأربعين تقريبُ مورّد.
   */
-  it("وفارقٌ صغير نسبةً لا يُرفَع — ولا يُحكَم على ما لا كلفةَ معلَنةً له", () => {
+  it("وفارق صغير نسبةً لا يرفع — ولا يحكم على ما لا كلفة معلنةً له", () => {
     expect(declaredCostDisagrees(1_000, 1_050)).toBe(false);
     expect(declaredCostDisagrees(1_000, 2_000)).toBe(true);
     expect(declaredCostDisagrees(null, 900)).toBe(false);
@@ -137,7 +137,7 @@ describe("الكلفةُ المعلَنة تكشف الوصفةَ الناقصة
     ولو قُرِّب كلُّ سطرٍ على حدةٍ لصار ٢+٢+٢+٢ = ‏٨ — تضيع هللةٌ في
     أربعة أسطر، وتضيع مئاتٌ في وصفاتِ أسبوع.
   */
-  it("والتقريبُ مرّةً في النهاية لا مرّةً لكلّ سطر", () => {
+  it("والتقريب مرّةً في النهاية لا مرّةً لكلّ سطر", () => {
     const straw = itemBySku.get("sk-0007")!;
     const one: CostedIngredient = {
       productId: straw.itemSku, name: straw.name,
@@ -152,27 +152,27 @@ describe("الكلفةُ المعلَنة تكشف الوصفةَ الناقصة
   });
 });
 
-describe("الكلفةُ بقاعدة الاستهلاك نفسِها", () => {
+describe("الكلفة بقاعدة الاستهلاك نفسها", () => {
   const coffee: CostedIngredient = {
     productId: "c", name: "بنّ", quantityMilli: 20_000, unit: "G", baseUnit: "G",
     packMilli: 1_000_000, packCostMinor: 10_000,
   };
 
-  it("بلا فاقدٍ ولا ناتج: ٢٠ جراماً من كيلو بمئة ريال = ريالان", () => {
+  it("بلا فاقد ولا ناتج: ٢٠ جراماً من كيلو بمئة ريال = ريالان", () => {
     expect(recipeCost([coffee]).costMinor).toBe(200);
     expect(recipeCost([coffee]).basis).toBe("CATALOG");
   });
 
-  it("وفاقدُ التجهيز يدخل الكلفة: ٨٪ ← ‏٢٠ ÷ ٠٫٩٢ جراماً", () => {
+  it("وفاقد التجهيز يدخل الكلفة: ٨٪ ← ‏٢٠ ÷ ٠٫٩٢ جراماً", () => {
     /* ‏21.739 جراماً × ٠٫١٠ ريال = ‏٢٫١٧ */
     expect(recipeCost([{ ...coffee, prepLossBp: 800 }]).costMinor).toBe(217);
   });
 
-  it("وناتجُ الوصفة يقسمها: دفعةٌ تُخرج أربعَ قطع كلفةُ القطعة ربعُها", () => {
+  it("وناتج الوصفة يقسمها: دفعة تخرج أربع قطع كلفة القطعة ربعها", () => {
     expect(recipeCost([coffee], { yieldMilli: 4000 }).costMinor).toBe(50);
   });
 
-  it("والفاتورةُ تُقدَّم على الكتالوج حين تُطلَب — ويُعلَن الأساس", () => {
+  it("والفاتورة تقدّم على الكتالوج حين تطلب — ويعلن الأساس", () => {
     /* ‏١١٥ ريالاً للكيلو في آخر فاتورة = ‏١١٫٥ هللة للجرام = ‏١١٬٥٠٠ مِلّي‑هللة */
     const priced = { ...coffee, invoiceRateMilliMinor: 11_500 };
     const cost = recipeCost([priced], { preferInvoice: true });
@@ -182,7 +182,7 @@ describe("الكلفةُ بقاعدة الاستهلاك نفسِها", () => {
     expect(recipeCost([priced]).costMinor).toBe(200);
   });
 
-  it("ومكوّنٌ بفاتورةٍ وآخرُ بلا فاتورة: خليطٌ يُسمّى", () => {
+  it("ومكوّن بفاتورة وآخر بلا فاتورة: خليط يسمّى", () => {
     const cup: CostedIngredient = {
       productId: "k", name: "كاس", quantityMilli: 1000, unit: "PIECE", baseUnit: "PIECE",
       packMilli: 500_000, packCostMinor: 21_500,
@@ -192,7 +192,7 @@ describe("الكلفةُ بقاعدة الاستهلاك نفسِها", () => {
     expect(cost.costMinor).toBe(230 + 43);
   });
 
-  it("وفاتورةٌ تُغني عن عبوةِ كتالوجٍ غائبة", () => {
+  it("وفاتورة تغني عن عبوة كتالوج غائبة", () => {
     const cost = recipeCost([{ ...coffee, packMilli: null, packCostMinor: null, invoiceRateMilliMinor: 11_500 }], { preferInvoice: true });
     expect(cost.costMinor).toBe(230);
     expect(cost.unknown).toEqual([]);

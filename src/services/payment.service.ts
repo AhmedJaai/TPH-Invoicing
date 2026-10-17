@@ -58,7 +58,7 @@ export class PaymentTwinError extends Error {
     بلا مستند — ولا يسأل عنه ثانيةً فيكرّر السؤال الذي سُئل هنا.
   */
   constructor(readonly twin: { id: string; documentId: string | null; hasBankRow: boolean; allocatedMinor: number }) {
-    super("سدادٌ بنفس المورّد والمبلغ في اليوم نفسه مقيَّدٌ من قبل — افتحه قبل أن تسجّل ثانيةً");
+    super("يوجد سداد مقيّد بالمورّد والمبلغ والتاريخ نفسها. افتحه قبل أن تسجّل سداداً آخر");
     this.name = "PaymentTwinError";
   }
 }
@@ -67,7 +67,7 @@ export class PaymentTwinError extends Error {
 export class AlreadyMatchedError extends Error {
   readonly status = 409;
   constructor() {
-    super("قُيّدت هذه الحركة من قبل — لم يُكتب شيءٌ ثانيةً. افتحها في صفحة البنك لترى دفعتها");
+    super("قُيّدت هذه الحركة من قبل ولم يُسجَّل شيء جديد. افتحها في صفحة البنك لترى دفعتها");
     this.name = "AlreadyMatchedError";
   }
 }

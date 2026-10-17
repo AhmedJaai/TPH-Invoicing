@@ -59,14 +59,14 @@ export async function POST(request: Request) {
     .from(bankTransactions)
     .where(eq(bankTransactions.id, body.transactionId));
 
-  if (!tx) return NextResponse.json({ error: "لا توجد هذه الحركة" }, { status: 404 });
+  if (!tx) return NextResponse.json({ error: "هذه الحركة غير موجودة" }, { status: 404 });
   if (!tx.matchedPaymentId) {
     /*
       «ليست سداداً» كانت بلا تراجع: من أعلنها خطأً لا يملك ردّها.
       فتعود الحركة إلى «مقترَحة» بلا قرار، ويبقى أثرُ الإعلان وردُّه.
     */
     if (tx.matchOutcome === "NOT_A_PAYMENT") {
-      const reason = body.reason?.trim() || "تراجعٌ عن «ليست سداداً»";
+      const reason = body.reason?.trim() || "تراجع عن «ليست سداداً»";
       /*
         والبابُ يعود إلى ما كان قبل الإعلان (محفوظٌ في تاريخ القرار) — كان
         يبقى «تحويلاً داخليّاً» فلا تعود الحركة إلى الطابور وتقول الرسالة
@@ -112,20 +112,20 @@ export async function POST(request: Request) {
           entityType: "bank_transaction",
           entityId: tx.id,
           before: { النتيجة: "NOT_A_PAYMENT", الباب: tx.category },
-          after: { الفعل: "تراجعٌ عن «ليست سداداً»", السبب: reason, "عاد الباب إلى": restored },
+          after: { الفعل: "تراجع عن «ليست سداداً»", السبب: reason, "عاد الباب إلى": restored },
         }, t);
         return true;
       });
       if (!undone) {
-        return NextResponse.json({ error: "رُدّ هذا الإعلان من قبل — حدّث الصفحة" }, { status: 409 });
+        return NextResponse.json({ error: "سبق التراجع عن هذا الإعلان. حدّث الصفحة." }, { status: 409 });
       }
-      return NextResponse.json({ ok: true, message: "رُدّ إعلان «ليست سداداً» — عادت الحركة تنتظر قراراً" });
+      return NextResponse.json({ ok: true, message: "تم التراجع عن «ليست سداداً»، وعادت الحركة تنتظر قرارك" });
     }
-    return NextResponse.json({ error: "هذه الحركة غير مطابَقة أصلاً" }, { status: 409 });
+    return NextResponse.json({ error: "هذه الحركة غير مطابقة من الأساس" }, { status: 409 });
   }
 
   const paymentId = tx.matchedPaymentId;
-  const reason = body.reason?.trim() || "تراجعٌ يدويّ عن المطابقة";
+  const reason = body.reason?.trim() || "تراجع يدويّ عن المطابقة";
   let freedInvoices: string[] = [];
   let freedMinor = 0;
   let reversedPayment = false;
@@ -230,12 +230,12 @@ export async function POST(request: Request) {
         الدفعة: paymentId,
         "فواتير تحرّرت": freedInvoices.length,
         "مبلغ تحرّر": freedMinor,
-        "رُدّت الدفعة": reversedPayment,
+        "ردّت الدفعة": reversedPayment,
         /*
           التفصيل لا العدد: أيّ فاتورةٍ كانت تُغطّى وبكم.
           فبعد شهرٍ يُقرأ «كانت على فاتورتَي أغسطس ٤ و١٢» لا «فُكّت ٢».
         */
-        "كانت مخصَّصة على": previousAllocations,
+        "كانت مخصّصة على": previousAllocations,
       },
     });
 
@@ -254,10 +254,10 @@ export async function POST(request: Request) {
     after: {
       الفعل: "تراجع عن المطابقة",
       السبب: reason,
-      "تخصيصات فُكّت": freedInvoices.length,
-      "رُدّت الدفعة": reversedPayment,
+      "تخصيصات فكّت": freedInvoices.length,
+      "ردّت الدفعة": reversedPayment,
       "مبلغ تحرّر": freedMinor,
-      "كانت مخصَّصة على": previousAllocations,
+      "كانت مخصّصة على": previousAllocations,
     },
     }, t);
     return true;
@@ -269,14 +269,14 @@ export async function POST(request: Request) {
     */
     if (e instanceof MonthClosedError) {
       return NextResponse.json({
-        error: `لم تُفكّ: هذه الدفعة مخصَّصةٌ على فاتورةٍ في شهرٍ مقفل. ${e.message.split(".")[0]} — أعد فتحه من صفحة الإقفال، ثمّ فُكّ المطابقة وأقفله ثانيةً.`,
+        error: `تعذّر فك المطابقة: هذه الدفعة مخصّصة على فاتورة في شهر مقفل. ${e.message.split(".")[0]}. أعد فتحه من صفحة الإقفال، ثم فك المطابقة وأقفله من جديد.`,
       }, { status: 409 });
     }
     return failWith(e, "match-undo");
   }
 
   if (!done) {
-    return NextResponse.json({ error: "فُكّت هذه المطابقة من قبل — حدّث الصفحة" }, { status: 409 });
+    return NextResponse.json({ error: "سبق فك هذه المطابقة. حدّث الصفحة." }, { status: 409 });
   }
 
   return NextResponse.json({
@@ -285,7 +285,7 @@ export async function POST(request: Request) {
     reversedPayment,
     freedMinor,
     message: reversedPayment
-      ? `فُكّت المطابقة ورُدّت الدفعة و${freedInvoices.length} تخصيصاً — والدفعة باقيةٌ في السجلّ مردودةً بسببها`
-      : `فُكّت المطابقة و${freedInvoices.length} تخصيصاً، والدفعة باقية لحركة أخرى`,
+      ? `تم فك المطابقة وردّ الدفعة وفك ${freedInvoices.length} تخصيصاً. تبقى الدفعة في السجلّ مردودة مع سبب الردّ`
+      : `تم فك المطابقة و${freedInvoices.length} تخصيصاً، وتبقى الدفعة لحركة أخرى`,
   });
 }

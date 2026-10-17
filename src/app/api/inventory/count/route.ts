@@ -55,7 +55,7 @@ export async function POST(request: Request) {
         await recomputeCount(countId);
         return NextResponse.json({
           ok: true, countId, created,
-          message: created ? "بدأ الجرد — اختر ما يُعَدّ ثمّ راجِع ما دخل وما خرج." : "هذه الفترة لها جردٌ مفتوحٌ أصلاً — فُتح.",
+          message: created ? "بدأ الجرد. اختر الأصناف التي ستعدّها، ثم راجع ما دخل وما خرج." : "هذه الفترة لها جرد مفتوح من قبل، وقد فتحناه لك.",
         });
       }
 
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
         const r = await saveCountScope(body.countId, { included: body.included, excluded: body.excluded }, user.id);
         return NextResponse.json({
           ok: true,
-          message: `حُفظ النطاق — يُعَدّ ما اخترتَه${r.excluded > 0 ? `، و${countNoun(r.excluded, ITEM)} خارجه` : ""}.`,
+          message: `تم حفظ النطاق: سيُعدّ ما اخترته${r.excluded > 0 ? `، ويبقى ${countNoun(r.excluded, ITEM)} خارجه` : ""}.`,
         });
       }
 
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
           body.entries.map((e) => ({ productId: e.productId, milli: e.actual, unit: e.unit })),
         );
         await saveActualCounts(body.countId, entries, user.id);
-        return NextResponse.json({ ok: true, message: `حُفظ عدُّ ${countNoun(entries.length, ITEM)}` });
+        return NextResponse.json({ ok: true, message: `تم حفظ عدّ ${countNoun(entries.length, ITEM)}` });
       }
 
       /*
@@ -95,8 +95,8 @@ export async function POST(request: Request) {
           user.id,
         );
         const parts = [
-          r.set > 0 ? `كُتب الرصيدُ الافتتاحيّ لـ${countNoun(r.set, ITEM)}` : null,
-          r.cleared > 0 ? `وأُفرغ لـ${countNoun(r.cleared, ITEM)} فعاد غيرَ معروف` : null,
+          r.set > 0 ? `تم تسجيل الرصيد الافتتاحي لـ${countNoun(r.set, ITEM)}` : null,
+          r.cleared > 0 ? `ومسح الرصيد لـ${countNoun(r.cleared, ITEM)} فعاد غير معروف` : null,
         ].filter(Boolean);
         return NextResponse.json({ ok: true, message: parts.length > 0 ? `${parts.join(" ")}.` : "لا تغيير." });
       }
@@ -112,21 +112,21 @@ export async function POST(request: Request) {
         const r = await db.transaction((t) => discardCount(body.countId, user.id, t));
         return NextResponse.json({
           ok: true,
-          message: `أُلغي جردُ ${r.periodStart} → ${r.periodEnd}`
-            + (r.counted > 0 ? ` — وعدُّ ${countNoun(r.counted, ITEM)} محفوظٌ في سجلّ التدقيق` : ""),
+          message: `أُلغي جرد ${r.periodStart} → ${r.periodEnd}`
+            + (r.counted > 0 ? `، وعدّ ${countNoun(r.counted, ITEM)} محفوظ في سجلّ التدقيق` : ""),
         });
       }
 
       case "recompute": {
         await recomputeCount(body.countId);
-        return NextResponse.json({ ok: true, message: "أُعيد حسابُ الجرد على أحدث البيانات." });
+        return NextResponse.json({ ok: true, message: "أُعيد حساب الجرد على أحدث البيانات." });
       }
 
       case "finalise": {
         const report = await finaliseCount(body.countId, user.id);
         return NextResponse.json({
           ok: true,
-          message: `أُقفل الجرد — ${countNoun(report.totals.linesCounted, ITEM)} عُدّت، والتقريرُ محفوظٌ كما هو.`,
+          message: `تم إقفال الجرد، وعُدّ ${countNoun(report.totals.linesCounted, ITEM)}. التقرير محفوظ كما هو.`,
         });
       }
 
@@ -144,7 +144,7 @@ export async function POST(request: Request) {
           throw e;
         }
         await reopenCount(body.countId, body.reason, user.id);
-        return NextResponse.json({ ok: true, message: "أُعيد فتحُ الجرد — والسببُ في سجلّ التدقيق." });
+        return NextResponse.json({ ok: true, message: "أُعيد فتح الجرد، والسبب مسجّل في سجلّ التدقيق." });
       }
     }
   } catch (e) {

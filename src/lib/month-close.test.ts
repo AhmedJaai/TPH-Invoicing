@@ -29,7 +29,7 @@ const state = (r: ReturnType<typeof buildMonthClose>, id: string) =>
   r.items.find((i) => i.id === id)?.state;
 
 describe("buildMonthClose", () => {
-  it("الشهر النظيف يُقفل", () => {
+  it("الشهر النظيف يقفل", () => {
     const r = buildMonthClose(clean);
     expect(r.canClose).toBe(true);
     expect(r.blockers).toHaveLength(0);
@@ -37,7 +37,7 @@ describe("buildMonthClose", () => {
     expect(r.items.every((i) => i.state === "PASS")).toBe(true);
   });
 
-  it("الشهر بلا فواتير يُمنع إقفاله", () => {
+  it("الشهر بلا فواتير يمنع إقفاله", () => {
     const r = buildMonthClose({ ...clean, invoiceCount: 0 });
     expect(state(r, "has-invoices")).toBe("BLOCK");
     expect(r.canClose).toBe(false);
@@ -61,19 +61,19 @@ describe("buildMonthClose", () => {
     expect(r.canClose).toBe(true);
   });
 
-  it("غير المسدَّد ينبّه بعدده ومبلغه", () => {
+  it("غير المسدّد ينبّه بعدده ومبلغه", () => {
     const r = buildMonthClose({ ...clean, unpaidCount: 3, unpaidTotalMinor: 125_050 });
     expect(state(r, "paid")).toBe("WARN");
     expect(r.items.find((i) => i.id === "paid")!.detail).toContain("1,250.50");
   });
 
-  it("الكشف الناقص يُحسب فرقاً لا عدداً مطلقاً", () => {
+  it("الكشف الناقص يحسب فرقاً لا عدداً مطلقاً", () => {
     const r = buildMonthClose({ ...clean, suppliersWithInvoices: 9, suppliersWithStatement: 4 });
     expect(state(r, "statements")).toBe("WARN");
     expect(r.items.find((i) => i.id === "statements")!.detail).toContain("5 من 9");
   });
 
-  it("كشوف أكثر من المورّدين لا تُنتج عدداً سالباً", () => {
+  it("كشوف أكثر من المورّدين لا تنتج عدداً سالباً", () => {
     const r = buildMonthClose({ ...clean, suppliersWithInvoices: 3, suppliersWithStatement: 5 });
     expect(state(r, "statements")).toBe("PASS");
   });
@@ -106,12 +106,12 @@ describe("buildMonthClose", () => {
 });
 
 describe("المجهول بند مستقلّ في قائمة الإقفال", () => {
-  it("لا يظهر البند إلا حين توجد فواتير لم تُقرأ", () => {
+  it("لا يظهر البند إلا حين توجد فواتير لم تقرأ", () => {
     const r = buildMonthClose(clean);
     expect(r.items.some((i) => i.id === "tax-unknown")).toBe(false);
   });
 
-  it("يظهر بعدده وبخطوة تخصّه: اقرأ المستند لا طالِب المورّد", () => {
+  it("يظهر بعدده وبخطوة تخصّه: اقرأ المستند لا طالب المورّد", () => {
     const r = buildMonthClose({ ...clean, unknownTaxCount: 5 });
     const item = r.items.find((i) => i.id === "tax-unknown")!;
     expect(item.state).toBe("WARN");
@@ -129,7 +129,7 @@ describe("تغطية البنك ومعادلته", () => {
     الفجوة كانت تُحسب وتُعرض ولا تمنع — فيُقفَل شهرٌ ينقصه أسبوع من
     الحركات، ويصير الإقفال شهادةً على ما لم يُقرأ.
   */
-  it("فجوةٌ في التغطية تمنع الإقفال", () => {
+  it("فجوة في التغطية تمنع الإقفال", () => {
     const r = buildMonthClose({ ...clean, bankGapDays: 7 });
     expect(state(r, "bank-coverage")).toBe("BLOCK");
     expect(r.canClose).toBe(false);
@@ -140,7 +140,7 @@ describe("تغطية البنك ومعادلته", () => {
   });
 
   /* «طوبقت كل الحركات» لا تعني «الحساب مضبوط» */
-  it("فرقٌ غير مفسَّر في المعادلة يمنع الإقفال", () => {
+  it("فرق غير مفسّر في المعادلة يمنع الإقفال", () => {
     const r = buildMonthClose({
       ...clean, bankBalanceStatus: "UNEXPLAINED", bankBalanceDifferenceMinor: -11_600_00,
     });
@@ -149,7 +149,7 @@ describe("تغطية البنك ومعادلته", () => {
     expect(r.blockers.some((b) => b.detail.includes("11,600.00"))).toBe(true);
   });
 
-  it("رصيدٌ مجهول ينبّه ولا يمنع — الجهل غير الخطأ", () => {
+  it("رصيد مجهول ينبّه ولا يمنع — الجهل غير الخطأ", () => {
     const r = buildMonthClose({
       ...clean, bankBalanceStatus: "UNKNOWN", bankBalanceDifferenceMinor: null,
     });
@@ -157,13 +157,13 @@ describe("تغطية البنك ومعادلته", () => {
     expect(r.canClose).toBe(false);
   });
 
-  it("هللةٌ واحدة تمرّ", () => {
+  it("هللة واحدة تمرّ", () => {
     expect(state(buildMonthClose({
       ...clean, bankBalanceStatus: "WITHIN_TOLERANCE", bankBalanceDifferenceMinor: 1,
     }), "bank-balance")).toBe("PASS");
   });
 
-  it("حركاتٌ بلا تفسير تنبّه", () => {
+  it("حركات بلا تفسير تنبّه", () => {
     const r = buildMonthClose({
       ...clean, bankUnexplainedCount: 9, bankUnexplainedMinor: 42_000_00,
     });
@@ -181,7 +181,7 @@ describe("تغطية البنك ومعادلته", () => {
   });
 });
 
-describe("لكلّ بندٍ غير ناجحٍ موضعُ إصلاحه", () => {
+describe("لكلّ بند غير ناجح موضع إصلاحه", () => {
   it("كلّ WARN وBLOCK يحمل رابطاً", () => {
     const r = buildMonthClose({
       ...clean, invoiceCount: 0, openBlockerIssues: 2, documentsNeedingReview: 1,
@@ -193,14 +193,14 @@ describe("لكلّ بندٍ غير ناجحٍ موضعُ إصلاحه", () => {
     expect(notPass.every((i) => Boolean(i.href))).toBe(true);
   });
 
-  it("ولا بند «مقيَّدة محاسبياً» — التصدير غير مبنيّ فلا يمرّ أبداً", () => {
+  it("ولا بند «مقيّدة محاسبياً» — التصدير غير مبنيّ فلا يمرّ أبداً", () => {
     expect(buildMonthClose({ ...clean, unpostedCount: 52 }).items.some((i) => i.id === "posted")).toBe(false);
   });
 });
 
 
-describe("ما يُفحَص على الفواتير لا يُعلَن ناجحاً على صفرٍ منها", () => {
-  it("شهرٌ بلا فاتورة: لا «كلّها ضريبية كاملة ✓» ولا «مسدَّدة ✓» ولا «الكشوف كاملة ✓»", () => {
+describe("ما يفحص على الفواتير لا يعلن ناجحاً على صفر منها", () => {
+  it("شهر بلا فاتورة: لا «كلّها ضريبية كاملة ✓» ولا «مسدّدة ✓» ولا «الكشوف كاملة ✓»", () => {
     const r = buildMonthClose({ ...clean, invoiceCount: 0, suppliersWithInvoices: 0, suppliersWithStatement: 0 });
     const ids = r.items.map((i) => i.id);
     expect(ids).not.toContain("tax-valid");
@@ -210,8 +210,8 @@ describe("ما يُفحَص على الفواتير لا يُعلَن ناجحا
   });
 });
 
-describe("إقرارُ الضريبة في قائمة الإقفال", () => {
-  it("آخرُ شهرٍ في الربع ينبّه إلى إقراره وموعده — ولا يمنع الإقفال", () => {
+describe("إقرار الضريبة في قائمة الإقفال", () => {
+  it("آخر شهر في الربع ينبّه إلى إقراره وموعده — ولا يمنع الإقفال", () => {
     const r = buildMonthClose({ ...clean, month: "2026-09", vatFiled: false });
     const item = r.items.find((i) => i.id === "vat-return");
     expect(item?.state).toBe("WARN");
@@ -221,14 +221,14 @@ describe("إقرارُ الضريبة في قائمة الإقفال", () => {
   it("وبعد تسجيل التقديم يمرّ", () => {
     expect(state(buildMonthClose({ ...clean, month: "2026-09", vatFiled: true }), "vat-return")).toBe("PASS");
   });
-  it("وشهرٌ في وسط الربع لا يحمل البند", () => {
+  it("وشهر في وسط الربع لا يحمل البند", () => {
     expect(state(buildMonthClose({ ...clean, vatFiled: false }), "vat-return")).toBeUndefined();
   });
 });
 
 
 describe("الإقفال يرى ما كان يفوته", () => {
-  it("حوالاتُ مورّدين بلا قيد تنبيهٌ بعددها ومبلغها — لا تمنع، وتُقَرّ بسبب", () => {
+  it("حوالات مورّدين بلا قيد تنبيه بعددها ومبلغها — لا تمنع، وتقرّ بسبب", () => {
     const r = buildMonthClose({ ...clean, bankSupplierUnpostedCount: 20, bankSupplierUnpostedMinor: 72_904_68 });
     const item = r.items.find((i) => i.id === "bank-supplier-unposted")!;
     expect(item.state).toBe("WARN");
@@ -237,43 +237,43 @@ describe("الإقفال يرى ما كان يفوته", () => {
     expect(r.canClose).toBe(true);
   });
 
-  it("كشفٌ وصل وفيه فروق ليس «وصل وتطابق»", () => {
+  it("كشف وصل وفيه فروق ليس «وصل وتطابق»", () => {
     const r = buildMonthClose({ ...clean, suppliersWithStatementIssues: 2 });
     const item = r.items.find((i) => i.id === "statements")!;
     expect(item.state).toBe("WARN");
-    expect(item.detail).toContain("فروقٌ مع دفترنا");
+    expect(item.detail).toContain("فروق مع دفاترنا");
     expect(r.canClose).toBe(true);
   });
 });
 
-describe("monthBalances — افتتاحيُّ الأولى وختاميُّ الأخيرة", () => {
+describe("monthBalances — افتتاحيّ الأولى وختاميّ الأخيرة", () => {
   const p = (over: Partial<Parameters<typeof monthBalances>[0][number]>) => ({
     bankAccountId: "A", periodStart: "2026-08-01", periodEnd: "2026-08-31",
     openingMinor: 0, closingMinor: 0, reviewed: false, ...over,
   });
 
-  it("كشفان نصف شهريّان لا يُجمَع افتتاحيّاهما", () => {
+  it("كشفان نصف شهريّان لا يجمع افتتاحيّاهما", () => {
     expect(monthBalances([
       p({ periodEnd: "2026-08-15", openingMinor: 10_000_00, closingMinor: 12_000_00 }),
       p({ periodStart: "2026-08-16", openingMinor: 12_000_00, closingMinor: 9_000_00 }),
     ])).toEqual({ openingMinor: 10_000_00, closingMinor: 9_000_00 });
   });
 
-  it("حسابان يُجمَعان", () => {
+  it("حسابان يجمعان", () => {
     expect(monthBalances([
       p({ openingMinor: 100, closingMinor: 300 }),
       p({ bankAccountId: "B", openingMinor: 50, closingMinor: 20 }),
     ])).toEqual({ openingMinor: 150, closingMinor: 320 });
   });
 
-  it("ما أدخله إنسان يغلب ما قُرئ للمدّة نفسها", () => {
+  it("ما أدخله إنسان يغلب ما قرئ للمدّة نفسها", () => {
     expect(monthBalances([
       p({ periodEnd: "2026-08-15", openingMinor: 1, closingMinor: 2 }),
       p({ openingMinor: 7, closingMinor: 9, reviewed: true }),
     ])).toEqual({ openingMinor: 7, closingMinor: 9 });
   });
 
-  it("بلا فترات أو برصيدٍ لم يُقرأ: مجهولٌ لا صفر", () => {
+  it("بلا فترات أو برصيد لم يقرأ: مجهول لا صفر", () => {
     expect(monthBalances([])).toEqual({ openingMinor: null, closingMinor: null });
     expect(monthBalances([p({ openingMinor: null, closingMinor: 5 })])).toEqual({ openingMinor: null, closingMinor: 5 });
   });

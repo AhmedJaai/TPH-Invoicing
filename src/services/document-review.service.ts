@@ -106,7 +106,7 @@ export async function loadPendingReview(limit = 200) {
 }
 
 function missingFor(reading: unknown, supplierKnown: boolean, fileName: string, isStatement: boolean): string[] {
-  if (isStatement) return supplierKnown ? [] : ["المورّد: لم يُعرَف من الاسم المقروء"];
+  if (isStatement) return supplierKnown ? [] : ["المورّد: لم يتعرّف النظام عليه من الاسم المقروء"];
   const x = (reading ?? {}) as { invoiceNumber?: string; invoiceDate?: string; totalAmount?: string };
   const fromName = factsFromFileName(fileName);
   return missingFromReading({
@@ -145,7 +145,7 @@ export async function approveEligible(actorId: string, limit = 80): Promise<{
           entityType: "document",
           entityId: d.id,
           before: { الحال: "ينتظر المراجعة" },
-          after: { الملف: d.fileName, الحال: "مؤرشف", السبب: "اجتمعت فيه شروطُ الأرشفة الآليّة" },
+          after: { الملف: d.fileName, الحال: "مؤرشف", السبب: "اجتمعت فيه شروط الأرشفة الآليّة" },
         }, t);
         if (d.supplierId) await applySupplierCredit(t, d.supplierId, { forwardDays: SETTLEMENT_FORWARD_DAYS });
         return true;
@@ -189,7 +189,7 @@ export async function processDocumentBacklog(
     أحمد: «كوهي وأطلس فواتيرهم موجودة على الغالب».
   */
   const creditApplied = await applyCreditEverywhere(notes);
-  if (creditApplied > 0) notes.push(`نُسبت ${creditApplied} دفعةً إلى فواتيرها`);
+  if (creditApplied > 0) notes.push(`وُزّعت ${creditApplied} دفعة على فواتيرها`);
   let renamed: { from: string; to: string }[] = [];
   let reread = 0;
   if (drive) {
@@ -231,7 +231,7 @@ export async function applyCreditEverywhere(notes: string[]): Promise<number> {
       const out = await db.transaction((t) => applySupplierCredit(t, supplier_id, { forwardDays: SETTLEMENT_FORWARD_DAYS }));
       creditApplied += out.allocations.length;
     } catch (e) {
-      notes.push(`خصمُ الرصيد: ${(e as Error).message.slice(0, 80)}`);
+      notes.push(`تعذّر خصم الرصيد: ${(e as Error).message.slice(0, 80)}`);
     }
   }
   return creditApplied;

@@ -6,7 +6,7 @@ describe("splitBankFee", () => {
     const r = splitBankFee(5_020_00, 5_000_00)!;
     expect(r.allocatedMinor).toBe(5_000_00);
     expect(r.feeMinor).toBe(20_00);
-    expect(r.reason).toContain("رسم التحويل");
+    expect(r.reason).toContain("رسوم التحويل");
   });
 
   it("النقص ليس رسماً — هو سدادٌ جزئيّ، وهما حالان مختلفان", () => {

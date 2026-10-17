@@ -29,8 +29,8 @@ async function setup(tx: Tx, readTotal: string) {
   return { s, oldDoc, newDoc, invoiceId };
 }
 
-describe("فاتورةٌ مصحَّحة تحلّ محلّ المقيَّدة", () => {
-  it("القيدُ نفسُه ينتقل إلى الملفّ الجديد بمبلغه، والقديمُ يُرفض", () =>
+describe("فاتورة مصحّحة تحلّ محلّ المقيّدة", () => {
+  it("القيد نفسه ينتقل إلى الملفّ الجديد بمبلغه، والقديم يرفض", () =>
     withRollback(async (tx) => {
       const { oldDoc, newDoc, invoiceId } = await setup(tx, "130.00");
       const out = await replaceWithCorrectedInvoice(tx, newDoc, await someone(tx));
@@ -42,7 +42,7 @@ describe("فاتورةٌ مصحَّحة تحلّ محلّ المقيَّدة", (
       expect((await tx.select({ s: documents.status }).from(documents).where(eq(documents.id, newDoc)))[0].s).toBe("ARCHIVED");
     }));
 
-  it("ما سُدِّد فوق المبلغ الجديد يعود رصيداً للمورّد", () =>
+  it("ما سدّد فوق المبلغ الجديد يعود رصيداً للمورّد", () =>
     withRollback(async (tx) => {
       const { s, newDoc, invoiceId } = await setup(tx, "130.00");
       const [p] = await tx.insert(payments).values({ supplierId: s, paidAt: day("2026-09-03"), amountMinor: 140_00, status: "APPLIED" }).returning({ id: payments.id });
@@ -53,7 +53,7 @@ describe("فاتورةٌ مصحَّحة تحلّ محلّ المقيَّدة", (
       expect(allocs.reduce((x, r) => x + r.a, 0)).toBe(130_00);
     }));
 
-  it("والمبلغُ نفسُه نسخةٌ لا تصحيح — يُرفض الاستبدال", () =>
+  it("والمبلغ نفسه نسخة لا تصحيح — يرفض الاستبدال", () =>
     withRollback(async (tx) => {
       const { newDoc } = await setup(tx, "140.00");
       expect(await caught(replaceWithCorrectedInvoice(tx, newDoc, await someone(tx)))).toBeInstanceOf(ReplaceRefused);

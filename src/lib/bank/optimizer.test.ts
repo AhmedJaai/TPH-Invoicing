@@ -148,10 +148,10 @@ describe("tally و strengthLabel", () => {
   });
 
   it("يُعرَض وصفٌ لا نسبة — النسبة تُقرأ يقيناً وهي ترجيح", () => {
-    expect(strengthLabel(0.95)).toBe("ترجيح قوي");
-    expect(strengthLabel(0.75)).toBe("ترجيح معتبر");
-    expect(strengthLabel(0.55)).toBe("ترجيح ضعيف");
-    expect(strengthLabel(0.2)).toBe("لا ترجيح");
+    expect(strengthLabel(0.95)).toBe("تطابق قوي");
+    expect(strengthLabel(0.75)).toBe("تطابق جيد");
+    expect(strengthLabel(0.55)).toBe("تطابق ضعيف");
+    expect(strengthLabel(0.2)).toBe("لا تطابق");
   });
 });
 

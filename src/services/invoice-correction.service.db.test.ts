@@ -15,8 +15,8 @@ async function someone(tx: Tx): Promise<string> {
   return u.id;
 }
 
-describe("تصحيحُ مورّد الفاتورة وتاريخها", () => {
-  it("قُرئ المورّدُ خطأً: يُفكّ سدادُ السابق ويعود إلى فاتورته، وتتبعها بنودُها", () =>
+describe("تصحيح مورّد الفاتورة وتاريخها", () => {
+  it("قرئ المورّد خطأً: يفكّ سداد السابق ويعود إلى فاتورته، وتتبعها بنودها", () =>
     withRollback(async (tx) => {
       const wrong = await makeSupplier(tx);
       const right = await makeSupplier(tx);
@@ -41,7 +41,7 @@ describe("تصحيحُ مورّد الفاتورة وتاريخها", () => {
       expect(line).toEqual({ s: right, sp_supplier: right });
     }));
 
-  it("التاريخُ يُصحَّح فينتقل الشهر", () =>
+  it("التاريخ يصحّح فينتقل الشهر", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 100_00, "2026-09-02");

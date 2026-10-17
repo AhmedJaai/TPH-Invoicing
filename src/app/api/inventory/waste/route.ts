@@ -29,7 +29,7 @@ const Body = z.object({
   productId: z.string().trim().min(1).max(64).optional(),
   quantity: z.union([z.string().max(30), z.number()]).optional(),
   unit: z.string().max(10).optional(),
-  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "التاريخ بصيغة YYYY-MM-DD").optional(),
+  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "اكتب التاريخ بصيغة YYYY-MM-DD").optional(),
   reason: z.string().max(40).optional(),
   kind: z.string().max(40).optional(),
   note: z.string().max(500).nullable().optional(),
@@ -58,19 +58,19 @@ export async function POST(request: Request) {
     وفي أسبوعٍ جردُه مقفَل يرفضه مؤثِّرُ `050`، و`respondTo` تقول سببَه.
   */
   if (body.action === "void") {
-    if (!body.wasteId) return NextResponse.json({ error: "لم يُحدَّد سطرُ الهدر" }, { status: 400 });
+    if (!body.wasteId) return NextResponse.json({ error: "لم تحدّد سطر الهدر" }, { status: 400 });
     try {
       await voidWaste(body.wasteId, body.reason ?? "", user.id);
       if (body.countId) await recomputeCount(body.countId).catch(() => undefined);
-      return NextResponse.json({ ok: true, message: "أُبطل الهدر — وعاد مقدارُه إلى «الفرق غير المفسَّر»." });
+      return NextResponse.json({ ok: true, message: "تم إبطال الهدر، وعاد مقداره إلى «الفرق غير المفسّر»." });
     } catch (e) {
       if (e instanceof MovementRefused) return NextResponse.json({ error: e.message }, { status: 409 });
       return failWith(e, "inventory-waste");
     }
   }
 
-  if (!body.productId) return NextResponse.json({ error: "لم يُحدَّد الصنف" }, { status: 400 });
-  if (!isStoredUnit(body.unit)) return NextResponse.json({ error: "وحدةٌ غير معروفة" }, { status: 400 });
+  if (!body.productId) return NextResponse.json({ error: "لم تحدّد الصنف" }, { status: 400 });
+  if (!isStoredUnit(body.unit)) return NextResponse.json({ error: "وحدة غير معروفة" }, { status: 400 });
 
   /* «5,200» لا تُخمَّن — فرقٌ بألف ضعف في هدرٍ يُطرَح من الفرق */
   if (typeof body.quantity === "string" && isAmbiguousThousands(body.quantity)) {
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     if (body.action === "movement") {
       const kind = body.kind as MovementKind;
       if (!(kind in MOVEMENT_KIND_LABEL)) {
-        return NextResponse.json({ error: "بابُ الحركة غير معروف" }, { status: 400 });
+        return NextResponse.json({ error: "نوع الحركة غير معروف" }, { status: 400 });
       }
       await recordMovement({
         productId: body.productId, kind, quantityMilli, unit: body.unit,
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     } else {
       const reason = body.reason as WasteReason;
       if (!(reason in WASTE_REASON_LABEL)) {
-        return NextResponse.json({ error: "سببُ الهدر غير معروف" }, { status: 400 });
+        return NextResponse.json({ error: "سبب الهدر غير معروف" }, { status: 400 });
       }
       const r = await recordWaste({
         productId: body.productId, quantityMilli, unit: body.unit,
@@ -105,7 +105,7 @@ export async function POST(request: Request) {
       });
       /* الضغطةُ الثانية لا تكتب — ويُقال ذلك، فلا يُظنّ أنّ الهدرَ سُجّل مرّتين */
       if (r.duplicate) {
-        return NextResponse.json({ ok: true, duplicate: true, message: "سُجّل هذا الهدرُ قبل لحظة — لم يُكتَب مرّةً ثانية." });
+        return NextResponse.json({ ok: true, duplicate: true, message: "سُجّل هذا الهدر قبل لحظة، ولم يُسجَّل مرة ثانية." });
       }
     }
 
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      message: body.action === "movement" ? "قُيّدت الحركة." : "سُجّل الهدر — وخرج من «الفرق غير المفسَّر».",
+      message: body.action === "movement" ? "تم قيد الحركة." : "تم تسجيل الهدر، وخرج من «الفرق غير المفسّر».",
     });
   } catch (e) {
     if (e instanceof MovementRefused) return NextResponse.json({ error: e.message }, { status: 409 });

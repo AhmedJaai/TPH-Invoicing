@@ -11,14 +11,14 @@ import { MonthClosedError } from "@/services/validation.service";
 export const runtime = "nodejs";
 
 const Body = z.object({
-  documentId: z.string().min(1, "لم يُذكر المستند"),
+  documentId: z.string().min(1, "لم يُحدَّد المستند"),
   kind: z.enum(["TAX_INVOICE", "SIMPLIFIED_INVOICE"]),
   supplierId: z.string().min(1, "اختر المورّد"),
   invoiceNumber: z.string().max(80),
   invoiceDate: z.string().max(40),
   subtotal: z.string().max(40).optional(),
   vat: z.string().max(40).optional(),
-  total: z.string().min(1, "اكتب الإجماليّ").max(40),
+  total: z.string().min(1, "اكتب الإجمالي").max(40),
   sellerVat: z.string().max(40).optional(),
   buyerVat: z.string().max(40).optional(),
   /** «قيّدها رغم ذلك» — سببٌ مكتوب، والخادمُ يقرّر أيجوز التجاوز */
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   }
   const parsed = Body.safeParse(raw);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلبٌ غير مفهوم" }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "الطلب غير مفهوم" }, { status: 400 });
   }
   const { preview, ...input } = parsed.data;
 

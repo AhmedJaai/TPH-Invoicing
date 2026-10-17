@@ -9,11 +9,11 @@ const invoice = (o: Partial<VatExportInvoice>): VatExportInvoice => ({
   reasons: [], warnings: [], periodMonth: "2026-08", carriedFromMonth: null, ...o,
 });
 
-describe("سجلُّ الإقرار للمحاسب", () => {
+describe("سجلّ الإقرار للمحاسب", () => {
   const invoices = [
     invoice({}),
     invoice({ number: "INV-2", vatMinor: null, subtotalMinor: null, vatUsedMinor: 1_500, choice: true }),
-    invoice({ number: "INV-3", included: false, reasons: ["رقمُ المورّد الضريبيّ"] }),
+    invoice({ number: "INV-3", included: false, reasons: ["رقم المورّد الضريبيّ"] }),
   ];
   const result = computeVatReturn({
     invoices: [
@@ -31,20 +31,20 @@ describe("سجلُّ الإقرار للمحاسب", () => {
   });
   const sheet = (name: string) => sheets.find((s) => s.name === name)!.rows;
 
-  it("المحسوبةُ في ورقتها بسندها، وما لم يُخصم في ورقته بسببه", () => {
+  it("المحسوبة في ورقتها بسندها، وما لم يخصم في ورقته بسببه", () => {
     expect(sheet("سجلّ المدخلات")).toHaveLength(3);
     expect(sheet("سجلّ المدخلات")[2][10]).toContain("15/115");
     expect(sheet("سجلّ المدخلات")[2][7]).toBe("غير معروف");
-    expect(sheet("لم تُخصم")[1][11]).toContain("رقمُ المورّد الضريبيّ");
+    expect(sheet("لم تُخصم")[1][11]).toContain("رقم المورّد الضريبيّ");
   });
 
-  it("الملخّصُ يحمل صافي الصفحة نفسَه، والنقدُ المكتوب وحده في المخرجات", () => {
+  it("الملخّص يحمل صافي الصفحة نفسه، والنقد المكتوب وحده في المخرجات", () => {
     const net = sheet("الملخّص").find((r) => typeof r[0] === "string" && r[0].startsWith("صافي الضريبة"))!;
     expect(net[2]).toEqual({ riyals: "120.00" });
     expect(sheet("سجلّ المخرجات")).toHaveLength(3);
   });
 
-  it("الورقةُ الجدوليّة لها ترشيح، والمالُ خلايا عدديّة", () => {
+  it("الورقة الجدوليّة لها ترشيح، والمال خلايا عدديّة", () => {
     const wb = sheetsToWorkbook(sheets);
     const ws = wb.Sheets["سجلّ المدخلات"];
     expect(ws["!autofilter"]).toBeDefined();

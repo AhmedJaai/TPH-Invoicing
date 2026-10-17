@@ -221,7 +221,7 @@ export function InventoryCountEntry({
       return;
     }
     setSent(Object.fromEntries(dirty.map((row) => [row.productId, values[row.productId] ?? ""])));
-    toast({ tone: "ok", title: String(r.data.message ?? "حُفظ العدّ."), body: "والفرقُ محسوبٌ في الخادم — تجده في «ماذا اختلف؟»." });
+    toast({ tone: "ok", title: String(r.data.message ?? "تم حفظ العدّ."), body: "يُحسب الفرق بعد الحفظ، وستجده في «ماذا اختلف؟»." });
     router.refresh();
   }
 
@@ -244,19 +244,19 @@ export function InventoryCountEntry({
       {restored > 0 && dirty.length > 0 && (
         <div role="status" className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3 text-xs leading-relaxed">
           <p className="min-w-0 flex-1">
-            <strong>مسوّدةٌ على هذا الجهاز لم تُحفَظ:</strong> استُعيد عدُّ {countNoun(restored, PRODUCT)} كتبتَه قبل أن تُغلَق الصفحة.
-            راجِعه ثمّ اضغط «احفظ العدّ» — لم يصل الخادمَ منه شيء.
+            <strong>مسوّدة غير محفوظة على هذا الجهاز:</strong> استُعيد عدّ {countNoun(restored, PRODUCT)} كتبته قبل إغلاق الصفحة.
+            راجعه ثم اضغط «احفظ العدّ»، فلم يُحفظ منه شيء بعد.
           </p>
           <button type="button" onClick={discardDraft} disabled={busy} className={buttonClass("quiet", "sm")}>تجاهل المسوّدة</button>
         </div>
       )}
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div className="max-w-2xl">
-          <h2 className="text-base font-bold">{locked ? "ما وُجد على الرفّ" : "اكتب ما وجدتَه على الرفّ"}</h2>
+          <h2 className="text-base font-bold">{locked ? "ما وُجد على الرف" : "اكتب ما وجدته على الرف"}</h2>
           <p className="mt-1 text-xs leading-relaxed text-ink-soft">
             {locked
-              ? "العدُّ كما أُقفل — مجمَّد."
-              : "صنفاً صنفاً، و«Enter» ينقلك إلى التالي. اترك ما لم تعدّه فارغاً — الفراغُ «لم يُعَدّ»، والتخمينُ يُحسَب عليه فرق."}
+              ? "العدّ مقفل كما هو ولا يمكن تعديله."
+              : "أدخل العدّ صنفاً صنفاً، و«Enter» ينقلك إلى الصنف التالي. اترك ما لم تعدّه فارغاً، فالفراغ يعني «لم يُعدّ». لا تخمّن، لأن التخمين يُحسب له فرق."}
           </p>
         </div>
         <div className="w-full sm:w-56">
@@ -264,7 +264,7 @@ export function InventoryCountEntry({
             <span className="font-bold">عُدّ <span className="nums">{counted}</span> من <span className="nums">{rows.length}</span></span>
             {rows.length > 0 && <span className="nums text-muted">{Math.round((counted / rows.length) * 100)}٪</span>}
           </p>
-          <div className="mt-1.5"><Meter value={counted} max={rows.length} tone={counted === rows.length ? "ok" : "accent"} label="تقدّم العدّ" /></div>
+          <div className="mt-1.5"><Meter value={counted} max={rows.length} tone={counted === rows.length ? "ok" : "accent"} label="تقدم العدّ" /></div>
         </div>
       </div>
 
@@ -276,13 +276,13 @@ export function InventoryCountEntry({
             onChange={(e) => setOnlyUncounted(e.target.checked)}
             className="h-4 w-4 accent-[var(--accent)]"
           />
-          ما لم يُعَدّ بعد
+          ما لم يُعدّ بعد
         </label>
       </Toolbar>
 
       {visible.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line px-5 py-10 text-center text-sm text-muted">
-          {onlyUncounted ? "عُدّت الأصنافُ كلُّها." : "لا صنفَ يطابق هذا الترشيح."}
+          {onlyUncounted ? "عُدّت جميع الأصناف." : "لا صنف يطابق هذا الترشيح."}
         </p>
       ) : (
         <ul className="overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
@@ -299,14 +299,14 @@ export function InventoryCountEntry({
                 <div className="col-span-2 min-w-0 md:col-span-1">
                   <p className="truncate text-[14px] font-bold">{row.productName}</p>
                   <p className="mt-0.5 text-xs text-muted">
-                    المتوقَّع:{" "}
+                    المتوقع:{" "}
                     <span className={row.expected ? "nums font-bold text-ink-soft" : "text-warn"}>{row.expected === null ? "غير معروف" : `${row.expected} ${row.unitLabel}`}</span>
                     {row.flags.length > 0 && row.expected === null && <span className="text-warn"> · {row.flags[0]}</span>}
                   </p>
                 </div>
 
                 <label className="flex min-w-0 items-center gap-2">
-                  <span className="sr-only">{`العدّ الفعليّ لـ${row.productName} بـ${row.unitLabel}`}</span>
+                  <span className="sr-only">{`العدّ الفعلي لـ${row.productName} بوحدة ${row.unitLabel}`}</span>
                   <input
                     ref={(el) => { inputs.current[at] = el; }}
                     type="text"
@@ -327,7 +327,7 @@ export function InventoryCountEntry({
                   />
                   {row.unitChoices.length > 1 ? (
                     <select
-                      aria-label={`وحدةُ عدّ ${row.productName}`}
+                      aria-label={`وحدة عدّ ${row.productName}`}
                       disabled={!editable || busy}
                       value={units[row.productId] ?? row.baseUnit}
                       onChange={(e) => setUnits((u) => ({ ...u, [row.productId]: e.target.value }))}
@@ -346,7 +346,7 @@ export function InventoryCountEntry({
                 <div className="min-w-0 text-end md:text-start">
                   {changed ? (
                     <p className={`text-[11px] ${bad ? "font-bold text-danger" : "text-muted"}`}>
-                      {bad ? (isAmbiguousThousands(value) ? "بنقطةٍ أم بلا فاصلة؟ اكتبها 5.2 أو 5200" : "رقمٌ لا يُقرأ") : "يُحسَب بعد الحفظ"}
+                      {bad ? (isAmbiguousThousands(value) ? "هل تقصد رقماً عشرياً أم بدون فاصلة؟ اكتبه 5.2 أو 5200" : "رقم غير مفهوم") : "يُحسب بعد الحفظ"}
                     </p>
                   ) : row.varianceText && d ? (
                     <>
@@ -356,11 +356,11 @@ export function InventoryCountEntry({
                       </p>
                       <p className="text-[11px] text-muted">
                         <span className="nums">{row.varianceBpText}</span>
-                        {row.varianceCostMinor !== null && <> · قيمتُه <Money minor={Math.abs(row.varianceCostMinor)} /></>}
+                        {row.varianceCostMinor !== null && <> · قيمة الفرق <Money minor={Math.abs(row.varianceCostMinor)} /></>}
                       </p>
                     </>
                   ) : (
-                    <p className="text-[11px] text-muted">{value.trim() === "" ? "لم يُعَدّ" : "فرقٌ غير محسوب"}</p>
+                    <p className="text-[11px] text-muted">{value.trim() === "" ? "لم يُعدّ" : "الفرق غير محسوب"}</p>
                   )}
                 </div>
               </li>
@@ -374,10 +374,10 @@ export function InventoryCountEntry({
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-overlay/95 px-4 py-3 shadow-overlay backdrop-blur">
             <p className="min-w-0 flex-1 text-[13px]">
               {dirty.length === 0
-                ? <span className="text-muted">كلُّ ما كتبتَه محفوظ — المسوّدةُ تبقى، والإقفالُ فعلٌ مستقلّ.</span>
+                ? <span className="text-muted">كل ما كتبته محفوظ. تبقى المسوّدة، والإقفال خطوة مستقلة.</span>
                 : invalid.length > 0
-                  ? <span className="font-bold text-danger">{countNoun(invalid.length, PRODUCT)} برقمٍ لا يُقرأ — صحّحه قبل الحفظ.</span>
-                  : <span className="font-bold">{countNoun(dirty.length, PRODUCT)} لم يُحفَظ بعد</span>}
+                  ? <span className="font-bold text-danger">{countNoun(invalid.length, PRODUCT)} بأرقام غير مفهومة. صحّحها قبل الحفظ.</span>
+                  : <span className="font-bold">{countNoun(dirty.length, PRODUCT)} لم يُحفظ بعد</span>}
             </p>
             {error && <p role="alert" className="w-full text-xs text-danger sm:order-last">{error}</p>}
             <button
@@ -387,7 +387,7 @@ export function InventoryCountEntry({
               disabled={busy || dirty.length === 0 || invalid.length > 0}
               className={`${buttonClass("primary", "lg")} w-full sm:w-auto`}
             >
-              {dirty.length === 0 ? "لا تغييرَ يُحفظ" : `احفظ العدّ (${dirty.length})`}
+              {dirty.length === 0 ? "لا توجد تغييرات للحفظ" : `احفظ العدّ (${dirty.length})`}
             </button>
           </div>
         </div>

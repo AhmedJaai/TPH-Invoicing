@@ -126,25 +126,25 @@ export function validateVision(
     const rowNumber = i + 1;
     const date = parseDate(r.date);
     if (!date) {
-      rejected.push({ rowNumber, reason: "تاريخٌ لم يُقرأ", raw: r.date });
+      rejected.push({ rowNumber, reason: "تاريخ غير مقروء", raw: r.date });
       return;
     }
     if (bounds?.from && date < bounds.from) {
-      rejected.push({ rowNumber, reason: "تاريخٌ قبل مدى الكشف", raw: r.date });
+      rejected.push({ rowNumber, reason: "تاريخ قبل فترة الكشف", raw: r.date });
       return;
     }
     if (bounds?.to && date > bounds.to) {
-      rejected.push({ rowNumber, reason: "تاريخٌ بعد مدى الكشف", raw: r.date });
+      rejected.push({ rowNumber, reason: "تاريخ بعد فترة الكشف", raw: r.date });
       return;
     }
 
     const minor = parseAmountToMinor(r.amount);
     if (minor === null) {
-      rejected.push({ rowNumber, reason: "مبلغٌ لم يُقرأ رقماً", raw: r.amount });
+      rejected.push({ rowNumber, reason: "مبلغ غير مقروء كرقم", raw: r.amount });
       return;
     }
     if (minor === 0) {
-      rejected.push({ rowNumber, reason: "مبلغٌ صفر — لا حركة بلا مال", raw: r.amount });
+      rejected.push({ rowNumber, reason: "مبلغ صفر، ولا توجد حركة بلا مبلغ", raw: r.amount });
       return;
     }
 
@@ -183,10 +183,10 @@ export function validateVision(
         openingMinor,
         closingMinor,
         blocked:
-          `القراءة البصرية لا تُطابق رصيد الكشف — فرقُ ` +
+          `القراءة من الصورة لا تطابق رصيد الكشف، والفرق ` +
           `${formatRiyalsDisplay(Math.abs(diff))} ريالاً. ` +
-          "أي أنّ سطراً سقط أو رقماً قُرئ خطأً، ولا يُعرَف أيّهما. " +
-          "اطلب الكشف نصّاً أو بصيغة Excel.",
+          "أي أن سطراً سقط أو رقماً قُرئ خطأً، ولا نعرف أيهما. " +
+          "اطلب الكشف بصيغة نص أو Excel.",
       };
     }
   }
@@ -197,7 +197,7 @@ export function validateVision(
       rejected,
       openingMinor,
       closingMinor,
-      blocked: "لم يُقرأ من الصورة سطرٌ واحد صالح.",
+      blocked: "لم يُقرأ من الصورة أي سطر صالح.",
     };
   }
 

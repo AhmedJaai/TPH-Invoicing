@@ -25,7 +25,7 @@ describe("دفعة أوّل الشهر", () => {
     expect(run.readyTotalMinor).toBe(45_000);
   });
 
-  it("تستبعد المسدَّد وتُدرج باقي المسدَّد جزئياً", () => {
+  it("تستبعد المسدّد وتدرج باقي المسدّد جزئياً", () => {
     const run = buildPaymentRun([
       inv({ invoiceId: "paid", totalMinor: 10_000, allocatedMinor: 10_000 }),
       inv({ invoiceId: "partial", totalMinor: 10_000, allocatedMinor: 4_000 }),
@@ -35,7 +35,7 @@ describe("دفعة أوّل الشهر", () => {
     expect(run.readyTotalMinor).toBe(6_000);
   });
 
-  it("تتسامح بهللة تقريب فلا تُدرج المسدَّدة", () => {
+  it("تتسامح بهللة تقريب فلا تدرج المسدّدة", () => {
     const run = buildPaymentRun([inv({ invoiceId: "x", totalMinor: 10_000, allocatedMinor: 9_999 })], "2026-08");
     expect(run.ready).toHaveLength(0);
   });
@@ -104,28 +104,28 @@ describe("ملف التحويلات", () => {
     expect(csv).toContain("SAR");
   });
 
-  it("يحمل حسابَ المستفيد من أدلّة الكشف — والبنكُ لا يحوّل إلى اسم", () => {
+  it("يحمل حساب المستفيد من أدلّة الكشف — والبنك لا يحوّل إلى اسم", () => {
     const sid = run.ready[0].supplierId;
     const accounts = new Map([[sid, resolvePayeeAccount([{ kind: "IBAN", normalized: "SA0380000000608010167519" }])]]);
     const line = toBankTransferCsv(run, accounts).split("\r\n")[1];
     expect(line).toContain("SA0380000000608010167519");
   });
 
-  it("ولا حسابَ يُخمَّن: المجهولُ خارجَ قسم التحويل، بعنوانه وتنبيهه", () => {
+  it("ولا حساب يخمّن: المجهول خارج قسم التحويل، بعنوانه وتنبيهه", () => {
     const lines = toBankTransferCsv(run).split("\r\n");
     expect(lines).toHaveLength(4);
     expect(lines[1]).toBe("");
-    expect(lines[2]).toContain("يحتاج حساباً");
-    expect(lines[3]).toContain("الحسابُ غير معروف");
+    expect(lines[2]).toContain("هؤلاء بلا حساب");
+    expect(lines[3]).toContain("الحساب غير معروف");
   });
 
-  it("ومن له حسابٌ في قسم التحويل وحده — لا عنوانَ ولا قسمَ ثانياً", () => {
+  it("ومن له حساب في قسم التحويل وحده — لا عنوان ولا قسم ثانياً", () => {
     const sid = run.ready[0].supplierId;
     const accounts = new Map([[sid, resolvePayeeAccount([{ kind: "IBAN", normalized: "SA0380000000608010167519" }])]]);
     expect(toBankTransferCsv(run, accounts).split("\r\n")).toHaveLength(2);
   });
 
-  it("خليّةٌ تبدأ بعلامة صيغة تُسبَق بفاصلةٍ عليا — لا تُنفَّذ في إكسل", () => {
+  it("خليّة تبدأ بعلامة صيغة تسبق بفاصلة عليا — لا تنفّذ في إكسل", () => {
     const evil = buildPaymentRun([
       inv({ invoiceId: "1", supplierName: "=HYPERLINK(\"http://x\")", invoiceNumber: "-1+2" }),
       inv({ invoiceId: "2", supplierId: "s2", supplierName: "@SUM(A1)", invoiceNumber: "+966" }),
@@ -139,7 +139,7 @@ describe("ملف التحويلات", () => {
     expect(csv).toContain("'+966");
   });
 
-  it("المبلغُ من الهللات نصّاً", () => {
+  it("المبلغ من الهللات نصّاً", () => {
     const one = buildPaymentRun([inv({ invoiceId: "1", totalMinor: 1_000_07 })], "2026-08");
     expect(toBankTransferCsv(one)).toContain("1000.07");
   });
@@ -169,14 +169,14 @@ describe("رسالة المورّد", () => {
   });
 });
 
-describe("المجهول لا يُسدَّد ولا يُطالَب صاحبه", () => {
+describe("المجهول لا يسدّد ولا يطالب صاحبه", () => {
   const base = {
     invoiceId: "i1", supplierId: "s1", supplierName: "أوراق الزيتون",
     invoiceNumber: "260300", invoiceDate: new Date("2026-08-05T00:00:00Z"),
     periodMonth: "2026-08", totalMinor: 50_000, allocatedMinor: 0, vatMinor: null,
   };
 
-  it("الفاتورة المجهولة تُحجَز بسبب يخصّها", () => {
+  it("الفاتورة المجهولة تحجز بسبب يخصّها", () => {
     const run = buildPaymentRun(
       [{ ...base, taxStatus: "UNKNOWN", inputVatStatus: "UNKNOWN" }],
       "2026-08",
@@ -187,7 +187,7 @@ describe("المجهول لا يُسدَّد ولا يُطالَب صاحبه", 
     expect(run.ready).toHaveLength(0);
   });
 
-  it("سبب الحجز يفرّق بين «اقرأ المستند» و«طالِب المورّد»", () => {
+  it("سبب الحجز يفرّق بين «اقرأ المستند» و«طالب المورّد»", () => {
     const run = buildPaymentRun(
       [
         { ...base, invoiceId: "u", taxStatus: "UNKNOWN", inputVatStatus: "UNKNOWN" },
@@ -199,7 +199,7 @@ describe("المجهول لا يُسدَّد ولا يُطالَب صاحبه", 
     expect(reasons).toEqual(["NOT_TAX_VALID", "TAX_UNKNOWN"]);
   });
 
-  it("الضريبة المجهولة لا تُجمع في «المعرّض» كصفر", () => {
+  it("الضريبة المجهولة لا تجمع في «المعرّض» كصفر", () => {
     const run = buildPaymentRun(
       [
         { ...base, invoiceId: "u", taxStatus: "UNKNOWN", inputVatStatus: "UNKNOWN" },
@@ -214,8 +214,8 @@ describe("المجهول لا يُسدَّد ولا يُطالَب صاحبه", 
   });
 });
 
-describe("دفعة أوّل الشهر — رصيدٌ لنا عند المورّد", () => {
-  it("يُخصم الرصيد من دفعة صاحبه وحده، ولا يُحوَّل ما يغطّيه", () => {
+describe("دفعة أوّل الشهر — رصيد لنا عند المورّد", () => {
+  it("يخصم الرصيد من دفعة صاحبه وحده، ولا يحوّل ما يغطّيه", () => {
     const run = buildPaymentRun([
       inv({ invoiceId: "1", supplierId: "loreva", supplierName: "لوريفا", totalMinor: 101_200 }),
       inv({ invoiceId: "2", supplierId: "olive", supplierName: "أوراق الزيتون", totalMinor: 70_000 }),
@@ -232,8 +232,8 @@ describe("دفعة أوّل الشهر — رصيدٌ لنا عند المورّ
   });
 });
 
-describe("ما قرأه النموذج ولم يُؤكَّد لا يدخل ملفّ التحويلات", () => {
-  it("يُحجَز بسببه ولو كان صالحاً ضريبياً", () => {
+describe("ما قرأه النموذج ولم يؤكّد لا يدخل ملفّ التحويلات", () => {
+  it("يحجز بسببه ولو كان صالحاً ضريبياً", () => {
     const run = buildPaymentRun([
       {
         invoiceId: "i-review", supplierId: "s1", supplierName: "مورّد", invoiceNumber: "1",
@@ -248,15 +248,15 @@ describe("ما قرأه النموذج ولم يُؤكَّد لا يدخل مل�
   });
 });
 
-describe("حسابُ المستفيد", () => {
-  it("آيبانٌ واحد يُكتَب — ويسبق رقمَ الحساب", () => {
+describe("حساب المستفيد", () => {
+  it("آيبان واحد يكتب — ويسبق رقم الحساب", () => {
     expect(resolvePayeeAccount([
       { kind: "ACCOUNT", normalized: "608010167519" },
       { kind: "IBAN", normalized: "SA0380000000608010167519" },
     ])).toEqual({ account: "SA0380000000608010167519", note: null });
   });
 
-  it("آيبانان مختلفان سؤالٌ لا يُحسَم بالحدس", () => {
+  it("آيبانان مختلفان سؤال لا يحسم بالحدس", () => {
     const r = resolvePayeeAccount([
       { kind: "IBAN", normalized: "SA0380000000608010167519" },
       { kind: "IBAN", normalized: "SA4420000001234567891234" },
@@ -265,7 +265,7 @@ describe("حسابُ المستفيد", () => {
     expect(r.note).toContain("حسابات");
   });
 
-  it("والمكرَّرُ نفسُه ليس حسابين", () => {
+  it("والمكرّر نفسه ليس حسابين", () => {
     expect(resolvePayeeAccount([
       { kind: "IBAN", normalized: "SA0380000000608010167519" },
       { kind: "IBAN", normalized: "SA0380000000608010167519" },
@@ -274,23 +274,23 @@ describe("حسابُ المستفيد", () => {
 });
 
 
-describe("حسابُ المستفيد — ما كتبه صاحبُ المقهى بيده يمضي ويُقال", () => {
+describe("حساب المستفيد — ما كتبه صاحب المقهى بيده يمضي ويقال", () => {
   const IBAN = "SA0380000000608010167519";
   const OTHER = "SA4420000001234567891234";
-  it("بلا دليلٍ في الكشوف: المكتوبُ بيد يُكتب، مع تنبيه أوّل تحويل", () => {
+  it("بلا دليل في الكشوف: المكتوب بيد يكتب، مع تنبيه أوّل تحويل", () => {
     const a = resolvePayeeAccount([], IBAN);
     expect(a.account).toBe(IBAN);
-    expect(a.note).toContain("لم يُحوَّل له من قبل");
+    expect(a.note).toContain("لم يسبق التحويل له");
   });
   it("يطابق الكشف: بلا تنبيه", () => {
     expect(resolvePayeeAccount([{ kind: "IBAN", normalized: IBAN }], IBAN)).toEqual({ account: IBAN, note: null });
   });
-  it("يخالف الكشف: يبقى ما كتبه — لا يُبدَّل ولا يُحجَب — ويُقال إنّه يخالف", () => {
+  it("يخالف الكشف: يبقى ما كتبه — لا يبدّل ولا يحجب — ويقال إنّه يخالف", () => {
     const a = resolvePayeeAccount([{ kind: "IBAN", normalized: OTHER }], IBAN);
     expect(a.account).toBe(IBAN);
     expect(a.note).toContain("يخالف");
   });
-  it("ويحسم تعدّدَ حسابات الكشوف", () => {
+  it("ويحسم تعدّد حسابات الكشوف", () => {
     const a = resolvePayeeAccount([{ kind: "IBAN", normalized: IBAN }, { kind: "IBAN", normalized: OTHER }], OTHER);
     expect(a).toEqual({ account: OTHER, note: null });
   });
@@ -302,7 +302,7 @@ import { afterPayment, applyPartialAmounts, holdReasonOf, isOverridableHold, tra
 import { distributePartial } from "./mark-paid-plan";
 import { EMPTY_SELECTION, planSupplier, readSelection } from "./pay-run-selection";
 
-describe("قرارُ المالك في المحجوز", () => {
+describe("قرار المالك في المحجوز", () => {
   const heldInv = inv({ invoiceId: "h1", totalMinor: 23_000, vatMinor: 3_000, taxStatus: "INVALID" });
 
   it("بلا قرار: تبقى محجوزةً ولا تدخل الجاهز", () => {
@@ -313,7 +313,7 @@ describe("قرارُ المالك في المحجوز", () => {
     expect(run.vatAtRiskMinor).toBe(3_000);
   });
 
-  it("بقراره: تدخل بمبلغها، وتُسرَد بسبب حجزها وسببه، والضريبةُ المعرّضة تبقى ظاهرة", () => {
+  it("بقراره: تدخل بمبلغها، وتسرد بسبب حجزها وسببه، والضريبة المعرّضة تبقى ظاهرة", () => {
     const run = buildPaymentRun([heldInv], "2026-08", { overrides: new Map([["h1", { note: "لا يسلّم قبل السداد" }]]) });
     expect(run.readyTotalMinor).toBe(23_000);
     expect(run.held).toHaveLength(0);
@@ -325,17 +325,17 @@ describe("قرارُ المالك في المحجوز", () => {
     expect(run.vatAtRiskMinor).toBe(3_000);
   });
 
-  it("ضريبةٌ لم تُقرأ تُعَدّ مجهولةً بعد القرار ولا تُجمَع صفراً", () => {
+  it("ضريبة لم تقرأ تعدّ مجهولةً بعد القرار ولا تجمع صفراً", () => {
     const run = buildPaymentRun(
       [inv({ invoiceId: "h2", vatMinor: null, inputVatStatus: "NOT_ELIGIBLE" })],
       "2026-08",
-      { overrides: new Map([["h2", { note: "متّفقٌ عليه" }]]) },
+      { overrides: new Map([["h2", { note: "متّفق عليه" }]]) },
     );
     expect(run.vatAtRiskMinor).toBe(0);
     expect(run.vatAtRiskUnknown).toBe(1);
   });
 
-  it("ما لم يُؤكَّد مستندُه لا يُدخله قرار — مبلغُه لم يره إنسان", () => {
+  it("ما لم يؤكّد مستنده لا يدخله قرار — مبلغه لم يره إنسان", () => {
     const run = buildPaymentRun(
       [inv({ invoiceId: "r1", needsReview: true })],
       "2026-08",
@@ -346,28 +346,28 @@ describe("قرارُ المالك في المحجوز", () => {
     expect(isOverridableHold("NEEDS_REVIEW")).toBe(false);
   });
 
-  it("قرارٌ على فاتورةٍ صارت صالحة لا أثر له — هي في الجاهز بلا وسم", () => {
+  it("قرار على فاتورة صارت صالحة لا أثر له — هي في الجاهز بلا وسم", () => {
     const run = buildPaymentRun([inv({ invoiceId: "ok" })], "2026-08", { overrides: new Map([["ok", { note: "قديم" }]]) });
     expect(run.overridden).toHaveLength(0);
     expect(run.readyTotalMinor).toBe(10_000);
   });
 
-  it("سببُ الحجز قاعدةٌ واحدة يقرؤها البناءُ ومسارُ القرار", () => {
+  it("سبب الحجز قاعدة واحدة يقرؤها البناء ومسار القرار", () => {
     expect(holdReasonOf({ needsReview: false, taxStatus: "VALID", inputVatStatus: "ELIGIBLE" })).toBeNull();
     expect(holdReasonOf({ needsReview: true, taxStatus: "VALID", inputVatStatus: "ELIGIBLE" })).toBe("NEEDS_REVIEW");
     expect(holdReasonOf({ needsReview: false, taxStatus: "UNKNOWN", inputVatStatus: "ELIGIBLE" })).toBe("TAX_UNKNOWN");
     expect(holdReasonOf({ needsReview: false, taxStatus: "VALID", inputVatStatus: "NOT_ELIGIBLE" })).toBe("NO_VAT_DEDUCTION");
   });
 
-  it("الملفُّ يسمّي ما دخل بقرار المالك في صفّ مورّده", () => {
+  it("الملفّ يسمّي ما دخل بقرار المالك في صفّ مورّده", () => {
     const run = buildPaymentRun([heldInv], "2026-08", { overrides: new Map([["h1", { note: "س" }]]) });
     const csv = toBankTransferCsv(run, new Map([["s1", { account: "SA0380000000608010167519", note: null }]]));
-    expect(csv).toContain("بقرار المالك وهي محجوزة: h1");
+    expect(csv).toContain("محجوزة وتُسدَّد بقرار المالك: h1");
   });
 });
 
-describe("استثناءُ فاتورةٍ واحدة", () => {
-  it("المستثناةُ لا تُحوَّل، والباقي بمبلغه", () => {
+describe("استثناء فاتورة واحدة", () => {
+  it("المستثناة لا تحوّل، والباقي بمبلغه", () => {
     const run = buildPaymentRun(
       [inv({ invoiceId: "a", totalMinor: 10_000 }), inv({ invoiceId: "b", totalMinor: 5_000 })],
       "2026-08",
@@ -377,7 +377,7 @@ describe("استثناءُ فاتورةٍ واحدة", () => {
     expect(run.readyTotalMinor).toBe(10_000);
   });
 
-  it("الرصيدُ يُخصم ممّا بقي بعد الاستثناء لا ممّا استُثني", () => {
+  it("الرصيد يخصم ممّا بقي بعد الاستثناء لا ممّا استثني", () => {
     const run = buildPaymentRun(
       [inv({ invoiceId: "a", totalMinor: 10_000 }), inv({ invoiceId: "b", totalMinor: 5_000 })],
       "2026-08",
@@ -388,7 +388,7 @@ describe("استثناءُ فاتورةٍ واحدة", () => {
     expect(run.coveredByCredit[0].creditAppliedMinor).toBe(5_000);
   });
 
-  it("استثناءُ كلّ فواتير مورّدٍ يُخرجه من الدفعة", () => {
+  it("استثناء كلّ فواتير مورّد يخرجه من الدفعة", () => {
     const run = buildPaymentRun([inv({ invoiceId: "a" })], "2026-08", { excludeInvoiceIds: new Set(["a"]) });
     expect(run.ready).toHaveLength(0);
     expect(run.coveredByCredit).toHaveLength(0);
@@ -401,7 +401,7 @@ describe("«ادفع كذا فقط» في الملفّ", () => {
     "2026-08",
   );
 
-  it("الجزئيُّ يُحوَّل بمبلغه ويُحفَظ الكلُّ بجانبه", () => {
+  it("الجزئيّ يحوّل بمبلغه ويحفظ الكلّ بجانبه", () => {
     const { run, errors } = applyPartialAmounts(base(), new Map([["s2", 12_550]]));
     expect(errors).toEqual([]);
     const s2 = run.ready.find((s) => s.supplierId === "s2");
@@ -410,7 +410,7 @@ describe("«ادفع كذا فقط» في الملفّ", () => {
     expect(run.readyTotalMinor).toBe(22_550);
   });
 
-  it("ما زاد على ما يُحوَّل يُردّ ولا يُقصّ", () => {
+  it("ما زاد على ما يحوّل يردّ ولا يقصّ", () => {
     const { run, errors } = applyPartialAmounts(base(), new Map([["s2", 30_001]]));
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain("بيكوف");
@@ -418,37 +418,37 @@ describe("«ادفع كذا فقط» في الملفّ", () => {
     expect(run.readyTotalMinor).toBe(40_000);
   });
 
-  it.each([0, -500, 12.5, Number.NaN])("مبلغٌ ليس عدداً صحيحاً موجباً (%s) يُردّ", (bad) => {
+  it.each([0, -500, 12.5, Number.NaN])("مبلغ ليس عدداً صحيحاً موجباً (%s) يردّ", (bad) => {
     expect(applyPartialAmounts(base(), new Map([["s2", bad]])).errors).toHaveLength(1);
   });
 
-  it("مبلغٌ يساوي الكلّ ليس جزئيّاً", () => {
+  it("مبلغ يساوي الكلّ ليس جزئيّاً", () => {
     const { run, errors } = applyPartialAmounts(base(), new Map([["s2", 30_000]]));
     expect(errors).toEqual([]);
     expect(run.ready.find((s) => s.supplierId === "s2")?.fullMinor).toBeUndefined();
   });
 
-  it("مبلغٌ لمورّدٍ ليس بين الجاهزين يُردّ", () => {
+  it("مبلغ لمورّد ليس بين الجاهزين يردّ", () => {
     expect(applyPartialAmounts(base(), new Map([["ghost", 100]])).errors).toHaveLength(1);
   });
 
-  it("الملفُّ يقول المبلغين في صفّ الجزئيّ", () => {
+  it("الملفّ يقول المبلغين في صفّ الجزئيّ", () => {
     const { run } = applyPartialAmounts(base(), new Map([["s2", 12_550]]));
     const csv = toBankTransferCsv(run, new Map([["s2", { account: "SA0380000000608010167519", note: null }]]));
     expect(csv).toContain("بيكوف,SA0380000000608010167519,125.50,SAR");
-    expect(csv).toContain("دفعٌ جزئيّ: 125.50 من 300.00");
-    expect(csv).toContain("سداد جزئيّ من فواتير 2026-08");
+    expect(csv).toContain("دفعة جزئية: 125.50 من 300.00");
+    expect(csv).toContain("سداد جزئي من فواتير 2026-08");
   });
 });
 
-describe("توزيعُ السداد الجزئيّ على الفواتير — الأقدمُ أوّلاً", () => {
+describe("توزيع السداد الجزئيّ على الفواتير — الأقدم أوّلاً", () => {
   const open = [
     { invoiceId: "old", openMinor: 10_000 },
     { invoiceId: "mid", openMinor: 5_000 },
     { invoiceId: "new", openMinor: 7_000 },
   ];
 
-  it("يملأ الأقدمَ ثمّ ما يليه، ويترك ما لم يبلغه", () => {
+  it("يملأ الأقدم ثمّ ما يليه، ويترك ما لم يبلغه", () => {
     const r = distributePartial(open, 12_000);
     expect(r).toEqual({
       ok: true,
@@ -457,33 +457,33 @@ describe("توزيعُ السداد الجزئيّ على الفواتير — �
     });
   });
 
-  it("مجموعُ الحصص هو المبلغُ بالهللة", () => {
+  it("مجموع الحصص هو المبلغ بالهللة", () => {
     const r = distributePartial(open, 21_999);
     expect(r.ok && r.shares.reduce((s, x) => s + x.payMinor, 0)).toBe(21_999);
   });
 
-  it("ما زاد على المفتوح يُردّ بمبلغ المفتوح — لا يُقصّ", () => {
+  it("ما زاد على المفتوح يردّ بمبلغ المفتوح — لا يقصّ", () => {
     expect(distributePartial(open, 22_001)).toEqual({ ok: false, reason: "EXCEEDS_OPEN", openMinor: 22_000 });
   });
 
-  it("المفتوحُ كلُّه مقبول", () => {
+  it("المفتوح كلّه مقبول", () => {
     const r = distributePartial(open, 22_000);
     expect(r.ok && r.untouched).toEqual([]);
   });
 
-  it.each([0, -1, 0.5, Number.NaN, Number.POSITIVE_INFINITY])("ما ليس عدداً صحيحاً موجباً (%s) يُردّ", (bad) => {
+  it.each([0, -1, 0.5, Number.NaN, Number.POSITIVE_INFINITY])("ما ليس عدداً صحيحاً موجباً (%s) يردّ", (bad) => {
     expect(distributePartial(open, bad).ok).toBe(false);
   });
 });
 
-describe("ما يبقى عليك بعد الدفعة — لا يُقصّ عند الصفر", () => {
-  it("الباقي يُقال بمبلغه", () => {
+describe("ما يبقى عليك بعد الدفعة — لا يقصّ عند الصفر", () => {
+  it("الباقي يقال بمبلغه", () => {
     expect(afterPayment(50_000, 30_000)).toEqual({ state: "remaining", minor: 20_000 });
   });
-  it("الدفعُ الزائد يُقال زيادةً بمبلغها لا «يبقى 0.00»", () => {
+  it("الدفع الزائد يقال زيادةً بمبلغها لا «يبقى 0.00»", () => {
     expect(afterPayment(30_000, 65_000)).toEqual({ state: "over", minor: 35_000 });
   });
-  it("السدادُ التامّ (بتسامح الهللة) ليس زيادةً ولا باقياً", () => {
+  it("السداد التامّ (بتسامح الهللة) ليس زيادةً ولا باقياً", () => {
     expect(afterPayment(30_000, 30_000)).toEqual({ state: "settled" });
     expect(afterPayment(30_000, 30_001)).toEqual({ state: "settled" });
   });
@@ -492,39 +492,39 @@ describe("ما يبقى عليك بعد الدفعة — لا يُقصّ عند 
   });
 });
 
-describe("اختيارُ صاحب الدفعة في الشاشة", () => {
+describe("اختيار صاحب الدفعة في الشاشة", () => {
   const s = { supplierId: "s1", creditMinor: 0, invoices: [{ id: "a", openMinor: 10_000 }, { id: "b", openMinor: 5_000 }] };
 
   it("بلا اختيار: الكلّ بمبلغه", () => {
     expect(planSupplier(s, EMPTY_SELECTION)).toMatchObject({ on: true, payingMinor: 15_000, skippedInvoices: 0, partialMinor: null });
   });
 
-  it("فاتورةٌ مستثناة تُنقص المجموعَ بمبلغها", () => {
+  it("فاتورة مستثناة تنقص المجموع بمبلغها", () => {
     const p = planSupplier(s, { ...EMPTY_SELECTION, skipInvoices: ["b"] });
     expect(p).toMatchObject({ on: true, payingMinor: 10_000, skippedInvoices: 1, invoiceIds: ["a"] });
   });
 
-  it("استثناءُ كلّ فواتيره يُخرجه", () => {
+  it("استثناء كلّ فواتيره يخرجه", () => {
     expect(planSupplier(s, { ...EMPTY_SELECTION, skipInvoices: ["a", "b"] })).toMatchObject({ on: false, payingMinor: 0 });
   });
 
-  it("المبلغُ الجزئيّ الصحيح هو ما يخرج", () => {
+  it("المبلغ الجزئيّ الصحيح هو ما يخرج", () => {
     expect(planSupplier(s, { ...EMPTY_SELECTION, partial: { s1: "75.50" } })).toMatchObject({ partialMinor: 7_550, payingMinor: 7_550, partialError: null });
   });
 
-  it("الجزئيُّ الأكبر ممّا يُحوَّل يُقال خطأً ولا يُحسَب — والمجموعُ يبقى الكلّ", () => {
+  it("الجزئيّ الأكبر ممّا يحوّل يقال خطأً ولا يحسب — والمجموع يبقى الكلّ", () => {
     const p = planSupplier(s, { ...EMPTY_SELECTION, partial: { s1: "151" } });
     expect(p.partialMinor).toBeNull();
     expect(p.partialError).not.toBeNull();
     expect(p.payingMinor).toBe(15_000);
   });
 
-  it("الرصيدُ يُخصم بقاعدة الخادم نفسها", () => {
+  it("الرصيد يخصم بقاعدة الخادم نفسها", () => {
     expect(transferAfterCredit(15_000, 4_000)).toEqual({ transferMinor: 11_000, creditAppliedMinor: 4_000 });
     expect(planSupplier({ ...s, creditMinor: 4_000 }, EMPTY_SELECTION)).toMatchObject({ fullMinor: 11_000, creditAppliedMinor: 4_000 });
   });
 
-  it("ما حُفظ في المتصفّح يُقرأ بفحص — والتالفُ «لا اختيار»", () => {
+  it("ما حفظ في المتصفّح يقرأ بفحص — والتالف «لا اختيار»", () => {
     expect(readSelection(null)).toEqual(EMPTY_SELECTION);
     expect(readSelection("x")).toEqual(EMPTY_SELECTION);
     expect(readSelection({ skipSuppliers: ["s1", 5], skipInvoices: "no", partial: { s1: "10", s2: 7 } }))
@@ -532,7 +532,7 @@ describe("اختيارُ صاحب الدفعة في الشاشة", () => {
   });
 });
 
-describe("دفعتان من صفوفٍ واحدة — «النقد القادم» يستعلم مرّةً", () => {
+describe("دفعتان من صفوف واحدة — «النقد القادم» يستعلم مرّةً", () => {
   /* صفوفُ الشهر الجاري تحوي صفوفَ ما قبله؛ فالدفعةُ المبنيّة منها كالمبنيّة من صفوف شهرها وحده */
   const older = [
     inv({ invoiceId: "jul", periodMonth: "2026-07", totalMinor: 7_000 }),
@@ -545,13 +545,13 @@ describe("دفعتان من صفوفٍ واحدة — «النقد القادم�
   ];
   const credit = new Map([["s1", 2_000]]);
 
-  it("دفعةُ الشهر المنقضي لا تتغيّر بوجود صفوف الشهر الجاري", () => {
+  it("دفعة الشهر المنقضي لا تتغيّر بوجود صفوف الشهر الجاري", () => {
     const options = { includeOlderUnpaid: true, creditBySupplier: credit };
     expect(buildPaymentRun([...older, ...current], "2026-08", options))
       .toEqual(buildPaymentRun(older, "2026-08", options));
   });
 
-  it("ودفعةُ الشهر الجاري وحده لا تأخذ من المتأخّر", () => {
+  it("ودفعة الشهر الجاري وحده لا تأخذ من المتأخّر", () => {
     const options = { includeOlderUnpaid: false };
     expect(buildPaymentRun([...older, ...current], "2026-09", options))
       .toEqual(buildPaymentRun(current, "2026-09", options));

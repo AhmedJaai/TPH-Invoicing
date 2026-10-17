@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "تعذّرت قراءة الطلب." }, { status: 400 });
     }
     const parsed = Body.safeParse(raw);
-    if (!parsed.success) return NextResponse.json({ error: "طلبٌ غير مفهوم." }, { status: 400 });
+    if (!parsed.success) return NextResponse.json({ error: "الطلب غير مفهوم." }, { status: 400 });
 
     if (parsed.data.preview) {
       return NextResponse.json({ ok: true, preview: await previewAccountReview(user.id) });

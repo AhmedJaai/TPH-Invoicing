@@ -41,7 +41,7 @@ export function UserAdmin({ users, meId }: { users: UserAdminItem[]; meId: strin
       toast({ tone: "danger", title: failed, body: res.error });
       return false;
     }
-    toast({ tone: "ok", title: res.data.message ?? "تمّ" });
+    toast({ tone: "ok", title: res.data.message ?? "تم" });
     if (res.data.signedOutSelf) router.push("/login");
     else router.refresh();
     return true;
@@ -62,15 +62,15 @@ export function UserAdmin({ users, meId }: { users: UserAdminItem[]; meId: strin
                 <bdi dir="ltr" className="block truncate text-[11px] text-muted">{u.email}</bdi>
               </span>
               <span className="flex shrink-0 flex-wrap items-center gap-1.5">
-                <Badge tone={u.isActive ? "ok" : "danger"} dot>{u.isActive ? "مفعَّل" : "معطَّل"}</Badge>
+                <Badge tone={u.isActive ? "ok" : "danger"} dot>{u.isActive ? "مفعّل" : "معطّل"}</Badge>
                 <Badge>{ROLE_LABEL[u.role]}</Badge>
               </span>
             </div>
 
             <p className="text-[11px] leading-relaxed text-muted">
               {u.activeSessions === 0
-                ? "لا جلسةَ قائمة — آخرُ نشاطه غير معروف"
-                : <>جلساتٌ قائمة: <span className="nums">{u.activeSessions}</span> · آخرُ تجديدٍ لجلسته {u.lastSeenAbout ?? "غير معروف"} (تُجدَّد مرّةً في اليوم ما دام يستعمل النظام)</>}
+                ? "لا توجد جلسة قائمة، وآخر نشاط له غير معروف"
+                : <>جلسات قائمة: <span className="nums">{u.activeSessions}</span> · آخر تجديد لجلسته {u.lastSeenAbout ?? "غير معروف"} (تتجدد الجلسة مرة في اليوم ما دام يستخدم النظام)</>}
             </p>
 
             {u.note && (
@@ -90,7 +90,7 @@ export function UserAdmin({ users, meId }: { users: UserAdminItem[]; meId: strin
                     aria-busy={working}
                     onChange={(e) => {
                       const role = ROLES.find((r) => r === e.target.value);
-                      if (role && role !== u.role) void send(u.id, { action: "role", role }, "لم يتغيّر الدور");
+                      if (role && role !== u.role) void send(u.id, { action: "role", role }, "تعذّر تغيير الدور");
                     }}
                     className="min-h-11 rounded-lg border border-line-input bg-raised px-2 text-sm sm:min-h-9"
                   >
@@ -101,29 +101,29 @@ export function UserAdmin({ users, meId }: { users: UserAdminItem[]; meId: strin
 
               {u.activeSessions > 0 && (
                 <ConfirmAction
-                  label={me ? "أنهِ جلساتي على كلّ الأجهزة" : "أنهِ جلساته"}
-                  title={me ? "إنهاءُ جلساتك كلِّها" : `إنهاءُ جلسات ${u.name ?? u.email}`}
+                  label={me ? "أنهِ جلساتي على كل الأجهزة" : "أنهِ جلساته"}
+                  title={me ? "إنهاء جلساتك كلها" : `إنهاء جلسات ${u.name ?? u.email}`}
                   consequence={me
-                    ? "تخرج من هذا الجهاز ومن كلّ جهازٍ دخلتَ منه، ثمّ تدخل من جديد بجوجل. نافعٌ إن ضاع جهازٌ أو بقيتَ داخلاً على جهازٍ مشترك."
-                    : "يخرج من كلّ أجهزته الآن، ويدخل من جديد بجوجل إن بقي حسابُه مفعَّلاً."}
-                  acknowledgement={me ? "أعرف أنّي سأدخل من جديد" : "أعرف أنّه سيُخرَج الآن"}
+                    ? "ستخرج من هذا الجهاز ومن كل جهاز دخلت منه، ثم تسجّل الدخول من جديد بحساب جوجل. هذا مفيد إن ضاع جهاز أو بقيت مسجّلاً الدخول على جهاز مشترك."
+                    : "سيخرج من كل أجهزته الآن، ويمكنه تسجيل الدخول من جديد بحساب جوجل إن بقي حسابه مفعّلاً."}
+                  acknowledgement={me ? "أعرف أنني سأسجّل الدخول من جديد" : "أعرف أنه سيخرج الآن"}
                   confirmLabel="أنهِ الجلسات"
                   tone="warn"
                   variant="secondary"
                   disabled={working}
-                  onConfirm={() => send(u.id, { action: "end-sessions" }, "لم تُنهَ الجلسات")}
+                  onConfirm={() => send(u.id, { action: "end-sessions" }, "تعذّر إنهاء الجلسات")}
                 />
               )}
 
               {!me && (u.isActive ? (
                 <ConfirmAction
                   label="عطّل حسابه"
-                  title={`تعطيلُ ${u.name ?? u.email}`}
-                  consequence="يُخرَج من كلّ أجهزته الآن ولا يدخل حتى تُعيد تفعيلَه. ما كتبه يبقى باسمه في سجلّ التدقيق."
-                  acknowledgement="أعرف أنّه لن يدخل حتى أُعيد تفعيلَه"
-                  confirmLabel="عطّله"
+                  title={`تعطيل ${u.name ?? u.email}`}
+                  consequence="سيخرج من كل أجهزته الآن ولن يتمكن من الدخول حتى تعيد تفعيل حسابه. ما سجّله من عمليات يبقى باسمه في سجلّ التدقيق."
+                  acknowledgement="أعرف أنه لن يدخل حتى أعيد تفعيله"
+                  confirmLabel="عطّل الحساب"
                   disabled={working}
-                  onConfirm={() => send(u.id, { action: "active", active: false }, "لم يُعطَّل الحساب")}
+                  onConfirm={() => send(u.id, { action: "active", active: false }, "تعذّر تعطيل الحساب")}
                 />
               ) : (
                 <button
@@ -131,9 +131,9 @@ export function UserAdmin({ users, meId }: { users: UserAdminItem[]; meId: strin
                   disabled={working}
                   aria-busy={working}
                   className={buttonClass("secondary", "sm")}
-                  onClick={() => void send(u.id, { action: "active", active: true }, "لم يُفعَّل الحساب")}
+                  onClick={() => void send(u.id, { action: "active", active: true }, "تعذّر تفعيل الحساب")}
                 >
-                  أعِد تفعيلَه
+                  أعد تفعيله
                 </button>
               ))}
             </div>

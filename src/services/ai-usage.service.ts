@@ -35,7 +35,7 @@ export async function recordAiUsage(entry: AiUsageEntry): Promise<void> {
       costMicroUsd: toMicroUsd(entry.estimatedCostUsd),
     });
   } catch (e) {
-    console.warn("[ai-usage] لم يُقيَّد النداء في الدفتر:", (e as Error).message.slice(0, 120));
+    console.warn("[ai-usage] تعذّر تسجيل الاستدعاء في السجل:", (e as Error).message.slice(0, 120));
   }
 }
 

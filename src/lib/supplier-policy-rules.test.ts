@@ -10,23 +10,23 @@ const base: DocumentPolicy = {
 };
 
 describe("من يحتاج عقد توريد", () => {
-  it("من لا يصدر فواتير ولا عقدَ عندنا", () => {
+  it("من لا يصدر فواتير ولا عقد عندنا", () => {
     expect(needsContract(base)).toBe(true);
   });
 
-  it("ومن يصدر فواتير ضريبية لا يُطلَب منه عقد", () => {
+  it("ومن يصدر فواتير ضريبية لا يطلب منه عقد", () => {
     expect(needsContract({ ...base, issuesInvoices: true })).toBe(false);
   });
 
-  it("ومن عقدُه عندنا استوفى", () => {
+  it("ومن عقده عندنا استوفى", () => {
     expect(needsContract({ ...base, contractOnFile: true })).toBe(false);
   });
 
-  it("ومن أُعلن أنّه لا يُطلَب منه عقد يخرج — وهو قرارُ صاحب العمل", () => {
+  it("ومن أعلن أنّه لا يطلب منه عقد يخرج — وهو قرار صاحب العمل", () => {
     expect(needsContract({ ...base, contractRequired: false })).toBe(false);
   });
 
-  it("ومن فواتيرُه ورقيّة مطلبُه رفعُ الورقة لا عقدٌ", () => {
+  it("ومن فواتيره ورقيّة مطلبه رفع الورقة لا عقد", () => {
     expect(needsContract({ ...base, paperInvoices: true })).toBe(false);
     expect(needsPaperUpload({ ...base, paperInvoices: true })).toBe(true);
   });
@@ -38,7 +38,7 @@ describe("من يحتاج عقد توريد", () => {
   شاشةٍ بدل استدعاء القاعدة — لأنّ المترجم لا يرى النسخة، ولا يرميها
   التشغيل، ولا تظهر إلّا عدداً يناقض عدداً.
 */
-describe("لا نسخةَ ثانية من الشرط", () => {
+describe("لا نسخة ثانية من الشرط", () => {
   const FILES = [
     "src/app/(app)/suppliers/page.tsx",
     "src/app/(app)/upload/page.tsx",
@@ -64,10 +64,10 @@ describe("لا نسخةَ ثانية من الشرط", () => {
   النقيّة، وإنّما تراه صفحةُ عطبٍ حمراء في وجه صاحب المقهى. وقع فعلاً:
   `from suppliers s` مع الحقن.
 */
-describe("الحقنُ لا يُلقَّب جدولُه", () => {
+describe("الحقن لا يلقّب جدوله", () => {
   const FILES = ["src/lib/attention-facts.ts"];
   for (const f of FILES) {
-    it(`${f} لا يُلقّب suppliers حيث يحقن القاعدة`, () => {
+    it(`${f} لا يلقّب suppliers حيث يحقن القاعدة`, () => {
       const src = readFileSync(f, "utf8");
       if (!src.includes("needsContractSql()")) return;
       /* اللقبُ كلمةٌ بعد الجدول ليست من كلمات SQL التالية له */

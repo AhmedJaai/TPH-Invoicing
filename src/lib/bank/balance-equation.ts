@@ -73,10 +73,10 @@ export function checkBalance(input: BalanceInput): BalanceResult {
       differenceMinor: null,
       reason:
         input.openingMinor === null && input.closingMinor === null
-          ? "الكشف لا يحمل رصيداً افتتاحياً ولا ختامياً — لا تُفحَص المعادلة"
+          ? "الكشف لا يحمل رصيداً افتتاحياً ولا ختامياً، فلا يمكن فحص المعادلة"
           : input.openingMinor === null
-            ? "الرصيد الافتتاحي غير معروف — والصفر ليس بديلاً عنه"
-            : "الرصيد الختامي غير معروف — والصفر ليس بديلاً عنه",
+            ? "الرصيد الافتتاحي غير معروف، وليس صفراً"
+            : "الرصيد الختامي غير معروف، وليس صفراً",
     };
   }
 
@@ -89,7 +89,7 @@ export function checkBalance(input: BalanceInput): BalanceResult {
       status: "BALANCED",
       computedClosingMinor: computed,
       differenceMinor: 0,
-      reason: "الافتتاحي والحركات يعطيان الختامي بالضبط",
+      reason: "الرصيد الافتتاحي مع الحركات يساوي الرصيد الختامي تماماً",
     };
   }
 
@@ -98,7 +98,7 @@ export function checkBalance(input: BalanceInput): BalanceResult {
       status: "WITHIN_TOLERANCE",
       computedClosingMinor: computed,
       differenceMinor: difference,
-      reason: `فرق ${abs} هللة — كسرُ تصديرٍ لا نقصُ حركة`,
+      reason: `الفرق ${abs} هللة، وهو فرق تقريب في ملف الكشف وليس نقصاً في الحركات`,
     };
   }
 
@@ -108,8 +108,8 @@ export function checkBalance(input: BalanceInput): BalanceResult {
     differenceMinor: difference,
     reason:
       difference > 0
-        ? `البنك يقول رصيداً أعلى بـ${riyals(abs)} — حركاتٌ واردة لم تُقرأ`
-        : `البنك يقول رصيداً أقلّ بـ${riyals(abs)} — حركاتٌ صادرة لم تُقرأ`,
+        ? `رصيد البنك أعلى بمقدار ${riyals(abs)}: توجد حركات واردة لم تُقرأ`
+        : `رصيد البنك أقل بمقدار ${riyals(abs)}: توجد حركات صادرة لم تُقرأ`,
   };
 }
 
@@ -187,9 +187,9 @@ function riyals(minor: number): string {
 /** جملةٌ عربية تصف الحال — تُعرَض كما هي. */
 export function describeReconciliation(r: AccountReconciliation): string {
   if (r.balance.status === "UNKNOWN") {
-    return `${r.explainedCount} من ${countNoun(r.totalCount, TRANSACTION)} مفسَّرة — والمعادلة لا تُفحَص: ${r.balance.reason}`;
+    return `${r.explainedCount} من ${countNoun(r.totalCount, TRANSACTION)} مفسَّرة، ولا يمكن فحص المعادلة: ${r.balance.reason}`;
   }
-  if (r.reconciled) return `الحساب مسوّى: ${r.totalCount} حركة، والمعادلة صحيحة`;
+  if (r.reconciled) return `الحساب مطابق: ${r.totalCount} حركة، والمعادلة صحيحة`;
   if (r.balance.status === "UNEXPLAINED") return r.balance.reason;
-  return `${countNoun(r.unexplainedCount, TRANSACTION)} بلا تفسير، قيمتها ${riyals(r.unexplainedMinor)}`;
+  return `${countNoun(r.unexplainedCount, TRANSACTION)} غير مفسَّرة، قيمتها ${riyals(r.unexplainedMinor)}`;
 }

@@ -16,7 +16,7 @@ import { formatRiyalsDisplay } from "@/lib/money";
 export const runtime = "nodejs";
 
 const Body = z.object({
-  month: z.string().regex(/^\d{4}-\d{2}$/, "شهر غير صالح"),
+  month: z.string().regex(/^\d{4}-\d{2}$/, "الشهر غير صالح"),
   invoiceIds: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)).min(1, "حدّد الفواتير").max(50),
   action: z.enum(["include", "restore"]),
   /** لِمَ تُدفَع وهي محجوزة — يُحفَظ مع القرار ويُعرَض بجانبه. */
@@ -43,13 +43,13 @@ export async function POST(request: Request) {
       return NextResponse.json({
         ok: true,
         restored: numbers.length,
-        message: numbers.length === 0 ? "لم تكن في الدفعة بقرار — لا شيء تغيّر" : `أُعيدت ${countNoun(numbers.length, INVOICE)} إلى الحجز`,
+        message: numbers.length === 0 ? "لم تكن هذه الفواتير ضمن الدفعة بقرارك، ولم يتغيّر شيء" : `أُعيدت ${countNoun(numbers.length, INVOICE)} إلى المحجوزة`,
       });
     }
 
     const note = read.body.note ?? "";
     if (note.length < 3) {
-      return NextResponse.json({ error: "اكتب سبباً — يُحفَظ مع قرارك ويُعرَض بجانبه" }, { status: 400 });
+      return NextResponse.json({ error: "اكتب السبب. يُحفظ مع قرارك ويظهر بجانبه." }, { status: 400 });
     }
     const out = await overrideHolds({ invoiceIds, note, actorId: user.id, month });
     return NextResponse.json({
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       openMinor: out.openMinor,
       vatAtRiskMinor: out.vatAtRiskMinor,
       vatAtRiskUnknown: out.vatAtRiskUnknown,
-      message: `دخلت ${countNoun(out.invoiceNumbers.length, INVOICE)} الدفعةَ بقرارك — ${formatRiyalsDisplay(out.openMinor)} ريال`,
+      message: `أُدخلت ${countNoun(out.invoiceNumbers.length, INVOICE)} في الدفعة بقرارك، بمبلغ ${formatRiyalsDisplay(out.openMinor)} ريال`,
     });
   } catch (e) {
     if (e instanceof HoldDecisionError) {

@@ -69,7 +69,7 @@ export function autoRecordRefusal(input: {
     فاتورةُ بيعٍ مشترياتٍ بـ١٬١٠٠ ريال.
   */
   if (!input.recorded.some((r) => r.supplierId === input.supplier.id)) {
-    return [`${input.supplier.nameAr}: لم تُقيَّد له فاتورةٌ من قبل — أوّلُ فاتورةٍ من مورّدٍ جديد تُقيَّد بيدك`];
+    return [`${input.supplier.nameAr}: لم تُسجَّل له فاتورة من قبل. أول فاتورة من مورّد جديد تُسجَّل يدوياً`];
   }
   const twin = findInvoiceTwin(input.recorded, {
     supplierId: input.supplier.id, invoiceNumber: input.invoiceNumber, invoiceDate: input.invoiceDate, totalMinor: input.totalMinor,
@@ -80,6 +80,6 @@ export function autoRecordRefusal(input: {
 /** الجملةُ التي تُقال تحت المستند حين يُترك لأنّه يشبه مقيَّداً. */
 export function twinReason(t: InvoiceTwin): string {
   return t.kind === "same-number"
-    ? `نسخةٌ من فاتورة ${t.invoice.invoiceNumber} المقيَّدة — تُرفض لا تُقيَّد`
-    : `يشبه فاتورة ${t.invoice.invoiceNumber} المقيَّدة (اليومُ والمبلغ نفسهما) — افتحه وقرّر`;
+    ? `نسخة من الفاتورة ${t.invoice.invoiceNumber} المسجّلة. ارفضها ولا تسجّلها`
+    : `يشبه الفاتورة ${t.invoice.invoiceNumber} المسجّلة (التاريخ والمبلغ نفسهما). افتحه وقرّر`;
 }

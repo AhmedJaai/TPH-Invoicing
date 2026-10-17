@@ -58,7 +58,7 @@ describe("ما ينفكّ إليه الملفّ قبل أن يُفكّ", () => {
   it("جدولٌ معقول يمرّ، وما ينفكّ إلى جيجابايتات يُردّ بسببه", () => {
     expect(zipBombReason(zipDeclaring([5_000_000, 20_000_000]))).toBeNull();
     const reason = zipBombReason(zipDeclaring([MAX_UNZIPPED_BYTES, 4_000_000_000]));
-    expect(reason).toMatch(/ينفكّ إلى/);
+    expect(reason).toMatch(/بعد فك ضغطه/);
   });
 
   it("وعددُ الأجزاء غير المعقول يُردّ", () => {

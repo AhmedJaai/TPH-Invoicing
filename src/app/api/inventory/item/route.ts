@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 
 const Body = z.object({
   action: z.enum(["retire", "restore"]).default("retire"),
-  productId: z.string().min(1, "لم يُحدَّد الصنف"),
+  productId: z.string().min(1, "لم تحدّد الصنف"),
 });
 
 export async function POST(request: Request) {
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   }
   const parsed = Body.safeParse(raw);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلبٌ غير مفهوم" }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلب غير مفهوم" }, { status: 400 });
   }
   const { action, productId } = parsed.data;
 
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     const gone = await retireStockItem(productId, user.id);
     return NextResponse.json({
       ok: true,
-      message: `أُخرج «${gone.name}» من الجرد — وبقي ما مضى كما حُسب.`,
+      message: `أُخرج «${gone.name}» من الجرد، وبقي ما مضى كما حُسب.`,
     });
   } catch (e) {
     /* «مستعمَلٌ في وصفة» خبرٌ عن الحال لا عطبٌ في الطلب */

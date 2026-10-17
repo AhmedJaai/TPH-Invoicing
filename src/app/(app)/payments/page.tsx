@@ -112,8 +112,8 @@ export default async function PaymentsPage({
       user={user}
       width="wide"
       title="دفعة الشهر"
-      eyebrow={`مستحقّات ${formatMonth(month)} وما تأخّر قبلها`}
-      intro="اختر من تحوِّل له هذه المرّة وأيَّ فواتيره وكم، وانظر ما يبقى عليك لكلٍّ بعدها، ثمّ نزّل ملفّ التحويلات أو سجّل السداد."
+      eyebrow={`مستحقات ${formatMonth(month)} وما تأخر قبلها`}
+      intro="اختر المورّدين الذين ستحوّل لهم هذه المرة، وفواتيرهم، والمبالغ. وانظر ما يبقى عليك لكل مورّد بعد الدفعة، ثم نزّل ملف التحويلات أو سجّل السداد."
     >
       <div className="mb-6">
         <LinkTabs
@@ -135,28 +135,28 @@ export default async function PaymentsPage({
         const covered = run.coveredByCredit.reduce((s, c) => s + c.creditAppliedMinor, 0);
         const vatUnknownOnly = run.vatAtRiskUnknown > 0 && run.vatAtRiskMinor === 0;
         const calm: string[] = [];
-        if (run.held.length === 0 && run.overridden.length === 0) calm.push("لا شيء محجوز");
-        if (run.vatAtRiskMinor === 0 && run.vatAtRiskUnknown === 0) calm.push("لا ضريبة مدخلاتٍ تضيع بهذه الدفعة");
-        if (covered === 0) calm.push("لا مورّد يغطّيه رصيدُك كلَّه");
+        if (run.held.length === 0 && run.overridden.length === 0) calm.push("لا توجد دفعات محجوزة");
+        if (run.vatAtRiskMinor === 0 && run.vatAtRiskUnknown === 0) calm.push("لا توجد ضريبة مدخلات ستضيع بهذه الدفعة");
+        if (covered === 0) calm.push("لا يوجد مورّد يغطي رصيدك مستحقاته كاملة");
         return (
           <>
             <StatGrid>
-              <Stat label="جاهزٌ للتحويل" icon={CircleCheck} minor={run.readyTotalMinor} tone="ok" sub={countNoun(run.ready.length, SUPPLIER)} />
+              <Stat label="جاهز للتحويل" icon={CircleCheck} minor={run.readyTotalMinor} tone="ok" sub={countNoun(run.ready.length, SUPPLIER)} />
               {run.held.length > 0 && (
-                <Stat label="محجوزٌ حتى تُعالَج" icon={PauseCircle} minor={run.heldTotalMinor} tone="warn" sub={countNoun(run.held.length, INVOICE)} />
+                <Stat label="محجوز حتى تعالجه" icon={PauseCircle} minor={run.heldTotalMinor} tone="warn" sub={countNoun(run.held.length, INVOICE)} />
               )}
               {(run.vatAtRiskMinor > 0 || run.vatAtRiskUnknown > 0) && (
                 <Stat
-                  label="ضريبةٌ معرّضة"
+                  label="ضريبة معرّضة للضياع"
                   icon={ShieldCheck}
                   value={vatUnknownOnly ? "غير معروف" : undefined}
                   minor={vatUnknownOnly ? undefined : run.vatAtRiskMinor}
                   tone={run.vatAtRiskMinor ? "danger" : undefined}
-                  sub={run.overridden.length > 0 && run.vatAtRiskUnknown === 0 ? `منها ما أدخلتَه في الدفعة بقرارك (${countNoun(run.overridden.length, INVOICE)})` : run.vatAtRiskUnknown > 0 ? `${run.vatAtRiskMinor > 0 ? "وأكثر: " : ""}${countNoun(run.vatAtRiskUnknown, INVOICE)} بلا ضريبةٍ مقروءة` : undefined}
+                  sub={run.overridden.length > 0 && run.vatAtRiskUnknown === 0 ? `منها ما أدخلته في الدفعة بقرار منك (${countNoun(run.overridden.length, INVOICE)})` : run.vatAtRiskUnknown > 0 ? `${run.vatAtRiskMinor > 0 ? "وأكثر من ذلك: " : ""}${countNoun(run.vatAtRiskUnknown, INVOICE)} لم تُقرأ ضريبتها` : undefined}
                 />
               )}
               {covered > 0 && (
-                <Stat label="يغطّيه رصيدُك عندهم" minor={covered} sub={countNoun(run.coveredByCredit.length, SUPPLIER)} />
+                <Stat label="يغطيه رصيدك عندهم" minor={covered} sub={countNoun(run.coveredByCredit.length, SUPPLIER)} />
               )}
             </StatGrid>
             <p className="mt-2">
@@ -174,8 +174,8 @@ export default async function PaymentsPage({
 
       {empty ? (
         <EmptyState
-          title={`لا مستحقّات في ${formatMonth(month)}`}
-          hint="إمّا سُدّد كلُّ شيء، أو لم تُرفع فواتيرُ الشهر بعد. انظر النقد القادم لما يستحقّ بعده."
+          title={`لا توجد مستحقات في ${formatMonth(month)}`}
+          hint="إما أنك سدّدت كل شيء، أو لم ترفع فواتير الشهر بعد. راجع «النقد القادم» لمعرفة ما يستحق بعد ذلك."
           action={<Link href="/cash" className="text-sm font-bold text-accent hover:underline">النقد القادم</Link>}
         />
       ) : (
@@ -187,12 +187,12 @@ export default async function PaymentsPage({
           )}
 
           {run.coveredByCredit.length > 0 && (
-            <Section title="يغطّيها رصيدُك عندهم" hint="دفعتَ لهؤلاء مالاً لم يُخصم بعد، ويكفي لفواتير الشهر كلّها — فلا تحوِّل لهم شيئاً.">
+            <Section title="يغطيها رصيدك عندهم" hint="دفعت لهؤلاء مبالغ لم تُخصم بعد، وتكفي لجميع فواتير الشهر، فلا تحوّل لهم شيئاً.">
               <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
                 {run.coveredByCredit.map((s) => (
                   <li key={s.supplierId} className="flex items-center justify-between gap-3 rounded-xl border border-ok/25 bg-ok-bg px-4 py-3 text-sm">
                     <span className="font-bold">{s.supplierName}</span>
-                    <span className="text-xs text-ink-soft">رصيدُك يغطّي <Money minor={s.creditAppliedMinor} /></span>
+                    <span className="text-xs text-ink-soft">رصيدك يغطي <Money minor={s.creditAppliedMinor} /></span>
                   </li>
                 ))}
               </ul>
@@ -200,7 +200,7 @@ export default async function PaymentsPage({
           )}
 
           {run.held.length > 0 && (
-            <Section title="محجوزٌ حتى تُعالَج" count={run.held.length} hint="لا يدخل ملفّ التحويلات ما لم تُدخله أنت. اطلب الفاتورة الصحيحة قبل السداد — والرسالةُ جاهزة.">
+            <Section title="محجوز حتى تعالجه" count={run.held.length} hint="لا تدخل هذه الفواتير في ملف التحويلات إلا إذا أدخلتها بنفسك. اطلب الفاتورة الصحيحة قبل السداد، والرسالة جاهزة.">
               <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
                 {[...heldBySupplier].map(([supplierId, list]) => {
                   const name = list[0].invoice.supplierName;
@@ -249,16 +249,16 @@ export default async function PaymentsPage({
                       </div>
                       {!phone && (
                         <p className="mt-2 text-[11px] text-muted">
-                          لا رقمَ له عندنا — تختار الجهةَ في واتساب.{" "}
+                          لا يوجد رقم لهذا المورّد عندنا، فاختر جهة الاتصال داخل واتساب.{" "}
                           {slugBy.get(supplierId) && (
-                            <Link href={`/suppliers/${slugBy.get(supplierId)}`} className="font-bold text-accent hover:underline">أضف رقمه في ملفّه</Link>
+                            <Link href={`/suppliers/${slugBy.get(supplierId)}`} className="font-bold text-accent hover:underline">أضف رقمه في ملفه</Link>
                           )}
                         </p>
                       )}
                       {unconfirmed.length > 0 && (
                         <p className="mt-2 text-[11px] leading-relaxed text-muted">
                           {overridable.length > 0 ? `${countNoun(unconfirmed.length, INVOICE)} منها ` : ""}
-                          مستندُها لم يُؤكَّد — مبلغُها قرأه النظام ولم تره بعد، فافتحها وأكّدها لتدخل الدفعة:{" "}
+                          مستنداتها لم تُؤكَّد بعد. قرأ النظام مبالغها ولم تراجعها أنت، فافتحها وأكّدها لتدخل في الدفعة:{" "}
                           {unconfirmed.map((h, i) => (
                             <span key={h.invoice.invoiceId}>
                               {i > 0 && "، "}
@@ -277,8 +277,7 @@ export default async function PaymentsPage({
       )}
 
       <Callout tone="muted" className="mt-10">
-        الملفُّ يُبنى في الخادم ممّا اخترته ويُسجَّل تنزيلُه في سجلّ التدقيق. والإقرارُ بالسداد يُكتب باسمك — وحين يصل كشفُ البنك يطابق ما بقي.
-        لما يستحقّ بعد هذه الدفعة انظر <Link href="/cash" className="font-bold text-accent hover:underline">النقد القادم</Link>.
+        يُنشأ الملف مما اخترته، ويُسجَّل تنزيله في سجل التدقيق. وإقرار السداد يُسجَّل باسمك، وعند وصول كشف البنك تُطابَق الحوالات المتبقية. لمعرفة ما يستحق بعد هذه الدفعة راجع <Link href="/cash" className="font-bold text-accent hover:underline">النقد القادم</Link>.
       </Callout>
     </PageShell>
   );

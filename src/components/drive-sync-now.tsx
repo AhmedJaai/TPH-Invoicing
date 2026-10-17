@@ -62,9 +62,9 @@ interface Outcome {
 type Phase = "scan" | "read" | "tidy";
 
 const PHASE_LABEL: Record<Phase, string> = {
-  scan: "يفحص الدرايف…",
-  read: "يقرأ الجديد ويؤرشف ما تجتمع فيه الشروط…",
-  tidy: "يستدرك ما تراكم ويسمّي ما خرج عن الصيغة…",
+  scan: "جارٍ فحص الدرايف…",
+  read: "جارٍ قراءة الملفات الجديدة وأرشفة ما استوفى الشروط…",
+  tidy: "جارٍ استكمال ما تراكم وإعادة تسمية الملفات التي خرجت عن الصيغة…",
 };
 
 export function DriveSyncNow({
@@ -146,18 +146,18 @@ export function DriveSyncNow({
       setPhase(null);
       toast({
         tone: "ok",
-        title: "تمّت المزامنة",
+        title: "تمت المزامنة",
         body: o.newFiles === 0 && o.renamed.length === 0 && o.approved === 0
-          ? "لا جديد في الدرايف، وكلُّ ما أُرشِف على الصيغة."
+          ? "لا جديد في الدرايف، وكل ما أُرشف مسمّى على الصيغة المعتمدة."
           : [
               o.newFiles > 0 ? `وُجد ${countNoun(o.newFiles, FILE)}` : null,
-              o.autoArchived > 0 ? `أُرشِف ${countNoun(o.autoArchived, DOCUMENT)}` : null,
-              o.renamed.length > 0 ? `سُمّي ${countNoun(o.renamed.length, FILE)}` : null,
+              o.autoArchived > 0 ? `أُرشف ${countNoun(o.autoArchived, DOCUMENT)}` : null,
+              o.renamed.length > 0 ? `أُعيدت تسمية ${countNoun(o.renamed.length, FILE)}` : null,
             ].filter(Boolean).join(" · "),
       });
       router.refresh();
     } catch {
-      fail("تعذّر الاتصال بالخادم — لم يصل الطلب. تحقّق من الشبكة ثمّ أعد المحاولة.", 0);
+      fail("تعذّر الاتصال بالخادم ولم يصل الطلب. تحقق من الشبكة ثم أعد المحاولة.", 0);
     }
   }
 
@@ -171,7 +171,7 @@ export function DriveSyncNow({
             <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold text-muted">حالُ المزامنة</p>
+            <p className="text-[11px] font-bold text-muted">حالة المزامنة</p>
             <h2 id="sync-title" className={`mt-0.5 text-lg font-bold leading-snug ${tone.ink}`}>{headline}</h2>
             <p className="mt-1 text-xs leading-relaxed text-ink-soft">{detail}</p>
           </div>
@@ -181,7 +181,7 @@ export function DriveSyncNow({
           {canRun ? (
             <button type="button" onClick={() => void run()} disabled={busy} className={buttonClass("primary", "lg")}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden /> : <FolderSync className="h-4 w-4" strokeWidth={2} aria-hidden />}
-              {busy ? "يزامن…" : "زامن الآن"}
+              {busy ? "جارٍ المزامنة…" : "زامن الآن"}
             </button>
           ) : state === "disconnected" && reconnect ? (
             <form action={reconnect}>
@@ -191,7 +191,7 @@ export function DriveSyncNow({
             <button type="button" disabled className={buttonClass("secondary", "lg")}>زامن الآن</button>
           )}
           <p className="text-[11px] text-muted sm:text-end">
-            {canRun ? "فحصٌ وقراءةٌ وأرشفةٌ وتسمية — كما تفعل الآليّة." : state === "preview" ? "لا درايف في نسخة التجربة." : "يحتاج تفويضاً من جوجل أوّلاً."}
+            {canRun ? "تفحص الدرايف وتقرأ الملفات وتؤرشفها وتعيد تسميتها، كما تفعل المزامنة التلقائية." : state === "preview" ? "الدرايف غير متاح في النسخة التجريبية." : "يلزم أولاً السماح بالوصول من حساب جوجل."}
           </p>
         </div>
       </div>
@@ -212,7 +212,7 @@ export function DriveSyncNow({
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sunken">
             <div className="upload-bar h-full w-1/3 rounded-full bg-accent" />
           </div>
-          <p className="mt-1.5 text-[11px] text-muted">قد يستغرق دقيقةً أو أكثر إن وُجدت ملفّاتٌ تُقرأ بمحتواها. لا تغلق الصفحة.</p>
+          <p className="mt-1.5 text-[11px] text-muted">قد يستغرق دقيقة أو أكثر إذا وُجدت ملفات تحتاج إلى قراءة محتواها. لا تغلق الصفحة.</p>
         </div>
       )}
 
@@ -235,21 +235,21 @@ export function DriveSyncNow({
 
 function OutcomePanel({ o }: { o: Outcome }) {
   const rows: { label: string; value: string; href?: string; tone?: "ok" | "warn" }[] = [
-    { label: "ملفّاتٌ جديدة في الدرايف", value: o.newFiles === 0 ? "لا شيء" : countNoun(o.newFiles, FILE) },
-    { label: "أُرشِفت وحدها", value: String(o.autoArchived), tone: o.autoArchived > 0 ? "ok" : undefined },
+    { label: "ملفات جديدة في الدرايف", value: o.newFiles === 0 ? "لا شيء" : countNoun(o.newFiles, FILE) },
+    { label: "أُرشفت تلقائياً", value: String(o.autoArchived), tone: o.autoArchived > 0 ? "ok" : undefined },
     {
       label: "تنتظر مراجعتك",
       value: String(o.needsReview),
       href: o.needsReview > 0 ? "/documents?status=NEEDS_REVIEW" : undefined,
       tone: o.needsReview > 0 ? "warn" : undefined,
     },
-    { label: "اعتُمد ممّا تراكم", value: String(o.approved) },
-    { label: "سُمّيت على الصيغة", value: String(o.renamed.length), tone: o.renamed.length > 0 ? "ok" : undefined },
+    { label: "اعتُمد من المتراكم", value: String(o.approved) },
+    { label: "أُعيدت تسميتها", value: String(o.renamed.length), tone: o.renamed.length > 0 ? "ok" : undefined },
   ];
   return (
     <div className="mt-4 rounded-xl border border-line bg-sunken/50 p-4">
       <p className="flex items-center gap-2 text-[13px] font-bold text-ok">
-        <CircleCheck className="h-4 w-4" strokeWidth={2} aria-hidden /> تمّت المزامنة الآن
+        <CircleCheck className="h-4 w-4" strokeWidth={2} aria-hidden /> تمت المزامنة الآن
       </p>
       <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {rows.map((r) => (
@@ -263,11 +263,11 @@ function OutcomePanel({ o }: { o: Outcome }) {
       </dl>
       {o.remaining + o.remainingNamed > 0 && (
         <p className="mt-3 text-xs text-ink-soft">
-          وبقي {countNoun(o.remaining + o.remainingNamed, FILE)} لم يُسجَّل أو يُقرأ بعد — يُكمَل في المزامنة القادمة، أو اضغط «زامن الآن» ثانيةً.
+          وبقي {countNoun(o.remaining + o.remainingNamed, FILE)} لم يُسجَّل أو يُقرأ بعد. سيكتمل في المزامنة القادمة، أو اضغط «زامن الآن» مرة أخرى.
         </p>
       )}
       {o.failures > 0 && (
-        <p className="mt-2 text-xs text-warn">تعذّرت قراءة {countNoun(o.failures, FILE)} — تجدها في «المستندات» بسببها.</p>
+        <p className="mt-2 text-xs text-warn">تعذّرت قراءة {countNoun(o.failures, FILE)}. ستجدها في «المستندات» مع سبب التعذّر.</p>
       )}
       {o.renamed.length > 0 && (
         <ul className="mt-3 space-y-1.5 border-t border-line-soft pt-3">
@@ -277,7 +277,7 @@ function OutcomePanel({ o }: { o: Outcome }) {
               <span dir="ltr" className="block truncate text-end text-[11px] font-bold text-ink-soft">{n.to}</span>
             </li>
           ))}
-          {o.renamed.length > 6 && <li className="text-[11px] text-muted">و{countNoun(o.renamed.length - 6, FILE)} غيرها في سجلّ التدقيق.</li>}
+          {o.renamed.length > 6 && <li className="text-[11px] text-muted">و{countNoun(o.renamed.length - 6, FILE)} أخرى في سجل التدقيق.</li>}
         </ul>
       )}
     </div>

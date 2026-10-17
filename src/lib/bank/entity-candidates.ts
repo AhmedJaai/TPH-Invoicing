@@ -88,7 +88,7 @@ export function proposeEntities(
       score: Math.min(0.7, 0.3 + 0.1 * hits.length + boost),
       evidence: [
         `كلمة مشتركة: ${hits.join(" · ")}`,
-        `أُكّدت هذه الجهة ${k.confirmations} مرّة`,
+        `أُكّدت هذه الجهة سابقاً ${k.confirmations} مرّة`,
       ],
     });
   }
@@ -128,7 +128,7 @@ export function proposeEntities(
           من نسبتها إلى قائمة. ولا تُنشأ إلّا بإقرار.
         */
         score: MIN_CANDIDATE_SCORE + 0.05,
-        evidence: ["اسمٌ يظهر في الوصف ولا يطابق جهةً مسجّلة — قد تكون جديدة"],
+        evidence: ["اسم ظاهر في الوصف ولا يطابق جهة مسجّلة، وقد تكون جهة جديدة"],
       });
     }
   }

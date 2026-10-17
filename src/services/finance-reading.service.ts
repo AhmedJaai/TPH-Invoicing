@@ -59,56 +59,56 @@ export function buildMonthFacts(view: PnlView, earlier: readonly PnlView[], sale
   const previousWhole = previous !== null && whole(previous);
 
   /* ── اكتمالُ الشهر أوّلاً: النموذجُ يعرف ما ينقص قبل أن يقرأ رقماً ── */
-  f.note(`اسمُ رقم الربح في ${m}`, p.profitLabel);
-  f.note(`اكتمالُ ${m}`, p.complete ? "مكتمل: لا ينقصه عنصرٌ أساسيّ" : `غير مكتمل — ${p.gaps.map((g) => g.label).join(" · ") || "—"}`);
+  f.note(`اسم رقم الربح في ${m}`, p.profitLabel);
+  f.note(`اكتمال ${m}`, p.complete ? "مكتمل: لا ينقصه عنصر أساسيّ" : `غير مكتمل — ${p.gaps.map((g) => g.label).join(" · ") || "—"}`);
   f.sar(`${p.profitLabel} في ${m}`, p.profitMinor);
-  f.pct(`هامشُ «${p.profitLabel}» من الإيراد`, p.netMarginBp);
+  f.pct(`هامش «${p.profitLabel}» من الإيراد`, p.netMarginBp);
 
   /* ── الإيراد وما حرّكه ── */
   f.sar(`الإيراد بلا ضريبة في ${m}`, p.revenueMinor);
   if (!open) {
     f.sar(`الإيراد — ${baseline}`, average(three.map((v) => v.pnl.revenueMinor)));
-    if (previous && pm && previousWhole) f.pct(`تغيّرُ الإيراد عن ${pm}`, changeBp(p.revenueMinor, previous.pnl.revenueMinor));
-    if (previous && pm && !previousWhole) f.note(`${pm}`, `شهرٌ ناقصُ الأيّام (${previous.revenue?.expectedDays ?? 0} يوماً — شهرُ الافتتاح): لا يُقارَن به مجموعٌ، ولا يُقال «قفز» أو «هبط» عنه`);
+    if (previous && pm && previousWhole) f.pct(`تغيّر الإيراد عن ${pm}`, changeBp(p.revenueMinor, previous.pnl.revenueMinor));
+    if (previous && pm && !previousWhole) f.note(`${pm}`, `شهر ناقص الأيّام (${previous.revenue?.expectedDays ?? 0} يوماً — شهر الافتتاح): لا يقارن به مجموع، ولا يقال «قفز» أو «هبط» عنه`);
   }
   const rev = view.revenue;
   const prevRev = previous?.revenue ?? null;
   if (rev && rev.orders > 0) {
-    f.count(`عددُ الطلبات في ${m}`, rev.orders);
-    f.sar(`متوسّطُ الطلب في ${m} (شاملاً الضريبة)`, Math.round(rev.paidMinor / rev.orders));
+    f.count(`عدد الطلبات في ${m}`, rev.orders);
+    f.sar(`متوسّط الطلب في ${m} (شاملاً الضريبة)`, Math.round(rev.paidMinor / rev.orders));
     if (prevRev && prevRev.orders > 0 && pm && !open && previousWhole) {
       const prevTicket = Math.round(prevRev.paidMinor / prevRev.orders);
-      f.count(`عددُ الطلبات في ${pm}`, prevRev.orders);
-      f.sar(`متوسّطُ الطلب في ${pm}`, prevTicket);
+      f.count(`عدد الطلبات في ${pm}`, prevRev.orders);
+      f.sar(`متوسّط الطلب في ${pm}`, prevTicket);
       /* تفكيكُ تغيّر ما دفعه الزبائن: ما جاء من عدد الطلبات وما جاء من حجم الطلب */
       const fromOrders = (rev.orders - prevRev.orders) * prevTicket;
       const fromTicket = rev.paidMinor - prevRev.paidMinor - fromOrders;
-      f.sar(`أثرُ ${rev.orders >= prevRev.orders ? "زيادة" : "نقص"} عدد الطلبات على ما دفعه الزبائن عن ${pm}`, Math.abs(fromOrders));
-      f.sar(`أثرُ ${fromTicket >= 0 ? "كِبَر" : "صِغَر"} متوسّط الطلب على ما دفعه الزبائن عن ${pm}`, Math.abs(fromTicket));
+      f.sar(`أثر ${rev.orders >= prevRev.orders ? "زيادة" : "نقص"} عدد الطلبات على ما دفعه الزبائن عن ${pm}`, Math.abs(fromOrders));
+      f.sar(`أثر ${fromTicket >= 0 ? "كبر" : "صغر"} متوسّط الطلب على ما دفعه الزبائن عن ${pm}`, Math.abs(fromTicket));
     }
   }
   const busiest = [...sales.hours].sort((a, b) => b.paidMinor - a.paidMinor)[0];
   if (busiest) {
-    f.count("الساعةُ الأنشط في اليوم (بتوقيت ٢٤ ساعة)", busiest.hour);
-    f.sar("مبيعاتُ الساعة الأنشط في الشهر كلِّه", busiest.paidMinor);
+    f.count("الساعة الأنشط في اليوم (بتوقيت ٢٤ ساعة)", busiest.hour);
+    f.sar("مبيعات الساعة الأنشط في الشهر كلّه", busiest.paidMinor);
   }
-  f.sar("مبيعاتٌ نقديّة (لا تدخل البنك ولا يراها الكشف)", rev?.cashMinor ?? null);
+  f.sar("مبيعات نقديّة (لا تدخل البنك ولا يراها الكشف)", rev?.cashMinor ?? null);
 
   /* ── التكلفة والهامش ── */
-  f.note("طريقةُ تكلفة المبيعات", p.cogsMethod === "STOCK" ? "بالجرد: مشتريات + مخزونُ أوّل الشهر − مخزونُ آخره" : p.cogsMethod === "PURCHASES" ? "مشترياتُ الشهر — لا عدَّ يفصل المخزون، فليست تكلفةَ ما بِيع" : "غير معروفة");
-  f.sar(`تكلفةُ المبيعات في ${m}`, p.cogsMinor);
-  f.pct(`هامشُ مجمل الربح في ${m}`, p.grossMarginBp);
-  f.pct(`هامشُ مجمل الربح — ${baseline}`, average(three.map((v) => v.pnl.grossMarginBp)));
-  f.sar("الاستهلاكُ النظريّ من الوصفات (ما كان ينبغي أن يُصرَف)", view.input.cogs.theoreticalMinor);
+  f.note("طريقة تكلفة المبيعات", p.cogsMethod === "STOCK" ? "بالجرد: مشتريات + مخزون أوّل الشهر − مخزون آخره" : p.cogsMethod === "PURCHASES" ? "مشتريات الشهر — لا عدّ يفصل المخزون، فليست تكلفة ما بيع" : "غير معروفة");
+  f.sar(`تكلفة المبيعات في ${m}`, p.cogsMinor);
+  f.pct(`هامش مجمل الربح في ${m}`, p.grossMarginBp);
+  f.pct(`هامش مجمل الربح — ${baseline}`, average(three.map((v) => v.pnl.grossMarginBp)));
+  f.sar("الاستهلاك النظريّ من الوصفات (ما كان ينبغي أن يصرف)", view.input.cogs.theoreticalMinor);
   if (p.unexplainedMinor !== null) {
     f.sar(p.unexplainedMinor >= 0
-      ? "فرقٌ غير مفسَّر: خرج من الرفّ أكثر ممّا تفسّره الوصفات (هدرٌ لم يُسجَّل، وصفةٌ أصغر من الواقع، أو تسريب)"
-      : "خطأُ بيانات: الوصفاتُ تقول أكثر ممّا خرج من الرفّ (فاتورةُ شراءٍ لم تُقيَّد، أو وصفةٌ أكبر من الواقع، أو عدٌّ خاطئ)", Math.abs(p.unexplainedMinor));
+      ? "فرق غير مفسّر: خرج من الرفّ أكثر ممّا تفسّره الوصفات (هدر لم يسجّل، وصفة أصغر من الواقع، أو تسريب)"
+      : "خطأ بيانات: الوصفات تقول أكثر ممّا خرج من الرفّ (فاتورة شراء لم تقيّد، أو وصفة أكبر من الواقع، أو عدّ خاطئ)", Math.abs(p.unexplainedMinor));
     const before = average(three.map((v) => (v.pnl.unexplainedMinor === null ? null : Math.abs(v.pnl.unexplainedMinor))));
-    if (before !== null) f.sar(`حجمُ الفرق بين الجرد والوصفات — ${baseline}`, before);
+    if (before !== null) f.sar(`حجم الفرق بين الجرد والوصفات — ${baseline}`, before);
   }
-  f.sar("مشروباتُ الموظّفين بتكلفتها (استهلاكٌ بلا إيراد)", view.input.cogs.staffMinor);
-  f.sar("هدرٌ مسجَّل في سجلّ الهدر", view.input.cogs.wasteMinor);
+  f.sar("مشروبات الموظّفين بتكلفتها (استهلاك بلا إيراد)", view.input.cogs.staffMinor);
+  f.sar("هدر مسجّل في سجلّ الهدر", view.input.cogs.wasteMinor);
 
   /* ── المصروفات: كلُّ فئةٍ بجانب عادتها ── */
   for (const o of p.opexByCategory.filter((x) => x.amountMinor >= 100_00).slice(0, 6)) {
@@ -117,53 +117,53 @@ export function buildMonthFacts(view: PnlView, earlier: readonly PnlView[], sale
     if (usual !== null && !open) f.sar(`مصروف «${o.label}» — ${baseline}`, usual);
   }
   for (const gap of ["RENT", "SALARY"] as const) {
-    if (p.gaps.some((g) => g.id === gap)) f.note(`مصروف «${CATEGORY_LABEL[gap]}» في ${m}`, "غير معروف: لا شيءَ مقيَّدٌ في الكشف ولا بإقرار المالك — ليس صفراً");
+    if (p.gaps.some((g) => g.id === gap)) f.note(`مصروف «${CATEGORY_LABEL[gap]}» في ${m}`, "غير معروف: لا شيء مقيّد في الكشف ولا بإقرار المالك — ليس صفراً");
   }
-  f.sar(`مجموعُ المصروفات التشغيليّة المعروفة في ${m}`, p.opexMinor);
+  f.sar(`مجموع المصروفات التشغيليّة المعروفة في ${m}`, p.opexMinor);
 
   /* ── ما صعد وما هبط وما هامشُه ضعيف ── */
   if (!open && pm && previousWhole) {
     const movers = sales.items.filter((i) => i.previousSalesMinor !== null).map((i) => ({ ...i, delta: i.salesMinor - (i.previousSalesMinor ?? 0) }));
     for (const i of [...movers].filter((x) => x.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3)) {
-      f.sar(`صعدت مبيعاتُ «${i.name}» عن ${pm} بـ`, i.delta);
+      f.sar(`صعدت مبيعات «${i.name}» عن ${pm} بـ`, i.delta);
     }
     for (const i of [...movers].filter((x) => x.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3)) {
-      f.sar(`هبطت مبيعاتُ «${i.name}» عن ${pm} بـ`, -i.delta);
+      f.sar(`هبطت مبيعات «${i.name}» عن ${pm} بـ`, -i.delta);
     }
   }
   for (const item of sales.items.slice(0, 3)) {
-    f.sar(`مبيعاتُ «${item.name}» (من الأعلى مبيعاً)`, item.salesMinor);
-    if (item.marginBp !== null) f.pct(`هامشُ «${item.name}»`, item.marginBp);
+    f.sar(`مبيعات «${item.name}» (من الأعلى مبيعاً)`, item.salesMinor);
+    if (item.marginBp !== null) f.pct(`هامش «${item.name}»`, item.marginBp);
   }
   const weak = sales.items.filter((i) => i.marginBp !== null && i.salesMinor >= 100_000).sort((a, b) => (a.marginBp ?? 0) - (b.marginBp ?? 0)).slice(0, 3);
   for (const item of weak) {
-    f.pct(`هامشُ «${item.name}» (من أضعف الهوامش)`, item.marginBp);
-    f.sar(`مبيعاتُ «${item.name}» (ضعيف الهامش)`, item.salesMinor);
-    if (item.costMinor !== null) f.sar(`كلفةُ ما بِيع من «${item.name}»`, item.costMinor);
+    f.pct(`هامش «${item.name}» (من أضعف الهوامش)`, item.marginBp);
+    f.sar(`مبيعات «${item.name}» (ضعيف الهامش)`, item.salesMinor);
+    if (item.costMinor !== null) f.sar(`كلفة ما بيع من «${item.name}»`, item.costMinor);
   }
-  f.sar("خصوماتُ الطلبات", sales.leaks.discountMinor);
-  f.sar("ما رُدّ للزبائن", sales.leaks.refundsMinor);
+  f.sar("خصومات الطلبات", sales.leaks.discountMinor);
+  f.sar("ما ردّ للزبائن", sales.leaks.refundsMinor);
 
   /* ── المشترى مقابل المباع ── */
-  f.pct("تغطيةُ ربط بنود الفواتير بأصناف المخزون (دونها تبقى مشترياتُ الصنف «غير معروفة»)", flow.coverage.bp);
+  f.pct("تغطية ربط بنود الفواتير بأصناف المخزون (دونها تبقى مشتريات الصنف «غير معروفة»)", flow.coverage.bp);
   const byGap = flow.items
     .map((x) => ({ name: x.name, minor: x.unexplainedMinor ?? x.witnessUnexplainedMinor, witness: x.unexplainedMinor === null }))
     .filter((x): x is { name: string; minor: number; witness: boolean } => x.minor !== null && x.minor > 0)
     .sort((a, b) => b.minor - a.minor).slice(0, 4);
   for (const x of byGap) {
-    f.sar(`فرقٌ غير مفسَّر (نقص) في «${x.name}»${x.witness ? " — بمشتريات فودكس لا بفواتيرنا" : ""}`, x.minor);
+    f.sar(`فرق غير مفسّر (نقص) في «${x.name}»${x.witness ? " — بمشتريات فودكس لا بفواتيرنا" : ""}`, x.minor);
   }
 
   /* ── إجراءاتٌ متاحة: ما يقدر عليه صاحبُه في التطبيق الآن ── */
   for (const lump of actions.rentLumps.slice(0, 2)) {
-    f.sar(`إجراءٌ متاح — وزِّع على أشهرها دفعةَ إيجارٍ خرجت من الكشف يوم ${lump.day.slice(8, 10)}/${lump.day.slice(5, 7)} ولم يُقَل كم شهراً تغطّي (من «ما لا يراه الكشف»)`, lump.amountMinor);
+    f.sar(`إجراء متاح — وزّع على أشهرها دفعة إيجار خرجت من الكشف يوم ${lump.day.slice(8, 10)}/${lump.day.slice(5, 7)} ولم يقل كم شهراً تغطّي (من «ما لا يراه الكشف»)`, lump.amountMinor);
   }
   if (actions.readyLinks.count > 0) {
-    f.count("إجراءٌ متاح — عددُ بنود الفواتير الجاهزة للربط بضغطة (بدليل فودكس)", actions.readyLinks.count);
-    f.sar("قيمةُ مشتريات البنود الجاهزة للربط", actions.readyLinks.valueMinor);
-    f.pct("نسبةُ المربوط من قيمة المشتريات كلَّ الوقت بعد إقرار الجاهز", actions.readyLinks.afterBp);
+    f.count("إجراء متاح — عدد بنود الفواتير الجاهزة للربط بضغطة (بدليل فودكس)", actions.readyLinks.count);
+    f.sar("قيمة مشتريات البنود الجاهزة للربط", actions.readyLinks.valueMinor);
+    f.pct("نسبة المربوط من قيمة المشتريات كلّ الوقت بعد إقرار الجاهز", actions.readyLinks.afterBp);
   }
-  if (view.input.cogs.wasteMinor === 0) f.note("إجراءٌ متاح", "سجلُّ الهدر فارغٌ هذا الشهر: ما يُرمى ولا يُكتب يبقى داخل الفرق غير المفسَّر — يُسجَّل من «الجرد»");
+  if (view.input.cogs.wasteMinor === 0) f.note("إجراء متاح", "سجلّ الهدر فارغ هذا الشهر: ما يرمى ولا يكتب يبقى داخل الفرق غير المفسّر — يسجّل من «الجرد»");
   return f.facts;
 }
 
@@ -224,9 +224,9 @@ export type ReadingOutcome =
   | { ok: false; status: number; reason: string };
 
 export async function generateReading(month: string, actorId: string | null, deadlineMs = 45_000): Promise<ReadingOutcome> {
-  if (!isDeepseekConfigured()) return { ok: false, status: 503, reason: "مفتاحُ الذكاء غير مضبوط — الأرقامُ كاملةٌ دونه." };
+  if (!isDeepseekConfigured()) return { ok: false, status: 503, reason: "مفتاح الذكاء غير مضبوط. الأرقام تظهر كاملة بدونه." };
   const facts = await gatherFacts(month);
-  if (!facts.some((x) => x.kind === "SAR" && x.value !== null)) return { ok: false, status: 409, reason: "لا أرقامَ معروفةً لهذا الشهر تُقرأ." };
+  if (!facts.some((x) => x.kind === "SAR" && x.value !== null)) return { ok: false, status: 409, reason: "لا توجد أرقام معروفة لهذا الشهر لتُقرأ." };
 
   const { system, user } = buildReadingMessages(formatMonth(month).replace(/\s+\d{4}$/, ""), facts);
   /* محاولتان على الأكثر: جوابُ النموذج يتفاوت — مرّةً ثلاثُ جُمل ومرّةً عشر — فيُؤخَذ الأوفى */
@@ -242,14 +242,14 @@ export async function generateReading(month: string, actorId: string | null, dea
     if (!result.ok) {
       failure = {
         ok: false, status: result.kind === "NO_BALANCE" ? 402 : 502,
-        reason: result.kind === "NO_BALANCE" ? "رصيدُ حساب الذكاء نفد — يُشحَن ثمّ تُعاد القراءة." : result.truncated ? "انقطع جوابُ الذكاء قبل أن يكتمل — أعِد المحاولة." : `تعذّرت القراءة: ${result.reason}`,
+        reason: result.kind === "NO_BALANCE" ? "نفد رصيد حساب الذكاء. اشحن الرصيد ثم أعد القراءة." : result.truncated ? "انقطع جواب الذكاء قبل أن يكتمل. أعد المحاولة." : `تعذّرت القراءة: ${result.reason}`,
       };
       /* رصيدٌ نافد أو مفتاحٌ غائب لا تصلحه محاولةٌ ثانية */
       if (result.kind === "NO_BALANCE" || result.kind === "NOT_CONFIGURED") break;
       continue;
     }
     const json = parseJsonLoose(result.text);
-    if (!json.ok) { failure = { ok: false, status: 502, reason: "جوابُ الذكاء ليس JSON يُقرأ — أعِد المحاولة." }; continue; }
+    if (!json.ok) { failure = { ok: false, status: 502, reason: "جواب الذكاء ليس بصيغة صالحة للقراءة. أعد المحاولة." }; continue; }
     const reading = validateReading(json.value, facts);
     if (best === null || reading.sentences.length > best.reading.sentences.length) best = { reading, model: result.model };
     if (readingIsFull(reading)) break;
@@ -257,7 +257,7 @@ export async function generateReading(month: string, actorId: string | null, dea
   if (best === null) return failure ?? { ok: false, status: 502, reason: "تعذّرت القراءة." };
   const { reading, model } = best;
   if (reading.sentences.length === 0) {
-    return { ok: false, status: 502, reason: "لم تبقَ جملةٌ واحدة بعد التحقّق من أرقامها — لم تُحفَظ القراءة." };
+    return { ok: false, status: 502, reason: "لم تبقَ أي جملة بعد التحقق من أرقامها، فلم تُحفظ القراءة." };
   }
   const hash = factsHash(facts);
   const [row] = await db.insert(financeReadings)

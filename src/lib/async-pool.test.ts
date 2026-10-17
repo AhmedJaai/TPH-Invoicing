@@ -8,8 +8,8 @@ function deferred() {
 }
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
-describe("createLimiter — ثلاثةٌ معاً والباقي ينتظر دوره", () => {
-  it("لا يجري أكثر من الحدّ في لحظة، ويجري الكلُّ في النهاية", async () => {
+describe("createLimiter — ثلاثة معاً والباقي ينتظر دوره", () => {
+  it("لا يجري أكثر من الحدّ في لحظة، ويجري الكلّ في النهاية", async () => {
     const run = createLimiter(3);
     let active = 0;
     let peak = 0;
@@ -35,7 +35,7 @@ describe("createLimiter — ثلاثةٌ معاً والباقي ينتظر دو
     expect(order).toEqual([1, 2, 3, 4]);
   });
 
-  it("عملٌ يرمي لا يوقف الطابور — مكانُه يُخلى لمن بعده", async () => {
+  it("عمل يرمي لا يوقف الطابور — مكانه يخلى لمن بعده", async () => {
     const run = createLimiter(1);
     const first = run(async () => { throw new Error("تعثّر"); });
     const second = run(async () => "وصل");
@@ -43,7 +43,7 @@ describe("createLimiter — ثلاثةٌ معاً والباقي ينتظر دو
     await expect(second).resolves.toBe("وصل");
   });
 
-  it("حدٌّ غير صالح يصير واحداً لا صفراً يعلّق كلَّ شيء", async () => {
+  it("حدّ غير صالح يصير واحداً لا صفراً يعلّق كلّ شيء", async () => {
     const run = createLimiter(0);
     await expect(run(async () => 1)).resolves.toBe(1);
   });

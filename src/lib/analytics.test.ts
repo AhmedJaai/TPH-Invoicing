@@ -37,7 +37,7 @@ describe("حالة السداد", () => {
     expect(s.remainingMinor).toBe(8_000);
   });
 
-  it("تتسامح بهللة تقريب فلا تُظهر المسددة ناقصة", () => {
+  it("تتسامح بهللة تقريب فلا تظهر المسددة ناقصة", () => {
     expect(paymentStatus({ invoiceId: "i", totalMinor: 13_000, allocatedMinor: 12_999 }).state).toBe("PAID");
     expect(paymentStatus({ invoiceId: "i", totalMinor: 13_000, allocatedMinor: 13_001 }).state).toBe("PAID");
   });
@@ -72,7 +72,7 @@ describe("أعمار الذمم", () => {
     expect(rows[1].oldestDays).toBeGreaterThan(70);
   });
 
-  it("تتجاهل المسدَّد", () => {
+  it("تتجاهل المسدّد", () => {
     expect(buildAging([
       { supplierId: "s1", supplierName: "أ", invoiceDate: d("2026-08-20"), outstandingMinor: 0 },
     ], asOf)).toHaveLength(0);
@@ -166,7 +166,7 @@ describe("أسماء تتكرّر عند مورّدين", () => {
     line({ description: "حليب 2 لتر", invoiceDate: "2026-08-02", supplierId: "s2", supplierName: "ب", quantity: 100, unitPriceMinor: 800 }),
   ]);
 
-  it("تُعرض مرشّحةً بالأرخص والأغلى", () => {
+  it("تعرض مرشّحةً بالأرخص والأغلى", () => {
     const c = findSameNameCandidates(items);
     expect(c).toHaveLength(1);
     expect(c[0].cheaper.supplierName).toBe("ب");
@@ -175,12 +175,12 @@ describe("أسماء تتكرّر عند مورّدين", () => {
     expect(c[0].gapRatio).toBeCloseTo(0.25);
   });
 
-  it("لا تُقدَّر وفورات — تطابق الاسم لا يعني تطابق الصنف", () => {
+  it("لا تقدّر وفورات — تطابق الاسم لا يعني تطابق الصنف", () => {
     const c = findSameNameCandidates(items)[0] as unknown as Record<string, unknown>;
     expect(c.potentialSavingMinor).toBeUndefined();
   });
 
-  it("الفارق الطفيف لا يُعرض", () => {
+  it("الفارق الطفيف لا يعرض", () => {
     const near = summarizeItems([
       line({ description: "سكر", invoiceDate: "2026-08-01", supplierId: "s1", supplierName: "أ", unitPriceMinor: 1000 }),
       line({ description: "سكر", invoiceDate: "2026-08-02", supplierId: "s2", supplierName: "ب", unitPriceMinor: 980 }),
@@ -210,7 +210,7 @@ describe("ضريبة المدخلات المعرّضة", () => {
     expect(r.atRiskCount).toBe(2);
   });
 
-  it("ترتّب المعرّض بالأكبر ليُعالَج أولاً", () => {
+  it("ترتّب المعرّض بالأكبر ليعالج أولاً", () => {
     expect(vatAtRisk(rows).rows[0].vatMinor).toBe(3_000);
   });
 
@@ -234,7 +234,7 @@ describe("المصروف الشهري", () => {
   });
 });
 
-describe("تغيّر السعر يُقارَن داخل المورّد الواحد", () => {
+describe("تغيّر السعر يقارن داخل المورّد الواحد", () => {
   it("لا يعدّ الانتقال إلى مورّد أرخص انخفاضاً في السعر", () => {
     const items = summarizeItems([
       line({ description: "حليب 2 لتر", invoiceDate: "2026-07-01", supplierId: "s1", supplierName: "الغالي", unitPriceMinor: 1000 }),
@@ -268,7 +268,7 @@ describe("تغيّر السعر يُقارَن داخل المورّد الوا�
   });
 });
 
-describe("ضريبة معرّضة: المجهول لا يُحسب صفراً", () => {
+describe("ضريبة معرّضة: المجهول لا يحسب صفراً", () => {
   const row = (
     id: string,
     vatMinor: number | null,
@@ -278,7 +278,7 @@ describe("ضريبة معرّضة: المجهول لا يُحسب صفراً", (
     invoiceDate: new Date("2026-08-01T00:00:00Z"), vatMinor, inputVatStatus,
   });
 
-  it("المجهول يُعدّ على حدة ولا يدخل المعرّض", () => {
+  it("المجهول يعدّ على حدة ولا يدخل المعرّض", () => {
     const v = vatAtRisk([
       row("a", 1_500, "NOT_ELIGIBLE"),
       row("b", null, "UNKNOWN"),
@@ -291,24 +291,24 @@ describe("ضريبة معرّضة: المجهول لا يُحسب صفراً", (
     expect(v.recoverableMinor).toBe(2_000);
   });
 
-  it("كل الفواتير مجهولة ← معرّض صفر، لكن المجهول معلَن لا مخفيّ", () => {
+  it("كل الفواتير مجهولة ← معرّض صفر، لكن المجهول معلن لا مخفيّ", () => {
     const v = vatAtRisk([row("a", null, "UNKNOWN"), row("b", null, "UNKNOWN")]);
     expect(v.atRiskMinor).toBe(0);
     expect(v.unknownCount).toBe(2);
   });
 
-  it("الضريبة الصفرية على فاتورة غير صالحة لا تُعدّ معرّضة — لا شيء يُخسر", () => {
+  it("الضريبة الصفرية على فاتورة غير صالحة لا تعدّ معرّضة — لا شيء يخسر", () => {
     const v = vatAtRisk([row("a", 0, "NOT_ELIGIBLE")]);
     expect(v.atRiskCount).toBe(0);
   });
 
-  it("يرتّب المعرّض بالأكبر ليُعالَج أوّلاً", () => {
+  it("يرتّب المعرّض بالأكبر ليعالج أوّلاً", () => {
     const v = vatAtRisk([row("a", 500, "NOT_ELIGIBLE"), row("b", 9_000, "NOT_ELIGIBLE")]);
     expect(v.rows[0].invoiceNumber).toBe("b");
   });
 });
 
-describe("spendTrend — الشهر الجاري يُقارَن بمثله", () => {
+describe("spendTrend — الشهر الجاري يقارن بمثله", () => {
   const row = (periodMonth: string, day: number, totalMinor: number) => ({
     periodMonth,
     invoiceDate: new Date(Date.UTC(+periodMonth.slice(0, 4), +periodMonth.slice(5, 7) - 1, day)),
@@ -330,7 +330,7 @@ describe("spendTrend — الشهر الجاري يُقارَن بمثله", () 
     expect(t.pct).toBeCloseTo(-0.2, 5);
   });
 
-  it("الشهر التامّ يُقارَن بالشهر كلّه", () => {
+  it("الشهر التامّ يقارن بالشهر كلّه", () => {
     const rows = [
       row("2026-07", 3, 1000_00), row("2026-07", 25, 1000_00),
       row("2026-08", 5, 1000_00),
@@ -340,7 +340,7 @@ describe("spendTrend — الشهر الجاري يُقارَن بمثله", () 
     expect(t.pct).toBeCloseTo(-0.5, 5);
   });
 
-  it("بلا أساس لا نسبة — ولا يُخترَع صفر", () => {
+  it("بلا أساس لا نسبة — ولا يخترع صفر", () => {
     const rows = [row("2026-09", 2, 400_00)];
     expect(spendTrend(rows, new Date(Date.UTC(2026, 8, 6))).pct).toBeNull();
   });
@@ -352,17 +352,17 @@ describe("منحنى سعر الصنف", () => {
     invoiceDate: date ? new Date(`${date}T00:00:00Z`) : null, quantity: 1, unitPriceMinor, lineTotalMinor: unitPriceMinor,
   });
 
-  it("الأسعارُ بترتيب تواريخها، الأقدمُ أوّلاً — مهما كان ترتيبُ القراءة", () => {
+  it("الأسعار بترتيب تواريخها، الأقدم أوّلاً — مهما كان ترتيب القراءة", () => {
     const [item] = summarizeItems([row("2026-03-01", 700), row("2026-01-01", 500), row("2026-02-01", 600)]);
     expect(item.priceTrail).toEqual([500, 600, 700]);
   });
 
-  it("ما لا تاريخَ له لا يُوضَع في زمنٍ مخترَع", () => {
+  it("ما لا تاريخ له لا يوضع في زمن مخترع", () => {
     const [item] = summarizeItems([row("2026-01-01", 500), row(null, 999), row("2026-02-01", 600)]);
     expect(item.priceTrail).toEqual([500, 600]);
   });
 
-  it("يومٌ واحد نقطةٌ واحدة، والمنحنى آخرُ اثنتي عشرة", () => {
+  it("يوم واحد نقطة واحدة، والمنحنى آخر اثنتي عشرة", () => {
     const rows = Array.from({ length: 15 }, (_, i) => row(`2026-01-${String(i + 1).padStart(2, "0")}`, 100 + i));
     const [item] = summarizeItems([...rows, row("2026-01-15", 999)]);
     expect(item.priceTrail).toHaveLength(12);

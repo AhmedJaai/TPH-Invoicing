@@ -6,8 +6,8 @@ const credit = (amountMinor: number, description: string) => ({
   description, reference: null,
 });
 
-describe("حسابُ المورّد — ما نعرفه مقابل ما يقول", () => {
-  it("بلا كشفٍ لا مقارنة — والمجهول لا يصير صفراً", () => {
+describe("حساب المورّد — ما نعرفه مقابل ما يقول", () => {
+  it("بلا كشف لا مقارنة — والمجهول لا يصير صفراً", () => {
     const a = buildSupplierAccount({ billedMinor: 5_000_00, paidMinor: 2_000_00 });
     expect(a.knownBalanceMinor).toBe(3_000_00);
     expect(a.reportedBalanceMinor).toBeNull();
@@ -23,14 +23,14 @@ describe("حسابُ المورّد — ما نعرفه مقابل ما يقول
     expect(a.differenceMinor).toBe(0);
   });
 
-  it("ويُتسامح بريال — المورّد يُسقط الكسور", () => {
+  it("ويتسامح بريال — المورّد يسقط الكسور", () => {
     const a = buildSupplierAccount({
       billedMinor: 5_000_00, paidMinor: 2_000_00, reportedBalanceMinor: 3_000_60,
     });
     expect(a.status).toBe("AGREED");
   });
 
-  it("يطالب بأكثر ← الفرق موجب ويُفسَّر", () => {
+  it("يطالب بأكثر ← الفرق موجب ويفسّر", () => {
     const a = buildSupplierAccount({
       billedMinor: 5_000_00, paidMinor: 2_000_00, reportedBalanceMinor: 4_000_00,
     });
@@ -44,10 +44,10 @@ describe("حسابُ المورّد — ما نعرفه مقابل ما يقول
       billedMinor: 5_000_00, paidMinor: 2_000_00, reportedBalanceMinor: 1_000_00,
     });
     expect(a.differenceMinor).toBe(-2_000_00);
-    expect(describeAccount(a)).toContain("نعرف أكثر");
+    expect(describeAccount(a)).toContain("ما عندنا أكثر");
   });
 
-  it("الإشعار الدائن يخفض المستحقّ ولا يُعدّ سداداً", () => {
+  it("الإشعار الدائن يخفض المستحقّ ولا يعدّ سداداً", () => {
     const a = buildSupplierAccount({
       billedMinor: 5_000_00,
       paidMinor: 0,
@@ -70,7 +70,7 @@ describe("حسابُ المورّد — ما نعرفه مقابل ما يقول
     expect(a.knownBalanceMinor).toBe(5_000_00);
   });
 
-  it("الرصيد السالب خبرٌ لا يُصفَّر — دفعنا أكثر ممّا فوتر", () => {
+  it("الرصيد السالب خبر لا يصفّر — دفعنا أكثر ممّا فوتر", () => {
     const a = buildSupplierAccount({
       billedMinor: 1_000_00, paidMinor: 3_000_00, reportedBalanceMinor: -2_000_00,
     });
@@ -96,14 +96,14 @@ describe("حسابُ المورّد — ما نعرفه مقابل ما يقول
    عندنا غيابُ علمٍ لا غيابُ دَين.
    ═══════════════════════════════════════════════════════════════ */
 describe("لا فاتورة ولا كشف ← مجهول لا صفر", () => {
-  it("بلا شيءٍ أصلاً ← UNKNOWN و`null`", () => {
+  it("بلا شيء أصلاً ← UNKNOWN و`null`", () => {
     const a = buildSupplierAccount({ billedMinor: 0, paidMinor: 0 });
     expect(a.knownBalanceMinor).toBeNull();
     expect(a.status).toBe("UNKNOWN");
-    expect(describeAccount(a)).toContain("مجهول");
+    expect(describeAccount(a)).toContain("غير معروف");
   });
 
-  it("وكشفٌ وصل بلا فاتورةٍ عندنا ← لا يُقارَن", () => {
+  it("وكشف وصل بلا فاتورة عندنا ← لا يقارن", () => {
     const a = buildSupplierAccount({
       billedMinor: 0, paidMinor: 0, reportedBalanceMinor: 3_000_00,
     });
@@ -112,13 +112,13 @@ describe("لا فاتورة ولا كشف ← مجهول لا صفر", () => {
     expect(a.status).toBe("NO_STATEMENT");
   });
 
-  it("وفاتورةٌ مسدَّدة بالكامل ← صفرٌ حقيقيّ لا مجهول", () => {
+  it("وفاتورة مسدّدة بالكامل ← صفر حقيقيّ لا مجهول", () => {
     const a = buildSupplierAccount({ billedMinor: 3_000_00, paidMinor: 3_000_00 });
     expect(a.knownBalanceMinor).toBe(0);
     expect(a.status).toBe("NO_STATEMENT");
   });
 
-  it("وسدادٌ بلا فاتورة ← معلومٌ سالب لا مجهول", () => {
+  it("وسداد بلا فاتورة ← معلوم سالب لا مجهول", () => {
     const a = buildSupplierAccount({ billedMinor: 0, paidMinor: 500_00 });
     expect(a.knownBalanceMinor).toBe(-500_00);
     expect(a.status).not.toBe("UNKNOWN");
@@ -153,25 +153,25 @@ describe("الكوب الذهبي: الفرق ليس فاتورةً غائبة",
     expect(a.status).toBe("DIFFERS");
   });
 
-  it("رصيدُ كشفه فاتورةٌ عندنا — فلا يُكتب «لم تصلنا»", () => {
+  it("رصيد كشفه فاتورة عندنا — فلا يكتب «لم تصلنا»", () => {
     const a = golden();
     expect(a.explanation).toEqual({ kind: "INVOICE_ON_FILE", invoiceNumber: "INV264916" });
     expect(describeAccount(a)).not.toContain("لم تصلنا");
     expect(describeAccount(a)).toContain("INV264916");
   });
 
-  it("وإن ساوى الفرقُ ما خُصّص بعد الكشف فهو ترتيبُ تخصيص", () => {
+  it("وإن ساوى الفرق ما خصّص بعد الكشف فهو ترتيب تخصيص", () => {
     const a = buildSupplierAccount({
       billedMinor: 1_350_675, paidMinor: 765_237,
       reportedBalanceMinor: 585_438 + 585_438,
       allocatedAfterStatementMinor: 585_438,
     });
     expect(a.explanation).toEqual({ kind: "ALLOCATED_AFTER_STATEMENT" });
-    expect(describeAccount(a)).toContain("ترتيبُ تخصيص");
+    expect(describeAccount(a)).toContain("ترتيب التوزيع");
     expect(describeAccount(a)).not.toContain("لم تصلنا");
   });
 
-  it("وبلا تفسيرٍ يُثبَت يبقى الاحتمال مكتوباً", () => {
+  it("وبلا تفسير يثبت يبقى الاحتمال مكتوباً", () => {
     const a = buildSupplierAccount({
       billedMinor: 5_000_00, paidMinor: 2_000_00, reportedBalanceMinor: 4_000_00,
       allocatedAfterStatementMinor: 300_00,
@@ -181,7 +181,7 @@ describe("الكوب الذهبي: الفرق ليس فاتورةً غائبة",
     expect(describeAccount(a)).toContain("لم تصلنا");
   });
 
-  it("وبلا كشفٍ لا يُحسَب ما بعده — مجهول لا صفر", () => {
+  it("وبلا كشف لا يحسب ما بعده — مجهول لا صفر", () => {
     const a = buildSupplierAccount({ billedMinor: 5_000_00, paidMinor: 2_000_00 });
     expect(a.allocatedAfterStatementMinor).toBeNull();
     expect(a.explanation).toBeNull();

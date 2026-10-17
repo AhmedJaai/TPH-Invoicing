@@ -130,7 +130,7 @@ export interface ComparisonVerdict {
 
 export function canCompare(a: Comparable, b: Comparable): ComparisonVerdict {
   if (a.unitPriceMinor === null || b.unitPriceMinor === null) {
-    return { comparable: false, reason: "سعر الوحدة غير معروف لأحدهما — ولا يُفترَض" };
+    return { comparable: false, reason: "سعر الوحدة غير معروف لأحدهما، ولا يمكن افتراضه" };
   }
   if (a.baseUnit === null || b.baseUnit === null) {
     return { comparable: false, reason: "وحدة القياس غير معروفة لأحدهما" };
@@ -138,10 +138,10 @@ export function canCompare(a: Comparable, b: Comparable): ComparisonVerdict {
   if (a.baseUnit !== b.baseUnit && !sameFamily(a.baseUnit, b.baseUnit)) {
     return {
       comparable: false,
-      reason: `${UNIT_LABEL[a.baseUnit]} لا يُقارَن بـ${UNIT_LABEL[b.baseUnit]} — عائلتان مختلفتان`,
+      reason: `${UNIT_LABEL[a.baseUnit]} لا يقارن بـ${UNIT_LABEL[b.baseUnit]}، فهما من نوعين مختلفين`,
     };
   }
-  return { comparable: true, reason: "الوحدتان من عائلةٍ واحدة" };
+  return { comparable: true, reason: "الوحدتان من النوع نفسه" };
 }
 
 /* ───────────────────── الوحدة كما تُخزَّن في القاعدة ───────────────────── */

@@ -89,7 +89,7 @@ export async function overrideHolds(
       .where(inArray(invoices.id, ids))
       .orderBy(invoices.invoiceDate, invoices.id)
       .for("update");
-    if (rows.length !== ids.length) throw new HoldDecisionError("فاتورةٌ ممّا اخترته غير موجودة — حدّث الصفحة", 400);
+    if (rows.length !== ids.length) throw new HoldDecisionError("إحدى الفواتير التي اخترتها غير موجودة. حدّث الصفحة", 400);
 
     const allocated = new Map(
       (await t
@@ -112,10 +112,10 @@ export async function overrideHolds(
     for (const r of rows) {
       const openMinor = r.totalMinor - (allocated.get(r.id) ?? 0);
       if (openMinor <= SETTLED_TOLERANCE_MINOR) {
-        throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} سُدّدت — لا شيء يُدخَل. حدّث الصفحة`);
+        throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} سُدّدت بالكامل، فلا شيء يدخل في الدفعة. حدّث الصفحة`);
       }
       if (r.periodMonth > input.month) {
-        throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} ليست من مستحقّات هذه الدفعة`, 400);
+        throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} ليست من مستحقات هذه الدفعة`, 400);
       }
       const reason = holdReasonOf({
         needsReview: r.documentId !== null && unconfirmed.has(r.documentId),
@@ -123,10 +123,10 @@ export async function overrideHolds(
         inputVatStatus: r.inputVatStatus,
       });
       if (reason === null) {
-        throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} لم تعد محجوزة — هي في الجاهز. حدّث الصفحة`);
+        throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} لم تعد محجوزة وهي الآن ضمن الجاهز. حدّث الصفحة`);
       }
       if (!isOverridableHold(reason)) {
-        throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} مستندُها لم يُؤكَّد — افتحه وأكّده، فمبلغُها لم يره إنسانٌ بعد`);
+        throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} لم يُؤكَّد مستندها. افتحه وأكّده، فلم يراجع أحد مبلغها بعد`);
       }
       decided.push({ id: r.id, invoiceNumber: r.invoiceNumber, reason, openMinor, vatMinor: r.vatMinor });
     }
@@ -185,7 +185,7 @@ export async function restoreHolds(input: { invoiceIds: readonly string[]; actor
       entityType: "payment_run",
       entityId: input.month,
       before: { سبب_القرار: [...new Set(removed.map((r) => r.note))] },
-      after: { الفواتير: numbers, الحال: "أُعيدت إلى الحجز" },
+      after: { الفواتير: numbers, الحال: "أعيدت إلى الحجز" },
     }, t);
     return numbers;
   });

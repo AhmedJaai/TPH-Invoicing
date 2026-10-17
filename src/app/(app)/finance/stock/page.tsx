@@ -49,7 +49,7 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
   const columns: Column<BalanceItem>[] = [
     { key: "name", header: "الصنف", primary: true, cell: (x) => x.name, sortBy: (x) => x.name },
     {
-      key: "purchased", header: month ? "اشتُري في الشهر" : "اشتُري", numeric: true,
+      key: "purchased", header: month ? "المشترى في الشهر" : "المشترى", numeric: true,
       cell: (x) => (x.purchasedMilli === null ? <span className="text-[11px] font-bold text-ink-soft">غير معروف</span> : (
         <span className="block">
           <span className="nums">{qty(x, x.purchasedMilli)}</span>
@@ -60,29 +60,29 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
     },
     {
       /* الرقمان معاً منذ البداية، وأيُّهما اعتُمد — «يشوف إيش اللي أدقّ» */
-      key: "sources", header: "فواتيرُنا / فودكس", numeric: true, secondary: true,
+      key: "sources", header: "فواتيرنا / فودكس", numeric: true, secondary: true,
       cell: (x) => (
         <span className="block text-[11px]">
-          <span className={`nums block ${x.source === "INVOICES" || x.source === "SAME" ? "font-bold text-ink" : "text-muted"}`}>{x.invoicesToDateMilli === null ? "لم تُربَط" : qty(x, x.invoicesToDateMilli)}</span>
-          <span className={`nums block ${x.source === "FOODICS" || x.source === "SAME" ? "font-bold text-ink" : "text-muted"}`}>{x.foodicsToDateMilli === null ? "لم يُدخَل" : qty(x, x.foodicsToDateMilli)}</span>
+          <span className={`nums block ${x.source === "INVOICES" || x.source === "SAME" ? "font-bold text-ink" : "text-muted"}`}>{x.invoicesToDateMilli === null ? "غير مربوطة" : qty(x, x.invoicesToDateMilli)}</span>
+          <span className={`nums block ${x.source === "FOODICS" || x.source === "SAME" ? "font-bold text-ink" : "text-muted"}`}>{x.foodicsToDateMilli === null ? "غير مُدخل" : qty(x, x.foodicsToDateMilli)}</span>
           {x.source && <span className="block text-[10px] text-muted">{PURCHASE_SOURCE_LABEL[x.source]}</span>}
         </span>
       ),
     },
     {
-      key: "sold", header: month ? "بِيع منه في الشهر" : "بِيع منه", numeric: true,
+      key: "sold", header: month ? "المباع في الشهر" : "المباع", numeric: true,
       cell: (x) => (x.soldMilli === null ? <span className="text-[11px] font-bold text-ink-soft">غير معروف</span> : (
         <span className="block">
           <span className="nums">{qty(x, x.soldMilli)}</span>
-          {x.staffMilli > 0 && <span className="block text-[10px] text-muted">منه موظّفون: <span className="nums">{qty(x, x.staffMilli)}</span></span>}
+          {x.staffMilli > 0 && <span className="block text-[10px] text-muted">منها للموظفين: <span className="nums">{qty(x, x.staffMilli)}</span></span>}
         </span>
       )),
       sortBy: (x) => x.soldMinor,
     },
     {
-      key: "expected", header: "المتوقَّع متبقّياً", numeric: true,
+      key: "expected", header: "المتوقع بقاؤه", numeric: true,
       cell: (x) => (x.expectedMilli === null ? <span className="text-[11px] font-bold text-ink-soft">غير معروف</span> : x.expectedMilli < 0 ? (
-        <span className="block text-[11px] text-warn"><span className="font-bold">بِيع أكثر ممّا سُجّل شراؤه</span><span className="nums block">بـ{qty(x, -x.expectedMilli)}</span></span>
+        <span className="block text-[11px] text-warn"><span className="font-bold">بيع أكثر مما سُجّل شراؤه</span><span className="nums block">بزيادة {qty(x, -x.expectedMilli)}</span></span>
       ) : (
         <span className="block"><span className="nums">{qty(x, x.expectedMilli)}</span><span className="block text-[10px] text-muted"><MaybeMoney minor={x.expectedMinor} /></span></span>
       )),
@@ -90,12 +90,12 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
     },
     {
       key: "counted", header: "المعدود", numeric: true, secondary: true,
-      cell: (x) => (x.count === null ? <span className="text-[11px] text-muted">لم يُعَدّ</span> : <span className="nums">{qty(x, x.count.milli)}</span>),
+      cell: (x) => (x.count === null ? <span className="text-[11px] text-muted">لم يُعدّ</span> : <span className="nums">{qty(x, x.count.milli)}</span>),
     },
     {
       key: "lost", header: "الضائع", numeric: true,
       cell: (x) => {
-        if (x.lostMilli === null) return <span className="text-[11px] text-muted">{x.count === null ? "لا عدَّ يقيسه" : "—"}</span>;
+        if (x.lostMilli === null) return <span className="text-[11px] text-muted">{x.count === null ? "لا جرد يقيسه" : "—"}</span>;
         return (
           <span className="block">
             <span className="font-bold"><MaybeMoney minor={x.lostMinor} signed why="لا كلفة" /></span>
@@ -119,13 +119,13 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
       width="wide"
       title="المشترى والمباع"
       eyebrow={b.from ? <>{formatMonth(month ?? "")}</> : b.firstDay ? <>منذ <bdi>{formatDay(b.firstDay)}</bdi> حتى <bdi>{formatDay(b.to)}</bdi></> : undefined}
-      intro="لكلّ صنف: كم اشتريتَ، كم بِيع منه بحسب وصفاته، وكم يُتوقَّع أنّه بقي. وحيث عُدّ الرفّ: كم ضاع."
-      actions={<LinkButton href="/finance/stock/links" icon={Link2} variant="secondary">اربط بنودَ الفواتير</LinkButton>}
+      intro="لكل صنف: كم اشتريت، وكم بِيع منه حسب الوصفات، وكم يُتوقع أن يكون قد بقي. وإن جرى عدّ الرف، يظهر كم ضاع."
+      actions={<LinkButton href="/finance/stock/links" icon={Link2} variant="secondary">اربط بنود الفواتير</LinkButton>}
     >
       <LinkTabs
-        label="المدّة"
+        label="المدة"
         items={[
-          { href: "/finance/stock", label: "كلّ الوقت", active: month === null },
+          { href: "/finance/stock", label: "كل الفترات", active: month === null },
           ...months.map((m) => ({ href: `/finance/stock?month=${m}`, label: formatMonth(m), active: m === month })),
         ]}
       />
@@ -133,65 +133,65 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KeyFigure
           icon={ShoppingCart}
-          label={month ? "اشتُري في الشهر" : "اشتُري"}
+          label={month ? "المشترى في الشهر" : "المشترى"}
           value={<Money minor={t.purchasedMinor} currency />}
-          sub={<>من المصدرين معاً، ويُعتمَد أكملُهما لكلّ صنف: فواتيرُنا أكمل في <strong className="text-ink">{t.invoicesBetter}</strong>، وفودكس في <strong className="text-ink">{t.foodicsBetter}</strong>، واتّفقا في {t.sourcesAgree}.{b.unlinkedInvoiceMinor > 0 && <> بنودُ فواتير بـ<Money minor={b.unlinkedInvoiceMinor} /> لم تُربَط بعد.</>}</>}
+          sub={<>من المصدرين معاً، ويُعتمد الأكمل منهما لكل صنف. فواتيرنا أكمل في <strong className="text-ink">{t.invoicesBetter}</strong> صنفاً، وفودكس أكمل في <strong className="text-ink">{t.foodicsBetter}</strong>، ويتفقان في {t.sourcesAgree}.{b.unlinkedInvoiceMinor > 0 && <> وهناك بنود فواتير بقيمة <Money minor={b.unlinkedInvoiceMinor} /> لم تُربط بعد.</>}</>}
           href="/finance/stock/links"
         />
         <KeyFigure
           icon={Utensils}
-          label={month ? "بِيع منه في الشهر" : "بِيع منه"}
+          label={month ? "المباع في الشهر" : "المباع"}
           value={<Money minor={t.soldMinor} currency />}
-          sub={<>الوصفات × ما بِيع، بسعر الشراء.{b.salesWithoutRecipeMinor > 0 && <> خارجه مبيعاتٌ بلا وصفة <Money minor={b.salesWithoutRecipeMinor} />.</>}</>}
+          sub={<>حسب الوصفات والكمّيات المباعة، بسعر الشراء.{b.salesWithoutRecipeMinor > 0 && <> لا يشمل مبيعات بلا وصفة بقيمة <Money minor={b.salesWithoutRecipeMinor} />.</>}</>}
         />
         <KeyFigure
           icon={Boxes}
-          label="المتوقَّع متبقّياً"
+          label="المتوقع بقاؤه"
           value={<Money minor={t.expectedMinor} currency />}
-          sub={<>كلُّ ما اشتُري منذ البداية ناقصاً كلَّ ما بِيع والهدرَ المسجَّل، حتى <bdi>{formatDay(b.to)}</bdi>.</>}
+          sub={<>كل ما اشتريته منذ البداية، مطروحاً منه ما بِيع والهدر المسجّل، حتى <bdi>{formatDay(b.to)}</bdi>.</>}
         />
         <KeyFigure
           icon={Scale}
           label="الضائع"
           tone={(t.lostMinor ?? 0) > 0 ? "warn" : undefined}
-          value={t.lostMinor === null ? <span className="text-xl text-muted">لا عدَّ يقيسه</span> : <Money minor={t.lostMinor} currency />}
+          value={t.lostMinor === null ? <span className="text-xl text-muted">لا جرد يقيسه</span> : <Money minor={t.lostMinor} currency />}
           sub={b.countDay
-            ? <>المتوقَّع يومَ عدّ <bdi>{formatDay(b.countDay)}</bdi> ناقصاً ما عُدّ، في {t.counted} صنفاً.{t.foundMinor !== null && t.foundMinor < 0 && <> ووُجد في غيرها أكثر ممّا سُجّل شراؤه بـ<Money minor={-t.foundMinor} />.</>}</>
-            : "لا عدَّ للرفّ بعد. «المتوقَّع» قد يكون كلُّه على الرفّ."}
+            ? <>المتوقع يوم العدّ <bdi>{formatDay(b.countDay)}</bdi> مطروحاً منه ما عُدّ فعلاً، في {t.counted} صنفاً.{t.foundMinor !== null && t.foundMinor < 0 && <> ووُجد في أصناف أخرى أكثر مما سُجّل شراؤه بقيمة <Money minor={-t.foundMinor} />.</>}</>
+            : "لم يُعدّ الرف بعد. قد يكون «المتوقع» كله موجوداً على الرف."}
           href="/inventory"
         />
       </div>
 
       {short.length > 0 && (
-        <Callout tone="warn" icon={Info} className="mt-4" title={`${short.length} صنفاً بِيع منه أكثر ممّا سُجّل شراؤه — بقيمة ${formatRiyalsDisplay(t.shortPurchasesMinor)} ريال`}
+        <Callout tone="warn" icon={Info} className="mt-4" title={`${short.length} صنفاً بِيع منه أكثر مما سُجّل شراؤه، بقيمة ${formatRiyalsDisplay(t.shortPurchasesMinor)} ريال`}
           action={<LinkButton href="/finance/stock/links" size="sm">اربط البنود</LinkButton>}>
-          ليس خطأً في المقهى: شراءٌ لم يدخل الحساب — فاتورةٌ لم تُربَط بصنفها، أو لم تُدخَل في فودكس، أو بضاعةٌ اشتُريت قبل الافتتاح. اربط بنودَ الفواتير فيكتمل.
+          هذا ليس خطأً في المقهى، بل مشتريات لم تدخل الحساب: فاتورة لم تُربط بصنفها، أو لم تُدخل في فودكس، أو بضاعة اشتريت قبل الافتتاح. اربط بنود الفواتير لتكتمل الصورة.
         </Callout>
       )}
 
       {recurring.length > 0 && (
-        <Section id="recurring" title="فروقٌ تتكرّر" icon={Scale} count={recurring.length} hint="صنفٌ فرقُه بين عدٍّ وعدّ فوق مئةٍ وخمسين ريالاً شهرين متتاليين فأكثر.">
+        <Section id="recurring" title="فروق متكررة" icon={Scale} count={recurring.length} hint="أصناف يزيد فرقها على مئة وخمسين ريالاً بين جردين، في شهرين متتاليين أو أكثر.">
           <ul className="space-y-2">
             {recurring.map((g) => (
               <li key={`${g.productId}${g.kind}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3">
                 <div className="min-w-0 flex-1 basis-56">
                   <p className="text-sm font-bold">
                     <Link href={`/finance/stock/item?id=${g.productId}&month=all`} className="hover:underline">{g.name}</Link>
-                    {" — "}{g.kind === "SHORTAGE" ? "يخرج من الرفّ أكثر ممّا تفسّره وصفتُه" : "بِيع منه أكثر ممّا اشتُري"}: <Money minor={g.totalMinor} /> في {g.months.length} أشهر
+                    {" — "}{g.kind === "SHORTAGE" ? "يخرج من الرف أكثر مما تفسّره وصفته" : "بِيع منه أكثر مما اشتريت"}: <Money minor={g.totalMinor} /> في {g.months.length} أشهر
                   </p>
                   <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
                     {g.months.map((m) => formatMonth(m)).join(" · ")}.{" "}
-                    {g.kind === "SHORTAGE" ? "راجِع الوصفة: أتطابق ما يُصرَف فعلاً؟ وسجِّل الهدرَ حين يقع." : "فاتورةٌ ناقصة؟ افتح الصنفَ وراجِع فواتيرَه."}
+                    {g.kind === "SHORTAGE" ? "راجع الوصفة وتأكد أنها تطابق ما يُصرف فعلاً، وسجّل الهدر حين يقع." : "قد تكون هناك فاتورة ناقصة. افتح الصنف وراجع فواتيره."}
                   </p>
                 </div>
-                {canSilence && <div className="flex shrink-0 flex-wrap items-center gap-1"><SignalControls signalKey={stockGapKey(g.productId, g.kind)} dismissLabel="أعرف سببَه" snoozeDays={30} /></div>}
+                {canSilence && <div className="flex shrink-0 flex-wrap items-center gap-1"><SignalControls signalKey={stockGapKey(g.productId, g.kind)} dismissLabel="أعرف سببه" snoozeDays={30} /></div>}
               </li>
             ))}
           </ul>
         </Section>
       )}
 
-      <Section title="الأصناف" icon={PackageCheck} count={rows.length} hint="مرتَّبةٌ بقيمة الضائع ثمّ بقيمة المتوقَّع — بالريال لا بالنسبة.">
+      <Section title="الأصناف" icon={PackageCheck} count={rows.length} hint="مرتّبة حسب قيمة الضائع ثم قيمة المتوقع، بالريال لا بالنسبة.">
         <DataTable
           columns={columns} rows={rows} keyOf={(x) => x.productId} sort={q.sort ?? null}
           hrefOf={(x) => `/finance/stock/item?id=${x.productId}&month=${param}`}
@@ -199,12 +199,12 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
         />
       </Section>
 
-      <Callout tone="info" icon={Info} className="mt-6" title="كيف يُقرأ">
+      <Callout tone="info" icon={Info} className="mt-6" title="كيف تُقرأ الأرقام">
         <ul className="list-disc space-y-0.5 ps-4">
-          <li><strong className="text-ink">المتوقَّع متبقّياً = كلُّ ما اشتُري − كلُّ ما بِيع منه − الهدر المسجَّل</strong>، منذ البداية. لا يحتاج جرداً.</li>
-          <li><strong className="text-ink">الضائع = المتوقَّع يومَ العدّ − ما عُدّ على الرفّ</strong>. قد يكون هدراً لم يُسجَّل، أو جرعةً أكبر من الوصفة، أو تسريباً — البياناتُ لا تحسم.</li>
-          <li>المشترى يُحسَب من <strong className="text-ink">فواتيرنا المربوطة</strong> ومن <strong className="text-ink">ما أُدخل في فودكس</strong> معاً، ويُعتمَد أكملُهما: الشراءُ يسقط من سجلٍّ ولا يُخترَع فيه. والرقمان في عمود «فواتيرُنا / فودكس» منذ البداية، والغامقُ ما اعتُمد.</li>
-          <li>الوحدةُ والعبوةُ من كتالوج فودكس. وكلُّ بندِ فاتورةٍ تربطه يُكمل سجلَّ صنفه.</li>
+          <li><strong className="text-ink">المتوقع بقاؤه = كل ما اشتريته − كل ما بِيع منه − الهدر المسجّل</strong>، منذ البداية. ولا يحتاج إلى جرد.</li>
+          <li><strong className="text-ink">الضائع = المتوقع يوم العدّ − ما عُدّ على الرف</strong>. قد يكون هدراً لم يُسجّل، أو كمّية أكبر من الوصفة، أو تسرباً، والبيانات وحدها لا تحدد السبب.</li>
+          <li>يُحسب المشترى من <strong className="text-ink">فواتيرنا المربوطة</strong> ومن <strong className="text-ink">ما أُدخل في فودكس</strong> معاً، ويُعتمد الأكمل منهما، لأن المشتريات قد تسقط من أحد السجلين لكنها لا تُضاف إليه من فراغ. يعرض عمود «فواتيرنا / فودكس» الرقمين منذ البداية، والرقم الغامق هو المعتمد.</li>
+          <li>الوحدة والعبوة من كتالوج فودكس. وكل بند فاتورة تربطه يُكمل سجل صنفه.</li>
         </ul>
       </Callout>
     </PageShell>

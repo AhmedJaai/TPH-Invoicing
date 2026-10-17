@@ -213,10 +213,10 @@ export function buildDoublePaidClaim(group: DoublePaidGroup): string {
     `السلام عليكم،`,
     ``,
     `خرج من حساب مؤسسة ذا بوبليك هاوس (الرقم الضريبي 310007971600003) مبلغ ${riyals(group.amountMinor)} ريال`
-      + ` ${countNoun(group.transactions.length, TIME)} بتاريخ ${group.day} لـ«${group.payee}»:`,
+      + ` ${countNoun(group.transactions.length, TIME)} بتاريخ ${group.day} لصالح «${group.payee}»:`,
     ...refs,
     ``,
-    `المستحقّ مرّةٌ واحدة، فنرجو ردّ الزائد وقدره ${riyals(group.excessMinor)} ريال، أو إفادتنا إن كان السدادان لعمليّتين مختلفتين.`,
+    `المستحق مرة واحدة فقط، فنرجو ردّ المبلغ الزائد وقدره ${riyals(group.excessMinor)} ريال، أو إفادتنا إن كان السدادان لعمليتين مختلفتين.`,
     `شاكرين لكم.`,
   ].join("\n");
 }

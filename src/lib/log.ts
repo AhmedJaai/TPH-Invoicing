@@ -45,7 +45,7 @@ export function describeError(e: unknown): ErrorFacts {
   const own = typeof err.message === "string" ? scrubMessage(err.message) : "";
   /* سببُ القاعدة أدلُّ من «Failed query»: يُلحَق برسالته، مقصوصاً مثلها */
   const why = typeof cause?.message === "string" ? scrubMessage(cause.message) : "";
-  const message = (why && why !== own ? `${own} ← ${why}` : own).slice(0, MAX_MESSAGE) || "خطأٌ بلا رسالة";
+  const message = (why && why !== own ? `${own} ← ${why}` : own).slice(0, MAX_MESSAGE) || "خطأ بلا رسالة";
   return {
     ...(typeof err.name === "string" && err.name !== "Error" ? { name: err.name } : {}),
     ...(code ? { code } : {}),
@@ -94,7 +94,7 @@ export function formatLogLine(
   try {
     return JSON.stringify(line);
   } catch {
-    return JSON.stringify({ kind, at: now.toISOString(), logError: "تعذّر تسلسلُ الحقول" });
+    return JSON.stringify({ kind, at: now.toISOString(), logError: "تعذّر تحويل الحقول إلى نص" });
   }
 }
 

@@ -24,8 +24,8 @@ const quiet: AttentionFacts = {
 
 const ids = (f: Partial<AttentionFacts>) => buildAttention({ ...quiet, ...f }).map((i) => i.id);
 
-describe("الكشفُ الواقف", () => {
-  it("أسبوعٌ مهلة، وما بعده بندٌ يقول آخر يومٍ ويفتح الاستيراد", () => {
+describe("الكشف الواقف", () => {
+  it("أسبوع مهلة، وما بعده بند يقول آخر يوم ويفتح الاستيراد", () => {
     expect(ids({ bankLastDay: "2026-09-17", bankStaleDays: 7 })).not.toContain("bank-stale");
     const [item] = buildAttention({ ...quiet, bankLastDay: "2026-09-03", bankStaleDays: 21 });
     expect(item.id).toBe("bank-stale");
@@ -34,17 +34,17 @@ describe("الكشفُ الواقف", () => {
     expect(item.impact).toEqual({ kind: "BLOCKED", amountMinor: null });
   });
 
-  it("بلا كشفٍ أصلاً لا يُقال «واقف» — ذاك سؤالُ «ابدأ من هنا»", () => {
+  it("بلا كشف أصلاً لا يقال «واقف» — ذاك سؤال «ابدأ من هنا»", () => {
     expect(ids({ bankLastDay: null, bankStaleDays: null })).not.toContain("bank-stale");
   });
 });
 
 describe("buildAttention", () => {
-  it("البيانات النظيفة لا تُنتج بنوداً", () => {
+  it("البيانات النظيفة لا تنتج بنوداً", () => {
     expect(buildAttention(quiet)).toHaveLength(0);
   });
 
-  it("كل بند يحمل خطوة ومكاناً يُعالَج فيه", () => {
+  it("كل بند يحمل خطوة ومكاناً يعالج فيه", () => {
     const items = buildAttention({
       ...quiet, duplicatePayments: 2, vatAtRiskMinor: 5_000, notTaxValidCount: 3,
       overdueMinor: 90_000, overdueSuppliers: [{ label: "أ" }],
@@ -89,7 +89,7 @@ describe("buildAttention", () => {
     expect(ids({ notTaxValidCount: 9, vatAtRiskMinor: 0 })).not.toContain("vat-at-risk");
   });
 
-  it("الحركات غير المصنَّفة تُوجَّه إلى الحركات نفسها لا إلى صفحة جامعة", () => {
+  it("الحركات غير المصنّفة توجّه إلى الحركات نفسها لا إلى صفحة جامعة", () => {
     const item = buildAttention({ ...quiet, unclassifiedBankTx: 20, unclassifiedBankAmountMinor: 5_000 })[0];
     /*
       ورشةُ القرار صارت لوحاً داخل البند نفسه، لا صفحةً مستقلّة تُسمّى
@@ -106,7 +106,7 @@ describe("buildAttention", () => {
       .toBe("HIGH");
   });
 
-  it("الأدلّة تُمرَّر كما هي", () => {
+  it("الأدلّة تمرّر كما هي", () => {
     const item = buildAttention({
       ...quiet, suppliersMissingStatement: ["أوراق الزيتون", "غاناش"],
     })[0];
@@ -131,7 +131,7 @@ describe("countBySeverity", () => {
 });
 
 describe("الأثر", () => {
-  it("كل بند يحمل أثراً مصنَّفاً", () => {
+  it("كل بند يحمل أثراً مصنّفاً", () => {
     const items = buildAttention({
       ...quiet,
       duplicatePayments: 2, duplicatePaymentAmountMinor: 300_00,
@@ -146,7 +146,7 @@ describe("الأثر", () => {
     }
   });
 
-  it("المال الذي قد يُسترد لا يُخلط بالمعرَّض للضياع", () => {
+  it("المال الذي قد يسترد لا يخلط بالمعرّض للضياع", () => {
     const items = buildAttention({
       ...quiet,
       duplicatePayments: 1, duplicatePaymentAmountMinor: 1_000_00,
@@ -158,12 +158,12 @@ describe("الأثر", () => {
     expect(vat.impact.kind).toBe("AT_RISK");
   });
 
-  it("المستحقّ المتأخّر مالٌ عليك لا مالٌ يضيع", () => {
+  it("المستحقّ المتأخّر مال عليك لا مال يضيع", () => {
     const items = buildAttention({ ...quiet, overdueMinor: 5_000_00, overdueSuppliers: [{ label: "س" }] });
     expect(items.find((i) => i.id === "overdue")!.impact.kind).toBe("OWED");
   });
 
-  it("ما لا يُقدَّر مبلغه يبقى null لا صفراً", () => {
+  it("ما لا يقدّر مبلغه يبقى null لا صفراً", () => {
     const items = buildAttention({ ...quiet, pendingDocuments: 4 });
     expect(items[0].impact.amountMinor).toBeNull();
   });
@@ -220,13 +220,13 @@ describe("prioritize", () => {
     expect(rest).toEqual([]);
   });
 
-  it("لا شيء يُنتج لا شيء", () => {
+  it("لا شيء ينتج لا شيء", () => {
     expect(prioritize([])).toEqual({ top: [], rest: [] });
   });
 });
 
 describe("impactByKind", () => {
-  it("لا تُجمع الأنواع بعضها إلى بعض", () => {
+  it("لا تجمع الأنواع بعضها إلى بعض", () => {
     const items = buildAttention({
       ...quiet,
       duplicatePayments: 1, duplicatePaymentAmountMinor: 1_000_00,
@@ -238,7 +238,7 @@ describe("impactByKind", () => {
     expect(by.RECOVERABLE?.count).toBe(1);
   });
 
-  it("المجهول مبلغه يُعدّ ولا يُضاف صفره إلى مبلغ", () => {
+  it("المجهول مبلغه يعدّ ولا يضاف صفره إلى مبلغ", () => {
     const by = impactByKind(buildAttention({ ...quiet, pendingDocuments: 3 }));
     expect(by.BLOCKED?.count).toBe(1);
     expect(by.BLOCKED?.amountMinor).toBe(0);
@@ -267,14 +267,14 @@ describe("كل تنبيه يفتح سجلّه بعينه", () => {
    */
   const HUBS = ["/money", "/purchases", "/performance", "/analysis", "/suppliers", "/bank", "/"];
 
-  it("لا تنبيه يُرسل إلى صفحة جامعة", () => {
+  it("لا تنبيه يرسل إلى صفحة جامعة", () => {
     expect(noisy.length).toBeGreaterThan(6);
     for (const i of noisy) {
-      expect(HUBS, `${i.id} يُرسل إلى صفحة جامعة`).not.toContain(i.href);
+      expect(HUBS, `${i.id} يرسل إلى صفحة جامعة`).not.toContain(i.href);
     }
   });
 
-  it("تنبيهات الفواتير تفتح القائمة مُرشَّحةً", () => {
+  it("تنبيهات الفواتير تفتح القائمة مرشّحةً", () => {
     for (const id of ["vat-at-risk", "unknown-tax", "no-lines", "overdue"]) {
       const item = noisy.find((i) => i.id === id);
       if (!item) continue;
@@ -282,20 +282,20 @@ describe("كل تنبيه يفتح سجلّه بعينه", () => {
     }
   });
 
-  it("لكل تنبيه نصُّ فعلٍ يقول إلى أين يذهب", () => {
+  it("لكل تنبيه نصّ فعل يقول إلى أين يذهب", () => {
     for (const i of noisy) {
       expect(i.actionLabel, i.id).toBeTruthy();
-      expect(i.actionLabel).not.toBe("عالِجها");
+      expect(i.actionLabel).not.toBe("عالجها");
     }
   });
 });
 
-describe("الغائب يُرى", () => {
+describe("الغائب يرى", () => {
   /*
     كل بندٍ آخر يصف شيئاً موجوداً فيه خلل، وهذا يصف شيئاً غائباً —
     فيبدو النظام تامّاً وهو ناقص.
   */
-  it("فجوة التغطية بندٌ حرج بمداها", () => {
+  it("فجوة التغطية بند حرج بمداها", () => {
     const items = buildAttention({
       ...quiet,
       bankGapDays: 12,
@@ -308,7 +308,7 @@ describe("الغائب يُرى", () => {
     expect(gap?.href).toBe("/bank#import");
   });
 
-  it("فرق المعادلة بندٌ حرج بمبلغه", () => {
+  it("فرق المعادلة بند حرج بمبلغه", () => {
     const item = buildAttention({ ...quiet, bankBalanceDifferenceMinor: -11_600_00 })
       .find((i) => i.id === "bank-balance-difference");
     expect(item?.severity).toBe("CRITICAL");
@@ -316,17 +316,17 @@ describe("الغائب يُرى", () => {
     expect(item?.detail).toContain("صادرة لم تُقرأ");
   });
 
-  it("وفرقٌ صغيرٌ (١٫٧٣) يُقال بمبلغه ولا يُرفع حرجاً", () => {
+  it("وفرق صغير (١٫٧٣) يقال بمبلغه ولا يرفع حرجاً", () => {
     const item = buildAttention({ ...quiet, bankBalanceDifferenceMinor: 173 }).find((i) => i.id === "bank-balance-difference");
     expect(item?.severity).toBe("MEDIUM");
     expect(item?.title).toContain("1.73");
   });
 
-  it("هللةٌ ليست فرقاً", () => {
+  it("هللة ليست فرقاً", () => {
     expect(ids({ bankBalanceDifferenceMinor: 1 })).not.toContain("bank-balance-difference");
   });
 
-  it("المعادلة المجهولة لا تُنتج بنداً — الجهل يُعلَن في الإقفال لا هنا", () => {
+  it("المعادلة المجهولة لا تنتج بنداً — الجهل يعلن في الإقفال لا هنا", () => {
     expect(ids({ bankBalanceDifferenceMinor: null })).not.toContain("bank-balance-difference");
   });
 });
@@ -336,13 +336,13 @@ describe("ازدواج المصروف", () => {
     يُعرَض ولا يُحذَف: القيد الآليّ كاد يمحو ثلاثة مصروفات حقيقية من
     بيانات المقهى، لكلٍّ حركتُها البنكية ببصمتها.
   */
-  it("بندٌ عالٍ بمبلغ الزائد لا بمبلغ الكلّ", () => {
+  it("بند عال بمبلغ الزائد لا بمبلغ الكلّ", () => {
     const item = buildAttention({
       ...quiet, duplicateExpenses: 2, duplicateExpenseAmountMinor: 1_200_00,
     }).find((i) => i.id === "duplicate-expenses");
     expect(item?.severity).toBe("HIGH");
     expect(item?.amountMinor).toBe(1_200_00);
-    expect(item?.action).toContain("بيدك");
+    expect(item?.action).toContain("بنفسك");
   });
 
   it("ولا بند بلا ازدواج", () => {
@@ -358,8 +358,8 @@ describe("ازدواج المصروف", () => {
    عملٌ باقٍ: تصل الفاتورة، أو يُعلَن أنّ المورّد لا يصدرها فيُطلَب
    عقدُ توريد. وبلا فاتورةٍ ضريبية لا يُخصَم مدخلُ الضريبة.
    ═══════════════════════════════════════════════════════════════ */
-describe("مالٌ خرج ولا فاتورة تفسّره", () => {
-  it("يُعرَض بندٌ عالي الأهمّية بأثرٍ «لم يُنسَب»", () => {
+describe("مال خرج ولا فاتورة تفسّره", () => {
+  it("يعرض بند عالي الأهمّية بأثر «لم ينسب»", () => {
     const items = buildAttention({
       ...quiet,
       unbackedPaymentCount: 3,
@@ -374,13 +374,13 @@ describe("مالٌ خرج ولا فاتورة تفسّره", () => {
     expect(item!.evidence).toHaveLength(1);
   });
 
-  it("ولا يُعرَض حين لا شيء معلَّق", () => {
+  it("ولا يعرض حين لا شيء معلّق", () => {
     expect(buildAttention(quiet).find((i) => i.id === "unbacked-payments"))
       .toBeUndefined();
   });
 });
 
-describe("كلّ عددٍ في العنوان يمرّ بتمييزه (CODE-107)", () => {
+describe("كلّ عدد في العنوان يمرّ بتمييزه (CODE-107)", () => {
   /*
     كان «1 مصروفاً يصف حدثاً» و«13 دفعة خرجت» يُكتبان بالرقم خامّاً —
     والواحد والاثنان صيغتان لا رقمان: «دفعة واحدة» و«دفعتان».
@@ -398,16 +398,16 @@ describe("كلّ عددٍ في العنوان يمرّ بتمييزه (CODE-107)
     }
   });
 
-  it("وما فوق العشرة مفردٌ منصوب", () => {
+  it("وما فوق العشرة مفرد منصوب", () => {
     const titles = buildAttention({ ...quiet, ...facts(13) }).map((i) => i.title);
-    expect(titles).toContain("13 يوماً بلا كشف بنكيّ");
+    expect(titles).toContain("13 يوماً بدون كشف بنكي");
     expect(titles).toContain("13 دفعة لم تُنسب إلى فاتورة");
     expect(titles).toContain("13 مانعاً لم يُعالَج");
   });
 });
 
-describe("التنبيه يُغلَق بقرار (SCN-104)", () => {
-  it("المُطالَب به بندٌ متوسّط لا حرج", () => {
+describe("التنبيه يغلق بقرار (SCN-104)", () => {
+  it("المطالب به بند متوسّط لا حرج", () => {
     const items = buildAttention({
       ...quiet, duplicatePaymentsClaimed: 1, duplicatePaymentClaimedMinor: 2_350_77,
     });
@@ -417,11 +417,11 @@ describe("التنبيه يُغلَق بقرار (SCN-104)", () => {
     expect(items[0].href).toBe("/attention?item=duplicate-payments-claimed");
   });
 
-  it("المجموعة المحسومة لا تُعدّ — لا بند حرج ولا متوسّط", () => {
+  it("المجموعة المحسومة لا تعدّ — لا بند حرج ولا متوسّط", () => {
     expect(ids({ duplicatePayments: 0, duplicatePaymentsClaimed: 0 })).toEqual([]);
   });
 
-  it("مورّدٌ بلا فواتير يُعرَض في «عقد التوريد» بمالِه", () => {
+  it("مورّد بلا فواتير يعرض في «عقد التوريد» بماله", () => {
     const item = buildAttention({
       ...quiet,
       suppliersWithoutContract: ["مريم"],
@@ -431,30 +431,30 @@ describe("التنبيه يُغلَق بقرار (SCN-104)", () => {
   });
 });
 
-describe("مالٌ خرج مرّتين — الجملةُ تتبع الدليل", () => {
+describe("مال خرج مرّتين — الجملة تتبع الدليل", () => {
   const item = (f: Partial<AttentionFacts>) =>
     buildAttention({ ...quiet, duplicatePayments: 1, duplicatePaymentAmountMinor: 1_180_40, ...f })
       .find((i) => i.id === "duplicate-payments")!;
 
-  it("بمرجعين مختلفين يُقال إنّهما عمليّتان", () => {
-    expect(item({ duplicatePaymentsDistinct: 1 }).detail).toContain("مرجعُ سدادٍ مستقلّ");
+  it("بمرجعين مختلفين يقال إنّهما عمليّتان", () => {
+    expect(item({ duplicatePaymentsDistinct: 1 }).detail).toContain("مرجع سداد مستقل");
   });
 
-  it("بلا مرجعين لا يُدَّعى مرجعٌ مستقلّ — والفعلُ تحقّقٌ قبل المطالبة", () => {
+  it("بلا مرجعين لا يدّعى مرجع مستقلّ — والفعل تحقّق قبل المطالبة", () => {
     const i = item({ duplicatePaymentsDistinct: 0 });
-    expect(i.detail).not.toContain("مستقلّ");
-    expect(i.detail).toContain("لم يُقطَع");
+    expect(i.detail).not.toContain("مستقل");
+    expect(i.detail).toContain("لا يمكن الجزم");
     expect(i.action).toContain("إن ظهر");
   });
 });
 
 
-describe("حوالةٌ لمورّد خرجت ثمّ عادت — findReversals موصولةً", () => {
+describe("حوالة لمورّد خرجت ثم عادت — findReversals موصولةً", () => {
   it("لا بند حين لا ردّ", () => {
     expect(buildAttention(quiet).some((i) => i.id === "bounced-payments")).toBe(false);
   });
 
-  it("بندٌ عالٍ يفتح الحركة الأولى، ومبلغه مستحقّ عليك", () => {
+  it("بند عال يفتح الحركة الأولى، ومبلغه مستحقّ عليك", () => {
     const items = buildAttention({
       ...quiet,
       bouncedPayments: [{ label: "غاناش", sub: "خرجت …", amountMinor: 4_250_00, href: "/bank/tx/t1" }],
@@ -465,16 +465,16 @@ describe("حوالةٌ لمورّد خرجت ثمّ عادت — findReversals �
     expect(b?.severity).toBe("HIGH");
     expect(b?.href).toBe("/bank/tx/t1");
     expect(b?.impact).toEqual({ kind: "OWED", amountMinor: 4_250_00 });
-    expect(b?.title).toContain("خرجت ثمّ عادت");
+    expect(b?.title).toContain("خرجت ثم عادت");
   });
 });
 
-describe("فواتيرُ أُرشفت ولم تُقيَّد", () => {
-  it("لا بندَ حين لا شيء", () => {
+describe("فواتير أرشفت ولم تقيّد", () => {
+  it("لا بند حين لا شيء", () => {
     expect(ids({})).not.toContain("unrecorded-invoices");
   });
 
-  it("بندٌ عالٍ يفتح ملفَّ أوّلها، ومبلغُه مستحقٌّ حين تُعرف كلُّ المبالغ", () => {
+  it("بند عال يفتح ملفّ أوّلها، ومبلغه مستحقّ حين تعرف كلّ المبالغ", () => {
     const [item] = buildAttention({
       ...quiet,
       unrecordedInvoices: [
@@ -488,7 +488,7 @@ describe("فواتيرُ أُرشفت ولم تُقيَّد", () => {
     expect(item.impact).toEqual({ kind: "OWED", amountMinor: 388_00 });
   });
 
-  it("المبلغُ المجهولُ لا يُجمع صفراً — الأثرُ «غير معروف»", () => {
+  it("المبلغ المجهول لا يجمع صفراً — الأثر «غير معروف»", () => {
     const [item] = buildAttention({
       ...quiet,
       unrecordedInvoices: [
@@ -500,8 +500,8 @@ describe("فواتيرُ أُرشفت ولم تُقيَّد", () => {
   });
 });
 
-describe("صفوفُ الكشف المحفوظة لقرارك", () => {
-  it("بندٌ واحدٌ يفتح صفحة البنك، ولا قدرَ يُفترض صفراً", () => {
+describe("صفوف الكشف المحفوظة لقرارك", () => {
+  it("بند واحد يفتح صفحة البنك، ولا قدر يفترض صفراً", () => {
     const item = buildAttention({ ...quiet, heldBankRows: 2 }).find((i) => i.id === "held-bank-rows")!;
     expect(item.count).toBe(2);
     expect(item.href).toBe("/bank#queue");
@@ -509,8 +509,8 @@ describe("صفوفُ الكشف المحفوظة لقرارك", () => {
   });
 });
 
-describe("كشفُ المورّد يخالف دفترَنا", () => {
-  it("غاناش: البندُ يقول الفرقَ ويفتح كشفَه", () => {
+describe("كشف المورّد يخالف دفترنا", () => {
+  it("غاناش: البند يقول الفرق ويفتح كشفه", () => {
     const [item] = buildAttention({ ...quiet, statementGaps: [{ supplierName: "غاناش", slug: "Ganache", day: "2026-08-31", theirsMinor: 5432_60, oursMinor: 4784_00, gapMinor: -648_60 }] });
     expect(item.id).toBe("statement-ledger-gap");
     expect(item.title).toContain("غاناش");
@@ -518,14 +518,14 @@ describe("كشفُ المورّد يخالف دفترَنا", () => {
     expect(item.href).toBe("/statements?supplier=Ganache");
   });
 
-  it("وبلا فرقٍ لا بند", () => {
+  it("وبلا فرق لا بند", () => {
     expect(ids({ statementGaps: [] })).not.toContain("statement-ledger-gap");
   });
 });
 
-describe("موعدُ إقرار الضريبة", () => {
+describe("موعد إقرار الضريبة", () => {
   const due = { periodKey: "2026-Q3", label: "الربع الثالث 2026", deadline: "2026-10-31" };
-  it("يظهر بموعده ورابطِ صفحته حتى يُسجَّل تقديمُه", () => {
+  it("يظهر بموعده ورابط صفحته حتى يسجّل تقديمه", () => {
     const [item] = buildAttention({ ...quiet, vatReturnDue: { ...due, daysLeft: 24 } }).filter((i) => i.id === "vat-return-due");
     expect(item).toMatchObject({ area: "VAT", severity: "MEDIUM", href: "/close/vat?period=2026-Q3" });
     expect(item.impact.amountMinor).toBeNull();
@@ -535,12 +535,12 @@ describe("موعدُ إقرار الضريبة", () => {
     expect(sev(10)).toBe("HIGH");
     expect(sev(-3)).toBe("HIGH");
   });
-  it("وما قُدِّم لا يظهر", () => {
+  it("وما قدّم لا يظهر", () => {
     expect(buildAttention({ ...quiet, vatReturnDue: null }).some((i) => i.id === "vat-return-due")).toBe(false);
   });
 });
 
-describe("ملاحظاتُ الشبكة والمتكرّر", () => {
+describe("ملاحظات الشبكة والمتكرّر", () => {
   const base = (): AttentionFacts => ({
     openBlockers: 0, pendingDocuments: 0, duplicatePayments: 0, duplicatePaymentAmountMinor: 0, duplicatePaymentEvidence: [],
     notTaxValidCount: 0, vatAtRiskMinor: 0, vatAtRiskEvidence: [], unknownTaxCount: 0, unknownTaxEvidence: [],
@@ -551,7 +551,7 @@ describe("ملاحظاتُ الشبكة والمتكرّر", () => {
     bankGapDays: 0, bankGapRanges: [], bankBalanceDifferenceMinor: null, priceRises: [], priceRiseAnnualMinor: 0,
   });
 
-  it("تسويةٌ لم تصل بندٌ يفتح صفحتَها، وتقديرُها لا يُجمع أثراً", () => {
+  it("تسوية لم تصل بند يفتح صفحتها، وتقديرها لا يجمع أثراً", () => {
     const item = buildAttention({ ...base(), missingSettlements: [{ day: "2026-07-20", usualMinor: 900_00 }] })
       .find((i) => i.id === "pos-missing-settlement");
     expect(item?.href).toBe("/money/pos#missing");
@@ -559,7 +559,7 @@ describe("ملاحظاتُ الشبكة والمتكرّر", () => {
     expect(item?.count).toBe(1);
   });
 
-  it("المتكرّر: ما خُصم مرّتين يُستردّ بمبلغه، والارتفاعُ وحده بلا مبلغٍ يُستردّ", () => {
+  it("المتكرّر: ما خصم مرّتين يستردّ بمبلغه، والارتفاع وحده بلا مبلغ يستردّ", () => {
     const twice = buildAttention({ ...base(), recurringAnomalies: [{ label: "إنترنت", kind: "TWICE", amountMinor: 460_00, day: "2026-08-09" }] })
       .find((i) => i.id === "recurring-anomalies");
     expect(twice?.impact).toEqual({ kind: "RECOVERABLE", amountMinor: 460_00 });
@@ -576,8 +576,8 @@ describe("ملاحظاتُ الشبكة والمتكرّر", () => {
   });
 });
 
-describe("وثائقُ تنتهي", () => {
-  it("المنتهي حرج، وما في أسبوعه عالٍ، وما في مهلته متوسّط — ويفتح صفحةَ الوثائق", () => {
+describe("وثائق تنتهي", () => {
+  it("المنتهي حرج، وما في أسبوعه عال، وما في مهلته متوسّط — ويفتح صفحة الوثائق", () => {
     const one = (daysLeft: number) => buildAttention({
       ...quiet,
       expiringObligations: [{ title: "رخصة البلديّة", kindLabel: "رخصة البلديّة", expiresOn: "2026-10-20", daysLeft }],
@@ -589,7 +589,7 @@ describe("وثائقُ تنتهي", () => {
     expect(one(20)?.impact).toEqual({ kind: "AT_RISK", amountMinor: null });
   });
 
-  it("بلا وثائقَ لا بند", () => {
+  it("بلا وثائق لا بند", () => {
     expect(buildAttention({ ...quiet, expiringObligations: [] }).map((i) => i.id)).not.toContain("obligations-expiring");
   });
 });

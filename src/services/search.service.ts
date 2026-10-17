@@ -185,7 +185,7 @@ async function findSuppliers(intent: SearchIntent, like: string, amounts: boolea
     kind: "supplier" as const,
     id: r.id,
     title: r.nameAr,
-    subtitle: `${r.slug}${r.vatNumber ? "" : " · بلا رقم ضريبي"}${r.isActive ? "" : " · معطَّل"}`,
+    subtitle: `${r.slug}${r.vatNumber ? "" : " · بلا رقم ضريبي"}${r.isActive ? "" : " · معطّل"}`,
     href: `/suppliers/${r.slug}`,
     verbs: amounts
       ? [
@@ -261,7 +261,7 @@ async function findBankTx(intent: SearchIntent, like: string): Promise<SearchHit
     title: (r.beneficiary ?? r.description ?? "حركة بنكية").slice(0, 60),
     subtitle: `${isoDay(r.date)} · ${
       r.direction === "DEBIT" ? "صادر" : "وارد"
-    }${r.category === "UNKNOWN" ? " · غير مصنَّفة" : ""}`,
+    }${r.category === "UNKNOWN" ? " · غير مصنّفة" : ""}`,
     amountMinor: r.amount,
     href: txHref(r.id),
   }));

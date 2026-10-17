@@ -44,26 +44,26 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         select
           (select count(*)::int from issues where status='OPEN' and severity='BLOCKER')      as open_blockers,
           (select count(*)::int from documents where status in ('PENDING','NEEDS_REVIEW'))   as pending_docs,
-          /* ما لا ضريبةَ فيه لا يُخصم منه شيء — أوراق الزيتون ولافا (٦٦ فاتورة) بلا ضريبة أصلاً */
+          /* ما لا ضريبة فيه لا يخصم منه شيء — أوراق الزيتون ولافا (٦٦ فاتورة) بلا ضريبة أصلاً */
           (select count(*)::int from invoices where tax_status='INVALID' and vat_minor > 0)  as not_valid,
           (select coalesce(sum(vat_minor),0)::bigint from invoices
              where input_vat_status='NOT_ELIGIBLE' and vat_minor > 0)                        as vat_at_risk,
           (select count(*)::int from invoices where tax_status='UNKNOWN')                    as unknown_tax,
           /*
-            ── عددُ البند هو عددُ الطابور نفسِه ──
+            ── عدد البند هو عدد الطابور نفسه ──
 
-            كان يعدّ ‎category='UNKNOWN'‎ بينما اللوحُ الذي يفتحه البند
-            (‎ReviewSection‎) يقرأ ‎pendingDecision()‎. فالعدّان لشيءٍ واحد
-            بشرطين مختلفين — وتقاطعُهما قد يكون صفراً: حركةٌ تنتظر قراراً
-            ولا بندَ يدلّ عليها، أو بندٌ يُفتَح على لوحٍ فارغ.
+            كان يعدّ ‎category='UNKNOWN'‎ بينما اللوح الذي يفتحه البند
+            (‎ReviewSection‎) يقرأ ‎pendingDecision()‎. فالعدّان لشيء واحد
+            بشرطين مختلفين — وتقاطعهما قد يكون صفراً: حركة تنتظر قراراً
+            ولا بند يدلّ عليها، أو بند يفتح على لوح فارغ.
 
-            فصار الشرط واحداً، يُستدعى ولا يُنسَخ.
+            فصار الشرط واحداً، يستدعى ولا ينسخ.
           */
           (select count(*)::int from ${bankTransactions} where ${pendingDecision()})          as unclassified,
           (select coalesce(sum(amount_minor),0)::bigint from ${bankTransactions}
              where ${pendingDecision()})                                                      as unclassified_amount,
           (select count(*)::int from bank_held_rows where resolved_at is null)                 as held_rows,
-          /* فاتورةُ سطر الكشف (057) لا ملفَّ لها يُقرأ منه بنود — كانت ٤٢ «بلا بنود» كلُّها منها */
+          /* فاتورة سطر الكشف (057) لا ملفّ لها يقرأ منه بنود — كانت ٤٢ «بلا بنود» كلّها منها */
           (select count(*)::int from invoices i join documents d on d.id = i.document_id
              where d.origin is null
                and not exists (select 1 from invoice_lines l where l.invoice_id=i.id))       as no_lines
@@ -89,9 +89,9 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
                   from payments p
                  where p.supplier_id = suppliers.id and p.status not in ('REVERSED','VOID')) as unbacked
         /*
-          القاعدةُ في supplier-policy-rules — تُحقَن ولا تُعاد كتابتها.
-          وبلا لقبٍ للجدول عمداً: القاعدةُ تسمّي أعمدتها باسم الجدول،
-          فلقبٌ هنا يجعلها تشير إلى ما ليس في FROM.
+          القاعدة في supplier-policy-rules — تحقن ولا تعاد كتابتها.
+          وبلا لقب للجدول عمداً: القاعدة تسمّي أعمدتها باسم الجدول،
+          فلقب هنا يجعلها تشير إلى ما ليس في FROM.
         */
         from ${suppliers}
         where suppliers.is_active and ${needsContractSql()}
@@ -118,9 +118,9 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
           where a.unit_price_minor > b.unit_price_minor
         )
         /*
-          الأثرُ السنويّ = الزيادةُ في سعر الوحدة × ما اشتُري منه فعلاً في
-          آخر سنة، بحساب القاعدة العشريّ لا بعددٍ عائم. وكان «× ٢٠»: عشرون
-          شراءً في السنة لكلّ صنف مفترَضةً بيد — رقمٌ مخترَع يُعرَض مالاً.
+          الأثر السنويّ = الزيادة في سعر الوحدة × ما اشتري منه فعلاً في
+          آخر سنة، بحساب القاعدة العشريّ لا بعدد عائم. وكان «× ٢٠»: عشرون
+          شراءً في السنة لكلّ صنف مفترضةً بيد — رقم مخترع يعرض مالاً.
         */
         select p.name_ar, p.description, p.now_price, p.then_price,
                round((p.now_price - p.then_price) * coalesce((
@@ -131,7 +131,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
                ), 0))::bigint as annual_minor
         from pairs p
         /*
-          وما تضاعف فوق ثلاثة أضعاف وحدةٌ أخرى لا سعرٌ ارتفع: «تشيز كيك الربتزل» قطعةً
+          وما تضاعف فوق ثلاثة أضعاف وحدة أخرى لا سعر ارتفع: «تشيز كيك الربتزل» قطعةً
           بـ١٢٫٥٠ ثمّ صينيةً بـ١٧٥ قيل «ارتفع ١٣٠٠٪ ويكلّفك ٩٧٥ في السنة» (لوريفا، سبتمبر ٢٠٢٦).
         */
         where p.then_price > 0 and (p.now_price - p.then_price) * 100 >= 5 * p.then_price
@@ -164,9 +164,9 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         from bank_transactions
         where direction = 'DEBIT'
           /*
-            الازدواجُ مبلغٌ واحدٌ في يومٍ واحد (يومُ UTC كما في findDoublePaid) — فما
-            لا يتكرّر يومُه ومبلغُه بين الصادر لا يكون ازدواجاً. كان يُجلَب الصادرُ
-            كلُّه في كلّ رسمٍ للقشرة لعددٍ واحدٍ في الشريط الجانبيّ؛ والنتيجةُ هي هي.
+            الازدواج مبلغ واحد في يوم واحد (يوم UTC كما في findDoublePaid) — فما
+            لا يتكرّر يومه ومبلغه بين الصادر لا يكون ازدواجاً. كان يجلب الصادر
+            كلّه في كلّ رسم للقشرة لعدد واحد في الشريط الجانبيّ؛ والنتيجة هي هي.
           */
           and (to_char(value_date at time zone 'UTC', 'YYYY-MM-DD'), amount_minor) in (
             select to_char(value_date at time zone 'UTC', 'YYYY-MM-DD'), amount_minor
@@ -210,7 +210,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
          where bt.amount_minor > 100
            and ((bt.direction = 'DEBIT' and (bt.matched_payment_id is not null or bt.category = 'SUPPLIER'))
              or (bt.direction = 'CREDIT' and bt.category <> 'INTERNAL'))
-           /* الردُّ صادرٌ ووارد بالمبلغ نفسه — وما لا نظيرَ لمبلغه في الاتّجاه الآخر لا يكون ردّاً (findReversals) */
+           /* الردّ صادر ووارد بالمبلغ نفسه — وما لا نظير لمبلغه في الاتّجاه الآخر لا يكون ردّاً (findReversals) */
            and bt.amount_minor in (
              select amount_minor from bank_transactions where amount_minor > 100
               group by amount_minor having count(distinct direction) = 2
@@ -257,7 +257,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   const overdueSuppliers = overdue.slice(0, 10).map<AttentionEvidence>((r) => ({
     label: r.nameAr,
     sub: r.creditMinor > 0 && r.owedMinor < r.overdueOpenMinor
-      ? `أقدم دين منذ ${countNoun(r.oldestDays, DAY)} · بعد خصم ما لك عنده ${formatRiyalsDisplay(r.creditMinor)}`
+      ? `أقدم دين منذ ${countNoun(r.oldestDays, DAY)} · بعد خصم رصيدك عنده ${formatRiyalsDisplay(r.creditMinor)}`
       : `أقدم دين منذ ${countNoun(r.oldestDays, DAY)}`,
     amountMinor: r.owedMinor,
   }));
@@ -306,7 +306,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
   const bankGapRanges = gaps.slice(0, 8).map<AttentionEvidence>((g) => ({
     label: `${g.start} ← ${g.end}`,
-    sub: `${countNoun(g.days, DAY)} بلا كشف`,
+    sub: `${countNoun(g.days, DAY)} بدون كشف`,
   }));
 
   /*
@@ -461,10 +461,10 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         label: (r.supplier ?? r.file_name).slice(0, 45),
         /* الرقمُ نفسُه بمبلغٍ آخر فاتورةٌ أعاد المورّدُ إصدارَها — لا نسخة */
         sub: r.twin && minor !== null && r.twin_total !== null && Number(r.twin_total) !== minor
-          ? `فاتورةٌ مصحَّحة لـ${r.twin} (${formatRiyalsDisplay(Number(r.twin_total))} ← ${formatRiyalsDisplay(minor)}) — استبدل بها المقيَّدة`
+          ? `فاتورة مصحّحة للفاتورة ${r.twin} (${formatRiyalsDisplay(Number(r.twin_total))} ← ${formatRiyalsDisplay(minor)}). استبدل بها الفاتورة المقيّدة`
           : r.twin
-          ? `نسخةٌ من الفاتورة ${r.twin} المقيَّدة — ارفضها`
-          : `${r.file_name.slice(0, 40)} — قيّدها من ملفّها`,
+          ? `نسخة من الفاتورة ${r.twin} المقيّدة، فارفضها`
+          : `${r.file_name.slice(0, 40)}: قيّدها من ملفّها`,
         amountMinor: minor ?? undefined,
         href: documentHref(r.id, "fix"),
       };
@@ -472,7 +472,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     bouncedPayments: bounced.map((b) => ({
       label: supplierOfTx.get(b.outgoing.id) ?? (b.outgoing.party ?? "حوالة").slice(0, 45),
       sub: `خرجت ${formatDay(b.outgoing.valueDate)} · عادت بعد ${countNoun(b.daysApart, DAY)}${
-        b.samePartyEvidence ? " من الطرف نفسه" : " — والطرف لم يتطابق"
+        b.samePartyEvidence ? " من الطرف نفسه" : " (الطرف غير مطابق)"
       }`,
       amountMinor: b.outgoing.amountMinor,
       href: txHref(b.outgoing.id),
@@ -538,14 +538,14 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     suppliersWithoutContract: noContract,
     suppliersWithoutContractEvidence: noContractRows.map((r) => ({
       label: String(r.name_ar),
-      sub: Number(r.unbacked) > 0 ? "دفعتَ له بلا فاتورة — والعقد هو مستندُه" : "لا دفعات بلا مستند",
+      sub: Number(r.unbacked) > 0 ? "دفعتَ له بلا فاتورة، والعقد هو المستند" : "لا توجد دفعات بلا مستند",
       amountMinor: Number(r.unbacked) > 0 ? Number(r.unbacked) : undefined,
     })),
     invoicesWithoutLines: Number(counts?.no_lines ?? 0),
     unbackedPaymentCount: unbacked.length,
     unbackedPaymentMinor: unbacked.reduce((n, r) => n + r.unbackedMinor, 0),
     unbackedPaymentEvidence: unbacked.slice(0, 6).map((r) => ({
-      label: r.supplierName ?? "بلا مورّد",
+      label: r.supplierName ?? "بدون مورّد",
       sub: `${r.paidOn} · من أصل ${formatRiyalsDisplay(r.amountMinor)}`,
       amountMinor: r.unbackedMinor,
     })),
@@ -559,7 +559,7 @@ function doublePaidEvidence(g: DoublePaidGroup): AttentionEvidence {
   return {
     label: g.payee,
     sub: `${g.day} · ${countNoun(g.transactions.length, TIME)}`
-      + (g.distinctOperations ? " · بمراجعِ سدادٍ مختلفة" : " · بلا مرجعٍ يفصلهما"),
+      + (g.distinctOperations ? " · بمراجع سداد مختلفة" : " · بلا مرجع يميّز بينهما"),
     amountMinor: g.excessMinor,
   };
 }

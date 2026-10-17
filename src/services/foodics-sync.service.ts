@@ -78,7 +78,7 @@ async function writeOrders(orders: readonly FoodicsOrder[], actorId: string | nu
     const m = mirrorOrder(o);
     if (m === null) {
       counts.rejected++;
-      counts.problems.push(`الطلب ${o.reference}: إجماليُّه أو دفعتُه لم تُقرأ — لم يدخل المرآة`);
+      counts.problems.push(`الطلب ${o.reference}: تعذّرت قراءة إجماليه أو دفعته، ولم يُسجَّل في بيانات فودكس`);
       return [];
     }
     return [m];
@@ -166,7 +166,7 @@ export async function syncOrders(window: OrderWindow, actorId: string | null, co
     if (deadlineAt !== null && Date.now() > deadlineAt) { counts.partial = true; break; }
     const got = await fetchPage("orders", FoodicsOrder, query, page);
     counts.rejected += got.rejected;
-    if (got.rejected > 0) counts.problems.push(`${got.rejected} طلباً في الصفحة ${page} لم يطابق الصيغة المعروفة`);
+    if (got.rejected > 0) counts.problems.push(`${got.rejected} طلباً في الصفحة ${page} بصيغة غير معروفة`);
     buffer.push(...got.items.filter(isSettledOrder));
     const last = page >= got.lastPage;
     if (page % BATCH_PAGES === 0 || last) {
@@ -230,7 +230,7 @@ export async function syncPurchases(counts: SyncCounts): Promise<void> {
       const row = purchaseRow(tx);
       if (row === null) {
         counts.rejected++;
-        counts.problems.push(`حركةُ الشراء ${tx.reference}: كمّيّةٌ أو كلفةٌ لم تُقرأ — لم تدخل المرآة`);
+        counts.problems.push(`حركة الشراء ${tx.reference}: تعذّرت قراءة الكمّية أو التكلفة، ولم تُسجَّل في بيانات فودكس`);
         return [];
       }
       return [row];
@@ -301,7 +301,7 @@ export async function syncStockCounts(counts: SyncCounts): Promise<void> {
     const row = stockCountRow(c);
     if (row === null) {
       counts.rejected++;
-      counts.problems.push(`الجرد ${c.reference}: كمّيّةٌ لم تُقرأ — لم يدخل المرآة`);
+      counts.problems.push(`الجرد ${c.reference}: تعذّرت قراءة الكمّية، ولم يُسجَّل في بيانات فودكس`);
       return [];
     }
     return [row];
@@ -343,13 +343,13 @@ export async function syncItemMoves(from: string, to: string, counts: SyncCounts
     for (const kind of STOCK_MOVE_KINDS) {
       const got = await fetchAll("inventory_transactions", FoodicsStockMove, { "filter[type]": kind, "filter[business_date]": day, include: "items" });
       counts.rejected += got.rejected;
-      if (got.rejected > 0) counts.problems.push(`${got.rejected} حركةَ صرفٍ في ${day} لم تطابق الصيغة المعروفة`);
+      if (got.rejected > 0) counts.problems.push(`${got.rejected} حركة صرف في ${day} بصيغة غير معروفة`);
       moves.push(...got.items);
     }
     const { rows, unread } = aggregateMoves(moves);
     if (unread > 0) {
       counts.rejected += unread;
-      counts.problems.push(`${unread} بندَ صرفٍ في ${day} لم تُقرأ كمّيّتُه أو كلفتُه`);
+      counts.problems.push(`${unread} بند صرف في ${day} تعذّرت قراءة كمّيته أو تكلفته`);
     }
     await db.transaction(async (t) => {
       await t.delete(foodicsItemMoves).where(eq(foodicsItemMoves.businessDate, day));
@@ -431,7 +431,7 @@ export async function runFoodicsSync(options: SyncOptions): Promise<SyncResult> 
           const { refreshRecurringGaps } = await import("./finance-attention.service");
           await refreshRecurringGaps();
         } catch (e) {
-          counts.problems.push(`تعذّر حسابُ الفرق المتكرّر في الأصناف: ${e instanceof Error ? e.message : String(e)}`);
+          counts.problems.push(`تعذّر حساب الفروقات المتكررة في الأصناف: ${e instanceof Error ? e.message : String(e)}`);
         }
       }
     }
@@ -495,8 +495,8 @@ export async function fetchFoodicsCatalog(): Promise<{ file: { fileName: string 
   ]);
   const stock = catalogItemsFromApi(items.items);
   const menu = catalogProductsFromApi(products.items);
-  if (items.rejected > 0) stock.warnings.push(`${items.rejected} صنفَ مخزونٍ لم يطابق الصيغة المعروفة — لم يُقرأ.`);
-  if (products.rejected > 0) menu.products.warnings.push(`${products.rejected} صنفاً مباعاً لم يطابق الصيغة المعروفة — لم يُقرأ.`);
+  if (items.rejected > 0) stock.warnings.push(`${items.rejected} صنف مخزون بصيغة غير معروفة، ولم يُقرأ.`);
+  if (products.rejected > 0) menu.products.warnings.push(`${products.rejected} صنفاً مباعاً بصيغة غير معروفة، ولم يُقرأ.`);
   return [
     { file: { fileName: "فودكس · أصناف المخزون" }, result: stock },
     { file: { fileName: "فودكس · الأصناف المباعة" }, result: menu.products },

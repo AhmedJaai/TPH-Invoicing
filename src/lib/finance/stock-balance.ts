@@ -22,9 +22,9 @@ import { SUSPECT_FLOOR_MINOR, SUSPECT_GAP_MULTIPLE } from "./stock-flow";
 export type PurchaseSource = "INVOICES" | "FOODICS" | "SAME";
 
 export const PURCHASE_SOURCE_LABEL: Record<PurchaseSource, string> = {
-  INVOICES: "فواتيرُنا أكمل",
+  INVOICES: "الفواتير أكمل",
   FOODICS: "فودكس أكمل",
-  SAME: "المصدران متّفقان",
+  SAME: "المصدران متفقان",
 };
 
 /** دون هذا الفرق (بنقاط الأساس) يُعدّ المصدران متّفقَين. */
@@ -67,10 +67,10 @@ export type BalanceNote =
   | "SUSPECT_ENTRY";
 
 export const BALANCE_NOTE_LABEL: Record<BalanceNote, string> = {
-  NO_PURCHASES: "لا شراءَ مسجَّلاً له — لا في فواتيرنا المربوطة ولا في فودكس",
-  NO_RECIPE: "لا وصفةَ تصل إليه — المباعُ منه غير معروف",
-  SOLD_MORE_THAN_BOUGHT: "بِيع منه أكثر ممّا سُجّل شراؤه — شراءٌ لم يُسجَّل",
-  SUSPECT_ENTRY: "رقمٌ مشكوكٌ فيه: عدٌّ أو كمّيّةُ شراءٍ أُدخلت خطأً",
+  NO_PURCHASES: "لا يوجد شراء مسجّل لهذا الصنف، لا في الفواتير المربوطة ولا في فودكس",
+  NO_RECIPE: "لا توجد وصفة تستخدم هذا الصنف، فالمباع منه غير معروف",
+  SOLD_MORE_THAN_BOUGHT: "المباع منه أكثر من المشتريات المسجّلة، فهناك مشتريات لم تُسجَّل",
+  SUSPECT_ENTRY: "رقم مشكوك فيه: قد يكون جرداً أو كمية شراء أُدخلت خطأً",
 };
 
 export interface BalanceItem {

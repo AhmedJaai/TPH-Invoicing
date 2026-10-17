@@ -94,7 +94,7 @@ export function RecipeEditor({
     setMessage(null);
     setLines([{ productId: "", quantity: "", unit: "G", prepLossPercent: "" }]);
     setOpen(false);
-    toast({ tone: "ok", title: String(r.data.message ?? "حُفظت الوصفة وفُعِّلت.") });
+    toast({ tone: "ok", title: String(r.data.message ?? "تم حفظ الوصفة وتفعيلها.") });
     router.refresh();
   }
 
@@ -102,20 +102,20 @@ export function RecipeEditor({
     <>
       <button type="button" onClick={() => setOpen(true)} className={buttonClass(variant, "sm")}>
         <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-        وصفةٌ جديدة
+        وصفة جديدة
       </button>
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
         size="lg"
-        title="وصفةٌ جديدة أو نسخةٌ جديدة"
-        description="غيّرتَ الجرعة؟ اكتب نسخةً بتاريخ التغيير — وتُغلَق السابقةُ في اليوم الذي قبله، فتبقى تقاريرُ ما مضى محسوبةً بما كان عاملاً فيها."
+        title="وصفة جديدة أو نسخة جديدة"
+        description="هل تغيّرت الكمية؟ أضف نسخة جديدة بتاريخ التغيير. تُغلق النسخة السابقة في اليوم الذي قبله، فتبقى تقارير الفترات الماضية محسوبة بالوصفة التي كانت سارية فيها."
         footer={
           <>
             {message && <p role={failed ? "alert" : "status"} className={`me-auto self-center text-xs ${failed ? "text-danger" : "text-ok"}`}>{message}</p>}
             <button type="button" onClick={() => setOpen(false)} className={buttonClass("quiet")}>إلغاء</button>
             <button aria-busy={busy} type="button" onClick={save} disabled={busy || !ready} className={buttonClass("primary")}>
-              احفظ النسخة وفعِّلها
+              احفظ النسخة وفعّلها
             </button>
           </>
         }
@@ -178,7 +178,7 @@ export function RecipeEditor({
                 </select>
               </label>
               <label>
-                <span className="block text-[11px] font-medium text-muted">فاقدُ التجهيز ٪</span>
+                <span className="block text-[11px] font-medium text-muted">فاقد التجهيز ٪</span>
                 <input
                   type="text" inputMode="decimal" dir="ltr"
                   value={line.prepLossPercent}
@@ -206,12 +206,12 @@ export function RecipeEditor({
           className={`${buttonClass("subtle", "sm")} mt-3`}
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          أضِف مكوّناً
+          أضف مكوّناً
         </button>
 
         <p className="mt-4 text-[11px] leading-relaxed text-muted">
-          «فاقدُ التجهيز» نسبةُ ما يُصرَف من الرفّ ولا يصل الكوب — يُترَك فارغاً إن لم يُقَس، ولا يُفترَض صفراً
-          في الحساب إلّا بمعنى «لم يُقَس».
+          «فاقد التجهيز» هو نسبة ما يُصرف من الرف ولا يصل إلى الكوب. اتركه فارغاً إن لم تقِسه؛
+          الفراغ يعني «لم يُقَس» وليس صفراً في الحساب.
         </p>
       </Sheet>
     </>

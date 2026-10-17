@@ -19,7 +19,7 @@ import { loadPaymentRun } from "@/services/payment-run.service";
 export const runtime = "nodejs";
 
 const Body = z.object({
-  month: z.string().regex(/^\d{4}-\d{2}$/, "شهر غير صالح"),
+  month: z.string().regex(/^\d{4}-\d{2}$/, "الشهر غير صالح"),
   /** مورّدون بأعيانهم من الجاهزين — وغيابُه «الكلّ». */
   suppliers: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)).max(500).optional(),
   /** فواتيرُ جاهزةٌ تُستثنى هذه المرّة — معرّفاتٌ وحدها. */
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
   const only = read.body.suppliers ? new Set(read.body.suppliers) : null;
   const ready = only ? full.ready.filter((r) => only.has(r.supplierId)) : full.ready;
   if (ready.length === 0) {
-    return NextResponse.json({ error: "لا مورّد جاهزاً في ما اخترته — حدّث الصفحة." }, { status: 400 });
+    return NextResponse.json({ error: "لا يوجد مورّد جاهز للدفع ضمن اختيارك. حدّث الصفحة." }, { status: 400 });
   }
   const chosen = { ...full, ready, readyTotalMinor: ready.reduce((s, r) => s + r.totalMinor, 0) };
 
@@ -75,13 +75,13 @@ export async function POST(request: Request) {
     if (only && !only.has(p.supplierId)) continue;
     const minor = parseRiyals(p.amount);
     if (minor === null) {
-      return NextResponse.json({ error: "مبلغٌ جزئيّ لا يُقرأ — اكتبه بالريال مثل 1500.00" }, { status: 400 });
+      return NextResponse.json({ error: "تعذّرت قراءة المبلغ الجزئي. اكتبه بالريال، مثل 1500.00" }, { status: 400 });
     }
     partialBySupplier.set(p.supplierId, minor);
   }
   const applied = applyPartialAmounts(chosen, partialBySupplier);
   if (applied.errors.length > 0) {
-    return NextResponse.json({ error: `${applied.errors.join(" · ")} — لم يُنزَّل ملفّ.` }, { status: 409 });
+    return NextResponse.json({ error: `${applied.errors.join(" · ")}. لم يُنزَّل أي ملف.` }, { status: 409 });
   }
   const run = applied.run;
   const partials = run.ready.filter((s) => s.fullMinor !== undefined);
@@ -100,11 +100,11 @@ export async function POST(request: Request) {
       "جاهز بالهللات": run.readyTotalMinor,
       "محجوز بالهللات": run.heldTotalMinor,
       مورّدون: run.ready.length,
-      "بلا حسابٍ معروف": suppliersMissingAccount(run, accounts).map((s) => s.supplierName),
-      ...(only ? { "اختيارٌ من الجاهزين": `${run.ready.length} من ${full.ready.length}` } : {}),
+      "بلا حساب معروف": suppliersMissingAccount(run, accounts).map((s) => s.supplierName),
+      ...(only ? { "اختيار من الجاهزين": `${run.ready.length} من ${full.ready.length}` } : {}),
       ...(read.body.excludeInvoices?.length ? { "فواتير مستثناة": read.body.excludeInvoices.length } : {}),
       ...(partials.length > 0
-        ? { "دفعٌ جزئيّ": partials.map((s) => ({ المورّد: s.supplierName, يُحوَّل_بالهللات: s.totalMinor, من_بالهللات: s.fullMinor })) }
+        ? { "دفع جزئيّ": partials.map((s) => ({ المورّد: s.supplierName, يُحوَّل_بالهللات: s.totalMinor, من_بالهللات: s.fullMinor })) }
         : {}),
       ...(byOwner.length > 0
         ? { "بقرار المالك وهي محجوزة": byOwner.map((o) => ({ الفاتورة: o.invoice.invoiceNumber, سبب_الحجز: o.reason, سبب_القرار: o.override?.note ?? null })) }

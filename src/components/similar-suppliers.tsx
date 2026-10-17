@@ -40,15 +40,15 @@ export function SimilarSuppliers({
   if (similar.length === 0) return null;
   return (
     <div role="alert" className="mt-2 rounded-lg border border-warn/40 bg-warn-bg/40 p-2.5">
-      <p className="text-[11px] font-bold text-ink">يشبه مورّداً مسجَّلاً — أهو هو؟</p>
+      <p className="text-[11px] font-bold text-ink">يشبه مورّداً مسجّلاً. هل هو نفسه؟</p>
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
         {similar.map((s) => (
           <button key={s.id} type="button" disabled={busy} onClick={() => onPick(s)} className={buttonClass("secondary", "sm")}>
-            هو «{s.nameAr}»
+            نعم، هو «{s.nameAr}»
           </button>
         ))}
         <button type="button" disabled={busy} aria-busy={busy} onClick={onCreateAnyway} className={buttonClass("quiet", "sm")}>
-          لا — أنشئه جديداً
+          لا، أنشئه مورّداً جديداً
         </button>
       </div>
     </div>

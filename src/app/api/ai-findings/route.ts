@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       const finding = await loadFinding(body.findingId);
       if (actionTouchesMoney(finding.action) && !can(user.role, "payment:approve")) {
         return NextResponse.json(
-          { error: "إقرار هذا الاقتراح يكتب سداداً، وهو لمن يعتمد السداد — اطلبه من المالك" },
+          { error: "اعتماد هذا الاقتراح يسجّل سداداً، وهو متاح لمن يملك صلاحية اعتماد السداد. اطلب ذلك من المالك." },
           { status: 403 },
         );
       }
@@ -66,6 +66,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: e.message }, { status: e.status });
     }
     console.error("[ai-findings]", e);
-    return NextResponse.json({ error: "تعذّر حفظ القرار — لم يُكتب شيء" }, { status: 500 });
+    return NextResponse.json({ error: "تعذّر حفظ القرار ولم يُسجَّل أي شيء. حاول مرة أخرى." }, { status: 500 });
   }
 }

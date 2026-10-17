@@ -171,10 +171,10 @@ export function lensHref(lens: Lens): string {
 /** الألسنة: الكلّ، ثمّ الإشارات، ثمّ الأبوابُ التي فيها شيءٌ الآن — بعددها. */
 export function lensTabs(items: readonly AttentionItem[]): { lens: Lens; label: string; count: number }[] {
   const tabs: { lens: Lens; label: string; count: number }[] = [
-    { lens: "all", label: "الكلّ", count: items.length },
+    { lens: "all", label: "الكل", count: items.length },
   ];
   const signals = items.filter(isSignal).length;
-  if (signals > 0) tabs.push({ lens: "signals", label: "إشاراتٌ في المال", count: signals });
+  if (signals > 0) tabs.push({ lens: "signals", label: "تنبيهات مالية", count: signals });
   for (const area of AREAS) {
     const n = items.filter((i) => i.area === area).length;
     if (n > 0) tabs.push({ lens: area, label: AREA_LABEL[area], count: n });

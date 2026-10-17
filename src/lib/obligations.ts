@@ -27,7 +27,7 @@ export const OBLIGATION_KIND_LABEL: Record<ObligationKind, string> = {
   IQAMA: "إقامة",
   LEASE: "عقد الإيجار",
   INSURANCE: "تأمين",
-  SUBSCRIPTION: "اشتراكٌ أو عقدُ خدمة",
+  SUBSCRIPTION: "اشتراك أو عقد خدمة",
   OTHER: "أخرى",
 };
 

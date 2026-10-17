@@ -37,8 +37,8 @@ async function setup(tx: Tx) {
   return { actorId, branch, coffee, milk, sp };
 }
 
-describe("ربطُ بنود الفواتير من الجرد", () => {
-  it("غيرُ المربوط يظهر بحاله، والربطُ مع العبوة يُدخل ٥ × ١ كجم = ٥٠٠٠ جرام", () =>
+describe("ربط بنود الفواتير من الجرد", () => {
+  it("غير المربوط يظهر بحاله، والربط مع العبوة يدخل ٥ × ١ كجم = ٥٠٠٠ جرام", () =>
     withRollback(async (tx) => {
       const { actorId, branch, coffee, sp } = await setup(tx);
       const { countId } = await startCount({ periodStart: WEEK.start, periodEnd: WEEK.end, branchId: branch.id, actorId }, tx);
@@ -65,7 +65,7 @@ describe("ربطُ بنود الفواتير من الجرد", () => {
       expect(audit.n).toBe(1);
     }));
 
-  it("والربطُ يبقى: فاتورةُ الأسبوع التالي من الصنف نفسه تدخل بلا سؤال", () =>
+  it("والربط يبقى: فاتورة الأسبوع التالي من الصنف نفسه تدخل بلا سؤال", () =>
     withRollback(async (tx) => {
       const { actorId, coffee, sp } = await setup(tx);
       await savePurchaseLink({ supplierProductId: sp, productId: coffee, packSize: "1", contentQuantity: "1", contentUnit: "KG" }, actorId, tx);
@@ -84,7 +84,7 @@ describe("ربطُ بنود الفواتير من الجرد", () => {
       expect(next.find((r) => r.supplierProductId === sp)?.status).toBe("LINKED");
     }));
 
-  it("اللترُ لا يُحوَّل إلى جرام — يُرفَض ولا يُكتَب شيء", () =>
+  it("اللتر لا يحوّل إلى جرام — يرفض ولا يكتب شيء", () =>
     withRollback(async (tx) => {
       const { actorId, coffee, sp } = await setup(tx);
       const e = await caught(savePurchaseLink(
@@ -97,7 +97,7 @@ describe("ربطُ بنود الفواتير من الجرد", () => {
       expect(row).toEqual({ product_id: null, content_unit: null });
     }));
 
-  it("والصفرُ ليس عبوة", () =>
+  it("والصفر ليس عبوة", () =>
     withRollback(async (tx) => {
       const { actorId, coffee, sp } = await setup(tx);
       const e = await caught(savePurchaseLink(
@@ -106,7 +106,7 @@ describe("ربطُ بنود الفواتير من الجرد", () => {
       expect(e).toBeInstanceOf(PurchaseLinkRefused);
     }));
 
-  it("كما في الإنتاج: فاتورةٌ تُحفَظ فيُبنى صنفُ مورّدها، ويُربَط مرّةً فتدخل التاليةُ مربوطةً وحدها", () =>
+  it("كما في الإنتاج: فاتورة تحفظ فيبنى صنف مورّدها، ويربط مرّةً فتدخل التالية مربوطةً وحدها", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const coffee = await makeStockProduct(tx, "بنّ أوغندا", "G", "COFFEE");
@@ -132,7 +132,7 @@ describe("ربطُ بنود الفواتير من الجرد", () => {
       expect(next.countedText).not.toBeNull();
     }));
 
-  it("إعادةُ قراءة الفاتورة لا تفكّ الاستلامَ المربوط ببندها — فلا تُحسَب البضاعةُ مرّتين", () =>
+  it("إعادة قراءة الفاتورة لا تفكّ الاستلام المربوط ببندها — فلا تحسب البضاعة مرّتين", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);
@@ -171,7 +171,7 @@ describe("ربطُ بنود الفواتير من الجرد", () => {
       expect(only.n).toBe(1);
     }));
 
-  it("بندان بالوصف نفسه يُقرنان بالكمّيّة لا بالترتيب — والمربوطُ الغائب يُردّ لا يُحذف", () =>
+  it("بندان بالوصف نفسه يقرنان بالكمّيّة لا بالترتيب — والمربوط الغائب يردّ لا يحذف", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const branch = await makeBranch(tx);

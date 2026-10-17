@@ -23,11 +23,11 @@ export interface FixFields {
 
 const LABEL: Record<keyof FixFields, string> = {
   invoiceNumber: "رقم الفاتورة",
-  sellerVat: "الرقم الضريبيّ للبائع",
-  buyerVat: "الرقم الضريبيّ للمشتري",
+  sellerVat: "الرقم الضريبي للبائع",
+  buyerVat: "الرقم الضريبي للمشتري",
   subtotal: "قبل الضريبة",
   vat: "الضريبة",
-  total: "الإجماليّ",
+  total: "الإجمالي",
   discount: "الخصم",
   charges: "الرسوم",
   invoiceDate: "التاريخ",
@@ -54,7 +54,7 @@ export function fixChanges(
   const show = (field: keyof FixFields, value: string): string => {
     const v = value.trim();
     if (v === "") return "فارغ";
-    if (field === "supplierId") return supplierName(v) ?? "مورّدٌ آخر";
+    if (field === "supplierId") return supplierName(v) ?? "مورّد آخر";
     if (MONEY.includes(field)) {
       const minor = parseRiyals(v);
       return minor === null ? v : formatRiyalsDisplay(minor);

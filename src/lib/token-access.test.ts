@@ -25,7 +25,7 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 describe("رمز الدرايف", () => {
-  it("لا يُقرأ accounts.refresh_token إلّا من مواضعه", () => {
+  it("لا يقرأ accounts.refresh_token إلّا من مواضعه", () => {
     const offenders = walk("src").filter((f) => !ALLOWED.has(f) && readFileSync(f, "utf8").includes("accounts.refresh_token"));
     expect(offenders).toEqual([]);
   });

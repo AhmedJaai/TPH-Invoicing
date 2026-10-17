@@ -34,18 +34,18 @@ export type ApiResult<T> =
 export const SESSION_EXPIRED_EVENT = "tph:session-expired";
 
 export const NETWORK_ERROR =
-  "تعذّر الاتصال بالخادم — لم يصل الطلب. تحقّق من الشبكة ثمّ أعد المحاولة.";
+  "تعذّر الاتصال بالخادم ولم يصل الطلب. تحقّق من الشبكة ثم أعد المحاولة.";
 
 /** رسالةٌ لرمز حالةٍ لم يرسل الخادمُ معه نصّاً يُقرأ. */
 export function messageForStatus(status: number): string {
-  if (status === 401) return "انتهت جلستك — سجّل الدخول ثانيةً، وما لم يُحفظ باقٍ في هذه الصفحة.";
-  if (status === 403) return "هذا الفعل خارج صلاحيتك.";
-  if (status === 413) return "الملفّ أكبر من الحدّ الذي يقبله الخادم — صغّره أو قسّمه ثمّ أعد المحاولة.";
-  if (status === 429) return "تجاوزتَ حدّ الاستعمال مؤقّتاً — انتظر قليلاً ثمّ أعد المحاولة.";
+  if (status === 401) return "انتهت جلستك. سجّل الدخول مرة أخرى، وما لم يُحفظ ما زال في هذه الصفحة.";
+  if (status === 403) return "ليست لديك صلاحية لهذا الإجراء.";
+  if (status === 413) return "الملف أكبر من الحد الذي يقبله الخادم. صغّره أو قسّمه ثم أعد المحاولة.";
+  if (status === 429) return "تجاوزت الحد المسموح من الطلبات مؤقتاً. انتظر قليلاً ثم أعد المحاولة.";
   if (status === 504 || status === 502) {
-    return "تأخّر الخادم فأُوقف الطلب قبل أن يكتمل — قد يكون بعضه حُفظ، فتحقّق قبل إعادة المحاولة.";
+    return "تأخّر الخادم فتوقّف الطلب قبل أن يكتمل. قد يكون بعضه قد حُفظ، فتحقّق قبل إعادة المحاولة.";
   }
-  return `ردّ الخادم بخطأ (الرمز ${status}) — أعد المحاولة، فإن تكرّر فأبلِغ مالك الحساب.`;
+  return `حدث خطأ في الخادم (الرمز ${status}). أعد المحاولة، فإن تكرّر فأبلغ مالك الحساب.`;
 }
 
 export async function readResponse<T = Record<string, unknown>>(res: Response): Promise<ApiResult<T>> {
@@ -74,7 +74,7 @@ export async function readResponse<T = Record<string, unknown>>(res: Response): 
     ok: false,
     status: res.status,
     error: res.ok
-      ? `ردّ الخادم بما لا يُقرأ (الرمز ${res.status}) — أعد المحاولة.`
+      ? `ردّ الخادم بما لا يمكن قراءته (الرمز ${res.status}). أعد المحاولة.`
       : res.status === 401
         ? messageForStatus(401)
         : serverMessage ?? messageForStatus(res.status),

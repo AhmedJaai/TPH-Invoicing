@@ -18,8 +18,8 @@ async function someone(tx: Tx): Promise<string> {
   return u.id;
 }
 
-describe("دفعةٌ بلا مورّد ولا حركة — تُحسَم ولا تبقى في الطابور", () => {
-  it("تُنسَب إلى مورّد، ولا تُنسَب ثانيةً", () =>
+describe("دفعة بلا مورّد ولا حركة — تحسم ولا تبقى في الطابور", () => {
+  it("تنسب إلى مورّد، ولا تنسب ثانيةً", () =>
     withRollback(async (tx) => {
       const id = await orphan(tx);
       const who = await someone(tx);
@@ -33,7 +33,7 @@ describe("دفعةٌ بلا مورّد ولا حركة — تُحسَم ولا �
       expect(e).toBeInstanceOf(OrphanPaymentError);
     }));
 
-  it("تُلغى بسببها ولا تُحذَف", () =>
+  it("تلغى بسببها ولا تحذف", () =>
     withRollback(async (tx) => {
       const id = await orphan(tx);
       await resolveOrphanPayment(tx, { action: "void", paymentId: id, reason: "أجرة — ليست لمورّد" }, await someone(tx));

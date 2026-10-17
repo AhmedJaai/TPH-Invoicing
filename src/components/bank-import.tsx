@@ -121,7 +121,7 @@ function UnknownRow({
       category,
       supplierId: needsSupplier ? supplierId : undefined,
     });
-    setMessage(r.ok ? (r.data.message ?? "حُفظت") : r.error);
+    setMessage(r.ok ? (r.data.message ?? "تم الحفظ") : r.error);
     setState(r.ok ? "saved" : "error");
     if (r.ok) onLearned();
   };
@@ -143,7 +143,7 @@ function UnknownRow({
       ) : (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <select
-            aria-label="باب الحركة"
+            aria-label="تصنيف الحركة"
             value={category}
             onChange={(e) => setCategory(e.target.value as TxCategory)}
             className={`min-w-[8rem] ${field}`}
@@ -155,10 +155,10 @@ function UnknownRow({
 
 
           <input
-            aria-label="النصّ المميِّز في وصف الحركة"
+            aria-label="النص المميّز في وصف الحركة"
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
-            placeholder="النصّ المميِّز في وصف الحركة"
+            placeholder="النص المميّز في وصف الحركة"
             dir="auto"
             className={`min-w-[9rem] flex-1 ${field}`}
           />
@@ -197,7 +197,7 @@ function UnknownRow({
  * خطوات الاستيراد، ظاهرةً — والخطوةُ تُشتقّ من الحال لا تُخزَّن: حالٌ
  * ثانية تُخزَّن هي حالٌ ثانية قد تخالف الأولى.
  */
-const STEPS = ["اختر الملفّ", "راجع المعاينة", "قيِّد الجديد", "النتيجة"] as const;
+const STEPS = ["اختر الملف", "راجع المعاينة", "قيّد الجديد", "النتيجة"] as const;
 
 function FlowSteps({ current, failed }: { current: number; failed: boolean }) {
   return (
@@ -216,7 +216,7 @@ function FlowSteps({ current, failed }: { current: number; failed: boolean }) {
               {state === "done" && <Check className="h-3 w-3 shrink-0 text-ok" strokeWidth={2.5} aria-hidden />}
               <span className="truncate">{label}</span>
               <span className="sr-only">
-                {state === "done" ? " — تمّت" : state === "current" ? " — الخطوة الحاليّة" : state === "failed" ? " — تعثّرت" : ""}
+                {state === "done" ? " — تمت" : state === "current" ? " — الخطوة الحالية" : state === "failed" ? " — تعثّرت" : ""}
               </span>
             </span>
           </li>
@@ -265,7 +265,7 @@ export function BankImport({
         setDone(message);
         setData(null);
         setLearned(0);
-        toast({ tone: "ok", title: "استُورد الكشف", body: message });
+        toast({ tone: "ok", title: "تم استيراد الكشف", body: message });
         router.refresh();
       } else {
         setData(r.data);
@@ -329,16 +329,16 @@ export function BankImport({
             </span>
             {busy === "reading" ? (
               <span role="status">
-                <span className="block text-sm font-bold">يقرأ «{fileName}»…</span>
-                <span className="mt-1 block text-xs text-muted">يعرف الجديد من المقيَّد ثمّ يرجّح المطابقات — قد يستغرق دقيقة. لا يُحفظ شيء بعد.</span>
+                <span className="block text-sm font-bold">جارٍ قراءة «{fileName}»…</span>
+                <span className="mt-1 block text-xs text-muted">يميّز الجديد من المقيّد ثم يرجّح المطابقات، وقد يستغرق ذلك دقيقة. لا يُحفظ شيء بعد.</span>
               </span>
             ) : (
               <span>
-                <span className="block text-sm font-bold">اختر ملفّ كشف الحساب أو أفلته هنا</span>
-                <span className="mt-1 block text-xs text-muted">Excel أو CSV أو PDF نصّيّ من بنكك — تُعرَض عليك معاينةٌ ولا يُحفظ شيء قبل أن تقيّده.</span>
+                <span className="block text-sm font-bold">اختر ملف كشف الحساب أو أفلته هنا</span>
+                <span className="mt-1 block text-xs text-muted">ملف Excel أو CSV أو PDF نصي من بنكك. تظهر لك معاينة، ولا يُحفظ شيء قبل أن تقيّده.</span>
               </span>
             )}
-            {!busy && <span className={buttonClass("secondary", "sm")}>تصفّح الملفّات</span>}
+            {!busy && <span className={buttonClass("secondary", "sm")}>تصفّح الملفات</span>}
           </label>
         )}
 
@@ -348,7 +348,7 @@ export function BankImport({
             <CircleAlert className="mt-0.5 h-[18px] w-[18px] shrink-0 text-danger" strokeWidth={2} aria-hidden />
             <div className="min-w-0 flex-1 text-xs leading-relaxed text-ink-soft">
               <p className="text-[13px] font-bold text-danger">
-                {error.during === "applying" ? "لم يُقيَّد الكشف" : "تعذّرت قراءة الملفّ"}
+                {error.during === "applying" ? "تعذّر قيد الكشف" : "تعذّرت قراءة الملف"}
               </p>
               <p className="mt-0.5">{error.message}</p>
             </div>
@@ -365,7 +365,7 @@ export function BankImport({
                 </button>
               )}
               <button type="button" onClick={reset} disabled={busy !== null} className={buttonClass("quiet", "sm")}>
-                اختر ملفّاً آخر
+                اختر ملفاً آخر
               </button>
             </div>
           </div>
@@ -381,7 +381,7 @@ export function BankImport({
             </div>
             <div className="flex flex-wrap gap-2">
               <a href="#queue" className={buttonClass("primary", "sm")}>
-                انظر ما ينتظر قرارك
+                اعرض ما ينتظر قرارك
                 <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
               </a>
               <button type="button" onClick={reset} className={buttonClass("secondary", "sm")}>استورد كشفاً آخر</button>
@@ -412,7 +412,7 @@ export function BankImport({
       */}
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line-soft bg-sunken/40 px-4 py-3 text-xs text-muted sm:px-5">
         <Info className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-        دفعتَ نقداً أو من حسابك الشخصيّ؟ يُسجَّل لكلّ فاتورةٍ وحدها من قائمة الفواتير.
+        هل دفعت نقداً أو من حسابك الشخصي؟ يُسجَّل ذلك لكل فاتورة على حدة من قائمة الفواتير.
         <Link href="/purchases/invoices?paid=OPEN" className="inline-flex min-h-11 items-center font-bold text-accent hover:underline sm:min-h-0">
           {openInvoiceCount > 0 ? `${countNoun(openInvoiceCount, INVOICE)} مفتوحة` : "قائمة الفواتير"}
           <ArrowLeft className="ms-0.5 h-3.5 w-3.5" strokeWidth={2} aria-hidden />
@@ -460,7 +460,7 @@ function PreviewPanel({
         </div>
         <button type="button" onClick={onCancel} disabled={busy !== null} className={buttonClass("quiet", "sm")}>
           <X className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          ألغِ
+          إلغاء
         </button>
       </div>
 
@@ -475,48 +475,48 @@ function PreviewPanel({
           </p>
           {data.sync && (
             <p className="mt-1 text-xs text-muted">
-              <span className="nums">{data.sync.inFile}</span> في الملفّ · <span className="nums">{data.sync.alreadyKnown}</span> مسجّلة عندك
-              {data.sync.byReference > 0 && ` (${countNoun(data.sync.byReference, TRANSACTION)} عرفناها برقم العمليّة)`}
+              <span className="nums">{data.sync.inFile}</span> في الملف · <span className="nums">{data.sync.alreadyKnown}</span> مسجّلة لديك
+              {data.sync.byReference > 0 && ` (${countNoun(data.sync.byReference, TRANSACTION)} تعرّفنا عليها برقم العملية)`}
             </p>
           )}
         </div>
         {!nothingNew && (
           <dl className="grid grid-cols-3 gap-2 text-center">
-            <Mini label="ستُطابَق فواتير" value={s.matchedInvoices} tone="ok" />
-            <Mini label="عُرف مورّدها بلا فاتورة" value={s.supplierOnly} />
-            <Mini label="تحتاجك" value={s.unknown} tone={s.unknown > 0 ? "warn" : undefined} />
+            <Mini label="ستطابق فواتير" value={s.matchedInvoices} tone="ok" />
+            <Mini label="مورّدها معروف بلا فاتورة" value={s.supplierOnly} />
+            <Mini label="تحتاج قرارك" value={s.unknown} tone={s.unknown > 0 ? "warn" : undefined} />
           </dl>
         )}
       </div>
 
       {/* ── ما يجب أن يُعرف قبل التقييد — الغائبُ لا يُرى ── */}
       {s.coverage && s.coverage.gaps.length > 0 && (
-        <Warn title="فجوةٌ في التغطية — أيّامٌ لم يُستورَد كشفُها">
+        <Warn title="فجوة في التغطية: أيام لم يُستورد كشفها">
           <ul className="mt-1 space-y-0.5">
             {s.coverage.gaps.slice(0, 4).map((g, i) => (
               <li key={i}><bdi>{formatDay(g.start)}</bdi> إلى <bdi>{formatDay(g.end)}</bdi> ({countNoun(g.days, DAY)})</li>
             ))}
           </ul>
-          <p className="mt-1">حركاتُ هذه الأيّام غائبة، ولن تظهر ناقصةً في أيّ تقرير — ارفع كشفها لتكتمل.</p>
+          <p className="mt-1">حركات هذه الأيام غائبة ولن يظهر في أي تقرير أنها ناقصة. ارفع كشفها لتكتمل البيانات.</p>
         </Warn>
       )}
       {(data.sync?.closedMonthRows ?? 0) > 0 && (
-        <Warn title={`${countNoun(data.sync?.closedMonthRows ?? 0, TRANSACTION)} في شهرٍ مقفل — لا تُقيَّد`}>
-          ({(data.sync?.closedMonths ?? []).join("، ")}). إن كانت مقصودة فأعد فتح الشهر من «إقفال الشهر» ثمّ استورد الكشف ثانيةً.
+        <Warn title={`${countNoun(data.sync?.closedMonthRows ?? 0, TRANSACTION)} في شهر مقفل ولن تُقيَّد`}>
+          ({(data.sync?.closedMonths ?? []).join("، ")}). إن كنت تريد قيدها فأعد فتح الشهر من «إقفال الشهر» ثم استورد الكشف مرة أخرى.
         </Warn>
       )}
       {s.exact === false && (
-        <Warn title="التوزيعُ تقريبيّ — لا مثبت">
-          الاحتمالاتُ أكثر من أن تُستقصى كلُّها، فتوقّف البحث عند أفضل ما بلغه. ولذلك لا يُطابَق شيءٌ تلقائياً هنا: كلُّه اقتراحٌ ينتظر تأكيدك.
+        <Warn title="التوزيع تقريبي وغير مؤكَّد">
+          الاحتمالات أكثر من أن يستطيع النظام فحصها كلها، فتوقّف البحث عند أفضل نتيجة وصل إليها. لذلك لا تتم أي مطابقة تلقائياً هنا، وكلها اقتراحات تنتظر تأكيدك.
         </Warn>
       )}
       {s.duplicateGroups > 0 && (
-        <Warn tone="danger" title={`${countNoun(s.duplicateGroups, GROUP)} يُشتبه بتكرار دفعها`}>
+        <Warn tone="danger" title={`${countNoun(s.duplicateGroups, GROUP)} يُشتبه في تكرار دفعها`}>
           راجعها بعد الاستيراد في «يحتاج قرارك».
         </Warn>
       )}
       {data.sync && data.sync.ambiguous > 0 && (
-        <Warn title={`${countNoun(data.sync.ambiguous, TRANSACTION)} قد تكون مكرَّرة — لن تُضاف ولن تُحذف`}>
+        <Warn title={`${countNoun(data.sync.ambiguous, TRANSACTION)} قد تكون مكرّرة، ولن تُضاف ولن تُحذف`}>
           <ul className="mt-1 space-y-1">
             {(data.sync.ambiguousRows ?? []).map((a, i) => (
               <li key={i}>
@@ -527,8 +527,8 @@ function PreviewPanel({
         </Warn>
       )}
       {data.sync && (data.sync.missingFromFile ?? 0) > 0 && (
-        <Warn tone="danger" title={`${countNoun(data.sync.missingFromFile ?? 0, TRANSACTION)} عندك في مدّة هذا الكشف وليست فيه`}>
-          مكرّرةٌ دخلت مرّتين، أو حركةٌ لم تقع — وهي تُفسد رصيد البنك. بعد الاستيراد تجدها في صفحة البنك: «احذفها» أو «أبقِها».
+        <Warn tone="danger" title={`${countNoun(data.sync.missingFromFile ?? 0, TRANSACTION)} موجودة لديك في فترة هذا الكشف وليست فيه`}>
+          قد تكون حركة مكرّرة دخلت مرتين، أو حركة لم تحدث فعلاً، وهي تُفسد رصيد البنك. بعد الاستيراد تجدها في صفحة البنك لتختار «احذفها» أو «أبقها».
           <ul className="mt-1 space-y-1">
             {(data.sync.missingFromFileRows ?? []).map((m, i) => (
               <li key={i}>
@@ -550,7 +550,7 @@ function PreviewPanel({
 
       {learnedCats.length > 0 && (
         <div>
-          <p className="text-[11px] font-bold text-muted">صُنّف بقواعدك</p>
+          <p className="text-[11px] font-bold text-muted">صُنّفت بقواعدك</p>
           <ul className="mt-1.5 flex flex-wrap gap-1.5">
             {learnedCats.map((c) => (
               <li key={c.category}>
@@ -562,7 +562,7 @@ function PreviewPanel({
       )}
 
       {data.preview.length > 0 && (
-        <Block title="عيّنةٌ ممّا سيُطابَق">
+        <Block title="عيّنة ممّا سيُطابَق">
           {data.preview.slice(0, 8).map((p, i) => (
             <li key={i} className="flex items-center gap-3 px-4 py-2 text-xs">
               <bdi className="w-20 shrink-0 text-muted">{formatDay(p.date)}</bdi>
@@ -580,8 +580,8 @@ function PreviewPanel({
             {countNoun(data.unknown.length, TRANSACTION)} لم يُعرف مستفيدها
           </p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
-            صنّف كلّ حركةٍ مرّة — يُحفظ التصنيف قاعدةً تسري على ما يشبهها في كلّ كشفٍ بعده، ويخرج من مستحقّات المورّدين ما ليس لهم.
-            {learned > 0 && ` صُنّف منها ${countNoun(learned, TRANSACTION)} حتى الآن.`}
+            صنّف كل حركة مرة واحدة. يُحفظ التصنيف قاعدة تسري على ما يشبهها في كل كشف لاحق، ويخرج من مستحقات المورّدين ما ليس لهم.
+            {learned > 0 && ` صنّفت منها ${countNoun(learned, TRANSACTION)} حتى الآن.`}
           </p>
           <ul className="mt-2 max-h-[26rem] divide-y divide-line-soft overflow-y-auto rounded-xl border border-line">
             {data.unknown.map((u) => (
@@ -591,14 +591,14 @@ function PreviewPanel({
           {learned > 0 && (
             <button type="button" onClick={onRematch} disabled={busy !== null} className={`mt-2 w-full ${buttonClass("secondary", "sm")}`}>
               <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              {busy === "reading" ? "يعيد المطابقة…" : "أعد المعاينة بالأسماء الجديدة"}
+              {busy === "reading" ? "جارٍ إعادة المطابقة…" : "أعد المعاينة بالأسماء الجديدة"}
             </button>
           )}
         </div>
       )}
 
       {data.supplierOnlyList.length > 0 && (
-        <Block title="عُرف المورّد ولم تُطابَق فاتورة" hint="إمّا سُدّدت سلفاً أو لم تُرفع فاتورتُها — تظهر في الطابور بعد التقييد.">
+        <Block title="المورّد معروف ولم تُطابَق فاتورة" hint="إما أنك سدّدت مقدّماً أو لم ترفع فاتورتها. تظهر في قائمة «يحتاج قرارك» بعد القيد.">
           {data.supplierOnlyList.slice(0, 8).map((u, i) => (
             <li key={i} className="flex items-center gap-3 px-4 py-2 text-xs">
               <bdi className="w-20 shrink-0 text-muted">{formatDay(u.date)}</bdi>
@@ -613,17 +613,17 @@ function PreviewPanel({
       <div className="flex flex-wrap items-center gap-2 border-t border-line-soft pt-4">
         {nothingNew ? (
           <>
-            <p className="flex-1 text-sm text-muted">لا شيء يُقيَّد من هذا الملفّ — كلُّ حركاته عندك.</p>
-            <button type="button" onClick={onCancel} className={buttonClass("secondary")}>اختر ملفّاً آخر</button>
+            <p className="flex-1 text-sm text-muted">لا يوجد ما يُقيَّد من هذا الملف، فكل حركاته مسجّلة لديك.</p>
+            <button type="button" onClick={onCancel} className={buttonClass("secondary")}>اختر ملفاً آخر</button>
           </>
         ) : (
           <>
             <button type="button" onClick={onApply} disabled={busy !== null} className={buttonClass("primary")}>
               {busy === "applying"
-                ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden /> يقيّد…</>
-                : <><Check className="h-4 w-4" strokeWidth={2.25} aria-hidden /> قيِّد {countNoun(added, TRANSACTION)} وطابِق</>}
+                ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden /> جارٍ القيد…</>
+                : <><Check className="h-4 w-4" strokeWidth={2.25} aria-hidden /> قيّد {countNoun(added, TRANSACTION)} وطابق</>}
             </button>
-            <button type="button" onClick={onCancel} disabled={busy !== null} className={buttonClass("quiet")}>ألغِ — لا يُحفظ شيء</button>
+            <button type="button" onClick={onCancel} disabled={busy !== null} className={buttonClass("quiet")}>إلغاء، ولن يُحفظ شيء</button>
           </>
         )}
       </div>

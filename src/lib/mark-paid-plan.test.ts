@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { planHandPayments } from "./mark-paid-plan";
 
-describe("planHandPayments — دفعةٌ لكلّ حوالة لا لكلّ فاتورة", () => {
-  it("فاتورتان بالمبلغ نفسه لمورّدٍ واحد دفعةٌ واحدة بمجموعهما — لا توأمَين", () => {
+describe("planHandPayments — دفعة لكلّ حوالة لا لكلّ فاتورة", () => {
+  it("فاتورتان بالمبلغ نفسه لمورّد واحد دفعة واحدة بمجموعهما — لا توأمين", () => {
     const plan = planHandPayments([
       { invoiceId: "a", supplierId: "bikov", periodMonth: "2026-08", restMinor: 15_000 },
       { invoiceId: "b", supplierId: "bikov", periodMonth: "2026-08", restMinor: 15_000 },
@@ -18,7 +18,7 @@ describe("planHandPayments — دفعةٌ لكلّ حوالة لا لكلّ فا
     }]);
   });
 
-  it("شهرُ الدفعة الأحدثُ بين فواتيرها", () => {
+  it("شهر الدفعة الأحدث بين فواتيرها", () => {
     const [p] = planHandPayments([
       { invoiceId: "a", supplierId: "s", periodMonth: "2026-09", restMinor: 100 },
       { invoiceId: "b", supplierId: "s", periodMonth: "2026-07", restMinor: 200 },
@@ -27,7 +27,7 @@ describe("planHandPayments — دفعةٌ لكلّ حوالة لا لكلّ فا
     expect(p.amountMinor).toBe(300);
   });
 
-  it("لكلّ مورّدٍ دفعتُه، وما لا مورّدَ له لا يُجمَع", () => {
+  it("لكلّ مورّد دفعته، وما لا مورّد له لا يجمع", () => {
     const plan = planHandPayments([
       { invoiceId: "a", supplierId: "s1", periodMonth: "2026-08", restMinor: 100 },
       { invoiceId: "b", supplierId: null, periodMonth: "2026-08", restMinor: 100 },
@@ -40,7 +40,7 @@ describe("planHandPayments — دفعةٌ لكلّ حوالة لا لكلّ فا
     ]);
   });
 
-  it("ما سدّدته حوالةُ الكشف كلَّه لا يُكتب له شيء، ومجموعُ التخصيص يساوي الدفعة", () => {
+  it("ما سدّدته حوالة الكشف كلّه لا يكتب له شيء، ومجموع التخصيص يساوي الدفعة", () => {
     const plan = planHandPayments([
       { invoiceId: "a", supplierId: "s", periodMonth: "2026-08", restMinor: 0 },
       { invoiceId: "b", supplierId: "s", periodMonth: "2026-08", restMinor: 1 },

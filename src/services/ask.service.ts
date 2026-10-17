@@ -45,7 +45,7 @@ export async function answerQuestion(q: Question): Promise<Answer> {
       state: "ANSWER",
       label: `عليك لـ${supplier.nameAr} الآن`,
       amountMinor: balance?.owedMinor ?? 0,
-      basis: balance ? "المفتوحُ على فواتيره بعد خصم ما دفعتَه ولم يُنسَب" : "لا فواتيرَ مفتوحةً له ولا دفعات",
+      basis: balance ? "الفواتير المفتوحة بعد خصم ما دفعته ولم يُوزَّع على فواتير" : "لا توجد فواتير مفتوحة ولا دفعات لهذا المورّد",
       href: `/suppliers/${supplier.slug}`,
     };
   }
@@ -62,9 +62,9 @@ export async function answerQuestion(q: Question): Promise<Answer> {
       ));
     return {
       state: "ANSWER",
-      label: `دفعتَ لـ${supplier.nameAr} ${when}`,
+      label: `دفعت لـ${supplier.nameAr} ${when}`,
       amountMinor: Number(row?.sum ?? 0),
-      basis: `${row?.n ?? 0} دفعة قائمة — بلا الإشعارات الدائنة وما أُلغي`,
+      basis: `${row?.n ?? 0} دفعة سارية، دون الإشعارات الدائنة والدفعات الملغاة`,
       href: `/suppliers/${supplier.slug}?tab=payments#detail`,
     };
   }
@@ -75,9 +75,9 @@ export async function answerQuestion(q: Question): Promise<Answer> {
     .where(and(eq(invoices.supplierId, supplier.id), q.month ? eq(invoices.periodMonth, q.month) : undefined));
   return {
     state: "ANSWER",
-    label: `اشتريتَ من ${supplier.nameAr} ${when}`,
+    label: `اشتريت من ${supplier.nameAr} ${when}`,
     amountMinor: Number(row?.sum ?? 0),
-    basis: `${row?.n ?? 0} فاتورة مقيَّدة بشهرها المحاسبيّ — شاملةً الضريبة`,
+    basis: `${row?.n ?? 0} فاتورة مقيّدة في شهرها المحاسبي، شاملة الضريبة`,
     href: `/suppliers/${supplier.slug}?tab=invoices#detail`,
   };
 }

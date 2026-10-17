@@ -83,7 +83,7 @@ function within(amountMinor: number, usualMinor: number): boolean {
 }
 
 function labelOf(tx: DebitTx): string {
-  return tx.beneficiaryRaw?.trim() || (tx.description ?? "").trim().slice(0, 40) || "جهةٌ غير مسمّاة";
+  return tx.beneficiaryRaw?.trim() || (tx.description ?? "").trim().slice(0, 40) || "جهة غير مسمّاة";
 }
 
 /** مفتاحُ قرار الإنسان في اقتراحٍ أو ملاحظة — من هويّة الجهة لا من معرّف صفّ. */

@@ -25,7 +25,7 @@ const Body = z.object({
     والفارغُ «غير معروف» ومقبول.
   */
   vatNumber: z.string().max(30).optional()
-    .refine((v) => !v?.trim() || isValidSaudiVat(v), "الرقم الضريبيّ 15 رقماً يبدأ بـ3 وينتهي بـ3 — صحّحه أو اتركه فارغاً"),
+    .refine((v) => !v?.trim() || isValidSaudiVat(v), "الرقم الضريبي 15 رقماً، يبدأ بـ3 وينتهي بـ3. صحّحه أو اتركه فارغاً."),
   /** «هو غيرُ من يشبهونه» — بعد ردّ 409 `similar`. */
   confirmNew: z.boolean().optional(),
 });
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
   if (out.kind === "similar") {
     return NextResponse.json({
-      error: `يشبه ${out.similar.map((s) => `«${s.nameAr}»`).join(" و")} المسجَّل — اختره إن كان هو، أو أنشئه جديداً إن كان غيرَه`,
+      error: `الاسم يشبه مورّداً مسجّلاً: ${out.similar.map((s) => `«${s.nameAr}»`).join(" و")}. اختره إن كان هو نفسه، أو أنشئ مورّداً جديداً إن كان غيره.`,
       similar: out.similar,
     }, { status: 409 });
   }
@@ -78,13 +78,13 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true, existed: true, supplier,
       message: out.by === "VAT"
-        ? `هذا الرقمُ الضريبيّ مسجَّلٌ لـ«${out.nameAr}» — اختير هو`
+        ? `هذا الرقم الضريبي مسجّل للمورّد «${out.nameAr}»، فتم اختياره`
         : `«${out.nameAr}» مسجّل مسبقاً`,
     });
   }
 
   return NextResponse.json({
     ok: true, existed: false, supplier,
-    message: `أُنشئ «${nameAr}» برمز ${out.slug}`,
+    message: `تم إنشاء «${nameAr}» برمز ${out.slug}`,
   });
 }

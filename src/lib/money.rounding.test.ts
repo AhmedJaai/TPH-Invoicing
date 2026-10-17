@@ -17,7 +17,7 @@ describe("isSupplierRounding", () => {
     expect(isSupplierRounding(100_00, 15_00, 115_50)).toBe(true);
   });
 
-  it("حدّ التسامح ريالٌ واحد لا أكثر", () => {
+  it("حدّ التسامح ريال واحد لا أكثر", () => {
     expect(TOTAL_ROUNDING_TOLERANCE_MINOR).toBe(100);
     expect(isSupplierRounding(100_00, 15_00, 114_00)).toBe(true);
     expect(isSupplierRounding(100_00, 15_00, 113_99)).toBe(false);

@@ -253,10 +253,10 @@ export default async function DocumentsPage({
     const reasons = reasonsOf(r);
     if (reasons.length > 0) return { tone: "warn", lines: reasons.map((x) => x.what) };
     const v = verdicts.get(r.id);
-    if (!v) return { tone: "muted", lines: ["قرأه النموذج — افتح الملفّ وقارن ثمّ اعتمد."] };
-    if (v.verdict.auto || v.recordable) return { tone: "ok", lines: ["تجتمع فيه الشروط — يُحسَم تلقائياً، أو بـ«اعتمدها كلَّها» أعلاه."] };
+    if (!v) return { tone: "muted", lines: ["قرأه النموذج. افتح الملف وقارن ثم اعتمد."] };
+    if (v.verdict.auto || v.recordable) return { tone: "ok", lines: ["تتوفر فيه الشروط، فيُحسم تلقائياً أو بزر «اعتمدها كلها» أعلاه."] };
     const texts = v.missing.length > 0 ? v.missing : v.verdict.gaps.map((g) => GAP_TEXT[g]);
-    return { tone: "warn", lines: texts.length > 0 ? texts : ["قرأه النموذج — افتح الملفّ وقارن ثمّ اعتمد."] };
+    return { tone: "warn", lines: texts.length > 0 ? texts : ["قرأه النموذج. افتح الملف وقارن ثم اعتمد."] };
   };
 
   /* ── الروابط: الترشيحُ في العنوان ── */
@@ -292,9 +292,9 @@ export default async function DocumentsPage({
 
   const tabs = [
     { id: "WAITING", label: "ينتظر المراجعة", count: nWaiting, href: link({ status: "NEEDS_REVIEW" }) },
-    { id: "ARCHIVED", label: "أُرشف", count: nArchived, href: link({ status: "ARCHIVED" }) },
-    { id: "REJECTED", label: "رُفض", count: nRejected, href: link({ status: "REJECTED" }) },
-    { id: "ALL", label: "الكلّ", count: nAll, href: link({ status: "ALL" }) },
+    { id: "ARCHIVED", label: "المؤرشف", count: nArchived, href: link({ status: "ARCHIVED" }) },
+    { id: "REJECTED", label: "المرفوض", count: nRejected, href: link({ status: "REJECTED" }) },
+    { id: "ALL", label: "الكل", count: nAll, href: link({ status: "ALL" }) },
   ] as const;
 
   return (
@@ -302,15 +302,15 @@ export default async function DocumentsPage({
       user={user}
       width="wide"
       title="المستندات"
-      intro="ما وصل من فواتير وكشوف وإيصالات — ما ينتظر قرارك أوّلاً، وكلُّ مستندٍ موصولٌ بملفّه في الدرايف."
+      intro="الفواتير والكشوف والإيصالات التي وصلتك. يظهر أولاً ما ينتظر قرارك، وكل مستند مرتبط بملفه في الدرايف."
       actions={beat ? <DrivePulse beat={beat} /> : undefined}
     >
       {freshDb ? (
         /* قاعدةٌ بلا مستند: لا ألسنة ولا أصفار — الخطوةُ الأولى وحدها */
         <EmptyState
           icon={Upload}
-          title="لم يصل مستندٌ بعد."
-          hint="ارفع أوّل فاتورة — صوّرها بجوّالك أو اختر ملفّها — أو زامن الدرايف ليُقرأ ما فيه. وكلُّ ما يصل يظهر هنا."
+          title="لم يصل أي مستند بعد."
+          hint="ارفع أول فاتورة، بتصويرها بجوالك أو باختيار ملفها، أو زامن الدرايف ليقرأ النظام ما فيه. وسيظهر هنا كل ما يصل."
           action={
             <div className="flex flex-wrap justify-center gap-2">
               <LinkButton href="/upload" variant="primary" icon={Upload}>ارفع مستنداً</LinkButton>
@@ -400,8 +400,8 @@ export default async function DocumentsPage({
           {rows.length > 0 && (
             <p className="mt-4 text-xs text-muted">
               {countNoun(total, DOCUMENT)}
-              {filtered ? " ضمن الترشيح" : ""}
-              {q ? <> — بحثاً عن «<bdi>{q}</bdi>»</> : null}
+              {filtered ? " ضمن نتائج التصفية" : ""}
+              {q ? <> · بحثاً عن «<bdi>{q}</bdi>»</> : null}
               {pages > 1 && <> · صفحة <span className="nums">{page}</span> من <span className="nums">{pages}</span></>}
             </p>
           )}
@@ -414,12 +414,12 @@ export default async function DocumentsPage({
                 <EmptyState
                   compact
                   icon={CircleCheck}
-                  title="لا مستند ينتظر قرارك."
-                  hint="كلُّ ما وصل اعتُمد أو رُفض. وما يصل من الرفع أو الدرايف ويحتاج نظرك يظهر هنا."
+                  title="لا توجد مستندات تنتظر قرارك."
+                  hint="كل ما وصل تم اعتماده أو رفضه. وما يصل عن طريق الرفع أو الدرايف ويحتاج مراجعتك سيظهر هنا."
                   action={
                     <>
                       <LinkButton href={link({ status: "ARCHIVED" })} icon={Archive}>
-                        افتح المؤرشَف ({nArchived})
+                        افتح المؤرشف ({nArchived})
                       </LinkButton>
                       <LinkButton href="/upload" variant="primary" icon={Upload}>ارفع مستنداً</LinkButton>
                     </>
@@ -427,7 +427,7 @@ export default async function DocumentsPage({
                 />
                 {recent.length > 0 && (
                   <section aria-labelledby="recent-docs" className="mt-8">
-                    <h2 id="recent-docs" className="mb-3 text-[15px] font-bold">وصل مؤخّراً</h2>
+                    <h2 id="recent-docs" className="mb-3 text-[15px] font-bold">وصل مؤخراً</h2>
                     <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
                       {recent.map((d) => (
                         <li key={d.id}>
@@ -451,13 +451,13 @@ export default async function DocumentsPage({
               ) : (
                 <EmptyState
                   icon={FileSearch}
-                  title={q ? `لا مستند باسمٍ فيه «${q}» هنا.` : "لا مستند يطابق هذا الترشيح."}
-                  hint={tab !== "ALL" ? "جرّب «الكلّ» — قد يكون في حالٍ أخرى — أو امسح الترشيح." : "جرّب توسيع الترشيح أو امسحه."}
+                  title={q ? `لا توجد مستندات باسم يحتوي على «${q}» هنا.` : "لا توجد مستندات تطابق هذه التصفية."}
+                  hint={tab !== "ALL" ? "جرّب «الكل»، فقد يكون المستند في حالة أخرى، أو امسح التصفية." : "جرّب توسيع التصفية أو امسحها."}
                   action={
                     <>
-                      {tab !== "ALL" && <LinkButton href={link({ status: "ALL" })}>ابحث في الكلّ</LinkButton>}
+                      {tab !== "ALL" && <LinkButton href={link({ status: "ALL" })}>ابحث في الكل</LinkButton>}
                       <LinkButton href={link({ month: undefined, supplier: undefined, kind: undefined, q: undefined })} variant="primary">
-                        امسح الترشيح
+                        امسح التصفية
                       </LinkButton>
                     </>
                   }
@@ -470,13 +470,13 @@ export default async function DocumentsPage({
                     tone="ok"
                     icon={CircleCheck}
                     className="mb-4"
-                    title={`${countNoun(eligible, DOCUMENT)} يُحسَم الآن بلا مراجعة`}
+                    title={`${countNoun(eligible, DOCUMENT)} يمكن حسمها الآن دون مراجعة`}
                     action={<ConfirmEligible count={eligible} />}
                   >
-                    تجتمع فيها الشروط، أو قراءتُها كاملة وفاتورتُها لم تُقيَّد بعد. الضغطُ يقيّدها ويعتمدها، ويبقى ما لا يستقيم بسببه.
+                    هذه المستندات تتوفر فيها الشروط، أو قراءتها كاملة ولم تُقيَّد فاتورتها بعد. بالضغط تُقيَّد وتُعتمد، وما لا يصح منها يبقى مع بيان السبب.
                   </Callout>
                 )}
-                <ul className="space-y-3" aria-label="مستنداتٌ تنتظر المراجعة">
+                <ul className="space-y-3" aria-label="مستندات تنتظر المراجعة">
                   {rows.map((r) => (
                     <WaitingCard
                       key={r.id}
@@ -509,7 +509,7 @@ export default async function DocumentsPage({
                       <span className="flex min-w-0 items-center gap-3" title={r.fileName}>
                         <Monogram name={r.supplierName ?? KIND_LABEL[r.kind] ?? "م"} />
                         <span className="min-w-0">
-                          <span className="block truncate font-bold">{r.supplierName ?? "مورّدٌ لم يُعرَف"}</span>
+                          <span className="block truncate font-bold">{r.supplierName ?? "مورّد غير معروف"}</span>
                           <span className="block truncate text-[11px] font-normal text-muted">
                             {r.invoiceNumber
                               ? <bdi className="nums">{r.invoiceNumber}</bdi>
@@ -544,8 +544,8 @@ export default async function DocumentsPage({
                           {r.status === "REJECTED" && (
                             <span className="block text-[11px] leading-relaxed text-muted">
                               {j
-                                ? <>رُفض {formatDay(j.at)}{j.by ? <> بيد <bdi>{j.by}</bdi></> : null} — {j.reason ?? "بلا سبب مكتوب"}</>
-                                : "رُفض — ولا أثرَ لسببه في السجلّ."}
+                                ? <>رُفض في {formatDay(j.at)}{j.by ? <> بواسطة <bdi>{j.by}</bdi></> : null}: {j.reason ?? "بلا سبب مكتوب"}</>
+                                : "مرفوض، ولا يوجد سبب مسجّل في السجل."}
                             </span>
                           )}
                           {r.status === "REJECTED" && canDecide && showAmounts && <RestoreDocument documentId={r.id} />}
@@ -573,7 +573,7 @@ export default async function DocumentsPage({
                           الدرايف
                         </a>
                       ) : (
-                        <span className="text-xs text-muted">لا ملفّ</span>
+                        <span className="text-xs text-muted">لا يوجد ملف</span>
                       ),
                   },
                 ]}
@@ -612,7 +612,7 @@ function DrivePulse({ beat }: { beat: DriveHeartbeat }) {
     beat.state === "preview" ? { dot: "bg-muted", text: "الدرايف: غير موصول في التجربة" }
     : beat.state === "disconnected" ? { dot: "bg-danger", text: "الدرايف: غير موصول بحسابك" }
     : beat.state === "failing" && beat.failure ? { dot: "bg-danger", text: `الدرايف: تعثّر ${timeAgo(beat.failure.at)}` }
-    : beat.state === "ok" && beat.checkedAt ? { dot: "bg-ok", text: `الدرايف: فُحص ${timeAgo(beat.checkedAt)}` }
+    : beat.state === "ok" && beat.checkedAt ? { dot: "bg-ok", text: `الدرايف: فحص ${timeAgo(beat.checkedAt)}` }
     : { dot: "bg-warn", text: "الدرايف: لم يُفحص بعد" };
   return (
     <Link href="/documents/drive" className={buttonClass("secondary", "sm")}>

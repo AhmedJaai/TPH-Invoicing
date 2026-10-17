@@ -137,10 +137,10 @@ export function fitToProfile(
 
     if (off <= spread) {
       adjustment += 0.05;
-      notes.push(`المهلة ${countNoun(candidate.lagDays, DAY)}، وعادتُه ${profile.medianLagDays}`);
+      notes.push(`المهلة ${countNoun(candidate.lagDays, DAY)}، والمعتاد عند هذا المورّد ${profile.medianLagDays}`);
     } else if (off > spread * 3) {
       adjustment -= 0.05;
-      notes.push(`المهلة ${countNoun(candidate.lagDays, DAY)}، وعادتُه ${profile.medianLagDays} — بعيدة`);
+      notes.push(`المهلة ${countNoun(candidate.lagDays, DAY)}، والمعتاد عند هذا المورّد ${profile.medianLagDays}، وهي مدة بعيدة`);
     }
   }
 
@@ -148,10 +148,10 @@ export function fitToProfile(
     const grouped = candidate.invoiceCount >= 2;
     if (grouped === profile.batches) {
       adjustment += 0.03;
-      notes.push(profile.batches ? "يُسدَّد جمعاً وهذه مجموعة" : "يُسدَّد فاتورةً فاتورة");
+      notes.push(profile.batches ? "يُسدَّد له عادةً أكثر من فاتورة في دفعة، وهذه دفعة مجمّعة" : "يُسدَّد له عادةً كل فاتورة على حدة");
     } else if (grouped && !profile.batches) {
       adjustment -= 0.03;
-      notes.push("لم يُسدَّد جمعاً من قبل");
+      notes.push("لم تُسدَّد له فواتير مجمّعة في دفعة واحدة من قبل");
     }
   }
 

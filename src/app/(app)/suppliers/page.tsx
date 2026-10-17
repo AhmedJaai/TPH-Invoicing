@@ -83,8 +83,8 @@ export default async function SuppliersPage({
       <PageShell user={user} width="wide" title="حسابات المورّدين">
         <EmptyState
           icon={Store}
-          title="لا مورّدين بعد."
-          hint="يُنشَأ المورّد حين تُقرأ أوّل فاتورة منه — أو تختاره «مورّداً جديداً» في شاشة الرفع."
+          title="لا يوجد مورّدون بعد."
+          hint="يُضاف المورّد تلقائياً عند قراءة أول فاتورة منه، أو بالضغط على «مورّد جديد» في شاشة الرفع."
           action={<LinkButton href="/upload" variant="primary">ارفع مستنداً</LinkButton>}
         />
       </PageShell>
@@ -157,7 +157,7 @@ export default async function SuppliersPage({
   const worth = rows.filter((r) => r.owedMinor > 0 || r.creditLeftMinor > 0);
 
   const tabs = [
-    { id: "all" as const, label: "الكلّ", count: rows.length },
+    { id: "all" as const, label: "الكل", count: rows.length },
     ...(showAmounts
       ? [
           { id: "owed" as const, label: "عليك", count: rows.filter(inView.owed).length },
@@ -186,10 +186,10 @@ export default async function SuppliersPage({
                 ? "لا فاتورة ولا دفعة بعد"
                 : r.openCount > 0
                   ? `${countNoun(r.openCount, INVOICE)} مفتوحة`
-                  : !r.issuesInvoices ? "لا يصدر فواتير — يُسدَّد عند الدفع"
-                  : r.invoiceCount > 0 ? "فواتيره مسدَّدة" : "دفعاتٌ بلا فواتير"}
-              {r.contract && <Badge tone="warn">يحتاج عقداً</Badge>}
-              {r.paper && <Badge>فواتيرُه ورقيّة</Badge>}
+                  : !r.issuesInvoices ? "لا يصدر فواتير، ويُسدَّد له عند الدفع"
+                  : r.invoiceCount > 0 ? "فواتيره مسدّدة" : "دفعات بلا فواتير"}
+              {r.contract && <Badge tone="warn">يحتاج عقد توريد</Badge>}
+              {r.paper && <Badge>فواتيره ورقية</Badge>}
             </span>
           </span>
         </span>
@@ -225,7 +225,7 @@ export default async function SuppliersPage({
               ) : (
                 r.openCount > 0 ? (
                   /* فاتورةٌ مفتوحة يقابلها مالٌ لم يُنسب — ليس «متّزناً» يُترك */
-                  <span className="text-[11px] font-bold text-warn">متّزنٌ على الورق</span>
+                  <span className="text-[11px] font-bold text-warn">متّزن على الورق</span>
                 ) : (
                   <span className="text-[11px] text-muted">{r.idle ? "—" : "متّزن"}</span>
                 )
@@ -233,7 +233,7 @@ export default async function SuppliersPage({
           },
           {
             key: "age",
-            header: "أقدم دَين",
+            header: "أقدم مبلغ مستحق",
             sortBy: (r) => r.ageing.oldestOwedDays,
             sortFirst: "desc",
             cell: (r) =>
@@ -271,8 +271,8 @@ export default async function SuppliersPage({
       width="wide"
       title="حسابات المورّدين"
       intro={showAmounts
-        ? "لمن تدين، وكم، ومنذ متى — بعد خصم ما دفعتَه لكلٍّ منهم، وما بقي لك عندهم."
-        : "المورّدون وفواتيرُهم المفتوحة وآخرُ تعاملٍ معهم — والمبالغُ خارج صلاحيتك."}
+        ? "لمن تدين، وبكم، ومنذ متى، بعد خصم ما دفعته لكل مورّد وما بقي لك عنده."
+        : "المورّدون وفواتيرهم المفتوحة وآخر تعامل معهم. المبالغ غير متاحة لدورك."}
       actions={
         showAmounts && can(user.role, "payment:approve") ? (
           <>
@@ -294,29 +294,29 @@ export default async function SuppliersPage({
               tone={totals.owedMinor > 0 ? "warn" : undefined}
               value={<Money minor={totals.owedMinor} currency />}
               sub={totals.owedMinor > 0
-                ? `${countNoun(totals.owedSuppliers, SUPPLIER)} · على ${countNoun(totals.openInvoiceCount, INVOICE)} مفتوحة، بعد خصم ما دفعتَه لهم`
-                : "لا فاتورة مفتوحة إلّا وقد غطّاها ما دفعتَه."}
+                ? `${countNoun(totals.owedSuppliers, SUPPLIER)} · عن ${countNoun(totals.openInvoiceCount, INVOICE)} مفتوحة، بعد خصم ما دفعته لهم`
+                : "كل فاتورة مفتوحة غطّاها ما دفعته."}
             >
               <AgeingBar buckets={allBuckets} />
             </Figure>
             <Figure
               icon={Hourglass}
-              label="متأخّرٌ أكثر من 60 يوماً"
+              label="متأخر أكثر من 60 يوماً"
               href="/suppliers?view=overdue"
               tone={overdueMinor > 0 ? "danger" : "ok"}
               value={<Money minor={overdueMinor} />}
               sub={overdueMinor > 0
-                ? `عند ${countNoun(overdue.length, SUPPLIER)} · أقدمُه منذ ${countNoun(oldestOverdue, DAY)}`
-                : "لا دَين تجاوز ستّين يوماً بعد خصم أرصدتك."}
+                ? `عند ${countNoun(overdue.length, SUPPLIER)} · أقدمها منذ ${countNoun(oldestOverdue, DAY)}`
+                : "لا يوجد مبلغ متأخر أكثر من ستين يوماً بعد خصم أرصدتك."}
             />
             <Figure
               icon={PiggyBank}
-              label="رصيدٌ لك عندهم"
+              label="رصيد لك عندهم"
               href="/suppliers?view=credit"
               value={<Money minor={totals.creditLeftMinor} />}
               sub={totals.creditLeftMinor > 0
-                ? `${countNoun(totals.creditSuppliers, SUPPLIER)} · مالٌ دفعتَه ولم تصلك فاتورتُه — يُخصَم من فواتيرهم القادمة`
-                : "لا مال دفعتَه إلّا وفاتورتُه عندك."}
+                ? `${countNoun(totals.creditSuppliers, SUPPLIER)} · مبالغ دفعتها ولم تصلك فواتيرها، وستُخصم من فواتيرهم القادمة`
+                : "كل مبلغ دفعته وصلتك فاتورته."}
             />
           </div>
         ) : (
@@ -324,10 +324,10 @@ export default async function SuppliersPage({
           <Callout
             tone="accent"
             icon={Sparkles}
-            title="لا يعرف النظام بعدُ لمن تدين"
+            title="لا يعرف النظام بعد لمن تدين"
             action={<LinkButton href="/upload" variant="primary" size="sm">ارفع مستنداً</LinkButton>}
           >
-            لا فاتورةَ ولا دفعةَ مقيّدة لأيّ مورّد. ارفع فواتيرهم واستورد كشف البنك، فيظهر هنا ما عليك وما لك ومنذ متى.
+            لم تُسجَّل أي فاتورة أو دفعة لأي مورّد. ارفع فواتيرهم واستورد كشف البنك ليظهر هنا ما عليك وما لك ومنذ متى.
           </Callout>
         )
       )}
@@ -345,10 +345,10 @@ export default async function SuppliersPage({
           tone="info"
           icon={FileWarning}
           className="mt-4"
-          action={<LinkButton href="/suppliers?unbacked=1#unbacked" size="sm">اعرضها واطلب فواتيرها</LinkButton>}
+          action={<LinkButton href="/suppliers?unbacked=1#unbacked" size="sm">اعرض الدفعات واطلب فواتيرها</LinkButton>}
         >
-          <strong className="text-ink">{countNoun(unbackedPayments.length, PAYMENT_RECORD)} دفعتَها ولم يصل مستندُها</strong>{" "}
-          — <Money minor={unbackedTotal} />. بلا فاتورةٍ ضريبية لا يُخصَم مدخلُها.
+          <strong className="text-ink">{countNoun(unbackedPayments.length, PAYMENT_RECORD)} دفعتها ولم تصلك مستنداتها</strong>{" "}
+          — <Money minor={unbackedTotal} />. بدون فاتورة ضريبية لا يمكن خصم ضريبة المدخلات.
         </Callout>
       )}
 
@@ -359,7 +359,7 @@ export default async function SuppliersPage({
         title="المورّدون"
         icon={Store}
         count={rows.length}
-        hint={showAmounts ? "من عليك له أوّلاً وبالأكبر. ابحث بالاسم، أو بالاسم الذي يظهر به في كشف البنك." : undefined}
+        hint={showAmounts ? "يظهر أولاً من له عليك أكبر مبلغ. ابحث بالاسم، أو بالاسم الذي يظهر به في كشف البنك." : undefined}
       >
         <div className="mb-3">
           <LinkTabs
@@ -374,24 +374,24 @@ export default async function SuppliersPage({
         </div>
 
         {(needContract.length > 0 || paperOnly.length > 0) && view === "all" && (
-          <Callout tone="warn" icon={Clock} className="mb-3" title="ما يُطلَب من مورّدين">
+          <Callout tone="warn" icon={Clock} className="mb-3" title="مطلوب من بعض المورّدين">
             {needContract.length > 0 && (
               <p id="no-contract" className="scroll-mt-24">
-                <span className="font-bold text-ink">{countNoun(needContract.length, SUPPLIER)} يحتاج عقد توريد</span> — لا يصدرون فواتير ضريبية،
-                وبلا عقدٍ مكتوب لا خصمَ ضريبة ولا إثباتَ مصروف:{" "}
+                <span className="font-bold text-ink">{countNoun(needContract.length, SUPPLIER)} يحتاج عقد توريد</span>، لأنهم لا يصدرون فواتير ضريبية،
+                وبدون عقد مكتوب لا يمكن خصم الضريبة ولا إثبات المصروف:{" "}
                 {needContract.map((r, i) => (
                   <span key={r.id}>
                     {i > 0 && " · "}
                     <Link href={`/suppliers/${r.slug}?tab=profile`} className="font-medium underline underline-offset-4 hover:text-ink">{r.nameAr}</Link>
                   </span>
                 ))}
-                . ومن لا يحتاج عقداً تُطفئه من ملفّه.
+                . وإذا كان المورّد لا يحتاج عقداً، أوقف ذلك من ملفه.
               </p>
             )}
             {paperOnly.length > 0 && (
               <p className={needContract.length > 0 ? "mt-1" : ""}>
-                <span className="font-bold text-ink">{countNoun(paperOnly.length, SUPPLIER)} فواتيرُه ورقيّة</span> — فاتورتُه موجودةٌ باليد، والمطلوبُ
-                تصويرُها ورفعُها: {paperOnly.map((r) => r.nameAr).join(" · ")}.
+                <span className="font-bold text-ink">{countNoun(paperOnly.length, SUPPLIER)} فواتيره ورقية</span>؛ فاتورته بيدك، والمطلوب
+                تصويرها ورفعها: {paperOnly.map((r) => r.nameAr).join(" · ")}.
               </p>
             )}
           </Callout>
@@ -410,14 +410,14 @@ export default async function SuppliersPage({
               compact
               icon={Store}
               title={
-                view === "owed" ? "لا مورّد عليك له شيء."
-                : view === "overdue" ? "لا دَين تجاوز ستّين يوماً."
-                : view === "credit" ? "لا رصيد لك عند أحد."
-                : view === "idle" ? "كلُّ مورّدٍ مسجَّل تعاملتَ معه."
-                : "لا مورّدين في هذه القائمة."
+                view === "owed" ? "لا يوجد مورّد مستحق له شيء عليك."
+                : view === "overdue" ? "لا يوجد مبلغ متأخر أكثر من ستين يوماً."
+                : view === "credit" ? "لا يوجد رصيد لك عند أي مورّد."
+                : view === "idle" ? "تعاملت مع جميع المورّدين المسجّلين."
+                : "لا يوجد مورّدون في هذه القائمة."
               }
-              hint={view === "owed" || view === "overdue" ? "كلُّ فاتورةٍ مفتوحة غطّاها ما دفعتَه — بحسب ما قُيّد من فواتير ودفعات." : undefined}
-              action={<LinkButton href="/suppliers" size="sm">كلُّ المورّدين</LinkButton>}
+              hint={view === "owed" || view === "overdue" ? "كل فاتورة مفتوحة غطّاها ما دفعته، بحسب الفواتير والدفعات المسجّلة." : undefined}
+              action={<LinkButton href="/suppliers" size="sm">جميع المورّدين</LinkButton>}
             />
           }
         />
@@ -429,7 +429,7 @@ export default async function SuppliersPage({
           title="اقتراحات التحليل"
           icon={Sparkles}
           count={findings.length > 0 ? findings.length : undefined}
-          hint="يقرأ التحليلُ فواتير المورّد ودفعاته وكشوفه ويقترح ما يصحّح حسابه. الأرقامُ يحسبها الخادم، ولا يُكتب شيءٌ حتى تُقرّه."
+          hint="يقرأ التحليل فواتير المورّد ودفعاته وكشوفه ويقترح ما يصحّح حسابه. تُحسب الأرقام آلياً، ولا يُسجَّل أي اقتراح حتى تعتمده."
           action={
             can(user.role, "supplier:edit") && worth.length > 0 ? (
               <RunAnalysis
@@ -443,8 +443,8 @@ export default async function SuppliersPage({
             <EmptyState
               compact
               icon={Sparkles}
-              title="لا اقتراح ينتظر قرارك."
-              hint="شغّل التحليل على من بينك وبينه رصيد — يقارن فواتيره بدفعاته وكشفه، ويقترح ولا يكتب."
+              title="لا توجد اقتراحات تنتظر قرارك."
+              hint="شغّل التحليل على المورّدين الذين بينك وبينهم رصيد. يقارن فواتيرهم بدفعاتهم وكشوفهم ويقترح التصحيحات، ولا يُسجَّل شيء حتى تعتمده."
             />
           ) : (
             <FindingsList findings={findings} canApprove={can(user.role, "payment:approve")} showSupplier collapseAfter={3} />
@@ -466,14 +466,14 @@ async function UnbackedSection({ groups, count, canRequest }: { groups: ReturnTy
   return (
     <div id="unbacked" className="scroll-mt-28">
       <Section
-        title="دفعاتٌ لم تُنسب إلى فاتورة"
+        title="دفعات غير مربوطة بفواتير"
         icon={FileWarning}
         count={count}
-        hint={`عند ${countNoun(groups.filter((g) => g.supplierId).length, SUPPLIER)}. بلا فاتورةٍ ضريبية لا يُخصَم مدخلُها. ومن لا يصدر فواتير يُطلَب منه عقدُ توريد بدلها — وهو معدودٌ هنا كغيره، فالمال خرج.`}
-        action={<LinkButton href="/suppliers" size="sm" variant="quiet">كلّ الحسابات</LinkButton>}
+        hint={`عند ${countNoun(groups.filter((g) => g.supplierId).length, SUPPLIER)}. بدون فاتورة ضريبية لا يمكن خصم ضريبة المدخلات. والمورّد الذي لا يصدر فواتير يُطلب منه عقد توريد بدلها، وتُحسب دفعته هنا كغيره لأن المبلغ خرج فعلاً.`}
+        action={<LinkButton href="/suppliers" size="sm" variant="quiet">جميع الحسابات</LinkButton>}
       >
         {groups.length === 0 ? (
-          <EmptyState compact title="لا دفعة بلا فاتورة." hint="كلّ ما دُفع له مستندُه." />
+          <EmptyState compact title="لا توجد دفعات بلا فاتورة." hint="كل ما دُفع له لديه مستند." />
         ) : (
           <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 xl:grid-cols-2">
             {groups.map((g) => (
@@ -489,7 +489,7 @@ async function UnbackedSection({ groups, count, canRequest }: { groups: ReturnTy
                       )}
                       <span className="block text-[11px] text-muted">
                         {countNoun(g.payments.length, PAYMENT_RECORD)}
-                        {g.supplierId ? " بلا فاتورة" : " لم تُعرَف جهتها — افتح حركتها وحدّد مورّدها"}
+                        {g.supplierId ? " بلا فاتورة" : " بلا مورّد معروف. افتح الحركة البنكية وحدّد المورّد"}
                       </span>
                     </span>
                     <span className="shrink-0 text-end">
@@ -506,7 +506,7 @@ async function UnbackedSection({ groups, count, canRequest }: { groups: ReturnTy
                             <>
                               {" · "}
                               <Link href={txHref(p.bankTransactionId)} className="inline-flex min-h-11 items-center font-medium text-accent hover:underline sm:min-h-0">
-                                حركتها
+                                الحركة البنكية
                               </Link>
                             </>
                           )}
@@ -524,7 +524,7 @@ async function UnbackedSection({ groups, count, canRequest }: { groups: ReturnTy
                         requestedDaysAgo={marks.get(invoiceRequestKey(g) ?? "") ?? null}
                         canMark={canRequest}
                       />
-                      {g.supplierSlug && <LinkButton href={`/suppliers/${g.supplierSlug}`} size="sm">ملفّه</LinkButton>}
+                      {g.supplierSlug && <LinkButton href={`/suppliers/${g.supplierSlug}`} size="sm">ملف المورّد</LinkButton>}
                     </div>
                   )}
                 </Card>

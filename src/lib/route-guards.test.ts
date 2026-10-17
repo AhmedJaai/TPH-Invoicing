@@ -83,21 +83,21 @@ export function handlerGuards(source: string, fileName = "route.ts"): HandlerGua
  * مساراتٌ بلا `guard` — ولكلٍّ سببُه.
  */
 const UNGUARDED: Record<string, string> = {
-  "src/app/api/health/route.ts": "فحصُ الحياة علنيّ عمداً: المجهولُ يرى «حيّ أو لا» وحده، والتفصيلُ بـaudit:view داخله",
-  "src/app/api/auth/[...nextauth]/route.ts": "بابُ الدخول نفسُه — Auth.js",
+  "src/app/api/health/route.ts": "فحص الحياة علنيّ عمداً: المجهول يرى «حيّ أو لا» وحده، والتفصيل بـaudit:view داخله",
+  "src/app/api/auth/[...nextauth]/route.ts": "باب الدخول نفسه — Auth.js",
 };
 
 /**
  * كتابةٌ تُحرَس بصلاحيّة قراءة — ولكلٍّ سببُه. ما ليس هنا فيلزمه `:edit` أو ما فوقها.
  */
 const WRITE_WITH_VIEW: Record<string, string> = {
-  "src/app/api/notifications/route.ts POST": "يكتب حدَّ القراءة للمستخدم نفسِه وحده — لا مال ولا قرار",
+  "src/app/api/notifications/route.ts POST": "يكتب حدّ القراءة للمستخدم نفسه وحده — لا مال ولا قرار",
 };
 
 const isReadOnly = (capability: string) => /:view$/.test(capability);
 const posix = (file: string) => file.split(path.sep).join("/");
 
-describe("كلُّ مسارٍ يبدأ بحارس، والكتابةُ بغير صلاحية القراءة", () => {
+describe("كلّ مسار يبدأ بحارس، والكتابة بغير صلاحية القراءة", () => {
   const files = routes(API);
 
   it("الحارس يرى المسارات فعلاً", () => {
@@ -121,31 +121,31 @@ describe("كلُّ مسارٍ يبدأ بحارس، والكتابةُ بغير 
           expect(h.capabilities, `${key} في UNGUARDED وهو يحمل حارساً — احذفه منها`).toEqual([]);
           return;
         }
-        expect(h.capabilities.length, `${h.method} لا يبلغ نداءَ guard(route, capability)`).toBeGreaterThan(0);
-        expect(h.capabilities, "الصلاحيّةُ تُكتب نصّاً حرفيّاً — لا متغيّراً لا يُقرأ هنا").not.toContain(null);
+        expect(h.capabilities.length, `${h.method} لا يبلغ نداء guard(route, capability)`).toBeGreaterThan(0);
+        expect(h.capabilities, "الصلاحيّة تكتب نصّاً حرفيّاً — لا متغيّراً لا يقرأ هنا").not.toContain(null);
 
         if (!MUTATING.has(h.method)) return;
         const exemption = `${key} ${h.method}`;
         const writes = h.capabilities.filter((c): c is string => c !== null && !isReadOnly(c));
         if (exemption in WRITE_WITH_VIEW) {
-          expect(writes, `${exemption} في WRITE_WITH_VIEW وله صلاحيّةُ كتابة — احذفه منها`).toEqual([]);
+          expect(writes, `${exemption} في WRITE_WITH_VIEW وله صلاحيّة كتابة — احذفه منها`).toEqual([]);
           return;
         }
         expect(
           writes.length,
-          `${h.method} يكتب وحارسُه صلاحيّةُ قراءة (${h.capabilities.join("، ")}) — الكتابة لا تُحرَس بصلاحية قراءة`,
+          `${h.method} يكتب وحارسه صلاحيّة قراءة (${h.capabilities.join("، ")}) — الكتابة لا تحرس بصلاحية قراءة`,
         ).toBeGreaterThan(0);
       });
     }
   }
 
-  it("ولا استثناءَ لمسارٍ لم يعد موجوداً", () => {
+  it("ولا استثناء لمسار لم يعد موجوداً", () => {
     const known = new Set(files.map(posix));
     for (const k of Object.keys(UNGUARDED)) expect(known, `${k} في UNGUARDED وليس في المستودع`).toContain(k);
     for (const k of Object.keys(WRITE_WITH_VIEW)) expect(known).toContain(k.split(" ")[0]);
   });
 
-  it("والقارئ يبلغ الحارسَ عبر دالّةٍ محلّيّة، ويفرّق معالجاً عن آخر", () => {
+  it("والقارئ يبلغ الحارس عبر دالّة محلّيّة، ويفرّق معالجاً عن آخر", () => {
     const source = `
       import { guard } from "@/services/guard";
       async function handle(request: Request) { const user = await guard("x", "bank:edit"); return user; }

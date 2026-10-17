@@ -66,7 +66,7 @@ export async function applyRenames(
       .limit(1);
     /* ما لا سجلَّ له عندنا لا يُمسّ */
     if (!doc) {
-      failed.push({ from: t.fileName, error: "لا سجلَّ له عندنا — لم يُسمَّ" });
+      failed.push({ from: t.fileName, error: "ليس له سجل عندنا، فلم يُغيَّر اسمه" });
       continue;
     }
 
@@ -114,7 +114,7 @@ export async function applyRenames(
       }
       if (renamedInDrive) done.push({ from: t.fileName, to: proposed });
       const error = renamedInDrive
-        ? `سُمّي في الدرايف وتعذّر تحديث القيد: ${(e as Error).message}`
+        ? `أُعيدت تسميته في الدرايف وتعذّر تحديث القيد: ${(e as Error).message}`
         : (e as Error).message;
       failed.push({ from: t.fileName, error });
       /* النيّةُ كُتبت قبل النداء — فما لم يقع يُقال إنّه لم يقع، بسببه */
@@ -124,7 +124,7 @@ export async function applyRenames(
         entityType: "document",
         entityId: doc.id,
         before: { fileName: t.fileName },
-        after: { fileName: proposed, driveFileId: t.driveFileId, المصدر: trace.via, السبب: error.slice(0, 300), "سُمّي في الدرايف": renamedInDrive },
+        after: { fileName: proposed, driveFileId: t.driveFileId, المصدر: trace.via, السبب: error.slice(0, 300), "أُعيدت تسميته في الدرايف": renamedInDrive },
       }).catch(() => undefined);
     }
   }
@@ -216,7 +216,7 @@ export async function renameArchived(
       entityType: "drive",
       entityId: "rename",
       after: {
-        الفعل: "إعادة تسمية آليّة في الدرايف إلى الصيغة القياسية",
+        الفعل: "إعادة تسمية آلية في الدرايف إلى الصيغة المعتمدة",
         المصدر: via,
         عدد: outcome.done.length,
         الملفّات: outcome.done.map((d) => `${d.from} ← ${d.to}`),

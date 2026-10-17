@@ -29,8 +29,8 @@ async function statementWith(tx: Tx, supplierId: string, lines: { date: string; 
   return st.id;
 }
 
-describe("قيدُ الناقصة من كشف المورّد (غاناش)", () => {
-  it("يُقيَّد كلُّ سطرٍ مدينٍ لم يُطابَق — بلا صافٍ ولا ضريبة، ويُطابَق السطرُ بها", () =>
+describe("قيد الناقصة من كشف المورّد (غاناش)", () => {
+  it("يقيّد كلّ سطر مدين لم يطابق — بلا صاف ولا ضريبة، ويطابق السطر بها", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const st = await statementWith(tx, s, [
@@ -50,7 +50,7 @@ describe("قيدُ الناقصة من كشف المورّد (غاناش)", () =
       expect((await recordStatementOnlyInvoices(tx, st, await someone(tx))).created).toHaveLength(0);
     }));
 
-  it("ملفُّها حين يصل يتبنّى القيدَ نفسَه — لا فاتورتان، ولا يُحسب «مكرّرة»", () =>
+  it("ملفّها حين يصل يتبنّى القيد نفسه — لا فاتورتان، ولا يحسب «مكرّرة»", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const st = await statementWith(tx, s, [{ date: "2026-09-02", ref: "CIV-9", debit: 115_00 }]);
@@ -70,7 +70,7 @@ describe("قيدُ الناقصة من كشف المورّد (غاناش)", () =
       expect(await tx.select({ id: documents.id }).from(documents).where(eq(documents.id, before.doc))).toHaveLength(0);
     }));
 
-  it("سطرٌ رقمُه داخل فاتورةٍ جامعة عندنا لا يُقيَّد ثانية (هنقري مان)", () =>
+  it("سطر رقمه داخل فاتورة جامعة عندنا لا يقيّد ثانية (هنقري مان)", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const doc = await makeDocument(tx, s, "2026-05-01");
@@ -88,7 +88,7 @@ describe("قيدُ الناقصة من كشف المورّد (غاناش)", () =
       expect(lines.every((l) => l.m === "MATCHED")).toBe(true);
     }));
 
-  it("رقمُ السطر بلا وصف الفرع", () => {
+  it("رقم السطر بلا وصف الفرع", () => {
     expect(statementRefNumber("INVA/2026/02717 (Abhur - 001578")).toBe("INVA/2026/02717");
   });
 });

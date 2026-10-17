@@ -140,34 +140,34 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
   }, [chords, role, router]);
 
   return (
-    <Sheet open={help} onClose={() => setHelp(false)} title="اختصارات لوحة المفاتيح" description="تعمل من أيّ صفحة ما دام المؤشّر خارج حقلٍ يُكتب فيه — ولوحةُ الكتابة عربيّةً أو إنجليزيّة." size="md">
+    <Sheet open={help} onClose={() => setHelp(false)} title="اختصارات لوحة المفاتيح" description="تعمل في أي صفحة ما دمت لست داخل حقل كتابة، وبلوحة مفاتيح عربية أو إنجليزية." size="md">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 sm:grid-cols-2">
         <ShortcutGroup
-          title="عامّ"
+          title="عامة"
           rows={[
-            { keys: ["⌘", "K"], label: "ابحث أو انتقل أو افعل" },
+            { keys: ["⌘", "K"], label: "ابحث أو انتقل أو نفّذ أمراً" },
             { keys: ["/"], label: "افتح البحث" },
             ...(can(role, "document:upload") ? [{ keys: ["U"], label: "ارفع مستنداً أو صوّره" }] : []),
             { keys: ["?"], label: "هذه القائمة" },
-            { keys: ["Esc"], label: "أغلق ما فُتح" },
-            { keys: ["⌘", "Z"], label: "تراجَع عن آخر فعلٍ يقبل التراجع" },
+            { keys: ["Esc"], label: "أغلق النافذة المفتوحة" },
+            { keys: ["⌘", "Z"], label: "تراجع عن آخر إجراء يقبل التراجع" },
           ]}
         />
         <ShortcutGroup
           title="في القوائم"
           rows={[
-            { keys: ["J"], label: "الصفّ التالي" },
-            { keys: ["K"], label: "الصفّ السابق" },
-            { keys: ["Enter"], label: "افتح الصفّ المختار" },
-            { keys: ["J", "K"], label: "واللوحُ مفتوح: الملفُّ التالي في مكانه" },
-            { keys: ["Esc"], label: "أغلق اللوح" },
+            { keys: ["J"], label: "الصف التالي" },
+            { keys: ["K"], label: "الصف السابق" },
+            { keys: ["Enter"], label: "افتح الصف المحدد" },
+            { keys: ["J", "K"], label: "واللوحة مفتوحة: الانتقال إلى الملف التالي أو السابق" },
+            { keys: ["Esc"], label: "أغلق اللوحة" },
           ]}
         />
         <ShortcutGroup
           title="في طابور المراجعة"
           rows={[
-            { keys: ["A"], label: "أقِرَّ اقتراحَ الصفّ المختار" },
-            { keys: ["X"], label: "ليست سداداً — افتح أسبابَه" },
+            { keys: ["A"], label: "اعتمد اقتراح الصف المحدد" },
+            { keys: ["X"], label: "ليست سداداً (افتح الأسباب)" },
             { keys: ["S"], label: "تخطَّ إلى التالي" },
           ]}
         />

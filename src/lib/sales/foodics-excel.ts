@@ -130,8 +130,8 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
         sales: [], rows: [], periodStart: null, periodEnd: null, warnings,
         recognisedColumns: [], unrecognisedColumns: [],
         blocked:
-          "لم يُفهَم هذا الملفّ: لم يُعثَر على عمودَي «اسم الصنف» و«الكمّيّة». " +
-          "صدِّر من فودكس تقريرَ بنود الطلبات أو تقريرَ الأصناف بترويسةٍ واحدة.",
+          "تعذّرت قراءة هذا الملف: لم نجد عمودَي «اسم الصنف» و«الكمّيّة». " +
+          "صدّر من فودكس تقرير بنود الطلبات أو تقرير الأصناف بصف عناوين واحد.",
       };
     }
 
@@ -155,15 +155,15 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
     const order: DateOrder = detectDateOrder(samples);
     if (!usingRawDates && order === "AMBIGUOUS" && samples.length > 0) {
       warnings.push(
-        "لم يقطع الملفّ بترتيب اليوم والشهر في تواريخه — قُرئت **اليومُ أوّلاً**. " +
-        "راجِع الفترة المعروضة أدناه قبل الاعتماد.",
+        "لا يتضح من الملف ترتيب اليوم والشهر في التواريخ، فقُرئ **اليوم أولاً**. " +
+        "راجع الفترة المعروضة أدناه قبل الاعتماد.",
       );
     }
     if (dateCol === undefined) {
       warnings.push(
         options.fallbackBusinessDate
-          ? `لا عمودَ تاريخٍ في الملفّ — نُسبت الصفوفُ كلُّها إلى ${options.fallbackBusinessDate} كما اخترتَ.`
-          : "لا عمودَ تاريخٍ في الملفّ، ولم يُحدَّد يومُ عملٍ — فلا يُعرَف متى بِيع.",
+          ? `لا يوجد عمود تاريخ في الملف، فنُسبت كل الصفوف إلى ${options.fallbackBusinessDate} كما اخترت.`
+          : "لا يوجد عمود تاريخ في الملف ولم تحدّد يوم العمل، فلا يُعرف متى تم البيع.",
       );
     }
 
@@ -184,15 +184,15 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
         rows.push({ rowNumber, raw, status, reason, saleExternalId: null });
       };
 
-      if (Object.keys(raw).length === 0) { reject("SKIPPED", "صفٌّ فارغ"); return; }
+      if (Object.keys(raw).length === 0) { reject("SKIPPED", "صف فارغ"); return; }
 
       /* المعرَّبُ يُفضَّل حين يكون مملوءاً — وهو فارغٌ في تصدير فودكس المفحوص */
       const name = ((cell(row, index.productNameLocalized) ?? "").trim())
         || (cell(row, index.productName) ?? "").trim();
-      if (name === "") { reject("SKIPPED", "لا اسمَ صنفٍ في الصفّ — غالباً سطرُ مجموعٍ أو فاصل"); return; }
+      if (name === "") { reject("SKIPPED", "لا يوجد اسم صنف في الصف، وغالباً هو سطر مجموع أو فاصل"); return; }
 
       const quantityCell = (cell(row, index.quantity) ?? "").trim();
-      if (quantityCell === "") { reject("SKIPPED", "لا كمّيّة في الصفّ — غالباً سطرُ مجموعٍ أو فاصل"); return; }
+      if (quantityCell === "") { reject("SKIPPED", "لا توجد كمية في الصف، وغالباً هو سطر مجموع أو فاصل"); return; }
       const quantityMilli = parseQuantityMilli(quantityCell);
       if (quantityMilli === null) {
         reject("ERROR", `تعذّرت قراءة ${FIELD_LABEL.quantity}: «${quantityCell}»`);
@@ -207,7 +207,7 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
         ?? options.fallbackBusinessDate
         ?? null;
       if (!businessDate) {
-        reject("ERROR", "لا يُعرَف يومُ عمل هذا الصفّ — وبيعةٌ في اليوم الخطأ تُحسَب بوصفةٍ أخرى");
+        reject("ERROR", "يوم العمل لهذا الصف غير معروف، وأي بيع في يوم خاطئ يُحسب بوصفة مختلفة");
         return;
       }
 
@@ -369,7 +369,7 @@ export const foodicsExcelAdapter: SalesFileAdapter = {
       parent.modifiers = [...(parent.modifiers ?? []), line.name];
     }
     if (orphans > 0) {
-      warnings.push(`${orphans} خيارَ إضافةٍ لا أصلَ له في طلبه — حُفظ ولم يُنسَب.`);
+      warnings.push(`${orphans} خيار إضافة بلا بند أصلي في طلبه. حُفظت دون نسبتها لبند.`);
     }
 
     /* حالُ الطلب تُحفَظ، ولا تُسقِط بنداً صُنع: الملغى يُعرَف ببنده */

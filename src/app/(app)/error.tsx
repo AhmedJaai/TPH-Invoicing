@@ -66,18 +66,18 @@ export default function ErrorPage({
         <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-danger-bg text-danger">
           {online ? <CloudOff className="h-6 w-6" strokeWidth={1.75} aria-hidden /> : <WifiOff className="h-6 w-6" strokeWidth={1.75} aria-hidden />}
         </span>
-        <h1 className="mt-4 text-lg font-bold">{online ? "تعذّر عرض هذه الصفحة" : "أنت بلا اتّصال"}</h1>
+        <h1 className="mt-4 text-lg font-bold">{online ? "تعذّر عرض هذه الصفحة" : "لا يوجد اتصال بالإنترنت"}</h1>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-soft">
           {online
-            ? "عرضُ الصفحة لا يكتب شيئاً، فلم يضِع قيد. الخادمُ لم يردّ — وغالباً هو انقطاعٌ عابر في الاتصال بالقاعدة."
-            : "جهازُك غير موصولٍ بالشبكة. عرضُ الصفحة لا يكتب شيئاً، فلم يضِع قيد — وتُعاد المحاولةُ وحدها حين يعود الاتّصال."}
+            ? "عرض الصفحة لا يغيّر أي بيانات، فلم يضع شيء. الخادم لم يستجب، وغالباً السبب انقطاع عابر في الاتصال بقاعدة البيانات."
+            : "جهازك غير متصل بالشبكة. عرض الصفحة لا يغيّر أي بيانات، فلم يضع شيء. ستُعاد المحاولة تلقائياً عند عودة الاتصال."}
         </p>
         <p className="mt-2 min-h-5 text-xs font-bold text-ink-soft" role="status">
-          {left !== null && <>تُعاد المحاولةُ بعد <span className="nums">{left}</span> ث…</>}
+          {left !== null && <>ستُعاد المحاولة بعد <span className="nums">{left}</span> ث…</>}
         </p>
         {error.digest && (
           <p className="mt-3 text-[11px] text-muted">
-            إن تكرّر فانقل هذا الرمز لمن يصلحه: <span className="nums" dir="ltr">{error.digest}</span>
+            إن تكرر الخطأ فأرسل هذا الرمز للمختص: <span className="nums" dir="ltr">{error.digest}</span>
           </p>
         )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">

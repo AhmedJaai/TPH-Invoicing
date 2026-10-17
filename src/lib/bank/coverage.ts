@@ -117,7 +117,7 @@ export function describeCoverage(c: Coverage): string {
   if (c.from === null) return "لم يُستورَد شيء بعد.";
 
   const span = `من ${c.from} إلى ${c.to}`;
-  if (c.gaps.length === 0 && c.overlaps.length === 0) return `${span} — متّصلة بلا فجوة.`;
+  if (c.gaps.length === 0 && c.overlaps.length === 0) return `${span}: متصلة بلا فجوة.`;
 
   const parts: string[] = [span];
   if (c.gaps.length > 0) {
@@ -129,7 +129,7 @@ export function describeCoverage(c: Coverage): string {
     );
   }
   if (c.overlaps.length > 0) {
-    parts.push(`و${c.overlaps.length} تداخلاً بين كشوف — لا يضرّ، فالحركة المكرّرة تُرفَض`);
+    parts.push(`و${c.overlaps.length} تداخلاً بين الكشوف، وهو لا يضر لأن الحركة المكرّرة تُرفض`);
   }
   return `${parts.join("، ")}.`;
 }

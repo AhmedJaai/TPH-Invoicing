@@ -133,7 +133,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   "audit:view": "عرض سجلّ التدقيق",
   "inventory:view": "عرض الجرد",
   "inventory:count": "إدخال الجرد وإقفاله",
-  "inventory:reopen": "إعادة فتح جردٍ مقفَل",
+  "inventory:reopen": "إعادة فتح جرد مقفل",
   "recipe:edit": "تعديل الوصفات",
 };
 
@@ -141,7 +141,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
 export class ForbiddenError extends Error {
   readonly capability: Capability;
   constructor(capability: Capability) {
-    super(`هذا الفعل يحتاج صلاحية «${CAPABILITY_LABEL[capability]}» — اطلبها من مالك الحساب.`);
+    super(`هذا الفعل يحتاج صلاحية «${CAPABILITY_LABEL[capability]}». اطلبها من مالك الحساب.`);
     this.name = "ForbiddenError";
     this.capability = capability;
   }

@@ -37,10 +37,10 @@ import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
 export type ValuationBasis = "PERIOD_WEIGHTED_AVERAGE" | "LATEST_KNOWN" | "CATALOG" | "UNKNOWN";
 
 export const VALUATION_LABEL: Record<ValuationBasis, string> = {
-  PERIOD_WEIGHTED_AVERAGE: "قُوِّم بمتوسّط شراء الفترة",
-  LATEST_KNOWN: "قُوِّم بآخر كلفةٍ معروفة — لا شراءَ في الفترة",
-  CATALOG: "قُوِّم بكلفة الكتالوج المعياريّة — لا فاتورةَ لهذا الصنف",
-  UNKNOWN: "لا كلفةَ معروفة — لم يُقوَّم",
+  PERIOD_WEIGHTED_AVERAGE: "مُقيَّم بمتوسط سعر شراء الفترة",
+  LATEST_KNOWN: "مُقيَّم بآخر تكلفة معروفة لعدم وجود شراء في الفترة",
+  CATALOG: "مُقيَّم بتكلفة الكتالوج المعيارية لعدم وجود فاتورة لهذا الصنف",
+  UNKNOWN: "لا توجد تكلفة معروفة، فلم يُقيَّم",
 };
 
 /**
@@ -72,16 +72,16 @@ export type LineFlag =
   | "SUPPLIER_RETURN";
 
 export const FLAG_LABEL: Record<LineFlag, string> = {
-  OPENING_UNKNOWN: "الرصيد الافتتاحيّ غير معروف — لا جردَ سابقٌ ولا رصيدٌ مكتوب",
-  PURCHASES_UNKNOWN: "مشترياتُ الفترة فيها بنودٌ لم تُعرَف كمّيّتُها",
-  CONSUMPTION_UNKNOWN: "الاستهلاك المتوقَّع غير محسوب — لا وصفةَ تصل إلى هذا الصنف",
-  COST_UNKNOWN: "كلفةُ الوحدة غير معروفة — فلا تُحسَب كلفةُ الفرق",
-  NOT_COUNTED: "لم يُدخَل عدٌّ فعليّ بعد",
-  UNIT_CONFLICT: "ذُكر في الوصفات بوحدتين من عائلتين مختلفتين",
-  RECIPE_UNIT_MISMATCH: "وحدةُ الوصفة لا تُحوَّل إلى وحدة الصنف",
-  OUT_OF_SCOPE: "خارج هذا الجرد باختيارك — وقائعُه محسوبة ولا فرقَ له",
-  RECEIPT_POSSIBLE_DUPLICATE: "كمّيّةٌ مستلَمة قد تكون هي نفسَ بندِ فاتورة — فالمشتريات غير معروفة حتى تُحسَم",
-  SUPPLIER_RETURN: "في مشترياته مرتجعٌ للمورّد (بندُ فاتورةٍ بكمّيّةٍ سالبة) — وقد طُرح منها",
+  OPENING_UNKNOWN: "الرصيد الافتتاحي غير معروف: لا يوجد جرد سابق ولا رصيد مكتوب",
+  PURCHASES_UNKNOWN: "في مشتريات الفترة بنود كميتها غير معروفة",
+  CONSUMPTION_UNKNOWN: "الاستهلاك المتوقع غير محسوب: لا توجد وصفة تستخدم هذا الصنف",
+  COST_UNKNOWN: "تكلفة الوحدة غير معروفة، فلا تُحسب تكلفة الفرق",
+  NOT_COUNTED: "لم يُدخل جرد فعلي بعد",
+  UNIT_CONFLICT: "ذُكر في الوصفات بوحدتين من نوعين مختلفين",
+  RECIPE_UNIT_MISMATCH: "وحدة الوصفة لا يمكن تحويلها إلى وحدة الصنف",
+  OUT_OF_SCOPE: "مستبعد من هذا الجرد باختيارك، فحركاته محسوبة وليس له فرق",
+  RECEIPT_POSSIBLE_DUPLICATE: "كمية مستلمة قد تكون نفسها بند فاتورة، فالمشتريات غير معروفة حتى تحسم الأمر",
+  SUPPLIER_RETURN: "في مشترياته مرتجع للمورّد (بند فاتورة بكمية سالبة)، وقد خُصم منها",
 };
 
 /** مصدرُ الرصيد الافتتاحيّ — بترتيبٍ ثابت لا تتنافس فيه المصادر. */
@@ -90,7 +90,7 @@ export type OpeningSource = "MANUAL" | "PREVIOUS_COUNT" | "MOVEMENT" | "UNKNOWN"
 export const OPENING_SOURCE_LABEL: Record<OpeningSource, string> = {
   MANUAL: "أُدخل يدوياً",
   PREVIOUS_COUNT: "من جرد الأسبوع السابق",
-  MOVEMENT: "من رصيدٍ افتتاحيٍّ مسجَّل",
+  MOVEMENT: "من رصيد افتتاحي مسجّل",
   UNKNOWN: "غير معروف",
 };
 

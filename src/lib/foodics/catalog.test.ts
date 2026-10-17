@@ -20,7 +20,7 @@ describe("كتالوجُ فودكس من الواجهة", () => {
     ]);
     expect(out.rows).toBe(2);
     expect(out.items).toEqual([]);
-    expect(out.issues.map((i) => i.reason)).toEqual(["كلفةٌ غير مقروءة", "وحدةُ صرفٍ غير معروفة"]);
+    expect(out.issues.map((i) => i.reason)).toEqual(["التكلفة غير مقروءة", "وحدة الصرف غير معروفة"]);
   });
 
   it("الصنفُ المباع ووصفتُه: كمّيّةُ المكوّن بوحدة صرفه", () => {
@@ -38,6 +38,6 @@ describe("كتالوجُ فودكس من الواجهة", () => {
     ]);
     expect(products.products).toEqual([{ productSku: "sk-0002", name: "Espresso", priceMinor: 1200, declaredCostMinor: null, isActive: true }]);
     expect(recipes.recipeLines.map((l) => [l.itemSku, l.quantityMilli, l.unit])).toEqual([["sk-0043", 18_000, "G"], ["sk-0039", 1_000, "PIECE"]]);
-    expect(recipes.issues.map((i) => i.reason)).toEqual(["كمّيّةٌ غير مقروءة"]);
+    expect(recipes.issues.map((i) => i.reason)).toEqual(["الكمية غير مقروءة"]);
   });
 });

@@ -56,8 +56,8 @@ async function voidAudits(tx: Tx, paymentId: string): Promise<number> {
   return rows.length;
 }
 
-describe("undoMarkedPaid — إلغاءٌ لا حذف", () => {
-  it("تعود الفاتورةُ مفتوحةً بالهللة، وتبقى الدفعةُ ملغاةً بسببها، وفي السجلّ سطرُها", () =>
+describe("undoMarkedPaid — إلغاء لا حذف", () => {
+  it("تعود الفاتورة مفتوحةً بالهللة، وتبقى الدفعة ملغاةً بسببها، وفي السجلّ سطرها", () =>
     withRollback(async (tx) => {
       const { invoiceId, paymentId } = await markedPaid(tx);
       expect(await allocatedTo(tx, invoiceId)).toBe(TOTAL);
@@ -69,11 +69,11 @@ describe("undoMarkedPaid — إلغاءٌ لا حذف", () => {
       const row = await paymentRow(tx, paymentId);
       expect(row.status).toBe("VOID");
       expect(row.amountMinor).toBe(TOTAL);
-      expect(row.reason).toContain("تراجعٌ عن إقرار سداد");
+      expect(row.reason).toContain("تراجع عن إقرار سداد");
       expect(await voidAudits(tx, paymentId)).toBe(1);
     }));
 
-  it("التراجعُ مرّتين لا يُنتج أثراً ثانياً — 409 ولا سطرَ تدقيقٍ جديد", () =>
+  it("التراجع مرّتين لا ينتج أثراً ثانياً — 409 ولا سطر تدقيق جديد", () =>
     withRollback(async (tx) => {
       const { invoiceId, paymentId } = await markedPaid(tx);
       const who = await someone(tx);
@@ -86,7 +86,7 @@ describe("undoMarkedPaid — إلغاءٌ لا حذف", () => {
       expect(await allocatedTo(tx, invoiceId)).toBe(0);
     }));
 
-  it("بعد نافذة التراجع لا يُلغى من الإشعار — والدفعةُ وتخصيصُها كما هما", () =>
+  it("بعد نافذة التراجع لا يلغى من الإشعار — والدفعة وتخصيصها كما هما", () =>
     withRollback(async (tx) => {
       const { invoiceId, paymentId } = await markedPaid(tx);
       await tx.execute(sql`update payments set created_at = now() - interval '31 minutes' where id = ${paymentId}`);
@@ -98,7 +98,7 @@ describe("undoMarkedPaid — إلغاءٌ لا حذف", () => {
       expect(await allocatedTo(tx, invoiceId)).toBe(TOTAL);
     }));
 
-  it("دفعةٌ لها مستند ليست إقراراً بلا دليل — لا تُلغى من هنا", () =>
+  it("دفعة لها مستند ليست إقراراً بلا دليل — لا تلغى من هنا", () =>
     withRollback(async (tx) => {
       const supplierForDoc = await makeSupplier(tx);
       const documentId = await makeDocument(tx, supplierForDoc, "2026-08-12");
@@ -110,7 +110,7 @@ describe("undoMarkedPaid — إلغاءٌ لا حذف", () => {
       expect(await allocatedTo(tx, invoiceId)).toBe(TOTAL);
     }));
 
-  it("في شهرٍ مقفل يُرفَض — ولا يتغيّر شيء", () =>
+  it("في شهر مقفل يرفض — ولا يتغيّر شيء", () =>
     withRollback(async (tx) => {
       const { invoiceId, paymentId } = await markedPaid(tx);
       await tx.insert(monthCloses).values({ month: "2026-08", status: "CLOSED" });
@@ -122,7 +122,7 @@ describe("undoMarkedPaid — إلغاءٌ لا حذف", () => {
       expect(await voidAudits(tx, paymentId)).toBe(0);
     }));
 
-  it("ومعرّفٌ لا دفعةَ له 404 — ولا يُلغى ما جاء معه", () =>
+  it("ومعرّف لا دفعة له 404 — ولا يلغى ما جاء معه", () =>
     withRollback(async (tx) => {
       const { invoiceId, paymentId } = await markedPaid(tx);
 

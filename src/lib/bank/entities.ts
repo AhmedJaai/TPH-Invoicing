@@ -130,7 +130,7 @@ export function resolveSupplier(
 
     for (const acc of s.accounts ?? []) {
       if (accounts.has(acc)) {
-        evidence.push({ kind: "ACCOUNT", detail: `الحساب ${acc} معروف أنّه له`, weight: WEIGHT.ACCOUNT, decisive: true });
+        evidence.push({ kind: "ACCOUNT", detail: `الحساب ${acc} معروف أنه يخصّه`, weight: WEIGHT.ACCOUNT, decisive: true });
       }
     }
 
@@ -149,7 +149,7 @@ export function resolveSupplier(
 
     for (const id of ids) {
       if ((s.accounts ?? []).includes(id)) {
-        evidence.push({ kind: "NATIONAL_ID", detail: `رقم الهوية ${id} معروف`, weight: WEIGHT.NATIONAL_ID, decisive: true });
+        evidence.push({ kind: "NATIONAL_ID", detail: `رقم الهوية ${id} معروف لهذا المورّد`, weight: WEIGHT.NATIONAL_ID, decisive: true });
       }
     }
 
@@ -157,7 +157,7 @@ export function resolveSupplier(
       if (!name) continue;
       const n = normalizeText(name);
       if (n.length >= MIN_TOKEN && text.includes(n)) {
-        evidence.push({ kind: "NAME", detail: `اسم المورّد «${name}» وارد كما هو`, weight: WEIGHT.NAME, decisive: false });
+        evidence.push({ kind: "NAME", detail: `اسم المورّد «${name}» وارد في الوصف كما هو`, weight: WEIGHT.NAME, decisive: false });
         break;
       }
     }
@@ -166,7 +166,7 @@ export function resolveSupplier(
     if (tokens.length > 0) {
       evidence.push({
         kind: "TOKEN",
-        detail: `كلمة مميّزة: ${tokens.join(" · ")}`,
+        detail: `كلمة مميزة: ${tokens.join(" · ")}`,
         // كلمتان مميّزتان أقوى من واحدة، ولا تبلغان القاطع
         weight: Math.min(WEIGHT.TOKEN + 0.2 * (tokens.length - 1), 0.75),
         decisive: false,
@@ -201,7 +201,7 @@ export function resolveSupplier(
   if (results.length > 1 && results[1].score >= results[0].score) {
     return { ...results[0], score: results[0].score * 0.6,
       evidence: [...results[0].evidence,
-        { kind: "TOKEN", detail: "مورّدٌ آخر يطابق بنفس القوّة — لا يُحسم", weight: 0, decisive: false }] };
+        { kind: "TOKEN", detail: "يوجد مورّد آخر يطابق بالقوة نفسها، فلا يمكن الحسم", weight: 0, decisive: false }] };
   }
 
   return results[0];

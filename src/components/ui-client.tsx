@@ -120,7 +120,7 @@ export function ConfirmAction({
               type="button"
               disabled={!understood}
               aria-busy={busy}
-              title={!understood ? "أقرَّ بما فوقه أوّلاً" : undefined}
+              title={!understood ? "أكّد الإقرار أعلاه أولاً" : undefined}
               onClick={async () => {
                 if (busy) return;
                 setBusy(true);
@@ -264,7 +264,7 @@ export function ActionButton({
         {children}
       </button>
       {disabled && reason && <span id={reasonId} className="sr-only">{reason}</span>}
-      <span className="sr-only" aria-live="polite">{busy ? "يُنفَّذ" : done ? "تمّ" : ""}</span>
+      <span className="sr-only" aria-live="polite">{busy ? "جارٍ التنفيذ" : done ? "تم" : ""}</span>
     </>
   );
 }
@@ -483,14 +483,14 @@ export function TableFilter({ label, total }: { label: string; total: number }) 
           shown === 0 ? (
             /* الفراغُ يُقال بما يُخرج منه: رأسُ جدولٍ فوق لا شيء لا يقول ما العمل */
             <>
-              لا صفّ يطابق «<bdi>{q}</bdi>» في المعروض.{" "}
+              لا يوجد صف يطابق «<bdi>{q}</bdi>» في الصفوف المعروضة.{" "}
               <button type="button" onClick={() => { setQ(""); ref.current?.focus(); }} className="min-h-8 font-bold text-accent hover:underline">
                 امسح البحث
               </button>
             </>
           ) : <><span className="nums nums-count">{shown}</span> من <span className="nums nums-count">{total}</span></>
         ) : (
-          <><span className="nums nums-count">{total}</span> صفّاً</>
+          <><span className="nums nums-count">{total}</span> صفاً</>
         )}
       </p>
     </div>
@@ -528,7 +528,7 @@ export function RowLink({
       onTouchStart={show}
       onFocus={show}
       data-row-link=""
-      aria-label="افتح التفصيل"
+      aria-label="افتح التفاصيل"
       aria-labelledby={labelledBy}
       className={className}
     />
@@ -553,8 +553,8 @@ export const SectionBoundary = catchError(
         تعذّر عرض {props.what}
       </p>
       <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-        بقيّةُ الصفحة كما قُرئت، ولم يُكتب شيء. غالباً انقطاعٌ عابر في الاتّصال بالقاعدة.
-        {isDigested(error) && <> إن تكرّر فانقل هذا الرمز لمن يصلحه: <span className="nums nums-count" dir="ltr">{error.digest}</span></>}
+        بقية الصفحة ظاهرة كما هي، ولم يُحفظ أي تغيير. غالباً السبب انقطاع عابر في الاتصال بقاعدة البيانات.
+        {isDigested(error) && <> إن تكرّر الخطأ فأبلغ به الدعم الفني مع هذا الرمز: <span className="nums nums-count" dir="ltr">{error.digest}</span></>}
       </p>
       <button type="button" onClick={() => retry()} className={`mt-3 ${buttonClass("secondary", "sm")}`}>
         <RotateCw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
@@ -605,7 +605,7 @@ export function SortHeader({
       href={sortHref(pathname, params, param, formatSort(next))}
       scroll={false}
       replace
-      data-tip={next ? (next.dir === "desc" ? "رتّب تنازليّاً" : "رتّب تصاعديّاً") : "أعِد الترتيبَ الأصليّ"}
+      data-tip={next ? (next.dir === "desc" ? "رتّب تنازلياً" : "رتّب تصاعدياً") : "أعد الترتيب الأصلي"}
       className={`-mx-1.5 inline-flex min-h-7 items-center gap-1 rounded-md px-1.5 transition-colors hover:bg-hover hover:text-ink ${current ? "text-ink" : ""}`}
     >
       {children}
@@ -637,10 +637,10 @@ export function SortSelect({
         onChange={(e) => router.replace(sortHref(pathname, params, param, e.target.value || null), { scroll: false })}
         className={`${fieldClass("sm")} max-w-56`}
       >
-        <option value="">الترتيب الأصليّ</option>
+        <option value="">الترتيب الأصلي</option>
         {options.flatMap((o) => {
           const second: SortDir = o.first === "desc" ? "asc" : "desc";
-          const word = (d: SortDir) => (d === "asc" ? "تصاعديّاً" : "تنازليّاً");
+          const word = (d: SortDir) => (d === "asc" ? "تصاعدياً" : "تنازلياً");
           return [o.first, second].map((d) => (
             <option key={`${o.key}.${d}`} value={`${o.key}.${d}`}>{o.label} — {word(d)}</option>
           ));
@@ -902,7 +902,7 @@ export function Toaster() {
             <Icon className={`mt-0.5 h-[18px] w-[18px] shrink-0 ${TOAST_TONE[tone]}`} strokeWidth={2} aria-hidden />
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-bold leading-snug">
-                {t.state === "undone" ? "تمّ التراجع." : t.state === "undo-failed" ? "تعذّر التراجع — لم يتغيّر شيء." : t.title}
+                {t.state === "undone" ? "تم التراجع." : t.state === "undo-failed" ? "تعذّر التراجع، ولم يتغيّر شيء." : t.title}
               </p>
               {t.body && t.state === "idle" && <p className="mt-0.5 text-xs leading-relaxed text-muted">{t.body}</p>}
             </div>
@@ -1147,7 +1147,7 @@ export function SelectAll() {
     <input
       ref={ref}
       type="checkbox"
-      aria-label="حدّد كلَّ الظاهر في هذا الجدول"
+      aria-label="حدّد كل الصفوف الظاهرة في هذا الجدول"
       checked={total > 0 && ids.length >= total}
       onChange={(e) => {
         if (!root) return;
@@ -1185,12 +1185,12 @@ export function BulkBar({ children }: {
       {ids.length > 0 && (
         <div
           role="region"
-          aria-label="أفعالٌ على المحدَّد"
+          aria-label="أفعال على المحدّد"
           className="no-print sticky bottom-20 z-20 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-accent-line bg-overlay px-4 py-3 shadow-overlay lg:bottom-4"
         >
-          <p className="text-[13px] font-bold">محدَّد <span className="nums nums-count">{ids.length}</span></p>
+          <p className="text-[13px] font-bold">المحدّد: <span className="nums nums-count">{ids.length}</span></p>
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{children(selected, clear)}</div>
-          <button type="button" onClick={clear} className={buttonClass("quiet", "sm")}>ألغِ التحديد</button>
+          <button type="button" onClick={clear} className={buttonClass("quiet", "sm")}>إلغاء التحديد</button>
         </div>
       )}
     </div>

@@ -56,9 +56,9 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
         setError({ id: s.id, message: r.error });
         return;
       }
-      const message = r.data.message ?? "صُنّفت سداد مورّد";
+      const message = r.data.message ?? "تم تصنيف الحركة سداداً لمورّد";
       setDone((d) => new Map(d).set(s.id, message));
-      toast({ tone: "ok", title: message, body: "ويسري على أمثالها في الكشوف القادمة." });
+      toast({ tone: "ok", title: message, body: "وسيُطبَّق التصنيف على الحركات المشابهة في الكشوف القادمة." });
       router.refresh();
     } finally {
       setBusy(null);
@@ -75,7 +75,7 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
               <span className="min-w-0">
                 <span className="block truncate text-[13px] font-bold" dir="auto">{s.label}</span>
                 <span className="mt-0.5 block text-[11px] text-muted">
-                  مصنَّفة «{s.categoryLabel}» · تحمل اسم المورّد «{s.supplier}»
+                  مصنَّفة «{s.categoryLabel}» · وتحمل اسم المورّد «{s.supplier}»
                 </span>
               </span>
               <span className="shrink-0 text-[13px] font-bold"><Money minor={s.amountMinor} /></span>
@@ -98,10 +98,10 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
                 </button>
                 {s.bankTransactionId && (
                   <Link href={txHref(s.bankTransactionId)} className="inline-flex min-h-11 items-center gap-1 text-[11px] font-bold text-ink-soft hover:text-accent sm:min-h-0">
-                    افتح حركتها <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                    افتح الحركة <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                   </Link>
                 )}
-                {!s.supplierId && <span className="text-[11px] text-muted">المورّد غير مسجَّل بمعرّفه — صنّفها من البنك.</span>}
+                {!s.supplierId && <span className="text-[11px] text-muted">تعذّر ربط المورّد بالحركة. صنّفها من صفحة البنك.</span>}
               </div>
             )}
 

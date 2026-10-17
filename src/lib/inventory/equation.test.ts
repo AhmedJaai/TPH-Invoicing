@@ -18,7 +18,7 @@ function terms(over: Partial<StockTerms> = {}): StockTerms {
 }
 
 describe("المعادلة", () => {
-  it("افتتاحيّ ٥ + مشتريات ٢٠ − استهلاك ١٢ = ١٣ متوقَّعاً", () => {
+  it("افتتاحيّ ٥ + مشتريات ٢٠ − استهلاك ١٢ = ١٣ متوقّعاً", () => {
     const closing = theoreticalClosing(terms());
     expect(canonicalToQuantity(closing!, "KG")).toBe(13);
   });
@@ -39,7 +39,7 @@ describe("المعادلة", () => {
     ومقامُ المخزون الختاميّ يتضخّم كلّما قلّ ما بقي على الرفّ، فيُنذر
     أشدَّ ما يكون آخرَ الأسبوع حين يكون الرفّ فارغاً بحقّ.
   */
-  it("استهلاكٌ ٣٠ وفرقٌ ‑١ ← الأساسيّة ‑٣٫٣٣٪ لا ‑١٠٪", () => {
+  it("استهلاك ٣٠ وفرق ‑١ ← الأساسيّة ‑٣٫٣٣٪ لا ‑١٠٪", () => {
     const r = stockVariance(
       terms({ openingMilli: kg(40), purchasesMilli: 0, theoreticalConsumptionMilli: kg(30) }),
       kg(9),
@@ -51,7 +51,7 @@ describe("المعادلة", () => {
     expect(r.varianceBp).toBe(-1000);
   });
 
-  it("واستهلاكٌ صفرٌ لا يُنتج نسبةً أساسيّة — ولا «∞٪» ولا «١٠٠٪»", () => {
+  it("واستهلاك صفر لا ينتج نسبةً أساسيّة — ولا «∞٪» ولا «١٠٠٪»", () => {
     const r = stockVariance(
       terms({ openingMilli: kg(10), purchasesMilli: 0, theoreticalConsumptionMilli: 0 }),
       kg(9),
@@ -60,7 +60,7 @@ describe("المعادلة", () => {
     expect(r.varianceConsumptionBp).toBeNull();
   });
 
-  it("والمتوقَّع ٦ مع فعليٍّ ٥٫٢ = ‑٠٫٨ كجم", () => {
+  it("والمتوقّع ٦ مع فعليّ ٥٫٢ = ‑٠٫٨ كجم", () => {
     const r = stockVariance(
       terms({ openingMilli: kg(6), purchasesMilli: 0, theoreticalConsumptionMilli: 0 }),
       kg(5.2),
@@ -68,7 +68,7 @@ describe("المعادلة", () => {
     expect(canonicalToQuantity(r.varianceMilli!, "KG")).toBe(-0.8);
   });
 
-  it("والهدرُ المسجَّل والتسوياتُ تدخل المعادلة", () => {
+  it("والهدر المسجّل والتسويات تدخل المعادلة", () => {
     const closing = theoreticalClosing(terms({
       recordedWasteMilli: kg(1),
       adjustmentsInMilli: kg(2),
@@ -78,14 +78,14 @@ describe("المعادلة", () => {
     expect(canonicalToQuantity(closing!, "KG")).toBe(13.5);
   });
 
-  it("ولا يُقصّ المتوقَّع عند الصفر — السالبُ خبر", () => {
+  it("ولا يقصّ المتوقّع عند الصفر — السالب خبر", () => {
     const closing = theoreticalClosing(terms({ theoreticalConsumptionMilli: kg(40) }));
     expect(canonicalToQuantity(closing!, "KG")).toBe(-15);
   });
 });
 
-describe("المجهولُ ينتشر ولا يُبتلَع", () => {
-  it("افتتاحيٌّ مجهول ⇒ المتوقَّعُ مجهول — لا ٢٠", () => {
+describe("المجهول ينتشر ولا يبتلع", () => {
+  it("افتتاحيّ مجهول ⇒ المتوقّع مجهول — لا ٢٠", () => {
     const r = stockVariance(terms({ openingMilli: null }), kg(10.5));
     expect(r.theoreticalClosingMilli).toBeNull();
     expect(r.varianceMilli).toBeNull();
@@ -93,21 +93,21 @@ describe("المجهولُ ينتشر ولا يُبتلَع", () => {
     expect(r.varianceConsumptionBp).toBeNull();
   });
 
-  it("ومشترياتٌ فيها بندٌ لم تُعرَف كمّيّتُه ⇒ مجهول", () => {
+  it("ومشتريات فيها بند لم تعرف كمّيّته ⇒ مجهول", () => {
     expect(theoreticalClosing(terms({ purchasesMilli: null }))).toBeNull();
   });
 
-  it("واستهلاكٌ لا وصفةَ له ⇒ مجهول", () => {
+  it("واستهلاك لا وصفة له ⇒ مجهول", () => {
     expect(theoreticalClosing(terms({ theoreticalConsumptionMilli: null }))).toBeNull();
   });
 
-  it("وصنفٌ لم يُعَدّ ⇒ لا فرق — والمتوقَّعُ يبقى محسوباً", () => {
+  it("وصنف لم يعدّ ⇒ لا فرق — والمتوقّع يبقى محسوباً", () => {
     const r = stockVariance(terms(), null);
     expect(canonicalToQuantity(r.theoreticalClosingMilli!, "KG")).toBe(13);
     expect(r.varianceMilli).toBeNull();
   });
 
-  it("والقسمةُ على صفرٍ لا تُصلَح بمئةٍ ولا بصفر — النسبةُ غير معرَّفة", () => {
+  it("والقسمة على صفر لا تصلح بمئة ولا بصفر — النسبة غير معرّفة", () => {
     const r = stockVariance(
       terms({ openingMilli: 0, purchasesMilli: kg(12), theoreticalConsumptionMilli: kg(12) }),
       kg(-1),

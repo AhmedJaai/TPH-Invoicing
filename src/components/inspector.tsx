@@ -94,7 +94,7 @@ export function InspectorPanel({
       go();
       return;
     }
-    setHeld({ what: dirty.dataset.dirty || "ما كتبتَه", go });
+    setHeld({ what: dirty.dataset.dirty || "ما كتبته", go });
   }, []);
 
   const close = useCallback(() => guarded(() => leave(() => router.back())), [guarded, leave, router]);
@@ -276,25 +276,25 @@ export function InspectorPanel({
           </div>
           <div className="flex shrink-0 items-center gap-1" onPointerDown={(e) => e.stopPropagation()}>
             {siblings && (
-              <div className="flex items-center" role="group" aria-label="التنقّل بين ملفّات القائمة">
+              <div className="flex items-center" role="group" aria-label="التنقل بين ملفات القائمة">
                 <button
                   type="button"
                   onClick={() => step(siblings.prev)}
                   disabled={!siblings.prev}
-                  aria-label="الملفّ السابق في القائمة"
+                  aria-label="الملف السابق في القائمة"
                   data-tip="السابق (K)"
                   className="grid h-11 w-9 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent sm:h-9 sm:w-8"
                 >
                   <ChevronUp className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
                 </button>
                 <span className="nums nums-count px-0.5 text-[11px] text-muted" aria-live="polite">
-                  <span className="sr-only">الملفّ </span>{siblings.at + 1}<span aria-hidden> / </span><span className="sr-only"> من </span>{siblings.total}
+                  <span className="sr-only">الملف </span>{siblings.at + 1}<span aria-hidden> / </span><span className="sr-only"> من </span>{siblings.total}
                 </span>
                 <button
                   type="button"
                   onClick={() => step(siblings.next)}
                   disabled={!siblings.next}
-                  aria-label="الملفّ التالي في القائمة"
+                  aria-label="الملف التالي في القائمة"
                   data-tip="التالي (J)"
                   className="grid h-11 w-9 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent sm:h-9 sm:w-8"
                 >
@@ -305,8 +305,8 @@ export function InspectorPanel({
             {fullHref && <a
               href={fullHref}
               data-full-page=""
-              aria-label="افتح الصفحة كاملة"
-              data-tip="افتح الصفحة كاملة"
+              aria-label="افتح في صفحة كاملة"
+              data-tip="افتح في صفحة كاملة"
               className="grid h-11 w-11 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-ink sm:h-9 sm:w-9"
             >
               <Maximize2 className="h-4 w-4" strokeWidth={2} aria-hidden />
@@ -314,7 +314,7 @@ export function InspectorPanel({
             <button
               type="button"
               onClick={close}
-              aria-label="أغلق اللوح"
+              aria-label="أغلق اللوحة"
               data-tip="أغلق (Esc)"
               className="grid h-11 w-11 place-items-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-ink sm:h-9 sm:w-9"
             >
@@ -323,13 +323,13 @@ export function InspectorPanel({
           </div>
         </header>
         {held && (
-          <div role="alertdialog" aria-label="لم يُحفَظ بعد" className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-warn/30 bg-warn-bg px-4 py-2.5 text-xs sm:px-6">
-            <p className="min-w-0 flex-1 basis-48 font-bold text-ink">عندك «{held.what}» لم يُحفَظ — إن تركتَه ضاع ما كتبت.</p>
+          <div role="alertdialog" aria-label="تغييرات غير محفوظة" className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-warn/30 bg-warn-bg px-4 py-2.5 text-xs sm:px-6">
+            <p className="min-w-0 flex-1 basis-48 font-bold text-ink">لديك تغييرات غير محفوظة في «{held.what}». إذا غادرت ستضيع.</p>
             <button type="button" autoFocus onClick={() => setHeld(null)} className="min-h-9 rounded-lg bg-accent px-3 font-bold text-accent-ink hover:bg-accent-strong">
-              ابقَ وأكمِل
+              ابقَ وأكمل
             </button>
             <button type="button" onClick={() => { const go = held.go; setHeld(null); go(); }} className="min-h-9 rounded-lg border border-line-input bg-raised px-3 font-bold text-ink hover:bg-hover">
-              اترك ما كتبت
+              غادر دون حفظ
             </button>
           </div>
         )}
@@ -365,7 +365,7 @@ export function InspectorSkeleton({ title }: { title: string }) {
           </div>
         ))}
       </div>
-      <span className="sr-only">يُحمّل…</span>
+      <span className="sr-only">جارٍ التحميل…</span>
     </InspectorPanel>
   );
 }

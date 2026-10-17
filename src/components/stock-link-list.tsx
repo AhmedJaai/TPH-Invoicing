@@ -29,11 +29,11 @@ export function StockLinkList({ rows, options, canEdit, notStockKeys }: {
           <li key={r.supplierProductId} className="py-3.5">
             <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[11px]">
               <span className="font-bold text-ink"><Money minor={r.valueMinor} /></span>
-              <span className="text-muted">اشتُري منه كلَّ الوقت</span>
+              <span className="text-muted">مشترياتك منه حتى الآن</span>
               {r.evidence && (
                 <Badge tone="accent">
                   <Scale className="h-3 w-3" strokeWidth={2} aria-hidden />
-                  فودكس: «{r.evidence.productName}» في {r.evidence.matches} {r.evidence.matches === 1 ? "سطرٍ" : "سطراً"} بالمبلغ نفسه
+                  فودكس: «{r.evidence.productName}» في {r.evidence.matches} {r.evidence.matches === 1 ? "سطر" : "سطراً"} بالمبلغ نفسه
                 </Badge>
               )}
               {r.notStock && <Badge tone="muted">ليس مخزوناً</Badge>}
@@ -41,7 +41,7 @@ export function StockLinkList({ rows, options, canEdit, notStockKeys }: {
             <LinkRow row={r} options={options} canEdit={canEdit && !r.notStock} onSaved={setSaved} />
             {canEdit && r.status !== "LINKED" && (
               <div className="mt-2 flex flex-wrap items-center gap-1">
-                <SignalControls signalKey={notStockKeys[r.supplierProductId]} silenced={r.notStock} dismissLabel="ليس مخزوناً — أخرِجه" snoozeDays={30} />
+                <SignalControls signalKey={notStockKeys[r.supplierProductId]} silenced={r.notStock} dismissLabel="ليس مخزوناً، أخرجه" snoozeDays={30} />
               </div>
             )}
           </li>
@@ -54,8 +54,8 @@ export function StockLinkList({ rows, options, canEdit, notStockKeys }: {
 /** «أقِرّ الجاهز»: ما اتّفق عليه دليلُ فودكس صنفاً وعبوةً بشاهدَين فأكثر. الخادمُ يعيد الاشتقاق. */
 export function ApproveReady({ ids, count }: { ids: readonly string[]; count: number }) {
   return (
-    <PostAction url="/api/finance/stock-links" body={{ ids }} variant="primary" size="md" done="رُبطت البنود">
-      أقِرّ الـ{count} الجاهزة
+    <PostAction url="/api/finance/stock-links" body={{ ids }} variant="primary" size="md" done="تم ربط البنود">
+      اعتمد الـ{count} الجاهزة
     </PostAction>
   );
 }

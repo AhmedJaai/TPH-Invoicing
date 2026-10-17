@@ -43,6 +43,6 @@ export async function loadFoodicsAttentionFacts(): Promise<FoodicsAttentionFacts
       .map((m) => ({ purchaseId: m.purchase.id, supplierName: m.invoice.supplierName, invoiceNumber: m.invoice.invoiceNumber, gapMinor: m.gapMinor })),
     purchaseMissing: witness.comparison.onlyFoodics
       .filter((p) => p.linkedSupplierId !== null && !purchaseSilenced.has(purchaseSignalKey(p.id)))
-      .map((p) => ({ purchaseId: p.id, supplierName: p.foodicsSupplierName ?? "مورّدٌ بلا اسم", invoiceNumber: p.invoiceNumber, totalMinor: p.totalMinor })),
+      .map((p) => ({ purchaseId: p.id, supplierName: p.foodicsSupplierName ?? "مورّد بلا اسم", invoiceNumber: p.invoiceNumber, totalMinor: p.totalMinor })),
   };
 }

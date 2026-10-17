@@ -16,7 +16,7 @@ export function Changes({ changes }: { changes: readonly Change[] }) {
   if (shown.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs leading-relaxed text-muted">
-        لم يتغيّر شيءٌ يستحقّ الذكر منذ الأسبوع الماضي — والسكونُ خبرٌ أيضاً.
+        لم يتغيّر شيء يستحق الذكر منذ الأسبوع الماضي، وهذا خبر جيد أيضاً.
       </p>
     );
   }

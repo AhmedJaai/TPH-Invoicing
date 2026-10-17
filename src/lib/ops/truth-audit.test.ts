@@ -23,66 +23,66 @@ describe("مقابلة الأرشيف بالقاعدة", () => {
     expect(verdicts([file()], [rec()])).toEqual(["VERIFIED"]);
   });
 
-  it("اختلاف الإجمالي يحتاج تصحيحاً — ولا يُصحَّح آلياً", () => {
+  it("اختلاف الإجمالي يحتاج تصحيحاً — ولا يصحّح آلياً", () => {
     const f = auditTruth([file()], [rec({ totalMinor: 1_050_00 })])[0];
     expect(f.verdict).toBe("CORRECTED");
     expect(f.detail).toContain("100.00");
-    expect(f.suggestion).toContain("لا يُصحَّح آلياً");
+    expect(f.suggestion).toContain("لا يتم آلياً");
   });
 
-  it("وريالٌ يُتسامح فيه — المورّد يُسقط كسور الريال", () => {
+  it("وريال يتسامح فيه — المورّد يسقط كسور الريال", () => {
     expect(TOTAL_TOLERANCE_MINOR).toBe(100);
     expect(verdicts([file()], [rec({ totalMinor: 1_150_00 - 100 })])).toEqual(["VERIFIED"]);
     expect(verdicts([file()], [rec({ totalMinor: 1_150_00 - 101 })])).toEqual(["CORRECTED"]);
   });
 
-  it("اختلاف الشهر تصحيحٌ كذلك — ينقل الفاتورة إلى شهرٍ ليس لها", () => {
+  it("اختلاف الشهر تصحيح كذلك — ينقل الفاتورة إلى شهر ليس لها", () => {
     const f = auditTruth([file()], [rec({ periodMonth: "2026-07" })])[0];
     expect(f.verdict).toBe("CORRECTED");
     expect(f.detail).toContain("2026-07");
   });
 
-  it("أصلٌ بلا قيد مفقود", () => {
+  it("أصل بلا قيد مفقود", () => {
     const f = auditTruth([file()], [])[0];
     expect(f.verdict).toBe("MISSING");
-    expect(f.detail).toContain("ولا قيد له");
+    expect(f.detail).toContain("وليس له قيد");
   });
 
-  it("وقيدٌ بلا أصل مفقودٌ كذلك — ولا يُحذَف", () => {
+  it("وقيد بلا أصل مفقود كذلك — ولا يحذف", () => {
     const f = auditTruth([], [rec()])[0];
     expect(f.verdict).toBe("MISSING");
     expect(f.suggestion).toContain("لا تحذف القيد");
   });
 
-  it("أصلٌ واحد وقيدان مكرَّر", () => {
+  it("أصل واحد وقيدان مكرّر", () => {
     const f = auditTruth([file()], [rec({ documentId: "a" }), rec({ documentId: "b" })])[0];
     expect(f.verdict).toBe("DUPLICATE");
     expect(f.detail).toContain("2");
   });
 });
 
-describe("ما لا يُقطَع فيه", () => {
+describe("ما لا يقطع فيه", () => {
   /*
     `AMBIGUOUS` ليست فشلاً: هي الحكم الصادق حين لا يكفي الدليل، وهي ما
     يمنع أن يُصحَّح رقمٌ صحيح بآخر خاطئ.
   */
-  it("اسمٌ بلا إجمالٍ لا يُقابَل", () => {
+  it("اسم بلا إجمال لا يقابل", () => {
     const f = auditTruth([file({ totalMinor: null })], [rec()])[0];
     expect(f.verdict).toBe("AMBIGUOUS");
-    expect(f.detail).toContain("لا يحمل إجمالاً");
+    expect(f.detail).toContain("لا يتضمن إجمالياً");
   });
 
-  it("وقيدٌ بلا إجمالٍ مقروء كذلك", () => {
+  it("وقيد بلا إجمال مقروء كذلك", () => {
     expect(verdicts([file()], [rec({ totalMinor: null })])).toEqual(["AMBIGUOUS"]);
   });
 
-  it("وقيدٌ بلا معرّف درايف لا يُقابَل بأصل", () => {
+  it("وقيد بلا معرّف درايف لا يقابل بأصل", () => {
     const f = auditTruth([], [rec({ driveId: null })])[0];
     expect(f.verdict).toBe("AMBIGUOUS");
-    expect(f.detail).toContain("لا يُقابَل بأصل");
+    expect(f.detail).toContain("مقابلته بالأصل");
   });
 
-  it("ولا يُقال «مطابق» عن رقمٍ لم يُقرأ", () => {
+  it("ولا يقال «مطابق» عن رقم لم يقرأ", () => {
     expect(verdicts([file({ totalMinor: null })], [rec({ totalMinor: null })]))
       .toEqual(["AMBIGUOUS"]);
   });
@@ -94,11 +94,11 @@ describe("الحكم على النقاء", () => {
   });
 
   /* الجهل ليس خطأً — و`AMBIGUOUS` لا تمنع */
-  it("وما لا يُقطَع فيه لا يمنع", () => {
+  it("وما لا يقطع فيه لا يمنع", () => {
     expect(isClean(summarize(auditTruth([file({ totalMinor: null })], [rec()])))).toBe(true);
   });
 
-  it("والمخالف والمكرَّر والمفقود يمنعون", () => {
+  it("والمخالف والمكرّر والمفقود يمنعون", () => {
     expect(isClean(summarize(auditTruth([file()], [rec({ totalMinor: 9_99 })])))).toBe(false);
     expect(isClean(summarize(auditTruth([file()], [])))).toBe(false);
     expect(isClean(summarize(auditTruth([file()], [rec({ documentId: "a" }), rec({ documentId: "b" })]))))

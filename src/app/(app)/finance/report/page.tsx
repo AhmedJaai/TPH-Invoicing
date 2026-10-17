@@ -10,6 +10,7 @@ import { CATEGORY_LABEL } from "@/lib/bank/rules";
 import { OPEX_SOURCE_LABEL } from "@/lib/finance/pnl";
 import { formatShare } from "@/lib/finance/format";
 import { formatDay, formatMoment, formatMonth, monthEndDay } from "@/lib/riyadh-time";
+import { INVOICE, PRODUCT, countNoun } from "@/lib/arabic";
 import { loadPnl, loadPurchaseInvoices } from "@/services/profit.service";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
   const user = await currentUser();
   if (!user) redirect("/login?from=/finance");
   if (!can(user.role, "amounts:view")) {
-    return <PageShell user={user} title="تقريرُ الشهر"><NoAccess what="تقرير الشهر" /></PageShell>;
+    return <PageShell user={user} title="تقرير الشهر"><NoAccess what="تقرير الشهر" /></PageShell>;
   }
   const q = await searchParams;
   if (!q.month || !MONTH_RE.test(q.month)) redirect("/finance");
@@ -39,19 +40,19 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
   return (
     <PageShell
       user={user}
-      title={`تقريرُ ${formatMonth(month)}`}
-      eyebrow="مؤسسة ذا بوبليك هاوس · الرقم الضريبيّ 310007971600003"
-      intro={view.frozenAt ? `شهرٌ مقفل — التقريرُ مجمَّدٌ ${formatMoment(new Date(view.frozenAt))}.` : view.closed ? "شهرٌ مقفل — لم يُجمَّد تقريرُه بعد." : "شهرٌ مفتوح — أرقامُه تتغيّر بما يُقيَّد."}
+      title={`تقرير ${formatMonth(month)}`}
+      eyebrow="مؤسسة ذا بوبليك هاوس · الرقم الضريبي 310007971600003"
+      intro={view.frozenAt ? `شهر مقفل، والتقرير مجمَّد في ${formatMoment(new Date(view.frozenAt))}.` : view.closed ? "شهر مقفل، ولم يُجمَّد تقريره بعد." : "شهر مفتوح، وتتغيّر أرقامه بما يُقيَّد فيه."}
       actions={
         <span className="no-print flex flex-wrap items-center gap-2">
-          <LinkButton href={`/finance?month=${month}`} variant="quiet" size="sm" icon={ArrowRight}>قائمةُ الدخل</LinkButton>
-          <LinkButton href={`/close/pack?month=${month}`} variant="secondary" icon={FileSpreadsheet}>حزمةُ المحاسب (Excel)</LinkButton>
+          <LinkButton href={`/finance?month=${month}`} variant="quiet" size="sm" icon={ArrowRight}>قائمة الدخل</LinkButton>
+          <LinkButton href={`/close/pack?month=${month}`} variant="secondary" icon={FileSpreadsheet}>حزمة المحاسب (Excel)</LinkButton>
           <PrintButton />
         </span>
       }
     >
       <section aria-label="قائمة الدخل">
-        <h2 className="mb-2 text-sm font-bold">قائمةُ الدخل</h2>
+        <h2 className="mb-2 text-sm font-bold">قائمة الدخل</h2>
         <table className="w-full border-collapse">
           <tbody>
             {p.lines.map((l) => (
@@ -68,31 +69,31 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
           </tbody>
         </table>
         <p className="mt-2 text-[11px] text-ink-soft">
-          هامشُ مجمل الربح {formatShare(p.grossMarginBp)} · هامشُ «{p.profitLabel}» {formatShare(p.netMarginBp)}.
+          هامش مجمل الربح {formatShare(p.grossMarginBp)} · هامش «{p.profitLabel}» {formatShare(p.netMarginBp)}.
         </p>
       </section>
 
       <section aria-label="ما يشمله وما ينقصه" className="mt-6">
         <h2 className="mb-2 text-sm font-bold">ما يشمله هذا الرقم وما ينقصه</h2>
         <ul className="list-disc space-y-1 ps-5 text-[12px] leading-relaxed">
-          <li>الإيراد: ما دفعه الزبائن (نقداً وبطاقةً) في فودكس بعد المرتجَع <Money minor={view.revenue?.paidMinor ?? 0} />، ناقصاً ضريبةَ المبيعات <Money minor={view.revenue?.vatMinor ?? 0} />. مشروباتُ الموظّفين («House Account») ليست إيراداً.</li>
+          <li>الإيراد: ما دفعه الزبائن (نقداً وبالبطاقة) في فودكس بعد المرتجعات <Money minor={view.revenue?.paidMinor ?? 0} />، مطروحاً منه ضريبة المبيعات <Money minor={view.revenue?.vatMinor ?? 0} />. مشروبات الموظفين («House Account») ليست إيراداً.</li>
           <li>
-            تكلفةُ المبيعات: {p.cogsMethod === "STOCK" && c.stock
-              ? <>بالجرد — مشترياتُ الشهر + مخزونُ عدّ <bdi>{formatDay(c.stock.openingDay)}</bdi> (<Money minor={c.stock.openingValueMinor} />) − مخزونُ عدّ <bdi>{formatDay(c.stock.closingDay)}</bdi> (<Money minor={c.stock.closingValueMinor} />)، {c.stock.countedItems} صنفاً معدوداً، مقوَّمةً بآخر كلفةٍ معروفة.</>
-              : <>مشترياتُ الشهر — {c.stockMissing ?? "لا عدّ"}، فهي ليست تكلفةَ ما بِيع.</>}
+            تكلفة المبيعات: {p.cogsMethod === "STOCK" && c.stock
+              ? <>بالجرد: مشتريات الشهر + مخزون عُدّ في <bdi>{formatDay(c.stock.openingDay)}</bdi> (<Money minor={c.stock.openingValueMinor} />) − مخزون عُدّ في <bdi>{formatDay(c.stock.closingDay)}</bdi> (<Money minor={c.stock.closingValueMinor} />)، والمعدود {countNoun(c.stock.countedItems, PRODUCT)}، مقيَّماً بآخر تكلفة معروفة.</>
+              : <>مشتريات الشهر ({c.stockMissing ?? "لا يوجد جرد"})، وهي ليست تكلفة ما بيع.</>}
           </li>
-          <li>المصروفات: ما قُيِّد من كشف البنك بتصنيفه، وما أقرّه المالك ممّا لا يراه الكشف. سدادُ المورّدين في المشتريات لا هنا. ضريبةُ الرسوم وسدادُ الهيئة ليسا مصروفاً.</li>
+          <li>المصروفات: ما قُيّد من كشف البنك بتصنيفه، وما أقرّه المالك مما لا يظهر في الكشف. سداد المورّدين محسوب في المشتريات وليس هنا. ضريبة الرسوم وسداد الهيئة ليسا مصروفاً.</li>
           {p.gaps.length === 0
-            ? <li className="font-bold">لا ينقصه عنصرٌ أساسيّ.</li>
+            ? <li className="font-bold">لا ينقصه عنصر أساسي.</li>
             : p.gaps.map((g) => <li key={g.id} className="font-bold">ينقصه: {g.label}.</li>)}
         </ul>
       </section>
 
       <section aria-label="المصروفات" className="mt-6">
-        <h2 className="mb-2 text-sm font-bold">المصروفاتُ التشغيليّة — صفّاً صفّاً</h2>
-        {view.opexRows.length === 0 ? <p className="text-[12px] text-muted">لا مصروفَ مقيَّداً لهذا الشهر.</p> : (
+        <h2 className="mb-2 text-sm font-bold">المصروفات التشغيلية بالتفصيل</h2>
+        {view.opexRows.length === 0 ? <p className="text-[12px] text-muted">لا توجد مصروفات مقيّدة لهذا الشهر.</p> : (
           <table className="w-full border-collapse">
-            <thead><tr><th className={th}>البيان</th><th className={th}>الفئة</th><th className={th}>المصدر</th><th className={`${th} text-end`}>المبلغ</th></tr></thead>
+            <thead><tr><th className={th}>البيان</th><th className={th}>التصنيف</th><th className={th}>المصدر</th><th className={`${th} text-end`}>المبلغ</th></tr></thead>
             <tbody>
               {view.opexRows.filter((r) => r.category !== "POS_FEE" && r.category !== "BANK_FEE").map((r) => (
                 <tr key={r.id}>
@@ -104,7 +105,7 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
               ))}
               {p.opexByCategory.filter((o) => o.category === "POS_FEE" || o.category === "BANK_FEE").map((o) => (
                 <tr key={o.category}>
-                  <td className={td}>{o.label} — مجموعُ حركاتها الصغيرة</td>
+                  <td className={td}>{o.label} (مجموع حركاتها الصغيرة)</td>
                   <td className={td}>{o.label}</td>
                   <td className={td}>{OPEX_SOURCE_LABEL.BANK}</td>
                   <td className={`${td} text-end`}><Money minor={o.amountMinor} /></td>
@@ -116,9 +117,9 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
       </section>
 
       <section aria-label="المشتريات" className="mt-6">
-        <h2 className="mb-2 text-sm font-bold">مشترياتُ الشهر — {invoices.length} فاتورة</h2>
+        <h2 className="mb-2 text-sm font-bold">مشتريات الشهر: {countNoun(invoices.length, INVOICE)}</h2>
         <table className="w-full border-collapse">
-          <thead><tr><th className={th}>المورّد</th><th className={th}>الفاتورة</th><th className={th}>دخلت</th><th className={`${th} text-end`}>بلا ضريبة</th></tr></thead>
+          <thead><tr><th className={th}>المورّد</th><th className={th}>الفاتورة</th><th className={th}>تاريخ الدخول</th><th className={`${th} text-end`}>بدون ضريبة</th></tr></thead>
           <tbody>
             {invoices.map((r) => (
               <tr key={r.id}>
@@ -134,7 +135,7 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
             </tr>
           </tbody>
         </table>
-        {invoices.some((r) => r.grossOnly) && <p className="mt-1 text-[10px] text-muted">* لم يُقرأ صافيها ولا ضريبتُها — دخلت بإجماليّها.</p>}
+        {invoices.some((r) => r.grossOnly) && <p className="mt-1 text-[10px] text-muted">* لم يُقرأ صافيها ولا ضريبتها، فدخلت بإجماليها.</p>}
       </section>
     </PageShell>
   );

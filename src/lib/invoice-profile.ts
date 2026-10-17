@@ -50,7 +50,7 @@ export const LOW_CONFIDENCE = MEDIUM_COVERAGE;
 
 export const FIELD_LABEL: Record<string, string> = {
   amounts: "المبالغ",
-  vatNumbers: "الأرقام الضريبيّة",
+  vatNumbers: "الأرقام الضريبية",
   invoiceDate: "التاريخ",
   documentKind: "نوع المستند",
   supplierName: "اسم المورّد",

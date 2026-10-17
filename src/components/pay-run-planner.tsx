@@ -166,7 +166,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
       });
       if (!res.ok) {
         const failed = await readResponse(res);
-        setError(failed.ok ? "تعذّر التنزيل — أعد المحاولة." : failed.error);
+        setError(failed.ok ? "تعذّر تنزيل الملف. حاول مرة أخرى." : failed.error);
         return;
       }
       const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? `payment-run-${month}.csv`;
@@ -178,7 +178,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      toast({ tone: "ok", title: "نُزّل ملفّ التحويلات", body: name });
+      toast({ tone: "ok", title: "تم تنزيل ملف التحويلات", body: name });
     } catch {
       setError(NETWORK_ERROR);
     } finally {
@@ -232,13 +232,13 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
     setConfirming(false);
     setTwins(twinIds);
 
-    const notes = [...failures, ...(left > 0 ? [`أوقفتَ التسجيل — بقي ${countNoun(left, SUPPLIER)} لم يُسجَّل`] : [])];
+    const notes = [...failures, ...(left > 0 ? [`أوقفت التسجيل، وبقي ${countNoun(left, SUPPLIER)} دون تسجيل`] : [])];
     if (notes.length > 0) setError(notes.join(" · "));
     if (marked > 0) {
       toast({
         tone: "ok",
-        title: `سُجّل سدادُ ${countNoun(marked, INVOICE)}`,
-        body: "إقرارٌ منك لا مطابقةٌ بنكية — وحين يصل الكشف يطابق ما بقي.",
+        title: `تم تسجيل سداد ${countNoun(marked, INVOICE)}`,
+        body: "هذا إقرار منك وليس مطابقة بنكية. عند وصول الكشف تُطابَق الدفعات المتبقية.",
         undo: paymentIds.length + drawn.length > 0 ? {
           run: async () => {
             const u = await postJson<{ message: string }>("/api/mark-paid/undo", { paymentIds, drawn });
@@ -249,7 +249,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
       });
       router.refresh();
     } else if (notes.length === 0) {
-      toast({ tone: "warn", title: "لم تُوسَم فاتورة — ربما سُدّدت من نافذةٍ أخرى.", body: "حدّث الصفحة لترى حالها." });
+      toast({ tone: "warn", title: "لم تُسجَّل أي فاتورة مسدّدة. ربما سُدّدت من نافذة أخرى.", body: "حدّث الصفحة لترى حالتها." });
       router.refresh();
     }
   }
@@ -260,17 +260,17 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
       setError(r.error);
       return;
     }
-    toast({ tone: "ok", title: `أُعيدت فاتورة ${invoice.number} إلى الحجز`, body: "خرجت من الدفعة ومن ملفّ التحويلات." });
+    toast({ tone: "ok", title: `أُعيدت الفاتورة ${invoice.number} إلى المحجوزة`, body: "خرجت من الدفعة ومن ملف التحويلات." });
     router.refresh();
   }
 
   /* لِمَ الزرّ معطَّل — يُكتب سطراً يُرى على الجوّال، لا تلميحاً تحت الفأرة وحده */
   const blocked = chosen.length === 0
-    ? "لم تختر أحداً — اختر مورّداً أوّلاً."
+    ? "لم تختر أي مورّد. اختر مورّداً أولاً."
     : badPartial.length > 0
-      ? `صحّح المبلغ الجزئيّ لـ${badPartial.map((s) => s.name).join("، ")} أو امسحه.`
+      ? `صحّح المبلغ الجزئي لـ${badPartial.map((s) => s.name).join("، ")} أو امسحه.`
       : null;
-  const markBlocked = blocked ?? (markable.length === 0 ? "كلُّ من اخترتَهم خُصم لهم رصيد — يُسجَّل سدادُهم من ملفّ المورّد." : null);
+  const markBlocked = blocked ?? (markable.length === 0 ? "لك رصيد عند كل من اخترتهم. سجّل سدادهم من ملف المورّد." : null);
   const markTotal = markable.reduce((sum, s) => sum + planOf(s).payingMinor, 0);
 
   return (
@@ -292,7 +292,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
           </label>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] text-muted">
-              {chosen.length === 0 ? "لم تختر أحداً" : `محدَّدٌ للتحويل — ${countNoun(chosen.length, SUPPLIER)}`}
+              {chosen.length === 0 ? "لم تختر أي مورّد" : `محدّد للتحويل: ${countNoun(chosen.length, SUPPLIER)}`}
             </p>
             <p className="text-xl font-bold leading-tight"><Money minor={totalMinor} currency /></p>
           </div>
@@ -305,7 +305,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
               className={buttonClass("secondary")}
             >
               <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
-              نزّل ملفّ التحويلات
+              نزّل ملف التحويلات
             </button>
             <button
               type="button"
@@ -314,7 +314,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
               className={buttonClass("primary")}
             >
               <Check className="h-4 w-4" strokeWidth={2.25} aria-hidden />
-              سجّل المحدَّد مسدَّداً
+              سجّل المحدّد كمسدّد
             </button>
           </div>
         </div>
@@ -322,30 +322,30 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
         {customised && (
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-soft">
             <span>
-              غيّرتَ الدفعة:
-              {skippedSuppliers > 0 && <> استثنيتَ {countNoun(skippedSuppliers, SUPPLIER)}</>}
-              {skippedInvoices > 0 && <>{skippedSuppliers > 0 ? " و" : " استثنيتَ "}{countNoun(skippedInvoices, INVOICE)}</>}
-              {partialCount > 0 && <>{skippedSuppliers + skippedInvoices > 0 ? " · " : " "}مبلغٌ جزئيّ لـ{countNoun(partialCount, SUPPLIER)}</>}
-              {" "}— واختيارُك محفوظٌ على هذا الجهاز.
+              عدّلت الدفعة:
+              {skippedSuppliers > 0 && <> استثنيت {countNoun(skippedSuppliers, SUPPLIER)}</>}
+              {skippedInvoices > 0 && <>{skippedSuppliers > 0 ? " و" : " استثنيت "}{countNoun(skippedInvoices, INVOICE)}</>}
+              {partialCount > 0 && <>{skippedSuppliers + skippedInvoices > 0 ? " · " : " "}مبلغ جزئي لـ{countNoun(partialCount, SUPPLIER)}</>}
+              . اختيارك محفوظ على هذا الجهاز.
             </span>
             <button type="button" onClick={() => change(EMPTY_SELECTION)} className="inline-flex min-h-8 items-center gap-1 font-bold text-accent hover:underline">
               <RotateCcw className="h-3 w-3" strokeWidth={2} aria-hidden />
-              أعِد الكلّ بمبلغه
+              أعد الكل بمبالغها الكاملة
             </button>
           </p>
         )}
         {missingAccount > 0 && chosen.length > 0 && (
           <p className="mt-2 flex items-center gap-1.5 text-[11px] text-warn">
             <ShieldAlert className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            {missingAccount === 1 ? "مورّدٌ واحد" : countNoun(missingAccount, SUPPLIER)} بلا حسابٍ معروف ({noAccount.map((s) => s.name).join("، ")}) — يخرج في آخر الملفّ بقسمٍ منفصل «يحتاج حساباً» لا بين التحويلات.
+            {missingAccount === 1 ? "مورّد واحد" : countNoun(missingAccount, SUPPLIER)} بلا حساب بنكي معروف ({noAccount.map((s) => s.name).join("، ")}). يظهر في آخر الملف تحت قسم منفصل «يحتاج حساباً» وليس بين التحويلات.
           </p>
         )}
         {progress && (
           <p role="status" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-ink-soft">
-            <span>يُسجَّل <span className="nums">{progress.done + 1}</span> من <span className="nums">{progress.total}</span> — {progress.current}</span>
+            <span>جارٍ التسجيل <span className="nums">{progress.done + 1}</span> من <span className="nums">{progress.total}</span>: {progress.current}</span>
             {progress.total - progress.done > 1 && (
               <button type="button" onClick={() => { stop.current = true; }} className="min-h-8 font-bold text-accent hover:underline">
-                أوقف بعد الحاليّ
+                أوقف بعد المورّد الحالي
               </button>
             )}
           </p>
@@ -353,7 +353,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
         {error && <p role="alert" className="mt-2 text-xs font-bold text-danger">{error}</p>}
         {twins.length > 0 && (
           <button type="button" disabled={busy} aria-busy={busy} onClick={() => markPaid(twins)} className={`${buttonClass("secondary", "sm")} mt-2`}>
-            سدادٌ آخر حقّاً — سجّل {countNoun(twins.length, SUPPLIER)}
+            هذا سداد آخر فعلاً، سجّل {countNoun(twins.length, SUPPLIER)}
           </button>
         )}
       </div>
@@ -386,14 +386,14 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 truncate text-[14px] font-bold">
                     {s.slug ? <Link href={`/suppliers/${s.slug}`} className="truncate hover:text-accent">{s.name}</Link> : <span className="truncate">{s.name}</span>}
-                    {state === "ok" && <CircleCheck className="h-4 w-4 shrink-0 text-ok" strokeWidth={2} aria-label="سُجّل" />}
+                    {state === "ok" && <CircleCheck className="h-4 w-4 shrink-0 text-ok" strokeWidth={2} aria-label="تم التسجيل" />}
                     {state === "failed" && <CircleAlert className="h-4 w-4 shrink-0 text-danger" strokeWidth={2} aria-label="لم يُسجَّل" />}
                   </p>
                   <p className="mt-0.5 truncate text-[11px] text-muted">
                     {plan.skippedInvoices > 0
                       ? <><span className="nums">{plan.invoiceIds.length}</span> من {countNoun(s.invoices.length, INVOICE)}</>
                       : countNoun(s.invoices.length, INVOICE)}
-                    {!s.account && <span className="text-warn"> · {s.accountNote ?? "الحسابُ غير معروف"}</span>}
+                    {!s.account && <span className="text-warn"> · {s.accountNote ?? "الحساب غير معروف"}</span>}
                   </p>
                   {/* الحسابُ والمبلغُ يُنسخان بضغطة إلى تطبيق البنك — بصيغته، بلا فواصل */}
                   {s.account && (
@@ -411,7 +411,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                   {ownerCount > 0 && (
                     <p className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-warn">
                       <ShieldAlert className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />
-                      فيها {countNoun(ownerCount, INVOICE)} محجوزة أدخلتَها بقرارك
+                      تتضمن {countNoun(ownerCount, INVOICE)} محجوزة أدخلتها بقرارك
                     </p>
                   )}
                 </div>
@@ -422,14 +422,14 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                   ) : (
                     <>
                       {plan.partialMinor !== null && (
-                        <p className="text-[11px] font-bold text-warn">جزءٌ من <Money minor={plan.fullMinor} /></p>
+                        <p className="text-[11px] font-bold text-warn">جزء من <Money minor={plan.fullMinor} /></p>
                       )}
                       {after.state === "remaining" && <p className="text-[11px] text-muted">يبقى عليك له <Money minor={after.minor} /></p>}
                       {after.state === "settled" && <p className="text-[11px] text-muted">لا يبقى عليك له شيء</p>}
                       {/* الزيادةُ تُقال بمبلغها — كانت تُقصّ إلى «يبقى 0.00» */}
                       {after.state === "over" && (
                         <p className="text-[11px] font-bold text-warn">
-                          تدفع زيادةً <Money minor={after.minor} /> — تصير رصيداً لك عنده
+                          تدفع زيادة <Money minor={after.minor} />، وتصير رصيداً لك عنده
                         </p>
                       )}
                     </>
@@ -439,7 +439,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                   type="button"
                   onClick={() => toggleOpen(s.supplierId)}
                   aria-expanded={expanded}
-                  aria-label={expanded ? "أخفِ الفواتير" : "اعرض الفواتير واختر منها"}
+                  aria-label={expanded ? "إخفاء الفواتير" : "عرض الفواتير والاختيار منها"}
                   className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-hover hover:text-ink sm:h-9 sm:w-9"
                 >
                   <ChevronDown className={`h-4 w-4 transition-transform duration-(--dur-3) ${expanded ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden />
@@ -447,16 +447,16 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
               </div>
               {plan.on && after.state === "over" && (
                 <p className="border-t border-line-soft bg-warn-bg px-4 py-2 text-xs leading-relaxed text-ink-soft sm:px-5">
-                  ما عليك له الآن <Money minor={s.owedMinor ?? 0} /> وهذه الدفعة <Money minor={plan.payingMinor} />.
-                  قد يكون سدادٌ أو إشعارٌ دائن قُيِّد بعد بناء الدفعة — راجع{" "}
-                  {s.slug ? <Link href={`/suppliers/${s.slug}`} className="font-bold text-accent hover:underline">ملفَّه</Link> : "ملفَّه"}{" "}
-                  قبل التحويل، أو استثنِ فاتورةً أو اكتب مبلغاً جزئيّاً.
+                  المستحق عليك له الآن <Money minor={s.owedMinor ?? 0} />، وهذه الدفعة <Money minor={plan.payingMinor} />.
+                  ربما قُيّد سداد أو إشعار دائن بعد تجهيز الدفعة. راجع{" "}
+                  {s.slug ? <Link href={`/suppliers/${s.slug}`} className="font-bold text-accent hover:underline">ملف المورّد</Link> : "ملف المورّد"}{" "}
+                  قبل التحويل، أو استثنِ فاتورة، أو اكتب مبلغاً جزئياً.
                 </p>
               )}
               {plan.on && plan.creditAppliedMinor > 0 && (
                 <p className="border-t border-line-soft bg-accent-soft/50 px-4 py-2 text-xs leading-relaxed text-ink-soft sm:px-5">
-                  خُصم <Money minor={plan.creditAppliedMinor} /> رصيداً لك عنده — فحوِّل الباقي وحده، ثمّ اخصم الرصيد من ملفّه.
-                  ولا يُسجَّل سدادُه من هنا.
+                  لك عنده رصيد <Money minor={plan.creditAppliedMinor} />. حوّل له الباقي فقط، ثم اخصم الرصيد من ملف المورّد.
+                  ولا يمكن تسجيل سداده من هنا.
                 </p>
               )}
               <Reveal open={expanded}>
@@ -479,16 +479,16 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                               <bdi className="font-mono">{i.number}</bdi> · {i.date}
                             </span>
                           </label>
-                          <Link href={i.href} className="shrink-0 text-[11px] font-bold text-accent hover:underline">افتحها</Link>
+                          <Link href={i.href} className="shrink-0 text-[11px] font-bold text-accent hover:underline">افتح الفاتورة</Link>
                           <span className={`nums-col shrink-0 font-bold ${included ? "" : "text-muted"}`}><Money minor={i.openMinor} /></span>
                         </div>
                         {i.owner && (
                           <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-warn-bg px-3 py-2 text-[11px] leading-relaxed text-ink-soft">
                             <span className="min-w-0 flex-1">
-                              <b className="text-warn">بقرارك وهي محجوزة:</b> {i.owner.hold}. سببُك: «{i.owner.note}»
+                              <b className="text-warn">محجوزة وأدخلتها بقرارك:</b> {i.owner.hold}. سببك: «{i.owner.note}»
                             </span>
                             <button type="button" disabled={busy} onClick={() => restoreHold(i)} className="min-h-8 shrink-0 font-bold text-accent hover:underline">
-                              أعِدها إلى الحجز
+                              أعدها إلى المحجوزة
                             </button>
                           </div>
                         )}
@@ -508,15 +508,15 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                           onChange={(e) => setPartial(s.supplierId, e.target.value)}
                           placeholder={formatRiyals(plan.fullMinor)}
                           aria-invalid={plan.partialError !== null}
-                          aria-label={`مبلغٌ جزئيّ لـ${s.name} بالريال`}
+                          aria-label={`مبلغ جزئي لـ${s.name} بالريال`}
                           className="nums h-11 w-36 rounded-lg border border-line-input bg-raised px-3 text-sm sm:h-9"
                         />
                         <span className={plan.partialError ? "font-bold text-danger" : "text-muted"}>
                           {plan.partialError
                             ? <>{plan.partialError} (<Money minor={plan.fullMinor} />)</>
                             : plan.partialMinor !== null
-                              ? <>يبقى من هذه الدفعة <Money minor={plan.fullMinor - plan.partialMinor} /> — ويُسدَّد الأقدمُ أوّلاً</>
-                              : "اتركه فارغاً لتدفع المختارَ كلَّه"}
+                              ? <>يبقى بدون دفع <Money minor={plan.fullMinor - plan.partialMinor} />، ويُسدَّد الأقدم أولاً</>
+                              : "اتركه فارغاً لدفع المبلغ كاملاً"}
                         </span>
                       </label>
                     </li>
@@ -531,8 +531,8 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
       <Sheet
         open={confirming}
         onClose={() => { if (!busy) setConfirming(false); }}
-        title="سجّل أنّها سُدّدت"
-        description="إقرارٌ منك لا مطابقةٌ بنكية — يُكتب في سجلّ التدقيق باسمك."
+        title="سجّل الفواتير كمسدّدة"
+        description="هذا إقرار منك وليس مطابقة بنكية، ويُكتب في سجلّ التدقيق باسمك."
         size="sm"
         footer={
           <>
@@ -550,8 +550,8 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
               <Money minor={markTotal} currency /> لـ{countNoun(markable.length, SUPPLIER)}
             </p>
             <p className="text-[11px] text-ink-soft">
-              {countNoun(markable.reduce((sum, x) => sum + planOf(x).invoiceIds.length, 0), INVOICE)} يُسجَّل سدادُها بتاريخ {dayOk ? formatDay(paidOn) : "—"}
-              {markable.some((x) => planOf(x).partialMinor !== null) ? " — والجزئيُّ يسدّد الأقدمَ أوّلاً ويُبقي الباقي مفتوحاً." : "."}
+              سيُسجَّل سداد {countNoun(markable.reduce((sum, x) => sum + planOf(x).invoiceIds.length, 0), INVOICE)} بتاريخ {dayOk ? formatDay(paidOn) : "—"}
+              {markable.some((x) => planOf(x).partialMinor !== null) ? ". المبلغ الجزئي يُسدَّد به الأقدم أولاً ويبقى الباقي مفتوحاً." : "."}
             </p>
           </div>
         </div>
@@ -569,20 +569,20 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
           />
           <DateChips value={paidOn} onPick={setPaidOn} disabled={busy} max={today} />
           <span className={`mt-1 block text-[11px] ${dayOk ? "text-muted" : "font-bold text-danger"}`}>
-            {dayOk ? "اليومُ الذي خرجت فيه الحوالة من البنك — به تُطابَق حين يصل الكشف." : "يوم التحويل لا يكون بعد اليوم."}
+            {dayOk ? "يوم خروج الحوالة من البنك. نستخدمه للمطابقة عند وصول الكشف." : "يوم التحويل لا يمكن أن يكون بعد اليوم."}
           </span>
         </label>
         {progress && (
           <p role="status" className="mt-3 text-xs font-bold text-ink-soft">
-            يُسجَّل <span className="nums">{progress.done + 1}</span> من <span className="nums">{progress.total}</span> — {progress.current}
+            جارٍ التسجيل <span className="nums">{progress.done + 1}</span> من <span className="nums">{progress.total}</span>: {progress.current}
           </p>
         )}
         <p className="mt-3 text-xs leading-relaxed text-muted">
-          حين يصل كشف البنك يطابق ما بقي، ولا يُنشئ سداداً ثانياً لفاتورةٍ خُصّصت. وإن ضغطتَ خطأً فزرُّ «تراجع» في الإشعار يُلغي ما كُتب.
+          عند وصول كشف البنك تُطابَق الدفعات المتبقية، ولا يُنشأ سداد ثانٍ لفاتورة سبق تسجيل سدادها. وإن ضغطت بالخطأ فاضغط «تراجع» في الإشعار لإلغاء ما سُجِّل.
         </p>
         {chosen.length > markable.length && (
           <p className="mt-2 text-xs text-warn">
-            {countNoun(chosen.length - markable.length, SUPPLIER)} خُصم لهم رصيد — لا يُسجَّلون هنا.
+            {countNoun(chosen.length - markable.length, SUPPLIER)} لك عندهم رصيد، ولا يُسجَّل سدادهم من هنا.
           </p>
         )}
       </Sheet>
@@ -637,10 +637,10 @@ export function HoldOverride({
     setAsking(false);
     toast({
       tone: "warn",
-      title: `دخلت فواتيرُ ${supplierName} الدفعةَ بقرارك`,
-      body: "هي الآن بين الجاهز موسومةً «بقرارك» — ومن هناك تُعاد إلى الحجز.",
+      title: `أُدخلت فواتير ${supplierName} في الدفعة بقرارك`,
+      body: "ستجدها الآن بين الفواتير الجاهزة وعليها علامة «بقرارك»، ويمكنك إعادتها إلى المحجوزة من هناك.",
       undo: {
-        label: "أعِدها إلى الحجز",
+        label: "أعدها إلى المحجوزة",
         run: async () => {
           const u = await postJson<{ message?: string }>("/api/payment-run/hold", { month, invoiceIds, action: "restore" });
           if (u.ok) router.refresh();
@@ -660,8 +660,8 @@ export function HoldOverride({
       <Sheet
         open={asking}
         onClose={() => { if (!busy) setAsking(false); }}
-        title={`ادفع لـ${supplierName} وهي محجوزة`}
-        description="قرارُك يُحفَظ بسببه في سجلّ التدقيق، والتنبيهُ يبقى ظاهراً في الدفعة."
+        title={`الدفع لـ${supplierName} مع أن فواتيره محجوزة`}
+        description="يُحفظ قرارك مع سببه في سجلّ التدقيق، ويبقى التنبيه ظاهراً في الدفعة."
         size="sm"
         footer={
           <>
@@ -677,9 +677,9 @@ export function HoldOverride({
             <Money minor={openMinor} currency /> على {countNoun(invoiceIds.length, INVOICE)}
           </p>
           <p className="mt-1">
-            السدادُ قبل الفاتورة الضريبيّة الصحيحة يُفقدك ورقةَ التفاوض.
-            {vatAtRiskMinor > 0 && <> وضريبةُ مدخلاتٍ <b><Money minor={vatAtRiskMinor} /></b> لا تُخصم ما لم تصل الفاتورةُ الصحيحة.</>}
-            {vatAtRiskUnknown > 0 && <> و{countNoun(vatAtRiskUnknown, INVOICE)} لم تُقرأ ضريبتُها — المعرّضُ منها غير معروف.</>}
+            السداد قبل وصول الفاتورة الضريبية الصحيحة يُضعف موقفك التفاوضي مع المورّد.
+            {vatAtRiskMinor > 0 && <> وضريبة المدخلات البالغة <b><Money minor={vatAtRiskMinor} /></b> لا يمكن خصمها قبل وصول الفاتورة الصحيحة.</>}
+            {vatAtRiskUnknown > 0 && <> و{countNoun(vatAtRiskUnknown, INVOICE)} لم تُقرأ ضريبتها، فمقدار الضريبة المعرّضة منها غير معروف.</>}
           </p>
         </div>
         <label className="mt-3 block">
@@ -690,10 +690,10 @@ export function HoldOverride({
             maxLength={300}
             rows={2}
             disabled={busy}
-            placeholder="مثلاً: لا يسلّم قبل السداد"
+            placeholder="مثلاً: المورّد لا يسلّم قبل السداد"
             className="mt-1 block w-full rounded-lg border border-line-input bg-raised px-3 py-2 text-sm"
           />
-          <span className="mt-1 block text-[11px] text-muted">يُعرَض بجانب الفاتورة في الدفعة وفي ملفّ التحويلات «بقرار المالك».</span>
+          <span className="mt-1 block text-[11px] text-muted">يظهر بجانب الفاتورة في الدفعة وفي ملف التحويلات بعبارة «بقرار المالك».</span>
         </label>
         {error && <p role="alert" className="mt-2 text-xs font-bold text-danger">{error}</p>}
       </Sheet>

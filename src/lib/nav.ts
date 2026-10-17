@@ -70,7 +70,7 @@ export const AREAS: readonly NavArea[] = [
     short: "قرارك",
     icon: "decisions",
     group: "today",
-    question: "كلُّ بندٍ بسببه ودليله وفعله",
+    question: "كلّ بند بسببه ودليله وفعله",
     chord: "a",
     needs: "reports:view",
     owns: ["/review", "/audit"],
@@ -106,7 +106,7 @@ export const AREAS: readonly NavArea[] = [
     short: "المالية",
     icon: "finance",
     group: "money",
-    question: "هل ربحتَ، وكم، ولماذا — وما وضعك الآن",
+    question: "هل ربحت، وكم، ولماذا — وما وضعك الآن",
     chord: "f",
     needs: "amounts:view",
     owns: ["/finance/rows", "/finance/report", "/finance/inputs"],
@@ -196,7 +196,7 @@ export const AREAS: readonly NavArea[] = [
     short: "الجرد",
     icon: "inventory",
     group: "ops",
-    question: "أين ذهب ما اشتريتَه",
+    question: "أين ذهب ما اشتريته",
     chord: "i",
     needs: "inventory:view",
     owns: ["/inventory/counts", "/inventory/trend", "/inventory/mapping"],
@@ -209,7 +209,7 @@ export const AREAS: readonly NavArea[] = [
       { href: "/inventory/recipes", label: "الوصفات", needs: "recipe:edit" },
       { href: "/inventory/items", label: "الأصناف" },
       /* وسيطُ ما يُباع في كلّ يومٍ من الأسبوع — عادةٌ لا توقّع (`lib/sales/weekday-habit.ts`) */
-      { href: "/inventory/habit", label: "عادةُ البيع" },
+      { href: "/inventory/habit", label: "عادة البيع" },
     ],
   },
 ];
@@ -220,7 +220,7 @@ export const AREAS: readonly NavArea[] = [
 export const ACCOUNT_LINKS: readonly (NavLink & { icon: NavIcon })[] = [
   { href: "/settings", label: "الإعدادات", needs: "supplier:view", icon: "settings" },
   /* دفترُ الاختيارات: ما قرّره صاحبُه بيده، بحاله وزرّ سحبه (`lib/choices.ts`) */
-  { href: "/settings/choices", label: "ما قرّرتَه", needs: "amounts:view", icon: "decisions" },
+  { href: "/settings/choices", label: "ما قرّرته", needs: "amounts:view", icon: "decisions" },
   { href: "/settings/audit", label: "سجلّ التدقيق", needs: "audit:view", icon: "audit" },
 ];
 

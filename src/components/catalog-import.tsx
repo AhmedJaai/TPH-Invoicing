@@ -82,7 +82,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
   if (!canEdit) {
     return (
       <p className="rounded-xl border border-dashed border-line px-5 py-6 text-center text-xs text-muted">
-        رفعُ الكتالوج يكتب وصفاتٍ تُحسَب بها الكلفة — وهو خارج صلاحيتك.
+        رفع الكتالوج يحفظ وصفات تُحسب بها التكلفة، وهو خارج صلاحياتك.
       </p>
     );
   }
@@ -95,7 +95,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
       <div className="rounded-2xl border border-line bg-raised shadow-raised">
         {/* ── ثلاثُ مراحل ظاهرة: اختر ← عاين ← نفِّذ ── */}
         <ol className="flex border-b border-line text-[11px] font-bold" aria-label="مراحل رفع الكتالوج">
-          {["اختر المصدر", "عاين ما سيقع", "نفِّذ"].map((label, i) => (
+          {["اختر المصدر", "عاين ما سيحدث", "نفّذ"].map((label, i) => (
             <li
               key={label}
               aria-current={stage === i + 1 ? "step" : undefined}
@@ -114,9 +114,9 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
           <div className={`mb-3 flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 ${fromFoodics ? "border-accent-line bg-accent-soft/40" : "border-line bg-sunken/40"}`}>
             <PlugZap className={`h-5 w-5 shrink-0 ${fromFoodics ? "text-accent" : "text-muted"}`} strokeWidth={1.75} aria-hidden />
             <div className="min-w-0 flex-1 basis-56">
-              <p className="text-sm font-bold">{fromFoodics ? "يُقرأ من فودكس مباشرةً" : "اقرأه من فودكس مباشرةً"}</p>
+              <p className="text-sm font-bold">{fromFoodics ? "القراءة من فودكس مباشرة" : "اقرأ من فودكس مباشرة"}</p>
               <p className="mt-0.5 text-xs leading-relaxed text-muted">
-                أصنافُ المخزون والأصنافُ المباعة والوصفات من واجهة فودكس — بلا تصديرٍ ولا رفع. والمعاينةُ قبل الكتابة كما في الملفّات.
+                أصناف المخزون والأصناف المباعة والوصفات من فودكس نفسه، دون تصدير أو رفع ملفات. وتظهر لك معاينة قبل الحفظ كما في رفع الملفات.
               </p>
             </div>
             <button
@@ -125,7 +125,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
               onClick={() => { setFromFoodics(!fromFoodics); setFiles([]); setResult(null); setError(null); }}
               className={buttonClass(fromFoodics ? "secondary" : "primary", "sm")}
             >
-              {fromFoodics ? "ارفع ملفّاتٍ بدلاً منه" : "اقرأ من فودكس"}
+              {fromFoodics ? "ارفع ملفات بدلاً منه" : "اقرأ من فودكس"}
             </button>
           </div>
 
@@ -133,9 +133,9 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
             <span className="grid h-12 w-12 place-items-center rounded-full bg-accent-soft text-accent">
               <Files className="h-5 w-5" strokeWidth={1.75} aria-hidden />
             </span>
-            <span className="text-sm font-bold">{files.length > 0 ? "غيّر الملفّات" : "اختر ملفّات الكتالوج الثلاثة معاً"}</span>
+            <span className="text-sm font-bold">{files.length > 0 ? "غيّر الملفات" : "اختر ملفات الكتالوج الثلاثة معاً"}</span>
             <span className="max-w-md text-xs leading-relaxed text-muted">
-              أصنافُ المخزون، والأصنافُ المباعة، والوصفات — تُرفع معاً لأنّ الوصفة تربط الاثنين. ويُعرَف كلُّ ملفٍّ بأعمدته لا باسمه.
+              أصناف المخزون، والأصناف المباعة، والوصفات. تُرفع معاً لأن الوصفة تربط بين النوعين الأولين. ويُعرف كل ملف بأعمدته لا باسمه.
             </span>
             <input
               type="file" multiple accept=".csv,.xlsx,.xls,text/csv"
@@ -157,13 +157,13 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
                   <li key={f.name} className="flex min-h-9 items-center gap-2 rounded-lg border border-line bg-raised px-2.5 py-1 text-xs">
                     <FileSpreadsheet className={`h-3.5 w-3.5 shrink-0 ${read ? (read.kind ? "text-ok" : "text-danger") : "text-muted"}`} strokeWidth={2} aria-hidden />
                     <span className="max-w-56 truncate font-medium" dir="auto">{f.name}</span>
-                    {read && <span className={read.kind ? "text-ok" : "text-danger"}>{read.kind ? read.label : "لم تُفهَم أعمدتُه"}</span>}
+                    {read && <span className={read.kind ? "text-ok" : "text-danger"}>{read.kind ? read.label : "تعذّر فهم أعمدته"}</span>}
                   </li>
                 );
               })}
               {files.length < 3 && (
                 <li className="flex items-center text-[11px] text-warn">
-                  {files.length === 1 ? "ملفٌّ واحد" : "ملفّان"} من ثلاثة — الوصفاتُ تحتاج الثلاثة.
+                  {files.length === 1 ? "ملف واحد" : "ملفان"} من ثلاثة. الوصفات تحتاج الملفات الثلاثة.
                 </li>
               )}
             </ul>
@@ -171,7 +171,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
 
           <label className="mt-4 block">
             <span className="block text-[11px] font-medium text-muted">
-              تسري الوصفاتُ الجديدة من — أوّلُ أسبوعٍ قادم، فما مضى حُسب بوصفاته
+              تسري الوصفات الجديدة اعتباراً من تاريخ (يُفضَّل أول أسبوع قادم)، وما مضى يُحسب بوصفاته السابقة
             </span>
             <input
               type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)}
@@ -187,7 +187,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
               /* بعد المعاينة الفعلُ التالي هو التنفيذ — فلا زرّان رئيسيّان متجاوران */
               className={buttonClass(result?.dryRun ? "secondary" : "primary")}
             >
-              {busy === "preview" ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />يُحسَب…</> : result?.dryRun ? "أعد المعاينة" : "اعرض ما سيقع"}
+              {busy === "preview" ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />جارٍ الحساب…</> : result?.dryRun ? "أعد المعاينة" : "اعرض ما سيحدث"}
             </button>
             {result?.dryRun && (
               <button
@@ -196,16 +196,16 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
                 disabled={busy !== null}
                 className={buttonClass("primary")}
               >
-                {busy === "commit" ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />يُكتَب…</> : "نفِّذ الاستيراد"}
+                {busy === "commit" ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />جارٍ الحفظ…</> : "نفّذ الاستيراد"}
               </button>
             )}
-            {files.length === 0 && !fromFoodics && !committed && <span className="text-[11px] text-muted">لا يُكتب شيءٌ قبل أن ترى ما سيقع.</span>}
+            {files.length === 0 && !fromFoodics && !committed && <span className="text-[11px] text-muted">لا يُحفظ شيء قبل أن ترى ما سيحدث.</span>}
           </div>
 
           {error && (
             <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2.5 text-xs leading-relaxed text-danger">
               <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-              <span>{error} — لم يُكتب شيء.</span>
+              <span>{error}. لم يُحفظ شيء.</span>
             </p>
           )}
         </div>
@@ -228,12 +228,12 @@ function CatalogOutcome({ result }: { result: CatalogResult }) {
           : <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-ok" strokeWidth={2} aria-hidden />}
         <div className="min-w-0 flex-1">
           <p className={`text-[15px] font-bold ${result.dryRun ? "text-accent" : "text-ok"}`}>
-            {result.dryRun ? "معاينة — لم يُكتب شيءٌ بعد" : "استُورد الكتالوج"}
+            {result.dryRun ? "معاينة، ولم يُحفظ شيء بعد" : "استورد الكتالوج"}
           </p>
           <ul className="mt-1 space-y-0.5 text-[11px] text-muted">
             {result.files.map((f) => (
               <li key={f.fileName} dir="auto">
-                {f.fileName} — {f.kind === null ? "لم تُفهَم أعمدتُه" : `${f.label}، ${f.rows} صفّاً`}
+                {f.fileName} — {f.kind === null ? "تعذّر فهم أعمدته" : `${f.label}، ${f.rows} صفاً`}
               </li>
             ))}
           </ul>
@@ -246,15 +246,15 @@ function CatalogOutcome({ result }: { result: CatalogResult }) {
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Fact label="أصنافُ مخزونٍ جديدة" value={result.stockItems.created} />
-        <Fact label="حُدِّثت" value={result.stockItems.updated} />
-        <Fact label="أصنافٌ مباعةٌ جديدة" value={result.menuProducts.created} />
-        <Fact label="حُدِّثت" value={result.menuProducts.updated} />
-        <Fact label="وصفاتٌ كُتبت" value={result.recipes.written} />
+        <Fact label="أصناف مخزون جديدة" value={result.stockItems.created} />
+        <Fact label="أصناف مخزون محدَّثة" value={result.stockItems.updated} />
+        <Fact label="أصناف مباعة جديدة" value={result.menuProducts.created} />
+        <Fact label="أصناف مباعة محدَّثة" value={result.menuProducts.updated} />
+        <Fact label="وصفات حُفظت" value={result.recipes.written} />
         <Fact label="لم تتغيّر" value={result.recipes.unchanged} />
-        <Fact label="بيدِ إنسان — لم تُمَسّ" value={result.recipes.skippedHuman} />
+        <Fact label="وصفات كتبتها بيدك (لم تُعدَّل)" value={result.recipes.skippedHuman} />
         <Fact
-          label="تعذّرت"
+          label="تعذّر استيرادها"
           value={result.recipes.blocked}
           tone={result.recipes.blocked > 0 ? "text-danger" : undefined}
         />
@@ -263,7 +263,7 @@ function CatalogOutcome({ result }: { result: CatalogResult }) {
       {linked.length > 0 && (
         <div className="mt-3 rounded-lg border border-warn/25 bg-warn-bg px-3 py-2">
           <p className="text-[11px] font-bold text-warn">
-            رُبطت بأصنافٍ قائمةٍ بالاسم نفسِه ({linked.length}) — راجِعها
+            رُبطت بأصناف موجودة بالاسم نفسه ({linked.length}). راجعها
           </p>
           <ul className="mt-1 space-y-0.5 text-[11px] text-warn">
             {linked.map((c) => <li key={c.sku}>{c.name}</li>)}
@@ -274,7 +274,7 @@ function CatalogOutcome({ result }: { result: CatalogResult }) {
       {skipped.length > 0 && (
         <details className="mt-3">
           <summary className="cursor-pointer text-xs font-bold">
-            وصفاتٌ مكتوبةٌ بيدِ إنسان، لم يُكتَب فوقها ({skipped.length})
+            وصفات كتبها إنسان بيده، ولم يُكتب فوقها ({skipped.length})
           </summary>
           <ul className="mt-2 space-y-0.5 text-[11px] text-muted">
             {skipped.map((c) => <li key={c.sku}>{c.name}</li>)}
@@ -295,7 +295,7 @@ function CatalogOutcome({ result }: { result: CatalogResult }) {
       {result.files.some((f) => f.issues.length > 0) && (
         <details className="mt-3">
           <summary className="cursor-pointer text-xs font-bold">
-            صفوفٌ لم تُقرأ ({result.files.reduce((s, f) => s + f.issues.length, 0)})
+            صفوف لم تُقرأ ({result.files.reduce((s, f) => s + f.issues.length, 0)})
           </summary>
           <ul className="mt-2 space-y-1 text-[11px] text-muted">
             {result.files.flatMap((f) => f.issues.map((i) => (

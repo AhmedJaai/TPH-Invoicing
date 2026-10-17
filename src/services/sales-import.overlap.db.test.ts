@@ -20,8 +20,8 @@ const unitsOn = async (tx: Parameters<Parameters<typeof withRollback>[0]>[0], da
      where s.business_date::date = ${day}::date
   `)).rows[0].q);
 
-describe("تقريرا فودكس لليوم نفسه لا يُحسبان معاً", () => {
-  it("مزيجُ المنتجات ليومٍ استُورد بأصناف الطلبات يُرفض ولا يُكتب", () =>
+describe("تقريرا فودكس لليوم نفسه لا يحسبان معاً", () => {
+  it("مزيج المنتجات ليوم استورد بأصناف الطلبات يرفض ولا يكتب", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const day = "2099-03-10";
@@ -34,7 +34,7 @@ describe("تقريرا فودكس لليوم نفسه لا يُحسبان معا
       expect(await unitsOn(tx, day)).toBe(before);
     }));
 
-  it("ومزيجُ المنتجات للفرع نفسه بتسميتين مفتاحٌ واحد — لا بيعتان", () =>
+  it("ومزيج المنتجات للفرع نفسه بتسميتين مفتاح واحد — لا بيعتان", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       const day = "2099-03-11";
@@ -50,7 +50,7 @@ describe("تقريرا فودكس لليوم نفسه لا يُحسبان معا
     }));
 });
 
-describe("تصديرٌ مصحَّح نقص فيه صنفٌ من طلب", () => {
+describe("تصدير مصحّح نقص فيه صنف من طلب", () => {
   const HEADER = ["order_reference", "order_status", "type", "parent_item_sku", "status", "sku", "name", "unit_price", "quantity", "total_price", "business_date", "branch_name"];
   const file = (rows: (string | number)[][]) => {
     const wb = XLSX.utils.book_new();
@@ -60,12 +60,12 @@ describe("تصديرٌ مصحَّح نقص فيه صنفٌ من طلب", () => {
   const latte = ["ORD-FIX-1", "Done", "المنتج", "", "Done", "SKU-LATTE", "Spanish Latte", 18, 1, 18, "2099-04-02", "Branch 1"];
   const cake = ["ORD-FIX-1", "Done", "المنتج", "", "Done", "SKU-CAKE", "Cheesecake", 22, 1, 22, "2099-04-02", "Branch 1"];
 
-  it("السطرُ الغائب يُلغى ولا يُحذف — ولا يبقى محسوباً", () =>
+  it("السطر الغائب يلغى ولا يحذف — ولا يبقى محسوباً", () =>
     withRollback(async (tx) => {
       const actorId = await makeActor(tx);
       await importSalesFile({ buffer: file([latte, cake]), fileName: "orders-v1.xlsx", actorId }, tx);
       const r = await importSalesFile({ buffer: file([latte]), fileName: "orders-v2.xlsx", actorId }, tx);
-      expect(r.revisions.some((x) => x.now.includes("غاب عن التصدير"))).toBe(true);
+      expect(r.revisions.some((x) => x.now.includes("غاب عن آخر تصدير"))).toBe(true);
 
       const lines = (await tx.execute<{ d: string; v: boolean }>(sql`
         select sl.description as d, sl.is_void as v from sale_lines sl join sales s on s.id = sl.sale_id

@@ -268,7 +268,7 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
                 and i.period_month in (${supplierMonths})
                 and ${INVOICE_COUNTED})) as supplier_has_invoices,
            ${COVERED_BY_INVOICE} as covered,
-           /* لما اختاره صاحبُه وحده — الباقي لا يُسأل عنه */
+           /* لما اختاره صاحبه وحده — الباقي لا يسأل عنه */
            case when c.included is true and bt.direction = 'DEBIT' then ${COVERING_INVOICES} else '[]'::jsonb end as covering,
            ${BOUNCED} as bounced
     from bank_transactions bt
@@ -314,7 +314,7 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
     return {
       ...base,
       supplier: i.supplier, supplierId: i.supplier_id, supplierSlug: i.supplier_slug, number: i.number, day: i.day, periodMonth: i.period_month,
-      reasons: i.awaiting && machineEligible({ ...base, awaitingReview: false }) ? ["تنتظر المراجعة — لم يُقرّ أحدٌ قراءتَها"] : reasons,
+      reasons: i.awaiting && machineEligible({ ...base, awaitingReview: false }) ? ["تنتظر المراجعة ولم يعتمد أحد قراءتها"] : reasons,
       warnings: reviewWarnings(i),
       supplierVat: i.supplier_vat,
       sellerVat: i.seller_vat,
@@ -373,19 +373,19 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
   };
 }
 
-const SELLER_VAT_UNREAD = "رقمُ المورّد الضريبيّ";
+const SELLER_VAT_UNREAD = "رقم المورّد الضريبيّ";
 
 /** أركانُ الفاتورة الضريبيّة التي لم تُقرأ — بالفحص نفسه الذي حكم (`validation.ts`). */
 function missingPillars(i: { number: string; seller_vat: string | null; buyer_vat: string | null; vat_minor: number | null }): string[] {
   const out: string[] = [];
   const ours = companyVatDigits();
-  if (!i.number.trim()) out.push("رقمُ الفاتورة");
+  if (!i.number.trim()) out.push("رقم الفاتورة");
   /* رقمُنا في خانة البائع قراءةٌ خاطئة لا رقمُ مورّد */
   if (!isValidSaudiVat(i.seller_vat) || (ours !== "" && (i.seller_vat ?? "").replace(/\D/g, "") === ours)) out.push(SELLER_VAT_UNREAD);
   const buyer = (i.buyer_vat ?? "").replace(/\D/g, "");
-  if (buyer !== ours) out.push(buyer ? "رقمُنا الضريبيّ (قُرئ غيرَه)" : "رقمُنا الضريبيّ");
-  if (i.vat_minor === null) out.push("مبلغُ الضريبة");
-  else if (i.vat_minor === 0) out.push("الضريبةُ صفرٌ مقروء");
+  if (buyer !== ours) out.push(buyer ? "رقمنا الضريبيّ (قُرئ رقم آخر)" : "رقمنا الضريبيّ");
+  if (i.vat_minor === null) out.push("مبلغ الضريبة");
+  else if (i.vat_minor === 0) out.push("الضريبة المقروءة صفر");
   return out;
 }
 
@@ -401,19 +401,19 @@ function reviewWarnings(i: {
   const out: string[] = [];
   if (i.vat_minor !== null && i.vat_minor > 0) {
     if (i.subtotal_minor !== null && i.vat_minor > vatOnNet(i.subtotal_minor) + TOTAL_ROUNDING_TOLERANCE_MINOR) {
-      out.push("الضريبةُ المقروءة فوق 15٪ من الصافي");
+      out.push("الضريبة المقروءة فوق 15٪ من الصافي");
     } else if (i.vat_minor > vatInsideGross(i.total_minor) + TOTAL_ROUNDING_TOLERANCE_MINOR) {
-      out.push("الضريبةُ المقروءة فوق 15/115 من الإجمالي");
+      out.push("الضريبة المقروءة فوق 15/115 من الإجمالي");
     }
   }
-  if (i.twin_supplier) out.push(`الفاتورةُ نفسُها مقيَّدةٌ تحت «${i.twin_supplier}» — قد تُخصم مرّتين`);
+  if (i.twin_supplier) out.push(`الفاتورة نفسها مقيّدة تحت «${i.twin_supplier}»، وقد تُخصم ضريبتها مرتين`);
   const seller = (i.seller_vat ?? "").replace(/\D/g, "");
   const known = (i.supplier_vat ?? "").replace(/\D/g, "");
   if (isValidSaudiVat(i.seller_vat) && isValidSaudiVat(i.supplier_vat) && seller !== known && seller !== companyVatDigits()) {
-    out.push("رقمُ البائع على الورقة غيرُ رقم المورّد في سجلّه");
+    out.push("رقم البائع على الورقة يختلف عن رقم المورّد في سجلّه");
   }
   if (Math.abs(monthIndex(i.date_month) - monthIndex(i.period_month)) > FAR_DATE_MONTHS) {
-    out.push("تاريخُها بعيدٌ عن الفترة بأكثر من سنة — راجع السنة المقروءة");
+    out.push("تاريخها يبعد عن الفترة أكثر من سنة. راجع السنة المقروءة");
   }
   return out;
 }
@@ -480,7 +480,7 @@ async function assertNotFiled(conn: Conn, months: readonly string[]): Promise<vo
     .where(and(inArray(vatFilings.periodKey, keys), isNull(vatFilings.voidedAt)));
   if (filed.length > 0) {
     throw new VatChoiceRefused(
-      `إقرارُ ${filed.map((f) => f.key).join(" و")} قُدِّم — اختياراتُه مقفلة. إن لزم التغيير فتراجع عن تسجيل التقديم أوّلاً.`,
+      `إقرار ${filed.map((f) => f.key).join(" و")} قُدّم واختياراته مقفلة. إن لزم التغيير فتراجع عن تسجيل التقديم أولاً.`,
     );
   }
 }
@@ -500,9 +500,9 @@ export async function chooseVatTxs(ids: readonly string[], included: boolean | n
       })
       .from(bankTransactions).where(inArray(bankTransactions.id, unique))
       .then((rows) => rows.map((f) => ({ ...f, category: vatCategory(f) })));
-    if (found.length !== unique.length) throw new VatChoiceRefused("حركةٌ لم تعد موجودة — حدّث الصفحة");
+    if (found.length !== unique.length) throw new VatChoiceRefused("الحركة لم تعد موجودة. حدّث الصفحة");
     if (found.some((f) => f.category === null)) {
-      throw new VatChoiceRefused("الرسمُ لا يُعدّ بذاته — ضريبتُه في حركتها المستقلّة");
+      throw new VatChoiceRefused("الرسم لا يُحتسب بذاته، وضريبته في حركتها المستقلة");
     }
     await assertNotFiled(t, found.map((f) => f.month));
 
@@ -514,13 +514,13 @@ export async function chooseVatTxs(ids: readonly string[], included: boolean | n
           and ${COVERED_BY_INVOICE}
       `)).rows;
       if (covered.length > 0) {
-        throw new VatChoiceRefused("ضريبةُ هذه الحركة محسوبةٌ في فاتورتها — ضمُّها يعدّها مرّتين");
+        throw new VatChoiceRefused("ضريبة هذه الحركة محسوبة في فاتورتها، وإضافتها تحسبها مرتين");
       }
       const bounced = (await t.execute<{ id: string }>(sql`
         select bt.id from bank_transactions bt where bt.id in (${idList}) and ${BOUNCED}
       `)).rows;
       if (bounced.length > 0) {
-        throw new VatChoiceRefused("هذه حوالةٌ ارتدّت وعاد مبلغُها — لا شراءَ فيها ولا بيع");
+        throw new VatChoiceRefused("هذه حوالة ارتدّت وعاد مبلغها، فلا شراء فيها ولا بيع");
       }
     }
 
@@ -543,9 +543,9 @@ export async function chooseVatTxs(ids: readonly string[], included: boolean | n
       actorId, action: "VAT_TX_CHOSEN", entityType: "bank_transaction",
       entityId: unique.length === 1 ? unique[0] : `${unique.length} حركة`,
       /* ما كان مختاراً بيدٍ قبل هذا — الصفُّ يُحذف عند الإعادة إلى الأصل، فهنا أثرُه الوحيد */
-      before: before.length > 0 ? { "اختيارٌ سابق": Object.fromEntries(before.map((b) => [b.id, b.included ? "تُعدّ" : "لا تُعدّ"])) } : undefined,
+      before: before.length > 0 ? { "اختيار سابق": Object.fromEntries(before.map((b) => [b.id, b.included ? "تعدّ" : "لا تعدّ"])) } : undefined,
       after: {
-        القرار: included === null ? "الأصل" : included ? "تُعدّ في الإقرار" : "لا تُعدّ",
+        القرار: included === null ? "الأصل" : included ? "تعدّ في الإقرار" : "لا تعدّ",
         الحركات: unique.length,
         ...(unique.length > 1 ? { المعرّفات: unique } : {}),
       },
@@ -569,15 +569,15 @@ export async function chooseVatInvoices(ids: readonly string[], included: boolea
         awaitingReview: sql<boolean>`exists (select 1 from documents d where d.id = ${invoicesTable}.document_id and d.status <> 'ARCHIVED')`,
       })
       .from(invoicesTable).where(inArray(invoicesTable.id, unique));
-    if (found.length !== unique.length) throw new VatChoiceRefused("فاتورةٌ لم تعد موجودة — حدّث الصفحة");
+    if (found.length !== unique.length) throw new VatChoiceRefused("الفاتورة لم تعد موجودة. حدّث الصفحة");
     if (found.some((f) => f.taxStatus === "NOT_APPLICABLE")) {
-      throw new VatChoiceRefused("عرضُ السعر والفاتورةُ المبدئيّة ليسا فاتورةً ضريبيّة — لا تُخصم ضريبتُهما");
+      throw new VatChoiceRefused("عرض السعر والفاتورة المبدئية ليسا فاتورة ضريبية، فلا تُخصم ضريبتهما");
     }
     await assertNotFiled(t, found.map((f) => f.periodMonth));
     const zero = found.find((f) => f.vatMinor === 0);
     if (included && zero) {
       throw new VatChoiceRefused(
-        `الفاتورة ${zero.number} قُرئت ضريبتُها صفراً — لا شيء فيها يُخصم. إن كانت على الورقة ضريبة فصحّح مبلغها من الفاتورة.`,
+        `الفاتورة ${zero.number} قُرئت ضريبتها صفراً، فلا شيء فيها يُخصم. إن كانت على الورقة ضريبة فصحّح مبلغها من الفاتورة.`,
       );
     }
 
@@ -599,9 +599,9 @@ export async function chooseVatInvoices(ids: readonly string[], included: boolea
     await recordAudit({
       actorId, action: "VAT_INVOICE_CHOSEN", entityType: "invoice",
       entityId: unique.length === 1 ? unique[0] : `${unique.length} فاتورة`,
-      before: before.length > 0 ? { "إقرارٌ سابق": Object.fromEntries(before.map((b) => [b.id, b.included ? "تُحسب" : "لا تُحسب"])) } : undefined,
+      before: before.length > 0 ? { "إقرار سابق": Object.fromEntries(before.map((b) => [b.id, b.included ? "تحسب" : "لا تحسب"])) } : undefined,
       after: {
-        القرار: included === null ? "حكمُ الآلة" : included ? "ضريبيّةٌ على الورقة — تُحسب في الخصم" : "لا تُحسب في الخصم",
+        القرار: included === null ? "حكم الآلة" : included ? "ضريبيّة على الورقة — تحسب في الخصم" : "لا تحسب في الخصم",
         الفواتير: found.map((f) => f.number),
         ...(unique.length > 1 ? { المعرّفات: unique } : {}),
       },
@@ -617,9 +617,9 @@ export async function chooseVatInvoices(ids: readonly string[], included: boolea
  * المبلغُ يصل هللاتٍ صحيحة فحصها المسار؛ ولا يُكتب في ربعٍ قُدِّم إقرارُه.
  */
 export async function setVatCashSales(month: string, grossMinor: number | null, actorId: string, conn: Conn = db): Promise<void> {
-  if (parseVatPeriod(month)?.kind !== "month") throw new VatChoiceRefused("شهرٌ غير صالح");
+  if (parseVatPeriod(month)?.kind !== "month") throw new VatChoiceRefused("شهر غير صالح");
   if (grossMinor !== null && (!Number.isSafeInteger(grossMinor) || grossMinor < 0)) {
-    throw new VatChoiceRefused("مبلغُ النقد لا يكون سالباً");
+    throw new VatChoiceRefused("مبلغ النقد لا يمكن أن يكون سالباً");
   }
   await conn.transaction(async (t) => {
     await assertNotFiled(t, [month]);
@@ -636,8 +636,8 @@ export async function setVatCashSales(month: string, grossMinor: number | null, 
     }
     await recordAudit({
       actorId, action: "VAT_CASH_SALES_SET", entityType: "vat_period", entityId: month,
-      before: before ? { "نقدٌ غير مودَع (هللة)": before.cashSalesGrossMinor } : undefined,
-      after: { "نقدٌ غير مودَع (هللة)": grossMinor },
+      before: before ? { "نقد غير مودع (هللة)": before.cashSalesGrossMinor } : undefined,
+      after: { "نقد غير مودع (هللة)": grossMinor },
     }, t);
   });
 }
@@ -660,19 +660,19 @@ export interface FileVatReturnInput {
  */
 export async function fileVatReturn(input: FileVatReturnInput, actorId: string, conn: Conn = db): Promise<VatFilingView> {
   const period = parseVatPeriod(input.periodKey);
-  if (!period || period.kind !== "quarter") throw new VatChoiceRefused("الإقرارُ يُسجَّل للربع كاملاً");
+  if (!period || period.kind !== "quarter") throw new VatChoiceRefused("يُسجَّل الإقرار للربع كاملاً");
   const today = todayInRiyadh();
-  if (today < periodBounds(period).until) throw new VatChoiceRefused("الربعُ لم ينتهِ بعد — لا يُقدَّم إقرارُه");
+  if (today < periodBounds(period).until) throw new VatChoiceRefused("الربع لم ينتهِ بعد، فلا يمكن تقديم إقراره");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.filedOn) || input.filedOn > today || input.filedOn < periodBounds(period).until) {
-    throw new VatChoiceRefused("يومُ التقديم يقع بعد نهاية الربع ولا يسبق اليوم");
+    throw new VatChoiceRefused("يجب أن يكون يوم التقديم بعد نهاية الربع وألا يكون بعد اليوم");
   }
 
   return conn.transaction(async (t) => {
-    if (await loadVatFiling(period, t)) throw new VatChoiceRefused("سُجّل تقديمُ هذا الإقرار من قبل — حدّث الصفحة");
+    if (await loadVatFiling(period, t)) throw new VatChoiceRefused("سُجّل تقديم هذا الإقرار من قبل. حدّث الصفحة");
     const view = await loadVatReturn(period, t);
     const r = view.result;
     if (r.netMinor < 0 && input.creditDisposition === null) {
-      throw new VatChoiceRefused("الصافي رصيدٌ لك — اختر: يُرحَّل للربع التالي أم طُلب استردادُه");
+      throw new VatChoiceRefused("الصافي رصيد لك. اختر: ترحيله إلى الربع التالي أو طلب استرداده");
     }
     const [row] = await t.insert(vatFilings).values({
       periodKey: periodKey(period),
@@ -696,7 +696,7 @@ export async function fileVatReturn(input: FileVatReturnInput, actorId: string, 
       after: {
         الفترة: row.periodKey, "يوم التقديم": row.filedOn, المرجع: row.reference,
         "ضريبة المخرجات (هللة)": row.outputVatMinor, "ضريبة المدخلات (هللة)": row.inputVatMinor,
-        "رصيدٌ مرحَّل (هللة)": row.carriedInMinor, "الصافي (هللة)": row.netMinor,
+        "رصيد مرحّل (هللة)": row.carriedInMinor, "الصافي (هللة)": row.netMinor,
         "الرصيد الدائن": row.creditDisposition,
       },
     }, t);
@@ -710,13 +710,13 @@ export async function fileVatReturn(input: FileVatReturnInput, actorId: string, 
  */
 export async function voidVatFiling(periodKeyRaw: string, reason: string, actorId: string, conn: Conn = db): Promise<void> {
   const period = parseVatPeriod(periodKeyRaw);
-  if (!period || period.kind !== "quarter") throw new VatChoiceRefused("فترةٌ غير صالحة");
+  if (!period || period.kind !== "quarter") throw new VatChoiceRefused("فترة غير صالحة");
   await conn.transaction(async (t) => {
     const filing = await loadVatFiling(period, t);
-    if (!filing) throw new VatChoiceRefused("لا تقديمَ مسجَّلاً لهذا الربع — حدّث الصفحة");
+    if (!filing) throw new VatChoiceRefused("لا يوجد تقديم مسجّل لهذا الربع. حدّث الصفحة");
     if (filing.creditDisposition === "CARRY") {
       const next = await loadVatFiling(nextQuarter(period), t);
-      if (next) throw new VatChoiceRefused("رصيدُ هذا الإقرار رُحِّل إلى إقرار الربع التالي المقدَّم — تراجع عن ذاك أوّلاً");
+      if (next) throw new VatChoiceRefused("رُحّل رصيد هذا الإقرار إلى إقرار الربع التالي المقدَّم. تراجع عن ذلك الإقرار أولاً");
     }
     await t.update(vatFilings)
       .set({ voidedAt: sql`now()`, voidedById: actorId, voidReason: reason })

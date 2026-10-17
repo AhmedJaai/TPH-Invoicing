@@ -28,12 +28,12 @@ export function NoStatementsButton({ supplierId }: { supplierId: string }) {
           const r = await postJson("/api/supplier-policy", { supplierId, issuesStatements: false });
           setBusy(false);
           if (!r.ok) { setError(r.error); return; }
-          toast({ tone: "ok", title: "حُفظ: لا يصدر كشوفاً", body: "لن يُطلَب منه كشفٌ بعد اليوم — ويُعاد من صفحته إن تغيّر." });
+          toast({ tone: "ok", title: "تم الحفظ: المورّد لا يصدر كشوف حساب", body: "لن نطلب منه كشف حساب بعد اليوم. يمكنك تغيير ذلك من صفحته." });
           router.refresh();
         }}
       >
         <FileX className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        لا يصدر كشوفاً
+        لا يصدر كشوف حساب
       </button>
       {error && <span className="text-[11px] font-bold text-danger" role="alert">{error}</span>}
     </span>

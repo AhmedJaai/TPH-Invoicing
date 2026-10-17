@@ -49,12 +49,12 @@ function caught(code: string): number {
     plugins: { tph },
     rules: { "tph/no-column-in-correlated-subquery": "error" },
   }, { filename: "src/x.ts" });
-  if (messages.some((m) => m.fatal)) throw new Error("مثالٌ لا يُحلَّل");
+  if (messages.some((m) => m.fatal)) throw new Error("مثال لا يحلّل");
   return messages.length;
 }
 
-describe("الاستعلام الفرعيّ المرتبط يُكتب بالمرجع لا بالعمود", () => {
-  it("الحارس يُمسك الشكل الخاطئ — وإلّا كان طمأنينةً بلا سند", () => {
+describe("الاستعلام الفرعيّ المرتبط يكتب بالمرجع لا بالعمود", () => {
+  it("الحارس يمسك الشكل الخاطئ — وإلّا كان طمأنينةً بلا سند", () => {
     expect(caught(
       "sql`coalesce((select sum(pa.amount_minor) from payment_allocations pa where pa.invoice_id = ${invoices.id}), 0)`",
     )).toBe(1);

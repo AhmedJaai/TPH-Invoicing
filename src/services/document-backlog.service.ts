@@ -85,10 +85,10 @@ export function missingFromReading(r: {
   rawDate: string | null;
 }): string[] {
   const out: string[] = [];
-  if (!r.supplierKnown) out.push("المورّد: لم يُعرَف من الاسم المقروء");
+  if (!r.supplierKnown) out.push("المورّد: لم يتعرّف النظام عليه من الاسم المقروء");
   if (!r.invoiceNumber) out.push("رقم الفاتورة: لم يُقرأ");
   if (!r.invoiceDate) {
-    out.push(r.rawDate ? `التاريخ: قُرئ «${r.rawDate}» ولم يُفهَم` : "التاريخ: لم يُقرأ");
+    out.push(r.rawDate ? `التاريخ: قُرئ «${r.rawDate}» ولم يُفهم` : "التاريخ: لم يُقرأ");
   }
   if (r.totalMinor === null) out.push("الإجمالي: لم يُقرأ");
   return out;
@@ -186,7 +186,7 @@ export async function recordFromStoredReadings(
     const kind = doc.kind && doc.kind !== "UNKNOWN" ? doc.kind : x.documentKind ?? "";
     if (!INVOICE_KINDS.has(kind) && kind !== "STATEMENT") continue;
     if (doc.reading === null) {
-      out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["لم تُحفظ له قراءة — أعِد قراءته من ملفّه"] });
+      out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["لا توجد قراءة محفوظة له. أعد قراءته من ملفه"] });
       continue;
     }
     /* ما سكت عنه النموذجُ ونطق به اسمُ الملفّ — سدٌّ لفراغ لا تصحيحٌ لقراءة */
@@ -213,12 +213,12 @@ export async function recordFromStoredReadings(
     */
     if (kind === "STATEMENT") {
       if (!supplier) {
-        out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["المورّد: لم يُعرَف من الاسم المقروء"] });
+        out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["المورّد: لم يتعرّف النظام عليه من الاسم المقروء"] });
         continue;
       }
       const end = date ?? (doc.periodMonth ? lastDayOf(doc.periodMonth) : null);
       if (!end) {
-        out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["التاريخ: لم يُقرأ، ولا شهرَ للمجلّد"] });
+        out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["التاريخ: لم يُقرأ، ولا يوجد شهر للمجلد"] });
         continue;
       }
       const item: BacklogItem = {
@@ -248,7 +248,7 @@ export async function recordFromStoredReadings(
             action: "DOCUMENT_REREAD",
             entityType: "document",
             entityId: doc.id,
-            after: { الملف: doc.fileName, السبب: "قُيِّد كشفاً من القراءة المحفوظة", نهاية_الفترة: end },
+            after: { الملف: doc.fileName, السبب: "قُيّد كشف من القراءة المحفوظة", نهاية_الفترة: end },
           }, tx);
         });
         out.recorded++;
@@ -354,8 +354,8 @@ export async function recordFromStoredReadings(
           after: {
             الملف: doc.fileName,
             السبب: wasArchived
-              ? "أُرشف ولم يُقيَّد — قُيِّد آلياً من قراءته المحفوظة بعد التحقّق أنّه ليس نسخة"
-              : "قُيِّدت من القراءة المحفوظة — لم يُعَد النداء",
+              ? "أُرشف دون قيد، فقُيّد آلياً من قراءته المحفوظة بعد التأكد من أنه ليس نسخة مكررة"
+              : "قُيّدت من القراءة المحفوظة دون استدعاء جديد للنموذج",
             التاريخ: date,
           },
         }, tx);
@@ -364,7 +364,7 @@ export async function recordFromStoredReadings(
       });
       /* قيدٌ سبقه قيدٌ من نافذةٍ أخرى — لا يُعدّ ولا يُسكَت عنه */
       if (!invoiceId) {
-        out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: [`قُيِّدت فاتورةٌ برقم ${number} لهذا المورّد للتوّ`] });
+        out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: [`سُجّلت للتو فاتورة بالرقم ${number} لهذا المورّد`] });
         continue;
       }
       out.recorded++;

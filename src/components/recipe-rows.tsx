@@ -90,8 +90,8 @@ export function RecipeRows({
         <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-raised px-4 py-3 text-xs leading-relaxed text-ink-soft">
           <p className="min-w-0 flex-1">
             {byCatalog
-              ? <>الكلفةُ معروضةٌ <strong className="text-ink">بكلفة الكتالوج</strong> — الرقمُ المعياريّ المكتوب في فودكس.</>
-              : <>الكلفةُ معروضةٌ <strong className="text-ink">بآخر فاتورةٍ</strong> لكلّ مكوّن — ثمنٌ دُفع فعلاً — وما لا فاتورةَ له فبكلفة الكتالوج. فقد تخالف ما كان يُعرَض بالكتالوج وحده.</>}
+              ? <>الكلفة معروضة <strong className="text-ink">بكلفة الكتالوج</strong>، وهي الرقم المعياري المسجّل في فودكس.</>
+              : <>الكلفة معروضة <strong className="text-ink">بآخر فاتورة</strong> لكل مكوّن، أي بما دفعته فعلاً، وما لا فاتورة له يُحسب بكلفة الكتالوج. لذلك قد تختلف عمّا كان يظهر بالكتالوج وحده.</>}
           </p>
           <button type="button" onClick={() => setByCatalog((v) => !v)} aria-pressed={byCatalog} className={buttonClass("secondary", "sm")}>
             {byCatalog ? "اعرضها بآخر فاتورة" : "اعرضها بكلفة الكتالوج"}
@@ -110,7 +110,7 @@ export function RecipeRows({
           <span className="text-end">الفرق</span>
         </div>
         {visible.length === 0 && (
-          <p className="px-5 py-10 text-center text-sm text-muted">لا وصفةَ تطابق «{query}».</p>
+          <p className="px-5 py-10 text-center text-sm text-muted">لا وصفة تطابق «{query}».</p>
         )}
         <ul className="divide-y divide-line-soft">
           {visible.map((row) => {
@@ -126,8 +126,8 @@ export function RecipeRows({
                   <ChevronLeft aria-hidden className={`h-4 w-4 text-muted transition-transform ${expanded ? "-rotate-90" : ""}`} strokeWidth={2} />
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-bold">{row.menuProductName}</span>
-                    {row.activeVersion === null && <span className="text-[11px] font-bold text-warn">مسوّدةٌ لا تدخل الحساب</span>}
-                    {row.unknownCost.length > 0 && row.activeVersion !== null && <span className="text-[11px] text-warn">كلفةُ مكوّنٍ غير معروفة</span>}
+                    {row.activeVersion === null && <span className="text-[11px] font-bold text-warn">مسودة لا تدخل في الحساب</span>}
+                    {row.unknownCost.length > 0 && row.activeVersion !== null && <span className="text-[11px] text-warn">كلفة مكوّن غير معروفة</span>}
                   </span>
                   <span className="nums text-xs text-muted md:text-ink-soft">{row.ingredientCount} مكوّن</span>
                   <span className="col-start-2 text-xs md:col-start-auto md:text-end">
@@ -182,7 +182,7 @@ export function RecipeRows({
 const COST_BASIS_LABEL = {
   INVOICE: "بآخر فاتورة",
   CATALOG: "بكلفة الكتالوج",
-  MIXED: "فواتيرُ وكتالوج",
+  MIXED: "فواتير وكتالوج",
 } as const;
 
 interface Draft {
@@ -236,7 +236,7 @@ function RecipePanel({
 
     setBusy(null);
     if (!res.ok) { setError(res.error); return; }
-    setDone(String(res.data.message ?? "حُفظ."));
+    setDone(String(res.data.message ?? "تم الحفظ."));
     router.refresh();
   }
 
@@ -246,15 +246,15 @@ function RecipePanel({
     <div className="border-t border-line bg-sunken/50 px-4 py-4">
       <p className="text-[11px] leading-relaxed text-muted">
         {row.activeVersion === null
-          ? "مسوّدة — لا تدخل الحساب حتّى تُفعَّل."
+          ? "مسودة، ولا تدخل في الحساب حتى تُفعَّل."
           : isSinceBeginning(row.activeFromLabel)
-            ? `النسخة ${row.activeVersion} — سارية منذ البداية، فتغطّي الأسابيع كلَّها.`
-            : `النسخة ${row.activeVersion} — سارية من ${row.activeFromLabel}.`}
-        {row.versions > 1 && ` ولها ${row.versions} نسخ.`}
+            ? `النسخة ${row.activeVersion} سارية منذ البداية، وتغطي كل الأسابيع.`
+            : `النسخة ${row.activeVersion} سارية من ${row.activeFromLabel}.`}
+        {row.versions > 1 && ` وللوصفة ${row.versions} نسخ.`}
       </p>
 
       {empty ? (
-        <p className="mt-3 text-xs text-warn">لا مكوّنَ في هذه النسخة.</p>
+        <p className="mt-3 text-xs text-warn">لا توجد مكوّنات في هذه النسخة.</p>
       ) : (
         <ul className="mt-3 divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised">
           {draft.map((line, at) => (
@@ -262,7 +262,7 @@ function RecipePanel({
               <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{line.name}</span>
 
               <label className="flex items-center gap-1.5">
-                <span className="sr-only">{`كمّيّةُ ${line.name}`}</span>
+                <span className="sr-only">{`كمية ${line.name}`}</span>
                 <input
                   type="text" inputMode="decimal" dir="ltr"
                   disabled={busy !== null}
@@ -273,7 +273,7 @@ function RecipePanel({
               </label>
 
               <label>
-                <span className="sr-only">{`وحدةُ ${line.name}`}</span>
+                <span className="sr-only">{`وحدة ${line.name}`}</span>
                 <select
                   disabled={busy !== null}
                   value={line.unit}
@@ -297,7 +297,7 @@ function RecipePanel({
                 onClick={() => setDraft((v) => v.filter((_, i) => i !== at))}
                 className={buttonClass("secondary", "sm")}
               >
-                احذفه
+                احذف
               </button>
             </li>
           ))}
@@ -322,7 +322,7 @@ function RecipePanel({
 
       {remaining.length > 0 && (
         <label className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] text-muted">أضِف مكوّناً</span>
+          <span className="text-[11px] text-muted">أضف مكوّناً</span>
           <select
             value=""
             disabled={busy !== null}
@@ -358,17 +358,17 @@ function RecipePanel({
             disabled={!dirty || empty || busy !== null}
             className={buttonClass("primary", "sm")}
           >
-            صحِّحها — تسري على الأسابيع كلِّها
+            صحّح الوصفة (تسري على كل الأسابيع)
           </button>
         ) : (
           <p className="text-[11px] leading-relaxed text-warn">
-            حُسب بهذه النسخة جردٌ مقفَل، فلا تُصحَّح في مكانها — غيِّرها بتاريخ.
+            حُسب بهذه النسخة جرد مقفل، فلا يمكن تصحيحها في مكانها. غيّرها بتاريخ جديد.
           </p>
         )}
 
         <label className="flex flex-wrap items-end gap-2">
           <span className="text-[11px] text-muted">
-            أو غيِّرها من
+            أو غيّرها اعتباراً من
             <input
               type="date"
               value={changeFrom}
@@ -384,18 +384,18 @@ function RecipePanel({
             disabled={!dirty || empty || busy !== null || changeFrom === ""}
             className={buttonClass("secondary", "sm")}
           >
-            احفظ تغييراً
+            احفظ التغيير
           </button>
         </label>
 
         <ConfirmAction
           label="احذف الوصفة"
-          title={`حذفُ وصفة «${row.menuProductName}»`}
+          title={`حذف وصفة «${row.menuProductName}»`}
           consequence={
-            `تُحذَف نسخُها كلُّها (${row.versions})، فلا يُحسَب لهذا الصنف استهلاكٌ بعدها`
-            + " — ويظهر ما اشتُري من مكوّناته كلُّه «فرقاً» في الجرد."
+            `ستُحذف كل نسخها (${row.versions})، ولن يُحسب استهلاك لهذا الصنف بعد ذلك`
+            + ". وسيظهر ما اشتريته من مكوّناته كله كـ«فرق» في الجرد."
           }
-          acknowledgement="أفهم أنّ استهلاك هذا الصنف لن يُحسَب بعد الحذف."
+          acknowledgement="أفهم أن استهلاك هذا الصنف لن يُحسب بعد الحذف."
           confirmLabel="احذفها"
           tone="warn"
           variant="secondary"

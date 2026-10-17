@@ -169,7 +169,7 @@ async function handle(request: Request) {
   const leased = body.apply === true && body.readContent === true;
   const holder = randomUUID();
   if (leased && !(await acquireLease(SYNC_LEASE, holder, SYNC_LEASE_MS))) {
-    const error = "مزامنةٌ أخرى تقرأ الدرايف الآن — من جهازٍ أو لسانٍ آخر. انتظر دقيقةً ثمّ أعد المحاولة.";
+    const error = "توجد مزامنة أخرى تقرأ الدرايف الآن، من جهاز أو تبويب آخر. انتظر دقيقة ثم أعد المحاولة.";
     return body.background === true
       ? NextResponse.json({ busy: true, error })
       : NextResponse.json({ busy: true, error }, { status: 409 });
@@ -298,7 +298,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
       /* ما هو مسجَّل لا يُقرأ ثانيةً — استخراجٌ بلا سبب */
       if (known.has(id)) continue;
       const file = await getFileMeta(drive, id);
-      if (!file) { notes.push(`${id} — لم يُقرأ: لا يُرى بتفويضك، أو حُذف من الدرايف`); continue; }
+      if (!file) { notes.push(`${id} — لم يُقرأ: لا يظهر بتفويضك، أو حُذف من الدرايف`); continue; }
       /*
         موضعُه من الأرشيف بالحكم الواحد (`archivePlace`): في مجلّد مورّدٍ داخل شهر، أو في
         مجلّد الشهر نفسه — والشهرُ لا يُقبل إلّا تحت سنةٍ مهيّأة. وما لا موضعَ له يُقال
@@ -423,7 +423,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
   const createdDocIds: string[] = [];
   if (copies.length > 0) {
     for (const c of copies) await recordCopy(c.entry, c.original);
-    notes.push(`${countNoun(copies.length, FILE)} نسخةٌ من ملفٍّ مقيَّد (البصمةُ نفسُها) — لم تُقرأ، وقُيِّدت نسخةً في «رُفض»: ${copies.slice(0, 3).map((c) => c.entry.file.name).join("، ")}`);
+    notes.push(`${countNoun(copies.length, FILE)} نسخة من ملف مسجّل (البصمة نفسها) — لم تُقرأ، وسُجّلت في «رفض»: ${copies.slice(0, 3).map((c) => c.entry.file.name).join("، ")}`);
   }
 
   for (const { entry, parsed } of named.slice(0, MAX_NAMED_PER_CALL)) {
@@ -601,7 +601,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
       if (readable.length >= MAX_CONTENT_PER_CALL) break;
       const closed = await firstClosedMonth(db, [entry.month]);
       if (closed) {
-        notes.push(`${entry.file.name} — لم يُقرأ: ${new MonthClosedError(closed).message}`);
+        notes.push(`${entry.file.name} — لم يقرأ: ${new MonthClosedError(closed).message}`);
         closedMonthSkipped++;
         closedUnnamed++;
         continue;
@@ -626,7 +626,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
         ويُعاد من ملفّه بيد صاحبه.
       */
       if (entry.file.mimeType.startsWith("application/vnd.google-apps.")) {
-        const reason = "مستندُ جوجل لا ملفّ — نزّله PDF وضعه في المجلّد";
+        const reason = "هذا مستند جوجل وليس ملفاً. نزّله بصيغة PDF وضعه في المجلد.";
         readFailures.push(`${entry.file.name} — ${reason}`);
         await recordUnread(entry, null, entry.file.mimeType, user.id, "UNKNOWN", { error: reason });
         settled++;
@@ -642,7 +642,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
         }
         readFailures.push(`${entry.file.name} — تعذّر التنزيل`);
         await recordUnread(entry, null, entry.file.mimeType, user.id, "UNKNOWN", {
-          error: `تعذّر تنزيلُه من الدرايف: ${(e as Error).message}`,
+          error: `تعذّر تنزيله من الدرايف: ${(e as Error).message}`,
         });
         settled++;
         continue;
@@ -660,7 +660,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
         .limit(1);
       if (sameContent) {
         await recordCopy(entry, sameContent);
-        notes.push(`${entry.file.name} — نسخةٌ من «${sameContent.name}» (البصمةُ نفسُها) — لم تُقرأ، وقُيِّدت نسخةً في «رُفض»`);
+        notes.push(`${entry.file.name} — نسخة من «${sameContent.name}» (البصمة نفسها) — لم تُقرأ، وسُجّلت في «رفض»`);
         settled++;
         continue;
       }
@@ -716,7 +716,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
         سُجّلت الفاتورة.
       */
       if (x.documentKind === "QUOTATION") {
-        quotations.push(`${entry.file.name} — عرض سعر، حُفظ ولم يُقيَّد`);
+        quotations.push(`${entry.file.name} — عرض سعر، حُفظ ولم يُسجَّل`);
         await recordUnread(entry, data, mimeType, user.id, "QUOTATION", { reading: x });
         settled++;
         continue;
@@ -932,7 +932,7 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
         ملفات_جديدة: fresh.length,
         سُجّلت: created,
         فواتير: invoicesCreated,
-        "إيصالات عُلِّقت على دفعةٍ قائمة": paymentsAdopted,
+        "إيصالات علّقت على دفعة قائمة": paymentsAdopted,
         قُرئ_محتواها: read,
         المستندات: createdDocIds,
       },
@@ -1003,11 +1003,11 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
           .where(and(eq(issues.code, ISSUE.FILE_IN_WRONG_MONTH), eq(issues.status, "OPEN"), eq(issues.entityId, w.documentId))).limit(1);
         if (!open) {
           await t.insert(issues).values({ code: ISSUE.FILE_IN_WRONG_MONTH, severity: "WARN", entityType: "document", entityId: w.documentId,
-            message: `«${w.fileName}» في مجلد ${w.folderMonth} وفاتورتُه لشهر ${w.month} — انقله إلى مجلد ${w.month}` });
+            message: `«${w.fileName}» في مجلد ${w.folderMonth} وفاتورته لشهر ${w.month}. انقله إلى مجلد ${w.month}.` });
         }
       }
     });
-    for (const w of wrong) notes.push(`${w.fileName} — في مجلد ${w.folderMonth} وفاتورتُه لـ${w.month}`);
+    for (const w of wrong) notes.push(`${w.fileName} — في مجلد ${w.folderMonth} وفاتورته لـ${w.month}`);
   }
 
   /*
@@ -1039,13 +1039,13 @@ async function sync(user: Awaited<ReturnType<typeof guard>>, body: Body) {
           }
           continue;
         }
-        const where = presence.state === "trashed" ? "في سلّة الدرايف" : "حُذف من الدرايف";
+        const where = presence.state === "trashed" ? "في سلة الدرايف" : "محذوف من الدرايف";
         const [open] = await db.select({ id: issues.id }).from(issues)
           .where(and(eq(issues.code, ISSUE.FILE_MISSING_IN_DRIVE), eq(issues.status, "OPEN"), eq(issues.entityId, doc.docId))).limit(1);
         if (!open) {
           await db.insert(issues).values({
             code: ISSUE.FILE_MISSING_IN_DRIVE, severity: "WARN", entityType: "document", entityId: doc.docId,
-            message: `«${doc.name}» ${where} — استعِده من سلّة الدرايف (تُفرَّغ بعد ثلاثين يوماً)، فالقيدُ بلا ورقته لا يسند خصمَ ضريبته`,
+            message: `«${doc.name}» ${where}. استعده من سلة الدرايف (تُفرَّغ بعد ثلاثين يوماً)، فالقيد بلا مستنده لا يدعم خصم ضريبته.`,
           });
         }
         notes.push(`${doc.name} — ${where}`);
@@ -1162,7 +1162,7 @@ function driveOrigin(entry: ArchiveEntry) {
  * ولا تُحفظ لها `sha256`: فإن أعادها إنسانٌ للمراجعة لم يصطدم بفرادة بصمة أصلها.
  */
 async function recordCopy(entry: ArchiveEntry, original: Original): Promise<void> {
-  const reason = `نسخةٌ من «${original.name}» — البصمةُ نفسُها`;
+  const reason = `نسخة من «${original.name}» — البصمة نفسها`;
   await db.transaction(async (t) => {
     const [doc] = await t.insert(documents).values({
       driveFileId: entry.file.id,

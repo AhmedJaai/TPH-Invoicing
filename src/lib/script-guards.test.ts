@@ -39,11 +39,11 @@ const GUARD = /\b(?:assertWriteAllowed|writeAllowed)\s*\(/;
  * ما يكتب بلا ذلك الحارس — ولكلٍّ سببُه. الإضافةُ هنا قرارٌ يُراجَع، لا سهو.
  */
 const EXEMPT: Record<string, string> = {
-  "migrate.ts": "مشغّلُ الهجرات نفسُه — يجري في بناء المنصّة، وحمايتُه القفلُ والبصمة",
-  "seed-test-fixture.ts": "يرفض ما ليس قاعدةَ اختبار (testDatabaseProblem)",
-  "certify-flow.ts": "كلُّ سيناريو في معاملةٍ تُلغى — لا يُكتَب شيء",
-  "verify-invariants.ts": "يحاول خرقَ القيود في معاملاتٍ تُلغى — لا يُكتَب شيء",
-  "restore-verify.ts": "يكتب في قاعدةٍ يسمّيها الأمر صراحةً ويرفض غير الفارغة — لا يقرأ DATABASE_URL هدفاً",
+  "migrate.ts": "مشغّل الهجرات نفسه — يجري في بناء المنصّة، وحمايته القفل والبصمة",
+  "seed-test-fixture.ts": "يرفض ما ليس قاعدة اختبار (testDatabaseProblem)",
+  "certify-flow.ts": "كلّ سيناريو في معاملة تلغى — لا يكتب شيء",
+  "verify-invariants.ts": "يحاول خرق القيود في معاملات تلغى — لا يكتب شيء",
+  "restore-verify.ts": "يكتب في قاعدة يسمّيها الأمر صراحةً ويرفض غير الفارغة — لا يقرأ DATABASE_URL هدفاً",
 };
 
 /** وكلُّ مُعفًى يحمل في نصّه ما يقوله سببُه — وإلّا صار الإعفاءُ ادّعاءً. */
@@ -55,7 +55,7 @@ const EXEMPT_EVIDENCE: Record<string, RegExp> = {
   "restore-verify.ts": /rollback/i,
 };
 
-describe("النصوص الكاتبة تحمل حارسَها", () => {
+describe("النصوص الكاتبة تحمل حارسها", () => {
   it("الحارس يرى النصوص فعلاً", () => {
     expect(SCRIPTS.length).toBeGreaterThan(40);
     expect(SCRIPTS.filter((f) => writesSomething(readFileSync(path.join(DIR, f), "utf8"))).length).toBeGreaterThan(15);
@@ -64,26 +64,26 @@ describe("النصوص الكاتبة تحمل حارسَها", () => {
   for (const file of SCRIPTS) {
     const source = readFileSync(path.join(DIR, file), "utf8");
     if (!writesSomething(source)) continue;
-    it(`${file} — ${file in EXEMPT ? "مُعفًى بسببه" : "بحارس الكتابة"}`, () => {
+    it(`${file} — ${file in EXEMPT ? "معفًى بسببه" : "بحارس الكتابة"}`, () => {
       if (file in EXEMPT) {
-        expect(EXEMPT_EVIDENCE[file].test(source), `${file}: ${EXEMPT[file]} — ولا أثرَ لذلك في نصّه`).toBe(true);
+        expect(EXEMPT_EVIDENCE[file].test(source), `${file}: ${EXEMPT[file]} — ولا أثر لذلك في نصّه`).toBe(true);
         return;
       }
       expect(
         GUARD.test(stripComments(source)),
-        `${file} يكتب بلا assertWriteAllowed/writeAllowed (scripts/lib/guard-write.ts) — اجعله يعاين حتى يُكتب الإقرار، أو أضِفه إلى EXEMPT بسببه`,
+        `${file} يكتب بلا assertWriteAllowed/writeAllowed (scripts/lib/guard-write.ts) — اجعله يعاين حتى يكتب الإقرار، أو أضفه إلى EXEMPT بسببه`,
       ).toBe(true);
     });
   }
 
-  it("ولا إعفاءَ لنصٍّ لم يعد موجوداً أو لم يعد يكتب", () => {
+  it("ولا إعفاء لنصّ لم يعد موجوداً أو لم يعد يكتب", () => {
     for (const file of Object.keys(EXEMPT)) {
       expect(SCRIPTS, `${file} في EXEMPT وليس في scripts/`).toContain(file);
       expect(writesSomething(readFileSync(path.join(DIR, file), "utf8")), `${file} لم يعد يكتب — احذفه من EXEMPT`).toBe(true);
     }
   });
 
-  it("والكاشف يُمسك أشكال الكتابة، ولا يُمسك القراءة ولا التعليق", () => {
+  it("والكاشف يمسك أشكال الكتابة، ولا يمسك القراءة ولا التعليق", () => {
     expect(writesSomething("await db.insert(invoices).values(v);")).toBe(true);
     expect(writesSomething("await t.update(payments).set({ status });")).toBe(true);
     expect(writesSomething("await db.transaction((t) => refresh(t, id));")).toBe(true);
@@ -102,7 +102,7 @@ describe("النصوص الكاتبة تحمل حارسَها", () => {
   db:dedupe الذي حذف صفوفاً حقيقيّة من قبل.
 */
 describe("النصوص الكاتبة", () => {
-  it("كلّ علمِ كتابةٍ يمرّ بالإقرار المكتوب", () => {
+  it("كلّ علم كتابة يمرّ بالإقرار المكتوب", () => {
     const offenders = SCRIPTS.filter((f) => {
       const s = readFileSync(path.join(DIR, f), "utf8");
       const hasWriteFlag = /\b(?:process\.argv|args)\.includes\("(?:apply|--apply|--commit)"\)/.test(s);

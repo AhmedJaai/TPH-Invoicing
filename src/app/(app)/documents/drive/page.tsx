@@ -49,7 +49,7 @@ export default async function DrivePage() {
       user={user}
       width="wide"
       title="الدرايف"
-      intro="أرشيفُ المقهى في جوجل درايف: يُقرأ الجديدُ منه وحده، ويُسمّى المؤرشَفُ على الصيغة وحده. هنا حالُه وما فعله — والتحكّمُ اليدويّ إن لم ترد الانتظار."
+      intro="أرشيف المقهى في جوجل درايف. يقرأ النظام الجديد منه تلقائياً، ويعيد تسمية المؤرشف بالصيغة القياسية تلقائياً. تجد هنا حالة الربط وما تم تنفيذه، وأدوات يدوية إن لم ترد الانتظار."
     >
       <DriveSyncNow {...statusCopy(s)} state={s.state} facts={syncFacts(s)} reconnect={reconnect} />
 
@@ -68,8 +68,8 @@ export default async function DrivePage() {
           value={<span className="nums">{s.fromDrive}</span>}
           sub={
             s.lastArrivalAt
-              ? `آخرُها دخل ${formatDay(s.lastArrivalAt)}${s.arrivedLast7Days > 0 ? ` · هذا الأسبوع ${countNoun(s.arrivedLast7Days, DOCUMENT)}` : " · لا جديد هذا الأسبوع"}`
-              : "لم يدخل مستندٌ بعد."
+              ? `آخر مستند دخل ${formatDay(s.lastArrivalAt)}${s.arrivedLast7Days > 0 ? ` · هذا الأسبوع ${countNoun(s.arrivedLast7Days, DOCUMENT)}` : " · لا جديد هذا الأسبوع"}`
+              : "لم يدخل أي مستند بعد."
           }
         />
         <KeyFigure
@@ -78,11 +78,11 @@ export default async function DrivePage() {
           href="/documents?status=NEEDS_REVIEW"
           tone={s.waitingReview > 0 ? "warn" : undefined}
           value={<span className="nums">{s.waitingReview}</span>}
-          sub={s.waitingReview > 0 ? "لم تجتمع فيه شروطُ الأرشفة الآليّة — ولا يُسمّى حتى يُعتمَد." : "كلُّ ما وصل حُسم."}
+          sub={s.waitingReview > 0 ? "لم تتوفر فيه شروط الأرشفة الآلية، ولن تُعاد تسميته حتى تعتمده." : "كل ما وصل تم حسمه."}
         />
         <KeyFigure
           icon={PenLine}
-          label="على الصيغة"
+          label="بالصيغة القياسية"
           tone={n.known > 0 && toRename === 0 ? "ok" : undefined}
           value={
             n.known === 0
@@ -91,28 +91,28 @@ export default async function DrivePage() {
           }
           sub={
             n.known === 0
-              ? "لا ملفَّ مسجّلاً بعد."
+              ? "لا توجد ملفات مسجّلة بعد."
               : [
                   n.toRenameArchived > 0
-                    ? `${s.writesAllowed ? "للتسمية في الاستدراك القادم" : "للتسمية من الإنتاج وحده"}: ${countNoun(n.toRenameArchived, FILE)}`
+                    ? `${s.writesAllowed ? "ستُعاد تسميتها في الاستدراك القادم" : "لا تُعاد تسميتها إلا من نسخة الإنتاج"}: ${countNoun(n.toRenameArchived, FILE)}`
                     : null,
-                  n.toRenamePending > 0 ? `بعد اعتمادها: ${countNoun(n.toRenamePending, FILE)}` : null,
-                  n.cannot > 0 ? `ينقصها ما يُبنى به الاسم: ${countNoun(n.cannot, FILE)}` : null,
-                ].filter(Boolean).join(" · ") || "كلُّ ما نعرفه على الصيغة."
+                  n.toRenamePending > 0 ? `تُعاد تسميتها بعد اعتمادها: ${countNoun(n.toRenamePending, FILE)}` : null,
+                  n.cannot > 0 ? `تنقصها بيانات تكوين الاسم: ${countNoun(n.cannot, FILE)}` : null,
+                ].filter(Boolean).join(" · ") || "كل الملفات المعروفة على الصيغة القياسية."
           }
         />
       </div>
 
       <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-        <Section title="كيف يعمل" icon={FolderSync} className="mt-0!" hint="بلا زرٍّ تضغطه — ما دام التطبيق مفتوحاً عند أحدكم.">
+        <Section title="كيف يعمل" icon={FolderSync} className="mt-0!" hint="لا تحتاج إلى الضغط على أي زر، ما دام التطبيق مفتوحاً عند أحدكم.">
           <Timeline items={HOW_IT_WORKS} />
         </Section>
 
         <Section
-          title="آخرُ ما فعله"
+          title="آخر ما فعله"
           icon={History}
           className="mt-0!"
-          action={can(user.role, "audit:view") ? <LinkButton href="/settings/audit?kind=documents" size="sm" variant="quiet">سجلُّ التدقيق</LinkButton> : undefined}
+          action={can(user.role, "audit:view") ? <LinkButton href="/settings/audit?kind=documents" size="sm" variant="quiet">سجلّ التدقيق</LinkButton> : undefined}
         >
           {s.recent.length > 0 ? (
             <Timeline items={s.recent.map(activityItem)} />
@@ -120,8 +120,8 @@ export default async function DrivePage() {
             <EmptyState
               compact
               icon={History}
-              title="لم يُسجَّل بعدُ ما فعله الدرايف."
-              hint="يُكتب هنا كلُّ مزامنةٍ وجدت جديداً وكلُّ تسميةٍ وقعت — بالاسمين."
+              title="لم يُسجَّل بعد أي نشاط للدرايف."
+              hint="تظهر هنا كل مزامنة وجدت جديداً وكل إعادة تسمية، مع الاسم القديم والجديد."
             />
           )}
         </Section>
@@ -129,9 +129,9 @@ export default async function DrivePage() {
 
       <Section
         id="manual"
-        title="أدواتٌ مفصّلة"
+        title="أدوات يدوية"
         icon={FileSearch}
-        hint="«زامن الآن» أعلاه يفعل كلَّ شيء. وهنا لمن يريد أن يرى قبل أن يُسجَّل شيء: ما الجديد في الدرايف، وما سيُسمّى — ويختار ملفّاً ملفّاً."
+        hint="زر «زامن الآن» أعلاه يكفي عادةً. وهنا أدوات لمن يريد أن يرى الجديد في الدرايف وما ستتغيّر تسميته قبل التسجيل، ويختار الملفات واحداً واحداً."
         className="mt-12"
       >
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
@@ -147,27 +147,27 @@ const HOW_IT_WORKS: TimelineItem[] = [
   {
     id: "scan",
     icon: FolderSync,
-    title: "يفحص الدرايف كلَّ ثلاث ساعات",
-    body: "مجلّداتِ الشهرين الأخيرين، ويأخذ ما لم يُسجَّل من قبل. وتقع المزامنةُ حين يكون التطبيق مفتوحاً عند المالك أو من له صلاحيةُ الرفع — فإن لم يفتحه أحدٌ انتظرت أوّلَ فتح.",
+    title: "يفحص الدرايف كل ثلاث ساعات",
+    body: "يفحص مجلدات الشهرين الأخيرين ويأخذ ما لم يُسجَّل من قبل. تتم المزامنة عندما يكون التطبيق مفتوحاً عند المالك أو عند من لديه صلاحية الرفع، فإن لم يفتحه أحد انتظرت حتى أول فتح.",
   },
   {
     id: "read",
     icon: FileSearch,
-    title: "يقرأ الجديد ويقيّد ما يطمئنّ إليه",
-    body: "ما اجتمعت فيه شروطُ الأرشفة الآليّة الأربعة يُقيَّد وحده، وما عداه ينتظر مراجعتك في «المستندات» بسببه.",
+    title: "يقرأ الجديد ويقيّد ما يطمئن إليه",
+    body: "ما توفرت فيه شروط الأرشفة الآلية الأربعة يُقيَّد تلقائياً، وما عداه ينتظر مراجعتك في «المستندات» مع بيان السبب.",
   },
   {
     id: "rename",
     icon: PenLine,
-    title: "يسمّي المؤرشَف على الصيغة",
-    body: "كلَّ عشر دقائق: خمسةٌ وعشرون ملفّاً في كلّ مرّة، من البيانات المقيَّدة وحدها، والاسمان في سجلّ التدقيق. وما ينتظر المراجعة لا يُسمّى حتى يُعتمَد.",
+    title: "يعيد تسمية المؤرشف بالصيغة القياسية",
+    body: "كل عشر دقائق يعيد تسمية خمسة وعشرين ملفاً في كل مرة، اعتماداً على البيانات المقيّدة فقط، ويُسجَّل الاسمان القديم والجديد في سجل التدقيق. وما ينتظر المراجعة لا تُعاد تسميته حتى يُعتمد.",
   },
   {
     id: "safe",
     icon: ShieldCheck,
     tone: "ok",
-    title: "لا حذفَ ولا نقل — أبداً",
-    body: "التسميةُ هي الكتابةُ الوحيدة على الدرايف، ولا تقع إلّا من التطبيق الحقيقيّ — لا من نسخ التجربة.",
+    title: "لا حذف ولا نقل أبداً",
+    body: "إعادة التسمية هي الكتابة الوحيدة على الدرايف، ولا تتم إلا من التطبيق الفعلي وليس من نسخ التجربة.",
   },
 ];
 
@@ -177,7 +177,7 @@ function activityItem(a: DriveStatus["recent"][number]): TimelineItem {
     return {
       id: a.id,
       icon: PenLine,
-      title: `سُمّي ${countNoun(a.count, FILE)} على الصيغة`,
+      title: `أُعيدت تسمية ${countNoun(a.count, FILE)} بالصيغة القياسية`,
       meta: `${timeAgo(a.at)}${who}`,
       body: a.lines.length > 0 ? (
         <ul className="space-y-1.5">
@@ -191,7 +191,7 @@ function activityItem(a: DriveStatus["recent"][number]): TimelineItem {
               </li>
             );
           })}
-          {a.lines.length > 3 && <li className="text-[11px] text-muted">و{countNoun(a.lines.length - 3, FILE)} غيرها في سجلّ التدقيق.</li>}
+          {a.lines.length > 3 && <li className="text-[11px] text-muted">و{countNoun(a.lines.length - 3, FILE)} أخرى في سجل التدقيق.</li>}
         </ul>
       ) : undefined,
     };
@@ -210,30 +210,30 @@ function statusCopy(s: DriveStatus): { headline: string; detail: string } {
   switch (s.state) {
     case "preview":
       return {
-        headline: "نسخةُ تجربة: الدرايف غير موصول هنا — عمداً",
-        detail: "تدخل هذه النسخةَ بلا تسجيل دخول، فلا تستعير تفويضَ درايف المالك كي لا يُكتب في الأرشيف الحقيقيّ. الأرقامُ أدناه من نسخة البيانات.",
+        headline: "نسخة تجربة: الدرايف غير موصول هنا عمداً",
+        detail: "تُفتح هذه النسخة بدون تسجيل دخول، ولا تستخدم تفويض درايف الخاص بالمالك حتى لا تكتب في الأرشيف الحقيقي. الأرقام أدناه من نسخة البيانات التجريبية.",
       };
     case "disconnected":
       return {
         headline: "الدرايف غير موصول بحسابك",
-        detail: "لا تفويضَ درايف محفوظٌ لحسابك، فلا مزامنةَ ولا تسمية. أعد الربط ووافق على صلاحية الدرايف في صفحة جوجل.",
+        detail: "لا يوجد تفويض محفوظ للدرايف في حسابك، فلا مزامنة ولا إعادة تسمية. أعد الربط ووافق على صلاحية الدرايف في صفحة جوجل.",
       };
     case "failing":
       return {
-        headline: `توقّفت المزامنة ${s.failure ? timeAgo(s.failure.at) : ""}`.trim(),
-        detail: s.failure?.reason ?? "تعذّر الفحص.",
+        headline: `توقفت المزامنة ${s.failure ? timeAgo(s.failure.at) : ""}`.trim(),
+        detail: s.failure?.reason ?? "تعذّر فحص الدرايف.",
       };
     case "unchecked":
       return {
-        headline: "لم تُسجَّل مزامنةٌ بعد",
-        detail: "تقع وحدها في الدقائق الأولى من فتح التطبيق ثمّ كلَّ ثلاث ساعات — أو اضغط «زامن الآن».",
+        headline: "لم تُسجَّل أي مزامنة بعد",
+        detail: "تتم المزامنة تلقائياً في الدقائق الأولى من فتح التطبيق ثم كل ثلاث ساعات، أو اضغط «زامن الآن».",
       };
     case "ok":
       return {
-        headline: "المزامنةُ تعمل وحدها",
+        headline: "المزامنة تعمل وحدها",
         detail: s.writesAllowed
-          ? "كلَّ ثلاث ساعات والتطبيقُ مفتوح، والتسميةُ كلَّ عشر دقائق. لا حاجةَ لزرّ — إلّا إن وضعتَ ملفّاً الآن ولا تريد الانتظار."
-          : "والتسميةُ موقوفةٌ في هذه البيئة — تقع من الإنتاج وحده، فالأرشيف واحدٌ لا نسخةَ له.",
+          ? "كل ثلاث ساعات والتطبيق مفتوح، وإعادة التسمية كل عشر دقائق. لا حاجة إلى الضغط على أي زر، إلا إن وضعت ملفاً الآن ولا تريد الانتظار."
+          : "إعادة التسمية موقوفة في هذه البيئة، وتتم من نسخة الإنتاج فقط لأن الأرشيف واحد.",
       };
   }
 }
@@ -242,19 +242,19 @@ function statusCopy(s: DriveStatus): { headline: string; detail: string } {
 function syncFacts(s: DriveStatus): { label: string; value: string; hint?: string }[] {
   return [
     {
-      label: "آخرُ مزامنة",
+      label: "آخر مزامنة",
       value: s.checkedAt ? formatMoment(s.checkedAt) : "لم تُسجَّل بعد",
-      hint: s.checkedAt ? timeAgo(s.checkedAt) : "تُسجَّل أوّلَ ما يُفحص الدرايف",
+      hint: s.checkedAt ? timeAgo(s.checkedAt) : "تُسجَّل عند أول فحص للدرايف",
     },
     {
-      label: "آخرُ مرّةٍ وجدت جديداً",
-      value: s.lastFoundAt ? formatMoment(s.lastFoundAt) : "لم تجد بعد",
-      hint: s.lastArrivalAt ? `آخرُ مستندٍ دخل الأرشيف ${formatDay(s.lastArrivalAt)}` : undefined,
+      label: "آخر مرة وُجد فيها جديد",
+      value: s.lastFoundAt ? formatMoment(s.lastFoundAt) : "لم يُوجد جديد بعد",
+      hint: s.lastArrivalAt ? `آخر مستند دخل الأرشيف ${formatDay(s.lastArrivalAt)}` : undefined,
     },
     {
-      label: "آخرُ تسمية",
-      value: s.lastRenamedAt ? formatMoment(s.lastRenamedAt) : "لم تقع بعد",
-      hint: s.writesAllowed ? "تعمل وحدها كلَّ عشر دقائق" : "من الإنتاج وحده",
+      label: "آخر تسمية",
+      value: s.lastRenamedAt ? formatMoment(s.lastRenamedAt) : "لم تتم بعد",
+      hint: s.writesAllowed ? "تتم تلقائياً كل عشر دقائق" : "من نسخة الإنتاج فقط",
     },
   ];
 }

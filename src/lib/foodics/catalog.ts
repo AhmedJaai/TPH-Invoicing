@@ -25,25 +25,25 @@ export function catalogItemsFromApi(items: readonly FoodicsInventoryItem[]): Par
     const sku = i.sku?.trim() ?? "";
     const name = i.name?.trim() ?? "";
     if (sku === "" || name === "") {
-      out.issues.push({ row: n, reason: "صفٌّ بلا رمزٍ أو اسم", detail: `sku=«${sku}» name=«${name}»` });
+      out.issues.push({ row: n, reason: "صف بلا رمز أو اسم", detail: `sku=«${sku}» name=«${name}»` });
       return;
     }
     const unitWord = i.ingredient_unit?.trim() ?? "";
     const baseUnit = readUnit(unitWord);
     if (baseUnit === null) {
-      out.issues.push({ row: n, reason: "وحدةُ صرفٍ غير معروفة", detail: `«${name}» وحدتُه «${unitWord}»` });
+      out.issues.push({ row: n, reason: "وحدة الصرف غير معروفة", detail: `«${name}» وحدته «${unitWord}»` });
       return;
     }
     const storageUnit = i.storage_unit?.trim() ?? "";
     const factorMilli = i.storage_to_ingredient_factor === null || i.storage_to_ingredient_factor === undefined
       ? null : decimalToMilli(i.storage_to_ingredient_factor.toFixed(6));
     if (factorMilli === null || factorMilli <= 0) {
-      out.issues.push({ row: n, reason: "معامِلُ العبوة غير مقروء", detail: `«${name}» — لا يُعرَف كم ${unitWord} في ${storageUnit || "وحدة التخزين"}` });
+      out.issues.push({ row: n, reason: "معامل العبوة غير مقروء", detail: `«${name}» . لا نعرف كم ${unitWord} في ${storageUnit || "وحدة التخزين"}` });
       return;
     }
     const packCostMinor = riyalsToMinor(i.cost);
     if (packCostMinor === null || packCostMinor < 0) {
-      out.issues.push({ row: n, reason: "كلفةٌ غير مقروءة", detail: `«${name}» بلا كلفةٍ في فودكس` });
+      out.issues.push({ row: n, reason: "التكلفة غير مقروءة", detail: `«${name}» بلا تكلفة في فودكس` });
       return;
     }
     out.items.push({ itemSku: sku, name, storageUnit, baseUnit, packQuantityMilli: factorMilli, packCostMinor });
@@ -60,7 +60,7 @@ export function catalogProductsFromApi(products: readonly FoodicsCatalogProduct[
     const sku = p.sku?.trim() ?? "";
     const name = p.name?.trim() ?? "";
     if (sku === "" || name === "") {
-      menu.issues.push({ row: n, reason: "صفٌّ بلا رمزٍ أو اسم", detail: `sku=«${sku}» name=«${name}»` });
+      menu.issues.push({ row: n, reason: "صف بلا رمز أو اسم", detail: `sku=«${sku}» name=«${name}»` });
       return;
     }
     menu.products.push({
@@ -77,19 +77,19 @@ export function catalogProductsFromApi(products: readonly FoodicsCatalogProduct[
       const row = recipes.rows;
       const itemSku = ing.sku?.trim() ?? "";
       if (itemSku === "") {
-        recipes.issues.push({ row, reason: "سطرٌ بلا طرفين", detail: `منتج=«${sku}» مكوّن=«»` });
+        recipes.issues.push({ row, reason: "سطر بلا منتج أو مكوّن", detail: `منتج=«${sku}» مكوّن=«»` });
         continue;
       }
       const unitWord = ing.ingredient_unit?.trim() ?? "";
       const unit = readUnit(unitWord);
       if (unit === null) {
-        recipes.issues.push({ row, reason: "وحدةٌ غير معروفة", detail: `${sku} ← ${itemSku} بوحدة «${unitWord}»` });
+        recipes.issues.push({ row, reason: "وحدة غير معروفة", detail: `${sku} ← ${itemSku} بوحدة «${unitWord}»` });
         continue;
       }
       const quantity = ing.pivot.quantity;
       const quantityMilli = quantity === null || quantity === undefined ? null : decimalToMilli(quantity.toFixed(6));
       if (quantityMilli === null || quantityMilli <= 0) {
-        recipes.issues.push({ row, reason: "كمّيّةٌ غير مقروءة", detail: `${sku} ← ${itemSku} كمّيّتُه «${quantity ?? ""}»` });
+        recipes.issues.push({ row, reason: "الكمية غير مقروءة", detail: `${sku} ← ${itemSku} كميته «${quantity ?? ""}»` });
         continue;
       }
       recipes.recipeLines.push({

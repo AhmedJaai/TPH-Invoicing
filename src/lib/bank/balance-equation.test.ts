@@ -103,6 +103,6 @@ describe("تسوية الحساب", () => {
       { openingMinor: null, closingMinor: null },
     );
     expect(r.reconciled).toBe(false);
-    expect(describeReconciliation(r)).toContain("لا تُفحَص");
+    expect(describeReconciliation(r)).toContain("لا يمكن فحص المعادلة");
   });
 });

@@ -24,25 +24,25 @@ const present = z.string().trim().min(1);
 
 /** ما يرمي التطبيقُ اليوم عند غيابه — لكن عند الاستعمال لا عند الإقلاع. */
 const EXPECTED: Record<string, { schema: z.ZodType; why: string }> = {
-  DATABASE_URL: { schema: z.string().regex(/^postgres(ql)?:\/\/\S+$/), why: "سلسلةُ اتّصال Postgres" },
-  AUTH_SECRET: { schema: present, why: "سرُّ الجلسات" },
-  GOOGLE_CLIENT_ID: { schema: present, why: "الدخولُ بجوجل والدرايف" },
-  GOOGLE_CLIENT_SECRET: { schema: present, why: "الدخولُ بجوجل والدرايف" },
-  COMPANY_VAT_NUMBER: { schema: z.string().regex(/^3\d{13}3$/), why: "خمسةَ عشر رقماً تبدأ بـ3 وتنتهي به" },
-  DRIVE_ACCOUNTS_FOLDER_ID: { schema: present, why: "مجلّدُ الحسابات في الدرايف" },
-  DRIVE_YEAR_2026_FOLDER_ID: { schema: present, why: "مجلّدُ سنة ٢٠٢٦" },
-  DRIVE_YEAR_2027_FOLDER_ID: { schema: present, why: "مجلّدُ سنة ٢٠٢٧" },
-  DEEPSEEK_API_KEY: { schema: present, why: "قراءةُ المستندات" },
+  DATABASE_URL: { schema: z.string().regex(/^postgres(ql)?:\/\/\S+$/), why: "رابط الاتصال بقاعدة بيانات Postgres" },
+  AUTH_SECRET: { schema: present, why: "المفتاح السري لجلسات الدخول" },
+  GOOGLE_CLIENT_ID: { schema: present, why: "الدخول بجوجل والدرايف" },
+  GOOGLE_CLIENT_SECRET: { schema: present, why: "الدخول بجوجل والدرايف" },
+  COMPANY_VAT_NUMBER: { schema: z.string().regex(/^3\d{13}3$/), why: "خمسة عشر رقماً تبدأ بالرقم 3 وتنتهي به" },
+  DRIVE_ACCOUNTS_FOLDER_ID: { schema: present, why: "مجلد الحسابات في الدرايف" },
+  DRIVE_YEAR_2026_FOLDER_ID: { schema: present, why: "مجلد سنة ٢٠٢٦" },
+  DRIVE_YEAR_2027_FOLDER_ID: { schema: present, why: "مجلد سنة ٢٠٢٧" },
+  DEEPSEEK_API_KEY: { schema: present, why: "قراءة المستندات" },
 };
 
 /** اختياريٌّ اليوم — يُفحَص شكلُه **إن ضُبط** وحده، وغيابُه ليس مشكلة. */
 const OPTIONAL: Record<string, { schema: z.ZodType; why: string }> = {
-  TOKEN_ENCRYPTION_KEY: { schema: z.string().min(32), why: "٣٢ حرفاً فأكثر" },
-  TOKEN_ENCRYPTION_KEY_PREVIOUS: { schema: z.string().min(32), why: "٣٢ حرفاً فأكثر" },
-  DB_POOL_MAX: { schema: z.string().regex(/^([1-9]|10)$/), why: "عددٌ صحيح من ١ إلى ١٠ — وما عداه يُهمَل" },
-  AI_DAILY_BUDGET_USD: { schema: z.string().regex(/^\d+(\.\d+)?$/), why: "عددٌ بالدولار — وما لا يُقرأ يُترَك الإنفاقُ بلا سقف" },
-  DEEPSEEK_BASE_URL: { schema: z.string().regex(/^https?:\/\/\S+$/), why: "عنوانٌ يبدأ بـhttp" },
-  AUTH_URL: { schema: z.string().regex(/^https?:\/\/\S+$/), why: "عنوانٌ يبدأ بـhttp" },
+  TOKEN_ENCRYPTION_KEY: { schema: z.string().min(32), why: "٣٢ حرفاً أو أكثر" },
+  TOKEN_ENCRYPTION_KEY_PREVIOUS: { schema: z.string().min(32), why: "٣٢ حرفاً أو أكثر" },
+  DB_POOL_MAX: { schema: z.string().regex(/^([1-9]|10)$/), why: "عدد صحيح من ١ إلى ١٠، وأي قيمة أخرى تُهمل" },
+  AI_DAILY_BUDGET_USD: { schema: z.string().regex(/^\d+(\.\d+)?$/), why: "مبلغ بالدولار، وإذا تعذّرت قراءته يصبح الإنفاق بلا سقف" },
+  DEEPSEEK_BASE_URL: { schema: z.string().regex(/^https?:\/\/\S+$/), why: "رابط يبدأ بـ http" },
+  AUTH_URL: { schema: z.string().regex(/^https?:\/\/\S+$/), why: "رابط يبدأ بـ http" },
   EXTRACTION_ALLOW_ALT_PROVIDER: { schema: z.enum(["true", "false"]), why: "true أو false" },
 };
 
@@ -68,6 +68,6 @@ export function checkEnv(env: Record<string, string | undefined>): EnvProblem[] 
 /** جملةٌ عربيّة لكلّ مشكلة — لما يُعرَض للمخوَّل في فحص الصحّة. */
 export function describeEnvProblem(p: EnvProblem): string {
   return p.kind === "missing"
-    ? `${p.name} غير مضبوط (${p.why}) — يسقط ما يحتاجه عند أوّل استعمال`
-    : `${p.name} مضبوطٌ ولا يُقرأ (${p.why})`;
+    ? `${p.name} غير مضبوط (${p.why}). ستتعطّل الميزة التي تحتاجه عند أول استخدام`
+    : `${p.name} مضبوط بقيمة غير صالحة (${p.why})`;
 }

@@ -57,7 +57,7 @@ export class UploadReviewMissing extends Error {}
 export async function reviewUpload(sha256: string, originalFileName: string, edits: ReviewEdits): Promise<PipelineResult> {
   const [cached] = await db.select({ extraction: extractionCache.extraction }).from(extractionCache)
     .where(eq(extractionCache.sha256, sha256)).limit(1);
-  if (!cached) throw new UploadReviewMissing("لم تُحفظ قراءةُ هذا الملفّ — أزِله وارفعه ثانيةً");
+  if (!cached) throw new UploadReviewMissing("لم تُحفظ قراءة هذا الملف. احذفه وارفعه مرة أخرى");
   const x = applyEdits(cached.extraction as ExtractionResult, edits);
 
   const list = await loadSupplierRecords();

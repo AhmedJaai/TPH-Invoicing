@@ -16,7 +16,7 @@ describe("التحويل المعياريّ", () => {
     expect(formatQuantity(grams, "KG")).toBe("2 كيلو");
   });
 
-  it("١٠٠ مشروبٍ × ٢٠ جراماً = ٢ كجم — بلا كسرٍ عائمٍ متراكم", () => {
+  it("١٠٠ مشروب × ٢٠ جراماً = ٢ كجم — بلا كسر عائم متراكم", () => {
     /* كما يحسبها المحرّك: (كمّيّة بالمِلّي × كمّيّة المكوّن بالمِلّي) ÷ الناتج */
     const sold = 100 * 1000;
     const perDrink = 20 * 1000;
@@ -26,7 +26,7 @@ describe("التحويل المعياريّ", () => {
     expect(canonicalToQuantity(canonical, "KG")).toBe(2);
   });
 
-  it("١ كيلو = ١٬٠٠٠٬٠٠٠ مِلّي‑جرام، و١ لتر = ١٬٠٠٠٬٠٠٠ مِلّي‑مليلتر", () => {
+  it("١ كيلو = ١٬٠٠٠٬٠٠٠ ملّي‑جرام، و١ لتر = ١٬٠٠٠٬٠٠٠ ملّي‑مليلتر", () => {
     expect(toCanonical(1000, "KG")).toBe(1_000_000);
     expect(toCanonical(1000, "L")).toBe(1_000_000);
     expect(toCanonical(1000, "G")).toBe(1000);
@@ -39,14 +39,14 @@ describe("التحويل المعياريّ", () => {
   });
 });
 
-describe("لا جسرَ بين العائلات", () => {
-  it("الوزنُ لا يصير حجماً — ولا معامِلَ كثافةٍ مخترَع", () => {
+describe("لا جسر بين العائلات", () => {
+  it("الوزن لا يصير حجماً — ولا معامل كثافة مخترع", () => {
     expect(convertMilli(1000, "KG", "L")).toBeNull();
     expect(convertMilli(1000, "ML", "G")).toBeNull();
     expect(sameUnitFamily("KG", "L")).toBe(false);
   });
 
-  it("والحبّةُ ليست عبوة — عائلتان، كما في `unit-conversion.convert`", () => {
+  it("والحبّة ليست عبوة — عائلتان، كما في `unit-conversion.convert`", () => {
     expect(unitFamily("PIECE")).not.toBe(unitFamily("PACK"));
     expect(convertMilli(1000, "PACK", "PIECE")).toBeNull();
   });
@@ -58,7 +58,7 @@ describe("لا جسرَ بين العائلات", () => {
   });
 });
 
-describe("العدد العشريّ يُقرأ حروفاً لا بالفاصلة العائمة", () => {
+describe("العدد العشريّ يقرأ حروفاً لا بالفاصلة العائمة", () => {
   it("«0.333» = ٣٣٣ — لا 333.00000000000006", () => {
     expect(decimalToMilli("0.333")).toBe(333);
     expect(Number.isInteger(decimalToMilli("0.333")!)).toBe(true);
@@ -73,12 +73,12 @@ describe("العدد العشريّ يُقرأ حروفاً لا بالفاصل�
     expect(decimalToMilli("7")).toBe(7000);
   });
 
-  it("والخانةُ الرابعة تُقرِّب ولا تُقصّ — القصُّ يُنقص دائماً", () => {
+  it("والخانة الرابعة تقرّب ولا تقصّ — القصّ ينقص دائماً", () => {
     expect(decimalToMilli("0.0006")).toBe(1);
     expect(decimalToMilli("1.9999")).toBe(2000);
   });
 
-  it("وما ليس عدداً يُرجع `null` — لا صفراً", () => {
+  it("وما ليس عدداً يرجع `null` — لا صفراً", () => {
     expect(decimalToMilli("")).toBeNull();
     expect(decimalToMilli("غير معروف")).toBeNull();
     expect(decimalToMilli(null)).toBeNull();
@@ -86,7 +86,7 @@ describe("العدد العشريّ يُقرأ حروفاً لا بالفاصل�
     expect(decimalToMilli("12kg")).toBeNull();
   });
 
-  it("الأرقامُ العربيّة والفارسيّة تُقرأ — لوحةُ الجوّال تكتبها", () => {
+  it("الأرقام العربيّة والفارسيّة تقرأ — لوحة الجوّال تكتبها", () => {
     expect(decimalToMilli("٥٫٢")).toBe(5200);
     expect(decimalToMilli("۵٫۲")).toBe(5200);
     expect(decimalToMilli("٥.٢")).toBe(5200);
@@ -94,7 +94,7 @@ describe("العدد العشريّ يُقرأ حروفاً لا بالفاصل�
     expect(decimalToMilli("٥٫٢ كجم")).toBeNull();
   });
 
-  it("«5,200» لا تُخمَّن: أهي ٥٫٢ أم ٥٢٠٠؟ — تُردّ", () => {
+  it("«5,200» لا تخمّن: أهي ٥٫٢ أم ٥٢٠٠؟ — تردّ", () => {
     expect(decimalToMilli("5,200")).toBeNull();
     expect(decimalToMilli("٥,٢٠٠")).toBeNull();
     expect(isAmbiguousThousands("5,200")).toBe(true);
@@ -109,7 +109,7 @@ describe("العدد العشريّ يُقرأ حروفاً لا بالفاصل�
     expect(isAmbiguousThousands("5200")).toBe(false);
   });
 
-  it("والنصفُ يُقرَّب بعيداً عن الصفر في الجهتين", () => {
+  it("والنصف يقرّب بعيداً عن الصفر في الجهتين", () => {
     expect(roundHalfAwayFromZero(2.5)).toBe(3);
     expect(roundHalfAwayFromZero(-2.5)).toBe(-3);
     expect(roundHalfAwayFromZero(-2.4)).toBe(-2);
@@ -118,7 +118,7 @@ describe("العدد العشريّ يُقرأ حروفاً لا بالفاصل�
     expect(decimalToMilli(0.0005)).toBe(1);
   });
 
-  it("ويُكتَب إلى عمود numeric(…,3) بثلاث خانات", () => {
+  it("ويكتب إلى عمود numeric(…,3) بثلاث خانات", () => {
     expect(milliToDecimal(2500)).toBe("2.500");
     expect(milliToDecimal(1)).toBe("0.001");
     expect(milliToDecimal(-2500)).toBe("-2.500");
@@ -126,25 +126,25 @@ describe("العدد العشريّ يُقرأ حروفاً لا بالفاصل�
 });
 
 describe("العرض", () => {
-  it("المجهولُ يُكتب «غير معروف» لا صفراً", () => {
+  it("المجهول يكتب «غير معروف» لا صفراً", () => {
     expect(formatQuantity(null, "KG")).toBe("غير معروف");
     expect(formatSignedQuantity(null, "KG")).toBe("غير معروف");
   });
 
-  it("والفرقُ يُقرأ باتّجاهه قبل مقداره", () => {
+  it("والفرق يقرأ باتّجاهه قبل مقداره", () => {
     expect(formatSignedQuantity(-2_500_000, "KG")).toBe("−2.5 كيلو");
     expect(formatSignedQuantity(2_500_000, "KG")).toBe("+2.5 كيلو");
     expect(formatSignedQuantity(0, "KG")).toBe("0 كيلو");
   });
 });
 
-describe("يُعَدّ بالوحدة التي يُوزَن بها", () => {
+describe("يعدّ بالوحدة التي يوزن بها", () => {
   /*
     وحدةُ الصنف في الكتالوج وحدةُ صرفه — البنُّ بالجرام لأنّ الوصفة
     تقول «٢٠ جراماً». والميزانُ يقول «٥٫٢ كجم». فلو لزمت الصغرى لكُتب
     «٥٢٠٠»، وخطأُ صفرٍ واحد فرقٌ بعشرة أضعاف لا يُرى إلّا في التقرير.
   */
-  it("الوزنُ جرامٌ وكيلو، والحجمُ مليلترٌ ولتر", () => {
+  it("الوزن جرام وكيلو، والحجم مليلتر ولتر", () => {
     expect(unitChoices("G")).toEqual(["G", "KG"]);
     expect(unitChoices("KG")).toEqual(["G", "KG"]);
     expect(unitChoices("ML")).toEqual(["ML", "L"]);
@@ -152,12 +152,12 @@ describe("يُعَدّ بالوحدة التي يُوزَن بها", () => {
   });
 
   /* ولا معامِلَ بين حبّةٍ وعبوة، فلا خيارَ فيهما */
-  it("وما لا ثانيَ له تبقى وحدتُه وحدها", () => {
+  it("وما لا ثاني له تبقى وحدته وحدها", () => {
     expect(unitChoices("PIECE")).toEqual(["PIECE"]);
     expect(unitChoices("PACK")).toEqual(["PACK"]);
   });
 
-  it("والرقمُ المكتوب بالكيلو يصير مِلّي‑جرامٍ في الخادم", () => {
+  it("والرقم المكتوب بالكيلو يصير ملّي‑جرام في الخادم", () => {
     /* ‏٥٫٢ كجم */
     expect(toCanonical(decimalToMilli("5.2")!, "KG")).toBe(5_200_000);
     /* وهو عينُ ٥٢٠٠ جراماً */

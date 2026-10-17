@@ -41,14 +41,14 @@ export async function POST(request: Request) {
   try {
     parsed = Body.safeParse(await request.json());
   } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب." }, { status: 400 });
+    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
   }
-  if (!parsed.success) return NextResponse.json({ error: "الطلب غير مفهوم." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "الطلب غير صالح." }, { status: 400 });
   try {
     const seenAt = await markNoticesSeen(user.id);
     return NextResponse.json({ seenAt });
   } catch (e) {
     console.error("[notifications] POST", e);
-    return NextResponse.json({ error: "تعذّر حفظ القراءة — لم يتغيّر شيء." }, { status: 500 });
+    return NextResponse.json({ error: "تعذّر حفظ حالة القراءة، ولم يتغيّر شيء." }, { status: 500 });
   }
 }

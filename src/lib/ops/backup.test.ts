@@ -22,10 +22,10 @@ const cat: Catalog = {
   triggers: [{ sch: "public", name: "invoices_month_lock", def: "CREATE TRIGGER invoices_month_lock BEFORE INSERT ON public.invoices FOR EACH ROW EXECUTE FUNCTION month_lock()" }],
 };
 
-describe("مولِّد النسخة", () => {
+describe("مولّد النسخة", () => {
   const { pre, post } = buildSchemaSql(cat);
 
-  it("السطر الأوّل يُطفئ فحص أجسام الدوالّ — وإلّا سقطت الاستعادة عند month_is_closed", () => {
+  it("السطر الأوّل يطفئ فحص أجسام الدوالّ — وإلّا سقطت الاستعادة عند month_is_closed", () => {
     expect(pre.split("\n")[0]).toBe(PRE_DATA_PREAMBLE);
     expect(PRE_DATA_PREAMBLE).toBe("set check_function_bodies = off;");
   });
@@ -35,7 +35,7 @@ describe("مولِّد النسخة", () => {
     expect(pre.indexOf("create type")).toBeLessThan(pre.indexOf("create table"));
   });
 
-  it("القيود والفهارس والمؤثِّرات بعد البيانات لا قبلها", () => {
+  it("القيود والفهارس والمؤثّرات بعد البيانات لا قبلها", () => {
     for (const s of ["PRIMARY KEY", "CREATE INDEX", "CREATE TRIGGER"]) {
       expect(pre).not.toContain(s);
       expect(post).toContain(s);
@@ -47,7 +47,7 @@ describe("مولِّد النسخة", () => {
     expect(BACKUP_SECTIONS).toEqual(["schema-pre-data.sql", "data", "schema-post-data.sql", "manifest.json"]);
   });
 
-  it("رموز جوجل لا تُنسَخ، والجلسات لا تُنسَخ", () => {
+  it("رموز جوجل لا تنسخ، والجلسات لا تنسخ", () => {
     const accounts = tableSelect(`"public"."accounts"`, ["id", "refresh_token", "access_token", "id_token", "provider"]);
     expect(accounts).toContain('null::text as "refresh_token"');
     expect(accounts).toContain('null::text as "access_token"');
@@ -57,11 +57,11 @@ describe("مولِّد النسخة", () => {
     expect(tableSelect(`"public"."invoices"`, ["id"])).toBe(`select "id" from "public"."invoices"`);
   });
 
-  it("البصمة تُحسب على التعبير نفسه الذي نُسخ به", () => {
+  it("البصمة تحسب على التعبير نفسه الذي نسخ به", () => {
     expect(contentHashSql(`"public"."accounts"`, ["refresh_token"])).toContain(tableSelect(`"public"."accounts"`, ["refresh_token"]));
   });
 
-  it("الجدول الغائب بعد الاستعادة لا يُعدّ مطابقاً", () => {
+  it("الجدول الغائب بعد الاستعادة لا يعدّ مطابقاً", () => {
     const res = compareTables(
       { tables: { a: { n: 2, h: "x" }, b: { n: 0, h: "y" }, c: { n: 1, h: "z" } } },
       { a: { n: 2, h: "x" }, c: { n: 1, h: "other" } },

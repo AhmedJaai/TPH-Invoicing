@@ -16,7 +16,7 @@ function line(over: Partial<PurchaseLineInput> = {}): PurchaseLineInput {
   };
 }
 
-describe("كمّيّةُ الشراء من مواصفة العبوة", () => {
+describe("كمّيّة الشراء من مواصفة العبوة", () => {
   it("كرتونان × ١٢ × ١ لتر = ٢٤ لتراً", () => {
     const q = purchaseQuantity(
       line({ qty: "2", packSize: "12", contentUnit: "L", contentQuantity: "1" }),
@@ -27,7 +27,7 @@ describe("كمّيّةُ الشراء من مواصفة العبوة", () => {
     expect(canonicalToQuantity(q.canonicalMilli, "L")).toBe(24);
   });
 
-  it("وكيسُ ٥ كجم يُقرأ ٥ كجم", () => {
+  it("وكيس ٥ كجم يقرأ ٥ كجم", () => {
     const q = purchaseQuantity(
       line({ qty: "4", packSize: "1", contentUnit: "KG", contentQuantity: "5" }),
       "KG",
@@ -35,7 +35,7 @@ describe("كمّيّةُ الشراء من مواصفة العبوة", () => {
     expect(q.known && canonicalToQuantity(q.canonicalMilli, "KG")).toBe(20);
   });
 
-  it("ويُحوَّل داخل العائلة: ٥٠٠ جرامٍ × ٦ إلى وحدة الكيلو", () => {
+  it("ويحوّل داخل العائلة: ٥٠٠ جرام × ٦ إلى وحدة الكيلو", () => {
     const q = purchaseQuantity(
       line({ qty: "1", packSize: "6", contentUnit: "G", contentQuantity: "500" }),
       "KG",
@@ -44,29 +44,29 @@ describe("كمّيّةُ الشراء من مواصفة العبوة", () => {
   });
 });
 
-describe("المجهولُ لا يُخمَّن", () => {
-  it("بلا مواصفة عبوةٍ لا كمّيّة — ولا يُفترَض واحد", () => {
+describe("المجهول لا يخمّن", () => {
+  it("بلا مواصفة عبوة لا كمّيّة — ولا يفترض واحد", () => {
     expect(purchaseQuantity(line({ packSize: null }), "KG")).toEqual({ known: false, reason: "NO_PACK_SPEC" });
     expect(purchaseQuantity(line({ contentUnit: null }), "KG")).toEqual({ known: false, reason: "NO_PACK_SPEC" });
     expect(purchaseQuantity(line({ contentQuantity: null }), "KG")).toEqual({ known: false, reason: "NO_PACK_SPEC" });
   });
 
-  it("وبلا كمّيّةٍ مقروءةٍ في الفاتورة لا كمّيّة", () => {
+  it("وبلا كمّيّة مقروءة في الفاتورة لا كمّيّة", () => {
     expect(purchaseQuantity(line({ qty: null }), "KG")).toEqual({ known: false, reason: "MISSING_QUANTITY" });
     expect(purchaseQuantity(line({ qty: "غير مقروء" }), "KG")).toEqual({ known: false, reason: "MISSING_QUANTITY" });
   });
 
-  it("ولترٌ لا يصير كيلو — عائلتان", () => {
+  it("ولتر لا يصير كيلو — عائلتان", () => {
     expect(purchaseQuantity(line({ contentUnit: "L" }), "KG"))
       .toEqual({ known: false, reason: "UNIT_FAMILY_MISMATCH" });
   });
 
-  it("وبندٌ غير مربوطٍ بصنفٍ معياريّ يخرج بسببه", () => {
+  it("وبند غير مربوط بصنف معياريّ يخرج بسببه", () => {
     expect(purchaseQuantity(line({ productId: null }), "KG"))
       .toEqual({ known: false, reason: "UNLINKED_PRODUCT" });
   });
 
-  it("**ولا تُشتقّ كمّيّةٌ من مبلغٍ بالريال**", () => {
+  it("**ولا تشتقّ كمّيّة من مبلغ بالريال**", () => {
     /*
       لو خُمّنت الكمّيّة من المبلغ لكان لهذا السطر «١٠ كجم» بسعرٍ سابق.
       والرقمُ الناتج يبدو دقيقاً وهو مخترَع، ثمّ يُبنى عليه فرقُ جردٍ
@@ -77,10 +77,10 @@ describe("المجهولُ لا يُخمَّن", () => {
   });
 });
 
-describe("تجميعُ مشتريات الفترة", () => {
+describe("تجميع مشتريات الفترة", () => {
   const baseUnit = () => "KG" as const;
 
-  it("يجمع ما عُرف، ويفصل ما لم يُعرَف بعدده ومبلغه", () => {
+  it("يجمع ما عرف، ويفصل ما لم يعرف بعدده ومبلغه", () => {
     const s = summarisePurchases(
       [
         line({ lineId: "a", qty: "2", packSize: "1", contentUnit: "KG", contentQuantity: "5", lineTotalMinor: 200_00 }),
@@ -101,7 +101,7 @@ describe("تجميعُ مشتريات الفترة", () => {
 });
 
 describe("الكلفة", () => {
-  it("متوسّطٌ مرجَّح لكلفة وحدة الأساس", () => {
+  it("متوسّط مرجّح لكلفة وحدة الأساس", () => {
     const s = summarisePurchases(
       [
         line({ lineId: "a", qty: "1", packSize: "1", contentUnit: "KG", contentQuantity: "10", lineTotalMinor: 500_00 }),
@@ -113,12 +113,12 @@ describe("الكلفة", () => {
     expect(unitCostMilliMinor(s.byProduct.get("p-coffee"), "KG", null)).toBe(60_00 * 1000);
   });
 
-  it("وبلا مشترياتٍ صالحةٍ تُؤخَذ الكلفةُ السابقة — وإلّا `null` لا صفر", () => {
+  it("وبلا مشتريات صالحة تؤخذ الكلفة السابقة — وإلّا `null` لا صفر", () => {
     expect(unitCostMilliMinor(undefined, "KG", 75_00 * 1000)).toBe(75_00 * 1000);
     expect(unitCostMilliMinor(undefined, "KG", null)).toBeNull();
   });
 
-  it("وكلفةُ الفرق عددٌ صحيح بالهللات، و`null` حين تُجهَل الكلفة", () => {
+  it("وكلفة الفرق عدد صحيح بالهللات، و`null` حين تجهل الكلفة", () => {
     /* ‑٢٫٥ كجم × ٧٥ ريالاً = ‑١٨٧٫٥٠ */
     expect(varianceCostMinor(-2_500_000, 75_00 * 1000, "KG")).toBe(-187_50);
     expect(varianceCostMinor(-2_500_000, null, "KG")).toBeNull();
@@ -133,7 +133,7 @@ describe("الكلفة", () => {
     **خمسةُ ريالاتٍ تضيع في كلّ كرتون، ٦٪**. وبالمِلّي تعود ٨٥
     بالضبط.
   */
-  it("ومعدَّلٌ كسريّ — ٢٫١٢٥ هللة للمصّاصة — يعود تامّاً على الكرتون", () => {
+  it("ومعدّل كسريّ — ٢٫١٢٥ هللة للمصّاصة — يعود تامّاً على الكرتون", () => {
     const rate = Math.round((85_00 * 1000) / 4000);
     expect(rate).toBe(2_125);
     expect(varianceCostMinor(4000 * 1000, rate, "PIECE")).toBe(85_00);
@@ -141,19 +141,19 @@ describe("الكلفة", () => {
     expect(varianceCostMinor(4000 * 1000, Math.round(rate / 1000) * 1000, "PIECE")).toBe(80_00);
   });
 
-  it("وعددُ وحدات الأساس يُحسَب من المعياريّ", () => {
+  it("وعدد وحدات الأساس يحسب من المعياريّ", () => {
     expect(quantityInBaseUnits(2_000_000, "KG")).toBe(2);
     expect(quantityInBaseUnits(2_000_000, "G")).toBe(2000);
   });
 });
 
-describe("الصفرُ ليس كمّيّة، والسالبُ مرتجعٌ يُسمّى", () => {
-  it("بندٌ كمّيّتُه صفر «لم تُقرأ كمّيّتُه» — لا مشترياتٌ معروفةٌ بصفر", () => {
+describe("الصفر ليس كمّيّة، والسالب مرتجع يسمّى", () => {
+  it("بند كمّيّته صفر «لم تقرأ كمّيّته» — لا مشتريات معروفة بصفر", () => {
     expect(purchaseQuantity(line({ qty: "0" }), "KG")).toEqual({ known: false, reason: "MISSING_QUANTITY" });
     expect(purchaseQuantity(line({ qty: "0.000" }), "KG")).toEqual({ known: false, reason: "MISSING_QUANTITY" });
   });
 
-  it("والسالبُ يُنقص المشتريات ويُحفَظ مقدارُه مرتجعاً", () => {
+  it("والسالب ينقص المشتريات ويحفظ مقداره مرتجعاً", () => {
     const s = summarisePurchases(
       [
         line({ lineId: "a", qty: "10", lineTotalMinor: 450_000 }),
@@ -168,20 +168,20 @@ describe("الصفرُ ليس كمّيّة، والسالبُ مرتجعٌ يُ�
   });
 });
 
-describe("الضربُ لا يتجاوز العددَ الآمن بصمت", () => {
-  it("ما جاوز العددَ الصحيح الآمن «لم تُقرأ كمّيّتُه»", () => {
+describe("الضرب لا يتجاوز العدد الآمن بصمت", () => {
+  it("ما جاوز العدد الصحيح الآمن «لم تقرأ كمّيّته»", () => {
     /* ‏١٠٠٬٠٠٠ كرتون × ١٠٠٠ × ١٠٠٠ لتر — خطأُ قراءةٍ لا شراء */
     expect(purchaseQuantity(line({ qty: "100000", packSize: "1000", contentUnit: "L", contentQuantity: "1000" }), "L"))
       .toEqual({ known: false, reason: "MISSING_QUANTITY" });
   });
 
-  it("وما دونه يُحسَب بالضبط حيث كانت العائمةُ تُخطئ", () => {
+  it("وما دونه يحسب بالضبط حيث كانت العائمة تخطئ", () => {
     /* ‏٩٠٠٧ × ١٠٠٠ × ١٠٠٠٫٠٠١ مل: حاصلُ الضرب ‏≈9×10^18 قبل القسمة */
     const q = purchaseQuantity(line({ qty: "9007", packSize: "1000", contentUnit: "ML", contentQuantity: "1000.001" }), "ML");
     expect(q).toEqual({ known: true, canonicalMilli: 9_007_009_007_000 });
   });
 
-  it("والكسرُ يُقرَّب نصفُه بعيداً عن الصفر", () => {
+  it("والكسر يقرّب نصفه بعيداً عن الصفر", () => {
     /* ‏٠٫٠٠١ × ٠٫٥ × ١ جرام = ‏٠٫٠٠٠٥ جرام = نصفُ مِلّي‑جرام */
     expect(purchaseQuantity(line({ qty: "0.001", packSize: "0.5", contentUnit: "G", contentQuantity: "1" }), "G"))
       .toEqual({ known: true, canonicalMilli: 1 });
@@ -190,8 +190,8 @@ describe("الضربُ لا يتجاوز العددَ الآمن بصمت", () =
   });
 });
 
-describe("كلفةُ الفرق: نقصٌ وزيادةٌ متساويان يتقاصّان", () => {
-  it("−٠٫٥ هللة و+٠٫٥ هللة مجموعُهما صفر", () => {
+describe("كلفة الفرق: نقص وزيادة متساويان يتقاصّان", () => {
+  it("−٠٫٥ هللة و+٠٫٥ هللة مجموعهما صفر", () => {
     /* ‏٥ مِلّي‑كيلو بـ١٠٠ هللة للكيلو = نصفُ هللة */
     const up = varianceCostMinor(5_000, 100_000, "KG");
     const down = varianceCostMinor(-5_000, 100_000, "KG");

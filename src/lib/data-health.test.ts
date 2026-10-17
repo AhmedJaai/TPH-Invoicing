@@ -18,7 +18,7 @@ describe("buildDataHealth", () => {
     expect(get(h, "lines").state).toBe("GOOD");
   });
 
-  it("البنود الناقصة تُخفض التغطية وتُعلَن بنسبتها", () => {
+  it("البنود الناقصة تخفض التغطية وتعلن بنسبتها", () => {
     const h = buildDataHealth({ ...full, invoicesWithLines: 48 });
     const m = get(h, "lines");
     expect(m.state).toBe("PARTIAL");
@@ -26,7 +26,7 @@ describe("buildDataHealth", () => {
     expect(m.detail).toContain("38٪");
   });
 
-  it("المبيعات غير موصولة — لا تُملأ بصفر", () => {
+  it("المبيعات غير موصولة — لا تملأ بصفر", () => {
     const m = get(buildDataHealth(full), "sales");
     expect(m.state).toBe("NOT_CONNECTED");
     expect(m.coverage).toBeNull();
@@ -39,7 +39,7 @@ describe("buildDataHealth", () => {
     expect(h.confidence).toBeGreaterThan(0.9);
   });
 
-  it("كل بند ناقص يحمل خطوة تُصلحه", () => {
+  it("كل بند ناقص يحمل خطوة تصلحه", () => {
     const h = buildDataHealth({ ...full, invoicesWithLines: 10, invoicesWithTaxDetail: 10, unclassifiedBankTx: 40 });
     for (const m of h.metrics) {
       if (m.state === "PARTIAL" || m.state === "MISSING") expect(m.action, m.id).toBeTruthy();
@@ -62,7 +62,7 @@ describe("buildDataHealth", () => {
     expect(get(h, "invoices").state).toBe("MISSING");
   });
 
-  it("الحركات غير المصنَّفة تُعلَن بعددها", () => {
+  it("الحركات غير المصنّفة تعلن بعددها", () => {
     const m = get(buildDataHealth({ ...full, unclassifiedBankTx: 8 }), "bank-classified");
     expect(m.detail).toContain("8");
     expect(m.state).toBe("GOOD"); // ٨ من ١٤٢٨ تغطية عالية

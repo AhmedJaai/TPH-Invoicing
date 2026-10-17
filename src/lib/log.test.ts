@@ -5,7 +5,7 @@ const AT = new Date("2026-10-10T08:00:00.000Z");
 const parse = (line: string) => JSON.parse(line) as Record<string, unknown>;
 
 describe("describeError", () => {
-  it("يقصّ قيمَ الإدخال من رسالة Drizzle ومن أثرها — المبالغُ والأسماءُ لا تدخل السجلّ", () => {
+  it("يقصّ قيم الإدخال من رسالة Drizzle ومن أثرها — المبالغ والأسماء لا تدخل السجلّ", () => {
     const e = new Error('Failed query: insert into "payments" ("amount_minor","payee") values ($1,$2)\nparams: 150000,مؤسسة عمار');
     const facts = describeError(e);
     expect(facts.message).toContain("Failed query");
@@ -13,7 +13,7 @@ describe("describeError", () => {
     expect(JSON.stringify(facts)).not.toContain("عمار");
   });
 
-  it("رمزُ القاعدة يُؤخَذ من السبب حين يلفّه Drizzle، ورسالةُ السبب تُلحَق", () => {
+  it("رمز القاعدة يؤخذ من السبب حين يلفّه Drizzle، ورسالة السبب تلحق", () => {
     const cause = Object.assign(new Error("duplicate key value violates unique constraint"), { code: "23505" });
     const e = Object.assign(new Error("Failed query: insert …\nparams: 1,2"), { cause });
     expect(describeError(e)).toMatchObject({ code: "23505" });
@@ -21,34 +21,34 @@ describe("describeError", () => {
     expect(describeError(e).message).not.toContain("params");
   });
 
-  it("الأثرُ أربعةُ أسطرٍ في سطر، والرسالةُ ثلاثمئة حرفٍ على الأكثر", () => {
+  it("الأثر أربعة أسطر في سطر، والرسالة ثلاثمئة حرف على الأكثر", () => {
     const facts = describeError(new Error("x".repeat(900)));
     expect(facts.message).toHaveLength(300);
     expect(facts.stack?.split(" | ").length).toBeLessThanOrEqual(4);
     expect(facts.stack).not.toContain("\n");
   });
 
-  it("وما ليس خطأً يُوصَف ولا يرمي", () => {
+  it("وما ليس خطأً يوصف ولا يرمي", () => {
     expect(describeError("انقطع")).toEqual({ message: "انقطع" });
     expect(describeError(null)).toEqual({ message: "null" });
     expect(describeError(undefined)).toEqual({ message: "undefined" });
-    expect(describeError({})).toEqual({ message: "خطأٌ بلا رسالة" });
+    expect(describeError({})).toEqual({ message: "خطأ بلا رسالة" });
     expect(describeError(Object.assign(new TypeError("لا"), { code: "ECONNRESET" }))).toMatchObject({ name: "TypeError", code: "ECONNRESET" });
   });
 });
 
 describe("formatLogLine", () => {
-  it("سطرٌ واحد JSON: الحدثُ ووقتُه ثمّ الحقول", () => {
+  it("سطر واحد JSON: الحدث ووقته ثمّ الحقول", () => {
     const line = formatLogLine("slow-query", { durationMs: 812, route: "/api/bank-import" }, AT);
     expect(line).not.toContain("\n");
     expect(parse(line)).toEqual({ kind: "slow-query", at: "2026-10-10T08:00:00.000Z", durationMs: 812, route: "/api/bank-import" });
   });
 
-  it("الحقولُ لا تغلب اسمَ الحدث ولا وقتَه", () => {
+  it("الحقول لا تغلب اسم الحدث ولا وقته", () => {
     expect(parse(formatLogLine("a", { kind: "b", at: "أمس" }, AT))).toEqual({ kind: "a", at: AT.toISOString() });
   });
 
-  it("الأسرارُ تُحجَب باسم الحقل — كعكةٌ ورمزٌ وآيبان", () => {
+  it("الأسرار تحجب باسم الحقل — كعكة ورمز وآيبان", () => {
     const got = parse(formatLogLine("x", {
       cookie: "session=abc", Authorization: "Bearer s3cr3t", apiKey: "sk-1", iban: "SA0380000000608010167519",
       nested: { refreshToken: "r-1", ok: 1 },
@@ -57,7 +57,7 @@ describe("formatLogLine", () => {
     expect(got.nested).toEqual({ refreshToken: "[محجوب]", ok: 1 });
   });
 
-  it("الخطأُ في حقلٍ يُختصَر، والنصُّ الطويل يُقصّ، والكائنُ العميق لا يُصبّ", () => {
+  it("الخطأ في حقل يختصر، والنصّ الطويل يقصّ، والكائن العميق لا يصبّ", () => {
     const got = parse(formatLogLine("x", {
       error: new Error("Failed query: select 1\nparams: 99"),
       long: "ن".repeat(2_000),
@@ -76,7 +76,7 @@ describe("formatLogLine", () => {
     expect("fn" in got).toBe(false);
   });
 
-  it("ومرجعٌ دائريّ لا يُسقط السطر", () => {
+  it("ومرجع دائريّ لا يسقط السطر", () => {
     const loop: Record<string, unknown> = { a: 1 };
     loop.self = loop;
     expect(parse(formatLogLine("x", { loop }, AT))).toMatchObject({ kind: "x", loop: { a: 1, self: "[كائن]" } });

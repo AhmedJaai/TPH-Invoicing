@@ -41,11 +41,11 @@ export function planImport(parsed: ParsedFileName, hasSupplier: boolean): Import
   const notes: string[] = [];
   const documentKind = KIND_FROM_NAME[parsed.kind] ?? "UNKNOWN";
 
-  if (!hasSupplier && parsed.slug) notes.push(`المورد ${parsed.slug} غير مسجّل`);
-  if (parsed.amountMinor === undefined) notes.push("لا مبلغ في الاسم — سُجّل مستنداً بلا قيد");
-  if (parsed.monthOnly) notes.push("الاسم يحمل الشهر بلا يوم");
-  if (parsed.kind === "INVOICE" && !parsed.invoiceNumber) notes.push("فاتورة بلا رقم في الاسم");
-  if (parsed.kind === "SALES_INVOICE") notes.push("فاتورة صادرة منّا — لا تدخل المشتريات");
+  if (!hasSupplier && parsed.slug) notes.push(`المورّد ${parsed.slug} غير مسجّل`);
+  if (parsed.amountMinor === undefined) notes.push("لا يوجد مبلغ في الاسم، فسيُسجَّل المستند بلا قيد");
+  if (parsed.monthOnly) notes.push("الاسم يحتوي على الشهر دون اليوم");
+  if (parsed.kind === "INVOICE" && !parsed.invoiceNumber) notes.push("لا يوجد رقم فاتورة في الاسم");
+  if (parsed.kind === "SALES_INVOICE") notes.push("فاتورة صادرة منّا، فلا تدخل ضمن المشتريات");
 
   const hasAmount = parsed.amountMinor !== undefined;
 

@@ -306,14 +306,14 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
     setActive(movePaletteCursor(rows.map(groupOf), current, key));
   }
 
-  const GROUP_LABEL: Record<string, string> = { ...COMMAND_GROUP_LABEL, RECORDS: "في سجلّاتك", RECENT: "فتحتَها مؤخّراً" };
+  const GROUP_LABEL: Record<string, string> = { ...COMMAND_GROUP_LABEL, RECORDS: "في سجلّاتك", RECENT: "فتحتها مؤخراً" };
 
   const intentLine =
-    intent?.kind === "AMOUNT" && intent.amountMinor !== undefined ? <>يبحث عن مبلغ <Money minor={intent.amountMinor} /> ± ريال في الفواتير والحركات</>
-    : intent?.kind === "NUMBER" ? <>يبحث عن رقم <bdi dir="ltr" className="font-mono">{intent.term}</bdi> في الفواتير والمراجع</>
-    : intent?.kind === "MONTH" ? <>يبحث في شهر <bdi dir="ltr">{intent.term}</bdi></>
-    : intent?.kind === "DATE" ? <>يبحث في يوم <bdi dir="ltr">{intent.term}</bdi></>
-    : intent?.kind === "VAT" ? <>يبحث عن رقمٍ ضريبيّ بين المورّدين</>
+    intent?.kind === "AMOUNT" && intent.amountMinor !== undefined ? <>بحث عن مبلغ <Money minor={intent.amountMinor} /> ± ريال في الفواتير والحركات</>
+    : intent?.kind === "NUMBER" ? <>بحث عن رقم <bdi dir="ltr" className="font-mono">{intent.term}</bdi> في الفواتير والمراجع</>
+    : intent?.kind === "MONTH" ? <>بحث في شهر <bdi dir="ltr">{intent.term}</bdi></>
+    : intent?.kind === "DATE" ? <>بحث في يوم <bdi dir="ltr">{intent.term}</bdi></>
+    : intent?.kind === "VAT" ? <>بحث عن رقم ضريبي بين المورّدين</>
     : null;
 
   return (
@@ -334,13 +334,13 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
           enterKeyHint="search"
           autoComplete="off"
           dir="rtl"
-          aria-label="ابحث أو اكتب فعلاً"
+          aria-label="ابحث أو اكتب أمراً"
           role="combobox"
           aria-expanded
           aria-controls="palette-results"
           aria-autocomplete="list"
           aria-activedescendant={rows.length > 0 ? `palette-row-${current}` : undefined}
-          placeholder={canSearch ? "مورّد، رقم فاتورة، مبلغ — أو فعلٌ مثل «أقفل الشهر»" : "اكتب فعلاً أو صفحة"}
+          placeholder={canSearch ? "مورّد، رقم فاتورة، مبلغ، أو أمر مثل «أقفل الشهر»" : "اكتب أمراً أو اسم صفحة"}
           className="palette-input min-h-14 w-full bg-transparent py-4 text-[15px] placeholder:text-muted"
         />
         {busy ? (
@@ -353,7 +353,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
       {asking && (
         <div className="border-b border-line-soft bg-accent-soft/50 px-4 py-3" role="status">
           {shownAnswer === null ? (
-            <p className="text-xs text-muted">يحسب الجواب…</p>
+            <p className="text-xs text-muted">جارٍ حساب الجواب…</p>
           ) : shownAnswer.state === "ANSWER" ? (
             <Link href={shownAnswer.href} onClick={() => close()} className="group block">
               <span className="block text-[11px] font-bold text-ink-soft">{shownAnswer.label}</span>
@@ -361,9 +361,9 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
               <span className="mt-0.5 block text-[11px] text-muted">{shownAnswer.basis} · <span className="font-bold text-accent group-hover:underline">افتح مصدره</span></span>
             </Link>
           ) : shownAnswer.state === "AMBIGUOUS" ? (
-            <p className="text-xs leading-relaxed text-ink-soft">أيَّهم تقصد؟ {shownAnswer.names.join(" · ")} — اكتب الاسمَ أتمّ.</p>
+            <p className="text-xs leading-relaxed text-ink-soft">أيهم تقصد؟ {shownAnswer.names.join(" · ")}. اكتب الاسم كاملاً.</p>
           ) : shownAnswer.state === "UNKNOWN_SUPPLIER" ? (
-            <p className="text-xs leading-relaxed text-ink-soft">لا مورّدَ مسجَّلاً باسمٍ فيه «{shownAnswer.text}» — فلا رقمَ يُقال.</p>
+            <p className="text-xs leading-relaxed text-ink-soft">لا يوجد مورّد مسجّل باسم فيه «{shownAnswer.text}»، فلا يوجد رقم لعرضه.</p>
           ) : shownAnswer.state === "FAILED" ? (
             <p className="text-xs font-bold text-danger">{shownAnswer.error}</p>
           ) : null}
@@ -375,7 +375,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
       )}
 
       <p className="sr-only" aria-live="polite">
-        {busy ? "يبحث" : failed ? "تعذّر البحث" : `${rows.length} نتيجة`}
+        {busy ? "جارٍ البحث" : failed ? "تعذّر البحث" : `${rows.length} نتيجة`}
       </p>
 
       <ul id="palette-results" ref={listRef} role="listbox" aria-label="النتائج" className="max-h-[min(62vh,30rem,calc(var(--vvh,100dvh)-8.5rem))] overflow-y-auto overscroll-contain py-2">
@@ -415,19 +415,19 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
         })}
       </ul>
 
-      {searching && busy && hits.length === 0 && rows.length === 0 && <p className="px-4 pb-4 text-xs text-muted">يبحث في سجلّاتك…</p>}
+      {searching && busy && hits.length === 0 && rows.length === 0 && <p className="px-4 pb-4 text-xs text-muted">جارٍ البحث في سجلّاتك…</p>}
       {failed && <p className="px-4 pb-3 text-xs text-danger">تعذّر البحث في السجلّات: {failed}</p>}
       {rows.length === 0 && !busy && !asking && (
         <p className="px-4 py-8 text-center text-xs text-muted">
-          لا شيء يطابق «{q}».{canSearch && " جرّب رقم فاتورة أو مبلغاً أو اسم مورّد."}
+          لا توجد نتائج تطابق «{q}».{canSearch && " جرّب رقم فاتورة أو مبلغاً أو اسم مورّد."}
         </p>
       )}
 
       <div className="hidden items-center gap-4 border-t border-line bg-sunken/50 px-4 py-2.5 text-[11px] text-muted sm:flex">
-        <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> للتنقّل</span>
+        <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> للتنقل</span>
         <span className="flex items-center gap-1"><Kbd>Tab</Kbd> للمجموعة التالية</span>
         <span className="flex items-center gap-1"><Kbd>↵</Kbd> للفتح</span>
-        <span className="ms-auto flex items-center gap-1"><Kbd>?</Kbd> كلُّ الاختصارات</span>
+        <span className="ms-auto flex items-center gap-1"><Kbd>?</Kbd> كل الاختصارات</span>
       </div>
     </dialog>
   );

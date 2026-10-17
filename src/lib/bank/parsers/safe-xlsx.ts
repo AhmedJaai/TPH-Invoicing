@@ -118,7 +118,7 @@ export function readWorkbookSafely(buffer: Buffer, options: ReadOptions = {}): S
 
   const names = wb.SheetNames.slice(0, MAX_SHEETS);
   if (wb.SheetNames.length > MAX_SHEETS) {
-    warnings.push(`الملفّ فيه ${wb.SheetNames.length} ورقة، وقُرئت ${MAX_SHEETS} منها.`);
+    warnings.push(`الملف فيه ${wb.SheetNames.length} ورقة، وقُرئت ${MAX_SHEETS} منها.`);
   }
 
   const sheets: SafeSheet[] = names.map((name) => {
@@ -145,14 +145,14 @@ export function readWorkbookSafely(buffer: Buffer, options: ReadOptions = {}): S
     });
 
     if (rowsTruncated) {
-      warnings.push(`الورقة «${name}» أطول من ${MAX_ROWS} صفّاً — قُرئ أوّلُها فقط.`);
+      warnings.push(`الورقة «${name}» أطول من ${MAX_ROWS} صفاً، فقُرئت الصفوف الأولى فقط.`);
     }
     /* القصّ يُعلَن — وصفٌ مبتور بلا علمٍ يُطابَق على ما ليس فيه */
     if (cellsTruncated > 0) {
-      warnings.push(`في الورقة «${name}» ${cellsTruncated} خليّةٌ أطول من ${MAX_CELL_CHARS} حرفاً — قُصّت.`);
+      warnings.push(`في الورقة «${name}» ${cellsTruncated} خلية أطول من ${MAX_CELL_CHARS} حرفاً، فقُصّ نصّها.`);
     }
     if (colsTruncated) {
-      warnings.push(`الورقة «${name}» أعرض من ${MAX_COLS} عموداً — قُرئ أوّلُها فقط.`);
+      warnings.push(`الورقة «${name}» أعرض من ${MAX_COLS} عموداً، فقُرئت الأعمدة الأولى فقط.`);
     }
 
     let rawGrid: string[][] | undefined;

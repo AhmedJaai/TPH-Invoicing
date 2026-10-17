@@ -64,7 +64,7 @@ describe("رقم ضريبي لمنشأة أخرى", () => {
 });
 
 describe("عرض السعر والمسودة", () => {
-  it("لا يُقيَّد كفاتورة", () => {
+  it("لا يقيّد كفاتورة", () => {
     const r = validateInvoice({
       kind: "QUOTATION", invoiceNumber: "Q-1",
       sellerVat: "310111111100003", buyerVat: COMPANY_VAT,
@@ -108,7 +108,7 @@ describe("الأصل الثابت", () => {
     expect(codes(r)).toContain(ISSUE.POSSIBLE_FIXED_ASSET);
   });
 
-  it("لا يرفعه لصافٍ تحت الحد ولو تجاوز المجموع الحد بالضريبة", () => {
+  it("لا يرفعه لصاف تحت الحد ولو تجاوز المجموع الحد بالضريبة", () => {
     const r = validateInvoice({
       kind: "TAX_INVOICE", invoiceNumber: "99",
       sellerVat: "310111111100003", buyerVat: COMPANY_VAT,
@@ -160,7 +160,7 @@ describe("المجهول لا يصير صفراً", () => {
     totalMinor: 11_500,
   };
 
-  it("ضريبةٌ لم تُقرأ ← الحالة مجهولة لا غير صالحة", () => {
+  it("ضريبة لم تقرأ ← الحالة مجهولة لا غير صالحة", () => {
     const r = validateInvoice(
       { ...complete, subtotalMinor: null, vatMinor: null },
       { companyVat: COMPANY },
@@ -169,7 +169,7 @@ describe("المجهول لا يصير صفراً", () => {
     expect(r.inputVatStatus).toBe("UNKNOWN");
   });
 
-  it("ضريبةٌ قُرئت وكانت صفراً ← غير صالحة، والفرق مقصود", () => {
+  it("ضريبة قرئت وكانت صفراً ← غير صالحة، والفرق مقصود", () => {
     const r = validateInvoice(
       { ...complete, subtotalMinor: 11_500, vatMinor: 0 },
       { companyVat: COMPANY },
@@ -186,7 +186,7 @@ describe("المجهول لا يصير صفراً", () => {
     expect(r.findings.some((f) => f.code === "TAX_STATUS_UNKNOWN")).toBe(true);
   });
 
-  it("ركنٌ ناقص معلوم يسبق الجهل: بلا رقم ضريبي للمشتري ← غير صالحة لا مجهولة", () => {
+  it("ركن ناقص معلوم يسبق الجهل: بلا رقم ضريبي للمشتري ← غير صالحة لا مجهولة", () => {
     const r = validateInvoice(
       { ...complete, buyerVat: null, subtotalMinor: null, vatMinor: null },
       { companyVat: COMPANY },
@@ -194,7 +194,7 @@ describe("المجهول لا يصير صفراً", () => {
     expect(r.taxStatus).toBe("INVALID");
   });
 
-  it("عرض السعر لا يُقيَّد أصلاً ← NOT_APPLICABLE لا INVALID", () => {
+  it("عرض السعر لا يقيّد أصلاً ← NOT_APPLICABLE لا INVALID", () => {
     const r = validateInvoice(
       { ...complete, kind: "QUOTATION", subtotalMinor: 10_000, vatMinor: 1_500 },
       { companyVat: COMPANY },
@@ -211,7 +211,7 @@ describe("المجهول لا يصير صفراً", () => {
     expect(r.findings.some((f) => f.code === "VAT_MATH_MISMATCH")).toBe(false);
   });
 
-  it("أساس الرسملة يُشتقّ من الفرق حين يُجهَل الصافي وتُعرف الضريبة", () => {
+  it("أساس الرسملة يشتقّ من الفرق حين يجهل الصافي وتعرف الضريبة", () => {
     const r = validateInvoice(
       { ...complete, subtotalMinor: null, vatMinor: 60_000, totalMinor: 460_000 },
       { companyVat: COMPANY },
@@ -221,7 +221,7 @@ describe("المجهول لا يصير صفراً", () => {
     expect(r.isFixedAsset).toBe(true);
   });
 
-  it("بلا إجمالي معلوم لا يُحكم بالرسملة", () => {
+  it("بلا إجمالي معلوم لا يحكم بالرسملة", () => {
     const r = validateInvoice(
       { ...complete, totalMinor: null, subtotalMinor: null, vatMinor: null },
       { companyVat: COMPANY },
@@ -230,7 +230,7 @@ describe("المجهول لا يصير صفراً", () => {
   });
 });
 
-describe("الخصمُ بعد الضريبة", () => {
+describe("الخصم بعد الضريبة", () => {
   const paper = {
     kind: "TAX_INVOICE" as const, invoiceNumber: "771",
     sellerVat: "310111111100003", buyerVat: COMPANY_VAT,
@@ -238,39 +238,39 @@ describe("الخصمُ بعد الضريبة", () => {
     subtotalMinor: 1_000_00, vatMinor: 150_00, totalMinor: 1_100_00,
   };
 
-  it("الخصمُ المطبوع يسدّ الفرق ← للعلم لا عطب، والضريبةُ صالحة", () => {
+  it("الخصم المطبوع يسدّ الفرق ← للعلم لا عطب، والضريبة صالحة", () => {
     const r = validateInvoice({ ...paper, discountMinor: 50_00 }, ctx);
     expect(r.taxStatus).toBe("VALID");
     expect(r.findings).toHaveLength(1);
     expect(r.findings[0]).toMatchObject({ code: ISSUE.VAT_MATH_MISMATCH, severity: "INFO", variant: "DISCOUNT" });
   });
 
-  it("بلا خصمٍ مقروء الفرقُ نفسُه عطبٌ كما كان", () => {
+  it("بلا خصم مقروء الفرق نفسه عطب كما كان", () => {
     const r = validateInvoice(paper, ctx);
     expect(r.findings[0]).toMatchObject({ code: ISSUE.VAT_MATH_MISMATCH, severity: "WARN" });
     expect(r.findings[0].variant).toBeUndefined();
   });
 
-  it("خصمٌ لا يسدّ الفرق لا يُصدَّق", () => {
+  it("خصم لا يسدّ الفرق لا يصدّق", () => {
     const r = validateInvoice({ ...paper, discountMinor: 30_00 }, ctx);
     expect(r.findings[0].severity).not.toBe("INFO");
   });
 
-  it("رسومُ التوصيل بعد الضريبة تسدّ الزيادة ← للعلم، والضريبةُ صالحة", () => {
+  it("رسوم التوصيل بعد الضريبة تسدّ الزيادة ← للعلم، والضريبة صالحة", () => {
     const r = validateInvoice({ ...paper, subtotalMinor: 925_00, vatMinor: 138_75, totalMinor: 1088_75, chargesMinor: 25_00 }, ctx);
     expect(r.taxStatus).toBe("VALID");
     expect(r.findings[0]).toMatchObject({ code: ISSUE.VAT_MATH_MISMATCH, severity: "INFO", variant: "CHARGES" });
   });
 
-  it("ضريبةٌ صفرٌ مقروءة تُسمّى سبباً — لا «غير صالحة» بلا ركن", () => {
+  it("ضريبة صفر مقروءة تسمّى سبباً — لا «غير صالحة» بلا ركن", () => {
     const r = validateInvoice({ ...paper, subtotalMinor: 1_000_00, vatMinor: 0, totalMinor: 1_000_00 }, ctx);
     expect(r.taxStatus).toBe("INVALID");
     expect(codes(r)).toContain(ISSUE.ZERO_VAT);
   });
 });
 
-describe("رقمُ المنشأة المقروء ناقصاً", () => {
-  it("١٤ خانة ليست منشأةً أخرى — ركنٌ لم يُقرأ لا مانع (مختبرات القهوة)", () => {
+describe("رقم المنشأة المقروء ناقصاً", () => {
+  it("١٤ خانة ليست منشأةً أخرى — ركن لم يقرأ لا مانع (مختبرات القهوة)", () => {
     const r = validateInvoice({
       kind: "TAX_INVOICE", invoiceNumber: "V405791", sellerVat: "301283361800003", buyerVat: "31000797600003",
       subtotalMinor: 198_26, vatMinor: 29_74, totalMinor: 228_00,
@@ -279,15 +279,15 @@ describe("رقمُ المنشأة المقروء ناقصاً", () => {
     expect(r.findings.find((f) => f.code === ISSUE.MISSING_BUYER_VAT)?.variant).toBe("UNREADABLE");
     expect(r.taxStatus).toBe("INVALID");
   });
-  it("ورقمٌ سليمُ الشكل لمنشأةٍ أخرى يبقى مانعاً", () => {
+  it("ورقم سليم الشكل لمنشأة أخرى يبقى مانعاً", () => {
     const r = validateInvoice({ kind: "TAX_INVOICE", invoiceNumber: "1", sellerVat: "301283361800003", buyerVat: "300000000000003",
       subtotalMinor: 100_00, vatMinor: 15_00, totalMinor: 115_00 }, ctx);
     expect(hasBlocker(r.findings)).toBe(true);
   });
 });
 
-describe("رقمُنا في خانة البائع ليس رقمَ مورّد", () => {
-  it("قراءةٌ وضعت رقمَ المشتري موضعَ البائع ← ركنٌ لم يُقرأ، لا «ضريبيّة كاملة»", () => {
+describe("رقمنا في خانة البائع ليس رقم مورّد", () => {
+  it("قراءة وضعت رقم المشتري موضع البائع ← ركن لم يقرأ، لا «ضريبيّة كاملة»", () => {
     const r = validateInvoice({
       kind: "TAX_INVOICE", invoiceNumber: "77", sellerVat: "٣١٠٠٠٧٩٧١٦٠٠٠٠٣", buyerVat: COMPANY_VAT,
       subtotalMinor: 10_000, vatMinor: 1_500, totalMinor: 11_500,
@@ -298,25 +298,25 @@ describe("رقمُنا في خانة البائع ليس رقمَ مورّد", (
   });
 });
 
-describe("ضريبةٌ وإجماليٌّ بلا صافٍ مقروء", () => {
+describe("ضريبة وإجماليّ بلا صاف مقروء", () => {
   const base = { kind: "TAX_INVOICE" as const, invoiceNumber: "9", sellerVat: "310111111100003", buyerVat: COMPANY_VAT };
-  it("ضريبةٌ يحتملها الإجمالي ← صالحة", () => {
+  it("ضريبة يحتملها الإجمالي ← صالحة", () => {
     expect(validateInvoice({ ...base, vatMinor: 1_500, totalMinor: 11_500 }, ctx).taxStatus).toBe("VALID");
     /* رسومٌ بعد الضريبة تُنقص النسبة ولا تزيدها */
     expect(validateInvoice({ ...base, vatMinor: 1_500, totalMinor: 14_000 }, ctx).taxStatus).toBe("VALID");
   });
-  it("ضريبةٌ فوق 15/115 من الإجمالي ← «لم تُقرأ» لا خصم: 1,500 والصواب 150", () => {
+  it("ضريبة فوق 15/115 من الإجمالي ← «لم تقرأ» لا خصم: 1,500 والصواب 150", () => {
     const r = validateInvoice({ ...base, vatMinor: 150_000, totalMinor: 115_000 }, ctx);
     expect(r.taxStatus).toBe("UNKNOWN");
     expect(r.inputVatStatus).toBe("UNKNOWN");
     expect(codes(r)).toContain(ISSUE.VAT_MATH_MISMATCH);
   });
-  it("وفرقُ التقريب ضمن الريال لا يُسقطها", () => {
+  it("وفرق التقريب ضمن الريال لا يسقطها", () => {
     expect(validateInvoice({ ...base, vatMinor: 15_090, totalMinor: 115_000 }, ctx).taxStatus).toBe("VALID");
   });
 });
 
-describe("رسائلُ المبالغ بمنزلتين", () => {
+describe("رسائل المبالغ بمنزلتين", () => {
   it("«660.10» لا «660.1»", () => {
     const r = validateInvoice({
       kind: "TAX_INVOICE", invoiceNumber: "1", sellerVat: "310111111100003", buyerVat: COMPANY_VAT,

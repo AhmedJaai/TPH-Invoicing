@@ -77,7 +77,7 @@ const run = (cases: AdjudicationCase[], p = provider(), median: number | null = 
   });
 
 describe("adjudicate — الحلقة كاملةً", () => {
-  it("لا يُستدعى مزوّدٌ غير مهيَّأ", async () => {
+  it("لا يستدعى مزوّد غير مهيّأ", async () => {
     const judge = vi.fn();
     expect(await run([invoiceCase()], provider({ isConfigured: () => false, judge }))).toEqual([]);
     expect(judge).not.toHaveBeenCalled();
@@ -93,7 +93,7 @@ describe("adjudicate — الحلقة كاملةً", () => {
       }),
     }));
     expect(bad.candidate).toBeNull();
-    expect(bad.refused).toContain("وليس في القائمة");
+    expect(bad.refused).toContain("غير موجود في القائمة");
   });
 
   it("يردّ الأدلّة التي ادّعاها ولم تقع", async () => {
@@ -112,7 +112,7 @@ describe("adjudicate — الحلقة كاملةً", () => {
     expect(r.decision.disposition).toBe("REVIEW");
   });
 
-  it("ثقةُ النموذج الضعيفة تُسقِط الحكم إلى مراجعة", async () => {
+  it("ثقة النموذج الضعيفة تسقط الحكم إلى مراجعة", async () => {
     const [r] = await run([invoiceCase()], provider({
       judge: async () => ({
         verdict: { choice: "c1", reasonCodes: ["AMOUNT_EXACT"], confidence: 0.2, reason: "" },
@@ -122,7 +122,7 @@ describe("adjudicate — الحلقة كاملةً", () => {
     expect(r.decision.disposition).toBe("REVIEW");
   });
 
-  it("ولا يبلغ حكمُه المطابقة التلقائية أبداً", async () => {
+  it("ولا يبلغ حكمه المطابقة التلقائية أبداً", async () => {
     for (const c of [0.7, 0.99, 1]) {
       const [r] = await run([invoiceCase()], provider({
         judge: async () => ({
@@ -138,27 +138,27 @@ describe("adjudicate — الحلقة كاملةً", () => {
    * المسار الذي كان ميّتاً: مبلغٌ كبير ومستفيد مجهول. كان يُنشَأ بلا
    * مرشّحين والحَكَم يرفض ما لا مرشّح له.
    */
-  it("حالة الجهة تصل الحَكَم وتُرجع اختياراً", async () => {
+  it("حالة الجهة تصل الحكم وترجع اختياراً", async () => {
     const [r] = await run([entityCase()]);
     expect(r.kind).toBe("ENTITY");
     expect(r.entityChoice?.name).toBe("المراعي");
     // وتعريف الجهة يحتاج إقراراً صريحاً لأنّه يُنشئ ذاكرة
     expect(r.decision.disposition).toBe("REVIEW");
-    expect(r.decision.reasons.join(" ")).toContain("يعمّ على أمثاله");
+    expect(r.decision.reasons.join(" ")).toContain("يسري على الحركات المشابهة");
   });
 
-  it("وحالةٌ بلا مرشّحين لا تُستدعى", async () => {
+  it("وحالة بلا مرشّحين لا تستدعى", async () => {
     const judge = vi.fn();
     const empty: AdjudicationCase = { ...entityCase(), entityCandidates: [] };
     expect(await run([empty], provider({ judge }))).toEqual([]);
     expect(judge).not.toHaveBeenCalled();
   });
 
-  it("فشل الاستدعاء يُسجَّل ولا يُسقط الدفعة", async () => {
+  it("فشل الاستدعاء يسجّل ولا يسقط الدفعة", async () => {
     const [r] = await run([invoiceCase()], provider({
       judge: async () => { throw new Error("انقطع"); },
     }));
-    expect(r.refused).toContain("تعذّر الاستدعاء");
+    expect(r.refused).toContain("تعذّر الاتصال بالنموذج");
     expect(r.decision.disposition).toBe("REVIEW");
   });
 
@@ -174,8 +174,8 @@ describe("adjudicate — الحلقة كاملةً", () => {
   });
 });
 
-describe("الأثر — كي يُجاب «لماذا؟» بعد ستّة أشهر", () => {
-  it("يُحفَظ المزوّد والنموذج والنسختان والمدّة", async () => {
+describe("الأثر — كي يجاب «لماذا؟» بعد ستّة أشهر", () => {
+  it("يحفظ المزوّد والنموذج والنسختان والمدّة", async () => {
     const [r] = await run([invoiceCase()]);
     expect(r.provenance.provider).toBe("test");
     expect(r.provenance.model).toBe("m");
@@ -184,7 +184,7 @@ describe("الأثر — كي يُجاب «لماذا؟» بعد ستّة أشه
     expect(r.provenance.durationMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("وثقةُ النموذج وسببه ورموزه — المدَّعى والمقبول والمردود", async () => {
+  it("وثقة النموذج وسببه ورموزه — المدّعى والمقبول والمردود", async () => {
     const [r] = await run([invoiceCase()], provider({
       judge: async () => ({
         verdict: {
@@ -201,7 +201,7 @@ describe("الأثر — كي يُجاب «لماذا؟» بعد ستّة أشه
     expect(r.provenance.refutedCodes).toContain("REFERENCE_MATCH");
   });
 
-  it("والإشارات الستّ التي بُني عليها القرار", async () => {
+  it("والإشارات الستّ التي بني عليها القرار", async () => {
     const [r] = await run([invoiceCase()]);
     expect(r.decision.signals).toHaveProperty("candidateScore");
     expect(r.decision.signals).toHaveProperty("margin");

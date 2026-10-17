@@ -150,7 +150,7 @@ export async function GET() {
         const t = await client.getAccessToken();
         const sealed = sealedWithCurrentKey(row.token);
         driveToken = t.token
-          ? { ok: true, sealed, ...(sealed ? {} : { fix: "الرمز غير مختومٍ بالمفتاح الجاري — سجّل الخروج ثمّ الدخول، أو شغّل scripts/reseal-drive-tokens.ts" }) }
+          ? { ok: true, sealed, ...(sealed ? {} : { fix: "الرمز غير مشفّر بالمفتاح الحالي. سجّل الخروج ثم الدخول، أو شغّل scripts/reseal-drive-tokens.ts" }) }
           : { ok: false, error: "لم يصدر رمز وصول" };
       } catch (e) {
         driveToken = { ok: false, error: (e as Error).message.slice(0, 80) };
@@ -181,7 +181,7 @@ export async function GET() {
       healthy: overall,
       checks: { ...checks, providerReachable, driveToken },
       ...(tokenKeyMissing
-        ? { problems: ["TOKEN_ENCRYPTION_KEY غير مضبوط في الإنتاج (٣٢ حرفاً فأكثر) — رمزُ الدرايف يُحفظ بلا تشفير. اضبطه في Vercel ثمّ سجّل الخروج والدخول"] }
+        ? { problems: ["TOKEN_ENCRYPTION_KEY غير مضبوط في الإنتاج (٣٢ حرفاً فأكثر)، فيُحفظ رمز الدرايف بلا تشفير. اضبطه في Vercel ثم سجّل الخروج والدخول."] }
         : {}),
       ...(envProblems.length > 0 ? { env: envProblems } : {}),
       at: new Date().toISOString(),

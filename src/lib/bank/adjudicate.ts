@@ -82,8 +82,8 @@ export function needsAdjudication(input: CaseInput): AdjudicationCase | null {
       candidates: [top, second, ...input.candidates.slice(2, 5)],
       entityCandidates: [],
       note:
-        `مرشّحان متقاربان (${Math.round(top.score * 100)} و${Math.round(second.score * 100)}) — ` +
-        "الحساب لا يفصل بينهما",
+        `مرشّحان متقاربان في الدرجة (${Math.round(top.score * 100)} و${Math.round(second.score * 100)}) — ` +
+        "ولا يمكن الترجيح بينهما بالحساب",
     };
   }
 
@@ -102,8 +102,8 @@ export function needsAdjudication(input: CaseInput): AdjudicationCase | null {
       candidates: [],
       entityCandidates: [...entities],
       note:
-        `مبلغ كبير (${formatRiyalsDisplay(input.amountMinor)} ريالاً) ومستفيده مجهول — ` +
-        `و${entities.length} جهةً مرشَّحة`,
+        `مبلغ كبير (${formatRiyalsDisplay(input.amountMinor)} ريالاً) والمستفيد غير معروف، ` +
+        `وعدد الجهات المرشّحة ${entities.length}`,
     };
   }
 

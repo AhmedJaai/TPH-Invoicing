@@ -39,9 +39,9 @@ export async function FiledQuartersSection() {
   return (
     <Section
       id="quarters"
-      title="الأرباعُ المقدَّمة جنباً إلى جنب"
+      title="الأرباع المقدّمة جنباً إلى جنب"
       icon={GitCompareArrows}
-      hint="كما قُدِّمت للهيئة — من لقطة «قدّمتُه»، لا من حساب اليوم."
+      hint="كما قدّمتها للهيئة، من لقطة «قدّمته» وليس من حساب اليوم."
     >
       <div className="scroll-x overflow-x-auto rounded-xl border border-line bg-raised">
         <table className="w-full min-w-[30rem] border-collapse">
@@ -57,15 +57,15 @@ export async function FiledQuartersSection() {
             </tr>
           </thead>
           <tbody>
-            {line("ضريبةُ المبيعات", (q) => <Money minor={q.outputVatMinor} />)}
-            {line("خصمُ الفواتير", (q) => (q.fromInvoicesMinor === null ? unknown : <Money minor={q.fromInvoicesMinor} />))}
-            {line("خصمُ ضريبة الرسوم", (q) => (q.fromFeesMinor === null ? unknown : <Money minor={q.fromFeesMinor} />))}
-            {line("خصمُ ما اخترتَه", (q) => (q.fromSelectedMinor === null ? unknown : <Money minor={q.fromSelectedMinor} />))}
-            {line("مجموعُ المدخلات", (q) => <Money minor={q.inputVatMinor} />)}
-            {line("المدخلاتُ من المخرجات", (q) => (q.inputShareBp === null
+            {line("ضريبة المبيعات", (q) => <Money minor={q.outputVatMinor} />)}
+            {line("خصم الفواتير", (q) => (q.fromInvoicesMinor === null ? unknown : <Money minor={q.fromInvoicesMinor} />))}
+            {line("خصم ضريبة الرسوم", (q) => (q.fromFeesMinor === null ? unknown : <Money minor={q.fromFeesMinor} />))}
+            {line("خصم ما اخترته", (q) => (q.fromSelectedMinor === null ? unknown : <Money minor={q.fromSelectedMinor} />))}
+            {line("مجموع المدخلات", (q) => <Money minor={q.inputVatMinor} />)}
+            {line("المدخلات من المخرجات", (q) => (q.inputShareBp === null
               ? <span className="text-[11px] text-muted">لا مخرجات</span>
               : <bdi className="nums" dir="ltr">{shareText(q.inputShareBp)}</bdi>))}
-            {line("الصافي (سالبٌ: رصيدٌ لك)", (q) => <Money minor={q.netMinor} signed />, true)}
+            {line("الصافي (سالب: رصيد لصالحك)", (q) => <Money minor={q.netMinor} signed />, true)}
           </tbody>
         </table>
       </div>
@@ -74,7 +74,7 @@ export async function FiledQuartersSection() {
         <p className="font-bold">
           {netChangeMinor === 0
             ? `صافي ${labelOf(current)} يساوي صافي ${labelOf(previous)}.`
-            : <>صافي {labelOf(current)} {netChangeMinor > 0 ? "أعلى" : "أدنى"} من {labelOf(previous)} بـ<Money minor={Math.abs(netChangeMinor)} /> — أكبرُ ما حرّكه:</>}
+            : <>صافي {labelOf(current)} {netChangeMinor > 0 ? "أعلى" : "أدنى"} من {labelOf(previous)} بـ<Money minor={Math.abs(netChangeMinor)} />. أكبر ما أثّر فيه:</>}
         </p>
         {drivers.length > 0 && (
           <ul className="mt-2 space-y-1 text-ink-soft">
@@ -89,7 +89,7 @@ export async function FiledQuartersSection() {
           </ul>
         )}
         <p className="mt-2 text-[11px] text-muted">
-          لمعرفة أيّ مورّدٍ أو حوالةٍ وراء الباب افتح الربعَ من رأس الجدول — فواتيرُه وحركاتُه بأسمائها هناك.
+          لمعرفة أي مورّد أو حوالة وراء كل بند، افتح الربع من رأس الجدول. ستجد فواتيره وحركاته بأسمائها هناك.
         </p>
       </div>
     </Section>

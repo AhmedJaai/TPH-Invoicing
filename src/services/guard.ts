@@ -52,7 +52,7 @@ export function respondTo(e: unknown): NextResponse | null {
   */
   const code = pgErrorCode(e);
   if (code === "23505") {
-    return NextResponse.json({ error: "سُجّل هذا من قبل — ربما من نافذةٍ أخرى. حدّث الصفحة" }, { status: 409 });
+    return NextResponse.json({ error: "سُجّل هذا من قبل، ربما من نافذة أخرى. حدّث الصفحة" }, { status: 409 });
   }
   /*
     ومؤثِّراتُنا تقول سببها بالعربيّة («هذا يقع في أسبوعٍ جردُه مقفَل — أعِد فتح
@@ -64,13 +64,13 @@ export function respondTo(e: unknown): NextResponse | null {
     return NextResponse.json({ error: own }, { status: 409 });
   }
   if (code === "23514") {
-    return NextResponse.json({ error: "رفضت القاعدة هذه القيمة لأنّها تخالف قيداً ماليّاً — لم يُكتب شيء. حدّث الصفحة" }, { status: 409 });
+    return NextResponse.json({ error: "رُفضت هذه القيمة لأنها تخالف قاعدة مالية، ولم يُحفظ شيء. حدّث الصفحة" }, { status: 409 });
   }
   if (code === "23503") {
-    return NextResponse.json({ error: "سجلٌّ مرتبط غير موجود — ربما حُذف أو لم يُحفظ. حدّث الصفحة" }, { status: 400 });
+    return NextResponse.json({ error: "السجل المرتبط غير موجود، ربما حُذف أو لم يُحفظ. حدّث الصفحة" }, { status: 400 });
   }
   if (code === "22003") {
-    return NextResponse.json({ error: "رقمٌ أكبر من المعقول — راجع الأصفار" }, { status: 400 });
+    return NextResponse.json({ error: "الرقم كبير جداً، راجع عدد الأصفار" }, { status: 400 });
   }
   return null;
 }
@@ -93,7 +93,7 @@ export function failWith(e: unknown, route: string): NextResponse {
   /* سطرٌ واحد بالمرجع نفسه — بلا `params:`: قيمُ الإدخال (مبالغُ وأسماء) لا تدخل السجلّ */
   logEvent("route-error", { route, ref, ...describeError(e) });
   return NextResponse.json(
-    { error: `عطبٌ في الخادم — أعد المحاولة، وإن تكرّر فاذكر المرجع ${ref}`, ref },
+    { error: `حدث خطأ في الخادم. حاول مرة أخرى، وإن تكرر فاذكر المرجع ${ref}`, ref },
     { status: 500 },
   );
 }

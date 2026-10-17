@@ -85,10 +85,10 @@ export function deepseekProvider(): AdjudicatorProvider {
       if (!result.ok) throw new Error(result.reason);
 
       const parsed = parseJsonLoose(result.text);
-      if (!parsed.ok) throw new Error("مخرَج الحَكَم ليس JSON");
+      if (!parsed.ok) throw new Error("ردّ النموذج ليس بصيغة JSON");
 
       const verdict = verdictSchema.safeParse(parsed.value);
-      if (!verdict.success) throw new Error("مخرَجٌ لا يطابق المخطّط");
+      if (!verdict.success) throw new Error("ردّ النموذج لا يطابق الشكل المطلوب");
 
       return { verdict: verdict.data, durationMs: result.durationMs };
     },

@@ -130,7 +130,7 @@ describe("parseBankStatement — أوراق متعدّدة", () => {
     const buf = book({ Sheet1: [["مرحباً"], ["لا شيء هنا"]] });
     const r = parseBankStatement(buf);
     expect(r.rows).toEqual([]);
-    expect(r.warnings[0].reason).toContain("لم يُعثر على صفّ الرؤوس");
+    expect(r.warnings[0].reason).toContain("لم يُعثر على صف عناوين الأعمدة");
   });
 });
 

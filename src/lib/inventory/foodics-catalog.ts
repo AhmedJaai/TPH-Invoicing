@@ -199,7 +199,7 @@ export function parseCatalogFile(buffer: Buffer): ParsedCatalog {
   const wb = readWorkbookSafely(buffer);
   const sheet = wb.sheets[0];
   if (!sheet || sheet.grid.length === 0) {
-    return { kind: "ITEMS", items: [], products: [], recipeLines: [], rows: 0, warnings: wb.warnings, issues: [{ row: 0, reason: "ملفٌّ فارغ", detail: "لا صفوفَ فيه" }] };
+    return { kind: "ITEMS", items: [], products: [], recipeLines: [], rows: 0, warnings: wb.warnings, issues: [{ row: 0, reason: "الملف فارغ", detail: "لا توجد صفوف فيه" }] };
   }
 
   const head = sheet.grid[0];
@@ -208,8 +208,8 @@ export function parseCatalogFile(buffer: Buffer): ParsedCatalog {
     return {
       kind: "ITEMS", items: [], products: [], recipeLines: [], rows: 0, warnings: wb.warnings,
       issues: [{
-        row: 1, reason: "ترويسةٌ غير مفهومة",
-        detail: `لم تُعرَف أعمدةُ أيٍّ من الملفّات الثلاثة. الموجود: ${head.filter(Boolean).join("، ")}`,
+        row: 1, reason: "عناوين الأعمدة غير مفهومة",
+        detail: `لم يتعرّف النظام على أعمدة أي من ملفات الكتالوج الثلاثة. الأعمدة الموجودة: ${head.filter(Boolean).join("، ")}`,
       }],
     };
   }
@@ -239,7 +239,7 @@ function readItem(row: readonly string[], n: number, at: At, out: ParsedCatalog)
   const sku = text(row, at("sku"));
   const name = text(row, at("name"));
   if (sku === "" || name === "") {
-    out.issues.push({ row: n, reason: "صفٌّ بلا رمزٍ أو اسم", detail: `sku=«${sku}» name=«${name}»` });
+    out.issues.push({ row: n, reason: "صف بلا رمز أو اسم", detail: `sku=«${sku}» name=«${name}»` });
     return;
   }
 
@@ -247,13 +247,13 @@ function readItem(row: readonly string[], n: number, at: At, out: ParsedCatalog)
   const unitWord = text(row, at("ingredient_unit"));
   const baseUnit = readUnit(unitWord);
   if (baseUnit === null) {
-    out.issues.push({ row: n, reason: "وحدةُ صرفٍ غير معروفة", detail: `«${name}» وحدتُه «${unitWord}»` });
+    out.issues.push({ row: n, reason: "وحدة الصرف غير معروفة", detail: `«${name}» وحدته «${unitWord}»` });
     return;
   }
 
   const factorMilli = decimalToMilli(text(row, at("storage_to_ingredient_factor")));
   if (factorMilli === null || factorMilli <= 0) {
-    out.issues.push({ row: n, reason: "معامِلُ العبوة غير مقروء", detail: `«${name}» — لا يُعرَف كم ${unitWord} في ${storageUnit || "وحدة التخزين"}` });
+    out.issues.push({ row: n, reason: "معامل العبوة غير مقروء", detail: `«${name}» . لا نعرف كم ${unitWord} في ${storageUnit || "وحدة التخزين"}` });
     return;
   }
 
@@ -261,7 +261,7 @@ function readItem(row: readonly string[], n: number, at: At, out: ParsedCatalog)
   /* فودكس يحسب الكلفةَ متوسّطاً بأربع خانات («11.6668») — تُقرَّب إلى الهللة كما تُقرأ كلفةُ الصنف المباع */
   const packCostMinor = costText === "" ? null : parseSourceCostMinor(costText);
   if (packCostMinor === null || packCostMinor < 0) {
-    out.issues.push({ row: n, reason: "كلفةٌ غير مقروءة", detail: `«${name}» كلفتُه «${costText}»` });
+    out.issues.push({ row: n, reason: "التكلفة غير مقروءة", detail: `«${name}» تكلفته «${costText}»` });
     return;
   }
 
@@ -275,7 +275,7 @@ function readProduct(row: readonly string[], n: number, at: At, out: ParsedCatal
   const sku = text(row, at("sku"));
   const name = text(row, at("name"));
   if (sku === "" || name === "") {
-    out.issues.push({ row: n, reason: "صفٌّ بلا رمزٍ أو اسم", detail: `sku=«${sku}» name=«${name}»` });
+    out.issues.push({ row: n, reason: "صف بلا رمز أو اسم", detail: `sku=«${sku}» name=«${name}»` });
     return;
   }
   const price = text(row, at("price"));
@@ -294,22 +294,22 @@ function readRecipeLine(row: readonly string[], n: number, at: At, out: ParsedCa
   const productSku = text(row, at("product_sku"));
   const itemSku = text(row, at("inventory_item_sku"));
   if (productSku === "" || itemSku === "") {
-    out.issues.push({ row: n, reason: "سطرٌ بلا طرفين", detail: `منتج=«${productSku}» مكوّن=«${itemSku}»` });
+    out.issues.push({ row: n, reason: "سطر بلا منتج أو مكوّن", detail: `منتج=«${productSku}» مكوّن=«${itemSku}»` });
     return;
   }
 
   const unitWord = text(row, at("unit"));
   const unit = readUnit(unitWord);
   if (unit === null) {
-    out.issues.push({ row: n, reason: "وحدةٌ غير معروفة", detail: `${productSku} ← ${itemSku} بوحدة «${unitWord}»` });
+    out.issues.push({ row: n, reason: "وحدة غير معروفة", detail: `${productSku} ← ${itemSku} بوحدة «${unitWord}»` });
     return;
   }
 
   const quantityMilli = decimalToMilli(text(row, at("quantity")));
   if (quantityMilli === null || quantityMilli <= 0) {
     out.issues.push({
-      row: n, reason: "كمّيّةٌ غير مقروءة",
-      detail: `${productSku} ← ${itemSku} كمّيّتُه «${text(row, at("quantity"))}»`,
+      row: n, reason: "الكمية غير مقروءة",
+      detail: `${productSku} ← ${itemSku} كميته «${text(row, at("quantity"))}»`,
     });
     return;
   }

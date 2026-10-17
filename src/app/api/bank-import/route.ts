@@ -52,7 +52,7 @@ async function handle(request: Request) {
   const file = form?.get("file");
   const apply = form?.get("apply") === "true";
 
-  if (!(file instanceof File)) return NextResponse.json({ error: "لم يصل ملف" }, { status: 400 });
+  if (!(file instanceof File)) return NextResponse.json({ error: "لم يصل أي ملف" }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "الملف أكبر من ٤ ميجابايت" }, { status: 400 });
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -277,7 +277,7 @@ async function handle(request: Request) {
       ? [{
           start: isoDay(parsed.periodStart),
           end: isoDay(parsed.periodEnd),
-          label: "هذا الملفّ",
+          label: "هذا الملف",
         }]
       : [];
 
@@ -644,7 +644,7 @@ async function handle(request: Request) {
   }
 
   if (!importId) {
-    return NextResponse.json({ error: "تعذّر تسجيل عملية الاستيراد" }, { status: 500 });
+    return NextResponse.json({ error: "تعذّر تسجيل عملية الاستيراد. حاول مرة أخرى." }, { status: 500 });
   }
 
   /*
@@ -746,7 +746,7 @@ async function handle(request: Request) {
                 مطابقة: decided.decision?.reasons ?? [],
                 درجةالمستفيد: Math.round(decided.supplierScore * 100),
                 ...(reservedForHand.has(key)
-                  ? { سدادمقيّدبيد: "بمبلغها نفسه للمورّد نفسه — تُربط به ولا تُكتب دفعةً ثانية" }
+                  ? { سدادمقيّدبيد: "بمبلغها نفسه للمورّد نفسه — تربط به ولا تكتب دفعةً ثانية" }
                   : {}),
               }
             : null,
@@ -786,7 +786,7 @@ async function handle(request: Request) {
         event: "CLASSIFIED",
         actor: decided?.classificationSource === "MEMORY" ? "MEMORY" : "SYSTEM",
         actorId: user.id,
-        detail: decided?.classificationReason ?? "بلا سبب مسجَّل",
+        detail: decided?.classificationReason ?? "لا يوجد سبب مسجّل",
         payload: {
           الباب: decided?.category,
           المصدر: decided?.classificationSource,
@@ -826,7 +826,7 @@ async function handle(request: Request) {
           payload: {
             الثقة: verdict.provenance.modelConfidence,
             "أدلّة صحّت": verdict.provenance.upheldCodes,
-            "أدلّة رُدّت": verdict.provenance.refutedCodes,
+            "أدلّة ردّت": verdict.provenance.refutedCodes,
           },
         });
       }
@@ -982,7 +982,7 @@ async function handle(request: Request) {
     bankImportId: importId ?? null,
     bankAccountId,
     againstTransactionId: m.id,
-    reason: "عندنا وليست في كشف البنك الذي يغطّي يومها — مكرّرةٌ دخلت مرّتين، أو حركةٌ لم تقع",
+    reason: "موجودة عندنا وغير موجودة في كشف البنك الذي يغطي يومها. قد تكون مكررة سُجّلت مرتين، أو حركة لم تحدث فعلاً.",
     valueDate: m.valueDate,
     description: m.description,
     beneficiaryRaw: m.beneficiaryRaw,
@@ -1034,17 +1034,17 @@ async function handle(request: Request) {
     rejectedByConstraint,
     message:
       newRows === 0
-        ? `هذا الكشف مقيَّد عندك من قبل — ${countNoun(canonicalRows.length, TRANSACTION)} كلّها مسجَّلة، فلم تُضَف واحدة${
-            missingFromFile.length > 0 ? `. وعندك ${countNoun(missingFromFile.length, TRANSACTION)} في مدّته ليست فيه — لقرارك في صفحة البنك` : ""
+        ? `هذا الكشف مسجّل عندك من قبل: ${countNoun(canonicalRows.length, TRANSACTION)} جميعها مسجّلة، فلم تُضَف حركة جديدة${
+            missingFromFile.length > 0 ? `. وعندك ${countNoun(missingFromFile.length, TRANSACTION)} في فترته غير موجودة فيه، وتنتظر قرارك في صفحة البنك` : ""
           }.`
-        : `تمّت المزامنة: ${countNoun(canonicalRows.length, TRANSACTION)} في الملفّ · ${sync.known.length} موجودة · ${newRows} جديدة${
+        : `تمت المزامنة: ${countNoun(canonicalRows.length, TRANSACTION)} في الملف · ${sync.known.length} موجودة · ${newRows} جديدة${
             sync.ambiguous.length > 0 ? ` · ${sync.ambiguous.length} للمراجعة` : ""
           }${
-            sync.conflict.length > 0 ? ` · ${sync.conflict.length} تضارب هويّة — لم تُقيَّد` : ""
-          }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} ردّها قيد القاعدة` : ""}${
-            handLinked > 0 ? ` · ${handLinked} رُبطت بسدادٍ قيّدتَه بيدك` : ""
-          }${derived.created > 0 ? ` · ${derived.created} قُيّدت مصروفاً` : ""}${
-            held > 0 ? ` · ${held} محفوظةٌ لقرارك في صفحة البنك` : ""
+            sync.conflict.length > 0 ? ` · ${sync.conflict.length} تعارض في الهوية ولم تُسجَّل` : ""
+          }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} رفضتها قاعدة البيانات` : ""}${
+            handLinked > 0 ? ` · ${handLinked} رُبطت بسداد سجّلته يدوياً` : ""
+          }${derived.created > 0 ? ` · ${derived.created} سُجّلت مصروفاً` : ""}${
+            held > 0 ? ` · ${held} محفوظة لتقرر فيها في صفحة البنك` : ""
           }.`,
     handLinked,
     linkNotes,

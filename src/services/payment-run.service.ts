@@ -53,7 +53,7 @@ export async function loadPayableInvoices(month: string): Promise<PayableInvoice
   return rows.map<PayableInvoice>((r) => ({
     invoiceId: r.invoiceId,
     supplierId: r.supplierId,
-    supplierName: r.supplierName ?? "غير محدَّد",
+    supplierName: r.supplierName ?? "غير محدّد",
     invoiceNumber: r.invoiceNumber,
     invoiceDate: r.invoiceDate,
     periodMonth: r.periodMonth,

@@ -17,7 +17,7 @@ const MAX_RETRIES = 4;
 
 export class FoodicsNotConfiguredError extends Error {
   constructor() {
-    super("فودكس غير موصول: مفتاحُ الربط `FOODICS_API_TOKEN` غير مضبوطٍ في البيئة.");
+    super("فودكس غير موصول: مفتاح الربط `FOODICS_API_TOKEN` غير مضبوط في البيئة.");
     this.name = "FoodicsNotConfiguredError";
   }
 }
@@ -26,7 +26,7 @@ export class FoodicsApiError extends Error {
   constructor(readonly status: number, path: string) {
     super(
       status === 401 || status === 403
-        ? `فودكس رفض المفتاح (${status}) عند ${path} — قد يكون أُلغي من «Authorized Apps» أو نقصته صلاحية.`
+        ? `فودكس رفض المفتاح (${status}) عند ${path} . قد يكون المفتاح أُلغي من «Authorized Apps» أو تنقصه صلاحية.`
         : `فودكس ردّ بـ${status} عند ${path}.`,
     );
     this.name = "FoodicsApiError";

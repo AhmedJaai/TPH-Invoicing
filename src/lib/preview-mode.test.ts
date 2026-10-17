@@ -2,24 +2,24 @@ import { describe, expect, it } from "vitest";
 import { isProductionEnv, previewAllowed, previewRole, refusalReason } from "./preview-mode";
 
 describe("previewAllowed", () => {
-  it("مغلق ما لم يُطلب صراحةً", () => {
+  it("مغلق ما لم يطلب صراحةً", () => {
     expect(previewAllowed({})).toBe(false);
     expect(previewAllowed({ AUTH_BYPASS: "false" })).toBe(false);
     expect(previewAllowed({ AUTH_BYPASS: "1" })).toBe(false);
     expect(previewAllowed({ AUTH_BYPASS: "TRUE" })).toBe(false);
   });
 
-  it("يعمل في التطوير حين يُطلب", () => {
+  it("يعمل في التطوير حين يطلب", () => {
     expect(previewAllowed({ AUTH_BYPASS: "true", NODE_ENV: "development" })).toBe(true);
   });
 
-  it("لا يعمل في إنتاج Vercel ولو فُعِّل المتغيّر", () => {
+  it("لا يعمل في إنتاج Vercel ولو فعّل المتغيّر", () => {
     expect(
       previewAllowed({ AUTH_BYPASS: "true", VERCEL_ENV: "production", NODE_ENV: "production" }),
     ).toBe(false);
   });
 
-  it("لا يعمل في بناء إنتاجيّ خارج Vercel", () => {
+  it("لا يعمل في بناء إنتاجي خارج Vercel", () => {
     expect(previewAllowed({ AUTH_BYPASS: "true", NODE_ENV: "production" })).toBe(false);
   });
 
@@ -29,7 +29,7 @@ describe("previewAllowed", () => {
     `development` معها — فيشهد الأخضرُ لحالةٍ لا وجود لها، والميزةُ
     ميّتةٌ على Vercel ولا أحد يعلم.
   */
-  it("يعمل في معاينة Vercel — وهي تُبنى بـNODE_ENV=production كالإنتاج", () => {
+  it("يعمل في معاينة Vercel — وهي تبنى بـNODE_ENV=production كالإنتاج", () => {
     expect(previewAllowed({ AUTH_BYPASS: "true", VERCEL_ENV: "preview", NODE_ENV: "production" }))
       .toBe(true);
   });
@@ -47,7 +47,7 @@ describe("isProductionEnv", () => {
     expect(isProductionEnv({ VERCEL_ENV: "development", NODE_ENV: "production" })).toBe(false);
   });
 
-  it("وNODE_ENV هو الحاكم حيث لا وجود له — بناءٌ مستضاف بنفسه", () => {
+  it("وNODE_ENV هو الحاكم حيث لا وجود له — بناء مستضاف بنفسه", () => {
     expect(isProductionEnv({ NODE_ENV: "production" })).toBe(true);
     expect(isProductionEnv({ NODE_ENV: "test" })).toBe(false);
     expect(isProductionEnv({})).toBe(false);
@@ -55,29 +55,29 @@ describe("isProductionEnv", () => {
 });
 
 describe("refusalReason", () => {
-  it("تسكت حين لا يُطلب التخطّي", () => {
+  it("تسكت حين لا يطلب التخطّي", () => {
     expect(refusalReason({})).toBeNull();
     expect(refusalReason({ AUTH_BYPASS: "false", NODE_ENV: "production" })).toBeNull();
   });
 
-  it("تُبيّن السبب حين يُطلب ويُرفض", () => {
+  it("تبيّن السبب حين يطلب ويرفض", () => {
     expect(refusalReason({ AUTH_BYPASS: "true", VERCEL_ENV: "production" })).toContain("إنتاج");
-    expect(refusalReason({ AUTH_BYPASS: "true", NODE_ENV: "production" })).toContain("إنتاجيّ");
+    expect(refusalReason({ AUTH_BYPASS: "true", NODE_ENV: "production" })).toContain("إنتاجي");
   });
 
-  it("تسكت حين يُطلب ويُسمح", () => {
+  it("تسكت حين يطلب ويسمح", () => {
     expect(refusalReason({ AUTH_BYPASS: "true", NODE_ENV: "development" })).toBeNull();
   });
 });
 
 describe("previewRole", () => {
-  it("المالكُ افتراضاً، والدورُ المعروف يُجرَّب", () => {
+  it("المالك افتراضاً، والدور المعروف يجرّب", () => {
     expect(previewRole(undefined)).toBe("OWNER");
     expect(previewRole("ACCOUNTANT")).toBe("ACCOUNTANT");
     expect(previewRole("PURCHASING")).toBe("PURCHASING");
   });
 
-  it("ما ليس دوراً معروفاً يُرَدّ إلى المالك ولا يُخترَع", () => {
+  it("ما ليس دوراً معروفاً يردّ إلى المالك ولا يخترع", () => {
     expect(previewRole("ADMIN")).toBe("OWNER");
     expect(previewRole("accountant")).toBe("OWNER");
   });

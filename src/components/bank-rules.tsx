@@ -46,7 +46,7 @@ export function BankRules({ rows, canEdit }: { rows: BankRuleRow[]; canEdit: boo
   if (rows.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs leading-relaxed text-muted">
-        لا قواعد بعد — تُنشأ من «صنّفها» عند استيراد كشف البنك، ثمّ تُطبَّق على كلّ كشفٍ بعده.
+        لا توجد قواعد بعد. تُنشأ القواعد من «صنّفها» عند استيراد كشف البنك، ثم تُطبَّق على كل كشف بعده.
       </p>
     );
   }
@@ -59,10 +59,10 @@ export function BankRules({ rows, canEdit }: { rows: BankRuleRow[]; canEdit: boo
     setBusy(false);
     setAsking(null);
     if (res.ok) {
-      toast({ tone: "ok", title: "حُذفت القاعدة", body: "الحركاتُ المصنَّفة بها قبلُ تبقى على تصنيفها." });
+      toast({ tone: "ok", title: "تم حذف القاعدة", body: "الحركات المصنّفة بها سابقاً تبقى على تصنيفها." });
       router.refresh();
     } else {
-      toast({ tone: "danger", title: "لم تُحذف القاعدة", body: res.error });
+      toast({ tone: "danger", title: "تعذّر حذف القاعدة", body: res.error });
     }
   }
 
@@ -75,13 +75,13 @@ export function BankRules({ rows, canEdit }: { rows: BankRuleRow[]; canEdit: boo
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="ابحث بالنصّ أو الباب أو المورّد"
+          placeholder="ابحث بالنص أو التصنيف أو المورّد"
           className="min-h-11 w-full rounded-lg border border-line-input bg-raised ps-9 pe-3 text-sm sm:min-h-9"
         />
       </label>
 
       {shown.length === 0 ? (
-        <p className="text-xs text-muted">لا قاعدة تطابق «{q}».</p>
+        <p className="text-xs text-muted">لا توجد قاعدة تطابق «{q}».</p>
       ) : (
         <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
           {shown.map((r) => (
@@ -109,7 +109,7 @@ export function BankRules({ rows, canEdit }: { rows: BankRuleRow[]; canEdit: boo
 
       {!q && matched.length > FIRST && (
         <button type="button" onClick={() => setAll((v) => !v)} className={buttonClass("secondary", "sm")}>
-          {all ? "اعرض أقلّ" : <>اعرض الكلّ (<span className="nums">{matched.length}</span>)</>}
+          {all ? "اعرض أقل" : <>اعرض الكل (<span className="nums">{matched.length}</span>)</>}
         </button>
       )}
     </div>

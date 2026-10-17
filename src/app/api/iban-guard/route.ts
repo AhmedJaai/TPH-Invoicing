@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 const Body = z.object({
   /** يغيب في «أوّلُ حوالةٍ إلى حسابٍ جديد» — قرارُها بالآيبان وحده. */
   supplierId: z.string().trim().min(1).max(64).optional(),
-  iban: z.string().trim().regex(/^SA\d{22}$/i, "آيبانٌ غير مفهوم"),
+  iban: z.string().trim().regex(/^SA\d{22}$/i, "رقم الآيبان غير صالح"),
   decision: z.enum(["KNOWN", "OPEN"]),
   note: z.string().trim().max(500).optional(),
 });
@@ -31,16 +31,16 @@ export async function POST(request: Request) {
       return NextResponse.json({
         ok: true,
         message: decision === "OPEN"
-          ? "أُعيد فتح السؤال عن هذا المستفيد"
-          : `حُفظ: ${first.payee ?? "مستفيدٌ"} تعرفه — لن يُذكر ثانيةً`,
+          ? "سيُسأل عن هذا المستفيد من جديد"
+          : `تم الحفظ: ${first.payee ?? "المستفيد"} معروف لديك، ولن يظهر التنبيه له مرة أخرى`,
       });
     }
     const alert = await db.transaction((t) => resolveIbanAlert(t, { supplierId, iban, decision, note }, user.id));
     return NextResponse.json({
       ok: true,
       message: decision === "OPEN"
-        ? `أُعيد فتح السؤال عن حساب ${alert.supplierName}`
-        : `حُفظ: حسابٌ لـ${alert.supplierName} تعرفه — خرج التنبيه، ويعود إن ظهر حسابٌ آخر`,
+        ? `سيُسأل عن حساب ${alert.supplierName} من جديد`
+        : `تم الحفظ: حساب ${alert.supplierName} معروف لديك. سيعود التنبيه إن ظهر حساب آخر`,
     });
   } catch (e) {
     if (e instanceof IbanAlertGone) return NextResponse.json({ error: e.message }, { status: 409 });

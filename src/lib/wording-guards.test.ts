@@ -14,8 +14,8 @@ function tsx(dir: string): string[] {
   });
 }
 
-describe("كلمةُ الخروج واحدة", () => {
-  it("زرٌّ يترك نموذجاً لا يُسمّى «تراجع»", () => {
+describe("كلمة الخروج واحدة", () => {
+  it("زرّ يترك نموذجاً لا يسمّى «تراجع»", () => {
     const offenders = [...tsx("src/components"), ...tsx("src/app")].filter((file) =>
       /<button\b[^>]*>\s*تراجع\s*<\/button>/.test(readFileSync(file, "utf8")));
     expect(offenders).toEqual([]);

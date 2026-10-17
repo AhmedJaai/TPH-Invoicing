@@ -3,7 +3,7 @@ import { addDays } from "./riyadh-time";
 import { DISMISSED, isSilenced, signalPrefix, silencedKeys, snoozeDay, snoozedUntil } from "./signal-decisions";
 
 describe("signal-decisions", () => {
-  it("المفتاحُ يُقبل ببادئته المعروفة وحدها", () => {
+  it("المفتاح يقبل ببادئته المعروفة وحدها", () => {
     expect(signalPrefix("pos-missing:2026-07-20")).toBe("pos-missing");
     expect(signalPrefix("recurring-rose:NAME:شركة:2026-08-07")).toBe("recurring-rose");
     expect(signalPrefix("double-paid:abc")).toBeNull();
@@ -11,7 +11,7 @@ describe("signal-decisions", () => {
     expect(signalPrefix("pos-missing: 2026")).toBeNull();
   });
 
-  it("المُسكَتُ صامتٌ دائماً، والمؤجَّلُ حتى يومه داخلاً ثمّ يعود", () => {
+  it("المسكت صامت دائماً، والمؤجّل حتى يومه داخلاً ثمّ يعود", () => {
     expect(isSilenced(DISMISSED, "2030-01-01")).toBe(true);
     const snooze = snoozedUntil("2026-08-10");
     expect(snoozeDay(snooze)).toBe("2026-08-10");
@@ -20,13 +20,13 @@ describe("signal-decisions", () => {
     expect(isSilenced(snooze, "2026-08-11")).toBe(false);
   });
 
-  it("قرارٌ لا يُفهم لا يُسكت شيئاً", () => {
+  it("قرار لا يفهم لا يسكت شيئاً", () => {
     expect(isSilenced("CLAIMED", "2026-08-10")).toBe(false);
     expect(isSilenced("SNOOZED:قريباً", "2026-08-10")).toBe(false);
     expect(isSilenced(null, "2026-08-10")).toBe(false);
   });
 
-  it("المفاتيحُ الصامتة تُجمع من الصفوف بتاريخ اليوم", () => {
+  it("المفاتيح الصامتة تجمع من الصفوف بتاريخ اليوم", () => {
     const keys = silencedKeys(
       [
         { key: "a:1", decision: DISMISSED },

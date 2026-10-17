@@ -80,7 +80,7 @@ export function describeMover(row: AuditRow, viewerId: string): Mover {
   const automatic = row.actorId === null || (typeof reason === "string" && /آلي|الأرشفة الآليّة|القراءة المحفوظة/.test(reason));
   return {
     label: actionLabel(row.action),
-    who: automatic ? "النظام" : row.actorId === viewerId ? "أنت" : row.actorName ?? "مستخدمٌ آخر",
+    who: automatic ? "النظام" : row.actorId === viewerId ? "أنت" : row.actorName ?? "مستخدم آخر",
     automatic,
     detail: Array.isArray(detail)
       ? detail.filter((d): d is string => typeof d === "string").slice(0, 4).join("، ") || null

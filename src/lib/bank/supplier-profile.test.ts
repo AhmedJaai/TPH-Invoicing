@@ -53,7 +53,7 @@ describe("موافقة المرشّح للملامح", () => {
   it("ما وافق العادة يُرجَّح", () => {
     const fit = fitToProfile(fast, { lagDays: 2, invoiceCount: 1 });
     expect(fit.adjustment).toBeGreaterThan(0);
-    expect(fit.reason).toContain("عادتُه");
+    expect(fit.reason).toContain("المعتاد");
   });
 
   it("ما بَعُد عنها يُخفَّض", () => {
@@ -73,9 +73,9 @@ describe("موافقة المرشّح للملامح", () => {
 
   it("المجموعة تُرجَّح عند من يُسدَّد جمعاً وتُخفَّض عند غيره", () => {
     expect(fitToProfile(monthly, { lagDays: 30, invoiceCount: 7 }).reason)
-      .toContain("جمعاً");
+      .toContain("دفعة مجمّعة");
     expect(fitToProfile(fast, { lagDays: 2, invoiceCount: 6 }).reason)
-      .toContain("لم يُسدَّد جمعاً");
+      .toContain("فواتير مجمّعة");
   });
 
   /* ترجيحٌ لا حسم: الملامح تفصل بين متقاربَين ولا تجعل بعيداً قريباً */

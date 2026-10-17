@@ -58,13 +58,13 @@ async function dispatch(request: Request): Promise<Response | null> {
   return answer === null ? null : await answer;
 }
 
-describe("عاملُ الخدمة (public/sw.js)", () => {
+describe("عامل الخدمة (public/sw.js)", () => {
   beforeEach(() => {
     load();
     netFetch = async () => new Response("ok");
   });
 
-  it("لا يعترض ردّاً ماليّاً ولا ملفّاً ثابتاً ولا طلبَ RSC — الشبكةُ كما كانت", async () => {
+  it("لا يعترض ردّاً ماليّاً ولا ملفّاً ثابتاً ولا طلب RSC — الشبكة كما كانت", async () => {
     expect(await dispatch(new Request(`${origin}/api/payment-run`))).toBeNull();
     expect(await dispatch(new Request(`${origin}/api/analyze`, { method: "POST", body: "x" }))).toBeNull();
     expect(await dispatch(new Request(`${origin}/_next/static/chunk.js`))).toBeNull();
@@ -78,13 +78,13 @@ describe("عاملُ الخدمة (public/sw.js)", () => {
     expect(source).not.toMatch(/addAll\(|caches\.match\(/);
   });
 
-  it("التنقّلُ يذهب إلى الشبكة، وما وصل يُعاد كما هو", async () => {
+  it("التنقّل يذهب إلى الشبكة، وما وصل يعاد كما هو", async () => {
     netFetch = async () => new Response("الصفحة", { status: 200 });
     const res = await dispatch(navigation(`${origin}/suppliers`));
     expect(await res!.text()).toBe("الصفحة");
   });
 
-  it("وحين لا يصل الطلب: «أنت بلا اتّصال» بالعربيّة، ٥٠٣، ولا تُخزَّن", async () => {
+  it("وحين لا يصل الطلب: «أنت بلا اتّصال» بالعربيّة، ٥٠٣، ولا تخزّن", async () => {
     netFetch = async () => { throw new TypeError("Failed to fetch"); };
     const res = await dispatch(navigation(`${origin}/payments`));
     expect(res!.status).toBe(503);
@@ -94,7 +94,7 @@ describe("عاملُ الخدمة (public/sw.js)", () => {
     expect(html).toContain("أنت بلا اتّصال");
   });
 
-  it("المشاركة: الملفّاتُ تُحفَظ ثمّ يُحوَّل إلى صفحة الرفع، وصفحةُ الرفع تأخذها وتُفرغ الصندوق", async () => {
+  it("المشاركة: الملفّات تحفظ ثمّ يحوّل إلى صفحة الرفع، وصفحة الرفع تأخذها وتفرغ الصندوق", async () => {
     const form = new FormData();
     form.append("files", new File([new Uint8Array([37, 80, 68, 70])], "فاتورة مراعي.pdf", { type: "application/pdf" }));
     form.append("files", new File([new Uint8Array([1, 2, 3])], "IMG_1.HEIC", { type: "" }));
@@ -119,14 +119,14 @@ describe("عاملُ الخدمة (public/sw.js)", () => {
     }
   });
 
-  it("مشاركةٌ بلا ملفّ (نصٌّ أو رابط) تفتح صفحةَ الرفع وتقول ذلك — لا صفحةَ خطأ", async () => {
+  it("مشاركة بلا ملفّ (نصّ أو رابط) تفتح صفحة الرفع وتقول ذلك — لا صفحة خطأ", async () => {
     const form = new FormData();
     form.append("text", "مرحبا");
     const res = await dispatch(new Request(`${origin}/share-target`, { method: "POST", body: form }));
     expect(res!.headers.get("location")).toBe(`${origin}/upload?shared=0`);
   });
 
-  it("ما بقي في الصندوق أكثر من يومٍ يُمحى ولا يُقرأ", async () => {
+  it("ما بقي في الصندوق أكثر من يوم يمحى ولا يقرأ", async () => {
     const cache = await cachesFake.open(SHARE_CACHE);
     const old = Date.now() - 25 * 60 * 60 * 1000;
     await cache.put(`${origin}/__shared/old`, new Response("x", { headers: { "content-type": "application/pdf", "x-file-name": "old.pdf", "x-shared-at": String(old) } }));
@@ -141,24 +141,24 @@ describe("عاملُ الخدمة (public/sw.js)", () => {
 });
 
 describe("sharedFileName", () => {
-  it("يفكّ الاسمَ العربيّ، ويُسقط المسار", () => {
+  it("يفكّ الاسم العربيّ، ويسقط المسار", () => {
     expect(sharedFileName(encodeURIComponent("فاتورة.pdf"), "application/pdf")).toBe("فاتورة.pdf");
     expect(sharedFileName(encodeURIComponent("../../etc/x.pdf"), "application/pdf")).toBe("x.pdf");
   });
 
-  it("اسمٌ غائب أو فاسد يأخذ اسماً عامّاً بامتداد نوعه — فيقبله شرطُ القراءة", () => {
+  it("اسم غائب أو فاسد يأخذ اسماً عامّاً بامتداد نوعه — فيقبله شرط القراءة", () => {
     expect(sharedFileName(null, "application/pdf")).toBe("مشاركة.pdf");
     expect(sharedFileName("%E0%A4%A", "image/jpeg")).toBe("مشاركة.jpg");
     expect(sharedFileName("", "image/png")).toBe("مشاركة.png");
   });
 });
 
-describe("بيانُ التثبيت يعلن هدفَ المشاركة الذي يستقبله العامل", () => {
+describe("بيان التثبيت يعلن هدف المشاركة الذي يستقبله العامل", () => {
   const manifest = JSON.parse(readFileSync("src/app/manifest.webmanifest", "utf8")) as {
     share_target?: { action: string; method: string; enctype: string; params: { files: { name: string; accept: string[] }[] } };
   };
 
-  it("المسارُ والطريقةُ واسمُ الحقل تطابق `sw.js`", () => {
+  it("المسار والطريقة واسم الحقل تطابق `sw.js`", () => {
     const source = readFileSync("public/sw.js", "utf8");
     expect(manifest.share_target?.method).toBe("POST");
     expect(manifest.share_target?.enctype).toBe("multipart/form-data");

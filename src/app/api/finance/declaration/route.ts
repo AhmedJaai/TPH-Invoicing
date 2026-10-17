@@ -14,11 +14,11 @@ import { createDeclaration, DeclarationRefused, voidDeclaration } from "@/servic
 
 export const runtime = "nodejs";
 
-const Month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "اكتب الشهر بصيغة 2026-08");
+const Month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "اكتب الشهر بصيغة YYYY-MM، مثل 2026-08");
 const Create = z.object({
   action: z.literal("create"),
   kind: z.enum(["SPREAD", "OFF_BOOK", "NONE"]),
-  category: z.string().refine(isTxCategory, "فئةٌ غير معروفة"),
+  category: z.string().refine(isTxCategory, "فئة غير معروفة"),
   label: z.string().trim().min(2, "اكتب وصفاً قصيراً").max(120),
   /** المبلغُ نصّاً بالريال — يُقرأ هللاتٍ في الخادم. */
   amount: z.string().trim().max(20).optional(),
@@ -38,13 +38,13 @@ export async function POST(request: Request) {
     const body = read.body;
     if (body.action === "void") {
       const done = await voidDeclaration(body.id, user.id);
-      return NextResponse.json({ ok: true, message: done ? "سُحب الإقرار — يعود الشهرُ كما يقوله الكشف" : "كان مسحوباً أصلاً" });
+      return NextResponse.json({ ok: true, message: done ? "تم سحب الإقرار، وعاد الشهر إلى ما في كشف البنك" : "الإقرار مسحوب من قبل" });
     }
-    if (!isTxCategory(body.category)) return NextResponse.json({ error: "فئةٌ غير معروفة" }, { status: 400 });
+    if (!isTxCategory(body.category)) return NextResponse.json({ error: "فئة غير معروفة" }, { status: 400 });
     let amountMinor = 0;
     if (body.kind === "OFF_BOOK") {
       const parsed = parseRiyals(body.amount ?? "");
-      if (parsed === null || parsed <= 0) return NextResponse.json({ error: "اكتب مبلغَ الشهر رقماً أكبر من صفر." }, { status: 400 });
+      if (parsed === null || parsed <= 0) return NextResponse.json({ error: "اكتب مبلغ الشهر رقماً أكبر من صفر." }, { status: 400 });
       amountMinor = parsed;
     }
     await createDeclaration({
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       fromMonth: body.fromMonth, toMonth: body.toMonth,
       bankTransactionId: body.bankTransactionId ?? null, note: body.note ?? null,
     }, user.id);
-    return NextResponse.json({ ok: true, message: "حُفظ الإقرار — دخل قائمةَ الدخل باسمه" });
+    return NextResponse.json({ ok: true, message: "تم حفظ الإقرار، ويظهر في قائمة الدخل باسمه" });
   } catch (e) {
     if (e instanceof DeclarationRefused) return NextResponse.json({ error: e.message }, { status: 409 });
     const mapped = respondTo(e);

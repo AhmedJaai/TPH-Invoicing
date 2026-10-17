@@ -64,7 +64,7 @@ const ACTIONS: readonly Command[] = [
   {
     id: "drive-sync",
     label: "زامن الدرايف الآن",
-    hint: "آخرُ مزامنة، والفحصُ والأرشفةُ والتسميةُ بضغطة",
+    hint: "يفحص الملفات الجديدة ويؤرشفها ويسمّيها بضغطة واحدة",
     group: "ACTION",
     href: "/documents/drive",
     needs: "document:upload",
@@ -82,7 +82,7 @@ const ACTIONS: readonly Command[] = [
   {
     id: "decide",
     label: "راجع ما ينتظر قرارك",
-    hint: "كلّ بندٍ بسببه ودليله وفعله",
+    hint: "كل بند مع سببه والإجراء المقترح",
     group: "ACTION",
     href: "/attention",
     needs: "reports:view",
@@ -91,7 +91,7 @@ const ACTIONS: readonly Command[] = [
   {
     id: "pay-run",
     label: "جهّز دفعة الشهر للمورّدين",
-    hint: "ملفّ تحويلاتٍ بما عليك لكلّ مورّد",
+    hint: "ملف تحويلات بالمبلغ المستحق لكل مورّد",
     group: "ACTION",
     href: "/payments",
     needs: "payment:approve",
@@ -100,7 +100,7 @@ const ACTIONS: readonly Command[] = [
   {
     id: "close-month",
     label: "أقفل الشهر",
-    hint: "المعادلة والكشوف قبل الإقفال",
+    hint: "فحص المعادلة والكشوف قبل الإقفال",
     group: "ACTION",
     href: "/close",
     needs: "month:close",
@@ -127,7 +127,7 @@ const ACTIONS: readonly Command[] = [
   {
     id: "cash",
     label: "انظر النقد القادم",
-    hint: "ما يخرج ومتى، مقابل رصيد البنك",
+    hint: "ما سيخرج ومتى، مقارنة برصيد البنك",
     group: "ACTION",
     href: "/cash",
     needs: "bank:view",
@@ -136,7 +136,7 @@ const ACTIONS: readonly Command[] = [
   {
     id: "accountant-pack",
     label: "صدّر حزمة المحاسب",
-    hint: "فواتير الشهر ودفعاته ومصروفه وضريبته — ملفّ Excel",
+    hint: "ملف Excel بفواتير الشهر ودفعاته ومصروفاته وضريبته",
     group: "ACTION",
     href: "/close#export",
     needs: "month:close",
@@ -145,7 +145,7 @@ const ACTIONS: readonly Command[] = [
   {
     id: "add-expense",
     label: "سجّل مصروفاً دُفع نقداً",
-    hint: "إيجار، راتب، فاتورة خدمة — خارج كشف البنك",
+    hint: "مثل الإيجار أو الراتب أو فاتورة خدمة، مما لا يظهر في كشف البنك",
     group: "ACTION",
     href: "/money/expenses?add=1",
     needs: "expense:edit",
@@ -153,7 +153,7 @@ const ACTIONS: readonly Command[] = [
   },
   {
     id: "statements",
-    label: "طابِق كشف مورّد",
+    label: "طابق كشف مورّد",
     hint: "الكشوف",
     group: "ACTION",
     href: "/statements",
@@ -164,7 +164,7 @@ const ACTIONS: readonly Command[] = [
     /* «إقرار الضريبة» كان صفحةً بلا مرادف — من كتب «vat» أو «هيئة» أو «زكاة» لم يجد شيئاً */
     id: "vat-file",
     label: "قدّم إقرار الضريبة",
-    hint: "حسابُ الربع وما يُخصم — ثمّ «قدّمتُه للهيئة»",
+    hint: "احسب ضريبة الربع وما يُخصم منها، ثم سجّل «قدّمته للهيئة»",
     group: "ACTION",
     href: "/close/vat",
     needs: "month:close",
@@ -176,8 +176,8 @@ const ACTIONS: readonly Command[] = [
 const VIEW: readonly Command[] = [
   { id: "shortcuts", label: "اختصارات لوحة المفاتيح", hint: "?", group: "ACTION", href: "/", event: "shortcuts", keywords: ["اختصار", "مفاتيح", "shortcuts", "keyboard"] },
   { id: "theme", label: "بدّل الوضع الفاتح والداكن", group: "ACTION", href: "/", event: "theme", keywords: ["داكن", "ليلي", "فاتح", "dark", "theme"] },
-  { id: "theme-system", label: "اتبع وضع الجهاز", hint: "فاتحٌ نهاراً وداكنٌ ليلاً كما يضبطه جهازك", group: "ACTION", href: "/", event: "theme-system", keywords: ["جهاز", "نظام", "تلقائي", "داكن", "فاتح", "system", "auto", "theme"] },
-  { id: "amounts", label: "أخفِ المبالغ أو أظهرها", hint: "للعرض على غيرك", group: "ACTION", href: "/", event: "amounts", keywords: ["اخف", "اخفاء", "مبالغ", "hide", "privacy"] },
+  { id: "theme-system", label: "اتبع وضع الجهاز", hint: "فاتح نهاراً وداكن ليلاً حسب إعداد جهازك", group: "ACTION", href: "/", event: "theme-system", keywords: ["جهاز", "نظام", "تلقائي", "داكن", "فاتح", "system", "auto", "theme"] },
+  { id: "amounts", label: "أخف المبالغ أو أظهرها", hint: "عند عرض الشاشة على غيرك", group: "ACTION", href: "/", event: "amounts", keywords: ["اخف", "اخفاء", "مبالغ", "hide", "privacy"] },
 ];
 
 /**
@@ -187,8 +187,8 @@ const VIEW: readonly Command[] = [
 const SECONDARY: readonly Command[] = [
   { id: "p:analysis", label: "الأصناف والأسعار", hint: "المورّدون", group: "PAGE", href: "/analysis", needs: "amounts:view", keywords: ["سعر", "اسعار", "صنف", "prices"] },
   { id: "p:expenses", label: "المصروفات", hint: "البنك", group: "PAGE", href: "/money/expenses", needs: "bank:view", keywords: ["مصروف", "ايجار", "رواتب", "expenses"] },
-  { id: "p:obligations", label: "الوثائق والتراخيص", hint: "ما ينتهي: رخصة، شهادة، إقامة، عقد", group: "PAGE", href: "/settings/obligations", needs: "reports:view", keywords: ["رخصه", "سجل", "تجاري", "بلديه", "اقامه", "شهاده", "صحيه", "عقد", "ايجار", "انتهاء", "تجديد", "licence", "expiry"] },
-  { id: "p:owner", label: "بينك وبين المقهى", hint: "ما دفعتَه من جيبك وما أخذتَه", group: "PAGE", href: "/money/owner", needs: "bank:view", keywords: ["مالك", "سحب", "مسحوبات", "شخصي", "جاري", "owner", "drawings"] },
+  { id: "p:obligations", label: "الوثائق والتراخيص", hint: "ما له تاريخ انتهاء: رخصة، شهادة، إقامة، عقد", group: "PAGE", href: "/settings/obligations", needs: "reports:view", keywords: ["رخصه", "سجل", "تجاري", "بلديه", "اقامه", "شهاده", "صحيه", "عقد", "ايجار", "انتهاء", "تجديد", "licence", "expiry"] },
+  { id: "p:owner", label: "بينك وبين المقهى", hint: "ما دفعته من مالك الخاص وما سحبته", group: "PAGE", href: "/money/owner", needs: "bank:view", keywords: ["مالك", "سحب", "مسحوبات", "شخصي", "جاري", "owner", "drawings"] },
   { id: "p:trend", label: "اتّجاه الجرد", hint: "الجرد", group: "PAGE", href: "/inventory/trend", needs: "amounts:view", keywords: ["فرق", "اتجاه", "trend"] },
   { id: "p:mapping", label: "منتجات تحتاج ربطاً", hint: "الجرد", group: "PAGE", href: "/inventory/mapping", needs: "inventory:view", keywords: ["ربط", "منتج", "mapping"] },
 ];

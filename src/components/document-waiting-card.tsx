@@ -59,14 +59,14 @@ export function WaitingCard({
       <div className="flex flex-wrap items-start gap-x-4 gap-y-3 px-4 pt-4 sm:px-5">
         <Monogram name={r.supplierName ?? "؟"} className="h-10 w-10 text-sm" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-bold">{r.supplierName ?? "مورّدٌ لم يُعرَف"}</p>
+          <p className="truncate text-[15px] font-bold">{r.supplierName ?? "مورّد غير معروف"}</p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
             <span>{kindLabel}</span>
             {r.periodMonth && <><span aria-hidden>·</span><span>{formatMonth(r.periodMonth)}</span></>}
             {r.textSource && (
               <>
                 <span aria-hidden>·</span>
-                <span>{r.textSource === "TEXT" ? "قُرئ من نصّ الملفّ" : "قُرئ من صورة — ظنّاً"}</span>
+                <span>{r.textSource === "TEXT" ? "قُرئ من نص الملف" : "قُرئ من صورة (تقدير)"}</span>
               </>
             )}
           </p>
@@ -86,7 +86,7 @@ export function WaitingCard({
       <div className={`mx-4 mt-3 flex items-start gap-2 rounded-lg bg-sunken px-3 py-2 text-xs leading-relaxed sm:mx-5 ${whyCls}`}>
         <WhyIcon className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
         <div className="min-w-0">
-          <p className="font-bold">{why.tone === "ok" ? "جاهز" : why.tone === "warn" ? "لم يدخل وحده" : "يحتاج نظرك"}</p>
+          <p className="font-bold">{why.tone === "ok" ? "جاهز" : why.tone === "warn" ? "لم يُعتمد تلقائياً" : "يحتاج مراجعتك"}</p>
           <ul className="text-ink-soft">
             {why.lines.map((l) => <li key={l}>{l}</li>)}
           </ul>
@@ -114,7 +114,7 @@ export function WaitingCard({
         {r.invoiceId && showAmounts && (
           <Link href={invoiceHref(r.invoiceId, "tax")} className={buttonClass("quiet", "sm")}>
             <PenLine className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            صحّح حقلاً
+            صحّح بياناً
           </Link>
         )}
         <span className="flex-1" />
@@ -122,9 +122,9 @@ export function WaitingCard({
         {/* ما لم يُقيَّد له شيء لا يُعتمد — يُكمَل ويُقيَّد من ملفّه */}
         {canDecide && showAmounts && r.status === "NEEDS_REVIEW" && (r.invoiceId || !RECORDABLE.has(r.kind)) && <ConfirmDocument documentId={r.id} variant="primary" />}
         {canDecide && showAmounts && !r.invoiceId && RECORDABLE.has(r.kind) && (
-          <Link href={documentHref(r.id, "fix")} className={buttonClass("primary", "sm")}>أكمِله وقيّده</Link>
+          <Link href={documentHref(r.id, "fix")} className={buttonClass("primary", "sm")}>أكمله وقيّده</Link>
         )}
-        {!canDecide && <span className="text-[11px] text-muted">الحسمُ لمن يرفع المستندات ويعتمدها.</span>}
+        {!canDecide && <span className="text-[11px] text-muted">القرار لمن يرفع المستندات ويعتمدها.</span>}
       </div>
     </li>
   );

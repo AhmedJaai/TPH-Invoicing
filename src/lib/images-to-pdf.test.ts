@@ -14,8 +14,8 @@ async function noiseJpeg(width: number, height: number, seed: number): Promise<U
   return new Uint8Array(await sharp(raw, { raw: { width, height, channels: 3 } }).jpeg({ quality: 80 }).toBuffer());
 }
 
-describe("imagesToPdf — صفحتا فاتورةٍ في مستندٍ واحد", () => {
-  it("يقرؤه قارئُ الـPDF الذي يقرأ به الخادم: صفحتان بنسبة صورتَيهما", async () => {
+describe("imagesToPdf — صفحتا فاتورة في مستند واحد", () => {
+  it("يقرؤه قارئ الـPDF الذي يقرأ به الخادم: صفحتان بنسبة صورتيهما", async () => {
     const pdf = imagesToPdf([
       { jpeg: await noiseJpeg(300, 400, 1), width: 300, height: 400 },
       { jpeg: await noiseJpeg(400, 300, 2), width: 400, height: 300 },
@@ -36,7 +36,7 @@ describe("imagesToPdf — صفحتا فاتورةٍ في مستندٍ واحد",
     expect(ops.fnArray.length).toBeGreaterThan(0);
   });
 
-  it("ومقصُّ الخادم ينتزع الصورتَين كما هما — بايتاً ببايت، بلا إعادة ضغط", async () => {
+  it("ومقصّ الخادم ينتزع الصورتين كما هما — بايتاً ببايت، بلا إعادة ضغط", async () => {
     const a = await noiseJpeg(300, 400, 3);
     const b = await noiseJpeg(320, 420, 4);
     const pdf = imagesToPdf([
@@ -49,7 +49,7 @@ describe("imagesToPdf — صفحتا فاتورةٍ في مستندٍ واحد",
     expect(found.some((f) => Buffer.from(b).equals(f.data))).toBe(true);
   });
 
-  it("إزاحاتُ `xref` تشير إلى كائناتها بالبايت", async () => {
+  it("إزاحات `xref` تشير إلى كائناتها بالبايت", async () => {
     const pdf = imagesToPdf([{ jpeg: await noiseJpeg(64, 64, 5), width: 64, height: 64 }]);
     const text = Buffer.from(pdf).toString("latin1");
     const startxref = Number(/startxref\n(\d+)\n%%EOF/.exec(text)![1]);
@@ -61,8 +61,8 @@ describe("imagesToPdf — صفحتا فاتورةٍ في مستندٍ واحد",
     expect(rows).toHaveLength(5);
   });
 
-  it("ما ليس JPEG أو بلا أبعادٍ يُرفَض بكلامٍ مفهوم — لا ملفٌّ تالف", () => {
-    expect(() => imagesToPdf([])).toThrow("لا صورةَ");
+  it("ما ليس JPEG أو بلا أبعاد يرفض بكلام مفهوم — لا ملفّ تالف", () => {
+    expect(() => imagesToPdf([])).toThrow("لا توجد صور");
     expect(() => imagesToPdf([{ jpeg: new Uint8Array([0x89, 0x50, 0x4e, 0x47]), width: 10, height: 10 }])).toThrow("JPEG");
     expect(() => imagesToPdf([{ jpeg: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), width: 0, height: 10 }])).toThrow("JPEG");
   });

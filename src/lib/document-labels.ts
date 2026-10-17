@@ -14,15 +14,15 @@ export const DOCUMENT_KIND_LABEL: Record<string, string> = {
   CASH_RECEIPT: "إيصال نقدي",
   CONTRACT: "عقد",
   UTILITY: "مرافق وحكومي",
-  UNKNOWN: "غير محدَّد",
+  UNKNOWN: "غير محدّد",
 };
 
 export const DOCUMENT_STATUS_BADGE: Record<string, { text: string; tone: LabelTone }> = {
-  ARCHIVED: { text: "أُرشف", tone: "ok" },
+  ARCHIVED: { text: "مؤرشف", tone: "ok" },
   PENDING: { text: "ينتظر المراجعة", tone: "warn" },
   EXTRACTED: { text: "ينتظر المراجعة", tone: "warn" },
   NEEDS_REVIEW: { text: "ينتظر المراجعة", tone: "warn" },
-  REJECTED: { text: "رُفض", tone: "danger" },
+  REJECTED: { text: "مرفوض", tone: "danger" },
 };
 
 /** رابطُ ملفّ المستند — لوحاً فوق ما أنت فيه، أو صفحةً إن فُتح مباشرة. */

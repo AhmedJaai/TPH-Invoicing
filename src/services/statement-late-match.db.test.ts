@@ -4,8 +4,8 @@ import { statementLines } from "@/db/schema";
 import { day, makeDocument, makeSupplier, withRollback } from "@/test/db";
 import { createInvoice, createStatement } from "./invoice.service";
 
-describe("فاتورةٌ تصل بعد كشف مورّدها", () => {
-  it("يُطابَق سطرُها في الكشف ويُحسَم تنبيهُ «اطلبها منه»", () =>
+describe("فاتورة تصل بعد كشف مورّدها", () => {
+  it("يطابق سطرها في الكشف ويحسم تنبيه «اطلبها منه»", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const stDoc = await makeDocument(tx, s, "2026-09-30");

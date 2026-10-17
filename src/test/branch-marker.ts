@@ -24,7 +24,7 @@ export async function assertTestBranchMarker(url: string | undefined): Promise<v
     );
     if (!found.rows[0]?.marker) {
       throw new Error(
-        `✕ لا جدولَ علَمٍ «${TEST_BRANCH_MARKER}» في هذه القاعدة — فلا دليل أنّها فرعُ الاختبار لا الإنتاج.\n` +
+        `✕ لا جدول علم «${TEST_BRANCH_MARKER}» في هذه القاعدة — فلا دليل أنّها فرع الاختبار لا الإنتاج.\n` +
         `  في محرّر SQL لفرع الاختبار وحده:  create table ${TEST_BRANCH_MARKER} ();\n` +
         "  (انظر docs/decisions/engineering-ops.md ← «اختبارات القاعدة على فرع Neon»)",
       );

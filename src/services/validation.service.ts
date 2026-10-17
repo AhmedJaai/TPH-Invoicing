@@ -20,7 +20,7 @@ import { supplierContext, type SupplierContext } from "./supplier.service";
 export class BlockedError extends Error {
   readonly blockers: string[];
   constructor(blockers: string[]) {
-    super(`لا يمكن الأرشفة قبل معالجة: ${blockers[0]}`);
+    super(`لا يمكن الأرشفة قبل معالجة ما يلي: ${blockers[0]}`);
     this.name = "BlockedError";
     this.blockers = blockers;
   }
@@ -29,7 +29,7 @@ export class BlockedError extends Error {
 /** خطأ يُترجم إلى ٤٠٩: الشهر مقفل. */
 export class MonthClosedError extends Error {
   constructor(month: string) {
-    super(`شهر ${month} مقفل. أعد فتحه من صفحة الإقفال إن كانت هذه فاتورة متأخّرة.`);
+    super(`شهر ${month} مقفل. أعد فتحه من صفحة الإقفال إن كانت هذه فاتورة متأخرة.`);
     this.name = "MonthClosedError";
   }
 }
@@ -68,7 +68,7 @@ const INVOICE_KINDS = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE", "UTILITY"]);
 
 export async function reviewForArchive(fields: ConfirmedFields): Promise<ReviewResult> {
   const supplier = await supplierContext(fields.supplierId);
-  if (fields.supplierId && !supplier) throw new InvalidInputError("المورد المحدَّد غير موجود");
+  if (fields.supplierId && !supplier) throw new InvalidInputError("المورّد المحدد غير موجود");
 
   /*
     الإجماليّ صفرٌ أو سالب لا يُقيَّد فاتورة.
@@ -82,7 +82,7 @@ export async function reviewForArchive(fields: ConfirmedFields): Promise<ReviewR
     fields.totalMinor !== null && fields.totalMinor !== undefined &&
     fields.totalMinor <= 0
   ) {
-    throw new BlockedError(["الإجماليّ صفرٌ أو سالب — لا تُقيَّد فاتورةٌ بلا مبلغ. صحّحه من المستند نفسه"]);
+    throw new BlockedError(["الإجمالي صفر أو سالب، فلا يمكن قيد فاتورة بلا مبلغ. صحّحه من المستند نفسه"]);
   }
 
   /*

@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   }
 
   const period = parseVatPeriod(new URL(request.url).searchParams.get("period"));
-  if (!period) return NextResponse.json({ error: "اختر فترةً صحيحة (2026-Q3 أو YYYY-MM)." }, { status: 400 });
+  if (!period) return NextResponse.json({ error: "اختر فترة صحيحة، مثل 2026-Q3 أو YYYY-MM." }, { status: 400 });
   const key = periodKey(period);
 
   try {
@@ -69,6 +69,6 @@ export async function GET(request: Request) {
     });
   } catch (e) {
     console.error("[vat-export]", e);
-    return NextResponse.json({ error: "تعذّر إعداد سجلّ الإقرار — لم يُكتب شيء. أعد المحاولة بعد لحظة." }, { status: 500 });
+    return NextResponse.json({ error: "تعذّر إعداد سجلّ الإقرار، ولم يُحفظ شيء. أعد المحاولة بعد لحظة." }, { status: 500 });
   }
 }

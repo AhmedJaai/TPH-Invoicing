@@ -39,7 +39,7 @@ const Body = z.object({
    * الربعيّ والسنويّ، فيقع في «النقد القادم» في موضعه. وبدونه يُقال
    * «يومٌ غير محدَّد» ولا يُخترَع له يوم.
    */
-  startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "التاريخ بصيغة YYYY-MM-DD").optional(),
+  startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "اكتب التاريخ بصيغة YYYY-MM-DD").optional(),
 });
 type Body = z.infer<typeof Body>;
 
@@ -70,9 +70,9 @@ export async function POST(request: Request) {
       action: "EXPENSE_REMOVED",
       entityType: "recurring_expense",
       entityId: body.id,
-      after: { الحالة: "معطَّل" },
+      after: { الحالة: "معطّل" },
     });
-    return NextResponse.json({ ok: true, message: "عُطّل المصروف ولم يُحذف" });
+    return NextResponse.json({ ok: true, message: "تم تعطيل المصروف دون حذفه" });
   }
 
   /* المعطَّل يُعاد — نقرةٌ خاطئة على «عطّله» لم يكن لها رجوع */
@@ -90,9 +90,9 @@ export async function POST(request: Request) {
       action: "EXPENSE_REACTIVATED",
       entityType: "recurring_expense",
       entityId: body.id,
-      after: { البند: row.label, الحالة: "مفعَّل" },
+      after: { البند: row.label, الحالة: "مفعّل" },
     });
-    return NextResponse.json({ ok: true, message: `أُعيد «${row.label}» إلى المتوقَّع` });
+    return NextResponse.json({ ok: true, message: `أُعيد «${row.label}» إلى المصروفات المتوقّعة` });
   }
 
   const label = body.label?.trim();
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
   if (body.startsOn) {
     const d = new Date(`${body.startsOn}T12:00:00Z`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(body.startsOn) || Number.isNaN(d.getTime()) || isoDay(d) !== body.startsOn) {
-      return NextResponse.json({ error: "تاريخ أوّل استحقاقٍ غير صالح" }, { status: 400 });
+      return NextResponse.json({ error: "تاريخ أول استحقاق غير صالح" }, { status: 400 });
     }
     startsOn = body.startsOn;
   }
@@ -139,5 +139,5 @@ export async function POST(request: Request) {
     after: { البند: label, المبلغ_بالهللة: amountMinor, الدورة: cadence, التصنيف: body.category, أوّل_استحقاق: startsOn },
   });
 
-  return NextResponse.json({ ok: true, id: row.id, message: `أُضيف «${label}»` });
+  return NextResponse.json({ ok: true, id: row.id, message: `تمت إضافة «${label}»` });
 }

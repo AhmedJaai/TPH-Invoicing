@@ -147,7 +147,7 @@ export interface LinkResult {
  */
 export async function linkToProduct(input: LinkInput): Promise<LinkResult> {
   if (input.supplierProductIds.length === 0) {
-    throw new Error("لم تُحدَّد أصناف للربط");
+    throw new Error("لم تحدد أي أصناف للربط");
   }
 
   let productId = input.productId ?? "";
@@ -156,7 +156,7 @@ export async function linkToProduct(input: LinkInput): Promise<LinkResult> {
 
   if (!productId) {
     const name = input.newProductName?.trim();
-    if (!name) throw new Error("اكتب اسم الصنف المعياري أو اختر واحداً قائماً");
+    if (!name) throw new Error("اكتب اسم الصنف المعياري أو اختر صنفاً موجوداً");
 
     const [existing] = await db
       .select({ id: products.id, nameAr: products.nameAr })

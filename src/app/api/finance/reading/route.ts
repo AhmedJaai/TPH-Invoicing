@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const { reading } = outcome.stored;
     return NextResponse.json({
       ok: true,
-      message: reading.dropped > 0 ? `كُتبت القراءة — وأُسقطت ${reading.dropped} جملةً فيها رقمٌ ليس ممّا حُسب` : "كُتبت القراءة",
+      message: reading.dropped > 0 ? `تمت كتابة القراءة، وحُذفت ${reading.dropped} جملةً فيها رقم غير محسوب` : "تمت كتابة القراءة",
     });
   } catch (e) {
     const mapped = respondTo(e);

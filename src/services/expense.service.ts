@@ -185,7 +185,7 @@ export async function deriveExpensesFromBank(
         entityType: "expense",
         entityId: month ?? "all",
         after: {
-          قُيّدت: inserted, "رُبطت بمصروفٍ قُيِّد بيد": adoptions.length,
+          قُيّدت: inserted, "ربطت بمصروف قيّد بيد": adoptions.length,
           "تغيّر بابها": sync.updated, "لم تعد مصروفاً": sync.removed,
         },
       }, tx);
@@ -344,7 +344,7 @@ export async function recordManualExpense(
     note?: string;
   },
 ): Promise<string> {
-  if (input.amountMinor <= 0) throw new Error("المبلغ يجب أن يكون موجباً");
+  if (input.amountMinor <= 0) throw new Error("يجب أن يكون المبلغ أكبر من صفر");
 
   const id = createId();
   const recurring = await activeRecurring();
@@ -406,7 +406,7 @@ export async function deleteExpense(userId: string, id: string): Promise<DeleteE
       entityType: "expense",
       entityId: id,
       before: row,
-      after: { الفعل: "حُذف القيد", المصدر: row.source },
+      after: { الفعل: "حذف القيد", المصدر: row.source },
     }, t);
     return "DELETED";
   });
@@ -433,7 +433,7 @@ export async function deriveOpenMonths(
     try {
       created += (await deriveExpensesFromBank(userId, month, conn)).created;
     } catch (e) {
-      notes.push(`مصروفات ${month}: ${(e as Error).message.slice(0, 120)}`);
+      notes.push(`تعذّر اشتقاق مصروفات ${month}: ${(e as Error).message.slice(0, 120)}`);
     }
   }
   return { created, notes };

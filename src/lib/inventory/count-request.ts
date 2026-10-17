@@ -22,17 +22,17 @@ import { STORED_UNITS, type StoredUnit } from "@/lib/unit-conversion";
 
 const MAX_ITEMS = 2000;
 
-const id = z.string().trim().min(1, "معرّفٌ فارغ").max(64, "معرّفٌ أطول من المعقول");
+const id = z.string().trim().min(1, "المعرّف فارغ").max(64, "المعرّف أطول من المسموح");
 
 /** تاريخٌ حقيقيّ بصيغة `YYYY-MM-DD` — لا «2026-02-30». */
-export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "التاريخ بصيغة YYYY-MM-DD").refine((v) => {
+export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "اكتب التاريخ بصيغة YYYY-MM-DD").refine((v) => {
   const [y, m, d] = v.split("-").map(Number);
   const t = new Date(Date.UTC(y, m - 1, d));
   return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
-}, "تاريخٌ غير موجود في التقويم");
+}, "هذا التاريخ غير موجود في التقويم");
 
 export const storedUnit = z.enum(STORED_UNITS as unknown as [StoredUnit, ...StoredUnit[]], {
-  error: "وحدةٌ غير معروفة",
+  error: "الوحدة غير معروفة",
 });
 
 /**
@@ -40,7 +40,7 @@ export const storedUnit = z.enum(STORED_UNITS as unknown as [StoredUnit, ...Stor
  * «أفرِغه»)، والسالبُ وما لا يُقرأ يُردّ.
  */
 export const quantityText = z
-  .union([z.string().max(24, "كمّيّةٌ أطول من المعقول"), z.null()])
+  .union([z.string().max(24, "الكمية أطول من المسموح"), z.null()])
   .transform((v, ctx) => {
     if (v === null || v.trim() === "") return null;
     /* «5,200» لا تُخمَّن — فرقٌ بألف ضعف */
@@ -50,7 +50,7 @@ export const quantityText = z
     }
     const milli = decimalToMilli(v.trim());
     if (milli === null || milli < 0) {
-      ctx.addIssue({ code: "custom", message: `كمّيّةٌ غير مقروءة: «${v}» — اكتب رقماً موجباً` });
+      ctx.addIssue({ code: "custom", message: `الكمية غير مقروءة: «${v}». اكتب رقماً موجباً` });
       return z.NEVER;
     }
     return milli;
@@ -87,18 +87,18 @@ export const countRequest = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("save"),
     countId: id,
-    entries: z.array(entry).min(1, "لا صنفَ في الطلب").max(MAX_ITEMS),
+    entries: z.array(entry).min(1, "لا يوجد صنف في الطلب").max(MAX_ITEMS),
   }).strict(),
   z.object({
     action: z.literal("opening"),
     countId: id,
-    entries: z.array(openingEntry).min(1, "لا صنفَ في الطلب").max(MAX_ITEMS),
+    entries: z.array(openingEntry).min(1, "لا يوجد صنف في الطلب").max(MAX_ITEMS),
   }).strict(),
   z.object({ action: z.literal("finalise"), countId: id }).strict(),
   z.object({
     action: z.literal("reopen"),
     countId: id,
-    reason: z.string().trim().min(5, "اكتب سببَ إعادة الفتح — خمسةُ أحرفٍ على الأقلّ").max(500),
+    reason: z.string().trim().min(5, "اكتب سبب إعادة الفتح (خمسة أحرف على الأقل)").max(500),
   }).strict(),
   z.object({ action: z.literal("recompute"), countId: id }).strict(),
   z.object({ action: z.literal("discard"), countId: id }).strict(),
@@ -117,9 +117,9 @@ export function parseCountRequest(body: unknown):
 
 export function firstMessage(error: z.ZodError): string {
   const issue = error.issues[0];
-  if (!issue) return "طلبٌ غير مفهوم";
-  if (issue.code === "invalid_union" || issue.path[0] === "action") return "فعلٌ غير معروف";
-  if (issue.code === "unrecognized_keys") return `حقلٌ غير متوقَّع: ${issue.keys.join("، ")}`;
-  if (issue.code === "invalid_type") return `حقلٌ مفقودٌ أو من نوعٍ خاطئ: ${issue.path.join(".") || "الطلب"}`;
+  if (!issue) return "الطلب غير مفهوم";
+  if (issue.code === "invalid_union" || issue.path[0] === "action") return "الإجراء غير معروف";
+  if (issue.code === "unrecognized_keys") return `حقل غير متوقع: ${issue.keys.join("، ")}`;
+  if (issue.code === "invalid_type") return `حقل ناقص أو نوعه خاطئ: ${issue.path.join(".") || "الطلب"}`;
   return issue.message;
 }

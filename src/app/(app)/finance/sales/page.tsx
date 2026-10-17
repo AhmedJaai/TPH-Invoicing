@@ -24,10 +24,10 @@ function pctChange(now: number, before: number | null): number | null {
 
 const itemColumns: Column<ItemRow>[] = [
   { key: "name", header: "الصنف", primary: true, cell: (i) => i.name, sortBy: (i) => i.name },
-  { key: "qty", header: "الكمّيّة", numeric: true, cell: (i) => <span className="nums">{formatUnits(i.quantityMilli)}</span>, sortBy: (i) => i.quantityMilli },
+  { key: "qty", header: "الكمية", numeric: true, cell: (i) => <span className="nums">{formatUnits(i.quantityMilli)}</span>, sortBy: (i) => i.quantityMilli },
   { key: "sales", header: "المبيعات (بالضريبة)", numeric: true, cell: (i) => <Money minor={i.salesMinor} />, sortBy: (i) => i.salesMinor },
   { key: "change", header: "عن الشهر السابق", cell: (i) => (i.previousSalesMinor === null ? <span className="text-[11px] text-muted">جديد</span> : <Delta pct={pctChange(i.salesMinor, i.previousSalesMinor)} />), sortBy: (i) => (i.previousSalesMinor === null ? null : i.salesMinor - i.previousSalesMinor), secondary: true },
-  { key: "cost", header: "كلفةُ الوصفة", numeric: true, cell: (i) => <MaybeMoney minor={i.costMinor} />, sortBy: (i) => i.costMinor, secondary: true },
+  { key: "cost", header: "تكلفة الوصفة", numeric: true, cell: (i) => <MaybeMoney minor={i.costMinor} />, sortBy: (i) => i.costMinor, secondary: true },
   { key: "margin", header: "الهامش", numeric: true, cell: (i) => (i.marginBp === null ? <span className="text-[11px] text-muted">لا وصفة</span> : <span className={i.marginBp < 5_000 ? "font-bold text-warn" : ""}>{formatShare(i.marginBp)}</span>), sortBy: (i) => i.marginBp },
 ];
 
@@ -48,8 +48,8 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
 
   if (months.length === 0) {
     return (
-      <PageShell user={user} title="المبيعات" intro="ما يُباع ومتى — من طلبات فودكس.">
-        <EmptyState icon={ShoppingBag} title="لا مبيعاتٍ مقروءةً بعد." hint="تُقرأ من واجهة فودكس. زامِنها من «فودكس والبنك»." action={<LinkButton href="/money/foodics" size="sm">افتح فودكس والبنك</LinkButton>} />
+      <PageShell user={user} title="المبيعات" intro="ما يُباع ومتى، من طلبات فودكس.">
+        <EmptyState icon={ShoppingBag} title="لا توجد مبيعات مقروءة بعد." hint="تُقرأ المبيعات من واجهة فودكس. زامنها من «فودكس والبنك»." action={<LinkButton href="/money/foodics" size="sm">افتح فودكس والبنك</LinkButton>} />
       </PageShell>
     );
   }
@@ -76,16 +76,16 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
   const busiest = [...a.hours].sort((x, y) => y.paidMinor - x.paidMinor)[0];
 
   return (
-    <PageShell user={user} width="wide" title="المبيعات" intro="ماذا يُباع ومتى، وما صعد وما هبط، وما الذي خرج من الإيراد — من طلبات فودكس.">
+    <PageShell user={user} width="wide" title="المبيعات" intro="ماذا يُباع ومتى، وما الذي ارتفع وما الذي انخفض، وما الذي خرج من الإيراد، من طلبات فودكس.">
       <MonthTabs base="/finance/sales" months={months} active={month} />
 
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KeyFigure
           icon={ShoppingBag}
-          label={`ما دفعه الزبائن — ${formatMonth(month)}`}
+          label={`ما دفعه الزبائن في ${formatMonth(month)}`}
           delta={rev ? pctChange(rev.paidMinor, before) : undefined}
           value={rev ? <Money minor={rev.paidMinor} currency /> : <span className="text-xl text-muted">غير معروف</span>}
-          sub={rev ? <>شاملاً الضريبة. بلا ضريبته <strong className="text-ink"><Money minor={rev.paidMinor - rev.vatMinor} /></strong> — هو إيرادُ قائمة الدخل.{open && before !== null && " المقارنةُ بما مضى من الشهر السابق حتى اليوم نفسه."}</> : undefined}
+          sub={rev ? <>شاملاً الضريبة. وبدون الضريبة <strong className="text-ink"><Money minor={rev.paidMinor - rev.vatMinor} /></strong>، وهو إيراد قائمة الدخل.{open && before !== null && " المقارنة بما مضى من الشهر السابق حتى اليوم نفسه."}</> : undefined}
           href={`/finance?month=${month}`}
         />
         <KeyFigure
@@ -93,27 +93,27 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
           label="الطلبات"
           delta={rev && a.previous && !open ? pctChange(rev.orders, a.previous.orders) : undefined}
           value={rev ? <span className="nums">{rev.orders.toLocaleString("en-US")}</span> : <span className="text-xl text-muted">غير معروف</span>}
-          sub={rev ? <>في {rev.coveredDays} يوماً — {rev.coveredDays > 0 ? Math.round(rev.orders / rev.coveredDays) : 0} طلباً في اليوم.</> : undefined}
+          sub={rev ? <>في {rev.coveredDays} يوماً، بمعدل {rev.coveredDays > 0 ? Math.round(rev.orders / rev.coveredDays) : 0} طلباً في اليوم.</> : undefined}
         />
         <KeyFigure
           icon={CreditCard}
-          label="متوسّطُ الطلب"
+          label="متوسط الطلب"
           delta={ticket !== null ? pctChange(ticket, prevTicket) : undefined}
           value={ticket === null ? <span className="text-xl text-muted">غير معروف</span> : <Money minor={ticket} currency />}
           sub="ما دفعه الزبائن ÷ عدد الطلبات، شاملاً الضريبة."
         />
         <KeyFigure
           icon={Clock}
-          label="الساعةُ الأنشط"
+          label="الساعة الأنشط"
           value={busiest ? <span className="nums">{busiest.hour}:00</span> : <span className="text-xl text-muted">غير معروف</span>}
-          sub={busiest ? <>بيع فيها <Money minor={busiest.paidMinor} /> هذا الشهر في {busiest.orders} طلباً.</> : undefined}
+          sub={busiest ? <>بيع فيها <Money minor={busiest.paidMinor} /> هذا الشهر من خلال {busiest.orders} طلباً.</> : undefined}
           href="#when"
         />
       </div>
 
-      <Section title="يوماً بيوم" icon={CalendarDays} hint="ما دفعه الزبائن كلَّ يوم. يومٌ بلا شريطٍ لا طلباتِ فيه.">
+      <Section title="يوماً بيوم" icon={CalendarDays} hint="ما دفعه الزبائن كل يوم. اليوم الذي لا يظهر له شريط لم تُسجَّل فيه طلبات.">
         <div className="overflow-x-auto rounded-2xl border border-line bg-raised p-4 shadow-raised">
-          <ol className="flex h-40 min-w-[36rem] items-end gap-1" aria-label="مبيعات الأيّام">
+          <ol className="flex h-40 min-w-[36rem] items-end gap-1" aria-label="مبيعات الأيام">
             {a.days.map((d) => (
               <li key={d.day} className="group relative flex h-full min-w-0 flex-1 flex-col justify-end" title={`${formatWeekday(d.day)} ${formatDay(d.day)}`}>
                 <span className="sr-only">{formatDay(d.day)}: {(d.paidMinor / 100).toFixed(0)} ريالاً</span>
@@ -126,7 +126,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
       </Section>
 
       <div id="when" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 lg:grid-cols-2">
-        <Section title="متى يُباع — بالساعة" icon={Clock} hint="مجموعُ ما بِيع في كلّ ساعةٍ من اليوم خلال الشهر.">
+        <Section title="متى يُباع، بالساعة" icon={Clock} hint="مجموع ما بيع في كل ساعة من اليوم خلال الشهر.">
           <ul className="space-y-1 rounded-2xl border border-line bg-raised p-4 shadow-raised">
             {a.hours.map((h) => (
               <li key={h.hour} className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem] items-center gap-2 text-[12px]">
@@ -138,7 +138,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
           </ul>
         </Section>
         <div>
-          <Section title="وبأيّام الأسبوع" icon={CalendarDays} hint="متوسّطُ اليوم الواحد — الخميسُ بأربعة أيّامٍ لا يُقارَن مجموعُه بجمعةٍ بخمسة.">
+          <Section title="وبأيام الأسبوع" icon={CalendarDays} hint="متوسط اليوم الواحد، لأن مجموع الخميس في شهر فيه أربعة أيام خميس لا يصح مقارنته بالجمعة في شهر فيه خمس جمع.">
             <ul className="space-y-1 rounded-2xl border border-line bg-raised p-4 shadow-raised">
               {weekdayAvg.map((w) => (
                 <li key={w.weekday} className="grid grid-cols-[4.5rem_minmax(0,1fr)_6.5rem] items-center gap-2 text-[12px]">
@@ -149,11 +149,11 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
               ))}
             </ul>
           </Section>
-          <Section title="طرقُ الدفع ونوعُ الطلب" icon={CreditCard}>
+          <Section title="طرق الدفع ونوع الطلب" icon={CreditCard}>
             <ul className="divide-y divide-line-soft rounded-2xl border border-line bg-raised px-4 shadow-raised">
               {a.methods.map((m) => (
                 <li key={m.name} className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 text-[13px]">
-                  <span>{m.type === 1 ? "نقد" : m.type === 5 ? "مشروباتُ موظّفين (House Account)" : m.name}{m.type === 5 && <span className="ms-1 text-[11px] text-muted">ليست إيراداً</span>}</span>
+                  <span>{m.type === 1 ? "نقد" : m.type === 5 ? "مشروبات الموظفين (House Account)" : m.name}{m.type === 5 && <span className="ms-1 text-[11px] text-muted">ليست إيراداً</span>}</span>
                   <span className="font-bold">
                     <Money minor={m.amountMinor} />
                     {m.type !== 5 && methodTotal > 0 && <span className="ms-2 text-[11px] font-normal text-muted">{formatShare(Math.round((m.amountMinor * 10_000) / methodTotal))}</span>}
@@ -162,7 +162,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
               ))}
               {a.types.map((t) => (
                 <li key={`t${t.type}`} className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 text-[13px] text-ink-soft">
-                  <span>طلباتٌ {t.label} — {t.orders.toLocaleString("en-US")}</span>
+                  <span>طلبات {t.label}: {t.orders.toLocaleString("en-US")}</span>
                   <span className="font-bold text-ink"><Money minor={t.paidMinor} /></span>
                 </li>
               ))}
@@ -172,10 +172,10 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-x-6 lg:grid-cols-3">
-        <Mover title="ما صعد" icon={TrendingUp} items={risers} empty="لا صنفَ صعد عن الشهر السابق." />
-        <Mover title="ما هبط" icon={TrendingDown} items={fallers} empty="لا صنفَ هبط عن الشهر السابق." />
-        <Section title="أضعفُ الهوامش" icon={Coffee} hint="بين ما بِيع بثلاثمئةٍ فأكثر.">
-          {weak.length === 0 ? <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا صنفَ له وصفةٌ وكلفةٌ بعد.</p> : (
+        <Mover title="ما ارتفع" icon={TrendingUp} items={risers} empty="لم يرتفع أي صنف عن الشهر السابق." />
+        <Mover title="ما انخفض" icon={TrendingDown} items={fallers} empty="لم ينخفض أي صنف عن الشهر السابق." />
+        <Section title="أضعف الهوامش" icon={Coffee} hint="من بين ما بيع بثلاثمئة ريال فأكثر.">
+          {weak.length === 0 ? <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا يوجد صنف له وصفة وتكلفة بعد.</p> : (
             <ul className="divide-y divide-line-soft rounded-2xl border border-line bg-raised px-4 shadow-raised">
               {weak.map((i) => (
                 <li key={i.key} className="flex items-baseline justify-between gap-2 py-2.5 text-[13px]">
@@ -188,28 +188,28 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
         </Section>
       </div>
 
-      <Section title="ما خرج من الإيراد" icon={Info} hint="وصفٌ لما وقع — لا حكمَ فيه على أحد.">
+      <Section title="ما خرج من الإيراد" icon={Info} hint="وصف لما حدث، وليس اتهاماً لأحد.">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Leak label="خصوماتُ الطلبات" minor={a.leaks.discountMinor} sub={`${a.leaks.discountedOrders} طلباً بخصم.`} />
-          <Leak label="رُدّ للزبائن" minor={a.leaks.refundsMinor} sub={`${a.leaks.refundOrders} طلباً مرتجَعاً.`} />
+          <Leak label="خصومات الطلبات" minor={a.leaks.discountMinor} sub={`${a.leaks.discountedOrders} طلباً عليها خصم.`} />
+          <Leak label="مبالغ ردّت للزبائن" minor={a.leaks.refundsMinor} sub={`${a.leaks.refundOrders} طلباً مرتجعاً.`} />
           <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised">
-            <p className="text-[11px] font-bold text-muted">طلباتٌ أُلغيت</p>
+            <p className="text-[11px] font-bold text-muted">طلبات ملغاة</p>
             <p className="mt-2 text-lg font-semibold"><span className="nums">{a.leaks.voidOrders}</span></p>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted">لم تُصنَع ولم تُحصَّل. فودكس لا يحفظ مبلغَ الطلب الملغى — فعددُها يُقال لا قيمتُها.</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted">لم تُحضَّر ولم تُحصَّل. فودكس لا يحفظ مبلغ الطلب الملغى، لذلك نعرض عددها دون قيمتها.</p>
           </div>
           <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised">
-            <p className="text-[11px] font-bold text-muted">مشروباتُ الموظّفين</p>
-            <p className="mt-2 text-lg font-semibold"><MaybeMoney minor={a.leaks.staffCostMinor} why="صنفٌ منها بلا وصفة" /></p>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted">بتكلفتها، في {a.leaks.staffOrders} طلباً — وبسعر القائمة <Money minor={a.leaks.staffListMinor} />. استهلاكٌ بلا إيراد، داخلٌ في تكلفة المبيعات.</p>
+            <p className="text-[11px] font-bold text-muted">مشروبات الموظفين</p>
+            <p className="mt-2 text-lg font-semibold"><MaybeMoney minor={a.leaks.staffCostMinor} why="فيها صنف بلا وصفة" /></p>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted">بتكلفتها، في {a.leaks.staffOrders} طلباً، وبسعر القائمة <Money minor={a.leaks.staffListMinor} />. هي استهلاك بلا إيراد، وتدخل في تكلفة المبيعات.</p>
           </div>
         </div>
       </Section>
 
-      <Section title="الأصناف" icon={Utensils} count={a.items.length} hint="المبيعاتُ بسعر الإيصال شاملاً الضريبة قبل خصم الطلب؛ والهامشُ على السعر بلا ضريبة، بكلفة الوصفة.">
+      <Section title="الأصناف" icon={Utensils} count={a.items.length} hint="المبيعات بسعر الإيصال شاملاً الضريبة وقبل خصم الطلب، والهامش محسوب على السعر بدون ضريبة وبتكلفة الوصفة.">
         {noRecipe.length > 0 && (
-          <Callout tone="warn" icon={Info} className="mb-3" title={`${noRecipe.length} صنفاً بِيع ولا تُعرَف كلفتُه`}
+          <Callout tone="warn" icon={Info} className="mb-3" title={`${noRecipe.length} من الأصناف المباعة لا تُعرف تكلفتها`}
             action={<LinkButton href="/inventory/recipes" size="sm">الوصفات</LinkButton>}>
-            بمبيعاتٍ <strong><Money minor={noRecipeMinor} /></strong> هذا الشهر: لا وصفةَ له، أو مكوّنٌ في وصفته بلا كلفة. هامشُه <Unknown /> — لا صفر.
+            مبيعاتها <strong><Money minor={noRecipeMinor} /></strong> هذا الشهر. ليست لها وصفة، أو في وصفتها مكوّن بلا تكلفة. هامشها <Unknown /> وليس صفراً.
           </Callout>
         )}
         <DataTable columns={itemColumns} rows={a.items} keyOf={(i) => i.key} sort={q.sort ?? null} searchOf={(i) => i.name} />
@@ -220,7 +220,7 @@ export default async function FinanceSalesPage({ searchParams }: { searchParams:
 
 function Mover({ title, icon, items, empty }: { title: string; icon: typeof TrendingUp; items: readonly (ItemRow & { delta: number })[]; empty: string }) {
   return (
-    <Section title={title} icon={icon} hint="بالريال عن الشهر السابق.">
+    <Section title={title} icon={icon} hint="الفرق بالريال عن الشهر السابق.">
       {items.length === 0 ? <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">{empty}</p> : (
         <ul className="divide-y divide-line-soft rounded-2xl border border-line bg-raised px-4 shadow-raised">
           {items.map((i) => (

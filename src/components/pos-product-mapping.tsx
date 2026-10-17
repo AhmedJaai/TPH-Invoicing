@@ -53,7 +53,7 @@ export function PosProductMapping({
       setError(r.error);
       return;
     }
-    toast({ tone: "ok", title: `رُبط «${row.name}»`, body: "ويُعرَف بمعرّفه في كلّ استيرادٍ بعده." });
+    toast({ tone: "ok", title: `تم ربط «${row.name}»`, body: "سيُتعرَّف عليه تلقائياً في كل استيراد قادم." });
     router.refresh();
   }
 
@@ -67,7 +67,7 @@ export function PosProductMapping({
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-bold" dir="auto">{row.name}</p>
               <p className="mt-0.5 text-[11px] text-muted">
-                <span className="nums">{row.soldUnits}</span> وحدة بِيعت · <Money minor={row.soldMinor} />
+                <span className="nums">{row.soldUnits}</span> وحدة مباعة · <Money minor={row.soldMinor} />
                 {row.category && <> · {row.category}</>}
               </p>
             </div>
@@ -77,10 +77,10 @@ export function PosProductMapping({
                 <select
                   value={selected[row.id] ?? ""}
                   onChange={(e) => setSelected((s) => ({ ...s, [row.id]: e.target.value }))}
-                  aria-label={`اربط «${row.name}» بصنف`}
+                  aria-label={`ربط «${row.name}» بصنف`}
                   className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-2 text-sm sm:min-h-9 sm:w-64 sm:flex-none"
                 >
-                  <option value="">أنشئ صنفاً باسمه</option>
+                  <option value="">أنشئ صنفاً جديداً بالاسم نفسه</option>
                   {menuProducts.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
@@ -92,7 +92,7 @@ export function PosProductMapping({
                   disabled={busyId !== null}
                   className={buttonClass("primary", "sm")}
                 >
-                  اربطه
+                  اربط
                 </button>
               </div>
             ) : null}

@@ -4,14 +4,14 @@ import { CATEGORY_LABEL } from "./bank/rules";
 import { VALUE_LABEL, labelValue } from "./audit-labels";
 
 describe("تسميات سجلّ التدقيق", () => {
-  it("لكلّ نوع اقتراحٍ تسمية", () => {
+  it("لكلّ نوع اقتراح تسمية", () => {
     for (const kind of FINDING_KINDS) {
       expect(VALUE_LABEL[kind], kind).toBeTruthy();
       expect(VALUE_LABEL[kind]).not.toBe(kind);
     }
   });
 
-  it("لكلّ باب حركةٍ تسمية", () => {
+  it("لكلّ باب حركة تسمية", () => {
     for (const category of Object.keys(CATEGORY_LABEL)) {
       expect(VALUE_LABEL[category], category).toBeTruthy();
       expect(VALUE_LABEL[category]).not.toBe(category);
@@ -24,8 +24,8 @@ describe("تسميات سجلّ التدقيق", () => {
     }
   });
 
-  it("وما لا تسمية له يبقى كما هو — السجلّ لا يُخفي شيئاً وقع", () => {
-    expect(labelValue("MISSING_INVOICES")).toBe("دفعتَ أكثر من فواتيره");
+  it("وما لا تسمية له يبقى كما هو — السجلّ لا يخفي شيئاً وقع", () => {
+    expect(labelValue("MISSING_INVOICES")).toBe("المدفوع أكثر من فواتيره");
     expect(labelValue("BANK_FEE")).toBe("رسوم بنكية");
     expect(labelValue("SOMETHING_NEW")).toBe("SOMETHING_NEW");
     expect(labelValue(42)).toBe("42");

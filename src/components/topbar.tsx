@@ -42,7 +42,7 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
         <p className="min-w-0 flex-1 truncate text-[15px] font-bold lg:hidden">{area?.label ?? account?.label ?? "ذا بوبليك هاوس"}</p>
 
         {/* الحاسوب: فتاتُ الموضع */}
-        <nav aria-label="موضعك" className="hidden min-w-0 items-center gap-1.5 text-[13px] lg:flex lg:w-64 xl:w-72">
+        <nav aria-label="موقعك في النظام" className="hidden min-w-0 items-center gap-1.5 text-[13px] lg:flex lg:w-64 xl:w-72">
           {area ? (
             <>
               {canSeeArea(role, area) ? (
@@ -81,7 +81,7 @@ export function Topbar({ role, controls }: { role: Role; controls?: React.ReactN
           className="mx-auto hidden h-9 w-full max-w-md items-center gap-2 rounded-lg border border-line bg-raised px-3 text-start text-[13px] text-muted shadow-xs transition-colors hover:border-line-input lg:flex"
         >
           <Search className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-          <span className="flex-1 truncate">ابحث عن مورّدٍ أو فاتورةٍ أو مبلغ — أو اكتب فعلاً</span>
+          <span className="flex-1 truncate">ابحث عن مورّد أو فاتورة أو مبلغ، أو اكتب أمراً</span>
           <Kbd>⌘K</Kbd>
         </button>
 
@@ -158,7 +158,7 @@ export function DropAnywhere({ role }: { role: Role }) {
       setOver(false);
       const n = queueCapture(e.dataTransfer?.files ?? []);
       if (n === 0) {
-        toast({ tone: "warn", title: "لا يُقرأ إلّا PDF أو صورة." });
+        toast({ tone: "warn", title: "يقبل النظام ملفات PDF والصور فقط." });
         return;
       }
       if (window.location.pathname !== "/upload") router.push("/upload");
@@ -173,11 +173,11 @@ export function DropAnywhere({ role }: { role: Role }) {
       if (document.querySelector("dialog[open]")) return;
       const n = queueCapture(files);
       if (n === 0) {
-        toast({ tone: "warn", title: "لا يُقرأ إلّا PDF أو صورة.", body: "ما لُصق ليس صورةً ولا PDF." });
+        toast({ tone: "warn", title: "يقبل النظام ملفات PDF والصور فقط.", body: "ما لصقته ليس صورة ولا ملف PDF." });
         return;
       }
       e.preventDefault();
-      toast({ tone: "info", title: n === 1 ? "لُصق مستندٌ — يُقرأ الآن" : "لُصقت مستنداتٌ — تُقرأ الآن" });
+      toast({ tone: "info", title: n === 1 ? "تم لصق المستند وجارٍ قراءته" : "تم لصق المستندات وجارٍ قراءتها" });
       if (window.location.pathname !== "/upload") router.push("/upload");
     }
 
@@ -202,8 +202,8 @@ export function DropAnywhere({ role }: { role: Role }) {
         <span className="grid h-14 w-14 place-items-center rounded-full bg-accent-soft text-accent">
           <UploadCloud className="h-7 w-7" strokeWidth={1.75} aria-hidden />
         </span>
-        <p className="text-lg font-bold">أفلِتها هنا لتُقرأ</p>
-        <p className="text-sm text-muted">فواتير وإيصالات وكشوف — PDF أو صور، أكثر من ملفّ معاً.</p>
+        <p className="text-lg font-bold">أفلت الملفات هنا لقراءتها</p>
+        <p className="text-sm text-muted">فواتير وإيصالات وكشوف حساب، بصيغة PDF أو صور، ويمكنك رفع أكثر من ملف معاً.</p>
       </div>
     </div>
   );

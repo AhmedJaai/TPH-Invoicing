@@ -115,8 +115,8 @@ export default async function ItemsAndPricesPage({
       <PageShell user={user} width="wide" title="الأصناف والأسعار">
         <EmptyState
           icon={Tags}
-          title="لا بنود فواتير بعد."
-          hint="تُبنى الأصناف من بنود الفواتير — يمتلئ هذا حين يُقرأ محتوى أوّل فاتورة، فيظهر كلُّ صنفٍ وسعرُه وعند مَن."
+          title="لا توجد بنود فواتير بعد."
+          hint="تُبنى الأصناف من بنود الفواتير. بعد قراءة محتوى أول فاتورة يظهر كل صنف وسعره والمورّد الذي اشتريته منه."
           action={<LinkButton href="/upload" variant="primary">ارفع مستنداً</LinkButton>}
         />
       </PageShell>
@@ -160,70 +160,70 @@ export default async function ItemsAndPricesPage({
       user={user}
       width="wide"
       title="الأصناف والأسعار"
-      intro="كلُّ صنفٍ اشتريتَه: كم كلّف، ومن أيّ مورّد، وكيف تحرّك سعرُه عنده."
+      intro="كل صنف اشتريته: كم كلّفك، ومن أي مورّد، وكيف تغيّر سعره عنده."
     >
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Figure
           icon={TrendingUp}
-          label="ارتفع سعرُه"
+          label="ارتفع سعره"
           href="/analysis#price-moves"
           tone={rises.length > 0 ? "warn" : undefined}
           value={<span className="nums">{rises.length}</span>}
-          sub={rises.length > 0 ? `أكبرُه ${maxRise}٪ في آخر شراء — عند المورّد نفسه.` : "لا صنفَ ارتفع سعرُه 3٪ فأكثر في آخر شراء."}
+          sub={rises.length > 0 ? `أكبر زيادة ${maxRise}٪ في آخر شراء من المورّد نفسه.` : "لم يرتفع سعر أي صنف بنسبة 3٪ أو أكثر في آخر شراء."}
         />
         <Figure
           icon={TrendingDown}
-          label="انخفض سعرُه"
+          label="انخفض سعره"
           href="/analysis#price-moves"
           tone={falls.length > 0 ? "ok" : undefined}
           value={<span className="nums">{falls.length}</span>}
-          sub="مقابل آخر سعرٍ خالفه، عند المورّد نفسه."
+          sub="مقارنة بالسعر السابق عند المورّد نفسه."
         />
         <Figure
           icon={ShoppingBasket}
-          label="مشتريات محسوبة بالبنود"
+          label="مشتريات حسب البنود"
           href="/analysis?view=spend"
           value={<Money minor={totalSpend} />}
-          sub={`${countNoun(items.length, PRODUCT)} عند المورّدين كلّهم.`}
+          sub={`${countNoun(items.length, PRODUCT)} عند جميع المورّدين.`}
         />
         {mapping ? (
           <Figure
             icon={Link2}
-            label="مربوطٌ بصنفٍ معياريّ"
+            label="مربوطة بصنف معياري"
             href="/analysis?view=mapping"
             value={<><span className="nums">{mapping[2].mapped}</span><span className="text-base font-medium text-muted"> من <span className="nums">{mapping[2].total}</span></span></>}
           >
             <Meter value={mapping[2].mapped} max={Math.max(1, mapping[2].total)} tone={unmapped === 0 ? "ok" : "accent"} label="الأصناف المربوطة" />
           </Figure>
         ) : (
-          <Figure icon={Layers} label="أصناف مختلفة" value={<span className="nums">{items.length}</span>} sub="الصنفُ بمورّده — الاسمُ وحده لا يعرّف صنفاً." />
+          <Figure icon={Layers} label="أصناف مختلفة" value={<span className="nums">{items.length}</span>} sub="يُحسب الصنف مع مورّده، فالاسم وحده لا يحدد الصنف." />
         )}
       </div>
 
       {rows.length >= LINE_LIMIT && (
-        <Callout tone="warn" icon={Info} className="mt-4" title="الأرقامُ على أحدث البنود وحدها">
-          بلغت بنودُ الفواتير حدَّ ما تقرؤه هذه الصفحة (<span className="nums">{LINE_LIMIT}</span> بنداً) — فالأقدمُ منها غير محسوبٍ في المتوسّطات ودورات الشراء. آخرُ سعرٍ وما تحرّك صحيحان.
+        <Callout tone="warn" icon={Info} className="mt-4" title="الأرقام مبنية على أحدث البنود فقط">
+          بلغ عدد بنود الفواتير الحد الذي تقرؤه هذه الصفحة (<span className="nums">{LINE_LIMIT}</span> بنداً)، لذلك لا تدخل البنود الأقدم في المتوسطات ودورات الشراء. أما آخر سعر وتغيّره فصحيحان.
         </Callout>
       )}
       {lineCoverage && lineCoverage.state !== "GOOD" && (
-        <Callout tone="warn" icon={Info} className="mt-4" title="الأرقامُ على جزءٍ من الفواتير">
-          أرقام هذه الصفحة مبنيّة على {lineCoverage.detail}. الباقي غير محسوب فيها.
+        <Callout tone="warn" icon={Info} className="mt-4" title="الأرقام مبنية على جزء من الفواتير">
+          أرقام هذه الصفحة مبنية على {lineCoverage.detail}. الباقي غير محسوب فيها.
         </Callout>
       )}
       {/* ما لا يُحسَب يُقال ولا يُعرَض صفراً — والمبيعات غير موصولة */}
       <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-muted">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
         <span>
-          <span className="font-bold text-ink-soft">غير متاح بعد:</span> هامشُ الربح وتكلفةُ المبيعات وربحيّةُ الصنف — تحتاج مصدرَ مبيعاتٍ لم يُوصَل،
-          ولن تُعرَض بأرقامٍ مقدَّرة.
+          <span className="font-bold text-ink-soft">غير متاح بعد:</span> هامش الربح وتكلفة المبيعات وربحية الصنف. تحتاج إلى مصدر مبيعات لم يُربط بعد،
+          ولن تُعرض بأرقام تقديرية.
         </span>
       </p>
 
       <div className="mt-8">
         <LinkTabs
-          label="أعمال الأصناف"
+          label="خيارات الأصناف"
           items={[
-            { href: "/analysis", label: "ما تحرّك سعرُه", count: priceMoves.length, active: view === "prices" },
+            { href: "/analysis", label: "ما تحرّك سعره", count: priceMoves.length, active: view === "prices" },
             { href: "/analysis?view=spend", label: "حسب الإنفاق", count: items.length, active: view === "spend" },
             ...(canMap ? [{ href: "/analysis?view=mapping", label: "اربط الأصناف", count: unmapped, active: view === "mapping" }] : []),
           ]}
@@ -234,11 +234,11 @@ export default async function ItemsAndPricesPage({
         <>
           <Section
             id="price-moves"
-            title="ما تحرّك سعرُه"
+            title="ما تحرّك سعره"
             icon={Tags}
             count={priceMoves.length}
             className="mt-6"
-            hint="سعرُ الوحدة في آخر شراء مقابل آخر سعرٍ خالفه — عند المورّد نفسه، وبعد الخصم. ما دون 3٪ تقريبٌ لا حركة."
+            hint="سعر الوحدة في آخر شراء مقارنة بالسعر السابق عند المورّد نفسه، بعد الخصم. الفرق الأقل من 3٪ يُعدّ تقريباً وليس تغيّراً."
           >
             <DataTable
               rows={priceMoves}
@@ -249,8 +249,8 @@ export default async function ItemsAndPricesPage({
                 <EmptyState
                   compact
                   icon={Tags}
-                  title="لم يتحرّك سعرُ صنفٍ 3٪ فأكثر."
-                  hint="كلُّ صنفٍ اشتُري مرّتين فأكثر بقي سعرُه في آخر شراءٍ قريباً ممّا قبله."
+                  title="لم يتغيّر سعر أي صنف بنسبة 3٪ أو أكثر."
+                  hint="كل صنف اشتريته مرتين أو أكثر بقي سعره في آخر شراء قريباً من سعره السابق."
                 />
               }
               columns={[
@@ -261,7 +261,7 @@ export default async function ItemsAndPricesPage({
                       <Monogram name={i.supplierName} />
                       <span className="min-w-0">
                         <span className="block truncate font-bold" dir="auto">{i.displayName}</span>
-                        <span className="block text-[11px] font-normal text-muted">{supplierCell(i)} · طُلب {countNoun(i.orderCount, TIME)}</span>
+                        <span className="block text-[11px] font-normal text-muted">{supplierCell(i)} · طلب {countNoun(i.orderCount, TIME)}</span>
                       </span>
                     </span>
                   ),
@@ -274,16 +274,16 @@ export default async function ItemsAndPricesPage({
                 },
                 {
                   /* سؤالُ «هل يرتفع؟» زمنيّ: آخرُ الأسعار خطّاً، الأقدمُ يميناً كما تُقرأ الصفحة */
-                  key: "trail", header: "اتّجاهه", secondary: true,
+                  key: "trail", header: "الاتجاه", secondary: true,
                   cell: (i) => i.priceTrail.length >= 3 ? (
                     <Sparkline
                       values={[...i.priceTrail].reverse()}
                       tone={i.priceChange!.direction === "down" ? "ok" : "warn"}
                       className="h-7 w-20"
-                      label={`سعرُ ${i.displayName} في آخر ${i.priceTrail.length} مرّات شراء — ${i.priceChange!.direction === "down" ? "ينخفض" : "يرتفع"}`}
+                      label={`سعر ${i.displayName} في آخر ${i.priceTrail.length} مرات شراء: ${i.priceChange!.direction === "down" ? "ينخفض" : "يرتفع"}`}
                     />
                   ) : (
-                    <span className="text-[11px] text-muted">مرّتان فقط</span>
+                    <span className="text-[11px] text-muted">مرتان فقط</span>
                   ),
                 },
                 {
@@ -318,14 +318,14 @@ export default async function ItemsAndPricesPage({
           </Section>
 
           <Section
-            title="بلغ دورةَ شرائه المعتادة"
+            title="اقترب موعد شرائه المعتاد"
             icon={CalendarClock}
             count={dueSoon.length > 0 ? dueSoon.length : undefined}
             /* النظام لا يعرف المخزون — يعرف سلوكَ الشراء وحده، فيقول المقارنة ولا يوصي */
-            hint="ليست توصيةً بإعادة الطلب — النظام لا يعرف مخزونك. يعرف كم يوماً يمرّ عادةً بين شرائك للصنف، ومتى اشتريتَه آخر مرّة."
+            hint="هذه ليست توصية بإعادة الطلب، فالنظام لا يعرف مخزونك. هو يعرف فقط كم يوماً تفصل عادةً بين مرات شرائك للصنف ومتى اشتريته آخر مرة."
           >
             {dueSoon.length === 0 ? (
-              <EmptyState compact icon={CalendarClock} title="لا صنفَ بلغ دورته." hint="تُحسب الدورة لما اشتُري في يومين مختلفين فأكثر." />
+              <EmptyState compact icon={CalendarClock} title="لا يوجد صنف حان موعد شرائه." hint="تُحسب الدورة للأصناف التي اشتريتها في يومين مختلفين أو أكثر." />
             ) : (
               <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
                 {dueSoon.map((x) => (
@@ -333,10 +333,10 @@ export default async function ItemsAndPricesPage({
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-bold" dir="auto">{x.item.displayName}</span>
                       <span className="block text-[11px] leading-relaxed text-muted">
-                        {x.item.supplierName} · عادةً كلَّ {countNoun(x.cycle, DAY)} · آخرُه قبل {countNoun(x.since, DAY)}
+                        {x.item.supplierName} · عادةً كل {countNoun(x.cycle, DAY)} · آخر شراء قبل {countNoun(x.since, DAY)}
                       </span>
                     </span>
-                    <Badge tone={x.since > x.cycle ? "warn" : undefined} dot>{x.since > x.cycle ? "تجاوز دورتك" : "بلغ دورتك"}</Badge>
+                    <Badge tone={x.since > x.cycle ? "warn" : undefined} dot>{x.since > x.cycle ? "تجاوز موعده" : "حان موعده"}</Badge>
                   </li>
                 ))}
               </ul>
@@ -351,7 +351,7 @@ export default async function ItemsAndPricesPage({
           icon={ShoppingBasket}
           count={items.length}
           className="mt-6"
-          hint="بالأكثر كلفة — أعلى الجدول هو ما يستحقّ التفاوض عليه. ابحث باسم الصنف أو المورّد."
+          hint="مرتبة من الأعلى كلفة إلى الأقل. الأصناف في أعلى الجدول هي الأولى بالتفاوض على سعرها. يمكنك البحث باسم الصنف أو المورّد."
         >
           <DataTable
             rows={items}
@@ -369,10 +369,10 @@ export default async function ItemsAndPricesPage({
                 ),
               },
               { key: "total", header: "الإجمالي", numeric: true, cell: (i) => <span className="font-bold"><Money minor={i.totalSpentMinor} /></span> },
-              { key: "unit", header: "متوسّط سعر الوحدة", numeric: true, cell: (i) => (i.averageUnitPriceMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={i.averageUnitPriceMinor} />) },
-              { key: "orders", header: "مرّات الطلب", numeric: true, cell: (i) => <span className="nums">{i.orderCount}</span> },
+              { key: "unit", header: "متوسط سعر الوحدة", numeric: true, cell: (i) => (i.averageUnitPriceMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={i.averageUnitPriceMinor} />) },
+              { key: "orders", header: "مرات الطلب", numeric: true, cell: (i) => <span className="nums">{i.orderCount}</span> },
               {
-                key: "move", header: "آخر تغيّر", secondary: true,
+                key: "move", header: "آخر تغيير", secondary: true,
                 cell: (i) => (i.priceChange ? <Delta pct={pctOf(i)} favourable={i.priceChange.direction === "down"} /> : <span className="text-[11px] text-muted">—</span>),
               },
               {
@@ -390,10 +390,10 @@ export default async function ItemsAndPricesPage({
           title="اربط أصناف المورّدين"
           icon={Link2}
           className="mt-6"
-          hint={`${mapping[2].mapped} من ${mapping[2].total} مربوطة بصنفٍ معياريّ. والربط أساسُ كلّ مقارنة تكلفة: بلا وحدةٍ واحدة تُجمَع، «العنب» عند مورّدَين صنفان لا واحد.`}
+          hint={`${mapping[2].mapped} من ${mapping[2].total} مربوطة بصنف معياري. الربط ضروري لمقارنة التكلفة، فبدونه يُحسب «العنب» عند مورّدَين صنفين مختلفين.`}
         >
           {mapping[0].length === 0 ? (
-            <EmptyState compact icon={Link2} title="لا أصناف بعد." hint="تُبنى من بنود الفواتير — اقرأ محتوى فواتيرك أوّلاً." />
+            <EmptyState compact icon={Link2} title="لا توجد أصناف بعد." hint="تُبنى الأصناف من بنود الفواتير. اقرأ محتوى فواتيرك أولاً." />
           ) : (
             <ProductMapping
               rows={mapping[0]}

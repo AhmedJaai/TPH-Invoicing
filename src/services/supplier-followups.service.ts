@@ -53,9 +53,9 @@ export async function loadUnbackedPayments(): Promise<UnbackedPayment[]> {
         left join documents d on d.id = p.document_id
        where p.status not in ('REVERSED','VOID','ADVANCE')
          /*
-           مورّدٌ أعلن صاحبُ المقهى أنّه لا يصدر فواتير، وعقدُه عندنا أو لا
-           يُطلَب منه عقد — دفعاتُه بلا فاتورة حالُه المعلَنة لا عملٌ باقٍ.
-           كانت تُعرَض «اطلب الفاتورة» لمن قيل عنه صراحةً إنّه لا يصدرها
+           مورّد أعلن صاحب المقهى أنّه لا يصدر فواتير، وعقده عندنا أو لا
+           يطلب منه عقد — دفعاته بلا فاتورة حاله المعلنة لا عمل باق.
+           كانت تعرض «اطلب الفاتورة» لمن قيل عنه صراحةً إنّه لا يصدرها
            (أحمد: «لافا والفلاتر والبراونيز — حاطّ هذا في ملفّهم»).
          */
          and not coalesce(s.issues_invoices = false and (s.contract_on_file or not s.contract_required), false)
@@ -99,7 +99,7 @@ export async function loadMissingStatementSuppliers(month: string): Promise<Miss
              to_char(max(i.invoice_date), 'YYYY-MM-DD') as last_invoice
         from invoices i
         join suppliers s on s.id = i.supplier_id
-       /* من أُعلن أنّه لا يصدر كشوفاً لا يُطلَب منه (044) */
+       /* من أعلن أنّه لا يصدر كشوفاً لا يطلب منه (044) */
        where s.issues_statements
          and not exists (
          select 1 from statements st

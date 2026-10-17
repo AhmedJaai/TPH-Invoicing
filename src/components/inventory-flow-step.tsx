@@ -106,10 +106,10 @@ export function FlowStep({
   return (
     <div>
       <div className="mb-4 max-w-3xl">
-        <h2 className="text-base font-bold">المعادلةُ التي يُحسَب بها فرقُك</h2>
+        <h2 className="text-base font-bold">المعادلة التي يُحسب بها الفرق</h2>
         <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-          لكلّ صنف: ما كان على الرفّ، وما دخل، وما صُرف من المبيعات بنسخة الوصفة السارية <strong>في تاريخ كلّ بيعة</strong> —
-          فيخرج ما يُتوقَّع أن تجده. وما لا يُعرَف يبقى «غير معروف» ولا يُحسَب صفراً، <strong>ولك أن تُدخله</strong> من موضعه.
+          لكل صنف: ما كان على الرف، وما دخل، وما صُرف من المبيعات حسب الوصفة السارية <strong>وقت كل عملية بيع</strong>.
+          والناتج هو ما يُتوقع أن تجده. وما لا يُعرف يبقى «غير معروف» ولا يُحسب صفراً، <strong>ويمكنك إدخاله</strong> من خانته.
         </p>
       </div>
 
@@ -117,16 +117,16 @@ export function FlowStep({
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-warn/25 bg-warn-bg px-4 py-3">
           <TriangleAlert className="h-[18px] w-[18px] shrink-0 text-warn" strokeWidth={2} aria-hidden />
           <p className="min-w-0 flex-1 text-xs leading-relaxed text-ink-soft">
-            {missingOpening > 0 && <><span className="font-bold text-ink">{countNoun(missingOpening, PRODUCT)}</span> رصيدُه الافتتاحيّ غير معروف. </>}
-            {missingPurchases > 0 && <><span className="font-bold text-ink">{countNoun(missingPurchases, PRODUCT)}</span> كمّيّةُ مشترياته غير معروفة. </>}
-            وبلا هذه لا يُحسَب لها فرق.
+            {missingOpening > 0 && <><span className="font-bold text-ink">{countNoun(missingOpening, PRODUCT)}</span> رصيده الافتتاحي غير معروف. </>}
+            {missingPurchases > 0 && <><span className="font-bold text-ink">{countNoun(missingPurchases, PRODUCT)}</span> كمية مشترياته غير معروفة. </>}
+            ولا يُحسب فرق لهذه الأصناف بدون هذه البيانات.
           </p>
           <button type="button" onClick={() => setOnlyMissing((v) => !v)} className={buttonClass("secondary", "sm")}>
-            {onlyMissing ? "اعرض الكلّ" : "اعرض ما ينقصه شيء"}
+            {onlyMissing ? "اعرض الكل" : "اعرض الأصناف الناقصة"}
           </button>
           {canEdit && missingOpening > 0 && (
             <button type="button" onClick={() => setGrid((v) => !v)} className={buttonClass(grid ? "quiet" : "primary", "sm")}>
-              {grid ? "أغلِق الجدول" : "أدخل الأرصدة دفعةً واحدة"}
+              {grid ? "أغلق الجدول" : "أدخل الأرصدة دفعة واحدة"}
             </button>
           )}
         </div>
@@ -142,7 +142,7 @@ export function FlowStep({
 
       {visible.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line px-5 py-10 text-center text-sm text-muted">
-          {onlyMissing ? "لا صنفَ ينقصه شيء — المعادلةُ معروفةُ الحدود كلُّها." : "لا صنفَ يطابق هذا الترشيح."}
+          {onlyMissing ? "لا يوجد صنف ناقص، فكل بيانات المعادلة معروفة." : "لا يوجد صنف يطابق هذا الفلتر."}
         </p>
       ) : (
         <ul className="space-y-3">
@@ -151,11 +151,11 @@ export function FlowStep({
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <p className="min-w-0 flex-1 truncate text-[14px] font-bold">
                   {row.productName}
-                  <span className="ms-2 text-[11px] font-medium text-muted">{row.categoryLabel} · بـ{row.unitLabel}</span>
+                  <span className="ms-2 text-[11px] font-medium text-muted">{row.categoryLabel} · بوحدة {row.unitLabel}</span>
                 </p>
                 <p className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold ${row.expected === null ? "bg-warn-bg text-warn" : "bg-accent-soft text-accent"}`}>
                   <Equal className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
-                  يُتوقَّع على الرفّ:
+                  المتوقع على الرف:
                   <span className={row.expected === null ? "" : "nums"}>{row.expected ?? "غير معروف"}</span>
                 </p>
               </div>
@@ -164,16 +164,16 @@ export function FlowStep({
               <dl className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
                 <Term
                   op={null}
-                  label="الرصيد الافتتاحيّ"
+                  label="الرصيد الافتتاحي"
                   value={row.openingText}
-                  source={row.openingText === null ? "لا جردَ سابقٌ ولا رصيدٌ مكتوب" : row.openingSourceLabel}
+                  source={row.openingText === null ? "لا يوجد جرد سابق ولا رصيد مدخل" : row.openingSourceLabel}
                   action={canEdit ? (
                     <button
                       type="button"
                       onClick={() => setEditor({ productId: row.productId, kind: "opening" })}
                       className={buttonClass(row.openingText === null ? "primary" : "quiet", "sm")}
                     >
-                      {row.openingText === null ? "أدخل الرصيد" : row.openingManual ? "عدِّله" : "استبدِله يدوياً"}
+                      {row.openingText === null ? "أدخل الرصيد" : row.openingManual ? "عدّله" : "استبدله يدوياً"}
                     </button>
                   ) : undefined}
                 />
@@ -183,40 +183,40 @@ export function FlowStep({
                   value={row.purchasesText === null ? null : row.purchasesZero ? "لا مشتريات" : row.purchasesText}
                   plain={row.purchasesZero}
                   source={row.purchasesText === null
-                    ? "بندٌ لم تُعرَف كمّيّتُه أو استلامٌ لم يُحسَم"
-                    : `${row.manualReceiptsText !== null ? `منها ${row.manualReceiptsText} أُدخلت يدوياً` : "من الفواتير"}${row.supplierReturn ? " · وطُرح منها مرتجعٌ للمورّد" : ""}`}
+                    ? "بند كميته غير معروفة، أو استلام لم يُحسم"
+                    : `${row.manualReceiptsText !== null ? `منها ${row.manualReceiptsText} أُدخلت يدوياً` : "من الفواتير"}${row.supplierReturn ? " · وطُرح منها مرتجع للمورّد" : ""}`}
                   action={canEdit ? (
                     <button
                       type="button"
                       onClick={() => setEditor({ productId: row.productId, kind: "receipt" })}
                       className={buttonClass(row.purchasesText === null ? "primary" : "quiet", "sm")}
                     >
-                      أدخل كمّيّةً مستلَمة
+                      أدخل كمية مستلمة
                     </button>
                   ) : undefined}
                   extra={row.adjustmentsText !== null ? <>± إضافات <span className="nums">{row.adjustmentsText}</span></> : undefined}
                 />
                 <Term
                   op="−"
-                  label="الاستهلاك المتوقَّع"
+                  label="الاستهلاك المتوقع"
                   value={row.consumptionText}
-                  source={row.consumptionText === null ? "لا وصفةَ تصل إليه" : "من المبيعات بوصفاتها"}
+                  source={row.consumptionText === null ? "لا توجد وصفة تستخدمه" : "من المبيعات حسب وصفاتها"}
                   action={row.consumptionText === null ? (
                     /* المجهولُ هنا وصفةٌ غائبة — وموضعُ كتابتها الوصفات، بلا بحثٍ عنه */
                     <Link href="/inventory/recipes" className={buttonClass("secondary", "sm")}>
-                      اكتب وصفةً تستعمله
+                      اكتب وصفة تستخدمه
                     </Link>
                   ) : undefined}
-                  extra={row.wasteText !== null ? <>− هدرٌ مسجَّل <span className="nums">{row.wasteText}</span></> : undefined}
+                  extra={row.wasteText !== null ? <>− هدر مسجل <span className="nums">{row.wasteText}</span></> : undefined}
                 />
                 <Term
                   op="="
-                  label="المتوقَّع"
+                  label="المتوقع"
                   value={row.expected}
                   strong
                   source={row.expected === null
-                    ? `مجهولٌ لأنّ ${[row.openingText === null && "الرصيد", row.purchasesText === null && "المشتريات", row.consumptionText === null && "الاستهلاك"].filter(Boolean).join(" و") || "حدّاً فيه"} غير معروف — أكمِله في مربّعه`
-                    : "يُقابَل بما تعدّه"}
+                    ? `غير معروف لأن ${[row.openingText === null && "الرصيد", row.purchasesText === null && "المشتريات", row.consumptionText === null && "الاستهلاك"].filter(Boolean).join(" و") || "أحد بنود المعادلة"} غير معروف. أكمله في خانته`
+                    : "يُقارن بما تعدّه"}
                 />
               </dl>
 
@@ -311,10 +311,10 @@ function OpeningEditor({ countId, row, onDone }: { countId: string; row: StepRow
 
   return (
     <div className="mt-3 animate-rise rounded-xl border border-accent-line bg-accent-soft/40 p-4">
-      <p className="text-[13px] font-bold">ما كان على الرفّ أوّلَ الأسبوع — {row.productName}</p>
+      <p className="text-[13px] font-bold">ما كان على الرف أول الأسبوع: {row.productName}</p>
       {row.openingText !== null && !row.openingManual && (
         <p className="mt-1 text-[11px] text-muted">
-          الحاليّ {row.openingText} {row.openingSourceLabel} — وما تُدخله يغلبه صراحةً ويُكتَب مصدرُه «يدويّ».
+          الرصيد الحالي {row.openingText} {row.openingSourceLabel}. وما تدخله يحل محله ويُسجَّل مصدره «يدوي».
         </p>
       )}
       <div className="mt-2 flex flex-wrap items-end gap-2">
@@ -340,7 +340,7 @@ function OpeningEditor({ countId, row, onDone }: { countId: string; row: StepRow
         </button>
         {row.openingManual && (
           <button type="button" disabled={busy} onClick={() => void save(null)} className={buttonClass("secondary", "sm")}>
-            أفرِغه — يعود كما كان
+            احذف الرصيد المدخل وأعده كما كان
           </button>
         )}
         <button type="button" disabled={busy} onClick={onDone} className={buttonClass("quiet", "sm")}>إلغاء</button>
@@ -377,27 +377,27 @@ function ReceiptList({ receipts, canEdit }: { receipts: ReceiptRow[]; canEdit: b
           <span className="nums">{r.receivedOn}</span>
           <span className="nums font-bold">{r.quantityText}</span>
           <span className="text-muted">
-            أُدخلت يدوياً
+            أُدخل يدوياً
             {r.supplierName && ` · ${r.supplierName}`}
             {r.documentRef && ` · ${r.documentRef}`}
-            {r.linkedInvoiceNumber && ` · هي فاتورة ${r.linkedInvoiceNumber}`}
-            {r.confirmedSeparate && " · شحنةٌ منفصلة"}
+            {r.linkedInvoiceNumber && ` · هو نفسه فاتورة ${r.linkedInvoiceNumber}`}
+            {r.confirmedSeparate && " · شحنة منفصلة"}
           </span>
           {canEdit && voiding !== r.id && (
-            <button type="button" onClick={() => setVoiding(r.id)} className={buttonClass("quiet", "sm")}>ألغِها</button>
+            <button type="button" onClick={() => setVoiding(r.id)} className={buttonClass("quiet", "sm")}>ألغِ الاستلام</button>
           )}
           {voiding === r.id && (
             <span className="flex w-full flex-wrap items-center gap-2">
               <input
                 type="text" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus
-                placeholder="سببُ الإلغاء" aria-label="سببُ الإلغاء"
+                placeholder="سبب الإلغاء" aria-label="سبب الإلغاء"
                 className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-sm"
               />
               <button
                 type="button" disabled={busy || reason.trim().length < 3}
                 onClick={() => void voidIt(r.id)} className={buttonClass("danger", "sm")}
               >
-                ألغِها — وتبقى في السجلّ
+                ألغِ الاستلام (يبقى في السجل)
               </button>
               <button type="button" onClick={() => setVoiding(null)} className={buttonClass("quiet", "sm")}>إلغاء</button>
             </span>
@@ -428,19 +428,19 @@ function DuplicateQuestion({ duplicates, canEdit }: { duplicates: DuplicateRow[]
   return (
     <div className="mt-3 rounded-xl border border-warn/25 bg-warn-bg p-3.5 text-xs">
       <p className="font-bold text-warn">
-        كمّيّةٌ أدخلتَها يدوياً قد تكون هي نفسَ بندِ فاتورةٍ وصلت — فالمشترياتُ غير معروفة حتى تختار.
+        كمية أدخلتها يدوياً قد تكون هي نفس بند في فاتورة وصلت لاحقاً، فالمشتريات غير معروفة حتى تختار.
       </p>
       <ul className="mt-2 space-y-1.5">
         {duplicates.map((d) => (
           <li key={`${d.receiptId}:${d.invoiceLineId}`} className="flex flex-wrap items-center gap-2">
             <span className="min-w-0 flex-1">
               {d.supplierName} · {d.invoiceNumber} · <span className="nums">{d.effectiveDate}</span>
-              <span className="text-muted">{d.basis === "SAME_QUANTITY" ? " — بالكمّيّة نفسِها" : " — كمّيّتُها غير معروفة"}</span>
+              <span className="text-muted">{d.basis === "SAME_QUANTITY" ? " (بالكمية نفسها)" : " (كميتها غير معروفة)"}</span>
             </span>
             {canEdit && (
               <>
                 <button type="button" disabled={busy} onClick={() => void resolve(d.receiptId, { kind: "LINK", invoiceLineId: d.invoiceLineId })} className={buttonClass("primary", "sm")}>
-                  هي هذه — اربطهما
+                  هما شحنة واحدة، اربطهما
                 </button>
                 <button type="button" disabled={busy} onClick={() => void resolve(d.receiptId, { kind: "SEPARATE" })} className={buttonClass("secondary", "sm")}>
                   شحنتان مختلفتان

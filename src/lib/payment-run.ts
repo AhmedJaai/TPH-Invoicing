@@ -108,11 +108,11 @@ const HOLD_TEXT: Record<HoldReason, string> = {
     ملفُّ التحويلات يُرفع إلى البنك فيُحوَّل به مال — وما قرأه النموذج
     ولم يره إنسان لا يدخله. فاتورةٌ منفوخة حسابُها مستقيم تمرّ كلّ فحص.
   */
-  NEEDS_REVIEW: "مستندُها لم يُؤكَّد بعد — افتح المستند وأكّده قبل السداد",
-  NOT_TAX_VALID: "ليست فاتورة ضريبية كاملة — اطلب البديل قبل السداد",
-  NO_VAT_DEDUCTION: "لا تصلح لخصم ضريبة المدخلات — اطلب فاتورة ضريبية",
+  NEEDS_REVIEW: "لم يُؤكَّد مستندها بعد. افتح المستند وأكّده قبل السداد",
+  NOT_TAX_VALID: "ليست فاتورة ضريبية كاملة. اطلب فاتورة بديلة قبل السداد",
+  NO_VAT_DEDUCTION: "لا تصلح لخصم ضريبة المدخلات. اطلب فاتورة ضريبية",
   // المجهول لا يُسدَّد ولا يُطالَب صاحبه: يُقرأ أوّلاً
-  TAX_UNKNOWN: "لم يُقرأ تفصيلها الضريبي — اقرأ المستند قبل السداد",
+  TAX_UNKNOWN: "لم يُقرأ تفصيلها الضريبي. اقرأ المستند قبل السداد",
 };
 
 /**
@@ -231,17 +231,17 @@ export function applyPartialAmounts(
   const errors: string[] = [];
   const known = new Set(run.ready.map((s) => s.supplierId));
   for (const id of partialBySupplier.keys()) {
-    if (!known.has(id)) errors.push("مبلغٌ جزئيّ لمورّدٍ ليس بين الجاهزين — حدّث الصفحة");
+    if (!known.has(id)) errors.push("المبلغ الجزئي لمورّد غير موجود بين الجاهزين للسداد. حدّث الصفحة");
   }
   const ready = run.ready.map((s) => {
     const partial = partialBySupplier.get(s.supplierId);
     if (partial === undefined) return s;
     if (!Number.isSafeInteger(partial) || partial <= 0) {
-      errors.push(`${s.supplierName}: المبلغ الجزئيّ ليس مبلغاً صحيحاً`);
+      errors.push(`${s.supplierName}: المبلغ الجزئي غير صالح`);
       return s;
     }
     if (partial > s.totalMinor) {
-      errors.push(`${s.supplierName}: ${formatRiyals(partial)} أكبر ممّا يُحوَّل له (${formatRiyals(s.totalMinor)})`);
+      errors.push(`${s.supplierName}: ${formatRiyals(partial)} أكبر من المبلغ المراد تحويله (${formatRiyals(s.totalMinor)})`);
       return s;
     }
     return partial === s.totalMinor ? s : { ...s, totalMinor: partial, fullMinor: s.totalMinor };
@@ -302,18 +302,18 @@ export function resolvePayeeAccount(
     return {
       account: manualIban,
       note: seen.length === 0
-        ? "آيبانٌ مكتوبٌ بيد — لم يُحوَّل له من قبل، فتحقّق منه قبل أوّل تحويل"
-        : agrees ? null : "مكتوبٌ بيد ويخالف الحسابَ الذي حُوِّل له في الكشوف — تأكّد من المورّد قبل التحويل",
+        ? "الآيبان مكتوب يدوياً ولم يسبق التحويل له، فتحقّق منه قبل أول تحويل"
+        : agrees ? null : "مكتوب يدوياً ويخالف الحساب الذي حُوِّل إليه في الكشوف. تأكّد من المورّد قبل التحويل",
     };
   }
   for (const kind of ["IBAN", "ACCOUNT"] as const) {
     const values = distinct(kind);
     if (values.length === 1) return { account: values[0], note: null };
     if (values.length > 1) {
-      return { account: null, note: `له ${values.length} حسابات في الكشوف — اختر الصحيح في البنك` };
+      return { account: null, note: `له ${values.length} حسابات في الكشوف. اختر الحساب الصحيح في البنك` };
     }
   }
-  return { account: null, note: "الحسابُ غير معروف — أدخله في ملفّ المورّد" };
+  return { account: null, note: "الحساب غير معروف. أدخله في ملف المورّد" };
 }
 
 /**
@@ -345,7 +345,7 @@ export function toBankTransferCsv(
     byOwner.set(supplier.supplierId, [...(byOwner.get(supplier.supplierId) ?? []), o.invoice.invoiceNumber]);
   }
   const ownerNote = (numbers: string[] | undefined) =>
-    numbers && numbers.length > 0 ? `بقرار المالك وهي محجوزة: ${numbers.join(" | ")}` : null;
+    numbers && numbers.length > 0 ? `محجوزة وتُسدَّد بقرار المالك: ${numbers.join(" | ")}` : null;
   const row = (s: SupplierPayment) => {
     const acc = accounts.get(s.supplierId) ?? resolvePayeeAccount([]);
     return [
@@ -356,11 +356,11 @@ export function toBankTransferCsv(
       "SAR",
       String(s.invoiceCount),
       s.invoices.map((i) => i.invoiceNumber).join(" | "),
-      s.fullMinor === undefined ? `سداد فواتير ${run.month}` : `سداد جزئيّ من فواتير ${run.month}`,
+      s.fullMinor === undefined ? `سداد فواتير ${run.month}` : `سداد جزئي من فواتير ${run.month}`,
       [
         acc.note,
         /* الجزئيُّ يُقال بمبلغيه: من يرفع الملفَّ يرى أنّ الباقي لم يُنسَ */
-        s.fullMinor === undefined ? null : `دفعٌ جزئيّ: ${formatRiyals(s.totalMinor)} من ${formatRiyals(s.fullMinor)}`,
+        s.fullMinor === undefined ? null : `دفعة جزئية: ${formatRiyals(s.totalMinor)} من ${formatRiyals(s.fullMinor)}`,
         ownerNote(byOwner.get(s.supplierId)),
       ].filter(Boolean).join(" — "),
     ];
@@ -368,7 +368,7 @@ export function toBankTransferCsv(
   const missing = suppliersMissingAccount(run, accounts);
   const withAccount = run.ready.filter((s) => !missing.includes(s));
   const rows = [
-    ["اسم المستفيد", "حساب المستفيد", "المبلغ", "العملة", "عدد الفواتير", "أرقام الفواتير", "البيان", "تنبيه"],
+    ["اسم المستفيد", "حساب المستفيد", "المبلغ", "العملة", "عدد الفواتير", "أرقام الفواتير", "البيان", "ملاحظة"],
     ...withAccount.map(row),
     /*
       مَن لا حسابَ له خارجَ قسم التحويل: ملفٌّ يُرفع إلى البنك وفيه خانةُ حسابٍ
@@ -376,7 +376,7 @@ export function toBankTransferCsv(
       فيُفصَلون في آخره بعنوانٍ يقول ما هم، ولا يُسقَطون فيُنسَوا.
     */
     ...(missing.length > 0
-      ? [[], ["يحتاج حساباً — ليس في التحويل: احذف هذا القسم قبل الرفع وحوّل لهم بعد إدخال حسابهم"], ...missing.map(row)]
+      ? [[], ["هؤلاء بلا حساب ولم يدخلوا في التحويل: احذف هذا القسم قبل الرفع، وحوّل لهم بعد إدخال حساباتهم"], ...missing.map(row)]
       : []),
   ];
   const escape = (v: string) => {

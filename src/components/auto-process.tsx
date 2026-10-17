@@ -105,9 +105,9 @@ function tellOnce(message: string) {
   } catch { /* بلا تخزين: يُقال في كلّ مزامنة — أي كلَّ ثلاث ساعات */ }
   toast({
     tone: "warn",
-    title: "مزامنةُ الدرايف متوقّفة",
+    title: "مزامنة الدرايف متوقفة",
     body: message,
-    link: { label: "حالُ الدرايف", href: "/documents/drive" },
+    link: { label: "حالة الدرايف", href: "/documents/drive" },
     duration: 10_000,
   });
 }
@@ -148,7 +148,7 @@ export function AutoProcess({ drive = true }: { drive?: boolean }) {
         const succeeded = r.ok && !r.data.busy && !r.data.needsAuth && !r.data.paused;
         stamp("tph:auto-sync", succeeded || (r.ok && (r.data.needsAuth || r.data.paused)) ? Date.now() : Date.now() - SYNC_EVERY_MS + SYNC_RETRY_MS);
         if (succeeded && deep && !r.data.summary?.truncated) stamp("tph:auto-sync-deep");
-        if (r.ok && r.data.needsAuth) tellOnce(r.data.error ?? "تفويضُ الدرايف غائبٌ أو منتهٍ — سجّل الخروج ثمّ الدخول.");
+        if (r.ok && r.data.needsAuth) tellOnce(r.data.error ?? "تفويض الدرايف غير موجود أو منتهٍ. سجّل الخروج ثم الدخول.");
         else if (succeeded) {
           arrived += r.data.summary?.created ?? 0;
           done.push(...readAutoWork(r.data.backlog?.done));
@@ -188,7 +188,7 @@ export function AutoProcess({ drive = true }: { drive?: boolean }) {
           tone: summary.touchesMoney ? "warn" : "info",
           title: summary.title,
           body: summary.body,
-          link: { label: "اعرض ما فعله أو أوقفه", href: "/documents/drive#auto" },
+          link: { label: "اعرض ما نفّذه أو أوقفه", href: "/documents/drive#auto" },
           duration: 14_000,
         });
       }

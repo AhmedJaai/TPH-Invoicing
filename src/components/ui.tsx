@@ -490,7 +490,7 @@ export function Monogram({ name, className = "h-8 w-8 text-[13px]" }: { name: st
  */
 export function DoneMark({ className = "h-14 w-14" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 52 52" className={`done-mark ${className}`} role="img" aria-label="تمّ">
+    <svg viewBox="0 0 52 52" className={`done-mark ${className}`} role="img" aria-label="تم">
       <circle cx="26" cy="26" r="24" fill="none" stroke="currentColor" strokeWidth="2.5" className="done-mark-ring" />
       <path d="M15 27 l7.5 7.5 L37 19" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="done-mark-tick" />
     </svg>
@@ -565,7 +565,7 @@ export function NoAccess({ what }: { what?: string }) {
     <div data-no-access="">
       <EmptyState
         title={what ? `${what} خارج صلاحيتك.` : "هذه الصفحة خارج صلاحيتك."}
-        hint="اطلب من مالك الحساب توسيع صلاحيتك، ثمّ حدّث الصفحة."
+        hint="اطلب من مالك الحساب توسيع صلاحياتك، ثم حدّث الصفحة."
       />
     </div>
   );
@@ -668,7 +668,7 @@ export function Stepper({
             <p className={`text-sm font-bold ${s.state === "done" ? "text-muted" : ""}`}>
               {s.title}
               <span className="sr-only">
-                {s.state === "done" ? " — تمّت" : s.state === "blocked" ? " — متوقّفة" : s.state === "current" ? " — الخطوة الحاليّة" : ""}
+                {s.state === "done" ? " — مكتملة" : s.state === "blocked" ? " — متوقفة" : s.state === "current" ? " — الخطوة الحالية" : ""}
               </span>
             </p>
             {s.detail && <div className="mt-0.5 text-xs leading-relaxed text-muted">{s.detail}</div>}
@@ -840,7 +840,7 @@ export function DataTable<T>({
         {empty ?? (
           <EmptyState
             title="لا شيء في هذا الجدول بعد."
-            hint="يمتلئ حين يصل ما يخصّه — فاتورةً تُرفع، أو كشفاً يُستورَد."
+            hint="يمتلئ الجدول عندما يصل ما يخصه، مثل فاتورة ترفعها أو كشف حساب تستورده."
           />
         )}
       </>
@@ -904,7 +904,7 @@ export function DataTable<T>({
                         <SortHeader param={sortParam} sortKey={c.key} first={c.sortFirst ?? (c.numeric ? "desc" : "asc")}>{c.header}</SortHeader>
                       </Suspense>
                     ) : (
-                      c.header || <span className="sr-only">الفعل</span>
+                      c.header || <span className="sr-only">الإجراء</span>
                     )}
                   </th>
                 );

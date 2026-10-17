@@ -64,7 +64,7 @@ describe("activeArea", () => {
     expect(activeArea("/bank/")?.href).toBe("/bank");
   });
 
-  it("ترجع غير معرَّف لمسار لا يخصّ أحداً", () => {
+  it("ترجع غير معرّف لمسار لا يخصّ أحداً", () => {
     expect(activeArea("/login")).toBeUndefined();
   });
 });
@@ -79,7 +79,7 @@ describe("activeChild", () => {
     expect(activeChild("/suppliers/Ganache", suppliers)?.href).toBe("/suppliers");
   });
 
-  it("ترجع غير معرَّف لقسم خارج المساحة", () => {
+  it("ترجع غير معرّف لقسم خارج المساحة", () => {
     expect(activeChild("/bank", suppliers)).toBeUndefined();
   });
 });
@@ -109,7 +109,7 @@ describe("visibleAreas", () => {
     expect(hrefs).toContain("/close");
   });
 
-  it("لا مساحةَ لما يُضبط مرّةً في العمر ولا لصفحةٍ حُذفت", () => {
+  it("لا مساحة لما يضبط مرّةً في العمر ولا لصفحة حذفت", () => {
     const hrefs = AREAS.map((a) => a.href);
     expect(hrefs).not.toContain("/settings");
     expect(hrefs).not.toContain("/performance");
@@ -127,12 +127,12 @@ describe("visibleAreas", () => {
     ثماني مساحاتٍ في ثلاث مجموعات — والعددُ محروس: كلُّ مدخلٍ عملٌ
     يوميٌّ أو أسبوعيّ باسمه، لا جدولٌ في القاعدة.
   */
-  it("المجموعات ثلاث بترتيبها، ولا مجموعةَ فارغة", () => {
+  it("المجموعات ثلاث بترتيبها، ولا مجموعة فارغة", () => {
     expect(groupedAreas("OWNER").map((g) => g.group)).toEqual(["today", "money", "ops"]);
     expect(groupedAreas("PURCHASING").map((g) => g.group)).toEqual(["today", "ops"]);
   });
 
-  it("لكلّ مساحةٍ حرفُ اختصارٍ لا يتكرّر", () => {
+  it("لكلّ مساحة حرف اختصار لا يتكرّر", () => {
     const chords = AREAS.map((a) => a.chord);
     expect(new Set(chords).size).toBe(chords.length);
     expect(chordsFor("OWNER")).toHaveLength(AREAS.length);
@@ -160,7 +160,7 @@ describe("visibleChildren و entryHref", () => {
     الدرايف لسانٌ في «المستندات» لا قسمٌ أسفل «ارفع»: سأل صاحبُ المقهى «ما
     أشوفها، هل صارت تلقائيّة؟» والمزامنةُ تعمل وحدها بلا أثرٍ يُرى.
   */
-  it("المستندات تُظهر الرفعَ والدرايفَ لساناً لمن يرفع", () => {
+  it("المستندات تظهر الرفع والدرايف لساناً لمن يرفع", () => {
     const docs = AREAS.find((a) => a.href === "/documents")!;
     expect(visibleChildren("OWNER", docs).map((c) => c.href)).toEqual(["/documents", "/upload", "/documents/drive"]);
     expect(activeChild("/documents/drive", docs)?.href).toBe("/documents/drive");
@@ -188,7 +188,7 @@ describe("mobileTabs", () => {
     expect(tabs).toHaveLength(MOBILE_TABS);
   });
 
-  it("تبقي «اليوم» في الشريط حتى حين تُرفع مساحة بعيدة", () => {
+  it("تبقي «اليوم» في الشريط حتى حين ترفع مساحة بعيدة", () => {
     const { tabs } = mobileTabs("OWNER", "/inventory");
     expect(tabs[0].href).toBe("/");
   });
@@ -217,7 +217,7 @@ describe("«كم أدين ولمن؟»", () => {
     });
   });
 
-  it("لا مرشِّح في مسار لسان — اللسان وجهةٌ لا ترشيح", () => {
+  it("لا مرشّح في مسار لسان — اللسان وجهة لا ترشيح", () => {
     // كان «المستحقّ عليك» يفتح `?paid=OPEN`: فواتيرُ مورّدٍ دُفع له
     // مقدَّماً تظهر فيه «مستحقّة»، وهي مسدَّدة.
     for (const area of AREAS) {
@@ -303,7 +303,7 @@ describe("الهيكل يحمل اسم صفحته", () => {
   };
   walk("src/app");
 
-  it("ثمّة هياكل تُفحَص أصلاً", () => {
+  it("ثمّة هياكل تفحص أصلاً", () => {
     expect(loadings.length).toBeGreaterThan(10);
   });
 
@@ -323,19 +323,19 @@ describe("الهيكل يحمل اسم صفحته", () => {
   المشتريات: العلامةُ إلى «اليوم» (يُحوِّل)، وألسنةُ المورّدين إلى صفحاتٍ مالُها
   خارج صلاحيته.
 */
-describe("روابطُ الدور تصل ولا تُردّ", () => {
-  it("العلامةُ تفتح أوّلَ ما يراه الدور", () => {
+describe("روابط الدور تصل ولا تردّ", () => {
+  it("العلامة تفتح أوّل ما يراه الدور", () => {
     expect(homeHref("OWNER")).toBe("/");
     expect(homeHref("PURCHASING")).toBe("/documents");
   });
 
-  it("فتاتُ الموضع لا يفتح مساحةً خارج الصلاحية", () => {
+  it("فتات الموضع لا يفتح مساحةً خارج الصلاحية", () => {
     const payments = AREAS.find((a) => a.href === "/payments")!;
     expect(canSeeArea("OWNER", payments)).toBe(true);
     expect(canSeeArea("PURCHASING", payments)).toBe(false);
   });
 
-  it("ألسنةُ المورّدين التي صفحاتُها مالٌ تحتاج رؤيةَ المال", () => {
+  it("ألسنة المورّدين التي صفحاتها مال تحتاج رؤية المال", () => {
     const suppliers = AREAS.find((a) => a.href === "/suppliers")!;
     for (const href of ["/purchases/invoices", "/statements", "/analysis"]) {
       expect(suppliers.children.find((c) => c.href === href)?.needs).toBe("amounts:view");
@@ -343,13 +343,13 @@ describe("روابطُ الدور تصل ولا تُردّ", () => {
   });
 });
 
-describe("نقطةُ المساحة من وجهات بنود الطابور", () => {
-  it("كلُّ بندٍ يُعَدّ لمساحة وجهته — بأطول بادئة، وبلا استعلامه", async () => {
+describe("نقطة المساحة من وجهات بنود الطابور", () => {
+  it("كلّ بند يعدّ لمساحة وجهته — بأطول بادئة، وبلا استعلامه", async () => {
     const { areaCounts } = await import("./nav");
     expect(areaCounts(["/bank#import", "/bank/tx/abc", "/close/vat?period=2026-Q3", "/purchases/invoices?overdue=1"]))
       .toEqual({ "/bank": 2, "/close": 1, [activeArea("/purchases/invoices")?.href ?? ""]: 1 });
   });
-  it("ما وجهتُه الطابورُ نفسُه أو «اليوم» لا يُعَدّ لمساحة", async () => {
+  it("ما وجهته الطابور نفسه أو «اليوم» لا يعدّ لمساحة", async () => {
     const { areaCounts } = await import("./nav");
     expect(areaCounts(["/attention?item=x", "/", "/no-such-page"])).toEqual({});
   });

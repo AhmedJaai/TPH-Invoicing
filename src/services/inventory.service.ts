@@ -68,8 +68,8 @@ const RECEIPT_AMBIGUITY_DAYS = 3;
 export class NotAWeekError extends Error {
   constructor(readonly suggestion: { start: string; end: string }) {
     super(
-      `الجردُ أسبوعٌ من الأحد إلى السبت — وهذه الفترة ليست كذلك.`
-      + ` أقربُ أسبوعٍ يحويها: ${weekLabel(suggestion)}.`,
+      `الجرد أسبوع كامل من الأحد إلى السبت، وهذه الفترة ليست كذلك.`
+      + ` أقرب أسبوع يشملها: ${weekLabel(suggestion)}.`,
     );
     this.name = "NotAWeekError";
   }
@@ -77,14 +77,14 @@ export class NotAWeekError extends Error {
 
 export class OverlappingPeriodError extends Error {
   constructor(readonly periodStart: string, readonly periodEnd: string) {
-    super(`هذه الفترة تتقاطع مع جردٍ آخر (${periodStart} → ${periodEnd}) — اختر فترةً تبدأ بعده.`);
+    super(`هذه الفترة تتقاطع مع جرد آخر (${periodStart} → ${periodEnd}). اختر فترة تبدأ بعده.`);
     this.name = "OverlappingPeriodError";
   }
 }
 
 export class CountLockedError extends Error {
   constructor() {
-    super("هذا الجرد مقفَل — أعِد فتحَه أوّلاً إن أردت تعديله.");
+    super("هذا الجرد مقفل. أعد فتحه أولاً إن أردت تعديله.");
     this.name = "CountLockedError";
   }
 }
@@ -161,8 +161,8 @@ export async function loadSoldLines(
                    left join pos_products pp2 on pp2.id = ml.pos_product_id
                   where ml.sale_id = s.id and ml.is_modifier
                     /*
-                      الخيارُ لسطر أصله (065). وما قُيِّد قبل العمود فارغٌ فيه،
-                      فيُقرأ بالرمز كما كان — حتى يُعاد رفعُ ملفّه.
+                      الخيار لسطر أصله (065). وما قيّد قبل العمود فارغ فيه،
+                      فيقرأ بالرمز كما كان — حتى يعاد رفع ملفّه.
                     */
                     and case when ml.parent_line_external_id is not null
                              then ml.parent_line_external_id = sl.external_id
@@ -258,7 +258,7 @@ export async function loadSoldForReport(
 /** كمّيّةُ سطر البيع من نصّ `numeric` — وما لا يُقرأ عطبٌ يُسمَع لا صفرٌ يُحسَب. */
 function soldMilli(quantity: unknown): number {
   const milli = decimalToMilli(String(quantity));
-  if (milli === null) throw new Error(`كمّيّةُ سطر بيعٍ لا تُقرأ: «${String(quantity)}»`);
+  if (milli === null) throw new Error(`تعذّرت قراءة كمّية سطر البيع: «${String(quantity)}»`);
   return milli;
 }
 
@@ -314,11 +314,11 @@ export async function loadPurchaseLines(
      where coalesce(i.received_on, to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD')) >= ${from}
        and coalesce(i.received_on, to_char(i.invoice_date at time zone 'Asia/Riyadh', 'YYYY-MM-DD')) <= ${until}
        /*
-         ── البندُ الذي يمثّله استلامٌ يدويّ يخرج من الحساب ──
+         ── البند الذي يمثّله استلام يدويّ يخرج من الحساب ──
 
-         قال صاحبُ المقهى إنّ هذا الاستلامَ هو الوجهُ الفعليّ لهذا البند:
-         فالكمّيّةُ كمّيّتُه وتاريخُه تاريخُه. ويخرج البندُ **حيثما وقع
-         تاريخُه** — فاتورةٌ بتاريخ ٢٠ لشحنةٍ وصلت ١٨ لا تُحسَب في أسبوع
+         قال صاحب المقهى إنّ هذا الاستلام هو الوجه الفعليّ لهذا البند:
+         فالكمّيّة كمّيّته وتاريخه تاريخه. ويخرج البند **حيثما وقع
+         تاريخه** — فاتورة بتاريخ ٢٠ لشحنة وصلت ١٨ لا تحسب في أسبوع
          ٢٠ ثانيةً.
        */
        and not exists (
@@ -379,7 +379,7 @@ export async function loadPurchaseLines(
       supplierName: r.supplier_name === null ? "" : String(r.supplier_name),
       invoiceDate: String(r.received_on),
       receiptKnown: true,
-      description: "كمّيّةٌ مستلَمة",
+      description: "كمّيّة مستلمة",
       productId: String(r.product_id),
       qty: null,
       lineTotalMinor: cost ?? 0,
@@ -479,9 +479,9 @@ export async function resolveOpenings(
       from inventory_movements m
      where m.kind = 'OPENING'
        /*
-         رصيدٌ مسجَّلٌ في يومٍ هو افتتاحيُّ الفترة التي تبدأ بعده — عشيّتُها أو
-         أوّلُها. والأقدمُ منه كالجرد الأقدم: يُسقط ما استُهلك بينهما، فالفجوةُ
-         «غير معروف» لا رقمُ يونيو في أسبوع سبتمبر.
+         رصيد مسجّل في يوم هو افتتاحيّ الفترة التي تبدأ بعده — عشيّتها أو
+         أوّلها. والأقدم منه كالجرد الأقدم: يسقط ما استهلك بينهما، فالفجوة
+         «غير معروف» لا رقم يونيو في أسبوع سبتمبر.
        */
        and m.occurred_on between ${addDays(periodStart, -1)} and ${periodStart}
        and ${branchId ? sql`(m.branch_id = ${branchId} or m.branch_id is null)` : sql`true`}
@@ -859,7 +859,7 @@ export async function loadScope(
 /** معرّفٌ ليس صنفاً في هذا الجرد — يُلغي العمليّةَ كلَّها. */
 export class ScopeItemNotInCountError extends Error {
   constructor(readonly productIds: readonly string[]) {
-    super(`${productIds.length} صنفاً ليس في هذا الجرد — لم يُحفَظ شيءٌ من النطاق. حدّث الصفحة.`);
+    super(`${productIds.length} صنفاً ليست في هذا الجرد، ولم يُحفظ شيء من النطاق. حدّث الصفحة.`);
     this.name = "ScopeItemNotInCountError";
   }
 }
@@ -889,7 +889,7 @@ export async function saveCountScope(
 
   const both = new Set([...change.included, ...change.excluded]);
   if (both.size !== change.included.length + change.excluded.length) {
-    throw new Error("صنفٌ واحدٌ ذُكر داخلاً وخارجاً معاً — لم يُحفَظ شيء.");
+    throw new Error("ذُكر صنف واحد ضمن المُضافين والمُستبعدين معاً، ولم يُحفظ شيء.");
   }
 
   return conn.transaction(async (tx) => {
@@ -987,12 +987,12 @@ export async function setOpenings(
     let cleared = 0;
     for (const e of entries) {
       const product = byId.get(e.productId);
-      if (!product) throw new Error("صنفٌ ليس من أصناف المخزون — لم يُحفَظ شيء.");
+      if (!product) throw new Error("هذا الصنف ليس من أصناف المخزون، ولم يُحفظ شيء.");
       if (e.enteredMilli !== null && (!Number.isInteger(e.enteredMilli) || e.enteredMilli < 0)) {
-        throw new Error(`رصيدٌ غير مقروء لـ«${product.name}»`);
+        throw new Error(`تعذّرت قراءة الرصيد لـ«${product.name}»`);
       }
       if (e.enteredMilli !== null && !sameUnitFamily(e.unit, product.baseUnit)) {
-        throw new Error(`وحدةُ «${product.name}» لا تُحوَّل إلى وحدته — وزنٌ لا يصير حجماً`);
+        throw new Error(`لا يمكن تحويل وحدة «${product.name}» إلى وحدة الصنف (الوزن لا يتحوّل إلى حجم)`);
       }
 
       const [previous] = await tx
@@ -1113,7 +1113,7 @@ export interface StartCountInput {
  * لصاحب المقهى.
  */
 export async function startCount(input: StartCountInput, conn: Conn = db): Promise<{ countId: string; created: boolean }> {
-  if (input.periodEnd < input.periodStart) throw new Error("نهايةُ الفترة قبل بدايتها");
+  if (input.periodEnd < input.periodStart) throw new Error("تاريخ نهاية الفترة قبل تاريخ بدايتها");
   /*
     ── الأسبوعُ من الأحد إلى السبت، ويُفرَض هنا ──
 
@@ -1182,7 +1182,7 @@ export async function discardCount(
   conn: Conn = db,
 ): Promise<{ periodStart: string; periodEnd: string; counted: number }> {
   const header = await loadCountHeader(countId, conn);
-  if (!header) throw new Error("الجرد غير موجود — ربما أُلغي من نافذةٍ أخرى");
+  if (!header) throw new Error("الجرد غير موجود، ربما أُلغي من نافذة أخرى");
   if (header.status === "FINALISED") throw new CountLockedError();
 
   /* التدقيقُ والحذفُ معاً أو لا شيء — كان التدقيقُ يُكتب ثمّ يُردّ الحذفُ فيبقى سجلُّ إلغاءٍ لم يقع */
@@ -1206,7 +1206,7 @@ export async function discardCount(
         العدّ_الفعليّ: rows.map((c) => ({ الصنف: c.productId, بالمِلّي: Number(c.actualMilli), الوحدة: c.unit })),
         الأرصدة_الافتتاحيّة: openings.map((o) => ({ الصنف: o.productId, بالمِلّي: Number(o.milli), الوحدة: o.unit })),
       },
-      after: { السبب: "أُلغي الجردُ قبل إقفاله" },
+      after: { السبب: "ألغي الجرد قبل إقفاله" },
     }, t);
 
     /* الأسطرُ واللقطةُ والأرصدةُ تتبعه (cascade) — والمؤثِّرُ يأذن لأنّه مسوّدة */
@@ -1350,10 +1350,10 @@ export async function canonicalCounts(
 
   return entries.map((e) => {
     const p = byId.get(e.productId);
-    if (!p) throw new Error("صنفٌ غير معروف — حدّث الصفحة");
+    if (!p) throw new Error("الصنف غير معروف. حدّث الصفحة");
     if (e.milli === null) return { productId: e.productId, actualMilli: null };
     if (!sameUnitFamily(e.unit, p.baseUnit)) {
-      throw new Error(`وحدةُ «${p.name}» لا تُحوَّل إلى وحدته — وزنٌ لا يصير حجماً`);
+      throw new Error(`لا يمكن تحويل وحدة «${p.name}» إلى وحدة الصنف (الوزن لا يتحوّل إلى حجم)`);
     }
     return { productId: e.productId, actualMilli: toCanonical(e.milli, e.unit) };
   });
@@ -1401,7 +1401,7 @@ export async function saveActualCounts(
   await conn.transaction(async (tx) => {
     for (const e of entries) {
       if (e.actualMilli !== null && !Number.isFinite(e.actualMilli)) {
-        throw new Error("كمّيّةٌ غير مقروءة");
+        throw new Error("تعذّرت قراءة الكمّية");
       }
       /*
         ويُعَدّ أثرُ الكتابة — الشرطُ في `where` بلا فحصِ عدد الصفوف
@@ -1415,7 +1415,7 @@ export async function saveActualCounts(
         .returning({ id: inventoryCountLines.id });
 
       if (written.length === 0) {
-        throw new Error(`صنفٌ ليس في هذا الجرد — لم يُكتب عدُّه (${e.productId}). حدّث الصفحة.`);
+        throw new Error(`هذا الصنف ليس في هذا الجرد، ولم يُحفظ عدّه (${e.productId}). حدّث الصفحة.`);
       }
     }
 
@@ -1545,8 +1545,8 @@ async function importIdsFor(periodStart: string, periodEnd: string, conn: Conn):
 export async function reopenCount(countId: string, reason: string, actorId: string, conn: Conn = db): Promise<void> {
   const header = await loadCountHeader(countId, conn);
   if (!header) throw new Error("الجرد غير موجود");
-  if (header.status !== "FINALISED") throw new Error("هذا الجرد مفتوحٌ أصلاً");
-  if (reason.trim().length < 4) throw new Error("اكتب سبب إعادة الفتح — يبقى في سجلّ التدقيق");
+  if (header.status !== "FINALISED") throw new Error("هذا الجرد مفتوح أصلاً");
+  if (reason.trim().length < 4) throw new Error("اكتب سبب إعادة الفتح، فسيبقى في سجل التدقيق");
 
   await conn.transaction(async (tx) => {
     await tx
@@ -1907,7 +1907,7 @@ export async function unmappedPosProducts(conn: Conn = db): Promise<{
       from pos_products pp
       left join sale_lines sl on sl.pos_product_id = pp.id
      where pp.product_id is null
-       /* خيارُ الإضافة ليس صنفاً يُباع — فلا يُطلَب ربطُه ولا وصفتُه */
+       /* خيار الإضافة ليس صنفاً يباع — فلا يطلب ربطه ولا وصفته */
        and pp.kind = 'PRODUCT'
      group by pp.id
      order by sold_minor desc

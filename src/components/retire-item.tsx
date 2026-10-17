@@ -30,10 +30,10 @@ export function RetireItem({ productId, name }: { productId: string; name: strin
           setError(null);
           toast({
             tone: "ok",
-            title: `أُخرج «${name}» من الجرد`,
-            body: "لا يظهر في العدّ القادم، وتاريخُه باقٍ كما حُسب.",
+            title: `تم إخراج «${name}» من الجرد`,
+            body: "لن يظهر في الجرد القادم، وتبقى حركاته السابقة كما هي.",
             undo: {
-              label: "أعِده",
+              label: "أعده إلى الجرد",
               run: async () => {
                 const back = await postJson("/api/inventory/item", { action: "restore", productId });
                 if (!back.ok) return false;
@@ -47,7 +47,7 @@ export function RetireItem({ productId, name }: { productId: string; name: strin
         }}
       >
         <Archive className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        <span>أخرِجه من الجرد</span>
+        <span>أخرجه من الجرد</span>
       </ActionButton>
       {error && <p role="alert" className="mt-1 text-[11px] leading-relaxed text-danger">{error}</p>}
     </>

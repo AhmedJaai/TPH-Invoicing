@@ -57,12 +57,12 @@ export function decide(a: Assignment): Decision {
   const reasons: string[] = [...a.candidate.evidence];
 
   if (score < SUGGEST_SCORE - SCORE_EPSILON) {
-    reasons.push("الترجيح ضعيف — لا يكفي حتى للاقتراح");
+    reasons.push("درجة التطابق ضعيفة ولا تكفي حتى للاقتراح");
     return { disposition: "REVIEW", reasons };
   }
 
   if (NEVER_AUTO.includes(outcome)) {
-    reasons.push("هذه الحالة لا تُطابَق تلقائياً: تغيّر الرصيد على نحوٍ يحتاج قرارك");
+    reasons.push("هذه الحالة لا تُطابَق تلقائياً لأنها تغيّر الرصيد وتحتاج قرارك");
     return { disposition: "SUGGEST", reasons };
   }
 
@@ -76,18 +76,18 @@ export function decide(a: Assignment): Decision {
   }
 
   if (score < AUTO_SCORE - SCORE_EPSILON) {
-    reasons.push(`الترجيح ${Math.round(score * 100)} من مئة — دون حدّ التلقائية`);
+    reasons.push(`درجة التطابق ${Math.round(score * 100)} من مئة، وهي دون حدّ المطابقة التلقائية`);
     return { disposition: "SUGGEST", reasons };
   }
 
   if (margin < AUTO_MARGIN - SCORE_EPSILON) {
     reasons.push(
-      `يوجد مرشّح آخر قريبٌ منه (${Math.round((a.runnerUpScore ?? 0) * 100)} مقابل ${Math.round(score * 100)}) — فلا يُحسم تلقائياً`,
+      `يوجد مرشّح آخر قريب منه (${Math.round((a.runnerUpScore ?? 0) * 100)} مقابل ${Math.round(score * 100)})، فلا تتم المطابقة تلقائياً`,
     );
     return { disposition: "SUGGEST", reasons };
   }
 
-  reasons.push("لا مرشّح آخر يقاربه");
+  reasons.push("لا يوجد مرشّح آخر قريب منه");
   return { disposition: "AUTO", reasons };
 }
 
@@ -113,8 +113,8 @@ export function tally(decisions: readonly Decision[]): Tally {
  * تُعرَض كلمةٌ لا نسبة: النسبة تُقرأ يقيناً وهي ترجيح.
  */
 export function strengthLabel(score: number): string {
-  if (score >= AUTO_SCORE) return "ترجيح قوي";
-  if (score >= 0.7) return "ترجيح معتبر";
-  if (score >= SUGGEST_SCORE) return "ترجيح ضعيف";
-  return "لا ترجيح";
+  if (score >= AUTO_SCORE) return "تطابق قوي";
+  if (score >= 0.7) return "تطابق جيد";
+  if (score >= SUGGEST_SCORE) return "تطابق ضعيف";
+  return "لا تطابق";
 }

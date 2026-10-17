@@ -83,8 +83,8 @@ export function planSupplier(s: SelectableSupplier, selection: PayRunSelection):
   const written = selection.partial[s.supplierId];
   if (on && written !== undefined) {
     const minor = parseRiyals(written);
-    if (minor === null || minor <= 0) partialError = "ليس مبلغاً — اكتبه بالريال مثل 1500.00";
-    else if (minor > transferMinor) partialError = "أكبر ممّا يُحوَّل له";
+    if (minor === null || minor <= 0) partialError = "المبلغ غير صالح. اكتبه بالريال مثل 1500.00";
+    else if (minor > transferMinor) partialError = "أكبر من المبلغ المراد تحويله له";
     /* مبلغٌ يساوي الكلّ ليس جزئيّاً */
     else if (minor < transferMinor) partialMinor = minor;
   }

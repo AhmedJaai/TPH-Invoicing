@@ -63,7 +63,7 @@ export async function POST(request: Request) {  let user;
       .delete(bankRules)
       .where(eq(bankRules.id, body.id))
       .returning({ id: bankRules.id, pattern: bankRules.pattern, category: bankRules.category });
-    if (!gone) return NextResponse.json({ error: "القاعدة غير موجودة — ربما حُذفت من نافذةٍ أخرى" }, { status: 404 });
+    if (!gone) return NextResponse.json({ error: "القاعدة غير موجودة، وربما حُذفت من نافذة أخرى" }, { status: 404 });
     await recordAudit({
       actorId: user.id,
       action: "BANK_RULE_DELETED",
@@ -71,11 +71,11 @@ export async function POST(request: Request) {  let user;
       entityId: gone.id,
       before: { النمط: gone.pattern, التصنيف: CATEGORY_LABEL[gone.category as TxCategory] ?? gone.category },
     });
-    return NextResponse.json({ ok: true, message: `حُذفت قاعدة «${gone.pattern}» — ولا تسري على الكشوف القادمة` });
+    return NextResponse.json({ ok: true, message: `حُذفت قاعدة «${gone.pattern}»، ولن تُطبَّق على الكشوف القادمة` });
   }
 
   const pattern = body.pattern?.trim();
-  if (!pattern) return NextResponse.json({ error: "اكتب النصّ المميِّز للحركة" }, { status: 400 });
+  if (!pattern) return NextResponse.json({ error: "اكتب النص المميّز للحركة" }, { status: 400 });
   const category = body.category;
   if (!category || !CATEGORIES.includes(category)) {
     return NextResponse.json({ error: "تصنيف غير معروف" }, { status: 400 });
@@ -88,7 +88,7 @@ export async function POST(request: Request) {  let user;
    */
   if (normalized.length < 3) {
     return NextResponse.json(
-      { error: "النصّ قصير جداً — اكتب كلمة مميِّزة على الأقل" },
+      { error: "النص قصير جداً. اكتب كلمة مميّزة على الأقل." },
       { status: 400 },
     );
   }
@@ -162,10 +162,10 @@ export async function POST(request: Request) {  let user;
     id: inserted[0].id,
     message:
       (category === "SUPPLIER"
-        ? `«${pattern}» صار اسماً بنكياً لـ${supplierName}`
-        : `«${pattern}» صُنّف ${CATEGORY_LABEL[category]}`)
+        ? `أصبح «${pattern}» اسماً بنكياً للمورّد ${supplierName}`
+        : `أصبح «${pattern}» يُصنَّف ${CATEGORY_LABEL[category]}`)
       + (previous && previous.category !== category
-        ? ` — واستُبدلت قاعدةٌ كانت تصنّفه ${CATEGORY_LABEL[previous.category as keyof typeof CATEGORY_LABEL] ?? previous.category}`
+        ? `، وحلّ محل قاعدة سابقة كانت تصنّفه ${CATEGORY_LABEL[previous.category as keyof typeof CATEGORY_LABEL] ?? previous.category}`
         : ""),
   });
 }

@@ -25,7 +25,7 @@ export function BankBounce({ pair, currentId }: {
     const r = await postJson<{ message?: string }>("/api/bank-bounce", { outgoingId: pair.outgoingId, incomingId: pair.incomingId, decision });
     setBusy(false);
     if (!r.ok) { setError(r.error); return; }
-    toast({ tone: "ok", title: r.data.message ?? "حُسم" });
+    toast({ tone: "ok", title: r.data.message ?? "تم الحسم" });
     router.refresh();
   }
 
@@ -33,15 +33,15 @@ export function BankBounce({ pair, currentId }: {
     <div className="mt-3 rounded-xl border border-warn/25 bg-warn-bg p-3 text-xs leading-relaxed">
       <p className="flex items-center gap-1.5 font-bold">
         <Undo2 className="h-4 w-4 text-warn" aria-hidden />
-        خرجت {formatRiyalsDisplay(pair.amountMinor)} في <bdi className="nums">{pair.outDay}</bdi> وعاد المبلغُ نفسُه في <bdi className="nums">{pair.backDay}</bdi>
+        خرج مبلغ {formatRiyalsDisplay(pair.amountMinor)} في <bdi className="nums">{pair.outDay}</bdi> وعاد المبلغ نفسه في <bdi className="nums">{pair.backDay}</bdi>
       </p>
       <p className="mt-1 text-ink-soft">
-        إن كانت الحوالةُ ارتدّت فالفاتورةُ التي قُيّدت عليها لم تُسدَّد. «ارتدّت» تردّ الدفعة فتعود مستحقّة — ثمّ أعِد التحويل.{" "}
+        إن كانت الحوالة ارتدّت فالفاتورة التي قُيّدت عليها لم تُسدَّد. «ارتدّت» تلغي الدفعة فتعود الفاتورة مستحقة، ثم أعد التحويل.{" "}
         <Link href={`/bank/tx/${other}`} className="font-bold text-accent hover:underline">افتح الحركة الأخرى</Link>
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         <button type="button" disabled={busy} onClick={() => decide("BOUNCED")} className={buttonClass("primary", "sm")}>ارتدّت</button>
-        <button type="button" disabled={busy} onClick={() => decide("NOT_BOUNCE")} className={buttonClass("secondary", "sm")}>ليست ردّاً</button>
+        <button type="button" disabled={busy} onClick={() => decide("NOT_BOUNCE")} className={buttonClass("secondary", "sm")}>لم ترتدّ</button>
       </div>
       {error && <p role="alert" className="mt-1 text-danger">{error}</p>}
     </div>

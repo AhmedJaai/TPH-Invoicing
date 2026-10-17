@@ -76,8 +76,8 @@ export async function readStatementFile(
   const reallyPdf = sniffMimeType(buffer) === "application/pdf";
   if (isPdf(fileName, mimeType) && !reallyPdf) {
     return {
-      bank: "غير محدَّد", rows: [], warnings: [], source: "PDF_TEXT",
-      blocked: "الملفّ مسمّىً PDF ومحتواه ليس PDF — نزّله من البنك من جديد، أو ارفعه بصيغة Excel.",
+      bank: "غير محدّد", rows: [], warnings: [], source: "PDF_TEXT",
+      blocked: "الملف يحمل امتداد PDF لكن محتواه ليس PDF. نزّله من البنك من جديد أو ارفعه بصيغة Excel.",
     };
   }
   if (!reallyPdf) {
@@ -116,35 +116,35 @@ export async function readStatementFile(
       وهو ليس كذلك.
     */
     const askForText =
-      `هذا الملفّ صورةٌ لا نصّ (${extracted.pageCount} صفحة). ` +
-      "اطلب من بنكك كشفاً بصيغة Excel أو PDF نصّيّ — أو صدّره من التطبيق لا صورةً.";
+      `هذا الملف صورة وليس نصاً (${extracted.pageCount} صفحة). ` +
+      "اطلب من بنكك كشفاً بصيغة Excel أو PDF نصي، أو صدّره من تطبيق البنك بدلاً من تصويره.";
 
     const vision = selectedVision();
     if (!vision.isConfigured()) {
-      return { bank: "غير محدَّد", rows: [], warnings: [], source: "PDF_SCANNED", blocked: askForText };
+      return { bank: "غير محدّد", rows: [], warnings: [], source: "PDF_SCANNED", blocked: askForText };
     }
 
     if (extracted.pageCount > MAX_VISION_PAGES) {
       return {
-        bank: "غير محدَّد", rows: [], warnings: [], source: "PDF_SCANNED",
+        bank: "غير محدّد", rows: [], warnings: [], source: "PDF_SCANNED",
         blocked:
-          `الكشف ${extracted.pageCount} صفحة، والقراءة البصرية تقف عند ${MAX_VISION_PAGES}. ` +
-          "قسّمه أو اطلبه نصّاً.",
+          `الكشف ${extracted.pageCount} صفحة، والقراءة البصرية تقتصر على ${MAX_VISION_PAGES}. ` +
+          "قسّمه إلى ملفات أصغر أو اطلبه بصيغة نصية.",
       };
     }
 
     const outcome = await vision.read(buffer);
     if (!outcome.ok || !outcome.value) {
       return {
-        bank: "غير محدَّد", rows: [], warnings: [], source: "PDF_SCANNED",
-        blocked: `تعذّرت القراءة البصرية: ${outcome.reason ?? "بلا سبب"}. ${askForText}`,
+        bank: "غير محدّد", rows: [], warnings: [], source: "PDF_SCANNED",
+        blocked: `تعذّرت القراءة البصرية: ${outcome.reason ?? "لا يوجد سبب معروف"}. ${askForText}`,
       };
     }
 
     const checked = validateVision(outcome.value);
     if (checked.blocked) {
       return {
-        bank: "غير محدَّد", rows: [], warnings: [], source: "PDF_SCANNED",
+        bank: "غير محدّد", rows: [], warnings: [], source: "PDF_SCANNED",
         blocked: `${checked.blocked} ${askForText}`,
       };
     }
@@ -161,7 +161,7 @@ export async function readStatementFile(
       accountNumber: outcome.value.accountNumber ?? undefined,
       bankEvidence: detectedVision?.matched,
       notices: [
-        "قُرئ هذا الكشف بصرياً من صورة — لا يُطابَق منه شيء تلقائياً مهما بلغت الدرجة.",
+        "قُرئ هذا الكشف بصرياً من صورة، فلا يُطابق منه شيء تلقائياً مهما بلغت الدرجة.",
         ...adapterNotices(adapterFor(detectedVision?.bankId)),
       ],
       rows: checked.rows.map((r) => ({

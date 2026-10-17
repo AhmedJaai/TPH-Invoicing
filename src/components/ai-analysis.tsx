@@ -68,8 +68,8 @@ async function postJson(url: string, body: unknown): Promise<{ ok: boolean; stat
 
 const errorOf = (r: Awaited<ReturnType<typeof postJson>>) =>
   r === null
-    ? "تعذّر الاتصال بالخادم — لم يصل الطلب."
-    : String(r.data.error ?? (r.status === 504 ? "تأخّر الخادم — أعد المحاولة" : `ردّ الخادم بالرمز ${r.status}`));
+    ? "تعذّر الاتصال بالخادم، ولم يصل الطلب."
+    : String(r.data.error ?? (r.status === 504 ? "تأخّر الخادم في الرد. أعد المحاولة." : `رد الخادم بالرمز ${r.status}`));
 
 const SEVERITY_TONE: Record<string, Tone | undefined> = {
   HIGH: "danger",
@@ -107,7 +107,7 @@ export function RunAnalysis({
     */
     for (let k = 0; k < suppliers.length; k++) {
       const s = suppliers[k];
-      setProgress(suppliers.length > 1 ? `يحلّل ${k + 1} من ${suppliers.length} — ${s.name}` : "يحلّل… قد يستغرق نصف دقيقة");
+      setProgress(suppliers.length > 1 ? `جارٍ تحليل ${k + 1} من ${suppliers.length}: ${s.name}` : "جارٍ التحليل… قد يستغرق نصف دقيقة");
       const r = await postJson("/api/ai-analysis", { supplierId: s.id });
       const text = r && r.ok
         ? `${String(r.data.summary ?? "")}${Number(r.data.count ?? 0) > 0 ? ` — ${countNoun(Number(r.data.count ?? 0), SUGGESTION)}` : ""}`
@@ -129,7 +129,7 @@ export function RunAnalysis({
         className={buttonClass("secondary", "sm")}
       >
         <Sparkles className={`h-4 w-4 text-accent ${busy ? "animate-pulse" : ""}`} strokeWidth={2} aria-hidden />
-        {busy ? "يحلّل…" : label}
+        {busy ? "جارٍ التحليل…" : label}
       </button>
       {progress && <p className="text-xs text-muted" aria-live="polite">{progress}</p>}
       {lines.length > 0 && (
@@ -223,7 +223,7 @@ function FindingCard({
       setState("preview");
       return;
     }
-    setMessage({ text: String(r.data.message ?? "حُفظ"), bad: false });
+    setMessage({ text: String(r.data.message ?? "تم الحفظ"), bad: false });
     setState("done");
     router.refresh();
   }
@@ -262,28 +262,28 @@ function FindingCard({
 
       {state === "preview" && preview && (
         <p className="mt-3 rounded-lg border border-warn/25 bg-warn-bg p-3 text-xs leading-relaxed">
-          تُقيَّد فاتورة {preview.invoiceNumber} مسدَّدةً من حسابك بـ{formatRiyalsDisplay(preview.ownerPaymentMinor)}
+          سيتم قيد الفاتورة {preview.invoiceNumber} مسدّدة من حسابك بمبلغ {formatRiyalsDisplay(preview.ownerPaymentMinor)}
           {preview.freed.length > 0 && (
             <>
-              {" · "}وتُفَكّ عنها حوالاتُ المقهى ({formatRiyalsDisplay(preview.freed.reduce((s, x) => s + x.amountMinor, 0))})
+              {" · "}وسيتم فك حوالات المقهى عنها ({formatRiyalsDisplay(preview.freed.reduce((s, x) => s + x.amountMinor, 0))})
               {preview.reapplied.length > 0 && (
-                <> وتُخصم من: {preview.reapplied.map((x) => `فاتورة ${x.invoiceNumber} بـ${formatRiyalsDisplay(x.amountMinor)}`).join("، ")}</>
+                <> وسيتم الخصم من: {preview.reapplied.map((x) => `فاتورة ${x.invoiceNumber} بمبلغ ${formatRiyalsDisplay(x.amountMinor)}`).join("، ")}</>
               )}
             </>
           )}
-          {preview.creditLeftMinor > 0 && <> · ويبقى لك عنده {formatRiyalsDisplay(preview.creditLeftMinor)}</>}
+          {preview.creditLeftMinor > 0 && <> · ويبقى لك لديه {formatRiyalsDisplay(preview.creditLeftMinor)}</>}
         </p>
       )}
 
       {state === "dismissing" && (
         <label className="mt-3 block text-xs">
-          <span className="text-muted">لماذا ليس صحيحاً؟ (اختياريّ — يتعلّم منه التحليل القادم)</span>
+          <span className="text-muted">لماذا هذه الملاحظة غير صحيحة؟ (اختياري، يستفيد منه التحليل القادم)</span>
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
             maxLength={500}
             className="mt-1 block min-h-11 w-full rounded-lg border border-line-input bg-surface px-3 text-sm"
-            placeholder="مثلاً: سدّدتُها بحوالةٍ من حسابٍ آخر"
+            placeholder="مثال: سدّدتها بحوالة من حساب آخر"
           />
         </label>
       )}
@@ -311,9 +311,9 @@ function FindingCard({
                   disabled={state === "busy" || !canApprove}
                   className={buttonClass("primary", "sm")}
                   onClick={() => decide("accept")}
-                  title={canApprove ? undefined : "إقرار ما يكتب سداداً لمن يعتمد السداد"}
+                  title={canApprove ? undefined : "إقرار ما يُسجَّل سداداً يحتاج صلاحية اعتماد السداد"}
                 >
-                  {f.action?.type === "OWNER_PAID" ? ACT.paidFromOwner : f.action?.type === "VOID_DUPLICATE" ? "هي دفعةٌ واحدة — ألغِ المكرّرة" : "اخصم الرصيد من فواتيره"}
+                  {f.action?.type === "OWNER_PAID" ? ACT.paidFromOwner : f.action?.type === "VOID_DUPLICATE" ? "هي دفعة واحدة، ألغِ المكرّرة" : "اخصم الرصيد من فواتيره"}
                 </button>
               )}
               <button type="button" disabled={state === "busy"} className={buttonClass("quiet", "sm")} onClick={() => setState("dismissing")}>
@@ -323,7 +323,7 @@ function FindingCard({
           ) : (
             <>
               <button type="button" disabled={state === "busy"} className={buttonClass("secondary", "sm")} onClick={() => decide("accept")}>
-                صحيح — عُلم
+                صحيح، للعلم
               </button>
               <button type="button" disabled={state === "busy"} className={buttonClass("quiet", "sm")} onClick={() => setState("dismissing")}>
                 ليس صحيحاً
@@ -334,7 +334,7 @@ function FindingCard({
       )}
 
       {!canApprove && moneyAction && state !== "done" && (
-        <p className="mt-2 text-[11px] text-muted">إقرار هذا يكتب سداداً — يحتاج صلاحية اعتماد السداد.</p>
+        <p className="mt-2 text-[11px] text-muted">إقرار هذه الملاحظة يسجّل سداداً، ويحتاج صلاحية اعتماد السداد.</p>
       )}
       {message && (
         <p className={`mt-2 text-xs font-bold ${message.bad ? "text-danger" : "text-ok"}`} role={message.bad ? "alert" : "status"}>

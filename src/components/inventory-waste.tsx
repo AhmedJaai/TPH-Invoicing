@@ -19,13 +19,13 @@ import { buttonClass } from "./ui";
  * سؤالٌ مفتوح، والثاني جوابٌ مكتوب.
  */
 const REASONS = [
-  { value: "EXPIRED", label: "انتهت صلاحيّته" },
+  { value: "EXPIRED", label: "انتهت صلاحيته" },
   { value: "SPILLED", label: "انسكب" },
-  { value: "FAILED_PREP", label: "تحضيرٌ فاشل" },
-  { value: "CALIBRATION", label: "معايرةُ الماكينة" },
-  { value: "STAFF_DRINK", label: "مشروبُ موظَّف" },
+  { value: "FAILED_PREP", label: "تحضير فاشل" },
+  { value: "CALIBRATION", label: "معايرة الماكينة" },
+  { value: "STAFF_DRINK", label: "مشروب موظف" },
   { value: "DAMAGED", label: "تلف" },
-  { value: "OTHER", label: "سببٌ آخر" },
+  { value: "OTHER", label: "سبب آخر" },
 ];
 
 /** هدرٌ مسجَّل في أسبوع هذا الجرد — يُعرَض ليُراجَع ويُبطَل إن أخطأ صاحبُه. */
@@ -86,7 +86,7 @@ export function InventoryWaste({
     setVoiding(null);
     setVoidReason("");
     setFailed(false);
-    setMessage(String(r.data.message ?? "أُبطل."));
+    setMessage(String(r.data.message ?? "تم إبطال الهدر."));
     router.refresh();
   }
 
@@ -118,7 +118,7 @@ export function InventoryWaste({
       return;
     }
     requestId.current = null;
-    setMessage(String(r.data.message ?? "سُجّل."));
+    setMessage(String(r.data.message ?? "تم تسجيل الهدر."));
     setQuantity("");
     setNote("");
     router.refresh();
@@ -133,11 +133,11 @@ export function InventoryWaste({
     <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
       <h3 className="flex items-center gap-2 text-sm font-bold">
         <Trash2 className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-        سجِّل هدراً تعرفه
+        سجّل هدراً تعرف سببه
       </h3>
       <p className="mt-1 text-xs leading-relaxed text-muted">
-        ما تُسجّله هنا يخرج من «الفرق غير المفسَّر» ويُعرَض باسمه. وما لا تعرف سببه
-        يبقى سؤالاً مفتوحاً — ولا يُسمّى هدراً.
+        ما تسجّله هنا يُستبعد من «الفرق غير المفسَّر» ويظهر باسمه. أما ما لا تعرف سببه
+        فيبقى فرقاً غير مفسَّر ولا يُسجَّل هدراً.
       </p>
 
       {/* نموذجٌ حقيقيّ: Enter في حقل الكمّيّة يسجّل، و«تمّ» في لوحة مفاتيح الهاتف كذلك */}
@@ -156,7 +156,7 @@ export function InventoryWaste({
           </select>
         </label>
         <label className="w-28">
-          <span className="block text-[11px] text-muted">الكمّيّة {item ? `(${item.unitLabel})` : ""}</span>
+          <span className="block text-[11px] text-muted">الكمية {item ? `(${item.unitLabel})` : ""}</span>
           <input
             type="text" inputMode="decimal" dir="ltr" enterKeyHint="done"
             value={quantity} onChange={(e) => edit(setQuantity)(e.target.value)}
@@ -183,7 +183,7 @@ export function InventoryWaste({
         <input
           type="text" value={note} onChange={(e) => setNote(e.target.value)}
           aria-label="ملاحظة على هذا الهدر"
-          placeholder="ملاحظة (اختياريّة)"
+          placeholder="ملاحظة (اختيارية)"
           className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-xs"
         />
         <button
@@ -192,7 +192,7 @@ export function InventoryWaste({
           disabled={busy || !productId || quantity.trim() === ""}
           className={buttonClass("primary")}
         >
-          سجِّل الهدر
+          سجّل الهدر
         </button>
       </form>
 
@@ -206,7 +206,7 @@ export function InventoryWaste({
       */}
       {recorded.length > 0 && (
         <div className="mt-4 border-t border-line-soft pt-3">
-          <h4 className="text-xs font-bold">هدرُ هذا الأسبوع المسجَّل</h4>
+          <h4 className="text-xs font-bold">الهدر المسجل لهذا الأسبوع</h4>
           <ul className="mt-2 space-y-1.5 text-xs">
             {recorded.map((w) => (
               <li key={w.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -223,14 +223,14 @@ export function InventoryWaste({
                     onClick={() => { setVoiding(w.id); setVoidReason(""); setVoidError(null); }}
                     className={buttonClass("quiet", "sm")}
                   >
-                    أبطِله
+                    أبطل الهدر
                   </button>
                 )}
                 {voiding === w.id && (
                   <span className="flex w-full flex-wrap items-center gap-2">
                     <input
                       type="text" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} autoFocus
-                      placeholder="سببُ الإبطال" aria-label="سببُ الإبطال"
+                      placeholder="سبب الإبطال" aria-label="سبب إبطال الهدر"
                       className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-sm"
                     />
                     <button
@@ -239,7 +239,7 @@ export function InventoryWaste({
                       onClick={() => void voidIt(w.id)}
                       className={buttonClass("danger", "sm")}
                     >
-                      أبطِل الهدر
+                      أبطل الهدر
                     </button>
                     <button type="button" disabled={busy} onClick={() => setVoiding(null)} className={buttonClass("quiet", "sm")}>إلغاء</button>
                     {voidError && <span role="alert" className="w-full text-danger">{voidError}</span>}

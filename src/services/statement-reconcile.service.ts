@@ -235,8 +235,8 @@ async function ledgerGapFinding(
     gapMinor: gap,
     code: ISSUE.STATEMENT_LEDGER_GAP,
     severity: "WARN" as const,
-    message: `كشفُه يقول إنّا ندين له ${formatRiyalsDisplay(closingMinor)} يوم ${day}، ودفترُنا يقول ${owed >= 0 ? formatRiyalsDisplay(owed) : `لنا عنده ${formatRiyalsDisplay(-owed)}`} — `
-      + (gap < 0 ? `ينقصنا ${formatRiyalsDisplay(-gap)}: فواتيرُ في كشفه لم تُقيَّد، أو سدادٌ مقيَّدٌ لم يقع` : `يزيدنا ${formatRiyalsDisplay(gap)}: سدادٌ لم يُقيَّد، أو فاتورةٌ عندنا ليست في كشفه`),
+    message: `حسب كشفه نحن مدينون له بمبلغ ${formatRiyalsDisplay(closingMinor)} يوم ${day}، وحسب دفاترنا ${owed >= 0 ? `المبلغ ${formatRiyalsDisplay(owed)}` : `لنا عنده ${formatRiyalsDisplay(-owed)}`}. `
+      + (gap < 0 ? `ينقص في دفاترنا ${formatRiyalsDisplay(-gap)}: قد تكون فواتير في كشفه لم تُقيَّد، أو سداد قُيّد ولم يقع فعلاً` : `يزيد في دفاترنا ${formatRiyalsDisplay(gap)}: قد يكون هناك سداد لم يُقيَّد، أو فاتورة عندنا ليست في كشفه`),
   };
 }
 
@@ -271,7 +271,7 @@ export async function refreshStatementFindings(tx: Tx, statementId: string): Pro
   `)).rows;
   await put(ISSUE.INVOICE_IN_STATEMENT_NOT_ARCHIVED, Number(left.n) === 0 ? null : {
     severity: "WARN",
-    message: `${countNoun(Number(left.n), INVOICE)} في كشف المورّد بقيمة ${formatRiyalsDisplay(Number(left.total))} ريال ولا ملف لها عندنا — اطلبها منه`,
+    message: `${countNoun(Number(left.n), INVOICE)} في كشف المورّد بقيمة ${formatRiyalsDisplay(Number(left.total))} ريال ولا ملف لها عندنا. اطلبها منه`,
   });
   /* «يخالف مبلغها» من أسطره المتنازَع عليها — فاتورةٌ مصحَّحة أو مقروءةٌ من جديد تُسقطه */
   const [{ disputed }] = (await tx.execute<{ disputed: number }>(sql`

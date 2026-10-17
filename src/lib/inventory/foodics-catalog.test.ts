@@ -17,8 +17,8 @@ const INGREDIENTS = "src/test/fixtures/foodics-product-ingredients.csv";
 
 const read = (p: string) => parseCatalogFile(readFileSync(p));
 
-describe("الملفُّ يُعرَف بأعمدته لا باسمه", () => {
-  it("الثلاثةُ تُميَّز، ولا يلتبس ملفٌّ بآخر", () => {
+describe("الملفّ يعرف بأعمدته لا باسمه", () => {
+  it("الثلاثة تميّز، ولا يلتبس ملفّ بآخر", () => {
     expect(read(ITEMS).kind).toBe("ITEMS");
     expect(read(PRODUCTS).kind).toBe("PRODUCTS");
     expect(read(INGREDIENTS).kind).toBe("INGREDIENTS");
@@ -31,24 +31,24 @@ describe("الملفُّ يُعرَف بأعمدته لا باسمه", () => {
     لكنّ الترتيبَ مثبَّتٌ باختبارٍ كي لا يُقلَب سهواً: ملفٌّ يُقرأ على
     أنّه غيرُه يُنشئ أصنافاً وهميّة بأسماءِ وصفات.
   */
-  it("وترويسةٌ غريبة تُعلَن ولا تُقرأ بالحدس", () => {
+  it("وترويسة غريبة تعلن ولا تقرأ بالحدس", () => {
     const r = parseCatalogFile(Buffer.from("alpha,beta\n1,2\n", "utf8"));
     expect(r.items).toHaveLength(0);
-    expect(r.issues[0].reason).toBe("ترويسةٌ غير مفهومة");
+    expect(r.issues[0].reason).toBe("عناوين الأعمدة غير مفهومة");
     expect(r.issues[0].detail).toContain("alpha");
   });
 });
 
-describe("أصنافُ المخزون — ٦٠ صنفاً", () => {
+describe("أصناف المخزون — ٦٠ صنفاً", () => {
   const parsed = read(ITEMS);
 
-  it("تُقرأ كلُّها بلا صفٍّ ساقط", () => {
+  it("تقرأ كلّها بلا صفّ ساقط", () => {
     expect(parsed.rows).toBe(60);
     expect(parsed.items).toHaveLength(60);
     expect(parsed.issues).toHaveLength(0);
   });
 
-  it("والعبوةُ تُقرأ بمعامِلها: كرتونُ ٥٠٠ كاسٍ بـ٢١٥ ريالاً", () => {
+  it("والعبوة تقرأ بمعاملها: كرتون ٥٠٠ كاس بـ٢١٥ ريالاً", () => {
     const cups = parsed.items.find((i) => i.itemSku === "sk-0018")!;
     expect(cups.name).toBe("كاسات ١٢ اونص");
     expect(cups.storageUnit).toBe("كرتون");
@@ -57,7 +57,7 @@ describe("أصنافُ المخزون — ٦٠ صنفاً", () => {
     expect(cups.packCostMinor).toBe(21_500);
   });
 
-  it("وعلبةُ الحليب ١٫٧٥ لترٍ بـ١١ ريالاً — والكسرُ في المعامِل لا في المال", () => {
+  it("وعلبة الحليب ١٫٧٥ لتر بـ١١ ريالاً — والكسر في المعامل لا في المال", () => {
     const milk = parsed.items.find((i) => i.itemSku === "sk-0008")!;
     expect(milk.baseUnit).toBe("L");
     expect(milk.packQuantityMilli).toBe(1_750);
@@ -70,7 +70,7 @@ describe("أصنافُ المخزون — ٦٠ صنفاً", () => {
     الملفُّ يكتبهما بالتاء المربوطة وبالهاء، وفي الوصفات ٥١ سطراً بهذه
     و٣٦ بتلك. ولو لم يُطبَّعا لخرج ثلثُ الوصفات «بوحدةٍ غير معروفة».
   */
-  it("والتاءُ المربوطة والهاءُ وحدةٌ واحدة", () => {
+  it("والتاء المربوطة والهاء وحدة واحدة", () => {
     expect(readUnit("حبة")).toBe("PIECE");
     expect(readUnit("حبه")).toBe("PIECE");
     expect(readUnit("قطعة")).toBe("PIECE");
@@ -81,15 +81,15 @@ describe("أصنافُ المخزون — ٦٠ صنفاً", () => {
     expect(readUnit("علبة")).toBe("PACK");
   });
 
-  it("وما لا يُفهَم يُعلَن ولا يُخمَّن", () => {
+  it("وما لا يفهم يعلن ولا يخمّن", () => {
     expect(readUnit("صندوق كبير")).toBeNull();
     expect(readUnit("")).toBeNull();
   });
 });
 
-describe("كلفةُ العبوة بأربع منازل", () => {
+describe("كلفة العبوة بأربع منازل", () => {
   /* تصديرُ أكتوبر ٢٠٢٦: «تشيز برتزل» ‏11.6668 و«حليب كوكنت» ‏9.7825 — كانا يُردّان فيسقطان من الكتالوج */
-  it("تُقرَّب إلى الهللة ولا يسقط الصنف", () => {
+  it("تقرّب إلى الهللة ولا يسقط الصنف", () => {
     const head = "id,name,sku,storage_unit,ingredient_unit,storage_to_ingredient_factor,cost,minimum_level,par_level,maximum_level,category_reference,barcode,name_localized";
     const r = parseCatalogFile(Buffer.from(`\uFEFF${head}\nx,"تشيز برتزل",sk-0900,حبة,حبة,1,11.6668,,,,,,\n`, "utf8"));
     expect(r.issues).toEqual([]);
@@ -100,20 +100,20 @@ describe("كلفةُ العبوة بأربع منازل", () => {
 describe("الأصناف المباعة — ٥٨ صنفاً", () => {
   const parsed = read(PRODUCTS);
 
-  it("تُقرأ كلُّها", () => {
+  it("تقرأ كلّها", () => {
     expect(parsed.rows).toBe(58);
     expect(parsed.products).toHaveLength(58);
     expect(parsed.issues).toHaveLength(0);
   });
 
-  it("والسعرُ هللاتٌ صحيحة", () => {
+  it("والسعر هللات صحيحة", () => {
     const latte = parsed.products.find((p) => p.productSku === "sk-0007")!;
     expect(latte.name).toBe("Latte");
     expect(latte.priceMinor).toBe(1_900);
     expect(latte.isActive).toBe(true);
   });
 
-  it("والمعطَّلُ يُقرأ معطَّلاً — أربعةٌ منها", () => {
+  it("والمعطّل يقرأ معطّلاً — أربعة منها", () => {
     const off = parsed.products.filter((p) => !p.isActive).map((p) => p.productSku);
     expect(off).toEqual(["sk-0082", "sk-0066", "sk-0057", "sk-0053"]);
   });
@@ -123,12 +123,12 @@ describe("الأصناف المباعة — ٥٨ صنفاً", () => {
     و`parseRiyals` يردّ ما جاوز منزلتين عن قصد — فتُقرأ بقارئ الكلفة
     الإعلاميّة وتُقرَّب، وتبقى للمقارنة لا للتقييم.
   */
-  it("والكلفةُ المعلَنة بخمس منازلَ تُقرَّب ولا تُردّ", () => {
+  it("والكلفة المعلنة بخمس منازل تقرّب ولا تردّ", () => {
     const cheesecake = parsed.products.find((p) => p.productSku === "sk-0023")!;
     expect(cheesecake.declaredCostMinor).toBe(917);
   });
 
-  it("ومن لا كلفةَ معلَنةً له تبقى فارغةً لا صفراً", () => {
+  it("ومن لا كلفة معلنةً له تبقى فارغةً لا صفراً", () => {
     expect(parsed.products.find((p) => p.productSku === "sk-0007")!.declaredCostMinor).toBeNull();
   });
 });
@@ -136,13 +136,13 @@ describe("الأصناف المباعة — ٥٨ صنفاً", () => {
 describe("الوصفات — ١٤٢ سطراً", () => {
   const parsed = read(INGREDIENTS);
 
-  it("تُقرأ كلُّها", () => {
+  it("تقرأ كلّها", () => {
     expect(parsed.rows).toBe(142);
     expect(parsed.recipeLines).toHaveLength(142);
     expect(parsed.issues).toHaveLength(0);
   });
 
-  it("والسطرُ يحمل طرفيه بنطاقيهما", () => {
+  it("والسطر يحمل طرفيه بنطاقيهما", () => {
     const line = parsed.recipeLines[0];
     expect(line.productSku).toBe("sk-0059");
     expect(line.productName).toBe("Iced V60 Colombia");
@@ -159,7 +159,7 @@ describe("الوصفات — ١٤٢ سطراً", () => {
     الاختبار يقف على الحدّ: لو خُلط النطاقان لصار البنُّ هو الإسبريسو،
     ولاستهلكت الوصفةُ نفسَها.
   */
-  it("ورمزُ المنتج ورمزُ المكوّن نطاقان — ولهما ٣٩ تصادماً", () => {
+  it("ورمز المنتج ورمز المكوّن نطاقان — ولهما ٣٩ تصادماً", () => {
     const products = new Set(read(PRODUCTS).products.map((p) => p.productSku));
     const items = new Set(read(ITEMS).items.map((i) => i.itemSku));
     const clashes = [...items].filter((s) => products.has(s));
@@ -171,14 +171,14 @@ describe("الوصفات — ١٤٢ سطراً", () => {
     expect(espresso.map((l) => l.itemSku).sort()).toEqual(["sk-0039", "sk-0043"]);
   });
 
-  it("وكلُّ مكوّنٍ له صنفُ مخزونٍ قائم", () => {
+  it("وكلّ مكوّن له صنف مخزون قائم", () => {
     const items = new Set(read(ITEMS).items.map((i) => i.itemSku));
     const orphans = parsed.recipeLines.filter((l) => !items.has(l.itemSku));
     expect(orphans).toHaveLength(0);
   });
 });
 
-describe("الكلفةُ تُحسَب ولا تُنسَخ", () => {
+describe("الكلفة تحسب ولا تنسخ", () => {
   const items = new Map(read(ITEMS).items.map((i) => [i.itemSku, i] as const));
   const lines = read(INGREDIENTS).recipeLines;
 
@@ -189,7 +189,7 @@ describe("الكلفةُ تُحسَب ولا تُنسَخ", () => {
     الهللة. ولو اختلف سطرٌ واحد لكان معناه أنّنا أسأنا فهمَ العبوة أو
     الوحدة — ولم نكن لنعلم لولا المقابلة.
   */
-  it("‏١٤٢ سطراً: حسابُنا يطابق ما يقوله الملفّ في كلٍّ منها", () => {
+  it("‏١٤٢ سطراً: حسابنا يطابق ما يقوله الملفّ في كلّ منها", () => {
     const off: string[] = [];
     for (const l of lines) {
       const item = items.get(l.itemSku)!;
@@ -210,12 +210,12 @@ describe("الكلفةُ تُحسَب ولا تُنسَخ", () => {
     صحيحة، ومن قرّبها إلى ٢ أسقط ٦٪ ومن قرّبها إلى ٣ زادها ٤١٪. وفي
     مِلّي‑الهللة تُمثَّل بالضبط.
   */
-  it("ومصّاصةٌ واحدة ٢٬١٢٥ مِلّي‑هللة — لا هللتين ولا ثلاثاً", () => {
+  it("ومصّاصة واحدة ٢٬١٢٥ ملّي‑هللة — لا هللتين ولا ثلاثاً", () => {
     const straws = items.get("sk-0007")!;
     expect(unitCostMilliMinor(straws)).toBe(2_125);
   });
 
-  it("وكلفةُ الوصفة تُجمَع بالمِلّي وتُقرَّب مرّةً واحدة", () => {
+  it("وكلفة الوصفة تجمع بالملّي وتقرّب مرّةً واحدة", () => {
     const iced = lines.filter((l) => l.productSku === "sk-0009");
     const total = iced.reduce((s, l) => s + lineCostMilliMinor(l.quantityMilli, l.unit, items.get(l.itemSku)!)!, 0);
     expect(total).toBe(268_868);
@@ -229,12 +229,12 @@ describe("الكلفةُ تُحسَب ولا تُنسَخ", () => {
     عشرون جراماً من صنفٍ وحدتُه اللتر لا تُحوَّل، فتعود `null` ولا
     يُحسَب لها ثمن. وصفرٌ هنا يقول «بلا كلفة» وهو كذب.
   */
-  it("ووحدةٌ من عائلةٍ أخرى تُرَدّ `null` لا صفراً", () => {
+  it("ووحدة من عائلة أخرى تردّ `null` لا صفراً", () => {
     const milk: StockItemRow = items.get("sk-0008")!;
     expect(lineCostMilliMinor(20_000, "G", milk)).toBeNull();
   });
 
-  it("ويُحوَّل داخل العائلة: ٠٫٠٢ كيلو سكرٍ = ‏١٠ هللات", () => {
+  it("ويحوّل داخل العائلة: ٠٫٠٢ كيلو سكر = ‏١٠ هللات", () => {
     const sugar = items.get("sk-0027")!;
     expect(sugar.baseUnit).toBe("KG");
     expect(toMinor(lineCostMilliMinor(20, "KG", sugar)!)).toBe(10);

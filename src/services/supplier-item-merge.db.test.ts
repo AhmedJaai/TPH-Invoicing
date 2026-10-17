@@ -15,8 +15,8 @@ async function someone(tx: Tx): Promise<string> {
 }
 const line = (description: string) => ({ description, quantity: "1", unitPrice: "100", lineTotal: "100" });
 
-describe("صيغةُ صنف المورّد تُدمج بأصلها (056)", () => {
-  it("«كولومي عنب» هو «كولومبي عنب»: تُنقل بنودُه، ويُكتب بالأصل ما يأتي بعده", () =>
+describe("صيغة صنف المورّد تدمج بأصلها (056)", () => {
+  it("«كولومي عنب» هو «كولومبي عنب»: تنقل بنوده، ويكتب بالأصل ما يأتي بعده", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const a = await makeInvoice(tx, s, 115_00, "2026-09-01");
@@ -37,7 +37,7 @@ describe("صيغةُ صنف المورّد تُدمج بأصلها (056)", () =>
       expect(l).toEqual({ d: "كولومي عنب", n: normalizeItem("كولومبي عنب") });
     }));
 
-  it("صنفان مربوطان بصنفي جردٍ مختلفين لا يُدمجان", () =>
+  it("صنفان مربوطان بصنفي جرد مختلفين لا يدمجان", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 115_00, "2026-09-01");

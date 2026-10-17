@@ -64,7 +64,7 @@ export async function recordStatementOnlyInvoices(
     .where(eq(statements.id, statementId))
     .for("update", { of: statements })
     .limit(1);
-  if (!st) throw new StatementInvoicesRefused("لا كشف بهذا المعرّف", 404);
+  if (!st) throw new StatementInvoicesRefused("لا يوجد كشف بهذا المعرّف", 404);
 
   const lines = await tx
     .select({ id: statementLines.id, date: statementLines.date, ref: statementLines.ref, debitMinor: statementLines.debitMinor })
@@ -108,8 +108,8 @@ export async function recordStatementOnlyInvoices(
     });
   if (!matchedByNumber && inWindow.length > 0) {
     throw new StatementInvoicesRefused(
-      "مراجعُ هذا الكشف ليست أرقامَ فواتيرنا (لم يطابق سطرٌ منه فاتورةً برقمها) — فلا يُقيَّد منه شيءٌ آلياً، "
-      + "وقد تكون فواتيرُه عندنا بأرقامٍ أخرى. قارِنه بالفواتير من صفحة المورّد.",
+      "أرقام المراجع في هذا الكشف ليست أرقام فواتيرنا (لم يطابق أي سطر فيه فاتورةً برقمها)، فلن يُقيَّد منه شيء تلقائياً. "
+      + "وقد تكون فواتيره عندنا بأرقام أخرى. قارنه بالفواتير من صفحة المورّد.",
     );
   }
 
@@ -179,7 +179,7 @@ export async function recordStatementOnlyInvoices(
       after: {
         الكشف: st.fileName,
         الفواتير: out.created.map((c) => `${c.number} · ${c.date} · ${formatRiyalsDisplay(c.amountMinor)}`),
-        السبب: "فواتيرُ يذكرها كشفُ المورّد ولا ملفَّ لها — قُيِّدت منه، ولا تُخصم ضريبتُها حتى يصل ملفُّها",
+        السبب: "فواتير ذكرها كشف المورّد ولا ملف لها. قُيّدت من الكشف، ولا تُخصم ضريبتها حتى يصل ملفها",
         شهرٌ_مقفل: out.closedMonth.map((c) => `${c.number} (${c.month})`),
       },
     }, tx);

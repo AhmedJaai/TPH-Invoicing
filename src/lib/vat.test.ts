@@ -13,7 +13,7 @@ for (let m = 0; m <= 30_000; m++) AMOUNTS.push(m);
 for (let m = 30_000; m <= 5_000_000; m += 997) AMOUNTS.push(m);
 AMOUNTS.push(57_400, 60_375, 66_010, 1_757_200, 2_147_483_647);
 
-describe("النسبة ١٥٪ في موضعٍ واحد — وتطابق ما كان مكتوباً في كلّ موضع", () => {
+describe("النسبة ١٥٪ في موضع واحد — وتطابق ما كان مكتوباً في كلّ موضع", () => {
   it("١١٥ فيها ١٥، و١٠٠ عليها ١٥", () => {
     expect(VAT_PERCENT).toBe(15);
     expect(vatInsideGross(11_500)).toBe(1_500);
@@ -58,16 +58,16 @@ describe("النسبة ١٥٪ في موضعٍ واحد — وتطابق ما ك�
  * يبعد عن (الصافي + ضريبته) **واحداً بالمئة بالضبط** كان يُردّ «ليس شاملاً الضريبة»
  * لخطأ تمثيلٍ لا لحساب. وما دون الحدّ وما فوقه بهللةٍ لم يتغيّر فيه شيء.
  */
-describe("line-pricing: «الإجماليّ شاملٌ الضريبة» بلا عددٍ عائم", () => {
+describe("line-pricing: «الإجماليّ شامل الضريبة» بلا عدد عائم", () => {
   const REL = 0.01;
   const near = (a: number, b: number) => (b === 0 ? a === 0 : Math.abs(a - b) / Math.abs(b) <= REL);
 
-  it("الصيغةُ العائمة كانت تخطئ تمثيلَ ٦٩٫٠٠", () => {
+  it("الصيغة العائمة كانت تخطئ تمثيل ٦٩٫٠٠", () => {
     expect(6_000 * (1 + 0.15)).not.toBe(6_900);
     expect(grossOfNetExact(6_000)).toBe(6_900);
   });
 
-  it("لا يفترق الحكمُ عن القديم إلّا عند الحدّ نفسه (١٪ بالضبط)", () => {
+  it("لا يفترق الحكم عن القديم إلّا عند الحدّ نفسه (١٪ بالضبط)", () => {
     let differ = 0;
     for (let net = 1; net <= 400_000; net++) {
       const before = net * (1 + 0.15);
@@ -87,13 +87,13 @@ describe("line-pricing: «الإجماليّ شاملٌ الضريبة» بلا 
     expect(differ).toBeLessThan(200);
   });
 
-  it("السطرُ الشاملُ الضريبة يُقرأ صافياً كما كان", () => {
+  it("السطر الشامل الضريبة يقرأ صافياً كما كان", () => {
     expect(resolveLinePricing({ quantity: 10, unitPriceMinor: 1_000, lineTotalMinor: 11_500 })?.basis).toBe("TOTAL_INCLUDES_VAT");
     expect(resolveLinePricing({ quantity: 10, unitPriceMinor: 1_000, lineTotalMinor: 10_000 })?.basis).toBe("CONSISTENT");
     expect(resolveLinePricing({ quantity: 10, unitPriceMinor: 1_000, lineTotalMinor: 8_855 })?.basis).toBe("DISCOUNTED");
   });
 
-  it("بنودٌ شاملةٌ الضريبة تُردّ إلى الصافي ويجمع مجموعُها إليه بالهللة", () => {
+  it("بنود شاملة الضريبة تردّ إلى الصافي ويجمع مجموعها إليه بالهللة", () => {
     const lines = [
       { effectiveUnitMinor: 1_150, netTotalMinor: 11_500, listUnitMinor: null, discountMinor: 0, basis: "CONSISTENT" as const },
       { effectiveUnitMinor: 333, netTotalMinor: 3_833, listUnitMinor: null, discountMinor: 0, basis: "CONSISTENT" as const },
@@ -104,7 +104,7 @@ describe("line-pricing: «الإجماليّ شاملٌ الضريبة» بلا 
   });
 });
 
-describe("حارس: لا نسبةَ ضريبةٍ مكتوبةً باليد خارج vat.ts", () => {
+describe("حارس: لا نسبة ضريبة مكتوبةً باليد خارج vat.ts", () => {
   const ROOT = path.resolve(__dirname, "..");
   const files: string[] = [];
   const walk = (dir: string) => {
@@ -119,7 +119,7 @@ describe("حارس: لا نسبةَ ضريبةٍ مكتوبةً باليد خا�
   /* ضربٌ أو قسمةٌ بـ١٥ أو ١١٥، أو `0.15`/`1.15` في عبارةٍ حسابيّة، أو الثابتُ العائم القديم */
   const HAND_RATE = /(?:[*/]\s*(?:15|115)\b(?!\s*[%٪]))|(?:[*/]\s*(?:0\.15|1\.15)\b)|(?:\b(?:0\.15|1\.15)\s*[*/])|\bVAT_RATE\b(?!_)/;
 
-  it("كلُّ حسابٍ بالنسبة يمرّ بدوالّ vat.ts", () => {
+  it("كلّ حساب بالنسبة يمرّ بدوالّ vat.ts", () => {
     const offenders: string[] = [];
     for (const f of files) {
       if (f.endsWith(`${path.sep}lib${path.sep}vat.ts`)) continue;

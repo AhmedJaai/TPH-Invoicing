@@ -22,7 +22,7 @@ const Body = z.object({ documentId: z.string().trim().min(1).max(64) }).strict()
 export async function POST(request: Request) {
   try {
     const user = await guard("invoice-replace", "document:upload");
-    if (!can(user.role, "amounts:view")) return NextResponse.json({ error: "الاستبدالُ يحتاج صلاحية عرض المبالغ" }, { status: 403 });
+    if (!can(user.role, "amounts:view")) return NextResponse.json({ error: "استبدال الفاتورة يحتاج صلاحية عرض المبالغ" }, { status: 403 });
     const read = await readJson(request, Body);
     if (!read.ok) return read.response;
     const out = await db.transaction((tx) => replaceWithCorrectedInvoice(tx, read.body.documentId, user.id));
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     if (out.driveFileId && driveWritesAllowed(process.env)) {
       try {
         const token = await refreshTokenFor(user.id);
-        if (token) renamedTo = (await renameArchived(driveForUser(token), [out.driveFileId], user.id, "فاتورةٌ مصحَّحة")).done[0]?.to ?? null;
+        if (token) renamedTo = (await renameArchived(driveForUser(token), [out.driveFileId], user.id, "فاتورة مصحّحة")).done[0]?.to ?? null;
       } catch (e) {
         console.warn("[invoice-replace] تعذّرت التسمية:", (e as Error).message);
       }
@@ -40,9 +40,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       invoiceId: out.invoiceId,
-      message: `حلّت محلّ ${out.invoiceNumber}: ${formatRiyalsDisplay(out.beforeMinor)} ← ${formatRiyalsDisplay(out.afterMinor)}`
-        + (out.releasedMinor > 0 ? ` — وعاد ${formatRiyalsDisplay(out.releasedMinor)} رصيداً للمورّد` : "")
-        + (renamedTo ? ` · سُمّي ${renamedTo}` : ""),
+      message: `حلّت هذه الفاتورة محل ${out.invoiceNumber}: ${formatRiyalsDisplay(out.beforeMinor)} ← ${formatRiyalsDisplay(out.afterMinor)}`
+        + (out.releasedMinor > 0 ? `، وعاد ${formatRiyalsDisplay(out.releasedMinor)} رصيداً للمورّد` : "")
+        + (renamedTo ? ` · وسُمّي الملف ${renamedTo}` : ""),
     });
   } catch (e) {
     if (e instanceof ReplaceRefused) return NextResponse.json({ error: e.message }, { status: e.status });

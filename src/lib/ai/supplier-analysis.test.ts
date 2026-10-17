@@ -81,7 +81,7 @@ describe("validateAnalysis", () => {
       ],
     }, golden, signals);
     expect(r.findings).toHaveLength(0);
-    expect(r.dropped.map((d) => d.reason)).toEqual(["بلا فاتورةٍ معروفة", "بلا حوالةٍ معروفة", "نوعٌ خارج القائمة"]);
+    expect(r.dropped.map((d) => d.reason)).toEqual(["لا توجد فاتورة معروفة", "لا توجد حوالة معروفة", "نوع خارج القائمة"]);
   });
 
   it("لا خصم رصيد حين لا رصيد، ولا «دفعتَ أكثر» حين لم تدفع أكثر", () => {

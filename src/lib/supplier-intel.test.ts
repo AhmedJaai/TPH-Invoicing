@@ -19,7 +19,7 @@ const inv = (id: string, date: string, openMinor: number, ageDays: number): Open
   bucket: (ageDays > 90 ? 3 : ageDays > 60 ? 2 : ageDays > 30 ? 1 : 0) as AgeBucketIndex,
 });
 
-describe("أعمارُ الدَّين تتوزّع على «عليك» نفسه", () => {
+describe("أعمار الدّين تتوزّع على «عليك» نفسه", () => {
   const open = [
     inv("A", "2026-05-01", 50_000, 146),
     inv("B", "2026-07-10", 30_000, 76),
@@ -28,7 +28,7 @@ describe("أعمارُ الدَّين تتوزّع على «عليك» نفسه"
   ];
   const totalOpen = open.reduce((s, i) => s + i.openMinor, 0);
 
-  it("مجموعُ الشرائح هو ما يقوله مصدرُ الأرصدة بالهللة", () => {
+  it("مجموع الشرائح هو ما يقوله مصدر الأرصدة بالهللة", () => {
     for (const credit of [0, 1, 40_000, 55_000, 109_999, 110_000, 200_000]) {
       const b = supplierBalance({
         supplierId: "s", billedMinor: totalOpen, openMinor: totalOpen, openCount: 4,
@@ -40,7 +40,7 @@ describe("أعمارُ الدَّين تتوزّع على «عليك» نفسه"
     }
   });
 
-  it("والرصيدُ يأكل الأقدمَ أوّلاً — فالمتأخّر هو `overdueOwedMinor` بعينه", () => {
+  it("والرصيد يأكل الأقدم أوّلاً — فالمتأخّر هو `overdueOwedMinor` بعينه", () => {
     const overdueOpen = open.filter((i) => i.bucket >= 2).reduce((s, i) => s + i.openMinor, 0);
     for (const credit of [0, 30_000, 80_000, 95_000]) {
       const owed = Math.max(0, totalOpen - credit);
@@ -48,7 +48,7 @@ describe("أعمارُ الدَّين تتوزّع على «عليك» نفسه"
     }
   });
 
-  it("أقدمُ دَينٍ هو أقدمُ فاتورةٍ بقي عليها شيءٌ بعد الرصيد، لا أقدمُ فاتورةٍ مفتوحة", () => {
+  it("أقدم دين هو أقدم فاتورة بقي عليها شيء بعد الرصيد، لا أقدم فاتورة مفتوحة", () => {
     expect(ageOwed(open, totalOpen).oldestOwedDays).toBe(146);
     // رصيدٌ بستّين ألفاً يغطّي A كلّها وعشرةً من B
     const a = ageOwed(open, totalOpen - 60_000);
@@ -57,19 +57,19 @@ describe("أعمارُ الدَّين تتوزّع على «عليك» نفسه"
     expect(a.buckets).toEqual([10_000, 20_000, 20_000, 0]);
   });
 
-  it("لا دَين = لا عمر، ولا يُقال «صفر يوم»", () => {
+  it("لا دين = لا عمر، ولا يقال «صفر يوم»", () => {
     const a = ageOwed(open, 0);
     expect(a.oldestOwedDays).toBeNull();
     expect(a.carrying).toEqual([]);
   });
 
-  it("دَينٌ أكبر من المفتوح لا يُطوى في شريحة — يُعرَض بلا عمر", () => {
+  it("دين أكبر من المفتوح لا يطوى في شريحة — يعرض بلا عمر", () => {
     const a = ageOwed([inv("A", "2026-09-01", 1_000, 20)], 1_500);
     expect(a.buckets).toEqual([1_000, 0, 0, 0]);
     expect(a.unagedMinor).toBe(500);
   });
 
-  it("نبرةُ العمر", () => {
+  it("نبرة العمر", () => {
     expect(ageTone(null)).toBe("muted");
     expect(ageTone(45)).toBe("muted");
     expect(ageTone(61)).toBe("warn");
@@ -77,7 +77,7 @@ describe("أعمارُ الدَّين تتوزّع على «عليك» نفسه"
   });
 });
 
-describe("انتظامُ السداد من التخصيصات وحدها", () => {
+describe("انتظام السداد من التخصيصات وحدها", () => {
   it("دون العيّنة: غير معروف لا صفر", () => {
     const r = paymentReliability(
       [{ invoiceDate: "2026-08-01", settledOn: "2026-08-11" }],
@@ -88,7 +88,7 @@ describe("انتظامُ السداد من التخصيصات وحدها", () =>
     expect(r.sampleCount).toBe(1);
   });
 
-  it("المتوسّط والوسيط بالأيّام، والمسدَّد قبل تاريخه يُعدّ صفراً ويُحصى", () => {
+  it("المتوسّط والوسيط بالأيّام، والمسدّد قبل تاريخه يعدّ صفراً ويحصى", () => {
     const r = paymentReliability(
       [
         { invoiceDate: "2026-08-01", settledOn: "2026-08-11" }, // 10
@@ -104,12 +104,12 @@ describe("انتظامُ السداد من التخصيصات وحدها", () =>
   });
 });
 
-describe("تاريخُ الأسعار داخل المورّد", () => {
+describe("تاريخ الأسعار داخل المورّد", () => {
   const line = (n: string, date: string, unit: number, id = date) => ({
     normalized: n, description: n, date, unitPriceMinor: unit, invoiceId: id, invoiceNumber: id,
   });
 
-  it("النسبة من الهللات، وآخرُ تغيّرٍ مقابل آخر سعرٍ خالفه", () => {
+  it("النسبة من الهللات، وآخر تغيّر مقابل آخر سعر خالفه", () => {
     const [h] = priceHistory([
       line("حليب", "2026-06-01", 1_000),
       line("حليب", "2026-07-01", 1_100),
@@ -121,7 +121,7 @@ describe("تاريخُ الأسعار داخل المورّد", () => {
     expect(h.points).toEqual([1_000, 1_100, 1_100, 1_210]);
   });
 
-  it("شراءٌ واحد لا نسبةَ له، وسعرُ صفرٍ لا يدخل", () => {
+  it("شراء واحد لا نسبة له، وسعر صفر لا يدخل", () => {
     const h = priceHistory([line("سكر", "2026-09-01", 500), line("سكر", "2026-09-02", 0)]);
     expect(h[0].purchases).toBe(1);
     expect(h[0].changePct).toBeNull();
@@ -137,7 +137,7 @@ describe("تاريخُ الأسعار داخل المورّد", () => {
   });
 });
 
-describe("كشفُ الحساب", () => {
+describe("كشف الحساب", () => {
   it("الختاميّ = الافتتاحيّ + الفواتير − المدفوعات، والفاتورة قبل الدفعة في يومها", () => {
     const l = buildLedger(5_000, [
       { id: "p1", date: "2026-09-02", kind: "PAYMENT", reference: "حوالة", amountMinor: 7_000 },
@@ -149,8 +149,8 @@ describe("كشفُ الحساب", () => {
     expect(l.closingMinor).toBe(5_000 + l.invoicedMinor - l.paidMinor);
   });
 
-  it("والرصيدُ السالب رصيدٌ لك لا خطأ", () => {
-    const l = buildLedger(0, [{ id: "p", date: "2026-09-01", kind: "PAYMENT", reference: "مقدَّمة", amountMinor: 1_000 }]);
+  it("والرصيد السالب رصيد لك لا خطأ", () => {
+    const l = buildLedger(0, [{ id: "p", date: "2026-09-01", kind: "PAYMENT", reference: "مقدّمة", amountMinor: 1_000 }]);
     expect(l.closingMinor).toBe(-1_000);
   });
 });

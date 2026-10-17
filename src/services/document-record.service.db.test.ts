@@ -24,8 +24,8 @@ const base = (documentId: string, supplierId: string) => ({
   total: "1150",
 });
 
-describe("قيدُ فاتورةٍ من مستندٍ بيد — «أكمِل الناقص»", () => {
-  it("المعاينةُ تحكم ولا تكتب", () =>
+describe("قيد فاتورة من مستند بيد — «أكمل الناقص»", () => {
+  it("المعاينة تحكم ولا تكتب", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const d = await makeDocument(tx, s, "2026-08-10");
@@ -37,7 +37,7 @@ describe("قيدُ فاتورةٍ من مستندٍ بيد — «أكمِل ال
       expect(rows).toHaveLength(0);
     }));
 
-  it("القيدُ بالمسار نفسه: الهللاتُ من النصّ، والتاريخُ موحَّد، والنوعُ والمورّدُ على المستند، وأثرٌ في السجلّ", () =>
+  it("القيد بالمسار نفسه: الهللات من النصّ، والتاريخ موحّد، والنوع والمورّد على المستند، وأثر في السجلّ", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const d = await makeDocument(tx, s, "2026-08-10");
@@ -55,7 +55,7 @@ describe("قيدُ فاتورةٍ من مستندٍ بيد — «أكمِل ال
       expect(log.map((l) => l.action)).toContain("DOCUMENT_RECORDED_BY_HAND");
     }));
 
-  it("لا يُقيَّد مرّتين، ولا فوق فاتورةٍ قائمة، ولا المرفوض", () =>
+  it("لا يقيّد مرّتين، ولا فوق فاتورة قائمة، ولا المرفوض", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const who = await someone(tx);
@@ -68,7 +68,7 @@ describe("قيدُ فاتورةٍ من مستندٍ بيد — «أكمِل ال
       expect(await caught(recordDocumentByHand(who, base(rejected, s), false, tx))).toBeInstanceOf(RecordRefused);
     }));
 
-  it("رقمٌ مسجَّلٌ للمورّد نفسه يمنع القيد ويُقال — لا يُكتب شيء", () =>
+  it("رقم مسجّل للمورّد نفسه يمنع القيد ويقال — لا يكتب شيء", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const existing = await makeInvoice(tx, s, 500_00, "2026-08-01");

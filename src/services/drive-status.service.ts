@@ -157,7 +157,7 @@ function toActivity(r: { id: string; at: Date; action: string; actor: string | n
     const lines = linesOf(field(r.after, "الملفّات"));
     return { id: r.id, at: r.at, kind: "RENAMED", actor: r.actor, count: countOf(field(r.after, "عدد")) || lines.length, lines };
   }
-  return { id: r.id, at: r.at, kind: "SYNCED", actor: r.actor, count: countOf(field(r.after, "سُجّلت")), lines: [] };
+  return { id: r.id, at: r.at, kind: "SYNCED", actor: r.actor, count: countOf(field(r.after, "سجّلت")), lines: [] };
 }
 
 /**
@@ -190,7 +190,7 @@ export async function loadDriveHeartbeat(userId: string): Promise<DriveHeartbeat
   const failedAt = failed?.at ?? null;
   const connected = previewMode ? null : token !== null;
   const state = driveState({ previewMode, connected, checkedAt, failedAt });
-  const failure = state === "failing" && failedAt ? { at: failedAt, reason: failed?.reason ?? "تعذّر الفحص." } : null;
+  const failure = state === "failing" && failedAt ? { at: failedAt, reason: failed?.reason ?? "تعذّر إجراء الفحص." } : null;
   return { state, previewMode, connected, checkedAt, failure };
 }
 

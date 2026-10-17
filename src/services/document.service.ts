@@ -18,7 +18,7 @@ import type { Tx } from "./types";
 export class DuplicateDocumentError extends Error {
   readonly existingFileName: string;
   constructor(fileName: string) {
-    super(`هذا الملف مرفوع مسبقاً باسم ${fileName}`);
+    super(`هذا الملف مرفوع سابقاً باسم ${fileName}`);
     this.name = "DuplicateDocumentError";
     this.existingFileName = fileName;
   }
@@ -144,7 +144,7 @@ export async function recordUploadOrphan(input: {
   uploadedById: string;
   reason: string;
 }): Promise<void> {
-  const reason = `رُفع إلى الدرايف ولم يُقيَّد — ${input.reason}`.slice(0, 500);
+  const reason = `رُفع إلى الدرايف ولم يُقيَّد: ${input.reason}`.slice(0, 500);
   await db.transaction(async (t) => {
     const [doc] = await t.insert(documents).values({
       driveFileId: input.driveFileId,

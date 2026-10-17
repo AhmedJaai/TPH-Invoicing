@@ -21,7 +21,7 @@ describe("suggestMerges", () => {
     expect(s[0].caveats).toHaveLength(0);
   });
 
-  it("«العنب» يُقترح ضعيفاً مع بيان سببه — لا يُجمع بصمت", () => {
+  it("«العنب» يقترح ضعيفاً مع بيان سببه — لا يجمع بصمت", () => {
     const s = suggestMerges([
       item("s1", "المحمصة الغربية", "عنب", "عنب", 15_500),
       item("s2", "لافا كمبوتشا", "عنب", "عنب", 1_350),
@@ -31,7 +31,7 @@ describe("suggestMerges", () => {
     expect(s[0].caveats.join(" ")).toContain("صنفان مختلفان");
   });
 
-  it("الاسم من كلمة واحدة يُضعِف الاقتراح", () => {
+  it("الاسم من كلمة واحدة يضعف الاقتراح", () => {
     const s = suggestMerges([
       item("s1", "أ", "سكر", "سكر", 1_000),
       item("s2", "ب", "سكر", "سكر", 1_050),
@@ -40,12 +40,12 @@ describe("suggestMerges", () => {
     expect(s[0].caveats.join(" ")).toContain("كلمة واحدة");
   });
 
-  it("الطلب مرّة واحدة يُضعِف الاقتراح", () => {
+  it("الطلب مرّة واحدة يضعف الاقتراح", () => {
     const s = suggestMerges([
       item("s1", "أ", "حليب طازج 2 l", "حليب طازج", 900, 10),
       item("s2", "ب", "حليب طازج 2 l", "Fresh Milk", 880, 1),
     ]);
-    expect(s[0].caveats.join(" ")).toContain("مرّة واحدة");
+    expect(s[0].caveats.join(" ")).toContain("مرة واحدة");
   });
 
   it("يرتّب الأقوى أوّلاً", () => {
@@ -67,7 +67,7 @@ describe("suggestMerges", () => {
     expect(s[0].items[0].supplierName).toBe("ب");
   });
 
-  it("بلا أسعار مسجّلة: لا يُخترع فارق، ويُقال إنّه لا دليل", () => {
+  it("بلا أسعار مسجّلة: لا يخترع فارق، ويقال إنّه لا دليل", () => {
     const s = suggestMerges([
       item("s1", "أ", "عينه مجانيه", "عينة", 0),
       item("s2", "ب", "عينه مجانيه", "عينة", 0),
@@ -75,7 +75,7 @@ describe("suggestMerges", () => {
     expect(s).toHaveLength(1);
     expect(Number.isFinite(s[0].priceRatio)).toBe(true);
     expect(s[0].strength).toBe("WEAK");
-    expect(s[0].caveats.join(" ")).toContain("لا أسعار");
+    expect(s[0].caveats.join(" ")).toContain("لا توجد أسعار");
   });
 });
 
@@ -103,7 +103,7 @@ describe("suggestCategory", () => {
     expect(suggestCategory("مطهر أرضيات")).toBe("CLEANING");
   });
 
-  it("ما لا دلالة فيه يبقى «أخرى» — لا يُخمَّن", () => {
+  it("ما لا دلالة فيه يبقى «أخرى» — لا يخمّن", () => {
     expect(suggestCategory("صنف غير معروف ٣٤٥")).toBe("OTHER");
   });
 });

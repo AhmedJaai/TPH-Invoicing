@@ -26,8 +26,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       message: read.body.decision === "BOUNCED"
-        ? `حُسمت: ارتدّت — ${out.freedInvoices > 0 ? "رُدّت الدفعة وعادت فاتورتُها مستحقّة" : "ولا دفعةَ عليها"}`
-        : "حُسمت: ليست ردّاً — خرج التنبيه",
+        ? `تم الحسم: الحوالة مرتجعة. ${out.freedInvoices > 0 ? "أُلغيت الدفعة وعادت فاتورتها مستحقة." : "ولا توجد دفعة مرتبطة بها."}`
+        : "تم الحسم: الحركة ليست مرتجعة. أُزيل التنبيه.",
     });
   } catch (e) {
     if (e instanceof BounceRefused) return NextResponse.json({ error: e.message }, { status: 409 });

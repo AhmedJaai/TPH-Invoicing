@@ -17,9 +17,9 @@ export async function loadRunway(): Promise<Runway> {
   }
   const [row] = (await db.execute<{ out: string; first_day: string | null }>(sql`
     select coalesce(sum(bt.amount_minor) filter (where bt.direction = 'DEBIT'
-             /* حركةٌ بين حسابَي المنشأة ليست مالاً خرج منها */
+             /* حركة بين حسابي المنشأة ليست مالاً خرج منها */
              and bt.category::text <> 'INTERNAL'
-             /* وما خرج ثمّ عاد وحُسم «ارتدّت» لم يخرج */
+             /* وما خرج ثمّ عاد وحسم «ارتدّت» لم يخرج */
              and not exists (
                select 1 from alert_resolutions ar
                 where ar.decision = 'BOUNCED' and ar.key like 'bounce:' || bt.id || ':%')), 0)::bigint as out,

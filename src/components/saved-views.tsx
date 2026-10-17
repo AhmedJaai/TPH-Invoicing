@@ -90,7 +90,7 @@ export function SavedViews({ scope, suggestedName }: {
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {views.length > 0 && <span className="text-[11px] font-bold text-muted">عروضي</span>}
+      {views.length > 0 && <span className="text-[11px] font-bold text-muted">عروضي المحفوظة</span>}
       {views.map((v) => (
         <span
           key={v.href}
@@ -102,7 +102,7 @@ export function SavedViews({ scope, suggestedName }: {
           <button
             type="button"
             onClick={() => write(key, views.filter((x) => x.href !== v.href))}
-            aria-label={`احذف العرض «${v.name}»`}
+            aria-label={`احذف العرض المحفوظ «${v.name}»`}
             className="grid h-8 w-8 place-items-center rounded-full text-muted hover:text-danger"
           >
             <X className="h-3 w-3" strokeWidth={2.5} aria-hidden />

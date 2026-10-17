@@ -102,11 +102,11 @@ export async function SupplierView({
     /* في اللوح يُقال الخبرُ في اللوح نفسه — صفحةُ ٤٠٤ العامّة كانت تأخذ مكانَه بلا إطاره ولا زرّ إغلاقه */
     if (mode !== "drawer") notFound();
     return (
-      <DetailFrame mode={mode} fullHref="/suppliers" user={user} width="page" title="مورّدٌ غير موجود">
+      <DetailFrame mode={mode} fullHref="/suppliers" user={user} width="page" title="مورّد غير موجود">
         <EmptyState
           icon={Store}
-          title="لا يوجد مورّدٌ بهذا الرابط."
-          hint="ربما دُمج في مورّدٍ آخر فتغيّر رمزُه — ابحث عنه باسمه في قائمة المورّدين."
+          title="لا يوجد مورّد بهذا الرابط."
+          hint="ربما دُمج مع مورّد آخر فتغيّر رابطه. ابحث عنه بالاسم في قائمة المورّدين."
           action={<LinkButton href="/suppliers" variant="primary">المورّدون</LinkButton>}
         />
       </DetailFrame>
@@ -135,15 +135,15 @@ export async function SupplierView({
         (select coalesce(sum(pa.amount_minor), 0)::bigint from payment_allocations pa
           join invoices i on i.id = pa.invoice_id where i.supplier_id = ${s.id})    as paid,
         (select count(*)::int from statements where supplier_id = ${s.id})          as statement_count,
-        -- آخرُ رصيدٍ ختاميّ قرأناه من كشوفه. وقد يغيب: كشفٌ وصل ولم
-        -- يُقرأ رصيدُه ليس كشفاً يقول «صفر».
+        -- آخر رصيد ختاميّ قرأناه من كشوفه. وقد يغيب: كشف وصل ولم
+        -- يقرأ رصيده ليس كشفاً يقول «صفر».
         (select closing_balance_minor from statements
           where supplier_id = ${s.id} and closing_balance_minor is not null
           order by period_end desc nulls last limit 1)                              as reported_balance,
         (select to_char(period_end, 'YYYY-MM-DD') from statements
           where supplier_id = ${s.id} and closing_balance_minor is not null
           order by period_end desc nulls last limit 1)                              as reported_at,
-        -- الأشهر التي تغطّيها كشوفه لا عددُ ملفّاتها: كشفٌ تراكميّ لأربعة أشهر أربعة
+        -- الأشهر التي تغطّيها كشوفه لا عدد ملفّاتها: كشف تراكميّ لأربعة أشهر أربعة
         (select count(distinct to_char(m, 'YYYY-MM'))::int
            from statements st,
                 generate_series(date_trunc('month', coalesce(st.period_start, st.period_end)),
@@ -151,10 +151,10 @@ export async function SupplierView({
           where st.supplier_id = ${s.id} and st.period_end is not null)            as statement_months,
         (select count(*)::int from supplier_aliases where supplier_id = ${s.id})    as alias_count,
         (select count(*)::int from supplier_products where supplier_id = ${s.id})   as product_count,
-        -- المقدَّمة المعلَنة — وحدها «لك عنده» (SCN-105)
+        -- المقدّمة المعلنة — وحدها «لك عنده» (SCN-105)
         (select coalesce(sum(amount_minor - fee_minor), 0)::bigint from payments
           where supplier_id = ${s.id} and status = 'ADVANCE')                       as advance
-      /* فواتيرُه تُمسَح مرّةً واحدة — كانت ستّةَ استعلاماتٍ فرعيّة على الجدول نفسه */
+      /* فواتيره تمسح مرّةً واحدة — كانت ستّة استعلامات فرعيّة على الجدول نفسه */
       from (
         select count(*)::int                                          as invoice_count,
                coalesce(sum(total_minor), 0)::bigint                  as billed,
@@ -177,7 +177,7 @@ export async function SupplierView({
         (select coalesce(sum(amount_minor - fee_minor), 0)::bigint from payments
           where supplier_id = ${s.id} and status not in ('REVERSED','VOID')
             and paid_at::date <= ${reportedDay})                                as paid,
-        /* ما سُدّد بعد الكشف من فواتير سبقته — يبدو مفتوحاً عنده ومسدَّداً اليوم */
+        /* ما سدّد بعد الكشف من فواتير سبقته — يبدو مفتوحاً عنده ومسدّداً اليوم */
         (select coalesce(sum(pa.amount_minor), 0)::bigint
            from payment_allocations pa
            join payments p on p.id = pa.payment_id
@@ -375,15 +375,15 @@ export async function SupplierView({
       eyebrow={
         <span className="flex flex-wrap items-center gap-2">
           <Monogram name={s.nameAr} className="h-6 w-6 text-[11px]" />
-          <span>ملفّ المورّد</span>
+          <span>ملف المورّد</span>
           {/* الشارةُ تفتح سياستَه — هناك تُغيَّر إن تغيّر حالُه */}
           {!s.issuesInvoices && (
             <Link href={`/suppliers/${s.slug}?tab=profile`} scroll={false} className="rounded-full hover:opacity-80">
               <Badge tone="warn">لا يصدر فواتير</Badge>
             </Link>
           )}
-          {s.paperInvoices && <Badge>فواتيرُه ورقيّة</Badge>}
-          {!s.isActive && <Badge tone="danger">معطَّل</Badge>}
+          {s.paperInvoices && <Badge>فواتيره ورقية</Badge>}
+          {!s.isActive && <Badge tone="danger">معطّل</Badge>}
         </span>
       }
       intro={`${countNoun(n("invoice_count"), INVOICE)} · ${countNoun(n("active_months"), MONTH)} من التعامل · ${countNoun(n("product_count"), PRODUCT)}`}
@@ -402,19 +402,19 @@ export async function SupplierView({
                 <span className={`grid h-7 w-7 place-items-center rounded-lg ${balance > 0 ? "bg-warn-bg text-warn" : "bg-sunken text-ink-soft"}`}>
                   <Scale className="h-4 w-4" strokeWidth={2} aria-hidden />
                 </span>
-                {balance > 0 ? "عليك له" : creditLeft > 0 ? "رصيدٌ لك عنده" : offsetting ? "متّزنٌ على الورق" : "الحساب متّزن"}
+                {balance > 0 ? "عليك له" : creditLeft > 0 ? "رصيد لك عنده" : offsetting ? "متّزن على الورق" : "الحساب متّزن"}
               </p>
               {ageing.oldestOwedDays !== null && (
                 /* الدَّينُ القديم يُسدَّد من دفعة الشهر — والشارةُ بابُها لمن يعتمد السداد وحده */
                 can(user.role, "payment:approve") ? (
                   <Link href="/payments" className="rounded-full hover:opacity-80">
                     <Badge tone={ageTone(ageing.oldestOwedDays) === "muted" ? undefined : ageTone(ageing.oldestOwedDays)} dot>
-                      أقدمُ دَينٍ منذ {countNoun(ageing.oldestOwedDays, DAY)} — جهّز سدادَه
+                      أقدم مبلغ مستحق منذ {countNoun(ageing.oldestOwedDays, DAY)} — جهّز سداده
                     </Badge>
                   </Link>
                 ) : (
                   <Badge tone={ageTone(ageing.oldestOwedDays) === "muted" ? undefined : ageTone(ageing.oldestOwedDays)} dot>
-                    أقدمُ دَينٍ منذ {countNoun(ageing.oldestOwedDays, DAY)}
+                    أقدم مبلغ مستحق منذ {countNoun(ageing.oldestOwedDays, DAY)}
                   </Badge>
                 )
               )}
@@ -424,22 +424,22 @@ export async function SupplierView({
             </p>
             <p className="mt-2.5 text-xs leading-relaxed text-muted">
               {balance > 0
-                ? `على ${countNoun(bal?.openCount ?? 0, INVOICE)} مفتوحة، بعد خصم ما دفعتَه له.`
+                ? `عن ${countNoun(bal?.openCount ?? 0, INVOICE)} مفتوحة، بعد خصم ما دفعته له.`
                 : creditLeft > 0
-                  ? "مالٌ دفعتَه له ولم تصلك فاتورتُه — يُخصَم من فواتيره القادمة."
+                  ? "مبلغ دفعته له ولم تصلك فاتورته. سيُخصم من فواتيره القادمة."
                   : !s.issuesInvoices && paidNet > 0
-                    ? "لا يصدر فواتير — ما دفعتَه له شراءٌ سُدّد يومَ دفعه، لا رصيدٌ ينتظر فاتورة."
+                    ? "لا يصدر فواتير، فما دفعته له يُحسب مشتريات مسدّدة يوم الدفع، ولا يوجد رصيد ينتظر فاتورة."
                   : offsetting
-                    ? "فاتورةٌ مفتوحة يقابلها مالٌ دفعتَه ولم يُنسب إلى فاتورة — فإمّا سدادٌ لم يُنسب، وإمّا دفعةٌ قُيِّدت مرّتين."
+                    ? "توجد فاتورة مفتوحة يقابلها مبلغ دفعته ولم يُربط بأي فاتورة. إما أنه سداد لم يُربط بفاتورته، وإما أن الدفعة سُجّلت مرتين."
                     : n("invoice_count") === 0 && paidNet === 0
-                      ? "لا فاتورة منه ولا دفعة له بعد — فلا حسابَ يُقال عنه شيء."
-                      : "لا فاتورة مفتوحة ولا رصيدَ لك عنده."}
+                      ? "لا توجد فاتورة منه ولا دفعة له حتى الآن، فلا حساب لعرضه."
+                      : "لا توجد فاتورة مفتوحة ولا رصيد لك عنده."}
             </p>
             {/* ما يتقابل لا يُقال «متّزناً» وتُترك — بابُه بجانبه */}
             {unapplied > 0 && (bal?.openMinor ?? 0) > 0 && can(user.role, "payment:approve") && (
               <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-warn-bg px-3 py-2 text-[11px] text-warn">
                 <span className="flex-1">
-                  <Money minor={Math.min(unapplied, bal?.openMinor ?? 0)} /> دفعتَها ولم تُنسب، وفاتورةٌ مفتوحة بمثلها.
+                  <Money minor={Math.min(unapplied, bal?.openMinor ?? 0)} /> دفعتها دون ربطها بفاتورة، وتوجد فاتورة مفتوحة بالمبلغ نفسه.
                 </span>
                 <AccountReview size="sm" />
               </div>
@@ -450,7 +450,7 @@ export async function SupplierView({
                 <AgeingBar buckets={ageing.buckets} />
                 {ageing.unagedMinor > 0 && (
                   <p className="mt-2 text-[11px] text-warn">
-                    <Money minor={ageing.unagedMinor} /> منه لا تُعرف فاتورتُه — حدّث الصفحة.
+                    <Money minor={ageing.unagedMinor} /> منه لا نعرف فاتورته. حدّث الصفحة.
                   </p>
                 )}
               </div>
@@ -458,16 +458,16 @@ export async function SupplierView({
 
             {/* ── ممّ تكوّن: كلُّ طرفٍ يفتح سجلّاته ── */}
             <dl className="mt-5 divide-y divide-line-soft rounded-lg border border-line-soft bg-sunken/50 px-3 text-xs">
-              <Trace label="فُوتِرَ عليك" minor={billed} href={`/purchases/invoices?supplier=${s.slug}`} />
-              <Trace label="دفعتَ له" minor={paidNet} href={`/suppliers/${s.slug}?tab=payments#detail`} />
+              <Trace label="فواتير صدرت عليك" minor={billed} href={`/purchases/invoices?supplier=${s.slug}`} />
+              <Trace label="دفعت له" minor={paidNet} href={`/suppliers/${s.slug}?tab=payments#detail`} />
               {(bal?.creditNotesMinor ?? 0) > 0 && (
-                <Trace label="إشعاراتٌ دائنة (مرتجع أو خصم)" minor={bal?.creditNotesMinor ?? 0} href={`/suppliers/${s.slug}?tab=payments#detail`} />
+                <Trace label="إشعارات دائنة (مرتجع أو خصم)" minor={bal?.creditNotesMinor ?? 0} href={`/suppliers/${s.slug}?tab=payments#detail`} />
               )}
-              <Trace label="بقي مفتوحاً على فواتيره" minor={bal?.openMinor ?? 0} href={`/purchases/invoices?supplier=${s.slug}&paid=OPEN`} />
+              <Trace label="المتبقي على فواتيره" minor={bal?.openMinor ?? 0} href={`/purchases/invoices?supplier=${s.slug}&paid=OPEN`} />
               {creditSplit.unbackedMinor > 0 && (
-                <Trace label="دفعتَ بلا فاتورة" minor={creditSplit.unbackedMinor} href={`/suppliers?unbacked=1#unbacked-${s.slug}`} />
+                <Trace label="دفعات بلا فاتورة" minor={creditSplit.unbackedMinor} href={`/suppliers?unbacked=1#unbacked-${s.slug}`} />
               )}
-              {creditSplit.advanceMinor > 0 && <Trace label="مقدَّمةٌ معلَنة" minor={creditSplit.advanceMinor} />}
+              {creditSplit.advanceMinor > 0 && <Trace label="دفعة مقدّمة" minor={creditSplit.advanceMinor} />}
             </dl>
           </Card>
 
@@ -488,8 +488,8 @@ export async function SupplierView({
                 <Compare
                   label="ما يقوله كشفه"
                   value={account.reportedBalanceMinor}
-                  missing="لم يصل"
-                  sub={reportedAt ? "آخر رصيدٍ ختاميّ" : "أو وصل ولم يُقرأ"}
+                  missing="لم يصل كشف"
+                  sub={reportedAt ? "آخر رصيد ختامي" : "أو وصل الكشف ولم يُقرأ"}
                 />
                 <Compare
                   label="الفرق"
@@ -500,15 +500,15 @@ export async function SupplierView({
               </dl>
               <p className={`mt-3 text-xs leading-relaxed ${account.status === "DIFFERS" ? "text-ink-soft" : "text-muted"}`}>
                 {describeAccount(account)}
-                {paidAfterStatement > 0 && <> · ودفعتَ بعد كشفه <Money minor={paidAfterStatement} /></>}
-                {account.allocatedAfterStatementMinor ? <> · وخُصّص بعده على فواتير سبقته <Money minor={account.allocatedAfterStatementMinor} /></> : null}
+                {paidAfterStatement > 0 && <> · ودفعت بعد تاريخ كشفه <Money minor={paidAfterStatement} /></>}
+                {account.allocatedAfterStatementMinor ? <> · وخُصّص بعده مبلغ على فواتير أقدم من الكشف <Money minor={account.allocatedAfterStatementMinor} /></> : null}
               </p>
               {why && (why.missing.length + why.priceDiffs.length + why.notInStatement.length > 0) && (
                 <div className="mt-3 space-y-2.5 border-t border-line-soft pt-3 text-xs">
-                  <p className="font-bold">ما يفسّر الفرق — من كشفه حتى {formatDay(why.periodEnd)}</p>
+                  <p className="font-bold">أسباب الفرق، من كشفه حتى {formatDay(why.periodEnd)}</p>
                   {why.missing.length > 0 && (
                     <div>
-                      <p className="text-warn">في كشفه وليست عندنا — اطلبها منه:</p>
+                      <p className="text-warn">فواتير في كشفه وليست عندنا. اطلبها منه:</p>
                       <ul className="mt-1 space-y-0.5">
                         {why.missing.map((m, i) => (
                           <li key={i} className="flex justify-between gap-3">
@@ -521,12 +521,12 @@ export async function SupplierView({
                   )}
                   {why.priceDiffs.length > 0 && (
                     <div>
-                      <p className="text-warn">المبلغُ في كشفه غيرُ فاتورتنا:</p>
+                      <p className="text-warn">فواتير مبلغها في كشفه يختلف عن مبلغها عندنا:</p>
                       <ul className="mt-1 space-y-0.5">
                         {why.priceDiffs.map((d) => (
                           <li key={d.invoiceId} className="flex flex-wrap justify-between gap-x-3">
                             <Link href={invoiceHref(d.invoiceId)} className="font-bold text-accent hover:underline"><bdi className="nums">{d.invoiceNumber}</bdi></Link>
-                            <span>كشفُه <Money minor={d.theirsMinor} /> · فاتورتُنا <Money minor={d.oursMinor} /> · {d.oursMinor > d.theirsMinor ? "أكثرُ عندنا بـ" : "أقلُّ عندنا بـ"}<Money minor={Math.abs(d.oursMinor - d.theirsMinor)} /></span>
+                            <span>كشفه <Money minor={d.theirsMinor} /> · فاتورتنا <Money minor={d.oursMinor} /> · {d.oursMinor > d.theirsMinor ? "أكثر عندنا بـ" : "أقلّ عندنا بـ"}<Money minor={Math.abs(d.oursMinor - d.theirsMinor)} /></span>
                           </li>
                         ))}
                       </ul>
@@ -534,7 +534,7 @@ export async function SupplierView({
                   )}
                   {why.notInStatement.length > 0 && (
                     <div>
-                      <p className="text-ink-soft">عندنا في مدّته ولم ترد في كشفه:</p>
+                      <p className="text-ink-soft">فواتير عندنا في فترة الكشف ولم ترد فيه:</p>
                       <ul className="mt-1 space-y-0.5">
                         {why.notInStatement.map((n) => (
                           <li key={n.invoiceId} className="flex justify-between gap-3">
@@ -557,15 +557,15 @@ export async function SupplierView({
                 كيف تسدّد له
               </h2>
               {rel.invoiceCount === 0 ? (
-                <p className="mt-3 text-xs leading-relaxed text-muted">غير معروف — لا فاتورة منه بعد، فلا سدادَ يُقاس.</p>
+                <p className="mt-3 text-xs leading-relaxed text-muted">غير معروف: لا توجد فاتورة منه بعد، فلا يمكن قياس السداد.</p>
               ) : (
                 <>
                   <div className="mt-3 flex items-baseline justify-between gap-3 text-xs">
-                    <span className="text-muted">سُدّد من فواتيره</span>
+                    <span className="text-muted">المسدّد من فواتيره</span>
                     <span className="font-bold"><span className="nums">{rel.settledCount}</span> من <span className="nums">{rel.invoiceCount}</span></span>
                   </div>
                   <div className="mt-1.5">
-                    <Meter value={rel.settledCount} max={rel.invoiceCount} tone={rel.settledCount === rel.invoiceCount ? "ok" : "accent"} label="الفواتير المسدَّدة" />
+                    <Meter value={rel.settledCount} max={rel.invoiceCount} tone={rel.settledCount === rel.invoiceCount ? "ok" : "accent"} label="الفواتير المسدّدة" />
                   </div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
                     <div className="min-w-0">
@@ -579,14 +579,14 @@ export async function SupplierView({
                       </dd>
                       <dd className="mt-0.5 text-[11px] leading-relaxed text-muted">
                         {rel.averageDays === null
-                          ? `يلزم ${countNoun(MIN_SETTLED_SAMPLE, INVOICE)} مسدَّدة بدفعةٍ معروفة — عندنا ${rel.sampleCount}`
-                          : `الوسيط من ${countNoun(rel.sampleCount, INVOICE)} · المتوسّط ${countNoun(rel.averageDays, DAY)}${rel.prepaidCount > 0 ? ` · ${rel.prepaidCount} سبقها رصيد` : ""}`}
+                          ? `يلزم ${countNoun(MIN_SETTLED_SAMPLE, INVOICE)} مسدّدة بدفعة معروفة، والمتوفر لدينا ${rel.sampleCount}`
+                          : `الوسيط من ${countNoun(rel.sampleCount, INVOICE)} · المتوسط ${countNoun(rel.averageDays, DAY)}${rel.prepaidCount > 0 ? ` · ${rel.prepaidCount} سبقها رصيد دائن` : ""}`}
                       </dd>
                     </div>
                     <div className="min-w-0">
-                      <dt className="text-[11px] text-muted">آخرُ دفعةٍ له</dt>
+                      <dt className="text-[11px] text-muted">آخر دفعة له</dt>
                       <dd className="mt-1 text-sm font-bold">
-                        {intel.lastPayment ? <Money minor={intel.lastPayment.amountMinor} /> : <span className="font-medium text-muted">لا دفعة بعد</span>}
+                        {intel.lastPayment ? <Money minor={intel.lastPayment.amountMinor} /> : <span className="font-medium text-muted">لا توجد دفعة بعد</span>}
                       </dd>
                       {intel.lastPayment && <dd className="mt-0.5 text-[11px] text-muted">{formatDay(intel.lastPayment.date)}</dd>}
                     </div>
@@ -599,7 +599,7 @@ export async function SupplierView({
                   className="mt-4 flex min-h-11 items-center gap-2 rounded-lg bg-warn-bg px-3 text-xs font-bold text-warn transition-colors hover:brightness-95 sm:min-h-9"
                 >
                   <Tags className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                  {countNoun(rising, PRODUCT)} ارتفع سعرُه في آخر شراء — انظر أسعاره
+                  {countNoun(rising, PRODUCT)} ارتفع سعره في آخر شراء. راجع أسعاره
                 </Link>
               )}
             </Card>
@@ -612,12 +612,12 @@ export async function SupplierView({
           title="اقتراحات التحليل"
           icon={Sparkles}
           count={findings.length > 0 ? findings.length : undefined}
-          hint="يقرأ فواتيره ودفعاته وكشوفه وحوالات البنك، ويقترح ما يصحّح حسابه. لا يُكتب شيءٌ حتى تُقرّه."
+          hint="يقرأ فواتيره ودفعاته وكشوفه وحوالات البنك ويقترح ما يصحّح حسابه. لا يُسجَّل أي اقتراح حتى تعتمده."
           action={canAnalyze ? <RunAnalysis suppliers={[{ id: s.id, name: s.nameAr }]} label="حلّل حسابه" /> : undefined}
         >
           {findings.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line px-4 py-3 text-xs text-muted">
-              لا اقتراح مفتوح. حلّل حسابه لترى ما يقوله التحليل — يقترح ولا يكتب.
+              لا توجد اقتراحات مفتوحة. اضغط «حلّل حسابه» ليعرض النظام اقتراحاته. لن يُسجَّل شيء حتى تعتمده.
             </p>
           ) : (
             <FindingsList findings={findings} canApprove={canApprove} showSupplier={false} collapseAfter={2} />
@@ -649,7 +649,7 @@ export async function SupplierView({
                 hrefOf={(r) => (showAmounts ? invoiceHref(r.id) : undefined)}
                 searchOf={(r) => `${r.number} ${formatDay(r.date)}`}
                 searchLabel="ابحث برقم الفاتورة"
-                empty={<EmptyState compact icon={FileText} title="لا فواتير منه بعد." hint="ترفع فاتورةً منه فتظهر هنا، ويبدأ حسابُه." action={<LinkButton href="/upload" size="sm" variant="primary">ارفع مستنداً</LinkButton>} />}
+                empty={<EmptyState compact icon={FileText} title="لا توجد فواتير منه بعد." hint="ارفع فاتورة منه لتظهر هنا ويبدأ حسابه." action={<LinkButton href="/upload" size="sm" variant="primary">ارفع مستنداً</LinkButton>} />}
                 columns={[
                   {
                     key: "number",
@@ -668,7 +668,7 @@ export async function SupplierView({
                     secondary: true,
                     cell: (r) => (
                       <Badge tone={r.taxStatus === "VALID" ? "ok" : r.taxStatus === "INVALID" ? "danger" : undefined} dot>
-                        {r.taxStatus === "VALID" ? "مستوفية" : r.taxStatus === "INVALID" ? "ناقصة" : r.taxStatus === "UNKNOWN" ? "لم تُقرأ" : "لا تُقيَّد"}
+                        {r.taxStatus === "VALID" ? "مستوفية" : r.taxStatus === "INVALID" ? "ناقصة" : r.taxStatus === "UNKNOWN" ? "لم تقرأ" : "لا تقيّد"}
                       </Badge>
                     ),
                   },
@@ -683,11 +683,11 @@ export async function SupplierView({
                         {
                           /* «ما بقي» على الفاتورة نفسها — قبل خصم رصيدك عنده، ومعه عمرُها */
                           key: "remaining",
-                          header: "ما بقي",
+                          header: "المتبقي",
                           numeric: true as const,
                           cell: (r: (typeof recent)[number]) => {
                             const rem = r.total - Number(r.allocated);
-                            if (rem <= SETTLED_TOLERANCE_MINOR) return <span className="text-[11px] font-bold text-ok">✓ مسدَّدة</span>;
+                            if (rem <= SETTLED_TOLERANCE_MINOR) return <span className="text-[11px] font-bold text-ok">✓ مسدّدة</span>;
                             const age = ageOf.get(r.id);
                             return (
                               <span className="inline-flex flex-col items-end">
@@ -705,8 +705,8 @@ export async function SupplierView({
               />
               {n("invoice_count") > recent.length && (
                 <p className="mt-2 text-xs text-muted">
-                  تُعرض آخرُ {recent.length} من {countNoun(n("invoice_count"), INVOICE)} —{" "}
-                  <Link href={`/purchases/invoices?supplier=${s.slug}`} className="font-bold text-accent hover:underline">كلُّها في الفواتير</Link>.
+                  المعروض آخر {recent.length} من {countNoun(n("invoice_count"), INVOICE)} —{" "}
+                  <Link href={`/purchases/invoices?supplier=${s.slug}`} className="font-bold text-accent hover:underline">عرض الكل في الفواتير</Link>.
                 </p>
               )}
             </>
@@ -717,11 +717,11 @@ export async function SupplierView({
               rows={paymentRows}
               keyOf={(r) => r.id}
               hrefOf={(r) => (r.tx ? txHref(r.tx) : undefined)}
-              empty={<EmptyState compact icon={Banknote} title="لا دفعة مسجّلة له." hint="تُقيَّد الدفعة من حركة البنك أو من إيصال سداد مؤرشف." action={<LinkButton href="/bank" size="sm">افتح حركة البنك</LinkButton>} />}
+              empty={<EmptyState compact icon={Banknote} title="لا توجد دفعة مسجّلة له." hint="تُسجَّل الدفعة من حركة بنكية أو من إيصال سداد مؤرشف." action={<LinkButton href="/bank" size="sm">افتح حركة البنك</LinkButton>} />}
               columns={[
                 { key: "date", header: "التاريخ", primary: true, cell: (r) => <span className="whitespace-nowrap">{formatDay(r.d)}</span> },
                 { key: "amount", header: "المبلغ", numeric: true, cell: (r) => <span className="font-bold"><Money minor={Number(r.amount)} /></span> },
-                { key: "allocated", header: "خُصّص على فواتيره", numeric: true, cell: (r) => <Money minor={Number(r.allocated)} /> },
+                { key: "allocated", header: "المخصّص لفواتيره", numeric: true, cell: (r) => <Money minor={Number(r.allocated)} /> },
                 {
                   key: "left",
                   header: "بلا فاتورة",
@@ -733,10 +733,10 @@ export async function SupplierView({
                       : <span className="text-muted">—</span>;
                   },
                 },
-                { key: "method", header: "طريقته", secondary: true, cell: (r) => <span className="text-xs text-ink-soft">{METHOD_LABEL[r.method] ?? r.method}</span> },
+                { key: "method", header: "طريقة الدفع", secondary: true, cell: (r) => <span className="text-xs text-ink-soft">{METHOD_LABEL[r.method] ?? r.method}</span> },
                 {
                   key: "state",
-                  header: "حالها",
+                  header: "الحالة",
                   cell: (r) => (
                     <Badge tone={r.status === "REVERSED" || r.status === "VOID" ? "danger" : r.status === "APPLIED" ? "ok" : undefined} dot>
                       {paymentStatusLabel(r.status)}
@@ -745,9 +745,9 @@ export async function SupplierView({
                 },
                 {
                   key: "tx",
-                  header: "حركتها",
+                  header: "الحركة البنكية",
                   secondary: true,
-                  cell: (r) => r.tx ? <span className="text-xs font-bold text-accent">في الكشف</span> : <span className="text-xs text-muted">لا حركة</span>,
+                  cell: (r) => r.tx ? <span className="text-xs font-bold text-accent">مرتبطة بحركة بنكية</span> : <span className="text-xs text-muted">بلا حركة بنكية</span>,
                 },
               ]}
             />
@@ -756,7 +756,7 @@ export async function SupplierView({
           {tab === "prices" && (
             <>
               <p className="mb-3 max-w-3xl text-xs leading-relaxed text-muted">
-                سعرُ الوحدة الفعليّ في كلّ شراءٍ منه — بعد الخصم، وداخل هذا المورّد وحده. وآخرُ تغيّرٍ هو السعرُ الحاليّ مقابل آخر سعرٍ خالفه.
+                سعر الوحدة الفعلي في كل عملية شراء منه، بعد الخصم، ولهذا المورّد وحده. «آخر تغيّر» هو الفرق بين السعر الحالي وآخر سعر مختلف عنه.
               </p>
               <DataTable
                 rows={intel.prices}
@@ -768,8 +768,8 @@ export async function SupplierView({
                   <EmptyState
                     compact
                     icon={Tags}
-                    title="لا بنود مقروءة من فواتيره."
-                    hint="تُبنى الأسعار من بنود الفواتير — حين يُقرأ محتوى فاتورةٍ منه يظهر سعرُ كلّ صنفٍ فيها هنا."
+                    title="لا توجد بنود مقروءة من فواتيره."
+                    hint="تُبنى الأسعار من بنود الفواتير. حين يقرأ النظام فاتورة منه يظهر هنا سعر كل صنف فيها."
                   />
                 }
                 columns={[
@@ -781,7 +781,7 @@ export async function SupplierView({
                       <span className="block min-w-0">
                         <span className="block truncate font-bold" dir="auto">{p.displayName}</span>
                         <span className="block text-[11px] font-normal text-muted">
-                          اشتُري {countNoun(p.purchases, TIME)} · آخرها {formatDay(p.lastDate)}
+                          اشتريته {countNoun(p.purchases, TIME)} · آخر مرة {formatDay(p.lastDate)}
                         </span>
                         {canAnalyze && (
                           <SupplierItemMerge
@@ -807,23 +807,23 @@ export async function SupplierView({
                                 <span className="text-[11px] text-muted">من <Money minor={p.lastMove.previousMinor} /></span>
                               </span>
                             ) : (
-                              <span className="text-[11px] text-muted">{p.purchases > 1 ? "لم يتغيّر" : "شراءٌ واحد"}</span>
+                              <span className="text-[11px] text-muted">{p.purchases > 1 ? "لم يتغيّر" : "شراء واحد"}</span>
                             ),
                         },
                         {
                           key: "since",
-                          header: "منذ أوّل شراء",
+                          header: "منذ أول شراء",
                           secondary: true,
                           cell: (p: (typeof intel.prices)[number]) =>
                             p.changePct === null ? <span className="text-[11px] text-muted">—</span> : <Delta pct={p.changePct} favourable={p.changePct <= 0} />,
                         },
                         {
                           key: "trend",
-                          header: "المسار",
+                          header: "اتجاه السعر",
                           secondary: true,
                           cell: (p: (typeof intel.prices)[number]) =>
                             p.lastMove ? (
-                              <Sparkline values={p.points} label={`مسار سعر ${p.displayName}`} tone={(p.lastMove?.pct ?? 0) > 0 ? "warn" : "accent"} />
+                              <Sparkline values={p.points} label={`اتجاه سعر ${p.displayName}`} tone={(p.lastMove?.pct ?? 0) > 0 ? "warn" : "accent"} />
                             ) : (
                               <span className="text-[11px] text-muted">ثابت</span>
                             ),
@@ -840,16 +840,16 @@ export async function SupplierView({
               <EmptyState
                 compact
                 icon={ScrollText}
-                title={s.issuesStatements ? "لا كشف حساب واحد منه." : "لا يصدر كشوفاً — كما أُعلن في ملفّه."}
+                title={s.issuesStatements ? "لم يصل منه أي كشف حساب." : "لا يصدر كشوف حساب، كما هو مسجّل في ملفه."}
                 hint={
                   s.issuesStatements
-                    ? `تعاملتَ معه ${countNoun(n("active_months"), MONTH)} بلا كشف. والكشف هو ما يكشف الفاتورة التي حُمّلت عليك ولم تصلك — لا يكشفها تفتيشُ أرشيفك، لأنّها ليست فيه.`
-                    : "فحسابُه عندنا من فواتيره ودفعاته وحدها، وكشفُ حسابه منّا يُطبع من «كشف الحساب»."
+                    ? `تعاملت معه ${countNoun(n("active_months"), MONTH)} دون كشف حساب. الكشف هو ما يُظهر الفاتورة التي سجّلها عليك ولم تصلك، ولا يظهرها أرشيفك لأنها غير موجودة فيه.`
+                    : "حسابه عندنا مبني على فواتيره ودفعاته فقط. ويمكنك طباعة كشف حسابه منّا من زر «كشف الحساب»."
                 }
                 action={
                   <>
                     {s.issuesStatements && <LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} variant="primary" size="sm">ارفع كشفه وطابقه</LinkButton>}
-                    {showAmounts && <LinkButton href={`/suppliers/${s.slug}/statement`} size="sm" icon={Printer}>كشفُ حسابه منّا</LinkButton>}
+                    {showAmounts && <LinkButton href={`/suppliers/${s.slug}/statement`} size="sm" icon={Printer}>كشف حسابه منّا</LinkButton>}
                   </>
                 }
               />
@@ -865,13 +865,13 @@ export async function SupplierView({
                         <span className="block text-[13px] font-bold">{formatRange(st.ps.slice(0, 10), st.pe.slice(0, 10))}</span>
                         <span className="block text-[11px] text-muted">
                           {Number(st.lines) > 0
-                            ? `${countNoun(Number(st.lines), LINE)} · طوبق منها ${Number(st.matched)}`
-                            : "لم تُقرأ أسطرُه — طابِقه لتُقرأ"}
+                            ? `${countNoun(Number(st.lines), LINE)} · طُوبق منها ${Number(st.matched)}`
+                            : "لم تُقرأ أسطره بعد. طابقه ليقرأها النظام."}
                         </span>
                       </span>
                       {showAmounts && (
                         <span className="shrink-0 text-end">
-                          <span className="block text-[11px] text-muted">رصيدُه الختاميّ</span>
+                          <span className="block text-[11px] text-muted">رصيده الختامي</span>
                           {st.closing === null
                             ? <span className="block text-[13px] font-bold text-muted">غير معروف</span>
                             : <span className="block text-[13px] font-bold"><Money minor={Number(st.closing)} /></span>}
@@ -882,7 +882,7 @@ export async function SupplierView({
                 </ul>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <LinkButton href={`/statements?supplier=${encodeURIComponent(s.slug)}`} size="sm" variant="primary">طابقها بفواتيرك</LinkButton>
-                  {showAmounts && <LinkButton href={`/suppliers/${s.slug}/statement`} size="sm" icon={Printer}>كشفُ حسابه منّا</LinkButton>}
+                  {showAmounts && <LinkButton href={`/suppliers/${s.slug}/statement`} size="sm" icon={Printer}>كشف حسابه منّا</LinkButton>}
                 </div>
               </>
             )
@@ -903,14 +903,14 @@ export async function SupplierView({
               />
 
               {showAmounts && overAlert && s.balanceAlertMinor !== null && (
-                <Callout tone="warn" title="تجاوز ما عليك له الحدَّ الذي وضعتَه">
-                  عليك له <Money minor={balance} /> والحدُّ <Money minor={s.balanceAlertMinor} /> — الحدُّ من «عدّل بياناته» أدناه، يُرفَع أو يُمحى منه.
+                <Callout tone="warn" title="المستحق له تجاوز الحد الذي حددته">
+                  المستحق له <Money minor={balance} /> والحد <Money minor={s.balanceAlertMinor} />. يمكنك رفع الحد أو حذفه من «عدّل بياناته» أدناه.
                 </Callout>
               )}
               {showAmounts && pastDue && pastDue.count > 0 && (
-                <Callout tone="warn" title={`${countNoun(pastDue.count, INVOICE)} جاوزت أجلَها`}>
-                  بقي عليها <Money minor={pastDue.totalMinor} />، وأقدمُها جاوز استحقاقَه بـ{countNoun(pastDue.oldestDays, DAY)} —
-                  بأجل هذا المورّد ({s.paymentTermsDays === 0 ? "نقداً" : countNoun(s.paymentTermsDays ?? 0, DAY)}) الذي كتبتَه في بياناته.
+                <Callout tone="warn" title={`${countNoun(pastDue.count, INVOICE)} تجاوزت أجل سدادها`}>
+                  المتبقي عليها <Money minor={pastDue.totalMinor} />، وأقدمها تأخر عن موعد استحقاقه {countNoun(pastDue.oldestDays, DAY)}،
+                  حسب أجل السداد المسجّل لهذا المورّد في بياناته ({s.paymentTermsDays === 0 ? "نقداً" : countNoun(s.paymentTermsDays ?? 0, DAY)}).
                 </Callout>
               )}
 
@@ -953,17 +953,17 @@ export async function SupplierView({
                       label: "أجل السداد",
                       value: <Fact
                         value={s.paymentTermsDays === null ? s.paymentTerms : s.paymentTermsDays === 0 ? "نقداً" : countNoun(s.paymentTermsDays, DAY)}
-                        missing="غير معروف — العمرُ من تاريخ الفاتورة" soft
+                        missing="غير معروف (يُحسب عمر الفاتورة من تاريخها)" soft
                       />,
                     },
                     { label: "التصنيف", value: <Fact value={SUPPLIER_CATEGORY_LABEL[s.category]} /> },
                     { label: "المندوب", value: <Fact value={s.contactName} missing="غير معروف" soft /> },
                     { label: "الجوّال", value: <Fact value={s.phoneE164} missing="غير معروف" soft ltr /> },
                     { label: "البريد", value: <Fact value={s.email} missing="غير معروف" soft ltr /> },
-                    { label: "الآيبان (بيد)", value: <Fact value={s.iban} missing="لم يُكتب — يُعرف من الكشوف إن حُوِّل له" soft ltr /> },
+                    { label: "الآيبان", value: <Fact value={s.iban} missing="غير مسجّل (يُعرف من الكشوف إن حوّلت له)" soft ltr /> },
                     ...(showAmounts ? [{
-                      label: "حدّ التنبيه",
-                      value: s.balanceAlertMinor === null ? <Fact value={null} missing="بلا حدّ" soft /> : <Money minor={s.balanceAlertMinor} />,
+                      label: "حد التنبيه",
+                      value: s.balanceAlertMinor === null ? <Fact value={null} missing="بلا حد" soft /> : <Money minor={s.balanceAlertMinor} />,
                     }] : []),
                     {
                       label: "عقد التوريد",
@@ -974,12 +974,12 @@ export async function SupplierView({
                     { label: "أسماء بديلة", value: <Fact value={String(n("alias_count"))} /> },
                     {
                       label: "فواتيره",
-                      value: <Fact value={!s.issuesInvoices ? "لا يصدر فواتير" : s.paperInvoices ? "ضريبية — ورقيّة باليد" : "ضريبية"} />,
+                      value: <Fact value={!s.issuesInvoices ? "لا يصدر فواتير" : s.paperInvoices ? "ضريبية — ورقية" : "ضريبية"} />,
                     },
                   ]}
                 />
                 {/* عدٌّ من أدلّة القراءة — يُقرأ بعد الرسم، وعطبُه لا يُسقط الملفّ */}
-                <SectionBoundary what="رمز الفاتورة الإلكترونيّة">
+                <SectionBoundary what="رمز الفاتورة الإلكترونية">
                   <Suspense fallback={null}>
                     <SupplierQrLine supplierId={s.id} slug={s.slug} />
                   </Suspense>
@@ -989,7 +989,7 @@ export async function SupplierView({
               {/* «تعاملك معه» تقييمٌ لا فعلَ له — خلف لسانٍ يُفتَح عند التفاوض. */}
               <div>
                 <h3 className="mb-2 text-xs font-bold text-muted">
-                  تعاملك معه — وما لا تكفي بياناته يبقى غير مقيَّم، ولا يُعطى صفراً
+                  تقييم تعاملك معه (ما لا تكفي بياناته يبقى «غير مقيّم» ولا يُحتسب صفراً)
                 </h3>
                 <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
                   {health.map((d) => (
@@ -1013,7 +1013,7 @@ export async function SupplierView({
             آخر ما جرى
           </h2>
           {timeline.length === 0 ? (
-            <EmptyState compact icon={CalendarClock} title="لا شيء جرى معه بعد." hint="فاتورةٌ تُرفع أو دفعةٌ تُقيَّد تظهر هنا بترتيبها." />
+            <EmptyState compact icon={CalendarClock} title="لا توجد أحداث بعد." hint="تظهر هنا الفواتير المرفوعة والدفعات المسجّلة بترتيبها الزمني." />
           ) : (
             <div className="rounded-xl border border-line bg-raised p-4 shadow-raised sm:p-5">
               <Timeline items={timeline} />
@@ -1047,7 +1047,7 @@ function toTimeline(events: readonly TimelineEvent[], showAmounts: boolean): Tim
         key,
         title: ACTION_LABEL[e.title as keyof typeof ACTION_LABEL] ?? e.title,
         meta: formatDay(day),
-        body: e.meta ? `بيد ${e.meta}` : undefined,
+        body: e.meta ? `بواسطة ${e.meta}` : undefined,
         icon: History,
       });
       continue;
@@ -1085,13 +1085,13 @@ function toTimeline(events: readonly TimelineEvent[], showAmounts: boolean): Tim
     const [from, to] = e.title.split("|");
     out.push({
       id: e.id,
-      title: "وصل كشفُ حساب",
+      title: "وصل كشف حساب",
       meta: formatDay(day),
       body: (
         <>
           {formatRange(from, to)}
           {showAmounts && (
-            <> · رصيدُه {e.amountMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={e.amountMinor} />}</>
+            <> · رصيده الختامي {e.amountMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={e.amountMinor} />}</>
           )}
         </>
       ),

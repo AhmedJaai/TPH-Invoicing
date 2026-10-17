@@ -20,8 +20,8 @@ const invoiceInput = (documentId: string, supplierId: string, periodMonth: strin
   isFixedAsset: false,
 });
 
-describe("الشهر المقفل لا يُكتب فيه", () => {
-  it("createInvoice في شهرٍ مقفل ← MonthClosedError", () =>
+describe("الشهر المقفل لا يكتب فيه", () => {
+  it("createInvoice في شهر مقفل ← MonthClosedError", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       await tx.insert(monthCloses).values({ month: "2026-07", status: "CLOSED" });
@@ -31,7 +31,7 @@ describe("الشهر المقفل لا يُكتب فيه", () => {
       expect(e).toBeInstanceOf(MonthClosedError);
     }));
 
-  it("والشهرُ من تاريخ الفاتورة لا من مجلّدها: فاتورةُ يوليو في مجلّد أغسطس تُرفَض ما دام يوليو مقفلاً", () =>
+  it("والشهر من تاريخ الفاتورة لا من مجلّدها: فاتورة يوليو في مجلّد أغسطس ترفض ما دام يوليو مقفلاً", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       await tx.insert(monthCloses).values({ month: "2026-07", status: "CLOSED" });
@@ -40,7 +40,7 @@ describe("الشهر المقفل لا يُكتب فيه", () => {
       expect(e).toBeInstanceOf(MonthClosedError);
     }));
 
-  it("وفاتورةُ أغسطس في مجلّد سبتمبر تُحسَب في أغسطس", () =>
+  it("وفاتورة أغسطس في مجلّد سبتمبر تحسب في أغسطس", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       const documentId = await makeDocument(tx, supplierId, "2026-09-02");
@@ -49,7 +49,7 @@ describe("الشهر المقفل لا يُكتب فيه", () => {
       expect(row.m).toBe("2026-08");
     }));
 
-  it("وفي شهرٍ مفتوح تُنشأ — الحارس لا يرفض كلّ شيء", () =>
+  it("وفي شهر مفتوح تنشأ — الحارس لا يرفض كلّ شيء", () =>
     withRollback(async (tx) => {
       const supplierId = await makeSupplier(tx);
       await tx.insert(monthCloses).values({ month: "2026-07", status: "CLOSED" });

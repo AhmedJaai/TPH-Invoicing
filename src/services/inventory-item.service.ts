@@ -32,19 +32,19 @@ export interface ItemMovement {
 const WASTE_REASON: Record<string, string> = {
   EXPIRED: "انتهت صلاحيّته",
   SPILLED: "انسكب",
-  FAILED_PREP: "تحضيرٌ فاشل",
-  CALIBRATION: "معايرةُ الماكينة",
-  STAFF_DRINK: "مشروبُ موظَّف",
+  FAILED_PREP: "تحضير فاشل",
+  CALIBRATION: "معايرة الماكينة",
+  STAFF_DRINK: "مشروب موظّف",
   DAMAGED: "تلف",
-  OTHER: "سببٌ آخر",
+  OTHER: "سبب آخر",
 };
 
 const MOVEMENT_LABEL: Record<string, string> = {
-  OPENING: "رصيدٌ افتتاحيّ مسجَّل",
-  ADJUST_IN: "إضافةٌ إلى الرفّ",
-  ADJUST_OUT: "سحبٌ من الرفّ",
-  TRANSFER_IN: "نقلٌ وارد",
-  TRANSFER_OUT: "نقلٌ صادر",
+  OPENING: "رصيد افتتاحيّ مسجّل",
+  ADJUST_IN: "إضافة إلى الرفّ",
+  ADJUST_OUT: "سحب من الرفّ",
+  TRANSFER_IN: "نقل وارد",
+  TRANSFER_OUT: "نقل صادر",
 };
 
 function unitOf(v: unknown): StoredUnit | null {
@@ -110,7 +110,7 @@ export async function itemMovements(productId: string, limit = 40): Promise<Item
       id: `rcp:${r.id}`,
       kind: "RECEIPT",
       day: String(r.day),
-      title: r.supplier_name ? `استلامٌ يدويّ — ${String(r.supplier_name)}` : "استلامٌ يدويّ",
+      title: r.supplier_name ? `استلام يدويّ — ${String(r.supplier_name)}` : "استلام يدويّ",
       detail: r.voided_at
         ? `أُلغي${r.void_reason ? `: ${String(r.void_reason)}` : ""}`
         : r.document_ref ? `مستند ${String(r.document_ref)}` : null,
@@ -125,7 +125,7 @@ export async function itemMovements(productId: string, limit = 40): Promise<Item
       id: `wst:${r.id}`,
       kind: "WASTE",
       day: String(r.day),
-      title: `هدرٌ مسجَّل — ${WASTE_REASON[String(r.reason)] ?? String(r.reason)}`,
+      title: `هدر مسجّل — ${WASTE_REASON[String(r.reason)] ?? String(r.reason)}`,
       detail: r.voided_at
         ? `أُبطل${r.void_reason ? `: ${String(r.void_reason)}` : ""}`
         : r.note ? String(r.note) : null,

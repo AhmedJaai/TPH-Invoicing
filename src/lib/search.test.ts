@@ -5,34 +5,34 @@ import {
 } from "./search";
 
 describe("parseSearch", () => {
-  it("الفراغ لا يُنتج بحثاً", () => {
+  it("الفراغ لا ينتج بحثاً", () => {
     expect(parseSearch("")).toBeNull();
     expect(parseSearch("   ")).toBeNull();
   });
 
-  it("التاريخ الكامل يُقرأ تاريخاً", () => {
+  it("التاريخ الكامل يقرأ تاريخاً", () => {
     const r = parseSearch("2026-08-17")!;
     expect(r.kind).toBe("DATE");
     expect(r.targets).toContain("invoices");
   });
 
-  it("الشهر يُقرأ شهراً", () => {
+  it("الشهر يقرأ شهراً", () => {
     expect(parseSearch("2026-08")!.kind).toBe("MONTH");
   });
 
-  it("خمسة عشر رقماً رقمٌ ضريبي، ويُبحث في المورّدين", () => {
+  it("خمسة عشر رقماً رقم ضريبي، ويبحث في المورّدين", () => {
     const r = parseSearch("310007971600003")!;
     expect(r.kind).toBe("VAT");
     expect(r.targets).toEqual(["suppliers"]);
   });
 
-  it("المبلغ الصغير يُقرأ مبلغاً", () => {
+  it("المبلغ الصغير يقرأ مبلغاً", () => {
     const r = parseSearch("47500")!;
     expect(r.kind).toBe("AMOUNT");
     expect(r.amountMinor).toBe(47_500_00);
   });
 
-  it("الرقم الطويل يُقرأ رقم مستند، ويبقى المبلغ مطروحاً", () => {
+  it("الرقم الطويل يقرأ رقم مستند، ويبقى المبلغ مطروحاً", () => {
     const r = parseSearch("260342")!;
     expect(r.kind).toBe("NUMBER");
     expect(r.term).toBe("260342");
@@ -40,7 +40,7 @@ describe("parseSearch", () => {
     expect(r.amountMinor).toBe(260_342_00);
   });
 
-  it("الصفرُ في أوّله رقمُ مستندٍ لا مبلغ — «00073» فاتورةٌ لا ٧٣ ريالاً", () => {
+  it("الصفر في أوّله رقم مستند لا مبلغ — «00073» فاتورة لا ٧٣ ريالاً", () => {
     const r = parseSearch("00073")!;
     expect(r.kind).toBe("NUMBER");
     expect(r.term).toBe("00073");
@@ -54,29 +54,29 @@ describe("parseSearch", () => {
     expect(r.amountMinor).toBe(1_234_567_89);
   });
 
-  it("فاصل الآلاف يُفهم", () => {
+  it("فاصل الآلاف يفهم", () => {
     expect(parseSearch("1,414.87")!.amountMinor).toBe(1_414_87);
   });
 
-  it("الأرقام العربية تُقرأ كاللاتينية", () => {
+  it("الأرقام العربية تقرأ كاللاتينية", () => {
     const r = parseSearch("٤٧٥٠٠")!;
     expect(r.kind).toBe("AMOUNT");
     expect(r.amountMinor).toBe(47_500_00);
   });
 
-  it("المرجع بحروف وأرقام يُقرأ رقماً", () => {
+  it("المرجع بحروف وأرقام يقرأ رقماً", () => {
     const r = parseSearch("V405484")!;
     expect(r.kind).toBe("NUMBER");
     expect(r.term).toBe("V405484");
   });
 
-  it("الاسم العربي يُقرأ نصّاً ويُبحث في المورّدين أوّلاً", () => {
+  it("الاسم العربي يقرأ نصّاً ويبحث في المورّدين أوّلاً", () => {
     const r = parseSearch("لافا")!;
     expect(r.kind).toBe("TEXT");
     expect(r.targets[0]).toBe("suppliers");
   });
 
-  it("النصّ يُوحَّد فلا تحجبه الهمزة ولا التاء المربوطة", () => {
+  it("النصّ يوحّد فلا تحجبه الهمزة ولا التاء المربوطة", () => {
     expect(parseSearch("مخبزة الأحمد")!.term).toBe(normalizeArabic("مخبزه الاحمد"));
   });
 });
@@ -92,8 +92,8 @@ describe("normalizeDigits", () => {
 });
 
 describe("normalizeArabic", () => {
-  it("تُسقط التشكيل والتطويل", () => {
-    expect(normalizeArabic("مُحَمَّـد")).toBe("محمد");
+  it("تسقط التشكيل والتطويل", () => {
+    expect(normalizeArabic("محمّـد")).toBe("محمد");
   });
 
   it("توحّد الألف والياء والتاء المربوطة", () => {
@@ -102,7 +102,7 @@ describe("normalizeArabic", () => {
     expect(normalizeArabic("مصطفى")).toBe("مصطفي");
   });
 
-  it("تُقلّص الفراغات", () => {
+  it("تقلّص الفراغات", () => {
     expect(normalizeArabic("  لافا   كوفي ")).toBe("لافا كوفي");
   });
 });
@@ -138,7 +138,7 @@ describe("rankHits", () => {
     expect(r[0].kind).toBe("supplier");
   });
 
-  it("لا يُفقد شيء من النتائج", () => {
+  it("لا يفقد شيء من النتائج", () => {
     const all: SearchHit[] = ["invoice", "supplier", "product", "bankTransaction", "document"].map((k) => hit(k as SearchHit["kind"]));
     expect(rankHits(all, "TEXT")).toHaveLength(5);
   });
@@ -156,7 +156,7 @@ describe("rankHits", () => {
    ‏`translate` على العمود بالتحويل نفسه. وهذه تحرس نصفَه الأوّل:
    أن يبقى التوحيد متطابقاً بين ما يُكتَب وما تحوّله القاعدة.
    ═══════════════════════════════════════════════════════════════ */
-describe("توحيدُ العربية متطابقٌ مع ما تفعله القاعدة", () => {
+describe("توحيد العربية متطابق مع ما تفعله القاعدة", () => {
   /** التحويل نفسه المكتوب في `translate(col, 'إأآٱىة', 'اااايه')`. */
   const asDatabaseWould = (s: string) =>
     s.replace(/[إأآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه");
@@ -172,7 +172,7 @@ describe("توحيدُ العربية متطابقٌ مع ما تفعله الق
     }
   });
 
-  it("والهمزة تُسقَط من الطرفين فيلتقيان", () => {
+  it("والهمزة تسقط من الطرفين فيلتقيان", () => {
     expect(normalizeArabic("أوراق")).toBe("اوراق");
     expect(asDatabaseWould("أوراق الزيتون")).toContain("اوراق");
   });
@@ -183,8 +183,8 @@ describe("توحيدُ العربية متطابقٌ مع ما تفعله الق
   });
 });
 
-describe("escapeLike — نصُّ المستخدم يُطابَق حرفاً", () => {
-  it("النسبة والشرطة السفليّة والمائلة تُهرَّب", () => {
+describe("escapeLike — نصّ المستخدم يطابق حرفاً", () => {
+  it("النسبة والشرطة السفليّة والمائلة تهرّب", () => {
     expect(escapeLike("50%")).toBe("50\\%");
     expect(escapeLike("INV_12")).toBe("INV\\_12");
     expect(escapeLike("a\\b")).toBe("a\\\\b");
@@ -195,14 +195,14 @@ describe("escapeLike — نصُّ المستخدم يُطابَق حرفاً", (
   });
 });
 
-describe("utcRange — نطاقٌ يُخدَم من الفهرس", () => {
+describe("utcRange — نطاق يخدم من الفهرس", () => {
   it("اليوم: من منتصف ليله إلى منتصف ليل تاليه", () => {
     const r = utcRange("2026-08-17")!;
     expect(r.from.toISOString()).toBe("2026-08-17T00:00:00.000Z");
     expect(r.until.toISOString()).toBe("2026-08-18T00:00:00.000Z");
   });
 
-  it("آخر يومٍ في الشهر يعبر إلى الشهر التالي", () => {
+  it("آخر يوم في الشهر يعبر إلى الشهر التالي", () => {
     expect(utcRange("2026-12-31")!.until.toISOString()).toBe("2027-01-01T00:00:00.000Z");
   });
 
@@ -212,7 +212,7 @@ describe("utcRange — نطاقٌ يُخدَم من الفهرس", () => {
     expect(r.until.toISOString()).toBe("2027-01-01T00:00:00.000Z");
   });
 
-  it("تاريخٌ لا وجود له لا يُبحث به", () => {
+  it("تاريخ لا وجود له لا يبحث به", () => {
     expect(utcRange("2026-13-01")).toBeNull();
     expect(utcRange("2026-02-31")).toBeNull();
     expect(utcRange("2026-08-00")).toBeNull();

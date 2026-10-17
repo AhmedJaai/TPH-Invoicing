@@ -21,8 +21,8 @@ async function discountOf(tx: Tx, id: string) {
 /* ١٠٠٠ + ١٥٠ ضريبة − ٥٠ خصمٌ نقديّ = ١١٠٠ مستحقّ */
 const paper = { subtotalMinor: 1_000_00, vatMinor: 150_00, totalMinor: 1_100_00 };
 
-describe("الخصمُ بعد الضريبة (054)", () => {
-  it("يُقيَّد الخصمُ المقروء إن سدّ الفرق، والمستحقُّ هو الإجماليّ بعده", () =>
+describe("الخصم بعد الضريبة (054)", () => {
+  it("يقيّد الخصم المقروء إن سدّ الفرق، والمستحقّ هو الإجماليّ بعده", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const doc = await makeDocument(tx, s, "2026-09-10");
@@ -33,7 +33,7 @@ describe("الخصمُ بعد الضريبة (054)", () => {
       expect(await discountOf(tx, id!)).toEqual({ d: 50_00, t: 1_100_00 });
     }));
 
-  it("القاعدةُ ترفض الفرقَ بلا خصمٍ يسدّه — بالقيد الذي يسمّيه", () =>
+  it("القاعدة ترفض الفرق بلا خصم يسدّه — بالقيد الذي يسمّيه", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 1_150_00, "2026-09-10");
@@ -47,7 +47,7 @@ describe("الخصمُ بعد الضريبة (054)", () => {
       `);
     }));
 
-  it("يُصحَّح بكتابة الخصم، ويُمحى حين يستقيم الحسابُ بدونه", () =>
+  it("يصحّح بكتابة الخصم، ويمحى حين يستقيم الحساب بدونه", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 1_150_00, "2026-09-10");
@@ -60,7 +60,7 @@ describe("الخصمُ بعد الضريبة (054)", () => {
       expect(await discountOf(tx, inv)).toEqual({ d: null, t: 1_150_00 });
     }));
 
-  it("خصمٌ مكتوبٌ لا يسدّ الفرق يُردّ بجملة لا بخطأ قاعدة", () =>
+  it("خصم مكتوب لا يسدّ الفرق يردّ بجملة لا بخطأ قاعدة", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const inv = await makeInvoice(tx, s, 1_150_00, "2026-09-10");
@@ -68,7 +68,7 @@ describe("الخصمُ بعد الضريبة (054)", () => {
         .rejects.toBeInstanceOf(InvoiceCorrectionRefused);
     }));
 
-  it("رسومُ التوصيل بعد الضريبة تُقيَّد بالقاعدة نفسها (055)", () =>
+  it("رسوم التوصيل بعد الضريبة تقيّد بالقاعدة نفسها (055)", () =>
     withRollback(async (tx) => {
       const s = await makeSupplier(tx);
       const doc = await makeDocument(tx, s, "2026-09-10");

@@ -16,8 +16,8 @@ async function rent(tx: Tx, iso: string, amountMinor: number): Promise<void> {
 const count = async (tx: Tx, month: string) =>
   Number((await tx.execute<{ n: number }>(sql`select count(*)::int as n from expenses where period_month = ${month}`)).rows[0].n);
 
-describe("المصروفُ يُشتقّ وحده — والشهرُ المقفل لا يُمسّ", () => {
-  it("حركةُ إيجارٍ مصنَّفة تصير مصروفاً، والإعادةُ لا تُكرّر", () =>
+describe("المصروف يشتقّ وحده — والشهر المقفل لا يمسّ", () => {
+  it("حركة إيجار مصنّفة تصير مصروفاً، والإعادة لا تكرّر", () =>
     withRollback(async (tx) => {
       await rent(tx, "2099-06-05", 8000_00);
       const before = await count(tx, "2099-06");
@@ -27,7 +27,7 @@ describe("المصروفُ يُشتقّ وحده — والشهرُ المقفل
       expect((await deriveOpenMonths(["2099-06"], null, tx)).created).toBe(0);
     }));
 
-  it("وفي الشهر المقفل لا يُقيَّد شيء ولا يُرمى خطأ", () =>
+  it("وفي الشهر المقفل لا يقيّد شيء ولا يرمى خطأ", () =>
     withRollback(async (tx) => {
       await rent(tx, "2099-07-05", 8000_00);
       await tx.insert(monthCloses).values({ month: "2099-07", status: "CLOSED" });
@@ -37,7 +37,7 @@ describe("المصروفُ يُشتقّ وحده — والشهرُ المقفل
       expect(await count(tx, "2099-07")).toBe(before);
     }));
 
-  it("مصروفٌ قُيِّد بيدٍ ثمّ جاءت حركتُه — يُتبنّى ولا يُكرَّر", () =>
+  it("مصروف قيّد بيد ثمّ جاءت حركته — يتبنّى ولا يكرّر", () =>
     withRollback(async (tx) => {
       await tx.execute(sql`
         insert into expenses (id, period_month, occurred_on, category, label, amount_minor, source)

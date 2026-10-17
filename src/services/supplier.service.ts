@@ -190,7 +190,7 @@ export async function createSupplier(input: CreateSupplierInput, actorId: string
         الرمز: slug,
         "مجلد الدرايف": input.driveFolderName?.trim() || nameAr,
         ...(vat ? { "الرقم الضريبي": vat } : {}),
-        ...(resolved.similar.length > 0 ? { "أُنشئ مع وجود من يشبهه": resolved.similar.map((s) => s.nameAr) } : {}),
+        ...(resolved.similar.length > 0 ? { "أنشئ مع وجود من يشبهه": resolved.similar.map((s) => s.nameAr) } : {}),
       },
     }, t);
 

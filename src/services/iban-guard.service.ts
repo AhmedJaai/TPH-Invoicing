@@ -97,7 +97,7 @@ export async function loadIbanAlerts(reader: Conn = db): Promise<IbanAlertRow[]>
 
 export class IbanAlertGone extends Error {
   constructor() {
-    super("هذا التنبيه لم يعد قائماً — ربما حُدِّث آيبانُ المورّد أو أُعيد نسبُ الحوالة. حدّث الصفحة.");
+    super("هذا التنبيه لم يعد قائماً، ربما حُدّث آيبان المورّد أو نُسبت الحوالة لجهة أخرى. حدّث الصفحة.");
   }
 }
 
@@ -128,12 +128,12 @@ export async function resolveIbanAlert(
     action: "ALERT_RESOLVED",
     entityType: "alert",
     entityId: alert.key,
-    before: before ? { القرار: "حسابٌ له أعرفه", الملاحظة: before.note } : null,
+    before: before ? { القرار: "حساب له أعرفه", الملاحظة: before.note } : null,
     after: {
-      القرار: input.decision === "OPEN" ? "أُعيد فتحه" : "حسابٌ له أعرفه",
+      القرار: input.decision === "OPEN" ? "أعيد فتحه" : "حساب له أعرفه",
       الملاحظة: input.note,
       المورّد: alert.supplierName,
-      "الآيبان الذي حُوِّل إليه": alert.seenIban,
+      "الآيبان الذي حوّل إليه": alert.seenIban,
       "الحساب المعروف": alert.knownIbans,
       المبلغ_بالهللات: alert.totalMinor,
     },
@@ -224,9 +224,9 @@ export async function resolveFirstTransfer(
     action: "ALERT_RESOLVED",
     entityType: "alert",
     entityId: row.key,
-    before: before ? { القرار: "مستفيدٌ أعرفه", الملاحظة: before.note } : null,
+    before: before ? { القرار: "مستفيد أعرفه", الملاحظة: before.note } : null,
     after: {
-      القرار: input.decision === "OPEN" ? "أُعيد فتحه" : "مستفيدٌ أعرفه",
+      القرار: input.decision === "OPEN" ? "أعيد فتحه" : "مستفيد أعرفه",
       الملاحظة: input.note,
       المستفيد: row.payee,
       الآيبان: row.iban,

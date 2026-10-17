@@ -111,7 +111,7 @@ export default async function InventoryItemsPage({
       cell: (r) => (
         <span className="block min-w-0">
           <Link href={`/inventory/items/${r.id}`} className="font-bold hover:text-accent" dir="auto">{r.name}</Link>
-          <span className="mt-0.5 block text-[11px] font-normal text-muted">{r.categoryLabel} · يُعَدّ بـ{r.unitLabel}</span>
+          <span className="mt-0.5 block text-[11px] font-normal text-muted">{r.categoryLabel} · يُعدّ بوحدة {r.unitLabel}</span>
         </span>
       ),
     },
@@ -120,15 +120,15 @@ export default async function InventoryItemsPage({
       cell: (r) => (
         r.inRecipes === 0
           /* الشارةُ بابٌ إلى علاجها — الوصفات، لا خبرٌ يقف */
-          ? <Link href="/inventory/recipes" className="relative z-10 inline-flex"><Badge tone="warn" dot>لا وصفةَ تصل إليه — اكتبها</Badge></Link>
+          ? <Link href="/inventory/recipes" className="relative z-10 inline-flex"><Badge tone="warn" dot>لا توجد وصفة تستخدمه، اكتب وصفة</Badge></Link>
           : <span className="text-ink-soft">{countNoun(r.inRecipes, RECIPE)}</span>
       ),
     },
     {
-      key: "last", header: "آخرُ فرق",
+      key: "last", header: "آخر فرق",
       cell: (r) => (
         r.lastVarianceBp === null && r.lastVarianceMilli === null
-          ? <span className="text-muted">{r.countedTimes === 0 ? "لم يُعَدّ بعد" : "لم يُحسَب"}</span>
+          ? <span className="text-muted">{r.countedTimes === 0 ? "لم يُعدّ بعد" : "لم يُحسب"}</span>
           : (
             <span className="inline-flex flex-wrap items-center gap-x-2">
               <DirectionTag milli={r.lastVarianceMilli} />
@@ -140,7 +140,7 @@ export default async function InventoryItemsPage({
     },
     {
       key: "times", header: "العدّ", secondary: true,
-      cell: (r) => r.countedTimes === 0 ? <span className="text-muted">لم يُعَدّ بعد</span> : <span className="text-ink-soft">{countNoun(r.countedTimes, TIME)}</span>,
+      cell: (r) => r.countedTimes === 0 ? <span className="text-muted">لم يُعدّ بعد</span> : <span className="text-ink-soft">{countNoun(r.countedTimes, TIME)}</span>,
     },
   ];
 
@@ -162,28 +162,28 @@ export default async function InventoryItemsPage({
       user={user}
       width="wide"
       title="الأصناف"
-      intro="ما يُعَدّ على الرفّ ووحدةُ قياسه. وصنفٌ لا وصفةَ تصل إليه لا يُحسَب له استهلاكٌ متوقَّع — فيظهر ما اشتُري منه كلُّه فرقاً."
+      intro="الأصناف التي تُعدّ على الرف ووحدة قياس كل منها. الصنف الذي لا توجد له وصفة لا يُحسب له استهلاك متوقع، فيظهر كل ما اشتريته منه فرقاً."
     >
       {all.length > 0 && noRecipe.length === all.length && (
         <Callout
           tone="warn"
           icon={BookOpen}
           className="mb-6"
-          title="لا صنفَ هنا تصل إليه وصفة بعد"
+          title="لا توجد وصفة لأي صنف هنا بعد"
           action={canEdit ? <LinkButton href="/inventory/import#catalog" variant="primary" size="sm">ارفع كتالوج فودكس</LinkButton> : undefined}
         >
-          هذه أصنافٌ أنشأتها فواتيرُ المورّدين. وبلا وصفاتٍ لا يُعرَف ما صُرف منها — والكتالوجُ يُنشئ الوصفاتِ كلَّها دفعةً واحدة.
+          هذه أصناف أنشأتها فواتير المورّدين. وبدون وصفات لا يعرف النظام ما صُرف منها، وكتالوج فودكس ينشئ كل الوصفات دفعة واحدة.
         </Callout>
       )}
 
       {all.length > 0 && (
         <div className="mb-4">
           <LinkTabs
-            label="رشِّح الأصناف"
+            label="تصفية الأصناف"
             items={[
-              { href: "/inventory/items", label: "الكلّ", count: all.length, active: show === "all" },
+              { href: "/inventory/items", label: "الكل", count: all.length, active: show === "all" },
               { href: "/inventory/items?show=norecipe", label: "بلا وصفة", count: noRecipe.length, active: show === "norecipe" },
-              { href: "/inventory/items?show=uncounted", label: "لم يُعَدّ بعد", count: uncounted.length, active: show === "uncounted" },
+              { href: "/inventory/items?show=uncounted", label: "لم تُعدّ بعد", count: uncounted.length, active: show === "uncounted" },
             ]}
           />
         </div>
@@ -195,21 +195,21 @@ export default async function InventoryItemsPage({
         keyOf={(r) => r.id}
         hrefOf={(r) => `/inventory/items/${r.id}`}
         searchOf={(r) => `${r.name} ${r.categoryLabel} ${r.unitLabel}`}
-        searchLabel="ابحث باسم الصنف أو بابه"
+        searchLabel="ابحث باسم الصنف أو تصنيفه"
         empty={
           all.length === 0 ? (
             <EmptyState
               icon={Package}
-              title="لا صنفَ مخزونٍ مسجَّل بعد."
-              hint="كتالوجُ فودكس يُنشئ أصنافَ المخزون ووصفاتِها دفعةً واحدة. وتُبنى أصنافٌ كذلك من بنود فواتير المورّدين حين تُربَط."
+              title="لا توجد أصناف مخزون مسجّلة بعد."
+              hint="كتالوج فودكس ينشئ أصناف المخزون ووصفاتها دفعة واحدة. كما تُنشأ أصناف من بنود فواتير المورّدين عند ربطها."
               action={canEdit ? <LinkButton href="/inventory/import#catalog" variant="primary" size="sm">ارفع كتالوج فودكس</LinkButton> : undefined}
             />
           ) : (
             <EmptyState
               compact
               icon={Package}
-              title={show === "norecipe" ? "كلُّ صنفٍ تصل إليه وصفة." : "عُدّ كلُّ صنفٍ مرّةً على الأقلّ."}
-              hint={`والأصنافُ كلُّها ${countNoun(all.length, PRODUCT)} في لسان «الكلّ».`}
+              title={show === "norecipe" ? "لكل صنف وصفة." : "عُدّ كل صنف مرة واحدة على الأقل."}
+              hint={`مجموع الأصناف ${countNoun(all.length, PRODUCT)}، وتجدها كلها في تبويب «الكل».`}
             />
           )
         }
