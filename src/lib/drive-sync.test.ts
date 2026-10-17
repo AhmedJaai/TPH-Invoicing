@@ -105,7 +105,7 @@ describe("المشي يقول ما لم يقرأه", () => {
   it("عطب في مجلّد مورّد واحد لا يسقط الباقي — ويذكر", async () => {
     const r = await walkArchive(archive(TREE, ["kohi"]));
     expect(r.entries.map((e) => e.file.id).sort()).toEqual(["a1", "a2", "loose"]);
-    expect(r.notes.some((n) => n.includes("2026-09/Kohi") && n.includes("تعذّر سرده"))).toBe(true);
+    expect(r.notes.some((n) => n.includes("2026-09/Kohi") && n.includes("تعذّر عرض محتوياته"))).toBe(true);
     /* ما لم يُسرَد لا يُحكَم على ما فيه بالغياب */
     expect(r.walkedFolderIds.has("kohi")).toBe(false);
     expect(r.walkedFolderIds.has("aval")).toBe(true);

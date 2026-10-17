@@ -32,11 +32,11 @@ export default async function OwnerPage() {
 
   if (a.lines.length === 0) {
     return (
-      <PageShell user={user} width="wide" title="بينك وبين المقهى" intro="ما دفعته من جيبك للمقهى، وما أخذته منه.">
+      <PageShell user={user} width="wide" title="بينك وبين المقهى" intro="ما دفعته من مالك الخاص للمقهى، وما أخذته منه.">
         <EmptyState
           icon={UserRound}
-          title="لا شيء مقيّد بينك وبين المقهى بعد."
-          hint="يجمع هنا ما صنّف في كشف البنك «تحويل شخصيّ»، وما سدّد لمورّد بطريقة «من حساب المالك». صنّف تحويلاتك الشخصيّة في حركة البنك فتظهر — ولا يعرض رصيد صفر عن غير علم."
+          title="لا توجد حركات بينك وبين المقهى بعد."
+          hint="تظهر هنا الحركات المصنّفة «تحويل شخصي» في كشف البنك، والسداد للمورّدين بطريقة «من حساب المالك». صنّف تحويلاتك الشخصية في حركات البنك لتظهر هنا. ولا يعرض النظام رصيداً صفرياً وهو لا يعرف الحقيقة."
           action={<LinkButton href="/bank?show=unknown#transactions" variant="primary">صنّف حركات البنك</LinkButton>}
         />
       </PageShell>
@@ -51,36 +51,35 @@ export default async function OwnerPage() {
       width="wide"
       title="بينك وبين المقهى"
       eyebrow={a.bankFirstDay ? <>كشف البنك من <bdi>{formatDay(a.bankFirstDay)}</bdi> إلى <bdi>{formatDay(a.bankLastDay)}</bdi></> : undefined}
-      intro="ما سدّدته من حسابك الشخصيّ عن المقهى وما أدخلته إليه، مقابل ما أخذته منه — ممّا صنّف وقيّد."
+      intro="ما سدّدته من حسابك الشخصي عن المقهى وما أدخلته إليه، مقابل ما أخذته منه، بحسب ما صُنّف وسُجّل."
     >
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
         <KeyFigure
           icon={ArrowDownLeft}
           label="دفعته وأدخلته"
           value={<Money minor={a.paidForCafeMinor + a.putInMinor} />}
-          sub={<>سداد عن المقهى <Money minor={a.paidForCafeMinor} /> · تحويل إلى حسابه <Money minor={a.putInMinor} /></>}
+          sub={<>سداد عن المقهى <Money minor={a.paidForCafeMinor} /> · تحويل إلى حساب المقهى <Money minor={a.putInMinor} /></>}
         />
         <KeyFigure
           icon={ArrowUpRight}
           label="أخذته"
           value={<Money minor={a.tookOutMinor} />}
-          sub="صادر البنك المصنّف «تحويل شخصيّ» — قيوده أدناه."
+          sub="الصادر من البنك المصنّف «تحويل شخصي». تفاصيله في القيود أدناه."
         />
         <KeyFigure
           icon={Scale}
           tone={a.balanceMinor < 0 ? "warn" : undefined}
-          label={owed ? "المقهى مدين لك" : a.balanceMinor < 0 ? "أخذت أكثر ممّا أدخلت" : "متعادلان"}
+          label={owed ? "المقهى مدين لك" : a.balanceMinor < 0 ? "أخذت أكثر مما أدخلت" : "متعادلان"}
           value={<Money minor={Math.abs(a.balanceMinor)} />}
-          sub="ما دفعته وأدخلته ناقصاً ما أخذته — منذ أوّل ما في السجلّ."
+          sub="ما دفعته وأدخلته مطروحاً منه ما أخذته، منذ أول حركة في السجل."
         />
       </div>
 
       <Callout tone="info" icon={Info} className="mt-4">
-        <strong className="text-ink">جمع لا حكم:</strong> يحسب ما صنّف «تحويل شخصيّ» وما قيّد «من حساب المالك» وحدهما. تحويل لم يصنّف، أو ما
-        دفعته نقداً بلا قيد، ليس هنا — والتسمية المحاسبيّة (مسحوبات، جاري المالك، رأس مال) لمحاسبك.
+        <strong className="text-ink">مجرد جمع للأرقام:</strong> يُحسب هنا ما صُنّف «تحويل شخصي» وما سُجّل «من حساب المالك» فقط. التحويل غير المصنّف وما دفعته نقداً دون تسجيل غير محسوبين. أما التسمية المحاسبية (مسحوبات أو جاري المالك أو رأس مال) فاتركها لمحاسبك.
       </Callout>
 
-      <Section title="سنةً بسنة" icon={HandCoins} hint="«كم سحبت هذا العام؟» — وأوّل سنة وآخرها بقدر ما يغطّيه الكشف.">
+      <Section title="سنة بسنة" icon={HandCoins} hint="للإجابة عن سؤال «كم سحبت هذا العام؟». السنة الأولى والأخيرة تشملان ما يغطيه الكشف فقط.">
         <DataTable<OwnerYear>
           rows={a.years}
           keyOf={(y) => y.year}
@@ -94,14 +93,14 @@ export default async function OwnerPage() {
         />
       </Section>
 
-      <Section title="القيود" icon={UserRound} count={a.lines.length} hint="الأحدث أوّلاً، وبعد كلّ رصيده. والسطر يفتح حركته في البنك أو ملفّ المورّد الذي سدّد.">
+      <Section title="القيود" icon={UserRound} count={a.lines.length} hint="الأحدث أولاً، ويظهر بعد كل حركة الرصيد. اضغط السطر لفتح الحركة في البنك أو ملف المورّد الذي سُدّد له.">
         <DataTable<OwnerLine>
           rows={a.lines}
           keyOf={(l) => l.id}
           hrefOf={(l) => l.href}
           searchOf={(l) => `${l.label} ${OWNER_ENTRY_LABEL[l.kind]}`}
           columns={[
-            { key: "day", header: "اليوم", cell: (l) => <bdi>{formatDay(l.day)}</bdi> },
+            { key: "day", header: "التاريخ", cell: (l) => <bdi>{formatDay(l.day)}</bdi> },
             {
               key: "label",
               header: "البيان",
@@ -114,7 +113,7 @@ export default async function OwnerPage() {
               ),
             },
             { key: "amount", header: "المبلغ", numeric: true, cell: (l) => <Money minor={signedMinor(l)} signed /> },
-            { key: "balance", header: "الرصيد بعده", numeric: true, secondary: true, cell: (l) => <Money minor={l.balanceMinor} signed /> },
+            { key: "balance", header: "الرصيد بعدها", numeric: true, secondary: true, cell: (l) => <Money minor={l.balanceMinor} signed /> },
           ]}
         />
       </Section>

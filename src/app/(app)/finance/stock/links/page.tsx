@@ -46,7 +46,7 @@ export default async function StockLinksPage({ searchParams }: { searchParams: P
       user={user}
       width="wide"
       title="ربط بنود الفواتير"
-      intro="اسم الصنف في الفاتورة غير اسمه في الوصفة. اربط كلّ بند بصنف المخزون وقل كم في وحدته — مرّةً واحدة، ويدخل كلّ تقرير بعدها."
+      intro="اسم الصنف في الفاتورة يختلف عن اسمه في الوصفة. اربط كل بند بصنف المخزون وحدّد كم يحتوي كل وحدة منه. تفعل ذلك مرة واحدة، فتعتمد عليه كل التقارير بعدها."
       actions={<LinkButton href="/finance/stock" variant="quiet" size="sm" icon={ArrowRight}>المشترى والمباع</LinkButton>}
     >
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
@@ -55,15 +55,15 @@ export default async function StockLinksPage({ searchParams }: { searchParams: P
           label="مربوط من قيمة المشتريات"
           tone={(coverage.nowBp ?? 0) >= 8_000 ? "ok" : "warn"}
           value={<span className="nums">{formatShare(coverage.nowBp)}</span>}
-          sub={<><Money minor={links.measuredMinor} /> من <Money minor={links.totalMinor - links.notStockMinor} /> مشتريات كلّ الوقت — بنده مربوط بصنف وعبوته معروفة. والصنف يدخل تقرير «المشترى والمباع» حين يبلغ المربوط منه أربعة أخماس ما أدخل في فودكس.</>}
+          sub={<><Money minor={links.measuredMinor} /> من <Money minor={links.totalMinor - links.notStockMinor} /> مشتريات كل الفترات، وهي البنود المربوطة بصنف وعبوتها معروفة. يظهر الصنف في تقرير «المشترى والمباع» حين يبلغ المربوط منه أربعة أخماس ما أُدخل في فودكس.</>}
         />
         <KeyFigure
           icon={Scale}
           label="جاهز بدليل فودكس"
           value={<span className="nums">{ready.length}</span>}
           sub={ready.length > 0
-            ? <>بقيمة <strong className="text-ink"><Money minor={links.readyMinor} /></strong>. إقرارها يرفع المربوط إلى <strong className="text-ink">{formatShare(coverage.afterBp)}</strong>.</>
-            : "لا بند اتّفق عليه دليل فودكس صنفاً وعبوةً بعد."}
+            ? <>بقيمة <strong className="text-ink"><Money minor={links.readyMinor} /></strong>. باعتمادها يرتفع المربوط إلى <strong className="text-ink">{formatShare(coverage.afterBp)}</strong>.</>
+            : "لا يوجد بند يؤكده فودكس صنفاً وعبوةً حتى الآن."}
         >
           {canEdit && ready.length > 0 && <ApproveReady ids={ready.map((r) => r.supplierProductId)} count={ready.length} />}
         </KeyFigure>
@@ -71,13 +71,13 @@ export default async function StockLinksPage({ searchParams }: { searchParams: P
           icon={CircleCheck}
           label="بقي بلا ربط"
           value={<span className="nums">{open.length}</span>}
-          sub={<>{countNoun(open.length, PRODUCT)} بقيمة <Money minor={open.reduce((s, r) => s + r.valueMinor, 0)} />. ما ليس مخزوناً (معدّات، خدمات) أخرجه فلا يسأل عنه.</>}
+          sub={<>{countNoun(open.length, PRODUCT)} بقيمة <Money minor={open.reduce((s, r) => s + r.valueMinor, 0)} />. ما ليس مخزوناً (معدات أو خدمات) أخرجه من القائمة حتى لا يُسأل عنه.</>}
         />
       </div>
 
       <Callout tone="info" icon={Info} className="mt-4" title="ما «الجاهز»؟">
-        بند في فاتورتنا يقابله في فودكس — للمورّد نفسه في الأيّام نفسها <strong className="text-ink">وبالمبلغ نفسه</strong> — بند شراء اختار له من أدخله صنف المخزون وكتب كمّيّته.
-        فإن اتّفق {READY_MIN_MATCHES === 2 ? "شاهدان" : `${READY_MIN_MATCHES} شواهد`} فأكثر على الصنف وعلى ما في الوحدة عدّ جاهزاً. تقرّه أنت بضغطة، ولا يربط شيء وحده.
+        هو بند في فاتورتنا يقابله بند في فودكس لنفس المورّد في الأيام نفسها <strong className="text-ink">وبالمبلغ نفسه</strong>، وقد حدّد من أدخله صنف المخزون وكمّيته.
+        فإذا أكّد الصنف والكمّية في الوحدة {READY_MIN_MATCHES === 2 ? "بندان" : `${READY_MIN_MATCHES} بنود`} فأكثر، يصبح البند جاهزاً. تعتمده أنت بضغطة واحدة، ولا يُربط شيء تلقائياً.
       </Callout>
 
       <div className="mt-5">
@@ -92,16 +92,16 @@ export default async function StockLinksPage({ searchParams }: { searchParams: P
         />
       </div>
 
-      <Section title={view === "ready" ? "جاهز للإقرار" : view === "linked" ? "ما ربط" : view === "out" ? "ما أخرج" : "بلا ربط"} count={list.length}
-        hint={list.length > SHOWN ? `أثقل ${SHOWN} قيمةً — اربطها فيظهر ما بعدها.` : "مرتّبة بقيمة ما اشتري منها."}>
+      <Section title={view === "ready" ? "جاهز للإقرار" : view === "linked" ? "المربوط" : view === "out" ? "ليس مخزوناً" : "بلا ربط"} count={list.length}
+        hint={list.length > SHOWN ? `أعلى ${SHOWN} بنود قيمةً. اربطها لتظهر البقية.` : "مرتّبة حسب قيمة المشتريات."}>
         {list.length === 0 ? (
-          <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا شيء في هذه القائمة.</p>
+          <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا توجد بنود في هذه القائمة.</p>
         ) : (
           <StockLinkList rows={list.slice(0, SHOWN)} options={links.options} canEdit={canEdit} notStockKeys={keys} />
         )}
         {view === "ready" && list.length > 0 && (
           <p className="mt-2 text-[11px] text-muted">
-            العبوة المقترحة «ما في وحدة الفاتورة الواحدة» بوحدة الصنف — كيس الكيلو {`«1 × 1000 ${storedUnitLabel("G")}»`}. عدّلها في النموذج إن رأيت غيرها.
+            العبوة المقترحة هي ما تحويه وحدة الفاتورة الواحدة بوحدة الصنف، فكيس الكيلو {`«1 × 1000 ${storedUnitLabel("G")}»`}. عدّلها في النموذج إن كانت مختلفة.
           </p>
         )}
       </Section>

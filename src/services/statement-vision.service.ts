@@ -49,7 +49,7 @@ function parseOrFail(
   model: string,
 ): VisionOutcome {
   const json = firstJson(text);
-  if (!json) return { ok: false, reason: "لم يرجع النموذج JSON", provider, model };
+  if (!json) return { ok: false, reason: "لم يُرجع النموذج بيانات بصيغة JSON", provider, model };
 
   try {
     const value = visionStatementSchema.parse(JSON.parse(json));
@@ -59,7 +59,7 @@ function parseOrFail(
       الجواب المخالف للمخطّط يُرَدّ ولا يُرمَّم. ترميمُه هنا يعني
       تخميناً على تخمين.
     */
-    return { ok: false, reason: "جواب النموذج لا يوافق المخطّط", provider, model };
+    return { ok: false, reason: "جواب النموذج لا يطابق الصيغة المطلوبة", provider, model };
   }
 }
 
@@ -93,7 +93,7 @@ export function deepseekVision(): VisionProvider {
           reason:
             input.mode === "UNREADABLE"
               ? input.reason
-              : "الكشف نصّيّ — يقرأ حسابياً ولا يرسل إلى نموذج رؤية",
+              : "الكشف نصي، فيُقرأ برمجياً ولا يُرسل إلى نموذج الرؤية",
         };
       }
 
@@ -108,8 +108,8 @@ export function deepseekVision(): VisionProvider {
           provider: "deepseek",
           model,
           reason:
-            `الكشف ${input.pagesTotal} صفحات ولا يقرأ بصرياً منه إلّا ${input.pagesRead} — ` +
-            "وكشف ناقص أسوأ من لا كشف. قسّمه ملفّات أصغر، أو اطلبه من البنك نصّاً (PDF غير مصوّر أو Excel)",
+            `الكشف ${input.pagesTotal} صفحات ولا يمكن قراءة سوى ${input.pagesRead} منها بصرياً. ` +
+            "والكشف الناقص أسوأ من عدم وجود كشف. قسّمه إلى ملفات أصغر، أو اطلبه من البنك بصيغة نصية (PDF غير مصوّر أو Excel)",
         };
       }
 

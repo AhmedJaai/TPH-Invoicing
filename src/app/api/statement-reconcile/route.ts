@@ -103,7 +103,7 @@ async function handle(request: Request) {
 
     if (!row) return NextResponse.json({ error: "الكشف غير موجود" }, { status: 404 });
     if (!row.driveFileId) {
-      return NextResponse.json({ error: "لا ملف في الدرايف لهذا الكشف" }, { status: 400 });
+      return NextResponse.json({ error: "لا يوجد ملف في الدرايف لهذا الكشف" }, { status: 400 });
     }
 
     /* من الحارس وحده: وضعُ التجربة لا يستعير تفويض المالك (drive.service.ts) */
@@ -126,7 +126,7 @@ async function handle(request: Request) {
       console.error("[statement-reconcile] تعذّر تنزيل الكشف:", e);
       const tooBig = e instanceof DriveFileTooLargeError;
       return NextResponse.json(
-        { error: tooBig ? e.message : "تعذّر تنزيل الكشف من الدرايف — تحقّق من أنّ الملفّ ما زال في مكانه ثمّ أعد المحاولة" },
+        { error: tooBig ? e.message : "تعذّر تنزيل الكشف من الدرايف. تحقّق من أن الملف ما زال في مكانه ثم أعد المحاولة." },
         { status: tooBig ? 413 : 502 },
       );
     }
@@ -137,17 +137,17 @@ async function handle(request: Request) {
     fileName = row.fileName;
     documentId = row.documentId;
   } else {
-    if (!(file instanceof File)) return NextResponse.json({ error: "لم يصل ملف" }, { status: 400 });
+    if (!(file instanceof File)) return NextResponse.json({ error: "لم يصل أي ملف" }, { status: 400 });
     if (file.size === 0) return NextResponse.json({ error: "الملف فارغ" }, { status: 400 });
-    if (file.size > MAX_BYTES) return NextResponse.json({ error: "حجم الملف يتجاوز ٤ ميجابايت — حدّ المنصّة" }, { status: 400 });
+    if (file.size > MAX_BYTES) return NextResponse.json({ error: "حجم الملف يتجاوز ٤ ميجابايت، وهذا الحد الأقصى المسموح" }, { status: 400 });
     if (!isSupportedUpload(file.type)) {
-      return NextResponse.json({ error: "نوع غير مدعوم — المقبول PDF أو صورة" }, { status: 400 });
+      return NextResponse.json({ error: "نوع الملف غير مدعوم. المقبول: PDF أو صورة." }, { status: 400 });
     }
     data = Buffer.from(await file.arrayBuffer());
     /* النوعُ من بصمة الملفّ لا ممّا أعلنه المتصفّح — قبل أيّ محلِّل */
     const sniffed = sniffMimeType(data);
     if (!sniffed) {
-      return NextResponse.json({ error: "محتوى الملفّ ليس PDF ولا صورة — تحقّق من الملفّ ثمّ أعد الرفع" }, { status: 400 });
+      return NextResponse.json({ error: "محتوى الملف ليس PDF ولا صورة. تحقّق من الملف ثم أعد رفعه." }, { status: 400 });
     }
     mimeType = signatureMatches(file.type, data) ? file.type : sniffed;
     fileName = file.name;
@@ -179,7 +179,7 @@ async function handle(request: Request) {
   if (!supplierId) {
     return NextResponse.json(
       {
-        error: "لم يعرف المورّد من الكشف — اختره يدوياً",
+        error: "لم يتعرّف النظام على المورّد من الكشف. اخترْه يدوياً.",
         needsSupplier: true,
         candidates: supplierList.map((s) => ({ id: s.id, nameAr: s.nameAr })),
       },
@@ -200,7 +200,7 @@ async function handle(request: Request) {
 
   if (parsedLines.length === 0) {
     return NextResponse.json(
-      { error: "لم تقرأ أي حركة من الكشف. تأكّد أنّ الملف كشف حساب لا فاتورة." },
+      { error: "لم تُقرأ أي حركة من الكشف. تأكّد أن الملف كشف حساب وليس فاتورة." },
       { status: 400 },
     );
   }

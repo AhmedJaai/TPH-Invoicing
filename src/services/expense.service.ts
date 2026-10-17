@@ -344,7 +344,7 @@ export async function recordManualExpense(
     note?: string;
   },
 ): Promise<string> {
-  if (input.amountMinor <= 0) throw new Error("المبلغ يجب أن يكون موجباً");
+  if (input.amountMinor <= 0) throw new Error("يجب أن يكون المبلغ أكبر من صفر");
 
   const id = createId();
   const recurring = await activeRecurring();
@@ -433,7 +433,7 @@ export async function deriveOpenMonths(
     try {
       created += (await deriveExpensesFromBank(userId, month, conn)).created;
     } catch (e) {
-      notes.push(`مصروفات ${month}: ${(e as Error).message.slice(0, 120)}`);
+      notes.push(`تعذّر اشتقاق مصروفات ${month}: ${(e as Error).message.slice(0, 120)}`);
     }
   }
   return { created, notes };

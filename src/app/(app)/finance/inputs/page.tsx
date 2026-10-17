@@ -10,6 +10,7 @@ import { Badge, Callout, EmptyState, LinkButton, NoAccess, Section } from "@/com
 import { CATEGORY_LABEL, isTxCategory, type TxCategory } from "@/lib/bank/rules";
 import { monthsBetween, spreadShare } from "@/lib/finance/pnl";
 import { formatRiyalsDisplay } from "@/lib/money";
+import { countNoun, MONTH } from "@/lib/arabic";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadDeclarations, loadSpreadCandidates } from "@/services/profit.service";
 
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 /** ما يُقرّ به: مصروفاتُ تشغيلٍ قد تقع خارج الكشف أو تُدفَع دفعةً لأشهر. */
 const CATEGORIES: readonly TxCategory[] = ["RENT", "SALARY", "UTILITY", "GOVERNMENT", "OTHER"];
-const KIND_LABEL = { SPREAD: "دفعة موزّعة", OFF_BOOK: "خارج الكشف — شهريّ", NONE: "لا يوجد" } as const;
+const KIND_LABEL = { SPREAD: "دفعة موزّعة", OFF_BOOK: "خارج الكشف (شهري)", NONE: "لا يوجد" } as const;
 
 /**
  * ما لا يراه الكشف — الإيجارُ الذي يغطّي أشهراً، والراتبُ النقديّ، وما يُدفَع من حسابٍ
@@ -48,17 +49,17 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
     <PageShell
       user={user}
       title="ما لا يراه الكشف"
-      intro="الإيجار الذي دفع مرّةً لأشهر، والراتب الذي يدفع نقداً، وما يخرج من حساب شخصيّ. قله مرّةً فيكتمل ربح الشهر."
+      intro="الإيجار الذي يُدفع دفعة واحدة لعدة أشهر، والراتب الذي يُدفع نقداً، وما يخرج من حساب شخصي. أدخله هنا مرة واحدة ليكتمل ربح الشهر."
       actions={<LinkButton href={`/finance?month=${month}`} variant="quiet" size="sm" icon={ArrowRight}>قائمة الدخل</LinkButton>}
     >
       {lumps.length > 0 && (
-        <Callout tone="warn" icon={Info} title="إيجار في الكشف لم يقل كم شهراً يغطّي">
+        <Callout tone="warn" icon={Info} title="إيجار في الكشف لم تحدد عدد الأشهر التي يغطيها">
           <ul className="space-y-1">
             {lumps.map((t) => (
-              <li key={t.id}><bdi>{formatDay(t.day)}</bdi> — <strong><Money minor={t.amountMinor} currency /></strong> · {t.label}</li>
+              <li key={t.id}><bdi>{formatDay(t.day)}</bdi>: <strong><Money minor={t.amountMinor} currency /></strong> · {t.label}</li>
             ))}
           </ul>
-          <p className="mt-2">شهر الدفع يحمله كلّه اليوم، والأشهر حوله «ربح قبل الإيجار». اختر «دفعة في الكشف تغطّي أشهراً» أدناه وحدّد أشهرها.</p>
+          <p className="mt-2">يتحمل شهر الدفع المبلغ كاملاً حالياً، وتظهر الأشهر الأخرى «ربحاً قبل الإيجار». اختر «دفعة في الكشف تغطي أشهراً» أدناه وحدّد أشهرها.</p>
         </Callout>
       )}
 
@@ -71,12 +72,12 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
           />
         </div>
       ) : (
-        <Callout tone="info" icon={Info} className="mt-5" title="للقراءة فقط">الإقرار يكتبه من يملك إقفال الشهر.</Callout>
+        <Callout tone="info" icon={Info} className="mt-5" title="للقراءة فقط">يدخل الإقرار من لديه صلاحية إقفال الشهر.</Callout>
       )}
 
-      <Section title="ما أقررته" icon={HandCoins} count={sorted.length} hint="كلّ إقرار يدخل قائمة الدخل في أشهره باسمه. سحبه يعيد الشهر كما يقوله الكشف.">
+      <Section title="ما أقررته" icon={HandCoins} count={sorted.length} hint="يدخل كل إقرار في قائمة الدخل ضمن أشهره وباسمه. وعند سحبه يعود الشهر إلى ما يظهره الكشف.">
         {sorted.length === 0 ? (
-          <EmptyState icon={HandCoins} title="لم تقرّ بشيء بعد." hint="بلا إيجار ولا رواتب يبقى الشهر «ربحاً قبل الإيجار» لا «صافي الربح»." />
+          <EmptyState icon={HandCoins} title="لم تدخل أي إقرار بعد." hint="بدون الإيجار والرواتب يبقى الشهر «ربحاً قبل الإيجار» وليس «صافي الربح»." />
         ) : (
           <ul className="space-y-2">
             {sorted.map((d) => {
@@ -90,13 +91,13 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
                       <Badge tone="muted">{CATEGORY_LABEL[d.category]}</Badge>
                     </p>
                     <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                      {d.fromMonth === d.toMonth ? formatMonth(d.fromMonth) : <>من {formatMonth(d.fromMonth)} إلى {formatMonth(d.toMonth)} ({months.length} أشهر)</>}
-                      {d.kind === "SPREAD" && <> — <Money minor={d.amountMinor} /> توزّع: <Money minor={spreadShare(d.amountMinor, d.fromMonth, d.toMonth, d.fromMonth)} /> للشهر</>}
-                      {d.kind === "OFF_BOOK" && <> — <Money minor={d.amountMinor} /> لكلّ شهر</>}
+                      {d.fromMonth === d.toMonth ? formatMonth(d.fromMonth) : <>من {formatMonth(d.fromMonth)} إلى {formatMonth(d.toMonth)} ({countNoun(months.length, MONTH)})</>}
+                      {d.kind === "SPREAD" && <> · <Money minor={d.amountMinor} /> موزّعة، بواقع <Money minor={spreadShare(d.amountMinor, d.fromMonth, d.toMonth, d.fromMonth)} /> للشهر</>}
+                      {d.kind === "OFF_BOOK" && <> · <Money minor={d.amountMinor} /> لكل شهر</>}
                     </p>
                   </div>
                   {canEdit && (
-                    <PostAction url="/api/finance/declaration" body={{ action: "void", id: d.id }} variant="quiet" done="سحب الإقرار">اسحبه</PostAction>
+                    <PostAction url="/api/finance/declaration" body={{ action: "void", id: d.id }} variant="quiet" done="سُحب الإقرار">اسحبه</PostAction>
                   )}
                 </li>
               );

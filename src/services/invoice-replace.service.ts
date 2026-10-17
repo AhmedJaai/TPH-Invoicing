@@ -52,17 +52,17 @@ export async function replaceWithCorrectedInvoice(tx: Tx, documentId: string, ac
     id: documents.id, fileName: documents.fileName, status: documents.status, kind: documents.kind,
     supplierId: documents.supplierId, reading: documents.extractionJson, driveFileId: documents.driveFileId,
   }).from(documents).where(eq(documents.id, documentId)).for("update").limit(1);
-  if (!doc) throw new ReplaceRefused("لا يوجد هذا المستند", 404);
-  if (doc.status === "REJECTED") throw new ReplaceRefused("المستند مرفوض — أعده إلى المراجعة أوّلاً");
+  if (!doc) throw new ReplaceRefused("المستند غير موجود", 404);
+  if (doc.status === "REJECTED") throw new ReplaceRefused("المستند مرفوض. أعده إلى المراجعة أولاً");
   const [own] = await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.documentId, doc.id)).limit(1);
-  if (own) throw new ReplaceRefused("له فاتورة مقيّدة من قبل");
-  if (!doc.supplierId) throw new ReplaceRefused("لم يعرف مورّده — قيّده من «عاينها وقيّدها»");
+  if (own) throw new ReplaceRefused("لهذا المستند فاتورة مقيّدة من قبل");
+  if (!doc.supplierId) throw new ReplaceRefused("لم يُعرف مورّد هذا المستند. قيّده من «عاينها وقيّدها»");
 
   const r = (doc.reading ?? null) as StoredReading | null;
   const number = (r?.invoiceNumber ?? "").trim();
   const totalMinor = parseRiyals(r?.totalAmount ?? "");
   const date = normalizeDocumentDate(r?.invoiceDate ?? "");
-  if (!number || totalMinor === null) throw new ReplaceRefused("لم يقرأ رقمه أو إجماليّه — أعد قراءته أوّلاً");
+  if (!number || totalMinor === null) throw new ReplaceRefused("تعذّرت قراءة رقم الفاتورة أو إجماليها. أعد قراءة المستند أولاً");
 
   /* القديمةُ: الرقمُ نفسُه بأيّ صيغة، لمورّدها، ولها ملفّ (لا قيدُ سطر كشف) */
   const key = invoiceNumberKey(number);
@@ -73,8 +73,8 @@ export async function replaceWithCorrectedInvoice(tx: Tx, documentId: string, ac
     .innerJoin(documents, and(eq(documents.id, invoices.documentId), isNull(documents.origin)))
     .where(eq(invoices.supplierId, doc.supplierId)))
     .find((o) => invoiceNumberKey(o.number) === key);
-  if (!old) throw new ReplaceRefused("لا فاتورة مقيّدة بهذا الرقم لمورّده — قيّدها فاتورةً جديدة");
-  if (old.total === totalMinor) throw new ReplaceRefused("المبلغ نفسه — هذه نسخة لا تصحيح: ارفضها");
+  if (!old) throw new ReplaceRefused("لا توجد فاتورة مقيّدة بهذا الرقم لهذا المورّد. قيّدها فاتورة جديدة");
+  if (old.total === totalMinor) throw new ReplaceRefused("المبلغ نفسه، فهذه نسخة مكررة لا تصحيح. ارفضها");
 
   const invoiceDate = date ? new Date(`${date}T00:00:00Z`) : old.date;
   const month = date ? date.slice(0, 7) : old.month;

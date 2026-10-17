@@ -100,7 +100,7 @@ export function OrphanPayment({
             {suppliers.map((s) => <option key={s.id} value={s.id}>{s.nameAr}</option>)}
           </select>
           <button aria-busy={busy} type="button" disabled={busy || !supplierId} onClick={() => submit(twin)} className={buttonClass("primary", "sm")}>
-            {twin ? "سداد آخر — انسبها" : "انسبها"}
+            {twin ? "هذا سداد آخر، انسبها" : "انسبها"}
           </button>
         </div>
       )}
@@ -113,15 +113,15 @@ export function OrphanPayment({
               aria-label="ما هذه الدفعة"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="ما هي؟ أجرة · تحويل شخصيّ · مصروف…"
+              placeholder="ما هي؟ مثل: أجرة، تحويل شخصي، مصروف…"
               className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-surface px-2 text-xs lg:min-h-9"
             />
             <button aria-busy={busy} type="button" disabled={busy || reason.trim().length < 3} onClick={() => submit()} className={buttonClass("danger", "sm")}>
-              ألغ قيدها
+              ألغِ قيدها
             </button>
           </div>
           <p className="text-[11px] leading-relaxed text-muted">
-            يلغى قيدها سداداً ولا يحذف: تبقى بحالها وسببها في السجلّ، والإيصال في الأرشيف.
+            يُلغى قيدها كسداد دون حذفها: تبقى الدفعة مع سبب الإلغاء في السجلّ، ويبقى الإيصال في الأرشيف.
           </p>
         </div>
       )}

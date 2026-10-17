@@ -35,7 +35,7 @@ describe("محوِّلات البنوك", () => {
   it("والمجرَّب يُعلن عِلَلَه المعروفة كذلك", () => {
     const notices = adapterNotices(adapterFor("SNB"));
     expect(notices.some((n) => n.includes("لم يُجرَّب"))).toBe(false);
-    expect(notices.some((n) => n.includes("مرجعُ البنك"))).toBe(true);
+    expect(notices.some((n) => n.includes("مرجع البنك"))).toBe(true);
   });
 
   it("كلّ محوِّل يحمل عِلّةً واحدة على الأقلّ", () => {

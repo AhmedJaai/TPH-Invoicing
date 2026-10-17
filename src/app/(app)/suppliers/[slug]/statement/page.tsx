@@ -78,7 +78,7 @@ export default async function SupplierStatementPage({
 
   const year = today.slice(0, 4);
   const presets = [
-    { label: "كلّ التعامل", from: first ?? today, to: today },
+    { label: "كل فترة التعامل", from: first ?? today, to: today },
     { label: "هذه السنة", from: `${year}-01-01`, to: today },
     { label: "آخر 90 يوماً", from: addDays(today, -89), to: today },
     { label: "آخر 30 يوماً", from: addDays(today, -29), to: today },
@@ -104,7 +104,7 @@ export default async function SupplierStatementPage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href={`/suppliers/${s.slug}`} className="inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-ink-soft hover:text-accent sm:min-h-0">
             <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            ملفّ {s.nameAr}
+            ملف {s.nameAr}
           </Link>
           <PrintButton />
         </div>
@@ -127,7 +127,7 @@ export default async function SupplierStatementPage({
               <span className="text-[11px] text-muted">إلى</span>
               <input type="date" name="to" defaultValue={to} max={today} className="min-h-11 rounded-lg border border-line-input bg-raised px-2.5 sm:min-h-9" />
             </label>
-            <button type="submit" className={buttonClass("secondary", "sm")}>اعرض</button>
+            <button type="submit" className={buttonClass("secondary", "sm")}>اعرض الكشف</button>
           </form>
         </div>
       </div>
@@ -139,15 +139,15 @@ export default async function SupplierStatementPage({
             <p className="text-[11px] font-bold tracking-wide text-muted">كشف حساب مورّد</p>
             <h1 className="mt-1 text-2xl font-bold leading-tight">{s.nameAr}</h1>
             <p className="mt-1.5 text-xs text-ink-soft">
-              {s.vatNumber ? <>الرقم الضريبيّ <bdi dir="ltr" className="font-mono">{s.vatNumber}</bdi></> : "لا رقم ضريبيّاً مسجّلاً له"}
-              {s.crNumber && <> · السجلّ <bdi dir="ltr" className="font-mono">{s.crNumber}</bdi></>}
+              {s.vatNumber ? <>الرقم الضريبي <bdi dir="ltr" className="font-mono">{s.vatNumber}</bdi></> : "لا يوجد رقم ضريبي مسجّل له"}
+              {s.crNumber && <> · السجل التجاري <bdi dir="ltr" className="font-mono">{s.crNumber}</bdi></>}
             </p>
           </div>
           <div className="text-end text-xs leading-relaxed text-ink-soft">
             <p className="text-sm font-bold text-ink">{companyConfig.nameAr}</p>
             <p>النسيم، جدة</p>
-            {vat && <p>الرقم الضريبيّ <bdi dir="ltr" className="font-mono">{vat}</bdi></p>}
-            {cr && <p>السجلّ التجاريّ <bdi dir="ltr" className="font-mono">{cr}</bdi></p>}
+            {vat && <p>الرقم الضريبي <bdi dir="ltr" className="font-mono">{vat}</bdi></p>}
+            {cr && <p>السجل التجاري <bdi dir="ltr" className="font-mono">{cr}</bdi></p>}
           </div>
         </header>
 
@@ -161,11 +161,11 @@ export default async function SupplierStatementPage({
             <dd className="mt-1 font-bold">{formatDay(today)}</dd>
           </div>
           <div>
-            <dt className="text-[11px] text-muted">الرصيد الافتتاحيّ</dt>
+            <dt className="text-[11px] text-muted">الرصيد الافتتاحي</dt>
             <dd className="mt-1 text-sm font-bold"><Balance minor={ledger.openingMinor} /></dd>
           </div>
           <div>
-            <dt className="text-[11px] text-muted">الرصيد الختاميّ</dt>
+            <dt className="text-[11px] text-muted">الرصيد الختامي</dt>
             <dd className="mt-1 text-sm font-bold"><Balance minor={ledger.closingMinor} /></dd>
           </div>
         </dl>
@@ -175,8 +175,8 @@ export default async function SupplierStatementPage({
             <EmptyState
               compact
               icon={ScrollText}
-              title="لا قيد في هذه الفترة."
-              hint={first ? `أوّل تعامل معه في ${formatDay(first)} — اختر «كلّ التعامل».` : "لا فاتورة منه ولا دفعة له بعد."}
+              title="لا توجد حركات في هذه الفترة."
+              hint={first ? `بدأ التعامل معه في ${formatDay(first)}. اختر «كل فترة التعامل» لعرضه.` : "لا توجد فاتورة منه ولا دفعة له حتى الآن."}
             />
           </div>
         ) : (
@@ -217,7 +217,7 @@ export default async function SupplierStatementPage({
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-ink font-bold">
-                  <td className="px-2.5 py-2.5" colSpan={2}>المجموع والرصيد الختاميّ</td>
+                  <td className="px-2.5 py-2.5" colSpan={2}>الإجمالي والرصيد الختامي</td>
                   <td className="nums-col px-2.5 py-2.5"><Money minor={ledger.invoicedMinor} /></td>
                   <td className="nums-col px-2.5 py-2.5"><Money minor={ledger.paidMinor} /></td>
                   <td className="nums-col px-2.5 py-2.5"><Balance minor={ledger.closingMinor} /></td>
@@ -229,16 +229,16 @@ export default async function SupplierStatementPage({
 
         <footer className="mt-6 space-y-1.5 border-t border-line pt-4 text-[11px] leading-relaxed text-muted">
           <p>
-            الرصيد الموجب مستحقّ للمورّد علينا، والسالب رصيد لنا عنده. المدفوعات بما وصل المورّد بعد رسم التحويل،
-            والمردودة والملغاة لا تدخل.
+            الرصيد الموجب مبلغ مستحق للمورّد علينا، والسالب رصيد لنا عنده. المدفوعات بالمبلغ الذي وصل المورّد بعد رسوم التحويل،
+            ولا تشمل الدفعات المردودة أو الملغاة.
           </p>
           {coversToday && drift !== 0 && (
             <p className="text-ink-soft">
-              وحسابه في النظام اليوم <Balance minor={systemNet ?? 0} />، والفرق <Money minor={Math.abs(drift)} /> كسور تقريب
-              على فواتير عدّت مسدّدة — أو تخصيص يستحقّ المراجعة في ملفّه.
+              رصيده في النظام اليوم <Balance minor={systemNet ?? 0} />، والفرق <Money minor={Math.abs(drift)} /> وهو ناتج عن كسور تقريب
+              في فواتير اعتُبرت مسدّدة، أو عن تخصيص دفعة يحتاج إلى مراجعة في ملف المورّد.
             </p>
           )}
-          <p>صدر من نظام {companyConfig.nameAr} بتاريخ {formatDay(today)} — من القيود المسجّلة حتى تاريخه.</p>
+          <p>صدر هذا الكشف من نظام {companyConfig.nameAr} بتاريخ {formatDay(today)} بناءً على القيود المسجّلة حتى هذا التاريخ.</p>
         </footer>
       </article>
     </main>

@@ -54,8 +54,8 @@ export function previewAllowed(env: PreviewEnv): boolean {
  */
 export function refusalReason(env: PreviewEnv): string | null {
   if (env.AUTH_BYPASS !== "true") return null;
-  if (env.VERCEL_ENV === "production") return "وضع المعاينة مرفوض: البيئة إنتاج على Vercel.";
-  if (!env.VERCEL_ENV && env.NODE_ENV === "production") return "وضع المعاينة مرفوض: البناء إنتاجيّ.";
+  if (env.VERCEL_ENV === "production") return "وضع المعاينة غير مسموح: البيئة بيئة إنتاج على Vercel.";
+  if (!env.VERCEL_ENV && env.NODE_ENV === "production") return "وضع المعاينة غير مسموح: هذا بناء إنتاجي.";
   return null;
 }
 

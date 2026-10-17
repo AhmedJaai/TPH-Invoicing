@@ -188,7 +188,7 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
         salesWritten: 0, salesRestated: 0, lineCount: 0, unitsMilli: 0,
       },
       revisions: [],
-      messages: [`هذا الملفّ مستورد من قبل باسم «${seen.fileName}» — ولم يكتب شيء ثانيةً.`],
+      messages: [`هذا الملف مستورد من قبل باسم «${seen.fileName}»، ولم يُسجَّل شيء جديد.`],
       recognisedColumns: [],
       unrecognisedColumns: [],
       unmappedProducts: 0,
@@ -230,14 +230,14 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
     parsed = {
       ...parsed,
       blocked:
-        `الورقة «${truncatedSheet}» أطول ممّا يقرأ في مرّة، فقرئ أوّلها فقط — ولم يكتب شيء. ` +
-        "صدّر من فودكس أسبوعاً واحداً في الملفّ وارفع كلّ أسبوع وحده.",
+        `الورقة «${truncatedSheet}» أطول مما يمكن قراءته في مرة واحدة، فقُرئ أولها فقط ولم يُسجَّل شيء. ` +
+        "صدّر من فودكس أسبوعاً واحداً في كل ملف، وارفع كل أسبوع على حدة.",
     };
   }
 
   if (!parsed || parsed.blocked) {
     const blocked = parsed?.blocked
-      ?? "لم يفهم هذا الملفّ: لم يعثر على جدول فيه «اسم الصنف» و«الكمّيّة».";
+      ?? "تعذّر فهم هذا الملف: لم يُعثر فيه على جدول يضم «اسم الصنف» و«الكمّيّة».";
     return {
       importId: "",
       status: "FAILED",
@@ -314,9 +314,9 @@ export async function importParsedSales(p: ParsedImportInput, conn: Conn = db): 
        order by 1
     `)).rows.map((r) => r.day);
     if (clash.length > 0) {
-      const blocked = `أيّام هذا الملفّ مستوردة من قبل بتقرير آخر من فودكس (${kind === "PMIX" ? "أصناف الطلبات" : "مزيج المنتجات"}): `
+      const blocked = `أيام هذا الملف مستوردة من قبل من تقرير آخر في فودكس (${kind === "PMIX" ? "أصناف الطلبات" : "مزيج المنتجات"}): `
         + `${clash.slice(0, 5).join("، ")}${clash.length > 5 ? ` و${clash.length - 5} غيرها` : ""}. `
-        + "ولو استورد لحسب بيعها مرّتين. استورد تقريراً واحداً لكلّ أسبوع — وأصناف الطلبات أدقّ.";
+        + "ولو استُورد هذا الملف لحُسبت مبيعاتها مرتين. استورد تقريراً واحداً لكل أسبوع، وتقرير أصناف الطلبات أدق.";
       return {
         importId: "", status: "FAILED", adapter: adapterName, shape: file.shape,
         periodStart: file.periodStart, periodEnd: file.periodEnd,
@@ -329,7 +329,7 @@ export async function importParsedSales(p: ParsedImportInput, conn: Conn = db): 
 
   const messages: string[] = [...p.messages, ...file.warnings];
   if (retryOf !== null) {
-    messages.push("هذا الملفّ رفع من قبل ولم يستورد كاملاً — أعيدت قراءته، وما كان مقيّداً منه لم يكتب مرّتين.");
+    messages.push("رُفع هذا الملف من قبل ولم يُستورد كاملاً، فأُعيدت قراءته ولم يُسجَّل ما قُيّد منه مرة ثانية.");
   }
   const written = await writeImport({
     file, sourceId, branchId, sha, input, messages, conn, retryOf,
@@ -574,8 +574,8 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
       for (const [rowNumber, o] of outcome.byRow) rowOutcome.set(rowNumber, o);
       if (outcome.keptDespiteAbsence > 0) {
         messages.push(
-          `يوم ${sale.businessDate}: الملفّ يذكر أقلّ من نصف أصنافه المقيّدة — يبدو تقريراً مرشّحاً، ` +
-          `فلم يلغ ما غاب عنه (${outcome.keptDespiteAbsence}). إن كان التقرير كاملاً فارفعه بلا ترشيح.`,
+          `يوم ${sale.businessDate}: يذكر الملف أقل من نصف أصنافه المقيّدة، ويبدو أنه تقرير مفلتر، ` +
+          `فلم يُلغَ ما غاب عنه (${outcome.keptDespiteAbsence}). إن كان التقرير كاملاً فارفعه بلا فلترة.`,
         );
       }
     }
@@ -649,15 +649,15 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
       understood === 0 ? "FAILED" : counts.errors > 0 ? "PARTIAL" : "IMPORTED";
 
     if (counts.errors > 0) {
-      messages.push(`${counts.errors} صفّاً لم يقرأ — محفوظ بنصّه وسببه، ويعرض أدناه.`);
+      messages.push(`${counts.errors} صفاً تعذّرت قراءته. نصّه وسببه محفوظان ويظهران أدناه.`);
     }
     if (counts.revised > 0) {
       messages.push(
-        `${counts.revised} سطراً كان مقيّداً وتغيّر ما يقوله المصدر عنه — حدّث ولم يردّ. والتفصيل أدناه.`,
+        `${counts.revised} سطراً كان مقيّداً وتغيّرت بياناته في المصدر، فتم تحديثه ولم يُرفض. التفاصيل أدناه.`,
       );
     }
     if (counts.duplicates > 0) {
-      messages.push(`${counts.duplicates} سطراً مقيّد من قبل بلا تغيير — لم يكتب مرّتين.`);
+      messages.push(`${counts.duplicates} سطراً مقيّد من قبل بلا تغيير، فلم يُسجَّل مرة ثانية.`);
     }
 
     await tx
@@ -794,7 +794,7 @@ export function decideLines(
         out.changed.push({ ...values, id: was.id });
       }
       for (const n of l.rowNumbers) {
-        out.byRow.set(n, { status: "DUPLICATE", reason: "مقيّد من قبل بلا تغيير — لم يكتب مرّتين" });
+        out.byRow.set(n, { status: "DUPLICATE", reason: "مقيّد من قبل بلا تغيير، فلم يُسجَّل مرة ثانية" });
       }
       continue;
     }
@@ -817,7 +817,7 @@ export function decideLines(
     for (const n of l.rowNumbers) {
       out.byRow.set(n, {
         status: "REVISED",
-        reason: `تغيّر ما يقوله المصدر: ${describe(was.sourceStatus, was.quantity)} ← ${describe(l.sourceStatus, milliToDecimal(l.quantityMilli))}`,
+        reason: `تغيّرت بيانات المصدر: ${describe(was.sourceStatus, was.quantity)} ← ${describe(l.sourceStatus, milliToDecimal(l.quantityMilli))}`,
       });
     }
   }
@@ -840,7 +840,7 @@ export function decideLines(
     out.revised.push({
       lineExternalId: was.externalId,
       was: `${was.sourceStatus ?? "—"} × ${was.quantity ?? "—"}`,
-      now: "غاب عن التصدير الأحدث — ألغي",
+      now: "غاب عن آخر تصدير، فأُلغي",
     });
   }
   return out;

@@ -25,15 +25,15 @@
 export type ReviewBucket = "CONFIRM" | "REVIEW" | "RESOLVE";
 
 export const BUCKET_LABEL: Record<ReviewBucket, string> = {
-  CONFIRM: "يُؤكَّد",
-  REVIEW: "يُراجَع",
-  RESOLVE: "يُحسَم",
+  CONFIRM: "للتأكيد",
+  REVIEW: "للمراجعة",
+  RESOLVE: "للحسم",
 };
 
 export const BUCKET_HINT: Record<ReviewBucket, string> = {
-  CONFIRM: "النظام واثق ويطلب تأكيدك — تُؤكَّد جمعاً",
-  REVIEW: "النظام متردّد — أكّدها، أو قيّدها على حساب المورّد، أو أعلِن أنّها ليست سداداً",
-  RESOLVE: "جهةٌ لا يعرفها النظام — تعريفُها يسري على أمثالها",
+  CONFIRM: "النظام واثق من هذه الحركات ويطلب تأكيدك. يمكنك تأكيدها دفعة واحدة",
+  REVIEW: "النظام غير متأكد. أكّدها، أو قيّدها على حساب المورّد، أو حدّد أنها ليست سداداً",
+  RESOLVE: "جهة لا يعرفها النظام. تعريفها هنا ينطبق على الحركات المشابهة",
 };
 
 export interface ReviewItem {
@@ -122,7 +122,7 @@ export function describeQueue(groups: readonly Bucketed[]): string {
     .filter((g) => g.items.length > 0)
     .map((g) => `${BUCKET_LABEL[g.bucket]} ${g.items.length}`);
 
-  return parts.length === 0 ? "لا شيء ينتظرك" : parts.join(" · ");
+  return parts.length === 0 ? "لا شيء بانتظارك" : parts.join(" · ");
 }
 
 /**

@@ -15,11 +15,11 @@ import { sameUnitFamily, toCanonical } from "./units";
 export type WasteReason = "EXPIRED" | "SPILLED" | "FAILED_PREP" | "CALIBRATION" | "STAFF_DRINK" | "DAMAGED" | "OTHER";
 
 export const WASTE_REASON_LABEL: Record<WasteReason, string> = {
-  EXPIRED: "انتهت صلاحيّته",
+  EXPIRED: "انتهت صلاحيته",
   SPILLED: "انسكب",
   FAILED_PREP: "تحضير فاشل",
   CALIBRATION: "معايرة الماكينة",
-  STAFF_DRINK: "مشروب موظّف",
+  STAFF_DRINK: "مشروب موظف",
   DAMAGED: "تلف",
   OTHER: "سبب آخر",
 };

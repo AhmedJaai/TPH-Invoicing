@@ -35,7 +35,7 @@ describe("بوّابة الإنتاج", () => {
     ]);
     expect(g.ready).toBe(false);
     expect(g.unknown).toBe(1);
-    expect(g.verdict).toContain("ليست «لا بأس»");
+    expect(g.verdict).toContain("عدم التحقق");
   });
 
   /* البند الساقط سهواً يجعل البوّابة تبدو أنقى ممّا هي */

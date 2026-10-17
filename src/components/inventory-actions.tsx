@@ -83,7 +83,7 @@ export function StartCount({
         <div className="min-w-0">
           <h2 id="start-count-title" className="text-base font-bold">ابدأ جرد أسبوع</h2>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
-            من الأحد إلى تقفيلة السبت. يهيّأ لك ما بيع فيه وما اشتري، ثمّ تدخل ما وجدته وحده.
+            من الأحد إلى نهاية السبت. نجهّز لك ما بِيع وما اشتريته خلال الأسبوع، وعليك فقط إدخال ما وجدته على الرف.
           </p>
         </div>
       </div>
@@ -101,7 +101,7 @@ export function StartCount({
         <div className="min-w-0 flex-1 rounded-xl border border-line bg-sunken/60 px-4 py-2.5 text-center" aria-live="polite">
           <p className="text-[15px] font-bold leading-snug sm:text-base">{formatWeek(week.start, week.end)}</p>
           <p className="mt-0.5 text-[11px] text-muted">
-            {atLatest ? "آخر أسبوع اكتمل" : `قبل ${countNoun(Math.round((Date.parse(defaultStart) - Date.parse(week.start)) / (7 * MS_PER_DAY)), WEEK)}`}
+            {atLatest ? "آخر أسبوع مكتمل" : `قبل ${countNoun(Math.round((Date.parse(defaultStart) - Date.parse(week.start)) / (7 * MS_PER_DAY)), WEEK)}`}
           </p>
         </div>
         <button
@@ -143,7 +143,7 @@ export function StartCount({
       {sameAsOpen && (
         <p className="mt-4 flex items-start gap-2 rounded-lg border border-accent-line bg-accent-soft/60 px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
           <CalendarRange className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2} aria-hidden />
-          <span>هذا أسبوع الجرد المفتوح نفسه — عد إليه وأكمله، أو اختر أسبوعاً آخر بالسهمين.</span>
+          <span>هذا هو أسبوع الجرد المفتوح نفسه. ارجع إليه وأكمله، أو اختر أسبوعاً آخر بالسهمين.</span>
         </p>
       )}
 
@@ -155,11 +155,11 @@ export function StartCount({
             </button>
             {onRestart && (
               <ConfirmAction
-                label="ألغه وابدأه من جديد"
+                label="ألغِ الجرد وابدأ من جديد"
                 title="جرد جديد للأسبوع نفسه"
-                consequence="يحذف الجرد المفتوح لهذا الأسبوع ويبدأ غيره فارغاً. وما عددته فيه لا ينقل — يبقى نصّه في سجلّ التدقيق وحده."
-                acknowledgement="أفهم أنّ عدّ الجرد المفتوح لا يعود إلّا بإدخاله ثانيةً."
-                confirmLabel="ألغه وابدأ"
+                consequence="سيُحذف الجرد المفتوح لهذا الأسبوع ويبدأ جرد جديد فارغ. لا تُنقل الأعداد التي أدخلتها، وتبقى مسجلة في سجل التدقيق فقط."
+                acknowledgement="أفهم أن أعداد الجرد المفتوح لن تعود إلا بإدخالها من جديد."
+                confirmLabel="ألغِ وابدأ"
                 variant="quiet"
                 size="md"
                 onConfirm={onRestart}
@@ -217,13 +217,13 @@ export function FinaliseCount({
         label="أقفل الجرد"
         title="إقفال جرد هذه الفترة"
         consequence={
-          `تجمّد الأرقام كما هي الآن، وتحفظ أصولها (نسخ الوصفات وأسطر الفواتير).`
-          + ` ولا يتغيّر هذا التقرير بعدها مهما عدّلت وصفة أو وصلت فاتورة.`
-          + (uncounted > 0 ? ` و${uncounted} صنفاً لم يدخل له عدّ فعليّ — يقفل بلا فرق محسوب.` : "")
-          + (partial ? " والتقرير جزئيّ: بعض المبيعات خارج الحساب، وهو مكتوب في التقرير." : "")
+          `ستُجمَّد الأرقام كما هي الآن، وتُحفظ مصادرها (نسخ الوصفات وبنود الفواتير).`
+          + ` ولن يتغيّر هذا التقرير بعد ذلك حتى لو عدّلت وصفة أو وصلت فاتورة.`
+          + (uncounted > 0 ? ` وهناك ${uncounted} صنفاً لم يُدخل له عدّ فعلي، وسيُقفل دون حساب فرق له.` : "")
+          + (partial ? " والتقرير جزئي: بعض المبيعات غير محسوبة، وهذا مذكور في التقرير." : "")
         }
-        acknowledgement="أفهم أنّ التقرير يجمّد، وأنّ إعادة فتحه تحتاج صلاحية المالك وسبباً مكتوباً."
-        confirmLabel="أقفله"
+        acknowledgement="أفهم أن التقرير سيُجمَّد، وأن إعادة فتحه تحتاج إلى صلاحية المالك وسبب مكتوب."
+        confirmLabel="أقفل الجرد"
         tone="warn"
         variant="primary"
         size="md"
@@ -269,8 +269,8 @@ export function ReopenCount({ countId }: { countId: string }) {
         إعادة فتح هذا الجرد
       </p>
       <p className="mt-1 text-[11px] leading-relaxed text-muted">
-        يعاد حساب التقرير على أحدث البيانات، فقد تتغيّر أرقامه. والسبب يبقى في سجلّ
-        التدقيق، وعدّاد الفتح يعرض في التقرير.
+        سيُعاد حساب التقرير على أحدث البيانات، وقد تتغير أرقامه. يبقى السبب في سجل
+        التدقيق، ويظهر عدد مرات إعادة الفتح في التقرير.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <input
@@ -278,7 +278,7 @@ export function ReopenCount({ countId }: { countId: string }) {
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           aria-label="سبب إعادة فتح الجرد"
-          placeholder="لماذا يعاد فتحه؟"
+          placeholder="لماذا تعيد فتحه؟"
           className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-sm sm:min-h-9"
         />
         <button
@@ -287,7 +287,7 @@ export function ReopenCount({ countId }: { countId: string }) {
           disabled={busy || reason.trim().length < 4}
           className={buttonClass("secondary", "sm")}
         >
-          أعد فتحه
+          أعد فتح الجرد
         </button>
       </div>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
@@ -364,12 +364,12 @@ export function NewCount({
       action: "start", periodStart: openWeek.start, periodEnd: openWeek.end, branchId: openBranchId,
     });
     if (!r.ok) {
-      toast({ tone: "danger", title: "ألغي الجرد ولم يبدأ الجديد", body: `${r.error} — ابدأه من «ابدأ جرداً جديداً».` });
+      toast({ tone: "danger", title: "أُلغي الجرد لكن لم يبدأ الجرد الجديد", body: `${r.error}. ابدأ الجرد الجديد من «ابدأ جرداً جديداً».` });
       router.push("/inventory");
       router.refresh();
       return false;
     }
-    toast({ tone: "ok", title: "بدأ الجرد من جديد", body: `أسبوع ${formatWeek(openWeek.start, openWeek.end)} — فارغاً.` });
+    toast({ tone: "ok", title: "بدأ جرد جديد", body: `أسبوع ${formatWeek(openWeek.start, openWeek.end)}، وهو فارغ.` });
     setOpen(false);
     router.push(`/inventory/counts/${r.data.countId}`);
     router.refresh();
@@ -385,7 +385,7 @@ export function NewCount({
         open={open}
         onClose={() => setOpen(false)}
         title="جرد جديد"
-        description={`جرد أسبوع ${formatWeek(openWeek.start, openWeek.end)} يبقى مفتوحاً كما هو — تعود إليه متى شئت وتكمله أو تقفله. والجديد لأسبوع غيره.`}
+        description={`جرد أسبوع ${formatWeek(openWeek.start, openWeek.end)} يبقى مفتوحاً كما هو، ويمكنك العودة إليه لاحقاً لإكماله أو إقفاله. أما الجرد الجديد فيكون لأسبوع آخر.`}
         size="md"
       >
         <StartCount
@@ -419,17 +419,17 @@ export function DiscardCount({
   return (
     <div>
       <ConfirmAction
-        label="ألغ هذا الجرد"
+        label="ألغِ هذا الجرد"
         title={`إلغاء جرد أسبوع ${formatWeek(week.start, week.end)}`}
         consequence={
-          "يحذف هذا الجرد ولا يقفل — ويعود أسبوعه بلا جرد، فتبدؤه من جديد متى شئت."
+          "سيُحذف هذا الجرد دون إقفال، ويعود أسبوعه بلا جرد، ويمكنك بدء جرد جديد له متى شئت."
           + (countedItems > 0
-            ? ` وما عددته فيه (${countNoun(countedItems, ITEM)}) لا ينقل إلى الجديد — يبقى نصّه في سجلّ التدقيق وحده.`
-            : " ولم يعدّ فيه صنف بعد.")
-          + " والهدر المسجّل في الأسبوع يبقى كما هو."
+            ? ` والأعداد التي أدخلتها فيه (${countNoun(countedItems, ITEM)}) لن تُنقل إلى الجرد الجديد، وتبقى مسجلة في سجل التدقيق فقط.`
+            : " ولم يُعدّ فيه أي صنف بعد.")
+          + " أما الهدر المسجّل في الأسبوع فيبقى كما هو."
         }
-        acknowledgement="أفهم أنّ هذا الجرد يحذف، وأنّ عدّه لا يعود إلّا بإدخاله ثانيةً."
-        confirmLabel="ألغه"
+        acknowledgement="أفهم أن هذا الجرد سيُحذف، وأن أعداده لن تعود إلا بإدخالها من جديد."
+        confirmLabel="ألغِ الجرد"
         variant="quiet"
         onConfirm={async () => {
           setError(null);
@@ -438,7 +438,7 @@ export function DiscardCount({
             setError(r.error);
             return false;
           }
-          toast({ tone: "ok", title: "ألغي الجرد", body: r.data.message ?? "" });
+          toast({ tone: "ok", title: "تم إلغاء الجرد", body: r.data.message ?? "" });
           router.push("/inventory");
           router.refresh();
           return true;

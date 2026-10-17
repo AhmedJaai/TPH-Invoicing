@@ -71,17 +71,17 @@ export function suggestMerges(items: readonly SupplierItem[]): MergeSuggestion[]
     const priceRatio = hasPrices && min > 0 ? max / min : 1;
 
     const caveats: string[] = [];
-    if (!hasPrices) caveats.push("لا أسعار مسجّلة للمقارنة");
+    if (!hasPrices) caveats.push("لا توجد أسعار مسجّلة للمقارنة");
     if (priceRatio > PLAUSIBLE_PRICE_RATIO) {
       caveats.push(
-        `فارق السعر ${priceRatio.toFixed(1)} ضعفاً — الأرجح أنّهما صنفان مختلفان يحملان الاسم نفسه`,
+        `فارق السعر ${priceRatio.toFixed(1)} ضعفاً. غالباً هما صنفان مختلفان بالاسم نفسه`,
       );
     }
     if (list.some((i) => i.orderCount === 1)) {
-      caveats.push("أحدهما طلب مرّة واحدة — الاسم قد يكون مؤقّتاً");
+      caveats.push("أحدهما طُلب مرة واحدة فقط، وقد يكون اسمه مؤقتاً");
     }
     if (normalized.split(" ").length === 1) {
-      caveats.push("الاسم كلمة واحدة — يحتمل معاني كثيرة");
+      caveats.push("الاسم كلمة واحدة وقد يحمل معاني كثيرة");
     }
 
     out.push({

@@ -46,11 +46,11 @@ export default async function ObligationsPage() {
 
   if (view.open.length === 0 && view.archived.length === 0) {
     return (
-      <PageShell user={user} width="wide" title="الوثائق والتراخيص" intro="ما له تاريخ انتهاء: السجلّ التجاريّ، رخصة البلديّة، الدفاع المدنيّ، الشهادات الصحّيّة، الإقامات، عقد الإيجار.">
+      <PageShell user={user} width="wide" title="الوثائق والتراخيص" intro="وثائق لها تاريخ انتهاء: السجل التجاري، رخصة البلدية، الدفاع المدني، الشهادات الصحية، الإقامات، عقد الإيجار.">
         <EmptyState
           icon={FileBadge}
-          title="لم تدخل وثيقة بعد."
-          hint="أدخل وثائق المقهى بتاريخ انتهائها مرّةً (نحو عشر)، فيذكّرك النظام قبل كلّ بمهلتها في «يحتاج قرارك». وحتى تدخل لا يقال «لا شيء ينتهي» — النظام لا يعرف."
+          title="لم تُضف أي وثيقة بعد."
+          hint="أضف وثائق المقهى مع تاريخ انتهاء كل منها (نحو عشر وثائق)، وسيذكّرك النظام قبل انتهائها في «يحتاج قرارك». وإلى أن تضيفها لا نستطيع القول إن «لا شيء ينتهي»، لأن النظام لا يعرف شيئاً عنها."
           action={canEdit ? <ObligationForm /> : undefined}
         />
       </PageShell>
@@ -62,7 +62,7 @@ export default async function ObligationsPage() {
       user={user}
       width="wide"
       title="الوثائق والتراخيص"
-      intro="ما له تاريخ انتهاء يغرّم على فواته — يذكّرك النظام قبل كلّ بمهلتها في «يحتاج قرارك»."
+      intro="التأخر في تجديد هذه الوثائق قد يعرّضك لغرامات، وسيذكّرك النظام قبل انتهاء كل منها في «يحتاج قرارك»."
       actions={canEdit ? <ObligationForm /> : undefined}
     >
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
@@ -71,24 +71,24 @@ export default async function ObligationsPage() {
           tone={expired.length > 0 ? "danger" : "ok"}
           label="انتهت"
           value={<span className="nums nums-count">{expired.length}</span>}
-          sub={expired.length > 0 ? expired.slice(0, 3).map((r) => r.title).join("، ") : "لا وثيقة منتهية ممّا أدخلته."}
+          sub={expired.length > 0 ? expired.slice(0, 3).map((r) => r.title).join("، ") : "لا توجد وثيقة منتهية بين ما أضفته."}
         />
         <KeyFigure
           icon={CalendarClock}
           tone={due.length > 0 ? "warn" : undefined}
           label="داخل مهلة التذكير"
           value={<span className="nums nums-count">{due.length}</span>}
-          sub={due.length > 0 ? due.slice(0, 3).map((r) => r.title).join("، ") : "لا شيء يقترب موعده ممّا أدخلته."}
+          sub={due.length > 0 ? due.slice(0, 3).map((r) => r.title).join("، ") : "لا توجد وثيقة يقترب موعد انتهائها."}
         />
         <KeyFigure
           icon={ShieldCheck}
           label="أقرب موعد"
           value={next ? <bdi className="text-xl">{formatDay(next.expiresOn)}</bdi> : <span className="text-xl text-muted">—</span>}
-          sub={next ? `${next.title} — ${describeDaysLeft(next.left)}` : "كلّ ما أدخلته منته."}
+          sub={next ? `${next.title} — ${describeDaysLeft(next.left)}` : "جميع الوثائق التي أضفتها منتهية."}
         />
       </div>
 
-      <Section title="الوثائق" icon={FileBadge} count={rows.length} hint="الأقرب انتهاءً أوّلاً. «جدّد» بتعديل تاريخ الانتهاء؛ و«أرشف» لما لم يعد لازماً — لا يحذف.">
+      <Section title="الوثائق" icon={FileBadge} count={rows.length} hint="الأقرب انتهاءً أولاً. للتجديد عدّل تاريخ الانتهاء، وأرشف ما لم تعد بحاجة إليه (الأرشفة لا تحذفه).">
         <DataTable<(typeof rows)[number]>
           rows={rows}
           keyOf={(r) => r.id}
@@ -126,7 +126,7 @@ export default async function ObligationsPage() {
               cell: (r) => (
                 <span className="flex flex-col items-start gap-1">
                   <Badge tone={LEVEL_TONE[r.level]} dot>{EXPIRY_LEVEL_LABEL[r.level]}</Badge>
-                  <span className="text-[11px] text-muted">{describeDaysLeft(r.left)} · تذكير قبلها بـ{r.remindDays} يوماً{r.snoozed && " · أجّلت تذكيرها"}</span>
+                  <span className="text-[11px] text-muted">{describeDaysLeft(r.left)} · التذكير قبل {r.remindDays} يوماً{r.snoozed && " · أجّلتَ التذكير"}</span>
                 </span>
               ),
             },
@@ -142,7 +142,7 @@ export default async function ObligationsPage() {
                       {canSnooze && (r.level === "URGENT" || r.level === "SOON") && (
                         r.snoozed
                           ? <SignalControls signalKey={obligationKey(r)} silenced />
-                          : <SignalControls signalKey={obligationKey(r)} dismissLabel="لا تذكّرني بها" />
+                          : <SignalControls signalKey={obligationKey(r)} dismissLabel="لا تذكّرني" />
                       )}
                       {canEdit && (
                         <PostAction url="/api/obligation" body={{ action: "close", id: r.id }} undo={{ body: { action: "reopen", id: r.id } }} variant="quiet">
@@ -159,13 +159,13 @@ export default async function ObligationsPage() {
       </Section>
 
       {view.archived.length > 0 && (
-        <Section title="المؤرشف" icon={Archive} count={view.archived.length} hint="لا يذكّر بها. تعاد إن أرشفت خطأً.">
+        <Section title="المؤرشف" icon={Archive} count={view.archived.length} hint="لا يذكّرك النظام بها. يمكنك إعادتها إن أرشفتها بالخطأ.">
           <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
             {view.archived.map((o) => (
               <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-[13px]">
                 <span className="min-w-0 truncate">
                   <span className="font-bold">{o.title}</span>
-                  <span className="ms-2 text-[11px] text-muted">{OBLIGATION_KIND_LABEL[o.kind]} · كانت تنتهي <bdi>{formatDay(o.expiresOn)}</bdi></span>
+                  <span className="ms-2 text-[11px] text-muted">{OBLIGATION_KIND_LABEL[o.kind]} · كان تاريخ انتهائها <bdi>{formatDay(o.expiresOn)}</bdi></span>
                 </span>
                 {canEdit && (
                   <PostAction url="/api/obligation" body={{ action: "reopen", id: o.id }} variant="quiet">

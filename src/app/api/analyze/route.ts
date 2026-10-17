@@ -54,24 +54,24 @@ async function handle(request: Request) {
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلغ مالك الحساب." }, { status: 400 });
+    return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، وإن تكرر ذلك فأبلغ مالك الحساب." }, { status: 400 });
   }
 
   const file = form.get("file");
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: "لم يصل ملف" }, { status: 400 });
+    return NextResponse.json({ error: "لم يصل أي ملف" }, { status: 400 });
   }
   if (file.size === 0) {
     return NextResponse.json({ error: "الملف فارغ" }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "حجم الملف يتجاوز ٤ ميجابايت — صغّره (صوّره بدقّة أقلّ) ثمّ أعد المحاولة" }, { status: 400 });
+    return NextResponse.json({ error: "حجم الملف يتجاوز ٤ ميجابايت. صغّره (صوّره بدقة أقل) ثم أعد المحاولة." }, { status: 400 });
   }
   /* كروم يرسل HEIC بنوعٍ فارغ — فيُعرف من الامتداد */
   const declaredType = uploadMimeType(file.type, file.name);
   if (!isSupportedUpload(declaredType)) {
     return NextResponse.json(
-      { error: `نوع غير مدعوم (${declaredType || "مجهول"}) — المقبول PDF أو صورة (JPG · PNG · HEIC)` },
+      { error: `نوع الملف غير مدعوم (${declaredType || "مجهول"}). المقبول ملف PDF أو صورة (JPG · PNG · HEIC).` },
       { status: 400 },
     );
   }
@@ -85,7 +85,7 @@ async function handle(request: Request) {
   const sniffed = sniffMimeType(buffer);
   if (!sniffed) {
     return NextResponse.json(
-      { error: "محتوى الملفّ ليس PDF ولا صورة — تأكّد من الملفّ ثمّ أعد المحاولة" },
+      { error: "محتوى الملف ليس PDF ولا صورة. تأكد من الملف ثم أعد المحاولة." },
       { status: 400 },
     );
   }
@@ -111,7 +111,7 @@ async function handle(request: Request) {
   if (duplicateFile) {
     return NextResponse.json(
       {
-        error: `هذا الملف رفع من قبل («${duplicateFile.fileName}») — لم يقرأ ثانيةً`,
+        error: `رُفع هذا الملف من قبل («${duplicateFile.fileName}») ولم يُقرأ مرة أخرى.`,
         duplicateDocumentId: duplicateFile.id,
       },
       { status: 409 },
@@ -149,8 +149,8 @@ async function handle(request: Request) {
       return NextResponse.json(
         {
           error: extraction.kind === "NO_BALANCE"
-            ? "قراءة المستندات متوقّفة: نفد رصيد القارئ. ملفّك سليم ولم يحفظ شيء — أبلغ مالك الحساب ليشحن الرصيد، ثمّ أعد الرفع."
-            : `قراءة المستندات متوقّفة مؤقّتاً (${extraction.reason}). ملفّك سليم ولم يحفظ شيء — أعد المحاولة بعد دقائق.`,
+            ? "قراءة المستندات متوقفة لأن رصيد القارئ نفد. ملفك سليم ولم يُحفظ شيء. أبلغ مالك الحساب ليشحن الرصيد ثم أعد الرفع."
+            : `قراءة المستندات متوقفة مؤقتاً (${extraction.reason}). ملفك سليم ولم يُحفظ شيء. أعد المحاولة بعد دقائق.`,
           readerOutage: extraction.kind,
         },
         { status: extraction.kind === "NO_BALANCE" ? 402 : 503 },

@@ -291,8 +291,8 @@ async function stockCogs(
   month: string, window: StockWindow, basics: StockBasics, rates: ReadonlyMap<string, number>,
   purchases: readonly PurchaseDay[], theoretical: ReadonlyMap<string, DayCost>, conn: Conn,
 ): Promise<{ cogs: StockCogsDetail | null; missing: string | null }> {
-  if (!window.openingCountDay) return { cogs: null, missing: "لا عدّ قرب أوّل الشهر" };
-  if (!window.closingCountDay) return { cogs: null, missing: "لا عدّ قرب آخر الشهر" };
+  if (!window.openingCountDay) return { cogs: null, missing: "لا يوجد جرد قريب من أول الشهر" };
+  if (!window.closingCountDay) return { cogs: null, missing: "لا يوجد جرد قريب من آخر الشهر" };
   const [open, close] = await Promise.all([
     countValuesAt(window.openingCountDay, basics, conn),
     countValuesAt(window.closingCountDay, basics, conn),
@@ -315,7 +315,7 @@ async function stockCogs(
     }
     items.push({ productId, name, openingMinor, closingMinor });
   }
-  if (items.length === 0) return { cogs: null, missing: "لا صنف عدّ في الطرفين وله كلفة معروفة" };
+  if (items.length === 0) return { cogs: null, missing: "لا يوجد صنف مجرود في بداية الشهر ونهايته وله تكلفة معروفة" };
 
   const openingValueMinor = items.reduce((s, x) => s + x.openingMinor, 0);
   const closingValueMinor = items.reduce((s, x) => s + x.closingMinor, 0);
@@ -407,9 +407,9 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
     if (!isTxCategory(r.category)) continue;
     const source = r.source === "INVOICE" ? "INVOICE" as const : r.source === "MANUAL" ? "MANUAL" as const : "BANK" as const;
     if (RECOVERABLE_VAT.has(r.category)) {
-      excluded.push({ id: r.id, label: r.label, amountMinor: r.amount_minor, reason: "ضريبة رسوم تخصم في الإقرار" });
+      excluded.push({ id: r.id, label: r.label, amountMinor: r.amount_minor, reason: "ضريبة رسوم تُخصم في الإقرار الضريبي" });
     } else if (r.category === "GOVERNMENT" && isTaxSettlement(r.description, r.beneficiary, r.label)) {
-      excluded.push({ id: r.id, label: r.label, amountMinor: r.amount_minor, reason: "سداد لهيئة الزكاة والضريبة — تسوية ضريبة لا مصروف" });
+      excluded.push({ id: r.id, label: r.label, amountMinor: r.amount_minor, reason: "سداد لهيئة الزكاة والضريبة والجمارك (تسوية ضريبية وليس مصروفاً)" });
     } else if (r.bank_transaction_id && spreadTx.has(r.bank_transaction_id)) {
       /* دفعةٌ وُزّعت على أشهر: تخرج من شهر دفعها وتدخل حصصاً أدناه */
     } else {
@@ -503,7 +503,7 @@ async function computePnl(month: string, shared: Shared, conn: Conn): Promise<Om
   const theoretical = dailyTheoretical(soldLines, shared.versions, rates, shared.basics.baseUnitOf);
   const inMonth = purchases.filter((p) => p.day >= monthStart && p.day <= monthEnd);
   const stock = open
-    ? { cogs: null, missing: "الشهر لم ينته" }
+    ? { cogs: null, missing: "الشهر لم ينتهِ بعد" }
     : await stockCogs(month, window, shared.basics, rates, purchases, theoretical, conn);
 
   const revenue = shared.revenue.get(month) ?? null;
@@ -590,7 +590,7 @@ export class FreezeRefused extends Error {}
 /** يجمّد قائمةَ دخل شهرٍ مقفل كما تُحسَب الآن. يُكتب في سجلّ التدقيق بطرفيه. */
 export async function freezePnl(month: string, actorId: string | null): Promise<void> {
   const live = await loadLivePnl(month);
-  if (!live.closed) throw new FreezeRefused("لا يجمّد تقرير شهر لم يقفل — أقفل الشهر أوّلاً.");
+  if (!live.closed) throw new FreezeRefused("لا يمكن تجميد تقرير شهر لم يُقفل. أقفل الشهر أولاً.");
   await db.transaction(async (t) => {
     const [before] = await t.select().from(financeSnapshots).where(eq(financeSnapshots.month, month)).limit(1);
     await t.insert(financeSnapshots).values({ month, payload: live, frozenById: actorId })
@@ -622,15 +622,15 @@ export interface NewDeclaration {
 export const MAX_DECLARATION_MONTHS = 36;
 
 export async function createDeclaration(input: NewDeclaration, actorId: string): Promise<string> {
-  if (input.fromMonth > input.toMonth) throw new DeclarationRefused("آخر شهر قبل أوّله.");
+  if (input.fromMonth > input.toMonth) throw new DeclarationRefused("الشهر الأخير قبل الشهر الأول.");
   const [fy, fm] = input.fromMonth.split("-").map(Number);
   const [ty, tm] = input.toMonth.split("-").map(Number);
-  if ((ty - fy) * 12 + (tm - fm) + 1 > MAX_DECLARATION_MONTHS) throw new DeclarationRefused(`المدى أطول من ${MAX_DECLARATION_MONTHS} شهراً — راجع الشهرين.`);
+  if ((ty - fy) * 12 + (tm - fm) + 1 > MAX_DECLARATION_MONTHS) throw new DeclarationRefused(`المدة أطول من ${MAX_DECLARATION_MONTHS} شهراً. راجع الشهرين.`);
   return db.transaction(async (t) => {
     let amountMinor = input.amountMinor;
     const label = input.label.trim();
     if (input.kind === "SPREAD") {
-      if (!input.bankTransactionId) throw new DeclarationRefused("اختر حركة البنك التي توزّع.");
+      if (!input.bankTransactionId) throw new DeclarationRefused("اختر الحركة البنكية التي تريد توزيعها.");
       /* المبلغُ من القاعدة لا من المتصفّح */
       const tx = (await t.execute<{ amount_minor: number; direction: string; category: string; month: string }>(sql`
         select amount_minor, direction::text as direction, category::text as category,
@@ -638,12 +638,12 @@ export async function createDeclaration(input: NewDeclaration, actorId: string):
           from bank_transactions where id = ${input.bankTransactionId}
       `)).rows[0];
       if (!tx || tx.direction !== "DEBIT") throw new DeclarationRefused("الحركة غير موجودة أو ليست صادرة.");
-      if (tx.category !== input.category) throw new DeclarationRefused("فئة الحركة في الكشف غير الفئة المختارة — صنّف الحركة أوّلاً.");
-      if (tx.month < input.fromMonth || tx.month > input.toMonth) throw new DeclarationRefused("شهر الدفع خارج المدى الذي تغطّيه — راجع الشهرين.");
+      if (tx.category !== input.category) throw new DeclarationRefused("فئة الحركة في كشف الحساب تختلف عن الفئة المختارة. صنّف الحركة أولاً.");
+      if (tx.month < input.fromMonth || tx.month > input.toMonth) throw new DeclarationRefused("شهر الدفع خارج المدة التي تغطيها. راجع الشهرين.");
       amountMinor = tx.amount_minor;
       const [taken] = await t.select({ id: financeDeclarations.id }).from(financeDeclarations)
         .where(and(eq(financeDeclarations.bankTransactionId, input.bankTransactionId), eq(financeDeclarations.kind, "SPREAD"), isNull(financeDeclarations.voidedAt))).limit(1);
-      if (taken) throw new DeclarationRefused("هذه الحركة موزّعة أصلاً — اسحب توزيعها أوّلاً إن أردت تغييره.");
+      if (taken) throw new DeclarationRefused("هذه الحركة موزّعة مسبقاً. ألغِ توزيعها أولاً إن أردت تغييره.");
     } else if (input.kind === "NONE") {
       amountMinor = 0;
     } else if (!(amountMinor > 0)) {

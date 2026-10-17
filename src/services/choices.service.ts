@@ -119,17 +119,17 @@ async function cashRows(): Promise<ChoiceRow[]> {
       id: `vat-cash:${r.month}`,
       group: "vat-cash",
       subject: formatMonth(r.month),
-      choice: "نقد لم يودع، شاملاً الضريبة",
+      choice: "نقد غير مودع، شامل الضريبة",
       decidedOn: day(r.updatedAt),
       effectMinor: vatInsideGross(r.cashSalesGrossMinor),
       effectLabel: "ضريبة مبيعات",
       state: locked ? "LOCKED" : "APPLIED",
-      reason: locked ? `إقرار ${quarterLabel(q)} قدّم` : null,
+      reason: locked ? `إقرار ${quarterLabel(q)} قُدِّم` : null,
       href: `/close/vat?period=${r.month}#cash`,
       revoke: locked ? null : {
         url: "/api/vat-return", needs: "month:close",
         body: { action: "cash", month: r.month, amount: null },
-        label: "امحه — «لم يكتب»",
+        label: "احذفه وأعد المبلغ إلى «غير مدخل»",
       },
     };
   });
@@ -150,17 +150,17 @@ async function holdRows(): Promise<ChoiceRow[]> {
     id: `hold:${r.invoiceId}`,
     group: "hold",
     subject: `${r.supplier} — ${r.number || "بلا رقم"}`,
-    choice: `تدفع وهي محجوزة — «${r.note}»`,
+    choice: `تُدفع رغم حجزها: «${r.note}»`,
     decidedOn: day(r.at),
     effectMinor: r.totalMinor,
-    effectLabel: "إجماليّ الفاتورة — يدخل الدفعة ما بقي منها",
+    effectLabel: "إجمالي الفاتورة، ويدخل الدفعة ما بقي منها",
     state: "APPLIED",
     reason: null,
     href: "/payments",
     revoke: {
       url: "/api/payment-run/hold", needs: "payment:approve",
       body: { month: r.month, invoiceIds: [r.invoiceId], action: "restore" },
-      label: "أعدها إلى الحجز",
+      label: "أعدها إلى المحجوزات",
     },
   }));
 }
@@ -198,10 +198,10 @@ async function alertRows(): Promise<ChoiceRow[]> {
       return [{
         ...base,
         id: `alert:${r.key}`,
-        subject: `سداد مرّتين${first?.beneficiary ? ` — ${first.beneficiary.slice(0, 40)}` : ""}${first ? ` — ${formatDay(first.valueDate)}` : ""}`,
+        subject: `سداد مكرر${first?.beneficiary ? ` — ${first.beneficiary.slice(0, 40)}` : ""}${first ? ` — ${formatDay(first.valueDate)}` : ""}`,
         choice: isDoubleDecision(r.decision) ? DOUBLE_PAID_DECISION_LABEL[r.decision] : r.decision,
         effectMinor: first ? first.amountMinor * Math.max(0, ids.length - 1) : null,
-        effectLabel: "الزائد الذي كان يطالب به",
+        effectLabel: "المبلغ الزائد الذي كان مطلوباً",
         href: first ? txHref(first.id) : null,
         revoke: {
           url: "/api/alert-resolve", needs: "bank:edit",
@@ -216,8 +216,8 @@ async function alertRows(): Promise<ChoiceRow[]> {
       return [{
         ...base,
         id: `alert:${r.key}`,
-        subject: `حوالة خرجت ثمّ عادت${out ? ` — ${formatDay(out.valueDate)}` : ""}`,
-        choice: r.decision === "BOUNCED" ? "ارتدّت — ردّت دفعتها" : "ليست ردّاً",
+        subject: `حوالة خرجت ثم عادت${out ? ` — ${formatDay(out.valueDate)}` : ""}`,
+        choice: r.decision === "BOUNCED" ? "ارتدّت وأُلغيت دفعتها" : "ليست ردّاً",
         effectMinor: out?.amountMinor ?? null,
         effectLabel: "مبلغ الحوالة",
         href: out ? txHref(out.id) : null,
@@ -233,7 +233,7 @@ async function alertRows(): Promise<ChoiceRow[]> {
         ...base,
         id: `alert:${r.key}`,
         subject: `${s.name} — حوالة إلى ${groupIban(iban)}`,
-        choice: "حساب له أعرفه",
+        choice: "حساب أعرفه لهذا المورّد",
         effectMinor: null,
         effectLabel: null,
         href: `/suppliers/${s.slug}`,
@@ -272,7 +272,7 @@ async function alertRows(): Promise<ChoiceRow[]> {
         ...base,
         id: `alert:${r.key}`,
         subject: title,
-        choice: `أجّلته إلى ${formatDay(until)}`,
+        choice: `أجّلته حتى ${formatDay(until)}`,
         effectMinor: null,
         effectLabel: null,
         href: "/attention",
@@ -314,19 +314,19 @@ async function supplierRows(): Promise<ChoiceRow[]> {
       decidedOn: null, effectMinor: null, effectLabel: null, state: "APPLIED", reason: null, href,
       revoke: { url: "/api/supplier-policy", needs: "supplier:edit", body: { supplierId: s.id, ...body }, label },
     });
-    if (!s.issuesInvoices) flag("no-invoices", "لا يصدر فواتير ضريبيّة — لا يطالب بها", { issuesInvoices: true }, "أعده: يصدر فواتير");
-    if (s.paperInvoices) flag("paper", "فواتيره ورقيّة تسلّم باليد", { paperInvoices: false }, "أعده: ليست ورقيّة");
-    if (!s.contractRequired) flag("no-contract", "لا يطلب منه عقد توريد", { contractRequired: true }, "أعده: يطلب عقد");
-    if (!s.issuesStatements) flag("no-statements", "لا يصدر كشف حساب — لا يطلب منه", { issuesStatements: true }, "أعده: يصدر كشفاً");
+    if (!s.issuesInvoices) flag("no-invoices", "لا يصدر فواتير ضريبية، فلا تُطلب منه", { issuesInvoices: true }, "أعده إلى: يصدر فواتير");
+    if (s.paperInvoices) flag("paper", "فواتيره ورقية تُسلَّم باليد", { paperInvoices: false }, "أعده إلى: فواتير غير ورقية");
+    if (!s.contractRequired) flag("no-contract", "لا يُطلب منه عقد توريد", { contractRequired: true }, "أعده إلى: يُطلب عقد");
+    if (!s.issuesStatements) flag("no-statements", "لا يصدر كشف حساب، فلا يُطلب منه", { issuesStatements: true }, "أعده إلى: يصدر كشفاً");
     const inFile = (key: string, choice: string, effectMinor: number | null, effectLabel: string | null, extra: Partial<ChoiceRow> = {}) => out.push({
       id: `supplier:${s.id}:${key}`, group: "supplier", subject: s.name, choice,
       decidedOn: null, effectMinor, effectLabel, state: "APPLIED", reason: null, href, revoke: null, ...extra,
     });
     if (s.terms !== null) inFile("terms", s.terms === 0 ? "أجل السداد: نقداً" : `أجل السداد: ${countNoun(s.terms, DAY)}`, null, null);
-    if (s.limitMinor !== null) inFile("limit", "حدّ للرصيد يفتح تنبيهاً", s.limitMinor, "الحدّ");
+    if (s.limitMinor !== null) inFile("limit", "حد للرصيد يُفعّل تنبيهاً", s.limitMinor, "الحدّ");
     if (s.iban) {
       const note = payee.get(s.id)?.note ?? null;
-      inFile("iban", `آيبان مكتوب بيد: ${groupIban(s.iban)}${s.ibanBy ? ` — كتبه ${s.ibanBy}` : ""}`, null, null, {
+      inFile("iban", `آيبان مكتوب يدوياً: ${groupIban(s.iban)}${s.ibanBy ? ` — كتبه ${s.ibanBy}` : ""}`, null, null, {
         decidedOn: day(s.ibanSetAt),
         /* مكتوبٌ بيد ويخالف الكشوف: يمضي كما كُتب، ويُقال هنا كما يُقال في ملفّ التحويل */
         reason: note,
@@ -358,10 +358,10 @@ async function ruleRows(): Promise<ChoiceRow[]> {
       choice: `${isTxCategory(r.category) ? CATEGORY_LABEL[r.category] : r.category}${r.supplier ? ` — ${r.supplier}` : ""}`,
       decidedOn: r.created_on,
       effectMinor: n > 0 ? Number(r.total) : null,
-      effectLabel: n > 0 ? `صنّفت بها ${countNoun(n, TRANSACTION)}` : null,
+      effectLabel: n > 0 ? `صُنّفت بها ${countNoun(n, TRANSACTION)}` : null,
       /* قاعدةٌ لم تُصنَّف بها حركةٌ واحدة قائمةٌ ولا تعمل — تُقال كذلك */
       state: n > 0 ? "APPLIED" : "NOT_APPLIED",
-      reason: n > 0 ? r.note : "لم تصنّف بها حركة بعد — قد يكون نصّها لا يطابق وصف البنك، أو سبقتها قاعدة أخرى",
+      reason: n > 0 ? r.note : "لم تُصنَّف بها أي حركة بعد. قد لا يطابق نصها وصف البنك، أو سبقتها قاعدة أخرى",
       href: "/settings#rules",
       revoke: null,
     };
@@ -382,7 +382,7 @@ async function waiverRows(): Promise<ChoiceRow[]> {
     id: `waiver:${r.id}`,
     group: "waiver",
     subject: r.message.slice(0, 120),
-    choice: r.reason ? `تجاوزتها — «${r.reason}»` : "تجاوزتها",
+    choice: r.reason ? `تجاوزتها: «${r.reason}»` : "تجاوزتها",
     decidedOn: day(r.at),
     effectMinor: null,
     effectLabel: null,

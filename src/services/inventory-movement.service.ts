@@ -62,10 +62,10 @@ async function stockItem(productId: string, unit: StoredUnit, tx: Conn): Promise
     .where(eq(products.id, productId))
     .limit(1);
   if (!product) throw new MovementRefused("الصنف غير موجود");
-  if (!product.isStockItem) throw new MovementRefused(`«${product.nameAr}» ليس صنفاً يخزّن — لا يسجّل عليه هدر ولا حركة`);
+  if (!product.isStockItem) throw new MovementRefused(`«${product.nameAr}» ليس صنفاً مخزّناً، فلا يمكن تسجيل هدر أو حركة عليه`);
   if (!sameUnitFamily(unit, product.baseUnit)) {
     throw new MovementRefused(
-      `«${product.nameAr}» يقاس بـ${storedUnitLabel(product.baseUnit)}، و${storedUnitLabel(unit)} لا تحوّل إليه — وزن وحجم وعدّ لا تتبادل`,
+      `«${product.nameAr}» يُقاس بـ${storedUnitLabel(product.baseUnit)}، ولا يمكن تحويل ${storedUnitLabel(unit)} إليه (الوزن والحجم والعدّ لا تتحوّل إلى بعضها)`,
     );
   }
   return { nameAr: product.nameAr };
@@ -98,9 +98,9 @@ export interface WasteResult {
 
 export async function recordWaste(input: WasteInput, conn: Conn = db): Promise<WasteResult> {
   if (!isStoredUnit(input.unit)) throw new Error("وحدة غير معروفة");
-  if (!DATE.test(input.occurredOn)) throw new Error("التاريخ يكتب YYYY-MM-DD");
+  if (!DATE.test(input.occurredOn)) throw new Error("اكتب التاريخ بصيغة YYYY-MM-DD");
   if (!Number.isInteger(input.quantityMilli) || input.quantityMilli <= 0) {
-    throw new Error("الكمّيّة تكون أكبر من صفر");
+    throw new Error("يجب أن تكون الكمّية أكبر من صفر");
   }
 
   const requestId = input.clientRequestId?.trim() || null;
@@ -135,7 +135,7 @@ export async function recordWaste(input: WasteInput, conn: Conn = db): Promise<W
         .from(wasteRecords)
         .where(eq(wasteRecords.clientRequestId, requestId))
         .limit(1);
-      if (!existing) throw new Error("تعذّر تسجيل الهدر — أعد المحاولة");
+      if (!existing) throw new Error("تعذّر تسجيل الهدر. حاول مرة أخرى.");
       return { id: existing.id, duplicate: true };
     }
 
@@ -165,7 +165,7 @@ export async function recordWaste(input: WasteInput, conn: Conn = db): Promise<W
  */
 export async function voidWaste(id: string, reason: string, actorId: string, conn: Conn = db): Promise<void> {
   const why = reason.trim();
-  if (why.length < 3) throw new MovementRefused("اكتب سبب الإبطال — الإبطال بلا سبب لا يفهم بعد شهر");
+  if (why.length < 3) throw new MovementRefused("اكتب سبب الإبطال، فالإبطال بلا سبب يصعب فهمه لاحقاً");
 
   await conn.transaction(async (tx) => {
     /* الشرطُ في التحديث نفسِه: ضغطتان على «أبطِل» تُبطل الأولى وتُردّ الثانية */
@@ -177,7 +177,7 @@ export async function voidWaste(id: string, reason: string, actorId: string, con
         productId: wasteRecords.productId, quantityMilli: wasteRecords.quantityMilli,
         unit: wasteRecords.unit, occurredOn: wasteRecords.occurredOn, reason: wasteRecords.reason,
       });
-    if (!row) throw new MovementRefused("هذا الهدر غير موجود أو أبطل من قبل");
+    if (!row) throw new MovementRefused("هذا الهدر غير موجود أو أُبطل من قبل");
 
     await recordAudit({
       actorId,
@@ -244,9 +244,9 @@ export interface MovementInput {
 
 export async function recordMovement(input: MovementInput, conn: Conn = db): Promise<string> {
   if (!isStoredUnit(input.unit)) throw new Error("وحدة غير معروفة");
-  if (!DATE.test(input.occurredOn)) throw new Error("التاريخ يكتب YYYY-MM-DD");
+  if (!DATE.test(input.occurredOn)) throw new Error("اكتب التاريخ بصيغة YYYY-MM-DD");
   if (!Number.isInteger(input.quantityMilli) || input.quantityMilli <= 0) {
-    throw new Error("الكمّيّة تكون أكبر من صفر");
+    throw new Error("يجب أن تكون الكمّية أكبر من صفر");
   }
 
   return conn.transaction(async (tx) => {

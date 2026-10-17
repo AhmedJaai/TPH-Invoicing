@@ -187,7 +187,7 @@ function buildRows(
       rows: [],
       warnings: [
         ...warnings,
-        { rowNumber: 0, reason: "لم يُعثر على صفّ الرؤوس — تأكّد أنّ الملف كشف حساب", raw: "" },
+        { rowNumber: 0, reason: "لم يُعثر على صف عناوين الأعمدة. تأكّد أن الملف كشف حساب بنكي", raw: "" },
       ],
     };
   }

@@ -21,15 +21,15 @@ export function ReplaceInvoice({ documentId, number, before, after }: { document
     return (
       <button type="button" className={buttonClass("primary", "sm")} onClick={() => setAsking(true)}>
         <Replace className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        فاتورة مصحّحة — استبدل بها المقيّدة
+        هذه فاتورة مصحّحة: استبدل بها المقيّدة
       </button>
     );
   }
   return (
     <span className="flex w-full flex-col gap-2 rounded-lg border border-accent-line bg-sunken px-3 py-2.5 text-xs leading-relaxed">
       <span>
-        تحلّ هذه محلّ <bdi className="nums font-bold">{number}</bdi>: مبلغها <bdi className="nums font-bold">{before}</bdi> ← <bdi className="nums font-bold">{after}</bdi>،
-        وبنودها وحكمها الضريبيّ من هذه القراءة، وما سدّد فوق المبلغ الجديد يعود رصيداً للمورّد. والمستند القديم يرفض ويبقى في السجلّ.
+        ستحلّ هذه الفاتورة محلّ <bdi className="nums font-bold">{number}</bdi>، ويتغيّر المبلغ من <bdi className="nums font-bold">{before}</bdi> إلى <bdi className="nums font-bold">{after}</bdi>،
+        وتؤخذ البنود والحالة الضريبية من هذه القراءة. وما سُدّد زيادة عن المبلغ الجديد يصبح رصيداً للمورّد. يُرفض المستند القديم ويبقى في السجلّ.
       </span>
       <span className="flex flex-wrap gap-2">
         <button
@@ -43,11 +43,11 @@ export function ReplaceInvoice({ documentId, number, before, after }: { document
             const r = await postJson<{ message: string; invoiceId: string }>("/api/invoice-replace", { documentId });
             setBusy(false);
             if (!r.ok) { setError(r.error); return; }
-            toast({ tone: "ok", title: "استبدلت الفاتورة", body: r.data.message });
+            toast({ tone: "ok", title: "تم استبدال الفاتورة", body: r.data.message });
             router.refresh();
           }}
         >
-          {busy ? "يستبدل…" : "نعم، استبدلها"}
+          {busy ? "جارٍ الاستبدال…" : "نعم، استبدلها"}
         </button>
         <button type="button" disabled={busy} className={buttonClass("quiet", "sm")} onClick={() => setAsking(false)}>إلغاء</button>
       </span>

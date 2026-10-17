@@ -34,7 +34,7 @@ describe("الملفّ يعرف بأعمدته لا باسمه", () => {
   it("وترويسة غريبة تعلن ولا تقرأ بالحدس", () => {
     const r = parseCatalogFile(Buffer.from("alpha,beta\n1,2\n", "utf8"));
     expect(r.items).toHaveLength(0);
-    expect(r.issues[0].reason).toBe("ترويسة غير مفهومة");
+    expect(r.issues[0].reason).toBe("عناوين الأعمدة غير مفهومة");
     expect(r.issues[0].detail).toContain("alpha");
   });
 });

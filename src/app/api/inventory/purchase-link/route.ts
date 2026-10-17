@@ -13,7 +13,7 @@ import { storedUnit } from "@/lib/inventory/count-request";
 export const runtime = "nodejs";
 
 const Id = z.string().trim().min(1).max(64);
-const Decimal = z.string().trim().regex(/^\d{1,7}(\.\d{1,3})?$/, "رقم بثلاث خانات عشريّة على الأكثر");
+const Decimal = z.string().trim().regex(/^\d{1,7}(\.\d{1,3})?$/, "اكتب رقماً بثلاث خانات عشرية على الأكثر");
 const Body = z.object({
   supplierProductId: Id,
   productId: Id,
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const parsed = Body.safeParse(raw);
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلب غير مفهوم" }, { status: 400 });
     const r = await savePurchaseLink(parsed.data, user.id);
-    return NextResponse.json({ ok: true, message: `ربط بـ«${r.productName}» — يعاد حساب المشتريات` });
+    return NextResponse.json({ ok: true, message: `تم الربط بـ«${r.productName}» وسيُعاد حساب المشتريات` });
   } catch (e) {
     if (e instanceof PurchaseLinkRefused) return NextResponse.json({ error: e.message }, { status: 409 });
     const mapped = respondTo(e);

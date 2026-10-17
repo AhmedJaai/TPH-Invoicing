@@ -146,7 +146,7 @@ describe("reconcileStatement", () => {
     );
     expect(r.computedClosingMinor).toBe(52000);
     expect(r.balanceArithmeticOk).toBe(false);
-    expect(r.findings.some((f) => f.message.includes("لا يستقيم"))).toBe(true);
+    expect(r.findings.some((f) => f.message.includes("لا تستقيم"))).toBe(true);
   });
 
   it("يقبل الحساب المستقيم", () => {
@@ -175,7 +175,7 @@ describe("reconcileStatement", () => {
     );
     expect(r.balanceArithmeticOk).toBeNull();
     expect(r.computedClosingMinor).toBeNull();
-    expect(r.findings.some((f) => f.message.includes("لا يستقيم"))).toBe(false);
+    expect(r.findings.some((f) => f.message.includes("لا تستقيم"))).toBe(false);
   });
 
   it("الافتتاحيّ صفراً مقروءاً يفحص — الصفر المقروء ليس كالمجهول", () => {

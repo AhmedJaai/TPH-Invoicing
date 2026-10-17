@@ -48,7 +48,7 @@ describe("batchDay · rateBp · schemeLabel", () => {
   it("لا يُخمَّن اسمُ شبكةٍ لم يثبت رمزُها", () => {
     expect(schemeLabel("MC")).toBe("ماستركارد (MC)");
     expect(schemeLabel("SM")).toBe("رمز SM");
-    expect(schemeLabel(undefined)).toBe("رمزٌ لم يُقرأ");
+    expect(schemeLabel(undefined)).toBe("رمز غير مقروء");
   });
 });
 

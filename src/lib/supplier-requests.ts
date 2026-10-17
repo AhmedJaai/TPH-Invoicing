@@ -71,7 +71,7 @@ export function groupUnbackedBySupplier(rows: readonly UnbackedPayment[]): Unbac
 export function buildInvoiceRequest(group: UnbackedSupplier): string {
   const lines = group.payments.map((p) =>
     `• ${p.paidOn}: حوالة ${formatRiyalsDisplay(p.amountMinor)} ريال`
-    + (p.unbackedMinor < p.amountMinor ? ` — بقي منها بلا فاتورة ${formatRiyalsDisplay(p.unbackedMinor)}` : ""),
+    + (p.unbackedMinor < p.amountMinor ? ` (المتبقي بلا فاتورة منها: ${formatRiyalsDisplay(p.unbackedMinor)}` : ""),
   );
   return [
     `السلام عليكم ${group.supplierName}،`,
@@ -90,7 +90,7 @@ export function buildStatementRequest(supplierName: string, month: string): stri
     `السلام عليكم ${supplierName}،`,
     ``,
     `نرجو إرسال كشف حساب مؤسسة ذا بوبليك هاوس (الرقم الضريبي 310007971600003) عن شهر ${month}،`
-      + ` بفواتيره وسداداته ورصيده الختاميّ.`,
+      + ` متضمناً الفواتير والسدادات والرصيد الختامي.`,
     `شاكرين لكم.`,
   ].join("\n");
 }
@@ -138,9 +138,9 @@ export function buildPriceRiseMessage(f: PriceRiseFacts): string {
     `لاحظنا تغيّراً في سعر «${f.itemName}» في فواتيركم لمؤسسة ذا بوبليك هاوس:`,
     `• ${f.previousDay}: ${formatRiyalsDisplay(f.previousMinor)} ريال للوحدة`,
     `• ${f.currentDay}: ${formatRiyalsDisplay(f.currentMinor)} ريال للوحدة (بزيادة ${formatRiyalsDisplay(delta)})`,
-    ...(annual !== null ? [`وبمعدّل شرائنا منكم تبلغ الزيادة نحو ${formatRiyalsDisplay(annual)} ريال سنويّاً.`] : []),
+    ...(annual !== null ? [`وبحسب معدل شرائنا منكم تبلغ الزيادة نحو ${formatRiyalsDisplay(annual)} ريال سنوياً.`] : []),
     ``,
-    `نرجو إفادتنا بسبب التغيّر، وإمكان تثبيت السعر السابق.`,
+    `نرجو إفادتنا بسبب التغيّر، وبإمكانية العودة إلى السعر السابق.`,
     `شاكرين لكم.`,
   ].join("\n");
 }
@@ -176,5 +176,5 @@ export const REMIND_AFTER_DAYS = 7;
 /** «طولب اليوم» · «طولب قبل ٩ أيّام — ذكِّره» */
 export function describeRequested(daysAgo: number): string {
   const when = daysAgo <= 0 ? "اليوم" : daysAgo === 1 ? "أمس" : daysAgo === 2 ? "قبل يومين" : daysAgo <= 10 ? `قبل ${daysAgo} أيّام` : `قبل ${daysAgo} يوماً`;
-  return daysAgo >= REMIND_AFTER_DAYS ? `طولب ${when} — ذكّره` : `طولب ${when}`;
+  return daysAgo >= REMIND_AFTER_DAYS ? `طُولب ${when}، وحان وقت التذكير` : `طُولب ${when}`;
 }

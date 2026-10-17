@@ -14,6 +14,7 @@
  */
 import { occursIn, type RecurringInput, type SupplierDue, type VatDue } from "./cash-outlook";
 import { daysInMonth } from "@/lib/riyadh-time";
+import { countNoun, SUPPLIER } from "./arabic";
 import { addMonths } from "./filing";
 
 export type CommitmentKind = "SUPPLIER_RUN" | "RECURRING" | "VAT" | "EXPIRY";
@@ -94,15 +95,15 @@ export function buildCommitments(input: CommitmentsInput): Commitments {
   const overdueMinor = sum(input.overdueRun);
   if (overdueMinor > 0) {
     put(`${thisMonth}-01`, {
-      id: "run:overdue", kind: "SUPPLIER_RUN", label: "دفعة الشهر الماضي — لم تحوّل بعد",
-      sub: `${input.overdueRun.filter((s) => s.amountMinor > 0).length} مورّدين`, amountMinor: overdueMinor, href: "/payments",
+      id: "run:overdue", kind: "SUPPLIER_RUN", label: "دفعة الشهر الماضي، لم تُحوَّل بعد",
+      sub: countNoun(input.overdueRun.filter((s) => s.amountMinor > 0).length, SUPPLIER), amountMinor: overdueMinor, href: "/payments",
     });
   }
   const nextMinor = sum(input.nextRun);
   if (nextMinor > 0) {
     put(`${addMonths(thisMonth, 1)}-01`, {
       id: "run:next", kind: "SUPPLIER_RUN", label: "دفعة هذا الشهر",
-      sub: "من الفواتير المسجّلة حتى اليوم — وتكبر", amountMinor: nextMinor, href: "/payments",
+      sub: "من الفواتير المسجّلة حتى اليوم، وتزيد مع كل فاتورة جديدة", amountMinor: nextMinor, href: "/payments",
     });
   }
 
@@ -123,9 +124,9 @@ export function buildCommitments(input: CommitmentsInput): Commitments {
       id: `vat:${v.periodKey}`,
       kind: "VAT",
       label: `آخر موعد لإقرار ${v.label}`,
-      sub: v.amountMinor === null ? "مبلغه غير معروف — شهر منه بلا كشف"
-        : v.amountMinor <= 0 ? "لا مبلغ يسدّد بحساب اليوم — ويقدّم الإقرار"
-        : v.accruing ? "المبلغ حتى اليوم ويكبر" : undefined,
+      sub: v.amountMinor === null ? "المبلغ غير معروف لأن شهراً منه بلا كشف بنك"
+        : v.amountMinor <= 0 ? "لا يوجد مبلغ مستحق السداد حالياً، لكن يجب تقديم الإقرار"
+        : v.accruing ? "المبلغ حتى اليوم، وسيزيد" : undefined,
       amountMinor: v.amountMinor === null ? null : Math.max(0, v.amountMinor),
       href: `/close/vat?period=${v.periodKey}`,
     });

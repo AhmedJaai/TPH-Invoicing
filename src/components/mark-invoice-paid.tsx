@@ -67,18 +67,18 @@ async function post(body: unknown): Promise<{ ok: boolean; status: number; data:
 }
 
 function describePreview(p: Preview): string[] {
-  const parts = [`تقيّد دفعة من حسابك بـ${formatRiyalsDisplay(p.ownerPaymentMinor)}`];
+  const parts = [`ستُسجَّل دفعة من حسابك بمبلغ ${formatRiyalsDisplay(p.ownerPaymentMinor)}`];
   const freed = p.freed.reduce((s, f) => s + f.amountMinor, 0);
   if (freed > 0) {
     const moved = p.reapplied
-      .map((r) => `فاتورة ${r.invoiceNumber} بـ${formatRiyalsDisplay(r.amountMinor)}`)
+      .map((r) => `فاتورة ${r.invoiceNumber} بمبلغ ${formatRiyalsDisplay(r.amountMinor)}`)
       .join("، ");
     parts.push(
-      `وتفكّ عنها حوالات المقهى (${formatRiyalsDisplay(freed)})`
-      + (moved ? ` وتخصم من: ${moved}` : ""),
+      `وسيُلغى تخصيص حوالات المقهى لها (${formatRiyalsDisplay(freed)})`
+      + (moved ? ` وتُخصم من: ${moved}` : ""),
     );
   }
-  if (p.creditLeftMinor > 0) parts.push(`ويبقى لك عنده ${formatRiyalsDisplay(p.creditLeftMinor)}`);
+  if (p.creditLeftMinor > 0) parts.push(`ويبقى لك رصيد عند المورّد بمبلغ ${formatRiyalsDisplay(p.creditLeftMinor)}`);
   return parts;
 }
 
@@ -118,8 +118,8 @@ export function MarkInvoicePaid({
   function fail(r: Awaited<ReturnType<typeof post>>, back: State) {
     setMessage(
       r === null
-        ? "تعذّر الاتصال بالخادم — لم يصل الطلب."
-        : String(r.data.error ?? `تعذّر الحفظ — ردّ الخادم بالرمز ${r.status}`),
+        ? "تعذّر الاتصال بالخادم ولم يصل الطلب."
+        : String(r.data.error ?? `تعذّر الحفظ (رمز الخطأ ${r.status})`),
     );
     setState(back);
   }
@@ -152,19 +152,19 @@ export function MarkInvoicePaid({
       `marked: 0` حين لا يجد فاتورةً تنطبق.
     */
     if (r.data.marked === 0) {
-      setMessage("لم يكتب شيء — قد تكون مسدّدةً أصلاً. حدّث الصفحة.");
+      setMessage("لم يُسجَّل شيء، فقد تكون الفاتورة مسدّدة أصلاً. حدّث الصفحة.");
       setState("choose");
       return;
     }
     setState("done");
-    const text = String(r.data.message ?? "سجّلت مسدّدة");
+    const text = String(r.data.message ?? "سُجّلت الفاتورة مسدّدة");
     const paymentIds = Array.isArray(r.data.paymentIds)
       ? r.data.paymentIds.filter((x): x is string => typeof x === "string")
       : [];
     const drawn = readDrawn(r.data.drawn);
     toast({
       tone: "ok",
-      title: "سجّلت الفاتورة مسدّدة",
+      title: "سُجّلت الفاتورة مسدّدة",
       body: text,
       undo: paymentIds.length + drawn.length > 0
         ? {
@@ -185,7 +185,7 @@ export function MarkInvoicePaid({
   }
 
   if (state === "done") {
-    return <span className="text-[11px] font-bold text-ok">✓ سجّلت مسدّدة</span>;
+    return <span className="text-[11px] font-bold text-ok">✓ سُجّلت مسدّدة</span>;
   }
 
   /*
@@ -210,7 +210,7 @@ export function MarkInvoicePaid({
           className={panel ? `${buttonClass("primary", "md")} w-full sm:w-auto` : buttonClass("secondary", "sm")}
         >
           <Banknote className="h-4 w-4" strokeWidth={2} aria-hidden />
-          سجّل أنّها سدّدت
+          سجّل الفاتورة مسدّدة
         </button>
       )}
 
@@ -222,14 +222,14 @@ export function MarkInvoicePaid({
               <Choice
                 icon={Wallet}
                 title="من حسابي أو نقداً"
-                hint="لا يظهر في كشف المقهى. تعرض المعاينة قبل الحفظ."
+                hint="لا يظهر في كشف المقهى. ستظهر لك معاينة قبل الحفظ."
                 busy={state === "previewing"}
                 onClick={loadOwnerPreview}
               />
               <Choice
                 icon={Landmark}
                 title="حوالة من حساب المقهى"
-                hint="تسجّل دفعة، وتطابق حين يصل كشف البنك."
+                hint="تُسجَّل دفعة، وتُطابق عند وصول كشف البنك."
                 disabled={state === "previewing"}
                 onClick={() => setState("confirm-bank")}
               />
@@ -267,7 +267,7 @@ export function MarkInvoicePaid({
       {(state === "confirm-bank" || (state === "busy" && !preview)) && (
         <div className={panel ? "rounded-xl border border-line bg-sunken/60 p-3.5" : "flex flex-wrap items-center justify-end gap-1.5"}>
           <p className={panel ? "text-xs leading-relaxed text-ink-soft" : "text-[11px] text-muted"}>
-            تنشأ دفعة بـ<bdi className="nums font-bold text-ink">{label}</bdi> وتخصّص عليها — ويمكنك التراجع من الإشعار.
+            ستُنشأ دفعة بمبلغ <bdi className="nums font-bold text-ink">{label}</bdi> وتُخصَّص للفاتورة، ويمكنك التراجع من الإشعار.
           </p>
           <div className={panel ? "mt-3 flex flex-wrap items-center gap-2" : "flex flex-wrap items-center justify-end gap-1.5"}>
             <label className="flex items-center gap-1.5 text-[11px] font-bold text-ink-soft">
@@ -293,11 +293,11 @@ export function MarkInvoicePaid({
               <button type="button" disabled={state === "busy"} onClick={() => { setPaidOn(invoiceDay); setTwin(false); }} className={buttonClass("quiet", "sm")}>يوم الفاتورة</button>
             )}
           </div>
-          {!dayOk && <p className="mt-1 text-[11px] font-bold text-danger">يوم السداد لا يكون بعد اليوم.</p>}
+          {!dayOk && <p className="mt-1 text-[11px] font-bold text-danger">لا يمكن أن يكون يوم السداد بعد اليوم.</p>}
           <div className={panel ? "mt-3 flex flex-wrap gap-2" : "flex flex-wrap gap-1.5"}>
             {twin ? (
               <button aria-busy={state === "busy"} type="button" disabled={state === "busy" || !dayOk} onClick={() => run("BANK", true)} className={buttonClass("primary", "sm")}>
-                سداد آخر — سجّله
+                هذا سداد آخر، سجّله
               </button>
             ) : (
               <button aria-busy={state === "busy"} type="button" disabled={state === "busy" || !dayOk} onClick={() => run("BANK")} className={buttonClass("primary", "sm")}>
@@ -340,7 +340,7 @@ function Choice({
         <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
       </span>
       <span className="min-w-0">
-        <span className="block text-[13px] font-bold">{busy ? "يحسب ما سينتقل…" : title}</span>
+        <span className="block text-[13px] font-bold">{busy ? "جارٍ حساب ما سيتغيّر…" : title}</span>
         <span className="mt-0.5 block text-[11px] leading-relaxed text-muted">{hint}</span>
       </span>
     </button>

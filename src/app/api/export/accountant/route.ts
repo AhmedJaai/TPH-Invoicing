@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
   const month = new URL(request.url).searchParams.get("month") ?? "";
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
-    return NextResponse.json({ error: "اختر شهراً صحيحاً (YYYY-MM)." }, { status: 400 });
+    return NextResponse.json({ error: "اختر شهراً صحيحاً بصيغة YYYY-MM." }, { status: 400 });
   }
 
   try {
@@ -64,6 +64,6 @@ export async function GET(request: Request) {
     });
   } catch (e) {
     console.error("[accountant-pack]", e);
-    return NextResponse.json({ error: "تعذّر إعداد الحزمة — لم يكتب شيء. أعد المحاولة بعد لحظة." }, { status: 500 });
+    return NextResponse.json({ error: "تعذّر إعداد الحزمة، ولم يُحفظ شيء. أعد المحاولة بعد لحظة." }, { status: 500 });
   }
 }

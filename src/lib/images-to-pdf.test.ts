@@ -62,7 +62,7 @@ describe("imagesToPdf — صفحتا فاتورة في مستند واحد", () 
   });
 
   it("ما ليس JPEG أو بلا أبعاد يرفض بكلام مفهوم — لا ملفّ تالف", () => {
-    expect(() => imagesToPdf([])).toThrow("لا صورة");
+    expect(() => imagesToPdf([])).toThrow("لا توجد صور");
     expect(() => imagesToPdf([{ jpeg: new Uint8Array([0x89, 0x50, 0x4e, 0x47]), width: 10, height: 10 }])).toThrow("JPEG");
     expect(() => imagesToPdf([{ jpeg: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), width: 0, height: 10 }])).toThrow("JPEG");
   });

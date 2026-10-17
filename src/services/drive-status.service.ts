@@ -190,7 +190,7 @@ export async function loadDriveHeartbeat(userId: string): Promise<DriveHeartbeat
   const failedAt = failed?.at ?? null;
   const connected = previewMode ? null : token !== null;
   const state = driveState({ previewMode, connected, checkedAt, failedAt });
-  const failure = state === "failing" && failedAt ? { at: failedAt, reason: failed?.reason ?? "تعذّر الفحص." } : null;
+  const failure = state === "failing" && failedAt ? { at: failedAt, reason: failed?.reason ?? "تعذّر إجراء الفحص." } : null;
   return { state, previewMode, connected, checkedAt, failure };
 }
 

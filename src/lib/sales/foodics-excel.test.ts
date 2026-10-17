@@ -235,7 +235,7 @@ describe("حالاتٌ تُصنَع لأنّها لم ترد", () => {
     const p = foodicsExcelAdapter.parse(sheet([
       line({ order_reference: 8, type: "خيار الإضافة", parent_item_sku: "sk-9999", sku: "sk-0039", name: "Double shots", unit_price: 0, total_price: 0 }),
     ]), {});
-    expect(p.warnings.some((w) => w.includes("لا أصلَ له"))).toBe(true);
+    expect(p.warnings.some((w) => w.includes("بلا بند أصلي"))).toBe(true);
     expect(p.sales[0].lines[0].isModifier).toBe(true);
   });
 

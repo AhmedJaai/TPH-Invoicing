@@ -133,10 +133,10 @@ export async function loadStockLinks(conn: Conn = db): Promise<StockLinks> {
       qtyText: r.qty_unknown > 0 || r.qty === null ? "غير معروفة في بعضها" : plain(r.qty),
       status,
       statusLabel: status === "LINKED" ? null
-        : status === "UNLINKED_PRODUCT" ? "لم يربط بصنف مخزون"
-        : status === "NO_PACK_SPEC" ? "ربط ولم يكتب ما في الوحدة"
-        : status === "UNIT_FAMILY_MISMATCH" ? "وحدة العبوة لا تحوّل إلى وحدة الصنف"
-        : "كمّيّة غير مقروءة في بعض فواتيره",
+        : status === "UNLINKED_PRODUCT" ? "غير مربوط بصنف مخزون"
+        : status === "NO_PACK_SPEC" ? "مربوط ولم يُكتب محتوى الوحدة"
+        : status === "UNIT_FAMILY_MISMATCH" ? "لا يمكن تحويل وحدة العبوة إلى وحدة الصنف"
+        : "تعذّرت قراءة الكمّية في بعض فواتيره",
       countedText: null,
       valueMinor: Number(r.value), lastDay: r.last_day,
       evidence: ev && evProduct ? { ...ev, productName: evProduct.nameAr } : null,

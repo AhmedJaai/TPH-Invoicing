@@ -41,8 +41,8 @@ export function ConfirmDocument({
           if (!r.ok) { setError(r.error); return; }
           toast({
             tone: "ok",
-            title: "اعتمد المستند",
-            body: "دخلت فاتورته المستحقّ، وخصم منها ما دفعته للمورّد مقدّماً.",
+            title: "تم اعتماد المستند",
+            body: "دخلت فاتورته في المستحقات، وخُصم منها ما دفعته للمورّد مقدّماً.",
           });
           router.refresh();
         }}

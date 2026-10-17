@@ -52,7 +52,7 @@ export async function updateSupplierProfile(
     .from(suppliers)
     .where(eq(suppliers.id, req.supplierId))
     .for("update");
-  if (!cur) throw new SupplierProfileError("لا مورّد بهذا المعرّف — حدّث الصفحة.", 404);
+  if (!cur) throw new SupplierProfileError("لا يوجد مورّد بهذا المعرّف. حدّث الصفحة.", 404);
 
   /* الغائبُ لا يُمسّ، والفارغُ يمحو (يصير «غير معروف») */
   const vat = blank(req.vatNumber);
@@ -91,7 +91,7 @@ export async function updateSupplierProfile(
       .where(and(eq(suppliers.vatNumber, next.vatNumber), ne(suppliers.id, cur.id)))
       .limit(1);
     if (other) {
-      throw new SupplierProfileError(`هذا الرقم الضريبيّ مسجّل لـ«${other.nameAr}» — إن كانا مورّداً واحداً فهو تكرار يدمج، لا رقم ينسخ.`, 409);
+      throw new SupplierProfileError(`هذا الرقم الضريبي مسجّل لـ«${other.nameAr}». إن كانا مورّداً واحداً فادمجهما بدلاً من نسخ الرقم.`, 409);
     }
   }
 
@@ -104,7 +104,7 @@ export async function updateSupplierProfile(
          and regexp_replace(seller_vat, '\\D', '', 'g') <> ${next.vatNumber}
     `)).rows;
     if (Number(n) > 0) {
-      warnings.push(`${countNoun(Number(n), INVOICE)} مقيّدة لهذا المورّد تحمل رقماً ضريبيّاً غير هذا — الفواتير لا تتغيّر، فتحقّق أيّ الرقمين الصحيح.`);
+      warnings.push(`${countNoun(Number(n), INVOICE)} مقيّدة لهذا المورّد تحمل رقماً ضريبياً مختلفاً عن هذا. الفواتير لن تتغيّر، فتحقق من الرقم الصحيح.`);
     }
   }
   if (changed.includes("nameAr")) {
@@ -113,17 +113,17 @@ export async function updateSupplierProfile(
       .from(suppliers)
       .where(and(ne(suppliers.id, cur.id), eq(suppliers.isActive, true)));
     const clash = others.find((o) => normalizeName(o.nameAr) === normalizeName(next.nameAr));
-    if (clash) warnings.push(`مورّد آخر مسجّل بالاسم نفسه («${clash.nameAr}») — سيصعب التفريق بينهما.`);
+    if (clash) warnings.push(`يوجد مورّد آخر بالاسم نفسه («${clash.nameAr}»)، وسيصعب التفريق بينهما.`);
   }
   if (changed.includes("iban") && next.iban) {
-    if (cur.iban) warnings.push("تغيير آيبان مورّد قائم أشهر احتيال في المدفوعات — تأكّد من المورّد باتصال على رقمه المعروف، لا من رسالة وصلتك.");
+    if (cur.iban) warnings.push("تغيير آيبان مورّد قائم من أشهر طرق الاحتيال في المدفوعات. تأكّد من المورّد باتصال على رقمه المعروف، وليس من رسالة وصلتك.");
     const seen = await tx
       .select({ normalized: counterpartyEvidence.normalized })
       .from(counterpartyEvidence)
       .innerJoin(counterparties, eq(counterparties.id, counterpartyEvidence.counterpartyId))
       .where(and(eq(counterparties.supplierId, cur.id), inArray(counterpartyEvidence.kind, ["IBAN"])));
     if (seen.length > 0 && !seen.some((e) => e.normalized === next.iban)) {
-      warnings.push("هذا الآيبان يخالف الحساب الذي حوّل له في كشوف البنك — إن غيّر المورّد حسابه فتأكّد منه أوّلاً.");
+      warnings.push("هذا الآيبان يختلف عن الحساب الذي حوّلت إليه في كشوف البنك. إن غيّر المورّد حسابه فتأكّد منه أولاً.");
     }
   }
   if (warnings.length > 0 && !req.confirm) return { kind: "confirm", warnings };

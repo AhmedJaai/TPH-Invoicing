@@ -73,21 +73,21 @@ export function detectAnomalies(f: LifecycleFacts): LifecycleAnomaly[] {
   if (f.posted && !f.decided) {
     out.push({
       code: "POSTED_WITHOUT_DECISION",
-      detail: "أُنشئت لها دفعة ولم يُسجَّل حسمُها — مالٌ كُتب بلا قرارٍ مسجَّل",
+      detail: "أُنشئت لها دفعة دون تسجيل أي قرار — قُيّد مال بلا قرار مسجّل",
     });
   }
 
   if (f.decided && !f.posted && !f.ignored) {
     out.push({
       code: "DECIDED_NOT_POSTED",
-      detail: "حُسمت ولم تُقيَّد — قرارٌ لم يبلغ المال",
+      detail: "اتُّخذ فيها قرار لكنها لم تُقيَّد، فلم يظهر أثر القرار في الدفعات",
     });
   }
 
   if (f.posted && f.ignored) {
     out.push({
       code: "POSTED_BUT_IGNORED",
-      detail: "أُعلنت ليست سداداً ولها دفعة — قولان متناقضان عن حركةٍ واحدة",
+      detail: "صُنّفت أنها ليست سداداً ولها دفعة — تناقض في الحركة نفسها",
     });
   }
 

@@ -57,26 +57,26 @@ export default async function HabitPage() {
       user={user}
       width="wide"
       title="عادة البيع"
-      intro="كم يباع عادةً من كلّ صنف في كلّ يوم من الأسبوع — وسيط ما بيع فعلاً، وتحته أدناه وأعلاه. عادة لا توقّع: للتحضير والطلب."
+      intro="كم يُباع عادةً من كل صنف في كل يوم من أيام الأسبوع. الرقم الكبير هو الوسيط لما بيع فعلاً، وتحته أدنى كمية وأعلاها. هذه عادة البيع وليست توقعاً، وتفيدك في التحضير والطلب."
     >
       {!h.ready ? (
         <EmptyState
           icon={CalendarRange}
-          title={`لا تقال عادة بعد: ${h.usableWeeks.length} من ${HABIT_MIN_WEEKS} أسابيع`}
-          hint={`تبنى على ${HABIT_MIN_WEEKS} أسابيع على الأقلّ من آخر ${HABIT_WEEKS} (${formatRange(h.windowStart, h.windowEnd)})، في كلّ منها ${HABIT_MIN_DAYS_PER_WEEK} أيّام بمبيعات مستوردة. ${h.droppedWeeks.length > 0 ? `${h.droppedWeeks.length} منها ناقصة الأيّام أو بلا ملفّ.` : ""}`}
+          title={`لا يمكن تحديد عادة البيع بعد: ${h.usableWeeks.length} من ${HABIT_MIN_WEEKS} أسابيع`}
+          hint={`تحتاج إلى ${HABIT_MIN_WEEKS} أسابيع على الأقل من آخر ${HABIT_WEEKS} (${formatRange(h.windowStart, h.windowEnd)})، في كل منها ${HABIT_MIN_DAYS_PER_WEEK} أيام بمبيعات مستوردة. ${h.droppedWeeks.length > 0 ? `${h.droppedWeeks.length} منها ناقصة الأيام أو بلا ملف.` : ""}`}
           action={canImport ? <LinkButton href="/inventory/import" variant="primary" size="sm">استورد مبيعات فودكس</LinkButton> : undefined}
         />
       ) : (
         <>
-          <Callout tone="info" icon={CalendarRange} title={`مبنيّة على ${h.usableWeeks.length} أسابيع — ${formatRange(h.windowStart, h.windowEnd)}`}>
-            أسطر المنتج وحدها (بلا خيارات الإضافة والملغى والمرتجع). يوم بلا أيّ بيعة في الملفّ لا يدخل الحساب — مغلق أو ناقص — ويوم بيع فيه غير الصنف صفره حقيقيّ.
-            {h.droppedWeeks.length > 0 && ` أسقط ${h.droppedWeeks.length} من أسابيع النافذة لنقص أيّامه.`}
+          <Callout tone="info" icon={CalendarRange} title={`مبنية على ${h.usableWeeks.length} أسابيع: ${formatRange(h.windowStart, h.windowEnd)}`}>
+            المحسوب هو أسطر المنتجات فقط، دون خيارات الإضافة والمبيعات الملغاة والمرتجعة. اليوم الذي لا توجد فيه أي عملية بيع في الملف لا يدخل الحساب، لأنه يوم مغلق أو بياناته ناقصة. أما اليوم الذي بِيعت فيه أصناف أخرى ولم يُبع هذا الصنف فيُحسب صفراً حقيقياً.
+            {h.droppedWeeks.length > 0 && ` استُبعد ${h.droppedWeeks.length} من أسابيع الفترة لنقص أيامها.`}
           </Callout>
           <div className="mt-5">
             <DataTable columns={columns} rows={h.items.slice(0, SHOWN)} keyOf={(i) => i.itemId} searchOf={(i) => i.itemName} />
           </div>
           {h.items.length > SHOWN && (
-            <p className="mt-3 text-[11px] text-muted">يعرض أكثر {SHOWN} صنفاً بيعاً من {h.items.length}.</p>
+            <p className="mt-3 text-[11px] text-muted">يعرض أكثر {SHOWN} صنفاً مبيعاً من أصل {h.items.length}.</p>
           )}
         </>
       )}

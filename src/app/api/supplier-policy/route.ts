@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   const body: Body = read.body;
 
   const id = body.supplierId?.trim();
-  if (!id) return NextResponse.json({ error: "لم يذكر المورّد" }, { status: 400 });
+  if (!id) return NextResponse.json({ error: "لم تحدّد المورّد" }, { status: 400 });
 
   const [before] = await db
     .select({
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     .from(suppliers)
     .where(eq(suppliers.id, id))
     .limit(1);
-  if (!before) return NextResponse.json({ error: "لا مورّد بهذا المعرّف" }, { status: 404 });
+  if (!before) return NextResponse.json({ error: "لا يوجد مورّد بهذا المعرّف" }, { status: 404 });
 
   /* ما لم يُرسَل يبقى كما هو — الطلبُ الجزئيّ لا يمحو ما لم يُذكَر. */
   const next = {
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "لا يجتمعان: «فواتيره ورقيّة» تعني أنّها موجودة ولم ترفع، و«لا يصدر فواتير» تعني أنّها غير موجودة. اختر واحدة.",
+          "لا يمكن الجمع بين الخيارين: «فواتيره ورقية» تعني أن الفواتير موجودة ولم تُرفع، و«لا يصدر فواتير» تعني أنها غير موجودة. اختر أحدهما.",
       },
       { status: 400 },
     );

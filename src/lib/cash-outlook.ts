@@ -167,7 +167,7 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
       .map(({ r, o }) => ({
         id: `rec:${r.id}:${month}`,
         label: r.label,
-        sub: o.day ? `يوم ${o.day}` : "يوم غير محدّد",
+        sub: o.day ? `يوم ${o.day}` : "اليوم غير محدّد",
         amountMinor: r.amountMinor,
         kind: "RECURRING" as const,
         href: "/settings#recurring",
@@ -177,7 +177,7 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
   const settled = input.recurring
     .filter((r) => input.paidThisMonth?.has(r.id) && occursIn(r, thisMonth).occurs)
     .map((r) => `${r.label} ${formatRiyalsDisplay(r.amountMinor)}`);
-  const settledNote = settled.length > 0 ? ` · وخرج منها ما قيّد دفعه: ${settled.join("، ")}` : "";
+  const settledNote = settled.length > 0 ? ` · وقد خرج منها ما سُجّل دفعه: ${settled.join("، ")}` : "";
 
   /*
     الضريبة: كلُّ مستحقٍّ معلومٍ موجب يقع في مرحلة موعده. ما فات موعدُه متأخّرٌ الآن،
@@ -188,7 +188,7 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
   const vatLine = (v: VatDue): OutflowLine => ({
     id: `vat:${v.periodKey}`,
     label: `ضريبة القيمة المضافة — ${v.label}`,
-    sub: `${v.accruing ? "حتى اليوم، وتكبر · " : ""}آخر موعدها ${formatDay(v.deadline)}`,
+    sub: `${v.accruing ? "المبلغ حتى اليوم وسيزيد · " : ""}آخر موعد لسدادها ${formatDay(v.deadline)}`,
     amountMinor: v.amountMinor ?? 0,
     kind: "VAT" as const,
     href: `/close/vat?period=${v.periodKey}`,
@@ -203,28 +203,28 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
     {
       id: "overdue",
       title: "متأخّر الآن",
-      when: `دفعة ${formatMonth(input.runMonth)} — كان موعدها أوّل ${formatMonth(thisMonth)}`,
+      when: `دفعة ${formatMonth(input.runMonth)} التي كان موعدها أول ${formatMonth(thisMonth)}`,
       tone: "danger",
       lines: [...supplierLines(input.overdueRun, "run"), ...vatIn((m) => m < thisMonth)],
     },
     {
       id: "rest",
       title: `بقيّة ${formatMonth(thisMonth)}`,
-      when: `مصروفات متكرّرة لم يقيّد دفعها هذا الشهر — لم يحن يومها أو يومها غير محدّد${settledNote}`,
+      when: `مصروفات متكرّرة لم يُسجَّل دفعها هذا الشهر، ولم يحن موعدها أو موعدها غير محدّد${settledNote}`,
       tone: "warn",
       lines: [...recurringLines(thisMonth, (day) => day === null || day >= todayDay), ...vatIn((m) => m === thisMonth)],
     },
     {
       id: "next-run",
       title: `أوّل ${formatMonth(nextMonth)}`,
-      when: `دفعة ${formatMonth(thisMonth)} — من الفواتير المسجّلة حتى اليوم، وتكبر كلّما وصلت فاتورة`,
+      when: `دفعة ${formatMonth(thisMonth)} من الفواتير المسجّلة حتى اليوم، وتزيد كلما وصلت فاتورة جديدة`,
       tone: "neutral",
       lines: [...supplierLines(input.nextRun, "next"), ...recurringLines(nextMonth, (day) => day === 1)],
     },
     {
       id: "next-month",
       title: `خلال ${formatMonth(nextMonth)}`,
-      when: "المصروفات المتكرّرة المسجّلة",
+      when: "المصروفات المتكرّرة المسجّلة لديك",
       tone: "neutral",
       lines: [...recurringLines(nextMonth, (day) => day !== 1), ...vatIn((m) => m === nextMonth)],
     },
@@ -241,7 +241,7 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
         if (running < 0 && shortfallAt === null) shortfallAt = b.id;
       }
       /* عنوانُ المرحلة يصف الدفعةَ والمتكرّر — فإن دخلتها الضريبةُ قيل */
-      const when = b.lines.some((l) => l.kind === "VAT") ? `${b.when} · ومعها ضريبة القيمة المضافة بموعد إقرارها` : b.when;
+      const when = b.lines.some((l) => l.kind === "VAT") ? `${b.when} · ومعها ضريبة القيمة المضافة عند موعد الإقرار` : b.when;
       return { ...b, when, totalMinor, afterMinor: running };
     });
 
@@ -301,7 +301,7 @@ export function whatIfDefer(
   });
   const all = later.length > 0
     ? [...staged, {
-        bucket: { id: LATER_BUCKET, title: "بعد ذلك", when: "ما أجّلته من آخر مرحلة — يبقى مستحقّاً", tone: "neutral" as const, lines: [], totalMinor: 0, afterMinor: null },
+        bucket: { id: LATER_BUCKET, title: "بعد ذلك", when: "ما أجّلته من آخر مرحلة، وهو ما زال مستحقاً", tone: "neutral" as const, lines: [], totalMinor: 0, afterMinor: null },
         lines: later,
       }]
     : staged;

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
-import { Activity, CalendarClock, Cpu, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound, UsersRound } from "lucide-react";
+import { Activity, CalendarClock, Cpu, Languages, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound, UsersRound } from "lucide-react";
 import { BankRules, type BankRuleRow } from "@/components/bank-rules";
 import { CATEGORY_LABEL, isTxCategory } from "@/lib/bank/rules";
 import { asCadence } from "@/lib/cash-outlook";
@@ -20,6 +20,9 @@ import { UserAdmin } from "@/components/user-admin";
 import { aiSpendThisMonth } from "@/services/ai-usage.service";
 import { dailyBudgetMicroUsd, formatUsd } from "@/lib/ai/usage-ledger";
 import { listUsersForAdmin } from "@/services/user-admin.service";
+import { cookies } from "next/headers";
+import { LanguageSwitch } from "@/components/i18n/language-switch";
+import { asLocale, LOCALE_COOKIE } from "@/lib/i18n/locale";
 
 export const dynamic = "force-dynamic";
 
@@ -106,8 +109,10 @@ export default async function SettingsPage() {
   const aiSpend = spend && spend.calls > 0 ? spend : null;
   const aiBudget = dailyBudgetMicroUsd(process.env.AI_DAILY_BUDGET_USD);
   const managedUsers = can(user.role, "users:manage") && !isAuthBypassed() ? await listUsersForAdmin() : null;
+  const locale = asLocale((await cookies()).get(LOCALE_COOKIE)?.value);
   const toc = [
     { id: "account", label: "الحساب", icon: UserRound },
+    { id: "language", label: "اللغة", icon: Languages },
     ...(managedUsers ? [{ id: "users", label: "المستخدمون", icon: UsersRound }] : []),
     ...(showMoney ? [{ id: "recurring", label: "المصروفات المتكرّرة", icon: Repeat }] : []),
     ...(showRules ? [{ id: "rules", label: "قواعد التصنيف", icon: SlidersHorizontal }] : []),
@@ -116,7 +121,7 @@ export default async function SettingsPage() {
   ];
 
   return (
-    <PageShell user={user} width="wide" title="الإعدادات" intro={`ما يضبط مرّة: ${[showMoney ? "المصروفات المتكرّرة" : null, showRules ? "قواعد التصنيف" : null, "حال الربط"].filter(Boolean).join("، و")}.`}>
+    <PageShell user={user} width="wide" title="الإعدادات" intro={`إعدادات تضبطها مرة واحدة: ${[showMoney ? "المصروفات المتكرّرة" : null, showRules ? "قواعد التصنيف" : null, "حالة الربط"].filter(Boolean).join("، و")}.`}>
       {/* `minmax(0,1fr)` على الجوّال أيضاً — عمودٌ ضمنيّ بعرض محتواه يمدّه صفُّ الفهرس فتفيض الصفحة كلُّها عرضاً */}
       <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[13rem_minmax(0,1fr)]">
         <nav aria-label="أقسام الإعدادات" className="min-w-0 lg:sticky lg:top-24 lg:self-start">
@@ -140,20 +145,24 @@ export default async function SettingsPage() {
                 items={[
                   { label: "أنت", value: user.name ?? "مستخدم" },
                   { label: "دورك", value: ROLE_LABEL[user.role] },
-                  { label: "المستخدمون", value: <span className="nums">{Number(f?.users ?? 0)}</span>, hint: managedUsers ? "الدور والتعطيل والجلسات في «المستخدمون» أدناه؛ وإضافة بريد جديد من قائمة الدخول عند النشر" : "يديرهم مالك الحساب" },
+                  { label: "المستخدمون", value: <span className="nums">{Number(f?.users ?? 0)}</span>, hint: managedUsers ? "يمكنك إدارة الدور والتعطيل والجلسات من قسم «المستخدمون» أدناه. ويُضاف البريد الجديد من قائمة الدخول عند النشر." : "يديرهم مالك الحساب." },
                 ]}
               />
               {isAuthBypassed() && (
-                <Callout tone="danger" icon={ShieldAlert} className="mt-4" title="وضع التجربة مفعّل — الدخول معطّل">
-                  كلّ من يعرف الرابط يدخل بدور «{ROLE_LABEL[user.role]}». لا يعمل في الإنتاج مهما فعّل.
+                <Callout tone="danger" icon={ShieldAlert} className="mt-4" title="وضع التجربة مفعّل، وتسجيل الدخول معطّل">
+                  يدخل كل من يعرف الرابط بدور «{ROLE_LABEL[user.role]}». هذا الوضع لا يعمل في الإنتاج مهما كانت الإعدادات.
                 </Callout>
               )}
             </div>
           </Section>
 
+          <Section id="language" title="اللغة" icon={Languages} hint="لغة الواجهة على هذا الجهاز. أسماء المورّدين ونصوص المستندات تبقى كما وردت.">
+            <LanguageSwitch current={locale} />
+          </Section>
+
           {can(user.role, "reports:view") && (
-            <Callout tone="accent" icon={CalendarClock} className="mt-6" title="الوثائق والتراخيص" action={<LinkButton href="/settings/obligations" variant="secondary" size="sm">افتحها</LinkButton>}>
-              السجلّ التجاريّ ورخصة البلديّة والشهادات الصحّيّة والإقامات وعقد الإيجار — بتاريخ انتهائها، ويذكّرك النظام قبله.
+            <Callout tone="accent" icon={CalendarClock} className="mt-6" title="الوثائق والتراخيص" action={<LinkButton href="/settings/obligations" variant="secondary" size="sm">افتح الوثائق</LinkButton>}>
+              السجل التجاري ورخصة البلدية والشهادات الصحية والإقامات وعقد الإيجار، مع تاريخ انتهاء كل منها. يذكّرك النظام قبل انتهائها.
             </Callout>
           )}
 
@@ -163,7 +172,7 @@ export default async function SettingsPage() {
               title="المستخدمون"
               icon={UsersRound}
               count={managedUsers.length}
-              hint="من يدخل، وبأيّ دور، ومن جلسته قائمة. بريد جديد يضاف إلى قائمة الدخول عند النشر ويظهر هنا بعد أوّل دخوله؛ ودوره بعدها يتغيّر من هنا."
+              hint="من يستطيع الدخول، وبأي دور، ومن لديه جلسة مفتوحة. يُضاف البريد الجديد إلى قائمة الدخول عند النشر، ويظهر هنا بعد أول دخول له، ثم يمكنك تغيير دوره من هنا."
             >
               <UserAdmin
                 meId={user.id}
@@ -182,7 +191,7 @@ export default async function SettingsPage() {
               id="recurring"
               title="المصروفات المتكرّرة"
               icon={Repeat}
-              hint="ما يتكرّر بلا فاتورة تصلك: الإيجار والرواتب والاشتراكات. منها يعرف «النقد القادم»، ويقابل المتوقّع بالفعليّ."
+              hint="مصروفات تتكرر دون أن تصلك فاتورة بها: الإيجار والرواتب والاشتراكات. يعتمد عليها «النقد القادم» ويقارن المتوقع بالفعلي."
               action={can(user.role, "bank:view") ? <Link href="/cash" className="text-xs font-bold text-accent hover:underline">النقد القادم</Link> : undefined}
             >
               <RecurringExpenses rows={all.filter((r) => r.isActive).map(toRow)} inactive={all.filter((r) => !r.isActive).map(toRow)} canEdit={can(user.role, "expense:edit")} />
@@ -190,17 +199,17 @@ export default async function SettingsPage() {
           )}
 
           {showRules && (
-            <Section id="rules" title="قواعد تصنيف الحركات" icon={SlidersHorizontal} count={rules.length} hint="ما قرّرته مرّةً عند استيراد كشف: حركة فيها هذا النصّ تصنّف هكذا في كلّ كشف بعده.">
+            <Section id="rules" title="قواعد تصنيف الحركات" icon={SlidersHorizontal} count={rules.length} hint="تصنيف اخترته مرة عند استيراد كشف، فتُصنَّف به كل حركة تحتوي على هذا النص في الكشوف التالية.">
               <BankRules rows={rules} canEdit={can(user.role, "bank:edit")} />
             </Section>
           )}
 
           <Section
             id="health"
-            title="حال الربط وصحّة البيانات"
+            title="حالة الربط وصحة البيانات"
             icon={Activity}
-            hint="ما ليس موصولاً يقال عنه ذلك، ولا يملأ بصفر ولا ببيانات وهميّة."
-            action={<span className="text-xs font-bold text-ink-soft">الاكتمال <span className="nums">{Math.round(health.confidence * 100)}</span>٪</span>}
+            hint="ما ليس موصولاً يُعرض كذلك، ولا يُملأ بأصفار أو ببيانات وهمية."
+            action={<span className="text-xs font-bold text-ink-soft">نسبة الاكتمال <span className="nums">{Math.round(health.confidence * 100)}</span>٪</span>}
           >
             <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
               {health.metrics.map((m) => {
@@ -243,19 +252,19 @@ export default async function SettingsPage() {
                 <Link href="/settings/audit" className="rounded-xl border border-line bg-raised p-4 shadow-raised transition-colors hover:border-accent-line">
                   <ScrollText className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
                   <p className="mt-2 text-sm font-bold">سجلّ التدقيق <span className="nums text-muted">{Number(f?.audit ?? 0)}</span></p>
-                  <p className="mt-0.5 text-[11px] text-muted">ما فعل ومن فعله ومتى — لا يعدّل ولا يحذف</p>
+                  <p className="mt-0.5 text-[11px] text-muted">ماذا حدث ومن فعله ومتى. السجل لا يُعدَّل ولا يُحذف.</p>
                 </Link>
               )}
               <div className="rounded-xl border border-line bg-raised p-4 shadow-raised">
                 <Cpu className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
                 <p className="mt-2 text-sm font-bold">قارئ المستندات</p>
-                <p className="mt-0.5 text-[11px] text-muted"><bdi dir="ltr">{activeProviderName()}</bdi> — يضبط عند النشر</p>
+                <p className="mt-0.5 text-[11px] text-muted"><bdi dir="ltr">{activeProviderName()}</bdi> — يُضبط عند النشر</p>
                 {showMoney && (
                   <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
                     {aiSpend === null
-                      ? "إنفاقه هذا الشهر: غير معروف — لم يقيّد نداء في الدفتر بعد"
-                      : <>إنفاقه هذا الشهر تقديراً: <bdi dir="ltr" className="nums font-bold">${formatUsd(aiSpend.costMicroUsd)}</bdi> في <span className="nums">{aiSpend.calls}</span> نداء</>}
-                    {aiBudget !== null && <> · سقف اليوم <bdi dir="ltr" className="nums">${formatUsd(aiBudget)}</bdi></>}
+                      ? "إنفاقه هذا الشهر: غير معروف، لأنه لم تُسجَّل أي عملية قراءة بعد"
+                      : <>إنفاقه التقديري هذا الشهر: <bdi dir="ltr" className="nums font-bold">${formatUsd(aiSpend.costMicroUsd)}</bdi> عن <span className="nums">{aiSpend.calls}</span> عملية قراءة</>}
+                    {aiBudget !== null && <> · الحد اليومي <bdi dir="ltr" className="nums">${formatUsd(aiBudget)}</bdi></>}
                   </p>
                 )}
               </div>

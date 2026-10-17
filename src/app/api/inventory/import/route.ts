@@ -29,13 +29,13 @@ export async function POST(request: Request) {
   const branchLabel = String(form?.get("branch") ?? "").trim() || undefined;
 
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: "لم يصل ملفّ" }, { status: 400 });
+    return NextResponse.json({ error: "لم يصل أي ملف" }, { status: 400 });
   }
   if (file.size > MAX_SALES_FILE_BYTES) {
     return NextResponse.json({ error: SALES_FILE_TOO_LARGE }, { status: 413 });
   }
   if (fallbackBusinessDate && !/^\d{4}-\d{2}-\d{2}$/.test(fallbackBusinessDate)) {
-    return NextResponse.json({ error: "التاريخ يكتب YYYY-MM-DD" }, { status: 400 });
+    return NextResponse.json({ error: "اكتب التاريخ بصيغة YYYY-MM-DD" }, { status: 400 });
   }
 
   try {

@@ -18,7 +18,7 @@ import type { SalesTransaction } from "./connector";
  */
 export const MAX_SALES_FILE_BYTES = 4 * 1024 * 1024;
 export const SALES_FILE_TOO_LARGE =
-  "الملفّ أكبر من ٤ ميجابايت — صدِّر من فودكس أسبوعاً واحداً في الملفّ وارفع كلَّ أسبوعٍ وحده.";
+  "حجم الملف أكبر من ٤ ميجابايت. صدّر من فودكس أسبوعاً واحداً في كل ملف، وارفع كل أسبوع على حدة.";
 
 export type ParsedRowStatus = "PARSED" | "SKIPPED" | "ERROR" | "DUPLICATE" | "REVISED";
 

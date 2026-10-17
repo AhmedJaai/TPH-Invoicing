@@ -39,12 +39,12 @@ export async function POST(request: Request) {
   const body: Body = read.body;
 
   const ids = body.posProductIds ?? [];
-  if (ids.length === 0) return NextResponse.json({ error: "لم تحدّد أصناف" }, { status: 400 });
+  if (ids.length === 0) return NextResponse.json({ error: "لم تحدّد أي صنف" }, { status: 400 });
 
   try {
     if (body.action === "unmap") {
       const n = await unmapPosProducts(ids, user.id);
-      return NextResponse.json({ ok: true, message: `فكّ ربط ${countNoun(n, PRODUCT)}` });
+      return NextResponse.json({ ok: true, message: `تم فك ربط ${countNoun(n, PRODUCT)}` });
     }
 
     const result = await mapPosProducts({
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true, ...result,
-      message: `ربط ${countNoun(result.mapped, PRODUCT)} بـ«${result.productName}»${result.createdProduct ? " (أنشئ الآن)" : ""}`,
+      message: `تم ربط ${countNoun(result.mapped, PRODUCT)} بـ«${result.productName}»${result.createdProduct ? " (صنف جديد)" : ""}`,
     });
   } catch (e) {
     return failWith(e, "inventory-mapping");

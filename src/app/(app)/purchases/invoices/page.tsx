@@ -195,7 +195,7 @@ export default async function InvoicesPage({
       intro={describeFilters(f, supplierName)}
       actions={
         hasFilters(f)
-          ? <LinkButton href="/purchases/invoices" size="sm">امسح الترشيح</LinkButton>
+          ? <LinkButton href="/purchases/invoices" size="sm">إزالة التصفية</LinkButton>
           : undefined
       }
     >
@@ -203,9 +203,9 @@ export default async function InvoicesPage({
         /* قاعدةٌ بلا فاتورة: لا «٠٫٠٠ بقي» — فالصفرُ يُقرأ «لا دَين» */
         <EmptyState
           icon={Receipt}
-          title="لم تسجّل فاتورة بعد."
-          hint="تسجّل الفاتورة حين يرفع مستندها أو يقرأ من الدرايف. صوّرها أو اختر ملفّها، ويقرأ النظام مورّدها ومبالغها لتؤكّدها."
-          action={<LinkButton href="/upload" variant="primary" icon={Upload}>ارفع أوّل فاتورة</LinkButton>}
+          title="لم تُسجَّل أي فاتورة بعد."
+          hint="تُسجَّل الفاتورة عند رفع مستندها أو قراءته من الدرايف. صوّرها أو اختر ملفها، وسيقرأ النظام اسم المورّد والمبالغ لتؤكدها."
+          action={<LinkButton href="/upload" variant="primary" icon={Upload}>ارفع أول فاتورة</LinkButton>}
         />
       ) : (
         <>
@@ -213,10 +213,10 @@ export default async function InvoicesPage({
           {/* على الجوّال: ما بقي أوّلاً بعرض الشاشة، والرقمان الآخران تحته جنباً إلى جنب */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="order-2 sm:order-1">
-              <Stat icon={FileText} label="المعروض" value={countNoun(count, INVOICE)} sub="الصفّ كلّه يفتح ملفّ فاتورته." />
+              <Stat icon={FileText} label="المعروض" value={countNoun(count, INVOICE)} sub="اضغط على أي صف لفتح الفاتورة." />
             </div>
             <div className="order-3 sm:order-2">
-              <Stat icon={Scale} label="قيمتها" minor={Number(t.billed)} sub="مجموع إجماليّاتها بالضريبة." />
+              <Stat icon={Scale} label="قيمتها" minor={Number(t.billed)} sub="مجموع إجماليات الفواتير شاملة الضريبة." />
             </div>
             {/*
               ── ليست «عليك» ──
@@ -228,14 +228,14 @@ export default async function InvoicesPage({
             <div className="order-1 col-span-2 sm:order-3 sm:col-span-1">
             <Stat
               icon={Wallet}
-              label="بقي على هذه الفواتير"
+              label="المتبقي على هذه الفواتير"
               minor={Number(t.outstanding)}
               tone={Number(t.outstanding) > 0 ? "warn" : "ok"}
               href={f.paid === "OPEN" ? undefined : linkTo(f, { paid: "OPEN" })}
               sub={
                 Number(t.openN) > 0
-                  ? `على ${countNoun(Number(t.openN), INVOICE)} — وحساب كلّ مورّد بعد رصيدك عنده في «المورّدون».`
-                  : "لا شيء باق على ما يعرض."
+                  ? `على ${countNoun(Number(t.openN), INVOICE)}. أما حساب كل مورّد بعد خصم رصيدك عنده فتجده في «المورّدون».`
+                  : "لا يوجد مبلغ متبقٍ على الفواتير المعروضة."
               }
             />
             </div>
@@ -244,7 +244,7 @@ export default async function InvoicesPage({
           {/* ── السداد ألسنةٌ بأعدادها، والباقي قوائمُ منسدلة ── */}
           <div className="mt-6 space-y-3 border-b border-line pb-3">
             <LinkTabs
-              label="حال السداد"
+              label="حالة السداد"
               items={paidTabs.map((x) => ({
                 href: linkTo(f, { paid: x.v }),
                 label: x.label,
@@ -257,7 +257,7 @@ export default async function InvoicesPage({
                 label="الضريبة"
                 value={f.tax ?? ""}
                 options={[
-                  { value: "", label: "كلّ الحالات الضريبيّة", href: linkTo(f, { tax: undefined }) },
+                  { value: "", label: "كل الحالات الضريبية", href: linkTo(f, { tax: undefined }) },
                   ...(["INVALID", "UNKNOWN", "VALID"] as const).map((v) => ({
                     value: v, label: TAX_LABEL[v], href: linkTo(f, { tax: v }),
                   })),
@@ -267,7 +267,7 @@ export default async function InvoicesPage({
                 label="الشهر"
                 value={f.month ?? ""}
                 options={[
-                  { value: "", label: "كلّ الأشهر", href: linkTo(f, { month: undefined }) },
+                  { value: "", label: "كل الأشهر", href: linkTo(f, { month: undefined }) },
                   ...months.filter((m) => m.month).map((m) => ({
                     value: m.month, label: formatMonth(m.month), href: linkTo(f, { month: m.month }),
                   })),
@@ -277,12 +277,12 @@ export default async function InvoicesPage({
                 label="المورّد"
                 value={f.supplier ?? ""}
                 options={[
-                  { value: "", label: "كلّ المورّدين", href: linkTo(f, { supplier: undefined }) },
+                  { value: "", label: "كل المورّدين", href: linkTo(f, { supplier: undefined }) },
                   ...supplierList.map((s) => ({ value: s.slug, label: s.nameAr, href: linkTo(f, { supplier: s.slug }) })),
                 ]}
               />
               <Toggle href={linkTo(f, { overdue: !f.overdue })} on={Boolean(f.overdue)}>
-                متأخّرة <span className="nums">{OVERDUE_DAYS}</span>+ يوماً
+                متأخرة أكثر من <span className="nums">{OVERDUE_DAYS}</span> يوماً
               </Toggle>
               <Toggle href={linkTo(f, { noLines: !f.noLines })} on={Boolean(f.noLines)}>
                 بلا بنود
@@ -303,9 +303,9 @@ export default async function InvoicesPage({
               empty={
                 <EmptyState
                   icon={CircleCheck}
-                  title={f.paid === "OPEN" ? "لا فاتورة عليها رصيد ضمن هذا الترشيح." : "لا فاتورة تطابق هذا الترشيح."}
-                  hint="جرّب توسيعه، أو امسحه لترى كلّ الفواتير."
-                  action={<LinkButton href="/purchases/invoices" variant="primary">امسح الترشيح</LinkButton>}
+                  title={f.paid === "OPEN" ? "لا توجد فاتورة عليها رصيد ضمن هذه التصفية." : "لا توجد فاتورة تطابق هذه التصفية."}
+                  hint="جرّب توسيع التصفية، أو أزلها لترى كل الفواتير."
+                  action={<LinkButton href="/purchases/invoices" variant="primary">إزالة التصفية</LinkButton>}
                 />
               }
               columns={[
@@ -351,7 +351,7 @@ export default async function InvoicesPage({
                       <Link
                         href={invoiceHref(r.id, "tax")}
                         className="relative inline-flex items-center gap-1.5 underline-offset-4 hover:underline"
-                        title="لماذا؟ وكيف تصلح"
+                        title="لماذا؟ وكيف تصلحها"
                       >
                         {badge}
                         <span className="text-[11px] text-muted">{gaps.length > 0 ? `ينقصها: ${gaps.join("، ")}` : "لماذا؟"}</span>
@@ -367,12 +367,12 @@ export default async function InvoicesPage({
                   cell: (r) =>
                     Number(r.lineCount) > 0
                       ? <span className="nums">{r.lineCount}</span>
-                      : <span className="text-[11px] text-warn">لم تقرأ</span>,
+                      : <span className="text-[11px] text-warn">لم تُقرأ</span>,
                 },
                 { key: "total", header: "الإجمالي", numeric: true, cell: (r) => <Money minor={r.total} /> },
                 {
                   key: "remaining",
-                  header: "ما بقي",
+                  header: "المتبقي",
                   numeric: true,
                   cell: (r: Row) => {
                     const rem = r.total - Number(r.allocated);
@@ -380,7 +380,7 @@ export default async function InvoicesPage({
                     return (
                       <span className="inline-flex flex-col items-end">
                         <span className="font-bold"><Money minor={rem} tone="warn" /></span>
-                        {Number(r.allocated) > 0 && <span className="text-[10px] text-muted">سدّد بعضها</span>}
+                        {Number(r.allocated) > 0 && <span className="text-[10px] text-muted">مسدّدة جزئياً</span>}
                       </span>
                     );
                   },

@@ -25,7 +25,7 @@ describe("تسميات سجلّ التدقيق", () => {
   });
 
   it("وما لا تسمية له يبقى كما هو — السجلّ لا يخفي شيئاً وقع", () => {
-    expect(labelValue("MISSING_INVOICES")).toBe("دفعت أكثر من فواتيره");
+    expect(labelValue("MISSING_INVOICES")).toBe("المدفوع أكثر من فواتيره");
     expect(labelValue("BANK_FEE")).toBe("رسوم بنكية");
     expect(labelValue("SOMETHING_NEW")).toBe("SOMETHING_NEW");
     expect(labelValue(42)).toBe("42");

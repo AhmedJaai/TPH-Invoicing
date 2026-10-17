@@ -99,7 +99,7 @@ describe("computeCoverage", () => {
     expect(c.sales.unitsCoveredBp).toBe(10_000);
     expect(c.purchases.coveredBp).toBe(10_000);
     expect(c.gaps).toEqual([]);
-    expect(describeCoverage(c)).toContain("كلّ ما بيع");
+    expect(describeCoverage(c)).toContain("كل ما بيع");
   });
 
   it("يوم ناقص في الوسط: جزئيّ ويسمّى اليوم", () => {
@@ -130,7 +130,7 @@ describe("computeCoverage", () => {
     expect(c.sales.unitsCoveredBp).toBeNull();
     expect(c.purchases.coveredBp).toBeNull();
     expect(c.sales.missingDays).toHaveLength(7);
-    expect(describeCoverage(c)).toContain("لا مبيعات في هذه الفترة");
+    expect(describeCoverage(c)).toContain("لا توجد مبيعات في هذه الفترة");
   });
 
   it("مبيعات ولم يدخل الحساب منها سطر: متعذّر — ويقول لماذا", () => {
@@ -142,7 +142,7 @@ describe("computeCoverage", () => {
     }));
     expect(c.readiness).toBe("BLOCKED");
     expect(c.sales.coveredBp).toBe(0);
-    expect(describeCoverage(c)).toContain("لم يدخل الحساب سطر بيع واحد");
+    expect(describeCoverage(c)).toContain("لم يدخل في الحساب أي سطر بيع");
   });
 
   it("فجوة مبيعات تجمع بسببها، بعددها ومالها وحصّتها من الوحدات وأسمائها", () => {
@@ -179,12 +179,12 @@ describe("computeCoverage", () => {
     expect(c.sales.excludedUnitsMilli).toBe(0);
   });
 
-  it("سطر شراء لم تعرف كمّيّته: جزئيّ، ونسبته من مال المشتريات", () => {
+  it("سطر شراء كميته غير معروفة: جزئيّ، ونسبته من مال المشتريات", () => {
     const c = computeCoverage(input({ purchases: purchases([7_500], [gap("حليب كرتون", 2_500)]) }));
     expect(c.readiness).toBe("PARTIAL");
     expect(c.purchases).toMatchObject({ lines: 2, includedLines: 1, excludedLines: 1, excludedTotalMinor: 2_500, coveredBp: 7_500 });
     expect(c.gaps).toEqual([expect.objectContaining({ kind: "PURCHASES", reason: "NO_PACK_SPEC", count: 1, totalMinor: 2_500, examples: ["حليب كرتون"] })]);
-    expect(describeCoverage(c)).toContain("سطر شراء لم تعرف كمّيّته");
+    expect(describeCoverage(c)).toContain("سطر شراء كميته غير معروفة");
   });
 
   it("تضارب الوحدات والتباس الاستلام واحتمال التكرار فجوات تنقص الجاهزيّة", () => {

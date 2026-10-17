@@ -43,7 +43,7 @@ export interface MapResult {
  * لا يُعَدّ أبداً — «سبانيش لاتيه: كم كوباً على الرفّ؟».
  */
 export async function mapPosProducts(input: MapInput, conn: Conn = db): Promise<MapResult> {
-  if (input.posProductIds.length === 0) throw new Error("لم تحدّد أصناف");
+  if (input.posProductIds.length === 0) throw new Error("لم تحدد أي أصناف");
 
   return conn.transaction(async (tx) => {
     let productId = input.productId ?? "";
@@ -52,7 +52,7 @@ export async function mapPosProducts(input: MapInput, conn: Conn = db): Promise<
 
     if (!productId) {
       const name = input.newProductName?.trim();
-      if (!name) throw new Error("اختر صنفاً قائماً أو اكتب اسم صنف جديد");
+      if (!name) throw new Error("اختر صنفاً موجوداً أو اكتب اسم صنف جديد");
 
       const [existing] = await tx
         .select({ id: products.id, nameAr: products.nameAr })

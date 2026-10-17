@@ -70,7 +70,7 @@ export interface WalkResult {
 export class DriveArchiveInvisibleError extends Error {
   constructor() {
     super(
-      "حساب جوجل هذا لا يرى مجلّدات الأرشيف فلم يقرأ منها شيء — اطلب من مالك الأرشيف مشاركة مجلّد الحسابات مع حسابك، ثمّ أعد الفحص.",
+      "حساب جوجل هذا لا يرى مجلدات الأرشيف، ولم يُقرأ منها أي ملف. اطلب من مالك الأرشيف مشاركة مجلد الحسابات مع حسابك، ثم أعد الفحص.",
     );
     this.name = "DriveArchiveInvisibleError";
   }
@@ -100,11 +100,11 @@ export function archivePlace(
   const isArchiveMonth = (f: Pick<DriveFile, "name" | "parents">): boolean =>
     MONTH_RE.test(f.name) && (f.parents ?? []).some((p) => yearFolderIds.includes(p));
 
-  if (!parent) return { ok: false, needsGrandparent: false, reason: "لا مجلّد له يرى بتفويضك" };
+  if (!parent) return { ok: false, needsGrandparent: false, reason: "لا يوجد مجلد له يظهر في حسابك" };
   if (isArchiveMonth(parent)) return { ok: true, month: parent.name, folderName: "" };
-  if (!grandparent) return { ok: false, needsGrandparent: true, reason: "ليس داخل مجلّد شهر من الأرشيف" };
+  if (!grandparent) return { ok: false, needsGrandparent: true, reason: "ليس داخل مجلد شهر من الأرشيف" };
   if (isArchiveMonth(grandparent)) return { ok: true, month: grandparent.name, folderName: parent.name };
-  return { ok: false, needsGrandparent: false, reason: "ليس داخل مجلّد شهر من الأرشيف" };
+  return { ok: false, needsGrandparent: false, reason: "ليس داخل مجلد شهر من الأرشيف" };
 }
 
 /** كم مجلّد مورّدٍ يُقرأ معاً — الشبكة تنتظر أكثر ممّا تحسب. */
@@ -195,7 +195,7 @@ export async function walkArchive(
         children = await listChildren(drive, month.id);
       } catch (e) {
         if (isDriveAuthError(e)) throw new DriveAuthExpiredError();
-        notes.push(`مجلّد ${month.name} — تعذّر سرده فلم يقرأ: ${(e as Error).message}`);
+        notes.push(`مجلد ${month.name}: تعذّر عرض محتوياته فلم يُقرأ. السبب: ${(e as Error).message}`);
         continue;
       }
       const folders = children.filter(isFolder);
@@ -211,12 +211,12 @@ export async function walkArchive(
           files = await listChildren(drive, folder.id);
         } catch (e) {
           if (isDriveAuthError(e)) throw new DriveAuthExpiredError();
-          notes.push(`${month.name}/${folder.name} — تعذّر سرده فلم يقرأ: ${(e as Error).message}`);
+          notes.push(`${month.name}/${folder.name}: تعذّر عرض محتوياته فلم يُقرأ. السبب: ${(e as Error).message}`);
           return [];
         }
         /* المشي ينزل ثلاثةَ مستويات؛ فما في مجلّدٍ فرعيّ لا يُرى — ويُقال، لا يُسكَت عنه */
         for (const sub of files.filter(isFolder)) {
-          notes.push(`${month.name}/${folder.name}/${sub.name} — مجلّد فرعيّ لا يقرأ ما فيه؛ انقل ملفّاته إلى مجلّد المورّد`);
+          notes.push(`${month.name}/${folder.name}/${sub.name} مجلد فرعي لا تُقرأ ملفاته. انقلها إلى مجلد المورّد`);
         }
         return take(files, month.name, folder.name, folder.id);
       });

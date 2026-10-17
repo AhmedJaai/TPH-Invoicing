@@ -137,7 +137,7 @@ export function buildProfitLoss(input: ProfitLossInput): ProfitLoss {
       id: "sales",
       label: "صافي المبيعات",
       amountMinor: null,
-      unavailableReason: "غير موصولة — لا مصدر مبيعات",
+      unavailableReason: "غير موصولة: لا يوجد مصدر للمبيعات",
     });
     missing.push("المبيعات");
   } else {
@@ -158,7 +158,7 @@ export function buildProfitLoss(input: ProfitLossInput): ProfitLoss {
     id: "cogs",
     label: "تكلفة المبيعات",
     amountMinor: null,
-    unavailableReason: "تحتاج المخزون — المشتريات ليست تكلفة مبيعات",
+    unavailableReason: "تحتاج بيانات المخزون، فالمشتريات ليست تكلفة المبيعات",
   });
   missing.push("المخزون");
 
@@ -167,7 +167,7 @@ export function buildProfitLoss(input: ProfitLossInput): ProfitLoss {
     label: "مجمل الربح",
     amountMinor: null,
     derived: true,
-    unavailableReason: "يحتاج المبيعات وتكلفة المبيعات",
+    unavailableReason: "يحتاج إلى المبيعات وتكلفة المبيعات",
   });
 
   const operating = [...input.operatingByCategory]
@@ -196,7 +196,7 @@ export function buildProfitLoss(input: ProfitLossInput): ProfitLoss {
     label: "الربح التشغيلي",
     amountMinor: null,
     derived: true,
-    unavailableReason: "يحتاج مجمل الربح",
+    unavailableReason: "يحتاج إلى مجمل الربح",
   });
 
   return { lines, complete: missing.length === 0, missing };

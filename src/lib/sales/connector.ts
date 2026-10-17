@@ -83,7 +83,7 @@ export interface SalesConnector {
  */
 export class NotConnectedError extends Error {
   constructor(name = "مصدر المبيعات") {
-    super(`${name} غير موصول. لا تُعرض أرقام مبيعات قبل وصله.`);
+    super(`${name} غير موصول. لن تظهر أرقام المبيعات قبل ربطه.`);
     this.name = "NotConnectedError";
   }
 }
@@ -91,7 +91,7 @@ export class NotConnectedError extends Error {
 export const notConnected: SalesConnector = {
   name: "غير موصول",
   async status() {
-    return { connected: false, reason: "لم يُوصَل مصدر مبيعات بعد" };
+    return { connected: false, reason: "لم يُربط أي مصدر للمبيعات بعد" };
   },
   async fetchDays() {
     throw new NotConnectedError();

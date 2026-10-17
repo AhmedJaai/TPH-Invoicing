@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const parsed = { data: read.body };
     const amountMinor = parseRiyals(parsed.data.amount);
     if (amountMinor === null || amountMinor <= 0) {
-      return NextResponse.json({ error: "مبلغ الإشعار لم يفهم — اكتبه رقماً بالريال" }, { status: 400 });
+      return NextResponse.json({ error: "تعذّر فهم مبلغ الإشعار. اكتبه رقماً بالريال." }, { status: 400 });
     }
 
     const out = await db.transaction((tx) => recordCreditNote(tx, {
@@ -47,8 +47,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       message: out.remainingMinor > 0
-        ? `قيّد الإشعار — بقي على الفاتورة ${formatRiyalsDisplay(out.remainingMinor)}`
-        : "قيّد الإشعار — والفاتورة مسوّاة كلّها",
+        ? `تم تسجيل الإشعار. المتبقي على الفاتورة ${formatRiyalsDisplay(out.remainingMinor)}`
+        : "تم تسجيل الإشعار، والفاتورة مسدّدة بالكامل",
     });
   } catch (e) {
     if (e instanceof CreditNoteRefused) {

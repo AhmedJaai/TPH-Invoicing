@@ -86,14 +86,14 @@ export async function POST(request: Request) {
     */
     if (body.background && await isAutoPaused()) {
       return NextResponse.json({
-        ok: true, skipped: true, paused: true, message: "العمل الآليّ موقوف",
+        ok: true, skipped: true, paused: true, message: "العمل الآلي موقوف",
         recorded: 0, approved: 0, renamed: [], reread: 0, notes: [], handLinked: 0, done: [],
       });
     }
     const fingerprint = await backlogFingerprint();
     if (body.background && !(await isDue("backlog", fingerprint, BACKLOG_MAX_AGE_MS))) {
       return NextResponse.json({
-        ok: true, skipped: true, message: "لا جديد منذ آخر استدراك",
+        ok: true, skipped: true, message: "لا جديد منذ آخر مراجعة آلية",
         recorded: 0, approved: 0, renamed: [], reread: 0, notes: [], handLinked: 0, done: [],
       });
     }
@@ -107,15 +107,15 @@ export async function POST(request: Request) {
     /* والدفعةُ التي قُيِّدت مرّتين بالمبلغ نفسه — حوالةٌ وإقرارٌ عنها — تُدمج بالسياسة نفسها */
     const echoesMerged = can(user.role, "payment:approve") ? await mergeExactEchoes(user.id, r.notes) : 0;
     const parts = [
-      echoesMerged > 0 ? `دمجت ${countNoun(echoesMerged, PAYMENT)} قيّدت مرّتين` : null,
-      handLinked > 0 ? `ربطت ${countNoun(handLinked, TRANSACTION)} في البنك بسداد قيّدته بيدك` : null,
-      r.recorded > 0 ? `قيّد من القراءة المحفوظة: ${countNoun(r.recorded, INVOICE)}` : null,
-      r.approved > 0 ? `اعتمد ${countNoun(r.approved, DOCUMENT)}` : null,
-      r.renamed.length > 0 ? `وسمّي ${countNoun(r.renamed.length, FILE)}` : null,
-      r.reread > 0 ? `وأعيدت قراءة ${countNoun(r.reread, INVOICE)}` : null,
+      echoesMerged > 0 ? `دُمجت ${countNoun(echoesMerged, PAYMENT)} سُجّلت مرتين` : null,
+      handLinked > 0 ? `رُبطت ${countNoun(handLinked, TRANSACTION)} بنكية بسداد سجّلته يدوياً` : null,
+      r.recorded > 0 ? `سُجّلت من القراءة المحفوظة: ${countNoun(r.recorded, INVOICE)}` : null,
+      r.approved > 0 ? `اعتُمد ${countNoun(r.approved, DOCUMENT)}` : null,
+      r.renamed.length > 0 ? `وتمت تسمية ${countNoun(r.renamed.length, FILE)}` : null,
+      r.reread > 0 ? `وأُعيدت قراءة ${countNoun(r.reread, INVOICE)}` : null,
       r.notes.length > 0 ? `وتعذّر ${r.notes.length}: ${r.notes[0]}` : null,
     ].filter(Boolean);
-    const message = parts.length === 0 ? "لا مستند تجتمع فيه الشروط الآن" : parts.join(" · ");
+    const message = parts.length === 0 ? "لا يوجد مستند تتوفر فيه الشروط الآن" : parts.join(" · ");
     await markRan("backlog", await backlogFingerprint());
     return NextResponse.json({ ok: true, message, ...r, handLinked: handLinked + echoesMerged });
   }
@@ -158,9 +158,9 @@ export async function POST(request: Request) {
       return rows[0];
     });
     if (!restored) {
-      return NextResponse.json({ error: "المستند ليس مرفوضاً — ربما أعيد من نافذة أخرى" }, { status: 409 });
+      return NextResponse.json({ error: "المستند ليس مرفوضاً، وربما أُعيد من نافذة أخرى" }, { status: 409 });
     }
-    return NextResponse.json({ ok: true, message: "أعيد للمراجعة — يقيّد ويحسم تلقائياً إن اجتمعت شروطه" });
+    return NextResponse.json({ ok: true, message: "أُعيد المستند للمراجعة، وسيُسجَّل ويُحسم تلقائياً إن توفرت شروطه" });
   }
 
   if (body.action === "confirm") {
@@ -180,8 +180,8 @@ export async function POST(request: Request) {
     if (unrecorded) {
       return NextResponse.json({
         error: unrecorded.kind === "UNKNOWN"
-          ? "لم يقرأ هذا المستند ولم يقيّد له شيء — أعد قراءته، أو قيّده من ملفّه، أو ارفضه"
-          : "لم تقيّد له فاتورة ولا كشف — قيّده من ملفّه («عاينها وقيّدها») ثمّ يعتمد، أو ارفضه",
+          ? "لم يُقرأ هذا المستند ولم يُسجَّل له شيء. أعد قراءته، أو سجّله من ملفه، أو ارفضه."
+          : "لم تُسجَّل له فاتورة ولا كشف. سجّله من ملفه («عاينها وقيّدها») ثم اعتمده، أو ارفضه.",
       }, { status: 409 });
     }
     const confirmed = await db.transaction(async (t) => {
@@ -224,7 +224,7 @@ export async function POST(request: Request) {
       return { ...rows[0], invoices: linked?.invoices ?? 0, statements: linked?.statements ?? 0 };
     });
     if (!confirmed) {
-      return NextResponse.json({ error: "المستند ليس بانتظار مراجعة — ربما حسم من نافذة أخرى" }, { status: 409 });
+      return NextResponse.json({ error: "المستند ليس بانتظار المراجعة، وربما حُسم من نافذة أخرى" }, { status: 409 });
     }
     /*
       ── وما اعتُمد يُسمّى ── (إذن أحمد في ٢٤ سبتمبر ٢٠٢٦)
@@ -249,11 +249,11 @@ export async function POST(request: Request) {
     }
     /* الرسالة تقول ما وقع: لا «دخلت فاتورتُه الدفعة» لمستندٍ لا فاتورة له */
     const message = confirmed.invoices > 0
-      ? "اعتمد المستند — وتدخل فاتورته دفعة الشهر، ويخصم منها ما دفع للمورّد مقدّماً"
+      ? "اعتُمد المستند، وستدخل فاتورته في دفعة الشهر ويُخصم منها ما دفعته للمورّد مقدّماً"
       : confirmed.statements > 0
-        ? "اعتمد الكشف"
-        : "اعتمد المستند — ولا فاتورة مقيّدة له بعد: ارفعه من صفحة الرفع ليقرأ ويقيّد";
-    return NextResponse.json({ ok: true, message: renamedTo ? `${message} · وسمّي ${renamedTo}` : message });
+        ? "اعتُمد الكشف"
+        : "اعتُمد المستند، ولا توجد فاتورة مسجّلة له بعد. ارفعه من صفحة الرفع ليقرأه النظام ويسجّله.";
+    return NextResponse.json({ ok: true, message: renamedTo ? `${message} · وتمت تسميته ${renamedTo}` : message });
   }
 
   const reason = body.reason?.trim().slice(0, 500) || "رفض من صفحة المستندات";
@@ -381,28 +381,28 @@ export async function POST(request: Request) {
 
   switch (outcome.kind) {
     case "NOT_PENDING":
-      return NextResponse.json({ error: "المستند ليس بانتظار قرار — ربما حسم من نافذة أخرى" }, { status: 409 });
+      return NextResponse.json({ error: "المستند ليس بانتظار قرار، وربما حُسم من نافذة أخرى" }, { status: 409 });
     case "FORBIDDEN":
-      return NextResponse.json({ error: "لهذا المستند فاتورة بمبلغ — رفضه يحتاج صلاحية عرض المبالغ" }, { status: 403 });
+      return NextResponse.json({ error: "لهذا المستند فاتورة بمبلغ، ورفضه يحتاج صلاحية عرض المبالغ" }, { status: 403 });
     case "PAID":
       return NextResponse.json({
-        error: `على الفاتورة ${outcome.number} سداد مقيّد (${formatRiyalsDisplay(outcome.allocatedMinor)}) — تراجع عن السداد أوّلاً ثمّ ارفض المستند`,
+        error: `على الفاتورة ${outcome.number} سداد مسجّل (${formatRiyalsDisplay(outcome.allocatedMinor)}). تراجع عن السداد أولاً ثم ارفض المستند.`,
       }, { status: 409 });
     case "NO_TWIN":
       return NextResponse.json({
-        error: `لا فاتورة أخرى بالرقم ${outcome.number} لهذا المورّد، ولا بيومها ومبلغها، ولا ملفّ بالبصمة نفسها — فليست مكرّرة. `
-          + "إن رفضت لسبب آخر فاكتبه، وإن كانت صحيحةً فاعتمدها: رفضها يسقط مبلغها من المستحقّ.",
+        error: `لا توجد فاتورة أخرى بالرقم ${outcome.number} لهذا المورّد، ولا بالتاريخ والمبلغ نفسيهما، ولا ملف بالبصمة نفسها، فهي ليست مكررة. `
+          + "إن رفضتها لسبب آخر فاكتبه، وإن كانت صحيحة فاعتمدها، لأن رفضها يُسقط مبلغها من المستحق.",
       }, { status: 409 });
     case "MATCHED":
       return NextResponse.json({
-        error: `الفاتورة ${outcome.number} مطابقة في كشف مورّد — أعد مطابقة الكشف قبل رفض المستند`,
+        error: `الفاتورة ${outcome.number} مطابقة في كشف مورّد. أعد مطابقة الكشف قبل رفض المستند.`,
       }, { status: 409 });
     case "DONE":
       return NextResponse.json({
         ok: true,
         message: outcome.removed > 0
-          ? "رفض المستند وأسقطت فاتورته من المستحقّ — وملفّه باق في الدرايف كما هو"
-          : "رفض المستند — وملفّه باق في الدرايف كما هو",
+          ? "رُفض المستند وأُسقطت فاتورته من المستحق، ويبقى ملفه في الدرايف كما هو"
+          : "رُفض المستند، ويبقى ملفه في الدرايف كما هو",
       });
   }
 }

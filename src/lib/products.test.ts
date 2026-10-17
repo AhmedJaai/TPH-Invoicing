@@ -45,7 +45,7 @@ describe("suggestMerges", () => {
       item("s1", "أ", "حليب طازج 2 l", "حليب طازج", 900, 10),
       item("s2", "ب", "حليب طازج 2 l", "Fresh Milk", 880, 1),
     ]);
-    expect(s[0].caveats.join(" ")).toContain("مرّة واحدة");
+    expect(s[0].caveats.join(" ")).toContain("مرة واحدة");
   });
 
   it("يرتّب الأقوى أوّلاً", () => {
@@ -75,7 +75,7 @@ describe("suggestMerges", () => {
     expect(s).toHaveLength(1);
     expect(Number.isFinite(s[0].priceRatio)).toBe(true);
     expect(s[0].strength).toBe("WEAK");
-    expect(s[0].caveats.join(" ")).toContain("لا أسعار");
+    expect(s[0].caveats.join(" ")).toContain("لا توجد أسعار");
   });
 });
 

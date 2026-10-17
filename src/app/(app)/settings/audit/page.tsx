@@ -79,8 +79,8 @@ function Detail({ value, label }: { value: unknown; label: string }) {
 
 function entityLink(entityType: string, entityId: string): React.ReactNode {
   if (entityType === "invoice") return <Link href={invoiceHref(entityId)} className="font-bold text-accent hover:underline">فاتورة</Link>;
-  if (entityType === "bank_transaction") return <Link href={txHref(encodeURIComponent(entityId))} className="font-bold text-accent hover:underline">حركة بنك</Link>;
-  if (entityType === "month") return <Link href="/close" className="font-bold text-accent hover:underline">الإقفال</Link>;
+  if (entityType === "bank_transaction") return <Link href={txHref(encodeURIComponent(entityId))} className="font-bold text-accent hover:underline">حركة بنكية</Link>;
+  if (entityType === "month") return <Link href="/close" className="font-bold text-accent hover:underline">إقفال الشهر</Link>;
   return ENTITY_LABEL[entityType] ?? "سجلّ";
 }
 
@@ -153,13 +153,13 @@ export default async function AuditTrailPage({
       user={user}
       width="page"
       title="سجلّ التدقيق"
-      intro="ما فعل، ومن فعله، ومتى — بتوقيت الرياض. لا يعدّل ولا يحذف."
+      intro="كل ما تم تنفيذه، ومن نفّذه، ومتى، بتوقيت الرياض. لا يمكن تعديل هذا السجل ولا حذف شيء منه."
     >
       <div className="mb-6">
         <LinkTabs
-          label="الباب"
+          label="النوع"
           items={[
-            { href: tab(null), label: "كلّ ما فعله إنسان", active: kind === null },
+            { href: tab(null), label: "كل ما نفّذه المستخدمون", active: kind === null },
             ...(["money", "documents", "bank", "suppliers", "inventory", "learned"] as const).map((k) => ({
               href: tab(k),
               label: AUDIT_KIND_LABEL[k],
@@ -171,8 +171,8 @@ export default async function AuditTrailPage({
 
       {rows.length === 0 ? (
         <EmptyState
-          title={page > 1 ? "لا أقدم من هذا." : "لا شيء في هذا الباب بعد."}
-          hint="كلّ فعل يكتب مالاً أو يغيّر حالاً يقيّد هنا باسم فاعله ووقته."
+          title={page > 1 ? "لا توجد سجلات أقدم من هذا." : "لا توجد سجلات من هذا النوع بعد."}
+          hint="كل إجراء يسجّل مبلغاً أو يغيّر حالة يُسجَّل هنا باسم من نفّذه ووقته."
           action={page > 1 ? <Link href={pageHref(page - 1)} className={buttonClass("secondary", "sm")}>الأحدث</Link> : undefined}
         />
       ) : (
@@ -210,7 +210,7 @@ export default async function AuditTrailPage({
                               </summary>
                               <div className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-3 rounded-lg bg-sunken/60 p-3 sm:grid-cols-2">
                                 <Detail value={r.before} label="قبل" />
-                                <Detail value={r.after} label={r.before ? "بعد" : "ما كتب"} />
+                                <Detail value={r.after} label={r.before ? "بعد" : "ما سُجّل"} />
                               </div>
                             </details>
                           )}

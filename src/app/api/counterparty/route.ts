@@ -100,16 +100,16 @@ export async function POST(request: Request) {
   }
   if (ids.length > MAX_GROUP) {
     return NextResponse.json(
-      { error: `${countNoun(MAX_GROUP, TRANSACTION)} في المرّة الواحدة على الأكثر` },
+      { error: `الحد الأقصى ${countNoun(MAX_GROUP, TRANSACTION)} في المرة الواحدة` },
       { status: 400 },
     );
   }
   if (!body.kind || !KINDS.includes(body.kind)) {
-    return NextResponse.json({ error: "اختر باباً صالحاً" }, { status: 400 });
+    return NextResponse.json({ error: "اختر تصنيفاً صالحاً" }, { status: 400 });
   }
   if (body.kind === "SUPPLIER" && !body.supplierId) {
     return NextResponse.json(
-      { error: "سداد المورّد يحتاج تحديد المورّد" },
+      { error: "سداد المورّد يحتاج اختيار المورّد" },
       { status: 400 },
     );
   }
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
   if (rows.length > 1) {
     if (!groupKey || identities.some((i) => i?.key !== groupKey)) {
       return NextResponse.json({
-        error: "هذه الحركات لا يجمعها مستفيد ولا نمط واحد — تؤكّد كلّ على حدة",
+        error: "لا يجمع هذه الحركات مستفيد واحد ولا نمط واحد. أكّد كل حركة على حدة.",
       }, { status: 409 });
     }
   }
@@ -288,7 +288,7 @@ export async function POST(request: Request) {
     console.error("counterparty:", err.cause ?? err);
     const code = err.cause?.code ? ` (رمز ${err.cause.code})` : "";
     return NextResponse.json(
-      { error: `تعذّر حفظ التعريف، ولم يكتب منه شيء — أعد المحاولة${code}` },
+      { error: `تعذّر حفظ التعريف ولم يُسجَّل منه شيء. أعد المحاولة.${code}` },
       { status: 500 },
     );
   }
@@ -317,11 +317,11 @@ export async function POST(request: Request) {
   /* المصروفُ يتبع التصنيفَ الجديد في شهره — يُقيَّد أو يُصحَّح بابُه وحده */
   const derived = await deriveOpenMonths(rows.map((r) => monthOf(r.valueDate)), user.id);
 
-  const parts = [`حفظت «${party?.name}»`];
-  parts.push(`وطبّقت على ${countNoun(rows.length, TRANSACTION)}`);
-  if (derived.created > 0) parts.push(`وقيّد ${countNoun(derived.created, TRANSACTION)} مصروفاً`);
+  const parts = [`تم حفظ «${party?.name}»`];
+  parts.push(`وطُبّق على ${countNoun(rows.length, TRANSACTION)}`);
+  if (derived.created > 0) parts.push(`وسُجّل مصروف عن ${countNoun(derived.created, TRANSACTION)}`);
   if (result.conflicts.length > 0) {
-    parts.push(`ودليل أو أكثر (${result.conflicts.length}) يدلّ على جهة أخرى — راجعها`);
+    parts.push(`ويوجد ${result.conflicts.length} من الأدلة تشير إلى جهة أخرى، فراجعها`);
   }
 
   return NextResponse.json({

@@ -55,7 +55,7 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
       return;
     }
     setDuplicate(false);
-    toast({ title: r.data.message ?? "قيّد الإشعار", tone: "ok" });
+    toast({ title: r.data.message ?? "تم قيد الإشعار", tone: "ok" });
     setOpen(false);
     setAmount("");
     setReference("");
@@ -71,7 +71,7 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
     >
       <p className="text-xs font-bold">إشعار دائن على هذه الفاتورة</p>
       <p className="mt-1 text-[11px] leading-relaxed text-muted">
-        ينقص ما بقي عليها ولا يعدّ مالاً خرج — ولا ينتظر كشف بنك.
+        يُنقص المبلغ المتبقي عليها، ولا يُعدّ مالاً خرج، ولا ينتظر كشف بنك.
       </p>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Field label="المبلغ (ريال)" required>
@@ -96,13 +96,13 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
             </>
           )}
         </Field>
-        <Field label="رقمه (اختياريّ)" className="col-span-2 sm:col-span-1">
+        <Field label="رقمه (اختياري)" className="col-span-2 sm:col-span-1">
           {({ invalid, ...p }) => (
             <Input {...p} invalid={invalid} type="text" dir="ltr" className="nums" enterKeyHint="done" value={reference} onChange={(e) => setReference(e.target.value)} disabled={busy} maxLength={60} />
           )}
         </Field>
       </div>
-      <Field label="السبب (اختياريّ)" className="mt-3">
+      <Field label="السبب (اختياري)" className="mt-3">
         {({ invalid, ...p }) => (
           <Input
             {...p}
@@ -113,17 +113,17 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
             onChange={(e) => setReason(e.target.value)}
             disabled={busy}
             maxLength={200}
-            placeholder="مرتجع حليب منته · خصم كمّيّة"
+            placeholder="مثال: مرتجع حليب منتهي الصلاحية · خصم كمية"
           />
         )}
       </Field>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       <div className="mt-3 flex gap-2">
         <button type="submit" aria-busy={busy} disabled={busy || amount.trim() === ""} className={buttonClass("primary", "sm")}>
-          <span>{duplicate ? "إشعار آخر — قيّده" : "قيّد الإشعار"}</span>
+          <span>{duplicate ? "قيّد إشعاراً آخر" : "قيّد الإشعار"}</span>
         </button>
         <button type="button" onClick={() => { setOpen(false); setError(null); }} disabled={busy} className={buttonClass("quiet", "sm")}>
-          ألغ
+          إلغاء
         </button>
       </div>
     </form>

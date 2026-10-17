@@ -73,7 +73,7 @@ describe("المردودة والملغاة", () => {
     expect(availableMinor(f)).toBe(0);
   });
 
-  it("الملغاة كذلك — وهي لم تقع أصلاً", () => {
+  it("الملغاة كذلك — وهي لم تحدث أصلاً", () => {
     expect(derivePaymentStatus(facts({ voided: true }))).toBe("VOID");
     expect(countsAsPaid("VOID")).toBe(false);
   });
@@ -134,8 +134,8 @@ describe("خطّة الردّ", () => {
   });
 
   it("بلا سبب مكتوب يكتب سبب صريح", () => {
-    expect(planReversal([], "VOID", "  ").reason).toContain("لم تقع");
-    expect(planReversal([], "REVERSED", "").reason).toContain("ردّ مالها");
+    expect(planReversal([], "VOID", "  ").reason).toContain("لم تحدث");
+    expect(planReversal([], "REVERSED", "").reason).toContain("ردّ مبلغها");
   });
 });
 

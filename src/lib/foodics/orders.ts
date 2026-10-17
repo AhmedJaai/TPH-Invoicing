@@ -91,7 +91,7 @@ export function ordersToSalesFile(orders: readonly FoodicsOrder[]): ConvertedOrd
   for (const order of orders) {
     if (!isSettledOrder(order)) continue;
     if ((order.combos ?? []).length > 0) {
-      problems.push({ reference: order.reference, reason: "طلبٌ فيه «كومبو» — صيغةٌ لم تُفحَص بعد، فلم يُقيَّد بالتخمين" });
+      problems.push({ reference: order.reference, reason: "الطلب فيه «كومبو» وهذه الصيغة لم تُفحص بعد، فلم يُسجَّل بالتخمين" });
       continue;
     }
 
@@ -123,7 +123,7 @@ export function ordersToSalesFile(orders: readonly FoodicsOrder[]): ConvertedOrd
       const lineTotalMinor = riyalsToMinor(p.total_price);
       const unitPriceMinor = riyalsToMinor(p.unit_price);
       if (sku === "" || quantityMilli === null || lineTotalMinor === null || unitPriceMinor === null) {
-        unreadable = `بندٌ لم يُقرأ (${name || "بلا اسم"}): رمزُه أو كمّيّتُه أو مبلغُه غائب`;
+        unreadable = `بند غير مقروء (${name || "بلا اسم"}): رمزه أو كميته أو مبلغه غير موجود`;
         break;
       }
       const isVoid = isVoidStatus(p.status);
@@ -175,7 +175,7 @@ export function ordersToSalesFile(orders: readonly FoodicsOrder[]): ConvertedOrd
         const optionTotalMinor = riyalsToMinor(o.total_price);
         const optionUnitMinor = riyalsToMinor(o.unit_price);
         if (optionSku === "" || optionTotalMinor === null || optionUnitMinor === null) {
-          unreadable = `خيارٌ لم يُقرأ على «${name}»`;
+          unreadable = `خيار غير مقروء في «${name}»`;
           break;
         }
         rowNumber++;

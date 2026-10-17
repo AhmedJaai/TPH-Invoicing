@@ -23,17 +23,17 @@ export interface BriefFacts {
 
 export function buildBrief(f: BriefFacts): string {
   const head = `ذا بوبليك هاوس — ${f.dateLabel}`;
-  if (f.knowsNothing) return `${head}\nالنظام لم يقرأ مستنداً ولا كشفاً بعد — لا أرقام تقال.`;
+  if (f.knowsNothing) return `${head}\nلم يقرأ النظام أي مستند أو كشف بعد، فلا أرقام لعرضها.`;
   const lines = [
     head,
     f.owedMinor > 0
       ? `• عليك للمورّدين ${formatRiyalsDisplay(f.owedMinor)} ريال (${countNoun(f.owedSuppliers, SUPPLIER)})`
-      : "• لا مستحقّ للمورّدين الآن",
+      : "• لا مبالغ مستحقة للمورّدين الآن",
     f.weekMinor === null ? null
-      : f.weekMinor > 0 ? `• يخرج هذا الأسبوع ${formatRiyalsDisplay(f.weekMinor)} ريال` : "• لا خروج معروفاً هذا الأسبوع",
+      : f.weekMinor > 0 ? `• يخرج هذا الأسبوع ${formatRiyalsDisplay(f.weekMinor)} ريال` : "• لا مبالغ معروفة ستخرج هذا الأسبوع",
     f.balanceMinor === undefined ? null
       : f.balanceMinor === null ? "• رصيد البنك غير معروف" : `• آخر رصيد معروف ${formatRiyalsDisplay(f.balanceMinor)} ريال`,
-    f.pending > 0 ? `• ينتظر القرار ${countNoun(f.pending, ITEM)}` : "• لا شيء ينتظر القرار",
+    f.pending > 0 ? `• بانتظار قرارك ${countNoun(f.pending, ITEM)}` : "• لا شيء بانتظار قرارك",
   ];
   return lines.filter(Boolean).join("\n");
 }

@@ -65,7 +65,7 @@ describe("تصدير مصحّح نقص فيه صنف من طلب", () => {
       const actorId = await makeActor(tx);
       await importSalesFile({ buffer: file([latte, cake]), fileName: "orders-v1.xlsx", actorId }, tx);
       const r = await importSalesFile({ buffer: file([latte]), fileName: "orders-v2.xlsx", actorId }, tx);
-      expect(r.revisions.some((x) => x.now.includes("غاب عن التصدير"))).toBe(true);
+      expect(r.revisions.some((x) => x.now.includes("غاب عن آخر تصدير"))).toBe(true);
 
       const lines = (await tx.execute<{ d: string; v: boolean }>(sql`
         select sl.description as d, sl.is_void as v from sale_lines sl join sales s on s.id = sl.sale_id

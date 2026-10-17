@@ -31,8 +31,8 @@ export const runtime = "nodejs";
 
 const Body = z.object({
   /** معرّفاتُ الحركتين (أو أكثر) اللتين خرج فيهما المال — بلا تكرار */
-  transactionIds: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)).min(2, "حدّد الحركتين اللتين خرج فيهما المال مرّتين").max(20)
-    .refine((ids) => new Set(ids).size === ids.length, "حركة مكرّرة في الطلب"),
+  transactionIds: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)).min(2, "حدّد الحركتين اللتين خرج فيهما المبلغ مرتين").max(20)
+    .refine((ids) => new Set(ids).size === ids.length, "الطلب يحتوي حركة مكررة"),
   /** «OPEN» يعيد البندَ مفتوحاً */
   decision: z.custom<DoublePaidDecision | "OPEN">(
     (v) => v === "OPEN" || (typeof v === "string" && (DOUBLE_PAID_DECISIONS as readonly string[]).includes(v)),
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
   const group = groups.find((g) => g.transactions.length === ids.length);
   if (rows.length !== ids.length || !group) {
     return NextResponse.json(
-      { error: "هذه الحركات لا تعدّ سداداً مزدوجاً الآن — ربما تغيّر تصنيفها. حدّث الصفحة." },
+      { error: "لم تعد هذه الحركات تُعدّ سداداً مزدوجاً، فقد يكون تصنيفها تغيّر. حدّث الصفحة." },
       { status: 409 },
     );
   }
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
     message: reopen
       ? "أعيد فتح التنبيه"
       : decision === "CLAIMED"
-        ? "حفظ: طولبت الجهة — يبقى التنبيه بحال أهدأ حتى يعود المال"
-        : `حفظ: ${DOUBLE_PAID_DECISION_LABEL[decision as DoublePaidDecision]} — خرج التنبيه من «يحتاج قرارك»`,
+        ? "تم الحفظ: طالبتَ الجهة بالمبلغ. يبقى التنبيه هادئاً حتى يعود المبلغ."
+        : `تم الحفظ: ${DOUBLE_PAID_DECISION_LABEL[decision as DoublePaidDecision]}. أُزيل التنبيه من «يحتاج قرارك».`,
   });
 }

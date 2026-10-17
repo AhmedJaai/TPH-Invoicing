@@ -18,23 +18,23 @@ export async function WasteBoardSection() {
       id="waste"
       title="الهدر المسجّل"
       icon={Trash2}
-      hint={`آخر ${WASTE_BOARD_WEEKS} أسابيع (منذ ${formatDay(b.since)}) — بسعر الوحدة من آخر جرد حمله الصنف. يسجّل الهدر في خطوة «ماذا اختلف؟» من الجرد.`}
+      hint={`آخر ${WASTE_BOARD_WEEKS} أسابيع (منذ ${formatDay(b.since)})، بسعر الوحدة من آخر جرد للصنف. يُسجَّل الهدر في خطوة «ماذا اختلف؟» من الجرد.`}
     >
       {b.recordCount === 0 ? (
         <EmptyState
           compact
           icon={Trash2}
-          title="لم يسجّل هدر في هذه الأسابيع."
-          hint="غياب السجلّ لا يعني أنّه لم يقع — ما لم يكتب يبقى في الجرد «فرقاً غير مفسّر»."
+          title="لم يُسجَّل هدر في هذه الأسابيع."
+          hint="غياب التسجيل لا يعني أن الهدر لم يقع. وما لم يُسجَّل يبقى في الجرد «فرقاً غير مفسَّر»."
         />
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
           <Card>
-            <p className="text-xs font-bold text-muted">كلفة ما سجّل، بسببه</p>
+            <p className="text-xs font-bold text-muted">كلفة الهدر المسجّل حسب السبب</p>
             <p className="mt-2 text-2xl font-semibold tracking-tight"><Money minor={b.knownCostMinor} currency /></p>
             <p className="mt-1 text-[11px] text-muted">
-              {countNoun(b.recordCount, TIME)} سجّل فيها هدر
-              {b.unknownCount > 0 && <span className="font-bold text-warn"> — منها {countNoun(b.unknownCount, TIME)} بلا كلفة معروفة، خارج المجموع</span>}
+              سُجّل فيها هدر {countNoun(b.recordCount, TIME)}
+              {b.unknownCount > 0 && <span className="font-bold text-warn"> · منها {countNoun(b.unknownCount, TIME)} بلا كلفة معروفة، وهي خارج المجموع</span>}
             </p>
             <div className="mt-4">
               <BarList
@@ -51,7 +51,7 @@ export async function WasteBoardSection() {
           <Card>
             <p className="text-xs font-bold text-muted">أكثر الأصناف هدراً</p>
             {b.topProducts.length === 0 ? (
-              <p className="mt-3 text-xs leading-relaxed text-muted">غير معروف: لا سعر وحدة لأيّ من الأصناف المهدرة — يعرف بعد أوّل جرد تربط فيه مشترياتها.</p>
+              <p className="mt-3 text-xs leading-relaxed text-muted">غير معروف: لا يوجد سعر وحدة لأي من الأصناف المهدرة. سيُعرف بعد أول جرد تربط فيه مشترياتها.</p>
             ) : (
               <div className="mt-3">
                 <BarList
@@ -66,14 +66,14 @@ export async function WasteBoardSection() {
               </div>
             )}
             {b.repeatedExpiry.length > 0 && (
-              <Callout tone="warn" className="mt-4" title="انتهت صلاحيّته أكثر من مرّة">
+              <Callout tone="warn" className="mt-4" title="انتهت صلاحيته أكثر من مرة">
                 {b.repeatedExpiry.map((x, i) => (
                   <span key={x.productId}>
                     {i > 0 && "، "}
                     <Link href={`/inventory/items/${x.productId}`} className="font-bold hover:underline">{x.productName}</Link> ({countNoun(x.count, TIME)})
                   </span>
                 ))}
-                {" "}— تكراره يقول إنّ الطلبيّة أكبر ممّا يباع قبل انتهائه.
+                . تكرار ذلك يعني أن الكمية المطلوبة أكبر مما يُباع قبل انتهاء صلاحيته.
               </Callout>
             )}
           </Card>

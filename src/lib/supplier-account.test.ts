@@ -44,7 +44,7 @@ describe("حساب المورّد — ما نعرفه مقابل ما يقول",
       billedMinor: 5_000_00, paidMinor: 2_000_00, reportedBalanceMinor: 1_000_00,
     });
     expect(a.differenceMinor).toBe(-2_000_00);
-    expect(describeAccount(a)).toContain("نعرف أكثر");
+    expect(describeAccount(a)).toContain("ما عندنا أكثر");
   });
 
   it("الإشعار الدائن يخفض المستحقّ ولا يعدّ سداداً", () => {
@@ -100,7 +100,7 @@ describe("لا فاتورة ولا كشف ← مجهول لا صفر", () => {
     const a = buildSupplierAccount({ billedMinor: 0, paidMinor: 0 });
     expect(a.knownBalanceMinor).toBeNull();
     expect(a.status).toBe("UNKNOWN");
-    expect(describeAccount(a)).toContain("مجهول");
+    expect(describeAccount(a)).toContain("غير معروف");
   });
 
   it("وكشف وصل بلا فاتورة عندنا ← لا يقارن", () => {
@@ -167,7 +167,7 @@ describe("الكوب الذهبي: الفرق ليس فاتورةً غائبة",
       allocatedAfterStatementMinor: 585_438,
     });
     expect(a.explanation).toEqual({ kind: "ALLOCATED_AFTER_STATEMENT" });
-    expect(describeAccount(a)).toContain("ترتيب تخصيص");
+    expect(describeAccount(a)).toContain("ترتيب التوزيع");
     expect(describeAccount(a)).not.toContain("لم تصلنا");
   });
 

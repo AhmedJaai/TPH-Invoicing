@@ -18,9 +18,9 @@ import { lastCompleteWeek, nextWeek } from "@/lib/inventory/week";
 export const dynamic = "force-dynamic";
 
 const STATUS: Record<string, { label: string; tone: Tone }> = {
-  IMPORTED: { label: "كامل", tone: "ok" },
+  IMPORTED: { label: "مكتمل", tone: "ok" },
   PARTIAL: { label: "جزئيّ", tone: "warn" },
-  FAILED: { label: "لم يستورد", tone: "danger" },
+  FAILED: { label: "فشل الاستيراد", tone: "danger" },
   DUPLICATE: { label: "مكرّر", tone: "muted" },
   PENDING: { label: "لم يكتمل", tone: "warn" },
 };
@@ -90,7 +90,7 @@ export default async function SalesImportPage() {
       cell: (r) => <span className="font-bold" dir="auto">{r.fileName}</span>,
     },
     {
-      key: "status", header: "الحال",
+      key: "status", header: "الحالة",
       cell: (r) => <Badge tone={STATUS[r.status]?.tone} dot>{STATUS[r.status]?.label ?? r.status}</Badge>,
     },
     {
@@ -104,11 +104,11 @@ export default async function SalesImportPage() {
       cell: (r) => (
         <span className="nums">
           {r.importedRows} / {r.totalRows}
-          {r.errorRows > 0 && <span className="text-danger"> · {r.errorRows} لم يقرأ</span>}
+          {r.errorRows > 0 && <span className="text-danger"> · {r.errorRows} لم تُقرأ</span>}
         </span>
       ),
     },
-    { key: "at", header: "رفع في", secondary: true, cell: (r) => formatDay(r.createdAt) },
+    { key: "at", header: "تاريخ الرفع", secondary: true, cell: (r) => formatDay(r.createdAt) },
   ];
 
   return (
@@ -116,7 +116,7 @@ export default async function SalesImportPage() {
       user={user}
       width="page"
       title="الاستيراد"
-      intro="ملفّان يدخلان من هنا: كتالوج المقهى مرّةً وعند تغيّره، ومبيعات الأسبوع كلّ أحد — من فودكس كما هي."
+      intro="ترفع من هنا ملفين من فودكس: كتالوج المقهى (مرة واحدة ثم عند تغيّره)، ومبيعات الأسبوع (كل أحد). ارفعهما كما صدرا من فودكس."
       actions={setup.unmapped > 0
         ? <LinkButton href="/inventory/mapping" size="sm" icon={Link2}>{`${countNoun(setup.unmapped, PRODUCT)} تحتاج ربطاً`}</LinkButton>
         : undefined}
@@ -144,7 +144,7 @@ export default async function SalesImportPage() {
             n={2}
             icon={FileSpreadsheet}
             title="مبيعات الأسبوع"
-            hint="تصدير فودكس (Excel) كما هو — تقرير الطلبات أو مزيج الأصناف. منه وحده يعرف ما كان ينبغي أن يصرف."
+            hint="ملف Excel مُصدَّر من فودكس كما هو، من تقرير الطلبات أو تقرير مزيج الأصناف. منه يعرف النظام ما كان ينبغي أن يُصرف من المخزون."
           />
           <InventoryImport canImport={can(user.role, "inventory:count")} hasCatalog={hasCatalog} />
         </section>
@@ -155,8 +155,8 @@ export default async function SalesImportPage() {
             icon={BookOpen}
             title={hasCatalog ? "الكتالوج: الأصناف والعبوات والوصفات" : "ابدأ بالكتالوج: الأصناف والعبوات والوصفات"}
             hint={hasCatalog
-              ? "ما يباع، وما يخزّن، وكم يدخل كلّ مشروب. ارفعه ثانيةً حين يتغيّر — وما كتبته بيدك لا يكتب فوقه."
-              : "بلا وصفات لا يعرف ما استهلكته المبيعات — فهو الخطوة الأولى، ثمّ ملفّ المبيعات."}
+              ? "يحدد ما يُباع وما يُخزَّن وكم يدخل في كل مشروب. ارفعه من جديد كلما تغيّر، وما كتبته بيدك لا يُستبدل."
+              : "بدون الوصفات لا يعرف النظام ما استهلكته المبيعات، لذلك هو الخطوة الأولى، ثم ملف المبيعات."}
           />
           <CatalogImport
             canEdit={can(user.role, "recipe:edit")}
@@ -176,8 +176,8 @@ export default async function SalesImportPage() {
             <EmptyState
               compact
               icon={FileSpreadsheet}
-              title="لم يستورد ملفّ مبيعات بعد."
-              hint="يظهر هنا كلّ ملفّ ترفعه، وأيّ فترة غطّاها، وما لم يقرأ منه — فيعرف أيّ الأسابيع عندنا وأيّها لم يصل."
+              title="لم يُستورد أي ملف مبيعات بعد."
+              hint="يظهر هنا كل ملف ترفعه، والفترة التي يغطيها، وما تعذّرت قراءته منه، لتعرف أي الأسابيع وصلت وأيها لم تصل."
             />
           }
         />

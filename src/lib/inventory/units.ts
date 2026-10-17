@@ -150,7 +150,7 @@ export function isAmbiguousThousands(value: string): boolean {
 /** رسالةُ اللبس — واحدةٌ لكلّ خانةٍ يكتبها إنسان. */
 export function ambiguousThousandsMessage(value: string): string {
   const [whole, frac] = toLatinDigits(value).trim().replace(/^[+-]/, "").split(",");
-  return `«${value.trim()}» تحتمل قراءتين: ${whole}.${frac} أم ${whole}${frac}؟ اكتبها بنقطة أو بلا فاصلة`;
+  return `«${value.trim()}» تحتمل قراءتين: ${whole}.${frac} أم ${whole}${frac}؟ اكتبها بنقطة عشرية أو بدون فاصلة`;
 }
 
 /**

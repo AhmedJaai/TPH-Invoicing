@@ -92,12 +92,12 @@ function sameParty(a: string | null, b: string | null): boolean {
 export function describeReversal(r: Reversal): string {
   const amount = formatRiyalsDisplay(r.outgoing.amountMinor);
   const base =
-    `خرج ${amount} في ${isoDay(r.outgoing.valueDate)} ` +
+    `خرج مبلغ ${amount} في ${isoDay(r.outgoing.valueDate)} ` +
     `وعاد بعد ${r.daysApart} ${r.daysApart === 1 ? "يوم" : "أيام"}`;
 
   return r.samePartyEvidence
-    ? `${base} — ومن الطرف نفسه، فهو ردٌّ لا إيراد.`
-    : `${base} — والطرف لم يتطابق، فهو ترجيحٌ يحتاج نظرك.`;
+    ? `${base}، ومن الجهة نفسها، فهو مبلغ مردود وليس إيراداً.`
+    : `${base}، لكن الجهة لم تتطابق، فهو مجرد احتمال يحتاج مراجعتك.`;
 }
 
 /**

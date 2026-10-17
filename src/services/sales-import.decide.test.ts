@@ -41,7 +41,7 @@ describe("decideLines", () => {
   it("سطر طلب غاب عن تصدير أحدث يلغى", () => {
     const out = decideLines("s1", sale("FDX:1", [line("a")]), new Map(), new Map([prior("a"), prior("b")]));
     expect(out.removed).toEqual(["id-b"]);
-    expect(out.revised[0].now).toContain("غاب عن التصدير");
+    expect(out.revised[0].now).toContain("غاب عن آخر تصدير");
   });
 
   it("وما ألغي من قبل لا يعلن ثانيةً", () => {

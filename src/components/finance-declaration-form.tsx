@@ -9,9 +9,9 @@ import { toast } from "./ui-client";
 export interface SpreadCandidate { id: string; day: string; dayLabel: string; amountText: string; label: string; spread: boolean }
 
 const KINDS = [
-  { value: "OFF_BOOK", label: "مصروف خارج الكشف يتكرّر كلّ شهر", hint: "راتب يدفع نقداً، إيجار من حساب شخصيّ. اكتب مبلغ الشهر الواحد." },
-  { value: "SPREAD", label: "دفعة في الكشف تغطّي أشهراً", hint: "إيجار دفع مرّةً لستّة أشهر: يوزّع بالتساوي على أشهره." },
-  { value: "NONE", label: "لا يوجد في هذه الأشهر", hint: "لم يكن على المقهى هذا المصروف فيها — فلا يعدّ ناقصاً." },
+  { value: "OFF_BOOK", label: "مصروف خارج الكشف يتكرر كل شهر", hint: "مثل راتب يُدفع نقداً أو إيجار يُدفع من حساب شخصي. اكتب مبلغ الشهر الواحد." },
+  { value: "SPREAD", label: "دفعة في الكشف تغطي عدة أشهر", hint: "مثل إيجار دُفع مرة واحدة لستة أشهر، ويُوزَّع بالتساوي على أشهره." },
+  { value: "NONE", label: "لا يوجد في هذه الأشهر", hint: "لم يكن على المقهى هذا المصروف في تلك الأشهر، فلا يُعدّ ناقصاً." },
 ] as const;
 type Kind = (typeof KINDS)[number]["value"];
 
@@ -55,7 +55,7 @@ export function DeclarationForm({ categories, candidates, defaults }: {
     });
     setBusy(false);
     if (!r.ok) { setError(r.error); return; }
-    toast({ tone: "ok", title: r.data.message ?? "حفظ الإقرار" });
+    toast({ tone: "ok", title: r.data.message ?? "تم حفظ الإقرار" });
     setLabel(""); setAmount(""); setTxId("");
     router.refresh();
   }
@@ -64,7 +64,7 @@ export function DeclarationForm({ categories, candidates, defaults }: {
   return (
     <form onSubmit={(e) => { e.preventDefault(); void save(); }} className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
       <fieldset className="space-y-2">
-        <legend className="text-sm font-bold">ما الذي تقوله؟</legend>
+        <legend className="text-sm font-bold">ما الذي تريد إقراره؟</legend>
         {KINDS.map((k) => (
           <label key={k.value} className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 ${kind === k.value ? "border-accent-line bg-accent-soft/50" : "border-line"}`}>
             <input type="radio" name="kind" value={k.value} checked={kind === k.value} onChange={() => setKind(k.value)} className="mt-1" />
@@ -84,18 +84,18 @@ export function DeclarationForm({ categories, candidates, defaults }: {
           </select>
         </label>
         <label className="text-xs font-medium text-ink-soft">
-          وصف قصير <span className="font-normal text-muted">(اختياريّ)</span>
+          وصف قصير <span className="font-normal text-muted">(اختياري)</span>
           <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} disabled={busy} maxLength={120} placeholder={kind === "OFF_BOOK" ? "راتب فلان نقداً" : categoryLabel} className={field} />
         </label>
 
         {kind === "SPREAD" && (
           <label className="text-xs font-medium text-ink-soft sm:col-span-2">
-            حركة البنك التي توزّع
+            حركة البنك المراد توزيعها
             <select value={txId} onChange={(e) => setTxId(e.target.value)} disabled={busy} className={field}>
               <option value="">— اختر —</option>
               {options.map((c) => <option key={c.id} value={c.id}>{c.dayLabel} · {c.amountText} ريال · {c.label}</option>)}
             </select>
-            {options.length === 0 && <span className="mt-1 block text-[11px] text-warn">لا حركة في الكشف مصنّفةً «{categoryLabel}» لم توزّع. صنّف الحركة في «حركة البنك» أوّلاً.</span>}
+            {options.length === 0 && <span className="mt-1 block text-[11px] text-warn">لا توجد حركة في الكشف مصنّفة «{categoryLabel}» ولم تُوزَّع. صنّف الحركة أولاً من «حركة البنك».</span>}
           </label>
         )}
         {kind === "OFF_BOOK" && (
@@ -114,12 +114,12 @@ export function DeclarationForm({ categories, candidates, defaults }: {
         </label>
       </div>
 
-      {fromMonth > toMonth && <p role="alert" className="mt-2 text-xs font-bold text-danger">آخر شهر قبل أوّله.</p>}
+      {fromMonth > toMonth && <p role="alert" className="mt-2 text-xs font-bold text-danger">شهر النهاية قبل شهر البداية.</p>}
       {error && <p role="alert" className="mt-3 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2 text-xs font-bold text-danger">{error}</p>}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button type="submit" disabled={busy || !ready} aria-busy={busy} className={buttonClass("primary")}>احفظ الإقرار</button>
         <p className="min-w-0 flex-1 basis-56 text-[11px] leading-relaxed text-muted">
-          لا ينشأ مصروف ولا دفعة ولا يمسّ مال مقيّد. يدخل قائمة الدخل باسمه، ويكتب في سجلّ التدقيق، ويسحب متى شئت.
+          لا يُنشئ الإقرار مصروفاً ولا دفعة، ولا يغيّر أي مبلغ مقيّد. يظهر في قائمة الدخل باسمه، ويُسجَّل في سجل التدقيق، ويمكنك سحبه متى شئت.
         </p>
       </div>
     </form>

@@ -21,7 +21,7 @@ export async function readJson<S extends z.ZodType>(
     raw = await request.json();
   } catch {
     if (!options.emptyOk) {
-      return { ok: false, response: NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، فإن تكرّر فأبلغ مالك الحساب." }, { status: 400 }) };
+      return { ok: false, response: NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة، وإن تكرر الخطأ فأبلغ مالك الحساب." }, { status: 400 }) };
     }
     raw = {};
   }

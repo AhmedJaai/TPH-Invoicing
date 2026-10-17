@@ -86,7 +86,7 @@ async function handle(request: Request) {
     .from(bankTransactions)
     .where(eq(bankTransactions.id, body.transactionId));
 
-  if (!tx) return NextResponse.json({ error: "لا توجد هذه الحركة" }, { status: 404 });
+  if (!tx) return NextResponse.json({ error: "هذه الحركة غير موجودة" }, { status: 404 });
   if (tx.matchedPaymentId) {
     /*
       ضغطةٌ ثانية بعد انقطاعٍ نجح فيه الطلب الأوّل ليست خطأً من صاحبها.
@@ -105,10 +105,10 @@ async function handle(request: Request) {
       .orderBy(desc(decisionHistory.createdAt))
       .limit(1);
     if (recent) {
-      return NextResponse.json({ ok: true, message: "قيّدت من قبل — لم يكتب شيء ثانيةً" });
+      return NextResponse.json({ ok: true, message: "قُيّدت هذه الحركة من قبل، ولم يُسجَّل شيء جديد" });
     }
     return NextResponse.json(
-      { error: "هذه الحركة سجّلت سداداً من قبل — افتحها في صفحة البنك لترى دفعتها" },
+      { error: "سُجّل لهذه الحركة سداد من قبل. افتحها في صفحة البنك لترى دفعتها." },
       { status: 409 },
     );
   }
@@ -136,8 +136,8 @@ async function handle(request: Request) {
       }
       return NextResponse.json({
         ok: true,
-        message: `ربطت بسداد قيّدته بيدك (${formatRiyalsDisplay(link.paymentMinor)}${link.invoices[0] ? ` · ${link.invoices[0].number}` : ""}) — لم تنشأ دفعة ثانية`
-          + (link.extraMinor > 0 ? ` · وزادت ${formatRiyalsDisplay(link.extraMinor)} رصيداً للمورّد` : ""),
+        message: `تم الربط بسداد قيّدته بنفسك (${formatRiyalsDisplay(link.paymentMinor)}${link.invoices[0] ? ` · ${link.invoices[0].number}` : ""})، ولم تُنشأ دفعة ثانية`
+          + (link.extraMinor > 0 ? ` · وزاد ${formatRiyalsDisplay(link.extraMinor)} رصيداً للمورّد` : ""),
       });
     }
   }
@@ -160,7 +160,7 @@ async function handle(request: Request) {
       const supplierId = body.supplierId ?? tx.supplierId;
       if (!supplierId) {
         return NextResponse.json(
-          { error: "الدفعة المقدّمة تحتاج مورّداً — لمن دفعت؟" },
+          { error: "الدفعة المقدّمة تحتاج مورّداً. حدّد المورّد الذي دفعت له." },
           { status: 400 },
         );
       }
@@ -207,7 +207,7 @@ async function handle(request: Request) {
 
       return NextResponse.json({
         ok: true,
-        message: "قيّدت دفعةً مقدّمة — تخصّص على فاتورة المورّد حين تصل",
+        message: "تم قيد دفعة مقدّمة، وتُخصَّم من فاتورة المورّد حين تصل",
       });
     }
 
@@ -257,7 +257,7 @@ async function handle(request: Request) {
       }, t);
     });
 
-    return NextResponse.json({ ok: true, message: `حفظت: ${kind.label}` });
+    return NextResponse.json({ ok: true, message: `تم الحفظ: ${kind.label}` });
   }
 
   /* ── سدادٌ على حساب المورّد ── */
@@ -282,7 +282,7 @@ async function handle(request: Request) {
     const supplierId = [...suppliers][0];
     if (suppliers.size !== 1 || !supplierId) {
       return NextResponse.json(
-        { error: "لا يسدّد حساب بلا مورّد واحد يجمع الحركات" },
+        { error: "لا يمكن تسجيل سداد على حساب دون مورّد واحد تُجمع عليه الحركات" },
         { status: 400 },
       );
     }
@@ -292,7 +292,7 @@ async function handle(request: Request) {
     const already = group.filter((g) => g.matchedPaymentId !== null);
     if (already.length > 0) {
       return NextResponse.json(
-        { error: `${already.length} من هذه الحركات سجّلت سداداً بالفعل` },
+        { error: `سُجّل سداد لـ${already.length} من هذه الحركات بالفعل` },
         { status: 409 },
       );
     }
@@ -308,7 +308,7 @@ async function handle(request: Request) {
     (يعيد الحساب في الخادم)، والسداد على الحساب بـ settleSupplier أعلاه.
   */
   return NextResponse.json(
-    { error: "حدّد الفعل: سداد على حساب المورّد، أو «ليست سداداً»" },
+    { error: "حدّد الإجراء: سداد على حساب المورّد، أو «ليست سداداً»" },
     { status: 400 },
   );
 }
@@ -459,10 +459,10 @@ async function settleAccounts(
     unapplied: unappliedTotal,
     supplierBalanceAfter: left,
     message: invoiceCount === 0
-      ? `قيّد ${money(allocatedTotal + unappliedTotal)} على حساب المورّد — لا فاتورة مفتوحة تقابله، فبقي غير مخصّص`
-      : `سدّد ${money(allocatedTotal)} على ${countNoun(invoiceCount, INVOICE)} بالأقدم أوّلاً (لا رقم فاتورة في الحوالة)`
-        + (unappliedTotal > 0 ? ` · وبقي ${money(unappliedTotal)} غير مخصّص` : "")
+      ? `تم قيد ${money(allocatedTotal + unappliedTotal)} على حساب المورّد، وبقي غير مخصّص لعدم وجود فاتورة مفتوحة تقابله`
+      : `تم سداد ${money(allocatedTotal)} على ${countNoun(invoiceCount, INVOICE)} بالأقدم أولاً (لا يوجد رقم فاتورة في الحوالة)`
+        + (unappliedTotal > 0 ? ` · ويبقى ${money(unappliedTotal)} غير مخصّص` : "")
         + ` · رصيد المورّد بعدها ${money(left)}`
-        + (adopted > 0 ? ` · و${adopted} منها كانت مقيّدةً من إيصالها فلم تكرّر` : ""),
+        + (adopted > 0 ? ` · و${adopted} منها كانت مقيّدة من إيصالها فلم تُقيَّد مرة ثانية` : ""),
   });
 }

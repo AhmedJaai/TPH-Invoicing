@@ -45,7 +45,7 @@ describe("مقارنة السعر لحظة المراجعة", () => {
       last([["سكر", 1_000], ["ملح", 1_000]]),
     );
     const text = priceObjection("المراعي", moves, (m) => (m / 100).toFixed(2), (d) => d);
-    expect(text).toContain("سكر: 11.00 — وكان 10.00 في 2026-09-01");
+    expect(text).toContain("سكر: 11.00 (كان 10.00 في 2026-09-01)");
     expect(text).not.toContain("ملح");
   });
 });

@@ -34,7 +34,7 @@ export function RejectDocument({ documentId, cancel = false, redirectTo }: {
     return (
       <button type="button" className={buttonClass(cancel ? "danger" : "quiet", "sm")} onClick={() => setAsking(true)}>
         <Ban className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        {cancel ? "ألغ الفاتورة" : "ارفضه"}
+        {cancel ? "ألغِ الفاتورة" : "ارفض المستند"}
       </button>
     );
   }
@@ -45,7 +45,7 @@ export function RejectDocument({ documentId, cancel = false, redirectTo }: {
         type="text"
         value={reason}
         onChange={(e) => setReason(e.target.value)}
-        placeholder="السبب (اختياريّ)"
+        placeholder="السبب (اختياري)"
         aria-label={cancel ? "سبب الإلغاء" : "سبب الرفض"}
         autoFocus
         className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-2.5 text-xs sm:min-h-8 sm:w-44 sm:flex-none"
@@ -63,16 +63,16 @@ export function RejectDocument({ documentId, cancel = false, redirectTo }: {
           if (!r.ok) { setError(r.error); return; }
           toast({
             tone: "info",
-            title: cancel ? "ألغيت الفاتورة" : "رفض المستند",
+            title: cancel ? "تم إلغاء الفاتورة" : "تم رفض المستند",
             body: cancel
-              ? "خرجت من المستحقّ، وبقي ملفّها في الدرايف والأثر في السجلّ."
-              : "بقي ملفّه في الدرايف — تجده تحت «رفض» في المستندات، ومنه يعاد إلى المراجعة.",
+              ? "خرجت من المبالغ المستحقة، وبقي ملفها في الدرايف وأثرها في السجلّ."
+              : "بقي ملفه في الدرايف. تجده تحت «رفض» في المستندات، ويمكنك إعادته منه إلى المراجعة.",
           });
           if (redirectTo) router.push(redirectTo);
           else router.refresh();
         }}
       >
-        {cancel ? "نعم، ألغها" : "نعم، ارفضه"}
+        {cancel ? "نعم، ألغِها" : "نعم، ارفضه"}
       </button>
       <button type="button" className={buttonClass("quiet", "sm")} onClick={() => { setAsking(false); setError(null); }}>
         تراجع

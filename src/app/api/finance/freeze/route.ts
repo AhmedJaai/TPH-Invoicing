@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const read = await readJson(request, Body);
     if (!read.ok) return read.response;
     await freezePnl(read.body.month, user.id);
-    return NextResponse.json({ ok: true, message: "جمّد تقرير الشهر كما هو الآن" });
+    return NextResponse.json({ ok: true, message: "تم تجميد تقرير الشهر بحالته الآن" });
   } catch (e) {
     if (e instanceof FreezeRefused) return NextResponse.json({ error: e.message }, { status: 409 });
     const mapped = respondTo(e);

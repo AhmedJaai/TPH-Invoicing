@@ -57,7 +57,7 @@ export function Sidebar({
   const area = activeArea(pathname);
 
   return (
-    <nav className="flex h-full flex-col" aria-label="التنقّل الرئيسيّ">
+    <nav className="flex h-full flex-col" aria-label="التنقل الرئيسي">
       <div className="flex items-center gap-2.5 px-4 pb-4 pt-5">
         <Link href={homeHref(role)} className="flex min-w-0 items-center gap-2.5 rounded-lg">
           <BrandMark className="h-8 w-auto text-frame-accent" />
@@ -253,7 +253,7 @@ export function MobileTabBar({
         </nav>
       </div>
 
-      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="كلّ المساحات">
+      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="كل المساحات">
         {/* زرُّ الوسط يفتح الكاميرا وحدها — وهذا بابُ الملفّ (PDF وصل في واتساب) من حيث أنت */}
         {canCapture && (
           <div className="mb-4">
@@ -341,9 +341,9 @@ function AreaDot({ counts, href, frame }: { counts: Promise<ShellCounts>; href: 
   const n = use(counts).areas?.[href] ?? 0;
   if (n === 0) return null;
   return (
-    <span className="relative grid h-4 w-4 shrink-0 place-items-center" data-tip={`فيها ${n} ممّا يحتاج قرارك`}>
+    <span className="relative grid h-4 w-4 shrink-0 place-items-center" data-tip={`فيها ${n} مما يحتاج قرارك`}>
       <span aria-hidden className={`h-2 w-2 rounded-full ${frame ? "bg-frame-accent" : "bg-accent"}`} />
-      <span className="sr-only">فيها {n} ممّا يحتاج قرارك</span>
+      <span className="sr-only">فيها {n} مما يحتاج قرارك</span>
     </span>
   );
 }
@@ -384,7 +384,7 @@ export function CaptureButton({ role, variant }: { role: Role; variant: "frame" 
     if (!files?.length) return;
     const n = queueCapture(files);
     if (n === 0) {
-      toast({ tone: "warn", title: "لا يقرأ إلّا PDF أو صورة.", body: "اختر فاتورةً أو إيصالاً أو كشفاً بإحدى الصيغتين." });
+      toast({ tone: "warn", title: "الملفات المقبولة هي PDF أو الصور فقط.", body: "اختر فاتورة أو إيصالاً أو كشفاً بإحدى هاتين الصيغتين." });
       return;
     }
     router.push("/upload");
@@ -434,8 +434,8 @@ export function CaptureButton({ role, variant }: { role: Role; variant: "frame" 
         >
           <FolderOpen className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
           <span className="min-w-0">
-            ارفع ملفّاً من جهازك
-            <span className="block text-[11px] font-medium text-ink-soft">PDF أو صور محفوظة — وزرّ الوسط للكاميرا</span>
+            ارفع ملفاً من جهازك
+            <span className="block text-[11px] font-medium text-ink-soft">PDF أو صور محفوظة. وزر الوسط للكاميرا</span>
           </span>
         </button>
       </>

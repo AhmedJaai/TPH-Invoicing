@@ -106,7 +106,7 @@ const KEYWORDS: readonly Keyword[] = [
     ولا تُطابَق هنا «Tax» وحدها: وصفُ زاتكا يحملها
     («Zakat, Tax and Customs») وهي سدادٌ حكوميّ لا ضريبةُ رسم.
   */
-  { match: VAT_RE, kind: "BANK_VAT", direction: "DEBIT", label: "ضريبة على رسمٍ بنكيّ" },
+  { match: VAT_RE, kind: "BANK_VAT", direction: "DEBIT", label: "ضريبة على رسم بنكي" },
   /*
     ولا تُقيَّد بأوّل النصّ وآخره: `searchText` يجمع الوصف والنوع
     والمستفيد، فالرسو التي كانت تُعرَف حين يغيب نوعها خرجت مجهولةً
@@ -131,11 +131,11 @@ const KEYWORDS: readonly Keyword[] = [
   { match: /\bMinistry\s+of\b|وزاره\s|امانه\s|بلديه/i, kind: "GOVERNMENT", direction: "DEBIT", label: "جهة حكومية" },
   { match: /التامينات\s*الاجتماعيه|\bGOSI\b/i, kind: "GOVERNMENT", direction: "DEBIT", label: "التأمينات الاجتماعية" },
   { match: /\bEJAR\b|ايجار|شبكه\s*ايجار/i, kind: "RENT", direction: "DEBIT", label: "منصّة إيجار" },
-  { match: /رواتب|\bSALARY\b|\bPAYROLL\b|Monthly\s*Sal/i, kind: "SALARY", direction: "DEBIT", label: "وصفٌ يقول راتباً" },
+  { match: /رواتب|\bSALARY\b|\bPAYROLL\b|Monthly\s*Sal/i, kind: "SALARY", direction: "DEBIT", label: "الوصف يدلّ على راتب" },
   { match: /\bSTC\b|\bMOBILY\b|\bZAIN\b|الاتصالات\s*السعوديه/i, kind: "UTILITY", direction: "DEBIT", label: "مشغّل اتصالات" },
   { match: /Saudi\s*Energy|الشركه\s*السعوديه\s*للكهرباء|كهرباء|\bSWCC\b|مياه/i, kind: "UTILITY", direction: "DEBIT", label: "كهرباء أو مياه" },
   { match: /زكاه|صدقه|جمعيه\s*خيريه/i, kind: "ZAKAT", direction: "DEBIT", label: "زكاة أو صدقة" },
-  { match: /رسوم\s*تحويل|رسوم\s*شهريه|Service\s*Charge|\bFEE\b/i, kind: "BANK_FEE", direction: "DEBIT", label: "رسم بنكيّ مصرَّح" },
+  { match: /رسوم\s*تحويل|رسوم\s*شهريه|Service\s*Charge|\bFEE\b/i, kind: "BANK_FEE", direction: "DEBIT", label: "رسم بنكي معروف" },
   { match: /تحويل\s*داخلي|Internal\s*Transfer|بين\s*حسابات/i, kind: "INTERNAL_TRANSFER", label: "تحويل بين حسابات" },
 ];
 
@@ -167,7 +167,7 @@ export function classify(
       layer: "STRUCTURE",
       source: "STRUCTURE",
       ruleId: null,
-      reason: `بنية الوصف تقول إنّها حركة شبكة${tx.pos.scheme ? ` (${tx.pos.scheme})` : ""}`,
+      reason: `وصف الحركة يدلّ على أنها حركة شبكة${tx.pos.scheme ? ` (${tx.pos.scheme})` : ""}`,
       merchantKey: tx.pos.merchantId ? `POS:${tx.pos.merchantId}` : null,
     };
   }
@@ -242,7 +242,7 @@ export function classify(
       layer: "AMOUNT",
       source: "AMOUNT",
       ruleId: null,
-      reason: "صادرٌ أقلّ من عشرين ريالاً وليس ضريبة — رسمُ بنك بحكم مقداره",
+      reason: "صادر أقل من عشرين ريالاً وليس ضريبة، فيُعدّ رسماً بنكياً بحكم مقداره",
       merchantKey: key,
     };
   }
@@ -255,8 +255,8 @@ export function classify(
     ruleId: null,
     reason:
       tx.direction === "CREDIT"
-        ? "وارد لم يُعرف مصدره — ولا يُفترَض أنّه ضجيج"
-        : "لم يُعرف المستفيد ولا دلّ الوصف على بابٍ",
+        ? "وارد لم يُعرف مصدره، ولا يُعدّ حركة غير مهمة"
+        : "لم يُعرف المستفيد ولا يدلّ الوصف على التصنيف",
     merchantKey: key,
   };
 }

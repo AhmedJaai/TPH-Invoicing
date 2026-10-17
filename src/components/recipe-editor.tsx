@@ -94,7 +94,7 @@ export function RecipeEditor({
     setMessage(null);
     setLines([{ productId: "", quantity: "", unit: "G", prepLossPercent: "" }]);
     setOpen(false);
-    toast({ tone: "ok", title: String(r.data.message ?? "حفظت الوصفة وفعّلت.") });
+    toast({ tone: "ok", title: String(r.data.message ?? "تم حفظ الوصفة وتفعيلها.") });
     router.refresh();
   }
 
@@ -109,7 +109,7 @@ export function RecipeEditor({
         onClose={() => setOpen(false)}
         size="lg"
         title="وصفة جديدة أو نسخة جديدة"
-        description="غيّرت الجرعة؟ اكتب نسخةً بتاريخ التغيير — وتغلق السابقة في اليوم الذي قبله، فتبقى تقارير ما مضى محسوبةً بما كان عاملاً فيها."
+        description="هل تغيّرت الكمية؟ أضف نسخة جديدة بتاريخ التغيير. تُغلق النسخة السابقة في اليوم الذي قبله، فتبقى تقارير الفترات الماضية محسوبة بالوصفة التي كانت سارية فيها."
         footer={
           <>
             {message && <p role={failed ? "alert" : "status"} className={`me-auto self-center text-xs ${failed ? "text-danger" : "text-ok"}`}>{message}</p>}
@@ -210,8 +210,8 @@ export function RecipeEditor({
         </button>
 
         <p className="mt-4 text-[11px] leading-relaxed text-muted">
-          «فاقد التجهيز» نسبة ما يصرف من الرفّ ولا يصل الكوب — يترك فارغاً إن لم يقس، ولا يفترض صفراً
-          في الحساب إلّا بمعنى «لم يقس».
+          «فاقد التجهيز» هو نسبة ما يُصرف من الرف ولا يصل إلى الكوب. اتركه فارغاً إن لم تقِسه؛
+          الفراغ يعني «لم يُقَس» وليس صفراً في الحساب.
         </p>
       </Sheet>
     </>

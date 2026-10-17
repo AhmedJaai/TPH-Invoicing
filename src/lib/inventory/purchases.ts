@@ -66,10 +66,10 @@ export type PurchaseGapReason =
   | "UNIT_FAMILY_MISMATCH";
 
 export const PURCHASE_GAP_LABEL: Record<PurchaseGapReason, string> = {
-  UNLINKED_PRODUCT: "بند غير مربوط بصنف معياريّ",
-  NO_PACK_SPEC: "مواصفة عبوة المورّد غير معروفة — فلا تعرف الكمّيّة",
-  MISSING_QUANTITY: "الكمّيّة غير مقروءة في الفاتورة",
-  UNIT_FAMILY_MISMATCH: "وحدة العبوة لا تحوّل إلى وحدة الصنف — وزن وحجم",
+  UNLINKED_PRODUCT: "بند غير مربوط بصنف معياري",
+  NO_PACK_SPEC: "مواصفة عبوة المورّد غير معروفة، فالكمية غير معروفة",
+  MISSING_QUANTITY: "الكمية غير مقروءة في الفاتورة",
+  UNIT_FAMILY_MISMATCH: "وحدة العبوة لا يمكن تحويلها إلى وحدة الصنف (وزن مقابل حجم)",
 };
 
 export type PurchaseQuantity =

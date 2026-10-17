@@ -65,9 +65,9 @@ export function snoozeOptions(today: string): { label: string; day: string }[] {
   const nextMonth = isoDay(new Date(Date.UTC(y, m, 1)));
   const options = [
     { label: "غداً", day: addDays(today, 1) },
-    { label: "بعد ٣ أيّام", day: addDays(today, 3) },
+    { label: "بعد ٣ أيام", day: addDays(today, 3) },
     { label: "بعد أسبوع", day: addDays(today, 7) },
-    { label: "أوّل الشهر القادم", day: nextMonth },
+    { label: "أول الشهر القادم", day: nextMonth },
   ];
   /* أوّلُ الشهر قد يكون غداً أو بعد ثلاثة — لا يُعرض اليومُ نفسُه مرّتين */
   return options.filter((o, i) => options.findIndex((x) => x.day === o.day) === i && validSnoozeDay(o.day, today));

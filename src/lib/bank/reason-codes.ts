@@ -30,7 +30,7 @@ export const REASON_LABEL: Record<ReasonCode, string> = {
   AMOUNT_EXACT: "المبلغ يطابق تماماً",
   AMOUNT_CLOSE: "المبلغ قريب",
   DATE_CLOSE: "التاريخ قريب",
-  HISTORICAL_PATTERN: "نمطٌ سابق أكّدتَه",
+  HISTORICAL_PATTERN: "نمط سابق أكّدته",
   CANDIDATE_MARGIN: "يسبق التالي بفارق واضح",
   ONLY_CANDIDATE: "لا منافس له",
 };

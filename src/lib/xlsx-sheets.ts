@@ -43,6 +43,6 @@ export function sheetsToWorkbook(sheets: readonly Sheet[]): XLSX.WorkBook {
 
 export function sheetsToXlsx(sheets: readonly Sheet[]): Uint8Array {
   const out: unknown = XLSX.write(sheetsToWorkbook(sheets), { type: "buffer", bookType: "xlsx" });
-  if (!(out instanceof Uint8Array)) throw new Error("تعذّرت كتابة الملفّ");
+  if (!(out instanceof Uint8Array)) throw new Error("تعذّر إنشاء الملف");
   return new Uint8Array(out);
 }

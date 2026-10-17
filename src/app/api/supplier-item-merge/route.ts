@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const out = await db.transaction((tx) => mergeSupplierItems(tx, read.body, user.id));
     return NextResponse.json({
       ok: true,
-      message: out.linesMoved === 1 ? "دمج — ونقل بند واحد" : `دمج — ونقلت بنوده (${out.linesMoved})`,
+      message: out.linesMoved === 1 ? "تم الدمج ونقل بند واحد" : `تم الدمج ونقل بنوده (${out.linesMoved})`,
     });
   } catch (e) {
     if (e instanceof ItemMergeRefused) return NextResponse.json({ error: e.message }, { status: e.status });

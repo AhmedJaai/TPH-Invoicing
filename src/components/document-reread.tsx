@@ -80,12 +80,12 @@ export function DocumentReread({
     if (apply) {
       setPreview(null);
       const text = r.data.savedForRecording
-        ? "حفظت القراءة على المستند — قيّده الآن من «عاينها وقيّدها» أدناه."
-        : `كتبت القراءة — ${countNoun(r.data.linesWritten ?? 0, ITEM)}.`
-        + (r.data.taxStatus === "VALID" ? " وصارت الفاتورة مستوفية الأركان." : "")
+        ? "حُفظت القراءة على المستند. قيّده الآن من «عاينها وقيّدها» أدناه."
+        : `سُجّلت القراءة: ${countNoun(r.data.linesWritten ?? 0, ITEM)}.`
+        + (r.data.taxStatus === "VALID" ? " وأصبحت الفاتورة مستوفية الشروط الضريبية." : "")
         + (r.data.problem ? ` ${r.data.problem}` : "");
       setDone(text);
-      toast({ tone: r.data.problem ? "warn" : "ok", title: "أقرّت القراءة الجديدة", body: text });
+      toast({ tone: r.data.problem ? "warn" : "ok", title: "تم اعتماد القراءة الجديدة", body: text });
       router.refresh();
       return;
     }
@@ -102,7 +102,7 @@ export function DocumentReread({
           className={buttonClass("secondary", "sm")}
         >
           <ScanText className={`h-3.5 w-3.5 ${busy ? "animate-pulse" : ""}`} strokeWidth={2} aria-hidden />
-          {busy ? "يقرأ المستند… (حتى دقيقة)" : "أعد قراءة المستند"}
+          {busy ? "جارٍ قراءة المستند… (قد يستغرق دقيقة)" : "أعد قراءة المستند"}
         </button>
       )}
 
@@ -115,7 +115,7 @@ export function DocumentReread({
 
       {preview?.read && (
         <div className="w-full rounded-xl border border-accent-line bg-raised p-3.5 shadow-raised">
-          <p className="text-xs font-bold">ما قرأه النموذج الآن — لم يكتب بعد</p>
+          <p className="text-xs font-bold">ما قرأه النموذج الآن (لم يُحفظ بعد)</p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{preview.note}</p>
           {preview.problem && (
             <p className="mt-2 rounded-lg bg-warn-bg px-2.5 py-1.5 text-[11px] leading-relaxed text-warn" role="status">
@@ -126,9 +126,9 @@ export function DocumentReread({
           <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] sm:grid-cols-3">
             <Pair label="الصافي" value={money(preview.read.subtotalMinor)} />
             <Pair label="الضريبة" value={money(preview.read.vatMinor)} />
-            <Pair label="الإجماليّ" value={money(preview.read.totalMinor)} />
-            <Pair label="ضريبيّ البائع" value={preview.read.sellerVat ?? "لم يقرأ"} />
-            <Pair label="ضريبيّ المشتري" value={preview.read.buyerVat ?? "لم يقرأ"} />
+            <Pair label="الإجمالي" value={money(preview.read.totalMinor)} />
+            <Pair label="الرقم الضريبي للبائع" value={preview.read.sellerVat ?? "غير مقروء"} />
+            <Pair label="الرقم الضريبي للمشتري" value={preview.read.buyerVat ?? "غير مقروء"} />
             <Pair label="البنود" value={<span className="nums">{preview.read.lineCount}</span>} />
           </dl>
 
@@ -149,8 +149,8 @@ export function DocumentReread({
               لا تُقرأ بنودُها. وقولُ ذلك أصدق من كتابة صفرٍ ثانية.
             */
             <p className="mt-2.5 text-[11px] leading-relaxed text-warn">
-              لم تقرأ بنود هذه المرّة أيضاً — الأرجح أنّ المستند صورة لا يقرأ تفصيلها.
-              اكتب ما تحتاجه بيدك، أو اطلب من المورّد نسخةً أوضح.
+              لم تُقرأ البنود هذه المرة أيضاً، والأرجح أن المستند صورة لا يمكن قراءة تفاصيلها.
+              اكتب ما تحتاجه بنفسك، أو اطلب من المورّد نسخة أوضح.
             </p>
           )}
 
@@ -162,7 +162,7 @@ export function DocumentReread({
               disabled={busy}
               className={buttonClass("primary", "sm")}
             >
-              أقرّ هذه القراءة
+              اعتمد هذه القراءة
             </button>
             <button
               type="button"
@@ -190,6 +190,6 @@ function Pair({ label, value }: { label: string; value: React.ReactNode }) {
 
 /** المجهول يبقى مجهولاً — ولا يُكتَب صفراً. */
 function money(minor: number | null): React.ReactNode {
-  if (minor === null) return <span className="font-normal text-muted">لم يقرأ</span>;
+  if (minor === null) return <span className="font-normal text-muted">غير مقروء</span>;
   return <Money minor={minor} />;
 }

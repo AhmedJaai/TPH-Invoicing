@@ -51,7 +51,7 @@ export default async function InventoryHistoryPage() {
       ),
     },
     {
-      key: "status", header: "الحال",
+      key: "status", header: "الحالة",
       cell: (r) => (
         <span className="flex flex-wrap gap-1">
           <Badge tone={r.status === "FINALISED" ? undefined : "accent"} dot>
@@ -107,7 +107,7 @@ export default async function InventoryHistoryPage() {
       cell: (r) => r.summary.linesMeasured === 0 ? <span className="text-muted">—</span> : <Money minor={r.summary.netCostMinor} />,
     },
     {
-      key: "items", header: "أصناف عدّت", numeric: true, secondary: true,
+      key: "items", header: "الأصناف المعدودة", numeric: true, secondary: true,
       cell: (r) => <span className="nums">{r.itemsCounted} من {r.itemsInScope}</span>,
     },
   ];
@@ -117,7 +117,7 @@ export default async function InventoryHistoryPage() {
       user={user}
       width="wide"
       title="سجلّ الجرد"
-      intro="كلّ جرد مقفل يبقى كما أقفل — لا تغيّره وصفة تعدّل بعده ولا فاتورة تصل."
+      intro="يبقى كل جرد مقفل كما أُقفل، فلا تغيّره وصفة تُعدَّل بعده ولا فاتورة تصل لاحقاً."
       actions={setup.finalised > 0 ? <LinkButton href="/inventory/trend" size="sm" icon={TrendingUp}>الاتّجاه</LinkButton> : undefined}
     >
       {latest && (
@@ -143,14 +143,14 @@ export default async function InventoryHistoryPage() {
         empty={
           <EmptyState
             icon={ClipboardCheck}
-            title="لا جرد في السجلّ بعد."
+            title="لا يوجد جرد في السجل بعد."
             hint={setup.openCountId
-              ? "عندك جرد مفتوح — أكمله وأقفله فيظهر هنا بأرقامه مجمّدة."
+              ? "لديك جرد مفتوح. أكمله وأقفله ليظهر هنا بأرقامه النهائية."
               : progress.next === "catalog"
-                ? "يمتلئ السجلّ بأوّل جرد يقفل. والطريق إليه يبدأ بكتالوج فودكس، ثمّ ملفّ المبيعات، ثمّ العدّ."
+                ? "يمتلئ السجل عند إقفال أول جرد. ابدأ بكتالوج فودكس، ثم ملف المبيعات، ثم العدّ."
                 : progress.next === "sales"
-                  ? "الكتالوج عندك — بقي ملفّ مبيعات الأسبوع، ثمّ تبدأ أوّل جرد."
-                  : "كلّ ما يلزم عندك — ابدأ أوّل جرد أسبوعيّ وأقفله، فيظهر هنا."}
+                  ? "الكتالوج جاهز. ارفع ملف مبيعات الأسبوع، ثم ابدأ أول جرد."
+                  : "كل ما يلزم جاهز. ابدأ أول جرد أسبوعي وأقفله ليظهر هنا."}
             action={
               setup.openCountId ? <LinkButton href="/inventory" variant="primary" size="sm">أكمل الجرد المفتوح</LinkButton>
                 : progress.next === "catalog" ? <LinkButton href="/inventory/import#catalog" variant="primary" size="sm">ارفع كتالوج فودكس</LinkButton>
@@ -162,7 +162,7 @@ export default async function InventoryHistoryPage() {
       />
       {rows.some((r) => !r.summary.consumptionCostComplete) && (
         <p className="mt-3 text-[11px] leading-relaxed text-muted">
-          * مقام النسبة ناقص: بعض الاستهلاك في ذلك الأسبوع لا تعرف كلفته، فالنسبة على ما عرف وحده.
+          * النسبة غير كاملة: كلفة بعض الاستهلاك في ذلك الأسبوع غير معروفة، فحُسبت النسبة على المعروف منها فقط.
         </p>
       )}
       {/* الهدرُ يُقرأ بعد الجدول، وعطبُه لا يُسقط السجلّ */}

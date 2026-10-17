@@ -110,7 +110,7 @@ export default async function BankPage({
       width="wide"
       /* اسمُ الصفحة هو اسمُ لسانها حرفاً بحرف — «فعلٌ واحد باسمٍ واحد» */
       title="حركة البنك"
-      intro="ما خرج من حسابك وما دخل إليه كما في الكشف — ما ينتظر قرارك أوّلاً، ثمّ السجلّ كاملاً. وكلّ مطابقة تقول لماذا ويتراجع عنها."
+      intro="ما خرج من حسابك وما دخل إليه كما في كشف البنك. تبدأ بما ينتظر قرارك ثم سجل الحركات كاملاً. لكل مطابقة سببها، ويمكنك التراجع عنها."
       actions={canEdit ? (
         <LinkButton href="#import" icon={Upload} variant={empty ? "primary" : "secondary"}>
           استورد كشفاً
@@ -124,8 +124,8 @@ export default async function BankPage({
         */
         <EmptyState
           icon={Landmark}
-          title="استورد أوّل كشف لحسابك."
-          hint="بلا كشف لا يعرف النظام ما خرج ولا ما دخل، ولا أيّ فاتورة سدّدت — فلا يعرض هنا رقم يقرأ صفراً. نزّل كشف الحساب من بنكك (Excel أو PDF) وارفعه أدناه؛ تعرض عليك معاينة قبل أن يحفظ شيء."
+          title="استورد أول كشف حساب."
+          hint="بدون كشف لا يعرف النظام ما خرج من حسابك ولا ما دخل، ولا أي فاتورة سُدّدت، لذلك لا تظهر هنا أي أرقام. نزّل كشف الحساب من بنكك (Excel أو PDF) وارفعه أدناه. ستظهر لك معاينة قبل حفظ أي شيء."
           action={canEdit ? <LinkButton href="#import" variant="primary" icon={Upload}>ابدأ الاستيراد</LinkButton> : undefined}
         />
       ) : (
@@ -144,8 +144,8 @@ export default async function BankPage({
             <div id="double-paid" className="mt-4 flex scroll-mt-28 flex-wrap items-center gap-3 rounded-xl border border-danger/25 bg-danger-bg px-4 py-3">
               <CircleAlert className="h-[18px] w-[18px] shrink-0 text-danger" strokeWidth={2} aria-hidden />
               <p className="min-w-0 flex-1 text-xs leading-relaxed text-ink-soft">
-                <span className="block text-[13px] font-bold text-danger">مال خرج مرّتين في يوم واحد — {countNoun(doublePaid, ITEM)}</span>
-                يطالب به الجهة ويستردّ، ولا يصلح في قيدنا.
+                <span className="block text-[13px] font-bold text-danger">مبلغ خرج مرتين في يوم واحد: {countNoun(doublePaid, ITEM)}</span>
+                يمكنك مطالبة الجهة المستلمة باسترداده، ولا يمكن تصحيحه بقيد في النظام.
               </p>
               <LinkButton href="/attention?item=duplicate-payments" variant="primary" size="sm">احسمه في «يحتاج قرارك»</LinkButton>
             </div>
@@ -158,7 +158,7 @@ export default async function BankPage({
             icon={Inbox}
             count={queue.groups.length + held.length > 0 ? queue.groups.length + held.length : undefined}
             hint={queue.groups.length > 0
-              ? `${countNoun(queue.groups.length, GROUP)} تضمّ ${countNoun(queuedTx, TRANSACTION)} — سؤال واحد عن كلّ ما يتشابه، وما تؤكّده يصير ذاكرة.`
+              ? `${countNoun(queue.groups.length, GROUP)} تضم ${countNoun(queuedTx, TRANSACTION)}. نسأل سؤالاً واحداً عن الحركات المتشابهة، وما تؤكده يتذكره النظام.`
               : undefined}
           >
             {/*
@@ -169,10 +169,10 @@ export default async function BankPage({
               <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-accent-line bg-accent-soft/50 px-4 py-3">
                 <p className="min-w-0 flex-1 text-xs leading-relaxed">
                   <span className="font-bold">
-                    {handLinks.length === 1 ? "حركة هنا سدادها مقيّد بيدك من قبل" : `${countNoun(handLinks.length, TRANSACTION)} هنا لكلّ منها سداد قيّدته بيدك من قبل`}
+                    {handLinks.length === 1 ? "حركة هنا سبق أن قيّدت سدادها يدوياً" : `${countNoun(handLinks.length, TRANSACTION)} هنا سبق أن قيّدت سداد كل منها يدوياً`}
                   </span>
-                  {" — "}{handLinks.map((l) => `${l.supplierName} ${formatRiyalsDisplay(l.transferMinor)}`).join("، ")}.
-                  {" "}أغلقت الفاتورة بذلك السداد، فلم يجد المطابق فاتورةً مفتوحة. اربطها ولا تقيّدها مرّةً ثانية.
+                  {": "}{handLinks.map((l) => `${l.supplierName} ${formatRiyalsDisplay(l.transferMinor)}`).join("، ")}.
+                  {" "}أُغلقت الفاتورة بذلك السداد، فلم يجد النظام فاتورة مفتوحة للمطابقة. اربط الحركة بالسداد ولا تقيّده مرة ثانية.
                 </p>
                 <AccountReview size="sm" variant="primary" />
               </div>
@@ -184,10 +184,10 @@ export default async function BankPage({
               <div className="flex flex-wrap items-center gap-3 rounded-xl border border-ok/25 bg-ok-bg px-5 py-4">
                 <CircleCheck className="h-6 w-6 shrink-0 text-ok" strokeWidth={2} aria-hidden />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-ok">لا حركة في الكشف تنتظر تعريفاً.</p>
+                  <p className="text-sm font-bold text-ok">لا توجد حركات في الكشف تنتظر تصنيفاً.</p>
                   <p className="mt-0.5 text-xs text-ink-soft">
-                    كلّ ما استورد عرف بابه{coverage.lastDay ? <> حتى <bdi>{formatDay(coverage.lastDay)}</bdi></> : null}
-                    {stale ? " — وما بعده لم يستورد بعد." : "."} وحوالات المورّدين التي تنتظر فاتورتها في «يحتاج قرارك».
+                    صُنّفت كل الحركات المستوردة{coverage.lastDay ? <> حتى <bdi>{formatDay(coverage.lastDay)}</bdi></> : null}
+                    {stale ? "، وما بعد ذلك لم يُستورد بعد." : "."} أما حوالات المورّدين التي تنتظر فاتورتها فتجدها في «يحتاج قرارك».
                   </p>
                 </div>
                 <Link href="/attention" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline sm:min-h-0">
@@ -202,7 +202,7 @@ export default async function BankPage({
             id="transactions"
             title="سجلّ الحركات"
             icon={ListFilter}
-            hint="لمن خرج المال وممّن دخل، وأين وقفت كلّ حركة. والحال يشتقّ من الحركة نفسها لا من ترجيح قديم."
+            hint="لمن خرج المال ومن أين دخل، وحالة كل حركة. تُحسب الحالة من الحركة نفسها دائماً."
           >
             <div className="mb-3 space-y-2">
               <LinkTabs
@@ -215,7 +215,7 @@ export default async function BankPage({
                 <LinkTabs
                   label="الشهر"
                   items={[
-                    { href: href({ month: null }), label: "كلّ الأشهر", active: month === null },
+                    { href: href({ month: null }), label: "كل الأشهر", active: month === null },
                     ...ledger.months.map((m) => ({ href: href({ month: m }), label: formatMonth(m), active: m === month })),
                   ]}
                 />
@@ -230,8 +230,8 @@ export default async function BankPage({
                   name="q"
                   type="search"
                   defaultValue={search?.text ?? ""}
-                  placeholder="ابحث في كلّ الحركات: مبلغ أو اسم أو نصّ البنك"
-                  aria-label="ابحث في كلّ الحركات بالمبلغ أو الاسم أو نصّ البنك"
+                  placeholder="ابحث في كل الحركات: مبلغ أو اسم أو نص البنك"
+                  aria-label="ابحث في كل الحركات بالمبلغ أو الاسم أو نص البنك"
                   dir="auto"
                   className="min-h-11 w-full rounded-lg border border-line-input bg-raised ps-9 pe-3 text-sm sm:min-h-9"
                 />
@@ -244,15 +244,15 @@ export default async function BankPage({
 
             {search ? (
               <p className="mb-3 text-xs text-ink-soft" role="status">
-                {ledger.total === 0 ? "لا حركة تطابق" : <><span className="nums">{ledger.total}</span> تطابق</>} «<bdi>{search.text}</bdi>»
-                {search.amount ? " (مبلغاً أو نصّاً)" : ""} في «{VIEW_LABEL[view]}»{month ? ` في ${formatMonth(month)}` : " في كلّ الأشهر"}
-                {ledger.total > ledger.rows.length && <> — يعرض أحدث <span className="nums">{ledger.rows.length}</span>؛ ضيّق البحث أو اختر شهراً</>}
-                {view !== "all" && <> · <Link href={href({ show: "all" })} className="font-bold text-accent hover:underline">ابحث في كلّ الأنواع</Link></>}
+                {ledger.total === 0 ? "لا توجد حركات تطابق" : <><span className="nums">{ledger.total}</span> نتيجة تطابق</>} «<bdi>{search.text}</bdi>»
+                {search.amount ? " (مبلغاً أو نصاً)" : ""} في «{VIEW_LABEL[view]}»{month ? ` في ${formatMonth(month)}` : " في كل الأشهر"}
+                {ledger.total > ledger.rows.length && <>. المعروض أحدث <span className="nums">{ledger.rows.length}</span>، ضيّق البحث أو اختر شهراً</>}
+                {view !== "all" && <> · <Link href={href({ show: "all" })} className="font-bold text-accent hover:underline">ابحث في كل الأنواع</Link></>}
               </p>
             ) : ledger.total > ledger.rows.length && (
               <p className="mb-3 flex items-start gap-2 text-xs text-muted">
                 <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-                <span>يعرض أحدث {countNoun(txLimit(month), TRANSACTION)} من <span className="nums">{ledger.total}</span>. ابحث أعلاه في الحركات كلّها، أو اختر شهراً لترى حركاته.</span>
+                <span>المعروض أحدث {countNoun(txLimit(month), TRANSACTION)} من <span className="nums">{ledger.total}</span>. ابحث أعلاه في كل الحركات، أو اختر شهراً لترى حركاته.</span>
               </p>
             )}
 
@@ -266,9 +266,9 @@ export default async function BankPage({
                 <EmptyState
                   compact
                   icon={ListFilter}
-                  title={search ? `لا حركة تطابق «${search.text}».` : `لا حركات في «${VIEW_LABEL[view]}»${month ? ` في ${formatMonth(month)}` : ""}.`}
-                  hint="جرّب لساناً آخر أو شهراً آخر."
-                  action={<LinkButton href={href({ show: "all", month: null })} size="sm">اعرض الكلّ</LinkButton>}
+                  title={search ? `لا توجد حركات تطابق «${search.text}».` : `لا توجد حركات في «${VIEW_LABEL[view]}»${month ? ` في ${formatMonth(month)}` : ""}.`}
+                  hint="جرّب نوعاً آخر أو شهراً آخر."
+                  action={<LinkButton href={href({ show: "all", month: null })} size="sm">اعرض الكل</LinkButton>}
                 />
               }
               columns={[
@@ -287,7 +287,7 @@ export default async function BankPage({
                   ),
                 },
                 { key: "date", header: "التاريخ", cell: (t) => <bdi className="whitespace-nowrap text-ink-soft">{formatDay(t.valueDate)}</bdi> },
-                { key: "kind", header: "الباب", secondary: true, cell: (t) => <CategoryBadge category={t.category} /> },
+                { key: "kind", header: "التصنيف", secondary: true, cell: (t) => <CategoryBadge category={t.category} /> },
                 {
                   key: "amount", header: "المبلغ", numeric: true,
                   cell: (t) => (
@@ -312,11 +312,11 @@ export default async function BankPage({
         id="import"
         title="استيراد كشف"
         icon={Upload}
-        hint="الملفّ الذي استورد من قبل لا يتكرّر — تقيّد الحركات الجديدة وحدها، وتعرض عليك قبل أن تحفظ."
+        hint="لا يُستورد الملف نفسه مرتين، فتُسجَّل الحركات الجديدة فقط. ستظهر لك معاينة قبل الحفظ."
       >
         {canEdit
           ? <BankImport openInvoiceCount={coverage.openInvoices} suppliers={queue.suppliers} />
-          : <EmptyState compact title="استيراد الكشف خارج صلاحيتك." hint="اطلب من مالك الحساب أن يستورده، أو أن يوسّع صلاحيتك." />}
+          : <EmptyState compact title="ليست لديك صلاحية استيراد الكشف." hint="اطلب من مالك الحساب أن يستورده أو أن يمنحك الصلاحية." />}
       </Section>
     </PageShell>
   );
@@ -352,7 +352,7 @@ function CoverageBand({
           </p>
           <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
             {stale
-              ? <>وقف منذ {countNoun(staleDays, DAY)} — ما بعده لا يعرفه النظام، وكلّ رقم يقف معه.</>
+              ? <>توقف منذ {countNoun(staleDays, DAY)}. لا يعرف النظام ما بعد ذلك، وكل الأرقام مبنية على ما قبله.</>
               : <>من <bdi>{formatDay(firstDay)}</bdi> · {countNoun(txCount, TRANSACTION)}</>}
           </p>
         </div>
@@ -360,7 +360,7 @@ function CoverageBand({
       <dl className="min-w-0">
         <dt className="text-xs font-bold text-muted">إيداعات الشبكة في هذه الفترة</dt>
         <dd className="mt-0.5 text-lg font-bold text-ok"><Money minor={settledMinor} /></dd>
-        <dd className="text-[11px] text-muted">ما دخل من البطاقات — لا «مبيعات»</dd>
+        <dd className="text-[11px] text-muted">ما دخل من البطاقات، وليس «مبيعات»</dd>
       </dl>
       {stale && canEdit && (
         <a href="#import" className={buttonClass("primary")}>
@@ -381,13 +381,13 @@ function StateCell({ tx, queued, canUndo }: { tx: LedgerRow; queued: boolean; ca
   if (tx.pending) {
     return queued ? (
       <a href="#queue" className="relative z-10 inline-flex min-h-11 items-center sm:min-h-0">
-        <Badge tone="warn" dot>تنتظر قرارك — في الطابور أعلاه</Badge>
+        <Badge tone="warn" dot>تنتظر قرارك، وهي في الطابور أعلاه</Badge>
       </a>
     ) : (
       <Link href="/attention" className="relative z-10 inline-flex min-h-11 items-center sm:min-h-0">
-        <Badge tone="warn" dot>تنتظر قرارك — في «يحتاج قرارك»</Badge>
+        <Badge tone="warn" dot>تنتظر قرارك في «يحتاج قرارك»</Badge>
       </Link>
     );
   }
-  return <span className="text-[11px] text-muted">لا تحتاج مطابقة</span>;
+  return <span className="text-[11px] text-muted">لا تحتاج إلى مطابقة</span>;
 }

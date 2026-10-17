@@ -18,7 +18,7 @@ const quantity = z.string().max(24).transform((v, ctx) => {
   }
   const milli = decimalToMilli(v.trim());
   if (milli === null || milli <= 0) {
-    ctx.addIssue({ code: "custom", message: `كمّيّة غير مقروءة: «${v}» — الاستلام كمّيّة موجبة` });
+    ctx.addIssue({ code: "custom", message: `الكمية غير مقروءة: «${v}». يجب أن تكون كمية الاستلام رقماً موجباً` });
     return z.NEVER;
   }
   return milli;
@@ -29,7 +29,7 @@ const riyals = z.union([z.string().max(24), z.null()]).transform((v, ctx) => {
   if (v === null || v.trim() === "") return null;
   const milli = decimalToMilli(v.trim().replace(/,/g, ""));
   if (milli === null || milli < 0 || milli % 10 !== 0) {
-    ctx.addIssue({ code: "custom", message: `مبلغ غير مقروء: «${v}» — ريال وهللتان على الأكثر` });
+    ctx.addIssue({ code: "custom", message: `المبلغ غير مقروء: «${v}». اكتبه بالريال بخانتين عشريتين على الأكثر` });
     return z.NEVER;
   }
   /* مِلّي‑ريال ÷ ١٠ = هللة — بلا عائمة */

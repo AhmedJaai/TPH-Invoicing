@@ -97,7 +97,7 @@ export async function loadIbanAlerts(reader: Conn = db): Promise<IbanAlertRow[]>
 
 export class IbanAlertGone extends Error {
   constructor() {
-    super("هذا التنبيه لم يعد قائماً — ربما حدّث آيبان المورّد أو أعيد نسب الحوالة. حدّث الصفحة.");
+    super("هذا التنبيه لم يعد قائماً، ربما حُدّث آيبان المورّد أو نُسبت الحوالة لجهة أخرى. حدّث الصفحة.");
   }
 }
 

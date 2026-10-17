@@ -39,10 +39,10 @@ interface Verdict {
 }
 
 const TAX_TEXT: Record<string, string> = {
-  VALID: "ضريبيّة مستوفية — تخصم مدخلاتها",
-  INVALID: "ينقصها ركن ضريبيّ — لا تخصم مدخلاتها",
-  UNKNOWN: "تفصيلها الضريبيّ غير معروف",
-  NOT_APPLICABLE: "لا تقيّد ضريبيّاً",
+  VALID: "فاتورة ضريبية مستوفية الشروط، وتُخصم ضريبتها",
+  INVALID: "ينقصها بيان ضريبي مطلوب، ولا تُخصم ضريبتها",
+  UNKNOWN: "بياناتها الضريبية غير معروفة",
+  NOT_APPLICABLE: "لا تُقيَّد ضريبياً",
 };
 
 export function DocumentRecord({
@@ -106,7 +106,7 @@ export function DocumentRecord({
   const sumOk = sub !== null && vat !== null && total !== null ? Math.abs(sub + vat - total) <= TOTAL_ROUNDING_TOLERANCE_MINOR : null;
   const ready = Boolean(supplierId) && f.invoiceNumber.trim() !== "" && date !== null && total !== null
     && (f.subtotal.trim() === "" || sub !== null) && (f.vat.trim() === "" || vat !== null);
-  const why = !supplierId ? "اختر المورّد" : !f.invoiceNumber.trim() ? "اكتب رقم الفاتورة" : !date ? "اكتب التاريخ" : total === null ? "اكتب الإجماليّ" : "مبلغ لا يقرأ";
+  const why = !supplierId ? "اختر المورّد" : !f.invoiceNumber.trim() ? "اكتب رقم الفاتورة" : !date ? "اكتب التاريخ" : total === null ? "اكتب الإجماليّ" : "مبلغ غير مقروء";
 
   async function send(preview: boolean, override?: string): Promise<boolean> {
     setError(null);
@@ -118,8 +118,8 @@ export function DocumentRecord({
     if (!preview && r.data.recorded) {
       toast({
         tone: "ok",
-        title: "قيّدت الفاتورة",
-        body: `دخلت مستحقّ ${formatMonth(r.data.month)}، وكتب القيد في السجلّ باسمك. وتصحّح من ملفّها.`,
+        title: "تم قيد الفاتورة",
+        body: `دخلت في مستحقات ${formatMonth(r.data.month)}، وسُجّل القيد باسمك. يمكنك تصحيحها من صفحة الفاتورة.`,
         link: r.data.invoiceId ? { label: "افتح الفاتورة", href: `/purchases/invoices/${r.data.invoiceId}` } : undefined,
       });
       router.refresh();
@@ -147,7 +147,7 @@ export function DocumentRecord({
     setSupplierId(r.data.supplier.id);
     setCreating(false);
     setNewName("");
-    toast({ tone: "ok", title: "أنشئ المورّد", body: r.data.supplier.nameAr });
+    toast({ tone: "ok", title: "تم إنشاء المورّد", body: r.data.supplier.nameAr });
     return true;
   }
 
@@ -160,7 +160,7 @@ export function DocumentRecord({
     <div className="space-y-4" data-dirty={touched ? "قيد المستند" : undefined}>
       {fromName.length > 0 && (
         <p className="rounded-lg bg-info-bg px-3 py-2 text-[11px] leading-relaxed text-info">
-          {fromName.join(" و")} مأخوذ من اسم الملفّ لا من القراءة — قارنه بالورقة.
+          {fromName.join(" و")} مأخوذ من اسم الملف وليس من قراءة المستند، فقارنه بالورقة.
         </p>
       )}
 
@@ -188,7 +188,7 @@ export function DocumentRecord({
         {miss("المورّد") && !supplierId && (
           <p className="mb-1 flex items-center gap-1.5 text-[11px] font-bold text-danger">
             <CircleAlert className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-            المورّد لم يعرف — اختره، أو أنشئه إن لم يكن مسجّلاً
+            لم يُعرف المورّد. اختره من القائمة، أو أنشئه إن لم يكن مسجلاً
           </p>
         )}
         <SupplierPicker text={supplierText} suppliers={list} value={supplierId} onChange={(id) => { setSupplierId(id); setVerdict(null); }} />
@@ -209,7 +209,7 @@ export function DocumentRecord({
                 className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm sm:min-h-9"
               />
             </label>
-            <ActionButton variant="primary" size="sm" disabled={newName.trim().length < 2} reason="اكتب الاسم — حرفان على الأقلّ" onAction={() => createSupplier()}>
+            <ActionButton variant="primary" size="sm" disabled={newName.trim().length < 2} reason="اكتب الاسم، وحرفان على الأقل" onAction={() => createSupplier()}>
               أنشئه
             </ActionButton>
             <button type="button" onClick={() => { setCreating(false); setSimilar([]); }} className={buttonClass("quiet", "sm")}>إلغاء</button>
@@ -233,30 +233,30 @@ export function DocumentRecord({
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 @lg:grid-cols-2">
         <Field id={`${ids}-n`} label="رقم الفاتورة" value={f.invoiceNumber} onChange={(v) => set({ invoiceNumber: v })} ltr
-          missing={miss("رقم")} hint={!f.invoiceNumber.trim() ? { tone: "danger", text: "مطلوب — كما على الورقة" } : null} />
+          missing={miss("رقم")} hint={!f.invoiceNumber.trim() ? { tone: "danger", text: "مطلوب، كما هو على الورقة" } : null} />
         <Field id={`${ids}-d`} label="التاريخ" value={f.invoiceDate} onChange={(v) => set({ invoiceDate: v })} ltr placeholder="2026-09-15"
           missing={miss("التاريخ")}
-          hint={!f.invoiceDate.trim() ? { tone: "danger", text: "مطلوب — منه يعرف شهرها" }
-            : date ? { tone: "ok", text: <>يحسب في {formatMonth(date.slice(0, 7))}</> }
-            : { tone: "danger", text: "لا يفهم — اكتبه 2026-09-15 أو 15/09/2026" }} />
+          hint={!f.invoiceDate.trim() ? { tone: "danger", text: "مطلوب، فبه يُعرف شهر الفاتورة" }
+            : date ? { tone: "ok", text: <>تُحسب في {formatMonth(date.slice(0, 7))}</> }
+            : { tone: "danger", text: "تاريخ غير مفهوم، اكتبه هكذا: 2026-09-15 أو 15/09/2026" }} />
         <Field id={`${ids}-s`} label="الصافي قبل الضريبة" value={f.subtotal} onChange={(v) => set({ subtotal: v })} ltr decimal
-          hint={f.subtotal.trim() && sub === null ? { tone: "danger", text: "لا يقرأ مبلغاً" } : !f.subtotal.trim() ? { tone: "warn", text: "فارغ — يحفظ «غير معروف»" } : null} />
+          hint={f.subtotal.trim() && sub === null ? { tone: "danger", text: "ليس مبلغاً مفهوماً" } : !f.subtotal.trim() ? { tone: "warn", text: "فارغ، وسيُحفظ «غير معروف»" } : null} />
         <Field id={`${ids}-v`} label="الضريبة" value={f.vat} onChange={(v) => set({ vat: v })} ltr decimal
-          hint={f.vat.trim() && vat === null ? { tone: "danger", text: "لا يقرأ مبلغاً" } : !f.vat.trim() ? { tone: "warn", text: "فارغ — يحفظ «غير معروف»" } : null} />
+          hint={f.vat.trim() && vat === null ? { tone: "danger", text: "ليس مبلغاً مفهوماً" } : !f.vat.trim() ? { tone: "warn", text: "فارغ، وسيُحفظ «غير معروف»" } : null} />
         <Field id={`${ids}-t`} label="الإجماليّ" value={f.total} onChange={(v) => set({ total: v })} ltr decimal missing={miss("الإجمالي")}
-          hint={total === null ? { tone: "danger", text: f.total.trim() ? "لا يقرأ مبلغاً" : "مطلوب" } : { tone: "ok", text: <>يحفظ <Money minor={total} /></> }} />
+          hint={total === null ? { tone: "danger", text: f.total.trim() ? "ليس مبلغاً مفهوماً" : "مطلوب" } : { tone: "ok", text: <>سيُحفظ <Money minor={total} /></> }} />
         <Field id={`${ids}-sv`} label="الرقم الضريبيّ للبائع" value={f.sellerVat} onChange={(v) => set({ sellerVat: v })} ltr
-          hint={f.sellerVat.trim() ? (isValidSaudiVat(f.sellerVat) ? { tone: "ok", text: "سليم الشكل" } : { tone: "warn", text: "15 خانة، يبدأ بـ3 وينتهي بـ3" }) : null} />
+          hint={f.sellerVat.trim() ? (isValidSaudiVat(f.sellerVat) ? { tone: "ok", text: "سليم الشكل" } : { tone: "warn", text: "يجب أن يكون 15 خانة، يبدأ بـ3 وينتهي بـ3" }) : null} />
         {/* رقمُ المنشأة كما على الورقة — كان يُرسَل ولا يُرى، فمن رأى «لا يطابق» لم يجد أين يصحّحه */}
         <Field id={`${ids}-bv`} label="الرقم الضريبيّ للمشتري (المنشأة)" value={f.buyerVat} onChange={(v) => set({ buyerVat: v })} ltr
-          hint={f.buyerVat.trim() ? (isValidSaudiVat(f.buyerVat) ? { tone: "ok", text: "سليم الشكل" } : { tone: "warn", text: "15 خانة — قارنه بالورقة" }) : { tone: "warn", text: "فارغ — لا تخصم مدخلاتها بلا رقم المنشأة" }} />
+          hint={f.buyerVat.trim() ? (isValidSaudiVat(f.buyerVat) ? { tone: "ok", text: "سليم الشكل" } : { tone: "warn", text: "يجب أن يكون 15 خانة، فقارنه بالورقة" }) : { tone: "warn", text: "فارغ، ولا تُخصم ضريبة الفاتورة بدون رقم المنشأة" }} />
       </div>
 
       {sumOk !== null && (
         <p className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold ${sumOk ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn"}`}>
           {sumOk ? <CircleCheck className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden /> : <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />}
           الصافي + الضريبة = <Money minor={(sub ?? 0) + (vat ?? 0)} />
-          {sumOk ? " — يطابق الإجماليّ" : " — يخالف الإجماليّ"}
+          {sumOk ? " (يطابق الإجمالي)" : " (يخالف الإجمالي)"}
         </p>
       )}
 
@@ -264,10 +264,10 @@ export function DocumentRecord({
       {verdict && !verdict.recorded && (
         <div aria-live="polite" className="animate-rise rounded-xl border border-line bg-sunken/60 p-3.5 text-xs leading-relaxed">
           <p className="font-bold">
-            {verdict.blockers.length === 0 ? "حكم الخادم: تقيّد" : "حكم الخادم: لا تقيّد بعد"}
+            {verdict.blockers.length === 0 ? "الفاتورة جاهزة للقيد" : "الفاتورة غير جاهزة للقيد"}
           </p>
           <ul className="mt-1.5 space-y-1 text-ink-soft">
-            <li>تدخل مستحقّ <b>{formatMonth(verdict.month)}</b> بـ<Money minor={verdict.totalMinor} /></li>
+            <li>تدخل في مستحقات <b>{formatMonth(verdict.month)}</b> بمبلغ <Money minor={verdict.totalMinor} /></li>
             <li>{TAX_TEXT[verdict.taxStatus] ?? verdict.taxStatus}</li>
             {verdict.blockers.map((b) => <li key={b} className="font-bold text-danger">{b}</li>)}
             {verdict.notes.map((n) => <li key={n} className="text-warn">{n}</li>)}
@@ -283,7 +283,7 @@ export function DocumentRecord({
       {verdict && !verdict.recorded && verdict.blockers.length > 0 && verdict.overridable && (
         <div className="rounded-xl border border-warn/30 bg-warn-bg/50 p-3.5">
           <label htmlFor={`${ids}-ov`} className="block text-xs font-bold text-warn">
-            الفاتورة لنا رغم ذلك؟ اكتب لماذا — يحفظ في السجلّ باسمك
+            هل الفاتورة لمنشأتنا رغم ذلك؟ اكتب السبب، وسيُسجَّل باسمك
           </label>
           <textarea
             id={`${ids}-ov`}
@@ -294,14 +294,14 @@ export function DocumentRecord({
             className="mt-1.5 w-full rounded-lg border border-line-input bg-raised px-2.5 py-2 text-sm"
           />
           <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
-            تدخل المستحقّ ويسدّد عليها، ولا تخصم ضريبتها حتى يصحّح المورّد الرقم.
+            تدخل في المستحقات ويمكن السداد عليها، لكن لا تُخصم ضريبتها حتى يصحح المورّد الرقم.
           </p>
           <div className="mt-2">
             <ActionButton
               variant="secondary"
               size="sm"
               disabled={overrideReason.trim().length < 8}
-              reason="اكتب سبباً يفهم بعد شهر"
+              reason="اكتب سبباً واضحاً يفهمه غيرك بعد شهر"
               onAction={() => send(false, overrideReason.trim())}
             >
               <FilePlus2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
@@ -330,7 +330,7 @@ export function DocumentRecord({
           </ActionButton>
         )}
         <p className="text-[11px] text-muted">
-          {verdict && verdict.blockers.length === 0 ? "القيد يدخلها المستحقّ ويكتب باسمك — وتلغى من ملفّها إن أخطأت." : "المعاينة لا تكتب شيئاً."}
+          {verdict && verdict.blockers.length === 0 ? "القيد يضيفها إلى المستحقات ويُسجَّل باسمك، ويمكنك إلغاؤها من صفحة الفاتورة إن أخطأت." : "المعاينة لا تسجّل شيئاً."}
         </p>
       </div>
     </div>

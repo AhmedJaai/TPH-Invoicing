@@ -27,7 +27,7 @@ describe("مقابلة الأرشيف بالقاعدة", () => {
     const f = auditTruth([file()], [rec({ totalMinor: 1_050_00 })])[0];
     expect(f.verdict).toBe("CORRECTED");
     expect(f.detail).toContain("100.00");
-    expect(f.suggestion).toContain("لا يصحّح آلياً");
+    expect(f.suggestion).toContain("لا يتم آلياً");
   });
 
   it("وريال يتسامح فيه — المورّد يسقط كسور الريال", () => {
@@ -45,7 +45,7 @@ describe("مقابلة الأرشيف بالقاعدة", () => {
   it("أصل بلا قيد مفقود", () => {
     const f = auditTruth([file()], [])[0];
     expect(f.verdict).toBe("MISSING");
-    expect(f.detail).toContain("ولا قيد له");
+    expect(f.detail).toContain("وليس له قيد");
   });
 
   it("وقيد بلا أصل مفقود كذلك — ولا يحذف", () => {
@@ -69,7 +69,7 @@ describe("ما لا يقطع فيه", () => {
   it("اسم بلا إجمال لا يقابل", () => {
     const f = auditTruth([file({ totalMinor: null })], [rec()])[0];
     expect(f.verdict).toBe("AMBIGUOUS");
-    expect(f.detail).toContain("لا يحمل إجمالاً");
+    expect(f.detail).toContain("لا يتضمن إجمالياً");
   });
 
   it("وقيد بلا إجمال مقروء كذلك", () => {
@@ -79,7 +79,7 @@ describe("ما لا يقطع فيه", () => {
   it("وقيد بلا معرّف درايف لا يقابل بأصل", () => {
     const f = auditTruth([], [rec({ driveId: null })])[0];
     expect(f.verdict).toBe("AMBIGUOUS");
-    expect(f.detail).toContain("لا يقابل بأصل");
+    expect(f.detail).toContain("مقابلته بالأصل");
   });
 
   it("ولا يقال «مطابق» عن رقم لم يقرأ", () => {

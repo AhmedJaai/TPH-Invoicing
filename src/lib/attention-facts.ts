@@ -257,7 +257,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
   const overdueSuppliers = overdue.slice(0, 10).map<AttentionEvidence>((r) => ({
     label: r.nameAr,
     sub: r.creditMinor > 0 && r.owedMinor < r.overdueOpenMinor
-      ? `أقدم دين منذ ${countNoun(r.oldestDays, DAY)} · بعد خصم ما لك عنده ${formatRiyalsDisplay(r.creditMinor)}`
+      ? `أقدم دين منذ ${countNoun(r.oldestDays, DAY)} · بعد خصم رصيدك عنده ${formatRiyalsDisplay(r.creditMinor)}`
       : `أقدم دين منذ ${countNoun(r.oldestDays, DAY)}`,
     amountMinor: r.owedMinor,
   }));
@@ -306,7 +306,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
   const bankGapRanges = gaps.slice(0, 8).map<AttentionEvidence>((g) => ({
     label: `${g.start} ← ${g.end}`,
-    sub: `${countNoun(g.days, DAY)} بلا كشف`,
+    sub: `${countNoun(g.days, DAY)} بدون كشف`,
   }));
 
   /*
@@ -461,10 +461,10 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         label: (r.supplier ?? r.file_name).slice(0, 45),
         /* الرقمُ نفسُه بمبلغٍ آخر فاتورةٌ أعاد المورّدُ إصدارَها — لا نسخة */
         sub: r.twin && minor !== null && r.twin_total !== null && Number(r.twin_total) !== minor
-          ? `فاتورة مصحّحة لـ${r.twin} (${formatRiyalsDisplay(Number(r.twin_total))} ← ${formatRiyalsDisplay(minor)}) — استبدل بها المقيّدة`
+          ? `فاتورة مصحّحة للفاتورة ${r.twin} (${formatRiyalsDisplay(Number(r.twin_total))} ← ${formatRiyalsDisplay(minor)}). استبدل بها الفاتورة المقيّدة`
           : r.twin
-          ? `نسخة من الفاتورة ${r.twin} المقيّدة — ارفضها`
-          : `${r.file_name.slice(0, 40)} — قيّدها من ملفّها`,
+          ? `نسخة من الفاتورة ${r.twin} المقيّدة، فارفضها`
+          : `${r.file_name.slice(0, 40)}: قيّدها من ملفّها`,
         amountMinor: minor ?? undefined,
         href: documentHref(r.id, "fix"),
       };
@@ -472,7 +472,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     bouncedPayments: bounced.map((b) => ({
       label: supplierOfTx.get(b.outgoing.id) ?? (b.outgoing.party ?? "حوالة").slice(0, 45),
       sub: `خرجت ${formatDay(b.outgoing.valueDate)} · عادت بعد ${countNoun(b.daysApart, DAY)}${
-        b.samePartyEvidence ? " من الطرف نفسه" : " — والطرف لم يتطابق"
+        b.samePartyEvidence ? " من الطرف نفسه" : " (الطرف غير مطابق)"
       }`,
       amountMinor: b.outgoing.amountMinor,
       href: txHref(b.outgoing.id),
@@ -538,14 +538,14 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     suppliersWithoutContract: noContract,
     suppliersWithoutContractEvidence: noContractRows.map((r) => ({
       label: String(r.name_ar),
-      sub: Number(r.unbacked) > 0 ? "دفعت له بلا فاتورة — والعقد هو مستنده" : "لا دفعات بلا مستند",
+      sub: Number(r.unbacked) > 0 ? "دفعتَ له بلا فاتورة، والعقد هو المستند" : "لا توجد دفعات بلا مستند",
       amountMinor: Number(r.unbacked) > 0 ? Number(r.unbacked) : undefined,
     })),
     invoicesWithoutLines: Number(counts?.no_lines ?? 0),
     unbackedPaymentCount: unbacked.length,
     unbackedPaymentMinor: unbacked.reduce((n, r) => n + r.unbackedMinor, 0),
     unbackedPaymentEvidence: unbacked.slice(0, 6).map((r) => ({
-      label: r.supplierName ?? "بلا مورّد",
+      label: r.supplierName ?? "بدون مورّد",
       sub: `${r.paidOn} · من أصل ${formatRiyalsDisplay(r.amountMinor)}`,
       amountMinor: r.unbackedMinor,
     })),
@@ -559,7 +559,7 @@ function doublePaidEvidence(g: DoublePaidGroup): AttentionEvidence {
   return {
     label: g.payee,
     sub: `${g.day} · ${countNoun(g.transactions.length, TIME)}`
-      + (g.distinctOperations ? " · بمراجع سداد مختلفة" : " · بلا مرجع يفصلهما"),
+      + (g.distinctOperations ? " · بمراجع سداد مختلفة" : " · بلا مرجع يميّز بينهما"),
     amountMinor: g.excessMinor,
   };
 }

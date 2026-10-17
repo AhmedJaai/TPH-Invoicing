@@ -102,11 +102,11 @@ export async function mergePaymentEcho(
   const manual = locked.find((p) => p.id === input.manualId);
   const bank = locked.find((p) => p.id === input.bankId);
   if (!manual || !bank || !manual.supplierId || manual.supplierId !== bank.supplierId) {
-    throw new EchoMergeRefused("لم توجد الدفعتان لمورّد واحد — حدّث المراجعة");
+    throw new EchoMergeRefused("الدفعتان ليستا لمورّد واحد. حدّث صفحة المراجعة");
   }
   const still = findPaymentEchoes(await echoRows(tx, manual.supplierId))
     .some((e) => e.manualId === input.manualId && e.bankId === input.bankId);
-  if (!still) throw new EchoMergeRefused("تغيّرت الدفعتان منذ المعاينة — حدّث المراجعة");
+  if (!still) throw new EchoMergeRefused("تغيّرت الدفعتان منذ المعاينة. حدّث صفحة المراجعة");
 
   await assertMonthsOpen(tx, [manual.appliesToMonth, monthOf(manual.paidAt)]);
 
@@ -119,7 +119,7 @@ export async function mergePaymentEcho(
   const moved = await allocate(tx, bank.id, bank.amountMinor, reversal.previousAllocations);
   if (moved.allocatedMinor !== reversal.freedMinor) {
     /* الحوالةُ لم تسع ما فُكّ — فلا نصفَ دمج: تُلغى المعاملة كلّها */
-    throw new EchoMergeRefused("الحوالة لا تسع ما على الإقرار — لم يدمج شيء");
+    throw new EchoMergeRefused("مبلغ الحوالة لا يكفي لما سُجّل على الإقرار، ولم يُدمج شيء");
   }
 
   await recordAudit({
@@ -171,10 +171,10 @@ export async function mergeIntoCredit(tx: Tx, manualId: string, actorId: string)
   const [manual] = await tx
     .select({ id: payments.id, supplierId: payments.supplierId, paidAt: payments.paidAt, appliesToMonth: payments.appliesToMonth })
     .from(payments).where(eq(payments.id, manualId)).for("update");
-  if (!manual?.supplierId) throw new EchoMergeRefused("لم توجد الدفعة — حدّث المراجعة");
+  if (!manual?.supplierId) throw new EchoMergeRefused("الدفعة غير موجودة. حدّث صفحة المراجعة");
   await tx.select({ id: payments.id }).from(payments).where(eq(payments.supplierId, manual.supplierId)).for("update");
   const echo = (await creditEchoesOf(tx, manual.supplierId)).find((e) => e.manualId === manualId);
-  if (!echo) throw new EchoMergeRefused("تغيّرت الدفعات منذ المعاينة — حدّث المراجعة");
+  if (!echo) throw new EchoMergeRefused("تغيّرت الدفعات منذ المعاينة. حدّث صفحة المراجعة");
 
   await assertMonthsOpen(tx, [manual.appliesToMonth, monthOf(manual.paidAt)]);
   const reversal = await reversePayment(tx, {
@@ -200,7 +200,7 @@ export async function mergeIntoCredit(tx: Tx, manualId: string, actorId: string)
       moved += out.allocatedMinor;
     }
   }
-  if (moved !== reversal.freedMinor) throw new EchoMergeRefused("الحوالات لا تسع ما على الإقرار — لم يدمج شيء");
+  if (moved !== reversal.freedMinor) throw new EchoMergeRefused("مبالغ الحوالات لا تكفي لما سُجّل على الإقرار، ولم يُدمج شيء");
 
   await recordAudit({
     actorId,
@@ -335,7 +335,7 @@ export async function linkHandPayment(
   await tx.select({ id: bankTransactions.id }).from(bankTransactions).where(eq(bankTransactions.id, input.transferId)).for("update");
   const { transfers, hand } = await handLinkInputs(tx, input);
   const [link] = linkHandPayments(transfers, hand);
-  if (!link) throw new HandLinkRefused("تغيّرت الحوالة أو الدفعة منذ المعاينة — حدّث المراجعة");
+  if (!link) throw new HandLinkRefused("تغيّرت الحوالة أو الدفعة منذ المعاينة. حدّث صفحة المراجعة");
 
   const [p] = await tx.select({ paidAt: payments.paidAt, appliesToMonth: payments.appliesToMonth, feeMinor: payments.feeMinor })
     .from(payments).where(eq(payments.id, link.paymentId));

@@ -41,7 +41,7 @@ export async function FiledQuartersSection() {
       id="quarters"
       title="الأرباع المقدّمة جنباً إلى جنب"
       icon={GitCompareArrows}
-      hint="كما قدّمت للهيئة — من لقطة «قدّمته»، لا من حساب اليوم."
+      hint="كما قدّمتها للهيئة، من لقطة «قدّمته» وليس من حساب اليوم."
     >
       <div className="scroll-x overflow-x-auto rounded-xl border border-line bg-raised">
         <table className="w-full min-w-[30rem] border-collapse">
@@ -51,7 +51,7 @@ export async function FiledQuartersSection() {
               {shown.map((q) => (
                 <th key={q.periodKey} scope="col" className="px-3 py-2 text-end text-[11px] font-bold text-muted">
                   <Link href={`/close/vat?period=${q.periodKey}`} className="hover:text-accent hover:underline">{labelOf(q)}</Link>
-                  <span className="block font-normal">قدّم {formatDay(q.filedOn)}</span>
+                  <span className="block font-normal">قُدِّم {formatDay(q.filedOn)}</span>
                 </th>
               ))}
             </tr>
@@ -65,7 +65,7 @@ export async function FiledQuartersSection() {
             {line("المدخلات من المخرجات", (q) => (q.inputShareBp === null
               ? <span className="text-[11px] text-muted">لا مخرجات</span>
               : <bdi className="nums" dir="ltr">{shareText(q.inputShareBp)}</bdi>))}
-            {line("الصافي (سالب: رصيد لك)", (q) => <Money minor={q.netMinor} signed />, true)}
+            {line("الصافي (سالب: رصيد لصالحك)", (q) => <Money minor={q.netMinor} signed />, true)}
           </tbody>
         </table>
       </div>
@@ -74,7 +74,7 @@ export async function FiledQuartersSection() {
         <p className="font-bold">
           {netChangeMinor === 0
             ? `صافي ${labelOf(current)} يساوي صافي ${labelOf(previous)}.`
-            : <>صافي {labelOf(current)} {netChangeMinor > 0 ? "أعلى" : "أدنى"} من {labelOf(previous)} بـ<Money minor={Math.abs(netChangeMinor)} /> — أكبر ما حرّكه:</>}
+            : <>صافي {labelOf(current)} {netChangeMinor > 0 ? "أعلى" : "أدنى"} من {labelOf(previous)} بـ<Money minor={Math.abs(netChangeMinor)} />. أكبر ما أثّر فيه:</>}
         </p>
         {drivers.length > 0 && (
           <ul className="mt-2 space-y-1 text-ink-soft">
@@ -89,7 +89,7 @@ export async function FiledQuartersSection() {
           </ul>
         )}
         <p className="mt-2 text-[11px] text-muted">
-          لمعرفة أيّ مورّد أو حوالة وراء الباب افتح الربع من رأس الجدول — فواتيره وحركاته بأسمائها هناك.
+          لمعرفة أي مورّد أو حوالة وراء كل بند، افتح الربع من رأس الجدول. ستجد فواتيره وحركاته بأسمائها هناك.
         </p>
       </div>
     </Section>

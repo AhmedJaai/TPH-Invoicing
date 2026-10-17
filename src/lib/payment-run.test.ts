@@ -115,7 +115,7 @@ describe("ملف التحويلات", () => {
     const lines = toBankTransferCsv(run).split("\r\n");
     expect(lines).toHaveLength(4);
     expect(lines[1]).toBe("");
-    expect(lines[2]).toContain("يحتاج حساباً");
+    expect(lines[2]).toContain("هؤلاء بلا حساب");
     expect(lines[3]).toContain("الحساب غير معروف");
   });
 
@@ -280,7 +280,7 @@ describe("حساب المستفيد — ما كتبه صاحب المقهى بي
   it("بلا دليل في الكشوف: المكتوب بيد يكتب، مع تنبيه أوّل تحويل", () => {
     const a = resolvePayeeAccount([], IBAN);
     expect(a.account).toBe(IBAN);
-    expect(a.note).toContain("لم يحوّل له من قبل");
+    expect(a.note).toContain("لم يسبق التحويل له");
   });
   it("يطابق الكشف: بلا تنبيه", () => {
     expect(resolvePayeeAccount([{ kind: "IBAN", normalized: IBAN }], IBAN)).toEqual({ account: IBAN, note: null });
@@ -362,7 +362,7 @@ describe("قرار المالك في المحجوز", () => {
   it("الملفّ يسمّي ما دخل بقرار المالك في صفّ مورّده", () => {
     const run = buildPaymentRun([heldInv], "2026-08", { overrides: new Map([["h1", { note: "س" }]]) });
     const csv = toBankTransferCsv(run, new Map([["s1", { account: "SA0380000000608010167519", note: null }]]));
-    expect(csv).toContain("بقرار المالك وهي محجوزة: h1");
+    expect(csv).toContain("محجوزة وتُسدَّد بقرار المالك: h1");
   });
 });
 
@@ -436,8 +436,8 @@ describe("«ادفع كذا فقط» في الملفّ", () => {
     const { run } = applyPartialAmounts(base(), new Map([["s2", 12_550]]));
     const csv = toBankTransferCsv(run, new Map([["s2", { account: "SA0380000000608010167519", note: null }]]));
     expect(csv).toContain("بيكوف,SA0380000000608010167519,125.50,SAR");
-    expect(csv).toContain("دفع جزئيّ: 125.50 من 300.00");
-    expect(csv).toContain("سداد جزئيّ من فواتير 2026-08");
+    expect(csv).toContain("دفعة جزئية: 125.50 من 300.00");
+    expect(csv).toContain("سداد جزئي من فواتير 2026-08");
   });
 });
 

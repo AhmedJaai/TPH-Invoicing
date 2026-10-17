@@ -57,7 +57,7 @@ export function AppShell({
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
       <a href="#main" className="skip-link">
-        تخطّ إلى المحتوى
+        انتقل إلى المحتوى
       </a>
 
       <aside

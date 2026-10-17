@@ -24,18 +24,18 @@ export default function DrawerError({
   }, [error]);
 
   return (
-    <InspectorPanel title="تعذّر فتح هذا الملفّ">
+    <InspectorPanel title="تعذّر فتح الملفّ">
       <div className="rounded-2xl border border-line bg-raised px-6 py-10 text-center">
         <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-danger-bg text-danger">
           <CloudOff className="h-6 w-6" strokeWidth={1.75} aria-hidden />
         </span>
         <p role="alert" className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-ink-soft">
-          فتح الملفّ لا يكتب شيئاً، فلم يضع قيد. وغالباً هو انقطاع عابر في الاتّصال بالقاعدة —
-          أعد المحاولة بعد لحظة، والقائمة تحته كما تركتها.
+          فتح الملفّ لا يغيّر أي بيانات، فلم يضع شيء. غالباً السبب انقطاع عابر في الاتصال بقاعدة البيانات.
+          أعد المحاولة بعد لحظة، والقائمة خلفه كما هي.
         </p>
         {error.digest && (
           <p className="mt-3 text-[11px] text-muted">
-            إن تكرّر فانقل هذا الرمز لمن يصلحه: <span className="nums nums-count" dir="ltr">{error.digest}</span>
+            إن تكرر الخطأ فأرسل هذا الرمز للمختص: <span className="nums nums-count" dir="ltr">{error.digest}</span>
           </p>
         )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">

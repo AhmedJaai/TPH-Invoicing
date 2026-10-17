@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       const raw = body.amount ?? "";
       const minor = raw === "" ? null : parseRiyals(raw);
       if (raw !== "" && (minor === null || minor < 0)) {
-        return NextResponse.json({ error: "مبلغ النقد لم يقرأ — اكتبه رقماً مثل 1250.50" }, { status: 400 });
+        return NextResponse.json({ error: "تعذّرت قراءة مبلغ النقد. اكتبه رقماً، مثل 1250.50" }, { status: 400 });
       }
       await setVatCashSales(body.month, minor, user.id);
       return NextResponse.json({ ok: true });

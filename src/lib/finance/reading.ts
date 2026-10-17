@@ -57,9 +57,9 @@ export function factsHash(facts: readonly Fact[]): string {
 export type ReadingSection = "CHANGED" | "WHY" | "DO";
 
 export const SECTION_LABEL: Record<ReadingSection, string> = {
-  CHANGED: "أهمّ ما تغيّر",
-  WHY: "السبب المرجّح",
-  DO: "ما يقترح فعله",
+  CHANGED: "أهم ما تغيّر",
+  WHY: "السبب المحتمل",
+  DO: "ما نقترح فعله",
 };
 
 export interface ReadingSentence {

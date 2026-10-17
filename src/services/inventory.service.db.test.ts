@@ -165,7 +165,7 @@ describe("استيراد المبيعات لا يضاعف", () => {
         select status, reason from sales_import_rows where import_id = ${second.importId}
       `);
       expect(raw.rows[0].status).toBe("REVISED");
-      expect(raw.rows[0].reason).toContain("تغيّر ما يقوله المصدر");
+      expect(raw.rows[0].reason).toContain("تغيّرت بيانات المصدر");
     }));
 
   it("وخيار الإضافة يقيّد ولا يدخل طابور الربط", () =>

@@ -23,7 +23,7 @@ export function AutoWorkSwitch({ paused, since }: { paused: boolean; since: stri
       setError(r.error);
       return false;
     }
-    toast({ tone: next ? "warn" : "ok", title: next ? "أوقف العمل الآليّ" : "عاد العمل الآليّ", body: r.data.message });
+    toast({ tone: next ? "warn" : "ok", title: next ? "تم إيقاف العمل الآلي" : "عاد العمل الآلي", body: r.data.message });
     router.refresh();
     return true;
   }
@@ -37,16 +37,16 @@ export function AutoWorkSwitch({ paused, since }: { paused: boolean; since: stri
         ? <PauseCircle className="h-5 w-5 shrink-0 text-warn" strokeWidth={2} aria-hidden />
         : <PlayCircle className="h-5 w-5 shrink-0 text-ok" strokeWidth={2} aria-hidden />}
       <div className="min-w-0 flex-1 basis-64">
-        <p className="text-sm font-bold">{paused ? "العمل الآليّ موقوف" : "العمل الآليّ يعمل"}</p>
+        <p className="text-sm font-bold">{paused ? "العمل الآلي موقوف" : "العمل الآلي يعمل"}</p>
         <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
           {paused
-            ? <>لا يقيّد ولا يعتمد ولا يزامن شيء في الخلفيّة{since ? <> منذ {since}</> : null} — على كلّ جهاز. «زامن الآن» بيدك يعمل.</>
-            : "يقيّد الفواتير المقروءة كاملةً ويعتمد ما اجتمعت فيه الشروط، ويخبرك بما فعل وبكم زاد ما عليك. وما فعله في «آخر ما فعله» أدناه — افتح المستند لتصحّحه أو ترفضه."}
+            ? <>لا يُقيَّد ولا يُعتمد ولا يُزامَن شيء في الخلفية{since ? <> منذ {since}</> : null}، على كل الأجهزة. زر «زامن الآن» يعمل عند الضغط عليه.</>
+            : "يقيّد الفواتير المقروءة كاملة ويعتمد ما اجتمعت فيه الشروط، ويخبرك بما فعله وبمقدار الزيادة في ما عليك. وتجد ما نفّذه في «آخر ما فعله» أدناه، وافتح المستند لتصحّحه أو ترفضه."}
         </p>
         {error && <p role="alert" className="mt-1 text-xs font-bold text-danger">{error}</p>}
       </div>
       <ActionButton onAction={() => set(!paused)} variant={paused ? "primary" : "secondary"} size="sm" showDone={false}>
-        {paused ? "شغّله" : "أوقف العمل الآليّ"}
+        {paused ? "شغّله" : "أوقف العمل الآلي"}
       </ActionButton>
     </div>
   );

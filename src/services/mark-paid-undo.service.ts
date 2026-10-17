@@ -49,17 +49,17 @@ export async function undoMarkedPaid(
     .for("update");
 
   if (rows.length !== paymentIds.length) {
-    throw new UndoError("لم توجد كلّ الدفعات — ربما ألغيت من نافذة أخرى. حدّث الصفحة.", 404);
+    throw new UndoError("لم تُوجد كل الدفعات، ربما أُلغيت من نافذة أخرى. حدّث الصفحة.", 404);
   }
   for (const p of rows) {
     if (p.status === "REVERSED" || p.status === "VOID") {
-      throw new UndoError("ألغي هذا السداد من قبل — حدّث الصفحة.", 409);
+      throw new UndoError("أُلغي هذا السداد من قبل. حدّث الصفحة.", 409);
     }
     if (!p.recent) {
-      throw new UndoError("فات وقت التراجع من الإشعار — ألغ الدفعة من ملفّ الفاتورة.", 409);
+      throw new UndoError("انتهى وقت التراجع من الإشعار. ألغِ الدفعة من ملف الفاتورة.", 409);
     }
     if (p.hasBankTx || p.documentId) {
-      throw new UndoError("لهذه الدفعة حركة بنك أو إيصال — لا تلغى من هنا.", 409);
+      throw new UndoError("لهذه الدفعة حركة بنكية أو إيصال، فلا يمكن إلغاؤها من هنا.", 409);
     }
   }
 

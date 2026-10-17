@@ -123,11 +123,11 @@ export async function POST(request: Request) {
 
   /* ── التنفيذ ── */
   if (!can(user.role, "supplier:edit")) {
-    return NextResponse.json({ error: "تسمية ملفّات الأرشيف تحتاج صلاحية «تعديل المورّدين والأصناف» — اطلبها من مالك الحساب" }, { status: 403 });
+    return NextResponse.json({ error: "تسمية ملفات الأرشيف تحتاج صلاحية «تعديل المورّدين والأصناف». اطلبها من مالك الحساب." }, { status: 403 });
   }
   const chosen = new Set(Array.isArray(body.fileIds) ? body.fileIds : []);
   if (chosen.size === 0) {
-    return NextResponse.json({ error: "لم تُختَر ملفّات" }, { status: 400 });
+    return NextResponse.json({ error: "لم تختر أي ملف" }, { status: 400 });
   }
 
   /* وضعُ التجربة لا يحمل تفويضاً — لا يُسمّى ملفٌّ في الأرشيف الحقيقيّ منه */
@@ -192,10 +192,10 @@ export async function POST(request: Request) {
       التسمية لا تعمل، وهي تعمل.
     */
     message: failed.length > 0
-      ? `أُعيدت تسمية ${done.length} · وتعذّر ${failed.length}: ${failed[0]?.error.slice(0, 80)}`
+      ? `أُعيدت تسمية ${done.length} · وتعذّرت تسمية ${failed.length}: ${failed[0]?.error.slice(0, 80)}`
       : done.length === 0
-        ? "لا شيء يحتاج تسمية — أسماؤها موحَّدة أصلاً"
-        : `أُعيدت تسمية ${done.length} ملفّاً`
-          + (mine.length > targets.length ? ` · بقي ${mine.length - targets.length} — اضغط ثانيةً` : ""),
+        ? "لا شيء يحتاج إلى إعادة تسمية، فأسماء الملفات موحّدة أصلاً"
+        : `أُعيدت تسمية ${done.length} ملفاً`
+          + (mine.length > targets.length ? ` · بقي ${mine.length - targets.length}، اضغط مرة أخرى` : ""),
   });
 }

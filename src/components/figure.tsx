@@ -74,7 +74,7 @@ export function Figure({
             className="-mx-1.5 mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-md px-1.5 text-xs font-bold text-ink-soft transition-colors hover:bg-hover hover:text-ink sm:min-h-7"
           >
             <Dot confidence={provenance.confidence} />
-            {open ? "أخف المصدر" : "من أين جاء؟"}
+            {open ? "أخفِ المصدر" : "من أين جاء هذا الرقم؟"}
             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden />
           </button>
 
@@ -87,7 +87,7 @@ export function Figure({
 
 function Dot({ confidence }: { confidence: Provenance["confidence"] }) {
   const cls = confidence === "HIGH" ? "bg-ok" : confidence === "MEDIUM" ? "bg-warn" : "bg-danger";
-  const title = confidence === "HIGH" ? "تغطية شبه تامّة" : confidence === "MEDIUM" ? "نقص محدود" : "نقص مؤثّر";
+  const title = confidence === "HIGH" ? "تغطية شبه كاملة" : confidence === "MEDIUM" ? "نقص محدود" : "نقص مؤثر";
   return (
     <span className="inline-flex items-center" title={title}>
       <span aria-hidden className={`inline-block h-2 w-2 rounded-full ${cls}`} />
@@ -107,14 +107,14 @@ function Breakdown({ provenance: p, unit }: { provenance: Provenance; unit: stri
               <span className={`flex items-center gap-1.5 ${c.included ? "font-bold text-ink" : "text-muted"}`}>
                 <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${c.included ? "bg-ok" : "bg-warn"}`} />
                 {c.label}
-                <span className="sr-only">{c.included ? " — داخل في الرقم" : " — خارج الرقم"}</span>
+                <span className="sr-only">{c.included ? " (محسوب في الرقم)" : " (غير محسوب في الرقم)"}</span>
               </span>
               {c.reason && <span className="mt-0.5 block text-muted">{c.reason}</span>}
             </span>
             <span className="shrink-0 whitespace-nowrap text-muted">
               <span className="nums">{c.count}</span> {c.unit ?? unit}
               {c.amountMinor !== null && c.amountMinor !== 0 && <> · <Money minor={c.amountMinor} /></>}
-              {c.amountMinor === null && " · مبلغ مجهول"}
+              {c.amountMinor === null && " · المبلغ غير معروف"}
             </span>
           </li>
         ))}
@@ -122,13 +122,13 @@ function Breakdown({ provenance: p, unit }: { provenance: Provenance; unit: stri
 
       <p className="border-t border-line-soft px-3 py-2 text-[11px] leading-relaxed text-muted">
         {p.coverage === null
-          ? "لا شيء بني عليه هذا الرقم بعد."
-          : `التغطية ${Math.round(p.coverage * 100)}٪ بالعدد. ` +
+          ? "لا توجد بيانات يُبنى عليها هذا الرقم بعد."
+          : `التغطية ${Math.round(p.coverage * 100)}٪ من حيث العدد. ` +
             (p.excludedCount === 0
-              ? "لا شيء خارج الرقم."
+              ? "لا يوجد شيء خارج الرقم."
               : p.excludedUnknownCount > 0
-                ? `و${p.excludedUnknownCount} منها مبلغها مجهول، فلا يصحّ افتراضه صفراً.`
-                : "المستبعد معروف مبلغه ومذكور أعلاه.")}
+                ? `منها ${p.excludedUnknownCount} مبلغها غير معروف، ولا يصح اعتباره صفراً.`
+                : "مبالغ المستبعد معروفة وموضحة أعلاه.")}
       </p>
 
       {fixes.length > 0 && (

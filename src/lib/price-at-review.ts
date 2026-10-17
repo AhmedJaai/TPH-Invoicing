@@ -62,8 +62,8 @@ export function priceObjection(supplierName: string, moves: readonly PriceMove[]
   return [
     `السلام عليكم ${supplierName}،`,
     "",
-    "في الفاتورة الأخيرة أسعار أعلى من آخر توريد:",
-    ...rises.map((m) => `• ${m.description}: ${riyals(m.nowMinor)} — وكان ${riyals(m.wasMinor)} في ${day(m.wasDay)}`),
+    "لاحظنا في الفاتورة الأخيرة أسعاراً أعلى من آخر توريد:",
+    ...rises.map((m) => `• ${m.description}: ${riyals(m.nowMinor)} (كان ${riyals(m.wasMinor)} في ${day(m.wasDay)})`),
     "",
     "نرجو التوضيح أو تصحيح الفاتورة قبل اعتمادها. شاكرين لكم.",
   ].join("\n");

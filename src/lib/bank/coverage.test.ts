@@ -65,7 +65,7 @@ describe("analyzeCoverage", () => {
 describe("describeCoverage", () => {
   it("تقول المتّصلة متّصلة", () => {
     const s = describeCoverage(analyzeCoverage([p("2026-08-01", "2026-08-31")]));
-    expect(s).toContain("متّصلة بلا فجوة");
+    expect(s).toContain("متصلة بلا فجوة");
   });
 
   it("تُقدّم الفجوة — فهي وحدها ما لا يُصلحه شيء إلّا رفع كشفها", () => {
@@ -82,7 +82,7 @@ describe("describeCoverage", () => {
       p("2026-08-01", "2026-08-31"),
       p("2026-08-15", "2026-09-15"),
     ]));
-    expect(s).toContain("لا يضرّ");
+    expect(s).toContain("لا يضر");
   });
 
   it("لا شيء بعد", () => {

@@ -26,7 +26,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const ApiBody = z.object({
   source: z.literal("foodics-api"),
-  effectiveFrom: z.string().regex(DATE, "تاريخ سريان الوصفات يكتب YYYY-MM-DD"),
+  effectiveFrom: z.string().regex(DATE, "اكتب تاريخ سريان الوصفات بصيغة YYYY-MM-DD"),
   dryRun: z.boolean().optional(),
 }).strict();
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const read = await readJson(request, ApiBody);
     if (!read.ok) return read.response;
     if (!foodicsConfigured()) {
-      return NextResponse.json({ error: "فودكس غير موصول: مفتاح الربط غير مضبوط في بيئة الخادم. ارفع الملفّات الثلاثة بدلاً منه." }, { status: 409 });
+      return NextResponse.json({ error: "فودكس غير متصل: مفتاح الربط غير مضبوط في إعدادات الخادم. ارفع الملفات الثلاثة بدلاً منه." }, { status: 409 });
     }
     try {
       const parsed = await fetchFoodicsCatalog();
@@ -65,9 +65,9 @@ export async function POST(request: Request) {
   if (!form) return NextResponse.json({ error: "تعذّرت قراءة الطلب" }, { status: 400 });
 
   const uploads = form.getAll("files").filter((f): f is File => f instanceof File);
-  if (uploads.length === 0) return NextResponse.json({ error: "لم يصل ملفّ" }, { status: 400 });
+  if (uploads.length === 0) return NextResponse.json({ error: "لم يصل أي ملف" }, { status: 400 });
   if (uploads.length > MAX_FILES) {
-    return NextResponse.json({ error: `ثلاثة ملفّات على الأكثر` }, { status: 400 });
+    return NextResponse.json({ error: `الحد الأقصى ثلاثة ملفات` }, { status: 400 });
   }
   for (const f of uploads) {
     if (f.size > MAX_BYTES) {
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
 
   const effectiveFrom = String(form.get("effectiveFrom") ?? "").trim();
   if (!DATE.test(effectiveFrom)) {
-    return NextResponse.json({ error: "تاريخ سريان الوصفات يكتب YYYY-MM-DD" }, { status: 400 });
+    return NextResponse.json({ error: "اكتب تاريخ سريان الوصفات بصيغة YYYY-MM-DD" }, { status: 400 });
   }
 
   const files: CatalogFile[] = [];

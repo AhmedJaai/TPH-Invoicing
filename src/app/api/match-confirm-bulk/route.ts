@@ -81,11 +81,11 @@ export async function POST(request: Request) {
 
   const ids = [...new Set(body.transactionIds ?? [])];
   if (ids.length === 0) {
-    return NextResponse.json({ error: "لم تحدّد حركة" }, { status: 400 });
+    return NextResponse.json({ error: "لم تحدّد أي حركة" }, { status: 400 });
   }
   if (ids.length > MAX_BULK) {
     return NextResponse.json(
-      { error: `أقصى ما يقرّ دفعةً واحدة ${countNoun(MAX_BULK, TRANSACTION)}` },
+      { error: `الحد الأقصى للإقرار دفعة واحدة ${countNoun(MAX_BULK, TRANSACTION)}` },
       { status: 400 },
     );
   }
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
   /* ما لا يصلح للإقرار أصلاً يُفرَز قبل أي حساب */
   const eligible = rows.filter((tx) => {
     if (tx.matchedPaymentId) {
-      outcomes.push({ transactionId: tx.id, ok: false, reason: "مطابقة أصلاً" });
+      outcomes.push({ transactionId: tx.id, ok: false, reason: "مطابَقة من قبل" });
       return false;
     }
     /* ومن اختار فاتورةً بعينها لحركةٍ في «يُراجَع» فقد قرّر — يُتحقَّق من اختياره أدناه */
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
     if (tx.matchDisposition !== "SUGGEST" && !pickedByHand) {
       outcomes.push({
         transactionId: tx.id, ok: false,
-        reason: "ليست اقتراحاً — الإقرار الجماعيّ للاقتراحات وحدها",
+        reason: "ليست اقتراحاً. الإقرار الجماعي للاقتراحات فقط.",
       });
       return false;
     }
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
   });
 
   for (const missing of ids.filter((id) => !rows.some((r) => r.id === id))) {
-    outcomes.push({ transactionId: missing, ok: false, reason: "لا توجد هذه الحركة" });
+    outcomes.push({ transactionId: missing, ok: false, reason: "هذه الحركة غير موجودة" });
   }
 
   if (eligible.length === 0) {
@@ -133,15 +133,15 @@ export async function POST(request: Request) {
       outcomes,
       message:
         outcomes.length === 1
-          ? `لم يكتب شيء — ${outcomes[0].reason}`
-          : `لم يكتب شيء — ${countNoun(outcomes.length, TRANSACTION)} ردّت`,
+          ? `لم يُحفظ شيء. ${outcomes[0].reason}`
+          : `لم يُحفظ شيء. رُدّت ${countNoun(outcomes.length, TRANSACTION)}`,
     });
   }
 
   /* اختيارُ مرشّحٍ بعينه لحركةٍ واحدة — لا يُعمَّم على دفعة */
   const chosenInvoiceIds = body.candidateInvoiceIds ?? [];
   if (chosenInvoiceIds.length > 0 && ids.length !== 1) {
-    return NextResponse.json({ error: "اختيار الفاتورة لحركة واحدة في المرّة" }, { status: 400 });
+    return NextResponse.json({ error: "اختيار الفاتورة يكون لحركة واحدة في المرة" }, { status: 400 });
   }
 
   /* ── الحقائق كما هي الآن، لا كما كانت لحظة الاستيراد ── */
@@ -176,7 +176,7 @@ export async function POST(request: Request) {
       if (chosenInvoiceIds.length > 0 && !candidate) {
         outcomes.push({
           transactionId: tx.id, ok: false,
-          reason: "الفاتورة المختارة لم تعد مرشّحةً لهذه الحركة — سدّدت أو تغيّرت. حدّث القائمة واختر من جديد",
+          reason: "الفاتورة المختارة لم تعد مرشّحة لهذه الحركة، فقد سُدّدت أو تغيّرت. حدّث القائمة واختر من جديد.",
         });
         continue;
       }
@@ -205,8 +205,8 @@ export async function POST(request: Request) {
         transactionId: tx.id,
         ok: false,
         reason: !single && candidate
-          ? `${last ?? "لم تعد تبلغ حدّ الحسم"} — أقرّها وحدها من صفّها`
-          : last ?? "لم تعد تبلغ حدّ الحسم — راجعها وحدها",
+          ? `${last ?? "لم تعد تبلغ حدّ الحسم"}. أقرّها وحدها من صفّها.`
+          : last ?? "لم تعد تبلغ حدّ الحسم. راجعها وحدها.",
       });
       continue;
     }
@@ -326,7 +326,7 @@ export async function POST(request: Request) {
         ok: false,
         reason: e instanceof AlreadyMatchedError || e instanceof MonthClosedError
           ? e.message
-          : "تعذّر التقييد — لم يكتب منها شيء. أعد المحاولة، فإن تكرّر فأبلغ مالك الحساب.",
+          : "تعذّر التقييد، ولم يُحفظ منها شيء. أعد المحاولة، فإن تكرّر فأبلغ مالك الحساب.",
       });
       continue;
     }
@@ -335,8 +335,8 @@ export async function POST(request: Request) {
     outcomes.push({
       transactionId: tx.id,
       ok: true,
-      reason: `أقرّت على ${countNoun(decided.allocations.length, INVOICE)}`
-        + (unallocated > 0 ? ` · وبقي ${formatRiyalsDisplay(unallocated)} غير مخصّص على حساب المورّد` : ""),
+      reason: `تم الإقرار على ${countNoun(decided.allocations.length, INVOICE)}`
+        + (unallocated > 0 ? ` · ويبقى ${formatRiyalsDisplay(unallocated)} غير مخصّص على حساب المورّد` : ""),
       paymentId,
       invoiceIds: decided.allocations.map((a) => a.invoiceId),
     });
@@ -350,8 +350,8 @@ export async function POST(request: Request) {
     message:
       confirmed === ids.length
         ? single
-          ? outcomes.find((o) => o.ok)?.reason ?? `أقرّت ${countNoun(confirmed, TRANSACTION)}`
-          : `أقرّت ${countNoun(confirmed, TRANSACTION)}`
-        : `أقرّت ${confirmed} من ${ids.length} — والباقي تغيّر حاله فيراجع وحده`,
+          ? outcomes.find((o) => o.ok)?.reason ?? `تم إقرار ${countNoun(confirmed, TRANSACTION)}`
+          : `تم إقرار ${countNoun(confirmed, TRANSACTION)}`
+        : `تم إقرار ${confirmed} من ${ids.length}. الباقي تغيّرت حالته، فراجعه على حدة.`,
   });
 }

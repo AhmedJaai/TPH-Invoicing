@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   const { key, action } = read.body;
   const prefix = signalPrefix(key);
   if (!prefix) {
-    return NextResponse.json({ error: "هذه الملاحظة لا تحسم من هنا." }, { status: 400 });
+    return NextResponse.json({ error: "لا يمكن البتّ في هذه الملاحظة من هنا." }, { status: 400 });
   }
   const note = read.body.note?.trim().slice(0, 500) || null;
   const until = action === "snooze" ? addDays(todayInRiyadh(), read.body.days ?? 7) : null;
@@ -75,8 +75,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     message:
-      action === "dismiss" ? "أسكتت — لن تظهر ثانيةً إلّا إن تغيّر ما بنيت عليه"
-      : until ? `أجّلت — تعود بعد ${until}`
-      : "أعيدت الملاحظة",
+      action === "dismiss" ? "تم إسكات الملاحظة، ولن تظهر مرة أخرى إلا إذا تغيّرت البيانات التي بُنيت عليها"
+      : until ? `تم التأجيل، وتعود الملاحظة بعد ${until}`
+      : "أُعيدت الملاحظة",
   });
 }

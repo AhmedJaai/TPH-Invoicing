@@ -93,7 +93,7 @@ describe("adjudicate — الحلقة كاملةً", () => {
       }),
     }));
     expect(bad.candidate).toBeNull();
-    expect(bad.refused).toContain("وليس في القائمة");
+    expect(bad.refused).toContain("غير موجود في القائمة");
   });
 
   it("يردّ الأدلّة التي ادّعاها ولم تقع", async () => {
@@ -144,7 +144,7 @@ describe("adjudicate — الحلقة كاملةً", () => {
     expect(r.entityChoice?.name).toBe("المراعي");
     // وتعريف الجهة يحتاج إقراراً صريحاً لأنّه يُنشئ ذاكرة
     expect(r.decision.disposition).toBe("REVIEW");
-    expect(r.decision.reasons.join(" ")).toContain("يعمّ على أمثاله");
+    expect(r.decision.reasons.join(" ")).toContain("يسري على الحركات المشابهة");
   });
 
   it("وحالة بلا مرشّحين لا تستدعى", async () => {
@@ -158,7 +158,7 @@ describe("adjudicate — الحلقة كاملةً", () => {
     const [r] = await run([invoiceCase()], provider({
       judge: async () => { throw new Error("انقطع"); },
     }));
-    expect(r.refused).toContain("تعذّر الاستدعاء");
+    expect(r.refused).toContain("تعذّر الاتصال بالنموذج");
     expect(r.decision.disposition).toBe("REVIEW");
   });
 

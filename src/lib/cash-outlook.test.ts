@@ -77,7 +77,7 @@ describe("buildCashOutlook", () => {
     const o = buildCashOutlook({ ...base, recurring: [rent, other], balanceMinor: 5_000_000, paidThisMonth: new Set(["r1"]) });
     const rest = o.buckets.find((b) => b.id === "rest");
     expect(rest?.lines.map((l) => l.label)).toEqual(["اشتراك آخر"]);
-    expect(rest?.when).toContain(`وخرج منها ما قيّد دفعه: ${rent.label}`);
+    expect(rest?.when).toContain(`وقد خرج منها ما سُجّل دفعه: ${rent.label}`);
   });
 
   it("الرصيد المجهول لا يرسم — لا «يبقى بعدها» عن غير علم", () => {

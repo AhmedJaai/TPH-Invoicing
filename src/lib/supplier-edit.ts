@@ -90,25 +90,25 @@ const text = (max: number) => z.string().trim().max(max);
 
 export const supplierProfileRequest = z.object({
   supplierId: z.string().trim().min(1).max(64),
-  nameAr: text(200).min(2, "اسم المورّد حرفان على الأقلّ").optional(),
+  nameAr: text(200).min(2, "اسم المورّد يجب أن يكون حرفين على الأقل").optional(),
   nameEn: text(200).optional(),
   vatNumber: text(30).optional()
-    .refine((v) => !v || isValidSaudiVat(v), "الرقم الضريبيّ 15 رقماً يبدأ بـ3 وينتهي بـ3 — صحّحه أو اتركه فارغاً"),
+    .refine((v) => !v || isValidSaudiVat(v), "الرقم الضريبي 15 رقماً يبدأ بـ3 وينتهي بـ3. صحّحه أو اتركه فارغاً"),
   crNumber: text(30).optional(),
   category: z.enum(SUPPLIER_CATEGORIES).optional(),
   /** أيّامٌ صحيحة نصّاً — والفارغ «غير معروف». */
   paymentTermsDays: text(4).optional()
-    .refine((v) => !v || (/^\d{1,3}$/.test(latinDigits(v)) && Number(latinDigits(v)) <= 365), "أجل السداد أيّام من 0 إلى 365 — أو اتركه فارغاً"),
+    .refine((v) => !v || (/^\d{1,3}$/.test(latinDigits(v)) && Number(latinDigits(v)) <= 365), "أجل السداد عدد أيام من 0 إلى 365، أو اتركه فارغاً"),
   /** حدُّ الرصيد بالريال نصّاً — والفارغ «بلا حدّ». */
   balanceAlert: text(20).optional()
-    .refine((v) => { if (!v) return true; const m = parseRiyals(v); return m !== null && m > 0; }, "حدّ التنبيه مبلغ بالريال أكبر من صفر — أو اتركه فارغاً"),
+    .refine((v) => { if (!v) return true; const m = parseRiyals(v); return m !== null && m > 0; }, "حد التنبيه مبلغ بالريال أكبر من صفر، أو اتركه فارغاً"),
   phone: text(30).optional()
-    .refine((v) => !v || normalizePhoneE164(v) !== null, "رقم الجوّال لا يفهم — اكتبه 05xxxxxxxx أو بمفتاح الدولة"),
+    .refine((v) => !v || normalizePhoneE164(v) !== null, "رقم الجوال غير صالح. اكتبه بصيغة 05xxxxxxxx أو مع مفتاح الدولة"),
   email: text(120).optional()
-    .refine((v) => !v || z.email().safeParse(v).success, "البريد الإلكترونيّ لا يفهم"),
+    .refine((v) => !v || z.email().safeParse(v).success, "البريد الإلكتروني غير صالح"),
   contactName: text(120).optional(),
   iban: text(40).optional()
-    .refine((v) => !v || isValidSaudiIban(v), "الآيبان لا يستقيم: SA ثمّ 22 رقماً، وخانتا التحقّق لا تطابقان — راجعه خانةً خانة"),
+    .refine((v) => !v || isValidSaudiIban(v), "الآيبان غير صحيح: يجب أن يبدأ بـSA ثم 22 رقماً، ورقما التحقق لا يطابقان. راجعه رقماً رقماً"),
   /** «نعم، غيّر الرقم الضريبيّ/الآيبان رغم التنبيه» — بعد ردّ 409 `warnings`. */
   confirm: z.boolean().optional(),
 }).strict();

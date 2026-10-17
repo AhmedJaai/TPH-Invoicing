@@ -24,14 +24,14 @@ describe("ما فعله النظام وحده يقال بأثره", () => {
     const s = summarizeAutoWork([item({ totalMinor: 5_000 }), item({ documentId: "d2", totalMinor: null })]);
     expect(s?.owedAddedMinor).toBe(5_000);
     expect(s?.owedUnknown).toBe(1);
-    expect(s?.body).toContain("لم يعرف مبلغها");
+    expect(s?.body).toContain("لم يُعرف مبلغها");
   });
 
   it("كلّ ما قيّد مجهول المبلغ ← لا يقال «زاد 0.00»", () => {
     const s = summarizeAutoWork([item({ totalMinor: null })]);
     expect(s?.owedAddedMinor).toBe(0);
     expect(s?.body).not.toContain("0.00");
-    expect(s?.body).toContain("لم يعرف مبلغها");
+    expect(s?.body).toContain("لم يُعرف مبلغها");
   });
 
   it("الاعتماد وحده لا يزيد ما عليك — الفاتورة مقيّدة من قبل", () => {

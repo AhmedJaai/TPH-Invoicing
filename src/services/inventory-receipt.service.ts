@@ -63,9 +63,9 @@ export class PossibleDuplicateReceiptError extends Error {
   ) {
     super(
       candidates.length > 0
-        ? `يشبه هذا الاستلام ${candidates.length === 1 ? "بنداً" : `${candidates.length} بنود`} في فاتورة قائمة`
-          + ` (${candidates[0].supplierName} · ${candidates[0].invoiceNumber}) — أهو نفسه أم شحنة أخرى؟`
-        : `أدخلت الكمّيّة نفسها لهذا الصنف يوم ${earlierReceipts[0].receivedOn} — أهي شحنة أخرى أم أدخلت مرّتين؟`,
+        ? `يشبه هذا الاستلام ${candidates.length === 1 ? "بنداً" : `${candidates.length} بنود`} في فاتورة موجودة`
+          + ` (${candidates[0].supplierName} · ${candidates[0].invoiceNumber}). هل هو الاستلام نفسه أم شحنة أخرى؟`
+        : `أدخلت الكمّية نفسها لهذا الصنف يوم ${earlierReceipts[0].receivedOn}. هل هي شحنة أخرى أم أُدخلت مرتين؟`,
     );
     this.name = "PossibleDuplicateReceiptError";
   }
@@ -126,16 +126,16 @@ async function stockProduct(productId: string, conn: Conn) {
     .from(products)
     .where(and(eq(products.id, productId), eq(products.isStockItem, true)))
     .limit(1);
-  if (!p) throw new Error("صنف ليس من أصناف المخزون");
+  if (!p) throw new Error("هذا الصنف ليس من أصناف المخزون");
   return p;
 }
 
 function checkQuantity(name: string, enteredMilli: number, unit: StoredUnit, baseUnit: StoredUnit): number {
   if (!Number.isInteger(enteredMilli) || enteredMilli <= 0) {
-    throw new Error(`كمّيّة غير مقروءة لـ«${name}» — الاستلام كمّيّة موجبة`);
+    throw new Error(`تعذّرت قراءة الكمّية لـ«${name}». يجب أن تكون كمّية الاستلام أكبر من صفر`);
   }
   if (!sameUnitFamily(unit, baseUnit)) {
-    throw new Error(`وحدة «${name}» لا تحوّل إلى وحدته — وزن لا يصير حجماً`);
+    throw new Error(`لا يمكن تحويل وحدة «${name}» إلى وحدة الصنف (الوزن لا يتحوّل إلى حجم)`);
   }
   return toCanonical(enteredMilli, unit);
 }
@@ -171,9 +171,9 @@ async function checkLink(invoiceLineId: string, productId: string, conn: Conn): 
   `)).rows;
   if (!row) throw new Error("بند الفاتورة غير موجود");
   if (row.product_id !== null && String(row.product_id) !== productId) {
-    throw new Error("بند الفاتورة لصنف آخر — لا يربط بهذا الاستلام");
+    throw new Error("بند الفاتورة يخص صنفاً آخر، فلا يمكن ربطه بهذا الاستلام");
   }
-  if (row.linked) throw new Error("هذا البند مرتبط باستلام آخر — والبند الواحد لا يمثّل شحنتين");
+  if (row.linked) throw new Error("هذا البند مرتبط باستلام آخر، والبند الواحد لا يمثّل شحنتين");
 }
 
 /**
@@ -187,7 +187,7 @@ export async function createReceipt(input: ReceiptInput, actorId: string, conn: 
     const product = await stockProduct(input.productId, tx);
     const canonical = checkQuantity(product.name, input.enteredMilli, input.unit, product.baseUnit);
     if (input.costMinor != null && (!Number.isInteger(input.costMinor) || input.costMinor < 0)) {
-      throw new Error("الكلفة مبلغ موجب بالهللات — أو اتركها فارغة");
+      throw new Error("التكلفة مبلغ موجب بالهللات، أو اتركها فارغة");
     }
 
     const resolution = input.resolution ?? null;
@@ -238,7 +238,7 @@ export async function createReceipt(input: ReceiptInput, actorId: string, conn: 
 async function activeReceipt(id: string, conn: Conn) {
   const [r] = await conn.select().from(inventoryReceipts)
     .where(and(eq(inventoryReceipts.id, id), isNull(inventoryReceipts.voidedAt))).limit(1);
-  if (!r) throw new Error("الاستلام غير موجود أو ألغي");
+  if (!r) throw new Error("الاستلام غير موجود أو أُلغي");
   return r;
 }
 
@@ -289,7 +289,7 @@ export async function updateReceipt(
 
 /** يلغي استلاماً — بسببه ومن ألغاه، ولا يُمحى. */
 export async function voidReceipt(id: string, reason: string, actorId: string, conn: Conn = db): Promise<void> {
-  if (reason.trim().length < 3) throw new Error("اكتب سبب الإلغاء — الإلغاء بلا سبب لا يفهم بعد شهر");
+  if (reason.trim().length < 3) throw new Error("اكتب سبب الإلغاء، فالإلغاء بلا سبب يصعب فهمه لاحقاً");
   await conn.transaction(async (tx) => {
     const before = await activeReceipt(id, tx);
     await tx.update(inventoryReceipts)

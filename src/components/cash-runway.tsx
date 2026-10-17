@@ -16,11 +16,11 @@ export async function RunwayLine() {
     <p className="flex items-start gap-2 text-xs leading-relaxed text-ink-soft">
       <Hourglass className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} aria-hidden />
       {r.days === null || r.dailyOutflowMinor === null ? (
-        <span className="text-muted">أيّام النقد الباقية — {r.blocked ? RUNWAY_BLOCK_LABEL[r.blocked] : "لا تحسب"}.</span>
+        <span className="text-muted">أيام النقد الباقية: {r.blocked ? RUNWAY_BLOCK_LABEL[r.blocked] : "لا يمكن حسابها"}.</span>
       ) : (
         <span>
-          يغطّي نحو <span className="font-bold text-ink">{r.days === 0 ? "صفر يوم" : countNoun(r.days, DAY)}</span> من الصادر،
-          بمعدّل <Money minor={r.dailyOutflowMinor} /> في اليوم في آخر {countNoun(r.basisDays, DAY)} من الكشف — إن لم يدخل شيء. الوارد غير محسوب.
+          يغطّي الرصيد نحو <span className="font-bold text-ink">{r.days === 0 ? "صفر يوم" : countNoun(r.days, DAY)}</span> من المصروفات،
+          بمعدل <Money minor={r.dailyOutflowMinor} /> في اليوم خلال آخر {countNoun(r.basisDays, DAY)} من الكشف، على افتراض ألا يدخل مال. الوارد غير محسوب.
         </span>
       )}
     </p>

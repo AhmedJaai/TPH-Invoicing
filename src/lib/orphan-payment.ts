@@ -23,7 +23,7 @@ export const orphanPaymentRequest = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("void"),
     paymentId: id,
-    reason: z.string().trim().min(3, "اكتب ما هي هذه الدفعة إن لم تكن لمورّد").max(300),
+    reason: z.string().trim().min(3, "اكتب سبب الإلغاء: ما هذه الدفعة إن لم تكن لمورّد؟").max(300),
   }).strict(),
 ]);
 

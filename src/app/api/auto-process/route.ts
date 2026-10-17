@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   }
   /* العملُ الآليّ يقيّد مبالغَ ويعتمدها — فضابطُه لمن يراها، كالاعتماد نفسه */
   if (!can(user.role, "amounts:view")) {
-    return NextResponse.json({ error: "إيقاف العمل الآليّ يحتاج صلاحية عرض المبالغ" }, { status: 403 });
+    return NextResponse.json({ error: "إيقاف العمل الآلي يحتاج صلاحية عرض المبالغ" }, { status: 403 });
   }
 
   const read = await readJson(request, Body);
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     ok: true,
     paused: read.body.paused,
     message: read.body.paused
-      ? "أوقف العمل الآليّ — لا يقيّد ولا يعتمد شيء في الخلفيّة حتى تشغّله"
-      : "عاد العمل الآليّ — يقيّد ويعتمد ما تجتمع فيه الشروط",
+      ? "أُوقف العمل الآلي. لن يُسجَّل ولن يُعتمد شيء في الخلفية حتى تعيد تشغيله."
+      : "عاد العمل الآلي. سيُسجَّل ويُعتمد ما تتوفر فيه الشروط.",
   });
 }

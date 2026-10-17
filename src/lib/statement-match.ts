@@ -227,11 +227,11 @@ export function reconcileStatement(
       */
       const score = byRef ? (amountClose ? 1 : 0.9) : 0.7;
       const why: string[] = [];
-      if (byRef) why.push(`المورّد كتب مرجعاً يطابق رقم فاتورتنا ${o.invoice.invoiceNumber}`);
+      if (byRef) why.push(`المرجع في الكشف يطابق رقم فاتورتنا ${o.invoice.invoiceNumber}`);
       if (amountClose) why.push("المبلغ يطابق");
       else why.push(`فرق المبلغ ${formatRiyalsDisplay(Math.abs(o.invoice.totalMinor - line.debitMinor))} ريالاً`);
-      if (dateClose) why.push("التاريخ ضمن النافذة");
-      else why.push("التاريخ خارج النافذة");
+      if (dateClose) why.push("التاريخ ضمن المدة المسموحة");
+      else why.push("التاريخ خارج المدة المسموحة");
 
       claims.push({
         transactionId: key,
@@ -378,7 +378,7 @@ export function reconcileStatement(
     findings.push({
       code: ISSUE.INVOICE_IN_STATEMENT_NOT_ARCHIVED,
       severity: "WARN",
-      message: `${countNoun(missingFromArchive.length, INVOICE)} في كشف المورّد بقيمة ${formatRiyalsDisplay(total)} ريال ولا ملف لها عندنا — اطلبها منه`,
+      message: `${countNoun(missingFromArchive.length, INVOICE)} في كشف المورّد بقيمة ${formatRiyalsDisplay(total)} ريال، وليس لها ملف عندنا. اطلبها منه`,
     });
   }
 
@@ -386,7 +386,7 @@ export function reconcileStatement(
     findings.push({
       code: ISSUE.STATEMENT_AMOUNT_MISMATCH,
       severity: "WARN",
-      message: `${countNoun(amountMismatches.length, INVOICE)} يخالف مبلغها في الكشف مبلغها عندنا`,
+      message: `${countNoun(amountMismatches.length, INVOICE)} يخالف مبلغها في الكشف ما سجّلناه عندنا`,
     });
   }
 
@@ -394,7 +394,7 @@ export function reconcileStatement(
     findings.push({
       code: ISSUE.INVOICE_NOT_IN_STATEMENT,
       ...ISSUE_TEXT.INVOICE_NOT_IN_STATEMENT,
-      message: `${countNoun(notInStatement.length, INVOICE)} عندنا لم ترد في كشفه — تحقّق أنّها ليست مكرّرة أو لغير هذا المورّد`,
+      message: `${countNoun(notInStatement.length, INVOICE)} عندنا لم ترد في كشفه. تحقّق من أنها ليست مكررة أو تخص مورّداً آخر`,
     });
   }
 
@@ -402,7 +402,7 @@ export function reconcileStatement(
     findings.push({
       code: ISSUE.STATEMENT_AMOUNT_MISMATCH,
       severity: "WARN",
-      message: `حساب الكشف نفسه لا يستقيم: افتتاحي وحركات تعطي ${formatRiyalsDisplay(computedClosingMinor!)} والختامي المكتوب ${formatRiyalsDisplay(options.closingBalanceMinor!)}`,
+      message: `حسابات الكشف نفسه لا تستقيم: الرصيد الافتتاحي مع الحركات يعطي ${formatRiyalsDisplay(computedClosingMinor!)} بينما الرصيد الختامي المكتوب ${formatRiyalsDisplay(options.closingBalanceMinor!)}`,
     });
   }
 
@@ -435,14 +435,14 @@ export function buildDiscrepancyMemo(
     ``,
     `راجعنا كشف حسابكم عن ${periodLabel} وقابلناه بسجلاتنا:`,
     ``,
-    `• ما حمّلتموه علينا: ${riyals(r.theirBilledMinor)} ريال`,
-    `• ما لدينا من فواتيركم: ${riyals(r.ourBilledMinor)} ريال`,
+    `• إجمالي ما حمّلتموه علينا: ${riyals(r.theirBilledMinor)} ريال`,
+    `• إجمالي فواتيركم لدينا: ${riyals(r.ourBilledMinor)} ريال`,
   ];
 
   if (r.billedDifferenceMinor !== 0) {
     const more = r.billedDifferenceMinor > 0;
     out.push(
-      `• الفرق: ${riyals(Math.abs(r.billedDifferenceMinor))} ريال ${more ? "زيادة عندكم" : "زيادة عندنا"}`,
+      `• الفرق: ${riyals(Math.abs(r.billedDifferenceMinor))} ريال ${more ? "أكثر في كشفكم" : "أكثر في سجلاتنا"}`,
     );
   }
 
@@ -456,7 +456,7 @@ export function buildDiscrepancyMemo(
   }
 
   if (r.amountMismatches.length > 0) {
-    out.push(``, `فواتير يختلف مبلغها بين كشفكم وبيننا:`);
+    out.push(``, `فواتير يختلف مبلغها بين كشفكم وسجلاتنا:`);
     for (const l of r.amountMismatches) {
       out.push(
         `  - ${l.invoice!.invoiceNumber} · عندكم ${riyals(l.line.debitMinor)} · عندنا ${riyals(l.invoice!.totalMinor)}`,
@@ -471,6 +471,6 @@ export function buildDiscrepancyMemo(
     }
   }
 
-  out.push(``, `نشكر لكم التعاون.`);
+  out.push(``, `نشكر لكم تعاونكم.`);
   return out.join("\n");
 }

@@ -50,11 +50,11 @@ export function ShellWatch() {
       if (away < STALE_AFTER_MS) return;
       /* من يكتب لا تُحدَّث صفحتُه تحت يده — يُقال له ويحدّث متى شاء */
       if (typing() || document.querySelector("dialog[open]")) {
-        toast({ tone: "info", title: "الأرقام قد تكون قديمة", body: "غبت عن الصفحة مدّة — حدّثها حين تفرغ ممّا تكتب." });
+        toast({ tone: "info", title: "الأرقام قد تكون قديمة", body: "غبت عن الصفحة فترة. حدّثها عندما تنتهي مما تكتبه." });
         return;
       }
       router.refresh();
-      toast({ tone: "info", title: "حدّثت الصفحة الآن", body: "عدت بعد غياب، فأعيد جلب الأرقام.", duration: 3500 });
+      toast({ tone: "info", title: "تم تحديث الصفحة", body: "عدت بعد غياب، فأُعيد تحميل الأرقام.", duration: 3500 });
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
@@ -65,7 +65,7 @@ export function ShellWatch() {
       open={expired}
       onClose={() => setExpired(false)}
       title="انتهت جلستك"
-      description="ما كتبته في هذه الصفحة باق — لم يحفظ بعد."
+      description="ما كتبته في هذه الصفحة ما زال موجوداً، لكنه لم يُحفظ بعد."
       size="sm"
       footer={
         <>
@@ -78,14 +78,14 @@ export function ShellWatch() {
             onClick={() => setExpired(false)}
           >
             <ExternalLink className="h-4 w-4" strokeWidth={2} aria-hidden />
-            ادخل ثانيةً في لسان جديد
+            سجّل الدخول من جديد في تبويب جديد
           </a>
         </>
       }
     >
       <p className="text-sm leading-relaxed text-ink-soft">
-        ادخل بحسابك في لسان جديد، ثمّ عد إلى هذا اللسان وأعد ما كنت تفعله — الصفحة هنا كما تركتها.
-        وإن أغلقت هذه الورقة فلن يحفظ شيء حتى تدخل.
+        سجّل الدخول بحسابك في تبويب جديد، ثم عد إلى هذا التبويب وأعد ما كنت تفعله. الصفحة هنا كما تركتها.
+        وإن أغلقت هذه النافذة فلن يُحفظ شيء حتى تسجّل الدخول.
       </p>
     </Sheet>
   );

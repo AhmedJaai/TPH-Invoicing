@@ -68,7 +68,7 @@ function LinkRow({
         newProductName: creating ? newName.trim() : undefined,
         category: creating ? category : undefined,
       });
-      setMessage(r.ok ? (r.data.message ?? "ربطت") : r.error);
+      setMessage(r.ok ? (r.data.message ?? "تم الربط") : r.error);
       /*
         الربط الذي لم يربط شيئاً ليس نجاحاً — والنصّ يقوله («لا أصناف»)
         بينما اللون كان يقول «تمّ». فيُقرأ اللونُ قبل النصّ.
@@ -88,7 +88,7 @@ function LinkRow({
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium">{i.displayName}</span>
               <span className="block text-[11px] text-muted">
-                {i.supplierName} · طلب {countNoun(i.orderCount, TIME)}
+                {i.supplierName} · طُلب {countNoun(i.orderCount, TIME)}
               </span>
             </span>
             <span className="nums shrink-0 text-xs" dir="ltr">
@@ -113,7 +113,7 @@ function LinkRow({
       ) : (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <select
-            aria-label="الصنف المعياريّ"
+            aria-label="الصنف المعياري"
             value={productId}
             onChange={(e) => setProductId(e.target.value)}
             className="min-h-11 min-w-[9rem] rounded-lg border border-line-input bg-raised px-2.5 text-xs sm:min-h-9"
@@ -127,7 +127,7 @@ function LinkRow({
           {creating && (
             <>
               <input
-                aria-label="اسم صنف معياريّ جديد"
+                aria-label="اسم صنف معياري جديد"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="اسم الصنف المعياري"
@@ -192,7 +192,7 @@ function Triage({
     return (
       <div className="rounded-2xl border border-ok/40 bg-ok-bg px-5 py-10 text-center">
         <p className="text-sm font-bold text-ok">لا شيء ينتظر الفرز.</p>
-        <p className="mt-1.5 text-xs text-ink-soft">كل صنف مورّد صار له صنف معياري.</p>
+        <p className="mt-1.5 text-xs text-ink-soft">كل صنف مورّد له الآن صنف معياري.</p>
       </div>
     );
   }
@@ -273,13 +273,13 @@ function Triage({
           <p className="text-[11px] text-muted">صنف معياري بالاسم نفسه</p>
           <p className="mt-1 text-sm font-bold">{candidate.nameAr}</p>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
-            الاسم متطابق — والاسم وحده يخدع أحياناً. أكّده إن كان هو فعلاً.
+            الاسمان متطابقان، لكن الاسم وحده قد يخدع. أكّد الربط إن كان هو الصنف نفسه فعلاً.
           </p>
         </div>
       ) : (
         <p className="mt-4 text-xs leading-relaxed text-muted">
-          لا صنف معياري يحمل هذا الاسم. إنشاؤه يجعل ما تشتريه من مورّدين مختلفين
-          يجمع تحت شيء واحد.
+          لا يوجد صنف معياري بهذا الاسم. عند إنشائه يُجمع ما تشتريه من مورّدين
+          مختلفين تحت صنف واحد.
         </p>
       )}
 
@@ -292,7 +292,7 @@ function Triage({
           </button>
         )}
         <button type="button" onClick={createOwn} disabled={busy} className={buttonClass(candidate ? "secondary" : "primary", "sm")}>
-          {candidate ? "لا، أنشئ صنفاً له" : "أنشئ صنفاً معيارياً له"}
+          {candidate ? "لا، أنشئ صنفاً جديداً له" : "أنشئ صنفاً معيارياً له"}
         </button>
         <button
           type="button"
@@ -300,7 +300,7 @@ function Triage({
           disabled={busy}
           className={buttonClass("quiet", "sm")}
         >
-          تخطّ
+          تجاوز
         </button>
       </div>
     </div>
@@ -362,8 +362,8 @@ export function ProductMapping({
       <section>
         <h2 className="font-display text-lg font-bold leading-tight">افرزها واحداً واحداً</h2>
         <p className="mb-3 mt-1 max-w-2xl text-xs leading-relaxed text-muted">
-          القرار في كل صنف واحد بسيط: أهو الصنف المعياري نفسه أم لا؟ فيعرض
-          واحد في كل مرّة، وينتقل إلى الذي يليه.
+          القرار في كل صنف بسيط: هل هو الصنف المعياري نفسه أم لا؟ نعرض لك
+          صنفاً واحداً في كل مرة، ثم ننتقل إلى الذي يليه.
         </p>
         <Triage queue={singles} products={products} onResolved={(id) => onDone([id])} />
       </section>
@@ -372,9 +372,9 @@ export function ProductMapping({
         <section>
           <h2 className="text-base font-bold">أصناف قد تكون صنفاً واحداً</h2>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            أصناف تحمل الاسم نفسه عند مورّدين. وتطابق الاسم لا يعني تطابق الصنف —
-            «عنب» عند المحمصة الغربية كيلو بنّ، وعند لافا زجاجة كمبوتشا. فما يضعف
-            الاقتراح معروض معه.
+            أصناف تحمل الاسم نفسه عند مورّدين. وتطابق الاسم لا يعني تطابق الصنف:
+            «عنب» عند المحمصة الغربية كيلو بنّ، وعند لافا زجاجة كمبوتشا. لذلك نعرض
+            مع كل اقتراح ما يضعفه.
           </p>
           <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {suggestionGroups.map((g) => (
@@ -393,8 +393,8 @@ export function ProductMapping({
       <section>
         <h2 className="text-base font-bold">أصناف بلا ربط ({singles.length})</h2>
         <p className="mt-1 text-xs leading-relaxed text-muted">
-          كلّ منها صنف مورّد قائم بذاته. ربطه بصنف معياري هو ما يسمح لاحقاً بجمع
-          ما اشتريته من مورّدين مختلفين تحت شيء واحد.
+          كل منها صنف مورّد قائم بذاته. ربطه بصنف معياري يتيح لاحقاً جمع
+          ما اشتريته من مورّدين مختلفين تحت صنف واحد.
         </p>
         {singles.length === 0 ? (
           <p className="mt-3 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-xs text-ok">
@@ -409,7 +409,7 @@ export function ProductMapping({
         )}
         {singles.length > 60 && (
           <p className="mt-2 text-xs text-muted">
-            يعرض ستّون من {singles.length} — الأكثر إنفاقاً أوّلاً.
+            نعرض أول ستين صنفاً من {singles.length}، بدءاً بالأكثر إنفاقاً.
           </p>
         )}
       </section>
@@ -465,7 +465,7 @@ function UnlinkButton({ id }: { id: string }) {
         }}
         className={buttonClass("quiet", "sm")}
       >
-        فكّ الربط
+        إلغاء الربط
       </button>
       {error && <span role="alert" className="text-[11px] font-bold text-danger">{error}</span>}
     </span>

@@ -151,11 +151,11 @@ export function validateVerdict(
 
   const candidate = map.get(verdict.choice.trim());
   if (!candidate) {
-    return { candidate: null, rejected: `اختار «${verdict.choice}» وليس في القائمة — رُدّ` };
+    return { candidate: null, rejected: `اختار النموذج «${verdict.choice}» وهو غير موجود في القائمة، فرُفض اختياره` };
   }
 
   if (!Number.isFinite(verdict.confidence) || verdict.confidence < 0 || verdict.confidence > 1) {
-    return { candidate: null, rejected: "ثقةٌ خارج المدى — رُدّ" };
+    return { candidate: null, rejected: "درجة الثقة خارج النطاق، فرُفض الاختيار" };
   }
 
   return { candidate, rejected: null };

@@ -37,7 +37,7 @@ export const maxDuration = 60;
 
 const Body = z.object({
   /** يوم السداد (YYYY-MM-DD) — وإن غاب فاليوم بتوقيت الرياض، لا تاريخ الفاتورة */
-  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "التاريخ بصيغة YYYY-MM-DD").optional(),
+  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "اكتب التاريخ بصيغة YYYY-MM-DD").optional(),
   /** فواتير بعينها، أو كل ما يسبق شهراً */
   invoiceIds: z.array(z.string().trim().min(1).max(64)).max(500).optional(),
   supplierId: z.string().trim().min(1).max(64).optional(),
@@ -84,7 +84,7 @@ async function handle(request: Request) {
   if (body.source === "OWNER") {
     const invoiceId = body.invoiceIds?.length === 1 ? body.invoiceIds[0] : null;
     if (!invoiceId) {
-      return NextResponse.json({ error: "السداد من حساب المالك يسجّل لفاتورة واحدة في كلّ مرّة" }, { status: 400 });
+      return NextResponse.json({ error: "السداد من حساب المالك يُسجَّل لفاتورة واحدة في كل مرة" }, { status: 400 });
     }
 
     try {
@@ -120,9 +120,9 @@ async function handle(request: Request) {
         marked: 1,
         totalMinor: outcome.ownerPaymentMinor,
         message:
-          `قيّدت فاتورة ${outcome.invoiceNumber} مسدّدةً من حسابك بـ${formatRiyalsDisplay(outcome.ownerPaymentMinor)} ريال`
-          + (moved > 0 ? ` · وانتقل ${formatRiyalsDisplay(moved)} من حوالات المقهى إلى فواتيره الأخرى` : "")
-          + (outcome.creditLeftMinor > 0 ? ` · وبقي لك عنده ${formatRiyalsDisplay(outcome.creditLeftMinor)}` : ""),
+          `تم قيد الفاتورة ${outcome.invoiceNumber} مسدّدة من حسابك بمبلغ ${formatRiyalsDisplay(outcome.ownerPaymentMinor)} ريال`
+          + (moved > 0 ? ` · وانتقل ${formatRiyalsDisplay(moved)} من حوالات المقهى إلى فواتير أخرى لهذا المورّد` : "")
+          + (outcome.creditLeftMinor > 0 ? ` · ويبقى لك عنده ${formatRiyalsDisplay(outcome.creditLeftMinor)}` : ""),
       });
     } catch (e) {
       if (e instanceof CreditError) {
@@ -140,10 +140,10 @@ async function handle(request: Request) {
     مستند. والإقرار بالسداد إقرارٌ عن فاتورةٍ يراها صاحبها، لا عن نطاق.
   */
   if (!body.invoiceIds?.length) {
-    return NextResponse.json({ error: "حدّد الفواتير التي سدّدت — واحدةً واحدة" }, { status: 400 });
+    return NextResponse.json({ error: "حدّد الفواتير التي سدّدتها، فاتورة فاتورة" }, { status: 400 });
   }
   if (body.invoiceIds.length > 50) {
-    return NextResponse.json({ error: "خمسون فاتورة في المرّة الواحدة على الأكثر" }, { status: 400 });
+    return NextResponse.json({ error: "الحد الأقصى خمسون فاتورة في المرة الواحدة" }, { status: 400 });
   }
   /*
     يوم السداد لا يوم الفاتورة.
@@ -156,7 +156,7 @@ async function handle(request: Request) {
   */
   const today = todayInRiyadh();
   if (body.paidOn && body.paidOn > today) {
-    return NextResponse.json({ error: "يوم السداد لا يكون بعد اليوم — صحّح التاريخ" }, { status: 400 });
+    return NextResponse.json({ error: "يوم السداد لا يمكن أن يكون بعد اليوم. صحّح التاريخ." }, { status: 400 });
   }
   const paidOn = body.paidOn ?? today;
   const paidAt = new Date(`${paidOn}T00:00:00Z`);
@@ -171,11 +171,11 @@ async function handle(request: Request) {
   let partialMinor: number | null = null;
   if (body.partialAmount !== undefined) {
     if (!body.supplierId) {
-      return NextResponse.json({ error: "المبلغ الجزئيّ يسجّل لمورّد واحد — حدّده" }, { status: 400 });
+      return NextResponse.json({ error: "المبلغ الجزئي يُسجَّل لمورّد واحد. حدّد المورّد." }, { status: 400 });
     }
     partialMinor = parseRiyals(body.partialAmount);
     if (partialMinor === null || partialMinor <= SETTLED_TOLERANCE_MINOR) {
-      return NextResponse.json({ error: "المبلغ الجزئيّ ليس مبلغاً صحيحاً — اكتبه بالريال مثل 1500.00" }, { status: 400 });
+      return NextResponse.json({ error: "المبلغ الجزئي غير صحيح. اكتبه بالريال، مثل 1500.00" }, { status: 400 });
     }
   }
 
@@ -319,18 +319,18 @@ async function handle(request: Request) {
     */
     if (e instanceof PaymentTwinError) {
       return NextResponse.json({
-        error: "لهذا المورّد سداد مقيّد بالمبلغ نفسه في اليوم نفسه. إن كان هذا سداداً آخر فأقرّ به، وإلّا فغيّر يوم السداد أو افتح المقيّد.",
+        error: "لهذا المورّد سداد مقيّد بالمبلغ نفسه في اليوم نفسه. إن كان هذا سداداً آخر فأكّد ذلك، وإلا فغيّر يوم السداد أو افتح السداد المقيّد.",
         twin: true,
       }, { status: 409 });
     }
     if (e instanceof PartialRejected) {
       return NextResponse.json({
-        error: `المبلغ الجزئيّ أكبر من المفتوح على هذه الفواتير (${formatRiyalsDisplay(e.openMinor)} ريال) — لم يكتب شيء. صحّح المبلغ.`,
+        error: `المبلغ الجزئي أكبر من المفتوح على هذه الفواتير (${formatRiyalsDisplay(e.openMinor)} ريال)، ولم يُحفظ شيء. صحّح المبلغ.`,
         openMinor: e.openMinor,
       }, { status: 409 });
     }
     if (e instanceof MarkPaidRaced) {
-      return NextResponse.json({ error: "تغيّر ما على هذه الفواتير أثناء الحفظ — لم يكتب شيء. حدّث الصفحة وأعد." }, { status: 409 });
+      return NextResponse.json({ error: "تغيّرت حالة هذه الفواتير أثناء الحفظ، ولم يُحفظ شيء. حدّث الصفحة وأعد المحاولة." }, { status: 409 });
     }
     const mapped = respondTo(e);
     if (mapped) return mapped;
@@ -338,7 +338,7 @@ async function handle(request: Request) {
   }
 
   if (marked === 0) {
-    return NextResponse.json({ ok: true, marked: 0, message: "لا فواتير مفتوحة ضمن النطاق" });
+    return NextResponse.json({ ok: true, marked: 0, message: "لا توجد فواتير مفتوحة ضمن النطاق" });
   }
 
   const drawnMinor = drawn.reduce((s, d) => s + d.amountMinor, 0);
@@ -352,10 +352,10 @@ async function handle(request: Request) {
     drawn: drawn.map((d) => ({ paymentId: d.paymentId, invoiceId: d.invoiceId })),
     ...(partialMinor === null ? {} : { partial: true, leftMinor: openBeforeMinor - totalMinor }),
     message: (partialMinor === null
-      ? `سجّل سداد ${countNoun(marked, INVOICE)} بقيمة ${formatRiyalsDisplay(totalMinor)} ريال`
-      : `سجّل سداد جزئيّ ${formatRiyalsDisplay(totalMinor)} ريال على ${countNoun(marked, INVOICE)} (الأقدم أوّلاً) · بقي ${formatRiyalsDisplay(openBeforeMinor - totalMinor)}`)
+      ? `تم تسجيل سداد ${countNoun(marked, INVOICE)} بقيمة ${formatRiyalsDisplay(totalMinor)} ريال`
+      : `تم تسجيل سداد جزئي بمبلغ ${formatRiyalsDisplay(totalMinor)} ريال على ${countNoun(marked, INVOICE)} (الأقدم أولاً) · والباقي ${formatRiyalsDisplay(openBeforeMinor - totalMinor)}`)
       + (drawnMinor > 0
-        ? ` · منها ${formatRiyalsDisplay(drawnMinor)} من حوالة في الكشف لم تكن منسوبة (${drawnDays.map((d) => formatDay(d)).join("، ")}) — فلم تقيّد مرّتين`
+        ? ` · منها ${formatRiyalsDisplay(drawnMinor)} من حوالة في الكشف لم تكن منسوبة إلى فاتورة (${drawnDays.map((d) => formatDay(d)).join("، ")})، فلم تُقيَّد مرتين`
         : ""),
   });
 }

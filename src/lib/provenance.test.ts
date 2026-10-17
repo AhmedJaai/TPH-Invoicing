@@ -90,10 +90,10 @@ describe("summarize", () => {
   });
 
   it("تقول مكتمل حين لا نقص", () => {
-    expect(summarize(buildProvenance([c({ id: "in", count: 3 })]))).toBe("3 فاتورة · مكتمل");
+    expect(summarize(buildProvenance([c({ id: "in", count: 3 })]))).toBe("3 فاتورة · كاملة");
   });
 
   it("تقول لا بيانات حين لا شيء", () => {
-    expect(summarize(buildProvenance([]))).toBe("لا بيانات بعد");
+    expect(summarize(buildProvenance([]))).toBe("لا توجد بيانات بعد");
   });
 });

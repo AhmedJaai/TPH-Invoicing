@@ -55,10 +55,10 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
       user={user}
       width="wide"
       title="النقد القادم"
-      intro="ما يخرج من الحساب في الأسابيع القادمة ممّا هو معلوم وحده — دفعات المورّدين والمصروفات المتكرّرة وضريبة القيمة المضافة — مقابل آخر رصيد معروف."
+      intro="المبالغ المعروفة التي ستخرج من الحساب في الأسابيع القادمة، وهي دفعات المورّدين والمصروفات المتكررة وضريبة القيمة المضافة، مقارنةً بآخر رصيد معروف."
       actions={
         <LinkButton href="/settings#recurring" icon={Plus} variant="secondary">
-          مصروف متكرّر
+          مصروف متكرر
         </LinkButton>
       }
     >
@@ -68,12 +68,12 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           icon={Landmark}
           label="آخر رصيد معروف"
           value={balanceKnown ? <Money minor={o.balanceMinor as number} /> : <span className="text-xl text-muted">غير معروف</span>}
-          sub={balanceKnown ? `في ${formatDay(o.balanceAsOf)} — وما دخل وخرج بعده لم يحسب` : "لا كشف يحمل الرصيد. استورد كشفاً فيه عمود الرصيد، أو أدخله عند الإقفال."}
+          sub={balanceKnown ? `في ${formatDay(o.balanceAsOf)}، ولا يشمل ما دخل وخرج بعد ذلك` : "لا يوجد كشف فيه الرصيد. استورد كشفاً يحتوي على عمود الرصيد، أو أدخله عند الإقفال."}
           href={balanceKnown ? "/bank" : "/bank#import"}
         >
           {/* سطرٌ يُحسب بعد الرسم، وعطبُه لا يُسقط الصفحة */}
           {balanceKnown && (
-            <SectionBoundary what="أيّام النقد الباقية">
+            <SectionBoundary what="الأيام المتبقية من النقد">
               <Suspense fallback={null}>
                 <RunwayLine />
               </Suspense>
@@ -85,7 +85,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           <KeyFigure
             icon={TriangleAlert}
             tone="danger"
-            label="متأخّر الآن"
+            label="متأخر الآن"
             value={<Money minor={overdue.totalMinor} />}
             sub={overdueSub(overdue.lines)}
             href={payHref}
@@ -98,9 +98,9 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           sub={
             balanceKnown && o.buckets.length > 0
               ? o.shortfallAt
-                ? "يقصر عنه الرصيد المعروف — انظر أين أدناه."
-                : "يغطّيه الرصيد المعروف."
-              : "مجموع ما في الجدول الزمنيّ أدناه."
+                ? "لا يكفيه الرصيد المعروف. شاهد التفاصيل أدناه."
+                : "يكفيه الرصيد المعروف."
+              : "مجموع ما في الجدول الزمني أدناه."
           }
         />
       </div>
@@ -108,14 +108,14 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
       {!overdue && (
         <p className="mt-3 flex items-center gap-2 text-xs text-muted">
           <CircleCheck className="h-3.5 w-3.5 shrink-0 text-ok" strokeWidth={2} aria-hidden />
-          لا شيء متأخّر من دفعة الشهر الماضي
+          لا توجد مبالغ متأخرة من دفعة الشهر الماضي
         </p>
       )}
 
       <Callout tone="info" icon={Info} className="mt-4">
-        <strong className="text-ink">إسقاط لا توقّع:</strong> الوارد غير محسوب لأنّ مبيعات فودكس غير موصولة، والمصروف الذي لم يسجّل متكرّراً لا يظهر.
-        فالرصيد بعد كلّ مرحلة حدّ أدنى لما سيبقى.
-        {o.heldMinor > 0 && <> ومحجوز <Money minor={o.heldMinor} /> حتى تصل الفواتير الصحيحة — لا يحسب هنا.</>}
+        <strong className="text-ink">تقدير وليس توقعاً:</strong> لا تُحسب المبالغ الواردة لأن مبيعات فودكس غير مربوطة، ولا تظهر المصروفات التي لم تُسجَّل كمتكررة.
+        لذلك فالرصيد بعد كل مرحلة هو الحد الأدنى المتوقع بقاؤه.
+        {o.heldMinor > 0 && <> وهناك <Money minor={o.heldMinor} /> محجوزة حتى تصل الفواتير الصحيحة، ولا تدخل في الحساب هنا.</>}
       </Callout>
 
       {/* ── حدُّ الرصيد: تحذيرٌ بما يكسره — لا يمنع دفعةً ولا يغيّر رقماً ── */}
@@ -124,15 +124,15 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           tone="danger"
           icon={ShieldAlert}
           className="mt-3"
-          title={`الرصيد ينزل تحت حدّك عند «${o.breach.title}»`}
+          title={`الرصيد سينزل تحت حدّك عند «${o.breach.title}»`}
           action={<LinkButton href="#floor" variant="secondary" size="sm">غيّر الحدّ</LinkButton>}
         >
-          يبقى بعدها <Money minor={o.breach.afterMinor} /> وحدّك <Money minor={o.floorMinor ?? 0} /> — ينقص <Money minor={o.breach.shortMinor} /> إن لم يدخل شيء
-          (الوارد غير محسوب). أكبر ما فيها:{" "}
+          يبقى بعدها <Money minor={o.breach.afterMinor} /> وحدّك <Money minor={o.floorMinor ?? 0} />، أي ينقصك <Money minor={o.breach.shortMinor} /> إن لم يدخل شيء
+          (المبالغ الواردة غير محسوبة). أكبر البنود:{" "}
           {o.breach.causes.map((c, i) => (
             <span key={c.label}>{i > 0 && " · "}{c.label} <Money minor={c.amountMinor} /></span>
           ))}
-          . جرّب تأجيل سطر في الجدول أدناه لترى أثره.
+          . جرّب تأجيل أحد البنود في الجدول أدناه لترى أثره.
         </Callout>
       )}
 
@@ -142,16 +142,16 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           tone="warn"
           icon={Percent}
           className="mt-3"
-          title="دخلت ضريبة القيمة المضافة هذا الإسقاط"
-          action={<LinkButton href="/cash?vat=off" variant="secondary" size="sm">اعرضه بلا الضريبة</LinkButton>}
+          title="هذا التقدير يشمل ضريبة القيمة المضافة"
+          action={<LinkButton href="/cash?vat=off" variant="secondary" size="sm">اعرضه بدون الضريبة</LinkButton>}
         >
           {o.vatIncluded.map((v) => (
             <span key={v.periodKey} className="block">
-              {v.label}: <Money minor={v.amountMinor ?? 0} /> {v.accruing ? "حتى اليوم (تكبر مع المبيعات)" : "لم يسجّل تقديمه"} — آخر موعدها <bdi>{formatDay(v.deadline)}</bdi>.{" "}
+              {v.label}: <Money minor={v.amountMinor ?? 0} /> {v.accruing ? "حتى اليوم (تزيد مع المبيعات)" : "لم يُسجَّل تقديم إقرارها"} — آخر موعد لها <bdi>{formatDay(v.deadline)}</bdi>.{" "}
               {canVat && <Link href={`/close/vat?period=${v.periodKey}`} className="font-bold text-accent hover:underline">حسابها</Link>}
             </span>
           ))}
-          فارتفع «يخرج حتى آخر الشهر القادم» ونقص «يبقى بعدها» بمقدارها.
+          لذلك زاد «يخرج حتى آخر الشهر القادم» ونقص «يبقى بعدها» بمقدارها.
         </Callout>
       )}
       {o.vatOff.some((v) => (v.amountMinor ?? 0) > 0) && (
@@ -159,10 +159,10 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           tone="info"
           icon={Percent}
           className="mt-3"
-          title="الإسقاط معروض بلا الضريبة"
+          title="التقدير معروض بدون الضريبة"
           action={<LinkButton href="/cash" variant="primary" size="sm">أدخل الضريبة</LinkButton>}
         >
-          خارجه بطلبك:{" "}
+          المستبعد بناءً على طلبك:{" "}
           {o.vatOff.filter((v) => (v.amountMinor ?? 0) > 0).map((v, i) => (
             <span key={v.periodKey}>{i > 0 && " · "}{v.label} <Money minor={v.amountMinor ?? 0} /> (موعدها <bdi>{formatDay(v.deadline)}</bdi>)</span>
           ))}
@@ -173,19 +173,19 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         <Callout tone="accent" icon={Percent} className="mt-3" title="جنّب للضريبة">
           {o.vatAhead.map((v) => (
             <span key={v.periodKey} className="block">
-              {v.label}: <Money minor={v.amountMinor ?? 0} /> {v.accruing ? "حتى اليوم — وتكبر مع كلّ يوم بيع" : ""} · تسدّد قبل <bdi>{formatDay(v.deadline)}</bdi>.{" "}
+              {v.label}: <Money minor={v.amountMinor ?? 0} /> {v.accruing ? "حتى اليوم، وتزيد مع كل يوم بيع" : ""} · تُسدَّد قبل <bdi>{formatDay(v.deadline)}</bdi>.{" "}
               {canVat && <Link href={`/close/vat?period=${v.periodKey}`} className="font-bold text-accent hover:underline">حسابها</Link>}
             </span>
           ))}
-          موعدها بعد أفق الجدول أدناه، فلا تطرح من «يبقى بعدها» — لكنّها خروج قادم.
+          موعدها بعد الفترة التي يغطيها الجدول أدناه، فلا تُطرح من «يبقى بعدها»، لكنها مبلغ سيخرج لاحقاً.
         </Callout>
       )}
       {o.vatUnknown.length > 0 && (
-        <Callout tone="warn" icon={Percent} className="mt-3" title="ضريبة قادمة لا يعرف قدرها">
+        <Callout tone="warn" icon={Percent} className="mt-3" title="ضريبة قادمة مبلغها غير معروف">
           {o.vatUnknown.map((v) => (
             <span key={v.periodKey} className="block">
-              {v.label} (موعدها <bdi>{formatDay(v.deadline)}</bdi>): شهر منه بلا كشف بنك، فمبيعاته غير معروفة ولا يكتب مستحقّه رقماً.{" "}
-              {canVat && <Link href={`/close/vat?period=${v.periodKey}`} className="font-bold text-accent hover:underline">ما ينقصه</Link>}
+              {v.label} (موعدها <bdi>{formatDay(v.deadline)}</bdi>): أحد شهورها بلا كشف بنك، فمبيعاته غير معروفة ولن يُكتب مبلغ الضريبة المستحقة.{" "}
+              {canVat && <Link href={`/close/vat?period=${v.periodKey}`} className="font-bold text-accent hover:underline">ما الناقص</Link>}
             </span>
           ))}
         </Callout>
@@ -197,9 +197,9 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         {o.buckets.length === 0 ? (
           <EmptyState
             icon={CalendarClock}
-            title="لا خروج معروفاً في الأسابيع القادمة."
-            hint="لا دفعة مورّدين مفتوحة، ولا مصروفات متكرّرة مسجّلة. سجّل الإيجار والرواتب متكرّرةً ليظهر خروجها هنا في يومه."
-            action={<LinkButton href="/settings#recurring" variant="primary" icon={Plus}>سجّل مصروفاً متكرّراً</LinkButton>}
+            title="لا توجد مبالغ معروفة ستخرج في الأسابيع القادمة."
+            hint="لا توجد دفعة مورّدين مفتوحة ولا مصروفات متكررة مسجّلة. سجّل الإيجار والرواتب كمصروفات متكررة لتظهر هنا في موعدها."
+            action={<LinkButton href="/settings#recurring" variant="primary" icon={Plus}>سجّل مصروفاً متكرراً</LinkButton>}
           />
         ) : (
           <CashTimeline buckets={buckets} balanceMinor={o.balanceMinor} runMonth={o.runMonth} canPay={canPay} />
@@ -214,7 +214,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           title="الإيجار والرواتب لا يظهران بعد"
           action={<LinkButton href="/settings#recurring" variant="primary" size="sm" icon={Plus}>سجّلها</LinkButton>}
         >
-          لا مصروف متكرّراً مسجّلاً — فالجدول أعلاه دفعات المورّدين وحدها. سجّل ما يتكرّر كلّ شهر بيومه فيدخل الإسقاط.
+          لا توجد مصروفات متكررة مسجّلة، فالجدول أعلاه يعرض دفعات المورّدين فقط. سجّل ما يتكرر كل شهر بيومه ليدخل في التقدير.
         </Callout>
       )}
 
@@ -222,30 +222,30 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         <h2 className="text-base font-bold">حدّ الرصيد الأدنى</h2>
         <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted">
           {o.floorMinor === null
-            ? "لم تكتب حدّاً — فلا ينبّه على الرصيد. اكتب ما لا تحبّ أن ينزل الحساب تحته، فيسمّى لك أوّل موعد يكسره وما يسبّبه."
+            ? "لم تحدّد حدّاً أدنى، فلن ينبّهك النظام عند انخفاض الرصيد. اكتب الرصيد الذي لا تريد أن ينزل الحساب تحته، وسيُظهر لك أول موعد ينزل فيه تحته وسببه."
             : !balanceKnown
-              ? "الحدّ مكتوب، لكنّ الرصيد غير معروف — فلا يحكم عليه: لا إنذار ولا «سليم». استورد كشفاً يحمل الرصيد."
+              ? "الحد الأدنى محدد، لكن الرصيد غير معروف، فلا يمكن تقييم الوضع ولا يظهر أي تنبيه. استورد كشفاً فيه الرصيد."
               : o.breach
-                ? "الإسقاط يكسر الحدّ — التفصيل أعلى الصفحة."
-                : "الإسقاط المعلوم لا ينزل تحت الحدّ حتى آخر الشهر القادم — والمصروف غير المسجّل لا يدخله."}
+                ? "التقدير ينزل تحت الحد الأدنى. التفاصيل في أعلى الصفحة."
+                : "المبالغ المعروفة لا تنزل بالرصيد تحت الحد الأدنى حتى آخر الشهر القادم، ولا تشمل المصروفات غير المسجّلة."}
         </p>
         <div className="mt-4">
           {can(user.role, "bank:edit")
             ? <CashFloor floorMinor={o.floorMinor} />
-            : <p className="text-xs text-muted">{o.floorMinor === null ? "يضبطه المالك أو المحاسب." : <>الحدّ الحاليّ <Money minor={o.floorMinor} />.</>}</p>}
+            : <p className="text-xs text-muted">{o.floorMinor === null ? "يحدده المالك أو المحاسب." : <>الحد الحالي <Money minor={o.floorMinor} />.</>}</p>}
         </div>
       </section>
 
       {nextRun && (
         <p className="mt-6 text-xs leading-relaxed text-muted">
-          دفعة الشهر القادم تبنى من الفواتير المسجّلة حتى اليوم وتكبر مع كلّ فاتورة تصل
+          تُبنى دفعة الشهر القادم من الفواتير المسجّلة حتى اليوم، وتزيد مع كل فاتورة جديدة
           {canPay ? (
             <>
-              {" "}— ودفعة الشهر الماضي تعتمد من{" "}
+              {". "}أما دفعة الشهر الماضي فتُعتمد من{" "}
               <Link href="/payments" className="font-bold text-accent hover:underline">دفعة الشهر</Link>.
             </>
           ) : (
-            " — ويعتمدها المالك."
+            "، ويعتمدها المالك."
           )}
         </p>
       )}
@@ -258,7 +258,7 @@ function overdueSub(lines: readonly { kind: string }[]): string {
   const suppliers = lines.filter((l) => l.kind === "SUPPLIER").length;
   const vat = lines.some((l) => l.kind === "VAT");
   const parts = [
-    ...(suppliers > 0 ? [`${countNoun(suppliers, SUPPLIER)} من دفعة الشهر الماضي لم يحوّل لهم`] : []),
+    ...(suppliers > 0 ? [`${countNoun(suppliers, SUPPLIER)} من دفعة الشهر الماضي لم تُحوَّل مستحقاتهم`] : []),
     ...(vat ? ["ضريبة فات موعد إقرارها"] : []),
   ];
   return parts.join(" · ");

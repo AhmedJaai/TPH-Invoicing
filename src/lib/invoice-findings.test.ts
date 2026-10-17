@@ -24,7 +24,7 @@ describe("لماذا ناقصة ركن", () => {
   it("تسمّي الركن الناقص ولا تكتفي بالحكم", () => {
     const r = invoiceReasons({ ...ok, sellerVat: null }, supplier, COMPANY_VAT);
     expect(r).toHaveLength(1);
-    expect(r[0].what).toContain("رقم ضريبيّ للبائع");
+    expect(r[0].what).toContain("رقم ضريبي للبائع");
     /* ولكلّ سببٍ فعلُه — والسببُ بلا فعلٍ نصفُ خبر */
     expect(r[0].fix.length).toBeGreaterThan(20);
   });

@@ -313,7 +313,7 @@ describe("الغائب يرى", () => {
       .find((i) => i.id === "bank-balance-difference");
     expect(item?.severity).toBe("CRITICAL");
     expect(item?.amountMinor).toBe(11_600_00);
-    expect(item?.detail).toContain("صادرة لم تقرأ");
+    expect(item?.detail).toContain("صادرة لم تُقرأ");
   });
 
   it("وفرق صغير (١٫٧٣) يقال بمبلغه ولا يرفع حرجاً", () => {
@@ -342,7 +342,7 @@ describe("ازدواج المصروف", () => {
     }).find((i) => i.id === "duplicate-expenses");
     expect(item?.severity).toBe("HIGH");
     expect(item?.amountMinor).toBe(1_200_00);
-    expect(item?.action).toContain("بيدك");
+    expect(item?.action).toContain("بنفسك");
   });
 
   it("ولا بند بلا ازدواج", () => {
@@ -400,9 +400,9 @@ describe("كلّ عدد في العنوان يمرّ بتمييزه (CODE-107)",
 
   it("وما فوق العشرة مفرد منصوب", () => {
     const titles = buildAttention({ ...quiet, ...facts(13) }).map((i) => i.title);
-    expect(titles).toContain("13 يوماً بلا كشف بنكيّ");
-    expect(titles).toContain("13 دفعة لم تنسب إلى فاتورة");
-    expect(titles).toContain("13 مانعاً لم يعالج");
+    expect(titles).toContain("13 يوماً بدون كشف بنكي");
+    expect(titles).toContain("13 دفعة لم تُنسب إلى فاتورة");
+    expect(titles).toContain("13 مانعاً لم يُعالَج");
   });
 });
 
@@ -437,19 +437,19 @@ describe("مال خرج مرّتين — الجملة تتبع الدليل", ()
       .find((i) => i.id === "duplicate-payments")!;
 
   it("بمرجعين مختلفين يقال إنّهما عمليّتان", () => {
-    expect(item({ duplicatePaymentsDistinct: 1 }).detail).toContain("مرجع سداد مستقلّ");
+    expect(item({ duplicatePaymentsDistinct: 1 }).detail).toContain("مرجع سداد مستقل");
   });
 
   it("بلا مرجعين لا يدّعى مرجع مستقلّ — والفعل تحقّق قبل المطالبة", () => {
     const i = item({ duplicatePaymentsDistinct: 0 });
-    expect(i.detail).not.toContain("مستقلّ");
-    expect(i.detail).toContain("لم يقطع");
+    expect(i.detail).not.toContain("مستقل");
+    expect(i.detail).toContain("لا يمكن الجزم");
     expect(i.action).toContain("إن ظهر");
   });
 });
 
 
-describe("حوالة لمورّد خرجت ثمّ عادت — findReversals موصولةً", () => {
+describe("حوالة لمورّد خرجت ثم عادت — findReversals موصولةً", () => {
   it("لا بند حين لا ردّ", () => {
     expect(buildAttention(quiet).some((i) => i.id === "bounced-payments")).toBe(false);
   });
@@ -465,7 +465,7 @@ describe("حوالة لمورّد خرجت ثمّ عادت — findReversals م�
     expect(b?.severity).toBe("HIGH");
     expect(b?.href).toBe("/bank/tx/t1");
     expect(b?.impact).toEqual({ kind: "OWED", amountMinor: 4_250_00 });
-    expect(b?.title).toContain("خرجت ثمّ عادت");
+    expect(b?.title).toContain("خرجت ثم عادت");
   });
 });
 

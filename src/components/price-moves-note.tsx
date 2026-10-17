@@ -38,7 +38,7 @@ export function PriceMovesNote({ moves, supplierName }: { moves: readonly PriceM
         {rises.length > 0 ? "أسعار ارتفعت عن آخر توريد" : "أسعار انخفضت عن آخر توريد"}
       </h4>
       <p className="mt-0.5 text-[11px] leading-relaxed text-ink-soft">
-        سعر الوحدة كما قرئ مقابل آخر سعر قيّد للصنف نفسه عند {supplierName}. دون 3٪ لا يذكر.
+        سعر الوحدة في الفاتورة مقارنةً بآخر سعر مسجّل للصنف نفسه عند {supplierName}. لا تُعرض التغيّرات الأقل من 3٪.
       </p>
       <ul className="mt-2 space-y-1.5">
         {moves.map((m) => {
@@ -48,7 +48,7 @@ export function PriceMovesNote({ moves, supplierName }: { moves: readonly PriceM
             <li key={m.description} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-xs">
               <span className="min-w-0 flex-1 basis-40 truncate font-bold" dir="auto">{m.description}</span>
               <span className="text-ink-soft">
-                <Money minor={m.nowMinor} /> — وكان <Money minor={m.wasMinor} /> في {formatDay(m.wasDay)}
+                <Money minor={m.nowMinor} />، وكان <Money minor={m.wasMinor} /> في {formatDay(m.wasDay)}
               </span>
               <span className={`inline-flex items-center gap-0.5 font-bold ${up ? "text-warn" : "text-ok"}`}>
                 <Icon className="h-3 w-3" strokeWidth={2.5} aria-hidden />
@@ -67,7 +67,7 @@ export function PriceMovesNote({ moves, supplierName }: { moves: readonly PriceM
           className={`${buttonClass("secondary", "sm")} mt-3`}
         >
           <MessageCircle className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          اعترض — رسالة واتساب جاهزة
+          اعترض برسالة واتساب جاهزة
         </a>
       )}
     </section>

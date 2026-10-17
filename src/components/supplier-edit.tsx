@@ -83,7 +83,7 @@ export function SupplierEdit({
       setError(w.length > 0 ? null : r.error);
       return;
     }
-    toast({ tone: "ok", title: "حفظت بيانات المورّد", body: r.data.message });
+    toast({ tone: "ok", title: "تم حفظ بيانات المورّد", body: r.data.message });
     setWarnings([]);
     setOpen(false);
     router.refresh();
@@ -99,7 +99,7 @@ export function SupplierEdit({
         open={open}
         onClose={close}
         title="بيانات المورّد"
-        description="الحقل الفارغ «غير معروف». ولا يحفظ شيء حتى تضغط «احفظ»."
+        description="الحقل الفارغ يعني «غير معروف». ولا يُحفظ شيء حتى تضغط «احفظ»."
         footer={
           <>
             <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={close}>إلغاء</button>
@@ -125,11 +125,11 @@ export function SupplierEdit({
             <input value={form.nameEn} onChange={(e) => set({ nameEn: e.target.value })} disabled={busy} dir="ltr" className={FIELD} />
           </label>
           <label className="text-xs font-bold">
-            الرقم الضريبيّ
+            الرقم الضريبي
             <input value={form.vatNumber} onChange={(e) => set({ vatNumber: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" placeholder="15 رقماً" className={`nums ${FIELD}`} />
           </label>
           <label className="text-xs font-bold">
-            السجلّ التجاريّ
+            السجل التجاري
             <input value={form.crNumber} onChange={(e) => set({ crNumber: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" className={`nums ${FIELD}`} />
           </label>
           <label className="text-xs font-bold">
@@ -147,39 +147,39 @@ export function SupplierEdit({
             </select>
           </label>
           <label className="text-xs font-bold">
-            أجل السداد (أيّام)
-            <input value={form.paymentTermsDays} onChange={(e) => set({ paymentTermsDays: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" placeholder="0 = نقداً · فارغ = غير معروف" className={`nums ${FIELD}`} />
-            <span className="mt-1 block text-[11px] font-normal text-muted">به يحسب «جاوز أجله» في ملفّه — لا ستّون يوماً للجميع.</span>
+            مهلة السداد (بالأيام)
+            <input value={form.paymentTermsDays} onChange={(e) => set({ paymentTermsDays: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" placeholder="0 = نقداً، وفارغ = غير معروف" className={`nums ${FIELD}`} />
+            <span className="mt-1 block text-[11px] font-normal text-muted">تُحسب به حالة «تجاوز المهلة» في ملف المورّد، بدل مهلة ثابتة (ستين يوماً) للجميع.</span>
             {termsHint && form.paymentTermsDays.trim() === "" && (
               <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-accent-line bg-accent-soft px-2.5 py-1.5 text-[11px] font-normal text-ink-soft">
-                <span>تدفع له عادةً بعد <bdi className="nums font-bold text-ink">{termsHint.medianDays}</bdi> يوماً (وسيط <bdi className="nums">{termsHint.sampleCount}</bdi> فاتورةً سدّدت).</span>
+                <span>تدفع له عادةً بعد <bdi className="nums font-bold text-ink">{termsHint.medianDays}</bdi> يوماً (الوسيط لـ<bdi className="nums">{termsHint.sampleCount}</bdi> فاتورة مسدّدة).</span>
                 <button type="button" disabled={busy} onClick={() => set({ paymentTermsDays: String(termsHint.medianDays) })} className="font-bold text-accent hover:underline">
-                  اكتبه أجلاً
+                  اعتمده مهلة سداد
                 </button>
               </span>
             )}
           </label>
           <label className="text-xs font-bold">
-            نبّهني إن تجاوز ما عليّ له (ريال)
-            <input value={form.balanceAlert} onChange={(e) => set({ balanceAlert: e.target.value })} disabled={busy} dir="ltr" inputMode="decimal" placeholder="فارغ = بلا حدّ" className={`nums ${FIELD}`} />
+            نبّهني إذا تجاوز المستحق له (بالريال)
+            <input value={form.balanceAlert} onChange={(e) => set({ balanceAlert: e.target.value })} disabled={busy} dir="ltr" inputMode="decimal" placeholder="فارغ = بلا حد" className={`nums ${FIELD}`} />
           </label>
           <label className="text-xs font-bold">
             اسم المندوب
             <input value={form.contactName} onChange={(e) => set({ contactName: e.target.value })} disabled={busy} dir="auto" className={FIELD} />
           </label>
           <label className="text-xs font-bold">
-            جوّاله (واتساب)
+            جوال المندوب (واتساب)
             <input value={form.phone} onChange={(e) => set({ phone: e.target.value })} disabled={busy} dir="ltr" inputMode="tel" placeholder="05xxxxxxxx" className={`nums ${FIELD}`} />
           </label>
           <label className="text-xs font-bold">
-            البريد الإلكترونيّ
+            البريد الإلكتروني
             <input value={form.email} onChange={(e) => set({ email: e.target.value })} disabled={busy} dir="ltr" inputMode="email" className={FIELD} />
           </label>
           <label className="text-xs font-bold sm:col-span-2">
             الآيبان
-            <input value={form.iban} onChange={(e) => set({ iban: e.target.value })} disabled={busy} dir="ltr" placeholder="SA.. — 24 خانة" className={`nums font-mono ${FIELD}`} />
+            <input value={form.iban} onChange={(e) => set({ iban: e.target.value })} disabled={busy} dir="ltr" placeholder="SA.. (24 خانة)" className={`nums font-mono ${FIELD}`} />
             <span className="mt-1 block text-[11px] font-normal text-muted">
-              يفحص بخانتي التحقّق، ويكتب في ملفّ التحويلات. وما حوّل له في الكشوف يعرف وحده — اكتبه لمن لم تحوّل له من قبل أو غيّر حسابه.
+              يُتحقق من صحته تلقائياً ويُستخدم في ملف التحويلات. أما الحساب الذي حوّلت له سابقاً فيُقرأ تلقائياً من الكشوف، فاكتبه فقط إذا لم تحوّل له من قبل أو غيّر حسابه.
             </span>
           </label>
         </div>
@@ -190,7 +190,7 @@ export function SupplierEdit({
             <ul className="mt-1 list-disc space-y-1 ps-4">
               {warnings.map((w) => <li key={w}>{w}</li>)}
             </ul>
-            <p className="mt-1.5 text-muted">لم يحفظ شيء بعد — القرار لك.</p>
+            <p className="mt-1.5 text-muted">لم يُحفظ شيء بعد، والقرار لك.</p>
           </div>
         )}
         {error && <p role="alert" className="mt-3 text-xs font-bold text-danger">{error}</p>}

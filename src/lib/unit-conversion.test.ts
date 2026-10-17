@@ -89,7 +89,7 @@ describe("هل يصحّ أن يقارنا؟", () => {
   it("عائلتان مختلفتان لا تقارنان", () => {
     const v = canCompare(p("LITER", 800), p("KG", 3000));
     expect(v.comparable).toBe(false);
-    expect(v.reason).toContain("عائلتان");
+    expect(v.reason).toContain("نوعين مختلفين");
   });
 
   it("والمجهول لا يقارن", () => {

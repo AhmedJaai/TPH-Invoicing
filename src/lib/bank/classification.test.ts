@@ -92,7 +92,7 @@ describe("الطبقة الرابعة — المجهول يُعلَن", () => {
   it("الوارد المجهول لا يُفترَض ضجيجاً — وهذا كان الخلل", () => {
     const c = classify(row({ direction: "CREDIT", description: "ايداع" }));
     expect(c.kind).toBe("UNKNOWN");
-    expect(c.reason).toContain("لا يُفترَض أنّه ضجيج");
+    expect(c.reason).toContain("ولا يُعدّ حركة غير مهمة");
   });
 });
 

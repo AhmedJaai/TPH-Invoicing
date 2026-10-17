@@ -51,7 +51,7 @@ export function CashFlowChart({
               >
                 <span className="min-w-0">
                   <span className="block text-[13px] font-bold">{formatMonth(m.month)}</span>
-                  {note && <span className="block text-[10px] font-bold text-warn">جزئيّ · {note}</span>}
+                  {note && <span className="block text-[10px] font-bold text-warn">جزئي · {note}</span>}
                 </span>
                 <span className="min-w-0 space-y-1.5">
                   <Bar tone="bg-accent" width={pct(m.inMinor)} label="وارد" minor={m.inMinor} />

@@ -102,7 +102,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
     if (r.ok) setFeed((f) => (f ? { ...f, unread: 0, seenAt: r.data.seenAt } : f));
     else {
       setFeed(before);
-      setError(`لم تعلّم مقروءةً: ${r.error}`);
+      setError(`تعذّر تعليم الإشعارات كمقروءة: ${r.error}`);
     }
   }
 
@@ -113,7 +113,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
       <button
         type="button"
         onClick={() => { setOpen(true); void load(); }}
-        aria-label={unread > 0 ? `الإشعارات — ${unread} جديد` : "الإشعارات"}
+        aria-label={unread > 0 ? `الإشعارات: ${unread} جديد` : "الإشعارات"}
         aria-haspopup="dialog"
         data-tip="الإشعارات"
         className={`relative grid shrink-0 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-hover hover:text-ink ${compact ? "h-11 w-11" : "h-9 w-9"}`}
@@ -130,11 +130,11 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
         open={open}
         onClose={() => setOpen(false)}
         title="الإشعارات"
-        description="ما تغيّر منذ آخر مرّة، وملخّص آخر ٢٤ ساعة."
+        description="ما استجدّ منذ آخر زيارة، وملخّص آخر ٢٤ ساعة."
         footer={
           <>
             <button type="button" onClick={() => void load()} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-ink-soft hover:bg-hover sm:min-h-8">
-              <RefreshCw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> حدّث
+              <RefreshCw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> تحديث
             </button>
             <button
               type="button"
@@ -143,13 +143,13 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
               className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-accent-ink disabled:opacity-50 sm:min-h-8"
             >
               <CheckCheck className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              علّم الكلّ مقروءاً
+              اجعل الكلّ مقروءاً
             </button>
           </>
         }
       >
         {/* زرّان بحالٍ مضغوطة لا «ألسنة»: نمطُ `tab` يَعِد بلوحٍ وأسهمٍ لم تكن */}
-        <div role="group" aria-label="أيّ الإشعارات تعرض" className="mb-4 inline-flex rounded-lg bg-sunken p-1">
+        <div role="group" aria-label="نوع الإشعارات المعروضة" className="mb-4 inline-flex rounded-lg bg-sunken p-1">
           {([["new", "الجديد"], ["digest", "ملخّص اليوم"]] as const).map(([k, label]) => (
             <button
               key={k}
@@ -173,14 +173,14 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
         {!feed && !error && (
           <div className="space-y-2" aria-busy="true">
             {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-14" />)}
-            <span className="sr-only">يحمّل…</span>
+            <span className="sr-only">جارٍ التحميل…</span>
           </div>
         )}
 
         {feed && tab === "new" && (
           feed.notices.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">
-              لم يقع شيء في الأسبوعين الماضيين يستحقّ إشعاراً.
+              لا شيء جديد يستحقّ الإشعار خلال الأسبوعين الماضيين.
             </p>
           ) : (
             <ul className="space-y-1">
@@ -222,17 +222,17 @@ function DigestPanel({ feed }: { feed: NoticeFeed }) {
   const d = feed.digest;
   const rows: { label: string; n: number; href: string }[] = [
     { label: "مستندات وصلت", n: d.documentsArrived, href: "/documents" },
-    { label: "أرشفت وقيّدت", n: d.documentsArchived, href: "/documents" },
-    { label: "تنتظر مراجعتك الآن", n: d.needsReview, href: "/documents" },
-    { label: "دفعات قيّدت", n: d.paymentsRecorded, href: "/bank" },
-    { label: "قرارات حسمت", n: d.decisionsTaken, href: "/settings/audit" },
+    { label: "مستندات أُرشفت وقُيّدت", n: d.documentsArchived, href: "/documents" },
+    { label: "مستندات تنتظر مراجعتك", n: d.needsReview, href: "/documents" },
+    { label: "دفعات قُيّدت", n: d.paymentsRecorded, href: "/bank" },
+    { label: "قرارات اتُّخذت", n: d.decisionsTaken, href: "/settings/audit" },
   ];
   const quiet = rows.every((r) => r.n === 0);
   return (
     <div>
       {quiet && (
         <p className="mb-3 rounded-lg bg-sunken px-3 py-2 text-xs text-muted">
-          يوم هادئ: لم يصل مستند ولم يحسم قرار في آخر ٢٤ ساعة.
+          يوم هادئ: لم يصل أي مستند ولم يُتَّخذ أي قرار في آخر ٢٤ ساعة.
         </p>
       )}
       <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">

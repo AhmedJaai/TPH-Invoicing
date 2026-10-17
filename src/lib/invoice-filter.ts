@@ -87,16 +87,16 @@ export function hasFilters(f: InvoiceFilters): boolean {
 }
 
 export const TAX_LABEL: Record<TaxFilter, string> = {
-  VALID: "مستوفية الأركان",
-  INVALID: "ينقصها ركن",
-  UNKNOWN: "لم تقرأ ضريبتها",
-  NOT_APPLICABLE: "لا تقيّد",
+  VALID: "بياناتها الضريبية مكتملة",
+  INVALID: "بياناتها الضريبية ناقصة",
+  UNKNOWN: "لم تُقرأ ضريبتها",
+  NOT_APPLICABLE: "لا تُسجَّل كفاتورة",
 };
 
 export const PAID_LABEL: Record<PaidFilter, string> = {
   OPEN: "عليها رصيد",
-  UNPAID: "لم تسدّد",
-  PARTIAL: "سدّدت جزئياً",
+  UNPAID: "غير مسدّدة",
+  PARTIAL: "مسدّدة جزئياً",
   PAID: "مسدّدة",
 };
 

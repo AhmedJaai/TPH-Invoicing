@@ -23,11 +23,11 @@ export interface FixFields {
 
 const LABEL: Record<keyof FixFields, string> = {
   invoiceNumber: "رقم الفاتورة",
-  sellerVat: "الرقم الضريبيّ للبائع",
-  buyerVat: "الرقم الضريبيّ للمشتري",
+  sellerVat: "الرقم الضريبي للبائع",
+  buyerVat: "الرقم الضريبي للمشتري",
   subtotal: "قبل الضريبة",
   vat: "الضريبة",
-  total: "الإجماليّ",
+  total: "الإجمالي",
   discount: "الخصم",
   charges: "الرسوم",
   invoiceDate: "التاريخ",

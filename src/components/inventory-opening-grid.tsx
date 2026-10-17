@@ -75,9 +75,9 @@ export function OpeningGrid({
 
   return (
     <div className="mb-5 animate-rise rounded-2xl border border-accent-line bg-raised p-4 shadow-lifted sm:p-5">
-      <p className="text-[14px] font-bold">الأرصدة الافتتاحيّة — ما كان على الرفّ أوّل الأسبوع</p>
+      <p className="text-[14px] font-bold">الأرصدة الافتتاحية: ما كان على الرف أول الأسبوع</p>
       <p className="mt-1 text-[11px] leading-relaxed text-muted">
-        اكتب ما تعرفه، واترك ما لا تعرفه فارغاً — يبقى «غير معروف» ولا يحسب صفراً.
+        اكتب ما تعرفه، واترك ما لا تعرفه فارغاً، فيبقى «غير معروف» ولا يُحسب صفراً.
       </p>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -87,15 +87,15 @@ export function OpeningGrid({
           className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-raised px-3 text-sm"
         />
         <select
-          value={category} onChange={(e) => setCategory(e.target.value)} aria-label="رشّح بالباب"
+          value={category} onChange={(e) => setCategory(e.target.value)} aria-label="تصفية حسب الفئة"
           className="min-h-11 rounded-lg border border-line-input bg-raised px-3 text-xs"
         >
-          <option value="">كلّ الأبواب</option>
+          <option value="">كل الفئات</option>
           {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
         <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line-input bg-raised px-3 text-xs sm:min-h-9">
           <input type="checkbox" checked={onlyUnknown} onChange={(e) => setOnlyUnknown(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
-          غير المعروف وحده
+          غير المعروف فقط
         </label>
       </div>
 
@@ -105,13 +105,13 @@ export function OpeningGrid({
             <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
               {row.productName}
               {row.openingText !== null && (
-                <span className="text-muted"> — الحاليّ {row.openingText} {row.openingSourceLabel}</span>
+                <span className="text-muted"> — الرصيد الحالي {row.openingText} {row.openingSourceLabel}</span>
               )}
             </span>
             <input
               data-opening-input type="text" inputMode="decimal" dir="ltr"
               value={values[row.productId] ?? ""} placeholder="—" disabled={busy}
-              aria-label={`الرصيد الافتتاحيّ لـ${row.productName}`}
+              aria-label={`الرصيد الافتتاحي لـ${row.productName}`}
               onChange={(e) => setValues((v) => ({ ...v, [row.productId]: e.target.value }))}
               onKeyDown={(e) => onKey(e, at)}
               className="nums h-12 w-28 rounded-lg border border-line-input bg-raised px-2 text-center text-base font-bold"
@@ -134,7 +134,7 @@ export function OpeningGrid({
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button aria-busy={busy} type="button" disabled={busy || filled.length === 0} onClick={() => void save()} className={buttonClass("primary")}>
-          {filled.length === 0 ? "لا رصيد مكتوب" : `احفظ ${filled.length} رصيداً`}
+          {filled.length === 0 ? "لا توجد أرصدة مكتوبة" : `احفظ ${filled.length} رصيداً`}
         </button>
         <button type="button" disabled={busy} onClick={onDone} className={buttonClass("quiet", "sm")}>أغلق</button>
         {error && <span role="alert" className="text-xs text-danger">{error}</span>}

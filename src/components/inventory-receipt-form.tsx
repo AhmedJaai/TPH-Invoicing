@@ -116,11 +116,11 @@ export function ReceiptForm({
       }}
       className="mt-3 animate-rise rounded-xl border border-accent-line bg-accent-soft/40 p-4"
     >
-      <p className="text-[11px] font-bold">كمّيّة دخلت الرفّ — {productName}</p>
+      <p className="text-[11px] font-bold">كمية دخلت إلى الرف: {productName}</p>
 
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="text-[11px] text-muted">
-          الكمّيّة
+          الكمية
           <input
             type="text" inputMode="decimal" dir="ltr" autoFocus enterKeyHint="done"
             value={quantity} onChange={(e) => setQuantity(e.target.value)} disabled={busy}
@@ -146,13 +146,13 @@ export function ReceiptForm({
           <DateChips value={date} onPick={setDate} disabled={busy} hijri={false} />
         </label>
         <button type="button" onClick={() => setMore((m) => !m)} className={buttonClass("quiet", "sm")}>
-          {more ? "أخف التفاصيل" : "تفاصيل اختياريّة"}
+          {more ? "أخفِ التفاصيل" : "تفاصيل اختيارية"}
         </button>
       </div>
 
       {outside && (
         <p className="mt-2 text-[11px] text-warn">
-          هذا التاريخ خارج أسبوع الجرد ({periodStart} → {periodEnd}) — فيدخل حساب أسبوعه هو لا هذا.
+          هذا التاريخ خارج أسبوع الجرد ({periodStart} → {periodEnd})، فسيدخل في حساب أسبوعه وليس في هذا الجرد.
         </p>
       )}
 
@@ -176,7 +176,7 @@ export function ReceiptForm({
             />
           </label>
           <label className="text-[11px] text-muted">
-            الكلفة بالريال
+            التكلفة بالريال
             <input
               type="text" inputMode="decimal" dir="ltr" value={cost} onChange={(e) => setCost(e.target.value)} disabled={busy}
               placeholder="—"
@@ -197,11 +197,11 @@ export function ReceiptForm({
         <div className="mt-3 rounded-lg border border-warn/40 bg-warn-bg p-3">
           <p className="text-[11px] font-bold text-warn">
             {candidates.length > 0
-              ? "في الفواتير ما يشبه هذا الاستلام — أهو هو، أم شحنة أخرى؟"
-              : `أدخلت الكمّيّة نفسها يوم ${earlier[0]?.receivedOn ?? ""} — أهي شحنة أخرى، أم أدخلت مرّتين؟`}
+              ? "توجد في الفواتير كمية تشبه هذا الاستلام. هل هي نفسها أم شحنة أخرى؟"
+              : `أدخلت الكمية نفسها يوم ${earlier[0]?.receivedOn ?? ""}. هل هي شحنة أخرى، أم أدخلتها مرتين؟`}
           </p>
           <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
-            لو حسب الاثنان وهما شحنة واحدة لظهر على الرفّ ضعف ما دخله. فلا يحفظ شيء حتى تختار.
+            لو حُسب الاثنان وهما شحنة واحدة لظهر على الرف ضعف ما دخله فعلاً. لذلك لن يُحفظ شيء حتى تختار.
           </p>
           <ul className="mt-2 space-y-1.5">
             {candidates.map((c) => (
@@ -209,7 +209,7 @@ export function ReceiptForm({
                 <span className="min-w-0 flex-1">
                   {c.supplierName} · {c.invoiceNumber} · <span className="nums">{c.effectiveDate}</span>
                   <span className="text-muted">
-                    {c.basis === "SAME_QUANTITY" ? " — بالكمّيّة نفسها" : " — كمّيّتها في الفاتورة غير معروفة"}
+                    {c.basis === "SAME_QUANTITY" ? " (بالكمية نفسها)" : " (كميتها في الفاتورة غير معروفة)"}
                   </span>
                 </span>
                 <button
@@ -217,14 +217,14 @@ export function ReceiptForm({
                   onClick={() => void send({ kind: "LINK", invoiceLineId: c.invoiceLineId })}
                   className={buttonClass("primary", "sm")}
                 >
-                  هي هذه الفاتورة — اربطها
+                  هي من هذه الفاتورة، اربطها
                 </button>
               </li>
             ))}
           </ul>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" disabled={busy} onClick={() => void send({ kind: "SEPARATE" })} className={buttonClass("secondary", "sm")}>
-              شحنة أخرى — احفظها منفصلة
+              شحنة أخرى، احفظها منفصلة
             </button>
             <button type="button" disabled={busy} onClick={() => setCandidates(null)} className={buttonClass("quiet", "sm")}>
               إلغاء
@@ -238,7 +238,7 @@ export function ReceiptForm({
             type="submit" disabled={busy || quantity.trim() === "" || date === ""}
             className={buttonClass("primary", "sm")}
           >
-            احفظ الكمّيّة
+            احفظ الكمية
           </button>
           <button type="button" disabled={busy} onClick={onDone} className={buttonClass("quiet", "sm")}>إلغاء</button>
         </div>

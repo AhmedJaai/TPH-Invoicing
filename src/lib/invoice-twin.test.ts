@@ -49,7 +49,7 @@ describe("autoRecordRefusal — باب القيد الآليّ الواحد", ()
   it("فاتورة لغيرنا لا تقيّد", () =>
     expect(autoRecordRefusal({ ...base, blockers: [{ message: "الرقم الضريبيّ للمشتري ليس رقمنا" }] })).toEqual(["الرقم الضريبيّ للمشتري ليس رقمنا"]));
   it("الرقم نفسه بصيغة أخرى نسخة لا فاتورة", () =>
-    expect(autoRecordRefusal({ ...base, invoiceNumber: "INV/2026/05297" })[0]).toContain("نسخة من فاتورة"));
+    expect(autoRecordRefusal({ ...base, invoiceNumber: "INV/2026/05297" })[0]).toContain("نسخة من الفاتورة"));
   it("أوّل فاتورة من مورّد لا فاتورة له تقيّد بيد", () =>
-    expect(autoRecordRefusal({ ...base, supplier: { id: "s2", nameAr: "سبعة جرة" } })[0]).toContain("أوّل فاتورة"));
+    expect(autoRecordRefusal({ ...base, supplier: { id: "s2", nameAr: "سبعة جرة" } })[0]).toContain("أول فاتورة"));
 });

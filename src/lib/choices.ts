@@ -17,9 +17,9 @@ export type ChoiceGroupId =
 
 export const CHOICE_GROUP_LABEL: Record<ChoiceGroupId, string> = {
   "vat-tx": "حركات بنك اخترتها للإقرار",
-  "vat-invoice": "فواتير أقررت ضريبتها أو أخرجتها",
+  "vat-invoice": "فواتير أقررت ضريبتها أو استبعدتها",
   "vat-cash": "مبيعات نقد كتبتها",
-  hold: "فواتير محجوزة أدخلتها الدفعة",
+  hold: "فواتير موقوفة أدخلتها في الدفعة",
   alert: "تنبيهات أغلقتها",
   supplier: "ما قلته عن مورّديك",
   rule: "قواعد تصنيف كتبتها",
@@ -27,14 +27,14 @@ export const CHOICE_GROUP_LABEL: Record<ChoiceGroupId, string> = {
 };
 
 export const CHOICE_GROUP_HINT: Record<ChoiceGroupId, string> = {
-  "vat-tx": "صادر ضممته إلى خصم الضريبة، ووارد عددته بيعاً أو أخرجته. الأثر ضريبته في الإقرار.",
-  "vat-invoice": "فاتورة قلت إنّها ضريبيّة على الورقة فتخصم، أو أخرجتها من الخصم.",
-  "vat-cash": "نقد لم يودع كتبته شهراً شهراً — يدخل ضريبة المبيعات كما كتبته.",
-  hold: "النظام يحجزها بسبب يقوله، وأنت قرّرت دفعها. سحب القرار يعيدها إلى الحجز.",
-  alert: "ما قلت فيه «ليس ازدواجاً» أو «أعرفه» أو «استردّ» — لا يعود حتى تفتحه.",
-  supplier: "سياسة المستندات، والأجل والحدّ، والآيبان المكتوب بيد — تحكم التنبيهات وملفّ التحويل.",
-  rule: "نصّ في وصف الحركة يصنّف به كلّ ما يشبهها.",
-  waiver: "ملاحظة مانعة قرّرت تجاوزها بسبب كتبته.",
+  "vat-tx": "حركات صادرة أضفتها إلى خصم الضريبة، وحركات واردة اعتبرتها مبيعات أو استبعدتها. يظهر أثرها في الإقرار الضريبي.",
+  "vat-invoice": "فواتير أكّدت أنها ضريبية فتُخصم ضريبتها، أو استبعدتها من الخصم.",
+  "vat-cash": "مبيعات نقدية لم تُودَع في البنك سجّلتها لكل شهر، وتدخل في ضريبة المبيعات كما سجّلتها.",
+  hold: "أوقفها النظام لسبب يظهر معها، وقرّرت أنت دفعها. إلغاء قرارك يعيدها إلى الإيقاف.",
+  alert: "تنبيهات اخترت فيها «ليس ازدواجاً» أو «أعرفه» أو «استردّ». لن تظهر من جديد إلا إذا أعدت فتحها.",
+  supplier: "سياسة المستندات، ومدة السداد والحد الأقصى، والآيبان المكتوب يدوياً. وهي تؤثر في التنبيهات وفي ملف التحويلات.",
+  rule: "نص في وصف الحركة تُصنَّف به كل الحركات المشابهة.",
+  waiver: "ملاحظة مانعة قرّرت تجاوزها وكتبت السبب.",
 };
 
 export type ChoiceState =
@@ -47,8 +47,8 @@ export type ChoiceState =
 
 export const CHOICE_STATE_LABEL: Record<ChoiceState, string> = {
   APPLIED: "يعمل",
-  NOT_APPLIED: "لا يطبّق الآن",
-  LOCKED: "مقفل بإقرار قدّم",
+  NOT_APPLIED: "غير مطبّق الآن",
+  LOCKED: "مقفل لأن الإقرار قُدِّم",
 };
 
 export interface ChoiceRevoke {
@@ -113,16 +113,16 @@ export function vatTxChoiceRows(txs: readonly VatTxChoiceInput[], filedLabel: st
       group: "vat-tx",
       subject: t.label,
       choice: chosenIn
-        ? t.direction === "CREDIT" ? "عددتها بيعاً" : "ضممتها إلى خصم الضريبة"
-        : t.direction === "CREDIT" ? "أخرجتها من المبيعات" : "أخرجتها من الخصم",
+        ? t.direction === "CREDIT" ? "اعتبرتها بيعاً" : "أضفتها إلى خصم الضريبة"
+        : t.direction === "CREDIT" ? "استبعدتها من المبيعات" : "استبعدتها من الخصم",
       decidedOn: t.day,
       /* المُخرَجةُ أثرُها ضريبةٌ لا تُحسب — وما لم يكن يُضمّ أصلاً فإخراجُه لا أثرَ له بالريال */
       effectMinor: notApplied ? 0 : chosenIn ? t.vatMinor : t.includedByDefault ? -t.vatMinor : null,
-      effectLabel: t.direction === "CREDIT" ? "ضريبة مبيعات" : "ضريبة تخصم",
+      effectLabel: t.direction === "CREDIT" ? "ضريبة مبيعات" : "ضريبة تُخصم",
       state: filedLabel ? "LOCKED" : notApplied ? "NOT_APPLIED" : "APPLIED",
       reason: filedLabel
-        ? `${filedLabel} قدّم${notApplied ? ` — ولم تحسب فيه: ${t.blocked ?? "حالها تغيّرت"}` : ""}`
-        : notApplied ? `${t.blocked ?? "حالها تغيّرت"} — كانت ستخصم ${riyals(t.vatMinor)} ريال` : null,
+        ? `${filedLabel} تم تقديمه${notApplied ? ` ولم تُحسب فيه: ${t.blocked ?? "تغيّرت حالتها"}` : ""}`
+        : notApplied ? `${t.blocked ?? "تغيّرت حالتها"}. كانت ستُخصم ${riyals(t.vatMinor)} ريال` : null,
       href: t.href,
       revoke: filedLabel ? null : {
         url: "/api/vat-choice",
@@ -158,14 +158,14 @@ export function vatInvoiceChoiceRows(invoices: readonly VatInvoiceChoiceInput[],
       id: `vat-invoice:${i.id}`,
       group: "vat-invoice",
       subject: `${i.supplier} — ${i.number || "بلا رقم"}`,
-      choice: chosenIn ? "أقررت أنّها ضريبيّة فتخصم" : "أخرجتها من الخصم",
+      choice: chosenIn ? "أكّدت أنها ضريبية فتُخصم" : "استبعدتها من الخصم",
       decidedOn: i.day,
       effectMinor: notApplied ? 0 : chosenIn ? i.vatUsedMinor : i.machineEligible ? -i.vatUsedMinor : null,
-      effectLabel: "ضريبة تخصم",
+      effectLabel: "ضريبة تُخصم",
       state: filedLabel ? "LOCKED" : notApplied ? "NOT_APPLIED" : "APPLIED",
       reason: filedLabel
-        ? `${filedLabel} قدّم`
-        : notApplied ? "ضريبتها قرئت صفراً — لا شيء فيها يخصم. صحّح الضريبة في الفاتورة إن كانت القراءة خطأ" : null,
+        ? `${filedLabel} تم تقديمه`
+        : notApplied ? "قُرئت ضريبتها صفراً، فلا شيء يُخصم منها. صحّح الضريبة في الفاتورة إن كانت القراءة خاطئة" : null,
       href: i.href,
       revoke: filedLabel ? null : {
         url: "/api/vat-choice",

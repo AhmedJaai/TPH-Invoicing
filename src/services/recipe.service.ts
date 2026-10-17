@@ -66,23 +66,23 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** فحصُ المسوّدة — واحدٌ للحفظ والتصحيح، فلا يفترق الشرطان. */
 function validateDraft(ingredients: readonly IngredientDraft[]): void {
-  if (ingredients.length === 0) throw new Error("وصفة بلا مكوّنات لا تحسب — أضف مكوّناً واحداً على الأقلّ");
+  if (ingredients.length === 0) throw new Error("لا يمكن حساب وصفة بلا مكوّنات. أضف مكوّناً واحداً على الأقل");
   for (const ing of ingredients) {
     if (!isStoredUnit(ing.unit)) throw new Error("وحدة مكوّن غير معروفة");
     if (!Number.isInteger(ing.quantityMilli) || ing.quantityMilli <= 0) {
-      throw new Error("كمّيّة المكوّن تكون أكبر من صفر");
+      throw new Error("يجب أن تكون كمّية المكوّن أكبر من صفر");
     }
     /* مئةٌ بالمئة قسمةٌ على صفر، وما فوقها استهلاكٌ سالب — يُردّ من كلّ باب */
     const loss = ing.prepLossBp ?? null;
     if (loss !== null && (!Number.isInteger(loss) || loss < 0 || loss > MAX_PREP_LOSS_BP)) {
-      throw new Error("فاقد التجهيز أقلّ من مئة بالمئة — المئة قسمة على صفر");
+      throw new Error("يجب أن يكون فاقد التجهيز أقل من مئة بالمئة");
     }
   }
   /* المكوّنُ يتكرّر بخيارين مختلفين — ولا يتكرّر بالخيار نفسه */
   const seen = new Set<string>();
   for (const ing of ingredients) {
     const key = `${ing.productId}|${ing.modifierExternalId ?? ""}`;
-    if (seen.has(key)) throw new Error("المكوّن مذكور مرّتين بالخيار نفسه — اجمعه في سطر واحد");
+    if (seen.has(key)) throw new Error("المكوّن مذكور مرتين بالخيار نفسه. اجمعه في سطر واحد");
     seen.add(key);
   }
 }
@@ -101,7 +101,7 @@ export function previousDay(date: string): string {
  * حُسب بها — وهو ما تمنعه هذه الطبقةُ كلُّها.
  */
 export async function saveRecipeVersion(input: SaveVersionInput, conn: Conn = db): Promise<SaveVersionResult> {
-  if (!DATE.test(input.effectiveFrom)) throw new Error("تاريخ بدء السريان يكتب YYYY-MM-DD");
+  if (!DATE.test(input.effectiveFrom)) throw new Error("اكتب تاريخ بدء السريان بصيغة YYYY-MM-DD");
   validateDraft(input.ingredients);
 
   return conn.transaction(async (tx) => {
@@ -171,7 +171,7 @@ export async function saveRecipeVersion(input: SaveVersionInput, conn: Conn = db
       if (current) {
         if (current.effectiveFrom >= effectiveFrom) {
           throw new Error(
-            `النسخة السارية تبدأ في ${current.effectiveFrom} — فلا تبدأ الجديدة قبلها أو معها. اختر تاريخاً بعده.`,
+            `النسخة السارية تبدأ في ${current.effectiveFrom} ، فيجب أن تبدأ النسخة الجديدة بعدها. اختر تاريخاً لاحقاً.`,
           );
         }
         await tx
@@ -269,7 +269,7 @@ export async function activateRecipeVersion(versionId: string, actorId: string, 
 
     if (current) {
       if (current.effectiveFrom >= v.effectiveFrom) {
-        throw new Error(`النسخة السارية تبدأ في ${current.effectiveFrom} — عدّل تاريخ هذه لتبدأ بعده.`);
+        throw new Error(`النسخة السارية تبدأ في ${current.effectiveFrom}. عدّل تاريخ هذه النسخة لتبدأ بعده.`);
       }
       await tx
         .update(recipeVersions)
@@ -584,7 +584,7 @@ export async function correctRecipeVersion(
          and v.status = 'ACTIVE' and v.effective_to is null
        limit 1
     `)).rows;
-    if (!current) throw new Error("لا نسخة سارية لهذا الصنف — احفظ وصفةً أوّلاً");
+    if (!current) throw new Error("لا توجد نسخة سارية لهذا الصنف. احفظ وصفة أولاً");
 
     const [locked] = (await tx.execute<{ period_start: string; period_end: string }>(sql`
       select c.period_start, c.period_end
@@ -648,8 +648,8 @@ export async function correctRecipeVersion(
 export class RecipeLockedError extends Error {
   constructor(readonly periodStart: string, readonly periodEnd: string) {
     super(
-      `حسب بهذه الوصفة جرد مقفل (${periodStart} → ${periodEnd})،`
-      + ` فتصحيحها يجعل أصل ذلك التقرير يكذب.`
+      `حُسب بهذه الوصفة جرد مقفل (${periodStart} → ${periodEnd})،`
+      + ` وتصحيحها سيجعل تقرير ذلك الجرد غير صحيح.`
       + ` احفظ **تغييراً بتاريخ** يبدأ بعد الجرد المقفل.`,
     );
     this.name = "RecipeLockedError";
@@ -676,7 +676,7 @@ export async function deleteRecipe(
        where r.product_id = ${menuProductId}
        limit 1
     `)).rows;
-    if (!row) throw new Error("لا وصفة لهذا الصنف");
+    if (!row) throw new Error("لا توجد وصفة لهذا الصنف");
 
     const [locked] = (await tx.execute<{ period_start: string; period_end: string }>(sql`
       select c.period_start, c.period_end
@@ -716,8 +716,8 @@ export async function deleteRecipe(
 export class ItemInUseError extends Error {
   constructor(public readonly recipes: readonly string[]) {
     super(
-      `هذا الصنف مكوّن في ${recipes.length} وصفةً سارية (${recipes.slice(0, 5).join("، ")}`
-      + `${recipes.length > 5 ? "…" : ""}). احذفه من وصفاتها أوّلاً، ثمّ أخرجه.`,
+      `هذا الصنف مكوّن في ${recipes.length} وصفات سارية (${recipes.slice(0, 5).join("، ")}`
+      + `${recipes.length > 5 ? "…" : ""}). احذفه من هذه الوصفات أولاً، ثم أخرجه من المخزون.`,
     );
     this.name = "ItemInUseError";
   }
@@ -747,7 +747,7 @@ export async function retireStockItem(
        where p.id = ${productId} and p.is_stock_item and p.is_active
        limit 1
     `)).rows;
-    if (!row) throw new Error("لا صنف مخزون قائم بهذا المعرّف");
+    if (!row) throw new Error("لا يوجد صنف مخزون بهذا المعرّف");
 
     /* الوصفاتُ السارية وحدها تمنع — والمؤرشفةُ ذكرى، لا استعمال */
     const used = (await tx.execute<{ name_ar: string }>(sql`
@@ -794,7 +794,7 @@ export async function restoreStockItem(
        where p.id = ${productId} and p.is_stock_item and not p.is_active
        limit 1
     `)).rows;
-    if (!row) throw new Error("لا صنف مخرجاً بهذا المعرّف — ربما أعيد من قبل");
+    if (!row) throw new Error("لا يوجد صنف مُخرَج بهذا المعرّف، ربما أُعيد من قبل");
 
     await tx.execute(sql`update products set is_active = true where id = ${productId}`);
 

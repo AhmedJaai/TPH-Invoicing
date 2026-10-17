@@ -40,7 +40,7 @@ const KNOWN_SCHEME: Record<string, string> = {
 };
 
 export function schemeLabel(code: string | undefined): string {
-  if (!code) return "رمزٌ لم يُقرأ";
+  if (!code) return "رمز غير مقروء";
   const c = code.toUpperCase();
   return KNOWN_SCHEME[c] ? `${KNOWN_SCHEME[c]} (${c})` : `رمز ${c}`;
 }

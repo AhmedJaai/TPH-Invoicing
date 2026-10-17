@@ -66,7 +66,7 @@ describe("buildPriceRiseMessage", () => {
     expect(text).toContain("2026-09-02: 12.75");
     expect(text).toContain("بزيادة 1.25");
     /* ١٫٢٥ × ٤٢٠ = ٥٢٥ */
-    expect(text).toContain("525.00 ريال سنويّاً");
+    expect(text).toContain("525.00 ريال سنوياً");
   });
 
   it("كمّيّة مجهولة ⇒ لا أثر سنويّاً يقدّر", () => {
@@ -100,8 +100,8 @@ describe("سجلّ المطالبة", () => {
   });
 
   it("بعد أسبوع يقال «ذكّره»", () => {
-    expect(describeRequested(0)).toBe("طولب اليوم");
-    expect(describeRequested(3)).toBe("طولب قبل 3 أيّام");
-    expect(describeRequested(9)).toBe("طولب قبل 9 أيّام — ذكّره");
+    expect(describeRequested(0)).toBe("طُولب اليوم");
+    expect(describeRequested(3)).toBe("طُولب قبل 3 أيّام");
+    expect(describeRequested(9)).toBe("طُولب قبل 9 أيّام، وحان وقت التذكير");
   });
 });

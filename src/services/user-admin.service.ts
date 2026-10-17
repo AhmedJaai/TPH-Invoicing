@@ -78,7 +78,7 @@ export async function applyUserChange(actorId: string, targetId: string, change:
       allowlisted: list.has(r.email.toLowerCase()),
     }));
     const target = everyone.find((u) => u.id === targetId);
-    if (!target) throw new UserChangeRefused("المستخدم غير موجود — حدّث الصفحة");
+    if (!target) throw new UserChangeRefused("المستخدم غير موجود. حدّث الصفحة");
 
     const verdict = checkUserChange(actorId, target, change, everyone);
     if (!verdict.ok) throw new UserChangeRefused(verdict.reason);
@@ -92,7 +92,7 @@ export async function applyUserChange(actorId: string, targetId: string, change:
         before: { المستخدم: target.email, الدور: target.role },
         after: { المستخدم: target.email, الدور: change.role },
       }, t);
-      return { message: `صار دور ${who} «${ROLE_LABEL[change.role]}» — يسري من طلبه التالي`, signedOutSelf: false };
+      return { message: `صار دور ${who} «${ROLE_LABEL[change.role]}»، ويسري من طلبه التالي`, signedOutSelf: false };
     }
 
     if (change.kind === "active") {
@@ -110,8 +110,8 @@ export async function applyUserChange(actorId: string, targetId: string, change:
       }, t);
       return {
         message: change.active
-          ? `أعيد تفعيل ${who} — يدخل بجوجل متى شاء`
-          : `عطّل ${who} وأنهيت جلساته — لا يدخل حتى تعيد تفعيله`,
+          ? `أُعيد تفعيل ${who}، ويمكنه الدخول بحساب جوجل متى شاء`
+          : `عُطّل ${who} وأُنهيت جلساته، ولا يستطيع الدخول حتى تعيد تفعيله`,
         signedOutSelf: false,
       };
     }
@@ -122,7 +122,7 @@ export async function applyUserChange(actorId: string, targetId: string, change:
       after: { المستخدم: target.email, "جلسات أنهيت": ended.length },
     }, t);
     return {
-      message: ended.length === 0 ? `لا جلسة قائمة لـ${who}` : `أنهيت جلسات ${who} على كلّ الأجهزة — يدخل من جديد بجوجل`,
+      message: ended.length === 0 ? `لا توجد جلسة نشطة لـ${who}` : `أُنهيت جلسات ${who} على كل الأجهزة، وسيدخل من جديد بحساب جوجل`,
       signedOutSelf: target.id === actorId && ended.length > 0,
     };
   });

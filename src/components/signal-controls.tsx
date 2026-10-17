@@ -21,9 +21,9 @@ export function SignalControls({
 }) {
   if (silenced) {
     return (
-      <PostAction url="/api/signal" body={{ key: signalKey, action: "reopen" }} variant="quiet" done="أعيدت الملاحظة">
+      <PostAction url="/api/signal" body={{ key: signalKey, action: "reopen" }} variant="quiet" done="أُعيد التنبيه">
         <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        أعدها
+        أعد التنبيه
       </PostAction>
     );
   }

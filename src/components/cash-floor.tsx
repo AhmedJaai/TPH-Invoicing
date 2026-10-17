@@ -22,7 +22,7 @@ export function CashFloor({ floorMinor }: { floorMinor: number | null }) {
       setError(r.error);
       return false;
     }
-    toast({ tone: "ok", title: typeof r.data.message === "string" ? r.data.message : "حفظ" });
+    toast({ tone: "ok", title: typeof r.data.message === "string" ? r.data.message : "تم الحفظ" });
     router.refresh();
     return true;
   }
@@ -32,10 +32,10 @@ export function CashFloor({ floorMinor }: { floorMinor: number | null }) {
       <Field
         label="حدّك الأدنى للرصيد (ريال)"
         error={error}
-        hint="ينبّه حين ينزل «يبقى بعدها» تحته. اتركه فارغاً لرفعه."
+        hint="يظهر تنبيه حين ينزل «يبقى بعدها» عن هذا الحد. اتركه فارغاً لإلغاء الحد."
         className="w-full max-w-64"
       >
-        {({ invalid, ...p }) => <MoneyInput {...p} invalid={invalid} value={amount} onChange={setAmount} placeholder="مثلاً 20000" />}
+        {({ invalid, ...p }) => <MoneyInput {...p} invalid={invalid} value={amount} onChange={setAmount} placeholder="مثال: 20000" />}
       </Field>
       <ActionButton onAction={save} variant="secondary" className="mb-[1.35rem]">احفظ الحدّ</ActionButton>
     </div>

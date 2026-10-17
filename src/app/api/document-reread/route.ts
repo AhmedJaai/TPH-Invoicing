@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     في المعاينة ويكتبها، وهو ما يمنعه «صحّح الحقول». والرقمُ والتاريخ يُصحَّحان هناك.
   */
   if (!can(user.role, "amounts:view")) {
-    return NextResponse.json({ error: "إعادة قراءة الفاتورة تحتاج صلاحية عرض المبالغ — وتصحيح الرقم والتاريخ من «صحّح الحقول»." }, { status: 403 });
+    return NextResponse.json({ error: "إعادة قراءة الفاتورة تحتاج صلاحية عرض المبالغ. ويمكنك تصحيح الرقم والتاريخ من «صحّح الحقول»." }, { status: 403 });
   }
 
   let raw: unknown;
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
   }
   const parsed = Body.safeParse(raw);
-  if (!parsed.success) return NextResponse.json({ error: "لم يذكر المستند" }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "لم يُحدَّد المستند" }, { status: 400 });
   const body = parsed.data;
   const id = body.documentId;
 
@@ -80,8 +80,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "لا تفويض درايف في هذه البيئة — إعادة القراءة تعمل في الإنتاج وحده. "
-          + "وتصحيح الحقول بيدك يعمل هنا.",
+          "لا يوجد تفويض للدرايف في هذه البيئة، وإعادة القراءة تعمل في الإنتاج فقط. "
+          + "أما تصحيح الحقول يدوياً فيعمل هنا.",
       },
       { status: 409 },
     );

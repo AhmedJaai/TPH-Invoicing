@@ -56,7 +56,7 @@ export async function ReviewSection({
     return (
       <p role="status" className="flex items-center gap-2 rounded-xl border border-ok/25 bg-ok-bg px-4 py-3 text-xs font-bold text-ok">
         <CircleCheck className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-        كلّ حركة في الكشف لها قرار مسجّل — إمّا مطابقة وإمّا معلن أنّها ليست سداداً.
+        لكل حركة في الكشف قرار مسجّل: إما مطابقتها بفاتورة، أو تحديد أنها ليست سداداً.
       </p>
     );
   }
@@ -111,7 +111,7 @@ export async function ReviewSection({
       {truncated && (
         <p className="mb-3 flex items-start gap-2 rounded-xl border border-warn/25 bg-warn-bg px-4 py-2.5 text-xs text-warn">
           <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-          يعرض أكبر {LIMIT} بنداً بالمبلغ — وفي الطابور أكثر. احسم ما هنا ثمّ حدّث الصفحة.
+          نعرض أكبر {LIMIT} بنداً بالمبلغ، وفي الطابور بنود أخرى. احسم ما هنا ثم حدّث الصفحة.
         </p>
       )}
       <ReviewWorkspace

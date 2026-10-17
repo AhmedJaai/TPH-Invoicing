@@ -31,21 +31,21 @@ export const SIGNAL_PREFIXES = [
 export type SignalPrefix = (typeof SIGNAL_PREFIXES)[number];
 
 export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
-  "pos-missing": "تسوية شبكة لم تصل",
+  "pos-missing": "تسوية الشبكة لم تصل",
   "pos-fee-rise": "ارتفاع رسوم الشبكة",
   "recurring-suggest": "اقتراح مصروف متكرّر",
-  "recurring-twice": "خصم تكرّر في الشهر",
-  "recurring-rose": "خصم ارتفع عن عادته",
-  "recurring-missing": "خصم معتاد غاب",
-  obligation: "وثيقة تنتهي",
+  "recurring-twice": "خصم تكرر مرتين في الشهر",
+  "recurring-rose": "خصم ارتفع عن المعتاد",
+  "recurring-missing": "خصم معتاد لم يحدث هذا الشهر",
+  obligation: "وثيقة قاربت على الانتهاء",
   "cash-floor": "الرصيد تحت حدّه",
-  "qty-outlier": "كمّيّة على غير العادة",
+  "qty-outlier": "كمية غير معتادة",
   "foodics-card": "فرق بين بطاقات فودكس ودفعة البنك",
   "foodics-purchase": "فرق بين مشتريات فودكس وفواتيرنا",
-  "foodics-till": "فرق بين المعدود في الصندوق والمتوقّع",
-  "stock-link": "بند فاتورة ليس مخزوناً",
+  "foodics-till": "فرق بين النقد المعدود في الصندوق والمتوقع",
+  "stock-link": "بند فاتورة ليس من المخزون",
   "stock-gap": "فرق متكرّر في صنف مخزون",
-  "repeat-delivery": "توريد يبدو مقيّداً مرّتين",
+  "repeat-delivery": "توريد يبدو مسجلاً مرتين",
 };
 
 const KEY_RE = /^[a-z-]{3,24}:[^\s]{1,160}$/;

@@ -29,7 +29,7 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
     const r = await postJson<{ message?: string }>("/api/bank-held", { id, decision });
     setBusy(null);
     if (!r.ok) { setError(r.error); return; }
-    toast({ tone: "ok", title: r.data.message ?? "حسم" });
+    toast({ tone: "ok", title: r.data.message ?? "تم الحسم" });
     router.refresh();
   }
 
@@ -37,7 +37,7 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
     <div className="mb-3 rounded-xl border border-warn/25 bg-warn-bg px-4 py-3">
       <p className="flex items-center gap-2 text-[13px] font-bold">
         <CircleHelp className="h-[18px] w-[18px] shrink-0 text-warn" strokeWidth={2} aria-hidden />
-        {rows.length === 1 ? "حركة تنتظر قرارك — الدليل لا يحسمها" : `${rows.length} حركات تنتظر قرارك — الدليل لا يحسمها`}
+        {rows.length === 1 ? "حركة تنتظر قرارك، فالأدلة وحدها لا تحسمها" : `${rows.length} حركات تنتظر قرارك، فالأدلة وحدها لا تحسمها`}
       </p>
       <ul className="mt-2 divide-y divide-line-soft">
         {rows.map((r) => (
@@ -70,7 +70,7 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
                 {r.kind === "MISSING_FROM_FILE" ? (
                   <>
                     <button type="button" disabled={busy !== null} onClick={() => decide(r.id, "REMOVED")} className={buttonClass("danger", "sm")}>
-                      ليست في الكشف — احذفها
+                      ليست في الكشف، احذفها
                     </button>
                     <button type="button" disabled={busy !== null} onClick={() => decide(r.id, "CHECKED")} className={buttonClass("secondary", "sm")}>
                       أبقها
@@ -82,12 +82,12 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
                       هي نفسها
                     </button>
                     <button type="button" disabled={busy !== null} onClick={() => decide(r.id, "ADDED")} className={buttonClass("primary", "sm")}>
-                      حركة أخرى — أضفها
+                      حركة أخرى، أضفها
                     </button>
                   </>
                 ) : (
                   <button type="button" disabled={busy !== null} onClick={() => decide(r.id, "CHECKED")} className={buttonClass("secondary", "sm")}>
-                    نظرت في الملفّ — أغلقه
+                    راجعت الملف، أغلق التنبيه
                   </button>
                 )}
               </div>

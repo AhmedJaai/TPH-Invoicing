@@ -9,6 +9,12 @@ const OPTIONS: { value: Locale; label: string; lang: string }[] = [
   { value: "en", label: "English", lang: "en" },
 ];
 
+/** يكتب الكعكةَ ويعيد التحميل — خارج المكوّن، فالمتصفّحُ لا حالُ React. */
+function applyLocale(next: Locale) {
+  document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+  window.location.reload();
+}
+
 /**
  * زرُّ لغة الواجهة — في الإعدادات. يكتب الكعكةَ ثمّ يعيد تحميل الصفحة، لأنّ
  * الاتّجاهَ (`dir`) واللغةَ يُكتبان على `<html>` في الخادم قبل أوّل رسم.
@@ -20,8 +26,7 @@ export function LanguageSwitch({ current }: { current: Locale }) {
   const choose = (next: Locale) => {
     if (next === current || busy) return;
     setBusy(true);
-    document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
-    window.location.reload();
+    applyLocale(next);
   };
 
   return (

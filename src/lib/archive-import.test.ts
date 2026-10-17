@@ -19,7 +19,7 @@ describe("planImport", () => {
   it("الفاتورة بلا رقم تسجّل مستنداً وتذكر في الملاحظات", () => {
     const p = plan("2026-05-21_OliveLeaves_Invoice_SAR405.00.pdf");
     expect(p.createsInvoice).toBe(false);
-    expect(p.notes.some((n) => n.includes("بلا رقم"))).toBe(true);
+    expect(p.notes.some((n) => n.includes("رقم فاتورة"))).toBe(true);
   });
 
   /*
@@ -34,7 +34,7 @@ describe("planImport", () => {
     const p = plan("2026-07-31_OliveLeaves_Statement_to-31-07.pdf");
     expect(p.documentKind).toBe("STATEMENT");
     expect(p.createsStatement).toBe(true);
-    expect(p.notes.some((n) => n.includes("لا مبلغ"))).toBe(true);
+    expect(p.notes.some((n) => n.includes("لا يوجد مبلغ"))).toBe(true);
   });
 
   it("الفاتورة بلا مبلغ تبقى غير مقيّدة — الفرق مقصود", () => {
@@ -68,6 +68,6 @@ describe("planImport", () => {
 
   it("الشهر بلا يوم يذكر لا يبتلع", () => {
     const p = plan("2026-05_OliveLeaves_Invoice_INVA-02527_SAR240.00.pdf");
-    expect(p.notes.some((n) => n.includes("بلا يوم"))).toBe(true);
+    expect(p.notes.some((n) => n.includes("دون اليوم"))).toBe(true);
   });
 });

@@ -31,7 +31,7 @@ export function TaskRow({ item }: { item: AttentionItem }) {
       data-href={`/attention?item=${encodeURIComponent(item.id)}`}
       className="card-rows group relative flex items-center gap-3.5 px-4 py-3.5 transition-colors hover:bg-hover sm:px-5"
     >
-      <Link href={detailHref} aria-label="افتح التفصيل" tabIndex={-1} className="absolute inset-0" />
+      <Link href={detailHref} aria-label="افتح التفاصيل" tabIndex={-1} className="absolute inset-0" />
       <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${s.chip}`} title={SEVERITY_LABEL[item.severity]}>
         <Icon className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
         <span className="sr-only">{SEVERITY_LABEL[item.severity]}</span>
@@ -52,7 +52,7 @@ export function TaskRow({ item }: { item: AttentionItem }) {
       )}
 
       <Link href={item.href} className={`${buttonClass("secondary", "sm")} hidden sm:inline-flex`}>
-        {item.actionLabel ?? "افتح السجلّات"}
+        {item.actionLabel ?? "افتح السجلات"}
       </Link>
       <ArrowLeft className="h-4 w-4 shrink-0 text-muted sm:hidden" strokeWidth={2} aria-hidden />
     </li>

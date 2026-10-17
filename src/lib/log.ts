@@ -94,7 +94,7 @@ export function formatLogLine(
   try {
     return JSON.stringify(line);
   } catch {
-    return JSON.stringify({ kind, at: now.toISOString(), logError: "تعذّر تسلسل الحقول" });
+    return JSON.stringify({ kind, at: now.toISOString(), logError: "تعذّر تحويل الحقول إلى نص" });
   }
 }
 

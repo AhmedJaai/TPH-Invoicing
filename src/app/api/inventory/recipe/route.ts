@@ -62,16 +62,16 @@ export async function POST(request: Request) {
     if (body.action === "activate") {
       if (!body.versionId) return NextResponse.json({ error: "لم تحدّد النسخة" }, { status: 400 });
       await activateRecipeVersion(body.versionId, user.id);
-      return NextResponse.json({ ok: true, message: "فعّلت النسخة — وأغلقت السابقة في اليوم الذي قبلها." });
+      return NextResponse.json({ ok: true, message: "تم تفعيل النسخة، وأُغلقت النسخة السابقة في اليوم الذي قبلها." });
     }
 
-    if (!body.menuProductId) return NextResponse.json({ error: "لم يحدّد الصنف المباع" }, { status: 400 });
+    if (!body.menuProductId) return NextResponse.json({ error: "لم تحدّد الصنف المباع" }, { status: 400 });
 
     if (body.action === "delete") {
       const gone = await deleteRecipe(body.menuProductId, user.id);
       return NextResponse.json({
         ok: true,
-        message: `حذفت وصفة «${gone.name}» بنسخها (${gone.deletedVersions}).`,
+        message: `تم حذف وصفة «${gone.name}» بنسخها (${gone.deletedVersions}).`,
       });
     }
 
@@ -79,21 +79,21 @@ export async function POST(request: Request) {
     for (const raw of body.ingredients ?? []) {
       if (!raw.productId) continue;
       if (!isStoredUnit(raw.unit)) {
-        return NextResponse.json({ error: "وحدة مكوّن غير معروفة" }, { status: 400 });
+        return NextResponse.json({ error: "وحدة أحد المكوّنات غير معروفة" }, { status: 400 });
       }
       const quantityMilli = decimalToMilli(typeof raw.quantity === "number" ? raw.quantity : String(raw.quantity ?? "").trim());
       if (quantityMilli === null || quantityMilli <= 0) {
-        return NextResponse.json({ error: `كمّيّة مكوّن غير مقروءة: «${String(raw.quantity ?? "")}»` }, { status: 400 });
+        return NextResponse.json({ error: `تعذّرت قراءة كمية أحد المكوّنات: «${String(raw.quantity ?? "")}»` }, { status: 400 });
       }
 
       /* النسبةُ تُكتب مئويّةً وتُخزَّن نقاطَ أساسٍ صحيحة — لا كسرَ عائم */
       let prepLossBp: number | null = null;
       if (raw.prepLossPercent !== null && raw.prepLossPercent !== undefined && String(raw.prepLossPercent).trim() !== "") {
         const milli = decimalToMilli(String(raw.prepLossPercent).trim());
-        if (milli === null) return NextResponse.json({ error: "نسبة فاقد التجهيز غير مقروءة" }, { status: 400 });
+        if (milli === null) return NextResponse.json({ error: "تعذّرت قراءة نسبة فاقد التجهيز" }, { status: 400 });
         prepLossBp = Math.round(milli / 10);
         if (prepLossBp < 0 || prepLossBp > MAX_PREP_LOSS_BP) {
-          return NextResponse.json({ error: "فاقد التجهيز بين صفر ومئة بالمئة (غير شامل للمئة)" }, { status: 400 });
+          return NextResponse.json({ error: "فاقد التجهيز يجب أن يكون بين صفر ومئة بالمئة، ولا يشمل المئة" }, { status: 400 });
         }
       }
 
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
       ? null
       : decimalToMilli(String(body.yieldQuantity).trim());
     if (yieldQuantityMilli !== null && (yieldQuantityMilli <= 0 || yieldUnit === null)) {
-      return NextResponse.json({ error: "ناتج الوصفة يذكر بكمّيّته ووحدته معاً" }, { status: 400 });
+      return NextResponse.json({ error: "اكتب ناتج الوصفة بكميته ووحدته معاً" }, { status: 400 });
     }
 
     /*
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({
         ok: true, ...fixed,
-        message: `صحّحت النسخة ${fixed.version} — والتصحيح يسري على الأسابيع كلّها.`,
+        message: `تم تصحيح النسخة ${fixed.version}، ويسري التصحيح على كل الأسابيع.`,
       });
     }
 
@@ -141,8 +141,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true, ...result,
       message: result.activated
-        ? `حفظت النسخة ${result.version} وسرت من ${body.effectiveFrom}.`
-        : `حفظت النسخة ${result.version} مسوّدةً — لا تدخل الحساب حتى تفعّل.`,
+        ? `تم حفظ النسخة ${result.version}، وتسري من ${body.effectiveFrom}.`
+        : `تم حفظ النسخة ${result.version} مسوّدة، ولا تدخل في الحساب حتى تفعّلها.`,
     });
   } catch (e) {
     /* «حُسب بها جردٌ مقفَل» خبرٌ عن الحال لا عطبٌ في الطلب */

@@ -58,8 +58,8 @@ export function CashTimeline({
     saveSelection(runMonth, { ...current, skipSuppliers: [...new Set([...current.skipSuppliers, ...deferredSuppliers])] });
     toast({
       tone: "ok",
-      title: `استثني ${countNoun(deferredSuppliers.length, SUPPLIER)} من دفعة الشهر`,
-      body: "لم يحوّل شيء ولم يقيّد — راجع الدفعة ثمّ نزّل ملفّها.",
+      title: `استُثني ${countNoun(deferredSuppliers.length, SUPPLIER)} من دفعة الشهر`,
+      body: "لم يُحوَّل شيء ولم يُقيَّد. راجع الدفعة ثم نزّل ملفها.",
     });
     router.push("/payments");
   }
@@ -72,15 +72,15 @@ export function CashTimeline({
         <div role="status" className="sticky top-14 z-10 mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-info/30 bg-info-bg px-4 py-3 text-xs lg:top-[60px]">
           <FlaskConical className="h-4 w-4 shrink-0 text-info" strokeWidth={2} aria-hidden />
           <p className="min-w-0 flex-1 basis-56 leading-relaxed text-ink-soft">
-            <b className="text-ink">تجربة — لم يحفظ شيء.</b> أجّلت <Money minor={view.deferredMinor} /> إلى المرحلة التالية
+            <b className="text-ink">تجربة، ولم يُحفظ شيء.</b> أجّلتَ <Money minor={view.deferredMinor} /> إلى المرحلة التالية
             {view.lowestMinor !== null && (
-              <> · أدنى ما يبلغه الرصيد <b className={view.lowestMinor < 0 ? "text-danger" : "text-ink"}><Money minor={view.lowestMinor} /></b></>
+              <> · أدنى رصيد يصل إليه <b className={view.lowestMinor < 0 ? "text-danger" : "text-ink"}><Money minor={view.lowestMinor} /></b></>
             )}
-            {view.shortfallAt === null && balanceMinor !== null ? " · لا يقصر الرصيد المعروف بهذا الترتيب." : ""}
+            {view.shortfallAt === null && balanceMinor !== null ? " · الرصيد المعروف يكفي بهذا الترتيب." : ""}
           </p>
           <button type="button" onClick={() => setDeferred(new Set())} className={buttonClass("quiet", "sm")}>
             <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            ألغ التجربة
+            إلغاء التجربة
           </button>
           {canPay && deferredSuppliers.length > 0 && (
             <button type="button" onClick={adopt} className={buttonClass("primary", "sm")}>
@@ -113,11 +113,11 @@ export function CashTimeline({
               {view.shortfallAt === b.id && (
                 <p className="flex items-center gap-2 bg-danger-bg px-4 py-2 text-xs font-bold text-danger sm:px-5">
                   <CircleAlert className="h-4 w-4" strokeWidth={2} aria-hidden />
-                  هنا يقصر الرصيد المعروف عمّا يخرج{trying ? " — بترتيب التجربة." : " — جرّب تأجيل سطر بمربّعه."}
+                  هنا لا يكفي الرصيد المعروف لتغطية ما سيخرج{trying ? " (بترتيب التجربة)." : ". جرّب تأجيل سطر بتحديد مربّعه."}
                 </p>
               )}
               {b.lines.length === 0 ? (
-                <p className="px-4 py-3 text-xs text-muted sm:px-5">أجّلت كلّ ما فيها.</p>
+                <p className="px-4 py-3 text-xs text-muted sm:px-5">أُجّل كل ما فيها.</p>
               ) : (
                 <ul className="divide-y divide-line-soft">
                   {b.lines.map((l) => {
@@ -156,7 +156,7 @@ export function CashTimeline({
       </ol>
       {!trying && view.buckets.length > 0 && (
         <p className="mt-3 text-xs text-muted">
-          «ماذا لو أجّلت هذا؟» — علّم مربّع أيّ سطر لترى ما يبقى بعد كلّ مرحلة. تجربة في هذه الصفحة لا تحفظ ولا تغيّر قيداً.
+          «ماذا لو أجّلت هذا؟» حدّد مربّع أي سطر لترى ما يبقى بعد كل مرحلة. هذه تجربة في هذه الصفحة فقط، ولا تُحفظ ولا تغيّر أي قيد.
         </p>
       )}
     </>
@@ -195,15 +195,15 @@ function BalanceSteps({ balanceMinor, buckets }: { balanceMinor: number; buckets
   return (
     <figure className="mb-6 rounded-xl border border-line bg-raised p-4 shadow-raised sm:p-5">
       <figcaption className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-[13px] font-bold">الرصيد بعد كلّ مرحلة</span>
-        <span className="text-[11px] text-muted">حدّ أدنى — الوارد غير مرسوم</span>
+        <span className="text-[13px] font-bold">الرصيد بعد كل مرحلة</span>
+        <span className="text-[11px] text-muted">حد أدنى، والوارد غير مرسوم</span>
       </figcaption>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
         className="h-28 w-full"
         role="img"
-        aria-label={`خطّ الرصيد المتوقّع: يبدأ بآخر رصيد معروف وأدناه عند «${lowest.label}»${lowest.minor < 0 ? " تحت الصفر" : ""}`}
+        aria-label={`خط الرصيد المتوقع: يبدأ بآخر رصيد معروف وأدنى نقطة فيه عند «${lowest.label}»${lowest.minor < 0 ? " تحت الصفر" : ""}`}
       >
         {bottom < 0 && <rect x="0" y={zero} width={W} height={H - zero} className="fill-danger-bg" />}
         <line x1="0" x2={W} y1={zero} y2={zero} className="stroke-line-input" strokeWidth="1" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />

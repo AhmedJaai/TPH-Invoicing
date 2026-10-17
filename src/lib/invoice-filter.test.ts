@@ -59,9 +59,9 @@ describe("linkTo", () => {
 describe("describe", () => {
   it("تقول ما يعرض لا اسم الصفحة", () => {
     expect(describeFilters(parseFilters({}))).toBe("كل الفواتير");
-    expect(describeFilters(parseFilters({ tax: "INVALID" }))).toBe("ينقصها ركن");
+    expect(describeFilters(parseFilters({ tax: "INVALID" }))).toBe("بياناتها الضريبية ناقصة");
     expect(describeFilters(parseFilters({ tax: "INVALID", month: "2026-08" })))
-      .toBe("ينقصها ركن · في 2026-08");
+      .toBe("بياناتها الضريبية ناقصة · في 2026-08");
     expect(describeFilters(parseFilters({ overdue: "1" }))).toContain("60");
     expect(describeFilters(parseFilters({ supplier: "Loreva" }), "لوريفا كيك")).toBe("من لوريفا كيك");
     expect(describeFilters(parseFilters({ supplier: "Loreva" }))).toBe("من Loreva");

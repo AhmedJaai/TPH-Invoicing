@@ -105,14 +105,14 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
             <p className="text-[11px] font-bold tracking-wide text-muted">حزمة المحاسب</p>
             <h1 className="mt-1 text-2xl font-bold leading-tight">{formatMonth(month)}</h1>
             <p className={`mt-1.5 text-xs font-bold ${input.closed ? "text-ok" : "text-warn"}`}>
-              {input.closed ? "الشهر مقفل — أرقامه ثابتة." : "الشهر مفتوح — قد تتغيّر أرقامه بما يضاف بعد اليوم."}
+              {input.closed ? "الشهر مقفل، وأرقامه ثابتة." : "الشهر مفتوح، وقد تتغيّر أرقامه بما يُضاف بعد اليوم."}
             </p>
           </div>
           <div className="text-end text-xs leading-relaxed text-ink-soft">
             <p className="text-sm font-bold text-ink">{companyConfig.nameAr}</p>
             <p>النسيم، جدة</p>
-            {vat && <p>الرقم الضريبيّ <bdi dir="ltr" className="font-mono">{vat}</bdi></p>}
-            {cr && <p>السجلّ التجاريّ <bdi dir="ltr" className="font-mono">{cr}</bdi></p>}
+            {vat && <p>الرقم الضريبي <bdi dir="ltr" className="font-mono">{vat}</bdi></p>}
+            {cr && <p>السجل التجاري <bdi dir="ltr" className="font-mono">{cr}</bdi></p>}
           </div>
         </header>
 
@@ -121,8 +121,8 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
             <EmptyState
               compact
               icon={FileText}
-              title={`لا قيد في ${formatMonth(month)}.`}
-              hint="لا فاتورة بشهره المحاسبيّ، ولا دفعة ولا مصروف ولا حركة بنك بتاريخه — اختر شهراً آخر."
+              title={`لا توجد قيود في ${formatMonth(month)}.`}
+              hint="لا توجد فواتير ولا دفعات ولا مصروفات ولا حركات بنكية في هذا الشهر. اختر شهراً آخر."
             />
           </div>
         ) : (
@@ -136,15 +136,15 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
                   ["مجموع الفواتير", <Money key="t" minor={s.invoicesTotalMinor} />],
                   ["الضريبة المقروءة", <Money key="v" minor={s.vatKnownMinor} />],
                   ["فواتير ضريبتها غير مقروءة", <span key="u" className={`nums ${s.vatUnknownCount > 0 ? "text-warn" : ""}`}>{s.vatUnknownCount}</span>],
-                  ["ضريبة الفواتير المستوفية (رقم الإقرار في صفحته)", <Money key="d" minor={s.deductibleVatMinor} />],
-                  ["ما سدّد منها", <Money key="p" minor={s.paidMinor} />],
-                  ["ما بقي عليها", <Money key="o" minor={s.openMinor} />],
+                  ["ضريبة الفواتير المستوفية (رقم الإقرار الضريبي في صفحته)", <Money key="d" minor={s.deductibleVatMinor} />],
+                  ["المسدَّد منها", <Money key="p" minor={s.paidMinor} />],
+                  ["المتبقي عليها", <Money key="o" minor={s.openMinor} />],
                 ]}
               />
               <SummaryBlock
                 title="المال"
                 rows={[
-                  ["دفعات الشهر (القائمة)", <Money key="p" minor={s.paymentsMinor} />],
+                  ["دفعات الشهر (السارية)", <Money key="p" minor={s.paymentsMinor} />],
                   ...creditNoteRow(s.creditNotesMinor),
                   ["المصروفات", <Money key="e" minor={s.expensesMinor} />],
                   ["وارد البنك", <Money key="i" minor={s.bankInMinor} />],
@@ -174,7 +174,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
             {/* ── الفواتير ── */}
             <SheetSection title="الفواتير" count={input.invoices.length}>
               <SheetTable
-                head={["الرقم", "التاريخ", "المورّد", "قبل الضريبة", "الضريبة", "الإجمالي", "حالها الضريبيّ", "الباقي"]}
+                head={["الرقم", "التاريخ", "المورّد", "قبل الضريبة", "الضريبة", "الإجمالي", "حالتها الضريبية", "الباقي"]}
                 numeric={[3, 4, 5, 7]}
                 rows={input.invoices.map((i, idx) => ({
                   key: `${i.number}:${idx}`,
@@ -199,9 +199,9 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
             </SheetSection>
 
             {/* ── المصروفات: بأبوابها، ثمّ بنودُها عدا الرسوم الصغيرة ── */}
-            <SheetSection title="المصروفات بأبوابها" count={input.expenses.length}>
+            <SheetSection title="المصروفات حسب التصنيف" count={input.expenses.length}>
               <SheetTable
-                head={["الباب", "عدد القيود", "المجموع"]}
+                head={["التصنيف", "عدد القيود", "المجموع"]}
                 numeric={[1, 2]}
                 rows={expensesByCategory(input).map((o) => ({
                   key: o.category,
@@ -213,10 +213,10 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
 
             <SheetSection title="بنود المصروفات" count={namedExpenses.length}>
               <p className="mb-3 text-xs leading-relaxed text-ink-soft">
-                عدا رسوم الشبكة والبنك وضريبتها — مئات قيود صغيرة مجموعها في الجدول أعلاه، وبنودها في ملفّ Excel.
+                لا تشمل رسوم الشبكة والبنك وضريبتها، فهي مئات القيود الصغيرة، ومجموعها في الجدول أعلاه وتفاصيلها في ملف Excel.
               </p>
               <SheetTable
-                head={["التاريخ", "الباب", "البيان", "المبلغ", "المصدر"]}
+                head={["التاريخ", "التصنيف", "البيان", "المبلغ", "المصدر"]}
                 numeric={[3]}
                 rows={namedExpenses.map((e, idx) => ({
                   key: `${e.date}:${idx}`,
@@ -226,9 +226,9 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
             </SheetSection>
 
             {/* ── البنك: الصادرُ بأبوابه، ثمّ ما لا تفسيرَ له ── */}
-            <SheetSection title="صادر البنك بأبوابه" count={input.bank.filter((b) => b.direction === "DEBIT").length}>
+            <SheetSection title="صادر البنك حسب التصنيف" count={input.bank.filter((b) => b.direction === "DEBIT").length}>
               <SheetTable
-                head={["الباب", "عدد الحركات", "المجموع"]}
+                head={["التصنيف", "عدد الحركات", "المجموع"]}
                 numeric={[1, 2]}
                 rows={outflow.map((o) => ({
                   key: o.category,
@@ -240,12 +240,12 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
 
             <SheetSection title="صادر بلا تفسير" count={unclear.length}>
               <p className="mb-3 text-xs leading-relaxed text-ink-soft">
-                ما خرج ولم يصنّف، أو خرج لمورّد ولا دفعة مقيّدةً تقابله. والحركات كلّها بتفصيلها في ملفّ Excel.
+                مبالغ خرجت ولم تُصنَّف، أو خرجت لمورّد دون دفعة مسجّلة تقابلها. تفاصيل كل الحركات في ملف Excel.
               </p>
               <SheetTable
-                head={["التاريخ", "البيان", "الباب", "المبلغ"]}
+                head={["التاريخ", "البيان", "التصنيف", "المبلغ"]}
                 numeric={[3]}
-                empty="كلّ ما خرج له باب، أو دفعة مقيّدة لمورّده."
+                empty="كل ما خرج له تصنيف أو دفعة مسجّلة لمورّده."
                 rows={unclear.map((b, idx) => ({
                   key: `${b.date}:${idx}`,
                   cells: [<Day key="d" day={b.date} />, b.description, categoryLabel(b.category), <Money key="a" minor={b.amountMinor} />],
@@ -257,11 +257,11 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
 
         <footer className="mt-8 space-y-1.5 border-t border-line pt-4 text-[11px] leading-relaxed text-muted">
           <p>
-            الفواتير والمصروفات بشهرها المحاسبيّ، والدفعات وحركات البنك بيوم وقوعها بتوقيت الرياض. والمردودة والملغاة
-            من الدفعات لا تدخل المجموع. وما لم يقرأ مكتوب «غير معروف» لا صفراً.
+            الفواتير والمصروفات حسب شهرها المحاسبي، والدفعات وحركات البنك حسب يوم حدوثها بتوقيت الرياض. الدفعات المردودة والملغاة
+            لا تدخل في المجموع. وما لم يُقرأ يظهر «غير معروف» وليس صفراً.
           </p>
-          <p>المبيعات غير موصولة بالنظام — الإيراد ليس في هذه الحزمة.</p>
-          <p>صدرت من نظام {companyConfig.nameAr} بتاريخ {formatDay(input.generatedAt)}.</p>
+          <p>المبيعات غير مربوطة بالنظام، لذلك لا يظهر الإيراد في هذه الحزمة.</p>
+          <p>صدرت هذه الحزمة من نظام {companyConfig.nameAr} بتاريخ {formatDay(input.generatedAt)}.</p>
         </footer>
       </article>
     </main>
@@ -274,7 +274,7 @@ function Maybe({ minor }: { minor: number | null }) {
 
 /** سطرُ الإشعارات الدائنة — يُعرض حين يوجد، ويُقال إنّه لم يخرج له مال. */
 function creditNoteRow(minor: number): [string, React.ReactNode][] {
-  return minor > 0 ? [["إشعارات دائنة — لا مال خرج", <Money key="cn" minor={minor} />]] : [];
+  return minor > 0 ? [["إشعارات دائنة (لا مبالغ خرجت)", <Money key="cn" minor={minor} />]] : [];
 }
 
 function SummaryBlock({ title, rows }: { title: string; rows: [string, React.ReactNode][] }) {
@@ -368,9 +368,9 @@ function PaymentsTable({ input, total }: { input: PackInput; total: number }) {
         key: `${p.date}:${idx}`,
         cells: [
           <Day key="d" day={p.date} />,
-          p.supplier ?? "غير منسوبة",
+          p.supplier ?? "غير منسوبة لمورّد",
           <Money key="a" minor={p.amountMinor} />,
-          `${METHOD_LABEL[p.method] ?? p.method}${p.fromBank ? "" : " · إقرار يدويّ"}`,
+          `${METHOD_LABEL[p.method] ?? p.method}${p.fromBank ? "" : " · إقرار يدوي"}`,
           paymentStatusLabel(p.status),
           p.invoices.length > 0 ? <bdi key="i" dir="ltr" className="font-mono text-[11px]">{p.invoices.join(" · ")}</bdi> : "—",
         ],

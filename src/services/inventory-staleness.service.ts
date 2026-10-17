@@ -52,10 +52,10 @@ export async function changesSinceFinalise(header: CountHeader, conn: Conn = db)
           and (p.status = 'DRAFT' or p.finalised_at > ${f})) as previous
   `)).rows;
   const out: StaleReason[] = [];
-  if (r.sales > 0) out.push({ label: "ملفّ مبيعات لأيّامه استورد بعد الإقفال", count: r.sales });
-  if (r.invoices > 0) out.push({ label: "فاتورة شراء لأسبوعه قيّدت بعد الإقفال", count: r.invoices });
-  if (r.linked > 0) out.push({ label: "صنف مورّد من فواتيره ربط بصنف جرد بعد الإقفال", count: r.linked });
-  if (r.recipes > 0) out.push({ label: "نسخة وصفة تسري فيه فعّلت بعد الإقفال", count: r.recipes });
-  if (r.previous > 0) out.push({ label: "جرد الأسبوع الذي قبله أعيد فتحه بعد إقفال هذا — فرصيده الافتتاحيّ قد تغيّر", count: r.previous });
+  if (r.sales > 0) out.push({ label: "ملف مبيعات لأيامه استُورد بعد الإقفال", count: r.sales });
+  if (r.invoices > 0) out.push({ label: "فاتورة شراء لأسبوعه قُيّدت بعد الإقفال", count: r.invoices });
+  if (r.linked > 0) out.push({ label: "صنف مورّد من فواتيره رُبط بصنف جرد بعد الإقفال", count: r.linked });
+  if (r.recipes > 0) out.push({ label: "نسخة وصفة تسري فيه فُعّلت بعد الإقفال", count: r.recipes });
+  if (r.previous > 0) out.push({ label: "جرد الأسبوع السابق أُعيد فتحه بعد إقفال هذا الجرد، فقد يتغيّر رصيده الافتتاحي", count: r.previous });
   return out;
 }

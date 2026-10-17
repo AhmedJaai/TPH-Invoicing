@@ -65,8 +65,8 @@ export type InputVatStatus = "ELIGIBLE" | "NOT_ELIGIBLE" | "UNKNOWN";
 export const TAX_STATUS_LABEL: Record<TaxStatus, string> = {
   VALID: "ضريبية كاملة",
   INVALID: "لا تصلح للخصم",
-  UNKNOWN: "لم تقرأ بعد",
-  NOT_APPLICABLE: "لا تقيّد",
+  UNKNOWN: "لم تُقرأ بعد",
+  NOT_APPLICABLE: "لا تُقيَّد",
 };
 
 export interface ValidationResult {
@@ -124,7 +124,7 @@ export function validateInvoice(
   const hasSellerVat = isValidSaudiVat(candidate.sellerVat) && !sellerIsUs;
   if (!hasSellerVat && !isNotInvoice) {
     findings.push(sellerIsUs
-      ? finding(ISSUE.MISSING_SELLER_VAT, { variant: "UNREADABLE", message: "قرئ رقم منشأتنا في خانة البائع — رقم المورّد الضريبيّ لم يقرأ؛ صحّحه من الورقة" })
+      ? finding(ISSUE.MISSING_SELLER_VAT, { variant: "UNREADABLE", message: "قُرئ رقم منشأتنا في خانة البائع، ولم يُقرأ الرقم الضريبي للمورّد. صحّحه من الفاتورة الأصلية" })
       : finding(ISSUE.MISSING_SELLER_VAT));
   }
 
@@ -142,7 +142,7 @@ export function validateInvoice(
     if (!isNotInvoice) {
       findings.push(finding(ISSUE.MISSING_BUYER_VAT, {
         variant: "UNREADABLE",
-        message: `رقم المنشأة على الفاتورة لم يقرأ سليماً (${buyerVat}) — صحّحه من الورقة`,
+        message: `لم يُقرأ رقم المنشأة على الفاتورة قراءة سليمة (${buyerVat}). صحّحه من الفاتورة الأصلية`,
       }));
     }
   } else if (!buyerVatMatches) {
@@ -176,7 +176,7 @@ export function validateInvoice(
       findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
         severity: "INFO",
         variant: "ROUNDING",
-        message: `المورّد قرّب الإجمالي: ${formatRiyalsDisplay(subtotalMinor + vatMinor)} صار ${formatRiyalsDisplay(totalMinor)}`,
+        message: `المورّد قرّب الإجمالي من ${formatRiyalsDisplay(subtotalMinor + vatMinor)} إلى ${formatRiyalsDisplay(totalMinor)}`,
       }));
     } else if (totals.verdict === "ADJUSTED") {
       /* خصمٌ أو رسومٌ بعد الضريبة: المستحقّ غيرُ الصافي والضريبة، والضريبةُ كما هي */
@@ -187,11 +187,11 @@ export function validateInvoice(
       findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
         severity: "INFO",
         variant: totals.chargesMinor !== null && totals.discountMinor === null ? "CHARGES" : "DISCOUNT",
-        message: `${parts} بعد الضريبة: الصافي والضريبة ${formatRiyalsDisplay(subtotalMinor + vatMinor)} والمستحقّ ${formatRiyalsDisplay(totalMinor)}`,
+        message: `${parts} بعد الضريبة: الصافي مع الضريبة ${formatRiyalsDisplay(subtotalMinor + vatMinor)} والمبلغ المستحق ${formatRiyalsDisplay(totalMinor)}`,
       }));
     } else if (totals.verdict === "MISMATCH") {
       findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
-        message: `المجموع ${formatRiyalsDisplay(totalMinor)} لا يساوي الصافي ${formatRiyalsDisplay(subtotalMinor)} زائد الضريبة ${formatRiyalsDisplay(vatMinor)}`,
+        message: `الإجمالي ${formatRiyalsDisplay(totalMinor)} لا يساوي الصافي ${formatRiyalsDisplay(subtotalMinor)} زائد الضريبة ${formatRiyalsDisplay(vatMinor)}`,
       }));
     } else if (hasVatBreakdown) {
       /* ضربٌ صحيح (×15 ÷100) — لا `× 0.15` عائماً في حسابٍ ماليّ */
@@ -201,7 +201,7 @@ export function validateInvoice(
         findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
           severity: "INFO",
           variant: "RATE",
-          message: `الضريبة ${formatRiyalsDisplay(vatMinor)} تخالف ١٥٪ من الصافي (${formatRiyalsDisplay(expected)}) — تحقّق من وجود بنود معفاة`,
+          message: `الضريبة ${formatRiyalsDisplay(vatMinor)} تختلف عن ١٥٪ من الصافي (${formatRiyalsDisplay(expected)}). تحقّق من وجود بنود معفاة`,
         }));
       }
     }
@@ -216,7 +216,7 @@ export function validateInvoice(
     && vatMinor > vatInsideGross(totalMinor) + TOTAL_ROUNDING_TOLERANCE_MINOR;
   if (vatImplausible) {
     findings.push(finding(ISSUE.VAT_MATH_MISMATCH, {
-      message: `الضريبة ${formatRiyalsDisplay(vatMinor)} أكبر ممّا يحتمله الإجمالي ${formatRiyalsDisplay(totalMinor)} (أقصاها ${formatRiyalsDisplay(vatInsideGross(totalMinor))}) — أحد الرقمين قرئ خطأً`,
+      message: `الضريبة ${formatRiyalsDisplay(vatMinor)} أكبر مما يحتمله الإجمالي ${formatRiyalsDisplay(totalMinor)} (أقصاها ${formatRiyalsDisplay(vatInsideGross(totalMinor))}). أحد الرقمين قُرئ خطأً`,
     }));
   }
 
@@ -253,7 +253,7 @@ export function validateInvoice(
   const isFixedAsset = totalKnown && assetBasis > FIXED_ASSET_THRESHOLD_MINOR;
   if (isFixedAsset) {
     findings.push(finding(ISSUE.POSSIBLE_FIXED_ASSET, {
-      message: `مبلغ ${formatRiyalsDisplay(assetBasis)} ريال يتجاوز حد الرسملة ٣٬٠٠٠ — راجع إن كانت معدّة تهلك`,
+      message: `مبلغ ${formatRiyalsDisplay(assetBasis)} ريال يتجاوز حد الرسملة ٣٬٠٠٠. راجع إن كانت معدّة تُهلك بالاستخدام`,
     }));
   }
 
@@ -267,7 +267,7 @@ export function validateInvoice(
 
   if (lowConfidenceFields.length > 0) {
     findings.push(finding(ISSUE.LOW_CONFIDENCE_FIELD, {
-      message: `حقول تحتاج مراجعة: ${lowConfidenceFields.join("، ")}`,
+      message: `حقول تحتاج إلى مراجعة: ${lowConfidenceFields.join("، ")}`,
     }));
   }
 

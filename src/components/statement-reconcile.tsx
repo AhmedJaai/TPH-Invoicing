@@ -85,7 +85,7 @@ function useReconcile() {
       onClose={() => setResult(null)}
       size="lg"
       title={result ? `${result.supplier.nameAr} · ${formatRange(result.period.start, result.period.end)}` : "نتيجة المطابقة"}
-      description={result ? (result.persisted ? "حفظ الناتج مع الكشف." : "فحص لم يحفظ منه شيء.") : undefined}
+      description={result ? (result.persisted ? "تم حفظ النتيجة مع الكشف." : "هذا فحص فقط ولم يُحفظ منه شيء.") : undefined}
       footer={<button type="button" onClick={() => setResult(null)} className={buttonClass("secondary")}>أغلق</button>}
     >
       {result && <ResultView result={result} />}
@@ -123,7 +123,7 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
           icon={GitCompareArrows}
           count={pending.length}
           className="mt-0"
-          hint="أرشفت ولم تقرأ أسطرها بعد — المطابقة تقرؤها وتقابل كلّ سطر بفواتيرك، وتكشف ما حمّله عليك ولم يصلك."
+          hint="كشوف أُرشفت ولم تُقرأ أسطرها بعد. المطابقة تقرأ الأسطر وتقابل كل سطر بفواتيرك، وتكشف الفواتير التي سجّلها المورّد عليك ولم تصلك."
         >
           <ul className="space-y-2">
             {pending.map((a) => (
@@ -135,12 +135,12 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
                     <span className="block text-[11px] text-muted">{formatRange(a.periodStart, a.periodEnd)}</span>
                   </span>
                   <span className="text-end">
-                    <span className="block text-[11px] text-muted">رصيده الختاميّ</span>
+                    <span className="block text-[11px] text-muted">رصيده الختامي</span>
                     <Closing minor={a.closingBalanceMinor} />
                   </span>
                   <button type="button" onClick={() => match(a.id)} disabled={busy !== null} className={buttonClass("primary", "sm")}>
                     <GitCompareArrows className="h-4 w-4" strokeWidth={2} aria-hidden />
-                    {busy === a.id ? "يقرأ ويطابق…" : "طابق"}
+                    {busy === a.id ? "جارٍ القراءة والمطابقة…" : "طابق"}
                   </button>
                 </div>
                 {error?.key === a.id && <p role="alert" className="border-t border-line-soft bg-danger-bg px-4 py-2 text-xs text-danger sm:px-5">{error.text}</p>}
@@ -152,7 +152,7 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
 
       {/* ── كلُّ الكشوف ── */}
       <Section
-        title="كلّ الكشوف المؤرشفة"
+        title="كل الكشوف المؤرشفة"
         icon={ScrollText}
         count={archived.length}
         className={pending.length > 0 ? "" : "mt-0"}
@@ -166,8 +166,8 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
             <EmptyState
               compact
               icon={ScrollText}
-              title="لا كشوف مؤرشفة بعد."
-              hint="ارفع كشف المورّد من «الرفع» فيؤرشف، ثمّ طابقه هنا — أو افحصه قبل أرشفته من الجانب."
+              title="لا توجد كشوف مؤرشفة بعد."
+              hint="ارفع كشف المورّد من «الرفع» ليُؤرشف، ثم طابقه هنا. ويمكنك أيضاً فحصه قبل الأرشفة من الجانب."
             />
           }
           columns={[
@@ -194,14 +194,14 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
               header: "أسطره",
               cell: (a) =>
                 a.lineCount === 0 ? (
-                  <Badge tone="warn" dot>لم تقرأ</Badge>
+                  <Badge tone="warn" dot>لم تُقرأ</Badge>
                 ) : (
                   <span className="whitespace-nowrap text-xs text-ink-soft">
-                    طوبق <span className="nums">{a.matchedCount}</span> من <span className="nums">{a.lineCount}</span>
+                    طُوبق <span className="nums">{a.matchedCount}</span> من <span className="nums">{a.lineCount}</span>
                   </span>
                 ),
             },
-            { key: "closing", header: "الرصيد الختاميّ", numeric: true, cell: (a) => <Closing minor={a.closingBalanceMinor} /> },
+            { key: "closing", header: "الرصيد الختامي", numeric: true, cell: (a) => <Closing minor={a.closingBalanceMinor} /> },
             {
               key: "act",
               header: "",
@@ -210,7 +210,7 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
               cell: (a) => (
                 <span className="flex flex-col items-end gap-1">
                   <button type="button" onClick={() => match(a.id)} disabled={busy !== null} className={`${buttonClass(a.lineCount === 0 ? "primary" : "quiet", "sm")} relative whitespace-nowrap`}>
-                    {busy === a.id ? "يقرأ ويطابق…" : a.lineCount > 0 ? "أعد المطابقة" : "طابق"}
+                    {busy === a.id ? "جارٍ القراءة والمطابقة…" : a.lineCount > 0 ? "أعد المطابقة" : "طابق"}
                   </button>
                   {a.missingCount > 0 && (
                     <RecordMissing statementId={a.id} count={a.missingCount} minor={a.missingMinor} />
@@ -251,7 +251,7 @@ export function StatementQuickCheck({
           افحص كشفاً وصلك الآن
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-          يقرأ ويطابق ويعرض — ولا يحفظ منه شيء. للأرشفة ارفعه من «الرفع».
+          يقرأ الكشف ويطابقه ويعرض النتيجة، ولا يحفظ منه شيئاً. للأرشفة ارفعه من «الرفع».
         </p>
         <label className="mt-3 block text-[11px] text-muted">
           المورّد
@@ -260,7 +260,7 @@ export function StatementQuickCheck({
             onChange={(e) => setSupplierId(e.target.value)}
             className="mt-1 block min-h-11 w-full rounded-lg border border-line-input bg-raised px-2.5 text-sm sm:min-h-9"
           >
-            <option value="">يستنتج من الكشف</option>
+            <option value="">يحدّده النظام من الكشف</option>
             {suppliers.map((x) => (
               <option key={x.id} value={x.id}>{x.nameAr}</option>
             ))}
@@ -273,11 +273,11 @@ export function StatementQuickCheck({
           className={`${buttonClass("primary", "sm")} mt-3 w-full`}
         >
           <Upload className="h-4 w-4" strokeWidth={2} aria-hidden />
-          {busy === "upload" ? "يقرأ…" : "اختر ملفّ الكشف"}
+          {busy === "upload" ? "جارٍ القراءة…" : "اختر ملف الكشف"}
         </button>
         <input
           ref={inputRef}
-          aria-label="ملفّ كشف المورّد"
+          aria-label="ملف كشف المورّد"
           type="file"
           accept=".pdf,image/*"
           className="sr-only"
@@ -328,37 +328,37 @@ function ResultView({ result }: { result: Result }) {
   return (
     <div className="space-y-5">
       {clean ? (
-        <Callout tone="ok" icon={CircleCheck} title="كشفه يوافق فواتيرك">
-          لا فاتورة حمّلها عليك وليست عندك، ولا فرق في المبالغ.
+        <Callout tone="ok" icon={CircleCheck} title="كشفه يطابق فواتيرك">
+          لا توجد فاتورة سجّلها عليك وليست عندك، ولا فروق في المبالغ.
         </Callout>
       ) : (
         <Callout tone={s.missingFromArchive > 0 ? "danger" : "warn"} icon={CircleAlert} title="في كشفه ما يخالف فواتيرك">
-          {s.missingFromArchive > 0 && <>{countNoun(s.missingFromArchive, INVOICE)} حمّلها عليك ولا ملفّ لها عندك. </>}
+          {s.missingFromArchive > 0 && <>{countNoun(s.missingFromArchive, INVOICE)} سجّلها عليك ولا ملف لها عندك. </>}
           {s.amountMismatches > 0 && <>وفي {s.amountMismatches} فرق في المبلغ. </>}
-          والمذكّرة أسفل جاهزة للمورّد.
+          المذكّرة أسفله جاهزة لإرسالها للمورّد.
         </Callout>
       )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Count label="أسطر كشفه" value={s.statementLines} />
-        <Count label="طوبقت" value={s.matched} tone="ok" />
-        <Count label="حمّلها ولا ملفّ لها" value={s.missingFromArchive} tone={s.missingFromArchive ? "danger" : "ok"} />
+        <Count label="طُوبقت" value={s.matched} tone="ok" />
+        <Count label="سجّلها عليك ولا ملف لها" value={s.missingFromArchive} tone={s.missingFromArchive ? "danger" : "ok"} />
         <Count label="فروق مبالغ" value={s.amountMismatches} tone={s.amountMismatches ? "warn" : "ok"} />
       </div>
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border border-line-soft bg-sunken/50 p-3 text-xs sm:grid-cols-4">
-        <div><dt className="text-[11px] text-muted">ما حمّله علينا</dt><dd className="mt-1 font-bold"><Money minor={s.theirBilledMinor} /></dd></div>
+        <div><dt className="text-[11px] text-muted">ما سجّله علينا</dt><dd className="mt-1 font-bold"><Money minor={s.theirBilledMinor} /></dd></div>
         <div><dt className="text-[11px] text-muted">ما لدينا من فواتيره</dt><dd className="mt-1 font-bold"><Money minor={s.ourBilledMinor} /></dd></div>
         <div>
           <dt className="text-[11px] text-muted">الفرق</dt>
           <dd className={`mt-1 font-bold ${s.billedDifferenceMinor === 0 ? "text-ok" : "text-warn"}`}><Money minor={Math.abs(s.billedDifferenceMinor)} /></dd>
         </div>
-        <div><dt className="text-[11px] text-muted">ما سدّدناه في كشفه</dt><dd className="mt-1 font-bold"><Money minor={s.theirPaidMinor} /></dd></div>
+        <div><dt className="text-[11px] text-muted">ما سدّدناه حسب كشفه</dt><dd className="mt-1 font-bold"><Money minor={s.theirPaidMinor} /></dd></div>
       </dl>
 
       {result.unreadLines && result.unreadLines.length > 0 && (
-        <Callout tone="warn" icon={CircleAlert} title={`${countNoun(result.unreadLines.length, LINE)} لم يقرأ مبلغه أو تاريخه`}>
-          لم تطابق ولم تحذف — راجعها في الكشف نفسه.
+        <Callout tone="warn" icon={CircleAlert} title={`${countNoun(result.unreadLines.length, LINE)} لم يُقرأ مبلغه أو تاريخه`}>
+          لم تُطابَق ولم تُحذف. راجعها في الكشف نفسه.
           <ul className="mt-1.5 space-y-0.5">
             {(allUnread ? result.unreadLines : result.unreadLines.slice(0, 12)).map((u, i) => (
               <li key={i} className="text-[11px]" dir="auto">
@@ -376,14 +376,14 @@ function ResultView({ result }: { result: Result }) {
 
       {s.balanceArithmeticOk === false && (
         <Callout tone="warn" icon={CircleAlert}>
-          حساب الكشف نفسه لا يستقيم: الافتتاحيّ مع الحركات لا يعطي الرصيد الختاميّ المكتوب فيه.
+          حساب الكشف نفسه غير صحيح: الرصيد الافتتاحي مع الحركات لا يعطي الرصيد الختامي المكتوب فيه.
         </Callout>
       )}
 
       {result.missing.length > 0 && (
         <section>
-          <h3 className="text-sm font-bold text-danger">حمّلها عليك ولا ملفّ لها عندك — {result.missing.length}</h3>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">فاتورة ناقصة لا يكشفها تفتيش أرشيفك، لأنّها ليست فيه.</p>
+          <h3 className="text-sm font-bold text-danger">سجّلها عليك ولا ملف لها عندك: {result.missing.length}</h3>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">فاتورة ناقصة لا تظهر عند مراجعة أرشيفك، لأنها ليست فيه.</p>
           <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-lg border border-danger/25">
             {result.missing.map((m, i) => (
               <li key={i} className="flex items-center justify-between gap-3 bg-danger-bg px-3 py-2 text-xs">
@@ -413,8 +413,8 @@ function ResultView({ result }: { result: Result }) {
 
       {result.extra.length > 0 && (
         <section>
-          <h3 className="text-sm font-bold">عندك ولم ترد في كشفه — {result.extra.length}</h3>
-          <p className="mt-0.5 text-[11px] text-muted">تحقّق أنّها ليست مكرّرةً عندك، ولا تخصّ مورّداً آخر.</p>
+          <h3 className="text-sm font-bold">عندك ولم ترد في كشفه: {result.extra.length}</h3>
+          <p className="mt-0.5 text-[11px] text-muted">تحقّق من أنها ليست مكرّرة عندك، وأنها لا تخص مورّداً آخر.</p>
           <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-lg border border-line">
             {(allExtra ? result.extra : result.extra.slice(0, 15)).map((m, i) => (
               <li key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
@@ -454,14 +454,14 @@ function ResultView({ result }: { result: Result }) {
             className={buttonClass("secondary", "sm")}
           >
             <Copy className="h-4 w-4" strokeWidth={2} aria-hidden />
-            {copied === "ok" ? "✓ نسخت" : "انسخ المذكّرة"}
+            {copied === "ok" ? "✓ تم النسخ" : "انسخ المذكّرة"}
           </button>
           <a href={whatsappHref(result.supplier.phoneE164, result.memo)} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
             <MessageCircle className="h-4 w-4" strokeWidth={2} aria-hidden />
-            أرسلها واتساب
+            أرسلها عبر واتساب
           </a>
           {copied === "fail" && (
-            <span role="alert" className="text-[11px] text-danger">منع المتصفّح الحافظة — حدّد نصّ المذكّرة وانسخه بيدك.</span>
+            <span role="alert" className="text-[11px] text-danger">منع المتصفح النسخ إلى الحافظة. حدّد نص المذكّرة وانسخه بنفسك.</span>
           )}
         </div>
       </section>
@@ -484,16 +484,16 @@ function RecordMissing({ statementId, count, minor }: { statementId: string; cou
     const r = await postJson<{ message: string }>("/api/statement-invoices", { statementId });
     setBusy(false);
     if (!r.ok) { setError(r.error); return; }
-    toast({ tone: "ok", title: "قيّدت الناقصة من الكشف", body: r.data.message });
+    toast({ tone: "ok", title: "تم قيد الفواتير الناقصة من الكشف", body: r.data.message });
     router.refresh();
   }
   return (
     <span className="relative z-10 flex max-w-64 flex-col items-end gap-1 text-end">
       <span className="text-[11px] text-warn">
-        {count === 1 ? "فاتورة" : <><span className="nums">{count}</span> فواتير</>} في الكشف لا ملفّ لها (<Money minor={minor} />)
+        {count === 1 ? "فاتورة" : <><span className="nums">{count}</span> فواتير</>} في الكشف لا ملف لها (<Money minor={minor} />)
       </span>
       <button type="button" onClick={run} disabled={busy} aria-busy={busy} className={`${buttonClass("secondary", "sm")} whitespace-nowrap`}>
-        {busy ? "يقيّد…" : "قيّدها من الكشف"}
+        {busy ? "جارٍ القيد…" : "قيّدها من الكشف"}
       </button>
       {error && <span role="alert" className="text-[11px] text-danger">{error}</span>}
     </span>

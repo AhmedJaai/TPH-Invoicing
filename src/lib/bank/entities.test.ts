@@ -98,7 +98,7 @@ describe("resolveSupplier", () => {
     ];
     const r = resolveSupplier(row({ description: "تحويل الى محمصة الغربية" }), twins)!;
     expect(r.score).toBeLessThan(0.8);
-    expect(r.evidence.map((e) => e.detail).join(" ")).toContain("لا يُحسم");
+    expect(r.evidence.map((e) => e.detail).join(" ")).toContain("فلا يمكن الحسم");
   });
 
   it("لكل تعريف أدلّته مكتوبةً كي تُعرَض", () => {

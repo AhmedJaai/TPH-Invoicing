@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     if (e instanceof UserChangeRefused) return NextResponse.json({ error: e.message }, { status: 400 });
     /* قيمةٌ لا يعرفها نوعُ `role` في القاعدة: هجرةُ الدور الجديد لم تُطبَّق بعد */
     if (pgErrorCode(e) === "22P02") {
-      return NextResponse.json({ error: "هذا الدور لم يضف إلى القاعدة بعد — تطبّق هجرته ثمّ يعاد. لم يتغيّر شيء" }, { status: 409 });
+      return NextResponse.json({ error: "هذا الدور لم يُضف إلى قاعدة البيانات بعد. شغّل هجرته ثم أعد المحاولة. لم يتغيّر شيء." }, { status: 409 });
     }
     return failWith(e, "users");
   }

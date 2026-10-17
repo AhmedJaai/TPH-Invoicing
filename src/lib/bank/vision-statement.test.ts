@@ -69,7 +69,7 @@ describe("فحص ما قرأه النموذج", () => {
       visionStatementSchema.parse({ rows: [row({ date: "2025-01-01" })] }),
       { from: new Date("2026-08-01T00:00:00Z"), to: new Date("2026-08-31T00:00:00Z") },
     );
-    expect(v.rejected[0].reason).toContain("قبل مدى");
+    expect(v.rejected[0].reason).toContain("قبل فترة");
     expect(v.blocked).toContain("لم يُقرأ");
   });
 
@@ -83,7 +83,7 @@ describe("فحص ما قرأه النموذج", () => {
       closingBalance: "68,400.00",
       rows: [row({ amount: "20,000.00" })],
     }));
-    expect(v.blocked).toContain("لا تُطابق رصيد الكشف");
+    expect(v.blocked).toContain("لا تطابق رصيد الكشف");
     expect(v.rows).toEqual([]);
   });
 

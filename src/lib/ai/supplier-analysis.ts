@@ -317,7 +317,7 @@ export const MAX_FINDINGS = 8;
 export function validateAnalysis(raw: unknown, f: SupplierFacts, s: Signals): AnalysisResult {
   const parsed = rawOutputSchema.safeParse(raw);
   if (!parsed.success) {
-    return { summary: "", findings: [], dropped: [{ kind: "*", reason: "الجواب لا يطابق الشكل المطلوب" }] };
+    return { summary: "", findings: [], dropped: [{ kind: "*", reason: "الرد لا يطابق الشكل المطلوب" }] };
   }
 
   const index = new Map<string, FindingRef>();
@@ -332,7 +332,7 @@ export function validateAnalysis(raw: unknown, f: SupplierFacts, s: Signals): An
 
   for (const item of parsed.data.findings) {
     const kind = (FINDING_KINDS as readonly string[]).includes(item.kind) ? (item.kind as FindingKind) : null;
-    if (!kind) { dropped.push({ kind: item.kind, reason: "نوعٌ خارج القائمة" }); continue; }
+    if (!kind) { dropped.push({ kind: item.kind, reason: "نوع خارج القائمة" }); continue; }
 
     const refs = [...new Set([...(item.refs ?? []), ...(item.invoiceRef ? [item.invoiceRef] : [])])]
       .map((r) => index.get(r.trim()))
@@ -342,7 +342,7 @@ export function validateAnalysis(raw: unknown, f: SupplierFacts, s: Signals): An
     /* رموزُ المراجع (F10 · P1) تُسمّى بأسمائها قبل أن تُحفَظ — من الفهرس كلِّه لا من مراجع البند وحدها */
     const title = humanizeRefs(clean(item.title, 120), [...index.values()]);
     const explanation = humanizeRefs(clean(item.explanation, 700), [...index.values()]);
-    if (!title) { dropped.push({ kind, reason: "بلا عنوان" }); continue; }
+    if (!title) { dropped.push({ kind, reason: "بدون عنوان" }); continue; }
 
     let amountMinor: number | null = null;
     let action: FindingAction | null = null;
@@ -351,21 +351,21 @@ export function validateAnalysis(raw: unknown, f: SupplierFacts, s: Signals): An
       case "PAID_OUTSIDE_BANK": {
         const inv = f.invoices.find((i) => i.ref === item.invoiceRef?.trim())
           ?? f.invoices.find((i) => refs.some((r) => r.type === "invoice" && r.id === i.id));
-        if (!inv) { dropped.push({ kind, reason: "بلا فاتورةٍ معروفة" }); continue; }
+        if (!inv) { dropped.push({ kind, reason: "لا توجد فاتورة معروفة" }); continue; }
         const owner = inv.totalMinor - inv.outsideBankMinor;
-        if (owner <= SETTLED_TOLERANCE_MINOR) { dropped.push({ kind, reason: "مقيَّدةٌ من خارج الحساب أصلاً" }); continue; }
+        if (owner <= SETTLED_TOLERANCE_MINOR) { dropped.push({ kind, reason: "مقيَّدة أصلاً على أنها مسدَّدة من خارج الحساب" }); continue; }
         amountMinor = owner;
         action = { type: "OWNER_PAID", invoiceId: inv.id };
         break;
       }
       case "APPLY_CREDIT": {
-        if (s.creditMinor <= 0 || s.openMinor <= 0) { dropped.push({ kind, reason: "لا رصيد أو لا مفتوح" }); continue; }
+        if (s.creditMinor <= 0 || s.openMinor <= 0) { dropped.push({ kind, reason: "لا يوجد رصيد أو مبلغ مفتوح" }); continue; }
         amountMinor = Math.min(s.creditMinor, s.openMinor);
         action = { type: "APPLY_CREDIT" };
         break;
       }
       case "MISSING_INVOICES": {
-        if (s.overpaidMinor <= 100) { dropped.push({ kind, reason: "لم يُدفع فوق الفواتير" }); continue; }
+        if (s.overpaidMinor <= 100) { dropped.push({ kind, reason: "المدفوع لا يزيد على الفواتير" }); continue; }
         amountMinor = s.overpaidMinor;
         break;
       }
@@ -374,7 +374,7 @@ export function validateAnalysis(raw: unknown, f: SupplierFacts, s: Signals): An
           .map((r) => f.payments.find((p) => p.id === r.id)!)
           .filter(isLive);
         const same = pays.length >= 2 && pays.every((p) => p.amountMinor === pays[0].amountMinor);
-        if (!same) { dropped.push({ kind, reason: "لا دفعتان قائمتان بمبلغٍ واحد" }); continue; }
+        if (!same) { dropped.push({ kind, reason: "لا توجد دفعتان قائمتان بمبلغ واحد" }); continue; }
         amountMinor = pays[0].amountMinor;
         /*
           «هي دفعةٌ واحدة» كان لا فعل لها إلّا «ليس صحيحاً» — فيُسكت الرفضُ
@@ -391,13 +391,13 @@ export function validateAnalysis(raw: unknown, f: SupplierFacts, s: Signals): An
       case "STATEMENT_GAP": {
         const st = refs.find((r) => r.type === "statement");
         const gap = st ? s.statementGaps.find((g) => f.statements.find((k) => k.id === st.id)?.ref === g.ref) : undefined;
-        if (!gap) { dropped.push({ kind, reason: "بلا كشفٍ مقروء الرصيد" }); continue; }
+        if (!gap) { dropped.push({ kind, reason: "لا يوجد كشف مقروء الرصيد" }); continue; }
         amountMinor = Math.abs(gap.diffMinor);
         break;
       }
       case "UNLINKED_TRANSFER": {
         const ts = refs.filter((r) => r.type === "transfer");
-        if (ts.length === 0) { dropped.push({ kind, reason: "بلا حوالةٍ معروفة" }); continue; }
+        if (ts.length === 0) { dropped.push({ kind, reason: "لا توجد حوالة معروفة" }); continue; }
         amountMinor = ts.reduce((sum, r) => sum + (f.transfers.find((t) => t.id === r.id)?.amountMinor ?? 0), 0);
         break;
       }

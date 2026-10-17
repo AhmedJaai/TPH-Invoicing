@@ -34,7 +34,7 @@ export async function mergeSupplierItems(
     .limit(1);
   const into = chain?.canonical ?? input.into;
   const from = input.from;
-  if (from === into) throw new ItemMergeRefused("الصنفان واحد أصلاً.", 400);
+  if (from === into) throw new ItemMergeRefused("الصنفان هما الصنف نفسه.", 400);
 
   const sp = await tx
     .select({
@@ -49,12 +49,12 @@ export async function mergeSupplierItems(
     .for("update", { of: supplierProducts });
   const fromSp = sp.find((r) => r.normalized === from);
   const intoSp = sp.find((r) => r.normalized === into);
-  if (!fromSp || !intoSp) throw new ItemMergeRefused("لم يعثر على أحد الصنفين عند هذا المورّد — حدّث الصفحة.", 404);
+  if (!fromSp || !intoSp) throw new ItemMergeRefused("لم يُعثر على أحد الصنفين عند هذا المورّد. حدّث الصفحة.", 404);
 
   if (fromSp.productId && intoSp.productId && fromSp.productId !== intoSp.productId) {
     throw new ItemMergeRefused(
-      `«${fromSp.displayName}» مربوط في الجرد بـ«${fromSp.productName}» و«${intoSp.displayName}» بـ«${intoSp.productName}». `
-      + "إن كانا صنفاً واحداً فوحّد ربطهما أوّلاً من لوح الجرد.",
+      `«${fromSp.displayName}» مربوط في الجرد بـ«${fromSp.productName}»، و«${intoSp.displayName}» مربوط بـ«${intoSp.productName}». `
+      + "إن كانا صنفاً واحداً فوحّد ربطهما أولاً من شاشة الجرد.",
     );
   }
   /* الأصلُ يرث ربطَ الجرد والعبوةَ إن لم يكن له — فلا يُسأل عنه ثانية */

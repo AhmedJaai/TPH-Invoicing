@@ -51,7 +51,7 @@ describe("الدور هنا وقائمة الدخول", () => {
   it("خفّض في القائمة وبقي هنا: يقال أيّهما النافذ", () => {
     const note = allowlistNote("ACCOUNTANT", "PURCHASING", ROLE_LABEL);
     expect(note).toContain("مدير المشتريات");
-    expect(note).toContain("الدور هنا هو النافذ");
+    expect(note).toContain("المعتمد هو الدور هنا");
   });
   it("خارج القائمة: لا يدخل", () => {
     expect(allowlistNote("ACCOUNTANT", undefined, ROLE_LABEL)).toContain("لا يستطيع الدخول");

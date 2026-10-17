@@ -26,16 +26,16 @@ export async function SupplierQrLine({ supplierId, slug }: { supplierId: string;
     <p className="mt-4 flex flex-wrap items-start gap-x-2 gap-y-1 border-t border-line-soft pt-3 text-xs leading-relaxed text-ink-soft">
       <QrCode className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="font-bold text-ink">رمز الفاتورة الإلكترونيّة: </span>
+        <span className="font-bold text-ink">رمز الفاتورة الإلكترونية: </span>
         {checked === 0 ? (
-          <>غير معروف — {countNoun(c.invoices, INVOICE)} ضريبيّة قرئت قبل أن يحفظ دليل الرمز. أعد قراءة واحدة من ملفّها فيفحص رمزها.</>
+          <>غير معروف: {countNoun(c.invoices, INVOICE)} ضريبية قُرئت قبل أن يُحفظ دليل الرمز. أعد قراءة واحدة منها ليُفحص رمزها.</>
         ) : (
           <>
-            <bdi className="nums font-bold text-ink">{c.withQr}</bdi> من <bdi className="nums">{checked}</bdi> فحصت تحمل رمزاً يقرأ
+            <bdi className="nums font-bold text-ink">{c.withQr}</bdi> من <bdi className="nums">{checked}</bdi> فاتورة مفحوصة تحمل رمزاً مقروءاً
             {c.phase2 > 0 && <> (منها <bdi className="nums">{c.phase2}</bdi> بتوقيع المرحلة الثانية)</>}
             {c.withoutQr > 0 && <span className="font-bold text-warn"> · <bdi className="nums">{c.withoutQr}</bdi> بلا رمز</span>}
             {c.foreignQr > 0 && <> · <bdi className="nums">{c.foreignQr}</bdi> برمز ليس رمز الهيئة</>}
-            {c.unchecked > 0 && <span className="text-muted"> · <bdi className="nums">{c.unchecked}</bdi> لم تفحص</span>}
+            {c.unchecked > 0 && <span className="text-muted"> · <bdi className="nums">{c.unchecked}</bdi> لم تُفحص</span>}
             .
           </>
         )}{" "}

@@ -18,11 +18,11 @@ export function ShareBrief({ text }: { text: string }) {
         return;
       }
       await navigator.clipboard.writeText(text);
-      toast({ tone: "ok", title: "نسخت الإحاطة", body: "الصقها في واتساب أو رسالة." });
+      toast({ tone: "ok", title: "تم نسخ الإحاطة", body: "الصقها في واتساب أو في رسالة." });
     } catch (e) {
       /* أغلق ورقةَ المشاركة بيده — ليس عطباً */
       if (e instanceof DOMException && e.name === "AbortError") return;
-      toast({ tone: "warn", title: "تعذّرت المشاركة", body: "المتصفّح منع النسخ — حدّد النصّ يدويّاً من الصفحة." });
+      toast({ tone: "warn", title: "تعذّرت المشاركة", body: "منع المتصفح النسخ. حدّد النص من الصفحة وانسخه بنفسك." });
     }
   }
   return (

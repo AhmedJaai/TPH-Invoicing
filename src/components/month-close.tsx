@@ -44,7 +44,7 @@ const RANK: Record<State, number> = { PASS: 0, WARN: 1, BLOCK: 2 };
 
 const STATE_UI: Record<State, { icon: LucideIcon; text: string; chip: string; label: string }> = {
   PASS: { icon: CircleCheck, text: "text-ok", chip: "bg-ok-bg text-ok", label: "سليم" },
-  WARN: { icon: TriangleAlert, text: "text-warn", chip: "bg-warn-bg text-warn", label: "تنبيه لا يمنع" },
+  WARN: { icon: TriangleAlert, text: "text-warn", chip: "bg-warn-bg text-warn", label: "تنبيه لا يمنع الإقفال" },
   BLOCK: { icon: CircleAlert, text: "text-danger", chip: "bg-danger-bg text-danger", label: "يمنع الإقفال" },
 };
 
@@ -86,9 +86,9 @@ export function MonthClose({
           return false;
         }
         setData(r.data);
-        if (action === "close") toast({ tone: "ok", title: `أقفل ${formatMonth(forMonth)}`, body: "والحزمة جاهزة للمحاسب أدناه." });
-        if (action === "reopen") toast({ tone: "warn", title: `فتح ${formatMonth(forMonth)} من جديد`, body: "سجّل الفتح في سجلّ التدقيق باسمك." });
-        if (action === "balances") toast({ tone: "ok", title: "حفظ الرصيدان وأعيد الفحص" });
+        if (action === "close") toast({ tone: "ok", title: `تم إقفال ${formatMonth(forMonth)}`, body: "وحزمة المحاسب جاهزة أدناه." });
+        if (action === "reopen") toast({ tone: "warn", title: `أُعيد فتح ${formatMonth(forMonth)}`, body: "سُجّلت إعادة الفتح في سجل التدقيق باسمك." });
+        if (action === "balances") toast({ tone: "ok", title: "تم حفظ الرصيدين وإعادة الفحص" });
         if (action !== "check") router.refresh();
         return true;
       } finally {
@@ -161,18 +161,18 @@ export function MonthClose({
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-muted">إقفال {formatMonth(month)}</p>
                 <p className="mt-1 text-2xl font-bold tracking-tight">
-                  {isClosed ? "الشهر مقفل" : report.canClose ? "جاهز للإقفال" : "لا يقفل بعد"}
+                  {isClosed ? "الشهر مقفل" : report.canClose ? "جاهز للإقفال" : "غير جاهز للإقفال"}
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-ink-soft">
                   اجتاز <span className="nums font-bold">{passed}</span> من {countNoun(total, CHECK)}
                   {report.blockers.length > 0 && <> · {countNoun(report.blockers.length, BLOCKER)} يجب حلّه</>}
-                  {report.warnings.length > 0 && <> · {countNoun(report.warnings.length, WARNING)} لا يمنع</>}
+                  {report.warnings.length > 0 && <> · {countNoun(report.warnings.length, WARNING)} لا يمنع الإقفال</>}
                 </p>
               </div>
               {/* الجوابُ ومعه الخطوةُ التالية: المانعُ الأوّل بضغطة، لا بالبحث عنه في القائمة */}
               {!isClosed && firstBlocker && (
                 <a href={`#check-${firstBlocker.id}`} className={buttonClass("primary", "md")}>
-                  إلى ما يمنع <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
+                  إلى المانع <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
                 </a>
               )}
             </div>
@@ -250,12 +250,12 @@ export function MonthClose({
             >
               <h3 className="text-[15px] font-bold">رصيدا الحساب في {formatMonth(month)}</h3>
               <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                كما في كشف البنك: الرصيد قبل أوّل حركة في الشهر، والرصيد بعد آخرها. بهما تفحص
-                المعادلة: الافتتاحيّ + الوارد − الصادر = الختاميّ.
+                اكتبهما كما في كشف البنك: الرصيد قبل أول حركة في الشهر، والرصيد بعد آخر حركة. بهما تُفحص
+                المعادلة: الافتتاحي + الوارد − الصادر = الختامي.
               </p>
               <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
                 <label className="block text-xs">
-                  <span className="font-bold text-ink-soft">الرصيد الافتتاحيّ</span>
+                  <span className="font-bold text-ink-soft">الرصيد الافتتاحي</span>
                   <input
                     value={opening}
                     onChange={(e) => setOpening(e.target.value)}
@@ -267,7 +267,7 @@ export function MonthClose({
                   />
                 </label>
                 <label className="block text-xs">
-                  <span className="font-bold text-ink-soft">الرصيد الختاميّ</span>
+                  <span className="font-bold text-ink-soft">الرصيد الختامي</span>
                   <input
                     value={closing}
                     onChange={(e) => setClosing(e.target.value)}
@@ -301,9 +301,9 @@ export function MonthClose({
                 <>
                   <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
                     {report.warnings.length === 0
-                      ? "لا شيء يمنع الإقفال ولا شيء ينبّه. "
-                      : `لا مانع، وفيه ${countNoun(report.warnings.length, WARNING)} ستقرّ بها. `}
-                    بعد الإقفال ترفض الأرشفة إضافة أيّ مستند إلى هذا الشهر، وتستطيع إعادة فتحه متى وصلت فاتورة متأخّرة.
+                      ? "لا يوجد ما يمنع الإقفال ولا تنبيهات. "
+                      : `لا يوجد مانع، لكن هناك ${countNoun(report.warnings.length, WARNING)} ستقرّ بها. `}
+                    بعد الإقفال لن تقبل الأرشفة أي مستند جديد لهذا الشهر، ويمكنك إعادة فتحه عند وصول فاتورة متأخرة.
                   </p>
                   {report.warnings.length > 0 && (
                     <label className="mt-3 block text-xs">
@@ -311,7 +311,7 @@ export function MonthClose({
                       <input
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
-                        placeholder="يحفظ في سجلّ التدقيق"
+                        placeholder="يُحفظ في سجل التدقيق"
                         dir="auto"
                         className="mt-1.5 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm"
                       />
@@ -328,10 +328,10 @@ export function MonthClose({
                       title={`إقفال ${formatMonth(month)}`}
                       consequence={
                         report.warnings.length > 0
-                          ? `بعد الإقفال ترفض الأرشفة أيّ مستند لهذا الشهر، وتقرّ ${countNoun(report.warnings.length, WARNING)} على حالها. وتستطيع إعادة فتحه متى وصلتك فاتورة متأخّرة.`
-                          : "بعد الإقفال ترفض الأرشفة أيّ مستند لهذا الشهر. وتستطيع إعادة فتحه متى وصلتك فاتورة متأخّرة."
+                          ? `بعد الإقفال لن تقبل الأرشفة أي مستند لهذا الشهر، وستقرّ بـ${countNoun(report.warnings.length, WARNING)} كما هو. ويمكنك إعادة فتحه عند وصول فاتورة متأخرة.`
+                          : "بعد الإقفال لن تقبل الأرشفة أي مستند لهذا الشهر. ويمكنك إعادة فتحه عند وصول فاتورة متأخرة."
                       }
-                      acknowledgement={`أقرّ بأنّ فواتير ${formatMonth(month)} كلّها وصلت، وأنّ ما بقي من تنبيهات مقصود لا مفوت.`}
+                      acknowledgement={`أقرّ بأن جميع فواتير ${formatMonth(month)} قد وصلت، وأن ما بقي من تنبيهات مقصود وليس سهواً.`}
                       confirmLabel={`أقفل ${formatMonth(month)}`}
                       onConfirm={() => call("close", month)}
                     />
@@ -340,7 +340,7 @@ export function MonthClose({
               ) : (
                 <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
                   <span className="font-bold text-danger">{countNoun(report.blockers.length, BLOCKER)} يجب معالجته قبل الإقفال.</span>{" "}
-                  هذه أخطاء في البيانات نفسها لا وقائع تقرّ بها — أصلحها من أزرار «أصلح» أعلاه ثمّ أعد الفحص.
+                  هذه أخطاء في البيانات نفسها وليست أموراً يمكنك الإقرار بها. أصلحها من أزرار «أصلح» أعلاه ثم أعد الفحص.
                 </p>
               )}
             </section>
@@ -350,7 +350,7 @@ export function MonthClose({
                 <Lock className="h-4 w-4 text-ok" strokeWidth={2} aria-hidden /> هذا الشهر مقفل
               </h3>
               <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
-                الأرشفة ترفض إضافة مستند إليه. إن وصلتك فاتورة متأخّرة تخصّه، أعد فتحه — ويسجّل ذلك باسمك.
+                لا تقبل الأرشفة إضافة مستندات إليه. إذا وصلتك فاتورة متأخرة تخصه، أعد فتحه، وسيُسجَّل ذلك باسمك.
               </p>
               <div className="mt-4">
                 <ConfirmAction
@@ -359,8 +359,8 @@ export function MonthClose({
                   tone="warn"
                   disabled={busy !== null}
                   title={`إعادة فتح ${formatMonth(month)}`}
-                  consequence="تقبل إضافة المستندات إليه من جديد، ويسجّل الفتح في سجلّ التدقيق باسمك. وتقارير الشهر تتغيّر بما يضاف بعده."
-                  acknowledgement="أقرّ بأنّ لديّ ما يخصّ هذا الشهر ولم يدرج فيه."
+                  consequence="ستقبل الأرشفة إضافة مستندات إليه من جديد، وستُسجَّل إعادة الفتح في سجل التدقيق باسمك. وستتغير تقارير الشهر بما يُضاف بعد ذلك."
+                  acknowledgement="أقرّ بأن لدي ما يخص هذا الشهر ولم يُدرج فيه."
                   confirmLabel={`افتح ${formatMonth(month)}`}
                   onConfirm={() => call("reopen", month)}
                 />
@@ -377,8 +377,8 @@ export function MonthClose({
               <div className="min-w-0 flex-1">
                 <h3 className="text-[15px] font-bold">حزمة المحاسب — {formatMonth(month)}</h3>
                 <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
-                  ملفّ Excel بستّ أوراق (الملخّص · الفواتير · الضريبة · الدفعات · المصروفات · حركات البنك)، أو ورقة تطبع وتحفظ PDF بالأرقام نفسها.
-                  {isClosed ? " الشهر مقفل، فأرقامه ثابتة." : " الشهر مفتوح — قد تتغيّر أرقامه بعد التنزيل، ويكتب ذلك في الملفّ."}
+                  ملف Excel بست أوراق (الملخص · الفواتير · الضريبة · الدفعات · المصروفات · حركات البنك)، أو نسخة للطباعة أو الحفظ بصيغة PDF بالأرقام نفسها.
+                  {isClosed ? " الشهر مقفل، فأرقامه ثابتة." : " الشهر مفتوح، وقد تتغير أرقامه بعد التنزيل، وهذا مذكور في الملف."}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -397,7 +397,7 @@ export function MonthClose({
           {isClosed && (
             <p className="flex items-center gap-1.5 text-[11px] text-muted">
               <Unlock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              إعادة الفتح والإقفال كلاهما في سجلّ التدقيق بالاسم والوقت.
+              تُسجَّل إعادة الفتح والإقفال في سجل التدقيق بالاسم والوقت.
             </p>
           )}
         </>

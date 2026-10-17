@@ -19,7 +19,7 @@ describe("previewAllowed", () => {
     ).toBe(false);
   });
 
-  it("لا يعمل في بناء إنتاجيّ خارج Vercel", () => {
+  it("لا يعمل في بناء إنتاجي خارج Vercel", () => {
     expect(previewAllowed({ AUTH_BYPASS: "true", NODE_ENV: "production" })).toBe(false);
   });
 
@@ -62,7 +62,7 @@ describe("refusalReason", () => {
 
   it("تبيّن السبب حين يطلب ويرفض", () => {
     expect(refusalReason({ AUTH_BYPASS: "true", VERCEL_ENV: "production" })).toContain("إنتاج");
-    expect(refusalReason({ AUTH_BYPASS: "true", NODE_ENV: "production" })).toContain("إنتاجيّ");
+    expect(refusalReason({ AUTH_BYPASS: "true", NODE_ENV: "production" })).toContain("إنتاجي");
   });
 
   it("تسكت حين يطلب ويسمح", () => {

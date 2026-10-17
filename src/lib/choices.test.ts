@@ -35,7 +35,7 @@ describe("دفتر الاختيارات — إقرار الضريبة", () => {
 
   it("ما أخرج وكان يضمّ أصلاً أثره سالب، وما لم يكن يضمّ لا أثر له بالريال", () => {
     const [byDefault] = vatTxChoiceRows([tx({ choice: false, included: false, includedByDefault: true, direction: "CREDIT" })], null);
-    expect(byDefault).toMatchObject({ state: "APPLIED", effectMinor: -150_00, choice: "أخرجتها من المبيعات" });
+    expect(byDefault).toMatchObject({ state: "APPLIED", effectMinor: -150_00, choice: "استبعدتها من المبيعات" });
     const [never] = vatTxChoiceRows([tx({ choice: false, included: false })], null);
     expect(never.effectMinor).toBeNull();
   });
@@ -44,7 +44,7 @@ describe("دفتر الاختيارات — إقرار الضريبة", () => {
     const [r] = vatTxChoiceRows([tx({})], "إقرار الربع الثالث 2026");
     expect(r.state).toBe("LOCKED");
     expect(r.revoke).toBeNull();
-    expect(r.reason).toContain("قدّم");
+    expect(r.reason).toContain("تم تقديمه");
   });
 
   it("فاتورة أقرّت وضريبتها صفر مقروء: لا تطبّق ويقال لماذا", () => {

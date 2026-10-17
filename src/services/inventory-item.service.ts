@@ -112,7 +112,7 @@ export async function itemMovements(productId: string, limit = 40): Promise<Item
       day: String(r.day),
       title: r.supplier_name ? `استلام يدويّ — ${String(r.supplier_name)}` : "استلام يدويّ",
       detail: r.voided_at
-        ? `ألغي${r.void_reason ? `: ${String(r.void_reason)}` : ""}`
+        ? `أُلغي${r.void_reason ? `: ${String(r.void_reason)}` : ""}`
         : r.document_ref ? `مستند ${String(r.document_ref)}` : null,
       milli: Number(r.entered_milli),
       unit: unitOf(r.entered_unit),
@@ -127,7 +127,7 @@ export async function itemMovements(productId: string, limit = 40): Promise<Item
       day: String(r.day),
       title: `هدر مسجّل — ${WASTE_REASON[String(r.reason)] ?? String(r.reason)}`,
       detail: r.voided_at
-        ? `أبطل${r.void_reason ? `: ${String(r.void_reason)}` : ""}`
+        ? `أُبطل${r.void_reason ? `: ${String(r.void_reason)}` : ""}`
         : r.note ? String(r.note) : null,
       milli: Number(r.quantity_milli),
       unit: unitOf(r.unit),

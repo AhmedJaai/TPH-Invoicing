@@ -108,7 +108,7 @@ export async function importFoodicsCatalog(
   input: CatalogImportInput,
   conn: Conn = db,
 ): Promise<CatalogImportResult> {
-  if (input.files.length === 0) throw new Error("لم يرفع ملفّ");
+  if (input.files.length === 0) throw new Error("لم يُرفع أي ملف");
   return importParsedCatalog(
     input.files.map((file) => ({ file: { fileName: file.fileName }, result: parseCatalogFile(file.buffer) })),
     input,
@@ -125,11 +125,11 @@ export async function importParsedCatalog(
   input: CatalogWriteInput,
   conn: Conn = db,
 ): Promise<CatalogImportResult> {
-  if (!DATE.test(input.effectiveFrom)) throw new Error("تاريخ سريان الوصفات يكتب YYYY-MM-DD");
+  if (!DATE.test(input.effectiveFrom)) throw new Error("اكتب تاريخ سريان الوصفات بصيغة YYYY-MM-DD");
 
   const files: CatalogFileResult[] = parsed.map(({ file, result }) => ({
     fileName: file.fileName,
-    kind: result.issues.some((i) => i.reason === "ترويسة غير مفهومة") ? null : result.kind,
+    kind: result.issues.some((i) => i.reason === "عناوين الأعمدة غير مفهومة") ? null : result.kind,
     label: CATALOG_LABEL[result.kind],
     rows: result.rows,
     issues: result.issues,
@@ -259,7 +259,7 @@ async function upsertStockItems(
       out.stockItems.linkedByName++;
       out.changes.push({
         sku: item.itemSku, name: item.name, action: "LINKED_BY_NAME",
-        detail: "ربط بصنف قائم بالاسم نفسه — راجعه إن لم يكن هو",
+        detail: "رُبط بصنف قائم بالاسم نفسه. راجعه إن لم يكن هو الصنف المقصود",
       });
       continue;
     }
@@ -350,7 +350,7 @@ async function upsertMenuProducts(
       out.menuProducts.linkedByName++;
       out.changes.push({
         sku: item.productSku, name: item.name, action: "LINKED_BY_NAME",
-        detail: "صنف أنشئ من المبيعات قبل الكتالوج — ربط برمزه ولم يكرّر",
+        detail: "صنف أُنشئ من المبيعات قبل الكتالوج، فرُبط برمزه ولم يتكرر",
       });
     } else if (known) {
       await tx.update(products).set(patch).where(eq(products.id, known));
@@ -474,7 +474,7 @@ async function writeRecipes(
     if (!menuId) {
       out.blocked.push({
         productSku, name: group[0].productName,
-        reason: "لا صنف مباعاً بهذا الرمز — ارفع ملفّ الأصناف المباعة معه",
+        reason: "لا يوجد صنف مباع بهذا الرمز. ارفع معه ملف الأصناف المباعة",
       });
       out.recipes.blocked++;
       continue;
@@ -484,7 +484,7 @@ async function writeRecipes(
       out.recipes.skippedHuman++;
       out.changes.push({
         sku: productSku, name: group[0].productName, action: "SKIPPED",
-        detail: "وصفته مكتوبة بيد إنسان — لم يكتب فوقها",
+        detail: "وصفته مكتوبة يدوياً، فلم تُستبدل",
       });
       continue;
     }
@@ -499,7 +499,7 @@ async function writeRecipes(
     if (missing !== null) {
       out.blocked.push({
         productSku, name: group[0].productName,
-        reason: `مكوّنه «${missing}» ليس في أصناف المخزون — ارفع ملفّ أصناف المخزون معه`,
+        reason: `مكوّنه «${missing}» غير موجود في أصناف المخزون. ارفع معه ملف أصناف المخزون`,
       });
       out.recipes.blocked++;
       continue;

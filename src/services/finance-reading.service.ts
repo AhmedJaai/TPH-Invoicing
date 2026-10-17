@@ -224,9 +224,9 @@ export type ReadingOutcome =
   | { ok: false; status: number; reason: string };
 
 export async function generateReading(month: string, actorId: string | null, deadlineMs = 45_000): Promise<ReadingOutcome> {
-  if (!isDeepseekConfigured()) return { ok: false, status: 503, reason: "مفتاح الذكاء غير مضبوط — الأرقام كاملة دونه." };
+  if (!isDeepseekConfigured()) return { ok: false, status: 503, reason: "مفتاح الذكاء غير مضبوط. الأرقام تظهر كاملة بدونه." };
   const facts = await gatherFacts(month);
-  if (!facts.some((x) => x.kind === "SAR" && x.value !== null)) return { ok: false, status: 409, reason: "لا أرقام معروفةً لهذا الشهر تقرأ." };
+  if (!facts.some((x) => x.kind === "SAR" && x.value !== null)) return { ok: false, status: 409, reason: "لا توجد أرقام معروفة لهذا الشهر لتُقرأ." };
 
   const { system, user } = buildReadingMessages(formatMonth(month).replace(/\s+\d{4}$/, ""), facts);
   /* محاولتان على الأكثر: جوابُ النموذج يتفاوت — مرّةً ثلاثُ جُمل ومرّةً عشر — فيُؤخَذ الأوفى */
@@ -242,14 +242,14 @@ export async function generateReading(month: string, actorId: string | null, dea
     if (!result.ok) {
       failure = {
         ok: false, status: result.kind === "NO_BALANCE" ? 402 : 502,
-        reason: result.kind === "NO_BALANCE" ? "رصيد حساب الذكاء نفد — يشحن ثمّ تعاد القراءة." : result.truncated ? "انقطع جواب الذكاء قبل أن يكتمل — أعد المحاولة." : `تعذّرت القراءة: ${result.reason}`,
+        reason: result.kind === "NO_BALANCE" ? "نفد رصيد حساب الذكاء. اشحن الرصيد ثم أعد القراءة." : result.truncated ? "انقطع جواب الذكاء قبل أن يكتمل. أعد المحاولة." : `تعذّرت القراءة: ${result.reason}`,
       };
       /* رصيدٌ نافد أو مفتاحٌ غائب لا تصلحه محاولةٌ ثانية */
       if (result.kind === "NO_BALANCE" || result.kind === "NOT_CONFIGURED") break;
       continue;
     }
     const json = parseJsonLoose(result.text);
-    if (!json.ok) { failure = { ok: false, status: 502, reason: "جواب الذكاء ليس JSON يقرأ — أعد المحاولة." }; continue; }
+    if (!json.ok) { failure = { ok: false, status: 502, reason: "جواب الذكاء ليس بصيغة صالحة للقراءة. أعد المحاولة." }; continue; }
     const reading = validateReading(json.value, facts);
     if (best === null || reading.sentences.length > best.reading.sentences.length) best = { reading, model: result.model };
     if (readingIsFull(reading)) break;
@@ -257,7 +257,7 @@ export async function generateReading(month: string, actorId: string | null, dea
   if (best === null) return failure ?? { ok: false, status: 502, reason: "تعذّرت القراءة." };
   const { reading, model } = best;
   if (reading.sentences.length === 0) {
-    return { ok: false, status: 502, reason: "لم تبق جملة واحدة بعد التحقّق من أرقامها — لم تحفظ القراءة." };
+    return { ok: false, status: 502, reason: "لم تبقَ أي جملة بعد التحقق من أرقامها، فلم تُحفظ القراءة." };
   }
   const hash = factsHash(facts);
   const [row] = await db.insert(financeReadings)

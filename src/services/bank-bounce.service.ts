@@ -32,15 +32,15 @@ export async function resolveBounce(
 ): Promise<{ freedInvoices: number }> {
   const [out] = await tx.select().from(bankTransactions).where(eq(bankTransactions.id, input.outgoingId)).for("update");
   const [back] = await tx.select().from(bankTransactions).where(eq(bankTransactions.id, input.incomingId)).for("update");
-  if (!out || !back) throw new BounceRefused("لم توجد الحركتان — حدّث الصفحة");
+  if (!out || !back) throw new BounceRefused("الحركتان غير موجودتين. حدّث الصفحة");
   const gapDays = (back.valueDate.getTime() - out.valueDate.getTime()) / MS_PER_DAY;
   if (out.direction !== "DEBIT" || back.direction !== "CREDIT" || out.amountMinor !== back.amountMinor
     || gapDays <= 0 || gapDays > REVERSAL_WINDOW_DAYS + 1) {
-    throw new BounceRefused("الحركتان ليستا خروجاً وعودةً بالمبلغ نفسه في نافذة الأيّام");
+    throw new BounceRefused("الحركتان ليستا خروج مبلغ وعودته نفسه خلال المدة المحددة");
   }
   const key = reversalKey(out.id, back.id);
   const [already] = await tx.select({ key: alertResolutions.key }).from(alertResolutions).where(eq(alertResolutions.key, key));
-  if (already) throw new BounceRefused("حسم هذا من قبل — حدّث الصفحة");
+  if (already) throw new BounceRefused("سبق حسم هذا القرار. حدّث الصفحة");
 
   let freedInvoices = 0;
   if (input.decision === "BOUNCED") {

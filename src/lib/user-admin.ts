@@ -43,14 +43,14 @@ export function checkUserChange(
   if (change.kind === "end-sessions") return { ok: true };
 
   if (change.kind === "role") {
-    if (change.role === target.role) return { ok: false, reason: "هذا دوره الآن — لم يتغيّر شيء" };
-    if (self) return { ok: false, reason: "لا تغيّر دورك بنفسك — يغيّره مالك آخر، كي لا تفقد إدارة النظام" };
+    if (change.role === target.role) return { ok: false, reason: "هذا هو دوره الحالي، ولم يتغيّر شيء" };
+    if (self) return { ok: false, reason: "لا يمكنك تغيير دورك بنفسك. يغيّره مالك آخر حتى لا تفقد صلاحية إدارة النظام" };
   }
   if (change.kind === "active") {
     if (change.active === target.isActive) {
-      return { ok: false, reason: change.active ? "حسابه مفعّل الآن" : "حسابه معطّل الآن" };
+      return { ok: false, reason: change.active ? "حسابه مفعّل بالفعل" : "حسابه معطّل بالفعل" };
     }
-    if (self && !change.active) return { ok: false, reason: "لا تعطّل حسابك بنفسك — تحبس خارج النظام" };
+    if (self && !change.active) return { ok: false, reason: "لا يمكنك تعطيل حسابك بنفسك، فستُمنع من دخول النظام" };
   }
 
   /* بعد التغيير: أيبقى مالكٌ يدخل؟ */
@@ -60,16 +60,16 @@ export function checkUserChange(
     isActive: change.kind === "active" ? change.active : u.isActive,
   });
   if (everyone.some(canSignInAsOwner) && !after.some(canSignInAsOwner)) {
-    return { ok: false, reason: "هو المالك الوحيد الذي يستطيع الدخول — لا يترك النظام بلا مالك" };
+    return { ok: false, reason: "هو المالك الوحيد القادر على الدخول، ولا يجوز أن يبقى النظام بلا مالك" };
   }
   return { ok: true };
 }
 
 /** ما يُقال حين يخالف الدورُ هنا ما في قائمة الدخول — أو `null` إن اتّفقا. */
 export function allowlistNote(dbRole: Role, listed: Role | undefined, roleLabel: Record<Role, string>): string | null {
-  if (listed === undefined) return "ليس في قائمة الدخول (ALLOWED_EMAILS) — لا يستطيع الدخول";
+  if (listed === undefined) return "ليس في قائمة الدخول (ALLOWED_EMAILS)، فلا يستطيع الدخول";
   if (listed !== dbRole) {
-    return `في قائمة الدخول «${roleLabel[listed]}» ودوره هنا «${roleLabel[dbRole]}» — الدور هنا هو النافذ؛ القائمة تقرأ عند أوّل دخول وحده`;
+    return `في قائمة الدخول «${roleLabel[listed]}» ودوره هنا «${roleLabel[dbRole]}». المعتمد هو الدور هنا، والقائمة تُقرأ عند أول دخول فقط`;
   }
   return null;
 }

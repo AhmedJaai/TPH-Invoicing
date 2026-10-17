@@ -22,7 +22,7 @@ function Line({ w, foodicsCashMinor }: { w: SalesWitness; foodicsCashMinor: numb
           <Badge tone="muted">لا مبيعات فودكس لهذا الشهر</Badge>
         </span>
         <span className="mt-1 block text-[11px] leading-relaxed text-muted">
-          لا شاهد على الرقم المكتوب: لم تقرأ مبيعات هذا الشهر من فودكس. والإقرار لا يتوقّف عليه.
+          لا يوجد ما نقارن به الرقم المكتوب، لأن مبيعات هذا الشهر لم تُقرأ من فودكس. ولا يتوقف الإقرار على ذلك.
         </span>
       </li>
     );
@@ -35,7 +35,7 @@ function Line({ w, foodicsCashMinor }: { w: SalesWitness; foodicsCashMinor: numb
       <span className="flex flex-wrap items-center justify-between gap-2">
         <span className="font-bold">{formatMonth(w.month)}</span>
         {w.verdict === "AGREES" ? (
-          <Badge tone="ok" dot>يتّفقان</Badge>
+          <Badge tone="ok" dot>متطابقان</Badge>
         ) : w.verdict === "FOODICS_HIGHER" ? (
           <Badge tone="warn" dot>فودكس أعلى</Badge>
         ) : (
@@ -46,28 +46,28 @@ function Line({ w, foodicsCashMinor }: { w: SalesWitness; foodicsCashMinor: numb
         <dt className="text-muted">
           ضريبة المبيعات في فودكس
           <span className="block">
-            يغطّي {countNoun(w.coveredDays, DAY)} من {w.expectedDays}
-            {missing > 0 && <span className="font-bold text-warn"> — ينقصه {countNoun(missing, DAY)}</span>}
+            يغطي {countNoun(w.coveredDays, DAY)} من {w.expectedDays}
+            {missing > 0 && <span className="font-bold text-warn"> · ينقصه {countNoun(missing, DAY)}</span>}
           </span>
         </dt>
         <dd className="text-end text-xs font-bold"><Money minor={w.vatMinor ?? 0} /></dd>
         <dt className="text-muted">
           ضريبة المبيعات في الإقرار
           <span className="block">
-            من وارد البنك{w.cashTypedGrossMinor === null ? " — ولم تكتب نقداً لهذا الشهر" : <> ومن <Money minor={w.cashTypedGrossMinor} /> نقداً كتبته</>}
+            من وارد البنك{w.cashTypedGrossMinor === null ? "، ولم تُدخل مبيعات نقدية لهذا الشهر" : <> ومن <Money minor={w.cashTypedGrossMinor} /> نقداً أدخلتها</>}
           </span>
         </dt>
         <dd className="text-end text-xs font-bold"><Money minor={w.returnOutputVatMinor} /></dd>
         {foodicsCashMinor !== null && (
           <>
             <dt className="text-muted">
-              ما قبضه فودكس نقداً هذا الشهر
+              المبيعات النقدية في فودكس هذا الشهر
               <span className="block">
                 {w.cashTypedGrossMinor === null
-                  ? <span className="font-bold text-warn">لم تكتب نقداً بعد — هذا الرقم الذي يكتب</span>
+                  ? <span className="font-bold text-warn">لم تُدخل مبيعات نقدية بعد، وهذا هو الرقم الذي ستُدخله</span>
                   : w.cashTypedGrossMinor === foodicsCashMinor
-                    ? "وهو ما كتبته"
-                    : <>وكتبت <Money minor={w.cashTypedGrossMinor} /></>}
+                    ? "وهو ما أدخلته"
+                    : <>وأدخلت <Money minor={w.cashTypedGrossMinor} /></>}
               </span>
             </dt>
             <dd className="text-end text-xs font-bold"><Money minor={foodicsCashMinor} /></dd>
@@ -82,17 +82,17 @@ function Line({ w, foodicsCashMinor }: { w: SalesWitness; foodicsCashMinor: numb
       </dl>
       {w.verdict === "FOODICS_HIGHER" && (
         <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
-          يقابله نحو <Money minor={gross} /> مبيعات شاملة الضريبة لم تدخل الإقرار: نقد لم يكتب، أو تسوية شبكة لم تصل البنك بعد، أو وارد لم يضمّ.
-          رقمك المكتوب باق كما هو — غيّره من الخانة أعلاه إن رأيت.
+          يقابل ذلك نحو <Money minor={gross} /> مبيعات شاملة الضريبة لم تدخل الإقرار. قد يكون السبب نقداً لم تدخله، أو تسوية شبكة لم تصل البنك بعد، أو وارداً لم يُضَف.
+          الرقم الذي أدخلته باقٍ كما هو، ويمكنك تعديله من الخانة أعلاه.
         </p>
       )}
       {w.verdict === "RETURN_HIGHER" && (
         <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
-          الإقرار يحسب نحو <Money minor={gross} /> مبيعات فوق ما في فودكس: {missing > 0 ? "قد تكون أيّاماً لم تقرأ من فودكس، أو " : ""}وارد ضمّ وليس بيعاً، أو نقد كتب وقد أودع.
+          يتضمن الإقرار نحو <Money minor={gross} /> مبيعات أكثر مما في فودكس. {missing > 0 ? "قد يكون السبب أياماً لم تُقرأ من فودكس، أو " : "قد يكون السبب "}وارداً أُضيف وليس بيعاً، أو نقداً أُدخل وقد أُودع في البنك.
         </p>
       )}
       {(w.refundMinor ?? 0) > 0 && (
-        <p className="mt-1 text-[11px] text-muted">وفي فودكس مرتجعات بـ<Money minor={w.refundMinor ?? 0} /> — معروضة ولا تطرح هنا.</p>
+        <p className="mt-1 text-[11px] text-muted">وفي فودكس مرتجعات بـ<Money minor={w.refundMinor ?? 0} />، وهي معروضة هنا ولا تُخصم.</p>
       )}
     </li>
   );
@@ -106,16 +106,16 @@ export async function SalesWitnessPanel({ months }: { months: readonly WitnessMo
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft px-4 py-2.5">
         <p className="flex items-center gap-2 text-xs font-bold">
           <Scale className="h-4 w-4 text-muted" strokeWidth={1.75} aria-hidden />
-          شاهد من فودكس
+          مطابقة مع مبيعات فودكس
         </p>
-        <span className="text-[11px] text-muted">للمقابلة وحدها — لا يدخل الإقرار ولا يغيّر ما كتبته</span>
+        <span className="text-[11px] text-muted">للمقارنة فقط. لا يدخل الإقرار ولا يغيّر ما أدخلته</span>
       </div>
       <ul className="divide-y divide-line-soft">
         {witness.map((w) => <Line key={w.month} w={w} foodicsCashMinor={cash.get(w.month) ?? null} />)}
       </ul>
       {!any && (
         <div className="border-t border-line-soft px-4 py-2.5">
-          <LinkButton href="/money/foodics" size="sm">حال وصل فودكس</LinkButton>
+          <LinkButton href="/money/foodics" size="sm">حالة ربط فودكس</LinkButton>
         </div>
       )}
     </div>
@@ -123,5 +123,5 @@ export async function SalesWitnessPanel({ months }: { months: readonly WitnessMo
 }
 
 export function SalesWitnessSkeleton() {
-  return <div className="mt-3 h-24 animate-pulse rounded-xl border border-line bg-sunken/60" role="status" aria-label="تقرأ مبيعات فودكس" />;
+  return <div className="mt-3 h-24 animate-pulse rounded-xl border border-line bg-sunken/60" role="status" aria-label="جارٍ قراءة مبيعات فودكس" />;
 }

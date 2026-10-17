@@ -64,7 +64,7 @@ describe("قائمة الدخل", () => {
   it("فرق سالب يسمّى خطأ بيانات لا ربحاً", () => {
     const p = buildPnl({ ...base, cogs: { ...base.cogs, theoreticalMinor: 3_500_000 } });
     expect(p.unexplainedMinor).toBe(-600_000);
-    expect(p.lines.find((l) => l.id === "cogs-unexplained")?.label).toContain("فاتورة لم تقيّد");
+    expect(p.lines.find((l) => l.id === "cogs-unexplained")?.label).toContain("فاتورة لم تُسجَّل");
   });
   it("بلا عدّ: التكلفة مشتريات الشهر ويقال ذلك في اسم الرقم", () => {
     const p = buildPnl({ ...base, cogs: { ...base.cogs, stock: null, stockMissing: "لا عدّ في أوّل الشهر" } });
