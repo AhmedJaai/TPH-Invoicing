@@ -464,7 +464,7 @@ describe("التقرير المقفل لا يتغيّر", () => {
           .set({ actualMilli: kg(99) })
           .where(eq(inventoryCountLines.countId, countId)),
       );
-      expect(pgErrorOf(e)?.message).toContain("مقفل");
+      expect(pgErrorOf(e)?.message).toMatch(/مقفَ?ل/);
     }));
 
   it("والخدمة تقول ذلك بلغة تقرأ قبل أن يصل الطلب إلى القاعدة", () =>
@@ -498,7 +498,7 @@ describe("التقرير المقفل لا يتغيّر", () => {
       const e = await caught(
         tx.delete(inventoryCountSnapshots).where(eq(inventoryCountSnapshots.countId, countId)),
       );
-      expect(pgErrorOf(e)?.message).toContain("لا تعدّل");
+      expect(pgErrorOf(e)?.message).toMatch(/لا تُ?عدَّ?ّ?ل/);
     }));
 
   it("وإعادة الفتح فعل بسبب مكتوب، وعدّادها يبقى", () =>

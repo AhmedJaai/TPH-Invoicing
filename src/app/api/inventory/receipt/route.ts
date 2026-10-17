@@ -103,7 +103,8 @@ export async function POST(request: Request) {
 function lockedWeekMessage(e: unknown): string | null {
   const err = e as { message?: unknown; cause?: { message?: unknown } } | null;
   for (const m of [err?.cause?.message, err?.message]) {
-    if (typeof m === "string" && m.includes("جرده مقفل")) return m.slice(m.indexOf("هذا"));
+    /* نصُّ المؤثِّر في الهجرة مشكول («جردُه مقفَل») — فيُقارَن بلا حركات */
+    if (typeof m === "string" && m.replace(/[\u064B-\u0652]/g, "").includes("جرده مقفل")) return m.slice(m.indexOf("هذا"));
   }
   return null;
 }

@@ -346,7 +346,7 @@ describe("المقفل لا يعني غير ما عناه يوم أقفل", () =
         insert into inventory_count_openings (id, count_id, product_id, entered_milli, entered_unit, canonical_milli)
         values ('x-open', ${countId}, ${coffee}, 1000, 'KG', 1000000)
       `));
-      expect(String((bypass as Error).message) + String((bypass as { cause?: Error }).cause?.message ?? "")).toContain("مقفل");
+      expect(String((bypass as Error).message) + String((bypass as { cause?: Error }).cause?.message ?? "")).toMatch(/مقفَ?ل/);
     }));
 });
 
