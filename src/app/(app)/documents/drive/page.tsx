@@ -109,7 +109,7 @@ export default async function DrivePage() {
         </Section>
 
         <Section
-          title="آخر ما فعله"
+          title="آخر ما نفّذه"
           icon={History}
           className="mt-0!"
           action={can(user.role, "audit:view") ? <LinkButton href="/settings/audit?kind=documents" size="sm" variant="quiet">سجلّ التدقيق</LinkButton> : undefined}
@@ -200,7 +200,7 @@ function activityItem(a: DriveStatus["recent"][number]): TimelineItem {
     id: a.id,
     icon: FolderSync,
     tone: "ok",
-    title: `دخل من الدرايف ${countNoun(a.count, DOCUMENT)}`,
+    title: `وصل من الدرايف ${countNoun(a.count, DOCUMENT)}`,
     meta: `${timeAgo(a.at)}${who}`,
   };
 }
@@ -230,7 +230,7 @@ function statusCopy(s: DriveStatus): { headline: string; detail: string } {
       };
     case "ok":
       return {
-        headline: "المزامنة تعمل وحدها",
+        headline: "المزامنة تلقائية",
         detail: s.writesAllowed
           ? "كل ثلاث ساعات والتطبيق مفتوح، وإعادة التسمية كل عشر دقائق. لا حاجة إلى الضغط على أي زر، إلا إن وضعت ملفاً الآن ولا تريد الانتظار."
           : "إعادة التسمية موقوفة في هذه البيئة، وتتم من نسخة الإنتاج فقط لأن الأرشيف واحد.",
@@ -252,7 +252,7 @@ function syncFacts(s: DriveStatus): { label: string; value: string; hint?: strin
       hint: s.lastArrivalAt ? `آخر مستند دخل الأرشيف ${formatDay(s.lastArrivalAt)}` : undefined,
     },
     {
-      label: "آخر تسمية",
+      label: "آخر إعادة تسمية",
       value: s.lastRenamedAt ? formatMoment(s.lastRenamedAt) : "لم تتم بعد",
       hint: s.writesAllowed ? "تتم تلقائياً كل عشر دقائق" : "من نسخة الإنتاج فقط",
     },

@@ -411,7 +411,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                   {ownerCount > 0 && (
                     <p className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-warn">
                       <ShieldAlert className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />
-                      تتضمن {countNoun(ownerCount, INVOICE)} محجوزة أدخلتها بقرارك
+                      تتضمن {countNoun(ownerCount, INVOICE)} محجوزة وأضفتها بقرارك
                     </p>
                   )}
                 </div>
@@ -424,8 +424,8 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                       {plan.partialMinor !== null && (
                         <p className="text-[11px] font-bold text-warn">جزء من <Money minor={plan.fullMinor} /></p>
                       )}
-                      {after.state === "remaining" && <p className="text-[11px] text-muted">يبقى عليك له <Money minor={after.minor} /></p>}
-                      {after.state === "settled" && <p className="text-[11px] text-muted">لا يبقى عليك له شيء</p>}
+                      {after.state === "remaining" && <p className="text-[11px] text-muted">المتبقي له <Money minor={after.minor} /></p>}
+                      {after.state === "settled" && <p className="text-[11px] text-muted">لا يتبقى له شيء</p>}
                       {/* الزيادةُ تُقال بمبلغها — كانت تُقصّ إلى «يبقى 0.00» */}
                       {after.state === "over" && (
                         <p className="text-[11px] font-bold text-warn">
@@ -655,7 +655,7 @@ export function HoldOverride({
     <>
       <button type="button" onClick={() => setAsking(true)} className={buttonClass("secondary", "sm")}>
         <Wallet className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        أدخلها في الدفعة
+        أضفها إلى الدفعة
       </button>
       <Sheet
         open={asking}
@@ -667,7 +667,7 @@ export function HoldOverride({
           <>
             <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={() => setAsking(false)}>إلغاء</button>
             <button type="button" aria-busy={busy} className={buttonClass("primary")} disabled={busy || !noteOk} onClick={include}>
-              أدخلها في الدفعة
+              أضفها إلى الدفعة
             </button>
           </>
         }

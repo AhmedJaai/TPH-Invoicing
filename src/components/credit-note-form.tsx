@@ -120,7 +120,7 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       <div className="mt-3 flex gap-2">
         <button type="submit" aria-busy={busy} disabled={busy || amount.trim() === ""} className={buttonClass("primary", "sm")}>
-          <span>{duplicate ? "قيّد إشعاراً آخر" : "قيّد الإشعار"}</span>
+          <span>{duplicate ? "قيّد إشعاراً آخر" : "سجّل الإشعار"}</span>
         </button>
         <button type="button" onClick={() => { setOpen(false); setError(null); }} disabled={busy} className={buttonClass("quiet", "sm")}>
           إلغاء

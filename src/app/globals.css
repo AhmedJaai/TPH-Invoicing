@@ -1168,3 +1168,8 @@ details[open]::details-content {
   .nums-frac { opacity: 1; }
   .skeleton { animation: none; }
 }
+
+/* الأسهم مرسومةٌ لاتجاه العربية؛ في الواجهة الإنجليزية تنعكس لتشير إلى «التالي» الصحيح */
+html[dir="ltr"] :is(.lucide-arrow-left, .lucide-arrow-right, .lucide-chevron-left, .lucide-chevron-right, .lucide-chevrons-left, .lucide-chevrons-right) {
+  transform: scaleX(-1);
+}

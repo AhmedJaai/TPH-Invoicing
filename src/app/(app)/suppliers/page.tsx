@@ -225,7 +225,7 @@ export default async function SuppliersPage({
               ) : (
                 r.openCount > 0 ? (
                   /* فاتورةٌ مفتوحة يقابلها مالٌ لم يُنسب — ليس «متّزناً» يُترك */
-                  <span className="text-[11px] font-bold text-warn">متّزن على الورق</span>
+                  <span className="text-[11px] font-bold text-warn">متوازن على الورق</span>
                 ) : (
                   <span className="text-[11px] text-muted">{r.idle ? "—" : "متّزن"}</span>
                 )

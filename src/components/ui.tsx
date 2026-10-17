@@ -334,7 +334,7 @@ export function StatGrid({ children }: { children: React.ReactNode }) {
  * ارتفاعُ المشتريات لا لون له — قد يكون نموّاً وقد يكون تسرّباً.
  */
 export function Delta({ pct, favourable }: { pct: number | null; favourable?: boolean | null }) {
-  if (pct === null) return <span className="text-[11px] text-muted">بلا مقارنة</span>;
+  if (pct === null) return <span className="text-[11px] text-muted">بدون مقارنة</span>;
   const up = pct > 0;
   const tone = favourable === true ? "text-ok bg-ok-bg" : favourable === false ? "text-warn bg-warn-bg" : "text-ink-soft bg-sunken";
   return (

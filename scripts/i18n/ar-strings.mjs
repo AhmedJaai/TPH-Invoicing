@@ -107,7 +107,58 @@ if (cmd === "list") {
   const arr = [...seen].map(([ar, files]) => ({ ar, files: [...files] }));
   fs.writeFileSync(args[0], JSON.stringify(arr, null, 1));
   console.log(`${arr.length} unique strings`);
+} else if (cmd === "apply") {
+  // يستبدل نصوصاً بأعيانها: ملفّ JSON ‏{ "path": [[old, new], …] } — القالب بخاناته ‎{0}‎
+  // يُعاد بناؤه بتعابيره نفسها وبترتيبها، فلا تُمسّ الشيفرة إلّا في النصّ.
+  const plan = JSON.parse(fs.readFileSync(args[0], "utf8"));
+  const norm = (v) => v.replace(/\s+/g, " ").trim();
+  let done = 0, missed = [];
+  for (const [f, pairs] of Object.entries(plan)) {
+    let text = fs.readFileSync(f, "utf8");
+    const kind = f.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+    const sf = ts.createSourceFile(f, text, ts.ScriptTarget.Latest, true, kind);
+    const map = new Map(pairs.map(([a, b]) => [norm(a), b]));
+    const hit = new Set();
+    const edits = [];
+    const esc = (v, q) => v.replace(/\\/g, "\\\\").replace(q === "`" ? /`|\$\{/g : new RegExp(q, "g"), (m) => "\\" + m);
+    const visit = (n) => {
+      if (ts.isTemplateExpression(n)) {
+        let v = n.head.text; n.templateSpans.forEach((sp, i) => (v += `{${i}}` + sp.literal.text));
+        const nv = map.get(norm(v));
+        if (nv !== undefined) {
+          const parts = nv.split(/\{(\d+)\}/);
+          const order = parts.filter((_, i) => i % 2 === 1).map(Number);
+          if (order.length === n.templateSpans.length) {
+            let out = "`" + esc(parts[0], "`");
+            order.forEach((k, i) => { out += "${" + n.templateSpans[k].expression.getText(sf) + "}" + esc(parts[2 * i + 2], "`"); });
+            edits.push([n.getStart(sf), n.getEnd(), out + "`"]); hit.add(norm(v));
+          }
+        }
+      } else if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) {
+        const nv = map.get(norm(n.text));
+        if (nv !== undefined) {
+          const raw = text.slice(n.getStart(sf), n.getEnd()); const q = raw[0];
+          edits.push([n.getStart(sf), n.getEnd(), q + esc(nv, q === "`" ? "`" : q) + q]); hit.add(norm(n.text));
+        }
+      } else if (n.kind === ts.SyntaxKind.JsxText) {
+        const nv = map.get(norm(n.text));
+        if (nv !== undefined && !/[{}<>]/.test(nv)) {
+          const raw = text.slice(n.getStart(sf), n.getEnd());
+          const lead = raw.match(/^\s*/)[0], trail = raw.match(/\s*$/)[0];
+          edits.push([n.getStart(sf), n.getEnd(), lead + nv + trail]); hit.add(norm(n.text));
+        }
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(sf);
+    for (const [a, b, r] of edits.sort((x, y) => y[0] - x[0])) text = text.slice(0, a) + r + text.slice(b);
+    fs.writeFileSync(f, text);
+    done += edits.length;
+    for (const k of map.keys()) if (!hit.has(k)) missed.push(f + " :: " + k);
+  }
+  console.log(`applied ${done}`);
+  if (missed.length) console.log("missed:\n" + missed.join("\n"));
 } else {
-  console.error("usage: list|strip|extract");
+  console.error("usage: list|strip|extract|apply");
   process.exit(1);
 }

@@ -55,3 +55,21 @@ describe("حدود القوالب", () => {
     expect(t2.translate("وقواعد التصنيف")).toBe("and Classification rules");
   });
 });
+
+describe("قوالب بلا طرفٍ يُفهرَس، والتواريخ القصيرة", () => {
+  const t3 = new Translator({ "{0} من {1} لها بنود ({2})": "{0} of {1} have lines ({2})", "لا فواتير": "no invoices", "أكتوبر": "October" });
+  it("قالبٌ يبدأ بخانة وينتهي بحرفٍ واحد يُطابَق", () => {
+    expect(t3.translate("٠ من لا فواتير لها بنود (٠٪)")).toBe("0 of no invoices have lines (0%)");
+  });
+  it("مدى تاريخٍ قصير يُترجَم كلمةً كلمة", () => {
+    expect(t3.translate("٤–١٠ أكتوبر ٢٠٢٦")).toBe("4–10 October 2026");
+    expect(t3.translate("مؤسسة ١٠ أكتوبر")).toBe("مؤسسة ١٠ أكتوبر");
+  });
+});
+
+describe("خانة أخيرة فارغة", () => {
+  const t4 = new Translator({ "تُنشئ الوصفات دفعة واحدة{0}.": "Creates recipes in one go{0}." });
+  it("النصّ بلا قيمته الأخيرة يُترجَم", () => {
+    expect(t4.translate("تُنشئ الوصفات دفعة واحدة.")).toBe("Creates recipes in one go.");
+  });
+});

@@ -70,7 +70,7 @@ export function UserAdmin({ users, meId }: { users: UserAdminItem[]; meId: strin
             <p className="text-[11px] leading-relaxed text-muted">
               {u.activeSessions === 0
                 ? "لا توجد جلسة قائمة، وآخر نشاط له غير معروف"
-                : <>جلسات قائمة: <span className="nums">{u.activeSessions}</span> · آخر تجديد لجلسته {u.lastSeenAbout ?? "غير معروف"} (تتجدد الجلسة مرة في اليوم ما دام يستخدم النظام)</>}
+                : <>جلسات نشطة: <span className="nums">{u.activeSessions}</span> · آخر تجديد لجلسته {u.lastSeenAbout ?? "غير معروف"} (تتجدد الجلسة مرة في اليوم ما دام يستخدم النظام)</>}
             </p>
 
             {u.note && (

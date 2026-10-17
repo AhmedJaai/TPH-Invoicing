@@ -197,7 +197,7 @@ function UnknownRow({
  * خطوات الاستيراد، ظاهرةً — والخطوةُ تُشتقّ من الحال لا تُخزَّن: حالٌ
  * ثانية تُخزَّن هي حالٌ ثانية قد تخالف الأولى.
  */
-const STEPS = ["اختر الملف", "راجع المعاينة", "قيّد الجديد", "النتيجة"] as const;
+const STEPS = ["اختر الملف", "راجع المعاينة", "سجّل الجديد", "النتيجة"] as const;
 
 function FlowSteps({ current, failed }: { current: number; failed: boolean }) {
   return (

@@ -415,7 +415,7 @@ export async function POST(request: Request) {
         driveMd5,
         periodMonth,
         uploadedById: user.id,
-        reason: e instanceof MonthClosedError ? e.message : code ? `رفضت قاعدة البيانات القيد (${code})` : "تعذّر القيد",
+        reason: e instanceof MonthClosedError ? e.message : code ? `رفضت قاعدة البيانات القيد (${code})` : "تعذّر التسجيل",
       }).catch(() => undefined);
       throw e;
     });

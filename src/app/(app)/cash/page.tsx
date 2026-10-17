@@ -170,7 +170,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         </Callout>
       )}
       {o.vatAhead.length > 0 && (
-        <Callout tone="accent" icon={Percent} className="mt-3" title="جنّب للضريبة">
+        <Callout tone="accent" icon={Percent} className="mt-3" title="خصّص مبلغاً للضريبة">
           {o.vatAhead.map((v) => (
             <span key={v.periodKey} className="block">
               {v.label}: <Money minor={v.amountMinor ?? 0} /> {v.accruing ? "حتى اليوم، وتزيد مع كل يوم بيع" : ""} · تُسدَّد قبل <bdi>{formatDay(v.deadline)}</bdi>.{" "}

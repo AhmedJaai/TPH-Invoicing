@@ -159,7 +159,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
           <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
             <KeyFigure
               icon={Landmark}
-              label={!whole ? (r.netMinor >= 0 ? "حصة الشهر من الإقرار" : "حصة الشهر: رصيد لك") : r.netMinor >= 0 ? "تسدّده للهيئة" : "رصيد لك لدى الهيئة"}
+              label={!whole ? (r.netMinor >= 0 ? "حصة الشهر من الإقرار" : "حصة الشهر: رصيد لك") : r.netMinor >= 0 ? "المستحق للهيئة" : "رصيد لك لدى الهيئة"}
               tone={r.netMinor > 0 ? "warn" : "ok"}
               value={<Money minor={Math.abs(r.netMinor)} currency />}
               sub={
@@ -210,7 +210,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                 {filing.creditDisposition === "REFUND" && "، وقد طُلب استرداد الرصيد"}.
                 {r.netMinor === filing.netMinor
                   ? " والحساب اليوم يطابق ما قُدّم."
-                  : ` والحساب اليوم ${riyalsText(Math.abs(r.netMinor))}${r.netMinor < 0 ? " رصيداً لك" : ""}، والفرق ${riyalsText(Math.abs(r.netMinor - filing.netMinor))} سببه تغيّرات بعد التقديم (فاتورة رُفعت أو صُحّحت، أو تغيّر تصنيف حركة). راجع المحاسب، فقد يلزم تصحيح في إقرار لاحق.`}
+                  : ` والحساب اليوم ${riyalsText(Math.abs(r.netMinor))}${r.netMinor < 0 ? " رصيداً لصالحك" : ""}، والفرق ${riyalsText(Math.abs(r.netMinor - filing.netMinor))} سببه تغيّرات بعد التقديم (فاتورة رُفعت أو صُحّحت، أو تغيّر تصنيف حركة). راجع المحاسب، فقد يلزم تصحيح في إقرار لاحق.`}
               </Callout>
             )}
             {whole && !filing && quarterEnded && (
@@ -287,7 +287,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                 {!filing && (
                   <span className="mt-2 block">
                     <VatBulk kind="invoice" ids={awaiting.map((i) => i.id)} included variant="subtle">
-                      {`احسبها كلّها (${awaiting.length})`}
+                      {`احسبها كلها (${awaiting.length})`}
                     </VatBulk>
                   </span>
                 )}
@@ -332,7 +332,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                   <Line label="− رصيد دائن مرحّل" hint={`من ${quarterLabel(view.carriedFrom)}`} minor={-r.carriedInMinor} />
                 )}
                 <div className="flex items-center justify-between gap-3 bg-sunken/60 px-4 py-3 font-bold sm:px-5">
-                  <dt>{r.netMinor >= 0 ? "= تسدّده للهيئة" : "= رصيد لك"}</dt>
+                  <dt>{r.netMinor >= 0 ? "= المستحق للهيئة" : "= رصيد لصالحك"}</dt>
                   <dd><Money minor={Math.abs(r.netMinor)} currency tone={r.netMinor > 0 ? "warn" : "ok"} /></dd>
                 </div>
               </dl>
@@ -360,7 +360,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
           {/* ── النقدُ غير المودَع ── */}
           <Section
             id="cash"
-            title="نقد لم يودع"
+            title="نقد لم يُودَع"
             icon={Banknote}
             hint="المبيعات التي قبضتها نقداً ولم تودعها في الحساب لا تظهر في الكشف. اكتب مجموعها لكل شهر شاملاً الضريبة (من تقرير فودكس) لتدخل في ضريبة المخرجات. الحقل الفارغ يعني «لم يُدخَل» وليس صفراً. ولا تكتب ما أودعته في الحساب، فهو محسوب ضمن الوارد."
           >
@@ -518,7 +518,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
                     )}
                     {bySupplier.length > 1 && bySupplier.map((g) => (
                       <VatBulk key={g.supplierId} kind="invoice" ids={g.ids} included>
-                        احسب فواتير {g.supplier} ({g.ids.length})
+                        أضف فواتير {g.supplier} إلى الخصم ({g.ids.length})
                       </VatBulk>
                     ))}
                   </div>
@@ -547,7 +547,7 @@ export default async function VatPage({ searchParams }: { searchParams: Promise<
 
           {confirmed.length > 0 && (
             <Section
-              title="فواتير حسبتها بإقرارك"
+              title="فواتير أضفتها بنفسك"
               count={confirmed.length}
               hint={`ضريبتها في الخصم ${riyalsText(r.input.invoices.confirmed.vatMinor)}${r.input.invoices.confirmed.derivedCount > 0 ? `، منها ${countNoun(r.input.invoices.confirmed.derivedCount, INVOICE)} حُسبت ضريبتها بنسبة 15/115 من إجماليها لأنها لم تُقرأ` : ""}. وهذا الإقرار مسجّل في سجل التدقيق باسمك.`}
               action={filing ? undefined : <VatBulk kind="invoice" ids={confirmed.map((i) => i.id)} included={null} variant="quiet">تراجع عنها كلها</VatBulk>}
@@ -704,7 +704,7 @@ function txColumns(kind: "debit" | "credit" | "vat", filed?: string): Column<Vat
       cell: (t) => (
         <span className="flex min-w-0 flex-wrap items-center gap-1.5">
           <span className="truncate">{t.label}</span>
-          {t.coveredByInvoice && t.direction === "DEBIT" && <Badge tone="ok">فاتورتها محسوبة</Badge>}
+          {t.coveredByInvoice && t.direction === "DEBIT" && <Badge tone="ok">فاتورتها محسوبة في الخصم</Badge>}
           {t.bounced && <Badge tone="muted">مردودة</Badge>}
           {t.caution !== null && <Badge tone={t.included ? "warn" : "muted"}>{t.included ? "تصنيف لا ضريبة فيه غالباً، فاحتفظ بفاتورته" : "لا ضريبة فيه غالباً"}</Badge>}
           {t.supplierHasInvoices && t.blocked === null && t.direction === "DEBIT" && <Badge tone="warn">لمورّدها فواتير محسوبة، فتحقق قبل أن تحسبها</Badge>}

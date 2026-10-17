@@ -94,7 +94,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
           </div>
         </div>
         <LinkTabs
-          label="شهر الحزمة"
+          label="شهر التقرير"
           items={recent.map((m) => ({ href: `/close/pack?month=${m}`, label: formatMonth(m), active: m === month }))}
         />
       </div>
@@ -149,7 +149,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
                   ["المصروفات", <Money key="e" minor={s.expensesMinor} />],
                   ["وارد البنك", <Money key="i" minor={s.bankInMinor} />],
                   ["صادر البنك", <Money key="o" minor={s.bankOutMinor} />],
-                  ["صادر بلا تفسير", <span key="u" className={`nums ${s.bankUnexplainedCount > 0 ? "text-warn" : ""}`}>{s.bankUnexplainedCount}</span>],
+                  ["مدفوعات غير مصنّفة", <span key="u" className={`nums ${s.bankUnexplainedCount > 0 ? "text-warn" : ""}`}>{s.bankUnexplainedCount}</span>],
                 ]}
               />
             </div>
@@ -238,7 +238,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
               />
             </SheetSection>
 
-            <SheetSection title="صادر بلا تفسير" count={unclear.length}>
+            <SheetSection title="مدفوعات غير مصنّفة" count={unclear.length}>
               <p className="mb-3 text-xs leading-relaxed text-ink-soft">
                 مبالغ خرجت ولم تُصنَّف، أو خرجت لمورّد دون دفعة مسجّلة تقابلها. تفاصيل كل الحركات في ملف Excel.
               </p>
@@ -375,7 +375,7 @@ function PaymentsTable({ input, total }: { input: PackInput; total: number }) {
           p.invoices.length > 0 ? <bdi key="i" dir="ltr" className="font-mono text-[11px]">{p.invoices.join(" · ")}</bdi> : "—",
         ],
       }))}
-      foot={["المجموع القائم", "", <Money key="t" minor={total} />, "", "", ""]}
+      foot={["الإجمالي المستحق", "", <Money key="t" minor={total} />, "", "", ""]}
     />
   );
 }

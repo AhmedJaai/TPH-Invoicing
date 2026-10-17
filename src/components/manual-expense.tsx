@@ -87,13 +87,13 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
     <>
       <button type="button" onClick={() => setOpen(true)} className={buttonClass(variant, "sm")}>
         <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-        قيّد مصروفاً نقدياً
+        سجّل مصروفاً نقدياً
       </button>
 
       <Sheet
         open={open}
         onClose={close}
-        title="مصروف دفع خارج البنك"
+        title="مصروف دُفع خارج البنك"
         description="مصروف دُفع نقداً أو من حساب آخر، فلا يظهر في كشف البنك ولا يمكن أخذه منه."
         size="sm"
         footer={

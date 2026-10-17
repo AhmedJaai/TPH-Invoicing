@@ -309,7 +309,7 @@ export function CommandPalette({ role, canSearch }: { role: Role; canSearch: boo
   const GROUP_LABEL: Record<string, string> = { ...COMMAND_GROUP_LABEL, RECORDS: "في سجلّاتك", RECENT: "فتحتها مؤخراً" };
 
   const intentLine =
-    intent?.kind === "AMOUNT" && intent.amountMinor !== undefined ? <>بحث عن مبلغ <Money minor={intent.amountMinor} /> ± ريال في الفواتير والحركات</>
+    intent?.kind === "AMOUNT" && intent.amountMinor !== undefined ? <>بحث عن مبلغ <Money minor={intent.amountMinor} /> بفارق ريال في الفواتير والحركات</>
     : intent?.kind === "NUMBER" ? <>بحث عن رقم <bdi dir="ltr" className="font-mono">{intent.term}</bdi> في الفواتير والمراجع</>
     : intent?.kind === "MONTH" ? <>بحث في شهر <bdi dir="ltr">{intent.term}</bdi></>
     : intent?.kind === "DATE" ? <>بحث في يوم <bdi dir="ltr">{intent.term}</bdi></>

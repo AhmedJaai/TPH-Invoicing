@@ -1185,7 +1185,7 @@ export function BulkBar({ children }: {
       {ids.length > 0 && (
         <div
           role="region"
-          aria-label="أفعال على المحدّد"
+          aria-label="إجراءات على المحدد"
           className="no-print sticky bottom-20 z-20 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-accent-line bg-overlay px-4 py-3 shadow-overlay lg:bottom-4"
         >
           <p className="text-[13px] font-bold">المحدّد: <span className="nums nums-count">{ids.length}</span></p>

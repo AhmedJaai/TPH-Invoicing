@@ -164,7 +164,7 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
           ]}
         />
         <ShortcutGroup
-          title="في طابور المراجعة"
+          title="في قائمة المراجعة"
           rows={[
             { keys: ["A"], label: "اعتمد اقتراح الصف المحدد" },
             { keys: ["X"], label: "ليست سداداً (افتح الأسباب)" },

@@ -77,7 +77,7 @@ export function OrphanPayment({
           onClick={() => { setMode("assign"); setError(null); }}
           className={buttonClass(mode === "assign" ? "primary" : "secondary", "sm")}
         >
-          انسبها إلى مورّد
+          اربطها بمورّد
         </button>
         <button
           type="button"

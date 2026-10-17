@@ -597,7 +597,7 @@ function gapAction(g: CoverageGap, locked: boolean): { href: string; label: stri
       return { href: "/purchases/invoices", label: "الفواتير" };
     case "RECEIPT_AMBIGUOUS":
     case "RECEIPT_POSSIBLE_DUPLICATE":
-      return { href: "?step=flow", label: "احسمها في الخطوة الثانية" };
+      return { href: "?step=flow", label: "قرّر فيها في الخطوة الثانية" };
     default:
       return null;
   }

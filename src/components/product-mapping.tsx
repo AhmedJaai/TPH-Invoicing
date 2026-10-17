@@ -191,7 +191,7 @@ function Triage({
   if (!item) {
     return (
       <div className="rounded-2xl border border-ok/40 bg-ok-bg px-5 py-10 text-center">
-        <p className="text-sm font-bold text-ok">لا شيء ينتظر الفرز.</p>
+        <p className="text-sm font-bold text-ok">لا شيء ينتظر التصنيف.</p>
         <p className="mt-1.5 text-xs text-ink-soft">كل صنف مورّد له الآن صنف معياري.</p>
       </div>
     );
@@ -360,7 +360,7 @@ export function ProductMapping({
   return (
     <div className="space-y-8">
       <section>
-        <h2 className="font-display text-lg font-bold leading-tight">افرزها واحداً واحداً</h2>
+        <h2 className="font-display text-lg font-bold leading-tight">راجعها واحداً تلو الآخر</h2>
         <p className="mb-3 mt-1 max-w-2xl text-xs leading-relaxed text-muted">
           القرار في كل صنف بسيط: هل هو الصنف المعياري نفسه أم لا؟ نعرض لك
           صنفاً واحداً في كل مرة، ثم ننتقل إلى الذي يليه.

@@ -106,7 +106,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
       <div className="no-print"><MonthTabs base="/finance" months={months} active={month} /></div>
 
       {view.stale && (
-        <Callout tone="warn" icon={Snowflake} className="mt-4" title="تغيّر ما تحت هذا التقرير المجمّد"
+        <Callout tone="warn" icon={Snowflake} className="mt-4" title="تغيّرت البيانات منذ تجميد هذا التقرير"
           action={canClose ? <PostAction url="/api/finance/freeze" body={{ month }} done="أُعيد تجميد التقرير">أعد تجميده بأرقام اليوم</PostAction> : undefined}>
           الأرقام هنا كما جُمّدت، لكن الحساب الحالي يختلف عنها اليوم، بسبب فاتورة وصلت متأخرة أو إقرار أضفته أو ربط تغيّر. يبقى التقرير المجمّد كما هو حتى تعيد تجميده.
         </Callout>
@@ -237,7 +237,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         <ProfitTrend months={series.map(trendOf)} active={month} hrefOf={(m) => `/finance?month=${m}`} />
       </Section>
 
-      <Section title="ما يقوله الشهر" className="print:hidden">
+      <Section title="ملخّص الشهر" className="print:hidden">
         <FinanceReading month={month} stored={stored} canAsk={canClose} />
       </Section>
 

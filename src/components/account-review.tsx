@@ -197,7 +197,7 @@ export function AccountReview({ variant = "secondary", size = "md" }: { variant?
                             <Money minor={e.amountMinor} />
                           </span>
                           <span className="mt-1 block leading-relaxed text-muted">
-                            حوالة الكشف {formatDay(e.bankDay)} · وسداد يدوي {formatDay(e.manualDay)}
+                            الحوالة في الكشف {formatDay(e.bankDay)} · وسداد يدوي {formatDay(e.manualDay)}
                             {e.invoices.length > 0 && <> سدّدت {e.invoices.map((i) => i.number).join("، ")}</>}
                           </span>
                         </span>

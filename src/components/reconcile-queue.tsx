@@ -145,7 +145,7 @@ export function ReconcileQueue({
       <div className="flex items-center gap-3 rounded-xl border border-ok/25 bg-ok-bg px-5 py-5">
         <DoneMark className="h-8 w-8 shrink-0 text-ok" />
         <div>
-          <p className="text-sm font-bold text-ok">انتهت المجموعات.</p>
+          <p className="text-sm font-bold text-ok">لا توجد مجموعات أخرى.</p>
           <p className="mt-0.5 text-xs text-ink-soft">
             ما أجبت عنه سيحفظه النظام، فيتعرّف على ما يشبهه في الكشوف القادمة دون أن يسألك.
           </p>

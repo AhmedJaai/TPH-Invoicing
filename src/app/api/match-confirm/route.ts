@@ -287,7 +287,7 @@ async function handle(request: Request) {
       );
     }
     if (group.some((g) => g.direction !== "DEBIT")) {
-      return NextResponse.json({ error: "المال الداخل ليس سداداً" }, { status: 400 });
+      return NextResponse.json({ error: "المبلغ الوارد لا يُسجَّل كسداد لمورّد" }, { status: 400 });
     }
     const already = group.filter((g) => g.matchedPaymentId !== null);
     if (already.length > 0) {

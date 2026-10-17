@@ -720,7 +720,7 @@ function Row({
       {/* ── تعريف الجهة ── */}
       {open === "define" && (
         <div className="mt-2 rounded-xl border border-line bg-sunken px-3 py-2.5">
-          <p className="text-xs font-bold">ما باب هذه الحركة؟</p>
+          <p className="text-xs font-bold">ما تصنيف هذه الحركة؟</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {KINDS.map((k) => (
               <button

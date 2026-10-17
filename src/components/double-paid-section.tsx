@@ -26,7 +26,7 @@ import {
 export const DOUBLE_PAID_DECISION_LABEL: Record<DoublePaidDecision, string> = {
   CLAIMED: "تمت المطالبة",
   RECOVERED: "تم استرداد المال",
-  NOT_DUPLICATE: "ليست ازدواجاً",
+  NOT_DUPLICATE: "ليست مكررة",
 };
 
 export async function loadDoublePaid() {

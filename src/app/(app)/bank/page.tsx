@@ -147,7 +147,7 @@ export default async function BankPage({
                 <span className="block text-[13px] font-bold text-danger">مبلغ خرج مرتين في يوم واحد: {countNoun(doublePaid, ITEM)}</span>
                 يمكنك مطالبة الجهة المستلمة باسترداده، ولا يمكن تصحيحه بقيد في النظام.
               </p>
-              <LinkButton href="/attention?item=duplicate-payments" variant="primary" size="sm">احسمه في «يحتاج قرارك»</LinkButton>
+              <LinkButton href="/attention?item=duplicate-payments" variant="primary" size="sm">قرّر فيه من «يحتاج قرارك»</LinkButton>
             </div>
           )}
 

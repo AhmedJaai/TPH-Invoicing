@@ -156,7 +156,7 @@ export function buildChanges(f: ChangeFacts): Change[] {
       favourable: null,
       detail:
         dir === "NEW" ? `أوّل مشتريات في ${f.thisMonthLabel}`
-        : dir === "FLAT" ? "قريبة ممّا كانت"
+        : dir === "FLAT" ? "قريبة من الشهر السابق"
         : dir === "UP" ? "أنفقت أكثر. تأكّد أنه نمو في العمل وليس هدراً"
         : "أنفقت أقلّ",
       href: "/purchases/invoices",

@@ -184,7 +184,7 @@ export function InvoiceFix({
               <div className="min-w-0">
                 <p className="text-xs font-bold">
                   {/* ما هو للعلم لا يُكتب «يحتاج معالجة» — وإلّا صار كلُّ تقريبٍ عطباً */}
-                  {r.severity === "BLOCKER" ? "يمنع القيد: " : r.severity === "WARN" ? "يحتاج إلى معالجة: " : "للعلم: "}
+                  {r.severity === "BLOCKER" ? "يمنع التسجيل: " : r.severity === "WARN" ? "يحتاج إلى معالجة: " : "للعلم: "}
                   {r.what}
                 </p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-ink-soft">{r.fix}</p>

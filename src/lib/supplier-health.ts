@@ -72,7 +72,7 @@ export function scoreDocuments(f: SupplierFacts): DimensionScore {
 
 export function scoreVat(f: SupplierFacts): DimensionScore {
   if (!f.issuesInvoices) {
-    return { dimension: "VAT", grade: "POOR", reason: "لا يصدر فواتير ضريبية، فلا خصم مدخلات." };
+    return { dimension: "VAT", grade: "POOR", reason: "لا يصدر فواتير ضريبية، فلا تُخصم ضريبة مشترياته." };
   }
   const judged = f.taxValidCount + f.taxInvalidCount;
   if (judged === 0) {
@@ -121,10 +121,10 @@ export function scorePricing(f: SupplierFacts): DimensionScore {
     return { dimension: "PRICING", grade: "GOOD", reason: `متوسّط أسعاره تغيّر ${shown}، وهو مستقر.` };
   }
   if (p < 0) {
-    return { dimension: "PRICING", grade: "GOOD", reason: `متوسّط أسعاره انخفض ${shown}.` };
+    return { dimension: "PRICING", grade: "GOOD", reason: `انخفض متوسط أسعاره ${shown}.` };
   }
   if (p <= PRICE_HOT_PCT) {
-    return { dimension: "PRICING", grade: "FAIR", reason: `متوسّط أسعاره ارتفع ${shown}.` };
+    return { dimension: "PRICING", grade: "FAIR", reason: `ارتفع متوسط أسعاره ${shown}.` };
   }
   return { dimension: "PRICING", grade: "POOR",
     reason: `متوسّط أسعاره ارتفع ${shown} ، ويستحق التفاوض.` };

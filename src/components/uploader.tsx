@@ -1641,7 +1641,7 @@ function ReviewCard({
             <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
             <div>
               <p className="font-bold">
-                تعثّرت الأرشفة
+                فشلت الأرشفة
                 {item.finishedInMs !== undefined && <> بعد <span className="nums">{(item.finishedInMs / 1000).toFixed(1)}</span> ثانية</>}
               </p>
               <p className="mt-0.5 text-ink-soft">{item.archiveError}</p>
