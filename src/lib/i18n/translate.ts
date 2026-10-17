@@ -65,6 +65,9 @@ export class Translator {
       }
       const order: number[] = [];
       const parts = key.split(SLOT);
+      /* قالبٌ نصُّه الثابت أقلّ من ثلاثة أحرف («ال{0}»، «لـ{0}») يطابق كلَّ شيءٍ فيفسد غيره */
+      const letters = parts.filter((_, i) => i % 2 === 0).join("").match(/[\u0621-\u064A]/g)?.length ?? 0;
+      if (letters < 3) continue;
       let src = "^";
       parts.forEach((p, i) => {
         if (i % 2 === 0) src += escapeRe(p);
@@ -108,6 +111,12 @@ export class Translator {
       const values: string[] = [];
       t.order.forEach((slot, i) => (values[slot] = this.core(m[i + 1].trim(), depth + 1)));
       return t.en.replace(SLOT, (_, n) => values[Number(n)] ?? "");
+    }
+
+    /* واو العطف في أوّل الكلمة: «وقواعد التصنيف» ← «and» + المعروف */
+    if (s.length > 2 && s.startsWith("و")) {
+      const rest = this.core(s.slice(1), depth + 1);
+      if (rest !== s.slice(1)) return `and ${rest}`;
     }
 
     /* تقسيمٌ على الفواصل — كلُّ جزءٍ يُترجَم وحده إن عُرف */

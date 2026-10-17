@@ -12,6 +12,7 @@ export function UserMenu({ name, role, tone = "surface" }: { name?: string | nul
     <div className="flex min-w-0 flex-1 items-center gap-2.5">
       <span
         aria-hidden
+        data-no-translate
         className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[13px] font-bold ${
           frame ? "bg-frame-raised text-frame-accent" : "bg-accent-soft text-accent"
         }`}

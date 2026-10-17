@@ -45,3 +45,13 @@ describe("ترجمة الواجهة", () => {
     expect(latinize("«أ»، ب؟")).toBe("\"أ\", ب?");
   });
 });
+
+describe("حدود القوالب", () => {
+  const t2 = new Translator({ "ال{0}": "the {0}", "السبت": "Saturday", "أكتوبر": "October", "قواعد التصنيف": "Classification rules" });
+  it("قالبٌ ثابتُه أقلّ من ثلاثة أحرف لا يُطبَّق — التاريخ يُترجَم جزءاً جزءاً", () => {
+    expect(t2.translate("السبت، ١٧ أكتوبر")).toBe("Saturday, 17 October");
+  });
+  it("واو العطف تُترجَم وما بعدها معروف", () => {
+    expect(t2.translate("وقواعد التصنيف")).toBe("and Classification rules");
+  });
+});

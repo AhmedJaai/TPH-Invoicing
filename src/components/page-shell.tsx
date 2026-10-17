@@ -3,6 +3,7 @@ import { CommandPalette } from "./command-palette";
 import { Suspense, ViewTransition } from "react";
 import { AutoProcess } from "./auto-process";
 import { ShellWatch } from "./shell-watch";
+import { HydrationSignal } from "./i18n/hydration-signal";
 import { HashScroll } from "./hash-scroll";
 import { TrialBanner } from "./trial-banner";
 import { UserMenu } from "./user-menu";
@@ -154,6 +155,7 @@ export function PageShell({
     */
     <ViewTransition enter="page-in" exit="page-out" default="none">
     <main id="main" className={mainClass(width)}>
+      <HydrationSignal />
       {/* React 19 يرفع `<title>` إلى الترويسة أينما رُسم */}
       <title>{`${title} · ذا بوبليك هاوس`}</title>
       <header>
