@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "drizzle-orm";
-import { Activity, CalendarClock, Cpu, Languages, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound, UsersRound } from "lucide-react";
+import { Activity, CalendarClock, Camera, Cpu, Languages, Repeat, ScrollText, ShieldAlert, SlidersHorizontal, Store, UserRound, UsersRound } from "lucide-react";
+import { CaptureLinks } from "@/components/capture-links";
+import { listLinks } from "@/services/capture.service";
 import { BankRules, type BankRuleRow } from "@/components/bank-rules";
 import { CATEGORY_LABEL, isTxCategory } from "@/lib/bank/rules";
 import { asCadence } from "@/lib/cash-outlook";
@@ -110,6 +112,7 @@ export default async function SettingsPage() {
   const aiSpend = spend && spend.calls > 0 ? spend : null;
   const aiBudget = dailyBudgetMicroUsd(process.env.AI_DAILY_BUDGET_USD);
   const managedUsers = can(user.role, "users:manage") && !isAuthBypassed() ? await listUsersForAdmin() : null;
+  const captureLinks = can(user.role, "users:manage") ? await listLinks() : null;
   const locale = asLocale((await cookies()).get(LOCALE_COOKIE)?.value);
   const toc = [
     { id: "account", label: "الحساب", icon: UserRound },
@@ -181,6 +184,24 @@ export default async function SettingsPage() {
                   activeSessions: u.activeSessions,
                   lastSeenAbout: u.lastSeenAbout ? timeAgo(u.lastSeenAbout) : null,
                   note: u.note,
+                }))}
+              />
+            </Section>
+          )}
+
+          {captureLinks && (
+            <Section
+              id="team-links"
+              title="روابط تصوير الفريق"
+              icon={Camera}
+              count={captureLinks.length}
+              hint="رابط لكل باريستا يصوّر به الفاتورة الورقية حين يستلمها، بلا حساب ولا كلمة مرور. لا يرى شيئاً غير ما أرسله، وتنتظر صوره اعتمادك في صفحة الرفع."
+            >
+              <CaptureLinks
+                links={captureLinks.map((l) => ({
+                  ...l,
+                  createdAt: l.createdAt.toISOString(),
+                  lastUsedAt: l.lastUsedAt?.toISOString() ?? null,
                 }))}
               />
             </Section>

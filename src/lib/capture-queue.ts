@@ -47,3 +47,19 @@ export function onCaptured(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
+
+/*
+  صورةٌ من الفريق (`/c/…`) تُفتح هنا لتُراجَع — ويُحمل معها معرّفُها إلى الأرشفة،
+  فتصير مستنداً في المعاملة نفسها. يُعلَّق على الملفّ نفسه لا على اسمه: الاسمان
+  قد يتشابهان، والملفُّ واحد.
+*/
+const captureIds = new WeakMap<File, string>();
+
+export function tagCapture(file: File, captureId: string): File {
+  captureIds.set(file, captureId);
+  return file;
+}
+
+export function captureIdOf(file: File): string | undefined {
+  return captureIds.get(file);
+}

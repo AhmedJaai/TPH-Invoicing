@@ -2,12 +2,14 @@ import { MyUploads } from "@/components/my-uploads";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
-import { FolderSync, Inbox } from "lucide-react";
+import { FolderSync, Inbox, UsersRound } from "lucide-react";
 import { db } from "@/db";
 import { suppliers } from "@/db/schema";
 import { Uploader } from "@/components/uploader";
 import { PageShell } from "@/components/page-shell";
-import { Callout, LinkButton } from "@/components/ui";
+import { Callout, LinkButton, Section } from "@/components/ui";
+import { TeamCaptures } from "@/components/team-captures";
+import { listPendingCaptures } from "@/services/capture.service";
 import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { inboxCount } from "@/lib/work";
@@ -43,6 +45,8 @@ export default async function UploadPage() {
     /* العددُ نفسُه الذي في شارة «المستندات» — لا عدٌّ ثانٍ بشرطٍ آخر */
     inboxCount().catch(() => null),
   ]);
+  /* صورُ الفريق تنتظر من يقرّر — ومن لا يقرّر لا يراها */
+  const team = canDecide ? await listPendingCaptures() : [];
 
   return (
     <PageShell
@@ -51,11 +55,30 @@ export default async function UploadPage() {
       title="ارفع مستنداً"
       intro="صوّر الفاتورة أو اختر ملفها كما وصلك. يقرأ النظام المورّد والرقم والتاريخ والمبالغ، ولا يُحفظ شيء حتى تؤكدها أنت."
     >
-      <Uploader
-        canSeeAmounts={showAmounts}
-        canCreateSupplier={can(user.role, "supplier:edit")}
-        suppliers={rows}
-      />
+      {/* صورُ الفريق أوّلاً — من جاء من «يحتاج قرارك» جاء لها */}
+      {team.length > 0 && (
+        <Section
+          id="team"
+          className="mb-10"
+          title="صوّرها الفريق، وتنتظرك"
+          icon={UsersRound}
+          count={team.length}
+          hint="افتح كل صورة لتراجعها في القارئ تحت القائمة ثم تعتمدها، أو ارفضها بسبب يراه من صوّرها."
+        >
+          <TeamCaptures
+            canSeeAmounts={showAmounts}
+            items={team.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() }))}
+          />
+        </Section>
+      )}
+
+      <div id="reader" className="scroll-mt-24">
+        <Uploader
+          canSeeAmounts={showAmounts}
+          canCreateSupplier={can(user.role, "supplier:edit")}
+          suppliers={rows}
+        />
+      </div>
 
       {/* من يرفع يرى أين وقف ما رفعه اليوم — بلا مبالغ، فلا يسأل «هل وصل؟» */}
       <MyUploads userId={user.id} canOpen={can(user.role, "document:view")} />

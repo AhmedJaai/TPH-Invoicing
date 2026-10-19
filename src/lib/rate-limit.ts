@@ -60,6 +60,15 @@ export function decide(
 export const RULES: Record<string, RateLimitRule> = {
   // تستهلك حصّة النموذج — الأضيق
   analyze: { limit: 40, windowSeconds: 3600 },
+  /*
+    رابطُ الباريستا بلا دخول — يُعدّ لكلّ رابط. الفحصُ قراءةُ نموذج (إعادةُ التصوير
+    تُعيده)، والإرسالُ صفٌّ في القاعدة. ورابطٌ تسرّب لا يُغرق الانتظار.
+  */
+  "capture-check": { limit: 40, windowSeconds: 3600 },
+  "capture-submit": { limit: 40, windowSeconds: 3600 },
+  "capture-file": { limit: 300, windowSeconds: 3600 },
+  "capture-decide": { limit: 120, windowSeconds: 3600 },
+  "capture-link": { limit: 30, windowSeconds: 3600 },
   archive: { limit: 60, windowSeconds: 3600 },
   "statement-reconcile": { limit: 20, windowSeconds: 3600 },
   /*

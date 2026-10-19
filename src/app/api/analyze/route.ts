@@ -23,6 +23,7 @@ import { can } from "@/lib/permissions";
 import { itemKeys, priceMovesAtReview, type PriceMove } from "@/lib/price-at-review";
 import { loadLastItemPrices } from "@/services/price-review.service";
 import { loadSupplierRecords } from "@/services/upload-review.service";
+import { CAPTURE_READING_MAX_AGE_MS, isWaitingCapture } from "@/services/capture.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -128,7 +129,8 @@ async function handle(request: Request) {
     ثانيةً عن الملفّ نفسه.
   */
   /* تُفحص بالمخطّط وبنسخة الموجِّه — ما لا يطابق القائمَ يُقرأ من جديد (`reading-cache.service`) */
-  const recent = await loadCachedReading(sha256, 60 * 60 * 1000);
+  /* صورةٌ من الفريق قُرئت يوم وصلت — قراءتُها صالحةٌ حتّى تُفتح، لا ساعةً وحدها */
+  const recent = await loadCachedReading(sha256, (await isWaitingCapture(sha256)) ? CAPTURE_READING_MAX_AGE_MS : 60 * 60 * 1000);
 
   const extraction: ExtractionOutcome = recent
     ?? await extractDocument({

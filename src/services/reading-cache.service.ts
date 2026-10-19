@@ -50,7 +50,7 @@ export async function loadCachedReading(sha256: string, maxAgeMs: number): Promi
   };
 }
 
-export async function saveCachedReading(sha256: string, extraction: ExtractionSuccess, userId: string): Promise<void> {
+export async function saveCachedReading(sha256: string, extraction: ExtractionSuccess, userId: string | null): Promise<void> {
   const reading = {
     extraction: extraction.value,
     model: extraction.model,

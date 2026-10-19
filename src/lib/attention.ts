@@ -109,6 +109,8 @@ export interface AttentionFacts {
   openBlockers: number;
   /** مستندات لم يُبتّ فيها */
   pendingDocuments: number;
+  /** صورُ فواتيرٍ ورقيّة أرسلها الفريق من روابطه وتنتظر الاعتماد (081). الغائبُ: لم يُسأل. */
+  teamCaptures?: number;
   /**
    * فواتيرُ خرج مالها مرّتين في اليوم نفسه لجهةٍ واحدة.
    *
@@ -1202,6 +1204,27 @@ export function buildAttention(f: AttentionFacts): AttentionItem[] {
       href: "/purchases/invoices?noLines=1",
       count: f.invoicesWithoutLines,
       impact: { kind: "UNATTRIBUTED", amountMinor: null },
+      evidence: [],
+    });
+  }
+
+  /*
+    الباريستا صوّر الفاتورة عند الباب — وما لم تُعتمد فليست في الدفاتر ولا في
+    الدرايف. والورقةُ قد تضيع بعدها، فالصورةُ هي الأصل حتّى تُؤرشَف.
+  */
+  if ((f.teamCaptures ?? 0) > 0) {
+    const n = f.teamCaptures ?? 0;
+    out.push({
+      id: "team-captures",
+      area: "INVOICES",
+      severity: "MEDIUM",
+      title: n === 1 ? "فاتورة صوّرها الفريق تنتظر اعتمادك" : n === 2 ? "فاتورتان صوّرهما الفريق تنتظران اعتمادك" : `${n} ${n <= 10 ? "فواتير" : "فاتورة"} صوّرها الفريق تنتظر اعتمادك`,
+      detail: "لن تدخل الدفاتر ولا الدرايف حتى تعتمدها، وقد قرأها النظام عند وصولها.",
+      action: "راجع كل صورة في القارئ ثم اعتمدها، أو ارفضها بسبب يراه من صوّرها.",
+      actionLabel: "راجعها",
+      href: "/upload#team",
+      count: n,
+      impact: { kind: "BLOCKED", amountMinor: null },
       evidence: [],
     });
   }

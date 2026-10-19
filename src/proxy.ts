@@ -9,7 +9,11 @@ import type { NextRequest } from "next/server";
 import { previewAllowed } from "@/lib/preview-mode";
 
 /* `/i18n/`: قاموسُ الواجهة الإنجليزيّة — نصوصُ أزرارٍ لا بيانات، وصفحةُ الدخول تحتاجه قبل الجلسة */
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health", "/i18n/"];
+/*
+  `/c/` و`/api/capture/scan/`: رابطُ تصوير الباريستا — بلا جلسة، ورمزُه هو إذنُه. والمسارُ
+  نفسُه يفحص الرمز (`capture.service.ts`) ولا يملك إلّا وضعَ صورةٍ في الانتظار.
+*/
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health", "/i18n/", "/c/", "/api/capture/scan/"];
 
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const ACCEPTED_BODIES = /^(application\/json|multipart\/form-data|application\/x-www-form-urlencoded)/i;

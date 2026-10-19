@@ -56,6 +56,23 @@ describe("الطلب الكاتب على /api", () => {
   });
 });
 
+describe("رابطُ تصوير الباريستا", () => {
+  it("صفحتُه وإرسالُه بلا جلسة — الرمزُ إذنُه ويفحصه المسار", () => {
+    expect(proxy(new NextRequest("https://app.example.com/c/abcdefghijklmnopqrstuvwxyz12")).status).toBe(200);
+    const send = proxy(post({ origin: "https://app.example.com", "content-type": "multipart/form-data; boundary=x" }, "/api/capture/scan/submit"));
+    expect(send.status).toBe(200);
+  });
+
+  it("ولا يفتح ما سواه: ملفُّ الصورة ورفضُها يحتاجان جلسة", () => {
+    expect(proxy(new NextRequest("https://app.example.com/api/capture/file?id=x")).status).toBe(401);
+    expect(proxy(post({ origin: "https://app.example.com", "content-type": "application/json" }, "/api/capture/decide")).status).toBe(401);
+  });
+
+  it("والإرسالُ من موقعٍ آخر يُردّ ولو بلا جلسة", () => {
+    expect(proxy(post({ origin: "https://evil.example", "content-type": "multipart/form-data; boundary=x" }, "/api/capture/scan/submit")).status).toBe(403);
+  });
+});
+
 describe("الخروج يمسح خزين المتصفّح", () => {
   it("صفحة الدخول تحمل Clear-Site-Data، وصفحات التطبيق لا تحملها", () => {
     const login = proxy(new NextRequest("https://app.example.com/login"));

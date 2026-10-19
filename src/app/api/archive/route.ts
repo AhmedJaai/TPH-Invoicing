@@ -37,6 +37,7 @@ import { can, ForbiddenError } from "@/lib/permissions";
 import { eq } from "drizzle-orm";
 import { applySupplierCredit } from "@/services/supplier-credit.service";
 import { SETTLEMENT_FORWARD_DAYS } from "@/lib/allocation";
+import { settleCapture } from "@/services/capture.service";
 
 export const runtime = "nodejs";
 
@@ -94,6 +95,8 @@ const ArchiveBody = z.object({
     .transform((v) => v ?? undefined),
   lines: z.array(z.object({ description: Cell, quantity: Cell, unitPrice: Cell, lineTotal: Cell })).max(500).nullish()
     .transform((v) => v ?? undefined),
+  /** صورةٌ من الفريق تُعتمد بهذه الأرشفة — تصير مستنداً في المعاملة نفسها */
+  captureId: Opt(64),
 });
 type ArchiveBody = z.infer<typeof ArchiveBody>;
 
@@ -299,6 +302,8 @@ export async function POST(request: Request) {
         uploadedById: user.id,
         status: needsReview ? "NEEDS_REVIEW" : "ARCHIVED",
       });
+
+      if (body.captureId) await settleCapture(tx, body.captureId, docId, user.id);
 
       if (review.canCreateInvoice && body.supplierId && invoiceDate && totalMinor !== null) {
         const invoiceId = await createInvoice(tx, {

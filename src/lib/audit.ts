@@ -21,6 +21,10 @@ export type AuditAction =
   | "DOCUMENT_UPLOADED"
   | "DOCUMENT_ARCHIVED"
   | "DOCUMENT_REJECTED"
+  /* صورُ الفريق (081): رابطُ تصويرٍ أُنشئ أو أُلغي، وصورةٌ رُفضت بسببها */
+  | "DOCUMENT_CAPTURE_LINK_CREATED"
+  | "DOCUMENT_CAPTURE_LINK_REVOKED"
+  | "DOCUMENT_CAPTURE_REJECTED"
   | "FIELD_CORRECTED"
   | "SUPPLIER_CREATED"
   | "SUPPLIER_UPDATED"

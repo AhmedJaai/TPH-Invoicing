@@ -85,6 +85,9 @@ export function handlerGuards(source: string, fileName = "route.ts"): HandlerGua
 const UNGUARDED: Record<string, string> = {
   "src/app/api/health/route.ts": "فحص الحياة علنيّ عمداً: المجهول يرى «حيّ أو لا» وحده، والتفصيل بـaudit:view داخله",
   "src/app/api/auth/[...nextauth]/route.ts": "باب الدخول نفسه — Auth.js",
+  /* رابطُ الباريستا بلا جلسة: الرمزُ إذنُه (`resolveLink`) والعدُّ لكلّ رابط (`consume`)، ولا يملك إلّا وضعَ صورةٍ في الانتظار */
+  "src/app/api/capture/scan/check/route.ts": "فحصُ وضوح صورة الباريستا — برمز رابطه لا بجلسة",
+  "src/app/api/capture/scan/submit/route.ts": "إرسالُ صورة الباريستا إلى الانتظار — برمز رابطه لا بجلسة",
 };
 
 /**

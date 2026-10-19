@@ -593,3 +593,17 @@ describe("وثائق تنتهي", () => {
     expect(buildAttention({ ...quiet, expiringObligations: [] }).map((i) => i.id)).not.toContain("obligations-expiring");
   });
 });
+
+describe("صورُ الفريق", () => {
+  it("تنتظر اعتمادك ببندٍ يفتح قائمتها في صفحة الرفع", () => {
+    const item = buildAttention({ ...quiet, teamCaptures: 3 }).find((i) => i.id === "team-captures");
+    expect(item?.href).toBe("/upload#team");
+    expect(item?.count).toBe(3);
+    expect(item?.title).toBe("3 فواتير صوّرها الفريق تنتظر اعتمادك");
+  });
+
+  it("الواحدةُ تُقال مفردةً، ولا بندَ بلا صور", () => {
+    expect(buildAttention({ ...quiet, teamCaptures: 1 }).find((i) => i.id === "team-captures")?.title).toBe("فاتورة صوّرها الفريق تنتظر اعتمادك");
+    expect(buildAttention({ ...quiet, teamCaptures: 0 }).map((i) => i.id)).not.toContain("team-captures");
+  });
+});

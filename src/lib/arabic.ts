@@ -51,6 +51,14 @@ export const ITEM: NounForms = {
   zero: "لا بنود",
 };
 
+export const PAGE: NounForms = {
+  one: "صفحة واحدة",
+  two: "صفحتان",
+  few: "صفحات",
+  many: "صفحة",
+  zero: "لا صفحات",
+};
+
 export const TRANSACTION: NounForms = {
   one: "حركة واحدة",
   two: "حركتان",

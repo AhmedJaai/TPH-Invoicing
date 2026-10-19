@@ -21,7 +21,7 @@ import { deleteDraft, loadDrafts, saveDraft } from "@/lib/review-drafts";
 import { Sheet, toast } from "./ui-client";
 import { imagesToPdf, type JpegPage } from "@/lib/images-to-pdf";
 import { Money } from "./money";
-import { onCaptured, takeCaptured } from "@/lib/capture-queue";
+import { captureIdOf, onCaptured, tagCapture, takeCaptured } from "@/lib/capture-queue";
 import { takeShared } from "@/lib/shared-inbox";
 import { T } from "@/components/i18n/t";
 
@@ -99,6 +99,8 @@ type Item =
       fileBase64: string;
       mimeType: string;
       previewUrl: string;
+      /** صورةٌ من الفريق — تُعتمد بهذه الأرشفة */
+      captureId?: string;
       archiving?: boolean;
       startedAt?: number;
       finishedInMs?: number;
@@ -688,7 +690,10 @@ export function Uploader({
 
   /** يقرأ ملفّاً واحداً حان دورُه — والبندُ في القائمة منذ اختير («ينتظر دوره»). */
   const read = useCallback(async (id: string, picked: File) => {
+    const captureId = captureIdOf(picked);
     const file = await prepareForUpload(picked);
+    /* «أعد المحاولة» يقرأ الملفَّ المُعَدّ — فيحمل المعرّفَ هو أيضاً */
+    if (captureId) tagCapture(file, captureId);
 
     /* الحدّ يُقال قبل الإرسال — لا ٤١٣ نصّيّ من المنصّة بعده */
     if (file.size > MAX_BYTES) {
@@ -734,6 +739,7 @@ export function Uploader({
                 fileBase64,
                 mimeType: file.type,
                 previewUrl,
+                captureId,
                 edited: {
                   invoiceNumber: data.result.invoiceNumber ?? "",
                   invoiceDate: data.result.invoiceDate ?? "",
@@ -908,6 +914,7 @@ export function Uploader({
           isFixedAsset: r.isFixedAsset,
           findings: r.findings,
           lines: (it.data.extraction as { lines?: unknown[] } | undefined)?.lines ?? [],
+          captureId: it.captureId,
         }),
       });
       const read = await readResponse<{ fileName: string; webViewLink?: string; renamed?: boolean; needsReview?: boolean }>(res);

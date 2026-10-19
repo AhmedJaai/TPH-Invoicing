@@ -2,7 +2,7 @@
 
 الحَكَم هو `src/db/schema.ts` ومجلّد `drizzle/sql/`. **اقرأ هذا** قبل أن تكتب هجرة.
 
-## الجداول — ٧٩
+## الجداول — ٨١
 
 `users` `accounts` `sessions` `verification_tokens` · `documents` `invoices` `invoice_lines` `issues`
 `suppliers` `supplier_aliases` `supplier_products` `supplier_item_aliases` · `payments` `payment_allocations` `payment_hold_overrides`
@@ -18,6 +18,7 @@
 `foodics_orders` `foodics_order_payments` `foodics_suppliers` `foodics_purchases` `foodics_purchase_items` `foodics_tills` `foodics_sync_runs`
 `foodics_stock_counts` `foodics_stock_count_items` `foodics_item_moves` `foodics_move_days`
 `finance_declarations` `finance_snapshots` `finance_readings`
+`capture_links` `captures`
 
 التعريف في `src/db/schema.ts`.
 
@@ -125,6 +126,7 @@
 | `078_alert_resolution_signal_keys.sql` | يوسّع قيدَ `alert_resolutions.key` بصيغة مفاتيح الملاحظات (`pos-missing:…` · `foodics-purchase:…`) — تتمّةُ 077 |
 | `079_foodics_stock_witness.sql` | شاهدُ المخزون من فودكس: `foodics_stock_counts` · `foodics_stock_count_items` (ما عُدّ على الرفّ — واقعةٌ كتبها إنسان) · `foodics_item_moves` (صرفُه مجموعاً يوماً بصنفٍ بنوع) · `foodics_move_days` (يومٌ قُرئ كلُّه)؛ و`foodics_tills.user_name` · `device_name` |
 | `080_finance.sql` | المساحةُ الماليّة: `finance_declarations` (إقرارُ المالك: توزيعُ دفعةٍ على أشهر · مصروفٌ خارج الكشف · «لا يوجد») · `finance_snapshots` (قائمةُ دخل الشهر المقفل مجمَّدةً) · `finance_readings` (قراءةُ النموذج بمدخلاتها وبصمتها) — طبقةُ قراءةٍ لا دفتر |
+| `081_team_captures.sql` | صورُ الفريق: `capture_links` (رابطُ تصويرٍ شخصيّ بلا دخول، تُحفظ بصمةُ رمزه ويُلغى ولا يُحذف) · `captures` (صورةُ الفاتورة الورقيّة تنتظر في القاعدة لا في الدرايف حتّى تُعتمد بالأرشفة أو تُرفض بسببها) — إضافةٌ خالصة |
 
 والمشغّل لا يعيد هجرةً مطبَّقة تغيّر ملفّها إلّا بـ`--reapply <الاسم>`، وبقفلٍ استشاريّ ضدّ تشغيلين.
 

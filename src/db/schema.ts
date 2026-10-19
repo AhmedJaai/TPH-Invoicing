@@ -8,7 +8,7 @@
 import {
   pgTable, pgEnum, text, integer, bigint, boolean, timestamp, jsonb,
   doublePrecision, numeric, uniqueIndex, index, primaryKey,
-  type AnyPgColumn,
+  type AnyPgColumn, customType,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { createId } from "@/lib/id";
@@ -2345,3 +2345,49 @@ export const financeReadings = pgTable("finance_readings", {
   createdAt: now(),
   createdById: text("created_by_id").references(() => users.id),
 }, (t) => [index("finance_readings_scope_idx").on(t.scope, t.month, t.createdAt)]);
+
+/* ──────────────────── صورُ الفريق (081) ──────────────────── */
+
+/** بايتاتٌ خامّ — الصورةُ في القاعدة حتّى تُعتمد، ثمّ تُفرَّغ وتبقى في الدرايف. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
+
+/**
+ * رابطُ تصويرٍ شخصيّ لموظّف — بلا دخول. تُحفظ بصمةُ رمزه لا الرمز نفسُه،
+ * ويُلغى ولا يُحذف فيبقى اسمُ من أرسل ما أرسله.
+ */
+export const captureLinks = pgTable("capture_links", {
+  id: id(),
+  label: text("label").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  createdById: text("created_by_id").references(() => users.id),
+  createdAt: now(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  revokedById: text("revoked_by_id").references(() => users.id),
+});
+
+/**
+ * صورةُ فاتورةٍ ورقيّة من الفريق، تنتظر إقرار صاحب العمل. لا تبلغ الدرايف
+ * ولا الدفاتر إلّا بالأرشفة المعتادة (`/api/archive` بـ`captureId`).
+ */
+export const captures = pgTable("captures", {
+  id: id(),
+  linkId: text("link_id").notNull().references(() => captureLinks.id),
+  fileData: bytea("file_data"),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  sha256: text("sha256").notNull(),
+  originalFileName: text("original_file_name"),
+  note: text("note"),
+  /** PENDING · ARCHIVED · REJECTED */
+  status: text("status").notNull().default("PENDING"),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  readError: text("read_error"),
+  documentId: text("document_id").references(() => documents.id, { onDelete: "set null" }),
+  decidedById: text("decided_by_id").references(() => users.id),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  decisionNote: text("decision_note"),
+  createdAt: now(),
+});

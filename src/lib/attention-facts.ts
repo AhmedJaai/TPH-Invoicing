@@ -44,6 +44,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         select
           (select count(*)::int from issues where status='OPEN' and severity='BLOCKER')      as open_blockers,
           (select count(*)::int from documents where status in ('PENDING','NEEDS_REVIEW'))   as pending_docs,
+          (select count(*)::int from captures where status = 'PENDING')                       as team_captures,
           /* ما لا ضريبة فيه لا يخصم منه شيء — أوراق الزيتون ولافا (٦٦ فاتورة) بلا ضريبة أصلاً */
           (select count(*)::int from invoices where tax_status='INVALID' and vat_minor > 0)  as not_valid,
           (select coalesce(sum(vat_minor),0)::bigint from invoices
@@ -501,6 +502,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     vatReturnDue: await vatReturnDue(),
     openBlockers: Number(counts?.open_blockers ?? 0),
     pendingDocuments: Number(counts?.pending_docs ?? 0),
+    teamCaptures: Number(counts?.team_captures ?? 0),
     /*
       كان هنا صفرٌ مكتوبٌ بيد، وتعليقٌ يحيل إلى صفحة البنك — وصفحةُ
       البنك لا تحسبه أيضاً. فالبندُ لم يظهر مرّةً واحدة، والشاشةُ تقول
