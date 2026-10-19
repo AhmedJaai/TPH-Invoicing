@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const read = await readJson(request, ApiBody);
     if (!read.ok) return read.response;
     if (!foodicsConfigured()) {
-      return NextResponse.json({ error: "فودكس غير متصل: مفتاح الربط غير مضبوط في إعدادات الخادم. ارفع الملفات الثلاثة بدلاً منه." }, { status: 409 });
+      return NextResponse.json({ error: "فودكس غير متصل: مفتاح الربط غير مضبوط في إعدادات الخادم. ارفع الملفات الثلاثة بدلاً من ذلك." }, { status: 409 });
     }
     try {
       const parsed = await fetchFoodicsCatalog();

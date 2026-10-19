@@ -31,12 +31,25 @@ export function latinize(s: string): string {
     .replace(/ـ/g, "");
 }
 
+/**
+ * «←» بعد زرٍّ أو رابطٍ في العربيّة تعني «إلى الأمام»، واتّجاهها في الإنجليزيّة «→».
+ * و«→» تُترك: هي في النصوص سهمُ مدى («{0} → {1}») يُقرأ كذلك في الاتّجاهين.
+ */
+export function flipArrows(s: string): string {
+  return s.replace(/←/g, "→");
+}
+
 export function hasArabic(s: string): boolean {
   return ARABIC.test(s);
 }
 
 function normalize(s: string): string {
   return s.replace(/\s+/g, " ").trim();
+}
+
+/** بلا تشكيلٍ ولا تطويل — نصٌّ قديم محفوظ بتشكيله يطابق مفتاحه الحاليّ. */
+function fold(s: string): string {
+  return normalize(s).replace(/[\u064B-\u0652\u0640]/g, "");
 }
 
 interface Template {
@@ -52,6 +65,9 @@ function escapeRe(s: string) {
 
 export class Translator {
   private exact = new Map<string, string>();
+  private folded = new Map<string, string>();
+  /** الجملُ ذوات الخانات بنصّها — لـ`<T>` التي تحمل الجملة كاملةً بخاناتها */
+  private slotted = new Map<string, string>();
   private byHead = new Map<string, Template[]>();
   private byTail = new Map<string, Template[]>();
   /** قوالب طرفاها أقصر من حرفين («{0} … ({1})») — قليلة، فتُفحص كلّها */
@@ -63,8 +79,11 @@ export class Translator {
       const key = normalize(ar);
       if (!HAS_SLOT.test(key)) {
         this.exact.set(key, en);
+        if (!this.folded.has(fold(key))) this.folded.set(fold(key), en);
         continue;
       }
+      this.slotted.set(key, en);
+      if (!this.slotted.has(fold(key))) this.slotted.set(fold(key), en);
       const order: number[] = [];
       const parts = key.split(SLOT);
       /* خانةٌ أخيرة تُترك فارغةً أحياناً («…دفعة واحدة{0}.») — يُسجَّل النصّ بدونها أيضاً */
@@ -93,21 +112,37 @@ export class Translator {
 
   /** يترجم نصّاً كما رُسم، ويُبقي مسافاته في طرفيه. */
   translate(raw: string): string {
-    if (!hasArabic(raw)) return latinize(raw);
+    if (!hasArabic(raw)) return flipArrows(latinize(raw));
     const cached = this.cache.get(raw);
     if (cached !== undefined) return cached;
     const lead = raw.match(/^\s*/)![0];
     const trail = raw.slice(lead.length).match(/\s*$/)![0];
-    const out = lead + this.core(normalize(raw), 0) + trail;
+    const out = lead + flipArrows(this.core(normalize(raw), 0)) + trail;
     if (this.cache.size > 20000) this.cache.clear();
     this.cache.set(raw, out);
     return out;
   }
 
+  /**
+   * جملةُ `<T>` بخاناتها («سجّلت دفعة لـ{0} بمبلغ {1}») ← قالبُها الإنجليزيّ بالخانات نفسها.
+   * فإن لم تُعرف كاملةً تُرجمت قطعُها النصّيّة كلٌّ وحده، والخاناتُ في مواضعها.
+   */
+  template(s: string): string {
+    const lead = s.match(/^\s*/)![0];
+    const trail = s.slice(lead.length).match(/\s*$/)![0];
+    const key = normalize(s);
+    const hit = this.slotted.get(key) ?? this.slotted.get(fold(key)) ?? this.exact.get(key) ?? this.folded.get(fold(key));
+    if (hit !== undefined) return lead + flipArrows(hit) + trail;
+    return s
+      .split(/(\{\d+\})/)
+      .map((p) => (/^\{\d+\}$/.test(p) ? p : this.translate(p)))
+      .join("");
+  }
+
   private core(s: string, depth: number): string {
     if (!s) return s;
     if (!hasArabic(s)) return latinize(s);
-    const hit = this.exact.get(s);
+    const hit = this.exact.get(s) ?? this.folded.get(fold(s));
     if (hit !== undefined) return hit;
     if (depth > 3) return latinize(s);
 

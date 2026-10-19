@@ -109,7 +109,7 @@ export function ViewControls() {
         type="button"
         onClick={toggleAmounts}
         className={btn}
-        data-tip="أخف المبالغ أو أظهرها — للعرض على غيرك"
+        data-tip="أخفِ المبالغ أو أظهرها، لتعرض الشاشة على غيرك"
         aria-label="بدّل إخفاء المبالغ"
       >
         <Eye className="icon-shown h-[18px] w-[18px]" />
@@ -120,7 +120,7 @@ export function ViewControls() {
         type="button"
         onClick={toggleTheme}
         className={btn}
-        data-tip="بدّل بين الوضع الفاتح والداكن — و«اتبع وضع الجهاز» في لوحة الأوامر"
+        data-tip="بدّل بين الوضع الفاتح والداكن، و«اتبع وضع الجهاز» في لوحة الأوامر"
         aria-label="بدّل الوضع الفاتح والداكن"
       >
         <Sun className="icon-dark h-[18px] w-[18px]" />

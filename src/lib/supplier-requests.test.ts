@@ -101,7 +101,7 @@ describe("سجلّ المطالبة", () => {
 
   it("بعد أسبوع يقال «ذكّره»", () => {
     expect(describeRequested(0)).toBe("طُولب اليوم");
-    expect(describeRequested(3)).toBe("طُولب قبل 3 أيّام");
-    expect(describeRequested(9)).toBe("طُولب قبل 9 أيّام، وحان وقت التذكير");
+    expect(describeRequested(3)).toBe("طُولب قبل 3 أيام");
+    expect(describeRequested(9)).toBe("طُولب قبل 9 أيام، وحان وقت التذكير");
   });
 });

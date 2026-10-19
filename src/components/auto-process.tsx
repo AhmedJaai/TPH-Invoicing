@@ -148,7 +148,7 @@ export function AutoProcess({ drive = true }: { drive?: boolean }) {
         const succeeded = r.ok && !r.data.busy && !r.data.needsAuth && !r.data.paused;
         stamp("tph:auto-sync", succeeded || (r.ok && (r.data.needsAuth || r.data.paused)) ? Date.now() : Date.now() - SYNC_EVERY_MS + SYNC_RETRY_MS);
         if (succeeded && deep && !r.data.summary?.truncated) stamp("tph:auto-sync-deep");
-        if (r.ok && r.data.needsAuth) tellOnce(r.data.error ?? "تفويض الدرايف غير موجود أو منتهٍ. سجّل الخروج ثم الدخول.");
+        if (r.ok && r.data.needsAuth) tellOnce(r.data.error ?? "تفويض الدرايف غير موجود أو منتهٍ. سجّل الخروج ثم ادخل من جديد.");
         else if (succeeded) {
           arrived += r.data.summary?.created ?? 0;
           done.push(...readAutoWork(r.data.backlog?.done));

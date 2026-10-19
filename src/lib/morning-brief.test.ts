@@ -32,7 +32,7 @@ describe("إحاطة الصباح نصّاً", () => {
   it("الصفر المعلوم جملة لا «0.00»", () => {
     const t = buildBrief({ ...facts, owedMinor: 0, owedSuppliers: 0, pending: 0, weekMinor: 0 });
     expect(t).toContain("لا مبالغ مستحقة للمورّدين الآن");
-    expect(t).toContain("لا شيء بانتظار قرارك");
+    expect(t).toContain("لا شيء ينتظر قرارك");
     expect(t).not.toContain("0.00");
   });
 

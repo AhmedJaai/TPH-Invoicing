@@ -6,6 +6,7 @@ import { RotateCcw } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 /** «أعِده للمراجعة» — المرفوضُ يُقرأ من جديد ويُحكَم عليه كأيّ مستندٍ ينتظر. */
 export function RestoreDocument({ documentId }: { documentId: string }) {
@@ -35,9 +36,7 @@ export function RestoreDocument({ documentId }: { documentId: string }) {
           router.refresh();
         }}
       >
-        <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        أعده إلى المراجعة
-      </button>
+        <T s="{0}أعده إلى المراجعة" a={[<RotateCcw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
       {error && <span className="text-[11px] font-bold text-danger" role="alert">{error}</span>}
     </span>
   );

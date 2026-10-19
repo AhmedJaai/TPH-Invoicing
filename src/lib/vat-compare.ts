@@ -77,7 +77,7 @@ export function netDrivers(previous: FiledQuarter, current: FiledQuarter): NetDr
   const parts: [string, number | null, number | null][] = [
     ["خصم الفواتير", previous.fromInvoicesMinor, current.fromInvoicesMinor],
     ["خصم ضريبة الرسوم", previous.fromFeesMinor, current.fromFeesMinor],
-    ["خصم ما اخترته من الصادر", previous.fromSelectedMinor, current.fromSelectedMinor],
+    ["خصم ما اخترته من الخارج", previous.fromSelectedMinor, current.fromSelectedMinor],
   ];
   if (parts.every(([, a, b]) => a !== null && b !== null)) {
     for (const [label, a, b] of parts) drivers.push({ label, effectMinor: -((b ?? 0) - (a ?? 0)) });

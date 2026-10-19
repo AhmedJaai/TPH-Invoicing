@@ -59,6 +59,6 @@ describe("obligations", () => {
     expect(describeDaysLeft(0)).toBe("تنتهي اليوم");
     expect(describeDaysLeft(2)).toBe("بعد يومين");
     expect(describeDaysLeft(12)).toBe("بعد 12 يوماً");
-    expect(describeDaysLeft(-3)).toBe("انتهت منذ 3 أيّام");
+    expect(describeDaysLeft(-3)).toBe("انتهت منذ 3 أيام");
   });
 });

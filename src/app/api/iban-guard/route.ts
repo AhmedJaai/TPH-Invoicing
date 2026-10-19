@@ -32,7 +32,7 @@ export async function POST(request: Request) {
         ok: true,
         message: decision === "OPEN"
           ? "سيُسأل عن هذا المستفيد من جديد"
-          : `تم الحفظ: ${first.payee ?? "المستفيد"} معروف لديك، ولن يظهر التنبيه له مرة أخرى`,
+          : `حُفظ: ${first.payee ?? "المستفيد"} معروف لديك، ولن يظهر له التنبيه مرة أخرى`,
       });
     }
     const alert = await db.transaction((t) => resolveIbanAlert(t, { supplierId, iban, decision, note }, user.id));
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       ok: true,
       message: decision === "OPEN"
         ? `سيُسأل عن حساب ${alert.supplierName} من جديد`
-        : `تم الحفظ: حساب ${alert.supplierName} معروف لديك. سيعود التنبيه إن ظهر حساب آخر`,
+        : `حُفظ: حساب ${alert.supplierName} معروف لديك. سيعود التنبيه إن ظهر حساب آخر`,
     });
   } catch (e) {
     if (e instanceof IbanAlertGone) return NextResponse.json({ error: e.message }, { status: 409 });

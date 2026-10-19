@@ -123,7 +123,7 @@ export async function POST(request: Request) {
 
   /* ── التنفيذ ── */
   if (!can(user.role, "supplier:edit")) {
-    return NextResponse.json({ error: "تسمية ملفات الأرشيف تحتاج صلاحية «تعديل المورّدين والأصناف». اطلبها من مالك الحساب." }, { status: 403 });
+    return NextResponse.json({ error: "تسمية ملفات الأرشيف تحتاج إلى صلاحية «تعديل المورّدين والأصناف». اطلبها من مالك الحساب." }, { status: 403 });
   }
   const chosen = new Set(Array.isArray(body.fileIds) ? body.fileIds : []);
   if (chosen.size === 0) {
@@ -135,7 +135,7 @@ export async function POST(request: Request) {
 
   if (!token) {
     return NextResponse.json(
-      { error: "لا يوجد تفويض درايف لحسابك. سجّل الخروج ثم الدخول ووافق على صلاحية الدرايف." },
+      { error: "حسابك غير مفوَّض على الدرايف. سجّل الخروج ثم ادخل من جديد ووافق على صلاحية الدرايف." },
       { status: 428 },
     );
   }
@@ -192,10 +192,10 @@ export async function POST(request: Request) {
       التسمية لا تعمل، وهي تعمل.
     */
     message: failed.length > 0
-      ? `أُعيدت تسمية ${done.length} · وتعذّرت تسمية ${failed.length}: ${failed[0]?.error.slice(0, 80)}`
+      ? `سُمّي ${done.length} · وتعذّرت تسمية ${failed.length}: ${failed[0]?.error.slice(0, 80)}`
       : done.length === 0
-        ? "لا شيء يحتاج إلى إعادة تسمية، فأسماء الملفات موحّدة أصلاً"
-        : `أُعيدت تسمية ${done.length} ملفاً`
+        ? "لا شيء يحتاج إلى إعادة تسمية، فأسماء الملفات موحّدة"
+        : `سُمّي ${done.length} ملفاً من جديد`
           + (mine.length > targets.length ? ` · بقي ${mine.length - targets.length}، اضغط مرة أخرى` : ""),
   });
 }

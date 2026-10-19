@@ -23,8 +23,8 @@ export async function POST(request: Request) {
     const out = await db.transaction((tx) => recordStatementOnlyInvoices(tx, read.body.statementId, user.id));
     const total = out.created.reduce((s, c) => s + c.amountMinor, 0);
     const parts = [
-      out.created.length > 0 ? `تم قيد ${out.created.length} فاتورة من الكشف بمبلغ ${formatRiyalsDisplay(total)}. لا تُخصم ضريبتها حتى يصل ملفها.` : "لا توجد فواتير ناقصة لتُقيَّد",
-      out.closedMonth.length > 0 ? `و${out.closedMonth.length} في شهر مقفل لم تُقيَّد (${[...new Set(out.closedMonth.map((c) => c.month))].join("، ")}). أعد فتح الشهر أولاً.` : null,
+      out.created.length > 0 ? `سُجّلت ${out.created.length} فاتورة من الكشف بمبلغ ${formatRiyalsDisplay(total)}. لا تُخصم ضريبتها حتى يصل ملفها.` : "لا توجد فواتير ناقصة لتُسجَّل",
+      out.closedMonth.length > 0 ? `و${out.closedMonth.length} في شهر مقفل لم تُسجَّل (${[...new Set(out.closedMonth.map((c) => c.month))].join("، ")}). أعد فتح الشهر أولاً.` : null,
     ].filter(Boolean);
     return NextResponse.json({ ok: true, created: out.created.length, message: parts.join(". ") });
   } catch (e) {

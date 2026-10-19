@@ -9,6 +9,7 @@ import { buttonClass } from "./ui";
 import { toast } from "./ui-client";
 import { postJson } from "@/lib/http-client";
 import { txHref } from "@/lib/inspector";
+import { T } from "@/components/i18n/t";
 
 /**
  * تصحيحُ التصنيف في موضع التنبيه.
@@ -56,7 +57,7 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
         setError({ id: s.id, message: r.error });
         return;
       }
-      const message = r.data.message ?? "تم تصنيف الحركة سداداً لمورّد";
+      const message = r.data.message ?? "صُنّفت الحركة سداداً لمورّد";
       setDone((d) => new Map(d).set(s.id, message));
       toast({ tone: "ok", title: message, body: "وسيُطبَّق التصنيف على الحركات المشابهة في الكشوف القادمة." });
       router.refresh();
@@ -75,8 +76,7 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
               <span className="min-w-0">
                 <span className="block truncate text-[13px] font-bold" dir="auto">{s.label}</span>
                 <span className="mt-0.5 block text-[11px] text-muted">
-                  مصنَّفة «{s.categoryLabel}» · وتحمل اسم المورّد «{s.supplier}»
-                </span>
+                  <T s="مصنّفة «{0}» · وتحمل اسم المورّد «{1}»" a={[s.categoryLabel, s.supplier]} /></span>
               </span>
               <span className="shrink-0 text-[13px] font-bold"><Money minor={s.amountMinor} /></span>
             </div>
@@ -98,8 +98,7 @@ export function ExpenseReclassify({ suspects }: { suspects: Suspect[] }) {
                 </button>
                 {s.bankTransactionId && (
                   <Link href={txHref(s.bankTransactionId)} className="inline-flex min-h-11 items-center gap-1 text-[11px] font-bold text-ink-soft hover:text-accent sm:min-h-0">
-                    افتح الحركة <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                  </Link>
+                    <T s="افتح الحركة {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
                 )}
                 {!s.supplierId && <span className="text-[11px] text-muted">تعذّر ربط المورّد بالحركة. صنّفها من صفحة البنك.</span>}
               </div>

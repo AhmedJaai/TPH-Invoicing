@@ -71,7 +71,7 @@ describe("وصف الطابور", () => {
   });
 
   it("الفارغ يُقال صراحةً", () => {
-    expect(describeQueue(groupForReview([]))).toBe("لا شيء بانتظارك");
+    expect(describeQueue(groupForReview([]))).toBe("لا شيء ينتظرك");
   });
 
   it("المجموعة الفارغة لا تُذكر", () => {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Compass } from "lucide-react";
 import { buttonClass } from "@/components/ui-tokens";
 import { Kbd } from "@/components/ui";
+import { T } from "@/components/i18n/t";
 
 /** رابطٌ قديم أو مورّدٌ دُمج — بالعربية، ومعه طريقُ الرجوع. */
 export default function NotFound() {
@@ -14,12 +15,10 @@ export default function NotFound() {
         </span>
         <h1 className="mt-4 text-lg font-bold">لم نجد هذه الصفحة</h1>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-soft">
-          قد يكون الرابط قديماً، أو دُمج المورّد في مورّد آخر فتغيّر رمزه. ابحث عمّا تريد من أي
-          صفحة بـ<Kbd>⌘K</Kbd> أو{" "}<Kbd>/</Kbd>.
-        </p>
+          <T s="ربما الرابط قديم، أو دُمج المورّد في غيره فتغيّر رمزه. ابحث عما تريد من أي صفحة بـ{0} أو {1}." a={[<Kbd key="0">⌘K</Kbd>, <Kbd key="1">/</Kbd>]} /></p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <Link href="/" className={buttonClass("primary")}>
-            إلى اليوم
+            العودة إلى اليوم
           </Link>
           <Link href="/suppliers" className={buttonClass("secondary")}>
             المورّدون

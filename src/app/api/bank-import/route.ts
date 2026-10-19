@@ -644,7 +644,7 @@ async function handle(request: Request) {
   }
 
   if (!importId) {
-    return NextResponse.json({ error: "تعذّر تسجيل عملية الاستيراد. حاول مرة أخرى." }, { status: 500 });
+    return NextResponse.json({ error: "تعذّر تسجيل الاستيراد. حاول مرة أخرى." }, { status: 500 });
   }
 
   /*
@@ -746,7 +746,7 @@ async function handle(request: Request) {
                 مطابقة: decided.decision?.reasons ?? [],
                 درجةالمستفيد: Math.round(decided.supplierScore * 100),
                 ...(reservedForHand.has(key)
-                  ? { سدادمقيّدبيد: "بمبلغها نفسه للمورّد نفسه — تربط به ولا تكتب دفعةً ثانية" }
+                  ? { سدادمقيّدبيد: "بالمبلغ نفسه للمورّد نفسه، فتُربط به ولا تُسجَّل دفعة ثانية" }
                   : {}),
               }
             : null,
@@ -982,7 +982,7 @@ async function handle(request: Request) {
     bankImportId: importId ?? null,
     bankAccountId,
     againstTransactionId: m.id,
-    reason: "موجودة عندنا وغير موجودة في كشف البنك الذي يغطي يومها. قد تكون مكررة سُجّلت مرتين، أو حركة لم تحدث فعلاً.",
+    reason: "موجودة عندنا وليست في كشف البنك الذي يغطي يومها. ربما سُجّلت مرتين، أو لم تحدث أصلاً.",
     valueDate: m.valueDate,
     description: m.description,
     beneficiaryRaw: m.beneficiaryRaw,
@@ -1034,17 +1034,15 @@ async function handle(request: Request) {
     rejectedByConstraint,
     message:
       newRows === 0
-        ? `هذا الكشف مسجّل عندك من قبل: ${countNoun(canonicalRows.length, TRANSACTION)} جميعها مسجّلة، فلم تُضَف حركة جديدة${
-            missingFromFile.length > 0 ? `. وعندك ${countNoun(missingFromFile.length, TRANSACTION)} في فترته غير موجودة فيه، وتنتظر قرارك في صفحة البنك` : ""
-          }.`
+        ? `هذا الكشف مسجّل عندك من قبل: ${countNoun(canonicalRows.length, TRANSACTION)} كلها مسجّلة، فلم تُضَف حركة جديدة${missingFromFile.length > 0 ? `. وعندك ${countNoun(missingFromFile.length, TRANSACTION)} في فترته ليست فيه، تنتظر قرارك في صفحة البنك` : ""}.`
         : `تمت المزامنة: ${countNoun(canonicalRows.length, TRANSACTION)} في الملف · ${sync.known.length} موجودة · ${newRows} جديدة${
             sync.ambiguous.length > 0 ? ` · ${sync.ambiguous.length} للمراجعة` : ""
           }${
-            sync.conflict.length > 0 ? ` · ${sync.conflict.length} تعارض في الهوية ولم تُسجَّل` : ""
+            sync.conflict.length > 0 ? ` · ${sync.conflict.length} تعارضت هويتها فلم تُسجَّل` : ""
           }${rejectedByConstraint > 0 ? ` · ${rejectedByConstraint} رفضتها قاعدة البيانات` : ""}${
             handLinked > 0 ? ` · ${handLinked} رُبطت بسداد سجّلته يدوياً` : ""
           }${derived.created > 0 ? ` · ${derived.created} سُجّلت مصروفاً` : ""}${
-            held > 0 ? ` · ${held} محفوظة لتقرر فيها في صفحة البنك` : ""
+            held > 0 ? ` · ${held} محفوظة لتقرر فيها من صفحة البنك` : ""
           }.`,
     handLinked,
     linkNotes,

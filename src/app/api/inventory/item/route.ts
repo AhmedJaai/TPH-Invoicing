@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   }
   const parsed = Body.safeParse(raw);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلب غير مفهوم" }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "الطلب غير مفهوم" }, { status: 400 });
   }
   const { action, productId } = parsed.data;
 

@@ -81,7 +81,7 @@ function entityLink(entityType: string, entityId: string): React.ReactNode {
   if (entityType === "invoice") return <Link href={invoiceHref(entityId)} className="font-bold text-accent hover:underline">فاتورة</Link>;
   if (entityType === "bank_transaction") return <Link href={txHref(encodeURIComponent(entityId))} className="font-bold text-accent hover:underline">حركة بنكية</Link>;
   if (entityType === "month") return <Link href="/close" className="font-bold text-accent hover:underline">إقفال الشهر</Link>;
-  return ENTITY_LABEL[entityType] ?? "سجلّ";
+  return ENTITY_LABEL[entityType] ?? "سجل";
 }
 
 export default async function AuditTrailPage({
@@ -93,8 +93,8 @@ export default async function AuditTrailPage({
   if (!user) redirect("/login?from=/settings/audit");
   if (!can(user.role, "audit:view")) {
     return (
-      <PageShell user={user} width="wide" title="سجلّ التدقيق">
-        <NoAccess what="سجلّ التدقيق" />
+      <PageShell user={user} width="wide" title="سجل التدقيق">
+        <NoAccess what="سجل التدقيق" />
       </PageShell>
     );
   }
@@ -152,8 +152,8 @@ export default async function AuditTrailPage({
     <PageShell
       user={user}
       width="page"
-      title="سجلّ التدقيق"
-      intro="كل ما تم تنفيذه، ومن نفّذه، ومتى، بتوقيت الرياض. لا يمكن تعديل هذا السجل ولا حذف شيء منه."
+      title="سجل التدقيق"
+      intro="كل ما نُفّذ، ومن نفّذه، ومتى، بتوقيت الرياض. لا يمكن تعديل هذا السجل ولا حذف شيء منه."
     >
       <div className="mb-6">
         <LinkTabs
@@ -171,8 +171,8 @@ export default async function AuditTrailPage({
 
       {rows.length === 0 ? (
         <EmptyState
-          title={page > 1 ? "لا توجد سجلات أقدم من هذا." : "لا توجد سجلات من هذا النوع بعد."}
-          hint="كل إجراء يسجّل مبلغاً أو يغيّر حالة يُسجَّل هنا باسم من نفّذه ووقته."
+          title={page > 1 ? "لا توجد سجلات أقدم." : "لا توجد سجلات من هذا النوع بعد."}
+          hint="كل إجراء يسجّل مبلغاً أو يغيّر حالة يُسجَّل هنا مع اسم من نفّذه ووقته."
           action={page > 1 ? <Link href={pageHref(page - 1)} className={buttonClass("secondary", "sm")}>الأحدث</Link> : undefined}
         />
       ) : (

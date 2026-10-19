@@ -82,7 +82,7 @@ export function needsAdjudication(input: CaseInput): AdjudicationCase | null {
       candidates: [top, second, ...input.candidates.slice(2, 5)],
       entityCandidates: [],
       note:
-        `مرشّحان متقاربان في الدرجة (${Math.round(top.score * 100)} و${Math.round(second.score * 100)}) — ` +
+        `مرشّحان متقاربان في الدرجة (${Math.round(top.score * 100)} و${Math.round(second.score * 100)})، ` +
         "ولا يمكن الترجيح بينهما بالحساب",
     };
   }

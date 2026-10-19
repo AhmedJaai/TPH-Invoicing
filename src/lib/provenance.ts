@@ -87,7 +87,7 @@ export function buildProvenance(contributions: readonly Contribution[]): Provena
  * هو ما يجعل الرقم مضلّلاً.
  */
 export function summarize(p: Provenance, unit = "فاتورة"): string {
-  if (p.includedCount === 0 && p.excludedCount === 0) return "لا توجد بيانات بعد";
+  if (p.includedCount === 0 && p.excludedCount === 0) return "لا بيانات بعد";
 
   const head = `${p.includedCount} ${unit}`;
   if (p.excludedCount === 0) return `${head} · كاملة`;

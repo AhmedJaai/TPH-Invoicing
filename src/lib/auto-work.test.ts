@@ -14,7 +14,7 @@ describe("ما فعله النظام وحده يقال بأثره", () => {
   it("ما قيّد يقال بمبلغه: زاد ما عليك كذا", () => {
     const s = summarizeAutoWork([item({ totalMinor: 100_000 }), item({ documentId: "d2", totalMinor: 24_050, supplierName: "بيكوف" })]);
     expect(s?.owedAddedMinor).toBe(124_050);
-    expect(s?.title).toContain("قيّد");
+    expect(s?.title).toContain("سُجّلت");
     expect(s?.body).toContain("1,240.50");
     expect(s?.body).toContain("المراعي");
     expect(s?.touchesMoney).toBe(true);
@@ -38,7 +38,7 @@ describe("ما فعله النظام وحده يقال بأثره", () => {
     const s = summarizeAutoWork([item({ what: "approved", totalMinor: 90_000 })]);
     expect(s?.owedAddedMinor).toBe(0);
     expect(s?.touchesMoney).toBe(false);
-    expect(s?.title).toContain("اعتمد");
+    expect(s?.title).toContain("اعتُمد");
   });
 
   it("وصول مستندات جديدة وحده خبر كذلك", () => {

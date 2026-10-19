@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { normalizeArabic } from "@/lib/search";
 import { Popover } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 /** فوق هذا العدد تصير القائمةُ لوحاً فيه بحث — ثلاثون مورّداً لا يُمرَّر فيهم. */
 const SEARCH_ABOVE = 12;
@@ -72,7 +73,7 @@ export function FilterSelect({
               />
             </label>
             <ul className="min-h-0 flex-1 overflow-y-auto p-1" aria-label={label}>
-              {shown.length === 0 && <li className="px-3 py-3 text-xs text-muted">لا شيء يطابق «{q}».</li>}
+              {shown.length === 0 && <li className="px-3 py-3 text-xs text-muted"><T s="لا شيء يطابق «{0}»." a={[q]} /></li>}
               {shown.map((o) => (
                 <li key={o.value}>
                   <button

@@ -8,6 +8,7 @@ import { request, postJson } from "@/lib/http-client";
 import { timeAgo } from "@/lib/arabic";
 import type { NoticeFeed, Notice } from "@/services/notifications.service";
 import { Sheet } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * مركزُ الإشعارات والملخّصُ اليوميّ.
@@ -102,7 +103,7 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
     if (r.ok) setFeed((f) => (f ? { ...f, unread: 0, seenAt: r.data.seenAt } : f));
     else {
       setFeed(before);
-      setError(`تعذّر تعليم الإشعارات كمقروءة: ${r.error}`);
+      setError(`تعذّر تعليم الإشعارات مقروءة: ${r.error}`);
     }
   }
 
@@ -130,27 +131,24 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
         open={open}
         onClose={() => setOpen(false)}
         title="الإشعارات"
-        description="ما استجدّ منذ آخر زيارة، وملخّص آخر ٢٤ ساعة."
+        description="ما استجد منذ آخر زيارة، وملخص آخر ٢٤ ساعة."
         footer={
           <>
             <button type="button" onClick={() => void load()} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-ink-soft hover:bg-hover sm:min-h-8">
-              <RefreshCw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> تحديث
-            </button>
+              <T s="{0} تحديث" a={[<RefreshCw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
             <button
               type="button"
               disabled={marking || unread === 0}
               onClick={markSeen}
               className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-accent-ink disabled:opacity-50 sm:min-h-8"
             >
-              <CheckCheck className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              اجعل الكلّ مقروءاً
-            </button>
+              <T s="{0}علّم الكل مقروءاً" a={[<CheckCheck key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
           </>
         }
       >
         {/* زرّان بحالٍ مضغوطة لا «ألسنة»: نمطُ `tab` يَعِد بلوحٍ وأسهمٍ لم تكن */}
         <div role="group" aria-label="نوع الإشعارات المعروضة" className="mb-4 inline-flex rounded-lg bg-sunken p-1">
-          {([["new", "الجديد"], ["digest", "ملخّص اليوم"]] as const).map(([k, label]) => (
+          {([["new", "الجديد"], ["digest", "ملخص اليوم"]] as const).map(([k, label]) => (
             <button
               key={k}
               type="button"
@@ -173,14 +171,14 @@ export function NotificationsBell({ compact = false }: { compact?: boolean }) {
         {!feed && !error && (
           <div className="space-y-2" aria-busy="true">
             {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-14" />)}
-            <span className="sr-only">جارٍ التحميل…</span>
+            <span className="sr-only">يحمّل…</span>
           </div>
         )}
 
         {feed && tab === "new" && (
           feed.notices.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">
-              لا شيء جديد يستحقّ الإشعار خلال الأسبوعين الماضيين.
+              لا شيء جديد يستحق الإشعار خلال الأسبوعين الماضيين.
             </p>
           ) : (
             <ul className="space-y-1">
@@ -222,9 +220,9 @@ function DigestPanel({ feed }: { feed: NoticeFeed }) {
   const d = feed.digest;
   const rows: { label: string; n: number; href: string }[] = [
     { label: "مستندات وصلت", n: d.documentsArrived, href: "/documents" },
-    { label: "مستندات أُرشفت وقُيّدت", n: d.documentsArchived, href: "/documents" },
+    { label: "مستندات أُرشفت وسُجّلت", n: d.documentsArchived, href: "/documents" },
     { label: "مستندات تنتظر مراجعتك", n: d.needsReview, href: "/documents" },
-    { label: "دفعات قُيّدت", n: d.paymentsRecorded, href: "/bank" },
+    { label: "دفعات سُجّلت", n: d.paymentsRecorded, href: "/bank" },
     { label: "قرارات اتُّخذت", n: d.decisionsTaken, href: "/settings/audit" },
   ];
   const quiet = rows.every((r) => r.n === 0);
@@ -232,7 +230,7 @@ function DigestPanel({ feed }: { feed: NoticeFeed }) {
     <div>
       {quiet && (
         <p className="mb-3 rounded-lg bg-sunken px-3 py-2 text-xs text-muted">
-          يوم هادئ: لم يصل أي مستند ولم يُتَّخذ أي قرار في آخر ٢٤ ساعة.
+          يوم هادئ: لم يصل مستند ولم يُتخذ قرار في آخر ٢٤ ساعة.
         </p>
       )}
       <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised">

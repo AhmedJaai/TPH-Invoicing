@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   const marked = await markInvoicesRequested(read.body.supplierId, user.id);
   if (!marked) {
-    return NextResponse.json({ error: "لا توجد دفعة بلا مستند لهذا المورّد الآن، فربما وصلت فواتيره. حدّث الصفحة." }, { status: 409 });
+    return NextResponse.json({ error: "لا توجد الآن دفعة بلا مستند لهذا المورّد، فربما وصلت فواتيره. حدّث الصفحة." }, { status: 409 });
   }
-  return NextResponse.json({ ok: true, message: "تم تسجيل أنك طالبت المورّد اليوم" });
+  return NextResponse.json({ ok: true, message: "سُجّل أنك طالبت المورّد اليوم" });
 }

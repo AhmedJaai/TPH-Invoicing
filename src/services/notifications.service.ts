@@ -129,7 +129,7 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
       title: `وصل ${countNoun(Number(d.arrived), DOCUMENT)}`,
       body: Number(d.archived) === Number(d.arrived)
         ? "قُرئت كلها وأُرشفت."
-        : `أُرشف منها ${countNoun(Number(d.archived), DOCUMENT)} والباقي ينتظر.`,
+        : `أُرشف منها ${countNoun(Number(d.archived), DOCUMENT)}، والباقي ينتظر.`,
       href: "/documents",
     });
   }
@@ -142,7 +142,7 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
       kind: "REVIEW",
       tone: "warn",
       title: `${countNoun(Number(p.review), DOCUMENT)} تنتظر مراجعتك`,
-      body: "قرأها النظام لكن لم تتحقق شروط أرشفتها تلقائياً.",
+      body: "قرأها النظام، لكن شروط أرشفتها التلقائية لم تكتمل.",
       href: "/documents",
     });
   }
@@ -166,7 +166,7 @@ export async function loadNoticeFeed(user: { id: string; role: Role }): Promise<
       at: new Date(`${todayInRiyadh()}T00:00:00+03:00`).toISOString(),
       kind: "OVERDUE",
       tone: "warn",
-      title: `${countNoun(overdue.length, SUPPLIER)} تأخّر سدادهم أكثر من ${countNoun(60, DAY)}`,
+      title: `${countNoun(overdue.length, SUPPLIER)} تأخر سدادهم أكثر من ${countNoun(60, DAY)}`,
       body: `أقدم مبلغ مستحق منذ ${countNoun(oldest, DAY)}.`,
       /* من لا يعتمد الدفعة يفتح الحسابات — لا صفحةً تقول «خارج صلاحيتك» */
       href: can(user.role, "payment:approve") ? "/payments" : "/suppliers",

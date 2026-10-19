@@ -394,7 +394,7 @@ export function reconcileStatement(
     findings.push({
       code: ISSUE.INVOICE_NOT_IN_STATEMENT,
       ...ISSUE_TEXT.INVOICE_NOT_IN_STATEMENT,
-      message: `${countNoun(notInStatement.length, INVOICE)} عندنا لم ترد في كشفه. تحقّق من أنها ليست مكررة أو تخص مورّداً آخر`,
+      message: `${countNoun(notInStatement.length, INVOICE)} عندنا لم ترد في كشفه. تأكد أنها ليست مكررة، ولا تخص مورّداً آخر`,
     });
   }
 
@@ -402,7 +402,7 @@ export function reconcileStatement(
     findings.push({
       code: ISSUE.STATEMENT_AMOUNT_MISMATCH,
       severity: "WARN",
-      message: `حسابات الكشف نفسه لا تستقيم: الرصيد الافتتاحي مع الحركات يعطي ${formatRiyalsDisplay(computedClosingMinor!)} بينما الرصيد الختامي المكتوب ${formatRiyalsDisplay(options.closingBalanceMinor!)}`,
+      message: `حساب الكشف نفسه لا يستقيم: الرصيد الافتتاحي مع الحركات يساوي ${formatRiyalsDisplay(computedClosingMinor!)}، بينما الرصيد الختامي المكتوب ${formatRiyalsDisplay(options.closingBalanceMinor!)}`,
     });
   }
 
@@ -433,10 +433,10 @@ export function buildDiscrepancyMemo(
   const out: string[] = [
     `السلام عليكم ${supplierName}،`,
     ``,
-    `راجعنا كشف حسابكم عن ${periodLabel} وقابلناه بسجلاتنا:`,
+    `راجعنا كشف حسابكم عن ${periodLabel} وقارنّاه بسجلاتنا:`,
     ``,
     `• إجمالي ما حمّلتموه علينا: ${riyals(r.theirBilledMinor)} ريال`,
-    `• إجمالي فواتيركم لدينا: ${riyals(r.ourBilledMinor)} ريال`,
+    `• إجمالي فواتيركم عندنا: ${riyals(r.ourBilledMinor)} ريال`,
   ];
 
   if (r.billedDifferenceMinor !== 0) {
@@ -465,7 +465,7 @@ export function buildDiscrepancyMemo(
   }
 
   if (r.notInStatement.length > 0) {
-    out.push(``, `فواتير لدينا لم ترد في كشفكم:`);
+    out.push(``, `فواتير عندنا لم ترد في كشفكم:`);
     for (const i of r.notInStatement) {
       out.push(`  - ${i.invoiceNumber} · ${formatDay(i.invoiceDate)} · ${riyals(i.totalMinor)} ريال`);
     }

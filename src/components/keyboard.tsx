@@ -140,7 +140,7 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
   }, [chords, role, router]);
 
   return (
-    <Sheet open={help} onClose={() => setHelp(false)} title="اختصارات لوحة المفاتيح" description="تعمل في أي صفحة ما دمت لست داخل حقل كتابة، وبلوحة مفاتيح عربية أو إنجليزية." size="md">
+    <Sheet open={help} onClose={() => setHelp(false)} title="اختصارات لوحة المفاتيح" description="تعمل في أي صفحة ما دمت خارج حقول الكتابة، سواء كانت لوحة المفاتيح عربية أو إنجليزية." size="md">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 sm:grid-cols-2">
         <ShortcutGroup
           title="عامة"
@@ -159,7 +159,7 @@ export function KeyboardShortcuts({ role }: { role: Role }) {
             { keys: ["J"], label: "الصف التالي" },
             { keys: ["K"], label: "الصف السابق" },
             { keys: ["Enter"], label: "افتح الصف المحدد" },
-            { keys: ["J", "K"], label: "واللوحة مفتوحة: الانتقال إلى الملف التالي أو السابق" },
+            { keys: ["J", "K"], label: "واللوحة مفتوحة: انتقل إلى الملف التالي أو السابق" },
             { keys: ["Esc"], label: "أغلق اللوحة" },
           ]}
         />

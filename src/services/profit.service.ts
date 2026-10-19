@@ -291,8 +291,8 @@ async function stockCogs(
   month: string, window: StockWindow, basics: StockBasics, rates: ReadonlyMap<string, number>,
   purchases: readonly PurchaseDay[], theoretical: ReadonlyMap<string, DayCost>, conn: Conn,
 ): Promise<{ cogs: StockCogsDetail | null; missing: string | null }> {
-  if (!window.openingCountDay) return { cogs: null, missing: "لا يوجد جرد قريب من أول الشهر" };
-  if (!window.closingCountDay) return { cogs: null, missing: "لا يوجد جرد قريب من آخر الشهر" };
+  if (!window.openingCountDay) return { cogs: null, missing: "لا جرد قريب من أول الشهر" };
+  if (!window.closingCountDay) return { cogs: null, missing: "لا جرد قريب من آخر الشهر" };
   const [open, close] = await Promise.all([
     countValuesAt(window.openingCountDay, basics, conn),
     countValuesAt(window.closingCountDay, basics, conn),
@@ -315,7 +315,7 @@ async function stockCogs(
     }
     items.push({ productId, name, openingMinor, closingMinor });
   }
-  if (items.length === 0) return { cogs: null, missing: "لا يوجد صنف مجرود في بداية الشهر ونهايته وله تكلفة معروفة" };
+  if (items.length === 0) return { cogs: null, missing: "لا صنف مجرود في أول الشهر وآخره وله تكلفة معروفة" };
 
   const openingValueMinor = items.reduce((s, x) => s + x.openingMinor, 0);
   const closingValueMinor = items.reduce((s, x) => s + x.closingMinor, 0);
@@ -409,7 +409,7 @@ async function loadOpex(month: string, declarations: readonly Declaration[], con
     if (RECOVERABLE_VAT.has(r.category)) {
       excluded.push({ id: r.id, label: r.label, amountMinor: r.amount_minor, reason: "ضريبة رسوم تُخصم في الإقرار الضريبي" });
     } else if (r.category === "GOVERNMENT" && isTaxSettlement(r.description, r.beneficiary, r.label)) {
-      excluded.push({ id: r.id, label: r.label, amountMinor: r.amount_minor, reason: "سداد لهيئة الزكاة والضريبة والجمارك (تسوية ضريبية وليس مصروفاً)" });
+      excluded.push({ id: r.id, label: r.label, amountMinor: r.amount_minor, reason: "سداد لهيئة الزكاة والضريبة والجمارك (تسوية ضريبية، لا مصروف)" });
     } else if (r.bank_transaction_id && spreadTx.has(r.bank_transaction_id)) {
       /* دفعةٌ وُزّعت على أشهر: تخرج من شهر دفعها وتدخل حصصاً أدناه */
     } else {
@@ -637,13 +637,13 @@ export async function createDeclaration(input: NewDeclaration, actorId: string):
                to_char(value_date at time zone 'Asia/Riyadh', 'YYYY-MM') as month
           from bank_transactions where id = ${input.bankTransactionId}
       `)).rows[0];
-      if (!tx || tx.direction !== "DEBIT") throw new DeclarationRefused("الحركة غير موجودة أو ليست صادرة.");
-      if (tx.category !== input.category) throw new DeclarationRefused("فئة الحركة في كشف الحساب تختلف عن الفئة المختارة. صنّف الحركة أولاً.");
+      if (!tx || tx.direction !== "DEBIT") throw new DeclarationRefused("الحركة غير موجودة، أو ليست خارجة.");
+      if (tx.category !== input.category) throw new DeclarationRefused("فئة الحركة في كشف الحساب غير الفئة المختارة. صنّف الحركة أولاً.");
       if (tx.month < input.fromMonth || tx.month > input.toMonth) throw new DeclarationRefused("شهر الدفع خارج المدة التي تغطيها. راجع الشهرين.");
       amountMinor = tx.amount_minor;
       const [taken] = await t.select({ id: financeDeclarations.id }).from(financeDeclarations)
         .where(and(eq(financeDeclarations.bankTransactionId, input.bankTransactionId), eq(financeDeclarations.kind, "SPREAD"), isNull(financeDeclarations.voidedAt))).limit(1);
-      if (taken) throw new DeclarationRefused("هذه الحركة موزّعة مسبقاً. ألغِ توزيعها أولاً إن أردت تغييره.");
+      if (taken) throw new DeclarationRefused("هذه الحركة موزّعة من قبل. ألغِ توزيعها أولاً إن أردت تغييره.");
     } else if (input.kind === "NONE") {
       amountMinor = 0;
     } else if (!(amountMinor > 0)) {

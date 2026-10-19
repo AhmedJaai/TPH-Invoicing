@@ -22,6 +22,7 @@ import { Kbd } from "./ui";
 import { openCommandPalette } from "@/lib/ui-events";
 import { LinkPending, Sheet, toast } from "./ui-client";
 import { useShellPath } from "./use-shell-path";
+import { T } from "@/components/i18n/t";
 
 /**
  * التنقّل حول عمل صاحب المقهى لا حول جداول القاعدة.
@@ -247,9 +248,7 @@ export function MobileTabBar({
             aria-haspopup="dialog"
             className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px] transition-colors ${moreOpen ? "text-accent" : "text-muted"}`}
           >
-            <Ellipsis className="h-[22px] w-[22px]" strokeWidth={1.75} aria-hidden />
-            المزيد
-          </button>
+            <T s="{0}المزيد" a={[<Ellipsis key="0" className="h-[22px] w-[22px]" strokeWidth={1.75} aria-hidden />]} /></button>
         </nav>
       </div>
 
@@ -343,7 +342,7 @@ function AreaDot({ counts, href, frame }: { counts: Promise<ShellCounts>; href: 
   return (
     <span className="relative grid h-4 w-4 shrink-0 place-items-center" data-tip={`فيها ${n} مما يحتاج قرارك`}>
       <span aria-hidden className={`h-2 w-2 rounded-full ${frame ? "bg-frame-accent" : "bg-accent"}`} />
-      <span className="sr-only">فيها {n} مما يحتاج قرارك</span>
+      <span className="sr-only"><T s="فيها {0} مما يحتاج قرارك" a={[n]} /></span>
     </span>
   );
 }
@@ -362,7 +361,7 @@ function CountBadgeValue({ counts, href, className }: { counts: Promise<ShellCou
   }, [href, n]);
   if (n === 0) return null;
   return (
-    <span className={`nums nums-count ${className}`} aria-label={n === null ? "تعذّر العدّ" : `${n} بانتظارك`}>
+    <span className={`nums nums-count ${className}`} aria-label={n === null ? "تعذّر العد" : `${n} بانتظارك`}>
       {n === null ? "؟" : n}
     </span>
   );
@@ -384,7 +383,7 @@ export function CaptureButton({ role, variant }: { role: Role; variant: "frame" 
     if (!files?.length) return;
     const n = queueCapture(files);
     if (n === 0) {
-      toast({ tone: "warn", title: "الملفات المقبولة هي PDF أو الصور فقط.", body: "اختر فاتورة أو إيصالاً أو كشفاً بإحدى هاتين الصيغتين." });
+      toast({ tone: "warn", title: "الملفات المقبولة: PDF أو صور فقط.", body: "اختر فاتورة أو إيصالاً أو كشفاً بإحدى هاتين الصيغتين." });
       return;
     }
     router.push("/upload");
@@ -434,9 +433,7 @@ export function CaptureButton({ role, variant }: { role: Role; variant: "frame" 
         >
           <FolderOpen className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
           <span className="min-w-0">
-            ارفع ملفاً من جهازك
-            <span className="block text-[11px] font-medium text-ink-soft">PDF أو صور محفوظة. وزر الوسط للكاميرا</span>
-          </span>
+            <T s="ارفع ملفاً من جهازك{0}" a={[<span key="0" className="block text-[11px] font-medium text-ink-soft">PDF أو صور محفوظة، وزر الوسط للكاميرا</span>]} /></span>
         </button>
       </>
     );
@@ -451,9 +448,7 @@ export function CaptureButton({ role, variant }: { role: Role; variant: "frame" 
           onClick={() => ref.current?.click()}
           className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-bold text-accent-ink shadow-xs transition-colors hover:bg-accent-strong"
         >
-          <Upload className="h-4 w-4" strokeWidth={2} aria-hidden />
-          ارفع مستنداً
-        </button>
+          <T s="{0}ارفع مستنداً" a={[<Upload key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></button>
       </>
     );
   }
@@ -466,10 +461,7 @@ export function CaptureButton({ role, variant }: { role: Role; variant: "frame" 
         onClick={() => ref.current?.click()}
         className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-frame-accent text-[13px] font-bold text-frame transition-[filter] hover:brightness-110"
       >
-        <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden />
-        ارفع مستنداً
-        <Kbd tone="inherit">U</Kbd>
-      </button>
+        <T s="{0}ارفع مستنداً{1}" a={[<Plus key="0" className="h-4 w-4" strokeWidth={2.5} aria-hidden />, <Kbd key="1" tone="inherit">U</Kbd>]} /></button>
     </>
   );
 }

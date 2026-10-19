@@ -20,7 +20,7 @@ export type Readiness = "READY" | "PARTIAL" | "BLOCKED";
 
 export const READINESS_LABEL: Record<Readiness, string> = {
   READY: "جاهز",
-  PARTIAL: "جزئيّ",
+  PARTIAL: "جزئي",
   BLOCKED: "متعذّر",
 };
 
@@ -261,7 +261,7 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
     gaps.push({
       kind: "PURCHASES",
       reason: "RECEIPT_POSSIBLE_DUPLICATE",
-      label: "كمية أدخلتها يدوياً قد تكون نفسها بند فاتورة وصلت. اربطهما أو أكّد أنهما شحنتان مختلفتان",
+      label: "كمية أدخلتها يدوياً قد تكون هي بند فاتورة وصلت. اربطهما، أو أكّد أنهما شحنتان مختلفتان",
       count: dup.length,
       totalMinor: 0,
       unitsShareBp: null,
@@ -325,8 +325,8 @@ export function computeCoverage(input: CoverageInput): CoverageReport {
 export function describeCoverage(c: CoverageReport): string {
   if (c.readiness === "BLOCKED") {
     return c.sales.lines === 0
-      ? "لا توجد مبيعات في هذه الفترة. استورد ملف فودكس أولاً."
-      : "لم يدخل في الحساب أي سطر بيع، لأنه لا يوجد صنف مربوط بوصفة سارية.";
+      ? "لا مبيعات في هذه الفترة. استورد ملف فودكس أولاً."
+      : "لم يدخل في الحساب أي سطر بيع، لأنه لا صنف مربوط بوصفة سارية.";
   }
   if (c.readiness === "READY") {
     return "كل ما بيع في الفترة مربوط وله وصفة سارية، وكل سطر شراء معروفة كميته.";

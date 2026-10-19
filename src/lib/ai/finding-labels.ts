@@ -23,7 +23,7 @@ export const FINDING_LABEL: Record<FindingKind, string> = {
   APPLY_CREDIT: "رصيد لك عنده لم يُخصم",
   MISSING_INVOICES: "المدفوع أكثر من فواتيره",
   DUPLICATE_PAYMENT: "دفعة مسجّلة مرتين",
-  STATEMENT_GAP: "كشفه لا يطابق دفاترنا",
+  STATEMENT_GAP: "كشفه لا يطابق سجلاتنا",
   UNLINKED_TRANSFER: "حوالة له غير مربوطة",
   NOTE: "ملاحظة",
 };

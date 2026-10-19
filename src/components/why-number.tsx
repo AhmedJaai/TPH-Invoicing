@@ -6,6 +6,7 @@ import { CircleHelp } from "lucide-react";
 import { Money } from "./money";
 import { Popover } from "./ui-client";
 import { request } from "@/lib/http-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * «لماذا هذا الرقم؟» — زرٌّ صغير تحت الرقم الرئيسيّ يفتح آخرَ ما حرّكه.
@@ -59,16 +60,16 @@ export function WhyNumber({ figure, auditHref }: { figure: "owed" | "vat" | "pay
       <Popover
         buttonLabel="لماذا هذا الرقم؟"
         buttonClassName="inline-flex min-h-8 items-center gap-1 rounded-md text-[11px] font-bold text-accent hover:underline"
-        button={<><CircleHelp className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />لماذا هذا الرقم؟</>}
+        button={<><T s="{0}لماذا هذا الرقم؟" a={[<CircleHelp key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></>}
         width="22rem"
       >
         {() => (
           <div>
             <p className="text-sm font-bold">آخر ما غيّر هذا الرقم</p>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{figure === "vat" ? "من سجلّ التدقيق، الأحدث أولاً: ما اخترته للإقرار، وما قُيّد أو صُحّح من فواتير، وما استُورد من كشوف." : figure === "payrun" ? "من سجلّ التدقيق، الأحدث أولاً: ما قُيّد، وما سُدّد، وما قررته في المبالغ المحجوزة." : "من سجلّ التدقيق، الأحدث أولاً: ما قُيّد، وما سُدّد، وما صُحّح."}</p>
-            {state === "loading" && <p className="mt-3 text-xs text-muted" role="status">جارٍ التحميل…</p>}
+            <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{figure === "vat" ? "من سجل التدقيق، الأحدث أولاً: ما اخترته للإقرار، وما سُجّل أو صُحّح من فواتير، وما استُورد من كشوف." : figure === "payrun" ? "من سجل التدقيق، الأحدث أولاً: ما سُجّل، وما سُدّد، وما قرّرته في المبالغ الموقوفة." : "من سجل التدقيق، الأحدث أولاً: ما سُجّل، وما سُدّد، وما صُحّح."}</p>
+            {state === "loading" && <p className="mt-3 text-xs text-muted" role="status">يحمّل…</p>}
             {state === "failed" && <p className="mt-3 text-xs font-bold text-danger" role="alert">{error}</p>}
-            {state === "ready" && movers.length === 0 && <p className="mt-3 text-xs text-muted">لا توجد حركات في السجلّ على هذا الرقم بعد.</p>}
+            {state === "ready" && movers.length === 0 && <p className="mt-3 text-xs text-muted">لا حركات في السجل على هذا الرقم بعد.</p>}
             {state === "ready" && movers.length > 0 && (
               <ul className="mt-3 divide-y divide-line-soft">
                 {movers.map((m) => (
@@ -87,7 +88,7 @@ export function WhyNumber({ figure, auditHref }: { figure: "owed" | "vat" | "pay
               </ul>
             )}
             {auditHref && (
-              <Link href={auditHref} className="mt-2 inline-block text-[11px] font-bold text-accent hover:underline">عرض السجلّ كاملاً</Link>
+              <Link href={auditHref} className="mt-2 inline-block text-[11px] font-bold text-accent hover:underline">اعرض السجل كاملاً</Link>
             )}
           </div>
         )}

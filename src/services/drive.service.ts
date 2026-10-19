@@ -17,8 +17,8 @@ export class NoDriveAuthorizationError extends Error {
   constructor(expired = false) {
     super(
       expired
-        ? "انتهت صلاحية ربط الدرايف، فلم يُرفع الملف ولم يُقيَّد شيء. سجّل الخروج ثم الدخول بحساب جوجل ووافق على صلاحية الدرايف."
-        : "حسابك غير مربوط بالدرايف. سجّل الخروج ثم الدخول ووافق على صلاحية الدرايف.",
+        ? "انتهت صلاحية ربط الدرايف، فلم يُرفع الملف ولم يُسجَّل شيء. سجّل الخروج ثم ادخل بحساب جوجل ووافق على صلاحية الدرايف."
+        : "حسابك غير مربوط بالدرايف. سجّل الخروج ثم ادخل من جديد ووافق على صلاحية الدرايف.",
     );
     this.name = "NoDriveAuthorizationError";
   }
@@ -35,7 +35,7 @@ export class DriveUnavailableError extends Error {
 /** خطأ يُترجم إلى ٤٠٠: سنة لا مجلد لها في الإعدادات. */
 export class UnknownYearError extends Error {
   constructor(year: string) {
-    super(`لا يوجد مجلد لسنة ${year} في الإعدادات`);
+    super(`لا مجلد لسنة ${year} في الإعدادات`);
     this.name = "UnknownYearError";
   }
 }

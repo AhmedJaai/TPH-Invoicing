@@ -117,11 +117,11 @@ export async function POST(request: Request) {
         return true;
       });
       if (!undone) {
-        return NextResponse.json({ error: "سبق التراجع عن هذا الإعلان. حدّث الصفحة." }, { status: 409 });
+        return NextResponse.json({ error: "سبق التراجع عن هذا القرار. حدّث الصفحة." }, { status: 409 });
       }
-      return NextResponse.json({ ok: true, message: "تم التراجع عن «ليست سداداً»، وعادت الحركة تنتظر قرارك" });
+      return NextResponse.json({ ok: true, message: "تراجعتَ عن «ليست سداداً»، وعادت الحركة تنتظر قرارك" });
     }
-    return NextResponse.json({ error: "هذه الحركة غير مطابقة من الأساس" }, { status: 409 });
+    return NextResponse.json({ error: "هذه الحركة غير مطابقة أصلاً" }, { status: 409 });
   }
 
   const paymentId = tx.matchedPaymentId;
@@ -269,14 +269,14 @@ export async function POST(request: Request) {
     */
     if (e instanceof MonthClosedError) {
       return NextResponse.json({
-        error: `تعذّر فك المطابقة: هذه الدفعة مخصّصة على فاتورة في شهر مقفل. ${e.message.split(".")[0]}. أعد فتحه من صفحة الإقفال، ثم فك المطابقة وأقفله من جديد.`,
+        error: `تعذّر فك المطابقة: هذه الدفعة مخصّصة على فاتورة في شهر مقفل. ${e.message.split(".")[0]}. أعد فتحه من صفحة الإقفال، ثم فك المطابقة، ثم أقفله من جديد.`,
       }, { status: 409 });
     }
     return failWith(e, "match-undo");
   }
 
   if (!done) {
-    return NextResponse.json({ error: "سبق فك هذه المطابقة. حدّث الصفحة." }, { status: 409 });
+    return NextResponse.json({ error: "فُكّت هذه المطابقة من قبل. حدّث الصفحة." }, { status: 409 });
   }
 
   return NextResponse.json({
@@ -285,7 +285,7 @@ export async function POST(request: Request) {
     reversedPayment,
     freedMinor,
     message: reversedPayment
-      ? `تم فك المطابقة وردّ الدفعة وفك ${freedInvoices.length} تخصيصاً. تبقى الدفعة في السجلّ مردودة مع سبب الردّ`
-      : `تم فك المطابقة و${freedInvoices.length} تخصيصاً، وتبقى الدفعة لحركة أخرى`,
+      ? `فُكّت المطابقة ورُدّت الدفعة وفُكّ ${freedInvoices.length} تخصيصاً. تبقى الدفعة في السجل مردودة مع سبب ردّها`
+      : `فُكّت المطابقة و${freedInvoices.length} تخصيصاً، وتبقى الدفعة متاحة لحركة أخرى`,
   });
 }

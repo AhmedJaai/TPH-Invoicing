@@ -70,7 +70,7 @@ export const AREAS: readonly NavArea[] = [
     short: "قرارك",
     icon: "decisions",
     group: "today",
-    question: "كلّ بند بسببه ودليله وفعله",
+    question: "كل بند مع سببه ودليله وما تفعله",
     chord: "a",
     needs: "reports:view",
     owns: ["/review", "/audit"],
@@ -106,7 +106,7 @@ export const AREAS: readonly NavArea[] = [
     short: "المالية",
     icon: "finance",
     group: "money",
-    question: "هل ربحت، وكم، ولماذا — وما وضعك الآن",
+    question: "هل ربحت، وكم، ولماذا، وما وضعك الآن",
     chord: "f",
     needs: "amounts:view",
     owns: ["/finance/rows", "/finance/report", "/finance/inputs"],
@@ -170,7 +170,7 @@ export const AREAS: readonly NavArea[] = [
       { href: "/money", label: "أين ذهب" },
       /* من الكشف نفسه: ما تأخذه الشبكة وما لم يصل، وما يتكرّر خصمُه كلَّ شهر */
       { href: "/money/pos", label: "تسويات الشبكة" },
-      { href: "/money/recurring", label: "الاشتراكات والمتكرّر" },
+      { href: "/money/recurring", label: "الخصومات المتكررة" },
       /* ما قبضه فودكس بطاقةً ونقداً أمام ما دخل الحساب */
       { href: "/money/foodics", label: "فودكس والبنك" },
     ],
@@ -205,7 +205,7 @@ export const AREAS: readonly NavArea[] = [
       /* أسبوعيٌّ كالجرد نفسِه: ملفُّ المبيعات، والكتالوجُ مرّةً ثمّ عند تغيّره */
       { href: "/inventory/import", label: "الاستيراد", needs: "inventory:count" },
       /* السجلُّ جوابُه بالريال — فمن لا يرى المبالغ لا يُفتَح له */
-      { href: "/inventory/history", label: "سجلّ الجرد", needs: "amounts:view" },
+      { href: "/inventory/history", label: "سجل الجرد", needs: "amounts:view" },
       { href: "/inventory/recipes", label: "الوصفات", needs: "recipe:edit" },
       { href: "/inventory/items", label: "الأصناف" },
       /* وسيطُ ما يُباع في كلّ يومٍ من الأسبوع — عادةٌ لا توقّع (`lib/sales/weekday-habit.ts`) */
@@ -221,7 +221,7 @@ export const ACCOUNT_LINKS: readonly (NavLink & { icon: NavIcon })[] = [
   { href: "/settings", label: "الإعدادات", needs: "supplier:view", icon: "settings" },
   /* دفترُ الاختيارات: ما قرّره صاحبُه بيده، بحاله وزرّ سحبه (`lib/choices.ts`) */
   { href: "/settings/choices", label: "ما قرّرته", needs: "amounts:view", icon: "decisions" },
-  { href: "/settings/audit", label: "سجلّ التدقيق", needs: "audit:view", icon: "audit" },
+  { href: "/settings/audit", label: "سجل التدقيق", needs: "audit:view", icon: "audit" },
 ];
 
 /** شريطُ الجوّال: ثلاثُ مساحاتٍ وزرُّ الالتقاط في الوسط و«المزيد». */

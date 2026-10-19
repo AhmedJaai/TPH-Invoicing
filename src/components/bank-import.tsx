@@ -15,6 +15,7 @@ import { Money } from "./money";
 import { Badge, buttonClass } from "./ui";
 import { toast } from "./ui-client";
 import { SupplierPicker } from "./supplier-picker";
+import { T } from "@/components/i18n/t";
 
 interface Coverage {
   from: string | null;
@@ -121,7 +122,7 @@ function UnknownRow({
       category,
       supplierId: needsSupplier ? supplierId : undefined,
     });
-    setMessage(r.ok ? (r.data.message ?? "تم الحفظ") : r.error);
+    setMessage(r.ok ? (r.data.message ?? "حُفظ") : r.error);
     setState(r.ok ? "saved" : "error");
     if (r.ok) onLearned();
   };
@@ -216,7 +217,7 @@ function FlowSteps({ current, failed }: { current: number; failed: boolean }) {
               {state === "done" && <Check className="h-3 w-3 shrink-0 text-ok" strokeWidth={2.5} aria-hidden />}
               <span className="truncate">{label}</span>
               <span className="sr-only">
-                {state === "done" ? " — تمت" : state === "current" ? " — الخطوة الحالية" : state === "failed" ? " — تعثّرت" : ""}
+                {state === "done" ? "، تمت" : state === "current" ? "، الخطوة الحالية" : state === "failed" ? "، تعثّرت" : ""}
               </span>
             </span>
           </li>
@@ -265,7 +266,7 @@ export function BankImport({
         setDone(message);
         setData(null);
         setLearned(0);
-        toast({ tone: "ok", title: "تم استيراد الكشف", body: message });
+        toast({ tone: "ok", title: "استُورد الكشف", body: message });
         router.refresh();
       } else {
         setData(r.data);
@@ -329,13 +330,13 @@ export function BankImport({
             </span>
             {busy === "reading" ? (
               <span role="status">
-                <span className="block text-sm font-bold">جارٍ قراءة «{fileName}»…</span>
-                <span className="mt-1 block text-xs text-muted">يميّز الجديد من المقيّد ثم يرجّح المطابقات، وقد يستغرق ذلك دقيقة. لا يُحفظ شيء بعد.</span>
+                <span className="block text-sm font-bold"><T s="يقرأ «{0}»…" a={[fileName]} /></span>
+                <span className="mt-1 block text-xs text-muted">يفصل الجديد عمّا سُجّل من قبل، ثم يرجّح المطابقات، وقد يستغرق ذلك دقيقة. لم يُحفظ شيء بعد.</span>
               </span>
             ) : (
               <span>
                 <span className="block text-sm font-bold">اختر ملف كشف الحساب أو أفلته هنا</span>
-                <span className="mt-1 block text-xs text-muted">ملف Excel أو CSV أو PDF نصي من بنكك. تظهر لك معاينة، ولا يُحفظ شيء قبل أن تقيّده.</span>
+                <span className="mt-1 block text-xs text-muted">ملف Excel أو CSV أو PDF نصي من بنكك. ستظهر لك معاينة، ولا يُحفظ شيء قبل أن تسجّله.</span>
               </span>
             )}
             {!busy && <span className={buttonClass("secondary", "sm")}>تصفّح الملفات</span>}
@@ -348,7 +349,7 @@ export function BankImport({
             <CircleAlert className="mt-0.5 h-[18px] w-[18px] shrink-0 text-danger" strokeWidth={2} aria-hidden />
             <div className="min-w-0 flex-1 text-xs leading-relaxed text-ink-soft">
               <p className="text-[13px] font-bold text-danger">
-                {error.during === "applying" ? "تعذّر قيد الكشف" : "تعذّرت قراءة الملف"}
+                {error.during === "applying" ? "تعذّر تسجيل الكشف" : "تعذّرت قراءة الملف"}
               </p>
               <p className="mt-0.5">{error.message}</p>
             </div>
@@ -360,9 +361,7 @@ export function BankImport({
                   disabled={busy !== null}
                   className={buttonClass("secondary", "sm")}
                 >
-                  <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                  أعد المحاولة
-                </button>
+                  <T s="{0}أعد المحاولة" a={[<RotateCcw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
               )}
               <button type="button" onClick={reset} disabled={busy !== null} className={buttonClass("quiet", "sm")}>
                 اختر ملفاً آخر
@@ -381,9 +380,7 @@ export function BankImport({
             </div>
             <div className="flex flex-wrap gap-2">
               <a href="#queue" className={buttonClass("primary", "sm")}>
-                اعرض ما ينتظر قرارك
-                <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              </a>
+                <T s="اعرض ما ينتظر قرارك{0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
               <button type="button" onClick={reset} className={buttonClass("secondary", "sm")}>استورد كشفاً آخر</button>
             </div>
           </div>
@@ -411,13 +408,10 @@ export function BankImport({
         صار فاتورةً فاتورة حيث تُرى — ويُسأل فيه من أين دُفعت.
       */}
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line-soft bg-sunken/40 px-4 py-3 text-xs text-muted sm:px-5">
-        <Info className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-        هل دفعت نقداً أو من حسابك الشخصي؟ يُسجَّل ذلك لكل فاتورة على حدة من قائمة الفواتير.
-        <Link href="/purchases/invoices?paid=OPEN" className="inline-flex min-h-11 items-center font-bold text-accent hover:underline sm:min-h-0">
+        <T s="{0}دفعت نقداً أو من حسابك الشخصي؟ سجّل ذلك لكل فاتورة وحدها من قائمة الفواتير.{1}" a={[<Info key="0" className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />, <Link key="1" href="/purchases/invoices?paid=OPEN" className="inline-flex min-h-11 items-center font-bold text-accent hover:underline sm:min-h-0">
           {openInvoiceCount > 0 ? `${countNoun(openInvoiceCount, INVOICE)} مفتوحة` : "قائمة الفواتير"}
           <ArrowLeft className="ms-0.5 h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        </Link>
-      </p>
+        </Link>]} /></p>
     </div>
   );
 }
@@ -449,19 +443,15 @@ function PreviewPanel({
           <p className="truncate text-[13px] font-bold" dir="auto">{fileName ?? "كشف الحساب"}</p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted">
             <span>{s.bank}</span>
-            {s.accountNumber && <span>· حساب <bdi dir="ltr" className="font-mono">{s.accountNumber}</bdi></span>}
+            {s.accountNumber && <span><T s="· حساب {0}" a={[<bdi key="0" dir="ltr" className="font-mono">{s.accountNumber}</bdi>]} /></span>}
             {s.periodStart && s.periodEnd && (
               <span className="inline-flex items-center gap-1">
-                · <CalendarRange className="h-3 w-3" strokeWidth={2} aria-hidden />
-                <bdi>{formatDay(s.periodStart)}</bdi> إلى <bdi>{formatDay(s.periodEnd)}</bdi>
-              </span>
+                <T s="· {0}{1} إلى {2}" a={[<CalendarRange key="0" className="h-3 w-3" strokeWidth={2} aria-hidden />, <bdi key="1">{formatDay(s.periodStart)}</bdi>, <bdi key="2">{formatDay(s.periodEnd)}</bdi>]} /></span>
             )}
           </p>
         </div>
         <button type="button" onClick={onCancel} disabled={busy !== null} className={buttonClass("quiet", "sm")}>
-          <X className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          إلغاء
-        </button>
+          <T s="{0}إلغاء" a={[<X key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
       </div>
 
       {/*
@@ -475,15 +465,13 @@ function PreviewPanel({
           </p>
           {data.sync && (
             <p className="mt-1 text-xs text-muted">
-              <span className="nums">{data.sync.inFile}</span> في الملف · <span className="nums">{data.sync.alreadyKnown}</span> مسجّلة لديك
-              {data.sync.byReference > 0 && ` (${countNoun(data.sync.byReference, TRANSACTION)} تعرّفنا عليها برقم العملية)`}
-            </p>
+              <T s="{0} في الملف · {1} مسجّلة عندك{2}" a={[<span key="0" className="nums">{data.sync.inFile}</span>, <span key="1" className="nums">{data.sync.alreadyKnown}</span>, data.sync.byReference > 0 && ` (${countNoun(data.sync.byReference, TRANSACTION)} عُرفت برقم العملية)`]} /></p>
           )}
         </div>
         {!nothingNew && (
           <dl className="grid grid-cols-3 gap-2 text-center">
-            <Mini label="ستطابق فواتير" value={s.matchedInvoices} tone="ok" />
-            <Mini label="مورّدها معروف بلا فاتورة" value={s.supplierOnly} />
+            <Mini label="ستُطابَق بفواتير" value={s.matchedInvoices} tone="ok" />
+            <Mini label="مورّدها معروف وليس لها فاتورة" value={s.supplierOnly} />
             <Mini label="تحتاج قرارك" value={s.unknown} tone={s.unknown > 0 ? "warn" : undefined} />
           </dl>
         )}
@@ -494,29 +482,28 @@ function PreviewPanel({
         <Warn title="فجوة في التغطية: أيام لم يُستورد كشفها">
           <ul className="mt-1 space-y-0.5">
             {s.coverage.gaps.slice(0, 4).map((g, i) => (
-              <li key={i}><bdi>{formatDay(g.start)}</bdi> إلى <bdi>{formatDay(g.end)}</bdi> ({countNoun(g.days, DAY)})</li>
+              <li key={i}><T s="{0} إلى {1} ({2})" a={[<bdi key="0">{formatDay(g.start)}</bdi>, <bdi key="1">{formatDay(g.end)}</bdi>, countNoun(g.days, DAY)]} /></li>
             ))}
           </ul>
-          <p className="mt-1">حركات هذه الأيام غائبة ولن يظهر في أي تقرير أنها ناقصة. ارفع كشفها لتكتمل البيانات.</p>
+          <p className="mt-1">حركات هذه الأيام غائبة، ولن يقول أي تقرير إنها ناقصة. ارفع كشفها لتكتمل البيانات.</p>
         </Warn>
       )}
       {(data.sync?.closedMonthRows ?? 0) > 0 && (
-        <Warn title={`${countNoun(data.sync?.closedMonthRows ?? 0, TRANSACTION)} في شهر مقفل ولن تُقيَّد`}>
-          ({(data.sync?.closedMonths ?? []).join("، ")}). إن كنت تريد قيدها فأعد فتح الشهر من «إقفال الشهر» ثم استورد الكشف مرة أخرى.
-        </Warn>
+        <Warn title={`${countNoun(data.sync?.closedMonthRows ?? 0, TRANSACTION)} في شهر مقفل، ولن تُسجَّل`}>
+          <T s="({0}). إن أردت تسجيلها فأعد فتح الشهر من «إقفال الشهر»، ثم استورد الكشف مرة أخرى." a={[(data.sync?.closedMonths ?? []).join("، ")]} /></Warn>
       )}
       {s.exact === false && (
-        <Warn title="التوزيع تقريبي وغير مؤكَّد">
-          الاحتمالات أكثر من أن يستطيع النظام فحصها كلها، فتوقّف البحث عند أفضل نتيجة وصل إليها. لذلك لا تتم أي مطابقة تلقائياً هنا، وكلها اقتراحات تنتظر تأكيدك.
+        <Warn title="التوزيع تقريبي وغير مؤكد">
+          الاحتمالات أكثر من أن يفحصها النظام كلها، فتوقف البحث عند أفضل نتيجة وصل إليها. لذلك لن تتم هنا أي مطابقة تلقائية، وكلها اقتراحات تنتظر تأكيدك.
         </Warn>
       )}
       {s.duplicateGroups > 0 && (
-        <Warn tone="danger" title={`${countNoun(s.duplicateGroups, GROUP)} يُشتبه في تكرار دفعها`}>
+        <Warn tone="danger" title={`${countNoun(s.duplicateGroups, GROUP)} يُشتبه في أنها دُفعت مرتين`}>
           راجعها بعد الاستيراد في «يحتاج قرارك».
         </Warn>
       )}
       {data.sync && data.sync.ambiguous > 0 && (
-        <Warn title={`${countNoun(data.sync.ambiguous, TRANSACTION)} قد تكون مكرّرة، ولن تُضاف ولن تُحذف`}>
+        <Warn title={`${countNoun(data.sync.ambiguous, TRANSACTION)} قد تكون مكررة، فلن تُضاف ولن تُحذف`}>
           <ul className="mt-1 space-y-1">
             {(data.sync.ambiguousRows ?? []).map((a, i) => (
               <li key={i}>
@@ -527,21 +514,19 @@ function PreviewPanel({
         </Warn>
       )}
       {data.sync && (data.sync.missingFromFile ?? 0) > 0 && (
-        <Warn tone="danger" title={`${countNoun(data.sync.missingFromFile ?? 0, TRANSACTION)} موجودة لديك في فترة هذا الكشف وليست فيه`}>
-          قد تكون حركة مكرّرة دخلت مرتين، أو حركة لم تحدث فعلاً، وهي تُفسد رصيد البنك. بعد الاستيراد تجدها في صفحة البنك لتختار «احذفها» أو «أبقها».
-          <ul className="mt-1 space-y-1">
+        <Warn tone="danger" title={`${countNoun(data.sync.missingFromFile ?? 0, TRANSACTION)} موجودة عندك في فترة هذا الكشف وليست فيه`}>
+          <T s="ربما دخلت مرتين، أو لم تحدث أصلاً، وهي تُفسد رصيد البنك. بعد الاستيراد تجدها في صفحة البنك لتختار «احذفها» أو «أبقها».{0}" a={[<ul key="0" className="mt-1 space-y-1">
             {(data.sync.missingFromFileRows ?? []).map((m, i) => (
               <li key={i}>
                 <bdi>{formatDay(m.date)}</bdi> · {m.direction === "DEBIT" ? "صادر" : "وارد"} <span className="font-bold"><Money minor={m.amountMinor} /></span> · <span dir="auto">{m.description}</span>
               </li>
             ))}
-          </ul>
-        </Warn>
+          </ul>]} /></Warn>
       )}
       {/* حدودُ القراءة المعلومة سلفاً — تُعرَض دائماً، لا حين يقع الخطأ */}
       {(s.notices ?? []).length > 0 && (
         <div className="rounded-xl border border-line bg-sunken/60 px-4 py-3 text-xs leading-relaxed text-ink-soft">
-          <p className="flex items-center gap-1.5 font-bold text-ink"><Info className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> حدود هذه القراءة</p>
+          <p className="flex items-center gap-1.5 font-bold text-ink"><T s="{0} حدود هذه القراءة" a={[<Info key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></p>
           <ul className="mt-1 space-y-0.5">
             {(s.notices ?? []).map((n, i) => <li key={i}>— {n}</li>)}
           </ul>
@@ -562,7 +547,7 @@ function PreviewPanel({
       )}
 
       {data.preview.length > 0 && (
-        <Block title="عيّنة ممّا سيُطابَق">
+        <Block title="عيّنة مما سيُطابَق">
           {data.preview.slice(0, 8).map((p, i) => (
             <li key={i} className="flex items-center gap-3 px-4 py-2 text-xs">
               <bdi className="w-20 shrink-0 text-muted">{formatDay(p.date)}</bdi>
@@ -576,13 +561,9 @@ function PreviewPanel({
       {data.unknown.length > 0 && (
         <div>
           <p className="flex items-center gap-2 text-[13px] font-bold">
-            <TriangleAlert className="h-4 w-4 text-warn" strokeWidth={2} aria-hidden />
-            {countNoun(data.unknown.length, TRANSACTION)} لم يُعرف مستفيدها
-          </p>
+            <T s="{0}{1} لم يُعرف المستفيد منها" a={[<TriangleAlert key="0" className="h-4 w-4 text-warn" strokeWidth={2} aria-hidden />, countNoun(data.unknown.length, TRANSACTION)]} /></p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
-            صنّف كل حركة مرة واحدة. يُحفظ التصنيف قاعدة تسري على ما يشبهها في كل كشف لاحق، ويخرج من مستحقات المورّدين ما ليس لهم.
-            {learned > 0 && ` صنّفت منها ${countNoun(learned, TRANSACTION)} حتى الآن.`}
-          </p>
+            <T s="صنّف كل حركة مرة واحدة، فيُحفظ تصنيفك قاعدةً تُطبَّق على ما يشبهها في كل كشف قادم، ويخرج من مستحقات المورّدين ما ليس لهم.{0}" a={[learned > 0 && ` صنّفتَ منها ${countNoun(learned, TRANSACTION)} حتى الآن.`]} /></p>
           <ul className="mt-2 max-h-[26rem] divide-y divide-line-soft overflow-y-auto rounded-xl border border-line">
             {data.unknown.map((u) => (
               <UnknownRow key={u.id} tx={u} suppliers={suppliers} onLearned={onLearned} />
@@ -591,14 +572,14 @@ function PreviewPanel({
           {learned > 0 && (
             <button type="button" onClick={onRematch} disabled={busy !== null} className={`mt-2 w-full ${buttonClass("secondary", "sm")}`}>
               <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              {busy === "reading" ? "جارٍ إعادة المطابقة…" : "أعد المعاينة بالأسماء الجديدة"}
+              {busy === "reading" ? "يعيد المطابقة…" : "أعد المعاينة بالأسماء الجديدة"}
             </button>
           )}
         </div>
       )}
 
       {data.supplierOnlyList.length > 0 && (
-        <Block title="المورّد معروف ولم تُطابَق فاتورة" hint="إما أنك سدّدت مقدّماً أو لم ترفع فاتورتها. تظهر في قائمة «يحتاج قرارك» بعد القيد.">
+        <Block title="المورّد معروف ولم تُطابَق فاتورة" hint="إما أنك دفعت مقدّماً، أو لم ترفع فاتورتها بعد. ستظهر في «يحتاج قرارك» بعد التسجيل.">
           {data.supplierOnlyList.slice(0, 8).map((u, i) => (
             <li key={i} className="flex items-center gap-3 px-4 py-2 text-xs">
               <bdi className="w-20 shrink-0 text-muted">{formatDay(u.date)}</bdi>
@@ -613,17 +594,17 @@ function PreviewPanel({
       <div className="flex flex-wrap items-center gap-2 border-t border-line-soft pt-4">
         {nothingNew ? (
           <>
-            <p className="flex-1 text-sm text-muted">لا يوجد ما يُقيَّد من هذا الملف، فكل حركاته مسجّلة لديك.</p>
+            <p className="flex-1 text-sm text-muted">لا شيء جديد يُسجَّل من هذا الملف، فكل حركاته مسجّلة عندك.</p>
             <button type="button" onClick={onCancel} className={buttonClass("secondary")}>اختر ملفاً آخر</button>
           </>
         ) : (
           <>
             <button type="button" onClick={onApply} disabled={busy !== null} className={buttonClass("primary")}>
               {busy === "applying"
-                ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden /> جارٍ القيد…</>
-                : <><Check className="h-4 w-4" strokeWidth={2.25} aria-hidden /> قيّد {countNoun(added, TRANSACTION)} وطابق</>}
+                ? <><T s="{0} يسجّل…" a={[<Loader2 key="0" className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />]} /></>
+                : <><T s="{0} سجّل {1} وطابِق" a={[<Check key="0" className="h-4 w-4" strokeWidth={2.25} aria-hidden />, countNoun(added, TRANSACTION)]} /></>}
             </button>
-            <button type="button" onClick={onCancel} disabled={busy !== null} className={buttonClass("quiet")}>إلغاء، ولن يُحفظ شيء</button>
+            <button type="button" onClick={onCancel} disabled={busy !== null} className={buttonClass("quiet")}>ألغِ، ولن يُحفظ شيء</button>
           </>
         )}
       </div>

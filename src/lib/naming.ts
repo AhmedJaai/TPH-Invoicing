@@ -154,7 +154,7 @@ export function parseFileName(
 
   // ملفات خدمية لا محاسبية
   if (extension === "txt" || extension === "md") {
-    return { ok: false, reason: "ملف ملاحظات لا مستند محاسبي" };
+    return { ok: false, reason: "ملف ملاحظات، لا مستند محاسبي" };
   }
 
   let base = rawBase;
@@ -185,7 +185,7 @@ export function parseFileName(
   } else if (/^SAR/i.test(lastPart)) {
     return {
       ok: false,
-      reason: `مبلغ غير صالح: ${lastPart} — يجب أن يكون SAR بمنزلتين عشريتين`,
+      reason: `مبلغ غير صالح: ${lastPart}، ويجب أن يكون SAR بخانتين عشريتين`,
     };
   }
 
@@ -234,7 +234,7 @@ export function parseFileName(
   if (!kind) return { ok: false, reason: `نوع مستند غير معروف: ${parts[2]}` };
 
   const slug = parts.slice(1, typeIndex).join("_");
-  if (!slug) return { ok: false, reason: "لا يوجد اسم مورّد" };
+  if (!slug) return { ok: false, reason: "لا اسم مورّد" };
 
   // ما بين النوع والمبلغ: رقم الفاتورة أو وصف الفترة
   const tail = parts.slice(typeIndex + 1, amountMatch ? -1 : undefined).filter(Boolean);

@@ -30,7 +30,7 @@ export function RetireItem({ productId, name }: { productId: string; name: strin
           setError(null);
           toast({
             tone: "ok",
-            title: `تم إخراج «${name}» من الجرد`,
+            title: `أُخرج «${name}» من الجرد`,
             body: "لن يظهر في الجرد القادم، وتبقى حركاته السابقة كما هي.",
             undo: {
               label: "أعده إلى الجرد",

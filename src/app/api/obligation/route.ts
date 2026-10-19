@@ -23,7 +23,7 @@ const Fields = z.object({
   reference: optional(80),
   holder: optional(120),
   expiresOn: z.string().refine(isRealDay, "تاريخ الانتهاء غير صالح. اكتبه بصيغة YYYY-MM-DD."),
-  remindDays: z.number().int().min(1, "أقل مهلة هي يوم واحد").max(MAX_REMIND_DAYS, `أقصى مهلة هي ${MAX_REMIND_DAYS} يوماً`).optional(),
+  remindDays: z.number().int().min(1, "أقل مهلة يوم واحد").max(MAX_REMIND_DAYS, `أطول مهلة ${MAX_REMIND_DAYS} يوماً`).optional(),
   note: optional(500),
 });
 
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
   try {
     if (body.action === "create") {
       const id = await createObligation(toInput(body), user.id);
-      return NextResponse.json({ ok: true, id, message: `تمت إضافة «${body.title}»` });
+      return NextResponse.json({ ok: true, id, message: `أُضيف «${body.title}»` });
     }
     const found =
       body.action === "update" ? await updateObligation(body.id, toInput(body), user.id)
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     if (!found) return NextResponse.json({ error: "الوثيقة غير موجودة، فربما حُذفت. حدّث الصفحة." }, { status: 404 });
     return NextResponse.json({
       ok: true,
-      message: body.action === "update" ? "تم حفظ التعديل" : body.action === "close" ? "تمت الأرشفة، ولن يُرسل تذكير بها" : "أُعيدت الوثيقة إلى المتابعة",
+      message: body.action === "update" ? "حُفظ التعديل" : body.action === "close" ? "أُرشفت، ولن يصلك تذكير بها" : "أُعيدت الوثيقة إلى المتابعة",
     });
   } catch (e) {
     const mapped = respondTo(e);

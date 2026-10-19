@@ -151,7 +151,7 @@ export function validateVerdict(
 
   const candidate = map.get(verdict.choice.trim());
   if (!candidate) {
-    return { candidate: null, rejected: `اختار النموذج «${verdict.choice}» وهو غير موجود في القائمة، فرُفض اختياره` };
+    return { candidate: null, rejected: `اختار النموذج «${verdict.choice}» وهو ليس في القائمة، فرُفض اختياره` };
   }
 
   if (!Number.isFinite(verdict.confidence) || verdict.confidence < 0 || verdict.confidence > 1) {

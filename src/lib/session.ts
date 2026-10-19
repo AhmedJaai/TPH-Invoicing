@@ -103,7 +103,7 @@ export const currentUser = cache(async (): Promise<CurrentUser | null> => {
 /** يرمي عند غياب الجلسة أو الصلاحية — تُترجم في الواجهة إلى 401 أو 403. */
 export class UnauthenticatedError extends Error {
   constructor() {
-    super("يجب تسجيل الدخول");
+    super("ادخل أولاً");
     this.name = "UnauthenticatedError";
   }
 }

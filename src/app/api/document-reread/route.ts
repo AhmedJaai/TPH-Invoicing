@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     في المعاينة ويكتبها، وهو ما يمنعه «صحّح الحقول». والرقمُ والتاريخ يُصحَّحان هناك.
   */
   if (!can(user.role, "amounts:view")) {
-    return NextResponse.json({ error: "إعادة قراءة الفاتورة تحتاج صلاحية عرض المبالغ. ويمكنك تصحيح الرقم والتاريخ من «صحّح الحقول»." }, { status: 403 });
+    return NextResponse.json({ error: "إعادة قراءة الفاتورة تحتاج إلى صلاحية عرض المبالغ. ويمكنك تصحيح الرقم والتاريخ من «صحّح الحقول»." }, { status: 403 });
   }
 
   let raw: unknown;

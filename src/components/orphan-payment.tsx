@@ -6,6 +6,7 @@ import { postJson } from "@/lib/http-client";
 import { CircleAlert, CircleCheck, ExternalLink } from "lucide-react";
 import { buttonClass } from "./ui";
 import { toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * دفعةٌ بلا مورّد ولا حركة بنك — تُحسَم في بندها.
@@ -68,9 +69,7 @@ export function OrphanPayment({
       <div className="flex flex-wrap items-center gap-2">
         {receiptUrl && (
           <a href={receiptUrl} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm")}>
-            <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            افتح الإيصال
-          </a>
+            <T s="{0}افتح الإيصال" a={[<ExternalLink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
         )}
         <button
           type="button"
@@ -100,7 +99,7 @@ export function OrphanPayment({
             {suppliers.map((s) => <option key={s.id} value={s.id}>{s.nameAr}</option>)}
           </select>
           <button aria-busy={busy} type="button" disabled={busy || !supplierId} onClick={() => submit(twin)} className={buttonClass("primary", "sm")}>
-            {twin ? "هذا سداد آخر، انسبها" : "انسبها"}
+            {twin ? "هذا سداد آخر، فانسبها" : "انسبها"}
           </button>
         </div>
       )}
@@ -113,15 +112,15 @@ export function OrphanPayment({
               aria-label="ما هذه الدفعة"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="ما هي؟ مثل: أجرة، تحويل شخصي، مصروف…"
+              placeholder="ما هي؟ مثلاً: أجرة، تحويل شخصي، مصروف…"
               className="min-h-11 min-w-0 flex-1 rounded-lg border border-line-input bg-surface px-2 text-xs lg:min-h-9"
             />
             <button aria-busy={busy} type="button" disabled={busy || reason.trim().length < 3} onClick={() => submit()} className={buttonClass("danger", "sm")}>
-              ألغِ قيدها
+              ألغِ تسجيلها
             </button>
           </div>
           <p className="text-[11px] leading-relaxed text-muted">
-            يُلغى قيدها كسداد دون حذفها: تبقى الدفعة مع سبب الإلغاء في السجلّ، ويبقى الإيصال في الأرشيف.
+            يُلغى تسجيلها سداداً دون حذفها: تبقى الدفعة في السجل مع سبب الإلغاء، ويبقى الإيصال في الأرشيف.
           </p>
         </div>
       )}

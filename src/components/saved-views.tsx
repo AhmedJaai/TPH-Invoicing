@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { BookmarkPlus, X } from "lucide-react";
 import { buttonClass } from "./ui-tokens";
+import { T } from "@/components/i18n/t";
 
 /**
  * «عروضي» — ترشيحٌ يُحفَظ باسمٍ على هذا الجهاز ويُفتح بضغطة.
@@ -130,9 +131,7 @@ export function SavedViews({ scope, suggestedName }: {
         </form>
       ) : (
         <button type="button" onClick={() => setNaming(true)} className={buttonClass("quiet", "sm")}>
-          <BookmarkPlus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          احفظ هذا العرض
-        </button>
+          <T s="{0}احفظ هذا العرض" a={[<BookmarkPlus key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
       ))}
     </div>
   );

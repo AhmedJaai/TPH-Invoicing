@@ -15,6 +15,7 @@ import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadFinanceAttentionFacts, stockGapKey } from "@/services/finance-attention.service";
 import { loadStockBalance } from "@/services/stock-balance.service";
 import { loadFlowMonths } from "@/services/stock-flow.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,7 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
       cell: (x) => (x.soldMilli === null ? <span className="text-[11px] font-bold text-ink-soft">غير معروف</span> : (
         <span className="block">
           <span className="nums">{qty(x, x.soldMilli)}</span>
-          {x.staffMilli > 0 && <span className="block text-[10px] text-muted">منها للموظفين: <span className="nums">{qty(x, x.staffMilli)}</span></span>}
+          {x.staffMilli > 0 && <span className="block text-[10px] text-muted"><T s="منها للموظفين: {0}" a={[<span key="0" className="nums">{qty(x, x.staffMilli)}</span>]} /></span>}
         </span>
       )),
       sortBy: (x) => x.soldMinor,
@@ -82,7 +83,7 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
     {
       key: "expected", header: "المتوقع بقاؤه", numeric: true,
       cell: (x) => (x.expectedMilli === null ? <span className="text-[11px] font-bold text-ink-soft">غير معروف</span> : x.expectedMilli < 0 ? (
-        <span className="block text-[11px] text-warn"><span className="font-bold">بيع أكثر مما سُجّل شراؤه</span><span className="nums block">بزيادة {qty(x, -x.expectedMilli)}</span></span>
+        <span className="block text-[11px] text-warn"><span className="font-bold">بيع أكثر مما سُجّل شراؤه</span><span className="nums block"><T s="بزيادة {0}" a={[qty(x, -x.expectedMilli)]} /></span></span>
       ) : (
         <span className="block"><span className="nums">{qty(x, x.expectedMilli)}</span><span className="block text-[10px] text-muted"><MaybeMoney minor={x.expectedMinor} /></span></span>
       )),
@@ -93,12 +94,12 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
       cell: (x) => (x.count === null ? <span className="text-[11px] text-muted">لم يُعدّ</span> : <span className="nums">{qty(x, x.count.milli)}</span>),
     },
     {
-      key: "lost", header: "الضائع", numeric: true,
+      key: "lost", header: "المفقود", numeric: true,
       cell: (x) => {
-        if (x.lostMilli === null) return <span className="text-[11px] text-muted">{x.count === null ? "لا جرد يقيسه" : "—"}</span>;
+        if (x.lostMilli === null) return <span className="text-[11px] text-muted">{x.count === null ? "لا يوجد جرد يقيسه" : "—"}</span>;
         return (
           <span className="block">
-            <span className="font-bold"><MaybeMoney minor={x.lostMinor} signed why="لا كلفة" /></span>
+            <span className="font-bold"><MaybeMoney minor={x.lostMinor} signed why="بلا تكلفة" /></span>
             <span className="nums block text-[10px] text-muted">{x.lostMilli >= 0 ? qty(x, x.lostMilli) : `وُجد أكثر بـ${qty(x, -x.lostMilli)}`}</span>
           </span>
         );
@@ -118,8 +119,8 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
       user={user}
       width="wide"
       title="المشترى والمباع"
-      eyebrow={b.from ? <>{formatMonth(month ?? "")}</> : b.firstDay ? <>منذ <bdi>{formatDay(b.firstDay)}</bdi> حتى <bdi>{formatDay(b.to)}</bdi></> : undefined}
-      intro="لكل صنف: كم اشتريت، وكم بِيع منه حسب الوصفات، وكم يُتوقع أن يكون قد بقي. وإن جرى عدّ الرف، يظهر كم ضاع."
+      eyebrow={b.from ? <>{formatMonth(month ?? "")}</> : b.firstDay ? <><T s="من {0} إلى {1}" a={[<bdi key="0">{formatDay(b.firstDay)}</bdi>, <bdi key="1">{formatDay(b.to)}</bdi>]} /></> : undefined}
+      intro="لكل صنف: كم اشتريت، وكم بيع منه حسب الوصفات، وكم يُتوقع أن يتبقى. وإذا عُدّ الرف، يظهر كم فُقد."
       actions={<LinkButton href="/finance/stock/links" icon={Link2} variant="secondary">اربط بنود الفواتير</LinkButton>}
     >
       <LinkTabs
@@ -135,63 +136,61 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
           icon={ShoppingCart}
           label={month ? "المشترى في الشهر" : "المشترى"}
           value={<Money minor={t.purchasedMinor} currency />}
-          sub={<>من المصدرين معاً، ويُعتمد الأكمل منهما لكل صنف. فواتيرنا أكمل في <strong className="text-ink">{t.invoicesBetter}</strong> صنفاً، وفودكس أكمل في <strong className="text-ink">{t.foodicsBetter}</strong>، ويتفقان في {t.sourcesAgree}.{b.unlinkedInvoiceMinor > 0 && <> وهناك بنود فواتير بقيمة <Money minor={b.unlinkedInvoiceMinor} /> لم تُربط بعد.</>}</>}
+          sub={<><T s="من المصدرين معاً، ويُعتمد الأكمل منهما لكل صنف. فواتيرنا أكمل في {0} صنفاً، وفودكس أكمل في {1}، ويتفقان في {2}.{3}" a={[<strong key="0" className="text-ink">{t.invoicesBetter}</strong>, <strong key="1" className="text-ink">{t.foodicsBetter}</strong>, t.sourcesAgree, b.unlinkedInvoiceMinor > 0 && <> <T s=" وهناك بنود فواتير بقيمة {0} لم تُربط بعد." a={[<Money key="0" minor={b.unlinkedInvoiceMinor} />]} /></>]} /></>}
           href="/finance/stock/links"
         />
         <KeyFigure
           icon={Utensils}
           label={month ? "المباع في الشهر" : "المباع"}
           value={<Money minor={t.soldMinor} currency />}
-          sub={<>حسب الوصفات والكمّيات المباعة، بسعر الشراء.{b.salesWithoutRecipeMinor > 0 && <> لا يشمل مبيعات بلا وصفة بقيمة <Money minor={b.salesWithoutRecipeMinor} />.</>}</>}
+          sub={<><T s="حسب الوصفات والكميات المباعة، بسعر الشراء.{0}" a={[b.salesWithoutRecipeMinor > 0 && <> <T s=" لا يشمل مبيعات بلا وصفة قيمتها {0}." a={[<Money key="0" minor={b.salesWithoutRecipeMinor} />]} /></>]} /></>}
         />
         <KeyFigure
           icon={Boxes}
           label="المتوقع بقاؤه"
           value={<Money minor={t.expectedMinor} currency />}
-          sub={<>كل ما اشتريته منذ البداية، مطروحاً منه ما بِيع والهدر المسجّل، حتى <bdi>{formatDay(b.to)}</bdi>.</>}
+          sub={<><T s="كل ما اشتريته منذ البداية، مطروحاً منه ما بيع والهدر المسجّل، حتى {0}." a={[<bdi key="0">{formatDay(b.to)}</bdi>]} /></>}
         />
         <KeyFigure
           icon={Scale}
-          label="الضائع"
+          label="المفقود"
           tone={(t.lostMinor ?? 0) > 0 ? "warn" : undefined}
-          value={t.lostMinor === null ? <span className="text-xl text-muted">لا جرد يقيسه</span> : <Money minor={t.lostMinor} currency />}
+          value={t.lostMinor === null ? <span className="text-xl text-muted">لا يوجد جرد يقيسه</span> : <Money minor={t.lostMinor} currency />}
           sub={b.countDay
-            ? <>المتوقع يوم العدّ <bdi>{formatDay(b.countDay)}</bdi> مطروحاً منه ما عُدّ فعلاً، في {t.counted} صنفاً.{t.foundMinor !== null && t.foundMinor < 0 && <> ووُجد في أصناف أخرى أكثر مما سُجّل شراؤه بقيمة <Money minor={-t.foundMinor} />.</>}</>
-            : "لم يُعدّ الرف بعد. قد يكون «المتوقع» كله موجوداً على الرف."}
+            ? <><T s="المتوقع يوم العدّ {0} مطروحاً منه ما عُدّ فعلاً، في {1} صنفاً.{2}" a={[<bdi key="0">{formatDay(b.countDay)}</bdi>, t.counted, t.foundMinor !== null && t.foundMinor < 0 && <> <T s=" ووُجد في أصناف أخرى أكثر مما سُجّل شراؤه بقيمة {0}." a={[<Money key="0" minor={-t.foundMinor} />]} /></>]} /></>
+            : "لم يُعدّ الرف بعد، وقد يكون «المتوقع» كله موجوداً عليه."}
           href="/inventory"
         />
       </div>
 
       {short.length > 0 && (
-        <Callout tone="warn" icon={Info} className="mt-4" title={`${short.length} صنفاً بِيع منه أكثر مما سُجّل شراؤه، بقيمة ${formatRiyalsDisplay(t.shortPurchasesMinor)} ريال`}
+        <Callout tone="warn" icon={Info} className="mt-4" title={`${short.length} صنفاً بيع منها أكثر مما سُجّل شراؤه، بقيمة ${formatRiyalsDisplay(t.shortPurchasesMinor)} ريال`}
           action={<LinkButton href="/finance/stock/links" size="sm">اربط البنود</LinkButton>}>
-          هذا ليس خطأً في المقهى، بل مشتريات لم تدخل الحساب: فاتورة لم تُربط بصنفها، أو لم تُدخل في فودكس، أو بضاعة اشتريت قبل الافتتاح. اربط بنود الفواتير لتكتمل الصورة.
+          هذا ليس خطأً من المقهى، بل مشتريات لم تدخل الحساب: فاتورة لم تُربط بصنفها، أو لم تُدخل في فودكس، أو بضاعة اشتُريت قبل الافتتاح. اربط بنود الفواتير لتكتمل الصورة.
         </Callout>
       )}
 
       {recurring.length > 0 && (
-        <Section id="recurring" title="فروق متكررة" icon={Scale} count={recurring.length} hint="أصناف يزيد فرقها على مئة وخمسين ريالاً بين جردين، في شهرين متتاليين أو أكثر.">
+        <Section id="recurring" title="فروق متكررة" icon={Scale} count={recurring.length} hint="أصناف يزيد فرقها على 150 ريالاً بين جردين، لشهرين متتاليين أو أكثر.">
           <ul className="space-y-2">
             {recurring.map((g) => (
               <li key={`${g.productId}${g.kind}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3">
                 <div className="min-w-0 flex-1 basis-56">
                   <p className="text-sm font-bold">
-                    <Link href={`/finance/stock/item?id=${g.productId}&month=all`} className="hover:underline">{g.name}</Link>
-                    {" — "}{g.kind === "SHORTAGE" ? "يخرج من الرف أكثر مما تفسّره وصفته" : "بِيع منه أكثر مما اشتريت"}: <Money minor={g.totalMinor} /> في {g.months.length} أشهر
-                  </p>
+                    <T s="{0} — {1}: {2} في {3} أشهر" a={[<Link key="0" href={`/finance/stock/item?id=${g.productId}&month=all`} className="hover:underline">{g.name}</Link>, g.kind === "SHORTAGE" ? "يخرج من الرف أكثر مما تفسّره وصفته" : "بيع منه أكثر مما اشتريت", <Money key="2" minor={g.totalMinor} />, g.months.length]} /></p>
                   <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
                     {g.months.map((m) => formatMonth(m)).join(" · ")}.{" "}
-                    {g.kind === "SHORTAGE" ? "راجع الوصفة وتأكد أنها تطابق ما يُصرف فعلاً، وسجّل الهدر حين يقع." : "قد تكون هناك فاتورة ناقصة. افتح الصنف وراجع فواتيره."}
+                    {g.kind === "SHORTAGE" ? "راجع الوصفة وتأكد أنها تطابق ما يُصرف فعلاً، وسجّل الهدر حين يحدث." : "ربما توجد فاتورة ناقصة. افتح الصنف وراجع فواتيره."}
                   </p>
                 </div>
-                {canSilence && <div className="flex shrink-0 flex-wrap items-center gap-1"><SignalControls signalKey={stockGapKey(g.productId, g.kind)} dismissLabel="أعرف سببه" snoozeDays={30} /></div>}
+                {canSilence && <div className="flex shrink-0 flex-wrap items-center gap-1"><SignalControls signalKey={stockGapKey(g.productId, g.kind)} dismissLabel="أعرف السبب" snoozeDays={30} /></div>}
               </li>
             ))}
           </ul>
         </Section>
       )}
 
-      <Section title="الأصناف" icon={PackageCheck} count={rows.length} hint="مرتّبة حسب قيمة الضائع ثم قيمة المتوقع، بالريال لا بالنسبة.">
+      <Section title="الأصناف" icon={PackageCheck} count={rows.length} hint="مرتبة حسب قيمة المفقود ثم قيمة المتوقع، بالريال لا بالنسبة.">
         <DataTable
           columns={columns} rows={rows} keyOf={(x) => x.productId} sort={q.sort ?? null}
           hrefOf={(x) => `/finance/stock/item?id=${x.productId}&month=${param}`}
@@ -199,12 +198,12 @@ export default async function FinanceStockPage({ searchParams }: { searchParams:
         />
       </Section>
 
-      <Callout tone="info" icon={Info} className="mt-6" title="كيف تُقرأ الأرقام">
+      <Callout tone="info" icon={Info} className="mt-6" title="كيف تقرأ الأرقام">
         <ul className="list-disc space-y-0.5 ps-4">
-          <li><strong className="text-ink">المتوقع بقاؤه = كل ما اشتريته − كل ما بِيع منه − الهدر المسجّل</strong>، منذ البداية. ولا يحتاج إلى جرد.</li>
-          <li><strong className="text-ink">الضائع = المتوقع يوم العدّ − ما عُدّ على الرف</strong>. قد يكون هدراً لم يُسجّل، أو كمّية أكبر من الوصفة، أو تسرباً، والبيانات وحدها لا تحدد السبب.</li>
-          <li>يُحسب المشترى من <strong className="text-ink">فواتيرنا المربوطة</strong> ومن <strong className="text-ink">ما أُدخل في فودكس</strong> معاً، ويُعتمد الأكمل منهما، لأن المشتريات قد تسقط من أحد السجلين لكنها لا تُضاف إليه من فراغ. يعرض عمود «فواتيرنا / فودكس» الرقمين منذ البداية، والرقم الغامق هو المعتمد.</li>
-          <li>الوحدة والعبوة من كتالوج فودكس. وكل بند فاتورة تربطه يُكمل سجل صنفه.</li>
+          <li><T s="{0}، منذ البداية، ولا يحتاج إلى جرد." a={[<strong key="0" className="text-ink">المتوقع بقاؤه = كل ما اشتريته − كل ما بيع منه − الهدر المسجّل</strong>]} /></li>
+          <li><T s="{0}. قد يكون هدراً لم يُسجَّل، أو كمية أكبر من الوصفة، أو تسريباً، والبيانات وحدها لا تحدد السبب." a={[<strong key="0" className="text-ink">المفقود = المتوقع يوم العدّ − ما عُدّ على الرف</strong>]} /></li>
+          <li><T s="تُحسب المشتريات من {0} ومن {1} معاً، ويُعتمد الأكمل منهما، لأن المشتريات قد تسقط من أحد السجلين لكنها لا تظهر فيه من لا شيء. يعرض عمود «فواتيرنا / فودكس» الرقمين منذ البداية، والرقم الغامق هو المعتمد." a={[<strong key="0" className="text-ink">فواتيرنا المربوطة</strong>, <strong key="1" className="text-ink">ما أُدخل في فودكس</strong>]} /></li>
+          <li>الوحدة والعبوة من كتالوج فودكس، وكل بند فاتورة تربطه يُكمل سجل صنفه.</li>
         </ul>
       </Callout>
     </PageShell>

@@ -28,12 +28,13 @@ import {
   TX_VIEWS, txLimit, countOpenDoublePaid, loadBankCoverage, loadBankQueue, loadLedger,
   type LedgerRow, type TxView,
 } from "@/services/bank-view.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
 const VIEW_LABEL: Record<TxView, string> = {
-  out: "الصادر",
-  in: "الوارد",
+  out: "المبالغ الخارجة",
+  in: "المبالغ الداخلة",
   fees: "رسوم البنك والشبكة",
   unknown: "غير مصنّفة",
   all: "الكلّ",
@@ -61,7 +62,7 @@ export default async function BankPage({
   if (!user) redirect("/login?from=/bank");
   if (!can(user.role, "bank:view")) {
     return (
-      <PageShell user={user} width="wide" title="حركة البنك">
+      <PageShell user={user} width="wide" title="حركات البنك">
         <NoAccess what="كشف البنك" />
       </PageShell>
     );
@@ -109,8 +110,8 @@ export default async function BankPage({
       user={user}
       width="wide"
       /* اسمُ الصفحة هو اسمُ لسانها حرفاً بحرف — «فعلٌ واحد باسمٍ واحد» */
-      title="حركة البنك"
-      intro="ما خرج من حسابك وما دخل إليه كما في كشف البنك. تبدأ بما ينتظر قرارك ثم سجل الحركات كاملاً. لكل مطابقة سببها، ويمكنك التراجع عنها."
+      title="حركات البنك"
+      intro="كل ما خرج من حسابك وما دخل إليه كما يظهر في كشف البنك. في الأعلى ما ينتظر قرارك، ثم سجل الحركات كاملاً. لكل مطابقة سببها، ويمكنك التراجع عنها."
       actions={canEdit ? (
         <LinkButton href="#import" icon={Upload} variant={empty ? "primary" : "secondary"}>
           استورد كشفاً
@@ -125,7 +126,7 @@ export default async function BankPage({
         <EmptyState
           icon={Landmark}
           title="استورد أول كشف حساب."
-          hint="بدون كشف لا يعرف النظام ما خرج من حسابك ولا ما دخل، ولا أي فاتورة سُدّدت، لذلك لا تظهر هنا أي أرقام. نزّل كشف الحساب من بنكك (Excel أو PDF) وارفعه أدناه. ستظهر لك معاينة قبل حفظ أي شيء."
+          hint="بدون كشف الحساب لا يعرف النظام ما خرج من حسابك وما دخل إليه، ولا أي فاتورة سُدّدت، لذلك لا تظهر هنا أرقام. نزّل كشف الحساب من تطبيق بنكك (Excel أو PDF) وارفعه أدناه، وستظهر لك معاينة قبل حفظ أي شيء."
           action={canEdit ? <LinkButton href="#import" variant="primary" icon={Upload}>ابدأ الاستيراد</LinkButton> : undefined}
         />
       ) : (
@@ -144,10 +145,8 @@ export default async function BankPage({
             <div id="double-paid" className="mt-4 flex scroll-mt-28 flex-wrap items-center gap-3 rounded-xl border border-danger/25 bg-danger-bg px-4 py-3">
               <CircleAlert className="h-[18px] w-[18px] shrink-0 text-danger" strokeWidth={2} aria-hidden />
               <p className="min-w-0 flex-1 text-xs leading-relaxed text-ink-soft">
-                <span className="block text-[13px] font-bold text-danger">مبلغ خرج مرتين في يوم واحد: {countNoun(doublePaid, ITEM)}</span>
-                يمكنك مطالبة الجهة المستلمة باسترداده، ولا يمكن تصحيحه بقيد في النظام.
-              </p>
-              <LinkButton href="/attention?item=duplicate-payments" variant="primary" size="sm">قرّر فيه من «يحتاج قرارك»</LinkButton>
+                <T s="{0}يمكنك مطالبة الجهة التي استلمت المبلغ بإعادته، فلا يمكن تصحيحه بقيد في النظام." a={[<span key="0" className="block text-[13px] font-bold text-danger"><T s="مبلغ خرج مرتين في يوم واحد: {0}" a={[countNoun(doublePaid, ITEM)]} /></span>]} /></p>
+              <LinkButton href="/attention?item=duplicate-payments" variant="primary" size="sm">قرّر بشأنه في «يحتاج قرارك»</LinkButton>
             </div>
           )}
 
@@ -158,7 +157,7 @@ export default async function BankPage({
             icon={Inbox}
             count={queue.groups.length + held.length > 0 ? queue.groups.length + held.length : undefined}
             hint={queue.groups.length > 0
-              ? `${countNoun(queue.groups.length, GROUP)} تضم ${countNoun(queuedTx, TRANSACTION)}. نسأل سؤالاً واحداً عن الحركات المتشابهة، وما تؤكده يتذكره النظام.`
+              ? `${countNoun(queue.groups.length, GROUP)} تضم ${countNoun(queuedTx, TRANSACTION)}. نسألك سؤالاً واحداً عن الحركات المتشابهة، ويتذكر النظام ما تؤكده.`
               : undefined}
           >
             {/*
@@ -168,12 +167,9 @@ export default async function BankPage({
             {handLinks.length > 0 && (
               <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-accent-line bg-accent-soft/50 px-4 py-3">
                 <p className="min-w-0 flex-1 text-xs leading-relaxed">
-                  <span className="font-bold">
-                    {handLinks.length === 1 ? "حركة هنا سبق أن قيّدت سدادها يدوياً" : `${countNoun(handLinks.length, TRANSACTION)} هنا سبق أن قيّدت سداد كل منها يدوياً`}
-                  </span>
-                  {": "}{handLinks.map((l) => `${l.supplierName} ${formatRiyalsDisplay(l.transferMinor)}`).join("، ")}.
-                  {" "}أُغلقت الفاتورة بذلك السداد، فلم يجد النظام فاتورة مفتوحة للمطابقة. اربط الحركة بالسداد ولا تقيّده مرة ثانية.
-                </p>
+                  <T s="{0}: {1}. أُغلقت الفاتورة بذلك السداد، فلم يجد النظام فاتورة مفتوحة يطابقها. اربط الحركة بذلك السداد ولا تسجّله مرة ثانية." a={[<span key="0" className="font-bold">
+                    {handLinks.length === 1 ? "حركة سبق أن سجّلت سدادها يدوياً" : `${countNoun(handLinks.length, TRANSACTION)} سبق أن سجّلت سداد كل منها يدوياً`}
+                  </span>, handLinks.map((l) => `${l.supplierName} ${formatRiyalsDisplay(l.transferMinor)}`).join("، ")]} /></p>
                 <AccountReview size="sm" variant="primary" />
               </div>
             )}
@@ -184,15 +180,12 @@ export default async function BankPage({
               <div className="flex flex-wrap items-center gap-3 rounded-xl border border-ok/25 bg-ok-bg px-5 py-4">
                 <CircleCheck className="h-6 w-6 shrink-0 text-ok" strokeWidth={2} aria-hidden />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-ok">لا توجد حركات في الكشف تنتظر تصنيفاً.</p>
+                  <p className="text-sm font-bold text-ok">لا توجد في الكشف حركات تنتظر التصنيف.</p>
                   <p className="mt-0.5 text-xs text-ink-soft">
-                    صُنّفت كل الحركات المستوردة{coverage.lastDay ? <> حتى <bdi>{formatDay(coverage.lastDay)}</bdi></> : null}
-                    {stale ? "، وما بعد ذلك لم يُستورد بعد." : "."} أما حوالات المورّدين التي تنتظر فاتورتها فتجدها في «يحتاج قرارك».
-                  </p>
+                    <T s="صُنّفت كل الحركات المستوردة{0}{1} أما حوالات المورّدين التي تنتظر فواتيرها فتجدها في «يحتاج قرارك»." a={[coverage.lastDay ? <> <T s=" حتى {0}" a={[<bdi key="0">{formatDay(coverage.lastDay)}</bdi>]} /></> : null, stale ? "، وما بعد ذلك لم يُستورد بعد." : "."]} /></p>
                 </div>
                 <Link href="/attention" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline sm:min-h-0">
-                  افتح «يحتاج قرارك» <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                </Link>
+                  <T s="افتح «يحتاج قرارك» {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
               </div>
             )}
           </Section>
@@ -200,9 +193,9 @@ export default async function BankPage({
           {/* ── السجلّ ── */}
           <Section
             id="transactions"
-            title="سجلّ الحركات"
+            title="سجل الحركات"
             icon={ListFilter}
-            hint="لمن خرج المال ومن أين دخل، وحالة كل حركة. تُحسب الحالة من الحركة نفسها دائماً."
+            hint="لمن خرج المال ومن أين دخل، وحالة كل حركة. تُحسب الحالة دائماً من الحركة نفسها."
           >
             <div className="mb-3 space-y-2">
               <LinkTabs
@@ -230,7 +223,7 @@ export default async function BankPage({
                   name="q"
                   type="search"
                   defaultValue={search?.text ?? ""}
-                  placeholder="ابحث في كل الحركات: مبلغ أو اسم أو نص البنك"
+                  placeholder="ابحث في كل الحركات: بالمبلغ أو الاسم أو نص البنك"
                   aria-label="ابحث في كل الحركات بالمبلغ أو الاسم أو نص البنك"
                   dir="auto"
                   className="min-h-11 w-full rounded-lg border border-line-input bg-raised ps-9 pe-3 text-sm sm:min-h-9"
@@ -244,15 +237,11 @@ export default async function BankPage({
 
             {search ? (
               <p className="mb-3 text-xs text-ink-soft" role="status">
-                {ledger.total === 0 ? "لا توجد حركات تطابق" : <><span className="nums">{ledger.total}</span> نتيجة تطابق</>} «<bdi>{search.text}</bdi>»
-                {search.amount ? " (مبلغاً أو نصاً)" : ""} في «{VIEW_LABEL[view]}»{month ? ` في ${formatMonth(month)}` : " في كل الأشهر"}
-                {ledger.total > ledger.rows.length && <>. المعروض أحدث <span className="nums">{ledger.rows.length}</span>، ضيّق البحث أو اختر شهراً</>}
-                {view !== "all" && <> · <Link href={href({ show: "all" })} className="font-bold text-accent hover:underline">ابحث في كل الأنواع</Link></>}
-              </p>
+                <T s="{0} «{1}»{2} في «{3}»{4}{5}{6}" a={[ledger.total === 0 ? "لا توجد حركات مطابقة" : <><T s="{0} نتيجة مطابقة" a={[<span key="0" className="nums">{ledger.total}</span>]} /></>, <bdi key="1">{search.text}</bdi>, search.amount ? " (مبلغ أو نص)" : "", VIEW_LABEL[view], month ? ` في ${formatMonth(month)}` : " في كل الأشهر", ledger.total > ledger.rows.length && <><T s=". المعروض هو أحدث {0}، فضيّق البحث أو اختر شهراً" a={[<span key="0" className="nums">{ledger.rows.length}</span>]} /></>, view !== "all" && <> · <Link href={href({ show: "all" })} className="font-bold text-accent hover:underline">ابحث في كل الأنواع</Link></>]} /></p>
             ) : ledger.total > ledger.rows.length && (
               <p className="mb-3 flex items-start gap-2 text-xs text-muted">
                 <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-                <span>المعروض أحدث {countNoun(txLimit(month), TRANSACTION)} من <span className="nums">{ledger.total}</span>. ابحث أعلاه في كل الحركات، أو اختر شهراً لترى حركاته.</span>
+                <span><T s="المعروض هو أحدث {0} من {1}. ابحث في كل الحركات من الأعلى، أو اختر شهراً لترى حركاته." a={[countNoun(txLimit(month), TRANSACTION), <span key="1" className="nums">{ledger.total}</span>]} /></span>
               </p>
             )}
 
@@ -261,13 +250,13 @@ export default async function BankPage({
               keyOf={(t) => t.id}
               hrefOf={(t) => txHref(t.id)}
               searchOf={(t) => [t.who, t.description, CATEGORY_LABEL[t.category], formatDay(t.valueDate), formatRiyalsDisplay(t.amountMinor)].filter(Boolean).join(" ")}
-              searchLabel="صفّ المعروض"
+              searchLabel="تصفية المعروض"
               empty={
                 <EmptyState
                   compact
                   icon={ListFilter}
                   title={search ? `لا توجد حركات تطابق «${search.text}».` : `لا توجد حركات في «${VIEW_LABEL[view]}»${month ? ` في ${formatMonth(month)}` : ""}.`}
-                  hint="جرّب نوعاً آخر أو شهراً آخر."
+                  hint="جرّب نوعاً أو شهراً آخر."
                   action={<LinkButton href={href({ show: "all", month: null })} size="sm">اعرض الكل</LinkButton>}
                 />
               }
@@ -292,13 +281,13 @@ export default async function BankPage({
                   key: "amount", header: "المبلغ", numeric: true,
                   cell: (t) => (
                     <span className={`relative font-bold ${t.direction === "CREDIT" ? "text-ok" : ""}`}>
-                      <span className="sr-only">{t.direction === "DEBIT" ? "صادر" : "وارد"} </span>
+                      <span className="sr-only">{t.direction === "DEBIT" ? "خارج" : "داخل"} </span>
                       <span dir="ltr">{t.direction === "CREDIT" ? "+" : "−"}<Money minor={t.amountMinor} /></span>
                     </span>
                   ),
                 },
                 {
-                  key: "state", header: "الحال", wrap: true,
+                  key: "state", header: "الحالة", wrap: true,
                   cell: (t) => <span id={`tx-${t.id}`} className="block scroll-mt-28"><StateCell tx={t} queued={queue.queuedIds.has(t.id)} canUndo={canApprove} /></span>,
                 },
               ]}
@@ -312,11 +301,11 @@ export default async function BankPage({
         id="import"
         title="استيراد كشف"
         icon={Upload}
-        hint="لا يُستورد الملف نفسه مرتين، فتُسجَّل الحركات الجديدة فقط. ستظهر لك معاينة قبل الحفظ."
+        hint="لا يُستورد الملف نفسه مرتين، فتُسجَّل الحركات الجديدة فقط، وستظهر لك معاينة قبل الحفظ."
       >
         {canEdit
           ? <BankImport openInvoiceCount={coverage.openInvoices} suppliers={queue.suppliers} />
-          : <EmptyState compact title="ليست لديك صلاحية استيراد الكشف." hint="اطلب من مالك الحساب أن يستورده أو أن يمنحك الصلاحية." />}
+          : <EmptyState compact title="ليست لديك صلاحية استيراد الكشف." hint="اطلب من مالك الحساب أن يستورده بنفسه أو أن يمنحك الصلاحية." />}
       </Section>
     </PageShell>
   );
@@ -346,27 +335,25 @@ function CoverageBand({
           {stale ? <CircleAlert className="h-5 w-5" strokeWidth={2} aria-hidden /> : <CalendarRange className="h-5 w-5" strokeWidth={2} aria-hidden />}
         </span>
         <div className="min-w-0">
-          <p className="text-xs font-bold text-muted">الكشف المستورد</p>
+          <p className="text-xs font-bold text-muted">آخر كشف مستورد</p>
           <p className={`mt-0.5 text-lg font-bold leading-snug ${stale ? "text-warn" : ""}`}>
-            {lastDay ? <>حتى <bdi>{formatDay(lastDay)}</bdi></> : "غير معروف"}
+            {lastDay ? <><T s="حتى {0}" a={[<bdi key="0">{formatDay(lastDay)}</bdi>]} /></> : "غير معروف"}
           </p>
           <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
             {stale
-              ? <>توقف منذ {countNoun(staleDays, DAY)}. لا يعرف النظام ما بعد ذلك، وكل الأرقام مبنية على ما قبله.</>
-              : <>من <bdi>{formatDay(firstDay)}</bdi> · {countNoun(txCount, TRANSACTION)}</>}
+              ? <><T s="يتوقف الكشف عند {0}. لا يعرف النظام ما بعد هذا التاريخ، وكل الأرقام مبنية على ما قبله." a={[countNoun(staleDays, DAY)]} /></>
+              : <><T s="من {0} · {1}" a={[<bdi key="0">{formatDay(firstDay)}</bdi>, countNoun(txCount, TRANSACTION)]} /></>}
           </p>
         </div>
       </div>
       <dl className="min-w-0">
         <dt className="text-xs font-bold text-muted">إيداعات الشبكة في هذه الفترة</dt>
         <dd className="mt-0.5 text-lg font-bold text-ok"><Money minor={settledMinor} /></dd>
-        <dd className="text-[11px] text-muted">ما دخل من البطاقات، وليس «مبيعات»</dd>
+        <dd className="text-[11px] text-muted">ما دخل من البطاقات، وهو ليس «المبيعات»</dd>
       </dl>
       {stale && canEdit && (
         <a href="#import" className={buttonClass("primary")}>
-          <Upload className="h-4 w-4" strokeWidth={2} aria-hidden />
-          استورد الأحدث
-        </a>
+          <T s="{0}استورد الأحدث" a={[<Upload key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></a>
       )}
     </div>
   );
@@ -381,7 +368,7 @@ function StateCell({ tx, queued, canUndo }: { tx: LedgerRow; queued: boolean; ca
   if (tx.pending) {
     return queued ? (
       <a href="#queue" className="relative z-10 inline-flex min-h-11 items-center sm:min-h-0">
-        <Badge tone="warn" dot>تنتظر قرارك، وهي في الطابور أعلاه</Badge>
+        <Badge tone="warn" dot>تنتظر قرارك، وهي في القائمة أعلاه</Badge>
       </a>
     ) : (
       <Link href="/attention" className="relative z-10 inline-flex min-h-11 items-center sm:min-h-0">

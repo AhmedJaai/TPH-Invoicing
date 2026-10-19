@@ -36,7 +36,7 @@ export function DeriveExpenses({
         setError(r.error);
         return;
       }
-      toast({ tone: (r.data.created ?? 0) > 0 ? "ok" : "info", title: r.data.message ?? "تمّ" });
+      toast({ tone: (r.data.created ?? 0) > 0 ? "ok" : "info", title: r.data.message ?? "تم" });
       router.refresh();
     } finally {
       setBusy(false);
@@ -47,7 +47,7 @@ export function DeriveExpenses({
     <span className="inline-flex flex-wrap items-center gap-2">
       <button type="button" onClick={run} disabled={busy} className={buttonClass(variant, "sm")}>
         <RefreshCw className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} strokeWidth={2} aria-hidden />
-        {busy ? "جارٍ القيد من الكشف…" : label ?? "سجّل من كشف البنك"}
+        {busy ? "يسجّل من الكشف…" : label ?? "سجّل من كشف البنك"}
       </button>
       {error && <span role="alert" className="text-[11px] font-bold text-danger">{error}</span>}
     </span>

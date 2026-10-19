@@ -85,7 +85,7 @@ export async function POST(request: Request) {
   }
   if (ids.length > MAX_BULK) {
     return NextResponse.json(
-      { error: `الحد الأقصى للإقرار دفعة واحدة ${countNoun(MAX_BULK, TRANSACTION)}` },
+      { error: `الحد الأقصى للتأكيد دفعة واحدة ${countNoun(MAX_BULK, TRANSACTION)}` },
       { status: 400 },
     );
   }
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
     if (tx.matchDisposition !== "SUGGEST" && !pickedByHand) {
       outcomes.push({
         transactionId: tx.id, ok: false,
-        reason: "ليست اقتراحاً. الإقرار الجماعي للاقتراحات فقط.",
+        reason: "ليست اقتراحاً، والتأكيد الجماعي للاقتراحات فقط.",
       });
       return false;
     }
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
   /* اختيارُ مرشّحٍ بعينه لحركةٍ واحدة — لا يُعمَّم على دفعة */
   const chosenInvoiceIds = body.candidateInvoiceIds ?? [];
   if (chosenInvoiceIds.length > 0 && ids.length !== 1) {
-    return NextResponse.json({ error: "اختيار الفاتورة يكون لحركة واحدة في المرة" }, { status: 400 });
+    return NextResponse.json({ error: "اختيار الفاتورة يكون لحركة واحدة في كل مرة" }, { status: 400 });
   }
 
   /* ── الحقائق كما هي الآن، لا كما كانت لحظة الاستيراد ── */
@@ -205,8 +205,8 @@ export async function POST(request: Request) {
         transactionId: tx.id,
         ok: false,
         reason: !single && candidate
-          ? `${last ?? "لم تعد تبلغ حدّ الحسم"}. أقرّها وحدها من صفّها.`
-          : last ?? "لم تعد تبلغ حدّ الحسم. راجعها وحدها.",
+          ? `${last ?? "لم تعد تبلغ حد القرار التلقائي"}. أكّدها وحدها من صفها.`
+          : last ?? "لم تعد تبلغ حد القرار التلقائي، فراجعها وحدها.",
       });
       continue;
     }
@@ -326,7 +326,7 @@ export async function POST(request: Request) {
         ok: false,
         reason: e instanceof AlreadyMatchedError || e instanceof MonthClosedError
           ? e.message
-          : "تعذّر التقييد، ولم يُحفظ منها شيء. أعد المحاولة، فإن تكرّر فأبلغ مالك الحساب.",
+          : "تعذّر التسجيل، ولم يُحفظ شيء. أعد المحاولة، وإن تكرر فأبلغ مالك الحساب.",
       });
       continue;
     }
@@ -335,8 +335,8 @@ export async function POST(request: Request) {
     outcomes.push({
       transactionId: tx.id,
       ok: true,
-      reason: `تم الإقرار على ${countNoun(decided.allocations.length, INVOICE)}`
-        + (unallocated > 0 ? ` · ويبقى ${formatRiyalsDisplay(unallocated)} غير مخصّص على حساب المورّد` : ""),
+      reason: `أُكّد على ${countNoun(decided.allocations.length, INVOICE)}`
+        + (unallocated > 0 ? ` · ويبقى ${formatRiyalsDisplay(unallocated)} غير مخصّص في حساب المورّد` : ""),
       paymentId,
       invoiceIds: decided.allocations.map((a) => a.invoiceId),
     });
@@ -350,8 +350,8 @@ export async function POST(request: Request) {
     message:
       confirmed === ids.length
         ? single
-          ? outcomes.find((o) => o.ok)?.reason ?? `تم إقرار ${countNoun(confirmed, TRANSACTION)}`
-          : `تم إقرار ${countNoun(confirmed, TRANSACTION)}`
-        : `تم إقرار ${confirmed} من ${ids.length}. الباقي تغيّرت حالته، فراجعه على حدة.`,
+          ? outcomes.find((o) => o.ok)?.reason ?? `أُكّد ${countNoun(confirmed, TRANSACTION)}`
+          : `أُكّد ${countNoun(confirmed, TRANSACTION)}`
+        : `أُكّد ${confirmed} من ${ids.length}. تغيّرت حالة الباقي، فراجعه وحده.`,
   });
 }

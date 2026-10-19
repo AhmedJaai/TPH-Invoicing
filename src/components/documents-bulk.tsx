@@ -8,6 +8,7 @@ import { buttonClass } from "./ui-tokens";
 import { postJson } from "@/lib/http-client";
 import { DOCUMENT, countNoun } from "@/lib/arabic";
 import { ACT } from "@/lib/ui-terms";
+import { T } from "@/components/i18n/t";
 
 /**
  * اعتمادُ المحدَّد من المستندات — عشرةٌ بضغطة لا صفّاً صفّاً.
@@ -41,11 +42,11 @@ export function DocumentsBulk() {
     if (ok > 0) {
       toast({
         tone: failed.length > 0 ? "warn" : "ok",
-        title: `تم اعتماد ${countNoun(ok, DOCUMENT)}`,
+        title: `اعتُمد ${countNoun(ok, DOCUMENT)}`,
         body: [
-          "دخلت فواتيرها في المستحقات، وخُصم منها ما دُفع للمورّد مقدماً",
-          failed.length > 0 ? `ورُفض ${failed.length}، وأسبابها في الشريط` : null,
-          done < selected.length ? `وتوقف الاعتماد، وبقي ${selected.length - done} دون اعتماد` : null,
+          "دخلت فواتيرها في المستحقات، وخُصم منها ما دُفع للمورّد مقدّماً",
+          failed.length > 0 ? `ورُفض ${failed.length}، وأسباب الرفض في الشريط` : null,
+          done < selected.length ? `وتوقف الاعتماد، فبقي ${selected.length - done} دون اعتماد` : null,
         ].filter(Boolean).join(" · "),
       });
       router.refresh();
@@ -66,13 +67,11 @@ export function DocumentsBulk() {
             className={buttonClass("primary", "sm")}
           >
             <Check className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-            {ACT.approveDocument}{selected.length > 1 ? " (كل المحدد)" : ""}
+            {ACT.approveDocument}{selected.length > 1 ? " (كل ما حددته)" : ""}
           </button>
           {progress && (
             <span role="status" className="flex items-center gap-2 text-xs font-bold text-ink-soft">
-              جارٍ اعتماد <span className="nums nums-count">{progress.done + 1}</span> من <span className="nums nums-count">{progress.total}</span>
-              <button type="button" onClick={() => { stop.current = true; }} className="min-h-8 text-accent hover:underline">أوقف بعد الحالي</button>
-            </span>
+              <T s="يعتمد {0} من {1}{2}" a={[<span key="0" className="nums nums-count">{progress.done + 1}</span>, <span key="1" className="nums nums-count">{progress.total}</span>, <button key="2" type="button" onClick={() => { stop.current = true; }} className="min-h-8 text-accent hover:underline">توقف بعد الحالي</button>]} /></span>
           )}
           {failures.length > 0 && (
             <ul className="w-full space-y-0.5 text-[11px] leading-relaxed text-danger" role="alert">

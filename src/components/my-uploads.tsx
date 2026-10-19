@@ -14,11 +14,11 @@ import { formatMoment, todayInRiyadh } from "@/lib/riyadh-time";
  * بحال كلٍّ منها — **بلا مبالغ**: الاسمُ والساعةُ والحال وحدها.
  */
 const STATE: Record<string, { label: string; icon: LucideIcon; tone: string }> = {
-  PENDING: { label: "قيد القراءة", icon: Clock3, tone: "text-muted" },
-  EXTRACTED: { label: "تمت قراءته وينتظر المراجعة", icon: Clock3, tone: "text-warn" },
+  PENDING: { label: "تجري قراءته", icon: Clock3, tone: "text-muted" },
+  EXTRACTED: { label: "قُرئ وينتظر المراجعة", icon: Clock3, tone: "text-warn" },
   NEEDS_REVIEW: { label: "ينتظر قرار المالك", icon: Clock3, tone: "text-warn" },
   ARCHIVED: { label: "اعتُمد وأُرشف", icon: CircleCheck, tone: "text-ok" },
-  REJECTED: { label: "رُفض، اسأل المالك عن السبب", icon: CircleAlert, tone: "text-danger" },
+  REJECTED: { label: "رُفض، واسأل المالك عن السبب", icon: CircleAlert, tone: "text-danger" },
 };
 
 export async function MyUploads({ userId, canOpen }: {
@@ -44,7 +44,7 @@ export async function MyUploads({ userId, canOpen }: {
     <section aria-labelledby="mine-title" className="mt-8">
       <h2 id="mine-title" className="text-sm font-bold">ما رفعته اليوم</h2>
       <p className="mt-0.5 text-xs text-muted">
-        {countNoun(rows.length, DOCUMENT)}{waiting > 0 ? ` (${waiting} لم تُعتمد بعد)` : " (تم البت في جميعها)"}
+        {countNoun(rows.length, DOCUMENT)}{waiting > 0 ? ` (${waiting} لم تُعتمد بعد)` : " (قُرّر فيها كلها)"}
       </p>
       <ul className="mt-3 divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
         {rows.map((r) => {

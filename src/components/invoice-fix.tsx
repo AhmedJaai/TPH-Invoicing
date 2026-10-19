@@ -11,6 +11,7 @@ import { checkInvoiceTotals, parseRiyals } from "@/lib/money";
 import { isValidSaudiVat } from "@/lib/validation";
 import type { InvoiceReason } from "@/lib/invoice-findings";
 import { changesLine, fixChanges } from "@/lib/invoice-fix-changes";
+import { T } from "@/components/i18n/t";
 
 /**
  * «لماذا ناقصةُ ركن» — ومعها ما يُصلحها.
@@ -109,12 +110,12 @@ export function InvoiceFix({
     const changed = changesLine(fixChanges(initial, saved, (id) => suppliers.find((s) => s.id === id)?.name ?? null));
     toast({
       tone: valid ? "ok" : "warn",
-      title: "تم حفظ التصحيح",
+      title: "حُفظ التصحيح",
       body: [
         changed,
         released
-          ? "أُلغي ربط سداد المورّد السابق بها، وعاد رصيداً له يُخصم من فواتيره"
-          : valid ? "أعاد النظام فحص الفاتورة، وأصبحت مستوفية الشروط الضريبية" : "ما زال فيها ما يحتاج إلى مراجعة، وأسبابه أعلاه",
+          ? "أُلغي ربط سداد المورّد السابق بها، وعاد رصيداً لك عنده يُخصم من فواتيره"
+          : valid ? "أعاد النظام فحص الفاتورة، فصارت مستوفية للشروط الضريبية" : "ما زال فيها ما يحتاج إلى مراجعة، وأسبابه أعلاه",
       ].filter(Boolean).join(" — "),
       duration: 12_000,
       /*
@@ -143,20 +144,15 @@ export function InvoiceFix({
       <div className="space-y-1.5">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
           <span className="inline-flex items-center gap-1.5 font-bold text-ok">
-            <CircleCheck className="h-4 w-4" strokeWidth={2} aria-hidden />
-            مستوفية الشروط الضريبية، ولا ينقصها شيء.
-          </span>
+            <T s="{0}مستوفية للشروط الضريبية، ولا ينقصها شيء." a={[<CircleCheck key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></span>
           {canEdit && (
             <button type="button" onClick={() => setOpen(true)} className={buttonClass("quiet", "sm")}>
-              <PenLine className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              صحّح بياناً على أي حال
-            </button>
+              <T s="{0}صحّح معلومة على أي حال" a={[<PenLine key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
           )}
         </p>
         {reasons.map((r) => (
           <p key={r.code} className="text-[11px] leading-relaxed text-muted">
-            للعلم: {r.what}. {r.fix}
-          </p>
+            <T s="للعلم: {0}. {1}" a={[r.what, r.fix]} /></p>
         ))}
       </div>
     );
@@ -196,16 +192,14 @@ export function InvoiceFix({
 
       {canEdit && !open && (
         <button type="button" onClick={() => setOpen(true)} className={buttonClass("secondary", "sm")}>
-          <PenLine className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          صحّح البيانات بنفسك
-        </button>
+          <T s="{0}صحّح البيانات بنفسك" a={[<PenLine key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
       )}
 
       {canEdit && (
         <Reveal open={open}>
         <div className="rounded-xl border border-line bg-raised p-3.5 shadow-raised">
           <p className="mb-2.5 text-[11px] leading-relaxed text-muted">
-            اكتب ما هو مكتوب على الورقة. وسيُعيد النظام فحص الفاتورة بعد الحفظ، فلا حاجة إلى تحديد حالتها من هنا.
+            اكتب ما في الورقة. سيعيد النظام فحص الفاتورة بعد الحفظ، فلا داعي لتحديد حالتها من هنا.
           </p>
           <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 sm:grid-cols-2">
             <Field label="رقم الفاتورة" value={form.invoiceNumber} onChange={(v) => set({ invoiceNumber: v })} ltr />
@@ -214,8 +208,8 @@ export function InvoiceFix({
             <Field label="الصافي قبل الضريبة" value={form.subtotal} onChange={(v) => set({ subtotal: v })} ltr hint={amountHint(form.subtotal)} />
             <Field label="الضريبة" value={form.vat} onChange={(v) => set({ vat: v })} ltr hint={amountHint(form.vat)} />
             <Field label="الإجمالي (المستحق)" value={form.total} onChange={(v) => set({ total: v })} ltr hint={amountHint(form.total, true)} />
-            <Field label="خصم بعد الضريبة (إن وجد)" value={form.discount} onChange={(v) => set({ discount: v })} ltr hint={optionalHint(form.discount)} />
-            <Field label="رسوم توصيل بعد الضريبة (إن وجدت)" value={form.charges} onChange={(v) => set({ charges: v })} ltr hint={optionalHint(form.charges)} />
+            <Field label="خصم بعد الضريبة (إن وُجد)" value={form.discount} onChange={(v) => set({ discount: v })} ltr hint={optionalHint(form.discount)} />
+            <Field label="رسوم توصيل بعد الضريبة (إن وُجدت)" value={form.charges} onChange={(v) => set({ charges: v })} ltr hint={optionalHint(form.charges)} />
             <label className="block">
               <span className="mb-1 block text-[11px] font-medium text-muted">تاريخ الفاتورة</span>
               <input
@@ -223,7 +217,7 @@ export function InvoiceFix({
                 className="nums min-h-11 w-full rounded-lg border border-line-input bg-raised px-2.5 text-sm sm:min-h-9"
               />
               {form.invoiceDate.slice(0, 7) !== initial.invoiceDate.slice(0, 7) && (
-                <span className="mt-1 block text-[11px] text-warn">ستنتقل إلى شهر {form.invoiceDate.slice(0, 7)}، لأن شهر الفاتورة يُحدَّد من تاريخها</span>
+                <span className="mt-1 block text-[11px] text-warn"><T s="ستنتقل إلى شهر {0}، لأن شهر الفاتورة يُحدَّد من تاريخها" a={[form.invoiceDate.slice(0, 7)]} /></span>
               )}
             </label>
             <label className="block">
@@ -237,8 +231,8 @@ export function InvoiceFix({
               {form.supplierId !== initial.supplierId && (
                 <span className="mt-1 block text-[11px] text-warn">
                   {paidMinor > 0
-                    ? <>سيُلغى ما خُصّص لها من سداد المورّد السابق (<Money minor={paidMinor} />) ويعود رصيداً له، ثم يُخصم رصيد المورّد الجديد.</>
-                    : "وستنتقل بنودها وأصنافها إلى المورّد الجديد."}
+                    ? <><T s="سيُلغى ما خُصّص لها من سداد المورّد السابق ({0}) ويعود رصيداً لك عنده، ثم يُخصم رصيدك عند المورّد الجديد." a={[<Money key="0" minor={paidMinor} />]} /></>
+                    : "وتنتقل بنودها وأصنافها إلى المورّد الجديد."}
                 </span>
               )}
             </label>
@@ -284,16 +278,16 @@ type Hint = { tone: "ok" | "warn" | "danger"; text: React.ReactNode } | null;
 function vatHint(v: string): Hint {
   if (!v.trim()) return null;
   return isValidSaudiVat(v)
-    ? { tone: "ok", text: "رقم ضريبي سليم الشكل" }
-    : { tone: "warn", text: "يجب أن يكون 15 خانة، يبدأ بـ3 وينتهي بـ3" };
+    ? { tone: "ok", text: "رقم ضريبي صيغته سليمة" }
+    : { tone: "warn", text: "يجب أن يكون ١٥ رقماً، يبدأ بـ3 وينتهي بـ3" };
 }
 
 function amountHint(v: string, required = false): Hint {
-  if (!v.trim()) return required ? { tone: "danger", text: "الإجمالي مطلوب" } : { tone: "warn", text: "فارغ، وسيُحفظ «غير معروف»" };
+  if (!v.trim()) return required ? { tone: "danger", text: "الإجمالي مطلوب" } : { tone: "warn", text: "فارغ، فسيُحفظ «غير معروف»" };
   const minor = parseRiyals(v);
-  if (minor === null) return { tone: "danger", text: "ليس مبلغاً مفهوماً، اكتبه مثل 1250.50" };
+  if (minor === null) return { tone: "danger", text: "المبلغ غير مفهوم، اكتبه مثل 1250.50" };
   /* ما كُتب بأرقامٍ هنديّة أو بفواصل يُعرض كما سيُحفظ */
-  return /[٠-٩۰-۹٬٫,]/.test(v) ? { tone: "ok", text: <>سيُحفظ <Money minor={minor} /></> } : null;
+  return /[٠-٩۰-۹٬٫,]/.test(v) ? { tone: "ok", text: <><T s="سيُحفظ {0}" a={[<Money key="0" minor={minor} />]} /></> } : null;
 }
 
 /* الخصمُ والرسومُ فراغُهما «لا شيء» لا «غير معروف» — فلا يُنذَر عنهما */
@@ -318,10 +312,7 @@ function SumCheck({ subtotal, vat, total, discount, charges }: { subtotal: strin
       aria-live="polite"
       className={`mt-2.5 flex flex-wrap items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold ${ok ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn"}`}
     >
-      {ok ? <CircleCheck className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden /> : <TriangleAlert className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />}
-      الصافي + الضريبة{check.discountMinor !== null && <> − الخصم</>}{check.chargesMinor !== null && <> + الرسوم</>} = <Money minor={sum} />
-      {ok ? " (يطابق الإجمالي)" : <> (يخالف الإجمالي بمقدار <Money minor={Math.abs(sum - t)} />)</>}
-    </p>
+      <T s="{0}الصافي + الضريبة{1}{2} = {3}{4}" a={[ok ? <CircleCheck className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden /> : <TriangleAlert className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />, check.discountMinor !== null && <> − الخصم</>, check.chargesMinor !== null && <> + الرسوم</>, <Money key="3" minor={sum} />, ok ? " (يطابق الإجمالي)" : <> <T s=" (يخالف الإجمالي بـ{0})" a={[<Money key="0" minor={Math.abs(sum - t)} />]} /></>]} /></p>
   );
 }
 

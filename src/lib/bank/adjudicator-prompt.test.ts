@@ -79,7 +79,7 @@ describe("validateVerdict", () => {
   it("يردّ ما ليس في القائمة — وهذا يمنع اختراع فاتورة", () => {
     const r = validateVerdict({ choice: "c9", confidence: 1, reasonCodes: [], reason: "" }, map);
     expect(r.candidate).toBeNull();
-    expect(r.rejected).toContain("غير موجود في القائمة");
+    expect(r.rejected).toContain("ليس في القائمة");
   });
 
   it("يردّ ثقةً خارج المدى", () => {

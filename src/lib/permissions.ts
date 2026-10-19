@@ -141,7 +141,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
 export class ForbiddenError extends Error {
   readonly capability: Capability;
   constructor(capability: Capability) {
-    super(`هذا الفعل يحتاج صلاحية «${CAPABILITY_LABEL[capability]}». اطلبها من مالك الحساب.`);
+    super(`هذا الإجراء يحتاج إلى صلاحية «${CAPABILITY_LABEL[capability]}». اطلبها من مالك الحساب.`);
     this.name = "ForbiddenError";
     this.capability = capability;
   }

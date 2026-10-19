@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { DICTIONARY_URL } from "@/lib/i18n/locale";
-import { Translator, type Dictionary } from "@/lib/i18n/translate";
+import { loadTranslator } from "@/lib/i18n/dictionary-store";
 import { HYDRATED_EVENT } from "./hydration-signal";
 
 /** ما لا يُمسّ نصُّه: ما يكتبه المستخدم، والشيفرة. */
@@ -45,13 +44,9 @@ export function EnglishRuntime() {
       });
       Promise.all([hydrated, complete]).then(idle);
     });
-    const dictionary = fetch(DICTIONARY_URL, { cache: "force-cache" })
-      .then((r) => (r.ok ? (r.json() as Promise<Dictionary>) : Promise.reject(new Error(String(r.status)))));
-
-    Promise.all([dictionary, loaded])
-      .then(([dict]) => {
+    Promise.all([loadTranslator(), loaded])
+      .then(([tr]) => {
         if (cancelled) return;
-        const tr = new Translator(dict);
         const mine = new WeakMap<Node, string>();
 
         const skipped = (el: Element | null): boolean =>

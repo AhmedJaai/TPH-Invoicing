@@ -102,7 +102,7 @@ export function openToken(stored: string): string {
     const kid = rest.slice(0, cut);
     const k = keys.find((x) => x.kid === kid);
     if (cut < 0 || !k) {
-      throw new Error("رمز الدرايف مشفّر بمفتاح غير المضبوط هنا. إن كان المفتاح قد تغيّر فضع المفتاح السابق في TOKEN_ENCRYPTION_KEY_PREVIOUS، أو سجّل الخروج ثم الدخول");
+      throw new Error("رمز الدرايف مشفّر بمفتاح غير المضبوط هنا. إن تغيّر المفتاح فضع المفتاح السابق في TOKEN_ENCRYPTION_KEY_PREVIOUS، أو سجّل الخروج ثم ادخل من جديد");
     }
     return decrypt(k.v2, rest.slice(cut + 1));
   }

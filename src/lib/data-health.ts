@@ -79,7 +79,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     known: input.invoices,
     total: input.invoices,
     detail: input.invoices > 0 ? `${countNoun(input.invoices, INVOICE)}` : "لا فواتير بعد",
-    action: input.invoices > 0 ? undefined : "ارفع فواتيرك أو زامن الدرايف",
+    action: input.invoices > 0 ? undefined : "ارفع فواتيرك، أو زامن الدرايف",
   });
 
   const lines = ratio(input.invoicesWithLines, input.invoices);
@@ -91,7 +91,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     known: input.invoicesWithLines,
     total: input.invoices,
     detail: `${input.invoicesWithLines} من ${countNoun(input.invoices, INVOICE)} لها بنود (${pct(lines)})`,
-    action: lines >= 0.95 ? undefined : "اقرأ محتوى بقية الفواتير، فبدون البنود لا يمكن تحليل الأصناف",
+    action: lines >= 0.95 ? undefined : "اقرأ محتوى باقي الفواتير، فبدون البنود لا يمكن تحليل الأصناف",
   });
 
   const tax = ratio(input.invoicesWithTaxDetail, input.invoices);
@@ -103,7 +103,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     known: input.invoicesWithTaxDetail,
     total: input.invoices,
     detail: `${input.invoicesWithTaxDetail} من ${countNoun(input.invoices, INVOICE)} قُرئ تفصيلها الضريبي (${pct(tax)})`,
-    action: tax >= 0.95 ? undefined : "بقية الفواتير حالتها غير معروفة وليست غير صالحة، فاقرأ مستنداتها",
+    action: tax >= 0.95 ? undefined : "باقي الفواتير حالتها غير معروفة لا غير صالحة، فاقرأ مستنداتها",
   });
 
   const bank = ratio(input.monthsWithBank, input.monthsWithInvoices);
@@ -133,7 +133,7 @@ export function buildDataHealth(input: HealthInput): DataHealth {
       input.bankTx === 0
         ? "لا حركات بعد"
         : `${countNoun(input.unclassifiedBankTx, TRANSACTION)} لم تُصنَّف بعد`,
-    action: input.unclassifiedBankTx === 0 ? undefined : "صنّفها من صفحة المال، فالتصنيف الواحد ينطبق على الحركات المشابهة",
+    action: input.unclassifiedBankTx === 0 ? undefined : "صنّفها من صفحة المال، فالتصنيف الواحد يُطبَّق على الحركات المشابهة",
   });
 
   const statements = ratio(input.suppliersWithStatements, input.suppliersWithInvoices);
@@ -162,8 +162,8 @@ export function buildDataHealth(input: HealthInput): DataHealth {
     coverage: null,
     known: 0,
     total: 0,
-    detail: "غير موصولة: لا يوجد مصدر للمبيعات بعد",
-    action: "عند ربط نقطة البيع يمكن حساب هامش الربح وتكلفة المبيعات",
+    detail: "غير موصولة: لا مصدر للمبيعات بعد",
+    action: "حين تُربط نقطة البيع يمكن حساب هامش الربح وتكلفة المبيعات",
   });
 
   metrics.push({

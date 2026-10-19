@@ -108,11 +108,11 @@ export async function resolveHeldRow(
 ): Promise<{ transactionId: string | null; removed?: boolean }> {
   const [row] = await tx.select().from(bankHeldRows).where(eq(bankHeldRows.id, id)).for("update");
   if (!row) throw new HeldRowRefused("الصف غير موجود. حدّث الصفحة");
-  if (row.resolvedAt) throw new HeldRowRefused("سبق حسم هذا الصف. حدّث الصفحة");
+  if (row.resolvedAt) throw new HeldRowRefused("قُرّر في هذا الصف من قبل. حدّث الصفحة");
   if (row.kind === "MISSING_FROM_FILE") return resolveMissing(tx, row, decision, actorId);
-  if (decision === "REMOVED") throw new HeldRowRefused("الحذف خاص بحركة عندنا ليست في الكشف، وهذا صف من الكشف");
+  if (decision === "REMOVED") throw new HeldRowRefused("الحذف لحركة عندنا ليست في الكشف، وهذا صف من الكشف");
   if (decision === "ADDED" && row.kind === "CONFLICT") {
-    throw new HeldRowRefused("لا يمكن إضافة الصف المتعارض: مرجعه لحركة مسجّلة بمبلغ آخر. راجع الملف ثم اختر «تحقّقت»");
+    throw new HeldRowRefused("لا يمكن إضافة الصف المتعارض: مرجعه لحركة مسجّلة بمبلغ آخر. راجع الملف، ثم اختر «تحقّقت»");
   }
   if (decision === "SAME" && row.kind === "CONFLICT") decision = "CHECKED";
 
@@ -207,7 +207,7 @@ async function resolveMissing(
       .where(eq(bankTransactions.id, row.againstTransactionId)).for("update");
     if (t) {
       if (t.matchedPaymentId || t.matchStatus === "MATCHED") {
-        throw new HeldRowRefused("الحركة مطابقة بدفعة. فكّ المطابقة من صفحتها أولاً ثم احذفها");
+        throw new HeldRowRefused("الحركة مطابقة بدفعة. فك المطابقة من صفحتها أولاً، ثم احذفها");
       }
       const linked = await tx.select({ id: expenses.id, month: expenses.periodMonth, amountMinor: expenses.amountMinor, label: expenses.label })
         .from(expenses).where(eq(expenses.bankTransactionId, t.id));

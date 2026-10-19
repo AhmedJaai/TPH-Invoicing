@@ -259,7 +259,7 @@ async function upsertStockItems(
       out.stockItems.linkedByName++;
       out.changes.push({
         sku: item.itemSku, name: item.name, action: "LINKED_BY_NAME",
-        detail: "رُبط بصنف قائم بالاسم نفسه. راجعه إن لم يكن هو الصنف المقصود",
+        detail: "رُبط بصنف موجود بالاسم نفسه، فراجعه إن لم يكن هو المقصود",
       });
       continue;
     }
@@ -474,7 +474,7 @@ async function writeRecipes(
     if (!menuId) {
       out.blocked.push({
         productSku, name: group[0].productName,
-        reason: "لا يوجد صنف مباع بهذا الرمز. ارفع معه ملف الأصناف المباعة",
+        reason: "لا صنف مباع بهذا الرمز. ارفع معه ملف الأصناف المباعة",
       });
       out.recipes.blocked++;
       continue;
@@ -499,7 +499,7 @@ async function writeRecipes(
     if (missing !== null) {
       out.blocked.push({
         productSku, name: group[0].productName,
-        reason: `مكوّنه «${missing}» غير موجود في أصناف المخزون. ارفع معه ملف أصناف المخزون`,
+        reason: `مكوّنه «${missing}» ليس في أصناف المخزون. ارفع معه ملف أصناف المخزون`,
       });
       out.recipes.blocked++;
       continue;

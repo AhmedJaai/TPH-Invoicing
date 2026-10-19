@@ -45,7 +45,7 @@ export async function answerQuestion(q: Question): Promise<Answer> {
       state: "ANSWER",
       label: `عليك لـ${supplier.nameAr} الآن`,
       amountMinor: balance?.owedMinor ?? 0,
-      basis: balance ? "الفواتير المفتوحة بعد خصم ما دفعته ولم يُوزَّع على فواتير" : "لا توجد فواتير مفتوحة ولا دفعات لهذا المورّد",
+      basis: balance ? "الفواتير المفتوحة بعد خصم ما دفعته ولم يُوزَّع على فواتير" : "لا فواتير مفتوحة ولا دفعات لهذا المورّد",
       href: `/suppliers/${supplier.slug}`,
     };
   }
@@ -77,7 +77,7 @@ export async function answerQuestion(q: Question): Promise<Answer> {
     state: "ANSWER",
     label: `اشتريت من ${supplier.nameAr} ${when}`,
     amountMinor: Number(row?.sum ?? 0),
-    basis: `${row?.n ?? 0} فاتورة مقيّدة في شهرها المحاسبي، شاملة الضريبة`,
+    basis: `${row?.n ?? 0} فاتورة مسجّلة في شهرها المحاسبي، شاملة الضريبة`,
     href: `/suppliers/${supplier.slug}?tab=invoices#detail`,
   };
 }

@@ -77,9 +77,9 @@ export function zipExpansion(data: Uint8Array): { entries: number; uncompressedB
 export function zipBombReason(data: Uint8Array): string | null {
   const z = zipExpansion(data);
   if (!z) return null;
-  if (z.entries > MAX_ZIP_ENTRIES) return "الملف يحتوي على عدد غير معقول من الأجزاء، وليس جدولاً صالحاً للقراءة. صدّره من جديد";
+  if (z.entries > MAX_ZIP_ENTRIES) return "الملف فيه عدد غير معقول من الأجزاء، فليس جدولاً صالحاً للقراءة. صدّره من جديد";
   if (z.uncompressedBytes > MAX_UNZIPPED_BYTES) {
-    return `حجم الملف بعد فك ضغطه ${Math.round(z.uncompressedBytes / (1024 * 1024))} ميجابايت، وهو أكبر من أن يكون جدولاً صالحاً للقراءة. صدّر فترة أقصر`;
+    return `حجم الملف بعد فك ضغطه ${Math.round(z.uncompressedBytes / (1024 * 1024))} ميجابايت، وهو أكبر من أن يكون جدولاً صالحاً. صدّر فترة أقصر`;
   }
   return null;
 }
@@ -106,6 +106,6 @@ export function heifDimensions(data: Uint8Array): { width: number; height: numbe
 export function assertHeifOpenable(data: Uint8Array): void {
   const d = heifDimensions(data);
   if (d && d.width * d.height > MAX_IMAGE_PIXELS) {
-    throw new Error(`الصورة أكبر من أن تُفتح (${d.width}×${d.height}). صوّرها بدقة أقل`);
+    throw new Error(`الصورة أكبر من أن تُفتح (${d.width}×${d.height})، فصوّرها بدقة أقل`);
   }
 }

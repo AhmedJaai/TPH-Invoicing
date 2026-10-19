@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CloudOff, RotateCw, WifiOff } from "lucide-react";
 import { buttonClass } from "@/components/ui-tokens";
+import { T } from "@/components/i18n/t";
 
 /**
  * حدُّ الخطأ — بالعربية، داخل القشرة.
@@ -69,24 +70,21 @@ export default function ErrorPage({
         <h1 className="mt-4 text-lg font-bold">{online ? "تعذّر عرض هذه الصفحة" : "لا يوجد اتصال بالإنترنت"}</h1>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-soft">
           {online
-            ? "عرض الصفحة لا يغيّر أي بيانات، فلم يضع شيء. الخادم لم يستجب، وغالباً السبب انقطاع عابر في الاتصال بقاعدة البيانات."
-            : "جهازك غير متصل بالشبكة. عرض الصفحة لا يغيّر أي بيانات، فلم يضع شيء. ستُعاد المحاولة تلقائياً عند عودة الاتصال."}
+            ? "عرض الصفحة لا يغيّر أي بيانات، فلم يضِع شيء. لم يستجب الخادم، والسبب غالباً انقطاع مؤقت في الاتصال بقاعدة البيانات."
+            : "جهازك غير متصل بالإنترنت. عرض الصفحة لا يغيّر أي بيانات، فلم يضِع شيء، وستُعاد المحاولة تلقائياً عند عودة الاتصال."}
         </p>
         <p className="mt-2 min-h-5 text-xs font-bold text-ink-soft" role="status">
-          {left !== null && <>ستُعاد المحاولة بعد <span className="nums">{left}</span> ث…</>}
+          {left !== null && <><T s="إعادة المحاولة بعد {0} ث…" a={[<span key="0" className="nums">{left}</span>]} /></>}
         </p>
         {error.digest && (
           <p className="mt-3 text-[11px] text-muted">
-            إن تكرر الخطأ فأرسل هذا الرمز للمختص: <span className="nums" dir="ltr">{error.digest}</span>
-          </p>
+            <T s="إن تكرر الخطأ فأرسل هذا الرمز للدعم الفني: {0}" a={[<span key="0" className="nums" dir="ltr">{error.digest}</span>]} /></p>
         )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button type="button" onClick={() => retry()} className={buttonClass("primary")}>
-            <RotateCw className="h-4 w-4" strokeWidth={2} aria-hidden />
-            أعد المحاولة
-          </button>
+            <T s="{0}أعد المحاولة" a={[<RotateCw key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></button>
           <Link href="/" className={buttonClass("secondary")}>
-            إلى اليوم
+            حتى اليوم
           </Link>
         </div>
       </div>

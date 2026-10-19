@@ -314,7 +314,7 @@ export async function loadVatReturn(period: VatPeriod, conn: Conn = db): Promise
     return {
       ...base,
       supplier: i.supplier, supplierId: i.supplier_id, supplierSlug: i.supplier_slug, number: i.number, day: i.day, periodMonth: i.period_month,
-      reasons: i.awaiting && machineEligible({ ...base, awaitingReview: false }) ? ["تنتظر المراجعة ولم يعتمد أحد قراءتها"] : reasons,
+      reasons: i.awaiting && machineEligible({ ...base, awaitingReview: false }) ? ["تنتظر المراجعة، ولم يعتمد أحد قراءتها"] : reasons,
       warnings: reviewWarnings(i),
       supplierVat: i.supplier_vat,
       sellerVat: i.seller_vat,
@@ -406,14 +406,14 @@ function reviewWarnings(i: {
       out.push("الضريبة المقروءة فوق 15/115 من الإجمالي");
     }
   }
-  if (i.twin_supplier) out.push(`الفاتورة نفسها مقيّدة تحت «${i.twin_supplier}»، وقد تُخصم ضريبتها مرتين`);
+  if (i.twin_supplier) out.push(`الفاتورة نفسها مسجّلة تحت «${i.twin_supplier}»، وقد تُخصم ضريبتها مرتين`);
   const seller = (i.seller_vat ?? "").replace(/\D/g, "");
   const known = (i.supplier_vat ?? "").replace(/\D/g, "");
   if (isValidSaudiVat(i.seller_vat) && isValidSaudiVat(i.supplier_vat) && seller !== known && seller !== companyVatDigits()) {
-    out.push("رقم البائع على الورقة يختلف عن رقم المورّد في سجلّه");
+    out.push("رقم البائع في الورقة يختلف عن رقم المورّد في سجله");
   }
   if (Math.abs(monthIndex(i.date_month) - monthIndex(i.period_month)) > FAR_DATE_MONTHS) {
-    out.push("تاريخها يبعد عن الفترة أكثر من سنة. راجع السنة المقروءة");
+    out.push("تاريخها يبعد عن الفترة أكثر من سنة، فراجع السنة المقروءة");
   }
   return out;
 }
@@ -502,7 +502,7 @@ export async function chooseVatTxs(ids: readonly string[], included: boolean | n
       .then((rows) => rows.map((f) => ({ ...f, category: vatCategory(f) })));
     if (found.length !== unique.length) throw new VatChoiceRefused("الحركة لم تعد موجودة. حدّث الصفحة");
     if (found.some((f) => f.category === null)) {
-      throw new VatChoiceRefused("الرسم لا يُحتسب بذاته، وضريبته في حركتها المستقلة");
+      throw new VatChoiceRefused("الرسم لا يُحتسب وحده، وضريبته في حركتها المستقلة");
     }
     await assertNotFiled(t, found.map((f) => f.month));
 
@@ -577,7 +577,7 @@ export async function chooseVatInvoices(ids: readonly string[], included: boolea
     const zero = found.find((f) => f.vatMinor === 0);
     if (included && zero) {
       throw new VatChoiceRefused(
-        `الفاتورة ${zero.number} قُرئت ضريبتها صفراً، فلا شيء فيها يُخصم. إن كانت على الورقة ضريبة فصحّح مبلغها من الفاتورة.`,
+        `الفاتورة ${zero.number} قُرئت ضريبتها صفراً، فلا يُخصم منها شيء. إن كانت على الورقة ضريبة فصحّح مبلغها من الفاتورة.`,
       );
     }
 
@@ -664,7 +664,7 @@ export async function fileVatReturn(input: FileVatReturnInput, actorId: string, 
   const today = todayInRiyadh();
   if (today < periodBounds(period).until) throw new VatChoiceRefused("الربع لم ينتهِ بعد، فلا يمكن تقديم إقراره");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.filedOn) || input.filedOn > today || input.filedOn < periodBounds(period).until) {
-    throw new VatChoiceRefused("يجب أن يكون يوم التقديم بعد نهاية الربع وألا يكون بعد اليوم");
+    throw new VatChoiceRefused("يجب أن يكون يوم التقديم بعد نهاية الربع، وألا يتجاوز اليوم");
   }
 
   return conn.transaction(async (t) => {
@@ -672,7 +672,7 @@ export async function fileVatReturn(input: FileVatReturnInput, actorId: string, 
     const view = await loadVatReturn(period, t);
     const r = view.result;
     if (r.netMinor < 0 && input.creditDisposition === null) {
-      throw new VatChoiceRefused("الصافي رصيد لك. اختر: ترحيله إلى الربع التالي أو طلب استرداده");
+      throw new VatChoiceRefused("الصافي رصيد لك. اختر: ترحيله إلى الربع التالي، أو طلب استرداده");
     }
     const [row] = await t.insert(vatFilings).values({
       periodKey: periodKey(period),

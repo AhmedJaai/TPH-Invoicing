@@ -17,10 +17,10 @@ export interface NewsItem {
 }
 
 export const WHATS_NEW: readonly NewsItem[] = [
-  { id: "payrun-partial", date: "2026-10-09", needs: "payment:approve", href: "/payments", text: "دفعة الشهر: استثنِ فاتورة واحدة أو ادفع جزءاً من المبلغ. والفواتير المحجوزة تدخل الدفعة بقرارك مع ذكر السبب." },
+  { id: "payrun-partial", date: "2026-10-09", needs: "payment:approve", href: "/payments", text: "دفعة الشهر: استثنِ فاتورة واحدة أو ادفع جزءاً من المبلغ. والفواتير الموقوفة تدخل الدفعة بقرارك مع ذكر السبب." },
   { id: "cash-what-if", date: "2026-10-09", needs: "bank:view", href: "/cash", text: "النقد القادم: «ماذا لو أجّلت هذا؟» حدّد بنداً لترى ما يبقى بعد كل مرحلة، مع خط الرصيد." },
   { id: "auto-work-told", date: "2026-10-09", needs: "document:upload", href: "/documents/drive#auto", text: "العمل الآلي يخبرك بما قيّده واعتمده وبمقدار الزيادة في ما عليك، ويمكنك إيقافه وتشغيله من صفحة الدرايف." },
-  { id: "bank-search", date: "2026-10-09", needs: "bank:view", href: "/bank#transactions", text: "سجل البنك: البحث بالمبلغ أو الاسم يشمل كل الحركات وليس الأحدث فقط." },
+  { id: "bank-search", date: "2026-10-09", needs: "bank:view", href: "/bank#transactions", text: "سجل البنك: البحث بالمبلغ أو الاسم يشمل كل الحركات، لا الأحدث فقط." },
 ];
 
 /** ما لم يُقرأ بعد ممّا يملك الدورُ رؤيتَه — الأحدثُ أوّلاً. */

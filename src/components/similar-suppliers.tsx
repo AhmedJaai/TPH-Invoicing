@@ -1,6 +1,7 @@
 "use client";
 
 import { buttonClass } from "./ui-tokens";
+import { T } from "@/components/i18n/t";
 
 /**
  * «أتقصد فلاناً؟» — حين يردّ `/api/supplier` بـ409 و`similar`.
@@ -44,8 +45,7 @@ export function SimilarSuppliers({
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
         {similar.map((s) => (
           <button key={s.id} type="button" disabled={busy} onClick={() => onPick(s)} className={buttonClass("secondary", "sm")}>
-            نعم، هو «{s.nameAr}»
-          </button>
+            <T s="نعم، هو «{0}»" a={[s.nameAr]} /></button>
         ))}
         <button type="button" disabled={busy} aria-busy={busy} onClick={onCreateAnyway} className={buttonClass("quiet", "sm")}>
           لا، أنشئه مورّداً جديداً

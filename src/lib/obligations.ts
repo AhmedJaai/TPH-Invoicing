@@ -20,10 +20,10 @@ export const OBLIGATION_KINDS = [
 export type ObligationKind = (typeof OBLIGATION_KINDS)[number];
 
 export const OBLIGATION_KIND_LABEL: Record<ObligationKind, string> = {
-  COMMERCIAL_REGISTER: "السجلّ التجاريّ",
-  MUNICIPAL_LICENCE: "رخصة البلديّة",
-  CIVIL_DEFENCE: "الدفاع المدنيّ",
-  HEALTH_CERTIFICATE: "شهادة صحّيّة",
+  COMMERCIAL_REGISTER: "السجل التجاري",
+  MUNICIPAL_LICENCE: "رخصة البلدية",
+  CIVIL_DEFENCE: "الدفاع المدني",
+  HEALTH_CERTIFICATE: "شهادة صحية",
   IQAMA: "إقامة",
   LEASE: "عقد الإيجار",
   INSURANCE: "تأمين",
@@ -120,7 +120,7 @@ export function describeDaysLeft(left: number): string {
   if (left === 0) return "تنتهي اليوم";
   if (left === 1) return "تنتهي غداً";
   if (left === -1) return "انتهت أمس";
-  if (left > 0) return left === 2 ? "بعد يومين" : left <= 10 ? `بعد ${left} أيّام` : `بعد ${left} يوماً`;
+  if (left > 0) return left === 2 ? "بعد يومين" : left <= 10 ? `بعد ${left} أيام` : `بعد ${left} يوماً`;
   const past = -left;
-  return past === 2 ? "انتهت منذ يومين" : past <= 10 ? `انتهت منذ ${past} أيّام` : `انتهت منذ ${past} يوماً`;
+  return past === 2 ? "انتهت منذ يومين" : past <= 10 ? `انتهت منذ ${past} أيام` : `انتهت منذ ${past} يوماً`;
 }

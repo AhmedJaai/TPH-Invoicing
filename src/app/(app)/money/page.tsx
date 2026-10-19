@@ -14,6 +14,7 @@ import { DAY, INVOICE, TRANSACTION, countNoun } from "@/lib/arabic";
 import { daysSinceRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { BANK_STALE_DAYS } from "@/lib/attention";
 import { loadMoneyView } from "@/services/money-view.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -56,11 +57,11 @@ export default async function MoneyPage({
   */
   if (v.txCount === 0) {
     return (
-      <PageShell user={user} width="wide" title="أين ذهب المال" intro="الأرقام من كشف بنكك وليست تقديرات.">
+      <PageShell user={user} width="wide" title="أين ذهب المال" intro="الأرقام من كشف بنكك، لا تقديرات.">
         <EmptyState
           icon={Landmark}
           title="لم يُستورد كشف بنك بعد."
-          hint="بدون كشف لا يعرف النظام ما خرج من الحساب ولا وجهته، ولذلك لا يعرض أرقاماً توحي بأنها صفر. استورد كشف الحساب لتظهر هنا تصنيفات الصادر وحركة كل شهر."
+          hint="بدون كشف لا يعرف النظام ما خرج من الحساب ولا إلى أين، فلن يعرض أرقاماً توهم بأنها صفر. استورد كشف الحساب لتظهر هنا تصنيفات الخارج وحركة كل شهر."
           action={<LinkButton href="/bank#import" variant="primary" icon={Upload}>استورد كشف البنك</LinkButton>}
         />
       </PageShell>
@@ -87,12 +88,9 @@ export default async function MoneyPage({
       title="أين ذهب المال"
       eyebrow={
         <span className={stale ? "font-bold text-warn" : ""}>
-          {stale && <CircleAlert className="me-1 inline-block h-3.5 w-3.5 align-[-2px]" strokeWidth={2} aria-hidden />}
-          من كشف البنك: <bdi>{formatDay(v.firstDay)}</bdi> إلى <bdi>{formatDay(v.lastDay)}</bdi>
-          {stale && <> · آخر تحديث قبل {countNoun(staleDays, DAY)}</>}
-        </span>
+          <T s="{0}من كشف البنك: {1} إلى {2}{3}" a={[stale && <CircleAlert className="me-1 inline-block h-3.5 w-3.5 align-[-2px]" strokeWidth={2} aria-hidden />, <bdi key="1">{formatDay(v.firstDay)}</bdi>, <bdi key="2">{formatDay(v.lastDay)}</bdi>, stale && <> <T s=" · آخر تحديث قبل {0}" a={[countNoun(staleDays, DAY)]} /></>]} /></span>
       }
-      intro="كل ريال خرج من حسابك ووجهته، وما دخل إليه. الأرقام من الكشف نفسه وليست تقديرات، وما لم يُصنَّف يظهر بمبلغه."
+      intro="كل ريال خرج من حسابك وإلى أين ذهب، وما دخل إليه. الأرقام من الكشف نفسه لا تقديرات، وما لم يُصنَّف يظهر بمبلغه."
       actions={stale ? <LinkButton href="/bank#import" icon={Upload} variant="primary">استورد الأحدث</LinkButton> : undefined}
     >
       {v.months.length > 1 && (
@@ -115,7 +113,7 @@ export default async function MoneyPage({
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
         <Figure
           icon={<ArrowUpRight strokeWidth={2} aria-hidden />}
-          label={`الصادر · ${periodLabel}`}
+          label={`الخارج · ${periodLabel}`}
           provenance={v.outflow}
           unit="حركة"
           href={month ? `/bank?month=${month}#transactions` : "/bank#transactions"}
@@ -126,19 +124,18 @@ export default async function MoneyPage({
           note={
             v.unknown.count > 0 ? (
               <span className="text-warn">
-                ولا يشمل {countNoun(v.unknown.count, TRANSACTION)} بقيمة <Money minor={v.unknown.minor} /> لم تُعرف وجهتها.
-              </span>
+                <T s="لا يشمل {0} بقيمة {1} لم تُعرف وجهتها." a={[countNoun(v.unknown.count, TRANSACTION), <Money key="1" minor={v.unknown.minor} />]} /></span>
             ) : (
-              "وجهة كل الصادر في هذه الفترة معروفة."
+              "كل ما خرج في هذه الفترة معروف الوجهة."
             )
           }
         />
         <Figure
           icon={<ArrowDownLeft strokeWidth={2} aria-hidden />}
-          label={`الوارد · ${periodLabel}`}
+          label={`الداخل · ${periodLabel}`}
           value={<Money minor={v.inMinor} />}
           href={month ? `/bank?show=in&month=${month}#transactions` : "/bank?show=in#transactions"}
-          note="إيداعات الشبكة والتحويلات إلى الحساب، وليست «مبيعات»."
+          note="إيداعات الشبكة والتحويلات الواردة إلى الحساب، وهي ليست «المبيعات»."
         />
         <Figure
           icon={<Scale strokeWidth={2} aria-hidden />}
@@ -147,32 +144,30 @@ export default async function MoneyPage({
           tone={netMinor < 0 ? "danger" : undefined}
           note={
             month && partial.has(month)
-              ? `شهر جزئي (${partial.get(month)}) ولا يصح مقارنته بشهر كامل.`
-              : "الوارد مطروحاً منه كل ما خرج، بما فيه غير المصنّف."
+              ? `شهر ناقص (${partial.get(month)})، فلا تقارنه بشهر كامل.`
+              : "الداخل مطروحاً منه كل ما خرج، بما في ذلك غير المصنّف."
           }
         />
       </div>
 
       <Callout tone="info" icon={Info} className="mt-4">
-        <strong className="text-ink">الإيراد غير معروف هنا.</strong> مبيعات فودكس لا تدخل هذه الصفحة، لذلك لا يُحسب ربح ولا هامش. والصافي أعلاه هو حركة الحساب البنكي وليس ربح المقهى.
-      </Callout>
+        <T s="{0} مبيعات فودكس لا تدخل في هذه الصفحة، فلا يُحسب فيها ربح ولا هامش. والصافي أعلاه حركة الحساب البنكي، لا ربح المقهى." a={[<strong key="0" className="text-ink">الإيراد غير معروف هنا.</strong>]} /></Callout>
 
       <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         {/* ── أين ذهب الصادر ── */}
         <Section
-          title="أين ذهب الصادر"
+          title="أين ذهب الخارج"
           icon={PieChart}
           className="mt-0!"
-          hint={`الصادر في ${periodLabel} موزعاً على تصنيفاته، ومجموعها هو الصادر كله. سداد المورّدين محسوب ضمن المشتريات، وسحب المالك ليس مصروفاً.`}
+          hint={`ما خرج في ${periodLabel} موزّعاً على تصنيفاته، ومجموعها هو كل ما خرج. سداد المورّدين محسوب ضمن المشتريات، وسحب المالك ليس مصروفاً.`}
           action={
             <Link href={month ? `/money/expenses?month=${month}` : "/money/expenses"} className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline sm:min-h-0">
-              تفاصيل المصروفات <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            </Link>
+              <T s="تفاصيل المصروفات {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
           }
         >
           <div className="rounded-2xl border border-line bg-raised p-3 shadow-raised sm:p-4">
             {v.buckets.length === 0 ? (
-              <p className="px-2 py-6 text-center text-xs text-muted">لا يوجد صادر في {periodLabel}.</p>
+              <p className="px-2 py-6 text-center text-xs text-muted"><T s="لم يخرج شيء في {0}." a={[periodLabel]} /></p>
             ) : (
               <BarList
                 items={v.buckets.map((b) => ({
@@ -190,16 +185,14 @@ export default async function MoneyPage({
               <div className="mt-2 flex flex-wrap items-center gap-3 rounded-xl border border-warn/25 bg-warn-bg px-3 py-2.5">
                 <CircleAlert className="h-4 w-4 shrink-0 text-warn" strokeWidth={2} aria-hidden />
                 <p className="min-w-0 flex-1 text-xs text-ink-soft">
-                  <span className="font-bold text-warn">غير مصنّف: <Money minor={v.unknown.minor} /></span>
-                  {" "}({countNoun(v.unknown.count, TRANSACTION)})، لذلك فالتوزيع أعلاه ناقص بهذا المبلغ.
-                </p>
+                  <T s="{0} ({1})، فالتوزيع أعلاه ينقصه هذا المبلغ." a={[<span key="0" className="font-bold text-warn"><T s="غير مصنّف: {0}" a={[<Money key="0" minor={v.unknown.minor} />]} /></span>, countNoun(v.unknown.count, TRANSACTION)]} /></p>
                 <LinkButton href="/bank?show=unknown#transactions" size="sm" variant="primary">صنّفها</LinkButton>
               </div>
             )}
 
             <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-line-soft px-2 pt-3 text-xs">
               <div>
-                <dt className="text-muted">الصادر كله</dt>
+                <dt className="text-muted">كل ما خرج</dt>
                 <dd className="mt-0.5 text-sm font-bold"><Money minor={v.outMinor} /></dd>
               </div>
               <div>
@@ -215,14 +208,14 @@ export default async function MoneyPage({
           title="شهراً بشهر"
           icon={ChartColumn}
           className="mt-0!"
-          hint="الوارد والصادر في كل شهر من الكشف. اضغط على شهر لترى تصنيفاته."
+          hint="ما دخل وما خرج في كل شهر من الكشف. اضغط الشهر لترى تصنيفاته."
         >
           <CashFlowChart months={v.flow.months} partial={partial} hrefOf={(m) => monthHref(m)} active={month} />
         </Section>
       </div>
 
       {/* ── الضريبة في الفواتير — ليست حركة بنك، لكنّها مالٌ يعود أو يضيع ── */}
-      <Section title="ضريبة المشتريات" icon={Receipt} hint="من الفواتير المسجّلة وليس من الكشف.">
+      <Section title="ضريبة المشتريات" icon={Receipt} hint="من الفواتير المسجّلة، لا من الكشف.">
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
           <Link href="/purchases/invoices?tax=VALID" className="flex items-center justify-between gap-3 rounded-xl border border-line bg-raised px-4 py-3.5 shadow-raised transition-colors hover:border-accent-line">
             <span>
@@ -233,11 +226,11 @@ export default async function MoneyPage({
           </Link>
           <Link href="/purchases/invoices?tax=INVALID" className="flex items-center justify-between gap-3 rounded-xl border border-line bg-raised px-4 py-3.5 shadow-raised transition-colors hover:border-accent-line">
             <span>
-              <span className="block text-xs font-bold text-muted">معرّضة للضياع</span>
+              <span className="block text-xs font-bold text-muted">مهددة بالضياع</span>
               <span className="mt-0.5 block text-[11px] text-muted">
                 {v.vat.unknownInvoices > 0
-                  ? `ولم تُقرأ تفاصيل ${countNoun(v.vat.unknownInvoices, INVOICE)} بعد`
-                  : "من فواتير لا يصح خصم ضريبتها"}
+                  ? `ولم تُقرأ بعد تفاصيل ${countNoun(v.vat.unknownInvoices, INVOICE)}`
+                  : "من فواتير لا يجوز خصم ضريبتها"}
               </span>
             </span>
             <span className={`text-lg font-bold ${v.vat.atRiskMinor > 0 ? "text-danger" : ""}`}><Money minor={v.vat.atRiskMinor} /></span>

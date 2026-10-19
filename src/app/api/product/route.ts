@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       entityId: ids[0],
       after: { عدد: ids.length },
     });
-    return NextResponse.json({ ok: true, message: `تم فك ربط ${countNoun(ids.length, PRODUCT)}` });
+    return NextResponse.json({ ok: true, message: `فُكّ ربط ${countNoun(ids.length, PRODUCT)}` });
   }
 
   try {
@@ -82,9 +82,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       ...result,
-      message: `تم ربط ${countNoun(result.linked, PRODUCT)} بـ«${result.productName}»${
-        result.createdProduct ? " (صنف جديد)" : ""
-      }`,
+      message: `رُبط ${countNoun(result.linked, PRODUCT)} بـ«${result.productName}»${result.createdProduct ? " (صنف جديد)" : ""}`,
     });
   } catch (e) {
     return failWith(e, "product");

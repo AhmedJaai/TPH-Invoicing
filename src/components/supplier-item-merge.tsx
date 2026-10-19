@@ -6,6 +6,7 @@ import { Merge } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * «هو نفسه…» — صيغةٌ أخرى لصنفٍ عند المورّد نفسه.
@@ -39,7 +40,7 @@ export function SupplierItemMerge({ supplierId, item, name, options }: {
       setError(r.error);
       return;
     }
-    toast({ tone: "ok", title: `تم دمج «${name}» في «${target.name}»`, body: r.data.message });
+    toast({ tone: "ok", title: `دُمج «${name}» في «${target.name}»`, body: r.data.message });
     setOpen(false);
     router.refresh();
   }
@@ -60,8 +61,7 @@ export function SupplierItemMerge({ supplierId, item, name, options }: {
   return (
     <div className="relative z-10 mt-2 rounded-lg border border-line bg-sunken/60 p-2.5">
       <label className="block text-[11px] text-muted">
-        «{name}» هو نفسه:
-        <select
+        <T s="«{0}» هو نفسه:{1}" a={[name, <select key="1"
           value={into}
           onChange={(e) => setInto(e.target.value)}
           disabled={busy}
@@ -71,16 +71,14 @@ export function SupplierItemMerge({ supplierId, item, name, options }: {
           {options.map((o) => (
             <option key={o.key} value={o.key}>{o.name}{o.suggested ? " · مقترح" : ""}</option>
           ))}
-        </select>
-      </label>
+        </select>]} /></label>
       {target && (
         <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">
-          ستُنقل بنود «{name}» إلى «{target.name}» ويُجمع تاريخ سعريهما، وكل بند يأتي بهذا الاسم بعد اليوم سيُسجَّل باسم «{target.name}».
-        </p>
+          <T s="ستُنقل بنود «{0}» إلى «{1}» ويُجمع تاريخ أسعارهما، وكل بند يصل بهذا الاسم بعد اليوم سيُسجَّل باسم «{2}»." a={[name, target.name, target.name]} /></p>
       )}
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <button type="button" onClick={merge} disabled={busy || !target} aria-busy={busy} className={buttonClass("primary", "sm")}>
-          {busy ? "جارٍ الدمج…" : "نعم، هما صنف واحد"}
+          {busy ? "يدمج…" : "نعم، هما صنف واحد"}
         </button>
         <button type="button" onClick={() => { setOpen(false); setError(null); }} disabled={busy} className={buttonClass("quiet", "sm")}>
           إلغاء

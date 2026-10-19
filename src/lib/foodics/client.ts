@@ -26,7 +26,7 @@ export class FoodicsApiError extends Error {
   constructor(readonly status: number, path: string) {
     super(
       status === 401 || status === 403
-        ? `فودكس رفض المفتاح (${status}) عند ${path} . قد يكون المفتاح أُلغي من «Authorized Apps» أو تنقصه صلاحية.`
+        ? `فودكس رفض المفتاح (${status}) عند ${path}. ربما أُلغي المفتاح من «Authorized Apps» أو تنقصه صلاحية.`
         : `فودكس ردّ بـ${status} عند ${path}.`,
     );
     this.name = "FoodicsApiError";

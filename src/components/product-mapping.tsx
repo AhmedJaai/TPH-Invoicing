@@ -7,6 +7,7 @@ import { CATEGORY_LABEL, type MergeSuggestion, type ProductCategory } from "@/li
 import { buttonClass } from "@/components/ui";
 import { postJson } from "@/lib/http-client";
 import { countNoun, TIME } from "@/lib/arabic";
+import { T } from "@/components/i18n/t";
 
 export interface SupplierProductView {
   id: string;
@@ -68,7 +69,7 @@ function LinkRow({
         newProductName: creating ? newName.trim() : undefined,
         category: creating ? category : undefined,
       });
-      setMessage(r.ok ? (r.data.message ?? "تم الربط") : r.error);
+      setMessage(r.ok ? (r.data.message ?? "رُبط") : r.error);
       /*
         الربط الذي لم يربط شيئاً ليس نجاحاً — والنصّ يقوله («لا أصناف»)
         بينما اللون كان يقول «تمّ». فيُقرأ اللونُ قبل النصّ.
@@ -88,8 +89,7 @@ function LinkRow({
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium">{i.displayName}</span>
               <span className="block text-[11px] text-muted">
-                {i.supplierName} · طُلب {countNoun(i.orderCount, TIME)}
-              </span>
+                <T s="{0} · طُلب {1}" a={[i.supplierName, countNoun(i.orderCount, TIME)]} /></span>
             </span>
             <span className="nums shrink-0 text-xs" dir="ltr">
               {formatRiyalsDisplay(i.lastUnitPriceMinor)}
@@ -192,7 +192,7 @@ function Triage({
     return (
       <div className="rounded-2xl border border-ok/40 bg-ok-bg px-5 py-10 text-center">
         <p className="text-sm font-bold text-ok">لا شيء ينتظر التصنيف.</p>
-        <p className="mt-1.5 text-xs text-ink-soft">كل صنف مورّد له الآن صنف معياري.</p>
+        <p className="mt-1.5 text-xs text-ink-soft">لكل صنف من أصناف المورّدين الآن صنف معياري.</p>
       </div>
     );
   }
@@ -243,8 +243,7 @@ function Triage({
     <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-[11px] text-muted">
-          <span className="nums">{position + 1}</span> من <span className="nums">{queue.length}</span>
-        </p>
+          <T s="{0} من {1}" a={[<span key="0" className="nums">{position + 1}</span>, <span key="1" className="nums">{queue.length}</span>]} /></p>
         {position > 0 && (
           <button
             type="button"
@@ -264,9 +263,7 @@ function Triage({
 
       <p className="mt-4 font-display text-xl font-bold leading-snug">{item.displayName}</p>
       <p className="mt-1.5 text-xs text-muted">
-        {item.supplierName} · اشتريته {countNoun(item.orderCount, TIME)} ·{" "}
-        {formatRiyalsDisplay(item.totalSpentMinor)} ريال
-      </p>
+        <T s="{0} · اشتريته {1} · {2} ريال" a={[item.supplierName, countNoun(item.orderCount, TIME), formatRiyalsDisplay(item.totalSpentMinor)]} /></p>
 
       {candidate ? (
         <div className="mt-4 rounded-xl border border-line bg-surface px-3.5 py-3">
@@ -278,8 +275,7 @@ function Triage({
         </div>
       ) : (
         <p className="mt-4 text-xs leading-relaxed text-muted">
-          لا يوجد صنف معياري بهذا الاسم. عند إنشائه يُجمع ما تشتريه من مورّدين
-          مختلفين تحت صنف واحد.
+          لا يوجد صنف معياري بهذا الاسم. حين تنشئه يُجمع ما تشتريه من مورّدين مختلفين تحت صنف واحد.
         </p>
       )}
 
@@ -360,10 +356,9 @@ export function ProductMapping({
   return (
     <div className="space-y-8">
       <section>
-        <h2 className="font-display text-lg font-bold leading-tight">راجعها واحداً تلو الآخر</h2>
+        <h2 className="font-display text-lg font-bold leading-tight">راجعها واحداً واحداً</h2>
         <p className="mb-3 mt-1 max-w-2xl text-xs leading-relaxed text-muted">
-          القرار في كل صنف بسيط: هل هو الصنف المعياري نفسه أم لا؟ نعرض لك
-          صنفاً واحداً في كل مرة، ثم ننتقل إلى الذي يليه.
+          القرار في كل صنف بسيط: هل هو الصنف المعياري نفسه أم لا؟ نعرض عليك صنفاً واحداً كل مرة، ثم ننتقل إلى التالي.
         </p>
         <Triage queue={singles} products={products} onResolved={(id) => onDone([id])} />
       </section>
@@ -372,9 +367,7 @@ export function ProductMapping({
         <section>
           <h2 className="text-base font-bold">أصناف قد تكون صنفاً واحداً</h2>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            أصناف تحمل الاسم نفسه عند مورّدين. وتطابق الاسم لا يعني تطابق الصنف:
-            «عنب» عند المحمصة الغربية كيلو بنّ، وعند لافا زجاجة كمبوتشا. لذلك نعرض
-            مع كل اقتراح ما يضعفه.
+            أصناف تحمل الاسم نفسه عند أكثر من مورّد. وتطابق الاسم لا يعني تطابق الصنف: «عنب» عند المحمصة الغربية كيلو بن، وعند لافا زجاجة كمبوتشا. لذلك نعرض مع كل اقتراح ما يضعفه.
           </p>
           <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {suggestionGroups.map((g) => (
@@ -391,10 +384,9 @@ export function ProductMapping({
       )}
 
       <section>
-        <h2 className="text-base font-bold">أصناف بلا ربط ({singles.length})</h2>
+        <h2 className="text-base font-bold"><T s="أصناف بلا ربط ({0})" a={[singles.length]} /></h2>
         <p className="mt-1 text-xs leading-relaxed text-muted">
-          كل منها صنف مورّد قائم بذاته. ربطه بصنف معياري يتيح لاحقاً جمع
-          ما اشتريته من مورّدين مختلفين تحت صنف واحد.
+          كل منها صنف مورّد مستقل. ربطه بصنف معياري يتيح لاحقاً جمع ما اشتريته من مورّدين مختلفين تحت صنف واحد.
         </p>
         {singles.length === 0 ? (
           <p className="mt-3 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-xs text-ok">
@@ -409,14 +401,13 @@ export function ProductMapping({
         )}
         {singles.length > 60 && (
           <p className="mt-2 text-xs text-muted">
-            نعرض أول ستين صنفاً من {singles.length}، بدءاً بالأكثر إنفاقاً.
-          </p>
+            <T s="نعرض أول ستين صنفاً من {0}، الأكثر إنفاقاً أولاً." a={[singles.length]} /></p>
         )}
       </section>
 
       {mapped.length > 0 && (
         <section>
-          <h2 className="text-base font-bold">مربوطة ({mapped.length})</h2>
+          <h2 className="text-base font-bold"><T s="مربوطة ({0})" a={[mapped.length]} /></h2>
           <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
             {mapped.slice(0, 40).map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-3 px-3 py-2">
@@ -465,7 +456,7 @@ function UnlinkButton({ id }: { id: string }) {
         }}
         className={buttonClass("quiet", "sm")}
       >
-        إلغاء الربط
+        ألغِ الربط
       </button>
       {error && <span role="alert" className="text-[11px] font-bold text-danger">{error}</span>}
     </span>

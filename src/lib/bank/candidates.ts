@@ -504,7 +504,7 @@ export function searchCandidates(
       if (!all || u.n >= all.total) continue;
       /* المرجعُ عيّن المأخوذَ كلَّه ولم يبقَ مرجعٌ خارجه — فلا التباس */
       if (u.preferred === u.n && all.preferred === u.n) continue;
-      return `${countNoun(all.total, INVOICE)} مفتوحة بالمبلغ نفسه (${formatRiyalsDisplay(amount)}) ولا يوجد دليل يميّز بينها. اقتُرحت الأقدم، فأقرّها أو اختر غيرها`;
+      return `${countNoun(all.total, INVOICE)} مفتوحة بالمبلغ نفسه (${formatRiyalsDisplay(amount)}) ولا دليل يميّز بينها. اقترحنا الأقدم، فأكّدها أو اختر غيرها`;
     }
     return undefined;
   };
@@ -556,11 +556,11 @@ export function searchCandidates(
     }
     else if (instalment !== null) {
       evidence.push(
-        `قسط: ${instalment}٪ من إجمالي الفاتورة (${formatRiyalsDisplay(inv.totalMinor)}) تماماً، ويبقى ${formatRiyalsDisplay(-diff)} ريالاً`,
+        `قسط: ${instalment}٪ من إجمالي الفاتورة (${formatRiyalsDisplay(inv.totalMinor)}) بالضبط، ويبقى ${formatRiyalsDisplay(-diff)} ريالاً`,
       );
     }
     else if (outcome === "PARTIAL_PAYMENT") evidence.push(`سداد جزئي، ويبقى ${formatRiyalsDisplay(-diff)} ريالاً`);
-    else if (outcome === "OVERPAYMENT") evidence.push(`يزيد ${formatRiyalsDisplay(diff)} ريالاً عن المتبقي`);
+    else if (outcome === "OVERPAYMENT") evidence.push(`يزيد على المتبقي ${formatRiyalsDisplay(diff)} ريالاً`);
     if (reference === 1) evidence.push("المرجع يطابق رقم الفاتورة");
     else if (reference > 0) evidence.push("المرجع يشبه رقم الفاتورة");
     evidence.push(`فرق التاريخ ${countNoun(daysBetween(tx.valueDate, inv.invoiceDate), DAY)}`);
@@ -568,7 +568,7 @@ export function searchCandidates(
       evidence.push(
         preferred.has(inv.id)
           ? `${countNoun(twins, INVOICE)} بالمبلغ نفسه، واختيرت التي يطابق مرجعها`
-          : `${countNoun(twins, INVOICE)} بالمبلغ نفسه، واختيرت الأقدم (الأقدم أولاً)`,
+          : `${countNoun(twins, INVOICE)} بالمبلغ نفسه، واختيرت الأقدم`,
       );
     }
 
@@ -636,8 +636,8 @@ export function searchCandidates(
       `${countNoun(subset.length, INVOICE)} مجموعها ${formatRiyalsDisplay(sum)} ريالاً`,
       ...(fee ? [`المجموع يطابق الدفعة مع رسم تحويل ${formatRiyalsDisplay(fee.feeMinor)}`]
         : amount === 1 ? ["المجموع يطابق الدفعة تماماً"]
-        : short > 0 ? [`الدفعة أقل من المجموع بمقدار ${formatRiyalsDisplay(short)} ريالاً، وتبقى على آخر فاتورة`]
-        : [`الدفعة أكثر من المجموع بمقدار ${formatRiyalsDisplay(-short)} ريالاً`]),
+        : short > 0 ? [`الدفعة أقل من المجموع بـ${formatRiyalsDisplay(short)} ريالاً، ويبقى الفرق على آخر فاتورة`]
+        : [`الدفعة أكثر من المجموع بـ${formatRiyalsDisplay(-short)} ريالاً`]),
     ];
 
     out.push({

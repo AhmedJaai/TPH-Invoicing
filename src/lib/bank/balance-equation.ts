@@ -75,8 +75,8 @@ export function checkBalance(input: BalanceInput): BalanceResult {
         input.openingMinor === null && input.closingMinor === null
           ? "الكشف لا يحمل رصيداً افتتاحياً ولا ختامياً، فلا يمكن فحص المعادلة"
           : input.openingMinor === null
-            ? "الرصيد الافتتاحي غير معروف، وليس صفراً"
-            : "الرصيد الختامي غير معروف، وليس صفراً",
+            ? "الرصيد الافتتاحي غير معروف، لا صفر"
+            : "الرصيد الختامي غير معروف، لا صفر",
     };
   }
 
@@ -98,7 +98,7 @@ export function checkBalance(input: BalanceInput): BalanceResult {
       status: "WITHIN_TOLERANCE",
       computedClosingMinor: computed,
       differenceMinor: difference,
-      reason: `الفرق ${abs} هللة، وهو فرق تقريب في ملف الكشف وليس نقصاً في الحركات`,
+      reason: `الفرق ${abs} هللة، وهو فرق تقريب في ملف الكشف لا نقص في الحركات`,
     };
   }
 
@@ -108,8 +108,8 @@ export function checkBalance(input: BalanceInput): BalanceResult {
     differenceMinor: difference,
     reason:
       difference > 0
-        ? `رصيد البنك أعلى بمقدار ${riyals(abs)}: توجد حركات واردة لم تُقرأ`
-        : `رصيد البنك أقل بمقدار ${riyals(abs)}: توجد حركات صادرة لم تُقرأ`,
+        ? `رصيد البنك أعلى بـ${riyals(abs)}: هناك حركات داخلة لم تُقرأ`
+        : `رصيد البنك أقل بـ${riyals(abs)}: هناك حركات خارجة لم تُقرأ`,
   };
 }
 

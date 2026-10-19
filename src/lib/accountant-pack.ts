@@ -220,19 +220,19 @@ export function buildAccountantPack(p: PackInput): Sheet[] {
     ["الضريبة المقروءة", riyals(s.vatKnownMinor)],
     ["فواتير لم تُقرأ ضريبتها", { count: s.vatUnknownCount }],
     /* حكمُ النظام على الفواتير وحده — رقمُ الإقرار يضيف ما أُقرّ بيد وضريبةَ الرسوم وما اختير من الكشف */
-    ["ضريبة الفواتير المستوفية للشروط (حسب النظام، ورقم الإقرار في سجلّ الإقرار)", riyals(s.deductibleVatMinor)],
+    ["ضريبة الفواتير المستوفية للشروط (بحسب النظام، ورقم الإقرار في سجل الإقرار)", riyals(s.deductibleVatMinor)],
     ["المسدّد منها", riyals(s.paidMinor)],
     ["المتبقي عليها", riyals(s.openMinor)],
     [],
     ["المال"],
     ["دفعات الشهر (القائمة)", riyals(s.paymentsMinor)],
-    ...(s.creditNotesMinor > 0 ? [["إشعارات دائنة (مرتجع أو خصم، دون خروج مال)", riyals(s.creditNotesMinor)]] : []),
+    ...(s.creditNotesMinor > 0 ? [["إشعارات دائنة (مرتجع أو خصم، بلا خروج مال)", riyals(s.creditNotesMinor)]] : []),
     ["المصروفات", riyals(s.expensesMinor)],
-    ["وارد البنك", riyals(s.bankInMinor)],
-    ["صادر البنك", riyals(s.bankOutMinor)],
-    ["صادر غير مفسَّر (غير مصنّف أو لمورّد بلا دفعة)", { count: s.bankUnexplainedCount }],
+    ["الداخل إلى البنك", riyals(s.bankInMinor)],
+    ["الخارج من البنك", riyals(s.bankOutMinor)],
+    ["خارج غير مفسَّر (غير مصنّف، أو لمورّد بلا دفعة)", { count: s.bankUnexplainedCount }],
     [],
-    ["ملاحظة", "الإيرادات غير مشمولة في هذه الحزمة. ضريبة المخرجات وحساب الإقرار في «سجلّ الإقرار» ضمن صفحة الإقرار الضريبي. والقيمة غير المعروفة تظهر «غير معروف» وليست صفراً."],
+    ["ملاحظة", "الإيرادات ليست في هذه الحزمة. ضريبة المخرجات وحساب الإقرار في «سجل الإقرار» داخل صفحة الإقرار الضريبي. والقيمة غير المعروفة تظهر «غير معروف» لا صفراً."],
   ];
 
   const invoices: Cell[][] = [
@@ -264,7 +264,7 @@ export function buildAccountantPack(p: PackInput): Sheet[] {
     ["التاريخ", "المورّد", "المبلغ", "رسم التحويل", "الطريقة", "الحال", "على الفواتير", "من كشف البنك"],
     ...p.payments.map((x) => [
       x.date,
-      x.supplier ?? "غير منسوبة لمورّد",
+      x.supplier ?? "غير منسوبة إلى مورّد",
       riyals(x.amountMinor),
       riyals(x.feeMinor),
       METHOD_LABEL[x.method] ?? x.method,

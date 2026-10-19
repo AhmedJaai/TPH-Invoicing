@@ -24,6 +24,7 @@ import { INVOICE, countNoun } from "@/lib/arabic";
 import { SETTLED_TOLERANCE_MINOR } from "@/lib/supplier-balances";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { invoiceHref } from "@/lib/invoice-profile";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -178,7 +179,7 @@ export default async function InvoicesPage({
   const noInvoicesAtAll = months.length === 0;
 
   const paidTabs: { v: PaidFilter | undefined; label: string; n: number }[] = [
-    { v: undefined, label: "الكلّ", n: Number(b.all) },
+    { v: undefined, label: "الكل", n: Number(b.all) },
     { v: "OPEN", label: PAID_LABEL.OPEN, n: Number(b.OPEN) },
     { v: "UNPAID", label: PAID_LABEL.UNPAID, n: Number(b.UNPAID) },
     { v: "PARTIAL", label: PAID_LABEL.PARTIAL, n: Number(b.PARTIAL) },
@@ -195,7 +196,7 @@ export default async function InvoicesPage({
       intro={describeFilters(f, supplierName)}
       actions={
         hasFilters(f)
-          ? <LinkButton href="/purchases/invoices" size="sm">إزالة التصفية</LinkButton>
+          ? <LinkButton href="/purchases/invoices" size="sm">أزل التصفية</LinkButton>
           : undefined
       }
     >
@@ -204,7 +205,7 @@ export default async function InvoicesPage({
         <EmptyState
           icon={Receipt}
           title="لم تُسجَّل أي فاتورة بعد."
-          hint="تُسجَّل الفاتورة عند رفع مستندها أو قراءته من الدرايف. صوّرها أو اختر ملفها، وسيقرأ النظام اسم المورّد والمبالغ لتؤكدها."
+          hint="تُسجَّل الفاتورة حين ترفع مستندها أو يقرؤه النظام من الدرايف. صوّرها أو اختر ملفها، وسيقرأ النظام اسم المورّد والمبالغ لتؤكدها."
           action={<LinkButton href="/upload" variant="primary" icon={Upload}>ارفع أول فاتورة</LinkButton>}
         />
       ) : (
@@ -213,10 +214,10 @@ export default async function InvoicesPage({
           {/* على الجوّال: ما بقي أوّلاً بعرض الشاشة، والرقمان الآخران تحته جنباً إلى جنب */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="order-2 sm:order-1">
-              <Stat icon={FileText} label="المعروض" value={countNoun(count, INVOICE)} sub="اضغط على أي صف لفتح الفاتورة." />
+              <Stat icon={FileText} label="المعروض" value={countNoun(count, INVOICE)} sub="اضغط أي صف لفتح الفاتورة." />
             </div>
             <div className="order-3 sm:order-2">
-              <Stat icon={Scale} label="قيمتها" minor={Number(t.billed)} sub="مجموع إجماليات الفواتير شاملة الضريبة." />
+              <Stat icon={Scale} label="قيمتها" minor={Number(t.billed)} sub="مجموع إجماليات الفواتير شاملاً الضريبة." />
             </div>
             {/*
               ── ليست «عليك» ──
@@ -234,8 +235,8 @@ export default async function InvoicesPage({
               href={f.paid === "OPEN" ? undefined : linkTo(f, { paid: "OPEN" })}
               sub={
                 Number(t.openN) > 0
-                  ? `على ${countNoun(Number(t.openN), INVOICE)}. أما حساب كل مورّد بعد خصم رصيدك عنده فتجده في «المورّدون».`
-                  : "لا يوجد مبلغ متبقٍ على الفواتير المعروضة."
+                  ? `على ${countNoun(Number(t.openN), INVOICE)}. أما حساب كل مورّد بعد خصم رصيدك عنده ففي «المورّدون».`
+                  : "لا شيء متبقٍ على الفواتير المعروضة."
               }
             />
             </div>
@@ -282,8 +283,7 @@ export default async function InvoicesPage({
                 ]}
               />
               <Toggle href={linkTo(f, { overdue: !f.overdue })} on={Boolean(f.overdue)}>
-                متأخرة أكثر من <span className="nums">{OVERDUE_DAYS}</span> يوماً
-              </Toggle>
+                <T s="متأخرة أكثر من {0} يوماً" a={[<span key="0" className="nums">{OVERDUE_DAYS}</span>]} /></Toggle>
               <Toggle href={linkTo(f, { noLines: !f.noLines })} on={Boolean(f.noLines)}>
                 بلا بنود
               </Toggle>
@@ -303,9 +303,9 @@ export default async function InvoicesPage({
               empty={
                 <EmptyState
                   icon={CircleCheck}
-                  title={f.paid === "OPEN" ? "لا توجد فاتورة عليها رصيد ضمن هذه التصفية." : "لا توجد فاتورة تطابق هذه التصفية."}
-                  hint="جرّب توسيع التصفية، أو أزلها لترى كل الفواتير."
-                  action={<LinkButton href="/purchases/invoices" variant="primary">إزالة التصفية</LinkButton>}
+                  title={f.paid === "OPEN" ? "لا توجد فاتورة عليها مبلغ متبقٍ في هذه التصفية." : "لا توجد فاتورة تطابق هذه التصفية."}
+                  hint="وسّع التصفية، أو أزلها لترى كل الفواتير."
+                  action={<LinkButton href="/purchases/invoices" variant="primary">أزل التصفية</LinkButton>}
                 />
               }
               columns={[
@@ -351,7 +351,7 @@ export default async function InvoicesPage({
                       <Link
                         href={invoiceHref(r.id, "tax")}
                         className="relative inline-flex items-center gap-1.5 underline-offset-4 hover:underline"
-                        title="لماذا؟ وكيف تصلحها"
+                        title="لماذا؟ وكيف تصلحها؟"
                       >
                         {badge}
                         <span className="text-[11px] text-muted">{gaps.length > 0 ? `ينقصها: ${gaps.join("، ")}` : "لماذا؟"}</span>
@@ -413,13 +413,10 @@ export default async function InvoicesPage({
                 <LinkButton href={linkTo(f, { page: f.page - 1 })} size="sm" icon={ArrowRight}>الأحدث</LinkButton>
               ) : <span />}
               <span className="text-xs text-muted">
-                صفحة <span className="nums">{f.page}</span> من <span className="nums">{pages}</span>
-              </span>
+                <T s="صفحة {0} من {1}" a={[<span key="0" className="nums">{f.page}</span>, <span key="1" className="nums">{pages}</span>]} /></span>
               {f.page < pages ? (
                 <Link href={linkTo(f, { page: f.page + 1 })} className={buttonClass("secondary", "sm")}>
-                  الأقدم
-                  <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
-                </Link>
+                  <T s="الأقدم{0}" a={[<ArrowLeft key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></Link>
               ) : <span />}
             </nav>
           )}

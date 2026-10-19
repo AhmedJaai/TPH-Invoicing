@@ -7,6 +7,7 @@ import type { ReviewItem } from "@/lib/bank/review-queue";
 import { pendingDecision } from "@/lib/bank/pending";
 import { toCanonical } from "@/lib/bank/canonical";
 import { isoDay } from "@/lib/riyadh-time";
+import { T } from "@/components/i18n/t";
 
 /**
  * ورشةُ قرار حركات البنك — كانت صفحةً كاملة تُسمّى «طابور المراجعة».
@@ -55,9 +56,7 @@ export async function ReviewSection({
   if (rows.length === 0) {
     return (
       <p role="status" className="flex items-center gap-2 rounded-xl border border-ok/25 bg-ok-bg px-4 py-3 text-xs font-bold text-ok">
-        <CircleCheck className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-        لكل حركة في الكشف قرار مسجّل: إما مطابقتها بفاتورة، أو تحديد أنها ليست سداداً.
-      </p>
+        <T s="{0}لكل حركة في الكشف قرار مسجّل: إما مطابقتها بفاتورة، أو أنها ليست سداداً." a={[<CircleCheck key="0" className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />]} /></p>
     );
   }
 
@@ -110,9 +109,7 @@ export async function ReviewSection({
     <>
       {truncated && (
         <p className="mb-3 flex items-start gap-2 rounded-xl border border-warn/25 bg-warn-bg px-4 py-2.5 text-xs text-warn">
-          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-          نعرض أكبر {LIMIT} بنداً بالمبلغ، وفي الطابور بنود أخرى. احسم ما هنا ثم حدّث الصفحة.
-        </p>
+          <T s="{0}نعرض أكبر {1} بنداً مبلغاً، وفي القائمة بنود أخرى. قرّر فيما هنا ثم حدّث الصفحة." a={[<TriangleAlert key="0" className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />, LIMIT]} /></p>
       )}
       <ReviewWorkspace
         suppliers={supplierOptions}

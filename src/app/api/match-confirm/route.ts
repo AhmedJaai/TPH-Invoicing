@@ -105,7 +105,7 @@ async function handle(request: Request) {
       .orderBy(desc(decisionHistory.createdAt))
       .limit(1);
     if (recent) {
-      return NextResponse.json({ ok: true, message: "قُيّدت هذه الحركة من قبل، ولم يُسجَّل شيء جديد" });
+      return NextResponse.json({ ok: true, message: "سُجّلت هذه الحركة من قبل، ولم يُضف شيء جديد" });
     }
     return NextResponse.json(
       { error: "سُجّل لهذه الحركة سداد من قبل. افتحها في صفحة البنك لترى دفعتها." },
@@ -136,8 +136,8 @@ async function handle(request: Request) {
       }
       return NextResponse.json({
         ok: true,
-        message: `تم الربط بسداد قيّدته بنفسك (${formatRiyalsDisplay(link.paymentMinor)}${link.invoices[0] ? ` · ${link.invoices[0].number}` : ""})، ولم تُنشأ دفعة ثانية`
-          + (link.extraMinor > 0 ? ` · وزاد ${formatRiyalsDisplay(link.extraMinor)} رصيداً للمورّد` : ""),
+        message: `رُبطت بسداد سجّلته بنفسك (${formatRiyalsDisplay(link.paymentMinor)}${link.invoices[0] ? ` · ${link.invoices[0].number}` : ""})، ولم تُنشأ دفعة ثانية`
+          + (link.extraMinor > 0 ? ` · وزاد رصيدك عند المورّد ${formatRiyalsDisplay(link.extraMinor)}` : ""),
       });
     }
   }
@@ -160,7 +160,7 @@ async function handle(request: Request) {
       const supplierId = body.supplierId ?? tx.supplierId;
       if (!supplierId) {
         return NextResponse.json(
-          { error: "الدفعة المقدّمة تحتاج مورّداً. حدّد المورّد الذي دفعت له." },
+          { error: "الدفعة المقدّمة تحتاج إلى مورّد. حدّد المورّد الذي دفعت له." },
           { status: 400 },
         );
       }
@@ -207,7 +207,7 @@ async function handle(request: Request) {
 
       return NextResponse.json({
         ok: true,
-        message: "تم قيد دفعة مقدّمة، وتُخصَّم من فاتورة المورّد حين تصل",
+        message: "سُجّلت دفعة مقدّمة، وتُخصم من فاتورة المورّد حين تصل",
       });
     }
 
@@ -257,7 +257,7 @@ async function handle(request: Request) {
       }, t);
     });
 
-    return NextResponse.json({ ok: true, message: `تم الحفظ: ${kind.label}` });
+    return NextResponse.json({ ok: true, message: `حُفظ: ${kind.label}` });
   }
 
   /* ── سدادٌ على حساب المورّد ── */
@@ -282,17 +282,17 @@ async function handle(request: Request) {
     const supplierId = [...suppliers][0];
     if (suppliers.size !== 1 || !supplierId) {
       return NextResponse.json(
-        { error: "لا يمكن تسجيل سداد على حساب دون مورّد واحد تُجمع عليه الحركات" },
+        { error: "لا يمكن تسجيل سداد على الحساب دون مورّد واحد تُجمع عليه الحركات" },
         { status: 400 },
       );
     }
     if (group.some((g) => g.direction !== "DEBIT")) {
-      return NextResponse.json({ error: "المبلغ الوارد لا يُسجَّل كسداد لمورّد" }, { status: 400 });
+      return NextResponse.json({ error: "المبلغ الداخل لا يُسجَّل سداداً لمورّد" }, { status: 400 });
     }
     const already = group.filter((g) => g.matchedPaymentId !== null);
     if (already.length > 0) {
       return NextResponse.json(
-        { error: `سُجّل سداد لـ${already.length} من هذه الحركات بالفعل` },
+        { error: `سُجّل سداد لـ${already.length} من هذه الحركات من قبل` },
         { status: 409 },
       );
     }
@@ -459,10 +459,10 @@ async function settleAccounts(
     unapplied: unappliedTotal,
     supplierBalanceAfter: left,
     message: invoiceCount === 0
-      ? `تم قيد ${money(allocatedTotal + unappliedTotal)} على حساب المورّد، وبقي غير مخصّص لعدم وجود فاتورة مفتوحة تقابله`
-      : `تم سداد ${money(allocatedTotal)} على ${countNoun(invoiceCount, INVOICE)} بالأقدم أولاً (لا يوجد رقم فاتورة في الحوالة)`
+      ? `سُجّل ${money(allocatedTotal + unappliedTotal)} على حساب المورّد، وبقي غير مخصّص لأنه لا فاتورة مفتوحة تقابله`
+      : `سُدّد ${money(allocatedTotal)} على ${countNoun(invoiceCount, INVOICE)} بالأقدم أولاً (لا رقم فاتورة في الحوالة)`
         + (unappliedTotal > 0 ? ` · ويبقى ${money(unappliedTotal)} غير مخصّص` : "")
         + ` · رصيد المورّد بعدها ${money(left)}`
-        + (adopted > 0 ? ` · و${adopted} منها كانت مقيّدة من إيصالها فلم تُقيَّد مرة ثانية` : ""),
+        + (adopted > 0 ? ` · و${adopted} منها كانت مسجّلة من إيصالها، فلم تُسجَّل مرة ثانية` : ""),
   });
 }

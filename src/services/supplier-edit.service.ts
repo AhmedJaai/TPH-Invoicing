@@ -104,7 +104,7 @@ export async function updateSupplierProfile(
          and regexp_replace(seller_vat, '\\D', '', 'g') <> ${next.vatNumber}
     `)).rows;
     if (Number(n) > 0) {
-      warnings.push(`${countNoun(Number(n), INVOICE)} مقيّدة لهذا المورّد تحمل رقماً ضريبياً مختلفاً عن هذا. الفواتير لن تتغيّر، فتحقق من الرقم الصحيح.`);
+      warnings.push(`${countNoun(Number(n), INVOICE)} مسجّلة لهذا المورّد تحمل رقماً ضريبياً غير هذا. الفواتير لن تتغيّر، فتأكد من الرقم الصحيح.`);
     }
   }
   if (changed.includes("nameAr")) {
@@ -116,14 +116,14 @@ export async function updateSupplierProfile(
     if (clash) warnings.push(`يوجد مورّد آخر بالاسم نفسه («${clash.nameAr}»)، وسيصعب التفريق بينهما.`);
   }
   if (changed.includes("iban") && next.iban) {
-    if (cur.iban) warnings.push("تغيير آيبان مورّد قائم من أشهر طرق الاحتيال في المدفوعات. تأكّد من المورّد باتصال على رقمه المعروف، وليس من رسالة وصلتك.");
+    if (cur.iban) warnings.push("تغيير آيبان مورّد قائم من أشهر طرق الاحتيال في المدفوعات. تأكد من المورّد باتصال على رقمه المعروف، لا من رسالة وصلتك.");
     const seen = await tx
       .select({ normalized: counterpartyEvidence.normalized })
       .from(counterpartyEvidence)
       .innerJoin(counterparties, eq(counterparties.id, counterpartyEvidence.counterpartyId))
       .where(and(eq(counterparties.supplierId, cur.id), inArray(counterpartyEvidence.kind, ["IBAN"])));
     if (seen.length > 0 && !seen.some((e) => e.normalized === next.iban)) {
-      warnings.push("هذا الآيبان يختلف عن الحساب الذي حوّلت إليه في كشوف البنك. إن غيّر المورّد حسابه فتأكّد منه أولاً.");
+      warnings.push("هذا الآيبان يختلف عن الحساب الذي حوّلت إليه في كشوف البنك. إن غيّر المورّد حسابه فتأكد منه أولاً.");
     }
   }
   if (warnings.length > 0 && !req.confirm) return { kind: "confirm", warnings };

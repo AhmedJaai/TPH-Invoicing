@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     const openingMinor = parseRiyals(body.openingBalance ?? "");
     const closingMinor = parseRiyals(body.closingBalance ?? "");
     if (openingMinor === null || closingMinor === null) {
-      return NextResponse.json({ error: "اكتب الرصيدين كما في كشف البنك، أرقاماً" }, { status: 400 });
+      return NextResponse.json({ error: "اكتب الرصيدين أرقاماً كما في كشف البنك" }, { status: 400 });
     }
     if (existing?.status === "CLOSED") {
       return NextResponse.json({ error: "الشهر مقفل. أعد فتحه قبل تغيير رصيديه." }, { status: 409 });
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
     const nextReport = buildMonthClose(nextFacts);
     return NextResponse.json({
       ok: true, report: nextReport, facts: nextFacts, status: existing?.status ?? "OPEN",
-      message: "تم حفظ الرصيدين وإعادة الفحص",
+      message: "حُفظ الرصيدان وأُعيد الفحص",
     });
   }
 
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
   if (action === "reopen") {
     /* إعادة فتح شهرٍ شُهد عليه للمالك وحده — الإقفالُ شهادةٌ لا تُنقَض بصلاحية الإقفال */
     if (!can(user.role, "month:reopen")) {
-      return NextResponse.json({ error: "إعادة فتح الشهر من صلاحية المالك وحده" }, { status: 403 });
+      return NextResponse.json({ error: "إعادة فتح الشهر صلاحية للمالك وحده" }, { status: 403 });
     }
     if (!existing || existing.status !== "CLOSED") {
       return NextResponse.json({ error: "هذا الشهر ليس مقفلاً" }, { status: 409 });
@@ -161,7 +161,7 @@ export async function POST(request: Request) {
 
   // ── الإقفال ──
   if (existing?.status === "CLOSED") {
-    return NextResponse.json({ error: "الشهر مقفل بالفعل" }, { status: 409 });
+    return NextResponse.json({ error: "الشهر مقفل من قبل" }, { status: 409 });
   }
 
   if (!report.canClose) {
@@ -181,7 +181,7 @@ export async function POST(request: Request) {
   */
   if (report.warnings.length > 0 && !body.note?.trim()) {
     return NextResponse.json(
-      { error: `اكتب ملاحظة تذكر سبب الإقفال مع ${countNoun(report.warnings.length, WARNING)}. تُحفظ الملاحظة في شهادة الإقفال.` },
+      { error: `اكتب ملاحظة بسبب الإقفال مع ${countNoun(report.warnings.length, WARNING)}. تُحفظ الملاحظة في شهادة الإقفال.` },
       { status: 400 },
     );
   }
@@ -221,7 +221,7 @@ export async function POST(request: Request) {
     return true;
   });
   if (!closedNow) {
-    return NextResponse.json({ error: "الشهر مقفل بالفعل" }, { status: 409 });
+    return NextResponse.json({ error: "الشهر مقفل من قبل" }, { status: 409 });
   }
 
   /*
@@ -240,6 +240,6 @@ export async function POST(request: Request) {
     ok: true,
     report,
     status: "CLOSED",
-    message: `تم إقفال ${body.month}${report.warnings.length ? ` مع الإقرار بـ${countNoun(report.warnings.length, WARNING)}` : ""}${frozen ? "" : "، لكن تعذّر تجميد تقرير الربح. جمّده من «المالية»."}`,
+    message: `أُقفل ${body.month}${report.warnings.length ? ` مع إقرارك بـ${countNoun(report.warnings.length, WARNING)}` : ""}${frozen ? "" : "، لكن تعذّر تجميد تقرير الربح، فجمّده من «المالية»."}`,
   });
 }

@@ -9,6 +9,7 @@ import { Badge } from "./ui";
 import { Money } from "./money";
 import type { StockItemOption } from "@/services/inventory-purchase-link.service";
 import type { StockLinkRow } from "@/services/stock-link.service";
+import { T } from "@/components/i18n/t";
 
 /**
  * بنودُ الفواتير صفّاً صفّاً مرتَّبةً بقيمتها — بجانب كلٍّ دليلُه وفعلُه.
@@ -32,16 +33,14 @@ export function StockLinkList({ rows, options, canEdit, notStockKeys }: {
               <span className="text-muted">مشترياتك منه حتى الآن</span>
               {r.evidence && (
                 <Badge tone="accent">
-                  <Scale className="h-3 w-3" strokeWidth={2} aria-hidden />
-                  فودكس: «{r.evidence.productName}» في {r.evidence.matches} {r.evidence.matches === 1 ? "سطر" : "سطراً"} بالمبلغ نفسه
-                </Badge>
+                  <T s="{0}فودكس: «{1}» في {2} {3} بالمبلغ نفسه" a={[<Scale key="0" className="h-3 w-3" strokeWidth={2} aria-hidden />, r.evidence.productName, r.evidence.matches, r.evidence.matches === 1 ? "سطر" : "سطراً"]} /></Badge>
               )}
               {r.notStock && <Badge tone="muted">ليس مخزوناً</Badge>}
             </div>
             <LinkRow row={r} options={options} canEdit={canEdit && !r.notStock} onSaved={setSaved} />
             {canEdit && r.status !== "LINKED" && (
               <div className="mt-2 flex flex-wrap items-center gap-1">
-                <SignalControls signalKey={notStockKeys[r.supplierProductId]} silenced={r.notStock} dismissLabel="ليس مخزوناً، أخرجه" snoozeDays={30} />
+                <SignalControls signalKey={notStockKeys[r.supplierProductId]} silenced={r.notStock} dismissLabel="ليس مخزوناً، فأخرجه" snoozeDays={30} />
               </div>
             )}
           </li>
@@ -54,8 +53,7 @@ export function StockLinkList({ rows, options, canEdit, notStockKeys }: {
 /** «أقِرّ الجاهز»: ما اتّفق عليه دليلُ فودكس صنفاً وعبوةً بشاهدَين فأكثر. الخادمُ يعيد الاشتقاق. */
 export function ApproveReady({ ids, count }: { ids: readonly string[]; count: number }) {
   return (
-    <PostAction url="/api/finance/stock-links" body={{ ids }} variant="primary" size="md" done="تم ربط البنود">
-      اعتمد الـ{count} الجاهزة
-    </PostAction>
+    <PostAction url="/api/finance/stock-links" body={{ ids }} variant="primary" size="md" done="رُبطت البنود">
+      <T s="اعتمد الـ{0} الجاهزة" a={[count]} /></PostAction>
   );
 }

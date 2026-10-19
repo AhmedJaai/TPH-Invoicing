@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     try {
       await voidWaste(body.wasteId, body.reason ?? "", user.id);
       if (body.countId) await recomputeCount(body.countId).catch(() => undefined);
-      return NextResponse.json({ ok: true, message: "تم إبطال الهدر، وعاد مقداره إلى «الفرق غير المفسّر»." });
+      return NextResponse.json({ ok: true, message: "أُبطل الهدر، وعادت كميته إلى «الفرق غير المفسَّر»." });
     } catch (e) {
       if (e instanceof MovementRefused) return NextResponse.json({ error: e.message }, { status: 409 });
       return failWith(e, "inventory-waste");
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
   }
   const quantityMilli = decimalToMilli(typeof body.quantity === "number" ? body.quantity : String(body.quantity ?? "").trim());
   if (quantityMilli === null || quantityMilli <= 0) {
-    return NextResponse.json({ error: "اكتب كمّيّةً أكبر من صفر" }, { status: 400 });
+    return NextResponse.json({ error: "اكتب كمية أكبر من صفر" }, { status: 400 });
   }
 
   try {
@@ -105,7 +105,7 @@ export async function POST(request: Request) {
       });
       /* الضغطةُ الثانية لا تكتب — ويُقال ذلك، فلا يُظنّ أنّ الهدرَ سُجّل مرّتين */
       if (r.duplicate) {
-        return NextResponse.json({ ok: true, duplicate: true, message: "سُجّل هذا الهدر قبل لحظة، ولم يُسجَّل مرة ثانية." });
+        return NextResponse.json({ ok: true, duplicate: true, message: "سُجّل هذا الهدر قبل لحظة، فلم يُسجَّل مرة ثانية." });
       }
     }
 
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      message: body.action === "movement" ? "تم قيد الحركة." : "تم تسجيل الهدر، وخرج من «الفرق غير المفسّر».",
+      message: body.action === "movement" ? "سُجّلت الحركة." : "سُجّل الهدر، وخرج من «الفرق غير المفسَّر».",
     });
   } catch (e) {
     if (e instanceof MovementRefused) return NextResponse.json({ error: e.message }, { status: 409 });

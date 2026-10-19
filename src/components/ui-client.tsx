@@ -9,6 +9,7 @@ import { buttonClass, fieldClass, type ButtonVariant } from "./ui-tokens";
 import { normalizeArabic, normalizeDigits } from "@/lib/search";
 import { shortcutKey } from "@/lib/shortcut-keys";
 import { formatSort, nextSort, parseSort, type SortDir } from "@/lib/table-sort";
+import { T } from "@/components/i18n/t";
 
 /**
  * عناصر تحتاج تفاعلاً — الإقرار، والبحثُ داخل الجدول، والإشعاراتُ
@@ -264,7 +265,7 @@ export function ActionButton({
         {children}
       </button>
       {disabled && reason && <span id={reasonId} className="sr-only">{reason}</span>}
-      <span className="sr-only" aria-live="polite">{busy ? "جارٍ التنفيذ" : done ? "تم" : ""}</span>
+      <span className="sr-only" aria-live="polite">{busy ? "ينفّذ" : done ? "تم" : ""}</span>
     </>
   );
 }
@@ -483,14 +484,12 @@ export function TableFilter({ label, total }: { label: string; total: number }) 
           shown === 0 ? (
             /* الفراغُ يُقال بما يُخرج منه: رأسُ جدولٍ فوق لا شيء لا يقول ما العمل */
             <>
-              لا يوجد صف يطابق «<bdi>{q}</bdi>» في الصفوف المعروضة.{" "}
-              <button type="button" onClick={() => { setQ(""); ref.current?.focus(); }} className="min-h-8 font-bold text-accent hover:underline">
+              <T s="لا صف يطابق «{0}» في الصفوف المعروضة. {1}" a={[<bdi key="0">{q}</bdi>, <button key="1" type="button" onClick={() => { setQ(""); ref.current?.focus(); }} className="min-h-8 font-bold text-accent hover:underline">
                 امسح البحث
-              </button>
-            </>
-          ) : <><span className="nums nums-count">{shown}</span> من <span className="nums nums-count">{total}</span></>
+              </button>]} /></>
+          ) : <><T s="{0} من {1}" a={[<span key="0" className="nums nums-count">{shown}</span>, <span key="1" className="nums nums-count">{total}</span>]} /></>
         ) : (
-          <><span className="nums nums-count">{total}</span> صفاً</>
+          <><T s="{0} صفاً" a={[<span key="0" className="nums nums-count">{total}</span>]} /></>
         )}
       </p>
     </div>
@@ -549,17 +548,11 @@ export const SectionBoundary = catchError(
   (props: { what: string }, { error, retry }: ErrorInfo) => (
     <div role="alert" className="rounded-xl border border-danger/25 bg-danger-bg px-4 py-4">
       <p className="flex items-center gap-2 text-sm font-bold text-danger">
-        <CircleAlert className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-        تعذّر عرض {props.what}
-      </p>
+        <T s="{0}تعذّر عرض {1}" a={[<CircleAlert key="0" className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />, props.what]} /></p>
       <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-        بقية الصفحة ظاهرة كما هي، ولم يُحفظ أي تغيير. غالباً السبب انقطاع عابر في الاتصال بقاعدة البيانات.
-        {isDigested(error) && <> إن تكرّر الخطأ فأبلغ به الدعم الفني مع هذا الرمز: <span className="nums nums-count" dir="ltr">{error.digest}</span></>}
-      </p>
+        <T s="باقي الصفحة ظاهر كما هو، ولم يُحفظ أي تغيير. السبب غالباً انقطاع عابر في الاتصال بقاعدة البيانات.{0}" a={[isDigested(error) && <> <T s=" إن تكرر الخطأ فأبلغ الدعم الفني بهذا الرمز: {0}" a={[<span key="0" className="nums nums-count" dir="ltr">{error.digest}</span>]} /></>]} /></p>
       <button type="button" onClick={() => retry()} className={`mt-3 ${buttonClass("secondary", "sm")}`}>
-        <RotateCw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        أعد المحاولة
-      </button>
+        <T s="{0}أعد المحاولة" a={[<RotateCw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
     </div>
   ),
 );
@@ -630,7 +623,7 @@ export function SortSelect({
   const current = parseSort(params.get(param), options.map((o) => o.key));
   return (
     <label htmlFor={id} className="flex items-center gap-2 text-xs text-muted">
-      <span className="shrink-0 font-bold">رتّب حسب</span>
+      <span className="shrink-0 font-bold">رتّب بحسب</span>
       <select
         id={id}
         value={formatSort(current) ?? ""}
@@ -902,7 +895,7 @@ export function Toaster() {
             <Icon className={`mt-0.5 h-[18px] w-[18px] shrink-0 ${TOAST_TONE[tone]}`} strokeWidth={2} aria-hidden />
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-bold leading-snug">
-                {t.state === "undone" ? "تم التراجع." : t.state === "undo-failed" ? "تعذّر التراجع، ولم يتغيّر شيء." : t.title}
+                {t.state === "undone" ? "تراجعتَ." : t.state === "undo-failed" ? "تعذّر التراجع، ولم يتغيّر شيء." : t.title}
               </p>
               {t.body && t.state === "idle" && <p className="mt-0.5 text-xs leading-relaxed text-muted">{t.body}</p>}
             </div>
@@ -1188,9 +1181,9 @@ export function BulkBar({ children }: {
           aria-label="إجراءات على المحدد"
           className="no-print sticky bottom-20 z-20 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-accent-line bg-overlay px-4 py-3 shadow-overlay lg:bottom-4"
         >
-          <p className="text-[13px] font-bold">المحدّد: <span className="nums nums-count">{ids.length}</span></p>
+          <p className="text-[13px] font-bold"><T s="المحدد: {0}" a={[<span key="0" className="nums nums-count">{ids.length}</span>]} /></p>
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{children(selected, clear)}</div>
-          <button type="button" onClick={clear} className={buttonClass("quiet", "sm")}>إلغاء التحديد</button>
+          <button type="button" onClick={clear} className={buttonClass("quiet", "sm")}>ألغِ التحديد</button>
         </div>
       )}
     </div>

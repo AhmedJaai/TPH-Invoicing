@@ -6,6 +6,7 @@ import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
 import { toast } from "./ui-client";
 import { Money } from "./money";
+import { T } from "@/components/i18n/t";
 
 /**
  * «منتجات تحتاج ربطاً» — ويُربَط الصنفُ **مرّةً واحدة**.
@@ -53,7 +54,7 @@ export function PosProductMapping({
       setError(r.error);
       return;
     }
-    toast({ tone: "ok", title: `تم ربط «${row.name}»`, body: "سيُتعرَّف عليه تلقائياً في كل استيراد قادم." });
+    toast({ tone: "ok", title: `رُبط «${row.name}»`, body: "سيتعرّف عليه النظام تلقائياً في كل استيراد قادم." });
     router.refresh();
   }
 
@@ -67,9 +68,7 @@ export function PosProductMapping({
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-bold" dir="auto">{row.name}</p>
               <p className="mt-0.5 text-[11px] text-muted">
-                <span className="nums">{row.soldUnits}</span> وحدة مباعة · <Money minor={row.soldMinor} />
-                {row.category && <> · {row.category}</>}
-              </p>
+                <T s="{0} وحدة مباعة · {1}{2}" a={[<span key="0" className="nums">{row.soldUnits}</span>, <Money key="1" minor={row.soldMinor} />, row.category && <> · {row.category}</>]} /></p>
             </div>
 
             {canEdit ? (

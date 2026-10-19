@@ -77,7 +77,7 @@ export async function driveForCli(
   const token = process.env.GOOGLE_DRIVE_REFRESH_TOKEN ?? (await lookupStoredToken?.()) ?? null;
   if (!token) {
     throw new Error(
-      "لا يوجد تفويض درايف. سجّل دخولك في التطبيق مرة واحدة، أو شغّل: npm run drive:auth",
+      "لا يوجد تفويض للدرايف. ادخل إلى التطبيق مرة واحدة، أو شغّل: npm run drive:auth",
     );
   }
   const auth = createOAuthClient();
@@ -143,7 +143,7 @@ export class DriveFileTooLargeError extends Error {
   readonly sizeBytes: number;
   constructor(sizeBytes: number) {
     super(
-      `حجمه ${Math.ceil(sizeBytes / (1024 * 1024))} ميجابايت، وهو أكبر من الحد المسموح للقراءة (${MAX_DOWNLOAD_BYTES / (1024 * 1024)} ميجابايت). صغّر الملف أو قسّمه ثم ضعه في المجلد`,
+      `حجمه ${Math.ceil(sizeBytes / (1024 * 1024))} ميجابايت، وهو أكبر من الحد المسموح للقراءة (${MAX_DOWNLOAD_BYTES / (1024 * 1024)} ميجابايت). صغّر الملف أو قسّمه، ثم ضعه في المجلد`,
     );
     this.name = "DriveFileTooLargeError";
     this.sizeBytes = sizeBytes;
@@ -153,7 +153,7 @@ export class DriveFileTooLargeError extends Error {
 export class DriveAuthExpiredError extends Error {
   constructor() {
     super(
-      "انتهت صلاحية تفويض الدرايف ولم يُقرأ منه أي ملف. سجّل الخروج ثم الدخول بحساب جوجل ووافق على صلاحية الدرايف، ثم أعد الفحص.",
+      "انتهت صلاحية تفويض الدرايف، فلم يُقرأ منه أي ملف. سجّل الخروج ثم ادخل بحساب جوجل ووافق على صلاحية الدرايف، ثم أعد الفحص.",
     );
     this.name = "DriveAuthExpiredError";
   }

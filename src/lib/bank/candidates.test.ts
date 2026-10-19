@@ -433,7 +433,7 @@ describe("مجموعةٌ تنقص عنها الدفعة", () => {
     const group = generateCandidates(tx({ amountMinor: 2_000_00 }), rows)
       .find((c) => c.invoiceIds.length === 2)!;
     expect(group.outcome).toBe("PARTIAL_PAYMENT");
-    expect(group.evidence.join(" ")).toContain("أقل من المجموع بمقدار 0.60");
+    expect(group.evidence.join(" ")).toContain("أقل من المجموع بـ0.60");
   });
 
   it("وبهللةٍ واحدة تبقى مجموعةً بمبلغها", () => {

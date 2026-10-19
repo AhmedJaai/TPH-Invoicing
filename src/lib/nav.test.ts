@@ -250,7 +250,7 @@ describe("سلامة البنية", () => {
     // الإقفالُ مساحةٌ بلا ألسنة — واسمُها عنوانُ صفحتها
     expect(AREAS.find((a) => a.href === "/close")?.label).toBe("إقفال الشهر");
     expect(labels.get("/inventory")).toBe("الجرد الحالي");
-    expect(labels.get("/inventory/history")).toBe("سجلّ الجرد");
+    expect(labels.get("/inventory/history")).toBe("سجل الجرد");
     /* والصفحةُ تحمل المبيعاتِ والكتالوجَ معاً، فاسمُها اسمُ الفعل لا أحدِ مفعوليه */
     expect(labels.get("/inventory/import")).toBe("الاستيراد");
     // الدرايف لسانٌ يُرى — لا قسمٌ أسفل «ارفع» يُظنّ غائباً

@@ -32,7 +32,7 @@ export const runtime = "nodejs";
 const Body = z.object({
   /** معرّفاتُ الحركتين (أو أكثر) اللتين خرج فيهما المال — بلا تكرار */
   transactionIds: z.array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)).min(2, "حدّد الحركتين اللتين خرج فيهما المبلغ مرتين").max(20)
-    .refine((ids) => new Set(ids).size === ids.length, "الطلب يحتوي حركة مكررة"),
+    .refine((ids) => new Set(ids).size === ids.length, "الطلب فيه حركة مكررة"),
   /** «OPEN» يعيد البندَ مفتوحاً */
   decision: z.custom<DoublePaidDecision | "OPEN">(
     (v) => v === "OPEN" || (typeof v === "string" && (DOUBLE_PAID_DECISIONS as readonly string[]).includes(v)),
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
   const group = groups.find((g) => g.transactions.length === ids.length);
   if (rows.length !== ids.length || !group) {
     return NextResponse.json(
-      { error: "لم تعد هذه الحركات تُعدّ سداداً مزدوجاً، فقد يكون تصنيفها تغيّر. حدّث الصفحة." },
+      { error: "لم تعد هذه الحركات تُعدّ سداداً مزدوجاً، فربما تغيّر تصنيفها. حدّث الصفحة." },
       { status: 409 },
     );
   }
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
       entityId: key,
       before: before ? { القرار: before.decision, الملاحظة: before.note } : null,
       after: {
-        القرار: reopen ? "أعيد فتحه" : DOUBLE_PAID_DECISION_LABEL[decision as DoublePaidDecision],
+        القرار: reopen ? "أُعيد فتحه" : DOUBLE_PAID_DECISION_LABEL[decision as DoublePaidDecision],
         الملاحظة: note,
         الجهة: group.payee,
         اليوم: group.day,
@@ -117,9 +117,9 @@ export async function POST(request: Request) {
     ok: true,
     key,
     message: reopen
-      ? "أعيد فتح التنبيه"
+      ? "أُعيد فتح التنبيه"
       : decision === "CLAIMED"
-        ? "تم الحفظ: طالبتَ الجهة بالمبلغ. يبقى التنبيه هادئاً حتى يعود المبلغ."
-        : `تم الحفظ: ${DOUBLE_PAID_DECISION_LABEL[decision as DoublePaidDecision]}. أُزيل التنبيه من «يحتاج قرارك».`,
+        ? "حُفظ: طالبتَ الجهة بالمبلغ. يبقى التنبيه صامتاً حتى يعود المبلغ."
+        : `حُفظ: ${DOUBLE_PAID_DECISION_LABEL[decision as DoublePaidDecision]}. أُزيل التنبيه من «يحتاج قرارك».`,
   });
 }

@@ -138,7 +138,7 @@ export function canCompare(a: Comparable, b: Comparable): ComparisonVerdict {
   if (a.baseUnit !== b.baseUnit && !sameFamily(a.baseUnit, b.baseUnit)) {
     return {
       comparable: false,
-      reason: `${UNIT_LABEL[a.baseUnit]} لا يقارن بـ${UNIT_LABEL[b.baseUnit]}، فهما من نوعين مختلفين`,
+      reason: `${UNIT_LABEL[a.baseUnit]} لا يُقارن بـ${UNIT_LABEL[b.baseUnit]}، فهما من نوعين مختلفين`,
     };
   }
   return { comparable: true, reason: "الوحدتان من النوع نفسه" };

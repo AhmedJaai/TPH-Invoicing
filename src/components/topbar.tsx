@@ -177,7 +177,7 @@ export function DropAnywhere({ role }: { role: Role }) {
         return;
       }
       e.preventDefault();
-      toast({ tone: "info", title: n === 1 ? "تم لصق المستند وجارٍ قراءته" : "تم لصق المستندات وجارٍ قراءتها" });
+      toast({ tone: "info", title: n === 1 ? "لُصق المستند، ويقرؤه النظام الآن" : "لُصقت المستندات، ويقرؤها النظام الآن" });
       if (window.location.pathname !== "/upload") router.push("/upload");
     }
 
@@ -203,7 +203,7 @@ export function DropAnywhere({ role }: { role: Role }) {
           <UploadCloud className="h-7 w-7" strokeWidth={1.75} aria-hidden />
         </span>
         <p className="text-lg font-bold">أفلت الملفات هنا لقراءتها</p>
-        <p className="text-sm text-muted">فواتير وإيصالات وكشوف حساب، بصيغة PDF أو صور، ويمكنك رفع أكثر من ملف معاً.</p>
+        <p className="text-sm text-muted">فواتير وإيصالات وكشوف حساب بصيغة PDF أو صور، ويمكنك رفع أكثر من ملف معاً.</p>
       </div>
     </div>
   );

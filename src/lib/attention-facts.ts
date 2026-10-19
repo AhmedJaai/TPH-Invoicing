@@ -306,7 +306,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
 
   const bankGapRanges = gaps.slice(0, 8).map<AttentionEvidence>((g) => ({
     label: `${g.start} ← ${g.end}`,
-    sub: `${countNoun(g.days, DAY)} بدون كشف`,
+    sub: `${countNoun(g.days, DAY)} بلا كشف`,
   }));
 
   /*
@@ -461,10 +461,10 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
         label: (r.supplier ?? r.file_name).slice(0, 45),
         /* الرقمُ نفسُه بمبلغٍ آخر فاتورةٌ أعاد المورّدُ إصدارَها — لا نسخة */
         sub: r.twin && minor !== null && r.twin_total !== null && Number(r.twin_total) !== minor
-          ? `فاتورة مصحّحة للفاتورة ${r.twin} (${formatRiyalsDisplay(Number(r.twin_total))} ← ${formatRiyalsDisplay(minor)}). استبدل بها الفاتورة المقيّدة`
+          ? `فاتورة مصحّحة للفاتورة ${r.twin} (${formatRiyalsDisplay(Number(r.twin_total))} ← ${formatRiyalsDisplay(minor)}). استبدل بها الفاتورة المسجّلة`
           : r.twin
-          ? `نسخة من الفاتورة ${r.twin} المقيّدة، فارفضها`
-          : `${r.file_name.slice(0, 40)}: قيّدها من ملفّها`,
+          ? `نسخة من الفاتورة ${r.twin} المسجّلة، فارفضها`
+          : `${r.file_name.slice(0, 40)}: سجّلها من ملفها`,
         amountMinor: minor ?? undefined,
         href: documentHref(r.id, "fix"),
       };
@@ -545,7 +545,7 @@ export async function gatherAttentionFacts(): Promise<AttentionFacts> {
     unbackedPaymentCount: unbacked.length,
     unbackedPaymentMinor: unbacked.reduce((n, r) => n + r.unbackedMinor, 0),
     unbackedPaymentEvidence: unbacked.slice(0, 6).map((r) => ({
-      label: r.supplierName ?? "بدون مورّد",
+      label: r.supplierName ?? "بلا مورّد",
       sub: `${r.paidOn} · من أصل ${formatRiyalsDisplay(r.amountMinor)}`,
       amountMinor: r.unbackedMinor,
     })),

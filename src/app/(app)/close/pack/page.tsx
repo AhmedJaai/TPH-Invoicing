@@ -17,6 +17,7 @@ import { METHOD_LABEL, paymentStatusLabel } from "@/lib/payment-state";
 import { TAX_STATUS_LABEL } from "@/lib/validation";
 import { previousMonth } from "@/lib/filing";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -82,14 +83,10 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
       <div className="no-print mb-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/close#export" className="inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-ink-soft hover:text-accent sm:min-h-0">
-            <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            إقفال الشهر
-          </Link>
+            <T s="{0}إقفال الشهر" a={[<ArrowRight key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
           <div className="flex flex-wrap gap-2">
             <a href={`/api/export/accountant?month=${month}`} download className={buttonClass("secondary")}>
-              <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
-              نزّل Excel
-            </a>
+              <T s="{0}نزّل Excel" a={[<Download key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></a>
             <PrintButton />
           </div>
         </div>
@@ -105,14 +102,14 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
             <p className="text-[11px] font-bold tracking-wide text-muted">حزمة المحاسب</p>
             <h1 className="mt-1 text-2xl font-bold leading-tight">{formatMonth(month)}</h1>
             <p className={`mt-1.5 text-xs font-bold ${input.closed ? "text-ok" : "text-warn"}`}>
-              {input.closed ? "الشهر مقفل، وأرقامه ثابتة." : "الشهر مفتوح، وقد تتغيّر أرقامه بما يُضاف بعد اليوم."}
+              {input.closed ? "الشهر مقفل، وأرقامه ثابتة." : "الشهر مفتوح، وقد تتغيّر أرقامه بما يُضاف لاحقاً."}
             </p>
           </div>
           <div className="text-end text-xs leading-relaxed text-ink-soft">
             <p className="text-sm font-bold text-ink">{companyConfig.nameAr}</p>
             <p>النسيم، جدة</p>
-            {vat && <p>الرقم الضريبي <bdi dir="ltr" className="font-mono">{vat}</bdi></p>}
-            {cr && <p>السجل التجاري <bdi dir="ltr" className="font-mono">{cr}</bdi></p>}
+            {vat && <p><T s="الرقم الضريبي {0}" a={[<bdi key="0" dir="ltr" className="font-mono">{vat}</bdi>]} /></p>}
+            {cr && <p><T s="السجل التجاري {0}" a={[<bdi key="0" dir="ltr" className="font-mono">{cr}</bdi>]} /></p>}
           </div>
         </header>
 
@@ -122,7 +119,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
               compact
               icon={FileText}
               title={`لا توجد قيود في ${formatMonth(month)}.`}
-              hint="لا توجد فواتير ولا دفعات ولا مصروفات ولا حركات بنكية في هذا الشهر. اختر شهراً آخر."
+              hint="لا توجد في هذا الشهر فواتير ولا دفعات ولا مصروفات ولا حركات بنكية. اختر شهراً آخر."
             />
           </div>
         ) : (
@@ -134,11 +131,11 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
                 rows={[
                   ["عدد الفواتير", <span key="n" className="nums">{s.invoiceCount}</span>],
                   ["مجموع الفواتير", <Money key="t" minor={s.invoicesTotalMinor} />],
-                  ["الضريبة المقروءة", <Money key="v" minor={s.vatKnownMinor} />],
-                  ["فواتير ضريبتها غير مقروءة", <span key="u" className={`nums ${s.vatUnknownCount > 0 ? "text-warn" : ""}`}>{s.vatUnknownCount}</span>],
+                  ["الضريبة كما قُرئت", <Money key="v" minor={s.vatKnownMinor} />],
+                  ["فواتير لم تُقرأ ضريبتها", <span key="u" className={`nums ${s.vatUnknownCount > 0 ? "text-warn" : ""}`}>{s.vatUnknownCount}</span>],
                   ["ضريبة الفواتير المستوفية (رقم الإقرار الضريبي في صفحته)", <Money key="d" minor={s.deductibleVatMinor} />],
                   ["المسدَّد منها", <Money key="p" minor={s.paidMinor} />],
-                  ["المتبقي عليها", <Money key="o" minor={s.openMinor} />],
+                  ["المتبقي منها", <Money key="o" minor={s.openMinor} />],
                 ]}
               />
               <SummaryBlock
@@ -147,8 +144,8 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
                   ["دفعات الشهر (السارية)", <Money key="p" minor={s.paymentsMinor} />],
                   ...creditNoteRow(s.creditNotesMinor),
                   ["المصروفات", <Money key="e" minor={s.expensesMinor} />],
-                  ["وارد البنك", <Money key="i" minor={s.bankInMinor} />],
-                  ["صادر البنك", <Money key="o" minor={s.bankOutMinor} />],
+                  ["الداخل إلى البنك", <Money key="i" minor={s.bankInMinor} />],
+                  ["الخارج من البنك", <Money key="o" minor={s.bankOutMinor} />],
                   ["مدفوعات غير مصنّفة", <span key="u" className={`nums ${s.bankUnexplainedCount > 0 ? "text-warn" : ""}`}>{s.bankUnexplainedCount}</span>],
                 ]}
               />
@@ -157,7 +154,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
             {/* ── الضريبة ── */}
             <SheetSection title="ضريبة المدخلات">
               <SheetTable
-                head={["الحال", "عدد الفواتير", "الضريبة المقروءة", "ملاحظة"]}
+                head={["الحالة", "عدد الفواتير", "الضريبة كما قُرئت", "ملاحظة"]}
                 numeric={[1, 2]}
                 rows={vatByStatus(input).map((v) => ({
                   key: v.status,
@@ -165,7 +162,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
                     INPUT_VAT_LABEL[v.status],
                     <span key="n" className="nums">{v.count}</span>,
                     <Money key="v" minor={v.vatKnownMinor} />,
-                    v.unknownVat > 0 ? `منها ${v.unknownVat} ضريبتها غير مقروءة` : "",
+                    v.unknownVat > 0 ? `منها ${v.unknownVat} لم تُقرأ ضريبتها` : "",
                   ],
                 }))}
               />
@@ -213,10 +210,10 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
 
             <SheetSection title="بنود المصروفات" count={namedExpenses.length}>
               <p className="mb-3 text-xs leading-relaxed text-ink-soft">
-                لا تشمل رسوم الشبكة والبنك وضريبتها، فهي مئات القيود الصغيرة، ومجموعها في الجدول أعلاه وتفاصيلها في ملف Excel.
+                لا تشمل رسوم الشبكة والبنك وضريبتها، فهي مئات القيود الصغيرة. مجموعها في الجدول أعلاه، وتفاصيلها في ملف Excel.
               </p>
               <SheetTable
-                head={["التاريخ", "التصنيف", "البيان", "المبلغ", "المصدر"]}
+                head={["التاريخ", "التصنيف", "الوصف", "المبلغ", "المصدر"]}
                 numeric={[3]}
                 rows={namedExpenses.map((e, idx) => ({
                   key: `${e.date}:${idx}`,
@@ -226,7 +223,7 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
             </SheetSection>
 
             {/* ── البنك: الصادرُ بأبوابه، ثمّ ما لا تفسيرَ له ── */}
-            <SheetSection title="صادر البنك حسب التصنيف" count={input.bank.filter((b) => b.direction === "DEBIT").length}>
+            <SheetSection title="الخارج من البنك حسب التصنيف" count={input.bank.filter((b) => b.direction === "DEBIT").length}>
               <SheetTable
                 head={["التصنيف", "عدد الحركات", "المجموع"]}
                 numeric={[1, 2]}
@@ -240,12 +237,12 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
 
             <SheetSection title="مدفوعات غير مصنّفة" count={unclear.length}>
               <p className="mb-3 text-xs leading-relaxed text-ink-soft">
-                مبالغ خرجت ولم تُصنَّف، أو خرجت لمورّد دون دفعة مسجّلة تقابلها. تفاصيل كل الحركات في ملف Excel.
+                مبالغ خرجت بلا تصنيف، أو خرجت لمورّد دون دفعة مسجّلة تقابلها. تفاصيل كل الحركات في ملف Excel.
               </p>
               <SheetTable
-                head={["التاريخ", "البيان", "التصنيف", "المبلغ"]}
+                head={["التاريخ", "الوصف", "التصنيف", "المبلغ"]}
                 numeric={[3]}
-                empty="كل ما خرج له تصنيف أو دفعة مسجّلة لمورّده."
+                empty="كل مبلغ خرج له تصنيف أو دفعة مسجّلة لمورّده."
                 rows={unclear.map((b, idx) => ({
                   key: `${b.date}:${idx}`,
                   cells: [<Day key="d" day={b.date} />, b.description, categoryLabel(b.category), <Money key="a" minor={b.amountMinor} />],
@@ -257,11 +254,10 @@ export default async function AccountantPackPage({ searchParams }: { searchParam
 
         <footer className="mt-8 space-y-1.5 border-t border-line pt-4 text-[11px] leading-relaxed text-muted">
           <p>
-            الفواتير والمصروفات حسب شهرها المحاسبي، والدفعات وحركات البنك حسب يوم حدوثها بتوقيت الرياض. الدفعات المردودة والملغاة
-            لا تدخل في المجموع. وما لم يُقرأ يظهر «غير معروف» وليس صفراً.
+            الفواتير والمصروفات حسب شهرها المحاسبي، والدفعات وحركات البنك حسب يوم حدوثها بتوقيت الرياض. لا تدخل الدفعات المردودة أو الملغاة في المجموع، وما لم يُقرأ يظهر «غير معروف» وليس صفراً.
           </p>
           <p>المبيعات غير مربوطة بالنظام، لذلك لا يظهر الإيراد في هذه الحزمة.</p>
-          <p>صدرت هذه الحزمة من نظام {companyConfig.nameAr} بتاريخ {formatDay(input.generatedAt)}.</p>
+          <p><T s="صدرت هذه الحزمة من نظام {0} بتاريخ {1}." a={[companyConfig.nameAr, formatDay(input.generatedAt)]} /></p>
         </footer>
       </article>
     </main>
@@ -274,7 +270,7 @@ function Maybe({ minor }: { minor: number | null }) {
 
 /** سطرُ الإشعارات الدائنة — يُعرض حين يوجد، ويُقال إنّه لم يخرج له مال. */
 function creditNoteRow(minor: number): [string, React.ReactNode][] {
-  return minor > 0 ? [["إشعارات دائنة (لا مبالغ خرجت)", <Money key="cn" minor={minor} />]] : [];
+  return minor > 0 ? [["إشعارات دائنة (لم يخرج بها مال)", <Money key="cn" minor={minor} />]] : [];
 }
 
 function SummaryBlock({ title, rows }: { title: string; rows: [string, React.ReactNode][] }) {
@@ -362,7 +358,7 @@ function SheetTable({
 function PaymentsTable({ input, total }: { input: PackInput; total: number }) {
   return (
     <SheetTable
-      head={["التاريخ", "المورّد", "المبلغ", "الطريقة", "الحال", "على الفواتير"]}
+      head={["التاريخ", "المورّد", "المبلغ", "طريقة الدفع", "الحالة", "على الفواتير"]}
       numeric={[2]}
       rows={input.payments.map((p, idx) => ({
         key: `${p.date}:${idx}`,
@@ -370,7 +366,7 @@ function PaymentsTable({ input, total }: { input: PackInput; total: number }) {
           <Day key="d" day={p.date} />,
           p.supplier ?? "غير منسوبة لمورّد",
           <Money key="a" minor={p.amountMinor} />,
-          `${METHOD_LABEL[p.method] ?? p.method}${p.fromBank ? "" : " · إقرار يدوي"}`,
+          `${METHOD_LABEL[p.method] ?? p.method}${p.fromBank ? "" : " · إضافة يدوية"}`,
           paymentStatusLabel(p.status),
           p.invoices.length > 0 ? <bdi key="i" dir="ltr" className="font-mono text-[11px]">{p.invoices.join(" · ")}</bdi> : "—",
         ],

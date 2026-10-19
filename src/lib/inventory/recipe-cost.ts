@@ -69,7 +69,7 @@ export interface RecipeCost {
 }
 
 export const COST_REASON_LABEL: Record<NonNullable<CostedLine["reason"]>, string> = {
-  NO_COST: "لا توجد عبوة ولا تكلفة معروفة لهذا المكوّن",
+  NO_COST: "لا عبوة ولا تكلفة معروفة لهذا المكوّن",
   UNIT_MISMATCH: "وحدة الوصفة لا يمكن تحويلها إلى وحدة الصنف",
 };
 

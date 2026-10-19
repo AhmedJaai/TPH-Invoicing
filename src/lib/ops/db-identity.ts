@@ -82,7 +82,7 @@ export function checkIsolation(prints: readonly DbFingerprint[]): IsolationCheck
     return {
       verdict: "UNKNOWN",
       reason:
-        `لم تُجمع إلّا ${named.length} بصمة، ولا يثبت العزل ببصمة واحدة. ` +
+        `لم تُجمع إلا ${named.length} بصمة، والعزل لا يثبت ببصمة واحدة. ` +
         "شغّل الفحص في الإنتاج والمعاينة معاً، ثم قارن بينهما.",
       collisions: [],
     };
@@ -113,7 +113,7 @@ export function checkIsolation(prints: readonly DbFingerprint[]): IsolationCheck
 
   return {
     verdict: "ISOLATED",
-    reason: `${named.length} بيئات، ولكل بيئة عنقودها الخاص، فلا تداخل بينها.`,
+    reason: `${named.length} بيئات، لكل منها عنقودها الخاص، فلا تداخل بينها.`,
     collisions: [],
   };
 }
@@ -123,7 +123,7 @@ export function connectionWarnings(p: DbFingerprint): string[] {
   const out: string[] = [];
   if (!p.pooled) {
     out.push(
-      "النقطة غير مجمّعة: تنفد اتصالاتها على Vercel ويتوقف العمل دون رسالة خطأ.",
+      "النقطة غير مجمّعة: تنفد اتصالاتها على Vercel فيتوقف العمل دون رسالة خطأ.",
     );
   }
   if (p.environment === "unknown") {

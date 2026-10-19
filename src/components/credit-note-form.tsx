@@ -7,6 +7,7 @@ import { ReceiptText } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
 import { Field, Input, MoneyInput, toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * «وصل إشعارٌ دائن؟» — مرتجعٌ أو خصمٌ من المورّد على هذه الفاتورة.
@@ -29,9 +30,7 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-accent hover:underline sm:min-h-0">
-        <ReceiptText className="h-3.5 w-3.5" aria-hidden />
-        وصل إشعار دائن؟ (مرتجع أو خصم)
-      </button>
+        <T s="{0}وصل إشعار دائن؟ (مرتجع أو خصم)" a={[<ReceiptText key="0" className="h-3.5 w-3.5" aria-hidden />]} /></button>
     );
   }
 
@@ -55,7 +54,7 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
       return;
     }
     setDuplicate(false);
-    toast({ title: r.data.message ?? "تم قيد الإشعار", tone: "ok" });
+    toast({ title: r.data.message ?? "سُجّل الإشعار", tone: "ok" });
     setOpen(false);
     setAmount("");
     setReference("");
@@ -71,7 +70,7 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
     >
       <p className="text-xs font-bold">إشعار دائن على هذه الفاتورة</p>
       <p className="mt-1 text-[11px] leading-relaxed text-muted">
-        يُنقص المبلغ المتبقي عليها، ولا يُعدّ مالاً خرج، ولا ينتظر كشف بنك.
+        يُنقص المبلغ المتبقي على الفاتورة، ولا يُعدّ مالاً خرج، ولا ينتظر كشف بنك.
       </p>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Field label="المبلغ (ريال)" required>
@@ -120,7 +119,7 @@ export function CreditNoteForm({ invoiceId, today }: { invoiceId: string; today:
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       <div className="mt-3 flex gap-2">
         <button type="submit" aria-busy={busy} disabled={busy || amount.trim() === ""} className={buttonClass("primary", "sm")}>
-          <span>{duplicate ? "قيّد إشعاراً آخر" : "سجّل الإشعار"}</span>
+          <span>{duplicate ? "سجّل إشعاراً آخر" : "سجّل الإشعار"}</span>
         </button>
         <button type="button" onClick={() => { setOpen(false); setError(null); }} disabled={busy} className={buttonClass("quiet", "sm")}>
           إلغاء

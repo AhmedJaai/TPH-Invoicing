@@ -8,6 +8,7 @@ import { CATEGORY_LABEL, type TxCategory } from "@/lib/bank/rules";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 export interface ExpenseRow {
   id: string;
@@ -73,7 +74,7 @@ export function RecurringExpenses({
   async function create() {
     const ok = await send({ action: "create", label, amount, category, cadence, startsOn: startsOn || undefined });
     if (ok) {
-      toast({ tone: "ok", title: `تمت إضافة «${label.trim()}»`, body: startsOn ? "سيظهر في «النقد القادم» في يوم استحقاقه." : "سيظهر في «النقد القادم» بدون يوم محدد." });
+      toast({ tone: "ok", title: `أُضيف «${label.trim()}»`, body: startsOn ? "سيظهر في «النقد القادم» في يوم استحقاقه." : "سيظهر في «النقد القادم» بلا يوم محدد." });
       setLabel("");
       setAmount("");
       setStartsOn("");
@@ -85,7 +86,7 @@ export function RecurringExpenses({
     if (ok) {
       toast({
         tone: "ok",
-        title: `تم تعطيل «${r.label}»`,
+        title: `عُطّل «${r.label}»`,
         body: "خرج من المتوقع ومن «النقد القادم»، ولم يُحذف.",
         undo: { run: () => send({ action: "activate", id: r.id }) },
       });
@@ -108,8 +109,8 @@ export function RecurringExpenses({
                   <span className="block truncate text-sm font-bold">{r.label}</span>
                   <span className="block text-[11px] text-muted">
                     {CATEGORY_LABEL[r.category]} · {CADENCE_LABEL[r.cadence]}
-                    {r.startsOn ? ` · من ${r.startsOn}` : " · بدون يوم محدد"}
-                    {r.cadence !== "MONTHLY" && <> · <Money minor={r.amountMinor} /> لكل دورة</>}
+                    {r.startsOn ? ` · من ${r.startsOn}` : " · بلا يوم محدد"}
+                    {r.cadence !== "MONTHLY" && <> <T s=" · {0} لكل دورة" a={[<Money key="0" minor={r.amountMinor} />]} /></>}
                   </span>
                 </span>
                 <span className="text-end">
@@ -136,21 +137,20 @@ export function RecurringExpenses({
         </div>
       ) : (
         <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs leading-relaxed text-muted">
-          لا توجد مصروفات متكررة مسجّلة بعد. سجّل الإيجار والرواتب هنا لتظهر في «النقد القادم» ويُقارَن المتوقع بالفعلي.
+          لا مصروفات متكررة مسجّلة بعد. سجّل الإيجار والرواتب هنا لتظهر في «النقد القادم»، ويُقارن المتوقع بالفعلي.
         </p>
       )}
 
       {inactive.length > 0 && (
         <details className="rounded-xl border border-dashed border-line px-4 py-2">
-          <summary className="flex min-h-11 cursor-pointer items-center text-xs text-muted sm:min-h-8">معطّلة (<span className="nums">{inactive.length}</span>)</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center text-xs text-muted sm:min-h-8"><T s="معطّلة ({0})" a={[<span key="0" className="nums">{inactive.length}</span>]} /></summary>
           <ul className="divide-y divide-line-soft pb-1">
             {inactive.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-3 py-2 text-muted">
                 <span className="min-w-0 truncate text-xs">{r.label} · {CATEGORY_LABEL[r.category]}</span>
                 {canEdit && (
                   <button type="button" onClick={() => void send({ action: "activate", id: r.id })} disabled={busy} className={buttonClass("quiet", "sm")}>
-                    <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden /> فعّل
-                  </button>
+                    <T s="{0} فعّل" a={[<RotateCcw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
                 )}
               </li>
             ))}
@@ -190,15 +190,13 @@ export function RecurringExpenses({
               </select>
             </label>
             <label className="block text-xs sm:col-span-2 lg:col-span-2">
-              <span className="font-bold text-ink-soft">أول استحقاق <span className="font-normal text-muted">(اختياري، ومنه يُحدَّد يوم الشهر)</span></span>
+              <span className="font-bold text-ink-soft"><T s="أول استحقاق {0}" a={[<span key="0" className="font-normal text-muted">(اختياري، ومنه يُعرف يوم الشهر)</span>]} /></span>
               <input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} dir="ltr" className={`${field} mt-1.5`} />
             </label>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button aria-busy={busy} type="submit" disabled={busy || label.trim().length < 2 || !amount.trim()} className={buttonClass("primary", "sm")}>
-              <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-              أضف
-            </button>
+              <T s="{0}أضف" a={[<Plus key="0" className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />]} /></button>
             {error && <p role="alert" className="text-xs font-bold text-danger">{error}</p>}
           </div>
         </form>

@@ -15,6 +15,7 @@ import { DriveSyncNow } from "@/components/drive-sync-now";
 import { loadDriveStatus, type DriveStatus } from "@/services/drive-status.service";
 import { AutoWorkSwitch } from "@/components/auto-work-switch";
 import { loadAutoPause } from "@/services/auto-process.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,7 @@ export default async function DrivePage() {
       user={user}
       width="wide"
       title="الدرايف"
-      intro="أرشيف المقهى في جوجل درايف. يقرأ النظام الجديد منه تلقائياً، ويعيد تسمية المؤرشف بالصيغة القياسية تلقائياً. تجد هنا حالة الربط وما تم تنفيذه، وأدوات يدوية إن لم ترد الانتظار."
+      intro="أرشيف المقهى في جوجل درايف. يقرأ النظام كل جديد فيه تلقائياً، ويعيد تسمية الملفات المؤرشفة بالصيغة القياسية. هنا تجد حالة الربط وما نُفّذ، وأدوات يدوية إن لم ترد الانتظار."
     >
       <DriveSyncNow {...statusCopy(s)} state={s.state} facts={syncFacts(s)} reconnect={reconnect} />
 
@@ -68,8 +69,8 @@ export default async function DrivePage() {
           value={<span className="nums">{s.fromDrive}</span>}
           sub={
             s.lastArrivalAt
-              ? `آخر مستند دخل ${formatDay(s.lastArrivalAt)}${s.arrivedLast7Days > 0 ? ` · هذا الأسبوع ${countNoun(s.arrivedLast7Days, DOCUMENT)}` : " · لا جديد هذا الأسبوع"}`
-              : "لم يدخل أي مستند بعد."
+              ? `آخر مستند وصل ${formatDay(s.lastArrivalAt)}${s.arrivedLast7Days > 0 ? ` · هذا الأسبوع ${countNoun(s.arrivedLast7Days, DOCUMENT)}` : " · لا جديد هذا الأسبوع"}`
+              : "لم يصل أي مستند بعد."
           }
         />
         <KeyFigure
@@ -78,7 +79,7 @@ export default async function DrivePage() {
           href="/documents?status=NEEDS_REVIEW"
           tone={s.waitingReview > 0 ? "warn" : undefined}
           value={<span className="nums">{s.waitingReview}</span>}
-          sub={s.waitingReview > 0 ? "لم تتوفر فيه شروط الأرشفة الآلية، ولن تُعاد تسميته حتى تعتمده." : "كل ما وصل تم حسمه."}
+          sub={s.waitingReview > 0 ? "لم تجتمع فيه شروط الأرشفة الآلية، ولن تُعاد تسميته حتى تعتمده." : "تمّ البتّ في كل ما وصل."}
         />
         <KeyFigure
           icon={PenLine}
@@ -94,17 +95,17 @@ export default async function DrivePage() {
               ? "لا توجد ملفات مسجّلة بعد."
               : [
                   n.toRenameArchived > 0
-                    ? `${s.writesAllowed ? "ستُعاد تسميتها في الاستدراك القادم" : "لا تُعاد تسميتها إلا من نسخة الإنتاج"}: ${countNoun(n.toRenameArchived, FILE)}`
+                    ? `${s.writesAllowed ? "ستُعاد تسميتها في الدورة القادمة" : "لا تُعاد تسميتها إلا من نسخة الإنتاج"}: ${countNoun(n.toRenameArchived, FILE)}`
                     : null,
                   n.toRenamePending > 0 ? `تُعاد تسميتها بعد اعتمادها: ${countNoun(n.toRenamePending, FILE)}` : null,
-                  n.cannot > 0 ? `تنقصها بيانات تكوين الاسم: ${countNoun(n.cannot, FILE)}` : null,
-                ].filter(Boolean).join(" · ") || "كل الملفات المعروفة على الصيغة القياسية."
+                  n.cannot > 0 ? `تنقصها بيانات لازمة لتكوين الاسم: ${countNoun(n.cannot, FILE)}` : null,
+                ].filter(Boolean).join(" · ") || "كل الملفات المعروفة مسمّاة بالصيغة القياسية."
           }
         />
       </div>
 
       <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-        <Section title="كيف يعمل" icon={FolderSync} className="mt-0!" hint="لا تحتاج إلى الضغط على أي زر، ما دام التطبيق مفتوحاً عند أحدكم.">
+        <Section title="كيف يعمل" icon={FolderSync} className="mt-0!" hint="لا حاجة إلى الضغط على أي زر، ما دام التطبيق مفتوحاً عند أحدكم.">
           <Timeline items={HOW_IT_WORKS} />
         </Section>
 
@@ -112,7 +113,7 @@ export default async function DrivePage() {
           title="آخر ما نفّذه"
           icon={History}
           className="mt-0!"
-          action={can(user.role, "audit:view") ? <LinkButton href="/settings/audit?kind=documents" size="sm" variant="quiet">سجلّ التدقيق</LinkButton> : undefined}
+          action={can(user.role, "audit:view") ? <LinkButton href="/settings/audit?kind=documents" size="sm" variant="quiet">سجل التدقيق</LinkButton> : undefined}
         >
           {s.recent.length > 0 ? (
             <Timeline items={s.recent.map(activityItem)} />
@@ -120,8 +121,8 @@ export default async function DrivePage() {
             <EmptyState
               compact
               icon={History}
-              title="لم يُسجَّل بعد أي نشاط للدرايف."
-              hint="تظهر هنا كل مزامنة وجدت جديداً وكل إعادة تسمية، مع الاسم القديم والجديد."
+              title="لم يُسجَّل أي نشاط للدرايف بعد."
+              hint="هنا تظهر كل مزامنة وجدت ملفات جديدة، وكل إعادة تسمية بالاسمين القديم والجديد."
             />
           )}
         </Section>
@@ -131,7 +132,7 @@ export default async function DrivePage() {
         id="manual"
         title="أدوات يدوية"
         icon={FileSearch}
-        hint="زر «زامن الآن» أعلاه يكفي عادةً. وهنا أدوات لمن يريد أن يرى الجديد في الدرايف وما ستتغيّر تسميته قبل التسجيل، ويختار الملفات واحداً واحداً."
+        hint="زر «زامن الآن» أعلاه يكفي غالباً. وهذه أدوات لمن يريد أن يرى الجديد في الدرايف وما ستتغيّر تسميته قبل التسجيل، ويختار الملفات واحداً واحداً."
         className="mt-12"
       >
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
@@ -148,26 +149,26 @@ const HOW_IT_WORKS: TimelineItem[] = [
     id: "scan",
     icon: FolderSync,
     title: "يفحص الدرايف كل ثلاث ساعات",
-    body: "يفحص مجلدات الشهرين الأخيرين ويأخذ ما لم يُسجَّل من قبل. تتم المزامنة عندما يكون التطبيق مفتوحاً عند المالك أو عند من لديه صلاحية الرفع، فإن لم يفتحه أحد انتظرت حتى أول فتح.",
+    body: "يفحص مجلدات آخر شهرين ويأخذ ما لم يُسجَّل بعد. تعمل المزامنة حين يكون التطبيق مفتوحاً عند المالك أو عند من لديه صلاحية الرفع، فإن لم يفتحه أحد انتظرت حتى يُفتح.",
   },
   {
     id: "read",
     icon: FileSearch,
-    title: "يقرأ الجديد ويقيّد ما يطمئن إليه",
-    body: "ما توفرت فيه شروط الأرشفة الآلية الأربعة يُقيَّد تلقائياً، وما عداه ينتظر مراجعتك في «المستندات» مع بيان السبب.",
+    title: "يقرأ الجديد ويسجّل ما يثق به",
+    body: "ما اجتمعت فيه شروط الأرشفة الآلية الأربعة يُسجَّل تلقائياً، وما عداه ينتظر مراجعتك في «المستندات» مع سببه.",
   },
   {
     id: "rename",
     icon: PenLine,
-    title: "يعيد تسمية المؤرشف بالصيغة القياسية",
-    body: "كل عشر دقائق يعيد تسمية خمسة وعشرين ملفاً في كل مرة، اعتماداً على البيانات المقيّدة فقط، ويُسجَّل الاسمان القديم والجديد في سجل التدقيق. وما ينتظر المراجعة لا تُعاد تسميته حتى يُعتمد.",
+    title: "يعيد تسمية الملفات المؤرشفة بالصيغة القياسية",
+    body: "كل عشر دقائق يعيد تسمية خمسة وعشرين ملفاً، معتمداً على البيانات المسجّلة فقط، ويحفظ الاسمين القديم والجديد في سجل التدقيق. وما ينتظر المراجعة لا تُعاد تسميته حتى يُعتمد.",
   },
   {
     id: "safe",
     icon: ShieldCheck,
     tone: "ok",
     title: "لا حذف ولا نقل أبداً",
-    body: "إعادة التسمية هي الكتابة الوحيدة على الدرايف، ولا تتم إلا من التطبيق الفعلي وليس من نسخ التجربة.",
+    body: "إعادة التسمية هي التعديل الوحيد الذي يجريه النظام على الدرايف، ولا تتم إلا من التطبيق الفعلي، لا من نسخ التجربة.",
   },
 ];
 
@@ -191,7 +192,7 @@ function activityItem(a: DriveStatus["recent"][number]): TimelineItem {
               </li>
             );
           })}
-          {a.lines.length > 3 && <li className="text-[11px] text-muted">و{countNoun(a.lines.length - 3, FILE)} أخرى في سجل التدقيق.</li>}
+          {a.lines.length > 3 && <li className="text-[11px] text-muted"><T s="و{0} أخرى في سجل التدقيق." a={[countNoun(a.lines.length - 3, FILE)]} /></li>}
         </ul>
       ) : undefined,
     };
@@ -210,13 +211,13 @@ function statusCopy(s: DriveStatus): { headline: string; detail: string } {
   switch (s.state) {
     case "preview":
       return {
-        headline: "نسخة تجربة: الدرايف غير موصول هنا عمداً",
-        detail: "تُفتح هذه النسخة بدون تسجيل دخول، ولا تستخدم تفويض درايف الخاص بالمالك حتى لا تكتب في الأرشيف الحقيقي. الأرقام أدناه من نسخة البيانات التجريبية.",
+        headline: "نسخة تجربة: الدرايف غير مربوط هنا عن قصد",
+        detail: "تُفتح هذه النسخة بلا تسجيل دخول، ولا تستخدم صلاحية الدرايف الخاصة بالمالك حتى لا تكتب في الأرشيف الحقيقي. الأرقام أدناه من البيانات التجريبية.",
       };
     case "disconnected":
       return {
-        headline: "الدرايف غير موصول بحسابك",
-        detail: "لا يوجد تفويض محفوظ للدرايف في حسابك، فلا مزامنة ولا إعادة تسمية. أعد الربط ووافق على صلاحية الدرايف في صفحة جوجل.",
+        headline: "الدرايف غير مربوط بحسابك",
+        detail: "لا توجد صلاحية درايف محفوظة في حسابك، فلا مزامنة ولا إعادة تسمية. أعد الربط ووافق على صلاحية الدرايف في صفحة جوجل.",
       };
     case "failing":
       return {
@@ -226,14 +227,14 @@ function statusCopy(s: DriveStatus): { headline: string; detail: string } {
     case "unchecked":
       return {
         headline: "لم تُسجَّل أي مزامنة بعد",
-        detail: "تتم المزامنة تلقائياً في الدقائق الأولى من فتح التطبيق ثم كل ثلاث ساعات، أو اضغط «زامن الآن».",
+        detail: "تبدأ المزامنة تلقائياً خلال دقائق من فتح التطبيق ثم كل ثلاث ساعات، أو اضغط «زامن الآن».",
       };
     case "ok":
       return {
         headline: "المزامنة تلقائية",
         detail: s.writesAllowed
-          ? "كل ثلاث ساعات والتطبيق مفتوح، وإعادة التسمية كل عشر دقائق. لا حاجة إلى الضغط على أي زر، إلا إن وضعت ملفاً الآن ولا تريد الانتظار."
-          : "إعادة التسمية موقوفة في هذه البيئة، وتتم من نسخة الإنتاج فقط لأن الأرشيف واحد.",
+          ? "كل ثلاث ساعات ما دام التطبيق مفتوحاً، وإعادة التسمية كل عشر دقائق. لا حاجة إلى الضغط على أي زر، إلا إن أضفت ملفاً الآن ولا تريد الانتظار."
+          : "إعادة التسمية متوقفة في هذه البيئة، ولا تتم إلا من نسخة الإنتاج لأن الأرشيف واحد.",
       };
   }
 }
@@ -254,7 +255,7 @@ function syncFacts(s: DriveStatus): { label: string; value: string; hint?: strin
     {
       label: "آخر إعادة تسمية",
       value: s.lastRenamedAt ? formatMoment(s.lastRenamedAt) : "لم تتم بعد",
-      hint: s.writesAllowed ? "تتم تلقائياً كل عشر دقائق" : "من نسخة الإنتاج فقط",
+      hint: s.writesAllowed ? "تلقائياً كل عشر دقائق" : "من نسخة الإنتاج فقط",
     },
   ];
 }

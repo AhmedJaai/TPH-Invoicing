@@ -6,6 +6,7 @@ import { postJson } from "@/lib/http-client";
 import { Plus, Trash2 } from "lucide-react";
 import { buttonClass } from "./ui";
 import { Sheet, toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * محرّرُ الوصفة — ولا تُعدَّل نسخةٌ في مكانها أبداً.
@@ -94,22 +95,20 @@ export function RecipeEditor({
     setMessage(null);
     setLines([{ productId: "", quantity: "", unit: "G", prepLossPercent: "" }]);
     setOpen(false);
-    toast({ tone: "ok", title: String(r.data.message ?? "تم حفظ الوصفة وتفعيلها.") });
+    toast({ tone: "ok", title: String(r.data.message ?? "حُفظت الوصفة وفُعّلت.") });
     router.refresh();
   }
 
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={buttonClass(variant, "sm")}>
-        <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-        وصفة جديدة
-      </button>
+        <T s="{0}وصفة جديدة" a={[<Plus key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></button>
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
         size="lg"
         title="وصفة جديدة أو نسخة جديدة"
-        description="هل تغيّرت الكمية؟ أضف نسخة جديدة بتاريخ التغيير. تُغلق النسخة السابقة في اليوم الذي قبله، فتبقى تقارير الفترات الماضية محسوبة بالوصفة التي كانت سارية فيها."
+        description="تغيّرت الكمية؟ أضف نسخة جديدة بتاريخ التغيير. تُغلق النسخة السابقة في اليوم الذي قبله، فتبقى تقارير الفترات الماضية محسوبة بالوصفة التي كانت سارية فيها."
         footer={
           <>
             {message && <p role={failed ? "alert" : "status"} className={`me-auto self-center text-xs ${failed ? "text-danger" : "text-ok"}`}>{message}</p>}
@@ -159,7 +158,7 @@ export function RecipeEditor({
                 </select>
               </label>
               <label>
-                <span className="block text-[11px] font-medium text-muted">الكمّيّة</span>
+                <span className="block text-[11px] font-medium text-muted">الكمية</span>
                 <input
                   type="text" inputMode="decimal" dir="ltr"
                   value={line.quantity}
@@ -205,13 +204,10 @@ export function RecipeEditor({
           onClick={() => setLines((ls) => [...ls, { productId: "", quantity: "", unit: "G", prepLossPercent: "" }])}
           className={`${buttonClass("subtle", "sm")} mt-3`}
         >
-          <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          أضف مكوّناً
-        </button>
+          <T s="{0}أضف مكوّناً" a={[<Plus key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
 
         <p className="mt-4 text-[11px] leading-relaxed text-muted">
-          «فاقد التجهيز» هو نسبة ما يُصرف من الرف ولا يصل إلى الكوب. اتركه فارغاً إن لم تقِسه؛
-          الفراغ يعني «لم يُقَس» وليس صفراً في الحساب.
+          «فاقد التجهيز» نسبة ما يُصرف من الرف ولا يصل إلى الكوب. اتركه فارغاً إن لم تقِسه، فالفراغ يعني «لم يُقَس» لا صفراً.
         </p>
       </Sheet>
     </>

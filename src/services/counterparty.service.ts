@@ -92,7 +92,7 @@ export interface ConfirmResult {
  */
 export async function confirmCounterparty(input: ConfirmInput): Promise<ConfirmResult> {
   const first = input.transactions[0];
-  if (!first) throw new Error("لا توجد حركة للتأكيد");
+  if (!first) throw new Error("لا حركة للتأكيد");
 
   /*
     اتحاد الأدلّة لا أدلّة واحدة.

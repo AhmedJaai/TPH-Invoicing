@@ -6,6 +6,7 @@ import { AlarmClock, CircleAlert } from "lucide-react";
 import { buttonClass } from "./ui";
 import { Popover, toast } from "./ui-client";
 import { postJson } from "@/lib/http-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * «أجِّله إلى…» — قرارٌ صغير بجانب البند: متى يعود، ولماذا (اختياريّ).
@@ -30,7 +31,7 @@ export function SnoozeControl({ itemId, options }: { itemId: string; options: re
     close();
     toast({
       tone: "ok",
-      title: r.data.message ?? "تم التأجيل",
+      title: r.data.message ?? "أُجّل",
       undo: {
         run: async () => {
           const u = await postJson("/api/attention-snooze", { itemId, until: null });
@@ -47,20 +48,20 @@ export function SnoozeControl({ itemId, options }: { itemId: string; options: re
     <Popover
       buttonLabel="أجّل هذا البند"
       buttonClassName={buttonClass("quiet", "md")}
-      button={<><AlarmClock className="h-4 w-4" strokeWidth={2} aria-hidden />أجّله</>}
+      button={<><T s="{0}أجّله" a={[<AlarmClock key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></>}
       width="19rem"
     >
       {(close) => (
         <div>
           <p className="text-sm font-bold">متى يعود؟</p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">يخرج من العدّ ويبقى ظاهراً في «مؤجّل»، ويعود تلقائياً في اليوم المحدد، أو قبله إن تغيّر مبلغه.</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">يخرج من العدد ويبقى ظاهراً في «المؤجّل»، ويعود تلقائياً في اليوم المحدد، أو قبله إن تغيّر مبلغه.</p>
           <label className="mt-3 block text-[11px] font-bold text-ink-soft" htmlFor={`snooze-note-${itemId}`}>السبب (اختياري)</label>
           <input
             id={`snooze-note-${itemId}`}
             value={note}
             onChange={(e) => setNote(e.target.value)}
             maxLength={300}
-            placeholder="أنتظر رد المورّد"
+            placeholder="أنتظر ردّ المورّد"
             className="mt-1 h-10 w-full rounded-lg border border-line bg-raised px-3 text-sm"
           />
           <div className="mt-3 grid grid-cols-2 gap-2">

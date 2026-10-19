@@ -86,7 +86,7 @@ describe("describeReversal", () => {
       tx({ id: "out", direction: "DEBIT" }),
       tx({ id: "in", direction: "CREDIT", valueDate: day("06") }),
     ]);
-    expect(describeReversal(r)).toContain("مبلغ مردود وليس إيراداً");
+    expect(describeReversal(r)).toContain("مبلغ مردود لا إيراد");
   });
 
   it("وتقول إنّه ترجيح حين لا يتطابق", () => {
@@ -94,6 +94,6 @@ describe("describeReversal", () => {
       tx({ id: "out", direction: "DEBIT", party: "أ ب ج د" }),
       tx({ id: "in", direction: "CREDIT", party: "هـ و ز ح", valueDate: day("06") }),
     ]);
-    expect(describeReversal(r)).toContain("يحتاج مراجعتك");
+    expect(describeReversal(r)).toContain("يحتاج إلى مراجعتك");
   });
 });

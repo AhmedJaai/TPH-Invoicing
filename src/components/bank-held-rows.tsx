@@ -9,6 +9,7 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
 import type { HeldRowView } from "@/services/bank-held.service";
+import { T } from "@/components/i18n/t";
 
 /**
  * صفوفٌ من الكشف لم تُقيَّد لأنّ الدليل لا يحسمها — ومعها قرارُها.
@@ -29,7 +30,7 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
     const r = await postJson<{ message?: string }>("/api/bank-held", { id, decision });
     setBusy(null);
     if (!r.ok) { setError(r.error); return; }
-    toast({ tone: "ok", title: r.data.message ?? "تم الحسم" });
+    toast({ tone: "ok", title: r.data.message ?? "قرّرتَ" });
     router.refresh();
   }
 
@@ -37,7 +38,7 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
     <div className="mb-3 rounded-xl border border-warn/25 bg-warn-bg px-4 py-3">
       <p className="flex items-center gap-2 text-[13px] font-bold">
         <CircleHelp className="h-[18px] w-[18px] shrink-0 text-warn" strokeWidth={2} aria-hidden />
-        {rows.length === 1 ? "حركة تنتظر قرارك، فالأدلة وحدها لا تحسمها" : `${rows.length} حركات تنتظر قرارك، فالأدلة وحدها لا تحسمها`}
+        {rows.length === 1 ? "حركة تنتظر قرارك، فالأدلة وحدها لا تكفي للبتّ فيها" : `${rows.length} حركات تنتظر قرارك، فالأدلة وحدها لا تكفي للبتّ فيها`}
       </p>
       <ul className="mt-2 divide-y divide-line-soft">
         {rows.map((r) => (
@@ -57,11 +58,9 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
               )}
               {r.against && r.kind !== "MISSING_FROM_FILE" && (
                 <>
-                  {" — تشبه "}
+                  {"، تشبه "}
                   <Link href={`/bank/tx/${r.against.id}`} className="font-bold text-accent hover:underline">
-                    حركة <bdi className="nums">{r.against.day}</bdi> بـ{formatRiyalsDisplay(r.against.amountMinor)}
-                    {r.against.operationRef ? <> (مرجع <bdi className="nums">{r.against.operationRef}</bdi>)</> : null}
-                  </Link>
+                    <T s="حركة {0} بـ{1}{2}" a={[<bdi key="0" className="nums">{r.against.day}</bdi>, formatRiyalsDisplay(r.against.amountMinor), r.against.operationRef ? <> <T s=" (مرجع {0})" a={[<bdi key="0" className="nums">{r.against.operationRef}</bdi>]} /></> : null]} /></Link>
                 </>
               )}
             </p>
@@ -70,7 +69,7 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
                 {r.kind === "MISSING_FROM_FILE" ? (
                   <>
                     <button type="button" disabled={busy !== null} onClick={() => decide(r.id, "REMOVED")} className={buttonClass("danger", "sm")}>
-                      ليست في الكشف، احذفها
+                      ليست في الكشف، فاحذفها
                     </button>
                     <button type="button" disabled={busy !== null} onClick={() => decide(r.id, "CHECKED")} className={buttonClass("secondary", "sm")}>
                       أبقها
@@ -79,15 +78,15 @@ export function BankHeldRows({ rows, canEdit }: { rows: HeldRowView[]; canEdit: 
                 ) : r.kind === "AMBIGUOUS" ? (
                   <>
                     <button type="button" disabled={busy !== null} onClick={() => decide(r.id, "SAME")} className={buttonClass("secondary", "sm")}>
-                      هي نفسها
+                      هي الحركة نفسها
                     </button>
                     <button type="button" disabled={busy !== null} onClick={() => decide(r.id, "ADDED")} className={buttonClass("primary", "sm")}>
-                      حركة أخرى، أضفها
+                      حركة أخرى، فأضفها
                     </button>
                   </>
                 ) : (
                   <button type="button" disabled={busy !== null} onClick={() => decide(r.id, "CHECKED")} className={buttonClass("secondary", "sm")}>
-                    راجعت الملف، أغلق التنبيه
+                    راجعت الملف، فأغلق التنبيه
                   </button>
                 )}
               </div>

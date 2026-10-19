@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 export interface SpreadCandidate { id: string; day: string; dayLabel: string; amountText: string; label: string; spread: boolean }
 
 const KINDS = [
-  { value: "OFF_BOOK", label: "مصروف خارج الكشف يتكرر كل شهر", hint: "مثل راتب يُدفع نقداً أو إيجار يُدفع من حساب شخصي. اكتب مبلغ الشهر الواحد." },
-  { value: "SPREAD", label: "دفعة في الكشف تغطي عدة أشهر", hint: "مثل إيجار دُفع مرة واحدة لستة أشهر، ويُوزَّع بالتساوي على أشهره." },
+  { value: "OFF_BOOK", label: "مصروف خارج الكشف يتكرر كل شهر", hint: "كراتب يُدفع نقداً أو إيجار يُدفع من حساب شخصي. اكتب مبلغ الشهر الواحد." },
+  { value: "SPREAD", label: "دفعة في الكشف تغطي عدة أشهر", hint: "كإيجار دُفع مرة واحدة عن ستة أشهر، فيُوزَّع بالتساوي على أشهره." },
   { value: "NONE", label: "لا يوجد في هذه الأشهر", hint: "لم يكن على المقهى هذا المصروف في تلك الأشهر، فلا يُعدّ ناقصاً." },
 ] as const;
 type Kind = (typeof KINDS)[number]["value"];
@@ -55,7 +56,7 @@ export function DeclarationForm({ categories, candidates, defaults }: {
     });
     setBusy(false);
     if (!r.ok) { setError(r.error); return; }
-    toast({ tone: "ok", title: r.data.message ?? "تم حفظ الإقرار" });
+    toast({ tone: "ok", title: r.data.message ?? "حُفظ ما أضفته" });
     setLabel(""); setAmount(""); setTxId("");
     router.refresh();
   }
@@ -64,7 +65,7 @@ export function DeclarationForm({ categories, candidates, defaults }: {
   return (
     <form onSubmit={(e) => { e.preventDefault(); void save(); }} className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
       <fieldset className="space-y-2">
-        <legend className="text-sm font-bold">ما الذي تريد إقراره؟</legend>
+        <legend className="text-sm font-bold">ماذا تريد أن تضيف؟</legend>
         {KINDS.map((k) => (
           <label key={k.value} className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 ${kind === k.value ? "border-accent-line bg-accent-soft/50" : "border-line"}`}>
             <input type="radio" name="kind" value={k.value} checked={kind === k.value} onChange={() => setKind(k.value)} className="mt-1" />
@@ -78,48 +79,35 @@ export function DeclarationForm({ categories, candidates, defaults }: {
 
       <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
         <label className="text-xs font-medium text-ink-soft">
-          الفئة
-          <select value={category} onChange={(e) => { setCategory(e.target.value); setTxId(""); }} disabled={busy} className={field}>
+          <T s="الفئة{0}" a={[<select key="0" value={category} onChange={(e) => { setCategory(e.target.value); setTxId(""); }} disabled={busy} className={field}>
             {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-        </label>
+          </select>]} /></label>
         <label className="text-xs font-medium text-ink-soft">
-          وصف قصير <span className="font-normal text-muted">(اختياري)</span>
-          <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} disabled={busy} maxLength={120} placeholder={kind === "OFF_BOOK" ? "راتب فلان نقداً" : categoryLabel} className={field} />
-        </label>
+          <T s="وصف قصير {0}{1}" a={[<span key="0" className="font-normal text-muted">(اختياري)</span>, <input key="1" type="text" value={label} onChange={(e) => setLabel(e.target.value)} disabled={busy} maxLength={120} placeholder={kind === "OFF_BOOK" ? "راتب فلان نقداً" : categoryLabel} className={field} />]} /></label>
 
         {kind === "SPREAD" && (
           <label className="text-xs font-medium text-ink-soft sm:col-span-2">
-            حركة البنك المراد توزيعها
-            <select value={txId} onChange={(e) => setTxId(e.target.value)} disabled={busy} className={field}>
+            <T s="حركة البنك التي تريد توزيعها{0}{1}" a={[<select key="0" value={txId} onChange={(e) => setTxId(e.target.value)} disabled={busy} className={field}>
               <option value="">— اختر —</option>
               {options.map((c) => <option key={c.id} value={c.id}>{c.dayLabel} · {c.amountText} ريال · {c.label}</option>)}
-            </select>
-            {options.length === 0 && <span className="mt-1 block text-[11px] text-warn">لا توجد حركة في الكشف مصنّفة «{categoryLabel}» ولم تُوزَّع. صنّف الحركة أولاً من «حركة البنك».</span>}
-          </label>
+            </select>, options.length === 0 && <span className="mt-1 block text-[11px] text-warn"><T s="لا توجد في الكشف حركة مصنّفة «{0}» لم تُوزَّع بعد. صنّف الحركة أولاً من «حركة البنك»." a={[categoryLabel]} /></span>]} /></label>
         )}
         {kind === "OFF_BOOK" && (
           <label className="text-xs font-medium text-ink-soft">
-            مبلغ الشهر الواحد (ريال)
-            <input type="text" inputMode="decimal" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={busy} placeholder="0.00" className={`${field} nums text-end`} />
-          </label>
+            <T s="مبلغ الشهر الواحد (ريال){0}" a={[<input key="0" type="text" inputMode="decimal" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={busy} placeholder="0.00" className={`${field} nums text-end`} />]} /></label>
         )}
         <label className="text-xs font-medium text-ink-soft">
-          من شهر
-          <input type="month" dir="ltr" value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} disabled={busy} className={field} />
-        </label>
+          <T s="من شهر{0}" a={[<input key="0" type="month" dir="ltr" value={fromMonth} onChange={(e) => setFromMonth(e.target.value)} disabled={busy} className={field} />]} /></label>
         <label className="text-xs font-medium text-ink-soft">
-          إلى شهر
-          <input type="month" dir="ltr" value={toMonth} onChange={(e) => setToMonth(e.target.value)} disabled={busy} className={field} />
-        </label>
+          <T s="إلى شهر{0}" a={[<input key="0" type="month" dir="ltr" value={toMonth} onChange={(e) => setToMonth(e.target.value)} disabled={busy} className={field} />]} /></label>
       </div>
 
       {fromMonth > toMonth && <p role="alert" className="mt-2 text-xs font-bold text-danger">شهر النهاية قبل شهر البداية.</p>}
       {error && <p role="alert" className="mt-3 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2 text-xs font-bold text-danger">{error}</p>}
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={busy || !ready} aria-busy={busy} className={buttonClass("primary")}>احفظ الإقرار</button>
+        <button type="submit" disabled={busy || !ready} aria-busy={busy} className={buttonClass("primary")}>احفظ</button>
         <p className="min-w-0 flex-1 basis-56 text-[11px] leading-relaxed text-muted">
-          لا يُنشئ الإقرار مصروفاً ولا دفعة، ولا يغيّر أي مبلغ مقيّد. يظهر في قائمة الدخل باسمه، ويُسجَّل في سجل التدقيق، ويمكنك سحبه متى شئت.
+          هذه الإضافة لا تنشئ مصروفاً ولا دفعة، ولا تغيّر أي مبلغ مسجّل. تظهر في قائمة الدخل باسمها، وتُسجَّل في سجل التدقيق، ويمكنك سحبها متى شئت.
         </p>
       </div>
     </form>

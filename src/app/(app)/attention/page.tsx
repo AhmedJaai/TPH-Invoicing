@@ -23,6 +23,7 @@ import {
 import {
   AllClear, ItemDetail, KnowsNothing, LensEmpty, TriageList, TriageSummary, TriageTabs, WorkspaceSkeleton,
 } from "@/components/attention-triage";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +89,7 @@ export default async function AttentionPage({
       user={user}
       width="wide"
       title="يحتاج قرارك"
-      intro="كل ما ينتظر قرارك في مكان واحد، الأهم أولاً. لكل بند سببه وأثره والإجراء المطلوب."
+      intro="كل ما ينتظر قرارك في مكان واحد، والأهم أولاً. لكل بند سببه وأثره والإجراء المطلوب منك."
     >
       {children}
     </PageShell>
@@ -165,9 +166,7 @@ export default async function AttentionPage({
           <div className={`min-w-0 lg:block ${picked || resolved ? "" : "hidden"}`}>
             {resolved && (
               <p role="status" className="mb-3 flex animate-rise items-center gap-2 rounded-xl border border-ok/25 bg-ok-bg px-4 py-2.5 text-xs font-bold text-ok">
-                <CircleCheck className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
-                تم حسم البند السابق وخرج من الطابور. وهذا هو البند التالي.
-              </p>
+                <T s="{0}تمّ البتّ في البند السابق وخرج من القائمة، وهذا هو البند التالي." a={[<CircleCheck key="0" className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />]} /></p>
             )}
             <ItemDetail
               key={selected.id}

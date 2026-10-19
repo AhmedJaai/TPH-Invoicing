@@ -12,6 +12,7 @@ import { currentUser } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { inboxCount } from "@/lib/work";
 import { DOCUMENT, countNoun } from "@/lib/arabic";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export default async function UploadPage() {
       user={user}
       width="page"
       title="ارفع مستنداً"
-      intro="صوّر الفاتورة أو اختر ملفها كما وصلك. يقرأ النظام المورّد والرقم والتاريخ والمبالغ، ولا يُحفظ شيء حتى تؤكّدها أنت."
+      intro="صوّر الفاتورة أو اختر ملفها كما وصلك. يقرأ النظام المورّد والرقم والتاريخ والمبالغ، ولا يُحفظ شيء حتى تؤكدها أنت."
     >
       <Uploader
         canSeeAmounts={showAmounts}
@@ -67,13 +68,13 @@ export default async function UploadPage() {
           title={`${countNoun(waiting, DOCUMENT)} ${waiting <= 2 ? (waiting === 1 ? "ينتظر" : "ينتظران") : "تنتظر"} مراجعتك`}
           action={<LinkButton href="/documents?status=NEEDS_REVIEW" size="sm" variant="primary">راجعها</LinkButton>}
         >
-          وصلت من الدرايف أو رفعتها سابقاً، ولم يعتمدها النظام تلقائياً. ستجد سبب كل مستند في صفحة المستندات.
+          وصلت من الدرايف أو رفعتها من قبل، ولم يعتمدها النظام تلقائياً. سبب كل مستند في صفحة المستندات.
         </Callout>
       )}
 
       {!showAmounts && (
         <p className="mt-6 text-xs leading-relaxed text-muted">
-          دورك لا يشمل الأرقام المالية. يمكنك رفع المستندات دون أن تظهر لك مبالغها، ويؤكّدها من يملك صلاحية رؤيتها.
+          دورك لا يشمل الأرقام المالية. ارفع المستندات دون أن ترى مبالغها، ويؤكدها من يملك صلاحية رؤيتها.
         </p>
       )}
 
@@ -86,14 +87,12 @@ export default async function UploadPage() {
           title="وما يصل إلى الدرايف يقرؤه النظام تلقائياً"
           action={<LinkButton href="/documents/drive" size="sm" variant="secondary">حالة الدرايف</LinkButton>}
         >
-          يفحص النظام الدرايف كل ثلاث ساعات، ويُعيد تسمية ما أُرشف حسب صيغة الأسماء المعتمدة دون أي إجراء منك. وإذا وضعت ملفاً فيه بنفسك ولا تريد الانتظار، افحصه الآن من تبويب «الدرايف».
+          يفحص النظام الدرايف كل ثلاث ساعات، ويعيد تسمية ما أرشفه بالصيغة المعتمدة دون أن تفعل شيئاً. وإن وضعت فيه ملفاً بنفسك ولا تريد الانتظار، فافحصه الآن من تبويب «الدرايف».
         </Callout>
       )}
       {showAmounts && (
         <p className="mt-4 text-xs text-muted">
-          لمراجعة المورّدين وما عليك لكل منهم:{" "}
-          <Link href="/suppliers" className="font-bold text-accent hover:underline">حسابات المورّدين</Link>
-        </p>
+          <T s="لتراجع المورّدين وما عليك لكل منهم: {0}" a={[<Link key="0" href="/suppliers" className="font-bold text-accent hover:underline">حسابات المورّدين</Link>]} /></p>
       )}
     </PageShell>
   );

@@ -57,6 +57,6 @@ export async function POST(request: Request) {
     counts: { ...c, problems: c.problems.slice(0, 10) },
     message: result.status === "PARTIAL"
       ? "قُرئ جزء من البيانات وانتهت المهلة. اضغط مرة أخرى لإكمال الباقي."
-      : parts.length > 0 ? `تمت المزامنة: ${parts.join(" · ")}.` : "تمت المزامنة. لا جديد منذ آخر مزامنة.",
+      : parts.length > 0 ? `تمت المزامنة: ${parts.join(" · ")}.` : "تمت المزامنة، ولا جديد منذ آخر مزامنة.",
   });
 }

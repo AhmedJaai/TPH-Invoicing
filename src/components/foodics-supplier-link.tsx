@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Link2, Unlink } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { ActionButton, toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * ربطُ مورّد فودكس بمورّدنا — اختيارٌ ثمّ ضغطة.
@@ -34,7 +35,7 @@ export function FoodicsSupplierLink({
       setError(r.error);
       return false;
     }
-    toast({ tone: "ok", title: r.data.message ?? "تم حفظ الربط" });
+    toast({ tone: "ok", title: r.data.message ?? "حُفظ الربط" });
     if (supplierId === null) setChoice("");
     router.refresh();
     return true;
@@ -50,18 +51,16 @@ export function FoodicsSupplierLink({
         onChange={(e) => setChoice(e.target.value)}
         className="min-h-11 min-w-0 max-w-full flex-1 basis-40 rounded-lg border border-line bg-raised px-2.5 text-xs font-bold sm:min-h-9"
       >
-        <option value="">— غير مربوط —</option>
+        <option value="">— بلا ربط —</option>
         {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
       </select>
-      <ActionButton onAction={() => save(choice)} variant={linkedSupplierId ? "secondary" : "primary"} size="sm" disabled={choice === "" || unchanged} reason={choice === "" ? "اختر مورّداً أولاً" : unchanged ? "هذا المورّد مربوط حالياً" : undefined}>
+      <ActionButton onAction={() => save(choice)} variant={linkedSupplierId ? "secondary" : "primary"} size="sm" disabled={choice === "" || unchanged} reason={choice === "" ? "اختر مورّداً أولاً" : unchanged ? "هذا المورّد مربوط الآن" : undefined}>
         <Link2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
         {linkedSupplierId ? "غيّر الربط" : "اربط"}
       </ActionButton>
       {linkedSupplierId && (
         <ActionButton onAction={() => save(null)} variant="quiet" size="sm" label="فكّ الربط">
-          <Unlink className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          فكّ الربط
-        </ActionButton>
+          <T s="{0}فكّ الربط" a={[<Unlink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></ActionButton>
       )}
       {error && <p role="alert" className="basis-full text-[11px] font-bold text-danger">{error}</p>}
     </div>

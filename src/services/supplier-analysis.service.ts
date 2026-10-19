@@ -215,7 +215,7 @@ export async function analyzeSupplier(
   const model = modelFor("REASONING");
 
   if (facts.invoices.length === 0 && facts.payments.length === 0 && facts.statements.length === 0) {
-    return { ok: true, supplierId, summary: "لا توجد فواتير ولا دفعات ولا كشوف لهذا المورّد، فلا شيء يُحلَّل.", findings: [], signals, model, costUsd: 0, runId, skipped: "EMPTY" };
+    return { ok: true, supplierId, summary: "لا فواتير ولا دفعات ولا كشوف لهذا المورّد، فلا شيء يُحلَّل.", findings: [], signals, model, costUsd: 0, runId, skipped: "EMPTY" };
   }
   if (!isDeepseekConfigured()) {
     return { ok: false, supplierId, reason: "مفتاح الذكاء الاصطناعي غير مضبوط في الخادم", status: 503 };
@@ -237,13 +237,13 @@ export async function analyzeSupplier(
     const reason =
       result.kind === "NO_BALANCE" ? "نفد رصيد حساب الذكاء الاصطناعي. اشحنه ثم أعد التحليل"
       : result.kind === "NOT_CONFIGURED" ? "مفتاح الذكاء الاصطناعي غير صالح"
-      : result.truncated ? "انقطع جواب الذكاء الاصطناعي قبل أن يكتمل. حاول مرة أخرى"
+      : result.truncated ? "انقطع ردّ الذكاء الاصطناعي قبل أن يكتمل. حاول مرة أخرى"
       : `تعذّر التحليل: ${result.reason}`;
     return { ok: false, supplierId, reason, status: result.kind === "NO_BALANCE" ? 402 : 502 };
   }
 
   const json = parseJsonLoose(result.text);
-  if (!json.ok) return { ok: false, supplierId, reason: "جواب الذكاء الاصطناعي ليس بصيغة JSON مقروءة", status: 502 };
+  if (!json.ok) return { ok: false, supplierId, reason: "ردّ الذكاء الاصطناعي ليس بصيغة JSON مقروءة", status: 502 };
 
   const analysis = validateAnalysis(json.value, facts, signals);
   const costUsd = result.estimatedCostUsd;
@@ -383,7 +383,7 @@ export async function decideFinding(input: {
 }): Promise<DecisionResult> {
   const finding = await loadFinding(input.findingId);
   if (finding.status !== "OPEN") {
-    throw new FindingDecisionError("سبق اتخاذ قرار في هذا الاقتراح. حدّث الصفحة");
+    throw new FindingDecisionError("قُرّر في هذا الاقتراح من قبل. حدّث الصفحة");
   }
 
   if (input.decision === "preview") {
@@ -403,11 +403,11 @@ export async function decideFinding(input: {
       actorId: input.userId, action: "AI_FINDING_DECIDED", entityType: "ai_finding", entityId: finding.id,
       after: { القرار: "رفض", النوع: finding.kind, العنوان: finding.title, ملاحظة: note },
     });
-    return { decision: "dismiss", message: "رُفض الاقتراح ولن يظهر مرة أخرى بلا دليل جديد" };
+    return { decision: "dismiss", message: "رُفض الاقتراح، ولن يظهر مرة أخرى إلا بدليل جديد" };
   }
 
   /* الإقرار */
-  let message = "تم اعتماد الاقتراح";
+  let message = "اعتُمد الاقتراح";
   let detail: Record<string, unknown> = {};
 
   try {
@@ -415,11 +415,11 @@ export async function decideFinding(input: {
       const [locked] = (
         await tx.execute<{ status: string }>(sql`select status from ai_findings where id = ${finding.id} for update`)
       ).rows;
-      if (locked?.status !== "OPEN") throw new FindingDecisionError("سبق اتخاذ قرار في هذا الاقتراح. حدّث الصفحة");
+      if (locked?.status !== "OPEN") throw new FindingDecisionError("قُرّر في هذا الاقتراح من قبل. حدّث الصفحة");
 
       if (finding.action?.type === "OWNER_PAID") {
         const outcome = await markPaidByOwner(tx, finding.action.invoiceId);
-        message = `قُيّدت فاتورة ${outcome.invoiceNumber} مسدّدة من حسابك`
+        message = `سُجّلت فاتورة ${outcome.invoiceNumber} مسدّدة من حسابك`
           + (outcome.appliedMinor > 0 ? `، وانتقلت حوالات المقهى إلى فواتيره الأخرى` : "");
         detail = {
           الفاتورة: outcome.invoiceNumber,
@@ -439,7 +439,7 @@ export async function decideFinding(input: {
           `)
         ).rows;
         if (!still || still.status === "REVERSED" || still.status === "VOID" || still.doc || still.bank) {
-          throw new FindingDecisionError("تغيّرت الدفعة منذ التحليل ولم يُلغَ شيء. أعد التحليل");
+          throw new FindingDecisionError("تغيّرت الدفعة منذ التحليل، فلم يُلغَ شيء. أعد التحليل");
         }
         const outcome = await reversePayment(tx, {
           paymentId,
@@ -448,12 +448,12 @@ export async function decideFinding(input: {
           userId: input.userId,
         });
         message = outcome.freedMinor > 0
-          ? "أُلغيت الدفعة المكررة، وعادت الفواتير التي كانت تغطيها مستحقة إن لم تُسدَّد بدفعة أخرى"
+          ? "أُلغيت الدفعة المكررة، وعادت الفواتير التي كانت تغطيها مستحقة ما لم تُسدَّد بدفعة أخرى"
           : "أُلغيت الدفعة المكررة";
         detail = { الدفعة: paymentId, المبلغ_بالهللات: Number(still.amount), كانت_مخصَّصة_على: outcome.previousAllocations };
       } else if (finding.action?.type === "APPLY_CREDIT") {
         const outcome = await applySupplierCredit(tx, finding.supplierId, { forwardDays: null });
-        message = outcome.appliedMinor > 0 ? "خُصم رصيدك عنده من فواتيره" : "لم يبق رصيد يمكن خصمه، فقد تغيّر الحساب منذ التحليل";
+        message = outcome.appliedMinor > 0 ? "خُصم رصيدك عنده من فواتيره" : "لم يبقَ رصيد يُخصم، فقد تغيّر الحساب منذ التحليل";
         detail = { خُصم_بالهللات: outcome.appliedMinor, التخصيصات: outcome.allocations };
       }
 
@@ -485,7 +485,7 @@ export async function decideFinding(input: {
       : "AI_FINDING_DECIDED",
     entityType: "ai_finding",
     entityId: finding.id,
-    after: { القرار: "أقرّ", النوع: finding.kind, العنوان: finding.title, ملاحظة: note, ...detail },
+    after: { القرار: "أكّد", النوع: finding.kind, العنوان: finding.title, ملاحظة: note, ...detail },
   });
 
   return { decision: "accept", message };

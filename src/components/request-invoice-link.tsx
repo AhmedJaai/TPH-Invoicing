@@ -36,7 +36,7 @@ export function RequestInvoiceLink({
     setNote(null);
     void postJson("/api/supplier-request", { supplierId }).then((r) => {
       if (r.ok) router.refresh();
-      else setNote(`فُتحت الرسالة، لكن لم يُسجَّل الطلب: ${r.error}`);
+      else setNote(`فُتحت الرسالة، لكن الطلب لم يُسجَّل: ${r.error}`);
     });
   }
 

@@ -73,3 +73,35 @@ describe("خانة أخيرة فارغة", () => {
     expect(t4.translate("تُنشئ الوصفات دفعة واحدة.")).toBe("Creates recipes in one go.");
   });
 });
+
+describe("الجملة الكاملة بخاناتها (<T>)", () => {
+  const tr = new Translator({
+    "{0} من {1} فحوص اجتازت": "{0} of {1} checks passed",
+    "يشبه الفاتورة {0} المسجّلة (التاريخ والمبلغ نفسهما)، فافتحه وقرّر": "Looks like recorded invoice {0} (same date and amount) — open it and decide",
+    "مسدّدة": "Paid",
+  });
+
+  it("تُترجم الجملة كلّها بمفتاحها لا قطعةً قطعة، والخانات في موضعها الإنجليزيّ", () => {
+    expect(tr.template("{0} من {1} فحوص اجتازت")).toBe("{0} of {1} checks passed");
+  });
+
+  it("الحركات في المفتاح لا تمنع المطابقة", () => {
+    expect(tr.template("يشبه الفاتورة {0} المسجلة (التاريخ والمبلغ نفسهما)، فافتحه وقرر")).toBe(
+      "Looks like recorded invoice {0} (same date and amount) — open it and decide",
+    );
+  });
+
+  it("يحفظ الفراغ على الطرفين، ويرجع إلى ترجمة القطع إن غاب المفتاح", () => {
+    expect(tr.template(" مسدّدة ")).toBe(" Paid ");
+    expect(tr.template("مسدّدة {0}")).toBe("Paid {0}");
+  });
+});
+
+describe("السهم في الواجهة الإنجليزيّة", () => {
+  it("«←» يصير «→» مرّةً واحدة، داخل الجملة المترجمة ووحده", () => {
+    const tr = new Translator({ "افتحها في البنك ←": "Open it in Bank ←" });
+    expect(tr.translate(" ←")).toBe(" →");
+    expect(tr.translate("افتحها في البنك ←")).toBe("Open it in Bank →");
+    expect(tr.template("افتحها في البنك ←")).toBe("Open it in Bank →");
+  });
+});

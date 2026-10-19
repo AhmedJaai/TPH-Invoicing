@@ -12,6 +12,7 @@ import {
   SETTLEMENT_GRACE_DAYS, USUAL_MIN_MONTHS, formatRate, missingSettlementKey, type MonthFees, type SettlementDay,
 } from "@/lib/bank/pos-watch";
 import { feeRiseKey, loadPosWatch, MISSING_LOOKBACK_DAYS } from "@/services/pos-watch.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export default async function PosPage() {
         <EmptyState
           icon={CreditCard}
           title="لا توجد حركات شبكة في كشف البنك بعد."
-          hint="يقرأ النظام التسويات ورسومها من كشف الحساب نفسه. استورد كشفاً يحتوي على إيداعات نقاط البيع لتظهر هنا نسبة الرسم الفعلية وأيام التسوية."
+          hint="يقرأ النظام التسويات ورسومها من كشف الحساب نفسه. استورد كشفاً فيه إيداعات نقاط البيع لتظهر هنا نسبة الرسم الفعلية وأيام التسوية."
           action={can(user.role, "bank:edit") ? <LinkButton href="/bank#import" variant="primary" icon={Upload}>استورد كشف البنك</LinkButton> : undefined}
         />
       </PageShell>
@@ -59,8 +60,8 @@ export default async function PosPage() {
       user={user}
       width="wide"
       title="تسويات الشبكة"
-      eyebrow={<>من كشف البنك حتى <bdi>{formatDay(w.lastBankDay)}</bdi></>}
-      intro="ما وصل إلى الحساب من مبيعات البطاقات، وما خصمته الشبكة منه رسوماً وضريبة، والأيام المعتادة التي لم تصل تسويتها."
+      eyebrow={<><T s="من كشف البنك حتى {0}" a={[<bdi key="0">{formatDay(w.lastBankDay)}</bdi>]} /></>}
+      intro="ما وصل إلى الحساب من مبيعات البطاقات، وما خصمته الشبكة منه من رسوم وضريبة، والأيام المعتادة التي لم تصل تسويتها."
     >
       {/* ── أرقامُ آخر شهر ── */}
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
@@ -68,7 +69,7 @@ export default async function PosPage() {
           icon={Landmark}
           label={`تسويات ${formatMonth(latest.month)}`}
           value={<Money minor={latest.settlementMinor} />}
-          sub="إيداعات الشبكة في الحساب قبل خصم الرسم. ليست «المبيعات»، فهي لا تشمل النقد ولا تطبيقات التوصيل."
+          sub="إيداعات الشبكة في الحساب قبل خصم الرسم. وهي ليست «المبيعات»، فلا تشمل النقد ولا تطبيقات التوصيل."
           href={`/bank?show=in&month=${latest.month}#transactions`}
         />
         <KeyFigure
@@ -77,10 +78,10 @@ export default async function PosPage() {
           value={latest.rateBp === null ? <span className="text-xl text-muted">غير معروف</span> : <span className="nums">{formatRate(latest.rateBp)}</span>}
           sub={
             latest.rateBp === null
-              ? "لا توجد تسويات في هذا الشهر لحساب النسبة عليها."
+              ? "لا توجد تسويات في هذا الشهر تُحسب عليها النسبة."
               : latest.usualBp === null
-                ? `رسوم العمليات ÷ التسويات. تُعرف «العادة» بعد ${countMonths(USUAL_MIN_MONTHS)} في الكشف.`
-                : `رسوم العمليات ÷ التسويات، وعادتها ${formatRate(latest.usualBp)} (وسيط الأشهر السابقة).`
+                ? `رسوم العمليات ÷ التسويات. يُعرف «المعتاد» بعد ${countMonths(USUAL_MIN_MONTHS)} في الكشف.`
+                : `رسوم العمليات ÷ التسويات، والمعتاد ${formatRate(latest.usualBp)} (وسيط الأشهر السابقة).`
           }
         />
         <KeyFigure
@@ -89,10 +90,7 @@ export default async function PosPage() {
           value={<Money minor={latest.feeMinor + latest.fixedFeeMinor + latest.vatMinor} />}
           sub={
             <>
-              رسم العمليات <Money minor={latest.feeMinor} />
-              {latest.fixedFeeMinor > 0 && <> · رسم ثابت <Money minor={latest.fixedFeeMinor} /></>}
-              {" "}· ضريبة الرسم <Money minor={latest.vatMinor} />
-            </>
+              <T s="رسم العمليات {0}{1} · ضريبة الرسم {2}" a={[<Money key="0" minor={latest.feeMinor} />, latest.fixedFeeMinor > 0 && <> <T s=" · رسم ثابت {0}" a={[<Money key="0" minor={latest.fixedFeeMinor} />]} /></>, <Money key="2" minor={latest.vatMinor} />]} /></>
           }
           href={`/bank?show=fees&month=${latest.month}#transactions`}
         />
@@ -106,8 +104,7 @@ export default async function PosPage() {
           title={`رسم ${formatMonth(w.feeRise.month)} أعلى من المعتاد: ${formatRate(w.feeRise.rateBp)} والمعتاد ${formatRate(w.feeRise.usualBp)}`}
           action={canEdit ? <SignalControls signalKey={feeRiseKey(w.feeRise.month)} snoozeDays={30} /> : undefined}
         >
-          الفرق على تسويات ذلك الشهر <Money minor={w.feeRise.excessMinor ?? 0} />. قد يكون السبب تغيّر نوع البطاقات (بطاقات ائتمانية أكثر) أو تغيّر سعر العقد. راجع البنك إن لم تعرف السبب، أو تجاهل التنبيه إن كان الارتفاع متفقاً عليه.
-        </Callout>
+          <T s="الفرق على تسويات ذلك الشهر {0}. قد يكون السبب تغيّر نوع البطاقات (بطاقات ائتمانية أكثر) أو تغيّر سعر العقد. راجع البنك إن لم تعرف السبب، أو تجاهل التنبيه إن كانت الزيادة متفقاً عليها." a={[<Money key="0" minor={w.feeRise.excessMinor ?? 0} />]} /></Callout>
       )}
 
       {/* ── تسوياتٌ لم تصل ── */}
@@ -116,13 +113,11 @@ export default async function PosPage() {
         title="أيام لم تصل تسويتها"
         icon={CalendarX}
         count={w.missing.length}
-        hint={`أيام تصل فيها التسوية عادةً في مثل هذا اليوم من الأسابيع السابقة، ولا توجد لها تسوية في الكشف، ومضى عليها ${countNoun(SETTLEMENT_GRACE_DAYS, DAY)} على الأقل. يشمل الفحص آخر ${countNoun(MISSING_LOOKBACK_DAYS, DAY)} من الكشف.`}
+        hint={`أيام تصل فيها التسوية عادةً في مثل هذا اليوم من الأسابيع الماضية، ولا تسوية لها في الكشف، ومضى عليها ${countNoun(SETTLEMENT_GRACE_DAYS, DAY)} على الأقل. يغطي الفحص آخر ${countNoun(MISSING_LOOKBACK_DAYS, DAY)} من الكشف.`}
       >
         {w.missing.length === 0 ? (
           <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs leading-relaxed text-muted shadow-raised">
-            لا توجد أيام معتادة بلا تسوية ضمن الفترة التي يغطيها الكشف حتى <bdi>{formatDay(w.lastBankDay)}</bdi>.
-            {w.silencedMissing.length > 0 && <> وتجاهلت {countNoun(w.silencedMissing.length, DAY)}، تجدها أدناه.</>}
-          </p>
+            <T s="لا يوجد يوم معتاد بلا تسوية في الفترة التي يغطيها الكشف حتى {0}.{1}" a={[<bdi key="0">{formatDay(w.lastBankDay)}</bdi>, w.silencedMissing.length > 0 && <> <T s=" وتجاهلتَ {0}، تجدها أدناه." a={[countNoun(w.silencedMissing.length, DAY)]} /></>]} /></p>
         ) : (
           <ul className="space-y-2">
             {w.missing.map((m) => (
@@ -132,13 +127,10 @@ export default async function PosPage() {
                     {formatWeekday(m.day)} <bdi>{formatDay(m.day)}</bdi>
                   </p>
                   <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
-                    لم تصل تسوية لهذا اليوم، بينما وصلت في مثله في {m.seenWeeks} من الأسابيع الستة السابقة
-                    {m.usualMinor !== null && <>، ووسيطها <Money minor={m.usualMinor} /> (تقدير وليس مبلغاً فعلياً)</>}.
-                    راجع تقرير الجهاز لذلك اليوم ثم البنك، وإن كان المقهى مغلقاً فتجاهل التنبيه.
-                  </p>
+                    <T s="لم تصل تسوية لهذا اليوم، مع أنها وصلت في مثله في {0} من الأسابيع الستة الماضية{1}. راجع تقرير الجهاز لذلك اليوم ثم البنك، وإن كان المقهى مغلقاً فتجاهل التنبيه." a={[m.seenWeeks, m.usualMinor !== null && <><T s="، ووسيطها {0} (تقدير لا مبلغ فعلي)" a={[<Money key="0" minor={m.usualMinor} />]} /></>]} /></p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-1">
-                  <LinkButton href={`/bank?show=in&month=${m.day.slice(0, 7)}#transactions`} variant="secondary" size="sm">الوارد في ذلك الشهر</LinkButton>
+                  <LinkButton href={`/bank?show=in&month=${m.day.slice(0, 7)}#transactions`} variant="secondary" size="sm">الداخل في ذلك الشهر</LinkButton>
                   {canEdit && <SignalControls signalKey={missingSettlementKey(m.day)} dismissLabel="كان مغلقاً / وصلت" />}
                 </div>
               </li>
@@ -147,7 +139,7 @@ export default async function PosPage() {
         )}
         {w.silencedMissing.length > 0 && (
           <details className="mt-3 text-xs text-muted">
-            <summary className="cursor-pointer font-bold">ما تجاهلته ({w.silencedMissing.length})</summary>
+            <summary className="cursor-pointer font-bold"><T s="ما تجاهلته ({0})" a={[w.silencedMissing.length]} /></summary>
             <ul className="mt-2 space-y-1">
               {w.silencedMissing.map((day) => (
                 <li key={day} className="flex flex-wrap items-center gap-2">
@@ -164,7 +156,7 @@ export default async function PosPage() {
       <Section
         title="الرسم شهراً بشهر"
         icon={Percent}
-        hint="النسبة = رسوم العمليات ÷ التسويات لجميع الشبكات معاً. أما الرسم الثابت (للجهاز أو الاشتراك الشهري) فيُعرض منفصلاً ولا يدخل في النسبة، وإلا ارتفعت النسبة في شهر قليل المبيعات دون أي تغيير في السعر."
+        hint="النسبة = رسوم العمليات ÷ التسويات لكل الشبكات معاً. والرسم الثابت (رسم الجهاز أو الاشتراك الشهري) يُعرض وحده ولا يدخل في النسبة، وإلا ارتفعت النسبة في الشهر قليل المبيعات دون أي تغيّر في السعر."
       >
         <DataTable<MonthFees>
           rows={w.months}
@@ -192,7 +184,7 @@ export default async function PosPage() {
             },
             {
               key: "usual",
-              header: "العادة",
+              header: "المعتاد",
               numeric: true,
               secondary: true,
               cell: (m) => (m.usualBp === null ? <span className="text-muted">—</span> : <span className="nums">{formatRate(m.usualBp)}</span>),
@@ -203,15 +195,12 @@ export default async function PosPage() {
         />
         {latest.schemes.length > 1 && (
           <p className="mt-3 text-xs leading-relaxed text-muted">
-            تسويات {formatMonth(latest.month)} موزعة حسب رمز الشبكة كما في الكشف:{" "}
-            {latest.schemes.map((s, i) => (
+            <T s="تسويات {0} موزّعة على رموز الشبكات كما في الكشف: {1}. ولا يمكن نسبة الرسم إلى شبكة بعينها، لأن رمزه في الكشف غير رمز تسويته." a={[formatMonth(latest.month), latest.schemes.map((s, i) => (
               <span key={s.code}>
                 {i > 0 && " · "}
                 {s.label} <Money minor={s.settlementMinor} />
               </span>
-            ))}
-            . ولا يمكن نسبة الرسم إلى شبكة بعينها، لأن رمزه في الكشف يختلف عن رمز تسويته.
-          </p>
+            ))]} /></p>
         )}
       </Section>
 
@@ -220,7 +209,7 @@ export default async function PosPage() {
         title="يوماً بيوم"
         icon={CreditCard}
         count={shownDays.length}
-        hint="لكل يوم بيع: ما وصل له من تسويات، وما يحمل تاريخه من رسم وضريبة. يؤخذ اليوم من رمز الدفعة في وصف البنك، وما لا يحمل الرمز يُنسب إلى يوم وصوله ويُوسَم بذلك."
+        hint="لكل يوم بيع: ما وصله من تسويات، وما يحمل تاريخه من رسم وضريبة. يُؤخذ اليوم من رمز الدفعة في وصف البنك، وما لا يحمل الرمز يُنسب إلى يوم وصوله ويُعلَّم بذلك."
       >
         <DataTable<SettlementDay>
           rows={shownDays}
@@ -250,8 +239,7 @@ export default async function PosPage() {
       </Section>
 
       <Callout tone="info" icon={Info} className="mt-8" action={<LinkButton href="/money/foodics" variant="secondary" size="sm">فودكس والبنك</LinkButton>}>
-        <strong className="text-ink">هل طابقت التسوية مبيعات البطاقات؟</strong> هذه الصفحة تعتمد على كشف البنك فقط، ويُعرف فيها غياب التسوية من عادة الأيام السابقة. أما مقارنة كل دفعة بما سجّله فودكس بالبطاقة فتجدها في «فودكس والبنك».
-      </Callout>
+        <T s="{0} هذه الصفحة تعتمد على كشف البنك وحده، وتعرف غياب التسوية من عادة الأيام الماضية. أما مقارنة كل دفعة بما سجّله فودكس بالبطاقة ففي «فودكس والبنك»." a={[<strong key="0" className="text-ink">هل طابقت التسويةُ مبيعاتِ البطاقات؟</strong>]} /></Callout>
     </PageShell>
   );
 }

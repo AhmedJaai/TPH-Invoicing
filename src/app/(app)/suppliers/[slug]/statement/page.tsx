@@ -15,6 +15,7 @@ import { loadFirstActivity, loadStatementLedger } from "@/services/supplier-inte
 import { loadSupplierBalances } from "@/services/supplier-balance.service";
 import { METHOD_LABEL } from "@/lib/payment-state";
 import { formatDay, todayInRiyadh, addDays } from "@/lib/riyadh-time";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -103,9 +104,7 @@ export default async function SupplierStatementPage({
       <div className="no-print mb-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href={`/suppliers/${s.slug}`} className="inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-ink-soft hover:text-accent sm:min-h-0">
-            <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            ملف {s.nameAr}
-          </Link>
+            <T s="{0}صفحة {1}" a={[<ArrowRight key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />, s.nameAr]} /></Link>
           <PrintButton />
         </div>
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -139,15 +138,15 @@ export default async function SupplierStatementPage({
             <p className="text-[11px] font-bold tracking-wide text-muted">كشف حساب مورّد</p>
             <h1 className="mt-1 text-2xl font-bold leading-tight">{s.nameAr}</h1>
             <p className="mt-1.5 text-xs text-ink-soft">
-              {s.vatNumber ? <>الرقم الضريبي <bdi dir="ltr" className="font-mono">{s.vatNumber}</bdi></> : "لا يوجد رقم ضريبي مسجّل له"}
-              {s.crNumber && <> · السجل التجاري <bdi dir="ltr" className="font-mono">{s.crNumber}</bdi></>}
+              {s.vatNumber ? <><T s="الرقم الضريبي {0}" a={[<bdi key="0" dir="ltr" className="font-mono">{s.vatNumber}</bdi>]} /></> : "لا رقم ضريبي مسجّل له"}
+              {s.crNumber && <> <T s=" · السجل التجاري {0}" a={[<bdi key="0" dir="ltr" className="font-mono">{s.crNumber}</bdi>]} /></>}
             </p>
           </div>
           <div className="text-end text-xs leading-relaxed text-ink-soft">
             <p className="text-sm font-bold text-ink">{companyConfig.nameAr}</p>
             <p>النسيم، جدة</p>
-            {vat && <p>الرقم الضريبي <bdi dir="ltr" className="font-mono">{vat}</bdi></p>}
-            {cr && <p>السجل التجاري <bdi dir="ltr" className="font-mono">{cr}</bdi></p>}
+            {vat && <p><T s="الرقم الضريبي {0}" a={[<bdi key="0" dir="ltr" className="font-mono">{vat}</bdi>]} /></p>}
+            {cr && <p><T s="السجل التجاري {0}" a={[<bdi key="0" dir="ltr" className="font-mono">{cr}</bdi>]} /></p>}
           </div>
         </header>
 
@@ -176,7 +175,7 @@ export default async function SupplierStatementPage({
               compact
               icon={ScrollText}
               title="لا توجد حركات في هذه الفترة."
-              hint={first ? `بدأ التعامل معه في ${formatDay(first)}. اختر «كل فترة التعامل» لعرضه.` : "لا توجد فاتورة منه ولا دفعة له حتى الآن."}
+              hint={first ? `بدأ التعامل معه في ${formatDay(first)}. اختر «كل فترة التعامل» لترى الكشف كاملاً.` : "لا فاتورة منه ولا دفعة له حتى الآن."}
             />
           </div>
         ) : (
@@ -204,9 +203,9 @@ export default async function SupplierStatementPage({
                     <td className="whitespace-nowrap px-2.5 py-2 text-ink-soft">{formatDay(r.date)}</td>
                     <td className="px-2.5 py-2">
                       {r.kind === "INVOICE" ? (
-                        <>فاتورة <bdi dir="ltr" className="font-mono">{r.reference}</bdi></>
+                        <><T s="فاتورة {0}" a={[<bdi key="0" dir="ltr" className="font-mono">{r.reference}</bdi>]} /></>
                       ) : (
-                        <>سداد · {METHOD_LABEL[r.reference] ?? r.reference}</>
+                        <><T s="سداد · {0}" a={[METHOD_LABEL[r.reference] ?? r.reference]} /></>
                       )}
                     </td>
                     <td className="nums-col px-2.5 py-2">{r.kind === "INVOICE" ? <Money minor={r.amountMinor} /> : null}</td>
@@ -229,16 +228,13 @@ export default async function SupplierStatementPage({
 
         <footer className="mt-6 space-y-1.5 border-t border-line pt-4 text-[11px] leading-relaxed text-muted">
           <p>
-            الرصيد الموجب مبلغ مستحق للمورّد علينا، والسالب رصيد لنا عنده. المدفوعات بالمبلغ الذي وصل المورّد بعد رسوم التحويل،
-            ولا تشمل الدفعات المردودة أو الملغاة.
+            الرصيد الموجب مبلغ مستحق للمورّد علينا، والسالب رصيد لنا عنده. المدفوعات بالمبلغ الذي وصل المورّد بعد رسوم التحويل، ولا تشمل الدفعات المردودة ولا الملغاة.
           </p>
           {coversToday && drift !== 0 && (
             <p className="text-ink-soft">
-              رصيده في النظام اليوم <Balance minor={systemNet ?? 0} />، والفرق <Money minor={Math.abs(drift)} /> وهو ناتج عن كسور تقريب
-              في فواتير اعتُبرت مسدّدة، أو عن تخصيص دفعة يحتاج إلى مراجعة في ملف المورّد.
-            </p>
+              <T s="رصيده في النظام اليوم {0}، والفرق {1}، وسببه كسور تقريب في فواتير عُدّت مسدّدة، أو تخصيص دفعة يحتاج إلى مراجعة في صفحة المورّد." a={[<Balance key="0" minor={systemNet ?? 0} />, <Money key="1" minor={Math.abs(drift)} />]} /></p>
           )}
-          <p>صدر هذا الكشف من نظام {companyConfig.nameAr} بتاريخ {formatDay(today)} بناءً على القيود المسجّلة حتى هذا التاريخ.</p>
+          <p><T s="صدر هذا الكشف من نظام {0} بتاريخ {1}، بناءً على ما سُجّل حتى ذلك التاريخ." a={[companyConfig.nameAr, formatDay(today)]} /></p>
         </footer>
       </article>
     </main>

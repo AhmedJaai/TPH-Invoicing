@@ -17,6 +17,7 @@ import {
 } from "@/lib/ai/finding-labels";
 import { SUGGESTION, countNoun } from "@/lib/arabic";
 import { ACT } from "@/lib/ui-terms";
+import { T } from "@/components/i18n/t";
 
 /**
  * اقتراحاتُ تحليل الذكاء — وقرارُ صاحب العمل فيها.
@@ -69,7 +70,7 @@ async function postJson(url: string, body: unknown): Promise<{ ok: boolean; stat
 const errorOf = (r: Awaited<ReturnType<typeof postJson>>) =>
   r === null
     ? "تعذّر الاتصال بالخادم، ولم يصل الطلب."
-    : String(r.data.error ?? (r.status === 504 ? "تأخّر الخادم في الرد. أعد المحاولة." : `رد الخادم بالرمز ${r.status}`));
+    : String(r.data.error ?? (r.status === 504 ? "تأخر الخادم في الرد. أعد المحاولة." : `ردّ الخادم بالرمز ${r.status}`));
 
 const SEVERITY_TONE: Record<string, Tone | undefined> = {
   HIGH: "danger",
@@ -107,7 +108,7 @@ export function RunAnalysis({
     */
     for (let k = 0; k < suppliers.length; k++) {
       const s = suppliers[k];
-      setProgress(suppliers.length > 1 ? `جارٍ تحليل ${k + 1} من ${suppliers.length}: ${s.name}` : "جارٍ التحليل… قد يستغرق نصف دقيقة");
+      setProgress(suppliers.length > 1 ? `يحلّل ${k + 1} من ${suppliers.length}: ${s.name}` : "يحلّل الآن… قد يستغرق نصف دقيقة");
       const r = await postJson("/api/ai-analysis", { supplierId: s.id });
       const text = r && r.ok
         ? `${String(r.data.summary ?? "")}${Number(r.data.count ?? 0) > 0 ? ` — ${countNoun(Number(r.data.count ?? 0), SUGGESTION)}` : ""}`
@@ -129,7 +130,7 @@ export function RunAnalysis({
         className={buttonClass("secondary", "sm")}
       >
         <Sparkles className={`h-4 w-4 text-accent ${busy ? "animate-pulse" : ""}`} strokeWidth={2} aria-hidden />
-        {busy ? "جارٍ التحليل…" : label}
+        {busy ? "يحلّل الآن…" : label}
       </button>
       {progress && <p className="text-xs text-muted" aria-live="polite">{progress}</p>}
       {lines.length > 0 && (
@@ -182,9 +183,7 @@ export function FindingsList({
           onClick={() => setAll(true)}
           className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-line text-xs font-medium text-ink-soft transition-colors hover:border-accent-line hover:text-accent"
         >
-          اعرض {countNoun(hidden, SUGGESTION)} {hidden === 1 ? "آخر" : "أخرى"}
-          <ChevronDown className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        </button>
+          <T s="اعرض {0} {1}{2}" a={[countNoun(hidden, SUGGESTION), hidden === 1 ? "آخر" : "أخرى", <ChevronDown key="2" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
       )}
     </>
   );
@@ -223,7 +222,7 @@ function FindingCard({
       setState("preview");
       return;
     }
-    setMessage({ text: String(r.data.message ?? "تم الحفظ"), bad: false });
+    setMessage({ text: String(r.data.message ?? "حُفظ"), bad: false });
     setState("done");
     router.refresh();
   }
@@ -262,22 +261,17 @@ function FindingCard({
 
       {state === "preview" && preview && (
         <p className="mt-3 rounded-lg border border-warn/25 bg-warn-bg p-3 text-xs leading-relaxed">
-          سيتم قيد الفاتورة {preview.invoiceNumber} مسدّدة من حسابك بمبلغ {formatRiyalsDisplay(preview.ownerPaymentMinor)}
-          {preview.freed.length > 0 && (
+          <T s="ستُسجَّل الفاتورة {0} مسدّدة من حسابك بمبلغ {1}{2}{3}" a={[preview.invoiceNumber, formatRiyalsDisplay(preview.ownerPaymentMinor), preview.freed.length > 0 && (
             <>
-              {" · "}وسيتم فك حوالات المقهى عنها ({formatRiyalsDisplay(preview.freed.reduce((s, x) => s + x.amountMinor, 0))})
-              {preview.reapplied.length > 0 && (
-                <> وسيتم الخصم من: {preview.reapplied.map((x) => `فاتورة ${x.invoiceNumber} بمبلغ ${formatRiyalsDisplay(x.amountMinor)}`).join("، ")}</>
-              )}
-            </>
-          )}
-          {preview.creditLeftMinor > 0 && <> · ويبقى لك لديه {formatRiyalsDisplay(preview.creditLeftMinor)}</>}
-        </p>
+              <T s=" · وستُفك عنها حوالات المقهى ({0}){1}" a={[formatRiyalsDisplay(preview.freed.reduce((s, x) => s + x.amountMinor, 0)), preview.reapplied.length > 0 && (
+                <> <T s=" وسيُخصم من: {0}" a={[preview.reapplied.map((x) => `فاتورة ${x.invoiceNumber} بمبلغ ${formatRiyalsDisplay(x.amountMinor)}`).join("، ")]} /></>
+              )]} /></>
+          ), preview.creditLeftMinor > 0 && <> <T s=" · ويبقى لك عنده {0}" a={[formatRiyalsDisplay(preview.creditLeftMinor)]} /></>]} /></p>
       )}
 
       {state === "dismissing" && (
         <label className="mt-3 block text-xs">
-          <span className="text-muted">لماذا هذه الملاحظة غير صحيحة؟ (اختياري، يستفيد منه التحليل القادم)</span>
+          <span className="text-muted">لماذا هذه الملاحظة غير صحيحة؟ (اختياري، يفيد التحليل القادم)</span>
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -301,7 +295,7 @@ function FindingCard({
             <>
               {f.action?.type === "OWNER_PAID" && state !== "preview" && (
                 <button aria-busy={state === "busy"} type="button" disabled={state === "busy"} className={buttonClass("secondary", "sm")} onClick={() => decide("preview")}>
-                  عاين ما سيتغيّر
+                  اعرض ما سيتغيّر
                 </button>
               )}
               {(f.action?.type !== "OWNER_PAID" || state === "preview") && (
@@ -311,22 +305,22 @@ function FindingCard({
                   disabled={state === "busy" || !canApprove}
                   className={buttonClass("primary", "sm")}
                   onClick={() => decide("accept")}
-                  title={canApprove ? undefined : "إقرار ما يُسجَّل سداداً يحتاج صلاحية اعتماد السداد"}
+                  title={canApprove ? undefined : "تأكيد ما يُسجَّل سداداً يحتاج إلى صلاحية اعتماد السداد"}
                 >
-                  {f.action?.type === "OWNER_PAID" ? ACT.paidFromOwner : f.action?.type === "VOID_DUPLICATE" ? "هي دفعة واحدة، ألغِ المكرّرة" : "اخصم الرصيد من فواتيره"}
+                  {f.action?.type === "OWNER_PAID" ? ACT.paidFromOwner : f.action?.type === "VOID_DUPLICATE" ? "هي دفعة واحدة، فألغِ المكررة" : "اخصم الرصيد من فواتيره"}
                 </button>
               )}
               <button type="button" disabled={state === "busy"} className={buttonClass("quiet", "sm")} onClick={() => setState("dismissing")}>
-                ليس صحيحاً
+                غير صحيح
               </button>
             </>
           ) : (
             <>
               <button type="button" disabled={state === "busy"} className={buttonClass("secondary", "sm")} onClick={() => decide("accept")}>
-                صحيح، للعلم
+                صحيح، للعلم فقط
               </button>
               <button type="button" disabled={state === "busy"} className={buttonClass("quiet", "sm")} onClick={() => setState("dismissing")}>
-                ليس صحيحاً
+                غير صحيح
               </button>
             </>
           )}
@@ -334,7 +328,7 @@ function FindingCard({
       )}
 
       {!canApprove && moneyAction && state !== "done" && (
-        <p className="mt-2 text-[11px] text-muted">إقرار هذه الملاحظة يسجّل سداداً، ويحتاج صلاحية اعتماد السداد.</p>
+        <p className="mt-2 text-[11px] text-muted">تأكيد هذه الملاحظة يسجّل سداداً، ويحتاج إلى صلاحية اعتماد السداد.</p>
       )}
       {message && (
         <p className={`mt-2 text-xs font-bold ${message.bad ? "text-danger" : "text-ok"}`} role={message.bad ? "alert" : "status"}>

@@ -22,6 +22,7 @@ import { gatherHealthFacts } from "@/lib/data-health-facts";
 import { ProductMapping } from "@/components/product-mapping";
 import { listProducts, listSupplierProducts, mappingCoverage } from "@/services/product.service";
 import { suggestMerges, type SupplierItem } from "@/lib/products";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -115,8 +116,8 @@ export default async function ItemsAndPricesPage({
       <PageShell user={user} width="wide" title="الأصناف والأسعار">
         <EmptyState
           icon={Tags}
-          title="لا توجد بنود فواتير بعد."
-          hint="تُبنى الأصناف من بنود الفواتير. بعد قراءة محتوى أول فاتورة يظهر كل صنف وسعره والمورّد الذي اشتريته منه."
+          title="لا توجد بنود فواتير حتى الآن."
+          hint="تُستخرج الأصناف من بنود الفواتير. بعد قراءة أول فاتورة سيظهر هنا كل صنف وسعره والمورّد الذي اشتريته منه."
           action={<LinkButton href="/upload" variant="primary">ارفع مستنداً</LinkButton>}
         />
       </PageShell>
@@ -160,7 +161,7 @@ export default async function ItemsAndPricesPage({
       user={user}
       width="wide"
       title="الأصناف والأسعار"
-      intro="كل صنف اشتريته: كم كلّفك، ومن أي مورّد، وكيف تغيّر سعره عنده."
+      intro="كل صنف اشتريته: كم كلّفك، ومن أي مورّد، وكيف تغيّر سعره."
     >
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Figure
@@ -169,7 +170,7 @@ export default async function ItemsAndPricesPage({
           href="/analysis#price-moves"
           tone={rises.length > 0 ? "warn" : undefined}
           value={<span className="nums">{rises.length}</span>}
-          sub={rises.length > 0 ? `أكبر زيادة ${maxRise}٪ في آخر شراء من المورّد نفسه.` : "لم يرتفع سعر أي صنف بنسبة 3٪ أو أكثر في آخر شراء."}
+          sub={rises.length > 0 ? `أعلى زيادة ${maxRise}٪ في آخر شراء من المورّد نفسه.` : "لم يرتفع سعر أي صنف بنسبة 3٪ أو أكثر في آخر شراء."}
         />
         <Figure
           icon={TrendingDown}
@@ -177,46 +178,42 @@ export default async function ItemsAndPricesPage({
           href="/analysis#price-moves"
           tone={falls.length > 0 ? "ok" : undefined}
           value={<span className="nums">{falls.length}</span>}
-          sub="مقارنة بالسعر السابق عند المورّد نفسه."
+          sub="مقارنةً بالسعر السابق عند المورّد نفسه."
         />
         <Figure
           icon={ShoppingBasket}
-          label="مشتريات حسب البنود"
+          label="المشتريات حسب البنود"
           href="/analysis?view=spend"
           value={<Money minor={totalSpend} />}
-          sub={`${countNoun(items.length, PRODUCT)} عند جميع المورّدين.`}
+          sub={`${countNoun(items.length, PRODUCT)} لدى جميع المورّدين.`}
         />
         {mapping ? (
           <Figure
             icon={Link2}
-            label="مربوطة بصنف معياري"
+            label="مربوطة بصنف موحّد"
             href="/analysis?view=mapping"
-            value={<><span className="nums">{mapping[2].mapped}</span><span className="text-base font-medium text-muted"> من <span className="nums">{mapping[2].total}</span></span></>}
+            value={<><span className="nums">{mapping[2].mapped}</span><span className="text-base font-medium text-muted"> <T s=" من {0}" a={[<span key="0" className="nums">{mapping[2].total}</span>]} /></span></>}
           >
             <Meter value={mapping[2].mapped} max={Math.max(1, mapping[2].total)} tone={unmapped === 0 ? "ok" : "accent"} label="الأصناف المربوطة" />
           </Figure>
         ) : (
-          <Figure icon={Layers} label="أصناف مختلفة" value={<span className="nums">{items.length}</span>} sub="يُحسب الصنف مع مورّده، فالاسم وحده لا يحدد الصنف." />
+          <Figure icon={Layers} label="أصناف مختلفة" value={<span className="nums">{items.length}</span>} sub="يُحسب الصنف مع مورّده، فالاسم وحده لا يكفي لتحديده." />
         )}
       </div>
 
       {rows.length >= LINE_LIMIT && (
         <Callout tone="warn" icon={Info} className="mt-4" title="الأرقام مبنية على أحدث البنود فقط">
-          بلغ عدد بنود الفواتير الحد الذي تقرؤه هذه الصفحة (<span className="nums">{LINE_LIMIT}</span> بنداً)، لذلك لا تدخل البنود الأقدم في المتوسطات ودورات الشراء. أما آخر سعر وتغيّره فصحيحان.
-        </Callout>
+          <T s="بلغت بنود الفواتير الحد الأعلى الذي تعرضه هذه الصفحة ({0} بنداً)، لذلك لا تدخل البنود الأقدم في المتوسطات ودورات الشراء. أما آخر سعر وتغيّره فصحيحان." a={[<span key="0" className="nums">{LINE_LIMIT}</span>]} /></Callout>
       )}
       {lineCoverage && lineCoverage.state !== "GOOD" && (
-        <Callout tone="warn" icon={Info} className="mt-4" title="الأرقام مبنية على جزء من الفواتير">
-          أرقام هذه الصفحة مبنية على {lineCoverage.detail}. الباقي غير محسوب فيها.
-        </Callout>
+        <Callout tone="warn" icon={Info} className="mt-4" title="الأرقام مبنية على جزء من الفواتير فقط">
+          <T s="أرقام هذه الصفحة مبنية على {0}، والباقي غير محسوب." a={[lineCoverage.detail]} /></Callout>
       )}
       {/* ما لا يُحسَب يُقال ولا يُعرَض صفراً — والمبيعات غير موصولة */}
       <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-muted">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
         <span>
-          <span className="font-bold text-ink-soft">غير متاح بعد:</span> هامش الربح وتكلفة المبيعات وربحية الصنف. تحتاج إلى مصدر مبيعات لم يُربط بعد،
-          ولن تُعرض بأرقام تقديرية.
-        </span>
+          <T s="{0} هامش الربح وتكلفة المبيعات وربحية كل صنف. تحتاج هذه الأرقام إلى ربط مصدر للمبيعات، ولن نعرضها بأرقام تقديرية." a={[<span key="0" className="font-bold text-ink-soft">غير متاح بعد:</span>]} /></span>
       </p>
 
       <div className="mt-8">
@@ -238,7 +235,7 @@ export default async function ItemsAndPricesPage({
             icon={Tags}
             count={priceMoves.length}
             className="mt-6"
-            hint="سعر الوحدة في آخر شراء مقارنة بالسعر السابق عند المورّد نفسه، بعد الخصم. الفرق الأقل من 3٪ يُعدّ تقريباً وليس تغيّراً."
+            hint="سعر الوحدة في آخر شراء مقارنةً بالسعر السابق عند المورّد نفسه، بعد الخصم. الفرق الأقل من 3٪ يُعد تقريباً لا تغيّراً."
           >
             <DataTable
               rows={priceMoves}
@@ -250,7 +247,7 @@ export default async function ItemsAndPricesPage({
                   compact
                   icon={Tags}
                   title="لم يتغيّر سعر أي صنف بنسبة 3٪ أو أكثر."
-                  hint="كل صنف اشتريته مرتين أو أكثر بقي سعره في آخر شراء قريباً من سعره السابق."
+                  hint="كل صنف اشتريته أكثر من مرة بقي سعره في آخر شراء قريباً من سعره السابق."
                 />
               }
               columns={[
@@ -261,13 +258,13 @@ export default async function ItemsAndPricesPage({
                       <Monogram name={i.supplierName} />
                       <span className="min-w-0">
                         <span className="block truncate font-bold" dir="auto">{i.displayName}</span>
-                        <span className="block text-[11px] font-normal text-muted">{supplierCell(i)} · طلب {countNoun(i.orderCount, TIME)}</span>
+                        <span className="block text-[11px] font-normal text-muted"><T s="{0} · طُلب {1}" a={[supplierCell(i), countNoun(i.orderCount, TIME)]} /></span>
                       </span>
                     </span>
                   ),
                 },
-                { key: "prev", header: "كان", numeric: true, cell: (i) => <span className="text-ink-soft"><Money minor={i.priceChange!.previousMinor} /></span> },
-                { key: "now", header: "صار", numeric: true, cell: (i) => <span className="font-bold"><Money minor={i.priceChange!.currentMinor} /></span> },
+                { key: "prev", header: "قبل", numeric: true, cell: (i) => <span className="text-ink-soft"><Money minor={i.priceChange!.previousMinor} /></span> },
+                { key: "now", header: "بعد", numeric: true, cell: (i) => <span className="font-bold"><Money minor={i.priceChange!.currentMinor} /></span> },
                 {
                   key: "delta", header: "التغيّر",
                   cell: (i) => <Delta pct={pctOf(i)} favourable={i.priceChange!.direction === "down"} />,
@@ -280,14 +277,14 @@ export default async function ItemsAndPricesPage({
                       values={[...i.priceTrail].reverse()}
                       tone={i.priceChange!.direction === "down" ? "ok" : "warn"}
                       className="h-7 w-20"
-                      label={`سعر ${i.displayName} في آخر ${i.priceTrail.length} مرات شراء: ${i.priceChange!.direction === "down" ? "ينخفض" : "يرتفع"}`}
+                      label={`سعر ${i.displayName} في آخر ${i.priceTrail.length} مرات شراء: ${i.priceChange!.direction === "down" ? "في انخفاض" : "في ارتفاع"}`}
                     />
                   ) : (
                     <span className="text-[11px] text-muted">مرتان فقط</span>
                   ),
                 },
                 {
-                  key: "when", header: "متى", secondary: true,
+                  key: "when", header: "موعد الشراء", secondary: true,
                   cell: (i) => <span className="whitespace-nowrap text-xs text-ink-soft">{formatDay(i.priceChange!.currentDate)}</span>,
                 },
                 {
@@ -308,9 +305,7 @@ export default async function ItemsAndPricesPage({
                       rel="noopener noreferrer"
                       className={`${buttonClass("quiet", "sm")} relative whitespace-nowrap`}
                     >
-                      <MessageCircle className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                      اسأل المورّد
-                    </a>
+                      <T s="{0}اسأل المورّد" a={[<MessageCircle key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
                   ) : null,
                 },
               ]}
@@ -322,10 +317,10 @@ export default async function ItemsAndPricesPage({
             icon={CalendarClock}
             count={dueSoon.length > 0 ? dueSoon.length : undefined}
             /* النظام لا يعرف المخزون — يعرف سلوكَ الشراء وحده، فيقول المقارنة ولا يوصي */
-            hint="هذه ليست توصية بإعادة الطلب، فالنظام لا يعرف مخزونك. هو يعرف فقط كم يوماً تفصل عادةً بين مرات شرائك للصنف ومتى اشتريته آخر مرة."
+            hint="هذه ليست توصية بإعادة الطلب، فالنظام لا يعرف كمية مخزونك. كل ما يعرفه هو عدد الأيام التي تفصل عادةً بين مرات شرائك للصنف، ومتى اشتريته آخر مرة."
           >
             {dueSoon.length === 0 ? (
-              <EmptyState compact icon={CalendarClock} title="لا يوجد صنف حان موعد شرائه." hint="تُحسب الدورة للأصناف التي اشتريتها في يومين مختلفين أو أكثر." />
+              <EmptyState compact icon={CalendarClock} title="لا يوجد صنف حان موعد شرائه." hint="تُحسب دورة الشراء للأصناف التي اشتريتها في يومين مختلفين على الأقل." />
             ) : (
               <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
                 {dueSoon.map((x) => (
@@ -333,10 +328,9 @@ export default async function ItemsAndPricesPage({
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-bold" dir="auto">{x.item.displayName}</span>
                       <span className="block text-[11px] leading-relaxed text-muted">
-                        {x.item.supplierName} · عادةً كل {countNoun(x.cycle, DAY)} · آخر شراء قبل {countNoun(x.since, DAY)}
-                      </span>
+                        <T s="{0} · عادةً كل {1} · آخر شراء قبل {2}" a={[x.item.supplierName, countNoun(x.cycle, DAY), countNoun(x.since, DAY)]} /></span>
                     </span>
-                    <Badge tone={x.since > x.cycle ? "warn" : undefined} dot>{x.since > x.cycle ? "تجاوز موعده" : "حان موعده"}</Badge>
+                    <Badge tone={x.since > x.cycle ? "warn" : undefined} dot>{x.since > x.cycle ? "فات موعده" : "حان موعده"}</Badge>
                   </li>
                 ))}
               </ul>
@@ -351,7 +345,7 @@ export default async function ItemsAndPricesPage({
           icon={ShoppingBasket}
           count={items.length}
           className="mt-6"
-          hint="مرتبة من الأعلى كلفة إلى الأقل. الأصناف في أعلى الجدول هي الأولى بالتفاوض على سعرها. يمكنك البحث باسم الصنف أو المورّد."
+          hint="مرتبة من الأعلى تكلفة إلى الأقل، فالأصناف في أعلى الجدول أولى بالتفاوض على سعرها. يمكنك البحث باسم الصنف أو المورّد."
         >
           <DataTable
             rows={items}
@@ -370,7 +364,7 @@ export default async function ItemsAndPricesPage({
               },
               { key: "total", header: "الإجمالي", numeric: true, cell: (i) => <span className="font-bold"><Money minor={i.totalSpentMinor} /></span> },
               { key: "unit", header: "متوسط سعر الوحدة", numeric: true, cell: (i) => (i.averageUnitPriceMinor === null ? <span className="text-muted">غير معروف</span> : <Money minor={i.averageUnitPriceMinor} />) },
-              { key: "orders", header: "مرات الطلب", numeric: true, cell: (i) => <span className="nums">{i.orderCount}</span> },
+              { key: "orders", header: "عدد مرات الطلب", numeric: true, cell: (i) => <span className="nums">{i.orderCount}</span> },
               {
                 key: "move", header: "آخر تغيير", secondary: true,
                 cell: (i) => (i.priceChange ? <Delta pct={pctOf(i)} favourable={i.priceChange.direction === "down"} /> : <span className="text-[11px] text-muted">—</span>),
@@ -390,10 +384,10 @@ export default async function ItemsAndPricesPage({
           title="اربط أصناف المورّدين"
           icon={Link2}
           className="mt-6"
-          hint={`${mapping[2].mapped} من ${mapping[2].total} مربوطة بصنف معياري. الربط ضروري لمقارنة التكلفة، فبدونه يُحسب «العنب» عند مورّدَين صنفين مختلفين.`}
+          hint={`${mapping[2].mapped} من ${mapping[2].total} مربوطة بصنف موحّد. الربط ضروري لمقارنة التكلفة، فبدونه يُحسب «العنب» عند مورّدَين على أنه صنفان مختلفان.`}
         >
           {mapping[0].length === 0 ? (
-            <EmptyState compact icon={Link2} title="لا توجد أصناف بعد." hint="تُبنى الأصناف من بنود الفواتير. اقرأ محتوى فواتيرك أولاً." />
+            <EmptyState compact icon={Link2} title="لا توجد أصناف حتى الآن." hint="تُستخرج الأصناف من بنود الفواتير، فاقرأ محتوى فواتيرك أولاً." />
           ) : (
             <ProductMapping
               rows={mapping[0]}

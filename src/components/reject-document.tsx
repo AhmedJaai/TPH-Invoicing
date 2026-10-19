@@ -63,9 +63,9 @@ export function RejectDocument({ documentId, cancel = false, redirectTo }: {
           if (!r.ok) { setError(r.error); return; }
           toast({
             tone: "info",
-            title: cancel ? "تم إلغاء الفاتورة" : "تم رفض المستند",
+            title: cancel ? "أُلغيت الفاتورة" : "رُفض المستند",
             body: cancel
-              ? "خرجت من المبالغ المستحقة، وبقي ملفها في الدرايف وأثرها في السجلّ."
+              ? "خرجت من المبالغ المستحقة، وبقي ملفها في الدرايف وأثرها في السجل."
               : "بقي ملفه في الدرايف. تجده تحت «رفض» في المستندات، ويمكنك إعادته منه إلى المراجعة.",
           });
           if (redirectTo) router.push(redirectTo);

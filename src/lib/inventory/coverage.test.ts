@@ -130,7 +130,7 @@ describe("computeCoverage", () => {
     expect(c.sales.unitsCoveredBp).toBeNull();
     expect(c.purchases.coveredBp).toBeNull();
     expect(c.sales.missingDays).toHaveLength(7);
-    expect(describeCoverage(c)).toContain("لا توجد مبيعات في هذه الفترة");
+    expect(describeCoverage(c)).toContain("لا مبيعات في هذه الفترة");
   });
 
   it("مبيعات ولم يدخل الحساب منها سطر: متعذّر — ويقول لماذا", () => {

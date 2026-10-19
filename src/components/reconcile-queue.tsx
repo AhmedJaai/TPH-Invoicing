@@ -12,6 +12,7 @@ import { suggestSuppliers } from "@/lib/supplier-suggest";
 import { SupplierPicker } from "./supplier-picker";
 import { ACT } from "@/lib/ui-terms";
 import { formatDay } from "@/lib/riyadh-time";
+import { T } from "@/components/i18n/t";
 
 /**
  * حلّ المعلّقات — **مجموعةً مجموعة** لا حركةً حركة.
@@ -43,7 +44,7 @@ export const REASON_LABEL: Record<QueueReason, string> = {
   OVERPAYMENT: "أكثر من المستحق",
   SUGGESTED: "اقتراح ينتظر تأكيدك",
   APPROXIMATE: "مطابقة تقريبية",
-  KNOWN_SUPPLIER_NO_INVOICE: "المورّد معروف ولا توجد فاتورة مقابلة",
+  KNOWN_SUPPLIER_NO_INVOICE: "المورّد معروف ولا فاتورة تقابله",
 };
 
 const REASON_TONE: Record<QueueReason, Tone> = {
@@ -145,9 +146,9 @@ export function ReconcileQueue({
       <div className="flex items-center gap-3 rounded-xl border border-ok/25 bg-ok-bg px-5 py-5">
         <DoneMark className="h-8 w-8 shrink-0 text-ok" />
         <div>
-          <p className="text-sm font-bold text-ok">لا توجد مجموعات أخرى.</p>
+          <p className="text-sm font-bold text-ok">لا مجموعات أخرى.</p>
           <p className="mt-0.5 text-xs text-ink-soft">
-            ما أجبت عنه سيحفظه النظام، فيتعرّف على ما يشبهه في الكشوف القادمة دون أن يسألك.
+            سيحفظ النظام ما أجبت عنه، ويتعرّف على ما يشبهه في الكشوف القادمة دون أن يسألك.
           </p>
         </div>
       </div>
@@ -178,7 +179,7 @@ export function ReconcileQueue({
         setError(r.error);
         return;
       }
-      onOk(r.data.message ?? "تم الحفظ");
+      onOk(r.data.message ?? "حُفظ");
       next();
       router.refresh();
     } finally {
@@ -220,7 +221,7 @@ export function ReconcileQueue({
       toast({
         tone: "ok",
         title: message,
-        body: single ? undefined : "للتراجع عن أي منها، افتحها في سجلّ الحركات أدناه ثم اضغط «لماذا؟».",
+        body: single ? undefined : "للتراجع عن أي منها، افتحها في سجل الحركات أدناه ثم اضغط «لماذا؟».",
         undo: single ? undoOne(single.id) : undefined,
       }),
     );
@@ -247,11 +248,9 @@ export function ReconcileQueue({
       {/* ── التقدّم: كم بقي، وبأيّ مبلغ ── */}
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <p className="text-xs text-muted">
-          <span className="font-bold text-ink">المجموعة <span className="nums">{doneCount + 1}</span> من <span className="nums">{groups.length}</span></span>
-          {" · "}بقي {countNoun(pendingCount, TRANSACTION)} بـ<Money minor={pendingMinor} />
-        </p>
+          <T s="{0} · بقي {1} بـ{2}" a={[<span key="0" className="font-bold text-ink"><T s="المجموعة {0} من {1}" a={[<span key="0" className="nums">{doneCount + 1}</span>, <span key="1" className="nums">{groups.length}</span>]} /></span>, countNoun(pendingCount, TRANSACTION), <Money key="2" minor={pendingMinor} />]} /></p>
         <div className="min-w-24 flex-1">
-          <Meter value={doneCount} max={groups.length} label="المجموعات التي تم حسمها" />
+          <Meter value={doneCount} max={groups.length} label="المجموعات التي قرّرت فيها" />
         </div>
         <button
           type="button"
@@ -259,9 +258,7 @@ export function ReconcileQueue({
           disabled={busy !== null}
           className={buttonClass("quiet", "sm")}
         >
-          <SkipForward className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          تجاوزها الآن
-        </button>
+          <T s="{0}تخطّها الآن" a={[<SkipForward key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
       </div>
 
       {/* المجموعةُ التالية تدخل بحركة — تُرى أنّ ما قبلها حُسم لا أنّ الصفحةَ تبدّلت */}
@@ -272,8 +269,7 @@ export function ReconcileQueue({
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-bold leading-snug" dir="auto">{group.title}</p>
             <p className="mt-1 text-[11px] text-muted">
-              {countNoun(group.items.length, TRANSACTION)} · يجمعها {group.identityLabel}
-            </p>
+              <T s="{0} · يجمعها {1}" a={[countNoun(group.items.length, TRANSACTION), group.identityLabel]} /></p>
             <div className="mt-2">
               <Badge tone={REASON_TONE[reason]} dot>{REASON_LABEL[reason]}</Badge>
             </div>
@@ -313,7 +309,7 @@ export function ReconcileQueue({
             <div className="flex gap-3 rounded-xl border border-accent-line bg-accent-soft/50 px-4 py-3">
               <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2} aria-hidden />
               <div className="min-w-0">
-                <p className="text-[11px] text-muted">تخمين النظام، وليس قراراً</p>
+                <p className="text-[11px] text-muted">تخمين من النظام، لا قرار</p>
                 <p className="text-sm font-bold">{group.guessName}</p>
                 {group.why.length > 0 && (
                   <ul className="mt-1 space-y-0.5">
@@ -333,9 +329,7 @@ export function ReconcileQueue({
           {group.supplierId && canApprove && (
             <section aria-label="السداد على حساب المورّد" className="rounded-xl border border-line px-4 py-3.5">
               <p className="flex items-center gap-2 text-xs text-muted">
-                <Store className="h-4 w-4 text-ink-soft" strokeWidth={2} aria-hidden />
-                المورّد معروف: <span className="font-bold text-ink">{group.supplierName}</span>
-              </p>
+                <T s="{0}المورّد معروف: {1}" a={[<Store key="0" className="h-4 w-4 text-ink-soft" strokeWidth={2} aria-hidden />, <span key="1" className="font-bold text-ink">{group.supplierName}</span>]} /></p>
               {typeof group.outstandingMinor === "number" && (
                 <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
                   <Cell label="المستحق له الآن" minor={group.outstandingMinor} />
@@ -357,7 +351,7 @@ export function ReconcileQueue({
                 )}
               </div>
               <p className="mt-2 text-[11px] leading-relaxed text-muted">
-                الحوالة لا تحمل رقم فاتورة، لذا تُوزَّع على الفواتير المفتوحة بالأقدم أولاً، وما بقي يبقى بلا تخصيص. ولن تُنشأ أي فاتورة جديدة.
+                الحوالة لا تحمل رقم فاتورة، فتُوزَّع على الفواتير المفتوحة بالأقدم أولاً، وما بقي يبقى بلا تخصيص. ولن تُنشأ فاتورة جديدة.
               </p>
             </section>
           )}
@@ -402,7 +396,7 @@ export function ReconcileQueue({
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button type="button" aria-busy={busy === "identify"} disabled={!ready || busy !== null} onClick={identify} className={buttonClass(group.supplierId ? "secondary" : "primary", "sm")}>
                   {group.items.length > 1
-                      ? `${ACT.defineGroup} وطبّقها على ${countNoun(group.items.length, TRANSACTION)}`
+                      ? `${ACT.defineGroup}، وطبّقها على ${countNoun(group.items.length, TRANSACTION)}`
                       : ACT.saveIdentityAndNext}
                 </button>
                 {!ready && kind === "SUPPLIER" && <span className="text-[11px] text-muted">اختر المورّد أولاً.</span>}
@@ -412,9 +406,7 @@ export function ReconcileQueue({
 
           {error && (
             <p role="alert" className="flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2 text-xs font-bold text-danger">
-              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-              {error}. لم يُحفظ شيء، والمجموعة ما زالت قائمة.
-            </p>
+              <T s="{0}{1}. لم يُحفظ شيء، والمجموعة باقية." a={[<CircleAlert key="0" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />, error]} /></p>
           )}
         </div>
 

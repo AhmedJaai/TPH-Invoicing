@@ -46,7 +46,7 @@ describe("weighVerdict — ثقة النموذج إشارة لا حُكم", () =
   it("الثقة الضعيفة تُسقِطه إلى مراجعة — وكانت تُتجاهَل تماماً", () => {
     const low = weighVerdict(input({ modelConfidence: MIN_MODEL_CONFIDENCE - 0.01 }));
     expect(low.disposition).toBe("REVIEW");
-    expect(low.reasons.join(" ")).toContain("أقل من الحدّ المقبول");
+    expect(low.reasons.join(" ")).toContain("أقل من الحد المقبول");
 
     expect(weighVerdict(input({ modelConfidence: 0.9 })).disposition).toBe("SUGGEST");
   });
@@ -58,7 +58,7 @@ describe("weighVerdict — ثقة النموذج إشارة لا حُكم", () =
     );
     const r = weighVerdict(input({ audit: bad }));
     expect(r.disposition).toBe("REVIEW");
-    expect(r.reasons.join(" ")).toContain("لم يتحقّق");
+    expect(r.reasons.join(" ")).toContain("لم يُتحقق منه");
   });
 
   it("الأبواب الخطرة تُراجَع مهما علت الثقة", () => {

@@ -67,10 +67,10 @@ export function respondTo(e: unknown): NextResponse | null {
     return NextResponse.json({ error: "رُفضت هذه القيمة لأنها تخالف قاعدة مالية، ولم يُحفظ شيء. حدّث الصفحة" }, { status: 409 });
   }
   if (code === "23503") {
-    return NextResponse.json({ error: "السجل المرتبط غير موجود، ربما حُذف أو لم يُحفظ. حدّث الصفحة" }, { status: 400 });
+    return NextResponse.json({ error: "السجل المرتبط غير موجود، فربما حُذف أو لم يُحفظ. حدّث الصفحة" }, { status: 400 });
   }
   if (code === "22003") {
-    return NextResponse.json({ error: "الرقم كبير جداً، راجع عدد الأصفار" }, { status: 400 });
+    return NextResponse.json({ error: "الرقم كبير جداً، فراجع عدد الأصفار" }, { status: 400 });
   }
   return null;
 }

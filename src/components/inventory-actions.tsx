@@ -10,6 +10,7 @@ import { weekOf, type Week } from "@/lib/inventory/week";
 import { ITEM, countNoun } from "@/lib/arabic";
 import { WEEK, formatWeek } from "./inventory-ui";
 import { addDays, MS_PER_DAY } from "@/lib/riyadh-time";
+import { T } from "@/components/i18n/t";
 
 /**
  * يبدأ جردَ أسبوع.
@@ -83,7 +84,7 @@ export function StartCount({
         <div className="min-w-0">
           <h2 id="start-count-title" className="text-base font-bold">ابدأ جرد أسبوع</h2>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
-            من الأحد إلى نهاية السبت. نجهّز لك ما بِيع وما اشتريته خلال الأسبوع، وعليك فقط إدخال ما وجدته على الرف.
+            من الأحد إلى نهاية السبت. نجهّز لك ما بيع وما اشتريته في الأسبوع، وكل ما عليك أن تدخل ما وجدته على الرف.
           </p>
         </div>
       </div>
@@ -143,7 +144,7 @@ export function StartCount({
       {sameAsOpen && (
         <p className="mt-4 flex items-start gap-2 rounded-lg border border-accent-line bg-accent-soft/60 px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
           <CalendarRange className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2} aria-hidden />
-          <span>هذا هو أسبوع الجرد المفتوح نفسه. ارجع إليه وأكمله، أو اختر أسبوعاً آخر بالسهمين.</span>
+          <span>هذا أسبوع الجرد المفتوح نفسه. ارجع إليه وأكمله، أو اختر أسبوعاً آخر بالسهمين.</span>
         </p>
       )}
 
@@ -151,14 +152,14 @@ export function StartCount({
         {sameAsOpen ? (
           <>
             <button type="button" onClick={onSameWeek} className={`${buttonClass("primary", "lg")} w-full sm:w-auto`}>
-              عد إلى الجرد المفتوح
+              ارجع إلى الجرد المفتوح
             </button>
             {onRestart && (
               <ConfirmAction
                 label="ألغِ الجرد وابدأ من جديد"
                 title="جرد جديد للأسبوع نفسه"
-                consequence="سيُحذف الجرد المفتوح لهذا الأسبوع ويبدأ جرد جديد فارغ. لا تُنقل الأعداد التي أدخلتها، وتبقى مسجلة في سجل التدقيق فقط."
-                acknowledgement="أفهم أن أعداد الجرد المفتوح لن تعود إلا بإدخالها من جديد."
+                consequence="سيُحذف الجرد المفتوح لهذا الأسبوع ويبدأ جرد جديد فارغ. الأعداد التي أدخلتها لن تُنقل، وتبقى في سجل التدقيق فقط."
+                acknowledgement="أفهم أن أعداد الجرد المفتوح لن تعود إلا إن أدخلتها من جديد."
                 confirmLabel="ألغِ وابدأ"
                 variant="quiet"
                 size="md"
@@ -218,9 +219,9 @@ export function FinaliseCount({
         title="إقفال جرد هذه الفترة"
         consequence={
           `ستُجمَّد الأرقام كما هي الآن، وتُحفظ مصادرها (نسخ الوصفات وبنود الفواتير).`
-          + ` ولن يتغيّر هذا التقرير بعد ذلك حتى لو عدّلت وصفة أو وصلت فاتورة.`
-          + (uncounted > 0 ? ` وهناك ${uncounted} صنفاً لم يُدخل له عدّ فعلي، وسيُقفل دون حساب فرق له.` : "")
-          + (partial ? " والتقرير جزئي: بعض المبيعات غير محسوبة، وهذا مذكور في التقرير." : "")
+          + ` ولن يتغيّر هذا التقرير بعدها، حتى لو عدّلت وصفة أو وصلت فاتورة.`
+          + (uncounted > 0 ? ` و${uncounted} صنفاً لم يُدخل لها عدّ فعلي، فستُقفل دون حساب فرقها.` : "")
+          + (partial ? " والتقرير جزئي: بعض المبيعات غير محسوبة، وهذا مذكور فيه." : "")
         }
         acknowledgement="أفهم أن التقرير سيُجمَّد، وأن إعادة فتحه تحتاج إلى صلاحية المالك وسبب مكتوب."
         confirmLabel="أقفل الجرد"
@@ -265,12 +266,9 @@ export function ReopenCount({ countId }: { countId: string }) {
   return (
     <div className="rounded-xl border border-warn/25 bg-warn-bg p-4">
       <p className="flex items-center gap-2 text-[13px] font-bold text-warn">
-        <TriangleAlert className="h-4 w-4" strokeWidth={2} aria-hidden />
-        إعادة فتح هذا الجرد
-      </p>
+        <T s="{0}إعادة فتح هذا الجرد" a={[<TriangleAlert key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></p>
       <p className="mt-1 text-[11px] leading-relaxed text-muted">
-        سيُعاد حساب التقرير على أحدث البيانات، وقد تتغير أرقامه. يبقى السبب في سجل
-        التدقيق، ويظهر عدد مرات إعادة الفتح في التقرير.
+        سيُعاد حساب التقرير بأحدث البيانات، وقد تتغيّر أرقامه. يبقى السبب في سجل التدقيق، ويظهر في التقرير عدد مرات إعادة الفتح.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <input
@@ -317,9 +315,7 @@ export function RecomputeCount({ countId }: { countId: string }) {
           router.refresh();
         }}
       >
-        <RefreshCw className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} strokeWidth={2} aria-hidden />
-        أعد الحساب
-      </button>
+        <T s="{0}أعد الحساب" a={[<RefreshCw key="0" className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} strokeWidth={2} aria-hidden />]} /></button>
       {error && <span role="alert" className="ms-2 text-xs text-danger">{error}</span>}
     </>
   );
@@ -364,12 +360,12 @@ export function NewCount({
       action: "start", periodStart: openWeek.start, periodEnd: openWeek.end, branchId: openBranchId,
     });
     if (!r.ok) {
-      toast({ tone: "danger", title: "أُلغي الجرد لكن لم يبدأ الجرد الجديد", body: `${r.error}. ابدأ الجرد الجديد من «ابدأ جرداً جديداً».` });
+      toast({ tone: "danger", title: "أُلغي الجرد، لكن الجرد الجديد لم يبدأ", body: `${r.error}. ابدأ الجرد الجديد من «ابدأ جرداً جديداً».` });
       router.push("/inventory");
       router.refresh();
       return false;
     }
-    toast({ tone: "ok", title: "بدأ جرد جديد", body: `أسبوع ${formatWeek(openWeek.start, openWeek.end)}، وهو فارغ.` });
+    toast({ tone: "ok", title: "بدأ جرد جديد", body: `أسبوع ${formatWeek(openWeek.start, openWeek.end)}، فارغ.` });
     setOpen(false);
     router.push(`/inventory/counts/${r.data.countId}`);
     router.refresh();
@@ -378,14 +374,12 @@ export function NewCount({
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={buttonClass("secondary", "sm")}>
-        <CalendarPlus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-        ابدأ جرداً جديداً
-      </button>
+        <T s="{0}ابدأ جرداً جديداً" a={[<CalendarPlus key="0" className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />]} /></button>
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
         title="جرد جديد"
-        description={`جرد أسبوع ${formatWeek(openWeek.start, openWeek.end)} يبقى مفتوحاً كما هو، ويمكنك العودة إليه لاحقاً لإكماله أو إقفاله. أما الجرد الجديد فيكون لأسبوع آخر.`}
+        description={`جرد أسبوع ${formatWeek(openWeek.start, openWeek.end)} يبقى مفتوحاً كما هو، وتعود إليه متى شئت لإكماله أو إقفاله. أما الجرد الجديد فلأسبوع آخر.`}
         size="md"
       >
         <StartCount
@@ -424,11 +418,11 @@ export function DiscardCount({
         consequence={
           "سيُحذف هذا الجرد دون إقفال، ويعود أسبوعه بلا جرد، ويمكنك بدء جرد جديد له متى شئت."
           + (countedItems > 0
-            ? ` والأعداد التي أدخلتها فيه (${countNoun(countedItems, ITEM)}) لن تُنقل إلى الجرد الجديد، وتبقى مسجلة في سجل التدقيق فقط.`
+            ? ` والأعداد التي أدخلتها فيه (${countNoun(countedItems, ITEM)}) لن تُنقل إلى الجرد الجديد، وتبقى في سجل التدقيق فقط.`
             : " ولم يُعدّ فيه أي صنف بعد.")
           + " أما الهدر المسجّل في الأسبوع فيبقى كما هو."
         }
-        acknowledgement="أفهم أن هذا الجرد سيُحذف، وأن أعداده لن تعود إلا بإدخالها من جديد."
+        acknowledgement="أفهم أن هذا الجرد سيُحذف، وأن أعداده لن تعود إلا إن أدخلتها من جديد."
         confirmLabel="ألغِ الجرد"
         variant="quiet"
         onConfirm={async () => {
@@ -438,7 +432,7 @@ export function DiscardCount({
             setError(r.error);
             return false;
           }
-          toast({ tone: "ok", title: "تم إلغاء الجرد", body: r.data.message ?? "" });
+          toast({ tone: "ok", title: "أُلغي الجرد", body: r.data.message ?? "" });
           router.push("/inventory");
           router.refresh();
           return true;

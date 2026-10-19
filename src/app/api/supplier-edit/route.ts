@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({
       ok: true,
-      message: out.kind === "unchanged" ? "لم يتغيّر شيء" : `تم الحفظ: ${out.changed.join("، ")}`,
+      message: out.kind === "unchanged" ? "لم يتغيّر شيء" : `حُفظ: ${out.changed.join("، ")}`,
     });
   } catch (e) {
     if (e instanceof SupplierProfileError) return NextResponse.json({ error: e.message }, { status: e.status });

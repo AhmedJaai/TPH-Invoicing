@@ -47,8 +47,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       message: out.remainingMinor > 0
-        ? `تم تسجيل الإشعار. المتبقي على الفاتورة ${formatRiyalsDisplay(out.remainingMinor)}`
-        : "تم تسجيل الإشعار، والفاتورة مسدّدة بالكامل",
+        ? `سُجّل الإشعار. المتبقي على الفاتورة ${formatRiyalsDisplay(out.remainingMinor)}`
+        : "سُجّل الإشعار، والفاتورة مسدّدة بالكامل",
     });
   } catch (e) {
     if (e instanceof CreditNoteRefused) {

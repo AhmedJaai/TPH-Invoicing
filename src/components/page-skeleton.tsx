@@ -69,7 +69,7 @@ export function PageSkeleton({
           </div>
         ))}
       </div>
-      <span className="sr-only">جارٍ التحميل…</span>
+      <span className="sr-only">يحمّل…</span>
     </main>
   );
 }

@@ -11,6 +11,7 @@ import { todayInRiyadh } from "@/lib/riyadh-time";
 import { Money } from "./money";
 import { buttonClass, type ButtonVariant } from "./ui-tokens";
 import { Sheet, toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 const CATEGORIES: TxCategory[] = ["RENT", "SALARY", "UTILITY", "GOVERNMENT", "ZAKAT", "OTHER"];
 
@@ -40,7 +41,7 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
 
   const minor = amount.trim() ? parseRiyals(amount) : null;
   const problems = {
-    label: label.trim().length < 2 ? "اكتب ما دفعت لأجله، وحرفان على الأقل." : null,
+    label: label.trim().length < 2 ? "اكتب ما دفعت من أجله، حرفين على الأقل." : null,
     amount: !amount.trim() ? "اكتب المبلغ." : minor === null || minor <= 0 ? "المبلغ غير مفهوم، اكتبه بالأرقام مثل 350 أو 1,250.50" : null,
     date: /^\d{4}-\d{2}-\d{2}$/.test(occurredOn) ? null : "اختر تاريخ الدفع.",
   };
@@ -68,7 +69,7 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
         else setError(r.error);
         return;
       }
-      toast({ tone: "ok", title: r.data.message ?? "تم قيد المصروف", body: "سيظهر في شهره أدناه، ويمكنك حذفه إن قُيّد بالخطأ." });
+      toast({ tone: "ok", title: r.data.message ?? "سُجّل المصروف", body: "سيظهر في شهره أدناه، ويمكنك حذفه إن سُجّل خطأً." });
       setLabel("");
       setAmount("");
       setDuplicate(null);
@@ -86,9 +87,7 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={buttonClass(variant, "sm")}>
-        <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-        سجّل مصروفاً نقدياً
-      </button>
+        <T s="{0}سجّل مصروفاً نقدياً" a={[<Plus key="0" className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />]} /></button>
 
       <Sheet
         open={open}
@@ -99,16 +98,16 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
         footer={
           duplicate ? (
             <>
-              <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={() => setDuplicate(null)}>لا، لا تقيّده</button>
+              <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={() => setDuplicate(null)}>لا، لا تسجّله</button>
               <button aria-busy={busy} type="button" className={buttonClass("primary")} disabled={busy} onClick={() => save(true)}>
-                نعم، هو مصروف ثانٍ، قيّده
+                نعم، هو مصروف آخر، سجّله
               </button>
             </>
           ) : (
             <>
               <button type="button" className={buttonClass("quiet")} disabled={busy} onClick={close}>إلغاء</button>
               <button aria-busy={busy} type="button" className={buttonClass("primary")} disabled={busy} onClick={() => save(false)}>
-                قيّده
+                سجّله
               </button>
             </>
           )
@@ -148,7 +147,7 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
               />
               {tried && problems.amount
                 ? <span id={`${ids}-amount`} className="mt-1 block text-[11px] font-bold text-danger">{problems.amount}</span>
-                : minor !== null && minor > 0 && <span id={`${ids}-amount`} className="mt-1 block text-[11px] text-muted">سيُقيَّد <Money minor={minor} /> ريالاً</span>}
+                : minor !== null && minor > 0 && <span id={`${ids}-amount`} className="mt-1 block text-[11px] text-muted"><T s="سيُسجَّل {0} ريالاً" a={[<Money key="0" minor={minor} />]} /></span>}
             </label>
             <label className="block">
               <span className="text-xs font-bold">تاريخ الدفع</span>
@@ -170,24 +169,22 @@ export function ManualExpense({ variant = "primary", startOpen = false }: { vari
             <select value={category} onChange={(e) => setCategory(e.target.value as TxCategory)} className={`${field} border-line-input`}>
               {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
             </select>
-            <span className="mt-1 block text-[11px] text-muted">لا تُقيّد هنا سداد المورّدين، فهو محسوب في المشتريات، وقيده مصروفاً يكرر احتسابه.</span>
+            <span className="mt-1 block text-[11px] text-muted">لا تسجّل هنا سداد المورّدين، فهو محسوب في المشتريات، وتسجيله مصروفاً يحسبه مرتين.</span>
           </label>
 
           {/* زرٌّ مخفيّ كي يُرسَل النموذج بـEnter من أيّ حقل */}
-          <button type="submit" className="sr-only" tabIndex={-1}>قيّده</button>
+          <button type="submit" className="sr-only" tabIndex={-1}>سجّله</button>
         </form>
 
         {duplicate && (
           <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-warn/25 bg-warn-bg px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" strokeWidth={2} aria-hidden />
-            <span><span className="font-bold text-warn">{duplicate}</span> إذا ضغطت الزر مرتين فلا تقيّده، وإذا كانا مصروفين مختلفين فعلاً فأكّد.</span>
+            <span><T s="{0} إن كنت ضغطت الزر مرتين فلا تسجّله، وإن كانا مصروفين مختلفين فعلاً فأكّد." a={[<span key="0" className="font-bold text-warn">{duplicate}</span>]} /></span>
           </p>
         )}
         {error && (
           <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2.5 text-xs font-bold text-danger">
-            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-            {error} ما كتبته ما زال موجوداً، فأعد المحاولة.
-          </p>
+            <T s="{0}{1} ما كتبته ما زال موجوداً، فأعد المحاولة." a={[<CircleAlert key="0" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />, error]} /></p>
         )}
       </Sheet>
     </>

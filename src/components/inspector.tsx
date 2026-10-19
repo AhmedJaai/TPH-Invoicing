@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { ChevronDown, ChevronUp, Maximize2, X } from "lucide-react";
 import { isInspectorPath, pathOf } from "@/lib/inspector";
 import { useDragToDismiss } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * لوحُ الفحص — ملفُّ السجلّ فوق القائمة، لا بدلاً منها.
@@ -324,7 +325,7 @@ export function InspectorPanel({
         </header>
         {held && (
           <div role="alertdialog" aria-label="تغييرات غير محفوظة" className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-warn/30 bg-warn-bg px-4 py-2.5 text-xs sm:px-6">
-            <p className="min-w-0 flex-1 basis-48 font-bold text-ink">لديك تغييرات غير محفوظة في «{held.what}». إذا غادرت ستضيع.</p>
+            <p className="min-w-0 flex-1 basis-48 font-bold text-ink"><T s="عندك تغييرات غير محفوظة في «{0}»، وستضيع إن غادرت." a={[held.what]} /></p>
             <button type="button" autoFocus onClick={() => setHeld(null)} className="min-h-9 rounded-lg bg-accent px-3 font-bold text-accent-ink hover:bg-accent-strong">
               ابقَ وأكمل
             </button>
@@ -365,7 +366,7 @@ export function InspectorSkeleton({ title }: { title: string }) {
           </div>
         ))}
       </div>
-      <span className="sr-only">جارٍ التحميل…</span>
+      <span className="sr-only">يحمّل…</span>
     </InspectorPanel>
   );
 }

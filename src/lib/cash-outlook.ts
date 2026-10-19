@@ -187,7 +187,7 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
   const vatKnown = vat.filter((v) => v.amountMinor !== null && v.amountMinor > 0);
   const vatLine = (v: VatDue): OutflowLine => ({
     id: `vat:${v.periodKey}`,
-    label: `ضريبة القيمة المضافة — ${v.label}`,
+    label: `ضريبة القيمة المضافة: ${v.label}`,
     sub: `${v.accruing ? "المبلغ حتى اليوم وسيزيد · " : ""}آخر موعد لسدادها ${formatDay(v.deadline)}`,
     amountMinor: v.amountMinor ?? 0,
     kind: "VAT" as const,
@@ -202,21 +202,21 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
   const raw: Omit<OutlookBucket, "totalMinor" | "afterMinor">[] = [
     {
       id: "overdue",
-      title: "متأخّر الآن",
+      title: "متأخر الآن",
       when: `دفعة ${formatMonth(input.runMonth)} التي كان موعدها أول ${formatMonth(thisMonth)}`,
       tone: "danger",
       lines: [...supplierLines(input.overdueRun, "run"), ...vatIn((m) => m < thisMonth)],
     },
     {
       id: "rest",
-      title: `بقيّة ${formatMonth(thisMonth)}`,
-      when: `مصروفات متكرّرة لم يُسجَّل دفعها هذا الشهر، ولم يحن موعدها أو موعدها غير محدّد${settledNote}`,
+      title: `باقي ${formatMonth(thisMonth)}`,
+      when: `مصروفات متكررة لم يُسجَّل دفعها هذا الشهر، ولم يحن موعدها أو موعدها غير محدد${settledNote}`,
       tone: "warn",
       lines: [...recurringLines(thisMonth, (day) => day === null || day >= todayDay), ...vatIn((m) => m === thisMonth)],
     },
     {
       id: "next-run",
-      title: `أوّل ${formatMonth(nextMonth)}`,
+      title: `أول ${formatMonth(nextMonth)}`,
       when: `دفعة ${formatMonth(thisMonth)} من الفواتير المسجّلة حتى اليوم، وتزيد كلما وصلت فاتورة جديدة`,
       tone: "neutral",
       lines: [...supplierLines(input.nextRun, "next"), ...recurringLines(nextMonth, (day) => day === 1)],
@@ -224,7 +224,7 @@ export function buildCashOutlook(input: OutlookInput): CashOutlook {
     {
       id: "next-month",
       title: `خلال ${formatMonth(nextMonth)}`,
-      when: "المصروفات المتكرّرة المسجّلة لديك",
+      when: "المصروفات المتكررة المسجّلة عندك",
       tone: "neutral",
       lines: [...recurringLines(nextMonth, (day) => day !== 1), ...vatIn((m) => m === nextMonth)],
     },
@@ -301,7 +301,7 @@ export function whatIfDefer(
   });
   const all = later.length > 0
     ? [...staged, {
-        bucket: { id: LATER_BUCKET, title: "بعد ذلك", when: "ما أجّلته من آخر مرحلة، وهو ما زال مستحقاً", tone: "neutral" as const, lines: [], totalMinor: 0, afterMinor: null },
+        bucket: { id: LATER_BUCKET, title: "بعد ذلك", when: "ما أجّلته من آخر مرحلة، وما زال مستحقاً", tone: "neutral" as const, lines: [], totalMinor: 0, afterMinor: null },
         lines: later,
       }]
     : staged;

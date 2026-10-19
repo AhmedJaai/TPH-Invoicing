@@ -17,6 +17,7 @@ import { formatRiyals } from "@/lib/money";
 import { afterPayment } from "@/lib/payment-run";
 import { EMPTY_SELECTION, parseSelection, planSupplier, rawSelection, saveSelection, subscribeSelection, type PayRunSelection } from "@/lib/pay-run-selection";
 import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
+import { T } from "@/components/i18n/t";
 
 /**
  * مخطِّطُ الدفعة — اختر من تدفع له وأيَّ فواتيره وكم، وانظر الأثر، ونزّل الملفّ،
@@ -166,7 +167,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
       });
       if (!res.ok) {
         const failed = await readResponse(res);
-        setError(failed.ok ? "تعذّر تنزيل الملف. حاول مرة أخرى." : failed.error);
+        setError(failed.ok ? "تعذّر تنزيل الملف، حاول مرة أخرى." : failed.error);
         return;
       }
       const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? `payment-run-${month}.csv`;
@@ -178,7 +179,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      toast({ tone: "ok", title: "تم تنزيل ملف التحويلات", body: name });
+      toast({ tone: "ok", title: "نُزّل ملف التحويلات", body: name });
     } catch {
       setError(NETWORK_ERROR);
     } finally {
@@ -209,7 +210,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
         invoiceIds: plan.invoiceIds,
         supplierId: s.supplierId,
         paidOn,
-        note: `دفعة ${month} — ${s.name}`,
+        note: `دفعة ${month}: ${s.name}`,
         /* الجزئيُّ بالريال نصّاً — والخادمُ يفحصه على المفتوح ويوزّعه بالأقدم أوّلاً */
         ...(plan.partialMinor !== null ? { partialAmount: formatRiyals(plan.partialMinor) } : {}),
         ...(acknowledge ? { acknowledgeTwin: true } : {}),
@@ -232,13 +233,13 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
     setConfirming(false);
     setTwins(twinIds);
 
-    const notes = [...failures, ...(left > 0 ? [`أوقفت التسجيل، وبقي ${countNoun(left, SUPPLIER)} دون تسجيل`] : [])];
+    const notes = [...failures, ...(left > 0 ? [`أوقفت التسجيل، فبقي ${countNoun(left, SUPPLIER)} دون تسجيل`] : [])];
     if (notes.length > 0) setError(notes.join(" · "));
     if (marked > 0) {
       toast({
         tone: "ok",
-        title: `تم تسجيل سداد ${countNoun(marked, INVOICE)}`,
-        body: "هذا إقرار منك وليس مطابقة بنكية. عند وصول الكشف تُطابَق الدفعات المتبقية.",
+        title: `سُجّل سداد ${countNoun(marked, INVOICE)}`,
+        body: "هذا تأكيد منك، لا مطابقة بنكية. وحين يصل الكشف تُطابَق الدفعات الباقية.",
         undo: paymentIds.length + drawn.length > 0 ? {
           run: async () => {
             const u = await postJson<{ message: string }>("/api/mark-paid/undo", { paymentIds, drawn });
@@ -249,7 +250,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
       });
       router.refresh();
     } else if (notes.length === 0) {
-      toast({ tone: "warn", title: "لم تُسجَّل أي فاتورة مسدّدة. ربما سُدّدت من نافذة أخرى.", body: "حدّث الصفحة لترى حالتها." });
+      toast({ tone: "warn", title: "لم تُسجَّل أي فاتورة مسدّدة، فربما سُدّدت من نافذة أخرى.", body: "حدّث الصفحة لترى حالتها." });
       router.refresh();
     }
   }
@@ -260,7 +261,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
       setError(r.error);
       return;
     }
-    toast({ tone: "ok", title: `أُعيدت الفاتورة ${invoice.number} إلى المحجوزة`, body: "خرجت من الدفعة ومن ملف التحويلات." });
+    toast({ tone: "ok", title: `أُعيدت الفاتورة ${invoice.number} إلى الموقوفة`, body: "خرجت من الدفعة ومن ملف التحويلات." });
     router.refresh();
   }
 
@@ -270,7 +271,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
     : badPartial.length > 0
       ? `صحّح المبلغ الجزئي لـ${badPartial.map((s) => s.name).join("، ")} أو امسحه.`
       : null;
-  const markBlocked = blocked ?? (markable.length === 0 ? "لك رصيد عند كل من اخترتهم. سجّل سدادهم من ملف المورّد." : null);
+  const markBlocked = blocked ?? (markable.length === 0 ? "لك رصيد عند كل من اخترتهم. سجّل سدادهم من صفحة المورّد." : null);
   const markTotal = markable.reduce((sum, s) => sum + planOf(s).payingMinor, 0);
 
   return (
@@ -288,7 +289,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                 : { ...selection, skipSuppliers: [], skipInvoices: selection.skipInvoices.filter((id) => !presentInvoices.has(id)) })}
               className="h-4 w-4 accent-[var(--accent)]"
             />
-            <span id="ready-title">الكلّ</span>
+            <span id="ready-title">الكل</span>
           </label>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] text-muted">
@@ -304,48 +305,35 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
               onClick={exportFile}
               className={buttonClass("secondary")}
             >
-              <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
-              نزّل ملف التحويلات
-            </button>
+              <T s="{0}نزّل ملف التحويلات" a={[<Download key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></button>
             <button
               type="button"
               disabled={markBlocked !== null || busy}
               onClick={() => setConfirming(true)}
               className={buttonClass("primary")}
             >
-              <Check className="h-4 w-4" strokeWidth={2.25} aria-hidden />
-              سجّل المحدّد كمسدّد
-            </button>
+              <T s="{0}سجّل المحدد مسدّداً" a={[<Check key="0" className="h-4 w-4" strokeWidth={2.25} aria-hidden />]} /></button>
           </div>
         </div>
         {markBlocked && <p className="mt-2 text-[11px] text-ink-soft">{markBlocked}</p>}
         {customised && (
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-soft">
             <span>
-              عدّلت الدفعة:
-              {skippedSuppliers > 0 && <> استثنيت {countNoun(skippedSuppliers, SUPPLIER)}</>}
-              {skippedInvoices > 0 && <>{skippedSuppliers > 0 ? " و" : " استثنيت "}{countNoun(skippedInvoices, INVOICE)}</>}
-              {partialCount > 0 && <>{skippedSuppliers + skippedInvoices > 0 ? " · " : " "}مبلغ جزئي لـ{countNoun(partialCount, SUPPLIER)}</>}
-              . اختيارك محفوظ على هذا الجهاز.
-            </span>
+              <T s="عدّلتَ الدفعة:{0}{1}{2}. اختيارك محفوظ على هذا الجهاز." a={[skippedSuppliers > 0 && <> <T s=" استثنيتَ {0}" a={[countNoun(skippedSuppliers, SUPPLIER)]} /></>, skippedInvoices > 0 && <>{skippedSuppliers > 0 ? " و" : " استثنيتَ "}{countNoun(skippedInvoices, INVOICE)}</>, partialCount > 0 && <><T s="{0}مبلغ جزئي لـ{1}" a={[skippedSuppliers + skippedInvoices > 0 ? " · " : " ", countNoun(partialCount, SUPPLIER)]} /></>]} /></span>
             <button type="button" onClick={() => change(EMPTY_SELECTION)} className="inline-flex min-h-8 items-center gap-1 font-bold text-accent hover:underline">
-              <RotateCcw className="h-3 w-3" strokeWidth={2} aria-hidden />
-              أعد الكل بمبالغها الكاملة
-            </button>
+              <T s="{0}أعد الكل بمبالغها الكاملة" a={[<RotateCcw key="0" className="h-3 w-3" strokeWidth={2} aria-hidden />]} /></button>
           </p>
         )}
         {missingAccount > 0 && chosen.length > 0 && (
           <p className="mt-2 flex items-center gap-1.5 text-[11px] text-warn">
-            <ShieldAlert className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            {missingAccount === 1 ? "مورّد واحد" : countNoun(missingAccount, SUPPLIER)} بلا حساب بنكي معروف ({noAccount.map((s) => s.name).join("، ")}). يظهر في آخر الملف تحت قسم منفصل «يحتاج حساباً» وليس بين التحويلات.
-          </p>
+            <T s="{0}{1} بلا حساب بنكي معروف ({2}). يظهر في آخر الملف في قسم مستقل «يحتاج إلى حساب»، لا بين التحويلات." a={[<ShieldAlert key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />, missingAccount === 1 ? "مورّد واحد" : countNoun(missingAccount, SUPPLIER), noAccount.map((s) => s.name).join("، ")]} /></p>
         )}
         {progress && (
           <p role="status" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-ink-soft">
-            <span>جارٍ التسجيل <span className="nums">{progress.done + 1}</span> من <span className="nums">{progress.total}</span>: {progress.current}</span>
+            <span><T s="يسجّل {0} من {1}: {2}" a={[<span key="0" className="nums">{progress.done + 1}</span>, <span key="1" className="nums">{progress.total}</span>, progress.current]} /></span>
             {progress.total - progress.done > 1 && (
               <button type="button" onClick={() => { stop.current = true; }} className="min-h-8 font-bold text-accent hover:underline">
-                أوقف بعد المورّد الحالي
+                توقف بعد المورّد الحالي
               </button>
             )}
           </p>
@@ -353,8 +341,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
         {error && <p role="alert" className="mt-2 text-xs font-bold text-danger">{error}</p>}
         {twins.length > 0 && (
           <button type="button" disabled={busy} aria-busy={busy} onClick={() => markPaid(twins)} className={`${buttonClass("secondary", "sm")} mt-2`}>
-            هذا سداد آخر فعلاً، سجّل {countNoun(twins.length, SUPPLIER)}
-          </button>
+            <T s="هذا سداد آخر فعلاً، سجّل {0}" a={[countNoun(twins.length, SUPPLIER)]} /></button>
         )}
       </div>
 
@@ -386,12 +373,12 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 truncate text-[14px] font-bold">
                     {s.slug ? <Link href={`/suppliers/${s.slug}`} className="truncate hover:text-accent">{s.name}</Link> : <span className="truncate">{s.name}</span>}
-                    {state === "ok" && <CircleCheck className="h-4 w-4 shrink-0 text-ok" strokeWidth={2} aria-label="تم التسجيل" />}
+                    {state === "ok" && <CircleCheck className="h-4 w-4 shrink-0 text-ok" strokeWidth={2} aria-label="سُجّل" />}
                     {state === "failed" && <CircleAlert className="h-4 w-4 shrink-0 text-danger" strokeWidth={2} aria-label="لم يُسجَّل" />}
                   </p>
                   <p className="mt-0.5 truncate text-[11px] text-muted">
                     {plan.skippedInvoices > 0
-                      ? <><span className="nums">{plan.invoiceIds.length}</span> من {countNoun(s.invoices.length, INVOICE)}</>
+                      ? <><T s="{0} من {1}" a={[<span key="0" className="nums">{plan.invoiceIds.length}</span>, countNoun(s.invoices.length, INVOICE)]} /></>
                       : countNoun(s.invoices.length, INVOICE)}
                     {!s.account && <span className="text-warn"> · {s.accountNote ?? "الحساب غير معروف"}</span>}
                   </p>
@@ -410,9 +397,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                   )}
                   {ownerCount > 0 && (
                     <p className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-warn">
-                      <ShieldAlert className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />
-                      تتضمن {countNoun(ownerCount, INVOICE)} محجوزة وأضفتها بقرارك
-                    </p>
+                      <T s="{0}تشمل {1} موقوفة أضفتها بقرارك" a={[<ShieldAlert key="0" className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />, countNoun(ownerCount, INVOICE)]} /></p>
                   )}
                 </div>
                 <div className="text-end">
@@ -422,15 +407,14 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                   ) : (
                     <>
                       {plan.partialMinor !== null && (
-                        <p className="text-[11px] font-bold text-warn">جزء من <Money minor={plan.fullMinor} /></p>
+                        <p className="text-[11px] font-bold text-warn"><T s="جزء من {0}" a={[<Money key="0" minor={plan.fullMinor} />]} /></p>
                       )}
-                      {after.state === "remaining" && <p className="text-[11px] text-muted">المتبقي له <Money minor={after.minor} /></p>}
-                      {after.state === "settled" && <p className="text-[11px] text-muted">لا يتبقى له شيء</p>}
+                      {after.state === "remaining" && <p className="text-[11px] text-muted"><T s="المتبقي له {0}" a={[<Money key="0" minor={after.minor} />]} /></p>}
+                      {after.state === "settled" && <p className="text-[11px] text-muted">لا يبقى له شيء</p>}
                       {/* الزيادةُ تُقال بمبلغها — كانت تُقصّ إلى «يبقى 0.00» */}
                       {after.state === "over" && (
                         <p className="text-[11px] font-bold text-warn">
-                          تدفع زيادة <Money minor={after.minor} />، وتصير رصيداً لك عنده
-                        </p>
+                          <T s="تدفع زيادة {0} تصير رصيداً لك عنده" a={[<Money key="0" minor={after.minor} />]} /></p>
                       )}
                     </>
                   )}
@@ -439,7 +423,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                   type="button"
                   onClick={() => toggleOpen(s.supplierId)}
                   aria-expanded={expanded}
-                  aria-label={expanded ? "إخفاء الفواتير" : "عرض الفواتير والاختيار منها"}
+                  aria-label={expanded ? "أخفِ الفواتير" : "اعرض الفواتير واختر منها"}
                   className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted hover:bg-hover hover:text-ink sm:h-9 sm:w-9"
                 >
                   <ChevronDown className={`h-4 w-4 transition-transform duration-(--dur-3) ${expanded ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden />
@@ -447,17 +431,11 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
               </div>
               {plan.on && after.state === "over" && (
                 <p className="border-t border-line-soft bg-warn-bg px-4 py-2 text-xs leading-relaxed text-ink-soft sm:px-5">
-                  المستحق عليك له الآن <Money minor={s.owedMinor ?? 0} />، وهذه الدفعة <Money minor={plan.payingMinor} />.
-                  ربما قُيّد سداد أو إشعار دائن بعد تجهيز الدفعة. راجع{" "}
-                  {s.slug ? <Link href={`/suppliers/${s.slug}`} className="font-bold text-accent hover:underline">ملف المورّد</Link> : "ملف المورّد"}{" "}
-                  قبل التحويل، أو استثنِ فاتورة، أو اكتب مبلغاً جزئياً.
-                </p>
+                  <T s="المستحق عليك له الآن {0}، وهذه الدفعة {1}. ربما قُيّد سداد أو إشعار دائن بعد تجهيز الدفعة. راجع {2} قبل التحويل، أو استثنِ فاتورة، أو اكتب مبلغاً جزئياً." a={[<Money key="0" minor={s.owedMinor ?? 0} />, <Money key="1" minor={plan.payingMinor} />, s.slug ? <Link href={`/suppliers/${s.slug}`} className="font-bold text-accent hover:underline">صفحة المورّد</Link> : "صفحة المورّد"]} /></p>
               )}
               {plan.on && plan.creditAppliedMinor > 0 && (
                 <p className="border-t border-line-soft bg-accent-soft/50 px-4 py-2 text-xs leading-relaxed text-ink-soft sm:px-5">
-                  لك عنده رصيد <Money minor={plan.creditAppliedMinor} />. حوّل له الباقي فقط، ثم اخصم الرصيد من ملف المورّد.
-                  ولا يمكن تسجيل سداده من هنا.
-                </p>
+                  <T s="لك عنده رصيد {0}. حوّل له الباقي فقط، ثم اخصم الرصيد من صفحة المورّد. لا يمكن تسجيل سداده من هنا." a={[<Money key="0" minor={plan.creditAppliedMinor} />]} /></p>
               )}
               <Reveal open={expanded}>
                 <ul className="divide-y divide-line-soft border-t border-line-soft bg-sunken/40">
@@ -485,10 +463,9 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                         {i.owner && (
                           <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-warn-bg px-3 py-2 text-[11px] leading-relaxed text-ink-soft">
                             <span className="min-w-0 flex-1">
-                              <b className="text-warn">محجوزة وأدخلتها بقرارك:</b> {i.owner.hold}. سببك: «{i.owner.note}»
-                            </span>
+                              <T s="{0} {1}. سببك: «{2}»" a={[<b key="0" className="text-warn">موقوفة وأضفتها بقرارك:</b>, i.owner.hold, i.owner.note]} /></span>
                             <button type="button" disabled={busy} onClick={() => restoreHold(i)} className="min-h-8 shrink-0 font-bold text-accent hover:underline">
-                              أعدها إلى المحجوزة
+                              أعدها إلى الموقوفة
                             </button>
                           </div>
                         )}
@@ -515,7 +492,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
                           {plan.partialError
                             ? <>{plan.partialError} (<Money minor={plan.fullMinor} />)</>
                             : plan.partialMinor !== null
-                              ? <>يبقى بدون دفع <Money minor={plan.fullMinor - plan.partialMinor} />، ويُسدَّد الأقدم أولاً</>
+                              ? <><T s="يبقى {0} بلا دفع، ويُسدَّد الأقدم أولاً" a={[<Money key="0" minor={plan.fullMinor - plan.partialMinor} />]} /></>
                               : "اتركه فارغاً لدفع المبلغ كاملاً"}
                         </span>
                       </label>
@@ -531,8 +508,8 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
       <Sheet
         open={confirming}
         onClose={() => { if (!busy) setConfirming(false); }}
-        title="سجّل الفواتير كمسدّدة"
-        description="هذا إقرار منك وليس مطابقة بنكية، ويُكتب في سجلّ التدقيق باسمك."
+        title="سجّل الفواتير مسدّدة"
+        description="هذا تأكيد منك لا مطابقة بنكية، ويُكتب في سجل التدقيق باسمك."
         size="sm"
         footer={
           <>
@@ -547,12 +524,9 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
           <Wallet className="h-5 w-5 text-accent" strokeWidth={2} aria-hidden />
           <div>
             <p className="text-sm font-bold">
-              <Money minor={markTotal} currency /> لـ{countNoun(markable.length, SUPPLIER)}
-            </p>
+              <T s="{0} لـ{1}" a={[<Money key="0" minor={markTotal} currency />, countNoun(markable.length, SUPPLIER)]} /></p>
             <p className="text-[11px] text-ink-soft">
-              سيُسجَّل سداد {countNoun(markable.reduce((sum, x) => sum + planOf(x).invoiceIds.length, 0), INVOICE)} بتاريخ {dayOk ? formatDay(paidOn) : "—"}
-              {markable.some((x) => planOf(x).partialMinor !== null) ? ". المبلغ الجزئي يُسدَّد به الأقدم أولاً ويبقى الباقي مفتوحاً." : "."}
-            </p>
+              <T s="سيُسجَّل سداد {0} بتاريخ {1}{2}" a={[countNoun(markable.reduce((sum, x) => sum + planOf(x).invoiceIds.length, 0), INVOICE), dayOk ? formatDay(paidOn) : "—", markable.some((x) => planOf(x).partialMinor !== null) ? ". المبلغ الجزئي يسدّد الأقدم أولاً، ويبقى الباقي مفتوحاً." : "."]} /></p>
           </div>
         </div>
         <label className="mt-3 block">
@@ -569,21 +543,19 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
           />
           <DateChips value={paidOn} onPick={setPaidOn} disabled={busy} max={today} />
           <span className={`mt-1 block text-[11px] ${dayOk ? "text-muted" : "font-bold text-danger"}`}>
-            {dayOk ? "يوم خروج الحوالة من البنك. نستخدمه للمطابقة عند وصول الكشف." : "يوم التحويل لا يمكن أن يكون بعد اليوم."}
+            {dayOk ? "يوم خروج الحوالة من البنك، ونستخدمه للمطابقة حين يصل الكشف." : "يوم التحويل لا يمكن أن يكون بعد اليوم."}
           </span>
         </label>
         {progress && (
           <p role="status" className="mt-3 text-xs font-bold text-ink-soft">
-            جارٍ التسجيل <span className="nums">{progress.done + 1}</span> من <span className="nums">{progress.total}</span>: {progress.current}
-          </p>
+            <T s="يسجّل {0} من {1}: {2}" a={[<span key="0" className="nums">{progress.done + 1}</span>, <span key="1" className="nums">{progress.total}</span>, progress.current]} /></p>
         )}
         <p className="mt-3 text-xs leading-relaxed text-muted">
-          عند وصول كشف البنك تُطابَق الدفعات المتبقية، ولا يُنشأ سداد ثانٍ لفاتورة سبق تسجيل سدادها. وإن ضغطت بالخطأ فاضغط «تراجع» في الإشعار لإلغاء ما سُجِّل.
+          حين يصل كشف البنك تُطابَق الدفعات الباقية، ولا يُنشأ سداد ثانٍ لفاتورة سُجّل سدادها. وإن ضغطت خطأً فاضغط «تراجع» في الإشعار لإلغاء ما سُجّل.
         </p>
         {chosen.length > markable.length && (
           <p className="mt-2 text-xs text-warn">
-            {countNoun(chosen.length - markable.length, SUPPLIER)} لك عندهم رصيد، ولا يُسجَّل سدادهم من هنا.
-          </p>
+            <T s="{0} لك عندهم رصيد، فلا يُسجَّل سدادهم من هنا." a={[countNoun(chosen.length - markable.length, SUPPLIER)]} /></p>
         )}
       </Sheet>
     </section>
@@ -594,9 +566,7 @@ export function PayRunPlanner({ month, suppliers }: { month: string; suppliers: 
 export function WhatsAppLink({ href }: { href: string }) {
   return (
     <a href={href} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
-      <MessageCircle className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-      رسالة واتساب جاهزة
-    </a>
+      <T s="{0}رسالة واتساب جاهزة" a={[<MessageCircle key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
   );
 }
 
@@ -637,10 +607,10 @@ export function HoldOverride({
     setAsking(false);
     toast({
       tone: "warn",
-      title: `أُدخلت فواتير ${supplierName} في الدفعة بقرارك`,
-      body: "ستجدها الآن بين الفواتير الجاهزة وعليها علامة «بقرارك»، ويمكنك إعادتها إلى المحجوزة من هناك.",
+      title: `أُضيفت فواتير ${supplierName} إلى الدفعة بقرارك`,
+      body: "تجدها الآن بين الفواتير الجاهزة وعليها علامة «بقرارك»، ويمكنك إعادتها إلى الموقوفة من هناك.",
       undo: {
-        label: "أعدها إلى المحجوزة",
+        label: "أعدها إلى الموقوفة",
         run: async () => {
           const u = await postJson<{ message?: string }>("/api/payment-run/hold", { month, invoiceIds, action: "restore" });
           if (u.ok) router.refresh();
@@ -654,14 +624,12 @@ export function HoldOverride({
   return (
     <>
       <button type="button" onClick={() => setAsking(true)} className={buttonClass("secondary", "sm")}>
-        <Wallet className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        أضفها إلى الدفعة
-      </button>
+        <T s="{0}أضفها إلى الدفعة" a={[<Wallet key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
       <Sheet
         open={asking}
         onClose={() => { if (!busy) setAsking(false); }}
-        title={`الدفع لـ${supplierName} مع أن فواتيره محجوزة`}
-        description="يُحفظ قرارك مع سببه في سجلّ التدقيق، ويبقى التنبيه ظاهراً في الدفعة."
+        title={`الدفع لـ${supplierName} مع أن فواتيره موقوفة`}
+        description="يُحفظ قرارك مع سببه في سجل التدقيق، ويبقى التنبيه ظاهراً في الدفعة."
         size="sm"
         footer={
           <>
@@ -674,13 +642,9 @@ export function HoldOverride({
       >
         <div className="rounded-xl bg-warn-bg px-4 py-3 text-xs leading-relaxed text-ink-soft">
           <p className="text-sm font-bold text-ink">
-            <Money minor={openMinor} currency /> على {countNoun(invoiceIds.length, INVOICE)}
-          </p>
+            <T s="{0} على {1}" a={[<Money key="0" minor={openMinor} currency />, countNoun(invoiceIds.length, INVOICE)]} /></p>
           <p className="mt-1">
-            السداد قبل وصول الفاتورة الضريبية الصحيحة يُضعف موقفك التفاوضي مع المورّد.
-            {vatAtRiskMinor > 0 && <> وضريبة المدخلات البالغة <b><Money minor={vatAtRiskMinor} /></b> لا يمكن خصمها قبل وصول الفاتورة الصحيحة.</>}
-            {vatAtRiskUnknown > 0 && <> و{countNoun(vatAtRiskUnknown, INVOICE)} لم تُقرأ ضريبتها، فمقدار الضريبة المعرّضة منها غير معروف.</>}
-          </p>
+            <T s="السداد قبل وصول الفاتورة الضريبية الصحيحة يُضعف موقفك في التفاوض مع المورّد.{0}{1}" a={[vatAtRiskMinor > 0 && <> <T s=" وضريبة المدخلات ({0}) لا يمكن خصمها قبل وصول الفاتورة الصحيحة." a={[<b key="0"><Money minor={vatAtRiskMinor} /></b>]} /></>, vatAtRiskUnknown > 0 && <> <T s=" و{0} لم تُقرأ ضريبتها، فمقدار الضريبة المهددة منها غير معروف." a={[countNoun(vatAtRiskUnknown, INVOICE)]} /></>]} /></p>
         </div>
         <label className="mt-3 block">
           <span className="text-xs font-bold">لماذا تدفعها الآن؟</span>
@@ -693,7 +657,7 @@ export function HoldOverride({
             placeholder="مثلاً: المورّد لا يسلّم قبل السداد"
             className="mt-1 block w-full rounded-lg border border-line-input bg-raised px-3 py-2 text-sm"
           />
-          <span className="mt-1 block text-[11px] text-muted">يظهر بجانب الفاتورة في الدفعة وفي ملف التحويلات بعبارة «بقرار المالك».</span>
+          <span className="mt-1 block text-[11px] text-muted">يظهر بجانب الفاتورة في الدفعة، وفي ملف التحويلات بعبارة «بقرار المالك».</span>
         </label>
         {error && <p role="alert" className="mt-2 text-xs font-bold text-danger">{error}</p>}
       </Sheet>

@@ -15,6 +15,7 @@ import { previousMonth } from "@/lib/filing";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { buildStatementRequest } from "@/lib/supplier-requests";
 import { loadMissingStatementSuppliers } from "@/services/supplier-followups.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -91,13 +92,13 @@ export default async function StatementsPage({
         <h2 id="missing-title" className="flex items-center gap-2 text-sm font-bold">
           <MailQuestion className={`h-4 w-4 ${missing.length > 0 ? "text-warn" : "text-ok"}`} strokeWidth={2} aria-hidden />
           {missing.length === 0
-            ? `وصلت جميع كشوف ${formatMonth(missingMonth)}`
+            ? `وصلت كل كشوف ${formatMonth(missingMonth)}`
             : `لم يصل كشف ${formatMonth(missingMonth)} من ${countNoun(missing.length, SUPPLIER)}`}
         </h2>
         <p className="mt-1 text-[11px] leading-relaxed text-muted">
           {missing.length === 0
-            ? "وصل كشف ينتهي في هذا الشهر من كل مورّد لديه فواتير عندنا."
-            : "لدى هؤلاء المورّدين فواتير عندنا، ولم يصل منهم كشف ينتهي في هذا الشهر. اطلب الكشف منهم، ثم ارفعه وطابقه."}
+            ? "وصل من كل مورّد له فواتير عندنا كشفٌ ينتهي في هذا الشهر."
+            : "لهؤلاء المورّدين فواتير عندنا، ولم يصل منهم كشف ينتهي في هذا الشهر. اطلب منهم الكشف، ثم ارفعه وطابقه."}
         </p>
       </header>
       {missing.length > 0 && (
@@ -109,7 +110,7 @@ export default async function StatementsPage({
                 <Link href={`/suppliers/${m.slug}`} className="block truncate text-[13px] font-bold hover:text-accent">{m.nameAr}</Link>
                 <span className="block text-[11px] text-muted">
                   {countNoun(m.invoiceCount, INVOICE)}
-                  {m.lastInvoiceDate && <> · آخر فاتورة {formatDay(m.lastInvoiceDate)}</>}
+                  {m.lastInvoiceDate && <> <T s=" · آخر فاتورة {0}" a={[formatDay(m.lastInvoiceDate)]} /></>}
                 </span>
               </span>
               <a
@@ -120,15 +121,13 @@ export default async function StatementsPage({
                 title="اطلب الكشف (واتساب)"
                 className={buttonClass("quiet", "sm")}
               >
-                <MessageCircle className="h-4 w-4" strokeWidth={2} aria-hidden />
-                اطلب الكشف
-              </a>
+                <T s="{0}اطلب الكشف" a={[<MessageCircle key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></a>
             </li>
           ))}
         </ul>
       )}
       <p className="border-t border-line-soft px-4 py-2.5 text-[11px] leading-relaxed text-muted sm:px-5">
-        إذا كان المورّد لا يصدر كشوفاً، سجّل ذلك في ملفه (قسم «بياناته») ولن يظهر هنا.
+        إن كان المورّد لا يصدر كشوفاً فسجّل ذلك في صفحته (قسم «بياناته») ولن يظهر هنا.
       </p>
     </section>
   );
@@ -138,16 +137,16 @@ export default async function StatementsPage({
       user={user}
       width="wide"
       title="الكشوف"
-      intro="قارن كشف المورّد بفواتيرك. هذه المقارنة وحدها تكشف الفاتورة التي سجّلها المورّد عليك ولم تصلك، لأنها غير موجودة في أرشيفك."
+      intro="قارن كشف المورّد بفواتيرك. هذه المقارنة وحدها تكشف الفاتورة التي سجّلها المورّد عليك ولم تصلك، لأنها ليست في أرشيفك أصلاً."
     >
       {params.supplier && (
         <Callout
           tone="info"
           className="mb-6"
-          action={<Link href="/statements" className={buttonClass("secondary", "sm")}>كشوف جميع المورّدين</Link>}
+          action={<Link href="/statements" className={buttonClass("secondary", "sm")}>كشوف كل المورّدين</Link>}
         >
           {focusSupplier
-            ? <>كشوف <strong className="text-ink">{focusSupplier.nameAr}</strong> فقط، وهو محدد مسبقاً في الفحص.</>
+            ? <><T s="كشوف {0} فقط، وهو محدد مسبقاً في الفحص." a={[<strong key="0" className="text-ink">{focusSupplier.nameAr}</strong>]} /></>
             : <>لا يوجد مورّد نشط بهذا المعرّف.</>}
         </Callout>
       )}

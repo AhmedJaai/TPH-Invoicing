@@ -23,6 +23,7 @@ import { storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
 import { CATEGORY_LABEL, type ProductCategory } from "@/lib/products";
 import { formatDay } from "@/lib/riyadh-time";
 import { LINE, countNoun } from "@/lib/arabic";
+import { T } from "@/components/i18n/t";
 
 
 /** كم حدثاً يُعرَض قبل «اعرض الأقدم». */
@@ -49,7 +50,7 @@ export async function ItemView({
   if (!user) redirect(`/login?from=/inventory/items/${id}`);
   if (!can(user.role, "inventory:view")) {
     return (
-      <DetailFrame mode={mode} fullHref={fullHref} user={user} width="page" title="ملفّ الصنف">
+      <DetailFrame mode={mode} fullHref={fullHref} user={user} width="page" title="صفحة الصنف">
         <NoAccess what="الجرد" />
       </DetailFrame>
     );
@@ -71,7 +72,7 @@ export async function ItemView({
         <EmptyState
           icon={PackageSearch}
           title="هذا الصنف غير موجود."
-          hint="ربما دُمج في صنف آخر أو حُذف من الكتالوج. تجد أثر ذلك في سجل التدقيق."
+          hint="ربما دُمج في صنف آخر أو حُذف من الكتالوج، وستجد ذلك في سجل التدقيق."
           action={<LinkButton href="/inventory" variant="primary">الجرد</LinkButton>}
         />
       </DetailFrame>
@@ -111,10 +112,10 @@ export async function ItemView({
       width="page"
       eyebrow={`صنف مخزون · ${CATEGORY_LABEL[product.category as ProductCategory] ?? product.category}`}
       title={product.nameAr}
-      intro={`يُعدّ بوحدة ${storedUnitLabel(unit)}${usage.length > 0 ? ` · يُصرف في ${usage.length === 1 ? "صنف واحد" : usage.length === 2 ? "صنفين" : `${usage.length} أصناف`} من القائمة` : " · لا توجد وصفة تستخدمه"}.`}
+      intro={`يُعدّ بوحدة ${storedUnitLabel(unit)}${usage.length > 0 ? ` · يُستخدم في ${usage.length === 1 ? "صنف واحد" : usage.length === 2 ? "صنفين" : `${usage.length} أصناف`} من القائمة` : " · لا توجد وصفة تستخدمه"}.`}
     >
       {!product.isActive && (
-        <Callout tone="muted" className="mb-6" title="هذا الصنف مُخرَج من الجرد">
+        <Callout tone="muted" className="mb-6" title="هذا الصنف مستبعد من الجرد">
           لن يظهر في العدّ القادم، وتبقى أرقامه السابقة كما حُسبت.
         </Callout>
       )}
@@ -129,8 +130,8 @@ export async function ItemView({
                 icon={ClipboardCheck}
                 title="لم يُحسب له فرق في أي جرد مقفل بعد."
                 hint={usage.length === 0
-                  ? "ولا توجد وصفة تستخدمه، فلن يُحسب له استهلاك ولا فرق حتى تكتب وصفة تحتوي عليه."
-                  : "يظهر هنا بعد أن يُعدّ في جرد ويُقفل هذا الجرد. ويُعرض النقص والزيادة كل على حدة."}
+                  ? "ولا توجد وصفة تستخدمه، فلن يُحسب له استهلاك ولا فرق حتى تضيفه إلى وصفة."
+                  : "يظهر هنا بعد أن يُعدّ في جرد ويُقفل ذلك الجرد، ويُعرض النقص والزيادة كلٌّ على حدة."}
               />
             ) : (
               <>
@@ -144,20 +145,20 @@ export async function ItemView({
                 />
                 {recurring && (
                   <Callout tone="warn" icon={Repeat} className="mt-3" title="نقص في كل جرد">
-                    النقص المتكرر بالقدر نفسه يشير غالباً إلى خلل في الوصفة أو الكمية المصروفة أو الميزان، لا إلى هدر متكرر. راجع كمية الوصفة قبل أن تبحث عن هدر.
+                    النقص الذي يتكرر بالقدر نفسه يدل غالباً على خلل في الوصفة أو الكمية المصروفة أو الميزان، لا على هدر متكرر. راجع كمية الوصفة قبل أن تبحث عن هدر.
                   </Callout>
                 )}
               </>
             )}
           </Section>
 
-          <Section title="الحركة والجرد" className="mt-0!" hint="ما دخل الرف وما خرج منه بغير البيع، وكل جرد مع معادلته. الأحدث أولاً.">
+          <Section title="الحركة والجرد" className="mt-0!" hint="ما دخل الرف وما خرج منه بغير البيع، وكل جرد مع معادلته، والأحدث أولاً.">
             {dated.length === 0 ? (
               <EmptyState
                 compact
                 icon={FileText}
                 title="لا توجد حركة مسجّلة لهذا الصنف بعد."
-                hint="تظهر هنا فواتير شرائه، وما يُستلم يدوياً، والهدر المسجّل، وكل جرد دخل فيه."
+                hint="هنا تظهر فواتير شرائه، والكميات المستلمة يدوياً، والهدر المسجّل، وكل جرد دخل فيه."
               />
             ) : (
               <Card>
@@ -166,8 +167,7 @@ export async function ItemView({
                 {dated.length > SHOWN && (
                   <details className="group mt-5 border-t border-line-soft pt-4">
                     <summary className="flex min-h-11 cursor-pointer items-center text-xs font-bold text-accent hover:underline sm:min-h-8">
-                      اعرض الأقدم ({dated.length - SHOWN})
-                    </summary>
+                      <T s="اعرض الأقدم ({0})" a={[dated.length - SHOWN]} /></summary>
                     <div className="mt-4">
                       <Timeline items={dated.slice(SHOWN).map((d) => d.item)} />
                     </div>
@@ -190,7 +190,7 @@ export async function ItemView({
                   label: "الشراء",
                   value: purchases.length === 0
                     ? <span className="text-muted">لا يوجد بند فاتورة مربوط</span>
-                    : <>{countNoun(purchases.length, LINE)}{purchases.length >= 40 ? " أو أكثر" : ""} في الفواتير</>,
+                    : <><T s="{0}{1} في الفواتير" a={[countNoun(purchases.length, LINE), purchases.length >= 40 ? " أو أكثر" : ""]} /></>,
                   hint: purchases[0] ? `آخر شراء ${formatDay(purchases[0].day)}` : undefined,
                 },
                 { label: "مرات العدّ", value: history.filter((h) => h.actualMilli !== null).length === 0 ? <span className="text-muted">لم يُعدّ بعد</span> : <span className="nums">{history.filter((h) => h.actualMilli !== null).length}</span> },
@@ -198,14 +198,12 @@ export async function ItemView({
             />
           </Card>
 
-          <Section title="يُصرف في" icon={BookOpen} className="mt-0!" count={usage.length > 0 ? usage.length : undefined}>
+          <Section title="يُستخدم في" icon={BookOpen} className="mt-0!" count={usage.length > 0 ? usage.length : undefined}>
             {usage.length === 0 ? (
               <Callout tone="warn" icon={BookOpen} title="لا توجد وصفة تستخدمه">
-                بدون وصفة لا يُحسب له استهلاك متوقع، فيظهر كل ما اشتريته منه «فرقاً».
-                {can(user.role, "recipe:edit") && (
+                <T s="بدون وصفة لا يُحسب له استهلاك متوقع، فيظهر كل ما اشتريته منه «فرقاً».{0}" a={[can(user.role, "recipe:edit") && (
                   <> <Link href="/inventory/recipes" className="font-bold text-accent hover:underline">افتح الوصفات</Link>.</>
-                )}
-              </Callout>
+                )]} /></Callout>
             ) : (
               <ul className="flex flex-wrap gap-1.5">
                 {usage.map((u) => (
@@ -218,7 +216,7 @@ export async function ItemView({
           </Section>
 
           <p className="rounded-xl border border-line bg-sunken/60 px-4 py-3 text-[11px] leading-relaxed text-ink-soft">
-            الفرق المتكرر بالقدر نفسه يشير غالباً إلى خلل في الوصفة أو الكمية المصروفة أو الميزان. أما الفرق المتغيّر فيشير إلى عدّ مستعجل أو فاتورة وصلت متأخرة. وما تعرف سببه سجّله هدراً في الجرد نفسه، فيخرج من «الفرق غير المفسَّر».
+            الفرق الذي يتكرر بالقدر نفسه يدل غالباً على خلل في الوصفة أو الكمية المصروفة أو الميزان. أما الفرق المتقلب فيدل على عدّ مستعجل أو فاتورة وصلت متأخرة. وما تعرف سببه سجّله هدراً في الجرد نفسه، فيخرج من «الفرق غير المفسَّر».
           </p>
         </aside>
       </div>
@@ -237,10 +235,7 @@ function countItem(h: ItemHistoryRow, showAmounts: boolean): TimelineItem {
     href: `/inventory/counts/${h.countId}`,
     title: (
       <>
-        جرد أسبوع {formatWeek(h.periodStart, h.periodEnd)}
-        {h.status === "DRAFT" && <span className="ms-2 align-middle"><Badge tone="accent">مسوّدة</Badge></span>}
-        {!h.inScope && <span className="ms-2 align-middle"><Badge>خارج الجرد</Badge></span>}
-      </>
+        <T s="جرد أسبوع {0}{1}{2}" a={[formatWeek(h.periodStart, h.periodEnd), h.status === "DRAFT" && <span className="ms-2 align-middle"><Badge tone="accent">مسودة</Badge></span>, !h.inScope && <span className="ms-2 align-middle"><Badge>خارج الجرد</Badge></span>]} /></>
     ),
     meta: h.varianceMilli === null ? "لم يُحسب فرق" : (
       <span className={`font-bold ${d ? DIRECTION[d].text : ""}`}>
@@ -256,15 +251,7 @@ function countItem(h: ItemHistoryRow, showAmounts: boolean): TimelineItem {
     */
     body: (
       <span className="nums">
-        افتتاحي {formatQuantity(h.openingMilli, h.baseUnit)}
-        {h.openingMilli !== null && ` (${OPENING_SOURCE_LABEL[h.openingSource]})`}
-        {" + "}مشتريات {formatQuantity(h.purchasesMilli, h.baseUnit)}
-        {h.manualReceiptsMilli > 0 && ` (منها ${formatQuantity(h.manualReceiptsMilli, h.baseUnit)} يدوياً)`}
-        {" − "}استهلاك {formatQuantity(h.theoreticalConsumptionMilli, h.baseUnit)}
-        {h.recordedWasteMilli > 0 && <>{" − "}هدر {formatQuantity(h.recordedWasteMilli, h.baseUnit)}</>}
-        {" = "}متوقع {formatQuantity(h.theoreticalClosingMilli, h.baseUnit)}
-        {" · "}الفعلي {formatQuantity(h.actualMilli, h.baseUnit)}
-      </span>
+        <T s="الافتتاحي {0}{1} + المشتريات {2}{3} − الاستهلاك {4}{5} = المتوقع {6} · الفعلي {7}" a={[formatQuantity(h.openingMilli, h.baseUnit), h.openingMilli !== null && ` (${OPENING_SOURCE_LABEL[h.openingSource]})`, formatQuantity(h.purchasesMilli, h.baseUnit), h.manualReceiptsMilli > 0 && ` (منها ${formatQuantity(h.manualReceiptsMilli, h.baseUnit)} يدوياً)`, formatQuantity(h.theoreticalConsumptionMilli, h.baseUnit), h.recordedWasteMilli > 0 && <><T s=" − هدر {0}" a={[formatQuantity(h.recordedWasteMilli, h.baseUnit)]} /></>, formatQuantity(h.theoreticalClosingMilli, h.baseUnit), formatQuantity(h.actualMilli, h.baseUnit)]} /></span>
     ),
   };
 }

@@ -110,21 +110,21 @@ export function canonicalName(doc: NamedDocument): NameVerdict {
   if (parsed.ok) return contradiction(doc, parsed.value);
 
   if (!INVOICE_KINDS.has(doc.kind) && doc.kind !== "STATEMENT") {
-    return { status: "CANNOT", reason: `نوعُه «${doc.kind}» — لا صيغة قياسية له هنا` };
+    return { status: "CANNOT", reason: `نوعه «${doc.kind}»، ولا صيغة تسمية له هنا` };
   }
-  if (!doc.slug) return { status: "CANNOT", reason: "لا مورّد مقيَّد له" };
-  if (!doc.date) return { status: "CANNOT", reason: "لا تاريخ مقيَّد له" };
-  if (doc.totalMinor === null) return { status: "CANNOT", reason: "لا إجماليّ مقيَّد له" };
+  if (!doc.slug) return { status: "CANNOT", reason: "لا مورّد مسجّل له" };
+  if (!doc.date) return { status: "CANNOT", reason: "لا تاريخ مسجّل له" };
+  if (doc.totalMinor === null) return { status: "CANNOT", reason: "لا إجمالي مسجّل له" };
 
   const extension = extensionOf(doc.fileName, doc.mimeType);
-  if (!extension) return { status: "CANNOT", reason: "اسمُه بلا امتداد ونوعُ محتواه غير معروف — لا يُخمَّن له امتداد" };
+  if (!extension) return { status: "CANNOT", reason: "اسمه بلا امتداد، ونوع محتواه غير معروف، فلا يُخمَّن له امتداد" };
   const shared = { date: doc.date, amountMinor: doc.totalMinor, extension };
 
   let proposed: string;
   if (doc.kind === "STATEMENT") {
     proposed = buildStatementFileName({ ...shared, slug: doc.slug });
   } else {
-    if (!doc.invoiceNumber) return { status: "CANNOT", reason: "لا رقم فاتورة مقيَّد له" };
+    if (!doc.invoiceNumber) return { status: "CANNOT", reason: "لا رقم فاتورة مسجّل له" };
     proposed = buildInvoiceFileName({
       ...shared, slug: doc.slug, invoiceNumber: doc.invoiceNumber,
     });
@@ -132,7 +132,7 @@ export function canonicalName(doc: NamedDocument): NameVerdict {
 
   if (proposed === doc.fileName) return { status: "OK" };
 
-  return { status: "RENAME", proposed, reason: "لا يُقرأ اسمُه — خارج الصيغة القياسية" };
+  return { status: "RENAME", proposed, reason: "اسمه غير مقروء، وهو خارج الصيغة المعتمدة" };
 }
 
 /**
@@ -152,7 +152,7 @@ function contradiction(doc: NamedDocument, p: ParsedFileName): NameVerdict {
   if (!doc.date || doc.totalMinor === null || !doc.invoiceNumber) return { status: "OK" };
 
   if (p.invoiceNumber && invoiceNumberKey(p.invoiceNumber) !== invoiceNumberKey(doc.invoiceNumber)) {
-    return { status: "CANNOT", reason: `رقمُ الفاتورة في الاسم «${p.invoiceNumber}» يخالف المقيَّد «${doc.invoiceNumber}» — راجع أيّهما الصحيح` };
+    return { status: "CANNOT", reason: `رقم الفاتورة في الاسم «${p.invoiceNumber}» يخالف المسجّل «${doc.invoiceNumber}»، فراجع أيهما الصحيح` };
   }
   const wrongAmount = p.amountMinor === undefined || p.amountMinor !== doc.totalMinor;
   const wrongDate = p.date !== doc.date;
@@ -176,7 +176,7 @@ function contradiction(doc: NamedDocument, p: ParsedFileName): NameVerdict {
     codedSlug ? "رمزٌ مكان اسم المورّد" : null,
     slashInName ? "«/» في الاسم" : null,
   ].filter(Boolean).join(" · ");
-  return { status: "RENAME", proposed, reason: `يُقرأ اسمُه ويخالف المقيَّد: ${why}` };
+  return { status: "RENAME", proposed, reason: `اسمه مقروء ويخالف المسجّل: ${why}` };
 }
 
 /**
@@ -192,14 +192,14 @@ export type RenameGate =
   | { go: false; reason: string; liveName?: string };
 
 export function renameGate(storedName: string, presence: FilePresence): RenameGate {
-  if (presence.state === "gone") return { go: false, reason: "لم يعد في الدرايف — لم يُسمَّ" };
-  if (presence.state === "trashed") return { go: false, reason: "في سلّة الدرايف — لم يُسمَّ" };
-  if (presence.state === "unknown") return { go: false, reason: "تعذّر التحقّق من اسمه الحاليّ في الدرايف — لم يُسمَّ" };
+  if (presence.state === "gone") return { go: false, reason: "لم يعد في الدرايف، فلم يُسمَّ" };
+  if (presence.state === "trashed") return { go: false, reason: "في سلة الدرايف، فلم يُسمَّ" };
+  if (presence.state === "unknown") return { go: false, reason: "تعذّر التحقق من اسمه الحالي في الدرايف، فلم يُسمَّ" };
   if (presence.name !== storedName) {
     return {
       go: false,
       liveName: presence.name,
-      reason: `غُيّر اسمُه في الدرايف بيدٍ إلى «${presence.name}» — حُدّث القيد ولم يُكتب فوقه`,
+      reason: `غُيّر اسمه في الدرايف يدوياً إلى «${presence.name}»، فحُدّث السجل ولم يُكتب فوقه`,
     };
   }
   return { go: true };

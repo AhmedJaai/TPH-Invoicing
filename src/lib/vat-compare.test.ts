@@ -34,7 +34,7 @@ describe("مقارنة الأرباع المقدّمة", () => {
     expect(c.latest?.drivers).toEqual([
       { label: "ضريبة المبيعات", effectMinor: 3_000_00 },
       { label: "خصم الفواتير", effectMinor: 3_000_00 },
-      { label: "خصم ما اخترته من الصادر", effectMinor: -400_00 },
+      { label: "خصم ما اخترته من الخارج", effectMinor: -400_00 },
     ]);
     const all = netDrivers(readFiledQuarter(q2), readFiledQuarter({ ...q3 }));
     expect(all.reduce((s, d) => s + d.effectMinor, 0) + -100_00).toBe(5_500_00);

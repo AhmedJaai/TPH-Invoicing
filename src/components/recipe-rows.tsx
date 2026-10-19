@@ -12,6 +12,7 @@ import { storedUnitLabel, type StoredUnit } from "@/lib/unit-conversion";
 import { isSinceBeginning } from "@/lib/inventory/recipe";
 import { COST_REASON_LABEL } from "@/lib/inventory/recipe-cost";
 import type { RecipeRow } from "@/services/recipe.service";
+import { T } from "@/components/i18n/t";
 
 /**
  * الوصفاتُ صفوفاً تتمدّد في مكانها.
@@ -81,7 +82,7 @@ export function RecipeRows({
             />
           </label>
           <p className="text-xs text-muted" aria-live="polite">
-            {q ? <><span className="nums">{visible.length}</span> من <span className="nums">{rows.length}</span></> : <><span className="nums">{rows.length}</span> وصفة</>}
+            {q ? <><T s="{0} من {1}" a={[<span key="0" className="nums">{visible.length}</span>, <span key="1" className="nums">{rows.length}</span>]} /></> : <><T s="{0} وصفة" a={[<span key="0" className="nums">{rows.length}</span>]} /></>}
           </p>
         </div>
       )}
@@ -90,11 +91,11 @@ export function RecipeRows({
         <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-raised px-4 py-3 text-xs leading-relaxed text-ink-soft">
           <p className="min-w-0 flex-1">
             {byCatalog
-              ? <>الكلفة معروضة <strong className="text-ink">بكلفة الكتالوج</strong>، وهي الرقم المعياري المسجّل في فودكس.</>
-              : <>الكلفة معروضة <strong className="text-ink">بآخر فاتورة</strong> لكل مكوّن، أي بما دفعته فعلاً، وما لا فاتورة له يُحسب بكلفة الكتالوج. لذلك قد تختلف عمّا كان يظهر بالكتالوج وحده.</>}
+              ? <><T s="التكلفة معروضة {0}، وهي التكلفة المعيارية المسجّلة في فودكس." a={[<strong key="0" className="text-ink">بتكلفة الكتالوج</strong>]} /></>
+              : <><T s="التكلفة معروضة {0} لكل مكوّن، أي بما دفعته فعلاً، وما ليست له فاتورة يُحسب بتكلفة الكتالوج. لذلك قد تختلف عما يظهر بالكتالوج وحده." a={[<strong key="0" className="text-ink">بآخر فاتورة</strong>]} /></>}
           </p>
           <button type="button" onClick={() => setByCatalog((v) => !v)} aria-pressed={byCatalog} className={buttonClass("secondary", "sm")}>
-            {byCatalog ? "اعرضها بآخر فاتورة" : "اعرضها بكلفة الكتالوج"}
+            {byCatalog ? "اعرضها بآخر فاتورة" : "اعرضها بتكلفة الكتالوج"}
           </button>
         </div>
       )}
@@ -105,12 +106,12 @@ export function RecipeRows({
           <span />
           <span>الصنف المباع</span>
           <span>المكوّنات</span>
-          <span className="text-end">الكلفة</span>
+          <span className="text-end">التكلفة</span>
           <span className="text-end">السعر</span>
           <span className="text-end">الفرق</span>
         </div>
         {visible.length === 0 && (
-          <p className="px-5 py-10 text-center text-sm text-muted">لا وصفة تطابق «{query}».</p>
+          <p className="px-5 py-10 text-center text-sm text-muted"><T s="لا وصفة تطابق «{0}»." a={[query]} /></p>
         )}
         <ul className="divide-y divide-line-soft">
           {visible.map((row) => {
@@ -127,11 +128,11 @@ export function RecipeRows({
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-bold">{row.menuProductName}</span>
                     {row.activeVersion === null && <span className="text-[11px] font-bold text-warn">مسودة لا تدخل في الحساب</span>}
-                    {row.unknownCost.length > 0 && row.activeVersion !== null && <span className="text-[11px] text-warn">كلفة مكوّن غير معروفة</span>}
+                    {row.unknownCost.length > 0 && row.activeVersion !== null && <span className="text-[11px] text-warn">تكلفة مكوّن غير معروفة</span>}
                   </span>
-                  <span className="nums text-xs text-muted md:text-ink-soft">{row.ingredientCount} مكوّن</span>
+                  <span className="nums text-xs text-muted md:text-ink-soft"><T s="{0} مكوّن" a={[row.ingredientCount]} /></span>
                   <span className="col-start-2 text-xs md:col-start-auto md:text-end">
-                    <span className="text-[11px] text-muted md:hidden">الكلفة </span>
+                    <span className="text-[11px] text-muted md:hidden">التكلفة </span>
                     {(() => {
                       const cost = costOf(row);
                       const basis = basisOf(row);
@@ -181,7 +182,7 @@ export function RecipeRows({
 
 const COST_BASIS_LABEL = {
   INVOICE: "بآخر فاتورة",
-  CATALOG: "بكلفة الكتالوج",
+  CATALOG: "بتكلفة الكتالوج",
   MIXED: "فواتير وكتالوج",
 } as const;
 
@@ -236,7 +237,7 @@ function RecipePanel({
 
     setBusy(null);
     if (!res.ok) { setError(res.error); return; }
-    setDone(String(res.data.message ?? "تم الحفظ."));
+    setDone(String(res.data.message ?? "حُفظ."));
     router.refresh();
   }
 
@@ -246,7 +247,7 @@ function RecipePanel({
     <div className="border-t border-line bg-sunken/50 px-4 py-4">
       <p className="text-[11px] leading-relaxed text-muted">
         {row.activeVersion === null
-          ? "مسودة، ولا تدخل في الحساب حتى تُفعَّل."
+          ? "مسودة، لا تدخل في الحساب حتى تُفعَّل."
           : isSinceBeginning(row.activeFromLabel)
             ? `النسخة ${row.activeVersion} سارية منذ البداية، وتغطي كل الأسابيع.`
             : `النسخة ${row.activeVersion} سارية من ${row.activeFromLabel}.`}
@@ -254,7 +255,7 @@ function RecipePanel({
       </p>
 
       {empty ? (
-        <p className="mt-3 text-xs text-warn">لا توجد مكوّنات في هذه النسخة.</p>
+        <p className="mt-3 text-xs text-warn">لا مكوّنات في هذه النسخة.</p>
       ) : (
         <ul className="mt-3 divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised">
           {draft.map((line, at) => (
@@ -368,15 +369,13 @@ function RecipePanel({
 
         <label className="flex flex-wrap items-end gap-2">
           <span className="text-[11px] text-muted">
-            أو غيّرها اعتباراً من
-            <input
+            <T s="أو غيّرها ابتداءً من{0}" a={[<input key="0"
               type="date"
               value={changeFrom}
               disabled={busy !== null}
               onChange={(e) => setChangeFrom(e.target.value)}
               className="nums mt-1 block min-h-11 rounded-lg border border-line-input bg-raised px-2 text-sm"
-            />
-          </span>
+            />]} /></span>
           <button
             aria-busy={busy === "save"}
             type="button"
@@ -392,8 +391,8 @@ function RecipePanel({
           label="احذف الوصفة"
           title={`حذف وصفة «${row.menuProductName}»`}
           consequence={
-            `ستُحذف كل نسخها (${row.versions})، ولن يُحسب استهلاك لهذا الصنف بعد ذلك`
-            + ". وسيظهر ما اشتريته من مكوّناته كله كـ«فرق» في الجرد."
+            `ستُحذف كل نسخها (${row.versions})، ولن يُحسب لهذا الصنف استهلاك بعد ذلك`
+            + ". وكل ما اشتريته من مكوّناته سيظهر «فرقاً» في الجرد."
           }
           acknowledgement="أفهم أن استهلاك هذا الصنف لن يُحسب بعد الحذف."
           confirmLabel="احذفها"

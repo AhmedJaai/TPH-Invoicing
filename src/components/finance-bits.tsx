@@ -4,6 +4,7 @@ import { Money } from "./money";
 import { LinkTabs } from "./ui";
 import { formatShare } from "@/lib/finance/format";
 import { formatMonth } from "@/lib/riyadh-time";
+import { T } from "@/components/i18n/t";
 
 /** ألسنةُ الأشهر — الأحدثُ أوّلاً. */
 export function MonthTabs({ base, months, active, extra = "" }: { base: string; months: readonly string[]; active: string; extra?: string }) {
@@ -20,9 +21,7 @@ export function Unknown({ why, className = "" }: { why?: string; className?: str
   return (
     <span className={`text-[11px] text-muted ${className}`}>
       <span className="inline-flex items-center gap-1 font-bold text-ink-soft">
-        <CircleHelp className="h-3 w-3" strokeWidth={2} aria-hidden />
-        غير معروف
-      </span>
+        <T s="{0}غير معروف" a={[<CircleHelp key="0" className="h-3 w-3" strokeWidth={2} aria-hidden />]} /></span>
       {why && <span className="block max-w-[22rem]">{why}</span>}
     </span>
   );
@@ -57,10 +56,10 @@ export function ProfitTrend({ months, active, hrefOf }: { months: readonly Trend
   return (
     <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-bold text-ink-soft">
-        <span className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-sm bg-accent" /> الإيراد</span>
-        <span className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-sm bg-sand" /> التكلفة والمصروفات</span>
-        <span className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-sm bg-plum" /> الربح</span>
-        <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2.5 w-2.5 rounded-sm bg-plum ${HATCH}`} /> ربح ناقص (ينقصه عنصر)</span>
+        <span className="flex items-center gap-1.5"><T s="{0} الإيراد" a={[<span key="0" aria-hidden className="h-2.5 w-2.5 rounded-sm bg-accent" />]} /></span>
+        <span className="flex items-center gap-1.5"><T s="{0} التكلفة والمصروفات" a={[<span key="0" aria-hidden className="h-2.5 w-2.5 rounded-sm bg-sand" />]} /></span>
+        <span className="flex items-center gap-1.5"><T s="{0} الربح" a={[<span key="0" aria-hidden className="h-2.5 w-2.5 rounded-sm bg-plum" />]} /></span>
+        <span className="flex items-center gap-1.5"><T s="{0} ربح ناقص (ينقصه بند)" a={[<span key="0" aria-hidden className={`h-2.5 w-2.5 rounded-sm bg-plum ${HATCH}`} />]} /></span>
       </div>
       <ol className="space-y-1">
         {months.map((m) => {

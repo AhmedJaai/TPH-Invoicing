@@ -8,7 +8,7 @@ import { buttonClass, type ButtonVariant } from "./ui-tokens";
  * يُبنى مولّدُ ملفّاتٍ على الخادم لما يفعله المتصفّح. وما عليه `.no-print`
  * يسقط من الورقة (`globals.css`).
  */
-export function PrintButton({ label = "اطبع أو احفظ كملف PDF", variant = "primary" }: { label?: string; variant?: ButtonVariant }) {
+export function PrintButton({ label = "اطبع أو احفظ ملف PDF", variant = "primary" }: { label?: string; variant?: ButtonVariant }) {
   return (
     <button type="button" onClick={() => window.print()} className={buttonClass(variant)}>
       <Printer className="h-4 w-4" strokeWidth={2} aria-hidden />

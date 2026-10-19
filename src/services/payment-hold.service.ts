@@ -112,7 +112,7 @@ export async function overrideHolds(
     for (const r of rows) {
       const openMinor = r.totalMinor - (allocated.get(r.id) ?? 0);
       if (openMinor <= SETTLED_TOLERANCE_MINOR) {
-        throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} سُدّدت بالكامل، فلا شيء يدخل في الدفعة. حدّث الصفحة`);
+        throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} سُدّدت بالكامل، فلا شيء يدخل الدفعة. حدّث الصفحة`);
       }
       if (r.periodMonth > input.month) {
         throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} ليست من مستحقات هذه الدفعة`, 400);
@@ -123,7 +123,7 @@ export async function overrideHolds(
         inputVatStatus: r.inputVatStatus,
       });
       if (reason === null) {
-        throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} لم تعد محجوزة وهي الآن ضمن الجاهز. حدّث الصفحة`);
+        throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} لم تعد موقوفة، وهي الآن مع الجاهزة. حدّث الصفحة`);
       }
       if (!isOverridableHold(reason)) {
         throw new HoldDecisionError(`فاتورة ${r.invoiceNumber} لم يُؤكَّد مستندها. افتحه وأكّده، فلم يراجع أحد مبلغها بعد`);

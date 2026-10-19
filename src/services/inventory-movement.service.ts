@@ -65,7 +65,7 @@ async function stockItem(productId: string, unit: StoredUnit, tx: Conn): Promise
   if (!product.isStockItem) throw new MovementRefused(`«${product.nameAr}» ليس صنفاً مخزّناً، فلا يمكن تسجيل هدر أو حركة عليه`);
   if (!sameUnitFamily(unit, product.baseUnit)) {
     throw new MovementRefused(
-      `«${product.nameAr}» يُقاس بـ${storedUnitLabel(product.baseUnit)}، ولا يمكن تحويل ${storedUnitLabel(unit)} إليه (الوزن والحجم والعدّ لا تتحوّل إلى بعضها)`,
+      `«${product.nameAr}» يُقاس بـ${storedUnitLabel(product.baseUnit)}، ولا يمكن تحويل ${storedUnitLabel(unit)} إليه (الوزن والحجم والعدد لا يتحول أحدها إلى الآخر)`,
     );
   }
   return { nameAr: product.nameAr };
@@ -100,7 +100,7 @@ export async function recordWaste(input: WasteInput, conn: Conn = db): Promise<W
   if (!isStoredUnit(input.unit)) throw new Error("وحدة غير معروفة");
   if (!DATE.test(input.occurredOn)) throw new Error("اكتب التاريخ بصيغة YYYY-MM-DD");
   if (!Number.isInteger(input.quantityMilli) || input.quantityMilli <= 0) {
-    throw new Error("يجب أن تكون الكمّية أكبر من صفر");
+    throw new Error("يجب أن تكون الكمية أكبر من صفر");
   }
 
   const requestId = input.clientRequestId?.trim() || null;
@@ -246,7 +246,7 @@ export async function recordMovement(input: MovementInput, conn: Conn = db): Pro
   if (!isStoredUnit(input.unit)) throw new Error("وحدة غير معروفة");
   if (!DATE.test(input.occurredOn)) throw new Error("اكتب التاريخ بصيغة YYYY-MM-DD");
   if (!Number.isInteger(input.quantityMilli) || input.quantityMilli <= 0) {
-    throw new Error("يجب أن تكون الكمّية أكبر من صفر");
+    throw new Error("يجب أن تكون الكمية أكبر من صفر");
   }
 
   return conn.transaction(async (tx) => {

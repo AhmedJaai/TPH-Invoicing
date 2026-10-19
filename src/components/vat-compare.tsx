@@ -8,6 +8,7 @@ import { Section } from "./ui";
 import { formatDay } from "@/lib/riyadh-time";
 import { compareFiledQuarters, shareText, type FiledQuarter } from "@/lib/vat-compare";
 import { parseVatPeriod, quarterLabel } from "@/lib/vat-return";
+import { T } from "@/components/i18n/t";
 
 function labelOf(q: FiledQuarter): string {
   const p = parseVatPeriod(q.periodKey);
@@ -41,7 +42,7 @@ export async function FiledQuartersSection() {
       id="quarters"
       title="الأرباع المقدّمة جنباً إلى جنب"
       icon={GitCompareArrows}
-      hint="كما قدّمتها للهيئة، من لقطة «قدّمته» وليس من حساب اليوم."
+      hint="كما قدّمتها للهيئة، من لقطة «قدّمته» لا من حساب اليوم."
     >
       <div className="scroll-x overflow-x-auto rounded-xl border border-line bg-raised">
         <table className="w-full min-w-[30rem] border-collapse">
@@ -51,7 +52,7 @@ export async function FiledQuartersSection() {
               {shown.map((q) => (
                 <th key={q.periodKey} scope="col" className="px-3 py-2 text-end text-[11px] font-bold text-muted">
                   <Link href={`/close/vat?period=${q.periodKey}`} className="hover:text-accent hover:underline">{labelOf(q)}</Link>
-                  <span className="block font-normal">قُدِّم {formatDay(q.filedOn)}</span>
+                  <span className="block font-normal"><T s="قُدِّم {0}" a={[formatDay(q.filedOn)]} /></span>
                 </th>
               ))}
             </tr>
@@ -74,7 +75,7 @@ export async function FiledQuartersSection() {
         <p className="font-bold">
           {netChangeMinor === 0
             ? `صافي ${labelOf(current)} يساوي صافي ${labelOf(previous)}.`
-            : <>صافي {labelOf(current)} {netChangeMinor > 0 ? "أعلى" : "أدنى"} من {labelOf(previous)} بـ<Money minor={Math.abs(netChangeMinor)} />. أكبر ما أثّر فيه:</>}
+            : <><T s="صافي {0} {1} من {2} بـ{3}. أكبر ما أثّر فيه:" a={[labelOf(current), netChangeMinor > 0 ? "أعلى" : "أدنى", labelOf(previous), <Money key="3" minor={Math.abs(netChangeMinor)} />]} /></>}
         </p>
         {drivers.length > 0 && (
           <ul className="mt-2 space-y-1 text-ink-soft">
@@ -89,7 +90,7 @@ export async function FiledQuartersSection() {
           </ul>
         )}
         <p className="mt-2 text-[11px] text-muted">
-          لمعرفة أي مورّد أو حوالة وراء كل بند، افتح الربع من رأس الجدول. ستجد فواتيره وحركاته بأسمائها هناك.
+          لتعرف أي مورّد أو حوالة وراء كل بند، افتح الربع من رأس الجدول، تجد فواتيره وحركاته بأسمائها.
         </p>
       </div>
     </Section>

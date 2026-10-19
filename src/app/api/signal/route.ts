@@ -75,8 +75,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     message:
-      action === "dismiss" ? "تم إسكات الملاحظة، ولن تظهر مرة أخرى إلا إذا تغيّرت البيانات التي بُنيت عليها"
-      : until ? `تم التأجيل، وتعود الملاحظة بعد ${until}`
+      action === "dismiss" ? "أُسكتت الملاحظة، ولن تظهر مرة أخرى إلا إن تغيّرت البيانات التي بُنيت عليها"
+      : until ? `أُجّلت، وتعود الملاحظة بعد ${until}`
       : "أُعيدت الملاحظة",
   });
 }

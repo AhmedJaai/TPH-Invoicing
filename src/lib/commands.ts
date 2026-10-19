@@ -127,7 +127,7 @@ const ACTIONS: readonly Command[] = [
   {
     id: "cash",
     label: "انظر النقد القادم",
-    hint: "ما سيخرج ومتى، مقارنة برصيد البنك",
+    hint: "ما سيخرج ومتى، مقارنةً برصيد البنك",
     group: "ACTION",
     href: "/cash",
     needs: "bank:view",
@@ -145,7 +145,7 @@ const ACTIONS: readonly Command[] = [
   {
     id: "add-expense",
     label: "سجّل مصروفاً دُفع نقداً",
-    hint: "مثل الإيجار أو الراتب أو فاتورة خدمة، مما لا يظهر في كشف البنك",
+    hint: "كالإيجار أو الراتب أو فاتورة خدمة، مما لا يظهر في كشف البنك",
     group: "ACTION",
     href: "/money/expenses?add=1",
     needs: "expense:edit",
@@ -176,8 +176,8 @@ const ACTIONS: readonly Command[] = [
 const VIEW: readonly Command[] = [
   { id: "shortcuts", label: "اختصارات لوحة المفاتيح", hint: "?", group: "ACTION", href: "/", event: "shortcuts", keywords: ["اختصار", "مفاتيح", "shortcuts", "keyboard"] },
   { id: "theme", label: "بدّل الوضع الفاتح والداكن", group: "ACTION", href: "/", event: "theme", keywords: ["داكن", "ليلي", "فاتح", "dark", "theme"] },
-  { id: "theme-system", label: "اتبع وضع الجهاز", hint: "فاتح نهاراً وداكن ليلاً حسب إعداد جهازك", group: "ACTION", href: "/", event: "theme-system", keywords: ["جهاز", "نظام", "تلقائي", "داكن", "فاتح", "system", "auto", "theme"] },
-  { id: "amounts", label: "أخف المبالغ أو أظهرها", hint: "عند عرض الشاشة على غيرك", group: "ACTION", href: "/", event: "amounts", keywords: ["اخف", "اخفاء", "مبالغ", "hide", "privacy"] },
+  { id: "theme-system", label: "اتبع وضع الجهاز", hint: "فاتح نهاراً وداكن ليلاً بحسب إعداد جهازك", group: "ACTION", href: "/", event: "theme-system", keywords: ["جهاز", "نظام", "تلقائي", "داكن", "فاتح", "system", "auto", "theme"] },
+  { id: "amounts", label: "أخفِ المبالغ أو أظهرها", hint: "حين تعرض الشاشة على غيرك", group: "ACTION", href: "/", event: "amounts", keywords: ["اخف", "اخفاء", "مبالغ", "hide", "privacy"] },
 ];
 
 /**
@@ -187,10 +187,10 @@ const VIEW: readonly Command[] = [
 const SECONDARY: readonly Command[] = [
   { id: "p:analysis", label: "الأصناف والأسعار", hint: "المورّدون", group: "PAGE", href: "/analysis", needs: "amounts:view", keywords: ["سعر", "اسعار", "صنف", "prices"] },
   { id: "p:expenses", label: "المصروفات", hint: "البنك", group: "PAGE", href: "/money/expenses", needs: "bank:view", keywords: ["مصروف", "ايجار", "رواتب", "expenses"] },
-  { id: "p:obligations", label: "الوثائق والتراخيص", hint: "ما له تاريخ انتهاء: رخصة، شهادة، إقامة، عقد", group: "PAGE", href: "/settings/obligations", needs: "reports:view", keywords: ["رخصه", "سجل", "تجاري", "بلديه", "اقامه", "شهاده", "صحيه", "عقد", "ايجار", "انتهاء", "تجديد", "licence", "expiry"] },
-  { id: "p:owner", label: "بينك وبين المقهى", hint: "ما دفعته من مالك الخاص وما سحبته", group: "PAGE", href: "/money/owner", needs: "bank:view", keywords: ["مالك", "سحب", "مسحوبات", "شخصي", "جاري", "owner", "drawings"] },
-  { id: "p:trend", label: "اتّجاه الجرد", hint: "الجرد", group: "PAGE", href: "/inventory/trend", needs: "amounts:view", keywords: ["فرق", "اتجاه", "trend"] },
-  { id: "p:mapping", label: "منتجات تحتاج ربطاً", hint: "الجرد", group: "PAGE", href: "/inventory/mapping", needs: "inventory:view", keywords: ["ربط", "منتج", "mapping"] },
+  { id: "p:obligations", label: "الوثائق والتراخيص", hint: "ما له تاريخ انتهاء: رخصة، أو شهادة، أو إقامة، أو عقد", group: "PAGE", href: "/settings/obligations", needs: "reports:view", keywords: ["رخصه", "سجل", "تجاري", "بلديه", "اقامه", "شهاده", "صحيه", "عقد", "ايجار", "انتهاء", "تجديد", "licence", "expiry"] },
+  { id: "p:owner", label: "بينك وبين المقهى", hint: "ما دفعته من مالك الخاص، وما سحبته", group: "PAGE", href: "/money/owner", needs: "bank:view", keywords: ["مالك", "سحب", "مسحوبات", "شخصي", "جاري", "owner", "drawings"] },
+  { id: "p:trend", label: "اتجاه الجرد", hint: "الجرد", group: "PAGE", href: "/inventory/trend", needs: "amounts:view", keywords: ["فرق", "اتجاه", "trend"] },
+  { id: "p:mapping", label: "منتجات تحتاج إلى ربط", hint: "الجرد", group: "PAGE", href: "/inventory/mapping", needs: "inventory:view", keywords: ["ربط", "منتج", "mapping"] },
 ];
 
 /** الصفحاتُ من نموذج التنقّل — المساحةُ وألسنتُها وروابطُ الحساب. */

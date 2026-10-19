@@ -61,7 +61,7 @@ export async function POST(request: Request) {
   const only = read.body.suppliers ? new Set(read.body.suppliers) : null;
   const ready = only ? full.ready.filter((r) => only.has(r.supplierId)) : full.ready;
   if (ready.length === 0) {
-    return NextResponse.json({ error: "لا يوجد مورّد جاهز للدفع ضمن اختيارك. حدّث الصفحة." }, { status: 400 });
+    return NextResponse.json({ error: "لا يوجد في اختيارك مورّد جاهز للدفع. حدّث الصفحة." }, { status: 400 });
   }
   const chosen = { ...full, ready, readyTotalMinor: ready.reduce((s, r) => s + r.totalMinor, 0) };
 

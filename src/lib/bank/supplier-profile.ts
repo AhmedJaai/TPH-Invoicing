@@ -148,7 +148,7 @@ export function fitToProfile(
     const grouped = candidate.invoiceCount >= 2;
     if (grouped === profile.batches) {
       adjustment += 0.03;
-      notes.push(profile.batches ? "يُسدَّد له عادةً أكثر من فاتورة في دفعة، وهذه دفعة مجمّعة" : "يُسدَّد له عادةً كل فاتورة على حدة");
+      notes.push(profile.batches ? "يُسدَّد له عادةً أكثر من فاتورة في دفعة، وهذه دفعة مجمّعة" : "يُسدَّد له عادةً كل فاتورة وحدها");
     } else if (grouped && !profile.batches) {
       adjustment -= 0.03;
       notes.push("لم تُسدَّد له فواتير مجمّعة في دفعة واحدة من قبل");

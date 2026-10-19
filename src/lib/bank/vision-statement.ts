@@ -144,7 +144,7 @@ export function validateVision(
       return;
     }
     if (minor === 0) {
-      rejected.push({ rowNumber, reason: "مبلغ صفر، ولا توجد حركة بلا مبلغ", raw: r.amount });
+      rejected.push({ rowNumber, reason: "مبلغ صفر، ولا حركة بلا مبلغ", raw: r.amount });
       return;
     }
 
