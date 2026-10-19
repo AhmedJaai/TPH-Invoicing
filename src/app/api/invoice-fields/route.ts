@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "تعذّرت قراءة الطلب. أعد المحاولة." }, { status: 400 });
     }
     const parsed = Body.safeParse(raw);
-    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلب غير مفهوم" }, { status: 400 });
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "الطلب غير مفهوم" }, { status: 400 });
     const b = parsed.data;
 
     /*
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
     */
     const touchesMoney = b.subtotal !== undefined || b.vat !== undefined || b.total !== undefined || b.discount !== undefined || b.charges !== undefined || b.supplierId !== undefined;
     if (touchesMoney && !can(user.role, "invoice:edit")) {
-      return NextResponse.json({ error: "تعديل المبالغ أو المورّد يحتاج صلاحية «تصحيح مبالغ الفاتورة ومورّدها». اطلبها من مالك الحساب." }, { status: 403 });
+      return NextResponse.json({ error: "تعديل المبالغ أو المورّد يحتاج إلى صلاحية «تصحيح مبالغ الفاتورة ومورّدها». اطلبها من مالك الحساب." }, { status: 403 });
     }
 
     const out = await db.transaction((tx) => correctInvoice(tx, {

@@ -65,7 +65,7 @@ async function handle(request: Request) {
     return NextResponse.json({ error: "الملف فارغ" }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "حجم الملف يتجاوز ٤ ميجابايت. صغّره (صوّره بدقة أقل) ثم أعد المحاولة." }, { status: 400 });
+    return NextResponse.json({ error: "حجم الملف أكبر من ٤ ميجابايت. صغّره (صوّره بدقة أقل) ثم أعد المحاولة." }, { status: 400 });
   }
   /* كروم يرسل HEIC بنوعٍ فارغ — فيُعرف من الامتداد */
   const declaredType = uploadMimeType(file.type, file.name);
@@ -85,7 +85,7 @@ async function handle(request: Request) {
   const sniffed = sniffMimeType(buffer);
   if (!sniffed) {
     return NextResponse.json(
-      { error: "محتوى الملف ليس PDF ولا صورة. تأكد من الملف ثم أعد المحاولة." },
+      { error: "الملف ليس PDF ولا صورة. تأكد منه ثم أعد المحاولة." },
       { status: 400 },
     );
   }
@@ -111,7 +111,7 @@ async function handle(request: Request) {
   if (duplicateFile) {
     return NextResponse.json(
       {
-        error: `رُفع هذا الملف من قبل («${duplicateFile.fileName}») ولم يُقرأ مرة أخرى.`,
+        error: `رُفع هذا الملف من قبل («${duplicateFile.fileName}»)، فلم يُقرأ مرة أخرى.`,
         duplicateDocumentId: duplicateFile.id,
       },
       { status: 409 },
@@ -149,7 +149,7 @@ async function handle(request: Request) {
       return NextResponse.json(
         {
           error: extraction.kind === "NO_BALANCE"
-            ? "قراءة المستندات متوقفة لأن رصيد القارئ نفد. ملفك سليم ولم يُحفظ شيء. أبلغ مالك الحساب ليشحن الرصيد ثم أعد الرفع."
+            ? "قراءة المستندات متوقفة لأن رصيد القارئ نفد. ملفك سليم ولم يُحفظ شيء. أبلغ مالك الحساب ليشحن الرصيد، ثم أعد الرفع."
             : `قراءة المستندات متوقفة مؤقتاً (${extraction.reason}). ملفك سليم ولم يُحفظ شيء. أعد المحاولة بعد دقائق.`,
           readerOutage: extraction.kind,
         },

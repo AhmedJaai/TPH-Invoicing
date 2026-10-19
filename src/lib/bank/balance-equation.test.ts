@@ -24,7 +24,7 @@ describe("معادلة الكشف", () => {
     });
     expect(r.status).toBe("UNEXPLAINED");
     expect(r.differenceMinor).toBe(-11_600_00);
-    expect(r.reason).toContain("صادرة لم تُقرأ");
+    expect(r.reason).toContain("خارجة لم تُقرأ");
   });
 
   it("فرقٌ موجب يعني واردةً لم تُقرأ", () => {
@@ -32,7 +32,7 @@ describe("معادلة الكشف", () => {
       openingMinor: 0, closingMinor: 500_00, creditsMinor: 0, debitsMinor: 0,
     });
     expect(r.status).toBe("UNEXPLAINED");
-    expect(r.reason).toContain("واردة لم تُقرأ");
+    expect(r.reason).toContain("داخلة لم تُقرأ");
   });
 
   it("هللةٌ واحدة تُتسامَح، وهللتان لا", () => {

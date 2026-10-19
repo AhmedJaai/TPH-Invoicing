@@ -44,7 +44,7 @@ describe("دفتر الاختيارات — إقرار الضريبة", () => {
     const [r] = vatTxChoiceRows([tx({})], "إقرار الربع الثالث 2026");
     expect(r.state).toBe("LOCKED");
     expect(r.revoke).toBeNull();
-    expect(r.reason).toContain("تم تقديمه");
+    expect(r.reason).toContain("قُدّم");
   });
 
   it("فاتورة أقرّت وضريبتها صفر مقروء: لا تطبّق ويقال لماذا", () => {

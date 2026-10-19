@@ -20,6 +20,7 @@ import { loadInventorySetup, setupProgress } from "@/services/inventory-overview
 import { PRODUCT, countNoun } from "@/lib/arabic";
 import { formatDay, todayInRiyadh } from "@/lib/riyadh-time";
 import { lastCompleteWeek } from "@/lib/inventory/week";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +79,7 @@ export default async function InventoryPage({
           width="wide"
           eyebrow={`جرد مفتوح${header.branchName ? ` · ${header.branchName}` : ""}`}
           title="الجرد الحالي"
-          intro={`أسبوع ${formatWeek(header.periodStart, header.periodEnd)} — المقارنة بين ما كان ينبغي أن يبقى على الرف وما وُجد فعلاً.`}
+          intro={`أسبوع ${formatWeek(header.periodStart, header.periodEnd)} — مقارنة بين ما كان يُفترض أن يبقى على الرف وما وُجد فعلاً.`}
           actions={
             <>
               {canCountHere && (
@@ -91,21 +92,20 @@ export default async function InventoryPage({
                   openBranchId={header.branchId}
                 />
               )}
-              {showAmounts && <LinkButton href="/inventory/history" size="sm" icon={History}>سجلّ الجرد</LinkButton>}
+              {showAmounts && <LinkButton href="/inventory/history" size="sm" icon={History}>سجل الجرد</LinkButton>}
             </>
           }
         >
           {otherDrafts.length > 0 && (
-            <nav aria-label="جردات مفتوحة أخرى" className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-sunken/50 px-4 py-3 text-xs">
-              <span className="font-bold text-muted">{otherDrafts.length === 1 ? "جرد آخر مفتوح:" : "جردات أخرى مفتوحة:"}</span>
+            <nav aria-label="جرود مفتوحة أخرى" className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-sunken/50 px-4 py-3 text-xs">
+              <span className="font-bold text-muted">{otherDrafts.length === 1 ? "جرد آخر مفتوح:" : "جرود أخرى مفتوحة:"}</span>
               {otherDrafts.map((d) => (
                 <Link
                   key={d.id}
                   href={`/inventory/counts/${d.id}`}
                   className="rounded-full border border-line bg-raised px-3 py-1.5 font-bold hover:border-accent-line hover:bg-hover"
                 >
-                  أسبوع {formatWeek(String(d.start), String(d.end))}
-                </Link>
+                  <T s="أسبوع {0}" a={[formatWeek(String(d.start), String(d.end))]} /></Link>
               ))}
             </nav>
           )}
@@ -140,9 +140,9 @@ export default async function InventoryPage({
   const canCount = can(user.role, "inventory:count");
 
   const intro = !progress.done.catalog
-    ? "الجرد يقارن ما وُجد على الرف بما كان ينبغي أن يُصرف. ولذلك يحتاج إلى ثلاث خطوات بالترتيب، وأولها الكتالوج."
+    ? "الجرد يقارن ما وُجد على الرف بما كان يُفترض أن يُصرف، لذلك يحتاج إلى ثلاث خطوات بالترتيب، أولها الكتالوج."
     : !progress.done.sales
-      ? "الكتالوج جاهز. ارفع ملف مبيعات الأسبوع ليعرف النظام ما كان ينبغي أن يُصرف."
+      ? "الكتالوج جاهز. ارفع ملف مبيعات الأسبوع ليعرف النظام ما كان يُفترض أن يُصرف."
       : `جاهز لجرد أسبوع ${formatWeek(week.start, week.end)}، وهو آخر أسبوع مكتمل.`;
 
   return (
@@ -152,7 +152,7 @@ export default async function InventoryPage({
       title="الجرد الحالي"
       intro={intro}
       actions={showAmounts && setup.finalised > 0
-        ? <LinkButton href="/inventory/history" size="sm" icon={History}>سجلّ الجرد</LinkButton>
+        ? <LinkButton href="/inventory/history" size="sm" icon={History}>سجل الجرد</LinkButton>
         : undefined}
     >
       {/* ── طريقُ البداية: يُعرَض حتى يوجد الكتالوجُ والمبيعات ── */}
@@ -164,10 +164,10 @@ export default async function InventoryPage({
           <div className="min-w-0">
             <h2 id="setup-title" className="flex items-center gap-2 text-base font-bold">
               <Sparkles className="h-[18px] w-[18px] text-accent" strokeWidth={2} aria-hidden />
-              {setup.counts === 0 && !progress.done.catalog ? "جهّز أول جرد" : "بقيت خطوات لإكمال الجرد"}
+              {setup.counts === 0 && !progress.done.catalog ? "جهّز أول جرد" : "خطوات قليلة لإكمال الجرد"}
             </h2>
             <p className="mb-4 mt-1 text-xs leading-relaxed text-ink-soft">
-              لا يمكن للجرد أن يقول «لا فرق» وهو لا يعرف ما بِيع. أكمل الخطوات بالترتيب، كل خطوة مرة واحدة، ثم ارفع المبيعات كل أحد.
+              لا يمكن للجرد أن يقول «لا فرق» وهو لا يعرف ما بيع. أكمل الخطوات بالترتيب، كل خطوة مرة واحدة، ثم ارفع المبيعات كل يوم أحد.
             </p>
             <SetupJourney facts={setup} />
           </div>
@@ -191,16 +191,16 @@ export default async function InventoryPage({
               branches={branchRows.map((b) => ({ id: b.id, name: b.nameAr }))}
               prerequisite={
                 !progress.done.catalog
-                  ? "بدون كتالوج لا توجد وصفات تُحسب بها المبيعات، فيظهر الجرد بلا فرق محسوب. ابدأ بالكتالوج أولاً."
+                  ? "بدون الكتالوج لا توجد وصفات تُحسب بها المبيعات، فيظهر الجرد بلا فرق محسوب. ابدأ بالكتالوج."
                   : !progress.done.sales
-                    ? "لا توجد مبيعات مستوردة بعد. يمكنك أن تبدأ العدّ الآن، وسيُحسب الفرق عند وصول ملف الأسبوع."
+                    ? "لا توجد مبيعات مستوردة بعد. يمكنك بدء العدّ الآن، وسيُحسب الفرق عند وصول ملف الأسبوع."
                     : null
               }
             />
           ) : (
             <Card>
               <p className="text-sm font-bold">لا يوجد جرد مفتوح الآن.</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted">بدء الجرد ليس من صلاحياتك. يبدؤه المالك أو المدير، ثم تجده هنا لتبدأ العدّ.</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">ليست لديك صلاحية بدء الجرد. يبدؤه المالك أو المدير، ثم تجده هنا لتبدأ العدّ.</p>
             </Card>
           )}
         </div>
@@ -230,13 +230,13 @@ export default async function InventoryPage({
               value={setup.salesThrough ? `حتى ${formatDay(setup.salesThrough)}` : "لم تصل بعد"}
               tone={setup.salesThrough ? undefined : "warn"}
               sub={setup.salesThrough
-                ? (setup.unmapped > 0 ? `و${countNoun(setup.unmapped, PRODUCT)} مباعة تنتظر الربط` : "من ملفات فودكس المستوردة")
+                ? (setup.unmapped > 0 ? `و${countNoun(setup.unmapped, PRODUCT)} منتجات مباعة تنتظر الربط` : "من ملفات فودكس المستوردة")
                 : "تأتي من ملف فودكس فقط، ولا يُفترض شيء بدونه"}
               href={canCount ? (setup.unmapped > 0 ? "/inventory/mapping" : "/inventory/import#sales") : undefined}
             />
             <FactTile
               icon={ClipboardCheck}
-              label="جردات مقفلة"
+              label="جرود مقفلة"
               value={setup.finalised === 0 ? "لا يوجد جرد بعد" : countNoun(setup.finalised, COUNT)}
               tone={setup.finalised === 0 ? "muted" : undefined}
               sub={setup.finalised === 0 ? "يمتلئ السجل عند إقفال أول جرد" : "بأرقامها النهائية كما أُقفلت"}
@@ -255,12 +255,11 @@ export default async function InventoryPage({
       */}
       {recent.length > 0 && (
         <Section
-          title="آخر الجردات المقفلة"
+          title="آخر الجرود المقفلة"
           icon={History}
           action={showAmounts ? (
             <Link href="/inventory/history" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
-              السجل كاملاً <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            </Link>
+              <T s="السجل كاملاً {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
           ) : undefined}
         >
           <ul className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-3">
@@ -270,7 +269,7 @@ export default async function InventoryPage({
                   href={`/inventory/counts/${c.id}`}
                   className="group block h-full rounded-xl border border-line bg-raised p-4 shadow-raised transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-accent-line hover:shadow-lifted"
                 >
-                  <span className="block text-[13px] font-bold group-hover:text-accent">أسبوع {formatWeek(c.periodStart, c.periodEnd)}</span>
+                  <span className="block text-[13px] font-bold group-hover:text-accent"><T s="أسبوع {0}" a={[formatWeek(c.periodStart, c.periodEnd)]} /></span>
                   {c.branchName && <span className="mt-0.5 block text-[11px] text-muted">{c.branchName}</span>}
                   {/* النقصُ والزيادةُ لا يتقاصّان — يُعرضان جنباً إلى جنب */}
                   <span className="mt-3 grid grid-cols-2 gap-2">

@@ -21,7 +21,7 @@ export type CommitmentKind = "SUPPLIER_RUN" | "RECURRING" | "VAT" | "EXPIRY";
 
 export const COMMITMENT_LABEL: Record<CommitmentKind, string> = {
   SUPPLIER_RUN: "دفعة المورّدين",
-  RECURRING: "متكرّر",
+  RECURRING: "متكرر",
   VAT: "ضريبة",
   EXPIRY: "وثيقة تنتهي",
 };
@@ -124,8 +124,8 @@ export function buildCommitments(input: CommitmentsInput): Commitments {
       id: `vat:${v.periodKey}`,
       kind: "VAT",
       label: `آخر موعد لإقرار ${v.label}`,
-      sub: v.amountMinor === null ? "المبلغ غير معروف لأن شهراً منه بلا كشف بنك"
-        : v.amountMinor <= 0 ? "لا يوجد مبلغ مستحق السداد حالياً، لكن يجب تقديم الإقرار"
+      sub: v.amountMinor === null ? "المبلغ غير معروف، لأن أحد أشهره بلا كشف بنك"
+        : v.amountMinor <= 0 ? "لا مبلغ مستحق السداد الآن، لكن يجب تقديم الإقرار"
         : v.accruing ? "المبلغ حتى اليوم، وسيزيد" : undefined,
       amountMinor: v.amountMinor === null ? null : Math.max(0, v.amountMinor),
       href: `/close/vat?period=${v.periodKey}`,

@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       entityId: body.id,
       after: { الحالة: "معطّل" },
     });
-    return NextResponse.json({ ok: true, message: "تم تعطيل المصروف دون حذفه" });
+    return NextResponse.json({ ok: true, message: "عُطّل المصروف ولم يُحذف" });
   }
 
   /* المعطَّل يُعاد — نقرةٌ خاطئة على «عطّله» لم يكن لها رجوع */
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
       entityId: body.id,
       after: { البند: row.label, الحالة: "مفعّل" },
     });
-    return NextResponse.json({ ok: true, message: `أُعيد «${row.label}» إلى المصروفات المتوقّعة` });
+    return NextResponse.json({ ok: true, message: `أُعيد «${row.label}» إلى المصروفات المتوقعة` });
   }
 
   const label = body.label?.trim();
@@ -139,5 +139,5 @@ export async function POST(request: Request) {
     after: { البند: label, المبلغ_بالهللة: amountMinor, الدورة: cadence, التصنيف: body.category, أوّل_استحقاق: startsOn },
   });
 
-  return NextResponse.json({ ok: true, id: row.id, message: `تمت إضافة «${label}»` });
+  return NextResponse.json({ ok: true, id: row.id, message: `أُضيف «${label}»` });
 }

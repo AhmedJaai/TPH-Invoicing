@@ -13,6 +13,7 @@ import { countNoun, BLOCKER, CHECK, WARNING } from "@/lib/arabic";
 import { formatMonth } from "@/lib/riyadh-time";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui-tokens";
+import { T } from "@/components/i18n/t";
 
 interface Response {
   report: MonthCloseReport;
@@ -86,9 +87,9 @@ export function MonthClose({
           return false;
         }
         setData(r.data);
-        if (action === "close") toast({ tone: "ok", title: `تم إقفال ${formatMonth(forMonth)}`, body: "وحزمة المحاسب جاهزة أدناه." });
+        if (action === "close") toast({ tone: "ok", title: `أُقفل ${formatMonth(forMonth)}`, body: "وحزمة المحاسب جاهزة أدناه." });
         if (action === "reopen") toast({ tone: "warn", title: `أُعيد فتح ${formatMonth(forMonth)}`, body: "سُجّلت إعادة الفتح في سجل التدقيق باسمك." });
-        if (action === "balances") toast({ tone: "ok", title: "تم حفظ الرصيدين وإعادة الفحص" });
+        if (action === "balances") toast({ tone: "ok", title: "حُفظ الرصيدان وأُعيد الفحص" });
         if (action !== "check") router.refresh();
         return true;
       } finally {
@@ -115,8 +116,7 @@ export function MonthClose({
       {/* ── الشهر ── */}
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-2 text-xs text-muted">
-          الشهر
-          <select
+          <T s="الشهر{0}" a={[<select key="0"
             value={month}
             onChange={(e) => {
               setMonth(e.target.value);
@@ -127,12 +127,9 @@ export function MonthClose({
             {months.map((m) => (
               <option key={m} value={m}>{formatMonth(m)}</option>
             ))}
-          </select>
-        </label>
+          </select>]} /></label>
         <button aria-busy={busy === "checking"} onClick={() => void call("check", month)} disabled={busy !== null} className={buttonClass("secondary", "sm")}>
-          <RotateCw className={`h-3.5 w-3.5 ${busy === "checking" ? "animate-spin" : ""}`} strokeWidth={2} aria-hidden />
-          أعد الفحص
-        </button>
+          <T s="{0}أعد الفحص" a={[<RotateCw key="0" className={`h-3.5 w-3.5 ${busy === "checking" ? "animate-spin" : ""}`} strokeWidth={2} aria-hidden />]} /></button>
       </div>
 
       {error && (
@@ -159,21 +156,17 @@ export function MonthClose({
                 {isClosed ? <Lock className="h-7 w-7" strokeWidth={1.75} aria-hidden /> : report.canClose ? <CircleCheck className="h-7 w-7" strokeWidth={1.75} aria-hidden /> : <CircleAlert className="h-7 w-7" strokeWidth={1.75} aria-hidden />}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-muted">إقفال {formatMonth(month)}</p>
+                <p className="text-xs font-bold text-muted"><T s="إقفال {0}" a={[formatMonth(month)]} /></p>
                 <p className="mt-1 text-2xl font-bold tracking-tight">
                   {isClosed ? "الشهر مقفل" : report.canClose ? "جاهز للإقفال" : "غير جاهز للإقفال"}
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                  اجتاز <span className="nums font-bold">{passed}</span> من {countNoun(total, CHECK)}
-                  {report.blockers.length > 0 && <> · {countNoun(report.blockers.length, BLOCKER)} يجب حلّه</>}
-                  {report.warnings.length > 0 && <> · {countNoun(report.warnings.length, WARNING)} لا يمنع الإقفال</>}
-                </p>
+                  <T s="اجتاز {0} من {1}{2}{3}" a={[<span key="0" className="nums font-bold">{passed}</span>, countNoun(total, CHECK), report.blockers.length > 0 && <> <T s=" · {0} يجب حلّها" a={[countNoun(report.blockers.length, BLOCKER)]} /></>, report.warnings.length > 0 && <> <T s=" · {0} لا يمنع الإقفال" a={[countNoun(report.warnings.length, WARNING)]} /></>]} /></p>
               </div>
               {/* الجوابُ ومعه الخطوةُ التالية: المانعُ الأوّل بضغطة، لا بالبحث عنه في القائمة */}
               {!isClosed && firstBlocker && (
                 <a href={`#check-${firstBlocker.id}`} className={buttonClass("primary", "md")}>
-                  إلى المانع <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
-                </a>
+                  <T s="إلى المانع {0}" a={[<ArrowLeft key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></a>
               )}
             </div>
             <div className="flex gap-1 px-5 pb-5 sm:px-6" aria-hidden>
@@ -225,8 +218,7 @@ export function MonthClose({
                           </div>
                           {i.href && i.state !== "PASS" && (
                             <Link href={i.href} className={buttonClass(i.state === "BLOCK" ? "primary" : "secondary", "sm")}>
-                              أصلح <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                            </Link>
+                              <T s="أصلح {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
                           )}
                         </li>
                       );
@@ -248,10 +240,9 @@ export function MonthClose({
                 void call("balances", month, { openingBalance: opening, closingBalance: closing });
               }}
             >
-              <h3 className="text-[15px] font-bold">رصيدا الحساب في {formatMonth(month)}</h3>
+              <h3 className="text-[15px] font-bold"><T s="رصيدا الحساب في {0}" a={[formatMonth(month)]} /></h3>
               <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                اكتبهما كما في كشف البنك: الرصيد قبل أول حركة في الشهر، والرصيد بعد آخر حركة. بهما تُفحص
-                المعادلة: الافتتاحي + الوارد − الصادر = الختامي.
+                اكتبهما كما في كشف البنك: الرصيد قبل أول حركة في الشهر، والرصيد بعد آخر حركة. بهما تُفحص المعادلة: الافتتاحي + الداخل − الخارج = الختامي.
               </p>
               <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
                 <label className="block text-xs">
@@ -294,17 +285,13 @@ export function MonthClose({
           {!isClosed ? (
             <section className="rounded-xl border border-line bg-raised p-5 shadow-raised">
               <h3 className="flex items-center gap-2 text-[15px] font-bold">
-                <Lock className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-                <span className="nums text-muted">{grouped.length + 1}.</span> الإقفال
-              </h3>
+                <T s="{0}{1} الإقفال" a={[<Lock key="0" className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />, <span key="1" className="nums text-muted">{grouped.length + 1}.</span>]} /></h3>
               {report.canClose ? (
                 <>
                   <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
-                    {report.warnings.length === 0
-                      ? "لا يوجد ما يمنع الإقفال ولا تنبيهات. "
-                      : `لا يوجد مانع، لكن هناك ${countNoun(report.warnings.length, WARNING)} ستقرّ بها. `}
-                    بعد الإقفال لن تقبل الأرشفة أي مستند جديد لهذا الشهر، ويمكنك إعادة فتحه عند وصول فاتورة متأخرة.
-                  </p>
+                    <T s="{0}بعد الإقفال لن يقبل الأرشيف أي مستند جديد لهذا الشهر، ويمكنك إعادة فتحه إن وصلت فاتورة متأخرة." a={[report.warnings.length === 0
+                      ? "لا مانع من الإقفال ولا تنبيهات. "
+                      : `لا مانع، لكن هناك ${countNoun(report.warnings.length, WARNING)} ستقرّ بها. `]} /></p>
                   {report.warnings.length > 0 && (
                     <label className="mt-3 block text-xs">
                       <span className="font-bold text-ink-soft">سبب الإقفال مع التنبيهات</span>
@@ -328,10 +315,10 @@ export function MonthClose({
                       title={`إقفال ${formatMonth(month)}`}
                       consequence={
                         report.warnings.length > 0
-                          ? `بعد الإقفال لن تقبل الأرشفة أي مستند لهذا الشهر، وستقرّ بـ${countNoun(report.warnings.length, WARNING)} كما هو. ويمكنك إعادة فتحه عند وصول فاتورة متأخرة.`
-                          : "بعد الإقفال لن تقبل الأرشفة أي مستند لهذا الشهر. ويمكنك إعادة فتحه عند وصول فاتورة متأخرة."
+                          ? `بعد الإقفال لن يقبل الأرشيف أي مستند لهذا الشهر، وستقرّ بـ${countNoun(report.warnings.length, WARNING)} كما هو. ويمكنك إعادة فتحه إن وصلت فاتورة متأخرة.`
+                          : "بعد الإقفال لن يقبل الأرشيف أي مستند لهذا الشهر، ويمكنك إعادة فتحه إن وصلت فاتورة متأخرة."
                       }
-                      acknowledgement={`أقرّ بأن جميع فواتير ${formatMonth(month)} قد وصلت، وأن ما بقي من تنبيهات مقصود وليس سهواً.`}
+                      acknowledgement={`أقرّ بأن كل فواتير ${formatMonth(month)} وصلت، وأن التنبيهات الباقية مقصودة لا سهو.`}
                       confirmLabel={`أقفل ${formatMonth(month)}`}
                       onConfirm={() => call("close", month)}
                     />
@@ -339,18 +326,15 @@ export function MonthClose({
                 </>
               ) : (
                 <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
-                  <span className="font-bold text-danger">{countNoun(report.blockers.length, BLOCKER)} يجب معالجته قبل الإقفال.</span>{" "}
-                  هذه أخطاء في البيانات نفسها وليست أموراً يمكنك الإقرار بها. أصلحها من أزرار «أصلح» أعلاه ثم أعد الفحص.
-                </p>
+                  <T s="{0} هذه أخطاء في البيانات نفسها، لا أمور تقرّ بها. أصلحها بأزرار «أصلح» أعلاه، ثم أعد الفحص." a={[<span key="0" className="font-bold text-danger"><T s="{0} يجب حلّها قبل الإقفال." a={[countNoun(report.blockers.length, BLOCKER)]} /></span>]} /></p>
               )}
             </section>
           ) : (
             <section className="rounded-xl border border-line bg-raised p-5 shadow-raised">
               <h3 className="flex items-center gap-2 text-[15px] font-bold">
-                <Lock className="h-4 w-4 text-ok" strokeWidth={2} aria-hidden /> هذا الشهر مقفل
-              </h3>
+                <T s="{0} هذا الشهر مقفل" a={[<Lock key="0" className="h-4 w-4 text-ok" strokeWidth={2} aria-hidden />]} /></h3>
               <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
-                لا تقبل الأرشفة إضافة مستندات إليه. إذا وصلتك فاتورة متأخرة تخصه، أعد فتحه، وسيُسجَّل ذلك باسمك.
+                لا يقبل الأرشيف مستندات جديدة لهذا الشهر. إن وصلتك فاتورة متأخرة تخصه فأعد فتحه، وسيُسجَّل ذلك باسمك.
               </p>
               <div className="mt-4">
                 <ConfirmAction
@@ -359,8 +343,8 @@ export function MonthClose({
                   tone="warn"
                   disabled={busy !== null}
                   title={`إعادة فتح ${formatMonth(month)}`}
-                  consequence="ستقبل الأرشفة إضافة مستندات إليه من جديد، وستُسجَّل إعادة الفتح في سجل التدقيق باسمك. وستتغير تقارير الشهر بما يُضاف بعد ذلك."
-                  acknowledgement="أقرّ بأن لدي ما يخص هذا الشهر ولم يُدرج فيه."
+                  consequence="سيقبل الأرشيف مستندات جديدة لهذا الشهر، وتُسجَّل إعادة الفتح في سجل التدقيق باسمك. وستتغيّر تقارير الشهر بما يُضاف بعدها."
+                  acknowledgement="أقرّ بأن عندي ما يخص هذا الشهر ولم يُضَف إليه."
                   confirmLabel={`افتح ${formatMonth(month)}`}
                   onConfirm={() => call("reopen", month)}
                 />
@@ -375,30 +359,22 @@ export function MonthClose({
                 <FileSpreadsheet className="h-6 w-6" strokeWidth={1.75} aria-hidden />
               </span>
               <div className="min-w-0 flex-1">
-                <h3 className="text-[15px] font-bold">حزمة المحاسب — {formatMonth(month)}</h3>
+                <h3 className="text-[15px] font-bold"><T s="حزمة المحاسب: {0}" a={[formatMonth(month)]} /></h3>
                 <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
-                  ملف Excel بست أوراق (الملخص · الفواتير · الضريبة · الدفعات · المصروفات · حركات البنك)، أو نسخة للطباعة أو الحفظ بصيغة PDF بالأرقام نفسها.
-                  {isClosed ? " الشهر مقفل، فأرقامه ثابتة." : " الشهر مفتوح، وقد تتغير أرقامه بعد التنزيل، وهذا مذكور في الملف."}
-                </p>
+                  <T s="ملف Excel من ست أوراق (الملخص · الفواتير · الضريبة · الدفعات · المصروفات · حركات البنك)، أو نسخة للطباعة أو الحفظ بصيغة PDF بالأرقام نفسها.{0}" a={[isClosed ? " الشهر مقفل، فأرقامه ثابتة." : " الشهر مفتوح، وقد تتغيّر أرقامه بعد التنزيل، وهذا مذكور في الملف."]} /></p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <a href={`/api/export/accountant?month=${month}`} download className={buttonClass(isClosed ? "primary" : "secondary")}>
-                  <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
-                  نزّل Excel
-                </a>
+                  <T s="{0}نزّل Excel" a={[<Download key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></a>
                 <Link href={`/close/pack?month=${month}`} className={buttonClass("secondary")}>
-                  <Printer className="h-4 w-4" strokeWidth={2} aria-hidden />
-                  اعرضها للطباعة
-                </Link>
+                  <T s="{0}اعرضها للطباعة" a={[<Printer key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></Link>
               </div>
             </div>
           </section>
 
           {isClosed && (
             <p className="flex items-center gap-1.5 text-[11px] text-muted">
-              <Unlock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              تُسجَّل إعادة الفتح والإقفال في سجل التدقيق بالاسم والوقت.
-            </p>
+              <T s="{0}تُسجَّل إعادة الفتح والإقفال في سجل التدقيق بالاسم والوقت." a={[<Unlock key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></p>
           )}
         </>
       )}

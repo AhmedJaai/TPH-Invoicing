@@ -8,7 +8,7 @@ import { asLocale, DICTIONARY_URL, LOCALE_COOKIE } from "@/lib/i18n/locale";
 
 export const metadata: Metadata = {
   title: "ذا بوبليك هاوس — المال والتشغيل",
-  description: "ماذا تحتاج أن تعرف أو تفعل اليوم، من وصول الفاتورة حتى قيدها وسدادها وإقفال الشهر",
+  description: "ماذا تحتاج أن تعرف أو تفعل اليوم، من وصول الفاتورة إلى تسجيلها وسدادها وإقفال الشهر",
   appleWebApp: { capable: true, title: "ذا بوبليك هاوس", statusBarStyle: "black-translucent" },
   manifest: "/manifest.webmanifest",
 };

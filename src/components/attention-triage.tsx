@@ -14,6 +14,7 @@ import {
 } from "@/lib/attention-triage";
 import { ITEM, countNoun, nounForm } from "@/lib/arabic";
 import type { StartState } from "@/lib/start";
+import { T } from "@/components/i18n/t";
 
 /**
  * «يحتاج قرارك» — صندوقُ فرزٍ لا قائمةُ تنبيهات.
@@ -97,13 +98,13 @@ function ItemGlyph({ id, className, strokeWidth = 2 }: { id: string; className: 
 const IMPACT: Record<ImpactKind, { icon: LucideIcon; text: string; hint: string; unknownHint: string }> = {
   RECOVERABLE: {
     icon: RotateCcw, text: "text-ok",
-    hint: "مال خرج وقد يعود إن طالبت به.",
+    hint: "مال خرج، وقد يعود إن طالبت به.",
     unknownHint: "قد يعود مال، ولم يُحسب مقداره بعد.",
   },
   AT_RISK: {
     icon: ShieldAlert, text: "text-danger",
     hint: "مال قد يضيع إن لم تعالجه.",
-    unknownHint: "قد يضيع مال لا يُعرف مقداره حتى تُقرأ بياناته.",
+    unknownHint: "قد يضيع مال، ولن يُعرف مقداره حتى تُقرأ بياناته.",
   },
   OWED: {
     icon: Clock, text: "text-warn",
@@ -112,12 +113,12 @@ const IMPACT: Record<ImpactKind, { icon: LucideIcon; text: string; hint: string;
   },
   UNATTRIBUTED: {
     icon: CircleHelp, text: "text-info",
-    hint: "مبلغ معلوم لم يُنسب إلى جهته بعد.",
-    unknownHint: "تنقص أرقامك بمقدار غير معروف حتى يصل ما ينقصها.",
+    hint: "مبلغ معروف لم يُنسب إلى جهته بعد.",
+    unknownHint: "أرقامك ناقصة بقدر غير معروف حتى يصل ما ينقصها.",
   },
   ANNUAL: {
     icon: TrendingUp, text: "text-plum",
-    hint: "تقدير لسنة قادمة، ولم يخرج مال.",
+    hint: "تقدير لسنة قادمة، ولم يخرج مال بعد.",
     unknownHint: "أثر سنوي لم يُقدَّر بعد.",
   },
   BLOCKED: {
@@ -173,7 +174,7 @@ export function TriageSummary({ items }: { items: readonly AttentionItem[] }) {
         {stakes.length > 0 && (
           <div className="min-w-0 flex-1 border-t border-line-soft pt-4 xl:border-t-0 xl:border-s xl:ps-6 xl:pt-0">
             <p className="mb-2.5 text-[11px] font-medium text-muted">
-              المال المعلّق بها، ولكل نوع مجموعه المستقل
+              المال المعلّق بها، ولكل نوع مجموعه وحده
             </p>
             <dl className="grid grid-cols-2 gap-x-5 gap-y-3.5 sm:grid-cols-3 xl:flex xl:flex-wrap xl:gap-x-8">
               {stakes.map((s) => (
@@ -262,8 +263,7 @@ export function TriageList({
         );
       })}
       <p className="hidden px-1 text-[11px] text-muted lg:block">
-        تنقّل بـ<Kbd>J</Kbd> و<Kbd>K</Kbd>، وافتح البند بـ<Kbd>Enter</Kbd>.
-      </p>
+        <T s="تنقّل بـ{0} و{1}، وافتح البند بـ{2}." a={[<Kbd key="0">J</Kbd>, <Kbd key="1">K</Kbd>, <Kbd key="2">Enter</Kbd>]} /></p>
     </div>
   );
 }
@@ -326,22 +326,18 @@ function TriageRow({ item, lens, active, then }: { item: AttentionItem; lens: Le
           <span>{IMPACT_LABEL[kind]}</span>
           {signal && (
             <span className="inline-flex items-center gap-1 rounded-full bg-plum-bg px-1.5 font-bold text-plum">
-              <Activity className="h-3 w-3" strokeWidth={2.25} aria-hidden />
-              إشارة
-            </span>
+              <T s="{0}إشارة" a={[<Activity key="0" className="h-3 w-3" strokeWidth={2.25} aria-hidden />]} /></span>
           )}
           {inPlace && (
             <span className="inline-flex items-center gap-1 font-bold text-accent">
-              <Zap className="h-3 w-3" strokeWidth={2.25} aria-hidden />
-              يحسم هنا
-            </span>
+              <T s="{0}تقرّر فيه هنا" a={[<Zap key="0" className="h-3 w-3" strokeWidth={2.25} aria-hidden />]} /></span>
           )}
         </p>
 
         {/* فعلُ الإشارة بضغطةٍ واحدة — وما يُحسم هنا فعلُه الصفُّ نفسه */}
         {signal && !inPlace && (
           <Link href={item.href} className={`${buttonClass("subtle", "sm")} mt-2`}>
-            {item.actionLabel ?? "افتح السجلّات"}
+            {item.actionLabel ?? "افتح السجلات"}
             <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
           </Link>
         )}
@@ -392,10 +388,7 @@ export function ItemDetail({
           href={lensHref(lens)}
           className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-ink-soft hover:text-accent"
         >
-          <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden />
-          كلّ البنود
-          <span className="nums font-medium text-muted">({list.length})</span>
-        </Link>
+          <T s="{0}كل البنود{1}" a={[<ChevronRight key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />, <span key="1" className="nums font-medium text-muted">({list.length})</span>]} /></Link>
         <Pager nav={nav} total={list.length} lens={lens} />
       </div>
 
@@ -407,9 +400,7 @@ export function ItemDetail({
               <Badge>{AREA_LABEL[item.area]}</Badge>
               {isSignal(item) && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-plum/25 bg-plum-bg px-2 py-0.5 text-[11px] font-bold leading-5 text-plum">
-                  <Activity className="h-3 w-3" strokeWidth={2.25} aria-hidden />
-                  تنبيه مالي
-                </span>
+                  <T s="{0}تنبيه مالي" a={[<Activity key="0" className="h-3 w-3" strokeWidth={2.25} aria-hidden />]} /></span>
               )}
             </div>
             <div className="hidden lg:block">
@@ -453,16 +444,12 @@ export function ItemDetail({
           <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 md:grid-cols-2">
             <div>
               <h3 className="flex items-center gap-1.5 text-[11px] font-bold text-muted">
-                <ScanSearch className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                لماذا ظهر
-              </h3>
+                <T s="{0}لماذا ظهر؟" a={[<ScanSearch key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></h3>
               <p className="mt-1.5 text-sm leading-relaxed text-ink-soft"><Prose text={item.detail} /></p>
             </div>
             <div>
               <h3 className="flex items-center gap-1.5 text-[11px] font-bold text-muted">
-                <ListChecks className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                ما المطلوب
-              </h3>
+                <T s="{0}ما المطلوب؟" a={[<ListChecks key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></h3>
               <p className="mt-1.5 text-sm font-medium leading-relaxed"><Prose text={item.action} /></p>
             </div>
           </div>
@@ -471,19 +458,17 @@ export function ItemDetail({
             {workspace ? (
               <>
                 <a href="#resolve" className={buttonClass("primary", "md")}>
-                  <ArrowDown className="h-4 w-4" strokeWidth={2} aria-hidden />
-                  قرّر هنا
-                </a>
+                  <T s="{0}قرّر هنا" a={[<ArrowDown key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></a>
                 {outward && (
                   <LinkButton href={item.href} variant="quiet" size="md">
-                    افتح سجلّاته كاملة
+                    افتح كل سجلاته
                   </LinkButton>
                 )}
               </>
             ) : (
               <>
                 <LinkButton href={item.href} variant="primary" size="md" icon={ArrowLeft}>
-                  {item.actionLabel ?? "افتح السجلّات"}
+                  {item.actionLabel ?? "افتح السجلات"}
                 </LinkButton>
                 <span className="text-[11px] text-muted">يفتح الصفحة التي تصلحه، ويخرج من هنا حين يُصلَح.</span>
               </>
@@ -503,10 +488,8 @@ export function ItemDetail({
         <section id="resolve" aria-labelledby="resolve-title" className="scroll-mt-24">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h3 id="resolve-title" className="flex items-center gap-2 text-[15px] font-bold">
-              <Zap className="h-[18px] w-[18px] text-accent" strokeWidth={2} aria-hidden />
-              قرّر هنا
-            </h3>
-            <p className="text-[11px] text-muted">ما تفعله يُحفظ فوراً، ويخرج البند من القائمة حين يُحسم كله.</p>
+              <T s="{0}قرّر هنا" a={[<Zap key="0" className="h-[18px] w-[18px] text-accent" strokeWidth={2} aria-hidden />]} /></h3>
+            <p className="text-[11px] text-muted">ما تفعله يُحفظ فوراً، ويخرج البند من القائمة حين تقرّر في كل ما فيه.</p>
           </div>
           {workspace}
         </section>
@@ -536,8 +519,7 @@ function Pager({
         <span aria-hidden className={`${cell} opacity-40`}><ChevronRight className="h-4 w-4" strokeWidth={2} /></span>
       )}
       <span className="min-w-12 text-center text-[11px] font-medium text-muted">
-        <span className="nums font-bold text-ink">{nav.index + 1}</span> من <span className="nums">{total}</span>
-      </span>
+        <T s="{0} من {1}" a={[<span key="0" className="nums font-bold text-ink">{nav.index + 1}</span>, <span key="1" className="nums">{total}</span>]} /></span>
       {nav.next ? (
         <Link href={itemHref(nav.next.id, lens, nav.after.next)} aria-label={`البند التالي: ${nav.next.title}`} className={`${cell} hover:bg-hover hover:text-ink`}>
           <ChevronLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
@@ -556,18 +538,15 @@ function EvidenceList({ evidence }: { evidence: readonly AttentionEvidence[] }) 
   return (
     <section aria-labelledby="evidence-title" className="overflow-hidden rounded-2xl border border-line bg-raised shadow-raised">
       <h3 id="evidence-title" className="flex items-center gap-2 border-b border-line-soft px-5 py-3.5 text-sm font-bold">
-        <ScanSearch className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-        الأساس الذي بُني عليه هذا البند
-        <span className="nums rounded-full bg-sunken px-2 py-0.5 text-[11px] text-ink-soft">{evidence.length}</span>
-      </h3>
+        <T s="{0}ما بُني عليه هذا البند{1}" a={[<ScanSearch key="0" className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />, <span key="1" className="nums rounded-full bg-sunken px-2 py-0.5 text-[11px] text-ink-soft">{evidence.length}</span>]} /></h3>
       <ul className="divide-y divide-line-soft">
         {shown.map((e, i) => <EvidenceRow key={i} e={e} />)}
       </ul>
       {rest.length > 0 && (
         <details className="group border-t border-line-soft">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-1.5 text-xs font-bold text-accent hover:bg-hover [&::-webkit-details-marker]:hidden">
-            <span className="group-open:hidden">اعرض الباقي <span className="nums">({rest.length})</span></span>
-            <span className="hidden group-open:inline">أخف الباقي</span>
+            <span className="group-open:hidden"><T s="اعرض الباقي {0}" a={[<span key="0" className="nums">({rest.length})</span>]} /></span>
+            <span className="hidden group-open:inline">أخفِ الباقي</span>
             <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" strokeWidth={2} aria-hidden />
           </summary>
           <ul className="divide-y divide-line-soft border-t border-line-soft">
@@ -616,7 +595,7 @@ export function WorkspaceSkeleton() {
           <div className="skeleton h-8 w-28 rounded-lg" />
         </div>
       ))}
-      <span className="sr-only">جارٍ تحميل الإجراء…</span>
+      <span className="sr-only">يحمّل الإجراء…</span>
     </div>
   );
 }
@@ -655,10 +634,8 @@ export function AllClear({ start, canPay = false }: { start: StartState; canPay?
       {start.incomplete && next && (
         <section className="rounded-2xl border border-accent-line bg-accent-soft/60 p-5">
           <h2 className="flex items-center gap-2 text-sm font-bold">
-            <Sparkles className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />
-            هذه النتيجة تخص ما قُرئ فقط
-          </h2>
-          <p className="mb-4 mt-1 text-xs leading-relaxed text-ink-soft">ما لم يُستورد بعد غير معروف وليس سليماً. أكمله ليُفحص.</p>
+            <T s="{0}هذه النتيجة تخص ما قُرئ فقط" a={[<Sparkles key="0" className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />]} /></h2>
+          <p className="mb-4 mt-1 text-xs leading-relaxed text-ink-soft">ما لم يُستورد بعد غير معروف، لا سليم. أكمله ليُفحص.</p>
           <StartSteps start={start} />
         </section>
       )}
@@ -671,11 +648,9 @@ export function KnowsNothing({ start }: { start: StartState }) {
   return (
     <section className="animate-rise rounded-2xl border border-accent-line bg-accent-soft/60 p-5 sm:p-6">
       <h2 className="flex items-center gap-2 text-base font-bold">
-        <Sparkles className="h-[18px] w-[18px] text-accent" strokeWidth={2} aria-hidden />
-        لا يعرف النظام شيئاً بعد
-      </h2>
+        <T s="{0}لا يعرف النظام شيئاً بعد" a={[<Sparkles key="0" className="h-[18px] w-[18px] text-accent" strokeWidth={2} aria-hidden />]} /></h2>
       <p className="mb-4 mt-1 max-w-2xl text-xs leading-relaxed text-ink-soft">
-        يظهر هنا ما يحتاج قرارك بعد أن يقرأ النظام مستنداتك وكشف بنكك. وخلو القائمة الآن لا يعني أن كل شيء سليم.
+        هنا يظهر ما يحتاج قرارك بعد أن يقرأ النظام مستنداتك وكشف بنكك. وخلو القائمة الآن لا يعني أن كل شيء سليم.
       </p>
       <StartSteps start={start} />
     </section>
@@ -703,14 +678,14 @@ function StartSteps({ start }: { start: StartState }) {
 
 /** عدسةٌ فرغت (حُسم آخرُ ما فيها) والطابورُ غيرُ فارغ. */
 export function LensEmpty({ lens }: { lens: Lens }) {
-  const label = lens === "signals" ? "الإشارات" : lens === "all" ? "الطابور" : AREA_LABEL[lens];
+  const label = lens === "signals" ? "الإشارات" : lens === "all" ? "القائمة" : AREA_LABEL[lens];
   return (
     <div className="rounded-2xl border border-dashed border-line bg-raised/60 px-6 py-12 text-center">
       <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-ok-bg text-ok">
         <CircleCheck className="h-5 w-5" strokeWidth={1.9} aria-hidden />
       </span>
-      <p className="mt-3 text-sm font-bold">لا شيء في «{label}» الآن.</p>
-      <p className="mx-auto mt-1 max-w-sm text-xs text-muted">تم حسم ما كان فيه، وبقي غيره في القائمة.</p>
+      <p className="mt-3 text-sm font-bold"><T s="لا شيء في «{0}» الآن." a={[label]} /></p>
+      <p className="mx-auto mt-1 max-w-sm text-xs text-muted">قرّرت في ما كان فيه، وبقي غيره في القائمة.</p>
       <div className="mt-5">
         <LinkButton href="/attention" variant="primary" icon={ArrowLeft}>اعرض كل البنود</LinkButton>
       </div>

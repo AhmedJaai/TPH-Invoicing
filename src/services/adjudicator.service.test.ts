@@ -93,7 +93,7 @@ describe("adjudicate — الحلقة كاملةً", () => {
       }),
     }));
     expect(bad.candidate).toBeNull();
-    expect(bad.refused).toContain("غير موجود في القائمة");
+    expect(bad.refused).toContain("ليس في القائمة");
   });
 
   it("يردّ الأدلّة التي ادّعاها ولم تقع", async () => {

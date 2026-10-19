@@ -137,7 +137,7 @@ export function buildProfitLoss(input: ProfitLossInput): ProfitLoss {
       id: "sales",
       label: "صافي المبيعات",
       amountMinor: null,
-      unavailableReason: "غير موصولة: لا يوجد مصدر للمبيعات",
+      unavailableReason: "غير موصولة: لا مصدر للمبيعات",
     });
     missing.push("المبيعات");
   } else {
@@ -158,7 +158,7 @@ export function buildProfitLoss(input: ProfitLossInput): ProfitLoss {
     id: "cogs",
     label: "تكلفة المبيعات",
     amountMinor: null,
-    unavailableReason: "تحتاج بيانات المخزون، فالمشتريات ليست تكلفة المبيعات",
+    unavailableReason: "تحتاج إلى بيانات المخزون، فالمشتريات ليست تكلفة المبيعات",
   });
   missing.push("المخزون");
 

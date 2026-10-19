@@ -186,7 +186,7 @@ export async function recordFromStoredReadings(
     const kind = doc.kind && doc.kind !== "UNKNOWN" ? doc.kind : x.documentKind ?? "";
     if (!INVOICE_KINDS.has(kind) && kind !== "STATEMENT") continue;
     if (doc.reading === null) {
-      out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["لا توجد قراءة محفوظة له. أعد قراءته من ملفه"] });
+      out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["لا قراءة محفوظة له. أعد قراءته من ملفه"] });
       continue;
     }
     /* ما سكت عنه النموذجُ ونطق به اسمُ الملفّ — سدٌّ لفراغ لا تصحيحٌ لقراءة */
@@ -218,7 +218,7 @@ export async function recordFromStoredReadings(
       }
       const end = date ?? (doc.periodMonth ? lastDayOf(doc.periodMonth) : null);
       if (!end) {
-        out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["التاريخ: لم يُقرأ، ولا يوجد شهر للمجلد"] });
+        out.missing.push({ documentId: doc.id, fileName: doc.fileName, reasons: ["التاريخ: لم يُقرأ، ولا شهر للمجلد"] });
         continue;
       }
       const item: BacklogItem = {

@@ -83,7 +83,7 @@ export interface SalesConnector {
  */
 export class NotConnectedError extends Error {
   constructor(name = "مصدر المبيعات") {
-    super(`${name} غير موصول. لن تظهر أرقام المبيعات قبل ربطه.`);
+    super(`${name} غير موصول، ولن تظهر أرقام المبيعات قبل ربطه.`);
     this.name = "NotConnectedError";
   }
 }

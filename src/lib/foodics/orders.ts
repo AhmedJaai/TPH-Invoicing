@@ -91,7 +91,7 @@ export function ordersToSalesFile(orders: readonly FoodicsOrder[]): ConvertedOrd
   for (const order of orders) {
     if (!isSettledOrder(order)) continue;
     if ((order.combos ?? []).length > 0) {
-      problems.push({ reference: order.reference, reason: "الطلب فيه «كومبو» وهذه الصيغة لم تُفحص بعد، فلم يُسجَّل بالتخمين" });
+      problems.push({ reference: order.reference, reason: "في الطلب «كومبو»، وهذه الصيغة لم تُفحص بعد، فلم يُسجَّل بالتخمين" });
       continue;
     }
 

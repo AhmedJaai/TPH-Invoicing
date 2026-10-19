@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
 import type { StepRow } from "./inventory-count-steps";
+import { T } from "@/components/i18n/t";
 
 /**
  * الأرصدةُ الافتتاحيّة دفعةً واحدة — لأوّل جرد، أو حين يبدأ المقهى.
@@ -94,9 +95,7 @@ export function OpeningGrid({
           {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
         <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line-input bg-raised px-3 text-xs sm:min-h-9">
-          <input type="checkbox" checked={onlyUnknown} onChange={(e) => setOnlyUnknown(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
-          غير المعروف فقط
-        </label>
+          <T s="{0}غير المعروف فقط" a={[<input key="0" type="checkbox" checked={onlyUnknown} onChange={(e) => setOnlyUnknown(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />]} /></label>
       </div>
 
       <ul className="mt-3 divide-y divide-line-soft">
@@ -105,7 +104,7 @@ export function OpeningGrid({
             <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
               {row.productName}
               {row.openingText !== null && (
-                <span className="text-muted"> — الرصيد الحالي {row.openingText} {row.openingSourceLabel}</span>
+                <span className="text-muted"> <T s=" — الرصيد الحالي {0} {1}" a={[row.openingText, row.openingSourceLabel]} /></span>
               )}
             </span>
             <input

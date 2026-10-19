@@ -42,5 +42,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "اكتب مبلغاً موجباً بالريال، أو اتركه فارغاً لإزالة الحد" }, { status: 400 });
   }
   await saveCashFloor(minor, user.id);
-  return NextResponse.json({ ok: true, message: `تم حفظ الحد: ${formatRiyalsDisplay(minor)} ريال` });
+  return NextResponse.json({ ok: true, message: `حُفظ الحد: ${formatRiyalsDisplay(minor)} ريال` });
 }

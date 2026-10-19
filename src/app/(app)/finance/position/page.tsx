@@ -11,13 +11,14 @@ import { daysSinceRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadFinancePosition, TILL_SMALL_MINOR, type TillRow } from "@/services/finance-position.service";
 import { loadFinanceAttentionFacts, tillSignalKey } from "@/services/finance-attention.service";
 import { SignalControls } from "@/components/signal-controls";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
 const tillColumns: Column<TillRow>[] = [
   { key: "day", header: "اليوم", primary: true, cell: (t) => <bdi>{formatDay(t.day)}</bdi> },
   { key: "who", header: "فتحه", cell: (t) => t.userName ?? "—", secondary: true },
-  { key: "expected", header: "المتوقّع في الدرج", numeric: true, cell: (t) => <MaybeMoney minor={t.expectedMinor} /> },
+  { key: "expected", header: "المتوقع في الدرج", numeric: true, cell: (t) => <MaybeMoney minor={t.expectedMinor} /> },
   { key: "counted", header: "المعدود", numeric: true, cell: (t) => (!t.closed ? <span className="text-[11px] text-muted">لم يُقفل</span> : <MaybeMoney minor={t.countedMinor} />) },
   {
     key: "variance", header: "الفرق", numeric: true,
@@ -51,38 +52,38 @@ export default async function FinancePositionPage() {
   const last = pos.cash.lastTill;
 
   return (
-    <PageShell user={user} width="wide" title="الوضع الآن" intro="رصيد البنك، وما عليك للمورّدين، وضريبة الإقرار القادم، والنقد الذي لا يظهر في كشف البنك.">
+    <PageShell user={user} width="wide" title="الوضع الآن" intro="رصيد البنك، والمستحق للمورّدين، وضريبة الإقرار القادم، والنقد الذي لا يظهر في كشف البنك.">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KeyFigure
           icon={Landmark}
           label="رصيد البنك"
           tone={bankAge !== null && bankAge > 7 ? "warn" : undefined}
           value={pos.bank.balanceMinor === null ? <span className="text-xl text-muted">غير معروف</span> : <Money minor={pos.bank.balanceMinor} currency />}
-          sub={pos.bank.asOf ? <>كما في آخر كشف تمت تسويته، <bdi>{formatDay(pos.bank.asOf)}</bdi>{bankAge !== null && bankAge > 7 && <>. مضى عليه {countNoun(bankAge, DAY)}، فاستورد كشفاً أحدث.</>}</> : "لا يوجد كشف مسوّى برصيد ختامي بعد."}
+          sub={pos.bank.asOf ? <><T s="حسب آخر كشف تمت تسويته، {0}{1}" a={[<bdi key="0">{formatDay(pos.bank.asOf)}</bdi>, bankAge !== null && bankAge > 7 && <><T s=". مرّ عليه {0}، فاستورد كشفاً أحدث." a={[countNoun(bankAge, DAY)]} /></>]} /></> : "لا يوجد بعد كشف مسوّى برصيد ختامي."}
           href="/bank"
         />
         <KeyFigure
           icon={HandCoins}
-          label="عليك للمورّدين"
+          label="المستحق للمورّدين"
           tone={overdueMinor > 0 ? "warn" : undefined}
           value={<Money minor={totals.owedMinor} currency />}
-          sub={<>لـ{countNoun(totals.owedSuppliers, SUPPLIER)}{overdueMinor > 0 && <>، منها <strong className="text-ink"><Money minor={overdueMinor} /></strong> تجاوزت ستين يوماً</>}{totals.creditLeftMinor > 0 && <>. ولك رصيد عند مورّدين <Money minor={totals.creditLeftMinor} /></>}.</>}
+          sub={<><T s="لـ{0}{1}{2}." a={[countNoun(totals.owedSuppliers, SUPPLIER), overdueMinor > 0 && <><T s="، منها {0} تجاوزت ستين يوماً" a={[<strong key="0" className="text-ink"><Money minor={overdueMinor} /></strong>]} /></>, totals.creditLeftMinor > 0 && <><T s=". ولك رصيد عند بعض المورّدين {0}" a={[<Money key="0" minor={totals.creditLeftMinor} />]} /></>]} /></>}
           href="/suppliers"
         />
         <KeyFigure
           icon={Receipt}
           label={vatNext ? `ضريبة ${vatNext.label}` : "ضريبة الإقرار القادم"}
-          value={vatNext ? (vatNext.amountMinor === null ? <span className="text-xl text-muted">غير معروف</span> : <Money minor={vatNext.amountMinor} currency />) : <span className="text-xl text-muted">لا يوجد إقرار معلّق</span>}
+          value={vatNext ? (vatNext.amountMinor === null ? <span className="text-xl text-muted">غير معروف</span> : <Money minor={vatNext.amountMinor} currency />) : <span className="text-xl text-muted">لا يوجد إقرار مستحق</span>}
           sub={vatNext
-            ? <>ضريبة المبيعات مطروحاً منها ضريبة المشتريات، كما يحسبها الإقرار الضريبي{vatNext.accruing ? " حتى اليوم" : ""}. آخر موعد <bdi>{formatDay(vatNext.deadline)}</bdi>.{vatNext.amountMinor === null && " في الفترة أيام بلا كشف بنك."}</>
-            : "تم تقديم الربع المنقضي، ولا يوجد شيء في الربع الجاري بعد."}
+            ? <><T s="ضريبة المبيعات مطروحاً منها ضريبة المشتريات، كما يحسبها الإقرار الضريبي{0}. آخر موعد {1}.{2}" a={[vatNext.accruing ? " حتى اليوم" : "", <bdi key="1">{formatDay(vatNext.deadline)}</bdi>, vatNext.amountMinor === null && " في الفترة أيام بلا كشف بنك."]} /></>
+            : "قُدّم إقرار الربع الماضي، ولا يوجد شيء في الربع الحالي بعد."}
           href="/close/vat"
         />
         <KeyFigure
           icon={Banknote}
           label="نقد سجّله فودكس ولم يدخل البنك"
           value={<Money minor={pos.cash.totalMinor} currency />}
-          sub={<>منذ {pos.cash.firstDay ? <bdi>{formatDay(pos.cash.firstDay)}</bdi> : "البداية"}. لا توجد إيداعات نقدية في الكشف، ولا تعرف البيانات كم بقي منه.</>}
+          sub={<><T s="منذ {0}. لا توجد في الكشف إيداعات نقدية، والبيانات لا تبيّن كم بقي منه." a={[pos.cash.firstDay ? <bdi>{formatDay(pos.cash.firstDay)}</bdi> : "البداية"]} /></>}
           href="#cash"
         />
       </div>
@@ -90,7 +91,7 @@ export default async function FinancePositionPage() {
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
         <Section title="لمن تدين" icon={HandCoins} action={<LinkButton href="/payments" size="sm" variant="quiet">دفعة الشهر</LinkButton>}>
           {pos.suppliers.top.length === 0 ? (
-            <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا توجد مبالغ مستحقة لمورّد الآن.</p>
+            <p className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا توجد مبالغ مستحقة لأي مورّد الآن.</p>
           ) : (
             <BarList items={pos.suppliers.top.map((s) => ({ key: s.supplierId, label: s.name, minor: s.owedMinor, href: `/suppliers/${s.supplierId}` }))} />
           )}
@@ -100,46 +101,38 @@ export default async function FinancePositionPage() {
           <ul className="space-y-2">
             {pos.vat.map((v) => (
               <li key={v.periodKey} className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-line bg-raised px-4 py-3 text-sm shadow-raised">
-                <span>ضريبة {v.label}{v.accruing && <span className="ms-1 text-[11px] text-muted">(تتراكم)</span>}، حتى <bdi>{formatDay(v.deadline)}</bdi></span>
+                <span><T s="ضريبة {0}{1}، حتى {2}" a={[v.label, v.accruing && <span className="ms-1 text-[11px] text-muted">(تتراكم)</span>, <bdi key="2">{formatDay(v.deadline)}</bdi>]} /></span>
                 <span className="font-bold"><MaybeMoney minor={v.amountMinor} why="أيام بلا كشف" /></span>
               </li>
             ))}
             {pos.suppliers.overdue.slice(0, 5).map((o) => (
               <li key={o.supplierId} className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3 text-sm">
-                <span>{o.nameAr}: أقدم فاتورة منذ {countNoun(o.oldestDays, DAY)}</span>
+                <span><T s="{0}: أقدم فاتورة منذ {1}" a={[o.nameAr, countNoun(o.oldestDays, DAY)]} /></span>
                 <span className="font-bold"><Money minor={o.owedMinor} /></span>
               </li>
             ))}
             {pos.vat.length === 0 && pos.suppliers.overdue.length === 0 && (
-              <li className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا توجد ضريبة معلّقة ولا مورّد تأخر سداد مستحقاته.</li>
+              <li className="rounded-xl border border-line bg-raised px-4 py-3 text-xs text-muted shadow-raised">لا ضريبة معلّقة، ولا مورّد تأخر سداد مستحقاته.</li>
             )}
           </ul>
         </Section>
       </div>
 
-      <Section id="cash" title="النقد والصندوق" icon={Banknote} hint="نقد المقهى كله خارج البنك، وهو ما سجّله فودكس نقداً وما عُدّ في الدرج عند الإقفال.">
+      <Section id="cash" title="النقد والصندوق" icon={Banknote} hint="كل نقد المقهى خارج البنك: ما سجّله فودكس نقداً، وما عُدّ في الدرج عند الإقفال.">
         <Callout tone="info" icon={Info} title="ما نعرفه وما لا نعرفه">
-          يعرف فودكس كم دخل نقداً وكم عُدّ في الدرج عند كل إقفال. لكن لا تعرف البيانات أين ذهب النقد بعد الإقفال: هل صُرف على المقهى أم أُخذ.
-          فإن كنت تدفع منه راتباً أو مشتريات فأدخلها في «ما لا يراه الكشف» لتدخل في قائمة الدخل.
-          {last && <> آخر عدّ: <bdi>{formatDay(last.day)}</bdi>، وفي الدرج <strong><MaybeMoney minor={last.countedMinor} /></strong> والمتوقع <MaybeMoney minor={last.expectedMinor} />.</>}
-          <div className="mt-3"><LinkButton href="/finance/inputs" size="sm">ما لا يراه الكشف</LinkButton></div>
-        </Callout>
+          <T s="يعرف فودكس كم دخل نقداً وكم عُدّ في الدرج عند كل إقفال، لكن البيانات لا تبيّن أين ذهب النقد بعد الإقفال: هل صُرف على المقهى أم سُحب. فإن كنت تدفع منه رواتب أو مشتريات فأدخلها في «ما لا يظهر في الكشف» لتدخل في قائمة الدخل.{0}{1}" a={[last && <> <T s=" آخر عدّ: {0}، وفي الدرج {1} والمتوقع {2}." a={[<bdi key="0">{formatDay(last.day)}</bdi>, <strong key="1"><MaybeMoney minor={last.countedMinor} /></strong>, <MaybeMoney key="2" minor={last.expectedMinor} />]} /></>, <div key="1" className="mt-3"><LinkButton href="/finance/inputs" size="sm">ما لا يظهر في الكشف</LinkButton></div>]} /></Callout>
 
         {flagged.length > 0 && (
-          <ul className="mt-4 space-y-2" aria-label="صناديق تحتاج إلى مراجعتك">
+          <ul className="mt-4 space-y-2" aria-label="صناديق تحتاج مراجعتك">
             {flagged.map((t) => (
               <li key={t.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3">
                 <div className="min-w-0 flex-1 basis-56">
                   <p className="text-sm font-bold">
-                    صندوق <bdi>{formatDay(t.day)}</bdi>: {t.uncounted ? "أُقفل بلا عدّ" : t.varianceMinor < 0 ? "المعدود أقل من المتوقع بمبلغ " : "المعدود أكثر من المتوقع بمبلغ "}
-                    {!t.uncounted && <Money minor={Math.abs(t.varianceMinor)} />}
-                  </p>
+                    <T s="صندوق {0}: {1}{2}" a={[<bdi key="0">{formatDay(t.day)}</bdi>, t.uncounted ? "أُقفل بلا عدّ" : t.varianceMinor < 0 ? "المعدود أقل من المتوقع بـ " : "المعدود أكثر من المتوقع بـ ", !t.uncounted && <Money minor={Math.abs(t.varianceMinor)} />]} /></p>
                   <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
-                    {t.userName && <>فتحه {t.userName}. </>}
-                    {t.uncounted ? <>يتوقع فودكس فيه <Money minor={Math.abs(t.varianceMinor)} /> ولم يُسجَّل المبلغ المعدود.</> : "اسأل من أقفله: هل عدّ المبلغ؟ وهل أخذ منه شيئاً لم يسجّله؟"} وإن عرفت السبب فاضغط «أعرف سببه» ولن يظهر التنبيه مرة أخرى.
-                  </p>
+                    <T s="{0}{1} وإن كنت تعرف السبب فاضغط «أعرف السبب» ولن يظهر التنبيه مرة أخرى." a={[t.userName && <><T s="فتحه {0}. " a={[t.userName]} /></>, t.uncounted ? <><T s="يتوقع فودكس فيه {0}، ولم يُسجَّل المبلغ المعدود." a={[<Money key="0" minor={Math.abs(t.varianceMinor)} />]} /></> : "اسأل من أقفله: هل عدّ المبلغ؟ وهل أخذ منه شيئاً دون تسجيله؟"]} /></p>
                 </div>
-                {canSilence && <div className="flex shrink-0 flex-wrap items-center gap-1"><SignalControls signalKey={tillSignalKey(t.id)} dismissLabel="أعرف سببه" /></div>}
+                {canSilence && <div className="flex shrink-0 flex-wrap items-center gap-1"><SignalControls signalKey={tillSignalKey(t.id)} dismissLabel="أعرف السبب" /></div>}
               </li>
             ))}
           </ul>
@@ -163,14 +156,14 @@ export default async function FinancePositionPage() {
                   <td className="px-3 py-2.5 text-end"><Money minor={m.cashMinor} /></td>
                   <td className="px-3 py-2.5 text-end">{m.shortMinor === 0 ? <span className="text-muted">—</span> : <Money minor={m.shortMinor} />}</td>
                   <td className="px-3 py-2.5 text-end">{m.overMinor === 0 ? <span className="text-muted">—</span> : <Money minor={m.overMinor} />}</td>
-                  <td className="px-4 py-2.5 text-end">{m.uncounted === 0 ? <span className="text-muted">—</span> : <span className="font-bold text-warn">{m.uncounted} من {m.tills}</span>}</td>
+                  <td className="px-4 py-2.5 text-end">{m.uncounted === 0 ? <span className="text-muted">—</span> : <span className="font-bold text-warn"><T s="{0} من {1}" a={[m.uncounted, m.tills]} /></span>}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-muted">
-          لا يُحسب النقص والزيادة مقابل بعضهما: إذا زاد درج عشرين ونقص آخر عشرين فهما مشكلتان وليسا صفراً. والصندوق الذي أُقفل ومبلغه المعدود صفر يعني أنه «لم يُعدّ»، وليس نقصه بالضرورة ضياعاً.
+          النقص والزيادة لا يُلغي أحدهما الآخر: إذا زاد درج عشرين ونقص آخر عشرين فهما مشكلتان لا صفر. والصندوق الذي أُقفل ومبلغه المعدود صفر يعني أنه «لم يُعدّ»، وليس بالضرورة أن المال ضاع.
         </p>
 
         <h3 className="mb-2 mt-6 text-sm font-bold">آخر الصناديق</h3>

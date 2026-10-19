@@ -156,7 +156,7 @@ export function VarianceSplit({
         <p className="mt-2.5 text-xs leading-relaxed text-muted">
           {!measured ? "لم يُحسب فرق أي صنف بعد. يُحسب الفرق لكل صنف عُدّ وعُرفت بيانات معادلته." : (
             <>
-              {lines === 0 ? (d === "short" ? "لا يوجد صنف وُجد منه أقل من المتوقع." : "لا يوجد صنف وُجد منه أكثر من المتوقع.") : (
+              {lines === 0 ? (d === "short" ? "لا صنف وُجد منه أقل من المتوقع." : "لا صنف وُجد منه أكثر من المتوقع.") : (
                 <><span className="font-bold text-ink-soft">{countNoun(lines, PRODUCT)}</span> {hint}</>
               )}
             </>
@@ -170,7 +170,7 @@ export function VarianceSplit({
     <div>
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
         {side("short", shortage, linesShort, "وُجد منه أقل من المتوقع.")}
-        {side("over", overage, linesOver, "وُجد منه أكثر من المتوقع، فقد يكون هناك شراء غير مقيّد أو عدّ يحتاج إلى مراجعة.")}
+        {side("over", overage, linesOver, "وُجد منه أكثر من المتوقع، فربما هناك شراء لم يُسجَّل، أو عدّ يحتاج إلى مراجعة.")}
       </div>
       {foot && <div className="mt-3">{foot}</div>}
     </div>
@@ -187,10 +187,10 @@ export function VarianceSplit({
  */
 export function EquationExplainer({ compact = false }: { compact?: boolean }) {
   const terms: { icon: LucideIcon; label: string; from: string; op?: LucideIcon }[] = [
-    { icon: ClipboardList, label: "ما كان على الرف", from: "جرد الأسبوع السابق أو رصيد تدخله" },
+    { icon: ClipboardList, label: "ما كان على الرف", from: "جرد الأسبوع السابق، أو رصيد تدخله" },
     { icon: FileSpreadsheet, label: "ما دخل", from: "فواتير المورّدين وما تدخله يدوياً", op: Plus },
     { icon: BookOpen, label: "ما صُرف", from: "مبيعات فودكس × الوصفات", op: Minus },
-    { icon: Scale, label: "المتوقع على الرف", from: "يُقارن بما عددته فيظهر الفرق", op: Equal },
+    { icon: Scale, label: "المتوقع على الرف", from: "يُقارن بما عددته، فيظهر الفرق", op: Equal },
   ];
   return (
     <ol className={`grid grid-cols-2 gap-2 ${compact ? "lg:grid-cols-4" : ""}`} aria-label="كيف يُحسب فرق الجرد">
@@ -268,7 +268,7 @@ export function SetupJourney({
           state: state("catalog"),
           detail: detail("catalog", done.catalog
             ? `${countNoun(facts.stockItems, PRODUCT)} مخزون · ${countNoun(facts.recipes, RECIPE)}`
-            : `ثلاثة ملفات معاً: أصناف المخزون، والأصناف المباعة، والوصفات. تُنشئ الوصفات والربط دفعة واحدة${facts.stockItems > 0 ? `، ولديك ${countNoun(facts.stockItems, PRODUCT)} مخزون من الفواتير بلا وصفة` : ""}.`,
+            : `ثلاثة ملفات معاً: أصناف المخزون، والأصناف المباعة، والوصفات. تنشئ الوصفات والربط دفعة واحدة${facts.stockItems > 0 ? `، وعندك ${countNoun(facts.stockItems, PRODUCT)} مخزون من الفواتير بلا وصفة` : ""}.`,
           "/inventory/import#catalog", "ارفع الكتالوج"),
           action: action("catalog", "/inventory/import#catalog", "ارفع الكتالوج"),
         },
@@ -278,7 +278,7 @@ export function SetupJourney({
           state: state("sales"),
           detail: detail("sales", done.sales
             ? `المبيعات مستوردة حتى ${formatDay(facts.salesThrough)}`
-            : "ارفع ملف التصدير (Excel) من فودكس كما هو، ومنه يُحسب ما كان ينبغي أن يُصرف. لا تُدخل أرقام مبيعات من خارج الملف.",
+            : "ارفع ملف التصدير (Excel) من فودكس كما هو، ومنه يُحسب ما كان يُفترض أن يُصرف. لا تُدخل أرقام مبيعات من خارج الملف.",
           "/inventory/import#sales", "ارفع المبيعات"),
           action: action("sales", "/inventory/import#sales", "ارفع المبيعات"),
         },
@@ -286,7 +286,7 @@ export function SetupJourney({
           id: "count",
           title: "ابدأ جرد الأسبوع",
           state: state("count"),
-          detail: detail("count", done.count ? "سبق أن بدأت جرداً، والسجل يحفظ كل جرد أُقفل." : "تختار ما ستعدّه، ثم تدخل ما وجدته على الرف، والباقي يُحسب تلقائياً.", countHref, "ابدأ الجرد"),
+          detail: detail("count", done.count ? "بدأت جرداً من قبل، والسجل يحفظ كل جرد أُقفل." : "اختر ما ستعدّه، ثم أدخل ما وجدته على الرف، والباقي يحسبه النظام.", countHref, "ابدأ الجرد"),
           action: action("count", countHref, "ابدأ الجرد"),
         },
       ]}

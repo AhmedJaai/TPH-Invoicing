@@ -13,13 +13,14 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { countNoun, MONTH } from "@/lib/arabic";
 import { currentMonthRiyadh, formatDay, formatMonth } from "@/lib/riyadh-time";
 import { loadDeclarations, loadSpreadCandidates } from "@/services/profit.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 /** ما يُقرّ به: مصروفاتُ تشغيلٍ قد تقع خارج الكشف أو تُدفَع دفعةً لأشهر. */
 const CATEGORIES: readonly TxCategory[] = ["RENT", "SALARY", "UTILITY", "GOVERNMENT", "OTHER"];
-const KIND_LABEL = { SPREAD: "دفعة موزّعة", OFF_BOOK: "خارج الكشف (شهري)", NONE: "لا يوجد" } as const;
+const KIND_LABEL = { SPREAD: "دفعة موزّعة", OFF_BOOK: "خارج الكشف (شهرياً)", NONE: "لا يوجد" } as const;
 
 /**
  * ما لا يراه الكشف — الإيجارُ الذي يغطّي أشهراً، والراتبُ النقديّ، وما يُدفَع من حسابٍ
@@ -29,7 +30,7 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
   const user = await currentUser();
   if (!user) redirect("/login?from=/finance/inputs");
   if (!can(user.role, "amounts:view")) {
-    return <PageShell user={user} title="ما لا يراه الكشف"><NoAccess what="إقرارات المالك" /></PageShell>;
+    return <PageShell user={user} title="ما لا يظهر في الكشف"><NoAccess what="إضافات المالك" /></PageShell>;
   }
   const q = await searchParams;
   const month = q.month && MONTH_RE.test(q.month) ? q.month : currentMonthRiyadh();
@@ -48,8 +49,8 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
   return (
     <PageShell
       user={user}
-      title="ما لا يراه الكشف"
-      intro="الإيجار الذي يُدفع دفعة واحدة لعدة أشهر، والراتب الذي يُدفع نقداً، وما يخرج من حساب شخصي. أدخله هنا مرة واحدة ليكتمل ربح الشهر."
+      title="ما لا يظهر في الكشف"
+      intro="الإيجار المدفوع دفعة واحدة عن عدة أشهر، والراتب المدفوع نقداً، وما يُدفع من حساب شخصي. أدخله هنا مرة واحدة ليكتمل ربح الشهر."
       actions={<LinkButton href={`/finance?month=${month}`} variant="quiet" size="sm" icon={ArrowRight}>قائمة الدخل</LinkButton>}
     >
       {lumps.length > 0 && (
@@ -59,7 +60,7 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
               <li key={t.id}><bdi>{formatDay(t.day)}</bdi>: <strong><Money minor={t.amountMinor} currency /></strong> · {t.label}</li>
             ))}
           </ul>
-          <p className="mt-2">يتحمل شهر الدفع المبلغ كاملاً حالياً، وتظهر الأشهر الأخرى «ربحاً قبل الإيجار». اختر «دفعة في الكشف تغطي أشهراً» أدناه وحدّد أشهرها.</p>
+          <p className="mt-2">حالياً يتحمل شهر الدفع المبلغ كله، وتظهر الأشهر الأخرى «ربحاً قبل الإيجار». اختر «دفعة في الكشف تغطي عدة أشهر» أدناه وحدّد أشهرها.</p>
         </Callout>
       )}
 
@@ -72,12 +73,12 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
           />
         </div>
       ) : (
-        <Callout tone="info" icon={Info} className="mt-5" title="للقراءة فقط">يدخل الإقرار من لديه صلاحية إقفال الشهر.</Callout>
+        <Callout tone="info" icon={Info} className="mt-5" title="للقراءة فقط">يضيف هذه البيانات من لديه صلاحية إقفال الشهر.</Callout>
       )}
 
-      <Section title="ما أقررته" icon={HandCoins} count={sorted.length} hint="يدخل كل إقرار في قائمة الدخل ضمن أشهره وباسمه. وعند سحبه يعود الشهر إلى ما يظهره الكشف.">
+      <Section title="ما أضفته" icon={HandCoins} count={sorted.length} hint="يظهر كل ما تضيفه في قائمة الدخل ضمن أشهره وباسمه، وإذا سحبته عاد الشهر إلى ما يظهره الكشف.">
         {sorted.length === 0 ? (
-          <EmptyState icon={HandCoins} title="لم تدخل أي إقرار بعد." hint="بدون الإيجار والرواتب يبقى الشهر «ربحاً قبل الإيجار» وليس «صافي الربح»." />
+          <EmptyState icon={HandCoins} title="لم تضف شيئاً بعد." hint="بدون الإيجار والرواتب يبقى رقم الشهر «ربحاً قبل الإيجار»، لا «صافي الربح»." />
         ) : (
           <ul className="space-y-2">
             {sorted.map((d) => {
@@ -91,13 +92,13 @@ export default async function FinanceInputsPage({ searchParams }: { searchParams
                       <Badge tone="muted">{CATEGORY_LABEL[d.category]}</Badge>
                     </p>
                     <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                      {d.fromMonth === d.toMonth ? formatMonth(d.fromMonth) : <>من {formatMonth(d.fromMonth)} إلى {formatMonth(d.toMonth)} ({countNoun(months.length, MONTH)})</>}
-                      {d.kind === "SPREAD" && <> · <Money minor={d.amountMinor} /> موزّعة، بواقع <Money minor={spreadShare(d.amountMinor, d.fromMonth, d.toMonth, d.fromMonth)} /> للشهر</>}
-                      {d.kind === "OFF_BOOK" && <> · <Money minor={d.amountMinor} /> لكل شهر</>}
+                      {d.fromMonth === d.toMonth ? formatMonth(d.fromMonth) : <><T s="من {0} إلى {1} ({2})" a={[formatMonth(d.fromMonth), formatMonth(d.toMonth), countNoun(months.length, MONTH)]} /></>}
+                      {d.kind === "SPREAD" && <> <T s=" · {0} موزّعة، بواقع {1} شهرياً" a={[<Money key="0" minor={d.amountMinor} />, <Money key="1" minor={spreadShare(d.amountMinor, d.fromMonth, d.toMonth, d.fromMonth)} />]} /></>}
+                      {d.kind === "OFF_BOOK" && <> <T s=" · {0} شهرياً" a={[<Money key="0" minor={d.amountMinor} />]} /></>}
                     </p>
                   </div>
                   {canEdit && (
-                    <PostAction url="/api/finance/declaration" body={{ action: "void", id: d.id }} variant="quiet" done="سُحب الإقرار">اسحبه</PostAction>
+                    <PostAction url="/api/finance/declaration" body={{ action: "void", id: d.id }} variant="quiet" done="سُحبت الإضافة">اسحبها</PostAction>
                   )}
                 </li>
               );

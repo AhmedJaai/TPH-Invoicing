@@ -114,7 +114,7 @@ export async function applyRenames(
       }
       if (renamedInDrive) done.push({ from: t.fileName, to: proposed });
       const error = renamedInDrive
-        ? `أُعيدت تسميته في الدرايف وتعذّر تحديث القيد: ${(e as Error).message}`
+        ? `سُمّي من جديد في الدرايف، وتعذّر تحديث السجل: ${(e as Error).message}`
         : (e as Error).message;
       failed.push({ from: t.fileName, error });
       /* النيّةُ كُتبت قبل النداء — فما لم يقع يُقال إنّه لم يقع، بسببه */

@@ -6,6 +6,7 @@ import { formatRiyalsDisplay } from "@/lib/money";
 import { priceObjection, type PriceMove } from "@/lib/price-at-review";
 import { formatDay } from "@/lib/riyadh-time";
 import { whatsappHref } from "@/lib/supplier-edit";
+import { T } from "@/components/i18n/t";
 
 /**
  * «أغلى بـ٨٪ من آخر مرّة» — في بطاقة المراجعة، والمندوبُ ما زال عند الباب.
@@ -38,8 +39,7 @@ export function PriceMovesNote({ moves, supplierName }: { moves: readonly PriceM
         {rises.length > 0 ? "أسعار ارتفعت عن آخر توريد" : "أسعار انخفضت عن آخر توريد"}
       </h4>
       <p className="mt-0.5 text-[11px] leading-relaxed text-ink-soft">
-        سعر الوحدة في الفاتورة مقارنةً بآخر سعر مسجّل للصنف نفسه عند {supplierName}. لا تُعرض التغيّرات الأقل من 3٪.
-      </p>
+        <T s="سعر الوحدة في الفاتورة مقارنةً بآخر سعر مسجّل للصنف نفسه عند {0}. لا تظهر التغيّرات الأقل من ٣٪." a={[supplierName]} /></p>
       <ul className="mt-2 space-y-1.5">
         {moves.map((m) => {
           const up = m.deltaBp > 0;
@@ -48,8 +48,7 @@ export function PriceMovesNote({ moves, supplierName }: { moves: readonly PriceM
             <li key={m.description} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-xs">
               <span className="min-w-0 flex-1 basis-40 truncate font-bold" dir="auto">{m.description}</span>
               <span className="text-ink-soft">
-                <Money minor={m.nowMinor} />، وكان <Money minor={m.wasMinor} /> في {formatDay(m.wasDay)}
-              </span>
+                <T s="{0}، وكان {1} في {2}" a={[<Money key="0" minor={m.nowMinor} />, <Money key="1" minor={m.wasMinor} />, formatDay(m.wasDay)]} /></span>
               <span className={`inline-flex items-center gap-0.5 font-bold ${up ? "text-warn" : "text-ok"}`}>
                 <Icon className="h-3 w-3" strokeWidth={2.5} aria-hidden />
                 <span className="sr-only">{up ? "أغلى" : "أرخص"}</span>
@@ -66,9 +65,7 @@ export function PriceMovesNote({ moves, supplierName }: { moves: readonly PriceM
           rel="noopener noreferrer"
           className={`${buttonClass("secondary", "sm")} mt-3`}
         >
-          <MessageCircle className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          اعترض برسالة واتساب جاهزة
-        </a>
+          <T s="{0}اعترض برسالة واتساب جاهزة" a={[<MessageCircle key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
       )}
     </section>
   );

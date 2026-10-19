@@ -9,6 +9,7 @@ import { STORED_UNITS, isStoredUnit, storedUnitLabel, type StoredUnit } from "@/
 import { PRODUCT, countNoun } from "@/lib/arabic";
 import { buttonClass } from "./ui";
 import type { PurchaseLinkRow, StockItemOption } from "@/services/inventory-purchase-link.service";
+import { T } from "@/components/i18n/t";
 
 /**
  * بنودُ فواتير الأسبوع التي لا يدخل منها شيءٌ الجردَ — ومعها فعلُها.
@@ -42,12 +43,11 @@ export function PurchaseLinkPanel({
         <div className="min-w-0 flex-1">
           <h3 id="purchase-links-title" className="text-sm font-bold">
             {open.length > 0
-              ? <>{countNoun(open.length, PRODUCT)} من فواتير الأسبوع لا يدخل في الجرد</>
+              ? <><T s="{0} من فواتير الأسبوع لا يدخل في الجرد" a={[countNoun(open.length, PRODUCT)]} /></>
               : <>كل ما في فواتير الأسبوع يدخل في الجرد</>}
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-            اسم الصنف في الفاتورة يختلف عن اسمه في الوصفة. اربط كل بند بصنف الجرد وحدّد الكمية في الوحدة الواحدة منه.
-            يكفي ذلك مرة واحدة، وسيُحسب في كل جرد لاحق.
+            اسم الصنف في الفاتورة غير اسمه في الوصفة. اربط كل بند بصنف الجرد، وحدّد الكمية في الوحدة الواحدة منه. يكفي ذلك مرة واحدة، ويُحسب في كل جرد بعده.
           </p>
           {saved && <p role="status" className="mt-2 text-xs font-medium text-ok">{saved}</p>}
         </div>
@@ -71,9 +71,7 @@ export function PurchaseLinkPanel({
             aria-expanded={showLinked}
             className="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink"
           >
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showLinked ? "rotate-180" : ""}`} aria-hidden />
-            ما رُبط ودخل في الجرد ({linked.length})
-          </button>
+            <T s="{0}ما رُبط ودخل في الجرد ({1})" a={[<ChevronDown key="0" className={`h-3.5 w-3.5 transition-transform duration-200 ${showLinked ? "rotate-180" : ""}`} aria-hidden />, linked.length]} /></button>
           {showLinked && (
             <ul className="mt-2 divide-y divide-line">
               {linked.map((r) => (
@@ -131,7 +129,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
       setError(r.error);
       return;
     }
-    onSaved(`${row.displayName}: ${r.data.message ?? "تم حفظ الربط"}`);
+    onSaved(`${row.displayName}: ${r.data.message ?? "حُفظ الربط"}`);
     setEditing(false);
     router.refresh();
   }
@@ -147,16 +145,14 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
           <span className="text-muted"> · {row.supplierName}</span>
         </p>
         <p className="text-[11px] text-muted">
-          الكمية <span className="nums">{row.qtyText}</span> · {row.lines === 1 ? "بند واحد" : <><span className="nums">{row.lines}</span> بنود</>}
-          {row.invoiceNumbers.length > 0 && <> · <span dir="ltr" className="nums">{row.invoiceNumbers.join("، ")}</span></>}
-        </p>
+          <T s="الكمية {0} · {1}{2}" a={[<span key="0" className="nums">{row.qtyText}</span>, row.lines === 1 ? "بند واحد" : <><T s="{0} بنود" a={[<span key="0" className="nums">{row.lines}</span>]} /></>, row.invoiceNumbers.length > 0 && <> · <span dir="ltr" className="nums">{row.invoiceNumbers.join("، ")}</span></>]} /></p>
       </div>
 
       {isLinked ? (
         <p className="mt-1 text-xs text-ink-soft">
           ← <span className="font-medium text-ink">{row.productName}</span>
-          {row.pack && <> · في الوحدة الواحدة <span className="nums">{row.pack.packSize} × {row.pack.contentQuantity}</span> {storedUnitLabel(row.pack.contentUnit)}</>}
-          {row.countedText && <> · دخل في الجرد <span className="nums font-medium text-ink">{row.countedText}</span></>}
+          {row.pack && <> <T s=" · في الوحدة الواحدة {0} {1}" a={[<span key="0" className="nums">{row.pack.packSize} × {row.pack.contentQuantity}</span>, storedUnitLabel(row.pack.contentUnit)]} /></>}
+          {row.countedText && <> <T s=" · دخل في الجرد {0}" a={[<span key="0" className="nums font-medium text-ink">{row.countedText}</span>]} /></>}
           {canEdit && !editing && (
             <button type="button" onClick={() => setEditing(true)} className="ms-2 text-xs font-medium text-accent hover:underline">
               غيّر
@@ -165,7 +161,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
         </p>
       ) : (
         <p className="mt-1 text-xs text-warn">
-          {row.productName && <>مربوط بـ«{row.productName}»، </>}
+          {row.productName && <><T s="مربوط بـ«{0}»، " a={[row.productName]} /></>}
           {row.statusLabel}
         </p>
       )}
@@ -174,8 +170,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
         /* نموذجٌ حقيقيّ: Enter في حقل العبوة يربط */
         <form onSubmit={(e) => { e.preventDefault(); void save(); }} className="mt-2 flex flex-wrap items-end gap-2">
           <label className="min-w-0 flex-1 basis-56 text-[11px] text-muted">
-            صنف الجرد
-            <select
+            <T s="صنف الجرد{0}" a={[<select key="0"
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
               disabled={busy}
@@ -187,29 +182,23 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
                   {o.nameAr}{o.id === suggested?.id && o.id !== row.productId ? " · مقترح" : ""}
                 </option>
               ))}
-            </select>
-          </label>
+            </select>]} /></label>
           <label className="text-[11px] text-muted">
-            عدد العبوات في الوحدة
-            <input
+            <T s="عدد العبوات في الوحدة{0}" a={[<input key="0"
               type="text" inputMode="decimal" dir="ltr"
               value={packSize} onChange={(e) => setPackSize(e.target.value)} disabled={busy}
               className="nums mt-1 block min-h-11 w-16 rounded-lg border border-line-input bg-raised px-2 text-center text-sm"
-            />
-          </label>
+            />]} /></label>
           <span className="pb-3 text-xs text-muted" aria-hidden>×</span>
           <label className="text-[11px] text-muted">
-            في العبوة
-            <input
+            <T s="في العبوة{0}" a={[<input key="0"
               type="text" inputMode="decimal" dir="ltr"
               value={contentQuantity} onChange={(e) => setContentQuantity(e.target.value)} disabled={busy}
               placeholder="1"
               className="nums mt-1 block min-h-11 w-20 rounded-lg border border-line-input bg-raised px-2 text-center text-sm"
-            />
-          </label>
+            />]} /></label>
           <label className="text-[11px] text-muted">
-            الوحدة
-            <select
+            <T s="الوحدة{0}" a={[<select key="0"
               value={contentUnit}
               onChange={(e) => setContentUnit(isStoredUnit(e.target.value) ? e.target.value : "")}
               disabled={busy}
@@ -217,8 +206,7 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
             >
               <option value="">—</option>
               {unitChoices.map((u) => <option key={u} value={u}>{storedUnitLabel(u)}</option>)}
-            </select>
-          </label>
+            </select>]} /></label>
           <button
             type="submit"
             aria-busy={busy}
@@ -237,14 +225,11 @@ export function LinkRow({ row, options, canEdit, onSaved }: {
 
       {showForm && (row.guessedPack || (suggested && !row.productId)) && (
         <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted">
-          <Sparkles className="h-3 w-3" aria-hidden />
-          اقتُرح هذا من اسم البند، فتأكد منه قبل الربط.
-        </p>
+          <T s="{0}هذا اقتراح من اسم البند، فتأكد منه قبل الربط." a={[<Sparkles key="0" className="h-3 w-3" aria-hidden />]} /></p>
       )}
       {product && contentUnit !== "" && !unitOk && (
         <p className="mt-1 text-[11px] text-warn">
-          «{product.nameAr}» يُقاس بوحدة {storedUnitLabel(product.baseUnit)}، فاختر وحدة من النوع نفسه.
-        </p>
+          <T s="«{0}» يُقاس بوحدة {1}، فاختر وحدة من النوع نفسه." a={[product.nameAr, storedUnitLabel(product.baseUnit)]} /></p>
       )}
       {error && <p role="alert" className="mt-1 text-xs text-danger">{error}</p>}
     </div>

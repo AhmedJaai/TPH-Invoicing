@@ -51,8 +51,8 @@ export function splitBankFee(
     allocatedMinor: invoiceTotalMinor,
     feeMinor: excess,
     reason:
-      `الخصم يزيد ${formatRiyalsDisplay(excess)} عن الفاتورة، ` +
-      "وهو ضمن حدّ رسوم التحويل، فيُسجَّل رسماً لا فرقاً",
+      `الخصم يزيد على الفاتورة ${formatRiyalsDisplay(excess)}، ` +
+      "وهو ضمن حد رسوم التحويل، فيُسجَّل رسماً لا فرقاً",
   };
 }
 

@@ -1,5 +1,6 @@
 import { BellOff, Clock, RotateCcw } from "lucide-react";
 import { PostAction } from "./post-action";
+import { T } from "@/components/i18n/t";
 
 /**
  * فعلا الملاحظة المحسوبة: «ذكّرني بعد أسبوع» و«أسكِتها» — ولمن أسكت «أعِدها».
@@ -22,9 +23,7 @@ export function SignalControls({
   if (silenced) {
     return (
       <PostAction url="/api/signal" body={{ key: signalKey, action: "reopen" }} variant="quiet" done="أُعيد التنبيه">
-        <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        أعد التنبيه
-      </PostAction>
+        <T s="{0}أعد التنبيه" a={[<RotateCcw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></PostAction>
     );
   }
   return (
@@ -35,9 +34,7 @@ export function SignalControls({
         undo={{ body: { key: signalKey, action: "reopen" } }}
         variant="quiet"
       >
-        <Clock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        ذكّرني بعد {snoozeDays === 7 ? "أسبوع" : `${snoozeDays} يوماً`}
-      </PostAction>
+        <T s="{0}ذكّرني بعد {1}" a={[<Clock key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />, snoozeDays === 7 ? "أسبوع" : `${snoozeDays} يوماً`]} /></PostAction>
       <PostAction
         url="/api/signal"
         body={{ key: signalKey, action: "dismiss" }}

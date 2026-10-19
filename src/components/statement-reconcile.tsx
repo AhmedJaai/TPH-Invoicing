@@ -12,6 +12,7 @@ import { Money } from "./money";
 import { Badge, Callout, DataTable, EmptyState, Monogram, Section } from "./ui";
 import { Sheet, toast } from "./ui-client";
 import { buttonClass } from "./ui-tokens";
+import { T } from "@/components/i18n/t";
 
 export interface ArchivedStatement {
   id: string;
@@ -85,7 +86,7 @@ function useReconcile() {
       onClose={() => setResult(null)}
       size="lg"
       title={result ? `${result.supplier.nameAr} · ${formatRange(result.period.start, result.period.end)}` : "نتيجة المطابقة"}
-      description={result ? (result.persisted ? "تم حفظ النتيجة مع الكشف." : "هذا فحص فقط ولم يُحفظ منه شيء.") : undefined}
+      description={result ? (result.persisted ? "حُفظت النتيجة مع الكشف." : "هذا فحص فقط، ولم يُحفظ منه شيء.") : undefined}
       footer={<button type="button" onClick={() => setResult(null)} className={buttonClass("secondary")}>أغلق</button>}
     >
       {result && <ResultView result={result} />}
@@ -123,7 +124,7 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
           icon={GitCompareArrows}
           count={pending.length}
           className="mt-0"
-          hint="كشوف أُرشفت ولم تُقرأ أسطرها بعد. المطابقة تقرأ الأسطر وتقابل كل سطر بفواتيرك، وتكشف الفواتير التي سجّلها المورّد عليك ولم تصلك."
+          hint="كشوف أُرشفت ولم تُقرأ أسطرها بعد. المطابقة تقرأ الأسطر وتقابل كل سطر بفواتيرك، فتكشف الفواتير التي سجّلها المورّد عليك ولم تصلك."
         >
           <ul className="space-y-2">
             {pending.map((a) => (
@@ -140,7 +141,7 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
                   </span>
                   <button type="button" onClick={() => match(a.id)} disabled={busy !== null} className={buttonClass("primary", "sm")}>
                     <GitCompareArrows className="h-4 w-4" strokeWidth={2} aria-hidden />
-                    {busy === a.id ? "جارٍ القراءة والمطابقة…" : "طابق"}
+                    {busy === a.id ? "يقرأ ويطابق…" : "طابق"}
                   </button>
                 </div>
                 {error?.key === a.id && <p role="alert" className="border-t border-line-soft bg-danger-bg px-4 py-2 text-xs text-danger sm:px-5">{error.text}</p>}
@@ -166,7 +167,7 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
             <EmptyState
               compact
               icon={ScrollText}
-              title="لا توجد كشوف مؤرشفة بعد."
+              title="لا كشوف مؤرشفة بعد."
               hint="ارفع كشف المورّد من «الرفع» ليُؤرشف، ثم طابقه هنا. ويمكنك أيضاً فحصه قبل الأرشفة من الجانب."
             />
           }
@@ -197,8 +198,7 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
                   <Badge tone="warn" dot>لم تُقرأ</Badge>
                 ) : (
                   <span className="whitespace-nowrap text-xs text-ink-soft">
-                    طُوبق <span className="nums">{a.matchedCount}</span> من <span className="nums">{a.lineCount}</span>
-                  </span>
+                    <T s="طُوبق {0} من {1}" a={[<span key="0" className="nums">{a.matchedCount}</span>, <span key="1" className="nums">{a.lineCount}</span>]} /></span>
                 ),
             },
             { key: "closing", header: "الرصيد الختامي", numeric: true, cell: (a) => <Closing minor={a.closingBalanceMinor} /> },
@@ -210,7 +210,7 @@ export function StatementReconcile({ archived }: { archived: ArchivedStatement[]
               cell: (a) => (
                 <span className="flex flex-col items-end gap-1">
                   <button type="button" onClick={() => match(a.id)} disabled={busy !== null} className={`${buttonClass(a.lineCount === 0 ? "primary" : "quiet", "sm")} relative whitespace-nowrap`}>
-                    {busy === a.id ? "جارٍ القراءة والمطابقة…" : a.lineCount > 0 ? "أعد المطابقة" : "طابق"}
+                    {busy === a.id ? "يقرأ ويطابق…" : a.lineCount > 0 ? "أعد المطابقة" : "طابق"}
                   </button>
                   {a.missingCount > 0 && (
                     <RecordMissing statementId={a.id} count={a.missingCount} minor={a.missingMinor} />
@@ -247,15 +247,12 @@ export function StatementQuickCheck({
       {/* ── فحصٌ سريع لكشفٍ وصل الآن ── */}
       <div className="rounded-xl border border-accent-line bg-accent-soft/50 p-4 sm:p-5">
         <h2 className="flex items-center gap-2 text-sm font-bold">
-          <FileSearch className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />
-          افحص كشفاً وصلك الآن
-        </h2>
+          <T s="{0}افحص كشفاً وصلك الآن" a={[<FileSearch key="0" className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />]} /></h2>
         <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-          يقرأ الكشف ويطابقه ويعرض النتيجة، ولا يحفظ منه شيئاً. للأرشفة ارفعه من «الرفع».
+          يقرأ الكشف ويطابقه ويعرض النتيجة، ولا يحفظ منه شيئاً. لأرشفته ارفعه من «الرفع».
         </p>
         <label className="mt-3 block text-[11px] text-muted">
-          المورّد
-          <select
+          <T s="المورّد{0}" a={[<select key="0"
             value={supplierId}
             onChange={(e) => setSupplierId(e.target.value)}
             className="mt-1 block min-h-11 w-full rounded-lg border border-line-input bg-raised px-2.5 text-sm sm:min-h-9"
@@ -264,8 +261,7 @@ export function StatementQuickCheck({
             {suppliers.map((x) => (
               <option key={x.id} value={x.id}>{x.nameAr}</option>
             ))}
-          </select>
-        </label>
+          </select>]} /></label>
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -273,7 +269,7 @@ export function StatementQuickCheck({
           className={`${buttonClass("primary", "sm")} mt-3 w-full`}
         >
           <Upload className="h-4 w-4" strokeWidth={2} aria-hidden />
-          {busy === "upload" ? "جارٍ القراءة…" : "اختر ملف الكشف"}
+          {busy === "upload" ? "يقرأ…" : "اختر ملف الكشف"}
         </button>
         <input
           ref={inputRef}
@@ -329,61 +325,54 @@ function ResultView({ result }: { result: Result }) {
     <div className="space-y-5">
       {clean ? (
         <Callout tone="ok" icon={CircleCheck} title="كشفه يطابق فواتيرك">
-          لا توجد فاتورة سجّلها عليك وليست عندك، ولا فروق في المبالغ.
+          لا فاتورة سجّلها عليك وليست عندك، ولا فروق في المبالغ.
         </Callout>
       ) : (
         <Callout tone={s.missingFromArchive > 0 ? "danger" : "warn"} icon={CircleAlert} title="كشفه يختلف عن فواتيرك">
-          {s.missingFromArchive > 0 && <>{countNoun(s.missingFromArchive, INVOICE)} سجّلها عليك ولا ملف لها عندك. </>}
-          {s.amountMismatches > 0 && <>وفي {s.amountMismatches} فرق في المبلغ. </>}
-          المذكّرة أسفله جاهزة لإرسالها للمورّد.
-        </Callout>
+          <T s="{0}{1}المذكرة أسفله جاهزة لإرسالها إلى المورّد." a={[s.missingFromArchive > 0 && <><T s="{0} سجّلها عليك وليس لها ملف عندك. " a={[countNoun(s.missingFromArchive, INVOICE)]} /></>, s.amountMismatches > 0 && <><T s="و{0} فيها فرق في المبلغ. " a={[s.amountMismatches]} /></>]} /></Callout>
       )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Count label="أسطر الكشف" value={s.statementLines} />
         <Count label="طُوبقت" value={s.matched} tone="ok" />
-        <Count label="سجّلها عليك ولا ملف لها" value={s.missingFromArchive} tone={s.missingFromArchive ? "danger" : "ok"} />
+        <Count label="سجّلها عليك وليس لها ملف" value={s.missingFromArchive} tone={s.missingFromArchive ? "danger" : "ok"} />
         <Count label="فروق مبالغ" value={s.amountMismatches} tone={s.amountMismatches ? "warn" : "ok"} />
       </div>
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border border-line-soft bg-sunken/50 p-3 text-xs sm:grid-cols-4">
         <div><dt className="text-[11px] text-muted">ما سجّله علينا</dt><dd className="mt-1 font-bold"><Money minor={s.theirBilledMinor} /></dd></div>
-        <div><dt className="text-[11px] text-muted">فواتيره لدينا</dt><dd className="mt-1 font-bold"><Money minor={s.ourBilledMinor} /></dd></div>
+        <div><dt className="text-[11px] text-muted">فواتيره عندنا</dt><dd className="mt-1 font-bold"><Money minor={s.ourBilledMinor} /></dd></div>
         <div>
           <dt className="text-[11px] text-muted">الفرق</dt>
           <dd className={`mt-1 font-bold ${s.billedDifferenceMinor === 0 ? "text-ok" : "text-warn"}`}><Money minor={Math.abs(s.billedDifferenceMinor)} /></dd>
         </div>
-        <div><dt className="text-[11px] text-muted">ما سدّدناه حسب كشفه</dt><dd className="mt-1 font-bold"><Money minor={s.theirPaidMinor} /></dd></div>
+        <div><dt className="text-[11px] text-muted">ما سدّدناه بحسب كشفه</dt><dd className="mt-1 font-bold"><Money minor={s.theirPaidMinor} /></dd></div>
       </dl>
 
       {result.unreadLines && result.unreadLines.length > 0 && (
         <Callout tone="warn" icon={CircleAlert} title={`${countNoun(result.unreadLines.length, LINE)} لم يُقرأ مبلغه أو تاريخه`}>
-          لم تُطابَق ولم تُحذف. راجعها في الكشف نفسه.
-          <ul className="mt-1.5 space-y-0.5">
+          <T s="لم تُطابَق ولم تُحذف، فراجعها في الكشف نفسه.{0}{1}" a={[<ul key="0" className="mt-1.5 space-y-0.5">
             {(allUnread ? result.unreadLines : result.unreadLines.slice(0, 12)).map((u, i) => (
               <li key={i} className="text-[11px]" dir="auto">
                 <bdi className="nums">{u.date || "بلا تاريخ"}</bdi> · {u.description || "بلا وصف"} · <bdi className="nums">{u.amountText || "بلا مبلغ"}</bdi>
               </li>
             ))}
-          </ul>
-          {!allUnread && result.unreadLines.length > 12 && (
+          </ul>, !allUnread && result.unreadLines.length > 12 && (
             <button type="button" onClick={() => setAllUnread(true)} className="mt-1.5 min-h-8 text-[11px] font-bold text-accent hover:underline">
-              اعرض الباقي (<span className="nums">{result.unreadLines.length - 12}</span>)
-            </button>
-          )}
-        </Callout>
+              <T s="اعرض الباقي ({0})" a={[<span key="0" className="nums">{result.unreadLines.length - 12}</span>]} /></button>
+          )]} /></Callout>
       )}
 
       {s.balanceArithmeticOk === false && (
         <Callout tone="warn" icon={CircleAlert}>
-          حساب الكشف نفسه غير صحيح: الرصيد الافتتاحي مع الحركات لا يعطي الرصيد الختامي المكتوب فيه.
+          حساب الكشف نفسه غير صحيح: الرصيد الافتتاحي مع الحركات لا يساوي الرصيد الختامي المكتوب فيه.
         </Callout>
       )}
 
       {result.missing.length > 0 && (
         <section>
-          <h3 className="text-sm font-bold text-danger">سجّلها عليك ولا ملف لها عندك: {result.missing.length}</h3>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">فاتورة ناقصة لا تظهر عند مراجعة أرشيفك، لأنها ليست فيه.</p>
+          <h3 className="text-sm font-bold text-danger"><T s="سجّلها عليك وليس لها ملف عندك: {0}" a={[result.missing.length]} /></h3>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">فاتورة ناقصة لن تراها حين تراجع أرشيفك، لأنها ليست فيه.</p>
           <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-lg border border-danger/25">
             {result.missing.map((m, i) => (
               <li key={i} className="flex items-center justify-between gap-3 bg-danger-bg px-3 py-2 text-xs">
@@ -403,7 +392,7 @@ function ResultView({ result }: { result: Result }) {
             {result.mismatches.map((m, i) => (
               <li key={i} className="flex flex-wrap items-center justify-between gap-2 bg-warn-bg px-3 py-2 text-xs">
                 <bdi dir="ltr" className="font-mono">{m.invoiceNumber}</bdi>
-                <span className="text-ink-soft">عنده <Money minor={m.theirsMinor} /> · عندنا <Money minor={m.oursMinor} /></span>
+                <span className="text-ink-soft"><T s="عنده {0} · عندنا {1}" a={[<Money key="0" minor={m.theirsMinor} />, <Money key="1" minor={m.oursMinor} />]} /></span>
                 <span className="font-bold text-warn">{m.differenceMinor > 0 ? "+" : "−"}<Money minor={Math.abs(m.differenceMinor)} /></span>
               </li>
             ))}
@@ -413,8 +402,8 @@ function ResultView({ result }: { result: Result }) {
 
       {result.extra.length > 0 && (
         <section>
-          <h3 className="text-sm font-bold">عندك ولم ترد في كشفه: {result.extra.length}</h3>
-          <p className="mt-0.5 text-[11px] text-muted">تحقّق من أنها ليست مكرّرة عندك، وأنها لا تخص مورّداً آخر.</p>
+          <h3 className="text-sm font-bold"><T s="عندك ولم ترد في كشفه: {0}" a={[result.extra.length]} /></h3>
+          <p className="mt-0.5 text-[11px] text-muted">تأكد أنها ليست مكررة عندك، وأنها لا تخص مورّداً آخر.</p>
           <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-lg border border-line">
             {(allExtra ? result.extra : result.extra.slice(0, 15)).map((m, i) => (
               <li key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
@@ -426,15 +415,14 @@ function ResultView({ result }: { result: Result }) {
           </ul>
           {!allExtra && result.extra.length > 15 && (
             <button type="button" onClick={() => setAllExtra(true)} className={`${buttonClass("quiet", "sm")} mt-2`}>
-              اعرض الباقي (<span className="nums">{result.extra.length - 15}</span>)
-            </button>
+              <T s="اعرض الباقي ({0})" a={[<span key="0" className="nums">{result.extra.length - 15}</span>]} /></button>
           )}
         </section>
       )}
 
       {/* ── مذكّرة الفروق ── */}
       <section>
-        <h3 className="text-sm font-bold">مذكّرة جاهزة للمورّد</h3>
+        <h3 className="text-sm font-bold">مذكرة جاهزة للمورّد</h3>
         <pre dir="rtl" className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-sunken p-3 font-sans text-[11px] leading-relaxed">
           {result.memo}
         </pre>
@@ -454,14 +442,12 @@ function ResultView({ result }: { result: Result }) {
             className={buttonClass("secondary", "sm")}
           >
             <Copy className="h-4 w-4" strokeWidth={2} aria-hidden />
-            {copied === "ok" ? "✓ تم النسخ" : "انسخ المذكّرة"}
+            {copied === "ok" ? "✓ نُسخت" : "انسخ المذكرة"}
           </button>
           <a href={whatsappHref(result.supplier.phoneE164, result.memo)} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
-            <MessageCircle className="h-4 w-4" strokeWidth={2} aria-hidden />
-            أرسلها عبر واتساب
-          </a>
+            <T s="{0}أرسلها عبر واتساب" a={[<MessageCircle key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></a>
           {copied === "fail" && (
-            <span role="alert" className="text-[11px] text-danger">منع المتصفح النسخ إلى الحافظة. حدّد نص المذكّرة وانسخه بنفسك.</span>
+            <span role="alert" className="text-[11px] text-danger">المتصفح منع النسخ. حدّد نص المذكرة وانسخه بنفسك.</span>
           )}
         </div>
       </section>
@@ -484,16 +470,15 @@ function RecordMissing({ statementId, count, minor }: { statementId: string; cou
     const r = await postJson<{ message: string }>("/api/statement-invoices", { statementId });
     setBusy(false);
     if (!r.ok) { setError(r.error); return; }
-    toast({ tone: "ok", title: "تم قيد الفواتير الناقصة من الكشف", body: r.data.message });
+    toast({ tone: "ok", title: "سُجّلت الفواتير الناقصة من الكشف", body: r.data.message });
     router.refresh();
   }
   return (
     <span className="relative z-10 flex max-w-64 flex-col items-end gap-1 text-end">
       <span className="text-[11px] text-warn">
-        {count === 1 ? "فاتورة" : <><span className="nums">{count}</span> فواتير</>} في الكشف لا ملف لها (<Money minor={minor} />)
-      </span>
+        <T s="{0} في الكشف ليس لها ملف ({1})" a={[count === 1 ? "فاتورة" : <><T s="{0} فواتير" a={[<span key="0" className="nums">{count}</span>]} /></>, <Money key="1" minor={minor} />]} /></span>
       <button type="button" onClick={run} disabled={busy} aria-busy={busy} className={`${buttonClass("secondary", "sm")} whitespace-nowrap`}>
-        {busy ? "جارٍ القيد…" : "سجّلها من الكشف"}
+        {busy ? "يسجّل…" : "سجّلها من الكشف"}
       </button>
       {error && <span role="alert" className="text-[11px] text-danger">{error}</span>}
     </span>

@@ -168,7 +168,7 @@ export async function loadDocumentProfile(id: string): Promise<DocumentProfile |
   const fromNameUsed: string[] = [];
   if (!readNumber && fromName.invoiceNumber) fromNameUsed.push("رقم الفاتورة");
   if (!readDate && fromName.date) fromNameUsed.push("التاريخ");
-  if (!readTotal && fromName.totalMinor !== null) fromNameUsed.push("الإجماليّ");
+  if (!readTotal && fromName.totalMinor !== null) fromNameUsed.push("الإجمالي");
 
   const recorded = row.invoiceId !== null || row.statementId !== null;
   const totalForMissing = parseRiyals(readTotal ?? "") ?? fromName.totalMinor;

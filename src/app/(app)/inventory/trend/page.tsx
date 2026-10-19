@@ -15,6 +15,7 @@ import { formatBp } from "@/lib/inventory/equation";
 import { combineSummaries } from "@/lib/inventory/variance-summary";
 import { formatSignedQuantity } from "@/lib/inventory/units";
 import { todayInRiyadh, addDays } from "@/lib/riyadh-time";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export default async function InventoryTrendPage({
   if (!user) redirect("/login?from=/inventory/trend");
   if (!can(user.role, "inventory:view") || !can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} width="wide" title="اتّجاه الجرد">
+      <PageShell user={user} width="wide" title="اتجاه الجرد">
         <NoAccess what="الجرد" />
       </PageShell>
     );
@@ -73,9 +74,9 @@ export default async function InventoryTrendPage({
     <PageShell
       user={user}
       width="wide"
-      title="اتّجاه الجرد"
-      intro="هل يتحسن الجرد أم يسوء؟ تحليل لما حدث فعلاً، دون توقعات."
-      actions={<LinkButton href="/inventory/history" size="sm" icon={History}>سجلّ الجرد</LinkButton>}
+      title="اتجاه الجرد"
+      intro="هل يتحسن الجرد أم يسوء؟ تحليل لما حدث فعلاً، بلا توقعات."
+      actions={<LinkButton href="/inventory/history" size="sm" icon={History}>سجل الجرد</LinkButton>}
     >
       {/* المدّةُ لا تُختار قبل أن يوجد ما يُحلَّل */}
       {finalisedAll > 0 && (
@@ -91,7 +92,7 @@ export default async function InventoryTrendPage({
             icon={TrendingUp}
             title={finalisedAll === 0 ? "لا يوجد جرد مقفل بعد، والاتجاه يحتاج إلى جردين." : "لا يوجد جرد مقفل في هذه المدة."}
             hint={finalisedAll === 0
-              ? "لا يمكن معرفة الاتجاه من نقطة واحدة. أقفل جردين أسبوعيين ليظهر هنا هل يتحسن النقص أم يسوء. لا يُرسم خط لما لم يحدث بعد."
+              ? "لا يُعرف الاتجاه من نقطة واحدة. أقفل جردين أسبوعيين لترى هنا هل يتحسن النقص أم يسوء، ولا يُرسم خط لما لم يحدث بعد."
               : `في السجل ${countNoun(finalisedAll, COUNT)} مقفلة خارج هذه المدة. وسّع المدة لتراها.`}
             action={finalisedAll === 0
               ? <LinkButton href="/inventory" variant="primary" size="sm">إلى الجرد الحالي</LinkButton>
@@ -111,21 +112,21 @@ export default async function InventoryTrendPage({
               foot={
                 <StatGrid>
                   <Stat
-                    label="النقص من كلفة الاستهلاك"
+                    label="النقص من تكلفة الاستهلاك"
                     value={total.shortageRateBp === null ? "غير محسوبة" : formatBp(-total.shortageRateBp)}
-                    sub={total.consumptionCostComplete ? "نسبة ما ضاع مما كان ينبغي أن يُصرف" : "محسوبة على ما عُرفت كلفته فقط"}
+                    sub={total.consumptionCostComplete ? "نسبة المفقود مما كان يُفترض أن يُصرف" : "محسوبة على ما عُرفت تكلفته فقط"}
                   />
                   <Stat
                     label="حجم الفروق"
                     minor={total.absoluteCostMinor}
-                    sub={`نقص وزيادة معاً · الصافي ${formatRiyalsDisplay(total.netCostMinor)}`}
+                    sub={`النقص والزيادة معاً · الصافي ${formatRiyalsDisplay(total.netCostMinor)}`}
                   />
-                  <Stat label="الجردات في المدة" value={countNoun(counted, COUNT)} sub={`من ${formatWeek(chrono[0].periodStart, chrono[chrono.length - 1].periodEnd)}`} />
+                  <Stat label="الجرود في المدة" value={countNoun(counted, COUNT)} sub={`من ${formatWeek(chrono[0].periodStart, chrono[chrono.length - 1].periodEnd)}`} />
                   <Stat
-                    label="الجردات المكتملة التغطية"
+                    label="الجرود المكتملة التغطية"
                     value={`${coveredWeeks} من ${counted}`}
                     tone={coveredWeeks < counted ? "warn" : undefined}
-                    sub={coveredWeeks < counted ? "وبقيتها جزئية، فالفرق فيها ناقص وليس صغيراً" : "كل ما بِيع دخل في الحساب"}
+                    sub={coveredWeeks < counted ? "والباقي جزئي، ففرقه ناقص وليس صغيراً" : "دخل كل ما بيع في الحساب"}
                   />
                 </StatGrid>
               }
@@ -134,7 +135,7 @@ export default async function InventoryTrendPage({
 
           <Section
             title="أسبوعاً بأسبوع"
-            hint="يظهر النقص والزيادة لكل أسبوع في شريطين متجاورين، ولا يلغي أحدهما الآخر. الشريط الأطول هو الأكبر في هذه المدة."
+            hint="يظهر نقص كل أسبوع وزيادته في شريطين متجاورين، ولا يُلغي أحدهما الآخر. الشريط الأطول هو الأكبر في هذه المدة."
           >
             <ul className="overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
               {chrono.map((c) => (
@@ -143,7 +144,7 @@ export default async function InventoryTrendPage({
                     <span className="min-w-0">
                       <span className="block text-[13px] font-bold">{formatWeek(c.periodStart, c.periodEnd)}</span>
                       {c.readiness && c.readiness !== "READY" && (
-                        <span className="mt-0.5 block text-[11px] text-warn">تقرير {READINESS_LABEL[c.readiness]}</span>
+                        <span className="mt-0.5 block text-[11px] text-warn"><T s="تقرير {0}" a={[READINESS_LABEL[c.readiness]]} /></span>
                       )}
                     </span>
                     <span className="min-w-0 space-y-1.5">
@@ -170,20 +171,19 @@ export default async function InventoryTrendPage({
 
           <Section
             title="أصناف يتكرر فيها الفرق"
-            hint="الفرق الصغير المتكرر يدل على خلل في طريقة العمل، كوصفة أو كمية أو ميزان. أما الفرق الكبير الذي حدث مرة واحدة فهو حادثة منفردة. والنوع الأول هو الذي يمكن إصلاحه."
+            hint="الفرق الصغير المتكرر يدل على خلل في طريقة العمل، كالوصفة أو الكمية أو الميزان. أما الفرق الكبير الذي حدث مرة واحدة فحادثة عابرة. والنوع الأول هو الذي يمكن إصلاحه."
           >
             <DataTable
               columns={recurringColumns}
               rows={recurring}
               keyOf={(r) => r.productId}
               hrefOf={(r) => `/inventory/items/${r.productId}`}
-              empty={<EmptyState compact icon={Repeat} title="لا يوجد صنف تكرر فيه الفرق في هذه المدة." hint="يظهر هنا الصنف الذي ينقص أو يزيد في أكثر من جرد." />}
+              empty={<EmptyState compact icon={Repeat} title="لم يتكرر الفرق في أي صنف خلال هذه المدة." hint="هنا يظهر الصنف الذي ينقص أو يزيد في أكثر من جرد." />}
             />
           </Section>
 
           <p className="mt-6 rounded-xl border border-line bg-sunken/60 px-4 py-3 text-[11px] leading-relaxed text-ink-soft">
-            الهدر المسجّل مخصوم من هذه الأرقام أصلاً، فما تراه هنا هو <strong>الفرق غير المفسَّر</strong> فقط. وكلما سجّلت هدراً أكثر صار هذا الرقم أدق في وصف ما لا نعرف سببه.
-          </p>
+            <T s="الهدر المسجّل مخصوم من هذه الأرقام أصلاً، فما تراه هنا هو {0} فقط. وكلما سجّلت الهدر أكثر صار هذا الرقم أدق في التعبير عما لا نعرف سببه." a={[<strong key="0">الفرق غير المفسَّر</strong>]} /></p>
         </>
       )}
     </PageShell>
@@ -196,8 +196,7 @@ const recurringColumns: readonly Column<RecurringItem>[] = [
     key: "pattern", header: "النمط",
     cell: (r) => (
       <span className={r.negativePeriods === r.periods && r.periods >= 2 ? "font-bold text-danger" : "text-ink-soft"}>
-        نقص في <span className="nums">{r.negativePeriods}</span> من <span className="nums">{r.periods}</span>
-      </span>
+        <T s="نقص في {0} من {1}" a={[<span key="0" className="nums">{r.negativePeriods}</span>, <span key="1" className="nums">{r.periods}</span>]} /></span>
     ),
   },
   { key: "qty", header: "النقص بالكمية", numeric: true, cell: (r) => <span className="nums">{formatSignedQuantity(-r.shortageMilli, r.baseUnit)}</span> },

@@ -32,7 +32,7 @@ export function ConfirmEligible({ count }: { count: number }) {
           const r = await postJson<{ message?: string }>("/api/document-status", { action: "confirm-eligible" });
           setBusy(false);
           if (!r.ok) { setError(r.error); return; }
-          toast({ tone: "ok", title: "تم حسم المستندات المستوفية للشروط", body: r.data.message ?? "تم الاعتماد" });
+          toast({ tone: "ok", title: "اعتُمدت المستندات المستوفية للشروط", body: r.data.message ?? "اعتُمد" });
           router.refresh();
         }}
       >

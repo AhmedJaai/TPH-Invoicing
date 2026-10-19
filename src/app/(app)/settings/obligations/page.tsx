@@ -13,6 +13,7 @@ import {
   type ExpiryLevel, type Obligation,
 } from "@/lib/obligations";
 import { loadObligations } from "@/services/obligation.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -46,11 +47,11 @@ export default async function ObligationsPage() {
 
   if (view.open.length === 0 && view.archived.length === 0) {
     return (
-      <PageShell user={user} width="wide" title="الوثائق والتراخيص" intro="وثائق لها تاريخ انتهاء: السجل التجاري، رخصة البلدية، الدفاع المدني، الشهادات الصحية، الإقامات، عقد الإيجار.">
+      <PageShell user={user} width="wide" title="الوثائق والتراخيص" intro="الوثائق التي لها تاريخ انتهاء: السجل التجاري، ورخصة البلدية، والدفاع المدني، والشهادات الصحية، والإقامات، وعقد الإيجار.">
         <EmptyState
           icon={FileBadge}
           title="لم تُضف أي وثيقة بعد."
-          hint="أضف وثائق المقهى مع تاريخ انتهاء كل منها (نحو عشر وثائق)، وسيذكّرك النظام قبل انتهائها في «يحتاج قرارك». وإلى أن تضيفها لا نستطيع القول إن «لا شيء ينتهي»، لأن النظام لا يعرف شيئاً عنها."
+          hint="أضف وثائق المقهى وتاريخ انتهاء كل منها (نحو عشر وثائق)، وسيذكّرك النظام قبل انتهائها في «يحتاج قرارك». وقبل أن تضيفها لا يستطيع النظام أن يقول «لا شيء ينتهي»، لأنه لا يعرف عنها شيئاً."
           action={canEdit ? <ObligationForm /> : undefined}
         />
       </PageShell>
@@ -78,17 +79,17 @@ export default async function ObligationsPage() {
           tone={due.length > 0 ? "warn" : undefined}
           label="داخل مهلة التذكير"
           value={<span className="nums nums-count">{due.length}</span>}
-          sub={due.length > 0 ? due.slice(0, 3).map((r) => r.title).join("، ") : "لا توجد وثيقة يقترب موعد انتهائها."}
+          sub={due.length > 0 ? due.slice(0, 3).map((r) => r.title).join("، ") : "لا وثيقة يقترب انتهاؤها."}
         />
         <KeyFigure
           icon={ShieldCheck}
           label="أقرب موعد"
           value={next ? <bdi className="text-xl">{formatDay(next.expiresOn)}</bdi> : <span className="text-xl text-muted">—</span>}
-          sub={next ? `${next.title} — ${describeDaysLeft(next.left)}` : "جميع الوثائق التي أضفتها منتهية."}
+          sub={next ? `${next.title} — ${describeDaysLeft(next.left)}` : "كل الوثائق التي أضفتها منتهية."}
         />
       </div>
 
-      <Section title="الوثائق" icon={FileBadge} count={rows.length} hint="الأقرب انتهاءً أولاً. للتجديد عدّل تاريخ الانتهاء، وأرشف ما لم تعد بحاجة إليه (الأرشفة لا تحذفه).">
+      <Section title="الوثائق" icon={FileBadge} count={rows.length} hint="الأقرب انتهاءً أولاً. للتجديد عدّل تاريخ الانتهاء، وأرشف ما لم تعد تحتاجه (الأرشفة لا تحذفه).">
         <DataTable<(typeof rows)[number]>
           rows={rows}
           keyOf={(r) => r.id}
@@ -126,7 +127,7 @@ export default async function ObligationsPage() {
               cell: (r) => (
                 <span className="flex flex-col items-start gap-1">
                   <Badge tone={LEVEL_TONE[r.level]} dot>{EXPIRY_LEVEL_LABEL[r.level]}</Badge>
-                  <span className="text-[11px] text-muted">{describeDaysLeft(r.left)} · التذكير قبل {r.remindDays} يوماً{r.snoozed && " · أجّلتَ التذكير"}</span>
+                  <span className="text-[11px] text-muted"><T s="{0} · التذكير قبل {1} يوماً{2}" a={[describeDaysLeft(r.left), r.remindDays, r.snoozed && " · أجّلتَ التذكير"]} /></span>
                 </span>
               ),
             },
@@ -146,9 +147,7 @@ export default async function ObligationsPage() {
                       )}
                       {canEdit && (
                         <PostAction url="/api/obligation" body={{ action: "close", id: r.id }} undo={{ body: { action: "reopen", id: r.id } }} variant="quiet">
-                          <Archive className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                          أرشف
-                        </PostAction>
+                          <T s="{0}أرشف" a={[<Archive key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></PostAction>
                       )}
                     </span>
                   ),
@@ -159,19 +158,17 @@ export default async function ObligationsPage() {
       </Section>
 
       {view.archived.length > 0 && (
-        <Section title="المؤرشف" icon={Archive} count={view.archived.length} hint="لا يذكّرك النظام بها. يمكنك إعادتها إن أرشفتها بالخطأ.">
+        <Section title="المؤرشف" icon={Archive} count={view.archived.length} hint="لا يذكّرك النظام بها، ويمكنك إعادتها إن أرشفتها خطأً.">
           <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
             {view.archived.map((o) => (
               <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-[13px]">
                 <span className="min-w-0 truncate">
                   <span className="font-bold">{o.title}</span>
-                  <span className="ms-2 text-[11px] text-muted">{OBLIGATION_KIND_LABEL[o.kind]} · كان تاريخ انتهائها <bdi>{formatDay(o.expiresOn)}</bdi></span>
+                  <span className="ms-2 text-[11px] text-muted"><T s="{0} · كان تاريخ انتهائها {1}" a={[OBLIGATION_KIND_LABEL[o.kind], <bdi key="1">{formatDay(o.expiresOn)}</bdi>]} /></span>
                 </span>
                 {canEdit && (
                   <PostAction url="/api/obligation" body={{ action: "reopen", id: o.id }} variant="quiet">
-                    <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                    أعدها
-                  </PostAction>
+                    <T s="{0}أعدها" a={[<RotateCcw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></PostAction>
                 )}
               </li>
             ))}

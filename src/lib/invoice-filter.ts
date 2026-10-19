@@ -90,7 +90,7 @@ export const TAX_LABEL: Record<TaxFilter, string> = {
   VALID: "بياناتها الضريبية مكتملة",
   INVALID: "بياناتها الضريبية ناقصة",
   UNKNOWN: "لم تُقرأ ضريبتها",
-  NOT_APPLICABLE: "لا تُسجَّل كفاتورة",
+  NOT_APPLICABLE: "لا تُسجَّل فاتورةً",
 };
 
 export const PAID_LABEL: Record<PaidFilter, string> = {
@@ -114,7 +114,7 @@ export function describe(f: InvoiceFilters, supplierName?: string | null): strin
   if (f.overdue) parts.push(`مضى على استحقاقها ${countNoun(OVERDUE_DAYS, DAY)}`);
   if (f.noLines) parts.push("بلا بنود مقروءة");
   if (f.withVat) parts.push("فيها ضريبة");
-  if (f.fixedAsset) parts.push("أصول ثابتة (فوق حدّ الرسملة)");
+  if (f.fixedAsset) parts.push("أصول ثابتة (فوق حد الرسملة)");
   if (f.month) parts.push(`في ${f.month}`);
   return parts.length === 0 ? "كل الفواتير" : parts.join(" · ");
 }

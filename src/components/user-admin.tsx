@@ -8,6 +8,7 @@ import { ROLE_LABEL, ROLES, type Role } from "@/lib/permissions";
 import { buttonClass } from "./ui-tokens";
 import { Badge } from "./ui";
 import { ConfirmAction, toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 export interface UserAdminItem {
   id: string;
@@ -69,8 +70,8 @@ export function UserAdmin({ users, meId }: { users: UserAdminItem[]; meId: strin
 
             <p className="text-[11px] leading-relaxed text-muted">
               {u.activeSessions === 0
-                ? "لا توجد جلسة قائمة، وآخر نشاط له غير معروف"
-                : <>جلسات نشطة: <span className="nums">{u.activeSessions}</span> · آخر تجديد لجلسته {u.lastSeenAbout ?? "غير معروف"} (تتجدد الجلسة مرة في اليوم ما دام يستخدم النظام)</>}
+                ? "لا جلسة مفتوحة، وآخر نشاط له غير معروف"
+                : <><T s="جلسات نشطة: {0} · آخر تجديد لجلسته {1} (تتجدد الجلسة مرة في اليوم ما دام يستخدم النظام)" a={[<span key="0" className="nums">{u.activeSessions}</span>, u.lastSeenAbout ?? "غير معروف"]} /></>}
             </p>
 
             {u.note && (
@@ -104,9 +105,9 @@ export function UserAdmin({ users, meId }: { users: UserAdminItem[]; meId: strin
                   label={me ? "أنهِ جلساتي على كل الأجهزة" : "أنهِ جلساته"}
                   title={me ? "إنهاء جلساتك كلها" : `إنهاء جلسات ${u.name ?? u.email}`}
                   consequence={me
-                    ? "ستخرج من هذا الجهاز ومن كل جهاز دخلت منه، ثم تسجّل الدخول من جديد بحساب جوجل. هذا مفيد إن ضاع جهاز أو بقيت مسجّلاً الدخول على جهاز مشترك."
-                    : "سيخرج من كل أجهزته الآن، ويمكنه تسجيل الدخول من جديد بحساب جوجل إن بقي حسابه مفعّلاً."}
-                  acknowledgement={me ? "أعرف أنني سأسجّل الدخول من جديد" : "أعرف أنه سيخرج الآن"}
+                    ? "ستخرج من هذا الجهاز ومن كل جهاز دخلت منه، ثم تدخل من جديد بحساب جوجل. هذا مفيد إن ضاع جهاز، أو بقيت داخلاً على جهاز مشترك."
+                    : "سيخرج من كل أجهزته الآن، ويمكنه الدخول من جديد بحساب جوجل ما دام حسابه مفعّلاً."}
+                  acknowledgement={me ? "أعرف أنني سأدخل من جديد" : "أعرف أنه سيخرج الآن"}
                   confirmLabel="أنهِ الجلسات"
                   tone="warn"
                   variant="secondary"
@@ -119,7 +120,7 @@ export function UserAdmin({ users, meId }: { users: UserAdminItem[]; meId: strin
                 <ConfirmAction
                   label="عطّل حسابه"
                   title={`تعطيل ${u.name ?? u.email}`}
-                  consequence="سيخرج من كل أجهزته الآن ولن يتمكن من الدخول حتى تعيد تفعيل حسابه. ما سجّله من عمليات يبقى باسمه في سجلّ التدقيق."
+                  consequence="سيخرج من كل أجهزته الآن، ولن يستطيع الدخول حتى تعيد تفعيل حسابه. ما سجّله من عمليات يبقى باسمه في سجل التدقيق."
                   acknowledgement="أعرف أنه لن يدخل حتى أعيد تفعيله"
                   confirmLabel="عطّل الحساب"
                   disabled={working}

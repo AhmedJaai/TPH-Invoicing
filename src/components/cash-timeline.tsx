@@ -10,6 +10,7 @@ import { toast } from "./ui-client";
 import { LATER_BUCKET, whatIfDefer, type OutlookBucket } from "@/lib/cash-outlook";
 import { parseSelection, rawSelection, saveSelection } from "@/lib/pay-run-selection";
 import { SUPPLIER, countNoun } from "@/lib/arabic";
+import { T } from "@/components/i18n/t";
 
 /**
  * «ما يخرج، ومتى» — الجدولُ الزمنيّ ورسمُه، وفيه «ماذا لو أجّلتُ هذا؟».
@@ -59,7 +60,7 @@ export function CashTimeline({
     toast({
       tone: "ok",
       title: `استُثني ${countNoun(deferredSuppliers.length, SUPPLIER)} من دفعة الشهر`,
-      body: "لم يُحوَّل شيء ولم يُقيَّد. راجع الدفعة ثم نزّل ملفها.",
+      body: "لم يُحوَّل شيء ولم يُسجَّل. راجع الدفعة ثم نزّل ملفها.",
     });
     router.push("/payments");
   }
@@ -72,16 +73,11 @@ export function CashTimeline({
         <div role="status" className="sticky top-14 z-10 mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-info/30 bg-info-bg px-4 py-3 text-xs lg:top-[60px]">
           <FlaskConical className="h-4 w-4 shrink-0 text-info" strokeWidth={2} aria-hidden />
           <p className="min-w-0 flex-1 basis-56 leading-relaxed text-ink-soft">
-            <b className="text-ink">تجربة، ولم يُحفظ شيء.</b> أجّلتَ <Money minor={view.deferredMinor} /> إلى المرحلة التالية
-            {view.lowestMinor !== null && (
-              <> · أدنى رصيد يصل إليه <b className={view.lowestMinor < 0 ? "text-danger" : "text-ink"}><Money minor={view.lowestMinor} /></b></>
-            )}
-            {view.shortfallAt === null && balanceMinor !== null ? " · الرصيد المعروف يكفي بهذا الترتيب." : ""}
-          </p>
+            <T s="{0} أجّلتَ {1} إلى المرحلة التالية{2}{3}" a={[<b key="0" className="text-ink">هذه تجربة، ولم يُحفظ شيء.</b>, <Money key="1" minor={view.deferredMinor} />, view.lowestMinor !== null && (
+              <> <T s=" · أدنى رصيد يصل إليه {0}" a={[<b key="0" className={view.lowestMinor < 0 ? "text-danger" : "text-ink"}><Money minor={view.lowestMinor} /></b>]} /></>
+            ), view.shortfallAt === null && balanceMinor !== null ? " · الرصيد المعروف يكفي بهذا الترتيب." : ""]} /></p>
           <button type="button" onClick={() => setDeferred(new Set())} className={buttonClass("quiet", "sm")}>
-            <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            إلغاء التجربة
-          </button>
+            <T s="{0}ألغِ التجربة" a={[<RotateCcw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
           {canPay && deferredSuppliers.length > 0 && (
             <button type="button" onClick={adopt} className={buttonClass("primary", "sm")}>
               اعتمد هذا الترتيب في دفعة الشهر
@@ -105,16 +101,13 @@ export function CashTimeline({
                   <p className="text-lg font-bold"><Money minor={b.totalMinor} /></p>
                   {b.afterMinor !== null && (
                     <p className={`mt-0.5 text-[11px] ${b.afterMinor < 0 ? "font-bold text-danger" : "text-muted"}`}>
-                      يبقى بعدها ≥ <Money minor={b.afterMinor} />
-                    </p>
+                      <T s="المتبقي بعدها ≥ {0}" a={[<Money key="0" minor={b.afterMinor} />]} /></p>
                   )}
                 </div>
               </header>
               {view.shortfallAt === b.id && (
                 <p className="flex items-center gap-2 bg-danger-bg px-4 py-2 text-xs font-bold text-danger sm:px-5">
-                  <CircleAlert className="h-4 w-4" strokeWidth={2} aria-hidden />
-                  هنا لا يكفي الرصيد المعروف لتغطية ما سيخرج{trying ? " (بترتيب التجربة)." : ". جرّب تأجيل سطر بتحديد مربّعه."}
-                </p>
+                  <T s="{0}هنا لا يكفي الرصيد المعروف لما سيخرج{1}" a={[<CircleAlert key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />, trying ? " (بترتيب التجربة)." : ". جرّب تأجيل سطر بتحديد مربعه."]} /></p>
               )}
               {b.lines.length === 0 ? (
                 <p className="px-4 py-3 text-xs text-muted sm:px-5">أُجّل كل ما فيها.</p>
@@ -141,7 +134,7 @@ export function CashTimeline({
                           <span className="min-w-0 flex-1 truncate text-[13px]">
                             {l.label}
                             {l.sub && <span className="ms-2 text-[11px] text-muted">{l.sub}</span>}
-                            {moved && <span className="ms-2 text-[11px] font-bold text-info">مؤجّل من «{origin.get(l.id) ?? ""}»</span>}
+                            {moved && <span className="ms-2 text-[11px] font-bold text-info"><T s="مؤجّل من «{0}»" a={[origin.get(l.id) ?? ""]} /></span>}
                           </span>
                           <span className="nums-col shrink-0 text-[13px] font-bold"><Money minor={l.amountMinor} /></span>
                         </Link>
@@ -156,7 +149,7 @@ export function CashTimeline({
       </ol>
       {!trying && view.buckets.length > 0 && (
         <p className="mt-3 text-xs text-muted">
-          «ماذا لو أجّلت هذا؟» حدّد مربّع أي سطر لترى ما يبقى بعد كل مرحلة. هذه تجربة في هذه الصفحة فقط، ولا تُحفظ ولا تغيّر أي قيد.
+          «ماذا لو أجّلت هذا؟» حدّد مربع أي سطر لترى ما يبقى بعد كل مرحلة. هذه تجربة في هذه الصفحة فقط، لا تُحفظ ولا تغيّر أي سجل.
         </p>
       )}
     </>
@@ -196,14 +189,14 @@ function BalanceSteps({ balanceMinor, buckets }: { balanceMinor: number; buckets
     <figure className="mb-6 rounded-xl border border-line bg-raised p-4 shadow-raised sm:p-5">
       <figcaption className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-[13px] font-bold">الرصيد بعد كل مرحلة</span>
-        <span className="text-[11px] text-muted">حد أدنى، والوارد غير مرسوم</span>
+        <span className="text-[11px] text-muted">حد أدنى، والداخل غير مرسوم</span>
       </figcaption>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
         className="h-28 w-full"
         role="img"
-        aria-label={`خط الرصيد المتوقع: يبدأ بآخر رصيد معروف وأدنى نقطة فيه عند «${lowest.label}»${lowest.minor < 0 ? " تحت الصفر" : ""}`}
+        aria-label={`خط الرصيد المتوقع: يبدأ من آخر رصيد معروف، وأدنى نقطة فيه عند «${lowest.label}»${lowest.minor < 0 ? " تحت الصفر" : ""}`}
       >
         {bottom < 0 && <rect x="0" y={zero} width={W} height={H - zero} className="fill-danger-bg" />}
         <line x1="0" x2={W} y1={zero} y2={zero} className="stroke-line-input" strokeWidth="1" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />

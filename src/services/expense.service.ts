@@ -406,7 +406,7 @@ export async function deleteExpense(userId: string, id: string): Promise<DeleteE
       entityType: "expense",
       entityId: id,
       before: row,
-      after: { الفعل: "حذف القيد", المصدر: row.source },
+      after: { الفعل: "حذف المصروف", المصدر: row.source },
     }, t);
     return "DELETED";
   });

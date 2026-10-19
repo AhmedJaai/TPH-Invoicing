@@ -114,7 +114,7 @@ export function VatBulk({
       size="sm"
       variant={variant}
       disabled={ids.length === 0}
-      reason="لا توجد حركة يمكن تغيير اختيارها"
+      reason="لا حركة يمكن تغيير اختيارها"
       onAction={async () => {
         const ok = await send(ids, included, kind);
         if (ok) start(() => { router.refresh(); });
@@ -222,7 +222,7 @@ export function VatFilePanel({ period, today, credit, disabled }: {
         <div className="space-y-3 rounded-xl border border-line bg-raised p-4">
           <p className="text-sm font-bold">تسجيل تقديم الإقرار</p>
           <p className="text-xs leading-relaxed text-ink-soft">
-            يُحفظ الرقم كما هو الآن وتُقفل اختيارات الربع، وما يتغيّر بعد ذلك يظهر كـ«فرق منذ التقديم». أما التقديم نفسه فيتم في بوابة الهيئة.
+            يُحفظ الرقم كما هو الآن وتُقفل اختيارات الربع، وما يتغيّر بعد ذلك يظهر «فرقاً منذ التقديم». أما التقديم نفسه فيتم في بوابة الهيئة.
           </p>
           <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
             <label className="block">
@@ -238,7 +238,7 @@ export function VatFilePanel({ period, today, credit, disabled }: {
             <fieldset>
               <legend className="mb-1 text-[11px] font-medium text-muted">الصافي رصيد لصالحك. ماذا اخترت في البوابة؟</legend>
               <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
-                {([["CARRY", "يُرحَّل للربع التالي"], ["REFUND", "طلبت استرداده"]] as const).map(([v, text]) => (
+                {([["CARRY", "يُرحّل إلى الربع التالي"], ["REFUND", "طلبت استرداده"]] as const).map(([v, text]) => (
                   <label key={v} className="flex min-h-11 items-center gap-2 sm:min-h-0">
                     <input type="radio" name={`vat-credit-${period}`} checked={disposition === v} onChange={() => setDisposition(v)} className="h-4 w-4 accent-[var(--accent)]" />
                     {text}
@@ -256,7 +256,7 @@ export function VatFilePanel({ period, today, credit, disabled }: {
               onAction={async () => {
                 const ok = await act({ action: "file", period, filedOn, reference: reference.trim() || null, creditDisposition: credit ? disposition : null }, "تعذّر تسجيل التقديم");
                 if (ok) {
-                  toast({ title: "تم تسجيل تقديم الإقرار", body: "حُفظ رقمه وأُقفلت اختيارات الربع.", tone: "ok" });
+                  toast({ title: "سُجّل تقديم الإقرار", body: "حُفظ رقمه وأُقفلت اختيارات الربع.", tone: "ok" });
                   setOpen(false);
                   start(() => { router.refresh(); });
                 }
@@ -289,7 +289,7 @@ export function VatVoidFiling({ period }: { period: string }) {
       <Reveal open={open}>
         <div className="space-y-3 rounded-xl border border-warn/30 bg-warn-bg p-4">
           <p className="text-xs leading-relaxed text-ink-soft">
-            يُعاد فتح اختيارات الربع، فيتغيّر رقمه بحسب ما تغيّر بعد التقديم. وتبقى اللقطة المحفوظة في السجلّ مع سبب التراجع. ولا يغيّر هذا شيئاً لدى الهيئة.
+            يُعاد فتح اختيارات الربع، فيتغيّر رقمه بقدر ما تغيّر بعد التقديم. وتبقى اللقطة المحفوظة في السجل مع سبب التراجع. ولا يغيّر هذا شيئاً عند الهيئة.
           </p>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium text-muted">سبب التراجع</span>

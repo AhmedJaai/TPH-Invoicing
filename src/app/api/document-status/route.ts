@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   */
   if (body.action === "confirm-eligible") {
     if (!can(user.role, "amounts:view")) {
-      return NextResponse.json({ error: "الاعتماد يحتاج صلاحية عرض المبالغ" }, { status: 403 });
+      return NextResponse.json({ error: "الاعتماد يحتاج إلى صلاحية عرض المبالغ" }, { status: 403 });
     }
     let drive = null;
     if (driveWritesAllowed(process.env)) {
@@ -111,11 +111,11 @@ export async function POST(request: Request) {
       handLinked > 0 ? `رُبطت ${countNoun(handLinked, TRANSACTION)} بنكية بسداد سجّلته يدوياً` : null,
       r.recorded > 0 ? `سُجّلت من القراءة المحفوظة: ${countNoun(r.recorded, INVOICE)}` : null,
       r.approved > 0 ? `اعتُمد ${countNoun(r.approved, DOCUMENT)}` : null,
-      r.renamed.length > 0 ? `وتمت تسمية ${countNoun(r.renamed.length, FILE)}` : null,
+      r.renamed.length > 0 ? `وسُمّي ${countNoun(r.renamed.length, FILE)}` : null,
       r.reread > 0 ? `وأُعيدت قراءة ${countNoun(r.reread, INVOICE)}` : null,
       r.notes.length > 0 ? `وتعذّر ${r.notes.length}: ${r.notes[0]}` : null,
     ].filter(Boolean);
-    const message = parts.length === 0 ? "لا يوجد مستند تتوفر فيه الشروط الآن" : parts.join(" · ");
+    const message = parts.length === 0 ? "لا يوجد الآن مستند تتوفر فيه الشروط" : parts.join(" · ");
     await markRan("backlog", await backlogFingerprint());
     return NextResponse.json({ ok: true, message, ...r, handLinked: handLinked + echoesMerged });
   }
@@ -140,7 +140,7 @@ export async function POST(request: Request) {
   */
   if (body.action === "restore") {
     if (!can(user.role, "amounts:view")) {
-      return NextResponse.json({ error: "الإعادة تحتاج صلاحية عرض المبالغ" }, { status: 403 });
+      return NextResponse.json({ error: "الإعادة تحتاج إلى صلاحية عرض المبالغ" }, { status: 403 });
     }
     const restored = await db.transaction(async (t) => {
       const rows = await t.update(documents).set({ status: "NEEDS_REVIEW" })
@@ -153,19 +153,19 @@ export async function POST(request: Request) {
         entityType: "document",
         entityId: rows[0].id,
         before: { الحال: "مرفوض" },
-        after: { الملف: rows[0].fileName, الحال: "ينتظر المراجعة", السبب: "أعيد من الرفض" },
+        after: { الملف: rows[0].fileName, الحال: "ينتظر المراجعة", السبب: "أُعيد من الرفض" },
       }, t);
       return rows[0];
     });
     if (!restored) {
-      return NextResponse.json({ error: "المستند ليس مرفوضاً، وربما أُعيد من نافذة أخرى" }, { status: 409 });
+      return NextResponse.json({ error: "المستند ليس مرفوضاً، فربما أُعيد من نافذة أخرى" }, { status: 409 });
     }
-    return NextResponse.json({ ok: true, message: "أُعيد المستند للمراجعة، وسيُسجَّل ويُحسم تلقائياً إن توفرت شروطه" });
+    return NextResponse.json({ ok: true, message: "أُعيد المستند إلى المراجعة، وسيُسجَّل ويُعتمد تلقائياً إن توفرت شروطه" });
   }
 
   if (body.action === "confirm") {
     if (!can(user.role, "amounts:view")) {
-      return NextResponse.json({ error: "تأكيد المستند يحتاج صلاحية عرض المبالغ" }, { status: 403 });
+      return NextResponse.json({ error: "تأكيد المستند يحتاج إلى صلاحية عرض المبالغ" }, { status: 403 });
     }
     /*
       «اعتمد» لا يُؤرشف ما لم يُقيَّد له شيء وهو ممّا يُقيَّد — فاتورةٌ أو كشفٌ أو مجهولُ
@@ -181,7 +181,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         error: unrecorded.kind === "UNKNOWN"
           ? "لم يُقرأ هذا المستند ولم يُسجَّل له شيء. أعد قراءته، أو سجّله من ملفه، أو ارفضه."
-          : "لم تُسجَّل له فاتورة ولا كشف. سجّله من ملفه («عاينها وقيّدها») ثم اعتمده، أو ارفضه.",
+          : "لم تُسجَّل له فاتورة ولا كشف. سجّله من ملفه (قسم «تسجيل المستند») ثم اعتمده، أو ارفضه.",
       }, { status: 409 });
     }
     const confirmed = await db.transaction(async (t) => {
@@ -224,7 +224,7 @@ export async function POST(request: Request) {
       return { ...rows[0], invoices: linked?.invoices ?? 0, statements: linked?.statements ?? 0 };
     });
     if (!confirmed) {
-      return NextResponse.json({ error: "المستند ليس بانتظار المراجعة، وربما حُسم من نافذة أخرى" }, { status: 409 });
+      return NextResponse.json({ error: "المستند لا ينتظر المراجعة، فربما قُرّر فيه من نافذة أخرى" }, { status: 409 });
     }
     /*
       ── وما اعتُمد يُسمّى ── (إذن أحمد في ٢٤ سبتمبر ٢٠٢٦)
@@ -252,8 +252,8 @@ export async function POST(request: Request) {
       ? "اعتُمد المستند، وستدخل فاتورته في دفعة الشهر ويُخصم منها ما دفعته للمورّد مقدّماً"
       : confirmed.statements > 0
         ? "اعتُمد الكشف"
-        : "اعتُمد المستند، ولا توجد فاتورة مسجّلة له بعد. ارفعه من صفحة الرفع ليقرأه النظام ويسجّله.";
-    return NextResponse.json({ ok: true, message: renamedTo ? `${message} · وتمت تسميته ${renamedTo}` : message });
+        : "اعتُمد المستند، ولا فاتورة مسجّلة له بعد. ارفعه من صفحة الرفع ليقرأه النظام ويسجّله.";
+    return NextResponse.json({ ok: true, message: renamedTo ? `${message} · وسُمّي ${renamedTo}` : message });
   }
 
   const reason = body.reason?.trim().slice(0, 500) || "رفض من صفحة المستندات";
@@ -381,27 +381,27 @@ export async function POST(request: Request) {
 
   switch (outcome.kind) {
     case "NOT_PENDING":
-      return NextResponse.json({ error: "المستند ليس بانتظار قرار، وربما حُسم من نافذة أخرى" }, { status: 409 });
+      return NextResponse.json({ error: "المستند لا ينتظر قراراً، فربما قُرّر فيه من نافذة أخرى" }, { status: 409 });
     case "FORBIDDEN":
-      return NextResponse.json({ error: "لهذا المستند فاتورة بمبلغ، ورفضه يحتاج صلاحية عرض المبالغ" }, { status: 403 });
+      return NextResponse.json({ error: "لهذا المستند فاتورة بمبلغ، ورفضه يحتاج إلى صلاحية عرض المبالغ" }, { status: 403 });
     case "PAID":
       return NextResponse.json({
-        error: `على الفاتورة ${outcome.number} سداد مسجّل (${formatRiyalsDisplay(outcome.allocatedMinor)}). تراجع عن السداد أولاً ثم ارفض المستند.`,
+        error: `على الفاتورة ${outcome.number} سداد مسجّل (${formatRiyalsDisplay(outcome.allocatedMinor)}). تراجع عن السداد أولاً، ثم ارفض المستند.`,
       }, { status: 409 });
     case "NO_TWIN":
       return NextResponse.json({
-        error: `لا توجد فاتورة أخرى بالرقم ${outcome.number} لهذا المورّد، ولا بالتاريخ والمبلغ نفسيهما، ولا ملف بالبصمة نفسها، فهي ليست مكررة. `
+        error: `لا توجد لهذا المورّد فاتورة أخرى بالرقم ${outcome.number}، ولا بالتاريخ والمبلغ نفسيهما، ولا ملف بالبصمة نفسها، فهي ليست مكررة. `
           + "إن رفضتها لسبب آخر فاكتبه، وإن كانت صحيحة فاعتمدها، لأن رفضها يُسقط مبلغها من المستحق.",
       }, { status: 409 });
     case "MATCHED":
       return NextResponse.json({
-        error: `الفاتورة ${outcome.number} مطابقة في كشف مورّد. أعد مطابقة الكشف قبل رفض المستند.`,
+        error: `الفاتورة ${outcome.number} مطابقة في كشف مورّد. أعد مطابقة الكشف قبل أن ترفض المستند.`,
       }, { status: 409 });
     case "DONE":
       return NextResponse.json({
         ok: true,
         message: outcome.removed > 0
-          ? "رُفض المستند وأُسقطت فاتورته من المستحق، ويبقى ملفه في الدرايف كما هو"
+          ? "رُفض المستند وسقطت فاتورته من المستحق، ويبقى ملفه في الدرايف كما هو"
           : "رُفض المستند، ويبقى ملفه في الدرايف كما هو",
       });
   }

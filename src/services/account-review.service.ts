@@ -119,7 +119,7 @@ export async function mergePaymentEcho(
   const moved = await allocate(tx, bank.id, bank.amountMinor, reversal.previousAllocations);
   if (moved.allocatedMinor !== reversal.freedMinor) {
     /* الحوالةُ لم تسع ما فُكّ — فلا نصفَ دمج: تُلغى المعاملة كلّها */
-    throw new EchoMergeRefused("مبلغ الحوالة لا يكفي لما سُجّل على الإقرار، ولم يُدمج شيء");
+    throw new EchoMergeRefused("مبلغ الحوالة لا يكفي لما سُجّل يدوياً، فلم يُدمج شيء");
   }
 
   await recordAudit({
@@ -200,7 +200,7 @@ export async function mergeIntoCredit(tx: Tx, manualId: string, actorId: string)
       moved += out.allocatedMinor;
     }
   }
-  if (moved !== reversal.freedMinor) throw new EchoMergeRefused("مبالغ الحوالات لا تكفي لما سُجّل على الإقرار، ولم يُدمج شيء");
+  if (moved !== reversal.freedMinor) throw new EchoMergeRefused("مبالغ الحوالات لا تكفي لما سُجّل يدوياً، فلم يُدمج شيء");
 
   await recordAudit({
     actorId,

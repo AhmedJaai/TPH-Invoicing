@@ -155,7 +155,7 @@ export async function savePurchaseLink(
   conn: Conn = db,
 ): Promise<{ productName: string }> {
   if (!DECIMAL.test(input.packSize) || (decimalToMilli(input.packSize) ?? 0) <= 0) throw new PurchaseLinkRefused("يجب أن يكون عدد العبوات في الوحدة رقماً أكبر من صفر");
-  if (!DECIMAL.test(input.contentQuantity) || (decimalToMilli(input.contentQuantity) ?? 0) <= 0) throw new PurchaseLinkRefused("يجب أن تكون كمّية العبوة رقماً أكبر من صفر");
+  if (!DECIMAL.test(input.contentQuantity) || (decimalToMilli(input.contentQuantity) ?? 0) <= 0) throw new PurchaseLinkRefused("يجب أن تكون كمية العبوة رقماً أكبر من صفر");
 
   const [sp] = await conn.select({
     id: supplierProducts.id, productId: supplierProducts.productId, packSize: supplierProducts.packSize,

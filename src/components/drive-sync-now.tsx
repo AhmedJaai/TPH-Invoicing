@@ -10,6 +10,7 @@ import { DOCUMENT, FILE, countNoun } from "@/lib/arabic";
 import type { DriveState } from "@/lib/drive-state";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * «زامن الآن» — ما تفعله المزامنةُ الآليّة كلَّ ثلاث ساعات، بضغطةٍ واحدة:
@@ -62,9 +63,9 @@ interface Outcome {
 type Phase = "scan" | "read" | "tidy";
 
 const PHASE_LABEL: Record<Phase, string> = {
-  scan: "جارٍ فحص الدرايف…",
-  read: "جارٍ قراءة الملفات الجديدة وأرشفة ما استوفى الشروط…",
-  tidy: "جارٍ استكمال ما تراكم وإعادة تسمية الملفات التي خرجت عن الصيغة…",
+  scan: "يفحص الدرايف…",
+  read: "يقرأ الملفات الجديدة ويؤرشف ما استوفى الشروط…",
+  tidy: "يكمل ما تراكم، ويعيد تسمية الملفات الخارجة عن الصيغة…",
 };
 
 export function DriveSyncNow({
@@ -148,16 +149,16 @@ export function DriveSyncNow({
         tone: "ok",
         title: "تمت المزامنة",
         body: o.newFiles === 0 && o.renamed.length === 0 && o.approved === 0
-          ? "لا جديد في الدرايف، وكل ما أُرشف مسمّى على الصيغة المعتمدة."
+          ? "لا جديد في الدرايف، وكل ما أُرشف مسمّى بالصيغة المعتمدة."
           : [
               o.newFiles > 0 ? `وُجد ${countNoun(o.newFiles, FILE)}` : null,
               o.autoArchived > 0 ? `أُرشف ${countNoun(o.autoArchived, DOCUMENT)}` : null,
-              o.renamed.length > 0 ? `أُعيدت تسمية ${countNoun(o.renamed.length, FILE)}` : null,
+              o.renamed.length > 0 ? `سُمّي من جديد ${countNoun(o.renamed.length, FILE)}` : null,
             ].filter(Boolean).join(" · "),
       });
       router.refresh();
     } catch {
-      fail("تعذّر الاتصال بالخادم ولم يصل الطلب. تحقق من الشبكة ثم أعد المحاولة.", 0);
+      fail("تعذّر الاتصال بالخادم ولم يصل الطلب. تأكد من الشبكة ثم أعد المحاولة.", 0);
     }
   }
 
@@ -181,7 +182,7 @@ export function DriveSyncNow({
           {canRun ? (
             <button type="button" onClick={() => void run()} disabled={busy} className={buttonClass("primary", "lg")}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden /> : <FolderSync className="h-4 w-4" strokeWidth={2} aria-hidden />}
-              {busy ? "جارٍ المزامنة…" : "زامن الآن"}
+              {busy ? "يزامن…" : "زامن الآن"}
             </button>
           ) : state === "disconnected" && reconnect ? (
             <form action={reconnect}>
@@ -191,7 +192,7 @@ export function DriveSyncNow({
             <button type="button" disabled className={buttonClass("secondary", "lg")}>زامن الآن</button>
           )}
           <p className="text-[11px] text-muted sm:text-end">
-            {canRun ? "تفحص الدرايف وتقرأ الملفات وتؤرشفها وتعيد تسميتها، كما تفعل المزامنة التلقائية." : state === "preview" ? "الدرايف غير متاح في النسخة التجريبية." : "يلزم أولاً السماح بالوصول من حساب جوجل."}
+            {canRun ? "يفحص الدرايف ويقرأ الملفات ويؤرشفها ويعيد تسميتها، كما تفعل المزامنة التلقائية." : state === "preview" ? "الدرايف غير متاح في النسخة التجريبية." : "اسمح أولاً بالوصول من حساب جوجل."}
           </p>
         </div>
       </div>
@@ -212,7 +213,7 @@ export function DriveSyncNow({
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sunken">
             <div className="upload-bar h-full w-1/3 rounded-full bg-accent" />
           </div>
-          <p className="mt-1.5 text-[11px] text-muted">قد يستغرق دقيقة أو أكثر إذا وُجدت ملفات تحتاج إلى قراءة محتواها. لا تغلق الصفحة.</p>
+          <p className="mt-1.5 text-[11px] text-muted">قد يستغرق دقيقة أو أكثر إن وُجدت ملفات تحتاج إلى قراءة محتواها. لا تغلق الصفحة.</p>
         </div>
       )}
 
@@ -244,13 +245,12 @@ function OutcomePanel({ o }: { o: Outcome }) {
       tone: o.needsReview > 0 ? "warn" : undefined,
     },
     { label: "اعتُمد من المتراكم", value: String(o.approved) },
-    { label: "أُعيدت تسميتها", value: String(o.renamed.length), tone: o.renamed.length > 0 ? "ok" : undefined },
+    { label: "سُمّيت من جديد", value: String(o.renamed.length), tone: o.renamed.length > 0 ? "ok" : undefined },
   ];
   return (
     <div className="mt-4 rounded-xl border border-line bg-sunken/50 p-4">
       <p className="flex items-center gap-2 text-[13px] font-bold text-ok">
-        <CircleCheck className="h-4 w-4" strokeWidth={2} aria-hidden /> تمت المزامنة الآن
-      </p>
+        <T s="{0} تمت المزامنة الآن" a={[<CircleCheck key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></p>
       <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {rows.map((r) => (
           <div key={r.label}>
@@ -263,11 +263,10 @@ function OutcomePanel({ o }: { o: Outcome }) {
       </dl>
       {o.remaining + o.remainingNamed > 0 && (
         <p className="mt-3 text-xs text-ink-soft">
-          وبقي {countNoun(o.remaining + o.remainingNamed, FILE)} لم يُسجَّل أو يُقرأ بعد. سيكتمل في المزامنة القادمة، أو اضغط «زامن الآن» مرة أخرى.
-        </p>
+          <T s="وبقي {0} لم يُسجَّل أو يُقرأ بعد. سيكتمل في المزامنة القادمة، أو اضغط «زامن الآن» مرة أخرى." a={[countNoun(o.remaining + o.remainingNamed, FILE)]} /></p>
       )}
       {o.failures > 0 && (
-        <p className="mt-2 text-xs text-warn">تعذّرت قراءة {countNoun(o.failures, FILE)}. ستجدها في «المستندات» مع سبب التعذّر.</p>
+        <p className="mt-2 text-xs text-warn"><T s="تعذّرت قراءة {0}. ستجدها في «المستندات» مع السبب." a={[countNoun(o.failures, FILE)]} /></p>
       )}
       {o.renamed.length > 0 && (
         <ul className="mt-3 space-y-1.5 border-t border-line-soft pt-3">
@@ -277,7 +276,7 @@ function OutcomePanel({ o }: { o: Outcome }) {
               <span dir="ltr" className="block truncate text-end text-[11px] font-bold text-ink-soft">{n.to}</span>
             </li>
           ))}
-          {o.renamed.length > 6 && <li className="text-[11px] text-muted">و{countNoun(o.renamed.length - 6, FILE)} أخرى في سجل التدقيق.</li>}
+          {o.renamed.length > 6 && <li className="text-[11px] text-muted"><T s="و{0} أخرى في سجل التدقيق." a={[countNoun(o.renamed.length - 6, FILE)]} /></li>}
         </ul>
       )}
     </div>

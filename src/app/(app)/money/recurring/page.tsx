@@ -13,6 +13,7 @@ import { formatRiyals } from "@/lib/money";
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
 import { SERIES_MIN_MONTHS, nextDueOn, suggestionKey } from "@/lib/recurring-detect";
 import { loadRecurringWatch, type SeriesView } from "@/services/recurring-watch.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +29,8 @@ export default async function RecurringPage() {
   if (!user) redirect("/login?from=/money/recurring");
   if (!can(user.role, "bank:view")) {
     return (
-      <PageShell user={user} width="wide" title="الاشتراكات والمتكرّر">
-        <NoAccess what="الاشتراكات والمتكرّر" />
+      <PageShell user={user} width="wide" title="الخصومات المتكررة">
+        <NoAccess what="الخصومات المتكررة" />
       </PageShell>
     );
   }
@@ -40,7 +41,7 @@ export default async function RecurringPage() {
 
   if (w.lastBankDay === null) {
     return (
-      <PageShell user={user} width="wide" title="الاشتراكات والمتكرّر" intro="المبالغ التي تُخصم كل شهر من كشف بنكك.">
+      <PageShell user={user} width="wide" title="الخصومات المتكررة" intro="المبالغ التي تُخصم من حسابك كل شهر.">
         <EmptyState
           icon={Landmark}
           title="لم يُستورد كشف بنك بعد."
@@ -58,17 +59,17 @@ export default async function RecurringPage() {
     <PageShell
       user={user}
       width="wide"
-      title="الاشتراكات والمتكرّر"
-      eyebrow={<>من كشف البنك حتى <bdi>{formatDay(w.lastBankDay)}</bdi></>}
-      intro="المبالغ التي يخصمها البنك كل شهر لجهة واحدة بمبلغ متقارب، مثل الإيجار والإنترنت واشتراكات البرامج والرواتب، وما خرج منها عن المعتاد."
+      title="الخصومات المتكررة"
+      eyebrow={<><T s="من كشف البنك حتى {0}" a={[<bdi key="0">{formatDay(w.lastBankDay)}</bdi>]} /></>}
+      intro="المبالغ التي يخصمها البنك كل شهر لجهة واحدة بمبلغ متقارب، كالإيجار والإنترنت واشتراكات البرامج والرواتب، وما خرج منها عن المعتاد."
       actions={<LinkButton href="/settings#recurring" icon={Repeat} variant="secondary">المتكرر المسجّل</LinkButton>}
     >
       {w.series.length === 0 ? (
         <EmptyState
           icon={Repeat}
-          title="لم يظهر في الكشف خصم شهري متكرر بعد."
-          hint={`يُعدّ الخصم متكرراً حين يُخصم مبلغ متقارب لجهة واحدة في ${SERIES_MIN_MONTHS} أشهر على الأقل. إن كان الكشف أقصر من ذلك فاستورد الأشهر السابقة، وما تعرفه مسبقاً (كالإيجار والرواتب) سجّله بنفسك.`}
-          action={canEdit ? <LinkButton href="/settings#recurring" variant="primary" icon={Plus}>سجّل مصروفاً متكرراً</LinkButton> : undefined}
+          title="لا يوجد في الكشف بعد خصم شهري متكرر."
+          hint={`يُعدّ الخصم متكرراً حين يُخصم مبلغ متقارب لجهة واحدة في ${SERIES_MIN_MONTHS} أشهر على الأقل. إن كان الكشف أقصر من ذلك فاستورد الأشهر السابقة، وما تعرفه سلفاً (كالإيجار والرواتب) أضِفه بنفسك.`}
+          action={canEdit ? <LinkButton href="/settings#recurring" variant="primary" icon={Plus}>أضف مصروفاً متكرراً</LinkButton> : undefined}
         />
       ) : (
         <>
@@ -77,27 +78,27 @@ export default async function RecurringPage() {
               icon={Repeat}
               label="خصومات شهرية في الكشف"
               value={<span className="nums nums-count">{w.series.length}</span>}
-              sub="جهات يُخصم لها مبلغ متقارب كل شهر، وتجدها في الجدول أدناه."
+              sub="جهات يُخصم لها مبلغ متقارب كل شهر، تجدها في الجدول أدناه."
             />
             <KeyFigure
               icon={CalendarClock}
               label="مجموعها في السنة"
               value={<Money minor={w.annualMinor} />}
-              sub="المبلغ المعتاد لكل جهة × ١٢. هذا تقدير وليس مبلغاً فعلياً."
+              sub="المبلغ المعتاد لكل جهة × ١٢. هذا تقدير، لا مبلغ فعلي."
             />
             <KeyFigure
               icon={Plus}
               tone={unregistered.length > 0 ? "warn" : "ok"}
-              label="غير مسجّلة كمصروف متكرر"
+              label="لم تُسجَّل مصروفاً متكرراً"
               value={<span className="nums nums-count">{unregistered.length}</span>}
-              sub={unregistered.length > 0 ? "لا تظهر في «النقد القادم» حتى تُسجَّل. أضفها من الجدول." : "كل ما في الكشف مسجّل أو تم تجاهل اقتراحه."}
+              sub={unregistered.length > 0 ? "لن تظهر في «النقد القادم» حتى تسجّلها. أضفها من الجدول." : "كل ما في الكشف مسجّل، أو تجاهلت اقتراحه."}
               href={unregistered.length > 0 ? "#series" : "/cash"}
             />
           </div>
 
           {/* ── ما خرج عن عادته ── */}
           {notes.length > 0 && (
-            <Section title="خرج عن المعتاد" icon={TrendingUp} count={notes.length} hint="هذه تنبيهات وليست أحكاماً. أنت تعرف إن كانت الزيادة متفقاً عليها أو الخصم الثاني مقصوداً، فتجاهل التنبيه مع ذكر السبب، أو راجع الجهة.">
+            <Section title="خرج عن المعتاد" icon={TrendingUp} count={notes.length} hint="هذه تنبيهات لا أحكام. أنت أعلم إن كانت الزيادة متفقاً عليها أو الخصم الثاني مقصوداً، فتجاهل التنبيه واذكر السبب، أو راجع الجهة.">
               <ul className="space-y-2">
                 {notes.map(({ series: s, key, note }) => (
                   <li key={key} className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3">
@@ -111,20 +112,15 @@ export default async function RecurringPage() {
                       <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
                         {note.kind === "TWICE" && (
                           <>
-                            خُصم في {formatMonth(note.month)} أكثر من مرة والمعتاد مرة واحدة، والمبلغ الزائد <Money minor={note.excessMinor} />
-                            {" "}({note.extra.map((x) => formatDay(x.day)).join("، ")}).
-                          </>
+                            <T s="خُصم في {0} أكثر من مرة والمعتاد مرة واحدة، والزائد {1} ({2})." a={[formatMonth(note.month), <Money key="1" minor={note.excessMinor} />, note.extra.map((x) => formatDay(x.day)).join("، ")]} /></>
                         )}
                         {note.kind === "ROSE" && (
                           <>
-                            خُصم <bdi>{formatDay(note.day)}</bdi> مبلغ <Money minor={note.toMinor} /> والمعتاد <Money minor={note.fromMinor} />، بزيادة{" "}
-                            <Money minor={note.diffMinor} /> في الشهر، أي <Money minor={note.diffMinor * 12} /> في السنة إن استمر.
-                          </>
+                            <T s="خُصم في {0} مبلغ {1} والمعتاد {2}، بزيادة {3} في الشهر، أي {4} في السنة إن استمرت." a={[<bdi key="0">{formatDay(note.day)}</bdi>, <Money key="1" minor={note.toMinor} />, <Money key="2" minor={note.fromMinor} />, <Money key="3" minor={note.diffMinor} />, <Money key="4" minor={note.diffMinor * 12} />]} /></>
                         )}
                         {note.kind === "MISSING" && (
                           <>
-                            لم يُخصم في {formatMonth(note.month)} وكان يُخصم كل شهر (المعتاد <Money minor={s.usualMinor} />). إن ألغيته فتجاهل التنبيه، وإن كان إيجاراً أو اشتراكاً قائماً فقد تأخر سداده.
-                          </>
+                            <T s="لم يُخصم في {0} مع أنه يُخصم كل شهر (المعتاد {1}). إن ألغيته فتجاهل التنبيه، وإن كان إيجاراً أو اشتراكاً قائماً فقد تأخر سداده." a={[formatMonth(note.month), <Money key="1" minor={s.usualMinor} />]} /></>
                         )}
                       </p>
                     </div>
@@ -144,7 +140,7 @@ export default async function RecurringPage() {
             title="ما يتكرر كل شهر"
             icon={Repeat}
             count={w.series.length}
-            hint="«المعتاد» هو وسيط الخصومات السابقة، و«اليوم» هو وسيط أيامها. وعند تسجيله كمصروف متكرر يظهر في «النقد القادم» في ذلك اليوم، ويمكنك تعديل مبلغه ودورته من الإعدادات."
+            hint="«المعتاد» وسيط الخصومات السابقة، و«اليوم» وسيط أيامها. وحين تسجّله مصروفاً متكرراً يظهر في «النقد القادم» في ذلك اليوم، ويمكنك تعديل مبلغه ودورته من الإعدادات."
           >
             <DataTable<SeriesView>
               rows={w.series}
@@ -184,10 +180,10 @@ export default async function RecurringPage() {
                   wrap: true,
                   cell: (s) =>
                     s.registered ? (
-                      <Badge tone="ok"><CircleCheck className="h-3 w-3" strokeWidth={2} aria-hidden />مسجّل: {s.registered.label}</Badge>
+                      <Badge tone="ok"><T s="{0}مسجّل: {1}" a={[<CircleCheck key="0" className="h-3 w-3" strokeWidth={2} aria-hidden />, s.registered.label]} /></Badge>
                     ) : s.suggestionSilenced ? (
                       <span className="flex flex-wrap items-center justify-end gap-1">
-                        <Badge>تم تجاهل الاقتراح</Badge>
+                        <Badge>تجاهلتَ الاقتراح</Badge>
                         {canSilence && <SignalControls signalKey={suggestionKey(s)} silenced />}
                       </span>
                     ) : canEdit ? (
@@ -204,9 +200,7 @@ export default async function RecurringPage() {
                           }}
                           variant="primary"
                         >
-                          <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                          أضفه كمصروف متكرر
-                        </PostAction>
+                          <T s="{0}أضفه مصروفاً متكرراً" a={[<Plus key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></PostAction>
                         {canSilence && <SignalControls signalKey={suggestionKey(s)} dismissLabel="ليس متكرراً" snoozeDays={30} />}
                       </span>
                     ) : (

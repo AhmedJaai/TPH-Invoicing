@@ -77,7 +77,7 @@ export class NotAWeekError extends Error {
 
 export class OverlappingPeriodError extends Error {
   constructor(readonly periodStart: string, readonly periodEnd: string) {
-    super(`هذه الفترة تتقاطع مع جرد آخر (${periodStart} → ${periodEnd}). اختر فترة تبدأ بعده.`);
+    super(`هذه الفترة تتقاطع مع جرد آخر (${periodStart} → ${periodEnd})، فاختر فترة تبدأ بعده.`);
     this.name = "OverlappingPeriodError";
   }
 }
@@ -258,7 +258,7 @@ export async function loadSoldForReport(
 /** كمّيّةُ سطر البيع من نصّ `numeric` — وما لا يُقرأ عطبٌ يُسمَع لا صفرٌ يُحسَب. */
 function soldMilli(quantity: unknown): number {
   const milli = decimalToMilli(String(quantity));
-  if (milli === null) throw new Error(`تعذّرت قراءة كمّية سطر البيع: «${String(quantity)}»`);
+  if (milli === null) throw new Error(`تعذّرت قراءة كمية سطر البيع: «${String(quantity)}»`);
   return milli;
 }
 
@@ -379,7 +379,7 @@ export async function loadPurchaseLines(
       supplierName: r.supplier_name === null ? "" : String(r.supplier_name),
       invoiceDate: String(r.received_on),
       receiptKnown: true,
-      description: "كمّيّة مستلمة",
+      description: "كمية مستلمة",
       productId: String(r.product_id),
       qty: null,
       lineTotalMinor: cost ?? 0,
@@ -859,7 +859,7 @@ export async function loadScope(
 /** معرّفٌ ليس صنفاً في هذا الجرد — يُلغي العمليّةَ كلَّها. */
 export class ScopeItemNotInCountError extends Error {
   constructor(readonly productIds: readonly string[]) {
-    super(`${productIds.length} صنفاً ليست في هذا الجرد، ولم يُحفظ شيء من النطاق. حدّث الصفحة.`);
+    super(`${productIds.length} صنفاً ليست في هذا الجرد، فلم يُحفظ شيء من النطاق. حدّث الصفحة.`);
     this.name = "ScopeItemNotInCountError";
   }
 }
@@ -889,7 +889,7 @@ export async function saveCountScope(
 
   const both = new Set([...change.included, ...change.excluded]);
   if (both.size !== change.included.length + change.excluded.length) {
-    throw new Error("ذُكر صنف واحد ضمن المُضافين والمُستبعدين معاً، ولم يُحفظ شيء.");
+    throw new Error("ذُكر صنف واحد بين المضافين والمستبعدين معاً، فلم يُحفظ شيء.");
   }
 
   return conn.transaction(async (tx) => {
@@ -987,12 +987,12 @@ export async function setOpenings(
     let cleared = 0;
     for (const e of entries) {
       const product = byId.get(e.productId);
-      if (!product) throw new Error("هذا الصنف ليس من أصناف المخزون، ولم يُحفظ شيء.");
+      if (!product) throw new Error("هذا الصنف ليس من أصناف المخزون، فلم يُحفظ شيء.");
       if (e.enteredMilli !== null && (!Number.isInteger(e.enteredMilli) || e.enteredMilli < 0)) {
         throw new Error(`تعذّرت قراءة الرصيد لـ«${product.name}»`);
       }
       if (e.enteredMilli !== null && !sameUnitFamily(e.unit, product.baseUnit)) {
-        throw new Error(`لا يمكن تحويل وحدة «${product.name}» إلى وحدة الصنف (الوزن لا يتحوّل إلى حجم)`);
+        throw new Error(`لا يمكن تحويل وحدة «${product.name}» إلى وحدة الصنف (الوزن لا يتحول إلى حجم)`);
       }
 
       const [previous] = await tx
@@ -1159,7 +1159,7 @@ export async function startCount(input: StartCountInput, conn: Conn = db): Promi
     action: "INVENTORY_COUNT_STARTED",
     entityType: "inventory_count",
     entityId: row.id,
-    after: { الفترة: `${input.periodStart} → ${input.periodEnd}`, الفرع: input.branchId ?? "الكلّ" },
+    after: { الفترة: `${input.periodStart} → ${input.periodEnd}`, الفرع: input.branchId ?? "الكل" },
   }, conn);
 
   return { countId: row.id, created: true };
@@ -1182,7 +1182,7 @@ export async function discardCount(
   conn: Conn = db,
 ): Promise<{ periodStart: string; periodEnd: string; counted: number }> {
   const header = await loadCountHeader(countId, conn);
-  if (!header) throw new Error("الجرد غير موجود، ربما أُلغي من نافذة أخرى");
+  if (!header) throw new Error("الجرد غير موجود، فربما أُلغي من نافذة أخرى");
   if (header.status === "FINALISED") throw new CountLockedError();
 
   /* التدقيقُ والحذفُ معاً أو لا شيء — كان التدقيقُ يُكتب ثمّ يُردّ الحذفُ فيبقى سجلُّ إلغاءٍ لم يقع */
@@ -1353,7 +1353,7 @@ export async function canonicalCounts(
     if (!p) throw new Error("الصنف غير معروف. حدّث الصفحة");
     if (e.milli === null) return { productId: e.productId, actualMilli: null };
     if (!sameUnitFamily(e.unit, p.baseUnit)) {
-      throw new Error(`لا يمكن تحويل وحدة «${p.name}» إلى وحدة الصنف (الوزن لا يتحوّل إلى حجم)`);
+      throw new Error(`لا يمكن تحويل وحدة «${p.name}» إلى وحدة الصنف (الوزن لا يتحول إلى حجم)`);
     }
     return { productId: e.productId, actualMilli: toCanonical(e.milli, e.unit) };
   });
@@ -1401,7 +1401,7 @@ export async function saveActualCounts(
   await conn.transaction(async (tx) => {
     for (const e of entries) {
       if (e.actualMilli !== null && !Number.isFinite(e.actualMilli)) {
-        throw new Error("تعذّرت قراءة الكمّية");
+        throw new Error("تعذّرت قراءة الكمية");
       }
       /*
         ويُعَدّ أثرُ الكتابة — الشرطُ في `where` بلا فحصِ عدد الصفوف
@@ -1415,7 +1415,7 @@ export async function saveActualCounts(
         .returning({ id: inventoryCountLines.id });
 
       if (written.length === 0) {
-        throw new Error(`هذا الصنف ليس في هذا الجرد، ولم يُحفظ عدّه (${e.productId}). حدّث الصفحة.`);
+        throw new Error(`هذا الصنف ليس في هذا الجرد، فلم يُحفظ عدّه (${e.productId}). حدّث الصفحة.`);
       }
     }
 

@@ -17,6 +17,7 @@ import { loadFocusedTx, loadTxAllocations } from "@/services/bank-view.service";
 import { invoiceHref } from "@/lib/invoice-profile";
 import { txHref } from "@/lib/inspector";
 import { formatDay } from "@/lib/riyadh-time";
+import { T } from "@/components/i18n/t";
 
 /**
  * ملفُّ حركة البنك — ما هي، ولماذا طُوبقت، وماذا سدّدت، وكيف يُتراجع عنها.
@@ -41,12 +42,12 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
   const tx = await loadFocusedTx(id);
   if (!tx) {
     return (
-      <DetailFrame mode={mode} fullHref={fullHref} user={user} width="page" title="حركة غير موجودة">
+      <DetailFrame mode={mode} fullHref={fullHref} user={user} width="page" title="الحركة غير موجودة">
         <EmptyState
           icon={CircleAlert}
-          title="لا توجد هذه الحركة."
-          hint="ربما دُمجت مع نسخة مكررة منها عند تنظيف المكررات، ويظهر ذلك في سجل التدقيق."
-          action={<LinkButton href="/bank" variant="primary">سجلّ الحركات</LinkButton>}
+          title="هذه الحركة غير موجودة."
+          hint="ربما دُمجت مع نسخة مكررة منها أثناء تنظيف التكرار، وستجد ذلك في سجل التدقيق."
+          action={<LinkButton href="/bank" variant="primary">سجل الحركات</LinkButton>}
         />
       </DetailFrame>
     );
@@ -78,7 +79,7 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
       eyebrow={
         <span className="inline-flex items-center gap-2">
           <Landmark className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          {tx.direction === "DEBIT" ? "صادر من حسابك" : "وارد إلى حسابك"} · <bdi>{formatDay(tx.valueDate)}</bdi>
+          {tx.direction === "DEBIT" ? "خارج من حسابك" : "داخل إلى حسابك"} · <bdi>{formatDay(tx.valueDate)}</bdi>
         </span>
       }
     >
@@ -96,7 +97,7 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
           <KeyValue
             items={[
               { label: "التاريخ", value: <bdi>{formatDay(tx.valueDate)}</bdi> },
-              { label: "الاتجاه", value: tx.direction === "DEBIT" ? "صادر" : "وارد" },
+              { label: "الاتجاه", value: tx.direction === "DEBIT" ? "خارج" : "داخل" },
               { label: "التصنيف", value: <CategoryBadge category={tx.category} /> },
               { label: "نوع العملية", value: tx.transactionType ?? <span className="text-muted">غير معروف</span> },
             ]}
@@ -109,22 +110,18 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
           </div>
         </div>
         <div>
-          <p className="mb-2 text-[11px] font-bold text-muted">سبب المطابقة وكيفية التراجع عنها</p>
+          <p className="mb-2 text-[11px] font-bold text-muted">لماذا طوبقت، وكيف تتراجع عن المطابقة</p>
           <MatchExplain match={tx.match} canUndo={canUndo} inline />
           {bounce && <BankBounce pair={bounce} currentId={id} />}
           {handLink && (
             <div className="mt-3 rounded-xl border border-accent-line bg-accent-soft/50 p-3 text-xs leading-relaxed">
-              <p className="font-bold">سبق أن قيّدت سدادها يدوياً</p>
+              <p className="font-bold">سبق أن سجّلت سدادها يدوياً</p>
               <p className="mt-1 text-ink-soft">
-                في {formatDay(handLink.paymentDay)} سجّلت دفعة لـ{handLink.supplierName} بمبلغ <Money minor={handLink.paymentMinor} />
-                {handLink.invoices.length > 0 && <> عن {handLink.invoices.map((i) => i.number).join("، ")}</>}، فأُغلقت فاتورته،
-                ولذلك لم يجد النظام فاتورة مفتوحة للمطابقة. هذه الحوالة هي ذلك السداد
-                {handLink.exact ? "." : <>، وهي أكبر منه بمبلغ <Money minor={handLink.extraMinor} /> (هل أُضيف توصيل إلى الفاتورة؟ صحّح إجماليها).</>}
-              </p>
+                <T s="في {0} سجّلت دفعة لـ{1} بمبلغ {2}{3}، فأُغلقت فاتورته، ولذلك لم يجد النظام فاتورة مفتوحة يطابقها. هذه الحوالة هي ذلك السداد نفسه{4}" a={[formatDay(handLink.paymentDay), handLink.supplierName, <Money key="2" minor={handLink.paymentMinor} />, handLink.invoices.length > 0 && <> <T s=" عن {0}" a={[handLink.invoices.map((i) => i.number).join("، ")]} /></>, handLink.exact ? "." : <><T s="، وهي أكبر منه بـ{0} (هل أُضيف رسم توصيل إلى الفاتورة؟ صحّح إجماليها)." a={[<Money key="0" minor={handLink.extraMinor} />]} /></>]} /></p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <AccountReview size="sm" variant="primary" />
                 {!handLink.exact && handLink.invoices[0] && (
-                  <LinkButton href={`/purchases/invoices/${handLink.invoices[0].id}?act=fix#fix`} size="sm">صحّح إجمالي {handLink.invoices[0].number}</LinkButton>
+                  <LinkButton href={`/purchases/invoices/${handLink.invoices[0].id}?act=fix#fix`} size="sm"><T s="صحّح إجمالي {0}" a={[handLink.invoices[0].number]} /></LinkButton>
                 )}
               </div>
             </div>
@@ -137,7 +134,7 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
           title="ما سدّدته"
           icon={Receipt}
           count={allocations.length}
-          hint={allocated < tx.amountMinor ? "المبلغ المتبقي منها رصيد لك عند المورّد، ويُخصم من فواتيره القادمة." : undefined}
+          hint={allocated < tx.amountMinor ? "المتبقي منها رصيد لك عند المورّد، يُخصم من فواتيره القادمة." : undefined}
           className="mt-8"
         >
           <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
@@ -152,8 +149,7 @@ export async function TxView({ params, mode }: { params: Promise<{ id: string }>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-bold">{a.supplierName}</span>
                     <span className="block text-[11px] text-muted">
-                      فاتورة <bdi className="nums">{a.invoiceNumber}</bdi> · <bdi>{formatDay(a.invoiceDate)}</bdi>
-                    </span>
+                      <T s="فاتورة {0} · {1}" a={[<bdi key="0" className="nums">{a.invoiceNumber}</bdi>, <bdi key="1">{formatDay(a.invoiceDate)}</bdi>]} /></span>
                   </span>
                   <span className="shrink-0 text-[13px] font-bold"><Money minor={a.amountMinor} /></span>
                 </Link>

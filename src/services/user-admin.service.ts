@@ -111,7 +111,7 @@ export async function applyUserChange(actorId: string, targetId: string, change:
       return {
         message: change.active
           ? `أُعيد تفعيل ${who}، ويمكنه الدخول بحساب جوجل متى شاء`
-          : `عُطّل ${who} وأُنهيت جلساته، ولا يستطيع الدخول حتى تعيد تفعيله`,
+          : `عُطّل ${who} وأُنهيت جلساته، ولن يستطيع الدخول حتى تعيد تفعيله`,
         signedOutSelf: false,
       };
     }
@@ -122,7 +122,7 @@ export async function applyUserChange(actorId: string, targetId: string, change:
       after: { المستخدم: target.email, "جلسات أنهيت": ended.length },
     }, t);
     return {
-      message: ended.length === 0 ? `لا توجد جلسة نشطة لـ${who}` : `أُنهيت جلسات ${who} على كل الأجهزة، وسيدخل من جديد بحساب جوجل`,
+      message: ended.length === 0 ? `لا جلسة نشطة لـ${who}` : `أُنهيت جلسات ${who} على كل الأجهزة، وسيدخل من جديد بحساب جوجل`,
       signedOutSelf: target.id === actorId && ended.length > 0,
     };
   });

@@ -50,7 +50,7 @@ export async function POST(request: Request) {
           note: body.note,
           resolution: body.resolution ?? null,
         }, user.id);
-        return NextResponse.json({ ok: true, receiptId: id, message: "تم قيد الكمية المستلمة، وهي تدخل في حساب الجرد." });
+        return NextResponse.json({ ok: true, receiptId: id, message: "سُجّلت الكمية المستلمة، وتدخل في حساب الجرد." });
       }
       case "update": {
         await updateReceipt(body.receiptId, {
@@ -62,19 +62,19 @@ export async function POST(request: Request) {
           costMinor: body.cost,
           note: body.note,
         }, user.id);
-        return NextResponse.json({ ok: true, message: "تم تعديل الاستلام، وما كان مكتوباً قبله محفوظ في سجلّ التدقيق." });
+        return NextResponse.json({ ok: true, message: "عُدّل الاستلام، وما كُتب قبله محفوظ في سجل التدقيق." });
       }
       case "void": {
         await voidReceipt(body.receiptId, body.reason, user.id);
-        return NextResponse.json({ ok: true, message: "أُلغي الاستلام، ويبقى في السجلّ مع سبب الإلغاء." });
+        return NextResponse.json({ ok: true, message: "أُلغي الاستلام، ويبقى في السجل مع سبب إلغائه." });
       }
       case "resolve": {
         await resolveReceipt(body.receiptId, body.resolution, user.id);
         return NextResponse.json({
           ok: true,
           message: body.resolution.kind === "LINK"
-            ? "تم ربط الاستلام ببند الفاتورة، ويُحسب مرة واحدة."
-            : "تم تأكيد أنهما شحنتان، ويُحسب الاثنان.",
+            ? "رُبط الاستلام ببند الفاتورة، ويُحسب مرة واحدة."
+            : "أكّدتَ أنهما شحنتان، فيُحسب الاثنان.",
         });
       }
     }
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     const lockMessage = lockedWeekMessage(e);
     if (code === "23514" && lockMessage) return NextResponse.json({ error: lockMessage }, { status: 409 });
     if (code === "23505") {
-      return NextResponse.json({ error: "هذا البند مرتبط باستلام آخر، والبند الواحد لا يمثّل شحنتين." }, { status: 409 });
+      return NextResponse.json({ error: "هذا البند مرتبط باستلام آخر، والبند الواحد لا يكون شحنتين." }, { status: 409 });
     }
     return failWith(e, "inventory-receipt");
   }

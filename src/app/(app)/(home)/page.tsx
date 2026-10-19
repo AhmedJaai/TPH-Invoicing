@@ -29,6 +29,7 @@ import { loadPaymentRun } from "@/services/payment-run.service";
 import { loadRecurringInputs, weekDue } from "@/services/cash-outlook.service";
 import type { WeekDue } from "@/lib/cash-outlook";
 import { greeting, loadCashPosition, loadCloseProgress, longDate } from "@/services/briefing.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -99,9 +100,9 @@ export default async function HomePage() {
   /* جملةُ الحال — تُبنى من الأرقام نفسها التي تحتها، لا من نموذج */
   const summary: string[] = [];
   if (start.knowsNothing) {
-    summary.push("لم يقرأ النظام أي بيانات بعد. بخطوتين فقط يعرف لمن تدين وأين ذهب المال.");
+    summary.push("لم يقرأ النظام أي بيانات حتى الآن. خطوتان فقط، ويعرف لمن تدين وأين ذهبت أموالك.");
   } else {
-    summary.push(attention.length === 0 ? "لا شيء ينتظر قرارك اليوم." : `ينتظر قرارك ${countNoun(attention.length, ITEM)}.`);
+    summary.push(attention.length === 0 ? "لا شيء يحتاج قرارك اليوم." : `${countNoun(attention.length, ITEM)} بانتظار قرارك.`);
     if (canPay && run && run.readyTotalMinor > 0) summary.push(`ودفعة ${formatMonth(runMonth)} جاهزة للتحويل (${countNoun(run.ready.length, SUPPLIER)}).`);
   }
 
@@ -131,7 +132,7 @@ export default async function HomePage() {
           )}
           {first && (
             <LinkButton href={first.href} variant="primary" size="lg" icon={ArrowLeft}>
-              {`ابدأ بالأهمّ: ${first.actionLabel ?? "افتح"}`}
+              {`ابدأ بالأهم: ${first.actionLabel ?? "افتح"}`}
             </LinkButton>
           )}
         </>
@@ -145,12 +146,12 @@ export default async function HomePage() {
         <section aria-labelledby="start-title" className="mb-8 rounded-2xl border border-accent-line bg-accent-soft/60 p-5 sm:p-6">
           <h2 id="start-title" className="flex items-center gap-2 text-base font-bold">
             <Sparkles className="h-[18px] w-[18px] text-accent" strokeWidth={2} aria-hidden />
-            {start.knowsNothing ? "ابدأ من هنا" : "بقيت خطوات لتكتمل الصورة"}
+            {start.knowsNothing ? "ابدأ من هنا" : "خطوات قليلة لتكتمل الصورة"}
           </h2>
           <p className="mb-4 mt-1 text-xs leading-relaxed text-ink-soft">
             {start.knowsNothing
-              ? "لا يعرض النظام «صفراً» وهو لم يقرأ شيئاً. أكمل الخطوات بالترتيب."
-              : "ما لم يُستورد بعد يظهر «غير معروف» لا صفراً، والأرقام أدناه مبنية على ما قُرئ فقط."}
+              ? "لن يعرض النظام «صفراً» وهو لم يقرأ شيئاً. أكمل الخطوات بالترتيب."
+              : "ما لم يُستورد بعد يظهر «غير معروف» وليس صفراً، والأرقام أدناه مبنية على ما قُرئ فقط."}
           </p>
           <Stepper
             steps={start.steps.map((s) => ({
@@ -179,12 +180,12 @@ export default async function HomePage() {
             tone={totals.owedMinor > 0 ? "warn" : undefined}
             sub={
               totals.owedMinor === 0
-                ? "لا مستحقّ على المقهى الآن."
-                : `${countNoun(totals.owedSuppliers, SUPPLIER)}${oldestDays > 0 ? ` · أقدم دين منذ ${countNoun(oldestDays, DAY)}` : ""}`
+                ? "لا يوجد على المقهى أي مبلغ مستحق الآن."
+                : `${countNoun(totals.owedSuppliers, SUPPLIER)}${oldestDays > 0 ? ` · أقدم مبلغ مستحق منذ ${countNoun(oldestDays, DAY)}` : ""}`
             }
           >
             {totals.creditLeftMinor > 0 && (
-              <p className="text-xs text-ink-soft">ولك رصيد عندهم <Money minor={totals.creditLeftMinor} /></p>
+              <p className="text-xs text-ink-soft"><T s="ولك عندهم رصيد {0}" a={[<Money key="0" minor={totals.creditLeftMinor} />]} /></p>
             )}
             {/* الرقمُ يتغيّر بقيدٍ أو سداد — وهنا يُقال بماذا، ومن فعله */}
             <WhyNumber figure="owed" auditHref={can(user.role, "audit:view") ? "/settings/audit?kind=money" : undefined} />
@@ -192,36 +193,35 @@ export default async function HomePage() {
           {week && (
             <KeyFigure
               icon={Wallet}
-              label="يخرج هذا الأسبوع"
+              label="مدفوعات هذا الأسبوع"
               href="/cash"
               tone={cash?.balanceMinor != null && cash.balanceMinor < week.totalMinor ? "danger" : undefined}
               value={
                 week.lines.length === 0
-                  ? <span className="text-[1.35rem] text-muted">لا دفعات مستحقة</span>
+                  ? <span className="text-[1.35rem] text-muted">لا مدفوعات مستحقة</span>
                   : <Money minor={week.totalMinor} />
               }
               sub={weekSummary(week, runMonth)}
             >
               {canPay && run && run.ready.length > 0 && (
                 <Link href="/payments" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
-                  جهّز الدفعة <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                </Link>
+                  <T s="جهّز الدفعة {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
               )}
             </KeyFigure>
           )}
           {cash && (
             <KeyFigure
               icon={Landmark}
-              label="في البنك"
+              label="رصيد البنك"
               href="/cash"
               value={cash.balanceMinor === null ? <span className="text-[1.35rem] text-muted">غير معروف</span> : <Money minor={cash.balanceMinor} />}
-              sub={cash.balanceMinor === null ? "لا يوجد كشف فيه الرصيد. استورد كشفاً يحتوي على عمود الرصيد." : `آخر رصيد معروف · ${formatDay(cash.asOf)}`}
+              sub={cash.balanceMinor === null ? "لا يوجد كشف يظهر فيه الرصيد. استورد كشفاً فيه عمود الرصيد." : `آخر رصيد معروف · ${formatDay(cash.asOf)}`}
             >
               {cash.balanceMinor !== null && week && week.totalMinor > 0 && (
                 cash.balanceMinor >= week.totalMinor ? (
-                  <p className="text-xs text-ink-soft">يكفي لما يخرج هذا الأسبوع، ويبقى <Money minor={cash.balanceMinor - week.totalMinor} /></p>
+                  <p className="text-xs text-ink-soft"><T s="يكفي لمدفوعات هذا الأسبوع، ويتبقى {0}" a={[<Money key="0" minor={cash.balanceMinor - week.totalMinor} />]} /></p>
                 ) : (
-                  <p className="text-xs font-bold text-danger">لا يكفي لما يخرج هذا الأسبوع، وينقصه <Money minor={week.totalMinor - cash.balanceMinor} /></p>
+                  <p className="text-xs font-bold text-danger"><T s="لا يكفي لمدفوعات هذا الأسبوع، وينقصه {0}" a={[<Money key="0" minor={week.totalMinor - cash.balanceMinor} />]} /></p>
                 )
               )}
             </KeyFigure>
@@ -233,10 +233,10 @@ export default async function HomePage() {
             value={<Money minor={facts.purchasesThisMonth} />}
             sub={
               pct === null
-                ? "محسوبة من الفواتير المسجّلة لا من كشف البنك."
+                ? "محسوبة من الفواتير المسجّلة، لا من كشف البنك."
                 : facts.daysElapsedInMonth === null
                   ? `عن ${formatMonth(facts.prevMonthLabel)}`
-                  : `عن أوّل ${countNoun(facts.daysElapsedInMonth, DAY)} من ${formatMonth(facts.prevMonthLabel)}`
+                  : `عن أول ${countNoun(facts.daysElapsedInMonth, DAY)} من ${formatMonth(facts.prevMonthLabel)}`
             }
             delta={pct}
           />
@@ -246,15 +246,14 @@ export default async function HomePage() {
       <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-10 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
         {/* ── ما ينتظر قرارك ── */}
         <Section
-          title="ما ينتظر قرارك"
+          title="ما يحتاج قرارك"
           icon={Inbox}
           count={attention.length > 0 ? attention.length : undefined}
           className="mt-0!"
           action={
             attention.length > 0 ? (
               <Link href="/attention" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline hover:underline-offset-4 sm:min-h-0">
-                اعرض القائمة كاملة <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              </Link>
+                <T s="اعرض القائمة كاملة {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
             ) : undefined
           }
         >
@@ -266,26 +265,23 @@ export default async function HomePage() {
                   href="/attention"
                   className="mt-2 flex min-h-11 items-center justify-center gap-1 rounded-xl border border-dashed border-line text-xs font-medium text-ink-soft transition-colors hover:border-accent-line hover:text-accent"
                 >
-                  والباقي {countNoun(attention.length - SHOWN, ITEM)} في القائمة
-                  <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                </Link>
+                  <T s="و{0} أخرى في القائمة{1}" a={[countNoun(attention.length - SHOWN, ITEM), <ArrowLeft key="1" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
               )}
               <p className="mt-3 hidden text-[11px] text-muted lg:block">
-                تنقّل بين البنود بالمفتاحين <Kbd>J</Kbd> و<Kbd>K</Kbd>، وافتح البند بـ<Kbd>Enter</Kbd>.
-              </p>
+                <T s="تنقّل بين البنود بالمفتاحين {0} و{1}، وافتح البند بمفتاح {2}." a={[<Kbd key="0">J</Kbd>, <Kbd key="1">K</Kbd>, <Kbd key="2">Enter</Kbd>]} /></p>
             </>
           ) : start.knowsNothing ? (
             <EmptyState
               compact
-              title="يظهر هنا ما يحتاج قرارك"
-              hint="بعد أن يقرأ النظام مستنداتك وكشف البنك، تظهر هنا الأمور التي تحتاج قرارك."
+              title="هنا يظهر ما يحتاج قرارك"
+              hint="بعد أن يقرأ النظام مستنداتك وكشف البنك، ستظهر هنا الأمور التي تحتاج قرارك."
             />
           ) : (
             <div className="flex items-center gap-3 rounded-xl border border-ok/25 bg-ok-bg px-5 py-6">
               <CircleCheck className="h-6 w-6 shrink-0 text-ok" strokeWidth={2} aria-hidden />
               <div>
-                <p className="text-sm font-bold text-ok">لا شيء ينتظر قرارك.</p>
-                <p className="mt-0.5 text-xs text-ink-soft">لا يوجد مبلغ خرج مرتين، ولا دفعة بلا مستند، ولا مستند ينتظر المراجعة.</p>
+                <p className="text-sm font-bold text-ok">لا شيء يحتاج قرارك.</p>
+                <p className="mt-0.5 text-xs text-ink-soft">لا مبالغ دُفعت مرتين، ولا دفعات بلا مستند، ولا مستندات تنتظر المراجعة.</p>
               </div>
             </div>
           )}
@@ -301,7 +297,7 @@ export default async function HomePage() {
           )}
 
           {!start.knowsNothing && (
-            <Section title="ما الذي تغيّر" icon={Sparkles} hint="منذ الأسبوع الماضي." className="mt-0!">
+            <Section title="ما الجديد" icon={Sparkles} hint="منذ الأسبوع الماضي." className="mt-0!">
               <Changes changes={changes} />
             </Section>
           )}
@@ -323,12 +319,12 @@ async function CloseCard({ month }: { month: string }) {
       >
         <span className="flex items-center justify-between gap-3">
           <span className="text-[13px] font-bold">
-            {p.closed ? "مقفل" : <><span className="nums">{p.passed}</span> من <span className="nums">{p.total}</span> فحوص ناجحة</>}
+            {p.closed ? "مقفل" : <><T s="{0} من {1} فحوص اجتازت" a={[<span key="0" className="nums">{p.passed}</span>, <span key="1" className="nums">{p.total}</span>]} /></>}
           </span>
           {p.closed ? (
             <Badge tone="ok" dot>مقفل</Badge>
           ) : blockers > 0 ? (
-            <Badge tone="danger" dot>{blockers === 1 ? "مانع واحد" : blockers === 2 ? "مانعان" : `${blockers} موانع`}</Badge>
+            <Badge tone="danger" dot>{blockers === 1 ? "عائق واحد" : blockers === 2 ? "عائقان" : `${blockers} عوائق`}</Badge>
           ) : (
             <Badge tone="accent" dot>جاهز للإقفال</Badge>
           )}
@@ -364,10 +360,10 @@ function weekSummary(week: WeekDue, runMonth: string): string {
   const suppliers = week.lines.filter((l) => l.kind === "SUPPLIER");
   const recurring = week.lines.filter((l) => l.kind === "RECURRING");
   const parts: string[] = [];
-  if (suppliers.length > 0) parts.push(`دفعة ${formatMonth(runMonth)} متأخّرة ${suppliers.length === 1 ? "لمورّد واحد" : suppliers.length === 2 ? "لمورّدين" : `لـ${countNoun(suppliers.length, SUPPLIER)}`}`);
+  if (suppliers.length > 0) parts.push(`دفعة ${formatMonth(runMonth)} متأخرة ${suppliers.length === 1 ? "لمورّد واحد" : suppliers.length === 2 ? "لمورّدين" : `لـ${countNoun(suppliers.length, SUPPLIER)}`}`);
   if (recurring.length > 0 && recurring[0].date) {
     parts.push(`${recurring[0].label} ${formatWeekday(recurring[0].date)}${recurring.length > 1 ? ` و${countNoun(recurring.length - 1, ITEM)} آخر` : ""}`);
   }
-  if (week.undated > 0) parts.push(`و${countNoun(week.undated, ITEM)} متكرر بلا يوم محدد`);
-  return parts.length > 0 ? parts.join(" · ") : "لا دفعات متأخرة ولا مصروفات متكررة تستحق خلال الأيام السبعة القادمة.";
+  if (week.undated > 0) parts.push(`و${countNoun(week.undated, ITEM)} مصروف متكرر بلا يوم محدد`);
+  return parts.length > 0 ? parts.join(" · ") : "لا دفعات متأخرة ولا مصروفات متكررة مستحقة خلال الأيام السبعة القادمة.";
 }

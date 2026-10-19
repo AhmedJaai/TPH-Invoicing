@@ -4,6 +4,7 @@ import { Badge } from "./ui";
 import { SECTION_LABEL, type Fact, type ReadingSection } from "@/lib/finance/reading";
 import { formatMoment } from "@/lib/riyadh-time";
 import type { StoredReading } from "@/services/finance-reading.service";
+import { T } from "@/components/i18n/t";
 
 const ORDER: readonly ReadingSection[] = ["CHANGED", "WHY", "DO"];
 
@@ -25,17 +26,14 @@ export function FinanceReading({ month, stored, canAsk }: { month: string; store
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm font-bold">
-            <Sparkles className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />
-            قراءة ذكية للشهر
-            <Badge tone="muted">اقتراح وليس حكماً</Badge>
-          </p>
+            <T s="{0}قراءة ذكية للشهر{1}" a={[<Sparkles key="0" className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />, <Badge key="1" tone="muted">اقتراح لا حكم</Badge>]} /></p>
           <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted">
-            النموذج لا يحسب بنفسه، بل يُعطى الأرقام المحسوبة ويكتب عنها. ويُتحقق من كل رقم في كل جملة، وتُحذف الجملة إذا ذكرت رقماً ليس من هذه الأرقام.
+            النموذج لا يحسب شيئاً، بل تُعطى له الأرقام المحسوبة فيكتب عنها. ويُراجَع كل رقم في كل جملة، وتُحذف الجملة إن ذكرت رقماً من خارج هذه الأرقام.
           </p>
         </div>
         {canAsk && (
           <span className="no-print flex shrink-0 flex-wrap items-center gap-2">
-            <PostAction url="/api/finance/reading" body={{ month }} variant={stored && !stored.stale ? "quiet" : "primary"} done="تمت كتابة القراءة">
+            <PostAction url="/api/finance/reading" body={{ month }} variant={stored && !stored.stale ? "quiet" : "primary"} done="كُتبت القراءة">
               <Sparkles className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
               {stored ? "اقرأ من جديد" : "اقرأ هذا الشهر"}
             </PostAction>
@@ -45,13 +43,13 @@ export function FinanceReading({ month, stored, canAsk }: { month: string; store
 
       {!stored ? (
         <p className="mt-4 rounded-xl bg-sunken/60 px-4 py-3 text-xs leading-relaxed text-ink-soft">
-          لم تُكتب قراءة لهذا الشهر بعد. الأرقام أعلاه كاملة بدونها.
+          لم تُكتب قراءة لهذا الشهر بعد، والأرقام أعلاه كاملة بدونها.
         </p>
       ) : (
         <>
           {stored.stale && (
             <p role="status" className="mt-4 rounded-xl border border-warn/30 bg-warn-bg px-4 py-2.5 text-xs font-bold text-warn">
-              تغيّرت الأرقام منذ كتابة هذه القراءة، فهي مبنية على أرقام سابقة. اضغط «اقرأ من جديد».
+              تغيّرت الأرقام منذ كُتبت هذه القراءة، فهي مبنية على أرقام قديمة. اضغط «اقرأ من جديد».
             </p>
           )}
           <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3">
@@ -61,7 +59,7 @@ export function FinanceReading({ month, stored, canAsk }: { month: string; store
                 <section key={section} aria-label={SECTION_LABEL[section]}>
                   <h3 className="text-xs font-bold text-ink-soft">{SECTION_LABEL[section]}</h3>
                   {list.length === 0 ? (
-                    <p className="mt-2 text-xs text-muted">لا توجد جمل هنا بعد التحقق.</p>
+                    <p className="mt-2 text-xs text-muted">لم تبقَ هنا جمل بعد المراجعة.</p>
                   ) : (
                     <ul className="mt-2 space-y-3">
                       {list.map((s, i) => (
@@ -69,7 +67,7 @@ export function FinanceReading({ month, stored, canAsk }: { month: string; store
                           {s.text}
                           {s.facts.length > 0 && (
                             <details className="mt-1">
-                              <summary className="cursor-pointer text-[11px] font-medium text-muted hover:text-ink">من أي أرقام؟</summary>
+                              <summary className="cursor-pointer text-[11px] font-medium text-muted hover:text-ink">من أي الأرقام؟</summary>
                               <ul className="mt-1 space-y-0.5 border-s-2 border-line ps-2 text-[11px] text-ink-soft">
                                 {s.facts.map((id) => {
                                   const f = factOf.get(id);
@@ -87,9 +85,7 @@ export function FinanceReading({ month, stored, canAsk }: { month: string; store
             })}
           </div>
           <p className="mt-4 text-[11px] text-muted">
-            كُتبت في <bdi>{formatMoment(new Date(stored.createdAt))}</bdi>
-            {stored.reading.dropped > 0 && <> · حُذفت {stored.reading.dropped} جملة لأنها ذكرت رقماً ليس من الأرقام المحسوبة</>}
-          </p>
+            <T s="كُتبت في {0}{1}" a={[<bdi key="0">{formatMoment(new Date(stored.createdAt))}</bdi>, stored.reading.dropped > 0 && <> <T s=" · حُذفت {0} جملة لأنها ذكرت رقماً من خارج الأرقام المحسوبة" a={[stored.reading.dropped]} /></>]} /></p>
         </>
       )}
     </div>

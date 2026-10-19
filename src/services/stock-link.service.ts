@@ -136,7 +136,7 @@ export async function loadStockLinks(conn: Conn = db): Promise<StockLinks> {
         : status === "UNLINKED_PRODUCT" ? "غير مربوط بصنف مخزون"
         : status === "NO_PACK_SPEC" ? "مربوط ولم يُكتب محتوى الوحدة"
         : status === "UNIT_FAMILY_MISMATCH" ? "لا يمكن تحويل وحدة العبوة إلى وحدة الصنف"
-        : "تعذّرت قراءة الكمّية في بعض فواتيره",
+        : "تعذّرت قراءة الكمية في بعض فواتيره",
       countedText: null,
       valueMinor: Number(r.value), lastDay: r.last_day,
       evidence: ev && evProduct ? { ...ev, productName: evProduct.nameAr } : null,

@@ -74,7 +74,7 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
     .where(eq(invoices.id, input.invoiceId))
     .for("update", { of: invoices })
     .limit(1);
-  if (!row) throw new InvoiceCorrectionRefused("لا توجد فاتورة بهذا المعرّف", 404);
+  if (!row) throw new InvoiceCorrectionRefused("لا فاتورة بهذا المعرّف", 404);
 
   const date = input.invoiceDate ? new Date(`${input.invoiceDate}T00:00:00Z`) : row.invoiceDate;
   if (Number.isNaN(date.getTime())) throw new InvoiceCorrectionRefused("تعذّر فهم التاريخ", 400);
@@ -90,7 +90,7 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
     totalMinor: pick(input.totalMinor, row.totalMinor),
   };
   if (!next.invoiceNumber) {
-    throw new InvoiceCorrectionRefused("رقم الفاتورة مطلوب. اكتب الرقم من الورقة، أو «بلا رقم» إن لم يكن لها رقم.", 400);
+    throw new InvoiceCorrectionRefused("رقم الفاتورة مطلوب. اكتبه من الورقة، أو «بلا رقم» إن لم يكن لها رقم.", 400);
   }
   if (next.totalMinor === null || next.totalMinor <= 0) {
     throw new InvoiceCorrectionRefused("الإجمالي مطلوب ويجب أن يكون أكبر من صفر، فالفاتورة بلا مبلغ لا معنى لها.", 400);
@@ -114,7 +114,7 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
       ].join("");
       throw new InvoiceCorrectionRefused(
         `الصافي ${formatRiyalsDisplay(next.subtotalMinor)} + الضريبة ${formatRiyalsDisplay(next.vatMinor)}${parts} `
-        + `لا يساوي المبلغ المستحق ${formatRiyalsDisplay(next.totalMinor)}. راجع الأرقام على الورقة.`, 400);
+        + `لا يساوي المبلغ المستحق ${formatRiyalsDisplay(next.totalMinor)}. راجع الأرقام في الورقة.`, 400);
     }
   } else if (typed) {
     throw new InvoiceCorrectionRefused("الخصم والرسوم بعد الضريبة يُحسبان على الصافي والضريبة، فاكتبهما معهما.", 400);
@@ -155,7 +155,7 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
   `)).rows;
   if (next.totalMinor < Number(allocated)) {
     throw new InvoiceCorrectionRefused(
-      `خُصّص على هذه الفاتورة ${formatRiyalsDisplay(Number(allocated))}، فلا يصح أن يقل إجماليها عن ذلك. تراجع عن التخصيص أولاً.`,
+      `خُصّص على هذه الفاتورة ${formatRiyalsDisplay(Number(allocated))}، فلا يصح أن يقل إجماليها عنه. تراجع عن التخصيص أولاً.`,
     );
   }
 
@@ -195,7 +195,7 @@ export async function correctInvoice(tx: Tx, input: InvoiceCorrection, actorId: 
     }).where(eq(invoices.id, row.id));
   } catch (e) {
     if ((e as { code?: string }).code === "23505") {
-      throw new InvoiceCorrectionRefused(`لهذا المورّد فاتورة مقيّدة بالرقم ${next.invoiceNumber}. افتحها وقارن قبل أن تقيّدها مرة أخرى.`);
+      throw new InvoiceCorrectionRefused(`لهذا المورّد فاتورة مسجّلة بالرقم ${next.invoiceNumber}. افتحها وقارن قبل أن تسجّلها مرة أخرى.`);
     }
     throw e;
   }

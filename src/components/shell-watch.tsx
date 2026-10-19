@@ -6,6 +6,7 @@ import { ExternalLink } from "lucide-react";
 import { Sheet, toast } from "./ui-client";
 import { buttonClass } from "./ui-tokens";
 import { SESSION_EXPIRED_EVENT } from "@/lib/http-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * عينُ القشرة على حالين لا تراهما الصفحةُ المرسومة في الخادم:
@@ -50,11 +51,11 @@ export function ShellWatch() {
       if (away < STALE_AFTER_MS) return;
       /* من يكتب لا تُحدَّث صفحتُه تحت يده — يُقال له ويحدّث متى شاء */
       if (typing() || document.querySelector("dialog[open]")) {
-        toast({ tone: "info", title: "الأرقام قد تكون قديمة", body: "غبت عن الصفحة فترة. حدّثها عندما تنتهي مما تكتبه." });
+        toast({ tone: "info", title: "الأرقام قد تكون قديمة", body: "غبت عن الصفحة مدة. حدّثها حين تنتهي مما تكتبه." });
         return;
       }
       router.refresh();
-      toast({ tone: "info", title: "تم تحديث الصفحة", body: "عدت بعد غياب، فأُعيد تحميل الأرقام.", duration: 3500 });
+      toast({ tone: "info", title: "حُدّثت الصفحة", body: "عدت بعد غياب، فأُعيد تحميل الأرقام.", duration: 3500 });
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
@@ -77,15 +78,12 @@ export function ShellWatch() {
             className={buttonClass("primary")}
             onClick={() => setExpired(false)}
           >
-            <ExternalLink className="h-4 w-4" strokeWidth={2} aria-hidden />
-            سجّل الدخول من جديد في تبويب جديد
-          </a>
+            <T s="{0}ادخل من جديد في تبويب جديد" a={[<ExternalLink key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></a>
         </>
       }
     >
       <p className="text-sm leading-relaxed text-ink-soft">
-        سجّل الدخول بحسابك في تبويب جديد، ثم عد إلى هذا التبويب وأعد ما كنت تفعله. الصفحة هنا كما تركتها.
-        وإن أغلقت هذه النافذة فلن يُحفظ شيء حتى تسجّل الدخول.
+        ادخل بحسابك في تبويب جديد، ثم عد إلى هذا التبويب وأكمل ما كنت تفعله، فالصفحة هنا كما تركتها. وإن أغلقت هذه النافذة فلن يُحفظ شيء حتى تدخل.
       </p>
     </Sheet>
   );

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         ok: true,
         restored: numbers.length,
-        message: numbers.length === 0 ? "لم تكن هذه الفواتير ضمن الدفعة بقرارك، ولم يتغيّر شيء" : `أُعيدت ${countNoun(numbers.length, INVOICE)} إلى المحجوزة`,
+        message: numbers.length === 0 ? "لم تكن هذه الفواتير في الدفعة بقرارك، فلم يتغيّر شيء" : `أُعيدت ${countNoun(numbers.length, INVOICE)} إلى الموقوفة`,
       });
     }
 
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       openMinor: out.openMinor,
       vatAtRiskMinor: out.vatAtRiskMinor,
       vatAtRiskUnknown: out.vatAtRiskUnknown,
-      message: `أُدخلت ${countNoun(out.invoiceNumbers.length, INVOICE)} في الدفعة بقرارك، بمبلغ ${formatRiyalsDisplay(out.openMinor)} ريال`,
+      message: `أُضيفت ${countNoun(out.invoiceNumbers.length, INVOICE)} إلى الدفعة بقرارك، بمبلغ ${formatRiyalsDisplay(out.openMinor)} ريال`,
     });
   } catch (e) {
     if (e instanceof HoldDecisionError) {

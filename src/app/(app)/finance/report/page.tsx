@@ -12,6 +12,7 @@ import { formatShare } from "@/lib/finance/format";
 import { formatDay, formatMoment, formatMonth, monthEndDay } from "@/lib/riyadh-time";
 import { INVOICE, PRODUCT, countNoun } from "@/lib/arabic";
 import { loadPnl, loadPurchaseInvoices } from "@/services/profit.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
       user={user}
       title={`تقرير ${formatMonth(month)}`}
       eyebrow="مؤسسة ذا بوبليك هاوس · الرقم الضريبي 310007971600003"
-      intro={view.frozenAt ? `شهر مقفل، والتقرير مجمَّد في ${formatMoment(new Date(view.frozenAt))}.` : view.closed ? "شهر مقفل، ولم يُجمَّد تقريره بعد." : "شهر مفتوح، وتتغيّر أرقامه بما يُقيَّد فيه."}
+      intro={view.frozenAt ? `شهر مقفل، والتقرير مجمَّد في ${formatMoment(new Date(view.frozenAt))}.` : view.closed ? "شهر مقفل، ولم يُجمَّد تقريره بعد." : "شهر مفتوح، وتتغيّر أرقامه بما يُسجَّل فيه."}
       actions={
         <span className="no-print flex flex-wrap items-center gap-2">
           <LinkButton href={`/finance?month=${month}`} variant="quiet" size="sm" icon={ArrowRight}>قائمة الدخل</LinkButton>
@@ -69,31 +70,29 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
           </tbody>
         </table>
         <p className="mt-2 text-[11px] text-ink-soft">
-          هامش مجمل الربح {formatShare(p.grossMarginBp)} · هامش «{p.profitLabel}» {formatShare(p.netMarginBp)}.
-        </p>
+          <T s="هامش مجمل الربح {0} · هامش «{1}» {2}." a={[formatShare(p.grossMarginBp), p.profitLabel, formatShare(p.netMarginBp)]} /></p>
       </section>
 
       <section aria-label="ما يشمله وما ينقصه" className="mt-6">
         <h2 className="mb-2 text-sm font-bold">ما يشمله هذا الرقم وما ينقصه</h2>
         <ul className="list-disc space-y-1 ps-5 text-[12px] leading-relaxed">
-          <li>الإيراد: ما دفعه الزبائن (نقداً وبالبطاقة) في فودكس بعد المرتجعات <Money minor={view.revenue?.paidMinor ?? 0} />، مطروحاً منه ضريبة المبيعات <Money minor={view.revenue?.vatMinor ?? 0} />. مشروبات الموظفين («House Account») ليست إيراداً.</li>
+          <li><T s="الإيراد: ما دفعه الزبائن في فودكس (نقداً وبالبطاقة) بعد المرتجعات {0}، مطروحاً منه ضريبة المبيعات {1}. ومشروبات الموظفين («House Account») ليست إيراداً." a={[<Money key="0" minor={view.revenue?.paidMinor ?? 0} />, <Money key="1" minor={view.revenue?.vatMinor ?? 0} />]} /></li>
           <li>
-            تكلفة المبيعات: {p.cogsMethod === "STOCK" && c.stock
-              ? <>بالجرد: مشتريات الشهر + مخزون عُدّ في <bdi>{formatDay(c.stock.openingDay)}</bdi> (<Money minor={c.stock.openingValueMinor} />) − مخزون عُدّ في <bdi>{formatDay(c.stock.closingDay)}</bdi> (<Money minor={c.stock.closingValueMinor} />)، والمعدود {countNoun(c.stock.countedItems, PRODUCT)}، مقيَّماً بآخر تكلفة معروفة.</>
-              : <>مشتريات الشهر ({c.stockMissing ?? "لا يوجد جرد"})، وهي ليست تكلفة ما بيع.</>}
-          </li>
-          <li>المصروفات: ما قُيّد من كشف البنك بتصنيفه، وما أقرّه المالك مما لا يظهر في الكشف. سداد المورّدين محسوب في المشتريات وليس هنا. ضريبة الرسوم وسداد الهيئة ليسا مصروفاً.</li>
+            <T s="تكلفة المبيعات: {0}" a={[p.cogsMethod === "STOCK" && c.stock
+              ? <><T s="بالجرد: مشتريات الشهر + مخزون عُدّ في {0} ({1}) − مخزون عُدّ في {2} ({3})، والمعدود {4}، مقيَّماً بآخر تكلفة معروفة." a={[<bdi key="0">{formatDay(c.stock.openingDay)}</bdi>, <Money key="1" minor={c.stock.openingValueMinor} />, <bdi key="2">{formatDay(c.stock.closingDay)}</bdi>, <Money key="3" minor={c.stock.closingValueMinor} />, countNoun(c.stock.countedItems, PRODUCT)]} /></>
+              : <><T s="مشتريات الشهر ({0})، وهي ليست تكلفة ما بيع." a={[c.stockMissing ?? "لا يوجد جرد"]} /></>]} /></li>
+          <li>المصروفات: ما سُجّل من كشف البنك بتصنيفه، وما أضافه المالك مما لا يظهر في الكشف. سداد المورّدين محسوب في المشتريات لا هنا، وضريبة الرسوم وسداد الهيئة ليسا مصروفاً.</li>
           {p.gaps.length === 0
             ? <li className="font-bold">لا ينقصه عنصر أساسي.</li>
-            : p.gaps.map((g) => <li key={g.id} className="font-bold">ينقصه: {g.label}.</li>)}
+            : p.gaps.map((g) => <li key={g.id} className="font-bold"><T s="ينقصه: {0}." a={[g.label]} /></li>)}
         </ul>
       </section>
 
       <section aria-label="المصروفات" className="mt-6">
         <h2 className="mb-2 text-sm font-bold">المصروفات التشغيلية بالتفصيل</h2>
-        {view.opexRows.length === 0 ? <p className="text-[12px] text-muted">لا توجد مصروفات مقيّدة لهذا الشهر.</p> : (
+        {view.opexRows.length === 0 ? <p className="text-[12px] text-muted">لا توجد مصروفات مسجّلة لهذا الشهر.</p> : (
           <table className="w-full border-collapse">
-            <thead><tr><th className={th}>البيان</th><th className={th}>التصنيف</th><th className={th}>المصدر</th><th className={`${th} text-end`}>المبلغ</th></tr></thead>
+            <thead><tr><th className={th}>الوصف</th><th className={th}>التصنيف</th><th className={th}>المصدر</th><th className={`${th} text-end`}>المبلغ</th></tr></thead>
             <tbody>
               {view.opexRows.filter((r) => r.category !== "POS_FEE" && r.category !== "BANK_FEE").map((r) => (
                 <tr key={r.id}>
@@ -105,7 +104,7 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
               ))}
               {p.opexByCategory.filter((o) => o.category === "POS_FEE" || o.category === "BANK_FEE").map((o) => (
                 <tr key={o.category}>
-                  <td className={td}>{o.label} (مجموع حركاتها الصغيرة)</td>
+                  <td className={td}><T s="{0} (مجموع حركاتها الصغيرة)" a={[o.label]} /></td>
                   <td className={td}>{o.label}</td>
                   <td className={td}>{OPEX_SOURCE_LABEL.BANK}</td>
                   <td className={`${td} text-end`}><Money minor={o.amountMinor} /></td>
@@ -117,9 +116,9 @@ export default async function FinanceReportPage({ searchParams }: { searchParams
       </section>
 
       <section aria-label="المشتريات" className="mt-6">
-        <h2 className="mb-2 text-sm font-bold">مشتريات الشهر: {countNoun(invoices.length, INVOICE)}</h2>
+        <h2 className="mb-2 text-sm font-bold"><T s="مشتريات الشهر: {0}" a={[countNoun(invoices.length, INVOICE)]} /></h2>
         <table className="w-full border-collapse">
-          <thead><tr><th className={th}>المورّد</th><th className={th}>الفاتورة</th><th className={th}>تاريخ الدخول</th><th className={`${th} text-end`}>بدون ضريبة</th></tr></thead>
+          <thead><tr><th className={th}>المورّد</th><th className={th}>الفاتورة</th><th className={th}>تاريخ الاستلام</th><th className={`${th} text-end`}>بدون ضريبة</th></tr></thead>
           <tbody>
             {invoices.map((r) => (
               <tr key={r.id}>

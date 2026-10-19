@@ -37,6 +37,7 @@ import { actionLabel } from "@/lib/audit-labels";
 import { ITEM, PAYMENT_RECORD, REASON, countNoun } from "@/lib/arabic";
 import { txHref } from "@/lib/inspector";
 import { monthOf } from "@/lib/filing";
+import { T } from "@/components/i18n/t";
 
 
 /**
@@ -84,13 +85,13 @@ export async function InvoiceView({
       <DetailFrame mode={mode} fullHref={fullHref} width="page" user={user} title="فاتورة غير موجودة">
         <EmptyState
           icon={Receipt}
-          title="هذه الفاتورة لم تعد موجودة في النظام."
+          title="هذه الفاتورة لم تعد في النظام."
           hint="ربما أُلغيت الفاتورة أو رُفض مستندها. يبقى أثر ذلك في سجل التدقيق، ولا يُمسّ ملفها في الدرايف."
           action={
             <>
               <LinkButton href="/purchases/invoices" variant="primary">كل الفواتير</LinkButton>
               <LinkButton href="/documents?status=REJECTED">المستندات المرفوضة</LinkButton>
-              {can(user.role, "audit:view") && <LinkButton href="/settings/audit">سجلّ التدقيق</LinkButton>}
+              {can(user.role, "audit:view") && <LinkButton href="/settings/audit">سجل التدقيق</LinkButton>}
             </>
           }
         />
@@ -161,17 +162,17 @@ export async function InvoiceView({
       id: a.paymentId,
       icon: undone ? CircleAlert : a.method === "BANK_TRANSFER" ? Landmark : Wallet,
       tone: undone ? "danger" : a.bankTxId ? "ok" : "accent",
-      title: <>خُصم لها <Money minor={a.amountMinor} /> · {METHOD_LABEL[a.method] ?? a.method}</>,
+      title: <><T s="خُصم لها {0} · {1}" a={[<Money key="0" minor={a.amountMinor} />, METHOD_LABEL[a.method] ?? a.method]} /></>,
       meta: formatDay(a.paidAt),
       body: (
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          {a.paymentAmountMinor !== a.amountMinor && <span>من دفعة بمبلغ <Money minor={a.paymentAmountMinor} /></span>}
+          {a.paymentAmountMinor !== a.amountMinor && <span><T s="من دفعة بمبلغ {0}" a={[<Money key="0" minor={a.paymentAmountMinor} />]} /></span>}
           <span className={undone ? "font-bold text-danger" : ""}>{paymentStatusLabel(a.status)}</span>
           <span aria-hidden>·</span>
           {a.bankTxId ? (
             <Link href={txHref(a.bankTxId)} className="font-bold text-accent hover:underline">افتح الحركة في البنك</Link>
           ) : a.method === "BANK_TRANSFER" ? (
-            <span className="text-warn">لم تُطابَق مع كشف البنك بعد</span>
+            <span className="text-warn">لم تُطابَق بكشف البنك بعد</span>
           ) : (
             <span className="text-muted">لا تظهر في كشف البنك</span>
           )}
@@ -188,7 +189,7 @@ export async function InvoiceView({
       meta: formatDay(h.at),
       body: <bdi>{h.actor ?? "النظام"}</bdi>,
     })),
-    { id: "archived", title: "أُرشفت الفاتورة", meta: formatDay(inv.createdAt), icon: FileText, body: doc.uploadedBy ? <>رفعها <bdi>{doc.uploadedBy}</bdi></> : undefined },
+    { id: "archived", title: "أُرشفت الفاتورة", meta: formatDay(inv.createdAt), icon: FileText, body: doc.uploadedBy ? <><T s="رفعها {0}" a={[<bdi key="0">{doc.uploadedBy}</bdi>]} /></> : undefined },
   ];
 
   const confidence = doc.fieldConfidence ? Object.entries(doc.fieldConfidence).sort(([, a], [, b]) => a - b) : [];
@@ -211,7 +212,7 @@ export async function InvoiceView({
         <nav className="flex flex-wrap gap-2" aria-label="التنقل بين فواتير المورّد">
           {nav.newer && <LinkButton href={invoiceHref(nav.newer)} size="sm">→ الأحدث</LinkButton>}
           {nav.older && <LinkButton href={invoiceHref(nav.older)} size="sm">الأقدم ←</LinkButton>}
-          <LinkButton href={`/suppliers/${supplier.slug}`} size="sm">ملف المورّد</LinkButton>
+          <LinkButton href={`/suppliers/${supplier.slug}`} size="sm">صفحة المورّد</LinkButton>
         </nav>
       }
     >
@@ -227,11 +228,11 @@ export async function InvoiceView({
               <Badge tone={taxTone} dot>{TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus}</Badge>
             </Link>
             {inv.taxStatus !== "VALID" && gaps.length > 0 && (
-              <span className="text-xs text-ink-soft">ينقصها: <b className="text-ink">{gaps.join("، ")}</b></span>
+              <span className="text-xs text-ink-soft"><T s="ينقصها: {0}" a={[<b key="0" className="text-ink">{gaps.join("، ")}</b>]} /></span>
             )}
             {inv.isFixedAsset && <Badge tone="info">أصل ثابت</Badge>}
           </div>
-          <p className="mt-5 text-xs font-bold text-muted">{p.settled ? "لا يوجد مبلغ متبقٍ" : "المتبقي عليها"}</p>
+          <p className="mt-5 text-xs font-bold text-muted">{p.settled ? "لا شيء متبقٍ" : "المتبقي عليها"}</p>
           <p className={`mt-1.5 text-[2.2rem] font-bold leading-none tracking-tight sm:text-[2.6rem] ${p.settled ? "text-ok" : ""}`}>
             {p.settled ? (
               <span className="inline-flex items-center gap-2">
@@ -247,11 +248,9 @@ export async function InvoiceView({
               <Meter value={Math.min(p.paidMinor, inv.totalMinor)} max={inv.totalMinor} tone={p.settled ? "ok" : "accent"} label="ما سُدّد من الإجمالي" />
             )}
             <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-              <span>الإجمالي <b className="text-ink"><Money minor={inv.totalMinor} /></b></span>
+              <span><T s="الإجمالي {0}" a={[<b key="0" className="text-ink"><Money minor={inv.totalMinor} /></b>]} /></span>
               <span>
-                المسدّد <b className="text-ink"><Money minor={p.paidMinor} /></b>
-                {p.allocations.length > 0 ? ` في ${countNoun(p.allocations.length, PAYMENT_RECORD)}` : " · لم يُسجَّل أي سداد"}
-              </span>
+                <T s="المسدّد {0}{1}" a={[<b key="0" className="text-ink"><Money minor={p.paidMinor} /></b>, p.allocations.length > 0 ? ` في ${countNoun(p.allocations.length, PAYMENT_RECORD)}` : " · لم يُسجَّل سداد"]} /></span>
             </p>
           </div>
         </div>
@@ -260,19 +259,18 @@ export async function InvoiceView({
           <p className="mb-3 text-xs font-bold text-muted">الخطوة التالية</p>
           {p.settled ? (
             <p className="text-sm leading-relaxed text-ink-soft">
-              لا يوجد ما عليك فعله. {p.allocations.length > 0 && <Link href="#pay" className="font-bold text-accent hover:underline">انظر كيف سُدّدت</Link>}
-            </p>
+              <T s="لا شيء مطلوب منك. {0}" a={[p.allocations.length > 0 && <Link href="#pay" className="font-bold text-accent hover:underline">انظر كيف سُدّدت</Link>]} /></p>
           ) : canPay ? (
             <>
               <MarkInvoicePaid invoiceId={inv.id} label={formatRiyals(p.remainingMinor)} layout="panel" startOpen={act === "pay"} invoiceDay={todayInRiyadh(inv.date)} />
               <p className="mt-3 text-[11px] leading-relaxed text-muted">
-                إذا سُدّدت بحوالة من حساب المقهى وسيصل كشفها، فانتظر الكشف لتُطابَق الدفعة تلقائياً.
+                إن سُدّدت بحوالة من حساب المقهى وكشفها في الطريق، فانتظر الكشف لتُطابَق الدفعة تلقائياً.
               </p>
               <CreditNoteForm invoiceId={inv.id} today={todayInRiyadh()} />
             </>
           ) : (
             <p className="text-sm leading-relaxed text-ink-soft">
-              تُطابَق الفاتورة عند ظهور حوالتها في كشف البنك. أما تسجيل السداد فهو لمن يملك صلاحية اعتماد السداد.
+              تُطابَق الفاتورة حين تظهر حوالتها في كشف البنك. أما تسجيل السداد فلمن يملك صلاحية اعتماده.
             </p>
           )}
         </div>
@@ -285,34 +283,26 @@ export async function InvoiceView({
         حين لا شيء: فراغُه هو الخبر.
       */}
       {(stale || doc.origin === "STATEMENT_LINE" || p.twins.length > 0 || addsUp === false || weak.length > 0 || problems.length > 0 || risen.length > 0) && (
-        <ul className="mt-4 space-y-2" aria-label="تنبيهات تستحق الانتباه">
+        <ul className="mt-4 space-y-2" aria-label="تنبيهات تستحق انتباهك">
           {p.twins.map((t) => (
             <Notice key={t.id} tone="warn" icon={Copy} href={invoiceHref(t.id)} cta="قارنها">
-              توجد فاتورة أخرى من {supplier.nameAr} بالإجمالي نفسه ({formatRiyalsDisplay(t.totalMinor)}) بتاريخ{" "}
-              {formatDay(t.date)}، رقمها <bdi className="nums">{t.number}</bdi>. قد تكون طلبين مختلفين أو فاتورة مكررة؛
-              قارن بنودهما قبل أن تسدّد الاثنتين.
-            </Notice>
+              <T s="توجد فاتورة أخرى من {0} بالإجمالي نفسه ({1}) بتاريخ {2}، ورقمها {3}. قد يكونان طلبين مختلفين أو فاتورة مكررة، فقارن بنودهما قبل أن تسدّد الاثنتين." a={[supplier.nameAr, formatRiyalsDisplay(t.totalMinor), formatDay(t.date), <bdi key="3" className="nums">{t.number}</bdi>]} /></Notice>
           ))}
           {doc.origin === "STATEMENT_LINE" && (
             <Notice tone="warn" icon={ScanText} href="#tax" cta="اطلبها">
-              سُجّلت هذه الفاتورة من كشف المورّد ولا يوجد لها ملف عندنا. تدخل ضمن المبلغ المستحق ولا تُخصم ضريبتها حتى يصل ملفها. اطلبها من {supplier.nameAr}، وعند رفعها ستحل محل هذا القيد نفسه دون تكرار.
-            </Notice>
+              <T s="سُجّلت هذه الفاتورة من كشف المورّد وليس لها ملف عندنا. تدخل في المبلغ المستحق، ولا تُخصم ضريبتها حتى يصل ملفها. اطلبها من {0}، وحين ترفعها تحل محل هذا السجل نفسه دون تكرار." a={[supplier.nameAr]} /></Notice>
           )}
           {stale && (
             <li className="flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-bg px-4 py-3 text-sm text-warn">
               <TriangleAlert className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
               <span className="min-w-0 flex-1 leading-relaxed">
-                الحالة الضريبية المحفوظة «{TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus}» قديمة،
-                وبحسب بيانات الفاتورة الحالية فهي «{TAX_LABEL[verdict.taxStatus as keyof typeof TAX_LABEL] ?? verdict.taxStatus}»
-                {gaps.length > 0 && <> (ينقصها: {gaps.join("، ")})</>}.
-                {monthClosed && <> وشهر {formatMonth(inv.month)} مقفل، فأعد فتحه لتصحيحها لأنها تؤثر في إقراره الضريبي.</>}
-              </span>
+                <T s="الحالة الضريبية المحفوظة «{0}» قديمة، وبيانات الفاتورة الحالية تجعلها «{1}»{2}.{3}" a={[TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus, TAX_LABEL[verdict.taxStatus as keyof typeof TAX_LABEL] ?? verdict.taxStatus, gaps.length > 0 && <> <T s=" (ينقصها: {0})" a={[gaps.join("، ")]} /></>, monthClosed && <> <T s=" وشهر {0} مقفل، فأعد فتحه لتصحيحها، لأنها تؤثر في إقراره الضريبي." a={[formatMonth(inv.month)]} /></>]} /></span>
               {canEdit && !monthClosed && <InvoiceRejudge invoiceId={inv.id} />}
             </li>
           )}
           {addsUp === false && (
             <Notice tone="danger" icon={CircleAlert} href="#tax" cta="صحّحها">
-              مجموع الصافي والضريبة يختلف عن الإجمالي بأكثر من ريال، وقد يكون أحد المبالغ قُرئ بشكل خاطئ.
+              مجموع الصافي والضريبة يختلف عن الإجمالي بأكثر من ريال، فربما قُرئ أحد المبالغ خطأً.
             </Notice>
           )}
           {problems.length > 0 && (
@@ -323,19 +313,18 @@ export async function InvoiceView({
               cta="عالجها"
             >
               {problems[0].what}
-              {problems.length > 1 && ` وهناك ${countNoun(problems.length - 1, REASON)} أخرى`}.
+              {problems.length > 1 && ` و${countNoun(problems.length - 1, REASON)} أخرى`}.
             </Notice>
           )}
           {weak.length > 0 && (
             <Notice tone="warn" icon={ScanText} href="#source" cta="راجع المصدر">
-              قرأ النظام {weak.join(" و")} بثقة ضعيفة، فقارنها بالورقة قبل أن تعتمدها.
-            </Notice>
+              <T s="قرأ النظام {0} بثقة ضعيفة، فقارنها بالورقة قبل اعتمادها." a={[weak.join(" و")]} /></Notice>
           )}
           {risen.length > 0 && (
             <Notice tone="warn" icon={TrendingUp} href="#lines" cta="انظر البنود">
               {risen.length === 1
-                ? `ارتفع سعر «${risen[0].description}» بنسبة ${risen[0].move?.percent ?? "?"}٪ عن آخر شراء.`
-                : `ارتفعت أسعار ${countNoun(risen.length, ITEM)} عن آخر شراء لها.`}
+                ? `ارتفع سعر «${risen[0].description}» ${risen[0].move?.percent ?? "?"}٪ عن آخر شراء.`
+                : `ارتفعت أسعار ${countNoun(risen.length, ITEM)} عن آخر شراء.`}
             </Notice>
           )}
         </ul>
@@ -349,14 +338,14 @@ export async function InvoiceView({
             icon={ListOrdered}
             title="البنود"
             count={p.lines.length > 0 ? p.lines.length : undefined}
-            hint={p.lines.length > 0 ? "كل بند مقارَن بآخر سعر اشتريته به من المورّد نفسه." : undefined}
+            hint={p.lines.length > 0 ? "كل بند مقارن بآخر سعر اشتريته به من المورّد نفسه." : undefined}
           >
             {p.lines.length === 0 ? (
               <EmptyState
                 compact
                 icon={ListOrdered}
                 title="لم تُقرأ بنود الفاتورة."
-                hint="الإجمالي معروف لكن مكوناته غير معروفة، لذلك لا تدخل الفاتورة في مقارنة الأسعار. أعد قراءة المستند لاستخراج البنود."
+                hint="الإجمالي معروف وتفاصيله غير معروفة، فلا تدخل الفاتورة في مقارنة الأسعار. أعد قراءة المستند لاستخراج البنود."
                 action={canEdit ? <DocumentReread documentId={doc.id} canEdit={canEdit} /> : undefined}
               />
             ) : (
@@ -381,7 +370,7 @@ export async function InvoiceView({
                       const m = l.move;
                       const pct = m.percent === null ? "?" : Math.abs(m.percent);
                       const badge = m.direction === "same"
-                        ? <Badge>كما هو</Badge>
+                        ? <Badge>بلا تغيير</Badge>
                         : <Badge tone={m.direction === "up" ? "warn" : "ok"}>{m.direction === "up" ? "▲ ارتفع" : "▼ انخفض"} <span className="nums">{pct}</span>٪</Badge>;
                       const title = `كان ${formatRiyalsDisplay(m.previousMinor)} في ${formatDay(m.previousDate)}`;
                       return m.previousInvoiceId ? (
@@ -404,17 +393,17 @@ export async function InvoiceView({
             icon={Wallet}
             title="السداد"
             count={p.allocations.length > 0 ? p.allocations.length : undefined}
-            hint={p.allocations.length > 0 ? "كل دفعة خُصم منها مبلغ لهذه الفاتورة، ومصدر هذه الدفعة." : undefined}
+            hint={p.allocations.length > 0 ? "كل دفعة خُصم منها مبلغ لهذه الفاتورة، ومن أين جاءت الدفعة." : undefined}
           >
             {p.allocations.length === 0 ? (
               <EmptyState
                 compact
                 icon={Wallet}
-                title="لم يُسجَّل لها سداد."
+                title="لم يُسجَّل لها أي سداد."
                 hint={
                   canPay
-                    ? "إذا سدّدتها نقداً أو من حسابك الشخصي فسجّل السداد من «الخطوة التالية» أعلاه. وإذا سُدّدت بحوالة من حساب المقهى فستُطابَق عند وصول كشف البنك."
-                    : "ستُطابَق عند ظهور حوالتها في كشف البنك."
+                    ? "إن سدّدتها نقداً أو من حسابك الشخصي فسجّل السداد من «الخطوة التالية» أعلاه. وإن سُدّدت بحوالة من حساب المقهى فستُطابَق حين يصل كشف البنك."
+                    : "ستُطابَق حين تظهر حوالتها في كشف البنك."
                 }
               />
             ) : (
@@ -425,14 +414,12 @@ export async function InvoiceView({
           </Section>
 
           {p.statementLines.length > 0 && (
-            <Section title="في كشف المورّد" icon={FileText} hint="المواضع التي ظهرت فيها هذه الفاتورة في كشوف حساب المورّد.">
+            <Section title="في كشف المورّد" icon={FileText} hint="أين ظهرت هذه الفاتورة في كشوف حساب المورّد.">
               <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised text-xs shadow-raised">
                 {p.statementLines.map((s) => (
                   <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                     <span>
-                      كشف {formatMonth(monthOf(s.periodEnd))} · {formatDay(s.date)}
-                      {s.ref && <> · <bdi className="nums">{s.ref}</bdi></>}
-                    </span>
+                      <T s="كشف {0} · {1}{2}" a={[formatMonth(monthOf(s.periodEnd)), formatDay(s.date), s.ref && <> · <bdi className="nums">{s.ref}</bdi></>]} /></span>
                     <span className="flex items-center gap-2">
                       <Money minor={s.debitMinor} />
                       <Badge tone={s.matchStatus === "MATCHED" ? "ok" : s.matchStatus === "DISPUTED" ? "danger" : "muted"} dot>
@@ -456,7 +443,7 @@ export async function InvoiceView({
                 <Row label="خصم بعد الضريبة"><span className="text-ok">− <Money minor={inv.discountMinor} /></span></Row>
               )}
               {inv.chargesMinor !== null && (
-                <Row label="رسوم بعد الضريبة (التوصيل)"><span>+ <Money minor={inv.chargesMinor} /></span></Row>
+                <Row label="رسوم بعد الضريبة (كالتوصيل)"><span>+ <Money minor={inv.chargesMinor} /></span></Row>
               )}
               <Row label={inv.discountMinor !== null || inv.chargesMinor !== null ? "المستحق" : "الإجمالي"}><span className="text-sm font-bold"><Money minor={inv.totalMinor} /></span></Row>
               <Row label="الرقم الضريبي للبائع">{inv.sellerVat ? <bdi className="nums">{inv.sellerVat}</bdi> : <Unknown text="لا رقم" />}</Row>
@@ -464,7 +451,7 @@ export async function InvoiceView({
               <Row label="الحالة الضريبية">
                 <Badge tone={taxTone} dot>{TAX_LABEL[inv.taxStatus as keyof typeof TAX_LABEL] ?? inv.taxStatus}</Badge>
                 {inv.taxStatus !== "VALID" && gaps.length > 0 && (
-                  <span className="mt-1 block text-[11px] text-ink-soft">ينقصها: {gaps.join("، ")}</span>
+                  <span className="mt-1 block text-[11px] text-ink-soft"><T s="ينقصها: {0}" a={[gaps.join("، ")]} /></span>
                 )}
               </Row>
               <Row label="خصم ضريبة المدخلات">
@@ -472,8 +459,8 @@ export async function InvoiceView({
                   {INPUT_VAT_LABEL[inv.inputVatStatus] ?? inv.inputVatStatus}
                 </span>
               </Row>
-              {inv.isFixedAsset && <Row label="التصنيف"><span className="text-warn">أصل ثابت (يُرسمل)</span></Row>}
-              {inv.carriedForwardFrom && <Row label="رُحّلت من">{formatMonth(inv.carriedForwardFrom)}</Row>}
+              {inv.isFixedAsset && <Row label="التصنيف"><span className="text-warn">أصل ثابت (يُرسمَل)</span></Row>}
+              {inv.carriedForwardFrom && <Row label="مُرحّلة من">{formatMonth(inv.carriedForwardFrom)}</Row>}
             </dl>
 
             <div id="fix" className="mt-3 scroll-mt-24">
@@ -502,7 +489,7 @@ export async function InvoiceView({
           </Section>
 
           {/* ── المصدر وثقة القراءة ── */}
-          <Section id="source" icon={ScanText} title="المصدر وثقة القراءة">
+          <Section id="source" icon={ScanText} title="المصدر ودقة القراءة">
             <div className="overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
               <div className="flex items-start gap-3 border-b border-line-soft p-4">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-sunken text-ink-soft">
@@ -511,17 +498,14 @@ export async function InvoiceView({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-bold" dir="auto" title={doc.fileName}>{doc.fileName}</p>
                   <p className="mt-0.5 text-[11px] text-muted">
-                    وصلت {formatDay(doc.uploadedAt)}{doc.uploadedBy && <> · <bdi>{doc.uploadedBy}</bdi></>}
-                    {" · "}
-                    {doc.textSource === "TEXT" ? "قُرئت من نص الملف (نقل مباشر)" : doc.textSource === "VISION" ? "قُرئت من صورة الملف (قراءة تقريبية)" : "لم يُسجَّل مصدر القراءة"}
-                  </p>
+                    <T s="وصلت {0}{1} · {2}" a={[formatDay(doc.uploadedAt), doc.uploadedBy && <> · <bdi>{doc.uploadedBy}</bdi></>, doc.textSource === "TEXT" ? "قُرئت من نص الملف مباشرة" : doc.textSource === "VISION" ? "قُرئت من صورة الملف (قراءة تقريبية)" : "لم يُسجَّل مصدر القراءة"]} /></p>
                 </div>
               </div>
 
               <div className="p-4">
                 <p className="mb-2.5 text-[11px] font-bold text-muted">درجة الثقة في كل حقل</p>
                 {confidence.length === 0 ? (
-                  <p className="text-xs text-muted">لم تُسجَّل درجة الثقة لهذه القراءة.</p>
+                  <p className="text-xs text-muted">لم تُحفظ درجة الثقة لهذه القراءة.</p>
                 ) : (
                   <ul className="space-y-2.5">
                     {confidence.map(([k, v]) => {
@@ -551,9 +535,7 @@ export async function InvoiceView({
                     rel="noreferrer"
                     className={buttonClass("secondary", "sm")}
                   >
-                    <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                    افتح الورقة في الدرايف
-                  </a>
+                    <T s="{0}افتح الورقة في الدرايف" a={[<ExternalLink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
                 )}
                 {p.lines.length > 0 && <DocumentReread documentId={doc.id} canEdit={canEdit} />}
               </div>
@@ -575,7 +557,7 @@ export async function InvoiceView({
               {cancellable ? (
                 <div className="rounded-xl border border-line bg-raised p-4 shadow-raised">
                   <p className="mb-3 text-[11px] leading-relaxed text-muted">
-                    استخدم هذا الخيار لفاتورة ألغاها المورّد. تخرج الفاتورة من المبلغ المستحق، ويبقى ملفها في الدرايف وأثرها في السجل.
+                    لفاتورة ألغاها المورّد. تخرج من المبلغ المستحق، ويبقى ملفها في الدرايف وأثرها في السجل.
                   </p>
                   <RejectDocument
                     documentId={doc.id}
@@ -585,8 +567,7 @@ export async function InvoiceView({
                 </div>
               ) : (
                 <p className="rounded-xl border border-line bg-sunken px-4 py-3 text-[11px] leading-relaxed text-muted">
-                  لا يمكن إلغاؤها: {p.allocations.length > 0 ? "عليها سداد مسجّل، فافصله عن حركة البنك أولاً" : "لأنها مطابقة بسطر في كشف المورّد"}.
-                </p>
+                  <T s="لا يمكن إلغاؤها: {0}." a={[p.allocations.length > 0 ? "عليها سداد مسجّل، فافصله عن حركة البنك أولاً" : "لأنها مطابقة بسطر في كشف المورّد"]} /></p>
               )}
             </Section>
           )}
@@ -597,8 +578,8 @@ export async function InvoiceView({
 }
 
 const INPUT_VAT_LABEL: Record<string, string> = {
-  ELIGIBLE: "تخصم",
-  NOT_ELIGIBLE: "لا تخصم",
+  ELIGIBLE: "تُخصم",
+  NOT_ELIGIBLE: "لا تُخصم",
   UNKNOWN: "غير معروف",
 };
 
@@ -607,7 +588,7 @@ const STATEMENT_MATCH_LABEL: Record<string, string> = {
   PARTIAL: "جزئياً",
   DISPUTED: "فرق مبلغ",
   UNMATCHED: "غير مطابقة",
-  IGNORED: "متجاهَلة",
+  IGNORED: "متجاهلة",
 };
 
 /** «١٫٠٠٠» كمّيّةٌ مخزَّنة بثلاث خانات — تُعرَض «١» كما كُتبت على الورقة. */

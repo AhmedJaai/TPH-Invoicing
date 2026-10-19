@@ -93,7 +93,7 @@ export function deepseekVision(): VisionProvider {
           reason:
             input.mode === "UNREADABLE"
               ? input.reason
-              : "الكشف نصي، فيُقرأ برمجياً ولا يُرسل إلى نموذج الرؤية",
+              : "الكشف نصي، فيُقرأ برمجياً ولا يُرسل إلى قارئ الصور",
         };
       }
 
@@ -108,7 +108,7 @@ export function deepseekVision(): VisionProvider {
           provider: "deepseek",
           model,
           reason:
-            `الكشف ${input.pagesTotal} صفحات ولا يمكن قراءة سوى ${input.pagesRead} منها بصرياً. ` +
+            `الكشف ${input.pagesTotal} صفحات، ولا يُقرأ منها من الصور إلا ${input.pagesRead}. ` +
             "والكشف الناقص أسوأ من عدم وجود كشف. قسّمه إلى ملفات أصغر، أو اطلبه من البنك بصيغة نصية (PDF غير مصوّر أو Excel)",
         };
       }

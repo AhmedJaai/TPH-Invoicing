@@ -564,7 +564,7 @@ export function NoAccess({ what }: { what?: string }) {
     /* `data-no-access`: الزاحفُ بدورٍ غير المالك يعدّ كلَّ صفحةٍ كهذه وصلها رابطٌ ظاهرٌ له طريقاً مسدوداً */
     <div data-no-access="">
       <EmptyState
-        title={what ? `${what} خارج صلاحيتك.` : "هذه الصفحة خارج صلاحيتك."}
+        title={what ? `${what} ليس من صلاحياتك.` : "هذه الصفحة ليست من صلاحياتك."}
         hint="اطلب من مالك الحساب توسيع صلاحياتك، ثم حدّث الصفحة."
       />
     </div>
@@ -668,7 +668,7 @@ export function Stepper({
             <p className={`text-sm font-bold ${s.state === "done" ? "text-muted" : ""}`}>
               {s.title}
               <span className="sr-only">
-                {s.state === "done" ? " — مكتملة" : s.state === "blocked" ? " — متوقفة" : s.state === "current" ? " — الخطوة الحالية" : ""}
+                {s.state === "done" ? "، مكتملة" : s.state === "blocked" ? "، متوقفة" : s.state === "current" ? "، الخطوة الحالية" : ""}
               </span>
             </p>
             {s.detail && <div className="mt-0.5 text-xs leading-relaxed text-muted">{s.detail}</div>}
@@ -840,7 +840,7 @@ export function DataTable<T>({
         {empty ?? (
           <EmptyState
             title="لا شيء في هذا الجدول بعد."
-            hint="يمتلئ الجدول عندما يصل ما يخصه، مثل فاتورة ترفعها أو كشف حساب تستورده."
+            hint="يمتلئ الجدول حين يصل ما يخصه، كفاتورة ترفعها أو كشف حساب تستورده."
           />
         )}
       </>

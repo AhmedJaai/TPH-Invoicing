@@ -188,7 +188,7 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
         salesWritten: 0, salesRestated: 0, lineCount: 0, unitsMilli: 0,
       },
       revisions: [],
-      messages: [`هذا الملف مستورد من قبل باسم «${seen.fileName}»، ولم يُسجَّل شيء جديد.`],
+      messages: [`هذا الملف مستورد من قبل باسم «${seen.fileName}»، فلم يُسجَّل شيء جديد.`],
       recognisedColumns: [],
       unrecognisedColumns: [],
       unmappedProducts: 0,
@@ -230,14 +230,14 @@ export async function importSalesFile(input: ImportInput, conn: Conn = db): Prom
     parsed = {
       ...parsed,
       blocked:
-        `الورقة «${truncatedSheet}» أطول مما يمكن قراءته في مرة واحدة، فقُرئ أولها فقط ولم يُسجَّل شيء. ` +
-        "صدّر من فودكس أسبوعاً واحداً في كل ملف، وارفع كل أسبوع على حدة.",
+        `الورقة «${truncatedSheet}» أطول مما يُقرأ في مرة واحدة، فقُرئ أولها فقط ولم يُسجَّل شيء. ` +
+        "صدّر من فودكس أسبوعاً واحداً في كل ملف، وارفع كل أسبوع وحده.",
     };
   }
 
   if (!parsed || parsed.blocked) {
     const blocked = parsed?.blocked
-      ?? "تعذّر فهم هذا الملف: لم يُعثر فيه على جدول يضم «اسم الصنف» و«الكمّيّة».";
+      ?? "تعذّر فهم هذا الملف: لم نجد فيه جدولاً فيه «اسم الصنف» و«الكمّيّة».";
     return {
       importId: "",
       status: "FAILED",
@@ -329,7 +329,7 @@ export async function importParsedSales(p: ParsedImportInput, conn: Conn = db): 
 
   const messages: string[] = [...p.messages, ...file.warnings];
   if (retryOf !== null) {
-    messages.push("رُفع هذا الملف من قبل ولم يُستورد كاملاً، فأُعيدت قراءته ولم يُسجَّل ما قُيّد منه مرة ثانية.");
+    messages.push("رُفع هذا الملف من قبل ولم يُستورد كاملاً، فأُعيدت قراءته دون تكرار ما سُجّل منه.");
   }
   const written = await writeImport({
     file, sourceId, branchId, sha, input, messages, conn, retryOf,
@@ -574,7 +574,7 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
       for (const [rowNumber, o] of outcome.byRow) rowOutcome.set(rowNumber, o);
       if (outcome.keptDespiteAbsence > 0) {
         messages.push(
-          `يوم ${sale.businessDate}: يذكر الملف أقل من نصف أصنافه المقيّدة، ويبدو أنه تقرير مفلتر، ` +
+          `يوم ${sale.businessDate}: يذكر الملف أقل من نصف أصنافه المسجّلة، ويبدو أنه تقرير مفلتر، ` +
           `فلم يُلغَ ما غاب عنه (${outcome.keptDespiteAbsence}). إن كان التقرير كاملاً فارفعه بلا فلترة.`,
         );
       }
@@ -649,15 +649,15 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
       understood === 0 ? "FAILED" : counts.errors > 0 ? "PARTIAL" : "IMPORTED";
 
     if (counts.errors > 0) {
-      messages.push(`${counts.errors} صفاً تعذّرت قراءته. نصّه وسببه محفوظان ويظهران أدناه.`);
+      messages.push(`${counts.errors} صفاً تعذّرت قراءتها، ونصها وسببها محفوظان ويظهران أدناه.`);
     }
     if (counts.revised > 0) {
       messages.push(
-        `${counts.revised} سطراً كان مقيّداً وتغيّرت بياناته في المصدر، فتم تحديثه ولم يُرفض. التفاصيل أدناه.`,
+        `${counts.revised} سطراً كان مسجّلاً وتغيّرت بياناته في المصدر، فحُدّث ولم يُرفض. التفاصيل أدناه.`,
       );
     }
     if (counts.duplicates > 0) {
-      messages.push(`${counts.duplicates} سطراً مقيّد من قبل بلا تغيير، فلم يُسجَّل مرة ثانية.`);
+      messages.push(`${counts.duplicates} سطراً مسجّل من قبل بلا تغيير، فلم يُسجَّل مرة ثانية.`);
     }
 
     await tx
@@ -794,7 +794,7 @@ export function decideLines(
         out.changed.push({ ...values, id: was.id });
       }
       for (const n of l.rowNumbers) {
-        out.byRow.set(n, { status: "DUPLICATE", reason: "مقيّد من قبل بلا تغيير، فلم يُسجَّل مرة ثانية" });
+        out.byRow.set(n, { status: "DUPLICATE", reason: "مسجّل من قبل بلا تغيير، فلم يُسجَّل مرة ثانية" });
       }
       continue;
     }

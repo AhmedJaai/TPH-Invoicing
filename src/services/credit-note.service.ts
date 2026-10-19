@@ -58,7 +58,7 @@ export async function recordCreditNote(
   if (input.amountMinor > outstanding) {
     throw new CreditNoteRefused(
       outstanding <= 0
-        ? `فاتورة ${inv.number} مسدّدة بالكامل، فيصبح الإشعار رصيداً للمورّد. إن كان الإشعار سابقاً للسداد فألغِ سدادها أولاً`
+        ? `فاتورة ${inv.number} مسدّدة بالكامل، فيصير الإشعار رصيداً لك عند المورّد. إن كان الإشعار قبل السداد فألغِ سدادها أولاً`
         : `الإشعار (${formatRiyalsDisplay(input.amountMinor)}) أكبر من المتبقي على فاتورة ${inv.number} (${formatRiyalsDisplay(outstanding)})`,
     );
   }
@@ -105,7 +105,7 @@ export async function recordCreditNote(
   });
   const out = await allocate(tx, paymentId, [{ invoiceId: inv.id, amountMinor: input.amountMinor }]);
   if (out.allocatedMinor !== input.amountMinor) {
-    throw new CreditNoteRefused("تعذّر توزيع الإشعار كله على الفاتورة، ولم يُسجَّل شيء");
+    throw new CreditNoteRefused("تعذّر توزيع الإشعار كله على الفاتورة، فلم يُسجَّل شيء");
   }
 
   await recordAudit({

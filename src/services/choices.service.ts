@@ -129,7 +129,7 @@ async function cashRows(): Promise<ChoiceRow[]> {
       revoke: locked ? null : {
         url: "/api/vat-return", needs: "month:close",
         body: { action: "cash", month: r.month, amount: null },
-        label: "احذفه وأعد المبلغ إلى «غير مدخل»",
+        label: "احذفه، وأعد المبلغ إلى «غير مُدخل»",
       },
     };
   });
@@ -150,7 +150,7 @@ async function holdRows(): Promise<ChoiceRow[]> {
     id: `hold:${r.invoiceId}`,
     group: "hold",
     subject: `${r.supplier} — ${r.number || "بلا رقم"}`,
-    choice: `تُدفع رغم حجزها: «${r.note}»`,
+    choice: `تُدفع رغم إيقافها: «${r.note}»`,
     decidedOn: day(r.at),
     effectMinor: r.totalMinor,
     effectLabel: "إجمالي الفاتورة، ويدخل الدفعة ما بقي منها",
@@ -160,7 +160,7 @@ async function holdRows(): Promise<ChoiceRow[]> {
     revoke: {
       url: "/api/payment-run/hold", needs: "payment:approve",
       body: { month: r.month, invoiceIds: [r.invoiceId], action: "restore" },
-      label: "أعدها إلى المحجوزات",
+      label: "أعدها إلى الموقوفة",
     },
   }));
 }
@@ -323,7 +323,7 @@ async function supplierRows(): Promise<ChoiceRow[]> {
       decidedOn: null, effectMinor, effectLabel, state: "APPLIED", reason: null, href, revoke: null, ...extra,
     });
     if (s.terms !== null) inFile("terms", s.terms === 0 ? "أجل السداد: نقداً" : `أجل السداد: ${countNoun(s.terms, DAY)}`, null, null);
-    if (s.limitMinor !== null) inFile("limit", "حد للرصيد يُفعّل تنبيهاً", s.limitMinor, "الحدّ");
+    if (s.limitMinor !== null) inFile("limit", "حد للرصيد يطلق تنبيهاً", s.limitMinor, "الحد");
     if (s.iban) {
       const note = payee.get(s.id)?.note ?? null;
       inFile("iban", `آيبان مكتوب يدوياً: ${groupIban(s.iban)}${s.ibanBy ? ` — كتبه ${s.ibanBy}` : ""}`, null, null, {
@@ -361,7 +361,7 @@ async function ruleRows(): Promise<ChoiceRow[]> {
       effectLabel: n > 0 ? `صُنّفت بها ${countNoun(n, TRANSACTION)}` : null,
       /* قاعدةٌ لم تُصنَّف بها حركةٌ واحدة قائمةٌ ولا تعمل — تُقال كذلك */
       state: n > 0 ? "APPLIED" : "NOT_APPLIED",
-      reason: n > 0 ? r.note : "لم تُصنَّف بها أي حركة بعد. قد لا يطابق نصها وصف البنك، أو سبقتها قاعدة أخرى",
+      reason: n > 0 ? r.note : "لم تُصنَّف بها أي حركة بعد. ربما لا يطابق نصها وصف البنك، أو سبقتها قاعدة أخرى",
       href: "/settings#rules",
       revoke: null,
     };

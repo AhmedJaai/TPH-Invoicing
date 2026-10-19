@@ -22,8 +22,8 @@ export interface BriefFacts {
 }
 
 export function buildBrief(f: BriefFacts): string {
-  const head = `ذا بوبليك هاوس — ${f.dateLabel}`;
-  if (f.knowsNothing) return `${head}\nلم يقرأ النظام أي مستند أو كشف بعد، فلا أرقام لعرضها.`;
+  const head = `ذا بوبليك هاوس: ${f.dateLabel}`;
+  if (f.knowsNothing) return `${head} لم يقرأ النظام بعد أي مستند أو كشف، فلا أرقام لعرضها.`;
   const lines = [
     head,
     f.owedMinor > 0
@@ -33,7 +33,7 @@ export function buildBrief(f: BriefFacts): string {
       : f.weekMinor > 0 ? `• يخرج هذا الأسبوع ${formatRiyalsDisplay(f.weekMinor)} ريال` : "• لا مبالغ معروفة ستخرج هذا الأسبوع",
     f.balanceMinor === undefined ? null
       : f.balanceMinor === null ? "• رصيد البنك غير معروف" : `• آخر رصيد معروف ${formatRiyalsDisplay(f.balanceMinor)} ريال`,
-    f.pending > 0 ? `• بانتظار قرارك ${countNoun(f.pending, ITEM)}` : "• لا شيء بانتظار قرارك",
+    f.pending > 0 ? `• ينتظر قرارك ${countNoun(f.pending, ITEM)}` : "• لا شيء ينتظر قرارك",
   ];
   return lines.filter(Boolean).join("\n");
 }

@@ -38,7 +38,7 @@ export function catalogItemsFromApi(items: readonly FoodicsInventoryItem[]): Par
     const factorMilli = i.storage_to_ingredient_factor === null || i.storage_to_ingredient_factor === undefined
       ? null : decimalToMilli(i.storage_to_ingredient_factor.toFixed(6));
     if (factorMilli === null || factorMilli <= 0) {
-      out.issues.push({ row: n, reason: "معامل العبوة غير مقروء", detail: `«${name}» . لا نعرف كم ${unitWord} في ${storageUnit || "وحدة التخزين"}` });
+      out.issues.push({ row: n, reason: "معامل العبوة غير مقروء", detail: `«${name}»: لا نعرف كم ${unitWord} في ${storageUnit || "وحدة التخزين"}` });
       return;
     }
     const packCostMinor = riyalsToMinor(i.cost);

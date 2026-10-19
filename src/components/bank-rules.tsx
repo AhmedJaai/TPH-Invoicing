@@ -7,6 +7,7 @@ import { postJson } from "@/lib/http-client";
 import { normalizeArabic, normalizeDigits } from "@/lib/search";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 export interface BankRuleRow {
   id: string;
@@ -46,7 +47,7 @@ export function BankRules({ rows, canEdit }: { rows: BankRuleRow[]; canEdit: boo
   if (rows.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs leading-relaxed text-muted">
-        لا توجد قواعد بعد. تُنشأ القواعد من «صنّفها» عند استيراد كشف البنك، ثم تُطبَّق على كل كشف بعده.
+        لا توجد قواعد بعد. تُنشأ القاعدة من «صنّفها» عند استيراد كشف البنك، ثم تُطبَّق على كل كشف بعده.
       </p>
     );
   }
@@ -59,7 +60,7 @@ export function BankRules({ rows, canEdit }: { rows: BankRuleRow[]; canEdit: boo
     setBusy(false);
     setAsking(null);
     if (res.ok) {
-      toast({ tone: "ok", title: "تم حذف القاعدة", body: "الحركات المصنّفة بها سابقاً تبقى على تصنيفها." });
+      toast({ tone: "ok", title: "حُذفت القاعدة", body: "الحركات التي صُنّفت بها من قبل تبقى على تصنيفها." });
       router.refresh();
     } else {
       toast({ tone: "danger", title: "تعذّر حذف القاعدة", body: res.error });
@@ -81,7 +82,7 @@ export function BankRules({ rows, canEdit }: { rows: BankRuleRow[]; canEdit: boo
       </label>
 
       {shown.length === 0 ? (
-        <p className="text-xs text-muted">لا توجد قاعدة تطابق «{q}».</p>
+        <p className="text-xs text-muted"><T s="لا توجد قاعدة تطابق «{0}»." a={[q]} /></p>
       ) : (
         <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
           {shown.map((r) => (
@@ -109,7 +110,7 @@ export function BankRules({ rows, canEdit }: { rows: BankRuleRow[]; canEdit: boo
 
       {!q && matched.length > FIRST && (
         <button type="button" onClick={() => setAll((v) => !v)} className={buttonClass("secondary", "sm")}>
-          {all ? "اعرض أقل" : <>اعرض الكل (<span className="nums">{matched.length}</span>)</>}
+          {all ? "اعرض أقل" : <><T s="اعرض الكل ({0})" a={[<span key="0" className="nums">{matched.length}</span>]} /></>}
         </button>
       )}
     </div>

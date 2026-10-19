@@ -34,7 +34,7 @@ describe("planImport", () => {
     const p = plan("2026-07-31_OliveLeaves_Statement_to-31-07.pdf");
     expect(p.documentKind).toBe("STATEMENT");
     expect(p.createsStatement).toBe(true);
-    expect(p.notes.some((n) => n.includes("لا يوجد مبلغ"))).toBe(true);
+    expect(p.notes.some((n) => n.includes("لا مبلغ"))).toBe(true);
   });
 
   it("الفاتورة بلا مبلغ تبقى غير مقيّدة — الفرق مقصود", () => {

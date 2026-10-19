@@ -67,10 +67,10 @@ export type BalanceNote =
   | "SUSPECT_ENTRY";
 
 export const BALANCE_NOTE_LABEL: Record<BalanceNote, string> = {
-  NO_PURCHASES: "لا يوجد شراء مسجّل لهذا الصنف، لا في الفواتير المربوطة ولا في فودكس",
-  NO_RECIPE: "لا توجد وصفة تستخدم هذا الصنف، فالمباع منه غير معروف",
+  NO_PURCHASES: "لا شراء مسجّل لهذا الصنف، لا في الفواتير المربوطة ولا في فودكس",
+  NO_RECIPE: "لا وصفة تستخدم هذا الصنف، فالمباع منه غير معروف",
   SOLD_MORE_THAN_BOUGHT: "المباع منه أكثر من المشتريات المسجّلة، فهناك مشتريات لم تُسجَّل",
-  SUSPECT_ENTRY: "رقم مشكوك فيه: قد يكون جرداً أو كمية شراء أُدخلت خطأً",
+  SUSPECT_ENTRY: "رقم مشكوك فيه: ربما جرد أو كمية شراء أُدخلت خطأً",
 };
 
 export interface BalanceItem {

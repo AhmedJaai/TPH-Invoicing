@@ -2,6 +2,7 @@ import { CircleAlert, CircleCheck, PlugZap, RefreshCw } from "lucide-react";
 import { formatDay, formatMoment } from "@/lib/riyadh-time";
 import type { FoodicsStatus } from "@/services/foodics-sync.service";
 import { PostAction } from "./post-action";
+import { T } from "@/components/i18n/t";
 
 /**
  * حالُ وصل فودكس — يظهر فوق كلّ مقارنةٍ تُبنى عليه.
@@ -17,9 +18,7 @@ export function FoodicsStatusBar({ status, canSync }: { status: FoodicsStatus; c
         <div className="min-w-0 flex-1 basis-56 text-xs leading-relaxed text-ink-soft">
           <p className="text-[13px] font-bold text-warn">فودكس غير مربوط بهذا الخادم</p>
           <p className="mt-0.5">
-            مفتاح الربط <bdi dir="ltr" className="font-mono">FOODICS_API_TOKEN</bdi> غير مضبوط في هذه البيئة، لذلك لا تُقرأ بيانات جديدة.
-            {status.orders > 0 && <> والمعروض أدناه بيانات قُرئت سابقاً حتى <bdi>{formatDay(status.lastDay)}</bdi>.</>}
-          </p>
+            <T s="مفتاح الربط {0} غير مضبوط في هذه البيئة، فلا تُقرأ بيانات جديدة.{1}" a={[<bdi key="0" dir="ltr" className="font-mono">FOODICS_API_TOKEN</bdi>, status.orders > 0 && <> <T s=" والمعروض أدناه بيانات قُرئت من قبل حتى {0}." a={[<bdi key="0">{formatDay(status.lastDay)}</bdi>]} /></>]} /></p>
         </div>
       </div>
     );
@@ -37,22 +36,20 @@ export function FoodicsStatusBar({ status, canSync }: { status: FoodicsStatus; c
           {failed
             ? "فشلت آخر مزامنة مع فودكس"
             : status.lastOkAt
-              ? <>بيانات فودكس محدّثة حتى <bdi>{formatMoment(status.lastOkAt)}</bdi></>
+              ? <><T s="بيانات فودكس محدّثة حتى {0}" a={[<bdi key="0">{formatMoment(status.lastOkAt)}</bdi>]} /></>
               : "فودكس مربوط، ولم تُقرأ منه بيانات بعد"}
         </p>
         <p className="mt-0.5 text-xs leading-relaxed text-muted">
           {failed && status.lastRun?.error ? <>{status.lastRun.error} · </> : null}
           {status.orders > 0
-            ? <><span className="nums">{status.orders.toLocaleString("ar-SA-u-nu-latn")}</span> طلباً من <bdi>{formatDay(status.firstDay)}</bdi> إلى <bdi>{formatDay(status.lastDay)}</bdi> · <span className="nums">{status.purchases}</span> حركة شراء. القراءة فقط، ولا يُكتب أي شيء في فودكس.</>
+            ? <><T s="{0} طلباً من {1} إلى {2} · {3} حركة شراء. القراءة فقط، ولا يُكتب شيء في فودكس." a={[<span key="0" className="nums">{status.orders.toLocaleString("ar-SA-u-nu-latn")}</span>, <bdi key="1">{formatDay(status.firstDay)}</bdi>, <bdi key="2">{formatDay(status.lastDay)}</bdi>, <span key="3" className="nums">{status.purchases}</span>]} /></>
             : "لم تُقرأ أي طلبات بعد. اضغط «زامن الآن» لقراءة الأيام الأخيرة."}
         </p>
       </div>
       {canSync && (
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <PostAction url="/api/foodics-sync" body={{}} variant="secondary" size="md" done="تمت مزامنة فودكس">
-            <RefreshCw className="h-4 w-4" strokeWidth={2} aria-hidden />
-            زامن الآن
-          </PostAction>
+          <PostAction url="/api/foodics-sync" body={{}} variant="secondary" size="md" done="زُومن فودكس">
+            <T s="{0}زامن الآن" a={[<RefreshCw key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></PostAction>
         </div>
       )}
     </div>

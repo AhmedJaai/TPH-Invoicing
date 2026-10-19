@@ -9,7 +9,7 @@
  * **والمبلغُ المجهول ليس صفراً:** فاتورةٌ قُيِّدت ولم يُعرف إجماليُّها تُعَدّ
  * «وأخرى لم يُعرف مبلغُها» ولا تُجمَع.
  */
-import { DOCUMENT, FILE, INVOICE, countNoun } from "./arabic";
+import { DOCUMENT, FILE, INVOICE, TRANSACTION, countNoun } from "./arabic";
 import { formatRiyalsDisplay } from "./money";
 
 export interface AutoWorkItem {
@@ -76,27 +76,27 @@ export function summarizeAutoWork(items: readonly AutoWorkItem[], counts: AutoWo
   const owedUnknown = recorded.filter((i) => i.totalMinor === null).length;
 
   const head = [
-    recorded.length > 0 ? `قيّد ${countNoun(recorded.length, INVOICE)}` : null,
-    approved.length > 0 ? `اعتمد ${countNoun(approved.length, DOCUMENT)}` : null,
-    recorded.length + approved.length === 0 && arrived > 0 ? `قرأ ${countNoun(arrived, DOCUMENT)} جديداً من الدرايف` : null,
+    recorded.length > 0 ? `سُجّلت ${countNoun(recorded.length, INVOICE)}` : null,
+    approved.length > 0 ? `اعتُمد ${countNoun(approved.length, DOCUMENT)}` : null,
+    recorded.length + approved.length === 0 && arrived > 0 ? `وصل ${countNoun(arrived, DOCUMENT)} جديداً من الدرايف` : null,
   ].filter(Boolean);
-  const title = head.length > 0 ? `النظام ${head.join(" و")} وحده` : "عمل آلي تم في الخلفية";
+  const title = head.length > 0 ? `${head.join(" و")} تلقائياً` : "عمل آلي تم في الخلفية";
 
   const names = [...new Set(recorded.concat(approved).map((i) => i.supplierName).filter((n): n is string => !!n))];
   const lines = [
     recorded.length > 0
       ? (owedAddedMinor > 0
           ? `زاد ما عليك للمورّدين ${formatRiyalsDisplay(owedAddedMinor)}`
-          : "قُيّدت فواتير")
+          : "سُجّلت فواتير")
         + (owedUnknown > 0 ? `${owedAddedMinor > 0 ? "، و" : "، "}${countNoun(owedUnknown, INVOICE)} لم يُعرف مبلغها` : "")
-        + " (قراءتها كاملة ولا توجد نسخة مكررة)"
+        + " (قراءتها كاملة، وليست نسخة مكررة)"
       : null,
     approved.length > 0 ? "استوفى المعتمد شروط الأرشفة الآلية فخرج من طابور المراجعة" : null,
     names.length > 0 ? `${names.slice(0, MAX_NAMES).join("، ")}${names.length > MAX_NAMES ? ` و${names.length - MAX_NAMES} غيرهم` : ""}` : null,
     recorded.length + approved.length > 0 && arrived > 0 ? `ووصل ${countNoun(arrived, DOCUMENT)} جديداً من الدرايف` : null,
-    linked > 0 ? `وربط ${linked} في البنك بسداد قيّدته يدوياً` : null,
-    renamed > 0 ? `وأُعيدت تسمية ${countNoun(renamed, FILE)} في الدرايف` : null,
-    reread > 0 ? `وأعيدت قراءة ${countNoun(reread, INVOICE)}` : null,
+    linked > 0 ? `ورُبط ${countNoun(linked, TRANSACTION)} في البنك بسداد سجّلته يدوياً` : null,
+    renamed > 0 ? `وسُمّي من جديد في الدرايف ${countNoun(renamed, FILE)}` : null,
+    reread > 0 ? `وقُرئ من جديد ${countNoun(reread, INVOICE)}` : null,
   ].filter(Boolean);
 
   return {

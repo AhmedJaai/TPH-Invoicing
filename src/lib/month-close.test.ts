@@ -241,7 +241,7 @@ describe("الإقفال يرى ما كان يفوته", () => {
     const r = buildMonthClose({ ...clean, suppliersWithStatementIssues: 2 });
     const item = r.items.find((i) => i.id === "statements")!;
     expect(item.state).toBe("WARN");
-    expect(item.detail).toContain("فروق مع دفاترنا");
+    expect(item.detail).toContain("فروق مع سجلاتنا");
     expect(r.canClose).toBe(true);
   });
 });

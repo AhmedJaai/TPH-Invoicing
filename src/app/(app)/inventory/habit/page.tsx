@@ -9,6 +9,7 @@ import {
   HABIT_MIN_DAYS_PER_WEEK, HABIT_MIN_WEEKS, HABIT_WEEKS, WEEKDAY_LABEL, unitsText, type ItemHabit,
 } from "@/lib/sales/weekday-habit";
 import { loadWeekdayHabit } from "@/services/weekday-habit.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export default async function HabitPage() {
   if (!user) redirect("/login?from=/inventory/habit");
   if (!can(user.role, "inventory:view")) {
     return (
-      <PageShell user={user} title="عادة البيع">
+      <PageShell user={user} title="نمط البيع">
         <NoAccess what="الجرد" />
       </PageShell>
     );
@@ -56,27 +57,25 @@ export default async function HabitPage() {
     <PageShell
       user={user}
       width="wide"
-      title="عادة البيع"
-      intro="كم يُباع عادةً من كل صنف في كل يوم من أيام الأسبوع. الرقم الكبير هو الوسيط لما بيع فعلاً، وتحته أدنى كمية وأعلاها. هذه عادة البيع وليست توقعاً، وتفيدك في التحضير والطلب."
+      title="نمط البيع"
+      intro="كم يُباع عادةً من كل صنف في كل يوم من أيام الأسبوع. الرقم الكبير هو الوسيط لما بيع فعلاً، وتحته أقل كمية وأكثرها. هذا نمط بيع وليس توقعاً، ويفيدك في التحضير والطلب."
     >
       {!h.ready ? (
         <EmptyState
           icon={CalendarRange}
-          title={`لا يمكن تحديد عادة البيع بعد: ${h.usableWeeks.length} من ${HABIT_MIN_WEEKS} أسابيع`}
-          hint={`تحتاج إلى ${HABIT_MIN_WEEKS} أسابيع على الأقل من آخر ${HABIT_WEEKS} (${formatRange(h.windowStart, h.windowEnd)})، في كل منها ${HABIT_MIN_DAYS_PER_WEEK} أيام بمبيعات مستوردة. ${h.droppedWeeks.length > 0 ? `${h.droppedWeeks.length} منها ناقصة الأيام أو بلا ملف.` : ""}`}
+          title={`لا يمكن تحديد نمط البيع بعد: ${h.usableWeeks.length} من ${HABIT_MIN_WEEKS} أسابيع`}
+          hint={`يلزم ${HABIT_MIN_WEEKS} أسابيع على الأقل من آخر ${HABIT_WEEKS} (${formatRange(h.windowStart, h.windowEnd)})، في كل منها ${HABIT_MIN_DAYS_PER_WEEK} أيام بمبيعات مستوردة. ${h.droppedWeeks.length > 0 ? `${h.droppedWeeks.length} منها ناقصة الأيام أو بلا ملف.` : ""}`}
           action={canImport ? <LinkButton href="/inventory/import" variant="primary" size="sm">استورد مبيعات فودكس</LinkButton> : undefined}
         />
       ) : (
         <>
-          <Callout tone="info" icon={CalendarRange} title={`مبنية على ${h.usableWeeks.length} أسابيع: ${formatRange(h.windowStart, h.windowEnd)}`}>
-            المحسوب هو أسطر المنتجات فقط، دون خيارات الإضافة والمبيعات الملغاة والمرتجعة. اليوم الذي لا توجد فيه أي عملية بيع في الملف لا يدخل الحساب، لأنه يوم مغلق أو بياناته ناقصة. أما اليوم الذي بِيعت فيه أصناف أخرى ولم يُبع هذا الصنف فيُحسب صفراً حقيقياً.
-            {h.droppedWeeks.length > 0 && ` استُبعد ${h.droppedWeeks.length} من أسابيع الفترة لنقص أيامها.`}
-          </Callout>
+          <Callout tone="info" icon={CalendarRange} title={`مبني على ${h.usableWeeks.length} أسابيع: ${formatRange(h.windowStart, h.windowEnd)}`}>
+            <T s="تُحسب أسطر المنتجات فقط، دون الإضافات والمبيعات الملغاة والمرتجعة. اليوم الذي لا توجد فيه أي عملية بيع في الملف لا يدخل الحساب، لأنه يوم إغلاق أو بياناته ناقصة. أما اليوم الذي بيعت فيه أصناف أخرى ولم يُبع فيه هذا الصنف فيُحسب صفراً حقيقياً.{0}" a={[h.droppedWeeks.length > 0 && ` استُبعد ${h.droppedWeeks.length} من أسابيع الفترة لنقص أيامها.`]} /></Callout>
           <div className="mt-5">
             <DataTable columns={columns} rows={h.items.slice(0, SHOWN)} keyOf={(i) => i.itemId} searchOf={(i) => i.itemName} />
           </div>
           {h.items.length > SHOWN && (
-            <p className="mt-3 text-[11px] text-muted">يعرض أكثر {SHOWN} صنفاً مبيعاً من أصل {h.items.length}.</p>
+            <p className="mt-3 text-[11px] text-muted"><T s="يعرض أكثر {0} صنفاً مبيعاً من أصل {1}." a={[SHOWN, h.items.length]} /></p>
           )}
         </>
       )}

@@ -6,6 +6,7 @@ import { request } from "@/lib/http-client";
 import Link from "next/link";
 import { ArrowLeft, CircleAlert, CircleCheck, Eye, FileSpreadsheet, Files, Loader2, PlugZap } from "lucide-react";
 import { buttonClass } from "./ui";
+import { T } from "@/components/i18n/t";
 
 /**
  * رفعُ كتالوج فودكس — ثلاثةُ ملفّاتٍ معاً، ومعاينةٌ قبل الكتابة.
@@ -82,7 +83,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
   if (!canEdit) {
     return (
       <p className="rounded-xl border border-dashed border-line px-5 py-6 text-center text-xs text-muted">
-        رفع الكتالوج يحفظ وصفات تُحسب بها التكلفة، وهو خارج صلاحياتك.
+        رفع الكتالوج يحفظ وصفات تُحسب بها التكلفة، وهذا ليس من صلاحياتك.
       </p>
     );
   }
@@ -116,7 +117,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
             <div className="min-w-0 flex-1 basis-56">
               <p className="text-sm font-bold">{fromFoodics ? "القراءة من فودكس مباشرة" : "اقرأ من فودكس مباشرة"}</p>
               <p className="mt-0.5 text-xs leading-relaxed text-muted">
-                أصناف المخزون والأصناف المباعة والوصفات من فودكس نفسه، دون تصدير أو رفع ملفات. وتظهر لك معاينة قبل الحفظ كما في رفع الملفات.
+                أصناف المخزون والأصناف المباعة والوصفات من فودكس نفسه، بلا تصدير ولا رفع ملفات. وستظهر لك معاينة قبل الحفظ كما في رفع الملفات.
               </p>
             </div>
             <button
@@ -125,7 +126,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
               onClick={() => { setFromFoodics(!fromFoodics); setFiles([]); setResult(null); setError(null); }}
               className={buttonClass(fromFoodics ? "secondary" : "primary", "sm")}
             >
-              {fromFoodics ? "ارفع ملفات بدلاً منه" : "اقرأ من فودكس"}
+              {fromFoodics ? "ارفع الملفات بدلاً من ذلك" : "اقرأ من فودكس"}
             </button>
           </div>
 
@@ -135,7 +136,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
             </span>
             <span className="text-sm font-bold">{files.length > 0 ? "غيّر الملفات" : "اختر ملفات الكتالوج الثلاثة معاً"}</span>
             <span className="max-w-md text-xs leading-relaxed text-muted">
-              أصناف المخزون، والأصناف المباعة، والوصفات. تُرفع معاً لأن الوصفة تربط بين النوعين الأولين. ويُعرف كل ملف بأعمدته لا باسمه.
+              أصناف المخزون، والأصناف المباعة، والوصفات. تُرفع معاً لأن الوصفة تربط بين النوعين الأولين. ويُعرف كل ملف من أعمدته لا من اسمه.
             </span>
             <input
               type="file" multiple accept=".csv,.xlsx,.xls,text/csv"
@@ -163,15 +164,14 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
               })}
               {files.length < 3 && (
                 <li className="flex items-center text-[11px] text-warn">
-                  {files.length === 1 ? "ملف واحد" : "ملفان"} من ثلاثة. الوصفات تحتاج الملفات الثلاثة.
-                </li>
+                  <T s="{0} من ثلاثة، والوصفات تحتاج الملفات الثلاثة." a={[files.length === 1 ? "ملف واحد" : "ملفان"]} /></li>
               )}
             </ul>
           )}
 
           <label className="mt-4 block">
             <span className="block text-[11px] font-medium text-muted">
-              تسري الوصفات الجديدة اعتباراً من تاريخ (يُفضَّل أول أسبوع قادم)، وما مضى يُحسب بوصفاته السابقة
+              تسري الوصفات الجديدة ابتداءً من تاريخ (والأفضل أول الأسبوع القادم)، وما مضى يُحسب بوصفاته السابقة
             </span>
             <input
               type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)}
@@ -187,7 +187,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
               /* بعد المعاينة الفعلُ التالي هو التنفيذ — فلا زرّان رئيسيّان متجاوران */
               className={buttonClass(result?.dryRun ? "secondary" : "primary")}
             >
-              {busy === "preview" ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />جارٍ الحساب…</> : result?.dryRun ? "أعد المعاينة" : "اعرض ما سيحدث"}
+              {busy === "preview" ? <><T s="{0}يحسب…" a={[<Loader2 key="0" className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />]} /></> : result?.dryRun ? "أعد المعاينة" : "اعرض ما سيحدث"}
             </button>
             {result?.dryRun && (
               <button
@@ -196,7 +196,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
                 disabled={busy !== null}
                 className={buttonClass("primary")}
               >
-                {busy === "commit" ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />جارٍ الحفظ…</> : "نفّذ الاستيراد"}
+                {busy === "commit" ? <><T s="{0}يحفظ…" a={[<Loader2 key="0" className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />]} /></> : "نفّذ الاستيراد"}
               </button>
             )}
             {files.length === 0 && !fromFoodics && !committed && <span className="text-[11px] text-muted">لا يُحفظ شيء قبل أن ترى ما سيحدث.</span>}
@@ -205,7 +205,7 @@ export function CatalogImport({ canEdit, defaultFrom }: { canEdit: boolean; defa
           {error && (
             <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2.5 text-xs leading-relaxed text-danger">
               <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-              <span>{error}. لم يُحفظ شيء.</span>
+              <span><T s="{0}. لم يُحفظ شيء." a={[error]} /></span>
             </p>
           )}
         </div>
@@ -240,8 +240,7 @@ function CatalogOutcome({ result }: { result: CatalogResult }) {
         </div>
         {!result.dryRun && (
           <Link href="/inventory/import#sales" className={buttonClass("primary", "sm")}>
-            التالي: ارفع المبيعات <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          </Link>
+            <T s="التالي: ارفع المبيعات {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
         )}
       </div>
 
@@ -252,7 +251,7 @@ function CatalogOutcome({ result }: { result: CatalogResult }) {
         <Fact label="أصناف مباعة محدَّثة" value={result.menuProducts.updated} />
         <Fact label="وصفات حُفظت" value={result.recipes.written} />
         <Fact label="لم تتغيّر" value={result.recipes.unchanged} />
-        <Fact label="وصفات كتبتها بيدك (لم تُعدَّل)" value={result.recipes.skippedHuman} />
+        <Fact label="وصفات كتبتها بيدك (لم تُغيَّر)" value={result.recipes.skippedHuman} />
         <Fact
           label="تعذّر استيرادها"
           value={result.recipes.blocked}
@@ -263,8 +262,7 @@ function CatalogOutcome({ result }: { result: CatalogResult }) {
       {linked.length > 0 && (
         <div className="mt-3 rounded-lg border border-warn/25 bg-warn-bg px-3 py-2">
           <p className="text-[11px] font-bold text-warn">
-            رُبطت بأصناف موجودة بالاسم نفسه ({linked.length}). راجعها
-          </p>
+            <T s="رُبطت بأصناف موجودة بالاسم نفسه ({0})، فراجعها" a={[linked.length]} /></p>
           <ul className="mt-1 space-y-0.5 text-[11px] text-warn">
             {linked.map((c) => <li key={c.sku}>{c.name}</li>)}
           </ul>
@@ -274,8 +272,7 @@ function CatalogOutcome({ result }: { result: CatalogResult }) {
       {skipped.length > 0 && (
         <details className="mt-3">
           <summary className="cursor-pointer text-xs font-bold">
-            وصفات كتبها إنسان بيده، ولم يُكتب فوقها ({skipped.length})
-          </summary>
+            <T s="وصفات كتبها أحدكم بيده، فلم يُكتب فوقها ({0})" a={[skipped.length]} /></summary>
           <ul className="mt-2 space-y-0.5 text-[11px] text-muted">
             {skipped.map((c) => <li key={c.sku}>{c.name}</li>)}
           </ul>
@@ -295,8 +292,7 @@ function CatalogOutcome({ result }: { result: CatalogResult }) {
       {result.files.some((f) => f.issues.length > 0) && (
         <details className="mt-3">
           <summary className="cursor-pointer text-xs font-bold">
-            صفوف لم تُقرأ ({result.files.reduce((s, f) => s + f.issues.length, 0)})
-          </summary>
+            <T s="صفوف لم تُقرأ ({0})" a={[result.files.reduce((s, f) => s + f.issues.length, 0)]} /></summary>
           <ul className="mt-2 space-y-1 text-[11px] text-muted">
             {result.files.flatMap((f) => f.issues.map((i) => (
               <li key={`${f.fileName}-${i.row}`}>

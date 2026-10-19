@@ -25,6 +25,6 @@ describe("الجرد المقفل يقول إن تغيّر ما تحته", () =>
       await tx.execute(sql`update sales_imports set created_at = now() + interval '1 hour' where file_name = 'late.xlsx'`);
 
       const stale = await changesSinceFinalise((await loadCountHeader(countId, tx))!, tx);
-      expect(stale.map((r) => r.label)).toEqual(["ملف مبيعات لأيامه استُورد بعد الإقفال"]);
+      expect(stale.map((r) => r.label)).toEqual(["استُورد بعد الإقفال ملف مبيعات لأيامه"]);
     }));
 });

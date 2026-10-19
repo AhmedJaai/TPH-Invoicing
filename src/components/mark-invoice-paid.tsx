@@ -10,6 +10,7 @@ import { todayInRiyadh, addDays } from "@/lib/riyadh-time";
 import { ACT } from "@/lib/ui-terms";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * «سجّل أنّها سُدّدت» — في صفحة الفواتير وملفّ الفاتورة.
@@ -78,7 +79,7 @@ function describePreview(p: Preview): string[] {
       + (moved ? ` وتُخصم من: ${moved}` : ""),
     );
   }
-  if (p.creditLeftMinor > 0) parts.push(`ويبقى لك رصيد عند المورّد بمبلغ ${formatRiyalsDisplay(p.creditLeftMinor)}`);
+  if (p.creditLeftMinor > 0) parts.push(`ويبقى لك عند المورّد رصيد بمبلغ ${formatRiyalsDisplay(p.creditLeftMinor)}`);
   return parts;
 }
 
@@ -152,7 +153,7 @@ export function MarkInvoicePaid({
       `marked: 0` حين لا يجد فاتورةً تنطبق.
     */
     if (r.data.marked === 0) {
-      setMessage("لم يُسجَّل شيء، فقد تكون الفاتورة مسدّدة أصلاً. حدّث الصفحة.");
+      setMessage("لم يُسجَّل شيء، فربما الفاتورة مسدّدة أصلاً. حدّث الصفحة.");
       setState("choose");
       return;
     }
@@ -209,9 +210,7 @@ export function MarkInvoicePaid({
           onClick={() => setState("choose")}
           className={panel ? `${buttonClass("primary", "md")} w-full sm:w-auto` : buttonClass("secondary", "sm")}
         >
-          <Banknote className="h-4 w-4" strokeWidth={2} aria-hidden />
-          سجّل الفاتورة مسدّدة
-        </button>
+          <T s="{0}سجّل الفاتورة مسدّدة" a={[<Banknote key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></button>
       )}
 
       {(state === "choose" || state === "previewing") && (
@@ -229,7 +228,7 @@ export function MarkInvoicePaid({
               <Choice
                 icon={Landmark}
                 title="حوالة من حساب المقهى"
-                hint="تُسجَّل دفعة، وتُطابق عند وصول كشف البنك."
+                hint="تُسجَّل دفعة، وتُطابَق حين يصل كشف البنك."
                 disabled={state === "previewing"}
                 onClick={() => setState("confirm-bank")}
               />
@@ -267,12 +266,10 @@ export function MarkInvoicePaid({
       {(state === "confirm-bank" || (state === "busy" && !preview)) && (
         <div className={panel ? "rounded-xl border border-line bg-sunken/60 p-3.5" : "flex flex-wrap items-center justify-end gap-1.5"}>
           <p className={panel ? "text-xs leading-relaxed text-ink-soft" : "text-[11px] text-muted"}>
-            ستُنشأ دفعة بمبلغ <bdi className="nums font-bold text-ink">{label}</bdi> وتُخصَّص للفاتورة، ويمكنك التراجع من الإشعار.
-          </p>
+            <T s="ستُنشأ دفعة بمبلغ {0} وتُخصَّص للفاتورة، ويمكنك التراجع من الإشعار." a={[<bdi key="0" className="nums font-bold text-ink">{label}</bdi>]} /></p>
           <div className={panel ? "mt-3 flex flex-wrap items-center gap-2" : "flex flex-wrap items-center justify-end gap-1.5"}>
             <label className="flex items-center gap-1.5 text-[11px] font-bold text-ink-soft">
-              يوم السداد
-              <input
+              <T s="يوم السداد{0}" a={[<input key="0"
                 type="date"
                 dir="ltr"
                 value={paidOn}
@@ -281,8 +278,7 @@ export function MarkInvoicePaid({
                 onChange={(e) => { setPaidOn(e.target.value); setTwin(false); setMessage(null); }}
                 aria-invalid={!dayOk}
                 className="nums h-9 rounded-lg border border-line-input bg-raised px-2 text-xs font-normal text-ink"
-              />
-            </label>
+              />]} /></label>
             {paidOn !== today && (
               <button type="button" disabled={state === "busy"} onClick={() => { setPaidOn(today); setTwin(false); }} className={buttonClass("quiet", "sm")}>اليوم</button>
             )}
@@ -340,7 +336,7 @@ function Choice({
         <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
       </span>
       <span className="min-w-0">
-        <span className="block text-[13px] font-bold">{busy ? "جارٍ حساب ما سيتغيّر…" : title}</span>
+        <span className="block text-[13px] font-bold">{busy ? "يحسب ما سيتغيّر…" : title}</span>
         <span className="mt-0.5 block text-[11px] leading-relaxed text-muted">{hint}</span>
       </span>
     </button>

@@ -45,7 +45,7 @@ function Row({ row: r, role }: { row: ChoiceRow; role: Role }) {
               <span className="block text-sm font-bold"><Money minor={r.effectMinor} signed /></span>
             </>
           ) : (
-            <span className="block text-[11px] text-muted">لا يوجد أثر يُحسب بالريال</span>
+            <span className="block text-[11px] text-muted">لا أثر له يُحسب بالريال</span>
           )}
         </div>
       </div>
@@ -56,7 +56,7 @@ function Row({ row: r, role }: { row: ChoiceRow; role: Role }) {
       )}
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
         {r.revoke && can(role, r.revoke.needs) && (
-          <PostAction url={r.revoke.url} body={r.revoke.body} variant="secondary" done="تم سحب الاختيار">
+          <PostAction url={r.revoke.url} body={r.revoke.body} variant="secondary" done="سُحب الاختيار">
             <Undo2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
             {r.revoke.label}
           </PostAction>
@@ -95,22 +95,22 @@ export default async function ChoicesPage() {
     <PageShell
       user={user}
       title="ما قرّرته"
-      intro="كل ما اخترته أو كتبته بنفسك، مع حالته اليوم وأثره بالريال حيث يمكن حسابه وزر سحبه. لا يتوقف أي اختيار منها بصمت، وما لا يُطبَّق منها يظهر هنا مع سببه."
+      intro="كل ما اخترته أو كتبته بنفسك، مع حالته اليوم، وأثره بالريال حيث يمكن حسابه، وزر سحبه. لا يتوقف أي اختيار بصمت، وما لا يُطبَّق منها يظهر هنا مع سببه."
     >
       {ledger.total === 0 ? (
         <EmptyState
           icon={ListChecks}
           title="لم تتخذ أي قرار بنفسك بعد."
-          hint="عندما تضيف حركة إلى الإقرار، أو تغلق تنبيهاً، أو تكتب سياسة لمورّد أو قاعدة تصنيف، يظهر قرارك هنا مع تاريخه وأثره."
+          hint="حين تضيف حركة إلى الإقرار، أو تغلق تنبيهاً، أو تكتب سياسة لمورّد أو قاعدة تصنيف، يظهر قرارك هنا مع تاريخه وأثره."
         />
       ) : (
         <>
           {ledger.notApplied.length > 0 ? (
-            <Callout tone="warn" icon={CircleSlash} title={`اختيارات لا تُطبَّق الآن: ${countNoun(ledger.notApplied.length, ITEM)}`}>
-              هذه اختيارات اخترتها لكنها لا تعمل اليوم. ستجد سبب كل منها في قسمه أدناه وقد وُضعت في أوله. اختيارك محفوظ كما هو، فاسحبه أو عالج السبب.
+            <Callout tone="warn" icon={CircleSlash} title={`اختيارات لا تعمل الآن: ${countNoun(ledger.notApplied.length, ITEM)}`}>
+              اخترتها لكنها لا تعمل اليوم. سبب كل منها في أول قسمه أدناه. اختيارك محفوظ كما هو، فاسحبه أو عالج السبب.
             </Callout>
           ) : (
-            <Callout tone="ok" icon={CircleCheck} title={`${countNoun(ledger.total, ITEM)}: كلها تعمل كما اخترت أو مقفلة بإقرار سابق`} />
+            <Callout tone="ok" icon={CircleCheck} title={`${countNoun(ledger.total, ITEM)}: كلها تعمل كما اخترت، أو مقفلة بإقرار سابق`} />
           )}
 
           {ledger.byGroup.map((g) => (
@@ -122,7 +122,7 @@ export default async function ChoicesPage() {
           ))}
 
           {ledger.olderVatChoices.count > 0 && (
-            <Section title="اختيارات إقرارات سابقة" hint="هذه أرباع سابقة لا يُعاد حسابها هنا، وتُفتح من صفحة إقرارها.">
+            <Section title="اختيارات إقرارات سابقة" hint="أرباع سابقة لا يُعاد حسابها هنا، وتُفتح من صفحة إقرارها.">
               <div className="flex flex-wrap gap-2">
                 {ledger.olderVatChoices.quarters.map((q) => (
                   <LinkButton key={q.key} href={`/close/vat?period=${q.key}`} size="sm">{q.label}</LinkButton>

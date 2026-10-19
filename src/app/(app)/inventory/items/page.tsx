@@ -14,6 +14,7 @@ import { formatBp } from "@/lib/inventory/equation";
 import { RetireItem } from "@/components/retire-item";
 import { DirectionTag, RECIPE } from "@/components/inventory-ui";
 import { PRODUCT, TIME, countNoun } from "@/lib/arabic";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -111,7 +112,7 @@ export default async function InventoryItemsPage({
       cell: (r) => (
         <span className="block min-w-0">
           <Link href={`/inventory/items/${r.id}`} className="font-bold hover:text-accent" dir="auto">{r.name}</Link>
-          <span className="mt-0.5 block text-[11px] font-normal text-muted">{r.categoryLabel} · يُعدّ بوحدة {r.unitLabel}</span>
+          <span className="mt-0.5 block text-[11px] font-normal text-muted"><T s="{0} · يُعدّ بوحدة {1}" a={[r.categoryLabel, r.unitLabel]} /></span>
         </span>
       ),
     },
@@ -120,7 +121,7 @@ export default async function InventoryItemsPage({
       cell: (r) => (
         r.inRecipes === 0
           /* الشارةُ بابٌ إلى علاجها — الوصفات، لا خبرٌ يقف */
-          ? <Link href="/inventory/recipes" className="relative z-10 inline-flex"><Badge tone="warn" dot>لا توجد وصفة تستخدمه، اكتب وصفة</Badge></Link>
+          ? <Link href="/inventory/recipes" className="relative z-10 inline-flex"><Badge tone="warn" dot>لا توجد وصفة تستخدمه، أضف وصفة</Badge></Link>
           : <span className="text-ink-soft">{countNoun(r.inRecipes, RECIPE)}</span>
       ),
     },
@@ -162,17 +163,17 @@ export default async function InventoryItemsPage({
       user={user}
       width="wide"
       title="الأصناف"
-      intro="الأصناف التي تُعدّ على الرف ووحدة قياس كل منها. الصنف الذي لا توجد له وصفة لا يُحسب له استهلاك متوقع، فيظهر كل ما اشتريته منه فرقاً."
+      intro="الأصناف التي تُعدّ على الرف ووحدة قياس كل منها. الصنف الذي ليست له وصفة لا يُحسب له استهلاك متوقع، فيظهر كل ما اشتريته منه فرقاً."
     >
       {all.length > 0 && noRecipe.length === all.length && (
         <Callout
           tone="warn"
           icon={BookOpen}
           className="mb-6"
-          title="لا توجد وصفة لأي صنف هنا بعد"
+          title="لا توجد بعد وصفة لأي صنف هنا"
           action={canEdit ? <LinkButton href="/inventory/import#catalog" variant="primary" size="sm">ارفع كتالوج فودكس</LinkButton> : undefined}
         >
-          هذه أصناف أنشأتها فواتير المورّدين. وبدون وصفات لا يعرف النظام ما صُرف منها، وكتالوج فودكس ينشئ كل الوصفات دفعة واحدة.
+          هذه أصناف أُنشئت من فواتير المورّدين. وبدون وصفات لا يعرف النظام ما صُرف منها، وكتالوج فودكس ينشئ كل الوصفات دفعة واحدة.
         </Callout>
       )}
 
@@ -201,15 +202,15 @@ export default async function InventoryItemsPage({
             <EmptyState
               icon={Package}
               title="لا توجد أصناف مخزون مسجّلة بعد."
-              hint="كتالوج فودكس ينشئ أصناف المخزون ووصفاتها دفعة واحدة. كما تُنشأ أصناف من بنود فواتير المورّدين عند ربطها."
+              hint="كتالوج فودكس ينشئ أصناف المخزون ووصفاتها دفعة واحدة، كما تُنشأ أصناف من بنود فواتير المورّدين عند ربطها."
               action={canEdit ? <LinkButton href="/inventory/import#catalog" variant="primary" size="sm">ارفع كتالوج فودكس</LinkButton> : undefined}
             />
           ) : (
             <EmptyState
               compact
               icon={Package}
-              title={show === "norecipe" ? "لكل صنف وصفة." : "عُدّ كل صنف مرة واحدة على الأقل."}
-              hint={`مجموع الأصناف ${countNoun(all.length, PRODUCT)}، وتجدها كلها في تبويب «الكل».`}
+              title={show === "norecipe" ? "كل صنف له وصفة." : "عُدّ كل صنف مرة واحدة على الأقل."}
+              hint={`عدد الأصناف ${countNoun(all.length, PRODUCT)}، وتجدها كلها في تبويب «الكل».`}
             />
           )
         }

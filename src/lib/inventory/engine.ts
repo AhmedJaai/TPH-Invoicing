@@ -37,10 +37,10 @@ import { MS_PER_DAY, isoDay } from "@/lib/riyadh-time";
 export type ValuationBasis = "PERIOD_WEIGHTED_AVERAGE" | "LATEST_KNOWN" | "CATALOG" | "UNKNOWN";
 
 export const VALUATION_LABEL: Record<ValuationBasis, string> = {
-  PERIOD_WEIGHTED_AVERAGE: "مُقيَّم بمتوسط سعر شراء الفترة",
-  LATEST_KNOWN: "مُقيَّم بآخر تكلفة معروفة لعدم وجود شراء في الفترة",
-  CATALOG: "مُقيَّم بتكلفة الكتالوج المعيارية لعدم وجود فاتورة لهذا الصنف",
-  UNKNOWN: "لا توجد تكلفة معروفة، فلم يُقيَّم",
+  PERIOD_WEIGHTED_AVERAGE: "مقوَّم بمتوسط سعر شراء الفترة",
+  LATEST_KNOWN: "مقوَّم بآخر تكلفة معروفة، لأنه لا شراء في الفترة",
+  CATALOG: "مقوَّم بتكلفة الكتالوج المعيارية، لأنه لا فاتورة لهذا الصنف",
+  UNKNOWN: "لا تكلفة معروفة، فلم يُقوَّم",
 };
 
 /**
@@ -72,16 +72,16 @@ export type LineFlag =
   | "SUPPLIER_RETURN";
 
 export const FLAG_LABEL: Record<LineFlag, string> = {
-  OPENING_UNKNOWN: "الرصيد الافتتاحي غير معروف: لا يوجد جرد سابق ولا رصيد مكتوب",
+  OPENING_UNKNOWN: "الرصيد الافتتاحي غير معروف: لا جرد سابق ولا رصيد مكتوب",
   PURCHASES_UNKNOWN: "في مشتريات الفترة بنود كميتها غير معروفة",
-  CONSUMPTION_UNKNOWN: "الاستهلاك المتوقع غير محسوب: لا توجد وصفة تستخدم هذا الصنف",
+  CONSUMPTION_UNKNOWN: "الاستهلاك المتوقع غير محسوب: لا وصفة تستخدم هذا الصنف",
   COST_UNKNOWN: "تكلفة الوحدة غير معروفة، فلا تُحسب تكلفة الفرق",
   NOT_COUNTED: "لم يُدخل جرد فعلي بعد",
   UNIT_CONFLICT: "ذُكر في الوصفات بوحدتين من نوعين مختلفين",
   RECIPE_UNIT_MISMATCH: "وحدة الوصفة لا يمكن تحويلها إلى وحدة الصنف",
-  OUT_OF_SCOPE: "مستبعد من هذا الجرد باختيارك، فحركاته محسوبة وليس له فرق",
-  RECEIPT_POSSIBLE_DUPLICATE: "كمية مستلمة قد تكون نفسها بند فاتورة، فالمشتريات غير معروفة حتى تحسم الأمر",
-  SUPPLIER_RETURN: "في مشترياته مرتجع للمورّد (بند فاتورة بكمية سالبة)، وقد خُصم منها",
+  OUT_OF_SCOPE: "مستبعد من هذا الجرد باختيارك، فحركاته محسوبة ولا فرق له",
+  RECEIPT_POSSIBLE_DUPLICATE: "كمية مستلمة قد تكون هي بند فاتورة، فالمشتريات غير معروفة حتى تقرّر",
+  SUPPLIER_RETURN: "في مشترياته مرتجع إلى المورّد (بند فاتورة بكمية سالبة)، وقد خُصم منها",
 };
 
 /** مصدرُ الرصيد الافتتاحيّ — بترتيبٍ ثابت لا تتنافس فيه المصادر. */

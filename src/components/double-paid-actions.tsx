@@ -6,6 +6,7 @@ import { Check, CircleAlert, MessageCircle, RotateCcw } from "lucide-react";
 import { buttonClass } from "./ui";
 import { ConfirmAction, toast } from "./ui-client";
 import { postJson } from "@/lib/http-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * أفعالُ «سُدّد مرّتين» — رسالة المطالبة، ثمّ قرارُ صاحب العمل.
@@ -54,8 +55,8 @@ export function DoublePaidActions({
       const previous: Decision | "OPEN" = decision ?? "OPEN";
       toast({
         tone: next === "OPEN" ? "info" : "ok",
-        title: r.data.message ?? "تم الحفظ",
-        body: "سُجّل القرار في سجل التدقيق باسمك.",
+        title: r.data.message ?? "حُفظ",
+        body: "سُجّل قرارك في سجل التدقيق باسمك.",
         undo: {
           run: async () => {
             const u = await send(previous);
@@ -83,20 +84,16 @@ export function DoublePaidActions({
             rel="noopener noreferrer"
             className={buttonClass(decision === null ? "primary" : "secondary", "sm")}
           >
-            <MessageCircle className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            رسالة مطالبة (واتساب)
-          </a>
+            <T s="{0}رسالة مطالبة (واتساب)" a={[<MessageCircle key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
         )}
         {canEdit && decision === null && (
           <button aria-busy={busy === "CLAIMED"} type="button" disabled={busy !== null} onClick={() => void decide("CLAIMED")} className={buttonClass("secondary", "sm")}>
-            تمت مطالبة الجهة
+            طالبتَ الجهة
           </button>
         )}
         {canEdit && !closed && (
           <button aria-busy={busy === "RECOVERED"} type="button" disabled={busy !== null} onClick={() => void decide("RECOVERED")} className={buttonClass("secondary", "sm")}>
-            <Check className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-            تم استرداد المال
-          </button>
+            <T s="{0}استُرد المال" a={[<Check key="0" className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />]} /></button>
         )}
         {canEdit && !closed && (
           <ConfirmAction
@@ -104,8 +101,8 @@ export function DoublePaidActions({
             variant="quiet"
             tone="warn"
             title="ليس سداداً مزدوجاً؟"
-            consequence="يختفي هذا التنبيه من «يحتاج قرارك» ولن تُطالَب الجهة بالمال. استخدمه فقط إذا كانت العمليتان مستحقتين فعلاً، كفاتورتين بالمبلغ نفسه مثلاً. يُسجَّل قرارك في سجل التدقيق باسمك، ويمكنك إعادة فتح التنبيه لاحقاً."
-            acknowledgement="تحققت أن المبلغ دُفع مرتين عن استحقاق فعلي"
+            consequence="يختفي هذا التنبيه من «يحتاج قرارك» ولن تُطالَب الجهة بالمال. استخدمه فقط إن كانت العمليتان مستحقتين فعلاً، كفاتورتين بالمبلغ نفسه. يُسجَّل قرارك في سجل التدقيق باسمك، ويمكنك إعادة فتح التنبيه لاحقاً."
+            acknowledgement="تأكدت أن المبلغ دُفع مرتين عن استحقاقين فعليين"
             confirmLabel="نعم، ليس مكرراً"
             disabled={busy !== null}
             onConfirm={() => decide("NOT_DUPLICATE")}
@@ -113,9 +110,7 @@ export function DoublePaidActions({
         )}
         {canEdit && decision !== null && (
           <button aria-busy={busy === "OPEN"} type="button" disabled={busy !== null} onClick={() => void decide("OPEN")} className={buttonClass("quiet", "sm")}>
-            <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            أعد فتح التنبيه
-          </button>
+            <T s="{0}أعد فتح التنبيه" a={[<RotateCcw key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
         )}
       </div>
       {error && (

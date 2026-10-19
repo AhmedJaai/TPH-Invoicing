@@ -36,11 +36,11 @@ export async function resolveBounce(
   const gapDays = (back.valueDate.getTime() - out.valueDate.getTime()) / MS_PER_DAY;
   if (out.direction !== "DEBIT" || back.direction !== "CREDIT" || out.amountMinor !== back.amountMinor
     || gapDays <= 0 || gapDays > REVERSAL_WINDOW_DAYS + 1) {
-    throw new BounceRefused("الحركتان ليستا خروج مبلغ وعودته نفسه خلال المدة المحددة");
+    throw new BounceRefused("الحركتان ليستا خروج مبلغ ثم عودته نفسه خلال المدة المحددة");
   }
   const key = reversalKey(out.id, back.id);
   const [already] = await tx.select({ key: alertResolutions.key }).from(alertResolutions).where(eq(alertResolutions.key, key));
-  if (already) throw new BounceRefused("سبق حسم هذا القرار. حدّث الصفحة");
+  if (already) throw new BounceRefused("قُرّر في هذا من قبل. حدّث الصفحة");
 
   let freedInvoices = 0;
   if (input.decision === "BOUNCED") {

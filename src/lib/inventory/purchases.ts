@@ -67,7 +67,7 @@ export type PurchaseGapReason =
 
 export const PURCHASE_GAP_LABEL: Record<PurchaseGapReason, string> = {
   UNLINKED_PRODUCT: "بند غير مربوط بصنف معياري",
-  NO_PACK_SPEC: "مواصفة عبوة المورّد غير معروفة، فالكمية غير معروفة",
+  NO_PACK_SPEC: "مواصفات عبوة المورّد غير معروفة، فالكمية غير معروفة",
   MISSING_QUANTITY: "الكمية غير مقروءة في الفاتورة",
   UNIT_FAMILY_MISMATCH: "وحدة العبوة لا يمكن تحويلها إلى وحدة الصنف (وزن مقابل حجم)",
 };

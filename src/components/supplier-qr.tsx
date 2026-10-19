@@ -4,6 +4,7 @@ import { QrCode } from "lucide-react";
 import { db } from "@/db";
 import { INVOICE, countNoun } from "@/lib/arabic";
 import { checkedCount, isStoredQrStatus, qrCoverage } from "@/lib/extraction/qr-coverage";
+import { T } from "@/components/i18n/t";
 
 /**
  * «الفوترة الإلكترونيّة: ١٤ من ١٦ برمز» في ملفّ المورّد (`lib/extraction/qr-coverage.ts`).
@@ -28,16 +29,10 @@ export async function SupplierQrLine({ supplierId, slug }: { supplierId: string;
       <span className="min-w-0 flex-1">
         <span className="font-bold text-ink">رمز الفاتورة الإلكترونية: </span>
         {checked === 0 ? (
-          <>غير معروف: {countNoun(c.invoices, INVOICE)} ضريبية قُرئت قبل أن يُحفظ دليل الرمز. أعد قراءة واحدة منها ليُفحص رمزها.</>
+          <><T s="غير معروف: {0} ضريبية قُرئت قبل أن يُحفظ دليل الرمز. أعد قراءة واحدة منها ليُفحص رمزها." a={[countNoun(c.invoices, INVOICE)]} /></>
         ) : (
           <>
-            <bdi className="nums font-bold text-ink">{c.withQr}</bdi> من <bdi className="nums">{checked}</bdi> فاتورة مفحوصة تحمل رمزاً مقروءاً
-            {c.phase2 > 0 && <> (منها <bdi className="nums">{c.phase2}</bdi> بتوقيع المرحلة الثانية)</>}
-            {c.withoutQr > 0 && <span className="font-bold text-warn"> · <bdi className="nums">{c.withoutQr}</bdi> بلا رمز</span>}
-            {c.foreignQr > 0 && <> · <bdi className="nums">{c.foreignQr}</bdi> برمز ليس رمز الهيئة</>}
-            {c.unchecked > 0 && <span className="text-muted"> · <bdi className="nums">{c.unchecked}</bdi> لم تُفحص</span>}
-            .
-          </>
+            <T s="{0} من {1} فاتورة مفحوصة تحمل رمزاً مقروءاً{2}{3}{4}{5}." a={[<bdi key="0" className="nums font-bold text-ink">{c.withQr}</bdi>, <bdi key="1" className="nums">{checked}</bdi>, c.phase2 > 0 && <> <T s=" (منها {0} بتوقيع المرحلة الثانية)" a={[<bdi key="0" className="nums">{c.phase2}</bdi>]} /></>, c.withoutQr > 0 && <span className="font-bold text-warn"> <T s=" · {0} بلا رمز" a={[<bdi key="0" className="nums">{c.withoutQr}</bdi>]} /></span>, c.foreignQr > 0 && <> <T s=" · {0} برمز ليس رمز الهيئة" a={[<bdi key="0" className="nums">{c.foreignQr}</bdi>]} /></>, c.unchecked > 0 && <span className="text-muted"> <T s=" · {0} لم تُفحص" a={[<bdi key="0" className="nums">{c.unchecked}</bdi>]} /></span>]} /></>
         )}{" "}
         <Link href={`/purchases/invoices?supplier=${slug}`} className="font-bold text-accent hover:underline">فواتيره</Link>
       </span>

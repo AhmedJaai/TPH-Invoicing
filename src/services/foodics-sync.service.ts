@@ -78,7 +78,7 @@ async function writeOrders(orders: readonly FoodicsOrder[], actorId: string | nu
     const m = mirrorOrder(o);
     if (m === null) {
       counts.rejected++;
-      counts.problems.push(`الطلب ${o.reference}: تعذّرت قراءة إجماليه أو دفعته، ولم يُسجَّل في بيانات فودكس`);
+      counts.problems.push(`الطلب ${o.reference}: تعذّرت قراءة إجماليه أو دفعته، فلم يُسجَّل في بيانات فودكس`);
       return [];
     }
     return [m];
@@ -230,7 +230,7 @@ export async function syncPurchases(counts: SyncCounts): Promise<void> {
       const row = purchaseRow(tx);
       if (row === null) {
         counts.rejected++;
-        counts.problems.push(`حركة الشراء ${tx.reference}: تعذّرت قراءة الكمّية أو التكلفة، ولم تُسجَّل في بيانات فودكس`);
+        counts.problems.push(`حركة الشراء ${tx.reference}: تعذّرت قراءة الكمية أو التكلفة، فلم تُسجَّل في بيانات فودكس`);
         return [];
       }
       return [row];
@@ -301,7 +301,7 @@ export async function syncStockCounts(counts: SyncCounts): Promise<void> {
     const row = stockCountRow(c);
     if (row === null) {
       counts.rejected++;
-      counts.problems.push(`الجرد ${c.reference}: تعذّرت قراءة الكمّية، ولم يُسجَّل في بيانات فودكس`);
+      counts.problems.push(`الجرد ${c.reference}: تعذّرت قراءة الكمية، فلم يُسجَّل في بيانات فودكس`);
       return [];
     }
     return [row];
@@ -349,7 +349,7 @@ export async function syncItemMoves(from: string, to: string, counts: SyncCounts
     const { rows, unread } = aggregateMoves(moves);
     if (unread > 0) {
       counts.rejected += unread;
-      counts.problems.push(`${unread} بند صرف في ${day} تعذّرت قراءة كمّيته أو تكلفته`);
+      counts.problems.push(`${unread} بند صرف في ${day} تعذّرت قراءة كميته أو تكلفته`);
     }
     await db.transaction(async (t) => {
       await t.delete(foodicsItemMoves).where(eq(foodicsItemMoves.businessDate, day));
@@ -495,8 +495,8 @@ export async function fetchFoodicsCatalog(): Promise<{ file: { fileName: string 
   ]);
   const stock = catalogItemsFromApi(items.items);
   const menu = catalogProductsFromApi(products.items);
-  if (items.rejected > 0) stock.warnings.push(`${items.rejected} صنف مخزون بصيغة غير معروفة، ولم يُقرأ.`);
-  if (products.rejected > 0) menu.products.warnings.push(`${products.rejected} صنفاً مباعاً بصيغة غير معروفة، ولم يُقرأ.`);
+  if (items.rejected > 0) stock.warnings.push(`${items.rejected} صنف مخزون بصيغة غير معروفة، فلم يُقرأ.`);
+  if (products.rejected > 0) menu.products.warnings.push(`${products.rejected} صنفاً مباعاً بصيغة غير معروفة، فلم يُقرأ.`);
   return [
     { file: { fileName: "فودكس · أصناف المخزون" }, result: stock },
     { file: { fileName: "فودكس · الأصناف المباعة" }, result: menu.products },

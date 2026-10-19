@@ -16,6 +16,7 @@ import { storedUnitLabel } from "@/lib/unit-conversion";
 import { Money } from "@/components/money";
 import { declaredCostDisagrees } from "@/lib/inventory/recipe-cost";
 import { todayInRiyadh } from "@/lib/riyadh-time";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,7 @@ export default async function RecipesPage() {
       user={user}
       width="wide"
       title="الوصفات"
-      intro="الكمية التي تخرج من الرف مقابل كل منتج يُباع. كل تعديل يُحفظ كنسخة جديدة بتاريخها، فتبقى تقارير الفترات السابقة كما حُسبت."
+      intro="الكمية التي تخرج من الرف لكل منتج يُباع. كل تعديل يُحفظ نسخةً جديدة بتاريخها، فتبقى تقارير الفترات السابقة كما حُسبت."
       actions={canWriteManually && rows.length > 0 ? (
         <RecipeEditor
           menuProducts={menuProducts.map((p) => ({ id: p.id, name: p.nameAr }))}
@@ -109,7 +110,7 @@ export default async function RecipesPage() {
           </span>
           <h2 className="mt-4 text-lg font-bold">لا توجد وصفات مسجّلة بعد</h2>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-ink-soft">
-            بدون وصفات لا يعرف النظام ما صرفته المبيعات، فلا يستطيع حساب فرق الجرد. وكتالوج فودكس ينشئها كلها دفعة واحدة، مع أصناف المخزون والأصناف المباعة وربطها بنقاط البيع.
+            بدون وصفات لا يعرف النظام ما استهلكته المبيعات، فلا يستطيع حساب فرق الجرد. وكتالوج فودكس ينشئها كلها دفعة واحدة، مع أصناف المخزون والأصناف المباعة وربطها بنقاط البيع.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-2">
             <LinkButton href="/inventory/import#catalog" variant="primary" icon={Upload}>ارفع كتالوج فودكس</LinkButton>
@@ -127,8 +128,8 @@ export default async function RecipesPage() {
           {!canWriteManually && (
             <p className="mx-auto mt-4 max-w-md text-[11px] leading-relaxed text-muted">
               {menuProducts.length === 0
-                ? "ولا يوجد منتج مباع مسجّل لتكتب له وصفة يدوياً. الكتالوج ينشئ المنتجات المباعة."
-                : "ولا يوجد صنف مخزون يصلح مكوّناً بعد."}
+                ? "ولا يوجد منتج مباع مسجّل لتكتب له وصفة يدوياً، فالكتالوج هو الذي ينشئ المنتجات المباعة."
+                : "ولا يوجد بعد صنف مخزون يصلح مكوّناً."}
             </p>
           )}
         </section>
@@ -138,7 +139,7 @@ export default async function RecipesPage() {
             <div className="mb-8 grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
               {missing.rows.length > 0 && (
                 <Callout tone="warn" icon={TriangleAlert} title={`منتجات مباعة بلا وصفة: ${countNoun(missing.rows.length, PRODUCT)}`}>
-                  <p>لا يدخل استهلاكها في الحساب، ويظهر ذلك في كل تقرير. الأكثر مبيعاً منها:</p>
+                  <p>استهلاكها لا يدخل في الحساب، وكل تقرير يذكر ذلك. أكثرها مبيعاً:</p>
                   <ul className="mt-2 flex flex-wrap gap-1.5">
                     {missing.rows.map((r) => (
                       <li key={String(r.id)} className="rounded-md bg-raised/80 px-2 py-0.5 font-medium text-ink">{String(r.name_ar)}</li>
@@ -155,13 +156,13 @@ export default async function RecipesPage() {
                 شوكةٌ وعلبةٌ بـ٠٫٧٦ ريالاً والمعلَنة ٩٫١٧ — والكعكةُ ليست فيها.
               */}
               {suspicious.length > 0 && (
-                <Callout tone="warn" icon={Scale} title={`وصفات كلفتها بعيدة عن المعلنة في فودكس: ${countNoun(suspicious.length, RECIPE)}`}>
-                  <p>السبب الأكثر شيوعاً أن المكوّن الأساسي للمنتج غير موجود في وصفته، فتُحسب العلبة والشوكة دون الكعكة.</p>
+                <Callout tone="warn" icon={Scale} title={`وصفات تكلفتها بعيدة عن تكلفتها في فودكس: ${countNoun(suspicious.length, RECIPE)}`}>
+                  <p>السبب الأشيع أن المكوّن الأساسي للمنتج ناقص من وصفته، فتُحسب العلبة والشوكة دون الكعكة.</p>
                   <ul className="mt-2 space-y-1">
                     {suspicious.map((r) => (
                       <li key={r.recipeId} className="flex flex-wrap items-baseline gap-x-2">
                         <span className="font-bold text-ink">{r.menuProductName}</span>
-                        <span>كلفة وصفته <Money minor={r.catalogCostMinor!} /> والمعلنة <Money minor={r.declaredCostMinor!} /></span>
+                        <span><T s="تكلفة وصفته {0} وفي فودكس {1}" a={[<Money key="0" minor={r.catalogCostMinor!} />, <Money key="1" minor={r.declaredCostMinor!} />]} /></span>
                       </li>
                     ))}
                   </ul>
@@ -175,7 +176,7 @@ export default async function RecipesPage() {
             icon={BookOpen}
             count={rows.length}
             className="mt-0!"
-            hint="افتح الوصفة لتصحيحها في مكانها أو لتغييرها من تاريخ معيّن. يتوسّع الصف في مكانه فلا تفقد موضعك في القائمة."
+            hint="افتح الوصفة لتصحيحها في مكانها أو لتغييرها ابتداءً من تاريخ معيّن. يتوسع الصف في مكانه، فلا تفقد موضعك في القائمة."
           >
             <RecipeRows
               rows={rows}

@@ -19,10 +19,10 @@ export function ExpenseDelete({ id, label }: { id: string; label: string }) {
   return (
     <div className="relative z-10">
       <ConfirmAction
-        label="احذف هذا القيد"
+        label="احذف هذا المصروف"
         title={`احذف «${label}»؟`}
-        consequence="سيُحذف هذا القيد من المصروفات، وينخفض مصروف شهره بقدر مبلغه. لن يتأثر كشف البنك ولا المستند، ويبقى الحذف مسجلاً في سجل التدقيق باسمك."
-        acknowledgement="هذا القيد زائد: العملية نفسها مقيّدة في قيد آخر، أو قُيّد هذا القيد بالخطأ"
+        consequence="سيُحذف هذا المصروف، وينقص مصروف شهره بقدر مبلغه. لن يتأثر كشف البنك ولا المستند، ويبقى الحذف مسجّلاً في سجل التدقيق باسمك."
+        acknowledgement="هذا المصروف زائد: العملية نفسها مسجّلة في مصروف آخر، أو سُجّل هذا خطأً"
         confirmLabel="احذفه"
         onConfirm={async () => {
           setError(null);
@@ -31,7 +31,7 @@ export function ExpenseDelete({ id, label }: { id: string; label: string }) {
             setError(r.error);
             return false;
           }
-          toast({ tone: "ok", title: r.data.message ?? "تم حذف القيد" });
+          toast({ tone: "ok", title: r.data.message ?? "حُذف المصروف" });
           router.refresh();
           return true;
         }}

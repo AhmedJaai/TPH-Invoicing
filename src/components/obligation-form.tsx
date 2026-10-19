@@ -33,7 +33,7 @@ export function ObligationForm({ existing }: { existing?: Obligation }) {
   const remind = Number(remindDays);
   const titleError = title.trim().length < 2 ? "اكتب اسم الوثيقة" : null;
   const dateError = !isRealDay(expiresOn) ? "اختر تاريخ الانتهاء" : null;
-  const remindError = !Number.isInteger(remind) || remind < 1 || remind > MAX_REMIND_DAYS ? `من يوم إلى ${MAX_REMIND_DAYS} يوماً` : null;
+  const remindError = !Number.isInteger(remind) || remind < 1 || remind > MAX_REMIND_DAYS ? `من يوم واحد إلى ${MAX_REMIND_DAYS} يوماً` : null;
 
   async function save(): Promise<boolean> {
     setTried(true);
@@ -48,7 +48,7 @@ export function ObligationForm({ existing }: { existing?: Obligation }) {
       setError(r.error);
       return false;
     }
-    toast({ tone: "ok", title: typeof r.data.message === "string" ? r.data.message : "تم الحفظ" });
+    toast({ tone: "ok", title: typeof r.data.message === "string" ? r.data.message : "حُفظ" });
     setOpen(false);
     if (!existing) {
       setTitle(""); setIssuer(""); setReference(""); setHolder(""); setExpiresOn(""); setNote(""); setTried(false);
@@ -67,7 +67,7 @@ export function ObligationForm({ existing }: { existing?: Obligation }) {
         open={open}
         onClose={() => setOpen(false)}
         title={existing ? `تعديل «${existing.title}»` : "وثيقة جديدة"}
-        description={existing ? "للتجديد اكتب تاريخ الانتهاء الجديد. يبقى التاريخ القديم محفوظاً في سجلّ التدقيق." : "كل وثيقة لها تاريخ انتهاء وتترتب غرامة على فواته: رخصة، شهادة، إقامة، عقد."}
+        description={existing ? "للتجديد اكتب تاريخ الانتهاء الجديد. يبقى التاريخ القديم محفوظاً في سجل التدقيق." : "كل وثيقة لها تاريخ انتهاء وتترتب على فواته غرامة: رخصة، أو شهادة، أو إقامة، أو عقد."}
         footer={
           <>
             <button type="button" onClick={() => setOpen(false)} className={buttonClass("quiet")}>إلغاء</button>
@@ -89,7 +89,7 @@ export function ObligationForm({ existing }: { existing?: Obligation }) {
           <Field label="تاريخ الانتهاء" required error={tried ? dateError : null} hint="بالتاريخ الميلادي.">
             {({ invalid, ...p }) => <Input {...p} invalid={invalid} type="date" dir="ltr" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} />}
           </Field>
-          <Field label="ذكّرني قبلها بكم يوماً" required error={tried ? remindError : null} hint="مثلاً: ٣٠ يوماً للرخص و٩٠ يوماً لعقد الإيجار.">
+          <Field label="ذكّرني قبلها بكم يوم؟" required error={tried ? remindError : null} hint="مثلاً: ٣٠ يوماً للرخص و٩٠ يوماً لعقد الإيجار.">
             {({ invalid, ...p }) => <Input {...p} invalid={invalid} type="text" inputMode="numeric" dir="ltr" className="nums" value={remindDays} onChange={(e) => setRemindDays(e.target.value.replace(/[^\d]/g, ""))} />}
           </Field>
           <Field label="الجهة المصدرة">

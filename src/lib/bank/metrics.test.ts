@@ -84,6 +84,6 @@ describe("الاستدعاء", () => {
   it("لا يُقاس، ويُقال ذلك صراحةً", () => {
     expect(computeMetrics(counts()).some((m) => m.key === "recall")).toBe(false);
     expect(RECALL_NOTE).toContain("لا يمكن قياس");
-    expect(RECALL_NOTE).toContain("الحدّ الأدنى");
+    expect(RECALL_NOTE).toContain("الحد الأدنى");
   });
 });

@@ -9,6 +9,7 @@ import { Badge, Callout, EmptyState, LinkButton, NoAccess, Section } from "@/com
 import { formatDay, formatMonth, formatWeekday } from "@/lib/riyadh-time";
 import { COMMITMENT_LABEL, type Commitment, type CommitmentKind } from "@/lib/commitments";
 import { COMMITMENT_MONTHS, loadCommitments } from "@/services/cash-outlook.service";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -48,25 +49,25 @@ export default async function CommitmentsPage() {
     <PageShell
       user={user}
       title="تقويم الالتزامات"
-      intro={`ما يدفع وما ينتهي يوماً بيوم في ${COMMITMENT_MONTHS === 3 ? "الأشهر الثلاثة" : `${COMMITMENT_MONTHS} أشهر`} القادمة: دفعات المورّدين والمصروفات المتكررة وموعد الإقرار الضريبي وانتهاء الوثائق.`}
+      intro={`ما ستدفعه وما سينتهي يوماً بيوم في ${COMMITMENT_MONTHS === 3 ? "الأشهر الثلاثة" : `${COMMITMENT_MONTHS} أشهر`} القادمة: دفعات المورّدين، والمصروفات المتكررة، وموعد الإقرار الضريبي، وانتهاء الوثائق.`}
       actions={<LinkButton href="/settings#recurring" icon={Plus} variant="secondary">مصروف متكرر</LinkButton>}
     >
       {nothing ? (
         <EmptyState
           icon={CalendarDays}
           title="لا توجد التزامات معروفة في الأشهر القادمة."
-          hint="يمتلئ التقويم من أربعة مصادر: دفعات المورّدين، والمصروفات المتكررة المسجّلة بأيامها، والإقرار الضريبي، والوثائق التي لها تاريخ انتهاء. سجّل الإيجار والرواتب كمصروفات متكررة، وأدخل وثائق المقهى."
+          hint="يُبنى التقويم من أربعة مصادر: دفعات المورّدين، والمصروفات المتكررة المسجّلة بأيامها، والإقرار الضريبي، والوثائق التي لها تاريخ انتهاء. سجّل الإيجار والرواتب كمصروفات متكررة، وأضف وثائق المقهى."
           action={
             <>
               <LinkButton href="/settings#recurring" variant="primary" icon={Plus}>سجّل مصروفاً متكرراً</LinkButton>
-              {canDocs && <LinkButton href="/settings/obligations" variant="secondary" icon={FileBadge}>أدخل وثيقة</LinkButton>}
+              {canDocs && <LinkButton href="/settings/obligations" variant="secondary" icon={FileBadge}>أضف وثيقة</LinkButton>}
             </>
           }
         />
       ) : (
         <>
           {c.overdue.length > 0 && (
-            <Callout tone="danger" icon={TriangleAlert} title="فات موعده ولم يُنجز بعد">
+            <Callout tone="danger" icon={TriangleAlert} title="فات موعده ولم يُنفَّذ">
               <ul className="mt-1 space-y-1">
                 {c.overdue.map((i) => (
                   <li key={i.id}><Entry item={i} href={hrefFor(i)} /></li>
@@ -87,12 +88,12 @@ export default async function CommitmentsPage() {
                       <p className="text-sm font-bold">
                         {formatWeekday(d.day)} <bdi>{formatDay(d.day)}</bdi>
                         {d.today && <span className="ms-2"><Badge tone="accent">اليوم</Badge></span>}
-                        {d.past && <span className="ms-2"><Badge>مضى</Badge></span>}
+                        {d.past && <span className="ms-2"><Badge>انقضى</Badge></span>}
                       </p>
                       {(d.totalMinor > 0 || d.hasUnknown) && (
                         <p className="text-sm font-bold">
                           {d.totalMinor > 0 && <Money minor={d.totalMinor} />}
-                          {d.hasUnknown && <span className="ms-2 text-[11px] font-medium text-warn">{d.totalMinor > 0 ? "+ بنود مبلغها غير معروف" : "مبلغ غير معروف"}</span>}
+                          {d.hasUnknown && <span className="ms-2 text-[11px] font-medium text-warn">{d.totalMinor > 0 ? "+ بنود مبالغها غير معروفة" : "مبلغ غير معروف"}</span>}
                         </p>
                       )}
                     </div>
@@ -111,7 +112,7 @@ export default async function CommitmentsPage() {
             <Section
               title="بلا يوم محدد"
               icon={Repeat}
-              hint="مصروفات متكررة تقع في هذا الشهر ولم يُحدَّد لها أول استحقاق، ولن يخترع النظام لها يوماً. اكتب تاريخها في الإعدادات لتظهر في التقويم."
+              hint="مصروفات متكررة تقع في هذا الشهر بلا تاريخ استحقاق أول، والنظام لن يخترع لها يوماً. أضف تاريخها من الإعدادات لتظهر في التقويم."
               action={<LinkButton href="/settings#recurring" variant="secondary" size="sm">حدّد يومها</LinkButton>}
             >
               <ul className="space-y-2">
@@ -130,15 +131,13 @@ export default async function CommitmentsPage() {
           )}
 
           {!c.hasObligations && canDocs && (
-            <Callout tone="accent" icon={FileBadge} className="mt-8" title="الوثائق لا تظهر بعد" action={<LinkButton href="/settings/obligations" variant="primary" size="sm">أدخلها</LinkButton>}>
-              لم تُدخل أي وثيقة بتاريخ انتهائها، فالتقويم يعرض الالتزامات المالية فقط. أدخل الرخص والإقامات وعقد الإيجار لتظهر في موعدها.
+            <Callout tone="accent" icon={FileBadge} className="mt-8" title="الوثائق لا تظهر بعد" action={<LinkButton href="/settings/obligations" variant="primary" size="sm">أضفها</LinkButton>}>
+              لم تُضف أي وثيقة بتاريخ انتهائها، لذلك يعرض التقويم الالتزامات المالية فقط. أضف الرخص والإقامات وعقد الإيجار لتظهر في مواعيدها.
             </Callout>
           )}
 
           <p className="mt-8 text-xs leading-relaxed text-muted">
-            لا يشمل التقويم المبالغ الواردة ولا المصروفات التي لم تُسجَّل كمتكررة. لمقارنة هذه الالتزامات بالرصيد افتح{" "}
-            <Link href="/cash" className="font-bold text-accent hover:underline">النقد القادم</Link>.
-          </p>
+            <T s="لا يشمل التقويم المبالغ الداخلة، ولا المصروفات غير المسجّلة كمتكررة. لمقارنة هذه الالتزامات بالرصيد افتح {0}." a={[<Link key="0" href="/cash" className="font-bold text-accent hover:underline">السيولة القادمة</Link>]} /></p>
         </>
       )}
     </PageShell>

@@ -56,7 +56,7 @@ export default async function CountReportPage({
       eyebrow={`${locked ? "جرد مقفل" : "جرد مفتوح"}${header.branchName ? ` · ${header.branchName}` : ""}`}
       intro={`أسبوع ${formatWeek(header.periodStart, header.periodEnd)}`}
       actions={can(user.role, "amounts:view")
-        ? <LinkButton href="/inventory/history" size="sm" icon={History}>سجلّ الجرد</LinkButton>
+        ? <LinkButton href="/inventory/history" size="sm" icon={History}>سجل الجرد</LinkButton>
         : undefined}
     >
       <InventoryWorkspace

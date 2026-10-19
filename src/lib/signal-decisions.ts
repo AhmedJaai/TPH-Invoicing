@@ -37,15 +37,15 @@ export const SIGNAL_LABEL: Record<SignalPrefix, string> = {
   "recurring-twice": "خصم تكرر مرتين في الشهر",
   "recurring-rose": "خصم ارتفع عن المعتاد",
   "recurring-missing": "خصم معتاد لم يحدث هذا الشهر",
-  obligation: "وثيقة قاربت على الانتهاء",
-  "cash-floor": "الرصيد تحت حدّه",
+  obligation: "وثيقة قارب انتهاؤها",
+  "cash-floor": "الرصيد تحت حده",
   "qty-outlier": "كمية غير معتادة",
   "foodics-card": "فرق بين بطاقات فودكس ودفعة البنك",
   "foodics-purchase": "فرق بين مشتريات فودكس وفواتيرنا",
   "foodics-till": "فرق بين النقد المعدود في الصندوق والمتوقع",
   "stock-link": "بند فاتورة ليس من المخزون",
-  "stock-gap": "فرق متكرّر في صنف مخزون",
-  "repeat-delivery": "توريد يبدو مسجلاً مرتين",
+  "stock-gap": "فرق متكرر في صنف مخزون",
+  "repeat-delivery": "توريد يبدو مسجّلاً مرتين",
 };
 
 const KEY_RE = /^[a-z-]{3,24}:[^\s]{1,160}$/;

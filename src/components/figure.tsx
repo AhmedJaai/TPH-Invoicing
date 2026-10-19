@@ -6,6 +6,7 @@ import { ArrowLeft, ChevronDown, Wrench } from "lucide-react";
 import { Money } from "./money";
 import { TONE_TEXT, type Tone, isNumeric } from "./ui";
 import type { Provenance } from "@/lib/provenance";
+import { T } from "@/components/i18n/t";
 
 /**
  * رقمٌ يشرح نفسه.
@@ -122,13 +123,13 @@ function Breakdown({ provenance: p, unit }: { provenance: Provenance; unit: stri
 
       <p className="border-t border-line-soft px-3 py-2 text-[11px] leading-relaxed text-muted">
         {p.coverage === null
-          ? "لا توجد بيانات يُبنى عليها هذا الرقم بعد."
-          : `التغطية ${Math.round(p.coverage * 100)}٪ من حيث العدد. ` +
+          ? "لا بيانات يُبنى عليها هذا الرقم بعد."
+          : `التغطية ${Math.round(p.coverage * 100)}٪ بالعدد. ` +
             (p.excludedCount === 0
-              ? "لا يوجد شيء خارج الرقم."
+              ? "لا شيء خارج هذا الرقم."
               : p.excludedUnknownCount > 0
                 ? `منها ${p.excludedUnknownCount} مبلغها غير معروف، ولا يصح اعتباره صفراً.`
-                : "مبالغ المستبعد معروفة وموضحة أعلاه.")}
+                : "مبالغ المستبعد معروفة ومبيّنة أعلاه.")}
       </p>
 
       {fixes.length > 0 && (
@@ -139,10 +140,7 @@ function Breakdown({ provenance: p, unit }: { provenance: Provenance; unit: stri
               href={c.href!}
               className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-accent-soft px-2.5 text-xs font-bold text-accent hover:brightness-95 sm:min-h-8"
             >
-              <Wrench className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              أصلح: {c.label}
-              <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            </Link>
+              <T s="{0}أصلح: {1}{2}" a={[<Wrench key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />, c.label, <ArrowLeft key="2" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
           ))}
         </div>
       )}

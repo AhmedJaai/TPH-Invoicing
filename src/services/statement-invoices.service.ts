@@ -64,7 +64,7 @@ export async function recordStatementOnlyInvoices(
     .where(eq(statements.id, statementId))
     .for("update", { of: statements })
     .limit(1);
-  if (!st) throw new StatementInvoicesRefused("لا يوجد كشف بهذا المعرّف", 404);
+  if (!st) throw new StatementInvoicesRefused("لا كشف بهذا المعرّف", 404);
 
   const lines = await tx
     .select({ id: statementLines.id, date: statementLines.date, ref: statementLines.ref, debitMinor: statementLines.debitMinor })
@@ -108,8 +108,8 @@ export async function recordStatementOnlyInvoices(
     });
   if (!matchedByNumber && inWindow.length > 0) {
     throw new StatementInvoicesRefused(
-      "أرقام المراجع في هذا الكشف ليست أرقام فواتيرنا (لم يطابق أي سطر فيه فاتورةً برقمها)، فلن يُقيَّد منه شيء تلقائياً. "
-      + "وقد تكون فواتيره عندنا بأرقام أخرى. قارنه بالفواتير من صفحة المورّد.",
+      "أرقام المراجع في هذا الكشف ليست أرقام فواتيرنا (لم يطابق أي سطر فيه فاتورة برقمها)، فلن يُسجَّل منه شيء تلقائياً. "
+      + "وربما فواتيره عندنا بأرقام أخرى، فقارنه بالفواتير من صفحة المورّد.",
     );
   }
 

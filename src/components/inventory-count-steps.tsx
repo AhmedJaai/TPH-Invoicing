@@ -11,6 +11,7 @@ import { FlowStep, type DuplicateRow, type ReceiptRow } from "./inventory-flow-s
 import { PRODUCT, countNoun } from "@/lib/arabic";
 import { Toolbar } from "./inventory-toolbar";
 import { STEP_ORDER as ORDER, type StepId } from "./inventory-ui";
+import { T } from "@/components/i18n/t";
 
 /**
  * الجردُ خمسُ خطوات، بترتيبِ ما يجري على الرفّ.
@@ -234,14 +235,10 @@ export function InventoryCountSteps({
             <div className="flex flex-wrap items-center gap-3">
               {step === "count" && dirtyCount > 0 && (
                 <span className="flex items-center gap-1.5 text-xs text-warn">
-                  <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                  {countNoun(dirtyCount, PRODUCT)} لم يُحفظ بعد
-                </span>
+                  <T s="{0}{1} لم يُحفظ بعد" a={[<TriangleAlert key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />, countNoun(dirtyCount, PRODUCT)]} /></span>
               )}
               <button type="button" onClick={() => go(next)} className={buttonClass("primary")}>
-                التالي: {meta[next].title}
-                <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
-              </button>
+                <T s="التالي: {0}{1}" a={[meta[next].title, <ArrowLeft key="1" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></button>
             </div>
           )}
         </div>
@@ -273,7 +270,7 @@ function StepNav({
       <div className="px-2 pb-2 pt-1.5 md:hidden">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-bold">
-            <span className="text-muted">الخطوة <span className="nums">{at + 1}</span> من <span className="nums">{order.length}</span> · </span>
+            <span className="text-muted"><T s="الخطوة {0} من {1} · " a={[<span key="0" className="nums">{at + 1}</span>, <span key="1" className="nums">{order.length}</span>]} /></span>
             {meta[current].title}
           </p>
           <p className="nums shrink-0 text-[11px] text-muted">{meta[current].status}</p>
@@ -392,7 +389,7 @@ function ScopePicker({
 
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
-    toast({ tone: "ok", title: `تم حفظ النطاق: سيُعدّ ${countNoun(chosen, PRODUCT)}.` });
+    toast({ tone: "ok", title: `حُفظ النطاق: سيُعدّ ${countNoun(chosen, PRODUCT)}.` });
     router.refresh();
     onDone();
   }
@@ -410,16 +407,12 @@ function ScopePicker({
       <div className="mb-4 max-w-3xl">
         <h2 className="text-base font-bold">اختر ما ستعدّه على الرف</h2>
         <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-          <strong>الصنف المستبعد ليس صفراً</strong>: تُحسب مشترياته واستهلاكه المتوقع ويظهران، لكن لا يُحسب له فرق
-          ولا يدخل في المجاميع، لأن الفرق يحتاج إلى عدّ فعلي. وما أدخلته من عدّ يبقى محفوظاً إذا أعدته.
-        </p>
+          <T s="{0}: تُحسب مشترياته واستهلاكه المتوقع ويظهران، لكن لا يُحسب له فرق ولا يدخل في المجاميع، لأن الفرق يحتاج إلى عدّ فعلي. وما أدخلته من عدّ يبقى محفوظاً إن أعدته." a={[<strong key="0">الصنف المستبعد ليس صفراً</strong>]} /></p>
         {!explicit && inherited && (
           <p className="mt-2 flex items-start gap-1.5 text-xs font-bold leading-relaxed text-warn">
-            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-            هذا الاختيار منقول من جردك السابق ولم تحفظه بعد. احفظه كما هو أو غيّره.
-          </p>
+            <T s="{0}هذا الاختيار منقول من جردك السابق ولم تحفظه بعد. احفظه كما هو أو غيّره." a={[<TriangleAlert key="0" className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />]} /></p>
         )}
-        {explicit && <p className="mt-2 text-xs text-muted">حفظتَ هذا النطاق لهذا الجرد، ولن يتغيّر إذا تغيّر الجرد السابق.</p>}
+        {explicit && <p className="mt-2 text-xs text-muted">حفظتَ هذا النطاق لهذا الجرد، ولن يتغيّر إن تغيّر الجرد السابق.</p>}
       </div>
 
       <Toolbar query={query} setQuery={setQuery} category={category} setCategory={setCategory} categories={categories}>
@@ -432,7 +425,7 @@ function ScopePicker({
       </Toolbar>
 
       {visible.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line px-5 py-10 text-center text-sm text-muted">لا يوجد صنف يطابق هذا الفلتر.</p>
+        <p className="rounded-xl border border-dashed border-line px-5 py-10 text-center text-sm text-muted">لا صنف يطابق هذه التصفية.</p>
       ) : (
         <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {visible.map((row) => {
@@ -452,9 +445,7 @@ function ScopePicker({
                   <span className="min-w-0 flex-1">
                     <span className={`block truncate text-[13px] font-bold ${on ? "" : "text-muted"}`}>{row.productName}</span>
                     <span className="block truncate text-[11px] text-muted">
-                      {row.categoryLabel} · يُعدّ بوحدة {row.unitLabel}
-                      {row.actual.trim() !== "" && <span className="nums"> · العدّ: {row.actual}</span>}
-                    </span>
+                      <T s="{0} · يُعدّ بوحدة {1}{2}" a={[row.categoryLabel, row.unitLabel, row.actual.trim() !== "" && <span className="nums"> <T s=" · العدّ: {0}" a={[row.actual]} /></span>]} /></span>
                   </span>
                   {picked[row.productId] !== row.inScope && (
                     <span className="shrink-0 rounded-full bg-warn-bg px-2 py-0.5 text-[10px] font-bold text-warn">تغيّر</span>
@@ -470,9 +461,9 @@ function ScopePicker({
       <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-10 mt-5 lg:bottom-4">
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-overlay/95 px-4 py-3 shadow-overlay backdrop-blur">
           <p className="min-w-0 flex-1 text-[13px]">
-            <span className="font-bold">سيُعدّ {countNoun(chosen, PRODUCT)}</span>
-            <span className="text-muted"> من {rows.length}</span>
-            {changed.length > 0 && <span className="text-warn"> · {changed.length} تغييرات لم تُحفظ</span>}
+            <span className="font-bold"><T s="سيُعدّ {0}" a={[countNoun(chosen, PRODUCT)]} /></span>
+            <span className="text-muted"> <T s=" من {0}" a={[rows.length]} /></span>
+            {changed.length > 0 && <span className="text-warn"> <T s=" · {0} تغييرات لم تُحفظ" a={[changed.length]} /></span>}
           </p>
           {error && <p role="alert" className="w-full text-xs text-danger sm:order-last">{error}</p>}
           {canEdit ? (
@@ -482,8 +473,7 @@ function ScopePicker({
             </button>
           ) : (
             <button type="button" onClick={onDone} className={buttonClass("primary")}>
-              تابع <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
-            </button>
+              <T s="تابع {0}" a={[<ArrowLeft key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></button>
           )}
         </div>
       </div>

@@ -63,7 +63,7 @@ export async function POST(request: Request) {  let user;
       .delete(bankRules)
       .where(eq(bankRules.id, body.id))
       .returning({ id: bankRules.id, pattern: bankRules.pattern, category: bankRules.category });
-    if (!gone) return NextResponse.json({ error: "القاعدة غير موجودة، وربما حُذفت من نافذة أخرى" }, { status: 404 });
+    if (!gone) return NextResponse.json({ error: "القاعدة غير موجودة، فربما حُذفت من نافذة أخرى" }, { status: 404 });
     await recordAudit({
       actorId: user.id,
       action: "BANK_RULE_DELETED",
@@ -75,7 +75,7 @@ export async function POST(request: Request) {  let user;
   }
 
   const pattern = body.pattern?.trim();
-  if (!pattern) return NextResponse.json({ error: "اكتب النص المميّز للحركة" }, { status: 400 });
+  if (!pattern) return NextResponse.json({ error: "اكتب النص الذي يميّز الحركة" }, { status: 400 });
   const category = body.category;
   if (!category || !CATEGORIES.includes(category)) {
     return NextResponse.json({ error: "تصنيف غير معروف" }, { status: 400 });
@@ -88,7 +88,7 @@ export async function POST(request: Request) {  let user;
    */
   if (normalized.length < 3) {
     return NextResponse.json(
-      { error: "النص قصير جداً. اكتب كلمة مميّزة على الأقل." },
+      { error: "النص قصير جداً. اكتب كلمة مميّزة واحدة على الأقل." },
       { status: 400 },
     );
   }
@@ -162,10 +162,10 @@ export async function POST(request: Request) {  let user;
     id: inserted[0].id,
     message:
       (category === "SUPPLIER"
-        ? `أصبح «${pattern}» اسماً بنكياً للمورّد ${supplierName}`
-        : `أصبح «${pattern}» يُصنَّف ${CATEGORY_LABEL[category]}`)
+        ? `صار «${pattern}» اسماً بنكياً للمورّد ${supplierName}`
+        : `صار «${pattern}» يُصنَّف ${CATEGORY_LABEL[category]}`)
       + (previous && previous.category !== category
-        ? `، وحلّ محل قاعدة سابقة كانت تصنّفه ${CATEGORY_LABEL[previous.category as keyof typeof CATEGORY_LABEL] ?? previous.category}`
+        ? `، بدلاً من قاعدة سابقة كانت تصنّفه ${CATEGORY_LABEL[previous.category as keyof typeof CATEGORY_LABEL] ?? previous.category}`
         : ""),
   });
 }

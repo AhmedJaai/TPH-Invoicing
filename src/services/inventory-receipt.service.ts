@@ -65,7 +65,7 @@ export class PossibleDuplicateReceiptError extends Error {
       candidates.length > 0
         ? `يشبه هذا الاستلام ${candidates.length === 1 ? "بنداً" : `${candidates.length} بنود`} في فاتورة موجودة`
           + ` (${candidates[0].supplierName} · ${candidates[0].invoiceNumber}). هل هو الاستلام نفسه أم شحنة أخرى؟`
-        : `أدخلت الكمّية نفسها لهذا الصنف يوم ${earlierReceipts[0].receivedOn}. هل هي شحنة أخرى أم أُدخلت مرتين؟`,
+        : `أدخلتَ الكمية نفسها لهذا الصنف يوم ${earlierReceipts[0].receivedOn}. هل هي شحنة أخرى أم أُدخلت مرتين؟`,
     );
     this.name = "PossibleDuplicateReceiptError";
   }
@@ -132,10 +132,10 @@ async function stockProduct(productId: string, conn: Conn) {
 
 function checkQuantity(name: string, enteredMilli: number, unit: StoredUnit, baseUnit: StoredUnit): number {
   if (!Number.isInteger(enteredMilli) || enteredMilli <= 0) {
-    throw new Error(`تعذّرت قراءة الكمّية لـ«${name}». يجب أن تكون كمّية الاستلام أكبر من صفر`);
+    throw new Error(`تعذّرت قراءة الكمية لـ«${name}»، ويجب أن تكون كمية الاستلام أكبر من صفر`);
   }
   if (!sameUnitFamily(unit, baseUnit)) {
-    throw new Error(`لا يمكن تحويل وحدة «${name}» إلى وحدة الصنف (الوزن لا يتحوّل إلى حجم)`);
+    throw new Error(`لا يمكن تحويل وحدة «${name}» إلى وحدة الصنف (الوزن لا يتحول إلى حجم)`);
   }
   return toCanonical(enteredMilli, unit);
 }
@@ -171,9 +171,9 @@ async function checkLink(invoiceLineId: string, productId: string, conn: Conn): 
   `)).rows;
   if (!row) throw new Error("بند الفاتورة غير موجود");
   if (row.product_id !== null && String(row.product_id) !== productId) {
-    throw new Error("بند الفاتورة يخص صنفاً آخر، فلا يمكن ربطه بهذا الاستلام");
+    throw new Error("بند الفاتورة يخص صنفاً آخر، فلا يُربط بهذا الاستلام");
   }
-  if (row.linked) throw new Error("هذا البند مرتبط باستلام آخر، والبند الواحد لا يمثّل شحنتين");
+  if (row.linked) throw new Error("هذا البند مرتبط باستلام آخر، والبند الواحد لا يكون شحنتين");
 }
 
 /**

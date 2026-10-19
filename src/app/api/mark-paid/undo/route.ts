@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       voided: out.voided,
-      message: `أُلغي الإقرار، وعادت فواتير بقيمة ${formatRiyalsDisplay(out.freedMinor)} ريال إلى المفتوحة.`,
+      message: `أُلغي تسجيل السداد، وعادت فواتير بقيمة ${formatRiyalsDisplay(out.freedMinor)} ريال مفتوحة.`,
     });
   } catch (e) {
     if (e instanceof UndoError) return NextResponse.json({ error: e.message }, { status: e.status });

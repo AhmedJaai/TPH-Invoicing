@@ -18,6 +18,7 @@ import { ACT, recordBatch } from "@/lib/ui-terms";
 import { formatDay } from "@/lib/riyadh-time";
 import { txHref } from "@/lib/inspector";
 import { SupplierPicker } from "./supplier-picker";
+import { T } from "@/components/i18n/t";
 
 /**
  * طابور المراجعة الموحَّد.
@@ -98,8 +99,7 @@ function RejectedList({ rejected, items }: { rejected: { transactionId: string; 
       </ul>
       {rejected.length > shown.length && (
         <button type="button" onClick={() => setAll(true)} className="mt-1.5 min-h-8 text-xs font-bold text-accent hover:underline">
-          اعرض الباقي (<span className="nums">{rejected.length - shown.length}</span>)
-        </button>
+          <T s="اعرض الباقي ({0})" a={[<span key="0" className="nums">{rejected.length - shown.length}</span>]} /></button>
       )}
     </>
   );
@@ -221,7 +221,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
     */
     const rejected = (data.outcomes ?? []).filter((o) => !o.ok);
     if (data.confirmed === 0 && rejected.length > 0) {
-      errorOn(id, rejected[0]?.reason ?? "لم يُحفظ شيء. راجع حالة الحركة.");
+      errorOn(id, rejected[0]?.reason ?? "لم يُحفظ شيء، فراجع حالة الحركة.");
       busyOn(id, false);
       return;
     }
@@ -265,17 +265,17 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
     المتصفّح لصدَّق الخادمُ اقتراحاً حُسب لحظة الاستيراد وقد سُدّدت فاتورته.
   */
   const confirmOne = (id: string) =>
-    post("/api/match-confirm-bulk", { transactionIds: [id] }, id, "تم التأكيد", true);
+    post("/api/match-confirm-bulk", { transactionIds: [id] }, id, "أُكّد", true);
 
   /*
     فاتورةٌ بعينها من قائمةٍ حسبها الخادم — تُرسَل معرّفاتُها وحدها، والخادم
     يتحقّق أنّها ما زالت مرشّحةً ويحسب التخصيص.
   */
   const pickOne = (id: string, invoiceIds: string[]) =>
-    post("/api/match-confirm-bulk", { transactionIds: [id], candidateInvoiceIds: invoiceIds }, id, "تم القيد على الفاتورة المختارة", true);
+    post("/api/match-confirm-bulk", { transactionIds: [id], candidateInvoiceIds: invoiceIds }, id, "سُجّلت على الفاتورة المختارة", true);
 
   const rejectOne = (id: string, kind: string) =>
-    post("/api/match-confirm", { transactionId: id, notAPayment: kind }, id, "تم الحفظ", true);
+    post("/api/match-confirm", { transactionId: id, notAPayment: kind }, id, "حُفظ", true);
 
   /*
     السدادُ على حساب المورّد — والسياسة تُقال قبل الضغط لا بعده.
@@ -284,10 +284,10 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
     جهاتِها بيده، فخرجت من الطابور بلا أن يُقيَّد ريالٌ منها.
   */
   const settleOne = (id: string) =>
-    post("/api/match-confirm", { transactionId: id, settleSupplier: true }, id, "تم القيد على حساب المورّد", true);
+    post("/api/match-confirm", { transactionId: id, settleSupplier: true }, id, "سُجّلت على حساب المورّد", true);
 
   const defineOne = (id: string, kind: string, displayName: string, supplierId: string | null) =>
-    post("/api/counterparty", { transactionId: id, kind, displayName, supplierId }, id, "تم التعريف");
+    post("/api/counterparty", { transactionId: id, kind, displayName, supplierId }, id, "عُرّفت الجهة");
 
   async function confirmAll() {
     setBusy(true);
@@ -318,7 +318,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
       const left = Math.max(0, confirmable.length - 50);
       setResult({
         ok: (r.data.confirmed ?? 0) > 0,
-        message: `${r.data.message ?? ""}${left > 0 ? ` · بقي ${left} لم يُرسل. اضغط مرة أخرى للمتابعة.` : ""}`,
+        message: `${r.data.message ?? ""}${left > 0 ? ` · بقي ${left} لم يُرسل، اضغط مرة أخرى للمتابعة.` : ""}`,
         rejected,
       });
       router.refresh();
@@ -331,7 +331,7 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
     return (
       <EmptyState
         title="لا شيء ينتظرك"
-        hint="لكل حركة في الكشف قرار مسجّل: إما مطابقتها بفاتورة، أو تحديد أنها ليست سداداً."
+        hint="لكل حركة في الكشف قرار مسجّل: إما مطابقتها بفاتورة، أو أنها ليست سداداً."
       />
     );
   }
@@ -372,22 +372,16 @@ export function ReviewWorkspace({ items, canApprove, canEdit, suppliers = [] }: 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-bold">
-                {countNoun(confirmable.length, SUGGESTION)} ينتظر تأكيدك
-              </p>
+                <T s="{0} ينتظر تأكيدك" a={[countNoun(confirmable.length, SUGGESTION)]} /></p>
               <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-                تُحسب من جديد قبل الحفظ على الفواتير كما هي الآن، لا كما
-                كانت وقت الاستيراد. وما تغيّرت حالته يُعاد إليك مع السبب ولا يُؤكَّد.
-                {confirmable.length > 50 && " ويُؤكَّد خمسون في كل مرة."}
-              </p>
+                <T s="يُعاد حسابها قبل الحفظ على الفواتير كما هي الآن، لا كما كانت وقت الاستيراد. وما تغيّرت حالته يعود إليك مع السبب ولا يُؤكَّد.{0}" a={[confirmable.length > 50 && " ويُؤكَّد خمسون في كل مرة."]} /></p>
               {/*
                 كان العدّان يختلفان بلا تفسير: البطاقة تقول «يُقَرّ ٨» والزرّ
                 «أقِرّ ٣». والفرق أنّ خمساً طُوبقت تلقائياً ولا تنتظر أحداً.
               */}
               {alreadyAuto > 0 && (
                 <p className="mt-1 text-xs leading-relaxed text-muted">
-                  ومعها {countNoun(alreadyAuto, TRANSACTION)} طُوبقت تلقائياً ولا تنتظر
-                  تأكيدك. تجدها أدناه للاطلاع، ويمكنك التراجع عنها من صفحة البنك.
-                </p>
+                  <T s="ومعها {0} طُوبقت تلقائياً ولا تنتظر تأكيدك. تجدها أدناه للاطلاع، ويمكنك التراجع عنها من صفحة البنك." a={[countNoun(alreadyAuto, TRANSACTION)]} /></p>
               )}
             </div>
             <button
@@ -511,11 +505,9 @@ function Bucket({
       {rest > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <button type="button" className={buttonClass("secondary", "sm")} onClick={() => setShown((s) => s + 40)}>
-            اعرض {Math.min(40, rest)} أخرى
-          </button>
+            <T s="اعرض {0} أخرى" a={[Math.min(40, rest)]} /></button>
           <span className="text-xs text-muted">
-            بقي <span className="nums">{rest}</span>. الترتيب حسب المبلغ، لأن الخطأ في المبلغ الأكبر أغلى.
-          </span>
+            <T s="بقي {0}. مرتبة بالمبلغ، لأن الخطأ في المبلغ الأكبر أغلى." a={[<span key="0" className="nums">{rest}</span>]} /></span>
         </div>
       )}
     </section>
@@ -654,9 +646,7 @@ function Row({
               aria-expanded={open === "reject"}
               data-key-action="reject"
             >
-              ليست سداداً
-              <KeyHint>X</KeyHint>
-            </button>
+              <T s="ليست سداداً{0}" a={[<KeyHint key="0">X</KeyHint>]} /></button>
           </>
         )}
 
@@ -680,9 +670,7 @@ function Row({
       {/* السياسة تُقال قبل الضغط — والمخفيّة تُنتج ثقةً بلا فهم */}
       {canAct && settleable(i) && (
         <p className="mt-1.5 text-xs leading-relaxed text-muted">
-          الحوالة لا تحمل رقم فاتورة، لذا تُوزَّع على فواتير {i.supplierName} المفتوحة
-          بالأقدم أولاً، وما بقي يبقى على حسابه بلا تخصيص.
-        </p>
+          <T s="الحوالة لا تحمل رقم فاتورة، فتُوزَّع على فواتير {0} المفتوحة بالأقدم أولاً، وما بقي يبقى في حسابه بلا تخصيص." a={[i.supplierName]} /></p>
       )}
 
       {open === "pick" && (
@@ -696,7 +684,7 @@ function Row({
       {/* ── ليست سداداً: السبب ── */}
       {open === "reject" && (
         <div className="mt-2 rounded-xl border border-line bg-sunken px-3 py-2.5">
-          <p className="text-xs font-bold">ما نوع هذه الحركة إذن؟</p>
+          <p className="text-xs font-bold">فما نوع هذه الحركة؟</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {NOT_PAYMENT.map((k) => (
               <button
@@ -711,8 +699,7 @@ function Row({
             ))}
           </div>
           <p className="mt-2 text-xs leading-relaxed text-muted">
-            «دفعة مقدّمة» تسجّل لمورّدها مبلغاً خرج قبل صدور فاتورته، ويُخصَّص عليها عند وصولها،
-            وهي لا تُتجاهل كالتحويل الداخلي.
+            «دفعة مقدّمة» تسجّل لمورّدها مبلغاً خرج قبل صدور فاتورته، ويُخصَّص على الفاتورة حين تصل، ولا تُتجاهل كالتحويل الداخلي.
           </p>
         </div>
       )}
@@ -765,7 +752,7 @@ function Row({
               {ACT.saveIdentity}
             </button>
             <span className="text-xs leading-relaxed text-muted">
-              ما تؤكده يحفظه النظام: يُطبَّق الآن على ما اخترته، ويتعرّف النظام على ما يشبهه في الكشوف القادمة دون أن يسألك.
+              ما تؤكده يحفظه النظام: يُطبَّق الآن على ما اخترته، ويتعرّف على ما يشبهه في الكشوف القادمة دون أن يسألك.
             </span>
           </div>
         </div>
@@ -784,7 +771,7 @@ const OUTCOME_NOTE: Record<string, string> = {
   EXACT_INVOICE: "فاتورة بالمبلغ نفسه",
   MULTI_INVOICE: "عدة فواتير مجموعها يساوي الدفعة",
   PARTIAL_PAYMENT: "سداد جزئي، ويبقى جزء من الفاتورة",
-  OVERPAYMENT: "تزيد على المتبقي، والزائد يبقى على حساب المورّد",
+  OVERPAYMENT: "أكثر من المتبقي، والزائد يبقى في حساب المورّد",
 };
 
 /**
@@ -816,13 +803,13 @@ function CandidatePicker({
   return (
     <div className="mt-2 rounded-xl border border-line bg-sunken px-3 py-2.5" aria-live="polite">
       <p className="text-xs font-bold">أي فاتورة تسدّدها هذه الحوالة؟</p>
-      {state.status === "loading" && <p className="mt-2 text-xs text-muted">جارٍ حساب الفواتير المرشّحة على أحدث بيانات الفواتير…</p>}
+      {state.status === "loading" && <p className="mt-2 text-xs text-muted">يحسب الفواتير المرشّحة بأحدث بياناتها…</p>}
       {state.status === "error" && (
         <p role="alert" className="mt-2 text-xs font-bold text-danger">{state.message}</p>
       )}
       {state.status === "ready" && state.candidates.length === 0 && (
         <p className="mt-2 text-xs leading-relaxed text-muted">
-          لا توجد فاتورة مفتوحة لهذا المورّد قريبة من مبلغ الحوالة. سجّلها على حسابه، أو ارفع فاتورتها لتظهر هنا كاقتراح.
+          لا توجد لهذا المورّد فاتورة مفتوحة قريبة من مبلغ الحوالة. سجّلها على حسابه، أو ارفع فاتورتها لتظهر هنا اقتراحاً.
         </p>
       )}
       {state.status === "ready" && state.candidates.length > 0 && (
@@ -847,8 +834,7 @@ function CandidatePicker({
                 ))}
               </ul>
               <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
-                {OUTCOME_NOTE[c.outcome] ?? "مرشّح"} · يُخصَّص <Money minor={c.allocatedMinor} />
-              </p>
+                <T s="{0} · يُخصَّص {1}" a={[OUTCOME_NOTE[c.outcome] ?? "مرشّح", <Money key="1" minor={c.allocatedMinor} />]} /></p>
               <dl className="mt-2 grid grid-cols-4 gap-1 text-center">
                 <Part label="المورّد" value={c.parts.supplier} />
                 <Part label="المبلغ" value={c.parts.amount} />
@@ -874,7 +860,7 @@ function CandidatePicker({
         </ul>
       )}
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
-        يتحقق النظام من اختيارك على الفواتير كما هي لحظة الحفظ ويحسب التخصيص، وما زاد يبقى على حساب المورّد بلا تخصيص.
+        يتحقق النظام من اختيارك على الفواتير كما هي لحظة الحفظ، ويحسب التخصيص، وما زاد يبقى في حساب المورّد بلا تخصيص.
       </p>
     </div>
   );

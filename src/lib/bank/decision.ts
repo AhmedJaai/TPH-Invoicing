@@ -57,12 +57,12 @@ export function decide(a: Assignment): Decision {
   const reasons: string[] = [...a.candidate.evidence];
 
   if (score < SUGGEST_SCORE - SCORE_EPSILON) {
-    reasons.push("درجة التطابق ضعيفة ولا تكفي حتى للاقتراح");
+    reasons.push("درجة التطابق ضعيفة، ولا تكفي حتى للاقتراح");
     return { disposition: "REVIEW", reasons };
   }
 
   if (NEVER_AUTO.includes(outcome)) {
-    reasons.push("هذه الحالة لا تُطابَق تلقائياً لأنها تغيّر الرصيد وتحتاج قرارك");
+    reasons.push("هذه الحالة لا تُطابَق تلقائياً لأنها تغيّر الرصيد، فتحتاج إلى قرارك");
     return { disposition: "SUGGEST", reasons };
   }
 
@@ -76,7 +76,7 @@ export function decide(a: Assignment): Decision {
   }
 
   if (score < AUTO_SCORE - SCORE_EPSILON) {
-    reasons.push(`درجة التطابق ${Math.round(score * 100)} من مئة، وهي دون حدّ المطابقة التلقائية`);
+    reasons.push(`درجة التطابق ${Math.round(score * 100)} من مئة، وهي دون حد المطابقة التلقائية`);
     return { disposition: "SUGGEST", reasons };
   }
 

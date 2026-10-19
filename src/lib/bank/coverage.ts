@@ -117,19 +117,19 @@ export function describeCoverage(c: Coverage): string {
   if (c.from === null) return "لم يُستورَد شيء بعد.";
 
   const span = `من ${c.from} إلى ${c.to}`;
-  if (c.gaps.length === 0 && c.overlaps.length === 0) return `${span}: متصلة بلا فجوة.`;
+  if (c.gaps.length === 0 && c.overlaps.length === 0) return `${span}: متصلة بلا فجوات.`;
 
   const parts: string[] = [span];
   if (c.gaps.length > 0) {
     const worst = [...c.gaps].sort((a, b) => b.days - a.days)[0];
     parts.push(
       c.gaps.length === 1
-        ? `وفيها فجوة من ${worst.start} إلى ${worst.end} (${countNoun(worst.days, DAY_NOUN)}) لم تُستورَد`
+        ? `وفيها فجوة من ${worst.start} إلى ${worst.end} (${countNoun(worst.days, DAY_NOUN)}) لم تُستورد`
         : `وفيها ${countNoun(c.gaps.length, GAP)}، أطولها ${countNoun(worst.days, DAY_NOUN)} من ${worst.start}`,
     );
   }
   if (c.overlaps.length > 0) {
-    parts.push(`و${c.overlaps.length} تداخلاً بين الكشوف، وهو لا يضر لأن الحركة المكرّرة تُرفض`);
+    parts.push(`و${c.overlaps.length} تداخلاً بين الكشوف، ولا ضرر منه لأن الحركة المكررة تُرفض`);
   }
   return `${parts.join("، ")}.`;
 }

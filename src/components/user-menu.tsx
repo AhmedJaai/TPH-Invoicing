@@ -32,7 +32,7 @@ export function UserMenu({ name, role, tone = "surface" }: { name?: string | nul
           }}
         >
           <SubmitButton
-            label="تسجيل الخروج"
+            label="اخرج"
             title="خروج"
             className={`grid h-11 w-11 place-items-center rounded-lg transition-colors sm:h-8 sm:w-8 ${
               frame ? "text-frame-muted hover:bg-frame-raised hover:text-frame-ink" : "text-muted hover:bg-hover hover:text-ink"

@@ -82,7 +82,7 @@ export async function reviewForArchive(fields: ConfirmedFields): Promise<ReviewR
     fields.totalMinor !== null && fields.totalMinor !== undefined &&
     fields.totalMinor <= 0
   ) {
-    throw new BlockedError(["الإجمالي صفر أو سالب، فلا يمكن قيد فاتورة بلا مبلغ. صحّحه من المستند نفسه"]);
+    throw new BlockedError(["الإجمالي صفر أو سالب، ولا تُسجَّل فاتورة بلا مبلغ. صحّحه من المستند نفسه"]);
   }
 
   /*

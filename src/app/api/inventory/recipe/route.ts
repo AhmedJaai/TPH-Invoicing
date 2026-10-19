@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     if (body.action === "activate") {
       if (!body.versionId) return NextResponse.json({ error: "لم تحدّد النسخة" }, { status: 400 });
       await activateRecipeVersion(body.versionId, user.id);
-      return NextResponse.json({ ok: true, message: "تم تفعيل النسخة، وأُغلقت النسخة السابقة في اليوم الذي قبلها." });
+      return NextResponse.json({ ok: true, message: "فُعّلت النسخة، وأُغلقت النسخة السابقة في اليوم الذي قبلها." });
     }
 
     if (!body.menuProductId) return NextResponse.json({ error: "لم تحدّد الصنف المباع" }, { status: 400 });
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       const gone = await deleteRecipe(body.menuProductId, user.id);
       return NextResponse.json({
         ok: true,
-        message: `تم حذف وصفة «${gone.name}» بنسخها (${gone.deletedVersions}).`,
+        message: `حُذفت وصفة «${gone.name}» بكل نسخها (${gone.deletedVersions}).`,
       });
     }
 
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
         if (milli === null) return NextResponse.json({ error: "تعذّرت قراءة نسبة فاقد التجهيز" }, { status: 400 });
         prepLossBp = Math.round(milli / 10);
         if (prepLossBp < 0 || prepLossBp > MAX_PREP_LOSS_BP) {
-          return NextResponse.json({ error: "فاقد التجهيز يجب أن يكون بين صفر ومئة بالمئة، ولا يشمل المئة" }, { status: 400 });
+          return NextResponse.json({ error: "فاقد التجهيز يجب أن يكون من صفر إلى أقل من مئة بالمئة" }, { status: 400 });
         }
       }
 
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({
         ok: true, ...fixed,
-        message: `تم تصحيح النسخة ${fixed.version}، ويسري التصحيح على كل الأسابيع.`,
+        message: `صُحّحت النسخة ${fixed.version}، ويسري التصحيح على كل الأسابيع.`,
       });
     }
 
@@ -141,8 +141,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true, ...result,
       message: result.activated
-        ? `تم حفظ النسخة ${result.version}، وتسري من ${body.effectiveFrom}.`
-        : `تم حفظ النسخة ${result.version} مسوّدة، ولا تدخل في الحساب حتى تفعّلها.`,
+        ? `حُفظت النسخة ${result.version}، وتسري من ${body.effectiveFrom}.`
+        : `حُفظت النسخة ${result.version} مسودة، ولا تدخل في الحساب حتى تفعّلها.`,
     });
   } catch (e) {
     /* «حُسب بها جردٌ مقفَل» خبرٌ عن الحال لا عطبٌ في الطلب */

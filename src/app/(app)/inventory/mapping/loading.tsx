@@ -1,5 +1,5 @@
 import { PageSkeleton } from "@/components/page-skeleton";
 
 export default function Loading() {
-  return <PageSkeleton title="منتجات تحتاج ربطاً" stats={0} width="page" />;
+  return <PageSkeleton title="منتجات تحتاج إلى ربط" stats={0} width="page" />;
 }

@@ -63,7 +63,7 @@ export function AppShell({
 
       <aside
         className="no-print sticky top-0 z-30 hidden h-screen bg-frame text-frame-ink lg:block"
-        aria-label="التنقّل"
+        aria-label="التنقل"
       >
         <Sidebar
           role={user.role}

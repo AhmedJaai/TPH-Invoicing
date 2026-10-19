@@ -11,6 +11,7 @@ import {
   buildDoublePaidClaim, doublePaidKey, findDoublePaid, partitionDoublePaid,
   type DoublePaidDecision, type DoublePaidGroup, type DoublePaidTx,
 } from "@/lib/bank/double-paid";
+import { T } from "@/components/i18n/t";
 
 /**
  * «سُدّد مرّتين» — موضعٌ واحد.
@@ -24,8 +25,8 @@ import {
  * ولا تنسخه.
  */
 export const DOUBLE_PAID_DECISION_LABEL: Record<DoublePaidDecision, string> = {
-  CLAIMED: "تمت المطالبة",
-  RECOVERED: "تم استرداد المال",
+  CLAIMED: "طالبتَ بها",
+  RECOVERED: "استُرد المال",
   NOT_DUPLICATE: "ليست مكررة",
 };
 
@@ -109,10 +110,7 @@ export function DoublePaidCard({
           {g.transactions.map((t, n) => (
             <li key={t.id} className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-2 text-[11px]">
               <span className="min-w-0 text-muted" dir="auto">
-                {n === 0 ? "الأولى" : n === 1 ? "الثانية" : `رقم ${n + 1}`} · مرجع البنك:{" "}
-                {/* `BANK_REF:` بادئةٌ داخليّة — وأحمد ينسخ الرقم ليطالب الجهة */}
-                <bdi className="nums font-bold text-ink">{t.operationRef?.replace(/^[A-Z_]+:/, "") ?? "غير مذكور"}</bdi>
-              </span>
+                {/* `BANK_REF:` بادئةٌ داخليّة — وأحمد ينسخ الرقم ليطالب الجهة */}<T s="{0} · مرجع البنك: {1}" a={[n === 0 ? "الأولى" : n === 1 ? "الثانية" : `رقم ${n + 1}`, <bdi key="1" className="nums font-bold text-ink">{t.operationRef?.replace(/^[A-Z_]+:/, "") ?? "غير مذكور"}</bdi>]} /></span>
               <span className="text-xs font-bold"><Money minor={t.amountMinor} /></span>
             </li>
           ))}
@@ -120,14 +118,10 @@ export function DoublePaidCard({
         <p className={`flex items-start gap-1.5 border-t border-line-soft px-3 py-2 text-[11px] leading-relaxed ${g.distinctOperations ? "text-ink-soft" : "text-warn"}`}>
           {g.distinctOperations ? (
             <>
-              <CircleCheck className="mt-0.5 h-3 w-3 shrink-0 text-ok" strokeWidth={2.25} aria-hidden />
-              لكل عملية مرجع سداد مختلف، فهما عمليتان فعلاً وليستا نسخة مكررة من الاستيراد.
-            </>
+              <T s="{0}لكل عملية مرجع سداد مختلف، فهما عمليتان حقيقيتان وليست إحداهما نسخة مكررة من الاستيراد." a={[<CircleCheck key="0" className="mt-0.5 h-3 w-3 shrink-0 text-ok" strokeWidth={2.25} aria-hidden />]} /></>
           ) : (
             <>
-              <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={2.25} aria-hidden />
-              لا يوجد مرجع يميّز بينهما، وقد تكون إحداهما نسخة مكررة من الاستيراد. تحقق من تطبيق البنك قبل المطالبة.
-            </>
+              <T s="{0}لا يوجد مرجع يميّز بينهما، وقد تكون إحداهما نسخة مكررة من الاستيراد. تأكد من تطبيق البنك قبل المطالبة." a={[<TriangleAlert key="0" className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={2.25} aria-hidden />]} /></>
           )}
         </p>
       </div>
@@ -153,9 +147,7 @@ export async function DoublePaidWorkspace({ canEdit }: { canEdit: boolean }) {
     <>
       {openOrClaimed.length === 0 ? (
         <p role="status" className="flex items-center gap-2 rounded-xl border border-ok/25 bg-ok-bg px-4 py-3 text-xs font-bold text-ok">
-          <CircleCheck className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-          تم البت في جميعها، ولا توجد مطالبة مفتوحة.
-        </p>
+          <T s="{0}قرّرت فيها كلها، ولا مطالبة مفتوحة." a={[<CircleCheck key="0" className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />]} /></p>
       ) : (
         <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
           {openOrClaimed.map((g) => (
@@ -172,8 +164,7 @@ export async function DoublePaidWorkspace({ canEdit }: { canEdit: boolean }) {
       {split.closed.length > 0 && (
         <details className="mt-3">
           <summary className="inline-flex min-h-11 cursor-pointer items-center text-xs font-bold text-muted hover:text-ink sm:min-h-0">
-            ما تم البت فيه ({countNoun(split.closed.length, ITEM)}). يمكن إعادة فتحه إن كان القرار خطأ
-          </summary>
+            <T s="ما قرّرت فيه ({0}). يمكنك إعادة فتحه إن كان القرار خطأً" a={[countNoun(split.closed.length, ITEM)]} /></summary>
           <ul className="mt-2 divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised/70">
             {split.closed.map(({ group: g, decision }) => (
               <li key={doublePaidKey(g)}>

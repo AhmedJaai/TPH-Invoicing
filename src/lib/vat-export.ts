@@ -51,7 +51,7 @@ export function buildVatSheets(p: VatExportInput): Sheet[] {
     ["سجلّ إقرار ضريبة القيمة المضافة", p.label],
     ["الفترة", p.periodKey],
     ["أُعدّ في", p.generatedAt],
-    ["الحالة", p.filing ? `قُدّم في ${p.filing.filedOn}${p.filing.reference ? ` — مرجع ${p.filing.reference}` : ""}` : "لم يُسجَّل تقديمه بعد، والأرقام قابلة للتغيّر"],
+    ["الحالة", p.filing ? `قُدّم في ${p.filing.filedOn}${p.filing.reference ? ` — مرجع ${p.filing.reference}` : ""}` : "لم يُسجَّل تقديمه بعد، والأرقام قد تتغيّر"],
     ...(p.filing ? [["الصافي المُقدَّم", riyals(p.filing.netMinor)] satisfies Cell[]] : []),
     [],
     ["البند", "المبلغ قبل الضريبة", "الضريبة"],

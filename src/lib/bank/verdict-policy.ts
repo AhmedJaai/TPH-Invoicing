@@ -114,10 +114,10 @@ export function weighVerdict(input: VerdictInput): VerdictDecision {
   const reasons: string[] = [];
 
   if (input.audit.upheld.length > 0) {
-    reasons.push(`أدلة تحقّقنا منها: ${input.audit.upheld.join(" · ")}`);
+    reasons.push(`أدلة تحققنا منها: ${input.audit.upheld.join(" · ")}`);
   }
   if (input.audit.refuted.length > 0) {
-    reasons.push(`ذكرها النموذج ولم تتحقّق: ${input.audit.refuted.join(" · ")}`);
+    reasons.push(`ذكرها النموذج ولم نتحقق منها: ${input.audit.refuted.join(" · ")}`);
   }
   if (input.audit.unknown.length > 0) {
     reasons.push(`رموز غير معروفة للنظام: ${input.audit.unknown.join(" · ")}`);
@@ -130,34 +130,34 @@ export function weighVerdict(input: VerdictInput): VerdictDecision {
     الجودة فيصير اقتراحاً بثقة النموذج وحدها.
   */
   if (quality === null) {
-    reasons.push("لم يذكر النموذج أي دليل يمكن التحقّق منه، لذلك لا يُقترح حكمه");
+    reasons.push("لم يذكر النموذج أي دليل يمكن التحقق منه، فلا يُقترح حكمه");
     return { disposition: "REVIEW", reasons, signals };
   }
 
   if (quality !== null && quality < MIN_EVIDENCE_QUALITY) {
-    reasons.push("أغلب ما ذكره النموذج لم يتحقّق، لذلك لا يُقترح حكمه");
+    reasons.push("أكثر ما ذكره النموذج لم يُتحقق منه، فلا يُقترح حكمه");
     return { disposition: "REVIEW", reasons, signals };
   }
 
   if (input.modelConfidence < MIN_MODEL_CONFIDENCE) {
     reasons.push(
-      `ثقة النموذج ${Math.round(input.modelConfidence * 100)} من مئة، وهي أقل من الحدّ المقبول`,
+      `ثقة النموذج ${Math.round(input.modelConfidence * 100)} من مئة، وهي أقل من الحد المقبول`,
     );
     return { disposition: "REVIEW", reasons, signals };
   }
 
   if (highRisk) {
-    reasons.push("هذا النوع من الحركات يحتاج حذراً أكبر، لأن الخطأ فيه يمسّ شخصاً أو جهة رسمية");
+    reasons.push("هذا النوع من الحركات يحتاج إلى حذر أكبر، لأن الخطأ فيه يمسّ شخصاً أو جهة رسمية");
     return { disposition: "REVIEW", reasons, signals };
   }
 
   if (highValue) {
     reasons.push(
-      `مبلغ كبير (${formatRiyalsDisplay(input.amountMinor)} · الحدّ ${formatRiyalsDisplay(threshold)}). راجعها قبل القرار`,
+      `مبلغ كبير (${formatRiyalsDisplay(input.amountMinor)} · الحد ${formatRiyalsDisplay(threshold)})، فراجعها قبل القرار`,
     );
     return { disposition: "REVIEW", reasons, signals };
   }
 
-  reasons.push("اقتراح ينتظر تأكيدك. النموذج لا يقرّر في المال");
+  reasons.push("اقتراح ينتظر تأكيدك، فالنموذج لا يقرّر في المال");
   return { disposition: "SUGGEST", reasons, signals };
 }

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
         if (removed.length === 0) return;
         await recordAudit({
           actorId: user.id, action: "ALERT_RESOLVED", entityType: "alert", entityId: removed[0].key,
-          before: { القرار: removed[0].decision }, after: { القرار: "أعيد من التأجيل" },
+          before: { القرار: removed[0].decision }, after: { القرار: "أُعيد من التأجيل" },
         }, t);
       });
       return NextResponse.json({ ok: true, message: "عاد البند إلى القائمة" });
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     const split = await attentionSplit();
     const item = [...split.active, ...split.snoozed.map((s) => s.item)].find((i) => i.id === itemId);
     if (!item) {
-      return NextResponse.json({ error: "لم يعد هذا البند في القائمة، فقد يكون حُسم. حدّث الصفحة." }, { status: 409 });
+      return NextResponse.json({ error: "لم يعد هذا البند في القائمة، فربما قُرّر فيه. حدّث الصفحة." }, { status: 409 });
     }
     const key = snoozeKey(item);
     const decision = snoozedUntil(until);
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         after: { القرار: `أجّل إلى ${until}`, البند: item.title, الملاحظة: note, المبلغ_بالهللات: item.amountMinor ?? null },
       }, t);
     });
-    return NextResponse.json({ ok: true, message: `تم التأجيل إلى ${formatDay(until)}. يعود البند تلقائياً في ذلك اليوم، أو قبله إن تغيّر مبلغه.` });
+    return NextResponse.json({ ok: true, message: `أُجّل إلى ${formatDay(until)}. يعود البند تلقائياً في ذلك اليوم، أو قبله إن تغيّر مبلغه.` });
   } catch (e) {
     const mapped = respondTo(e);
     if (mapped) return mapped;

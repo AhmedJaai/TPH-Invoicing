@@ -32,9 +32,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "تعذّرت قراءة الطلب." }, { status: 400 });
     }
     const parsed = Body.safeParse(raw);
-    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "طلب غير مفهوم" }, { status: 400 });
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "الطلب غير مفهوم" }, { status: 400 });
     const r = await savePurchaseLink(parsed.data, user.id);
-    return NextResponse.json({ ok: true, message: `تم الربط بـ«${r.productName}» وسيُعاد حساب المشتريات` });
+    return NextResponse.json({ ok: true, message: `رُبط بـ«${r.productName}»، وسيُعاد حساب المشتريات` });
   } catch (e) {
     if (e instanceof PurchaseLinkRefused) return NextResponse.json({ error: e.message }, { status: 409 });
     const mapped = respondTo(e);

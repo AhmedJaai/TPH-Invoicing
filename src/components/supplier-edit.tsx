@@ -7,6 +7,7 @@ import { postJson } from "@/lib/http-client";
 import { SUPPLIER_CATEGORIES, SUPPLIER_CATEGORY_LABEL } from "@/lib/supplier-edit";
 import { Sheet, toast } from "./ui-client";
 import { buttonClass } from "./ui-tokens";
+import { T } from "@/components/i18n/t";
 
 /**
  * «عدّل بياناته» — ما يكتبه صاحبُ المقهى عن مورّده بعد إنشائه.
@@ -83,7 +84,7 @@ export function SupplierEdit({
       setError(w.length > 0 ? null : r.error);
       return;
     }
-    toast({ tone: "ok", title: "تم حفظ بيانات المورّد", body: r.data.message });
+    toast({ tone: "ok", title: "حُفظت بيانات المورّد", body: r.data.message });
     setWarnings([]);
     setOpen(false);
     router.refresh();
@@ -92,9 +93,7 @@ export function SupplierEdit({
   return (
     <>
       <button type="button" onClick={() => { setForm(initial); setOpen(true); }} className={buttonClass("secondary", "sm")}>
-        <Pencil className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        عدّل بياناته
-      </button>
+        <T s="{0}عدّل بياناته" a={[<Pencil key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
       <Sheet
         open={open}
         onClose={close}
@@ -110,31 +109,22 @@ export function SupplierEdit({
               disabled={busy || !dirty}
               onClick={() => save(warnings.length > 0)}
             >
-              {warnings.length > 0 ? "نعم، احفظ رغم التنبيه" : "احفظ"}
+              {warnings.length > 0 ? "نعم، احفظ مع التنبيه" : "احفظ"}
             </button>
           </>
         }
       >
         <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
           <label className="text-xs font-bold">
-            الاسم بالعربية
-            <input value={form.nameAr} onChange={(e) => set({ nameAr: e.target.value })} disabled={busy} dir="auto" className={FIELD} />
-          </label>
+            <T s="الاسم بالعربية{0}" a={[<input key="0" value={form.nameAr} onChange={(e) => set({ nameAr: e.target.value })} disabled={busy} dir="auto" className={FIELD} />]} /></label>
           <label className="text-xs font-bold">
-            الاسم بالإنجليزية
-            <input value={form.nameEn} onChange={(e) => set({ nameEn: e.target.value })} disabled={busy} dir="ltr" className={FIELD} />
-          </label>
+            <T s="الاسم بالإنجليزية{0}" a={[<input key="0" value={form.nameEn} onChange={(e) => set({ nameEn: e.target.value })} disabled={busy} dir="ltr" className={FIELD} />]} /></label>
           <label className="text-xs font-bold">
-            الرقم الضريبي
-            <input value={form.vatNumber} onChange={(e) => set({ vatNumber: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" placeholder="15 رقماً" className={`nums ${FIELD}`} />
-          </label>
+            <T s="الرقم الضريبي{0}" a={[<input key="0" value={form.vatNumber} onChange={(e) => set({ vatNumber: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" placeholder="١٥ رقماً" className={`nums ${FIELD}`} />]} /></label>
           <label className="text-xs font-bold">
-            السجل التجاري
-            <input value={form.crNumber} onChange={(e) => set({ crNumber: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" className={`nums ${FIELD}`} />
-          </label>
+            <T s="السجل التجاري{0}" a={[<input key="0" value={form.crNumber} onChange={(e) => set({ crNumber: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" className={`nums ${FIELD}`} />]} /></label>
           <label className="text-xs font-bold">
-            التصنيف
-            <select
+            <T s="التصنيف{0}" a={[<select key="0"
               value={form.category}
               onChange={(e) => {
                 const c = SUPPLIER_CATEGORIES.find((x) => x === e.target.value);
@@ -144,44 +134,28 @@ export function SupplierEdit({
               className={FIELD}
             >
               {SUPPLIER_CATEGORIES.map((c) => <option key={c} value={c}>{SUPPLIER_CATEGORY_LABEL[c]}</option>)}
-            </select>
-          </label>
+            </select>]} /></label>
           <label className="text-xs font-bold">
-            مهلة السداد (بالأيام)
-            <input value={form.paymentTermsDays} onChange={(e) => set({ paymentTermsDays: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" placeholder="0 = نقداً، وفارغ = غير معروف" className={`nums ${FIELD}`} />
-            <span className="mt-1 block text-[11px] font-normal text-muted">تُحسب به حالة «تجاوز المهلة» في ملف المورّد، بدل مهلة ثابتة (ستين يوماً) للجميع.</span>
-            {termsHint && form.paymentTermsDays.trim() === "" && (
+            <T s="مهلة السداد (بالأيام){0}{1}{2}" a={[<input key="0" value={form.paymentTermsDays} onChange={(e) => set({ paymentTermsDays: e.target.value })} disabled={busy} dir="ltr" inputMode="numeric" placeholder="0 = نقداً، والفراغ = غير معروف" className={`nums ${FIELD}`} />, <span key="1" className="mt-1 block text-[11px] font-normal text-muted">بها تُحسب حالة «تجاوز المهلة» في صفحة المورّد، بدلاً من مهلة ثابتة (ستين يوماً) للجميع.</span>, termsHint && form.paymentTermsDays.trim() === "" && (
               <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-accent-line bg-accent-soft px-2.5 py-1.5 text-[11px] font-normal text-ink-soft">
-                <span>تدفع له عادةً بعد <bdi className="nums font-bold text-ink">{termsHint.medianDays}</bdi> يوماً (الوسيط لـ<bdi className="nums">{termsHint.sampleCount}</bdi> فاتورة مسدّدة).</span>
+                <span><T s="تدفع له عادةً بعد {0} يوماً (الوسيط لـ{1} فاتورة مسدّدة)." a={[<bdi key="0" className="nums font-bold text-ink">{termsHint.medianDays}</bdi>, <bdi key="1" className="nums">{termsHint.sampleCount}</bdi>]} /></span>
                 <button type="button" disabled={busy} onClick={() => set({ paymentTermsDays: String(termsHint.medianDays) })} className="font-bold text-accent hover:underline">
-                  اعتمده مهلة سداد
+                  اعتمدها مهلة للسداد
                 </button>
               </span>
-            )}
-          </label>
+            )]} /></label>
           <label className="text-xs font-bold">
-            نبّهني إذا تجاوز المستحق له (بالريال)
-            <input value={form.balanceAlert} onChange={(e) => set({ balanceAlert: e.target.value })} disabled={busy} dir="ltr" inputMode="decimal" placeholder="فارغ = بلا حد" className={`nums ${FIELD}`} />
-          </label>
+            <T s="نبّهني إن تجاوز المستحق له (بالريال){0}" a={[<input key="0" value={form.balanceAlert} onChange={(e) => set({ balanceAlert: e.target.value })} disabled={busy} dir="ltr" inputMode="decimal" placeholder="الفراغ = بلا حد" className={`nums ${FIELD}`} />]} /></label>
           <label className="text-xs font-bold">
-            اسم المندوب
-            <input value={form.contactName} onChange={(e) => set({ contactName: e.target.value })} disabled={busy} dir="auto" className={FIELD} />
-          </label>
+            <T s="اسم المندوب{0}" a={[<input key="0" value={form.contactName} onChange={(e) => set({ contactName: e.target.value })} disabled={busy} dir="auto" className={FIELD} />]} /></label>
           <label className="text-xs font-bold">
-            جوال المندوب (واتساب)
-            <input value={form.phone} onChange={(e) => set({ phone: e.target.value })} disabled={busy} dir="ltr" inputMode="tel" placeholder="05xxxxxxxx" className={`nums ${FIELD}`} />
-          </label>
+            <T s="جوال المندوب (واتساب){0}" a={[<input key="0" value={form.phone} onChange={(e) => set({ phone: e.target.value })} disabled={busy} dir="ltr" inputMode="tel" placeholder="05xxxxxxxx" className={`nums ${FIELD}`} />]} /></label>
           <label className="text-xs font-bold">
-            البريد الإلكتروني
-            <input value={form.email} onChange={(e) => set({ email: e.target.value })} disabled={busy} dir="ltr" inputMode="email" className={FIELD} />
-          </label>
+            <T s="البريد الإلكتروني{0}" a={[<input key="0" value={form.email} onChange={(e) => set({ email: e.target.value })} disabled={busy} dir="ltr" inputMode="email" className={FIELD} />]} /></label>
           <label className="text-xs font-bold sm:col-span-2">
-            الآيبان
-            <input value={form.iban} onChange={(e) => set({ iban: e.target.value })} disabled={busy} dir="ltr" placeholder="SA.. (24 خانة)" className={`nums font-mono ${FIELD}`} />
-            <span className="mt-1 block text-[11px] font-normal text-muted">
-              يُتحقق من صحته تلقائياً ويُستخدم في ملف التحويلات. أما الحساب الذي حوّلت له سابقاً فيُقرأ تلقائياً من الكشوف، فاكتبه فقط إذا لم تحوّل له من قبل أو غيّر حسابه.
-            </span>
-          </label>
+            <T s="الآيبان{0}{1}" a={[<input key="0" value={form.iban} onChange={(e) => set({ iban: e.target.value })} disabled={busy} dir="ltr" placeholder="SA.. (٢٤ خانة)" className={`nums font-mono ${FIELD}`} />, <span key="1" className="mt-1 block text-[11px] font-normal text-muted">
+              يُتحقق من صحته تلقائياً، ويُستخدم في ملف التحويلات. أما الحساب الذي حوّلت له من قبل فيُقرأ تلقائياً من الكشوف، فاكتبه فقط إن لم تحوّل له قبل الآن أو غيّر حسابه.
+            </span>]} /></label>
         </div>
 
         {warnings.length > 0 && (

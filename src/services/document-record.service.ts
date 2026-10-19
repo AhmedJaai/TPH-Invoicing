@@ -102,8 +102,8 @@ export async function recordDocumentByHand(
     .limit(1);
 
   if (!doc) throw new RecordRefused("المستند غير موجود", 404);
-  if (doc.invoiceId) throw new RecordRefused("لهذا المستند فاتورة مقيّدة. صحّحها من صفحتها بدل قيدها مرة ثانية");
-  if (doc.statementId) throw new RecordRefused("هذا المستند مقيّد ككشف حساب، فلا يمكن قيده فاتورة");
+  if (doc.invoiceId) throw new RecordRefused("لهذا المستند فاتورة مسجّلة. صحّحها من صفحتها بدلاً من تسجيلها مرة ثانية");
+  if (doc.statementId) throw new RecordRefused("هذا المستند مسجّل كشفَ حساب، فلا يُسجَّل فاتورة");
   if (doc.status === "REJECTED") throw new RecordRefused("المستند مرفوض. أعده إلى المراجعة أولاً");
 
   const [supplier] = await conn
@@ -111,7 +111,7 @@ export async function recordDocumentByHand(
     .from(suppliers)
     .where(eq(suppliers.id, input.supplierId))
     .limit(1);
-  if (!supplier) throw new RecordRefused("المورّد غير موجود. اخترْه من القائمة أو أنشئه", 400);
+  if (!supplier) throw new RecordRefused("المورّد غير موجود. اختره من القائمة أو أنشئه", 400);
 
   const date = normalizeDocumentDate(input.invoiceDate);
   const number = input.invoiceNumber.trim();
@@ -162,10 +162,10 @@ export async function recordDocumentByHand(
   const overridable = review.blockers.length > 0 && review.blockers.every((b) => OVERRIDABLE.has(b.code));
   const reason = input.override?.trim() ?? "";
   if (reason && !overridable) {
-    throw new RecordRefused("لا يمكن تجاوز هذا المانع: الفاتورة مكررة أو المستند ليس فاتورة. عالج المشكلة أو ارفض المستند.", 400);
+    throw new RecordRefused("لا يمكن تجاوز هذا المانع: الفاتورة مكررة، أو المستند ليس فاتورة. عالج المشكلة أو ارفض المستند.", 400);
   }
   if (reason && reason.length < MIN_OVERRIDE_REASON) {
-    throw new RecordRefused("اكتب سبباً يبقى مفهوماً بعد شهر: لماذا تقيّد الفاتورة رغم المانع؟", 400);
+    throw new RecordRefused("اكتب سبباً يبقى مفهوماً بعد شهر: لماذا تسجّل الفاتورة مع وجود المانع؟", 400);
   }
   const overriding = overridable && reason.length >= MIN_OVERRIDE_REASON;
 
@@ -198,8 +198,8 @@ export async function recordDocumentByHand(
       const clash = await findInvoiceConflict(tx, { documentId: doc.id, supplierId: supplier.id, invoiceNumber: number });
       throw new RecordRefused(
         clash?.by === "NUMBER"
-          ? `فاتورة ${clash.invoiceNumber} مقيّدة لهذا المورّد من ملف آخر، فلم تُقيَّد مرة ثانية. افتحها من فواتيره، وإن كان هذا نسخة منها فارفضه بسبب «مكرّرة»`
-          : "قُيّدت فاتورة لهذا المستند للتو. حدّث الصفحة",
+          ? `فاتورة ${clash.invoiceNumber} مسجّلة لهذا المورّد من ملف آخر، فلم تُسجَّل مرة ثانية. افتحها من فواتيره، وإن كان هذا نسخة منها فارفضه بسبب «مكررة»`
+          : "سُجّلت فاتورة لهذا المستند للتو. حدّث الصفحة",
       );
     }
     await replaceLines(tx, {

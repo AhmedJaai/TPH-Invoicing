@@ -11,6 +11,7 @@ import { documentHref } from "@/lib/document-labels";
 /** ما يُقيَّد فاتورةً — لا يُعتمد قبل قيده (والكشفُ يحرسه الخادم: لا صفَّ كشفٍ هنا) */
 const RECORDABLE = new Set(["TAX_INVOICE", "SIMPLIFIED_INVOICE", "UNKNOWN"]);
 import { formatDay, formatMonth } from "@/lib/riyadh-time";
+import { T } from "@/components/i18n/t";
 
 /** رابط الملف في الدرايف — المعرّف محفوظ لكل مستند منذ الأرشفة. */
 const driveUrl = (id: string) => `https://drive.google.com/file/d/${id}/view`;
@@ -66,7 +67,7 @@ export function WaitingCard({
             {r.textSource && (
               <>
                 <span aria-hidden>·</span>
-                <span>{r.textSource === "TEXT" ? "قُرئ من نص الملف" : "قُرئ من صورة (تقدير)"}</span>
+                <span>{r.textSource === "TEXT" ? "قُرئ من نص الملف" : "قُرئ من صورة (تقريبي)"}</span>
               </>
             )}
           </p>
@@ -86,7 +87,7 @@ export function WaitingCard({
       <div className={`mx-4 mt-3 flex items-start gap-2 rounded-lg bg-sunken px-3 py-2 text-xs leading-relaxed sm:mx-5 ${whyCls}`}>
         <WhyIcon className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
         <div className="min-w-0">
-          <p className="font-bold">{why.tone === "ok" ? "جاهز" : why.tone === "warn" ? "لم يُعتمد تلقائياً" : "يحتاج مراجعتك"}</p>
+          <p className="font-bold">{why.tone === "ok" ? "جاهز" : why.tone === "warn" ? "لم يُعتمد تلقائياً" : "يحتاج إلى مراجعتك"}</p>
           <ul className="text-ink-soft">
             {why.lines.map((l) => <li key={l}>{l}</li>)}
           </ul>
@@ -107,15 +108,11 @@ export function WaitingCard({
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line-soft bg-sunken/40 px-4 py-3 sm:px-5">
         {r.driveFileId && (
           <a href={driveUrl(r.driveFileId)} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
-            <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            افتح الورقة
-          </a>
+            <T s="{0}افتح الورقة" a={[<ExternalLink key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></a>
         )}
         {r.invoiceId && showAmounts && (
           <Link href={invoiceHref(r.invoiceId, "tax")} className={buttonClass("quiet", "sm")}>
-            <PenLine className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            صحّح بياناً
-          </Link>
+            <T s="{0}صحّح معلومة" a={[<PenLine key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
         )}
         <span className="flex-1" />
         {canDecide && (showAmounts || r.totalMinor === null) && <RejectDocument documentId={r.id} />}

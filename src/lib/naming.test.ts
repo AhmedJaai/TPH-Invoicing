@@ -74,7 +74,7 @@ describe("رفض الأسماء المخالفة", () => {
   it("يرفض مبلغاً بلا منزلتين عشريتين", () => {
     const r = parseFileName("2026-08-17_OliveLeaves_Invoice_260302_SAR410.pdf", SLUGS);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toContain("منزلتين");
+    if (!r.ok) expect(r.reason).toContain("خانتين");
   });
 
   it("يتجاهل ملفات الملاحظات", () => {

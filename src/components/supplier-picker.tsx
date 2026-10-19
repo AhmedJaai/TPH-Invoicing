@@ -8,6 +8,7 @@ import { buttonClass } from "./ui-tokens";
 import { postJson } from "@/lib/http-client";
 import { SimilarSuppliers, readSimilar, type SimilarSupplier } from "./similar-suppliers";
 import { suggestSuppliers, type SuggestibleSupplier } from "@/lib/supplier-suggest";
+import { T } from "@/components/i18n/t";
 
 /**
  * «أيّ مورّد؟» — المقترَحُ من نصّ البنك أوّلاً بضغطة، ثمّ القائمةُ كلُّها.
@@ -72,7 +73,7 @@ export function SupplierPicker({
     setCreating(false);
     toast({
       tone: "ok",
-      title: r.data.existed ? "المورّد مسجّل من قبل وتم اختياره" : "تم إنشاء المورّد واختياره",
+      title: r.data.existed ? "المورّد مسجّل من قبل، فاخترناه" : "أُنشئ المورّد واخترناه",
       body: s.nameAr,
     });
     return true;
@@ -81,7 +82,7 @@ export function SupplierPicker({
     <div className="mt-3 space-y-2">
       {suggested.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-bold text-muted">ربما يكون أحد هؤلاء (حسب الاسم في نص البنك):</span>
+          <span className="text-[11px] font-bold text-muted">ربما يكون أحد هؤلاء (بحسب الاسم في نص البنك):</span>
           {suggested.map((s) => (
             <button
               key={s.id}
@@ -123,9 +124,7 @@ export function SupplierPicker({
           onClick={() => { setName(createName.trim()); setCreating(true); setError(null); }}
           className={buttonClass("quiet", "sm")}
         >
-          <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-          ليس في القائمة؟ مورّد جديد
-        </button>
+          <T s="{0}ليس في القائمة؟ مورّد جديد" a={[<Plus key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
       )}
       {!chipsOnly && creating && (
         <div className="rounded-lg border border-line-soft bg-sunken/50 p-2.5">
@@ -144,13 +143,13 @@ export function SupplierPicker({
                 className="mt-1 min-h-11 w-full rounded-lg border border-line-input bg-raised px-3 text-sm sm:min-h-9"
               />
             </label>
-            <ActionButton variant="primary" size="sm" disabled={name.trim().length < 2} reason="اكتب الاسم (حرفان على الأقل)" onAction={() => create()}>
+            <ActionButton variant="primary" size="sm" disabled={name.trim().length < 2} reason="اكتب الاسم (حرفين على الأقل)" onAction={() => create()}>
               أنشئه واختره
             </ActionButton>
             <button type="button" onClick={() => setCreating(false)} className={buttonClass("quiet", "sm")}>إلغاء</button>
           </div>
           <p className="mt-1.5 text-[11px] text-muted">
-            يمكنك إكمال بياناته (الرقم الضريبي واسم مجلده في الدرايف) من ملفه بعد ذلك.
+            يمكنك إكمال بياناته (الرقم الضريبي واسم مجلده في الدرايف) من صفحته لاحقاً.
           </p>
           <SimilarSuppliers
             similar={similar}

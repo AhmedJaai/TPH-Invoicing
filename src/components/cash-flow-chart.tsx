@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Money } from "./money";
 import { formatMonth } from "@/lib/riyadh-time";
 import type { CashFlowMonth } from "@/lib/cashflow";
+import { T } from "@/components/i18n/t";
 
 /**
  * الوارد والصادر شهراً بشهر — شريطان لكلّ شهر على محورٍ واحد.
@@ -34,8 +35,8 @@ export function CashFlowChart({
     <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
       {/* اللونان من عائلةٍ واحدة، فالصادرُ مخطَّط: يُفرَّق بالنقش لا باللون وحده */}
       <div className="mb-4 flex flex-wrap items-center gap-4 text-[11px] font-bold text-ink-soft">
-        <span className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-sm bg-accent" /> وارد</span>
-        <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2.5 w-2.5 rounded-sm ${OUT_FILL}`} /> صادر</span>
+        <span className="flex items-center gap-1.5"><T s="{0} داخل" a={[<span key="0" aria-hidden className="h-2.5 w-2.5 rounded-sm bg-accent" />]} /></span>
+        <span className="flex items-center gap-1.5"><T s="{0} خارج" a={[<span key="0" aria-hidden className={`h-2.5 w-2.5 rounded-sm ${OUT_FILL}`} />]} /></span>
       </div>
       <ol className="space-y-1">
         {[...months].reverse().map((m) => {
@@ -51,11 +52,11 @@ export function CashFlowChart({
               >
                 <span className="min-w-0">
                   <span className="block text-[13px] font-bold">{formatMonth(m.month)}</span>
-                  {note && <span className="block text-[10px] font-bold text-warn">جزئي · {note}</span>}
+                  {note && <span className="block text-[10px] font-bold text-warn"><T s="جزئي · {0}" a={[note]} /></span>}
                 </span>
                 <span className="min-w-0 space-y-1.5">
-                  <Bar tone="bg-accent" width={pct(m.inMinor)} label="وارد" minor={m.inMinor} />
-                  <Bar tone={OUT_FILL} width={pct(m.outMinor)} label="صادر" minor={m.outMinor} />
+                  <Bar tone="bg-accent" width={pct(m.inMinor)} label="الداخل" minor={m.inMinor} />
+                  <Bar tone={OUT_FILL} width={pct(m.outMinor)} label="الخارج" minor={m.outMinor} />
                 </span>
                 <span className="col-span-2 flex items-baseline justify-between gap-2 border-t border-line-soft pt-1.5 text-end sm:col-span-1 sm:block sm:border-0 sm:pt-0">
                   <span className="text-[10px] font-bold text-muted sm:block">الصافي</span>

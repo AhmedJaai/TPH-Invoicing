@@ -9,6 +9,7 @@ import { buttonClass } from "./ui";
 import { formatWeek } from "./inventory-ui";
 import { PRODUCT, countNoun } from "@/lib/arabic";
 import { MAX_SALES_FILE_BYTES, SALES_FILE_TOO_LARGE } from "@/lib/sales/file-import";
+import { T } from "@/components/i18n/t";
 
 /**
  * رفعُ ملفّ مبيعات فودكس.
@@ -36,16 +37,16 @@ interface ImportResponse {
 }
 
 const SHAPE_LABEL: Record<string, string> = {
-  FOODICS_ORDER_ITEMS: "تصدير بنود الطلبات (لكل صف رقم الطلب الخاص به)",
-  FOODICS_ORDERS: "تصدير الطلبات (لكل صف رقم الطلب الخاص به)",
-  FOODICS_PRODUCT_MIX: "تصدير مزيج الأصناف (كمية المبيع من كل صنف في اليوم)",
+  FOODICS_ORDER_ITEMS: "تصدير بنود الطلبات (في كل صف رقم طلبه)",
+  FOODICS_ORDERS: "تصدير الطلبات (في كل صف رقم طلبه)",
+  FOODICS_PRODUCT_MIX: "تصدير مزيج الأصناف (كمية ما بيع من كل صنف في اليوم)",
 };
 
 const STATUS_LABEL: Record<ImportResponse["status"], { text: string; tone: string; border: string; icon: LucideIcon }> = {
-  IMPORTED: { text: "تم الاستيراد كاملاً", tone: "text-ok", border: "border-ok/30", icon: CircleCheck },
-  PARTIAL: { text: "تم الاستيراد جزئياً، وما لم يُقرأ محفوظ مع سببه", tone: "text-warn", border: "border-warn/30", icon: TriangleAlert },
-  FAILED: { text: "لم يتم الاستيراد. راجع الأعمدة أدناه", tone: "text-danger", border: "border-danger/30", icon: CircleAlert },
-  DUPLICATE: { text: "هذا الملف مستورد من قبل، ولم يُسجَّل منه شيء مرة أخرى", tone: "text-ink-soft", border: "border-line", icon: Copy },
+  IMPORTED: { text: "اكتمل الاستيراد", tone: "text-ok", border: "border-ok/30", icon: CircleCheck },
+  PARTIAL: { text: "استُورد جزء من الملف، وما لم يُقرأ محفوظ مع سببه", tone: "text-warn", border: "border-warn/30", icon: TriangleAlert },
+  FAILED: { text: "لم يُستورد شيء. راجع الأعمدة أدناه", tone: "text-danger", border: "border-danger/30", icon: CircleAlert },
+  DUPLICATE: { text: "هذا الملف مستورد من قبل، فلم يُسجَّل منه شيء مرة أخرى", tone: "text-ink-soft", border: "border-line", icon: Copy },
 };
 
 export function InventoryImport({ canImport, hasCatalog = true }: { canImport: boolean; hasCatalog?: boolean }) {
@@ -97,7 +98,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
   if (!canImport) {
     return (
       <p className="rounded-xl border border-dashed border-line px-5 py-6 text-center text-xs text-muted">
-        استيراد المبيعات ليس ضمن صلاحياتك. يرفعه من لديه صلاحية الجرد.
+        استيراد المبيعات ليس من صلاحياتك، ويرفعه من يملك صلاحية الجرد.
       </p>
     );
   }
@@ -110,9 +111,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
         <p className="flex items-start gap-2 rounded-lg border border-warn/25 bg-warn-bg px-3 py-2.5 text-xs leading-relaxed text-ink-soft">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" strokeWidth={2} aria-hidden />
           <span>
-            <strong className="text-ink">ارفع الكتالوج قبل المبيعات.</strong> ستُحفظ المبيعات الآن، لكن استهلاكها يبقى «غير معروف»
-            حتى تصل الوصفات، ولا تحتاج إلى إعادة رفعها بعد ذلك.
-          </span>
+            <T s="{0} ستُحفظ المبيعات الآن، ويبقى استهلاكها «غير معروف» حتى تصل الوصفات، ولن تحتاج إلى رفعها مرة أخرى بعد ذلك." a={[<strong key="0" className="text-ink">ارفع الكتالوج قبل المبيعات.</strong>]} /></span>
         </p>
       )}
 
@@ -126,11 +125,11 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold" dir="auto">{file.name}</p>
-                <p className="text-[11px] text-muted"><span className="nums">{kb(file.size)}</span> · سيُقرأ الملف حسب أعمدته، ولن يُسجَّل إن كان مستورداً من قبل</p>
+                <p className="text-[11px] text-muted"><T s="{0} · سيُقرأ الملف بحسب أعمدته، ولن يُسجَّل إن كان مستورداً من قبل" a={[<span key="0" className="nums">{kb(file.size)}</span>]} /></p>
               </div>
               <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                 <button type="button" onClick={() => void upload()} disabled={busy} className={`${buttonClass("primary")} flex-1 sm:flex-none`}>
-                  {busy ? <><Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />جارٍ قراءة الملف…</> : <><Upload className="h-4 w-4" strokeWidth={2} aria-hidden />استورد الملف</>}
+                  {busy ? <><T s="{0}يقرأ الملف…" a={[<Loader2 key="0" className="h-4 w-4 animate-spin" strokeWidth={2} aria-hidden />]} /></> : <><T s="{0}استورد الملف" a={[<Upload key="0" className="h-4 w-4" strokeWidth={2} aria-hidden />]} /></>}
                 </button>
                 <button type="button" onClick={reset} disabled={busy} className={buttonClass("quiet")}>غيّر الملف</button>
               </div>
@@ -141,7 +140,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
                 <Upload className="h-5 w-5" strokeWidth={1.75} aria-hidden />
               </span>
               <span className="text-sm font-bold">اختر ملف مبيعات فودكس</span>
-              <span className="max-w-sm text-xs leading-relaxed text-muted">Excel أو CSV بحجم أقصاه ٤ ميجابايت، ويشمل أسبوعاً واحداً. رفع الملف نفسه مرتين لا يكرر المبيعات.</span>
+              <span className="max-w-sm text-xs leading-relaxed text-muted">Excel أو CSV لا يتجاوز ٤ ميجابايت، ويغطي أسبوعاً واحداً. رفع الملف نفسه مرتين لا يكرر المبيعات.</span>
               <input
                 type="file"
                 accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -162,7 +161,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
           <div className="mt-3">
             {dateOpen ? (
               <label className="block">
-                <span className="block text-[11px] font-medium text-muted">يوم العمل (يُملأ فقط إذا لم يكن في الملف عمود تاريخ)</span>
+                <span className="block text-[11px] font-medium text-muted">يوم العمل (يُملأ فقط إن لم يكن في الملف عمود تاريخ)</span>
                 <input
                   type="date" value={businessDate} onChange={(e) => setBusinessDate(e.target.value)}
                   className="nums mt-1 min-h-11 rounded-lg border border-line-input bg-raised px-3 text-sm"
@@ -170,7 +169,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
               </label>
             ) : (
               <button type="button" onClick={() => setDateOpen(true)} className={`${buttonClass("quiet", "sm")} -ms-2`}>
-                الملف بلا عمود تاريخ؟ حدّد يوم العمل
+                ليس في الملف عمود تاريخ؟ حدّد يوم العمل
               </button>
             )}
           </div>
@@ -178,7 +177,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
           {error && (
             <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2.5 text-xs leading-relaxed text-danger">
               <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-              <span>{error} {file && "(لم يُسجَّل شيء، ويمكنك إعادة المحاولة)"}</span>
+              <span>{error} {file && "(لم يُسجَّل شيء، ويمكنك المحاولة من جديد)"}</span>
             </p>
           )}
         </div>
@@ -191,7 +190,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
             <div className="min-w-0 flex-1">
               <p className={`text-[15px] font-bold ${status.tone}`}>{status.text}</p>
               <p className="mt-0.5 text-xs text-muted">
-                {result.periodStart ? <>الفترة المقروءة: <strong className="text-ink-soft">{formatWeek(result.periodStart, result.periodEnd ?? result.periodStart)}</strong></> : "لم تُقرأ فترة من الملف."}
+                {result.periodStart ? <><T s="الفترة المقروءة: {0}" a={[<strong key="0" className="text-ink-soft">{formatWeek(result.periodStart, result.periodEnd ?? result.periodStart)}</strong>]} /></> : "لم تُقرأ فترة من الملف."}
                 {result.shape && SHAPE_LABEL[result.shape] && <> · {SHAPE_LABEL[result.shape]}</>}
               </p>
             </div>
@@ -203,7 +202,7 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
             <Fact label="صفوف الملف" value={result.totals.rows} />
             <Fact label="صفوف مقروءة" value={result.totals.parsed} />
             <Fact label="مبيعات مسجّلة" value={result.totals.salesWritten} />
-            <Fact label="مبيعات مُحدَّثة" value={result.totals.salesRestated} />
+            <Fact label="مبيعات محدّثة" value={result.totals.salesRestated} />
             <Fact label="بنود البيع" value={result.totals.lineCount} />
             <Fact label="صفوف متجاهلة" value={result.totals.skipped} />
             <Fact label="صفوف لم تُقرأ" value={result.totals.errors} tone={result.totals.errors > 0 ? "text-danger" : undefined} />
@@ -214,13 +213,11 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
           <div className="mt-4 flex flex-wrap gap-2">
             {result.unmappedProducts > 0 && (
               <Link href="/inventory/mapping" className={buttonClass("primary", "sm")}>
-                اربط {countNoun(result.unmappedProducts, PRODUCT)} <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              </Link>
+                <T s="اربط {0} {1}" a={[countNoun(result.unmappedProducts, PRODUCT), <ArrowLeft key="1" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
             )}
             {(result.status === "IMPORTED" || result.status === "PARTIAL") && (
               <Link href="/inventory#start" className={buttonClass(result.unmappedProducts > 0 ? "secondary" : "primary", "sm")}>
-                إلى الجرد <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-              </Link>
+                <T s="إلى الجرد {0}" a={[<ArrowLeft key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></Link>
             )}
           </div>
 
@@ -238,13 +235,12 @@ export function InventoryImport({ canImport, hasCatalog = true }: { canImport: b
           {result.recognisedColumns.length > 0 && (
             <details className="mt-4 rounded-lg border border-line-soft bg-sunken/50 px-3 py-2">
               <summary className="flex min-h-11 cursor-pointer items-center text-xs font-bold sm:min-h-8">
-                الأعمدة التي تم التعرف عليها ({result.recognisedColumns.length}). قارنها بالملف
-              </summary>
+                <T s="الأعمدة التي تعرّف عليها النظام ({0}). قارنها بالملف" a={[result.recognisedColumns.length]} /></summary>
               <ul className="mt-1 flex flex-wrap gap-1.5 pb-2">
                 {result.recognisedColumns.map((c) => <li key={c} className="rounded-md bg-raised px-2 py-0.5 text-[11px] text-ink-soft" dir="auto">{c}</li>)}
               </ul>
               {result.unrecognisedColumns.length > 0 && (
-                <p className="pb-2 text-[11px] text-muted"><strong>أعمدة لم يتم التعرف عليها:</strong> {result.unrecognisedColumns.join(" · ")}</p>
+                <p className="pb-2 text-[11px] text-muted"><strong>أعمدة لم يتعرّف عليها النظام:</strong> {result.unrecognisedColumns.join(" · ")}</p>
               )}
             </details>
           )}

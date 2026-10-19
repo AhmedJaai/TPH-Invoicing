@@ -14,14 +14,15 @@ import { loadInventorySetup, setupProgress } from "@/services/inventory-overview
 import { PRODUCT, countNoun } from "@/lib/arabic";
 import { formatDay } from "@/lib/riyadh-time";
 import { lastCompleteWeek, nextWeek } from "@/lib/inventory/week";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
 const STATUS: Record<string, { label: string; tone: Tone }> = {
   IMPORTED: { label: "مكتمل", tone: "ok" },
-  PARTIAL: { label: "جزئيّ", tone: "warn" },
+  PARTIAL: { label: "جزئي", tone: "warn" },
   FAILED: { label: "فشل الاستيراد", tone: "danger" },
-  DUPLICATE: { label: "مكرّر", tone: "muted" },
+  DUPLICATE: { label: "مكرر", tone: "muted" },
   PENDING: { label: "لم يكتمل", tone: "warn" },
 };
 
@@ -86,7 +87,7 @@ export default async function SalesImportPage() {
 
   const columns: readonly Column<ImportRow>[] = [
     {
-      key: "file", header: "الملفّ", primary: true,
+      key: "file", header: "الملف", primary: true,
       cell: (r) => <span className="font-bold" dir="auto">{r.fileName}</span>,
     },
     {
@@ -104,7 +105,7 @@ export default async function SalesImportPage() {
       cell: (r) => (
         <span className="nums">
           {r.importedRows} / {r.totalRows}
-          {r.errorRows > 0 && <span className="text-danger"> · {r.errorRows} لم تُقرأ</span>}
+          {r.errorRows > 0 && <span className="text-danger"> <T s=" · {0} لم تُقرأ" a={[r.errorRows]} /></span>}
         </span>
       ),
     },
@@ -116,9 +117,9 @@ export default async function SalesImportPage() {
       user={user}
       width="page"
       title="الاستيراد"
-      intro="ترفع من هنا ملفين من فودكس: كتالوج المقهى (مرة واحدة ثم عند تغيّره)، ومبيعات الأسبوع (كل أحد). ارفعهما كما صدرا من فودكس."
+      intro="من هنا ترفع ملفين من فودكس: كتالوج المقهى (مرة واحدة، ثم كلما تغيّر)، ومبيعات الأسبوع (كل يوم أحد). ارفعهما كما صدّرتهما من فودكس."
       actions={setup.unmapped > 0
-        ? <LinkButton href="/inventory/mapping" size="sm" icon={Link2}>{`${countNoun(setup.unmapped, PRODUCT)} تحتاج ربطاً`}</LinkButton>
+        ? <LinkButton href="/inventory/mapping" size="sm" icon={Link2}>{`${countNoun(setup.unmapped, PRODUCT)} تحتاج إلى ربط`}</LinkButton>
         : undefined}
     >
       {!progress.complete ? (
@@ -127,8 +128,8 @@ export default async function SalesImportPage() {
         </section>
       ) : (
         <p className="mb-8 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-line bg-raised px-4 py-3 text-xs text-ink-soft shadow-raised">
-          <span className="flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5 text-muted" strokeWidth={2} aria-hidden />الكتالوج: <strong className="text-ink">{countNoun(setup.recipes, RECIPE)}</strong></span>
-          <span className="flex items-center gap-1.5"><FileSpreadsheet className="h-3.5 w-3.5 text-muted" strokeWidth={2} aria-hidden />المبيعات حتى <strong className="text-ink">{formatDay(setup.salesThrough)}</strong></span>
+          <span className="flex items-center gap-1.5"><T s="{0}الكتالوج: {1}" a={[<BookOpen key="0" className="h-3.5 w-3.5 text-muted" strokeWidth={2} aria-hidden />, <strong key="1" className="text-ink">{countNoun(setup.recipes, RECIPE)}</strong>]} /></span>
+          <span className="flex items-center gap-1.5"><T s="{0}المبيعات حتى {1}" a={[<FileSpreadsheet key="0" className="h-3.5 w-3.5 text-muted" strokeWidth={2} aria-hidden />, <strong key="1" className="text-ink">{formatDay(setup.salesThrough)}</strong>]} /></span>
         </p>
       )}
 
@@ -144,7 +145,7 @@ export default async function SalesImportPage() {
             n={2}
             icon={FileSpreadsheet}
             title="مبيعات الأسبوع"
-            hint="ملف Excel مُصدَّر من فودكس كما هو، من تقرير الطلبات أو تقرير مزيج الأصناف. منه يعرف النظام ما كان ينبغي أن يُصرف من المخزون."
+            hint="ملف Excel كما صدّرته من فودكس، من تقرير الطلبات أو تقرير مزيج الأصناف. منه يعرف النظام ما كان يُفترض أن يُصرف من المخزون."
           />
           <InventoryImport canImport={can(user.role, "inventory:count")} hasCatalog={hasCatalog} />
         </section>
@@ -155,8 +156,8 @@ export default async function SalesImportPage() {
             icon={BookOpen}
             title={hasCatalog ? "الكتالوج: الأصناف والعبوات والوصفات" : "ابدأ بالكتالوج: الأصناف والعبوات والوصفات"}
             hint={hasCatalog
-              ? "يحدد ما يُباع وما يُخزَّن وكم يدخل في كل مشروب. ارفعه من جديد كلما تغيّر، وما كتبته بيدك لا يُستبدل."
-              : "بدون الوصفات لا يعرف النظام ما استهلكته المبيعات، لذلك هو الخطوة الأولى، ثم ملف المبيعات."}
+              ? "يحدد ما يُباع وما يُخزَّن وكم يدخل في كل مشروب. ارفعه من جديد كلما تغيّر، ولن يُستبدل ما كتبته بيدك."
+              : "بدون الوصفات لا يعرف النظام ما استهلكته المبيعات، لذلك يأتي الكتالوج أولاً، ثم ملف المبيعات."}
           />
           <CatalogImport
             canEdit={can(user.role, "recipe:edit")}
@@ -165,19 +166,19 @@ export default async function SalesImportPage() {
         </section>
       </div>
 
-      <Section title="ملفّات المبيعات المستوردة" icon={History} count={rows.length > 0 ? rows.length : undefined}>
+      <Section title="ملفات المبيعات المستوردة" icon={History} count={rows.length > 0 ? rows.length : undefined}>
         <DataTable
           columns={columns}
           rows={rows}
           keyOf={(r) => r.id}
           searchOf={(r) => `${r.fileName} ${r.periodStart ?? ""} ${r.periodEnd ?? ""}`}
-          searchLabel="ابحث باسم الملفّ أو التاريخ"
+          searchLabel="ابحث باسم الملف أو التاريخ"
           empty={
             <EmptyState
               compact
               icon={FileSpreadsheet}
               title="لم يُستورد أي ملف مبيعات بعد."
-              hint="يظهر هنا كل ملف ترفعه، والفترة التي يغطيها، وما تعذّرت قراءته منه، لتعرف أي الأسابيع وصلت وأيها لم تصل."
+              hint="هنا يظهر كل ملف ترفعه، والفترة التي يغطيها، وما تعذّرت قراءته منه، لتعرف أي الأسابيع وصلت وأيها لم يصل."
             />
           }
         />

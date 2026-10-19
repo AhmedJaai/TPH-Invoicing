@@ -60,7 +60,7 @@ export function SupplierPolicy({
       setMessage(r.error);
       return;
     }
-    setMessage("تم حفظ السياسة.");
+    setMessage("حُفظت السياسة.");
     router.refresh();
   }
 
@@ -70,8 +70,7 @@ export function SupplierPolicy({
     <div className="rounded-2xl border border-line bg-raised p-4 shadow-raised sm:p-5">
       <h3 className="text-sm font-bold">ما نطلبه من هذا المورّد</h3>
       <p className="mt-1 text-xs leading-relaxed text-muted">
-        يحدّدها صاحب العمل ولا يستنتجها النظام، لأن غياب المستند عندنا لا يعني أنه غير موجود.
-        وعلى هذه الخيارات يعتمد ما يظهر في «يحتاج قرارك».
+        يحددها صاحب العمل لا النظام، لأن غياب المستند عندنا لا يعني أنه غير موجود. وعلى هذه الخيارات يعتمد ما يظهر في «يحتاج قرارك».
       </p>
 
       <div className="mt-4 space-y-2.5">
@@ -80,7 +79,7 @@ export function SupplierPolicy({
           disabled={!canEdit || busy}
           onChange={(v) => set({ issuesInvoices: v, ...(v ? {} : { paperInvoices: false }) })}
           label="يصدر فواتير ضريبية"
-          hint="فاتورة تحمل رقمه الضريبي وبيانات الفاتورة الضريبية الكاملة، وبها وحدها تُخصم ضريبة المدخلات."
+          hint="فاتورة تحمل رقمه الضريبي وكامل بيانات الفاتورة الضريبية، وبها وحدها تُخصم ضريبة المدخلات."
         />
         <Choice
           checked={form.paperInvoices}
@@ -89,8 +88,8 @@ export function SupplierPolicy({
           label="فواتيره ورقية تُسلَّم باليد"
           hint={
             form.issuesInvoices
-              ? "الفواتير موجودة فعلاً وإن لم تُرفع، لذلك لن نطالبك بعقد، بل برفع الفاتورة الورقية."
-              : "لا يُختار هذا الخيار إلا للمورّد الذي يصدر فواتير: الفاتورة الورقية فاتورة موجودة لم تُرفع."
+              ? "الفواتير موجودة فعلاً وإن لم تُرفع، فلن نطلب منك عقداً، بل رفع الفاتورة الورقية."
+              : "هذا الخيار للمورّد الذي يصدر فواتير فقط: الفاتورة الورقية فاتورة موجودة لم تُرفع."
           }
         />
         <Choice
@@ -98,21 +97,20 @@ export function SupplierPolicy({
           disabled={!canEdit || busy}
           onChange={(v) => set({ contractRequired: v })}
           label="يُطلب منه عقد توريد"
-          hint="أوقفه للمورّد الذي تشتري منه مرة في السنة، حتى لا يظهر لك تنبيه لا تحتاج إلى فعل شيء بشأنه."
+          hint="أوقفه للمورّد الذي تشتري منه مرة في السنة، حتى لا يظهر لك تنبيه لا عمل لك فيه."
         />
         <Choice
           checked={form.contractOnFile}
           disabled={!canEdit || busy}
           onChange={(v) => set({ contractOnFile: v })}
           label="العقد موجود عندي"
-          hint="وقّعته واحتفظت به، فيختفي التنبيه."
+          hint="وقّعته وحفظته، فيختفي التنبيه."
         />
       </div>
 
       {conflict && (
         <p className="mt-3 rounded-lg border border-warn/40 bg-warn-bg px-3 py-2 text-xs leading-relaxed text-warn">
-          لا يمكن الجمع بينهما: «ورقية» تعني أن الفاتورة موجودة ولم تُرفع، و«لا يصدر فواتير» تعني
-          أنها غير موجودة.
+          لا يجتمع الخياران: «ورقية» تعني أن الفاتورة موجودة ولم تُرفع، و«لا يصدر فواتير» تعني أنها غير موجودة.
         </p>
       )}
 

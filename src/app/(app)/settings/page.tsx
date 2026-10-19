@@ -23,6 +23,7 @@ import { listUsersForAdmin } from "@/services/user-admin.service";
 import { cookies } from "next/headers";
 import { LanguageSwitch } from "@/components/i18n/language-switch";
 import { asLocale, LOCALE_COOKIE } from "@/lib/i18n/locale";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -114,14 +115,14 @@ export default async function SettingsPage() {
     { id: "account", label: "الحساب", icon: UserRound },
     { id: "language", label: "اللغة", icon: Languages },
     ...(managedUsers ? [{ id: "users", label: "المستخدمون", icon: UsersRound }] : []),
-    ...(showMoney ? [{ id: "recurring", label: "المصروفات المتكرّرة", icon: Repeat }] : []),
+    ...(showMoney ? [{ id: "recurring", label: "المصروفات المتكررة", icon: Repeat }] : []),
     ...(showRules ? [{ id: "rules", label: "قواعد التصنيف", icon: SlidersHorizontal }] : []),
-    { id: "health", label: "صحّة البيانات", icon: Activity },
+    { id: "health", label: "صحة البيانات", icon: Activity },
     { id: "system", label: "النظام", icon: Cpu },
   ];
 
   return (
-    <PageShell user={user} width="wide" title="الإعدادات" intro={`إعدادات تضبطها مرة واحدة: ${[showMoney ? "المصروفات المتكرّرة" : null, showRules ? "قواعد التصنيف" : null, "حالة الربط"].filter(Boolean).join("، و")}.`}>
+    <PageShell user={user} width="wide" title="الإعدادات" intro={`إعدادات تضبطها مرة واحدة: ${[showMoney ? "المصروفات المتكررة" : null, showRules ? "قواعد التصنيف" : null, "حالة الربط"].filter(Boolean).join("، و")}.`}>
       {/* `minmax(0,1fr)` على الجوّال أيضاً — عمودٌ ضمنيّ بعرض محتواه يمدّه صفُّ الفهرس فتفيض الصفحة كلُّها عرضاً */}
       <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[13rem_minmax(0,1fr)]">
         <nav aria-label="أقسام الإعدادات" className="min-w-0 lg:sticky lg:top-24 lg:self-start">
@@ -145,24 +146,23 @@ export default async function SettingsPage() {
                 items={[
                   { label: "أنت", value: user.name ?? "مستخدم" },
                   { label: "دورك", value: ROLE_LABEL[user.role] },
-                  { label: "المستخدمون", value: <span className="nums">{Number(f?.users ?? 0)}</span>, hint: managedUsers ? "يمكنك إدارة الدور والتعطيل والجلسات من قسم «المستخدمون» أدناه. ويُضاف البريد الجديد من قائمة الدخول عند النشر." : "يديرهم مالك الحساب." },
+                  { label: "المستخدمون", value: <span className="nums">{Number(f?.users ?? 0)}</span>, hint: managedUsers ? "تدير الأدوار والتعطيل والجلسات من قسم «المستخدمون» أدناه. ويُضاف البريد الجديد إلى قائمة الدخول عند النشر." : "يديرهم مالك الحساب." },
                 ]}
               />
               {isAuthBypassed() && (
                 <Callout tone="danger" icon={ShieldAlert} className="mt-4" title="وضع التجربة مفعّل، وتسجيل الدخول معطّل">
-                  يدخل كل من يعرف الرابط بدور «{ROLE_LABEL[user.role]}». هذا الوضع لا يعمل في الإنتاج مهما كانت الإعدادات.
-                </Callout>
+                  <T s="كل من يعرف الرابط يدخل بدور «{0}». هذا الوضع لا يعمل في الإنتاج مهما كانت الإعدادات." a={[ROLE_LABEL[user.role]]} /></Callout>
               )}
             </div>
           </Section>
 
-          <Section id="language" title="اللغة" icon={Languages} hint="لغة الواجهة على هذا الجهاز. أسماء المورّدين ونصوص المستندات تبقى كما وردت.">
+          <Section id="language" title="اللغة" icon={Languages} hint="لغة الواجهة على هذا الجهاز. أسماء المورّدين ونصوص المستندات تبقى كما هي.">
             <LanguageSwitch current={locale} />
           </Section>
 
           {can(user.role, "reports:view") && (
             <Callout tone="accent" icon={CalendarClock} className="mt-6" title="الوثائق والتراخيص" action={<LinkButton href="/settings/obligations" variant="secondary" size="sm">افتح الوثائق</LinkButton>}>
-              السجل التجاري ورخصة البلدية والشهادات الصحية والإقامات وعقد الإيجار، مع تاريخ انتهاء كل منها. يذكّرك النظام قبل انتهائها.
+              السجل التجاري ورخصة البلدية والشهادات الصحية والإقامات وعقد الإيجار، وتاريخ انتهاء كل منها. يذكّرك النظام قبل أن تنتهي.
             </Callout>
           )}
 
@@ -172,7 +172,7 @@ export default async function SettingsPage() {
               title="المستخدمون"
               icon={UsersRound}
               count={managedUsers.length}
-              hint="من يستطيع الدخول، وبأي دور، ومن لديه جلسة مفتوحة. يُضاف البريد الجديد إلى قائمة الدخول عند النشر، ويظهر هنا بعد أول دخول له، ثم يمكنك تغيير دوره من هنا."
+              hint="من يستطيع الدخول، وبأي دور، ومن جلسته مفتوحة. يُضاف البريد الجديد إلى قائمة الدخول عند النشر، ويظهر هنا بعد أول دخول له، ثم تغيّر دوره من هنا."
             >
               <UserAdmin
                 meId={user.id}
@@ -189,9 +189,9 @@ export default async function SettingsPage() {
           {showMoney && (
             <Section
               id="recurring"
-              title="المصروفات المتكرّرة"
+              title="المصروفات المتكررة"
               icon={Repeat}
-              hint="مصروفات تتكرر دون أن تصلك فاتورة بها: الإيجار والرواتب والاشتراكات. يعتمد عليها «النقد القادم» ويقارن المتوقع بالفعلي."
+              hint="مصروفات تتكرر بلا فاتورة: الإيجار والرواتب والاشتراكات. يعتمد عليها «النقد القادم»، ويقارن بها المتوقع بالفعلي."
               action={can(user.role, "bank:view") ? <Link href="/cash" className="text-xs font-bold text-accent hover:underline">النقد القادم</Link> : undefined}
             >
               <RecurringExpenses rows={all.filter((r) => r.isActive).map(toRow)} inactive={all.filter((r) => !r.isActive).map(toRow)} canEdit={can(user.role, "expense:edit")} />
@@ -199,7 +199,7 @@ export default async function SettingsPage() {
           )}
 
           {showRules && (
-            <Section id="rules" title="قواعد تصنيف الحركات" icon={SlidersHorizontal} count={rules.length} hint="تصنيف اخترته مرة عند استيراد كشف، فتُصنَّف به كل حركة تحتوي على هذا النص في الكشوف التالية.">
+            <Section id="rules" title="قواعد تصنيف الحركات" icon={SlidersHorizontal} count={rules.length} hint="تصنيف اخترته مرة عند استيراد كشف، فيُطبَّق على كل حركة فيها هذا النص في الكشوف التالية.">
               <BankRules rows={rules} canEdit={can(user.role, "bank:edit")} />
             </Section>
           )}
@@ -208,8 +208,8 @@ export default async function SettingsPage() {
             id="health"
             title="حالة الربط وصحة البيانات"
             icon={Activity}
-            hint="ما ليس موصولاً يُعرض كذلك، ولا يُملأ بأصفار أو ببيانات وهمية."
-            action={<span className="text-xs font-bold text-ink-soft">نسبة الاكتمال <span className="nums">{Math.round(health.confidence * 100)}</span>٪</span>}
+            hint="ما ليس موصولاً يظهر كذلك، ولا يُملأ بأصفار ولا ببيانات وهمية."
+            action={<span className="text-xs font-bold text-ink-soft"><T s="نسبة الاكتمال {0}٪" a={[<span key="0" className="nums">{Math.round(health.confidence * 100)}</span>]} /></span>}
           >
             <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">
               {health.metrics.map((m) => {
@@ -232,7 +232,7 @@ export default async function SettingsPage() {
                         <Meter value={Math.round(m.coverage * 100)} max={100} tone={ui.tone} label={m.label} />
                       </div>
                     )}
-                    {m.action && <p className="mt-2 text-[11px] text-ink-soft">الخطوة التالية: {m.action}</p>}
+                    {m.action && <p className="mt-2 text-[11px] text-ink-soft"><T s="الخطوة التالية: {0}" a={[m.action]} /></p>}
                   </li>
                 );
               })}
@@ -243,7 +243,7 @@ export default async function SettingsPage() {
             <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
               <Link href="/suppliers" className="rounded-xl border border-line bg-raised p-4 shadow-raised transition-colors hover:border-accent-line">
                 <Store className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-                <p className="mt-2 text-sm font-bold">المورّدون <span className="nums text-muted">{Number(f?.suppliers ?? 0)}</span></p>
+                <p className="mt-2 text-sm font-bold"><T s="المورّدون {0}" a={[<span key="0" className="nums text-muted">{Number(f?.suppliers ?? 0)}</span>]} /></p>
                 <p className="mt-0.5 text-[11px] text-muted">
                   {countNoun(Number(f?.aliases ?? 0), ALIAS)}{Number(f?.inactive ?? 0) > 0 ? ` · ${f?.inactive} معطّلة بعد الدمج` : ""}
                 </p>
@@ -251,20 +251,20 @@ export default async function SettingsPage() {
               {can(user.role, "audit:view") && (
                 <Link href="/settings/audit" className="rounded-xl border border-line bg-raised p-4 shadow-raised transition-colors hover:border-accent-line">
                   <ScrollText className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
-                  <p className="mt-2 text-sm font-bold">سجلّ التدقيق <span className="nums text-muted">{Number(f?.audit ?? 0)}</span></p>
-                  <p className="mt-0.5 text-[11px] text-muted">ماذا حدث ومن فعله ومتى. السجل لا يُعدَّل ولا يُحذف.</p>
+                  <p className="mt-2 text-sm font-bold"><T s="سجل التدقيق {0}" a={[<span key="0" className="nums text-muted">{Number(f?.audit ?? 0)}</span>]} /></p>
+                  <p className="mt-0.5 text-[11px] text-muted">ماذا حدث، ومن فعله، ومتى. السجل لا يُعدَّل ولا يُحذف.</p>
                 </Link>
               )}
               <div className="rounded-xl border border-line bg-raised p-4 shadow-raised">
                 <Cpu className="h-4 w-4 text-muted" strokeWidth={2} aria-hidden />
                 <p className="mt-2 text-sm font-bold">قارئ المستندات</p>
-                <p className="mt-0.5 text-[11px] text-muted"><bdi dir="ltr">{activeProviderName()}</bdi> — يُضبط عند النشر</p>
+                <p className="mt-0.5 text-[11px] text-muted"><T s="{0} — يُضبط عند النشر" a={[<bdi key="0" dir="ltr">{activeProviderName()}</bdi>]} /></p>
                 {showMoney && (
                   <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
                     {aiSpend === null
-                      ? "إنفاقه هذا الشهر: غير معروف، لأنه لم تُسجَّل أي عملية قراءة بعد"
-                      : <>إنفاقه التقديري هذا الشهر: <bdi dir="ltr" className="nums font-bold">${formatUsd(aiSpend.costMicroUsd)}</bdi> عن <span className="nums">{aiSpend.calls}</span> عملية قراءة</>}
-                    {aiBudget !== null && <> · الحد اليومي <bdi dir="ltr" className="nums">${formatUsd(aiBudget)}</bdi></>}
+                      ? "إنفاقه هذا الشهر غير معروف، لأنه لم تُسجَّل أي عملية قراءة بعد"
+                      : <><T s="إنفاقه التقديري هذا الشهر: {0} عن {1} عملية قراءة" a={[<bdi key="0" dir="ltr" className="nums font-bold">${formatUsd(aiSpend.costMicroUsd)}</bdi>, <span key="1" className="nums">{aiSpend.calls}</span>]} /></>}
+                    {aiBudget !== null && <> <T s=" · الحد اليومي {0}" a={[<bdi key="0" dir="ltr" className="nums">${formatUsd(aiBudget)}</bdi>]} /></>}
                   </p>
                 )}
               </div>

@@ -94,6 +94,6 @@ describe("summarize", () => {
   });
 
   it("تقول لا بيانات حين لا شيء", () => {
-    expect(summarize(buildProvenance([]))).toBe("لا توجد بيانات بعد");
+    expect(summarize(buildProvenance([]))).toBe("لا بيانات بعد");
   });
 });

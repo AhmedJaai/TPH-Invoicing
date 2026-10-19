@@ -313,7 +313,7 @@ describe("الغائب يرى", () => {
       .find((i) => i.id === "bank-balance-difference");
     expect(item?.severity).toBe("CRITICAL");
     expect(item?.amountMinor).toBe(11_600_00);
-    expect(item?.detail).toContain("صادرة لم تُقرأ");
+    expect(item?.detail).toContain("خارجة لم تُقرأ");
   });
 
   it("وفرق صغير (١٫٧٣) يقال بمبلغه ولا يرفع حرجاً", () => {
@@ -400,7 +400,7 @@ describe("كلّ عدد في العنوان يمرّ بتمييزه (CODE-107)",
 
   it("وما فوق العشرة مفرد منصوب", () => {
     const titles = buildAttention({ ...quiet, ...facts(13) }).map((i) => i.title);
-    expect(titles).toContain("13 يوماً بدون كشف بنكي");
+    expect(titles).toContain("13 يوماً بلا كشف بنكي");
     expect(titles).toContain("13 دفعة لم تُنسب إلى فاتورة");
     expect(titles).toContain("13 مانعاً لم يُعالَج");
   });

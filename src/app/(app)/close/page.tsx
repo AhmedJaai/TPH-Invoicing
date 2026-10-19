@@ -61,7 +61,7 @@ export default async function ClosePage() {
         <EmptyState
           icon={CalendarCheck}
           title="لا يوجد شهر جاهز للإقفال بعد"
-          hint="الإقفال يعني أن كل فواتير الشهر وصلت، ولا توجد فواتير في النظام حتى الآن. ارفع فواتيرك أو زامن الدرايف أولاً."
+          hint="إقفال الشهر يعني أن كل فواتيره وصلت، ولا توجد في النظام فواتير حتى الآن. ارفع فواتيرك أو زامن الدرايف أولاً."
           action={<LinkButton href="/upload" variant="primary">ارفع مستنداً</LinkButton>}
         />
       </PageShell>
@@ -76,8 +76,8 @@ export default async function ClosePage() {
     <PageShell
       user={user}
       title="إقفال الشهر"
-      eyebrow={`الشهر المنقضي: ${formatMonth(previous)}`}
-      intro="أكّد أن الشهر اكتمل: وصلت كل الفواتير، وعولجت كل المشكلات أو اعتمدتها عن علم. ثم تحصل على حزمة واحدة للمحاسب."
+      eyebrow={`الشهر الماضي: ${formatMonth(previous)}`}
+      intro="أكّد أن الشهر اكتمل: وصلت كل فواتيره، وعولجت كل المشكلات أو قبلتها عن علم. بعدها تحصل على حزمة واحدة جاهزة للمحاسب."
     >
       <div className="grid grid-cols-[minmax(0,1fr)] gap-10 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <MonthClose months={months} initialMonth={selected} initialReport={report} initialStatus={status} />
@@ -86,7 +86,7 @@ export default async function ClosePage() {
           <Section title="أشهر مقفلة" icon={Lock} className="mt-0!">
             {closed.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs leading-relaxed text-muted">
-                لم يُقفل أي شهر بعد. أول إقفال يثبّت أرقام شهره ويحفظه هنا.
+                لم يُقفل أي شهر بعد. الإقفال الأول يثبّت أرقام شهره ويحفظه هنا.
               </p>
             ) : (
               <ul className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised shadow-raised">

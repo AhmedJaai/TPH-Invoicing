@@ -175,6 +175,6 @@ export const REMIND_AFTER_DAYS = 7;
 
 /** «طولب اليوم» · «طولب قبل ٩ أيّام — ذكِّره» */
 export function describeRequested(daysAgo: number): string {
-  const when = daysAgo <= 0 ? "اليوم" : daysAgo === 1 ? "أمس" : daysAgo === 2 ? "قبل يومين" : daysAgo <= 10 ? `قبل ${daysAgo} أيّام` : `قبل ${daysAgo} يوماً`;
+  const when = daysAgo <= 0 ? "اليوم" : daysAgo === 1 ? "أمس" : daysAgo === 2 ? "قبل يومين" : daysAgo <= 10 ? `قبل ${daysAgo} أيام` : `قبل ${daysAgo} يوماً`;
   return daysAgo >= REMIND_AFTER_DAYS ? `طُولب ${when}، وحان وقت التذكير` : `طُولب ${when}`;
 }

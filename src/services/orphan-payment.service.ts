@@ -47,12 +47,12 @@ export async function resolveOrphanPayment(
     .for("update")
     .limit(1);
 
-  if (!p) throw new OrphanPaymentError("لا توجد دفعة بهذا المعرّف، ربما حُسمت من نافذة أخرى. حدّث الصفحة.", 404);
+  if (!p) throw new OrphanPaymentError("لا دفعة بهذا المعرّف، فربما قُرّر فيها من نافذة أخرى. حدّث الصفحة.", 404);
   if (p.status === "REVERSED" || p.status === "VOID") {
     throw new OrphanPaymentError("هذه الدفعة ملغاة أو مردودة من قبل. حدّث الصفحة.", 409);
   }
   if (p.supplierId) {
-    throw new OrphanPaymentError("هذه الدفعة منسوبة إلى مورّد من قبل، ولا يمكن نسبها لمورّد آخر من هنا.", 409);
+    throw new OrphanPaymentError("هذه الدفعة منسوبة إلى مورّد من قبل، ولا يمكن نسبتها إلى مورّد آخر من هنا.", 409);
   }
   /* دفعةٌ لها حركة بنك تُعرَّف جهتُها من الحركة — بابُها صفحةُ البنك */
   if (p.hasBankTx) {
@@ -78,9 +78,9 @@ export async function resolveOrphanPayment(
       const twin = await findPaymentTwin(t, { supplierId: s.id, paidAt: p.paidAt, amountMinor: p.amountMinor });
       if (twin && twin.id !== p.id) {
         throw new OrphanPaymentError(
-          `لـ${s.nameAr} سداد مقيّد بالمبلغ نفسه بتاريخ ${formatDay(p.paidAt)}`
+          `لـ${s.nameAr} سداد مسجّل بالمبلغ نفسه بتاريخ ${formatDay(p.paidAt)}`
           + (twin.hasBankRow ? " وله حركة في كشف الحساب" : "")
-          + ". قد تكون هذه الدفعة نسخة مكررة من الإيصال. إن كانت كذلك فألغِ قيدها بخيار «ليست لمورّد»، وإن كانت سداداً آخر فأكّد ذلك ثم انسبها.",
+          + ". قد تكون هذه الدفعة نسخة مكررة من الإيصال، فإن كانت كذلك فألغِ تسجيلها بخيار «ليست لمورّد»، وإن كانت سداداً آخر فأكّد ذلك ثم انسبها.",
           409,
           true,
         );
@@ -114,7 +114,7 @@ export async function resolveOrphanPayment(
       },
     }, t);
 
-    return { message: `نُسبت الدفعة إلى ${s.nameAr}، وصارت رصيداً له يُخصم من المبلغ المستحق عليك.` };
+    return { message: `نُسبت الدفعة إلى ${s.nameAr}، وصارت رصيداً لك عنده يُخصم من المبلغ المستحق عليك.` };
   }
 
   const outcome = await reversePayment(t, { paymentId: p.id, kind: "VOID", reason: req.reason, userId });
@@ -126,5 +126,5 @@ export async function resolveOrphanPayment(
     before: { الحال: p.status, المبلغ: p.amountMinor },
     after: { الحال: outcome.status, السبب: outcome.reason },
   }, t);
-  return { message: "أُلغي قيد الدفعة لأنها ليست سداد مورّد. الإيصال باقٍ في الأرشيف، والإجراء مسجّل في السجل." };
+  return { message: "أُلغي تسجيل الدفعة لأنها ليست سداد مورّد. الإيصال باقٍ في الأرشيف، والإجراء مسجّل في السجل." };
 }

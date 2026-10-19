@@ -55,8 +55,8 @@ export async function replaceWithCorrectedInvoice(tx: Tx, documentId: string, ac
   if (!doc) throw new ReplaceRefused("المستند غير موجود", 404);
   if (doc.status === "REJECTED") throw new ReplaceRefused("المستند مرفوض. أعده إلى المراجعة أولاً");
   const [own] = await tx.select({ id: invoices.id }).from(invoices).where(eq(invoices.documentId, doc.id)).limit(1);
-  if (own) throw new ReplaceRefused("لهذا المستند فاتورة مقيّدة من قبل");
-  if (!doc.supplierId) throw new ReplaceRefused("لم يُعرف مورّد هذا المستند. قيّده من «عاينها وقيّدها»");
+  if (own) throw new ReplaceRefused("لهذا المستند فاتورة مسجّلة من قبل");
+  if (!doc.supplierId) throw new ReplaceRefused("لم يُعرف مورّد هذا المستند. سجّله من قسم «تسجيل المستند»");
 
   const r = (doc.reading ?? null) as StoredReading | null;
   const number = (r?.invoiceNumber ?? "").trim();
@@ -73,7 +73,7 @@ export async function replaceWithCorrectedInvoice(tx: Tx, documentId: string, ac
     .innerJoin(documents, and(eq(documents.id, invoices.documentId), isNull(documents.origin)))
     .where(eq(invoices.supplierId, doc.supplierId)))
     .find((o) => invoiceNumberKey(o.number) === key);
-  if (!old) throw new ReplaceRefused("لا توجد فاتورة مقيّدة بهذا الرقم لهذا المورّد. قيّدها فاتورة جديدة");
+  if (!old) throw new ReplaceRefused("لا فاتورة مسجّلة بهذا الرقم لهذا المورّد، فسجّلها فاتورة جديدة");
   if (old.total === totalMinor) throw new ReplaceRefused("المبلغ نفسه، فهذه نسخة مكررة لا تصحيح. ارفضها");
 
   const invoiceDate = date ? new Date(`${date}T00:00:00Z`) : old.date;

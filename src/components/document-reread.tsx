@@ -80,12 +80,12 @@ export function DocumentReread({
     if (apply) {
       setPreview(null);
       const text = r.data.savedForRecording
-        ? "حُفظت القراءة على المستند. قيّده الآن من «عاينها وقيّدها» أدناه."
+        ? "حُفظت القراءة على المستند. سجّله الآن من قسم «تسجيل المستند» أدناه."
         : `سُجّلت القراءة: ${countNoun(r.data.linesWritten ?? 0, ITEM)}.`
-        + (r.data.taxStatus === "VALID" ? " وأصبحت الفاتورة مستوفية الشروط الضريبية." : "")
+        + (r.data.taxStatus === "VALID" ? " وصارت الفاتورة مستوفية للشروط الضريبية." : "")
         + (r.data.problem ? ` ${r.data.problem}` : "");
       setDone(text);
-      toast({ tone: r.data.problem ? "warn" : "ok", title: "تم اعتماد القراءة الجديدة", body: text });
+      toast({ tone: r.data.problem ? "warn" : "ok", title: "اعتُمدت القراءة الجديدة", body: text });
       router.refresh();
       return;
     }
@@ -102,7 +102,7 @@ export function DocumentReread({
           className={buttonClass("secondary", "sm")}
         >
           <ScanText className={`h-3.5 w-3.5 ${busy ? "animate-pulse" : ""}`} strokeWidth={2} aria-hidden />
-          {busy ? "جارٍ قراءة المستند… (قد يستغرق دقيقة)" : "أعد قراءة المستند"}
+          {busy ? "يقرأ المستند… (قد يستغرق دقيقة)" : "أعد قراءة المستند"}
         </button>
       )}
 
@@ -115,7 +115,7 @@ export function DocumentReread({
 
       {preview?.read && (
         <div className="w-full rounded-xl border border-accent-line bg-raised p-3.5 shadow-raised">
-          <p className="text-xs font-bold">ما قرأه النموذج الآن (لم يُحفظ بعد)</p>
+          <p className="text-xs font-bold">ما قرأه النظام الآن (لم يُحفظ بعد)</p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{preview.note}</p>
           {preview.problem && (
             <p className="mt-2 rounded-lg bg-warn-bg px-2.5 py-1.5 text-[11px] leading-relaxed text-warn" role="status">
@@ -149,8 +149,7 @@ export function DocumentReread({
               لا تُقرأ بنودُها. وقولُ ذلك أصدق من كتابة صفرٍ ثانية.
             */
             <p className="mt-2.5 text-[11px] leading-relaxed text-warn">
-              لم تُقرأ البنود هذه المرة أيضاً، والأرجح أن المستند صورة لا يمكن قراءة تفاصيلها.
-              اكتب ما تحتاجه بنفسك، أو اطلب من المورّد نسخة أوضح.
+              لم تُقرأ البنود هذه المرة أيضاً، والأرجح أن المستند صورة لا تُقرأ تفاصيلها. اكتب ما تحتاجه بنفسك، أو اطلب من المورّد نسخة أوضح.
             </p>
           )}
 

@@ -54,7 +54,7 @@ describe("حكم العزل", () => {
   it("بصمة واحدة لا تثبت عزلاً", () => {
     const c = checkIsolation([print({})]);
     expect(c.verdict).toBe("UNKNOWN");
-    expect(c.reason).toContain("لا يثبت العزل ببصمة واحدة");
+    expect(c.reason).toContain("والعزل لا يثبت ببصمة واحدة");
   });
 
   it("عنقودان مختلفان → معزولتان", () => {

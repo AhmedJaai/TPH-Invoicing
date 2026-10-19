@@ -109,7 +109,7 @@ export async function POST(request: Request) {
   }
   if (body.kind === "SUPPLIER" && !body.supplierId) {
     return NextResponse.json(
-      { error: "سداد المورّد يحتاج اختيار المورّد" },
+      { error: "سداد المورّد يحتاج إلى اختيار المورّد" },
       { status: 400 },
     );
   }
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
     .where(inArray(bankTransactions.id, ids));
 
   if (rows.length === 0) {
-    return NextResponse.json({ error: "لا توجد هذه الحركات" }, { status: 404 });
+    return NextResponse.json({ error: "هذه الحركات غير موجودة" }, { status: 404 });
   }
 
   /*
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
   if (rows.length > 1) {
     if (!groupKey || identities.some((i) => i?.key !== groupKey)) {
       return NextResponse.json({
-        error: "لا يجمع هذه الحركات مستفيد واحد ولا نمط واحد. أكّد كل حركة على حدة.",
+        error: "هذه الحركات لا يجمعها مستفيد واحد ولا نمط واحد. أكّد كل حركة وحدها.",
       }, { status: 409 });
     }
   }
@@ -288,7 +288,7 @@ export async function POST(request: Request) {
     console.error("counterparty:", err.cause ?? err);
     const code = err.cause?.code ? ` (رمز ${err.cause.code})` : "";
     return NextResponse.json(
-      { error: `تعذّر حفظ التعريف ولم يُسجَّل منه شيء. أعد المحاولة.${code}` },
+      { error: `تعذّر حفظ التعريف، ولم يُسجَّل منه شيء. أعد المحاولة.${code}` },
       { status: 500 },
     );
   }
@@ -317,11 +317,11 @@ export async function POST(request: Request) {
   /* المصروفُ يتبع التصنيفَ الجديد في شهره — يُقيَّد أو يُصحَّح بابُه وحده */
   const derived = await deriveOpenMonths(rows.map((r) => monthOf(r.valueDate)), user.id);
 
-  const parts = [`تم حفظ «${party?.name}»`];
+  const parts = [`حُفظ «${party?.name}»`];
   parts.push(`وطُبّق على ${countNoun(rows.length, TRANSACTION)}`);
   if (derived.created > 0) parts.push(`وسُجّل مصروف عن ${countNoun(derived.created, TRANSACTION)}`);
   if (result.conflicts.length > 0) {
-    parts.push(`ويوجد ${result.conflicts.length} من الأدلة تشير إلى جهة أخرى، فراجعها`);
+    parts.push(`و${result.conflicts.length} من الأدلة تشير إلى جهة أخرى، فراجعها`);
   }
 
   return NextResponse.json({

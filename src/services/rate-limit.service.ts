@@ -19,7 +19,7 @@ export class RateLimitedError extends Error {
   readonly limit: number;
   constructor(decision: RateLimitDecision, route: string) {
     super(
-      `تجاوزت حدّ الاستعمال لهذه العملية (${decision.limit} في الساعة). ` +
+      `تجاوزت حد الاستخدام لهذه العملية (${decision.limit} في الساعة). ` +
         `أعد المحاولة بعد ${Math.ceil(decision.retryAfterSeconds / 60)} دقيقة.`,
     );
     this.name = "RateLimitedError";

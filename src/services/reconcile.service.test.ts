@@ -362,7 +362,7 @@ describe("القراءة البصرية لا تحسم تلقائياً", () => {
   it("والمقروء بصرياً يقترح ولا يكتب", () => {
     const { results, planned } = runReconciliation({ ...input, readSource: "VISION" });
     expect(results[0].decision?.disposition).toBe("SUGGEST");
-    expect(results[0].decision?.reasons.some((r) => r.includes("بصرياً"))).toBe(true);
+    expect(results[0].decision?.reasons.some((r) => r.includes("من صورة"))).toBe(true);
     expect(planned).toHaveLength(0);
   });
 });

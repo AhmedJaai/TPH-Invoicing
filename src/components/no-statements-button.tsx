@@ -6,6 +6,7 @@ import { FileX } from "lucide-react";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
 import { toast } from "./ui-client";
+import { T } from "@/components/i18n/t";
 
 /**
  * «لا يصدر كشوفاً» — يُعلَن مرّةً فلا يُطلَب منه كشفٌ بعدها (044).
@@ -28,13 +29,11 @@ export function NoStatementsButton({ supplierId }: { supplierId: string }) {
           const r = await postJson("/api/supplier-policy", { supplierId, issuesStatements: false });
           setBusy(false);
           if (!r.ok) { setError(r.error); return; }
-          toast({ tone: "ok", title: "تم الحفظ: المورّد لا يصدر كشوف حساب", body: "لن نطلب منه كشف حساب بعد اليوم. يمكنك تغيير ذلك من صفحته." });
+          toast({ tone: "ok", title: "حُفظ: المورّد لا يصدر كشوف حساب", body: "لن نطلب منه كشف حساب بعد اليوم، ويمكنك تغيير ذلك من صفحته." });
           router.refresh();
         }}
       >
-        <FileX className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        لا يصدر كشوف حساب
-      </button>
+        <T s="{0}لا يصدر كشوف حساب" a={[<FileX key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></button>
       {error && <span className="text-[11px] font-bold text-danger" role="alert">{error}</span>}
     </span>
   );

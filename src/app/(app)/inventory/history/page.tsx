@@ -14,6 +14,7 @@ import { Money } from "@/components/money";
 import { listCounts, type CountSummary } from "@/services/inventory.service";
 import { formatBp } from "@/lib/inventory/equation";
 import { READINESS_LABEL } from "@/lib/inventory/coverage";
+import { T } from "@/components/i18n/t";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export default async function InventoryHistoryPage() {
   if (!user) redirect("/login?from=/inventory/history");
   if (!can(user.role, "inventory:view") || !can(user.role, "amounts:view")) {
     return (
-      <PageShell user={user} width="wide" title="سجلّ الجرد">
+      <PageShell user={user} width="wide" title="سجل الجرد">
         <NoAccess what="الجرد" />
       </PageShell>
     );
@@ -44,8 +45,7 @@ export default async function InventoryHistoryPage() {
       cell: (r) => (
         <span className="block min-w-0">
           <Link href={`/inventory/counts/${r.id}`} className="font-bold hover:text-accent">
-            أسبوع {formatWeek(r.periodStart, r.periodEnd)}
-          </Link>
+            <T s="أسبوع {0}" a={[formatWeek(r.periodStart, r.periodEnd)]} /></Link>
           {r.branchName && <span className="mt-0.5 block text-[11px] font-normal text-muted">{r.branchName}</span>}
         </span>
       ),
@@ -55,7 +55,7 @@ export default async function InventoryHistoryPage() {
       cell: (r) => (
         <span className="flex flex-wrap gap-1">
           <Badge tone={r.status === "FINALISED" ? undefined : "accent"} dot>
-            {r.status === "FINALISED" ? "مقفل" : "مسوّدة"}
+            {r.status === "FINALISED" ? "مقفل" : "مسودة"}
           </Badge>
           {r.readiness && r.readiness !== "READY" && (
             <Badge tone={r.readiness === "BLOCKED" ? "danger" : "warn"}>
@@ -108,7 +108,7 @@ export default async function InventoryHistoryPage() {
     },
     {
       key: "items", header: "الأصناف المعدودة", numeric: true, secondary: true,
-      cell: (r) => <span className="nums">{r.itemsCounted} من {r.itemsInScope}</span>,
+      cell: (r) => <span className="nums"><T s="{0} من {1}" a={[r.itemsCounted, r.itemsInScope]} /></span>,
     },
   ];
 
@@ -116,9 +116,9 @@ export default async function InventoryHistoryPage() {
     <PageShell
       user={user}
       width="wide"
-      title="سجلّ الجرد"
-      intro="يبقى كل جرد مقفل كما أُقفل، فلا تغيّره وصفة تُعدَّل بعده ولا فاتورة تصل لاحقاً."
-      actions={setup.finalised > 0 ? <LinkButton href="/inventory/trend" size="sm" icon={TrendingUp}>الاتّجاه</LinkButton> : undefined}
+      title="سجل الجرد"
+      intro="يبقى كل جرد مقفل كما أُقفل، فلا تغيّره وصفة عُدّلت بعده ولا فاتورة وصلت لاحقاً."
+      actions={setup.finalised > 0 ? <LinkButton href="/inventory/trend" size="sm" icon={TrendingUp}>الاتجاه</LinkButton> : undefined}
     >
       {latest && (
         <Section title={`آخر جرد مقفل — أسبوع ${formatWeek(latest.periodStart, latest.periodEnd)}`} className="mb-10 mt-0!">
@@ -150,11 +150,11 @@ export default async function InventoryHistoryPage() {
                 ? "يمتلئ السجل عند إقفال أول جرد. ابدأ بكتالوج فودكس، ثم ملف المبيعات، ثم العدّ."
                 : progress.next === "sales"
                   ? "الكتالوج جاهز. ارفع ملف مبيعات الأسبوع، ثم ابدأ أول جرد."
-                  : "كل ما يلزم جاهز. ابدأ أول جرد أسبوعي وأقفله ليظهر هنا."}
+                  : "كل شيء جاهز. ابدأ أول جرد أسبوعي وأقفله ليظهر هنا."}
             action={
               setup.openCountId ? <LinkButton href="/inventory" variant="primary" size="sm">أكمل الجرد المفتوح</LinkButton>
                 : progress.next === "catalog" ? <LinkButton href="/inventory/import#catalog" variant="primary" size="sm">ارفع كتالوج فودكس</LinkButton>
-                  : progress.next === "sales" ? <LinkButton href="/inventory/import#sales" variant="primary" size="sm">ارفع ملفّ المبيعات</LinkButton>
+                  : progress.next === "sales" ? <LinkButton href="/inventory/import#sales" variant="primary" size="sm">ارفع ملف المبيعات</LinkButton>
                     : <LinkButton href="/inventory#start" variant="primary" size="sm">ابدأ جرداً</LinkButton>
             }
           />
@@ -162,7 +162,7 @@ export default async function InventoryHistoryPage() {
       />
       {rows.some((r) => !r.summary.consumptionCostComplete) && (
         <p className="mt-3 text-[11px] leading-relaxed text-muted">
-          * النسبة غير كاملة: كلفة بعض الاستهلاك في ذلك الأسبوع غير معروفة، فحُسبت النسبة على المعروف منها فقط.
+          * النسبة غير مكتملة: تكلفة جزء من استهلاك ذلك الأسبوع غير معروفة، فحُسبت النسبة على المعروف منه فقط.
         </p>
       )}
       {/* الهدرُ يُقرأ بعد الجدول، وعطبُه لا يُسقط السجلّ */}

@@ -29,7 +29,7 @@ export async function readJson<S extends z.ZodType>(
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const field = issue?.path.length ? ` (${issue.path.join(".")})` : "";
-    return { ok: false, response: NextResponse.json({ error: `طلب غير مفهوم${field}: ${issue?.message ?? ""}`.trim() }, { status: 400 }) };
+    return { ok: false, response: NextResponse.json({ error: `الطلب غير مفهوم${field}: ${issue?.message ?? ""}`.trim() }, { status: 400 }) };
   }
   return { ok: true, body: parsed.data };
 }

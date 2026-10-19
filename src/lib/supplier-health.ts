@@ -59,12 +59,12 @@ export function scoreDocuments(f: SupplierFacts): DimensionScore {
   if (!f.issuesInvoices) {
     return f.contractOnFile
       ? { dimension: "DOCUMENTS", grade: "FAIR",
-          reason: "لا يصدر فواتير ضريبية، لكن لديه عقد توريد مكتوباً." }
+          reason: "لا يصدر فواتير ضريبية، لكن له عقد توريد مكتوب." }
       : { dimension: "DOCUMENTS", grade: "POOR",
-          reason: "لا يصدر فواتير ضريبية ولا يوجد عقد معه، فلا إثبات للمصروف ولا خصم للضريبة." };
+          reason: "لا يصدر فواتير ضريبية ولا عقد معه، فلا إثبات للمصروف ولا خصم للضريبة." };
   }
   if (f.invoiceCount === 0) {
-    return { dimension: "DOCUMENTS", grade: "UNRATED", reason: "لا توجد فواتير منه بعد." };
+    return { dimension: "DOCUMENTS", grade: "UNRATED", reason: "لا فواتير منه بعد." };
   }
   return { dimension: "DOCUMENTS", grade: "GOOD",
     reason: `${countNoun(f.invoiceCount, INVOICE)} محفوظة منه.` };
@@ -79,7 +79,7 @@ export function scoreVat(f: SupplierFacts): DimensionScore {
     return { dimension: "VAT", grade: "UNRATED",
       reason: f.taxUnknownCount > 0
         ? `${countNoun(f.taxUnknownCount, INVOICE)} لم يُقرأ تفصيلها الضريبي بعد.`
-        : "لا توجد فواتير مقروءة بعد." };
+        : "لا فواتير مقروءة بعد." };
   }
   const ratio = f.taxValidCount / judged;
   const pct = Math.round(ratio * 100);
@@ -96,11 +96,11 @@ export function scoreVat(f: SupplierFacts): DimensionScore {
 
 export function scoreStatements(f: SupplierFacts): DimensionScore {
   if (f.activeMonths === 0) {
-    return { dimension: "STATEMENTS", grade: "UNRATED", reason: "لا توجد معاملات بعد." };
+    return { dimension: "STATEMENTS", grade: "UNRATED", reason: "لا تعاملات بعد." };
   }
   if (f.statementCount === 0) {
     return { dimension: "STATEMENTS", grade: "POOR",
-      reason: `لم يصلنا أي كشف حساب خلال ${countNoun(f.activeMonths, MONTH)} من التعامل.` };
+      reason: `لم يصلنا منه أي كشف حساب خلال ${countNoun(f.activeMonths, MONTH)} من التعامل.` };
   }
   if (f.statementCount >= f.activeMonths) {
     return { dimension: "STATEMENTS", grade: "GOOD",
@@ -118,7 +118,7 @@ export function scorePricing(f: SupplierFacts): DimensionScore {
   const p = f.priceChangePct;
   const shown = `${p > 0 ? "+" : ""}${Math.round(p)}٪`;
   if (Math.abs(p) <= PRICE_CALM_PCT) {
-    return { dimension: "PRICING", grade: "GOOD", reason: `متوسّط أسعاره تغيّر ${shown}، وهو مستقر.` };
+    return { dimension: "PRICING", grade: "GOOD", reason: `متوسط أسعاره تغيّر ${shown}، وهو مستقر.` };
   }
   if (p < 0) {
     return { dimension: "PRICING", grade: "GOOD", reason: `انخفض متوسط أسعاره ${shown}.` };
@@ -127,7 +127,7 @@ export function scorePricing(f: SupplierFacts): DimensionScore {
     return { dimension: "PRICING", grade: "FAIR", reason: `ارتفع متوسط أسعاره ${shown}.` };
   }
   return { dimension: "PRICING", grade: "POOR",
-    reason: `متوسّط أسعاره ارتفع ${shown} ، ويستحق التفاوض.` };
+    reason: `متوسط أسعاره ارتفع ${shown}، ويستحق التفاوض.` };
 }
 
 export function buildSupplierHealth(f: SupplierFacts): DimensionScore[] {
@@ -150,7 +150,7 @@ export function overallGrade(scores: readonly DimensionScore[]): Grade {
 
 export const GRADE_LABEL: Record<Grade, string> = {
   GOOD: "سليم",
-  FAIR: "يحتاج مراجعة",
-  POOR: "يحتاج معالجة",
+  FAIR: "يحتاج إلى مراجعة",
+  POOR: "يحتاج إلى معالجة",
   UNRATED: "غير مقيّم",
 };

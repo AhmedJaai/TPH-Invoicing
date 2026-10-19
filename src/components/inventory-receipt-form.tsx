@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/http-client";
 import { buttonClass } from "./ui";
+import { T } from "@/components/i18n/t";
 
 /**
  * «أدخل الكمّيّة المستلَمة» — داخل سطر الصنف، لا في صفحةٍ أخرى.
@@ -116,35 +117,28 @@ export function ReceiptForm({
       }}
       className="mt-3 animate-rise rounded-xl border border-accent-line bg-accent-soft/40 p-4"
     >
-      <p className="text-[11px] font-bold">كمية دخلت إلى الرف: {productName}</p>
+      <p className="text-[11px] font-bold"><T s="كمية دخلت إلى الرف: {0}" a={[productName]} /></p>
 
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="text-[11px] text-muted">
-          الكمية
-          <input
+          <T s="الكمية{0}" a={[<input key="0"
             type="text" inputMode="decimal" dir="ltr" autoFocus enterKeyHint="done"
             value={quantity} onChange={(e) => setQuantity(e.target.value)} disabled={busy}
             placeholder="20"
             className="nums mt-1 block min-h-11 w-24 rounded-lg border border-line-input bg-raised px-2 text-center text-sm"
-          />
-        </label>
+          />]} /></label>
         <label className="text-[11px] text-muted">
-          الوحدة
-          <select
+          <T s="الوحدة{0}" a={[<select key="0"
             value={unit} onChange={(e) => setUnit(e.target.value)} disabled={busy || unitChoices.length < 2}
             className="mt-1 block min-h-11 rounded-lg border border-line-input bg-raised px-2 text-xs"
           >
             {unitChoices.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
-          </select>
-        </label>
+          </select>]} /></label>
         <label className="text-[11px] text-muted">
-          تاريخ الاستلام
-          <input
+          <T s="تاريخ الاستلام{0}{1}" a={[<input key="0"
             type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={busy}
             className="nums mt-1 block min-h-11 rounded-lg border border-line-input bg-raised px-2 text-sm"
-          />
-          <DateChips value={date} onPick={setDate} disabled={busy} hijri={false} />
-        </label>
+          />, <DateChips key="1" value={date} onPick={setDate} disabled={busy} hijri={false} />]} /></label>
         <button type="button" onClick={() => setMore((m) => !m)} className={buttonClass("quiet", "sm")}>
           {more ? "أخفِ التفاصيل" : "تفاصيل اختيارية"}
         </button>
@@ -152,44 +146,35 @@ export function ReceiptForm({
 
       {outside && (
         <p className="mt-2 text-[11px] text-warn">
-          هذا التاريخ خارج أسبوع الجرد ({periodStart} → {periodEnd})، فسيدخل في حساب أسبوعه وليس في هذا الجرد.
-        </p>
+          <T s="هذا التاريخ خارج أسبوع الجرد ({0} → {1})، فسيدخل في حساب أسبوعه لا في هذا الجرد." a={[periodStart, periodEnd]} /></p>
       )}
 
       {more && (
         <div className="mt-2 flex flex-wrap items-end gap-2">
           <label className="text-[11px] text-muted">
-            المورّد
-            <select
+            <T s="المورّد{0}" a={[<select key="0"
               value={supplierId} onChange={(e) => setSupplierId(e.target.value)} disabled={busy}
               className="mt-1 block min-h-11 max-w-56 rounded-lg border border-line-input bg-raised px-2 text-xs"
             >
               <option value="">—</option>
               {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </label>
+            </select>]} /></label>
           <label className="text-[11px] text-muted">
-            رقم المستند
-            <input
+            <T s="رقم المستند{0}" a={[<input key="0"
               type="text" value={documentRef} onChange={(e) => setDocumentRef(e.target.value)} disabled={busy}
               className="mt-1 block min-h-11 w-32 rounded-lg border border-line-input bg-raised px-2 text-sm"
-            />
-          </label>
+            />]} /></label>
           <label className="text-[11px] text-muted">
-            التكلفة بالريال
-            <input
+            <T s="التكلفة بالريال{0}" a={[<input key="0"
               type="text" inputMode="decimal" dir="ltr" value={cost} onChange={(e) => setCost(e.target.value)} disabled={busy}
               placeholder="—"
               className="nums mt-1 block min-h-11 w-28 rounded-lg border border-line-input bg-raised px-2 text-center text-sm"
-            />
-          </label>
+            />]} /></label>
           <label className="min-w-40 flex-1 text-[11px] text-muted">
-            ملاحظة
-            <input
+            <T s="ملاحظة{0}" a={[<input key="0"
               type="text" value={note} onChange={(e) => setNote(e.target.value)} disabled={busy}
               className="mt-1 block min-h-11 w-full rounded-lg border border-line-input bg-raised px-2 text-sm"
-            />
-          </label>
+            />]} /></label>
         </div>
       )}
 
@@ -197,11 +182,11 @@ export function ReceiptForm({
         <div className="mt-3 rounded-lg border border-warn/40 bg-warn-bg p-3">
           <p className="text-[11px] font-bold text-warn">
             {candidates.length > 0
-              ? "توجد في الفواتير كمية تشبه هذا الاستلام. هل هي نفسها أم شحنة أخرى؟"
-              : `أدخلت الكمية نفسها يوم ${earlier[0]?.receivedOn ?? ""}. هل هي شحنة أخرى، أم أدخلتها مرتين؟`}
+              ? "في الفواتير كمية تشبه هذا الاستلام. هل هي نفسها أم شحنة أخرى؟"
+              : `أدخلتَ الكمية نفسها يوم ${earlier[0]?.receivedOn ?? ""}. هل هي شحنة أخرى، أم أدخلتها مرتين؟`}
           </p>
           <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
-            لو حُسب الاثنان وهما شحنة واحدة لظهر على الرف ضعف ما دخله فعلاً. لذلك لن يُحفظ شيء حتى تختار.
+            لو حُسب الاثنان وهما شحنة واحدة لظهر على الرف ضعف ما دخله فعلاً، لذلك لن يُحفظ شيء حتى تختار.
           </p>
           <ul className="mt-2 space-y-1.5">
             {candidates.map((c) => (
@@ -217,14 +202,14 @@ export function ReceiptForm({
                   onClick={() => void send({ kind: "LINK", invoiceLineId: c.invoiceLineId })}
                   className={buttonClass("primary", "sm")}
                 >
-                  هي من هذه الفاتورة، اربطها
+                  هي من هذه الفاتورة، فاربطها
                 </button>
               </li>
             ))}
           </ul>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" disabled={busy} onClick={() => void send({ kind: "SEPARATE" })} className={buttonClass("secondary", "sm")}>
-              شحنة أخرى، احفظها منفصلة
+              شحنة أخرى، فاحفظها وحدها
             </button>
             <button type="button" disabled={busy} onClick={() => setCandidates(null)} className={buttonClass("quiet", "sm")}>
               إلغاء

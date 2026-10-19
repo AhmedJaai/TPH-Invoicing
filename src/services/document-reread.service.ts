@@ -67,7 +67,7 @@ export function amountsProblem(subtotal: number | null, vat: number | null, tota
   if (checkInvoiceTotals(subtotal, vat, total, postVat).verdict !== "MISMATCH") return null;
   return `الصافي ${formatRiyalsDisplay(subtotal)} + الضريبة ${formatRiyalsDisplay(vat)} = `
     + `${formatRiyalsDisplay(subtotal + vat)}، والإجمالي ${formatRiyalsDisplay(total)}. `
-    + `الفرق ${formatRiyalsDisplay(Math.abs(diff))} غير مقبول. قد تتضمن الفاتورة رسم توصيل أو خصماً لم يُقرأ، `
+    + `الفرق ${formatRiyalsDisplay(Math.abs(diff))} غير مقبول. ربما في الفاتورة رسم توصيل أو خصم لم يُقرأ، `
     + "لذلك لم تُحفظ المبالغ. صحّحها بنفسك عند الحاجة.";
 }
 
@@ -105,7 +105,7 @@ export async function rereadDocument(opts: {
     .where(eq(documents.id, opts.documentId))
     .limit(1);
 
-  if (!doc) return { ok: false, status: 404, error: "لا يوجد مستند بهذا المعرّف" };
+  if (!doc) return { ok: false, status: 404, error: "لا مستند بهذا المعرّف" };
   if (!doc.driveFileId) {
     return { ok: false, status: 409, error: "هذا المستند ليس له ملف في الدرايف، فلا يمكن إعادة قراءته." };
   }
@@ -116,7 +116,7 @@ export async function rereadDocument(opts: {
     ({ data, mimeType } = await downloadFile(opts.drive, doc.driveFileId));
   } catch (e) {
     if (isDriveAuthError(e)) {
-      return { ok: false, status: 401, error: "انتهت صلاحية ربط الدرايف. سجّل الخروج ثم الدخول بحساب جوجل وأعد المحاولة." };
+      return { ok: false, status: 401, error: "انتهت صلاحية ربط الدرايف. سجّل الخروج ثم ادخل بحساب جوجل، وأعد المحاولة." };
     }
     return { ok: false, status: 502, error: "تعذّر تنزيل الملف من الدرايف." };
   }
@@ -157,7 +157,7 @@ export async function rereadDocument(opts: {
     && Math.abs(doc.storedTotal - read.totalMinor) > TOTAL_ROUNDING_TOLERANCE_MINOR;
   const problem = amountsProblem(read.subtotalMinor, read.vatMinor, total, read)
     ?? (totalConflict
-      ? `الإجمالي المقروء ${formatRiyalsDisplay(read.totalMinor!)} يختلف عن المقيّد ${formatRiyalsDisplay(doc.storedTotal!)}، وبقي المقيّد كما هو.`
+      ? `الإجمالي المقروء ${formatRiyalsDisplay(read.totalMinor!)} يختلف عن المسجّل ${formatRiyalsDisplay(doc.storedTotal!)}، فبقي المسجّل كما هو.`
       : null);
   const amountsOk = amountsProblem(read.subtotalMinor, read.vatMinor, total, read) === null;
   /* الخصمُ والرسومُ يُكتبان مع الصافي والضريبة أو لا يُكتبان — والقيدُ 055 يزنها معاً */
@@ -169,7 +169,7 @@ export async function rereadDocument(opts: {
   if (!opts.apply) {
     return {
       ok: true, applied: false, model: outcome.model, fileName: doc.fileName, read, problem,
-      note: "هذه قراءة جديدة لم تُحفظ بعد. قارنها بالملف ثم أكّدها. ولا يتغيّر رقم الفاتورة، فهو لا يؤخذ من القراءة الجديدة.",
+      note: "هذه قراءة جديدة لم تُحفظ بعد. قارنها بالملف ثم أكّدها. ورقم الفاتورة لا يتغيّر، فهو لا يُؤخذ من القراءة الجديدة.",
     };
   }
 
@@ -195,13 +195,13 @@ export async function rereadDocument(opts: {
       await recordAudit({
         actorId: opts.actorId, action: "DOCUMENT_REREAD", entityType: "document", entityId: doc.id,
         after: { الملف: doc.fileName, النوع: kind, المورّد: matched.supplier?.nameAr ?? null, الإجمالي: x.totalAmount, المصدر: outcome.textSource ?? null,
-          السبب: "قُرئ من جديد ولا فاتورة له، فحُفظت قراءته ليُقيَّد بها" },
+          السبب: "قُرئ من جديد وليست له فاتورة، فحُفظت قراءته ليُسجَّل بها" },
       }, t);
     });
     return { ok: true, applied: true, model: outcome.model, linesWritten: 0, taxStatus: "UNKNOWN", amountsWritten: false, problem, savedForRecording: true };
   }
   if (!doc.supplierId) {
-    return { ok: false, status: 409, error: "لا يوجد مورّد لهذا المستند. اخترْه ثم أعد القراءة." };
+    return { ok: false, status: 409, error: "لا مورّد لهذا المستند. اختره ثم أعد القراءة." };
   }
 
   /*
@@ -293,7 +293,7 @@ export async function rereadDocument(opts: {
         ? msg
         : /مقفَل/.test(cause)
           ? cause
-        : "لم تُحفظ القراءة لأن قواعد المبالغ في قاعدة البيانات رفضتها، وغالباً لأن مبالغها لا تتفق مع ما سُدّد. صحّح الحقول بنفسك.",
+        : "لم تُحفظ القراءة لأن قواعد المبالغ في قاعدة البيانات رفضتها، والأرجح أن مبالغها لا تتفق مع ما سُدّد. صحّح الحقول بنفسك.",
     };
   }
 

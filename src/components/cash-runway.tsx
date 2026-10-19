@@ -3,6 +3,7 @@ import { Money } from "./money";
 import { DAY, countNoun } from "@/lib/arabic";
 import { RUNWAY_BLOCK_LABEL } from "@/lib/cash-runway";
 import { loadRunway } from "@/services/cash-runway.service";
+import { T } from "@/components/i18n/t";
 
 /**
  * سطرٌ تحت الرصيد: «يغطّي نحو ٢٣ يوماً من الصادر» بأساسه — أو لماذا لا يُحسب.
@@ -16,12 +17,10 @@ export async function RunwayLine() {
     <p className="flex items-start gap-2 text-xs leading-relaxed text-ink-soft">
       <Hourglass className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} aria-hidden />
       {r.days === null || r.dailyOutflowMinor === null ? (
-        <span className="text-muted">أيام النقد الباقية: {r.blocked ? RUNWAY_BLOCK_LABEL[r.blocked] : "لا يمكن حسابها"}.</span>
+        <span className="text-muted"><T s="أيام النقد الباقية: {0}." a={[r.blocked ? RUNWAY_BLOCK_LABEL[r.blocked] : "لا يمكن حسابها"]} /></span>
       ) : (
         <span>
-          يغطّي الرصيد نحو <span className="font-bold text-ink">{r.days === 0 ? "صفر يوم" : countNoun(r.days, DAY)}</span> من المصروفات،
-          بمعدل <Money minor={r.dailyOutflowMinor} /> في اليوم خلال آخر {countNoun(r.basisDays, DAY)} من الكشف، على افتراض ألا يدخل مال. الوارد غير محسوب.
-        </span>
+          <T s="يكفي الرصيد نحو {0} من المصروفات، بمعدل {1} يومياً في آخر {2} من الكشف، على افتراض أنه لن يدخل مال. الداخل غير محسوب." a={[<span key="0" className="font-bold text-ink">{r.days === 0 ? "صفر أيام" : countNoun(r.days, DAY)}</span>, <Money key="1" minor={r.dailyOutflowMinor} />, countNoun(r.basisDays, DAY)]} /></span>
       )}
     </p>
   );

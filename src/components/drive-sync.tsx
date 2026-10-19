@@ -8,6 +8,7 @@ import { INVOICE, QUOTATION, countNoun, FILE } from "@/lib/arabic";
 import { buttonClass } from "./ui-tokens";
 import { toast } from "./ui-client";
 import { GAP_TEXT, type AutoArchiveGap } from "@/lib/extraction/auto-archive";
+import { T } from "@/components/i18n/t";
 
 interface Summary {
   scope: string;
@@ -109,12 +110,12 @@ export function DriveSync() {
       catch { /* ليس JSON */ }
       setRenamed(
         !json ? { ok: false, text: `تعذّرت إعادة التسمية (رمز الخطأ ${res.status})` }
-        : res.ok ? { ok: true, text: json.message ?? "تمت إعادة التسمية" }
+        : res.ok ? { ok: true, text: json.message ?? "سُمّي من جديد" }
         : { ok: false, text: json.error ?? "تعذّرت إعادة التسمية" },
       );
       if (res.ok) setChosen(new Set());
     } catch {
-      setRenamed({ ok: false, text: "تعذّر الاتصال بالخادم ولم يصل الطلب. تحقق من الشبكة ثم أعد المحاولة." });
+      setRenamed({ ok: false, text: "تعذّر الاتصال بالخادم ولم يصل الطلب. تأكد من الشبكة ثم أعد المحاولة." });
     } finally {
       setRenaming(false);
     }
@@ -146,7 +147,7 @@ export function DriveSync() {
         if (!json) {
           throw new Error(
             res.status === 504 || /timeout|timed out/i.test(text)
-              ? "استغرقت القراءة وقتاً أطول من المسموح. ألغِ خيار «الأرشيف كله» أو أعد المحاولة، وستستأنف من حيث توقفت."
+              ? "استغرقت القراءة وقتاً أطول من المسموح. ألغِ خيار «الأرشيف كله» أو أعد المحاولة، وستكمل من حيث توقفت."
               : `تعذّرت المزامنة (رمز الخطأ ${res.status}). ${text.slice(0, 120)}`,
           );
         }
@@ -270,7 +271,7 @@ export function DriveSync() {
         if (apply) {
           toast({
             tone: "ok",
-            title: "تم تسجيل الجديد من الدرايف",
+            title: "سُجّل الجديد من الدرايف",
             body: `دخل تلقائياً ${countNoun(tally.auto, FILE)}${tally.review > 0 ? ` · ينتظر مراجعتك ${countNoun(tally.review, FILE)}` : ""}`,
           });
           router.refresh();
@@ -294,7 +295,7 @@ export function DriveSync() {
           <div className="min-w-0">
             <p className="text-sm font-bold">ملفات جديدة في الدرايف</p>
             <p className="mt-0.5 text-xs leading-relaxed text-muted">
-              يقارن الدرايف بالمسجَّل عندنا ويعرض الملفات غير المسجلة. لا يُسجَّل شيء حتى تضغط «سجّل الجديد».
+              يقارن الدرايف بما سُجّل عندنا ويعرض الملفات غير المسجّلة. لا يُسجَّل شيء حتى تضغط «سجّل الجديد».
             </p>
           </div>
         </div>
@@ -321,8 +322,7 @@ export function DriveSync() {
           <div className="min-w-0">
             <h3 className="text-sm font-bold">مزامنة الدرايف</h3>
             <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
-              يقارن ملفات الدرايف بما هو مسجَّل عندنا، ويضيف الملفات غير المسجلة، كملف أضفته بنفسك.
-              لا يعيد قراءة ما قُرئ سابقاً، ولا يحذف أو ينقل أي ملف.
+              يقارن ملفات الدرايف بما سُجّل عندنا، ويضيف غير المسجّل منها، كملف أضفته بنفسك. لا يعيد قراءة ما قُرئ من قبل، ولا يحذف ملفاً ولا ينقله.
             </p>
           </div>
         </div>
@@ -332,14 +332,12 @@ export function DriveSync() {
       </div>
 
       <label className="mt-3 flex min-h-11 items-center gap-2 text-xs sm:min-h-0">
-        <input
+        <T s="{0}افحص الأرشيف كله بدلاً من آخر ثلاثة أشهر (أبطأ)" a={[<input key="0"
           type="checkbox"
           checked={full}
           onChange={(e) => setFull(e.target.checked)}
           className="h-4 w-4 accent-[var(--accent)]"
-        />
-        افحص الأرشيف كله بدل آخر ثلاثة أشهر (أبطأ)
-      </label>
+        />]} /></label>
 
       {error && (
         <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-bg px-3 py-2 text-xs text-danger">
@@ -350,7 +348,7 @@ export function DriveSync() {
 
       {busy && (
         <div className="mt-3" aria-live="polite">
-          <p className="text-xs text-ink-soft">{busy === "scanning" ? "جارٍ فحص الدرايف…" : "جارٍ تسجيل الملفات الجديدة وقراءتها…"}</p>
+          <p className="text-xs text-ink-soft">{busy === "scanning" ? "يفحص الدرايف…" : "يسجّل الملفات الجديدة ويقرؤها…"}</p>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sunken">
             <div className="upload-bar h-full w-1/3 rounded-full bg-accent" />
           </div>
@@ -364,7 +362,7 @@ export function DriveSync() {
             <Stat label="ملفات جديدة" value={String(s.newFiles)} tone={s.newFiles ? "warn" : "ok"} />
             <Stat label="مفهومة من الاسم" value={String(s.understoodByName)} />
             <Stat
-              label="تحتاج قراءة المحتوى"
+              label="تحتاج إلى قراءة المحتوى"
               value={String(s.needContentReading)}
               tone={s.needContentReading ? "warn" : undefined}
             />
@@ -372,11 +370,7 @@ export function DriveSync() {
 
           {result?.applied && (
             <p className="mt-3 flex items-start gap-2 rounded-lg border border-ok/25 bg-ok-bg px-3 py-2 text-xs font-bold text-ok">
-              <CircleCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-              سُجّل {s.created ?? 0} مستنداً، منها {countNoun(s.invoicesCreated ?? 0, INVOICE)}
-              {s.contentRead ? ` · قُرئ محتوى ${s.contentRead}` : ""}
-              {s.remainingUnnamed ? ` · بقي ${countNoun(s.remainingUnnamed, FILE)} يحتاج إلى قراءة` : ""}
-            </p>
+              <T s="{0}سُجّل {1} مستنداً، منها {2}{3}{4}" a={[<CircleCheck key="0" className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />, s.created ?? 0, countNoun(s.invoicesCreated ?? 0, INVOICE), s.contentRead ? ` · قُرئ محتوى ${s.contentRead}` : "", s.remainingUnnamed ? ` · بقي ${countNoun(s.remainingUnnamed, FILE)} يحتاج إلى قراءة` : ""]} /></p>
           )}
 
           {/*
@@ -387,19 +381,14 @@ export function DriveSync() {
           */}
           {result?.backlog && (result.backlog.recorded > 0 || result.backlog.approved > 0) && (
             <p className="mt-2 rounded-lg bg-ok-bg px-3 py-2 text-[11px] font-bold text-ok">
-              استكمال ما تراكم:
-              {result.backlog.recorded > 0 && ` قُيّدت ${countNoun(result.backlog.recorded, INVOICE)} من قراءتها المحفوظة`}
-              {result.backlog.recorded > 0 && result.backlog.approved > 0 && " ·"}
-              {result.backlog.approved > 0 && ` واعتُمد ${countNoun(result.backlog.approved, FILE)} استوفى الشروط`}
-            </p>
+              <T s="استكمال ما تراكم:{0}{1}{2}" a={[result.backlog.recorded > 0 && ` سُجّلت ${countNoun(result.backlog.recorded, INVOICE)} من قراءتها المحفوظة`, result.backlog.recorded > 0 && result.backlog.approved > 0 && " ·", result.backlog.approved > 0 && ` واعتُمد ${countNoun(result.backlog.approved, FILE)} استوفى الشروط`]} /></p>
           )}
           {result?.applied && ((s.autoArchived ?? 0) > 0 || (s.needsReview ?? 0) > 0) && (
             <div className="mt-2 rounded-lg border border-line bg-sunken px-3 py-2 text-[11px] leading-relaxed">
               <p>
-                <strong className="text-ok">دخل تلقائياً {countNoun(s.autoArchived ?? 0, FILE)}</strong>
+                <strong className="text-ok"><T s="دخل تلقائياً {0}" a={[countNoun(s.autoArchived ?? 0, FILE)]} /></strong>
                 {(s.needsReview ?? 0) > 0 && (
-                  <> · <strong className="text-warn">ينتظر مراجعتك {countNoun(s.needsReview ?? 0, FILE)}</strong>
-                    {" "}في <Link href="/documents?status=NEEDS_REVIEW" className="font-bold text-accent underline underline-offset-4">المستندات</Link></>
+                  <> <T s=" · {0} في {1}" a={[<strong key="0" className="text-warn"><T s="ينتظر مراجعتك {0}" a={[countNoun(s.needsReview ?? 0, FILE)]} /></strong>, <Link key="1" href="/documents?status=NEEDS_REVIEW" className="font-bold text-accent underline underline-offset-4">المستندات</Link>]} /></>
                 )}
               </p>
               {result.reviewReasons && result.reviewReasons.length > 0 && (
@@ -418,8 +407,7 @@ export function DriveSync() {
           {result?.renamed && result.renamed.length > 0 && (
             <details className="mt-2 rounded-lg border border-line bg-raised px-3 py-2 text-[11px]">
               <summary className="cursor-pointer font-bold text-ok">
-                أُعيدت تسمية {countNoun(result.renamed.length, FILE)} في الدرايف تلقائياً
-              </summary>
+                <T s="سُمّي {0} من جديد في الدرايف تلقائياً" a={[countNoun(result.renamed.length, FILE)]} /></summary>
               <ul className="mt-1.5 space-y-0.5 text-muted">
                 {result.renamed.map((r) => (
                   <li key={r.to} className="truncate" dir="ltr">{r.from} → {r.to}</li>
@@ -439,11 +427,9 @@ export function DriveSync() {
           {result?.quotations && result.quotations.length > 0 && (
             <div className="mt-3 rounded-xl border border-warn/40 bg-warn-bg px-3 py-2.5">
               <p className="text-[11px] font-bold text-warn">
-                {countNoun(result.quotations.length, QUOTATION)} (لم يُسجَّل)
-              </p>
+                <T s="{0} (لم يُسجَّل)" a={[countNoun(result.quotations.length, QUOTATION)]} /></p>
               <p className="mt-1 text-[11px] text-muted">
-                عرض السعر ليس عملية مالية: لم يخرج مال ولم ينشأ التزام. يبقى في
-                الدرايف كما هو، وإذا تحوّل إلى فاتورة تُسجَّل الفاتورة.
+                عرض السعر ليس عملية مالية: لم يخرج مال ولم ينشأ التزام. يبقى في الدرايف كما هو، وإن تحوّل إلى فاتورة سُجّلت الفاتورة.
               </p>
               <ul className="mt-1.5 space-y-0.5">
                 {result.quotations.slice(0, 6).map((q) => (
@@ -456,10 +442,9 @@ export function DriveSync() {
           {result?.renameSuggestions && result.renameSuggestions.length > 0 && (
             <fieldset className="mt-3 rounded-xl border border-line bg-sunken px-3 py-2.5">
               <legend className="px-1 text-[11px] font-bold text-warn">
-                {countNoun(result.renameSuggestions.length, FILE)} اسمه غير واضح. اختر ما تريد إعادة تسميته
-              </legend>
+                <T s="{0} اسمه غير واضح. اختر ما تريد تسميته من جديد" a={[countNoun(result.renameSuggestions.length, FILE)]} /></legend>
               <p className="text-[11px] leading-relaxed text-muted">
-                لا تُعاد تسمية إلا ما تختاره، ويُسجَّل الاسمان القديم والجديد في سجل التدقيق. ولا يُحذف أو يُنقل أي ملف.
+                لا يُسمّى من جديد إلا ما تختاره، ويُسجَّل الاسمان القديم والجديد في سجل التدقيق. ولا يُحذف ملف ولا يُنقل.
               </p>
               <ul className="mt-1.5 space-y-1">
                 {result.renameSuggestions.map((r) => (
@@ -497,7 +482,7 @@ export function DriveSync() {
                   onClick={() => applyRenames([...chosen])}
                   className={buttonClass("secondary", "sm")}
                 >
-                  {`أعد تسمية المحدد (${chosen.size})`}
+                  {`سمّ المحدد من جديد (${chosen.size})`}
                 </button>
                 {renamed && (
                   <span className={`text-[11px] ${renamed.ok ? "text-ok" : "text-danger"}`} role="status">
@@ -510,7 +495,7 @@ export function DriveSync() {
 
           {result?.notes && result.notes.length > 0 && (
             <div className="mt-3">
-              <p className="text-[11px] font-bold text-warn">تحتاج مراجعتك</p>
+              <p className="text-[11px] font-bold text-warn">تحتاج إلى مراجعتك</p>
               <ul className="mt-1 space-y-0.5">
                 {result.notes.map((n, i) => (
                   <li key={i} className="text-[11px] leading-relaxed text-ink-soft">{n}</li>
@@ -521,8 +506,7 @@ export function DriveSync() {
 
           {result?.readerOutage && (
             <p role="alert" className="mt-3 rounded-lg bg-danger-bg px-3 py-2 text-[11px] leading-relaxed text-danger">
-              <b>توقفت القراءة:</b> {result.readerOutage}. لم يُقيَّد ما بقي لأنه لم يُقرأ، وسيُعاد في المزامنة التالية.
-            </p>
+              <T s="{0} {1}. لم يُسجَّل الباقي لأنه لم يُقرأ، وسيُعاد في المزامنة التالية." a={[<b key="0">توقفت القراءة:</b>, result.readerOutage]} /></p>
           )}
 
           {result?.readFailures && result.readFailures.length > 0 && (

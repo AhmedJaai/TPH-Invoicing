@@ -22,7 +22,7 @@ const Body = z.object({ documentId: z.string().trim().min(1).max(64) }).strict()
 export async function POST(request: Request) {
   try {
     const user = await guard("invoice-replace", "document:upload");
-    if (!can(user.role, "amounts:view")) return NextResponse.json({ error: "استبدال الفاتورة يحتاج صلاحية عرض المبالغ" }, { status: 403 });
+    if (!can(user.role, "amounts:view")) return NextResponse.json({ error: "استبدال الفاتورة يحتاج إلى صلاحية عرض المبالغ" }, { status: 403 });
     const read = await readJson(request, Body);
     if (!read.ok) return read.response;
     const out = await db.transaction((tx) => replaceWithCorrectedInvoice(tx, read.body.documentId, user.id));
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       ok: true,
       invoiceId: out.invoiceId,
       message: `حلّت هذه الفاتورة محل ${out.invoiceNumber}: ${formatRiyalsDisplay(out.beforeMinor)} ← ${formatRiyalsDisplay(out.afterMinor)}`
-        + (out.releasedMinor > 0 ? `، وعاد ${formatRiyalsDisplay(out.releasedMinor)} رصيداً للمورّد` : "")
+        + (out.releasedMinor > 0 ? `، وعاد ${formatRiyalsDisplay(out.releasedMinor)} رصيداً لك عند المورّد` : "")
         + (renamedTo ? ` · وسُمّي الملف ${renamedTo}` : ""),
     });
   } catch (e) {

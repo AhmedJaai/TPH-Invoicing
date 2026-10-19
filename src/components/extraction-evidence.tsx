@@ -13,6 +13,7 @@ import {
   QR_FIELD_LABEL, SOURCE_LABEL, evidenceWarnings,
   type ExtractionEvidence, type QrField,
 } from "@/lib/extraction/evidence";
+import { T } from "@/components/i18n/t";
 
 /** أسماءُ الحقول كما يراها المستخدم */
 const PROVENANCE_FIELD: Record<string, string> = {
@@ -30,18 +31,14 @@ function Mark({ field, evidence }: { field: QrField; evidence: ExtractionEvidenc
   if (evidence.agreements.includes(field)) {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] font-normal text-ok">
-        <CircleCheck className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        يطابق ما قُرئ
-      </span>
+        <T s="{0}يطابق ما قُرئ" a={[<CircleCheck key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />]} /></span>
     );
   }
   const d = evidence.disagreements.find((x) => x.field === field);
   if (d) {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] font-normal text-warn">
-        <TriangleAlert className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-        المقروء: <bdi dir="ltr" className="nums">{d.read}</bdi>
-      </span>
+        <T s="{0}المقروء: {1}" a={[<TriangleAlert key="0" className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />, <bdi key="1" dir="ltr" className="nums">{d.read}</bdi>]} /></span>
     );
   }
   return null;
@@ -66,15 +63,13 @@ export function ExtractionEvidencePanel({
   return (
     <div className={`rounded-xl border border-line bg-raised shadow-raised ${className}`}>
       <p className="flex items-center gap-2 border-b border-line-soft px-4 py-3 text-xs font-bold">
-        <QrCode className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />
-        مقارنة مع ما قرأه النموذج
-      </p>
+        <T s="{0}مقارنة بما قرأه النظام" a={[<QrCode key="0" className="h-4 w-4 text-accent" strokeWidth={2} aria-hidden />]} /></p>
 
       <div className="space-y-3 px-4 py-3 text-xs">
         {qr?.status === "FOUND" && (
           <div>
             <p className="leading-relaxed text-ink-soft">
-              قُرئ رمز الفاتورة الضريبية (QR) من الملف نفسه، وقد أنشأه نظام المورّد وليس النموذج:
+              قُرئ رمز الفاتورة الضريبية (QR) من الملف نفسه، وقد أنشأه نظام المورّد لا قارئ المستندات:
             </p>
             <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
               <div className="min-w-0">
@@ -126,12 +121,12 @@ export function ExtractionEvidencePanel({
         )}
         {qr?.status === "NONE" && (
           <p className="leading-relaxed text-muted">
-            لم يُعثر على رمز فاتورة ضريبية (QR) في الملف، وقد يكون موجوداً على الورقة ولم يتم التقاطه. لا يمكن المقارنة به.
+            لم يُعثر في الملف على رمز فاتورة ضريبية (QR)، وربما كان على الورقة ولم يظهر في الصورة. لا يمكن المقارنة به.
           </p>
         )}
         {qr?.status === "NOT_ZATCA" && (
           <p className="leading-relaxed text-muted">
-            يوجد في الملف رمز (QR) ليس رمز فاتورة ضريبية، فهو رابط أو رمز دفع. لا يمكن المقارنة به.
+            في الملف رمز (QR) ليس رمز فاتورة ضريبية، بل رابط أو رمز دفع. لا يمكن المقارنة به.
           </p>
         )}
         {qr?.status === "SKIPPED" && (
@@ -140,7 +135,7 @@ export function ExtractionEvidencePanel({
 
         {sources.length > 0 && (
           <div>
-            <p className="font-bold">بيانات لم يقرأها النموذج وأُخذت من مصدر آخر:</p>
+            <p className="font-bold">بيانات لم يقرأها النظام من المستند، بل أُخذت من مصدر آخر:</p>
             <ul className="mt-1 space-y-0.5 text-ink-soft">
               {sources.map(([key, source]) => (
                 <li key={key}>
@@ -148,7 +143,7 @@ export function ExtractionEvidencePanel({
                 </li>
               ))}
             </ul>
-            <p className="mt-1 text-[11px] text-muted">إذا خالف الورقة فعدّله في حقله، وما تكتبه أنت هو المعتمد.</p>
+            <p className="mt-1 text-[11px] text-muted">إن خالف الورقة فعدّله في حقله، وما تكتبه أنت هو المعتمد.</p>
           </div>
         )}
 

@@ -124,8 +124,10 @@ if (cmd === "list") {
     const visit = (n) => {
       if (ts.isTemplateExpression(n)) {
         let v = n.head.text; n.templateSpans.forEach((sp, i) => (v += `{${i}}` + sp.literal.text));
-        const nv = map.get(norm(v));
-        if (nv !== undefined) {
+        const nv0 = map.get(norm(v));
+        if (nv0 !== undefined) {
+          // الفراغ على طرفي القالب جزءٌ من المعنى (« · ») — يُحفظ كما كان
+          const nv = v.match(/^\s*/)[0] + nv0.trim() + v.match(/\s*$/)[0];
           const parts = nv.split(/\{(\d+)\}/);
           const order = parts.filter((_, i) => i % 2 === 1).map(Number);
           if (order.length === n.templateSpans.length) {
@@ -135,8 +137,9 @@ if (cmd === "list") {
           }
         }
       } else if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) {
-        const nv = map.get(norm(n.text));
-        if (nv !== undefined) {
+        const nv0 = map.get(norm(n.text));
+        if (nv0 !== undefined) {
+          const nv = n.text.match(/^\s*/)[0] + nv0.trim() + n.text.match(/\s*$/)[0];
           const raw = text.slice(n.getStart(sf), n.getEnd()); const q = raw[0];
           edits.push([n.getStart(sf), n.getEnd(), q + esc(nv, q === "`" ? "`" : q) + q]); hit.add(norm(n.text));
         }
@@ -151,9 +154,12 @@ if (cmd === "list") {
       ts.forEachChild(n, visit);
     };
     visit(sf);
-    for (const [a, b, r] of edits.sort((x, y) => y[0] - x[0])) text = text.slice(0, a) + r + text.slice(b);
+    // نصٌّ داخل قالبٍ يُستبدل هو أيضاً: يُترك للمرور التالي، فالقالب يُعاد بناؤه من تعابيره الأصلية
+    edits.sort((x, y) => y[0] - x[0]);
+    const kept = edits.filter((e) => !edits.some((o) => o !== e && o[0] <= e[0] && o[1] >= e[1] && (o[0] < e[0] || o[1] > e[1])));
+    for (const [a, b, r] of kept) text = text.slice(0, a) + r + text.slice(b);
     fs.writeFileSync(f, text);
-    done += edits.length;
+    done += kept.length;
     for (const k of map.keys()) if (!hit.has(k)) missed.push(f + " :: " + k);
   }
   console.log(`applied ${done}`);
