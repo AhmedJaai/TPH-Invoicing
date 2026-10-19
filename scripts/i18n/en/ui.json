@@ -1,4 +1,6 @@
 {
+"مزامنة أخرى مع فودكس تجري الآن من جهاز أو تبويب آخر. انتظر دقيقة ثم أعد المحاولة.": "Another Foodics sync is running right now, from another device or tab. Wait a minute and try again.",
+"استُورد هذا نفسه للتو من طلب آخر، ولم يُكتب شيء مرة ثانية.": "This exact data was just imported by another request; nothing was written twice.",
 "({0} · {1}). هل هو الاستلام نفسه أم شحنة أخرى؟": "({0} · {1}). Is it the same receipt or another shipment?",
 "({0} تعرّفنا عليها برقم العملية)": "({0} identified by transaction number)",
 "({0} عُرفت برقم العملية)": "({0} identified by transaction number)",

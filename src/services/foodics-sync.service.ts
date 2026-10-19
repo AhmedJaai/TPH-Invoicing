@@ -388,6 +388,23 @@ async function lastKnownUpdate(): Promise<Date | null> {
   return row?.at ? new Date(row.at) : null;
 }
 
+/**
+ * سببُ السقوط لا نصُّ الاستعلام. خطأُ Drizzle رسالتُه «Failed query: …» بالعبارة
+ * ومعاملاتِها كلِّها، وسببُ القاعدة الحقيقيُّ (أيُّ قيدٍ رفض) مدفونٌ في `cause` —
+ * فكانت الشاشةُ تعرض صفحةَ SQL ولا تقول لماذا.
+ */
+export function describeFailure(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const cause = e.cause;
+  if (cause instanceof Error) {
+    const constraint = "constraint" in cause ? cause.constraint : null;
+    return typeof constraint === "string" && constraint.length > 0
+      ? `${cause.message} (${constraint})`
+      : cause.message;
+  }
+  return e.message.startsWith("Failed query:") ? e.message.split("\n")[0].slice(0, 200) : e.message;
+}
+
 /** أوّلُ يومٍ يُقرأ إن لم يُقرأ شيءٌ قبلُ ولم يُحدَّد مدى — شهرٌ يكفي المسارَ القصير، والباقي للنصّ. */
 const FIRST_RUN_DAYS = 3;
 
@@ -436,7 +453,7 @@ export async function runFoodicsSync(options: SyncOptions): Promise<SyncResult> 
       }
     }
   } catch (e) {
-    error = e instanceof Error ? e.message : String(e);
+    error = describeFailure(e);
   }
 
   const status: SyncResult["status"] = error ? "FAILED" : counts.partial ? "PARTIAL" : "OK";

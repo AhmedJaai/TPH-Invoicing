@@ -334,6 +334,7 @@ export async function importParsedSales(p: ParsedImportInput, conn: Conn = db): 
   const written = await writeImport({
     file, sourceId, branchId, sha, input, messages, conn, retryOf,
   });
+  if (written.status === "DUPLICATE") return written;
 
   await recordAudit({
     actorId: input.actorId,
@@ -373,6 +374,16 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
 
   return w.conn.transaction(async (tx) => {
     /*
+      ── استيرادٌ واحدٌ في كلّ لحظة ──
+
+      «أهذا الطلبُ مقيَّد؟» يُسأل ثمّ يُكتب الجديدُ بمعرّفٍ جديد. فإن جرى استيرادان
+      معاً (مزامنةُ فودكس من جهازين، أو ملفٌّ مع مزامنة) رأى كلاهما الطلبَ غيرَ
+      مقيَّد، فكتبه الأوّل وسقط الثاني على `sales_uniq` (١٩ أكتوبر ٢٠٢٦). فالقفلُ
+      قبل السؤال: الثاني ينتظر، ثمّ يرى ما كتبه الأوّل فيُحدِّثه ولا يُكرِّره.
+    */
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('sales-import'))`);
+
+    /*
       بصمةُ الملفّ فريدة. فالمحاولةُ السابقة تُخلي البصمةَ **داخل المعاملة** —
       إن سقطت هذه عادت تلك كما كانت — وتبقى بصفوفها الخام وأسبابها.
     */
@@ -397,7 +408,19 @@ async function writeImport(w: WriteInput): Promise<ImportResult> {
         status: "PENDING",
         totalRows: file.rows.length,
       })
+      /* سبقه استيرادٌ للبصمة نفسِها وهو ينتظر القفل — فلا يُكتب شيءٌ ثانيةً */
+      .onConflictDoNothing({ target: salesImports.fileSha256 })
       .returning({ id: salesImports.id });
+    if (!imp) {
+      return {
+        importId: "", status: "DUPLICATE", adapter: file.adapter, shape: file.shape,
+        periodStart: file.periodStart, periodEnd: file.periodEnd,
+        totals: { rows: file.rows.length, parsed: 0, skipped: 0, errors: 0, duplicates: 0, revised: 0, salesWritten: 0, salesRestated: 0, lineCount: 0, unitsMilli: 0 },
+        revisions: [], messages: [...messages, "استُورد هذا نفسه للتو من طلب آخر، ولم يُكتب شيء مرة ثانية."],
+        recognisedColumns: file.recognisedColumns, unrecognisedColumns: file.unrecognisedColumns,
+        unmappedProducts: 0,
+      };
+    }
 
     /* ── أصنافُ نقاط البيع: تُقيَّد بمعرّفها الخارجيّ، وتُربَط لاحقاً بيدِ إنسان ── */
     const products = new Map<string, {
