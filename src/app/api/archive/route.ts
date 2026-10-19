@@ -28,7 +28,9 @@ import {
 import {
   assertMonthOpen, BlockedError, InvalidInputError, MonthClosedError, reviewForArchive,
 } from "@/services/validation.service";
-import { createInvoice, createStatement, replaceLines } from "@/services/invoice.service";
+import { attachFileToStatementInvoice, createInvoice, createStatement, invoiceAwaitingFile, replaceLines } from "@/services/invoice.service";
+import { firstClosedMonth } from "@/services/month-guard";
+import { adoptionInClosedMonth } from "@/lib/statement-adoption";
 import { parseStatementExtras } from "@/lib/extraction/statement-extras";
 import { createPayment, findPaymentTwin } from "@/services/payment.service";
 import { extractionCache, payments } from "@/db/schema";
@@ -237,11 +239,30 @@ export async function POST(request: Request) {
       .where(eq(extractionCache.sha256, sha256))
       .limit(1);
     const serverRaw = (cached?.extraction ?? null) as Record<string, unknown> | null;
-    await assertMonthOpen(periodMonth);
 
     const subtotalMinor = parseRiyals(body.subtotal ?? "");
     const vatMinor = parseRiyals(body.vat ?? "");
     const totalMinor = parseRiyals(body.total ?? "");
+
+    /*
+      ملفُّ فاتورةٍ قُيِّدت من كشف المورّد بلا ملفّ وشهرُها مقفل: يُربط بقيدها ولا يُغيَّر
+      رقم (`statement-adoption.ts`) — فلا يُسأل عن فتح الشهر. وما خالف إجماليُّه القيدَ يُردّ
+      قبل الدرايف. وفي الشهر المفتوح يتبنّاها `createInvoice` كاملةً كما كان.
+    */
+    const isInvoiceKind = body.documentKind !== "STATEMENT" && !PAYMENT_KINDS.has(body.documentKind);
+    const awaiting = isInvoiceKind && body.supplierId && body.invoiceNumber?.trim()
+      ? await invoiceAwaitingFile(db, body.supplierId, body.invoiceNumber.trim())
+      : null;
+    const attachOnly = awaiting && (await firstClosedMonth(db, [awaiting.periodMonth])) ? awaiting : null;
+    if (attachOnly) {
+      const verdict = adoptionInClosedMonth({
+        month: attachOnly.periodMonth, invoiceNumber: attachOnly.invoiceNumber,
+        recordedTotalMinor: attachOnly.totalMinor, fileTotalMinor: totalMinor,
+      });
+      if (!verdict.ok) throw new BlockedError([verdict.message]);
+    } else {
+      await assertMonthOpen(periodMonth);
+    }
     /* الخصمُ بعد الضريبة ممّا قرأه الخادم — يُقبل إن سدّ فرقَ ما أقرّه الإنسان وحده */
     const discountReadMinor = typeof serverRaw?.discountAmount === "string" ? parseRiyals(serverRaw.discountAmount) : null;
     const chargesReadMinor = typeof serverRaw?.chargesAmount === "string" ? parseRiyals(serverRaw.chargesAmount) : null;
@@ -305,7 +326,9 @@ export async function POST(request: Request) {
 
       if (body.captureId) await settleCapture(tx, body.captureId, docId, user.id);
 
-      if (review.canCreateInvoice && body.supplierId && invoiceDate && totalMinor !== null) {
+      if (attachOnly) {
+        await attachFileToStatementInvoice(tx, attachOnly, docId);
+      } else if (review.canCreateInvoice && body.supplierId && invoiceDate && totalMinor !== null) {
         const invoiceId = await createInvoice(tx, {
           documentId: docId,
           supplierId: body.supplierId,

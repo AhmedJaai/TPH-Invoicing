@@ -108,6 +108,39 @@ async function adoptStatementInvoice(tx: Tx, input: CreateInvoiceInput, periodMo
   return twin.id;
 }
 
+export interface AwaitingFileInvoice {
+  id: string;
+  documentId: string;
+  periodMonth: string;
+  totalMinor: number;
+  invoiceNumber: string;
+}
+
+/** فاتورةُ هذا المورّد بهذا الرقم المقيَّدةُ من كشفه بلا ملفّ — أو `null`. */
+export async function invoiceAwaitingFile(conn: Conn, supplierId: string, invoiceNumber: string): Promise<AwaitingFileInvoice | null> {
+  const rows = (await conn.execute<{ id: string; invoice_number: string; document_id: string; period_month: string; total_minor: number }>(sql`
+    select i.id, i.invoice_number, i.document_id, i.period_month, i.total_minor
+      from invoices i join documents d on d.id = i.document_id
+     where i.supplier_id = ${supplierId} and d.origin = ${STATEMENT_LINE_ORIGIN}
+  `)).rows;
+  const key = invoiceNumberKey(invoiceNumber);
+  const twin = rows.find((r) => invoiceNumberKey(r.invoice_number) === key);
+  return twin
+    ? { id: twin.id, documentId: twin.document_id, periodMonth: twin.period_month, totalMinor: Number(twin.total_minor), invoiceNumber: twin.invoice_number }
+    : null;
+}
+
+/**
+ * يربط الملفّ بفاتورةٍ من الكشف في شهرٍ مقفل — المستندُ وحده يتغيّر، ولا رقم.
+ * والمستندُ الذي لا ملفَّ له يُحذف كما في التبنّي الكامل. ومؤثِّرُ 028 لا يمنعه:
+ * لا يمسّ مبلغاً ولا شهراً ولا مورّداً.
+ */
+export async function attachFileToStatementInvoice(tx: Tx, twin: AwaitingFileInvoice, documentId: string): Promise<string> {
+  await tx.update(invoices).set({ documentId }).where(eq(invoices.id, twin.id));
+  await tx.delete(documents).where(and(eq(documents.id, twin.documentId), eq(documents.origin, STATEMENT_LINE_ORIGIN)));
+  return twin.id;
+}
+
 /**
  * لماذا أرجعت `createInvoice` فراغاً؟ — الفاتورةُ التي سبقت إلى القيد، وبأيّ بابٍ سبقت.
  *

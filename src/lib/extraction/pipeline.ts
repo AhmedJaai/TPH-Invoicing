@@ -30,6 +30,11 @@ export interface PipelineInput {
   originalFileName: string;
   /** أرقام فواتير هذا المورد الموجودة مسبقاً، لكشف التكرار */
   existingInvoiceNumbers?: string[];
+  /**
+   * أرقامُ فواتيره المقيَّدة من كشفه بلا ملفّ (057) — ليست تكراراً: هذا الملفُّ ملفُّها،
+   * يتبنّى قيدَها عند الأرشفة (`createInvoice`). فلا تُمنع، ويُقال إنّها ستُربط.
+   */
+  awaitingFileNumbers?: string[];
   /** بصمات الملفات المرفوعة سابقاً */
   fileAlreadyUploaded?: boolean;
   confidenceThreshold?: number;
@@ -60,6 +65,8 @@ export interface PipelineResult {
   lowConfidenceFields: string[];
   /** هل يمكن الرفع؟ يمنعه أي تنبيه من درجة BLOCKER */
   canArchive: boolean;
+  /** يكمل فاتورةً مقيَّدةً من كشف المورّد بلا ملفّ — رقمُها كما قُيِّد */
+  completesStatementInvoice?: string;
 }
 
 
@@ -162,7 +169,11 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     findings.push({ code: ISSUE.DUPLICATE_FILE, ...ISSUE_TEXT.DUPLICATE_FILE });
   }
 
-  if (invoiceNumber && input.existingInvoiceNumbers?.some((n) => sameInvoiceNumber(n, invoiceNumber))) {
+  const completesStatementInvoice = invoiceNumber
+    ? input.awaitingFileNumbers?.find((n) => sameInvoiceNumber(n, invoiceNumber))
+    : undefined;
+
+  if (!completesStatementInvoice && invoiceNumber && input.existingInvoiceNumbers?.some((n) => sameInvoiceNumber(n, invoiceNumber))) {
     findings.push({
       code: ISSUE.DUPLICATE_INVOICE,
       ...ISSUE_TEXT.DUPLICATE_INVOICE,
@@ -311,6 +322,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     proposedFileName,
     proposedFolderPath,
     proposedFolderName,
+    completesStatementInvoice,
     taxStatus: validation.taxStatus,
     inputVatStatus: validation.inputVatStatus,
     isFixedAsset: validation.isFixedAsset,

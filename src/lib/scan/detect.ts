@@ -10,6 +10,7 @@
  * خالصةٌ — لا متصفّح.
  */
 import { isConvexQuad, quadArea, type Quad, type Raster } from "./geometry";
+import { plausibleBorder, quadFromEdges } from "./edges";
 
 /** أطولُ ضلعٍ للصورة المصغّرة — يكفي للحواف ويجري في أجزاءٍ من الثانية. */
 export const DETECT_SIDE = 360;
@@ -71,10 +72,38 @@ export function downscaleGray(src: Raster, maxSide: number): { gray: Uint8Array;
   return { gray, width, height, scale };
 }
 
+/** أطولُ ضلعٍ لصورة الخطوط — أدقّ من صورة اللون، وهَف يجري فيها بأجزاءٍ من الثانية */
+export const EDGE_SIDE = 480;
+
 /**
  * زوايا الورقة بإحداثيّات الصورة الأصل — أو `null` إن لم تُعرف بثقة.
+ *
+ * الخطوطُ أوّلاً (`edges.ts`): تصدق على كلّ خلفيّة. ثمّ اللونُ إن لم تجد خطوطاً
+ * (ورقٌ مجعّد بلا طرفٍ مستقيم على كاونترٍ داكن).
  */
 export function detectDocument(src: Raster): Quad | null {
+  const small = downscaleGray(src, EDGE_SIDE);
+  const found = quadFromEdges(small);
+  if (found) {
+    const up = (p: { x: number; y: number }) => ({
+      x: Math.min(src.width, Math.max(0, p.x / small.scale)),
+      y: Math.min(src.height, Math.max(0, p.y / small.scale)),
+    });
+    const q = found.quad;
+    /* كما في اللون: شدٌّ يسير نحو الوسط فلا يبقى خطُّ الخلفيّة على طرف الورقة */
+    const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4;
+    const cy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
+    const pull = (p: { x: number; y: number }) => up({ x: p.x + (cx - p.x) * EDGE_INSET * 0.6, y: p.y + (cy - p.y) * EDGE_INSET * 0.6 });
+    return [pull(q[0]), pull(q[1]), pull(q[2]), pull(q[3])];
+  }
+  const byColor = detectByBrightness(src);
+  if (!byColor) return null;
+  const down = byColor.map((p) => ({ x: p.x * small.scale, y: p.y * small.scale }));
+  return plausibleBorder(small, [down[0], down[1], down[2], down[3]]) ? byColor : null;
+}
+
+/** فصلُ الفاتح عن الداكن — للورقة على سطحٍ داكن حين لا تُرى خطوطُها. */
+export function detectByBrightness(src: Raster): Quad | null {
   const { gray, width, height, scale } = downscaleGray(src, DETECT_SIDE);
   const t = otsuThreshold(gray);
   const bright = new Uint8Array(gray.length);

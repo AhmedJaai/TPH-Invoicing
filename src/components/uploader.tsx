@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Camera, Check, CircleAlert, CircleCheck, ExternalLink, FileText, FolderOpen, Info, Layers, Plus,
+  Camera, Check, CircleAlert, CircleCheck, ExternalLink, FileText, FolderOpen, Info, Layers, Link2, Plus,
   RotateCw, TriangleAlert, Upload, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import { formatRiyalsDisplay } from "@/lib/money";
@@ -65,6 +65,8 @@ interface AnalysisResponse {
     findings: Finding[];
     lowConfidenceFields: string[];
     canArchive: boolean;
+    /** يكمل فاتورةً مقيَّدةً من كشف المورّد بلا ملفّ — تُربط به ولا تُكرَّر */
+    completesStatementInvoice?: string;
   };
 }
 
@@ -1449,6 +1451,16 @@ function ReviewCard({
 
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="space-y-5 p-4 sm:p-5">
+          {/* فاتورةٌ قُيِّدت من كشف المورّد ولم يصل ملفُّها — وهذا ملفُّها: يُربط بقيدها ولا يُكرّره */}
+          {r.completesStatementInvoice && (
+            <p className="flex items-start gap-2 rounded-xl border border-info/25 bg-info-bg px-3.5 py-2.5 text-xs leading-relaxed text-info">
+              <Link2 className="mt-px h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+              <span>
+                <span className="font-bold">هذا ملف فاتورة {r.completesStatementInvoice} المسجّلة من كشف المورّد بلا ملف.</span>{" "}
+                حين تؤكده يُربط بقيدها ويُرفع إلى الدرايف، ولا تُسجَّل فاتورة ثانية. ويبقى ما سُدّد عليها كما هو.
+              </span>
+            </p>
+          )}
           {/* ── الحكمُ في سطر ── */}
           {decisions === 0 ? (
             <p className="flex items-start gap-2 rounded-xl border border-ok/25 bg-ok-bg px-3.5 py-2.5 text-xs font-bold text-ok">

@@ -208,3 +208,22 @@ describe("الصورة تحتفظ بامتدادها", () => {
     expect(r.proposedFileName?.endsWith(".jpg")).toBe(true);
   });
 });
+
+describe("فاتورةٌ قُيِّدت من كشف المورّد بلا ملفّ ثمّ وصل ملفُّها", () => {
+  it("لا تُمنع «مكرّرة» — هذا ملفُّها، ويُقال إنّه سيُربط بقيدها", () => {
+    const r = run({}, { existingInvoiceNumbers: [], awaitingFileNumbers: ["260302"] });
+    expect(codes(r)).not.toContain("DUPLICATE_INVOICE");
+    expect(r.completesStatementInvoice).toBe("260302");
+    expect(r.canArchive).toBe(true);
+  });
+
+  it("والرقمُ نفسُه بأصفارٍ مختلفة هو هي", () => {
+    expect(run({ invoiceNumber: "0260302" }, { awaitingFileNumbers: ["260302"] }).completesStatementInvoice).toBe("260302");
+  });
+
+  it("وما له ملفٌّ فعلاً يبقى تكراراً يُمنع", () => {
+    const r = run({}, { existingInvoiceNumbers: ["260302"], awaitingFileNumbers: [] });
+    expect(codes(r)).toContain("DUPLICATE_INVOICE");
+    expect(r.completesStatementInvoice).toBeUndefined();
+  });
+});

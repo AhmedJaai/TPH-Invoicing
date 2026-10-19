@@ -10,7 +10,8 @@
  */
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { extractionCache, invoices, supplierAliases, suppliers } from "@/db/schema";
+import { documents, extractionCache, invoices, supplierAliases, suppliers } from "@/db/schema";
+import { STATEMENT_LINE_ORIGIN } from "./invoice.service";
 import { companyConfig } from "@/config/drive";
 import { runPipeline, type PipelineResult } from "@/lib/extraction/pipeline";
 import type { ExtractionResult } from "@/lib/extraction/schema";
@@ -46,11 +47,28 @@ export async function loadSupplierRecords(): Promise<SupplierRecord[]> {
   }));
 }
 
-export async function existingNumbersOf(supplierId: string | undefined): Promise<string[]> {
-  if (!supplierId) return [];
-  return (await db.select({ n: invoices.invoiceNumber }).from(invoices).where(eq(invoices.supplierId, supplierId))).map((r) => r.n);
+/**
+ * أرقامُ فواتير المورّد: ما له ملفٌّ (تكرارُه يُمنع) وما قُيِّد من كشفه بلا ملفّ (ينتظر ملفَّه،
+ * فيتبنّاه — 057). بابٌ واحد للرفع ولمراجعته، وحكمُ الخادم (`validation.service`) بالقسمة نفسها.
+ */
+export async function invoiceNumbersOf(supplierId: string | undefined): Promise<{ existing: string[]; awaitingFile: string[] }> {
+  if (!supplierId) return { existing: [], awaitingFile: [] };
+  const rows = await db
+    .select({ n: invoices.invoiceNumber, origin: documents.origin })
+    .from(invoices)
+    .innerJoin(documents, eq(documents.id, invoices.documentId))
+    .where(eq(invoices.supplierId, supplierId));
+  return {
+    existing: rows.filter((r) => r.origin !== STATEMENT_LINE_ORIGIN).map((r) => r.n),
+    awaitingFile: rows.filter((r) => r.origin === STATEMENT_LINE_ORIGIN).map((r) => r.n),
+  };
 }
 
+
+export async function numbersForPipeline(supplierId: string | undefined) {
+  const n = await invoiceNumbersOf(supplierId);
+  return { existingInvoiceNumbers: n.existing, awaitingFileNumbers: n.awaitingFile };
+}
 
 export class UploadReviewMissing extends Error {}
 
@@ -72,7 +90,7 @@ export async function reviewUpload(sha256: string, originalFileName: string, edi
     match,
     companyVat: companyConfig.vatNumber,
     originalFileName,
-    existingInvoiceNumbers: await existingNumbersOf(match.supplier?.id),
+    ...(await numbersForPipeline(match.supplier?.id)),
     fileAlreadyUploaded: false,
   });
 }

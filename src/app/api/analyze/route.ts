@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { and, eq, ne, or } from "drizzle-orm";
 import { db } from "@/db";
-import { documents, invoices } from "@/db/schema";
+import { documents } from "@/db/schema";
 import { withDeadline } from "@/lib/ai/deadline";
 import { extractDocument, isSupportedUpload, uploadMimeType } from "@/lib/extraction";
 import { runPipeline } from "@/lib/extraction/pipeline";
@@ -22,7 +22,7 @@ import { guard, respondTo } from "@/services/guard";
 import { can } from "@/lib/permissions";
 import { itemKeys, priceMovesAtReview, type PriceMove } from "@/lib/price-at-review";
 import { loadLastItemPrices } from "@/services/price-review.service";
-import { loadSupplierRecords } from "@/services/upload-review.service";
+import { loadSupplierRecords, numbersForPipeline } from "@/services/upload-review.service";
 import { CAPTURE_READING_MAX_AGE_MS, isWaitingCapture } from "@/services/capture.service";
 
 export const runtime = "nodejs";
@@ -177,21 +177,13 @@ async function handle(request: Request) {
     supplierNameEn: extraction.value.supplierNameEn,
   });
 
-  const existingInvoiceNumbers = match.supplier
-    ? (
-        await db
-          .select({ invoiceNumber: invoices.invoiceNumber })
-          .from(invoices)
-          .where(eq(invoices.supplierId, match.supplier.id))
-      ).map((r) => r.invoiceNumber)
-    : [];
-
+  /* ما قُيِّد من كشف المورّد بلا ملفّ ليس تكراراً — هذا ملفُّه (057) */
   const result = runPipeline({
     extraction: extraction.value,
     match,
     companyVat: companyConfig.vatNumber,
     originalFileName: file.name,
-    existingInvoiceNumbers,
+    ...(await numbersForPipeline(match.supplier?.id)),
     fileAlreadyUploaded: false,
   });
 
