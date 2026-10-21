@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Camera, Check, CircleAlert, CircleCheck, Clock, FileText, ImagePlus, Palette, Plus, RotateCcw, ScanLine, Send, Trash2, X,
+  Camera, Check, CircleAlert, Crop, CircleCheck, Clock, FileText, ImagePlus, Palette, Plus, RotateCcw, ScanLine, Send, Trash2, X,
 } from "lucide-react";
 import { BrandMark } from "@/components/icons";
+import { LiveScanner } from "./live-scanner";
 import { buttonClass } from "@/components/ui-tokens";
 import { readResponse } from "@/lib/http-client";
 import { countNoun, PAGE, timeAgo } from "@/lib/arabic";
@@ -13,7 +14,7 @@ import type { ClarityVerdict } from "@/lib/capture-clarity";
 import { imagesToPdf, type JpegPage } from "@/lib/images-to-pdf";
 import { detectDocument } from "@/lib/scan/detect";
 import { enhanceScan, type ScanMode } from "@/lib/scan/enhance";
-import { insetQuad, orderQuad, quadArea, warpQuad, type Point, type Quad, type Raster } from "@/lib/scan/geometry";
+import { frameSpan, insetQuad, orderQuad, warpQuad, type Point, type Quad, type Raster } from "@/lib/scan/geometry";
 import { assessQuality, QUALITY_MESSAGE, type QualityIssue } from "@/lib/scan/quality";
 
 /**
@@ -50,6 +51,9 @@ interface ScanPage {
   width: number;
   height: number;
   issues: QualityIssue[];
+  /** الإطارُ الأصل وزواياه — لـ«عدّل الحدود» بعد الالتقاط */
+  source: Raster;
+  quad: Quad;
 }
 
 type Check =
@@ -61,7 +65,9 @@ type Check =
 type Stage =
   | { kind: "home" }
   | { kind: "preparing" }
-  | { kind: "adjust"; source: Raster; url: string; quad: Quad; detected: boolean }
+  /** الماسحُ الحيّ مفتوح */
+  | { kind: "live" }
+  | { kind: "adjust"; source: Raster; url: string; quad: Quad; detected: boolean; replaceId?: string }
   | { kind: "pages" }
   | { kind: "checking"; startedAt: number }
   | { kind: "checked"; result: Check }
@@ -143,7 +149,15 @@ export function Scanner({ token, label, recent }: { token: string; label: string
   useEffect(() => { pagesRef.current = pages; }, [pages]);
   useEffect(() => () => pagesRef.current.forEach((p) => URL.revokeObjectURL(p.url)), []);
 
-  const openCamera = useCallback(() => { setError(null); cameraInput.current?.click(); }, []);
+  /** لا كاميرا حيّة في هذا المتصفّح (منعٌ أو قِدَم) — فالتصويرُ العاديّ */
+  const [liveUnavailable, setLiveUnavailable] = useState(false);
+
+  /* الماسحُ الحيّ إن أمكن، وإلّا كاميرا الجوال العاديّة */
+  const openCamera = useCallback(() => {
+    setError(null);
+    if (liveUnavailable || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) cameraInput.current?.click();
+    else setStage({ kind: "live" });
+  }, [liveUnavailable]);
 
   const onPicked = useCallback(async (list: FileList | null) => {
     const file = list?.[0];
@@ -161,27 +175,74 @@ export function Scanner({ token, label, recent }: { token: string; label: string
     }
   }, []);
 
-  const acceptCrop = useCallback(async (source: Raster, url: string, quad: Quad) => {
+  /** إطارٌ وزواياه ← صفحةٌ مقوَّمةٌ منظَّفة */
+  const makePage = useCallback(async (source: Raster, quad: Quad, id = newId()): Promise<ScanPage> => {
+    const warped = warpQuad(source, quad, OUTPUT_SIDE);
+    const quality = assessQuality(warped, frameSpan(quad, source.width, source.height));
+    const clean = enhanceScan(warped, mode);
+    const jpeg = await encodeJpeg(clean);
+    return {
+      id, warped, jpeg, width: clean.width, height: clean.height, issues: quality.issues, source, quad,
+      url: URL.createObjectURL(new Blob([new Uint8Array(jpeg)], { type: "image/jpeg" })),
+    };
+  }, [mode]);
+
+  const acceptCrop = useCallback(async (source: Raster, url: string, quad: Quad, replaceId?: string) => {
     setStage({ kind: "preparing" });
     await paint();
     try {
-      const warped = warpQuad(source, quad, OUTPUT_SIDE);
-      const quality = assessQuality(warped, quadArea(quad) / (source.width * source.height));
-      const clean = enhanceScan(warped, mode);
-      const jpeg = await encodeJpeg(clean);
-      const page: ScanPage = {
-        id: newId(), warped, jpeg, width: clean.width, height: clean.height, issues: quality.issues,
-        url: URL.createObjectURL(new Blob([new Uint8Array(jpeg)], { type: "image/jpeg" })),
-      };
+      const page = await makePage(source, quad, replaceId);
       URL.revokeObjectURL(url);
       built.current = null;
-      setPages((prev) => [...prev, page]);
+      setPages((prev) => {
+        if (!replaceId) return [...prev, page];
+        return prev.map((p) => {
+          if (p.id !== replaceId) return p;
+          URL.revokeObjectURL(p.url);
+          return page;
+        });
+      });
       setStage({ kind: "pages" });
     } catch {
       setError("تعذّر تجهيز الصورة. صوّرها مرة أخرى.");
       setStage({ kind: pagesRef.current.length ? "pages" : "home" });
     }
-  }, [mode]);
+  }, [makePage]);
+
+  /* ── الماسحُ الحيّ ── */
+  const onLiveCapture = useCallback(async (frame: Raster, quad: Quad | null) => {
+    if (quad) {
+      const page = await makePage(frame, quad);
+      built.current = null;
+      setPages((prev) => [...prev, page]);
+      return;
+    }
+    /* التُقطت باليد ولم تُعرف الورقة: تُحدَّد زواياها بالإصبع */
+    const jpeg = await encodeJpeg(frame);
+    const url = URL.createObjectURL(new Blob([new Uint8Array(jpeg)], { type: "image/jpeg" }));
+    setStage({ kind: "adjust", source: frame, url, quad: insetQuad(frame.width, frame.height), detected: false });
+  }, [makePage]);
+
+  const onLiveDone = useCallback(() => {
+    setStage({ kind: pagesRef.current.length ? "pages" : "home" });
+  }, []);
+
+  const onLiveFallback = useCallback((reason: string) => {
+    setLiveUnavailable(true);
+    setError(`${reason} اضغط «صوّر الفاتورة» مرة أخرى.`);
+    setStage({ kind: pagesRef.current.length ? "pages" : "home" });
+  }, []);
+
+  /** «عدّل الحدود» لصفحةٍ التُقطت — من إطارها الأصل وزواياها */
+  const adjustPage = useCallback(async (id: string) => {
+    const page = pagesRef.current.find((p) => p.id === id);
+    if (!page) return;
+    setStage({ kind: "preparing" });
+    await paint();
+    const jpeg = await encodeJpeg(page.source);
+    const url = URL.createObjectURL(new Blob([new Uint8Array(jpeg)], { type: "image/jpeg" }));
+    setStage({ kind: "adjust", source: page.source, url, quad: page.quad, detected: true, replaceId: id });
+  }, []);
 
   /** النمطُ (مستند · ألوان) يُعاد على الصفحات كلّها من نسختها المقوَّمة */
   const switchMode = useCallback(async (next: ScanMode) => {
@@ -323,11 +384,21 @@ export function Scanner({ token, label, recent }: { token: string; label: string
         <Adjust
           stage={stage}
           onChange={(quad) => setStage({ ...stage, quad })}
-          onDone={() => void acceptCrop(stage.source, stage.url, stage.quad)}
+          onDone={() => void acceptCrop(stage.source, stage.url, stage.quad, stage.replaceId)}
           onRetake={() => { URL.revokeObjectURL(stage.url); setStage({ kind: pages.length ? "pages" : "home" }); openCamera(); }}
           onFull={() => setStage({ ...stage, quad: [
             { x: 0, y: 0 }, { x: stage.source.width, y: 0 }, { x: stage.source.width, y: stage.source.height }, { x: 0, y: stage.source.height },
           ] })}
+        />
+      )}
+
+      {stage.kind === "live" && (
+        <LiveScanner
+          pageCount={pages.length}
+          lastThumb={pages[pages.length - 1]?.url ?? null}
+          onCapture={onLiveCapture}
+          onDone={onLiveDone}
+          onFallback={onLiveFallback}
         />
       )}
 
@@ -337,6 +408,7 @@ export function Scanner({ token, label, recent }: { token: string; label: string
           mode={mode}
           onMode={(m) => void switchMode(m)}
           onRemove={removePage}
+          onAdjust={(id) => void adjustPage(id)}
           onAdd={openCamera}
           onCheck={() => void check()}
         />
@@ -422,9 +494,9 @@ function Home({ onCamera, onGallery, recent }: { onCamera: () => void; onGallery
           <Camera className="h-6 w-6" aria-hidden /> صوّر الفاتورة
         </button>
         <ul className="mt-4 space-y-1.5 text-xs leading-relaxed text-ink-soft">
-          <li>• ضع الورقة على سطح داكن، وصوّرها من فوقها مباشرة.</li>
-          <li>• اجعل الورقة كلها في الصورة، بلا ظل يدك عليها.</li>
-          <li>• إن كانت الفاتورة أكثر من صفحة فصوّرها كلها قبل الإرسال.</li>
+          <li>• وجّه الكاميرا نحو الفاتورة، فتظهر محدَّدةً بالأصفر، ثم ثبّت الجوال لحظة فتُلتقط وحدها.</li>
+          <li>• اجعل الورقة كلها في الإطار، بلا ظل يدك عليها.</li>
+          <li>• إن كانت أكثر من صفحة فضع التالية مكانها وتُلتقط هي أيضاً، ثم اضغط «تم».</li>
         </ul>
         <button type="button" onClick={onGallery} className={`${buttonClass("quiet", "sm")} mt-3 w-full`}>
           <ImagePlus className="h-4 w-4" aria-hidden /> أو اختر صورة من الجوال
@@ -552,12 +624,13 @@ function Adjust({
 }
 
 function Pages({
-  pages, mode, onMode, onRemove, onAdd, onCheck,
+  pages, mode, onMode, onRemove, onAdjust, onAdd, onCheck,
 }: {
   pages: ScanPage[];
   mode: ScanMode;
   onMode: (m: ScanMode) => void;
   onRemove: (id: string) => void;
+  onAdjust: (id: string) => void;
   onAdd: () => void;
   onCheck: () => void;
 }) {
@@ -590,9 +663,14 @@ function Pages({
             {/* الحذفُ تحت الصفحة لا فوقها — كان يغطّي أوّلَ سطرٍ منها */}
             <div className="flex items-center justify-between border-t border-line-soft px-3 py-1">
               <span className="text-xs text-muted">الصفحة {(i + 1).toLocaleString("ar-SA")}</span>
-              <button type="button" onClick={() => onRemove(p.id)} className={buttonClass("quiet", "sm")}>
-                <Trash2 className="h-3.5 w-3.5" aria-hidden /> احذفها
-              </button>
+              <span className="flex gap-1">
+                <button type="button" onClick={() => onAdjust(p.id)} className={buttonClass("quiet", "sm")}>
+                  <Crop className="h-3.5 w-3.5" aria-hidden /> عدّل الحدود
+                </button>
+                <button type="button" onClick={() => onRemove(p.id)} className={buttonClass("quiet", "sm")}>
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden /> احذفها
+                </button>
+              </span>
             </div>
           </li>
         ))}

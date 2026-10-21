@@ -19,6 +19,7 @@ const Body = z.object({
   invoiceDate: Text(40),
   vat: Text(40),
   total: Text(40),
+  discount: Text(40),
 }).strict();
 
 export async function POST(request: Request) {

@@ -4,6 +4,7 @@ import { deepseekExtractionProvider } from "./provider-deepseek";
 import { geminiProvider } from "./provider-gemini";
 import { ollamaProvider } from "./provider-ollama";
 import { selectedProviderName, type ExtractionOutcome, type ExtractionRequest } from "./provider";
+import { settlePreVatDiscount } from "./discount";
 import { deriveAmounts, isCalendarDate, looksHijri } from "./validate-extraction";
 import { emptyEvidence, reconcileWithQr } from "./evidence";
 import { readZatcaQr, type QrReading } from "./zatca-qr";
@@ -120,6 +121,9 @@ export async function extractDocument(request: ExtractionRequest): Promise<Extra
   /* الصافي = الإجماليّ − الضريبة: هويّةٌ حسابيّة تُعلَّم «محسوب» ولا تُنسَب للنموذج */
   const derived = deriveAmounts(value);
   if (derived.subtotalAmount !== value.subtotalAmount) evidence.provenance.subtotalAmount = "DERIVED";
+  /* والخصمُ قبل الضريبة يُنقص الوعاء — تشهد له الضريبةُ نفسُها (`discount.ts`) */
+  const settled = settlePreVatDiscount(derived).value;
+  if (settled.subtotalAmount !== derived.subtotalAmount) evidence.provenance.subtotalAmount = "DERIVED";
 
-  return { ...outcome, value: derived, evidence };
+  return { ...outcome, value: settled, evidence };
 }

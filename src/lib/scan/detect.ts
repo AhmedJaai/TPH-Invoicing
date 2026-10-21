@@ -11,6 +11,8 @@
  */
 import { isConvexQuad, quadArea, type Quad, type Raster } from "./geometry";
 import { plausibleBorder, quadFromEdges } from "./edges";
+import { quadFromRegion } from "./region";
+import { refineQuad } from "./refine";
 
 /** أطولُ ضلعٍ للصورة المصغّرة — يكفي للحواف ويجري في أجزاءٍ من الثانية. */
 export const DETECT_SIDE = 360;
@@ -74,6 +76,8 @@ export function downscaleGray(src: Raster, maxSide: number): { gray: Uint8Array;
 
 /** أطولُ ضلعٍ لصورة الخطوط — أدقّ من صورة اللون، وهَف يجري فيها بأجزاءٍ من الثانية */
 export const EDGE_SIDE = 480;
+/** دقّةُ التدقيق — أعلى من صورة الاكتشاف، والبحثُ في شريطٍ ضيّق فيبقى سريعاً */
+export const REFINE_SIDE = 900;
 
 /**
  * زوايا الورقة بإحداثيّات الصورة الأصل — أو `null` إن لم تُعرف بثقة.
@@ -82,6 +86,22 @@ export const EDGE_SIDE = 480;
  * (ورقٌ مجعّد بلا طرفٍ مستقيم على كاونترٍ داكن).
  */
 export function detectDocument(src: Raster): Quad | null {
+  /*
+    الرقعةُ البيضاء أوّلاً (`region.ts`): تصدق على السجّاد المزخرف والخشب والرخام، وهي
+    حالُ صور المقهى الحقيقيّة. ثمّ تُدقَّق أضلاعُها على حافّتها (`refine.ts`).
+  */
+  const region = quadFromRegion(src);
+  if (region) {
+    const mid = downscaleGray(src, REFINE_SIDE);
+    const down = region.quad.map((p) => ({ x: p.x * mid.scale, y: p.y * mid.scale }));
+    const refined = refineQuad({ gray: mid.gray, width: mid.width, height: mid.height }, [down[0], down[1], down[2], down[3]]);
+    const up = (p: { x: number; y: number }) => ({
+      x: Math.min(src.width, Math.max(0, p.x / mid.scale)),
+      y: Math.min(src.height, Math.max(0, p.y / mid.scale)),
+    });
+    return [up(refined[0]), up(refined[1]), up(refined[2]), up(refined[3])];
+  }
+
   const small = downscaleGray(src, EDGE_SIDE);
   const found = quadFromEdges(small);
   if (found) {

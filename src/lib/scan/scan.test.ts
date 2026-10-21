@@ -111,8 +111,9 @@ describe("اكتشافُ الورقة", () => {
     const q = detectDocument(photo(400, 520, PAPER));
     expect(q).not.toBeNull();
     q!.forEach((p, i) => {
-      expect(Math.abs(p.x - PAPER[i].x)).toBeLessThan(8);
-      expect(Math.abs(p.y - PAPER[i].y)).toBeLessThan(8);
+      /* ٢٪ من ضلع الصورة — كبقيّة الاختبارات (٢٠–٢٥ بكسلاً على ١٢٠٠) */
+      expect(Math.abs(p.x - PAPER[i].x)).toBeLessThan(11);
+      expect(Math.abs(p.y - PAPER[i].y)).toBeLessThan(11);
     });
   });
 

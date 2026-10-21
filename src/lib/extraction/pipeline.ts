@@ -22,6 +22,7 @@ import { SERVICE_FOLDERS } from "@/config/drive";
 import type { ExtractionResult } from "./schema";
 import type { SupplierMatch, SupplierRecord } from "@/lib/supplier-match";
 import { isCalendarDate } from "./validate-extraction";
+import { settlePreVatDiscount, type PreVatDiscount } from "./discount";
 
 export interface PipelineInput {
   extraction: ExtractionResult;
@@ -67,6 +68,8 @@ export interface PipelineResult {
   canArchive: boolean;
   /** يكمل فاتورةً مقيَّدةً من كشف المورّد بلا ملفّ — رقمُها كما قُيِّد */
   completesStatementInvoice?: string;
+  /** خصمٌ قبل الضريبة: المجموعُ قبله والخصم — والوعاءُ (`subtotalMinor`) بعده */
+  preVatDiscount?: PreVatDiscount;
 }
 
 
@@ -101,7 +104,10 @@ function toSlugToken(value: string): string {
 }
 
 export function runPipeline(input: PipelineInput): PipelineResult {
-  const { extraction: x, match } = input;
+  const { match } = input;
+  /* خصمٌ قبل الضريبة قُرئ مجموعُه قبله: الوعاءُ بعده (`discount.ts`) — ولقراءاتٍ حُفظت قبل التصحيح */
+  const settled = settlePreVatDiscount(input.extraction);
+  const x = settled.value;
   const findings: Finding[] = [];
 
   const subtotalMinor = parseRiyals(x.subtotalAmount) ?? undefined;
@@ -323,6 +329,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     proposedFolderPath,
     proposedFolderName,
     completesStatementInvoice,
+    preVatDiscount: settled.discount ?? undefined,
     taxStatus: validation.taxStatus,
     inputVatStatus: validation.inputVatStatus,
     isFixedAsset: validation.isFixedAsset,

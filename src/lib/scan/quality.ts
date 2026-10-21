@@ -25,7 +25,8 @@ export const BLUR_VARIANCE_MIN = 100;
 export const DARK_MEAN_MAX = 75;
 /** نسبةُ البكسلات المشبعة التي تُعدّ لمعة — حين لا يكون الورقُ كلُّه مشبعاً */
 const GLARE_SHARE = 0.025;
-const SMALL_AREA_RATIO = 0.25;
+/** الورقةُ تمتدّ أقلَّ من نصف الإطار طولاً وعرضاً — بعيدة */
+const SMALL_SPAN = 0.5;
 
 export interface QualityReport {
   issues: QualityIssue[];
@@ -55,9 +56,9 @@ export function laplacianVariance(gray: Uint8Array, width: number, height: numbe
 
 /**
  * @param page الورقة بعد التقويم وقبل التنظيف — التنظيفُ يرفع التباين فيُخفي الاهتزاز.
- * @param paperShare مساحةُ الورقة من الصورة الأصل (١ إن لم تُعرف).
+ * @param span امتدادُ الورقة في الإطار (`frameSpan`) — ١ إن لم يُعرف.
  */
-export function assessQuality(page: Raster, paperShare = 1): QualityReport {
+export function assessQuality(page: Raster, span = 1): QualityReport {
   const { gray, width, height } = downscaleGray(page, MEASURE_SIDE);
   const sharpness = laplacianVariance(gray, width, height);
   let total = 0;
@@ -81,6 +82,6 @@ export function assessQuality(page: Raster, paperShare = 1): QualityReport {
   if (brightness < DARK_MEAN_MAX) issues.push("DARK");
   /* لمعةٌ: بقعةٌ مشبعة والورقُ حولها غيرُ مشبع — لا ورقٌ أبيضُ كلُّه تحت ضوءٍ قويّ */
   if (saturated / gray.length > GLARE_SHARE && median < 235) issues.push("GLARE");
-  if (paperShare < SMALL_AREA_RATIO) issues.push("SMALL");
+  if (span < SMALL_SPAN) issues.push("SMALL");
   return { issues, sharpness, brightness };
 }

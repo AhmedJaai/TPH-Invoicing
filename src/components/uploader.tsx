@@ -67,6 +67,8 @@ interface AnalysisResponse {
     canArchive: boolean;
     /** يكمل فاتورةً مقيَّدةً من كشف المورّد بلا ملفّ — تُربط به ولا تُكرَّر */
     completesStatementInvoice?: string;
+    /** خصمٌ قبل الضريبة: المجموعُ قبله والخصم — و`subtotalMinor` بعده */
+    preVatDiscount?: { grossMinor: number; discountMinor: number };
   };
 }
 
@@ -669,6 +671,7 @@ export function Uploader({
         invoiceDate: sent.invoiceDate,
         vat: sent.vat,
         total: sent.total,
+        discount: sent.discount,
       });
       setItems((prev) => prev.map((x) => {
         if (x.id !== id || x.state !== "done") return x;
@@ -747,6 +750,7 @@ export function Uploader({
                   invoiceDate: data.result.invoiceDate ?? "",
                   total: data.result.totalMinor !== undefined ? formatRiyalsDisplay(data.result.totalMinor) : "",
                   vat: data.result.vatMinor !== undefined ? formatRiyalsDisplay(data.result.vatMinor) : "",
+                  discount: data.result.preVatDiscount ? formatRiyalsDisplay(data.result.preVatDiscount.discountMinor) : "",
                   fileName: data.result.proposedFileName ?? "",
                 },
               }
@@ -1515,9 +1519,15 @@ function ReviewCard({
                   <Field id={fid("total")} label="الرصيد الختامي (اختياري)" inputMode="decimal" value={item.edited.total} weak={low.has(LOW.amounts)} onChange={(v) => onEdit("total", v)} />
                 </div>
               ) : (
+              <>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <div className="col-span-2 min-w-0 sm:col-span-1">
-                  <p className="text-xs font-bold text-ink-soft">قبل الضريبة</p>
+                {/*
+                  الخصمُ قبل الضريبة حقلٌ دائم: يُكتب إن غاب عن القراءة، ويُصحَّح إن أخطأته.
+                  والخادمُ يحسب الوعاءَ بعده (`apply-edits.ts`) — لا الشاشة.
+                */}
+                <Field id={fid("discount")} label="الخصم (إن وُجد)" inputMode="decimal" value={item.edited.discount ?? ""} weak={false} onChange={(v) => onEdit("discount", v)} />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-ink-soft">{r.preVatDiscount ? "بعد الخصم، قبل الضريبة" : "قبل الضريبة"}</p>
                   <p className="mt-1.5 flex min-h-11 items-center rounded-lg bg-sunken px-3 text-sm sm:min-h-10">
                     {r.subtotalMinor !== undefined ? <Money minor={r.subtotalMinor} /> : <span className="text-muted">غير معروف</span>}
                   </p>
@@ -1525,6 +1535,12 @@ function ReviewCard({
                 <Field id={fid("vat")} label="الضريبة" inputMode="decimal" value={item.edited.vat} weak={low.has(LOW.amounts)} onChange={(v) => onEdit("vat", v)} />
                 <Field id={fid("total")} label="الإجمالي" inputMode="decimal" value={item.edited.total} weak={low.has(LOW.amounts)} onChange={(v) => onEdit("total", v)} />
               </div>
+              {r.preVatDiscount && (
+                <p className="mt-2 text-xs text-ink-soft">
+                  المجموع قبل الخصم <Money minor={r.preVatDiscount.grossMinor} /> − الخصم <Money minor={r.preVatDiscount.discountMinor} /> = الخاضع للضريبة <Money minor={r.subtotalMinor ?? 0} />
+                </p>
+              )}
+              </>
               )}
               <p className="mt-2 text-[11px] leading-relaxed text-muted">
                 يعيد النظام حساب المبالغ والحالة الضريبية عند التأكيد، فما تكتبه هنا يُفحص ولا يُعتمد كما هو.

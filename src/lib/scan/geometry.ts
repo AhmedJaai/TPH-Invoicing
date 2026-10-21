@@ -159,3 +159,13 @@ export function insetQuad(width: number, height: number, ratio = 0.04): Quad {
     { x: dx, y: dy }, { x: width - dx, y: dy }, { x: width - dx, y: height - dy }, { x: dx, y: height - dy },
   ];
 }
+
+/**
+ * كم تمتدّ الورقةُ في الإطار — أكبرُ نسبتَي طولها وعرضها إلى طوله وعرضه.
+ * لا المساحة: إيصالٌ طويلٌ ضيّق يملأ الإطار طولاً ومساحتُه خُمسُه.
+ */
+export function frameSpan(q: Quad, width: number, height: number): number {
+  const xs = q.map((p) => p.x);
+  const ys = q.map((p) => p.y);
+  return Math.max((Math.max(...xs) - Math.min(...xs)) / width, (Math.max(...ys) - Math.min(...ys)) / height);
+}
