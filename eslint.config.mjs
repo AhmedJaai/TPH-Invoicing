@@ -61,6 +61,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // مساحةُ فحصٍ مؤقّتة، خارج الشجرة المتعقَّبة
     ".scratch/**",
+    // ملفّاتُ onnxruntime-web المصغَّرة — تُنسخ من الحزمة (scripts/copy-ort.mjs)
+    "public/ort/**",
   ]),
 ]);
 

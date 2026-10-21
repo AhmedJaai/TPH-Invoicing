@@ -1,18 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
   Camera, Check, CircleAlert, Crop, CircleCheck, Clock, FileText, ImagePlus, Palette, Plus, RotateCcw, ScanLine, Send, Trash2, X,
 } from "lucide-react";
 import { BrandMark } from "@/components/icons";
 import { LiveScanner } from "./live-scanner";
+import { detect, warmDetector } from "./detector";
+
+const noSubscribe = () => () => {};
+/** آيفون أو آيباد (والآيباد الحديث يعلن نفسَه «ماك» ذا لمس) */
+function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
 import { buttonClass } from "@/components/ui-tokens";
 import { readResponse } from "@/lib/http-client";
 import { countNoun, PAGE, timeAgo } from "@/lib/arabic";
 import type { ClarityVerdict } from "@/lib/capture-clarity";
 import { imagesToPdf, type JpegPage } from "@/lib/images-to-pdf";
-import { detectDocument } from "@/lib/scan/detect";
 import { enhanceScan, type ScanMode } from "@/lib/scan/enhance";
 import { frameSpan, insetQuad, orderQuad, warpQuad, type Point, type Quad, type Raster } from "@/lib/scan/geometry";
 import { assessQuality, QUALITY_MESSAGE, type QualityIssue } from "@/lib/scan/quality";
@@ -156,12 +163,21 @@ export function Scanner({ token, label, recent }: { token: string; label: string
   /** لا كاميرا حيّة في هذا المتصفّح (منعٌ أو قِدَم) — فالتصويرُ العاديّ */
   const [liveUnavailable, setLiveUnavailable] = useState(false);
 
-  /* الماسحُ الحيّ إن أمكن، وإلّا كاميرا الجوال العاديّة */
+  /*
+    الآيفون: كاميرا الجوال نفسُها — صورةٌ كاملة بمعالجة أبل (HDR وتركيز)، والمتصفّحُ هناك
+    لا يعطي الصفحةَ إلّا إطارَ فيديو أضعف منها. ثمّ تُكتشف الورقةُ وتُقوَّم آليّاً. وغيرُه:
+    الماسحُ الحيّ (أندرويد يلتقط صورةً حقيقيّة بدقّة المستشعر).
+  */
+  const ios = useSyncExternalStore(noSubscribe, isIOS, () => false);
   const openCamera = useCallback(() => {
     setError(null);
-    if (liveUnavailable || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) cameraInput.current?.click();
+    if (ios || liveUnavailable || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) cameraInput.current?.click();
     else setStage({ kind: "live" });
-  }, [liveUnavailable]);
+  }, [ios, liveUnavailable]);
+  const openLive = useCallback(() => { setError(null); setStage({ kind: "live" }); }, []);
+
+  /* النموذجُ يُحمَّل والباريستا ما زال في الصفحة الأولى — جاهزٌ حين يصوّر */
+  useEffect(() => { warmDetector(); }, []);
 
   const onPicked = useCallback(async (list: FileList | null) => {
     const file = list?.[0];
@@ -171,7 +187,7 @@ export function Scanner({ token, label, recent }: { token: string; label: string
     await paint();
     try {
       const { raster, url } = await loadRaster(file);
-      const found = detectDocument(raster);
+      const found = await detect(raster).catch(() => null);
       setStage({ kind: "adjust", source: raster, url, quad: found ?? insetQuad(raster.width, raster.height), detected: Boolean(found) });
     } catch {
       setError("لم يستطع الجوال فتح هذه الصورة. صوّرها مرة أخرى بالكاميرا.");
@@ -401,7 +417,7 @@ export function Scanner({ token, label, recent }: { token: string; label: string
       )}
 
       {stage.kind === "home" && (
-        <Home onCamera={openCamera} onGallery={() => galleryInput.current?.click()} onReady={() => readyInput.current?.click()} recent={recent} />
+        <Home onCamera={openCamera} onLive={ios && !liveUnavailable ? openLive : undefined} onGallery={() => galleryInput.current?.click()} onReady={() => readyInput.current?.click()} recent={recent} />
       )}
 
       {stage.kind === "preparing" && <Busy text="يجهّز الصورة…" />}
@@ -535,7 +551,7 @@ const STATUS: Record<SentItem["status"], { text: string; tone: string; Icon: typ
   REJECTED: { text: "رُفضت", tone: "text-danger", Icon: CircleAlert },
 };
 
-function Home({ onCamera, onGallery, onReady, recent }: { onCamera: () => void; onGallery: () => void; onReady: () => void; recent: SentItem[] }) {
+function Home({ onCamera, onLive, onGallery, onReady, recent }: { onCamera: () => void; onLive?: () => void; onGallery: () => void; onReady: () => void; recent: SentItem[] }) {
   return (
     <>
       <section className="mt-6 rounded-2xl border border-line bg-raised p-5 shadow-raised">
@@ -543,13 +559,20 @@ function Home({ onCamera, onGallery, onReady, recent }: { onCamera: () => void; 
           <Camera className="h-6 w-6" aria-hidden /> صوّر الفاتورة
         </button>
         <ul className="mt-4 space-y-1.5 text-xs leading-relaxed text-ink-soft">
-          <li>• وجّه الكاميرا نحو الفاتورة حتى تظهر محدَّدةً بالأصفر، ثم اضغط زر الالتقاط والجوال ثابت.</li>
-          <li>• اجعل الورقة كلها في الإطار، بلا ظل يدك عليها.</li>
-          <li>• إن كانت أكثر من صفحة فالتقط التالية بعدها، ثم اضغط «تم».</li>
+          <li>• صوّرها من فوقها مباشرة، والورقة كلها في الإطار بلا ظل يدك عليها.</li>
+          <li>• يحدّد النظام حدودها ويقوّمها وحده، وتعدّل الزوايا بإصبعك إن لزم.</li>
+          <li>• إن كانت أكثر من صفحة فأضف التالية بعدها، ثم افحص الوضوح وأرسل.</li>
         </ul>
-        <button type="button" onClick={onGallery} className={`${buttonClass("quiet", "sm")} mt-3 w-full`}>
-          <ImagePlus className="h-4 w-4" aria-hidden /> أو اختر صورة من الجوال
-        </button>
+        <div className="mt-3 grid gap-1">
+          {onLive && (
+            <button type="button" onClick={onLive} className={`${buttonClass("quiet", "sm")} w-full`}>
+              <ScanLine className="h-4 w-4" aria-hidden /> أو الماسح الحيّ (الكاميرا داخل الصفحة)
+            </button>
+          )}
+          <button type="button" onClick={onGallery} className={`${buttonClass("quiet", "sm")} w-full`}>
+            <ImagePlus className="h-4 w-4" aria-hidden /> أو اختر صورة من الجوال
+          </button>
+        </div>
       </section>
 
       {/*

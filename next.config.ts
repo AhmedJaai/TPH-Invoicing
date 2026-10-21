@@ -28,6 +28,12 @@ const nextConfig: NextConfig = {
   */
   async headers() {
     return [
+      /*
+        نموذجُ زوايا الورقة (١٤ ميجابايت): يُنزَّل مرّةً ويبقى في الجوال — واسمُه بنسخته (`-v1`).
+      */
+      { source: "/models/:file*", headers: [{ key: "Cache-Control", value: "public, max-age=2592000, immutable" }] },
+      /* ملفّاتُ التشغيل باسمٍ ثابت عبر النسخ — يومٌ لا أكثر، فلا يبقى في الجوال نصفٌ قديمٌ ونصفٌ جديد */
+      { source: "/ort/:file*", headers: [{ key: "Cache-Control", value: "public, max-age=86400" }] },
       {
         source: "/:path*",
         headers: [
@@ -52,7 +58,8 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy-Report-Only",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
+              /* `wasm-unsafe-eval`: نموذجُ زوايا الورقة يجري بـWebAssembly في عامل الماسح */
+              "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://lh3.googleusercontent.com",
               "font-src 'self' data:",

@@ -6,6 +6,7 @@
 |---|---|
 | `src/services/capture.service.ts` | صورُ الفريق: روابطُ التصوير (بصمةُ الرمز) · فحصُ الوضوح بالقراءة · الانتظار والرفض · `settleCapture` داخل معاملة الأرشفة |
 | `src/lib/scan/` | الماسحُ على الجهاز، دوالُّ خالصة: `region` (الرقعةُ البيضاء — الأوّل) · `refine` (تدقيقُ الأضلاع) · `stability` (متى يُلتقط وحده) · `edges` (حوافُّ الورقة من خطوطها — هَف، وأبعدُ الخطوط، ولا حبرَ وراء الطرف) · `detect` (الخطوطُ ثمّ اللون) · `geometry` (التقويم المنظوريّ) · `enhance` (ورقٌ أبيض بلا ظلّ) · `quality` (مهزوزة · مظلمة · لمعة · بعيدة) |
+| `src/lib/scan/corner-model.ts` · `src/components/scan/detector.ts` | نموذجُ زوايا الورقة (مُدخلُه ومُخرجُه، خالص) · المكتشِفُ المشترك (عاملٌ واحد، ومهلة) — و`pickBest` في `detect.ts` يختار بشهادة الحافّة |
 | `src/components/scan/live-scanner.tsx` · `detect.worker.ts` | الماسحُ الحيّ: الكاميرا في الصفحة، والاكتشافُ في عامل، والالتقاطُ حين تثبت |
 | `src/lib/extraction/discount.ts` | `settlePreVatDiscount()` — الخصمُ قبل الضريبة يُنقص الوعاء، بشهادة الضريبة |
 | `src/lib/capture-clarity.ts` | `judgeClarity()` — أقُرئت الورقة؟ وما نقص بأسمائه، للباريستا قبل الإرسال |

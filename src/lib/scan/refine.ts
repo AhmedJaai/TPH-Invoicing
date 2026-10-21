@@ -138,3 +138,34 @@ export function refineQuad(img: GrayImage, q: Quad): Quad {
 
 /** أدنى قفزةٍ في السطوع تُعدّ طرفاً */
 const MIN_STEP = 12;
+
+/**
+ * كم يصدق الرباعيُّ طرفاً للورقة: لكلّ ضلعٍ نسبةُ النقاط التي داخلُها أفتحُ من خارجها
+ * بقفزةٍ واضحة — ومتوسّطُ الأضلاع الأربعة (٠ إلى ١). به يُختار بين اكتشافين يختلفان.
+ */
+export function borderScore(img: GrayImage, q: Quad): number {
+  const c = { x: (q[0].x + q[1].x + q[2].x + q[3].x) / 4, y: (q[0].y + q[1].y + q[2].y + q[3].y) / 4 };
+  const off = Math.max(2, Math.round(Math.hypot(img.width, img.height) * 0.004));
+  let sum = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = q[i];
+    const b = q[(i + 1) % 4];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len < 8) return 0;
+    let nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len;
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    if (nx * (c.x - mid.x) + ny * (c.y - mid.y) > 0) { nx = -nx; ny = -ny; }
+    const n = Math.min(40, Math.max(10, Math.round(len / 8)));
+    let hit = 0, seen = 0;
+    for (let k = 1; k < n; k++) {
+      const f = 0.1 + (0.8 * k) / n;
+      const px = a.x + (b.x - a.x) * f, py = a.y + (b.y - a.y) * f;
+      const ox = px + nx * off, oy = py + ny * off;
+      if (ox < 0 || oy < 0 || ox >= img.width || oy >= img.height) continue;
+      seen++;
+      if (at(img, px - nx * off, py - ny * off) - at(img, ox, oy) >= MIN_STEP) hit++;
+    }
+    sum += seen ? hit / seen : 0;
+  }
+  return sum / 4;
+}

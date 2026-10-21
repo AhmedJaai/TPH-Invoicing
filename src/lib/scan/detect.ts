@@ -12,7 +12,7 @@
 import { isConvexQuad, quadArea, type Quad, type Raster } from "./geometry";
 import { plausibleBorder, quadFromEdges } from "./edges";
 import { quadFromRegion } from "./region";
-import { refineQuad } from "./refine";
+import { borderScore, refineQuad } from "./refine";
 
 /** أطولُ ضلعٍ للصورة المصغّرة — يكفي للحواف ويجري في أجزاءٍ من الثانية. */
 export const DETECT_SIDE = 360;
@@ -193,3 +193,39 @@ export function detectByBrightness(src: Raster): Quad | null {
   });
   return [up(small[0]), up(small[1]), up(small[2]), up(small[3])];
 }
+
+/**
+ * يختار بين اكتشافاتٍ مختلفة (الرقعةُ البيضاء · نموذجُ الزوايا) بما تشهد به حافّةُ الورقة:
+ * كلٌّ يُدقَّق على حافّته (`refineQuad`)، ثمّ يُوزن بـ`borderScore` — كم من أضلاعه داخلُه
+ * أفتحُ من خارجه. وما لا يصدق منها شيءٌ (دون الحدّ) يُرجع `null`.
+ *
+ * والسببُ أنّهما يخطئان في مواضع مختلفة: الرقعةُ تفوتها الورقةُ التي تملأ الإطار،
+ * والنموذجُ تفوته الورقةُ الصغيرة البعيدة. ومعاً: ٢٧ من ٢٨ مشهداً على سجّاد التسجيل.
+ */
+export function pickBest(src: Raster, candidates: readonly (Quad | null)[]): Quad | null {
+  const list = candidates.filter((q): q is Quad => q !== null && isConvexQuad(q));
+  if (list.length === 0) return null;
+  const mid = downscaleGray(src, REFINE_SIDE);
+  const img = { gray: mid.gray, width: mid.width, height: mid.height };
+  let best: Quad | null = null;
+  let bestScore = MIN_BORDER_SCORE;
+  for (const q of list) {
+    const dn = (p: { x: number; y: number }) => ({ x: p.x * mid.scale, y: p.y * mid.scale });
+    const down: Quad = [dn(q[0]), dn(q[1]), dn(q[2]), dn(q[3])];
+    const refined = refineQuad(img, down);
+    const score = borderScore(img, refined);
+    if (score > bestScore) {
+      bestScore = score;
+      best = refined;
+    }
+  }
+  if (!best) return null;
+  const up = (p: { x: number; y: number }) => ({
+    x: Math.min(src.width, Math.max(0, p.x / mid.scale)),
+    y: Math.min(src.height, Math.max(0, p.y / mid.scale)),
+  });
+  return [up(best[0]), up(best[1]), up(best[2]), up(best[3])];
+}
+
+/** أدنى شهادةٍ للحافّة يُقبل بها اكتشاف */
+const MIN_BORDER_SCORE = 0.45;

@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Flashlight, FlashlightOff, X } from "lucide-react";
 import { countNoun, PAGE } from "@/lib/arabic";
-import { detectDocument } from "@/lib/scan/detect";
+import { detect, warmDetector } from "./detector";
 import type { Quad, Raster } from "@/lib/scan/geometry";
 import { StabilityTracker, type ScanState } from "@/lib/scan/stability";
-import type { DetectRequest, DetectResponse } from "./detect.worker";
 
 /**
  * الماسحُ الحيّ — كمسح المستندات في «الملاحظات».
@@ -170,7 +169,8 @@ export function LiveScanner({ pageCount, lastThumb, onCapture, onDone, onFallbac
       setFlash(true);
       setTimeout(() => setFlash(false), 180);
       /* اكتشافٌ ثانٍ بالدقّة الكاملة أدقُّ زوايا — وإلّا فما ثبت في الإطار المصغّر */
-      const quad = detectDocument(frame) ?? hint;
+      /* اكتشافٌ ثانٍ على الصورة الملتقطة نفسها (النموذجُ والرقعة) — وإلّا فما ثبت في العرض */
+      const quad = (await detect(frame).catch(() => null)) ?? hint;
       tracker.current?.markCaptured(hintInVideo);
       await onCapture(frame, quad);
     } finally {
@@ -180,40 +180,26 @@ export function LiveScanner({ pageCount, lastThumb, onCapture, onDone, onFallbac
 
   /* ── حلقةُ الاكتشاف ── */
   useEffect(() => {
-    let worker: Worker | null = null;
-    try {
-      worker = new Worker(new URL("./detect.worker.ts", import.meta.url), { type: "module" });
-    } catch {
-      worker = null;
-    }
+    warmDetector();
     const small = document.createElement("canvas");
     const ctx = small.getContext("2d", { willReadFrequently: true });
     let raf = 0;
     let busy = false;
     let lastSent = 0;
-    let id = 0;
-    let scale = 1;
+    let alive = true;
 
-    const handle = (quad: Quad | null) => {
+    const handle = (quad: Quad | null, scale: number) => {
       const v = video.current;
-      if (!v || !v.videoWidth) return;
+      if (!alive || !v || !v.videoWidth) return;
       if (!tracker.current) tracker.current = new StabilityTracker({ width: v.videoWidth, height: v.videoHeight });
       /* من الإطار المصغّر إلى بكسلات الفيديو */
-      const full = quad ? quad.map((p) => ({ x: p.x / scale, y: p.y / scale })) : null;
-      const q: Quad | null = full ? [full[0], full[1], full[2], full[3]] : null;
+      const up = (p: { x: number; y: number }) => ({ x: p.x / scale, y: p.y / scale });
+      const q: Quad | null = quad ? [up(quad[0]), up(quad[1]), up(quad[2]), up(quad[3])] : null;
       const r = tracker.current.update(q, performance.now());
       setDisplay(r.display);
       setState(r.state);
       if (r.capture && autoRef.current && !capturing.current) void capture(q);
     };
-
-    if (worker) {
-      worker.onmessage = (e: MessageEvent<DetectResponse>) => {
-        busy = false;
-        handle(e.data.quad);
-      };
-      worker.onerror = () => { busy = false; };
-    }
 
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
@@ -226,26 +212,21 @@ export function LiveScanner({ pageCount, lastThumb, onCapture, onDone, onFallbac
         /* الإطارُ تغيّر (دار الجوال): يُعاد العدّ على مقاسه الجديد */
         tracker.current = null;
       }
-      scale = Math.min(1, DETECT_SIDE / Math.max(v.videoWidth, v.videoHeight));
+      const scale = Math.min(1, DETECT_SIDE / Math.max(v.videoWidth, v.videoHeight));
       small.width = Math.round(v.videoWidth * scale);
       small.height = Math.round(v.videoHeight * scale);
       ctx.drawImage(v, 0, 0, small.width, small.height);
       const img = ctx.getImageData(0, 0, small.width, small.height);
       lastSent = now;
       busy = true;
-      if (worker) {
-        const msg: DetectRequest = { id: ++id, width: img.width, height: img.height, data: img.data.buffer };
-        worker.postMessage(msg, [img.data.buffer]);
-      } else {
-        /* بلا عامل: على خيط الواجهة، والإطارُ التالي بعد انتهائه */
-        handle(detectDocument({ width: img.width, height: img.height, data: img.data }));
-        busy = false;
-      }
+      void detect({ width: img.width, height: img.height, data: img.data })
+        .then((q) => handle(q, scale), () => handle(null, scale))
+        .finally(() => { busy = false; });
     };
     raf = requestAnimationFrame(tick);
     return () => {
+      alive = false;
       cancelAnimationFrame(raf);
-      worker?.terminate();
     };
   }, [capture]);
 
