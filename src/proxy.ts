@@ -13,7 +13,11 @@ import { previewAllowed } from "@/lib/preview-mode";
   `/c/` و`/api/capture/scan/`: رابطُ تصوير الباريستا — بلا جلسة، ورمزُه هو إذنُه. والمسارُ
   نفسُه يفحص الرمز (`capture.service.ts`) ولا يملك إلّا وضعَ صورةٍ في الانتظار.
 */
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health", "/i18n/", "/c/", "/api/capture/scan/"];
+/*
+  `/models/` و`/ort/`: نموذجُ زوايا الورقة وملفّاتُ تشغيله — ملفّاتٌ ثابتة لا بيانات، يطلبها
+  عاملُ ماسح الباريستا بلا جلسة. كانت تُحوَّل إلى صفحة الدخول (٣٠٧) فلا يُحمَّل النموذجُ أبداً.
+*/
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health", "/i18n/", "/c/", "/api/capture/scan/", "/models/", "/ort/"];
 
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const ACCEPTED_BODIES = /^(application\/json|multipart\/form-data|application\/x-www-form-urlencoded)/i;

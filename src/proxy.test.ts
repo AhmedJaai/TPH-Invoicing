@@ -63,6 +63,11 @@ describe("رابطُ تصوير الباريستا", () => {
     expect(send.status).toBe(200);
   });
 
+  it("ونموذجُ زوايا الورقة وملفّاتُ تشغيله بلا جلسة — يطلبها عاملُ الماسح", () => {
+    expect(proxy(new NextRequest("https://app.example.com/models/doc-corners-v1.onnx")).status).toBe(200);
+    expect(proxy(new NextRequest("https://app.example.com/ort/ort-wasm-simd-threaded.wasm")).status).toBe(200);
+  });
+
   it("ولا يفتح ما سواه: ملفُّ الصورة ورفضُها يحتاجان جلسة", () => {
     expect(proxy(new NextRequest("https://app.example.com/api/capture/file?id=x")).status).toBe(401);
     expect(proxy(post({ origin: "https://app.example.com", "content-type": "application/json" }, "/api/capture/decide")).status).toBe(401);
