@@ -140,6 +140,23 @@ describe("التنظيف", () => {
   });
 });
 
+describe("لا يُمحى الحبرُ الباهت", () => {
+  it("حرفُ الإيصال الحراريّ الباهت يبقى مقروءاً بعد التنظيف", () => {
+    /* ورقٌ ٢٣٥ وحبرٌ باهت ١٩٠ (إيصالٌ حراريّ قديم) */
+    const img = photo(300, 400, insetQuad(300, 400, 0));
+    for (let y = 100; y < 300; y++) for (let x = 50; x < 250; x++) {
+      if (y % 12 < 3) { const i = (y * 300 + x) * 4; img.data[i] = img.data[i + 1] = img.data[i + 2] = 190; }
+    }
+    for (const mode of ["document", "color"] as const) {
+      const out = enhanceScan(img, mode);
+      const faint = out.data[(108 * 300 + 120) * 4];
+      const paper = out.data[(104 * 300 + 120) * 4];
+      expect(paper - faint, mode).toBeGreaterThan(45);
+      expect(paper, mode).toBeGreaterThan(240);
+    }
+  });
+});
+
 describe("فحصُ الوضوح", () => {
   const sharp = photo(400, 520, insetQuad(400, 520, 0));
 

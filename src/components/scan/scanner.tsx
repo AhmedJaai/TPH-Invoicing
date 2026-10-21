@@ -67,6 +67,8 @@ type Stage =
   | { kind: "preparing" }
   /** الماسحُ الحيّ مفتوح */
   | { kind: "live" }
+  /** مسحٌ جاهز من ماسح الجوال — يُرسل كما هو */
+  | { kind: "ready"; name: string; pdf: boolean; url: string | null }
   | { kind: "adjust"; source: Raster; url: string; quad: Quad; detected: boolean; replaceId?: string }
   | { kind: "pages" }
   | { kind: "checking"; startedAt: number }
@@ -136,13 +138,15 @@ export function Scanner({ token, label, recent }: { token: string; label: string
   const router = useRouter();
   const [stage, setStage] = useState<Stage>({ kind: "home" });
   const [pages, setPages] = useState<ScanPage[]>([]);
-  const [mode, setMode] = useState<ScanMode>("document");
+  /* ألوانٌ طبيعيّة أوّلاً كـ«الملاحظات» — و«مستند» رماديٌّ لمن أراده */
+  const [mode, setMode] = useState<ScanMode>("color");
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   /** الملفُّ الذي فُحص — يُرسَل هو نفسُه، فتُعاد قراءتُه من الخزين لا من النموذج */
   const built = useRef<File | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
+  const readyInput = useRef<HTMLInputElement>(null);
 
   /* روابطُ المعاينة تُحرَّر حين تُترك الصفحات */
   const pagesRef = useRef(pages);
@@ -173,6 +177,24 @@ export function Scanner({ token, label, recent }: { token: string; label: string
       setError("لم يستطع الجوال فتح هذه الصورة. صوّرها مرة أخرى بالكاميرا.");
       setStage({ kind: pagesRef.current.length ? "pages" : "home" });
     }
+  }, []);
+
+  /*
+    مسحٌ جاهز من ماسح الجوال نفسه («الملفات» أو «الملاحظات» في الآيفون — ماسحُ أبل):
+    جودتُه جودةُ أبل، فلا يُقصّ ولا يُنظَّف ثانيةً. يُفحص ويُرسل كما هو.
+  */
+  const onReady = useCallback((list: FileList | null) => {
+    const file = list?.[0];
+    if (!file) return;
+    setError(null);
+    if (file.size > MAX_SEND_BYTES) {
+      setError("الملف أكبر من حد الإرسال. امسح صفحات أقل في المرة الواحدة.");
+      return;
+    }
+    pagesRef.current.forEach((p) => URL.revokeObjectURL(p.url));
+    setPages([]);
+    built.current = file;
+    setStage({ kind: "ready", name: file.name, pdf: file.type === "application/pdf" || /\.pdf$/i.test(file.name), url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null });
   }, []);
 
   /** إطارٌ وزواياه ← صفحةٌ مقوَّمةٌ منظَّفة */
@@ -284,6 +306,7 @@ export function Scanner({ token, label, recent }: { token: string; label: string
 
   const fileForSending = useCallback((): File | null => {
     if (built.current) return built.current;
+    if (pagesRef.current.length === 0) return null;
     const file = buildFile(pagesRef.current);
     if (file.size > MAX_SEND_BYTES) {
       setError("الصفحات أكبر من حد الإرسال. احذف صفحة وأرسلها في فاتورة مستقلة.");
@@ -367,6 +390,9 @@ export function Scanner({ token, label, recent }: { token: string; label: string
         onChange={(e) => { void onPicked(e.target.files); e.target.value = ""; }} />
       <input ref={galleryInput} aria-label="اختر صورة الفاتورة من الجوال" type="file" accept="image/*" className="hidden"
         onChange={(e) => { void onPicked(e.target.files); e.target.value = ""; }} />
+      {/* ملفٌّ جاهز من ماسح الآيفون (PDF) أو صورةٌ ممسوحة — يُرسل كما هو بلا قصٍّ ولا تنظيف */}
+      <input ref={readyInput} aria-label="ارفع مسحاً جاهزاً من ماسح الجوال" type="file" accept="application/pdf,image/*" className="hidden"
+        onChange={(e) => { onReady(e.target.files); e.target.value = ""; }} />
 
       {error && (
         <p role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-danger/30 bg-danger-bg px-3 py-2.5 text-sm text-danger">
@@ -375,10 +401,31 @@ export function Scanner({ token, label, recent }: { token: string; label: string
       )}
 
       {stage.kind === "home" && (
-        <Home onCamera={openCamera} onGallery={() => galleryInput.current?.click()} recent={recent} />
+        <Home onCamera={openCamera} onGallery={() => galleryInput.current?.click()} onReady={() => readyInput.current?.click()} recent={recent} />
       )}
 
       {stage.kind === "preparing" && <Busy text="يجهّز الصورة…" />}
+
+      {stage.kind === "ready" && (
+        <section className="mt-4 flex flex-col">
+          <div className="flex items-center gap-3 rounded-xl border border-line bg-raised p-3 shadow-raised">
+            {stage.url ? (
+              /* eslint-disable-next-line @next/next/no-img-element -- رابطٌ محلّيّ للمسح المختار */
+              <img src={stage.url} alt="" className="h-20 w-16 rounded-md border border-line object-cover" />
+            ) : (
+              <span className="grid h-20 w-16 place-items-center rounded-md border border-line bg-sunken"><FileText className="h-6 w-6 text-muted" aria-hidden /></span>
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold" dir="auto">{stage.name}</p>
+              <p className="text-xs text-muted">مسحٌ جاهز من ماسح الجوال، يُرسل كما هو.</p>
+            </div>
+          </div>
+          <button type="button" onClick={() => void check()} className={`${buttonClass("primary", "lg")} mt-4 w-full`}>
+            <ScanLine className="h-5 w-5" aria-hidden /> افحص الوضوح
+          </button>
+          <button type="button" onClick={startOver} className={`${buttonClass("quiet", "md")} mt-2 w-full`}>اختر ملفاً آخر</button>
+        </section>
+      )}
 
       {stage.kind === "adjust" && (
         <Adjust
@@ -424,6 +471,8 @@ export function Scanner({ token, label, recent }: { token: string; label: string
           onNote={setNote}
           onSend={() => void send()}
           onRetake={() => {
+            /* مسحٌ جاهز: يُعاد من البداية (ماسحُ الجوال أو ملفٌّ آخر) */
+            if (pages.length === 0) { startOver(); return; }
             /* الحكمُ القديم لا يبقى على صفحاتٍ تغيّرت — يعود إلى الصفحات أو البداية */
             const last = pages[pages.length - 1];
             if (last) removePage(last.id);
@@ -486,7 +535,7 @@ const STATUS: Record<SentItem["status"], { text: string; tone: string; Icon: typ
   REJECTED: { text: "رُفضت", tone: "text-danger", Icon: CircleAlert },
 };
 
-function Home({ onCamera, onGallery, recent }: { onCamera: () => void; onGallery: () => void; recent: SentItem[] }) {
+function Home({ onCamera, onGallery, onReady, recent }: { onCamera: () => void; onGallery: () => void; onReady: () => void; recent: SentItem[] }) {
   return (
     <>
       <section className="mt-6 rounded-2xl border border-line bg-raised p-5 shadow-raised">
@@ -494,12 +543,28 @@ function Home({ onCamera, onGallery, recent }: { onCamera: () => void; onGallery
           <Camera className="h-6 w-6" aria-hidden /> صوّر الفاتورة
         </button>
         <ul className="mt-4 space-y-1.5 text-xs leading-relaxed text-ink-soft">
-          <li>• وجّه الكاميرا نحو الفاتورة، فتظهر محدَّدةً بالأصفر، ثم ثبّت الجوال لحظة فتُلتقط وحدها.</li>
+          <li>• وجّه الكاميرا نحو الفاتورة حتى تظهر محدَّدةً بالأصفر، ثم اضغط زر الالتقاط والجوال ثابت.</li>
           <li>• اجعل الورقة كلها في الإطار، بلا ظل يدك عليها.</li>
-          <li>• إن كانت أكثر من صفحة فضع التالية مكانها وتُلتقط هي أيضاً، ثم اضغط «تم».</li>
+          <li>• إن كانت أكثر من صفحة فالتقط التالية بعدها، ثم اضغط «تم».</li>
         </ul>
         <button type="button" onClick={onGallery} className={`${buttonClass("quiet", "sm")} mt-3 w-full`}>
           <ImagePlus className="h-4 w-4" aria-hidden /> أو اختر صورة من الجوال
+        </button>
+      </section>
+
+      {/*
+        ماسحُ الجوال نفسه أوضحُ ما يكون (أبل تعالج الصورةَ بما لا تصله صفحةُ ويب). فطريقٌ
+        ثانٍ: يمسح بماسح الآيفون ثمّ يختار الملفّ هنا — ويُرسل كما هو.
+      */}
+      <section className="mt-4 rounded-2xl border border-line bg-raised p-5 shadow-raised">
+        <p className="text-sm font-bold">أوضح صورة: ماسح الآيفون نفسه</p>
+        <ol className="mt-2 list-inside list-decimal space-y-1 text-xs leading-relaxed text-ink-soft">
+          <li>افتح تطبيق «الملفات»، ثم «تصفح»، ثم النقاط الثلاث أعلى الشاشة، ثم «مسح المستندات».</li>
+          <li>امسح الفاتورة (يلتقطها وحده)، ثم «حفظ» واحفظها في الملفات.</li>
+          <li>ارجع هنا واضغط الزر، ثم اختر الملف.</li>
+        </ol>
+        <button type="button" onClick={onReady} className={`${buttonClass("secondary", "md")} mt-3 w-full`}>
+          <FileText className="h-4 w-4" aria-hidden /> ارفع ملفاً ممسوحاً
         </button>
       </section>
 
@@ -736,7 +801,7 @@ function Checked({
   return (
     <section className="mt-3 flex flex-col">
       {/* eslint-disable-next-line @next/next/no-img-element -- رابطٌ محلّيّ للصفحة الممسوحة */}
-      <img src={pages[0]?.url} alt="الفاتورة الممسوحة" className="mx-auto max-h-[28dvh] rounded-lg border border-line object-contain" />
+      {pages[0] && <img src={pages[0].url} alt="الفاتورة الممسوحة" className="mx-auto max-h-[28dvh] rounded-lg border border-line object-contain" />}
 
       <div className={`mt-4 rounded-xl border px-4 py-3 ${clear ? "border-ok/30 bg-ok-bg" : "border-warn/30 bg-warn-bg"}`}>
         <p className={`flex items-center gap-2 text-base font-bold ${clear ? "text-ok" : "text-warn"}`}>

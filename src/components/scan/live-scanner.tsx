@@ -55,7 +55,8 @@ export function LiveScanner({ pageCount, lastThumb, onCapture, onDone, onFallbac
   const [dims, setDims] = useState({ w: 0, h: 0 });
   const dimsRef = useRef(dims);
   const [flash, setFlash] = useState(false);
-  const [auto, setAuto] = useState(true);
+  /* اليدويُّ أوّلاً: الالتقاطُ الآليّ يُشغَّل لمن أراده (أحمد، ٢١ أكتوبر ٢٠٢٦: «من أسوأ ما يكون») */
+  const [auto, setAuto] = useState(false);
   const [torch, setTorch] = useState<boolean | null>(null);
   const autoRef = useRef(auto);
   useEffect(() => { autoRef.current = auto; }, [auto]);
@@ -71,7 +72,8 @@ export function LiveScanner({ pageCount, lastThumb, onCapture, onDone, onFallbac
       try {
         const s = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 2560 }, height: { ideal: 1440 } },
+          /* أعلى دقّةٍ تعطيها الكاميرا — الإطارُ هو الصورةُ حيث لا التقاطَ صوَرٍ حقيقيّ (آيفون) */
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 3840 }, height: { ideal: 2160 } },
         });
         if (cancelled) { s.getTracks().forEach((t) => t.stop()); return; }
         stream.current = s;
@@ -120,22 +122,61 @@ export function LiveScanner({ pageCount, lastThumb, onCapture, onDone, onFallbac
     return { width: img.width, height: img.height, data: img.data };
   }, []);
 
-  const capture = useCallback(async (hint: Quad | null) => {
+  /**
+   * صورةٌ حقيقيّة بدقّة المستشعر حيث يتاح (`ImageCapture` — كروم أندرويد): تركيزٌ ومعالجةٌ
+   * كالكاميرا لا إطارُ فيديو مضغوط. وإلّا فإطارُ الفيديو بأعلى دقّته.
+   */
+  const grabPhoto = useCallback(async (): Promise<Raster | null> => {
+    const track = stream.current?.getVideoTracks()[0];
+    const Capture = typeof window !== "undefined" ? Reflect.get(window, "ImageCapture") : undefined;
+    if (track && typeof Capture === "function") {
+      try {
+        const blob: unknown = await new Capture(track).takePhoto();
+        if (blob instanceof Blob) {
+          const bmp = await createImageBitmap(blob);
+          const canvas = document.createElement("canvas");
+          canvas.width = bmp.width;
+          canvas.height = bmp.height;
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          if (ctx) {
+            ctx.drawImage(bmp, 0, 0);
+            bmp.close();
+            const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            return { width: img.width, height: img.height, data: img.data };
+          }
+        }
+      } catch {
+        /* الكاميرا رفضت التقاطَ الصورة — يُكتفى بالإطار */
+      }
+    }
+    return grabFull();
+  }, [grabFull]);
+
+  const capture = useCallback(async (hintInVideo: Quad | null) => {
     if (capturing.current) return;
     capturing.current = true;
     try {
-      const frame = grabFull();
-      if (!frame) return;
+      const frame = await grabPhoto();
+      const v = video.current;
+      if (!frame || !v) return;
+      /* زوايا الفيديو بمقاس الصورة — والنسبةُ واحدة، وإلّا فلا تلميح */
+      const sx = frame.width / (v.videoWidth || frame.width);
+      const sy = frame.height / (v.videoHeight || frame.height);
+      const sameAspect = Math.abs(sx - sy) < 0.02;
+      const up = (p: { x: number; y: number }) => ({ x: p.x * sx, y: p.y * sy });
+      const hint: Quad | null = hintInVideo && sameAspect
+        ? [up(hintInVideo[0]), up(hintInVideo[1]), up(hintInVideo[2]), up(hintInVideo[3])]
+        : null;
       setFlash(true);
       setTimeout(() => setFlash(false), 180);
       /* اكتشافٌ ثانٍ بالدقّة الكاملة أدقُّ زوايا — وإلّا فما ثبت في الإطار المصغّر */
       const quad = detectDocument(frame) ?? hint;
-      tracker.current?.markCaptured(hint);
+      tracker.current?.markCaptured(hintInVideo);
       await onCapture(frame, quad);
     } finally {
       capturing.current = false;
     }
-  }, [grabFull, onCapture]);
+  }, [grabPhoto, onCapture]);
 
   /* ── حلقةُ الاكتشاف ── */
   useEffect(() => {

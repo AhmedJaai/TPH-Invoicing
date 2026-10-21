@@ -85,25 +85,35 @@ export function paperBackground(src: Raster): Float32Array {
   return bg;
 }
 
-/** يمدّ القيمة بين نقطتي الأسود والأبيض — ما تحت الأولى أسود، وما فوق الثانية أبيض. */
-const levels = (v: number, black: number, white: number) =>
-  Math.max(0, Math.min(255, ((v - black) / (white - black)) * 255));
+/*
+  منحنى الدرجات بعد قسمة الضوء: الورقُ (١) يبقى أبيض، وما دونه يُغمَّق بأُسّ.
+
+  كان قصّاً خطّيّاً (ما فوق ٢٣٢ أبيض): حبرُ الإيصال الحراريّ الباهت يقع فوقه فيُمحى —
+  «بيضاء مررررة والتفاصيل غير موجودة» (أحمد، ٢١ أكتوبر ٢٠٢٦). والأُسُّ لا يقصّ شيئاً:
+  حرفٌ باهتٌ عند ٠٫٨ من بياض الورق يصير ٠٫٦٧ (يُقرأ) لا ٠٫٨٣ (يكاد يختفي).
+*/
+const curve = (v: number, gamma: number) => 255 * Math.pow(Math.max(0, Math.min(1, v / 255)), gamma);
+
+/** أقصى تكبيرٍ للضوء — ظلٌّ عميقٌ لا يُضخَّم ضجيجُه حتّى يصير بقعاً */
+const MAX_GAIN = 2.4;
+const GAMMA_DOCUMENT = 1.8;
+const GAMMA_COLOR = 1.35;
 
 export function enhanceScan(src: Raster, mode: ScanMode): Raster {
   const bg = paperBackground(src);
   const out = new Uint8ClampedArray(src.data.length);
   const d = src.data;
   for (let p = 0, i = 0; p < bg.length; p++, i += 4) {
-    const k = 255 / bg[p];
+    const k = Math.min(MAX_GAIN, 255 / bg[p]);
     if (mode === "document") {
-      const v = levels(luminance(d, i) * k, 70, 232);
+      const v = curve(luminance(d, i) * k, GAMMA_DOCUMENT);
       out[i] = v;
       out[i + 1] = v;
       out[i + 2] = v;
     } else {
-      out[i] = levels(d[i] * k, 40, 240);
-      out[i + 1] = levels(d[i + 1] * k, 40, 240);
-      out[i + 2] = levels(d[i + 2] * k, 40, 240);
+      out[i] = curve(d[i] * k, GAMMA_COLOR);
+      out[i + 1] = curve(d[i + 1] * k, GAMMA_COLOR);
+      out[i + 2] = curve(d[i + 2] * k, GAMMA_COLOR);
     }
     out[i + 3] = 255;
   }
